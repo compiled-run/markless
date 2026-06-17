@@ -1,7 +1,7 @@
 # Arcade
 
 <p align="center">
-  <img src="./arcade-js-logo.png" alt="Arcade logo" width="180" />
+  <img src="./assets/arcade-js-logo.png" alt="Arcade logo" width="180" />
 </p>
 
 Arcade is a UI framework that ships HTML first and waits to run page code until
