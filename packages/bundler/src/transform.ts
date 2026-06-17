@@ -1,6 +1,5 @@
 import {
 	compileTsrxModule,
-	createSymbolResolverModuleManifest,
 	emitSymbolResolverModule,
 } from '@arcadejs/compiler';
 import type {
@@ -18,7 +17,6 @@ export async function transformTsrxModule(
 	const encodedFilename = encodeURIComponent(input.filename);
 	const payloadId = `${ARCADE_VIRTUAL_PREFIX}payload:${encodedFilename}`;
 	const resolverId = `${ARCADE_VIRTUAL_PREFIX}resolver:${encodedFilename}`;
-	const moduleManifestId = `${ARCADE_VIRTUAL_PREFIX}module-manifest:${encodedFilename}`;
 	const compiled = await compileTsrxModule({
 		filename: input.filename,
 		source: input.source,
@@ -26,16 +24,17 @@ export async function transformTsrxModule(
 		resolverId,
 		symbols: [],
 	});
-	const symbolRows = compiled.symbolModules.modules.map((module) => ({
+	const symbolModules = compiled.symbolModules.modules.map((module) => ({
+		...module,
+		virtualModuleId: symbolVirtualModuleId(input.filename, module.symbolId),
+	}));
+	const symbolRuntimeUrl = input.symbolRuntimeUrl ?? ((virtualModuleId: string) => virtualModuleId);
+	const symbolRows = symbolModules.map((module) => ({
 		id: module.symbolId,
-		chunk: symbolVirtualModuleId(input.filename, module.symbolId),
+		chunk: symbolRuntimeUrl(module.virtualModuleId),
 		exportName: module.exportName,
 	}));
 	const resolverSource = emitSymbolResolverModule({
-		buildId: input.buildId,
-		symbols: symbolRows,
-	});
-	const resolverManifest = createSymbolResolverModuleManifest({
 		buildId: input.buildId,
 		symbols: symbolRows,
 	});
@@ -43,12 +42,11 @@ export async function transformTsrxModule(
 		source: input.filename,
 		payload: { virtualModuleId: payloadId },
 		resolver: { virtualModuleId: resolverId },
-		moduleManifest: { virtualModuleId: moduleManifestId },
-		symbols: compiled.symbolModules.modules.map((module) => ({
+		symbols: symbolModules.map((module) => ({
 			symbolId: module.symbolId,
 			kind: module.kind,
 			exportName: module.exportName,
-			virtualModuleId: symbolVirtualModuleId(input.filename, module.symbolId),
+			virtualModuleId: module.virtualModuleId,
 		})),
 	};
 	const virtualModules: ArcadeVirtualModule[] = [
@@ -62,17 +60,9 @@ export async function transformTsrxModule(
 			type: 'resolver',
 			source: resolverSource,
 		},
-		{
-			id: moduleManifestId,
-			type: 'module-manifest',
-			source: objectModule({
-				...manifest,
-				resolverManifest,
-			}),
-		},
-		...compiled.symbolModules.modules.map(
+		...symbolModules.map(
 			(module): ArcadeVirtualModule => ({
-				id: symbolVirtualModuleId(input.filename, module.symbolId),
+				id: module.virtualModuleId,
 				type: 'symbol',
 				symbolId: module.symbolId,
 				exportName: module.exportName,
@@ -86,7 +76,6 @@ export async function transformTsrxModule(
 			filename: input.filename,
 			payloadId,
 			resolverId,
-			moduleManifestId,
 		}),
 		map: null,
 		virtualModules,
@@ -96,10 +85,6 @@ export async function transformTsrxModule(
 
 function symbolVirtualModuleId(filename: string, symbolId: string) {
 	return `${ARCADE_VIRTUAL_PREFIX}symbol:${encodeURIComponent(filename)}:${encodeURIComponent(symbolId)}`;
-}
-
-function objectModule(value: unknown) {
-	return `export default ${JSON.stringify(value, null, '\t')};\n`;
 }
 
 function payloadModule(payloadScripts: {
@@ -128,24 +113,16 @@ function emitSourceModule(input: {
 	readonly filename: string;
 	readonly payloadId: string;
 	readonly resolverId: string;
-	readonly moduleManifestId: string;
 }) {
 	return [
 		`import payloadScripts, { state as payloadState, view as payloadView } from '${input.payloadId}';`,
 		`import { loadSymbol, symbolManifest } from '${input.resolverId}';`,
-		`import moduleManifest from '${input.moduleManifestId}';`,
 		'',
 		`export const arcadeSource = ${JSON.stringify(input.filename)};`,
-		'export { loadSymbol, moduleManifest, payloadScripts, payloadState, payloadView, symbolManifest };',
+		'export { loadSymbol, payloadScripts, payloadState, payloadView, symbolManifest };',
 		'',
 		'export default {',
 		'	source: arcadeSource,',
-		'	payloadScripts,',
-		'	payloadState,',
-		'	payloadView,',
-		'	loadSymbol,',
-		'	symbolManifest,',
-		'	moduleManifest,',
 		'};',
 		'',
 	].join('\n');

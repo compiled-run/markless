@@ -1,9 +1,9 @@
 import { box } from '@arcadejs/witness';
 
-// Product truth: a production Vite build of the CSR fixture must emit the
-// bundle graph and lazy symbol chunks through the
-// real Vite/Rolldown pipeline. Dev-only HMR wiring must not leak into those
-// production artifacts, and the full arcade manifest must not be default output.
+// Product truth: a production Vite build of the CSR fixture must emit lazy
+// symbol chunks through the real Vite/Rolldown pipeline. Dev-only HMR wiring
+// must not leak into those production artifacts, and neither the broad manifest
+// nor speculative bundle graph should be default output.
 const FIXTURE = 'fixtures/vite-csr';
 const MANIFEST = `${FIXTURE}/dist/arcade-manifest.json`;
 const BUNDLE_GRAPH = `${FIXTURE}/dist/build/bundle-graph.json`;
@@ -17,7 +17,7 @@ const FORBIDDEN_DEV_STRINGS = [
 
 export default box(
 	{
-		name: 'csr build: bundle graph describes tsrx symbols without default manifest',
+		name: 'csr build: lazy symbol chunks without default manifest or bundle graph',
 		tags: ['csr', 'build'],
 		modes: ['build'],
 	},
@@ -33,16 +33,7 @@ export default box(
 		await expect.build.environment(build, 'client');
 		await expect.build.artifact(build, INDEX);
 		assertBuildDoesNotInclude(build, MANIFEST);
-		await expect.build.artifact(build, BUNDLE_GRAPH);
-
-		await expect.artifact.json(await build.artifact(BUNDLE_GRAPH), (json) => {
-			return (
-				Array.isArray(json) &&
-				json.includes('symbol:0') &&
-				json.includes('symbol:1') &&
-				json.some((item) => typeof item === 'string' && item.startsWith('chunk-'))
-			);
-		});
+		assertBuildDoesNotInclude(build, BUNDLE_GRAPH);
 		await expect.artifact.text(build, INDEX, {
 			contains: '/build/chunk-',
 			notContains: FORBIDDEN_DEV_STRINGS,

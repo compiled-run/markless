@@ -9,14 +9,13 @@ export interface ArcadeRolldownOptions {
 	devInjections?: GlobalInjections[];
 	devServer?: ArcadeDevServer;
 	hmr?: boolean;
-	bundleGraphAdders?: Set<BundleGraphAdder>;
 	onManifest?: (manifest: ArcadeManifest) => void;
 	emitManifestJson?: boolean;
 	rootDir?: string;
 	buildId?: string;
 }
 
-export type ArcadeVirtualModuleType = 'payload' | 'resolver' | 'module-manifest' | 'symbol';
+export type ArcadeVirtualModuleType = 'payload' | 'resolver' | 'symbol';
 
 export interface ArcadeVirtualModule {
 	id: string;
@@ -30,6 +29,7 @@ export interface TransformTsrxModuleInput {
 	filename: string;
 	source: string;
 	buildId?: string;
+	symbolRuntimeUrl?: (virtualModuleId: string) => string;
 }
 
 export interface TransformTsrxModuleResult {
@@ -43,7 +43,6 @@ export interface ArcadeTransformManifest {
 	source: string;
 	payload: ArcadeBuildModuleReference;
 	resolver: ArcadeBuildModuleReference;
-	moduleManifest: ArcadeBuildModuleReference;
 	symbols: ArcadeSymbolManifestEntry[];
 }
 
@@ -71,7 +70,7 @@ export interface ArcadeManifest {
 
 export type ServerArcadeManifest = Pick<
 	ArcadeManifest,
-	'version' | 'manifestHash' | 'modules' | 'bundleGraph' | 'bundleGraphAsset' | 'injections'
+	'version' | 'manifestHash' | 'modules' | 'injections'
 >;
 
 export interface ArcadeBundle {

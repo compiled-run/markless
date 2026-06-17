@@ -27,11 +27,8 @@ export default box(
 		await expect.build.environment(build, 'client');
 		await expect.build.artifact(build, INDEX);
 		assertBuildDoesNotInclude(build, MANIFEST);
-		await expect.build.artifact(build, BUNDLE_GRAPH);
+		assertBuildDoesNotInclude(build, BUNDLE_GRAPH);
 		await expect.artifact.text(build, INDEX, { contains: '/build/chunk-' });
-		await expect.artifact.json(await build.artifact(BUNDLE_GRAPH), (json) => {
-			return Array.isArray(json) && json.includes('symbol:0');
-		});
 
 		const preview = await pipeline.preview(build, {
 			config: (config) => ({

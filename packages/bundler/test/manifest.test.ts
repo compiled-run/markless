@@ -16,7 +16,6 @@ const transformManifest: ArcadeTransformManifest = {
 	source: '/workspace/app/src/root.tsrx',
 	payload: { virtualModuleId: 'virtual:arcade:payload:root' },
 	resolver: { virtualModuleId: 'virtual:arcade:resolver:root' },
-	moduleManifest: { virtualModuleId: 'virtual:arcade:module-manifest:root' },
 	symbols: [
 		{
 			symbolId: 'root#click',
@@ -145,7 +144,7 @@ describe('arcade manifest output', () => {
 		expect(graph).toContain('build/chunk-symbol.js');
 	});
 
-	test('injects build manifests into server output without a manifest input option', () => {
+	test('injects only server-needed build manifest fields into server output', () => {
 		const manifest: ArcadeManifest = {
 			version: 1,
 			manifestHash: 'abc',
@@ -162,7 +161,8 @@ describe('arcade manifest output', () => {
 		);
 
 		expect(code).toContain('"manifestHash":"abc"');
-		expect(code).toContain('"bundleGraph":["root#click"]');
+		expect(code).not.toContain('bundleGraph');
+		expect(code).not.toContain('bundleGraphAsset');
 		expect(code).toContain('if (false) throw new Error();');
 	});
 });

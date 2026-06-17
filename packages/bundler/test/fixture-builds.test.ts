@@ -13,8 +13,7 @@ const fixtures = [
 		filter: '@fixtures/vite-csr',
 		outputs: ['packages/bundler/fixtures/vite-csr/dist'],
 		forbiddenManifest: 'packages/bundler/fixtures/vite-csr/dist/arcade-manifest.json',
-		bundleGraph: 'packages/bundler/fixtures/vite-csr/dist/build/bundle-graph.json',
-		symbols: ['symbol:0', 'symbol:1'],
+		forbiddenBundleGraph: 'packages/bundler/fixtures/vite-csr/dist/build/bundle-graph.json',
 		runtimeBudget: {
 			dist: 'packages/bundler/fixtures/vite-csr/dist',
 			entryHtml: 'packages/bundler/fixtures/vite-csr/dist/index.html',
@@ -32,8 +31,7 @@ const fixtures = [
 		filter: '@fixtures/vite-ssr',
 		outputs: ['packages/bundler/fixtures/vite-ssr/dist'],
 		forbiddenManifest: 'packages/bundler/fixtures/vite-ssr/dist/arcade-manifest.json',
-		bundleGraph: 'packages/bundler/fixtures/vite-ssr/dist/build/bundle-graph.json',
-		symbols: ['symbol:0', 'symbol:1', 'symbol:2'],
+		forbiddenBundleGraph: 'packages/bundler/fixtures/vite-ssr/dist/build/bundle-graph.json',
 		runtimeBudget: {
 			dist: 'packages/bundler/fixtures/vite-ssr/dist',
 			maxRuntimeChunkGzipBytes: 2_175,
@@ -46,8 +44,7 @@ const fixtures = [
 		filter: '@fixtures/vite-plus',
 		outputs: ['packages/bundler/fixtures/vite-plus/dist'],
 		forbiddenManifest: 'packages/bundler/fixtures/vite-plus/dist/arcade-manifest.json',
-		bundleGraph: 'packages/bundler/fixtures/vite-plus/dist/build/bundle-graph.json',
-		symbols: ['symbol:0'],
+		forbiddenBundleGraph: 'packages/bundler/fixtures/vite-plus/dist/build/bundle-graph.json',
 		runtimeBudget: {
 			dist: 'packages/bundler/fixtures/vite-plus/dist',
 			entryHtml: 'packages/bundler/fixtures/vite-plus/dist/index.html',
@@ -62,8 +59,8 @@ const fixtures = [
 		outputs: ['packages/bundler/fixtures/rolldown-basic/dist'],
 		forbiddenManifest:
 			'packages/bundler/fixtures/rolldown-basic/dist/client/arcade-manifest.json',
-		bundleGraph: 'packages/bundler/fixtures/rolldown-basic/dist/client/build/bundle-graph.json',
-		symbols: ['symbol:0', 'symbol:1'],
+		forbiddenBundleGraph:
+			'packages/bundler/fixtures/rolldown-basic/dist/client/build/bundle-graph.json',
 	},
 ] as const;
 
@@ -89,12 +86,8 @@ describe('fixture builds', () => {
 				expect(await exists(resolve(root, fixture.forbiddenManifest))).toBe(false);
 			}
 
-			if ('bundleGraph' in fixture) {
-				const graph = JSON.parse(await readFile(resolve(root, fixture.bundleGraph), 'utf8'));
-				expect(graph).toEqual(expect.any(Array));
-				for (const symbol of fixture.symbols) {
-					expect(graph).toContain(symbol);
-				}
+			if ('forbiddenBundleGraph' in fixture) {
+				expect(await exists(resolve(root, fixture.forbiddenBundleGraph))).toBe(false);
 			}
 
 			if ('runtimeBudget' in fixture) {

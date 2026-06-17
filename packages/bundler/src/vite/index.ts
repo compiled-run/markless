@@ -9,13 +9,10 @@ import type {
 } from 'vite';
 import type { OutputOptions } from 'rolldown';
 import { joinURL } from 'ufo';
-import { createPreloadGraphAdder } from '../build/bundle-graph.ts';
 import { outputDefaults } from '../build/chunking.ts';
 import { createArcadeRolldownPlugin } from '../rolldown.ts';
 import {
-	type BundleGraphAdder,
 	type GlobalInjections,
-	type PreloadGraphEntriesAdder,
 	type ArcadeEnvironment,
 	type ArcadeManifest,
 	type ArcadeRolldownOptions,
@@ -30,11 +27,7 @@ import {
 import { createViteHmr } from './hmr.ts';
 
 export type {
-	BundleGraphAdder,
 	GlobalInjections,
-	PreloadGraphContext,
-	PreloadGraphEntries,
-	PreloadGraphEntriesAdder,
 	ArcadeEnvironment,
 	ArcadeManifest,
 	ArcadeRolldownOptions,
@@ -53,9 +46,7 @@ const ARCADE_SKIP_DUPLICATE_BUILDS = Symbol('arcade-skip-duplicate-builds');
 
 export function arcade(options: ArcadeViteOptions = {}): Plugin[] {
 	let manifest: ArcadeManifest | null = null;
-	const bundleGraphAdders = new Set<BundleGraphAdder>();
 	const rolldownOptions: InternalArcadeRolldownOptions = { ...options };
-	rolldownOptions.bundleGraphAdders = bundleGraphAdders;
 	rolldownOptions.onManifest = (nextManifest) => {
 		manifest = nextManifest;
 		options.onManifest?.(nextManifest);
@@ -85,10 +76,7 @@ export function arcade(options: ArcadeViteOptions = {}): Plugin[] {
 		api: {
 			...basePlugin.api,
 			getManifest: () => manifest,
-			registerBundleGraphAdder: (adder: BundleGraphAdder) => bundleGraphAdders.add(adder),
 			registerDevInjection: (injection: GlobalInjections) => devTags.register(injection),
-			registerPreloadGraphEntries: (adder: PreloadGraphEntriesAdder) =>
-				bundleGraphAdders.add(createPreloadGraphAdder(adder)),
 		},
 		config(config) {
 			configDefaults(config);
@@ -289,9 +277,7 @@ function runHook(hook: unknown, context: unknown, ...args: unknown[]) {
 type ArcadeVitePluginApi = {
 	invalidateGeneratedModules: (parent: string, environment?: ArcadeEnvironment) => string[];
 	getManifest?: () => ArcadeManifest | null;
-	registerBundleGraphAdder?: (adder: BundleGraphAdder) => void;
 	registerDevInjection?: (injection: GlobalInjections) => void;
-	registerPreloadGraphEntries?: (adder: PreloadGraphEntriesAdder) => void;
 };
 
 function getBuildEnvironment(context: unknown): ArcadeEnvironment {

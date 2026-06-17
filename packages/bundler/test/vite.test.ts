@@ -47,15 +47,15 @@ describe('Vite adapter structure', () => {
 		expect(ssrConfig.build).not.toHaveProperty('modulePreload');
 	});
 
-	test('wraps the Rolldown plugin with shared build state and public extension API', () => {
+	test('wraps the Rolldown plugin with shared build state and current public API', () => {
 		const plugin = getAsyncPlugin();
 
 		expect(plugin.name).toBe('vite-plugin-arcade');
 		expect(plugin.enforce).toBe('post');
 		expect(plugin.sharedDuringBuild).toBe(true);
 		expect(plugin.api?.getManifest()).toBe(null);
-		expect(plugin.api?.registerBundleGraphAdder).toEqual(expect.any(Function));
-		expect(plugin.api?.registerPreloadGraphEntries).toEqual(expect.any(Function));
+		expect(plugin.api).not.toHaveProperty('registerBundleGraphAdder');
+		expect(plugin.api).not.toHaveProperty('registerPreloadGraphEntries');
 		expect(plugin.api?.registerDevInjection).toEqual(expect.any(Function));
 	});
 
@@ -96,6 +96,29 @@ describe('Vite adapter structure', () => {
 			version: 1,
 			modules: [expect.objectContaining({ source: '/workspace/app/src/App.tsrx' })],
 		});
+	});
+
+	test('uses fetchable virtual symbol URLs in dev resolver tables', async () => {
+		const plugin = getAsyncPlugin();
+
+		callConfigResolved(plugin, {
+			base: '/dev/',
+			command: 'serve',
+			root: '/workspace/app',
+		});
+		await callTransform(
+			plugin,
+			source,
+			'/workspace/app/src/App.tsrx',
+			createViteHookContext('client'),
+		);
+		const resolverId = `virtual:arcade:resolver:${encodeURIComponent(
+			'/workspace/app/src/App.tsrx',
+		)}`;
+		const resolverSource = (await callLoad(plugin, `\0${resolverId}`)) as string;
+
+		expect(resolverSource).toContain('"/dev/@id/virtual:arcade:symbol:');
+		expect(resolverSource).not.toContain('"virtual:arcade:symbol:');
 	});
 
 	test('prebuilds the configured client and server environments once', async () => {
@@ -290,9 +313,7 @@ function getAsyncPlugin() {
 	return getPlugin(arcade(), 'vite-plugin-arcade') as ReturnType<typeof arcade>[number] & {
 		api?: {
 			getManifest: () => unknown;
-			registerBundleGraphAdder: (adder: () => Record<string, never>) => void;
 			registerDevInjection: (injection: unknown) => void;
-			registerPreloadGraphEntries: (adder: () => Record<string, never>) => void;
 		};
 		sharedDuringBuild?: boolean;
 	};

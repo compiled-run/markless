@@ -38,7 +38,7 @@ describe('TSRX Rolldown plugin structure', () => {
 		expect(callOptions(arcadeLib(), {})).toEqual({});
 	});
 
-	test('transformTsrxModule produces virtual payload, resolver, manifest, and symbol modules', async () => {
+	test('transformTsrxModule produces virtual payload, resolver, and symbol modules', async () => {
 		const result = await transformTsrxModule({
 			filename: '/workspace/app/src/App.tsrx',
 			source,
@@ -52,15 +52,19 @@ describe('TSRX Rolldown plugin structure', () => {
 			"import { loadSymbol, symbolManifest } from 'virtual:arcade:resolver:",
 		);
 		expect(result.code).toContain(
-			"import moduleManifest from 'virtual:arcade:module-manifest:",
+			'export { loadSymbol, payloadScripts, payloadState, payloadView, symbolManifest };',
 		);
-		expect(result.code).toContain(
-			'export { loadSymbol, moduleManifest, payloadScripts, payloadState, payloadView, symbolManifest };',
-		);
+		expect(result.code).toContain(['export default {', '\tsource: arcadeSource,', '};'].join('\n'));
+		expect(result.code).not.toContain('\tpayloadScripts,');
+		expect(result.code).not.toContain('\tsymbolManifest,');
+		expect(result.code).not.toContain('moduleManifest');
+		expect(result.code).not.toContain('module-manifest');
 		expect(result.virtualModules.map((item) => item.type)).toEqual(
-			expect.arrayContaining(['payload', 'resolver', 'module-manifest', 'symbol']),
+			expect.arrayContaining(['payload', 'resolver', 'symbol']),
 		);
+		expect(result.virtualModules.map((item) => item.type)).not.toContain('module-manifest');
 		expect(result.manifest.source).toBe('/workspace/app/src/App.tsrx');
+		expect('moduleManifest' in result.manifest).toBe(false);
 		expect(result.manifest.symbols).toContainEqual(
 			expect.objectContaining({
 				kind: 'event-handler',
@@ -142,7 +146,7 @@ describe('TSRX Rolldown plugin structure', () => {
 		expect(emittedAsset(emitFile, ARCADE_MANIFEST_FILE)).toBeUndefined();
 	});
 
-	test('generateBundle emits bundle graph and in-memory manifest metadata from build output', async () => {
+	test('generateBundle keeps in-memory manifest metadata without default bundle graph output', async () => {
 		let manifest:
 			| {
 					version?: number;
@@ -151,6 +155,7 @@ describe('TSRX Rolldown plugin structure', () => {
 						symbols?: Array<{ fileName?: string }>;
 					}>;
 					bundleGraphAsset?: string;
+					bundleGraph?: unknown;
 			  }
 			| undefined;
 		const plugin = arcadeClient({
@@ -169,7 +174,6 @@ describe('TSRX Rolldown plugin structure', () => {
 		const entryVirtualIds = [
 			`virtual:arcade:payload:${encoded}`,
 			`virtual:arcade:resolver:${encoded}`,
-			`virtual:arcade:module-manifest:${encoded}`,
 		];
 		const resolverId = `virtual:arcade:resolver:${encoded}`;
 		const resolverSource = (await callLoad(plugin, `\0${resolverId}`)) as string;
@@ -203,14 +207,10 @@ describe('TSRX Rolldown plugin structure', () => {
 			version: 1,
 			modules: [expect.objectContaining({ source: '/workspace/app/src/App.tsrx' })],
 		});
-		expect(manifest?.bundleGraphAsset).toBe(ARCADE_BUNDLE_GRAPH);
+		expect(manifest).not.toHaveProperty('bundleGraphAsset');
+		expect(manifest).not.toHaveProperty('bundleGraph');
 		expect(manifest?.modules[0]?.symbols[0]?.fileName).toMatch(/^chunk-\d+\.js$/);
-		expect(emitFile).toHaveBeenCalledWith(
-			expect.objectContaining({
-				type: 'asset',
-				fileName: ARCADE_BUNDLE_GRAPH,
-			}),
-		);
+		expect(emittedAsset(emitFile, ARCADE_BUNDLE_GRAPH)).toBeUndefined();
 		expect(emittedAsset(emitFile, ARCADE_MANIFEST_FILE)).toBeUndefined();
 		const resolverChunk = Object.values(bundle).find(
 			(item): item is { code: string; moduleIds: string[] } =>
@@ -239,7 +239,10 @@ describe('TSRX Rolldown plugin structure', () => {
 			type: 'asset',
 			fileName: ARCADE_MANIFEST_FILE,
 		});
-		expect(JSON.parse(String(manifestAsset?.source)).modules).toEqual([]);
+		const manifest = JSON.parse(String(manifestAsset?.source));
+		expect(manifest.modules).toEqual([]);
+		expect(manifest.bundleGraph).toBeUndefined();
+		expect(manifest.bundleGraphAsset).toBeUndefined();
 	});
 });
 

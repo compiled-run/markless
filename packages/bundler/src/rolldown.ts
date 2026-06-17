@@ -1,6 +1,6 @@
 import type { InputOptions, Plugin } from 'rolldown';
 import { parsePath } from 'ufo';
-import { ARCADE_BUILD_PREFIX, ARCADE_BUNDLE_GRAPH, outputDefaults } from './build/chunking.ts';
+import { ARCADE_BUILD_PREFIX, outputDefaults } from './build/chunking.ts';
 import {
 	ARCADE_MANIFEST,
 	ARCADE_MANIFEST_FILE,
@@ -25,11 +25,7 @@ import type {
 } from './types.ts';
 
 export type {
-	BundleGraphAdder,
 	GlobalInjections,
-	PreloadGraphContext,
-	PreloadGraphEntries,
-	PreloadGraphEntriesAdder,
 	ArcadeAsset,
 	ArcadeBundle,
 	ArcadeBundleGraph,
@@ -156,6 +152,11 @@ export function createArcadeRolldownPlugin(input: {
 				filename: source,
 				source: code,
 				buildId: internalOptions.buildId,
+				symbolRuntimeUrl:
+					currentEnvironment === 'client' && internalOptions.dev
+						? (virtualModuleId) =>
+								devVirtualModuleUrl(virtualModuleId, internalOptions.publicPath)
+						: undefined,
 			});
 			registerTransformArtifacts({
 				source,
@@ -216,8 +217,6 @@ export function createArcadeRolldownPlugin(input: {
 					transformManifests.values(),
 					getRoot(),
 					{
-						bundleGraphAsset: ARCADE_BUNDLE_GRAPH,
-						bundleGraphAdders: internalOptions.bundleGraphAdders,
 						canonPath: stripBuildPrefix,
 						publicPath: internalOptions.publicPath,
 						injections: internalOptions.devInjections,
@@ -230,11 +229,6 @@ export function createArcadeRolldownPlugin(input: {
 				}
 				internalOptions.onManifest?.(clientManifest);
 
-				this.emitFile({
-					type: 'asset',
-					fileName: ARCADE_BUNDLE_GRAPH,
-					source: JSON.stringify(clientManifest.bundleGraph),
-				});
 				if (internalOptions.emitManifestJson === true) {
 					this.emitFile({
 						type: 'asset',
@@ -353,6 +347,14 @@ function stripBuildPrefix(fileName: string) {
 		: fileName;
 }
 
+function devVirtualModuleUrl(
+	virtualModuleId: string,
+	publicPath: ((fileName: string) => string) | undefined,
+) {
+	const idPath = `/@id/${virtualModuleId}`;
+	return publicPath ? publicPath(idPath) : idPath;
+}
+
 function normalizeVirtualId(id: string) {
 	if (id.startsWith('\0')) {
 		return id.slice(1);
@@ -381,5 +383,4 @@ export {
 	devTagsManifest,
 	injectManifest,
 } from './build/manifest.ts';
-export { convertManifestToBundleGraph, createPreloadGraphAdder } from './build/bundle-graph.ts';
 export { ARCADE_VIRTUAL_PREFIX, transformTsrxModule } from './transform.ts';

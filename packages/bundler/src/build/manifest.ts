@@ -138,8 +138,6 @@ export function injectManifest(
 			manifestHash: manifest.manifestHash,
 			modules: manifest.modules,
 			injections: manifest.injections,
-			bundleGraph: manifest.bundleGraph,
-			bundleGraphAsset: manifest.bundleGraphAsset,
 		});
 	}
 
@@ -151,7 +149,6 @@ function cloneTransformManifest(manifest: ArcadeTransformManifest): ArcadeTransf
 		source: manifest.source,
 		payload: { ...manifest.payload },
 		resolver: { ...manifest.resolver },
-		moduleManifest: { ...manifest.moduleManifest },
 		symbols: manifest.symbols.map((symbol) => ({ ...symbol })),
 	};
 }
@@ -167,7 +164,7 @@ function finalizeVirtualModuleReferences(
 			.map(normalizeVirtualModuleId),
 	);
 	for (const module of modules) {
-		for (const reference of [module.payload, module.resolver, module.moduleManifest]) {
+		for (const reference of [module.payload, module.resolver]) {
 			if (ids.has(normalizeVirtualModuleId(reference.virtualModuleId))) {
 				reference.fileName = bundleFileName;
 			}
