@@ -1,4 +1,4 @@
-import { box } from '@async/witness';
+import { box } from '@arcadejs/witness';
 import { runtimeSizeReport, type RuntimeSizeReport } from '../test-support/runtime-size.ts';
 
 // Product truth: the Vite CSR fixture's production output is not only emitted
@@ -8,9 +8,9 @@ import { runtimeSizeReport, type RuntimeSizeReport } from '../test-support/runti
 const FIXTURE = 'fixtures/vite-csr';
 const DIST = `${FIXTURE}/dist`;
 const INDEX = `${FIXTURE}/dist/index.html`;
-const MANIFEST = `${FIXTURE}/dist/async-resumable-manifest.json`;
+const MANIFEST = `${FIXTURE}/dist/arcade-manifest.json`;
 const COUNTER = '[data-counter]';
-const REQUESTS = '/__async-resumable-fixture-requests';
+const REQUESTS = '/__arcade-fixture-requests';
 const WAIT = { timeoutMs: 10_000 };
 const MAX_STARTUP_RUNTIME_CHUNK_GZIP_BYTES = 3_000;
 const MAX_STARTUP_SCRIPTS_GZIP_BYTES = 3_050;

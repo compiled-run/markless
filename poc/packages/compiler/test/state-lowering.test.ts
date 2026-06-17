@@ -55,14 +55,16 @@ function expectDiagnostic(
 			candidate.artifactKeys?.includes(`write:${expected.sourceTarget}`),
 	);
 
-	expect(diagnostic, `diagnostics should include ${expected.code} for ${expected.sourceTarget}`)
-		.toBeDefined();
+	expect(
+		diagnostic,
+		`diagnostics should include ${expected.code} for ${expected.sourceTarget}`,
+	).toBeDefined();
 	expect(diagnostic).toMatchObject({
 		code: expected.code,
 		severity: 'error',
 		phase: 'state-lowering',
 		passId: 'state-lowering',
-		docsUrl: `https://async-resumable.dev/errors/${expected.code}`,
+		docsUrl: `https://arcadejs.com/errors/${expected.code}`,
 	});
 	expect(diagnostic?.primarySpan?.start).toEqual(expect.any(Number));
 	expect(diagnostic?.primarySpan?.end).toEqual(expect.any(Number));
@@ -207,51 +209,51 @@ test('state-lvalues lowering emits structured diagnostics for invalid writes', a
 	}
 
 	expectDiagnostic(artifact.diagnostics, {
-		code: 'AA_STATE_COMPUTED_READONLY',
+		code: 'ARCADE_STATE_COMPUTED_READONLY',
 		sourceTarget: 'doubled',
 		statePath: 'doubled',
 	});
 	expectDiagnostic(artifact.diagnostics, {
-		code: 'AA_STATE_COMPUTED_READONLY',
+		code: 'ARCADE_STATE_COMPUTED_READONLY',
 		sourceTarget: 'computedAlias',
 		statePath: 'doubled',
 	});
 	expectDiagnostic(artifact.diagnostics, {
-		code: 'AA_STATE_PROPS_READONLY',
+		code: 'ARCADE_STATE_PROPS_READONLY',
 		sourceTarget: 'props.count',
 		statePath: 'props.count',
 	});
 	expectDiagnostic(artifact.diagnostics, {
-		code: 'AA_STATE_PROPS_READONLY',
+		code: 'ARCADE_STATE_PROPS_READONLY',
 		sourceTarget: 'propCount',
 		statePath: 'props.count',
 	});
 	expectDiagnostic(artifact.diagnostics, {
-		code: 'AA_STATE_PROPS_READONLY',
+		code: 'ARCADE_STATE_PROPS_READONLY',
 		sourceTarget: 'settings.x',
 		statePath: 'props.settings.x',
 	});
 	expectDiagnostic(artifact.diagnostics, {
-		code: 'AA_STATE_PROPS_READONLY',
+		code: 'ARCADE_STATE_PROPS_READONLY',
 		sourceTarget: 'settings.nested.title',
 		statePath: 'props.settings.nested.title',
 	});
 	expectDiagnostic(artifact.diagnostics, {
-		code: 'AA_STATE_PROPS_READONLY',
+		code: 'ARCADE_STATE_PROPS_READONLY',
 		sourceTarget: 'items',
 		statePath: 'props.items',
 	});
 	expectDiagnostic(artifact.diagnostics, {
-		code: 'AA_STATE_ALIAS_AMBIGUOUS_WRITE',
+		code: 'ARCADE_STATE_ALIAS_AMBIGUOUS_WRITE',
 		sourceTarget: 'xAlias',
 		statePath: 'obj.x',
 	});
 	expectDiagnostic(artifact.diagnostics, {
-		code: 'AA_STATE_ALIAS_AMBIGUOUS_WRITE',
+		code: 'ARCADE_STATE_ALIAS_AMBIGUOUS_WRITE',
 		sourceTarget: 'dynamicAlias',
 	});
 	expectDiagnostic(artifact.diagnostics, {
-		code: 'AA_STATE_ALIAS_LOCAL_COPY',
+		code: 'ARCADE_STATE_ALIAS_LOCAL_COPY',
 		sourceTarget: 'firstItem',
 		statePath: 'obj.items.*',
 	});

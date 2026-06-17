@@ -1,4 +1,4 @@
-import type { ProtocolStatePayload, ProtocolViewPayload } from '@async/resumable-protocol';
+import type { ProtocolStatePayload, ProtocolViewPayload } from '@arcadejs/protocol';
 import type {
 	DomJournalEntry,
 	DomJournalResult,
@@ -107,8 +107,8 @@ export async function resumeEventOnlyFromPayloadDocument(
 ): Promise<EventOnlyResumeContainer> {
 	let container = containers.get(input.root);
 	if (!container) {
-		const state = readPayloadJson<ProtocolStatePayload>(input.document, 'async/state');
-		const view = readPayloadJson<ProtocolViewPayload>(input.document, 'async/view');
+		const state = readPayloadJson<ProtocolStatePayload>(input.document, 'arcade/state');
+		const view = readPayloadJson<ProtocolViewPayload>(input.document, 'arcade/view');
 		container = createEventOnlyResumeContainerState({
 			state,
 			view,

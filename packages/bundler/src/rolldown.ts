@@ -1,29 +1,25 @@
 import type { InputOptions, Plugin } from 'rolldown';
 import { parsePath } from 'ufo';
+import { ARCADE_BUILD_PREFIX, ARCADE_BUNDLE_GRAPH, outputDefaults } from './build/chunking.ts';
 import {
-	ASYNC_RESUMABLE_BUILD_PREFIX,
-	ASYNC_RESUMABLE_BUNDLE_GRAPH,
-	outputDefaults,
-} from './build/chunking.ts';
-import {
-	ASYNC_RESUMABLE_MANIFEST,
-	ASYNC_RESUMABLE_MANIFEST_FILE,
+	ARCADE_MANIFEST,
+	ARCADE_MANIFEST_FILE,
 	createManifest,
 	devTagsManifest,
 	injectManifest,
 } from './build/manifest.ts';
 import { stripEmptyVitePreloadWrappers } from './build/preload-cleanup.ts';
 import { rewriteGeneratedSymbolFacadeImports } from './build/symbol-facade-cleanup.ts';
-import { createResumableDevGraph } from './dev.ts';
-import { ASYNC_RESUMABLE_VIRTUAL_PREFIX, transformTsrxModule } from './transform.ts';
+import { createArcadeDevGraph } from './dev.ts';
+import { ARCADE_VIRTUAL_PREFIX, transformTsrxModule } from './transform.ts';
 import type {
-	ResumableEnvironment,
-	ResumableManifest,
-	ResumableRolldownOptions,
-	ResumableRolldownPluginApi,
-	ResumableTransformManifest,
-	ResumableVirtualModule,
-	ServerResumableManifest,
+	ArcadeEnvironment,
+	ArcadeManifest,
+	ArcadeRolldownOptions,
+	ArcadeRolldownPluginApi,
+	ArcadeTransformManifest,
+	ArcadeVirtualModule,
+	ServerArcadeManifest,
 	TransformTsrxModuleResult,
 } from './types.ts';
 
@@ -33,48 +29,48 @@ export type {
 	PreloadGraphContext,
 	PreloadGraphEntries,
 	PreloadGraphEntriesAdder,
-	ResumableAsset,
-	ResumableBundle,
-	ResumableBundleGraph,
-	ResumableDevServer,
-	ResumableEnvironment,
-	ResumableManifest,
-	ResumableRolldownOptions,
-	ResumableRolldownPluginApi,
-	ResumableTransformManifest,
-	ResumableVirtualModule,
-	ServerResumableManifest,
+	ArcadeAsset,
+	ArcadeBundle,
+	ArcadeBundleGraph,
+	ArcadeDevServer,
+	ArcadeEnvironment,
+	ArcadeManifest,
+	ArcadeRolldownOptions,
+	ArcadeRolldownPluginApi,
+	ArcadeTransformManifest,
+	ArcadeVirtualModule,
+	ServerArcadeManifest,
 	TransformTsrxModuleInput,
 	TransformTsrxModuleResult,
 } from './types.ts';
 
-type Environment = ResumableEnvironment | ((context: unknown) => ResumableEnvironment);
-export type ResumableRolldownPlugin = Plugin & { api: ResumableRolldownPluginApi };
-type InternalResumableRolldownOptions = ResumableRolldownOptions & {
+type Environment = ArcadeEnvironment | ((context: unknown) => ArcadeEnvironment);
+export type ArcadeRolldownPlugin = Plugin & { api: ArcadeRolldownPluginApi };
+type InternalArcadeRolldownOptions = ArcadeRolldownOptions & {
 	publicPath?: (fileName: string) => string;
 };
 
-const manifests = new Map<string, ResumableManifest>();
+const manifests = new Map<string, ArcadeManifest>();
 const TSRX_SOURCE_FILE = /\.tsrx(?:[?#].*)?$/;
 
-export const resumableClient = (options: ResumableRolldownOptions = {}) =>
-	createResumableRolldownPlugin({ environment: 'client', options });
-export const resumableServer = (options: ResumableRolldownOptions = {}) =>
-	createResumableRolldownPlugin({ environment: 'server', options });
-export const resumableLib = (options: ResumableRolldownOptions = {}) =>
-	createResumableRolldownPlugin({ environment: 'lib', options });
+export const arcadeClient = (options: ArcadeRolldownOptions = {}) =>
+	createArcadeRolldownPlugin({ environment: 'client', options });
+export const arcadeServer = (options: ArcadeRolldownOptions = {}) =>
+	createArcadeRolldownPlugin({ environment: 'server', options });
+export const arcadeLib = (options: ArcadeRolldownOptions = {}) =>
+	createArcadeRolldownPlugin({ environment: 'lib', options });
 
-export function createResumableRolldownPlugin(input: {
+export function createArcadeRolldownPlugin(input: {
 	environment: Environment;
-	options?: ResumableRolldownOptions;
-}): ResumableRolldownPlugin {
+	options?: ArcadeRolldownOptions;
+}): ArcadeRolldownPlugin {
 	const environment = input.environment;
-	const internalOptions = (input.options ?? {}) as InternalResumableRolldownOptions;
-	const virtualModules = new Map<string, ResumableVirtualModule>();
-	const transformManifests = new Map<string, ResumableTransformManifest>();
+	const internalOptions = (input.options ?? {}) as InternalArcadeRolldownOptions;
+	const virtualModules = new Map<string, ArcadeVirtualModule>();
+	const transformManifests = new Map<string, ArcadeTransformManifest>();
 	const sourceVirtualModules = new Map<string, Set<string>>();
-	const dev = createResumableDevGraph();
-	let manifest: ResumableManifest | ServerResumableManifest | null = null;
+	const dev = createArcadeDevGraph();
+	let manifest: ArcadeManifest | ServerArcadeManifest | null = null;
 	let root = internalOptions.rootDir;
 	const name = pluginName(environment);
 
@@ -92,7 +88,7 @@ export function createResumableRolldownPlugin(input: {
 
 	const plugin = {
 		api: {
-			invalidateGeneratedModules(parent: string, currentEnvironment?: ResumableEnvironment) {
+			invalidateGeneratedModules(parent: string, currentEnvironment?: ArcadeEnvironment) {
 				const ids = dev.clear(parent, currentEnvironment);
 				for (const id of ids) {
 					virtualModules.delete(id);
@@ -150,7 +146,7 @@ export function createResumableRolldownPlugin(input: {
 			if (!TSRX_SOURCE_FILE.test(id)) {
 				return null;
 			}
-			if (virtualId.startsWith(ASYNC_RESUMABLE_VIRTUAL_PREFIX)) {
+			if (virtualId.startsWith(ARCADE_VIRTUAL_PREFIX)) {
 				return null;
 			}
 			const source = pathname(id);
@@ -213,7 +209,7 @@ export function createResumableRolldownPlugin(input: {
 					transformManifests.values(),
 					getRoot(),
 					{
-						bundleGraphAsset: ASYNC_RESUMABLE_BUNDLE_GRAPH,
+						bundleGraphAsset: ARCADE_BUNDLE_GRAPH,
 						bundleGraphAdders: internalOptions.bundleGraphAdders,
 						canonPath: stripBuildPrefix,
 						publicPath: internalOptions.publicPath,
@@ -228,14 +224,14 @@ export function createResumableRolldownPlugin(input: {
 				internalOptions.onManifest?.(clientManifest);
 
 				for (const [fileName, source] of [
-					[ASYNC_RESUMABLE_BUNDLE_GRAPH, JSON.stringify(clientManifest.bundleGraph)],
-					[ASYNC_RESUMABLE_MANIFEST_FILE, JSON.stringify(clientManifest, null, '\t')],
+					[ARCADE_BUNDLE_GRAPH, JSON.stringify(clientManifest.bundleGraph)],
+					[ARCADE_MANIFEST_FILE, JSON.stringify(clientManifest, null, '\t')],
 				] as const) {
 					this.emitFile({ type: 'asset', fileName, source });
 				}
 			},
 		},
-	} satisfies Plugin & { api: ResumableRolldownPluginApi };
+	} satisfies Plugin & { api: ArcadeRolldownPluginApi };
 
 	return plugin;
 }
@@ -294,26 +290,26 @@ function isChunkWithGeneratedRuntime(output: unknown): output is {
 	return chunk.moduleIds.some((id) => {
 		if (typeof id !== 'string') return false;
 		const normalized = normalizeVirtualId(id);
-		return normalized.startsWith(ASYNC_RESUMABLE_VIRTUAL_PREFIX) || TSRX_SOURCE_FILE.test(id);
+		return normalized.startsWith(ARCADE_VIRTUAL_PREFIX) || TSRX_SOURCE_FILE.test(id);
 	});
 }
 
 function pluginName(environment: Environment) {
 	if (typeof environment === 'function') {
-		return 'async-resumable:rolldown';
+		return 'arcade:rolldown';
 	}
 
-	return `async-resumable:rolldown:${environment}`;
+	return `arcade:rolldown:${environment}`;
 }
 
 function registerTransformArtifacts(input: {
 	source: string;
 	result: TransformTsrxModuleResult;
-	virtualModules: Map<string, ResumableVirtualModule>;
-	transformManifests: Map<string, ResumableTransformManifest>;
+	virtualModules: Map<string, ArcadeVirtualModule>;
+	transformManifests: Map<string, ArcadeTransformManifest>;
 	sourceVirtualModules: Map<string, Set<string>>;
-	dev: ReturnType<typeof createResumableDevGraph>;
-	environment: ResumableEnvironment;
+	dev: ReturnType<typeof createArcadeDevGraph>;
+	environment: ArcadeEnvironment;
 }) {
 	const ids = new Set<string>();
 	for (const module of input.result.virtualModules) {
@@ -327,7 +323,7 @@ function registerTransformArtifacts(input: {
 
 function clearSourceVirtualModules(
 	source: string,
-	virtualModules: Map<string, ResumableVirtualModule>,
+	virtualModules: Map<string, ArcadeVirtualModule>,
 	sourceVirtualModules: Map<string, Set<string>>,
 ) {
 	const stale = sourceVirtualModules.get(source);
@@ -339,8 +335,8 @@ function clearSourceVirtualModules(
 }
 
 function stripBuildPrefix(fileName: string) {
-	return fileName.startsWith(ASYNC_RESUMABLE_BUILD_PREFIX)
-		? fileName.slice(ASYNC_RESUMABLE_BUILD_PREFIX.length)
+	return fileName.startsWith(ARCADE_BUILD_PREFIX)
+		? fileName.slice(ARCADE_BUILD_PREFIX.length)
 		: fileName;
 }
 
@@ -364,17 +360,13 @@ function pathname(id: string) {
 	return parsePath(id).pathname;
 }
 
+export { ARCADE_BUNDLE_GRAPH, ARCADE_BUILD_PREFIX, outputDefaults } from './build/chunking.ts';
 export {
-	ASYNC_RESUMABLE_BUNDLE_GRAPH,
-	ASYNC_RESUMABLE_BUILD_PREFIX,
-	outputDefaults,
-} from './build/chunking.ts';
-export {
-	ASYNC_RESUMABLE_MANIFEST,
-	ASYNC_RESUMABLE_MANIFEST_FILE,
+	ARCADE_MANIFEST,
+	ARCADE_MANIFEST_FILE,
 	createManifest,
 	devTagsManifest,
 	injectManifest,
 } from './build/manifest.ts';
 export { convertManifestToBundleGraph, createPreloadGraphAdder } from './build/bundle-graph.ts';
-export { ASYNC_RESUMABLE_VIRTUAL_PREFIX, transformTsrxModule } from './transform.ts';
+export { ARCADE_VIRTUAL_PREFIX, transformTsrxModule } from './transform.ts';

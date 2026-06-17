@@ -14,9 +14,9 @@ assert.equal(
 	'static SSR must not emit the inline resumer',
 );
 assert.equal(
-	staticHtml.includes('type="async/view"'),
+	staticHtml.includes('type="arcade/view"'),
 	false,
-	'static SSR without browser triggers must not emit async/view wiring',
+	'static SSR without browser triggers must not emit arcade/view wiring',
 );
 
 const interactiveHtml = renderEventOnlySsrHtml();
@@ -74,10 +74,7 @@ assert.deepEqual(
 );
 
 const size = measureEventOnlyResumer();
-const browserHtml = await readFile(
-	new URL('../browser/index.html', import.meta.url),
-	'utf8',
-);
+const browserHtml = await readFile(new URL('../browser/index.html', import.meta.url), 'utf8');
 assert.ok(
 	browserHtml.includes(size.minified),
 	'Witness browser fixture must use the measured minified resumer',

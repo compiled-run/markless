@@ -1,4 +1,4 @@
-import { ASYNC_PROTOCOL_VERSION, type ProtocolViewPayload } from '@async/resumable-protocol';
+import { ASYNC_PROTOCOL_VERSION, type ProtocolViewPayload } from '@arcadejs/protocol';
 import type { ProtocolViewPayloadInput } from '../artifacts.ts';
 
 export function createProtocolViewPayload(input: ProtocolViewPayloadInput): ProtocolViewPayload {

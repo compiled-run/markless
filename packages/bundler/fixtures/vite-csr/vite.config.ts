@@ -1,5 +1,5 @@
 import { defineConfig, type Plugin } from 'vite';
-import { resumable } from '@async/resumable/vite';
+import { arcade } from '@arcadejs/bundler/vite';
 
 type PreviewRequest = {
 	readonly url?: string;
@@ -13,10 +13,10 @@ type PreviewResponse = {
 	end(body?: string): void;
 };
 
-const REQUEST_LOG_PATH = '/__async-resumable-fixture-requests';
+const REQUEST_LOG_PATH = '/__arcade-fixture-requests';
 
 export default defineConfig({
-	plugins: [resumable(), fixtureScriptRequestLog()],
+	plugins: [arcade(), fixtureScriptRequestLog()],
 });
 
 function fixtureScriptRequestLog(): Plugin {

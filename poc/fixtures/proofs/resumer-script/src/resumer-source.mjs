@@ -4,7 +4,7 @@ export function eventOnlyResumerSource() {
 	return `(() => {
 	let d = document;
 	let r = d.currentScript.closest('[data-async]');
-	let v = JSON.parse(r.querySelector('script[type="async/view"]').textContent);
+	let v = JSON.parse(r.querySelector('script[type="arcade/view"]').textContent);
 	let w = d.createTreeWalker(r, 1);
 	let n = [r];
 	let x;

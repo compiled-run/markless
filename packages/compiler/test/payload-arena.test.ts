@@ -3,7 +3,7 @@ import { buildSemanticGraph, lowerStateAccess } from '../src/index.ts';
 import { planPayloadArena } from '../src/passes/payload-arena.ts';
 
 const source = `
-import { state, computed, element } from '@async/resumable';
+import { state, computed, element } from '@arcadejs/core';
 
 export function App() @{
 	let count = state(0);
@@ -40,7 +40,7 @@ export function App() @{
 `;
 
 const sharedSource = `
-import { shared, state, computed } from '@async/resumable';
+import { shared, state, computed } from '@arcadejs/core';
 
 export const session = shared(() => {
 	const data = state({ user: null, status: 'anonymous' });
@@ -212,7 +212,7 @@ test('planPayloadArena keeps distinct targets for repeated graph reads on one ho
 	const semanticGraph = await buildSemanticGraph({
 		filename: 'src/RepeatedTarget.tsrx',
 		source: `
-import { state } from '@async/resumable';
+import { state } from '@arcadejs/core';
 
 export function App() @{
 	const count = state(0);
@@ -255,7 +255,7 @@ test('planPayloadArena serializes known behavior input values without running be
 	const semanticGraph = await buildSemanticGraph({
 		filename: 'src/BehaviorInputs.tsrx',
 		source: `
-import { state, computed } from '@async/resumable';
+import { state, computed } from '@arcadejs/core';
 
 export function App() @{
 	const menu = state({ open: true, options: { color: 'red' } });
@@ -312,7 +312,7 @@ test('planPayloadArena classifies class and style binding targets', async () => 
 	const semanticGraph = await buildSemanticGraph({
 		filename: 'src/ClassStyleTargets.tsrx',
 		source: `
-import { state } from '@async/resumable';
+import { state } from '@arcadejs/core';
 
 export function App() @{
 	const activeClass = state('is-active');

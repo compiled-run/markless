@@ -1,5 +1,5 @@
 import { dirname, join, normalize, relative } from 'pathe';
-import { ASYNC_RESUMABLE_VIRTUAL_PREFIX } from '../transform.ts';
+import { ARCADE_VIRTUAL_PREFIX } from '../transform.ts';
 
 type GeneratedChunk = {
 	readonly type: 'chunk';
@@ -98,7 +98,7 @@ function findSymbolFacadeRewrite(
 
 function isGeneratedSymbolFacade(chunk: GeneratedChunk): boolean {
 	const facadeModuleId = chunk.facadeModuleId ? normalizeVirtualId(chunk.facadeModuleId) : '';
-	return facadeModuleId.startsWith(`${ASYNC_RESUMABLE_VIRTUAL_PREFIX}symbol:`);
+	return facadeModuleId.startsWith(`${ARCADE_VIRTUAL_PREFIX}symbol:`);
 }
 
 function rewriteDynamicImportSpecifiers(
@@ -146,7 +146,7 @@ function relativeChunkSpecifier(importerFileName: string, targetFileName: string
 function isGeneratedAsyncChunk(chunk: GeneratedChunk): boolean {
 	return chunk.moduleIds.some((id) => {
 		const normalized = normalizeVirtualId(id);
-		return normalized.startsWith(ASYNC_RESUMABLE_VIRTUAL_PREFIX) || TSRX_SOURCE_FILE.test(id);
+		return normalized.startsWith(ARCADE_VIRTUAL_PREFIX) || TSRX_SOURCE_FILE.test(id);
 	});
 }
 

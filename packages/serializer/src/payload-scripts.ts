@@ -1,4 +1,4 @@
-import type { ProtocolStatePayload, ProtocolViewPayload } from '@async/resumable-protocol';
+import type { ProtocolStatePayload, ProtocolViewPayload } from '@arcadejs/protocol';
 
 export type RenderPayloadScriptsInput = {
 	readonly state: ProtocolStatePayload;
@@ -16,12 +16,12 @@ export function renderPayloadScripts(input: RenderPayloadScriptsInput): Rendered
 	return {
 		state: input.state,
 		view: input.view,
-		stateScript: renderDataScript('async/state', input.state),
-		viewScript: renderDataScript('async/view', input.view),
+		stateScript: renderDataScript('arcade/state', input.state),
+		viewScript: renderDataScript('arcade/view', input.view),
 	};
 }
 
-function renderDataScript(type: 'async/state' | 'async/view', payload: unknown): string {
+function renderDataScript(type: 'arcade/state' | 'arcade/view', payload: unknown): string {
 	return `<script type="${type}">${escapeScriptJson(JSON.stringify(payload))}</script>`;
 }
 

@@ -53,13 +53,13 @@ export type RuntimeHardeningJournalEntry =
 	  }
 	| {
 			readonly kind: 'errorRecord';
-			readonly code: 'AA_RUNTIME_HANDLER_THROW';
+			readonly code: 'ARCADE_RUNTIME_HANDLER_THROW';
 			readonly message: string;
 			readonly committedWritesPreserved: true;
 	  };
 
 export type RuntimeHardeningErrorRecord = {
-	readonly code: 'AA_RUNTIME_HANDLER_THROW';
+	readonly code: 'ARCADE_RUNTIME_HANDLER_THROW';
 	readonly message: string;
 	readonly committedWritesPreserved: true;
 };
@@ -125,11 +125,13 @@ export function createRuntimeHardeningPoc(): RuntimeHardeningPoc {
 				version: currentVersion,
 			};
 			requests.set(request.requestId, request);
-			receipts.push(receipt('async-request', {
-				requestId: request.requestId,
-				id,
-				version: request.version,
-			}));
+			receipts.push(
+				receipt('async-request', {
+					requestId: request.requestId,
+					id,
+					version: request.version,
+				}),
+			);
 			return request;
 		},
 		async resolvePreview(requestId, value) {
@@ -139,11 +141,13 @@ export function createRuntimeHardeningPoc(): RuntimeHardeningPoc {
 			}
 
 			if (request.version < currentVersion) {
-				receipts.push(receipt('async-stale-ignore', {
-					requestId,
-					requestVersion: request.version,
-					currentVersion,
-				}));
+				receipts.push(
+					receipt('async-stale-ignore', {
+						requestId,
+						requestVersion: request.version,
+						currentVersion,
+					}),
+				);
 				return 'ignored';
 			}
 
@@ -152,20 +156,18 @@ export function createRuntimeHardeningPoc(): RuntimeHardeningPoc {
 				title: value.title,
 				version: request.version,
 			};
-			receipts.push(receipt('async-commit', {
-				requestId,
-				version: request.version,
-				id: value.id,
-			}));
-			appendJournal(
-				journal,
-				receipts,
-				{
-					kind: 'setText',
-					targetId: 'preview-title',
-					value: value.title,
-				},
+			receipts.push(
+				receipt('async-commit', {
+					requestId,
+					version: request.version,
+					id: value.id,
+				}),
 			);
+			appendJournal(journal, receipts, {
+				kind: 'setText',
+				targetId: 'preview-title',
+				value: value.title,
+			});
 			return 'committed';
 		},
 		preview() {
@@ -224,17 +226,21 @@ export function createRuntimeHardeningPoc(): RuntimeHardeningPoc {
 			state.committed++;
 			state.message = 'committed-before-error';
 			state.failNext = false;
-			receipts.push(receipt('graph-write', {
-				path: 'journal.committed',
-				value: state.committed,
-			}));
-			receipts.push(receipt('graph-write', {
-				path: 'journal.message',
-				value: state.message,
-			}));
+			receipts.push(
+				receipt('graph-write', {
+					path: 'journal.committed',
+					value: state.committed,
+				}),
+			);
+			receipts.push(
+				receipt('graph-write', {
+					path: 'journal.message',
+					value: state.message,
+				}),
+			);
 
 			const error = {
-				code: 'AA_RUNTIME_HANDLER_THROW',
+				code: 'ARCADE_RUNTIME_HANDLER_THROW',
 				message: 'after committed graph writes',
 				committedWritesPreserved: true,
 			} as const;

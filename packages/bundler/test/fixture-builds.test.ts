@@ -12,7 +12,7 @@ const fixtures = [
 	{
 		filter: '@fixtures/vite-csr',
 		outputs: ['packages/bundler/fixtures/vite-csr/dist'],
-		manifest: 'packages/bundler/fixtures/vite-csr/dist/async-resumable-manifest.json',
+		manifest: 'packages/bundler/fixtures/vite-csr/dist/arcade-manifest.json',
 		runtimeBudget: {
 			dist: 'packages/bundler/fixtures/vite-csr/dist',
 			entryHtml: 'packages/bundler/fixtures/vite-csr/dist/index.html',
@@ -35,7 +35,7 @@ const fixtures = [
 	{
 		filter: '@fixtures/vite-ssr',
 		outputs: ['packages/bundler/fixtures/vite-ssr/dist'],
-		manifest: 'packages/bundler/fixtures/vite-ssr/dist/async-resumable-manifest.json',
+		manifest: 'packages/bundler/fixtures/vite-ssr/dist/arcade-manifest.json',
 		runtimeBudget: {
 			dist: 'packages/bundler/fixtures/vite-ssr/dist',
 			maxRuntimeChunkGzipBytes: 2_175,
@@ -47,7 +47,7 @@ const fixtures = [
 	{
 		filter: '@fixtures/vite-plus',
 		outputs: ['packages/bundler/fixtures/vite-plus/dist'],
-		manifest: 'packages/bundler/fixtures/vite-plus/dist/async-resumable-manifest.json',
+		manifest: 'packages/bundler/fixtures/vite-plus/dist/arcade-manifest.json',
 		runtimeBudget: {
 			dist: 'packages/bundler/fixtures/vite-plus/dist',
 			entryHtml: 'packages/bundler/fixtures/vite-plus/dist/index.html',
@@ -61,8 +61,7 @@ const fixtures = [
 	{
 		filter: '@fixtures/rolldown-basic',
 		outputs: ['packages/bundler/fixtures/rolldown-basic/dist'],
-		manifest:
-			'packages/bundler/fixtures/rolldown-basic/dist/client/async-resumable-manifest.json',
+		manifest: 'packages/bundler/fixtures/rolldown-basic/dist/client/arcade-manifest.json',
 	},
 ] as const;
 

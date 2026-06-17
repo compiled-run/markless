@@ -186,18 +186,18 @@ const typedArrayConstructors = new Set([
 	'BigUint64Array',
 ]);
 const runtimeValueCodes = new Map([
-	['HTMLElement', 'AA_SERIALIZE_DOM_NODE'],
-	['Element', 'AA_SERIALIZE_DOM_NODE'],
-	['Node', 'AA_SERIALIZE_DOM_NODE'],
-	['Document', 'AA_SERIALIZE_DOM_NODE'],
-	['Request', 'AA_SERIALIZE_RUNTIME_VALUE'],
-	['Response', 'AA_SERIALIZE_RUNTIME_VALUE'],
-	['WebSocket', 'AA_SERIALIZE_RUNTIME_VALUE'],
-	['ReadableStream', 'AA_SERIALIZE_STREAM'],
-	['WritableStream', 'AA_SERIALIZE_STREAM'],
-	['TransformStream', 'AA_SERIALIZE_STREAM'],
-	['WeakMap', 'AA_SERIALIZE_WEAK_COLLECTION'],
-	['WeakSet', 'AA_SERIALIZE_WEAK_COLLECTION'],
+	['HTMLElement', 'ARCADE_SERIALIZE_DOM_NODE'],
+	['Element', 'ARCADE_SERIALIZE_DOM_NODE'],
+	['Node', 'ARCADE_SERIALIZE_DOM_NODE'],
+	['Document', 'ARCADE_SERIALIZE_DOM_NODE'],
+	['Request', 'ARCADE_SERIALIZE_RUNTIME_VALUE'],
+	['Response', 'ARCADE_SERIALIZE_RUNTIME_VALUE'],
+	['WebSocket', 'ARCADE_SERIALIZE_RUNTIME_VALUE'],
+	['ReadableStream', 'ARCADE_SERIALIZE_STREAM'],
+	['WritableStream', 'ARCADE_SERIALIZE_STREAM'],
+	['TransformStream', 'ARCADE_SERIALIZE_STREAM'],
+	['WeakMap', 'ARCADE_SERIALIZE_WEAK_COLLECTION'],
+	['WeakSet', 'ARCADE_SERIALIZE_WEAK_COLLECTION'],
 ]);
 
 export async function planSerializerValues(
@@ -526,7 +526,7 @@ function classifyIdentifier(
 		if (inState) {
 			addUnsupportedDiagnostic({
 				context,
-				code: 'AA_SERIALIZE_ELEMENT_HANDLE_IN_STATE',
+				code: 'ARCADE_SERIALIZE_ELEMENT_HANDLE_IN_STATE',
 				statePath,
 				valueKind: 'element-handle',
 				node,
@@ -574,7 +574,7 @@ function classifyIdentifier(
 		if (classInfo?.hasPrivateState) {
 			addUnsupportedDiagnostic({
 				context,
-				code: 'AA_SERIALIZE_RESOURCE_CLASS',
+				code: 'ARCADE_SERIALIZE_RESOURCE_CLASS',
 				statePath,
 				valueKind: classInfo.name,
 				node,
@@ -841,18 +841,18 @@ function addUnsupportedRuntimeDiagnostic(input: {
 	readonly node: AnyNode;
 }): void {
 	const title =
-		input.code === 'AA_SERIALIZE_DOM_NODE'
+		input.code === 'ARCADE_SERIALIZE_DOM_NODE'
 			? 'Cannot serialize DOM node'
-			: input.code === 'AA_SERIALIZE_STREAM'
+			: input.code === 'ARCADE_SERIALIZE_STREAM'
 				? 'Cannot serialize stream'
-				: input.code === 'AA_SERIALIZE_WEAK_COLLECTION'
+				: input.code === 'ARCADE_SERIALIZE_WEAK_COLLECTION'
 					? 'Cannot serialize weak collection'
 					: 'Cannot serialize runtime value';
 
 	addUnsupportedDiagnostic({
 		...input,
 		title,
-		why: 'This value depends on runtime identity or hidden host state that cannot be restored from async/state.',
+		why: 'This value depends on runtime identity or hidden host state that cannot be restored from arcade/state.',
 		suggestion:
 			'Move runtime resources into attach={...}, or store serializable data needed to recreate them.',
 	});
@@ -889,7 +889,7 @@ function addUnsupportedDiagnostic(input: {
 		statePath: input.statePath,
 		valueKind: input.valueKind,
 		suggestions: [{ message: input.suggestion }],
-		docsUrl: `https://async-resumable.dev/errors/${input.code}`,
+		docsUrl: `https://arcadejs.com/errors/${input.code}`,
 	});
 	addClassification(input.context, {
 		statePath: input.statePath,
@@ -907,7 +907,7 @@ function warnIfSecretLike(
 ): void {
 	if (!/secret|token|password|credential|apiKey/i.test(`${statePath} ${value ?? ''}`)) return;
 
-	const code = 'AA_SERIALIZE_SECRET_LEAK';
+	const code = 'ARCADE_SERIALIZE_SECRET_LEAK';
 	if (
 		context.diagnostics.some(
 			(candidate) => candidate.code === code && candidate.statePath === statePath,
@@ -923,7 +923,7 @@ function warnIfSecretLike(
 		passId: 'serializer-values-planning',
 		title: 'Possible secret in serialized state',
 		message: `The state path "${statePath}" looks like durable secret material.`,
-		why: 'async/state is sent to the browser, so durable graph state must not contain secrets or secret previews.',
+		why: 'arcade/state is sent to the browser, so durable graph state must not contain secrets or secret previews.',
 		primarySpan: sourceSpan(node),
 		artifactKeys: [`state:${statePath}`],
 		statePath,
@@ -934,7 +934,7 @@ function warnIfSecretLike(
 					'Do not store durable secrets in state; keep them server-side and expose only safe derived data.',
 			},
 		],
-		docsUrl: `https://async-resumable.dev/errors/${code}`,
+		docsUrl: `https://arcadejs.com/errors/${code}`,
 	});
 }
 

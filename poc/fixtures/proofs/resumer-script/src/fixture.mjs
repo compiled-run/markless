@@ -11,7 +11,7 @@ export function renderEventOnlySsrHtml() {
 	return [
 		'<section data-async data-count="0">',
 		'  <button type="button">Count 0</button>',
-		`  <script type="async/view">${escapeHtml(JSON.stringify(view))}</script>`,
+		`  <script type="arcade/view">${escapeHtml(JSON.stringify(view))}</script>`,
 		`  <script data-async-resumer>${escapeScript(resumer)}</script>`,
 		'</section>',
 	].join('\n');
@@ -30,7 +30,7 @@ export async function createInteractiveDocument() {
 	const root = new FakeElement('section', { 'data-async': '', 'data-count': '0' });
 	const button = root.appendChild(new FakeElement('button', { type: 'button' }));
 	button.textContent = 'Count 0';
-	const viewScript = root.appendChild(new FakeElement('script', { type: 'async/view' }));
+	const viewScript = root.appendChild(new FakeElement('script', { type: 'arcade/view' }));
 	viewScript.textContent = JSON.stringify(createViewPayload(createSymbolModuleUrl()));
 	const resumerScript = root.appendChild(
 		new FakeElement('script', { type: 'module', 'data-async-resumer': '' }),
@@ -89,12 +89,7 @@ export async function createInteractiveDocument() {
 }
 
 function createViewPayload(symbolModuleUrl) {
-	return [
-		['click'],
-		[[1, 0, 0, 0]],
-		[symbolModuleUrl],
-		['onClick'],
-	];
+	return [['click'], [[1, 0, 0, 0]], [symbolModuleUrl], ['onClick']];
 }
 
 function createSymbolModuleUrl() {

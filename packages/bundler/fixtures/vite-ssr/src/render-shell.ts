@@ -1,4 +1,4 @@
-import { renderToString, type SsrRenderOutput } from '@async/resumable/runtime/render-to-string';
+import { renderToString, type SsrRenderOutput } from '@arcadejs/runtime/render-to-string';
 
 export type PayloadScripts = Required<Pick<SsrRenderOutput, 'state' | 'view'>>;
 

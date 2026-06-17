@@ -5,24 +5,21 @@ import type {
 import { transformTsrxForBundler } from '../../compiler/src/index.ts';
 import type { PipelineManifest, PipelineReceipt } from '../../protocol/src/index.ts';
 
-export type AsyncResumableRolldownTransformResult = BundlerTransformedModule & {
+export type ArcadeRolldownTransformResult = BundlerTransformedModule & {
 	readonly moduleId: string;
 	readonly artifact: BundlerPipelineTransformArtifact;
 };
 
-export type AsyncResumableRolldownPlugin = {
-	readonly name: '@async/resumable/rolldown';
-	readonly transform: (
-		code: string,
-		id: string,
-	) => Promise<AsyncResumableRolldownTransformResult | null>;
+export type ArcadeRolldownPlugin = {
+	readonly name: '@arcadejs/bundler/rolldown';
+	readonly transform: (code: string, id: string) => Promise<ArcadeRolldownTransformResult | null>;
 	readonly load: (id: string) => Promise<string | null>;
 	readonly manifest: () => PipelineManifest;
 	readonly receipts: () => ReadonlyArray<PipelineReceipt>;
 	readonly artifactFor: (id: string) => BundlerPipelineTransformArtifact | undefined;
 };
 
-export function createAsyncResumableRolldownPlugin(): AsyncResumableRolldownPlugin {
+export function createArcadeRolldownPlugin(): ArcadeRolldownPlugin {
 	const artifacts = new Map<string, BundlerPipelineTransformArtifact>();
 	const virtualModules = new Map<string, string>();
 	const receipts: PipelineReceipt[] = [];
@@ -30,7 +27,7 @@ export function createAsyncResumableRolldownPlugin(): AsyncResumableRolldownPlug
 	let revision = 0;
 
 	return {
-		name: '@async/resumable/rolldown',
+		name: '@arcadejs/bundler/rolldown',
 		async transform(code, id) {
 			if (!id.endsWith('.tsrx')) return null;
 
@@ -98,7 +95,7 @@ export function createAsyncResumableRolldownPlugin(): AsyncResumableRolldownPlug
 
 function emptyManifest(): PipelineManifest {
 	return {
-		protocol: 'async-resumable-pipeline-poc',
+		protocol: 'arcade-pipeline-poc',
 		revision: 0,
 		transformedModules: [],
 		virtualModules: [],

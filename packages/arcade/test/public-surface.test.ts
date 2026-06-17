@@ -6,7 +6,7 @@ import {
 	renderToString,
 	resumeFromPayloadDocument,
 	resumeFromPayloadScripts,
-	resumableClient,
+	arcadeClient,
 	shared,
 	state,
 } from '../src/index.ts';
@@ -16,7 +16,7 @@ import { resumeEventFromPayloadDocument as narrowResumeEventFromPayloadDocument 
 import { render as narrowRender } from '../src/runtime/render.ts';
 import { renderToString as narrowRenderToString } from '../src/runtime/render-to-string.ts';
 import { resumeFromPayloadDocument as narrowResumeFromPayloadDocument } from '../src/runtime/resume.ts';
-import { resumable as viteResumable } from '../src/vite.ts';
+import { arcade as viteArcade } from '../src/vite.ts';
 
 test('main package exposes the curated author and build surface', () => {
 	expect(typeof state).toBe('function');
@@ -33,6 +33,6 @@ test('main package exposes the curated author and build surface', () => {
 	expect(typeof narrowRender).toBe('function');
 	expect(typeof narrowRenderToString).toBe('function');
 	expect(typeof narrowResumeFromPayloadDocument).toBe('function');
-	expect(typeof resumableClient).toBe('function');
-	expect(typeof viteResumable).toBe('function');
+	expect(typeof arcadeClient).toBe('function');
+	expect(typeof viteArcade).toBe('function');
 });

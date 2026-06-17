@@ -11,7 +11,7 @@ export {
 	type SharedDefinition,
 	type SharedOptions,
 	type SharedScope,
-} from '@async/resumable-core';
+} from '@arcadejs/core';
 export {
 	render,
 	renderToString,
@@ -26,15 +26,15 @@ export {
 	type ResumePayloadScriptsInput,
 	type ResumePayloadScriptsResult,
 	type SsrRenderOutput,
-} from '@async/resumable-runtime';
+} from '@arcadejs/runtime';
 export {
-	resumableClient,
-	resumableLib,
-	resumableServer,
-	type ResumableRolldownOptions,
-	type ResumableRolldownPlugin,
-	type ResumableTransformManifest,
-	type ResumableVirtualModule,
+	arcadeClient,
+	arcadeLib,
+	arcadeServer,
+	type ArcadeRolldownOptions,
+	type ArcadeRolldownPlugin,
+	type ArcadeTransformManifest,
+	type ArcadeVirtualModule,
 	type TransformTsrxModuleInput,
 	type TransformTsrxModuleResult,
-} from '@async/resumable-bundler/rolldown';
+} from '@arcadejs/bundler/rolldown';

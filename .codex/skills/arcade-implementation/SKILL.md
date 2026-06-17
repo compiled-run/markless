@@ -1,9 +1,9 @@
 ---
-name: async-await-implementation
-description: 'Use when implementing the @async/resumable TSRX framework: compiler passes, state graph runtime, resumability payloads, unified render/resume behavior, event/symbol behavior, build plugins, package scripts, or tests. Enforces test-driven development, the split framework specs, TSRX-only no-hydration/no-VDOM model, JS/TS compiler on @tsrx/core first, runtime-agnostic ESM, Rolldown/Vite-only build tooling, and junior/AI-friendly diagnostics.'
+name: arcade-implementation
+description: 'Use when implementing the Arcade TSRX framework: compiler passes, state graph runtime, resumability payloads, unified render/resume behavior, event/symbol behavior, build plugins, package scripts, or tests. Enforces test-driven development, the split framework specs, TSRX-only no-hydration/no-VDOM model, JS/TS compiler on @tsrx/core first, runtime-agnostic ESM, Rolldown/Vite-only build tooling, and junior/AI-friendly diagnostics.'
 ---
 
-# Async Resumable Implementation
+# Arcade Implementation
 
 ## Before Editing
 
@@ -29,7 +29,7 @@ description: 'Use when implementing the @async/resumable TSRX framework: compile
 
 - Build the first compiler in JS/TS on `@tsrx/core`.
 - Do not start with OXC, Rust, or a native compiler backend. Keep artifact contracts backend-neutral so OXC can replace internals later.
-- Do not use the sibling `../native-tsrx` repository: do not inspect it, edit it, run commands in it, or make async-await work depend on changes there. Treat `@tsrx/core` as an external dependency boundary; if its current parser artifacts are insufficient for a compiler behavior, keep coverage at the async-await compiler artifact boundary, record the caveat, or ask the user before any dependency work.
+- Do not use the sibling `../native-tsrx` repository: do not inspect it, edit it, run commands in it, or make Arcade work depend on changes there. Treat `@tsrx/core` as an external dependency boundary; if its current parser artifacts are insufficient for a compiler behavior, keep coverage at the Arcade compiler artifact boundary, record the caveat, or ask the user before any dependency work.
 - Structure compiler work as cooperating mini-compilers with typed artifacts: TSRX semantic graph, state lowering, async dependency extraction, sync event policy, capture analysis, template/view lowering, payload arena planning, symbol resolver planning, and final emit.
 - Treat compiler maintainability as product behavior. A contributor should be able to find the owning pass, read its artifact types, run its focused tests, and change it without understanding the whole compiler.
 - Before adding compiler semantics, inspect the production compiler module layout. If behavior is still concentrated in a large `index.ts`, broad AST visitor, or other orchestrator/barrel file, first extract the owning pass into a pass module or add the missing pass boundary. The package entry may re-export and the orchestrator may run the pass graph; neither should absorb pass implementation details.
@@ -45,7 +45,7 @@ description: 'Use when implementing the @async/resumable TSRX framework: compile
 - Prefer Web APIs and portable libraries. Use `pathe` for filesystem-like path work and `ufo` for URL/pathname/query work.
 - Build the repo as a pnpm workspace and vite-plus monorepo with multiple libraries. `package.json`, `pnpm-workspace.yaml`, and `pnpm-lock.yaml` own the workspace/dependency source of truth; vite-plus is the preferred command/tooling surface for build/test/check/format/lint.
 - The completed proof implementation lives under `poc/packages/*`; do not extend it when beginning production framework work unless the task is explicitly POC maintenance.
-- Initial production package folders are `packages/resumable`, `packages/core`, `packages/protocol`, `packages/runtime`, `packages/serializer`, `packages/compiler`, `packages/rolldown`, `packages/vite`, and `packages/test-utils`. `packages/resumable` is the main package for `@async/resumable`; the rest are internal boundaries until tests prove what should become public. Do not create `packages/server`.
+- `packages/core` owns the public authoring APIs for `@arcadejs/core`. `packages/arcade` is an umbrella package for curated public re-exports. The other production package folders are `packages/protocol`, `packages/runtime`, `packages/serializer`, `packages/compiler`, `packages/bundler`, `packages/test-utils`, and `packages/vitest-browser`; treat them as internal boundaries until tests prove what should become public. Do not create `packages/server`.
 - Use QDS/qwik-bundler as root vite-plus config and multi-lib/plugin structure references. Use Witness for pipeline/HMR proof behavior only, not as a workspace-structure reference.
 - Package/library builds should be vite-plus `pack` configs; prefer `vp pack`, `vp test`, `vp check`, `vp fmt`, `vp lint`, and `vp config` directly.
 - pnpm scripts should be thin aliases that invoke vite-plus commands; do not replace vite-plus as the default tooling surface with custom script stacks.

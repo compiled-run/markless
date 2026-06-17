@@ -1,12 +1,12 @@
 import { normalize } from 'pathe';
 import { parsePath } from 'ufo';
-import type { ResumableEnvironment } from './types.ts';
+import type { ArcadeEnvironment } from './types.ts';
 
-export function createResumableDevGraph() {
+export function createArcadeDevGraph() {
 	const parentModules = new Map<string, Set<string>>();
 
 	return {
-		record(parent: string, ids: Iterable<string>, environment: ResumableEnvironment) {
+		record(parent: string, ids: Iterable<string>, environment: ArcadeEnvironment) {
 			const entries = [...ids];
 			for (const path of parentKeys(parent)) {
 				const key = parentKey(environment, path);
@@ -17,7 +17,7 @@ export function createResumableDevGraph() {
 				parentModules.set(key, existing);
 			}
 		},
-		clear(parent: string, environment?: ResumableEnvironment) {
+		clear(parent: string, environment?: ArcadeEnvironment) {
 			const deleted: string[] = [];
 			for (const currentEnvironment of targetEnvironments(environment)) {
 				for (const path of parentKeys(parent)) {
@@ -36,7 +36,7 @@ export function createResumableDevGraph() {
 	};
 }
 
-function targetEnvironments(environment: ResumableEnvironment | undefined) {
+function targetEnvironments(environment: ArcadeEnvironment | undefined) {
 	if (environment) {
 		return [environment];
 	}
@@ -44,7 +44,7 @@ function targetEnvironments(environment: ResumableEnvironment | undefined) {
 	return allEnvironments;
 }
 
-const allEnvironments: readonly ResumableEnvironment[] = ['client', 'server', 'lib'];
+const allEnvironments: readonly ArcadeEnvironment[] = ['client', 'server', 'lib'];
 
 function parentKeys(parent: string) {
 	const path = pathname(parent);
@@ -57,7 +57,7 @@ function parentKeys(parent: string) {
 	return new Set([path, normalized, withLeadingSlash, barePath]);
 }
 
-function parentKey(environment: ResumableEnvironment, parent: string) {
+function parentKey(environment: ArcadeEnvironment, parent: string) {
 	return `${environment}:${parent}`;
 }
 

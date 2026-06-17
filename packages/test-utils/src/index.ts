@@ -1,4 +1,4 @@
-import type { ProtocolStatePayload, ProtocolViewPayload } from '@async/resumable-protocol';
+import type { ProtocolStatePayload, ProtocolViewPayload } from '@arcadejs/protocol';
 
 export type PayloadScriptPair = {
 	readonly stateScript: string;
@@ -58,14 +58,14 @@ export type PayloadDebugDump = {
 };
 
 export function assertPayloadScriptTypes(input: PayloadScriptPair): void {
-	assertPayloadScriptWrapper(input.stateScript, 'async/state');
-	assertPayloadScriptWrapper(input.viewScript, 'async/view');
+	assertPayloadScriptWrapper(input.stateScript, 'arcade/state');
+	assertPayloadScriptWrapper(input.viewScript, 'arcade/view');
 }
 
 export function decodePayloadScriptPair(input: PayloadScriptPair): DecodedPayloadScriptPair {
 	return {
-		state: parsePayloadScript(input.stateScript, 'async/state') as ProtocolStatePayload,
-		view: parsePayloadScript(input.viewScript, 'async/view') as ProtocolViewPayload,
+		state: parsePayloadScript(input.stateScript, 'arcade/state') as ProtocolStatePayload,
+		view: parsePayloadScript(input.viewScript, 'arcade/view') as ProtocolViewPayload,
 	};
 }
 
@@ -141,7 +141,7 @@ export function summarizeProtocolPayload(input: {
 	};
 }
 
-function parsePayloadScript(script: string, type: 'async/state' | 'async/view'): unknown {
+function parsePayloadScript(script: string, type: 'arcade/state' | 'arcade/view'): unknown {
 	assertPayloadScriptWrapper(script, type);
 
 	try {
@@ -161,13 +161,13 @@ function cloneDomUpdateTarget(
 	return { kind: 'text' };
 }
 
-function assertPayloadScriptWrapper(script: string, type: 'async/state' | 'async/view'): void {
+function assertPayloadScriptWrapper(script: string, type: 'arcade/state' | 'arcade/view'): void {
 	if (!script.startsWith(scriptPrefix(type)) || !script.endsWith(scriptSuffix)) {
 		throw new Error(`Expected ${type} payload script.`);
 	}
 }
 
-function scriptPrefix(type: 'async/state' | 'async/view'): string {
+function scriptPrefix(type: 'arcade/state' | 'arcade/view'): string {
 	return `<script type="${type}">`;
 }
 

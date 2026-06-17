@@ -1,4 +1,4 @@
-import type { ProtocolViewPayload } from '@async/resumable-protocol';
+import type { ProtocolViewPayload } from '@arcadejs/protocol';
 import { expect, test } from 'vitest';
 import { createProtocolStatePayload, renderPayloadScripts } from '../../serializer/src/index.ts';
 import { resumeEventOnlyFromPayloadDocument } from '../src/event-only-resume.ts';
@@ -38,8 +38,8 @@ function element(tagName: string, childNodes: FakeElement[] = []): FakeElement {
 function payloadDocument(stateScript: string, viewScript: string): FakePayloadDocument {
 	return {
 		scripts: {
-			'script[type="async/state"]': { textContent: scriptContent(stateScript) },
-			'script[type="async/view"]': { textContent: scriptContent(viewScript) },
+			'script[type="arcade/state"]': { textContent: scriptContent(stateScript) },
+			'script[type="arcade/view"]': { textContent: scriptContent(viewScript) },
 		},
 		querySelector(selector) {
 			return this.scripts[selector] ?? null;
@@ -48,7 +48,7 @@ function payloadDocument(stateScript: string, viewScript: string): FakePayloadDo
 }
 
 function scriptContent(script: string): string {
-	return script.replace(/^<script type="async\/(?:state|view)">/, '').replace('</script>', '');
+	return script.replace(/^<script type="arcade\/(?:state|view)">/, '').replace('</script>', '');
 }
 
 test('event-only resume dispatches lazy event symbols and flushes DOM update symbols', async () => {

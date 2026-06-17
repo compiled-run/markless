@@ -35,7 +35,7 @@ export type SyncPolicyRecord = {
 };
 
 export type SyncEventPolicyDiagnostic = {
-	readonly code: 'AA_SYNC_POLICY_UNPROVABLE_GUARD';
+	readonly code: 'ARCADE_SYNC_POLICY_UNPROVABLE_GUARD';
 	readonly severity: 'error';
 	readonly phase: 'sync-event-policy';
 	readonly passId: 'sync-event-policy';
@@ -179,7 +179,10 @@ function collectPoliciesFromStatement(input: {
 	walk(input.statement, (node) => {
 		if (node.type !== 'IfStatement') return;
 
-		const methods = eventPolicyMethods(node.consequent as AnyNode | undefined, input.eventParam);
+		const methods = eventPolicyMethods(
+			node.consequent as AnyNode | undefined,
+			input.eventParam,
+		);
 		if (methods.length === 0) return;
 
 		const test = node.test as AnyNode | undefined;
@@ -213,7 +216,7 @@ function collectPoliciesFromStatement(input: {
 
 		for (const method of methods) {
 			input.diagnostics.push({
-				code: 'AA_SYNC_POLICY_UNPROVABLE_GUARD',
+				code: 'ARCADE_SYNC_POLICY_UNPROVABLE_GUARD',
 				severity: 'error',
 				phase: 'sync-event-policy',
 				passId: 'sync-event-policy',
@@ -231,7 +234,7 @@ function collectPoliciesFromStatement(input: {
 							'Move DOM/runtime-dependent checks into the lazy handler, or express the sync browser policy with graph state and event fields only.',
 					},
 				],
-				docsUrl: 'https://async-resumable.dev/errors/AA_SYNC_POLICY_UNPROVABLE_GUARD',
+				docsUrl: 'https://arcadejs.com/errors/ARCADE_SYNC_POLICY_UNPROVABLE_GUARD',
 			});
 		}
 	});
@@ -336,7 +339,10 @@ function runtimeOrigins(
 	const origins: string[] = [];
 
 	walk(node, (candidate) => {
-		if (candidate.type === 'NewExpression' && expressionPath(candidate.callee as AnyNode) === 'FormData') {
+		if (
+			candidate.type === 'NewExpression' &&
+			expressionPath(candidate.callee as AnyNode) === 'FormData'
+		) {
 			pushUnique(origins, 'FormData');
 		}
 
@@ -521,7 +527,9 @@ function asNodes(value: unknown): AnyNode[] {
 }
 
 function isNode(value: unknown): value is AnyNode {
-	return typeof value === 'object' && value !== null && typeof (value as AnyNode).type === 'string';
+	return (
+		typeof value === 'object' && value !== null && typeof (value as AnyNode).type === 'string'
+	);
 }
 
 function unique<T>(values: ReadonlyArray<T>): ReadonlyArray<T> {

@@ -2,8 +2,8 @@ import {
 	ASYNC_PROTOCOL_VERSION,
 	type ProtocolStatePayload,
 	type ProtocolViewPayload,
-} from '@async/resumable-protocol';
-import { deserializeGraphValue, type SerializedGraphPayload } from '@async/resumable-serializer';
+} from '@arcadejs/protocol';
+import { deserializeGraphValue, type SerializedGraphPayload } from '@arcadejs/serializer';
 import { applyDomJournalEntries } from './dom-journal.ts';
 import { createRuntimeGraph, type RuntimeGraph, type RuntimeGraphRead } from './graph.ts';
 import {
@@ -54,9 +54,9 @@ export type ResumePayloadScriptsResult = {
 	readonly runtime: ResumeRuntime;
 };
 
-export type RuntimePayloadType = 'async/state' | 'async/view';
+export type RuntimePayloadType = 'arcade/state' | 'arcade/view';
 
-export type RuntimePayloadErrorCode = 'AA_PAYLOAD_INVALID' | 'AA_PROTOCOL_VERSION_MISMATCH';
+export type RuntimePayloadErrorCode = 'ARCADE_PAYLOAD_INVALID' | 'ARCADE_PROTOCOL_VERSION_MISMATCH';
 
 export type RuntimePayloadDiagnostic = {
 	readonly code: RuntimePayloadErrorCode;
@@ -104,13 +104,13 @@ export class RuntimePayloadError extends Error implements RuntimePayloadDiagnost
 }
 
 export function decodePayloadScripts(input: EncodedPayloadScripts): DecodedPayloadScripts {
-	const state = parseDataScript(input.stateScript, 'async/state') as ProtocolStatePayload;
-	const view = parseDataScript(input.viewScript, 'async/view') as ProtocolViewPayload;
+	const state = parseDataScript(input.stateScript, 'arcade/state') as ProtocolStatePayload;
+	const view = parseDataScript(input.viewScript, 'arcade/view') as ProtocolViewPayload;
 
 	assertStatePayloadShape(state);
 	assertViewPayloadShape(view);
-	assertProtocolVersion(state.version, 'async/state');
-	assertProtocolVersion(view.version, 'async/view');
+	assertProtocolVersion(state.version, 'arcade/state');
+	assertProtocolVersion(view.version, 'arcade/view');
 
 	return { state, view };
 }
@@ -119,8 +119,8 @@ export function readPayloadScriptsFromDocument(
 	document: PayloadScriptDocument,
 ): EncodedPayloadScripts {
 	return {
-		stateScript: readPayloadScriptFromDocument(document, 'async/state'),
-		viewScript: readPayloadScriptFromDocument(document, 'async/view'),
+		stateScript: readPayloadScriptFromDocument(document, 'arcade/state'),
+		viewScript: readPayloadScriptFromDocument(document, 'arcade/view'),
 	};
 }
 
@@ -361,20 +361,20 @@ function parseDataScript(script: string, type: RuntimePayloadType): unknown {
 function assertStatePayloadShape(payload: unknown): asserts payload is ProtocolStatePayload {
 	if (!isRecord(payload)) {
 		throw invalidPayloadShapeError(
-			'async/state',
-			'Invalid async/state payload: expected object.',
+			'arcade/state',
+			'Invalid arcade/state payload: expected object.',
 		);
 	}
 	if (!('version' in payload)) {
 		throw invalidPayloadShapeError(
-			'async/state',
-			'Invalid async/state payload: expected version.',
+			'arcade/state',
+			'Invalid arcade/state payload: expected version.',
 		);
 	}
-	const cells = requiredPayloadArrayField(payload, 'cells', 'async/state');
+	const cells = requiredPayloadArrayField(payload, 'cells', 'arcade/state');
 
 	for (const [index, cell] of cells.entries()) {
-		const context = `async/state cell[${index}]`;
+		const context = `arcade/state cell[${index}]`;
 		assertRecordShape(cell, context);
 		assertStringField(cell, 'graphNodeId', context);
 		assertStringField(cell, 'name', context);
@@ -382,10 +382,10 @@ function assertStatePayloadShape(payload: unknown): asserts payload is ProtocolS
 		if ('value' in cell) assertSerializedGraphPayload(cell.value, `${context}.value`);
 	}
 
-	const computedEntries = requiredPayloadArrayField(payload, 'computed', 'async/state');
+	const computedEntries = requiredPayloadArrayField(payload, 'computed', 'arcade/state');
 
 	for (const [index, computed] of computedEntries.entries()) {
-		const context = `async/state computed[${index}]`;
+		const context = `arcade/state computed[${index}]`;
 		assertRecordShape(computed, context);
 		assertStringField(computed, 'graphNodeId', context);
 		assertStringField(computed, 'name', context);
@@ -400,26 +400,26 @@ function assertStatePayloadShape(payload: unknown): asserts payload is ProtocolS
 function assertViewPayloadShape(payload: unknown): asserts payload is ProtocolViewPayload {
 	if (!isRecord(payload)) {
 		throw invalidPayloadShapeError(
-			'async/view',
-			'Invalid async/view payload: expected object.',
+			'arcade/view',
+			'Invalid arcade/view payload: expected object.',
 		);
 	}
 	if (!('version' in payload)) {
 		throw invalidPayloadShapeError(
-			'async/view',
-			'Invalid async/view payload: expected version.',
+			'arcade/view',
+			'Invalid arcade/view payload: expected version.',
 		);
 	}
 
-	const locators = requiredPayloadArrayField(payload, 'locators', 'async/view');
-	const events = requiredPayloadArrayField(payload, 'events', 'async/view');
-	const domUpdates = requiredPayloadArrayField(payload, 'domUpdates', 'async/view');
-	const behaviors = requiredPayloadArrayField(payload, 'behaviors', 'async/view');
-	const elementHandles = requiredPayloadArrayField(payload, 'elementHandles', 'async/view');
-	const asyncBoundaries = requiredPayloadArrayField(payload, 'asyncBoundaries', 'async/view');
+	const locators = requiredPayloadArrayField(payload, 'locators', 'arcade/view');
+	const events = requiredPayloadArrayField(payload, 'events', 'arcade/view');
+	const domUpdates = requiredPayloadArrayField(payload, 'domUpdates', 'arcade/view');
+	const behaviors = requiredPayloadArrayField(payload, 'behaviors', 'arcade/view');
+	const elementHandles = requiredPayloadArrayField(payload, 'elementHandles', 'arcade/view');
+	const asyncBoundaries = requiredPayloadArrayField(payload, 'asyncBoundaries', 'arcade/view');
 
 	for (const [index, locator] of locators.entries()) {
-		const context = `async/view locator[${index}]`;
+		const context = `arcade/view locator[${index}]`;
 		assertRecordShape(locator, context);
 		assertStringField(locator, 'hostNodeId', context);
 		assertLiteralField(locator, 'strategy', 'dom-order', context);
@@ -428,7 +428,7 @@ function assertViewPayloadShape(payload: unknown): asserts payload is ProtocolVi
 	}
 
 	for (const [index, event] of events.entries()) {
-		const context = `async/view event[${index}]`;
+		const context = `arcade/view event[${index}]`;
 		assertRecordShape(event, context);
 		assertStringField(event, 'hostNodeId', context);
 		assertStringField(event, 'eventName', context);
@@ -439,7 +439,7 @@ function assertViewPayloadShape(payload: unknown): asserts payload is ProtocolVi
 	}
 
 	for (const [index, domUpdate] of domUpdates.entries()) {
-		const context = `async/view domUpdate[${index}]`;
+		const context = `arcade/view domUpdate[${index}]`;
 		assertRecordShape(domUpdate, context);
 		assertStringField(domUpdate, 'hostNodeId', context);
 		assertStringField(domUpdate, 'source', context);
@@ -450,7 +450,7 @@ function assertViewPayloadShape(payload: unknown): asserts payload is ProtocolVi
 	}
 
 	for (const [index, behavior] of behaviors.entries()) {
-		const context = `async/view behavior[${index}]`;
+		const context = `arcade/view behavior[${index}]`;
 		assertRecordShape(behavior, context);
 		assertStringField(behavior, 'hostNodeId', context);
 		assertStringField(behavior, 'source', context);
@@ -462,7 +462,7 @@ function assertViewPayloadShape(payload: unknown): asserts payload is ProtocolVi
 	}
 
 	for (const [index, handle] of elementHandles.entries()) {
-		const context = `async/view elementHandle[${index}]`;
+		const context = `arcade/view elementHandle[${index}]`;
 		assertRecordShape(handle, context);
 		assertStringField(handle, 'hostNodeId', context);
 		assertStringField(handle, 'handleId', context);
@@ -470,7 +470,7 @@ function assertViewPayloadShape(payload: unknown): asserts payload is ProtocolVi
 	}
 
 	for (const [index, boundary] of asyncBoundaries.entries()) {
-		const context = `async/view asyncBoundary[${index}]`;
+		const context = `arcade/view asyncBoundary[${index}]`;
 		assertRecordShape(boundary, context);
 		assertStringField(boundary, 'id', context);
 		assertCommentAnchor(boundary.startAnchor, `${context}.startAnchor`);
@@ -652,13 +652,13 @@ function assertOptionalSharedDefinitions(record: Record<string, unknown>): void 
 	if (record.sharedDefinitions === undefined) return;
 	if (!Array.isArray(record.sharedDefinitions)) {
 		throw invalidPayloadShapeError(
-			'async/state',
-			'Invalid async/state payload: expected sharedDefinitions array.',
+			'arcade/state',
+			'Invalid arcade/state payload: expected sharedDefinitions array.',
 		);
 	}
 
 	for (const [index, definition] of record.sharedDefinitions.entries()) {
-		const context = `async/state sharedDefinitions[${index}]`;
+		const context = `arcade/state sharedDefinitions[${index}]`;
 		assertRecordShape(definition, context);
 		assertStringField(definition, 'id', context);
 		assertStringField(definition, 'name', context);
@@ -1452,7 +1452,7 @@ function payloadInvalidError(
 	suggestions: ReadonlyArray<{ readonly message: string }>,
 ): RuntimePayloadError {
 	return new RuntimePayloadError({
-		code: 'AA_PAYLOAD_INVALID',
+		code: 'ARCADE_PAYLOAD_INVALID',
 		severity: 'error',
 		phase: 'payload',
 		title: 'Invalid resumability payload',
@@ -1461,7 +1461,7 @@ function payloadInvalidError(
 		payloadType,
 		payloadScript: payloadScriptSelector(payloadType),
 		suggestions,
-		docsUrl: 'https://async.await.dev/errors/AA_PAYLOAD_INVALID',
+		docsUrl: 'https://arcadejs.com/errors/ARCADE_PAYLOAD_INVALID',
 	});
 }
 
@@ -1475,7 +1475,7 @@ function invalidPayloadShapeError(
 		`The ${payloadType} payload did not match the resumability protocol shape required by this runtime.`,
 		[
 			{
-				message: `Regenerate the ${payloadType} payload with the matching @async/resumable compiler/runtime version.`,
+				message: `Regenerate the ${payloadType} payload with the matching @arcadejs/core compiler/runtime version.`,
 			},
 		],
 	);
@@ -1486,7 +1486,7 @@ function protocolVersionMismatchError(
 	actualVersion: unknown,
 ): RuntimePayloadError {
 	return new RuntimePayloadError({
-		code: 'AA_PROTOCOL_VERSION_MISMATCH',
+		code: 'ARCADE_PROTOCOL_VERSION_MISMATCH',
 		severity: 'error',
 		phase: 'payload',
 		title: 'Unsupported resumability protocol version',
@@ -1498,15 +1498,15 @@ function protocolVersionMismatchError(
 		actualVersion,
 		suggestions: [
 			{
-				message: 'Use matching @async/resumable compiler and runtime package versions.',
+				message: 'Use matching @arcadejs/core compiler and runtime package versions.',
 			},
 		],
-		docsUrl: 'https://async.await.dev/errors/AA_PROTOCOL_VERSION_MISMATCH',
+		docsUrl: 'https://arcadejs.com/errors/ARCADE_PROTOCOL_VERSION_MISMATCH',
 	});
 }
 
 function contextPayloadType(context: string): RuntimePayloadType {
-	return context.startsWith('async/state') ? 'async/state' : 'async/view';
+	return context.startsWith('arcade/state') ? 'arcade/state' : 'arcade/view';
 }
 
 function payloadScriptSelector(type: RuntimePayloadType): string {

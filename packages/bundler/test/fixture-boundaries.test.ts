@@ -6,23 +6,23 @@ const fixtureRoot = resolve(import.meta.dirname, '../fixtures');
 const tsrxFixtureImports = [
 	{
 		path: 'rolldown-basic/src/root.tsrx',
-		importLine: "import { state } from '@async/resumable';",
+		importLine: "import { state } from '@arcadejs/core';",
 	},
 	{
 		path: 'vite-csr/src/root.tsrx',
-		importLine: "import { state } from '@async/resumable';",
+		importLine: "import { state } from '@arcadejs/core';",
 	},
 	{
 		path: 'vite-library/src/card.tsrx',
-		importLine: "import { state } from '@async/resumable';",
+		importLine: "import { state } from '@arcadejs/core';",
 	},
 	{
 		path: 'vite-plus/src/root.tsrx',
-		importLine: "import { state } from '@async/resumable';",
+		importLine: "import { state } from '@arcadejs/core';",
 	},
 	{
 		path: 'vite-ssr/src/root.tsrx',
-		importLine: "import { state, computed } from '@async/resumable';",
+		importLine: "import { state, computed } from '@arcadejs/core';",
 	},
 ] as const;
 
@@ -45,21 +45,19 @@ describe('fixture framework boundaries', () => {
 			expect(source).not.toContain('applyDomJournalEntries');
 			expect(source).not.toContain('applyDomJournal');
 		}
-		expect(csrEntry).toContain("import { render } from '@async/resumable/runtime/render';");
+		expect(csrEntry).toContain("import { render } from '@arcadejs/runtime/render';");
 		expect(csrEntry).not.toContain('resumeFromPayloadScripts');
-		expect(vitePlusEntry).toContain(
-			"import { render } from '@async/resumable/runtime/render';",
-		);
+		expect(vitePlusEntry).toContain("import { render } from '@arcadejs/runtime/render';");
 		expect(vitePlusEntry).not.toContain('resumeFromPayloadScripts');
 		expect(ssrEntry).toContain(
-			"import { resumeEventOnlyFromPayloadDocument } from '@async/resumable/runtime/event-only-resume';",
+			"import { resumeEventOnlyFromPayloadDocument } from '@arcadejs/runtime/event-only-resume';",
 		);
 		expect(ssrEntry).toContain('export async function resumeContainerEvent');
 		expect(ssrEntry).toContain('eventRecord');
 		expect(ssrEntry).not.toContain('__asyncResumeRuntimeStarted');
 		expect(ssrEntry).not.toContain('syncPolicyAlreadyApplied: true');
 		expect(ssrEntry).not.toContain('await resumeFromPayloadDocument');
-		expect(ssrEntry).not.toContain('@async/resumable/runtime/resume');
+		expect(ssrEntry).not.toContain('@arcadejs/runtime/resume');
 	});
 
 	test('server shell does not emit public per-node async host markers', async () => {
@@ -68,8 +66,8 @@ describe('fixture framework boundaries', () => {
 		expect(renderShell).not.toContain('data-async-host');
 		expect(renderShell).not.toContain('hostId');
 		expect(renderShell).toContain('renderToString');
-		expect(renderShell).toContain('@async/resumable/runtime/render-to-string');
-		expect(renderShell).not.toContain("from '@async/resumable/runtime/render'");
+		expect(renderShell).toContain('@arcadejs/runtime/render-to-string');
+		expect(renderShell).not.toContain("from '@arcadejs/runtime/render'");
 		expect(renderShell).toContain('resumeModuleUrl');
 		expect(renderShell).toContain('<span>hello</span>');
 	});
@@ -121,7 +119,7 @@ describe('fixture framework boundaries', () => {
 		const config = await readFixture('vite-csr/vite.config.ts');
 
 		expect(config).toContain('configurePreviewServer');
-		expect(config).toContain('__async-resumable-fixture-requests');
+		expect(config).toContain('__arcade-fixture-requests');
 		expect(config).toContain('isScriptRequest');
 	});
 

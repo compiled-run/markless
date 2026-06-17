@@ -11,20 +11,20 @@ import type { OutputOptions } from 'rolldown';
 import { joinURL } from 'ufo';
 import { createPreloadGraphAdder } from '../build/bundle-graph.ts';
 import { outputDefaults } from '../build/chunking.ts';
-import { createResumableRolldownPlugin } from '../rolldown.ts';
+import { createArcadeRolldownPlugin } from '../rolldown.ts';
 import {
 	type BundleGraphAdder,
 	type GlobalInjections,
 	type PreloadGraphEntriesAdder,
-	type ResumableEnvironment,
-	type ResumableManifest,
-	type ResumableRolldownOptions,
+	type ArcadeEnvironment,
+	type ArcadeManifest,
+	type ArcadeRolldownOptions,
 } from '../types.ts';
 import { createDevTags } from './dev-tags.ts';
 import {
 	isServerViteEnvironment,
-	resumableEnvironment,
-	transformResumableRequest,
+	arcadeEnvironment,
+	transformArcadeRequest,
 	viteEnvironmentName,
 } from './environment.ts';
 import { createViteHmr } from './hmr.ts';
@@ -35,26 +35,26 @@ export type {
 	PreloadGraphContext,
 	PreloadGraphEntries,
 	PreloadGraphEntriesAdder,
-	ResumableEnvironment,
-	ResumableManifest,
-	ResumableRolldownOptions,
+	ArcadeEnvironment,
+	ArcadeManifest,
+	ArcadeRolldownOptions,
 } from '../types.ts';
 
-export interface ResumableViteOptions extends ResumableRolldownOptions {
+export interface ArcadeViteOptions extends ArcadeRolldownOptions {
 	clientEnvironment?: string;
 	serverEnvironment?: string;
 }
 
-type ResumableOutputOptions = OutputOptions | OutputOptions[] | undefined;
-type InternalResumableRolldownOptions = ResumableRolldownOptions & {
+type ArcadeOutputOptions = OutputOptions | OutputOptions[] | undefined;
+type InternalArcadeRolldownOptions = ArcadeRolldownOptions & {
 	publicPath?: (fileName: string) => string;
 };
-const ASYNC_RESUMABLE_SKIP_DUPLICATE_BUILDS = Symbol('async-resumable-skip-duplicate-builds');
+const ARCADE_SKIP_DUPLICATE_BUILDS = Symbol('arcade-skip-duplicate-builds');
 
-export function resumable(options: ResumableViteOptions = {}): Plugin[] {
-	let manifest: ResumableManifest | null = null;
+export function arcade(options: ArcadeViteOptions = {}): Plugin[] {
+	let manifest: ArcadeManifest | null = null;
 	const bundleGraphAdders = new Set<BundleGraphAdder>();
-	const rolldownOptions: InternalResumableRolldownOptions = { ...options };
+	const rolldownOptions: InternalArcadeRolldownOptions = { ...options };
 	rolldownOptions.bundleGraphAdders = bundleGraphAdders;
 	rolldownOptions.onManifest = (nextManifest) => {
 		manifest = nextManifest;
@@ -64,12 +64,12 @@ export function resumable(options: ResumableViteOptions = {}): Plugin[] {
 		base: '/',
 		clientEnvironment: viteEnvironmentName('client', options),
 		enabled: false,
-		invalidateGeneratedModules: (parent: string, environment?: ResumableEnvironment) =>
-			resumablePlugin.api.invalidateGeneratedModules(parent, environment),
+		invalidateGeneratedModules: (parent: string, environment?: ArcadeEnvironment) =>
+			arcadePlugin.api.invalidateGeneratedModules(parent, environment),
 	};
 	const devTags = createDevTags();
 	rolldownOptions.devInjections = devTags.tags;
-	const basePlugin = createResumableRolldownPlugin({
+	const basePlugin = createArcadeRolldownPlugin({
 		environment: getBuildEnvironment,
 		options: rolldownOptions,
 	}) as Plugin & {
@@ -77,9 +77,9 @@ export function resumable(options: ResumableViteOptions = {}): Plugin[] {
 	};
 	const hmr = createViteHmr(hmrOptions);
 
-	const resumablePlugin = {
+	const arcadePlugin = {
 		...basePlugin,
-		name: 'vite-plugin-async-resumable',
+		name: 'vite-plugin-arcade',
 		enforce: 'post',
 		sharedDuringBuild: true,
 		api: {
@@ -130,13 +130,13 @@ export function resumable(options: ResumableViteOptions = {}): Plugin[] {
 		buildApp: {
 			order: 'pre',
 			handler(builder) {
-				return buildResumableEnvironments(builder, options);
+				return buildArcadeEnvironments(builder, options);
 			},
 		},
 		configureServer(server: ViteDevServer) {
 			rolldownOptions.devServer = {
 				transformRequest: (url, environment) =>
-					transformResumableRequest(server, url, environment, options),
+					transformArcadeRequest(server, url, environment, options),
 			};
 			hmr.configureServer(server);
 		},
@@ -163,12 +163,12 @@ export function resumable(options: ResumableViteOptions = {}): Plugin[] {
 		hotUpdate(ctx) {
 			return hmr.hotUpdate(this.environment, ctx);
 		},
-	} satisfies Plugin & { api: ResumableVitePluginApi };
+	} satisfies Plugin & { api: ArcadeVitePluginApi };
 
-	return [resumablePlugin];
+	return [arcadePlugin];
 }
 
-async function buildResumableEnvironments(builder: ViteBuilder, options: ResumableViteOptions) {
+async function buildArcadeEnvironments(builder: ViteBuilder, options: ArcadeViteOptions) {
 	const environments = buildEnvironments(builder, options);
 	const names = environments.map((environment) => environment.name);
 	skipDuplicateBuilds(builder, names);
@@ -180,7 +180,7 @@ async function buildResumableEnvironments(builder: ViteBuilder, options: Resumab
 	}
 }
 
-function buildEnvironments(builder: ViteBuilder, options: ResumableViteOptions) {
+function buildEnvironments(builder: ViteBuilder, options: ArcadeViteOptions) {
 	const environments = new Map<string, BuildEnvironment>();
 	for (const name of [
 		viteEnvironmentName('client', options),
@@ -193,7 +193,7 @@ function buildEnvironments(builder: ViteBuilder, options: ResumableViteOptions) 
 	}
 
 	for (const environment of Object.values(builder.environments)) {
-		if (resumableEnvironment(environment) === 'server') {
+		if (arcadeEnvironment(environment) === 'server') {
 			environments.set(environment.name, environment);
 		}
 	}
@@ -203,17 +203,17 @@ function buildEnvironments(builder: ViteBuilder, options: ResumableViteOptions) 
 
 function skipDuplicateBuilds(builder: ViteBuilder, names: readonly string[]) {
 	const guarded = builder as ViteBuilder & {
-		[ASYNC_RESUMABLE_SKIP_DUPLICATE_BUILDS]?: Set<string>;
+		[ARCADE_SKIP_DUPLICATE_BUILDS]?: Set<string>;
 	};
 
-	const guardedNames = guarded[ASYNC_RESUMABLE_SKIP_DUPLICATE_BUILDS] ?? new Set<string>();
+	const guardedNames = guarded[ARCADE_SKIP_DUPLICATE_BUILDS] ?? new Set<string>();
 	for (const name of names) {
 		guardedNames.add(name);
 	}
 
-	if (guarded[ASYNC_RESUMABLE_SKIP_DUPLICATE_BUILDS]) return;
+	if (guarded[ARCADE_SKIP_DUPLICATE_BUILDS]) return;
 
-	guarded[ASYNC_RESUMABLE_SKIP_DUPLICATE_BUILDS] = guardedNames;
+	guarded[ARCADE_SKIP_DUPLICATE_BUILDS] = guardedNames;
 	const build = builder.build.bind(builder);
 	builder.build = (environment: BuildEnvironment) => {
 		if (guardedNames.has(environment.name) && environment.isBuilt) {
@@ -233,8 +233,8 @@ function configDefaults(config: UserConfig) {
 }
 
 function withOutputDefaults(
-	output: ResumableOutputOptions,
-	environment: ResumableEnvironment,
+	output: ArcadeOutputOptions,
+	environment: ArcadeEnvironment,
 ): OutputOptions | OutputOptions[] {
 	if (Array.isArray(output)) {
 		return output.map((item) => outputDefaults(item, environment));
@@ -247,7 +247,7 @@ function withOutputDefaults(
 	return outputDefaults(output, environment);
 }
 
-function defaultOutDir(environment: ResumableEnvironment) {
+function defaultOutDir(environment: ArcadeEnvironment) {
 	if (environment === 'server') {
 		return 'dist/server';
 	}
@@ -258,8 +258,8 @@ function defaultOutDir(environment: ResumableEnvironment) {
 function configEnvironmentKind(
 	name: string,
 	config: EnvironmentOptions,
-	options: ResumableViteOptions,
-): ResumableEnvironment | null {
+	options: ArcadeViteOptions,
+): ArcadeEnvironment | null {
 	if (config.build?.lib) {
 		return null;
 	}
@@ -286,17 +286,17 @@ function runHook(hook: unknown, context: unknown, ...args: unknown[]) {
 	return hook.call(context, ...args);
 }
 
-type ResumableVitePluginApi = {
-	invalidateGeneratedModules: (parent: string, environment?: ResumableEnvironment) => string[];
-	getManifest?: () => ResumableManifest | null;
+type ArcadeVitePluginApi = {
+	invalidateGeneratedModules: (parent: string, environment?: ArcadeEnvironment) => string[];
+	getManifest?: () => ArcadeManifest | null;
 	registerBundleGraphAdder?: (adder: BundleGraphAdder) => void;
 	registerDevInjection?: (injection: GlobalInjections) => void;
 	registerPreloadGraphEntries?: (adder: PreloadGraphEntriesAdder) => void;
 };
 
-function getBuildEnvironment(context: unknown): ResumableEnvironment {
+function getBuildEnvironment(context: unknown): ArcadeEnvironment {
 	const pluginContext = context as { environment?: Environment };
-	return resumableEnvironment(pluginContext.environment);
+	return arcadeEnvironment(pluginContext.environment);
 }
 
-export type ResumableVitePlugin = ReturnType<typeof resumable>[number];
+export type ArcadeVitePlugin = ReturnType<typeof arcade>[number];

@@ -1,5 +1,5 @@
 export type RuntimeSerializerDiagnostic = {
-	readonly code: 'AA_SERIALIZE_WEAK_COLLECTION' | 'AA_SERIALIZE_SECRET_LEAK';
+	readonly code: 'ARCADE_SERIALIZE_WEAK_COLLECTION' | 'ARCADE_SERIALIZE_SECRET_LEAK';
 	readonly severity: 'error' | 'warning';
 	readonly phase: 'serialization';
 	readonly statePath: string;
@@ -26,10 +26,14 @@ type CloneContext = {
 
 export function roundTripRuntimeValueGraph<T>(value: T): RuntimeSerializerArtifact<T> {
 	const diagnostics: RuntimeSerializerDiagnostic[] = [];
-	const roundTrip = cloneValue(value, {
-		seen: new Map(),
-		diagnostics,
-	}, '') as T;
+	const roundTrip = cloneValue(
+		value,
+		{
+			seen: new Map(),
+			diagnostics,
+		},
+		'',
+	) as T;
 	const receipts: RuntimeSerializerReceipt[] = [
 		{
 			stage: 'serializer-roundtrip',
@@ -58,7 +62,7 @@ function cloneValue(value: unknown, context: CloneContext, statePath: string): u
 	if (typeof value === 'string') {
 		if (looksSecret(value) || looksSecretPath(statePath)) {
 			context.diagnostics.push({
-				code: 'AA_SERIALIZE_SECRET_LEAK',
+				code: 'ARCADE_SERIALIZE_SECRET_LEAK',
 				severity: 'warning',
 				phase: 'serialization',
 				statePath,
@@ -89,7 +93,7 @@ function cloneValue(value: unknown, context: CloneContext, statePath: string): u
 
 	if (value instanceof WeakMap || value instanceof WeakSet) {
 		context.diagnostics.push({
-			code: 'AA_SERIALIZE_WEAK_COLLECTION',
+			code: 'ARCADE_SERIALIZE_WEAK_COLLECTION',
 			severity: 'error',
 			phase: 'serialization',
 			statePath,
@@ -181,7 +185,9 @@ function cloneValue(value: unknown, context: CloneContext, statePath: string): u
 
 function cloneArrayBufferView(value: ArrayBufferView): ArrayBufferView {
 	if (value instanceof DataView) {
-		return new DataView(value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength));
+		return new DataView(
+			value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength),
+		);
 	}
 
 	const constructor = value.constructor as {

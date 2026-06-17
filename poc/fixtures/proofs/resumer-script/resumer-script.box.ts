@@ -1,4 +1,4 @@
-import { box } from '@async/witness';
+import { box } from '@arcadejs/witness';
 
 const FIXTURE = 'poc/fixtures/proofs/resumer-script/browser';
 const WAIT = { timeoutMs: 10_000 };
@@ -37,7 +37,8 @@ export default box(
 		await expect.page.attribute(page, '#root', 'data-count', '1', WAIT);
 		await expect.page.outcome(page, { consoleErrors: 0, failedRequests: 0 }, WAIT);
 
-		await receipt.capture('resumer-script inline event resumer lazy-loaded one symbol after click');
+		await receipt.capture(
+			'resumer-script inline event resumer lazy-loaded one symbol after click',
+		);
 	},
 );
-

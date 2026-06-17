@@ -3,7 +3,7 @@ import { compileTsrxModule } from '../src/index.ts';
 import { deserializeGraphValue } from '../../serializer/src/index.ts';
 
 const source = `
-import { state } from '@async/resumable';
+import { state } from '@arcadejs/core';
 
 export function App() @{
 	let count = state(1);
@@ -25,7 +25,7 @@ export function App() @{
 `;
 
 const eventWriteSource = `
-import { state } from '@async/resumable';
+import { state } from '@arcadejs/core';
 import { clamp } from './math';
 
 export function App() @{
@@ -80,7 +80,7 @@ export function App() @{
 `;
 
 const asyncComputedSource = `
-import { state, computed } from '@async/resumable';
+import { state, computed } from '@arcadejs/core';
 
 export function App() @{
 	const query = state('Ada');
@@ -144,12 +144,12 @@ test('compileTsrxModule orchestrates source to payload scripts and resolver modu
 			}),
 		]),
 	);
-	expect(result.payloadScripts.stateScript).toMatch(/^<script type="async\/state">/);
-	expect(result.payloadScripts.viewScript).toMatch(/^<script type="async\/view">/);
-	expect(result.renderShell).toContain('<script type="async/state">');
-	expect(result.renderShell).toContain('<script type="async/view">');
-	expect(result.renderShell.indexOf('<script type="async/state">')).toBeLessThan(
-		result.renderShell.indexOf('<script type="async/view">'),
+	expect(result.payloadScripts.stateScript).toMatch(/^<script type="arcade\/state">/);
+	expect(result.payloadScripts.viewScript).toMatch(/^<script type="arcade\/view">/);
+	expect(result.renderShell).toContain('<script type="arcade/state">');
+	expect(result.renderShell).toContain('<script type="arcade/view">');
+	expect(result.renderShell.indexOf('<script type="arcade/state">')).toBeLessThan(
+		result.renderShell.indexOf('<script type="arcade/view">'),
 	);
 	expect(result.symbolResolverModule).toContain('return import("/assets/app.handlers.js")');
 	expect(result.symbolResolverModule).toContain('return import("/assets/app.domUpdates.js")');

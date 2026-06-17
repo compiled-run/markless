@@ -1,28 +1,25 @@
-export type ResumableEnvironment = 'client' | 'server' | 'lib';
+export type ArcadeEnvironment = 'client' | 'server' | 'lib';
 
-export interface ResumableDevServer {
-	transformRequest: (
-		url: string,
-		environment: ResumableEnvironment,
-	) => Promise<unknown> | unknown;
+export interface ArcadeDevServer {
+	transformRequest: (url: string, environment: ArcadeEnvironment) => Promise<unknown> | unknown;
 }
 
-export interface ResumableRolldownOptions {
+export interface ArcadeRolldownOptions {
 	dev?: boolean;
 	devInjections?: GlobalInjections[];
-	devServer?: ResumableDevServer;
+	devServer?: ArcadeDevServer;
 	hmr?: boolean;
 	bundleGraphAdders?: Set<BundleGraphAdder>;
-	onManifest?: (manifest: ResumableManifest) => void;
+	onManifest?: (manifest: ArcadeManifest) => void;
 	rootDir?: string;
 	buildId?: string;
 }
 
-export type ResumableVirtualModuleType = 'payload' | 'resolver' | 'module-manifest' | 'symbol';
+export type ArcadeVirtualModuleType = 'payload' | 'resolver' | 'module-manifest' | 'symbol';
 
-export interface ResumableVirtualModule {
+export interface ArcadeVirtualModule {
 	id: string;
-	type: ResumableVirtualModuleType;
+	type: ArcadeVirtualModuleType;
 	source: string;
 	symbolId?: string;
 	exportName?: string;
@@ -37,46 +34,46 @@ export interface TransformTsrxModuleInput {
 export interface TransformTsrxModuleResult {
 	code: string;
 	map: null;
-	virtualModules: ResumableVirtualModule[];
-	manifest: ResumableTransformManifest;
+	virtualModules: ArcadeVirtualModule[];
+	manifest: ArcadeTransformManifest;
 }
 
-export interface ResumableTransformManifest {
+export interface ArcadeTransformManifest {
 	source: string;
-	payload: ResumableBuildModuleReference;
-	resolver: ResumableBuildModuleReference;
-	moduleManifest: ResumableBuildModuleReference;
-	symbols: ResumableSymbolManifestEntry[];
+	payload: ArcadeBuildModuleReference;
+	resolver: ArcadeBuildModuleReference;
+	moduleManifest: ArcadeBuildModuleReference;
+	symbols: ArcadeSymbolManifestEntry[];
 }
 
-export interface ResumableBuildModuleReference {
+export interface ArcadeBuildModuleReference {
 	virtualModuleId: string;
 	fileName?: string;
 }
 
-export interface ResumableSymbolManifestEntry extends ResumableBuildModuleReference {
+export interface ArcadeSymbolManifestEntry extends ArcadeBuildModuleReference {
 	symbolId: string;
 	exportName: string;
 	kind: string;
 }
 
-export interface ResumableManifest {
+export interface ArcadeManifest {
 	version: number;
 	manifestHash: string;
-	modules: ResumableTransformManifest[];
-	bundles: Record<string, ResumableBundle>;
-	assets?: Record<string, ResumableAsset>;
-	bundleGraph?: ResumableBundleGraph;
+	modules: ArcadeTransformManifest[];
+	bundles: Record<string, ArcadeBundle>;
+	assets?: Record<string, ArcadeAsset>;
+	bundleGraph?: ArcadeBundleGraph;
 	bundleGraphAsset?: string;
 	injections?: GlobalInjections[];
 }
 
-export type ServerResumableManifest = Pick<
-	ResumableManifest,
+export type ServerArcadeManifest = Pick<
+	ArcadeManifest,
 	'version' | 'manifestHash' | 'modules' | 'bundleGraph' | 'bundleGraphAsset' | 'injections'
 >;
 
-export interface ResumableBundle {
+export interface ArcadeBundle {
 	size: number;
 	total: number;
 	symbols?: string[];
@@ -85,7 +82,7 @@ export interface ResumableBundle {
 	origins?: string[];
 }
 
-export type ResumableAsset = {
+export type ArcadeAsset = {
 	name: string | undefined;
 	size: number;
 };
@@ -96,12 +93,12 @@ export type GlobalInjections = {
 	location: 'head' | 'body';
 };
 
-export type ResumableBundleGraph = Array<string | number>;
+export type ArcadeBundleGraph = Array<string | number>;
 
 export type PreloadGraphEntries = Record<string, { imports?: string[]; dynamicImports?: string[] }>;
 
 export interface PreloadGraphContext {
-	readonly manifest: ResumableManifest;
+	readonly manifest: ArcadeManifest;
 	readonly hasBundle: (bundleName: string) => boolean;
 	readonly bundlesForOrigins: (origins: readonly string[]) => string[];
 }
@@ -110,8 +107,8 @@ export type PreloadGraphEntriesAdder = (
 	context: PreloadGraphContext,
 ) => PreloadGraphEntries | undefined;
 
-export type BundleGraphAdder = (manifest: ResumableManifest) => PreloadGraphEntries | undefined;
+export type BundleGraphAdder = (manifest: ArcadeManifest) => PreloadGraphEntries | undefined;
 
-export type ResumableRolldownPluginApi = {
-	invalidateGeneratedModules: (parent: string, environment?: ResumableEnvironment) => string[];
+export type ArcadeRolldownPluginApi = {
+	invalidateGeneratedModules: (parent: string, environment?: ArcadeEnvironment) => string[];
 };

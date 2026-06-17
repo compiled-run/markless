@@ -36,7 +36,7 @@ Every runtime graph implementation must preserve:
 This graph is not a virtual DOM. It does not store a virtual element tree,
 virtual child arrays, component render-output snapshots, or a reconciliation
 target. State writes invalidate graph subscribers directly; DOM update symbols
-patch located real DOM nodes in place. `async/view` records and graph DOM update
+patch located real DOM nodes in place. `arcade/view` records and graph DOM update
 records may describe how to find/update existing DOM, but they are not an
 alternate UI tree to diff.
 
@@ -95,7 +95,7 @@ representation.
 
 Runtime graph behavior that does not need a browser stays in ordinary package
 unit tests. Any resume mechanic that depends on the browser resuming existing
-initial-render output must be proven with `@async/witness` against a real
+initial-render output must be proven with `@arcadejs/witness` against a real
 Vite/Rolldown dev, build, preview, or SSR fixture. That includes payload scripts
 already present in the document, generated resolver/chunk loading, delegated
 events on initially rendered DOM, DOM updates after lazy symbols, async boundary
@@ -104,7 +104,7 @@ bodies do not execute during browser resume.
 
 Witness is the canonical proof surface for resume mechanics. If a needed
 resume assertion is awkward or impossible with current Witness APIs, extend the
-local `@async/witness` package directly and use that new capability here. Do not
+local `@arcadejs/witness` package directly and use that new capability here. Do not
 replace the resume harness with jsdom, fake DOM, or Vitest browser-mode SSR
 workarounds just because they are easier to wire for one fixture.
 
@@ -131,8 +131,8 @@ container owns:
 - shared-state container scope
 
 CSR must not depend on SSR artifacts. A CSR app must still render and handle
-events when the document has no resumable container markup, no `async/state`, no
-`async/view`, and no inline resumer script.
+events when the document has no resumable container markup, no `arcade/state`, no
+`arcade/view`, and no inline resumer script.
 
 CSR may share the live container, delegated event, symbol resolver, graph, and
 scheduler machinery after `render()` has created the DOM and runtime graph. It
@@ -167,7 +167,7 @@ SSR containers with no browser triggers emit no resumer script.
 For the event-only v1 path, the resumer owns only:
 
 - locating the current SSR container
-- reading the compact `async/view` data for that container
+- reading the compact `arcade/view` data for that container
 - materializing locator side tables against the existing DOM
 - installing delegated listeners for the event names present in that data
 - walking from `event.target` to the container root
@@ -208,7 +208,7 @@ event-handler attributes.
   resolve each symbol through the generated symbol resolver, materialize its
   captured graph references and element handles, and run handlers in authored
   order. The resolver owns the dynamic import; event props are only encoded
-  symbol IDs in `async/view`.
+  symbol IDs in `arcade/view`.
 - Element handles resolve from serialized DOM locators at handler execution time.
   If the element was removed or the locator no longer matches, the handle reads
   as `undefined`.

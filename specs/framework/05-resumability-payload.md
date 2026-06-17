@@ -54,7 +54,7 @@ If a class wraps DOM or runtime resources, it is not a value class. Put the
 resource setup on the host element with `attach={...}` or recreate it from
 serializable state.
 
-### Resumable containers
+### Arcade containers
 
 `renderToString(App, options)` emits an SSR resumable container. The container is
 the runtime and microfrontend boundary: it owns a rendered DOM root, graph
@@ -67,7 +67,7 @@ patches, element handles, and diagnostics do not leak across sibling or nested
 microfrontends.
 
 CSR `render(App, { target })` creates the same logical runtime boundary in
-memory, but it does not consume or emit `async/state`, `async/view`, or the
+memory, but it does not consume or emit `arcade/state`, `arcade/view`, or the
 resumer script. CSR must work like a regular browser app from an empty target
 and app bundle.
 
@@ -120,15 +120,15 @@ per-node `on:click` attributes to know what code is on the page. By default, the
 core renderer emits two inert data scripts:
 
 ```html
-<script type="async/state">
+<script type="arcade/state">
 	...
 </script>
-<script type="async/view">
+<script type="arcade/view">
 	...
 </script>
 ```
 
-`async/state` carries the state arena. `async/view` carries the view/wiring
+`arcade/state` carries the state arena. `arcade/view` carries the view/wiring
 arena. The renderer may merge, split, or stream these payloads when the
 resumer/runtime protocol supports it, but these two script types are the
 canonical core containers and the names used by documentation, devtools, and
@@ -151,7 +151,7 @@ that ships it, plus gzip; authored source length is not an acceptance criterion.
 That measured scope includes only:
 
 - finding the current SSR container
-- reading compact `async/view` data
+- reading compact `arcade/view` data
 - materializing DOM locator side tables
 - installing the delegated listener set required by the event table
 - walking `event.target` back to the container root
@@ -169,7 +169,7 @@ browser-immediate cancellation/propagation do not pay for sync-policy dispatch;
 static pages pay 0 B for the resumer.
 
 The compiler/bundler/render pipeline owns the expensive decisions: whether a
-resumer is emitted at all, compact `async/view` encoding, DOM-order locator
+resumer is emitted at all, compact `arcade/view` encoding, DOM-order locator
 assignment, event-symbol extraction, symbol chunking, module/export tables,
 feature selection, minification, and inlining. The resumer is a trapdoor data
 interpreter for an already-rendered container, not the bundler, graph runtime, or
@@ -192,12 +192,12 @@ VNode format and does not imply a client VDOM or component re-render path.
 
 ### View locator materialization
 
-The v1 `async/view` locator model uses a browser-native `TreeWalker` over
+The v1 `arcade/view` locator model uses a browser-native `TreeWalker` over
 `ELEMENT` and `COMMENT` nodes to materialize encoded DOM-order records onto the
 existing initially-rendered DOM. This is a locator-decoding step only:
 
 ```txt
-async/view locator stream
+arcade/view locator stream
 -> TreeWalker over existing DOM
 -> skip static nodes and ignored/nested regions
 -> attach records to real elements/comment anchors
@@ -217,7 +217,7 @@ runtime record.
 
 This is deliberately not VDOM recovery. The `TreeWalker` pass does not
 materialize component VNodes, child VNode trees, or client render functions. It
-only maps compact `async/view` metadata to existing DOM nodes so later graph
+only maps compact `arcade/view` metadata to existing DOM nodes so later graph
 writes, events, visibility triggers, and behavior setup can address those nodes
 directly.
 

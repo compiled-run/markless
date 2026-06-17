@@ -1,4 +1,4 @@
-# Async-await build command policy.
+# Arcade build command policy.
 #
 # Codex .rules files control command approval behavior. The source guidance is:
 # framework build scripts and production optimization must use Rolldown or Vite

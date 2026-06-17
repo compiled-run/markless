@@ -1,4 +1,4 @@
-import { ASYNC_PROTOCOL_VERSION, type ProtocolStatePayload } from '@async/resumable-protocol';
+import { ASYNC_PROTOCOL_VERSION, type ProtocolStatePayload } from '@arcadejs/protocol';
 import {
 	serializeGraphValue,
 	type SerializedGraphPayload,
@@ -173,7 +173,7 @@ function protocolStateSerializationError(
 ): ProtocolStateSerializationError {
 	const cellPrefix = cell.name === '' ? cell.graphNodeId : cell.name;
 	const base = diagnostic ?? {
-		code: 'AA_SERIALIZE_UNSUPPORTED_VALUE' as const,
+		code: 'ARCADE_SERIALIZE_UNSUPPORTED_VALUE' as const,
 		severity: 'error' as const,
 		phase: 'serialization' as const,
 		title: 'Cannot serialize graph state value' as const,
@@ -188,7 +188,7 @@ function protocolStateSerializationError(
 					'Move runtime resources into attach={...}, make the value serializable state, or derive it with computed().',
 			},
 		],
-		docsUrl: 'https://async.await.dev/errors/AA_SERIALIZE_UNSUPPORTED_VALUE',
+		docsUrl: 'https://arcadejs.com/errors/ARCADE_SERIALIZE_UNSUPPORTED_VALUE',
 	};
 	const statePath = base.statePath === '<root>' ? cellPrefix : `${cellPrefix}.${base.statePath}`;
 

@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
-import { resumable } from '../src/vite/index.ts';
+import { arcade } from '../src/vite/index.ts';
 import {
 	callBuildApp,
 	callConfig,
@@ -16,7 +16,7 @@ import {
 } from './helpers.ts';
 
 const source = `
-import { state } from '@async/resumable';
+import { state } from '@arcadejs/core';
 
 export function App() @{
 	let count = state(0);
@@ -50,7 +50,7 @@ describe('Vite adapter structure', () => {
 	test('wraps the Rolldown plugin with shared build state and public extension API', () => {
 		const plugin = getAsyncPlugin();
 
-		expect(plugin.name).toBe('vite-plugin-async-resumable');
+		expect(plugin.name).toBe('vite-plugin-arcade');
 		expect(plugin.enforce).toBe('post');
 		expect(plugin.sharedDuringBuild).toBe(true);
 		expect(plugin.api?.getManifest()).toBe(null);
@@ -84,11 +84,8 @@ describe('Vite adapter structure', () => {
 					exports: ['default'],
 					imports: [],
 					dynamicImports: [],
-					moduleIds: [
-						'\0virtual:async-resumable:payload:%2Fworkspace%2Fapp%2Fsrc%2FApp.tsrx',
-					],
-					facadeModuleId:
-						'\0virtual:async-resumable:payload:%2Fworkspace%2Fapp%2Fsrc%2FApp.tsrx',
+					moduleIds: ['\0virtual:arcade:payload:%2Fworkspace%2Fapp%2Fsrc%2FApp.tsrx'],
+					facadeModuleId: '\0virtual:arcade:payload:%2Fworkspace%2Fapp%2Fsrc%2FApp.tsrx',
 				},
 			},
 			vi.fn(),
@@ -169,16 +166,16 @@ describe('Vite adapter structure', () => {
 				tag: 'script',
 				attrs: {
 					type: 'module',
-					src: '/dev/@id/virtual:async-resumable-dev-client',
+					src: '/dev/@id/virtual:arcade-dev-client',
 				},
 			}),
 		);
-		expect(await callResolveId(plugin, 'virtual:async-resumable-dev-client')).toMatchObject({
-			id: '\0virtual:async-resumable-dev-client',
+		expect(await callResolveId(plugin, 'virtual:arcade-dev-client')).toMatchObject({
+			id: '\0virtual:arcade-dev-client',
 			moduleSideEffects: true,
 		});
-		expect(await callLoad(plugin, '\0virtual:async-resumable-dev-client')).toContain(
-			"import.meta.hot.on('async-resumable:update'",
+		expect(await callLoad(plugin, '\0virtual:arcade-dev-client')).toContain(
+			"import.meta.hot.on('arcade:update'",
 		);
 	});
 
@@ -186,7 +183,7 @@ describe('Vite adapter structure', () => {
 		const plugin = getAsyncPlugin();
 		const send = vi.fn();
 		const invalidated: unknown[] = [];
-		const virtualModule = { id: '\0virtual:async-resumable:payload:/src/App.tsrx' };
+		const virtualModule = { id: '\0virtual:arcade:payload:/src/App.tsrx' };
 		const environment = {
 			config: { consumer: 'client' },
 			hot: { send },
@@ -227,11 +224,11 @@ describe('Vite adapter structure', () => {
 		expect(send).toHaveBeenCalledWith(
 			expect.objectContaining({
 				type: 'custom',
-				event: 'async-resumable:update',
+				event: 'arcade:update',
 				data: expect.objectContaining({
 					files: ['/src/App.tsrx'],
 					virtualModules: expect.arrayContaining([
-						expect.stringContaining('virtual:async-resumable:payload:'),
+						expect.stringContaining('virtual:arcade:payload:'),
 					]),
 				}),
 			}),
@@ -240,8 +237,8 @@ describe('Vite adapter structure', () => {
 
 	test('server hot updates forward through the configured client environment', () => {
 		const plugin = getPlugin(
-			resumable({ clientEnvironment: 'browser', serverEnvironment: 'edge' }),
-			'vite-plugin-async-resumable',
+			arcade({ clientEnvironment: 'browser', serverEnvironment: 'edge' }),
+			'vite-plugin-arcade',
 		);
 		const browserSend = vi.fn();
 		const defaultClientSend = vi.fn();
@@ -281,7 +278,7 @@ describe('Vite adapter structure', () => {
 		expect(browserSend).toHaveBeenCalledWith(
 			expect.objectContaining({
 				type: 'custom',
-				event: 'async-resumable:update',
+				event: 'arcade:update',
 				data: expect.objectContaining({ files: ['/src/App.tsrx'], t: 456 }),
 			}),
 		);
@@ -290,9 +287,7 @@ describe('Vite adapter structure', () => {
 });
 
 function getAsyncPlugin() {
-	return getPlugin(resumable(), 'vite-plugin-async-resumable') as ReturnType<
-		typeof resumable
-	>[number] & {
+	return getPlugin(arcade(), 'vite-plugin-arcade') as ReturnType<typeof arcade>[number] & {
 		api?: {
 			getManifest: () => unknown;
 			registerBundleGraphAdder: (adder: () => Record<string, never>) => void;

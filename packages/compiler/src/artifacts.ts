@@ -1,5 +1,5 @@
-import type { ProtocolStatePayload, ProtocolViewPayload } from '@async/resumable-protocol';
-import type { RenderedPayloadScripts } from '@async/resumable-serializer';
+import type { ProtocolStatePayload, ProtocolViewPayload } from '@arcadejs/protocol';
+import type { RenderedPayloadScripts } from '@arcadejs/serializer';
 import type { CompilerDiagnostic, SourceSpan } from './diagnostics.ts';
 
 export type { CompilerDiagnostic, DiagnosticSuggestion, SourceSpan } from './diagnostics.ts';
@@ -144,17 +144,17 @@ export type SemanticEvent = {
 
 export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 	readonly code:
-		| 'AA_FRAMEWORK_IMPORT_REQUIRED'
-		| 'AA_STATE_MODULE_SCOPE'
-		| 'AA_ASYNC_POST_AWAIT_READ'
-		| 'AA_ASYNC_BOUNDARY_REQUIRED'
-		| 'AA_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED'
-		| 'AA_STATE_ELEMENT_HANDLE_UNSERIALIZABLE'
-		| 'AA_SHARED_DEFINITION_CYCLE'
-		| 'AA_ELEMENT_HANDLE_REQUIRED'
-		| 'AA_ELEMENT_HANDLE_DUPLICATE'
-		| 'AA_ATTACH_HOST_ELEMENT_REQUIRED'
-		| 'AA_SYNC_POLICY_UNEXTRACTABLE';
+		| 'ARCADE_FRAMEWORK_IMPORT_REQUIRED'
+		| 'ARCADE_STATE_MODULE_SCOPE'
+		| 'ARCADE_ASYNC_POST_AWAIT_READ'
+		| 'ARCADE_ASYNC_BOUNDARY_REQUIRED'
+		| 'ARCADE_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED'
+		| 'ARCADE_STATE_ELEMENT_HANDLE_UNSERIALIZABLE'
+		| 'ARCADE_SHARED_DEFINITION_CYCLE'
+		| 'ARCADE_ELEMENT_HANDLE_REQUIRED'
+		| 'ARCADE_ELEMENT_HANDLE_DUPLICATE'
+		| 'ARCADE_ATTACH_HOST_ELEMENT_REQUIRED'
+		| 'ARCADE_SYNC_POLICY_UNEXTRACTABLE';
 	readonly phase: 'semantic-graph' | 'sync-policy';
 	readonly passId: 'tsrx-semantic-graph';
 };
@@ -268,13 +268,13 @@ export type StateLoweringInput = {
 
 export type StateLoweringDiagnostic = CompilerDiagnostic & {
 	readonly code:
-		| 'AA_STATE_UNRESOLVED_WRITE'
-		| 'AA_STATE_DYNAMIC_PATH_READ'
-		| 'AA_STATE_DYNAMIC_PATH_WRITE'
-		| 'AA_STATE_OPTIONAL_CHAIN_WRITE'
-		| 'AA_STATE_REST_ALIAS_EXCLUDED_PATH'
-		| 'AA_STATE_READ_ONLY_WRITE'
-		| 'AA_STATE_CONST_REASSIGNMENT';
+		| 'ARCADE_STATE_UNRESOLVED_WRITE'
+		| 'ARCADE_STATE_DYNAMIC_PATH_READ'
+		| 'ARCADE_STATE_DYNAMIC_PATH_WRITE'
+		| 'ARCADE_STATE_OPTIONAL_CHAIN_WRITE'
+		| 'ARCADE_STATE_REST_ALIAS_EXCLUDED_PATH'
+		| 'ARCADE_STATE_READ_ONLY_WRITE'
+		| 'ARCADE_STATE_CONST_REASSIGNMENT';
 	readonly phase: 'state-lowering';
 	readonly passId: 'state-lowering';
 	readonly source: string;
@@ -457,7 +457,7 @@ export type CaptureAnalysisInput = {
 };
 
 export type CaptureAnalysisDiagnostic = CompilerDiagnostic & {
-	readonly code: 'AA_CAPTURE_UNSUPPORTED_VALUE';
+	readonly code: 'ARCADE_CAPTURE_UNSUPPORTED_VALUE';
 	readonly phase: 'capture-analysis';
 	readonly passId: 'capture-analysis';
 	readonly symbolId?: string;

@@ -1,9 +1,9 @@
-# Resumable TSRX Framework — Design
+# Arcade TSRX Framework — Design
 
 **Date:** 2026-06-12
 **Status:** Approved direction, pre-implementation
 **Tagline:** A resumable UI framework for async-first apps.
-**Package:** `@async/await`
+**Package:** `@arcadejs/core`
 
 ## Summary
 
@@ -43,7 +43,7 @@ JSX/TSX is explicitly **not** supported.
    not a runtime library importable from arbitrary TS.
 5. **First-class async.** Async dataflow is a compiler-tracked graph feature, not
    an effect/task/resource wrapper. Pending/error UI is expressed with TSRX
-   boundaries, and async dependencies are serializable/resumable.
+   boundaries, and async dependencies are serializable and resumable.
 
 ## Non-Goals
 
@@ -102,7 +102,7 @@ Five pieces:
    (plus a shared IntersectionObserver for `onVisible`-wired elements),
    lazy-loads symbols on first interaction or visibility, re-attaches bindings
    on first relevant state change. No hydration pass, no component execution.
-5. **Build integration** — a Rolldown plugin base exported by `@async/await`,
+5. **Build integration** — a Rolldown plugin base exported by `@arcadejs/core`,
    with framework adapters such as Vite consuming that base plugin. Extracted
    symbols become code-split entry points, and production builds emit the
    generated symbol resolver plus manifest metadata needed by the server
@@ -204,11 +204,11 @@ export function Counter() @{
 
 ```tsx
 let count = state(0);
-let session = state({ user: null, status: "anonymous" });
+let session = state({ user: null, status: 'anonymous' });
 
-count++;                  // invalidates the scalar cell
-session.user = user;      // invalidates only the `user` path
-session.status = "ready"; // invalidates only the `status` path
+count++; // invalidates the scalar cell
+session.user = user; // invalidates only the `user` path
+session.status = 'ready'; // invalidates only the `status` path
 ```
 
 ### DOM element handles
@@ -309,8 +309,7 @@ The v1 supported forms are:
 Behavior functions receive the element and may return a cleanup function:
 
 ```ts
-type ElementBehavior<T extends Element> =
-  (element: T) => void | (() => void);
+type ElementBehavior<T extends Element> = (element: T) => void | (() => void);
 ```
 
 When behavior inputs change, v1 cleans up the existing behavior and runs it
@@ -482,7 +481,7 @@ disposed with it.
 The compiler should diagnose React-style child manipulation in v1:
 
 ```txt
-children is an opaque template projection in @async/await.
+children is an opaque template projection in @arcadejs/core.
 Render it with {children}, pass it through, or wrap it; do not inspect or map it.
 ```
 
@@ -507,16 +506,16 @@ core invariant:
 
 The classic uses of effects each have a better home:
 
-- *Derive state from state* → `computed()`.
-- *Fetch data from state* → `computed(async ...)` plus a TSRX async boundary.
-- *"When X changes, update Y"* → an antipattern in every fine-grained system;
+- _Derive state from state_ → `computed()`.
+- _Fetch data from state_ → `computed(async ...)` plus a TSRX async boundary.
+- _"When X changes, update Y"_ → an antipattern in every fine-grained system;
   with no render loop, every mutation originates at an identifiable site (an
   event handler), so co-locate the side work there as a plain function.
-- *Sync external targets* (`document.title`, imperative DOM) → these are
+- _Sync external targets_ (`document.title`, imperative DOM) → these are
   bindings to targets the template can't express; solved at the template level,
   not with lifecycle APIs.
-- *React to state you don't own* → deliberately unsupported.
-- *Eager client setup* (third-party widgets, canvas init, observers) →
+- _React to state you don't own_ → deliberately unsupported.
+- _Eager client setup_ (third-party widgets, canvas init, observers) →
   host element behavior through `use`.
 
 ### `onVisible` — visibility as an event, not a lifecycle
@@ -524,10 +523,7 @@ The classic uses of effects each have a better home:
 Visibility is modeled as an element event, parallel to `onClick`:
 
 ```tsx
-<img
-  src={src}
-  onVisible={() => analytics.recordImageSeen(src)}
-/>
+<img src={src} onVisible={() => analytics.recordImageSeen(src)} />
 ```
 
 Semantics:
@@ -541,7 +537,7 @@ Semantics:
 - **Not a reactive computation.** State reads inside are current-value reads —
   no subscriptions, no re-runs. DOM-backed libraries that need setup, updates,
   and cleanup belong in `use`, not `onVisible`.
-- The zero-JS guarantee gets a *scoped*, greppable asterisk: pages without
+- The zero-JS guarantee gets a _scoped_, greppable asterisk: pages without
   `onVisible` ship zero eager behavior; pages with it run exactly the symbols
   whose elements are on screen. There is no free-floating equivalent
   (`onMount()`, `client()`) and there never will be — anything without an
@@ -597,9 +593,7 @@ Semantics:
   sync computed:
 
 ```tsx
-const rawUser = computed(async ({ signal }) =>
-  fetchUser(route.params.userId, signal)
-);
+const rawUser = computed(async ({ signal }) => fetchUser(route.params.userId, signal));
 const formattedUser = computed(() => formatUser(rawUser, locale));
 ```
 
@@ -628,8 +622,8 @@ resource-shaped pair:
 
 ```ts
 _asyncComputed({
-  key: () => ({ id: route.params.userId }),
-  run: async ({ key, signal }) => fetchUser(key.id, signal),
+	key: () => ({ id: route.params.userId }),
+	run: async ({ key, signal }) => fetchUser(key.id, signal),
 });
 ```
 
@@ -681,20 +675,20 @@ graph writes in v1. State writes remain in the lazy handler chunk.
 let menuOpen = state(false);
 
 <input
-  onKeyDown={(event) => {
-    if (menuOpen && event.key === "Escape") {
-      event.preventDefault();
-      menuOpen = false;
-    }
-  }}
-/>
+	onKeyDown={(event) => {
+		if (menuOpen && event.key === 'Escape') {
+			event.preventDefault();
+			menuOpen = false;
+		}
+	}}
+/>;
 ```
 
 The compiler records a sync policy equivalent to:
 
 ```ts
-if (graph.read(menuOpenId) && event.key === "Escape") {
-  event.preventDefault();
+if (graph.read(menuOpenId) && event.key === 'Escape') {
+	event.preventDefault();
 }
 ```
 
@@ -916,21 +910,21 @@ context of the instance, so composed state keeps request/container isolation.
 
 ```tsx
 export const cart = shared(() => {
-  const s = session();
-  const c = state({ id: "current", items: [] });
+	const s = session();
+	const c = state({ id: 'current', items: [] });
 
-  const total = computed(() => {
-    const subtotal = c.items.reduce((sum, item) => sum + item.price, 0);
-    return applyCustomerPricing(subtotal, s.user);
-  });
+	const total = computed(() => {
+		const subtotal = c.items.reduce((sum, item) => sum + item.price, 0);
+		return applyCustomerPricing(subtotal, s.user);
+	});
 
-  return {
-    ...c,
-    total,
-    add(item) {
-      c.items.push(item);
-    },
-  };
+	return {
+		...c,
+		total,
+		add(item) {
+			c.items.push(item);
+		},
+	};
 });
 ```
 
@@ -1087,7 +1081,7 @@ no annotation:
 
 Extracted symbols are lazy-loaded, but normal framework-owned wiring does not
 turn into QRL-like user values or per-node DOM closures. Authored event props
-compile to encoded `async/view` records:
+compile to encoded `arcade/view` records:
 
 ```txt
 DOM locator + event name + optional sync policy IR + ordered handler symbol IDs
@@ -1095,33 +1089,31 @@ DOM locator + event name + optional sync policy IR + ordered handler symbol IDs
 
 The generated HTML does not need an `onClick={async (...) => import(...)}` shape,
 and production output should not require per-node event attributes. The
-`async/view` arena locates nodes by DOM-order streams, skip runs, branch anchors,
+`arcade/view` arena locates nodes by DOM-order streams, skip runs, branch anchors,
 or other private locator data, then the resumer builds internal side tables such
 as `WeakMap<Element, EventRecord>`.
 
 Dynamic imports are owned by a generated symbol resolver, not by each event prop.
 The resolver is a page/build-scoped module or equivalent compact runtime table
-that maps symbol IDs from `async/view` to chunks and exports:
+that maps symbol IDs from `arcade/view` to chunks and exports:
 
 ```ts
 export function loadSymbol(id: number) {
-  switch (id) {
-    case 7:
-      return import("/assets/menu.handlers.ab12.js")
-        .then((mod) => mod.onKeyDown_7);
-    case 8:
-      return import("/assets/menu.bindings.cd34.js")
-        .then((mod) => mod.textBinding_8);
-    default:
-      return Promise.reject(new Error(`Unknown async symbol ${id}`));
-  }
+	switch (id) {
+		case 7:
+			return import('/assets/menu.handlers.ab12.js').then((mod) => mod.onKeyDown_7);
+		case 8:
+			return import('/assets/menu.bindings.cd34.js').then((mod) => mod.textBinding_8);
+		default:
+			return Promise.reject(new Error(`Unknown async symbol ${id}`));
+	}
 }
 ```
 
 The exact resolver syntax is private build output. The full symbol manifest is a
 build/server artifact. The browser receives only the resolver/table needed for
 the current build or page, plus enough build/protocol identity to fail closed if
-`async/view` references a symbol the resolver does not know.
+`arcade/view` references a symbol the resolver does not know.
 
 The same resolver path is used for event handlers, DOM binding symbols,
 `use={...}` behavior symbols, async computed run functions, and other lazy
@@ -1206,7 +1198,7 @@ serializable state.
 The server renderer emits, alongside the HTML:
 
 1. **State values** — object state serializes with the tiered serializer above.
-   Sync `computed()` values are *not* serialized; they re-derive lazily from
+   Sync `computed()` values are _not_ serialized; they re-derive lazily from
    their dependencies on first read.
 2. **Async snapshots** — demanded async computed IDs, dependency keys, request
    versions, status (`pending`, `resolved`, `rejected`), and settled value/error
@@ -1247,11 +1239,15 @@ scripts, rather than relying on verbose JSON objects or scattered per-node
 attributes. By default, the core renderer emits two inert data scripts:
 
 ```html
-<script type="async/state">...</script>
-<script type="async/view">...</script>
+<script type="arcade/state">
+	...
+</script>
+<script type="arcade/view">
+	...
+</script>
 ```
 
-`async/state` carries the state arena. `async/view` carries the view/wiring
+`arcade/state` carries the state arena. `arcade/view` carries the view/wiring
 arena. The renderer may merge, split, or stream these payloads when the
 resumer/runtime protocol supports it, but these two script types are the
 canonical core containers and the names used by documentation, devtools, and
@@ -1266,12 +1262,12 @@ VNode format and does not imply a client VDOM or component re-render path.
 
 ### View locator materialization
 
-The v1 `async/view` locator model uses a browser-native `TreeWalker` over
+The v1 `arcade/view` locator model uses a browser-native `TreeWalker` over
 `ELEMENT` and `COMMENT` nodes to materialize encoded DOM-order records onto the
 existing server-rendered DOM. This is a locator-decoding step only:
 
 ```txt
-async/view locator stream
+arcade/view locator stream
 -> TreeWalker over existing DOM
 -> skip static nodes and ignored/nested regions
 -> attach records to real elements/comment anchors
@@ -1291,7 +1287,7 @@ runtime record.
 
 This is deliberately not VDOM recovery. The `TreeWalker` pass does not
 materialize component VNodes, child VNode trees, or client render functions. It
-only maps compact `async/view` metadata to existing DOM nodes so later graph
+only maps compact `arcade/view` metadata to existing DOM nodes so later graph
 writes, events, visibility triggers, and behavior setup can address those nodes
 directly.
 
@@ -1313,7 +1309,7 @@ included.
   resolve each symbol through the generated symbol resolver, materialize its
   captured graph references and element handles, and run handlers in authored
   order. The resolver owns the dynamic import; event props are only encoded
-  symbol IDs in `async/view`.
+  symbol IDs in `arcade/view`.
 - Element handles resolve from serialized DOM locators at handler execution time.
   If the element was removed or the locator no longer matches, the handle reads
   as `undefined`.
@@ -1361,29 +1357,29 @@ All diagnostics use one structured shape across compiler and runtime:
 
 ```ts
 type Diagnostic = {
-  code: string; // stable, e.g. "AA_CAPTURE_DOM_NODE"
-  severity: "error" | "warning" | "info";
-  phase:
-    | "parse"
-    | "state-lowering"
-    | "capture-analysis"
-    | "sync-policy"
-    | "serialization"
-    | "payload"
-    | "resume"
-    | "runtime";
-  title: string;
-  message: string;
-  why: string;
-  primarySpan?: SourceSpan;
-  secondarySpans?: LabeledSpan[];
-  passId?: string;
-  artifactKeys?: string[];
-  statePath?: string;
-  symbolId?: string;
-  elementLocator?: string;
-  suggestions: Suggestion[];
-  docsUrl: string;
+	code: string; // stable, e.g. "ARCADE_CAPTURE_DOM_NODE"
+	severity: 'error' | 'warning' | 'info';
+	phase:
+		| 'parse'
+		| 'state-lowering'
+		| 'capture-analysis'
+		| 'sync-policy'
+		| 'serialization'
+		| 'payload'
+		| 'resume'
+		| 'runtime';
+	title: string;
+	message: string;
+	why: string;
+	primarySpan?: SourceSpan;
+	secondarySpans?: LabeledSpan[];
+	passId?: string;
+	artifactKeys?: string[];
+	statePath?: string;
+	symbolId?: string;
+	elementLocator?: string;
+	suggestions: Suggestion[];
+	docsUrl: string;
 };
 ```
 
@@ -1395,7 +1391,7 @@ cannot safely rewrite, it still gives a precise migration path.
 Example shape:
 
 ```txt
-AA_CAPTURE_DOM_NODE: Cannot capture a DOM node in a lazy event handler
+ARCADE_CAPTURE_DOM_NODE: Cannot capture a DOM node in a lazy event handler
 
 src/Menu.tsrx:13:27
   12 | const menuEl = document.querySelector("#menu");
@@ -1404,7 +1400,7 @@ src/Menu.tsrx:13:27
 
 Why:
   Lazy handlers run after resume. A live DOM node cannot be serialized into
-  async/state or recovered from a JavaScript closure.
+  arcade/state or recovered from a JavaScript closure.
 
 Fix:
   Use element() plus el={...}, then read the element handle inside the handler.
@@ -1425,7 +1421,7 @@ codes and machine fields are compatibility surface.
 Diagnostic documentation follows the stable code:
 
 ```txt
-https://async-await.dev/errors/AA_CAPTURE_DOM_NODE
+https://corejs.dev/errors/ARCADE_CAPTURE_DOM_NODE
 ```
 
 Runtime diagnostics must link back to compiler artifacts whenever possible. A

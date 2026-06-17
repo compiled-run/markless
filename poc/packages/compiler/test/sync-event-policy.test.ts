@@ -56,7 +56,8 @@ test('sync-event-policy extraction proves sync browser policy split', async () =
 
 	expectPolicy(artifact.syncPolicies, {
 		eventName: 'keydown',
-		guardIncludes: 'shortcuts.trapArrows && (event.key === "ArrowDown" || event.key === "ArrowUp")',
+		guardIncludes:
+			'shortcuts.trapArrows && (event.key === "ArrowDown" || event.key === "ArrowUp")',
 		methods: ['preventDefault'],
 		graphReads: ['shortcuts.trapArrows'],
 		eventReads: ['event.key'],
@@ -72,17 +73,17 @@ test('sync-event-policy extraction proves sync browser policy split', async () =
 
 	const diagnostic = artifact.diagnostics.find(
 		(candidate) =>
-			candidate.code === 'AA_SYNC_POLICY_UNPROVABLE_GUARD' &&
+			candidate.code === 'ARCADE_SYNC_POLICY_UNPROVABLE_GUARD' &&
 			candidate.eventName === 'submit',
 	);
 
 	expect(diagnostic).toMatchObject({
-		code: 'AA_SYNC_POLICY_UNPROVABLE_GUARD',
+		code: 'ARCADE_SYNC_POLICY_UNPROVABLE_GUARD',
 		severity: 'error',
 		phase: 'sync-event-policy',
 		passId: 'sync-event-policy',
 		method: 'preventDefault',
-		docsUrl: 'https://async-resumable.dev/errors/AA_SYNC_POLICY_UNPROVABLE_GUARD',
+		docsUrl: 'https://arcadejs.com/errors/ARCADE_SYNC_POLICY_UNPROVABLE_GUARD',
 	});
 	expect(normalizeSource(diagnostic?.guardSource ?? '')).toContain(
 		'!shortcuts.allowSubmit && values.get("confirm") !== "yes"',

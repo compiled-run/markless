@@ -1,5 +1,5 @@
 import { defineConfig } from 'rolldown';
-import { resumableClient, resumableServer } from '@async/resumable/rolldown';
+import { arcadeClient, arcadeServer } from '@arcadejs/bundler/rolldown';
 
 export default defineConfig([
 	{
@@ -8,7 +8,7 @@ export default defineConfig([
 			dir: 'dist/client',
 			format: 'esm',
 		},
-		plugins: [resumableClient()],
+		plugins: [arcadeClient()],
 	},
 	{
 		input: 'src/render.ts',
@@ -16,6 +16,6 @@ export default defineConfig([
 			dir: 'dist/render',
 			format: 'esm',
 		},
-		plugins: [resumableServer()],
+		plugins: [arcadeServer()],
 	},
 ]);

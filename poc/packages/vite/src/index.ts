@@ -1,13 +1,13 @@
-import { createAsyncResumableRolldownPlugin } from '../../rolldown/src/index.ts';
-import type { AsyncResumableRolldownTransformResult } from '../../rolldown/src/index.ts';
+import { createArcadeRolldownPlugin } from '../../rolldown/src/index.ts';
+import type { ArcadeRolldownTransformResult } from '../../rolldown/src/index.ts';
 import type { PipelineManifest, PipelineReceipt } from '../../protocol/src/index.ts';
 
-export type AsyncResumableHotUpdateContext = {
+export type ArcadeHotUpdateContext = {
 	readonly file: string;
 	readonly read: () => string | Promise<string>;
 };
 
-export type AsyncResumableHotUpdateResult = {
+export type ArcadeHotUpdateResult = {
 	readonly moduleId: string;
 	readonly refreshedManifest: true;
 	readonly changedVirtualModules: ReadonlyArray<string>;
@@ -16,34 +16,29 @@ export type AsyncResumableHotUpdateResult = {
 	readonly transformed: boolean;
 };
 
-export type AsyncResumableVitePlugin = {
-	readonly name: '@async/resumable/vite';
+export type ArcadeVitePlugin = {
+	readonly name: '@arcadejs/bundler/vite';
 	readonly enforce: 'pre';
-	readonly asyncResumable: {
+	readonly arcade: {
 		readonly compilerModel: 'rolldown-base-plugin';
 		readonly usesSecondCompilerModel: false;
-		readonly basePluginName: '@async/resumable/rolldown';
+		readonly basePluginName: '@arcadejs/bundler/rolldown';
 		readonly manifest: () => PipelineManifest;
 		readonly receipts: () => ReadonlyArray<PipelineReceipt>;
 	};
-	readonly transform: (
-		code: string,
-		id: string,
-	) => Promise<AsyncResumableRolldownTransformResult | null>;
+	readonly transform: (code: string, id: string) => Promise<ArcadeRolldownTransformResult | null>;
 	readonly load: (id: string) => Promise<string | null>;
-	readonly handleHotUpdate: (
-		context: AsyncResumableHotUpdateContext,
-	) => Promise<AsyncResumableHotUpdateResult>;
+	readonly handleHotUpdate: (context: ArcadeHotUpdateContext) => Promise<ArcadeHotUpdateResult>;
 };
 
-export function createAsyncResumableVitePlugin(): AsyncResumableVitePlugin {
-	const base = createAsyncResumableRolldownPlugin();
+export function createArcadeVitePlugin(): ArcadeVitePlugin {
+	const base = createArcadeRolldownPlugin();
 	const adapterReceipts: PipelineReceipt[] = [];
 
 	return {
-		name: '@async/resumable/vite',
+		name: '@arcadejs/bundler/vite',
 		enforce: 'pre',
-		asyncResumable: {
+		arcade: {
 			compilerModel: 'rolldown-base-plugin',
 			usesSecondCompilerModel: false,
 			basePluginName: base.name,

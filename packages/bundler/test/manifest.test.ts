@@ -3,31 +3,31 @@ import {
 	convertManifestToBundleGraph,
 	createPreloadGraphAdder,
 } from '../src/build/bundle-graph.ts';
-import { ASYNC_RESUMABLE_BUNDLE_GRAPH } from '../src/build/chunking.ts';
+import { ARCADE_BUNDLE_GRAPH } from '../src/build/chunking.ts';
 import {
-	ASYNC_RESUMABLE_MANIFEST,
+	ARCADE_MANIFEST,
 	createManifest,
 	injectManifest,
-	type ResumableManifestBundle,
+	type ArcadeManifestBundle,
 } from '../src/build/manifest.ts';
-import type { ResumableManifest, ResumableTransformManifest } from '../src/types.ts';
+import type { ArcadeManifest, ArcadeTransformManifest } from '../src/types.ts';
 
-const transformManifest: ResumableTransformManifest = {
+const transformManifest: ArcadeTransformManifest = {
 	source: '/workspace/app/src/root.tsrx',
-	payload: { virtualModuleId: 'virtual:async-resumable:payload:root' },
-	resolver: { virtualModuleId: 'virtual:async-resumable:resolver:root' },
-	moduleManifest: { virtualModuleId: 'virtual:async-resumable:module-manifest:root' },
+	payload: { virtualModuleId: 'virtual:arcade:payload:root' },
+	resolver: { virtualModuleId: 'virtual:arcade:resolver:root' },
+	moduleManifest: { virtualModuleId: 'virtual:arcade:module-manifest:root' },
 	symbols: [
 		{
 			symbolId: 'root#click',
 			kind: 'event-handler',
 			exportName: 'onClick',
-			virtualModuleId: 'virtual:async-resumable:symbol:root:click',
+			virtualModuleId: 'virtual:arcade:symbol:root:click',
 		},
 	],
 };
 
-describe('resumable manifest output', () => {
+describe('arcade manifest output', () => {
 	test('creates a manifest from bundler output and transform artifacts', () => {
 		const manifest = createManifest(
 			{
@@ -43,8 +43,8 @@ describe('resumable manifest output', () => {
 					fileName: 'build/async-symbol.js',
 					name: 'root_click',
 					code: 'export const onClick = () => {};',
-					moduleIds: ['\0virtual:async-resumable:symbol:root:click'],
-					facadeModuleId: '\0virtual:async-resumable:symbol:root:click',
+					moduleIds: ['\0virtual:arcade:symbol:root:click'],
+					facadeModuleId: '\0virtual:arcade:symbol:root:click',
 				}),
 				'build/root.css': {
 					type: 'asset',
@@ -64,7 +64,7 @@ describe('resumable manifest output', () => {
 			[transformManifest],
 			'/workspace/app',
 			{
-				bundleGraphAsset: ASYNC_RESUMABLE_BUNDLE_GRAPH,
+				bundleGraphAsset: ARCADE_BUNDLE_GRAPH,
 				publicPath: (fileName) => `/assets/${fileName}`,
 			},
 		);
@@ -87,7 +87,7 @@ describe('resumable manifest output', () => {
 		});
 		expect(manifest.assets?.['build/root.css']).toEqual({ name: 'root.css', size: 6 });
 		expect(manifest.assets?.['build/async-entry.js.map']).toBeUndefined();
-		expect(manifest.bundleGraphAsset).toBe(ASYNC_RESUMABLE_BUNDLE_GRAPH);
+		expect(manifest.bundleGraphAsset).toBe(ARCADE_BUNDLE_GRAPH);
 		expect(manifest.bundleGraph).toContain('root#click');
 		expect(manifest.injections).toContainEqual({
 			tag: 'link',
@@ -101,7 +101,7 @@ describe('resumable manifest output', () => {
 	});
 
 	test('converts symbol and custom preload entries into the bundle graph', () => {
-		const manifest: ResumableManifest = {
+		const manifest: ArcadeManifest = {
 			version: 1,
 			manifestHash: 'test',
 			modules: [
@@ -146,18 +146,18 @@ describe('resumable manifest output', () => {
 	});
 
 	test('injects build manifests into server output without a manifest input option', () => {
-		const manifest: ResumableManifest = {
+		const manifest: ArcadeManifest = {
 			version: 1,
 			manifestHash: 'abc',
 			modules: [transformManifest],
 			bundles: {},
 			bundleGraph: ['root#click'],
-			bundleGraphAsset: ASYNC_RESUMABLE_BUNDLE_GRAPH,
+			bundleGraphAsset: ARCADE_BUNDLE_GRAPH,
 			injections: [{ tag: 'script', location: 'head', attributes: { src: '/runtime.js' } }],
 		};
 
 		const code = injectManifest(
-			`if (!${ASYNC_RESUMABLE_MANIFEST}) throw new Error(); export default ${ASYNC_RESUMABLE_MANIFEST};`,
+			`if (!${ARCADE_MANIFEST}) throw new Error(); export default ${ARCADE_MANIFEST};`,
 			manifest,
 		);
 
@@ -175,7 +175,7 @@ function chunk(input: {
 	dynamicImports?: string[];
 	moduleIds: string[];
 	facadeModuleId: string;
-}): ResumableManifestBundle[string] {
+}): ArcadeManifestBundle[string] {
 	return {
 		type: 'chunk',
 		fileName: input.fileName,

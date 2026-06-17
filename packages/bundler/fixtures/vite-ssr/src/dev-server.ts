@@ -31,13 +31,13 @@ type DevResponse = {
 };
 
 const CLIENT_RESUME_MODULE = '/src/entry-client.ts';
-const REQUEST_LOG_PATH = '/__async-resumable-fixture-requests';
+const REQUEST_LOG_PATH = '/__arcade-fixture-requests';
 
 // Fixture-only SSR host. Real apps should provide this from a runtime adapter
-// or meta-framework; the async-resumable bundler only needs SSR artifacts.
+// or meta-framework; the arcade bundler only needs SSR artifacts.
 export function fixtureSsrHost(): Plugin {
 	return {
-		name: 'fixture:async-resumable-ssr-host',
+		name: 'fixture:arcade-ssr-host',
 		config() {
 			return {
 				environments: {

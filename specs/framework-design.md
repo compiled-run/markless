@@ -1,4 +1,4 @@
-# Resumable TSRX Framework — Design
+# Arcade TSRX Framework — Design
 
 This file has been split into implementation-facing specs under
 [specs/framework](./framework/00-overview.md).
@@ -49,7 +49,7 @@ Source order:
 
 TSRX owns the authoring syntax and structural control-flow semantics. The
 framework compiler consumes TSRX parser/codegen-plugin artifacts and adds the
-`@async/resumable` host semantics: graph references, state lowering, capture
+`@arcadejs/core` host semantics: graph references, state lowering, capture
 diagnostics, symbol extraction, payload planning, and render/resume protocol
 wiring.
 

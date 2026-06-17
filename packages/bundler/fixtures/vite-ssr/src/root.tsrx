@@ -1,4 +1,4 @@
-import { state, computed } from '@async/resumable';
+import { state, computed } from '@arcadejs/core';
 
 export function App() @{
 	let count = state(0);

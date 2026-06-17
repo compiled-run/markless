@@ -1,4 +1,4 @@
-import { render } from '@async/resumable/runtime/render';
+import { render } from '@arcadejs/runtime/render';
 import { loadSymbol, payloadState, payloadView } from './root.tsrx';
 
 const app = document.querySelector('#app');

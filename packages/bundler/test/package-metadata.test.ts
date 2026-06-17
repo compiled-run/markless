@@ -10,7 +10,7 @@ const frameworkPackages = [
 	'packages/runtime/package.json',
 	'packages/compiler/package.json',
 	'packages/bundler/package.json',
-	'packages/resumable/package.json',
+	'packages/arcade/package.json',
 	'packages/test-utils/package.json',
 	'packages/vitest-browser/package.json',
 ] as const;

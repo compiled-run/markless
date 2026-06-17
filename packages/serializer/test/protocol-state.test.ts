@@ -54,7 +54,7 @@ test('createProtocolStatePayload preserves structured serialization diagnostics 
 
 	expect(error).toBeInstanceOf(ProtocolStateSerializationError);
 	expect(error).toMatchObject({
-		code: 'AA_SERIALIZE_UNSUPPORTED_VALUE',
+		code: 'ARCADE_SERIALIZE_UNSUPPORTED_VALUE',
 		severity: 'error',
 		phase: 'serialization',
 		title: 'Cannot serialize graph state value',
@@ -63,7 +63,7 @@ test('createProtocolStatePayload preserves structured serialization diagnostics 
 		path: ['socket'],
 		statePath: 'session.socket',
 		valueKind: 'function',
-		docsUrl: 'https://async.await.dev/errors/AA_SERIALIZE_UNSUPPORTED_VALUE',
+		docsUrl: 'https://arcadejs.com/errors/ARCADE_SERIALIZE_UNSUPPORTED_VALUE',
 		suggestions: [
 			{
 				message: expect.stringContaining('attach={...}'),

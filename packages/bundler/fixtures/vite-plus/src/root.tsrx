@@ -1,4 +1,4 @@
-import { state } from '@async/resumable';
+import { state } from '@arcadejs/core';
 
 export function Dashboard() @{
 	let status = state("ready");

@@ -1,4 +1,4 @@
-import { box } from '@async/witness';
+import { box } from '@arcadejs/witness';
 
 // Product truth: unlike the CSR fixture, SSR-related behavior has real server
 // work. The Vite/Rolldown build must emit a server entry that renders the
@@ -25,7 +25,7 @@ export default box(
 		await expect.build.environment(build, 'client');
 		await expect.build.environment(build, 'ssr');
 		await expect.artifact.text(build, SERVER_ENTRY, {
-			contains: ['data-counter', 'type=\\"async/state\\"', 'type=\\"async/view\\"'],
+			contains: ['data-counter', 'type=\\"arcade/state\\"', 'type=\\"arcade/view\\"'],
 		});
 
 		await receipt.capture('ssr server entry rendered payload shell');

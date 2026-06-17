@@ -242,7 +242,7 @@ function unresolvedWriteDiagnostic(
 	filename: string,
 ): StateLoweringDiagnostic {
 	return {
-		code: 'AA_STATE_UNRESOLVED_WRITE',
+		code: 'ARCADE_STATE_UNRESOLVED_WRITE',
 		severity: 'error',
 		phase: 'state-lowering',
 		title: 'Cannot resolve graph write target',
@@ -259,7 +259,7 @@ function unresolvedWriteDiagnostic(
 					'Write to a state() binding, a path inside object state, or move non-graph mutation into normal local code.',
 			},
 		],
-		docsUrl: 'https://async.await.dev/errors/AA_STATE_UNRESOLVED_WRITE',
+		docsUrl: 'https://arcadejs.com/errors/ARCADE_STATE_UNRESOLVED_WRITE',
 	};
 }
 
@@ -269,7 +269,7 @@ function dynamicGraphPathReadDiagnostic(
 	filename: string,
 ): StateLoweringDiagnostic {
 	return {
-		code: 'AA_STATE_DYNAMIC_PATH_READ',
+		code: 'ARCADE_STATE_DYNAMIC_PATH_READ',
 		severity: 'error',
 		phase: 'state-lowering',
 		title: 'Cannot read from a dynamic graph path',
@@ -286,7 +286,7 @@ function dynamicGraphPathReadDiagnostic(
 					'Use a statically named property path, a literal array index, or model the dynamic lookup as a computed() with explicit compiler support.',
 			},
 		],
-		docsUrl: 'https://async.await.dev/errors/AA_STATE_DYNAMIC_PATH_READ',
+		docsUrl: 'https://arcadejs.com/errors/ARCADE_STATE_DYNAMIC_PATH_READ',
 	};
 }
 
@@ -295,7 +295,7 @@ function dynamicGraphPathWriteDiagnostic(
 	filename: string,
 ): StateLoweringDiagnostic {
 	return {
-		code: 'AA_STATE_DYNAMIC_PATH_WRITE',
+		code: 'ARCADE_STATE_DYNAMIC_PATH_WRITE',
 		severity: 'error',
 		phase: 'state-lowering',
 		title: 'Cannot write to a dynamic graph path',
@@ -312,7 +312,7 @@ function dynamicGraphPathWriteDiagnostic(
 					'Use a statically named property path, a literal array index, or a collection method with compiler coverage for this state update.',
 			},
 		],
-		docsUrl: 'https://async.await.dev/errors/AA_STATE_DYNAMIC_PATH_WRITE',
+		docsUrl: 'https://arcadejs.com/errors/ARCADE_STATE_DYNAMIC_PATH_WRITE',
 	};
 }
 
@@ -321,7 +321,7 @@ function optionalChainWriteDiagnostic(
 	filename: string,
 ): StateLoweringDiagnostic {
 	return {
-		code: 'AA_STATE_OPTIONAL_CHAIN_WRITE',
+		code: 'ARCADE_STATE_OPTIONAL_CHAIN_WRITE',
 		severity: 'error',
 		phase: 'state-lowering',
 		title: 'Cannot write graph state through optional chaining',
@@ -338,7 +338,7 @@ function optionalChainWriteDiagnostic(
 					'Guard explicitly before mutating graph state, or initialize the state path so the collection method call always has a definite target.',
 			},
 		],
-		docsUrl: 'https://async.await.dev/errors/AA_STATE_OPTIONAL_CHAIN_WRITE',
+		docsUrl: 'https://arcadejs.com/errors/ARCADE_STATE_OPTIONAL_CHAIN_WRITE',
 	};
 }
 
@@ -361,7 +361,7 @@ function restAliasExcludedPathDiagnostic({
 	const excludedPathSource = excludedAliasPath.excludedPath.join('.');
 
 	return {
-		code: 'AA_STATE_REST_ALIAS_EXCLUDED_PATH',
+		code: 'ARCADE_STATE_REST_ALIAS_EXCLUDED_PATH',
 		severity: 'error',
 		phase: 'state-lowering',
 		title: 'Cannot write through an object-rest excluded path',
@@ -378,7 +378,7 @@ function restAliasExcludedPathDiagnostic({
 					'Write through the original graph path, or use the explicit destructured alias for the excluded property.',
 			},
 		],
-		docsUrl: 'https://async.await.dev/errors/AA_STATE_REST_ALIAS_EXCLUDED_PATH',
+		docsUrl: 'https://arcadejs.com/errors/ARCADE_STATE_REST_ALIAS_EXCLUDED_PATH',
 	};
 }
 
@@ -389,7 +389,7 @@ function readOnlyWriteDiagnostic(
 	const details = readOnlyWriteDetails(binding);
 
 	return {
-		code: 'AA_STATE_READ_ONLY_WRITE',
+		code: 'ARCADE_STATE_READ_ONLY_WRITE',
 		severity: 'error',
 		phase: 'state-lowering',
 		title: 'Cannot write to a read-only graph binding',
@@ -401,7 +401,7 @@ function readOnlyWriteDiagnostic(
 		statePath: write.target,
 		source: write.target,
 		suggestions: [{ message: details.suggestion }],
-		docsUrl: 'https://async.await.dev/errors/AA_STATE_READ_ONLY_WRITE',
+		docsUrl: 'https://arcadejs.com/errors/ARCADE_STATE_READ_ONLY_WRITE',
 	};
 }
 
@@ -535,7 +535,7 @@ function isStaticBracketSegment(segment: string): boolean {
 
 function constBindingReassignmentDiagnostic(write: SemanticStateWrite): StateLoweringDiagnostic {
 	return {
-		code: 'AA_STATE_CONST_REASSIGNMENT',
+		code: 'ARCADE_STATE_CONST_REASSIGNMENT',
 		severity: 'error',
 		phase: 'state-lowering',
 		title: 'Cannot reassign a const graph binding',
@@ -552,7 +552,7 @@ function constBindingReassignmentDiagnostic(write: SemanticStateWrite): StateLow
 					'Use let for scalar state you reassign, or mutate a property path on object state such as menu.open.',
 			},
 		],
-		docsUrl: 'https://async.await.dev/errors/AA_STATE_CONST_REASSIGNMENT',
+		docsUrl: 'https://arcadejs.com/errors/ARCADE_STATE_CONST_REASSIGNMENT',
 	};
 }
 

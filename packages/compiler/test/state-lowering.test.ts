@@ -4,7 +4,7 @@ import { buildSemanticGraph } from '../src/index.ts';
 import { lowerStateAccess } from '../src/passes/state-lowering.ts';
 
 const source = `
-import { state, computed } from '@async/resumable';
+import { state, computed } from '@arcadejs/core';
 
 export function Counter() @{
 	let count = state(0);
@@ -42,7 +42,7 @@ export function Counter() @{
 `;
 
 const readOnlyWriteSource = `
-import { state, computed } from '@async/resumable';
+import { state, computed } from '@arcadejs/core';
 
 export function Counter() @{
 	let count = state(0);
@@ -59,7 +59,7 @@ export function Greeting({ label }: { label: string }) @{
 `;
 
 const constReassignmentSource = `
-import { state } from '@async/resumable';
+import { state } from '@arcadejs/core';
 
 export function Counter() @{
 	const frozenCount = state(0);
@@ -79,7 +79,7 @@ export function Counter() @{
 `;
 
 const nestedAliasSource = `
-import { state } from '@async/resumable';
+import { state } from '@arcadejs/core';
 
 export function Queue() @{
 	const groups = state([['first'], { meta: { label: 'second' } }]);
@@ -97,7 +97,7 @@ export function Queue() @{
 `;
 
 const sharedFactorySource = `
-import { shared, state, computed } from '@async/resumable';
+import { shared, state, computed } from '@arcadejs/core';
 
 export const session = shared(() => {
 	const data = state({ user: null, status: 'anonymous' });
@@ -127,7 +127,7 @@ export function Header() @{
 `;
 
 const sharedDynamicPathSource = `
-import { shared, state } from '@async/resumable';
+import { shared, state } from '@arcadejs/core';
 
 export const session = shared(() => {
 	const data = state({ status: 'anonymous' });
@@ -428,11 +428,11 @@ test('lowerStateAccess reports dynamic graph path diagnostics for shared instanc
 	expect(lowered.diagnostics).toEqual(
 		expect.arrayContaining([
 			expect.objectContaining({
-				code: 'AA_STATE_DYNAMIC_PATH_READ',
+				code: 'ARCADE_STATE_DYNAMIC_PATH_READ',
 				source: 'currentSession[statusKey]',
 			}),
 			expect.objectContaining({
-				code: 'AA_STATE_DYNAMIC_PATH_WRITE',
+				code: 'ARCADE_STATE_DYNAMIC_PATH_WRITE',
 				source: 'currentSession[statusKey]',
 			}),
 		]),
@@ -553,7 +553,7 @@ test('lowerStateAccess reports a structured diagnostic for dynamic graph path wr
 	expect(lowered.writes).toEqual([]);
 	expect(lowered.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'AA_STATE_DYNAMIC_PATH_WRITE',
+			code: 'ARCADE_STATE_DYNAMIC_PATH_WRITE',
 			severity: 'error',
 			phase: 'state-lowering',
 			passId: 'state-lowering',
@@ -569,7 +569,7 @@ test('lowerStateAccess reports a structured diagnostic for dynamic graph path wr
 			},
 			statePath: 'items[index]',
 			source: 'items[index]',
-			docsUrl: 'https://async.await.dev/errors/AA_STATE_DYNAMIC_PATH_WRITE',
+			docsUrl: 'https://arcadejs.com/errors/ARCADE_STATE_DYNAMIC_PATH_WRITE',
 		}),
 	]);
 });
@@ -619,7 +619,7 @@ test('lowerStateAccess reports a structured diagnostic for dynamic graph path re
 	expect(lowered.reads).toEqual([]);
 	expect(lowered.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'AA_STATE_DYNAMIC_PATH_READ',
+			code: 'ARCADE_STATE_DYNAMIC_PATH_READ',
 			severity: 'error',
 			phase: 'state-lowering',
 			passId: 'state-lowering',
@@ -635,7 +635,7 @@ test('lowerStateAccess reports a structured diagnostic for dynamic graph path re
 			},
 			statePath: 'items[index]',
 			source: 'items[index]',
-			docsUrl: 'https://async.await.dev/errors/AA_STATE_DYNAMIC_PATH_READ',
+			docsUrl: 'https://arcadejs.com/errors/ARCADE_STATE_DYNAMIC_PATH_READ',
 		}),
 	]);
 });
@@ -692,7 +692,7 @@ test('lowerStateAccess reports a structured diagnostic for writes to paths exclu
 	expect(lowered.writes).toEqual([]);
 	expect(lowered.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'AA_STATE_REST_ALIAS_EXCLUDED_PATH',
+			code: 'ARCADE_STATE_REST_ALIAS_EXCLUDED_PATH',
 			severity: 'error',
 			phase: 'state-lowering',
 			passId: 'state-lowering',
@@ -708,7 +708,7 @@ test('lowerStateAccess reports a structured diagnostic for writes to paths exclu
 			},
 			statePath: 'menuRest.title',
 			source: 'menuRest.title',
-			docsUrl: 'https://async.await.dev/errors/AA_STATE_REST_ALIAS_EXCLUDED_PATH',
+			docsUrl: 'https://arcadejs.com/errors/ARCADE_STATE_REST_ALIAS_EXCLUDED_PATH',
 		}),
 	]);
 });
@@ -761,7 +761,7 @@ test('lowerStateAccess reports a structured diagnostic for optional graph writes
 	expect(lowered.writes).toEqual([]);
 	expect(lowered.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'AA_STATE_OPTIONAL_CHAIN_WRITE',
+			code: 'ARCADE_STATE_OPTIONAL_CHAIN_WRITE',
 			severity: 'error',
 			phase: 'state-lowering',
 			passId: 'state-lowering',
@@ -777,7 +777,7 @@ test('lowerStateAccess reports a structured diagnostic for optional graph writes
 			},
 			statePath: 'items',
 			source: 'items',
-			docsUrl: 'https://async.await.dev/errors/AA_STATE_OPTIONAL_CHAIN_WRITE',
+			docsUrl: 'https://arcadejs.com/errors/ARCADE_STATE_OPTIONAL_CHAIN_WRITE',
 		}),
 	]);
 });
@@ -796,7 +796,7 @@ test('lowerStateAccess reports a structured diagnostic for computed writes', asy
 	);
 	expect(lowered.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'AA_STATE_READ_ONLY_WRITE',
+			code: 'ARCADE_STATE_READ_ONLY_WRITE',
 			severity: 'error',
 			phase: 'state-lowering',
 			passId: 'state-lowering',
@@ -815,7 +815,7 @@ test('lowerStateAccess reports a structured diagnostic for computed writes', asy
 						'Write to the source state that the computed value derives from, or make a separate state() value for mutable data.',
 				},
 			],
-			docsUrl: 'https://async.await.dev/errors/AA_STATE_READ_ONLY_WRITE',
+			docsUrl: 'https://arcadejs.com/errors/ARCADE_STATE_READ_ONLY_WRITE',
 		}),
 	]);
 });
@@ -843,7 +843,7 @@ test('lowerStateAccess resolves prop reads and reports prop writes as read-only'
 	);
 	expect(lowered.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'AA_STATE_READ_ONLY_WRITE',
+			code: 'ARCADE_STATE_READ_ONLY_WRITE',
 			severity: 'error',
 			phase: 'state-lowering',
 			passId: 'state-lowering',
@@ -862,7 +862,7 @@ test('lowerStateAccess resolves prop reads and reports prop writes as read-only'
 						'Write to state owned by the parent graph, or pass an event handler/shared graph method that performs the update at the owner.',
 				},
 			],
-			docsUrl: 'https://async.await.dev/errors/AA_STATE_READ_ONLY_WRITE',
+			docsUrl: 'https://arcadejs.com/errors/ARCADE_STATE_READ_ONLY_WRITE',
 		}),
 	]);
 });
@@ -897,7 +897,7 @@ test('lowerStateAccess reports a structured diagnostic for const graph binding r
 	);
 	expect(lowered.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'AA_STATE_CONST_REASSIGNMENT',
+			code: 'ARCADE_STATE_CONST_REASSIGNMENT',
 			severity: 'error',
 			phase: 'state-lowering',
 			passId: 'state-lowering',
@@ -917,10 +917,10 @@ test('lowerStateAccess reports a structured diagnostic for const graph binding r
 						'Use let for scalar state you reassign, or mutate a property path on object state such as menu.open.',
 				},
 			],
-			docsUrl: 'https://async.await.dev/errors/AA_STATE_CONST_REASSIGNMENT',
+			docsUrl: 'https://arcadejs.com/errors/ARCADE_STATE_CONST_REASSIGNMENT',
 		}),
 		expect.objectContaining({
-			code: 'AA_STATE_CONST_REASSIGNMENT',
+			code: 'ARCADE_STATE_CONST_REASSIGNMENT',
 			severity: 'error',
 			phase: 'state-lowering',
 			passId: 'state-lowering',
@@ -933,7 +933,7 @@ test('lowerStateAccess reports a structured diagnostic for const graph binding r
 				start: aliasTargetStart,
 				end: aliasTargetStart + 'menuOpen'.length,
 			},
-			docsUrl: 'https://async.await.dev/errors/AA_STATE_CONST_REASSIGNMENT',
+			docsUrl: 'https://arcadejs.com/errors/ARCADE_STATE_CONST_REASSIGNMENT',
 		}),
 	]);
 });

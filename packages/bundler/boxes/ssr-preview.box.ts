@@ -1,4 +1,4 @@
-import { box } from '@async/witness';
+import { box } from '@arcadejs/witness';
 import { runtimeSizeReport, type RuntimeSizeReport } from '../test-support/runtime-size.ts';
 
 // Product truth: SSR resumability needs server-produced HTML. This box uses the
@@ -8,9 +8,9 @@ import { runtimeSizeReport, type RuntimeSizeReport } from '../test-support/runti
 const FIXTURE = 'fixtures/vite-ssr';
 const DIST = `${FIXTURE}/dist`;
 const INDEX = `${FIXTURE}/dist/index.html`;
-const MANIFEST = `${FIXTURE}/dist/async-resumable-manifest.json`;
+const MANIFEST = `${FIXTURE}/dist/arcade-manifest.json`;
 const COUNTER = '[data-counter]';
-const REQUESTS = '/__async-resumable-fixture-requests';
+const REQUESTS = '/__arcade-fixture-requests';
 const WAIT = { timeoutMs: 10_000 };
 const MAX_INTERACTION_RUNTIME_CHUNK_GZIP_BYTES = 2_175;
 const MAX_INTERACTION_SCRIPTS_GZIP_BYTES = 2_650;
@@ -44,8 +44,8 @@ export default box(
 		});
 		const html = await preview.request('/');
 		await expect.html.contains(html, 'data-counter');
-		await expect.html.contains(html, 'type="async/state"');
-		await expect.html.contains(html, 'type="async/view"');
+		await expect.html.contains(html, 'type="arcade/state"');
+		await expect.html.contains(html, 'type="arcade/view"');
 		await expect.html.contains(html, 'data-async-resumer');
 		assertHtmlHasNoExternalScripts(html);
 

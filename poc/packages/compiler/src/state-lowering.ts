@@ -126,7 +126,10 @@ export function lowerStateLvalues(graph: TsrxSemanticGraph): StateLoweringArtifa
 	};
 }
 
-function resolveWrite(write: StateWrite, aliases: ReadonlyMap<string, AliasBinding>): ResolvedWrite {
+function resolveWrite(
+	write: StateWrite,
+	aliases: ReadonlyMap<string, AliasBinding>,
+): ResolvedWrite {
 	const sourceSegments = write.path ?? staticPathSegments(write.target);
 	const first = sourceSegments[0];
 	const alias = first ? aliases.get(first.text) : undefined;
@@ -167,7 +170,7 @@ function invalidWriteDiagnostic(input: {
 
 	if (sourceRoot && input.computedNames.has(sourceRoot)) {
 		return createDiagnostic({
-			code: 'AA_STATE_COMPUTED_READONLY',
+			code: 'ARCADE_STATE_COMPUTED_READONLY',
 			sourceTarget,
 			statePath: sourceRoot,
 			span,
@@ -180,7 +183,7 @@ function invalidWriteDiagnostic(input: {
 
 	if (computedSource) {
 		return createDiagnostic({
-			code: 'AA_STATE_COMPUTED_READONLY',
+			code: 'ARCADE_STATE_COMPUTED_READONLY',
 			sourceTarget,
 			statePath: computedSource,
 			span,
@@ -193,7 +196,7 @@ function invalidWriteDiagnostic(input: {
 
 	if (resolved.alias?.kind === 'props-path' || resolved.segments[0]?.text === 'props') {
 		return createDiagnostic({
-			code: 'AA_STATE_PROPS_READONLY',
+			code: 'ARCADE_STATE_PROPS_READONLY',
 			sourceTarget,
 			statePath: resolved.target,
 			span,
@@ -206,7 +209,7 @@ function invalidWriteDiagnostic(input: {
 
 	if (resolved.alias?.kind === 'state-path' && resolved.alias.writability === 'ambiguous-write') {
 		return createDiagnostic({
-			code: 'AA_STATE_ALIAS_AMBIGUOUS_WRITE',
+			code: 'ARCADE_STATE_ALIAS_AMBIGUOUS_WRITE',
 			sourceTarget,
 			statePath: resolved.alias.source ?? undefined,
 			span,
@@ -219,14 +222,15 @@ function invalidWriteDiagnostic(input: {
 
 	if (resolved.alias?.kind === 'state-path' && resolved.alias.writability === 'local-copy') {
 		return createDiagnostic({
-			code: 'AA_STATE_ALIAS_LOCAL_COPY',
+			code: 'ARCADE_STATE_ALIAS_LOCAL_COPY',
 			sourceTarget,
 			statePath: resolved.alias.source ?? undefined,
 			span,
 			title: 'Cannot write through local copy alias',
 			message: `The write target "${sourceTarget}" is a local value copied out of state.`,
 			why: 'Array destructuring produces a local binding here, not a stable graph path that assignment can update.',
-			suggestion: 'Write through the original state array path or use a supported collection mutation.',
+			suggestion:
+				'Write through the original state array path or use a supported collection mutation.',
 		});
 	}
 
@@ -246,7 +250,7 @@ function createDiagnostic(input: DiagnosticInput): StateLoweringDiagnostic {
 		artifactKeys: [`write:${input.sourceTarget}`],
 		statePath: input.statePath,
 		suggestions: [{ message: input.suggestion }],
-		docsUrl: `https://async-resumable.dev/errors/${input.code}`,
+		docsUrl: `https://arcadejs.com/errors/${input.code}`,
 	};
 }
 
@@ -286,7 +290,9 @@ function displayStatePath(segments: ReadonlyArray<StatePathSegment>): string {
 		}
 
 		if (segment.kind === 'literal') {
-			path += /^\d+$/.test(segment.text) ? `[${segment.text}]` : `[${JSON.stringify(segment.text)}]`;
+			path += /^\d+$/.test(segment.text)
+				? `[${segment.text}]`
+				: `[${JSON.stringify(segment.text)}]`;
 			continue;
 		}
 

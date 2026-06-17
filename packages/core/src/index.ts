@@ -11,7 +11,7 @@ export type SharedOptions = {
 export type FrameworkApiName = 'state' | 'computed' | 'element' | 'shared';
 
 export type FrameworkApiRuntimeDiagnostic = {
-	readonly code: 'AA_FRAMEWORK_API_RUNTIME_CALL';
+	readonly code: 'ARCADE_FRAMEWORK_API_RUNTIME_CALL';
 	readonly severity: 'error';
 	readonly phase: 'runtime';
 	readonly title: 'Framework API executed without compiler output';
@@ -23,24 +23,24 @@ export type FrameworkApiRuntimeDiagnostic = {
 };
 
 export class FrameworkApiRuntimeError extends Error implements FrameworkApiRuntimeDiagnostic {
-	readonly code = 'AA_FRAMEWORK_API_RUNTIME_CALL' as const;
+	readonly code = 'ARCADE_FRAMEWORK_API_RUNTIME_CALL' as const;
 	readonly severity = 'error' as const;
 	readonly phase = 'runtime' as const;
 	readonly title = 'Framework API executed without compiler output' as const;
 	readonly why: string;
 	readonly apiName: FrameworkApiName;
 	readonly suggestions: ReadonlyArray<{ readonly message: string }>;
-	readonly docsUrl = 'https://async.await.dev/errors/AA_FRAMEWORK_API_RUNTIME_CALL';
+	readonly docsUrl = 'https://arcadejs.com/errors/ARCADE_FRAMEWORK_API_RUNTIME_CALL';
 
 	constructor(apiName: FrameworkApiName) {
 		super(frameworkApiRuntimeMessage(apiName));
 		this.name = 'FrameworkApiRuntimeError';
 		this.apiName = apiName;
-		this.why = `${apiName}() is an @async/resumable framework API that must be rewritten by the .tsrx compiler before runtime execution.`;
+		this.why = `${apiName}() is an @arcadejs/core framework API that must be rewritten by the .tsrx compiler before runtime execution.`;
 		this.suggestions = [
 			{
 				message:
-					'Import this API from @async/resumable inside a .tsrx file processed by the compiler. Do not call it from plain runtime JavaScript.',
+					'Import this API from @arcadejs/core inside a .tsrx file processed by the compiler. Do not call it from plain runtime JavaScript.',
 			},
 		];
 	}
@@ -69,5 +69,5 @@ function frameworkApi<T>(name: string, ..._args: unknown[]): T {
 }
 
 function frameworkApiRuntimeMessage(name: FrameworkApiName): string {
-	return `@async/resumable ${name}() must be compiled from a .tsrx file before it can run.`;
+	return `@arcadejs/core ${name}() must be compiled from a .tsrx file before it can run.`;
 }

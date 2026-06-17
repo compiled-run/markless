@@ -1,18 +1,18 @@
 import { describe, expect, test } from 'vitest';
-import { resumableClient, resumableLib, resumableServer } from '../src/rolldown.ts';
+import { arcadeClient, arcadeLib, arcadeServer } from '../src/rolldown.ts';
 import { callOutputOptions } from './helpers.ts';
 
-type ResumableOutputOptions = {
+type ArcadeOutputOptions = {
 	codeSplitting?: {
 		groups?: Array<{ name: string }>;
 	};
 };
 
-describe('resumable chunking defaults', () => {
+describe('arcade chunking defaults', () => {
 	test('uses explicit output defaults for each environment', () => {
-		const clientOutput = callOutputOptions(resumableClient(), {
+		const clientOutput = callOutputOptions(arcadeClient(), {
 			dir: 'dist/client',
-		}) as ResumableOutputOptions;
+		}) as ArcadeOutputOptions;
 
 		expect(clientOutput).toMatchObject({
 			dir: 'dist/client',
@@ -23,36 +23,36 @@ describe('resumable chunking defaults', () => {
 			strictExecutionOrder: true,
 		});
 		expect(clientOutput.codeSplitting?.groups?.map((group) => group.name)).toEqual([
-			'async-resumable-runtime',
-			'async-resumable-symbols',
+			'arcade-runtime',
+			'arcade-symbols',
 		]);
-		expect(callOutputOptions(resumableServer(), { dir: 'dist/server' })).toMatchObject({
+		expect(callOutputOptions(arcadeServer(), { dir: 'dist/server' })).toMatchObject({
 			dir: 'dist/server',
 			chunkFileNames: 'async-[hash].js',
 			hoistTransitiveImports: false,
 		});
-		expect(callOutputOptions(resumableLib(), { entryFileNames: '[name].js' })).toEqual({
+		expect(callOutputOptions(arcadeLib(), { entryFileNames: '[name].js' })).toEqual({
 			entryFileNames: '[name].js',
 		});
 	});
 
 	test('appends user code splitting groups after framework groups', () => {
 		const userGroup = { name: 'vendor', test: /vendor/ };
-		const output = callOutputOptions(resumableClient(), {
+		const output = callOutputOptions(arcadeClient(), {
 			codeSplitting: { groups: [userGroup] },
-		}) as ResumableOutputOptions;
+		}) as ArcadeOutputOptions;
 
 		expect(output.codeSplitting?.groups?.map((group) => group.name)).toEqual([
-			'async-resumable-runtime',
-			'async-resumable-symbols',
+			'arcade-runtime',
+			'arcade-symbols',
 			'vendor',
 		]);
 		expect(output.codeSplitting?.groups?.at(-1)).toBe(userGroup);
 	});
 
 	test('rejects boolean code splitting for client builds', () => {
-		expect(() => callOutputOptions(resumableClient(), { codeSplitting: true })).toThrow(
-			'@async/resumable requires output.codeSplitting to be an object',
+		expect(() => callOutputOptions(arcadeClient(), { codeSplitting: true })).toThrow(
+			'@arcadejs/bundler requires output.codeSplitting to be an object',
 		);
 	});
 });

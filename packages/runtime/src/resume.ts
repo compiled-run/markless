@@ -1,4 +1,4 @@
-import type { ProtocolViewPayload } from '@async/resumable-protocol';
+import type { ProtocolViewPayload } from '@arcadejs/protocol';
 import type {
 	DomJournalEntry,
 	DomJournalResult,
@@ -224,7 +224,9 @@ export type ResumeRuntime = {
 	readonly disposeHost: (hostNodeId: string) => void;
 };
 
-export type RuntimeResumeErrorCode = 'AA_RESUME_LOCATOR_MISSING' | 'AA_RESUME_LOCATOR_MISMATCH';
+export type RuntimeResumeErrorCode =
+	| 'ARCADE_RESUME_LOCATOR_MISSING'
+	| 'ARCADE_RESUME_LOCATOR_MISMATCH';
 
 export type RuntimeResumeDiagnostic = {
 	readonly code: RuntimeResumeErrorCode;
@@ -1049,22 +1051,22 @@ function missingElementLocatorError(
 	locator: ResumeViewRecord['locators'][number],
 ): RuntimeResumeError {
 	return new RuntimeResumeError({
-		code: 'AA_RESUME_LOCATOR_MISSING',
+		code: 'ARCADE_RESUME_LOCATOR_MISSING',
 		severity: 'error',
 		phase: 'resume',
 		title: 'Resume locator did not match the document',
 		message: `Resume locator ${locator.hostNodeId} expected <${locator.tagName}> at DOM order index ${String(locator.index)}.`,
-		why: 'The async/view payload points at an element that was not present in the resumed document. The runtime cannot safely attach events, behaviors, element handles, or DOM updates to a missing host node.',
+		why: 'The arcade/view payload points at an element that was not present in the resumed document. The runtime cannot safely attach events, behaviors, element handles, or DOM updates to a missing host node.',
 		hostNodeId: locator.hostNodeId,
 		elementLocator: domOrderLocator(locator.index),
 		expectedTagName: locator.tagName.toLowerCase(),
 		suggestions: [
 			{
 				message:
-					'Regenerate the async/view payload from the same initial render output that the browser is resuming.',
+					'Regenerate the arcade/view payload from the same initial render output that the browser is resuming.',
 			},
 		],
-		docsUrl: 'https://async.await.dev/errors/AA_RESUME_LOCATOR_MISSING',
+		docsUrl: 'https://arcadejs.com/errors/ARCADE_RESUME_LOCATOR_MISSING',
 	});
 }
 
@@ -1074,12 +1076,12 @@ function mismatchedElementLocatorError(
 ): RuntimeResumeError {
 	const expectedTagName = locator.tagName.toLowerCase();
 	return new RuntimeResumeError({
-		code: 'AA_RESUME_LOCATOR_MISMATCH',
+		code: 'ARCADE_RESUME_LOCATOR_MISMATCH',
 		severity: 'error',
 		phase: 'resume',
 		title: 'Resume locator matched a different element',
 		message: `Resume locator ${locator.hostNodeId} expected <${expectedTagName}> at DOM order index ${String(locator.index)} but found <${actualTagName}>.`,
-		why: 'The async/view payload no longer matches the document being resumed. The runtime cannot safely reuse a DOM-order locator when the element at that position has a different tag.',
+		why: 'The arcade/view payload no longer matches the document being resumed. The runtime cannot safely reuse a DOM-order locator when the element at that position has a different tag.',
 		hostNodeId: locator.hostNodeId,
 		elementLocator: domOrderLocator(locator.index),
 		expectedTagName,
@@ -1087,10 +1089,10 @@ function mismatchedElementLocatorError(
 		suggestions: [
 			{
 				message:
-					'Resume the exact document produced with the matching async/view payload, or regenerate the payload after changing markup.',
+					'Resume the exact document produced with the matching arcade/view payload, or regenerate the payload after changing markup.',
 			},
 		],
-		docsUrl: 'https://async.await.dev/errors/AA_RESUME_LOCATOR_MISMATCH',
+		docsUrl: 'https://arcadejs.com/errors/ARCADE_RESUME_LOCATOR_MISMATCH',
 	});
 }
 
@@ -1100,21 +1102,21 @@ function missingCommentAnchorError(
 	index: number,
 ): RuntimeResumeError {
 	return new RuntimeResumeError({
-		code: 'AA_RESUME_LOCATOR_MISSING',
+		code: 'ARCADE_RESUME_LOCATOR_MISSING',
 		severity: 'error',
 		phase: 'resume',
 		title: 'Resume locator did not match the document',
 		message: `Resume locator ${boundaryId} ${anchorName} expected a comment at DOM order index ${String(index)}.`,
-		why: 'The async/view payload references an async boundary comment anchor that was not present in the resumed document. The runtime needs both comment anchors before it can replace pending, fulfilled, or rejected boundary content.',
+		why: 'The arcade/view payload references an async boundary comment anchor that was not present in the resumed document. The runtime needs both comment anchors before it can replace pending, fulfilled, or rejected boundary content.',
 		boundaryId,
 		elementLocator: domOrderCommentLocator(index),
 		suggestions: [
 			{
 				message:
-					'Keep compiler-generated async boundary comments in the initial render output and resume with the matching async/view payload.',
+					'Keep compiler-generated async boundary comments in the initial render output and resume with the matching arcade/view payload.',
 			},
 		],
-		docsUrl: 'https://async.await.dev/errors/AA_RESUME_LOCATOR_MISSING',
+		docsUrl: 'https://arcadejs.com/errors/ARCADE_RESUME_LOCATOR_MISSING',
 	});
 }
 

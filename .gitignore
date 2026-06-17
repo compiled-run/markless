@@ -1,5 +1,7 @@
 # Dependencies
 node_modules/
+.pnpm-store/
+pnpm-store/
 
 # Build and test output
 dist/

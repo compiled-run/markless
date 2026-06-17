@@ -226,7 +226,7 @@ behavior can be lazy-loaded or diagnosed independently from the others.
 
 Extracted symbols are lazy-loaded, but normal framework-owned wiring does not
 turn into QRL-like user values or per-node DOM closures. Authored event props
-compile to encoded `async/view` records:
+compile to encoded `arcade/view` records:
 
 ```txt
 DOM locator + event name + optional sync policy IR + ordered handler symbol IDs
@@ -234,7 +234,7 @@ DOM locator + event name + optional sync policy IR + ordered handler symbol IDs
 
 The generated HTML does not need an `onClick={async (...) => import(...)}` shape,
 and production output should not require per-node event attributes. The
-`async/view` arena locates nodes by DOM-order streams, skip runs, branch anchors,
+`arcade/view` arena locates nodes by DOM-order streams, skip runs, branch anchors,
 or other private locator data, then the resumer builds internal side tables such
 as `WeakMap<Element, EventRecord>`.
 
@@ -247,7 +247,7 @@ execution.
 
 Dynamic imports are owned by a generated symbol resolver, not by each event prop.
 The resolver is a page/build-scoped module or equivalent compact runtime table
-that maps symbol IDs from `async/view` to chunks and exports:
+that maps symbol IDs from `arcade/view` to chunks and exports:
 
 ```ts
 export function loadSymbol(id: number) {
@@ -265,7 +265,7 @@ export function loadSymbol(id: number) {
 The exact resolver syntax is private build output. The full symbol manifest is a
 build artifact. The browser receives only the resolver/table needed for
 the current build or page, plus enough build/protocol identity to fail closed if
-`async/view` references a symbol the resolver does not know.
+`arcade/view` references a symbol the resolver does not know.
 
 The same resolver path is used for event handlers, DOM update symbols,
 `attach={...}` behavior symbols, async computed run functions, and other lazy

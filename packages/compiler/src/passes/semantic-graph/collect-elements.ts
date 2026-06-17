@@ -218,7 +218,7 @@ function unextractableSyncPolicyDiagnostic(
 	const actionLabel = actionCall?.action ?? 'preventDefault/stopPropagation';
 
 	return {
-		code: 'AA_SYNC_POLICY_UNEXTRACTABLE',
+		code: 'ARCADE_SYNC_POLICY_UNEXTRACTABLE',
 		severity: 'error',
 		phase: 'sync-policy',
 		title: 'Cannot extract synchronous event policy',
@@ -236,7 +236,7 @@ function unextractableSyncPolicyDiagnostic(
 					'Move the browser-critical condition into graph state and simple event-field comparisons, or remove preventDefault()/stopPropagation() from the lazy handler.',
 			},
 		],
-		docsUrl: 'https://async.await.dev/errors/AA_SYNC_POLICY_UNEXTRACTABLE',
+		docsUrl: 'https://arcadejs.com/errors/ARCADE_SYNC_POLICY_UNEXTRACTABLE',
 	};
 }
 

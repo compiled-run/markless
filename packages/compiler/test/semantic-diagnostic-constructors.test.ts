@@ -27,7 +27,7 @@ test('semantic diagnostic constructors stay owned by the semantic graph pass', (
 		),
 	).toEqual(
 		expect.objectContaining({
-			code: 'AA_ASYNC_BOUNDARY_REQUIRED',
+			code: 'ARCADE_ASYNC_BOUNDARY_REQUIRED',
 			phase: 'semantic-graph',
 			passId: 'tsrx-semantic-graph',
 			artifactKeys: ['semanticGraph'],
@@ -44,7 +44,7 @@ test('semantic diagnostic constructors stay owned by the semantic graph pass', (
 		),
 	).toEqual(
 		expect.objectContaining({
-			code: 'AA_ELEMENT_HANDLE_REQUIRED',
+			code: 'ARCADE_ELEMENT_HANDLE_REQUIRED',
 			elementLocator: 'h1',
 		}),
 	);

@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite';
-import { resumable } from '../../../resumable/src/vite.ts';
+import { arcade } from '../../../arcade/src/vite.ts';
 import { fixtureSsrHost } from './src/dev-server.ts';
 
 export default defineConfig(({ command }) => ({
@@ -24,5 +24,5 @@ export default defineConfig(({ command }) => ({
 			},
 		},
 	},
-	plugins: [resumable(), fixtureSsrHost()],
+	plugins: [arcade(), fixtureSsrHost()],
 }));

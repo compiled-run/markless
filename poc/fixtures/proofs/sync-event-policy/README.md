@@ -1,7 +1,7 @@
 # Sync Event Policy Proof
 
 This fixture defines the executable-spec surface for synchronous browser event
-policy extraction in `@async/resumable`. It is not a runtime event delegation
+policy extraction in `@arcadejs/core`. It is not a runtime event delegation
 implementation, not a dynamic import resolver, and not final artifact JSON.
 
 The fixture source lives at [src/App.tsrx](./src/App.tsrx).
@@ -30,13 +30,10 @@ The same authored fixture should be consumed one layer at a time:
    `computed()` sites, host nodes, event props, event method calls, event-field
    reads, graph-state reads, and graph writes inside handlers.
 2. **Sync event policy extraction**: prove the compiler can split only the
-   synchronous browser-critical policy from the lazy handler body:
-   - `menu.open && event.key === "Escape"` allows extracting
-     `event.preventDefault()` and `event.stopPropagation()`.
-   - `shortcuts.trapArrows && (event.key === "ArrowDown" || event.key ===
-     "ArrowUp")` allows extracting `event.preventDefault()`.
-   - graph writes such as `menu.open = false` and `menu.activeIndex++` remain in
-     the lazy handler symbol.
+   synchronous browser-critical policy from the lazy handler body: - `menu.open && event.key === "Escape"` allows extracting
+   `event.preventDefault()` and `event.stopPropagation()`. - `shortcuts.trapArrows && (event.key === "ArrowDown" || event.key ===
+"ArrowUp")` allows extracting `event.preventDefault()`. - graph writes such as `menu.open = false` and `menu.activeIndex++` remain in
+   the lazy handler symbol.
 3. **Diagnostics**: reject or require an explicit eager policy for
    `src/App.tsrx` submit policy because its guard depends on `FormData` and
    `event.currentTarget` DOM state instead of only graph state plus event fields.

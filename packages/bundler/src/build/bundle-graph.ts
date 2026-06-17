@@ -4,22 +4,22 @@ import { withoutLeadingSlash } from 'ufo';
 import type {
 	BundleGraphAdder,
 	PreloadGraphEntriesAdder,
-	ResumableBundle,
-	ResumableBundleGraph,
-	ResumableManifest,
+	ArcadeBundle,
+	ArcadeBundleGraph,
+	ArcadeManifest,
 } from '../types.ts';
 
 type BundleGraphEdge = [string, string | null];
-type BundleGraphRecord = Partial<ResumableBundle>;
+type BundleGraphRecord = Partial<ArcadeBundle>;
 
 const MINIMUM_CONNECTION_BYTES_PER_SECOND = (300 * 1024) / 8;
 const SLOW_BUNDLE_TOTAL = MINIMUM_CONNECTION_BYTES_PER_SECOND * 0.5;
 const SMALL_BUNDLE_TOTAL = 1000;
 
 export function convertManifestToBundleGraph(
-	manifest: ResumableManifest,
+	manifest: ArcadeManifest,
 	bundleGraphAdders?: Set<BundleGraphAdder>,
-): ResumableBundleGraph {
+): ArcadeBundleGraph {
 	const graph = bundleGraphRecords(manifest, bundleGraphAdders);
 	const dag = defDGraph(bundleGraphEdges(graph));
 	const reduced = dag.copy();
@@ -76,7 +76,7 @@ export function createPreloadGraphAdder(addEntries: PreloadGraphEntriesAdder): B
 		});
 }
 
-function bundlesForOrigins(manifest: ResumableManifest, origins: readonly string[]) {
+function bundlesForOrigins(manifest: ArcadeManifest, origins: readonly string[]) {
 	const normalizedOrigins = new Set(origins.map(normalizeManifestOrigin));
 	const bundles: string[] = [];
 	for (const [bundleName, bundle] of Object.entries(manifest.bundles)) {
@@ -89,10 +89,7 @@ function bundlesForOrigins(manifest: ResumableManifest, origins: readonly string
 	return bundles.sort();
 }
 
-function bundleGraphRecords(
-	manifest: ResumableManifest,
-	bundleGraphAdders?: Set<BundleGraphAdder>,
-) {
+function bundleGraphRecords(manifest: ArcadeManifest, bundleGraphAdders?: Set<BundleGraphAdder>) {
 	const graph: Record<string, BundleGraphRecord> = { ...manifest.bundles };
 	for (const module of manifest.modules) {
 		for (const symbol of module.symbols) {
@@ -110,7 +107,7 @@ function bundleGraphRecords(
 		}
 	}
 	if (bundleGraphAdders) {
-		const combined = { ...manifest, bundles: graph as ResumableManifest['bundles'] };
+		const combined = { ...manifest, bundles: graph as ArcadeManifest['bundles'] };
 		for (const add of bundleGraphAdders) {
 			Object.assign(graph, add(combined));
 		}
@@ -149,7 +146,7 @@ function isSymbolGraphNode(bundle: BundleGraphRecord) {
 	return bundle.size === 0 && bundle.total === 0 && bundle.dynamicImports?.length === 1;
 }
 
-function isGraphOnlyNode(bundleName: string, manifest: ResumableManifest) {
+function isGraphOnlyNode(bundleName: string, manifest: ArcadeManifest) {
 	return !manifest.bundles[bundleName];
 }
 

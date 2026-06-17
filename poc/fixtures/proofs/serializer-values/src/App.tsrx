@@ -211,7 +211,7 @@ export function Diagnostics() @{
     // expected diagnostic: private fields and cleanup closures make this a runtime resource.
     runtimeBox,
 
-    // expected warning: suspicious secret-looking path and value should not enter async/state.
+    // expected warning: suspicious secret-looking path and value should not enter arcade/state.
     secretToken: fixtureSecretToken,
   });
 

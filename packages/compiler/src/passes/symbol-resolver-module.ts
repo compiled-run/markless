@@ -1,4 +1,4 @@
-import { ASYNC_PROTOCOL_VERSION } from '@async/resumable-protocol';
+import { ASYNC_PROTOCOL_VERSION } from '@arcadejs/protocol';
 import type { SymbolResolverModuleInput, SymbolResolverModuleManifest } from '../artifacts.ts';
 
 export function createSymbolResolverModuleManifest(
@@ -41,10 +41,10 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'',
 		'function createUnknownSymbolError(id) {',
 		'	return Object.assign(new Error(`Unknown async symbol ${id}`), {',
-		'		code: "AA_SYMBOL_UNKNOWN",',
+		'		code: "ARCADE_SYMBOL_UNKNOWN",',
 		'		phase: "resume",',
 		'		symbolId: String(id),',
-		'		docsUrl: "https://async.await.dev/errors/AA_SYMBOL_UNKNOWN",',
+		'		docsUrl: "https://arcadejs.com/errors/ARCADE_SYMBOL_UNKNOWN",',
 		'	});',
 		'}',
 		'',

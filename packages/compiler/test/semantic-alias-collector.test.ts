@@ -203,7 +203,7 @@ test('alias collector reports graph destructuring defaults instead of dropping f
 	expect(graph.aliases).toEqual([]);
 	expect(graph.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'AA_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED',
+			code: 'ARCADE_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED',
 			severity: 'error',
 			phase: 'semantic-graph',
 			passId: 'tsrx-semantic-graph',
@@ -219,7 +219,7 @@ test('alias collector reports graph destructuring defaults instead of dropping f
 			},
 			statePath: 'menu.title',
 			source: 'menuTitle = "Untitled"',
-			docsUrl: 'https://async.await.dev/errors/AA_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED',
+			docsUrl: 'https://arcadejs.com/errors/ARCADE_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED',
 		}),
 	]);
 });

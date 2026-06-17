@@ -1,5 +1,5 @@
 {
-	"name": "@async/resumable-core",
+	"name": "@arcadejs/core",
 	"version": "0.0.0",
 	"private": true,
 	"type": "module",

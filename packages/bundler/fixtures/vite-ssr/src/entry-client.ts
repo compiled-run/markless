@@ -1,4 +1,4 @@
-import { resumeEventOnlyFromPayloadDocument } from '@async/resumable/runtime/event-only-resume';
+import { resumeEventOnlyFromPayloadDocument } from '@arcadejs/runtime/event-only-resume';
 import { loadSymbol } from './root.tsrx';
 
 type ResumeContainerEventInput = {

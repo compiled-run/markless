@@ -4,9 +4,9 @@ import {
 	renderPayloadScripts,
 	deserializeGraphValue,
 } from '../src/index.ts';
-import type { ProtocolViewPayload } from '@async/resumable-protocol';
+import type { ProtocolViewPayload } from '@arcadejs/protocol';
 
-test('renderPayloadScripts emits canonical async/state and async/view data scripts', () => {
+test('renderPayloadScripts emits canonical arcade/state and arcade/view data scripts', () => {
 	const shared = { id: 1 };
 	const state = createProtocolStatePayload({
 		cells: [
@@ -37,9 +37,9 @@ test('renderPayloadScripts emits canonical async/state and async/view data scrip
 
 	const scripts = renderPayloadScripts({ state, view });
 
-	expect(scripts.stateScript).toMatch(/^<script type="async\/state">/);
+	expect(scripts.stateScript).toMatch(/^<script type="arcade\/state">/);
 	expect(scripts.stateScript).toMatch(/<\/script>$/);
-	expect(scripts.viewScript).toMatch(/^<script type="async\/view">/);
+	expect(scripts.viewScript).toMatch(/^<script type="arcade\/view">/);
 	expect(scripts.viewScript).toMatch(/<\/script>$/);
 	expect(scripts.state.cells[0].value).toBeDefined();
 

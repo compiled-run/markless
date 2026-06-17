@@ -57,12 +57,12 @@ test('runtime serializer edge cases preserve identity, cycles, classes, and diag
 	expect(artifact.diagnostics).toEqual(
 		expect.arrayContaining([
 			expect.objectContaining({
-				code: 'AA_SERIALIZE_WEAK_COLLECTION',
+				code: 'ARCADE_SERIALIZE_WEAK_COLLECTION',
 				severity: 'error',
 				statePath: 'unsupported.weakState',
 			}),
 			expect.objectContaining({
-				code: 'AA_SERIALIZE_SECRET_LEAK',
+				code: 'ARCADE_SERIALIZE_SECRET_LEAK',
 				severity: 'warning',
 				statePath: 'unsupported.secretToken',
 			}),

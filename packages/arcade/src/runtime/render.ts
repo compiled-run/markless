@@ -4,4 +4,4 @@ export {
 	type CsrRenderOptions,
 	type CsrRenderOutput,
 	type RenderTarget,
-} from '@async/resumable-runtime/render';
+} from '@arcadejs/runtime/render';

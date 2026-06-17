@@ -1,4 +1,4 @@
-import type { ProtocolStatePayload, ProtocolViewPayload } from '@async/resumable-protocol';
+import type { ProtocolStatePayload, ProtocolViewPayload } from '@arcadejs/protocol';
 import {
 	createEventOnlyResumeContainerFromPayloads,
 	type EventOnlyResumeContainer,

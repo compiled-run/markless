@@ -1,7 +1,7 @@
 # Payload Locators Proof
 
 This fixture defines the executable-spec surface for payload view/wiring
-locator planning in `@async/resumable`. It is not a compiler implementation,
+locator planning in `@arcadejs/core`. It is not a compiler implementation,
 runtime resumer implementation, browser demo, or final artifact JSON.
 
 The fixture source lives at [src/App.tsrx](./src/App.tsrx).
@@ -49,7 +49,7 @@ The same authored fixture should be consumed one layer at a time:
 4. **Runtime graph**: use planned locator records to test concrete DOM mutation
    journal entries such as `setText`, `setAttr`, `insertRange`, `removeRange`,
    `moveRange`, and `runCleanup` without virtual element nodes or child lists.
-5. **Browser resume**: materialize the `async/view` locator stream with a
+5. **Browser resume**: materialize the `arcade/view` locator stream with a
    `TreeWalker`, attach event/binding/behavior/element-handle records to real
    elements or comment anchors, and verify that static nodes do not need
    per-node attributes.

@@ -1,4 +1,4 @@
-import { render } from '@async/resumable/runtime/render';
+import { render } from '@arcadejs/runtime/render';
 import { loadSymbol, payloadState, payloadView } from './root.tsrx';
 
 const app = document.querySelector('#app');
@@ -32,7 +32,7 @@ await render(
 app.appendChild(status);
 
 if (import.meta.hot) {
-	document.addEventListener('async-resumable:update', (event) => {
+	document.addEventListener('arcade:update', (event) => {
 		event.preventDefault();
 		status.textContent = event.type;
 	});

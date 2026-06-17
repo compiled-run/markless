@@ -1,5 +1,5 @@
-import { ASYNC_PROTOCOL_VERSION, type ProtocolViewPayload } from '@async/resumable-protocol';
-import { createProtocolStatePayload } from '@async/resumable-serializer';
+import { ASYNC_PROTOCOL_VERSION, type ProtocolViewPayload } from '@arcadejs/protocol';
+import { createProtocolStatePayload } from '@arcadejs/serializer';
 import { expect, test } from 'vitest';
 import { render, renderToString } from '../src/index.ts';
 
@@ -266,8 +266,8 @@ test('renderToString emits an SSR container and omits the resumer for static out
 	expect(componentBodyRuns).toBe(1);
 	expect(html).toContain('data-async-container');
 	expect(html).toContain('<p>Static</p>');
-	expect(html).toContain('type="async/state"');
-	expect(html).toContain('type="async/view"');
+	expect(html).toContain('type="arcade/state"');
+	expect(html).toContain('type="arcade/view"');
 	expect(html).not.toContain('data-async-resumer');
 });
 
@@ -285,9 +285,9 @@ test('renderToString emits one inline resumer for SSR containers with browser tr
 	);
 
 	expect(html.match(/data-async-resumer/g)).toHaveLength(1);
-	expect(html).toContain('<script type="async/state">');
-	expect(html).toContain('<script type="async/view">');
-	expect(html.indexOf('<script type="async/view">')).toBeLessThan(
+	expect(html).toContain('<script type="arcade/state">');
+	expect(html).toContain('<script type="arcade/view">');
+	expect(html.indexOf('<script type="arcade/view">')).toBeLessThan(
 		html.indexOf('data-async-resumer'),
 	);
 	expect(html).toContain('<script data-async-resumer nonce="nonce-1">');
@@ -304,7 +304,7 @@ test('renderToString inline event resumer imports the resume module only after i
 		}),
 		{ resumeModuleUrl },
 	);
-	const view = JSON.parse(extractScriptText(html, 'async/view')) as ProtocolViewPayload;
+	const view = JSON.parse(extractScriptText(html, 'arcade/view')) as ProtocolViewPayload;
 	const resumerSource = extractResumerSource(html);
 	expect(resumerSource).not.toContain('preventDefault');
 	expect(resumerSource).not.toContain('stopPropagation');
@@ -312,7 +312,7 @@ test('renderToString inline event resumer imports the resume module only after i
 	const root = element('DIV', [button]);
 	const listeners: Array<(event: FakeEvent) => Promise<void>> = [];
 	root.querySelector = (selector) =>
-		selector === 'script[type="async/view"]' ? { textContent: JSON.stringify(view) } : null;
+		selector === 'script[type="arcade/view"]' ? { textContent: JSON.stringify(view) } : null;
 	root.addEventListener = (type, listener, options) => {
 		const capture =
 			options === true || (typeof options === 'object' && options.capture === true);
@@ -388,13 +388,13 @@ test('renderToString inline event resumer steps aside after runtime startup', as
 		}),
 		{ resumeModuleUrl },
 	);
-	const view = JSON.parse(extractScriptText(html, 'async/view')) as ProtocolViewPayload;
+	const view = JSON.parse(extractScriptText(html, 'arcade/view')) as ProtocolViewPayload;
 	const resumerSource = extractResumerSource(html);
 	const button = element('BUTTON');
 	const root = element('DIV', [button]);
 	const listeners: Array<(event: FakeEvent) => Promise<void>> = [];
 	root.querySelector = (selector) =>
-		selector === 'script[type="async/view"]' ? { textContent: JSON.stringify(view) } : null;
+		selector === 'script[type="arcade/view"]' ? { textContent: JSON.stringify(view) } : null;
 	root.addEventListener = (type, listener, options) => {
 		const capture =
 			options === true || (typeof options === 'object' && options.capture === true);
@@ -478,13 +478,13 @@ test('renderToString inline event resumer runs sync policy before importing resu
 		}),
 		{ resumeModuleUrl },
 	);
-	const view = JSON.parse(extractScriptText(html, 'async/view')) as ProtocolViewPayload;
+	const view = JSON.parse(extractScriptText(html, 'arcade/view')) as ProtocolViewPayload;
 	const resumerSource = extractResumerSource(html);
 	const button = element('BUTTON');
 	const root = element('DIV', [button]);
 	const listeners: Array<(event: FakeEvent) => Promise<void>> = [];
 	root.querySelector = (selector) =>
-		selector === 'script[type="async/view"]' ? { textContent: JSON.stringify(view) } : null;
+		selector === 'script[type="arcade/view"]' ? { textContent: JSON.stringify(view) } : null;
 	root.addEventListener = (type, listener, options) => {
 		const capture =
 			options === true || (typeof options === 'object' && options.capture === true);
@@ -590,13 +590,13 @@ test('renderToString inline event resumer evaluates sync policy before importing
 		}),
 		{ resumeModuleUrl },
 	);
-	const view = JSON.parse(extractScriptText(html, 'async/view')) as ProtocolViewPayload;
+	const view = JSON.parse(extractScriptText(html, 'arcade/view')) as ProtocolViewPayload;
 	const resumerSource = extractResumerSource(html);
 	const button = element('BUTTON');
 	const root = element('DIV', [button]);
 	const listeners: Array<(event: FakeEvent) => Promise<void>> = [];
 	root.querySelector = (selector) =>
-		selector === 'script[type="async/view"]' ? { textContent: JSON.stringify(view) } : null;
+		selector === 'script[type="arcade/view"]' ? { textContent: JSON.stringify(view) } : null;
 	root.addEventListener = (type, listener, options) => {
 		const capture =
 			options === true || (typeof options === 'object' && options.capture === true);
@@ -700,15 +700,15 @@ test('renderToString inline event resumer reads graph-backed sync policy before 
 		}),
 		{ resumeModuleUrl },
 	);
-	const state = extractScriptText(html, 'async/state');
-	const view = JSON.parse(extractScriptText(html, 'async/view')) as ProtocolViewPayload;
+	const state = extractScriptText(html, 'arcade/state');
+	const view = JSON.parse(extractScriptText(html, 'arcade/view')) as ProtocolViewPayload;
 	const resumerSource = extractResumerSource(html);
 	const button = element('BUTTON');
 	const root = element('DIV', [button]);
 	const listeners: Array<(event: FakeEvent) => Promise<void>> = [];
 	root.querySelector = (selector) => {
-		if (selector === 'script[type="async/state"]') return { textContent: state };
-		if (selector === 'script[type="async/view"]') return { textContent: JSON.stringify(view) };
+		if (selector === 'script[type="arcade/state"]') return { textContent: state };
+		if (selector === 'script[type="arcade/view"]') return { textContent: JSON.stringify(view) };
 		return null;
 	};
 	root.addEventListener = (type, listener, options) => {
@@ -813,15 +813,15 @@ test('renderToString inline event resumer reads built-in graph values for sync p
 		}),
 		{ resumeModuleUrl },
 	);
-	const state = extractScriptText(html, 'async/state');
-	const view = JSON.parse(extractScriptText(html, 'async/view')) as ProtocolViewPayload;
+	const state = extractScriptText(html, 'arcade/state');
+	const view = JSON.parse(extractScriptText(html, 'arcade/view')) as ProtocolViewPayload;
 	const resumerSource = extractResumerSource(html);
 	const button = element('BUTTON');
 	const root = element('DIV', [button]);
 	const listeners: Array<(event: FakeEvent) => Promise<void>> = [];
 	root.querySelector = (selector) => {
-		if (selector === 'script[type="async/state"]') return { textContent: state };
-		if (selector === 'script[type="async/view"]') return { textContent: JSON.stringify(view) };
+		if (selector === 'script[type="arcade/state"]') return { textContent: state };
+		if (selector === 'script[type="arcade/view"]') return { textContent: JSON.stringify(view) };
 		return null;
 	};
 	root.addEventListener = (type, listener, options) => {
@@ -890,7 +890,7 @@ test('renderToString inline event resumer reads built-in graph values for sync p
 	}
 });
 
-function extractScriptText(html: string, type: 'async/state' | 'async/view'): string {
+function extractScriptText(html: string, type: 'arcade/state' | 'arcade/view'): string {
 	const pattern = new RegExp(`<script type="${type}">([\\s\\S]*?)<\\/script>`);
 	const match = pattern.exec(html);
 	if (!match) throw new Error(`Expected ${type} script.`);

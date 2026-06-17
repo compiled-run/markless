@@ -7,7 +7,9 @@
 		"build": "vite build"
 	},
 	"dependencies": {
-		"@async/resumable": "workspace:*"
+		"@arcadejs/bundler": "workspace:*",
+		"@arcadejs/core": "workspace:*",
+		"@arcadejs/runtime": "workspace:*"
 	},
 	"devDependencies": {
 		"typescript": "catalog:",

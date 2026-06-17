@@ -1,7 +1,7 @@
 # State Lvalues Proof
 
 This fixture defines the executable-spec surface for plain JavaScript lvalue
-lowering in `@async/resumable`. It is not a compiler implementation and it does
+lowering in `@arcadejs/core`. It is not a compiler implementation and it does
 not check in expected artifact JSON.
 
 The fixture sources live at:
@@ -38,24 +38,20 @@ The same authored fixture should be consumed one layer at a time:
    member paths, array method calls, and invalid write sites.
 2. **State lowering**: prove supported writes lower through graph access while
    preserving JavaScript semantics:
-   - `count++` reads the current scalar value, writes the incremented value, and
-     returns the normal update-expression value.
-   - `count = x` replaces the scalar graph cell.
-   - `obj.x = y` writes only the `x` path.
-   - nested writes such as `obj.nested.title = value` and
-     `obj.items[index].meta.edits++` invalidate only the affected paths plus any
-     dependent aggregate/list bindings.
-   - state-array `push`, indexed assignment, nested item writes, and `splice`
-     are represented as graph writes rather than opaque whole-app rerenders.
+    - `count++` reads the current scalar value, writes the incremented value, and
+      returns the normal update-expression value.
+    - `count = x` replaces the scalar graph cell.
+    - `obj.x = y` writes only the `x` path.
+    - nested writes such as `obj.nested.title = value` and
+      `obj.items[index].meta.edits++` invalidate only the affected paths plus any
+      dependent aggregate/list bindings.
+    - state-array `push`, indexed assignment, nested item writes, and `splice`
+      are represented as graph writes rather than opaque whole-app rerenders.
 3. **Diagnostics**: reject invalid writes in `src/diagnostics.tsrx` with
    structured diagnostics that include stable codes, source spans, `phase:
-   "state-lowering"`, a short reason, and actionable suggestions:
-   - computed bindings and aliases are read-only in v1.
-   - props and destructured prop aliases are read-only in v1.
-   - destructured state aliases that cannot be mapped back to a graph path
-     without changing JavaScript semantics are diagnostics.
-   - computed-property destructuring from state is ambiguous unless a later
-     fixture proves a supported form.
+"state-lowering"`, a short reason, and actionable suggestions: - computed bindings and aliases are read-only in v1. - props and destructured prop aliases are read-only in v1. - destructured state aliases that cannot be mapped back to a graph path
+   without changing JavaScript semantics are diagnostics. - computed-property destructuring from state is ambiguous unless a later
+   fixture proves a supported form.
 4. **Payload arena planning**: consume lowered state operations to plan graph
    cells, object/list path records, subscriptions, and event records without
    requiring runtime DOM code or final compact payload encoding.

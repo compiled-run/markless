@@ -6,7 +6,8 @@
 		"build": "rolldown -c"
 	},
 	"dependencies": {
-		"@async/resumable": "workspace:*"
+		"@arcadejs/bundler": "workspace:*",
+		"@arcadejs/core": "workspace:*"
 	},
 	"devDependencies": {
 		"rolldown": "1.0.3",

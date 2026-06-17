@@ -6,19 +6,19 @@ import type {
 	HotUpdateOptions,
 	ViteDevServer,
 } from 'vite';
-import type { ResumableEnvironment } from '../types.ts';
-import { fetchableDevEnvironment, resumableEnvironment } from './environment.ts';
+import type { ArcadeEnvironment } from '../types.ts';
+import { fetchableDevEnvironment, arcadeEnvironment } from './environment.ts';
 
-export const ASYNC_RESUMABLE_DEV_CLIENT_ID = 'virtual:async-resumable-dev-client';
-export const ASYNC_RESUMABLE_DEV_CLIENT_PATH = `/@id/${ASYNC_RESUMABLE_DEV_CLIENT_ID}`;
+export const ARCADE_DEV_CLIENT_ID = 'virtual:arcade-dev-client';
+export const ARCADE_DEV_CLIENT_PATH = `/@id/${ARCADE_DEV_CLIENT_ID}`;
 
-const RESOLVED_ASYNC_RESUMABLE_DEV_CLIENT_ID = `\0${ASYNC_RESUMABLE_DEV_CLIENT_ID}`;
+const RESOLVED_ARCADE_DEV_CLIENT_ID = `\0${ARCADE_DEV_CLIENT_ID}`;
 const SOURCE_FILE_EXTENSION = /\.tsrx$/;
 
-export const ASYNC_RESUMABLE_DEV_CLIENT_SOURCE = `
+export const ARCADE_DEV_CLIENT_SOURCE = `
 if (import.meta.hot) {
-	import.meta.hot.on('async-resumable:update', (data) => {
-		const event = new CustomEvent('async-resumable:update', {
+	import.meta.hot.on('arcade:update', (data) => {
+		const event = new CustomEvent('arcade:update', {
 			cancelable: true,
 			detail: data,
 		});
@@ -33,7 +33,7 @@ interface ViteHmrOptions {
 	base: string;
 	clientEnvironment: string;
 	enabled: boolean;
-	invalidateGeneratedModules?: (parent: string, environment?: ResumableEnvironment) => string[];
+	invalidateGeneratedModules?: (parent: string, environment?: ArcadeEnvironment) => string[];
 }
 
 export function createViteHmr(options: ViteHmrOptions) {
@@ -54,15 +54,15 @@ export function createViteHmr(options: ViteHmrOptions) {
 			return undefined;
 		},
 		resolveId(id: string) {
-			if (id !== ASYNC_RESUMABLE_DEV_CLIENT_ID) {
+			if (id !== ARCADE_DEV_CLIENT_ID) {
 				return null;
 			}
 
-			return { id: RESOLVED_ASYNC_RESUMABLE_DEV_CLIENT_ID, moduleSideEffects: true };
+			return { id: RESOLVED_ARCADE_DEV_CLIENT_ID, moduleSideEffects: true };
 		},
 		load(id: string) {
-			if (id === RESOLVED_ASYNC_RESUMABLE_DEV_CLIENT_ID) {
-				return ASYNC_RESUMABLE_DEV_CLIENT_SOURCE;
+			if (id === RESOLVED_ARCADE_DEV_CLIENT_ID) {
+				return ARCADE_DEV_CLIENT_SOURCE;
 			}
 
 			return null;
@@ -72,7 +72,7 @@ export function createViteHmr(options: ViteHmrOptions) {
 				return undefined;
 			}
 
-			const env = resumableEnvironment(environment);
+			const env = arcadeEnvironment(environment);
 			if (env === 'lib') {
 				return undefined;
 			}
@@ -125,7 +125,7 @@ export function createViteHmr(options: ViteHmrOptions) {
 
 			hot.send({
 				type: 'custom',
-				event: 'async-resumable:update',
+				event: 'arcade:update',
 				data: { files: [...files], virtualModules: [...virtualModules], t: ctx.timestamp },
 			});
 
@@ -168,7 +168,7 @@ function hmrClientTags(base: string): HtmlTagDescriptor[] {
 }
 
 function injectHmrClient(html: string, base: string) {
-	if (!html || html.includes(ASYNC_RESUMABLE_DEV_CLIENT_ID)) return html;
+	if (!html || html.includes(ARCADE_DEV_CLIENT_ID)) return html;
 
 	const tags = `<script type="module" src="${hmrClientPath(base)}"></script>`;
 	if (html.includes('</head>')) return html.replace('</head>', `${tags}</head>`);
@@ -177,7 +177,7 @@ function injectHmrClient(html: string, base: string) {
 }
 
 function hmrClientPath(base: string) {
-	return joinURL(base, ASYNC_RESUMABLE_DEV_CLIENT_PATH);
+	return joinURL(base, ARCADE_DEV_CLIENT_PATH);
 }
 
 function changedFiles(modules: EnvironmentModuleNode[]) {

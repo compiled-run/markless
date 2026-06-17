@@ -1,5 +1,5 @@
 {
-	"name": "@async/resumable-serializer",
+	"name": "@arcadejs/serializer",
 	"version": "0.0.0",
 	"private": true,
 	"type": "module",
@@ -8,6 +8,6 @@
 		".": "./src/index.ts"
 	},
 	"dependencies": {
-		"@async/resumable-protocol": "workspace:*"
+		"@arcadejs/protocol": "workspace:*"
 	}
 }

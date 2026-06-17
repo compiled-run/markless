@@ -2,23 +2,23 @@ import {
 	compileTsrxModule,
 	createSymbolResolverModuleManifest,
 	emitSymbolResolverModule,
-} from '@async/resumable-compiler';
+} from '@arcadejs/compiler';
 import type {
-	ResumableTransformManifest,
-	ResumableVirtualModule,
+	ArcadeTransformManifest,
+	ArcadeVirtualModule,
 	TransformTsrxModuleInput,
 	TransformTsrxModuleResult,
 } from './types.ts';
 
-export const ASYNC_RESUMABLE_VIRTUAL_PREFIX = 'virtual:async-resumable:';
+export const ARCADE_VIRTUAL_PREFIX = 'virtual:arcade:';
 
 export async function transformTsrxModule(
 	input: TransformTsrxModuleInput,
 ): Promise<TransformTsrxModuleResult> {
 	const encodedFilename = encodeURIComponent(input.filename);
-	const payloadId = `${ASYNC_RESUMABLE_VIRTUAL_PREFIX}payload:${encodedFilename}`;
-	const resolverId = `${ASYNC_RESUMABLE_VIRTUAL_PREFIX}resolver:${encodedFilename}`;
-	const moduleManifestId = `${ASYNC_RESUMABLE_VIRTUAL_PREFIX}module-manifest:${encodedFilename}`;
+	const payloadId = `${ARCADE_VIRTUAL_PREFIX}payload:${encodedFilename}`;
+	const resolverId = `${ARCADE_VIRTUAL_PREFIX}resolver:${encodedFilename}`;
+	const moduleManifestId = `${ARCADE_VIRTUAL_PREFIX}module-manifest:${encodedFilename}`;
 	const compiled = await compileTsrxModule({
 		filename: input.filename,
 		source: input.source,
@@ -41,7 +41,7 @@ export async function transformTsrxModule(
 		resolverId,
 		symbols: symbolRows,
 	});
-	const manifest: ResumableTransformManifest = {
+	const manifest: ArcadeTransformManifest = {
 		source: input.filename,
 		payload: { virtualModuleId: payloadId },
 		resolver: { virtualModuleId: resolverId },
@@ -53,7 +53,7 @@ export async function transformTsrxModule(
 			virtualModuleId: symbolVirtualModuleId(input.filename, module.symbolId),
 		})),
 	};
-	const virtualModules: ResumableVirtualModule[] = [
+	const virtualModules: ArcadeVirtualModule[] = [
 		{
 			id: payloadId,
 			type: 'payload',
@@ -73,7 +73,7 @@ export async function transformTsrxModule(
 			}),
 		},
 		...compiled.symbolModules.modules.map(
-			(module): ResumableVirtualModule => ({
+			(module): ArcadeVirtualModule => ({
 				id: symbolVirtualModuleId(input.filename, module.symbolId),
 				type: 'symbol',
 				symbolId: module.symbolId,
@@ -97,7 +97,7 @@ export async function transformTsrxModule(
 }
 
 function symbolVirtualModuleId(filename: string, symbolId: string) {
-	return `${ASYNC_RESUMABLE_VIRTUAL_PREFIX}symbol:${encodeURIComponent(filename)}:${encodeURIComponent(symbolId)}`;
+	return `${ARCADE_VIRTUAL_PREFIX}symbol:${encodeURIComponent(filename)}:${encodeURIComponent(symbolId)}`;
 }
 
 function objectModule(value: unknown) {
@@ -137,11 +137,11 @@ function emitSourceModule(input: {
 		`import { loadSymbol, symbolManifest } from '${input.resolverId}';`,
 		`import moduleManifest from '${input.moduleManifestId}';`,
 		'',
-		`export const resumableSource = ${JSON.stringify(input.filename)};`,
+		`export const arcadeSource = ${JSON.stringify(input.filename)};`,
 		'export { loadSymbol, moduleManifest, payloadScripts, payloadState, payloadView, symbolManifest };',
 		'',
 		'export default {',
-		'	source: resumableSource,',
+		'	source: arcadeSource,',
 		'	payloadScripts,',
 		'	payloadState,',
 		'	payloadView,',

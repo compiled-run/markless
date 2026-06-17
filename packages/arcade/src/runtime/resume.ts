@@ -4,4 +4,4 @@ export {
 	type ResumePayloadDocumentInput,
 	type ResumePayloadScriptsInput,
 	type ResumePayloadScriptsResult,
-} from '@async/resumable-runtime/resume';
+} from '@arcadejs/runtime/resume';

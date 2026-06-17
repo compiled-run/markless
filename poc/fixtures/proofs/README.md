@@ -1,6 +1,6 @@
 # Proof Fixtures
 
-These fixtures are executable specs for the first `@async/resumable`
+These fixtures are executable specs for the first `@arcadejs/core`
 implementation. They are not a throwaway POC implementation.
 
 Each proof directory should contain authored `.tsrx` source and a README that
@@ -49,7 +49,7 @@ a time through failing tests.
   behavior.
 - [`resumer-script`](./resumer-script/): isolated event-only SSR inline resumer
   proof. It checks that static SSR emits no resumer, event metadata lives in
-  `async/view`, startup imports no app or symbol code, the first click imports
+  `arcade/view`, startup imports no app or symbol code, the first click imports
   the matching symbol, and the inline bootstrap reports a reproducible
   minified+gzip size against the 700 B target.
 

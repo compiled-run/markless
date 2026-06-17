@@ -1,5 +1,5 @@
 {
-	"name": "@async/resumable",
+	"name": "@arcadejs/arcade",
 	"version": "0.0.0",
 	"private": true,
 	"type": "module",
@@ -17,8 +17,8 @@
 		"./vite": "./src/vite.ts"
 	},
 	"dependencies": {
-		"@async/resumable-bundler": "workspace:*",
-		"@async/resumable-core": "workspace:*",
-		"@async/resumable-runtime": "workspace:*"
+		"@arcadejs/bundler": "workspace:*",
+		"@arcadejs/core": "workspace:*",
+		"@arcadejs/runtime": "workspace:*"
 	}
 }

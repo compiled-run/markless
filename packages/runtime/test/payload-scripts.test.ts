@@ -10,7 +10,7 @@ import {
 	resumeFromPayloadScripts,
 	RuntimePayloadError,
 } from '../src/index.ts';
-import type { ProtocolViewPayload } from '@async/resumable-protocol';
+import type { ProtocolViewPayload } from '@arcadejs/protocol';
 
 type FakeElement = {
 	readonly nodeType: 1;
@@ -75,8 +75,8 @@ function comment(data: string): FakeComment {
 function payloadDocument(stateScript: string, viewScript: string): FakePayloadDocument {
 	return {
 		scripts: {
-			'script[type="async/state"]': { textContent: scriptContent(stateScript) },
-			'script[type="async/view"]': { textContent: scriptContent(viewScript) },
+			'script[type="arcade/state"]': { textContent: scriptContent(stateScript) },
+			'script[type="arcade/view"]': { textContent: scriptContent(viewScript) },
 		},
 		querySelector(selector) {
 			return this.scripts[selector] ?? null;
@@ -85,7 +85,7 @@ function payloadDocument(stateScript: string, viewScript: string): FakePayloadDo
 }
 
 function scriptContent(script: string): string {
-	return script.replace(/^<script type="async\/(?:state|view)">/, '').replace('</script>', '');
+	return script.replace(/^<script type="arcade\/(?:state|view)">/, '').replace('</script>', '');
 }
 
 async function settleMicrotasks(count = 4): Promise<void> {
@@ -434,7 +434,7 @@ test('runtime folds received shared patch records into decoded graph state', () 
 	);
 });
 
-test('runtime decodes serialized behavior input values from async/view scripts', () => {
+test('runtime decodes serialized behavior input values from arcade/view scripts', () => {
 	const state = createProtocolStatePayload({ cells: [] });
 	const view: ProtocolViewPayload = {
 		version: 1,
@@ -484,7 +484,7 @@ test('runtime decodes serialized behavior input values from async/view scripts',
 	]);
 });
 
-test('payload document resume applies DOM journal entries through async/view locators by default', async () => {
+test('payload document resume applies DOM journal entries through arcade/view locators by default', async () => {
 	const button = element('BUTTON');
 	const root = element('SECTION', [button]);
 	const state = createProtocolStatePayload({
@@ -817,245 +817,241 @@ test('payload script resume restarts pending async computed snapshots on demand'
 });
 
 test('runtime rejects payload scripts missing required state or view fields', () => {
-	const validState = '<script type="async/state">{"version":1,"cells":[],"computed":[]}</script>';
+	const validState =
+		'<script type="arcade/state">{"version":1,"cells":[],"computed":[]}</script>';
 	const validView =
-		'<script type="async/view">{"version":1,"locators":[],"events":[],"domUpdates":[],"behaviors":[],"elementHandles":[],"asyncBoundaries":[]}</script>';
+		'<script type="arcade/view">{"version":1,"locators":[],"events":[],"domUpdates":[],"behaviors":[],"elementHandles":[],"asyncBoundaries":[]}</script>';
 
 	expect(() =>
 		decodePayloadScripts({
-			stateScript: '<script type="async/state">{"version":1}</script>',
+			stateScript: '<script type="arcade/state">{"version":1}</script>',
 			viewScript: validView,
 		}),
-	).toThrow('Invalid async/state payload: expected cells array.');
+	).toThrow('Invalid arcade/state payload: expected cells array.');
 
 	expect(() =>
 		decodePayloadScripts({
-			stateScript: '<script type="async/state">{"version":1,"cells":[]}</script>',
+			stateScript: '<script type="arcade/state">{"version":1,"cells":[]}</script>',
 			viewScript: validView,
 		}),
-	).toThrow('Invalid async/state payload: expected computed array.');
+	).toThrow('Invalid arcade/state payload: expected computed array.');
 
 	expect(() =>
 		decodePayloadScripts({
 			stateScript: validState,
-			viewScript: '<script type="async/view">{"version":1,"locators":[]}</script>',
+			viewScript: '<script type="arcade/view">{"version":1,"locators":[]}</script>',
 		}),
-	).toThrow('Invalid async/view payload: expected events array.');
+	).toThrow('Invalid arcade/view payload: expected events array.');
 });
 
 test('runtime rejects payload scripts with malformed serialized state values', () => {
 	const validView =
-		'<script type="async/view">{"version":1,"locators":[],"events":[],"domUpdates":[],"behaviors":[],"elementHandles":[],"asyncBoundaries":[]}</script>';
+		'<script type="arcade/view">{"version":1,"locators":[],"events":[],"domUpdates":[],"behaviors":[],"elementHandles":[],"asyncBoundaries":[]}</script>';
 
 	expect(() =>
 		decodePayloadScripts({
 			stateScript:
-				'<script type="async/state">{"version":1,"cells":[],"computed":[],"sharedDefinitions":[{"id":"shared:src/session.tsrx#session","name":"session","exportedName":"session","version":-1,"graphNodeIds":[]}]}</script>',
+				'<script type="arcade/state">{"version":1,"cells":[],"computed":[],"sharedDefinitions":[{"id":"shared:src/session.tsrx#session","name":"session","exportedName":"session","version":-1,"graphNodeIds":[]}]}</script>',
 			viewScript: validView,
 		}),
-	).toThrow('Invalid async/state sharedDefinitions[0]: expected version non-negative integer.');
+	).toThrow('Invalid arcade/state sharedDefinitions[0]: expected version non-negative integer.');
 
 	expect(() =>
 		decodePayloadScripts({
 			stateScript:
-				'<script type="async/state">{"version":1,"cells":[{"graphNodeId":"state:count","name":"count","valueKind":"scalar","value":{"version":1,"root":0}}],"computed":[]}</script>',
+				'<script type="arcade/state">{"version":1,"cells":[{"graphNodeId":"state:count","name":"count","valueKind":"scalar","value":{"version":1,"root":0}}],"computed":[]}</script>',
 			viewScript: validView,
 		}),
-	).toThrow('Invalid async/state cell[0].value: expected records array.');
+	).toThrow('Invalid arcade/state cell[0].value: expected records array.');
 
 	expect(() =>
 		decodePayloadScripts({
 			stateScript:
-				'<script type="async/state">{"version":1,"cells":[{"graphNodeId":"state:user","name":"user","valueKind":"object","value":{"version":1,"root":{"$type":"unknown"},"records":[]}}],"computed":[]}</script>',
+				'<script type="arcade/state">{"version":1,"cells":[{"graphNodeId":"state:user","name":"user","valueKind":"object","value":{"version":1,"root":{"$type":"unknown"},"records":[]}}],"computed":[]}</script>',
 			viewScript: validView,
 		}),
-	).toThrow('Invalid async/state cell[0].value.root: expected serialized slot.');
+	).toThrow('Invalid arcade/state cell[0].value.root: expected serialized slot.');
 
 	expect(() =>
 		decodePayloadScripts({
 			stateScript:
-				'<script type="async/state">{"version":1,"cells":[{"graphNodeId":"state:count","name":"count","valueKind":"scalar","value":{"version":1,"root":{"$type":"bigint","value":"not-a-bigint"},"records":[]}}],"computed":[]}</script>',
+				'<script type="arcade/state">{"version":1,"cells":[{"graphNodeId":"state:count","name":"count","valueKind":"scalar","value":{"version":1,"root":{"$type":"bigint","value":"not-a-bigint"},"records":[]}}],"computed":[]}</script>',
 			viewScript: validView,
 		}),
-	).toThrow('Invalid async/state cell[0].value.root: expected bigint string.');
+	).toThrow('Invalid arcade/state cell[0].value.root: expected bigint string.');
 
 	expect(() =>
 		decodePayloadScripts({
 			stateScript:
-				'<script type="async/state">{"version":1,"cells":[{"graphNodeId":"state:pattern","name":"pattern","valueKind":"object","value":{"version":1,"root":{"$ref":0},"records":[{"id":0,"type":"regexp","source":"[","flags":""}]}}],"computed":[]}</script>',
+				'<script type="arcade/state">{"version":1,"cells":[{"graphNodeId":"state:pattern","name":"pattern","valueKind":"object","value":{"version":1,"root":{"$ref":0},"records":[{"id":0,"type":"regexp","source":"[","flags":""}]}}],"computed":[]}</script>',
 			viewScript: validView,
 		}),
 	).toThrow(
-		'Invalid async/state cell[0].value.records[0]: expected valid regexp pattern and flags.',
+		'Invalid arcade/state cell[0].value.records[0]: expected valid regexp pattern and flags.',
 	);
 
 	expect(() =>
 		decodePayloadScripts({
 			stateScript:
-				'<script type="async/state">{"version":1,"cells":[],"computed":[{"graphNodeId":"computed:details","name":"details","async":true,"snapshot":{"status":"fulfilled","version":1,"key":{"version":1,"root":"ada","records":[]},"value":{"version":1,"records":[]}}}]}</script>',
+				'<script type="arcade/state">{"version":1,"cells":[],"computed":[{"graphNodeId":"computed:details","name":"details","async":true,"snapshot":{"status":"fulfilled","version":1,"key":{"version":1,"root":"ada","records":[]},"value":{"version":1,"records":[]}}}]}</script>',
 			viewScript: validView,
 		}),
-	).toThrow('Invalid async/state computed[0].snapshot.value: expected root.');
+	).toThrow('Invalid arcade/state computed[0].snapshot.value: expected root.');
 
 	expect(() =>
 		decodePayloadScripts({
 			stateScript:
-				'<script type="async/state">{"version":1,"cells":[],"computed":[{"graphNodeId":"computed:details","name":"details","async":true,"snapshot":{"status":"pending","version":1.5,"key":{"version":1,"root":"ada","records":[]}}}]}</script>',
+				'<script type="arcade/state">{"version":1,"cells":[],"computed":[{"graphNodeId":"computed:details","name":"details","async":true,"snapshot":{"status":"pending","version":1.5,"key":{"version":1,"root":"ada","records":[]}}}]}</script>',
 			viewScript: validView,
 		}),
-	).toThrow('Invalid async/state computed[0].snapshot: expected version non-negative integer.');
+	).toThrow('Invalid arcade/state computed[0].snapshot: expected version non-negative integer.');
 
 	expect(() =>
 		decodePayloadScripts({
 			stateScript:
-				'<script type="async/state">{"version":1,"cells":[],"computed":[{"graphNodeId":"computed:details","name":"details","async":true,"snapshot":{"status":"pending","version":-1,"key":{"version":1,"root":"ada","records":[]}}}]}</script>',
+				'<script type="arcade/state">{"version":1,"cells":[],"computed":[{"graphNodeId":"computed:details","name":"details","async":true,"snapshot":{"status":"pending","version":-1,"key":{"version":1,"root":"ada","records":[]}}}]}</script>',
 			viewScript: validView,
 		}),
-	).toThrow('Invalid async/state computed[0].snapshot: expected version non-negative integer.');
+	).toThrow('Invalid arcade/state computed[0].snapshot: expected version non-negative integer.');
 
 	expect(() =>
 		decodePayloadScripts({
 			stateScript:
-				'<script type="async/state">{"version":1,"cells":[{"graphNodeId":"state:bytes","name":"bytes","valueKind":"object","value":{"version":1,"root":{"$ref":0},"records":[{"id":0,"type":"typed-array","arrayType":"UnknownArray","buffer":{"$ref":1},"byteOffset":0,"length":1},{"id":1,"type":"array-buffer","bytes":[1]}]}}],"computed":[]}</script>',
-			viewScript: validView,
-		}),
-	).toThrow('Invalid async/state cell[0].value.records[0]: expected supported typed array type.');
-
-	expect(() =>
-		decodePayloadScripts({
-			stateScript:
-				'<script type="async/state">{"version":1,"cells":[{"graphNodeId":"state:user","name":"user","valueKind":"object","value":{"version":1,"root":{"$ref":0},"records":[{"id":0,"type":"object","fields":[]},{"id":0,"type":"object","fields":[]}]}}],"computed":[]}</script>',
-			viewScript: validView,
-		}),
-	).toThrow('Invalid async/state cell[0].value.records[1]: duplicate record id 0.');
-
-	expect(() =>
-		decodePayloadScripts({
-			stateScript:
-				'<script type="async/state">{"version":1,"cells":[{"graphNodeId":"state:user","name":"user","valueKind":"object","value":{"version":1,"root":{"$ref":1},"records":[{"id":0,"type":"object","fields":[]}]}}],"computed":[]}</script>',
-			viewScript: validView,
-		}),
-	).toThrow('Invalid async/state cell[0].value.root: unknown record ref 1.');
-
-	expect(() =>
-		decodePayloadScripts({
-			stateScript:
-				'<script type="async/state">{"version":1,"cells":[{"graphNodeId":"state:user","name":"user","valueKind":"object","value":{"version":1,"root":{"$ref":0},"records":[{"id":0.5,"type":"object","fields":[]}]}}],"computed":[]}</script>',
-			viewScript: validView,
-		}),
-	).toThrow('Invalid async/state cell[0].value.records[0]: expected id non-negative integer.');
-
-	expect(() =>
-		decodePayloadScripts({
-			stateScript:
-				'<script type="async/state">{"version":1,"cells":[{"graphNodeId":"state:bytes","name":"bytes","valueKind":"object","value":{"version":1,"root":{"$ref":0},"records":[{"id":0,"type":"array-buffer","bytes":[256]}]}}],"computed":[]}</script>',
-			viewScript: validView,
-		}),
-	).toThrow('Invalid async/state cell[0].value.records[0]: expected bytes byte array.');
-
-	expect(() =>
-		decodePayloadScripts({
-			stateScript:
-				'<script type="async/state">{"version":1,"cells":[{"graphNodeId":"state:bytes","name":"bytes","valueKind":"object","value":{"version":1,"root":{"$ref":0},"records":[{"id":0,"type":"typed-array","arrayType":"Uint8Array","buffer":null,"byteOffset":0,"length":1}]}}],"computed":[]}</script>',
-			viewScript: validView,
-		}),
-	).toThrow('Invalid async/state cell[0].value.records[0]: expected buffer array-buffer ref.');
-
-	expect(() =>
-		decodePayloadScripts({
-			stateScript:
-				'<script type="async/state">{"version":1,"cells":[{"graphNodeId":"state:bytes","name":"bytes","valueKind":"object","value":{"version":1,"root":{"$ref":0},"records":[{"id":0,"type":"typed-array","arrayType":"Uint16Array","buffer":{"$ref":1},"byteOffset":1,"length":1},{"id":1,"type":"array-buffer","bytes":[0,1,2,3]}]}}],"computed":[]}</script>',
+				'<script type="arcade/state">{"version":1,"cells":[{"graphNodeId":"state:bytes","name":"bytes","valueKind":"object","value":{"version":1,"root":{"$ref":0},"records":[{"id":0,"type":"typed-array","arrayType":"UnknownArray","buffer":{"$ref":1},"byteOffset":0,"length":1},{"id":1,"type":"array-buffer","bytes":[1]}]}}],"computed":[]}</script>',
 			viewScript: validView,
 		}),
 	).toThrow(
-		'Invalid async/state cell[0].value.records[0]: typed-array byteOffset must align to element byte length.',
+		'Invalid arcade/state cell[0].value.records[0]: expected supported typed array type.',
 	);
 
 	expect(() =>
 		decodePayloadScripts({
 			stateScript:
-				'<script type="async/state">{"version":1,"cells":[{"graphNodeId":"state:bytes","name":"bytes","valueKind":"object","value":{"version":1,"root":{"$ref":0},"records":[{"id":0,"type":"typed-array","arrayType":"Uint16Array","buffer":{"$ref":1},"byteOffset":0,"length":2},{"id":1,"type":"array-buffer","bytes":[0,1]}]}}],"computed":[]}</script>',
+				'<script type="arcade/state">{"version":1,"cells":[{"graphNodeId":"state:user","name":"user","valueKind":"object","value":{"version":1,"root":{"$ref":0},"records":[{"id":0,"type":"object","fields":[]},{"id":0,"type":"object","fields":[]}]}}],"computed":[]}</script>',
+			viewScript: validView,
+		}),
+	).toThrow('Invalid arcade/state cell[0].value.records[1]: duplicate record id 0.');
+
+	expect(() =>
+		decodePayloadScripts({
+			stateScript:
+				'<script type="arcade/state">{"version":1,"cells":[{"graphNodeId":"state:user","name":"user","valueKind":"object","value":{"version":1,"root":{"$ref":1},"records":[{"id":0,"type":"object","fields":[]}]}}],"computed":[]}</script>',
+			viewScript: validView,
+		}),
+	).toThrow('Invalid arcade/state cell[0].value.root: unknown record ref 1.');
+
+	expect(() =>
+		decodePayloadScripts({
+			stateScript:
+				'<script type="arcade/state">{"version":1,"cells":[{"graphNodeId":"state:user","name":"user","valueKind":"object","value":{"version":1,"root":{"$ref":0},"records":[{"id":0.5,"type":"object","fields":[]}]}}],"computed":[]}</script>',
+			viewScript: validView,
+		}),
+	).toThrow('Invalid arcade/state cell[0].value.records[0]: expected id non-negative integer.');
+
+	expect(() =>
+		decodePayloadScripts({
+			stateScript:
+				'<script type="arcade/state">{"version":1,"cells":[{"graphNodeId":"state:bytes","name":"bytes","valueKind":"object","value":{"version":1,"root":{"$ref":0},"records":[{"id":0,"type":"array-buffer","bytes":[256]}]}}],"computed":[]}</script>',
+			viewScript: validView,
+		}),
+	).toThrow('Invalid arcade/state cell[0].value.records[0]: expected bytes byte array.');
+
+	expect(() =>
+		decodePayloadScripts({
+			stateScript:
+				'<script type="arcade/state">{"version":1,"cells":[{"graphNodeId":"state:bytes","name":"bytes","valueKind":"object","value":{"version":1,"root":{"$ref":0},"records":[{"id":0,"type":"typed-array","arrayType":"Uint8Array","buffer":null,"byteOffset":0,"length":1}]}}],"computed":[]}</script>',
+			viewScript: validView,
+		}),
+	).toThrow('Invalid arcade/state cell[0].value.records[0]: expected buffer array-buffer ref.');
+
+	expect(() =>
+		decodePayloadScripts({
+			stateScript:
+				'<script type="arcade/state">{"version":1,"cells":[{"graphNodeId":"state:bytes","name":"bytes","valueKind":"object","value":{"version":1,"root":{"$ref":0},"records":[{"id":0,"type":"typed-array","arrayType":"Uint16Array","buffer":{"$ref":1},"byteOffset":1,"length":1},{"id":1,"type":"array-buffer","bytes":[0,1,2,3]}]}}],"computed":[]}</script>',
 			viewScript: validView,
 		}),
 	).toThrow(
-		'Invalid async/state cell[0].value.records[0]: typed-array byte range exceeds referenced array-buffer.',
+		'Invalid arcade/state cell[0].value.records[0]: typed-array byteOffset must align to element byte length.',
 	);
 
 	expect(() =>
 		decodePayloadScripts({
 			stateScript:
-				'<script type="async/state">{"version":1,"cells":[{"graphNodeId":"state:bytes","name":"bytes","valueKind":"object","value":{"version":1,"root":{"$ref":0},"records":[{"id":0,"type":"data-view","buffer":{"$ref":1},"byteOffset":1,"byteLength":2},{"id":1,"type":"array-buffer","bytes":[0,1]}]}}],"computed":[]}</script>',
+				'<script type="arcade/state">{"version":1,"cells":[{"graphNodeId":"state:bytes","name":"bytes","valueKind":"object","value":{"version":1,"root":{"$ref":0},"records":[{"id":0,"type":"typed-array","arrayType":"Uint16Array","buffer":{"$ref":1},"byteOffset":0,"length":2},{"id":1,"type":"array-buffer","bytes":[0,1]}]}}],"computed":[]}</script>',
 			viewScript: validView,
 		}),
 	).toThrow(
-		'Invalid async/state cell[0].value.records[0]: data-view byte range exceeds referenced array-buffer.',
+		'Invalid arcade/state cell[0].value.records[0]: typed-array byte range exceeds referenced array-buffer.',
 	);
 
 	expect(() =>
 		decodePayloadScripts({
 			stateScript:
-				'<script type="async/state">{"version":1,"cells":[{"graphNodeId":"state:user","name":"user","valueKind":"object","value":{"version":1,"root":{"$ref":-1},"records":[]}}],"computed":[]}</script>',
+				'<script type="arcade/state">{"version":1,"cells":[{"graphNodeId":"state:bytes","name":"bytes","valueKind":"object","value":{"version":1,"root":{"$ref":0},"records":[{"id":0,"type":"data-view","buffer":{"$ref":1},"byteOffset":1,"byteLength":2},{"id":1,"type":"array-buffer","bytes":[0,1]}]}}],"computed":[]}</script>',
 			viewScript: validView,
 		}),
-	).toThrow('Invalid async/state cell[0].value.root: expected $ref non-negative integer.');
+	).toThrow(
+		'Invalid arcade/state cell[0].value.records[0]: data-view byte range exceeds referenced array-buffer.',
+	);
+
+	expect(() =>
+		decodePayloadScripts({
+			stateScript:
+				'<script type="arcade/state">{"version":1,"cells":[{"graphNodeId":"state:user","name":"user","valueKind":"object","value":{"version":1,"root":{"$ref":-1},"records":[]}}],"computed":[]}</script>',
+			viewScript: validView,
+		}),
+	).toThrow('Invalid arcade/state cell[0].value.root: expected $ref non-negative integer.');
 });
 
 test('runtime rejects payload scripts with malformed nested view records', () => {
-	const validState = '<script type="async/state">{"version":1,"cells":[],"computed":[]}</script>';
+	const validState =
+		'<script type="arcade/state">{"version":1,"cells":[],"computed":[]}</script>';
 
 	expect(() =>
 		decodePayloadScripts({
 			stateScript: validState,
 			viewScript:
-				'<script type="async/view">{"version":1,"locators":[{"strategy":"dom-order","index":0,"tagName":"section"}],"events":[],"domUpdates":[],"behaviors":[],"elementHandles":[],"asyncBoundaries":[]}</script>',
+				'<script type="arcade/view">{"version":1,"locators":[{"strategy":"dom-order","index":0,"tagName":"section"}],"events":[],"domUpdates":[],"behaviors":[],"elementHandles":[],"asyncBoundaries":[]}</script>',
 		}),
-	).toThrow('Invalid async/view locator[0]: expected hostNodeId string.');
+	).toThrow('Invalid arcade/view locator[0]: expected hostNodeId string.');
 
 	expect(() =>
 		decodePayloadScripts({
 			stateScript: validState,
 			viewScript:
-				'<script type="async/view">{"version":1,"locators":[{"hostNodeId":"h0","strategy":"dom-order","index":-1,"tagName":"section"}],"events":[],"domUpdates":[],"behaviors":[],"elementHandles":[],"asyncBoundaries":[]}</script>',
+				'<script type="arcade/view">{"version":1,"locators":[{"hostNodeId":"h0","strategy":"dom-order","index":-1,"tagName":"section"}],"events":[],"domUpdates":[],"behaviors":[],"elementHandles":[],"asyncBoundaries":[]}</script>',
 		}),
-	).toThrow('Invalid async/view locator[0]: expected index non-negative integer.');
+	).toThrow('Invalid arcade/view locator[0]: expected index non-negative integer.');
 
 	expect(() =>
 		decodePayloadScripts({
 			stateScript: validState,
 			viewScript:
-				'<script type="async/view">{"version":1,"locators":[],"events":[{"hostNodeId":"h1","eventName":"click"}],"domUpdates":[],"behaviors":[],"elementHandles":[],"asyncBoundaries":[]}</script>',
+				'<script type="arcade/view">{"version":1,"locators":[],"events":[{"hostNodeId":"h1","eventName":"click"}],"domUpdates":[],"behaviors":[],"elementHandles":[],"asyncBoundaries":[]}</script>',
 		}),
-	).toThrow('Invalid async/view event[0]: expected symbolIds array.');
+	).toThrow('Invalid arcade/view event[0]: expected symbolIds array.');
 
 	expect(() =>
 		decodePayloadScripts({
 			stateScript: validState,
 			viewScript:
-				'<script type="async/view">{"version":1,"locators":[],"events":[],"domUpdates":[{"hostNodeId":"h1","source":"count","graphNodeId":"state:count","path":[],"target":{"kind":"attribute"}}],"behaviors":[],"elementHandles":[],"asyncBoundaries":[]}</script>',
+				'<script type="arcade/view">{"version":1,"locators":[],"events":[],"domUpdates":[{"hostNodeId":"h1","source":"count","graphNodeId":"state:count","path":[],"target":{"kind":"attribute"}}],"behaviors":[],"elementHandles":[],"asyncBoundaries":[]}</script>',
 		}),
-	).toThrow('Invalid async/view domUpdate[0].target: expected attribute name string.');
+	).toThrow('Invalid arcade/view domUpdate[0].target: expected attribute name string.');
 
 	expect(() =>
 		decodePayloadScripts({
 			stateScript: validState,
 			viewScript:
-				'<script type="async/view">{"version":1,"locators":[],"events":[],"domUpdates":[{"hostNodeId":"h1","source":"count","graphNodeId":"state:count","path":[],"target":{"kind":"property"}}],"behaviors":[],"elementHandles":[],"asyncBoundaries":[]}</script>',
+				'<script type="arcade/view">{"version":1,"locators":[],"events":[],"domUpdates":[{"hostNodeId":"h1","source":"count","graphNodeId":"state:count","path":[],"target":{"kind":"property"}}],"behaviors":[],"elementHandles":[],"asyncBoundaries":[]}</script>',
 		}),
-	).toThrow('Invalid async/view domUpdate[0].target: expected property name string.');
+	).toThrow('Invalid arcade/view domUpdate[0].target: expected property name string.');
 
 	expect(() =>
 		decodePayloadScripts({
 			stateScript: validState,
 			viewScript:
-				'<script type="async/view">{"version":1,"locators":[],"events":[],"domUpdates":[{"hostNodeId":"h1","source":"count","graphNodeId":"state:count","path":[],"target":{"kind":"class"}}],"behaviors":[],"elementHandles":[],"asyncBoundaries":[]}</script>',
-		}),
-	).not.toThrow();
-
-	expect(() =>
-		decodePayloadScripts({
-			stateScript: validState,
-			viewScript:
-				'<script type="async/view">{"version":1,"locators":[],"events":[],"domUpdates":[{"hostNodeId":"h1","source":"count","graphNodeId":"state:count","path":[],"target":{"kind":"style"}}],"behaviors":[],"elementHandles":[],"asyncBoundaries":[]}</script>',
+				'<script type="arcade/view">{"version":1,"locators":[],"events":[],"domUpdates":[{"hostNodeId":"h1","source":"count","graphNodeId":"state:count","path":[],"target":{"kind":"class"}}],"behaviors":[],"elementHandles":[],"asyncBoundaries":[]}</script>',
 		}),
 	).not.toThrow();
 
@@ -1063,72 +1059,81 @@ test('runtime rejects payload scripts with malformed nested view records', () =>
 		decodePayloadScripts({
 			stateScript: validState,
 			viewScript:
-				'<script type="async/view">{"version":1,"locators":[],"events":[],"domUpdates":[],"behaviors":[{"hostNodeId":"h1","source":"chart(config)","inputSources":["config"]}],"elementHandles":[],"asyncBoundaries":[]}</script>',
+				'<script type="arcade/view">{"version":1,"locators":[],"events":[],"domUpdates":[{"hostNodeId":"h1","source":"count","graphNodeId":"state:count","path":[],"target":{"kind":"style"}}],"behaviors":[],"elementHandles":[],"asyncBoundaries":[]}</script>',
 		}),
-	).toThrow('Invalid async/view behavior[0]: expected functionSource string.');
+	).not.toThrow();
 
 	expect(() =>
 		decodePayloadScripts({
 			stateScript: validState,
 			viewScript:
-				'<script type="async/view">{"version":1,"locators":[],"events":[],"domUpdates":[],"behaviors":[{"hostNodeId":"h1","source":"chart(config)","functionSource":"chart","inputSources":["config"],"inputValues":{"color":"red"}}],"elementHandles":[],"asyncBoundaries":[]}</script>',
+				'<script type="arcade/view">{"version":1,"locators":[],"events":[],"domUpdates":[],"behaviors":[{"hostNodeId":"h1","source":"chart(config)","inputSources":["config"]}],"elementHandles":[],"asyncBoundaries":[]}</script>',
 		}),
-	).toThrow('Invalid async/view behavior[0]: expected inputValues array.');
+	).toThrow('Invalid arcade/view behavior[0]: expected functionSource string.');
 
 	expect(() =>
 		decodePayloadScripts({
 			stateScript: validState,
 			viewScript:
-				'<script type="async/view">{"version":1,"locators":[],"events":[],"domUpdates":[],"behaviors":[{"hostNodeId":"h1","source":"chart(config)","functionSource":"chart","inputSources":["config"],"inputGraphReads":[{"inputIndex":"0","source":"config","graphNodeId":"state:config","path":[]}]}],"elementHandles":[],"asyncBoundaries":[]}</script>',
+				'<script type="arcade/view">{"version":1,"locators":[],"events":[],"domUpdates":[],"behaviors":[{"hostNodeId":"h1","source":"chart(config)","functionSource":"chart","inputSources":["config"],"inputValues":{"color":"red"}}],"elementHandles":[],"asyncBoundaries":[]}</script>',
+		}),
+	).toThrow('Invalid arcade/view behavior[0]: expected inputValues array.');
+
+	expect(() =>
+		decodePayloadScripts({
+			stateScript: validState,
+			viewScript:
+				'<script type="arcade/view">{"version":1,"locators":[],"events":[],"domUpdates":[],"behaviors":[{"hostNodeId":"h1","source":"chart(config)","functionSource":"chart","inputSources":["config"],"inputGraphReads":[{"inputIndex":"0","source":"config","graphNodeId":"state:config","path":[]}]}],"elementHandles":[],"asyncBoundaries":[]}</script>',
 		}),
 	).toThrow(
-		'Invalid async/view behavior[0].inputGraphReads[0]: expected inputIndex non-negative integer.',
+		'Invalid arcade/view behavior[0].inputGraphReads[0]: expected inputIndex non-negative integer.',
 	);
 
 	expect(() =>
 		decodePayloadScripts({
 			stateScript: validState,
 			viewScript:
-				'<script type="async/view">{"version":1,"locators":[],"events":[],"domUpdates":[],"behaviors":[{"hostNodeId":"h1","source":"chart(config)","functionSource":"chart","inputSources":["config"],"inputGraphReads":[{"inputIndex":0.5,"source":"config","graphNodeId":"state:config","path":[]}]}],"elementHandles":[],"asyncBoundaries":[]}</script>',
+				'<script type="arcade/view">{"version":1,"locators":[],"events":[],"domUpdates":[],"behaviors":[{"hostNodeId":"h1","source":"chart(config)","functionSource":"chart","inputSources":["config"],"inputGraphReads":[{"inputIndex":0.5,"source":"config","graphNodeId":"state:config","path":[]}]}],"elementHandles":[],"asyncBoundaries":[]}</script>',
 		}),
 	).toThrow(
-		'Invalid async/view behavior[0].inputGraphReads[0]: expected inputIndex non-negative integer.',
+		'Invalid arcade/view behavior[0].inputGraphReads[0]: expected inputIndex non-negative integer.',
 	);
 
 	expect(() =>
 		decodePayloadScripts({
 			stateScript: validState,
 			viewScript:
-				'<script type="async/view">{"version":1,"locators":[],"events":[],"domUpdates":[],"behaviors":[],"elementHandles":[],"asyncBoundaries":[{"id":"boundary:0","startAnchor":{"strategy":"dom-order-comment","index":0.5},"endAnchor":{"strategy":"dom-order-comment","index":1},"asyncReads":[]}]}</script>',
+				'<script type="arcade/view">{"version":1,"locators":[],"events":[],"domUpdates":[],"behaviors":[],"elementHandles":[],"asyncBoundaries":[{"id":"boundary:0","startAnchor":{"strategy":"dom-order-comment","index":0.5},"endAnchor":{"strategy":"dom-order-comment","index":1},"asyncReads":[]}]}</script>',
 		}),
 	).toThrow(
-		'Invalid async/view asyncBoundary[0].startAnchor: expected index non-negative integer.',
+		'Invalid arcade/view asyncBoundary[0].startAnchor: expected index non-negative integer.',
 	);
 });
 
 test('runtime rejects payload scripts with malformed sync policy records', () => {
-	const validState = '<script type="async/state">{"version":1,"cells":[],"computed":[]}</script>';
+	const validState =
+		'<script type="arcade/state">{"version":1,"cells":[],"computed":[]}</script>';
 
 	expect(() =>
 		decodePayloadScripts({
 			stateScript: validState,
 			viewScript:
-				'<script type="async/view">{"version":1,"locators":[],"events":[{"hostNodeId":"h1","eventName":"click","symbolIds":[],"syncPolicy":{"when":{"type":"event-equals","field":"key","value":"Escape"},"actions":["cancel"]}}],"domUpdates":[],"behaviors":[],"elementHandles":[],"asyncBoundaries":[]}</script>',
+				'<script type="arcade/view">{"version":1,"locators":[],"events":[{"hostNodeId":"h1","eventName":"click","symbolIds":[],"syncPolicy":{"when":{"type":"event-equals","field":"key","value":"Escape"},"actions":["cancel"]}}],"domUpdates":[],"behaviors":[],"elementHandles":[],"asyncBoundaries":[]}</script>',
 		}),
-	).toThrow('Invalid async/view event[0].syncPolicy: expected supported sync action.');
+	).toThrow('Invalid arcade/view event[0].syncPolicy: expected supported sync action.');
 
 	expect(() =>
 		decodePayloadScripts({
 			stateScript: validState,
 			viewScript:
-				'<script type="async/view">{"version":1,"locators":[],"events":[{"hostNodeId":"h1","eventName":"click","symbolIds":[],"syncPolicy":{"when":{"type":"graph-truthy","path":[]},"actions":["preventDefault"]}}],"domUpdates":[],"behaviors":[],"elementHandles":[],"asyncBoundaries":[]}</script>',
+				'<script type="arcade/view">{"version":1,"locators":[],"events":[{"hostNodeId":"h1","eventName":"click","symbolIds":[],"syncPolicy":{"when":{"type":"graph-truthy","path":[]},"actions":["preventDefault"]}}],"domUpdates":[],"behaviors":[],"elementHandles":[],"asyncBoundaries":[]}</script>',
 		}),
-	).toThrow('Invalid async/view event[0].syncPolicy.when: expected graphNodeId string.');
+	).toThrow('Invalid arcade/view event[0].syncPolicy.when: expected graphNodeId string.');
 });
 
 test('runtime payload decode errors expose structured payload diagnostics', () => {
 	const validView =
-		'<script type="async/view">{"version":1,"locators":[],"events":[],"domUpdates":[],"behaviors":[],"elementHandles":[],"asyncBoundaries":[]}</script>';
+		'<script type="arcade/view">{"version":1,"locators":[],"events":[],"domUpdates":[],"behaviors":[],"elementHandles":[],"asyncBoundaries":[]}</script>';
 	const error = captureThrown(() =>
 		decodePayloadScripts({
 			stateScript: '{"version":1,"cells":[]}',
@@ -1138,50 +1143,50 @@ test('runtime payload decode errors expose structured payload diagnostics', () =
 
 	expect(error).toBeInstanceOf(RuntimePayloadError);
 	expect(error).toMatchObject({
-		code: 'AA_PAYLOAD_INVALID',
+		code: 'ARCADE_PAYLOAD_INVALID',
 		severity: 'error',
 		phase: 'payload',
 		title: 'Invalid resumability payload',
-		payloadType: 'async/state',
-		payloadScript: 'script[type="async/state"]',
-		docsUrl: 'https://async.await.dev/errors/AA_PAYLOAD_INVALID',
+		payloadType: 'arcade/state',
+		payloadScript: 'script[type="arcade/state"]',
+		docsUrl: 'https://arcadejs.com/errors/ARCADE_PAYLOAD_INVALID',
 		suggestions: [
 			{
-				message: expect.stringContaining('async/state'),
+				message: expect.stringContaining('arcade/state'),
 			},
 		],
 	});
 	expect(error).toMatchObject({
-		message: 'Expected async/state payload script.',
-		why: expect.stringContaining('async/state'),
+		message: 'Expected arcade/state payload script.',
+		why: expect.stringContaining('arcade/state'),
 	});
 });
 
 test('runtime protocol version mismatch errors expose expected and actual versions', () => {
 	const validView =
-		'<script type="async/view">{"version":1,"locators":[],"events":[],"domUpdates":[],"behaviors":[],"elementHandles":[],"asyncBoundaries":[]}</script>';
+		'<script type="arcade/view">{"version":1,"locators":[],"events":[],"domUpdates":[],"behaviors":[],"elementHandles":[],"asyncBoundaries":[]}</script>';
 	const error = captureThrown(() =>
 		decodePayloadScripts({
 			stateScript:
-				'<script type="async/state">{"version":2,"cells":[],"computed":[]}</script>',
+				'<script type="arcade/state">{"version":2,"cells":[],"computed":[]}</script>',
 			viewScript: validView,
 		}),
 	);
 
 	expect(error).toBeInstanceOf(RuntimePayloadError);
 	expect(error).toMatchObject({
-		code: 'AA_PROTOCOL_VERSION_MISMATCH',
+		code: 'ARCADE_PROTOCOL_VERSION_MISMATCH',
 		severity: 'error',
 		phase: 'payload',
 		title: 'Unsupported resumability protocol version',
-		payloadType: 'async/state',
-		payloadScript: 'script[type="async/state"]',
+		payloadType: 'arcade/state',
+		payloadScript: 'script[type="arcade/state"]',
 		expectedVersion: 1,
 		actualVersion: 2,
-		docsUrl: 'https://async.await.dev/errors/AA_PROTOCOL_VERSION_MISMATCH',
+		docsUrl: 'https://arcadejs.com/errors/ARCADE_PROTOCOL_VERSION_MISMATCH',
 	});
 	expect(error).toMatchObject({
-		message: 'Unsupported async/state protocol version 2.',
+		message: 'Unsupported arcade/state protocol version 2.',
 		why: expect.stringContaining('version 1'),
 	});
 });

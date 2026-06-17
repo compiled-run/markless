@@ -3,8 +3,7 @@ import { rewriteGeneratedSymbolFacadeImports } from '../src/build/symbol-facade-
 
 describe('generated symbol facade cleanup', () => {
 	test('rewrites resolver imports to shared symbol chunks and removes generated facades', () => {
-		const symbolVirtualId =
-			'\0virtual:async-resumable:symbol:%2Fworkspace%2Fsrc%2Froot.tsrx:symbol%3A0';
+		const symbolVirtualId = '\0virtual:arcade:symbol:%2Fworkspace%2Fsrc%2Froot.tsrx:symbol%3A0';
 		const bundle = {
 			'build/runtime.js': {
 				type: 'chunk',
@@ -14,7 +13,7 @@ describe('generated symbol facade cleanup', () => {
 				imports: [],
 				dynamicImports: ['build/symbol-0.js'],
 				moduleIds: [
-					'\0virtual:async-resumable:resolver:%2Fworkspace%2Fsrc%2Froot.tsrx',
+					'\0virtual:arcade:resolver:%2Fworkspace%2Fsrc%2Froot.tsrx',
 					'/workspace/src/root.tsrx',
 				],
 			},
@@ -51,8 +50,7 @@ describe('generated symbol facade cleanup', () => {
 	});
 
 	test('keeps facades when the imported chunk does not export every facade export', () => {
-		const symbolVirtualId =
-			'\0virtual:async-resumable:symbol:%2Fworkspace%2Fsrc%2Froot.tsrx:symbol%3A0';
+		const symbolVirtualId = '\0virtual:arcade:symbol:%2Fworkspace%2Fsrc%2Froot.tsrx:symbol%3A0';
 		const bundle = {
 			'build/runtime.js': {
 				type: 'chunk',
@@ -62,7 +60,7 @@ describe('generated symbol facade cleanup', () => {
 				imports: [],
 				dynamicImports: ['build/symbol-0.js'],
 				moduleIds: [
-					'\0virtual:async-resumable:resolver:%2Fworkspace%2Fsrc%2Froot.tsrx',
+					'\0virtual:arcade:resolver:%2Fworkspace%2Fsrc%2Froot.tsrx',
 					'/workspace/src/root.tsrx',
 				],
 			},

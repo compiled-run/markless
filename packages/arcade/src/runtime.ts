@@ -15,4 +15,4 @@ export {
 	type ResumePayloadScriptsInput,
 	type ResumePayloadScriptsResult,
 	type SsrRenderOutput,
-} from '@async/resumable-runtime';
+} from '@arcadejs/runtime';

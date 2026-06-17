@@ -1,5 +1,5 @@
-import { createProtocolStatePayload } from '@async/resumable-serializer';
-import type { ProtocolStatePayload } from '@async/resumable-protocol';
+import { createProtocolStatePayload } from '@arcadejs/serializer';
+import type { ProtocolStatePayload } from '@arcadejs/protocol';
 import type { ProtocolStatePayloadInput, SemanticSharedReturnProperty } from '../artifacts.ts';
 
 export function createProtocolStatePayloadFromArena(

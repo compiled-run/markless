@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { buildSemanticGraph } from '../src/index.ts';
 
 const moduleScopeSource = `
-import { state, computed } from '@async/resumable';
+import { state, computed } from '@arcadejs/core';
 
 const leaked = state(0);
 export const doubled = computed(() => leaked * 2);
@@ -23,7 +23,7 @@ export function Counter() @{
 `;
 
 const asyncPostAwaitReadSource = `
-import { state, computed } from '@async/resumable';
+import { state, computed } from '@arcadejs/core';
 
 export function UserRoute(route: { params: { userId: string } }) @{
 	const settings = state({ locale: 'en' });
@@ -44,7 +44,7 @@ export function UserRoute(route: { params: { userId: string } }) @{
 `;
 
 const missingAsyncBoundarySource = `
-import { computed } from '@async/resumable';
+import { computed } from '@arcadejs/core';
 
 export function UserRoute() @{
 	const user = computed(async ({ signal }) => {
@@ -57,7 +57,7 @@ export function UserRoute() @{
 `;
 
 const transitiveAsyncBoundarySource = `
-import { computed } from '@async/resumable';
+import { computed } from '@arcadejs/core';
 
 export function UserRoute() @{
 	const user = computed(async ({ signal }) => {
@@ -71,7 +71,7 @@ export function UserRoute() @{
 `;
 
 const elementHandleDiagnosticsSource = `
-import { state, element } from '@async/resumable';
+import { state, element } from '@arcadejs/core';
 
 export function Handles() @{
 	const menu = state({ open: false });
@@ -86,7 +86,7 @@ export function Handles() @{
 `;
 
 const elementHandleInStateSource = `
-import { state, element } from '@async/resumable';
+import { state, element } from '@arcadejs/core';
 
 export function Handles() @{
 	let input = element<HTMLInputElement>();
@@ -97,7 +97,7 @@ export function Handles() @{
 `;
 
 const componentAttachSource = `
-import { state } from '@async/resumable';
+import { state } from '@arcadejs/core';
 
 function ChartWrapper() @{
 	<canvas />
@@ -113,7 +113,7 @@ export function Dashboard() @{
 `;
 
 const unextractableSyncPolicySource = `
-import { state } from '@async/resumable';
+import { state } from '@arcadejs/core';
 
 export function Form() @{
 	const allowSubmit = state(false);
@@ -133,7 +133,7 @@ export function Form() @{
 `;
 
 const graphDestructureDefaultSource = `
-import { state } from '@async/resumable';
+import { state } from '@arcadejs/core';
 
 export function Menu() @{
 	const menu = state({ title: undefined });
@@ -144,7 +144,7 @@ export function Menu() @{
 `;
 
 const sharedCycleSource = `
-import { shared } from '@async/resumable';
+import { shared } from '@arcadejs/core';
 
 export const session = shared(() => {
 	const c = cart();
@@ -173,7 +173,7 @@ test('buildSemanticGraph reports module-scope graph state creation', async () =>
 	expect(graph.graphBindings).toEqual([]);
 	expect(graph.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'AA_STATE_MODULE_SCOPE',
+			code: 'ARCADE_STATE_MODULE_SCOPE',
 			severity: 'error',
 			phase: 'semantic-graph',
 			passId: 'tsrx-semantic-graph',
@@ -192,10 +192,10 @@ test('buildSemanticGraph reports module-scope graph state creation', async () =>
 						'Move state() or computed() creation into a component or declare request/container/page state with shared().',
 				},
 			],
-			docsUrl: 'https://async.await.dev/errors/AA_STATE_MODULE_SCOPE',
+			docsUrl: 'https://arcadejs.com/errors/ARCADE_STATE_MODULE_SCOPE',
 		}),
 		expect.objectContaining({
-			code: 'AA_STATE_MODULE_SCOPE',
+			code: 'ARCADE_STATE_MODULE_SCOPE',
 			severity: 'error',
 			phase: 'semantic-graph',
 			passId: 'tsrx-semantic-graph',
@@ -207,7 +207,7 @@ test('buildSemanticGraph reports module-scope graph state creation', async () =>
 				start: computedStart,
 				end: computedStart + 'computed(() => leaked * 2)'.length,
 			},
-			docsUrl: 'https://async.await.dev/errors/AA_STATE_MODULE_SCOPE',
+			docsUrl: 'https://arcadejs.com/errors/ARCADE_STATE_MODULE_SCOPE',
 		}),
 	]);
 });
@@ -221,7 +221,7 @@ test('buildSemanticGraph reports shared definition dependency cycles', async () 
 
 	expect(graph.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'AA_SHARED_DEFINITION_CYCLE',
+			code: 'ARCADE_SHARED_DEFINITION_CYCLE',
 			severity: 'error',
 			phase: 'semantic-graph',
 			passId: 'tsrx-semantic-graph',
@@ -234,7 +234,7 @@ test('buildSemanticGraph reports shared definition dependency cycles', async () 
 				start: cycleStart,
 				end: cycleStart + 'session()'.length,
 			},
-			docsUrl: 'https://async.await.dev/errors/AA_SHARED_DEFINITION_CYCLE',
+			docsUrl: 'https://arcadejs.com/errors/ARCADE_SHARED_DEFINITION_CYCLE',
 		}),
 	]);
 });
@@ -251,14 +251,14 @@ test('buildSemanticGraph reports missing framework API imports', async () => {
 	expect(graph.graphBindings).toEqual([]);
 	expect(graph.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'AA_FRAMEWORK_IMPORT_REQUIRED',
+			code: 'ARCADE_FRAMEWORK_IMPORT_REQUIRED',
 			severity: 'error',
 			phase: 'semantic-graph',
 			passId: 'tsrx-semantic-graph',
 			artifactKeys: ['semanticGraph'],
 			title: 'Framework API must be imported',
-			message: 'Cannot use state() until it is imported from @async/resumable.',
-			why: 'state() is a compiler-rewritten @async/resumable API. The import makes ownership explicit for TypeScript, editors, junior developers, and AI agents.',
+			message: 'Cannot use state() until it is imported from @arcadejs/core.',
+			why: 'state() is a compiler-rewritten @arcadejs/core API. The import makes ownership explicit for TypeScript, editors, junior developers, and AI agents.',
 			primarySpan: {
 				filename: 'src/Counter.tsrx',
 				start: stateStart,
@@ -266,14 +266,14 @@ test('buildSemanticGraph reports missing framework API imports', async () => {
 			},
 			suggestions: [
 				{
-					message: "Add `import { state } from '@async/resumable';` to this .tsrx file.",
+					message: "Add `import { state } from '@arcadejs/core';` to this .tsrx file.",
 				},
 			],
-			docsUrl: 'https://async.await.dev/errors/AA_FRAMEWORK_IMPORT_REQUIRED',
+			docsUrl: 'https://arcadejs.com/errors/ARCADE_FRAMEWORK_IMPORT_REQUIRED',
 		}),
 		expect.objectContaining({
-			code: 'AA_FRAMEWORK_IMPORT_REQUIRED',
-			message: 'Cannot use computed() until it is imported from @async/resumable.',
+			code: 'ARCADE_FRAMEWORK_IMPORT_REQUIRED',
+			message: 'Cannot use computed() until it is imported from @arcadejs/core.',
 			primarySpan: {
 				filename: 'src/Counter.tsrx',
 				start: computedStart,
@@ -281,14 +281,13 @@ test('buildSemanticGraph reports missing framework API imports', async () => {
 			},
 			suggestions: [
 				{
-					message:
-						"Add `import { computed } from '@async/resumable';` to this .tsrx file.",
+					message: "Add `import { computed } from '@arcadejs/core';` to this .tsrx file.",
 				},
 			],
 		}),
 		expect.objectContaining({
-			code: 'AA_FRAMEWORK_IMPORT_REQUIRED',
-			message: 'Cannot use element() until it is imported from @async/resumable.',
+			code: 'ARCADE_FRAMEWORK_IMPORT_REQUIRED',
+			message: 'Cannot use element() until it is imported from @arcadejs/core.',
 			primarySpan: {
 				filename: 'src/Counter.tsrx',
 				start: elementStart,
@@ -296,8 +295,7 @@ test('buildSemanticGraph reports missing framework API imports', async () => {
 			},
 			suggestions: [
 				{
-					message:
-						"Add `import { element } from '@async/resumable';` to this .tsrx file.",
+					message: "Add `import { element } from '@arcadejs/core';` to this .tsrx file.",
 				},
 			],
 		}),
@@ -320,7 +318,7 @@ test('buildSemanticGraph reports unextractable synchronous event policy', async 
 	]);
 	expect(graph.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'AA_SYNC_POLICY_UNEXTRACTABLE',
+			code: 'ARCADE_SYNC_POLICY_UNEXTRACTABLE',
 			severity: 'error',
 			phase: 'sync-policy',
 			passId: 'tsrx-semantic-graph',
@@ -340,7 +338,7 @@ test('buildSemanticGraph reports unextractable synchronous event policy', async 
 						'Move the browser-critical condition into graph state and simple event-field comparisons, or remove preventDefault()/stopPropagation() from the lazy handler.',
 				},
 			],
-			docsUrl: 'https://async.await.dev/errors/AA_SYNC_POLICY_UNEXTRACTABLE',
+			docsUrl: 'https://arcadejs.com/errors/ARCADE_SYNC_POLICY_UNEXTRACTABLE',
 		}),
 	]);
 });
@@ -354,7 +352,7 @@ test('buildSemanticGraph reports reactive reads after await in async computed bo
 
 	expect(graph.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'AA_ASYNC_POST_AWAIT_READ',
+			code: 'ARCADE_ASYNC_POST_AWAIT_READ',
 			severity: 'error',
 			phase: 'semantic-graph',
 			passId: 'tsrx-semantic-graph',
@@ -374,13 +372,13 @@ test('buildSemanticGraph reports reactive reads after await in async computed bo
 						'Read the graph value before the first await, or split post-await formatting into a separate sync computed().',
 				},
 			],
-			docsUrl: 'https://async.await.dev/errors/AA_ASYNC_POST_AWAIT_READ',
+			docsUrl: 'https://arcadejs.com/errors/ARCADE_ASYNC_POST_AWAIT_READ',
 		}),
 	]);
 	expect(graph.diagnostics).not.toEqual(
 		expect.arrayContaining([
 			expect.objectContaining({
-				code: 'AA_ASYNC_POST_AWAIT_READ',
+				code: 'ARCADE_ASYNC_POST_AWAIT_READ',
 				message: expect.stringContaining('route.params.userId'),
 			}),
 		]),
@@ -396,7 +394,7 @@ test('buildSemanticGraph reports async computed template reads outside async bou
 
 	expect(graph.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'AA_ASYNC_BOUNDARY_REQUIRED',
+			code: 'ARCADE_ASYNC_BOUNDARY_REQUIRED',
 			severity: 'error',
 			phase: 'semantic-graph',
 			passId: 'tsrx-semantic-graph',
@@ -416,7 +414,7 @@ test('buildSemanticGraph reports async computed template reads outside async bou
 						'Wrap this template read in @try with @pending and @catch branches, or read a sync computed that is already guarded by an async boundary.',
 				},
 			],
-			docsUrl: 'https://async.await.dev/errors/AA_ASYNC_BOUNDARY_REQUIRED',
+			docsUrl: 'https://arcadejs.com/errors/ARCADE_ASYNC_BOUNDARY_REQUIRED',
 		}),
 	]);
 });
@@ -447,7 +445,7 @@ test('buildSemanticGraph reports sync computed reads that transitively depend on
 	);
 	expect(graph.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'AA_ASYNC_BOUNDARY_REQUIRED',
+			code: 'ARCADE_ASYNC_BOUNDARY_REQUIRED',
 			severity: 'error',
 			phase: 'semantic-graph',
 			passId: 'tsrx-semantic-graph',
@@ -460,7 +458,7 @@ test('buildSemanticGraph reports sync computed reads that transitively depend on
 				start: invalidReadStart,
 				end: invalidReadStart + 'userName'.length,
 			},
-			docsUrl: 'https://async.await.dev/errors/AA_ASYNC_BOUNDARY_REQUIRED',
+			docsUrl: 'https://arcadejs.com/errors/ARCADE_ASYNC_BOUNDARY_REQUIRED',
 		}),
 	]);
 });
@@ -475,7 +473,7 @@ test('buildSemanticGraph reports invalid and duplicate element handle bindings',
 
 	expect(graph.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'AA_ELEMENT_HANDLE_REQUIRED',
+			code: 'ARCADE_ELEMENT_HANDLE_REQUIRED',
 			severity: 'error',
 			phase: 'semantic-graph',
 			passId: 'tsrx-semantic-graph',
@@ -495,10 +493,10 @@ test('buildSemanticGraph reports invalid and duplicate element handle bindings',
 						'Create a handle with element<T>() and bind that handle with el={handle}. Keep DOM-backed resources in attach={...}.',
 				},
 			],
-			docsUrl: 'https://async.await.dev/errors/AA_ELEMENT_HANDLE_REQUIRED',
+			docsUrl: 'https://arcadejs.com/errors/ARCADE_ELEMENT_HANDLE_REQUIRED',
 		}),
 		expect.objectContaining({
-			code: 'AA_ELEMENT_HANDLE_DUPLICATE',
+			code: 'ARCADE_ELEMENT_HANDLE_DUPLICATE',
 			severity: 'error',
 			phase: 'semantic-graph',
 			passId: 'tsrx-semantic-graph',
@@ -518,7 +516,7 @@ test('buildSemanticGraph reports invalid and duplicate element handle bindings',
 						'Create a separate element() handle for each host element, or move repeated element access into keyed state and behavior records.',
 				},
 			],
-			docsUrl: 'https://async.await.dev/errors/AA_ELEMENT_HANDLE_DUPLICATE',
+			docsUrl: 'https://arcadejs.com/errors/ARCADE_ELEMENT_HANDLE_DUPLICATE',
 		}),
 	]);
 });
@@ -532,7 +530,7 @@ test('buildSemanticGraph reports element handles stored in state', async () => {
 
 	expect(graph.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'AA_STATE_ELEMENT_HANDLE_UNSERIALIZABLE',
+			code: 'ARCADE_STATE_ELEMENT_HANDLE_UNSERIALIZABLE',
 			severity: 'error',
 			phase: 'semantic-graph',
 			passId: 'tsrx-semantic-graph',
@@ -540,7 +538,7 @@ test('buildSemanticGraph reports element handles stored in state', async () => {
 			title: 'element() handles cannot be stored in state',
 			message:
 				'Cannot store element handle "input" in state "saved" because element handles are DOM locators, not serializable graph data.',
-			why: 'state() values are serialized into async/state and resumed without running component bodies. An element() handle resolves through DOM locator metadata and must stay outside serialized graph state.',
+			why: 'state() values are serialized into arcade/state and resumed without running component bodies. An element() handle resolves through DOM locator metadata and must stay outside serialized graph state.',
 			primarySpan: {
 				filename: 'src/Handles.tsrx',
 				start: handleStart,
@@ -554,7 +552,7 @@ test('buildSemanticGraph reports element handles stored in state', async () => {
 						'Keep element handles in element() bindings and bind them with el={handle}. Store serializable ids, flags, or data in state() instead.',
 				},
 			],
-			docsUrl: 'https://async.await.dev/errors/AA_STATE_ELEMENT_HANDLE_UNSERIALIZABLE',
+			docsUrl: 'https://arcadejs.com/errors/ARCADE_STATE_ELEMENT_HANDLE_UNSERIALIZABLE',
 		}),
 	]);
 });
@@ -569,7 +567,7 @@ test('buildSemanticGraph reports attach on components instead of treating it as 
 	expect(graph.behaviors).toEqual([]);
 	expect(graph.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'AA_ATTACH_HOST_ELEMENT_REQUIRED',
+			code: 'ARCADE_ATTACH_HOST_ELEMENT_REQUIRED',
 			severity: 'error',
 			phase: 'semantic-graph',
 			passId: 'tsrx-semantic-graph',
@@ -589,7 +587,7 @@ test('buildSemanticGraph reports attach on components instead of treating it as 
 						'Move attach={...} to a host element such as <canvas>, or make the component forward behavior to a known host element in its own TSRX body.',
 				},
 			],
-			docsUrl: 'https://async.await.dev/errors/AA_ATTACH_HOST_ELEMENT_REQUIRED',
+			docsUrl: 'https://arcadejs.com/errors/ARCADE_ATTACH_HOST_ELEMENT_REQUIRED',
 		}),
 	]);
 });
@@ -604,7 +602,7 @@ test('buildSemanticGraph reports graph destructuring defaults as unsupported ali
 	expect(graph.aliases).toEqual([]);
 	expect(graph.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'AA_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED',
+			code: 'ARCADE_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED',
 			severity: 'error',
 			phase: 'semantic-graph',
 			passId: 'tsrx-semantic-graph',
@@ -620,7 +618,7 @@ test('buildSemanticGraph reports graph destructuring defaults as unsupported ali
 			},
 			statePath: 'menu.title',
 			source: 'menuTitle = "Untitled"',
-			docsUrl: 'https://async.await.dev/errors/AA_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED',
+			docsUrl: 'https://arcadejs.com/errors/ARCADE_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED',
 		}),
 	]);
 });

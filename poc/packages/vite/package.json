@@ -1,5 +1,5 @@
 {
-	"name": "@async/resumable-vite",
+	"name": "@arcadejs/vite",
 	"version": "0.0.0",
 	"private": true,
 	"type": "module",

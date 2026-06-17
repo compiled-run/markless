@@ -1,4 +1,4 @@
-import { renderPayloadScripts } from '@async/resumable-serializer';
+import { renderPayloadScripts } from '@arcadejs/serializer';
 import type { PayloadScriptsArtifact, PayloadScriptsInput } from '../artifacts.ts';
 
 export function renderPayloadScriptArtifact(input: PayloadScriptsInput): PayloadScriptsArtifact {

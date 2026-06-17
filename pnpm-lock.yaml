@@ -26,7 +26,7 @@ importers:
 
   .:
     devDependencies:
-      '@async/witness':
+      '@arcadejs/witness':
         specifier: link:../witness
         version: link:../witness
       '@types/node':
@@ -48,9 +48,21 @@ importers:
         specifier: 4.1.5
         version: 4.1.5(@types/node@24.12.2)(vite@8.0.16(@types/node@24.12.2))
 
+  packages/arcade:
+    dependencies:
+      '@arcadejs/bundler':
+        specifier: workspace:*
+        version: link:../bundler
+      '@arcadejs/core':
+        specifier: workspace:*
+        version: link:../core
+      '@arcadejs/runtime':
+        specifier: workspace:*
+        version: link:../runtime
+
   packages/bundler:
     dependencies:
-      '@async/resumable-compiler':
+      '@arcadejs/compiler':
         specifier: workspace:*
         version: link:../compiler
       '@thi.ng/dgraph':
@@ -71,9 +83,12 @@ importers:
 
   packages/bundler/fixtures/rolldown-basic:
     dependencies:
-      '@async/resumable':
+      '@arcadejs/bundler':
         specifier: workspace:*
-        version: link:../../../resumable
+        version: link:../..
+      '@arcadejs/core':
+        specifier: workspace:*
+        version: link:../../../core
     devDependencies:
       rolldown:
         specifier: 1.0.3
@@ -84,9 +99,15 @@ importers:
 
   packages/bundler/fixtures/vite-csr:
     dependencies:
-      '@async/resumable':
+      '@arcadejs/bundler':
         specifier: workspace:*
-        version: link:../../../resumable
+        version: link:../..
+      '@arcadejs/core':
+        specifier: workspace:*
+        version: link:../../../core
+      '@arcadejs/runtime':
+        specifier: workspace:*
+        version: link:../../../runtime
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -97,9 +118,12 @@ importers:
 
   packages/bundler/fixtures/vite-library:
     dependencies:
-      '@async/resumable':
+      '@arcadejs/bundler':
         specifier: workspace:*
-        version: link:../../../resumable
+        version: link:../..
+      '@arcadejs/core':
+        specifier: workspace:*
+        version: link:../../../core
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -110,9 +134,15 @@ importers:
 
   packages/bundler/fixtures/vite-plus:
     dependencies:
-      '@async/resumable':
+      '@arcadejs/bundler':
         specifier: workspace:*
-        version: link:../../../resumable
+        version: link:../..
+      '@arcadejs/core':
+        specifier: workspace:*
+        version: link:../../../core
+      '@arcadejs/runtime':
+        specifier: workspace:*
+        version: link:../../../runtime
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -129,9 +159,15 @@ importers:
 
   packages/bundler/fixtures/vite-ssr:
     dependencies:
-      '@async/resumable':
+      '@arcadejs/bundler':
         specifier: workspace:*
-        version: link:../../../resumable
+        version: link:../..
+      '@arcadejs/core':
+        specifier: workspace:*
+        version: link:../../../core
+      '@arcadejs/runtime':
+        specifier: workspace:*
+        version: link:../../../runtime
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -142,10 +178,10 @@ importers:
 
   packages/compiler:
     dependencies:
-      '@async/resumable-protocol':
+      '@arcadejs/protocol':
         specifier: workspace:*
         version: link:../protocol
-      '@async/resumable-serializer':
+      '@arcadejs/serializer':
         specifier: workspace:*
         version: link:../serializer
       '@tsrx/core':
@@ -156,42 +192,30 @@ importers:
 
   packages/protocol: {}
 
-  packages/resumable:
-    dependencies:
-      '@async/resumable-bundler':
-        specifier: workspace:*
-        version: link:../bundler
-      '@async/resumable-core':
-        specifier: workspace:*
-        version: link:../core
-      '@async/resumable-runtime':
-        specifier: workspace:*
-        version: link:../runtime
-
   packages/runtime:
     dependencies:
-      '@async/resumable-protocol':
+      '@arcadejs/protocol':
         specifier: workspace:*
         version: link:../protocol
-      '@async/resumable-serializer':
+      '@arcadejs/serializer':
         specifier: workspace:*
         version: link:../serializer
 
   packages/serializer:
     dependencies:
-      '@async/resumable-protocol':
+      '@arcadejs/protocol':
         specifier: workspace:*
         version: link:../protocol
 
   packages/test-utils:
     dependencies:
-      '@async/resumable-protocol':
+      '@arcadejs/protocol':
         specifier: workspace:*
         version: link:../protocol
 
   packages/vitest-browser:
     dependencies:
-      '@async/resumable-runtime':
+      '@arcadejs/runtime':
         specifier: workspace:*
         version: link:../runtime
       vitest:

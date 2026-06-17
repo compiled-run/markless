@@ -1,8 +1,8 @@
 import { defineConfig } from 'vite-plus';
-import { resumable } from '@async/resumable/vite';
+import { arcade } from '@arcadejs/bundler/vite';
 
 export default defineConfig({
-	plugins: [resumable()],
+	plugins: [arcade()],
 	test: {
 		environment: 'node',
 		include: ['src/**/*.test.ts'],

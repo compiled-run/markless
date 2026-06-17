@@ -1,4 +1,4 @@
-# Async-await runtime-agnostic command policy.
+# Arcade runtime-agnostic command policy.
 #
 # Shared framework packages must run across Node, Deno, Bun, workers, and
 # browser-hosted tooling through host adapters. Prefer Web APIs, `pathe`, and

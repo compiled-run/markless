@@ -18,21 +18,21 @@ export function frameworkImportRequiredDiagnostic(
 	filename: string,
 ): SemanticGraphDiagnostic {
 	return {
-		code: 'AA_FRAMEWORK_IMPORT_REQUIRED',
+		code: 'ARCADE_FRAMEWORK_IMPORT_REQUIRED',
 		severity: 'error',
 		phase: 'semantic-graph',
 		title: 'Framework API must be imported',
-		message: `Cannot use ${apiName}() until it is imported from @async/resumable.`,
-		why: `${apiName}() is a compiler-rewritten @async/resumable API. The import makes ownership explicit for TypeScript, editors, junior developers, and AI agents.`,
+		message: `Cannot use ${apiName}() until it is imported from @arcadejs/core.`,
+		why: `${apiName}() is a compiler-rewritten @arcadejs/core API. The import makes ownership explicit for TypeScript, editors, junior developers, and AI agents.`,
 		primarySpan: sourceSpan(call, filename),
 		passId: 'tsrx-semantic-graph',
 		artifactKeys: ['semanticGraph'],
 		suggestions: [
 			{
-				message: `Add \`import { ${apiName} } from '@async/resumable';\` to this .tsrx file.`,
+				message: `Add \`import { ${apiName} } from '@arcadejs/core';\` to this .tsrx file.`,
 			},
 		],
-		docsUrl: 'https://async.await.dev/errors/AA_FRAMEWORK_IMPORT_REQUIRED',
+		docsUrl: 'https://arcadejs.com/errors/ARCADE_FRAMEWORK_IMPORT_REQUIRED',
 	};
 }
 
@@ -43,7 +43,7 @@ export function moduleScopeGraphCreationDiagnostic(
 	filename: string,
 ): SemanticGraphDiagnostic {
 	return {
-		code: 'AA_STATE_MODULE_SCOPE',
+		code: 'ARCADE_STATE_MODULE_SCOPE',
 		severity: 'error',
 		phase: 'semantic-graph',
 		title: 'state() and computed() cannot be created at module scope',
@@ -58,7 +58,7 @@ export function moduleScopeGraphCreationDiagnostic(
 					'Move state() or computed() creation into a component or declare request/container/page state with shared().',
 			},
 		],
-		docsUrl: 'https://async.await.dev/errors/AA_STATE_MODULE_SCOPE',
+		docsUrl: 'https://arcadejs.com/errors/ARCADE_STATE_MODULE_SCOPE',
 	};
 }
 
@@ -67,7 +67,7 @@ export function asyncPostAwaitReadDiagnostic(
 	read: SemanticStateRead,
 ): SemanticGraphDiagnostic {
 	return {
-		code: 'AA_ASYNC_POST_AWAIT_READ',
+		code: 'ARCADE_ASYNC_POST_AWAIT_READ',
 		severity: 'error',
 		phase: 'semantic-graph',
 		title: 'Reactive reads after await are not resumable',
@@ -82,7 +82,7 @@ export function asyncPostAwaitReadDiagnostic(
 					'Read the graph value before the first await, or split post-await formatting into a separate sync computed().',
 			},
 		],
-		docsUrl: 'https://async.await.dev/errors/AA_ASYNC_POST_AWAIT_READ',
+		docsUrl: 'https://arcadejs.com/errors/ARCADE_ASYNC_POST_AWAIT_READ',
 	};
 }
 
@@ -93,7 +93,7 @@ export function asyncBoundaryRequiredDiagnostic(
 	const computedLabel = binding.async === true ? 'async computed' : 'async-capable computed';
 
 	return {
-		code: 'AA_ASYNC_BOUNDARY_REQUIRED',
+		code: 'ARCADE_ASYNC_BOUNDARY_REQUIRED',
 		severity: 'error',
 		phase: 'semantic-graph',
 		title: 'Async computed reads need an async boundary',
@@ -108,7 +108,7 @@ export function asyncBoundaryRequiredDiagnostic(
 					'Wrap this template read in @try with @pending and @catch branches, or read a sync computed that is already guarded by an async boundary.',
 			},
 		],
-		docsUrl: 'https://async.await.dev/errors/AA_ASYNC_BOUNDARY_REQUIRED',
+		docsUrl: 'https://arcadejs.com/errors/ARCADE_ASYNC_BOUNDARY_REQUIRED',
 	};
 }
 
@@ -119,7 +119,7 @@ export function graphDestructureDefaultUnsupportedDiagnostic(input: {
 	readonly sourceSpan?: SourceSpan;
 }): SemanticGraphDiagnostic {
 	return {
-		code: 'AA_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED',
+		code: 'ARCADE_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED',
 		severity: 'error',
 		phase: 'semantic-graph',
 		title: 'Graph destructuring defaults are not supported yet',
@@ -136,7 +136,7 @@ export function graphDestructureDefaultUnsupportedDiagnostic(input: {
 					'Use an explicit computed() for fallback logic, or read the graph path directly without a destructuring default.',
 			},
 		],
-		docsUrl: 'https://async.await.dev/errors/AA_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED',
+		docsUrl: 'https://arcadejs.com/errors/ARCADE_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED',
 	};
 }
 
@@ -147,12 +147,12 @@ export function stateElementHandleUnsupportedDiagnostic(input: {
 	readonly sourceSpan?: SourceSpan;
 }): SemanticGraphDiagnostic {
 	return {
-		code: 'AA_STATE_ELEMENT_HANDLE_UNSERIALIZABLE',
+		code: 'ARCADE_STATE_ELEMENT_HANDLE_UNSERIALIZABLE',
 		severity: 'error',
 		phase: 'semantic-graph',
 		title: 'element() handles cannot be stored in state',
 		message: `Cannot store element handle "${input.handleName}" in state "${input.stateName}" because element handles are DOM locators, not serializable graph data.`,
-		why: 'state() values are serialized into async/state and resumed without running component bodies. An element() handle resolves through DOM locator metadata and must stay outside serialized graph state.',
+		why: 'state() values are serialized into arcade/state and resumed without running component bodies. An element() handle resolves through DOM locator metadata and must stay outside serialized graph state.',
 		primarySpan: input.sourceSpan,
 		passId: 'tsrx-semantic-graph',
 		artifactKeys: ['semanticGraph'],
@@ -164,7 +164,7 @@ export function stateElementHandleUnsupportedDiagnostic(input: {
 					'Keep element handles in element() bindings and bind them with el={handle}. Store serializable ids, flags, or data in state() instead.',
 			},
 		],
-		docsUrl: 'https://async.await.dev/errors/AA_STATE_ELEMENT_HANDLE_UNSERIALIZABLE',
+		docsUrl: 'https://arcadejs.com/errors/ARCADE_STATE_ELEMENT_HANDLE_UNSERIALIZABLE',
 	};
 }
 
@@ -175,7 +175,7 @@ export function sharedDefinitionCycleDiagnostic(input: {
 	const cycleSource = input.cycle.join(' -> ');
 
 	return {
-		code: 'AA_SHARED_DEFINITION_CYCLE',
+		code: 'ARCADE_SHARED_DEFINITION_CYCLE',
 		severity: 'error',
 		phase: 'semantic-graph',
 		title: 'Shared definitions cannot depend on each other circularly',
@@ -190,7 +190,7 @@ export function sharedDefinitionCycleDiagnostic(input: {
 					'Break the shared() dependency cycle by passing plain data between definitions or by moving the shared read into an event method that runs after instance creation.',
 			},
 		],
-		docsUrl: 'https://async.await.dev/errors/AA_SHARED_DEFINITION_CYCLE',
+		docsUrl: 'https://arcadejs.com/errors/ARCADE_SHARED_DEFINITION_CYCLE',
 	};
 }
 
@@ -201,7 +201,7 @@ export function elementHandleRequiredDiagnostic(
 	const actual = graphBinding ? `${graphBinding.kind}()` : 'an unknown value';
 
 	return {
-		code: 'AA_ELEMENT_HANDLE_REQUIRED',
+		code: 'ARCADE_ELEMENT_HANDLE_REQUIRED',
 		severity: 'error',
 		phase: 'semantic-graph',
 		title: 'el expects an element() handle',
@@ -217,7 +217,7 @@ export function elementHandleRequiredDiagnostic(
 					'Create a handle with element<T>() and bind that handle with el={handle}. Keep DOM-backed resources in attach={...}.',
 			},
 		],
-		docsUrl: 'https://async.await.dev/errors/AA_ELEMENT_HANDLE_REQUIRED',
+		docsUrl: 'https://arcadejs.com/errors/ARCADE_ELEMENT_HANDLE_REQUIRED',
 	};
 }
 
@@ -225,7 +225,7 @@ export function duplicateElementHandleDiagnostic(
 	binding: SemanticElementHandleBinding,
 ): SemanticGraphDiagnostic {
 	return {
-		code: 'AA_ELEMENT_HANDLE_DUPLICATE',
+		code: 'ARCADE_ELEMENT_HANDLE_DUPLICATE',
 		severity: 'error',
 		phase: 'semantic-graph',
 		title: 'element() handle is bound more than once',
@@ -241,7 +241,7 @@ export function duplicateElementHandleDiagnostic(
 					'Create a separate element() handle for each host element, or move repeated element access into keyed state and behavior records.',
 			},
 		],
-		docsUrl: 'https://async.await.dev/errors/AA_ELEMENT_HANDLE_DUPLICATE',
+		docsUrl: 'https://arcadejs.com/errors/ARCADE_ELEMENT_HANDLE_DUPLICATE',
 	};
 }
 
@@ -254,7 +254,7 @@ export function attachHostElementRequiredDiagnostic(
 	const owner = ownerTagName ? `<${ownerTagName}>` : 'a non-host element';
 
 	return {
-		code: 'AA_ATTACH_HOST_ELEMENT_REQUIRED',
+		code: 'ARCADE_ATTACH_HOST_ELEMENT_REQUIRED',
 		severity: 'error',
 		phase: 'semantic-graph',
 		title: 'attach can only be bound to host elements',
@@ -269,7 +269,7 @@ export function attachHostElementRequiredDiagnostic(
 					'Move attach={...} to a host element such as <canvas>, or make the component forward behavior to a known host element in its own TSRX body.',
 			},
 		],
-		docsUrl: 'https://async.await.dev/errors/AA_ATTACH_HOST_ELEMENT_REQUIRED',
+		docsUrl: 'https://arcadejs.com/errors/ARCADE_ATTACH_HOST_ELEMENT_REQUIRED',
 	};
 }
 

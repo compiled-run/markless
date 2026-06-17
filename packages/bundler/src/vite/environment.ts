@@ -1,5 +1,5 @@
 import type { Environment, ViteDevServer } from 'vite';
-import type { ResumableEnvironment } from '../types.ts';
+import type { ArcadeEnvironment } from '../types.ts';
 
 type ViteEnvironmentConfig = {
 	consumer?: string;
@@ -11,14 +11,14 @@ type ViteEnvironmentLike = {
 	config?: ViteEnvironmentConfig;
 };
 
-export interface ResumableViteEnvironmentOptions {
+export interface ArcadeViteEnvironmentOptions {
 	clientEnvironment?: string;
 	serverEnvironment?: string;
 }
 
 export function viteEnvironmentName(
-	environment: ResumableEnvironment,
-	options: ResumableViteEnvironmentOptions = {},
+	environment: ArcadeEnvironment,
+	options: ArcadeViteEnvironmentOptions = {},
 ) {
 	if (environment === 'client') {
 		return options.clientEnvironment ?? 'client';
@@ -29,7 +29,7 @@ export function viteEnvironmentName(
 	return environment;
 }
 
-export function resumableEnvironment(environment: ViteEnvironmentLike | undefined) {
+export function arcadeEnvironment(environment: ViteEnvironmentLike | undefined) {
 	const config = environment?.config;
 	if (!config) {
 		return 'client';
@@ -55,11 +55,11 @@ export function isServerViteEnvironment(environment: ViteEnvironmentLike | undef
 	return environment?.name !== undefined && environment.name !== 'client';
 }
 
-export function transformResumableRequest(
+export function transformArcadeRequest(
 	server: Pick<ViteDevServer, 'environments'>,
 	url: string,
-	environment: ResumableEnvironment,
-	options?: ResumableViteEnvironmentOptions,
+	environment: ArcadeEnvironment,
+	options?: ArcadeViteEnvironmentOptions,
 ) {
 	return server.environments[viteEnvironmentName(environment, options)]?.transformRequest(url);
 }

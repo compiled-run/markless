@@ -145,7 +145,7 @@ test('serializeGraphValue reports unsupported values with a state path', () => {
 
 	expect(result.diagnostics).toEqual([
 		{
-			code: 'AA_SERIALIZE_UNSUPPORTED_VALUE',
+			code: 'ARCADE_SERIALIZE_UNSUPPORTED_VALUE',
 			severity: 'error',
 			phase: 'serialization',
 			title: 'Cannot serialize graph state value',
@@ -161,7 +161,7 @@ test('serializeGraphValue reports unsupported values with a state path', () => {
 						'Move runtime resources into attach={...}, make the value serializable state, or derive it with computed().',
 				},
 			],
-			docsUrl: 'https://async.await.dev/errors/AA_SERIALIZE_UNSUPPORTED_VALUE',
+			docsUrl: 'https://arcadejs.com/errors/ARCADE_SERIALIZE_UNSUPPORTED_VALUE',
 		},
 	]);
 });

@@ -6,7 +6,7 @@ export type FrameworkApiName = 'state' | 'computed' | 'element' | 'shared';
 const frameworkApiNames = new Set<FrameworkApiName>(['state', 'computed', 'element', 'shared']);
 
 // These imports make compiler-rewritten APIs explicit in user code.
-// A bare state() call is not enough; it must resolve to an import from @async/resumable.
+// A bare state() call is not enough; it must resolve to an import from @arcadejs/core.
 export function collectImports(
 	statements: ReadonlyArray<AnyNode>,
 ): ReadonlyMap<string, FrameworkApiName> {
@@ -14,7 +14,7 @@ export function collectImports(
 
 	for (const statement of statements) {
 		if (statement.type !== 'ImportDeclaration') continue;
-		if (statement.source?.value !== '@async/resumable') continue;
+		if (statement.source?.value !== '@arcadejs/core') continue;
 
 		for (const specifier of asNodes(statement.specifiers)) {
 			if (specifier.type !== 'ImportSpecifier') continue;
@@ -38,7 +38,7 @@ export function collectModuleImports(
 	for (const statement of statements) {
 		if (statement.type !== 'ImportDeclaration') continue;
 		const source = importSource(statement);
-		if (!source || source === '@async/resumable') continue;
+		if (!source || source === '@arcadejs/core') continue;
 
 		for (const specifier of asNodes(statement.specifiers)) {
 			if (specifier.type === 'ImportSpecifier') {

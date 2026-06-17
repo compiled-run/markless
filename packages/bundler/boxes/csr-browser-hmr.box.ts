@@ -1,8 +1,8 @@
-import { box } from '@async/witness';
+import { box } from '@arcadejs/witness';
 
-// Product truth: the Vite dev client injected by the async-resumable adapter
+// Product truth: the Vite dev client injected by the arcade adapter
 // reaches a real browser page. A TSRX edit must emit the framework hot payload,
-// the browser must receive the cancelable async-resumable:update event, and the
+// the browser must receive the cancelable arcade:update event, and the
 // fixture must consume it without navigating.
 const FIXTURE = 'fixtures/vite-csr';
 const WAIT = { timeoutMs: 10_000 };
@@ -23,7 +23,7 @@ export default box(
 
 		const page = await browser.visit('/');
 		await expect.page.exists(page, '#app', WAIT);
-		await page.trackEvents('async-resumable:update');
+		await page.trackEvents('arcade:update');
 
 		const change = await project.edit(`${FIXTURE}/src/root.tsrx`, {
 			replace: ['count++', 'count = count + 1'],
@@ -35,17 +35,17 @@ export default box(
 				client: {
 					hmr: 'none',
 					invalidated: ['src/root.tsrx'],
-					messages: ['async-resumable:update'],
+					messages: ['arcade:update'],
 				},
 			},
 			WAIT,
 		);
-		await expect.page.text(page, '#hmr-status', 'async-resumable:update', WAIT);
+		await expect.page.text(page, '#hmr-status', 'arcade:update', WAIT);
 		await expect.page.outcome(
 			page,
 			{
 				navigations: 0,
-				events: { 'async-resumable:update': { atLeast: 1 } },
+				events: { 'arcade:update': { atLeast: 1 } },
 			},
 			WAIT,
 		);

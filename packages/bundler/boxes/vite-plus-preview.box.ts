@@ -1,17 +1,17 @@
-import { box } from '@async/witness';
+import { box } from '@arcadejs/witness';
 
 // Product truth: the Vite plugin also has to work when consumed through a
 // vite-plus config, matching the repo's preferred tooling surface.
 const FIXTURE = 'fixtures/vite-plus';
 const INDEX = `${FIXTURE}/dist/index.html`;
-const MANIFEST = `${FIXTURE}/dist/async-resumable-manifest.json`;
+const MANIFEST = `${FIXTURE}/dist/arcade-manifest.json`;
 const BUNDLE_GRAPH = `${FIXTURE}/dist/build/bundle-graph.json`;
 const DASHBOARD = '[data-dashboard]';
 const WAIT = { timeoutMs: 10_000 };
 
 export default box(
 	{
-		name: 'vite-plus preview: built app loads async-resumable output',
+		name: 'vite-plus preview: built app loads arcade output',
 		tags: ['vite-plus', 'build', 'preview'],
 		modes: ['build', 'preview'],
 	},
@@ -59,6 +59,6 @@ export default box(
 		await expect.page.outcome(page, { consoleErrors: 0, failedRequests: 0 }, WAIT);
 
 		await preview.close();
-		await receipt.capture('vite-plus preview loaded async-resumable output');
+		await receipt.capture('vite-plus preview loaded arcade output');
 	},
 );

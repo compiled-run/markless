@@ -1,16 +1,18 @@
 {
-  "name": "@fixtures/vite-ssr",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "dev": "vite --mode ssr",
-    "build": "vite build --app"
-  },
-  "dependencies": {
-    "@async/resumable": "workspace:*"
-  },
-  "devDependencies": {
-    "typescript": "catalog:",
-    "vite": "8.0.16"
-  }
+	"name": "@fixtures/vite-ssr",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "vite --mode ssr",
+		"build": "vite build --app"
+	},
+	"dependencies": {
+		"@arcadejs/bundler": "workspace:*",
+		"@arcadejs/core": "workspace:*",
+		"@arcadejs/runtime": "workspace:*"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"vite": "8.0.16"
+	}
 }

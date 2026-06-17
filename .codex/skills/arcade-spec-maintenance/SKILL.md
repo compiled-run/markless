@@ -1,9 +1,9 @@
 ---
-name: async-await-spec-maintenance
-description: 'Use when updating, splitting, reviewing, or reconciling the @async/resumable framework design specs under specs/framework* or the specs/state.md progress ledger. Applies the current decisions without over-scoping implementation: TSRX-only, no hydration, no VDOM, graph-state resumability, compiler artifact pipeline, JS/TS on @tsrx/core first, runtime-agnostic ESM, Rolldown/Vite-only build tooling, and explicit deferred decisions.'
+name: arcade-spec-maintenance
+description: 'Use when updating, splitting, reviewing, or reconciling the Arcade framework design specs under specs/framework* or the specs/state.md progress ledger. Applies the current decisions without over-scoping implementation: TSRX-only, no hydration, no VDOM, graph-state resumability, compiler artifact pipeline, JS/TS on @tsrx/core first, runtime-agnostic ESM, Rolldown/Vite-only build tooling, and explicit deferred decisions.'
 ---
 
-# Async Resumable Spec Maintenance
+# Arcade Spec Maintenance
 
 ## Source Order
 
@@ -23,7 +23,7 @@ description: 'Use when updating, splitting, reviewing, or reconciling the @async
     - Dynamic imports are owned by the symbol resolver, not event props.
     - Sync event policy handles browser-immediate behavior before lazy imports.
     - First compiler implementation uses JS/TS with `@tsrx/core`; OXC/native work is deferred.
-    - Do not use the sibling `../native-tsrx` repository: do not inspect it, edit it, run commands in it, or make async-await work depend on changes there.
+    - Do not use the sibling `../native-tsrx` repository: do not inspect it, edit it, run commands in it, or make Arcade work depend on changes there.
     - Shared packages are runtime-agnostic ESM and avoid Node-only APIs.
     - Build scripts and optimization use Rolldown or Vite only.
 - Do not specify low-level runtime storage shapes unless the user asks. Specify behavioral contracts instead.

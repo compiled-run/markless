@@ -1,7 +1,7 @@
 # Symbol Resolver Proof
 
 This fixture defines the executable-spec surface for symbol resolver planning in
-`@async/resumable`. It is not a generated resolver implementation, a bundler
+`@arcadejs/core`. It is not a generated resolver implementation, a bundler
 manifest, dynamic import runtime code, event delegation, or final artifact JSON.
 
 The fixture source lives at [src/App.tsrx](./src/App.tsrx).

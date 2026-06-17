@@ -1,4 +1,0 @@
-interface:
-  display_name: "Async Resumable Implementation"
-  short_description: "Implement the TSRX resumable framework"
-  default_prompt: "Use $async-await-implementation to implement the next framework slice."

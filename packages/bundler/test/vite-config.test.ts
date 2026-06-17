@@ -1,7 +1,7 @@
 import type { EnvironmentOptions } from 'vite';
 import { describe, expect, test, vi } from 'vitest';
-import { resumable } from '../src/vite/index.ts';
-import type { ResumableManifest } from '../src/types.ts';
+import { arcade } from '../src/vite/index.ts';
+import type { ArcadeManifest } from '../src/types.ts';
 import {
 	callConfigEnvironment,
 	callConfigResolved,
@@ -13,11 +13,11 @@ import {
 
 describe('Vite config integration', () => {
 	test('shares plugin state across app build environments', () => {
-		expect(getResumablePlugin().sharedDuringBuild).toBe(true);
+		expect(getArcadePlugin().sharedDuringBuild).toBe(true);
 	});
 
 	test('sets output defaults on Vite client and server environments', () => {
-		const plugin = getResumablePlugin();
+		const plugin = getArcadePlugin();
 		const clientConfig: EnvironmentOptions = {
 			build: {
 				rolldownOptions: {
@@ -61,7 +61,7 @@ describe('Vite config integration', () => {
 	});
 
 	test('disables Vite modulepreload only for client environment builds', () => {
-		const plugin = getResumablePlugin();
+		const plugin = getArcadePlugin();
 
 		expect(callConfigEnvironment(plugin, 'client', {})).toMatchObject({
 			build: {
@@ -76,7 +76,7 @@ describe('Vite config integration', () => {
 	});
 
 	test('defaults SSR environment output from only the server entry input', () => {
-		const plugin = getResumablePlugin();
+		const plugin = getArcadePlugin();
 
 		expect(
 			callConfigEnvironment(plugin, 'ssr', {
@@ -102,7 +102,7 @@ describe('Vite config integration', () => {
 	});
 
 	test('defaults custom server-like environments without requiring consumer config', () => {
-		const plugin = getResumablePlugin();
+		const plugin = getArcadePlugin();
 
 		expect(
 			callConfigEnvironment(plugin, 'edge', {
@@ -128,7 +128,7 @@ describe('Vite config integration', () => {
 	});
 
 	test('dispatches output defaults by Vite environment context', () => {
-		const plugin = getResumablePlugin();
+		const plugin = getArcadePlugin();
 		const clientOutput = callOutputOptions(
 			plugin,
 			{ dir: 'dist/client' },
@@ -142,8 +142,8 @@ describe('Vite config integration', () => {
 			hoistTransitiveImports: false,
 		});
 		expect(clientOutput.codeSplitting?.groups?.map((group) => group.name)).toEqual([
-			'async-resumable-runtime',
-			'async-resumable-symbols',
+			'arcade-runtime',
+			'arcade-symbols',
 		]);
 		expect(
 			callOutputOptions(plugin, { dir: 'dist/server' }, createViteHookContext('server')),
@@ -164,8 +164,8 @@ describe('Vite config integration', () => {
 	});
 
 	test('uses Vite base for stylesheet manifest injections', () => {
-		let manifest: ResumableManifest | undefined;
-		const plugin = getResumablePlugin({ onManifest: (next) => (manifest = next) });
+		let manifest: ArcadeManifest | undefined;
+		const plugin = getArcadePlugin({ onManifest: (next) => (manifest = next) });
 
 		callConfigResolved(plugin, {
 			base: '/docs/',
@@ -198,10 +198,8 @@ describe('Vite config integration', () => {
 	});
 });
 
-function getResumablePlugin(options: Parameters<typeof resumable>[0] = {}) {
-	return getPlugin(resumable(options), 'vite-plugin-async-resumable') as ReturnType<
-		typeof resumable
-	>[number] & {
+function getArcadePlugin(options: Parameters<typeof arcade>[0] = {}) {
+	return getPlugin(arcade(options), 'vite-plugin-arcade') as ReturnType<typeof arcade>[number] & {
 		sharedDuringBuild?: boolean;
 	};
 }

@@ -1,0 +1,4 @@
+interface:
+    display_name: 'Arcade Implementation'
+    short_description: 'Implement the Arcade TSRX framework'
+    default_prompt: 'Use $arcade-implementation to implement the next framework slice.'

@@ -24,7 +24,7 @@ test('emitSymbolResolverModule emits dynamic imports owned by the generated reso
 	expect(output).toContain('case "symbol:domUpdate":');
 	expect(output).toContain('return import("/assets/menu.domUpdates.cd34.js")');
 	expect(output).toContain('throw createUnknownSymbolError(id);');
-	expect(output).toContain('code: "AA_SYMBOL_UNKNOWN"');
+	expect(output).toContain('code: "ARCADE_SYMBOL_UNKNOWN"');
 });
 
 test('emitSymbolResolverModule fails closed for unknown symbols with structured metadata', async () => {
@@ -38,10 +38,10 @@ test('emitSymbolResolverModule fails closed for unknown symbols with structured 
 	};
 
 	await expect(generatedModule.loadSymbol('symbol:missing')).rejects.toMatchObject({
-		code: 'AA_SYMBOL_UNKNOWN',
+		code: 'ARCADE_SYMBOL_UNKNOWN',
 		phase: 'resume',
 		symbolId: 'symbol:missing',
-		docsUrl: 'https://async.await.dev/errors/AA_SYMBOL_UNKNOWN',
+		docsUrl: 'https://arcadejs.com/errors/ARCADE_SYMBOL_UNKNOWN',
 	});
 	await expect(generatedModule.loadSymbol('symbol:missing')).rejects.toThrow(
 		'Unknown async symbol symbol:missing',

@@ -1,5 +1,5 @@
 {
-	"name": "@async/resumable-bundler",
+	"name": "@arcadejs/bundler",
 	"version": "0.0.0",
 	"private": true,
 	"type": "module",
@@ -12,7 +12,7 @@
 		"test:boxes": "witness run"
 	},
 	"dependencies": {
-		"@async/resumable-compiler": "workspace:*",
+		"@arcadejs/compiler": "workspace:*",
 		"@thi.ng/dgraph": "catalog:",
 		"pathe": "catalog:",
 		"ufo": "catalog:"

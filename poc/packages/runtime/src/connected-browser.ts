@@ -118,10 +118,14 @@ export function createConnectedBrowserPageFromBundlerOutput(
 		async load() {
 			loaded = true;
 			seedElements(elements, state);
-			receipts.push(receipt('page-load', input.artifact.filename, {
-				loadedFromBundlerOutput: true,
-				virtualModules: input.artifact.manifest.virtualModules.map((module) => module.id),
-			}));
+			receipts.push(
+				receipt('page-load', input.artifact.filename, {
+					loadedFromBundlerOutput: true,
+					virtualModules: input.artifact.manifest.virtualModules.map(
+						(module) => module.id,
+					),
+				}),
+			);
 		},
 		async resume() {
 			if (!loaded) {
@@ -129,10 +133,12 @@ export function createConnectedBrowserPageFromBundlerOutput(
 			}
 
 			resumed = true;
-			receipts.push(receipt('resume-graph-read', input.artifact.filename, {
-				state: serializedGraph,
-				componentBodyRunsDuringResume: 0,
-			}));
+			receipts.push(
+				receipt('resume-graph-read', input.artifact.filename, {
+					state: serializedGraph,
+					componentBodyRunsDuringResume: 0,
+				}),
+			);
 			applyJournal(elements, journal, receipts, [
 				{
 					kind: 'setText',
@@ -157,30 +163,36 @@ export function createConnectedBrowserPageFromBundlerOutput(
 				throw new Error('Cannot dispatch connected browser event before resume().');
 			}
 
-			receipts.push(receipt('delegated-event-dispatch', input.artifact.filename, {
-				eventName,
-				targetId,
-			}));
+			receipts.push(
+				receipt('delegated-event-dispatch', input.artifact.filename, {
+					eventName,
+					targetId,
+				}),
+			);
 
 			const syncPolicyApplied =
 				eventName === 'keydown' && init.key === 'Escape' && state.open === true;
 			const defaultPrevented = syncPolicyApplied;
 
 			if (eventName === 'keydown') {
-				receipts.push(receipt('sync-policy-evaluate', eventSymbols.keydown, {
-					eventName,
-					key: init.key ?? null,
-					applied: syncPolicyApplied,
-					methods: syncPolicyApplied ? ['preventDefault'] : [],
-				}));
+				receipts.push(
+					receipt('sync-policy-evaluate', eventSymbols.keydown, {
+						eventName,
+						key: init.key ?? null,
+						applied: syncPolicyApplied,
+						methods: syncPolicyApplied ? ['preventDefault'] : [],
+					}),
+				);
 			}
 
 			const loadedSymbolId = eventSymbols[eventName];
-			receipts.push(receipt('lazy-symbol-load', loadedSymbolId, {
-				eventName,
-				targetId,
-				importOwner: 'generated-symbol-resolver',
-			}));
+			receipts.push(
+				receipt('lazy-symbol-load', loadedSymbolId, {
+					eventName,
+					targetId,
+					importOwner: 'generated-symbol-resolver',
+				}),
+			);
 			runLazyHandler({ eventName, targetId, syncPolicyApplied, state, receipts });
 			applyJournal(elements, journal, receipts, [
 				{
@@ -263,8 +275,8 @@ function connectedPageHtml(input: {
 		'  <button id="select-symbol" type="button">Select symbol</button>',
 		'  <output id="journal-output"></output>',
 		'</main>',
-		`<script type="async/state">${JSON.stringify(input.state)}</script>`,
-		`<script type="async/view">${JSON.stringify({
+		`<script type="arcade/state">${JSON.stringify(input.state)}</script>`,
+		`<script type="arcade/view">${JSON.stringify({
 			moduleId: input.moduleId,
 			events: [
 				{
@@ -320,32 +332,42 @@ function runLazyHandler(input: {
 		input.state.selectedId = 'symbol';
 		input.state.revision++;
 		input.state.message = 'selected:symbol';
-		input.receipts.push(receipt('graph-write', 'pipeline.selectedId', {
-			path: 'pipeline.selectedId',
-			value: input.state.selectedId,
-		}));
-		input.receipts.push(receipt('graph-write', 'pipeline.revision', {
-			path: 'pipeline.revision',
-			value: input.state.revision,
-		}));
-		input.receipts.push(receipt('graph-write', 'pipeline.message', {
-			path: 'pipeline.message',
-			value: input.state.message,
-		}));
+		input.receipts.push(
+			receipt('graph-write', 'pipeline.selectedId', {
+				path: 'pipeline.selectedId',
+				value: input.state.selectedId,
+			}),
+		);
+		input.receipts.push(
+			receipt('graph-write', 'pipeline.revision', {
+				path: 'pipeline.revision',
+				value: input.state.revision,
+			}),
+		);
+		input.receipts.push(
+			receipt('graph-write', 'pipeline.message', {
+				path: 'pipeline.message',
+				value: input.state.message,
+			}),
+		);
 		return;
 	}
 
 	if (input.eventName === 'keydown' && input.syncPolicyApplied) {
 		input.state.open = false;
 		input.state.message = 'sync-policy:closed';
-		input.receipts.push(receipt('graph-write', 'pipeline.open', {
-			path: 'pipeline.open',
-			value: input.state.open,
-		}));
-		input.receipts.push(receipt('graph-write', 'pipeline.message', {
-			path: 'pipeline.message',
-			value: input.state.message,
-		}));
+		input.receipts.push(
+			receipt('graph-write', 'pipeline.open', {
+				path: 'pipeline.open',
+				value: input.state.open,
+			}),
+		);
+		input.receipts.push(
+			receipt('graph-write', 'pipeline.message', {
+				path: 'pipeline.message',
+				value: input.state.message,
+			}),
+		);
 	}
 }
 

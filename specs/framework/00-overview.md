@@ -2,13 +2,13 @@
 
 High-level product contract and index. Use this as the entry point before loading a narrower spec.
 
-**Original title:** Resumable TSRX Framework — Design
+**Original title:** Arcade TSRX Framework — Design
 
 **Date:** 2026-06-12
 **Status:** Approved direction; production implementation started. See
 `../state.md` for current worktree progress.
 **Tagline:** A resumable UI framework for async-first apps.
-**Package:** `@async/resumable`
+**Package:** `@arcadejs/core`
 
 ## Summary
 
@@ -53,11 +53,11 @@ JSX/TSX is explicitly **not** supported.
    subscription.
    "Signal" is an implementation detail of compiled output, never API vocabulary.
 4. **TSRX-only.** State and reactivity are language features of `.tsrx` files,
-   surfaced through compiler-rewritten imports from `@async/resumable`, not a
+   surfaced through compiler-rewritten imports from `@arcadejs/core`, not a
    runtime library usable from arbitrary TS.
 5. **First-class async.** Async dataflow is a compiler-tracked graph feature, not
    an effect/task/resource wrapper. Pending/error UI is expressed with TSRX
-   boundaries, and async dependencies are serializable/resumable.
+   boundaries, and async dependencies are serializable and resumable.
 
 ## Non-Goals
 
@@ -96,7 +96,7 @@ Four implementation areas:
    visibility, or another explicit trigger. No hydration pass, no component
    execution during browser resume.
 4. **Build integration** — a Rolldown plugin base exported by
-   `@async/resumable`,
+   `@arcadejs/bundler`,
    with framework adapters such as Vite consuming that base plugin. Extracted
    symbols become code-split entry points, and production builds emit the
    generated symbol resolver plus manifest metadata needed by the unified
@@ -115,7 +115,7 @@ Container vocabulary is shared across CSR and SSR:
 - A **CSR container** is created live by `render(App, { target })`. It owns the
   root target, graph instance, event delegation scope, symbol resolver, shared
   state scope, and cleanup/unmount boundary. It does not require pre-existing
-  special markup, `async/state`, `async/view`, or the resumer script. Component
+  special markup, `arcade/state`, `arcade/view`, or the resumer script. Component
   bodies execute because CSR must create the DOM and graph from an empty target.
 - An **SSR resumable container** is emitted by `renderToString(App, options)`.
   It owns the rendered DOM boundary, container-scoped payload scripts, symbol
@@ -145,9 +145,10 @@ implementation begins in root `packages/*` using the same boundaries.
 
 Initial internal production package map:
 
-- `packages/resumable` — main package for `@async/resumable`; curated public
-  re-exports only.
-- `packages/core` — compiler-rewritten framework APIs and public types.
+- `packages/core` — main authoring package for `@arcadejs/core`;
+  compiler-rewritten framework APIs and public types.
+- `packages/arcade` — umbrella re-export package while it remains in the
+  workspace; not the source of authoring API ownership.
 - `packages/protocol` — private shared contracts: graph IDs, symbol IDs,
   payload schema types, manifest types, diagnostics, and protocol/version
   constants.

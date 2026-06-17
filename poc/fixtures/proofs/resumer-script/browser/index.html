@@ -4,12 +4,7 @@
 		<meta charset="utf-8" />
 		<title>Resumer script proof</title>
 	</head>
-	<body
-		data-component-bodies="0"
-		data-app-modules="0"
-		data-symbol-modules="0"
-		data-handlers="0"
-	>
+	<body data-component-bodies="0" data-app-modules="0" data-symbol-modules="0" data-handlers="0">
 		<script>
 			globalThis.__resumerProof = {
 				componentBodies: 0,
@@ -21,11 +16,39 @@
 		</script>
 		<section id="root" data-async data-count="0">
 			<button id="counter" type="button">Count 0</button>
-			<script type="async/view">[["click"],[[1,0,0,0]],["/symbol-click.js"],["onClick"]]</script>
+			<script type="arcade/view">
+				[["click"],[[1,0,0,0]],["/symbol-click.js"],["onClick"]]
+			</script>
 			<script data-async-resumer>
-				(()=>{let e=document,t=e.currentScript.closest(`[data-async]`),n=JSON.parse(t.querySelector(`script[type="async/view"]`).textContent),r=e.createTreeWalker(t,1),i=[t],a;for(;a=r.nextNode();)i.push(a);n[0].map(e=>t.addEventListener(e,async e=>{let r=n[0].indexOf(e.type);for(let a=e.target;a&&a!==t;a=a.parentElement){let o=i.indexOf(a),s=n[1].find(e=>e[0]===o&&e[1]===r);if(s){await(await import(n[2][s[2]]))[n[3][s[3]]]({event:e,element:a,root:t});break}}},1))})();
+				(() => {
+					let e = document,
+						t = e.currentScript.closest(`[data-async]`),
+						n = JSON.parse(t.querySelector(`script[type="arcade/view"]`).textContent),
+						r = e.createTreeWalker(t, 1),
+						i = [t],
+						a;
+					for (; (a = r.nextNode()); ) i.push(a);
+					n[0].map((e) =>
+						t.addEventListener(
+							e,
+							async (e) => {
+								let r = n[0].indexOf(e.type);
+								for (let a = e.target; a && a !== t; a = a.parentElement) {
+									let o = i.indexOf(a),
+										s = n[1].find((e) => e[0] === o && e[1] === r);
+									if (s) {
+										await (
+											await import(n[2][s[2]])
+										)[n[3][s[3]]]({ event: e, element: a, root: t });
+										break;
+									}
+								}
+							},
+							1,
+						),
+					);
+				})();
 			</script>
 		</section>
 	</body>
 </html>
-

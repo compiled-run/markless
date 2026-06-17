@@ -1,4 +1,4 @@
-import type { ProtocolStatePayload } from '@async/resumable-protocol';
+import type { ProtocolStatePayload } from '@arcadejs/protocol';
 
 export type RuntimeGraphCell = {
 	readonly graphNodeId: string;

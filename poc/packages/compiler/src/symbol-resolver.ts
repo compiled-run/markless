@@ -59,7 +59,7 @@ export type InlineSyncPolicyRecord = {
 };
 
 export type FailClosedSymbolCase = {
-	readonly code: 'AA_SYMBOL_UNKNOWN' | 'AA_SYMBOL_MANIFEST_MISMATCH';
+	readonly code: 'ARCADE_SYMBOL_UNKNOWN' | 'ARCADE_SYMBOL_MANIFEST_MISMATCH';
 	readonly stage: 'symbol-resolution';
 	readonly action: 'fail-closed';
 	readonly message: string;
@@ -147,16 +147,18 @@ export async function planSymbolResolver(
 		})),
 		failClosedCases: [
 			{
-				code: 'AA_SYMBOL_UNKNOWN',
+				code: 'ARCADE_SYMBOL_UNKNOWN',
 				stage: 'symbol-resolution',
 				action: 'fail-closed',
-				message: 'Reject a resume or event dispatch request when the symbol ID is not present.',
+				message:
+					'Reject a resume or event dispatch request when the symbol ID is not present.',
 			},
 			{
-				code: 'AA_SYMBOL_MANIFEST_MISMATCH',
+				code: 'ARCADE_SYMBOL_MANIFEST_MISMATCH',
 				stage: 'symbol-resolution',
 				action: 'fail-closed',
-				message: 'Reject a resume or event dispatch request when manifest hashes do not match.',
+				message:
+					'Reject a resume or event dispatch request when manifest hashes do not match.',
 			},
 		],
 	};

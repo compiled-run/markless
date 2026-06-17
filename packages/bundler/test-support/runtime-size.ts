@@ -39,7 +39,7 @@ export type RuntimeSizeReport = {
 
 const RUNTIME_ORIGIN_MARKERS = [
 	'/protocol/src/',
-	'/resumable/src/runtime.ts',
+	'/arcade/src/runtime.ts',
 	'/runtime/src/',
 	'/serializer/src/',
 ];

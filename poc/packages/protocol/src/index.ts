@@ -68,7 +68,7 @@ export type PipelineRelationshipRecord = {
 };
 
 export type PipelineManifest = {
-	readonly protocol: 'async-resumable-pipeline-poc';
+	readonly protocol: 'arcade-pipeline-poc';
 	readonly revision: number;
 	readonly transformedModules: ReadonlyArray<PipelineTransformedModuleRecord>;
 	readonly virtualModules: ReadonlyArray<Omit<PipelineVirtualModuleRecord, 'code'>>;

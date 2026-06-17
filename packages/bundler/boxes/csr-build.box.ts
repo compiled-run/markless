@@ -1,16 +1,16 @@
-import { box } from '@async/witness';
+import { box } from '@arcadejs/witness';
 
 // Product truth: a production Vite build of the CSR fixture must emit the
-// async-resumable manifest, bundle graph, and lazy symbol chunks through the
+// arcade manifest, bundle graph, and lazy symbol chunks through the
 // real Vite/Rolldown pipeline. Dev-only HMR wiring must not leak into those
 // production artifacts.
 const FIXTURE = 'fixtures/vite-csr';
-const MANIFEST = `${FIXTURE}/dist/async-resumable-manifest.json`;
+const MANIFEST = `${FIXTURE}/dist/arcade-manifest.json`;
 const BUNDLE_GRAPH = `${FIXTURE}/dist/build/bundle-graph.json`;
 const INDEX = `${FIXTURE}/dist/index.html`;
 const FORBIDDEN_DEV_STRINGS = [
-	'virtual:async-resumable-dev-client',
-	'async-resumable:update',
+	'virtual:arcade-dev-client',
+	'arcade:update',
 	'import.meta.hot',
 	'location.reload',
 ];
@@ -63,8 +63,7 @@ export default box(
 						symbol.kind === 'event-handler' && typeof symbol.fileName === 'string',
 				) &&
 				!!module.symbols?.some(
-					(symbol) =>
-						symbol.kind === 'dom-update' && typeof symbol.fileName === 'string',
+					(symbol) => symbol.kind === 'dom-update' && typeof symbol.fileName === 'string',
 				) &&
 				!!value.bundles &&
 				Object.keys(value.bundles).some((name) => name.startsWith('async-'))

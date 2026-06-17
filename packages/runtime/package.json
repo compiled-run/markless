@@ -1,5 +1,5 @@
 {
-	"name": "@async/resumable-runtime",
+	"name": "@arcadejs/runtime",
 	"version": "0.0.0",
 	"private": true,
 	"type": "module",
@@ -14,7 +14,7 @@
 		"./resume": "./src/payload.ts"
 	},
 	"dependencies": {
-		"@async/resumable-protocol": "workspace:*",
-		"@async/resumable-serializer": "workspace:*"
+		"@arcadejs/protocol": "workspace:*",
+		"@arcadejs/serializer": "workspace:*"
 	}
 }

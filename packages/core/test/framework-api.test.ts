@@ -3,16 +3,16 @@ import { computed, element, FrameworkApiRuntimeError, shared, state } from '../s
 
 test('framework APIs fail loudly when executed without the TSRX compiler', () => {
 	expect(() => state(0)).toThrow(
-		'@async/resumable state() must be compiled from a .tsrx file before it can run.',
+		'@arcadejs/core state() must be compiled from a .tsrx file before it can run.',
 	);
 	expect(() => computed(() => 1)).toThrow(
-		'@async/resumable computed() must be compiled from a .tsrx file before it can run.',
+		'@arcadejs/core computed() must be compiled from a .tsrx file before it can run.',
 	);
 	expect(() => element()).toThrow(
-		'@async/resumable element() must be compiled from a .tsrx file before it can run.',
+		'@arcadejs/core element() must be compiled from a .tsrx file before it can run.',
 	);
 	expect(() => shared(() => ({ user: 'Ada' }), { scope: 'page' })).toThrow(
-		'@async/resumable shared() must be compiled from a .tsrx file before it can run.',
+		'@arcadejs/core shared() must be compiled from a .tsrx file before it can run.',
 	);
 });
 
@@ -21,12 +21,12 @@ test('framework APIs expose structured runtime diagnostics when executed directl
 
 	expect(error).toBeInstanceOf(FrameworkApiRuntimeError);
 	expect(error).toMatchObject({
-		code: 'AA_FRAMEWORK_API_RUNTIME_CALL',
+		code: 'ARCADE_FRAMEWORK_API_RUNTIME_CALL',
 		severity: 'error',
 		phase: 'runtime',
 		title: 'Framework API executed without compiler output',
 		apiName: 'state',
-		docsUrl: 'https://async.await.dev/errors/AA_FRAMEWORK_API_RUNTIME_CALL',
+		docsUrl: 'https://arcadejs.com/errors/ARCADE_FRAMEWORK_API_RUNTIME_CALL',
 		suggestions: [
 			{
 				message: expect.stringContaining('.tsrx'),
@@ -34,7 +34,7 @@ test('framework APIs expose structured runtime diagnostics when executed directl
 		],
 	});
 	expect(error).toMatchObject({
-		message: '@async/resumable state() must be compiled from a .tsrx file before it can run.',
+		message: '@arcadejs/core state() must be compiled from a .tsrx file before it can run.',
 		why: expect.stringContaining('state()'),
 	});
 });

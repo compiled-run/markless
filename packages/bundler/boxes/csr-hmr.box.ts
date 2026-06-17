@@ -1,7 +1,7 @@
-import { box } from '@async/witness';
+import { box } from '@arcadejs/witness';
 
 // Product truth: editing a TSRX source file in the Vite CSR fixture runs
-// through the real Vite dev pipeline, invalidates generated async-resumable
+// through the real Vite dev pipeline, invalidates generated arcade
 // virtual modules, and broadcasts the framework HMR payload. This mirrors
 // qwik-bundler's package-level boxes: the box owns the fixture path and
 // overlays the Vite root/config for the run.
@@ -10,7 +10,7 @@ const WAIT = { timeoutMs: 10_000 };
 
 export default box(
 	{
-		name: 'csr hmr: tsrx edit emits async-resumable payload',
+		name: 'csr hmr: tsrx edit emits arcade payload',
 		tags: ['csr', 'hmr'],
 	},
 	async ({ pipeline, project, environment, expect, receipt }) => {
@@ -36,7 +36,7 @@ export default box(
 				client: {
 					hmr: 'none',
 					invalidated: ['src/root.tsrx'],
-					messages: ['async-resumable:update'],
+					messages: ['arcade:update'],
 				},
 			},
 			WAIT,

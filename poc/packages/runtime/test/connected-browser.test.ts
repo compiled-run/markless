@@ -26,8 +26,8 @@ test('connected-browser POC runs one page from bundler output through resume and
 	});
 
 	expect(page.mode).toBe('browser-page');
-	expect(page.html).toContain('<script type="async/state"');
-	expect(page.html).toContain('<script type="async/view"');
+	expect(page.html).toContain('<script type="arcade/state"');
+	expect(page.html).toContain('<script type="arcade/view"');
 
 	await page.load();
 	const resume = await page.resume();

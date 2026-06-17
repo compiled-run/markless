@@ -2,22 +2,22 @@ import { relative } from 'pathe';
 import type {
 	BundleGraphAdder,
 	GlobalInjections,
-	ResumableAsset,
-	ResumableBundle,
-	ResumableManifest,
-	ResumableTransformManifest,
-	ServerResumableManifest,
+	ArcadeAsset,
+	ArcadeBundle,
+	ArcadeManifest,
+	ArcadeTransformManifest,
+	ServerArcadeManifest,
 } from '../types.ts';
 import { convertManifestToBundleGraph } from './bundle-graph.ts';
 
-export const ASYNC_RESUMABLE_MANIFEST = 'globalThis.__ASYNC_RESUMABLE_MANIFEST__';
-export const ASYNC_RESUMABLE_MANIFEST_FILE = 'async-resumable-manifest.json';
+export const ARCADE_MANIFEST = 'globalThis.__ARCADE_MANIFEST__';
+export const ARCADE_MANIFEST_FILE = 'arcade-manifest.json';
 
-export type ResumableManifestBundle = Record<string, ResumableManifestBundleItem>;
+export type ArcadeManifestBundle = Record<string, ArcadeManifestBundleItem>;
 
-export type ResumableManifestBundleItem = ResumableManifestAsset | ResumableManifestChunk;
+export type ArcadeManifestBundleItem = ArcadeManifestAsset | ArcadeManifestChunk;
 
-export interface ResumableManifestAsset {
+export interface ArcadeManifestAsset {
 	type: 'asset';
 	fileName: string;
 	name?: string;
@@ -25,7 +25,7 @@ export interface ResumableManifestAsset {
 	source: string | Uint8Array;
 }
 
-export interface ResumableManifestChunk {
+export interface ArcadeManifestChunk {
 	type: 'chunk';
 	fileName: string;
 	name: string;
@@ -40,8 +40,8 @@ export interface ResumableManifestChunk {
 const STYLESHEET_ASSET_RE = /\.css$/;
 
 export function createManifest(
-	bundle: ResumableManifestBundle,
-	transformManifests: Iterable<ResumableTransformManifest>,
+	bundle: ArcadeManifestBundle,
+	transformManifests: Iterable<ArcadeTransformManifest>,
 	root: string | undefined,
 	options: {
 		bundleGraphAsset?: string;
@@ -54,7 +54,7 @@ export function createManifest(
 	const canonPath = options.canonPath ?? ((fileName: string) => fileName);
 	const publicPath = options.publicPath ?? ((fileName: string) => fileName);
 	const modules = [...transformManifests].map(cloneTransformManifest);
-	const manifest: ResumableManifest = {
+	const manifest: ArcadeManifest = {
 		version: 1,
 		manifestHash: '',
 		modules,
@@ -78,7 +78,7 @@ export function createManifest(
 
 		const bundleFileName = canonPath(item.fileName);
 		const origins = getOrigins(item, root);
-		const asyncBundle: ResumableBundle = {
+		const asyncBundle: ArcadeBundle = {
 			size: item.code.length,
 			total: item.code.length,
 		};
@@ -123,15 +123,15 @@ export function createManifest(
 	return manifest;
 }
 
-export function devTagsManifest(devTags: GlobalInjections[]): ServerResumableManifest {
+export function devTagsManifest(devTags: GlobalInjections[]): ServerArcadeManifest {
 	return { version: 1, manifestHash: 'dev', modules: [], injections: devTags };
 }
 
 export function injectManifest(
 	code: string,
-	manifest: ResumableManifest | ServerResumableManifest | null,
+	manifest: ArcadeManifest | ServerArcadeManifest | null,
 ) {
-	let value = ASYNC_RESUMABLE_MANIFEST;
+	let value = ARCADE_MANIFEST;
 	if (manifest?.manifestHash) {
 		value = JSON.stringify({
 			version: manifest.version,
@@ -143,12 +143,10 @@ export function injectManifest(
 		});
 	}
 
-	return code
-		.replaceAll(`!${ASYNC_RESUMABLE_MANIFEST}`, 'false')
-		.replaceAll(ASYNC_RESUMABLE_MANIFEST, value);
+	return code.replaceAll(`!${ARCADE_MANIFEST}`, 'false').replaceAll(ARCADE_MANIFEST, value);
 }
 
-function cloneTransformManifest(manifest: ResumableTransformManifest): ResumableTransformManifest {
+function cloneTransformManifest(manifest: ArcadeTransformManifest): ArcadeTransformManifest {
 	return {
 		source: manifest.source,
 		payload: { ...manifest.payload },
@@ -159,8 +157,8 @@ function cloneTransformManifest(manifest: ResumableTransformManifest): Resumable
 }
 
 function finalizeVirtualModuleReferences(
-	modules: ResumableTransformManifest[],
-	item: ResumableManifestChunk,
+	modules: ArcadeTransformManifest[],
+	item: ArcadeManifestChunk,
 	bundleFileName: string,
 ) {
 	const ids = new Set(
@@ -190,7 +188,7 @@ function normalizeVirtualModuleId(id: string) {
 	return id;
 }
 
-function assetInfo(item: ResumableManifestAsset): ResumableAsset {
+function assetInfo(item: ArcadeManifestAsset): ArcadeAsset {
 	return {
 		name: item.names?.[0] ?? item.name,
 		size: item.source.length,
@@ -198,7 +196,7 @@ function assetInfo(item: ResumableManifestAsset): ResumableAsset {
 }
 
 function mapBundleNames(
-	bundle: ResumableManifestBundle,
+	bundle: ArcadeManifestBundle,
 	names: string[],
 	canonPath: (fileName: string) => string,
 ) {
@@ -212,7 +210,7 @@ function mapBundleNames(
 	});
 }
 
-function getOrigins(item: ResumableManifestChunk, root: string | undefined) {
+function getOrigins(item: ArcadeManifestChunk, root: string | undefined) {
 	return item.moduleIds
 		.filter((id) => !id.startsWith('\0'))
 		.map((id) => {
@@ -225,7 +223,7 @@ function getOrigins(item: ResumableManifestChunk, root: string | undefined) {
 		.sort();
 }
 
-function computeTotals(bundles: Record<string, ResumableBundle>) {
+function computeTotals(bundles: Record<string, ArcadeBundle>) {
 	const collect = (name: string, seen: Set<string>) => {
 		const bundle = bundles[name];
 		if (!bundle || seen.has(name)) return;
@@ -242,7 +240,7 @@ function computeTotals(bundles: Record<string, ResumableBundle>) {
 	}
 }
 
-function sortManifest(manifest: ResumableManifest) {
+function sortManifest(manifest: ArcadeManifest) {
 	manifest.modules = manifest.modules.sort((a, b) => a.source.localeCompare(b.source));
 	manifest.bundles = sortRecord(manifest.bundles);
 	manifest.assets = sortRecord(manifest.assets ?? {});

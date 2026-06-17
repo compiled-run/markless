@@ -1,4 +1,4 @@
-# Async Resumable Project Rules
+# Arcade Project Rules
 
 This repo is currently specification-first. When implementation starts, this file
 is the Codex-facing always-on guidance for building the TSRX resumable framework.
@@ -12,8 +12,8 @@ is the Codex-facing always-on guidance for building the TSRX resumable framework
 - Treat `specs/framework/archive/design-thread.md` as historical context, not the
   current implementation contract.
 - Project-local task skills live under `.codex/skills/`. Use
-  `$async-await-implementation` for implementation work and
-  `$async-await-spec-maintenance` for spec edits when available.
+  `$arcade-implementation` for implementation work and
+  `$arcade-spec-maintenance` for spec edits when available.
 
 ## Core Framework Constraints
 
@@ -32,10 +32,10 @@ is the Codex-facing always-on guidance for building the TSRX resumable framework
 - First compiler implementation is JS/TS on `@tsrx/core`. OXC/native work is
   deferred until the framework behavior and artifact contracts are proven.
 - Do not use the sibling `../native-tsrx` repository for this project: do not
-  inspect it, edit it, run commands in it, or make async-await work depend on
-  changes there. Treat `@tsrx/core` as an external dependency boundary; when a
-  parser artifact is missing, keep async-await tests at the compiler artifact
-  boundary, document the caveat, or ask the user before any dependency work.
+  inspect it, edit it, run commands in it, or make Arcade work depend on changes
+  there. Treat `@tsrx/core` as an external dependency boundary; when a parser
+  artifact is missing, keep Arcade tests at the compiler artifact boundary,
+  document the caveat, or ask the user before any dependency work.
 - Core packages are runtime-agnostic ESM. Avoid `node:*`, `fs`, `path`,
   `process`, `Buffer`, and Node-only assumptions in shared compiler/runtime code.
   Use host adapters for file access, module resolution, hashing, environment
@@ -85,12 +85,14 @@ Expected shape:
 - current proof implementation lives under `poc/packages/*`; do not extend it
   when beginning production framework work unless the task is explicitly a POC
   maintenance task
-- production package folders are `packages/resumable`, `packages/core`,
+- production package folders are `packages/arcade`, `packages/core`,
   `packages/protocol`, `packages/runtime`, `packages/serializer`,
-  `packages/compiler`, `packages/bundler`, and `packages/test-utils`
-- `packages/resumable` is the main package for `@async/resumable`; the other
-  packages are internal implementation boundaries until tests prove what should
-  become public
+  `packages/compiler`, `packages/bundler`, `packages/test-utils`, and
+  `packages/vitest-browser`
+- `packages/core` owns the public authoring APIs for `@arcadejs/core`.
+  `packages/arcade` is an umbrella re-export package while it remains in the
+  workspace. The other packages are internal implementation boundaries until
+  tests prove what should become public
 - do not create `packages/server`
 - package/library builds are represented as multiple vite-plus `pack` configs,
   similar to QDS's `buildOrder`

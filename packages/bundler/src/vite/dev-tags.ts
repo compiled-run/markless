@@ -1,6 +1,6 @@
 import { joinURL } from 'ufo';
 import type { GlobalInjections } from '../types.ts';
-import { ASYNC_RESUMABLE_DEV_CLIENT_PATH } from './hmr.ts';
+import { ARCADE_DEV_CLIENT_PATH } from './hmr.ts';
 
 export function createDevTags() {
 	const tags: GlobalInjections[] = [];
@@ -18,7 +18,7 @@ export function createDevTags() {
 			viteTagsAdded = true;
 			const viteTags = [headScript(base, '/@vite/client')];
 			if (hmrEnabled) {
-				viteTags.push(headScript(base, ASYNC_RESUMABLE_DEV_CLIENT_PATH));
+				viteTags.push(headScript(base, ARCADE_DEV_CLIENT_PATH));
 			}
 			tags.unshift(...viteTags);
 		},

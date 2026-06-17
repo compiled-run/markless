@@ -823,7 +823,7 @@ test('resume runtime reports structured errors for mismatched DOM-order locators
 
 	expect(error).toBeInstanceOf(RuntimeResumeError);
 	expect(error).toMatchObject({
-		code: 'AA_RESUME_LOCATOR_MISMATCH',
+		code: 'ARCADE_RESUME_LOCATOR_MISMATCH',
 		severity: 'error',
 		phase: 'resume',
 		title: 'Resume locator matched a different element',
@@ -831,11 +831,11 @@ test('resume runtime reports structured errors for mismatched DOM-order locators
 		elementLocator: 'dom-order:1',
 		expectedTagName: 'button',
 		actualTagName: 'input',
-		docsUrl: 'https://async.await.dev/errors/AA_RESUME_LOCATOR_MISMATCH',
+		docsUrl: 'https://arcadejs.com/errors/ARCADE_RESUME_LOCATOR_MISMATCH',
 	});
 	expect(error).toMatchObject({
 		message: 'Resume locator h1 expected <button> at DOM order index 1 but found <input>.',
-		why: expect.stringContaining('async/view'),
+		why: expect.stringContaining('arcade/view'),
 	});
 });
 
@@ -877,13 +877,13 @@ test('resume runtime reports structured errors for missing async boundary anchor
 
 	expect(error).toBeInstanceOf(RuntimeResumeError);
 	expect(error).toMatchObject({
-		code: 'AA_RESUME_LOCATOR_MISSING',
+		code: 'ARCADE_RESUME_LOCATOR_MISSING',
 		severity: 'error',
 		phase: 'resume',
 		title: 'Resume locator did not match the document',
 		boundaryId: 'boundary:0',
 		elementLocator: 'dom-order-comment:1',
-		docsUrl: 'https://async.await.dev/errors/AA_RESUME_LOCATOR_MISSING',
+		docsUrl: 'https://arcadejs.com/errors/ARCADE_RESUME_LOCATOR_MISSING',
 	});
 	expect(error).toMatchObject({
 		message: 'Resume locator boundary:0 endAnchor expected a comment at DOM order index 1.',

@@ -193,17 +193,17 @@ test('serializer-values fixture emits unsupported diagnostics and secret warning
 	const artifact = await fixtureArtifact();
 
 	for (const [statePath, code, valueKind] of [
-		['unsupported.domNode', 'AA_SERIALIZE_DOM_NODE', 'HTMLElement'],
+		['unsupported.domNode', 'ARCADE_SERIALIZE_DOM_NODE', 'HTMLElement'],
 		[
 			'unsupported.elementHandleInState',
-			'AA_SERIALIZE_ELEMENT_HANDLE_IN_STATE',
+			'ARCADE_SERIALIZE_ELEMENT_HANDLE_IN_STATE',
 			'element-handle',
 		],
-		['unsupported.request', 'AA_SERIALIZE_RUNTIME_VALUE', 'Request'],
-		['unsupported.stream', 'AA_SERIALIZE_STREAM', 'ReadableStream'],
-		['unsupported.socket', 'AA_SERIALIZE_RUNTIME_VALUE', 'WebSocket'],
-		['unsupported.weakState', 'AA_SERIALIZE_WEAK_COLLECTION', 'WeakMap'],
-		['unsupported.runtimeBox', 'AA_SERIALIZE_RESOURCE_CLASS', 'RuntimeBox'],
+		['unsupported.request', 'ARCADE_SERIALIZE_RUNTIME_VALUE', 'Request'],
+		['unsupported.stream', 'ARCADE_SERIALIZE_STREAM', 'ReadableStream'],
+		['unsupported.socket', 'ARCADE_SERIALIZE_RUNTIME_VALUE', 'WebSocket'],
+		['unsupported.weakState', 'ARCADE_SERIALIZE_WEAK_COLLECTION', 'WeakMap'],
+		['unsupported.runtimeBox', 'ARCADE_SERIALIZE_RESOURCE_CLASS', 'RuntimeBox'],
 	] as const) {
 		expect(diagnostic(artifact, statePath, code)).toMatchObject({
 			severity: 'error',
@@ -211,7 +211,7 @@ test('serializer-values fixture emits unsupported diagnostics and secret warning
 			passId: 'serializer-values-planning',
 			statePath,
 			valueKind,
-			docsUrl: `https://async-resumable.dev/errors/${code}`,
+			docsUrl: `https://arcadejs.com/errors/${code}`,
 		});
 	}
 
@@ -220,7 +220,7 @@ test('serializer-values fixture emits unsupported diagnostics and secret warning
 		'stateArena.secretWarning.tokenPreview',
 		'unsupported.secretToken',
 	]) {
-		expect(diagnostic(artifact, statePath, 'AA_SERIALIZE_SECRET_LEAK')).toMatchObject({
+		expect(diagnostic(artifact, statePath, 'ARCADE_SERIALIZE_SECRET_LEAK')).toMatchObject({
 			severity: 'warning',
 			phase: 'serialization',
 			passId: 'serializer-values-planning',

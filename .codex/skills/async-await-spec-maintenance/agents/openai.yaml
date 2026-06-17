@@ -1,4 +1,0 @@
-interface:
-  display_name: "Async Resumable Spec Maintenance"
-  short_description: "Update framework specs without drift"
-  default_prompt: "Use $async-await-spec-maintenance to update the framework design spec."

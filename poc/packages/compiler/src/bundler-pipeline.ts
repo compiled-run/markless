@@ -78,7 +78,7 @@ export async function transformTsrxForBundler(
 		},
 	];
 	const manifest: PipelineManifest = {
-		protocol: 'async-resumable-pipeline-poc',
+		protocol: 'arcade-pipeline-poc',
 		revision,
 		transformedModules: [
 			{
@@ -173,9 +173,9 @@ function createVirtualModules(input: {
 	readonly symbolIds: ReadonlyArray<string>;
 	readonly sourceFingerprint: string;
 }): PipelineVirtualModuleRecord[] {
-	const symbolResolverId = `virtual:async-resumable/symbol-resolver?module=${input.moduleSlug}`;
-	const manifestId = `virtual:async-resumable/manifest?module=${input.moduleSlug}`;
-	const runtimeId = `virtual:async-resumable/runtime?module=${input.moduleSlug}`;
+	const symbolResolverId = `virtual:arcade/symbol-resolver?module=${input.moduleSlug}`;
+	const manifestId = `virtual:arcade/manifest?module=${input.moduleSlug}`;
+	const runtimeId = `virtual:arcade/runtime?module=${input.moduleSlug}`;
 
 	return [
 		{
@@ -230,19 +230,19 @@ function transformedModuleCode(
 	const runtime = requiredVirtualModule(virtualModules, 'runtime-entry');
 
 	return [
-		'/* async-resumable TSRX transform */',
+		'/* arcade TSRX transform */',
 		`import { loadSymbol as __asyncLoadSymbol } from ${JSON.stringify(resolver.id)};`,
 		`import { manifest as __asyncManifest } from ${JSON.stringify(manifest.id)};`,
 		`import { runtimePlan as __asyncRuntimePlan } from ${JSON.stringify(runtime.id)};`,
 		'',
-		'export const __async_resumable_pipeline = {',
+		'export const __arcade_pipeline = {',
 		`  moduleId: ${JSON.stringify(filename)},`,
 		'  manifest: __asyncManifest,',
 		'  runtime: __asyncRuntimePlan,',
 		'  loadSymbol: __asyncLoadSymbol,',
 		'};',
 		'',
-		'export default __async_resumable_pipeline;',
+		'export default __arcade_pipeline;',
 		'',
 	].join('\n');
 }

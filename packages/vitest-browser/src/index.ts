@@ -4,7 +4,7 @@ import {
 	type CsrRenderOptions,
 	type CsrRenderOutput,
 	type RenderTarget,
-} from '@async/resumable-runtime';
+} from '@arcadejs/runtime';
 
 export type BrowserRenderElement = RenderTarget & {
 	innerHTML?: string;
@@ -124,6 +124,6 @@ function globalDocument(): BrowserRenderDocument {
 	}
 
 	throw new Error(
-		'@async/resumable-vitest-browser render() requires a browser document or an explicit document option.',
+		'@arcadejs/vitest-browser render() requires a browser document or an explicit document option.',
 	);
 }
