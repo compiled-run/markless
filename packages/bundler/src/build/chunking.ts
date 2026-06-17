@@ -43,7 +43,7 @@ export function outputDefaults(
 function arcadeCodeSplitting(codeSplitting: OutputOptions['codeSplitting']) {
 	if (typeof codeSplitting === 'boolean') {
 		throw new Error(
-			'@arcadejs/bundler requires output.codeSplitting to be an object so runtime chunks can be grouped.',
+			'Arcade bundler requires output.codeSplitting to be an object so runtime chunks can be grouped.',
 		);
 	}
 

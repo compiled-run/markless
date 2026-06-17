@@ -4,8 +4,8 @@ These fixtures are small QA targets for the host-native plugins.
 
 They intentionally use host config for entries, output, library mode, and runtime
 adapter choices. The Vite plugin only appears as `arcade()` from
-`@arcadejs/bundler/vite` or as `arcadeClient()` / `arcadeServer()` from
-`@arcadejs/bundler/rolldown`.
+`arcade/vite` or as `arcadeClient()` / `arcadeServer()` from
+`arcade/rolldown`.
 
 Run the package build first so workspace consumers resolve the current plugin
 output:

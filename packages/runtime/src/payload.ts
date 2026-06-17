@@ -1475,7 +1475,7 @@ function invalidPayloadShapeError(
 		`The ${payloadType} payload did not match the resumability protocol shape required by this runtime.`,
 		[
 			{
-				message: `Regenerate the ${payloadType} payload with the matching @arcadejs/core compiler/runtime version.`,
+				message: `Regenerate the ${payloadType} payload with the matching Arcade compiler/runtime version.`,
 			},
 		],
 	);
@@ -1498,7 +1498,7 @@ function protocolVersionMismatchError(
 		actualVersion,
 		suggestions: [
 			{
-				message: 'Use matching @arcadejs/core compiler and runtime package versions.',
+				message: 'Use matching Arcade compiler and runtime package versions.',
 			},
 		],
 		docsUrl: 'https://arcadejs.com/errors/ARCADE_PROTOCOL_VERSION_MISMATCH',

@@ -27,6 +27,10 @@ render/resume contract is not proven end to end.
 Completed slices are concentrated in:
 
 - workspace/package scaffolding and vite-plus tooling
+- the public umbrella package is named `arcade`; public docs, proof READMEs,
+  and bundler fixtures use `arcade`, `arcade/vite`, `arcade/rolldown`, and
+  `arcade/runtime/*`, while the semantic graph pass still accepts the internal
+  `@arcadejs/core` source for existing compiler fixtures
 - compiler module ownership and pass graph validation
 - semantic graph collection for early state, event, alias, async, shared
   definition/instance, and capture inputs

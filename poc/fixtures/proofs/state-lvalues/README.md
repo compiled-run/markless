@@ -1,7 +1,7 @@
 # State Lvalues Proof
 
 This fixture defines the executable-spec surface for plain JavaScript lvalue
-lowering in `@arcadejs/core`. It is not a compiler implementation and it does
+lowering in `arcade`. It is not a compiler implementation and it does
 not check in expected artifact JSON.
 
 The fixture sources live at:

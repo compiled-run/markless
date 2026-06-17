@@ -4,9 +4,10 @@ import type { SemanticModuleImport } from '../../artifacts.ts';
 export type FrameworkApiName = 'state' | 'computed' | 'element' | 'shared';
 
 const frameworkApiNames = new Set<FrameworkApiName>(['state', 'computed', 'element', 'shared']);
+const frameworkApiSources = new Set(['arcade', '@arcadejs/core']);
 
 // These imports make compiler-rewritten APIs explicit in user code.
-// A bare state() call is not enough; it must resolve to an import from @arcadejs/core.
+// A bare state() call is not enough; it must resolve to a framework package import.
 export function collectImports(
 	statements: ReadonlyArray<AnyNode>,
 ): ReadonlyMap<string, FrameworkApiName> {
@@ -14,7 +15,7 @@ export function collectImports(
 
 	for (const statement of statements) {
 		if (statement.type !== 'ImportDeclaration') continue;
-		if (statement.source?.value !== '@arcadejs/core') continue;
+		if (!isFrameworkApiSource(statement.source?.value)) continue;
 
 		for (const specifier of asNodes(statement.specifiers)) {
 			if (specifier.type !== 'ImportSpecifier') continue;
@@ -38,7 +39,7 @@ export function collectModuleImports(
 	for (const statement of statements) {
 		if (statement.type !== 'ImportDeclaration') continue;
 		const source = importSource(statement);
-		if (!source || source === '@arcadejs/core') continue;
+		if (!source || isFrameworkApiSource(source)) continue;
 
 		for (const specifier of asNodes(statement.specifiers)) {
 			if (specifier.type === 'ImportSpecifier') {
@@ -101,6 +102,10 @@ export function getCallName(node: AnyNode | undefined | null): string | null {
 
 export function isFrameworkApiName(name: string | null): name is FrameworkApiName {
 	return frameworkApiNames.has(name as FrameworkApiName);
+}
+
+export function isFrameworkApiSource(source: unknown): source is 'arcade' | '@arcadejs/core' {
+	return typeof source === 'string' && frameworkApiSources.has(source);
 }
 
 function importSource(node: AnyNode): string | null {

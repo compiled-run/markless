@@ -257,8 +257,8 @@ test('buildSemanticGraph reports missing framework API imports', async () => {
 			passId: 'tsrx-semantic-graph',
 			artifactKeys: ['semanticGraph'],
 			title: 'Framework API must be imported',
-			message: 'Cannot use state() until it is imported from @arcadejs/core.',
-			why: 'state() is a compiler-rewritten @arcadejs/core API. The import makes ownership explicit for TypeScript, editors, junior developers, and AI agents.',
+			message: 'Cannot use state() until it is imported from arcade.',
+			why: 'state() is a compiler-rewritten Arcade API. The import makes ownership explicit for TypeScript, editors, junior developers, and AI agents.',
 			primarySpan: {
 				filename: 'src/Counter.tsrx',
 				start: stateStart,
@@ -266,14 +266,14 @@ test('buildSemanticGraph reports missing framework API imports', async () => {
 			},
 			suggestions: [
 				{
-					message: "Add `import { state } from '@arcadejs/core';` to this .tsrx file.",
+					message: "Add `import { state } from 'arcade';` to this .tsrx file.",
 				},
 			],
 			docsUrl: 'https://arcadejs.com/errors/ARCADE_FRAMEWORK_IMPORT_REQUIRED',
 		}),
 		expect.objectContaining({
 			code: 'ARCADE_FRAMEWORK_IMPORT_REQUIRED',
-			message: 'Cannot use computed() until it is imported from @arcadejs/core.',
+			message: 'Cannot use computed() until it is imported from arcade.',
 			primarySpan: {
 				filename: 'src/Counter.tsrx',
 				start: computedStart,
@@ -281,13 +281,13 @@ test('buildSemanticGraph reports missing framework API imports', async () => {
 			},
 			suggestions: [
 				{
-					message: "Add `import { computed } from '@arcadejs/core';` to this .tsrx file.",
+					message: "Add `import { computed } from 'arcade';` to this .tsrx file.",
 				},
 			],
 		}),
 		expect.objectContaining({
 			code: 'ARCADE_FRAMEWORK_IMPORT_REQUIRED',
-			message: 'Cannot use element() until it is imported from @arcadejs/core.',
+			message: 'Cannot use element() until it is imported from arcade.',
 			primarySpan: {
 				filename: 'src/Counter.tsrx',
 				start: elementStart,
@@ -295,7 +295,7 @@ test('buildSemanticGraph reports missing framework API imports', async () => {
 			},
 			suggestions: [
 				{
-					message: "Add `import { element } from '@arcadejs/core';` to this .tsrx file.",
+					message: "Add `import { element } from 'arcade';` to this .tsrx file.",
 				},
 			],
 		}),

@@ -106,10 +106,10 @@ Expected shape:
   `packages/protocol`, `packages/runtime`, `packages/serializer`,
   `packages/compiler`, `packages/bundler`, `packages/test-utils`, and
   `packages/vitest-browser`
-- `packages/core` owns the public authoring APIs for `@arcadejs/core`.
-  `packages/arcade` is an umbrella re-export package while it remains in the
-  workspace. The other packages are internal implementation boundaries until
-  tests prove what should become public
+- `packages/arcade` owns the public `arcade` package and curated re-exports.
+  `packages/core` owns the internal implementation boundary for compiler-
+  rewritten authoring APIs. The other packages are internal implementation
+  boundaries until tests prove what should become public
 - do not create `packages/server`
 - package/library builds are represented as multiple vite-plus `pack` configs,
   similar to QDS's `buildOrder`

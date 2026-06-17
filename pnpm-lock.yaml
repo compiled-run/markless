@@ -83,12 +83,9 @@ importers:
 
   packages/bundler/fixtures/rolldown-basic:
     dependencies:
-      '@arcadejs/bundler':
+      arcade:
         specifier: workspace:*
-        version: link:../..
-      '@arcadejs/core':
-        specifier: workspace:*
-        version: link:../../../core
+        version: link:../../../arcade
     devDependencies:
       rolldown:
         specifier: 1.0.3
@@ -99,15 +96,9 @@ importers:
 
   packages/bundler/fixtures/vite-csr:
     dependencies:
-      '@arcadejs/bundler':
+      arcade:
         specifier: workspace:*
-        version: link:../..
-      '@arcadejs/core':
-        specifier: workspace:*
-        version: link:../../../core
-      '@arcadejs/runtime':
-        specifier: workspace:*
-        version: link:../../../runtime
+        version: link:../../../arcade
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -118,12 +109,9 @@ importers:
 
   packages/bundler/fixtures/vite-library:
     dependencies:
-      '@arcadejs/bundler':
+      arcade:
         specifier: workspace:*
-        version: link:../..
-      '@arcadejs/core':
-        specifier: workspace:*
-        version: link:../../../core
+        version: link:../../../arcade
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -134,15 +122,9 @@ importers:
 
   packages/bundler/fixtures/vite-plus:
     dependencies:
-      '@arcadejs/bundler':
+      arcade:
         specifier: workspace:*
-        version: link:../..
-      '@arcadejs/core':
-        specifier: workspace:*
-        version: link:../../../core
-      '@arcadejs/runtime':
-        specifier: workspace:*
-        version: link:../../../runtime
+        version: link:../../../arcade
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -159,15 +141,9 @@ importers:
 
   packages/bundler/fixtures/vite-ssr:
     dependencies:
-      '@arcadejs/bundler':
+      arcade:
         specifier: workspace:*
-        version: link:../..
-      '@arcadejs/core':
-        specifier: workspace:*
-        version: link:../../../core
-      '@arcadejs/runtime':
-        specifier: workspace:*
-        version: link:../../../runtime
+        version: link:../../../arcade
     devDependencies:
       typescript:
         specifier: 'catalog:'

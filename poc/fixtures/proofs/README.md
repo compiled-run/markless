@@ -1,6 +1,6 @@
 # Proof Fixtures
 
-These fixtures are executable specs for the first `@arcadejs/core`
+These fixtures are executable specs for the first `arcade`
 implementation. They are not a throwaway POC implementation.
 
 Each proof directory should contain authored `.tsrx` source and a README that

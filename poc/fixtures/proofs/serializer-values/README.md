@@ -1,7 +1,7 @@
 # Serializer Values Proof
 
 This fixture defines the executable-spec surface for serializer value handling
-in `@arcadejs/core`. It is not a serializer implementation, runtime resume
+in `arcade`. It is not a serializer implementation, runtime resume
 implementation, payload encoder, browser demo, or final artifact JSON.
 
 The fixture source lives at [src/App.tsrx](./src/App.tsrx).

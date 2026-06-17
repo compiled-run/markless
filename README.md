@@ -12,7 +12,7 @@ compiler and browser handle resume automatically from saved state. You do not
 manage serialization or draw boundaries by hand.
 
 ```tsx
-import { state } from '@arcadejs/core';
+import { state } from 'arcade';
 
 export function Counter() @{
   let count = state(0);
@@ -38,7 +38,7 @@ only the DOM that depends on `count`.
 ## What It Is
 
 - `.tsrx` components with familiar JavaScript reads and writes.
-- Authoring APIs from `@arcadejs/core`: `state`, `computed`, `shared`, and
+- Authoring APIs from `arcade`: `state`, `computed`, `shared`, and
   `element`.
 - Compiler-owned state graph, payloads, and lazy symbols.
 - No hydration, no VDOM, and no client component replay.

@@ -1,4 +1,4 @@
-import { state } from '@arcadejs/core';
+import { state } from 'arcade';
 
 export function Card() @{
 	let title = state("Library card");

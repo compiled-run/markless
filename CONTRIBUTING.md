@@ -21,10 +21,13 @@ contract.
 
 ## Package Map
 
-Workspace packages use the `@arcadejs/*` scope:
+Workspace packages mostly use the internal `@arcadejs/*` scope. App authors use
+the public `arcade` package:
 
-- `packages/core` -> `@arcadejs/core`, public authoring APIs such as `state()`,
-  `computed()`, `element()`, and `shared()`.
+- `packages/arcade` -> `arcade`, public authoring, runtime, and adapter
+  re-exports.
+- `packages/core` -> `@arcadejs/core`, internal authoring API implementation
+  used by `arcade`.
 - `packages/protocol` -> `@arcadejs/protocol`, shared protocol and payload
   types.
 - `packages/runtime` -> `@arcadejs/runtime`, graph runtime, render, and resume
@@ -37,9 +40,6 @@ Workspace packages use the `@arcadejs/*` scope:
 - `packages/test-utils` -> `@arcadejs/test-utils`, test helpers.
 - `packages/vitest-browser` -> `@arcadejs/vitest-browser`, browser-mode test
   helpers.
-- `packages/arcade` -> `@arcadejs/arcade`, umbrella re-exports while this
-  package remains in the workspace. Do not treat it as the owner of authoring
-  APIs.
 
 There is intentionally no `packages/server`. Initial render and browser resume
 are phases of one runtime model.
@@ -66,7 +66,7 @@ pnpm exec vp pack
 ## Development Rules
 
 - TSRX-only: Arcade components live in `.tsrx` files.
-- Import authoring APIs from `@arcadejs/core`.
+- Import authoring APIs from `arcade`.
 - Do not add reactivity to plain `.ts` files.
 - Do not add TSX or JSX support unless the specs are deliberately reopened.
 - Do not add hydration or VDOM behavior.

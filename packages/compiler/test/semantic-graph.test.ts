@@ -253,6 +253,32 @@ test('buildSemanticGraph creates the first production compiler artifact', async 
 	expect(graph.asyncBoundaries).toHaveLength(1);
 });
 
+test('buildSemanticGraph recognizes public arcade package framework imports', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/Counter.tsrx',
+		source: `
+import { state } from 'arcade';
+
+export function Counter() @{
+	let count = state(0);
+
+	<button onClick={() => count++}>{count}</button>
+}
+`,
+	});
+
+	expect(graph.diagnostics).toEqual([]);
+	expect(graph.graphBindings).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				name: 'count',
+				kind: 'state',
+				writable: true,
+			}),
+		]),
+	);
+});
+
 test('buildSemanticGraph records shared definitions and instance calls', async () => {
 	const graph = await buildSemanticGraph({
 		filename: 'src/session.tsrx',

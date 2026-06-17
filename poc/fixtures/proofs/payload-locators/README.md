@@ -1,7 +1,7 @@
 # Payload Locators Proof
 
 This fixture defines the executable-spec surface for payload view/wiring
-locator planning in `@arcadejs/core`. It is not a compiler implementation,
+locator planning in `arcade`. It is not a compiler implementation,
 runtime resumer implementation, browser demo, or final artifact JSON.
 
 The fixture source lives at [src/App.tsrx](./src/App.tsrx).

@@ -17,7 +17,7 @@ import {
 } from './helpers.ts';
 
 const source = `
-import { state } from '@arcadejs/core';
+import { state } from 'arcade';
 
 export function App() @{
 	let count = state(0);
@@ -54,7 +54,9 @@ describe('TSRX Rolldown plugin structure', () => {
 		expect(result.code).toContain(
 			'export { loadSymbol, payloadScripts, payloadState, payloadView, symbolManifest };',
 		);
-		expect(result.code).toContain(['export default {', '\tsource: arcadeSource,', '};'].join('\n'));
+		expect(result.code).toContain(
+			['export default {', '\tsource: arcadeSource,', '};'].join('\n'),
+		);
 		expect(result.code).not.toContain('\tpayloadScripts,');
 		expect(result.code).not.toContain('\tsymbolManifest,');
 		expect(result.code).not.toContain('moduleManifest');
