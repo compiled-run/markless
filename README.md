@@ -1,6 +1,8 @@
 # Arcade
 
-![Arcade logo](./arcade-js-logo.png)
+<p align="center">
+  <img src="./arcade-js-logo.png" alt="Arcade logo" width="180" />
+</p>
 
 Arcade is a UI framework that ships HTML first and waits to run page code until
 a user interacts with that part of the page, like a click.
@@ -9,7 +11,7 @@ The syntax is meant to feel like a familiar component framework, but the
 compiler and browser handle resume automatically from saved state. You do not
 manage serialization or draw boundaries by hand.
 
-```tsrx
+```tsx
 import { state } from '@arcadejs/core';
 
 export function Counter() @{
