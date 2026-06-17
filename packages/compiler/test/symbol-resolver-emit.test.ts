@@ -1,30 +1,48 @@
 import { expect, test } from 'vitest';
 import { emitSymbolResolverModule } from '../src/passes/symbol-resolver-module.ts';
 
-test('emitSymbolResolverModule emits dynamic imports owned by the generated resolver', () => {
+test('emitSymbolResolverModule emits compact table rows with a constant loader', async () => {
+	const moduleUrl = `data:text/javascript,${encodeURIComponent(
+		[
+			'export const onKeyDown_symbol_key = () => "loaded";',
+			'export const textDomUpdate_symbol_domUpdate = "dom-update";',
+		].join('\n'),
+	)}`;
 	const output = emitSymbolResolverModule({
 		symbols: [
 			{
 				id: 'symbol:key',
-				chunk: '/assets/menu.handlers.ab12.js',
+				chunk: moduleUrl,
 				exportName: 'onKeyDown_symbol_key',
 			},
 			{
 				id: 'symbol:domUpdate',
-				chunk: '/assets/menu.domUpdates.cd34.js',
+				chunk: moduleUrl,
 				exportName: 'textDomUpdate_symbol_domUpdate',
 			},
 		],
 	});
 
 	expect(output).toContain('export async function loadSymbol(id)');
-	expect(output).toContain('case "symbol:key":');
-	expect(output).toContain('return import("/assets/menu.handlers.ab12.js")');
-	expect(output).toContain('.then((mod) => mod.onKeyDown_symbol_key);');
-	expect(output).toContain('case "symbol:domUpdate":');
-	expect(output).toContain('return import("/assets/menu.domUpdates.cd34.js")');
+	expect(output).toContain('const moduleUrls = symbolManifest[3];');
+	expect(output).toContain('const exportNames = symbolManifest[4];');
+	expect(output).toContain('const symbolRows = symbolManifest[5];');
+	expect(output).toContain('import(/* @vite-ignore */ moduleUrls[row[0]])');
+	expect(output).not.toContain('switch (id)');
+	expect(output).not.toContain('case "symbol:key":');
+	expect(output).not.toContain('case "symbol:domUpdate":');
 	expect(output).toContain('throw createUnknownSymbolError(id);');
 	expect(output).toContain('code: "ARCADE_SYMBOL_UNKNOWN"');
+
+	const generatedModule = (await import(
+		`data:text/javascript,${encodeURIComponent(output)}`
+	)) as {
+		loadSymbol(id: string): Promise<unknown>;
+	};
+
+	const loaded = await generatedModule.loadSymbol('symbol:key');
+	expect((loaded as () => string)()).toBe('loaded');
+	await expect(generatedModule.loadSymbol('symbol:domUpdate')).resolves.toBe('dom-update');
 });
 
 test('emitSymbolResolverModule fails closed for unknown symbols with structured metadata', async () => {
@@ -71,21 +89,15 @@ test('emitSymbolResolverModule exports the symbol manifest with protocol and bui
 		symbolManifest: unknown;
 	};
 
-	expect(generatedModule.symbolManifest).toEqual({
-		protocolVersion: 1,
-		buildId: 'build:abc123',
-		resolverId: 'resolver:/src/App.tsrx',
-		symbols: [
-			{
-				id: 'symbol:key',
-				chunk: '/assets/menu.handlers.ab12.js',
-				exportName: 'onKeyDown_symbol_key',
-			},
-			{
-				id: 'symbol:private-export',
-				chunk: '/assets/private.cd34.js',
-				exportName: 'menu dom update',
-			},
-		],
-	});
+	expect(generatedModule.symbolManifest).toEqual([
+		1,
+		'build:abc123',
+		'resolver:/src/App.tsrx',
+		['/assets/menu.handlers.ab12.js', '/assets/private.cd34.js'],
+		['onKeyDown_symbol_key', 'menu dom update'],
+		{
+			'symbol:key': [0, 0],
+			'symbol:private-export': [1, 1],
+		},
+	]);
 });

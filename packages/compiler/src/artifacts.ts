@@ -502,12 +502,14 @@ export type SymbolResolverModuleInput = {
 	}>;
 };
 
-export type SymbolResolverModuleManifest = {
-	readonly protocolVersion: number;
-	readonly buildId: string | null;
-	readonly resolverId: string | null;
-	readonly symbols: SymbolResolverModuleInput['symbols'];
-};
+export type SymbolResolverModuleManifest = readonly [
+	protocolVersion: number,
+	buildId: string | null,
+	resolverId: string | null,
+	moduleUrls: ReadonlyArray<string>,
+	exportNames: ReadonlyArray<string>,
+	symbols: Readonly<Record<string, readonly [moduleIndex: number, exportIndex: number]>>,
+];
 
 export type ProtocolStatePayloadInput = {
 	readonly semanticGraph: SemanticGraphArtifact;

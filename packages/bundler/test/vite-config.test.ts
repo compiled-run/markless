@@ -38,8 +38,8 @@ describe('Vite config integration', () => {
 				rolldownOptions: {
 					output: {
 						dir: 'dist/client',
-						entryFileNames: 'build/async-[hash].js',
-						chunkFileNames: 'build/async-[hash].js',
+						entryFileNames: 'build/chunk-[hash].js',
+						chunkFileNames: 'build/chunk-[hash].js',
 						hoistTransitiveImports: false,
 					},
 				},
@@ -52,7 +52,7 @@ describe('Vite config integration', () => {
 					output: {
 						dir: 'dist/server',
 						entryFileNames: '[name].js',
-						chunkFileNames: 'async-[hash].js',
+						chunkFileNames: 'chunk-[hash].js',
 						hoistTransitiveImports: false,
 					},
 				},
@@ -93,7 +93,7 @@ describe('Vite config integration', () => {
 					input: 'src/entry-server.ts',
 					output: {
 						entryFileNames: '[name].js',
-						chunkFileNames: 'async-[hash].js',
+						chunkFileNames: 'chunk-[hash].js',
 						hoistTransitiveImports: false,
 					},
 				},
@@ -119,7 +119,7 @@ describe('Vite config integration', () => {
 					input: 'src/entry-server.ts',
 					output: {
 						entryFileNames: '[name].js',
-						chunkFileNames: 'async-[hash].js',
+						chunkFileNames: 'chunk-[hash].js',
 						hoistTransitiveImports: false,
 					},
 				},
@@ -137,8 +137,8 @@ describe('Vite config integration', () => {
 
 		expect(clientOutput).toMatchObject({
 			dir: 'dist/client',
-			entryFileNames: 'build/async-[hash].js',
-			chunkFileNames: 'build/async-[hash].js',
+			entryFileNames: 'build/chunk-[hash].js',
+			chunkFileNames: 'build/chunk-[hash].js',
 			hoistTransitiveImports: false,
 		});
 		expect(clientOutput.codeSplitting?.groups?.map((group) => group.name)).toEqual([
@@ -149,7 +149,7 @@ describe('Vite config integration', () => {
 			callOutputOptions(plugin, { dir: 'dist/server' }, createViteHookContext('server')),
 		).toMatchObject({
 			dir: 'dist/server',
-			chunkFileNames: 'async-[hash].js',
+			chunkFileNames: 'chunk-[hash].js',
 			hoistTransitiveImports: false,
 		});
 		expect(

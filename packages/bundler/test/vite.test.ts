@@ -26,7 +26,7 @@ export function App() @{
 `;
 
 describe('Vite adapter structure', () => {
-	test('lets the framework manifest own app preloading instead of Vite modulepreload', () => {
+	test('lets the framework bundle graph own app preloading instead of Vite modulepreload', () => {
 		const plugin = getAsyncPlugin();
 		const appConfig = {};
 		const ssrModeAppConfig = {};
@@ -76,10 +76,10 @@ describe('Vite adapter structure', () => {
 		callGenerateBundle(
 			plugin,
 			{
-				'build/async-payload.js': {
+				'build/chunk-payload.js': {
 					type: 'chunk',
-					fileName: 'build/async-payload.js',
-					name: 'async-payload',
+					fileName: 'build/chunk-payload.js',
+					name: 'chunk-payload',
 					code: 'export default {};',
 					exports: ['default'],
 					imports: [],

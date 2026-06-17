@@ -8,7 +8,6 @@ import { runtimeSizeReport, type RuntimeSizeReport } from '../test-support/runti
 const FIXTURE = 'fixtures/vite-ssr';
 const DIST = `${FIXTURE}/dist`;
 const INDEX = `${FIXTURE}/dist/index.html`;
-const MANIFEST = `${FIXTURE}/dist/arcade-manifest.json`;
 const COUNTER = '[data-counter]';
 const REQUESTS = '/__arcade-fixture-requests';
 const WAIT = { timeoutMs: 10_000 };
@@ -66,7 +65,6 @@ export default box(
 		);
 		const interactionRuntimeSize = await runtimeSizeReport({
 			dist: DIST,
-			manifest: MANIFEST,
 			scripts: interactionScripts,
 		});
 		receipt.note(`SSR interaction runtime size:\n${interactionRuntimeSize.summary}`);
@@ -118,9 +116,9 @@ function assertScriptsLoadedAfterInteraction(
 			'Expected first interaction to request the lazy SSR resume JavaScript module.',
 		);
 	}
-	if (!loadedAfterInteraction.some((path) => path.includes('/build/async-'))) {
+	if (!loadedAfterInteraction.some((path) => path.includes('/build/chunk-'))) {
 		throw new Error(
-			`Expected first interaction to request built async chunks, but saw: ${loadedAfterInteraction.join(', ')}`,
+			`Expected first interaction to request built chunks, but saw: ${loadedAfterInteraction.join(', ')}`,
 		);
 	}
 	return loadedAfterInteraction;

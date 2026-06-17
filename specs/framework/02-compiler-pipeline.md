@@ -218,7 +218,8 @@ Diagnostic quality is a first-class deliverable, not polish.
   extraction, post-await diagnostics, boundary lowering, extraction, sync event
   policy extraction, capture diagnostics). Each pass has fixtures for
   input artifacts → output artifacts/diagnostics; full compiler snapshots still
-  cover input `.tsrx` → emitted JS + symbol resolver/manifest.
+  cover input `.tsrx` → emitted JS, compact symbol resolver table, and any
+  optional manifest metadata.
   The accepted state-lvalue surface is defined by these fixtures: each new
   assignment/update/destructuring/collection-method form must prove its semantic
   target, lowered graph operation, preserved JavaScript behavior, or diagnostic.

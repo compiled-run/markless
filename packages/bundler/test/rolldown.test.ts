@@ -98,9 +98,12 @@ describe('TSRX Rolldown plugin structure', () => {
 		expect(payloadSource).toContain('export const payloadScripts =');
 		expect(payloadSource).toContain('export default payloadScripts;');
 		const resolverSource = (await callLoad(plugin, `\0${resolverId}`)) as string;
-		const symbolIds = [...resolverSource.matchAll(/import\("([^"]+)"\)/g)].map(
-			(match) => match[1],
-		);
+		const resolverModule = (await import(
+			`data:text/javascript,${encodeURIComponent(resolverSource)}`
+		)) as {
+			symbolManifest: [number, string | null, string | null, string[]];
+		};
+		const symbolIds = resolverModule.symbolManifest[3];
 		const symbolSources = await Promise.all(
 			symbolIds.map((symbolId) => callLoad(plugin, `\0${symbolId}`) as Promise<string>),
 		);
@@ -113,12 +116,19 @@ describe('TSRX Rolldown plugin structure', () => {
 	});
 
 	test('buildStart clears stale virtual modules and transform manifests', async () => {
-		const plugin = arcadeClient();
+		let manifest:
+			| {
+					modules?: unknown[];
+			  }
+			| undefined;
+		const plugin = arcadeClient({
+			onManifest: (next) => {
+				manifest = next;
+			},
+		});
 
 		callBuildStart(plugin, { cwd: '/workspace/app' });
-		const result = (await callTransform(plugin, source, '/workspace/app/src/App.tsrx')) as {
-			code: string;
-		};
+		await callTransform(plugin, source, '/workspace/app/src/App.tsrx');
 		const payloadId = `virtual:arcade:payload:${encodeURIComponent(
 			'/workspace/app/src/App.tsrx',
 		)}`;
@@ -128,13 +138,11 @@ describe('TSRX Rolldown plugin structure', () => {
 		expect(await callLoad(plugin, `\0${payloadId}`)).toBeNull();
 		const emitFile = vi.fn();
 		callGenerateBundle(plugin, {}, emitFile);
-		const manifestAsset = emitFile.mock.calls
-			.map((call) => call[0])
-			.find((item) => item.fileName === ARCADE_MANIFEST_FILE);
-		expect(JSON.parse(manifestAsset.source).modules).toEqual([]);
+		expect(manifest?.modules).toEqual([]);
+		expect(emittedAsset(emitFile, ARCADE_MANIFEST_FILE)).toBeUndefined();
 	});
 
-	test('generateBundle emits manifest and bundle graph assets from build output', async () => {
+	test('generateBundle emits bundle graph and in-memory manifest metadata from build output', async () => {
 		let manifest:
 			| {
 					version?: number;
@@ -165,49 +173,76 @@ describe('TSRX Rolldown plugin structure', () => {
 		];
 		const resolverId = `virtual:arcade:resolver:${encoded}`;
 		const resolverSource = (await callLoad(plugin, `\0${resolverId}`)) as string;
-		const symbolVirtualIds = [...resolverSource.matchAll(/import\("([^"]+)"\)/g)].map(
-			(match) => match[1],
-		);
+		const resolverModule = (await import(
+			`data:text/javascript,${encodeURIComponent(resolverSource)}`
+		)) as {
+			symbolManifest: [number, string | null, string | null, string[]];
+		};
+		const symbolVirtualIds = resolverModule.symbolManifest[3];
 		const virtualIds = [...entryVirtualIds, ...symbolVirtualIds].map((id) => `\0${id}`);
-
-		callGenerateBundle(
-			plugin,
-			Object.fromEntries(
-				virtualIds.map((id, index) => [
-					`build/async-${index}.js`,
-					{
-						type: 'chunk',
-						fileName: `build/async-${index}.js`,
-						name: `async-${index}`,
-						code: 'export default {};',
-						exports: ['default'],
-						imports: [],
-						dynamicImports: [],
-						moduleIds: [id],
-						facadeModuleId: id,
-					},
-				]),
-			),
-			emitFile,
+		const bundle = Object.fromEntries(
+			virtualIds.map((id, index) => [
+				`build/chunk-${index}.js`,
+				{
+					type: 'chunk',
+					fileName: `build/chunk-${index}.js`,
+					name: `chunk-${index}`,
+					code: id === `\0${resolverId}` ? resolverSource : 'export default {};',
+					exports: ['default'],
+					imports: [],
+					dynamicImports: [],
+					moduleIds: [id],
+					facadeModuleId: id,
+				},
+			]),
 		);
+
+		callGenerateBundle(plugin, bundle, emitFile);
 
 		expect(manifest).toMatchObject({
 			version: 1,
 			modules: [expect.objectContaining({ source: '/workspace/app/src/App.tsrx' })],
 		});
 		expect(manifest?.bundleGraphAsset).toBe(ARCADE_BUNDLE_GRAPH);
-		expect(manifest?.modules[0]?.symbols[0]?.fileName).toMatch(/^async-\d+\.js$/);
+		expect(manifest?.modules[0]?.symbols[0]?.fileName).toMatch(/^chunk-\d+\.js$/);
 		expect(emitFile).toHaveBeenCalledWith(
 			expect.objectContaining({
 				type: 'asset',
 				fileName: ARCADE_BUNDLE_GRAPH,
 			}),
 		);
-		expect(emitFile).toHaveBeenCalledWith(
-			expect.objectContaining({
-				type: 'asset',
-				fileName: ARCADE_MANIFEST_FILE,
-			}),
+		expect(emittedAsset(emitFile, ARCADE_MANIFEST_FILE)).toBeUndefined();
+		const resolverChunk = Object.values(bundle).find(
+			(item): item is { code: string; moduleIds: string[] } =>
+				typeof item === 'object' &&
+				item != null &&
+				'code' in item &&
+				'moduleIds' in item &&
+				Array.isArray(item.moduleIds) &&
+				item.moduleIds.includes(`\0${resolverId}`),
 		);
+		expect(resolverChunk?.code).toContain('import(/* @vite-ignore */ moduleUrls[row[0]])');
+		expect(resolverChunk?.code).not.toContain('switch (id)');
+		expect(resolverChunk?.code).not.toContain('virtual:arcade:symbol:');
+		expect(resolverChunk?.code).toMatch(/\["\.\/chunk-\d+\.js"/);
+	});
+
+	test('generateBundle emits arcade-manifest.json only when explicitly requested', () => {
+		const plugin = arcadeClient({ emitManifestJson: true });
+		const emitFile = vi.fn();
+
+		callBuildStart(plugin, { cwd: '/workspace/app' });
+		callGenerateBundle(plugin, {}, emitFile);
+
+		const manifestAsset = emittedAsset(emitFile, ARCADE_MANIFEST_FILE);
+		expect(manifestAsset).toMatchObject({
+			type: 'asset',
+			fileName: ARCADE_MANIFEST_FILE,
+		});
+		expect(JSON.parse(String(manifestAsset?.source)).modules).toEqual([]);
 	});
 });
+
+function emittedAsset(emitFile: ReturnType<typeof vi.fn>, fileName: string) {
+	return emitFile.mock.calls.map((call) => call[0]).find((item) => item.fileName === fileName);
+}

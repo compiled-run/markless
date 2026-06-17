@@ -143,9 +143,9 @@ no server-created DOM or serialized graph to resume.
 
 `renderToString(App, options)` is the server initial-render path. It returns HTML
 containing the rendered DOM, a resumable container boundary, container-scoped
-payload scripts, symbol resolver metadata, and the inline resumer bootstrap.
-That container boundary is the microfrontend/island scope for DOM locators,
-events, shared-state patches, diagnostics, and cleanup.
+payload scripts, compact symbol resolver table metadata, and the inline resumer
+bootstrap. That container boundary is the microfrontend/island scope for DOM
+locators, events, shared-state patches, diagnostics, and cleanup.
 
 The inline resumer activates automatically when the SSR HTML runs in a browser.
 App authors should not need to write a normal browser `resume()` call. Low-level
@@ -176,11 +176,14 @@ For the event-only v1 path, the resumer owns only:
 - importing and calling the lazy symbol
 
 The compiler/bundler/render pipeline owns locator planning, event extraction,
-symbol IDs, chunk emission, module/export tables, feature selection, and minified
-inline source generation. The resumer must not scan event attributes, discover
-chunks, plan symbols, decode the whole graph, run the DOM journal, start
-behaviors, demand async boundaries, or include visibility/sync-policy code unless
-the container payload needs that feature.
+symbol IDs, chunk emission, finalized module URL/specifier tables, feature
+selection, and minified inline source generation. The generated loader source is
+constant-size over compact row data and may use
+`import(/* @vite-ignore */ url)` against finalized chunk specifiers. The resumer
+must not scan event attributes, discover chunks, parse `arcade-manifest.json`,
+plan symbols, decode the whole graph, run the DOM journal, start behaviors,
+demand async boundaries, or include visibility/sync-policy code unless the
+container payload needs that feature.
 
 Production size targets are part of the runtime contract:
 
@@ -205,10 +208,11 @@ event-handler attributes.
   policy reads the already-materialized graph data plane by ID; it does not load
   app chunks or execute component/handler code.
 - First interaction: look up the ordered symbol list for that element/event,
-  resolve each symbol through the generated symbol resolver, materialize its
-  captured graph references and element handles, and run handlers in authored
-  order. The resolver owns the dynamic import; event props are only encoded
-  symbol IDs in `arcade/view`.
+  resolve each symbol through the generated symbol resolver's compact table,
+  materialize its captured graph references and element handles, and run
+  handlers in authored order. The resolver owns the dynamic import, including
+  any `import(/* @vite-ignore */ url)` runtime import form; event props are only
+  encoded symbol IDs in `arcade/view`.
 - Element handles resolve from serialized DOM locators at handler execution time.
   If the element was removed or the locator no longer matches, the handle reads
   as `undefined`.

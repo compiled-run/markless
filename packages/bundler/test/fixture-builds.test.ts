@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { readFile, rm } from 'node:fs/promises';
+import { access, readFile, rm } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { beforeAll, describe, expect, test } from 'vitest';
@@ -12,7 +12,9 @@ const fixtures = [
 	{
 		filter: '@fixtures/vite-csr',
 		outputs: ['packages/bundler/fixtures/vite-csr/dist'],
-		manifest: 'packages/bundler/fixtures/vite-csr/dist/arcade-manifest.json',
+		forbiddenManifest: 'packages/bundler/fixtures/vite-csr/dist/arcade-manifest.json',
+		bundleGraph: 'packages/bundler/fixtures/vite-csr/dist/build/bundle-graph.json',
+		symbols: ['symbol:0', 'symbol:1'],
 		runtimeBudget: {
 			dist: 'packages/bundler/fixtures/vite-csr/dist',
 			entryHtml: 'packages/bundler/fixtures/vite-csr/dist/index.html',
@@ -20,12 +22,6 @@ const fixtures = [
 			maxAsyncScriptsGzipBytes: 3_050,
 			maxAsyncScriptCount: 2,
 			forbidVitePreloadHelper: true,
-			forbiddenRuntimeOrigins: [
-				'/runtime/src/event-resume.ts',
-				'/runtime/src/payload.ts',
-				'/runtime/src/resume.ts',
-				'/serializer/src/',
-			],
 		},
 	},
 	{
@@ -35,7 +31,9 @@ const fixtures = [
 	{
 		filter: '@fixtures/vite-ssr',
 		outputs: ['packages/bundler/fixtures/vite-ssr/dist'],
-		manifest: 'packages/bundler/fixtures/vite-ssr/dist/arcade-manifest.json',
+		forbiddenManifest: 'packages/bundler/fixtures/vite-ssr/dist/arcade-manifest.json',
+		bundleGraph: 'packages/bundler/fixtures/vite-ssr/dist/build/bundle-graph.json',
+		symbols: ['symbol:0', 'symbol:1', 'symbol:2'],
 		runtimeBudget: {
 			dist: 'packages/bundler/fixtures/vite-ssr/dist',
 			maxRuntimeChunkGzipBytes: 2_175,
@@ -47,7 +45,9 @@ const fixtures = [
 	{
 		filter: '@fixtures/vite-plus',
 		outputs: ['packages/bundler/fixtures/vite-plus/dist'],
-		manifest: 'packages/bundler/fixtures/vite-plus/dist/arcade-manifest.json',
+		forbiddenManifest: 'packages/bundler/fixtures/vite-plus/dist/arcade-manifest.json',
+		bundleGraph: 'packages/bundler/fixtures/vite-plus/dist/build/bundle-graph.json',
+		symbols: ['symbol:0'],
 		runtimeBudget: {
 			dist: 'packages/bundler/fixtures/vite-plus/dist',
 			entryHtml: 'packages/bundler/fixtures/vite-plus/dist/index.html',
@@ -55,13 +55,15 @@ const fixtures = [
 			maxAsyncScriptsGzipBytes: 3_000,
 			maxAsyncScriptCount: 2,
 			forbidVitePreloadHelper: true,
-			forbiddenRuntimeOrigins: ['/runtime/src/event-resume.ts'],
 		},
 	},
 	{
 		filter: '@fixtures/rolldown-basic',
 		outputs: ['packages/bundler/fixtures/rolldown-basic/dist'],
-		manifest: 'packages/bundler/fixtures/rolldown-basic/dist/client/arcade-manifest.json',
+		forbiddenManifest:
+			'packages/bundler/fixtures/rolldown-basic/dist/client/arcade-manifest.json',
+		bundleGraph: 'packages/bundler/fixtures/rolldown-basic/dist/client/build/bundle-graph.json',
+		symbols: ['symbol:0', 'symbol:1'],
 	},
 ] as const;
 
@@ -83,13 +85,16 @@ describe('fixture builds', () => {
 
 			await execPnpm(['--filter', fixture.filter, 'build']);
 
-			if (fixture.manifest) {
-				const manifest = JSON.parse(
-					await readFile(resolve(root, fixture.manifest), 'utf8'),
-				);
-				expect(manifest.version).toBe(1);
-				expect(manifest.modules).toEqual(expect.any(Array));
-				expect(manifest.bundleGraphAsset).toBe('build/bundle-graph.json');
+			if ('forbiddenManifest' in fixture) {
+				expect(await exists(resolve(root, fixture.forbiddenManifest))).toBe(false);
+			}
+
+			if ('bundleGraph' in fixture) {
+				const graph = JSON.parse(await readFile(resolve(root, fixture.bundleGraph), 'utf8'));
+				expect(graph).toEqual(expect.any(Array));
+				for (const symbol of fixture.symbols) {
+					expect(graph).toContain(symbol);
+				}
 			}
 
 			if ('runtimeBudget' in fixture) {
@@ -99,7 +104,6 @@ describe('fixture builds', () => {
 						: undefined;
 				const report = await runtimeSizeReport({
 					dist: resolve(root, fixture.runtimeBudget.dist),
-					manifest: resolve(root, fixture.manifest),
 					scripts,
 					includeStaticImports: !!scripts,
 				});
@@ -119,20 +123,19 @@ describe('fixture builds', () => {
 						.map((chunk) => chunk.fileName);
 					expect(chunksWithVitePreloadHelper, report.summary).toEqual([]);
 				}
-				if ('forbiddenRuntimeOrigins' in fixture.runtimeBudget) {
-					const forbiddenOrigins = report.runtimeChunks.flatMap((chunk) =>
-						chunk.origins.filter((origin) =>
-							fixture.runtimeBudget.forbiddenRuntimeOrigins.some((forbidden) =>
-								`/${origin}`.includes(forbidden),
-							),
-						),
-					);
-					expect(forbiddenOrigins, report.summary).toEqual([]);
-				}
 			}
 		}, 120_000);
 	}
 });
+
+async function exists(path: string): Promise<boolean> {
+	try {
+		await access(path);
+		return true;
+	} catch {
+		return false;
+	}
+}
 
 async function readModuleScripts(fileName: string): Promise<string[]> {
 	const html = await readFile(fileName, 'utf8');

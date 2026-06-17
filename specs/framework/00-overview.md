@@ -98,10 +98,12 @@ Four implementation areas:
 4. **Build integration** — a Rolldown plugin base exported by
    `@arcadejs/bundler`,
    with framework adapters such as Vite consuming that base plugin. Extracted
-   symbols become code-split entry points, and production builds emit the
-   generated symbol resolver plus manifest metadata needed by the unified
-   render/resume runtime, preload/runtime graph, and cached initial-render
-   fragments.
+   symbols become code-split entry points, and production builds emit a
+   generated compact symbol resolver table with finalized chunk specifiers. Any
+   manifest-like metadata is for adapters, preload graphs, diagnostics,
+   devtools, or cached initial-render fragments; the default browser symbol
+   loading path consumes the resolver table and payload data, not
+   `arcade-manifest.json`.
 
 Do not split the framework into separate "server" and "client" products or
 packages. The authoring model is one unified render/resume model: CSR render,
@@ -160,8 +162,9 @@ Initial internal production package map:
 - `packages/compiler` — TSRX semantic graph, lowering passes, capture analysis,
   symbol extraction, artifact planning, and diagnostics.
 - `packages/bundler` — Qwik-bundler-shaped build package containing the
-  Rolldown-first plugin, virtual modules, symbol chunks, manifest output, and
-  Vite adapter dev/HMR/HTML integration.
+  Rolldown-first plugin, virtual modules, symbol chunks, compact resolver table
+  finalization, optional manifest/bundle-graph metadata, and Vite adapter
+  dev/HMR/HTML integration.
 - `packages/test-utils` — fixture harnesses, artifact assertions,
   serializer/resume helpers, browser helpers, and witness integration helpers.
 - `packages/vitest-browser` — CSR-only Vitest browser-mode support for targeted
@@ -180,12 +183,21 @@ tooling surface, so pnpm scripts should be thin aliases for `vp pack`,
 
 The build architecture is Rolldown-first, not Vite-first. The base Rolldown
 plugin owns compiler transforms, virtual modules, emitted symbol chunks,
-manifest generation, diagnostics, and browser/initial-render/library build
-modes. The Vite plugin is an adapter that wraps the Rolldown plugin with
+compact resolver table finalization, optional manifest metadata, diagnostics,
+and browser/initial-render/library build modes. The Vite plugin is an adapter
+that wraps the Rolldown plugin with
 Vite-specific environment detection, dev-server transforms, HMR, HTML/dev-tag
 injection, build orchestration, and public extension APIs. This mirrors the
 `qwik-bundler` structure: a reusable `rolldown` entry point is the core, and
 `vite` is one consumer of it.
+
+Default production JavaScript chunks emitted by the framework build integration
+use neutral bundler vocabulary: client chunks are written under
+`build/chunk-[hash].js`, and server-side non-entry chunks use
+`chunk-[hash].js`. The generated resolver table and any optional
+manifest/bundle-graph metadata carry symbol meaning; production chunk filenames
+should not expose compiler terms such as symbol kinds. The browser runtime must
+not need `arcade-manifest.json` to recover that meaning.
 
 Build scripts and production optimization must go through Rolldown or Vite.
 Do not add standalone esbuild, terser, Rollup, SWC, webpack, Babel build
@@ -214,8 +226,9 @@ The implementation rules are:
 - prefer runtime-agnostic path/URL helpers such as the unjs packages `pathe` and
   `ufo` over Node's `path` or `url` modules
 - generated code uses standard ESM and `import()`; the symbol resolver receives
-  already-normalized URLs/specifiers from the build manifest rather than doing
-  environment-specific path math at runtime
+  already-normalized URLs/specifiers from build integration's finalized resolver
+  table/bundle metadata rather than doing environment-specific path math at
+  runtime or parsing `arcade-manifest.json` in browser startup
 - Node/Vite/Rolldown-specific behavior lives only in adapter packages or clearly
   isolated integration modules, never in the semantic compiler/runtime core
 

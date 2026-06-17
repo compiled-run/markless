@@ -33,12 +33,10 @@ export async function transformTsrxModule(
 	}));
 	const resolverSource = emitSymbolResolverModule({
 		buildId: input.buildId,
-		resolverId,
 		symbols: symbolRows,
 	});
 	const resolverManifest = createSymbolResolverModuleManifest({
 		buildId: input.buildId,
-		resolverId,
 		symbols: symbolRows,
 	});
 	const manifest: ArcadeTransformManifest = {

@@ -27,13 +27,13 @@ export function outputDefaults(
 	const next: OutputOptions = { ...output, hoistTransitiveImports: false };
 	if (environment === 'server') {
 		next.entryFileNames ??= '[name].js';
-		next.chunkFileNames ??= 'async-[hash].js';
+		next.chunkFileNames ??= 'chunk-[hash].js';
 		next.codeSplitting = arcadeCodeSplitting(next.codeSplitting);
 		return next;
 	}
 
-	next.entryFileNames ??= `${ARCADE_BUILD_PREFIX}async-[hash].js`;
-	next.chunkFileNames ??= `${ARCADE_BUILD_PREFIX}async-[hash].js`;
+	next.entryFileNames ??= `${ARCADE_BUILD_PREFIX}chunk-[hash].js`;
+	next.chunkFileNames ??= `${ARCADE_BUILD_PREFIX}chunk-[hash].js`;
 	next.minifyInternalExports = false;
 	next.strictExecutionOrder = true;
 	next.codeSplitting = arcadeCodeSplitting(next.codeSplitting);

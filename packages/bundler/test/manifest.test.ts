@@ -31,16 +31,16 @@ describe('arcade manifest output', () => {
 	test('creates a manifest from bundler output and transform artifacts', () => {
 		const manifest = createManifest(
 			{
-				'build/async-entry.js': chunk({
-					fileName: 'build/async-entry.js',
+				'build/chunk-entry.js': chunk({
+					fileName: 'build/chunk-entry.js',
 					name: 'entry',
-					code: 'import "./async-symbol.js"; export default {};',
-					imports: ['build/async-symbol.js'],
+					code: 'import "./chunk-symbol.js"; export default {};',
+					imports: ['build/chunk-symbol.js'],
 					moduleIds: ['/workspace/app/src/root.tsrx'],
 					facadeModuleId: '/workspace/app/src/root.tsrx',
 				}),
-				'build/async-symbol.js': chunk({
-					fileName: 'build/async-symbol.js',
+				'build/chunk-symbol.js': chunk({
+					fileName: 'build/chunk-symbol.js',
 					name: 'root_click',
 					code: 'export const onClick = () => {};',
 					moduleIds: ['\0virtual:arcade:symbol:root:click'],
@@ -53,11 +53,11 @@ describe('arcade manifest output', () => {
 					names: ['root.css'],
 					source: 'body{}',
 				},
-				'build/async-entry.js.map': {
+				'build/chunk-entry.js.map': {
 					type: 'asset',
-					fileName: 'build/async-entry.js.map',
-					name: 'async-entry.js.map',
-					names: ['async-entry.js.map'],
+					fileName: 'build/chunk-entry.js.map',
+					name: 'chunk-entry.js.map',
+					names: ['chunk-entry.js.map'],
 					source: '{}',
 				},
 			},
@@ -74,19 +74,19 @@ describe('arcade manifest output', () => {
 			symbols: [
 				expect.objectContaining({
 					symbolId: 'root#click',
-					fileName: 'build/async-symbol.js',
+					fileName: 'build/chunk-symbol.js',
 				}),
 			],
 		});
-		expect(manifest.bundles['build/async-entry.js']).toMatchObject({
-			imports: ['build/async-symbol.js'],
+		expect(manifest.bundles['build/chunk-entry.js']).toMatchObject({
+			imports: ['build/chunk-symbol.js'],
 			origins: ['src/root.tsrx'],
 		});
-		expect(manifest.bundles['build/async-symbol.js']).toMatchObject({
+		expect(manifest.bundles['build/chunk-symbol.js']).toMatchObject({
 			symbols: ['root#click'],
 		});
 		expect(manifest.assets?.['build/root.css']).toEqual({ name: 'root.css', size: 6 });
-		expect(manifest.assets?.['build/async-entry.js.map']).toBeUndefined();
+		expect(manifest.assets?.['build/chunk-entry.js.map']).toBeUndefined();
 		expect(manifest.bundleGraphAsset).toBe(ARCADE_BUNDLE_GRAPH);
 		expect(manifest.bundleGraph).toContain('root#click');
 		expect(manifest.injections).toContainEqual({
@@ -110,19 +110,19 @@ describe('arcade manifest output', () => {
 					symbols: [
 						{
 							...transformManifest.symbols[0]!,
-							fileName: 'build/async-symbol.js',
+							fileName: 'build/chunk-symbol.js',
 						},
 					],
 				},
 			],
 			bundles: {
-				'build/async-entry.js': {
+				'build/chunk-entry.js': {
 					size: 100,
 					total: 200,
-					dynamicImports: ['build/async-symbol.js'],
+					dynamicImports: ['build/chunk-symbol.js'],
 					origins: ['src/root.tsrx'],
 				},
-				'build/async-symbol.js': {
+				'build/chunk-symbol.js': {
 					size: 50,
 					total: 50,
 					symbols: ['root#click'],
@@ -142,7 +142,7 @@ describe('arcade manifest output', () => {
 
 		expect(graph).toContain('root#click');
 		expect(graph).toContain('entry-preload');
-		expect(graph).toContain('build/async-symbol.js');
+		expect(graph).toContain('build/chunk-symbol.js');
 	});
 
 	test('injects build manifests into server output without a manifest input option', () => {

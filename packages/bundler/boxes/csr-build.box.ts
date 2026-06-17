@@ -1,9 +1,9 @@
 import { box } from '@arcadejs/witness';
 
 // Product truth: a production Vite build of the CSR fixture must emit the
-// arcade manifest, bundle graph, and lazy symbol chunks through the
+// bundle graph and lazy symbol chunks through the
 // real Vite/Rolldown pipeline. Dev-only HMR wiring must not leak into those
-// production artifacts.
+// production artifacts, and the full arcade manifest must not be default output.
 const FIXTURE = 'fixtures/vite-csr';
 const MANIFEST = `${FIXTURE}/dist/arcade-manifest.json`;
 const BUNDLE_GRAPH = `${FIXTURE}/dist/build/bundle-graph.json`;
@@ -17,7 +17,7 @@ const FORBIDDEN_DEV_STRINGS = [
 
 export default box(
 	{
-		name: 'csr build: manifest and bundle graph describe tsrx symbols',
+		name: 'csr build: bundle graph describes tsrx symbols without default manifest',
 		tags: ['csr', 'build'],
 		modes: ['build'],
 	},
@@ -32,49 +32,19 @@ export default box(
 
 		await expect.build.environment(build, 'client');
 		await expect.build.artifact(build, INDEX);
-		await expect.build.artifact(build, MANIFEST);
+		assertBuildDoesNotInclude(build, MANIFEST);
 		await expect.build.artifact(build, BUNDLE_GRAPH);
 
-		const manifest = await build.artifact(MANIFEST);
-		await expect.artifact.json(manifest, (json) => {
-			const value = json as {
-				version?: unknown;
-				modules?: Array<{
-					source?: unknown;
-					payload?: { virtualModuleId?: unknown };
-					resolver?: { virtualModuleId?: unknown };
-					moduleManifest?: { virtualModuleId?: unknown };
-					symbols?: Array<{ kind?: unknown; fileName?: unknown }>;
-				}>;
-				bundleGraphAsset?: unknown;
-				bundles?: Record<string, unknown>;
-			};
-			const module = value.modules?.find(
-				(item) => typeof item.source === 'string' && item.source.endsWith('/src/root.tsrx'),
-			);
-			return (
-				value.version === 1 &&
-				value.bundleGraphAsset === 'build/bundle-graph.json' &&
-				!!module?.payload?.virtualModuleId &&
-				!!module.resolver?.virtualModuleId &&
-				!!module.moduleManifest?.virtualModuleId &&
-				!!module.symbols?.some(
-					(symbol) =>
-						symbol.kind === 'event-handler' && typeof symbol.fileName === 'string',
-				) &&
-				!!module.symbols?.some(
-					(symbol) => symbol.kind === 'dom-update' && typeof symbol.fileName === 'string',
-				) &&
-				!!value.bundles &&
-				Object.keys(value.bundles).some((name) => name.startsWith('async-'))
-			);
-		});
-
 		await expect.artifact.json(await build.artifact(BUNDLE_GRAPH), (json) => {
-			return Array.isArray(json) && json.includes('symbol:0') && json.includes('symbol:1');
+			return (
+				Array.isArray(json) &&
+				json.includes('symbol:0') &&
+				json.includes('symbol:1') &&
+				json.some((item) => typeof item === 'string' && item.startsWith('chunk-'))
+			);
 		});
 		await expect.artifact.text(build, INDEX, {
-			contains: '/build/async-',
+			contains: '/build/chunk-',
 			notContains: FORBIDDEN_DEV_STRINGS,
 		});
 		await expect.build.forbids(build, FORBIDDEN_DEV_STRINGS);
@@ -83,3 +53,12 @@ export default box(
 		await receipt.capture('csr production build artifacts verified');
 	},
 );
+
+function assertBuildDoesNotInclude(
+	build: { readonly artifacts: readonly { readonly path: string }[] },
+	path: string,
+): void {
+	if (build.artifacts.some((artifact) => artifact.path === path)) {
+		throw new Error(`Expected production build not to emit ${path}.`);
+	}
+}

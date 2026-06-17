@@ -4,10 +4,10 @@ import { stripEmptyVitePreloadWrappers } from '../src/build/preload-cleanup.ts';
 describe('Vite preload cleanup', () => {
 	test('removes empty dynamic import preload wrappers without touching the import', () => {
 		const code =
-			'async function load(id){switch(id){case"symbol:0":return p(()=>import("./async-a.js").then((mod)=>mod.symbol_0),[]);case"symbol:1":return p(()=>import("./async-b.js").then((mod)=>mod.symbol_1),[],import.meta.url)}}';
+			'async function load(id){switch(id){case"symbol:0":return p(()=>import("./chunk-a.js").then((mod)=>mod.symbol_0),[]);case"symbol:1":return p(()=>import("./chunk-b.js").then((mod)=>mod.symbol_1),[],import.meta.url)}}';
 
 		expect(stripEmptyVitePreloadWrappers(code)).toBe(
-			'async function load(id){switch(id){case"symbol:0":return import("./async-a.js").then((mod)=>mod.symbol_0);case"symbol:1":return import("./async-b.js").then((mod)=>mod.symbol_1)}}',
+			'async function load(id){switch(id){case"symbol:0":return import("./chunk-a.js").then((mod)=>mod.symbol_0);case"symbol:1":return import("./chunk-b.js").then((mod)=>mod.symbol_1)}}',
 		);
 	});
 

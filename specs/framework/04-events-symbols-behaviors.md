@@ -250,22 +250,41 @@ The resolver is a page/build-scoped module or equivalent compact runtime table
 that maps symbol IDs from `arcade/view` to chunks and exports:
 
 ```ts
+const symbolManifest = [
+	1,
+	"build-ab12",
+	null,
+	["/build/chunk-ab12.js"],
+	["onKeyDown_7", "textBinding_8"],
+	{ 7: [0, 0], 8: [0, 1] },
+];
+
+const moduleUrls = symbolManifest[3];
+const exportNames = symbolManifest[4];
+const symbolRows = symbolManifest[5];
+
 export function loadSymbol(id: number) {
-	switch (id) {
-		case 7:
-			return import('/assets/menu.handlers.ab12.js').then((mod) => mod.onKeyDown_7);
-		case 8:
-			return import('/assets/menu.domUpdates.cd34.js').then((mod) => mod.textBinding_8);
-		default:
-			return Promise.reject(new Error(`Unknown async symbol ${id}`));
+	const row = symbolRows[id];
+	if (!row) {
+		throw createUnknownSymbolError(id);
 	}
+
+	return import(/* @vite-ignore */ moduleUrls[row[0]]).then(
+		(mod) => mod[exportNames[row[1]]],
+	);
 }
 ```
 
-The exact resolver syntax is private build output. The full symbol manifest is a
-build artifact. The browser receives only the resolver/table needed for
-the current build or page, plus enough build/protocol identity to fail closed if
-`arcade/view` references a symbol the resolver does not know.
+The exact resolver tuple layout is private build output. Table data may scale
+with symbol count, but the executable loader source must stay constant-size: no
+generated `switch (id)`, no generated `case` per symbol, and no per-node import
+closures. The build integration finalizes module URL/specifier entries after
+chunk emission, then the browser receives only the resolver table needed for the
+current build or page, plus enough build/protocol identity to fail closed if
+`arcade/view` references a symbol the resolver does not know. The default
+browser runtime must not fetch or parse `arcade-manifest.json` to discover
+symbol chunks. If a manifest is emitted, it is build/tooling/adapter metadata,
+not the runtime symbol-loading primitive.
 
 The same resolver path is used for event handlers, DOM update symbols,
 `attach={...}` behavior symbols, async computed run functions, and other lazy

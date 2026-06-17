@@ -4,39 +4,45 @@ import type { SymbolResolverModuleInput, SymbolResolverModuleManifest } from '..
 export function createSymbolResolverModuleManifest(
 	input: SymbolResolverModuleInput,
 ): SymbolResolverModuleManifest {
-	return {
-		protocolVersion: ASYNC_PROTOCOL_VERSION,
-		buildId: input.buildId ?? null,
-		resolverId: input.resolverId ?? null,
-		symbols: input.symbols,
-	};
+	const moduleUrls: string[] = [];
+	const exportNames: string[] = [];
+	const moduleIndexes = new Map<string, number>();
+	const exportIndexes = new Map<string, number>();
+	const symbols: Record<string, readonly [moduleIndex: number, exportIndex: number]> = {};
+
+	for (const symbol of input.symbols) {
+		const moduleIndex = tableIndex(moduleIndexes, moduleUrls, symbol.chunk);
+		const exportIndex = tableIndex(exportIndexes, exportNames, symbol.exportName);
+		symbols[symbol.id] = [moduleIndex, exportIndex];
+	}
+
+	return [
+		ASYNC_PROTOCOL_VERSION,
+		input.buildId ?? null,
+		input.resolverId ?? null,
+		moduleUrls,
+		exportNames,
+		symbols,
+	];
 }
 
 export function emitSymbolResolverModule(input: SymbolResolverModuleInput): string {
 	const manifest = createSymbolResolverModuleManifest(input);
-	const cases = input.symbols.map((symbol) => {
-		const exportAccess = isIdentifier(symbol.exportName)
-			? `mod.${symbol.exportName}`
-			: `mod[${JSON.stringify(symbol.exportName)}]`;
-
-		return [
-			`		case ${JSON.stringify(symbol.id)}:`,
-			`			return import(${JSON.stringify(symbol.chunk)})`,
-			`				.then((mod) => ${exportAccess});`,
-		].join('\n');
-	});
 
 	return [
 		'export const symbolManifest = ',
 		JSON.stringify(manifest),
 		';',
 		'',
+		'const moduleUrls = symbolManifest[3];',
+		'const exportNames = symbolManifest[4];',
+		'const symbolRows = symbolManifest[5];',
+		'',
 		'export async function loadSymbol(id) {',
-		'	switch (id) {',
-		...cases,
-		'		default:',
-		'			throw createUnknownSymbolError(id);',
-		'	}',
+		'	const row = symbolRows[id];',
+		'	if (!row) throw createUnknownSymbolError(id);',
+		'	return import(/* @vite-ignore */ moduleUrls[row[0]])',
+		'		.then((mod) => mod[exportNames[row[1]]]);',
 		'}',
 		'',
 		'function createUnknownSymbolError(id) {',
@@ -51,6 +57,16 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 	].join('\n');
 }
 
-function isIdentifier(value: string): boolean {
-	return /^[$A-Z_a-z][$\w]*$/.test(value);
+function tableIndex(
+	indexes: Map<string, number>,
+	values: string[],
+	value: string,
+): number {
+	const existing = indexes.get(value);
+	if (existing !== undefined) return existing;
+
+	const index = values.length;
+	indexes.set(value, index);
+	values.push(value);
+	return index;
 }

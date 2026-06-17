@@ -16,8 +16,8 @@ describe('arcade chunking defaults', () => {
 
 		expect(clientOutput).toMatchObject({
 			dir: 'dist/client',
-			entryFileNames: 'build/async-[hash].js',
-			chunkFileNames: 'build/async-[hash].js',
+			entryFileNames: 'build/chunk-[hash].js',
+			chunkFileNames: 'build/chunk-[hash].js',
 			hoistTransitiveImports: false,
 			minifyInternalExports: false,
 			strictExecutionOrder: true,
@@ -28,7 +28,7 @@ describe('arcade chunking defaults', () => {
 		]);
 		expect(callOutputOptions(arcadeServer(), { dir: 'dist/server' })).toMatchObject({
 			dir: 'dist/server',
-			chunkFileNames: 'async-[hash].js',
+			chunkFileNames: 'chunk-[hash].js',
 			hoistTransitiveImports: false,
 		});
 		expect(callOutputOptions(arcadeLib(), { entryFileNames: '[name].js' })).toEqual({

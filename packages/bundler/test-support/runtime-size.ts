@@ -1,6 +1,6 @@
-import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { readdir, readFile } from 'node:fs/promises';
 import { gzipSync } from 'node:zlib';
+import { dirname, join, resolve } from 'pathe';
 
 type ManifestBundle = {
 	readonly imports?: readonly string[];
@@ -13,7 +13,7 @@ type Manifest = {
 
 export type RuntimeSizeReportInput = {
 	readonly dist: string;
-	readonly manifest: string;
+	readonly manifest?: string;
 	readonly scripts?: readonly string[];
 	readonly includeStaticImports?: boolean;
 };
@@ -44,15 +44,31 @@ const RUNTIME_ORIGIN_MARKERS = [
 	'/serializer/src/',
 ];
 
+const RUNTIME_TEXT_MARKERS = [
+	'Cannot load async symbol',
+	'RuntimeResumeError',
+	'createResumeRuntime',
+	'createRuntimeGraph',
+	'createRuntimeGraphFromStatePayload',
+	'resumeContainerEvent',
+	'Missing arcade/state payload script',
+	'async:shared-patch',
+	'render(App, { target }) requires',
+];
+
 export async function runtimeSizeReport(input: RuntimeSizeReportInput): Promise<RuntimeSizeReport> {
-	const manifest = JSON.parse(await readFile(input.manifest, 'utf8')) as Manifest;
-	const bundles = manifest.bundles ?? {};
+	const manifest = input.manifest
+		? (JSON.parse(await readFile(input.manifest, 'utf8')) as Manifest)
+		: undefined;
+	const bundles = manifest?.bundles ?? {};
 	const roots = input.scripts?.map(normalizeScriptFileName).filter(isJavaScriptFile);
 	const fileNames = roots
 		? input.includeStaticImports
-			? collectStaticScriptClosure(roots, bundles)
+			? await collectStaticScriptClosure(input.dist, roots, bundles)
 			: roots
-		: Object.keys(bundles).filter(isJavaScriptFile);
+		: Object.keys(bundles).filter(isJavaScriptFile).length > 0
+			? Object.keys(bundles).filter(isJavaScriptFile)
+			: await collectClientScripts(input.dist);
 	const scripts = await Promise.all(
 		fileNames.map(async (fileName) => {
 			const source = await readEmittedScript(input.dist, fileName);
@@ -63,10 +79,13 @@ export async function runtimeSizeReport(input: RuntimeSizeReportInput): Promise<
 				gzipBytes: gzipSync(source, { level: 9 }).length,
 				origins: bundles[fileName]?.origins ?? [],
 				hasVitePreloadHelper: sourceText.includes('vite:preloadError'),
-			} satisfies RuntimeScriptSize;
+				isRuntimeChunk:
+					bundles[fileName]?.origins?.some(isRuntimeOrigin) ??
+					sourceLooksRuntimeOwned(sourceText),
+			} satisfies RuntimeScriptSize & { readonly isRuntimeChunk: boolean };
 		}),
 	);
-	const runtimeChunks = scripts.filter((script) => script.origins.some(isRuntimeOrigin));
+	const runtimeChunks = scripts.filter((script) => script.isRuntimeChunk);
 	const largestRuntimeChunk = runtimeChunks.reduce<RuntimeScriptSize | undefined>(
 		(largest, script) => {
 			if (!largest || script.gzipBytes > largest.gzipBytes) {
@@ -102,20 +121,21 @@ export async function runtimeSizeReport(input: RuntimeSizeReportInput): Promise<
 	};
 }
 
-function collectStaticScriptClosure(
+async function collectStaticScriptClosure(
+	dist: string,
 	roots: readonly string[],
 	bundles: Record<string, ManifestBundle>,
-): string[] {
+): Promise<string[]> {
 	const visited = new Set<string>();
-	const visit = (fileName: string): void => {
+	const visit = async (fileName: string): Promise<void> => {
 		if (visited.has(fileName)) return;
 		visited.add(fileName);
-		for (const imported of bundles[fileName]?.imports ?? []) {
-			if (isJavaScriptFile(imported)) visit(imported);
+		for (const imported of await staticImports(dist, fileName, bundles)) {
+			if (isJavaScriptFile(imported)) await visit(imported);
 		}
 	};
 
-	for (const root of roots) visit(root);
+	for (const root of roots) await visit(root);
 	return [...visited];
 }
 
@@ -135,6 +155,51 @@ async function readEmittedScript(dist: string, fileName: string): Promise<Uint8A
 	);
 }
 
+async function collectClientScripts(dist: string): Promise<string[]> {
+	const files = await listFiles(dist);
+	return files
+		.filter((fileName) => isJavaScriptFile(fileName) && !fileName.startsWith('server/'))
+		.map(normalizeScriptFileName)
+		.sort();
+}
+
+async function listFiles(root: string): Promise<string[]> {
+	const entries = await readdir(root, { withFileTypes: true });
+	const files: string[] = [];
+	for (const entry of entries) {
+		const entryPath = join(root, entry.name);
+		if (entry.isDirectory()) {
+			for (const child of await listFiles(entryPath)) {
+				files.push(join(entry.name, child));
+			}
+			continue;
+		}
+		if (entry.isFile()) files.push(entry.name);
+	}
+	return files;
+}
+
+async function staticImports(
+	dist: string,
+	fileName: string,
+	bundles: Record<string, ManifestBundle>,
+): Promise<string[]> {
+	const manifestImports = bundles[fileName]?.imports?.filter(isJavaScriptFile);
+	if (manifestImports?.length) return manifestImports;
+
+	const source = new TextDecoder().decode(await readEmittedScript(dist, fileName));
+	return [...source.matchAll(STATIC_IMPORT_RE)]
+		.map((match) => normalizeImportedScript(fileName, match[1]!))
+		.filter(isJavaScriptFile);
+}
+
+const STATIC_IMPORT_RE = /\bimport(?:(?:\s+|[{\w*])[\s\S]*?\bfrom\s*)?["']([^"']+)["']/g;
+
+function normalizeImportedScript(importer: string, specifier: string): string {
+	if (!specifier.startsWith('.')) return normalizeScriptFileName(specifier);
+	return normalizeScriptFileName(join(dirname(importer), specifier));
+}
+
 function normalizeScriptFileName(script: string): string {
 	const pathname = script.split('?')[0] ?? script;
 	const normalized = pathname.replaceAll('\\', '/').replace(/^\/+/, '');
@@ -148,6 +213,10 @@ function isJavaScriptFile(fileName: string): boolean {
 function isRuntimeOrigin(origin: string): boolean {
 	const normalized = `/${origin.replaceAll('\\', '/')}`;
 	return RUNTIME_ORIGIN_MARKERS.some((marker) => normalized.includes(marker));
+}
+
+function sourceLooksRuntimeOwned(source: string): boolean {
+	return RUNTIME_TEXT_MARKERS.some((marker) => source.includes(marker));
 }
 
 function formatRuntimeSizeSummary(input: {

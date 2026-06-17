@@ -26,25 +26,11 @@ export default box(
 
 		await expect.build.environment(build, 'client');
 		await expect.build.artifact(build, INDEX);
-		await expect.build.artifact(build, MANIFEST);
+		assertBuildDoesNotInclude(build, MANIFEST);
 		await expect.build.artifact(build, BUNDLE_GRAPH);
-		await expect.artifact.text(build, INDEX, { contains: '/build/async-' });
-		await expect.artifact.json(await build.artifact(MANIFEST), (json) => {
-			const value = json as {
-				version?: unknown;
-				bundleGraphAsset?: unknown;
-				modules?: Array<{ source?: unknown }>;
-			};
-
-			return (
-				value.version === 1 &&
-				value.bundleGraphAsset === 'build/bundle-graph.json' &&
-				!!value.modules?.some(
-					(module) =>
-						typeof module.source === 'string' &&
-						module.source.endsWith('/src/root.tsrx'),
-				)
-			);
+		await expect.artifact.text(build, INDEX, { contains: '/build/chunk-' });
+		await expect.artifact.json(await build.artifact(BUNDLE_GRAPH), (json) => {
+			return Array.isArray(json) && json.includes('symbol:0');
 		});
 
 		const preview = await pipeline.preview(build, {
@@ -62,3 +48,12 @@ export default box(
 		await receipt.capture('vite-plus preview loaded arcade output');
 	},
 );
+
+function assertBuildDoesNotInclude(
+	build: { readonly artifacts: readonly { readonly path: string }[] },
+	path: string,
+): void {
+	if (build.artifacts.some((artifact) => artifact.path === path)) {
+		throw new Error(`Expected production build not to emit ${path}.`);
+	}
+}

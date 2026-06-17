@@ -151,8 +151,23 @@ test('compileTsrxModule orchestrates source to payload scripts and resolver modu
 	expect(result.renderShell.indexOf('<script type="arcade/state">')).toBeLessThan(
 		result.renderShell.indexOf('<script type="arcade/view">'),
 	);
-	expect(result.symbolResolverModule).toContain('return import("/assets/app.handlers.js")');
-	expect(result.symbolResolverModule).toContain('return import("/assets/app.domUpdates.js")');
+	expect(result.symbolResolverModule).toContain(
+		'import(/* @vite-ignore */ moduleUrls[row[0]])',
+	);
+	expect(result.symbolResolverModule).not.toContain('switch (id)');
+	expect(result.symbolResolverModuleManifest).toEqual([
+		1,
+		null,
+		null,
+		['/assets/app.handlers.js', '/assets/app.domUpdates.js'],
+		['onKeyDown_0', 'onClick_1', 'inputValue_2', 'buttonText_3'],
+		{
+			'symbol:0': [0, 0],
+			'symbol:1': [0, 1],
+			'symbol:2': [1, 2],
+			'symbol:3': [1, 3],
+		},
+	]);
 
 	const countCell = result.protocolState.cells.find((cell) => cell.graphNodeId === 'state:count');
 	const menuCell = result.protocolState.cells.find((cell) => cell.graphNodeId === 'state:menu');

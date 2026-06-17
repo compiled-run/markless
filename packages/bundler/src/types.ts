@@ -11,6 +11,7 @@ export interface ArcadeRolldownOptions {
 	hmr?: boolean;
 	bundleGraphAdders?: Set<BundleGraphAdder>;
 	onManifest?: (manifest: ArcadeManifest) => void;
+	emitManifestJson?: boolean;
 	rootDir?: string;
 	buildId?: string;
 }

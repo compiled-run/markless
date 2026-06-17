@@ -52,12 +52,16 @@ Completed slices are concentrated in:
 - early public package re-exports and Rolldown/Vite adapter shells, including
   virtual module exposure for current simple event-handler update symbols,
   DOM update symbol modules, and transform
-  manifests, a unit-tested build manifest asset hook, a fixture-backed Vite
-  library build, and a direct Rolldown build that load the generated payload,
-  resolver, manifest, and current generated symbol virtual modules while
-  recording bundle-derived chunk filenames, finalized generated-symbol rows in
-  the emitted build manifest, and final emitted chunk filenames in the generated
-  resolver's exported symbol manifest for those current generated symbols;
+  manifests, a unit-tested in-memory manifest hook, an opt-in build manifest
+  asset hook, a unit-tested compact
+  symbol-table resolver module, a fixture-backed Vite library build, and a
+  direct Rolldown build that load the generated payload, resolver, manifest, and
+  current generated symbol virtual modules while recording bundle-derived chunk
+  filenames and final emitted chunk specifiers in the generated resolver's
+  compact exported symbol table for those current generated symbols; the
+  generated resolver no longer emits an app-sized `switch (id)` path, default
+  `arcade-manifest.json` emission is removed, and callers must opt in with
+  `emitManifestJson` when they need the full JSON metadata asset;
   repeated transforms for the same `.tsrx` module now drop stale generated
   virtual modules before registering fresh artifacts, and the Vite adapter's
   structural `configureServer` / `handleHotUpdate` hooks invalidate generated
@@ -72,14 +76,15 @@ Completed slices are concentrated in:
   custom update payload before redispatching it as a cancelable browser
   `CustomEvent`, and if no consumer prevents default it asks Vite HMR to
   invalidate the client module; the Vite adapter also defaults app builds to
-  `build.modulePreload = false` so the framework manifest/bundle-graph path owns
+  `build.modulePreload = false` so the framework bundle-graph/resolver-table path owns
   preload decisions; package-local Witness boxes under `packages/bundler/boxes`
   now run the Vite dev-server pipeline for the `vite-csr` fixture, edit a
   `.tsrx` file, record the `arcade:update` custom hot payload for the
   client environment without a Vite update payload, prove a real browser page
   receives the cancelable custom event without navigating, and prove the CSR
-  production build emits `arcade-manifest.json`, `build/bundle-graph.json`,
-  and generated event-handler/DOM-update async chunks without leaking dev-HMR
+  production build emits `build/bundle-graph.json`, omits default
+  `arcade-manifest.json`, and emits generated event-handler/DOM-update lazy chunks
+  without leaking dev-HMR
   client strings; the CSR production build is also served through Vite preview
   and proves client-created DOM can load the generated payload/resolver/symbol
   pipeline for a counter click with no console errors or failed requests; a
@@ -92,7 +97,8 @@ Completed slices are concentrated in:
   resumes that DOM for a `0` to `1` counter update without box-side HTML
   rewriting; the vite-plus fixture now has a real app entry and package-local
   Witness preview receipt proving a vite-plus config can build the
-  arcade manifest, bundle graph, and browser page through Vite preview;
+  bundle graph, omit default `arcade-manifest.json`, and serve the browser page
+  through Vite preview;
   `buildStart` clears accumulated transform manifests and generated virtual
   modules before a new build/dev cycle
 
@@ -137,12 +143,11 @@ The critical path to "full spec implementation" still requires:
 - lazy `element()` handle materialization for browser symbols, including
   handle-id/name lookup, browser current-DOM resolution, initial-render absence,
   and real browser removed-locator `undefined` semantics
-- generated symbol resolver integration with real build chunks and manifests
-  beyond the current generated DOM-update and simple event-handler update
-  filename/symbol map, including behavior build chunks, build-integrated
-  async-runner chunks, broader event write forms, generated exports, and
-  resolver tables fully derived from build output rather than fixture-supplied
-  symbol tables
+- complete generated symbol resolver integration beyond the current compact
+  table proof for generated DOM-update and simple event-handler update chunks:
+  behavior build chunks, build-integrated async-runner chunks, broader event
+  write forms, generated exports, and resolver tables derived from final build
+  output for all symbol kinds rather than fixture-supplied symbol tables
 - `shared()` support beyond the current same-module semantic definition/instance
   records and authored API type surface, including cross-module definition
   identity, request/container/page graph-context resolution,
@@ -151,7 +156,7 @@ The critical path to "full spec implementation" still requires:
   build, repeated-transform artifact cleanup, build-start cleanup, structural
   hot-update invalidation/custom-payload/dev-client fixtures, one Vite
   dev-server transform fixture, package-local Witness dev/browser HMR receipts,
-  one CSR production-build manifest/bundle-graph/no-dev-HMR-leakage receipt,
+  one CSR production-build bundle-graph/no-default-manifest/no-dev-HMR-leakage receipt,
   one CSR preview client-click receipt, one SSR built-server-entry build
   receipt, one SSR built-server-entry preview browser resume-click receipt, and
   one vite-plus build/preview receipt,
@@ -159,8 +164,8 @@ The critical path to "full spec implementation" still requires:
   production SSR serving beyond the current fixture host,
   behavior/build-integrated async-runner chunks,
   broader non-binding symbol support beyond simple event-handler update chunks,
-  and resolver source/manifest tables derived from final emitted chunk
-  specifiers beyond the current generated build fixture paths
+  and final resolver table handoff coverage beyond the current generated build
+  fixture paths
 - component/browser and resumability end-to-end tests proving no component body
   execution on browser resume
 - broad diagnostic coverage for unsupported state, capture, async, event, and
@@ -632,30 +637,34 @@ in the split specs.
   `arcade/state` keeps only serializable computed identity. Broader nonliteral
   assignment, bare local/non-imported named behavior, and nonliteral argument-bearing
   collection-call source-to-module extraction are not implemented yet. The
-  Rolldown/Vite adapter
-  path can now derive resolver rows for current generated event-handler and DOM
-  update virtual modules, and the current Vite fixture build proves the
+  Rolldown/Vite adapter path can now derive compact resolver table rows for
+  current generated event-handler and DOM update virtual modules, and the
+  current Vite fixture build proves the
   transformed `.tsrx` entry imports generated payload/resolver/manifest virtual
-  modules so those generated symbol modules reach build output. The emitted
-  `arcade-manifest.json` now records bundle-derived file names for
-  generated resolver, payload, manifest, and current generated symbol virtual
-  modules, plus finalized `{ symbolId, exportName, virtualModuleId, fileName }`
-  rows for generated symbols when their virtual modules appear in bundle output.
+  modules so those generated symbol modules reach build output. The in-memory
+  manifest hook records bundle-derived file names for generated resolver,
+  payload, manifest, and current generated symbol virtual modules, plus finalized
+  `{ symbolId, exportName, virtualModuleId, fileName }` rows for generated
+  symbols when their virtual modules appear in bundle output; the same full
+  metadata is emitted as `arcade-manifest.json` only when `emitManifestJson` is
+  explicitly enabled.
   The emitted public module manifests omit the internal pre-build symbol rows
-  used to derive those finalized rows. The bundle hook now uses those finalized
-  generated-symbol rows to rewrite matching `chunk` fields in the emitted
-  resolver's exported symbol manifest from generated virtual module IDs to final
-  emitted file names for the current generated symbol path. Behavior and
-  async-runner resolver rows still come from caller-supplied symbol tables rather
-  than real build output, and pre-bundle generated resolver source still starts
-  from virtual module IDs before the bundler rewrites dynamic imports and the
-  bundle hook patches exported manifest rows.
+  used to derive those finalized rows. The client bundle hook now rewrites
+  generated resolver table module URLs from `virtual:arcade:symbol:*` IDs to
+  final relative chunk specifiers, fails closed if a table symbol cannot be
+  mapped, and compacts duplicate final URLs after generated facade cleanup. The
+  generated resolver loader source is constant-size over the table data and uses
+  `import(/* @vite-ignore */ url).then((mod) => mod[exportName])` instead of an
+  app-sized switch. Behavior and async-runner resolver rows still come from
+  caller-supplied symbol tables rather than real build output for all symbol
+  kinds.
 - Symbol resolver module emission fails closed for unknown symbol IDs with
   `ARCADE_SYMBOL_UNKNOWN`, `resume` phase, the missing `symbolId`, and a stable docs
   URL on the thrown error object.
-- Symbol resolver module emission now exports a symbol manifest with protocol
-  version, optional build/resolver identity, and the ordered chunk/export table
-  supplied to the compiler by the current fixture/adapter boundary.
+- Symbol resolver module emission now exports a compact tuple-style symbol table
+  with protocol version, optional build/resolver identity, module URL table,
+  export-name table, and symbol-ID row record supplied to the compiler by the
+  current fixture/adapter boundary.
 - Protocol view planning links payload arena records to lazy symbol IDs.
 - Protocol view planning links each async boundary read to the generated
   async-computed-runner symbol ID, so visible/demanded boundaries can resolve
@@ -890,14 +899,16 @@ in the split specs.
   the `./vite` Vite adapter subpath. Current adapter tests cover unit-level
   `.tsrx` transform metadata, in-memory resolver/payload/generated-symbol
   /manifest virtual module resolution and loading, transform manifest objects,
-  build manifest asset emission from accumulated transform manifests, direct
+  in-memory manifest metadata from accumulated transform manifests, direct
   Vite transform/resolveId/load/generateBundle hook forwarding, a direct
-  Rolldown build, and a temporary Vite library build that write
-  `arcade-manifest.json` while loading the generated payload, resolver,
-  manifest, and current generated event-handler/DOM-update symbol virtual
-  modules and recording their emitted chunk filenames plus finalized
-  generated-symbol manifest rows, including the final emitted file names in the
-  resolver's exported symbol manifest for the current generated symbol chunks.
+  Rolldown build, and a temporary Vite library build that load the generated
+  payload, resolver, manifest, and current generated event-handler/DOM-update
+  symbol virtual modules while recording their emitted chunk filenames plus
+  finalized generated-symbol manifest rows; default builds emit
+  `build/bundle-graph.json` but not `arcade-manifest.json`, and the generated
+  resolver's compact exported symbol table uses final relative chunk specifiers
+  for the current generated symbol chunks and no longer emits an app-sized
+  `switch (id)` loader.
   Focused adapter
   tests also simulate an HMR-style module update by retransforming the same
   `.tsrx` file and proving stale generated DOM-update virtual modules no longer
@@ -922,8 +933,9 @@ in the split specs.
   message; one opens a real browser page, tracks the cancelable
   `arcade:update` browser event, and proves no navigation/reload while
   the fixture consumes the event; and one runs a production Vite build, proving
-  the emitted CSR manifest, bundle graph, async chunks, and absence of dev-HMR
-  strings in production artifacts. A fourth package-local box serves that CSR
+  the emitted CSR bundle graph, generated chunks, absent default
+  `arcade-manifest.json`, and absence of dev-HMR strings in production
+  artifacts. A fourth package-local box serves that CSR
   production build through Vite preview and proves client-created DOM can load
   the generated payload/resolver/symbol pipeline for a counter click without
   console errors or failed requests. A fifth package-local box builds the
@@ -936,8 +948,8 @@ in the split specs.
   `0` to `1` click update.
   Focused base-plugin and Vite-wrapper tests prove `buildStart` clears generated
   virtual modules plus accumulated transform manifests before a new build/dev
-  cycle, so stale virtual modules do not resolve/load and no stale manifest asset
-  is emitted after cleanup.
+  cycle, so stale virtual modules do not resolve/load and no stale manifest
+  metadata or opt-in manifest asset is emitted after cleanup.
 
 ## Remaining Major Work
 
@@ -1258,7 +1270,7 @@ as evidence for a new source change.
 - `pnpm exec vp test packages/compiler/test/payload-arena.test.ts packages/compiler/test/protocol-view.test.ts packages/compiler/test/protocol-state.test.ts packages/compiler/test/compile-module.test.ts`
 - `pnpm exec vp test`
 - `pnpm exec vp pack`
-- `(from packages/bundler) pnpm exec witness "csr build: manifest and bundle graph describe tsrx symbols" --json`
+- `(from packages/bundler) pnpm exec witness "csr build: bundle graph describes tsrx symbols without default manifest" --json`
 - `(from packages/bundler) pnpm exec witness "csr preview: built app loads through vite preview" --json`
 - `(from packages/bundler) pnpm exec witness "ssr build: Rolldown server entry renders payload shell" --json`
 - `(from packages/bundler) pnpm exec witness "ssr preview: built server entry shell resumes counter click" --json`
@@ -1270,16 +1282,16 @@ as evidence for a new source change.
 - `(from repo root) pnpm --filter @arcadejs/bundler exec witness run ssr-preview --mode preview`
   (receipt:
   `packages/bundler/.witness/receipts/2026-06-16T16-19-07.583Z/receipt.json`;
-  records startup script requests `(none)`, post-click requested async chunks,
-  largest runtime-heavy chunk `async-CAT12afM.js` at 43,623 raw / 12,500 gzip
+  records startup script requests `(none)`, post-click requested lazy chunks,
+  largest runtime-heavy post-click chunk at 43,623 raw / 12,500 gzip
   bytes, and all post-click async scripts at 45,658 raw / 13,486 gzip bytes)
 - `pnpm exec vp test packages/runtime/test/event-resume.test.ts packages/runtime/test/module-split.test.ts packages/arcade/test/public-surface.test.ts packages/bundler/test/fixture-boundaries.test.ts`
 - `pnpm exec vp test packages/bundler/test/fixture-builds.test.ts`
 - `(from repo root) pnpm --filter @arcadejs/bundler exec witness run ssr-preview --mode preview`
   (receipt:
   `packages/bundler/.witness/receipts/2026-06-16T16-31-44.234Z/receipt.json`;
-  records startup script requests `(none)`, post-click requested async chunks,
-  largest runtime-heavy chunk `async-YGRzjz_f.js` at 8,258 raw / 3,154 gzip
+  records startup script requests `(none)`, post-click requested lazy chunks,
+  largest runtime-heavy post-click chunk at 8,258 raw / 3,154 gzip
   bytes, and all post-click async scripts at 10,293 raw / 4,140 gzip bytes)
 
 Current spec/ledger-maintenance receipts:
@@ -1550,12 +1562,12 @@ commands are listed in the implementation/build section above.
   so a Vite library build loads them, and the generated resolver can pull the
   current generated symbol virtual modules into build output. The build manifest
   hook now maps generated virtual module IDs to output file names when bundler
-  metadata exposes them. It derives resolver entries for those generated virtual
-  modules and patches the emitted resolver symbol manifest's current generated
-  `chunk` rows to final emitted file names, but it does not emit executable
+  metadata exposes them. The client bundle hook rewrites the generated resolver's
+  compact table URLs from generated virtual module IDs to final relative chunk
+  specifiers for the current generated symbol path, but it does not emit executable
   component code, lowered state access code beyond simple event-handler update
-  modules, behavior/async modules, broad non-binding resolver source/manifest
-  rows derived from final chunk filenames, or initial-render/browser resume
+  modules, behavior/async modules, broad non-binding generated symbol chunks, or
+  initial-render/browser resume
   entry code.
 - template-binding audit confirmed current semantic/payload/protocol records for
   template reads now carry graph-path subscriptions, text or plain-attribute
@@ -1568,15 +1580,17 @@ commands are listed in the implementation/build section above.
   unit-level plugin shell whose `transform` compiles `.tsrx` modules with
   caller-supplied symbol tables, stores resolver, payload, generated-symbol,
   and manifest virtual module strings in an in-memory map, resolves and loads
-  those produced virtual module IDs, derives resolver rows for those generated
-  virtual modules, skips re-transforming generated virtual module IDs, imports
+  those produced virtual module IDs, derives compact resolver table rows for
+  those generated virtual modules, skips re-transforming generated virtual module IDs, imports
   generated payload/resolver/manifest modules from the transformed entry, returns
-  a transform manifest object, and emits accumulated transform manifests plus any
-  bundle-exposed generated virtual-module output filenames as
-  `arcade-manifest.json` through `generateBundle`; for current
-  generated event-handler and DOM-update symbols, it also records finalized
-  symbol rows when the symbol's virtual module has an emitted file name, while
-  the emitted public module manifests omit the internal pre-build symbol rows.
+  a transform manifest object, and exposes accumulated transform manifests plus
+  any bundle-exposed generated virtual-module output filenames through the
+  in-memory manifest hook; `generateBundle` emits `build/bundle-graph.json` by
+  default and emits `arcade-manifest.json` only when `emitManifestJson` is
+  explicitly enabled. For current generated event-handler and DOM-update symbols,
+  it also records finalized symbol rows when the symbol's virtual module has an
+  emitted file name, while the emitted public module manifests omit the internal
+  pre-build symbol rows.
   Repeated transforms for the same `.tsrx` module drop the previous transform's
   virtual module IDs from the in-memory resolver before registering the new
   artifacts, preventing stale generated symbol virtual modules from surviving an
@@ -1596,19 +1610,20 @@ commands are listed in the implementation/build section above.
   client URL, `transformRequest('/@arcade/dev-client')` serves the
   virtual client, and `transformRequest('/App.tsrx')` loads and transforms a
   `.tsrx` source file through Vite. One direct Rolldown build fixture and one
-  temporary Vite library build fixture now prove real builds write the manifest
-  asset, include generated
-  payload/resolver/current event-handler and DOM-update symbol code, record emitted file names
-  plus finalized symbol rows for those generated virtual modules, patch the
-  emitted resolver symbol manifest to use those generated symbols' final file
-  names, and keep internal pre-build symbol rows out of emitted module
-  manifests. `buildStart` clears generated virtual modules plus accumulated
-  transform manifests before a new build/dev cycle, preventing stale virtual
-  module resolution/loading and stale manifest asset emission in focused tests.
+  temporary Vite library build fixture now prove real builds write the bundle
+  graph by default, omit default `arcade-manifest.json`, include generated
+  payload/resolver/current event-handler and DOM-update symbol code, record
+  emitted file names plus finalized symbol rows for those generated virtual
+  modules, rewrite the compact resolver table to use those generated symbols'
+  final relative chunk specifiers, and keep internal pre-build symbol rows out of
+  emitted module manifests. `buildStart` clears generated virtual modules plus
+  accumulated transform manifests before a new build/dev cycle, preventing stale
+  virtual module resolution/loading and stale manifest metadata/optional asset
+  emission in focused tests.
   Package-local Witness boxes now prove Vite dev HMR payload delivery, real
   browser receipt of the cancelable `arcade:update` event without
-  navigation, and a CSR production build with manifest/bundle-graph artifacts
-  plus no dev-HMR string leakage. The same CSR production build is now served
+  navigation, and a CSR production build with bundle-graph artifacts, no default
+  `arcade-manifest.json`, plus no dev-HMR string leakage. The same CSR production build is now served
   through Vite preview and proves client-created DOM can load the generated
   payload/resolver/symbol pipeline for a counter click with no console errors or
   failed requests. A Vite SSR fixture now builds a server entry that contains
@@ -1618,10 +1633,9 @@ commands are listed in the implementation/build section above.
   through the generated resolver for a `0` to `1` click update. No fixture
   proves real DOM hot replacement beyond the fixture-level custom-event
   consumer, production SSR server-environment serving beyond the preview-index
-  harness, behavior/async-runner chunks,
-  broader event-handler write chunks beyond simple updates, or runtime resolver
-  source/manifest rewriting from final chunk filenames beyond the current
-  generated build fixture paths.
+  harness, behavior/async-runner chunks, broader event-handler write chunks
+  beyond simple updates, or full resolver table rewriting coverage beyond the
+  current generated build fixture paths.
 - public-surface source/test audit confirmed `packages/core` currently
   re-exports framework APIs, `resumeFromPayloadScripts`, the Rolldown adapter,
   and its `./vite` adapter subpath through private source-entry package
@@ -2158,17 +2172,19 @@ commands are listed in the implementation/build section above.
 - Current Rolldown/Vite adapter and public-surface tests exercise curated source
   re-exports, unit-level `.tsrx` transforms with fixture-supplied symbol tables,
   in-memory resolver/payload/generated-symbol/manifest virtual module
-  resolution and loads, transform manifest objects, resolver rows derived from
+  resolution and loads, transform manifest objects, compact resolver table rows derived from
   current event-handler and DOM-update symbol virtual modules, direct Vite wrapper hook
   forwarding for transform, resolveId, load, and generateBundle, and one
   direct Rolldown build fixture and one fixture-backed Vite library build that
-  write the build manifest asset while loading generated
-  payload/resolver/current event-handler and DOM-update symbol virtual modules and recording
-  their emitted chunk filenames plus finalized generated-symbol rows without
-  leaking internal pre-build symbol rows in the public module manifests. Those
-  fixtures also prove the emitted resolver's exported symbol manifest uses the
-  final emitted file names for the current generated symbol chunks
-  instead of the generated virtual module ID. Focused repeated-transform tests
+  write the bundle graph by default, omit default `arcade-manifest.json`, load
+  generated payload/resolver/current event-handler and DOM-update symbol virtual
+  modules, and record their emitted chunk filenames plus finalized
+  generated-symbol rows without leaking internal pre-build symbol rows in the
+  public module manifests. Those
+  fixtures also prove the emitted resolver's compact exported symbol table uses
+  final relative chunk specifiers for the current generated symbol chunks instead
+  of generated virtual module IDs, uses `import(/* @vite-ignore */ url)` for the
+  runtime load, and contains no generated `switch (id)` resolver. Focused repeated-transform tests
   prove stale generated symbol virtual modules stop resolving/loading after
   a `.tsrx` update removes the binding that produced them, and structural
   `handleHotUpdate` tests prove generated virtual module graph nodes are
@@ -2192,9 +2208,9 @@ commands are listed in the implementation/build section above.
   dev-server pipeline, edit the `.tsrx` source, record the
   `arcade:update` custom payload in the client environment's edit
   outcome, prove a real browser page receives the cancelable event without
-  navigating, and prove the CSR production build emits the arcade
-  manifest/bundle graph/async chunks while forbidding dev-HMR client strings in
-  emitted text artifacts. The CSR production build is also served by Vite
+  navigating, and prove the CSR production build emits the bundle graph and lazy
+  chunks, omits default `arcade-manifest.json`, and forbids dev-HMR client
+  strings in emitted text artifacts. The CSR production build is also served by Vite
   preview and proves client-created DOM can load the generated
   payload/resolver/symbol pipeline for a counter click with no console errors or
   failed requests. A Vite SSR fixture now builds a server entry that contains
@@ -2207,9 +2223,10 @@ commands are listed in the implementation/build section above.
   current-regression interaction budget is exceeded: 2.175 KB gzip for the
   runtime-heavy chunk, 2.65 KB gzip for all post-click async scripts, or three
   post-click script requests. Focused
-  fixture-build tests also rebuild the CSR, SSR, and vite-plus fixtures and
-  enforce current-regression gzip ceilings for the eager entry runtime closure
-  in CSR/vite-plus and all generated async scripts in SSR. The current ceilings
+  fixture-build tests also rebuild the CSR, SSR, vite-plus, and direct Rolldown
+  fixtures, assert default builds do not emit `arcade-manifest.json`, and enforce
+  current-regression gzip ceilings for the eager entry runtime closure in
+  CSR/vite-plus and all generated async scripts in SSR. The current ceilings
   are CSR 3 KB for the largest runtime-heavy chunk / 3.05 KB for the entry
   static script closure / 2 scripts, SSR 2.175 KB / 2.7 KB / 4 scripts, and
   vite-plus 2.95 KB for the largest runtime-heavy chunk / 3 KB for the entry
@@ -2217,14 +2234,17 @@ commands are listed in the implementation/build section above.
   chunks retain Vite's empty dynamic-import preload helper and still report the
   event-only 300-500 B gzip target / 700 B gzip hard budget as the remaining
   spec target. CSR and vite-plus fixture size checks now read the built
-  `index.html` module scripts and follow only manifest static imports, so lazy
-  fallback chunks remain visible in the build output without being counted as
-  eager runtime bytes.
+  `index.html` module scripts and follow static imports from emitted JavaScript
+  rather than `arcade-manifest.json`, so lazy fallback chunks remain visible in
+  the build output without being counted as eager runtime bytes.
   Grep MCP research against Vite/Rolldown usage showed `@vite-ignore` is used
   for runtime/non-static imports and a Rolldown fixture documents static
-  dynamic imports with `@vite-ignore` as having no import record, so generated
-  symbol resolver imports deliberately keep plain `import(...)` to preserve
-  virtual-module resolution and emitted chunk records. Generated DOM update
+  dynamic imports with `@vite-ignore` as having no import record. The current
+  generated resolver uses `import(/* @vite-ignore */ url)` against finalized
+  resolver table URLs; generated symbol virtual modules remain reachable because
+  the transformed entry/build integration emits them as chunks before
+  `generateBundle` rewrites the table strings to final relative specifiers.
+  Generated DOM update
   symbols now emit concrete `setText`, `setAttr`, and `setProp` journal object
   literals directly, so they do not import either the broad runtime entry or the
   helper-only `@arcadejs/runtime/dom-update` subpath. Generated
@@ -2255,13 +2275,13 @@ commands are listed in the implementation/build section above.
   from generated arcade runtime chunks after bundling, including empty
   wrappers around async fallback loaders. This preserves plain `import(...)`
   records during Vite/Rolldown resolution while removing the unused preload
-  helper from emitted JS. Generated symbol-resolver imports now
-  also bypass Vite/Rolldown's tiny virtual-symbol facade chunks when those
-  facades only import the shared symbol chunk, call generated init exports, and
-  re-export the symbol. The post-build cleanup rewrites the resolver to import
-  the shared symbol chunk directly, preserves the init calls in the resolver
-  `.then(...)` expression, removes the generated facade chunks from emitted JS,
-  and filters them out of the arcade manifest/bundle graph. Current
+  helper from emitted JS. Generated symbol-resolver table finalization now runs
+  after Vite/Rolldown's tiny virtual-symbol facade cleanup, so table URLs point
+  at the shared generated symbol chunk when facades are removed. The post-build
+  cleanup removes those generated facade chunks from emitted JS, filters them
+  out of the bundle graph and optional arcade manifest metadata, fails closed if
+  any table symbol cannot be mapped, and compacts duplicate final module URLs in
+  the resolver tuple. Current
   `.tsrx` source modules import `payloadState` and `payloadView` as named
   exports from the payload virtual module while preserving the default
   `payloadScripts` object for SSR, so CSR/vite-plus entries can consume the
@@ -2291,14 +2311,12 @@ commands are listed in the implementation/build section above.
   raw bytes / 349 gzip bytes and no runtime-heavy chunks:
   `packages/bundler/.witness/receipts/2026-06-16T18-17-52.935Z/receipt.json`.
   A vite-plus fixture now has a real app entry and a package-local preview box
-  that proves a vite-plus config emits the arcade manifest, bundle
-  graph, and browser output through Vite preview.
+  that proves a vite-plus config emits the bundle graph, omits default
+  `arcade-manifest.json`, and serves browser output through Vite preview.
   Focused base-plugin and Vite-wrapper tests prove `buildStart` cleanup clears
   stale generated virtual modules and accumulated transform manifests.
   They do not prove installed package export resolution, publish-ready exports,
-  resolver source/manifest rows rewritten from final chunk filenames beyond the
-  current generated build fixture paths, production SSR serving beyond the
-  current fixture host, behavior/async-runner chunks,
+  production SSR serving beyond the current fixture host, behavior/async-runner chunks,
   broader event-handler write chunks beyond simple updates, real DOM hot
   replacement beyond the fixture-level custom-event consumer, or full
   installed-package build receipts.

@@ -52,6 +52,10 @@ a time through failing tests.
   `arcade/view`, startup imports no app or symbol code, the first click imports
   the matching symbol, and the inline bootstrap reports a reproducible
   minified+gzip size against the 700 B target.
+- [`symbol-stress-runtime`](./symbol-stress-runtime/): POC runtime stress proof
+  for many distinct symbols on one page. It measures compact resolver-table
+  loading and event-only resumer dispatch for multiple symbol-count
+  cardinalities without relying on the current POC TSRX dependency path.
 
 ## Pass-Boundary Order
 

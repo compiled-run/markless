@@ -10,6 +10,7 @@ import {
 } from './build/manifest.ts';
 import { stripEmptyVitePreloadWrappers } from './build/preload-cleanup.ts';
 import { rewriteGeneratedSymbolFacadeImports } from './build/symbol-facade-cleanup.ts';
+import { rewriteGeneratedSymbolTableUrls } from './build/symbol-table.ts';
 import { createArcadeDevGraph } from './dev.ts';
 import { ARCADE_VIRTUAL_PREFIX, transformTsrxModule } from './transform.ts';
 import type {
@@ -203,6 +204,12 @@ export function createArcadeRolldownPlugin(input: {
 				stripEmptyPreloadWrappersFromGeneratedChunks(bundle);
 				const removedSymbolFacades = rewriteGeneratedSymbolFacadeImports(bundle);
 				const manifestBundle = bundleWithoutRemovedChunks(bundle, removedSymbolFacades);
+				const tableRewrite = rewriteGeneratedSymbolTableUrls(manifestBundle);
+				if (tableRewrite.unresolved.length > 0) {
+					this.error(
+						`Arcade symbol resolver table contains unresolved generated symbol chunks: ${tableRewrite.unresolved.join(', ')}`,
+					);
+				}
 
 				const clientManifest = createManifest(
 					manifestBundle,
@@ -223,11 +230,17 @@ export function createArcadeRolldownPlugin(input: {
 				}
 				internalOptions.onManifest?.(clientManifest);
 
-				for (const [fileName, source] of [
-					[ARCADE_BUNDLE_GRAPH, JSON.stringify(clientManifest.bundleGraph)],
-					[ARCADE_MANIFEST_FILE, JSON.stringify(clientManifest, null, '\t')],
-				] as const) {
-					this.emitFile({ type: 'asset', fileName, source });
+				this.emitFile({
+					type: 'asset',
+					fileName: ARCADE_BUNDLE_GRAPH,
+					source: JSON.stringify(clientManifest.bundleGraph),
+				});
+				if (internalOptions.emitManifestJson === true) {
+					this.emitFile({
+						type: 'asset',
+						fileName: ARCADE_MANIFEST_FILE,
+						source: JSON.stringify(clientManifest, null, '\t'),
+					});
 				}
 			},
 		},
