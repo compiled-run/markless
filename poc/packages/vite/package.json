@@ -1,5 +1,5 @@
 {
-	"name": "@arcadejs/vite",
+	"name": "@arcade/vite",
 	"version": "0.0.0",
 	"private": true,
 	"type": "module",

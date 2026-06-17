@@ -4,8 +4,8 @@ import {
 	type ProtocolSyncPolicyCondition,
 	type ProtocolStatePayload,
 	type ProtocolViewPayload,
-} from '@arcadejs/protocol';
-import { renderPayloadScripts } from '@arcadejs/serializer';
+} from '@arcade/protocol';
+import { renderPayloadScripts } from '@arcade/serializer';
 
 export type SsrRenderOutput = {
 	readonly html: string;

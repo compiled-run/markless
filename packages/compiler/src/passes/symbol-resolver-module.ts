@@ -1,4 +1,4 @@
-import { ASYNC_PROTOCOL_VERSION } from '@arcadejs/protocol';
+import { ASYNC_PROTOCOL_VERSION } from '@arcade/protocol';
 import type { SymbolResolverModuleInput, SymbolResolverModuleManifest } from '../artifacts.ts';
 
 export function createSymbolResolverModuleManifest(
@@ -57,11 +57,7 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 	].join('\n');
 }
 
-function tableIndex(
-	indexes: Map<string, number>,
-	values: string[],
-	value: string,
-): number {
+function tableIndex(indexes: Map<string, number>, values: string[], value: string): number {
 	const existing = indexes.get(value);
 	if (existing !== undefined) return existing;
 

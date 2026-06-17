@@ -1,5 +1,5 @@
 {
-	"name": "@arcadejs/bundler",
+	"name": "@arcade/bundler",
 	"version": "0.0.0",
 	"private": true,
 	"type": "module",
@@ -12,7 +12,7 @@
 		"test:boxes": "witness run"
 	},
 	"dependencies": {
-		"@arcadejs/compiler": "workspace:*",
+		"@arcade/compiler": "workspace:*",
 		"@thi.ng/dgraph": "catalog:",
 		"pathe": "catalog:",
 		"ufo": "catalog:"

@@ -1,4 +1,4 @@
-import { box } from '@arcadejs/witness';
+import { box } from '@arcade/witness';
 
 // Product truth: the Vite plugin also has to work when consumed through a
 // vite-plus config, matching the repo's preferred tooling surface.

@@ -1,7 +1,4 @@
-import {
-	compileTsrxModule,
-	emitSymbolResolverModule,
-} from '@arcadejs/compiler';
+import { compileTsrxModule, emitSymbolResolverModule } from '@arcade/compiler';
 import type {
 	ArcadeTransformManifest,
 	ArcadeVirtualModule,
@@ -28,7 +25,8 @@ export async function transformTsrxModule(
 		...module,
 		virtualModuleId: symbolVirtualModuleId(input.filename, module.symbolId),
 	}));
-	const symbolRuntimeUrl = input.symbolRuntimeUrl ?? ((virtualModuleId: string) => virtualModuleId);
+	const symbolRuntimeUrl =
+		input.symbolRuntimeUrl ?? ((virtualModuleId: string) => virtualModuleId);
 	const symbolRows = symbolModules.map((module) => ({
 		id: module.symbolId,
 		chunk: symbolRuntimeUrl(module.virtualModuleId),

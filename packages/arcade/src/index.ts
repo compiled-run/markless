@@ -11,7 +11,7 @@ export {
 	type SharedDefinition,
 	type SharedOptions,
 	type SharedScope,
-} from '@arcadejs/core';
+} from '@arcade/core';
 export {
 	render,
 	renderToString,
@@ -26,7 +26,7 @@ export {
 	type ResumePayloadScriptsInput,
 	type ResumePayloadScriptsResult,
 	type SsrRenderOutput,
-} from '@arcadejs/runtime';
+} from '@arcade/runtime';
 export {
 	arcadeClient,
 	arcadeLib,
@@ -37,4 +37,4 @@ export {
 	type ArcadeVirtualModule,
 	type TransformTsrxModuleInput,
 	type TransformTsrxModuleResult,
-} from '@arcadejs/bundler/rolldown';
+} from '@arcade/bundler/rolldown';

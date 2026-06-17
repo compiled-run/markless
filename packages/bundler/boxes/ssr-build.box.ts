@@ -1,4 +1,4 @@
-import { box } from '@arcadejs/witness';
+import { box } from '@arcade/witness';
 
 // Product truth: unlike the CSR fixture, SSR-related behavior has real server
 // work. The Vite/Rolldown build must emit a server entry that renders the

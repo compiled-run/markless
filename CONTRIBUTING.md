@@ -21,24 +21,24 @@ contract.
 
 ## Package Map
 
-Workspace packages mostly use the internal `@arcadejs/*` scope. App authors use
+Workspace packages mostly use the internal `@arcade/*` scope. App authors use
 the public `arcade` package:
 
 - `packages/arcade` -> `arcade`, public authoring, runtime, and adapter
   re-exports.
-- `packages/core` -> `@arcadejs/core`, internal authoring API implementation
+- `packages/core` -> `@arcade/core`, internal authoring API implementation
   used by `arcade`.
-- `packages/protocol` -> `@arcadejs/protocol`, shared protocol and payload
+- `packages/protocol` -> `@arcade/protocol`, shared protocol and payload
   types.
-- `packages/runtime` -> `@arcadejs/runtime`, graph runtime, render, and resume
+- `packages/runtime` -> `@arcade/runtime`, graph runtime, render, and resume
   helpers.
-- `packages/serializer` -> `@arcadejs/serializer`, value and payload
+- `packages/serializer` -> `@arcade/serializer`, value and payload
   serialization.
-- `packages/compiler` -> `@arcadejs/compiler`, compiler passes and artifacts
+- `packages/compiler` -> `@arcade/compiler`, compiler passes and artifacts
   for `.tsrx` files.
-- `packages/bundler` -> `@arcadejs/bundler`, Rolldown and Vite integration.
-- `packages/test-utils` -> `@arcadejs/test-utils`, test helpers.
-- `packages/vitest-browser` -> `@arcadejs/vitest-browser`, browser-mode test
+- `packages/bundler` -> `@arcade/bundler`, Rolldown and Vite integration.
+- `packages/test-utils` -> `@arcade/test-utils`, test helpers.
+- `packages/vitest-browser` -> `@arcade/vitest-browser`, browser-mode test
   helpers.
 
 There is intentionally no `packages/server`. Initial render and browser resume

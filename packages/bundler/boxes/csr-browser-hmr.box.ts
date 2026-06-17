@@ -1,4 +1,4 @@
-import { box } from '@arcadejs/witness';
+import { box } from '@arcade/witness';
 
 // Product truth: the Vite dev client injected by the arcade adapter
 // reaches a real browser page. A TSRX edit must emit the framework hot payload,

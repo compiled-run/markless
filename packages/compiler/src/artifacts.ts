@@ -1,5 +1,5 @@
-import type { ProtocolStatePayload, ProtocolViewPayload } from '@arcadejs/protocol';
-import type { RenderedPayloadScripts } from '@arcadejs/serializer';
+import type { ProtocolStatePayload, ProtocolViewPayload } from '@arcade/protocol';
+import type { RenderedPayloadScripts } from '@arcade/serializer';
 import type { CompilerDiagnostic, SourceSpan } from './diagnostics.ts';
 
 export type { CompilerDiagnostic, DiagnosticSuggestion, SourceSpan } from './diagnostics.ts';

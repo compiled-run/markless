@@ -15,4 +15,4 @@ export {
 	type ResumePayloadScriptsInput,
 	type ResumePayloadScriptsResult,
 	type SsrRenderOutput,
-} from '@arcadejs/runtime';
+} from '@arcade/runtime';

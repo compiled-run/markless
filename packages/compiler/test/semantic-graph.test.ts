@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { buildSemanticGraph } from '../src/index.ts';
 
 const source = `
-import { state, computed, element } from '@arcadejs/core';
+import { state, computed, element } from '@arcade/core';
 import { makeChart } from './chart';
 
 export function App({ label }: { label: string }) @{
@@ -45,7 +45,7 @@ export function App({ label }: { label: string }) @{
 `;
 
 const sharedSource = `
-import { shared, state, computed } from '@arcadejs/core';
+import { shared, state, computed } from '@arcade/core';
 
 export const session = shared(() => {
 	const data = state({ user: null, status: 'anonymous' });
@@ -69,7 +69,7 @@ export function Header() @{
 `;
 
 const sharedDependencySource = `
-import { shared, state } from '@arcadejs/core';
+import { shared, state } from '@arcade/core';
 
 export const session = shared(() => {
 	const data = state({ user: null });

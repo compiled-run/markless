@@ -1,4 +1,4 @@
-import { ASYNC_PROTOCOL_VERSION, type ProtocolStatePayload } from '@arcadejs/protocol';
+import { ASYNC_PROTOCOL_VERSION, type ProtocolStatePayload } from '@arcade/protocol';
 import {
 	serializeGraphValue,
 	type SerializedGraphPayload,

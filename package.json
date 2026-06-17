@@ -1,5 +1,5 @@
 {
-	"name": "@arcadejs/arcade-workspace",
+	"name": "@arcade/arcade-workspace",
 	"version": "0.0.0",
 	"private": true,
 	"type": "module",
@@ -12,7 +12,7 @@
 		"test:compiler": "vp test packages/compiler/test/*.test.ts"
 	},
 	"devDependencies": {
-		"@arcadejs/witness": "link:../witness",
+		"@arcade/witness": "link:../witness",
 		"@types/node": "24.12.2",
 		"rolldown": "1.0.3",
 		"typescript": "5.9.3",

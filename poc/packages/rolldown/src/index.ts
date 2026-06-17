@@ -11,7 +11,7 @@ export type ArcadeRolldownTransformResult = BundlerTransformedModule & {
 };
 
 export type ArcadeRolldownPlugin = {
-	readonly name: '@arcadejs/bundler/rolldown';
+	readonly name: '@arcade/bundler/rolldown';
 	readonly transform: (code: string, id: string) => Promise<ArcadeRolldownTransformResult | null>;
 	readonly load: (id: string) => Promise<string | null>;
 	readonly manifest: () => PipelineManifest;
@@ -27,7 +27,7 @@ export function createArcadeRolldownPlugin(): ArcadeRolldownPlugin {
 	let revision = 0;
 
 	return {
-		name: '@arcadejs/bundler/rolldown',
+		name: '@arcade/bundler/rolldown',
 		async transform(code, id) {
 			if (!id.endsWith('.tsrx')) return null;
 

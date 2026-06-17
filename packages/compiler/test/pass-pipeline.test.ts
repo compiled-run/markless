@@ -9,7 +9,7 @@ import {
 } from '../src/index.ts';
 
 const source = `
-import { state } from '@arcadejs/core';
+import { state } from '@arcade/core';
 
 export function App() @{
 	let count = state(0);

@@ -1,4 +1,4 @@
-import type { ProtocolViewPayload } from '@arcadejs/protocol';
+import type { ProtocolViewPayload } from '@arcade/protocol';
 import type { DomJournalEntry } from './graph.ts';
 
 export type DomUpdateEntryInput = {

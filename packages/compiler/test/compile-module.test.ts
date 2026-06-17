@@ -3,7 +3,7 @@ import { compileTsrxModule } from '../src/index.ts';
 import { deserializeGraphValue } from '../../serializer/src/index.ts';
 
 const source = `
-import { state } from '@arcadejs/core';
+import { state } from '@arcade/core';
 
 export function App() @{
 	let count = state(1);
@@ -25,7 +25,7 @@ export function App() @{
 `;
 
 const eventWriteSource = `
-import { state } from '@arcadejs/core';
+import { state } from '@arcade/core';
 import { clamp } from './math';
 
 export function App() @{
@@ -80,7 +80,7 @@ export function App() @{
 `;
 
 const asyncComputedSource = `
-import { state, computed } from '@arcadejs/core';
+import { state, computed } from '@arcade/core';
 
 export function App() @{
 	const query = state('Ada');

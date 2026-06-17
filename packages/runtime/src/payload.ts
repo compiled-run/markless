@@ -2,8 +2,8 @@ import {
 	ASYNC_PROTOCOL_VERSION,
 	type ProtocolStatePayload,
 	type ProtocolViewPayload,
-} from '@arcadejs/protocol';
-import { deserializeGraphValue, type SerializedGraphPayload } from '@arcadejs/serializer';
+} from '@arcade/protocol';
+import { deserializeGraphValue, type SerializedGraphPayload } from '@arcade/serializer';
 import { applyDomJournalEntries } from './dom-journal.ts';
 import { createRuntimeGraph, type RuntimeGraph, type RuntimeGraphRead } from './graph.ts';
 import {

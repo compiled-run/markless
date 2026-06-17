@@ -1,4 +1,4 @@
-import type { ProtocolStatePayload, ProtocolViewPayload } from '@arcadejs/protocol';
+import type { ProtocolStatePayload, ProtocolViewPayload } from '@arcade/protocol';
 
 export type RenderPayloadScriptsInput = {
 	readonly state: ProtocolStatePayload;

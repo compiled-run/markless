@@ -4,4 +4,4 @@ export {
 	type CsrRenderOptions,
 	type CsrRenderOutput,
 	type RenderTarget,
-} from '@arcadejs/runtime/render';
+} from '@arcade/runtime/render';

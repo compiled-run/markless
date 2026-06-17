@@ -1,4 +1,4 @@
-import { box } from '@arcadejs/witness';
+import { box } from '@arcade/witness';
 
 // Product truth: the SSR fixture's dev command must render server-produced HTML
 // before the browser resume entry runs. A click proves the page resumed existing

@@ -231,11 +231,11 @@ Diagnostic quality is a first-class deliverable, not polish.
   assert initial-render-resolved async data does not refetch on resume, then
   interact and assert only the expected symbols were fetched and the DOM updated.
   This e2e harness is the core invariant check and gets built early, not last.
-  Use `@arcadejs/witness` for any resume mechanic that must prove initially
+  Use `@arcade/witness` for any resume mechanic that must prove initially
   rendered HTML, payload scripts, generated chunks, Vite/Rolldown integration,
   browser-loaded symbols, or no component execution on browser resume. If the
   local Witness package cannot observe or assert a resume behavior the framework
-  needs, add that capability to the local `@arcadejs/witness` repo first instead of
+  needs, add that capability to the local `@arcade/witness` repo first instead of
   creating an ad hoc one-off harness in this monorepo.
 - **Vitest browser mode:** use a framework-owned `packages/vitest-browser`
   package for targeted CSR browser mechanics where SSR/initial-render output is

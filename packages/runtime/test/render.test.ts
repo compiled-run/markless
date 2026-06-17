@@ -1,5 +1,5 @@
-import { ASYNC_PROTOCOL_VERSION, type ProtocolViewPayload } from '@arcadejs/protocol';
-import { createProtocolStatePayload } from '@arcadejs/serializer';
+import { ASYNC_PROTOCOL_VERSION, type ProtocolViewPayload } from '@arcade/protocol';
+import { createProtocolStatePayload } from '@arcade/serializer';
 import { expect, test } from 'vitest';
 import { render, renderToString } from '../src/index.ts';
 

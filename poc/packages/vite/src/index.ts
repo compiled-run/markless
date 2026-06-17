@@ -17,12 +17,12 @@ export type ArcadeHotUpdateResult = {
 };
 
 export type ArcadeVitePlugin = {
-	readonly name: '@arcadejs/bundler/vite';
+	readonly name: '@arcade/bundler/vite';
 	readonly enforce: 'pre';
 	readonly arcade: {
 		readonly compilerModel: 'rolldown-base-plugin';
 		readonly usesSecondCompilerModel: false;
-		readonly basePluginName: '@arcadejs/bundler/rolldown';
+		readonly basePluginName: '@arcade/bundler/rolldown';
 		readonly manifest: () => PipelineManifest;
 		readonly receipts: () => ReadonlyArray<PipelineReceipt>;
 	};
@@ -36,7 +36,7 @@ export function createArcadeVitePlugin(): ArcadeVitePlugin {
 	const adapterReceipts: PipelineReceipt[] = [];
 
 	return {
-		name: '@arcadejs/bundler/vite',
+		name: '@arcade/bundler/vite',
 		enforce: 'pre',
 		arcade: {
 			compilerModel: 'rolldown-base-plugin',

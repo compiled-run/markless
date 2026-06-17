@@ -1,4 +1,4 @@
-import { box } from '@arcadejs/witness';
+import { box } from '@arcade/witness';
 
 // Product truth: a production Vite build of the CSR fixture must emit lazy
 // symbol chunks through the real Vite/Rolldown pipeline. Dev-only HMR wiring

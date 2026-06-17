@@ -1,4 +1,4 @@
-import type { ProtocolStatePayload } from '@arcadejs/protocol';
+import type { ProtocolStatePayload } from '@arcade/protocol';
 
 export type RuntimeGraphCell = {
 	readonly graphNodeId: string;

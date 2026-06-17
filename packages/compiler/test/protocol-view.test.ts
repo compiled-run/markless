@@ -8,7 +8,7 @@ import {
 } from '../src/index.ts';
 
 const source = `
-import { state } from '@arcadejs/core';
+import { state } from '@arcade/core';
 
 export function App() @{
 	let count = state(0);
@@ -30,7 +30,7 @@ export function App() @{
 `;
 
 const asyncBoundarySource = `
-import { computed } from '@arcadejs/core';
+import { computed } from '@arcade/core';
 
 export function App() @{
 	const details = computed(async ({ signal }) => {
@@ -156,7 +156,7 @@ test('createProtocolViewPayload keeps binding symbols distinct by target', async
 	const semanticGraph = await buildSemanticGraph({
 		filename: 'src/RepeatedTarget.tsrx',
 		source: `
-import { state } from '@arcadejs/core';
+import { state } from '@arcade/core';
 
 export function App() @{
 	const count = state(0);

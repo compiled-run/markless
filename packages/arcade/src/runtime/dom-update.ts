@@ -1,1 +1,1 @@
-export { createDomUpdateEntry, type DomUpdateEntryInput } from '@arcadejs/runtime/dom-update';
+export { createDomUpdateEntry, type DomUpdateEntryInput } from '@arcade/runtime/dom-update';

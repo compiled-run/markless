@@ -14,6 +14,18 @@ const frameworkPackages = [
 	'packages/test-utils/package.json',
 	'packages/vitest-browser/package.json',
 ] as const;
+const arcadeFacadeFiles = [
+	'packages/arcade/src/index.ts',
+	'packages/arcade/src/runtime.ts',
+	'packages/arcade/src/rolldown.ts',
+	'packages/arcade/src/vite.ts',
+	'packages/arcade/src/runtime/dom-update.ts',
+	'packages/arcade/src/runtime/event-only-resume.ts',
+	'packages/arcade/src/runtime/event-resume.ts',
+	'packages/arcade/src/runtime/render.ts',
+	'packages/arcade/src/runtime/render-to-string.ts',
+	'packages/arcade/src/runtime/resume.ts',
+] as const;
 
 describe('package metadata', () => {
 	test('framework packages are declared side-effect free for tree shaking', async () => {
@@ -43,5 +55,12 @@ describe('package metadata', () => {
 
 		expect(bundler.scripts?.['test:boxes']).toBe('witness run');
 		expect(workspace.scripts?.test).toBe('vp test && pnpm --dir packages/bundler test:boxes');
+	});
+
+	test('framework manifests and public facade do not reference unowned arcadejs scope', async () => {
+		for (const filePath of ['package.json', ...frameworkPackages, ...arcadeFacadeFiles]) {
+			const source = await readFile(resolve(root, filePath), 'utf8');
+			expect(source, filePath).not.toContain('@arcadejs/');
+		}
 	});
 });

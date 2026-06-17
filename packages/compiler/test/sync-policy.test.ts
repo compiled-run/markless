@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { buildSemanticGraph, lowerStateAccess, planPayloadArena } from '../src/index.ts';
 
 const source = `
-import { state } from '@arcadejs/core';
+import { state } from '@arcade/core';
 
 export function Menu() @{
 	const menu = state({ open: true });
@@ -20,7 +20,7 @@ export function Menu() @{
 `;
 
 const negatedGuardSource = `
-import { state } from '@arcadejs/core';
+import { state } from '@arcade/core';
 
 export function Menu() @{
 	const menu = state({ open: false });
@@ -106,7 +106,7 @@ export function Menu() @{
 `;
 
 const handlerArraySyncPolicySource = `
-import { state } from '@arcadejs/core';
+import { state } from '@arcade/core';
 
 export function Menu() @{
 	const menu = state({ open: true, locked: true });

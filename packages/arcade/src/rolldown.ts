@@ -4,4 +4,4 @@ export {
 	arcadeServer,
 	type ArcadeRolldownOptions,
 	type ArcadeRolldownPlugin,
-} from '@arcadejs/bundler/rolldown';
+} from '@arcade/bundler/rolldown';

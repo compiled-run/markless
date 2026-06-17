@@ -4,7 +4,7 @@ import type { SemanticModuleImport } from '../../artifacts.ts';
 export type FrameworkApiName = 'state' | 'computed' | 'element' | 'shared';
 
 const frameworkApiNames = new Set<FrameworkApiName>(['state', 'computed', 'element', 'shared']);
-const frameworkApiSources = new Set(['arcade', '@arcadejs/core']);
+const frameworkApiSources = new Set(['arcade', '@arcade/core']);
 
 // These imports make compiler-rewritten APIs explicit in user code.
 // A bare state() call is not enough; it must resolve to a framework package import.
@@ -104,7 +104,7 @@ export function isFrameworkApiName(name: string | null): name is FrameworkApiNam
 	return frameworkApiNames.has(name as FrameworkApiName);
 }
 
-export function isFrameworkApiSource(source: unknown): source is 'arcade' | '@arcadejs/core' {
+export function isFrameworkApiSource(source: unknown): source is 'arcade' | '@arcade/core' {
 	return typeof source === 'string' && frameworkApiSources.has(source);
 }
 

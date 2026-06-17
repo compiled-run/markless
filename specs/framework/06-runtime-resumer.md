@@ -95,7 +95,7 @@ representation.
 
 Runtime graph behavior that does not need a browser stays in ordinary package
 unit tests. Any resume mechanic that depends on the browser resuming existing
-initial-render output must be proven with `@arcadejs/witness` against a real
+initial-render output must be proven with `@arcade/witness` against a real
 Vite/Rolldown dev, build, preview, or SSR fixture. That includes payload scripts
 already present in the document, generated resolver/chunk loading, delegated
 events on initially rendered DOM, DOM updates after lazy symbols, async boundary
@@ -104,7 +104,7 @@ bodies do not execute during browser resume.
 
 Witness is the canonical proof surface for resume mechanics. If a needed
 resume assertion is awkward or impossible with current Witness APIs, extend the
-local `@arcadejs/witness` package directly and use that new capability here. Do not
+local `@arcade/witness` package directly and use that new capability here. Do not
 replace the resume harness with jsdom, fake DOM, or Vitest browser-mode SSR
 workarounds just because they are easier to wire for one fixture.
 

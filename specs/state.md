@@ -30,7 +30,7 @@ Completed slices are concentrated in:
 - the public umbrella package is named `arcade`; public docs, proof READMEs,
   and bundler fixtures use `arcade`, `arcade/vite`, `arcade/rolldown`, and
   `arcade/runtime/*`, while the semantic graph pass still accepts the internal
-  `@arcadejs/core` source for existing compiler fixtures
+  `@arcade/core` source for existing compiler fixtures
 - compiler module ownership and pass graph validation
 - semantic graph collection for early state, event, alias, async, shared
   definition/instance, and capture inputs
@@ -1056,7 +1056,7 @@ in the split specs.
   source/manifest derivation from emitted chunk filenames beyond the current
   generated build fixture paths, and real DOM hot replacement beyond the
   fixture-level custom-event consumer.
-- Add or extend local `@arcadejs/witness` capabilities whenever a required resume
+- Add or extend local `@arcade/witness` capabilities whenever a required resume
   mechanic cannot be observed by current Witness APIs, and keep Witness as the
   canonical harness for resume mechanics instead of moving those proofs into
   jsdom or Vitest browser-mode SSR workarounds.
@@ -1283,7 +1283,7 @@ as evidence for a new source change.
   `packages/bundler/.witness/receipts/2026-06-16T00-37-49.165Z/receipt.json`)
 - `pnpm exec vp test packages/bundler/test/*.test.ts packages/arcade/test/public-surface.test.ts`
 - `pnpm exec vp test packages/bundler/test/fixture-builds.test.ts`
-- `(from repo root) pnpm --filter @arcadejs/bundler exec witness run ssr-preview --mode preview`
+- `(from repo root) pnpm --filter @arcade/bundler exec witness run ssr-preview --mode preview`
   (receipt:
   `packages/bundler/.witness/receipts/2026-06-16T16-19-07.583Z/receipt.json`;
   records startup script requests `(none)`, post-click requested lazy chunks,
@@ -1291,7 +1291,7 @@ as evidence for a new source change.
   bytes, and all post-click async scripts at 45,658 raw / 13,486 gzip bytes)
 - `pnpm exec vp test packages/runtime/test/event-resume.test.ts packages/runtime/test/module-split.test.ts packages/arcade/test/public-surface.test.ts packages/bundler/test/fixture-boundaries.test.ts`
 - `pnpm exec vp test packages/bundler/test/fixture-builds.test.ts`
-- `(from repo root) pnpm --filter @arcadejs/bundler exec witness run ssr-preview --mode preview`
+- `(from repo root) pnpm --filter @arcade/bundler exec witness run ssr-preview --mode preview`
   (receipt:
   `packages/bundler/.witness/receipts/2026-06-16T16-31-44.234Z/receipt.json`;
   records startup script requests `(none)`, post-click requested lazy chunks,
@@ -1656,7 +1656,7 @@ commands are listed in the implementation/build section above.
   migration/version negotiation, browser helpers, or witness integration
   helpers.
 - shared-state audit confirms current `shared()` support covers the
-  `@arcadejs/core` framework API stub, the authored
+  `@arcade/core` framework API stub, the authored
   `shared(factory, options?)` call shape, the main package re-export,
   public-surface presence checks, diagnostic suggestion text, and semantic graph
   records for same-module exported shared definitions plus component-local
@@ -2251,7 +2251,7 @@ commands are listed in the implementation/build section above.
   Generated DOM update
   symbols now emit concrete `setText`, `setAttr`, and `setProp` journal object
   literals directly, so they do not import either the broad runtime entry or the
-  helper-only `@arcadejs/runtime/dom-update` subpath. Generated
+  helper-only `@arcade/runtime/dom-update` subpath. Generated
   event-handler modules also omit their previous `authoredSource` export;
   behavior and async-runner symbols keep their source metadata because current
   focused tests still use it for those symbol kinds. The Vite CSR/vite-plus
@@ -2265,7 +2265,7 @@ commands are listed in the implementation/build section above.
   The SSR fixture render shell imports `runtime/render-to-string`, keeping the
   SSR payload rendering and inline resumer source out of the eager CSR render
   entry. The SSR fixture browser entry now imports the narrower
-  `@arcadejs/runtime/event-only-resume` subpath for event-only payload
+  `@arcade/runtime/event-only-resume` subpath for event-only payload
   dispatch instead of the full `runtime/resume` or broader `runtime/event-resume`
   path. The event-only resume helper reads the existing payload scripts,
   materializes DOM-order locators, dispatches the current event through the

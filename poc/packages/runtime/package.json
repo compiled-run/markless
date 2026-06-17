@@ -1,5 +1,5 @@
 {
-	"name": "@arcadejs/runtime",
+	"name": "@arcade/runtime",
 	"version": "0.0.0",
 	"private": true,
 	"type": "module",

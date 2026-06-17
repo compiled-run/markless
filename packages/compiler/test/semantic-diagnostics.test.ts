@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { buildSemanticGraph } from '../src/index.ts';
 
 const moduleScopeSource = `
-import { state, computed } from '@arcadejs/core';
+import { state, computed } from '@arcade/core';
 
 const leaked = state(0);
 export const doubled = computed(() => leaked * 2);
@@ -23,7 +23,7 @@ export function Counter() @{
 `;
 
 const asyncPostAwaitReadSource = `
-import { state, computed } from '@arcadejs/core';
+import { state, computed } from '@arcade/core';
 
 export function UserRoute(route: { params: { userId: string } }) @{
 	const settings = state({ locale: 'en' });
@@ -44,7 +44,7 @@ export function UserRoute(route: { params: { userId: string } }) @{
 `;
 
 const missingAsyncBoundarySource = `
-import { computed } from '@arcadejs/core';
+import { computed } from '@arcade/core';
 
 export function UserRoute() @{
 	const user = computed(async ({ signal }) => {
@@ -57,7 +57,7 @@ export function UserRoute() @{
 `;
 
 const transitiveAsyncBoundarySource = `
-import { computed } from '@arcadejs/core';
+import { computed } from '@arcade/core';
 
 export function UserRoute() @{
 	const user = computed(async ({ signal }) => {
@@ -71,7 +71,7 @@ export function UserRoute() @{
 `;
 
 const elementHandleDiagnosticsSource = `
-import { state, element } from '@arcadejs/core';
+import { state, element } from '@arcade/core';
 
 export function Handles() @{
 	const menu = state({ open: false });
@@ -86,7 +86,7 @@ export function Handles() @{
 `;
 
 const elementHandleInStateSource = `
-import { state, element } from '@arcadejs/core';
+import { state, element } from '@arcade/core';
 
 export function Handles() @{
 	let input = element<HTMLInputElement>();
@@ -97,7 +97,7 @@ export function Handles() @{
 `;
 
 const componentAttachSource = `
-import { state } from '@arcadejs/core';
+import { state } from '@arcade/core';
 
 function ChartWrapper() @{
 	<canvas />
@@ -113,7 +113,7 @@ export function Dashboard() @{
 `;
 
 const unextractableSyncPolicySource = `
-import { state } from '@arcadejs/core';
+import { state } from '@arcade/core';
 
 export function Form() @{
 	const allowSubmit = state(false);
@@ -133,7 +133,7 @@ export function Form() @{
 `;
 
 const graphDestructureDefaultSource = `
-import { state } from '@arcadejs/core';
+import { state } from '@arcade/core';
 
 export function Menu() @{
 	const menu = state({ title: undefined });
@@ -144,7 +144,7 @@ export function Menu() @{
 `;
 
 const sharedCycleSource = `
-import { shared } from '@arcadejs/core';
+import { shared } from '@arcade/core';
 
 export const session = shared(() => {
 	const c = cart();
