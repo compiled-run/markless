@@ -74,6 +74,10 @@ pnpm exec vp pack
 - Keep shared compiler, runtime, serializer, and protocol code runtime-agnostic
   ESM.
 - Build tooling goes through Rolldown or Vite. Do not add another build stack.
+- Maintainers working on features must keep the relevant GoalBuddy kanban board
+  up to date. Use `docs/goals/<slug>/state.yaml` as the source of truth and
+  record task status, receipts, verification, and the next task or blocker
+  before stopping or handing off.
 
 ## Test Workflow
 

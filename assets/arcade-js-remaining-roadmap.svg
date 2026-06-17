@@ -1,0 +1,151 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1560 420" role="img" aria-labelledby="title desc">
+  <title id="title">Arcade JS remaining implementation roadmap</title>
+  <desc id="desc">Five flat cards show the remaining Arcade JS work: compiler output, render paths, browser resume, lazy features, and optional preloader.</desc>
+  <style>
+    :root {
+      color-scheme: light dark;
+    }
+
+    .card {
+      fill: #f6f8fa;
+      stroke: #d0d7de;
+      stroke-width: 1;
+    }
+
+    .title {
+      fill: #1f2328;
+      font: 700 24px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    .step {
+      fill: #59636e;
+      font: 600 15px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      text-transform: uppercase;
+    }
+
+    .body {
+      fill: #59636e;
+      font: 400 17px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    .arrow {
+      fill: none;
+      stroke: #818b98;
+      stroke-width: 2.5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .accent-blue {
+      fill: #F9A8D4;
+    }
+
+    .accent-green {
+      fill: #1a7f37;
+    }
+
+    .accent-orange {
+      fill: #FB923C;
+    }
+
+    .accent-pink {
+      fill: #EC4899;
+      opacity: 0.75;
+    }
+
+    .accent-gold {
+      fill: #818b98;
+    }
+
+    .sparkle {
+      fill: #F9A8D4;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .card {
+        fill: #161b22;
+        stroke: #3d444d;
+      }
+
+      .title {
+        fill: #e6edf2;
+      }
+
+      .step,
+      .body {
+        fill: #9198a1;
+      }
+
+      .arrow {
+        stroke: #767e89;
+      }
+
+      .accent-gold {
+        fill: #767e89;
+      }
+
+      .accent-green {
+        fill: #3fb950;
+      }
+    }
+  </style>
+
+  <defs>
+    <marker id="arrowhead" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path class="accent-gold" d="M 0 0 L 10 5 L 0 10 z" />
+    </marker>
+  </defs>
+
+  <rect class="card" x="20" y="42" width="280" height="300" rx="8" />
+  <circle class="accent-blue" cx="58" cy="84" r="10" />
+  <text class="step" x="82" y="90">Next</text>
+  <text class="title" x="48" y="140">Compiler output</text>
+  <text class="body" x="48" y="188">Turn TSRX templates</text>
+  <text class="body" x="48" y="218">into render artifacts.</text>
+  <text class="body" x="48" y="268">Cover text, attrs,</text>
+  <text class="body" x="48" y="298">events, and locators.</text>
+
+  <path class="arrow" d="M 320 192 H 365" marker-end="url(#arrowhead)" />
+
+  <rect class="card" x="385" y="42" width="280" height="300" rx="8" />
+  <circle class="accent-green" cx="423" cy="84" r="10" />
+  <text class="step" x="447" y="90">Then</text>
+  <text class="title" x="413" y="140">Render paths</text>
+  <text class="body" x="413" y="188">CSR and SSR run the</text>
+  <text class="body" x="413" y="218">generated artifacts.</text>
+  <text class="body" x="413" y="268">No browser resume</text>
+  <text class="body" x="413" y="298">for normal CSR.</text>
+
+  <path class="arrow" d="M 685 192 H 730" marker-end="url(#arrowhead)" />
+
+  <rect class="card" x="750" y="42" width="280" height="300" rx="8" />
+  <circle class="accent-orange" cx="788" cy="84" r="10" />
+  <text class="step" x="812" y="90">Then</text>
+  <text class="title" x="778" y="140">Browser resume</text>
+  <text class="body" x="778" y="188">Map payloads onto the</text>
+  <text class="body" x="778" y="218">real DOM with TreeWalker.</text>
+  <text class="body" x="778" y="268">Run lazy symbols after</text>
+  <text class="body" x="778" y="298">real user triggers.</text>
+
+  <path class="arrow" d="M 1050 192 H 1095" marker-end="url(#arrowhead)" />
+
+  <rect class="card" x="1115" y="42" width="280" height="300" rx="8" />
+  <circle class="accent-pink" cx="1153" cy="84" r="10" />
+  <text class="step" x="1177" y="90">Then</text>
+  <text class="title" x="1143" y="140">Lazy features</text>
+  <text class="body" x="1143" y="188">Finish onVisible, attach,</text>
+  <text class="body" x="1143" y="218">element handles, shared.</text>
+  <text class="body" x="1143" y="268">Add async runner and</text>
+  <text class="body" x="1143" y="298">behavior chunks.</text>
+
+  <path class="arrow" d="M 1415 192 H 1460" marker-end="url(#arrowhead)" />
+
+  <rect class="card" x="1480" y="42" width="60" height="300" rx="8" />
+  <circle class="accent-gold" cx="1510" cy="122" r="10" />
+  <path class="sparkle" d="M1510 156 l4.5 13 13 4.5 -13 4.5 -4.5 13 -4.5 -13 -13 -4.5 13 -4.5 Z" />
+  <path class="accent-orange" d="M1510 218 l4.5 13 13 4.5 -13 4.5 -4.5 13 -4.5 -13 -13 -4.5 13 -4.5 Z" />
+
+  <rect class="card" x="520" y="358" width="520" height="40" rx="8" />
+  <circle class="accent-gold" cx="552" cy="378" r="7" />
+  <text class="body" x="572" y="384">Optional preloader comes after chunk edges are proven.</text>
+</svg>

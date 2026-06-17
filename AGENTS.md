@@ -15,6 +15,23 @@ is the Codex-facing always-on guidance for building the TSRX resumable framework
   `$arcade-implementation` for implementation work and
   `$arcade-spec-maintenance` for spec edits when available.
 
+## Maintainer Kanban Board
+
+- When acting as an ArcadeJS maintainer on feature work, keep the canonical
+  GoalBuddy kanban board current. Board truth lives in the relevant
+  `docs/goals/<slug>/state.yaml`; generated `.goalbuddy-board/` files are only
+  the visual view.
+- Before changing feature code, identify the board task that owns the work. If a
+  feature-sized change has no board, create or request a GoalBuddy board instead
+  of tracking the work only in chat.
+- Update `state.yaml` whenever feature work changes status: starting or
+  finishing a task, changing `active_task`, adding or reordering follow-up work,
+  blocking or unblocking a task, or discovering new required verification.
+- Do not stop or hand off feature work without recording the current status,
+  receipts/evidence, verification results, and the next task or explicit blocker
+  in the board. If a local visual board is live, refresh/regenerate it after
+  changing `state.yaml` when the tool is available.
+
 ## Core Framework Constraints
 
 - TSRX-only. Do not add TSX/JSX support or reactive behavior in plain `.ts`
