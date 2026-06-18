@@ -126,7 +126,7 @@ function staticView(): ProtocolViewPayload {
 	};
 }
 
-test('render creates a CSR container without payload scripts or the inline resumer', async () => {
+test('render creates a client-render container without payload scripts or the inline resumer', async () => {
 	const target = {
 		children: [] as FakeElement[],
 		replaceChildren(...children: FakeElement[]) {
@@ -161,7 +161,7 @@ test('render creates a CSR container without payload scripts or the inline resum
 
 	expect(componentBodyRuns).toBe(1);
 	expect(target.children).toEqual([container.root]);
-	expect(container.phase).toBe('csr');
+	expect(container.phase).toBe('client-render');
 	expect(container.payloadScripts).toBeUndefined();
 	expect(container.resumerScript).toBeUndefined();
 	expect(loadedSymbols).toEqual([]);
@@ -172,7 +172,7 @@ test('render creates a CSR container without payload scripts or the inline resum
 	expect(container.graph.read('state:count')).toBe(1);
 });
 
-test('render uses the narrow CSR event path to apply DOM update symbols', async () => {
+test('render uses the narrow client-render event path to apply DOM update symbols', async () => {
 	const target = {
 		children: [] as FakeElement[],
 		replaceChildren(...children: FakeElement[]) {

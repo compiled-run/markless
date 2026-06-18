@@ -117,12 +117,12 @@ That package should follow the CSR helper shape of
 `/Users/jacksm5pro/dev/open-source/vitest-browser-qwik` and intentionally leave
 resume proofs to Witness-backed fixtures.
 
-### CSR render containers
+### Client render containers
 
-`render(App, { target })` is the normal browser render path. It executes the
-component body in the browser, creates DOM under the target, constructs a live
-runtime container, and wires events from compiled render artifacts. A CSR
-container owns:
+`render(App, { target })` is the normal client-side render path. It executes
+the component body in the browser, creates DOM under the target, constructs a
+live runtime container, and wires events from compiled render artifacts. A
+client render container owns:
 
 - the root target and cleanup/unmount boundary
 - one graph instance and scheduler

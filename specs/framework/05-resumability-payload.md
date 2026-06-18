@@ -66,10 +66,10 @@ DOM locator streams are container-scoped, so event dispatch, shared-state
 patches, element handles, and diagnostics do not leak across sibling or nested
 microfrontends.
 
-CSR `render(App, { target })` creates the same logical runtime boundary in
-memory, but it does not consume or emit `arcade/state`, `arcade/view`, or the
-resumer script. CSR must work like a regular browser app from an empty target
-and app bundle.
+Client-side `render(App, { target })` creates the same logical runtime boundary
+in memory, but it does not consume or emit `arcade/state`, `arcade/view`, or the
+resumer script. Client render must work like a regular browser app from an
+empty target and app bundle.
 
 ### Serialization payload
 

@@ -1,9 +1,10 @@
 import type { ProtocolStatePayload, ProtocolViewPayload } from '@arcade/protocol';
 import {
-	createEventOnlyCsrContainer,
-	startEventOnlyCsrRuntime,
-	type EventOnlyCsrContainer,
-} from './event-only-csr.ts';
+	createEventOnlyResumeContainerFromPayloads,
+	type EventOnlyResumeContainer,
+	type EventOnlyResumeDomElement,
+	type EventOnlyResumeDomEvent,
+} from './event-only-resume.ts';
 import type { RuntimeGraph } from './graph.ts';
 import type {
 	ResumeDomElement,
@@ -17,7 +18,7 @@ export type RenderTarget = {
 	readonly appendChild?: (child: ResumeDomElement) => unknown;
 };
 
-export type CsrRenderOutput = {
+export type ClientRenderOutput = {
 	readonly root: ResumeDomElement;
 	readonly graph?: RuntimeGraph;
 	readonly state?: ProtocolStatePayload;
@@ -25,7 +26,7 @@ export type CsrRenderOutput = {
 	readonly loadSymbol?: ResumeRuntimeInput['loadSymbol'];
 };
 
-export type CsrRenderOptions = {
+export type ClientRenderOptions = {
 	readonly target: RenderTarget;
 	readonly loadSymbol?: ResumeRuntimeInput['loadSymbol'];
 	readonly createVisibilityObserver?: ResumeRuntimeInput['createVisibilityObserver'];
@@ -33,13 +34,13 @@ export type CsrRenderOptions = {
 	readonly applyDomJournal?: ResumeRuntimeInput['applyDomJournal'];
 };
 
-export type CsrRenderRuntime = ResumeRuntime | EventOnlyCsrContainer;
+export type ClientRenderRuntime = ResumeRuntime | EventOnlyResumeContainer;
 
-export type CsrRenderContainer = {
-	readonly phase: 'csr';
+export type ClientRenderContainer = {
+	readonly phase: 'client-render';
 	readonly root: ResumeDomElement;
 	readonly graph: RuntimeGraph;
-	readonly runtime: CsrRenderRuntime;
+	readonly runtime: ClientRenderRuntime;
 	readonly payloadScripts?: undefined;
 	readonly resumerScript?: undefined;
 };
@@ -47,9 +48,9 @@ export type CsrRenderContainer = {
 const EMPTY_PROTOCOL_VERSION = 1 satisfies ProtocolStatePayload['version'];
 
 export async function render(
-	component: () => CsrRenderOutput,
-	options: CsrRenderOptions,
-): Promise<CsrRenderContainer> {
+	component: () => ClientRenderOutput,
+	options: ClientRenderOptions,
+): Promise<ClientRenderContainer> {
 	const output = component();
 	const view = output.view ?? emptyViewPayload();
 	const state = output.state ?? emptyStatePayload();
@@ -57,19 +58,19 @@ export async function render(
 
 	mountRoot(options.target, output.root);
 
-	if (canUseEventOnlyCsrRuntime(output, state, view)) {
-		const runtime = createEventOnlyCsrContainer({
-			root: output.root,
+	if (canUseEventOnlyClientRenderRuntime(output, state, view)) {
+		const runtime = await createEventOnlyResumeContainerFromPayloads({
+			root: output.root as EventOnlyResumeDomElement,
 			state,
 			view,
 			loadSymbol: loadSymbol as Parameters<
-				typeof createEventOnlyCsrContainer
+				typeof createEventOnlyResumeContainerFromPayloads
 			>[0]['loadSymbol'],
 		});
-		startEventOnlyCsrRuntime(output.root, view, runtime);
+		startEventOnlyClientRenderRuntime(output.root as EventOnlyResumeDomElement, view, runtime);
 
 		return {
-			phase: 'csr',
+			phase: 'client-render',
 			root: output.root,
 			graph: runtime.graph as RuntimeGraph,
 			runtime,
@@ -90,7 +91,7 @@ export async function render(
 	await runtime.start();
 
 	return {
-		phase: 'csr',
+		phase: 'client-render',
 		root: output.root,
 		graph,
 		runtime,
@@ -111,8 +112,8 @@ function mountRoot(target: RenderTarget, root: ResumeDomElement): void {
 	);
 }
 
-function canUseEventOnlyCsrRuntime(
-	output: CsrRenderOutput,
+function canUseEventOnlyClientRenderRuntime(
+	output: ClientRenderOutput,
 	state: ProtocolStatePayload,
 	view: ProtocolViewPayload,
 ): boolean {
@@ -126,6 +127,23 @@ function canUseEventOnlyCsrRuntime(
 		return false;
 	}
 	return true;
+}
+
+function startEventOnlyClientRenderRuntime(
+	root: EventOnlyResumeDomElement,
+	view: ProtocolViewPayload,
+	runtime: EventOnlyResumeContainer,
+): void {
+	const eventNames = new Set(view.events.map((event) => event.eventName));
+	for (const eventName of eventNames) {
+		root.addEventListener?.(
+			eventName,
+			async (event: EventOnlyResumeDomEvent) => {
+				await runtime.dispatch(event);
+			},
+			{ capture: true },
+		);
+	}
 }
 
 async function createFullRuntimeGraph(

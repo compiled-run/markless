@@ -2268,9 +2268,10 @@ commands are listed in the implementation/build section above.
   entry does not own those browser paths; that CSR entry now statically uses the
   narrow event-only resume container for the current event/DOM-update shape and
   dynamic-imports the full graph/resume/payload paths only for fallback cases.
-  The event-only CSR path now imports `runtime/event-only-resume` instead of the
-  broader `runtime/event-resume`; the focused fixture-build size tests forbid
-  `runtime/src/event-resume.ts` in the CSR and vite-plus eager runtime origins.
+  The event-only client-render path now imports `runtime/event-only-resume`
+  instead of the broader `runtime/event-resume`; the focused fixture-build size
+  tests forbid `runtime/src/event-resume.ts` in the CSR and vite-plus eager
+  runtime origins.
   The SSR fixture render shell imports `runtime/render-to-string`, keeping the
   SSR payload rendering and inline resumer source out of the eager CSR render
   entry. The SSR fixture browser entry now imports the narrower

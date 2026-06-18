@@ -1,9 +1,9 @@
 import {
 	applyDomJournalEntries,
-	render as renderCsrContainer,
-	type CsrRenderContainer,
-	type CsrRenderOptions,
-	type CsrRenderOutput,
+	render as renderClientContainer,
+	type ClientRenderContainer,
+	type ClientRenderOptions,
+	type ClientRenderOutput,
 	type DomJournalEntry,
 	type RenderTarget,
 } from '@arcade/runtime';
@@ -30,7 +30,7 @@ export type BrowserRenderDocument = {
 	};
 };
 
-export type BrowserRenderOptions = Omit<CsrRenderOptions, 'target'> & {
+export type BrowserRenderOptions = Omit<ClientRenderOptions, 'target'> & {
 	readonly container?: BrowserRenderElement;
 	readonly baseElement?: BrowserRenderElement;
 	readonly document?: BrowserRenderDocument;
@@ -39,7 +39,7 @@ export type BrowserRenderOptions = Omit<CsrRenderOptions, 'target'> & {
 export type BrowserRenderResult = {
 	readonly container: BrowserRenderElement;
 	readonly baseElement: BrowserRenderElement;
-	readonly runtime: CsrRenderContainer;
+	readonly runtime: ClientRenderContainer;
 	readonly unmount: () => void;
 	readonly asFragment: () => unknown;
 };
@@ -53,12 +53,12 @@ type MountedContainer = {
 const mountedContainers = new Map<BrowserRenderElement, MountedContainer>();
 
 export async function render(
-	component: () => CsrRenderOutput,
+	component: () => ClientRenderOutput,
 	options: BrowserRenderOptions = {},
 ): Promise<BrowserRenderResult> {
 	const setup = setupContainer(options);
-	let output: CsrRenderOutput | undefined;
-	const runtime = await renderCsrContainer(
+	let output: ClientRenderOutput | undefined;
+	const runtime = await renderClientContainer(
 		() => {
 			output = component();
 			return output;
@@ -86,7 +86,7 @@ export async function render(
 function applyBrowserDomJournal(
 	entries: ReadonlyArray<DomJournalEntry>,
 	root: BrowserRenderElement,
-	view: NonNullable<CsrRenderOutput['view']>,
+	view: NonNullable<ClientRenderOutput['view']>,
 ): void {
 	const elementsByHostId = materializeDomLocators(root, view.locators);
 
@@ -99,7 +99,7 @@ function applyBrowserDomJournal(
 
 function materializeDomLocators(
 	root: BrowserRenderElement,
-	locators: NonNullable<CsrRenderOutput['view']>['locators'],
+	locators: NonNullable<ClientRenderOutput['view']>['locators'],
 ): Map<string, BrowserRenderElement> {
 	const elements = collectElements(root);
 	const byHostId = new Map<string, BrowserRenderElement>();
@@ -156,7 +156,7 @@ function setupContainer(options: BrowserRenderOptions): MountedContainer & {
 
 function createRenderResult(
 	mounted: MountedContainer & { readonly baseElement: BrowserRenderElement },
-	runtime: CsrRenderContainer,
+	runtime: ClientRenderContainer,
 ): BrowserRenderResult {
 	mountedContainers.set(mounted.container, mounted);
 

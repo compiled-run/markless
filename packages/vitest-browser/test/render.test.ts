@@ -77,7 +77,7 @@ function documentLike() {
 	};
 }
 
-test('render mounts CSR output into an owned browser test container', async () => {
+test('render mounts client-render output into an owned browser test container', async () => {
 	const document = documentLike();
 	let runs = 0;
 
@@ -92,7 +92,7 @@ test('render mounts CSR output into an owned browser test container', async () =
 	);
 
 	expect(runs).toBe(1);
-	expect(screen.runtime.phase).toBe('csr');
+	expect(screen.runtime.phase).toBe('client-render');
 	expect(screen.baseElement).toBe(document.body);
 	expect(document.body.childNodes).toEqual([screen.container]);
 	expect(screen.container.childNodes).toEqual([screen.runtime.root]);
