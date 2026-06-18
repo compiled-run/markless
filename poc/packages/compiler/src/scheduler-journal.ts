@@ -176,9 +176,10 @@ function createWriteLookup(
 	operations: ReadonlyArray<LoweredStateOperation>,
 ): (path: string, method?: string) => WritePlan {
 	return (path, method) => {
-		const operation = operations.find(
-			(candidate) => candidate.target === path && candidate.method === method,
-		) ?? operations.find((candidate) => candidate.target === path);
+		const operation =
+			operations.find(
+				(candidate) => candidate.target === path && candidate.method === method,
+			) ?? operations.find((candidate) => candidate.target === path);
 
 		return {
 			path,
@@ -199,15 +200,24 @@ function schedulerWriteBatches(
 			writeFor('journal.revision'),
 			writeFor('journal.message'),
 		]),
-		batch('ordered-handlers:0', 'click', 0, [
-			writeFor('journal.firstHandlerSeen'),
-			writeFor('journal.revision'),
-			writeFor('journal.message'),
-		], 'ordered-handlers'),
-		batch('ordered-handlers:1', 'click', 1, [
-			writeFor('journal.committed'),
-			writeFor('journal.message'),
-		], 'ordered-handlers'),
+		batch(
+			'ordered-handlers:0',
+			'click',
+			0,
+			[
+				writeFor('journal.firstHandlerSeen'),
+				writeFor('journal.revision'),
+				writeFor('journal.message'),
+			],
+			'ordered-handlers',
+		),
+		batch(
+			'ordered-handlers:1',
+			'click',
+			1,
+			[writeFor('journal.committed'), writeFor('journal.message')],
+			'ordered-handlers',
+		),
 		batch('toggle-details:onClick', 'click', 0, [
 			writeFor('journal.open'),
 			writeFor('journal.revision'),
@@ -261,7 +271,8 @@ function batch(
 
 function invalidationRoots(graph: TsrxSemanticGraph): InvalidationRootPlan[] {
 	const computedNames = new Set(graph.computedSites.map((site) => site.name));
-	const keepKnown = (roots: ReadonlyArray<string>) => roots.filter((root) => computedNames.has(root));
+	const keepKnown = (roots: ReadonlyArray<string>) =>
+		roots.filter((root) => computedNames.has(root));
 
 	return [
 		{
@@ -434,13 +445,46 @@ function elementRecordMap(
 function rangePlans(locators: PayloadLocatorPlanningArtifact): RangeJournalPlan[] {
 	return [
 		...locators.branchAnchorRecords.flatMap((record) => [
-			rangePlan('insertRange', 'branch', record.id, targetFor(record.locator), record.condition),
-			rangePlan('removeRange', 'branch', record.id, targetFor(record.locator), record.condition),
+			rangePlan(
+				'insertRange',
+				'branch',
+				record.id,
+				targetFor(record.locator),
+				record.condition,
+			),
+			rangePlan(
+				'removeRange',
+				'branch',
+				record.id,
+				targetFor(record.locator),
+				record.condition,
+			),
 		]),
 		...locators.keyedListRecords.flatMap((record) => [
-			rangePlan('insertRange', 'keyed-list', record.id, targetFor(record.locator), undefined, record.key),
-			rangePlan('removeRange', 'keyed-list', record.id, targetFor(record.locator), undefined, record.key),
-			rangePlan('moveRange', 'keyed-list', record.id, targetFor(record.locator), undefined, record.key),
+			rangePlan(
+				'insertRange',
+				'keyed-list',
+				record.id,
+				targetFor(record.locator),
+				undefined,
+				record.key,
+			),
+			rangePlan(
+				'removeRange',
+				'keyed-list',
+				record.id,
+				targetFor(record.locator),
+				undefined,
+				record.key,
+			),
+			rangePlan(
+				'moveRange',
+				'keyed-list',
+				record.id,
+				targetFor(record.locator),
+				undefined,
+				record.key,
+			),
 		]),
 	];
 }

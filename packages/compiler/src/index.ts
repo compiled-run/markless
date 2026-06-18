@@ -19,3 +19,4 @@ export {
 	emitSymbolResolverModule,
 } from './passes/symbol-resolver-module.ts';
 export { planSymbolResolver } from './passes/symbol-resolver.ts';
+export { planTemplateView } from './passes/template-view.ts';

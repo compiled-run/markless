@@ -83,30 +83,35 @@ format:
 
 ```md
 ## Verdict
+
 [Ready / needs changes / blocked on direction] with one sentence why.
 Mode: [single-agent lens review / parallel lens review / staged re-review];
 Review type: [API change, API design, docs review, developer experience,
 release/platform readiness, AI-agent usability].
 
 ## Findings
+
 - [Severity] [Lens or combined lenses] Finding title
   Evidence: file, API surface, doc section, or observed behavior.
   Impact: why it matters.
   Task: exact next change or decision.
 
 ## Review Notes
+
 - Coverage: concise note on reviewed surfaces and lens coverage without exposing
   role-by-role labels.
 - Residual gaps: tests, evidence, product decisions, or follow-up review areas
   that remain.
 
 ## Needs Research / Direction
+
 - Question or research item.
   Recommended default: the reviewer recommendation if the user does not choose
   another direction.
   Re-review: who or which lens should check the result afterward.
 
 ## Task Queue
+
 - Ordered implementation or documentation tasks.
 ```
 
@@ -114,6 +119,7 @@ If the user explicitly requests a lens-by-lens report, add:
 
 ```md
 ## Role Perspectives
+
 - jr-engineer: concise perspective, or "No unique findings."
 - sr-engineer: concise perspective, or "No unique findings."
 - platform-engineer: concise perspective, or "No unique findings."

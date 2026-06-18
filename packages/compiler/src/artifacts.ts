@@ -215,6 +215,55 @@ export type SemanticTemplateRead = {
 	readonly asyncBoundaryId?: string;
 };
 
+export type SemanticTemplateStaticAttribute = {
+	readonly kind: 'static';
+	readonly name: string;
+	readonly value: string | number | boolean | null;
+};
+
+export type SemanticTemplateBindingAttribute = {
+	readonly kind: 'binding';
+	readonly name: string;
+	readonly source: string;
+	readonly target: Exclude<SemanticTemplateBindingTarget, { readonly kind: 'text' }>;
+	readonly sourceSpan?: SourceSpan;
+};
+
+export type SemanticTemplateAttribute =
+	| SemanticTemplateStaticAttribute
+	| SemanticTemplateBindingAttribute;
+
+export type SemanticTemplateNode =
+	| {
+			readonly id: string;
+			readonly kind: 'element';
+			readonly hostNodeId: string;
+			readonly tagName: string;
+			readonly parentId: string | null;
+			readonly attributes: ReadonlyArray<SemanticTemplateAttribute>;
+			readonly childNodeIds: ReadonlyArray<string>;
+	  }
+	| {
+			readonly id: string;
+			readonly kind: 'text';
+			readonly parentId: string | null;
+			readonly value: string;
+	  }
+	| {
+			readonly id: string;
+			readonly kind: 'binding';
+			readonly parentId: string | null;
+			readonly hostNodeId: string;
+			readonly source: string;
+			readonly target: SemanticTemplateBindingTarget;
+			readonly sourceSpan?: SourceSpan;
+	  };
+
+export type SemanticTemplateRoot = {
+	readonly componentName: string;
+	readonly nodeIds: ReadonlyArray<string>;
+};
+
 export type SemanticElementHandleBinding = {
 	readonly hostNodeId: string;
 	readonly handleName: string;
@@ -257,6 +306,8 @@ export type SemanticGraphArtifact = {
 	readonly aliases: ReadonlyArray<SemanticGraphAlias>;
 	readonly stateReads: ReadonlyArray<SemanticStateRead>;
 	readonly templateReads: ReadonlyArray<SemanticTemplateRead>;
+	readonly templateRoots: ReadonlyArray<SemanticTemplateRoot>;
+	readonly templateNodes: ReadonlyArray<SemanticTemplateNode>;
 	readonly stateWrites: ReadonlyArray<SemanticStateWrite>;
 	readonly asyncBoundaries: ReadonlyArray<{ readonly id: string }>;
 	readonly diagnostics: ReadonlyArray<SemanticGraphDiagnostic>;
@@ -303,6 +354,60 @@ export type StateLoweringArtifact = {
 	readonly passId: 'state-lowering';
 	readonly reads: ReadonlyArray<LoweredStateRead>;
 	readonly writes: ReadonlyArray<LoweredStateWrite>;
+	readonly diagnostics: ReadonlyArray<StateLoweringDiagnostic>;
+};
+
+export type TemplateViewInput = {
+	readonly semanticGraph: SemanticGraphArtifact;
+	readonly stateLowering: StateLoweringArtifact;
+};
+
+export type TemplateViewAttribute =
+	| SemanticTemplateStaticAttribute
+	| (SemanticTemplateBindingAttribute & {
+			readonly graphNodeId?: string;
+			readonly path?: ReadonlyArray<string>;
+			readonly initialValue?: unknown;
+	  });
+
+export type TemplateViewNode =
+	| {
+			readonly id: string;
+			readonly kind: 'element';
+			readonly hostNodeId: string;
+			readonly tagName: string;
+			readonly parentId: string | null;
+			readonly attributes: ReadonlyArray<TemplateViewAttribute>;
+			readonly childNodeIds: ReadonlyArray<string>;
+	  }
+	| {
+			readonly id: string;
+			readonly kind: 'text';
+			readonly parentId: string | null;
+			readonly value: string;
+	  }
+	| {
+			readonly id: string;
+			readonly kind: 'binding';
+			readonly parentId: string | null;
+			readonly hostNodeId: string;
+			readonly source: string;
+			readonly graphNodeId?: string;
+			readonly path?: ReadonlyArray<string>;
+			readonly target: SemanticTemplateBindingTarget;
+			readonly initialValue?: unknown;
+	  };
+
+export type TemplateViewComponent = {
+	readonly name: string;
+	readonly rootNodeIds: ReadonlyArray<string>;
+	readonly initialHtml: string;
+};
+
+export type TemplateViewArtifact = {
+	readonly passId: 'template-view';
+	readonly components: ReadonlyArray<TemplateViewComponent>;
+	readonly nodes: ReadonlyArray<TemplateViewNode>;
 	readonly diagnostics: ReadonlyArray<StateLoweringDiagnostic>;
 };
 
@@ -586,6 +691,7 @@ export type CompileTsrxModuleResult = {
 	readonly passGraph: CompilerPassGraph;
 	readonly semanticGraph: SemanticGraphArtifact;
 	readonly stateLowering: StateLoweringArtifact;
+	readonly templateView: TemplateViewArtifact;
 	readonly payloadArena: PayloadArenaArtifact;
 	readonly symbolResolver: SymbolResolverPlan;
 	readonly captureAnalysis: CaptureAnalysisArtifact;

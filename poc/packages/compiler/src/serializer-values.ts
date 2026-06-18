@@ -1,4 +1,5 @@
 import { parseModule } from '@tsrx/core';
+import { pocSecretWarningTextPattern } from './source-patterns.ts';
 import type { SourceSpan } from './semantic-graph.ts';
 
 export type SerializerValuesInput = {
@@ -905,7 +906,8 @@ function warnIfSecretLike(
 	value: string | null,
 	node: AnyNode,
 ): void {
-	if (!/secret|token|password|credential|apiKey/i.test(`${statePath} ${value ?? ''}`)) return;
+	const warningText = `${statePath} ${value ?? ''}`.toLowerCase();
+	if (!pocSecretWarningTextPattern.test(warningText)) return;
 
 	const code = 'ARCADE_SERIALIZE_SECRET_LEAK';
 	if (

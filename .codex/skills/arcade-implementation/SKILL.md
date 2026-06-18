@@ -37,6 +37,7 @@ description: 'Use when implementing the Arcade TSRX framework: compiler passes, 
 - Prefer pass-level fixture tests over only final bundle snapshots.
 - Keep intermediate artifacts human-readable and easy for agents to inspect.
 - Treat diagnostics as product behavior. Include source span, short reason, allowed alternatives, and the suggested fix.
+- Avoid deep nesting in compiler and bundler code. Use early returns for guards and exceptional cases. When code chooses between several cases from the same decision value or related condition set, prefer a `switch`, lookup table, pattern-matching helper, or small named helper over inline nested `if` blocks. A single `if` can still be too nested when it returns a large object with nested functions or casts; extract the branch body into a named helper so the top-level code reads by intent.
 
 ## Runtime And Build Rules
 
@@ -53,6 +54,9 @@ description: 'Use when implementing the Arcade TSRX framework: compiler passes, 
 - Use vite-plus-managed test, format, and lint tooling, including Vitest and oxfmt/oxlint-style behavior exposed through `vp`.
 - Build scripts and production optimization go through Rolldown or Vite only. Do not add esbuild, terser, Rollup, SWC, webpack, Babel build pipelines, or similar secondary transformers/minifiers.
 - Generated code should use standard ESM and `import()`. The build manifest provides normalized symbol URLs/specifiers.
+- Before adding or preserving a workaround that is becoming local infrastructure, especially around upstream tools, generated output, bundlers, dev servers, or browser quirks, stop and use grep MCP (`mcp__grep.searchGitHub`) for real-world fixes. This is mandatory well before a workaround reaches 200-300 LOC; treat roughly 80+ lines, parser-like source handling, duplicated upstream behavior, or several cooperating helpers as the checkpoint. Search literal code markers such as helper names, virtual module IDs, emitted error strings, or option names. Prefer well-regarded upstream/adjacent patterns and record the examples in the GoalBuddy receipt before implementing.
+- Do not add post-build string/regex cleanup for generated chunks as a defensive fallback. First fix the compiler artifact, Vite/Rolldown config, or plugin hook that creates the output. If generated code must be inspected, use a real parser/AST and a fixture proving the current build emits the construct.
+- Delete stale generated-code cleanups when current fixtures prove the build option already prevents the unwanted output. Keep the fixture or size/assertion test as the guard instead of preserving a parser-like fallback.
 
 ## Testing Rules
 

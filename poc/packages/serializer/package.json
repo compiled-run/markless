@@ -5,5 +5,8 @@
 	"type": "module",
 	"exports": {
 		".": "./src/index.ts"
+	},
+	"dependencies": {
+		"magic-regexp": "^0.11.0"
 	}
 }

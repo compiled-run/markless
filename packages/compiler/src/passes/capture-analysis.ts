@@ -5,6 +5,10 @@ import type {
 	PlannedSymbol,
 	SemanticLocalBinding,
 } from '../artifacts.ts';
+import {
+	compilerIdentifierPartPattern,
+	compilerIdentifierStartPattern,
+} from '../source-patterns.ts';
 
 export function analyzeCaptures(input: CaptureAnalysisInput): CaptureAnalysisArtifact {
 	const extractedSymbols = input.symbolResolver.symbols.map((symbol) => ({
@@ -199,10 +203,10 @@ function simpleParameterNames(source: string): ReadonlySet<string> {
 	const names = new Set<string>();
 
 	for (const rawParam of source.split(',')) {
-		const param = rawParam
-			.trim()
-			.replace(/^\.\.\./, '')
-			.trim();
+		const trimmedParam = rawParam.trim();
+		const param = (
+			trimmedParam.startsWith('...') ? trimmedParam.slice(3) : trimmedParam
+		).trim();
 		const nameEnd = identifierEndIndex(param, 0);
 		if (nameEnd > 0) names.add(param.slice(0, nameEnd));
 	}
@@ -360,11 +364,11 @@ function identifierEndIndex(source: string, start: number): number {
 }
 
 function isIdentifierStart(char: string): boolean {
-	return /[A-Za-z_$]/.test(char);
+	return compilerIdentifierStartPattern.test(char);
 }
 
 function isIdentifierChar(char: string): boolean {
-	return /[\w$]/.test(char);
+	return compilerIdentifierPartPattern.test(char);
 }
 
 function nextNonWhitespace(source: string, startIndex: number): string {

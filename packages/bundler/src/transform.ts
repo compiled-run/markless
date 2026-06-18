@@ -74,6 +74,7 @@ export async function transformTsrxModule(
 			filename: input.filename,
 			payloadId,
 			resolverId,
+			initialHtml: compiled.templateView.components[0]?.initialHtml ?? '',
 		}),
 		map: null,
 		virtualModules,
@@ -111,13 +112,33 @@ function emitSourceModule(input: {
 	readonly filename: string;
 	readonly payloadId: string;
 	readonly resolverId: string;
+	readonly initialHtml: string;
 }) {
 	return [
 		`import payloadScripts, { state as payloadState, view as payloadView } from '${input.payloadId}';`,
 		`import { loadSymbol, symbolManifest } from '${input.resolverId}';`,
 		'',
 		`export const arcadeSource = ${JSON.stringify(input.filename)};`,
+		`export const initialHtml = ${JSON.stringify(input.initialHtml)};`,
 		'export { loadSymbol, payloadScripts, payloadState, payloadView, symbolManifest };',
+		'',
+		'export function renderToStringInput() {',
+		'	return {',
+		'		html: initialHtml,',
+		'		state: payloadState,',
+		'		view: payloadView,',
+		'	};',
+		'}',
+		'',
+		'export function createRoot(documentRef = document) {',
+		"	const template = documentRef.createElement('template');",
+		'	template.innerHTML = initialHtml;',
+		'	const root = template.content.firstElementChild;',
+		'	if (!root) {',
+		"		throw new Error('Arcade generated render output did not create a root element.');",
+		'	}',
+		'	return root;',
+		'}',
 		'',
 		'export default {',
 		'	source: arcadeSource,',

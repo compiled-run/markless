@@ -46,8 +46,12 @@ describe('fixture framework boundaries', () => {
 			expect(source).not.toContain('applyDomJournal');
 		}
 		expect(csrEntry).toContain("import { render } from 'arcade/runtime/render';");
+		expect(csrEntry).toContain('createRoot');
+		expect(csrEntry).not.toContain('const counter = document.createElement');
 		expect(csrEntry).not.toContain('resumeFromPayloadScripts');
 		expect(vitePlusEntry).toContain("import { render } from 'arcade/runtime/render';");
+		expect(vitePlusEntry).toContain('createRoot');
+		expect(vitePlusEntry).not.toContain('const host = document.createElement');
 		expect(vitePlusEntry).not.toContain('resumeFromPayloadScripts');
 		expect(ssrEntry).toContain(
 			"import { resumeEventOnlyFromPayloadDocument } from 'arcade/runtime/event-only-resume';",
@@ -60,16 +64,22 @@ describe('fixture framework boundaries', () => {
 		expect(ssrEntry).not.toContain('arcade/runtime/resume');
 	});
 
-	test('server shell does not emit public per-node async host markers', async () => {
-		const renderShell = await readFixture('vite-ssr/src/render-shell.ts');
+	test('server entry renders the generated TSRX output instead of a handwritten shell', async () => {
+		const entryServer = await readFixture('vite-ssr/src/entry-server.ts');
+		const root = await readFixture('vite-ssr/src/root.tsrx');
 
-		expect(renderShell).not.toContain('data-async-host');
-		expect(renderShell).not.toContain('hostId');
-		expect(renderShell).toContain('renderToString');
-		expect(renderShell).toContain('arcade/runtime/render-to-string');
-		expect(renderShell).not.toContain("from 'arcade/runtime/render'");
-		expect(renderShell).toContain('resumeModuleUrl');
-		expect(renderShell).toContain('<span>hello</span>');
+		expect(entryServer).not.toContain('data-async-host');
+		expect(entryServer).not.toContain('hostId');
+		expect(entryServer).toContain('renderToString');
+		expect(entryServer).toContain('arcade/runtime/render-to-string');
+		expect(entryServer).toContain('renderToStringInput');
+		expect(entryServer).not.toContain('renderServerShell');
+		expect(entryServer).not.toContain("from './render-shell");
+		expect(entryServer).not.toContain('<button');
+		expect(entryServer).not.toContain('<span>hello</span>');
+		expect(entryServer).not.toContain("from 'arcade/runtime/render'");
+		expect(entryServer).toContain('resumeModuleUrl');
+		expect(root).toContain('data-counter');
 	});
 
 	test('SSR fixture config keeps framework compilation out of app config', async () => {

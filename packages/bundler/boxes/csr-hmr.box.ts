@@ -1,4 +1,4 @@
-import { box } from '@arcade/witness';
+import { box } from '@async/witness';
 
 // Product truth: editing a TSRX source file in the Vite CSR fixture runs
 // through the real Vite dev pipeline, invalidates generated arcade

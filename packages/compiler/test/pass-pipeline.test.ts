@@ -22,6 +22,7 @@ test('default compiler passes declare stable artifact boundaries', () => {
 	expect(defaultCompilerPasses.map((pass) => pass.passId)).toEqual([
 		'tsrx-semantic-graph',
 		'state-lowering',
+		'template-view',
 		'payload-arena',
 		'symbol-resolver',
 		'capture-analysis',
@@ -39,6 +40,12 @@ test('default compiler passes declare stable artifact boundaries', () => {
 				description: expect.stringContaining('state'),
 				consumes: ['semanticGraph'],
 				produces: ['stateLowering'],
+			}),
+			expect.objectContaining({
+				passId: 'template-view',
+				description: expect.stringContaining('template'),
+				consumes: ['semanticGraph', 'stateLowering'],
+				produces: ['templateView'],
 			}),
 			expect.objectContaining({
 				passId: 'payload-arena',

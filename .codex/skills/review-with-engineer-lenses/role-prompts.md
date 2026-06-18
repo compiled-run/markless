@@ -112,6 +112,7 @@ Each lens should return:
 Verdict: [ready / needs changes / blocked on direction]
 
 Findings:
+
 - [Severity] Finding title
   Evidence: [specific file, API surface, docs section, or observed behavior]
   Impact: [why this matters for this lens]
@@ -120,11 +121,13 @@ Findings:
 If this lens has no distinct concern, write: No unique findings.
 
 Follow-up:
+
 - [question or research task]
   Recommended default: [what this lens would choose if the user does not choose another direction]
   Re-review: [which lens should check the result afterward]
 
 Bias / fact check:
+
 - Verified facts used: [short list of evidence-backed facts]
 - Assumptions or unverified claims: [short list, or "None"]
 - Bias risks checked: [tool familiarity, local precedent, platform preference, etc.]

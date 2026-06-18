@@ -131,6 +131,14 @@ test('compileTsrxModule orchestrates source to payload scripts and resolver modu
 	});
 
 	expect(result.semanticGraph.components).toEqual([{ name: 'App' }]);
+	expect(result.passGraph.orderedPassIds).toContain('template-view');
+	expect(result.templateView.components).toEqual([
+		{
+			name: 'App',
+			rootNodeIds: ['template:0'],
+			initialHtml: '<section><input value="Menu"><button>1</button></section>',
+		},
+	]);
 	expect(result.stateLowering.diagnostics).toEqual([]);
 	expect(result.captureAnalysis.extractedSymbols).toEqual(
 		expect.arrayContaining([
@@ -151,9 +159,7 @@ test('compileTsrxModule orchestrates source to payload scripts and resolver modu
 	expect(result.renderShell.indexOf('<script type="arcade/state">')).toBeLessThan(
 		result.renderShell.indexOf('<script type="arcade/view">'),
 	);
-	expect(result.symbolResolverModule).toContain(
-		'import(/* @vite-ignore */ moduleUrls[row[0]])',
-	);
+	expect(result.symbolResolverModule).toContain('import(/* @vite-ignore */ moduleUrls[row[0]])');
 	expect(result.symbolResolverModule).not.toContain('switch (id)');
 	expect(result.symbolResolverModuleManifest).toEqual([
 		1,

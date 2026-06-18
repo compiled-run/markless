@@ -1,3 +1,18 @@
+import {
+	anyOf,
+	caseInsensitive,
+	char,
+	charIn,
+	charNotIn,
+	createRegExp,
+	exactly,
+	global as globalFlag,
+	letter,
+	maybe,
+	oneOrMore,
+	whitespace,
+	wordChar,
+} from 'magic-regexp';
 import { dirname, join, normalize, relative } from 'pathe';
 import { ARCADE_VIRTUAL_PREFIX } from '../transform.ts';
 
@@ -18,9 +33,59 @@ type SymbolFacadeRewrite = {
 	readonly initExports: readonly string[];
 };
 
-const TSRX_SOURCE_FILE = /\.tsrx(?:[?#].*)?$/;
-const LOCAL_DYNAMIC_IMPORT_RE =
-	/import\(\s*(["'`])([^"'`]+)\1\s*\)(?:\.then\(\s*\(?\s*([$A-Z_a-z][$\w]*)\s*\)?\s*=>\s*\3\.([$A-Z_a-z][$\w]*)\s*\))?/g;
+const jsQuote = charIn('"\'`');
+const generatedImportIdentifierStart = letter.or(charIn('_$'));
+const generatedImportIdentifierPart = wordChar.or(charIn('$'));
+const generatedImportIdentifier = generatedImportIdentifierStart.and(
+	oneOrMore(generatedImportIdentifierPart).optionally(),
+);
+const tsrxSourceFilePattern = createRegExp(
+	exactly('.tsrx')
+		.and(maybe(charIn('?#'), char.times.any()))
+		.at.lineEnd(),
+);
+const generatedImportIdentifierPattern = createRegExp(
+	generatedImportIdentifier.at.lineStart().at.lineEnd(),
+	[caseInsensitive],
+);
+const initCallMatcher = createRegExp(
+	generatedImportIdentifier.groupedAs('initLocal').and('()').at.lineStart().at.lineEnd(),
+	[caseInsensitive],
+);
+const quotedImportSpecifier = jsQuote
+	.groupedAs('quote')
+	.and(oneOrMore(charNotIn('"\'`')).groupedAs('specifier'))
+	.and.referenceTo('quote');
+const localDynamicImportMatcher = createRegExp(
+	exactly('import('),
+	whitespace.times.any(),
+	quotedImportSpecifier,
+	whitespace.times.any(),
+	')',
+	maybe(
+		'.then(',
+		whitespace.times.any(),
+		anyOf(
+			exactly(
+				'(',
+				whitespace.times.any(),
+				generatedImportIdentifier.groupedAs('parenthesizedParameter'),
+				whitespace.times.any(),
+				')',
+			),
+			generatedImportIdentifier.groupedAs('bareParameter'),
+		),
+		whitespace.times.any(),
+		'=>',
+		whitespace.times.any(),
+		generatedImportIdentifier.groupedAs('receiver'),
+		'.',
+		generatedImportIdentifier.groupedAs('exportName'),
+		whitespace.times.any(),
+		')',
+	),
+	[globalFlag, caseInsensitive],
+);
 
 export function rewriteGeneratedSymbolFacadeImports(
 	bundle: Record<string, unknown>,
@@ -107,15 +172,19 @@ function rewriteDynamicImportSpecifiers(
 ): { readonly code: string; readonly rewrittenFacades: ReadonlySet<string> } {
 	const rewrittenFacades = new Set<string>();
 	const code = chunk.code.replace(
-		LOCAL_DYNAMIC_IMPORT_RE,
+		localDynamicImportMatcher,
 		(
 			match,
 			quote: string,
 			specifier: string,
-			parameter: string | undefined,
+			parenthesizedParameter: string | undefined,
+			bareParameter: string | undefined,
+			receiver: string | undefined,
 			exportName: string | undefined,
 		) => {
 			if (!isLocalSpecifier(specifier)) return match;
+			const parameter = parenthesizedParameter ?? bareParameter;
+			if (parameter && receiver !== parameter) return match;
 
 			const importedFileName = resolveChunkSpecifier(chunk.fileName, specifier);
 			const rewrite = rewrites.get(importedFileName);
@@ -146,7 +215,7 @@ function relativeChunkSpecifier(importerFileName: string, targetFileName: string
 function isGeneratedAsyncChunk(chunk: GeneratedChunk): boolean {
 	return chunk.moduleIds.some((id) => {
 		const normalized = normalizeVirtualId(id);
-		return normalized.startsWith(ARCADE_VIRTUAL_PREFIX) || TSRX_SOURCE_FILE.test(id);
+		return normalized.startsWith(ARCADE_VIRTUAL_PREFIX) || tsrxSourceFilePattern.test(id);
 	});
 }
 
@@ -181,24 +250,44 @@ function isLocalSpecifier(specifier: string): boolean {
 }
 
 function parseSymbolFacade(code: string): { readonly initExports: readonly string[] } | undefined {
-	const match = code
-		.trim()
-		.match(
-			/^import\s*\{\s*([^}]*)\s*\}\s*from\s*(["'`])([^"'`]+)\2\s*;\s*([\s\S]*?)\s*export\s*\{\s*([^}]*)\s*\}\s*;?\s*$/,
-		);
-	if (!match) return undefined;
+	const source = code.trim();
+	if (!source.startsWith('import')) return undefined;
 
-	const imports = parseImportSpecifiers(match[1]!);
-	const exportLocals = parseExportLocalNames(match[5]!);
+	const importOpen = source.indexOf('{', 'import'.length);
+	if (importOpen < 0) return undefined;
+	const importClose = source.indexOf('}', importOpen + 1);
+	if (importClose < 0) return undefined;
+
+	const afterImport = source.slice(importClose + 1).trimStart();
+	if (!afterImport.startsWith('from')) return undefined;
+	const afterFrom = afterImport.slice('from'.length).trimStart();
+	const moduleLiteralEnd = quotedLiteralEnd(afterFrom);
+	if (moduleLiteralEnd < 0) return undefined;
+
+	let rest = afterFrom.slice(moduleLiteralEnd).trimStart();
+	if (!rest.startsWith(';')) return undefined;
+	rest = rest.slice(1).trim();
+
+	const exportStart = rest.lastIndexOf('export');
+	if (exportStart < 0) return undefined;
+	const body = rest.slice(0, exportStart).trim();
+	const afterExport = rest.slice(exportStart + 'export'.length).trimStart();
+	if (!afterExport.startsWith('{')) return undefined;
+	const exportClose = afterExport.indexOf('}', 1);
+	if (exportClose < 0) return undefined;
+	const trailing = afterExport.slice(exportClose + 1).trim();
+	if (trailing !== '' && trailing !== ';') return undefined;
+
+	const imports = parseImportSpecifiers(source.slice(importOpen + 1, importClose));
+	const exportLocals = parseExportLocalNames(afterExport.slice(1, exportClose));
 	if (!imports || !exportLocals) return undefined;
 
-	const body = match[4]!.trim();
 	const initLocals = body
 		? body
 				.split(';')
 				.map((statement) => statement.trim())
 				.filter(Boolean)
-				.map((statement) => statement.match(/^([$A-Z_a-z][$\w]*)\(\)$/)?.[1])
+				.map((statement) => statement.match(initCallMatcher)?.[1])
 		: [];
 	if (initLocals.some((name) => !name)) return undefined;
 
@@ -220,9 +309,9 @@ function parseImportSpecifiers(value: string): Map<string, string> | undefined {
 	for (const part of value.split(',')) {
 		const specifier = part.trim();
 		if (!specifier) continue;
-		const aliased = specifier.match(/^(.+?)\s+as\s+(.+)$/);
-		const imported = (aliased?.[1] ?? specifier).trim();
-		const local = (aliased?.[2] ?? specifier).trim();
+		const aliased = parseAliasedSpecifier(specifier);
+		if (!aliased) return undefined;
+		const { imported, local } = aliased;
 		if (!isIdentifier(imported) || !isIdentifier(local)) return undefined;
 		imports.set(local, imported);
 	}
@@ -234,17 +323,49 @@ function parseExportLocalNames(value: string): string[] | undefined {
 	for (const part of value.split(',')) {
 		const specifier = part.trim();
 		if (!specifier) continue;
-		const aliased = specifier.match(/^(.+?)\s+as\s+(.+)$/);
-		const local = (aliased?.[1] ?? specifier).trim();
-		const exported = (aliased?.[2] ?? specifier).trim();
+		const aliased = parseAliasedSpecifier(specifier);
+		if (!aliased) return undefined;
+		const { imported: local, local: exported } = aliased;
 		if (!isIdentifier(local) || !isIdentifier(exported)) return undefined;
 		locals.push(local);
 	}
 	return locals;
 }
 
+function parseAliasedSpecifier(
+	specifier: string,
+): { readonly imported: string; readonly local: string } | undefined {
+	const tokens = specifier.split(/\s+/).filter(Boolean);
+	if (tokens.length === 1) return { imported: tokens[0]!, local: tokens[0]! };
+	if (tokens.length === 3 && tokens[1] === 'as') {
+		return { imported: tokens[0]!, local: tokens[2]! };
+	}
+	return undefined;
+}
+
 function isIdentifier(value: string): boolean {
-	return /^[$A-Z_a-z][$\w]*$/.test(value);
+	return generatedImportIdentifierPattern.test(value);
+}
+
+function quotedLiteralEnd(source: string): number {
+	const quote = source[0];
+	if (quote !== '"' && quote !== "'" && quote !== '`') return -1;
+
+	let escaped = false;
+	for (let index = 1; index < source.length; index++) {
+		const char = source[index]!;
+		if (escaped) {
+			escaped = false;
+			continue;
+		}
+		if (char === '\\') {
+			escaped = true;
+			continue;
+		}
+		if (char === quote) return index + 1;
+	}
+
+	return -1;
 }
 
 function normalizeVirtualId(id: string): string {

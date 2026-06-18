@@ -17,6 +17,10 @@ import {
 	splitStaticGraphPath,
 	uniqueBy,
 } from '../artifact-helpers/graph-paths.ts';
+import {
+	compilerGraphPathRootMatcher,
+	compilerUnsignedIntegerPattern,
+} from '../source-patterns.ts';
 
 export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifact {
 	const reads: LoweredStateRead[] = [];
@@ -502,8 +506,8 @@ function pathStartsWith(path: ReadonlyArray<string>, prefix: ReadonlyArray<strin
 }
 
 function graphPathRoot(source: string): string | null {
-	const match = /^\s*([$A-Z_a-z][$\w]*)/.exec(source);
-	return match?.[1] ?? null;
+	const match = source.match(compilerGraphPathRootMatcher);
+	return match?.groups.rootName ?? null;
 }
 
 function hasDynamicBracketSegment(source: string): boolean {
@@ -526,7 +530,7 @@ function hasDynamicBracketSegment(source: string): boolean {
 }
 
 function isStaticBracketSegment(segment: string): boolean {
-	if (/^\d+$/.test(segment)) return true;
+	if (compilerUnsignedIntegerPattern.test(segment)) return true;
 	if (segment.length < 2) return false;
 
 	const quote = segment[0];

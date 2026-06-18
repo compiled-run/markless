@@ -1,5 +1,6 @@
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { describe, expect, test } from 'vitest';
 
 const root = resolve(import.meta.dirname, '../../..');
@@ -55,6 +56,23 @@ describe('package metadata', () => {
 
 		expect(bundler.scripts?.['test:boxes']).toBe('witness run');
 		expect(workspace.scripts?.test).toBe('vp test && pnpm --dir packages/bundler test:boxes');
+	});
+
+	test('package-local Witness boxes are importable', async () => {
+		const boxesDir = resolve(root, 'packages/bundler/boxes');
+		const boxFiles = (await readdir(boxesDir))
+			.filter((fileName) => fileName.endsWith('.box.ts'))
+			.sort();
+
+		expect(boxFiles).not.toHaveLength(0);
+
+		for (const fileName of boxFiles) {
+			const module = (await import(pathToFileURL(resolve(boxesDir, fileName)).href)) as {
+				readonly default?: unknown;
+			};
+
+			expect(module.default, fileName).toBeDefined();
+		}
 	});
 
 	test('framework manifests and public facade do not reference unowned arcadejs scope', async () => {

@@ -6,6 +6,7 @@ import {
 	type ProtocolViewPayload,
 } from '@arcade/protocol';
 import { renderPayloadScripts } from '@arcade/serializer';
+import { runtimeInlineClosingScriptMatcher } from './source-patterns.ts';
 
 export type SsrRenderOutput = {
 	readonly html: string;
@@ -271,5 +272,5 @@ function escapeAttribute(value: string): string {
 }
 
 function escapeInlineScript(value: string): string {
-	return value.replace(/<\/script/gi, '<\\/script');
+	return value.replace(runtimeInlineClosingScriptMatcher, '<\\/script');
 }

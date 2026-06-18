@@ -11,6 +11,7 @@ import type {
 	SymbolResolverModuleInput,
 	SymbolResolverModuleManifest,
 	SymbolResolverPlan,
+	TemplateViewArtifact,
 } from './artifacts.ts';
 import { runCompilerPassPipeline } from './pass-pipeline.ts';
 import { defaultCompilerPasses } from './pass-registry.ts';
@@ -27,6 +28,7 @@ import {
 	emitSymbolResolverModule,
 } from './passes/symbol-resolver-module.ts';
 import { planSymbolResolver } from './passes/symbol-resolver.ts';
+import { planTemplateView } from './passes/template-view.ts';
 
 export async function compileTsrxModule(
 	input: CompileTsrxModuleInput,
@@ -47,6 +49,7 @@ export async function compileTsrxModule(
 	const artifacts = pipeline.artifacts as {
 		readonly semanticGraph: SemanticGraphArtifact;
 		readonly stateLowering: StateLoweringArtifact;
+		readonly templateView: TemplateViewArtifact;
 		readonly payloadArena: PayloadArenaArtifact;
 		readonly symbolResolver: SymbolResolverPlan;
 		readonly captureAnalysis: CaptureAnalysisArtifact;
@@ -63,6 +66,7 @@ export async function compileTsrxModule(
 		passGraph: pipeline.passGraph,
 		semanticGraph: artifacts.semanticGraph,
 		stateLowering: artifacts.stateLowering,
+		templateView: artifacts.templateView,
 		payloadArena: artifacts.payloadArena,
 		symbolResolver: artifacts.symbolResolver,
 		captureAnalysis: artifacts.captureAnalysis,
@@ -103,6 +107,20 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 				run({ inputs }) {
 					return {
 						payloadArena: planPayloadArena({
+							semanticGraph: inputs.semanticGraph as SemanticGraphArtifact,
+							stateLowering: inputs.stateLowering as StateLoweringArtifact,
+						}),
+					};
+				},
+			};
+		}
+
+		if (pass.passId === 'template-view') {
+			return {
+				...pass,
+				run({ inputs }) {
+					return {
+						templateView: planTemplateView({
 							semanticGraph: inputs.semanticGraph as SemanticGraphArtifact,
 							stateLowering: inputs.stateLowering as StateLoweringArtifact,
 						}),

@@ -188,16 +188,97 @@ async function staticImports(
 	if (manifestImports?.length) return manifestImports;
 
 	const source = new TextDecoder().decode(await readEmittedScript(dist, fileName));
-	return [...source.matchAll(STATIC_IMPORT_RE)]
-		.map((match) => normalizeImportedScript(fileName, match[1]!))
+	return staticImportSpecifiers(source)
+		.map((specifier) => normalizeImportedScript(fileName, specifier))
 		.filter(isJavaScriptFile);
 }
-
-const STATIC_IMPORT_RE = /\bimport(?:(?:\s+|[{\w*])[\s\S]*?\bfrom\s*)?["']([^"']+)["']/g;
 
 function normalizeImportedScript(importer: string, specifier: string): string {
 	if (!specifier.startsWith('.')) return normalizeScriptFileName(specifier);
 	return normalizeScriptFileName(join(dirname(importer), specifier));
+}
+
+function staticImportSpecifiers(source: string): string[] {
+	const specifiers: string[] = [];
+	let cursor = 0;
+	while (cursor < source.length) {
+		const importIndex = source.indexOf('import', cursor);
+		if (importIndex < 0) break;
+		cursor = importIndex + 'import'.length;
+		if (!isKeywordAt(source, importIndex, 'import')) continue;
+
+		const specifier = readStaticImportSpecifier(source, cursor);
+		if (!specifier) continue;
+		specifiers.push(specifier.value);
+		cursor = specifier.end;
+	}
+
+	return specifiers;
+}
+
+function readStaticImportSpecifier(
+	source: string,
+	start: number,
+): { readonly value: string; readonly end: number } | undefined {
+	const direct = readQuotedString(source, skipSpaces(source, start));
+	if (direct) return direct;
+
+	let cursor = start;
+	while (cursor < source.length && source[cursor] !== ';') {
+		const fromIndex = source.indexOf('from', cursor);
+		if (fromIndex < 0) return undefined;
+		cursor = fromIndex + 'from'.length;
+		if (!isKeywordAt(source, fromIndex, 'from')) continue;
+
+		return readQuotedString(source, skipSpaces(source, cursor));
+	}
+
+	return undefined;
+}
+
+function readQuotedString(
+	source: string,
+	start: number,
+): { readonly value: string; readonly end: number } | undefined {
+	const quote = source[start];
+	if (quote !== '"' && quote !== "'") return undefined;
+
+	let value = '';
+	let escaped = false;
+	for (let index = start + 1; index < source.length; index++) {
+		const char = source[index]!;
+		if (escaped) {
+			value += char;
+			escaped = false;
+			continue;
+		}
+		if (char === '\\') {
+			escaped = true;
+			continue;
+		}
+		if (char === quote) return { value, end: index + 1 };
+		value += char;
+	}
+
+	return undefined;
+}
+
+function skipSpaces(source: string, start: number): number {
+	let cursor = start;
+	while (/\s/.test(source[cursor] ?? '')) cursor++;
+	return cursor;
+}
+
+function isKeywordAt(source: string, start: number, keyword: string): boolean {
+	return (
+		source.startsWith(keyword, start) &&
+		!isIdentifierChar(source[start - 1] ?? '') &&
+		!isIdentifierChar(source[start + keyword.length] ?? '')
+	);
+}
+
+function isIdentifierChar(char: string): boolean {
+	return /[\w$]/.test(char);
 }
 
 function normalizeScriptFileName(script: string): string {

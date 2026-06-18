@@ -1,3 +1,9 @@
+import {
+	pocSecretKeyPrefixPattern,
+	pocSecretPathPattern,
+	pocSecretValuePattern,
+} from './source-patterns.ts';
+
 export type RuntimeSerializerDiagnostic = {
 	readonly code: 'ARCADE_SERIALIZE_WEAK_COLLECTION' | 'ARCADE_SERIALIZE_SECRET_LEAK';
 	readonly severity: 'error' | 'warning';
@@ -201,9 +207,10 @@ function pathFor(parent: string, key: string): string {
 }
 
 function looksSecret(value: string): boolean {
-	return /^(sk|pk)_(live|test)_/.test(value) || /secret|token/i.test(value);
+	const lowerValue = value.toLowerCase();
+	return pocSecretKeyPrefixPattern.test(lowerValue) || pocSecretValuePattern.test(lowerValue);
 }
 
 function looksSecretPath(statePath: string): boolean {
-	return /secret|token|password|credential/i.test(statePath);
+	return pocSecretPathPattern.test(statePath.toLowerCase());
 }

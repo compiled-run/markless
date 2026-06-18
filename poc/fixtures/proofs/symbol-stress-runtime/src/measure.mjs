@@ -56,8 +56,8 @@ async function measureCompactResolver(symbolCount) {
 	assert.equal(hasSwitch, false, 'compact resolver source must not contain switch (id)');
 	assert.equal(source.includes('case "symbol:'), false, 'compact resolver must not emit cases');
 
-	const generatedModule = await measureAsync(() =>
-		import(dataModuleUrl(source, `resolver-${symbolCount}`)),
+	const generatedModule = await measureAsync(
+		() => import(dataModuleUrl(source, `resolver-${symbolCount}`)),
 	);
 	const resolver = generatedModule.value;
 

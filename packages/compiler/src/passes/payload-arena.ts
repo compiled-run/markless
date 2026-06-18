@@ -5,6 +5,11 @@ import type {
 	SemanticGraphBinding,
 } from '../artifacts.ts';
 import { resolveGraphPath, semanticAliasMap, uniqueBy } from '../artifact-helpers/graph-paths.ts';
+import {
+	compilerDoubleQuotedStringLiteralPattern,
+	compilerNumberLiteralPattern,
+	compilerSingleQuotedStringLiteralPattern,
+} from '../source-patterns.ts';
 
 export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact {
 	const bindings = new Map<string, SemanticGraphBinding>();
@@ -256,7 +261,7 @@ function literalBehaviorInputValue(source: string): BehaviorInputValue | undefin
 	if (valueSource === 'true') return { value: true };
 	if (valueSource === 'false') return { value: false };
 	if (valueSource === 'null') return { value: null };
-	if (/^[+-]?(?:\d+|\d*\.\d+)(?:e[+-]?\d+)?$/i.test(valueSource)) {
+	if (compilerNumberLiteralPattern.test(valueSource)) {
 		const value = Number(valueSource);
 		if (Number.isFinite(value)) return { value };
 	}
@@ -268,7 +273,7 @@ function literalBehaviorInputValue(source: string): BehaviorInputValue | undefin
 }
 
 function literalStringValue(source: string): BehaviorInputValue | undefined {
-	if (/^"(?:\\.|[^"\\])*"$/.test(source)) {
+	if (compilerDoubleQuotedStringLiteralPattern.test(source)) {
 		try {
 			return { value: JSON.parse(source) as unknown };
 		} catch {
@@ -276,7 +281,7 @@ function literalStringValue(source: string): BehaviorInputValue | undefined {
 		}
 	}
 
-	if (/^'(?:\\.|[^'\\])*'$/.test(source)) {
+	if (compilerSingleQuotedStringLiteralPattern.test(source)) {
 		return {
 			value: source.slice(1, -1).replace(/\\'/g, "'").replace(/\\\\/g, '\\'),
 		};

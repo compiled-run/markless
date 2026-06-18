@@ -5,6 +5,8 @@ import type {
 	SemanticBehavior,
 	SemanticElementHandleBinding,
 	SemanticGraphDiagnostic,
+	SemanticTemplateAttribute,
+	SemanticTemplateNode,
 	SourceSpan,
 } from '../../artifacts.ts';
 import { graphBindingMap } from '../../artifact-helpers/graph-paths.ts';
@@ -25,14 +27,29 @@ import type { MutableSemanticGraphArtifact, SemanticGraphWalk, WalkState } from 
 export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGraphWalk): void {
 	const tagName = getElementTagName(node);
 	const previousHost = state.currentHostNodeId;
+	const previousTemplateElement = state.currentTemplateElementId;
+	const previousTemplateParent = state.currentTemplateParentId;
 	const isHostElement = tagName ? isHostTagName(tagName) : false;
 	let hostNodeId = previousHost;
+	let templateNodeId: string | null = null;
 
 	if (tagName && isHostElement) {
 		hostNodeId = `h${state.nextHostId++}`;
+		templateNodeId = `template:${state.nextTemplateId++}`;
 		state.hostIds.set(node, hostNodeId);
 		state.graph.hostNodes.push({ id: hostNodeId, tagName });
+		registerTemplateNode(state, {
+			id: templateNodeId,
+			kind: 'element',
+			hostNodeId,
+			tagName,
+			parentId: previousTemplateParent,
+			attributes: [],
+			childNodeIds: [],
+		});
 		state.currentHostNodeId = hostNodeId;
+		state.currentTemplateElementId = templateNodeId;
+		state.currentTemplateParentId = templateNodeId;
 	}
 
 	for (const attribute of getElementAttributes(node)) {
@@ -51,6 +68,8 @@ export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGr
 	}
 
 	state.currentHostNodeId = previousHost;
+	state.currentTemplateElementId = previousTemplateElement;
+	state.currentTemplateParentId = previousTemplateParent;
 }
 
 export function collectTemplateExpression(node: AnyNode, state: WalkState): void {
@@ -59,14 +78,38 @@ export function collectTemplateExpression(node: AnyNode, state: WalkState): void
 	const expression = node.expression as AnyNode | undefined;
 	if (!expression) return;
 
+	const source = expressionSource(expression, state.source);
 	state.graph.templateReads.push({
 		hostNodeId: state.currentHostNodeId,
-		source: expressionSource(expression, state.source),
+		source,
 		sourceSpan: sourceSpan(expression, state.filename),
 		target: {
 			kind: 'text',
 		},
 		asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
+	});
+	registerTemplateNode(state, {
+		id: `template:${state.nextTemplateId++}`,
+		kind: 'binding',
+		parentId: state.currentTemplateParentId,
+		hostNodeId: state.currentHostNodeId,
+		source,
+		sourceSpan: sourceSpan(expression, state.filename),
+		target: {
+			kind: 'text',
+		},
+	});
+}
+
+export function collectTemplateText(node: AnyNode, state: WalkState): void {
+	const value = normalizedTemplateText(node);
+	if (!value) return;
+
+	registerTemplateNode(state, {
+		id: `template:${state.nextTemplateId++}`,
+		kind: 'text',
+		parentId: state.currentTemplateParentId,
+		value,
 	});
 }
 
@@ -174,15 +217,60 @@ function collectAttribute(
 	}
 
 	if (expressionValue && expressionValue.type !== 'Literal') {
+		const source = expressionSource(expressionValue, state.source);
+		registerTemplateAttribute(state, {
+			kind: 'binding',
+			name: attributeName,
+			source,
+			sourceSpan: sourceSpan(expressionValue, state.filename),
+			target: bindingTargetForAttribute(attributeName),
+		});
 		state.graph.templateReads.push({
 			hostNodeId,
-			source: expressionSource(expressionValue, state.source),
+			source,
 			sourceSpan: sourceSpan(expressionValue, state.filename),
 			target: bindingTargetForAttribute(attributeName),
 			asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
 		});
 		walk(expressionValue, state);
+		return;
 	}
+
+	registerStaticTemplateAttribute(attributeName, value, state);
+}
+
+function registerStaticTemplateAttribute(
+	attributeName: string,
+	value: AnyNode | undefined,
+	state: WalkState,
+): void {
+	const attributeValue = staticTemplateAttributeValue(value);
+	if (attributeValue === undefined) return;
+
+	registerTemplateAttribute(state, {
+		kind: 'static',
+		name: attributeName,
+		value: attributeValue,
+	});
+}
+
+function staticTemplateAttributeValue(
+	value: AnyNode | undefined,
+): string | number | boolean | null | undefined {
+	if (!value) return true;
+	if (value.type === 'Literal') {
+		const literal = value.value;
+		if (
+			typeof literal === 'string' ||
+			typeof literal === 'number' ||
+			typeof literal === 'boolean' ||
+			literal === null
+		) {
+			return literal;
+		}
+	}
+
+	return undefined;
 }
 
 function bindingTargetForAttribute(attributeName: string): {
@@ -207,6 +295,54 @@ function bindingTargetForAttribute(attributeName: string): {
 
 function isDomPropertyBindingName(attributeName: string): boolean {
 	return attributeName === 'value' || attributeName === 'checked' || attributeName === 'selected';
+}
+
+function registerTemplateNode(state: WalkState, node: SemanticTemplateNode): void {
+	state.graph.templateNodes.push(node);
+	if (node.parentId) {
+		appendTemplateChild(state, node.parentId, node.id);
+		return;
+	}
+	if (state.currentComponentName) {
+		appendTemplateRoot(state, state.currentComponentName, node.id);
+	}
+}
+
+function appendTemplateChild(state: WalkState, parentId: string, childId: string): void {
+	const parent = state.graph.templateNodes.find((node) => node.id === parentId);
+	if (!parent || parent.kind !== 'element') return;
+
+	(parent.childNodeIds as string[]).push(childId);
+}
+
+function appendTemplateRoot(state: WalkState, componentName: string, nodeId: string): void {
+	const existing = state.graph.templateRoots.find((root) => root.componentName === componentName);
+	if (existing) {
+		(existing.nodeIds as string[]).push(nodeId);
+		return;
+	}
+
+	state.graph.templateRoots.push({
+		componentName,
+		nodeIds: [nodeId],
+	});
+}
+
+function registerTemplateAttribute(state: WalkState, attribute: SemanticTemplateAttribute): void {
+	if (!state.currentTemplateElementId) return;
+	const node = state.graph.templateNodes.find(
+		(node) => node.id === state.currentTemplateElementId,
+	);
+	if (!node || node.kind !== 'element') return;
+
+	(node.attributes as SemanticTemplateAttribute[]).push(attribute);
+}
+
+function normalizedTemplateText(node: AnyNode): string | null {
+	const raw = typeof node.value === 'string' ? node.value : '';
+	if (!/\S/.test(raw)) return null;
+
+	return raw.replace(/[ \t\r\n]+/g, ' ');
 }
 
 function unextractableSyncPolicyDiagnostic(

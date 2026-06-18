@@ -1,6 +1,6 @@
-import { payloadScripts } from './root.tsrx';
-import { renderServerShell } from './render-shell.ts';
+import { renderToString } from 'arcade/runtime/render-to-string';
+import { renderToStringInput } from './root.tsrx';
 
 export function render(resumeModuleUrl = ''): string {
-	return renderServerShell(payloadScripts, resumeModuleUrl);
+	return renderToString(renderToStringInput, { resumeModuleUrl });
 }

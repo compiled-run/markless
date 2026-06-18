@@ -45,6 +45,9 @@ describe('TSRX Rolldown plugin structure', () => {
 		});
 
 		expect(result.code).toContain('export const arcadeSource');
+		expect(result.code).toContain('export const initialHtml');
+		expect(result.code).toContain('export function renderToStringInput()');
+		expect(result.code).toContain('export function createRoot(documentRef = document)');
 		expect(result.code).toContain(
 			"import payloadScripts, { state as payloadState, view as payloadView } from 'virtual:arcade:payload:",
 		);
@@ -119,6 +122,15 @@ describe('TSRX Rolldown plugin structure', () => {
 				expect.stringContaining('type: "setText"'),
 			]),
 		);
+	});
+
+	test('client plugin serves Vite preload helper as a tiny identity helper', async () => {
+		const helperSource = (await callLoad(arcadeClient(), '\0vite/preload-helper.js')) as string;
+
+		expect(helperSource).toContain(
+			'export const __vitePreload = (baseModule) => baseModule();',
+		);
+		expect(helperSource).not.toContain('vite:preloadError');
 	});
 
 	test('buildStart clears stale virtual modules and transform manifests', async () => {

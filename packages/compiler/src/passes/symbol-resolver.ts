@@ -6,6 +6,13 @@ import type {
 	SymbolResolverInput,
 	SymbolResolverPlan,
 } from '../artifacts.ts';
+import {
+	compilerEventAssignmentWriteMatcher,
+	compilerEventDeleteWriteMatcher,
+	compilerEventPostfixUpdateWriteMatcher,
+	compilerEventPrefixUpdateWriteMatcher,
+	compilerIdentifierPartPattern,
+} from '../source-patterns.ts';
 
 export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPlan {
 	const symbols: PlannedSymbol[] = [];
@@ -118,18 +125,18 @@ function handlerContainsWrite(handlerSource: string, write: LoweredStateWrite): 
 	}
 
 	if (write.operation === 'update' && write.updateOperator) {
-		const source = escapeRegExp(write.source);
-		const operator = escapeRegExp(write.updateOperator);
 		return (
-			new RegExp(`(?:^|[^$0-9A-Z_a-z])${source}\\s*${operator}`).test(handlerSource) ||
-			new RegExp(`${operator}\\s*${source}(?:$|[^$0-9A-Z_a-z])`).test(handlerSource)
+			compilerEventPostfixUpdateWriteMatcher(write.source, write.updateOperator).test(
+				handlerSource,
+			) ||
+			compilerEventPrefixUpdateWriteMatcher(write.source, write.updateOperator).test(
+				handlerSource,
+			)
 		);
 	}
 
 	if (write.operation === 'delete') {
-		return new RegExp(`delete\\s+${escapeRegExp(write.source)}(?:$|[^$0-9A-Z_a-z])`).test(
-			handlerSource,
-		);
+		return compilerEventDeleteWriteMatcher(write.source).test(handlerSource);
 	}
 
 	if (write.operation === 'call' && write.method) {
@@ -146,17 +153,11 @@ function handlerContainsWrite(handlerSource: string, write: LoweredStateWrite): 
 function handlerContainsAssignment(handlerSource: string, write: LoweredStateWrite): boolean {
 	if (!write.valueSource) return false;
 
-	const source = escapeRegExp(write.source);
-	const operator = escapeRegExp(write.assignmentOperator ?? '=');
-	const valueSource = escapeRegExp(write.valueSource);
-
-	return new RegExp(
-		`(?:^|[^$0-9A-Z_a-z])${source}\\s*${operator}\\s*${valueSource}(?:$|[^$0-9A-Z_a-z])`,
+	return compilerEventAssignmentWriteMatcher(
+		write.source,
+		write.assignmentOperator ?? '=',
+		write.valueSource,
 	).test(handlerSource);
-}
-
-function escapeRegExp(value: string): string {
-	return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function referencedModuleImports(
@@ -187,7 +188,7 @@ function sourceReferencesIdentifier(source: string, name: string): boolean {
 }
 
 function isIdentifierChar(char: string): boolean {
-	return /[$0-9A-Z_a-z]/.test(char);
+	return compilerIdentifierPartPattern.test(char);
 }
 
 function sourceWithoutStringOrCommentText(source: string): string {

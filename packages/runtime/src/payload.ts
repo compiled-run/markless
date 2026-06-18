@@ -12,6 +12,7 @@ import {
 	type ResumeRuntime,
 	type ResumeRuntimeInput,
 } from './resume.ts';
+import { runtimeBigIntStringPattern } from './source-patterns.ts';
 
 export type EncodedPayloadScripts = {
 	readonly stateScript: string;
@@ -1192,7 +1193,7 @@ function assertNonNegativeIntegerField(
 }
 
 function assertBigIntString(value: unknown, context: string): void {
-	if (typeof value === 'string' && /^-?(0|[1-9]\d*)$/.test(value)) return;
+	if (typeof value === 'string' && runtimeBigIntStringPattern.test(value)) return;
 
 	throw invalidPayloadShapeError(
 		contextPayloadType(context),

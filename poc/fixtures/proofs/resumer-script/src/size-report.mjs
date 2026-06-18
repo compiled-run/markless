@@ -1,10 +1,7 @@
 import { gzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { minifySync } from 'rolldown/experimental';
-import {
-	EVENT_ONLY_RESUMER_TARGET_BYTES,
-	eventOnlyResumerSource,
-} from './resumer-source.mjs';
+import { EVENT_ONLY_RESUMER_TARGET_BYTES, eventOnlyResumerSource } from './resumer-source.mjs';
 
 export function measureEventOnlyResumer() {
 	const source = eventOnlyResumerSource();
@@ -34,4 +31,3 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 function byteLength(value) {
 	return new TextEncoder().encode(value).byteLength;
 }
-

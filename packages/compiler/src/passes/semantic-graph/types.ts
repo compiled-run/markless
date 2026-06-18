@@ -14,8 +14,10 @@ import type {
 	SemanticHostNode,
 	SemanticLocalBinding,
 	SemanticStateRead,
+	SemanticTemplateNode,
 	SemanticStateWrite,
 	SemanticTemplateRead,
+	SemanticTemplateRoot,
 } from '../../artifacts.ts';
 import type { FrameworkApiName } from './imports.ts';
 
@@ -36,6 +38,8 @@ export type MutableSemanticGraphArtifact = {
 	aliases: SemanticGraphAlias[];
 	stateReads: SemanticStateRead[];
 	templateReads: SemanticTemplateRead[];
+	templateRoots: SemanticTemplateRoot[];
+	templateNodes: SemanticTemplateNode[];
 	stateWrites: SemanticStateWrite[];
 	asyncBoundaries: Array<{ readonly id: string }>;
 	diagnostics: SemanticGraphDiagnostic[];
@@ -48,10 +52,14 @@ export type WalkState = {
 	readonly frameworkApiImports: ReadonlyMap<string, FrameworkApiName>;
 	readonly hostIds: WeakMap<object, string>;
 	currentHostNodeId: string | null;
+	currentTemplateElementId: string | null;
+	currentTemplateParentId: string | null;
+	currentComponentName: string | null;
 	currentAsyncBoundaryId: string | null;
 	currentSharedDefinitionId: string | null;
 	nextHostId: number;
 	nextEventId: number;
+	nextTemplateId: number;
 	nextBoundaryId: number;
 };
 
@@ -75,6 +83,8 @@ export function createMutableSemanticGraphArtifact(filename: string): MutableSem
 		aliases: [],
 		stateReads: [],
 		templateReads: [],
+		templateRoots: [],
+		templateNodes: [],
 		stateWrites: [],
 		asyncBoundaries: [],
 		diagnostics: [],
@@ -94,10 +104,14 @@ export function createWalkState(input: {
 		frameworkApiImports: input.frameworkApiImports,
 		hostIds: new WeakMap<object, string>(),
 		currentHostNodeId: null,
+		currentTemplateElementId: null,
+		currentTemplateParentId: null,
+		currentComponentName: null,
 		currentAsyncBoundaryId: null,
 		currentSharedDefinitionId: null,
 		nextHostId: 0,
 		nextEventId: 0,
+		nextTemplateId: 0,
 		nextBoundaryId: 0,
 	};
 }

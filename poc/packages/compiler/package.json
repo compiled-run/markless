@@ -7,6 +7,7 @@
 		".": "./src/index.ts"
 	},
 	"dependencies": {
-		"@tsrx/core": "workspace:*"
+		"@tsrx/core": "workspace:*",
+		"magic-regexp": "^0.11.0"
 	}
 }

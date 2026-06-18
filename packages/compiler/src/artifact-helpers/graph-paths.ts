@@ -3,6 +3,10 @@ import type {
 	SemanticGraphArtifact,
 	SemanticGraphBinding,
 } from '../artifacts.ts';
+import {
+	compilerGraphPathIndexSegmentMatcher,
+	compilerGraphPathStringSegmentMatcher,
+} from '../source-patterns.ts';
 
 export function resolveGraphPath(
 	source: string,
@@ -117,8 +121,8 @@ function aliasExcludesPath(alias: SemanticGraphAlias, path: ReadonlyArray<string
 // Graph/member path parsing for compiler artifacts, not filesystem or URL path handling.
 export function splitStaticGraphPath(source: string): string[] {
 	return source
-		.replace(/\[['"]([^'"]+)['"]\]/g, '.$1')
-		.replace(/\[(\d+)\]/g, '.$1')
+		.replace(compilerGraphPathStringSegmentMatcher, '.$1')
+		.replace(compilerGraphPathIndexSegmentMatcher, '.$1')
 		.split('.')
 		.map((segment) => segment.trim())
 		.filter(Boolean);

@@ -6,14 +6,21 @@
 	"scripts": {
 		"build": "vp pack",
 		"check": "vp check",
+		"check.format": "vp fmt --check",
+		"check.lint": "vp lint",
+		"fix": "vp check --fix",
 		"fmt": "vp fmt",
-		"lint": "vp lint",
+		"format": "vp fmt",
+		"lint": "vp lint --fix",
+		"prepare": "vp config --hooks-only",
 		"test": "vp test && pnpm --dir packages/bundler test:boxes",
 		"test:compiler": "vp test packages/compiler/test/*.test.ts"
 	},
 	"devDependencies": {
-		"@arcade/witness": "link:../witness",
+		"@async/witness": "0.6",
+		"@gruhn/regex-utils": "^2.11.0",
 		"@types/node": "24.12.2",
+		"magic-regexp": "^0.11.0",
 		"rolldown": "1.0.3",
 		"typescript": "5.9.3",
 		"vite": "8.0.16",

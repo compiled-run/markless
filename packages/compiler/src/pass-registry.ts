@@ -14,6 +14,12 @@ export const defaultCompilerPasses: ReadonlyArray<CompilerPassDefinition> = [
 		produces: ['stateLowering'],
 	},
 	{
+		passId: 'template-view',
+		description: 'Lower simple TSRX templates into readable initial render artifacts.',
+		consumes: ['semanticGraph', 'stateLowering'],
+		produces: ['templateView'],
+	},
+	{
 		passId: 'payload-arena',
 		description: 'Plan state and view payload arenas from semantic and state artifacts.',
 		consumes: ['semanticGraph', 'stateLowering'],

@@ -12,6 +12,7 @@ import {
 	collectElement,
 	collectElementHandleDiagnostics,
 	collectTemplateExpression,
+	collectTemplateText,
 } from './collect-elements.ts';
 import {
 	collectAssignment,
@@ -58,7 +59,10 @@ export async function buildSemanticGraph(
 
 		graph.components.push({ name });
 		collectComponentProps(component, state);
+		const previousComponentName = state.currentComponentName;
+		state.currentComponentName = name;
 		walk(component.body as AnyNode, state);
+		state.currentComponentName = previousComponentName;
 	}
 
 	propagateAsyncComputedCapability(graph);
@@ -80,6 +84,9 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 		case 'JSXExpressionContainer':
 			collectTemplateExpression(node, state);
 			break;
+		case 'JSXText':
+			collectTemplateText(node, state);
+			return;
 		case 'VariableDeclaration':
 			collectVariableDeclaration(node, state);
 			break;

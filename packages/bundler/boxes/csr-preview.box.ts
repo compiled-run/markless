@@ -1,4 +1,4 @@
-import { box } from '@arcade/witness';
+import { box } from '@async/witness';
 import { runtimeSizeReport, type RuntimeSizeReport } from '../test-support/runtime-size.ts';
 
 // Product truth: the Vite CSR fixture's production output is not only emitted

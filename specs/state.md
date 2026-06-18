@@ -39,6 +39,13 @@ Completed slices are concentrated in:
 - payload arena and symbol resolver planning artifacts
 - template DOM update target metadata through payload/protocol and a runtime helper
   that maps those targets to structural DOM journal entries
+- a first pass-owned `template-view` artifact for simple TSRX templates,
+  including static host nodes, static attributes, text bindings, dynamic
+  attribute initial values, host locator ownership, simple state initial values,
+  and simple sync computed initial values; `.tsrx` bundler transforms now export
+  `initialHtml`, `renderToStringInput()`, and `createRoot()`, and the CSR,
+  SSR, and vite-plus bundler fixtures consume those generated render outputs
+  instead of handwritten app-root DOM/HTML shells
 - runtime graph scheduling, awaitable active flushes, invalidation,
   collection-method calls, and partial resume wiring
 - pure-value serializer support for identity/cycles and the accepted built-in
@@ -93,14 +100,15 @@ Completed slices are concentrated in:
   and proves client-created DOM can load the generated payload/resolver/symbol
   pipeline for a counter click with no console errors or failed requests; a
   package-local SSR build Witness box proves the Vite/Rolldown build emits both
-  client and `ssr` environments and that the built server entry contains the
-  counter DOM plus canonical `arcade/state` and `arcade/view` payload scripts; a
-  package-local SSR preview Witness box runs the fixture's Vite app-build path,
-  starts Vite preview, verifies the preview response contains server-produced
-  counter DOM plus canonical payload scripts, and proves the browser entry
-  resumes that DOM for a `0` to `1` counter update without box-side HTML
-  rewriting; the vite-plus fixture now has a real app entry and package-local
-  Witness preview receipt proving a vite-plus config can build the
+  client and `ssr` environments and that the built server entry contains
+  generated TSRX initial HTML plus render-time `arcade/state` and `arcade/view`
+  payload script generation; a package-local SSR preview Witness box runs the
+  fixture's Vite app-build path, starts Vite preview, verifies the preview
+  response contains server-produced counter DOM plus canonical payload scripts,
+  and proves the browser entry resumes that generated DOM for a `0 / 0` to `1`
+  counter update without box-side HTML rewriting; the vite-plus fixture now has
+  a real generated app entry and package-local Witness preview receipt proving a
+  vite-plus config can build the
   bundle graph, omit default `arcade-manifest.json`, and serve the browser page
   through Vite preview;
   `buildStart` clears accumulated transform manifests and generated virtual
@@ -108,7 +116,11 @@ Completed slices are concentrated in:
 
 The critical path to "full spec implementation" still requires:
 
-- template/view lowering and final emit that consume the current artifacts
+- broader template/view lowering and final emit beyond the current simple
+  generated static-host/text-binding artifact, including control flow,
+  projection, dynamic tags/components, scoped styles, richer expression
+  evaluation, browser DOM programs beyond `template.innerHTML`, and artifact
+  diagnostics for unsupported template shapes
 - TSRX control-flow identity metadata for keyed `@for` lists, branch-local
   `@if`/`@switch` scopes, unkeyed stateful-loop diagnostics, branch/list locator
   streams, and disposal behavior
@@ -121,18 +133,15 @@ The critical path to "full spec implementation" still requires:
 - authored template-comment and statement-container lexical-scope host metadata,
   including comment-aware locator planning so generated async anchors are not
   confused with authored comments
-- broaden the early CSR `render(App, { target })` runtime entry from the current
-  package-level fake-DOM surface into a real browser render path that executes
-  generated component/render artifacts, creates a full live container, and
-  proves browser event/DOM behavior without requiring `arcade/state`,
-  `arcade/view`, or the resumer script
+- broaden the early CSR `render(App, { target })` runtime entry beyond the
+  current generated `template.innerHTML` fixture path into a full live container
+  path that executes generated component/render artifacts without SSR payload
+  scripts or the resumer script
 - broaden the early SSR `renderToString(App, options)` runtime entry beyond the
-  current package-level payload/resumer shell so it executes generated compiler
-  render artifacts, awaits demanded async work, serializes real
-  graph/view/symbol/async snapshots into container-scoped payloads, generates
-  production-sized feature-sliced inline resumers for interactive containers,
-  and uses the current payload-script-only compiler `renderShell` artifact as
-  input rather than treating it as the whole render pipeline
+  current simple generated initial-HTML fixture path so it awaits demanded async
+  work, serializes real graph/view/symbol/async snapshots into
+  container-scoped payloads, and generates production-sized feature-sliced inline
+  resumers for interactive containers
 - browser resume that performs concrete DOM replacement/mutation behavior for
   all planned binding and async-boundary cases
 - broaden the CSR-only `packages/vitest-browser` helper from its current

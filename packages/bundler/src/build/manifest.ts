@@ -37,7 +37,7 @@ export interface ArcadeManifestChunk {
 	facadeModuleId?: string | null;
 }
 
-const STYLESHEET_ASSET_RE = /\.css$/;
+const stylesheetAssetPattern = /\.css$/;
 
 export function createManifest(
 	bundle: ArcadeManifestBundle,
@@ -70,7 +70,7 @@ export function createManifest(
 			}
 
 			manifest.assets![item.fileName] = assetInfo(item);
-			if (STYLESHEET_ASSET_RE.test(item.fileName)) {
+			if (stylesheetAssetPattern.test(item.fileName)) {
 				manifest.injections!.push(stylesheetInjection(publicPath(item.fileName)));
 			}
 			continue;

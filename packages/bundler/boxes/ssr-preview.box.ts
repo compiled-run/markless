@@ -1,4 +1,4 @@
-import { box } from '@arcade/witness';
+import { box } from '@async/witness';
 import { runtimeSizeReport, type RuntimeSizeReport } from '../test-support/runtime-size.ts';
 
 // Product truth: SSR resumability needs server-produced HTML. This box uses the
@@ -17,7 +17,7 @@ const MAX_INTERACTION_SCRIPT_COUNT = 3;
 
 export default box(
 	{
-		name: 'ssr preview: built server entry shell resumes counter click',
+		name: 'ssr preview: built server entry generated TSRX output resumes counter click',
 		tags: ['ssr', 'build', 'preview', 'browser'],
 		modes: ['build', 'preview'],
 	},
@@ -50,7 +50,7 @@ export default box(
 
 		const page = await preview.browser.visit('/');
 
-		await expect.page.text(page, COUNTER, '0', WAIT);
+		await expect.page.text(page, COUNTER, '0 / 0', WAIT);
 		const beforeInteraction = await readScriptRequests(preview);
 		receipt.note(`SSR startup script requests: ${formatRequests(beforeInteraction)}`);
 		assertNoScriptsLoaded(beforeInteraction);
@@ -72,7 +72,7 @@ export default box(
 		await expect.page.outcome(page, { consoleErrors: 0, failedRequests: 0 }, WAIT);
 
 		await preview.close();
-		await receipt.capture('ssr preview resumed server entry shell counter click');
+		await receipt.capture('ssr preview resumed generated server entry counter click');
 	},
 );
 
@@ -85,7 +85,7 @@ type Requestable = {
 };
 
 function assertHtmlHasNoExternalScripts(html: string): void {
-	if (/<script\b[^>]*\bsrc=/.test(html) || /rel="modulepreload"/.test(html)) {
+	if (/<script(?=[\s>])[^>]*\ssrc=/.test(html) || /rel="modulepreload"/.test(html)) {
 		throw new Error('Expected SSR HTML to ship only the inline resumer before interaction.');
 	}
 }

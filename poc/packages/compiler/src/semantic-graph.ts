@@ -760,7 +760,7 @@ function getIdentifierName(node: unknown): string | null {
 	return typeof node.name === 'string' ? node.name : null;
 }
 
-function getPropertyName(node: AnyNode | null | undefined, computed: boolean): string | null {
+function getPropertyName(node: AnyNode | null | undefined, _computed: boolean): string | null {
 	if (!node) return null;
 
 	if (node.type === 'Identifier') {

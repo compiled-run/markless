@@ -8,10 +8,13 @@ import {
 	devTagsManifest,
 	injectManifest,
 } from './build/manifest.ts';
-import { stripEmptyVitePreloadWrappers } from './build/preload-cleanup.ts';
 import { rewriteGeneratedSymbolFacadeImports } from './build/symbol-facade-cleanup.ts';
 import { rewriteGeneratedSymbolTableUrls } from './build/symbol-table.ts';
 import { createArcadeDevGraph } from './dev.ts';
+import {
+	bundlerTsrxSourceFileWithQueryMatcher,
+	bundlerVitePreloadHelperMatcher,
+} from './source-patterns.ts';
 import { ARCADE_VIRTUAL_PREFIX, transformTsrxModule } from './transform.ts';
 import type {
 	ArcadeEnvironment,
@@ -48,7 +51,13 @@ type InternalArcadeRolldownOptions = ArcadeRolldownOptions & {
 };
 
 const manifests = new Map<string, ArcadeManifest>();
-const TSRX_SOURCE_FILE = /\.tsrx(?:[?#].*)?$/;
+const tsrxSourceFileWithQueryMatcher = bundlerTsrxSourceFileWithQueryMatcher;
+const vitePreloadHelperMatcher = bundlerVitePreloadHelperMatcher;
+const arcadeVitePreloadIdentityHelperSource = [
+	'export const __vitePreload = (baseModule) => baseModule();',
+	'export const init_preload_helper = () => {};',
+	'',
+].join('\n');
 
 export const arcadeClient = (options: ArcadeRolldownOptions = {}) =>
 	createArcadeRolldownPlugin({ environment: 'client', options });
@@ -131,7 +140,12 @@ export function createArcadeRolldownPlugin(input: {
 			return null;
 		},
 		load(id) {
-			const module = virtualModules.get(normalizeVirtualId(id));
+			const virtualId = normalizeVirtualId(id);
+			if (vitePreloadHelperMatcher.test(virtualId)) {
+				return arcadeVitePreloadIdentityHelperSource;
+			}
+
+			const module = virtualModules.get(virtualId);
 			if (module) {
 				return module.source;
 			}
@@ -140,7 +154,7 @@ export function createArcadeRolldownPlugin(input: {
 		async transform(code, id) {
 			const currentEnvironment = getEnvironment(this);
 			const virtualId = normalizeVirtualId(id);
-			if (!TSRX_SOURCE_FILE.test(id)) {
+			if (!tsrxSourceFileWithQueryMatcher.test(id)) {
 				return null;
 			}
 			if (virtualId.startsWith(ARCADE_VIRTUAL_PREFIX)) {
@@ -202,7 +216,6 @@ export function createArcadeRolldownPlugin(input: {
 			handler(_, bundle) {
 				if (getEnvironment(this) !== 'client') return;
 
-				stripEmptyPreloadWrappersFromGeneratedChunks(bundle);
 				const removedSymbolFacades = rewriteGeneratedSymbolFacadeImports(bundle);
 				const manifestBundle = bundleWithoutRemovedChunks(bundle, removedSymbolFacades);
 				const tableRewrite = rewriteGeneratedSymbolTableUrls(manifestBundle);
@@ -257,17 +270,6 @@ function bundleWithoutRemovedChunks(
 	return next;
 }
 
-function stripEmptyPreloadWrappersFromGeneratedChunks(bundle: Record<string, unknown>) {
-	for (const output of Object.values(bundle)) {
-		if (!isChunkWithGeneratedRuntime(output)) continue;
-
-		const nextCode = stripEmptyVitePreloadWrappers(output.code);
-		if (nextCode !== output.code) {
-			output.code = nextCode;
-		}
-	}
-}
-
 function isChunkFile(output: unknown): output is {
 	readonly type: 'chunk';
 	readonly fileName: string;
@@ -278,27 +280,6 @@ function isChunkFile(output: unknown): output is {
 		readonly fileName?: unknown;
 	};
 	return chunk.type === 'chunk' && typeof chunk.fileName === 'string';
-}
-
-function isChunkWithGeneratedRuntime(output: unknown): output is {
-	readonly type: 'chunk';
-	code: string;
-	readonly moduleIds: readonly string[];
-} {
-	if (!output || typeof output !== 'object') return false;
-	const chunk = output as {
-		readonly type?: unknown;
-		readonly code?: unknown;
-		readonly moduleIds?: unknown;
-	};
-	if (chunk.type !== 'chunk' || typeof chunk.code !== 'string') return false;
-	if (!Array.isArray(chunk.moduleIds)) return false;
-
-	return chunk.moduleIds.some((id) => {
-		if (typeof id !== 'string') return false;
-		const normalized = normalizeVirtualId(id);
-		return normalized.startsWith(ARCADE_VIRTUAL_PREFIX) || TSRX_SOURCE_FILE.test(id);
-	});
 }
 
 function pluginName(environment: Environment) {

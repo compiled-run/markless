@@ -10,6 +10,7 @@
 	"dependencies": {
 		"@arcade/protocol": "workspace:*",
 		"@arcade/serializer": "workspace:*",
-		"@tsrx/core": "catalog:"
+		"@tsrx/core": "catalog:",
+		"magic-regexp": "^0.11.0"
 	}
 }

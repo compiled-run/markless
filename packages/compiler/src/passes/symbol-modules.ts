@@ -8,6 +8,17 @@ import type {
 	SymbolModulesArtifact,
 	SymbolModulesInput,
 } from '../artifacts.ts';
+import {
+	compilerCompoundAssignmentOperatorPattern,
+	compilerIdentifierPartPattern,
+	compilerIdentifierPathPattern,
+	compilerIdentifierPattern,
+	compilerIdentifierStartPattern,
+	compilerNumberLiteralPattern,
+	compilerNumericObjectKeyPattern,
+	compilerPrimitiveLiteralPattern,
+	compilerQuotedStringLiteralPattern,
+} from '../source-patterns.ts';
 
 export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtifact {
 	return {
@@ -372,8 +383,10 @@ function staticSourcePath(source: string): ReadonlyArray<string> | null {
 }
 
 function symbolExportName(symbolId: string): string {
-	const name = symbolId.replace(/[^$0-9A-Z_a-z]/g, '_');
-	if (/^[$A-Z_a-z]/.test(name)) return name;
+	const name = Array.from(symbolId, (character) =>
+		compilerIdentifierPartPattern.test(character) ? character : '_',
+	).join('');
+	if (compilerIdentifierStartPattern.test(name[0] ?? '')) return name;
 	return `_${name}`;
 }
 
@@ -1049,17 +1062,17 @@ function topLevelObjectPropertyColonIndex(source: string): number {
 function isSupportedObjectLiteralKey(source: string): boolean {
 	return (
 		isIdentifierObjectKey(source) ||
-		/^(['"])(?:\\.|(?!\1).)*\1$/.test(source) ||
-		/^(?:\d+|\d*\.\d+)$/.test(source)
+		compilerQuotedStringLiteralPattern.test(source) ||
+		compilerNumericObjectKeyPattern.test(source)
 	);
 }
 
 function isIdentifierObjectKey(source: string): boolean {
-	return /^[$A-Z_a-z][$0-9A-Z_a-z]*$/.test(source);
+	return compilerIdentifierPattern.test(source);
 }
 
 function isSupportedStaticCallCallee(source: string): boolean {
-	return /^[$A-Z_a-z][$0-9A-Z_a-z]*(?:\.[$A-Z_a-z][$0-9A-Z_a-z]*)*$/.test(source);
+	return compilerIdentifierPathPattern.test(source);
 }
 
 function canEmitStaticCallCallee(
@@ -1243,7 +1256,7 @@ function eventFieldAssignmentSource(
 		.split('.')
 		.filter(Boolean);
 	if (fields.length === 0) return null;
-	if (fields.some((field) => !/^[$A-Z_a-z][$0-9A-Z_a-z]*$/.test(field))) return null;
+	if (fields.some((field) => !compilerIdentifierPattern.test(field))) return null;
 
 	return `context.event?.${fields.join('?.')}`;
 }
@@ -1289,7 +1302,7 @@ function compoundAssignmentOperator(assignmentOperator: string): string | null {
 	if (assignmentOperator === '&&=') return '&&';
 	if (assignmentOperator === '||=') return '||';
 	if (assignmentOperator === '??=') return '??';
-	if (/^(?:[+\-*/%&|^]|<<|>>|>>>)=$/.test(assignmentOperator)) {
+	if (compilerCompoundAssignmentOperatorPattern.test(assignmentOperator)) {
 		return assignmentOperator.slice(0, -1);
 	}
 	return null;
@@ -1312,9 +1325,9 @@ function literalValueSource(valueSource: string | undefined): string | null {
 	const source = valueSource?.trim();
 	if (!source) return null;
 
-	if (/^(?:true|false|null|undefined)$/.test(source)) return source;
-	if (/^[+-]?(?:\d+|\d*\.\d+)(?:e[+-]?\d+)?$/i.test(source)) return source;
-	if (/^(['"])(?:\\.|(?!\1).)*\1$/.test(source)) return source;
+	if (compilerPrimitiveLiteralPattern.test(source)) return source;
+	if (compilerNumberLiteralPattern.test(source)) return source;
+	if (compilerQuotedStringLiteralPattern.test(source)) return source;
 
 	return null;
 }
@@ -1359,7 +1372,7 @@ function sourceReferencesIdentifier(source: string, name: string): boolean {
 }
 
 function isIdentifierChar(char: string): boolean {
-	return /[$0-9A-Z_a-z]/.test(char);
+	return compilerIdentifierPartPattern.test(char);
 }
 
 function emitModuleImport(moduleImport: SemanticModuleImport): string {

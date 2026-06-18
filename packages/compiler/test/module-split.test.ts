@@ -8,11 +8,13 @@ import { createProtocolStatePayloadFromArena } from '../src/passes/protocol-stat
 import { createProtocolViewPayload } from '../src/passes/protocol-view.ts';
 import { buildSemanticGraph } from '../src/passes/semantic-graph/index.ts';
 import { emitSymbolModules } from '../src/passes/symbol-modules.ts';
+import { planTemplateView } from '../src/passes/template-view.ts';
 
 test('compiler split modules expose their owning boundaries', () => {
 	expect(defaultCompilerPasses.map((pass) => pass.passId)).toEqual([
 		'tsrx-semantic-graph',
 		'state-lowering',
+		'template-view',
 		'payload-arena',
 		'symbol-resolver',
 		'capture-analysis',
@@ -26,6 +28,7 @@ test('compiler split modules expose their owning boundaries', () => {
 	expect(typeof compileTsrxModule).toBe('function');
 	expect(typeof analyzeCaptures).toBe('function');
 	expect(typeof buildSemanticGraph).toBe('function');
+	expect(typeof planTemplateView).toBe('function');
 	expect(typeof createProtocolStatePayloadFromArena).toBe('function');
 	expect(typeof createProtocolViewPayload).toBe('function');
 	expect(typeof renderPayloadScriptArtifact).toBe('function');

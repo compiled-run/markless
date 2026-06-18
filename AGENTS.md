@@ -13,7 +13,9 @@ is the Codex-facing always-on guidance for building the TSRX resumable framework
   current implementation contract.
 - Project-local task skills live under `.codex/skills/`. Use
   `$arcade-implementation` for implementation work and
-  `$arcade-spec-maintenance` for spec edits when available.
+  `$arcade-spec-maintenance` for spec edits when available. Use
+  `$regex-authoring` whenever adding, editing, refactoring, reviewing, or
+  testing regular expressions.
 
 ## Maintainer Kanban Board
 
@@ -76,6 +78,40 @@ is the Codex-facing always-on guidance for building the TSRX resumable framework
 - Avoid introducing new terms such as "intrinsic", "authored primitive", or
   similar compiler jargon in source names unless the spec section and diagnostic
   already use that exact term for users.
+
+## Control Flow Readability
+
+- Avoid deep nesting when adding or changing code. If a branch is a guard or
+  exceptional case, prefer an early return. If code chooses between several
+  cases from the same decision value or related condition set, prefer a
+  `switch`, lookup table, pattern-matching helper, or small named helper over
+  inline nested `if` blocks.
+- Treat nesting as more than brace count. A single `if` can still be too deep
+  when it returns a large object that contains nested functions, casts, or more
+  control flow. In that case, extract the returned shape or branch body into a
+  named helper so the caller reads as intent-first code.
+
+## Source Parsing And Generated Code Cleanup
+
+- Before adding or keeping a workaround that starts feeling like local
+  infrastructure, stop and use grep MCP (`mcp__grep.searchGitHub`) to look for
+  established fixes in real repositories. This is mandatory well before a
+  workaround reaches 200-300 LOC; treat roughly 80+ lines, generated/source text
+  parsing, upstream tool wrapping, or duplicated framework/bundler logic as the
+  checkpoint. Search for literal code markers from the problem, not broad
+  keywords, and prefer well-regarded upstream or adjacent projects. Record the
+  useful examples and chosen pattern in the GoalBuddy receipt or final notes
+  before implementing.
+- Do not fix generated JavaScript, TSRX, HTML, or manifest-like source by adding
+  a post-build regex/string scanner. Prefer the compiler artifact, build config,
+  Rolldown/Vite hook, or a real parser/AST for the language being inspected.
+- Before keeping or adding a fallback cleanup for generated code, prove the
+  current Vite/Rolldown fixture still emits the unwanted construct. If the
+  fixture no longer emits it, delete the fallback and keep the fixture/build
+  assertion as the guard.
+- Stop and ask before adding a local scanner that tracks nested delimiters,
+  quotes, escapes, or JavaScript/TSRX syntax. That is parser work, not a regex
+  migration, and it needs an explicit board receipt and tests.
 
 ## Pnpm / Vite-Plus Monorepo Shape
 

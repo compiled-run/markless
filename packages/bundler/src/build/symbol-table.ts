@@ -1,3 +1,13 @@
+import {
+	charIn,
+	charNotIn,
+	createRegExp,
+	digit,
+	exactly,
+	global as globalFlag,
+	oneOrMore,
+	whitespace,
+} from 'magic-regexp';
 import { dirname, relative } from 'pathe';
 import { ARCADE_VIRTUAL_PREFIX } from '../transform.ts';
 
@@ -15,11 +25,49 @@ export type SymbolTableUrlRewriteResult = {
 };
 
 const SYMBOL_VIRTUAL_PREFIX = `${ARCADE_VIRTUAL_PREFIX}symbol:`;
-const SYMBOL_VIRTUAL_STRING_RE = /(["'`])((?:virtual:arcade:symbol:)[^"'`]+)\1/g;
-const SYMBOL_MANIFEST_TUPLE_RE =
-	/(\[1,(?:null|["'`][^"'`]*["'`]),(?:null|["'`][^"'`]*["'`]),)(\[[^\]]*\]),(\[[^\]]*\]),(\{[^}]*\})(\])/g;
-const STRING_LITERAL_RE = /(["'`])([^"'`]*)\1/g;
-const SYMBOL_ROW_RE = /((?:["'`][^"'`]*["'`])\s*:\s*\[)(\d+)(,\s*\d+\])/g;
+const jsQuote = charIn('"\'`');
+const looseJsStringContent = charNotIn('"\'`').times.any();
+const looseJsString = jsQuote.and(looseJsStringContent, jsQuote);
+const looseJsArray = exactly('[', charNotIn(']').times.any(), ']');
+const looseJsObject = exactly('{', charNotIn('}').times.any(), '}');
+const nullableLooseJsString = exactly('null').or(looseJsString);
+
+const symbolVirtualStringMatcher = createRegExp(
+	jsQuote
+		.groupedAs('quote')
+		.and(
+			exactly(SYMBOL_VIRTUAL_PREFIX)
+				.and(oneOrMore(charNotIn('"\'`')))
+				.groupedAs('virtualId'),
+		)
+		.and.referenceTo('quote'),
+	[globalFlag],
+);
+const symbolManifestTupleMatcher = createRegExp(
+	exactly('[1,', nullableLooseJsString, ',', nullableLooseJsString, ',').groupedAs('prefix'),
+	looseJsArray.groupedAs('moduleUrlsSource'),
+	',',
+	looseJsArray.groupedAs('exportNamesSource'),
+	',',
+	looseJsObject.groupedAs('symbolRowsSource'),
+	exactly(']').groupedAs('suffix'),
+	[globalFlag],
+);
+const stringLiteralMatcher = createRegExp(
+	jsQuote
+		.groupedAs('quote')
+		.and(looseJsStringContent.groupedAs('value'))
+		.and.referenceTo('quote'),
+	[globalFlag],
+);
+const symbolRowMatcher = createRegExp(
+	looseJsString
+		.and(whitespace.times.any(), ':', whitespace.times.any(), '[')
+		.groupedAs('rowPrefix'),
+	oneOrMore(digit).groupedAs('moduleIndexSource'),
+	exactly(',', whitespace.times.any(), oneOrMore(digit), ']').groupedAs('rowSuffix'),
+	[globalFlag],
+);
 
 export function rewriteGeneratedSymbolTableUrls(
 	bundle: Record<string, unknown>,
@@ -80,7 +128,7 @@ function rewriteSymbolVirtualStrings(
 	const unresolved = new Set<string>();
 	const code = compactSymbolManifestTables(
 		chunk.code.replace(
-			SYMBOL_VIRTUAL_STRING_RE,
+			symbolVirtualStringMatcher,
 			(match, _quote: string, virtualId: string) => {
 				const fileName = symbolFiles.get(virtualId);
 				if (!fileName) {
@@ -99,7 +147,7 @@ function rewriteSymbolVirtualStrings(
 
 function compactSymbolManifestTables(code: string): string {
 	return code.replace(
-		SYMBOL_MANIFEST_TUPLE_RE,
+		symbolManifestTupleMatcher,
 		(
 			match,
 			prefix: string,
@@ -126,7 +174,7 @@ function compactSymbolManifestTables(code: string): string {
 			if (nextModuleUrls.length === moduleUrls.length) return match;
 
 			const nextSymbolRows = symbolRowsSource.replace(
-				SYMBOL_ROW_RE,
+				symbolRowMatcher,
 				(rowMatch, rowPrefix: string, moduleIndexSource: string, rowSuffix: string) => {
 					const moduleIndex = Number(moduleIndexSource);
 					const nextModuleIndex = moduleIndexMap.get(moduleIndex);
@@ -143,7 +191,7 @@ function compactSymbolManifestTables(code: string): string {
 function parseStringArray(source: string): string[] | undefined {
 	const values: string[] = [];
 	let end = 1;
-	for (const match of source.matchAll(STRING_LITERAL_RE)) {
+	for (const match of source.matchAll(stringLiteralMatcher)) {
 		values.push(match[2]!);
 		end = (match.index ?? 0) + match[0].length;
 	}

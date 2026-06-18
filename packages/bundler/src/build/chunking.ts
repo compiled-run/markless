@@ -1,4 +1,8 @@
 import type { CodeSplittingOptions, OutputOptions } from 'rolldown';
+import {
+	bundlerRuntimePackageChunkMatcher,
+	bundlerSymbolVirtualModuleMatcher,
+} from '../source-patterns.ts';
 import type { ArcadeEnvironment } from '../types.ts';
 
 export const ARCADE_BUILD_DIR = 'build';
@@ -8,11 +12,11 @@ export const ARCADE_BUNDLE_GRAPH = `${ARCADE_BUILD_PREFIX}bundle-graph.json`;
 const ARCADE_RUNTIME_GROUPS = [
 	{
 		name: 'arcade-runtime',
-		test: /[/\\]@arcadejs[/\\]runtime[/\\]/,
+		test: bundlerRuntimePackageChunkMatcher,
 	},
 	{
 		name: 'arcade-symbols',
-		test: /virtual:arcade:symbol:/,
+		test: bundlerSymbolVirtualModuleMatcher,
 	},
 ] satisfies NonNullable<CodeSplittingOptions['groups']>;
 

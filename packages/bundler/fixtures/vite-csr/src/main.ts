@@ -1,5 +1,5 @@
 import { render } from 'arcade/runtime/render';
-import { loadSymbol, payloadState, payloadView } from './root.tsrx';
+import { createRoot, loadSymbol, payloadState, payloadView } from './root.tsrx';
 
 const app = document.querySelector('#app');
 if (!app) {
@@ -10,16 +10,10 @@ const status = document.createElement('p');
 status.id = 'hmr-status';
 status.textContent = 'ready';
 
-const counter = document.createElement('button');
-
-counter.type = 'button';
-counter.dataset.counter = '';
-counter.textContent = '0';
-
 await render(
 	() => {
 		return {
-			root: counter,
+			root: createRoot(),
 			state: payloadState,
 			view: payloadView,
 			loadSymbol,

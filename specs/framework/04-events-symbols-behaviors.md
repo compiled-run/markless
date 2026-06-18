@@ -250,18 +250,18 @@ The resolver is a page/build-scoped module or equivalent compact runtime table
 that maps symbol IDs from `arcade/view` to chunks and exports:
 
 ```ts
-const symbolManifest = [
+const resolverTable = [
 	1,
-	"build-ab12",
+	'build-ab12',
 	null,
-	["/build/chunk-ab12.js"],
-	["onKeyDown_7", "textBinding_8"],
+	['/build/chunk-ab12.js'],
+	['onKeyDown_7', 'textBinding_8'],
 	{ 7: [0, 0], 8: [0, 1] },
 ];
 
-const moduleUrls = symbolManifest[3];
-const exportNames = symbolManifest[4];
-const symbolRows = symbolManifest[5];
+const moduleUrls = resolverTable[3];
+const exportNames = resolverTable[4];
+const symbolRows = resolverTable[5];
 
 export function loadSymbol(id: number) {
 	const row = symbolRows[id];
@@ -269,9 +269,7 @@ export function loadSymbol(id: number) {
 		throw createUnknownSymbolError(id);
 	}
 
-	return import(/* @vite-ignore */ moduleUrls[row[0]]).then(
-		(mod) => mod[exportNames[row[1]]],
-	);
+	return import(/* @vite-ignore */ moduleUrls[row[0]]).then((mod) => mod[exportNames[row[1]]]);
 }
 ```
 

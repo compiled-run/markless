@@ -133,7 +133,7 @@ async function exists(path: string): Promise<boolean> {
 async function readModuleScripts(fileName: string): Promise<string[]> {
 	const html = await readFile(fileName, 'utf8');
 	return [
-		...html.matchAll(/<script\b[^>]*\btype=["']module["'][^>]*\bsrc=["']([^"']+)["']/g),
+		...html.matchAll(/<script(?=[\s>])[^>]*\stype=["']module["'][^>]*\ssrc=["']([^"']+)["']/g),
 	].map((match) => match[1]!);
 }
 
