@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import type { SemanticGraphArtifact } from '../src/artifacts.ts';
 import { buildSemanticGraph, lowerStateAccess, planTemplateView } from '../src/index.ts';
 
 const source = `
@@ -14,6 +15,52 @@ export function App() @{
 		</button>
 		<span>hello</span>
 	</>
+}
+`;
+
+const sharedSource = `
+import { shared, state } from '@arcade/core';
+
+export const shell = shared(() => {
+	const data = state({ activeCartId: 'server-cart', status: 'server-ready' });
+
+	return {
+		...data,
+	};
+}, { scope: 'page' });
+
+export function App() @{
+	const pageShell = shell();
+
+	<section>
+		<button onClick={() => pageShell.status = 'client-ready'}>{pageShell.status}</button>
+		<aside>{pageShell.activeCartId} / {pageShell.status}</aside>
+	</section>
+}
+`;
+
+const sharedDefinitionSource = `
+import { shared, state } from '@arcade/core';
+
+export const shell = shared(() => {
+	const data = state({ activeCartId: 'server-cart', status: 'server-ready' });
+
+	return {
+		...data,
+	};
+}, { scope: 'page' });
+`;
+
+const importedSharedSource = `
+import { shell } from './shared-shell.tsrx';
+
+export function App() @{
+	const pageShell = shell();
+
+	<section>
+		<button onClick={() => pageShell.status = 'client-ready'}>{pageShell.status}</button>
+		<aside>{pageShell.activeCartId} / {pageShell.status}</aside>
+	</section>
 }
 `;
 
@@ -106,3 +153,91 @@ test('planTemplateView creates readable initial render records for a simple temp
 	]);
 	expect(templateView.diagnostics).toEqual([]);
 });
+
+test('planTemplateView renders initial shared instance return-property values', async () => {
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/root.tsrx',
+		source: sharedSource,
+	});
+	const stateLowering = lowerStateAccess({ semanticGraph });
+
+	const templateView = planTemplateView({ semanticGraph, stateLowering });
+
+	expect(templateView.components).toEqual([
+		{
+			name: 'App',
+			rootNodeIds: ['template:0'],
+			initialHtml:
+				'<section><button>server-ready</button><aside>server-cart / server-ready</aside></section>',
+		},
+	]);
+	expect(templateView.nodes).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				kind: 'binding',
+				source: 'pageShell.activeCartId',
+				graphNodeId: 'shared:src/root.tsrx#shell/state:data',
+				path: ['activeCartId'],
+				initialValue: 'server-cart',
+			}),
+			expect.objectContaining({
+				kind: 'binding',
+				source: 'pageShell.status',
+				graphNodeId: 'shared:src/root.tsrx#shell/state:data',
+				path: ['status'],
+				initialValue: 'server-ready',
+			}),
+		]),
+	);
+});
+
+test('planTemplateView renders imported shared instance return-property values', async () => {
+	const sharedDefinitionGraph = await buildSemanticGraph({
+		filename: 'src/shared-shell.tsrx',
+		source: sharedDefinitionSource,
+	});
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/root.tsrx',
+		source: importedSharedSource,
+		importedSharedDefinitions: importedSharedDefinitionsFrom(sharedDefinitionGraph),
+	});
+	const stateLowering = lowerStateAccess({ semanticGraph });
+
+	const templateView = planTemplateView({ semanticGraph, stateLowering });
+
+	expect(templateView.components).toEqual([
+		{
+			name: 'App',
+			rootNodeIds: ['template:0'],
+			initialHtml:
+				'<section><button>server-ready</button><aside>server-cart / server-ready</aside></section>',
+		},
+	]);
+	expect(templateView.nodes).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				kind: 'binding',
+				source: 'pageShell.activeCartId',
+				graphNodeId: 'shared:src/shared-shell.tsrx#shell/state:data',
+				path: ['activeCartId'],
+				initialValue: 'server-cart',
+			}),
+			expect.objectContaining({
+				kind: 'binding',
+				source: 'pageShell.status',
+				graphNodeId: 'shared:src/shared-shell.tsrx#shell/state:data',
+				path: ['status'],
+				initialValue: 'server-ready',
+			}),
+		]),
+	);
+});
+
+function importedSharedDefinitionsFrom(graph: SemanticGraphArtifact) {
+	return graph.sharedDefinitions.map((definition) => ({
+		definition,
+		graphBindings: graph.graphBindings.filter(
+			(binding) => binding.sharedDefinitionId === definition.id,
+		),
+	}));
+}

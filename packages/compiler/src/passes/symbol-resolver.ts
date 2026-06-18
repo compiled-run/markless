@@ -69,6 +69,8 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 	});
 
 	for (const computed of input.payloadArena.state.computed) {
+		if (computed.async !== true) continue;
+
 		const source = computed.functionSource ?? '';
 		const moduleImports = referencedModuleImports(input.semanticGraph.moduleImports, source);
 

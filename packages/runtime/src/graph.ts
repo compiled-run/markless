@@ -338,6 +338,62 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		definition: RuntimeSharedDefinition,
 	): RuntimeSharedDefinition => setSharedDefinitionVersion(definition, definition.version + 1);
 
+	const sharedPatchForGraphWrite = (
+		graphNodeId: string,
+		graphPath: ReadonlyArray<string>,
+		value: unknown,
+	): RuntimeGraphSharedPatch | null => {
+		const target = resolveSharedGraphWrite(graphNodeId, graphPath);
+		if (!target) return null;
+
+		const nextDefinition = nextSharedDefinitionVersion(target.definition);
+		return {
+			id: nextDefinition.id,
+			...(nextDefinition.scope ? { scope: nextDefinition.scope } : {}),
+			version: nextDefinition.version,
+			patch: [['set', target.exposedPath, value]],
+		};
+	};
+
+	const resolveSharedGraphWrite = (
+		graphNodeId: string,
+		graphPath: ReadonlyArray<string>,
+	): {
+		readonly definition: RuntimeSharedDefinition;
+		readonly exposedPath: ReadonlyArray<string>;
+	} | null => {
+		let bestMatch: {
+			readonly definition: RuntimeSharedDefinition;
+			readonly property: RuntimeSharedReturnProperty & { readonly kind: 'graph' };
+		} | null = null;
+
+		for (const definition of sharedDefinitions.values()) {
+			if (!definition.graphNodeIds.includes(graphNodeId)) continue;
+
+			for (const property of definition.returnProperties ?? []) {
+				if (property.kind !== 'graph') continue;
+				if (property.graphNodeId !== graphNodeId) continue;
+				if (!isPrefix(property.path, graphPath)) continue;
+				if (bestMatch && bestMatch.property.path.length >= property.path.length) continue;
+
+				bestMatch = {
+					definition,
+					property,
+				};
+			}
+		}
+
+		if (!bestMatch) return null;
+
+		return {
+			definition: bestMatch.definition,
+			exposedPath: [
+				bestMatch.property.name,
+				...graphPath.slice(bestMatch.property.path.length),
+			],
+		};
+	};
+
 	const applySharedPatch = (patch: RuntimeGraphSharedPatch): boolean => {
 		const definition = sharedDefinitions.get(patch.id);
 		if (!definition) return false;
@@ -590,6 +646,8 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			const path = write.path ?? [];
 			const current = cells.get(write.graphNodeId);
 			cells.set(write.graphNodeId, writePath(current, path, write.value));
+			const sharedPatch = sharedPatchForGraphWrite(write.graphNodeId, path, write.value);
+			if (sharedPatch) sharedPatches.push(sharedPatch);
 			markDirtyPath(write.graphNodeId, dirtyPathForGraphWrite(current, path));
 			scheduleFlush();
 		},
@@ -599,6 +657,8 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			const nextValue = update.update(currentValue);
 			const current = cells.get(update.graphNodeId);
 			cells.set(update.graphNodeId, writePath(current, path, nextValue));
+			const sharedPatch = sharedPatchForGraphWrite(update.graphNodeId, path, nextValue);
+			if (sharedPatch) sharedPatches.push(sharedPatch);
 			markDirtyPath(update.graphNodeId, dirtyPathForGraphWrite(current, path));
 			scheduleFlush();
 			if (update.returnValue === 'previous') return currentValue;

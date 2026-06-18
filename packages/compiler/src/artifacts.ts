@@ -1,13 +1,12 @@
-import type { ProtocolStatePayload, ProtocolViewPayload } from '@arcade/protocol';
+import type {
+	ProtocolComputedExpression,
+	ProtocolStatePayload,
+	ProtocolViewPayload,
+} from '@arcade/protocol';
 import type { RenderedPayloadScripts } from '@arcade/serializer';
 import type { CompilerDiagnostic, SourceSpan } from './diagnostics.ts';
 
 export type { CompilerDiagnostic, DiagnosticSuggestion, SourceSpan } from './diagnostics.ts';
-
-export type SemanticGraphInput = {
-	readonly filename: string;
-	readonly source: string;
-};
 
 export type SemanticComponent = {
 	readonly name: string;
@@ -69,6 +68,17 @@ export type SemanticSharedDefinition = {
 	readonly dependencies?: ReadonlyArray<SemanticSharedDependency>;
 	readonly returnProperties?: ReadonlyArray<SemanticSharedReturnProperty>;
 	readonly sourceSpan?: SourceSpan;
+};
+
+export type ImportedSharedDefinition = {
+	readonly definition: SemanticSharedDefinition;
+	readonly graphBindings: ReadonlyArray<SemanticGraphBinding>;
+};
+
+export type SemanticGraphInput = {
+	readonly filename: string;
+	readonly source: string;
+	readonly importedSharedDefinitions?: ReadonlyArray<ImportedSharedDefinition>;
 };
 
 export type SemanticSharedInstance = {
@@ -459,6 +469,7 @@ export type PayloadArenaArtifact = {
 			readonly async: boolean;
 			readonly functionSource?: string;
 			readonly dependencies?: ReadonlyArray<SemanticGraphDependency>;
+			readonly expression?: ProtocolComputedExpression;
 		}>;
 		readonly sharedDefinitions: ReadonlyArray<{
 			readonly id: string;
@@ -483,7 +494,7 @@ export type PayloadArenaArtifact = {
 			readonly source: string;
 			readonly graphNodeId: string;
 			readonly path: ReadonlyArray<string>;
-			readonly target: SemanticTemplateBindingTarget;
+			readonly target: NonNullable<ProtocolViewPayload['domUpdates'][number]['target']>;
 		}>;
 		readonly behaviors: ReadonlyArray<PayloadBehavior>;
 		readonly elementHandles: ReadonlyArray<{

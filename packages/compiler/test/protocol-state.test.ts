@@ -30,6 +30,46 @@ export function Header() @{
 }
 `;
 
+const syncComputedSource = `
+import { state, computed } from '@arcade/core';
+
+export function App() @{
+	let count = state(0);
+	const double = computed(() => count * 2);
+
+	<button>{double}</button>
+}
+`;
+
+test('createProtocolStatePayloadFromArena serializes sync computed expressions', async () => {
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/App.tsrx',
+		source: syncComputedSource,
+	});
+	const stateLowering = lowerStateAccess({ semanticGraph });
+	const payloadArena = planPayloadArena({ semanticGraph, stateLowering });
+
+	const state = createProtocolStatePayloadFromArena({
+		semanticGraph,
+		payloadArena,
+	});
+
+	expect(state.computed).toEqual([
+		{
+			graphNodeId: 'computed:double',
+			name: 'double',
+			async: false,
+			dependencies: [{ graphNodeId: 'state:count', path: [] }],
+			expression: {
+				kind: 'binary',
+				operator: '*',
+				left: { kind: 'read', graphNodeId: 'state:count', path: [] },
+				right: { kind: 'literal', value: 2 },
+			},
+		},
+	]);
+});
+
 test('createProtocolStatePayloadFromArena serializes shared definition metadata', async () => {
 	const semanticGraph = await buildSemanticGraph({
 		filename: 'src/session.tsrx',

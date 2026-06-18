@@ -1,3 +1,5 @@
+import type { ImportedSharedDefinition } from '@arcade/compiler';
+
 export type ArcadeEnvironment = 'client' | 'server' | 'lib';
 
 export interface ArcadeDevServer {
@@ -30,6 +32,7 @@ export interface TransformTsrxModuleInput {
 	source: string;
 	buildId?: string;
 	symbolRuntimeUrl?: (virtualModuleId: string) => string;
+	importedSharedDefinitions?: ReadonlyArray<ImportedSharedDefinition>;
 }
 
 export interface TransformTsrxModuleResult {

@@ -134,6 +134,63 @@ test('emitSymbolModules emits concrete DOM journal entries for each binding targ
 	}
 });
 
+test('emitSymbolModules re-renders multi-binding host text from graph reads', () => {
+	const artifact = emitSymbolModules({
+		symbolResolver: {
+			passId: 'symbol-resolver',
+			dynamicImportOwner: 'generated-symbol-resolver',
+			symbols: [
+				{
+					id: 'symbol:counterText',
+					kind: 'dom-update',
+					hostNodeId: 'h1',
+					source: 'double',
+					graphNodeId: 'computed:double',
+					target: {
+						kind: 'text',
+						segments: [
+							{
+								kind: 'read',
+								source: 'count',
+								graphNodeId: 'state:count',
+								path: [],
+							},
+							{ kind: 'static', value: ' / ' },
+							{
+								kind: 'read',
+								source: 'double',
+								graphNodeId: 'computed:double',
+								path: [],
+								expression: {
+									kind: 'binary',
+									operator: '*',
+									left: {
+										kind: 'read',
+										graphNodeId: 'state:count',
+										path: [],
+									},
+									right: { kind: 'literal', value: 2 },
+								},
+							},
+						],
+					},
+				},
+			],
+			syncPolicies: [],
+			diagnostics: [],
+		},
+		captureAnalysis: {
+			passId: 'capture-analysis',
+			extractedSymbols: [],
+			diagnostics: [],
+		},
+	});
+
+	expect(artifact.modules[0].source).toContain(
+		'value: [String((context.graph.read("state:count", [])) ?? ""), " / ", String(((context.graph.read("state:count", []) * 2)) ?? "")].join("")',
+	);
+});
+
 test('emitSymbolModules emits imported behavior modules with deferred input values', () => {
 	const artifact = emitSymbolModules({
 		symbolResolver: {

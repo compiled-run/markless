@@ -17,6 +17,35 @@ export function resolveGraphPath(
 	return resolveGraphSegments(segments, bindings, aliases, new Set());
 }
 
+export function resolveSharedInstanceGraphPath(
+	source: string,
+	graph: Pick<SemanticGraphArtifact, 'graphBindings' | 'sharedDefinitions' | 'sharedInstances'>,
+): { readonly binding: SemanticGraphBinding; readonly path: ReadonlyArray<string> } | null {
+	const segments = splitStaticGraphPath(source);
+	if (segments.length < 2) return null;
+
+	const [localName, propertyName, ...propertyPath] = segments;
+	const instance = findLast(graph.sharedInstances, (item) => item.localName === localName);
+	if (!instance) return null;
+
+	const definition = graph.sharedDefinitions.find((item) => item.id === instance.definitionId);
+	if (!definition) return null;
+
+	const property = findLast(
+		definition.returnProperties ?? [],
+		(item) => item.name === propertyName,
+	);
+	if (property?.kind !== 'graph') return null;
+
+	const binding = graph.graphBindings.find((item) => item.id === property.graphNodeId);
+	if (!binding) return null;
+
+	return {
+		binding,
+		path: [...property.path, ...propertyPath],
+	};
+}
+
 export function graphBindingMap(
 	graph: Pick<SemanticGraphArtifact, 'graphBindings'>,
 	sharedDefinitionId?: string | null,
@@ -106,6 +135,15 @@ function resolveGraphSegments(
 		binding,
 		path: segments.slice(1),
 	};
+}
+
+function findLast<T>(values: ReadonlyArray<T>, predicate: (value: T) => boolean): T | undefined {
+	for (let index = values.length - 1; index >= 0; index--) {
+		const value = values[index];
+		if (value !== undefined && predicate(value)) return value;
+	}
+
+	return undefined;
 }
 
 function aliasExcludesPath(alias: SemanticGraphAlias, path: ReadonlyArray<string>): boolean {

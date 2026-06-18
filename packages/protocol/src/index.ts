@@ -39,6 +39,36 @@ export type ProtocolSyncPolicy =
 			readonly branches: ReadonlyArray<ProtocolSyncPolicyBranch>;
 	  };
 
+export type ProtocolComputedExpression =
+	| {
+			readonly kind: 'read';
+			readonly graphNodeId: string;
+			readonly path: ReadonlyArray<string>;
+	  }
+	| {
+			readonly kind: 'literal';
+			readonly value: unknown;
+	  }
+	| {
+			readonly kind: 'binary';
+			readonly operator: '+' | '-' | '*' | '/';
+			readonly left: ProtocolComputedExpression;
+			readonly right: ProtocolComputedExpression;
+	  };
+
+export type ProtocolTextSegment =
+	| {
+			readonly kind: 'static';
+			readonly value: string;
+	  }
+	| {
+			readonly kind: 'read';
+			readonly source: string;
+			readonly graphNodeId: string;
+			readonly path: ReadonlyArray<string>;
+			readonly expression?: ProtocolComputedExpression;
+	  };
+
 export type ProtocolStatePayload = {
 	readonly version: typeof ASYNC_PROTOCOL_VERSION;
 	readonly cells: ReadonlyArray<{
@@ -55,6 +85,7 @@ export type ProtocolStatePayload = {
 			readonly graphNodeId: string;
 			readonly path: ReadonlyArray<string>;
 		}>;
+		readonly expression?: ProtocolComputedExpression;
 		readonly snapshot?:
 			| {
 					readonly status: 'idle';
@@ -126,6 +157,7 @@ export type ProtocolViewPayload = {
 		readonly target?:
 			| {
 					readonly kind: 'text';
+					readonly segments?: ReadonlyArray<ProtocolTextSegment>;
 			  }
 			| {
 					readonly kind: 'attribute';

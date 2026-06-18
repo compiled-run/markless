@@ -1,5 +1,7 @@
 export {
+	createEventResumeContainerFromPayloadDocument,
 	resumeEventFromPayloadDocument,
+	type CreateEventResumeContainerFromPayloadDocumentInput,
 	type EventResumeContainer,
 	type EventResumeDomElement,
 	type EventResumeDomEvent,

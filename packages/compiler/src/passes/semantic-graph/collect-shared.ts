@@ -75,7 +75,10 @@ function resolveSharedDefinitionCall(
 	if (!importedDefinition?.importedName) return undefined;
 
 	return {
-		id: sharedDefinitionId(importedDefinition.source, importedDefinition.importedName),
+		id: sharedDefinitionId(
+			resolveTsrxModuleImportSource(state.filename, importedDefinition.source),
+			importedDefinition.importedName,
+		),
 		name: importedDefinition.importedName,
 	};
 }
@@ -157,6 +160,24 @@ export function sharedDefinitionId(filename: string, exportedName: string): stri
 
 function isTsrxModuleImport(source: string): boolean {
 	return source.endsWith('.tsrx');
+}
+
+function resolveTsrxModuleImportSource(filename: string, source: string): string {
+	if (!source.startsWith('.')) return source;
+
+	const segments = filename.split('/');
+	segments.pop();
+
+	for (const segment of source.split('/')) {
+		if (segment === '.' || segment === '') continue;
+		if (segment === '..') {
+			segments.pop();
+			continue;
+		}
+		segments.push(segment);
+	}
+
+	return segments.join('/');
 }
 
 function collectFactoryDependencies(input: {

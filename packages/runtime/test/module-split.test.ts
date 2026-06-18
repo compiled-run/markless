@@ -5,7 +5,10 @@ import {
 	createEventOnlyResumeContainerFromPayloads,
 	resumeEventOnlyFromPayloadDocument,
 } from '../src/event-only-resume.ts';
-import { resumeEventFromPayloadDocument } from '../src/event-resume.ts';
+import {
+	createEventResumeContainerFromPayloadDocument,
+	resumeEventFromPayloadDocument,
+} from '../src/event-resume.ts';
 import { createRuntimeGraph } from '../src/graph.ts';
 import { decodePayloadScripts } from '../src/payload.ts';
 import { render } from '../src/render.ts';
@@ -17,6 +20,7 @@ test('runtime split modules expose graph, payload, event resume, render, DOM upd
 	expect(typeof createDomUpdateEntry).toBe('function');
 	expect(typeof createEventOnlyResumeContainerFromPayloads).toBe('function');
 	expect(typeof resumeEventOnlyFromPayloadDocument).toBe('function');
+	expect(typeof createEventResumeContainerFromPayloadDocument).toBe('function');
 	expect(typeof resumeEventFromPayloadDocument).toBe('function');
 	expect(typeof createRuntimeGraph).toBe('function');
 	expect(typeof decodePayloadScripts).toBe('function');

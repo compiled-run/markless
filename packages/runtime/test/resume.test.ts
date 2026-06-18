@@ -7,6 +7,7 @@ type FakeElement = {
 	readonly tagName: string;
 	readonly childNodes: FakeNode[];
 	parentElement?: FakeElement | null;
+	ownerDocument?: FakeDocument;
 	readonly dispatchedEvents: FakeDispatchedEvent[];
 	readonly listeners: Array<{
 		readonly type: string;
@@ -19,6 +20,19 @@ type FakeElement = {
 		options?: { readonly capture?: boolean },
 	): void;
 	dispatchEvent(event: FakeDispatchedEvent): boolean;
+};
+
+type FakeDocument = {
+	readonly listeners: Array<{
+		readonly type: string;
+		readonly listener: (event: FakeEvent | FakeDispatchedEvent) => Promise<void>;
+		readonly options?: { readonly capture?: boolean };
+	}>;
+	addEventListener(
+		type: string,
+		listener: (event: FakeEvent | FakeDispatchedEvent) => Promise<void>,
+		options?: { readonly capture?: boolean },
+	): void;
 };
 
 type FakeComment = {
@@ -65,6 +79,15 @@ function element(tagName: string, childNodes: FakeNode[] = []): FakeElement {
 		if (child.nodeType === 1) child.parentElement = node;
 	}
 	return node;
+}
+
+function documentTarget(): FakeDocument {
+	return {
+		listeners: [],
+		addEventListener(type, listener, options) {
+			this.listeners.push({ type, listener, options });
+		},
+	};
 }
 
 function comment(data: string): FakeComment {
@@ -335,6 +358,79 @@ test('resume runtime folds received shared patch events into graph state', async
 	);
 	expect(graph.takeSharedPatches()).toEqual([]);
 	expect(root.dispatchedEvents).toEqual([]);
+});
+
+test('resume runtime listens for shared patch events on the owner document', async () => {
+	const documentRef = documentTarget();
+	const root = element('SECTION');
+	root.ownerDocument = documentRef;
+	const graph = createRuntimeGraph({
+		cells: [
+			{
+				graphNodeId: 'shared:src/session.tsrx#session/state:data',
+				value: {
+					status: 'anonymous',
+				},
+			},
+		],
+		sharedDefinitions: [
+			{
+				id: 'shared:src/session.tsrx#session',
+				name: 'session',
+				exportedName: 'session',
+				scope: 'page',
+				version: 0,
+				graphNodeIds: ['shared:src/session.tsrx#session/state:data'],
+				returnProperties: [
+					{
+						kind: 'graph',
+						name: 'status',
+						graphNodeId: 'shared:src/session.tsrx#session/state:data',
+						path: ['status'],
+					},
+				],
+			},
+		],
+	});
+	const resume = createResumeRuntime({
+		root,
+		graph,
+		view: {
+			locators: [],
+			events: [],
+			domUpdates: [],
+			behaviors: [],
+			elementHandles: [],
+			asyncBoundaries: [],
+		},
+		loadSymbol() {
+			return () => undefined;
+		},
+	});
+
+	await resume.start();
+
+	expect(
+		root.listeners.find((listener) => listener.type === 'async:shared-patch'),
+	).toBeUndefined();
+	const patchListener = documentRef.listeners.find(
+		(listener) => listener.type === 'async:shared-patch',
+	);
+	expect(patchListener).toBeDefined();
+	await patchListener?.listener({
+		type: 'async:shared-patch',
+		detail: {
+			id: 'shared:src/session.tsrx#session',
+			scope: 'page',
+			version: 1,
+			patch: [['set', ['status'], 'ready']],
+		},
+		bubbles: true,
+		cancelable: false,
+		composed: true,
+	});
+
+	expect(graph.readShared('shared:src/session.tsrx#session', 'status')).toBe('ready');
 });
 
 test('resume runtime can skip sync policy already applied by the inline resumer', async () => {

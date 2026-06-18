@@ -218,7 +218,7 @@ function domJournalEntryProperties(
 	symbol: Extract<PlannedSymbol, { readonly kind: 'dom-update' }>,
 ): string[] {
 	const locator = `context.domUpdate?.hostNodeId ?? ${JSON.stringify(symbol.hostNodeId)}`;
-	const value = 'context.value';
+	const value = domJournalValueExpression(symbol);
 
 	if (symbol.target.kind === 'text') {
 		return [
@@ -261,6 +261,53 @@ function domJournalEntryProperties(
 		`		name: ${JSON.stringify(symbol.target.name)},`,
 		`		value: ${value},`,
 	];
+}
+
+function domJournalValueExpression(
+	symbol: Extract<PlannedSymbol, { readonly kind: 'dom-update' }>,
+): string {
+	if (symbol.target.kind === 'text' && symbol.target.segments?.length) {
+		return `[${symbol.target.segments.map(textSegmentExpression).join(', ')}].join("")`;
+	}
+
+	return 'context.value';
+}
+
+function textSegmentExpression(
+	segment: NonNullable<
+		Extract<
+			Extract<PlannedSymbol, { readonly kind: 'dom-update' }>['target'],
+			{ readonly kind: 'text' }
+		>['segments']
+	>[number],
+): string {
+	if (segment.kind === 'static') return JSON.stringify(segment.value);
+
+	const value = segment.expression
+		? protocolComputedExpressionSource(segment.expression)
+		: `context.graph.read(${JSON.stringify(segment.graphNodeId)}, ${JSON.stringify(segment.path)})`;
+	return `String((${value}) ?? "")`;
+}
+
+function protocolComputedExpressionSource(
+	expression: NonNullable<
+		Extract<
+			NonNullable<
+				Extract<
+					Extract<PlannedSymbol, { readonly kind: 'dom-update' }>['target'],
+					{ readonly kind: 'text' }
+				>['segments']
+			>[number],
+			{ readonly kind: 'read' }
+		>['expression']
+	>,
+): string {
+	if (expression.kind === 'literal') return JSON.stringify(expression.value);
+	if (expression.kind === 'read') {
+		return `context.graph.read(${JSON.stringify(expression.graphNodeId)}, ${JSON.stringify(expression.path)})`;
+	}
+
+	return `(${protocolComputedExpressionSource(expression.left)} ${expression.operator} ${protocolComputedExpressionSource(expression.right)})`;
 }
 
 function emitBehaviorModule(symbol: Extract<PlannedSymbol, { readonly kind: 'behavior' }>): string {

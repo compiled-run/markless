@@ -5,6 +5,7 @@ import type {
 	RuntimeGraph,
 	RuntimeGraphCall,
 	RuntimeGraphDelete,
+	RuntimeGraphSharedPatch,
 	RuntimeGraphSubscription,
 	RuntimeGraphUpdate,
 	RuntimeGraphWrite,
@@ -85,6 +86,12 @@ export type ResumeEventFromPayloadDocumentInput = {
 	readonly loadSymbol: (symbolId: string) => EventResumeSymbol | Promise<EventResumeSymbol>;
 };
 
+export type CreateEventResumeContainerFromPayloadDocumentInput = {
+	readonly document: EventResumePayloadDocument;
+	readonly root: EventResumeDomElement;
+	readonly loadSymbol: ResumeEventFromPayloadDocumentInput['loadSymbol'];
+};
+
 export type EventResumeContainer = {
 	readonly graph: EventResumeGraph;
 	readonly view: ProtocolViewPayload;
@@ -109,6 +116,11 @@ type DirtyPath = {
 	readonly path: ReadonlyArray<string>;
 };
 
+type EventRuntimeSharedDefinition = NonNullable<ProtocolStatePayload['sharedDefinitions']>[number];
+type EventRuntimeSharedReturnProperty = NonNullable<
+	EventRuntimeSharedDefinition['returnProperties']
+>[number];
+
 type EventResumeContainerState = EventResumeContainer & {
 	readonly elementsByHostId: ReadonlyMap<string, EventResumeDomElement>;
 };
@@ -117,6 +129,17 @@ const containers = new WeakMap<EventResumeDomElement, Promise<EventResumeContain
 
 export async function resumeEventFromPayloadDocument(
 	input: ResumeEventFromPayloadDocumentInput,
+): Promise<EventResumeContainer> {
+	const resumed = await createEventResumeContainerFromPayloadDocument(input);
+	await resumed.dispatch(input.event, {
+		element: input.element,
+		eventRecord: input.eventRecord,
+	});
+	return resumed;
+}
+
+export async function createEventResumeContainerFromPayloadDocument(
+	input: CreateEventResumeContainerFromPayloadDocumentInput,
 ): Promise<EventResumeContainer> {
 	let container = containers.get(input.root);
 	if (!container) {
@@ -131,12 +154,7 @@ export async function resumeEventFromPayloadDocument(
 		containers.set(input.root, container);
 	}
 
-	const resumed = await container;
-	await resumed.dispatch(input.event, {
-		element: input.element,
-		eventRecord: input.eventRecord,
-	});
-	return resumed;
+	return container;
 }
 
 export async function createEventResumeContainerFromPayloads(
@@ -195,6 +213,8 @@ function createEventResumeGraph(input: {
 	readonly getElementHandle: (handleIdOrName: string) => EventResumeDomElement | undefined;
 }): EventResumeGraph {
 	const cells = new Map<string, unknown>();
+	const sharedDefinitions = new Map<string, EventRuntimeSharedDefinition>();
+	const sharedPatches: RuntimeGraphSharedPatch[] = [];
 	const dirtyPaths: DirtyPath[] = [];
 	const subscriptions: RuntimeGraphSubscription[] = [];
 	const journal: DomJournalEntry[] = [];
@@ -209,34 +229,206 @@ function createEventResumeGraph(input: {
 		);
 	}
 
+	for (const definition of input.state.sharedDefinitions ?? []) {
+		sharedDefinitions.set(definition.id, definition);
+	}
+
+	const readGraph = (graphNodeId: string, path: ReadonlyArray<string> = []): unknown =>
+		readPath(cells.get(graphNodeId), path);
+
+	const readShared = (
+		definitionId: string,
+		propertyName: string,
+		path: ReadonlyArray<string> = [],
+	): unknown => {
+		const resolved = resolveSharedGraphPath(definitionId, propertyName, path);
+		return resolved ? readGraph(resolved.graphNodeId, resolved.graphPath) : undefined;
+	};
+
+	function resolveSharedGraphPath(
+		definitionId: string,
+		propertyName: string,
+		path: ReadonlyArray<string>,
+	):
+		| {
+				readonly definition: EventRuntimeSharedDefinition;
+				readonly graphNodeId: string;
+				readonly graphPath: ReadonlyArray<string>;
+				readonly exposedPath: ReadonlyArray<string>;
+		  }
+		| undefined {
+		const definition = sharedDefinitions.get(definitionId);
+		if (!definition) return undefined;
+
+		const property = findLastSharedReturnProperty(definition.returnProperties, propertyName);
+		if (!property || property.kind !== 'graph') return undefined;
+
+		return {
+			definition,
+			graphNodeId: property.graphNodeId,
+			graphPath: [...property.path, ...path],
+			exposedPath: [property.name, ...path],
+		};
+	}
+
+	function setSharedDefinitionVersion(
+		definition: EventRuntimeSharedDefinition,
+		version: number,
+	): EventRuntimeSharedDefinition {
+		const nextDefinition = { ...definition, version };
+		sharedDefinitions.set(definition.id, nextDefinition);
+		return nextDefinition;
+	}
+
+	function nextSharedDefinitionVersion(
+		definition: EventRuntimeSharedDefinition,
+	): EventRuntimeSharedDefinition {
+		return setSharedDefinitionVersion(definition, definition.version + 1);
+	}
+
+	function sharedPatchForGraphWrite(
+		graphNodeId: string,
+		graphPath: ReadonlyArray<string>,
+		value: unknown,
+	): RuntimeGraphSharedPatch | undefined {
+		const target = resolveSharedGraphWrite(graphNodeId, graphPath);
+		if (!target) return undefined;
+
+		const nextDefinition = nextSharedDefinitionVersion(target.definition);
+		return {
+			id: nextDefinition.id,
+			...(nextDefinition.scope ? { scope: nextDefinition.scope } : {}),
+			version: nextDefinition.version,
+			patch: [['set', target.exposedPath, value]],
+		};
+	}
+
+	function resolveSharedGraphWrite(
+		graphNodeId: string,
+		graphPath: ReadonlyArray<string>,
+	):
+		| {
+				readonly definition: EventRuntimeSharedDefinition;
+				readonly exposedPath: ReadonlyArray<string>;
+		  }
+		| undefined {
+		let bestMatch:
+			| {
+					readonly definition: EventRuntimeSharedDefinition;
+					readonly property: EventRuntimeSharedReturnProperty & {
+						readonly kind: 'graph';
+					};
+			  }
+			| undefined;
+
+		for (const definition of sharedDefinitions.values()) {
+			if (!definition.graphNodeIds.includes(graphNodeId)) continue;
+
+			for (const property of definition.returnProperties ?? []) {
+				if (property.kind !== 'graph') continue;
+				if (property.graphNodeId !== graphNodeId) continue;
+				if (!startsWithPath(graphPath, property.path)) continue;
+				if (bestMatch && bestMatch.property.path.length >= property.path.length) continue;
+
+				bestMatch = { definition, property };
+			}
+		}
+
+		if (!bestMatch) return undefined;
+
+		return {
+			definition: bestMatch.definition,
+			exposedPath: [
+				bestMatch.property.name,
+				...graphPath.slice(bestMatch.property.path.length),
+			],
+		};
+	}
+
+	function applySharedPatch(patch: RuntimeGraphSharedPatch): boolean {
+		const definition = sharedDefinitions.get(patch.id);
+		if (!definition) return false;
+		if (patch.version <= definition.version) return false;
+		if (patch.scope && definition.scope && patch.scope !== definition.scope) return false;
+		if (patch.patch.length === 0) return false;
+
+		const resolvedPatches: Array<{
+			readonly graphNodeId: string;
+			readonly graphPath: ReadonlyArray<string>;
+			readonly value: unknown;
+		}> = [];
+
+		for (const [operation, exposedPath, value] of patch.patch) {
+			if (operation !== 'set') return false;
+			const [propertyName, ...path] = exposedPath;
+			if (!propertyName) return false;
+
+			const resolved = resolveSharedGraphPath(patch.id, propertyName, path);
+			if (!resolved) return false;
+			resolvedPatches.push({
+				graphNodeId: resolved.graphNodeId,
+				graphPath: resolved.graphPath,
+				value,
+			});
+		}
+
+		for (const resolved of resolvedPatches) {
+			cells.set(
+				resolved.graphNodeId,
+				writePath(cells.get(resolved.graphNodeId), resolved.graphPath, resolved.value),
+			);
+			markDirty(resolved.graphNodeId, resolved.graphPath);
+		}
+
+		setSharedDefinitionVersion(definition, patch.version);
+		return true;
+	}
+
 	const graph: EventResumeGraph = {
 		read(graphNodeId, path = []) {
-			return readPath(cells.get(graphNodeId), path);
+			return readGraph(graphNodeId, path);
 		},
-		readShared() {
-			return undefined;
+		readShared,
+		writeShared(write) {
+			const target = resolveSharedGraphPath(
+				write.definitionId,
+				write.propertyName,
+				write.path ?? [],
+			);
+			if (!target) return false;
+
+			cells.set(
+				target.graphNodeId,
+				writePath(cells.get(target.graphNodeId), target.graphPath, write.value),
+			);
+			const nextDefinition = nextSharedDefinitionVersion(target.definition);
+			sharedPatches.push({
+				id: nextDefinition.id,
+				...(nextDefinition.scope ? { scope: nextDefinition.scope } : {}),
+				version: nextDefinition.version,
+				patch: [['set', target.exposedPath, write.value]],
+			});
+			markDirty(target.graphNodeId, target.graphPath);
+			return true;
 		},
-		writeShared() {
-			return false;
-		},
-		getSharedDefinition() {
-			return undefined;
+		getSharedDefinition(definitionId) {
+			return sharedDefinitions.get(definitionId);
 		},
 		listSharedDefinitions() {
-			return [];
+			return [...sharedDefinitions.values()];
 		},
 		takeSharedPatches() {
-			return [];
+			return sharedPatches.splice(0);
 		},
-		applySharedPatch() {
-			return false;
-		},
+		applySharedPatch,
 		write(write: RuntimeGraphWrite) {
 			const path = write.path ?? [];
 			cells.set(
 				write.graphNodeId,
 				writePath(cells.get(write.graphNodeId), path, write.value),
 			);
+			const sharedPatch = sharedPatchForGraphWrite(write.graphNodeId, path, write.value);
+			if (sharedPatch) sharedPatches.push(sharedPatch);
 			markDirty(write.graphNodeId, path);
 		},
 		update(update: RuntimeGraphUpdate) {
@@ -247,6 +439,8 @@ function createEventResumeGraph(input: {
 				update.graphNodeId,
 				writePath(cells.get(update.graphNodeId), path, nextValue),
 			);
+			const sharedPatch = sharedPatchForGraphWrite(update.graphNodeId, path, nextValue);
+			if (sharedPatch) sharedPatches.push(sharedPatch);
 			markDirty(update.graphNodeId, path);
 			if (update.returnValue === 'previous') return currentValue;
 			if (update.returnValue === 'next') return nextValue;
@@ -323,6 +517,20 @@ function createEventResumeGraph(input: {
 	}
 
 	return graph;
+}
+
+function findLastSharedReturnProperty(
+	properties: NonNullable<EventRuntimeSharedDefinition['returnProperties']> | undefined,
+	propertyName: string,
+): EventRuntimeSharedReturnProperty | undefined {
+	if (!properties) return undefined;
+
+	for (let index = properties.length - 1; index >= 0; index--) {
+		const property = properties[index];
+		if (property?.name === propertyName) return property;
+	}
+
+	return undefined;
 }
 
 async function dispatchEvent(input: {

@@ -20,6 +20,7 @@ export async function transformTsrxModule(
 		buildId: input.buildId,
 		resolverId,
 		symbols: [],
+		importedSharedDefinitions: input.importedSharedDefinitions,
 	});
 	const symbolModules = compiled.symbolModules.modules.map((module) => ({
 		...module,

@@ -16,9 +16,19 @@ export type ResumeDomElement = ResumeDomNode & {
 	readonly tagName: string;
 	readonly childNodes?: ReadonlyArray<ResumeDomNode>;
 	readonly parentElement?: ResumeDomElement | null;
+	readonly ownerDocument?: ResumeSharedPatchEventTarget;
 	readonly addEventListener?: (
 		type: string,
 		listener: (event: ResumeDomEvent) => Promise<void>,
+		options?: { readonly capture?: boolean },
+	) => void;
+	readonly dispatchEvent?: (event: ResumeSharedPatchEvent) => boolean;
+};
+
+export type ResumeSharedPatchEventTarget = {
+	readonly addEventListener?: (
+		type: string,
+		listener: (event: ResumeDomEvent | ResumeSharedPatchEvent) => Promise<void>,
 		options?: { readonly capture?: boolean },
 	) => void;
 	readonly dispatchEvent?: (event: ResumeSharedPatchEvent) => boolean;
@@ -653,9 +663,9 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 				input.root.addEventListener?.(eventType, dispatch, { capture: true });
 			}
 			if (input.graph.listSharedDefinitions().length > 0) {
-				input.root.addEventListener?.(
+				sharedPatchEventTarget(input.root).addEventListener?.(
 					SHARED_PATCH_EVENT_TYPE,
-					receiveSharedPatch as (event: ResumeDomEvent) => Promise<void>,
+					receiveSharedPatch,
 					{ capture: true },
 				);
 			}
@@ -773,6 +783,10 @@ function defaultSharedPatchDispatcher(
 	return (patch) => {
 		root.dispatchEvent?.(createSharedPatchEvent(patch));
 	};
+}
+
+function sharedPatchEventTarget(root: ResumeDomElement): ResumeSharedPatchEventTarget {
+	return root.ownerDocument ?? root;
 }
 
 type ResumeCustomEventConstructor = new (

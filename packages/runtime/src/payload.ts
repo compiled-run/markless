@@ -6,6 +6,7 @@ import {
 import { deserializeGraphValue, type SerializedGraphPayload } from '@arcade/serializer';
 import { applyDomJournalEntries } from './dom-journal.ts';
 import { createRuntimeGraph, type RuntimeGraph, type RuntimeGraphRead } from './graph.ts';
+import { evaluateProtocolComputedExpression } from './protocol-computed.ts';
 import {
 	createResumeRuntime,
 	type ResumeDomElement,
@@ -140,6 +141,7 @@ export function createRuntimeGraphFromStatePayload(payload: ProtocolStatePayload
 					? undefined
 					: deserializeGraphValue(cell.value as SerializedGraphPayload),
 		})),
+		computed: syncComputedFromPayload(payload),
 		sharedDefinitions: payload.sharedDefinitions,
 	});
 }
@@ -160,10 +162,27 @@ function createRuntimeGraphFromResumePayload(input: {
 					: deserializeGraphValue(cell.value as SerializedGraphPayload),
 		})),
 		sharedDefinitions: input.state.sharedDefinitions,
+		computed: syncComputedFromPayload(input.state),
 		asyncComputed: asyncComputedFromPayload(input, () => graph),
 	});
 
 	return graph;
+}
+
+function syncComputedFromPayload(payload: ProtocolStatePayload) {
+	return payload.computed.flatMap((computed) => {
+		if (computed.async === true || !computed.expression) return [];
+		const { expression } = computed;
+
+		return [
+			{
+				graphNodeId: computed.graphNodeId,
+				dependencies: computed.dependencies ?? [],
+				compute: (read: RuntimeGraphRead) =>
+					evaluateProtocolComputedExpression(expression, read),
+			},
+		];
+	});
 }
 
 function asyncComputedFromPayload(

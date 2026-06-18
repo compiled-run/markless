@@ -56,7 +56,7 @@ export default box(
 		assertNoScriptsLoaded(beforeInteraction);
 
 		await page.click(COUNTER, WAIT);
-		await expect.page.text(page, COUNTER, '1', WAIT);
+		await expect.page.text(page, COUNTER, '1 / 2', WAIT);
 		const afterInteraction = await readScriptRequests(preview);
 		receipt.note(`SSR interaction script requests: ${formatRequests(afterInteraction)}`);
 		const interactionScripts = assertScriptsLoadedAfterInteraction(

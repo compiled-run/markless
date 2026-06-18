@@ -41,6 +41,22 @@ const fixtures = [
 		},
 	},
 	{
+		filter: '@fixtures/vite-ssr-shared',
+		outputs: ['packages/bundler/fixtures/vite-ssr-shared/dist'],
+		forbiddenManifest: 'packages/bundler/fixtures/vite-ssr-shared/dist/arcade-manifest.json',
+		forbiddenBundleGraph:
+			'packages/bundler/fixtures/vite-ssr-shared/dist/build/bundle-graph.json',
+		runtimeBudget: {
+			dist: 'packages/bundler/fixtures/vite-ssr-shared/dist',
+			maxRuntimeChunkGzipBytes: 4_000,
+			maxAsyncScriptsGzipBytes: 4_100,
+			maxAsyncScriptCount: 4,
+			forbidVitePreloadHelper: true,
+			targetLabel:
+				'spec target: shared SSR build must not include the generic resume runtime',
+		},
+	},
+	{
 		filter: '@fixtures/vite-plus',
 		outputs: ['packages/bundler/fixtures/vite-plus/dist'],
 		forbiddenManifest: 'packages/bundler/fixtures/vite-plus/dist/arcade-manifest.json',
@@ -99,6 +115,10 @@ describe('fixture builds', () => {
 					dist: resolve(root, fixture.runtimeBudget.dist),
 					scripts,
 					includeStaticImports: !!scripts,
+					targetLabel:
+						'targetLabel' in fixture.runtimeBudget
+							? fixture.runtimeBudget.targetLabel
+							: undefined,
 				});
 				expect(report.runtimeChunks.length, report.summary).toBeGreaterThan(0);
 				expect(report.largestRuntimeChunk?.gzipBytes, report.summary).toBeLessThanOrEqual(

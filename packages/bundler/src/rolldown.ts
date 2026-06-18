@@ -1,3 +1,10 @@
+import { readFile } from 'node:fs/promises';
+import {
+	buildSemanticGraph,
+	type ImportedSharedDefinition,
+	type SemanticGraphArtifact,
+	type SemanticModuleImport,
+} from '@arcade/compiler';
 import type { InputOptions, Plugin } from 'rolldown';
 import { parsePath } from 'ufo';
 import { ARCADE_BUILD_PREFIX, outputDefaults } from './build/chunking.ts';
@@ -162,10 +169,16 @@ export function createArcadeRolldownPlugin(input: {
 			}
 			const source = pathname(id);
 			clearSourceVirtualModules(source, virtualModules, sourceVirtualModules);
+			const importedSharedDefinitions = await collectImportedSharedDefinitions({
+				filename: source,
+				source: code,
+				context: this,
+			});
 			const transformed = await transformTsrxModule({
 				filename: source,
 				source: code,
 				buildId: internalOptions.buildId,
+				importedSharedDefinitions,
 				symbolRuntimeUrl:
 					currentEnvironment === 'client' && internalOptions.dev
 						? (virtualModuleId) =>
@@ -320,6 +333,81 @@ function clearSourceVirtualModules(
 		virtualModules.delete(id);
 	}
 	sourceVirtualModules.delete(source);
+}
+
+type TsrxImportResolver = {
+	resolve: (
+		source: string,
+		importer?: string,
+		options?: { readonly skipSelf?: boolean },
+	) => Promise<{ readonly id: string } | null> | { readonly id: string } | null;
+	addWatchFile?: (id: string) => void;
+};
+
+async function collectImportedSharedDefinitions(input: {
+	readonly filename: string;
+	readonly source: string;
+	readonly context: TsrxImportResolver;
+}): Promise<ImportedSharedDefinition[]> {
+	const graph = await buildSemanticGraph({
+		filename: input.filename,
+		source: input.source,
+	});
+	const definitions = new Map<string, ImportedSharedDefinition>();
+
+	for (const moduleImport of namedTsrxImports(graph.moduleImports)) {
+		const imported = await loadImportedSharedDefinition({
+			moduleImport,
+			importer: input.filename,
+			context: input.context,
+		});
+		if (!imported) continue;
+
+		definitions.set(imported.definition.id, imported);
+	}
+
+	return [...definitions.values()];
+}
+
+function namedTsrxImports(
+	moduleImports: SemanticGraphArtifact['moduleImports'],
+): SemanticModuleImport[] {
+	return moduleImports.filter(
+		(moduleImport) =>
+			moduleImport.kind === 'named' &&
+			moduleImport.importedName &&
+			moduleImport.source.endsWith('.tsrx'),
+	);
+}
+
+async function loadImportedSharedDefinition(input: {
+	readonly moduleImport: SemanticModuleImport;
+	readonly importer: string;
+	readonly context: TsrxImportResolver;
+}): Promise<ImportedSharedDefinition | null> {
+	const resolved = await input.context.resolve(input.moduleImport.source, input.importer, {
+		skipSelf: true,
+	});
+	if (!resolved?.id) return null;
+	if (!tsrxSourceFileWithQueryMatcher.test(resolved.id)) return null;
+
+	const filename = pathname(normalizeVirtualId(resolved.id));
+	input.context.addWatchFile?.(filename);
+	const graph = await buildSemanticGraph({
+		filename,
+		source: await readFile(filename, 'utf8'),
+	});
+	const definition = graph.sharedDefinitions.find(
+		(item) => item.exportedName === input.moduleImport.importedName,
+	);
+	if (!definition) return null;
+
+	return {
+		definition,
+		graphBindings: graph.graphBindings.filter(
+			(binding) => binding.sharedDefinitionId === definition.id,
+		),
+	};
 }
 
 function stripBuildPrefix(fileName: string) {

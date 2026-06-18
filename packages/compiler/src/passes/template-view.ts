@@ -7,7 +7,11 @@ import type {
 	TemplateViewInput,
 	TemplateViewNode,
 } from '../artifacts.ts';
-import { resolveGraphPath, semanticAliasMap } from '../artifact-helpers/graph-paths.ts';
+import {
+	resolveGraphPath,
+	resolveSharedInstanceGraphPath,
+	semanticAliasMap,
+} from '../artifact-helpers/graph-paths.ts';
 import { compilerBinaryExpressionMatcher } from '../source-patterns.ts';
 
 export function planTemplateView(input: TemplateViewInput): TemplateViewArtifact {
@@ -19,7 +23,7 @@ export function planTemplateView(input: TemplateViewInput): TemplateViewArtifact
 	}
 
 	const nodes = input.semanticGraph.templateNodes.map((node) =>
-		templateViewNode(node, bindings, aliases),
+		templateViewNode(node, input.semanticGraph, bindings, aliases),
 	);
 	const nodesById = new Map(nodes.map((node) => [node.id, node]));
 
@@ -37,6 +41,7 @@ export function planTemplateView(input: TemplateViewInput): TemplateViewArtifact
 
 function templateViewNode(
 	node: SemanticTemplateNode,
+	semanticGraph: TemplateViewInput['semanticGraph'],
 	bindings: ReadonlyMap<string, SemanticGraphBinding>,
 	aliases: ReturnType<typeof semanticAliasMap>,
 ): TemplateViewNode {
@@ -44,13 +49,15 @@ function templateViewNode(
 		return {
 			...node,
 			attributes: node.attributes.map((attribute) =>
-				templateViewAttribute(attribute, bindings, aliases),
+				templateViewAttribute(attribute, semanticGraph, bindings, aliases),
 			),
 		};
 	}
 
 	if (node.kind === 'binding') {
-		const resolved = resolveGraphPath(node.source, bindings, aliases);
+		const resolved =
+			resolveGraphPath(node.source, bindings, aliases) ??
+			resolveSharedInstanceGraphPath(node.source, semanticGraph);
 		if (!resolved) return node;
 
 		return {
@@ -71,12 +78,15 @@ function templateViewNode(
 
 function templateViewAttribute(
 	attribute: SemanticTemplateAttribute,
+	semanticGraph: TemplateViewInput['semanticGraph'],
 	bindings: ReadonlyMap<string, SemanticGraphBinding>,
 	aliases: ReturnType<typeof semanticAliasMap>,
 ): TemplateViewAttribute {
 	if (attribute.kind === 'static') return attribute;
 
-	const resolved = resolveGraphPath(attribute.source, bindings, aliases);
+	const resolved =
+		resolveGraphPath(attribute.source, bindings, aliases) ??
+		resolveSharedInstanceGraphPath(attribute.source, semanticGraph);
 	if (!resolved) return attribute;
 
 	return {

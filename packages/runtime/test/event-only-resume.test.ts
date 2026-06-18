@@ -3,6 +3,23 @@ import { expect, test } from 'vitest';
 import { createProtocolStatePayload, renderPayloadScripts } from '../../serializer/src/index.ts';
 import { resumeEventOnlyFromPayloadDocument } from '../src/event-only-resume.ts';
 
+type SyncComputedExpression =
+	| {
+			readonly kind: 'read';
+			readonly graphNodeId: string;
+			readonly path: ReadonlyArray<string>;
+	  }
+	| {
+			readonly kind: 'literal';
+			readonly value: unknown;
+	  }
+	| {
+			readonly kind: 'binary';
+			readonly operator: '+' | '-' | '*' | '/';
+			readonly left: SyncComputedExpression;
+			readonly right: SyncComputedExpression;
+	  };
+
 type FakeElement = {
 	nodeType: 1;
 	readonly tagName: string;
@@ -147,4 +164,102 @@ test('event-only resume dispatches lazy event symbols and flushes DOM update sym
 	expect(loadedSymbols).toEqual(['symbol:event', 'symbol:text', 'symbol:event', 'symbol:text']);
 	expect(secondResult.graph.read('state:count')).toBe(2);
 	expect(button.textContent).toBe('2');
+});
+
+test('event-only resume recomputes sync computed DOM updates when dependencies change', async () => {
+	const output = element('OUTPUT');
+	const button = element('BUTTON');
+	const root = element('DIV', [button, output]);
+	const doubleExpression: SyncComputedExpression = {
+		kind: 'binary',
+		operator: '*',
+		left: { kind: 'read', graphNodeId: 'state:count', path: [] },
+		right: { kind: 'literal', value: 2 },
+	};
+	const state = createProtocolStatePayload({
+		cells: [
+			{
+				graphNodeId: 'state:count',
+				name: 'count',
+				valueKind: 'scalar',
+				value: 0,
+			},
+		],
+		computed: [
+			{
+				graphNodeId: 'computed:double',
+				name: 'double',
+				async: false,
+				dependencies: [{ graphNodeId: 'state:count', path: [] }],
+				expression: doubleExpression,
+			} as NonNullable<
+				Parameters<typeof createProtocolStatePayload>[0]['computed']
+			>[number] & {
+				readonly expression: SyncComputedExpression;
+			},
+		],
+	});
+	const view: ProtocolViewPayload = {
+		version: 1,
+		locators: [
+			{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'div' },
+			{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'button' },
+			{ hostNodeId: 'h2', strategy: 'dom-order', index: 2, tagName: 'output' },
+		],
+		events: [{ hostNodeId: 'h1', eventName: 'click', symbolIds: ['symbol:event'] }],
+		domUpdates: [
+			{
+				hostNodeId: 'h2',
+				source: 'double',
+				graphNodeId: 'state:count',
+				path: [],
+				target: {
+					kind: 'text',
+					segments: [
+						{
+							kind: 'read',
+							source: 'double',
+							graphNodeId: 'computed:double',
+							path: [],
+							expression: doubleExpression,
+						},
+					],
+				},
+				symbolId: 'symbol:double-text',
+			},
+		],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	const scripts = renderPayloadScripts({ state, view });
+
+	const result = await resumeEventOnlyFromPayloadDocument({
+		document: payloadDocument(scripts.stateScript, scripts.viewScript),
+		root,
+		event: { type: 'click', target: button },
+		loadSymbol(symbolId) {
+			if (symbolId === 'symbol:event') {
+				return (context) => {
+					context.graph.update({
+						graphNodeId: 'state:count',
+						path: [],
+						returnValue: 'next',
+						update(value) {
+							return Number(value) + 1;
+						},
+					});
+				};
+			}
+
+			return (context) => ({
+				type: 'setText',
+				locator: context.domUpdate?.hostNodeId ?? 'h2',
+				value: Number(context.graph.read('state:count')) * 2,
+			});
+		},
+	});
+
+	expect(result.graph.read('state:count')).toBe(1);
+	expect(output.textContent).toBe('2');
 });

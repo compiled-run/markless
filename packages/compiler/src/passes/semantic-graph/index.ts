@@ -35,6 +35,10 @@ export async function buildSemanticGraph(
 	const ast = parseModule(input.source, input.filename) as AnyNode;
 	const statements = asNodes(ast.body);
 	const graph = createMutableSemanticGraphArtifact(input.filename);
+	for (const imported of input.importedSharedDefinitions ?? []) {
+		graph.sharedDefinitions.push(imported.definition);
+		graph.graphBindings.push(...imported.graphBindings);
+	}
 	graph.moduleImports.push(...collectModuleImports(statements));
 	const frameworkApiImports = collectImports(statements);
 	const state = createWalkState({

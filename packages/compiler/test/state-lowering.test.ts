@@ -151,6 +151,22 @@ export function Header() @{
 }
 `;
 
+const importedSharedInstanceSource = `
+import { session as useSession } from './session.tsrx';
+
+export function Header() @{
+	const currentSession = useSession();
+
+	<button
+		onClick={() => {
+			currentSession.status = 'ready';
+		}}
+	>
+		{currentSession.status}
+	</button>
+}
+`;
+
 test('lowerStateAccess resolves plain reads and writes to graph operations', async () => {
 	const semanticGraph = await buildSemanticGraph({
 		filename: 'src/Counter.tsrx',
@@ -417,6 +433,42 @@ test('lowerStateAccess resolves shared instance return property reads and writes
 	expect(lowered.diagnostics).toEqual([]);
 });
 
+test('lowerStateAccess resolves imported shared instance return property reads and writes', async () => {
+	const sharedDefinitionGraph = await buildSemanticGraph({
+		filename: 'src/session.tsrx',
+		source: sharedFactorySource,
+	});
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/Header.tsrx',
+		source: importedSharedInstanceSource,
+		importedSharedDefinitions: importedSharedDefinitionsFrom(sharedDefinitionGraph),
+	});
+
+	const lowered = lowerStateAccess({ semanticGraph });
+
+	expect(lowered.reads).toEqual(
+		expect.arrayContaining([
+			{
+				source: 'currentSession.status',
+				graphNodeId: 'shared:src/session.tsrx#session/state:data',
+				path: ['status'],
+			},
+		]),
+	);
+	expect(lowered.writes).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				source: 'currentSession.status',
+				graphNodeId: 'shared:src/session.tsrx#session/state:data',
+				path: ['status'],
+				operation: 'assign',
+				valueSource: "'ready'",
+			}),
+		]),
+	);
+	expect(lowered.diagnostics).toEqual([]);
+});
+
 test('lowerStateAccess reports dynamic graph path diagnostics for shared instance properties', async () => {
 	const semanticGraph = await buildSemanticGraph({
 		filename: 'src/session.tsrx',
@@ -507,6 +559,15 @@ test('lowerStateAccess resolves array destructured aliases to indexed graph path
 	]);
 	expect(lowered.diagnostics).toEqual([]);
 });
+
+function importedSharedDefinitionsFrom(graph: SemanticGraphArtifact) {
+	return graph.sharedDefinitions.map((definition) => ({
+		definition,
+		graphBindings: graph.graphBindings.filter(
+			(binding) => binding.sharedDefinitionId === definition.id,
+		),
+	}));
+}
 
 test('lowerStateAccess reports a structured diagnostic for dynamic graph path writes', () => {
 	const semanticGraph = {

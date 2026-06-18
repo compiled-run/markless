@@ -1,10 +1,9 @@
 import type { ProtocolStatePayload, ProtocolViewPayload } from '@arcade/protocol';
 import {
-	createEventOnlyResumeContainerFromPayloads,
-	type EventOnlyResumeContainer,
-	type EventOnlyResumeDomElement,
-	type EventOnlyResumeDomEvent,
-} from './event-only-resume.ts';
+	createEventOnlyCsrContainer,
+	startEventOnlyCsrRuntime,
+	type EventOnlyCsrContainer,
+} from './event-only-csr.ts';
 import type { RuntimeGraph } from './graph.ts';
 import type {
 	ResumeDomElement,
@@ -34,7 +33,7 @@ export type CsrRenderOptions = {
 	readonly applyDomJournal?: ResumeRuntimeInput['applyDomJournal'];
 };
 
-export type CsrRenderRuntime = ResumeRuntime | EventOnlyResumeContainer;
+export type CsrRenderRuntime = ResumeRuntime | EventOnlyCsrContainer;
 
 export type CsrRenderContainer = {
 	readonly phase: 'csr';
@@ -59,15 +58,15 @@ export async function render(
 	mountRoot(options.target, output.root);
 
 	if (canUseEventOnlyCsrRuntime(output, state, view)) {
-		const runtime = await createEventOnlyResumeContainerFromPayloads({
-			root: output.root as EventOnlyResumeDomElement,
+		const runtime = createEventOnlyCsrContainer({
+			root: output.root,
 			state,
 			view,
 			loadSymbol: loadSymbol as Parameters<
-				typeof createEventOnlyResumeContainerFromPayloads
+				typeof createEventOnlyCsrContainer
 			>[0]['loadSymbol'],
 		});
-		startEventOnlyCsrRuntime(output.root as EventOnlyResumeDomElement, view, runtime);
+		startEventOnlyCsrRuntime(output.root, view, runtime);
 
 		return {
 			phase: 'csr',
@@ -127,23 +126,6 @@ function canUseEventOnlyCsrRuntime(
 		return false;
 	}
 	return true;
-}
-
-function startEventOnlyCsrRuntime(
-	root: EventOnlyResumeDomElement,
-	view: ProtocolViewPayload,
-	runtime: EventOnlyResumeContainer,
-): void {
-	const eventNames = new Set(view.events.map((event) => event.eventName));
-	for (const eventName of eventNames) {
-		root.addEventListener?.(
-			eventName,
-			async (event: EventOnlyResumeDomEvent) => {
-				await runtime.dispatch(event);
-			},
-			{ capture: true },
-		);
-	}
 }
 
 async function createFullRuntimeGraph(

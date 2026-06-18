@@ -29,6 +29,7 @@ export function createProtocolStatePayloadFromArena(
 						})),
 					}
 				: {}),
+			...(computed.expression ? { expression: computed.expression } : {}),
 		})),
 		sharedDefinitions: input.payloadArena.state.sharedDefinitions.map((definition) => ({
 			id: definition.id,

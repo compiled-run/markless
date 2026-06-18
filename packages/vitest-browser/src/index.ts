@@ -1,17 +1,25 @@
 import {
+	applyDomJournalEntries,
 	render as renderCsrContainer,
 	type CsrRenderContainer,
 	type CsrRenderOptions,
 	type CsrRenderOutput,
+	type DomJournalEntry,
 	type RenderTarget,
 } from '@arcade/runtime';
 
 export type BrowserRenderElement = RenderTarget & {
+	readonly nodeType?: number;
+	readonly tagName?: string;
+	readonly childNodes?: ArrayLike<BrowserRenderElement>;
 	innerHTML?: string;
 	parentNode?: {
 		readonly removeChild?: (child: BrowserRenderElement) => unknown;
 	} | null;
 	appendChild?: (child: BrowserRenderElement) => BrowserRenderElement;
+	setAttribute?: (name: string, value: string) => void;
+	removeAttribute?: (name: string) => void;
+	readonly [name: string]: unknown;
 };
 
 export type BrowserRenderDocument = {
@@ -49,14 +57,73 @@ export async function render(
 	options: BrowserRenderOptions = {},
 ): Promise<BrowserRenderResult> {
 	const setup = setupContainer(options);
-	const runtime = await renderCsrContainer(component, {
-		target: setup.container,
-		loadSymbol: options.loadSymbol,
-		createVisibilityObserver: options.createVisibilityObserver,
-		applyDomJournal: options.applyDomJournal,
-	});
+	let output: CsrRenderOutput | undefined;
+	const runtime = await renderCsrContainer(
+		() => {
+			output = component();
+			return output;
+		},
+		{
+			target: setup.container,
+			loadSymbol: options.loadSymbol,
+			createVisibilityObserver: options.createVisibilityObserver,
+			applyDomJournal:
+				options.applyDomJournal ??
+				((entries) => {
+					if (!output?.view) return;
+					applyBrowserDomJournal(
+						entries,
+						output.root as BrowserRenderElement,
+						output.view,
+					);
+				}),
+		},
+	);
 
 	return createRenderResult(setup, runtime);
+}
+
+function applyBrowserDomJournal(
+	entries: ReadonlyArray<DomJournalEntry>,
+	root: BrowserRenderElement,
+	view: NonNullable<CsrRenderOutput['view']>,
+): void {
+	const elementsByHostId = materializeDomLocators(root, view.locators);
+
+	applyDomJournalEntries(entries, {
+		resolveTarget(locator) {
+			return elementsByHostId.get(locator);
+		},
+	});
+}
+
+function materializeDomLocators(
+	root: BrowserRenderElement,
+	locators: NonNullable<CsrRenderOutput['view']>['locators'],
+): Map<string, BrowserRenderElement> {
+	const elements = collectElements(root);
+	const byHostId = new Map<string, BrowserRenderElement>();
+
+	for (const locator of locators) {
+		const element = elements[locator.index];
+		if (!element) continue;
+		if (element.tagName?.toLowerCase() !== locator.tagName.toLowerCase()) continue;
+
+		byHostId.set(locator.hostNodeId, element);
+	}
+
+	return byHostId;
+}
+
+function collectElements(root: BrowserRenderElement): BrowserRenderElement[] {
+	const elements: BrowserRenderElement[] = [];
+	const visit = (node: BrowserRenderElement): void => {
+		if (node.nodeType === 1) elements.push(node);
+		for (const child of Array.from(node.childNodes ?? [])) visit(child);
+	};
+
+	visit(root);
+	return elements;
 }
 
 export async function cleanup(): Promise<void> {

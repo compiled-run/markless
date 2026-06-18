@@ -16,6 +16,7 @@ export type RuntimeSizeReportInput = {
 	readonly manifest?: string;
 	readonly scripts?: readonly string[];
 	readonly includeStaticImports?: boolean;
+	readonly targetLabel?: string;
 };
 
 export type RuntimeScriptSize = {
@@ -115,6 +116,7 @@ export async function runtimeSizeReport(input: RuntimeSizeReportInput): Promise<
 					? 'entry static script closure'
 					: 'entry script roots'
 				: 'generated async scripts',
+			targetLabel: input.targetLabel,
 			largestRuntimeChunk,
 			runtimeChunks,
 		}),
@@ -303,6 +305,7 @@ function sourceLooksRuntimeOwned(source: string): boolean {
 function formatRuntimeSizeSummary(input: {
 	readonly asyncScripts: RuntimeSizeReport['asyncScripts'];
 	readonly reportLabel: string;
+	readonly targetLabel?: string;
 	readonly largestRuntimeChunk: RuntimeScriptSize | undefined;
 	readonly runtimeChunks: readonly RuntimeScriptSize[];
 }) {
@@ -319,6 +322,7 @@ function formatRuntimeSizeSummary(input: {
 		`largest runtime-heavy chunk: ${largest}`,
 		`runtime-heavy chunks: ${runtimeChunks}`,
 		`${input.reportLabel}: count=${input.asyncScripts.count} raw=${input.asyncScripts.rawBytes} gzip=${input.asyncScripts.gzipBytes}`,
-		'spec target: event-only resumer 300-500 B gzip target, 700 B gzip hard budget',
+		input.targetLabel ??
+			'spec target: event-only resumer 300-500 B gzip target, 700 B gzip hard budget',
 	].join('\n');
 }

@@ -50,6 +50,54 @@ test('runtime graph invalidates path subscribers and flushes concrete journal en
 	expect(graph.takeJournal()).toEqual([]);
 });
 
+test('runtime graph emits shared patches for graph writes to shared graph nodes', async () => {
+	const graph = createRuntimeGraph({
+		cells: [
+			{
+				graphNodeId: 'shared:src/session.tsrx#session/state:data',
+				value: {
+					status: 'anonymous',
+				},
+			},
+		],
+		sharedDefinitions: [
+			{
+				id: 'shared:src/session.tsrx#session',
+				name: 'session',
+				exportedName: 'session',
+				scope: 'page',
+				version: 0,
+				graphNodeIds: ['shared:src/session.tsrx#session/state:data'],
+				returnProperties: [
+					{
+						kind: 'graph',
+						name: 'status',
+						graphNodeId: 'shared:src/session.tsrx#session/state:data',
+						path: ['status'],
+					},
+				],
+			},
+		],
+	});
+
+	graph.write({
+		graphNodeId: 'shared:src/session.tsrx#session/state:data',
+		path: ['status'],
+		value: 'ready',
+	});
+	await graph.flush();
+
+	expect(graph.readShared('shared:src/session.tsrx#session', 'status')).toBe('ready');
+	expect(graph.takeSharedPatches()).toEqual([
+		{
+			id: 'shared:src/session.tsrx#session',
+			scope: 'page',
+			version: 1,
+			patch: [['set', ['status'], 'ready']],
+		},
+	]);
+});
+
 test('runtime graph appends multiple DOM journal entries from one subscription in order', async () => {
 	const graph = createRuntimeGraph({
 		cells: [{ graphNodeId: 'state:count', value: 0 }],

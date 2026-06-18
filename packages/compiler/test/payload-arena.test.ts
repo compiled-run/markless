@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import type { SemanticGraphArtifact } from '../src/artifacts.ts';
 import { buildSemanticGraph, lowerStateAccess } from '../src/index.ts';
 import { planPayloadArena } from '../src/passes/payload-arena.ts';
 
@@ -58,6 +59,16 @@ export const session = shared(() => {
 
 export function Header() @{
 	const currentSession = session();
+
+	<button>{currentSession.status}</button>
+}
+`;
+
+const importedSharedSource = `
+import { session as useSession } from './session.tsrx';
+
+export function Header() @{
+	const currentSession = useSession();
 
 	<button>{currentSession.status}</button>
 }
@@ -418,3 +429,42 @@ test('planPayloadArena records shared definition state planning metadata', async
 		]),
 	);
 });
+
+test('planPayloadArena wires imported shared instance template reads as DOM updates', async () => {
+	const sharedDefinitionGraph = await buildSemanticGraph({
+		filename: 'src/session.tsrx',
+		source: sharedSource,
+	});
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/Header.tsrx',
+		source: importedSharedSource,
+		importedSharedDefinitions: importedSharedDefinitionsFrom(sharedDefinitionGraph),
+	});
+	const stateLowering = lowerStateAccess({ semanticGraph });
+
+	const payload = planPayloadArena({
+		semanticGraph,
+		stateLowering,
+	});
+
+	expect(payload.view.domUpdates).toEqual([
+		{
+			hostNodeId: 'h0',
+			source: 'currentSession.status',
+			graphNodeId: 'shared:src/session.tsrx#session/state:data',
+			path: ['status'],
+			target: {
+				kind: 'text',
+			},
+		},
+	]);
+});
+
+function importedSharedDefinitionsFrom(graph: SemanticGraphArtifact) {
+	return graph.sharedDefinitions.map((definition) => ({
+		definition,
+		graphBindings: graph.graphBindings.filter(
+			(binding) => binding.sharedDefinitionId === definition.id,
+		),
+	}));
+}

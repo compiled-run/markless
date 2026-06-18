@@ -344,7 +344,7 @@ export function Header() @{
 	expect(graph.sharedDefinitions).toEqual([]);
 	expect(graph.sharedInstances).toEqual([
 		{
-			definitionId: 'shared:./session.tsrx#session',
+			definitionId: 'shared:src/session.tsrx#session',
 			definitionName: 'session',
 			localName: 'currentSession',
 			source: 'useSession()',
