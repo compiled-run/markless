@@ -50,6 +50,12 @@ export const defaultCompilerPasses: ReadonlyArray<CompilerPassDefinition> = [
 		produces: ['payloadScripts', 'renderShell'],
 	},
 	{
+		passId: 'client-event-only-entry',
+		description: 'Emit the generated client event-only render entry for simple CSR modules.',
+		consumes: ['source', 'semanticGraph', 'symbolResolver'],
+		produces: ['clientEventOnlyEntry'],
+	},
+	{
 		passId: 'symbol-modules',
 		description: 'Emit lazy symbol module sources for planned symbols.',
 		consumes: ['symbolResolver', 'captureAnalysis'],

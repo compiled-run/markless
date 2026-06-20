@@ -4,6 +4,7 @@ import type { SemanticModuleImport } from '../../artifacts.ts';
 export type FrameworkApiName = 'state' | 'computed' | 'element' | 'shared';
 
 const frameworkApiNames = new Set<FrameworkApiName>(['state', 'computed', 'element', 'shared']);
+const frameworkApiSources = new Set(['@arcadejs/core', '@arcadejs/arcade', 'arcade']);
 
 // These imports make compiler-rewritten APIs explicit in user code.
 // A bare state() call is not enough; it must resolve to an import from @arcadejs/core.
@@ -14,7 +15,7 @@ export function collectImports(
 
 	for (const statement of statements) {
 		if (statement.type !== 'ImportDeclaration') continue;
-		if (statement.source?.value !== '@arcadejs/core') continue;
+		if (!isFrameworkApiSource(importSource(statement))) continue;
 
 		for (const specifier of asNodes(statement.specifiers)) {
 			if (specifier.type !== 'ImportSpecifier') continue;
@@ -38,13 +39,14 @@ export function collectModuleImports(
 	for (const statement of statements) {
 		if (statement.type !== 'ImportDeclaration') continue;
 		const source = importSource(statement);
-		if (!source || source === '@arcadejs/core') continue;
+		if (!source) continue;
 
 		for (const specifier of asNodes(statement.specifiers)) {
 			if (specifier.type === 'ImportSpecifier') {
 				const importedName = getIdentifierName(specifier.imported as AnyNode | undefined);
 				const localName = getIdentifierName(specifier.local as AnyNode | undefined);
 				if (!importedName || !localName) continue;
+				if (isFrameworkApiSource(source) && isFrameworkApiName(importedName)) continue;
 
 				imports.push({
 					localName,
@@ -101,6 +103,10 @@ export function getCallName(node: AnyNode | undefined | null): string | null {
 
 export function isFrameworkApiName(name: string | null): name is FrameworkApiName {
 	return frameworkApiNames.has(name as FrameworkApiName);
+}
+
+function isFrameworkApiSource(source: string | null): boolean {
+	return !!source && frameworkApiSources.has(source);
 }
 
 function importSource(node: AnyNode): string | null {

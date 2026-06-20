@@ -75,6 +75,15 @@ describe('TSRX Rolldown plugin structure', () => {
 		);
 	});
 
+	test('transformTsrxModule exports the generated client event-only render entry', async () => {
+		const result = await transformTsrxModule({
+			filename: '/workspace/app/src/App.tsrx',
+			source,
+		});
+
+		expect(result.code).toContain('export async function renderClientEventOnly');
+	});
+
 	test('base plugin transforms TSRX and serves generated virtual modules', async () => {
 		const plugin = arcadeClient();
 

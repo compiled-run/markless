@@ -28,6 +28,7 @@ test('default compiler passes declare stable artifact boundaries', () => {
 		'protocol-state',
 		'protocol-view',
 		'payload-scripts',
+		'client-event-only-entry',
 		'symbol-modules',
 		'symbol-resolver-module',
 	]);
@@ -57,6 +58,12 @@ test('default compiler passes declare stable artifact boundaries', () => {
 				description: expect.stringContaining('capture'),
 				consumes: ['semanticGraph', 'symbolResolver'],
 				produces: ['captureAnalysis'],
+			}),
+			expect.objectContaining({
+				passId: 'client-event-only-entry',
+				description: expect.stringContaining('client event-only render entry'),
+				consumes: ['source', 'semanticGraph', 'symbolResolver'],
+				produces: ['clientEventOnlyEntry'],
 			}),
 			expect.objectContaining({
 				passId: 'symbol-resolver-module',
@@ -403,6 +410,7 @@ test('compileTsrxModule validates and returns the default pass graph', async () 
 			'protocolView',
 			'payloadScripts',
 			'renderShell',
+			'clientEventOnlyEntry',
 			'symbolModules',
 			'symbolResolverModule',
 			'symbolResolverModuleManifest',

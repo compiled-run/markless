@@ -151,9 +151,7 @@ test('compileTsrxModule orchestrates source to payload scripts and resolver modu
 	expect(result.renderShell.indexOf('<script type="arcade/state">')).toBeLessThan(
 		result.renderShell.indexOf('<script type="arcade/view">'),
 	);
-	expect(result.symbolResolverModule).toContain(
-		'import(/* @vite-ignore */ moduleUrls[row[0]])',
-	);
+	expect(result.symbolResolverModule).toContain('import(/* @vite-ignore */ moduleUrls[row[0]])');
 	expect(result.symbolResolverModule).not.toContain('switch (id)');
 	expect(result.symbolResolverModuleManifest).toEqual([
 		1,
@@ -202,6 +200,72 @@ test('compileTsrxModule orchestrates source to payload scripts and resolver modu
 			}),
 		]),
 	);
+});
+
+test('compileTsrxModule accepts the umbrella arcade authoring import', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/UmbrellaImport.tsrx',
+		source: source.replace('@arcadejs/core', 'arcade'),
+		symbols: [],
+	});
+
+	expect(result.semanticGraph.diagnostics).toEqual([]);
+	expect(result.semanticGraph.graphBindings).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({ id: 'state:count', name: 'count' }),
+			expect.objectContaining({ id: 'state:menu', name: 'menu' }),
+		]),
+	);
+});
+
+test('compileTsrxModule emits a client event-only render entry for simple keyed CSR', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/KeyedRows.tsrx',
+		source: `
+import { state } from 'arcade';
+import { appendRows, buildData, removeRow, swapRows, updateEveryTenthRow } from 'arcade-benchmark-data';
+
+export function App() @{
+	let rows = state([]);
+	let selected = state(null);
+	let nextId = state(1);
+
+	<div class="container">
+		<button id="run" onClick={() => {
+			rows = buildData(nextId, 1000);
+			nextId = nextId + 1000;
+			selected = null;
+		}}>Create 1,000 rows</button>
+		<button id="add" onClick={() => {
+			rows = appendRows(rows, nextId, 1000);
+			nextId += 1000;
+		}}>Append 1,000 rows</button>
+		<button id="update" onClick={() => rows = updateEveryTenthRow(rows)}>Update every 10th row</button>
+		<button id="clear" onClick={() => {
+			rows = [];
+			selected = null;
+		}}>Clear</button>
+		<button id="swaprows" onClick={() => rows = swapRows(rows)}>Swap Rows</button>
+		<table><tbody>
+			@for (const row of rows; key row.id) {
+				<tr class={selected === row.id ? 'danger' : ''}>
+					<td>{row.id}</td>
+					<td><a onClick={() => selected = row.id}>{row.label}</a></td>
+					<td><a onClick={() => rows = removeRow(rows, row.id)}><span class="remove"></span></a></td>
+				</tr>
+			}
+		</tbody></table>
+	</div>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.clientEventOnlyEntry?.moduleSource).toContain(
+		'export async function renderClientEventOnly',
+	);
+	expect(result.clientEventOnlyEntry?.moduleSource).toContain('dispatchSymbol("symbol:0"');
+	expect(result.clientEventOnlyEntry?.moduleSource).toContain('function syncKeyedRows');
 });
 
 test('compileTsrxModule emits generated event modules for supported graph write forms', async () => {

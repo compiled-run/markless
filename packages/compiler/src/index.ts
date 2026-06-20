@@ -7,6 +7,7 @@ export { formatCompilerArtifactDump, runCompilerPassPipeline } from './pass-pipe
 export { defaultCompilerPasses } from './pass-registry.ts';
 
 export { analyzeCaptures } from './passes/capture-analysis.ts';
+export { emitClientEventOnlyEntry } from './passes/client-event-only-entry.ts';
 export { planPayloadArena } from './passes/payload-arena.ts';
 export { renderPayloadScriptArtifact } from './passes/payload-scripts.ts';
 export { createProtocolStatePayloadFromArena } from './passes/protocol-state.ts';

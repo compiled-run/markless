@@ -45,6 +45,33 @@ test('emitSymbolResolverModule emits compact table rows with a constant loader',
 	await expect(generatedModule.loadSymbol('symbol:domUpdate')).resolves.toBe('dom-update');
 });
 
+test('emitSymbolResolverModule runs generated symbol chunk init exports before returning a symbol', async () => {
+	const moduleUrl = `data:text/javascript,${encodeURIComponent(
+		[
+			'let initialized = false;',
+			'export function init__virtual_arcade_symbol__root() { initialized = true; }',
+			'export function symbol_0() { return initialized ? "ready" : "cold"; }',
+		].join('\n'),
+	)}`;
+	const output = emitSymbolResolverModule({
+		symbols: [
+			{
+				id: 'symbol:0',
+				chunk: moduleUrl,
+				exportName: 'symbol_0',
+			},
+		],
+	});
+	const generatedModule = (await import(
+		`data:text/javascript,${encodeURIComponent(output)}`
+	)) as {
+		loadSymbol(id: string): Promise<unknown>;
+	};
+
+	const loaded = await generatedModule.loadSymbol('symbol:0');
+	expect((loaded as () => string)()).toBe('ready');
+});
+
 test('emitSymbolResolverModule fails closed for unknown symbols with structured metadata', async () => {
 	const output = emitSymbolResolverModule({
 		symbols: [],

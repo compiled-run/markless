@@ -87,6 +87,7 @@ export async function transformTsrxModule(
 			payloadId,
 			resolverId,
 			moduleManifestId,
+			clientEventOnlyEntrySource: compiled.clientEventOnlyEntry.moduleSource,
 		}),
 		map: null,
 		virtualModules,
@@ -129,6 +130,7 @@ function emitSourceModule(input: {
 	readonly payloadId: string;
 	readonly resolverId: string;
 	readonly moduleManifestId: string;
+	readonly clientEventOnlyEntrySource: string | null;
 }) {
 	return [
 		`import payloadScripts, { state as payloadState, view as payloadView } from '${input.payloadId}';`,
@@ -147,6 +149,7 @@ function emitSourceModule(input: {
 		'	symbolManifest,',
 		'	moduleManifest,',
 		'};',
+		input.clientEventOnlyEntrySource ?? '',
 		'',
 	].join('\n');
 }

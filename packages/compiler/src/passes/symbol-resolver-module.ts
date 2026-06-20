@@ -42,7 +42,18 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'	const row = symbolRows[id];',
 		'	if (!row) throw createUnknownSymbolError(id);',
 		'	return import(/* @vite-ignore */ moduleUrls[row[0]])',
-		'		.then((mod) => mod[exportNames[row[1]]]);',
+		'		.then((mod) => {',
+		'			runGeneratedSymbolChunkInitializers(mod);',
+		'			return mod[exportNames[row[1]]];',
+		'		});',
+		'}',
+		'',
+		'function runGeneratedSymbolChunkInitializers(mod) {',
+		'	for (const name in mod) {',
+		'		if (!name.startsWith("init__virtual_arcade_symbol")) continue;',
+		'		const init = mod[name];',
+		'		if (typeof init === "function") init();',
+		'	}',
 		'}',
 		'',
 		'function createUnknownSymbolError(id) {',
@@ -57,11 +68,7 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 	].join('\n');
 }
 
-function tableIndex(
-	indexes: Map<string, number>,
-	values: string[],
-	value: string,
-): number {
+function tableIndex(indexes: Map<string, number>, values: string[], value: string): number {
 	const existing = indexes.get(value);
 	if (existing !== undefined) return existing;
 

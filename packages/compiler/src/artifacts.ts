@@ -531,6 +531,18 @@ export type PayloadScriptsArtifact = {
 	readonly renderShell: string;
 };
 
+export type ClientEventOnlyEntryInput = {
+	readonly source: CompileTsrxModuleInput;
+	readonly semanticGraph: SemanticGraphArtifact;
+	readonly symbolResolver: SymbolResolverPlan;
+};
+
+export type ClientEventOnlyEntryArtifact = {
+	readonly passId: 'client-event-only-entry';
+	readonly moduleSource: string | null;
+	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
+};
+
 export type CompileTsrxModuleInput = SemanticGraphInput & SymbolResolverModuleInput;
 
 export type CompilerPassDefinition = {
@@ -593,6 +605,7 @@ export type CompileTsrxModuleResult = {
 	readonly protocolView: ProtocolViewPayload;
 	readonly payloadScripts: RenderedPayloadScripts;
 	readonly renderShell: string;
+	readonly clientEventOnlyEntry: ClientEventOnlyEntryArtifact;
 	readonly symbolModules: SymbolModulesArtifact;
 	readonly symbolResolverModule: string;
 	readonly symbolResolverModuleManifest: SymbolResolverModuleManifest;

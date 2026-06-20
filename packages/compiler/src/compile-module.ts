@@ -1,5 +1,6 @@
 import type {
 	CaptureAnalysisArtifact,
+	ClientEventOnlyEntryArtifact,
 	CompileTsrxModuleInput,
 	CompileTsrxModuleResult,
 	PayloadArenaArtifact,
@@ -15,6 +16,7 @@ import type {
 import { runCompilerPassPipeline } from './pass-pipeline.ts';
 import { defaultCompilerPasses } from './pass-registry.ts';
 import { analyzeCaptures } from './passes/capture-analysis.ts';
+import { emitClientEventOnlyEntry } from './passes/client-event-only-entry.ts';
 import { planPayloadArena } from './passes/payload-arena.ts';
 import { renderPayloadScriptArtifact } from './passes/payload-scripts.ts';
 import { createProtocolStatePayloadFromArena } from './passes/protocol-state.ts';
@@ -54,6 +56,7 @@ export async function compileTsrxModule(
 		readonly protocolView: CompileTsrxModuleResult['protocolView'];
 		readonly payloadScripts: PayloadScriptsArtifact['payloadScripts'];
 		readonly renderShell: PayloadScriptsArtifact['renderShell'];
+		readonly clientEventOnlyEntry: ClientEventOnlyEntryArtifact;
 		readonly symbolModules: SymbolModulesArtifact;
 		readonly symbolResolverModule: string;
 		readonly symbolResolverModuleManifest: SymbolResolverModuleManifest;
@@ -70,6 +73,7 @@ export async function compileTsrxModule(
 		protocolView: artifacts.protocolView,
 		payloadScripts: artifacts.payloadScripts,
 		renderShell: artifacts.renderShell,
+		clientEventOnlyEntry: artifacts.clientEventOnlyEntry,
 		symbolModules: artifacts.symbolModules,
 		symbolResolverModule: artifacts.symbolResolverModule,
 		symbolResolverModuleManifest: artifacts.symbolResolverModuleManifest,
@@ -180,6 +184,21 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 							typeof renderPayloadScriptArtifact
 						>[0]['protocolView'],
 					});
+				},
+			};
+		}
+
+		if (pass.passId === 'client-event-only-entry') {
+			return {
+				...pass,
+				run({ inputs }) {
+					return {
+						clientEventOnlyEntry: emitClientEventOnlyEntry({
+							source: sourceInput(inputs.source),
+							semanticGraph: inputs.semanticGraph as SemanticGraphArtifact,
+							symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
+						}),
+					};
 				},
 			};
 		}
