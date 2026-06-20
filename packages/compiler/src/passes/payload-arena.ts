@@ -2,6 +2,7 @@ import type {
 	PayloadArenaArtifact,
 	PayloadArenaInput,
 	PayloadBehavior,
+	PayloadKeyedRepeat,
 	SemanticGraphBinding,
 } from '../artifacts.ts';
 import { resolveGraphPath, semanticAliasMap, uniqueBy } from '../artifact-helpers/graph-paths.ts';
@@ -53,6 +54,22 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 		index,
 		tagName: hostNode.tagName,
 	}));
+	const keyedRepeats = input.semanticGraph.keyedRepeats.flatMap(
+		(repeat): PayloadKeyedRepeat[] => {
+			if (!repeat.collectionGraphNodeId) return [];
+
+			return [
+				{
+					id: repeat.id,
+					parentHostNodeId: repeat.parentHostNodeId,
+					...(repeat.rowHostNodeId ? { rowHostNodeId: repeat.rowHostNodeId } : {}),
+					collectionGraphNodeId: repeat.collectionGraphNodeId,
+					collectionPath: repeat.collectionPath,
+					keyPath: repeat.keyPath,
+				},
+			];
+		},
+	);
 	const viewDomUpdates = input.semanticGraph.templateReads.flatMap((read) => {
 		const resolved = resolveGraphPath(read.source, bindings, aliases);
 		if (!resolved) return [];
@@ -126,6 +143,7 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 		},
 		view: {
 			locators,
+			keyedRepeats,
 			events: input.semanticGraph.events,
 			domUpdates: uniqueBy(
 				viewDomUpdates,

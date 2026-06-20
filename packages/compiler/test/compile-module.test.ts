@@ -218,7 +218,7 @@ test('compileTsrxModule accepts the umbrella arcade authoring import', async () 
 	);
 });
 
-test('compileTsrxModule emits a client event-only render entry for simple keyed CSR', async () => {
+test('compileTsrxModule keeps client event-only render entry disabled until structural keyed lowering exists', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/KeyedRows.tsrx',
 		source: `
@@ -261,11 +261,7 @@ export function App() @{
 		symbols: [],
 	});
 
-	expect(result.clientEventOnlyEntry?.moduleSource).toContain(
-		'export async function renderClientEventOnly',
-	);
-	expect(result.clientEventOnlyEntry?.moduleSource).toContain('dispatchSymbol("symbol:0"');
-	expect(result.clientEventOnlyEntry?.moduleSource).toContain('function syncKeyedRows');
+	expect(result.clientEventOnlyEntry.moduleSource).toBeNull();
 });
 
 test('compileTsrxModule emits generated event modules for supported graph write forms', async () => {

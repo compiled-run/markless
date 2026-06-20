@@ -12,6 +12,7 @@ import type {
 	SemanticSharedInstance,
 	SemanticSyncPolicyConstant,
 	SemanticHostNode,
+	SemanticKeyedRepeat,
 	SemanticLocalBinding,
 	SemanticStateRead,
 	SemanticStateWrite,
@@ -28,6 +29,7 @@ export type MutableSemanticGraphArtifact = {
 	sharedDefinitions: SemanticSharedDefinition[];
 	sharedInstances: SemanticSharedInstance[];
 	hostNodes: SemanticHostNode[];
+	keyedRepeats: SemanticKeyedRepeat[];
 	events: SemanticEvent[];
 	syncPolicyConstants: SemanticSyncPolicyConstant[];
 	behaviors: SemanticBehavior[];
@@ -67,6 +69,7 @@ export function createMutableSemanticGraphArtifact(filename: string): MutableSem
 		sharedDefinitions: [],
 		sharedInstances: [],
 		hostNodes: [],
+		keyedRepeats: [],
 		events: [],
 		syncPolicyConstants: [],
 		behaviors: [],

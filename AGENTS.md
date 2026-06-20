@@ -203,6 +203,25 @@ Future compiler PRs/goals should report:
 A green end-to-end fixture is useful evidence, but it is not enough to justify
 bypassing pass-level artifacts.
 
+### Benchmark And Fixture Hardcoding Guardrail
+
+Production compiler and runtime code must not hardcode benchmark, fixture, or
+test implementation details. A benchmark optimization may be compiler-selected
+only from general TSRX structure and compiler artifacts: element/tag shape,
+static attributes, graph bindings, lowered reads/writes, event records, keyed
+repeat metadata, and emitted DOM locator plans. It must not encode
+js-framework-benchmark row names, button ids, state names, CSS class names,
+child indexes, magic row positions, imported helper names, or any other fact
+that is true only because a benchmark or test fixture happens to be written that
+way.
+
+Tests must not try to prevent this with a blacklist of known bad strings.
+Regression coverage should use alternate-shaped fixtures that keep the same
+structural pattern while changing names, element choices, property names,
+classes, and ordering. If the production code still works only for the original
+benchmark or fixture shape, the optimization is not maintainable enough to
+retain.
+
 ## Proof Fixtures
 
 The completed POC lives under `poc/`: proof fixtures under

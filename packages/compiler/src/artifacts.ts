@@ -90,6 +90,18 @@ export type SemanticHostNode = {
 	readonly tagName: string;
 };
 
+export type SemanticKeyedRepeat = {
+	readonly id: string;
+	readonly parentHostNodeId: string;
+	readonly rowHostNodeId?: string;
+	readonly itemName: string;
+	readonly collectionSource: string;
+	readonly collectionGraphNodeId?: string;
+	readonly collectionPath: ReadonlyArray<string>;
+	readonly keySource: string;
+	readonly keyPath: ReadonlyArray<string>;
+};
+
 export type SemanticSyncPolicyCondition =
 	| {
 			readonly type: 'and';
@@ -249,6 +261,7 @@ export type SemanticGraphArtifact = {
 	readonly sharedDefinitions: ReadonlyArray<SemanticSharedDefinition>;
 	readonly sharedInstances: ReadonlyArray<SemanticSharedInstance>;
 	readonly hostNodes: ReadonlyArray<SemanticHostNode>;
+	readonly keyedRepeats: ReadonlyArray<SemanticKeyedRepeat>;
 	readonly events: ReadonlyArray<SemanticEvent>;
 	readonly syncPolicyConstants?: ReadonlyArray<SemanticSyncPolicyConstant>;
 	readonly behaviors: ReadonlyArray<SemanticBehavior>;
@@ -340,6 +353,15 @@ export type PayloadBehavior = SemanticBehavior & {
 	}>;
 };
 
+export type PayloadKeyedRepeat = {
+	readonly id: string;
+	readonly parentHostNodeId: string;
+	readonly rowHostNodeId?: string;
+	readonly collectionGraphNodeId: string;
+	readonly collectionPath: ReadonlyArray<string>;
+	readonly keyPath: ReadonlyArray<string>;
+};
+
 export type PayloadArenaArtifact = {
 	readonly passId: 'payload-arena';
 	readonly state: {
@@ -372,6 +394,7 @@ export type PayloadArenaArtifact = {
 			readonly index: number;
 			readonly tagName: string;
 		}>;
+		readonly keyedRepeats: ReadonlyArray<PayloadKeyedRepeat>;
 		readonly events: SemanticGraphArtifact['events'];
 		readonly domUpdates: ReadonlyArray<{
 			readonly hostNodeId: string;

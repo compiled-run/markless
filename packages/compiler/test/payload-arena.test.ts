@@ -63,6 +63,24 @@ export function Header() @{
 }
 `;
 
+const keyedListSource = `
+import { state } from '@arcadejs/core';
+
+export function App() @{
+	const items = state([]);
+
+	<section>
+		<ul>
+			@for (const item of items; key item.key) {
+				<li>
+					<button onClick={() => console.log(item.key)}>{item.name}</button>
+				</li>
+			}
+		</ul>
+	</section>
+}
+`;
+
 test('planPayloadArena separates graph state from view wiring metadata', async () => {
 	const semanticGraph = await buildSemanticGraph({
 		filename: 'src/App.tsrx',
@@ -206,6 +224,34 @@ test('planPayloadArena separates graph state from view wiring metadata', async (
 		},
 	]);
 	expect(payload.diagnostics).toEqual([]);
+});
+
+test('planPayloadArena carries keyed repeat metadata into the resumable view plan', async () => {
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/ItemList.tsrx',
+		source: keyedListSource,
+	});
+	const stateLowering = lowerStateAccess({ semanticGraph });
+	const parentHostNodeId = semanticGraph.hostNodes.find(
+		(hostNode) => hostNode.tagName === 'ul',
+	)?.id;
+	const rowHostNodeId = semanticGraph.hostNodes.find((hostNode) => hostNode.tagName === 'li')?.id;
+
+	const payload = planPayloadArena({
+		semanticGraph,
+		stateLowering,
+	});
+
+	expect(payload.view.keyedRepeats).toEqual([
+		{
+			id: 'repeat:0',
+			parentHostNodeId,
+			rowHostNodeId,
+			collectionGraphNodeId: 'state:items',
+			collectionPath: [],
+			keyPath: ['key'],
+		},
+	]);
 });
 
 test('planPayloadArena keeps distinct targets for repeated graph reads on one host', async () => {

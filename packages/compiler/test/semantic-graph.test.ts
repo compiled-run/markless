@@ -93,6 +93,46 @@ export function CartButton() @{
 }
 `;
 
+const keyedTableSource = `
+import { state } from '@arcadejs/core';
+
+export function App() @{
+	const rows = state([]);
+	const selected = state(null);
+
+	<div>
+		<table>
+			<tbody>
+				@for (const row of rows; key row.id) {
+					<tr class={selected === row.id ? 'active' : ''}>
+						<td>{row.id}</td>
+						<td>{row.label}</td>
+					</tr>
+				}
+			</tbody>
+		</table>
+	</div>
+}
+`;
+
+const keyedListSource = `
+import { state } from '@arcadejs/core';
+
+export function App() @{
+	const items = state([]);
+
+	<section>
+		<ul>
+			@for (const item of items; key item.key) {
+				<li>
+					<button onClick={() => console.log(item.key)}>{item.name}</button>
+				</li>
+			}
+		</ul>
+	</section>
+}
+`;
+
 test('buildSemanticGraph creates the first production compiler artifact', async () => {
 	const graph = await buildSemanticGraph({
 		filename: 'src/App.tsrx',
@@ -251,6 +291,50 @@ test('buildSemanticGraph creates the first production compiler artifact', async 
 	);
 
 	expect(graph.asyncBoundaries).toHaveLength(1);
+});
+
+test('buildSemanticGraph records keyed repeat structure without benchmark assumptions', async () => {
+	const tableGraph = await buildSemanticGraph({
+		filename: 'src/TableRows.tsrx',
+		source: keyedTableSource,
+	});
+	const tableParent = tableGraph.hostNodes.find((hostNode) => hostNode.tagName === 'tbody');
+	const tableRow = tableGraph.hostNodes.find((hostNode) => hostNode.tagName === 'tr');
+
+	expect(tableGraph.keyedRepeats).toEqual([
+		{
+			id: 'repeat:0',
+			parentHostNodeId: tableParent?.id,
+			rowHostNodeId: tableRow?.id,
+			itemName: 'row',
+			collectionSource: 'rows',
+			collectionGraphNodeId: 'state:rows',
+			collectionPath: [],
+			keySource: 'row.id',
+			keyPath: ['id'],
+		},
+	]);
+
+	const listGraph = await buildSemanticGraph({
+		filename: 'src/ItemList.tsrx',
+		source: keyedListSource,
+	});
+	const listParent = listGraph.hostNodes.find((hostNode) => hostNode.tagName === 'ul');
+	const listRow = listGraph.hostNodes.find((hostNode) => hostNode.tagName === 'li');
+
+	expect(listGraph.keyedRepeats).toEqual([
+		{
+			id: 'repeat:0',
+			parentHostNodeId: listParent?.id,
+			rowHostNodeId: listRow?.id,
+			itemName: 'item',
+			collectionSource: 'items',
+			collectionGraphNodeId: 'state:items',
+			collectionPath: [],
+			keySource: 'item.key',
+			keyPath: ['key'],
+		},
+	]);
 });
 
 test('buildSemanticGraph records shared definitions and instance calls', async () => {

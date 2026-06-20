@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../src/index.ts';
 
-const keyedRowsSource = `
+const benchmarkShapedKeyedSource = `
 import { state } from 'arcade';
 import { appendRows, buildData, removeRow, swapRows, updateEveryTenthRow } from 'arcade-benchmark-data';
 
@@ -16,11 +16,6 @@ export function App() @{
 			nextId = nextId + 1000;
 			selected = null;
 		}}>Create 1,000 rows</button>
-		<button id="runlots" onClick={() => {
-			rows = buildData(nextId, 10000);
-			nextId = nextId + 10000;
-			selected = null;
-		}}>Create 10,000 rows</button>
 		<button id="add" onClick={() => {
 			rows = appendRows(rows, nextId, 1000);
 			nextId += 1000;
@@ -44,22 +39,42 @@ export function App() @{
 }
 `;
 
-test('client event-only entry emits detached batched keyed row replacement', async () => {
-	const result = await compileTsrxModule({
-		filename: 'src/KeyedRows.tsrx',
-		source: keyedRowsSource,
-		symbols: [],
-	});
+const alternateKeyedSource = `
+import { state } from 'arcade';
 
-	const moduleSource = result.clientEventOnlyEntry.moduleSource ?? '';
+export function App() @{
+	let items = state([]);
+	let activeKey = state(null);
 
-	expect(moduleSource).toContain('function createRowBatch');
-	expect(moduleSource).toContain('const rowElements = tbody.children;');
-	expect(moduleSource).toContain('tbody.remove();');
-	expect(moduleSource).toContain('tbodyParent.insertBefore(tbody, tbodyNextSibling);');
-	expect(moduleSource).not.toContain('payloadView');
-	expect(moduleSource.length).toBeLessThan(9200);
-	expect(moduleSource).not.toContain('const rowNodes = []');
-	expect(moduleSource).not.toContain('const rowById = new Map()');
-	expect(moduleSource).not.toContain('__arcadeRow');
+	<section class="app">
+		<button id="load" onClick={() => {
+			items = [{ key: 1, name: 'one' }];
+			activeKey = null;
+		}}>Load</button>
+		<ul>
+			@for (const item of items; key item.key) {
+				<li class={activeKey === item.key ? 'selected' : ''}>
+					<button onClick={() => activeKey = item.key}>{item.name}</button>
+					<i onClick={() => items = items.filter((entry) => entry.key !== item.key)}>x</i>
+					<small>{item.key}</small>
+				</li>
+			}
+		</ul>
+	</section>
+}
+`;
+
+test('client event-only entry is disabled until keyed repeat lowering is structural', async () => {
+	for (const [filename, source] of [
+		['src/BenchmarkShapedRows.tsrx', benchmarkShapedKeyedSource],
+		['src/AlternateRows.tsrx', alternateKeyedSource],
+	] as const) {
+		const result = await compileTsrxModule({
+			filename,
+			source,
+			symbols: [],
+		});
+
+		expect(result.clientEventOnlyEntry.moduleSource).toBeNull();
+	}
 });

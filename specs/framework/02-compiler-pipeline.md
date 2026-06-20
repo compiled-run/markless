@@ -106,6 +106,27 @@ extract a shared helper behind the artifact contract. Do not merge the pass
 domains back into one broad visitor or one "compiler context" that every pass
 mutates.
 
+### Benchmark and fixture hardcoding boundary
+
+Production compiler behavior must not encode benchmark, fixture, or test
+implementation details as semantics. Performance-oriented specialization is
+allowed only when the compiler selects it from general TSRX structure and typed
+artifacts: host elements, static attributes, graph bindings, lowered reads and
+writes, event records, keyed repeat metadata, payload/view locator plans, and
+symbol plans. It is not valid to special-case a benchmark by state variable
+names, button ids, helper import names, CSS classes, row positions, child-node
+offsets, text such as labels, or any other fact that is incidental to one
+fixture.
+
+Tests for these optimizations must prove structural generality. A test that only
+asserts "do not emit this known bad string" is insufficient. The focused fixture
+suite should include at least one alternate-shaped case that preserves the same
+compiler-recognized structure while changing names, tags, property names,
+classes, event controls, and child ordering. If the generated path cannot handle
+that alternate shape without adding more benchmark literals, the slice must be
+rejected or moved behind a non-production benchmark harness instead of retained
+in the framework compiler.
+
 See `09-compiler-module-split-plan.md` for the concrete production module split
 target and migration order.
 

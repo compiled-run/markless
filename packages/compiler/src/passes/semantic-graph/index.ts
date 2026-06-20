@@ -25,6 +25,7 @@ import {
 	collectSharedDefinitionDependencies,
 	collectSharedFactoryGraph,
 } from './collect-shared.ts';
+import { attachKeyedRepeatRowHost, collectKeyedRepeat } from './collect-repeat.ts';
 import { collectVariableDeclaration } from './collect-state.ts';
 import { createMutableSemanticGraphArtifact, createWalkState, type WalkState } from './types.ts';
 
@@ -83,6 +84,13 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 		case 'VariableDeclaration':
 			collectVariableDeclaration(node, state);
 			break;
+		case 'JSXForExpression':
+			const repeatIndex = collectKeyedRepeat(node, state);
+			for (const child of childNodes(node)) {
+				walk(child, state);
+			}
+			attachKeyedRepeatRowHost(node, state, repeatIndex);
+			return;
 		case 'AssignmentExpression':
 			collectAssignment(node, state);
 			collectExpressionReads(node, state);

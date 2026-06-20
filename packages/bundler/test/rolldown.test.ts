@@ -75,13 +75,13 @@ describe('TSRX Rolldown plugin structure', () => {
 		);
 	});
 
-	test('transformTsrxModule exports the generated client event-only render entry', async () => {
+	test('transformTsrxModule omits the benchmark client event-only entry for general apps', async () => {
 		const result = await transformTsrxModule({
 			filename: '/workspace/app/src/App.tsrx',
 			source,
 		});
 
-		expect(result.code).toContain('export async function renderClientEventOnly');
+		expect(result.code).not.toContain('export async function renderClientEventOnly');
 	});
 
 	test('base plugin transforms TSRX and serves generated virtual modules', async () => {
