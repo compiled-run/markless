@@ -53,6 +53,7 @@ type InternalArcadeRolldownOptions = ArcadeRolldownOptions & {
 
 const manifests = new Map<string, ArcadeManifest>();
 const TSRX_SOURCE_FILE = /\.tsrx(?:[?#].*)?$/;
+const SYMBOL_VIRTUAL_STRING_RE = /(["'`])((?:virtual:arcade:symbol:)[^"'`]+)\1/g;
 
 export const arcadeClient = (options: ArcadeRolldownOptions = {}) =>
 	createArcadeRolldownPlugin({ environment: 'client', options });
@@ -137,7 +138,10 @@ export function createArcadeRolldownPlugin(input: {
 		load(id) {
 			const module = virtualModules.get(normalizeVirtualId(id));
 			if (module) {
-				return module.source;
+				return virtualModuleSourceForLoad(module, {
+					dev: internalOptions.dev === true && getEnvironment(this) === 'client',
+					publicPath: internalOptions.publicPath,
+				});
 			}
 			return null;
 		},
@@ -351,6 +355,28 @@ function stripBuildPrefix(fileName: string) {
 	return fileName.startsWith(ARCADE_BUILD_PREFIX)
 		? fileName.slice(ARCADE_BUILD_PREFIX.length)
 		: fileName;
+}
+
+function virtualModuleSourceForLoad(
+	module: ArcadeVirtualModule,
+	options: {
+		readonly dev: boolean;
+		readonly publicPath?: (fileName: string) => string;
+	},
+) {
+	if (!options.dev || module.type !== 'resolver') return module.source;
+
+	return module.source.replace(SYMBOL_VIRTUAL_STRING_RE, (_match, _quote, virtualId) =>
+		JSON.stringify(devBrowserVirtualModuleUrl(virtualId, options.publicPath)),
+	);
+}
+
+function devBrowserVirtualModuleUrl(
+	virtualId: string,
+	publicPath: ((fileName: string) => string) | undefined,
+) {
+	const path = `@id/${resolveVirtualId(virtualId).replace('\0', '__x00__')}`;
+	return publicPath ? publicPath(path) : `/${path}`;
 }
 
 function normalizeVirtualId(id: string) {

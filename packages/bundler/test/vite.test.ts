@@ -179,6 +179,27 @@ describe('Vite adapter structure', () => {
 		);
 	});
 
+	test('serves dev symbol resolver tables with browser-loadable symbol module URLs', async () => {
+		const plugin = getAsyncPlugin();
+		const filename = '/workspace/app/src/App.tsrx';
+
+		callConfigResolved(plugin, {
+			base: '/dev/',
+			command: 'serve',
+			root: '/workspace/app',
+		});
+		await callTransform(plugin, source, filename, createViteHookContext('client'));
+
+		const resolverSource = await callLoad(
+			plugin,
+			`\0virtual:arcade:resolver:${encodeURIComponent(filename)}`,
+		);
+
+		expect(resolverSource).toContain('/dev/@id/__x00__virtual:arcade:symbol:');
+		expect(resolverSource).not.toContain('"virtual:arcade:symbol:');
+		expect(resolverSource).toContain('import(/* @vite-ignore */ moduleUrls[row[0]])');
+	});
+
 	test('hot updates invalidate generated virtual modules and send the custom event', async () => {
 		const plugin = getAsyncPlugin();
 		const send = vi.fn();
