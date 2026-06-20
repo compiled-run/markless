@@ -557,12 +557,64 @@ export type PayloadScriptsArtifact = {
 export type ClientEventOnlyEntryInput = {
 	readonly source: CompileTsrxModuleInput;
 	readonly semanticGraph: SemanticGraphArtifact;
+	readonly renderPlan: ClientEventOnlyRenderPlanArtifact;
 	readonly symbolResolver: SymbolResolverPlan;
 };
 
 export type ClientEventOnlyEntryArtifact = {
 	readonly passId: 'client-event-only-entry';
 	readonly moduleSource: string | null;
+	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
+};
+
+export type ClientEventOnlyRenderPlanInput = {
+	readonly source: SemanticGraphInput;
+	readonly semanticGraph: SemanticGraphArtifact;
+	readonly payloadArena: PayloadArenaArtifact;
+	readonly symbolResolver: SymbolResolverPlan;
+};
+
+export type ClientEventOnlyRenderPlanTextBinding = {
+	readonly source: string;
+	readonly itemPath: ReadonlyArray<string>;
+	readonly nodePath: ReadonlyArray<number>;
+};
+
+export type ClientEventOnlyRenderPlanClassBinding = {
+	readonly source: string;
+	readonly hostPath: ReadonlyArray<number>;
+	readonly stateGraphNodeId: string;
+	readonly statePath: ReadonlyArray<string>;
+	readonly itemPath: ReadonlyArray<string>;
+	readonly trueClass: string;
+	readonly falseClass: string;
+};
+
+export type ClientEventOnlyRenderPlanEventControl = {
+	readonly eventName: string;
+	readonly hostPath: ReadonlyArray<number>;
+	readonly handlerSource: string;
+	readonly symbolId: string;
+};
+
+export type ClientEventOnlyRenderPlanKeyedRepeat = {
+	readonly repeatId: string;
+	readonly parentHostNodeId: string;
+	readonly rowHostNodeId?: string;
+	readonly itemName: string;
+	readonly collectionGraphNodeId: string;
+	readonly collectionPath: ReadonlyArray<string>;
+	readonly keyPath: ReadonlyArray<string>;
+	readonly rowTemplateHtml: string;
+	readonly textBindings: ReadonlyArray<ClientEventOnlyRenderPlanTextBinding>;
+	readonly classBindings: ReadonlyArray<ClientEventOnlyRenderPlanClassBinding>;
+	readonly eventControls: ReadonlyArray<ClientEventOnlyRenderPlanEventControl>;
+};
+
+export type ClientEventOnlyRenderPlanArtifact = {
+	readonly passId: 'client-event-only-render-plan';
+	readonly rootTemplateHtml: string | null;
+	readonly keyedRepeats: ReadonlyArray<ClientEventOnlyRenderPlanKeyedRepeat>;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
 };
 
@@ -628,6 +680,7 @@ export type CompileTsrxModuleResult = {
 	readonly protocolView: ProtocolViewPayload;
 	readonly payloadScripts: RenderedPayloadScripts;
 	readonly renderShell: string;
+	readonly clientEventOnlyRenderPlan: ClientEventOnlyRenderPlanArtifact;
 	readonly clientEventOnlyEntry: ClientEventOnlyEntryArtifact;
 	readonly symbolModules: SymbolModulesArtifact;
 	readonly symbolResolverModule: string;

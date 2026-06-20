@@ -24,6 +24,7 @@ test('default compiler passes declare stable artifact boundaries', () => {
 		'state-lowering',
 		'payload-arena',
 		'symbol-resolver',
+		'client-event-only-render-plan',
 		'capture-analysis',
 		'protocol-state',
 		'protocol-view',
@@ -52,6 +53,12 @@ test('default compiler passes declare stable artifact boundaries', () => {
 				description: expect.stringContaining('symbol'),
 				consumes: ['semanticGraph', 'stateLowering', 'payloadArena'],
 				produces: ['symbolResolver'],
+			}),
+			expect.objectContaining({
+				passId: 'client-event-only-render-plan',
+				description: expect.stringContaining('client event-only templates'),
+				consumes: ['source', 'semanticGraph', 'payloadArena', 'symbolResolver'],
+				produces: ['clientEventOnlyRenderPlan'],
 			}),
 			expect.objectContaining({
 				passId: 'capture-analysis',
@@ -405,6 +412,7 @@ test('compileTsrxModule validates and returns the default pass graph', async () 
 			'stateLowering',
 			'payloadArena',
 			'symbolResolver',
+			'clientEventOnlyRenderPlan',
 			'captureAnalysis',
 			'protocolState',
 			'protocolView',

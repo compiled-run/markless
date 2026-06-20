@@ -261,6 +261,15 @@ export function App() @{
 		symbols: [],
 	});
 
+	expect(result.clientEventOnlyRenderPlan.keyedRepeats).toEqual([
+		expect.objectContaining({
+			repeatId: 'repeat:0',
+			itemName: 'row',
+			collectionGraphNodeId: 'state:rows',
+			keyPath: ['id'],
+			rowTemplateHtml: expect.stringContaining('<tr class="">'),
+		}),
+	]);
 	expect(result.clientEventOnlyEntry.moduleSource).toBeNull();
 });
 

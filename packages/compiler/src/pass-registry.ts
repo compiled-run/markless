@@ -26,6 +26,12 @@ export const defaultCompilerPasses: ReadonlyArray<CompilerPassDefinition> = [
 		produces: ['symbolResolver'],
 	},
 	{
+		passId: 'client-event-only-render-plan',
+		description: 'Plan structural client event-only templates for generated direct DOM emit.',
+		consumes: ['source', 'semanticGraph', 'payloadArena', 'symbolResolver'],
+		produces: ['clientEventOnlyRenderPlan'],
+	},
+	{
 		passId: 'capture-analysis',
 		description: 'Analyze extracted symbol sources for resumable capture eligibility.',
 		consumes: ['semanticGraph', 'symbolResolver'],
