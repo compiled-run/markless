@@ -57,8 +57,9 @@ jobs:
             - name: Install JS Framework Benchmark dependencies
               working-directory: ${{ env.JSFB_ROOT }}
               run: |
-                  npm ci
-                  npm run install-local
+                  npm ci --ignore-scripts
+                  npm run install-webdriver-ts
+                  npm run install-server
 
             - name: Install Arcade benchmark fixture
               run: pnpm bench:jsfb:prepare -- --jsfb-root "$JSFB_ROOT"
