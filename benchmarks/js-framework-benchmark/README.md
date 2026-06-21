@@ -23,12 +23,13 @@ To reproduce the CI setup locally with a JSFB checkout:
 ```sh
 git clone https://github.com/krausest/js-framework-benchmark.git ../js-framework-benchmark
 cd ../js-framework-benchmark
-npm ci
-npm run install-local
+npm ci --ignore-scripts
+npm run install-webdriver-ts
+npm run install-server
 cd ../arcade
 pnpm bench:jsfb:prepare -- --jsfb-root ../js-framework-benchmark
 cd ../js-framework-benchmark
-npm run rebuild-ci -- keyed/arcade
+ARCADE_REPO_ROOT=../arcade node --input-type=module -e "import { rebuildFrameworks } from './cli/rebuild-build-single.js'; if (!rebuildFrameworks(['keyed/arcade'], true)) process.exit(1);"
 npm start
 ```
 
@@ -39,12 +40,10 @@ cd ../js-framework-benchmark
 npm run bench -- \
 	--headless \
 	--framework keyed/arcade \
-	--benchmark 01_ 02_ 03_ 04_ 05_ 06_ 07_ 08_ 09_ 41_ 42_ 43_ \
-	--resultsDir "$PWD/webdriver-ts/results-arcade-local" \
-	--tracesDir "$PWD/webdriver-ts/traces-arcade-local"
+	--benchmark 01_ 02_ 03_ 04_ 05_ 06_ 07_ 08_ 09_ 40_
 
 cd ../arcade
-ARCADE_JSFB_RESULTS=../js-framework-benchmark/webdriver-ts/results-arcade-local pnpm test
+ARCADE_JSFB_RESULTS=../js-framework-benchmark/webdriver-ts/results pnpm test
 ```
 
 Run the guard against a JS Framework Benchmark results directory:
