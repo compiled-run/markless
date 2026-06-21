@@ -56,6 +56,10 @@ a time through failing tests.
   for many distinct symbols on one page. It measures compact resolver-table
   loading and event-only resumer dispatch for multiple symbol-count
   cardinalities without relying on the current POC TSRX dependency path.
+- [`ios-native-rendering-target`](./ios-native-rendering-target/): iOS native
+  target scaffold proving a serialized Arcade-style graph/projection artifact
+  can create UIKit controls, run a JavaScriptCore event symbol, and flush graph
+  state back into native text when full Xcode simulator tooling is available.
 
 ## Pass-Boundary Order
 
