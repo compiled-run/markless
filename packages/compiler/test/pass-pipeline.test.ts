@@ -63,7 +63,13 @@ test('default compiler passes declare stable artifact boundaries', () => {
 			expect.objectContaining({
 				passId: 'public-render-module',
 				description: expect.stringContaining('public render component'),
-				consumes: ['semanticGraph', 'publicRenderPlan', 'protocolState', 'protocolView'],
+				consumes: [
+					'semanticGraph',
+					'publicRenderPlan',
+					'symbolResolver',
+					'protocolState',
+					'protocolView',
+				],
 				produces: ['publicRenderModule'],
 			}),
 			expect.objectContaining({

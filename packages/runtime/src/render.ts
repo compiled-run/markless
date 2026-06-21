@@ -1,9 +1,5 @@
 import type { ProtocolStatePayload, ProtocolViewPayload } from '@arcade/protocol';
-import type {
-	EventOnlyResumeContainer,
-	EventOnlyResumeDomElement,
-	EventOnlyResumeDomEvent,
-} from './event-only-resume.ts';
+import type { EventOnlyResumeContainer } from './event-only-resume.ts';
 import type { RuntimeGraph } from './graph.ts';
 import type {
 	ResumeDomElement,
@@ -67,46 +63,14 @@ export async function render(
 		};
 	}
 
-	if (canUseEventOnlyCsrRuntime(output, state, view)) {
-		const { createEventOnlyResumeContainerFromPayloads } =
-			await import('./event-only-resume.ts');
-		const runtime = await createEventOnlyResumeContainerFromPayloads({
-			root: output.root as EventOnlyResumeDomElement,
-			state,
-			view,
-			loadSymbol: loadSymbol as unknown as Parameters<
-				typeof createEventOnlyResumeContainerFromPayloads
-			>[0]['loadSymbol'],
-		});
-		startEventOnlyCsrRuntime(output.root as EventOnlyResumeDomElement, view, runtime);
-
-		return {
-			phase: 'csr',
-			root: output.root,
-			graph: runtime.graph as RuntimeGraph,
-			runtime,
-		};
-	}
-
-	const graph = output.graph ?? (await createFullRuntimeGraph(state, !!output.state));
-	const { createResumeRuntime } = await import('./resume.ts');
-	const runtime = createResumeRuntime({
-		root: output.root,
-		graph,
+	const { renderCsrRuntime } = await import('./render-csr.ts');
+	return renderCsrRuntime({
+		output,
+		state,
 		view,
 		loadSymbol,
-		createVisibilityObserver: options.createVisibilityObserver,
-		createRemovalObserver: options.createRemovalObserver,
-		applyDomJournal: options.applyDomJournal,
+		options,
 	});
-	await runtime.start();
-
-	return {
-		phase: 'csr',
-		root: output.root,
-		graph,
-		runtime,
-	};
 }
 
 function mountRoot(target: RenderTarget, root: ResumeDomElement): void {
@@ -121,53 +85,6 @@ function mountRoot(target: RenderTarget, root: ResumeDomElement): void {
 	throw new TypeError(
 		'render(App, { target }) requires a target that can receive the root node.',
 	);
-}
-
-function canUseEventOnlyCsrRuntime(
-	output: CsrRenderOutput,
-	state: ProtocolStatePayload,
-	view: ProtocolViewPayload,
-): boolean {
-	if (output.graph) return false;
-	if ((state.sharedDefinitions?.length ?? 0) > 0) return false;
-	if (state.computed.length > 0) return false;
-	if (view.behaviors.length > 0) return false;
-	if (view.elementHandles.length > 0) return false;
-	if (view.asyncBoundaries.length > 0) return false;
-	if (view.events.some((event) => event.eventName === 'visible' || !!event.syncPolicy)) {
-		return false;
-	}
-	return true;
-}
-
-function startEventOnlyCsrRuntime(
-	root: EventOnlyResumeDomElement,
-	view: ProtocolViewPayload,
-	runtime: EventOnlyResumeContainer,
-): void {
-	const eventNames = new Set(view.events.map((event) => event.eventName));
-	for (const eventName of eventNames) {
-		root.addEventListener?.(
-			eventName,
-			async (event: EventOnlyResumeDomEvent) => {
-				await runtime.dispatch(event);
-			},
-			{ capture: true },
-		);
-	}
-}
-
-async function createFullRuntimeGraph(
-	state: ProtocolStatePayload,
-	hasAuthoredState: boolean,
-): Promise<RuntimeGraph> {
-	if (hasAuthoredState) {
-		const { createRuntimeGraphFromStatePayload } = await import('./payload.ts');
-		return createRuntimeGraphFromStatePayload(state);
-	}
-
-	const { createRuntimeGraph } = await import('./graph.ts');
-	return createRuntimeGraph({ cells: [] });
 }
 
 function emptyStatePayload(): ProtocolStatePayload {

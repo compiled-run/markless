@@ -47,7 +47,13 @@ export const defaultCompilerPasses: ReadonlyArray<CompilerPassDefinition> = [
 		passId: 'public-render-module',
 		description:
 			'Emit public render component factories from compiler-proven render artifacts.',
-		consumes: ['semanticGraph', 'publicRenderPlan', 'protocolState', 'protocolView'],
+		consumes: [
+			'semanticGraph',
+			'publicRenderPlan',
+			'symbolResolver',
+			'protocolState',
+			'protocolView',
+		],
 		produces: ['publicRenderModule'],
 	},
 	{

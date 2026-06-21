@@ -102,6 +102,213 @@ export function App() @{
 }
 `;
 
+type PublicRenderTestListener = (event: { readonly type: string }) => unknown;
+type PublicRenderTestGraph = {
+	readonly read: (graphNodeId: string, path?: readonly string[]) => unknown;
+	readonly write: (write: { readonly graphNodeId: string; readonly value: unknown }) => void;
+};
+
+class PublicRenderTestText {
+	readonly nodeType = 3;
+	parentElement: PublicRenderTestElement | null = null;
+
+	constructor(private value: string) {}
+
+	get textContent() {
+		return this.value;
+	}
+
+	set textContent(value: string) {
+		this.value = value;
+	}
+
+	cloneNode() {
+		return new PublicRenderTestText(this.value);
+	}
+}
+
+class PublicRenderTestElement {
+	readonly nodeType = 1;
+	readonly childNodes: Array<PublicRenderTestElement | PublicRenderTestText> = [];
+	readonly attributes = new Map<string, string>();
+	readonly listeners = new Map<string, PublicRenderTestListener[]>();
+	parentElement: PublicRenderTestElement | null = null;
+
+	constructor(readonly tagName: string) {}
+
+	get firstElementChild() {
+		return this.childNodes.find((child) => child.nodeType === 1) as
+			| PublicRenderTestElement
+			| undefined;
+	}
+
+	get nextSibling() {
+		const siblings = this.parentElement?.childNodes;
+		const index = siblings?.indexOf(this) ?? -1;
+		return index >= 0 ? siblings?.[index + 1] : undefined;
+	}
+
+	get textContent(): string {
+		return this.childNodes.map((child) => child.textContent).join('');
+	}
+
+	set textContent(value: string) {
+		this.replaceChildren(...(value ? [new PublicRenderTestText(value)] : []));
+	}
+
+	appendChild(child: PublicRenderTestElement | PublicRenderTestText) {
+		child.parentElement?.removeChild(child);
+		child.parentElement = this;
+		this.childNodes.push(child);
+		return child;
+	}
+
+	replaceChildren(...children: Array<PublicRenderTestElement | PublicRenderTestText>) {
+		for (const child of this.childNodes) child.parentElement = null;
+		this.childNodes.length = 0;
+		for (const child of children) this.appendChild(child);
+	}
+
+	insertBefore(
+		child: PublicRenderTestElement | PublicRenderTestText,
+		before: PublicRenderTestElement | PublicRenderTestText | undefined,
+	) {
+		child.parentElement?.removeChild(child);
+		const index = before ? this.childNodes.indexOf(before) : -1;
+		child.parentElement = this;
+		this.childNodes.splice(index >= 0 ? index : this.childNodes.length, 0, child);
+		return child;
+	}
+
+	removeChild(child: PublicRenderTestElement | PublicRenderTestText) {
+		const index = this.childNodes.indexOf(child);
+		if (index >= 0) this.childNodes.splice(index, 1);
+		child.parentElement = null;
+		return child;
+	}
+
+	remove() {
+		this.parentElement?.removeChild(this);
+	}
+
+	setAttribute(name: string, value: string) {
+		this.attributes.set(name, value);
+	}
+
+	getAttribute(name: string) {
+		return this.attributes.get(name);
+	}
+
+	addEventListener(type: string, listener: PublicRenderTestListener) {
+		const listeners = this.listeners.get(type) ?? [];
+		listeners.push(listener);
+		this.listeners.set(type, listeners);
+	}
+
+	async dispatch(type: string) {
+		for (const listener of this.listeners.get(type) ?? []) {
+			await listener({ type });
+		}
+	}
+
+	cloneNode(deep = false) {
+		const clone = new PublicRenderTestElement(this.tagName);
+		for (const [name, value] of this.attributes) clone.attributes.set(name, value);
+		if (deep) clone.replaceChildren(...this.childNodes.map((child) => child.cloneNode(true)));
+		return clone;
+	}
+}
+
+class PublicRenderTestTemplate {
+	readonly content = new PublicRenderTestElement('#fragment');
+
+	set innerHTML(html: string) {
+		this.content.replaceChildren(...parsePublicRenderTestHtml(html));
+	}
+}
+
+function parsePublicRenderTestHtml(html: string) {
+	const root = new PublicRenderTestElement('#root');
+	const stack = [root];
+	const tokens = html.match(/<\/?[^>]+>|[^<]+/g) ?? [];
+
+	for (const token of tokens) {
+		const parent = stack[stack.length - 1]!;
+		if (token.startsWith('</')) {
+			stack.pop();
+			continue;
+		}
+		if (token.startsWith('<')) {
+			const match = token.match(/^<([A-Za-z][\w-]*)([^>]*)>/);
+			if (!match) continue;
+			const element = new PublicRenderTestElement(match[1]!.toLowerCase());
+			for (const attribute of match[2]!.matchAll(/\s+([^\s=]+)(?:="([^"]*)")?/g)) {
+				element.setAttribute(attribute[1]!, attribute[2] ?? '');
+			}
+			parent.appendChild(element);
+			if (!token.endsWith('/>')) stack.push(element);
+			continue;
+		}
+		parent.appendChild(new PublicRenderTestText(token));
+	}
+
+	return root.childNodes;
+}
+
+async function importPublicRenderTestModule(
+	source: string,
+	globals?: {
+		readonly document: unknown;
+		readonly loadSymbol: unknown;
+	},
+): Promise<Record<string, unknown>> {
+	const globalScope = globalThis as typeof globalThis & {
+		__arcadePublicRenderTestDocument?: unknown;
+		__arcadePublicRenderTestLoadSymbol?: unknown;
+	};
+	const previousDocument = globalScope.__arcadePublicRenderTestDocument;
+	const previousLoadSymbol = globalScope.__arcadePublicRenderTestLoadSymbol;
+	if (globals) {
+		globalScope.__arcadePublicRenderTestDocument = globals.document;
+		globalScope.__arcadePublicRenderTestLoadSymbol = globals.loadSymbol;
+	}
+
+	try {
+		return (await import(
+			`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`
+		)) as Record<string, unknown>;
+	} finally {
+		globalScope.__arcadePublicRenderTestDocument = previousDocument;
+		globalScope.__arcadePublicRenderTestLoadSymbol = previousLoadSymbol;
+	}
+}
+
+function products(...items: ReadonlyArray<readonly [sku: string, name: string]>) {
+	return items.map(([sku, name]) => ({
+		meta: { sku },
+		copy: { name },
+	}));
+}
+
+function elementsByTag(root: PublicRenderTestElement, tagName: string): PublicRenderTestElement[] {
+	const matches: PublicRenderTestElement[] = [];
+	const visit = (node: PublicRenderTestElement | PublicRenderTestText) => {
+		if (node.nodeType !== 1) return;
+		if (node.tagName === tagName) matches.push(node);
+		for (const child of node.childNodes) visit(child);
+	};
+	visit(root);
+	return matches;
+}
+
+function rowTexts(root: PublicRenderTestElement): string[] {
+	return elementsByTag(root, 'li').map((row) => row.textContent);
+}
+
+function rowClasses(root: PublicRenderTestElement): Array<string | undefined> {
+	return elementsByTag(root, 'li').map((row) => row.getAttribute('class'));
+}
+
 test('compileTsrxModule orchestrates source to payload scripts and resolver module', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/App.tsrx',
@@ -276,6 +483,114 @@ export function App() @{
 	]) {
 		expect(moduleSource).not.toContain(unexpected);
 	}
+});
+
+test('compileTsrxModule public render module runs alternate keyed repeat shapes', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Catalog.tsrx',
+		source: `
+import { state } from '@arcade/core';
+
+export function Catalog() @{
+	let catalog = state([]);
+	let activeSku = state(null);
+
+	<div>
+		<button onClick={() => catalog = catalog}>Apply</button>
+		<ul>
+			@for (const product of catalog; key product.meta.sku) {
+				<li class={activeSku === product.meta.sku ? 'focused' : 'muted'}>
+					<strong>{product.copy.name}</strong>
+					<em>{product.meta.sku}</em>
+					<button onClick={() => activeSku = product.meta.sku}>Focus</button>
+				</li>
+			}
+		</ul>
+	</div>
+}
+`,
+		symbols: [],
+	});
+	const syncSymbol = result.symbolResolver.symbols.find((symbol) =>
+		symbol.source.includes('catalog = catalog'),
+	);
+	const focusSymbol = result.symbolResolver.symbols.find((symbol) =>
+		symbol.source.includes('activeSku = product.meta.sku'),
+	);
+	const focusModule = result.symbolModules.modules.find(
+		(module) => module.symbolId === focusSymbol?.id,
+	);
+	expect(syncSymbol).toBeDefined();
+	expect(focusSymbol).toBeDefined();
+	expect(focusModule).toBeDefined();
+
+	const focusExports = await importPublicRenderTestModule(focusModule!.source);
+	const scenarios = [
+		products(['amber-1', 'Amber'], ['blue-2', 'Blue']),
+		products(['amber-1', 'Amber'], ['blue-2', 'Blue'], ['copper-3', 'Copper']),
+		products(['blue-2', 'Blue'], ['amber-1', 'Amber'], ['copper-3', 'Copper']),
+		products(['blue-2', 'Blue'], ['copper-3', 'Copper']),
+		[],
+	];
+	const loadSymbol = (symbolId: string) => {
+		if (symbolId === syncSymbol?.id) {
+			return ({ graph }: { readonly graph: PublicRenderTestGraph }) => {
+				graph.write({
+					graphNodeId: 'state:catalog',
+					value: scenarios.shift(),
+				});
+			};
+		}
+		if (symbolId === focusSymbol?.id) return focusExports[focusModule!.exportName];
+		throw new Error(`Unexpected public render test symbol ${symbolId}`);
+	};
+	const document = {
+		createElement(tagName: string) {
+			if (tagName === 'template') return new PublicRenderTestTemplate();
+			return new PublicRenderTestElement(tagName);
+		},
+	};
+	const publicModule = await importPublicRenderTestModule(
+		[
+			'const document = globalThis.__arcadePublicRenderTestDocument;',
+			'const loadSymbol = globalThis.__arcadePublicRenderTestLoadSymbol;',
+			result.publicRenderModule.moduleSource,
+		].join('\n'),
+		{ document, loadSymbol },
+	);
+	const rendered = publicModule.Catalog() as {
+		readonly root: PublicRenderTestElement;
+		readonly graph: PublicRenderTestGraph;
+	};
+	const apply = elementsByTag(rendered.root, 'button')[0]!;
+
+	await apply.dispatch('click');
+	expect(rowTexts(rendered.root)).toEqual(['Amberamber-1Focus', 'Blueblue-2Focus']);
+
+	await apply.dispatch('click');
+	expect(rowTexts(rendered.root)).toEqual([
+		'Amberamber-1Focus',
+		'Blueblue-2Focus',
+		'Coppercopper-3Focus',
+	]);
+
+	await elementsByTag(rendered.root, 'li')[1]!.childNodes[2]!.dispatch('click');
+	expect(rendered.graph.read('state:activeSku')).toBe('blue-2');
+	expect(rowClasses(rendered.root)).toEqual(['muted', 'focused', 'muted']);
+
+	await apply.dispatch('click');
+	expect(rowTexts(rendered.root)).toEqual([
+		'Blueblue-2Focus',
+		'Amberamber-1Focus',
+		'Coppercopper-3Focus',
+	]);
+
+	await apply.dispatch('click');
+	expect(rowTexts(rendered.root)).toEqual(['Blueblue-2Focus', 'Coppercopper-3Focus']);
+	expect(rowClasses(rendered.root)).toEqual(['focused', 'muted']);
+
+	await apply.dispatch('click');
+	expect(elementsByTag(rendered.root, 'li')).toEqual([]);
 });
 
 test('compileTsrxModule does not emit public render factories for non-literal direct state values', async () => {

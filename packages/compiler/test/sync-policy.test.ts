@@ -154,14 +154,14 @@ test('compiler extracts sync preventDefault policy while keeping writes lazy', a
 	]);
 
 	expect(stateLowering.writes).toEqual([
-		{
+		expect.objectContaining({
 			source: 'menu.open',
 			graphNodeId: 'state:menu',
 			path: ['open'],
 			operation: 'assign',
 			method: undefined,
 			valueSource: 'false',
-		},
+		}),
 	]);
 
 	expect(payload.view.events).toEqual([

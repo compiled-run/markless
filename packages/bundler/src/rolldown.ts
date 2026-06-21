@@ -54,6 +54,7 @@ type InternalArcadeRolldownOptions = ArcadeRolldownOptions & {
 
 const manifests = new Map<string, ArcadeManifest>();
 const TSRX_SOURCE_FILE = /\.tsrx(?:[?#].*)?$/;
+const SYMBOL_VIRTUAL_ID_RE = /^virtual:arcade:symbol:([^:]+):[^:]+$/;
 const SYMBOL_VIRTUAL_STRING_RE = /(["'`])((?:virtual:arcade:symbol:)[^"'`]+)\1/g;
 
 export const arcadeClient = (options: ArcadeRolldownOptions = {}) =>
@@ -129,11 +130,17 @@ export function createArcadeRolldownPlugin(input: {
 		outputOptions(output) {
 			return outputDefaults(output, getEnvironment(this));
 		},
-		resolveId(source) {
+		async resolveId(source, importer) {
 			const normalized = normalizeVirtualId(source);
 			if (virtualModules.has(normalized)) {
 				return { id: resolveVirtualId(normalized), moduleSideEffects: true };
 			}
+
+			const symbolSource = sourceForSymbolVirtualImporter(importer);
+			if (symbolSource && isRelativeImport(source)) {
+				return await this.resolve(source, symbolSource, { skipSelf: true });
+			}
+
 			return null;
 		},
 		load(id) {
@@ -378,6 +385,17 @@ function devBrowserVirtualModuleUrl(
 ) {
 	const path = `@id/${resolveVirtualId(virtualId).replace('\0', '__x00__')}`;
 	return publicPath ? publicPath(path) : `/${path}`;
+}
+
+function sourceForSymbolVirtualImporter(importer: string | undefined): string | null {
+	if (!importer) return null;
+
+	const match = normalizeVirtualId(importer).match(SYMBOL_VIRTUAL_ID_RE);
+	return match?.[1] ? decodeURIComponent(match[1]) : null;
+}
+
+function isRelativeImport(source: string): boolean {
+	return source.startsWith('./') || source.startsWith('../');
 }
 
 function normalizeVirtualId(id: string) {

@@ -168,6 +168,18 @@ describe('TSRX Rolldown plugin structure', () => {
 		);
 	});
 
+	test('base plugin resolves symbol module relative imports from the source module', async () => {
+		const plugin = arcadeClient();
+		const filename = '/workspace/app/src/ListControls.tsrx';
+		const symbolId = `virtual:arcade:symbol:${encodeURIComponent(filename)}:${encodeURIComponent('symbol:0')}`;
+		const resolve = vi.fn(async () => ({ id: '/workspace/app/src/items.ts' }));
+
+		const result = await callResolveId(plugin, './items', `\0${symbolId}`, { resolve });
+
+		expect(resolve).toHaveBeenCalledWith('./items', filename, { skipSelf: true });
+		expect(result).toEqual({ id: '/workspace/app/src/items.ts' });
+	});
+
 	test('buildStart clears stale virtual modules and transform manifests', async () => {
 		let manifest:
 			| {

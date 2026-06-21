@@ -149,6 +149,7 @@ export type SemanticEvent = {
 	readonly eventName: string;
 	readonly handlerCount: number;
 	readonly handlerSources: ReadonlyArray<string>;
+	readonly handlerSpans: ReadonlyArray<SourceSpan | undefined>;
 	readonly handlerParameters: ReadonlyArray<ReadonlyArray<string>>;
 	readonly hasSyncPolicyCandidate: boolean;
 	readonly syncPolicy?: SemanticSyncPolicy;
@@ -301,6 +302,7 @@ export type LoweredStateRead = {
 
 export type LoweredStateWrite = {
 	readonly source: string;
+	readonly sourceSpan?: SourceSpan;
 	readonly graphNodeId: string;
 	readonly path: ReadonlyArray<string>;
 	readonly operation: SemanticStateWrite['operation'];
@@ -638,6 +640,7 @@ export type PublicRenderPlanArtifact = {
 export type PublicRenderModuleInput = {
 	readonly semanticGraph: SemanticGraphArtifact;
 	readonly publicRenderPlan: PublicRenderPlanArtifact;
+	readonly symbolResolver: SymbolResolverPlan;
 	readonly protocolState: ProtocolStatePayload;
 	readonly protocolView: ProtocolViewPayload;
 };

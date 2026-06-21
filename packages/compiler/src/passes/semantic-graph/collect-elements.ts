@@ -126,6 +126,7 @@ function collectAttribute(
 	if (isEventAttribute(attributeName)) {
 		const handlers = eventHandlerExpressions(expressionValue);
 		const handlerSources = handlers.map((handler) => expressionSource(handler, state.source));
+		const handlerSpans = handlers.map((handler) => sourceSpan(handler, state.filename));
 		const handlerParameters = handlers.map(handlerParameterNames);
 		const syncPolicy = extractSyncPolicy(expressionValue, state);
 		const hasSyncPolicyCandidate = hasSyncEventPolicyCandidate(expressionValue);
@@ -140,6 +141,7 @@ function collectAttribute(
 			eventName: normalizeEventName(attributeName),
 			handlerCount: getHandlerCount(expressionValue),
 			handlerSources,
+			handlerSpans,
 			handlerParameters,
 			hasSyncPolicyCandidate,
 			syncPolicy,

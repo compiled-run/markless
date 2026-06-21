@@ -4,11 +4,13 @@ import type {
 	PublicRenderModuleArtifact,
 	PublicRenderModuleInput,
 	PublicRenderPlanArtifact,
+	SymbolResolverPlan,
 } from '../artifacts.ts';
 
 type KeyedRepeatPlan = PublicRenderPlanArtifact['keyedRepeats'][number];
 type ProtocolState = PublicRenderModuleInput['protocolState'];
 type ProtocolView = PublicRenderModuleInput['protocolView'];
+type PublicGraphMethod = 'call' | 'delete';
 
 export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRenderModuleArtifact {
 	return {
@@ -18,6 +20,7 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 			publicRenderPlan: input.publicRenderPlan,
 			protocolState: input.protocolState,
 			protocolView: input.protocolView,
+			symbolResolver: input.symbolResolver,
 		}),
 		diagnostics: input.publicRenderPlan.diagnostics,
 	};
@@ -28,6 +31,7 @@ function emitPublicRenderComponents(input: {
 	readonly publicRenderPlan: PublicRenderPlanArtifact;
 	readonly protocolState: ProtocolState;
 	readonly protocolView: ProtocolView;
+	readonly symbolResolver: SymbolResolverPlan;
 }) {
 	if (
 		!input.publicRenderPlan.rootTemplateHtml ||
@@ -48,6 +52,7 @@ function emitPublicRenderComponents(input: {
 
 	const publicStaticEvents = emitPublicStaticEvents(publicView);
 	const componentFactories = input.componentNames.map((name) => emitComponentFactory(name));
+	const graphMethods = publicGraphMethods(input.symbolResolver);
 	const repeatCalls = input.publicRenderPlan.keyedRepeats.map(
 		(_repeat, index) => `	syncArcadePublicRepeat${index}(root, graph, loadSymbolForRepeat);`,
 	);
@@ -69,11 +74,11 @@ function emitPublicRenderComponents(input: {
 		'',
 		'function createArcadePublicRoot() {\n\tconst template = document.createElement("template");\n\ttemplate.innerHTML = arcadePublicRootTemplate;\n\tconst root = template.content.firstElementChild;\n\tif (!root) throw new Error("Arcade public render template did not create a root element.");\n\treturn root;\n}',
 		'',
-		'function createArcadePublicLoadSymbol(root) {\n\treturn async function loadArcadePublicSymbol(symbolId) {\n\t\tconst loaded = loadSymbol(symbolId);\n\t\tconst symbol = isArcadePublicPromise(loaded) ? await loaded : loaded;\n\t\treturn async function runArcadePublicSymbol(context) {\n\t\t\tconst result = symbol(context);\n\t\t\tconst value = isArcadePublicPromise(result) ? await result : result;\n\t\t\tsyncArcadePublicRepeats(root, context.graph, loadArcadePublicSymbol);\n\t\t\treturn value;\n\t\t};\n\t};\n}',
+		'function createArcadePublicLoadSymbol(root) {\n\treturn async function loadArcadePublicSymbol(symbolId) {\n\t\tconst symbol = await loadSymbol(symbolId);\n\t\treturn async function runArcadePublicSymbol(context) {\n\t\t\tconst value = await symbol(context);\n\t\t\tsyncArcadePublicRepeats(root, context.graph, loadArcadePublicSymbol);\n\t\t\treturn value;\n\t\t};\n\t};\n}',
 		'',
 		'function createArcadePublicRuntime(graph) {\n\treturn {\n\t\tgraph,\n\t\tview: { version: 1, locators: [], events: [], domUpdates: [], behaviors: [], elementHandles: [], asyncBoundaries: [] },\n\t\tasync dispatch() {},\n\t};\n}',
 		'',
-		'function createArcadePublicGraph() {\n\tconst cells = new Map(arcadePublicStateEntries.map(([id, value]) => [id, cloneArcadePublicValue(value)]));\n\treturn {\n\t\tread(graphNodeId, path = []) { return readArcadePublicPath(cells.get(graphNodeId), path); },\n\t\twrite(write) { const path = write.path ?? []; cells.set(write.graphNodeId, writeArcadePublicPath(cells.get(write.graphNodeId), path, write.value)); },\n\t\tupdate(update) { const path = update.path ?? []; const currentValue = readArcadePublicPath(cells.get(update.graphNodeId), path); const nextValue = update.update(currentValue); cells.set(update.graphNodeId, writeArcadePublicPath(cells.get(update.graphNodeId), path, nextValue)); if (update.returnValue === "previous") return currentValue; if (update.returnValue === "next") return nextValue; },\n\t\tcall(call) { const target = readArcadePublicPath(cells.get(call.graphNodeId), call.path ?? []); const method = target?.[call.method]; if (typeof method !== "function") throw new TypeError("Unsupported Arcade public graph call."); return method.apply(target, call.args ?? []); },\n\t\tdelete(deletion) { const path = deletion.path ?? []; if (path.length === 0) return false; const parent = readArcadePublicPath(cells.get(deletion.graphNodeId), path.slice(0, -1)); if (!parent || typeof parent !== "object") return true; return delete parent[path[path.length - 1]]; },\n\t\tasync flush() {},\n\t};\n}',
+		emitCreatePublicGraph(graphMethods),
 		'',
 		'function attachArcadePublicStaticEvents(root, graph, loadSymbolForEvent) {\n\tfor (const [index, eventName, symbolIds] of arcadePublicStaticEvents) {\n\t\tconst element = elementAtDomOrder(root, index);\n\t\tif (!element?.addEventListener) continue;\n\t\telement.addEventListener(eventName, async (event) => {\n\t\t\tfor (const symbolId of symbolIds) {\n\t\t\t\tconst symbol = await loadSymbolForEvent(symbolId);\n\t\t\t\tawait symbol({ graph, event, element, getElementHandle: () => undefined });\n\t\t\t}\n\t\t\tawait graph.flush();\n\t\t});\n\t}\n}',
 		'',
@@ -106,8 +111,6 @@ function emitPublicRenderComponents(input: {
 		'function cloneArcadePublicValue(value) {\n\tif (Array.isArray(value)) return value.map(cloneArcadePublicValue);\n\tif (value && typeof value === "object") { const clone = {}; for (const key of Object.keys(value)) clone[key] = cloneArcadePublicValue(value[key]); return clone; }\n\treturn value;\n}',
 		'',
 		'function stringifyArcadePublicValue(value) { return value == null ? "" : String(value); }',
-		'',
-		'function isArcadePublicPromise(value) { return !!value && typeof value.then === "function"; }',
 		'',
 	].join('\n');
 }
@@ -177,6 +180,42 @@ function emitPublicStaticEvents(publicView: ProtocolView): string {
 		})
 		.filter((entry): entry is string => entry !== null)
 		.join(',')}]`;
+}
+
+function publicGraphMethods(symbolResolver: SymbolResolverPlan): ReadonlySet<PublicGraphMethod> {
+	const methods = new Set<PublicGraphMethod>();
+	for (const symbol of symbolResolver.symbols) {
+		if (symbol.kind !== 'event-handler') continue;
+		for (const write of symbol.writes ?? []) {
+			if (write.operation === 'call') methods.add('call');
+			if (write.operation === 'delete') methods.add('delete');
+		}
+	}
+	return methods;
+}
+
+function emitCreatePublicGraph(methods: ReadonlySet<PublicGraphMethod>): string {
+	const optionalMethods = [
+		methods.has('call')
+			? '\t\tcall(call) { const target = readArcadePublicPath(cells.get(call.graphNodeId), call.path ?? []); const method = target?.[call.method]; if (typeof method !== "function") throw new TypeError("Unsupported Arcade public graph call."); return method.apply(target, call.args ?? []); },'
+			: null,
+		methods.has('delete')
+			? '\t\tdelete(deletion) { const path = deletion.path ?? []; if (path.length === 0) return false; const parent = readArcadePublicPath(cells.get(deletion.graphNodeId), path.slice(0, -1)); if (!parent || typeof parent !== "object") return true; return delete parent[path[path.length - 1]]; },'
+			: null,
+	].filter((method): method is string => method !== null);
+
+	return [
+		'function createArcadePublicGraph() {',
+		'\tconst cells = new Map(arcadePublicStateEntries.map(([id, value]) => [id, cloneArcadePublicValue(value)]));',
+		'\treturn {',
+		'\t\tread(graphNodeId, path = []) { return readArcadePublicPath(cells.get(graphNodeId), path); },',
+		'\t\twrite(write) { const path = write.path ?? []; cells.set(write.graphNodeId, writeArcadePublicPath(cells.get(write.graphNodeId), path, write.value)); },',
+		'\t\tupdate(update) { const path = update.path ?? []; const currentValue = readArcadePublicPath(cells.get(update.graphNodeId), path); const nextValue = update.update(currentValue); cells.set(update.graphNodeId, writeArcadePublicPath(cells.get(update.graphNodeId), path, nextValue)); if (update.returnValue === "previous") return currentValue; if (update.returnValue === "next") return nextValue; },',
+		...optionalMethods,
+		'\t\tflush() {},',
+		'\t};',
+		'}',
+	].join('\n');
 }
 
 function literalExpression(value: unknown): string {
@@ -250,9 +289,9 @@ function emitRepeatWriteFunction(repeat: KeyedRepeatPlan, index: number) {
 	const classWrites = repeat.classWrites.flatMap((write, writeIndex) => [
 		`	const classTarget${writeIndex} = nodeAtPath(row, ${JSON.stringify(write.hostPath)});`,
 		`	if (classTarget${writeIndex}?.setAttribute) {`,
-		`		const selected${writeIndex} = graph.read(${JSON.stringify(write.stateGraphNodeId)}, ${JSON.stringify(write.statePath)});`,
+		`		const stateValue${writeIndex} = graph.read(${JSON.stringify(write.stateGraphNodeId)}, ${JSON.stringify(write.statePath)});`,
 		`		const itemValue${writeIndex} = readArcadePublicPath(item, ${JSON.stringify(write.itemPath)});`,
-		`		classTarget${writeIndex}.setAttribute("class", selected${writeIndex} === itemValue${writeIndex} ? ${JSON.stringify(write.trueClass)} : ${JSON.stringify(write.falseClass)});`,
+		`		classTarget${writeIndex}.setAttribute("class", stateValue${writeIndex} === itemValue${writeIndex} ? ${JSON.stringify(write.trueClass)} : ${JSON.stringify(write.falseClass)});`,
 		'	}',
 	]);
 
@@ -268,21 +307,21 @@ function emitRepeatWriteFunction(repeat: KeyedRepeatPlan, index: number) {
 
 function emitRepeatClassStateFunction(repeat: KeyedRepeatPlan, index: number) {
 	const stateChecks = repeat.classWrites.flatMap((write, writeIndex) => [
-		`	const selected${writeIndex} = graph.read(${JSON.stringify(write.stateGraphNodeId)}, ${JSON.stringify(write.statePath)});`,
-		`	if (state.classValues[${writeIndex}] !== selected${writeIndex}) {`,
+		`	const stateValue${writeIndex} = graph.read(${JSON.stringify(write.stateGraphNodeId)}, ${JSON.stringify(write.statePath)});`,
+		`	if (state.classValues[${writeIndex}] !== stateValue${writeIndex}) {`,
 		`		updateArcadePublicRepeat${index}Class${writeIndex}(state, graph, state.classValues[${writeIndex}]);`,
-		`		updateArcadePublicRepeat${index}Class${writeIndex}(state, graph, selected${writeIndex});`,
-		`		state.classValues[${writeIndex}] = selected${writeIndex};`,
+		`		updateArcadePublicRepeat${index}Class${writeIndex}(state, graph, stateValue${writeIndex});`,
+		`		state.classValues[${writeIndex}] = stateValue${writeIndex};`,
 		'	}',
 	]);
 	const classUpdaters = repeat.classWrites.flatMap((write, writeIndex) => [
 		`function updateArcadePublicRepeat${index}Class${writeIndex}(state, graph, matchValue) {`,
-		`	const selected${writeIndex} = graph.read(${JSON.stringify(write.stateGraphNodeId)}, ${JSON.stringify(write.statePath)});`,
+		`	const stateValue${writeIndex} = graph.read(${JSON.stringify(write.stateGraphNodeId)}, ${JSON.stringify(write.statePath)});`,
 		'	for (const record of state.rows.values()) {',
 		`		const itemValue${writeIndex} = readArcadePublicPath(record.item, ${JSON.stringify(write.itemPath)});`,
 		`		if (itemValue${writeIndex} !== matchValue) continue;`,
 		`		const classTarget${writeIndex} = nodeAtPath(record.root, ${JSON.stringify(write.hostPath)});`,
-		`		if (classTarget${writeIndex}?.setAttribute) classTarget${writeIndex}.setAttribute("class", selected${writeIndex} === itemValue${writeIndex} ? ${JSON.stringify(write.trueClass)} : ${JSON.stringify(write.falseClass)});`,
+		`		if (classTarget${writeIndex}?.setAttribute) classTarget${writeIndex}.setAttribute("class", stateValue${writeIndex} === itemValue${writeIndex} ? ${JSON.stringify(write.trueClass)} : ${JSON.stringify(write.falseClass)});`,
 		'	}',
 		'}',
 		'',

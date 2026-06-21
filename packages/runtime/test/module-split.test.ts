@@ -47,5 +47,9 @@ test('render entry does not statically import event-only resume fallback code', 
 	expect(renderSource).not.toMatch(
 		/import\s*\{[\s\S]*createEventOnlyResumeContainerFromPayloads[\s\S]*\}\s*from\s+['"]\.\/event-only-resume\.ts['"]/,
 	);
-	expect(renderSource).toMatch(/await\s+import\(\s*['"]\.\/event-only-resume\.ts['"]\s*\)/);
+	expect(renderSource).toMatch(/await\s+import\(\s*['"]\.\/render-csr\.ts['"]\s*\)/);
+	expect(renderSource).not.toMatch(/await\s+import\(\s*['"]\.\/event-only-resume\.ts['"]\s*\)/);
+	expect(renderSource).not.toMatch(/await\s+import\(\s*['"]\.\/resume\.ts['"]\s*\)/);
+	expect(renderSource).not.toMatch(/await\s+import\(\s*['"]\.\/payload\.ts['"]\s*\)/);
+	expect(renderSource).not.toMatch(/await\s+import\(\s*['"]\.\/graph\.ts['"]\s*\)/);
 });

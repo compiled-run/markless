@@ -332,13 +332,13 @@ test('lowerStateAccess resolves parser-collected nested destructured aliases', a
 		]),
 	);
 	expect(lowered.writes).toEqual([
-		{
+		expect.objectContaining({
 			source: 'editableGroup',
 			graphNodeId: 'state:groups',
 			path: ['0'],
 			operation: 'assign',
 			valueSource: "['next']",
-		},
+		}),
 	]);
 	expect(lowered.diagnostics).toEqual([]);
 });
@@ -879,14 +879,14 @@ test('lowerStateAccess reports a structured diagnostic for const graph binding r
 
 	expect(lowered.writes).toEqual(
 		expect.arrayContaining([
-			{
+			expect.objectContaining({
 				source: 'menu.open',
 				graphNodeId: 'state:menu',
 				path: ['open'],
 				operation: 'assign',
 				method: undefined,
 				valueSource: 'true',
-			},
+			}),
 		]),
 	);
 	expect(lowered.writes).not.toEqual(

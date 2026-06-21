@@ -3,6 +3,7 @@ import type {
 	LoweredStateWrite,
 	PlannedSymbol,
 	SemanticModuleImport,
+	SourceSpan,
 	SymbolResolverInput,
 	SymbolResolverPlan,
 } from '../artifacts.ts';
@@ -14,6 +15,7 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 	for (const event of input.payloadArena.view.events) {
 		for (let order = 0; order < event.handlerCount; order++) {
 			const source = event.handlerSources[order] ?? '';
+			const sourceSpan = event.handlerSpans[order];
 			const moduleImports = referencedModuleImports(
 				input.semanticGraph.moduleImports,
 				source,
@@ -29,7 +31,7 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 				...(moduleImports.length > 0 ? { moduleImports } : {}),
 				order,
 				reads: eventReads(source, input.stateLowering?.reads),
-				writes: eventWrites(source, input.stateLowering?.writes),
+				writes: eventWrites(source, input.stateLowering?.writes, sourceSpan),
 			});
 		}
 	}
@@ -97,10 +99,14 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 function eventWrites(
 	handlerSource: string,
 	writes: ReadonlyArray<LoweredStateWrite> | undefined,
+	handlerSpan: SourceSpan | undefined,
 ): ReadonlyArray<LoweredStateWrite> {
 	if (!handlerSource || !writes?.length) return [];
 
-	return writes.filter((write) => handlerContainsWrite(handlerSource, write));
+	return writes.filter((write) => {
+		if (handlerSpan && write.sourceSpan) return spanContains(handlerSpan, write.sourceSpan);
+		return handlerContainsWrite(handlerSource, write);
+	});
 }
 
 function eventReads(
@@ -110,6 +116,14 @@ function eventReads(
 	if (!handlerSource || !reads?.length) return [];
 
 	return reads.filter((read) => handlerSource.includes(read.source));
+}
+
+function spanContains(container: SourceSpan, child: SourceSpan): boolean {
+	return (
+		container.filename === child.filename &&
+		child.start >= container.start &&
+		child.end <= container.end
+	);
 }
 
 function handlerContainsWrite(handlerSource: string, write: LoweredStateWrite): boolean {

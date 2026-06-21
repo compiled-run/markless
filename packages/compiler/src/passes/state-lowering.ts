@@ -143,6 +143,7 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 
 		writes.push({
 			source: write.target,
+			sourceSpan: write.targetSpan,
 			graphNodeId: resolved.binding.id,
 			path: resolved.path,
 			operation: write.operation,

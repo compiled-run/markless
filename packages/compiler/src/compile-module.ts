@@ -172,6 +172,7 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 						publicRenderModule: emitPublicRenderModule({
 							semanticGraph: inputs.semanticGraph as SemanticGraphArtifact,
 							publicRenderPlan: inputs.publicRenderPlan as PublicRenderPlanArtifact,
+							symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
 							protocolState:
 								inputs.protocolState as CompileTsrxModuleResult['protocolState'],
 							protocolView:
