@@ -18,6 +18,12 @@ jobs:
             ARCADE_JSFB_RESULTS: ${{ github.workspace }}/../js-framework-benchmark/webdriver-ts/results-arcade-ci
             ARCADE_JSFB_BASELINE_TRACES: ${{ github.workspace }}/../js-framework-benchmark/webdriver-ts/traces-arcade-base
             ARCADE_JSFB_TRACES: ${{ github.workspace }}/../js-framework-benchmark/webdriver-ts/traces-arcade-ci
+            NPM_CONFIG_AUDIT: "false"
+            NPM_CONFIG_FUND: "false"
+            NPM_CONFIG_PREFER_OFFLINE: "true"
+            PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+            PUPPETEER_SKIP_DOWNLOAD: "1"
+            CHROMEDRIVER_SKIP_DOWNLOAD: "true"
 
         steps:
             - uses: actions/checkout@v4
@@ -54,10 +60,18 @@ jobs:
             - name: Checkout JS Framework Benchmark
               run: git clone --depth 1 https://github.com/krausest/js-framework-benchmark.git "$JSFB_ROOT"
 
+            - name: Cache JS Framework Benchmark npm downloads
+              uses: actions/cache@v4
+              with:
+                  path: ~/.npm
+                  key: jsfb-npm-${{ runner.os }}-node24-v1
+                  restore-keys: |
+                      jsfb-npm-${{ runner.os }}-node24-
+
             - name: Install JS Framework Benchmark dependencies
               working-directory: ${{ env.JSFB_ROOT }}
               run: |
-                  npm ci --ignore-scripts
+                  npm ci --ignore-scripts --prefer-offline --no-audit --fund=false
                   npm run install-webdriver-ts
                   npm run install-server
 
