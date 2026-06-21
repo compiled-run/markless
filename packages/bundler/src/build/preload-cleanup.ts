@@ -153,6 +153,7 @@ function stripImportedVitePreloadHelper(code: string): string {
 
 	const initCall = `${escapeRegExp(helper.initFunction)}\\(\\)`;
 	return withoutImport
+		.replace(new RegExp(String.raw`,${initCall},`, 'g'), ',')
 		.replace(new RegExp(String.raw`\{${initCall},`, 'g'), '{')
 		.replace(new RegExp(String.raw`,${initCall}\}`, 'g'), '}')
 		.replace(new RegExp(String.raw`\{${initCall}\}`, 'g'), '{}');

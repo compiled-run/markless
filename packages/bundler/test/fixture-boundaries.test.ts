@@ -127,10 +127,10 @@ describe('fixture framework boundaries', () => {
 		const box = await readBox('csr-preview.box.ts');
 
 		expect(box).toContain('runtimeSizeReport');
-		expect(box).toContain('CSR startup runtime size');
+		expect(box).toContain('CSR preloaded runtime size');
 		expect(box).toContain('CSR interaction runtime size');
 		expect(box).toContain('MAX_INTERACTION_RUNTIME_CHUNK_GZIP_BYTES = 0');
-		expect(box).toContain('MAX_INTERACTION_SCRIPT_COUNT = 1');
+		expect(box).toContain('MAX_INTERACTION_SCRIPT_COUNT = 0');
 	});
 });
 

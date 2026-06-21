@@ -95,13 +95,17 @@ function bundleGraphRecords(manifest: ArcadeManifest, bundleGraphAdders?: Set<Bu
 		for (const symbol of module.symbols) {
 			if (!symbol.fileName) continue;
 			const bundle = manifest.bundles[symbol.fileName];
+			const imports = [
+				...(bundle?.imports ?? []),
+				...(module.resolver.fileName ? [module.resolver.fileName] : []),
+			];
 			const symbolBundle: BundleGraphRecord = {
 				size: 0,
 				total: 0,
 				dynamicImports: [symbol.fileName],
 			};
-			if (bundle?.imports) {
-				symbolBundle.imports = [...bundle.imports];
+			if (imports.length > 0) {
+				symbolBundle.imports = imports;
 			}
 			graph[symbol.symbolId] = symbolBundle;
 		}

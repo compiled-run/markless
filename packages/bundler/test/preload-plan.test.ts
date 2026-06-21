@@ -35,6 +35,21 @@ describe('module preload planning', () => {
 		expect(preloads).toContain('build/visible.js');
 	});
 
+	test('includes the generated resolver chunk for lazy symbol roots', () => {
+		const graph = convertManifestToBundleGraph(manifestWithResolverChunk());
+
+		const preloads = planModulePreloadUrls({
+			base: '/assets/',
+			bundleGraph: graph,
+			roots: ['symbol:click'],
+		});
+
+		expect(preloads).toContain('/assets/build/resolver.js');
+		expect(preloads.indexOf('/assets/build/resolver.js')).toBeLessThan(
+			preloads.indexOf('/assets/build/click.js'),
+		);
+	});
+
 	test('keeps framework API priority and fetch priority on planned links', () => {
 		const graph = convertManifestToBundleGraph(manifestWithComplexSymbolDeps());
 
@@ -128,6 +143,46 @@ function manifestWithComplexSymbolDeps(): ArcadeManifest {
 				size: 500,
 				total: 500,
 				origins: ['src/nested.ts'],
+			},
+		},
+	};
+}
+
+function manifestWithResolverChunk(): ArcadeManifest {
+	return {
+		version: 1,
+		manifestHash: 'test',
+		modules: [
+			{
+				source: '/workspace/app/src/root.tsrx',
+				payload: { virtualModuleId: 'virtual:arcade:payload:root' },
+				resolver: {
+					fileName: 'build/resolver.js',
+					virtualModuleId: 'virtual:arcade:resolver:root',
+				},
+				moduleManifest: { virtualModuleId: 'virtual:arcade:module-manifest:root' },
+				symbols: [
+					{
+						symbolId: 'symbol:click',
+						kind: 'event-handler',
+						exportName: 'onClick',
+						virtualModuleId: 'virtual:arcade:symbol:root:click',
+						fileName: 'build/click.js',
+					},
+				],
+			},
+		],
+		bundles: {
+			'build/click.js': {
+				size: 900,
+				total: 900,
+				symbols: ['symbol:click'],
+				origins: ['src/root.tsrx'],
+			},
+			'build/resolver.js': {
+				size: 500,
+				total: 500,
+				origins: ['src/root.tsrx'],
 			},
 		},
 	};
