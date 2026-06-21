@@ -1,11 +1,12 @@
 {
-	"name": "@arcadejs/runtime",
+	"name": "@arcade/runtime",
 	"version": "0.0.0",
 	"private": true,
 	"type": "module",
 	"sideEffects": false,
 	"exports": {
 		".": "./src/index.ts",
+		"./dom-journal": "./src/dom-journal.ts",
 		"./dom-update": "./src/dom-update.ts",
 		"./event-only-resume": "./src/event-only-resume.ts",
 		"./event-resume": "./src/event-resume.ts",
@@ -14,7 +15,7 @@
 		"./resume": "./src/payload.ts"
 	},
 	"dependencies": {
-		"@arcadejs/protocol": "workspace:*",
-		"@arcadejs/serializer": "workspace:*"
+		"@arcade/protocol": "workspace:*",
+		"@arcade/serializer": "workspace:*"
 	}
 }

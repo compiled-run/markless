@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { buildSemanticGraph } from '../src/index.ts';
 
 const source = `
-import { state, computed, element } from '@arcadejs/core';
+import { state, computed, element } from '@arcade/core';
 import { makeChart } from './chart';
 
 export function App({ label }: { label: string }) @{
@@ -45,7 +45,7 @@ export function App({ label }: { label: string }) @{
 `;
 
 const sharedSource = `
-import { shared, state, computed } from '@arcadejs/core';
+import { shared, state, computed } from '@arcade/core';
 
 export const session = shared(() => {
 	const data = state({ user: null, status: 'anonymous' });
@@ -69,7 +69,7 @@ export function Header() @{
 `;
 
 const sharedDependencySource = `
-import { shared, state } from '@arcadejs/core';
+import { shared, state } from '@arcade/core';
 
 export const session = shared(() => {
 	const data = state({ user: null });
@@ -93,30 +93,28 @@ export function CartButton() @{
 }
 `;
 
-const keyedTableSource = `
-import { state } from '@arcadejs/core';
+const keyedPanelSource = `
+import { state } from '@arcade/core';
 
 export function App() @{
-	const rows = state([]);
-	const selected = state(null);
+	const panels = state([]);
+	const active = state(null);
 
-	<div>
-		<table>
-			<tbody>
-				@for (const row of rows; key row.id) {
-					<tr class={selected === row.id ? 'active' : ''}>
-						<td>{row.id}</td>
-						<td>{row.label}</td>
-					</tr>
-				}
-			</tbody>
-		</table>
-	</div>
+	<aside>
+		<section>
+			@for (const panel of panels; key panel.slug) {
+				<article class={active === panel.slug ? 'active' : ''}>
+					<h3>{panel.title}</h3>
+					<p>{panel.summary}</p>
+				</article>
+			}
+		</section>
+	</aside>
 }
 `;
 
 const keyedListSource = `
-import { state } from '@arcadejs/core';
+import { state } from '@arcade/core';
 
 export function App() @{
 	const items = state([]);
@@ -293,25 +291,25 @@ test('buildSemanticGraph creates the first production compiler artifact', async 
 	expect(graph.asyncBoundaries).toHaveLength(1);
 });
 
-test('buildSemanticGraph records keyed repeat structure without benchmark assumptions', async () => {
-	const tableGraph = await buildSemanticGraph({
-		filename: 'src/TableRows.tsrx',
-		source: keyedTableSource,
+test('buildSemanticGraph records keyed repeat structure across alternate host shapes', async () => {
+	const panelGraph = await buildSemanticGraph({
+		filename: 'src/Panels.tsrx',
+		source: keyedPanelSource,
 	});
-	const tableParent = tableGraph.hostNodes.find((hostNode) => hostNode.tagName === 'tbody');
-	const tableRow = tableGraph.hostNodes.find((hostNode) => hostNode.tagName === 'tr');
+	const panelParent = panelGraph.hostNodes.find((hostNode) => hostNode.tagName === 'section');
+	const panelRow = panelGraph.hostNodes.find((hostNode) => hostNode.tagName === 'article');
 
-	expect(tableGraph.keyedRepeats).toEqual([
+	expect(panelGraph.keyedRepeats).toEqual([
 		{
 			id: 'repeat:0',
-			parentHostNodeId: tableParent?.id,
-			rowHostNodeId: tableRow?.id,
-			itemName: 'row',
-			collectionSource: 'rows',
-			collectionGraphNodeId: 'state:rows',
+			parentHostNodeId: panelParent?.id,
+			rowHostNodeId: panelRow?.id,
+			itemName: 'panel',
+			collectionSource: 'panels',
+			collectionGraphNodeId: 'state:panels',
 			collectionPath: [],
-			keySource: 'row.id',
-			keyPath: ['id'],
+			keySource: 'panel.slug',
+			keyPath: ['slug'],
 		},
 	]);
 

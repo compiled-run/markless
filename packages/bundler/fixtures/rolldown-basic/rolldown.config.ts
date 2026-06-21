@@ -1,5 +1,5 @@
 import { defineConfig } from 'rolldown';
-import { arcadeClient, arcadeServer } from '@arcadejs/bundler/rolldown';
+import { arcadeClient, arcadeServer } from '@arcade/bundler/rolldown';
 
 export default defineConfig([
 	{

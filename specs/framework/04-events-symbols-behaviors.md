@@ -252,10 +252,10 @@ that maps symbol IDs from `arcade/view` to chunks and exports:
 ```ts
 const symbolManifest = [
 	1,
-	"build-ab12",
+	'build-ab12',
 	null,
-	["/build/chunk-ab12.js"],
-	["onKeyDown_7", "textBinding_8"],
+	['/build/chunk-ab12.js'],
+	['onKeyDown_7', 'textBinding_8'],
 	{ 7: [0, 0], 8: [0, 1] },
 ];
 
@@ -269,9 +269,7 @@ export function loadSymbol(id: number) {
 		throw createUnknownSymbolError(id);
 	}
 
-	return import(/* @vite-ignore */ moduleUrls[row[0]]).then(
-		(mod) => mod[exportNames[row[1]]],
-	);
+	return import(/* @vite-ignore */ moduleUrls[row[0]]).then((mod) => mod[exportNames[row[1]]]);
 }
 ```
 

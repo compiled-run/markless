@@ -3,16 +3,16 @@ import { computed, element, FrameworkApiRuntimeError, shared, state } from '../s
 
 test('framework APIs fail loudly when executed without the TSRX compiler', () => {
 	expect(() => state(0)).toThrow(
-		'@arcadejs/core state() must be compiled from a .tsrx file before it can run.',
+		'@arcade/core state() must be compiled from a .tsrx file before it can run.',
 	);
 	expect(() => computed(() => 1)).toThrow(
-		'@arcadejs/core computed() must be compiled from a .tsrx file before it can run.',
+		'@arcade/core computed() must be compiled from a .tsrx file before it can run.',
 	);
 	expect(() => element()).toThrow(
-		'@arcadejs/core element() must be compiled from a .tsrx file before it can run.',
+		'@arcade/core element() must be compiled from a .tsrx file before it can run.',
 	);
 	expect(() => shared(() => ({ user: 'Ada' }), { scope: 'page' })).toThrow(
-		'@arcadejs/core shared() must be compiled from a .tsrx file before it can run.',
+		'@arcade/core shared() must be compiled from a .tsrx file before it can run.',
 	);
 });
 
@@ -34,7 +34,7 @@ test('framework APIs expose structured runtime diagnostics when executed directl
 		],
 	});
 	expect(error).toMatchObject({
-		message: '@arcadejs/core state() must be compiled from a .tsrx file before it can run.',
+		message: '@arcade/core state() must be compiled from a .tsrx file before it can run.',
 		why: expect.stringContaining('state()'),
 	});
 });

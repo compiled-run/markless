@@ -1,4 +1,4 @@
-import { state } from '@arcadejs/core';
+import { state } from '@arcade/core';
 
 export function Dashboard() @{
 	let status = state("ready");

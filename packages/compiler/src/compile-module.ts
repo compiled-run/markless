@@ -1,10 +1,10 @@
 import type {
 	CaptureAnalysisArtifact,
-	ClientEventOnlyEntryArtifact,
-	ClientEventOnlyRenderPlanArtifact,
 	CompileTsrxModuleInput,
 	CompileTsrxModuleResult,
 	PayloadArenaArtifact,
+	PublicRenderModuleArtifact,
+	PublicRenderPlanArtifact,
 	PayloadScriptsArtifact,
 	RunnableCompilerPassDefinition,
 	SemanticGraphArtifact,
@@ -17,10 +17,10 @@ import type {
 import { runCompilerPassPipeline } from './pass-pipeline.ts';
 import { defaultCompilerPasses } from './pass-registry.ts';
 import { analyzeCaptures } from './passes/capture-analysis.ts';
-import { emitClientEventOnlyEntry } from './passes/client-event-only-entry.ts';
-import { planClientEventOnlyRender } from './passes/client-event-only-render-plan.ts';
 import { planPayloadArena } from './passes/payload-arena.ts';
 import { renderPayloadScriptArtifact } from './passes/payload-scripts.ts';
+import { emitPublicRenderModule } from './passes/public-render-module.ts';
+import { planPublicRender } from './passes/public-render-plan.ts';
 import { createProtocolStatePayloadFromArena } from './passes/protocol-state.ts';
 import { createProtocolViewPayload } from './passes/protocol-view.ts';
 import { buildSemanticGraph } from './passes/semantic-graph/index.ts';
@@ -58,8 +58,8 @@ export async function compileTsrxModule(
 		readonly protocolView: CompileTsrxModuleResult['protocolView'];
 		readonly payloadScripts: PayloadScriptsArtifact['payloadScripts'];
 		readonly renderShell: PayloadScriptsArtifact['renderShell'];
-		readonly clientEventOnlyRenderPlan: ClientEventOnlyRenderPlanArtifact;
-		readonly clientEventOnlyEntry: ClientEventOnlyEntryArtifact;
+		readonly publicRenderPlan: PublicRenderPlanArtifact;
+		readonly publicRenderModule: PublicRenderModuleArtifact;
 		readonly symbolModules: SymbolModulesArtifact;
 		readonly symbolResolverModule: string;
 		readonly symbolResolverModuleManifest: SymbolResolverModuleManifest;
@@ -76,8 +76,8 @@ export async function compileTsrxModule(
 		protocolView: artifacts.protocolView,
 		payloadScripts: artifacts.payloadScripts,
 		renderShell: artifacts.renderShell,
-		clientEventOnlyRenderPlan: artifacts.clientEventOnlyRenderPlan,
-		clientEventOnlyEntry: artifacts.clientEventOnlyEntry,
+		publicRenderPlan: artifacts.publicRenderPlan,
+		publicRenderModule: artifacts.publicRenderModule,
 		symbolModules: artifacts.symbolModules,
 		symbolResolverModule: artifacts.symbolResolverModule,
 		symbolResolverModuleManifest: artifacts.symbolResolverModuleManifest,
@@ -148,16 +148,34 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 			};
 		}
 
-		if (pass.passId === 'client-event-only-render-plan') {
+		if (pass.passId === 'public-render-plan') {
 			return {
 				...pass,
 				run({ inputs }) {
 					return {
-						clientEventOnlyRenderPlan: planClientEventOnlyRender({
+						publicRenderPlan: planPublicRender({
 							source: sourceInput(inputs.source),
 							semanticGraph: inputs.semanticGraph as SemanticGraphArtifact,
 							payloadArena: inputs.payloadArena as PayloadArenaArtifact,
 							symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
+						}),
+					};
+				},
+			};
+		}
+
+		if (pass.passId === 'public-render-module') {
+			return {
+				...pass,
+				run({ inputs }) {
+					return {
+						publicRenderModule: emitPublicRenderModule({
+							semanticGraph: inputs.semanticGraph as SemanticGraphArtifact,
+							publicRenderPlan: inputs.publicRenderPlan as PublicRenderPlanArtifact,
+							protocolState:
+								inputs.protocolState as CompileTsrxModuleResult['protocolState'],
+							protocolView:
+								inputs.protocolView as CompileTsrxModuleResult['protocolView'],
 						}),
 					};
 				},
@@ -208,23 +226,6 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 			};
 		}
 
-		if (pass.passId === 'client-event-only-entry') {
-			return {
-				...pass,
-				run({ inputs }) {
-					return {
-						clientEventOnlyEntry: emitClientEventOnlyEntry({
-							source: sourceInput(inputs.source),
-							semanticGraph: inputs.semanticGraph as SemanticGraphArtifact,
-							renderPlan:
-								inputs.clientEventOnlyRenderPlan as ClientEventOnlyRenderPlanArtifact,
-							symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
-						}),
-					};
-				},
-			};
-		}
-
 		if (pass.passId === 'symbol-modules') {
 			return {
 				...pass,
@@ -233,6 +234,7 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 						symbolModules: emitSymbolModules({
 							symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
 							captureAnalysis: inputs.captureAnalysis as CaptureAnalysisArtifact,
+							publicRenderPlan: inputs.publicRenderPlan as PublicRenderPlanArtifact,
 						}),
 					};
 				},

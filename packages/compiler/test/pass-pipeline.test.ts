@@ -9,7 +9,7 @@ import {
 } from '../src/index.ts';
 
 const source = `
-import { state } from '@arcadejs/core';
+import { state } from '@arcade/core';
 
 export function App() @{
 	let count = state(0);
@@ -24,12 +24,12 @@ test('default compiler passes declare stable artifact boundaries', () => {
 		'state-lowering',
 		'payload-arena',
 		'symbol-resolver',
-		'client-event-only-render-plan',
-		'capture-analysis',
+		'public-render-plan',
 		'protocol-state',
 		'protocol-view',
+		'public-render-module',
+		'capture-analysis',
 		'payload-scripts',
-		'client-event-only-entry',
 		'symbol-modules',
 		'symbol-resolver-module',
 	]);
@@ -55,22 +55,22 @@ test('default compiler passes declare stable artifact boundaries', () => {
 				produces: ['symbolResolver'],
 			}),
 			expect.objectContaining({
-				passId: 'client-event-only-render-plan',
-				description: expect.stringContaining('client event-only templates'),
+				passId: 'public-render-plan',
+				description: expect.stringContaining('public render'),
 				consumes: ['source', 'semanticGraph', 'payloadArena', 'symbolResolver'],
-				produces: ['clientEventOnlyRenderPlan'],
+				produces: ['publicRenderPlan'],
+			}),
+			expect.objectContaining({
+				passId: 'public-render-module',
+				description: expect.stringContaining('public render component'),
+				consumes: ['semanticGraph', 'publicRenderPlan', 'protocolState', 'protocolView'],
+				produces: ['publicRenderModule'],
 			}),
 			expect.objectContaining({
 				passId: 'capture-analysis',
 				description: expect.stringContaining('capture'),
 				consumes: ['semanticGraph', 'symbolResolver'],
 				produces: ['captureAnalysis'],
-			}),
-			expect.objectContaining({
-				passId: 'client-event-only-entry',
-				description: expect.stringContaining('client event-only render entry'),
-				consumes: ['source', 'semanticGraph', 'symbolResolver'],
-				produces: ['clientEventOnlyEntry'],
 			}),
 			expect.objectContaining({
 				passId: 'symbol-resolver-module',
@@ -81,7 +81,7 @@ test('default compiler passes declare stable artifact boundaries', () => {
 			expect.objectContaining({
 				passId: 'symbol-modules',
 				description: expect.stringContaining('symbol module'),
-				consumes: ['symbolResolver', 'captureAnalysis'],
+				consumes: ['symbolResolver', 'captureAnalysis', 'publicRenderPlan'],
 				produces: ['symbolModules'],
 			}),
 		]),
@@ -412,13 +412,13 @@ test('compileTsrxModule validates and returns the default pass graph', async () 
 			'stateLowering',
 			'payloadArena',
 			'symbolResolver',
-			'clientEventOnlyRenderPlan',
+			'publicRenderPlan',
+			'publicRenderModule',
 			'captureAnalysis',
 			'protocolState',
 			'protocolView',
 			'payloadScripts',
 			'renderShell',
-			'clientEventOnlyEntry',
 			'symbolModules',
 			'symbolResolverModule',
 			'symbolResolverModuleManifest',

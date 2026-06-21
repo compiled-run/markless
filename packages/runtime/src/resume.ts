@@ -1,4 +1,4 @@
-import type { ProtocolViewPayload } from '@arcadejs/protocol';
+import type { ProtocolViewPayload } from '@arcade/protocol';
 import type {
 	DomJournalEntry,
 	DomJournalResult,
@@ -177,11 +177,10 @@ export type ResumeBehaviorCleanup = () => void;
 export type ResumeSymbol = (
 	context: ResumeSymbolContext,
 ) =>
-	| unknown
 	| void
 	| DomJournalResult
 	| ResumeBehaviorCleanup
-	| Promise<unknown | void | DomJournalResult | ResumeBehaviorCleanup>;
+	| Promise<void | DomJournalResult | ResumeBehaviorCleanup>;
 
 export type ResumeRuntimeErrorContext = {
 	readonly phase: 'event';
@@ -745,7 +744,7 @@ function isVisibleEntry(entry: ResumeVisibilityEntry): boolean {
 
 function defaultVisibilityObserverFactory(): ResumeVisibilityObserverFactory | undefined {
 	const observer = (
-		globalThis as {
+		globalThis as unknown as {
 			readonly IntersectionObserver?: ResumeVisibilityObserverConstructor;
 		}
 	).IntersectionObserver;
@@ -756,7 +755,7 @@ function defaultVisibilityObserverFactory(): ResumeVisibilityObserverFactory | u
 
 function defaultRemovalObserverFactory(): ResumeRemovalObserverFactory | undefined {
 	const observer = (
-		globalThis as {
+		globalThis as unknown as {
 			readonly MutationObserver?: ResumeRemovalObserverConstructor;
 		}
 	).MutationObserver;

@@ -1,18 +1,17 @@
-export {
-	applyDomJournalEntries,
-	render,
-	renderToString,
-	resumeFromPayloadDocument,
-	resumeFromPayloadScripts,
-	type DomJournalApplyOptions,
-	type DomJournalApplyTarget,
-	type CsrRenderContainer,
-	type CsrRenderOptions,
-	type CsrRenderOutput,
-	type RenderTarget,
-	type RenderToStringOptions,
-	type ResumePayloadDocumentInput,
-	type ResumePayloadScriptsInput,
-	type ResumePayloadScriptsResult,
-	type SsrRenderOutput,
-} from '@arcadejs/runtime';
+export { render } from '@arcade/runtime/render';
+export type {
+	CsrRenderContainer,
+	CsrRenderOptions,
+	CsrRenderOutput,
+	RenderTarget,
+} from '@arcade/runtime/render';
+export { renderToString } from '@arcade/runtime/render-to-string';
+export type { RenderToStringOptions, SsrRenderOutput } from '@arcade/runtime/render-to-string';
+export { resumeFromPayloadDocument, resumeFromPayloadScripts } from '@arcade/runtime/resume';
+export type {
+	ResumePayloadDocumentInput,
+	ResumePayloadScriptsInput,
+	ResumePayloadScriptsResult,
+} from '@arcade/runtime/resume';
+export { applyDomJournalEntries } from '@arcade/runtime/dom-journal';
+export type { DomJournalApplyOptions, DomJournalApplyTarget } from '@arcade/runtime/dom-journal';

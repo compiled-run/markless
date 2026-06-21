@@ -2,7 +2,7 @@ import {
 	compileTsrxModule,
 	createSymbolResolverModuleManifest,
 	emitSymbolResolverModule,
-} from '@arcadejs/compiler';
+} from '@arcade/compiler';
 import type {
 	ArcadeTransformManifest,
 	ArcadeVirtualModule,
@@ -86,8 +86,9 @@ export async function transformTsrxModule(
 			filename: input.filename,
 			payloadId,
 			resolverId,
+			resolverManifest,
 			moduleManifestId,
-			clientEventOnlyEntrySource: compiled.clientEventOnlyEntry.moduleSource,
+			publicRenderModuleSource: compiled.publicRenderModule.moduleSource,
 		}),
 		map: null,
 		virtualModules,
@@ -129,15 +130,20 @@ function emitSourceModule(input: {
 	readonly filename: string;
 	readonly payloadId: string;
 	readonly resolverId: string;
+	readonly resolverManifest: unknown;
 	readonly moduleManifestId: string;
-	readonly clientEventOnlyEntrySource: string | null;
+	readonly publicRenderModuleSource: string;
 }) {
 	return [
 		`import payloadScripts, { state as payloadState, view as payloadView } from '${input.payloadId}';`,
-		`import { loadSymbol, symbolManifest } from '${input.resolverId}';`,
 		`import moduleManifest from '${input.moduleManifestId}';`,
 		'',
 		`export const arcadeSource = ${JSON.stringify(input.filename)};`,
+		`const symbolManifest = ${JSON.stringify(input.resolverManifest)};`,
+		`const arcadeSymbolResolverModule = () => import('${input.resolverId}');`,
+		'function loadSymbol(symbolId) {',
+		'	return arcadeSymbolResolverModule().then((mod) => mod.loadSymbol(symbolId));',
+		'}',
 		'export { loadSymbol, moduleManifest, payloadScripts, payloadState, payloadView, symbolManifest };',
 		'',
 		'export default {',
@@ -149,7 +155,7 @@ function emitSourceModule(input: {
 		'	symbolManifest,',
 		'	moduleManifest,',
 		'};',
-		input.clientEventOnlyEntrySource ?? '',
+		input.publicRenderModuleSource,
 		'',
 	].join('\n');
 }

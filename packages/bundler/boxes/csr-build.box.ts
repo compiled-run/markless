@@ -1,4 +1,4 @@
-import { box } from '@arcadejs/witness';
+import { box } from '@async/witness';
 
 // Product truth: a production Vite build of the CSR fixture must emit the
 // bundle graph and lazy symbol chunks through the

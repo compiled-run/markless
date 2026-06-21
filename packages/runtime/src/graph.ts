@@ -1,4 +1,4 @@
-import type { ProtocolStatePayload } from '@arcadejs/protocol';
+import type { ProtocolStatePayload } from '@arcade/protocol';
 
 export type RuntimeGraphCell = {
 	readonly graphNodeId: string;
@@ -659,12 +659,18 @@ function findLastSharedReturnProperty(
 
 function appendJournalResult(journal: DomJournalEntry[], result: DomJournalResult | void): void {
 	if (!result) return;
-	if (Array.isArray(result)) {
+	if (isDomJournalEntryArray(result)) {
 		journal.push(...result);
 		return;
 	}
 
 	journal.push(result);
+}
+
+function isDomJournalEntryArray(
+	result: DomJournalResult,
+): result is ReadonlyArray<DomJournalEntry> {
+	return Array.isArray(result);
 }
 
 function readPath(value: unknown, path: ReadonlyArray<string>): unknown {
@@ -760,7 +766,7 @@ function applyCollectionCall(
 		throw new TypeError(`Unsupported graph collection method "${method}".`);
 	}
 
-	const callable = (target as { readonly [key: string]: unknown })[method];
+	const callable = (target as unknown as { readonly [key: string]: unknown })[method];
 	if (typeof callable !== 'function') {
 		throw new TypeError(`Unsupported graph collection method "${method}".`);
 	}

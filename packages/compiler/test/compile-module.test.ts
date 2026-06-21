@@ -3,7 +3,7 @@ import { compileTsrxModule } from '../src/index.ts';
 import { deserializeGraphValue } from '../../serializer/src/index.ts';
 
 const source = `
-import { state } from '@arcadejs/core';
+import { state } from '@arcade/core';
 
 export function App() @{
 	let count = state(1);
@@ -25,7 +25,7 @@ export function App() @{
 `;
 
 const eventWriteSource = `
-import { state } from '@arcadejs/core';
+import { state } from '@arcade/core';
 import { clamp } from './math';
 
 export function App() @{
@@ -80,7 +80,7 @@ export function App() @{
 `;
 
 const asyncComputedSource = `
-import { state, computed } from '@arcadejs/core';
+import { state, computed } from '@arcade/core';
 
 export function App() @{
 	const query = state('Ada');
@@ -202,10 +202,10 @@ test('compileTsrxModule orchestrates source to payload scripts and resolver modu
 	);
 });
 
-test('compileTsrxModule accepts the umbrella arcade authoring import', async () => {
+test('compileTsrxModule accepts the scoped umbrella authoring import', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/UmbrellaImport.tsrx',
-		source: source.replace('@arcadejs/core', 'arcade'),
+		source: source.replace('@arcade/core', '@arcade/arcade'),
 		symbols: [],
 	});
 
@@ -218,59 +218,158 @@ test('compileTsrxModule accepts the umbrella arcade authoring import', async () 
 	);
 });
 
-test('compileTsrxModule keeps client event-only render entry disabled until structural keyed lowering exists', async () => {
+test('compileTsrxModule emits public render direct DOM artifacts for supported keyed repeats', async () => {
 	const result = await compileTsrxModule({
-		filename: 'src/KeyedRows.tsrx',
+		filename: 'src/KeyedEntries.tsrx',
 		source: `
-import { state } from 'arcade';
-import { appendRows, buildData, removeRow, swapRows, updateEveryTenthRow } from 'arcade-benchmark-data';
+import { state } from '@arcade/core';
 
 export function App() @{
-	let rows = state([]);
-	let selected = state(null);
-	let nextId = state(1);
-
-	<div class="container">
-		<button id="run" onClick={() => {
-			rows = buildData(nextId, 1000);
-			nextId = nextId + 1000;
-			selected = null;
-		}}>Create 1,000 rows</button>
-		<button id="add" onClick={() => {
-			rows = appendRows(rows, nextId, 1000);
-			nextId += 1000;
-		}}>Append 1,000 rows</button>
-		<button id="update" onClick={() => rows = updateEveryTenthRow(rows)}>Update every 10th row</button>
-		<button id="clear" onClick={() => {
-			rows = [];
-			selected = null;
-		}}>Clear</button>
-		<button id="swaprows" onClick={() => rows = swapRows(rows)}>Swap Rows</button>
-		<table><tbody>
-			@for (const row of rows; key row.id) {
-				<tr class={selected === row.id ? 'danger' : ''}>
-					<td>{row.id}</td>
-					<td><a onClick={() => selected = row.id}>{row.label}</a></td>
-					<td><a onClick={() => rows = removeRow(rows, row.id)}><span class="remove"></span></a></td>
-				</tr>
+	let entries = state([]); let chosen = state(null); let draft = state({ code: 'draft' });
+	<main><button onClick={() => entries.push({ code: draft.code, title: 'Draft' })}>Add</button><button onClick={() => delete draft.code}>Delete draft</button>
+		<section>
+			@for (const entry of entries; key entry.code) {
+				<article class={chosen === entry.code ? 'picked' : 'plain'}>
+					<h2>{entry.title}</h2>
+					<button onClick={() => chosen = entry.code}>Choose</button>
+				</article>
 			}
-		</tbody></table>
-	</div>
+		</section>
+		<footer>Done</footer>
+	</main>
+}
+`,
+		symbols: [],
+	});
+	const moduleSource = result.publicRenderModule.moduleSource;
+
+	expect(result.publicRenderPlan.keyedRepeats).toEqual([
+		expect.objectContaining({
+			repeatId: 'repeat:0',
+			itemName: 'entry',
+			collectionGraphNodeId: 'state:entries',
+			keyPath: ['code'],
+			rowTemplateHtml: '<article class=""><h2> </h2><button>Choose</button></article>',
+		}),
+	]);
+	expect(result.publicRenderPlan.repeatGates).toEqual([
+		{ repeatId: 'repeat:0', supported: true },
+	]);
+	for (const expected of [
+		'export function App()',
+		'const graph = createArcadePublicGraph()',
+		'runtime: createArcadePublicRuntime(graph)',
+	]) {
+		expect(moduleSource).toContain(expected);
+	}
+	expect(moduleSource).toContain('!sameArcadePublicKeys(state.keys, nextKeys)');
+	expect(moduleSource).toMatch(
+		/call\(call\)[\s\S]*delete\(deletion\)[\s\S]*clearArcadePublicRows/,
+	);
+	for (const unexpected of [
+		'state: payloadState',
+		'view: arcadePublicView',
+		'payloadView',
+		'arcadePublicHostNodeIds',
+		'arcadePublicHostNodeIndexes',
+		'arcadePublicRepeatPlans',
+	]) {
+		expect(moduleSource).not.toContain(unexpected);
+	}
+});
+
+test('compileTsrxModule does not emit public render factories for non-literal direct state values', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/KeyedEntriesWithDate.tsrx',
+		source: `
+import { state } from '@arcade/core';
+
+export function App() @{
+	let entries = state([]);
+	let chosen = state(null);
+	const created = state(new Date('2026-06-16T12:00:00.000Z'));
+
+	<main>
+		<section>
+			@for (const entry of entries; key entry.code) {
+				<article class={chosen === entry.code ? 'picked' : 'plain'}>
+					<h2>{entry.title}</h2>
+					<button onClick={() => chosen = entry.code}>Choose</button>
+				</article>
+			}
+		</section>
+		<footer>Done</footer>
+	</main>
 }
 `,
 		symbols: [],
 	});
 
-	expect(result.clientEventOnlyRenderPlan.keyedRepeats).toEqual([
-		expect.objectContaining({
-			repeatId: 'repeat:0',
-			itemName: 'row',
-			collectionGraphNodeId: 'state:rows',
-			keyPath: ['id'],
-			rowTemplateHtml: expect.stringContaining('<tr class="">'),
-		}),
+	expect(result.protocolState.cells).toEqual([
+		expect.objectContaining({ graphNodeId: 'state:entries' }),
+		expect.objectContaining({ graphNodeId: 'state:chosen' }),
+		expect.objectContaining({ graphNodeId: 'state:created' }),
 	]);
-	expect(result.clientEventOnlyEntry.moduleSource).toBeNull();
+	expect(result.publicRenderModule.moduleSource).toBe('');
+	expect(result.publicRenderModule.moduleSource).not.toContain('createArcadePublicGraph');
+	expect(result.publicRenderModule.moduleSource).not.toContain(
+		'runtime: createArcadePublicRuntime(graph)',
+	);
+});
+
+test('compileTsrxModule does not emit misleading public render factories for multi-component modules', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/MultiComponentEntries.tsrx',
+		source: `import { state } from '@arcade/core';
+export function App() @{
+let entries = state([]);
+<main>@for (const entry of entries; key entry.code) {<article>{entry.title}</article>}</main>
+}
+export function Other() @{<aside>Other</aside>}`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderModule.moduleSource).toBe('');
+});
+
+test('compileTsrxModule does not emit public render factories for static shell expressions', async () => {
+	for (const [name, shell] of [
+		['text', "<h1>{'Entries'}</h1>"],
+		['attribute', '<h1 title={label}>Entries</h1>'],
+	] as const) {
+		const result = await compileTsrxModule({
+			filename: `src/StaticShell-${name}.tsrx`,
+			source: `import { state } from '@arcade/core';
+export function App() @{
+let entries = state([]); const label = 'Entries';
+<main>${shell}<section>@for (const entry of entries; key entry.code) {<article>{entry.title}</article>}</section></main>
+}`,
+			symbols: [],
+		});
+
+		expect(result.publicRenderModule.moduleSource).toBe('');
+	}
+});
+
+test('compileTsrxModule does not emit public render factories for unsupported repeat plans', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/UnsupportedEntries.tsrx',
+		source: `import { state } from '@arcade/core';
+export function App() @{
+let entries = state([]);
+<main><p>No entries</p>@for (const entry of entries; key entry.code) {<article>{entry.title}</article>}</main>
+}`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.repeatGates).toEqual([
+		{
+			repeatId: 'repeat:0',
+			supported: false,
+			reason: 'repeat-parent-must-contain-only-repeat',
+		},
+	]);
+	expect(result.publicRenderModule.moduleSource).toBe('');
 });
 
 test('compileTsrxModule emits generated event modules for supported graph write forms', async () => {

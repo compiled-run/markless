@@ -1,6 +1,6 @@
 # Resume Basic Proof
 
-This is the canonical vertical-slice fixture for `@arcadejs/core`. It is an
+This is the canonical vertical-slice fixture for `@arcade/core`. It is an
 executable spec for compiler/runtime contracts, not a demo app and not a
 throwaway implementation.
 

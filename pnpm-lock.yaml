@@ -26,7 +26,7 @@ importers:
 
   .:
     devDependencies:
-      '@arcadejs/witness':
+      '@async/witness':
         specifier: link:../witness
         version: link:../witness
       '@types/node':
@@ -50,19 +50,19 @@ importers:
 
   packages/arcade:
     dependencies:
-      '@arcadejs/bundler':
+      '@arcade/bundler':
         specifier: workspace:*
         version: link:../bundler
-      '@arcadejs/core':
+      '@arcade/core':
         specifier: workspace:*
         version: link:../core
-      '@arcadejs/runtime':
+      '@arcade/runtime':
         specifier: workspace:*
         version: link:../runtime
 
   packages/bundler:
     dependencies:
-      '@arcadejs/compiler':
+      '@arcade/compiler':
         specifier: workspace:*
         version: link:../compiler
       '@thi.ng/dgraph':
@@ -83,10 +83,10 @@ importers:
 
   packages/bundler/fixtures/rolldown-basic:
     dependencies:
-      '@arcadejs/bundler':
+      '@arcade/bundler':
         specifier: workspace:*
         version: link:../..
-      '@arcadejs/core':
+      '@arcade/core':
         specifier: workspace:*
         version: link:../../../core
     devDependencies:
@@ -99,13 +99,13 @@ importers:
 
   packages/bundler/fixtures/vite-csr:
     dependencies:
-      '@arcadejs/bundler':
+      '@arcade/bundler':
         specifier: workspace:*
         version: link:../..
-      '@arcadejs/core':
+      '@arcade/core':
         specifier: workspace:*
         version: link:../../../core
-      '@arcadejs/runtime':
+      '@arcade/runtime':
         specifier: workspace:*
         version: link:../../../runtime
     devDependencies:
@@ -118,10 +118,10 @@ importers:
 
   packages/bundler/fixtures/vite-library:
     dependencies:
-      '@arcadejs/bundler':
+      '@arcade/bundler':
         specifier: workspace:*
         version: link:../..
-      '@arcadejs/core':
+      '@arcade/core':
         specifier: workspace:*
         version: link:../../../core
     devDependencies:
@@ -134,13 +134,13 @@ importers:
 
   packages/bundler/fixtures/vite-plus:
     dependencies:
-      '@arcadejs/bundler':
+      '@arcade/bundler':
         specifier: workspace:*
         version: link:../..
-      '@arcadejs/core':
+      '@arcade/core':
         specifier: workspace:*
         version: link:../../../core
-      '@arcadejs/runtime':
+      '@arcade/runtime':
         specifier: workspace:*
         version: link:../../../runtime
     devDependencies:
@@ -159,13 +159,13 @@ importers:
 
   packages/bundler/fixtures/vite-ssr:
     dependencies:
-      '@arcadejs/bundler':
+      '@arcade/bundler':
         specifier: workspace:*
         version: link:../..
-      '@arcadejs/core':
+      '@arcade/core':
         specifier: workspace:*
         version: link:../../../core
-      '@arcadejs/runtime':
+      '@arcade/runtime':
         specifier: workspace:*
         version: link:../../../runtime
     devDependencies:
@@ -178,10 +178,10 @@ importers:
 
   packages/compiler:
     dependencies:
-      '@arcadejs/protocol':
+      '@arcade/protocol':
         specifier: workspace:*
         version: link:../protocol
-      '@arcadejs/serializer':
+      '@arcade/serializer':
         specifier: workspace:*
         version: link:../serializer
       '@tsrx/core':
@@ -194,28 +194,28 @@ importers:
 
   packages/runtime:
     dependencies:
-      '@arcadejs/protocol':
+      '@arcade/protocol':
         specifier: workspace:*
         version: link:../protocol
-      '@arcadejs/serializer':
+      '@arcade/serializer':
         specifier: workspace:*
         version: link:../serializer
 
   packages/serializer:
     dependencies:
-      '@arcadejs/protocol':
+      '@arcade/protocol':
         specifier: workspace:*
         version: link:../protocol
 
   packages/test-utils:
     dependencies:
-      '@arcadejs/protocol':
+      '@arcade/protocol':
         specifier: workspace:*
         version: link:../protocol
 
   packages/vitest-browser:
     dependencies:
-      '@arcadejs/runtime':
+      '@arcade/runtime':
         specifier: workspace:*
         version: link:../runtime
       vitest:

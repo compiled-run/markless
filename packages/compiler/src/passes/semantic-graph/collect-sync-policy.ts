@@ -214,7 +214,9 @@ function syncPolicyConstantValue(
 	return { ok: false };
 }
 
-function staticExpressionPath(node: AnyNode): ReadonlyArray<string> | null {
+function staticExpressionPath(node: AnyNode | undefined | null): ReadonlyArray<string> | null {
+	if (!node) return null;
+
 	const name = getIdentifierName(node);
 	if (name) return [name];
 

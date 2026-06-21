@@ -4,4 +4,4 @@ export {
 	type ResumePayloadDocumentInput,
 	type ResumePayloadScriptsInput,
 	type ResumePayloadScriptsResult,
-} from '@arcadejs/runtime/resume';
+} from '@arcade/runtime/resume';

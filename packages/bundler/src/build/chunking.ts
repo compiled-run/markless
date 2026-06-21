@@ -8,7 +8,7 @@ export const ARCADE_BUNDLE_GRAPH = `${ARCADE_BUILD_PREFIX}bundle-graph.json`;
 const ARCADE_RUNTIME_GROUPS = [
 	{
 		name: 'arcade-runtime',
-		test: /[/\\]@arcadejs[/\\]runtime[/\\]/,
+		test: /[/\\]@arcade[/\\]runtime[/\\]/,
 	},
 	{
 		name: 'arcade-symbols',
@@ -43,7 +43,7 @@ export function outputDefaults(
 function arcadeCodeSplitting(codeSplitting: OutputOptions['codeSplitting']) {
 	if (typeof codeSplitting === 'boolean') {
 		throw new Error(
-			'@arcadejs/bundler requires output.codeSplitting to be an object so runtime chunks can be grouped.',
+			'@arcade/bundler requires output.codeSplitting to be an object so runtime chunks can be grouped.',
 		);
 	}
 

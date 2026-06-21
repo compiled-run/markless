@@ -72,6 +72,70 @@ test('emitSymbolModules emits event and DOM update modules that consume resume c
 	expect(artifact.modules[1].source).toContain('value: context.value');
 });
 
+test('emitSymbolModules emits repeat-local assignment values through context locals', () => {
+	const artifact = emitSelectAssignmentSymbol('entry.code', repeatLocalPublicRenderPlan());
+
+	expect(artifact.modules[0].source).toContain('context.graph.write({');
+	expect(artifact.modules[0].source).toContain('graphNodeId: "state:selected"');
+	expect(artifact.modules[0].source).toContain('path: []');
+	expect(artifact.modules[0].source).toContain('value: context.locals?.entry?.code');
+});
+
+test('emitSymbolModules does not treat unproven dotted assignment values as repeat locals', () => {
+	const artifact = emitSelectAssignmentSymbol('external.code');
+
+	expect(artifact.modules[0].source).not.toContain('context.locals');
+	expect(artifact.modules[0].source).not.toContain('context.graph.write');
+});
+
+function emitSelectAssignmentSymbol(valueSource: string, publicRenderPlan?: any) {
+	return emitSymbolModules({
+		publicRenderPlan,
+		symbolResolver: {
+			passId: 'symbol-resolver',
+			dynamicImportOwner: 'generated-symbol-resolver',
+			symbols: [
+				{
+					id: 'symbol:select',
+					kind: 'event-handler',
+					hostNodeId: 'h2',
+					eventName: 'click',
+					source: `() => selected = ${valueSource}`,
+					parameters: [],
+					order: 0,
+					writes: [
+						{
+							source: 'selected',
+							graphNodeId: 'state:selected',
+							path: [],
+							operation: 'assign',
+							valueSource,
+						},
+					],
+				},
+			],
+			syncPolicies: [],
+			diagnostics: [],
+		},
+		captureAnalysis: { passId: 'capture-analysis', extractedSymbols: [], diagnostics: [] },
+	});
+}
+
+function repeatLocalPublicRenderPlan() {
+	return {
+		keyedRepeats: [
+			{
+				eventControls: [
+					{
+						symbolId: 'symbol:select',
+						itemContext: { itemName: 'entry' },
+					},
+				],
+			},
+		],
+	};
+}
+
 test('emitSymbolModules emits concrete DOM journal entries for each binding target', () => {
 	const cases = [
 		{

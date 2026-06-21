@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite';
-import { arcade } from '@arcadejs/bundler/vite';
+import { arcade } from '@arcade/bundler/vite';
 
 export default defineConfig({
 	plugins: [arcade()],
@@ -9,7 +9,7 @@ export default defineConfig({
 			formats: ['es'],
 		},
 		rolldownOptions: {
-			external: [/^@arcadejs\/arcade/],
+			external: [/^@arcade\/arcade/],
 		},
 	},
 });

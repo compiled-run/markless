@@ -3,6 +3,7 @@ import type {
 	LoweredStateRead,
 	LoweredStateWrite,
 	PlannedSymbol,
+	PublicRenderPlanArtifact,
 	SemanticGraphDependency,
 	SemanticModuleImport,
 	SymbolModulesArtifact,
@@ -10,21 +11,47 @@ import type {
 } from '../artifacts.ts';
 
 export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtifact {
+	const localNamesBySymbol = publicRenderLocalNamesBySymbol(input.publicRenderPlan);
+
 	return {
 		passId: 'symbol-modules',
-		modules: input.symbolResolver.symbols.flatMap(emitSymbolModule),
+		modules: input.symbolResolver.symbols.flatMap((symbol) =>
+			emitSymbolModule(symbol, localNamesBySymbol.get(symbol.id) ?? emptyLocalNames),
+		),
 		diagnostics: input.captureAnalysis.diagnostics,
 	};
 }
 
-function emitSymbolModule(symbol: PlannedSymbol): GeneratedSymbolModule[] {
+const emptyLocalNames = new Set<string>();
+
+function publicRenderLocalNamesBySymbol(
+	publicRenderPlan: PublicRenderPlanArtifact | undefined,
+): ReadonlyMap<string, ReadonlySet<string>> {
+	const localNamesBySymbol = new Map<string, Set<string>>();
+	for (const repeat of publicRenderPlan?.keyedRepeats ?? []) {
+		for (const eventControl of repeat.eventControls) {
+			let localNames = localNamesBySymbol.get(eventControl.symbolId);
+			if (!localNames) {
+				localNames = new Set();
+				localNamesBySymbol.set(eventControl.symbolId, localNames);
+			}
+			localNames.add(eventControl.itemContext.itemName);
+		}
+	}
+	return localNamesBySymbol;
+}
+
+function emitSymbolModule(
+	symbol: PlannedSymbol,
+	localNames: ReadonlySet<string>,
+): GeneratedSymbolModule[] {
 	if (symbol.kind === 'event-handler') {
 		return [
 			{
 				symbolId: symbol.id,
 				kind: symbol.kind,
 				exportName: symbolExportName(symbol.id),
-				source: emitEventHandlerModule(symbol),
+				source: emitEventHandlerModule(symbol, localNames),
 			},
 		];
 	}
@@ -65,10 +92,17 @@ function emitSymbolModule(symbol: PlannedSymbol): GeneratedSymbolModule[] {
 
 function emitEventHandlerModule(
 	symbol: Extract<PlannedSymbol, { readonly kind: 'event-handler' }>,
+	localNames: ReadonlySet<string>,
 ): string {
 	const exportName = symbolExportName(symbol.id);
 	const writes = (symbol.writes ?? []).flatMap((write) =>
-		emitEventWrite(write, symbol.parameters, symbol.reads ?? [], symbol.moduleImports ?? []),
+		emitEventWrite(
+			write,
+			symbol.parameters,
+			symbol.reads ?? [],
+			symbol.moduleImports ?? [],
+			localNames,
+		),
 	);
 	const imports = eventModuleImports(symbol, writes);
 
@@ -101,6 +135,7 @@ function emitEventWrite(
 	eventParameters: ReadonlyArray<string>,
 	graphReads: ReadonlyArray<LoweredStateRead>,
 	moduleImports: ReadonlyArray<SemanticModuleImport>,
+	localNames: ReadonlySet<string>,
 ): string[] {
 	if (write.operation === 'assign' && !write.assignmentOperator) {
 		const valueSource = supportedValueSource(
@@ -108,6 +143,7 @@ function emitEventWrite(
 			eventParameters,
 			graphReads,
 			moduleImports,
+			localNames,
 		);
 		if (valueSource) {
 			return [
@@ -127,6 +163,7 @@ function emitEventWrite(
 			eventParameters,
 			graphReads,
 			moduleImports,
+			localNames,
 		);
 		if (operator && valueSource) {
 			return [
@@ -171,6 +208,7 @@ function emitEventWrite(
 			eventParameters,
 			graphReads,
 			moduleImports,
+			localNames,
 		);
 		if (!argumentSources) return [];
 
@@ -382,19 +420,65 @@ function supportedValueSource(
 	eventParameters: ReadonlyArray<string>,
 	graphReads: ReadonlyArray<LoweredStateRead>,
 	moduleImports: ReadonlyArray<SemanticModuleImport>,
+	localNames: ReadonlySet<string>,
 ): string | null {
 	return (
 		literalValueSource(valueSource) ??
 		eventFieldAssignmentSource(valueSource, eventParameters) ??
 		graphReadSource(valueSource, graphReads) ??
-		arrayLiteralValueSource(valueSource, eventParameters, graphReads, moduleImports) ??
-		objectLiteralValueSource(valueSource, eventParameters, graphReads, moduleImports) ??
-		staticCallValueSource(valueSource, eventParameters, graphReads, moduleImports) ??
-		parenthesizedValueSource(valueSource, eventParameters, graphReads, moduleImports) ??
-		unaryValueSource(valueSource, eventParameters, graphReads, moduleImports) ??
-		conditionalValueSource(valueSource, eventParameters, graphReads, moduleImports) ??
-		binaryValueSource(valueSource, eventParameters, graphReads, moduleImports)
+		localValueSource(valueSource, localNames) ??
+		arrayLiteralValueSource(
+			valueSource,
+			eventParameters,
+			graphReads,
+			moduleImports,
+			localNames,
+		) ??
+		objectLiteralValueSource(
+			valueSource,
+			eventParameters,
+			graphReads,
+			moduleImports,
+			localNames,
+		) ??
+		staticCallValueSource(
+			valueSource,
+			eventParameters,
+			graphReads,
+			moduleImports,
+			localNames,
+		) ??
+		parenthesizedValueSource(
+			valueSource,
+			eventParameters,
+			graphReads,
+			moduleImports,
+			localNames,
+		) ??
+		unaryValueSource(valueSource, eventParameters, graphReads, moduleImports, localNames) ??
+		conditionalValueSource(
+			valueSource,
+			eventParameters,
+			graphReads,
+			moduleImports,
+			localNames,
+		) ??
+		binaryValueSource(valueSource, eventParameters, graphReads, moduleImports, localNames)
 	);
+}
+
+function localValueSource(
+	valueSource: string | undefined,
+	localNames: ReadonlySet<string>,
+): string | null {
+	const source = valueSource?.trim();
+	if (!source) return null;
+
+	const path = staticSourcePath(source);
+	if (!path || path.length < 2) return null;
+	if (!localNames.has(path[0] ?? '')) return null;
+
+	return `context.locals?.${path.join('?.')}`;
 }
 
 function arrayLiteralValueSource(
@@ -402,6 +486,7 @@ function arrayLiteralValueSource(
 	eventParameters: ReadonlyArray<string>,
 	graphReads: ReadonlyArray<LoweredStateRead>,
 	moduleImports: ReadonlyArray<SemanticModuleImport>,
+	localNames: ReadonlySet<string>,
 ): string | null {
 	const innerSource = arrayLiteralInnerSource(valueSource);
 	if (innerSource === null) return null;
@@ -412,7 +497,13 @@ function arrayLiteralValueSource(
 	const elements = elementSources.map((source) =>
 		source === ''
 			? ''
-			: arrayLiteralElementSource(source, eventParameters, graphReads, moduleImports),
+			: arrayLiteralElementSource(
+					source,
+					eventParameters,
+					graphReads,
+					moduleImports,
+					localNames,
+				),
 	);
 	if (elements.some((source) => source === null)) return null;
 
@@ -424,6 +515,7 @@ function arrayLiteralElementSource(
 	eventParameters: ReadonlyArray<string>,
 	graphReads: ReadonlyArray<LoweredStateRead>,
 	moduleImports: ReadonlyArray<SemanticModuleImport>,
+	localNames: ReadonlySet<string>,
 ): string | null {
 	const source = elementSource.trim();
 	if (source.startsWith('...')) {
@@ -432,13 +524,14 @@ function arrayLiteralElementSource(
 			eventParameters,
 			graphReads,
 			moduleImports,
+			localNames,
 		);
 		if (!value) return null;
 
 		return `...${value}`;
 	}
 
-	return supportedValueSource(source, eventParameters, graphReads, moduleImports);
+	return supportedValueSource(source, eventParameters, graphReads, moduleImports, localNames);
 }
 
 function objectLiteralValueSource(
@@ -446,6 +539,7 @@ function objectLiteralValueSource(
 	eventParameters: ReadonlyArray<string>,
 	graphReads: ReadonlyArray<LoweredStateRead>,
 	moduleImports: ReadonlyArray<SemanticModuleImport>,
+	localNames: ReadonlySet<string>,
 ): string | null {
 	const innerSource = objectLiteralInnerSource(valueSource);
 	if (innerSource === null) return null;
@@ -456,7 +550,7 @@ function objectLiteralValueSource(
 	if (!propertySources) return null;
 
 	const properties = propertySources.map((source) =>
-		objectLiteralPropertySource(source, eventParameters, graphReads, moduleImports),
+		objectLiteralPropertySource(source, eventParameters, graphReads, moduleImports, localNames),
 	);
 	if (properties.some((source) => source === null)) return null;
 
@@ -468,6 +562,7 @@ function objectLiteralPropertySource(
 	eventParameters: ReadonlyArray<string>,
 	graphReads: ReadonlyArray<LoweredStateRead>,
 	moduleImports: ReadonlyArray<SemanticModuleImport>,
+	localNames: ReadonlySet<string>,
 ): string | null {
 	const source = propertySource.trim();
 	if (!source) return null;
@@ -480,6 +575,7 @@ function objectLiteralPropertySource(
 			eventParameters,
 			graphReads,
 			moduleImports,
+			localNames,
 		);
 		if (!value) return null;
 
@@ -490,7 +586,13 @@ function objectLiteralPropertySource(
 	if (colonIndex === -1) {
 		if (!isIdentifierObjectKey(source)) return null;
 
-		const value = supportedValueSource(source, eventParameters, graphReads, moduleImports);
+		const value = supportedValueSource(
+			source,
+			eventParameters,
+			graphReads,
+			moduleImports,
+			localNames,
+		);
 		if (!value) return null;
 
 		return `${source}: ${value}`;
@@ -500,10 +602,22 @@ function objectLiteralPropertySource(
 	const valueSource = source.slice(colonIndex + 1).trim();
 	if (!valueSource) return null;
 
-	const emittedKey = objectLiteralKeySource(key, eventParameters, graphReads, moduleImports);
+	const emittedKey = objectLiteralKeySource(
+		key,
+		eventParameters,
+		graphReads,
+		moduleImports,
+		localNames,
+	);
 	if (!emittedKey) return null;
 
-	const value = supportedValueSource(valueSource, eventParameters, graphReads, moduleImports);
+	const value = supportedValueSource(
+		valueSource,
+		eventParameters,
+		graphReads,
+		moduleImports,
+		localNames,
+	);
 	if (!value) return null;
 
 	return `${emittedKey}: ${value}`;
@@ -514,6 +628,7 @@ function staticCallValueSource(
 	eventParameters: ReadonlyArray<string>,
 	graphReads: ReadonlyArray<LoweredStateRead>,
 	moduleImports: ReadonlyArray<SemanticModuleImport>,
+	localNames: ReadonlySet<string>,
 ): string | null {
 	const call = staticCallSourceParts(valueSource);
 	if (!call) return null;
@@ -525,7 +640,7 @@ function staticCallValueSource(
 	if (!argumentSources) return null;
 
 	const argumentsList = argumentSources.map((source) =>
-		supportedValueSource(source, eventParameters, graphReads, moduleImports),
+		supportedValueSource(source, eventParameters, graphReads, moduleImports, localNames),
 	);
 	if (argumentsList.some((source) => source === null)) return null;
 
@@ -542,6 +657,7 @@ function objectLiteralKeySource(
 	eventParameters: ReadonlyArray<string>,
 	graphReads: ReadonlyArray<LoweredStateRead>,
 	moduleImports: ReadonlyArray<SemanticModuleImport>,
+	localNames: ReadonlySet<string>,
 ): string | null {
 	if (isSupportedObjectLiteralKey(keySource)) return keySource;
 
@@ -553,6 +669,7 @@ function objectLiteralKeySource(
 		eventParameters,
 		graphReads,
 		moduleImports,
+		localNames,
 	);
 	if (!value) return null;
 
@@ -564,11 +681,18 @@ function parenthesizedValueSource(
 	eventParameters: ReadonlyArray<string>,
 	graphReads: ReadonlyArray<LoweredStateRead>,
 	moduleImports: ReadonlyArray<SemanticModuleImport>,
+	localNames: ReadonlySet<string>,
 ): string | null {
 	const innerSource = parenthesizedInnerSource(valueSource);
 	if (!innerSource) return null;
 
-	const inner = supportedValueSource(innerSource, eventParameters, graphReads, moduleImports);
+	const inner = supportedValueSource(
+		innerSource,
+		eventParameters,
+		graphReads,
+		moduleImports,
+		localNames,
+	);
 	if (!inner) return null;
 
 	return `(${inner})`;
@@ -579,6 +703,7 @@ function unaryValueSource(
 	eventParameters: ReadonlyArray<string>,
 	graphReads: ReadonlyArray<LoweredStateRead>,
 	moduleImports: ReadonlyArray<SemanticModuleImport>,
+	localNames: ReadonlySet<string>,
 ): string | null {
 	const source = valueSource?.trim();
 	if (!source) return null;
@@ -591,6 +716,7 @@ function unaryValueSource(
 		eventParameters,
 		graphReads,
 		moduleImports,
+		localNames,
 	);
 	if (!inner) return null;
 
@@ -614,22 +740,31 @@ function conditionalValueSource(
 	eventParameters: ReadonlyArray<string>,
 	graphReads: ReadonlyArray<LoweredStateRead>,
 	moduleImports: ReadonlyArray<SemanticModuleImport>,
+	localNames: ReadonlySet<string>,
 ): string | null {
 	const conditional = splitTopLevelConditionalValueSource(valueSource);
 	if (!conditional) return null;
 
-	const test = supportedValueSource(conditional.test, eventParameters, graphReads, moduleImports);
+	const test = supportedValueSource(
+		conditional.test,
+		eventParameters,
+		graphReads,
+		moduleImports,
+		localNames,
+	);
 	const consequent = supportedValueSource(
 		conditional.consequent,
 		eventParameters,
 		graphReads,
 		moduleImports,
+		localNames,
 	);
 	const alternate = supportedValueSource(
 		conditional.alternate,
 		eventParameters,
 		graphReads,
 		moduleImports,
+		localNames,
 	);
 	if (!test || !consequent || !alternate) return null;
 
@@ -647,12 +782,25 @@ function binaryValueSource(
 	eventParameters: ReadonlyArray<string>,
 	graphReads: ReadonlyArray<LoweredStateRead>,
 	moduleImports: ReadonlyArray<SemanticModuleImport>,
+	localNames: ReadonlySet<string>,
 ): string | null {
 	const binary = splitTopLevelBinaryValueSource(valueSource);
 	if (!binary) return null;
 
-	const left = supportedValueSource(binary.left, eventParameters, graphReads, moduleImports);
-	const right = supportedValueSource(binary.right, eventParameters, graphReads, moduleImports);
+	const left = supportedValueSource(
+		binary.left,
+		eventParameters,
+		graphReads,
+		moduleImports,
+		localNames,
+	);
+	const right = supportedValueSource(
+		binary.right,
+		eventParameters,
+		graphReads,
+		moduleImports,
+		localNames,
+	);
 	if (!left || !right) return null;
 
 	return `${left} ${binary.operator} ${right}`;
@@ -1253,9 +1401,10 @@ function supportedArgumentSources(
 	eventParameters: ReadonlyArray<string>,
 	graphReads: ReadonlyArray<LoweredStateRead>,
 	moduleImports: ReadonlyArray<SemanticModuleImport>,
+	localNames: ReadonlySet<string>,
 ): ReadonlyArray<string> | null {
 	const supported = argumentSources.map((source) =>
-		supportedArgumentSource(source, eventParameters, graphReads, moduleImports),
+		supportedArgumentSource(source, eventParameters, graphReads, moduleImports, localNames),
 	);
 	if (supported.some((source) => source === null)) return null;
 
@@ -1267,6 +1416,7 @@ function supportedArgumentSource(
 	eventParameters: ReadonlyArray<string>,
 	graphReads: ReadonlyArray<LoweredStateRead>,
 	moduleImports: ReadonlyArray<SemanticModuleImport>,
+	localNames: ReadonlySet<string>,
 ): string | null {
 	const trimmedSource = source.trim();
 	if (trimmedSource.startsWith('...')) {
@@ -1275,13 +1425,14 @@ function supportedArgumentSource(
 			eventParameters,
 			graphReads,
 			moduleImports,
+			localNames,
 		);
 		if (!spreadValue) return null;
 
 		return `...${spreadValue}`;
 	}
 
-	return supportedValueSource(source, eventParameters, graphReads, moduleImports);
+	return supportedValueSource(source, eventParameters, graphReads, moduleImports, localNames);
 }
 
 function compoundAssignmentOperator(assignmentOperator: string): string | null {

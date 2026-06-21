@@ -53,7 +53,7 @@ export async function buildSemanticGraph(
 
 	for (const statement of statements) {
 		const component = getComponent(statement);
-		const name = getIdentifierName(component?.id);
+		const name = getIdentifierName(component?.id as AnyNode | undefined);
 
 		if (!component || !name) continue;
 

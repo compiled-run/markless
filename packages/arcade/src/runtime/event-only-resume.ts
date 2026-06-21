@@ -8,4 +8,4 @@ export {
 	type EventOnlyResumeSymbol,
 	type EventOnlyResumeSymbolContext,
 	type ResumeEventOnlyFromPayloadDocumentInput,
-} from '@arcadejs/runtime/event-only-resume';
+} from '@arcade/runtime/event-only-resume';

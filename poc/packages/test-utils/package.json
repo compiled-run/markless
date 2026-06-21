@@ -1,5 +1,5 @@
 {
-	"name": "@arcadejs/test-utils",
+	"name": "@arcade/test-utils",
 	"version": "0.0.0",
 	"private": true,
 	"type": "module",

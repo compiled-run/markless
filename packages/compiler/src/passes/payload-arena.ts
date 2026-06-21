@@ -246,7 +246,7 @@ function pathInitialValue(
 ): BehaviorInputValue | undefined {
 	if (initialValue === undefined) return undefined;
 
-	let value = initialValue;
+	let value: unknown = initialValue;
 	for (const segment of path) {
 		if (value === null || value === undefined) return undefined;
 
@@ -260,9 +260,10 @@ function pathInitialValue(
 		}
 
 		if (typeof value !== 'object') return undefined;
-		if (!(segment in value)) return undefined;
+		const objectValue = value as Record<string, unknown>;
+		if (!(segment in objectValue)) return undefined;
 
-		value = (value as Record<string, unknown>)[segment];
+		value = objectValue[segment];
 	}
 
 	if (value === undefined) return undefined;

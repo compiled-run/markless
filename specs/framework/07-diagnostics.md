@@ -95,7 +95,7 @@ without requiring users to inspect compact payload encoding.
 
 Required compile-time diagnostics include capture-rule violations,
 bare `state()`/`computed()`/`shared()`/`element()` calls that are not imported
-from `@arcadejs/core`, framework APIs used outside a `.tsrx` reactive scope,
+from `@arcade/core`, framework APIs used outside a `.tsrx` reactive scope,
 reactive reads after `await` in async computed bodies, async reads outside an
 async boundary, `el` used with a non-`element()` handle, one `element()` handle
 bound to multiple live host elements, an element handle stored in `state()` or

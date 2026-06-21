@@ -17,12 +17,33 @@ import {
 } from './helpers.ts';
 
 const source = `
-import { state } from '@arcadejs/core';
+import { state } from '@arcade/core';
 
 export function App() @{
 	let count = state(0);
 
 	<button onClick={() => count++}>{count}</button>
+}
+`;
+
+const keyedSource = `
+import { state } from '@arcade/core';
+
+export function App() @{
+	let entries = state([]);
+	let chosen = state(null);
+
+	<main>
+		<section>
+			@for (const entry of entries; key entry.code) {
+				<article class={chosen === entry.code ? 'picked' : 'plain'}>
+					<h2>{entry.title}</h2>
+					<button onClick={() => chosen = entry.code}>Choose</button>
+				</article>
+			}
+		</section>
+		<footer>Done</footer>
+	</main>
 }
 `;
 
@@ -48,9 +69,12 @@ describe('TSRX Rolldown plugin structure', () => {
 		expect(result.code).toContain(
 			"import payloadScripts, { state as payloadState, view as payloadView } from 'virtual:arcade:payload:",
 		);
+		expect(result.code).not.toContain('import { loadSymbol, symbolManifest }');
 		expect(result.code).toContain(
-			"import { loadSymbol, symbolManifest } from 'virtual:arcade:resolver:",
+			"const arcadeSymbolResolverModule = () => import('virtual:arcade:resolver:",
 		);
+		expect(result.code).toContain('function loadSymbol(symbolId)');
+		expect(result.code).toContain('const symbolManifest = [1,');
 		expect(result.code).toContain(
 			"import moduleManifest from 'virtual:arcade:module-manifest:",
 		);
@@ -75,13 +99,33 @@ describe('TSRX Rolldown plugin structure', () => {
 		);
 	});
 
-	test('transformTsrxModule omits the benchmark client event-only entry for general apps', async () => {
+	test('transformTsrxModule omits alternate render entry exports', async () => {
 		const result = await transformTsrxModule({
 			filename: '/workspace/app/src/App.tsrx',
 			source,
 		});
 
-		expect(result.code).not.toContain('export async function renderClientEventOnly');
+		expect(result.code).not.toContain('export async function');
+	});
+
+	test('transformTsrxModule exports a public render component from compiler repeat artifacts', async () => {
+		const result = await transformTsrxModule({
+			filename: '/workspace/app/src/Entries.tsrx',
+			source: keyedSource,
+		});
+
+		expect(result.code).toContain('export function App()');
+		expect(result.code).toContain('<main><section></section><footer>Done</footer></main>');
+		expect(result.code).toContain('syncArcadePublicRepeat0');
+		expect(result.code).toContain('const graph = createArcadePublicGraph()');
+		expect(result.code).toContain('runtime: createArcadePublicRuntime(graph)');
+		expect(result.code).toContain('attachArcadePublicStaticEvents');
+		expect(result.code).not.toContain('state: payloadState');
+		expect(result.code).not.toContain('view: arcadePublicView');
+		expect(result.code).not.toContain('payloadView.locators.filter');
+		expect(result.code).not.toContain('arcadePublicHostNodeIndexes');
+		expect(result.code).toContain('locals: { "entry": record.item }');
+		expect(result.code).toContain('"state:entries"');
 	});
 
 	test('base plugin transforms TSRX and serves generated virtual modules', async () => {

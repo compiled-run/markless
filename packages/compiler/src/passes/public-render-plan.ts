@@ -8,21 +8,21 @@ import {
 	splitStaticGraphPath,
 } from '../artifact-helpers/graph-paths.ts';
 import type {
-	ClientEventOnlyRenderPlanArtifact,
-	ClientEventOnlyRenderPlanClassBinding,
-	ClientEventOnlyRenderPlanEventControl,
-	ClientEventOnlyRenderPlanInput,
-	ClientEventOnlyRenderPlanKeyedRepeat,
-	ClientEventOnlyRenderPlanTextBinding,
 	PayloadKeyedRepeat,
 	PlannedSymbol,
+	PublicRenderPlanArtifact,
+	PublicRenderPlanClassWrite,
+	PublicRenderPlanEventControl,
+	PublicRenderPlanInput,
+	PublicRenderPlanKeyedRepeat,
+	PublicRenderPlanRepeatGate,
+	PublicRenderPlanTextWrite,
+	PublicRenderPlanUnsupportedReason,
 	SemanticGraphBinding,
 	SemanticKeyedRepeat,
 } from '../artifacts.ts';
 
-export function planClientEventOnlyRender(
-	input: ClientEventOnlyRenderPlanInput,
-): ClientEventOnlyRenderPlanArtifact {
+export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlanArtifact {
 	const ast = parseModule(input.source.source, input.source.filename) as AnyNode;
 	const component = findComponent(ast);
 	const root = firstComponentRoot(component);
@@ -30,77 +30,175 @@ export function planClientEventOnlyRender(
 		return emptyPlan();
 	}
 
-	const hostIds = assignHostIds(
+	const assignedHosts = assignHostIds(
 		root,
 		input.semanticGraph.hostNodes.map((host) => host.id),
 	);
 	const repeatNodes = keyedRepeatNodes(root);
+	const repeatNodeById = new Map<string, AnyNode>();
+	input.semanticGraph.keyedRepeats.forEach((repeat, index) => {
+		const node = repeatNodes[index];
+		if (node) repeatNodeById.set(repeat.id, node);
+	});
+
 	const bindings = graphBindingMap(input.semanticGraph);
 	const aliases = semanticAliasMap(input.semanticGraph);
-	const keyedRepeats = input.payloadArena.view.keyedRepeats.flatMap((payloadRepeat, index) => {
+	const locatorByHostNodeId = new Map(
+		input.payloadArena.view.locators.map((locator) => [locator.hostNodeId, locator]),
+	);
+
+	const repeatGates: PublicRenderPlanRepeatGate[] = [];
+	const keyedRepeats: PublicRenderPlanKeyedRepeat[] = [];
+
+	for (const payloadRepeat of input.payloadArena.view.keyedRepeats) {
 		const semanticRepeat = input.semanticGraph.keyedRepeats.find(
 			(repeat) => repeat.id === payloadRepeat.id,
 		);
-		const repeatNode = repeatNodes[index];
-		if (!semanticRepeat || !repeatNode) return [];
+		const repeatNode = repeatNodeById.get(payloadRepeat.id);
+		if (!semanticRepeat || !repeatNode) continue;
 
-		const row = firstRepeatRow(repeatNode);
-		if (!row) return [];
+		const gate = supportedRepeatGate({
+			aliases,
+			assignedHosts,
+			bindings,
+			payloadRepeat,
+			repeatNode,
+			semanticRepeat,
+			source: input.source.source,
+			symbols: input.symbolResolver.symbols,
+		});
+		repeatGates.push(gate);
+		if (!gate.supported) continue;
 
-		return [
+		const row = singleRowRoot(repeatNode);
+		const parentLocator = locatorByHostNodeId.get(payloadRepeat.parentHostNodeId);
+		if (!row || !parentLocator) continue;
+
+		const rowPlan = collectRowPlan({
+			aliases,
+			assignedHosts,
+			bindings,
+			itemName: semanticRepeat.itemName,
+			keyPath: payloadRepeat.keyPath,
+			repeatId: payloadRepeat.id,
+			row,
+			source: input.source.source,
+			symbols: input.symbolResolver.symbols,
+		});
+		if (!rowPlan) continue;
+
+		keyedRepeats.push(
 			planKeyedRepeat({
-				bindings,
-				aliases,
-				hostIds,
 				payloadRepeat,
+				parentLocator,
 				row,
+				rowPlan,
 				semanticRepeat,
 				source: input.source.source,
-				symbols: input.symbolResolver.symbols,
 			}),
-		];
-	});
+		);
+	}
+
+	const rootTemplateHtml = staticShellSupported(root)
+		? staticHtml(root, { expressionText: ' ', omitForExpressions: true })
+		: null;
 
 	return {
-		passId: 'client-event-only-render-plan',
-		rootTemplateHtml: staticHtml(root, { expressionText: ' ', omitForExpressions: true }),
+		passId: 'public-render-plan',
+		rootTemplateHtml,
+		staticHostNodeIds: collectStaticHostNodeIds(root, assignedHosts),
+		repeatGates,
 		keyedRepeats,
 		diagnostics: [],
 	};
 }
 
-function emptyPlan(): ClientEventOnlyRenderPlanArtifact {
+function emptyPlan(): PublicRenderPlanArtifact {
 	return {
-		passId: 'client-event-only-render-plan',
+		passId: 'public-render-plan',
 		rootTemplateHtml: null,
+		staticHostNodeIds: [],
+		repeatGates: [],
 		keyedRepeats: [],
 		diagnostics: [],
 	};
 }
 
-function planKeyedRepeat(input: {
-	readonly bindings: ReadonlyMap<string, SemanticGraphBinding>;
+function supportedRepeatGate(input: {
 	readonly aliases: ReturnType<typeof semanticAliasMap>;
-	readonly hostIds: ReadonlyMap<AnyNode, string>;
+	readonly assignedHosts: AssignedHosts;
+	readonly bindings: ReadonlyMap<string, SemanticGraphBinding>;
 	readonly payloadRepeat: PayloadKeyedRepeat;
-	readonly row: AnyNode;
+	readonly repeatNode: AnyNode;
 	readonly semanticRepeat: SemanticKeyedRepeat;
 	readonly source: string;
 	readonly symbols: ReadonlyArray<PlannedSymbol>;
-}): ClientEventOnlyRenderPlanKeyedRepeat {
-	const rowPlan = collectRowPlan({
-		bindings: input.bindings,
-		aliases: input.aliases,
-		hostIds: input.hostIds,
-		itemName: input.semanticRepeat.itemName,
-		row: input.row,
-		source: input.source,
-		symbols: input.symbols,
-	});
+}): PublicRenderPlanRepeatGate {
+	const unsupported = unsupportedRepeatReason(input);
+	if (unsupported) {
+		return {
+			repeatId: input.payloadRepeat.id,
+			supported: false,
+			reason: unsupported,
+		};
+	}
 
 	return {
 		repeatId: input.payloadRepeat.id,
+		supported: true,
+	};
+}
+
+function unsupportedRepeatReason(input: {
+	readonly aliases: ReturnType<typeof semanticAliasMap>;
+	readonly assignedHosts: AssignedHosts;
+	readonly bindings: ReadonlyMap<string, SemanticGraphBinding>;
+	readonly payloadRepeat: PayloadKeyedRepeat;
+	readonly repeatNode: AnyNode;
+	readonly semanticRepeat: SemanticKeyedRepeat;
+	readonly source: string;
+	readonly symbols: ReadonlyArray<PlannedSymbol>;
+}): PublicRenderPlanUnsupportedReason | null {
+	const parent = input.assignedHosts.nodeByHostId.get(input.payloadRepeat.parentHostNodeId);
+	if (!parent) return 'repeat-parent-locator-missing';
+
+	if (!parentContainsOnlyRepeat(parent, input.repeatNode)) {
+		return 'repeat-parent-must-contain-only-repeat';
+	}
+
+	const row = singleRowRoot(input.repeatNode);
+	if (!row) return 'single-row-root-required';
+
+	if (containsNestedRepeat(row)) return 'nested-repeat-unsupported';
+
+	const rowPlan = collectRowPlan({
+		aliases: input.aliases,
+		assignedHosts: input.assignedHosts,
+		bindings: input.bindings,
+		itemName: input.semanticRepeat.itemName,
+		keyPath: input.payloadRepeat.keyPath,
+		repeatId: input.payloadRepeat.id,
+		row,
+		source: input.source,
+		symbols: input.symbols,
+	});
+	if (!rowPlan) return 'unsupported-row-binding';
+
+	return null;
+}
+
+function planKeyedRepeat(input: {
+	readonly payloadRepeat: PayloadKeyedRepeat;
+	readonly parentLocator: PublicRenderPlanKeyedRepeat['parentLocator'];
+	readonly row: AnyNode;
+	readonly rowPlan: RowPlan;
+	readonly semanticRepeat: SemanticKeyedRepeat;
+	readonly source: string;
+}): PublicRenderPlanKeyedRepeat {
+	return {
+		repeatId: input.payloadRepeat.id,
 		parentHostNodeId: input.payloadRepeat.parentHostNodeId,
+		parentLocator: input.parentLocator,
 		...(input.payloadRepeat.rowHostNodeId
 			? { rowHostNodeId: input.payloadRepeat.rowHostNodeId }
 			: {}),
@@ -112,39 +210,43 @@ function planKeyedRepeat(input: {
 			expressionText: ' ',
 			omitForExpressions: false,
 		}),
-		textBindings: rowPlan.textBindings,
-		classBindings: rowPlan.classBindings,
-		eventControls: rowPlan.eventControls,
+		textWrites: input.rowPlan.textWrites,
+		classWrites: input.rowPlan.classWrites,
+		eventControls: input.rowPlan.eventControls,
 	};
 }
 
+type RowPlan = {
+	readonly textWrites: ReadonlyArray<PublicRenderPlanTextWrite>;
+	readonly classWrites: ReadonlyArray<PublicRenderPlanClassWrite>;
+	readonly eventControls: ReadonlyArray<PublicRenderPlanEventControl>;
+};
+
 function collectRowPlan(input: {
-	readonly bindings: ReadonlyMap<string, SemanticGraphBinding>;
 	readonly aliases: ReturnType<typeof semanticAliasMap>;
-	readonly hostIds: ReadonlyMap<AnyNode, string>;
+	readonly assignedHosts: AssignedHosts;
+	readonly bindings: ReadonlyMap<string, SemanticGraphBinding>;
 	readonly itemName: string;
+	readonly keyPath: ReadonlyArray<string>;
+	readonly repeatId: string;
 	readonly row: AnyNode;
 	readonly source: string;
 	readonly symbols: ReadonlyArray<PlannedSymbol>;
-}): {
-	readonly textBindings: ReadonlyArray<ClientEventOnlyRenderPlanTextBinding>;
-	readonly classBindings: ReadonlyArray<ClientEventOnlyRenderPlanClassBinding>;
-	readonly eventControls: ReadonlyArray<ClientEventOnlyRenderPlanEventControl>;
-} {
-	const textBindings: ClientEventOnlyRenderPlanTextBinding[] = [];
-	const classBindings: ClientEventOnlyRenderPlanClassBinding[] = [];
-	const eventControls: ClientEventOnlyRenderPlanEventControl[] = [];
+}): RowPlan | null {
+	const textWrites: PublicRenderPlanTextWrite[] = [];
+	const classWrites: PublicRenderPlanClassWrite[] = [];
+	const eventControls: PublicRenderPlanEventControl[] = [];
 
-	const visitElement = (node: AnyNode, hostPath: ReadonlyArray<number>) => {
-		const hostNodeId = input.hostIds.get(node);
+	const visitElement = (node: AnyNode, hostPath: ReadonlyArray<number>): boolean => {
+		const hostNodeId = input.assignedHosts.hostIdByNode.get(node);
 
 		for (const attribute of getElementAttributes(node)) {
 			const attributeName = getIdentifierName(attribute.name as AnyNode | undefined);
-			if (!attributeName) continue;
+			if (!attributeName) return false;
 
 			const expression = unwrapExpressionContainer(attribute.value as AnyNode | undefined);
 			if (attributeName === 'class' && expression && expression.type !== 'Literal') {
-				const binding = classBindingPlan({
+				const binding = classWritePlan({
 					aliases: input.aliases,
 					bindings: input.bindings,
 					expression,
@@ -152,35 +254,49 @@ function collectRowPlan(input: {
 					itemName: input.itemName,
 					source: input.source,
 				});
-				if (binding) classBindings.push(binding);
+				if (!binding) return false;
+				classWrites.push(binding);
 				continue;
 			}
 
-			if (!hostNodeId || !isEventAttribute(attributeName) || !expression) continue;
+			if (isEventAttribute(attributeName)) {
+				if (!hostNodeId || !expression) return false;
 
-			for (const handler of eventHandlerExpressions(expression)) {
-				const eventName = normalizeEventName(attributeName);
-				const handlerSource = expressionSource(handler, input.source);
-				const symbol = input.symbols.find(
-					(symbol) =>
-						symbol.kind === 'event-handler' &&
-						symbol.hostNodeId === hostNodeId &&
-						symbol.eventName === eventName &&
-						symbol.source === handlerSource,
-				);
-				if (!symbol) continue;
+				for (const handler of eventHandlerExpressions(expression)) {
+					const eventName = normalizeEventName(attributeName);
+					const handlerSource = expressionSource(handler, input.source);
+					const symbol = input.symbols.find(
+						(symbol) =>
+							symbol.kind === 'event-handler' &&
+							symbol.hostNodeId === hostNodeId &&
+							symbol.eventName === eventName &&
+							symbol.source === handlerSource,
+					);
+					if (!symbol) return false;
 
-				eventControls.push({
-					eventName,
-					hostPath,
-					handlerSource,
-					symbolId: symbol.id,
-				});
+					eventControls.push({
+						eventName,
+						hostPath,
+						handlerSource,
+						symbolId: symbol.id,
+						itemContext: {
+							kind: 'keyed-repeat-item',
+							repeatId: input.repeatId,
+							itemName: input.itemName,
+							keyPath: input.keyPath,
+						},
+					});
+				}
+				continue;
 			}
+
+			if (attributeName === 'attach' || attributeName === 'el') return false;
+			if (expression && expression.type !== 'Literal') return false;
 		}
 
 		let childDomIndex = 0;
 		for (const child of asNodes(node.children)) {
+			if (isIgnorableTextNode(child)) continue;
 			if (isStaticTextNode(child)) {
 				childDomIndex++;
 				continue;
@@ -188,45 +304,50 @@ function collectRowPlan(input: {
 
 			if (child.type === 'JSXExpressionContainer' || child.type === 'TSRXExpression') {
 				const expression = child.expression as AnyNode | undefined;
-				if (expression) {
-					const source = expressionSource(expression, input.source);
-					const itemPath = itemPathFromSource(input.itemName, source);
-					if (itemPath) {
-						textBindings.push({
-							source,
-							itemPath,
-							nodePath: [...hostPath, childDomIndex],
-						});
-					}
-				}
+				if (!expression) return false;
+
+				const source = expressionSource(expression, input.source);
+				const itemPath = itemPathFromSource(input.itemName, source);
+				if (!itemPath) return false;
+
+				textWrites.push({
+					source,
+					itemPath,
+					nodePath: [...hostPath, childDomIndex],
+				});
 				childDomIndex++;
 				continue;
 			}
 
 			if (child.type === 'Element' || child.type === 'JSXElement') {
-				visitElement(child, [...hostPath, childDomIndex]);
+				if (!visitElement(child, [...hostPath, childDomIndex])) return false;
 				childDomIndex++;
+				continue;
 			}
+
+			return false;
 		}
+
+		return true;
 	};
 
-	visitElement(input.row, []);
+	if (!visitElement(input.row, [])) return null;
 
 	return {
-		textBindings,
-		classBindings,
+		textWrites,
+		classWrites,
 		eventControls,
 	};
 }
 
-function classBindingPlan(input: {
+function classWritePlan(input: {
 	readonly aliases: ReturnType<typeof semanticAliasMap>;
 	readonly bindings: ReadonlyMap<string, SemanticGraphBinding>;
 	readonly expression: AnyNode;
 	readonly hostPath: ReadonlyArray<number>;
 	readonly itemName: string;
 	readonly source: string;
-}): ClientEventOnlyRenderPlanClassBinding | null {
+}): PublicRenderPlanClassWrite | null {
 	if (input.expression.type !== 'ConditionalExpression') return null;
 
 	const test = input.expression.test as AnyNode | undefined;
@@ -299,11 +420,14 @@ function itemPathFromSource(itemName: string, source: string): ReadonlyArray<str
 	return segments.slice(1);
 }
 
-function assignHostIds(
-	root: AnyNode,
-	hostNodeIds: ReadonlyArray<string>,
-): ReadonlyMap<AnyNode, string> {
-	const hostIds = new Map<AnyNode, string>();
+type AssignedHosts = {
+	readonly hostIdByNode: ReadonlyMap<AnyNode, string>;
+	readonly nodeByHostId: ReadonlyMap<string, AnyNode>;
+};
+
+function assignHostIds(root: AnyNode, hostNodeIds: ReadonlyArray<string>): AssignedHosts {
+	const hostIdByNode = new Map<AnyNode, string>();
+	const nodeByHostId = new Map<string, AnyNode>();
 	let index = 0;
 
 	const visit = (node: AnyNode | null | undefined): void => {
@@ -313,7 +437,10 @@ function assignHostIds(
 			const tagName = getElementTagName(node);
 			if (tagName && isHostTagName(tagName)) {
 				const hostNodeId = hostNodeIds[index++];
-				if (hostNodeId) hostIds.set(node, hostNodeId);
+				if (hostNodeId) {
+					hostIdByNode.set(node, hostNodeId);
+					nodeByHostId.set(hostNodeId, node);
+				}
 			}
 		}
 
@@ -321,7 +448,27 @@ function assignHostIds(
 	};
 
 	visit(root);
-	return hostIds;
+	return { hostIdByNode, nodeByHostId };
+}
+
+function collectStaticHostNodeIds(
+	root: AnyNode,
+	assignedHosts: AssignedHosts,
+): ReadonlyArray<string> {
+	const hostNodeIds: string[] = [];
+
+	const visit = (node: AnyNode | null | undefined): void => {
+		if (!node || typeof node !== 'object') return;
+		if (node.type === 'JSXForExpression') return;
+
+		const hostNodeId = assignedHosts.hostIdByNode.get(node);
+		if (hostNodeId) hostNodeIds.push(hostNodeId);
+
+		for (const child of childNodes(node)) visit(child);
+	};
+
+	visit(root);
+	return hostNodeIds;
 }
 
 function keyedRepeatNodes(root: AnyNode): AnyNode[] {
@@ -336,11 +483,33 @@ function keyedRepeatNodes(root: AnyNode): AnyNode[] {
 	return repeats;
 }
 
-function firstRepeatRow(node: AnyNode): AnyNode | null {
-	const [row] = asNodes((node.body as AnyNode | undefined)?.body);
+function parentContainsOnlyRepeat(parent: AnyNode, repeat: AnyNode): boolean {
+	const meaningfulChildren = asNodes(parent.children).filter(
+		(child) => !isIgnorableTextNode(child),
+	);
+	return meaningfulChildren.length === 1 && meaningfulChildren[0] === repeat;
+}
+
+function singleRowRoot(node: AnyNode): AnyNode | null {
+	const bodyNodes = asNodes((node.body as AnyNode | undefined)?.body).filter(
+		(child) => !isIgnorableTextNode(child),
+	);
+	if (bodyNodes.length !== 1) return null;
+
+	const [row] = bodyNodes;
 	if (!row || (row.type !== 'Element' && row.type !== 'JSXElement')) return null;
 
 	return row;
+}
+
+function containsNestedRepeat(node: AnyNode): boolean {
+	const visit = (child: AnyNode | null | undefined): boolean => {
+		if (!child || typeof child !== 'object') return false;
+		if (child.type === 'JSXForExpression') return true;
+		return childNodes(child).some(visit);
+	};
+
+	return childNodes(node).some(visit);
 }
 
 function firstComponentRoot(component: AnyNode | undefined): AnyNode | null {
@@ -355,13 +524,21 @@ function firstComponentRoot(component: AnyNode | undefined): AnyNode | null {
 }
 
 function findComponent(ast: AnyNode): AnyNode | undefined {
+	let fallback: AnyNode | undefined;
+
 	for (const statement of asNodes(ast.body)) {
 		const declaration =
 			statement.type === 'ExportNamedDeclaration'
 				? (statement.declaration as AnyNode | undefined)
 				: statement;
-		if (declaration?.type === 'FunctionDeclaration') return declaration;
+		if (declaration?.type !== 'FunctionDeclaration') continue;
+		if (!firstComponentRoot(declaration)) continue;
+
+		if (statement.type === 'ExportNamedDeclaration') return declaration;
+		fallback ??= declaration;
 	}
+
+	return fallback;
 }
 
 function staticHtml(
@@ -379,7 +556,7 @@ function staticHtml(
 
 	if (node.type === 'JSXForExpression') {
 		if (options.omitForExpressions) return '';
-		const row = firstRepeatRow(node);
+		const row = singleRowRoot(node);
 		return row ? staticHtml(row, options) : '';
 	}
 
@@ -399,6 +576,33 @@ function staticHtml(
 	return `<${tagName}${attributes}>${children}</${tagName}>`;
 }
 
+function staticShellSupported(node: AnyNode): boolean {
+	if (node.type !== 'Element' && node.type !== 'JSXElement') return false;
+	if (
+		getElementAttributes(node).some((attribute) => {
+			const name = getIdentifierName(attribute.name as AnyNode | undefined);
+			const expression = unwrapExpressionContainer(attribute.value as AnyNode | undefined);
+			return (
+				!!name &&
+				!isEventAttribute(name) &&
+				name !== 'attach' &&
+				name !== 'el' &&
+				!!expression &&
+				expression.type !== 'Literal'
+			);
+		})
+	)
+		return false;
+
+	return asNodes(node.children).every(
+		(child) =>
+			isIgnorableTextNode(child) ||
+			isStaticTextNode(child) ||
+			child.type === 'JSXForExpression' ||
+			staticShellSupported(child),
+	);
+}
+
 function staticAttributeEntry(attribute: AnyNode): ReadonlyArray<readonly [string, string]> {
 	const name = getIdentifierName(attribute.name as AnyNode | undefined);
 	if (!name || isEventAttribute(name) || name === 'attach' || name === 'el') return [];
@@ -416,6 +620,10 @@ function staticAttributeEntry(attribute: AnyNode): ReadonlyArray<readonly [strin
 	}
 
 	return [[name, '']];
+}
+
+function isIgnorableTextNode(node: AnyNode): boolean {
+	return isStaticTextNode(node) && !staticTextValue(node);
 }
 
 function isStaticTextNode(node: AnyNode): boolean {

@@ -7,7 +7,7 @@ import {
 } from '../src/index.ts';
 
 const sharedSource = `
-import { shared, state, computed } from '@arcadejs/core';
+import { shared, state, computed } from '@arcade/core';
 
 export const session = shared(() => {
 	const data = state({ user: null, status: 'anonymous' });

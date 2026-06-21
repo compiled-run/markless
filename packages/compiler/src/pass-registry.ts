@@ -26,16 +26,10 @@ export const defaultCompilerPasses: ReadonlyArray<CompilerPassDefinition> = [
 		produces: ['symbolResolver'],
 	},
 	{
-		passId: 'client-event-only-render-plan',
-		description: 'Plan structural client event-only templates for generated direct DOM emit.',
+		passId: 'public-render-plan',
+		description: 'Plan compiler-proven direct DOM artifacts for public render().',
 		consumes: ['source', 'semanticGraph', 'payloadArena', 'symbolResolver'],
-		produces: ['clientEventOnlyRenderPlan'],
-	},
-	{
-		passId: 'capture-analysis',
-		description: 'Analyze extracted symbol sources for resumable capture eligibility.',
-		consumes: ['semanticGraph', 'symbolResolver'],
-		produces: ['captureAnalysis'],
+		produces: ['publicRenderPlan'],
 	},
 	{
 		passId: 'protocol-state',
@@ -50,21 +44,28 @@ export const defaultCompilerPasses: ReadonlyArray<CompilerPassDefinition> = [
 		produces: ['protocolView'],
 	},
 	{
+		passId: 'public-render-module',
+		description:
+			'Emit public render component factories from compiler-proven render artifacts.',
+		consumes: ['semanticGraph', 'publicRenderPlan', 'protocolState', 'protocolView'],
+		produces: ['publicRenderModule'],
+	},
+	{
+		passId: 'capture-analysis',
+		description: 'Analyze extracted symbol sources for resumable capture eligibility.',
+		consumes: ['semanticGraph', 'symbolResolver'],
+		produces: ['captureAnalysis'],
+	},
+	{
 		passId: 'payload-scripts',
 		description: 'Render arcade/state and arcade/view data scripts and the render shell.',
 		consumes: ['protocolState', 'protocolView'],
 		produces: ['payloadScripts', 'renderShell'],
 	},
 	{
-		passId: 'client-event-only-entry',
-		description: 'Emit the generated client event-only render entry for simple CSR modules.',
-		consumes: ['source', 'semanticGraph', 'symbolResolver'],
-		produces: ['clientEventOnlyEntry'],
-	},
-	{
 		passId: 'symbol-modules',
 		description: 'Emit lazy symbol module sources for planned symbols.',
-		consumes: ['symbolResolver', 'captureAnalysis'],
+		consumes: ['symbolResolver', 'captureAnalysis', 'publicRenderPlan'],
 		produces: ['symbolModules'],
 	},
 	{

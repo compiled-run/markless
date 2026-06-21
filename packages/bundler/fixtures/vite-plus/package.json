@@ -8,9 +8,9 @@
 		"test": "vp test"
 	},
 	"dependencies": {
-		"@arcadejs/bundler": "workspace:*",
-		"@arcadejs/core": "workspace:*",
-		"@arcadejs/runtime": "workspace:*"
+		"@arcade/bundler": "workspace:*",
+		"@arcade/core": "workspace:*",
+		"@arcade/runtime": "workspace:*"
 	},
 	"devDependencies": {
 		"typescript": "catalog:",

@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { buildSemanticGraph } from '../src/index.ts';
 
 const moduleScopeSource = `
-import { state, computed } from '@arcadejs/core';
+import { state, computed } from '@arcade/core';
 
 const leaked = state(0);
 export const doubled = computed(() => leaked * 2);
@@ -23,7 +23,7 @@ export function Counter() @{
 `;
 
 const asyncPostAwaitReadSource = `
-import { state, computed } from '@arcadejs/core';
+import { state, computed } from '@arcade/core';
 
 export function UserRoute(route: { params: { userId: string } }) @{
 	const settings = state({ locale: 'en' });
@@ -44,7 +44,7 @@ export function UserRoute(route: { params: { userId: string } }) @{
 `;
 
 const missingAsyncBoundarySource = `
-import { computed } from '@arcadejs/core';
+import { computed } from '@arcade/core';
 
 export function UserRoute() @{
 	const user = computed(async ({ signal }) => {
@@ -57,7 +57,7 @@ export function UserRoute() @{
 `;
 
 const transitiveAsyncBoundarySource = `
-import { computed } from '@arcadejs/core';
+import { computed } from '@arcade/core';
 
 export function UserRoute() @{
 	const user = computed(async ({ signal }) => {
@@ -71,7 +71,7 @@ export function UserRoute() @{
 `;
 
 const elementHandleDiagnosticsSource = `
-import { state, element } from '@arcadejs/core';
+import { state, element } from '@arcade/core';
 
 export function Handles() @{
 	const menu = state({ open: false });
@@ -86,7 +86,7 @@ export function Handles() @{
 `;
 
 const elementHandleInStateSource = `
-import { state, element } from '@arcadejs/core';
+import { state, element } from '@arcade/core';
 
 export function Handles() @{
 	let input = element<HTMLInputElement>();
@@ -97,7 +97,7 @@ export function Handles() @{
 `;
 
 const componentAttachSource = `
-import { state } from '@arcadejs/core';
+import { state } from '@arcade/core';
 
 function ChartWrapper() @{
 	<canvas />
@@ -113,7 +113,7 @@ export function Dashboard() @{
 `;
 
 const unextractableSyncPolicySource = `
-import { state } from '@arcadejs/core';
+import { state } from '@arcade/core';
 
 export function Form() @{
 	const allowSubmit = state(false);
@@ -133,7 +133,7 @@ export function Form() @{
 `;
 
 const graphDestructureDefaultSource = `
-import { state } from '@arcadejs/core';
+import { state } from '@arcade/core';
 
 export function Menu() @{
 	const menu = state({ title: undefined });
@@ -144,7 +144,7 @@ export function Menu() @{
 `;
 
 const sharedCycleSource = `
-import { shared } from '@arcadejs/core';
+import { shared } from '@arcade/core';
 
 export const session = shared(() => {
 	const c = cart();
@@ -257,8 +257,8 @@ test('buildSemanticGraph reports missing framework API imports', async () => {
 			passId: 'tsrx-semantic-graph',
 			artifactKeys: ['semanticGraph'],
 			title: 'Framework API must be imported',
-			message: 'Cannot use state() until it is imported from @arcadejs/core.',
-			why: 'state() is a compiler-rewritten @arcadejs/core API. The import makes ownership explicit for TypeScript, editors, junior developers, and AI agents.',
+			message: 'Cannot use state() until it is imported from @arcade/core.',
+			why: 'state() is a compiler-rewritten @arcade/core API. The import makes ownership explicit for TypeScript, editors, junior developers, and AI agents.',
 			primarySpan: {
 				filename: 'src/Counter.tsrx',
 				start: stateStart,
@@ -266,14 +266,14 @@ test('buildSemanticGraph reports missing framework API imports', async () => {
 			},
 			suggestions: [
 				{
-					message: "Add `import { state } from '@arcadejs/core';` to this .tsrx file.",
+					message: "Add `import { state } from '@arcade/core';` to this .tsrx file.",
 				},
 			],
 			docsUrl: 'https://arcadejs.com/errors/ARCADE_FRAMEWORK_IMPORT_REQUIRED',
 		}),
 		expect.objectContaining({
 			code: 'ARCADE_FRAMEWORK_IMPORT_REQUIRED',
-			message: 'Cannot use computed() until it is imported from @arcadejs/core.',
+			message: 'Cannot use computed() until it is imported from @arcade/core.',
 			primarySpan: {
 				filename: 'src/Counter.tsrx',
 				start: computedStart,
@@ -281,13 +281,13 @@ test('buildSemanticGraph reports missing framework API imports', async () => {
 			},
 			suggestions: [
 				{
-					message: "Add `import { computed } from '@arcadejs/core';` to this .tsrx file.",
+					message: "Add `import { computed } from '@arcade/core';` to this .tsrx file.",
 				},
 			],
 		}),
 		expect.objectContaining({
 			code: 'ARCADE_FRAMEWORK_IMPORT_REQUIRED',
-			message: 'Cannot use element() until it is imported from @arcadejs/core.',
+			message: 'Cannot use element() until it is imported from @arcade/core.',
 			primarySpan: {
 				filename: 'src/Counter.tsrx',
 				start: elementStart,
@@ -295,7 +295,7 @@ test('buildSemanticGraph reports missing framework API imports', async () => {
 			},
 			suggestions: [
 				{
-					message: "Add `import { element } from '@arcadejs/core';` to this .tsrx file.",
+					message: "Add `import { element } from '@arcade/core';` to this .tsrx file.",
 				},
 			],
 		}),

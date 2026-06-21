@@ -1,8 +1,19 @@
+import { parseJavaScriptModule, type JavaScriptAstNode } from '@arcade/compiler';
+
 export function stripEmptyVitePreloadWrappers(code: string): string {
 	const withoutDirectImports = stripDirectEmptyPreloadWrappers(code);
 	const withoutAsyncLoaders = stripAsyncEmptyPreloadWrappers(withoutDirectImports);
-	return stripUnusedVitePreloadHelper(withoutAsyncLoaders);
+	return stripImportedVitePreloadHelper(stripUnusedVitePreloadHelper(withoutAsyncLoaders));
 }
+
+type ImportedVitePreloadHelper = {
+	readonly importStart: number;
+	readonly importEnd: number;
+	readonly preloadFunction: string;
+	readonly initFunction: string;
+};
+
+const IMPORT_DECLARATION_CANDIDATE_RE = /\bimport\s*\{[\s\S]*?\}\s*from\s*["'][^"']+["'];?/g;
 
 function stripDirectEmptyPreloadWrappers(code: string): string {
 	let next = '';
@@ -131,6 +142,58 @@ function skipSpaces(code: string, start: number): number {
 	return cursor;
 }
 
+function stripImportedVitePreloadHelper(code: string): string {
+	const helper = findImportedVitePreloadHelper(code);
+	if (!helper) return code;
+
+	const withoutImport = code.slice(0, helper.importStart) + code.slice(helper.importEnd);
+	if (hasCallableReference(withoutImport, helper.preloadFunction)) {
+		return code;
+	}
+
+	const initCall = `${escapeRegExp(helper.initFunction)}\\(\\)`;
+	return withoutImport
+		.replace(new RegExp(String.raw`\{${initCall},`, 'g'), '{')
+		.replace(new RegExp(String.raw`,${initCall}\}`, 'g'), '}')
+		.replace(new RegExp(String.raw`\{${initCall}\}`, 'g'), '{}');
+}
+
+function findImportedVitePreloadHelper(code: string): ImportedVitePreloadHelper | undefined {
+	for (const match of code.matchAll(IMPORT_DECLARATION_CANDIDATE_RE)) {
+		const importStart = match.index ?? -1;
+		if (importStart < 0) continue;
+
+		const statement = match[0]!;
+		const ast = tryParseJavaScriptModule(statement);
+		const declaration = asNodes(ast?.body).find((node) => node.type === 'ImportDeclaration');
+		if (!declaration) continue;
+
+		let preloadFunction: string | undefined;
+		let initFunction: string | undefined;
+		for (const specifier of asNodes(declaration.specifiers)) {
+			if (specifier.type !== 'ImportSpecifier') continue;
+
+			const imported = identifierName(specifier.imported as JavaScriptAstNode | undefined);
+			const local = identifierName(specifier.local as JavaScriptAstNode | undefined);
+			if (!imported || !local) continue;
+
+			if (imported === '__vitePreload') preloadFunction = local;
+			if (imported === 'init_preload_helper') initFunction = local;
+		}
+
+		if (preloadFunction && initFunction) {
+			return {
+				importStart,
+				importEnd: importStart + statement.length,
+				preloadFunction,
+				initFunction,
+			};
+		}
+	}
+
+	return undefined;
+}
+
 function stripUnusedVitePreloadHelper(code: string): string {
 	const marker = code.indexOf('vite:preloadError');
 	if (marker < 0) return code;
@@ -142,7 +205,7 @@ function stripUnusedVitePreloadHelper(code: string): string {
 		code[helper.removeStart] === ',' && code[helper.removeEnd - 1] === ';' ? ';' : '';
 	const outsideHelper =
 		code.slice(0, helper.removeStart) + statementEnd + code.slice(helper.removeEnd);
-	if (new RegExp(`\\b${escapeRegExp(helper.preloadFunction)}\\s*\\(`).test(outsideHelper)) {
+	if (hasCallableReference(outsideHelper, helper.preloadFunction)) {
 		return code;
 	}
 
@@ -262,3 +325,159 @@ function findHelperDeclarationStart(
 function escapeRegExp(value: string): string {
 	return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
+
+function hasCallableReference(code: string, name: string): boolean {
+	const ast = tryParseJavaScriptModule(code);
+	if (!ast) return true;
+
+	let found = false;
+	walkReferenceScopes(ast, [], (node, scopes) => {
+		if (node.type !== 'CallExpression') return;
+		const callee = node.callee as JavaScriptAstNode | undefined;
+		if (identifierName(callee) !== name) return;
+		if (isDeclaredInScope(name, scopes)) return;
+		found = true;
+	});
+	return found;
+}
+
+function walkReferenceScopes(
+	node: JavaScriptAstNode | null | undefined,
+	scopes: ReadonlyArray<ReadonlySet<string>>,
+	visit: (node: JavaScriptAstNode, scopes: ReadonlyArray<ReadonlySet<string>>) => void,
+): void {
+	if (!node || typeof node !== 'object') return;
+
+	if (node.type === 'Program') {
+		const scope = collectScopeDeclarations(asNodes(node.body));
+		visit(node, [scope]);
+		for (const child of asNodes(node.body)) {
+			walkReferenceScopes(child, [scope], visit);
+		}
+		return;
+	}
+
+	if (isFunctionNode(node)) {
+		const scope = new Set<string>();
+		collectBindingNames(node.id as JavaScriptAstNode | undefined, scope);
+		for (const parameter of asNodes(node.params)) {
+			collectBindingNames(parameter, scope);
+		}
+		const nextScopes = [...scopes, scope];
+		visit(node, nextScopes);
+		walkReferenceScopes(node.body as JavaScriptAstNode | undefined, nextScopes, visit);
+		return;
+	}
+
+	if (node.type === 'BlockStatement') {
+		const scope = collectScopeDeclarations(asNodes(node.body));
+		const nextScopes = [...scopes, scope];
+		visit(node, nextScopes);
+		for (const child of asNodes(node.body)) {
+			walkReferenceScopes(child, nextScopes, visit);
+		}
+		return;
+	}
+
+	visit(node, scopes);
+	for (const child of childNodes(node)) {
+		walkReferenceScopes(child, scopes, visit);
+	}
+}
+
+function collectScopeDeclarations(nodes: readonly JavaScriptAstNode[]): Set<string> {
+	const declarations = new Set<string>();
+	for (const node of nodes) {
+		if (node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration') {
+			collectBindingNames(node.id as JavaScriptAstNode | undefined, declarations);
+			continue;
+		}
+		if (node.type === 'ImportDeclaration') {
+			for (const specifier of asNodes(node.specifiers)) {
+				collectBindingNames(specifier.local as JavaScriptAstNode | undefined, declarations);
+			}
+			continue;
+		}
+		if (node.type === 'VariableDeclaration') {
+			for (const declaration of asNodes(node.declarations)) {
+				collectBindingNames(declaration.id as JavaScriptAstNode | undefined, declarations);
+			}
+		}
+	}
+	return declarations;
+}
+
+function collectBindingNames(node: JavaScriptAstNode | null | undefined, names: Set<string>): void {
+	if (!node) return;
+	const name = identifierName(node);
+	if (name) {
+		names.add(name);
+		return;
+	}
+	for (const child of childNodes(node)) {
+		collectBindingNames(child, names);
+	}
+}
+
+function isDeclaredInScope(name: string, scopes: ReadonlyArray<ReadonlySet<string>>): boolean {
+	return scopes.some((scope) => scope.has(name));
+}
+
+function isFunctionNode(node: JavaScriptAstNode): boolean {
+	return (
+		node.type === 'FunctionDeclaration' ||
+		node.type === 'FunctionExpression' ||
+		node.type === 'ArrowFunctionExpression'
+	);
+}
+
+function tryParseJavaScriptModule(code: string): JavaScriptAstNode | undefined {
+	try {
+		return parseJavaScriptModule(code);
+	} catch {
+		return undefined;
+	}
+}
+
+function childNodes(node: JavaScriptAstNode): JavaScriptAstNode[] {
+	const children: JavaScriptAstNode[] = [];
+	for (const [key, value] of Object.entries(node)) {
+		if (ignoredAstKeys.has(key)) continue;
+		if (Array.isArray(value)) {
+			for (const item of value) {
+				if (isAstNode(item)) children.push(item);
+			}
+			continue;
+		}
+		if (isAstNode(value)) children.push(value);
+	}
+	return children;
+}
+
+function asNodes(value: unknown): JavaScriptAstNode[] {
+	return Array.isArray(value) ? value.filter(isAstNode) : [];
+}
+
+function isAstNode(value: unknown): value is JavaScriptAstNode {
+	return (
+		typeof value === 'object' &&
+		value !== null &&
+		typeof (value as JavaScriptAstNode).type === 'string'
+	);
+}
+
+function identifierName(node: JavaScriptAstNode | null | undefined): string | undefined {
+	return node?.type === 'Identifier' && typeof node.name === 'string' ? node.name : undefined;
+}
+
+const ignoredAstKeys = new Set([
+	'closingElement',
+	'id',
+	'leadingComments',
+	'loc',
+	'metadata',
+	'openingElement',
+	'parent',
+	'range',
+	'trailingComments',
+]);

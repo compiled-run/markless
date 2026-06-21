@@ -52,7 +52,7 @@ describe('arcade chunking defaults', () => {
 
 	test('rejects boolean code splitting for client builds', () => {
 		expect(() => callOutputOptions(arcadeClient(), { codeSplitting: true })).toThrow(
-			'@arcadejs/bundler requires output.codeSplitting to be an object',
+			'@arcade/bundler requires output.codeSplitting to be an object',
 		);
 	});
 });

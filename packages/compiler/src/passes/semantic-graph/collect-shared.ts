@@ -258,6 +258,8 @@ function collectReturnedObjectProperties(input: {
 		if (!name) continue;
 
 		const value = property.value as AnyNode | undefined;
+		if (!value) continue;
+
 		const propertySource = expressionSource(property, input.state.source);
 
 		if (property.method === true || isFunctionValue(value)) {
@@ -270,7 +272,7 @@ function collectReturnedObjectProperties(input: {
 			continue;
 		}
 
-		const valueSource = value ? expressionSource(value, input.state.source) : '';
+		const valueSource = expressionSource(value, input.state.source);
 		const resolved = resolveGraphPath(valueSource, bindings, aliases);
 		if (!resolved) continue;
 

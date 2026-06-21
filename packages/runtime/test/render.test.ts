@@ -1,5 +1,5 @@
-import { ASYNC_PROTOCOL_VERSION, type ProtocolViewPayload } from '@arcadejs/protocol';
-import { createProtocolStatePayload } from '@arcadejs/serializer';
+import { ASYNC_PROTOCOL_VERSION, type ProtocolViewPayload } from '@arcade/protocol';
+import { createProtocolStatePayload } from '@arcade/serializer';
 import { expect, test } from 'vitest';
 import { render, renderToString } from '../src/index.ts';
 
@@ -170,6 +170,39 @@ test('render creates a CSR container without payload scripts or the inline resum
 
 	expect(loadedSymbols).toEqual(['symbol:click']);
 	expect(container.graph.read('state:count')).toBe(1);
+});
+
+test('render returns a compiler-provided CSR runtime without event resume startup', async () => {
+	const target = {
+		children: [] as FakeElement[],
+		replaceChildren(...children: FakeElement[]) {
+			this.children = children;
+		},
+	};
+	const root = element('DIV');
+	const graph = {
+		read() {
+			return 'ready';
+		},
+	};
+	const runtime = {
+		graph,
+		view: staticView(),
+		async dispatch() {},
+	};
+
+	const container = await render(
+		() => ({
+			root,
+			graph,
+			runtime,
+		}),
+		{ target },
+	);
+
+	expect(target.children).toEqual([root]);
+	expect(container.graph).toBe(graph);
+	expect(container.runtime).toBe(runtime);
 });
 
 test('render uses the narrow CSR event path to apply DOM update symbols', async () => {

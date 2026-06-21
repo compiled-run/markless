@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { expect, test } from 'vitest';
 import {
 	computed,
@@ -10,6 +11,7 @@ import {
 	shared,
 	state,
 } from '../src/index.ts';
+import { applyDomJournalEntries as narrowApplyDomJournalEntries } from '../src/runtime/dom-journal.ts';
 import { createDomUpdateEntry as createNarrowDomUpdateEntry } from '../src/runtime/dom-update.ts';
 import { resumeEventOnlyFromPayloadDocument as narrowResumeEventOnlyFromPayloadDocument } from '../src/runtime/event-only-resume.ts';
 import { resumeEventFromPayloadDocument as narrowResumeEventFromPayloadDocument } from '../src/runtime/event-resume.ts';
@@ -17,6 +19,10 @@ import { render as narrowRender } from '../src/runtime/render.ts';
 import { renderToString as narrowRenderToString } from '../src/runtime/render-to-string.ts';
 import { resumeFromPayloadDocument as narrowResumeFromPayloadDocument } from '../src/runtime/resume.ts';
 import { arcade as viteArcade } from '../src/vite.ts';
+
+function readSource(relativePath: string): Promise<string> {
+	return readFile(new URL(relativePath, import.meta.url), 'utf8');
+}
 
 test('main package exposes the curated author and build surface', () => {
 	expect(typeof state).toBe('function');
@@ -27,6 +33,7 @@ test('main package exposes the curated author and build surface', () => {
 	expect(typeof renderToString).toBe('function');
 	expect(typeof resumeFromPayloadDocument).toBe('function');
 	expect(typeof resumeFromPayloadScripts).toBe('function');
+	expect(typeof narrowApplyDomJournalEntries).toBe('function');
 	expect(typeof createNarrowDomUpdateEntry).toBe('function');
 	expect(typeof narrowResumeEventOnlyFromPayloadDocument).toBe('function');
 	expect(typeof narrowResumeEventFromPayloadDocument).toBe('function');
@@ -35,4 +42,45 @@ test('main package exposes the curated author and build surface', () => {
 	expect(typeof narrowResumeFromPayloadDocument).toBe('function');
 	expect(typeof arcadeClient).toBe('function');
 	expect(typeof viteArcade).toBe('function');
+});
+
+test('root and grouped runtime entries use the @arcade namespace', async () => {
+	const staleScope = '@arcade' + 'js/';
+	const staleUnscopedPackage = 'arc' + 'ade/';
+	const [indexSource, runtimeSource] = await Promise.all([
+		readSource('../src/index.ts'),
+		readSource('../src/runtime.ts'),
+	]);
+
+	expect(indexSource).not.toContain(staleScope);
+	expect(runtimeSource).not.toContain(staleScope);
+	expect(indexSource).not.toContain(`from '${staleUnscopedPackage}`);
+	expect(indexSource).toContain("from './render.ts'");
+	expect(indexSource).toContain("from '@arcade/core'");
+	expect(indexSource).toContain("from '@arcade/runtime/render-to-string'");
+	expect(indexSource).toContain("from '@arcade/runtime/resume'");
+	expect(indexSource).toContain("from '@arcade/bundler/rolldown'");
+	expect(runtimeSource).toContain("from '@arcade/runtime/render'");
+	expect(runtimeSource).toContain("from '@arcade/runtime/render-to-string'");
+	expect(runtimeSource).toContain("from '@arcade/runtime/resume'");
+});
+
+test('root render fallback delegates mounting to the runtime render path', async () => {
+	const root = {
+		nodeType: 1,
+		tagName: 'DIV',
+		childNodes: [],
+		listeners: [],
+		addEventListener() {},
+	};
+	const target = {
+		children: [] as Array<typeof root>,
+		appendChild(child: typeof root) {
+			this.children.push(child);
+		},
+	};
+
+	await render(() => ({ root }), { target });
+
+	expect(target.children).toEqual([root]);
 });

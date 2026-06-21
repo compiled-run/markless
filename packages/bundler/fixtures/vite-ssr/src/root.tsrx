@@ -1,4 +1,4 @@
-import { state, computed } from '@arcadejs/core';
+import { state, computed } from '@arcade/core';
 
 export function App() @{
 	let count = state(0);

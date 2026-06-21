@@ -1,7 +1,7 @@
 # Scheduler Journal Proof
 
 This fixture defines the executable-spec surface for scheduler and DOM mutation
-journal semantics in `@arcadejs/core`. It is not a scheduler implementation,
+journal semantics in `@arcade/core`. It is not a scheduler implementation,
 runtime graph implementation, DOM mutation application layer, browser demo, or
 final artifact JSON.
 

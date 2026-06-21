@@ -178,20 +178,19 @@ function graphDependency(
 }
 
 function findFirstAwaitEnd(node: AnyNode | undefined): number | null {
-	let first: { readonly start: number; readonly end: number } | null = null;
+	let firstStart: number | null = null;
+	let firstEnd: number | null = null;
 
 	walkNode(node, (candidate) => {
 		if (candidate.type !== 'AwaitExpression') return;
 		if (typeof candidate.start !== 'number' || typeof candidate.end !== 'number') return;
-		if (first && candidate.start >= first.start) return;
+		if (firstStart !== null && candidate.start >= firstStart) return;
 
-		first = {
-			start: candidate.start,
-			end: candidate.end,
-		};
+		firstStart = candidate.start;
+		firstEnd = candidate.end;
 	});
 
-	return first?.end ?? null;
+	return firstEnd;
 }
 
 function postAwaitGraphReads(

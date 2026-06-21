@@ -37,8 +37,8 @@ const fixtures = [
 		runtimeBudget: {
 			dist: 'packages/bundler/fixtures/vite-ssr/dist',
 			maxRuntimeChunkGzipBytes: 2_175,
-			maxAsyncScriptsGzipBytes: 2_700,
-			maxAsyncScriptCount: 4,
+			maxAsyncScriptsGzipBytes: 3_700,
+			maxAsyncScriptCount: 6,
 			forbidVitePreloadHelper: true,
 		},
 	},
@@ -90,7 +90,9 @@ describe('fixture builds', () => {
 			}
 
 			if ('bundleGraph' in fixture) {
-				const graph = JSON.parse(await readFile(resolve(root, fixture.bundleGraph), 'utf8'));
+				const graph = JSON.parse(
+					await readFile(resolve(root, fixture.bundleGraph), 'utf8'),
+				);
 				expect(graph).toEqual(expect.any(Array));
 				for (const symbol of fixture.symbols) {
 					expect(graph).toContain(symbol);

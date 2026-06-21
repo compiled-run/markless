@@ -4,10 +4,10 @@ import type { SemanticModuleImport } from '../../artifacts.ts';
 export type FrameworkApiName = 'state' | 'computed' | 'element' | 'shared';
 
 const frameworkApiNames = new Set<FrameworkApiName>(['state', 'computed', 'element', 'shared']);
-const frameworkApiSources = new Set(['@arcadejs/core', '@arcadejs/arcade', 'arcade']);
+const frameworkApiSources = new Set(['@arcade/core', '@arcade/arcade']);
 
 // These imports make compiler-rewritten APIs explicit in user code.
-// A bare state() call is not enough; it must resolve to an import from @arcadejs/core.
+// A bare state() call is not enough; it must resolve to an import from @arcade/core.
 export function collectImports(
 	statements: ReadonlyArray<AnyNode>,
 ): ReadonlyMap<string, FrameworkApiName> {
@@ -110,6 +110,7 @@ function isFrameworkApiSource(source: string | null): boolean {
 }
 
 function importSource(node: AnyNode): string | null {
-	const value = node.source?.value;
+	const source = node.source as AnyNode | undefined;
+	const value = source?.value;
 	return typeof value === 'string' ? value : null;
 }

@@ -28,6 +28,7 @@ export type CompilerDiagnostic = {
 	readonly passId?: string;
 	readonly artifactKeys?: ReadonlyArray<string>;
 	readonly statePath?: string;
+	readonly source?: string;
 	readonly symbolId?: string;
 	readonly elementLocator?: string;
 	readonly suggestions: ReadonlyArray<DiagnosticSuggestion>;

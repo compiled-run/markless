@@ -11,4 +11,3 @@ export async function onClick({ element, root }) {
 	document.body.dataset.handlers = String(proof.handlers);
 	proof.receipts.push({ stage: 'handler-run', eventName: 'click', count });
 }
-

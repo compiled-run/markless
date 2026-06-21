@@ -6,8 +6,8 @@
 		"build": "vite build"
 	},
 	"dependencies": {
-		"@arcadejs/bundler": "workspace:*",
-		"@arcadejs/core": "workspace:*"
+		"@arcade/bundler": "workspace:*",
+		"@arcade/core": "workspace:*"
 	},
 	"devDependencies": {
 		"typescript": "catalog:",

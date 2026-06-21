@@ -36,11 +36,11 @@ export class FrameworkApiRuntimeError extends Error implements FrameworkApiRunti
 		super(frameworkApiRuntimeMessage(apiName));
 		this.name = 'FrameworkApiRuntimeError';
 		this.apiName = apiName;
-		this.why = `${apiName}() is an @arcadejs/core framework API that must be rewritten by the .tsrx compiler before runtime execution.`;
+		this.why = `${apiName}() is an @arcade/core framework API that must be rewritten by the .tsrx compiler before runtime execution.`;
 		this.suggestions = [
 			{
 				message:
-					'Import this API from @arcadejs/core inside a .tsrx file processed by the compiler. Do not call it from plain runtime JavaScript.',
+					'Import this API from @arcade/core inside a .tsrx file processed by the compiler. Do not call it from plain runtime JavaScript.',
 			},
 		];
 	}
@@ -69,5 +69,5 @@ function frameworkApi<T>(name: string, ..._args: unknown[]): T {
 }
 
 function frameworkApiRuntimeMessage(name: FrameworkApiName): string {
-	return `@arcadejs/core ${name}() must be compiled from a .tsrx file before it can run.`;
+	return `@arcade/core ${name}() must be compiled from a .tsrx file before it can run.`;
 }

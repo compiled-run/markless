@@ -151,7 +151,7 @@ disposed with it.
 The compiler should diagnose React-style child manipulation in v1:
 
 ```txt
-children is an opaque template projection in @arcadejs/core.
+children is an opaque template projection in @arcade/core.
 Render it with {children}, pass it through, or wrap it; do not inspect or map it.
 ```
 

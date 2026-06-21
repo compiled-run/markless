@@ -21,23 +21,23 @@ contract.
 
 ## Package Map
 
-Workspace packages use the `@arcadejs/*` scope:
+Workspace packages use the `@arcade/*` scope:
 
-- `packages/core` -> `@arcadejs/core`, public authoring APIs such as `state()`,
+- `packages/core` -> `@arcade/core`, public authoring APIs such as `state()`,
   `computed()`, `element()`, and `shared()`.
-- `packages/protocol` -> `@arcadejs/protocol`, shared protocol and payload
+- `packages/protocol` -> `@arcade/protocol`, shared protocol and payload
   types.
-- `packages/runtime` -> `@arcadejs/runtime`, graph runtime, render, and resume
+- `packages/runtime` -> `@arcade/runtime`, graph runtime, render, and resume
   helpers.
-- `packages/serializer` -> `@arcadejs/serializer`, value and payload
+- `packages/serializer` -> `@arcade/serializer`, value and payload
   serialization.
-- `packages/compiler` -> `@arcadejs/compiler`, compiler passes and artifacts
+- `packages/compiler` -> `@arcade/compiler`, compiler passes and artifacts
   for `.tsrx` files.
-- `packages/bundler` -> `@arcadejs/bundler`, Rolldown and Vite integration.
-- `packages/test-utils` -> `@arcadejs/test-utils`, test helpers.
-- `packages/vitest-browser` -> `@arcadejs/vitest-browser`, browser-mode test
+- `packages/bundler` -> `@arcade/bundler`, Rolldown and Vite integration.
+- `packages/test-utils` -> `@arcade/test-utils`, test helpers.
+- `packages/vitest-browser` -> `@arcade/vitest-browser`, browser-mode test
   helpers.
-- `packages/arcade` -> `@arcadejs/arcade`, umbrella re-exports while this
+- `packages/arcade` -> `@arcade/arcade`, umbrella re-exports while this
   package remains in the workspace. Do not treat it as the owner of authoring
   APIs.
 
@@ -66,7 +66,7 @@ pnpm exec vp pack
 ## Development Rules
 
 - TSRX-only: Arcade components live in `.tsrx` files.
-- Import authoring APIs from `@arcadejs/core`.
+- Import authoring APIs from `@arcade/core`.
 - Do not add reactivity to plain `.ts` files.
 - Do not add TSX or JSX support unless the specs are deliberately reopened.
 - Do not add hydration or VDOM behavior.

@@ -1,0 +1,15 @@
+{
+	"compilerOptions": {
+		"allowImportingTsExtensions": true,
+		"lib": ["ES2022", "DOM", "DOM.Iterable"],
+		"module": "ESNext",
+		"moduleResolution": "Bundler",
+		"noEmit": true,
+		"resolveJsonModule": true,
+		"skipLibCheck": true,
+		"target": "ES2022",
+		"types": ["node", "vitest"]
+	},
+	"exclude": ["dist", "node_modules", "poc", "packages/*/test", "packages/bundler/fixtures"],
+	"include": ["packages/*/src/**/*.d.ts", "packages/*/src/**/*.ts", "vite.config.ts"]
+}

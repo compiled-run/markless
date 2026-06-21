@@ -1,1 +1,1 @@
-export { arcade, type ArcadeVitePlugin } from '@arcadejs/bundler/vite';
+export { arcade, type ArcadeVitePlugin } from '@arcade/bundler/vite';

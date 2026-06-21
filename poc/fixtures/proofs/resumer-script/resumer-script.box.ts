@@ -1,4 +1,4 @@
-import { box } from '@arcadejs/witness';
+import { box } from '@async/witness';
 
 const FIXTURE = 'poc/fixtures/proofs/resumer-script/browser';
 const WAIT = { timeoutMs: 10_000 };

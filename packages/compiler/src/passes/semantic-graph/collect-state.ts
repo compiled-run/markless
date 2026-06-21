@@ -27,7 +27,7 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 		const callName = getCallName(init);
 		const frameworkApi = getFrameworkApiForCall(init, state.frameworkApiImports);
 
-		if (!name || !init) continue;
+		if (!id || !name || !init) continue;
 
 		if (callName && isFrameworkApiName(callName) && !frameworkApi) {
 			state.graph.diagnostics.push(

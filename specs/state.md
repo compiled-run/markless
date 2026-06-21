@@ -35,6 +35,7 @@ Completed slices are concentrated in:
 - payload arena and symbol resolver planning artifacts
 - template DOM update target metadata through payload/protocol and a runtime helper
   that maps those targets to structural DOM journal entries
+- compiler-planned public CSR render artifacts for supported keyed repeats, including cached generated row templates, direct empty-repeat clears, and early-exit DOM-order locator lookup; quick JFB evidence now improves CPU geomean to 0.78x of the prior retained sample, `03_update10th1k_x16` moved 43.3ms -> 26.5ms, `05_swap1k` moved 45.7ms -> 26.6ms, rebuild-ci size is 13,146 raw / 4,626 compressed, and generated symbol-cache, same-key prepass, direct Map key deletion, direct item/DOM path emission, row-map replacement on clear, and first-render class-scan skip alternatives were rejected after measurement
 - runtime graph scheduling, awaitable active flushes, invalidation,
   collection-method calls, and partial resume wiring
 - pure-value serializer support for identity/cycles and the accepted built-in
@@ -117,11 +118,12 @@ The critical path to "full spec implementation" still requires:
 - authored template-comment and statement-container lexical-scope host metadata,
   including comment-aware locator planning so generated async anchors are not
   confused with authored comments
-- broaden the early CSR `render(App, { target })` runtime entry from the current
-  package-level fake-DOM surface into a real browser render path that executes
-  generated component/render artifacts, creates a full live container, and
-  proves browser event/DOM behavior without requiring `arcade/state`,
-  `arcade/view`, or the resumer script
+- broaden the early CSR `render(App, { target })` runtime entry beyond the
+  current direct public-render fast path for supported static/keyed-repeat
+  shapes into a complete browser render path that executes general generated
+  component/render artifacts, creates a full live container, and proves browser
+  event/DOM behavior without requiring `arcade/state`, `arcade/view`, or the
+  resumer script
 - broaden the early SSR `renderToString(App, options)` runtime entry beyond the
   current package-level payload/resumer shell so it executes generated compiler
   render artifacts, awaits demanded async work, serializes real
@@ -1052,7 +1054,7 @@ in the split specs.
   source/manifest derivation from emitted chunk filenames beyond the current
   generated build fixture paths, and real DOM hot replacement beyond the
   fixture-level custom-event consumer.
-- Add or extend local `@arcadejs/witness` capabilities whenever a required resume
+- Add or extend local `@async/witness` capabilities whenever a required resume
   mechanic cannot be observed by current Witness APIs, and keep Witness as the
   canonical harness for resume mechanics instead of moving those proofs into
   jsdom or Vitest browser-mode SSR workarounds.
@@ -1279,7 +1281,7 @@ as evidence for a new source change.
   `packages/bundler/.witness/receipts/2026-06-16T00-37-49.165Z/receipt.json`)
 - `pnpm exec vp test packages/bundler/test/*.test.ts packages/arcade/test/public-surface.test.ts`
 - `pnpm exec vp test packages/bundler/test/fixture-builds.test.ts`
-- `(from repo root) pnpm --filter @arcadejs/bundler exec witness run ssr-preview --mode preview`
+- `(from repo root) pnpm --filter @arcade/bundler exec witness run ssr-preview --mode preview`
   (receipt:
   `packages/bundler/.witness/receipts/2026-06-16T16-19-07.583Z/receipt.json`;
   records startup script requests `(none)`, post-click requested lazy chunks,
@@ -1287,12 +1289,13 @@ as evidence for a new source change.
   bytes, and all post-click async scripts at 45,658 raw / 13,486 gzip bytes)
 - `pnpm exec vp test packages/runtime/test/event-resume.test.ts packages/runtime/test/module-split.test.ts packages/arcade/test/public-surface.test.ts packages/bundler/test/fixture-boundaries.test.ts`
 - `pnpm exec vp test packages/bundler/test/fixture-builds.test.ts`
-- `(from repo root) pnpm --filter @arcadejs/bundler exec witness run ssr-preview --mode preview`
+- `(from repo root) pnpm --filter @arcade/bundler exec witness run ssr-preview --mode preview`
   (receipt:
   `packages/bundler/.witness/receipts/2026-06-16T16-31-44.234Z/receipt.json`;
   records startup script requests `(none)`, post-click requested lazy chunks,
   largest runtime-heavy post-click chunk at 8,258 raw / 3,154 gzip
   bytes, and all post-click async scripts at 10,293 raw / 4,140 gzip bytes)
+- `pnpm exec vp pack`; focused compiler/bundler/runtime/arcade tests; local js-framework-benchmark quick comparisons against `vanillajs-keyed` and `vanillajs-3-keyed`; `npm run rebuild-ci -- keyed/arcade` passed smoke, memory, size, keyed, and CSP checks
 
 Current spec/ledger-maintenance receipts:
 
@@ -1652,7 +1655,7 @@ commands are listed in the implementation/build section above.
   migration/version negotiation, browser helpers, or witness integration
   helpers.
 - shared-state audit confirms current `shared()` support covers the
-  `@arcadejs/core` framework API stub, the authored
+  `@arcade/core` framework API stub, the authored
   `shared(factory, options?)` call shape, the main package re-export,
   public-surface presence checks, diagnostic suggestion text, and semantic graph
   records for same-module exported shared definitions plus component-local
@@ -2247,7 +2250,7 @@ commands are listed in the implementation/build section above.
   Generated DOM update
   symbols now emit concrete `setText`, `setAttr`, and `setProp` journal object
   literals directly, so they do not import either the broad runtime entry or the
-  helper-only `@arcadejs/runtime/dom-update` subpath. Generated
+  helper-only `@arcade/runtime/dom-update` subpath. Generated
   event-handler modules also omit their previous `authoredSource` export;
   behavior and async-runner symbols keep their source metadata because current
   focused tests still use it for those symbol kinds. The Vite CSR/vite-plus
@@ -2261,7 +2264,7 @@ commands are listed in the implementation/build section above.
   The SSR fixture render shell imports `runtime/render-to-string`, keeping the
   SSR payload rendering and inline resumer source out of the eager CSR render
   entry. The SSR fixture browser entry now imports the narrower
-  `@arcadejs/runtime/event-only-resume` subpath for event-only payload
+  `@arcade/runtime/event-only-resume` subpath for event-only payload
   dispatch instead of the full `runtime/resume` or broader `runtime/event-resume`
   path. The event-only resume helper reads the existing payload scripts,
   materializes DOM-order locators, dispatches the current event through the

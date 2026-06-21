@@ -1,5 +1,5 @@
 import { defineConfig, type Plugin } from 'vite';
-import { arcade } from '@arcadejs/bundler/vite';
+import { arcade } from '@arcade/bundler/vite';
 
 type PreviewRequest = {
 	readonly url?: string;

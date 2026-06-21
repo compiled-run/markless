@@ -1,5 +1,5 @@
 {
-	"name": "@arcadejs/rolldown",
+	"name": "@arcade/rolldown",
 	"version": "0.0.0",
 	"private": true,
 	"type": "module",

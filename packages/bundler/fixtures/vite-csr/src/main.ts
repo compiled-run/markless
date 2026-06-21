@@ -1,4 +1,4 @@
-import { render } from '@arcadejs/runtime/render';
+import { render } from '@arcade/runtime/render';
 import { loadSymbol, payloadState, payloadView } from './root.tsrx';
 
 const app = document.querySelector('#app');

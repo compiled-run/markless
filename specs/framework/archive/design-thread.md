@@ -3,7 +3,7 @@
 **Date:** 2026-06-12
 **Status:** Approved direction, pre-implementation
 **Tagline:** A resumable UI framework for async-first apps.
-**Package:** `@arcadejs/core`
+**Package:** `@arcade/core`
 
 ## Summary
 
@@ -102,7 +102,7 @@ Five pieces:
    (plus a shared IntersectionObserver for `onVisible`-wired elements),
    lazy-loads symbols on first interaction or visibility, re-attaches bindings
    on first relevant state change. No hydration pass, no component execution.
-5. **Build integration** — a Rolldown plugin base exported by `@arcadejs/core`,
+5. **Build integration** — a Rolldown plugin base exported by `@arcade/core`,
    with framework adapters such as Vite consuming that base plugin. Extracted
    symbols become code-split entry points, and production builds emit the
    generated symbol resolver plus manifest metadata needed by the server
@@ -481,7 +481,7 @@ disposed with it.
 The compiler should diagnose React-style child manipulation in v1:
 
 ```txt
-children is an opaque template projection in @arcadejs/core.
+children is an opaque template projection in @arcade/core.
 Render it with {children}, pass it through, or wrap it; do not inspect or map it.
 ```
 

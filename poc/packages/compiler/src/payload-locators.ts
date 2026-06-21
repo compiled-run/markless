@@ -114,7 +114,9 @@ export function planPayloadLocators(graph: TsrxSemanticGraph): PayloadLocatorPla
 	const elementRecords = graph.hostNodes
 		.filter((host) => ownersByHostId.has(host.id))
 		.map((host) => elementRecordFor(host, ownersByHostId));
-	const elementRecordByHostId = new Map(elementRecords.map((record) => [record.hostNodeId, record]));
+	const elementRecordByHostId = new Map(
+		elementRecords.map((record) => [record.hostNodeId, record]),
+	);
 	const dynamicHostNodeIds = elementRecords.map((record) => record.hostNodeId);
 	const staticHostNodeIds = graph.hostNodes
 		.filter((host) => !ownersByHostId.has(host.id))
@@ -230,7 +232,7 @@ function buildLocatorStream(input: {
 
 	for (const record of input.commentRecords) {
 		entries.push({
-			order: record.firstHostNodeId ? input.hostIndex.get(record.firstHostNodeId) ?? 0 : 0,
+			order: record.firstHostNodeId ? (input.hostIndex.get(record.firstHostNodeId) ?? 0) : 0,
 			priority: 0,
 			record,
 		});

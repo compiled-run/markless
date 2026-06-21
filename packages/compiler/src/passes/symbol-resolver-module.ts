@@ -1,4 +1,4 @@
-import { ASYNC_PROTOCOL_VERSION } from '@arcadejs/protocol';
+import { ASYNC_PROTOCOL_VERSION } from '@arcade/protocol';
 import type { SymbolResolverModuleInput, SymbolResolverModuleManifest } from '../artifacts.ts';
 
 export function createSymbolResolverModuleManifest(

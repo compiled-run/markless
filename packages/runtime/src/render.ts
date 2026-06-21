@@ -1,9 +1,8 @@
-import type { ProtocolStatePayload, ProtocolViewPayload } from '@arcadejs/protocol';
-import {
-	createEventOnlyResumeContainerFromPayloads,
-	type EventOnlyResumeContainer,
-	type EventOnlyResumeDomElement,
-	type EventOnlyResumeDomEvent,
+import type { ProtocolStatePayload, ProtocolViewPayload } from '@arcade/protocol';
+import type {
+	EventOnlyResumeContainer,
+	EventOnlyResumeDomElement,
+	EventOnlyResumeDomEvent,
 } from './event-only-resume.ts';
 import type { RuntimeGraph } from './graph.ts';
 import type {
@@ -21,6 +20,7 @@ export type RenderTarget = {
 export type CsrRenderOutput = {
 	readonly root: ResumeDomElement;
 	readonly graph?: RuntimeGraph;
+	readonly runtime?: CsrRenderRuntime;
 	readonly state?: ProtocolStatePayload;
 	readonly view?: ProtocolViewPayload;
 	readonly loadSymbol?: ResumeRuntimeInput['loadSymbol'];
@@ -58,12 +58,23 @@ export async function render(
 
 	mountRoot(options.target, output.root);
 
+	if (output.graph && output.runtime) {
+		return {
+			phase: 'csr',
+			root: output.root,
+			graph: output.graph,
+			runtime: output.runtime,
+		};
+	}
+
 	if (canUseEventOnlyCsrRuntime(output, state, view)) {
+		const { createEventOnlyResumeContainerFromPayloads } =
+			await import('./event-only-resume.ts');
 		const runtime = await createEventOnlyResumeContainerFromPayloads({
 			root: output.root as EventOnlyResumeDomElement,
 			state,
 			view,
-			loadSymbol: loadSymbol as Parameters<
+			loadSymbol: loadSymbol as unknown as Parameters<
 				typeof createEventOnlyResumeContainerFromPayloads
 			>[0]['loadSymbol'],
 		});

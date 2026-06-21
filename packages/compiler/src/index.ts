@@ -2,15 +2,16 @@ export type * from './artifacts.ts';
 export type * from './diagnostics.ts';
 
 export { compileTsrxModule } from './compile-module.ts';
+export { parseJavaScriptModule, type JavaScriptAstNode } from './js-ast.ts';
 export { CompilerPassGraphError, validateCompilerPassGraph } from './pass-graph.ts';
 export { formatCompilerArtifactDump, runCompilerPassPipeline } from './pass-pipeline.ts';
 export { defaultCompilerPasses } from './pass-registry.ts';
 
 export { analyzeCaptures } from './passes/capture-analysis.ts';
-export { emitClientEventOnlyEntry } from './passes/client-event-only-entry.ts';
-export { planClientEventOnlyRender } from './passes/client-event-only-render-plan.ts';
 export { planPayloadArena } from './passes/payload-arena.ts';
 export { renderPayloadScriptArtifact } from './passes/payload-scripts.ts';
+export { emitPublicRenderModule } from './passes/public-render-module.ts';
+export { planPublicRender } from './passes/public-render-plan.ts';
 export { createProtocolStatePayloadFromArena } from './passes/protocol-state.ts';
 export { createProtocolViewPayload } from './passes/protocol-view.ts';
 export { buildSemanticGraph } from './passes/semantic-graph/index.ts';

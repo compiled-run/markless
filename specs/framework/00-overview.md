@@ -8,7 +8,7 @@ High-level product contract and index. Use this as the entry point before loadin
 **Status:** Approved direction; production implementation started. See
 `../state.md` for current worktree progress.
 **Tagline:** A resumable UI framework for async-first apps.
-**Package:** `@arcadejs/core`
+**Package:** `@arcade/core`
 
 ## Summary
 
@@ -53,7 +53,7 @@ JSX/TSX is explicitly **not** supported.
    subscription.
    "Signal" is an implementation detail of compiled output, never API vocabulary.
 4. **TSRX-only.** State and reactivity are language features of `.tsrx` files,
-   surfaced through compiler-rewritten imports from `@arcadejs/core`, not a
+   surfaced through compiler-rewritten imports from `@arcade/core`, not a
    runtime library usable from arbitrary TS.
 5. **First-class async.** Async dataflow is a compiler-tracked graph feature, not
    an effect/task/resource wrapper. Pending/error UI is expressed with TSRX
@@ -96,7 +96,7 @@ Four implementation areas:
    visibility, or another explicit trigger. No hydration pass, no component
    execution during browser resume.
 4. **Build integration** — a Rolldown plugin base exported by
-   `@arcadejs/bundler`,
+   `@arcade/bundler`,
    with framework adapters such as Vite consuming that base plugin. Extracted
    symbols become code-split entry points, and production builds emit a
    generated compact symbol resolver table with finalized chunk specifiers. Any
@@ -147,7 +147,7 @@ implementation begins in root `packages/*` using the same boundaries.
 
 Initial internal production package map:
 
-- `packages/core` — main authoring package for `@arcadejs/core`;
+- `packages/core` — main authoring package for `@arcade/core`;
   compiler-rewritten framework APIs and public types.
 - `packages/arcade` — umbrella re-export package while it remains in the
   workspace; not the source of authoring API ownership.

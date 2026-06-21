@@ -5,6 +5,7 @@ import type {
 	SemanticBehavior,
 	SemanticElementHandleBinding,
 	SemanticGraphDiagnostic,
+	SemanticTemplateBindingTarget,
 	SourceSpan,
 } from '../../artifacts.ts';
 import { graphBindingMap } from '../../artifact-helpers/graph-paths.ts';
@@ -103,7 +104,7 @@ function collectAttribute(
 	ownerTagName: string | null,
 	isHostElement: boolean,
 ): void {
-	const attributeName = getIdentifierName(attribute.name);
+	const attributeName = getIdentifierName(attribute.name as AnyNode | undefined);
 	if (!attributeName) return;
 
 	const value = attribute.value as AnyNode | undefined;
@@ -185,10 +186,7 @@ function collectAttribute(
 	}
 }
 
-function bindingTargetForAttribute(attributeName: string): {
-	readonly kind: 'attribute' | 'property' | 'class' | 'style';
-	readonly name?: string;
-} {
+function bindingTargetForAttribute(attributeName: string): SemanticTemplateBindingTarget {
 	if (attributeName === 'class') return { kind: 'class' };
 	if (attributeName === 'style') return { kind: 'style' };
 
@@ -249,7 +247,10 @@ function fallbackSpan(filename: string): SourceSpan {
 }
 
 function getElementTagName(node: AnyNode): string | null {
-	return getIdentifierName(node.id) ?? getIdentifierName((node.openingElement as AnyNode)?.name);
+	return (
+		getIdentifierName(node.id as AnyNode | undefined) ??
+		getIdentifierName((node.openingElement as AnyNode | undefined)?.name as AnyNode | undefined)
+	);
 }
 
 function getElementAttributes(node: AnyNode): AnyNode[] {

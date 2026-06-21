@@ -49,7 +49,7 @@ Source order:
 
 TSRX owns the authoring syntax and structural control-flow semantics. The
 framework compiler consumes TSRX parser/codegen-plugin artifacts and adds the
-`@arcadejs/core` host semantics: graph references, state lowering, capture
+`@arcade/core` host semantics: graph references, state lowering, capture
 diagnostics, symbol extraction, payload planning, and render/resume protocol
 wiring.
 

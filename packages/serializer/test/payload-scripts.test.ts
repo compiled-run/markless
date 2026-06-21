@@ -4,7 +4,7 @@ import {
 	renderPayloadScripts,
 	deserializeGraphValue,
 } from '../src/index.ts';
-import type { ProtocolViewPayload } from '@arcadejs/protocol';
+import type { ProtocolViewPayload } from '@arcade/protocol';
 
 test('renderPayloadScripts emits canonical arcade/state and arcade/view data scripts', () => {
 	const shared = { id: 1 };

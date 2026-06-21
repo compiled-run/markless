@@ -79,19 +79,16 @@ function rewriteSymbolVirtualStrings(
 	let rewritten = 0;
 	const unresolved = new Set<string>();
 	const code = compactSymbolManifestTables(
-		chunk.code.replace(
-			SYMBOL_VIRTUAL_STRING_RE,
-			(match, _quote: string, virtualId: string) => {
-				const fileName = symbolFiles.get(virtualId);
-				if (!fileName) {
-					unresolved.add(virtualId);
-					return match;
-				}
+		chunk.code.replace(SYMBOL_VIRTUAL_STRING_RE, (match, _quote: string, virtualId: string) => {
+			const fileName = symbolFiles.get(virtualId);
+			if (!fileName) {
+				unresolved.add(virtualId);
+				return match;
+			}
 
-				rewritten++;
-				return JSON.stringify(relativeChunkSpecifier(chunk.fileName, fileName));
-			},
-		),
+			rewritten++;
+			return JSON.stringify(relativeChunkSpecifier(chunk.fileName, fileName));
+		}),
 	);
 
 	return { code, rewritten, unresolved: [...unresolved] };

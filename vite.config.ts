@@ -13,6 +13,7 @@ export default defineConfig({
 			'protocol/index': './packages/protocol/src/index.ts',
 			'serializer/index': './packages/serializer/src/index.ts',
 			'compiler/index': './packages/compiler/src/index.ts',
+			'runtime/dom-journal': './packages/runtime/src/dom-journal.ts',
 			'runtime/dom-update': './packages/runtime/src/dom-update.ts',
 			'runtime/event-only-resume': './packages/runtime/src/event-only-resume.ts',
 			'runtime/event-resume': './packages/runtime/src/event-resume.ts',
@@ -25,6 +26,7 @@ export default defineConfig({
 			'arcade/index': './packages/arcade/src/index.ts',
 			'arcade/rolldown': './packages/arcade/src/rolldown.ts',
 			'arcade/runtime': './packages/arcade/src/runtime.ts',
+			'arcade/runtime/dom-journal': './packages/arcade/src/runtime/dom-journal.ts',
 			'arcade/runtime/dom-update': './packages/arcade/src/runtime/dom-update.ts',
 			'arcade/runtime/event-only-resume':
 				'./packages/arcade/src/runtime/event-only-resume.ts',

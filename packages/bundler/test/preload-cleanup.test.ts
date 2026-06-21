@@ -27,6 +27,31 @@ describe('Vite preload cleanup', () => {
 		);
 	});
 
+	test('removes an imported Vite preload helper when no wrappers remain', () => {
+		const code =
+			'import{__esmMin as e}from"./shared.js";import{__vitePreload as t,init_preload_helper as n}from"./preload.js";async function load(){return import("./chunk.js")}function t(e){return e}var A=e((()=>{n()})),B=e((()=>{A()})),C=e((()=>{n(),d=["./symbol.js"]}));e((()=>{B(),C()}))();';
+
+		expect(stripEmptyVitePreloadWrappers(code)).toBe(
+			'import{__esmMin as e}from"./shared.js";async function load(){return import("./chunk.js")}function t(e){return e}var A=e((()=>{})),B=e((()=>{A()})),C=e((()=>{d=["./symbol.js"]}));e((()=>{B(),C()}))();',
+		);
+	});
+
+	test('removes an imported Vite preload helper regardless of import specifier order', () => {
+		const code =
+			'import{__esmMin as e}from"./shared.js";import{init_preload_helper as n,__vitePreload as t}from"./preload.js";async function load(){return import("./chunk.js")}var A=e((()=>{n()}));e((()=>{A()}))();';
+
+		expect(stripEmptyVitePreloadWrappers(code)).toBe(
+			'import{__esmMin as e}from"./shared.js";async function load(){return import("./chunk.js")}var A=e((()=>{}));e((()=>{A()}))();',
+		);
+	});
+
+	test('keeps an imported Vite preload helper when the preload function is still called', () => {
+		const code =
+			'import{__esmMin as e}from"./shared.js";import{init_preload_helper as n,__vitePreload as t}from"./preload.js";async function load(){return t(()=>import("./chunk.js"),["chunk.css"],import.meta.url)}var A=e((()=>{n()}));e((()=>{A()}))();';
+
+		expect(stripEmptyVitePreloadWrappers(code)).toBe(code);
+	});
+
 	test('removes empty preload wrappers around async fallback loaders', () => {
 		const code =
 			'import{__esmMin as e}from"./shared.js";var O,k,S,p,M=e((()=>{O=(function(){let e=typeof document<`u`&&document.createElement(`link`).relList;return e&&e.supports&&e.supports(`modulepreload`)?`modulepreload`:`preload`})(),k=function(e){return`/`+e},S={},p=function(e,t,n){let r=Promise.resolve();function i(e){let t=new Event(`vite:preloadError`,{cancelable:!0});if(t.payload=e,window.dispatchEvent(t),!t.defaultPrevented)throw e}return r.then(t=>e().catch(i))}}));async function load(){let{createRuntimeGraph:e}=await p(async()=>{let{createRuntimeGraph:e}=await import("./graph.js");return{createRuntimeGraph:e}},[]);return e({cells:[]})}var F=e((()=>{M()})),I=e((()=>{F()}));e((()=>{I()}))();';

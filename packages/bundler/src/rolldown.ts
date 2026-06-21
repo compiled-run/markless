@@ -4,6 +4,7 @@ import { ARCADE_BUILD_PREFIX, ARCADE_BUNDLE_GRAPH, outputDefaults } from './buil
 import {
 	ARCADE_MANIFEST,
 	ARCADE_MANIFEST_FILE,
+	type ArcadeManifestBundle,
 	createManifest,
 	devTagsManifest,
 	injectManifest,
@@ -254,12 +255,12 @@ export function createArcadeRolldownPlugin(input: {
 }
 
 function bundleWithoutRemovedChunks(
-	bundle: Record<string, unknown>,
+	bundle: ArcadeManifestBundle,
 	removedFileNames: ReadonlySet<string>,
 ) {
 	if (removedFileNames.size === 0) return bundle;
 
-	const next: Record<string, unknown> = {};
+	const next: ArcadeManifestBundle = {};
 	for (const [key, output] of Object.entries(bundle)) {
 		if (isChunkFile(output) && removedFileNames.has(output.fileName)) continue;
 		next[key] = output;

@@ -1,4 +1,4 @@
-import type { ProtocolStatePayload, ProtocolViewPayload } from '@arcadejs/protocol';
+import type { ProtocolStatePayload, ProtocolViewPayload } from '@arcade/protocol';
 import type {
 	DomJournalEntry,
 	DomJournalResult,
@@ -16,6 +16,11 @@ export type EventOnlyResumeDomElement = EventOnlyResumeDomNode & {
 	readonly tagName: string;
 	readonly parentElement?: EventOnlyResumeDomElement | null;
 	textContent?: string | null;
+	addEventListener?: (
+		type: string,
+		listener: (event: EventOnlyResumeDomEvent) => Promise<void>,
+		options?: { readonly capture?: boolean },
+	) => void;
 	setAttribute?: (name: string, value: string) => void;
 	removeAttribute?: (name: string) => void;
 	readonly [name: string]: unknown;
@@ -53,12 +58,13 @@ export type EventOnlyResumeSymbolContext = {
 	readonly element: EventOnlyResumeDomElement;
 	readonly getElementHandle: () => undefined;
 	readonly domUpdate?: EventOnlyResumeDomUpdateRecord;
+	readonly locals?: Readonly<Record<string, unknown>>;
 	readonly value?: unknown;
 };
 
 export type EventOnlyResumeSymbol = (
 	context: EventOnlyResumeSymbolContext,
-) => unknown | void | DomJournalResult | Promise<unknown | void | DomJournalResult>;
+) => void | DomJournalResult | Promise<void | DomJournalResult>;
 
 export type ResumeEventOnlyFromPayloadDocumentInput = {
 	readonly document: EventOnlyResumePayloadDocument;
@@ -313,8 +319,14 @@ function applyDomJournalResult(
 	elementsByHostId: ReadonlyMap<string, EventOnlyResumeDomElement>,
 ): void {
 	if (!result) return;
-	const entries = Array.isArray(result) ? result : [result];
+	const entries = isDomJournalEntryArray(result) ? result : [result];
 	for (const entry of entries) applyDomJournalEntry(entry, elementsByHostId);
+}
+
+function isDomJournalEntryArray(
+	result: DomJournalResult,
+): result is ReadonlyArray<DomJournalEntry> {
+	return Array.isArray(result);
 }
 
 function applyDomJournalEntry(

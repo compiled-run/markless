@@ -4,7 +4,7 @@ import {
 	type CsrRenderOptions,
 	type CsrRenderOutput,
 	type RenderTarget,
-} from '@arcadejs/runtime';
+} from '@arcade/runtime';
 
 export type BrowserRenderElement = RenderTarget & {
 	innerHTML?: string;
@@ -120,10 +120,10 @@ function destroyContainer(mounted: MountedContainer): void {
 
 function globalDocument(): BrowserRenderDocument {
 	if (typeof document !== 'undefined') {
-		return document;
+		return document as unknown as BrowserRenderDocument;
 	}
 
 	throw new Error(
-		'@arcadejs/vitest-browser render() requires a browser document or an explicit document option.',
+		'@arcade/vitest-browser render() requires a browser document or an explicit document option.',
 	);
 }

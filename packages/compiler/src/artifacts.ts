@@ -1,5 +1,5 @@
-import type { ProtocolStatePayload, ProtocolViewPayload } from '@arcadejs/protocol';
-import type { RenderedPayloadScripts } from '@arcadejs/serializer';
+import type { ProtocolStatePayload, ProtocolViewPayload } from '@arcade/protocol';
+import type { RenderedPayloadScripts } from '@arcade/serializer';
 import type { CompilerDiagnostic, SourceSpan } from './diagnostics.ts';
 
 export type { CompilerDiagnostic, DiagnosticSuggestion, SourceSpan } from './diagnostics.ts';
@@ -500,6 +500,7 @@ export type CaptureAnalysisArtifact = {
 export type SymbolModulesInput = {
 	readonly symbolResolver: SymbolResolverPlan;
 	readonly captureAnalysis: CaptureAnalysisArtifact;
+	readonly publicRenderPlan?: PublicRenderPlanArtifact;
 };
 
 export type GeneratedSymbolModule = {
@@ -554,33 +555,20 @@ export type PayloadScriptsArtifact = {
 	readonly renderShell: string;
 };
 
-export type ClientEventOnlyEntryInput = {
-	readonly source: CompileTsrxModuleInput;
-	readonly semanticGraph: SemanticGraphArtifact;
-	readonly renderPlan: ClientEventOnlyRenderPlanArtifact;
-	readonly symbolResolver: SymbolResolverPlan;
-};
-
-export type ClientEventOnlyEntryArtifact = {
-	readonly passId: 'client-event-only-entry';
-	readonly moduleSource: string | null;
-	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
-};
-
-export type ClientEventOnlyRenderPlanInput = {
+export type PublicRenderPlanInput = {
 	readonly source: SemanticGraphInput;
 	readonly semanticGraph: SemanticGraphArtifact;
 	readonly payloadArena: PayloadArenaArtifact;
 	readonly symbolResolver: SymbolResolverPlan;
 };
 
-export type ClientEventOnlyRenderPlanTextBinding = {
+export type PublicRenderPlanTextWrite = {
 	readonly source: string;
 	readonly itemPath: ReadonlyArray<string>;
 	readonly nodePath: ReadonlyArray<number>;
 };
 
-export type ClientEventOnlyRenderPlanClassBinding = {
+export type PublicRenderPlanClassWrite = {
 	readonly source: string;
 	readonly hostPath: ReadonlyArray<number>;
 	readonly stateGraphNodeId: string;
@@ -590,31 +578,73 @@ export type ClientEventOnlyRenderPlanClassBinding = {
 	readonly falseClass: string;
 };
 
-export type ClientEventOnlyRenderPlanEventControl = {
+export type PublicRenderPlanKeyedItemContext = {
+	readonly kind: 'keyed-repeat-item';
+	readonly repeatId: string;
+	readonly itemName: string;
+	readonly keyPath: ReadonlyArray<string>;
+};
+
+export type PublicRenderPlanEventControl = {
 	readonly eventName: string;
 	readonly hostPath: ReadonlyArray<number>;
 	readonly handlerSource: string;
 	readonly symbolId: string;
+	readonly itemContext: PublicRenderPlanKeyedItemContext;
 };
 
-export type ClientEventOnlyRenderPlanKeyedRepeat = {
+export type PublicRenderPlanUnsupportedReason =
+	| 'single-row-root-required'
+	| 'repeat-parent-must-contain-only-repeat'
+	| 'nested-repeat-unsupported'
+	| 'unsupported-row-binding'
+	| 'repeat-parent-locator-missing';
+
+export type PublicRenderPlanRepeatGate =
+	| {
+			readonly repeatId: string;
+			readonly supported: true;
+	  }
+	| {
+			readonly repeatId: string;
+			readonly supported: false;
+			readonly reason: PublicRenderPlanUnsupportedReason;
+	  };
+
+export type PublicRenderPlanKeyedRepeat = {
 	readonly repeatId: string;
 	readonly parentHostNodeId: string;
+	readonly parentLocator: PayloadArenaArtifact['view']['locators'][number];
 	readonly rowHostNodeId?: string;
 	readonly itemName: string;
 	readonly collectionGraphNodeId: string;
 	readonly collectionPath: ReadonlyArray<string>;
 	readonly keyPath: ReadonlyArray<string>;
 	readonly rowTemplateHtml: string;
-	readonly textBindings: ReadonlyArray<ClientEventOnlyRenderPlanTextBinding>;
-	readonly classBindings: ReadonlyArray<ClientEventOnlyRenderPlanClassBinding>;
-	readonly eventControls: ReadonlyArray<ClientEventOnlyRenderPlanEventControl>;
+	readonly textWrites: ReadonlyArray<PublicRenderPlanTextWrite>;
+	readonly classWrites: ReadonlyArray<PublicRenderPlanClassWrite>;
+	readonly eventControls: ReadonlyArray<PublicRenderPlanEventControl>;
 };
 
-export type ClientEventOnlyRenderPlanArtifact = {
-	readonly passId: 'client-event-only-render-plan';
+export type PublicRenderPlanArtifact = {
+	readonly passId: 'public-render-plan';
 	readonly rootTemplateHtml: string | null;
-	readonly keyedRepeats: ReadonlyArray<ClientEventOnlyRenderPlanKeyedRepeat>;
+	readonly staticHostNodeIds: ReadonlyArray<string>;
+	readonly repeatGates: ReadonlyArray<PublicRenderPlanRepeatGate>;
+	readonly keyedRepeats: ReadonlyArray<PublicRenderPlanKeyedRepeat>;
+	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
+};
+
+export type PublicRenderModuleInput = {
+	readonly semanticGraph: SemanticGraphArtifact;
+	readonly publicRenderPlan: PublicRenderPlanArtifact;
+	readonly protocolState: ProtocolStatePayload;
+	readonly protocolView: ProtocolViewPayload;
+};
+
+export type PublicRenderModuleArtifact = {
+	readonly passId: 'public-render-module';
+	readonly moduleSource: string;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
 };
 
@@ -680,8 +710,8 @@ export type CompileTsrxModuleResult = {
 	readonly protocolView: ProtocolViewPayload;
 	readonly payloadScripts: RenderedPayloadScripts;
 	readonly renderShell: string;
-	readonly clientEventOnlyRenderPlan: ClientEventOnlyRenderPlanArtifact;
-	readonly clientEventOnlyEntry: ClientEventOnlyEntryArtifact;
+	readonly publicRenderPlan: PublicRenderPlanArtifact;
+	readonly publicRenderModule: PublicRenderModuleArtifact;
 	readonly symbolModules: SymbolModulesArtifact;
 	readonly symbolResolverModule: string;
 	readonly symbolResolverModuleManifest: SymbolResolverModuleManifest;
