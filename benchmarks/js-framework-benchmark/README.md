@@ -40,6 +40,7 @@ cd ../js-framework-benchmark
 npm run bench -- \
 	--headless \
 	--framework keyed/arcade \
+	--count 5 \
 	--benchmark 01_ 02_ 03_ 04_ 05_ 06_ 07_ 08_ 09_ 40_
 
 cd ../arcade

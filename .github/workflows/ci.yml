@@ -20,6 +20,7 @@ jobs:
             ARCADE_JSFB_BASELINE_TRACES: /tmp/arcade-ci-${{ github.run_id }}/arcade-jsfb/traces-arcade-base
             ARCADE_JSFB_TRACES: /tmp/arcade-ci-${{ github.run_id }}/arcade-jsfb/traces-arcade-ci
             JSFB_SERVER_LOG: /tmp/arcade-ci-${{ github.run_id }}/jsfb-server.log
+            ARCADE_JSFB_CI_COUNT: "5"
             NPM_CONFIG_AUDIT: "false"
             NPM_CONFIG_FUND: "false"
             NPM_CONFIG_PREFER_OFFLINE: "true"
@@ -113,6 +114,7 @@ jobs:
                   npm run bench -- \
                     --headless \
                     --framework keyed/arcade \
+                    --count "$ARCADE_JSFB_CI_COUNT" \
                     --benchmark 01_ 02_ 03_ 04_ 05_ 06_ 07_ 08_ 09_ 40_ \
                     2>&1 | tee "$RUNNER_TEMP/jsfb-bench-baseline.log"
                   if grep -Fq "Frameworks that will be benchmarked []" "$RUNNER_TEMP/jsfb-bench-baseline.log"; then
@@ -143,6 +145,7 @@ jobs:
                   npm run bench -- \
                     --headless \
                     --framework keyed/arcade \
+                    --count "$ARCADE_JSFB_CI_COUNT" \
                     --benchmark 01_ 02_ 03_ 04_ 05_ 06_ 07_ 08_ 09_ 40_ \
                     2>&1 | tee "$RUNNER_TEMP/jsfb-bench-current.log"
                   if grep -Fq "Frameworks that will be benchmarked []" "$RUNNER_TEMP/jsfb-bench-current.log"; then
