@@ -39,11 +39,11 @@ export function App() @{
 	expect(symbolSources).toEqual(
 		expect.arrayContaining([
 			expect.stringContaining('import { makeItems } from "./items";'),
-			expect.stringContaining('value: makeItems(context.graph.read("state:nextId", []), 10)'),
+			expect.stringContaining('value: makeItems(context.graph.read("state:nextId"), 10)'),
 			expect.stringContaining('value: null'),
 			expect.stringContaining('import { appendItems } from "./items";'),
 			expect.stringContaining(
-				'value: appendItems(context.graph.read("state:items", []), context.graph.read("state:nextId", []), 10)',
+				'value: appendItems(context.graph.read("state:items"), context.graph.read("state:nextId"), 10)',
 			),
 		]),
 	);

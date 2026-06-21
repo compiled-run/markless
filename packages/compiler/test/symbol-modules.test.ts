@@ -394,7 +394,7 @@ test('emitSymbolModules emits async computed runner modules from planned sources
 	expect(artifact.modules[0].source).toContain(
 		'export const authoredSource = "async ({ signal }) => fetch(\\"/api/user/\\" + query, { signal })";',
 	);
-	expect(artifact.modules[0].source).toContain('const query = read("state:query", []);');
+	expect(artifact.modules[0].source).toContain('const query = read("state:query");');
 	expect(artifact.modules[0].source).toContain(
 		'const run = async ({ signal }) => fetch("/api/user/" + query, { signal });',
 	);
@@ -590,9 +590,7 @@ test('emitSymbolModules emits event field collection-call arguments for event ha
 	expect(artifact.modules[0].source).toContain('context.graph.call({');
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:items"');
 	expect(artifact.modules[0].source).toContain('method: "push"');
-	expect(artifact.modules[0].source).toContain(
-		'args: [context.event?.currentTarget?.value, "fallback"]',
-	);
+	expect(artifact.modules[0].source).toContain('args: [context.element?.value, "fallback"]');
 });
 
 test('emitSymbolModules emits graph-read collection-call arguments for event handler modules', () => {
@@ -705,7 +703,7 @@ test('emitSymbolModules preserves spread collection-call arguments for event han
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:items"');
 	expect(artifact.modules[0].source).toContain('method: "push"');
 	expect(artifact.modules[0].source).toContain(
-		'args: [...context.graph.read("state:nextItems", []), "tail"]',
+		'args: [...context.graph.read("state:nextItems"), "tail"]',
 	);
 });
 
@@ -800,7 +798,7 @@ test('emitSymbolModules emits event field assignments for event handler modules'
 	expect(artifact.modules[0].source).toContain('context.graph.write({');
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:query"');
 	expect(artifact.modules[0].source).toContain('path: []');
-	expect(artifact.modules[0].source).toContain('value: context.event?.currentTarget?.value');
+	expect(artifact.modules[0].source).toContain('value: context.element?.value');
 });
 
 test('emitSymbolModules emits graph-read assignments for event handler modules', () => {
@@ -916,7 +914,7 @@ test('emitSymbolModules emits binary graph-read assignment values for event hand
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:total"');
 	expect(artifact.modules[0].source).toContain('path: []');
 	expect(artifact.modules[0].source).toContain(
-		'value: context.graph.read("state:total", []) + context.graph.read("state:profile", ["step"])',
+		'value: context.graph.read("state:total") + context.graph.read("state:profile", ["step"])',
 	);
 });
 
@@ -982,7 +980,7 @@ test('emitSymbolModules emits nested parenthesized graph-read assignment values 
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:total"');
 	expect(artifact.modules[0].source).toContain('path: []');
 	expect(artifact.modules[0].source).toContain(
-		'value: (context.graph.read("state:total", []) + context.graph.read("state:profile", ["step"])) * context.graph.read("state:profile", ["scale"])',
+		'value: (context.graph.read("state:total") + context.graph.read("state:profile", ["step"])) * context.graph.read("state:profile", ["scale"])',
 	);
 });
 
@@ -1048,7 +1046,7 @@ test('emitSymbolModules emits conditional graph-read assignment values for event
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:total"');
 	expect(artifact.modules[0].source).toContain('path: []');
 	expect(artifact.modules[0].source).toContain(
-		'value: context.graph.read("state:menu", ["open"]) ? context.graph.read("state:profile", ["step"]) : context.graph.read("state:total", [])',
+		'value: context.graph.read("state:menu", ["open"]) ? context.graph.read("state:profile", ["step"]) : context.graph.read("state:total")',
 	);
 });
 
@@ -1104,7 +1102,7 @@ test('emitSymbolModules emits array literal assignment values for event handler 
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:items"');
 	expect(artifact.modules[0].source).toContain('path: []');
 	expect(artifact.modules[0].source).toContain(
-		'value: [context.graph.read("state:nextItem", []), "fallback"]',
+		'value: [context.graph.read("state:nextItem"), "fallback"]',
 	);
 });
 
@@ -1165,7 +1163,7 @@ test('emitSymbolModules emits array literal spread assignment values for event h
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:items"');
 	expect(artifact.modules[0].source).toContain('path: []');
 	expect(artifact.modules[0].source).toContain(
-		'value: [...context.graph.read("state:nextItems", []), context.graph.read("state:nextItem", [])]',
+		'value: [...context.graph.read("state:nextItems"), context.graph.read("state:nextItem")]',
 	);
 });
 
@@ -1220,9 +1218,7 @@ test('emitSymbolModules preserves sparse array literal assignment holes', () => 
 	expect(artifact.modules[0].source).toContain('context.graph.write({');
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:items"');
 	expect(artifact.modules[0].source).toContain('path: []');
-	expect(artifact.modules[0].source).toContain(
-		'value: [, context.graph.read("state:nextItem", [])]',
-	);
+	expect(artifact.modules[0].source).toContain('value: [, context.graph.read("state:nextItem")]');
 });
 
 test('emitSymbolModules emits object literal assignment values for event handler modules', () => {
@@ -1343,7 +1339,7 @@ test('emitSymbolModules emits object spread assignment values for event handler 
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:settings"');
 	expect(artifact.modules[0].source).toContain('path: []');
 	expect(artifact.modules[0].source).toContain(
-		'value: { ...context.graph.read("state:settings", []), title: context.graph.read("state:menu", ["title"]) }',
+		'value: { ...context.graph.read("state:settings"), title: context.graph.read("state:menu", ["title"]) }',
 	);
 });
 
@@ -1465,7 +1461,7 @@ test('emitSymbolModules emits static call assignment values for event handler mo
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:total"');
 	expect(artifact.modules[0].source).toContain('path: []');
 	expect(artifact.modules[0].source).toContain(
-		'value: Math.max(context.graph.read("state:total", []), context.graph.read("state:profile", ["step"]))',
+		'value: Math.max(context.graph.read("state:total"), context.graph.read("state:profile", ["step"]))',
 	);
 });
 
@@ -1535,7 +1531,7 @@ test('emitSymbolModules re-emits imported helper calls for event handler modules
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:total"');
 	expect(artifact.modules[0].source).toContain('path: []');
 	expect(artifact.modules[0].source).toContain(
-		'value: clamp(context.graph.read("state:total", []), context.graph.read("state:profile", ["step"]))',
+		'value: clamp(context.graph.read("state:total"), context.graph.read("state:profile", ["step"]))',
 	);
 });
 
@@ -1712,7 +1708,7 @@ test('emitSymbolModules re-emits namespace imported helper calls for event handl
 	});
 	expect(artifact.modules[0].source).toContain('import * as math from "./math";');
 	expect(artifact.modules[0].source).toContain(
-		'value: math.clamp(context.graph.read("state:total", []), context.graph.read("state:profile", ["step"]))',
+		'value: math.clamp(context.graph.read("state:total"), context.graph.read("state:profile", ["step"]))',
 	);
 });
 

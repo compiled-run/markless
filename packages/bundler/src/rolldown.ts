@@ -10,7 +10,11 @@ import {
 	injectManifest,
 } from './build/manifest.ts';
 import { stripEmptyVitePreloadWrappers } from './build/preload-cleanup.ts';
-import { rewriteGeneratedSymbolFacadeImports } from './build/symbol-facade-cleanup.ts';
+import {
+	compactGeneratedDirectSymbolLoaders,
+	rewriteGeneratedSymbolFacadeImports,
+	rewriteGeneratedSymbolInitExports,
+} from './build/symbol-facade-cleanup.ts';
 import { rewriteGeneratedSymbolTableUrls } from './build/symbol-table.ts';
 import { createArcadeDevGraph } from './dev.ts';
 import { ARCADE_VIRTUAL_PREFIX, transformTsrxModule } from './transform.ts';
@@ -213,8 +217,10 @@ export function createArcadeRolldownPlugin(input: {
 			handler(_, bundle) {
 				if (getEnvironment(this) !== 'client') return;
 
-				stripEmptyPreloadWrappersFromGeneratedChunks(bundle);
+				stripEmptyPreloadWrappersFromChunks(bundle);
 				const removedSymbolFacades = rewriteGeneratedSymbolFacadeImports(bundle);
+				rewriteGeneratedSymbolInitExports(bundle);
+				compactGeneratedDirectSymbolLoaders(bundle);
 				const manifestBundle = bundleWithoutRemovedChunks(bundle, removedSymbolFacades);
 				const tableRewrite = rewriteGeneratedSymbolTableUrls(manifestBundle);
 				if (tableRewrite.unresolved.length > 0) {
@@ -275,9 +281,9 @@ function bundleWithoutRemovedChunks(
 	return next;
 }
 
-function stripEmptyPreloadWrappersFromGeneratedChunks(bundle: Record<string, unknown>) {
+function stripEmptyPreloadWrappersFromChunks(bundle: Record<string, unknown>) {
 	for (const output of Object.values(bundle)) {
-		if (!isChunkWithGeneratedRuntime(output)) continue;
+		if (!isChunkWithCode(output)) continue;
 
 		const nextCode = stripEmptyVitePreloadWrappers(output.code);
 		if (nextCode !== output.code) {
@@ -298,25 +304,16 @@ function isChunkFile(output: unknown): output is {
 	return chunk.type === 'chunk' && typeof chunk.fileName === 'string';
 }
 
-function isChunkWithGeneratedRuntime(output: unknown): output is {
+function isChunkWithCode(output: unknown): output is {
 	readonly type: 'chunk';
 	code: string;
-	readonly moduleIds: readonly string[];
 } {
 	if (!output || typeof output !== 'object') return false;
 	const chunk = output as {
 		readonly type?: unknown;
 		readonly code?: unknown;
-		readonly moduleIds?: unknown;
 	};
-	if (chunk.type !== 'chunk' || typeof chunk.code !== 'string') return false;
-	if (!Array.isArray(chunk.moduleIds)) return false;
-
-	return chunk.moduleIds.some((id) => {
-		if (typeof id !== 'string') return false;
-		const normalized = normalizeVirtualId(id);
-		return normalized.startsWith(ARCADE_VIRTUAL_PREFIX) || TSRX_SOURCE_FILE.test(id);
-	});
+	return chunk.type === 'chunk' && typeof chunk.code === 'string';
 }
 
 function pluginName(environment: Environment) {
@@ -373,6 +370,7 @@ function virtualModuleSourceForLoad(
 	},
 ) {
 	if (!options.dev || module.type !== 'resolver') return module.source;
+	if (!module.source.includes('moduleUrls[row[0]]')) return module.source;
 
 	return module.source.replace(SYMBOL_VIRTUAL_STRING_RE, (_match, _quote, virtualId) =>
 		JSON.stringify(devBrowserVirtualModuleUrl(virtualId, options.publicPath)),

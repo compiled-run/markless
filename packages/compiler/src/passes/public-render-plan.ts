@@ -16,6 +16,8 @@ import type {
 	PublicRenderPlanInput,
 	PublicRenderPlanKeyedRepeat,
 	PublicRenderPlanRepeatGate,
+	PublicRenderPlanStaticEventControl,
+	PublicRenderPlanStaticTextWrite,
 	PublicRenderPlanTextWrite,
 	PublicRenderPlanUnsupportedReason,
 	SemanticGraphBinding,
@@ -34,6 +36,7 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 		root,
 		input.semanticGraph.hostNodes.map((host) => host.id),
 	);
+	const hostPaths = collectHostPaths(root, assignedHosts);
 	const repeatNodes = keyedRepeatNodes(root);
 	const repeatNodeById = new Map<string, AnyNode>();
 	input.semanticGraph.keyedRepeats.forEach((repeat, index) => {
@@ -46,6 +49,12 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 	const locatorByHostNodeId = new Map(
 		input.payloadArena.view.locators.map((locator) => [locator.hostNodeId, locator]),
 	);
+	const staticTextWrites = collectStaticTextWrites({
+		aliases,
+		bindings,
+		root,
+		source: input.source.source,
+	});
 
 	const repeatGates: PublicRenderPlanRepeatGate[] = [];
 	const keyedRepeats: PublicRenderPlanKeyedRepeat[] = [];
@@ -72,7 +81,8 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 
 		const row = singleRowRoot(repeatNode);
 		const parentLocator = locatorByHostNodeId.get(payloadRepeat.parentHostNodeId);
-		if (!row || !parentLocator) continue;
+		const parentPath = hostPaths.get(payloadRepeat.parentHostNodeId);
+		if (!row || !parentLocator || !parentPath) continue;
 
 		const rowPlan = collectRowPlan({
 			aliases,
@@ -91,6 +101,7 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 			planKeyedRepeat({
 				payloadRepeat,
 				parentLocator,
+				parentPath,
 				row,
 				rowPlan,
 				semanticRepeat,
@@ -99,14 +110,21 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 		);
 	}
 
-	const rootTemplateHtml = staticShellSupported(root)
-		? staticHtml(root, { expressionText: ' ', omitForExpressions: true })
-		: null;
+	const rootTemplateHtml =
+		staticTextWrites && staticShellSupported(root)
+			? staticHtml(root, { expressionText: ' ', omitForExpressions: true })
+			: null;
 
 	return {
 		passId: 'public-render-plan',
 		rootTemplateHtml,
 		staticHostNodeIds: collectStaticHostNodeIds(root, assignedHosts),
+		staticEventControls: collectStaticEventControls({
+			hostPaths,
+			payloadEvents: input.payloadArena.view.events,
+			symbols: input.symbolResolver.symbols,
+		}),
+		staticTextWrites: staticTextWrites ?? [],
 		repeatGates,
 		keyedRepeats,
 		diagnostics: [],
@@ -118,10 +136,66 @@ function emptyPlan(): PublicRenderPlanArtifact {
 		passId: 'public-render-plan',
 		rootTemplateHtml: null,
 		staticHostNodeIds: [],
+		staticEventControls: [],
+		staticTextWrites: [],
 		repeatGates: [],
 		keyedRepeats: [],
 		diagnostics: [],
 	};
+}
+
+function collectStaticTextWrites(input: {
+	readonly aliases: ReturnType<typeof semanticAliasMap>;
+	readonly bindings: ReadonlyMap<string, SemanticGraphBinding>;
+	readonly root: AnyNode;
+	readonly source: string;
+}): PublicRenderPlanStaticTextWrite[] | null {
+	const writes: PublicRenderPlanStaticTextWrite[] = [];
+	let sawRepeat = false;
+
+	const visitElement = (node: AnyNode, hostPath: ReadonlyArray<number>): boolean => {
+		let childDomIndex = 0;
+		for (const child of asNodes(node.children)) {
+			if (isIgnorableTextNode(child)) continue;
+			if (isStaticTextNode(child)) {
+				childDomIndex++;
+				continue;
+			}
+			if (child.type === 'JSXForExpression') {
+				sawRepeat = true;
+				continue;
+			}
+			if (child.type === 'JSXExpressionContainer' || child.type === 'TSRXExpression') {
+				const expression = child.expression as AnyNode | undefined;
+				if (!expression) return false;
+
+				const source = expressionSource(expression, input.source);
+				const graph = resolveGraphPath(source, input.bindings, input.aliases);
+				if (!graph || graph.binding.kind !== 'state') return false;
+
+				writes.push({
+					source,
+					graphNodeId: graph.binding.id,
+					path: graph.path,
+					nodePath: [...hostPath, childDomIndex],
+				});
+				childDomIndex++;
+				continue;
+			}
+			if (child.type === 'Element' || child.type === 'JSXElement') {
+				if (!visitElement(child, [...hostPath, childDomIndex])) return false;
+				childDomIndex++;
+				continue;
+			}
+			return false;
+		}
+
+		return true;
+	};
+
+	if (!visitElement(input.root, [])) return null;
+	if (sawRepeat && writes.length > 0) return null;
+	return writes;
 }
 
 function supportedRepeatGate(input: {
@@ -190,6 +264,7 @@ function unsupportedRepeatReason(input: {
 function planKeyedRepeat(input: {
 	readonly payloadRepeat: PayloadKeyedRepeat;
 	readonly parentLocator: PublicRenderPlanKeyedRepeat['parentLocator'];
+	readonly parentPath: ReadonlyArray<number>;
 	readonly row: AnyNode;
 	readonly rowPlan: RowPlan;
 	readonly semanticRepeat: SemanticKeyedRepeat;
@@ -199,6 +274,7 @@ function planKeyedRepeat(input: {
 		repeatId: input.payloadRepeat.id,
 		parentHostNodeId: input.payloadRepeat.parentHostNodeId,
 		parentLocator: input.parentLocator,
+		parentPath: input.parentPath,
 		...(input.payloadRepeat.rowHostNodeId
 			? { rowHostNodeId: input.payloadRepeat.rowHostNodeId }
 			: {}),
@@ -451,6 +527,35 @@ function assignHostIds(root: AnyNode, hostNodeIds: ReadonlyArray<string>): Assig
 	return { hostIdByNode, nodeByHostId };
 }
 
+function collectHostPaths(
+	root: AnyNode,
+	assignedHosts: AssignedHosts,
+): ReadonlyMap<string, ReadonlyArray<number>> {
+	const hostPathById = new Map<string, ReadonlyArray<number>>();
+
+	const visit = (node: AnyNode | null | undefined, path: ReadonlyArray<number>): void => {
+		if (!node || typeof node !== 'object') return;
+		if (node.type !== 'Element' && node.type !== 'JSXElement') return;
+
+		const hostNodeId = assignedHosts.hostIdByNode.get(node);
+		if (hostNodeId) hostPathById.set(hostNodeId, path);
+
+		let childDomIndex = 0;
+		for (const child of asNodes(node.children)) {
+			if (isIgnorableTextNode(child)) continue;
+			if (child.type === 'Element' || child.type === 'JSXElement') {
+				visit(child, [...path, childDomIndex]);
+				childDomIndex++;
+				continue;
+			}
+			childDomIndex++;
+		}
+	};
+
+	visit(root, []);
+	return hostPathById;
+}
+
 function collectStaticHostNodeIds(
 	root: AnyNode,
 	assignedHosts: AssignedHosts,
@@ -469,6 +574,40 @@ function collectStaticHostNodeIds(
 
 	visit(root);
 	return hostNodeIds;
+}
+
+function collectStaticEventControls(input: {
+	readonly hostPaths: ReadonlyMap<string, ReadonlyArray<number>>;
+	readonly payloadEvents: PublicRenderPlanInput['payloadArena']['view']['events'];
+	readonly symbols: ReadonlyArray<PlannedSymbol>;
+}): ReadonlyArray<PublicRenderPlanStaticEventControl> {
+	return input.payloadEvents.flatMap((event): PublicRenderPlanStaticEventControl[] => {
+		const hostPath = input.hostPaths.get(event.hostNodeId);
+		if (!hostPath) return [];
+
+		const symbolIds: string[] = [];
+		for (const symbol of input.symbols) {
+			if (
+				symbol.kind !== 'event-handler' ||
+				symbol.hostNodeId !== event.hostNodeId ||
+				symbol.eventName !== event.eventName
+			) {
+				continue;
+			}
+			symbolIds[symbol.order] = symbol.id;
+		}
+
+		return symbolIds.length > 0
+			? [
+					{
+						eventName: event.eventName,
+						hostNodeId: event.hostNodeId,
+						hostPath,
+						symbolIds,
+					},
+				]
+			: [];
+	});
 }
 
 function keyedRepeatNodes(root: AnyNode): AnyNode[] {
@@ -598,6 +737,8 @@ function staticShellSupported(node: AnyNode): boolean {
 		(child) =>
 			isIgnorableTextNode(child) ||
 			isStaticTextNode(child) ||
+			child.type === 'JSXExpressionContainer' ||
+			child.type === 'TSRXExpression' ||
 			child.type === 'JSXForExpression' ||
 			staticShellSupported(child),
 	);

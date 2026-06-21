@@ -182,13 +182,26 @@ describe('Vite adapter structure', () => {
 	test('serves dev symbol resolver tables with browser-loadable symbol module URLs', async () => {
 		const plugin = getAsyncPlugin();
 		const filename = '/workspace/app/src/App.tsrx';
+		const tableSource = `
+import { state } from '@arcade/core';
+
+export function App() @{
+	let count = state(0);
+	let label = state('ready');
+
+	<section>
+		<button onClick={() => count++} onKeyDown={() => label = 'key'}>{count}</button>
+		<p>{label}</p>
+	</section>
+}
+`;
 
 		callConfigResolved(plugin, {
 			base: '/dev/',
 			command: 'serve',
 			root: '/workspace/app',
 		});
-		await callTransform(plugin, source, filename, createViteHookContext('client'));
+		await callTransform(plugin, tableSource, filename, createViteHookContext('client'));
 
 		const resolverSource = await callLoad(
 			plugin,

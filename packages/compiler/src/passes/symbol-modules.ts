@@ -374,7 +374,7 @@ function asyncRunnerDependencyDeclarations(
 
 		seenNames.add(declaration.name);
 		declarations.push(
-			`	const ${declaration.name} = read(${JSON.stringify(declaration.graphNodeId)}, ${JSON.stringify(declaration.path)});`,
+			`	const ${declaration.name} = ${graphReadCallSource('read', declaration.graphNodeId, declaration.path)};`,
 		);
 	}
 
@@ -1392,6 +1392,12 @@ function eventFieldAssignmentSource(
 		.filter(Boolean);
 	if (fields.length === 0) return null;
 	if (fields.some((field) => !/^[$A-Z_a-z][$0-9A-Z_a-z]*$/.test(field))) return null;
+	if (fields[0] === 'currentTarget') {
+		const currentTargetFields = fields.slice(1);
+		return currentTargetFields.length === 0
+			? 'context.element'
+			: `context.element?.${currentTargetFields.join('?.')}`;
+	}
 
 	return `context.event?.${fields.join('?.')}`;
 }
@@ -1456,7 +1462,7 @@ function graphReadSource(
 	const graphRead = graphReads.find((read) => read.source === source);
 	if (!graphRead) return null;
 
-	return `context.graph.read(${JSON.stringify(graphRead.graphNodeId)}, ${JSON.stringify(graphRead.path)})`;
+	return graphReadCallSource('context.graph.read', graphRead.graphNodeId, graphRead.path);
 }
 
 function literalValueSource(valueSource: string | undefined): string | null {
@@ -1468,6 +1474,16 @@ function literalValueSource(valueSource: string | undefined): string | null {
 	if (/^(['"])(?:\\.|(?!\1).)*\1$/.test(source)) return source;
 
 	return null;
+}
+
+function graphReadCallSource(
+	callee: string,
+	graphNodeId: string,
+	path: ReadonlyArray<string>,
+): string {
+	return path.length === 0
+		? `${callee}(${JSON.stringify(graphNodeId)})`
+		: `${callee}(${JSON.stringify(graphNodeId)}, ${JSON.stringify(path)})`;
 }
 
 function uniqueModuleImports(

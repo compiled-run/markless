@@ -102,15 +102,24 @@ export function App() @{
 }
 `;
 
-type PublicRenderTestListener = (event: { readonly type: string }) => unknown;
+type PublicRenderTestEvent = {
+	readonly type: string;
+	readonly target: PublicRenderTestElement | null;
+};
+type PublicRenderTestListener = (event: PublicRenderTestEvent) => unknown;
 type PublicRenderTestGraph = {
 	readonly read: (graphNodeId: string, path?: readonly string[]) => unknown;
 	readonly write: (write: { readonly graphNodeId: string; readonly value: unknown }) => void;
 };
+type PublicRenderTestContainer = PublicRenderTestElement | PublicRenderTestFragment;
+type PublicRenderTestNode =
+	| PublicRenderTestElement
+	| PublicRenderTestFragment
+	| PublicRenderTestText;
 
 class PublicRenderTestText {
 	readonly nodeType = 3;
-	parentElement: PublicRenderTestElement | null = null;
+	parentElement: PublicRenderTestContainer | null = null;
 
 	constructor(private value: string) {}
 
@@ -129,10 +138,10 @@ class PublicRenderTestText {
 
 class PublicRenderTestElement {
 	readonly nodeType = 1;
-	readonly childNodes: Array<PublicRenderTestElement | PublicRenderTestText> = [];
+	readonly childNodes: PublicRenderTestNode[] = [];
 	readonly attributes = new Map<string, string>();
 	readonly listeners = new Map<string, PublicRenderTestListener[]>();
-	parentElement: PublicRenderTestElement | null = null;
+	parentElement: PublicRenderTestContainer | null = null;
 
 	constructor(readonly tagName: string) {}
 
@@ -156,23 +165,28 @@ class PublicRenderTestElement {
 		this.replaceChildren(...(value ? [new PublicRenderTestText(value)] : []));
 	}
 
-	appendChild(child: PublicRenderTestElement | PublicRenderTestText) {
+	appendChild(child: PublicRenderTestNode) {
+		if (child.nodeType === 11) {
+			while (child.childNodes.length > 0) this.appendChild(child.childNodes[0]!);
+			return child;
+		}
 		child.parentElement?.removeChild(child);
 		child.parentElement = this;
 		this.childNodes.push(child);
 		return child;
 	}
 
-	replaceChildren(...children: Array<PublicRenderTestElement | PublicRenderTestText>) {
+	replaceChildren(...children: PublicRenderTestNode[]) {
 		for (const child of this.childNodes) child.parentElement = null;
 		this.childNodes.length = 0;
 		for (const child of children) this.appendChild(child);
 	}
 
-	insertBefore(
-		child: PublicRenderTestElement | PublicRenderTestText,
-		before: PublicRenderTestElement | PublicRenderTestText | undefined,
-	) {
+	insertBefore(child: PublicRenderTestNode, before: PublicRenderTestNode | undefined) {
+		if (child.nodeType === 11) {
+			while (child.childNodes.length > 0) this.insertBefore(child.childNodes[0]!, before);
+			return child;
+		}
 		child.parentElement?.removeChild(child);
 		const index = before ? this.childNodes.indexOf(before) : -1;
 		child.parentElement = this;
@@ -180,7 +194,7 @@ class PublicRenderTestElement {
 		return child;
 	}
 
-	removeChild(child: PublicRenderTestElement | PublicRenderTestText) {
+	removeChild(child: PublicRenderTestNode) {
 		const index = this.childNodes.indexOf(child);
 		if (index >= 0) this.childNodes.splice(index, 1);
 		child.parentElement = null;
@@ -205,9 +219,12 @@ class PublicRenderTestElement {
 		this.listeners.set(type, listeners);
 	}
 
-	async dispatch(type: string) {
+	async dispatch(type: string, event: PublicRenderTestEvent = { type, target: this }) {
 		for (const listener of this.listeners.get(type) ?? []) {
-			await listener({ type });
+			await listener(event);
+		}
+		if (this.parentElement?.nodeType === 1) {
+			await this.parentElement.dispatch(type, event);
 		}
 	}
 
@@ -219,8 +236,44 @@ class PublicRenderTestElement {
 	}
 }
 
+class PublicRenderTestFragment {
+	readonly nodeType = 11;
+	readonly childNodes: PublicRenderTestNode[] = [];
+	parentElement: PublicRenderTestContainer | null = null;
+
+	get firstElementChild() {
+		return this.childNodes.find((child) => child.nodeType === 1) as
+			| PublicRenderTestElement
+			| undefined;
+	}
+
+	appendChild(child: PublicRenderTestNode) {
+		if (child.nodeType === 11) {
+			while (child.childNodes.length > 0) this.appendChild(child.childNodes[0]!);
+			return child;
+		}
+		child.parentElement?.removeChild(child);
+		child.parentElement = this;
+		this.childNodes.push(child);
+		return child;
+	}
+
+	replaceChildren(...children: PublicRenderTestNode[]) {
+		for (const child of this.childNodes) child.parentElement = null;
+		this.childNodes.length = 0;
+		for (const child of children) this.appendChild(child);
+	}
+
+	removeChild(child: PublicRenderTestNode) {
+		const index = this.childNodes.indexOf(child);
+		if (index >= 0) this.childNodes.splice(index, 1);
+		child.parentElement = null;
+		return child;
+	}
+}
+
 class PublicRenderTestTemplate {
-	readonly content = new PublicRenderTestElement('#fragment');
+	readonly content = new PublicRenderTestFragment();
 
 	set innerHTML(html: string) {
 		this.content.replaceChildren(...parsePublicRenderTestHtml(html));
@@ -449,13 +502,36 @@ export function App() @{
 		symbols: [],
 	});
 	const moduleSource = result.publicRenderModule.moduleSource;
+	const addSymbol = result.symbolResolver.symbols.find((symbol) =>
+		symbol.source.includes('entries.push'),
+	);
+	const deleteDraftSymbol = result.symbolResolver.symbols.find((symbol) =>
+		symbol.source.includes('delete draft.code'),
+	);
 
+	expect(addSymbol).toBeDefined();
+	expect(deleteDraftSymbol).toBeDefined();
+	expect(result.publicRenderPlan.staticEventControls).toEqual([
+		{
+			eventName: 'click',
+			hostNodeId: addSymbol!.hostNodeId,
+			hostPath: [0],
+			symbolIds: [addSymbol!.id],
+		},
+		{
+			eventName: 'click',
+			hostNodeId: deleteDraftSymbol!.hostNodeId,
+			hostPath: [1],
+			symbolIds: [deleteDraftSymbol!.id],
+		},
+	]);
 	expect(result.publicRenderPlan.keyedRepeats).toEqual([
 		expect.objectContaining({
 			repeatId: 'repeat:0',
 			itemName: 'entry',
 			collectionGraphNodeId: 'state:entries',
 			keyPath: ['code'],
+			parentPath: [2],
 			rowTemplateHtml: '<article class=""><h2> </h2><button>Choose</button></article>',
 		}),
 	]);
@@ -465,11 +541,101 @@ export function App() @{
 	for (const expected of [
 		'export function App()',
 		'const graph = createArcadePublicGraph()',
-		'runtime: createArcadePublicRuntime(graph)',
+		'runtime: { async dispatch() {} }',
 	]) {
 		expect(moduleSource).toContain(expected);
 	}
+	expect(moduleSource).not.toContain('function createArcadePublicRuntime');
+	expect(moduleSource).not.toContain('view: { version: 1');
 	expect(moduleSource).toContain('!sameArcadePublicKeys(state.keys, nextKeys)');
+	expect(moduleSource).toContain(
+		'const repeatState0 = { rows: new Map(), keys: [], classValue: undefined };',
+	);
+	expect(moduleSource).toContain('createArcadePublicLoadSymbol(root, repeatState0)');
+	expect(moduleSource).toContain(
+		'syncArcadePublicRepeat0(root, graph, componentLoadSymbol, repeatState0);',
+	);
+	expect(moduleSource).toContain(
+		'syncArcadePublicRepeat0(root, context.graph, loadArcadePublicSymbol, repeatState0);',
+	);
+	expect(moduleSource).not.toContain('function syncArcadePublicRepeats');
+	expect(moduleSource).not.toContain('const arcadePublicRepeatStates');
+	expect(moduleSource).not.toContain('function repeatState(root) {');
+	expect(moduleSource).not.toContain('function repeatState(root, planIndex)');
+	expect(moduleSource).not.toContain('states = []');
+	expect(moduleSource).toContain('function createArcadePublicRepeat0Record(row, item)');
+	expect(moduleSource).toContain('record = createArcadePublicRepeat0Record(rowRoot, item);');
+	expect(moduleSource).toContain('text0: row.childNodes?.[0]?.childNodes?.[0],');
+	expect(moduleSource).toContain('class0: row,');
+	expect(moduleSource).not.toContain('record.targets');
+	expect(moduleSource).toContain('[[0],"click",["symbol:0"]]');
+	expect(moduleSource).toContain('[[1],"click",["symbol:1"]]');
+	expect(moduleSource).toContain('const element = nodeAtPath(root, path);');
+	expect(moduleSource).toContain('const parent = root.childNodes?.[2];');
+	expect(moduleSource).not.toContain('const parent = elementAtDomOrder(root');
+	expect(moduleSource).not.toContain('function elementAtDomOrder');
+	expect(moduleSource).toContain('const textTarget0 = record.text0;');
+	expect(moduleSource).toContain('item.code');
+	expect(moduleSource).toContain('item.title');
+	expect(moduleSource).not.toContain('readArcadePublicPath(item, ["code"])');
+	expect(moduleSource).not.toContain('readArcadePublicPath(item, ["title"])');
+	expect(moduleSource).not.toContain('nodeAtPath(record.root');
+	expect(moduleSource).not.toContain('nodeAtPath(row');
+	expect(moduleSource).toContain('function nodeAtPath(root, path)');
+	expect(moduleSource).not.toContain('await graph.flush();');
+	expect(moduleSource).toContain('graph.flush();');
+	expect(moduleSource).toContain('function readArcadePublicRepeat0ClassValues(graph)');
+	expect(moduleSource).toContain(
+		'const collectionDirty = graph.isDirty?.("state:entries") ?? true;',
+	);
+	expect(moduleSource).toContain('const classDirty = graph.isDirty?.("state:chosen");');
+	expect(moduleSource).toContain('const items = graph.read("state:entries");');
+	expect(moduleSource).toContain('return graph.read("state:chosen");');
+	expect(moduleSource).not.toContain('graph.read("state:entries", [])');
+	expect(moduleSource).not.toContain('graph.read("state:chosen", [])');
+	expect(moduleSource).toContain('const classValue = readArcadePublicRepeat0ClassValues(graph);');
+	expect(moduleSource).toContain('writeArcadePublicRepeat0Row(record, item, classValue);');
+	expect(moduleSource).toContain(
+		'attachArcadePublicRepeat0Events(record, graph, loadSymbolForRepeat);',
+	);
+	expect(moduleSource).toContain(
+		'delegateArcadePublicRepeat0Events(parent, graph, loadSymbolForRepeat);',
+	);
+	expect(moduleSource).toContain('const element0 = record.root.childNodes?.[1];');
+	expect(moduleSource).toContain('element0.__arcadePublicRepeat0Event0 = record;');
+	expect(moduleSource).toContain('parent.addEventListener("click"');
+	expect(moduleSource).toContain('const record = eventTarget?.__arcadePublicRepeat0Event0;');
+	expect(moduleSource).not.toContain('element0.addEventListener("click"');
+	expect(moduleSource).not.toContain('event0:');
+	expect(moduleSource).toContain('const dirtyGraphNodeIds = new Set();');
+	expect(moduleSource).toContain('const dirtyArrayIndexes = new Map();');
+	expect(moduleSource).toContain(
+		'isDirty(graphNodeId) { return dirtyGraphNodeIds.has(graphNodeId); }',
+	);
+	expect(moduleSource).toContain(
+		'dirtyIndexes(graphNodeId) { return dirtyArrayIndexes.get(graphNodeId); }',
+	);
+	expect(moduleSource).toContain('const dirtyIndexes = graph.dirtyIndexes?.("state:entries");');
+	expect(moduleSource).toContain(
+		'patchArcadePublicRepeat0DirtyRows(state, items, dirtyIndexes, classValue)',
+	);
+	expect(moduleSource).toContain('function replaceArcadePublicRows(parent, state, keys)');
+	expect(moduleSource).toContain('document.createDocumentFragment()');
+	expect(moduleSource).toContain('const newRows = document.createDocumentFragment();');
+	expect(moduleSource).toContain('newRows.appendChild(record.root);');
+	expect(moduleSource).toContain('parent.appendChild?.(newRows);');
+	expect(moduleSource).toContain('pruneArcadePublicRows(state, nextKeys)');
+	expect(moduleSource).toContain('const record = state.rows.get(matchValue);');
+	expect(moduleSource).not.toContain('const liveKeys = new Set();');
+	expect(moduleSource).not.toContain('const nodes = [];');
+	expect(moduleSource).not.toContain('const mismatch = [];');
+	expect(moduleSource).not.toContain('function appendArcadePublicRows');
+	expect(moduleSource).not.toContain('parent.replaceChildren(...arcadePublicRowsForKeys');
+	expect(moduleSource).not.toContain('events: new Set()');
+	expect(moduleSource).not.toContain('record.events');
+	expect(moduleSource).not.toContain('arcadePublicEventMatch');
+	expect(moduleSource).not.toContain('eventTargets');
+	expect(moduleSource).not.toContain('findArcadePublicRepeatEventRecord');
 	expect(moduleSource).toMatch(
 		/call\(call\)[\s\S]*delete\(deletion\)[\s\S]*clearArcadePublicRows/,
 	);
@@ -502,7 +668,8 @@ export function Catalog() @{
 				<li class={activeSku === product.meta.sku ? 'focused' : 'muted'}>
 					<strong>{product.copy.name}</strong>
 					<em>{product.meta.sku}</em>
-					<button onClick={() => activeSku = product.meta.sku}>Focus</button>
+					<button onClick={() => activeSku = product.meta.sku}><span>Focus</span></button>
+					<button onClick={() => activeSku = product.copy.name}></button>
 				</li>
 			}
 		</ul>
@@ -517,22 +684,36 @@ export function Catalog() @{
 	const focusSymbol = result.symbolResolver.symbols.find((symbol) =>
 		symbol.source.includes('activeSku = product.meta.sku'),
 	);
+	const nameSymbol = result.symbolResolver.symbols.find((symbol) =>
+		symbol.source.includes('activeSku = product.copy.name'),
+	);
 	const focusModule = result.symbolModules.modules.find(
 		(module) => module.symbolId === focusSymbol?.id,
 	);
+	const nameModule = result.symbolModules.modules.find(
+		(module) => module.symbolId === nameSymbol?.id,
+	);
 	expect(syncSymbol).toBeDefined();
 	expect(focusSymbol).toBeDefined();
+	expect(nameSymbol).toBeDefined();
 	expect(focusModule).toBeDefined();
+	expect(nameModule).toBeDefined();
 
 	const focusExports = await importPublicRenderTestModule(focusModule!.source);
+	const nameExports = await importPublicRenderTestModule(nameModule!.source);
+	const initialProducts = products(['amber-1', 'Amber'], ['blue-2', 'Blue']);
+	const appendedProducts = [...initialProducts, ...products(['copper-3', 'Copper'])];
 	const scenarios = [
-		products(['amber-1', 'Amber'], ['blue-2', 'Blue']),
-		products(['amber-1', 'Amber'], ['blue-2', 'Blue'], ['copper-3', 'Copper']),
-		products(['blue-2', 'Blue'], ['amber-1', 'Amber'], ['copper-3', 'Copper']),
+		initialProducts,
+		appendedProducts,
+		products(['amber-1', 'Amber Prime'], ['blue-2', 'Blue'], ['copper-3', 'Copper']),
+		products(['blue-2', 'Blue'], ['amber-1', 'Amber Prime'], ['copper-3', 'Copper']),
 		products(['blue-2', 'Blue'], ['copper-3', 'Copper']),
 		[],
 	];
+	const loadSymbolCalls = new Map<string, number>();
 	const loadSymbol = (symbolId: string) => {
+		loadSymbolCalls.set(symbolId, (loadSymbolCalls.get(symbolId) ?? 0) + 1);
 		if (symbolId === syncSymbol?.id) {
 			return ({ graph }: { readonly graph: PublicRenderTestGraph }) => {
 				graph.write({
@@ -542,12 +723,16 @@ export function Catalog() @{
 			};
 		}
 		if (symbolId === focusSymbol?.id) return focusExports[focusModule!.exportName];
+		if (symbolId === nameSymbol?.id) return nameExports[nameModule!.exportName];
 		throw new Error(`Unexpected public render test symbol ${symbolId}`);
 	};
 	const document = {
 		createElement(tagName: string) {
 			if (tagName === 'template') return new PublicRenderTestTemplate();
 			return new PublicRenderTestElement(tagName);
+		},
+		createDocumentFragment() {
+			return new PublicRenderTestFragment();
 		},
 	};
 	const publicModule = await importPublicRenderTestModule(
@@ -563,34 +748,162 @@ export function Catalog() @{
 		readonly graph: PublicRenderTestGraph;
 	};
 	const apply = elementsByTag(rendered.root, 'button')[0]!;
+	expect(loadSymbolCalls.get(syncSymbol!.id)).toBe(1);
+	expect(loadSymbolCalls.get(focusSymbol!.id)).toBe(undefined);
 
 	await apply.dispatch('click');
 	expect(rowTexts(rendered.root)).toEqual(['Amberamber-1Focus', 'Blueblue-2Focus']);
+	const list = elementsByTag(rendered.root, 'ul')[0]!;
+	const firstFocusButton = elementsByTag(rendered.root, 'li')[0]!
+		.childNodes[2]! as PublicRenderTestElement;
+	const firstNameButton = elementsByTag(rendered.root, 'li')[0]!
+		.childNodes[3]! as PublicRenderTestElement;
+	expect(list.listeners.get('click')).toHaveLength(1);
+	expect(firstFocusButton.listeners.get('click')).toBe(undefined);
+	expect(firstNameButton.listeners.get('click')).toBe(undefined);
 
-	await apply.dispatch('click');
+	await firstNameButton.dispatch('click');
+	expect(rendered.graph.read('state:activeSku')).toBe('Amber');
+	expect(rowClasses(rendered.root)).toEqual(['muted', 'muted']);
+
+	const appendDispatch = apply.dispatch('click');
 	expect(rowTexts(rendered.root)).toEqual([
 		'Amberamber-1Focus',
 		'Blueblue-2Focus',
 		'Coppercopper-3Focus',
 	]);
+	await appendDispatch;
+	const firstRowBeforeReplacement = elementsByTag(rendered.root, 'li')[0]!;
 
-	await elementsByTag(rendered.root, 'li')[1]!.childNodes[2]!.dispatch('click');
+	const secondFocusButton = elementsByTag(rendered.root, 'li')[1]!
+		.childNodes[2]! as PublicRenderTestElement;
+	const secondFocusSpan = secondFocusButton.childNodes[0]! as PublicRenderTestElement;
+	await secondFocusSpan.dispatch('click');
 	expect(rendered.graph.read('state:activeSku')).toBe('blue-2');
 	expect(rowClasses(rendered.root)).toEqual(['muted', 'focused', 'muted']);
 
 	await apply.dispatch('click');
 	expect(rowTexts(rendered.root)).toEqual([
+		'Amber Primeamber-1Focus',
 		'Blueblue-2Focus',
-		'Amberamber-1Focus',
+		'Coppercopper-3Focus',
+	]);
+	expect(elementsByTag(rendered.root, 'li')[0]).toBe(firstRowBeforeReplacement);
+	expect(rowClasses(rendered.root)).toEqual(['muted', 'focused', 'muted']);
+
+	const cachedFocusSpan = firstFocusButton.childNodes[0]! as PublicRenderTestElement;
+	const cachedFocusDispatch = cachedFocusSpan.dispatch('click');
+	expect(rendered.graph.read('state:activeSku')).toBe('amber-1');
+	expect(rowClasses(rendered.root)).toEqual(['focused', 'muted', 'muted']);
+	await cachedFocusDispatch;
+
+	await apply.dispatch('click');
+	expect(rowTexts(rendered.root)).toEqual([
+		'Blueblue-2Focus',
+		'Amber Primeamber-1Focus',
 		'Coppercopper-3Focus',
 	]);
 
 	await apply.dispatch('click');
 	expect(rowTexts(rendered.root)).toEqual(['Blueblue-2Focus', 'Coppercopper-3Focus']);
-	expect(rowClasses(rendered.root)).toEqual(['focused', 'muted']);
+	expect(rowClasses(rendered.root)).toEqual(['muted', 'muted']);
 
 	await apply.dispatch('click');
 	expect(elementsByTag(rendered.root, 'li')).toEqual([]);
+	expect(loadSymbolCalls.get(syncSymbol!.id)).toBe(1);
+	expect(loadSymbolCalls.get(focusSymbol!.id)).toBe(1);
+	expect(loadSymbolCalls.get(nameSymbol!.id)).toBe(1);
+});
+
+test('compileTsrxModule public render module runs static text state bindings', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Scoreboard.tsrx',
+		source: `
+import { state } from '@arcade/core';
+
+export function Scoreboard() @{
+	let score = state({ total: 1 });
+
+	<section>
+		<button onClick={() => score.total++}>{score.total}</button>
+		<p>Stable</p>
+	</section>
+}
+`,
+		symbols: [],
+	});
+	const incrementSymbol = result.symbolResolver.symbols.find((symbol) =>
+		symbol.source.includes('score.total++'),
+	);
+	const incrementModule = result.symbolModules.modules.find(
+		(module) => module.symbolId === incrementSymbol?.id,
+	);
+
+	expect(incrementSymbol).toBeDefined();
+	expect(incrementModule).toBeDefined();
+	expect((result.publicRenderPlan as any).staticTextWrites).toEqual([
+		{
+			source: 'score.total',
+			graphNodeId: 'state:score',
+			path: ['total'],
+			nodePath: [0, 0],
+		},
+	]);
+	expect(result.publicRenderModule.moduleSource).toContain(
+		'function syncArcadePublicStaticText(root, graph)',
+	);
+
+	const incrementExports = await importPublicRenderTestModule(incrementModule!.source);
+	const loadSymbolCalls = new Map<string, number>();
+	const loadSymbol = (symbolId: string) => {
+		loadSymbolCalls.set(symbolId, (loadSymbolCalls.get(symbolId) ?? 0) + 1);
+		if (symbolId === incrementSymbol?.id) return incrementExports[incrementModule!.exportName];
+		throw new Error(`Unexpected public render test symbol ${symbolId}`);
+	};
+	const document = {
+		createElement(tagName: string) {
+			if (tagName === 'template') return new PublicRenderTestTemplate();
+			return new PublicRenderTestElement(tagName);
+		},
+		createDocumentFragment() {
+			return new PublicRenderTestFragment();
+		},
+	};
+	const publicModule = await importPublicRenderTestModule(
+		[
+			'const document = globalThis.__arcadePublicRenderTestDocument;',
+			'const loadSymbol = globalThis.__arcadePublicRenderTestLoadSymbol;',
+			result.publicRenderModule.moduleSource,
+		].join('\n'),
+		{ document, loadSymbol },
+	);
+	const rendered = publicModule.Scoreboard() as {
+		readonly root: PublicRenderTestElement;
+		readonly graph: PublicRenderTestGraph & {
+			readonly update: (update: {
+				readonly graphNodeId: string;
+				readonly path?: readonly string[];
+				readonly update: (value: unknown) => unknown;
+				readonly returnValue?: 'previous' | 'next';
+			}) => unknown;
+		};
+	};
+	const secondRendered = publicModule.Scoreboard() as {
+		readonly root: PublicRenderTestElement;
+		readonly graph: PublicRenderTestGraph;
+	};
+	const button = elementsByTag(rendered.root, 'button')[0]!;
+	const secondButton = elementsByTag(secondRendered.root, 'button')[0]!;
+
+	expect(button.textContent).toBe('1');
+	expect(secondButton.textContent).toBe('1');
+	expect(loadSymbolCalls.get(incrementSymbol!.id)).toBe(2);
+	await button.dispatch('click');
+	expect(rendered.graph.read('state:score', ['total'])).toBe(2);
+	expect(button.textContent).toBe('2');
+	expect(secondRendered.graph.read('state:score', ['total'])).toBe(1);
+	expect(secondButton.textContent).toBe('1');
+	expect(loadSymbolCalls.get(incrementSymbol!.id)).toBe(2);
 });
 
 test('compileTsrxModule does not emit public render factories for non-literal direct state values', async () => {
@@ -724,18 +1037,18 @@ test('compileTsrxModule emits generated event modules for supported graph write 
 	expect(clickModule).toContain('method: "push"');
 	expect(clickModule).toContain('args: ["third"]');
 	expect(clickModule).toContain('args: [context.graph.read("state:menu", ["title"])]');
-	expect(clickModule).toContain('args: [...context.graph.read("state:nextItems", [])]');
+	expect(clickModule).toContain('args: [...context.graph.read("state:nextItems")]');
 	expect(inputModule).toContain('graphNodeId: "state:menu"');
 	expect(inputModule).toContain('path: ["title"]');
-	expect(inputModule).toContain('value: context.event?.currentTarget?.value');
+	expect(inputModule).toContain('value: context.element?.value');
 	expect(inputCollectionModule).toContain('graphNodeId: "state:items"');
-	expect(inputCollectionModule).toContain('args: [context.event?.currentTarget?.value]');
+	expect(inputCollectionModule).toContain('args: [context.element?.value]');
 	expect(inputCollectionModule).not.toContain('args: ["third"]');
 	expect(dateModule).toContain('context.graph.call({');
 	expect(dateModule).toContain('graphNodeId: "state:currentDate"');
 	expect(dateModule).toContain('path: []');
 	expect(dateModule).toContain('method: "setTime"');
-	expect(dateModule).toContain('args: [context.graph.read("state:nextTime", [])]');
+	expect(dateModule).toContain('args: [context.graph.read("state:nextTime")]');
 
 	const copyModule = eventModuleSource('menu.title = profile.name');
 
@@ -763,7 +1076,7 @@ test('compileTsrxModule emits generated event modules for supported graph write 
 	expect(binaryAddModule).toContain('graphNodeId: "state:total"');
 	expect(binaryAddModule).toContain('path: []');
 	expect(binaryAddModule).toContain(
-		'value: context.graph.read("state:total", []) + context.graph.read("state:profile", ["step"])',
+		'value: context.graph.read("state:total") + context.graph.read("state:profile", ["step"])',
 	);
 
 	const nestedAddModule = eventModuleSource('total = (total + profile.step) * profile.scale');
@@ -772,7 +1085,7 @@ test('compileTsrxModule emits generated event modules for supported graph write 
 	expect(nestedAddModule).toContain('graphNodeId: "state:total"');
 	expect(nestedAddModule).toContain('path: []');
 	expect(nestedAddModule).toContain(
-		'value: (context.graph.read("state:total", []) + context.graph.read("state:profile", ["step"])) * context.graph.read("state:profile", ["scale"])',
+		'value: (context.graph.read("state:total") + context.graph.read("state:profile", ["step"])) * context.graph.read("state:profile", ["scale"])',
 	);
 
 	const conditionalModule = eventModuleSource('total = menu.open ? profile.step : total');
@@ -781,7 +1094,7 @@ test('compileTsrxModule emits generated event modules for supported graph write 
 	expect(conditionalModule).toContain('graphNodeId: "state:total"');
 	expect(conditionalModule).toContain('path: []');
 	expect(conditionalModule).toContain(
-		'value: context.graph.read("state:menu", ["open"]) ? context.graph.read("state:profile", ["step"]) : context.graph.read("state:total", [])',
+		'value: context.graph.read("state:menu", ["open"]) ? context.graph.read("state:profile", ["step"]) : context.graph.read("state:total")',
 	);
 
 	const callValueModule = eventModuleSource('total = Math.max(total, profile.step)');
@@ -790,7 +1103,7 @@ test('compileTsrxModule emits generated event modules for supported graph write 
 	expect(callValueModule).toContain('graphNodeId: "state:total"');
 	expect(callValueModule).toContain('path: []');
 	expect(callValueModule).toContain(
-		'value: Math.max(context.graph.read("state:total", []), context.graph.read("state:profile", ["step"]))',
+		'value: Math.max(context.graph.read("state:total"), context.graph.read("state:profile", ["step"]))',
 	);
 
 	const importedCallValueModule = eventModuleSource('total = clamp(total, profile.step)');
@@ -800,7 +1113,7 @@ test('compileTsrxModule emits generated event modules for supported graph write 
 	expect(importedCallValueModule).toContain('graphNodeId: "state:total"');
 	expect(importedCallValueModule).toContain('path: []');
 	expect(importedCallValueModule).toContain(
-		'value: clamp(context.graph.read("state:total", []), context.graph.read("state:profile", ["step"]))',
+		'value: clamp(context.graph.read("state:total"), context.graph.read("state:profile", ["step"]))',
 	);
 
 	const arrayLiteralModule = eventModuleSource('items = [nextItem');
@@ -809,7 +1122,7 @@ test('compileTsrxModule emits generated event modules for supported graph write 
 	expect(arrayLiteralModule).toContain('graphNodeId: "state:items"');
 	expect(arrayLiteralModule).toContain('path: []');
 	expect(arrayLiteralModule).toContain(
-		'value: [context.graph.read("state:nextItem", []), "fallback"]',
+		'value: [context.graph.read("state:nextItem"), "fallback"]',
 	);
 
 	const arraySpreadModule = eventModuleSource('items = [...nextItems');
@@ -818,7 +1131,7 @@ test('compileTsrxModule emits generated event modules for supported graph write 
 	expect(arraySpreadModule).toContain('graphNodeId: "state:items"');
 	expect(arraySpreadModule).toContain('path: []');
 	expect(arraySpreadModule).toContain(
-		'value: [...context.graph.read("state:nextItems", []), context.graph.read("state:nextItem", [])]',
+		'value: [...context.graph.read("state:nextItems"), context.graph.read("state:nextItem")]',
 	);
 
 	const objectLiteralModule = eventModuleSource('settings = { title: menu.title');
@@ -836,7 +1149,7 @@ test('compileTsrxModule emits generated event modules for supported graph write 
 	expect(objectSpreadModule).toContain('graphNodeId: "state:settings"');
 	expect(objectSpreadModule).toContain('path: []');
 	expect(objectSpreadModule).toContain(
-		'value: { ...context.graph.read("state:settings", []), title: context.graph.read("state:menu", ["title"]) }',
+		'value: { ...context.graph.read("state:settings"), title: context.graph.read("state:menu", ["title"]) }',
 	);
 
 	const computedKeyModule = eventModuleSource('settings = { [menu.title]: profile.step');
@@ -882,7 +1195,7 @@ test('compileTsrxModule emits async computed runner modules without serializing 
 		kind: 'async-computed-runner',
 		symbolId: 'symbol:1',
 	});
-	expect(runnerModule?.source).toContain('const query = read("state:query", []);');
+	expect(runnerModule?.source).toContain('const query = read("state:query");');
 	expect(runnerModule?.source).toContain(
 		"const response = await fetch('/api/details/' + q, { signal });",
 	);

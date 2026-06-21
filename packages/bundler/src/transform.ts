@@ -11,6 +11,13 @@ import type {
 } from './types.ts';
 
 export const ARCADE_VIRTUAL_PREFIX = 'virtual:arcade:';
+const SMALL_SYMBOL_DIRECT_LOAD_LIMIT = 8;
+
+type SourceSymbolRow = {
+	readonly id: string;
+	readonly chunk: string;
+	readonly exportName: string;
+};
 
 export async function transformTsrxModule(
 	input: TransformTsrxModuleInput,
@@ -89,6 +96,7 @@ export async function transformTsrxModule(
 			resolverManifest,
 			moduleManifestId,
 			publicRenderModuleSource: compiled.publicRenderModule.moduleSource,
+			symbols: symbolRows,
 		}),
 		map: null,
 		virtualModules,
@@ -133,6 +141,7 @@ function emitSourceModule(input: {
 	readonly resolverManifest: unknown;
 	readonly moduleManifestId: string;
 	readonly publicRenderModuleSource: string;
+	readonly symbols: ReadonlyArray<SourceSymbolRow>;
 }) {
 	return [
 		`import payloadScripts, { state as payloadState, view as payloadView } from '${input.payloadId}';`,
@@ -140,10 +149,7 @@ function emitSourceModule(input: {
 		'',
 		`export const arcadeSource = ${JSON.stringify(input.filename)};`,
 		`const symbolManifest = ${JSON.stringify(input.resolverManifest)};`,
-		`const arcadeSymbolResolverModule = () => import('${input.resolverId}');`,
-		'function loadSymbol(symbolId) {',
-		'	return arcadeSymbolResolverModule().then((mod) => mod.loadSymbol(symbolId));',
-		'}',
+		emitLoadSymbol(input),
 		'export { loadSymbol, moduleManifest, payloadScripts, payloadState, payloadView, symbolManifest };',
 		'',
 		'export default {',
@@ -157,5 +163,45 @@ function emitSourceModule(input: {
 		'};',
 		input.publicRenderModuleSource,
 		'',
+	]
+		.filter((line): line is string => line !== null)
+		.join('\n');
+}
+
+function emitLoadSymbol(input: {
+	readonly resolverId: string;
+	readonly symbols: ReadonlyArray<SourceSymbolRow>;
+}) {
+	if (input.symbols.length > 0 && input.symbols.length <= SMALL_SYMBOL_DIRECT_LOAD_LIMIT) {
+		return emitDirectSourceSymbolLoader(input.symbols);
+	}
+
+	return [
+		`const arcadeSymbolResolverModule = () => import('${input.resolverId}');`,
+		'function loadSymbol(symbolId) {',
+		'	return arcadeSymbolResolverModule().then((mod) => mod.loadSymbol(symbolId));',
+		'}',
+	].join('\n');
+}
+
+function emitDirectSourceSymbolLoader(symbols: ReadonlyArray<SourceSymbolRow>): string {
+	return [
+		'function loadSymbol(symbolId) {',
+		...symbols.flatMap((symbol) => [
+			`	if (symbolId === ${JSON.stringify(symbol.id)}) return import('${symbol.chunk}')`,
+			`		.then((mod) => readArcadeSourceSymbol(mod, ${JSON.stringify(symbol.exportName)}));`,
+		]),
+		'	return Promise.reject(new Error(`Unknown async symbol ${symbolId}`));',
+		'}',
+		emitSourceSymbolExportReader(),
+	].join('\n');
+}
+
+function emitSourceSymbolExportReader(): string {
+	return [
+		'function readArcadeSourceSymbol(mod, exportName) {',
+		'	mod.init__virtual_arcade_symbol?.();',
+		'	return mod[exportName];',
+		'}',
 	].join('\n');
 }

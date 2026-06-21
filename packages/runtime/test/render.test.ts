@@ -197,7 +197,12 @@ test('render returns a compiler-provided CSR runtime without event resume startu
 			graph,
 			runtime,
 		}),
-		{ target },
+		{
+			target,
+			get loadSymbol() {
+				throw new Error('fast-path render must not read fallback loadSymbol');
+			},
+		},
 	);
 
 	expect(target.children).toEqual([root]);

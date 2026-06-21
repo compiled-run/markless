@@ -70,10 +70,9 @@ describe('TSRX Rolldown plugin structure', () => {
 			"import payloadScripts, { state as payloadState, view as payloadView } from 'virtual:arcade:payload:",
 		);
 		expect(result.code).not.toContain('import { loadSymbol, symbolManifest }');
-		expect(result.code).toContain(
-			"const arcadeSymbolResolverModule = () => import('virtual:arcade:resolver:",
-		);
+		expect(result.code).not.toContain('const arcadeSymbolResolverModule');
 		expect(result.code).toContain('function loadSymbol(symbolId)');
+		expect(result.code).toContain("import('virtual:arcade:symbol:");
 		expect(result.code).toContain('const symbolManifest = [1,');
 		expect(result.code).toContain(
 			"import moduleManifest from 'virtual:arcade:module-manifest:",
@@ -118,14 +117,52 @@ describe('TSRX Rolldown plugin structure', () => {
 		expect(result.code).toContain('<main><section></section><footer>Done</footer></main>');
 		expect(result.code).toContain('syncArcadePublicRepeat0');
 		expect(result.code).toContain('const graph = createArcadePublicGraph()');
-		expect(result.code).toContain('runtime: createArcadePublicRuntime(graph)');
+		expect(result.code).toContain('runtime: { async dispatch() {} }');
+		expect(result.code).not.toContain('function createArcadePublicRuntime');
 		expect(result.code).toContain('attachArcadePublicStaticEvents');
 		expect(result.code).not.toContain('state: payloadState');
 		expect(result.code).not.toContain('view: arcadePublicView');
 		expect(result.code).not.toContain('payloadView.locators.filter');
 		expect(result.code).not.toContain('arcadePublicHostNodeIndexes');
 		expect(result.code).toContain('locals: { "entry": record.item }');
+		expect(result.code).toContain('delegateArcadePublicRepeat0Events');
+		expect(result.code).toContain('parent.addEventListener("click"');
+		expect(result.code).toContain('element0.__arcadePublicRepeat0Event0 = record;');
+		expect(result.code).not.toContain('element0.addEventListener("click"');
+		expect(result.code).not.toContain('findArcadePublicRepeatEventRecord');
 		expect(result.code).toContain('"state:entries"');
+	});
+
+	test('transformTsrxModule direct-loads small event symbol sets without a resolver hop', async () => {
+		const result = await transformTsrxModule({
+			filename: '/workspace/app/src/EightButtons.tsrx',
+			source: manyButtonSource(8),
+		});
+
+		expect(result.code).not.toContain(
+			"const arcadeSymbolResolverModule = () => import('virtual:arcade:resolver:",
+		);
+		expect(result.code).toContain('function loadSymbol(symbolId)');
+		expect(result.code).toContain('if (symbolId === "symbol:0")');
+		expect(result.code).toContain('if (symbolId === "symbol:7")');
+		expect(result.code).toContain("import('virtual:arcade:symbol:");
+		expect(result.code).toContain('readArcadeSourceSymbol(mod, "symbol_0")');
+		expect(result.code).toContain('mod.init__virtual_arcade_symbol?.();');
+		expect(result.code).not.toContain('name.startsWith("init__virtual_arcade_symbol")');
+	});
+
+	test('transformTsrxModule keeps compact resolver loading for larger symbol tables', async () => {
+		const result = await transformTsrxModule({
+			filename: '/workspace/app/src/ManySymbols.tsrx',
+			source: manyButtonSource(9),
+		});
+
+		expect(result.code).toContain(
+			"const arcadeSymbolResolverModule = () => import('virtual:arcade:resolver:",
+		);
+		expect(result.code).toContain(
+			'return arcadeSymbolResolverModule().then((mod) => mod.loadSymbol(symbolId));',
+		);
 	});
 
 	test('base plugin transforms TSRX and serves generated virtual modules', async () => {
@@ -151,12 +188,10 @@ describe('TSRX Rolldown plugin structure', () => {
 		expect(payloadSource).toContain('export const payloadScripts =');
 		expect(payloadSource).toContain('export default payloadScripts;');
 		const resolverSource = (await callLoad(plugin, `\0${resolverId}`)) as string;
-		const resolverModule = (await import(
-			`data:text/javascript,${encodeURIComponent(resolverSource)}`
-		)) as {
-			symbolManifest: [number, string | null, string | null, string[]];
-		};
-		const symbolIds = resolverModule.symbolManifest[3];
+		expect(resolverSource).toContain('if (id === "symbol:0")');
+		const symbolIds = ['symbol:0', 'symbol:1'].map(
+			(symbolId) => `virtual:arcade:symbol:${encoded}:${encodeURIComponent(symbolId)}`,
+		);
 		const symbolSources = await Promise.all(
 			symbolIds.map((symbolId) => callLoad(plugin, `\0${symbolId}`) as Promise<string>),
 		);
@@ -238,12 +273,9 @@ describe('TSRX Rolldown plugin structure', () => {
 		];
 		const resolverId = `virtual:arcade:resolver:${encoded}`;
 		const resolverSource = (await callLoad(plugin, `\0${resolverId}`)) as string;
-		const resolverModule = (await import(
-			`data:text/javascript,${encodeURIComponent(resolverSource)}`
-		)) as {
-			symbolManifest: [number, string | null, string | null, string[]];
-		};
-		const symbolVirtualIds = resolverModule.symbolManifest[3];
+		const symbolVirtualIds = ['symbol:0', 'symbol:1'].map(
+			(symbolId) => `virtual:arcade:symbol:${encoded}:${encodeURIComponent(symbolId)}`,
+		);
 		const virtualIds = [...entryVirtualIds, ...symbolVirtualIds].map((id) => `\0${id}`);
 		const bundle = Object.fromEntries(
 			virtualIds.map((id, index) => [
@@ -286,10 +318,9 @@ describe('TSRX Rolldown plugin structure', () => {
 				Array.isArray(item.moduleIds) &&
 				item.moduleIds.includes(`\0${resolverId}`),
 		);
-		expect(resolverChunk?.code).toContain('import(/* @vite-ignore */ moduleUrls[row[0]])');
-		expect(resolverChunk?.code).not.toContain('switch (id)');
+		expect(resolverChunk?.code).toContain('if (id === "symbol:0")');
+		expect(resolverChunk?.code).toContain('import(/* @vite-ignore */ "./chunk-');
 		expect(resolverChunk?.code).not.toContain('virtual:arcade:symbol:');
-		expect(resolverChunk?.code).toMatch(/\["\.\/chunk-\d+\.js"/);
 	});
 
 	test('generateBundle emits arcade-manifest.json only when explicitly requested', () => {
@@ -310,4 +341,23 @@ describe('TSRX Rolldown plugin structure', () => {
 
 function emittedAsset(emitFile: ReturnType<typeof vi.fn>, fileName: string) {
 	return emitFile.mock.calls.map((call) => call[0]).find((item) => item.fileName === fileName);
+}
+
+function manyButtonSource(count: number): string {
+	const buttons = Array.from(
+		{ length: count },
+		(_, index) =>
+			`		<button onClick={() => value = ${index + 1}}>Set ${index + 1}</button>`,
+	).join('\n');
+	return `
+import { state } from '@arcade/core';
+
+export function App() @{
+	let value = state(0);
+
+	<section>
+${buttons}
+	</section>
+}
+`;
 }

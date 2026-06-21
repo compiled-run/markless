@@ -19,6 +19,7 @@ test('planPublicRender emits compiler-proven direct DOM artifacts for a simple k
 	expect(plan.rootTemplateHtml).toBe('<main><section></section></main>');
 	expect(plan.staticHostNodeIds).toEqual([expect.any(String), repeat?.parentHostNodeId]);
 	expect(plan.staticHostNodeIds).not.toContain(repeat?.rowHostNodeId);
+	expect(plan.staticEventControls).toEqual([]);
 	expect(plan.repeatGates).toEqual([
 		{
 			repeatId: 'repeat:0',
@@ -72,6 +73,44 @@ test('planPublicRender emits compiler-proven direct DOM artifacts for a simple k
 		},
 	]);
 	expect(plan.diagnostics).toEqual([]);
+});
+
+test('planPublicRender records static event host paths for direct public emit', async () => {
+	const { plan, symbolResolver } = await createRenderPlan(
+		'src/Toolbar.tsrx',
+		appSource(`
+let actions = state({ runs: 0, clears: 0 });
+<nav>
+	<button onClick={() => actions.runs++}>Run</button>
+	<span><button onClick={() => actions.clears++}>Clear</button></span>
+</nav>`),
+	);
+	const runSymbol = symbolResolver.symbols.find((symbol) =>
+		symbol.source.includes('actions.runs++'),
+	);
+	const clearSymbol = symbolResolver.symbols.find((symbol) =>
+		symbol.source.includes('actions.clears++'),
+	);
+
+	expect(runSymbol).toBeDefined();
+	expect(clearSymbol).toBeDefined();
+	expect(plan.rootTemplateHtml).toBe(
+		'<nav><button>Run</button><span><button>Clear</button></span></nav>',
+	);
+	expect(plan.staticEventControls).toEqual([
+		{
+			eventName: 'click',
+			hostNodeId: runSymbol!.hostNodeId,
+			hostPath: [0],
+			symbolIds: [runSymbol!.id],
+		},
+		{
+			eventName: 'click',
+			hostNodeId: clearSymbol!.hostNodeId,
+			hostPath: [1, 0],
+			symbolIds: [clearSymbol!.id],
+		},
+	]);
 });
 
 test.each([

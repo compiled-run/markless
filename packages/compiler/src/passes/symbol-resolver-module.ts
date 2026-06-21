@@ -1,6 +1,8 @@
 import { ASYNC_PROTOCOL_VERSION } from '@arcade/protocol';
 import type { SymbolResolverModuleInput, SymbolResolverModuleManifest } from '../artifacts.ts';
 
+const SMALL_SYMBOL_SWITCH_LIMIT = 3;
+
 export function createSymbolResolverModuleManifest(
 	input: SymbolResolverModuleInput,
 ): SymbolResolverModuleManifest {
@@ -28,6 +30,9 @@ export function createSymbolResolverModuleManifest(
 
 export function emitSymbolResolverModule(input: SymbolResolverModuleInput): string {
 	const manifest = createSymbolResolverModuleManifest(input);
+	if (input.symbols.length > 0 && input.symbols.length <= SMALL_SYMBOL_SWITCH_LIMIT) {
+		return emitSmallSymbolResolverModule(input);
+	}
 
 	return [
 		'export const symbolManifest = ',
@@ -66,6 +71,27 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'}',
 		'',
 	].join('\n');
+}
+
+function emitSmallSymbolResolverModule(input: SymbolResolverModuleInput): string {
+	const symbolBranches = input.symbols.flatMap((symbol) => [
+		`	if (id === ${JSON.stringify(symbol.id)}) return import(/* @vite-ignore */ ${JSON.stringify(symbol.chunk)})`,
+		`		.then((mod) => { mod.init__virtual_arcade_symbol?.(); return mod${moduleExportAccess(symbol.exportName)}; });`,
+	]);
+
+	return [
+		'export async function loadSymbol(id) {',
+		...symbolBranches,
+		'	throw new Error(`Unknown async symbol ${id}`);',
+		'}',
+		'',
+	].join('\n');
+}
+
+function moduleExportAccess(exportName: string): string {
+	return /^[$A-Z_a-z][$\w]*$/.test(exportName)
+		? `.${exportName}`
+		: `[${JSON.stringify(exportName)}]`;
 }
 
 function tableIndex(indexes: Map<string, number>, values: string[], value: string): number {

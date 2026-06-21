@@ -105,7 +105,7 @@ type EventOnlyResumeContainerState = EventOnlyResumeContainer & {
 	readonly elementsByHostId: ReadonlyMap<string, EventOnlyResumeDomElement>;
 };
 
-const containers = new WeakMap<EventOnlyResumeDomElement, Promise<EventOnlyResumeContainerState>>();
+const containers = new WeakMap<EventOnlyResumeDomElement, EventOnlyResumeContainerState>();
 const noElementHandle = () => undefined;
 
 export async function resumeEventOnlyFromPayloadDocument(
@@ -124,23 +124,22 @@ export async function resumeEventOnlyFromPayloadDocument(
 		containers.set(input.root, container);
 	}
 
-	const resumed = await container;
-	await resumed.dispatch(input.event, {
+	await container.dispatch(input.event, {
 		element: input.element,
 		eventRecord: input.eventRecord,
 	});
-	return resumed;
+	return container;
 }
 
-export async function createEventOnlyResumeContainerFromPayloads(
+export function createEventOnlyResumeContainerFromPayloads(
 	input: CreateEventOnlyResumeContainerInput,
-): Promise<EventOnlyResumeContainer> {
+): EventOnlyResumeContainer {
 	return createEventOnlyResumeContainerState(input);
 }
 
-async function createEventOnlyResumeContainerState(
+function createEventOnlyResumeContainerState(
 	input: CreateEventOnlyResumeContainerInput,
-): Promise<EventOnlyResumeContainerState> {
+): EventOnlyResumeContainerState {
 	const elementsByHostId = materializeDomLocators(input.root, input.view.locators);
 	const graph = createEventOnlyResumeGraph({
 		state: input.state,

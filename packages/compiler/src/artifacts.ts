@@ -570,6 +570,20 @@ export type PublicRenderPlanTextWrite = {
 	readonly nodePath: ReadonlyArray<number>;
 };
 
+export type PublicRenderPlanStaticTextWrite = {
+	readonly source: string;
+	readonly graphNodeId: string;
+	readonly path: ReadonlyArray<string>;
+	readonly nodePath: ReadonlyArray<number>;
+};
+
+export type PublicRenderPlanStaticEventControl = {
+	readonly eventName: string;
+	readonly hostNodeId: string;
+	readonly hostPath: ReadonlyArray<number>;
+	readonly symbolIds: ReadonlyArray<string>;
+};
+
 export type PublicRenderPlanClassWrite = {
 	readonly source: string;
 	readonly hostPath: ReadonlyArray<number>;
@@ -617,6 +631,7 @@ export type PublicRenderPlanKeyedRepeat = {
 	readonly repeatId: string;
 	readonly parentHostNodeId: string;
 	readonly parentLocator: PayloadArenaArtifact['view']['locators'][number];
+	readonly parentPath: ReadonlyArray<number>;
 	readonly rowHostNodeId?: string;
 	readonly itemName: string;
 	readonly collectionGraphNodeId: string;
@@ -632,6 +647,8 @@ export type PublicRenderPlanArtifact = {
 	readonly passId: 'public-render-plan';
 	readonly rootTemplateHtml: string | null;
 	readonly staticHostNodeIds: ReadonlyArray<string>;
+	readonly staticEventControls: ReadonlyArray<PublicRenderPlanStaticEventControl>;
+	readonly staticTextWrites: ReadonlyArray<PublicRenderPlanStaticTextWrite>;
 	readonly repeatGates: ReadonlyArray<PublicRenderPlanRepeatGate>;
 	readonly keyedRepeats: ReadonlyArray<PublicRenderPlanKeyedRepeat>;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;

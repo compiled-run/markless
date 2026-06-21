@@ -1,12 +1,7 @@
 import type { ProtocolStatePayload, ProtocolViewPayload } from '@arcade/protocol';
 import type { EventOnlyResumeContainer } from './event-only-resume.ts';
 import type { RuntimeGraph } from './graph.ts';
-import type {
-	ResumeDomElement,
-	ResumeRuntime,
-	ResumeRuntimeInput,
-	ResumeSymbol,
-} from './resume.ts';
+import type { ResumeDomElement, ResumeRuntime, ResumeRuntimeInput } from './resume.ts';
 
 export type RenderTarget = {
 	readonly replaceChildren?: (...children: ReadonlyArray<ResumeDomElement>) => void;
@@ -30,7 +25,14 @@ export type CsrRenderOptions = {
 	readonly applyDomJournal?: ResumeRuntimeInput['applyDomJournal'];
 };
 
-export type CsrRenderRuntime = ResumeRuntime | EventOnlyResumeContainer;
+type CompilerProvidedCsrRuntime = {
+	readonly dispatch: (event?: unknown, options?: unknown) => Promise<void>;
+};
+
+export type CsrRenderRuntime =
+	| ResumeRuntime
+	| EventOnlyResumeContainer
+	| CompilerProvidedCsrRuntime;
 
 export type CsrRenderContainer = {
 	readonly phase: 'csr';
@@ -41,16 +43,11 @@ export type CsrRenderContainer = {
 	readonly resumerScript?: undefined;
 };
 
-const EMPTY_PROTOCOL_VERSION = 1 satisfies ProtocolStatePayload['version'];
-
 export async function render(
 	component: () => CsrRenderOutput,
 	options: CsrRenderOptions,
 ): Promise<CsrRenderContainer> {
 	const output = component();
-	const view = output.view ?? emptyViewPayload();
-	const state = output.state ?? emptyStatePayload();
-	const loadSymbol = output.loadSymbol ?? options.loadSymbol ?? missingLoadSymbol;
 
 	mountRoot(options.target, output.root);
 
@@ -63,14 +60,12 @@ export async function render(
 		};
 	}
 
-	const { renderCsrRuntime } = await import('./render-csr.ts');
-	return renderCsrRuntime({
-		output,
-		state,
-		view,
-		loadSymbol,
-		options,
-	});
+	return import('./render-csr.ts').then((runtime) =>
+		runtime.renderCsrRuntime({
+			output,
+			options,
+		}),
+	);
 }
 
 function mountRoot(target: RenderTarget, root: ResumeDomElement): void {
@@ -85,28 +80,4 @@ function mountRoot(target: RenderTarget, root: ResumeDomElement): void {
 	throw new TypeError(
 		'render(App, { target }) requires a target that can receive the root node.',
 	);
-}
-
-function emptyStatePayload(): ProtocolStatePayload {
-	return {
-		version: EMPTY_PROTOCOL_VERSION,
-		cells: [],
-		computed: [],
-	};
-}
-
-function emptyViewPayload(): ProtocolViewPayload {
-	return {
-		version: EMPTY_PROTOCOL_VERSION,
-		locators: [],
-		events: [],
-		domUpdates: [],
-		behaviors: [],
-		elementHandles: [],
-		asyncBoundaries: [],
-	};
-}
-
-function missingLoadSymbol(symbolId: string): ResumeSymbol {
-	throw new Error(`Cannot load async symbol ${symbolId} without a generated symbol resolver.`);
 }

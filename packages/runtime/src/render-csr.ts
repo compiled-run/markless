@@ -2,16 +2,16 @@ import type { ProtocolStatePayload, ProtocolViewPayload } from '@arcade/protocol
 import type { EventOnlyResumeDomElement, EventOnlyResumeDomEvent } from './event-only-resume.ts';
 import type { RuntimeGraph } from './graph.ts';
 import type { CsrRenderContainer, CsrRenderOptions, CsrRenderOutput } from './render.ts';
-import type { ResumeRuntimeInput } from './resume.ts';
+import type { ResumeSymbol } from './resume.ts';
 
 export async function renderCsrRuntime(input: {
 	readonly output: CsrRenderOutput;
-	readonly state: ProtocolStatePayload;
-	readonly view: ProtocolViewPayload;
-	readonly loadSymbol: ResumeRuntimeInput['loadSymbol'];
 	readonly options: CsrRenderOptions;
 }): Promise<CsrRenderContainer> {
-	const { output, state, view, loadSymbol, options } = input;
+	const { output, options } = input;
+	const state = output.state ?? emptyStatePayload();
+	const view = output.view ?? emptyViewPayload();
+	const loadSymbol = output.loadSymbol ?? options.loadSymbol ?? missingLoadSymbol;
 
 	if (canUseEventOnlyCsrRuntime(output, state, view)) {
 		const { createEventOnlyResumeContainerFromPayloads } =
@@ -61,6 +61,32 @@ export async function renderCsrRuntime(input: {
 		graph,
 		runtime,
 	};
+}
+
+const EMPTY_PROTOCOL_VERSION = 1 satisfies ProtocolStatePayload['version'];
+
+function emptyStatePayload(): ProtocolStatePayload {
+	return {
+		version: EMPTY_PROTOCOL_VERSION,
+		cells: [],
+		computed: [],
+	};
+}
+
+function emptyViewPayload(): ProtocolViewPayload {
+	return {
+		version: EMPTY_PROTOCOL_VERSION,
+		locators: [],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+}
+
+function missingLoadSymbol(symbolId: string): ResumeSymbol {
+	throw new Error(`Cannot load async symbol ${symbolId} without a generated symbol resolver.`);
 }
 
 function canUseEventOnlyCsrRuntime(
