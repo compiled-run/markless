@@ -95,13 +95,17 @@ function bundleGraphRecords(manifest: ArcadeManifest, bundleGraphAdders?: Set<Bu
 		for (const symbol of module.symbols) {
 			if (!symbol.fileName) continue;
 			const bundle = manifest.bundles[symbol.fileName];
+			const imports = [
+				...(bundle?.imports ?? []),
+				...(module.resolver.fileName ? [module.resolver.fileName] : []),
+			];
 			const symbolBundle: BundleGraphRecord = {
 				size: 0,
 				total: 0,
 				dynamicImports: [symbol.fileName],
 			};
-			if (bundle?.imports) {
-				symbolBundle.imports = [...bundle.imports];
+			if (imports.length > 0) {
+				symbolBundle.imports = imports;
 			}
 			graph[symbol.symbolId] = symbolBundle;
 		}
@@ -120,13 +124,7 @@ function bundleGraphRecords(manifest: ArcadeManifest, bundleGraphAdders?: Set<Bu
 		graph[bundleName] = {
 			...bundle,
 			imports: bundle.imports?.filter((dep) => graph[dep]) ?? [],
-			dynamicImports:
-				bundle.dynamicImports?.filter(
-					(dep) =>
-						(isGraphOnlyNode(bundleName, manifest) && !!graph[dep]) ||
-						isSymbolGraphNode(bundle) ||
-						hasSymbols(dep, graph),
-				) ?? [],
+			dynamicImports: bundle.dynamicImports?.filter((dep) => graph[dep]) ?? [],
 		};
 	}
 	const used = new Set<string>();
@@ -140,18 +138,6 @@ function bundleGraphRecords(manifest: ArcadeManifest, bundleGraphAdders?: Set<Bu
 		}
 	}
 	return graph;
-}
-
-function isSymbolGraphNode(bundle: BundleGraphRecord) {
-	return bundle.size === 0 && bundle.total === 0 && bundle.dynamicImports?.length === 1;
-}
-
-function isGraphOnlyNode(bundleName: string, manifest: ArcadeManifest) {
-	return !manifest.bundles[bundleName];
-}
-
-function hasSymbols(dep: string, graph: Record<string, BundleGraphRecord>) {
-	return !!graph[dep]?.symbols;
 }
 
 function dynamicImportMarker(

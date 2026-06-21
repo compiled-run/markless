@@ -1,5 +1,7 @@
 import { box } from '@async/witness';
+import { planModulePreloads } from '../src/build/preload-plan.ts';
 import { runtimeSizeReport, type RuntimeSizeReport } from '../test-support/runtime-size.ts';
+import type { ArcadeBundleGraph } from '../src/types.ts';
 
 // Product truth: the Vite CSR fixture's production output is not only emitted
 // correctly; it can be served by Vite preview and load the generated client
@@ -8,20 +10,22 @@ import { runtimeSizeReport, type RuntimeSizeReport } from '../test-support/runti
 const FIXTURE = 'fixtures/vite-csr';
 const DIST = `${FIXTURE}/dist`;
 const INDEX = `${FIXTURE}/dist/index.html`;
+const BUNDLE_GRAPH_REQUEST = '/build/bundle-graph.json';
 const COUNTER = '[data-counter]';
 const REQUESTS = '/__arcade-fixture-requests';
 const WAIT = { timeoutMs: 10_000 };
-const MAX_STARTUP_RUNTIME_CHUNK_GZIP_BYTES = 3_000;
-const MAX_STARTUP_SCRIPTS_GZIP_BYTES = 3_050;
-const MAX_STARTUP_SCRIPT_COUNT = 2;
+const MIN_CSR_PRELOAD_COUNT = 2;
+const MAX_PRELOADED_RUNTIME_CHUNK_GZIP_BYTES = 3_000;
+const MAX_PRELOADED_SCRIPTS_GZIP_BYTES = 4_500;
+const MAX_PRELOADED_SCRIPT_COUNT = 8;
 const MAX_INTERACTION_RUNTIME_CHUNK_GZIP_BYTES = 0;
-const MAX_INTERACTION_SCRIPTS_GZIP_BYTES = 550;
-const MAX_INTERACTION_SCRIPT_COUNT = 1;
+const MAX_INTERACTION_SCRIPTS_GZIP_BYTES = 0;
+const MAX_INTERACTION_SCRIPT_COUNT = 0;
 
 export default box(
 	{
 		name: 'csr preview: built app loads through vite preview',
-		tags: ['csr', 'preview'],
+		tags: ['csr', 'preview', 'preload'],
 		modes: ['build', 'preview'],
 	},
 	async ({ pipeline, expect, receipt }) => {
@@ -43,29 +47,41 @@ export default box(
 			}),
 		});
 		const page = await preview.browser.visit('/');
+		const expectedPreloadHrefs = expectedCsrPreloadHrefs(
+			JSON.parse(await preview.request(BUNDLE_GRAPH_REQUEST)) as ArcadeBundleGraph,
+		);
+		receipt.note(`CSR expected lazy symbol modulepreloads: ${expectedPreloadHrefs.join(', ')}`);
 
 		await expect.page.exists(page, '#app', WAIT);
 		await expect.page.text(page, '#hmr-status', 'ready', WAIT);
 		await expect.page.text(page, COUNTER, '0', WAIT);
+		await expect.page.attribute(page, 'body', 'data-csr-lazy-module', 'cold', WAIT);
+		const startupModules = await waitForExpectedPreloadRequests(page, expectedPreloadHrefs);
+		receipt.note(`CSR startup preloaded JS: ${formatNetworkRequests(startupModules)}`);
 		const beforeInteraction = await readScriptRequests(preview);
 		receipt.note(`CSR startup script requests: ${formatRequests(beforeInteraction)}`);
-		const startupRuntimeSize = await runtimeSizeReport({
+		const preloadedScripts = assertStartupPreloadsFetched(
+			beforeInteraction,
+			expectedPreloadHrefs,
+		);
+		const preloadedRuntimeSize = await runtimeSizeReport({
 			dist: DIST,
-			scripts: beforeInteraction.scripts,
+			scripts: preloadedScripts,
 		});
-		receipt.note(`CSR startup runtime size:\n${startupRuntimeSize.summary}`);
-		assertRuntimeSizeBudget(startupRuntimeSize, {
-			label: 'CSR startup',
-			maxRuntimeChunkGzipBytes: MAX_STARTUP_RUNTIME_CHUNK_GZIP_BYTES,
-			maxScriptsGzipBytes: MAX_STARTUP_SCRIPTS_GZIP_BYTES,
-			maxScriptCount: MAX_STARTUP_SCRIPT_COUNT,
+		receipt.note(`CSR preloaded runtime size:\n${preloadedRuntimeSize.summary}`);
+		assertRuntimeSizeBudget(preloadedRuntimeSize, {
+			label: 'CSR preloaded',
+			maxRuntimeChunkGzipBytes: MAX_PRELOADED_RUNTIME_CHUNK_GZIP_BYTES,
+			maxScriptsGzipBytes: MAX_PRELOADED_SCRIPTS_GZIP_BYTES,
+			maxScriptCount: MAX_PRELOADED_SCRIPT_COUNT,
 		});
 
 		await page.click(COUNTER, WAIT);
 		await expect.page.text(page, COUNTER, '1', WAIT);
+		await expect.page.attribute(page, 'body', 'data-csr-lazy-module', 'evaluated', WAIT);
 		const afterInteraction = await readScriptRequests(preview);
 		receipt.note(`CSR interaction script requests: ${formatRequests(afterInteraction)}`);
-		const interactionScripts = assertScriptsLoadedAfterInteraction(
+		const interactionScripts = assertNoScriptsLoadedAfterInteraction(
 			beforeInteraction,
 			afterInteraction,
 		);
@@ -95,6 +111,20 @@ type Requestable = {
 	request(path: string): Promise<string>;
 };
 
+type BrowserNetworkRequest = {
+	readonly url: string;
+	readonly method: string;
+	readonly startTimeMs: number;
+	readonly endTimeMs: number | null;
+	readonly durationMs: number | null;
+	readonly status: number | null;
+	readonly failedReason: string | null;
+};
+
+type NetworkRequestPage = {
+	networkRequests(): Promise<BrowserNetworkRequest[]>;
+};
+
 type RuntimeSizeBudget = {
 	readonly label: string;
 	readonly maxRuntimeChunkGzipBytes: number;
@@ -110,20 +140,100 @@ function formatRequests(log: ScriptRequestLog): string {
 	return log.scripts.length === 0 ? '(none)' : log.scripts.join(', ');
 }
 
-function assertScriptsLoadedAfterInteraction(
+function expectedCsrPreloadHrefs(bundleGraph: ArcadeBundleGraph): readonly string[] {
+	const roots = bundleGraph
+		.filter((item): item is string => typeof item === 'string' && item.startsWith('symbol:'))
+		.map((name) => ({ name, priority: 'high' as const }));
+	const hrefs = planModulePreloads({
+		base: '/build/',
+		bundleGraph,
+		roots,
+	}).map((preload) => preload.href);
+
+	if (hrefs.length < MIN_CSR_PRELOAD_COUNT) {
+		throw new Error(
+			`Expected CSR fixture to expose at least ${MIN_CSR_PRELOAD_COUNT} lazy symbol modulepreloads, saw ${hrefs.length}: ${hrefs.join(', ')}`,
+		);
+	}
+	return hrefs;
+}
+
+async function waitForExpectedPreloadRequests(
+	page: NetworkRequestPage,
+	expectedHrefs: readonly string[],
+	timeoutMs = 10_000,
+): Promise<readonly BrowserNetworkRequest[]> {
+	const expectedPaths = expectedHrefs.map(
+		(href) => new URL(href, 'http://fixture.local').pathname,
+	);
+	const start = Date.now();
+	let latest: readonly BrowserNetworkRequest[] = [];
+	while (Date.now() - start < timeoutMs) {
+		latest = jsBuildRequests(await page.networkRequests());
+		const requestPaths = new Set(latest.map((request) => new URL(request.url).pathname));
+		if (expectedPaths.every((path) => requestPaths.has(path))) return latest;
+		await sleep(50);
+	}
+	return latest;
+}
+
+function sleep(ms: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function jsBuildRequests(
+	requests: readonly BrowserNetworkRequest[],
+): readonly BrowserNetworkRequest[] {
+	return requests.filter(
+		(request) =>
+			request.method === 'GET' &&
+			new URL(request.url).pathname.startsWith('/build/') &&
+			new URL(request.url).pathname.endsWith('.js'),
+	);
+}
+
+function assertStartupPreloadsFetched(
+	log: ScriptRequestLog,
+	expectedHrefs: readonly string[],
+): readonly string[] {
+	const expectedPaths = expectedHrefs.map(
+		(href) => new URL(href, 'http://fixture.local').pathname,
+	);
+	const expectedPathSet = new Set(expectedPaths);
+	const requestPaths = new Set(log.scripts);
+	for (const path of expectedPaths) {
+		if (!requestPaths.has(path)) {
+			throw new Error(
+				`Expected CSR startup to request lazy symbol modulepreload ${path}, but saw: ${formatRequests(log)}`,
+			);
+		}
+	}
+	return [...new Set(log.scripts.filter((script) => expectedPathSet.has(script)))];
+}
+
+function assertNoScriptsLoadedAfterInteraction(
 	beforeInteraction: ScriptRequestLog,
 	afterInteraction: ScriptRequestLog,
 ): readonly string[] {
 	const loadedAfterInteraction = afterInteraction.scripts.slice(beforeInteraction.scripts.length);
-	if (loadedAfterInteraction.length === 0) {
-		throw new Error('Expected CSR counter click to request the lazy symbol chunk.');
-	}
-	if (!loadedAfterInteraction.some((path) => path.includes('/build/chunk-'))) {
+	if (loadedAfterInteraction.length > 0) {
 		throw new Error(
-			`Expected CSR counter click to request built chunks, but saw: ${loadedAfterInteraction.join(', ')}`,
+			`Expected preloaded CSR interaction to avoid new JS fetches after click, but saw: ${loadedAfterInteraction.join(', ')}`,
 		);
 	}
 	return loadedAfterInteraction;
+}
+
+function formatNetworkRequests(requests: readonly BrowserNetworkRequest[]): string {
+	if (requests.length === 0) return '(none)';
+	return requests
+		.map((request) => {
+			const path = new URL(request.url).pathname;
+			const duration =
+				request.durationMs === null ? '?' : `${Math.round(request.durationMs)}ms`;
+			return `${path} ${request.status ?? '?'} ${duration}`;
+		})
+		.join(', ');
 }
 
 function assertRuntimeSizeBudget(report: RuntimeSizeReport, budget: RuntimeSizeBudget): void {

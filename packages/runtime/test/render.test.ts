@@ -332,6 +332,39 @@ test('renderToString emits one inline resumer for SSR containers with browser tr
 	expect(html).toContain('globalThis.__started');
 });
 
+test('renderToString emits ordered modulepreload links before interactive payload startup', () => {
+	const html = renderToString(
+		() => ({
+			html: '<button type="button">Count 0</button>',
+			state: createProtocolStatePayload({ cells: [] }),
+			view: viewWithClick(),
+		}),
+		{
+			nonce: 'nonce-1',
+			modulePreloads: [
+				{ href: '/build/shared.js', fetchPriority: 'high' },
+				'/build/symbol.js',
+				'/build/shared.js',
+				{ href: '/build/low.js', fetchPriority: 'low' },
+			],
+			resumerSource: 'globalThis.__started = true;',
+		},
+	);
+
+	expect(html.match(/rel="modulepreload"/g)).toHaveLength(3);
+	expect(html).toContain(
+		'<link rel="modulepreload" href="/build/shared.js" crossorigin="anonymous" fetchpriority="high" nonce="nonce-1">',
+	);
+	expect(html).toContain(
+		'<link rel="modulepreload" href="/build/symbol.js" crossorigin="anonymous" nonce="nonce-1">',
+	);
+	expect(html).toContain(
+		'<link rel="modulepreload" href="/build/low.js" crossorigin="anonymous" fetchpriority="low" nonce="nonce-1">',
+	);
+	expect(html.indexOf('rel="modulepreload"')).toBeLessThan(html.indexOf('<button'));
+	expect(html.indexOf('rel="modulepreload"')).toBeLessThan(html.indexOf('data-async-resumer'));
+});
+
 test('renderToString inline event resumer imports the resume module only after interaction', async () => {
 	const resumeModuleUrl = createResumeModuleUrl();
 	const html = renderToString(

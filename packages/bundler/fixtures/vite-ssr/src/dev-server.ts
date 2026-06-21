@@ -2,6 +2,12 @@ import { readdir, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
+	planModulePreloads,
+	type ModulePreloadPlanEntry,
+	type ModulePreloadRoot,
+} from '../../../src/build/preload-plan.ts';
+import type { ArcadeBundleGraph } from '../../../src/types.ts';
+import {
 	createFetchableDevEnvironment,
 	createServerHotChannel,
 	createServerModuleRunner,
@@ -14,7 +20,11 @@ type CreateEnvironment = NonNullable<NonNullable<EnvironmentOptions['dev']>['cre
 type SsrRunner = ReturnType<typeof createServerModuleRunner>;
 
 type SsrEntry = {
-	render: (clientEntry?: string) => string | Promise<string>;
+	preloadRoots?: readonly ModulePreloadRoot[];
+	render: (
+		clientEntry?: string,
+		modulePreloads?: ReadonlyArray<ModulePreloadPlanEntry>,
+	) => string | Promise<string>;
 };
 
 type DevRequest = {
@@ -135,7 +145,7 @@ function createScriptRequestLog() {
 
 async function renderDevRequest(runner: SsrRunner, request: Request) {
 	const url = new URL(request.url);
-	if (url.pathname !== '/' && url.pathname !== '/index.html') {
+	if (!isHtmlRoute(url.pathname)) {
 		return new Response('Not found', { status: 404 });
 	}
 
@@ -151,8 +161,16 @@ async function renderPreviewRequest(root: string, outDir: string) {
 	const entry = (await import(
 		`${pathToFileURL(resolve(dist, 'server/entry-server.js')).href}?preview=${Date.now()}`
 	)) as SsrEntry;
+	const modulePreloads = planModulePreloads({
+		base: '/build/',
+		bundleGraph: await readBundleGraph(dist),
+		roots: [
+			...(entry.preloadRoots ?? []),
+			{ name: bundleGraphRootFromUrl(resumeModuleUrl), priority: 'high' },
+		],
+	});
 
-	return new Response(await entry.render(resumeModuleUrl), {
+	return new Response(await entry.render(resumeModuleUrl, modulePreloads), {
 		headers: { 'Content-Type': 'text/html;charset=utf-8' },
 	});
 }
@@ -168,6 +186,20 @@ async function readClientResumeModuleUrl(dist: string) {
 		}
 	}
 	throw new Error('Expected built client resume module exporting resumeContainerEvent.');
+}
+
+async function readBundleGraph(dist: string): Promise<ArcadeBundleGraph | undefined> {
+	return JSON.parse(
+		await readFile(resolve(dist, 'build/bundle-graph.json'), 'utf8'),
+	) as ArcadeBundleGraph;
+}
+
+function bundleGraphRootFromUrl(url: string): string {
+	const pathname = new URL(url, 'http://fixture.local').pathname;
+	if (pathname.startsWith('/build/')) {
+		return pathname.slice('/build/'.length);
+	}
+	return pathname.replace(/^\//, '');
 }
 
 function isScriptRequest(request: DevRequest, pathname: string): boolean {
@@ -187,12 +219,16 @@ function shouldRenderHtml(request: DevRequest) {
 	}
 
 	const pathname = new URL(request.url, requestOrigin(request)).pathname;
-	if (pathname !== '/' && pathname !== '/index.html') {
+	if (!isHtmlRoute(pathname)) {
 		return false;
 	}
 
 	const accept = request.headers.accept;
 	return typeof accept !== 'string' || accept.includes('text/html') || accept.includes('*/*');
+}
+
+function isHtmlRoute(pathname: string) {
+	return pathname === '/' || pathname === '/index.html';
 }
 
 function toFetchRequest(request: DevRequest) {

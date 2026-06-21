@@ -18,7 +18,16 @@ export type RenderToStringOptions = {
 	readonly resumeModuleUrl?: string;
 	readonly resumerSource?: string;
 	readonly containerId?: string;
+	readonly modulePreloads?: ReadonlyArray<ModulePreloadInput>;
 };
+
+export type ModulePreloadInput =
+	| string
+	| {
+			readonly href: string;
+			readonly fetchPriority?: 'high' | 'low' | 'auto';
+			readonly crossOrigin?: 'anonymous' | 'use-credentials';
+	  };
 
 export function renderToString(
 	component: () => SsrRenderOutput,
@@ -39,6 +48,7 @@ export function renderToString(
 			: '';
 
 	return [
+		renderModulePreloadLinks(options.modulePreloads, options.nonce),
 		`<div${renderContainerAttributes(options.containerId)}>`,
 		output.html,
 		payloadScripts?.stateScript,
@@ -48,6 +58,31 @@ export function renderToString(
 	]
 		.filter(Boolean)
 		.join('');
+}
+
+function renderModulePreloadLinks(
+	preloads: ReadonlyArray<ModulePreloadInput> | undefined,
+	nonce: string | undefined,
+): string {
+	if (!preloads?.length) return '';
+
+	const seen = new Set<string>();
+	const links: string[] = [];
+	for (const preload of preloads) {
+		const entry = typeof preload === 'string' ? { href: preload } : preload;
+		if (!entry.href || seen.has(entry.href)) continue;
+		seen.add(entry.href);
+
+		const attributes = [
+			'rel="modulepreload"',
+			`href="${escapeAttribute(entry.href)}"`,
+			`crossorigin="${escapeAttribute(entry.crossOrigin ?? 'anonymous')}"`,
+			entry.fetchPriority ? `fetchpriority="${entry.fetchPriority}"` : '',
+			nonce ? `nonce="${escapeAttribute(nonce)}"` : '',
+		].filter(Boolean);
+		links.push(`<link ${attributes.join(' ')}>`);
+	}
+	return links.join('');
 }
 
 function hasBrowserTriggers(view: ProtocolViewPayload): boolean {

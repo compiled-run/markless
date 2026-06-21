@@ -36,6 +36,15 @@ describe('Vite preload cleanup', () => {
 		);
 	});
 
+	test('removes imported Vite preload helper init calls from the middle of module init sequences', () => {
+		const code =
+			'import{__esmMin as e}from"./shared.js";import{__vitePreload as t,init_preload_helper as n}from"./preload.js";var f=e((()=>{})),m=e((()=>{})),v=e((()=>{f(),m(),n(),g=["./symbol.js"]}));e((()=>{v()}))();';
+
+		expect(stripEmptyVitePreloadWrappers(code)).toBe(
+			'import{__esmMin as e}from"./shared.js";var f=e((()=>{})),m=e((()=>{})),v=e((()=>{f(),m(),g=["./symbol.js"]}));e((()=>{v()}))();',
+		);
+	});
+
 	test('removes an imported Vite preload helper regardless of import specifier order', () => {
 		const code =
 			'import{__esmMin as e}from"./shared.js";import{init_preload_helper as n,__vitePreload as t}from"./preload.js";async function load(){return import("./chunk.js")}var A=e((()=>{n()}));e((()=>{A()}))();';
