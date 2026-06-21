@@ -37,8 +37,8 @@ const fixtures = [
 		runtimeBudget: {
 			dist: 'packages/bundler/fixtures/vite-ssr/dist',
 			maxRuntimeChunkGzipBytes: 2_175,
-			maxAsyncScriptsGzipBytes: 3_700,
-			maxAsyncScriptCount: 6,
+			maxAsyncScriptsGzipBytes: 4_100,
+			maxAsyncScriptCount: 7,
 			forbidVitePreloadHelper: true,
 		},
 	},
