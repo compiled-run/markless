@@ -11,14 +11,15 @@ jobs:
         runs-on: ubuntu-latest
         timeout-minutes: 120
         env:
+            ARCADE_CI_TEMP: /tmp/arcade-ci-${{ github.run_id }}
             ARCADE_REPO_ROOT: ${{ github.workspace }}
-            ARCADE_BASE_REPO_ROOT: ${{ runner.temp }}/arcade-baseline
-            JSFB_ROOT: ${{ runner.temp }}/js-framework-benchmark
-            ARCADE_JSFB_BASELINE_RESULTS: ${{ runner.temp }}/arcade-jsfb/results-arcade-base
-            ARCADE_JSFB_RESULTS: ${{ runner.temp }}/arcade-jsfb/results-arcade-ci
-            ARCADE_JSFB_BASELINE_TRACES: ${{ runner.temp }}/arcade-jsfb/traces-arcade-base
-            ARCADE_JSFB_TRACES: ${{ runner.temp }}/arcade-jsfb/traces-arcade-ci
-            JSFB_SERVER_LOG: ${{ runner.temp }}/jsfb-server.log
+            ARCADE_BASE_REPO_ROOT: /tmp/arcade-ci-${{ github.run_id }}/arcade-baseline
+            JSFB_ROOT: /tmp/arcade-ci-${{ github.run_id }}/js-framework-benchmark
+            ARCADE_JSFB_BASELINE_RESULTS: /tmp/arcade-ci-${{ github.run_id }}/arcade-jsfb/results-arcade-base
+            ARCADE_JSFB_RESULTS: /tmp/arcade-ci-${{ github.run_id }}/arcade-jsfb/results-arcade-ci
+            ARCADE_JSFB_BASELINE_TRACES: /tmp/arcade-ci-${{ github.run_id }}/arcade-jsfb/traces-arcade-base
+            ARCADE_JSFB_TRACES: /tmp/arcade-ci-${{ github.run_id }}/arcade-jsfb/traces-arcade-ci
+            JSFB_SERVER_LOG: /tmp/arcade-ci-${{ github.run_id }}/jsfb-server.log
             NPM_CONFIG_AUDIT: "false"
             NPM_CONFIG_FUND: "false"
             NPM_CONFIG_PREFER_OFFLINE: "true"
@@ -42,6 +43,9 @@ jobs:
 
             - name: Install Arcade dependencies
               run: pnpm install --frozen-lockfile
+
+            - name: Prepare CI temp directory
+              run: mkdir -p "$ARCADE_CI_TEMP"
 
             - name: Resolve benchmark baseline revision
               run: |
@@ -120,7 +124,7 @@ jobs:
                   if ! compgen -G "webdriver-ts/results/*arcade*-keyed_41_size-uncompressed.json" > /dev/null; then
                     exit 1
                   fi
-                  mkdir -p "$RUNNER_TEMP/arcade-jsfb"
+                  mkdir -p "$ARCADE_CI_TEMP/arcade-jsfb"
                   mv webdriver-ts/results "$ARCADE_JSFB_BASELINE_RESULTS"
                   if [ -d webdriver-ts/traces ]; then
                     mv webdriver-ts/traces "$ARCADE_JSFB_BASELINE_TRACES"
@@ -150,7 +154,7 @@ jobs:
                   if ! compgen -G "webdriver-ts/results/*arcade*-keyed_41_size-uncompressed.json" > /dev/null; then
                     exit 1
                   fi
-                  mkdir -p "$RUNNER_TEMP/arcade-jsfb"
+                  mkdir -p "$ARCADE_CI_TEMP/arcade-jsfb"
                   mv webdriver-ts/results "$ARCADE_JSFB_RESULTS"
                   if [ -d webdriver-ts/traces ]; then
                     mv webdriver-ts/traces "$ARCADE_JSFB_TRACES"
@@ -170,4 +174,4 @@ jobs:
                       ${{ env.ARCADE_JSFB_BASELINE_TRACES }}
                       ${{ env.ARCADE_JSFB_TRACES }}
                       ${{ env.JSFB_SERVER_LOG }}
-                      ${{ runner.temp }}/jsfb-*.log
+                      ${{ env.ARCADE_CI_TEMP }}/jsfb-*.log
