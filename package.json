@@ -12,7 +12,7 @@
 		"test:compiler": "vp test packages/compiler/test/*.test.ts"
 	},
 	"devDependencies": {
-		"@async/witness": "link:../witness",
+		"@async/witness": "0.7.0",
 		"@types/node": "24.12.2",
 		"rolldown": "1.0.3",
 		"typescript": "5.9.3",
