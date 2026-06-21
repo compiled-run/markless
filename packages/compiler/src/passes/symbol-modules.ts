@@ -1516,7 +1516,8 @@ function sourceReferencesIdentifier(source: string, name: string): boolean {
 	) {
 		const before = source[index - 1] ?? '';
 		const after = source[index + name.length] ?? '';
-		if (isIdentifierChar(before) || before === '.') continue;
+		if (isIdentifierChar(before)) continue;
+		if (before === '.' && source.slice(index - 3, index) !== '...') continue;
 		if (isIdentifierChar(after)) continue;
 
 		return true;

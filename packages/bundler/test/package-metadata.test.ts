@@ -42,6 +42,8 @@ describe('package metadata', () => {
 		};
 
 		expect(bundler.scripts?.['test:boxes']).toBe('witness run');
-		expect(workspace.scripts?.test).toBe('vp test && pnpm --dir packages/bundler test:boxes');
+		expect(workspace.scripts?.test).toBe(
+			'vp test && pnpm bench:jsfb:guard && pnpm --dir packages/bundler test:boxes',
+		);
 	});
 });

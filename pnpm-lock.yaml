@@ -116,6 +116,25 @@ importers:
         specifier: 8.0.16
         version: 8.0.16(@types/node@24.12.2)
 
+  packages/bundler/fixtures/vite-csr-preloader:
+    dependencies:
+      '@arcade/bundler':
+        specifier: workspace:*
+        version: link:../..
+      '@arcade/core':
+        specifier: workspace:*
+        version: link:../../../core
+      '@arcade/runtime':
+        specifier: workspace:*
+        version: link:../../../runtime
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vite:
+        specifier: 8.0.16
+        version: 8.0.16(@types/node@24.12.2)
+
   packages/bundler/fixtures/vite-library:
     dependencies:
       '@arcade/bundler':
@@ -158,6 +177,25 @@ importers:
         version: 4.1.5(@types/node@24.12.2)(vite@8.0.16(@types/node@24.12.2))
 
   packages/bundler/fixtures/vite-ssr:
+    dependencies:
+      '@arcade/bundler':
+        specifier: workspace:*
+        version: link:../..
+      '@arcade/core':
+        specifier: workspace:*
+        version: link:../../../core
+      '@arcade/runtime':
+        specifier: workspace:*
+        version: link:../../../runtime
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vite:
+        specifier: 8.0.16
+        version: 8.0.16(@types/node@24.12.2)
+
+  packages/bundler/fixtures/vite-ssr-preloader:
     dependencies:
       '@arcade/bundler':
         specifier: workspace:*

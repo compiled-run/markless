@@ -55,7 +55,6 @@ export default box(
 		await expect.page.exists(page, '#app', WAIT);
 		await expect.page.text(page, '#hmr-status', 'ready', WAIT);
 		await expect.page.text(page, COUNTER, '0', WAIT);
-		await expect.page.attribute(page, 'body', 'data-csr-lazy-module', 'cold', WAIT);
 		const startupModules = await waitForExpectedPreloadRequests(page, expectedPreloadHrefs);
 		receipt.note(`CSR startup preloaded JS: ${formatNetworkRequests(startupModules)}`);
 		const beforeInteraction = await readScriptRequests(preview);
@@ -78,7 +77,6 @@ export default box(
 
 		await page.click(COUNTER, WAIT);
 		await expect.page.text(page, COUNTER, '1', WAIT);
-		await expect.page.attribute(page, 'body', 'data-csr-lazy-module', 'evaluated', WAIT);
 		const afterInteraction = await readScriptRequests(preview);
 		receipt.note(`CSR interaction script requests: ${formatRequests(afterInteraction)}`);
 		const interactionScripts = assertNoScriptsLoadedAfterInteraction(

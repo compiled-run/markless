@@ -89,6 +89,12 @@ Compiler tests should assert pass artifacts and diagnostics whenever possible.
 End-to-end fixture tests are useful, but they do not replace pass-level
 coverage.
 
+`pnpm test` also includes the Arcade keyed JS Framework Benchmark regression
+guard. CI creates fresh base/current JSFB results on the same runner before
+running the main test command. To run the full benchmark gate locally, follow
+[`benchmarks/js-framework-benchmark/README.md`](./benchmarks/js-framework-benchmark/README.md)
+and set `ARCADE_JSFB_RESULTS` to the fresh results directory.
+
 ## Agent Notes
 
 Use project-local skills when available:

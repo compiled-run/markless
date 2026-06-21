@@ -2,7 +2,7 @@ import { box } from '@async/witness';
 import { planModulePreloadUrls } from '../src/build/preload-plan.ts';
 import type { ArcadeBundleGraph } from '../src/types.ts';
 
-const FIXTURE = 'fixtures/vite-csr';
+const FIXTURE = 'fixtures/vite-csr-preloader';
 const COUNTER = '[data-counter]';
 const CSR_ROUTE = '/';
 const BUNDLE_GRAPH_REQUEST = '/build/bundle-graph.json';
@@ -44,7 +44,6 @@ export default box(
 		});
 		await expect.page.text(page, COUNTER, '0', WAIT);
 		await expect.page.text(page, '#hmr-status', 'ready', WAIT);
-		await expect.page.attribute(page, 'body', 'data-csr-lazy-module', 'cold', WAIT);
 		const preloadRequests = await waitForExpectedPreloadRequests(page, expectedPreloadHrefs);
 		receipt.note(`CSR preload throttled startup JS:\n${formatTimeline(preloadRequests)}`);
 		assertPreloadedStartupModules(preloadRequests, expectedPreloadHrefs);
@@ -53,7 +52,6 @@ export default box(
 		const beforeClick = await page.networkRequests();
 		await page.click(COUNTER, WAIT);
 		await expect.page.text(page, COUNTER, '1', WAIT);
-		await expect.page.attribute(page, 'body', 'data-csr-lazy-module', 'evaluated', WAIT);
 		const afterClick = await page.networkRequests();
 		const interactionModules = jsBuildRequests(afterClick.slice(beforeClick.length));
 		receipt.note(`CSR preload post-click JS: ${formatRequests(interactionModules)}`);

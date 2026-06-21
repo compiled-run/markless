@@ -27,6 +27,7 @@ export function App() @{
 const eventWriteSource = `
 import { state } from '@arcade/core';
 import { clamp } from './math';
+import { makeItems } from './items';
 
 export function App() @{
 	const menu = state({ open: true, title: 'Menu' });
@@ -71,6 +72,7 @@ export function App() @{
 				items.push("third");
 				items.push(menu.title);
 				items.push(...nextItems);
+				items.push(...makeItems(1000));
 			}}
 		>
 			{menu.title}
@@ -119,15 +121,27 @@ type PublicRenderTestNode =
 
 class PublicRenderTestText {
 	readonly nodeType = 3;
+	nodeValueWriteCount = 0;
+	textContentWriteCount = 0;
 	parentElement: PublicRenderTestContainer | null = null;
 
 	constructor(private value: string) {}
+
+	get nodeValue() {
+		return this.value;
+	}
+
+	set nodeValue(value: string) {
+		this.nodeValueWriteCount++;
+		this.value = value;
+	}
 
 	get textContent() {
 		return this.value;
 	}
 
 	set textContent(value: string) {
+		this.textContentWriteCount++;
 		this.value = value;
 	}
 
@@ -141,6 +155,7 @@ class PublicRenderTestElement {
 	readonly childNodes: PublicRenderTestNode[] = [];
 	readonly attributes = new Map<string, string>();
 	readonly listeners = new Map<string, PublicRenderTestListener[]>();
+	classWriteCount = 0;
 	parentElement: PublicRenderTestContainer | null = null;
 
 	constructor(readonly tagName: string) {}
@@ -163,6 +178,15 @@ class PublicRenderTestElement {
 
 	set textContent(value: string) {
 		this.replaceChildren(...(value ? [new PublicRenderTestText(value)] : []));
+	}
+
+	get className(): string {
+		return this.attributes.get('class') ?? '';
+	}
+
+	set className(value: string) {
+		this.classWriteCount++;
+		this.attributes.set('class', value);
 	}
 
 	appendChild(child: PublicRenderTestNode) {
@@ -206,6 +230,7 @@ class PublicRenderTestElement {
 	}
 
 	setAttribute(name: string, value: string) {
+		if (name === 'class') this.classWriteCount++;
 		this.attributes.set(name, value);
 	}
 
@@ -360,6 +385,25 @@ function rowTexts(root: PublicRenderTestElement): string[] {
 
 function rowClasses(root: PublicRenderTestElement): Array<string | undefined> {
 	return elementsByTag(root, 'li').map((row) => row.getAttribute('class'));
+}
+
+function classWriteCounts(root: PublicRenderTestElement, tagName = 'li'): number[] {
+	return elementsByTag(root, tagName).map((row) => row.classWriteCount);
+}
+
+function textNodesByTag(root: PublicRenderTestElement, tagName: string): PublicRenderTestText[] {
+	const textNodes: PublicRenderTestText[] = [];
+	const visit = (node: PublicRenderTestNode) => {
+		if (node.nodeType === 3) {
+			textNodes.push(node);
+			return;
+		}
+		for (const child of node.childNodes) visit(child);
+	};
+	for (const element of elementsByTag(root, tagName)) {
+		for (const child of element.childNodes) visit(child);
+	}
+	return textNodes;
 }
 
 test('compileTsrxModule orchestrates source to payload scripts and resolver module', async () => {
@@ -748,10 +792,11 @@ export function Catalog() @{
 		readonly graph: PublicRenderTestGraph;
 	};
 	const apply = elementsByTag(rendered.root, 'button')[0]!;
-	expect(loadSymbolCalls.get(syncSymbol!.id)).toBe(1);
+	expect(loadSymbolCalls.get(syncSymbol!.id)).toBe(undefined);
 	expect(loadSymbolCalls.get(focusSymbol!.id)).toBe(undefined);
 
 	await apply.dispatch('click');
+	expect(loadSymbolCalls.get(syncSymbol!.id)).toBe(1);
 	expect(rowTexts(rendered.root)).toEqual(['Amberamber-1Focus', 'Blueblue-2Focus']);
 	const list = elementsByTag(rendered.root, 'ul')[0]!;
 	const firstFocusButton = elementsByTag(rendered.root, 'li')[0]!
@@ -813,6 +858,290 @@ export function Catalog() @{
 	expect(loadSymbolCalls.get(syncSymbol!.id)).toBe(1);
 	expect(loadSymbolCalls.get(focusSymbol!.id)).toBe(1);
 	expect(loadSymbolCalls.get(nameSymbol!.id)).toBe(1);
+});
+
+test('compileTsrxModule public render module skips redundant empty class writes', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Articles.tsrx',
+		source: `
+import { state } from '@arcade/core';
+
+export function Articles() @{
+	let entries = state([]);
+	let selected = state(null);
+
+	<section>
+		<button onClick={() => entries = [{ code: 'alpha', title: 'Alpha' }, { code: 'beta', title: 'Beta' }]}>Load</button>
+		<div>
+			@for (const entry of entries; key entry.code) {
+				<article class={selected === entry.code ? 'chosen' : ''}>
+					<h2>{entry.title}</h2>
+					<button onClick={() => selected = entry.code}>Pick</button>
+				</article>
+			}
+		</div>
+	</section>
+}
+`,
+		symbols: [],
+	});
+	const loadEntriesSymbol = result.symbolResolver.symbols.find((symbol) =>
+		symbol.source.includes('entries ='),
+	);
+	const selectSymbol = result.symbolResolver.symbols.find((symbol) =>
+		symbol.source.includes('selected = entry.code'),
+	);
+	expect(loadEntriesSymbol).toBeDefined();
+	expect(selectSymbol).toBeDefined();
+
+	const loadSymbol = (symbolId: string) => {
+		if (symbolId === loadEntriesSymbol?.id) {
+			return ({ graph }: { readonly graph: PublicRenderTestGraph }) => {
+				graph.write({
+					graphNodeId: 'state:entries',
+					value: [
+						{ code: 'alpha', title: 'Alpha' },
+						{ code: 'beta', title: 'Beta' },
+					],
+				});
+			};
+		}
+		if (symbolId === selectSymbol?.id) {
+			return ({
+				graph,
+				locals,
+			}: {
+				readonly graph: PublicRenderTestGraph;
+				readonly locals: { readonly entry: { readonly code: string } };
+			}) => graph.write({ graphNodeId: 'state:selected', value: locals.entry.code });
+		}
+		throw new Error(`Unexpected public render test symbol ${symbolId}`);
+	};
+	const document = {
+		createElement(tagName: string) {
+			if (tagName === 'template') return new PublicRenderTestTemplate();
+			return new PublicRenderTestElement(tagName);
+		},
+		createDocumentFragment() {
+			return new PublicRenderTestFragment();
+		},
+	};
+	const publicModule = await importPublicRenderTestModule(
+		[
+			'const document = globalThis.__arcadePublicRenderTestDocument;',
+			'const loadSymbol = globalThis.__arcadePublicRenderTestLoadSymbol;',
+			result.publicRenderModule.moduleSource,
+		].join('\n'),
+		{ document, loadSymbol },
+	);
+	const rendered = publicModule.Articles() as { readonly root: PublicRenderTestElement };
+	const loadButton = elementsByTag(rendered.root, 'button')[0]!;
+
+	await loadButton.dispatch('click');
+	expect(elementsByTag(rendered.root, 'article').map((row) => row.getAttribute('class'))).toEqual(
+		['', ''],
+	);
+	expect(classWriteCounts(rendered.root, 'article')).toEqual([0, 0]);
+
+	const articles = elementsByTag(rendered.root, 'article');
+	await (articles[1]!.childNodes[1]! as PublicRenderTestElement).dispatch('click');
+	expect(elementsByTag(rendered.root, 'article').map((row) => row.getAttribute('class'))).toEqual(
+		['', 'chosen'],
+	);
+	expect(classWriteCounts(rendered.root, 'article')).toEqual([0, 1]);
+
+	await (articles[0]!.childNodes[1]! as PublicRenderTestElement).dispatch('click');
+	expect(elementsByTag(rendered.root, 'article').map((row) => row.getAttribute('class'))).toEqual(
+		['chosen', ''],
+	);
+	expect(classWriteCounts(rendered.root, 'article')).toEqual([1, 2]);
+});
+
+test('compileTsrxModule public render module appends initial keyed rows into an empty parent', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/InitialArticles.tsrx',
+		source: `
+import { state } from '@arcade/core';
+
+export function InitialArticles() @{
+	let entries = state([]);
+
+	<section>
+		<button onClick={() => entries = [{ code: 'alpha', title: 'Alpha' }, { code: 'beta', title: 'Beta' }]}>Load</button>
+		<div>
+			@for (const entry of entries; key entry.code) {
+				<article>
+					<h2>{entry.title}</h2>
+				</article>
+			}
+		</div>
+	</section>
+}
+`,
+		symbols: [],
+	});
+	const loadEntriesSymbol = result.symbolResolver.symbols.find((symbol) =>
+		symbol.source.includes('entries ='),
+	);
+	expect(loadEntriesSymbol).toBeDefined();
+
+	const loadSymbol = (symbolId: string) => {
+		if (symbolId === loadEntriesSymbol?.id) {
+			return ({ graph }: { readonly graph: PublicRenderTestGraph }) => {
+				graph.write({
+					graphNodeId: 'state:entries',
+					value: [
+						{ code: 'alpha', title: 'Alpha' },
+						{ code: 'beta', title: 'Beta' },
+					],
+				});
+			};
+		}
+		throw new Error(`Unexpected public render test symbol ${symbolId}`);
+	};
+	const document = {
+		createElement(tagName: string) {
+			if (tagName === 'template') return new PublicRenderTestTemplate();
+			return new PublicRenderTestElement(tagName);
+		},
+		createDocumentFragment() {
+			return new PublicRenderTestFragment();
+		},
+	};
+	const publicModule = await importPublicRenderTestModule(
+		[
+			'const document = globalThis.__arcadePublicRenderTestDocument;',
+			'const loadSymbol = globalThis.__arcadePublicRenderTestLoadSymbol;',
+			result.publicRenderModule.moduleSource,
+		].join('\n'),
+		{ document, loadSymbol },
+	);
+	const rendered = publicModule.InitialArticles() as { readonly root: PublicRenderTestElement };
+	const list = elementsByTag(rendered.root, 'div')[0]!;
+	const originalAppendChild = list.appendChild.bind(list);
+	const originalReplaceChildren = list.replaceChildren.bind(list);
+	let appendCalls = 0;
+	let replaceCalls = 0;
+	list.appendChild = (child) => {
+		appendCalls++;
+		return originalAppendChild(child);
+	};
+	list.replaceChildren = (...children) => {
+		replaceCalls++;
+		return originalReplaceChildren(...children);
+	};
+
+	await elementsByTag(rendered.root, 'button')[0]!.dispatch('click');
+
+	expect(elementsByTag(rendered.root, 'article').map((row) => row.textContent)).toEqual([
+		'Alpha',
+		'Beta',
+	]);
+	expect(appendCalls).toBeGreaterThan(0);
+	expect(replaceCalls).toBe(0);
+});
+
+test('compileTsrxModule public render module writes keyed text bindings through text nodes', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/TextArticles.tsrx',
+		source: `
+import { state } from '@arcade/core';
+
+export function TextArticles() @{
+	let entries = state([]);
+
+	<section>
+		<button onClick={() => entries = [{ code: 'alpha', title: 'Alpha' }, { code: 'beta', title: 'Beta' }]}>Load</button>
+		<button onClick={() => entries = [{ code: 'alpha', title: 'Alpha Prime' }, { code: 'beta', title: 'Beta Prime' }]}>Rename</button>
+		<div>
+			@for (const entry of entries; key entry.code) {
+				<article>
+					<h2>{entry.title}</h2>
+				</article>
+			}
+		</div>
+	</section>
+}
+`,
+		symbols: [],
+	});
+	const loadEntriesSymbol = result.symbolResolver.symbols.find((symbol) =>
+		symbol.source.includes("'Alpha'"),
+	);
+	const renameEntriesSymbol = result.symbolResolver.symbols.find((symbol) =>
+		symbol.source.includes("'Alpha Prime'"),
+	);
+	expect(loadEntriesSymbol).toBeDefined();
+	expect(renameEntriesSymbol).toBeDefined();
+
+	const loadSymbol = (symbolId: string) => {
+		if (symbolId === loadEntriesSymbol?.id) {
+			return ({ graph }: { readonly graph: PublicRenderTestGraph }) => {
+				graph.write({
+					graphNodeId: 'state:entries',
+					value: [
+						{ code: 'alpha', title: 'Alpha' },
+						{ code: 'beta', title: 'Beta' },
+					],
+				});
+			};
+		}
+		if (symbolId === renameEntriesSymbol?.id) {
+			return ({ graph }: { readonly graph: PublicRenderTestGraph }) => {
+				graph.write({
+					graphNodeId: 'state:entries',
+					value: [
+						{ code: 'alpha', title: 'Alpha Prime' },
+						{ code: 'beta', title: 'Beta Prime' },
+					],
+				});
+			};
+		}
+		throw new Error(`Unexpected public render test symbol ${symbolId}`);
+	};
+	const document = {
+		createElement(tagName: string) {
+			if (tagName === 'template') return new PublicRenderTestTemplate();
+			return new PublicRenderTestElement(tagName);
+		},
+		createDocumentFragment() {
+			return new PublicRenderTestFragment();
+		},
+	};
+	const publicModule = await importPublicRenderTestModule(
+		[
+			'const document = globalThis.__arcadePublicRenderTestDocument;',
+			'const loadSymbol = globalThis.__arcadePublicRenderTestLoadSymbol;',
+			result.publicRenderModule.moduleSource,
+		].join('\n'),
+		{ document, loadSymbol },
+	);
+	const rendered = publicModule.TextArticles() as { readonly root: PublicRenderTestElement };
+	const [loadButton, renameButton] = elementsByTag(rendered.root, 'button');
+
+	await loadButton!.dispatch('click');
+	expect(elementsByTag(rendered.root, 'article').map((row) => row.textContent)).toEqual([
+		'Alpha',
+		'Beta',
+	]);
+	expect(textNodesByTag(rendered.root, 'h2').map((text) => text.nodeValueWriteCount)).toEqual([
+		1, 1,
+	]);
+	expect(textNodesByTag(rendered.root, 'h2').map((text) => text.textContentWriteCount)).toEqual([
+		0, 0,
+	]);
+
+	await renameButton!.dispatch('click');
+	expect(elementsByTag(rendered.root, 'article').map((row) => row.textContent)).toEqual([
+		'Alpha Prime',
+		'Beta Prime',
+	]);
+	expect(textNodesByTag(rendered.root, 'h2').map((text) => text.nodeValueWriteCount)).toEqual([
+		2, 2,
+	]);
+	expect(textNodesByTag(rendered.root, 'h2').map((text) => text.textContentWriteCount)).toEqual([
+		0, 0,
+	]);
 });
 
 test('compileTsrxModule public render module runs static text state bindings', async () => {
@@ -897,13 +1226,13 @@ export function Scoreboard() @{
 
 	expect(button.textContent).toBe('1');
 	expect(secondButton.textContent).toBe('1');
-	expect(loadSymbolCalls.get(incrementSymbol!.id)).toBe(2);
+	expect(loadSymbolCalls.get(incrementSymbol!.id)).toBe(undefined);
 	await button.dispatch('click');
 	expect(rendered.graph.read('state:score', ['total'])).toBe(2);
 	expect(button.textContent).toBe('2');
 	expect(secondRendered.graph.read('state:score', ['total'])).toBe(1);
 	expect(secondButton.textContent).toBe('1');
-	expect(loadSymbolCalls.get(incrementSymbol!.id)).toBe(2);
+	expect(loadSymbolCalls.get(incrementSymbol!.id)).toBe(1);
 });
 
 test('compileTsrxModule does not emit public render factories for non-literal direct state values', async () => {
@@ -1038,6 +1367,8 @@ test('compileTsrxModule emits generated event modules for supported graph write 
 	expect(clickModule).toContain('args: ["third"]');
 	expect(clickModule).toContain('args: [context.graph.read("state:menu", ["title"])]');
 	expect(clickModule).toContain('args: [...context.graph.read("state:nextItems")]');
+	expect(clickModule).toContain('args: [...makeItems(1000)]');
+	expect(clickModule).toContain('import { makeItems } from "./items";');
 	expect(inputModule).toContain('graphNodeId: "state:menu"');
 	expect(inputModule).toContain('path: ["title"]');
 	expect(inputModule).toContain('value: context.element?.value');

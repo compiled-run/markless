@@ -1,6 +1,6 @@
 import { box } from '@async/witness';
 
-const FIXTURE = 'fixtures/vite-ssr';
+const FIXTURE = 'fixtures/vite-ssr-preloader';
 const COUNTER = '[data-counter]';
 const SSR_ROUTE = '/';
 const WAIT = { timeoutMs: 10_000 };

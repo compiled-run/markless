@@ -6,6 +6,7 @@ export function nextCount(value: number): number {
 }
 
 function queueCounterWarmups(): void {
-	void import('/src/counter-history.ts');
-	void import('/src/counter-label.ts');
+	void import('./counter-history.ts');
+	void import('./counter-label.ts');
+	void import('./counter-metrics.ts');
 }

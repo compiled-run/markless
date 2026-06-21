@@ -1,0 +1,18 @@
+{
+	"name": "@fixtures/vite-ssr-preloader",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "vite --mode ssr",
+		"build": "vite build --app"
+	},
+	"dependencies": {
+		"@arcade/bundler": "workspace:*",
+		"@arcade/core": "workspace:*",
+		"@arcade/runtime": "workspace:*"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"vite": "8.0.16"
+	}
+}

@@ -1,0 +1,125 @@
+name: CI
+
+on:
+    pull_request:
+    push:
+        branches:
+            - main
+
+jobs:
+    test:
+        runs-on: ubuntu-latest
+        timeout-minutes: 120
+        env:
+            ARCADE_REPO_ROOT: ${{ github.workspace }}
+            ARCADE_BASE_REPO_ROOT: ${{ github.workspace }}/../arcade-baseline
+            JSFB_ROOT: ${{ github.workspace }}/../js-framework-benchmark
+            ARCADE_JSFB_BASELINE_RESULTS: ${{ github.workspace }}/../js-framework-benchmark/webdriver-ts/results-arcade-base
+            ARCADE_JSFB_RESULTS: ${{ github.workspace }}/../js-framework-benchmark/webdriver-ts/results-arcade-ci
+            ARCADE_JSFB_BASELINE_TRACES: ${{ github.workspace }}/../js-framework-benchmark/webdriver-ts/traces-arcade-base
+            ARCADE_JSFB_TRACES: ${{ github.workspace }}/../js-framework-benchmark/webdriver-ts/traces-arcade-ci
+
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10.33.2
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+
+            - name: Install Arcade dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Resolve benchmark baseline revision
+              run: |
+                  if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+                    echo "ARCADE_BASE_SHA=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_ENV"
+                  else
+                    echo "ARCADE_BASE_SHA=${{ github.event.before }}" >> "$GITHUB_ENV"
+                  fi
+
+            - name: Checkout benchmark baseline revision
+              run: git worktree add "$ARCADE_BASE_REPO_ROOT" "$ARCADE_BASE_SHA"
+
+            - name: Install baseline Arcade dependencies
+              working-directory: ${{ env.ARCADE_BASE_REPO_ROOT }}
+              run: pnpm install --frozen-lockfile
+
+            - name: Checkout JS Framework Benchmark
+              run: git clone --depth 1 https://github.com/krausest/js-framework-benchmark.git "$JSFB_ROOT"
+
+            - name: Install JS Framework Benchmark dependencies
+              working-directory: ${{ env.JSFB_ROOT }}
+              run: |
+                  npm ci
+                  npm run install-local
+
+            - name: Install Arcade benchmark fixture
+              run: pnpm bench:jsfb:prepare -- --jsfb-root "$JSFB_ROOT"
+
+            - name: Validate baseline Arcade benchmark fixture
+              working-directory: ${{ env.JSFB_ROOT }}
+              env:
+                  ARCADE_REPO_ROOT: ${{ env.ARCADE_BASE_REPO_ROOT }}
+              run: npm run rebuild-ci -- keyed/arcade
+
+            - name: Start JS Framework Benchmark server
+              working-directory: ${{ env.JSFB_ROOT }}
+              run: |
+                  npm start > /tmp/jsfb-server.log 2>&1 &
+                  echo "$!" > /tmp/jsfb-server.pid
+                  for attempt in {1..60}; do
+                    if curl -fsS http://localhost:8080/ls > /dev/null; then
+                      exit 0
+                    fi
+                    sleep 1
+                  done
+                  cat /tmp/jsfb-server.log
+                  exit 1
+
+            - name: Run baseline Arcade JS Framework Benchmark
+              working-directory: ${{ env.JSFB_ROOT }}
+              env:
+                  ARCADE_REPO_ROOT: ${{ env.ARCADE_BASE_REPO_ROOT }}
+              run: |
+                  npm run bench -- \
+                    --headless \
+                    --framework keyed/arcade \
+                    --benchmark 01_ 02_ 03_ 04_ 05_ 06_ 07_ 08_ 09_ 41_ 42_ 43_ \
+                    --resultsDir "$ARCADE_JSFB_BASELINE_RESULTS" \
+                    --tracesDir "$ARCADE_JSFB_BASELINE_TRACES"
+
+            - name: Validate current Arcade benchmark fixture
+              working-directory: ${{ env.JSFB_ROOT }}
+              run: npm run rebuild-ci -- keyed/arcade
+
+            - name: Run current Arcade JS Framework Benchmark
+              working-directory: ${{ env.JSFB_ROOT }}
+              run: |
+                  npm run bench -- \
+                    --headless \
+                    --framework keyed/arcade \
+                    --benchmark 01_ 02_ 03_ 04_ 05_ 06_ 07_ 08_ 09_ 41_ 42_ 43_ \
+                    --resultsDir "$ARCADE_JSFB_RESULTS" \
+                    --tracesDir "$ARCADE_JSFB_TRACES"
+
+            - name: Run main test flow
+              run: pnpm test
+
+            - name: Upload JSFB results
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: arcade-jsfb-results
+                  path: |
+                      ${{ env.ARCADE_JSFB_BASELINE_RESULTS }}
+                      ${{ env.ARCADE_JSFB_RESULTS }}
+                      ${{ env.ARCADE_JSFB_BASELINE_TRACES }}
+                      ${{ env.ARCADE_JSFB_TRACES }}
+                      /tmp/jsfb-server.log

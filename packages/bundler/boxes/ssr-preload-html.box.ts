@@ -1,6 +1,6 @@
 import { box } from '@async/witness';
 
-const FIXTURE = 'fixtures/vite-ssr';
+const FIXTURE = 'fixtures/vite-ssr-preloader';
 const INDEX = `${FIXTURE}/dist/index.html`;
 const SSR_ROUTE = '/';
 const MIN_COMPLEX_PRELOAD_COUNT = 6;

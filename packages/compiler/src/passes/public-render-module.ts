@@ -118,10 +118,6 @@ function emitPublicRenderComponents(input: {
 		hasStaticTextWrites ? '' : null,
 		'function attachArcadePublicStaticEvents(root, graph, loadSymbolForEvent) {\n\tfor (const [path, eventName, symbolIds] of arcadePublicStaticEvents) {\n\t\tconst element = nodeAtPath(root, path);\n\t\tif (!element?.addEventListener) continue;\n\t\telement.addEventListener(eventName, async (event) => {\n\t\t\tfor (const symbolId of symbolIds) {\n\t\t\t\tconst loaded = loadSymbolForEvent(symbolId);\n\t\t\t\tconst symbol = isArcadePublicThenable(loaded) ? await loaded : loaded;\n\t\t\t\tconst value = symbol({ graph, event, element, getElementHandle: () => undefined });\n\t\t\t\tif (isArcadePublicThenable(value)) await value;\n\t\t\t}\n\t\t\tgraph.flush();\n\t\t});\n\t}\n}',
 		'',
-		hasStaticEvents
-			? 'function warmArcadePublicStaticEventSymbols(loadSymbolForEvent) {\n\tfor (const [, , symbolIds] of arcadePublicStaticEvents) {\n\t\tfor (const symbolId of symbolIds) loadSymbolForEvent(symbolId);\n\t}\n}'
-			: null,
-		hasStaticEvents ? '' : null,
 		...emitRepeatSupportFunctions({
 			hasRepeats,
 			hasSingleRepeat,
@@ -203,9 +199,6 @@ function emitComponentFactory(
 	const syncStaticText = options.hasStaticTextWrites
 		? ['	syncArcadePublicStaticText(root, graph);']
 		: [];
-	const warmStaticEvents = options.hasStaticEvents
-		? ['	warmArcadePublicStaticEventSymbols(componentLoadSymbol);']
-		: [];
 	const syncRepeats = options.repeatSyncCall ? [`	${options.repeatSyncCall}`] : [];
 	return [
 		`export function ${name}() {`,
@@ -215,7 +208,6 @@ function emitComponentFactory(
 		`	const componentLoadSymbol = createArcadePublicLoadSymbol(${loadSymbolArguments});`,
 		...syncStaticText,
 		'	attachArcadePublicStaticEvents(root, graph, componentLoadSymbol);',
-		...warmStaticEvents,
 		...syncRepeats,
 		'	return {',
 		'		root,',
@@ -229,7 +221,7 @@ function emitComponentFactory(
 function emitStaticTextSyncFunction(publicRenderPlan: PublicRenderPlanArtifact): string {
 	const writes = publicRenderPlan.staticTextWrites.flatMap((write, index) => [
 		`	const textTarget${index} = nodeAtPath(root, ${JSON.stringify(write.nodePath)});`,
-		`	if (textTarget${index}) textTarget${index}.textContent = stringifyArcadePublicValue(${graphReadExpression(write.graphNodeId, write.path)});`,
+		`	if (textTarget${index}) textTarget${index}.nodeValue = stringifyArcadePublicValue(${graphReadExpression(write.graphNodeId, write.path)});`,
 	]);
 	if (writes.length === 0) return '';
 
@@ -464,7 +456,7 @@ function emitRepeatSyncFunction(
 	return [
 		`function syncArcadePublicRepeat${index}(root, graph, loadSymbolForRepeat${stateParameter}) {\n\tconst parent = ${domNodePathExpression('root', repeat.parentPath)};\n\tif (!parent?.replaceChildren) return;${stateDeclaration}${delegateEventsCall}\n\tconst collectionDirty = graph.isDirty?.(${JSON.stringify(repeat.collectionGraphNodeId)}) ?? true;\n\tconst classDirty = ${classDirtyExpression(repeat)};\n\tif (!collectionDirty && state.keys.length > 0) {\n\t\tif (classDirty) {\n\t\t\tconst ${classValueName} = readArcadePublicRepeat${index}ClassValues(graph);\n\t\t\tupdateArcadePublicRepeat${index}Classes(state, ${classValueName});\n\t\t\tstate.${classStateName} = ${classValueName};\n\t\t}\n\t\treturn;\n\t}\n\tconst items = ${graphReadExpression(repeat.collectionGraphNodeId, repeat.collectionPath)};\n\tif (!Array.isArray(items)) return;\n\tif (items.length === 0) { clearArcadePublicRows(parent, state); return; }\n\tconst ${classValueName} = readArcadePublicRepeat${index}ClassValues(graph);\n\tconst hadRows = state.keys.length > 0;\n\tconst dirtyIndexes = graph.dirtyIndexes?.(${JSON.stringify(repeat.collectionGraphNodeId)});\n\tif (hadRows && dirtyIndexes && dirtyIndexes.length < items.length && patchArcadePublicRepeat${index}DirtyRows(state, items, dirtyIndexes, ${classValueName})) {\n\t\tif (classDirty) updateArcadePublicRepeat${index}Classes(state, ${classValueName});\n\t\tstate.${classStateName} = ${classValueName};\n\t\treturn;\n\t}\n\tlet canAppend = hadRows && state.keys.length < items.length;\n\tconst newRows = document.createDocumentFragment();\n\tconst nextKeys = [];`,
 		`	for (let index = 0; index < items.length; index++) {\n\t\tconst item = items[index];\n\t\tconst key = ${itemPathReadSource('item', repeat.keyPath)};\n\t\tif (canAppend && index < state.keys.length && state.keys[index] !== key) canAppend = false;\n\t\tnextKeys.push(key);\n\t\tlet record = state.rows.get(key);\n\t\tif (!record) {\n\t\t\tconst rowRoot = createArcadePublicRow(${JSON.stringify(repeat.rowTemplateHtml)});\n\t\t\trecord = createArcadePublicRepeat${index}Record(rowRoot, item);\n\t\t\tstate.rows.set(key, record);\n\t\t\twriteArcadePublicRepeat${index}Row(record, item, ${classValueName});${attachEventsCall}\n\t\t\tif (!hadRows || canAppend) newRows.appendChild(record.root);\n\t\t} else if (record.item !== item) {\n\t\t\trecord.item = item;\n\t\t\twriteArcadePublicRepeat${index}Row(record, item, ${classValueName});\n\t\t} else {\n\t\t\trecord.item = item;\n\t\t}\n\t}`,
-		`	if (!hadRows) {\n\t\tparent.replaceChildren(newRows);\n\t} else if (parent.childNodes?.length === 0) {\n\t\treplaceArcadePublicRows(parent, state, nextKeys);\n\t} else if (canAppend) {\n\t\tparent.appendChild?.(newRows);\n\t} else if (!sameArcadePublicKeys(state.keys, nextKeys) &&\n\t\t!removeArcadePublicMissingKey(parent, state, nextKeys) &&\n\t\t!swapArcadePublicRows(parent, state, nextKeys)) {\n\t\treplaceArcadePublicRows(parent, state, nextKeys);\n\t}\n\tif (state.rows.size !== nextKeys.length) pruneArcadePublicRows(state, nextKeys);\n\tif (hadRows) updateArcadePublicRepeat${index}Classes(state, ${classValueName});\n\tstate.${classStateName} = ${classValueName};\n\tstate.keys = nextKeys;\n}`,
+		`	if (!hadRows) {\n\t\tif (parent.childNodes?.length === 0 && parent.appendChild) parent.appendChild(newRows);\n\t\telse parent.replaceChildren(newRows);\n\t} else if (parent.childNodes?.length === 0) {\n\t\treplaceArcadePublicRows(parent, state, nextKeys);\n\t} else if (canAppend) {\n\t\tparent.appendChild?.(newRows);\n\t} else if (!sameArcadePublicKeys(state.keys, nextKeys) &&\n\t\t!removeArcadePublicMissingKey(parent, state, nextKeys) &&\n\t\t!swapArcadePublicRows(parent, state, nextKeys)) {\n\t\treplaceArcadePublicRows(parent, state, nextKeys);\n\t}\n\tif (state.rows.size !== nextKeys.length) pruneArcadePublicRows(state, nextKeys);\n\tif (hadRows) updateArcadePublicRepeat${index}Classes(state, ${classValueName});\n\tstate.${classStateName} = ${classValueName};\n\tstate.keys = nextKeys;\n}`,
 		'',
 	].join('\n');
 }
@@ -518,15 +510,15 @@ function emitRepeatWriteFunction(repeat: KeyedRepeatPlan, index: number) {
 	const classParameter = useSingleClassValue ? 'classValue' : 'classValues';
 	const textWrites = repeat.textWrites.flatMap((write, writeIndex) => [
 		`	const textTarget${writeIndex} = record.text${writeIndex};`,
-		`	if (textTarget${writeIndex}) textTarget${writeIndex}.textContent = stringifyArcadePublicValue(${itemPathReadSource('item', write.itemPath)});`,
+		`	if (textTarget${writeIndex}) textTarget${writeIndex}.nodeValue = stringifyArcadePublicValue(${itemPathReadSource('item', write.itemPath)});`,
 	]);
 	const classWrites = repeat.classWrites.flatMap((write, writeIndex) => [
 		`	const classTarget${writeIndex} = record.class${writeIndex};`,
-		`	if (classTarget${writeIndex}?.setAttribute) {`,
-		`		const stateValue${writeIndex} = ${useSingleClassValue ? classParameter : `${classParameter}[${writeIndex}]`};`,
-		`		const itemValue${writeIndex} = ${itemPathReadSource('item', write.itemPath)};`,
-		`		classTarget${writeIndex}.setAttribute("class", stateValue${writeIndex} === itemValue${writeIndex} ? ${JSON.stringify(write.trueClass)} : ${JSON.stringify(write.falseClass)});`,
-		'	}',
+		`	const stateValue${writeIndex} = ${useSingleClassValue ? classParameter : `${classParameter}[${writeIndex}]`};`,
+		`	const itemValue${writeIndex} = ${itemPathReadSource('item', write.itemPath)};`,
+		write.falseClass === ''
+			? `	if (stateValue${writeIndex} === itemValue${writeIndex}) classTarget${writeIndex}?.setAttribute?.("class", ${JSON.stringify(write.trueClass)});`
+			: `	classTarget${writeIndex}?.setAttribute?.("class", stateValue${writeIndex} === itemValue${writeIndex} ? ${JSON.stringify(write.trueClass)} : ${JSON.stringify(write.falseClass)});`,
 	]);
 
 	return [
@@ -578,7 +570,7 @@ function emitRepeatClassStateFunction(repeat: KeyedRepeatPlan, index: number) {
 					'	const record = state.rows.get(matchValue);',
 					'	if (!record) return;',
 					`	const classTarget${writeIndex} = record.class${writeIndex};`,
-					`	if (classTarget${writeIndex}?.setAttribute) classTarget${writeIndex}.setAttribute("class", stateValue${writeIndex} === matchValue ? ${JSON.stringify(write.trueClass)} : ${JSON.stringify(write.falseClass)});`,
+					`	classTarget${writeIndex}?.setAttribute?.("class", stateValue${writeIndex} === matchValue ? ${JSON.stringify(write.trueClass)} : ${JSON.stringify(write.falseClass)});`,
 					'}',
 					'',
 				]
@@ -588,7 +580,7 @@ function emitRepeatClassStateFunction(repeat: KeyedRepeatPlan, index: number) {
 					`		const itemValue${writeIndex} = ${itemPathReadSource('record.item', write.itemPath)};`,
 					`		if (itemValue${writeIndex} !== matchValue) continue;`,
 					`		const classTarget${writeIndex} = record.class${writeIndex};`,
-					`		if (classTarget${writeIndex}?.setAttribute) classTarget${writeIndex}.setAttribute("class", stateValue${writeIndex} === itemValue${writeIndex} ? ${JSON.stringify(write.trueClass)} : ${JSON.stringify(write.falseClass)});`,
+					`		classTarget${writeIndex}?.setAttribute?.("class", stateValue${writeIndex} === itemValue${writeIndex} ? ${JSON.stringify(write.trueClass)} : ${JSON.stringify(write.falseClass)});`,
 					'	}',
 					'}',
 					'',
@@ -607,7 +599,10 @@ function emitRepeatClassStateFunction(repeat: KeyedRepeatPlan, index: number) {
 function emitRepeatEventFunction(repeat: KeyedRepeatPlan, index: number) {
 	const eventGroups = new Map<
 		string,
-		Array<{ readonly eventControl: KeyedRepeatPlan['eventControls'][number]; readonly eventIndex: number }>
+		Array<{
+			readonly eventControl: KeyedRepeatPlan['eventControls'][number];
+			readonly eventIndex: number;
+		}>
 	>();
 	repeat.eventControls.forEach((eventControl, eventIndex) => {
 		const controls = eventGroups.get(eventControl.eventName) ?? [];

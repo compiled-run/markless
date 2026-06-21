@@ -8,7 +8,10 @@
 		"check": "vp check",
 		"fmt": "vp fmt",
 		"lint": "vp lint",
-		"test": "vp test && pnpm --dir packages/bundler test:boxes",
+		"test": "vp test && pnpm bench:jsfb:guard && pnpm --dir packages/bundler test:boxes",
+		"bench:jsfb:compare": "node scripts/benchmarks/jsfb-baseline.mjs compare",
+		"bench:jsfb:guard": "node scripts/benchmarks/jsfb-baseline.mjs compare",
+		"bench:jsfb:prepare": "node scripts/benchmarks/prepare-jsfb-arcade.mjs",
 		"test:compiler": "vp test packages/compiler/test/*.test.ts"
 	},
 	"devDependencies": {
