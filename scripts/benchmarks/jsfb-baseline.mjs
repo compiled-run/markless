@@ -35,7 +35,7 @@ function readNumber(value) {
 
 function valueFromSummary(summary) {
 	if (!isObject(summary)) return readNumber(summary);
-	for (const key of ['geometricMean', 'median', 'mean', 'min']) {
+	for (const key of ['median', 'geometricMean', 'mean', 'min']) {
 		const value = readNumber(summary[key]);
 		if (value !== undefined) return value;
 	}

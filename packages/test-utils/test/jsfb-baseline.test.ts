@@ -35,6 +35,12 @@ function jsfbResult(
 	type: string,
 	key: string,
 	value: number,
+	summary: Partial<{
+		readonly geometricMean: number;
+		readonly max: number;
+		readonly mean: number;
+		readonly min: number;
+	}> = {},
 ) {
 	return JSON.stringify({
 		framework,
@@ -43,11 +49,11 @@ function jsfbResult(
 		type,
 		values: {
 			[key]: {
-				min: value,
-				max: value,
-				mean: value,
+				min: summary.min ?? value,
+				max: summary.max ?? value,
+				mean: summary.mean ?? value,
 				median: value,
-				geometricMean: value,
+				geometricMean: summary.geometricMean ?? value,
 				standardDeviation: 0,
 				values: [value],
 			},
@@ -62,22 +68,43 @@ describe('js-framework-benchmark baseline guard', () => {
 		await mkdir(resultsDir, { recursive: true });
 
 		await writeFile(
-			join(resultsDir, 'arcade-keyed_01_run1k.json'),
-			jsfbResult('arcade-keyed', '01_run1k', 'cpu', 'total', 22.7),
+			join(resultsDir, 'arcade-v0.0.0-local-keyed_05_swap1k.json'),
+			jsfbResult('arcade-v0.0.0-local-keyed', '05_swap1k', 'cpu', 'total', 15.9, {
+				geometricMean: 3.8,
+				max: 24.7,
+				mean: 17.16,
+				min: 14.5,
+			}),
 		);
 		await writeFile(
-			join(resultsDir, 'arcade-keyed_41_size-uncompressed.json'),
-			jsfbResult('arcade-keyed', '41_size-uncompressed', 'size', 'DEFAULT', 10.8),
+			join(resultsDir, 'arcade-v0.0.0-local-keyed_09_clear1k_x8.json'),
+			jsfbResult('arcade-v0.0.0-local-keyed', '09_clear1k_x8', 'cpu', 'total', 9.5, {
+				geometricMean: 2.6,
+				max: 11.5,
+				mean: 9.74,
+				min: 9.1,
+			}),
 		);
 		await writeFile(
-			join(resultsDir, 'solid-keyed_01_run1k.json'),
-			jsfbResult('solid-keyed', '01_run1k', 'cpu', 'total', 20.6),
+			join(resultsDir, 'arcade-v0.0.0-local-keyed_41_size-uncompressed.json'),
+			jsfbResult(
+				'arcade-v0.0.0-local-keyed',
+				'41_size-uncompressed',
+				'size',
+				'DEFAULT',
+				10.8,
+			),
+		);
+		await writeFile(
+			join(resultsDir, 'solid-v1.9.3-keyed_05_swap1k.json'),
+			jsfbResult('solid-v1.9.3-keyed', '05_swap1k', 'cpu', 'total', 16.2),
 		);
 
 		await expect(
 			readJsfbResultsDirectory(resultsDir, { framework: 'arcade-keyed' }),
 		).resolves.toEqual({
-			'01_run1k': 22.7,
+			'05_swap1k': 15.9,
+			'09_clear1k': 9.5,
 			'41_size-uncompressed': 10.8,
 		});
 	});

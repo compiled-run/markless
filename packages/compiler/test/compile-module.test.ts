@@ -644,18 +644,20 @@ export function App() @{
 	expect(moduleSource).not.toContain('graph.read("state:chosen", [])');
 	expect(moduleSource).toContain('const classValue = readArcadePublicRepeat0ClassValues(graph);');
 	expect(moduleSource).toContain('writeArcadePublicRepeat0Row(record, item, classValue);');
-	expect(moduleSource).toContain(
+	expect(moduleSource).toContain('attachArcadePublicRepeat0Events(record);');
+	expect(moduleSource).not.toContain(
 		'attachArcadePublicRepeat0Events(record, graph, loadSymbolForRepeat);',
 	);
 	expect(moduleSource).toContain(
 		'delegateArcadePublicRepeat0Events(parent, graph, loadSymbolForRepeat);',
 	);
-	expect(moduleSource).toContain('const element0 = record.root.childNodes?.[1];');
+	expect(moduleSource).toContain('event0: row.childNodes?.[1],');
+	expect(moduleSource).toContain('const element0 = record.event0;');
+	expect(moduleSource).not.toContain('const element0 = record.root.childNodes?.[1];');
 	expect(moduleSource).toContain('element0.__arcadePublicRepeat0Event0 = record;');
 	expect(moduleSource).toContain('parent.addEventListener("click"');
 	expect(moduleSource).toContain('const record = eventTarget?.__arcadePublicRepeat0Event0;');
 	expect(moduleSource).not.toContain('element0.addEventListener("click"');
-	expect(moduleSource).not.toContain('event0:');
 	expect(moduleSource).toContain('const dirtyGraphNodeIds = new Set();');
 	expect(moduleSource).toContain('const dirtyArrayIndexes = new Map();');
 	expect(moduleSource).toContain(
@@ -687,6 +689,12 @@ export function App() @{
 	expect(moduleSource).not.toContain('findArcadePublicRepeatEventRecord');
 	expect(moduleSource).toMatch(
 		/call\(call\)[\s\S]*delete\(deletion\)[\s\S]*clearArcadePublicRows/,
+	);
+	expect(moduleSource).toContain(
+		'if (parent.replaceChildren) parent.replaceChildren(); else parent.textContent = "";',
+	);
+	expect(moduleSource).not.toContain(
+		'if (parent.textContent !== undefined) parent.textContent = ""; else parent.replaceChildren?.();',
 	);
 	for (const unexpected of [
 		'state: payloadState',
@@ -1044,6 +1052,102 @@ export function InitialArticles() @{
 	]);
 	expect(appendCalls).toBeGreaterThan(0);
 	expect(replaceCalls).toBe(0);
+});
+
+test('compileTsrxModule public render module replaces all-new keyed rows with the built fragment', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/ReplaceArticles.tsrx',
+		source: `
+import { state } from '@arcade/core';
+
+export function ReplaceArticles() @{
+	let entries = state([]);
+
+	<section>
+		<button onClick={() => entries = [{ code: 'alpha', title: 'Alpha' }, { code: 'beta', title: 'Beta' }]}>Load</button>
+		<button onClick={() => entries = [{ code: 'copper', title: 'Copper' }, { code: 'delta', title: 'Delta' }]}>Replace</button>
+		<div>
+			@for (const entry of entries; key entry.code) {
+				<article>
+					<h2>{entry.title}</h2>
+				</article>
+			}
+		</div>
+	</section>
+}
+`,
+		symbols: [],
+	});
+	const loadEntriesSymbol = result.symbolResolver.symbols.find((symbol) =>
+		symbol.source.includes("'Alpha'"),
+	);
+	const replaceEntriesSymbol = result.symbolResolver.symbols.find((symbol) =>
+		symbol.source.includes("'Copper'"),
+	);
+	expect(loadEntriesSymbol).toBeDefined();
+	expect(replaceEntriesSymbol).toBeDefined();
+
+	const loadSymbol = (symbolId: string) => {
+		if (symbolId === loadEntriesSymbol?.id) {
+			return ({ graph }: { readonly graph: PublicRenderTestGraph }) => {
+				graph.write({
+					graphNodeId: 'state:entries',
+					value: [
+						{ code: 'alpha', title: 'Alpha' },
+						{ code: 'beta', title: 'Beta' },
+					],
+				});
+			};
+		}
+		if (symbolId === replaceEntriesSymbol?.id) {
+			return ({ graph }: { readonly graph: PublicRenderTestGraph }) => {
+				graph.write({
+					graphNodeId: 'state:entries',
+					value: [
+						{ code: 'copper', title: 'Copper' },
+						{ code: 'delta', title: 'Delta' },
+					],
+				});
+			};
+		}
+		throw new Error(`Unexpected public render test symbol ${symbolId}`);
+	};
+	let fragmentCreations = 0;
+	const document = {
+		createElement(tagName: string) {
+			if (tagName === 'template') return new PublicRenderTestTemplate();
+			return new PublicRenderTestElement(tagName);
+		},
+		createDocumentFragment() {
+			fragmentCreations++;
+			return new PublicRenderTestFragment();
+		},
+	};
+	const publicModule = await importPublicRenderTestModule(
+		[
+			'const document = globalThis.__arcadePublicRenderTestDocument;',
+			'const loadSymbol = globalThis.__arcadePublicRenderTestLoadSymbol;',
+			result.publicRenderModule.moduleSource,
+		].join('\n'),
+		{ document, loadSymbol },
+	);
+	const rendered = publicModule.ReplaceArticles() as { readonly root: PublicRenderTestElement };
+	const [loadButton, replaceButton] = elementsByTag(rendered.root, 'button');
+
+	await loadButton!.dispatch('click');
+	expect(elementsByTag(rendered.root, 'article').map((row) => row.textContent)).toEqual([
+		'Alpha',
+		'Beta',
+	]);
+	fragmentCreations = 0;
+
+	await replaceButton!.dispatch('click');
+
+	expect(elementsByTag(rendered.root, 'article').map((row) => row.textContent)).toEqual([
+		'Copper',
+		'Delta',
+	]);
+	expect(fragmentCreations).toBe(1);
 });
 
 test('compileTsrxModule public render module writes keyed text bindings through text nodes', async () => {
