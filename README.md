@@ -36,11 +36,11 @@ Arcade turns that `.tsrx` file into:
 - state, like `count`;
 - text that depends on that state;
 - events, like the button click;
-- small code chunks that load only when needed.
+- small code chunks that execute only when needed.
 
 On the web, Arcade turns this into HTML and DOM updates. The browser does not
 rerun `Counter()`, rebuild a virtual tree, or hydrate the app. When the button
-is clicked, Arcade loads the click code and updates only the text that depends
+is clicked, Arcade executes the click code and updates only the text that depends
 on `count`.
 
 On native targets, Arcade can turn the same kind of model into real native
@@ -65,7 +65,7 @@ Arcade .tsrx source
 - `.tsrx` components with familiar JavaScript reads and writes.
 - Authoring APIs from `arcade`: `state`, `computed`, `shared`, and
   `element`.
-- Compiler-owned state, payloads, and lazy code loading.
+- Compiler-owned state, payloads, and lazy code execution.
 - One web-like authoring model that can target more than the browser.
 - Target adapters for DOM, UIKit, AppKit, and future hosts.
 - No hydration, no VDOM, and no client component replay.
@@ -77,7 +77,7 @@ Arcade does not try to force one exact UI tree to work everywhere.
 An app can have routes or screens that are shared across targets, and it can
 also have routes or screens that are only for web, iOS, macOS, or another
 target. Arcade gives those targets the same framework model: state, events,
-async work, lazy code loading, and resumability. The target owns the real
+async work, lazy code execution, and resumability. The target owns the real
 controls. On the web that means DOM. On iOS that means UIKit. On macOS that
 means AppKit.
 
