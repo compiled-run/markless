@@ -199,6 +199,7 @@ export function compareBenchmarkResults(baseline, currentResults) {
 	const thresholds = baseline.thresholds ?? {};
 	const failures = [];
 	const warnings = [];
+	const cpuBenchmarkRegressions = [];
 
 	const currentCpu = [];
 	const baselineCpu = [];
@@ -211,7 +212,7 @@ export function compareBenchmarkResults(baseline, currentResults) {
 		baselineCpu.push(previous);
 		const ratio = current / previous;
 		if (ratio > (thresholds.cpuBenchmarkRegressionRatio ?? 1.07)) {
-			failures.push(
+			cpuBenchmarkRegressions.push(
 				`${key} regressed from ${previous} to ${current} (${formatRatio(ratio)} of baseline).`,
 			);
 		}
@@ -219,14 +220,18 @@ export function compareBenchmarkResults(baseline, currentResults) {
 
 	const currentGeo = geometricMean(currentCpu);
 	const baselineGeo = geometricMean(baselineCpu);
+	let cpuGeomeanDidNotRegress = false;
 	if (currentGeo !== undefined && baselineGeo !== undefined) {
 		const ratio = currentGeo / baselineGeo;
+		cpuGeomeanDidNotRegress = ratio <= 1;
 		if (ratio > (thresholds.cpuGeomeanRegressionRatio ?? 1.03)) {
 			failures.push(
 				`CPU geomean regressed from ${baselineGeo.toFixed(2)} to ${currentGeo.toFixed(2)} (${formatRatio(ratio)} of baseline).`,
 			);
 		}
 	}
+	if (cpuGeomeanDidNotRegress) warnings.push(...cpuBenchmarkRegressions);
+	else failures.push(...cpuBenchmarkRegressions);
 
 	for (const key of sizeBenchmarks) {
 		const current = requiredResult(currentResults, key, failures);

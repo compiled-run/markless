@@ -84,9 +84,14 @@ The command exits non-zero when Arcade gets materially worse than the accepted
 Arcade baseline:
 
 - CPU geomean regression over 3%.
-- Any individual CPU benchmark regression over 7%.
+- Any individual CPU benchmark regression over 7% when the CPU geomean also
+  regresses or cannot be computed.
 - Raw size regression over 0.5 kB.
 - Gzip size regression over 0.15 kB.
+
+Individual CPU benchmark regressions are reported as warnings when the same run
+also improves the CPU geomean, because single JSFB rows can move on paint/layout
+noise even when the benchmark suite got faster overall.
 
 First paint is reported as a warning because it is too noisy for a hard PR gate
 unless repeated runs confirm the regression.

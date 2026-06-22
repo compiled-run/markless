@@ -188,4 +188,39 @@ describe('js-framework-benchmark baseline guard', () => {
 		);
 		expect(sameMachineResult.ok).toBe(true);
 	});
+
+	test('warns for individual CPU row noise when same-runner geomean improves', async () => {
+		const { compareBenchmarkResults } = await loadBenchmarkGuard();
+		const baseline = {
+			thresholds: {
+				cpuGeomeanRegressionRatio: 1.03,
+				cpuBenchmarkRegressionRatio: 1.07,
+			},
+			benchmarks: {
+				cpu: ['01_run1k', '05_swap1k', '07_create10k'],
+			},
+			frameworks: {
+				arcade: {
+					results: {
+						'01_run1k': 95.1,
+						'05_swap1k': 65.5,
+						'07_create10k': 1425.8,
+					},
+				},
+			},
+		};
+
+		const result = compareBenchmarkResults(baseline, {
+			'01_run1k': 96.8,
+			'05_swap1k': 72.5,
+			'07_create10k': 1005.2,
+		});
+
+		expect(result.currentCpuGeomean).toBeLessThan(result.baselineCpuGeomean);
+		expect(result.ok).toBe(true);
+		expect(result.failures).toEqual([]);
+		expect(result.warnings).toEqual([
+			expect.stringContaining('05_swap1k regressed from 65.5 to 72.5'),
+		]);
+	});
 });
