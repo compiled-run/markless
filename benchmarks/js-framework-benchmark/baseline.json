@@ -4,7 +4,7 @@
 		"benchmarkSuite": "js-framework-benchmark",
 		"scope": "keyed",
 		"framework": "arcade-keyed",
-		"notes": "Accepted local full comparison from the Arcade benchmark optimization pass. Lower numbers are better."
+		"notes": "Accepted local full comparison from the Arcade benchmark optimization pass using JSFB values.total.median for CPU rows. Lower numbers are better."
 	},
 	"thresholds": {
 		"cpuGeomeanRegressionRatio": 1.03,
@@ -33,51 +33,51 @@
 			"displayName": "Arcade",
 			"results": {
 				"01_run1k": 22.7,
-				"02_replace1k": 24.6,
-				"03_update10th1k": 6.9,
-				"04_select1k": 2.4,
-				"05_swap1k": 3.8,
-				"06_remove-one-1k": 6.2,
-				"07_create10k": 230.4,
-				"08_create1k-after1k": 25.4,
-				"09_clear1k": 2.6,
+				"02_replace1k": 25.1,
+				"03_update10th1k": 16.15,
+				"04_select1k": 3.45,
+				"05_swap1k": 15.9,
+				"06_remove-one-1k": 12.1,
+				"07_create10k": 229.9,
+				"08_create1k-after1k": 24.05,
+				"09_clear1k": 9.5,
 				"41_size-uncompressed": 10.8,
 				"42_size-compressed": 3.7,
-				"43_first-paint": 78.1
+				"43_first-paint": 74
 			}
 		},
 		"solid": {
 			"displayName": "Solid",
 			"results": {
-				"01_run1k": 20.6,
-				"02_replace1k": 24,
-				"03_update10th1k": 6.4,
-				"04_select1k": 3.7,
-				"05_swap1k": 6.6,
-				"06_remove-one-1k": 5.5,
-				"07_create10k": 222,
-				"08_create1k-after1k": 25.3,
-				"09_clear1k": 4.8,
+				"01_run1k": 22.15,
+				"02_replace1k": 25.5,
+				"03_update10th1k": 15.55,
+				"04_select1k": 4.25,
+				"05_swap1k": 16.2,
+				"06_remove-one-1k": 12.05,
+				"07_create10k": 223.2,
+				"08_create1k-after1k": 25.25,
+				"09_clear1k": 12.65,
 				"41_size-uncompressed": 11.5,
 				"42_size-compressed": 4.5,
-				"43_first-paint": 60.4
+				"43_first-paint": 66.8
 			}
 		},
 		"ripple": {
 			"displayName": "Ripple",
 			"results": {
-				"01_run1k": 20.6,
-				"02_replace1k": 23.2,
-				"03_update10th1k": 5.9,
-				"04_select1k": 4.4,
-				"05_swap1k": 6.3,
-				"06_remove-one-1k": 5.2,
-				"07_create10k": 218.2,
-				"08_create1k-after1k": 24.8,
-				"09_clear1k": 4.4,
+				"01_run1k": 21.95,
+				"02_replace1k": 24.15,
+				"03_update10th1k": 15.55,
+				"04_select1k": 4.8,
+				"05_swap1k": 15.8,
+				"06_remove-one-1k": 11.65,
+				"07_create10k": 228.5,
+				"08_create1k-after1k": 24.35,
+				"09_clear1k": 10.65,
 				"41_size-uncompressed": 19.3,
 				"42_size-compressed": 7.3,
-				"43_first-paint": 64.7
+				"43_first-paint": 70.5
 			}
 		},
 		"vanillajs": {
