@@ -60,6 +60,10 @@ a time through failing tests.
   target scaffold proving a serialized Arcade-style graph/projection artifact
   can create UIKit controls, run a JavaScriptCore event symbol, and flush graph
   state back into native text when full Xcode simulator tooling is available.
+- [`macos-native-rendering-target`](./macos-native-rendering-target/): macOS
+  desktop target scaffold proving a serialized Arcade-style graph/projection
+  artifact can create AppKit controls, run a JavaScriptCore event symbol, and
+  flush graph state back into native text when Xcode macOS tooling is available.
 
 ## Pass-Boundary Order
 
