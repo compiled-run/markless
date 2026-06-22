@@ -608,7 +608,12 @@ export function App() @{
 	expect(moduleSource).not.toContain('function repeatState(root, planIndex)');
 	expect(moduleSource).not.toContain('states = []');
 	expect(moduleSource).toContain('function createArcadePublicRepeat0Record(row, item)');
+	expect(moduleSource).toContain('function createArcadePublicRepeat0Row()');
+	expect(moduleSource).toContain('let arcadePublicRepeat0Template;');
+	expect(moduleSource).toContain('const rowRoot = createArcadePublicRepeat0Row();');
 	expect(moduleSource).toContain('record = createArcadePublicRepeat0Record(rowRoot, item);');
+	expect(moduleSource).not.toContain('createArcadePublicRow(');
+	expect(moduleSource).not.toContain('arcadePublicRowTemplates');
 	expect(moduleSource).toContain('text0: row.childNodes?.[0]?.childNodes?.[0],');
 	expect(moduleSource).toContain('class0: row,');
 	expect(moduleSource).not.toContain('record.targets');

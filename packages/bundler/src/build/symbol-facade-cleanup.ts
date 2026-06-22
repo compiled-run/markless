@@ -343,11 +343,13 @@ function compactDirectSymbolLoadersInCode(code: string): {
 
 		const body = code.slice(bodyStart, bodyEnd);
 		const mapName = uniqueIdentifier('$s', `${code}${next}`);
+		const moduleCacheName = uniqueIdentifier('$m', `${code}${next}${mapName}`);
 		const replacement = compactDirectSymbolLoaderFunction({
 			functionName: match[1]!,
 			parameterName: match[2]!,
 			body,
 			mapName,
+			moduleCacheName,
 		});
 		if (!replacement) {
 			FUNCTION_DECLARATION_RE.lastIndex = bodyEnd + 1;
@@ -370,6 +372,7 @@ function compactDirectSymbolLoaderFunction(input: {
 	readonly parameterName: string;
 	readonly body: string;
 	readonly mapName: string;
+	readonly moduleCacheName: string;
 }): string | undefined {
 	const returnSource = input.body.trim();
 	if (!returnSource.startsWith('return ')) return undefined;
@@ -394,12 +397,15 @@ function compactDirectSymbolLoaderFunction(input: {
 	const generatedCount = generatedSymbolRangeCount(parsed.branches);
 	if (generatedCount !== undefined) {
 		return [
+			`let ${input.moduleCacheName};`,
 			`function ${input.functionName}(${input.parameterName}){`,
 			`let t=+${input.parameterName}.slice(7);`,
-			`return ${input.parameterName}===\`symbol:${'${t}'}\`&&t>=0&&t<${generatedCount}?`,
-			`import(${JSON.stringify(first.importSpecifier)})`,
-			`.then(${first.moduleParameter}=>${first.helperName}(${first.moduleParameter},\`symbol_${'${t}'}\`))`,
-			`:${parsed.fallback}`,
+			`if(${input.parameterName}===\`symbol:${'${t}'}\`&&t>=0&&t<${generatedCount}){`,
+			`if(${input.moduleCacheName})return ${first.helperName}(${input.moduleCacheName},\`symbol_${'${t}'}\`);`,
+			`return import(${JSON.stringify(first.importSpecifier)})`,
+			`.then(${first.moduleParameter}=>(${input.moduleCacheName}=${first.moduleParameter},${first.helperName}(${first.moduleParameter},\`symbol_${'${t}'}\`)))`,
+			`}`,
+			`return ${parsed.fallback}`,
 			'}',
 		].join('');
 	}
@@ -410,11 +416,15 @@ function compactDirectSymbolLoaderFunction(input: {
 		.join(',');
 	return [
 		`const ${input.mapName}={${mapEntries}};`,
+		`let ${input.moduleCacheName};`,
 		`function ${input.functionName}(${input.parameterName}){`,
 		`let ${exportVariable}=${input.mapName}[${input.parameterName}];`,
-		`return ${exportVariable}?import(${JSON.stringify(first.importSpecifier)})`,
-		`.then(${first.moduleParameter}=>${first.helperName}(${first.moduleParameter},${exportVariable}))`,
-		`:${parsed.fallback}`,
+		`if(${exportVariable}){`,
+		`if(${input.moduleCacheName})return ${first.helperName}(${input.moduleCacheName},${exportVariable});`,
+		`return import(${JSON.stringify(first.importSpecifier)})`,
+		`.then(${first.moduleParameter}=>(${input.moduleCacheName}=${first.moduleParameter},${first.helperName}(${first.moduleParameter},${exportVariable})))`,
+		`}`,
+		`return ${parsed.fallback}`,
 		'}',
 	].join('');
 }

@@ -1,12 +1,12 @@
 import { isEventAttribute, normalizeEventName, parseModule } from '@tsrx/core';
-import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../ast/nodes.ts';
-import { expressionSource } from '../ast/source.ts';
+import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
+import { expressionSource } from '../../ast/source.ts';
 import {
 	graphBindingMap,
 	resolveGraphPath,
 	semanticAliasMap,
 	splitStaticGraphPath,
-} from '../artifact-helpers/graph-paths.ts';
+} from '../../artifact-helpers/graph-paths.ts';
 import type {
 	PayloadKeyedRepeat,
 	PlannedSymbol,
@@ -22,8 +22,10 @@ import type {
 	PublicRenderPlanUnsupportedReason,
 	SemanticGraphBinding,
 	SemanticKeyedRepeat,
-} from '../artifacts.ts';
+} from '../../artifacts.ts';
 
+// Builds the public render artifact that the module emitter consumes. This pass
+// decides what direct DOM work is compiler-proven instead of emitting code itself.
 export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlanArtifact {
 	const ast = parseModule(input.source.source, input.source.filename) as AnyNode;
 	const component = findComponent(ast);

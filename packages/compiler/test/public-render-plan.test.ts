@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { buildSemanticGraph, lowerStateAccess } from '../src/index.ts';
 import { planPayloadArena } from '../src/passes/payload-arena.ts';
-import { planPublicRender } from '../src/passes/public-render-plan.ts';
+import { planPublicRender } from '../src/passes/public-render/plan.ts';
 import { planSymbolResolver } from '../src/passes/symbol-resolver.ts';
 
 const appSource = (body: string, extra = '') =>

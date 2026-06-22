@@ -226,7 +226,7 @@ describe('generated symbol facade cleanup', () => {
 
 		expect(result.compacted).toBe(1);
 		expect(bundle['build/app.js']?.code).toBe(
-			'function o(e){let t=+e.slice(7);return e===`symbol:${t}`&&t>=0&&t<2?import("./shared.js").then(e=>s(e,`symbol_${t}`)):Promise.reject(Error(`Unknown async symbol ${e}`))}function s(e,t){return e.init__virtual_arcade_symbol?.(),e[t]}',
+			'let $m;function o(e){let t=+e.slice(7);if(e===`symbol:${t}`&&t>=0&&t<2){if($m)return s($m,`symbol_${t}`);return import("./shared.js").then(e=>($m=e,s(e,`symbol_${t}`)))}return Promise.reject(Error(`Unknown async symbol ${e}`))}function s(e,t){return e.init__virtual_arcade_symbol?.(),e[t]}',
 		);
 	});
 
@@ -246,7 +246,7 @@ describe('generated symbol facade cleanup', () => {
 		compactGeneratedDirectSymbolLoaders(bundle);
 
 		expect(bundle['build/app.js']?.code).toBe(
-			'const $s={"root#save":"save","root#close":"close"};function o(e){let t=$s[e];return t?import("./shared.js").then(e=>s(e,t)):Promise.reject(Error(`Unknown async symbol ${e}`))}function s(e,t){return e[t]}',
+			'const $s={"root#save":"save","root#close":"close"};let $m;function o(e){let t=$s[e];if(t){if($m)return s($m,t);return import("./shared.js").then(e=>($m=e,s(e,t)))}return Promise.reject(Error(`Unknown async symbol ${e}`))}function s(e,t){return e[t]}',
 		);
 	});
 });
