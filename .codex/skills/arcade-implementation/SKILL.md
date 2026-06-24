@@ -9,9 +9,18 @@ description: 'Use when implementing the Arcade TSRX framework: compiler passes, 
 
 1. Run `git status --short` and inspect relevant diffs. Preserve user changes.
 2. Read [AGENTS.md](../../../AGENTS.md) and [specs/framework-design.md](../../../specs/framework-design.md), then the narrow spec files for the current task.
-3. Add or update the closest focused failing test before implementation. Run it and confirm it fails for the expected reason.
-4. Implement the smallest vertical slice that proves behavior. Avoid future infrastructure unless the active spec requires it.
-5. Use `apply_patch` for manual edits.
+3. Confirm the active goal prompt includes the hard TSRX spec requirement, at
+   least three minutes of grep MCP (`mcp__grep.searchGitHub`) research before
+   solving, and a self-created insertion limit. If any of these are missing,
+   add them to the goal prompt or stop and tell the user before implementation.
+4. Spend the required grep MCP time on relevant real-world code patterns and
+   record the patterns checked. This does not replace local repo inspection
+   with `rg`.
+5. Add or update the closest focused failing test before implementation. Run it and confirm it fails for the expected reason.
+6. Implement the smallest vertical slice that proves behavior. Avoid future
+   infrastructure unless the active spec requires it, and stay inside the
+   insertion limit unless the user approves expanding scope.
+7. Use `apply_patch` for manual edits.
 
 ## Core Model
 
@@ -61,6 +70,9 @@ description: 'Use when implementing the Arcade TSRX framework: compiler passes, 
 - Each pass should emit or expose a human-readable artifact that the next layer consumes. Do not hide contract decisions only inside generated code or browser behavior.
 - Proof fixtures live under `poc/fixtures/proofs/` and proof implementation packages live under `poc/packages/*`. They are executable specs and design evidence, not production framework packages. Start with `resume-basic`, `state-lvalues`, `sync-event-policy`, `payload-locators`, `symbol-resolver`, `serializer-values`, `scheduler-journal`, and `bundler-pipeline`.
 - Start each proof through GoalBuddy prompt/prep first, then run the generated `/goal`. One proof goal owns one `poc/fixtures/proofs/<name>/` directory.
+- Each GoalBuddy-prepared implementation goal must include: `TSRX spec compliance
+  is mandatory`, `Minimum grep MCP research: 3 minutes before solving`, and
+  `Insertion limit: <N> added lines unless the user approves expanding scope`.
 - Unit and integration tests should use vite-plus (`vp test`) once the package exists.
 - Component/browser tests should use Vitest browser mode, modeled after `/Users/jacksm5pro/dev/open-source/vitest-browser-qwik` and adapted for this framework.
 - Pipeline/HMR/build-behavior tests should use `/Users/jacksm5pro/dev/open-source/witness` so the Vite/Rolldown pipeline produces receipts.
