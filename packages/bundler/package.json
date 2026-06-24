@@ -5,6 +5,7 @@
 	"type": "module",
 	"sideEffects": false,
 	"exports": {
+		"./preload": "./src/preload.ts",
 		"./rolldown": "./src/rolldown.ts",
 		"./vite": "./src/vite/index.ts"
 	},

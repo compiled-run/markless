@@ -4,7 +4,7 @@ import type { SemanticModuleImport } from '../../artifacts.ts';
 export type FrameworkApiName = 'state' | 'computed' | 'element' | 'shared';
 
 const frameworkApiNames = new Set<FrameworkApiName>(['state', 'computed', 'element', 'shared']);
-const frameworkApiSources = new Set(['@arcade/core', '@arcade/arcade']);
+const frameworkApiSources = new Set(['@arcade/core', 'arcade']);
 
 // These imports make compiler-rewritten APIs explicit in user code.
 // A bare state() call is not enough; it must resolve to an import from @arcade/core.

@@ -125,7 +125,6 @@ function manifestWithLazySymbolDeps(): ArcadeManifest {
 				source: '/workspace/app/src/root.tsrx',
 				payload: { virtualModuleId: 'virtual:arcade:payload:root' },
 				resolver: { virtualModuleId: 'virtual:arcade:resolver:root' },
-				moduleManifest: { virtualModuleId: 'virtual:arcade:module-manifest:root' },
 				symbols: [
 					{
 						symbolId: 'symbol:press',

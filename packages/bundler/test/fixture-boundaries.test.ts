@@ -22,7 +22,7 @@ const tsrxFixtureImports = [
 	},
 	{
 		path: 'vite-ssr/src/root.tsrx',
-		importLine: "import { state, computed } from '@arcade/core';",
+		importLine: "import { state } from '@arcade/core';",
 	},
 ] as const;
 
@@ -36,40 +36,43 @@ describe('fixture framework boundaries', () => {
 	test('browser entries use CSR render and SSR resume runtime helpers at the right boundary', async () => {
 		const csrEntry = await readFixture('vite-csr/src/main.ts');
 		const vitePlusEntry = await readFixture('vite-plus/src/main.ts');
-		const ssrEntry = await readFixture('vite-ssr/src/entry-client.ts');
 
-		for (const source of [csrEntry, vitePlusEntry, ssrEntry]) {
+		for (const source of [csrEntry, vitePlusEntry]) {
 			expect(source).not.toContain('data-async-host');
 			expect(source).not.toContain('asyncHost');
 			expect(source).not.toContain('querySelectorAll');
 			expect(source).not.toContain('applyDomJournalEntries');
 			expect(source).not.toContain('applyDomJournal');
 		}
-		expect(csrEntry).toContain("import { render } from '@arcade/runtime/render';");
+		expect(csrEntry).toContain("import { render } from 'arcade';");
 		expect(csrEntry).not.toContain('resumeFromPayloadScripts');
-		expect(vitePlusEntry).toContain("import { render } from '@arcade/runtime/render';");
+		expect(vitePlusEntry).toContain("import { render } from 'arcade';");
 		expect(vitePlusEntry).not.toContain('resumeFromPayloadScripts');
-		expect(ssrEntry).toContain(
-			"import { resumeEventOnlyFromPayloadDocument } from '@arcade/runtime/event-only-resume';",
-		);
-		expect(ssrEntry).toContain('export async function resumeContainerEvent');
-		expect(ssrEntry).toContain('eventRecord');
-		expect(ssrEntry).not.toContain('__asyncResumeRuntimeStarted');
-		expect(ssrEntry).not.toContain('syncPolicyAlreadyApplied: true');
-		expect(ssrEntry).not.toContain('await resumeFromPayloadDocument');
-		expect(ssrEntry).not.toContain('@arcade/runtime/resume');
 	});
 
-	test('server shell does not emit public per-node async host markers', async () => {
-		const renderShell = await readFixture('vite-ssr/src/render-shell.ts');
+	test('SSR fixtures do not contain app-authored render ceremony files', async () => {
+		for (const path of [
+			'vite-ssr/src/entry-client.ts',
+			'vite-ssr/src/entry-server.ts',
+			'vite-ssr/src/render-shell.ts',
+			'vite-ssr-preloader/src/entry-client.ts',
+			'vite-ssr-preloader/src/entry-server.ts',
+			'vite-ssr-preloader/src/render-shell.ts',
+		]) {
+			await expect(readFixture(path)).rejects.toMatchObject({ code: 'ENOENT' });
+		}
+	});
 
-		expect(renderShell).not.toContain('data-async-host');
-		expect(renderShell).not.toContain('hostId');
-		expect(renderShell).toContain('renderToString');
-		expect(renderShell).toContain('@arcade/runtime/render-to-string');
-		expect(renderShell).not.toContain("from '@arcade/runtime/render'");
-		expect(renderShell).toContain('resumeModuleUrl');
-		expect(renderShell).toContain('<span>hello</span>');
+	test('SSR fixture host renders the compiled TSRX artifact directly', async () => {
+		const host = await readFixture('vite-ssr/src/dev-server.ts');
+
+		expect(host).toContain("import { renderToString");
+		expect(host).toContain("runner.import('/src/root.tsrx')");
+		expect(host).toContain('renderToString(entry.default');
+		expect(host).not.toContain('entry-client');
+		expect(host).not.toContain('entry-server');
+		expect(host).not.toContain('renderServerShell');
+		expect(host).not.toContain('render-shell');
 	});
 
 	test('SSR fixture config keeps framework compilation out of app config', async () => {
@@ -83,9 +86,9 @@ describe('fixture framework boundaries', () => {
 		expect(config).not.toContain('consumer:');
 		expect(config).not.toContain('outDir:');
 		expect(config).not.toContain('entryFileNames:');
-		expect(config).toContain("index: 'index.html'");
-		expect(config).toContain("resume: 'src/entry-client.ts'");
-		expect(config).toContain("input: 'src/entry-server.ts'");
+		expect(config).toContain("input: 'index.html'");
+		expect(config).not.toContain("symbols: 'src/root.tsrx'");
+		expect(config).toContain("input: 'src/root.tsrx'");
 		expect(config).toContain("preserveEntrySignatures: 'exports-only'");
 	});
 

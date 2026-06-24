@@ -13,6 +13,14 @@ export type SsrRenderOutput = {
 	readonly view?: ProtocolViewPayload;
 };
 
+export type SsrRenderArtifact = {
+	readonly renderSsr: (props?: unknown) => SsrRenderOutput;
+	readonly modulePreloads?: ReadonlyArray<ModulePreloadInput>;
+	readonly resumeModuleUrl?: string;
+};
+
+export type SsrRenderable = (() => SsrRenderOutput) | SsrRenderArtifact;
+
 export type RenderToStringOptions = {
 	readonly nonce?: string;
 	readonly resumeModuleUrl?: string;
@@ -27,28 +35,32 @@ export type ModulePreloadInput =
 			readonly href: string;
 			readonly fetchPriority?: 'high' | 'low' | 'auto';
 			readonly crossOrigin?: 'anonymous' | 'use-credentials';
-	  };
+};
 
 export function renderToString(
-	component: () => SsrRenderOutput,
+	component: SsrRenderable,
 	options: RenderToStringOptions = {},
 ): string {
-	const output = component();
+	const output = renderSsrOutput(component);
 	const hasPayload = !!output.state || !!output.view;
 	const state = output.state ?? emptyStatePayload();
 	const view = containerScopedView(output.view ?? emptyViewPayload());
 	const payloadScripts = hasPayload ? renderPayloadScripts({ state, view }) : undefined;
+	const resumeModuleUrl = options.resumeModuleUrl ?? artifactResumeModuleUrl(component);
+	const browserTriggers = hasBrowserTriggers(view);
+	const modulePreloads =
+		options.modulePreloads ?? (browserTriggers ? artifactModulePreloads(component) : undefined);
 	const resumerScript =
-		hasPayload && hasBrowserTriggers(view)
+		hasPayload && browserTriggers
 			? renderInlineResumerScript(
 					options.resumerSource ??
-						defaultInlineResumerSource(options.resumeModuleUrl, view),
+						defaultInlineResumerSource(resumeModuleUrl, view),
 					options.nonce,
 				)
 			: '';
 
 	return [
-		renderModulePreloadLinks(options.modulePreloads, options.nonce),
+		renderModulePreloadLinks(modulePreloads, options.nonce),
 		`<div${renderContainerAttributes(options.containerId)}>`,
 		output.html,
 		payloadScripts?.stateScript,
@@ -58,6 +70,22 @@ export function renderToString(
 	]
 		.filter(Boolean)
 		.join('');
+}
+
+function renderSsrOutput(component: SsrRenderable): SsrRenderOutput {
+	if (typeof component === 'function') return component();
+	if (component && typeof component.renderSsr === 'function') return component.renderSsr();
+	throw new TypeError('renderToString(App) requires a compiled TSRX artifact.');
+}
+
+function artifactResumeModuleUrl(component: SsrRenderable): string | undefined {
+	return typeof component === 'object' ? component.resumeModuleUrl : undefined;
+}
+
+function artifactModulePreloads(
+	component: SsrRenderable,
+): ReadonlyArray<ModulePreloadInput> | undefined {
+	return typeof component === 'object' ? component.modulePreloads : undefined;
 }
 
 function renderModulePreloadLinks(

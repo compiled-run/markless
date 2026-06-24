@@ -7,6 +7,7 @@ test('lowerStateAccess lowers delete writes to static graph paths', () => {
 		passId: 'tsrx-semantic-graph',
 		filename: 'src/Menu.tsrx',
 		components: [{ name: 'Menu' }],
+		componentEdges: [],
 		graphBindings: [
 			{
 				id: 'state:menu',
@@ -55,6 +56,7 @@ test('lowerStateAccess reports optional delete writes as optional-chain diagnost
 		passId: 'tsrx-semantic-graph',
 		filename: 'src/Menu.tsrx',
 		components: [{ name: 'Menu' }],
+		componentEdges: [],
 		graphBindings: [
 			{
 				id: 'state:menu',

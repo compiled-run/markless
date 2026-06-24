@@ -3,8 +3,8 @@ import { runtimeSizeReport, type RuntimeSizeReport } from '../test-support/runti
 
 // Product truth: SSR resumability needs server-produced HTML. This box uses the
 // fixture's real Vite app build, then serves it through Vite preview. Preview
-// must run the built server entry for HTML requests; the box must not rewrite
-// built HTML to make the assertion pass.
+// must render the built TSRX artifact for HTML requests; the box must not
+// rewrite built HTML to make the assertion pass.
 const FIXTURE = 'fixtures/vite-ssr';
 const DIST = `${FIXTURE}/dist`;
 const INDEX = `${FIXTURE}/dist/index.html`;
@@ -17,7 +17,7 @@ const MAX_PRELOADED_SCRIPT_COUNT = 6;
 
 export default box(
 	{
-		name: 'ssr preview: built server entry shell resumes counter click',
+		name: 'ssr preview: built TSRX artifact resumes counter click',
 		tags: ['ssr', 'build', 'preview', 'browser'],
 		modes: ['build', 'preview'],
 	},
@@ -71,7 +71,7 @@ export default box(
 		await expect.page.outcome(page, { consoleErrors: 0, failedRequests: 0 }, WAIT);
 
 		await preview.close();
-		await receipt.capture('ssr preview resumed server entry shell counter click');
+		await receipt.capture('ssr preview resumed TSRX artifact counter click');
 	},
 );
 

@@ -5,6 +5,7 @@ import type { ArcadeManifest } from '../src/types.ts';
 import {
 	callConfigEnvironment,
 	callConfigResolved,
+	callConfig,
 	callGenerateBundle,
 	callOutputOptions,
 	createViteHookContext,
@@ -75,14 +76,41 @@ describe('Vite config integration', () => {
 		});
 	});
 
-	test('defaults SSR environment output from only the server entry input', () => {
+	test('adds the SSR TSRX artifact as a client symbol root', () => {
+		const plugin = getArcadePlugin();
+		const config = {
+			build: {
+				rolldownOptions: {
+					input: 'index.html',
+				},
+			},
+			environments: {
+				ssr: {
+					build: {
+						rolldownOptions: {
+							input: 'src/App.tsrx',
+						},
+					},
+				},
+			},
+		};
+
+		callConfig(plugin, config, { command: 'build' });
+
+		expect(config.build.rolldownOptions.input).toEqual({
+			index: 'index.html',
+			symbols: 'src/App.tsrx',
+		});
+	});
+
+	test('defaults SSR environment output from only the TSRX artifact input', () => {
 		const plugin = getArcadePlugin();
 
 		expect(
 			callConfigEnvironment(plugin, 'ssr', {
 				build: {
 					rolldownOptions: {
-						input: 'src/entry-server.ts',
+						input: 'src/root.tsrx',
 					},
 				},
 			}),
@@ -90,7 +118,7 @@ describe('Vite config integration', () => {
 			build: {
 				outDir: 'dist/server',
 				rolldownOptions: {
-					input: 'src/entry-server.ts',
+					input: 'src/root.tsrx',
 					output: {
 						entryFileNames: '[name].js',
 						chunkFileNames: 'chunk-[hash].js',
@@ -108,7 +136,7 @@ describe('Vite config integration', () => {
 			callConfigEnvironment(plugin, 'edge', {
 				build: {
 					rolldownOptions: {
-						input: 'src/entry-server.ts',
+						input: 'src/root.tsrx',
 					},
 				},
 			}),
@@ -116,7 +144,7 @@ describe('Vite config integration', () => {
 			build: {
 				outDir: 'dist/server',
 				rolldownOptions: {
-					input: 'src/entry-server.ts',
+					input: 'src/root.tsrx',
 					output: {
 						entryFileNames: '[name].js',
 						chunkFileNames: 'chunk-[hash].js',

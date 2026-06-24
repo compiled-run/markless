@@ -1,4 +1,5 @@
 import type { InputOptions, Plugin } from 'rolldown';
+import { resolve } from 'pathe';
 import { parsePath } from 'ufo';
 import { ARCADE_BUILD_PREFIX, ARCADE_BUNDLE_GRAPH, outputDefaults } from './build/chunking.ts';
 import {
@@ -58,6 +59,7 @@ type InternalArcadeRolldownOptions = ArcadeRolldownOptions & {
 
 const manifests = new Map<string, ArcadeManifest>();
 const TSRX_SOURCE_FILE = /\.tsrx(?:[?#].*)?$/;
+const ARCADE_SYMBOL_SOURCE_QUERY_RE = /[?&]arcade-symbols(?:[&#]|$)/;
 const SYMBOL_VIRTUAL_ID_RE = /^virtual:arcade:symbol:([^:]+):[^:]+$/;
 const SYMBOL_VIRTUAL_STRING_RE = /(["'`])((?:virtual:arcade:symbol:)[^"'`]+)\1/g;
 
@@ -77,6 +79,7 @@ export function createArcadeRolldownPlugin(input: {
 	const virtualModules = new Map<string, ArcadeVirtualModule>();
 	const transformManifests = new Map<string, ArcadeTransformManifest>();
 	const sourceVirtualModules = new Map<string, Set<string>>();
+	const clientSymbolEntrySources = new Set<string>();
 	const dev = createArcadeDevGraph();
 	let manifest: ArcadeManifest | ServerArcadeManifest | null = null;
 	let root = internalOptions.rootDir;
@@ -120,12 +123,18 @@ export function createArcadeRolldownPlugin(input: {
 			if (!root) {
 				root = internalOptions.rootDir ?? input.cwd;
 			}
+			clientSymbolEntrySources.clear();
 			virtualModules.clear();
 			transformManifests.clear();
 			sourceVirtualModules.clear();
 			dev.reset();
 
 			const currentRoot = getRoot();
+			if (getEnvironment(this) === 'client') {
+				for (const source of clientSymbolEntries(input.input, currentRoot)) {
+					clientSymbolEntrySources.add(source);
+				}
+			}
 			manifest = null;
 			if (currentRoot) {
 				manifest = manifests.get(currentRoot) ?? null;
@@ -172,6 +181,16 @@ export function createArcadeRolldownPlugin(input: {
 				filename: source,
 				source: code,
 				buildId: internalOptions.buildId,
+				environment: currentEnvironment,
+				clientOutput:
+					currentEnvironment === 'client' &&
+					(clientSymbolEntrySources.has(source) || isSymbolOnlySourceRequest(id))
+						? 'symbols-only'
+						: undefined,
+				resumeModuleUrl:
+					internalOptions.dev === true && currentEnvironment === 'server'
+						? devBrowserSourceModuleUrl(source, getRoot(), internalOptions.publicPath)
+						: undefined,
 			});
 			registerTransformArtifacts({
 				source,
@@ -383,6 +402,51 @@ function devBrowserVirtualModuleUrl(
 ) {
 	const path = `@id/${resolveVirtualId(virtualId).replace('\0', '__x00__')}`;
 	return publicPath ? publicPath(path) : `/${path}`;
+}
+
+function devBrowserSourceModuleUrl(
+	source: string,
+	root: string | undefined,
+	publicPath: ((fileName: string) => string) | undefined,
+) {
+	const normalizedRoot = root && root.endsWith('/') ? root : root ? `${root}/` : '';
+	const fileName =
+		normalizedRoot && source.startsWith(normalizedRoot)
+			? source.slice(normalizedRoot.length)
+			: `@fs/${source.startsWith('/') ? source.slice(1) : source}`;
+	const path = `${fileName}?import`;
+	return publicPath ? publicPath(path) : `/${path}`;
+}
+
+function clientSymbolEntries(input: unknown, root: string | undefined): string[] {
+	if (!input || typeof input !== 'object' || Array.isArray(input)) {
+		return [];
+	}
+
+	const sources: string[] = [];
+	for (const [name, value] of Object.entries(input as Record<string, unknown>)) {
+		if (!/symbol/i.test(name)) continue;
+		for (const entry of inputEntryValues(value)) {
+			if (typeof entry === 'string' && TSRX_SOURCE_FILE.test(entry)) {
+				sources.push(normalizeInputSource(entry, root));
+			}
+		}
+	}
+	return sources;
+}
+
+function inputEntryValues(value: unknown): unknown[] {
+	return Array.isArray(value) ? value.flatMap(inputEntryValues) : [value];
+}
+
+function normalizeInputSource(source: string, root: string | undefined) {
+	const path = pathname(source);
+	if (path.startsWith('/')) return path;
+	return pathname(resolve(root ?? '', path));
+}
+
+function isSymbolOnlySourceRequest(id: string): boolean {
+	return ARCADE_SYMBOL_SOURCE_QUERY_RE.test(id);
 }
 
 function sourceForSymbolVirtualImporter(importer: string | undefined): string | null {

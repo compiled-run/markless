@@ -9,7 +9,7 @@
 	"dependencies": {
 		"@arcade/bundler": "workspace:*",
 		"@arcade/core": "workspace:*",
-		"@arcade/runtime": "workspace:*"
+		"arcade": "workspace:*"
 	},
 	"devDependencies": {
 		"typescript": "catalog:",

@@ -126,6 +126,8 @@ export type ProtocolViewPayload = {
 		readonly target?:
 			| {
 					readonly kind: 'text';
+					readonly trueValue?: string;
+					readonly falseValue?: string;
 			  }
 			| {
 					readonly kind: 'attribute';
@@ -137,6 +139,8 @@ export type ProtocolViewPayload = {
 			  }
 			| {
 					readonly kind: 'class';
+					readonly trueValue?: string;
+					readonly falseValue?: string;
 			  }
 			| {
 					readonly kind: 'style';

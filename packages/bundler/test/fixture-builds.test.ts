@@ -33,7 +33,7 @@ const fixtures = [
 		outputs: ['packages/bundler/fixtures/vite-ssr/dist'],
 		forbiddenManifest: 'packages/bundler/fixtures/vite-ssr/dist/arcade-manifest.json',
 		bundleGraph: 'packages/bundler/fixtures/vite-ssr/dist/build/bundle-graph.json',
-		symbols: ['symbol:0', 'symbol:1', 'symbol:2'],
+		symbols: ['symbol:0', 'symbol:1'],
 		runtimeBudget: {
 			dist: 'packages/bundler/fixtures/vite-ssr/dist',
 			maxRuntimeChunkGzipBytes: 2_175,

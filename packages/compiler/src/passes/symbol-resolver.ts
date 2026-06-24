@@ -36,6 +36,23 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 		}
 	}
 
+	for (const edge of input.semanticGraph.componentEdges) {
+		for (const prop of edge.props) {
+			if (prop.kind !== 'callback') continue;
+			const moduleImports = referencedModuleImports(input.semanticGraph.moduleImports, prop.source);
+			symbols.push({
+				id: `symbol:${nextSymbolId++}`,
+				kind: 'callback-prop',
+				componentEdgeId: edge.id,
+				propName: prop.name,
+				source: prop.source,
+				...(moduleImports.length > 0 ? { moduleImports } : {}),
+				reads: eventReads(prop.source, input.stateLowering?.reads),
+				writes: eventWrites(prop.source, input.stateLowering?.writes, prop.sourceSpan),
+			});
+		}
+	}
+
 	for (const domUpdate of input.payloadArena.view.domUpdates) {
 		symbols.push({
 			id: `symbol:${nextSymbolId++}`,

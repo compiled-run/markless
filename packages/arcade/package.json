@@ -1,11 +1,12 @@
 {
-	"name": "@arcade/arcade",
+	"name": "arcade",
 	"version": "0.0.0",
 	"private": true,
 	"type": "module",
 	"sideEffects": false,
 	"exports": {
 		".": "./src/index.ts",
+		"./preload": "./src/preload.ts",
 		"./rolldown": "./src/rolldown.ts",
 		"./runtime": "./src/runtime.ts",
 		"./runtime/dom-journal": "./src/runtime/dom-journal.ts",

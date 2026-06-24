@@ -1,4 +1,5 @@
 export type ArcadeEnvironment = 'client' | 'server' | 'lib';
+export type ArcadeClientOutput = 'full' | 'symbols-only';
 
 export interface ArcadeDevServer {
 	transformRequest: (url: string, environment: ArcadeEnvironment) => Promise<unknown> | unknown;
@@ -16,7 +17,7 @@ export interface ArcadeRolldownOptions {
 	buildId?: string;
 }
 
-export type ArcadeVirtualModuleType = 'payload' | 'resolver' | 'module-manifest' | 'symbol';
+export type ArcadeVirtualModuleType = 'payload' | 'resolver' | 'symbol';
 
 export interface ArcadeVirtualModule {
 	id: string;
@@ -30,6 +31,9 @@ export interface TransformTsrxModuleInput {
 	filename: string;
 	source: string;
 	buildId?: string;
+	environment?: ArcadeEnvironment;
+	clientOutput?: ArcadeClientOutput;
+	resumeModuleUrl?: string;
 }
 
 export interface TransformTsrxModuleResult {
@@ -43,7 +47,6 @@ export interface ArcadeTransformManifest {
 	source: string;
 	payload: ArcadeBuildModuleReference;
 	resolver: ArcadeBuildModuleReference;
-	moduleManifest: ArcadeBuildModuleReference;
 	symbols: ArcadeSymbolManifestEntry[];
 }
 

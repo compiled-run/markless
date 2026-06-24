@@ -10,13 +10,20 @@ export type {
 } from '@arcade/core';
 export { render } from './render.ts';
 export type {
+	CsrRenderArtifact,
 	CsrRenderContainer,
 	CsrRenderOptions,
 	CsrRenderOutput,
+	CsrRenderable,
 	RenderTarget,
 } from './render.ts';
 export { renderToString } from '@arcade/runtime/render-to-string';
-export type { RenderToStringOptions, SsrRenderOutput } from '@arcade/runtime/render-to-string';
+export type {
+	RenderToStringOptions,
+	SsrRenderArtifact,
+	SsrRenderable,
+	SsrRenderOutput,
+} from '@arcade/runtime/render-to-string';
 export { resumeFromPayloadDocument, resumeFromPayloadScripts } from '@arcade/runtime/resume';
 export type {
 	ResumePayloadDocumentInput,

@@ -39,7 +39,7 @@ export function getPlugin<T extends { name?: string }>(plugins: T[], name: strin
 
 export function callBuildStart(
 	plugin: PluginHooks,
-	options: { cwd: string },
+	options: { cwd: string; input?: unknown },
 	context: HookContext = {},
 ) {
 	return getHook(plugin.buildStart, 'buildStart').call(

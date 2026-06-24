@@ -131,6 +131,26 @@ export function App() @{
 }
 `;
 
+const componentEdgeSource = `
+import { state } from '@arcade/core';
+import { Player } from './Player.tsrx';
+export function App() @{
+	let current = state({ name: 'First' });
+	let playing = state(false);
+	<main><Player currentSong={current} isPlaying={playing} onNext={() => { playing = true; current.name = 'Second'; }} /></main>
+}
+`;
+
+const scopedComponentEdgeSource = `
+import { state } from '@arcade/core';
+import { Row } from './Row.tsrx';
+export function App() @{
+	const open = state(true);
+	const rows = state([]);
+	<section>@if (open) { @for (const row of rows; key row.id) { <Row row={row} /> } }</section>
+}
+`;
+
 test('buildSemanticGraph creates the first production compiler artifact', async () => {
 	const graph = await buildSemanticGraph({
 		filename: 'src/App.tsrx',
@@ -289,6 +309,43 @@ test('buildSemanticGraph creates the first production compiler artifact', async 
 	);
 
 	expect(graph.asyncBoundaries).toHaveLength(1);
+});
+
+test('buildSemanticGraph records component edges from TSRX AST', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/App.tsrx',
+		source: componentEdgeSource,
+	});
+	const scopedGraph = await buildSemanticGraph({
+		filename: 'src/App.tsrx',
+		source: scopedComponentEdgeSource,
+	});
+	const edge = graph.componentEdges[0];
+
+	expect(edge).toMatchObject({
+		parentComponentName: 'App',
+		childComponentName: 'Player',
+		importSource: './Player.tsrx',
+	});
+	expect(edge?.props).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({ name: 'currentSong', kind: 'graph-reference' }),
+			expect.objectContaining({ name: 'isPlaying', graphNodeId: 'state:playing' }),
+			expect.objectContaining({ name: 'onNext', kind: 'callback' }),
+		]),
+	);
+	expect(graph.stateWrites).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({ target: 'playing', operation: 'assign' }),
+			expect.objectContaining({ target: 'current.name', operation: 'assign' }),
+		]),
+	);
+	expect(scopedGraph.componentEdges[0]).toMatchObject({
+		childComponentName: 'Row',
+		branchScopeIds: ['branch:0'],
+		keyedRepeatScopeIds: ['repeat:0'],
+		props: [expect.objectContaining({ name: 'row', source: 'row', kind: 'opaque' })],
+	});
 });
 
 test('buildSemanticGraph records keyed repeat structure across alternate host shapes', async () => {

@@ -4,6 +4,7 @@ import { planSymbolResolver } from '../src/passes/symbol-resolver.ts';
 
 const source = `
 import { state, computed } from '@arcade/core';
+import { Child } from './Child.tsrx';
 import { chart, resizeCanvas } from './behaviors';
 import { clamp } from './math';
 
@@ -31,6 +32,7 @@ export function App() @{
 			{count} {result.title}
 		</button>
 		<canvas attach={[chart(result), resizeCanvas]} />
+		<Child onPick={() => count++} />
 	</section>
 }
 `;
@@ -80,6 +82,12 @@ test('planSymbolResolver assigns lazy symbols while resolver owns import boundar
 						updateOperator: '++',
 					}),
 				],
+			}),
+			expect.objectContaining({
+				kind: 'callback-prop',
+				propName: 'onPick',
+				source: '() => count++',
+				writes: [expect.objectContaining({ graphNodeId: 'state:count' })],
 			}),
 			expect.objectContaining({
 				kind: 'event-handler',

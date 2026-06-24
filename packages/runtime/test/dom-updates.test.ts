@@ -187,6 +187,23 @@ test('resume runtime passes DOM update value and target metadata to lazy DOM upd
 	expect(graph.takeJournal()).toEqual([]);
 });
 
+test('createDomUpdateEntry maps conditional text targets from graph truthiness', () => {
+	expect(
+		createDomUpdateEntry({
+			locator: 'button:icon',
+			target: { kind: 'text', trueValue: 'Pause', falseValue: 'Play' },
+			value: true,
+		}),
+	).toEqual({ type: 'setText', locator: 'button:icon', value: 'Pause' });
+	expect(
+		createDomUpdateEntry({
+			locator: 'button:icon',
+			target: { kind: 'text', trueValue: 'Pause', falseValue: 'Play' },
+			value: false,
+		}),
+	).toEqual({ type: 'setText', locator: 'button:icon', value: 'Play' });
+});
+
 async function drainMicrotasks(): Promise<void> {
 	for (let index = 0; index < 4; index++) {
 		await Promise.resolve();

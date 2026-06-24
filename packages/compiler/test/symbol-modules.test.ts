@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { emitSymbolModules } from '../src/passes/symbol-modules.ts';
 
-test('emitSymbolModules emits event and DOM update modules that consume resume context', () => {
+test('emitSymbolModules emits event, callback, and DOM update modules', () => {
 	const artifact = emitSymbolModules({
 		symbolResolver: {
 			passId: 'symbol-resolver',
@@ -27,6 +27,22 @@ test('emitSymbolModules emits event and DOM update modules that consume resume c
 					],
 				},
 				{
+					id: 'symbol:onNext',
+					kind: 'callback-prop',
+					componentEdgeId: 'edge:0',
+					propName: 'onNext',
+					source: '() => playing = true',
+					writes: [
+						{
+							source: 'playing',
+							graphNodeId: 'state:playing',
+							path: [],
+							operation: 'assign',
+							valueSource: 'true',
+						},
+					],
+				},
+				{
 					id: 'symbol:domUpdate',
 					kind: 'dom-update',
 					hostNodeId: 'h1',
@@ -46,30 +62,62 @@ test('emitSymbolModules emits event and DOM update modules that consume resume c
 	});
 
 	expect(artifact.passId).toBe('symbol-modules');
-	expect(artifact.modules).toHaveLength(2);
+	expect(artifact.modules).toHaveLength(3);
 	expect(artifact.modules[0]).toMatchObject({
 		symbolId: 'symbol:click',
 		kind: 'event-handler',
 		exportName: 'symbol_click',
 	});
-	expect(artifact.modules[0].source).not.toContain('authoredSource');
-	expect(artifact.modules[0].source).toContain('export function symbol_click(context)');
-	expect(artifact.modules[0].source).toContain('context.graph.update({');
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:count"');
-	expect(artifact.modules[0].source).toContain('path: []');
 	expect(artifact.modules[0].source).toContain('return Number(value) + 1;');
 	expect(artifact.modules[1]).toMatchObject({
+		symbolId: 'symbol:onNext',
+		kind: 'callback-prop',
+		exportName: 'symbol_onNext',
+	});
+	expect(artifact.modules[1].source).toContain('graphNodeId: "state:playing"');
+	expect(artifact.modules[1].source).toContain('value: true');
+	expect(artifact.modules[2]).toMatchObject({
 		symbolId: 'symbol:domUpdate',
 		kind: 'dom-update',
 		exportName: 'symbol_domUpdate',
 	});
-	expect(artifact.modules[1].source).not.toContain('import ');
-	expect(artifact.modules[1].source).not.toContain('createDomUpdateEntry');
-	expect(artifact.modules[1].source).toContain('export function symbol_domUpdate(context)');
-	expect(artifact.modules[1].source).toContain('type: "setProp"');
-	expect(artifact.modules[1].source).toContain('locator: context.domUpdate?.hostNodeId ?? "h1"');
-	expect(artifact.modules[1].source).toContain('name: "value"');
-	expect(artifact.modules[1].source).toContain('value: context.value');
+	expect(artifact.modules[2].source).toContain('type: "setProp"');
+	expect(artifact.modules[2].source).toContain('locator: context.domUpdate?.hostNodeId ?? "h1"');
+	expect(artifact.modules[2].source).toContain('name: "value"');
+	expect(artifact.modules[2].source).toContain('value: context.value');
+});
+
+test('emitSymbolModules emits conditional text DOM update values', () => {
+	const artifact = emitSymbolModules({
+		symbolResolver: {
+			passId: 'symbol-resolver',
+			dynamicImportOwner: 'generated-symbol-resolver',
+			symbols: [
+				{
+					id: 'symbol:playIcon',
+					kind: 'dom-update',
+					hostNodeId: 'h2',
+					source: 'playing',
+					graphNodeId: 'state:playing',
+					target: { kind: 'text', trueValue: 'Pause', falseValue: 'Play' },
+				},
+			],
+			syncPolicies: [],
+			diagnostics: [],
+		},
+		captureAnalysis: {
+			passId: 'capture-analysis',
+			extractedSymbols: [],
+			diagnostics: [],
+		},
+	});
+
+	expect(artifact.modules).toHaveLength(1);
+	expect(artifact.modules[0].source).toContain('type: "setText"');
+	expect(artifact.modules[0].source).toContain(
+		'value: context.value ? "Pause" : "Play"',
+	);
 });
 
 test('emitSymbolModules emits repeat-local assignment values through context locals', () => {

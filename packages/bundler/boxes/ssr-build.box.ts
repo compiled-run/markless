@@ -1,14 +1,14 @@
 import { box } from '@async/witness';
 
 // Product truth: unlike the CSR fixture, SSR-related behavior has real server
-// work. The Vite/Rolldown build must emit a server entry that renders the
-// existing DOM shell plus canonical async payload scripts.
+// work. The Vite/Rolldown build must emit a compiled TSRX artifact that can
+// render the DOM shell and expose payload metadata to renderToString().
 const FIXTURE = 'fixtures/vite-ssr';
-const SERVER_ENTRY = `${FIXTURE}/dist/server/entry-server.js`;
+const SERVER_ARTIFACT = `${FIXTURE}/dist/server/root.js`;
 
 export default box(
 	{
-		name: 'ssr build: Rolldown server entry renders payload shell',
+		name: 'ssr build: Rolldown server artifact renders payload shell',
 		tags: ['ssr', 'build'],
 		modes: ['build'],
 	},
@@ -24,10 +24,10 @@ export default box(
 
 		await expect.build.environment(build, 'client');
 		await expect.build.environment(build, 'ssr');
-		await expect.artifact.text(build, SERVER_ENTRY, {
-			contains: ['data-counter', 'type=\\"arcade/state\\"', 'type=\\"arcade/view\\"'],
+		await expect.artifact.text(build, SERVER_ARTIFACT, {
+			contains: ['data-counter', 'renderSsr(props)', 'payloadView: view'],
 		});
 
-		await receipt.capture('ssr server entry rendered payload shell');
+		await receipt.capture('ssr server artifact rendered payload shell');
 	},
 );

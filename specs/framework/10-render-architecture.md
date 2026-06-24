@@ -16,15 +16,15 @@ component work.
 For a single-root `.tsrx` app module, the normal architecture is:
 
 ```ts
-import App from './App.tsrx';
-import { render } from '@arcade/arcade';
+import App from "./App.tsrx";
+import { render } from "arcade";
 
 render(App, { target: document.getElementById('app')! });
 ```
 
 ```ts
-import App from './App.tsrx';
-import { renderToString } from '@arcade/arcade';
+import App from "./App.tsrx";
+import { renderToString } from "arcade";
 
 const html = renderToString(App);
 ```
@@ -32,6 +32,8 @@ const html = renderToString(App);
 `App` is the compiled TSRX artifact, not a browser component constructor that
 will be re-executed during resume. Framework render functions own the
 environment-specific orchestration around that artifact.
+App render code imports `render()` and `renderToString()` from `"arcade"`, not
+from `.tsrx` modules, `@arcade/core`, or runtime deep imports.
 
 When a `.tsrx` file exports multiple top-level components and no unambiguous app
 root can be selected, app code must pass the intended compiled artifact to the
@@ -411,9 +413,9 @@ Render architecture work is not complete until the following are proved by
 focused tests and fixture builds:
 
 1. CSR app code can import a compiled artifact from `./App.tsrx`, pass it to
-   `render` from `@arcade/arcade`, and run without SSR payloads or a resumer.
+   `render` from `arcade`, and run without SSR payloads or a resumer.
 2. SSR app code can import a compiled artifact from `./App.tsrx`, pass it to
-   `renderToString` from `@arcade/arcade`, and produce a resumable container
+   `renderToString` from `arcade`, and produce a resumable container
    without app-authored client/server entry wrappers.
 3. SSR initial HTML contains composed state/view payloads for root and child
    components.

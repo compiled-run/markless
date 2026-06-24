@@ -59,29 +59,36 @@ describe('TSRX Rolldown plugin structure', () => {
 		expect(callOptions(arcadeLib(), {})).toEqual({});
 	});
 
-	test('transformTsrxModule produces virtual payload, resolver, manifest, and symbol modules', async () => {
+	test('transformTsrxModule produces virtual payload, resolver, and symbol modules', async () => {
 		const result = await transformTsrxModule({
 			filename: '/workspace/app/src/App.tsrx',
 			source,
 		});
 
-		expect(result.code).toContain('export const arcadeSource');
+		expect(result.code).not.toContain('export const arcadeSource');
 		expect(result.code).toContain(
-			"import payloadScripts, { state as payloadState, view as payloadView } from 'virtual:arcade:payload:",
+			"import { state as payloadState, view as payloadView } from 'virtual:arcade:payload:",
 		);
 		expect(result.code).not.toContain('import { loadSymbol, symbolManifest }');
 		expect(result.code).not.toContain('const arcadeSymbolResolverModule');
 		expect(result.code).toContain('function loadSymbol(symbolId)');
 		expect(result.code).toContain("import('virtual:arcade:symbol:");
-		expect(result.code).toContain('const symbolManifest = [1,');
-		expect(result.code).toContain(
+		expect(result.code).not.toContain('const symbolManifest = [1,');
+		expect(result.code).not.toContain(
 			"import moduleManifest from 'virtual:arcade:module-manifest:",
 		);
+		expect(result.code).toContain('export { payloadView };');
+		expect(result.code).toContain('const arcadeCompiledApp = {');
+		expect(result.code).toContain('renderCsr: App,');
+		expect(result.code).toContain('renderSsr(props) {');
+		expect(result.code).toContain('const arcadeSsrStateValues = new Map');
 		expect(result.code).toContain(
-			'export { loadSymbol, moduleManifest, payloadScripts, payloadState, payloadView, symbolManifest };',
+			'const html = arcadeSsrHost(arcadeSsrHostLocators, "h0", "button") + "<button>" + arcadeSsrText(count) + "</button>";',
 		);
+		expect(result.code).toContain('export default arcadeCompiledApp;');
+		expect(result.code).not.toContain('source: arcadeSource');
 		expect(result.virtualModules.map((item) => item.type)).toEqual(
-			expect.arrayContaining(['payload', 'resolver', 'module-manifest', 'symbol']),
+			expect.arrayContaining(['payload', 'resolver', 'symbol']),
 		);
 		expect(result.manifest.source).toBe('/workspace/app/src/App.tsrx');
 		expect(result.manifest.symbols).toContainEqual(
@@ -98,13 +105,114 @@ describe('TSRX Rolldown plugin structure', () => {
 		);
 	});
 
+	test('transformTsrxModule emits a CSR-only default artifact for client builds', async () => {
+		const result = await transformTsrxModule({
+			filename: '/workspace/app/src/App.tsrx',
+			source,
+			environment: 'client',
+		});
+
+		expect(result.code).toContain(
+			"import { preloadLazySymbolModules } from 'arcade/preload';",
+		);
+		expect(result.code).toContain('preload: preloadCsrLazySymbols,');
+		expect(result.code).toContain('export default arcadeCompiledApp;');
+		expect(result.code).not.toContain('renderSsr(props) {');
+		expect(result.code).not.toContain('state: payloadState');
+	});
+
+	test('transformTsrxModule scopes browser symbol export names by source file', async () => {
+		const first = await transformTsrxModule({
+			filename: '/workspace/app/src/App.tsrx',
+			source,
+		});
+		const second = await transformTsrxModule({
+			filename: '/workspace/app/src/Player.tsrx',
+			source,
+		});
+		const firstSymbol = first.manifest.symbols[0]!;
+		const secondSymbol = second.manifest.symbols[0]!;
+		const firstModule = first.virtualModules.find(
+			(module) => module.type === 'symbol' && module.symbolId === firstSymbol.symbolId,
+		)!;
+
+		expect(firstSymbol.symbolId).toBe(secondSymbol.symbolId);
+		expect(firstSymbol.exportName).toMatch(/^symbol_0_[a-z0-9]+$/);
+		expect(secondSymbol.exportName).toMatch(/^symbol_0_[a-z0-9]+$/);
+		expect(firstSymbol.exportName).not.toBe(secondSymbol.exportName);
+		expect(firstModule.source).toContain(`export function ${firstSymbol.exportName}`);
+	});
+
+	test('transformTsrxModule emits symbol-only client roots for SSR browser symbols', async () => {
+		const result = await transformTsrxModule({
+			filename: '/workspace/app/src/App.tsrx',
+			source: `import { state } from '@arcade/core';
+import Child from './Child.tsrx';
+export function App() @{
+let count = state(0);
+<main><button onClick={() => count++}>{count}</button><Child count={count} /></main>
+}`,
+			environment: 'client',
+			clientOutput: 'symbols-only',
+		});
+
+		expect(result.code).toContain('export async function resumeContainerEvent');
+		expect(result.code).toContain('export { arcadeSsrLoadSymbolRoute as loadSymbol };');
+		expect(result.code).toContain('function arcadeSsrLoadSymbolRoute(symbolId)');
+		expect(result.code).toContain('import("./Child.tsrx?arcade-symbols")');
+		expect(result.code).toContain("import('virtual:arcade:symbol:");
+		expect(result.code).not.toContain('document.createElement');
+		expect(result.code).not.toContain('addEventListener');
+		expect(result.code).not.toContain('const arcadeCompiledApp = {');
+		expect(result.code).not.toContain('export default App;');
+		expect(result.code).not.toContain('export default arcadeCompiledApp;');
+		expect(result.code).not.toContain('payloadScripts');
+		expect(result.code).not.toContain('moduleManifest');
+	});
+
+	test('client plugin emits symbol-only output for named symbols TSRX entries', async () => {
+		const plugin = arcadeClient();
+
+		await callBuildStart(plugin, {
+			cwd: '/workspace/app',
+			input: { index: 'index.html', symbols: 'src/App.tsrx' },
+		});
+		const result = (await callTransform(
+			plugin,
+			source,
+			'/workspace/app/src/App.tsrx',
+		)) as { code: string };
+
+		expect(result.code).toContain('export async function resumeContainerEvent');
+		expect(result.code).not.toContain('document.createElement');
+		expect(result.code).not.toContain('export default App;');
+	});
+
+	test('transformTsrxModule emits a server render artifact without direct CSR emit', async () => {
+		const result = await transformTsrxModule({
+			filename: '/workspace/app/src/App.tsrx',
+			source: `import { state } from '@arcade/core';
+export function App() @{
+let active = state(true);
+<main class={active ? 'on' : 'off'}><h1>Hello</h1></main>
+}`,
+			environment: 'server',
+		});
+
+		expect(result.code).toContain('renderSsr(props) {');
+		expect(result.code).toContain('arcadeSsrAttribute("class", active ? \'on\' : \'off\')');
+		expect(result.code).not.toContain('renderCsr: App,');
+	});
+
 	test('transformTsrxModule omits alternate render entry exports', async () => {
 		const result = await transformTsrxModule({
 			filename: '/workspace/app/src/App.tsrx',
 			source,
 		});
 
-		expect(result.code).not.toContain('export async function');
+		expect(result.code).toContain('export async function resumeContainerEvent');
+		expect(result.code).not.toContain('export function render(');
+		expect(result.code).not.toContain('export function renderToString(');
 	});
 
 	test('transformTsrxModule exports a public render component from compiler repeat artifacts', async () => {
@@ -114,13 +222,16 @@ describe('TSRX Rolldown plugin structure', () => {
 		});
 
 		expect(result.code).toContain('export function App()');
+		expect(result.code).toContain('renderCsr: App,');
+		expect(result.code).toContain('export default arcadeCompiledApp;');
 		expect(result.code).toContain('<main><section></section><footer>Done</footer></main>');
 		expect(result.code).toContain('syncArcadePublicRepeat0');
 		expect(result.code).toContain('const graph = createArcadePublicGraph()');
 		expect(result.code).toContain('runtime: { async dispatch() {} }');
 		expect(result.code).not.toContain('function createArcadePublicRuntime');
 		expect(result.code).toContain('attachArcadePublicStaticEvents');
-		expect(result.code).not.toContain('state: payloadState');
+		expect(result.code).toContain('state: payloadState');
+		expect(result.code).toContain('view: arcadeSsrComposition.view');
 		expect(result.code).not.toContain('view: arcadePublicView');
 		expect(result.code).not.toContain('payloadView.locators.filter');
 		expect(result.code).not.toContain('arcadePublicHostNodeIndexes');
@@ -146,7 +257,7 @@ describe('TSRX Rolldown plugin structure', () => {
 		expect(result.code).toContain('if (symbolId === "symbol:0")');
 		expect(result.code).toContain('if (symbolId === "symbol:7")');
 		expect(result.code).toContain("import('virtual:arcade:symbol:");
-		expect(result.code).toContain('readArcadeSourceSymbol(mod, "symbol_0")');
+		expect(result.code).toMatch(/readArcadeSourceSymbol\(mod, "symbol_0_[a-z0-9]+"\)/);
 		expect(result.code).toContain('mod.init__virtual_arcade_symbol?.();');
 		expect(result.code).not.toContain('name.startsWith("init__virtual_arcade_symbol")');
 	});
@@ -269,7 +380,6 @@ describe('TSRX Rolldown plugin structure', () => {
 		const entryVirtualIds = [
 			`virtual:arcade:payload:${encoded}`,
 			`virtual:arcade:resolver:${encoded}`,
-			`virtual:arcade:module-manifest:${encoded}`,
 		];
 		const resolverId = `virtual:arcade:resolver:${encoded}`;
 		const resolverSource = (await callLoad(plugin, `\0${resolverId}`)) as string;

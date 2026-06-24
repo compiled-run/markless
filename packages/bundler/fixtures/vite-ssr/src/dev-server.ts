@@ -1,6 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { renderToString, type SsrRenderable } from 'arcade';
 import {
 	planModulePreloads,
 	type ModulePreloadPlanEntry,
@@ -20,11 +21,16 @@ type CreateEnvironment = NonNullable<NonNullable<EnvironmentOptions['dev']>['cre
 type SsrRunner = ReturnType<typeof createServerModuleRunner>;
 
 type SsrEntry = {
-	preloadRoots?: readonly ModulePreloadRoot[];
-	render: (
-		clientEntry?: string,
-		modulePreloads?: ReadonlyArray<ModulePreloadPlanEntry>,
-	) => string | Promise<string>;
+	default: SsrRenderable & {
+		readonly payloadView?: {
+			readonly events?: ReadonlyArray<{
+				readonly symbolIds?: ReadonlyArray<string>;
+			}>;
+			readonly domUpdates?: ReadonlyArray<{
+				readonly symbolId?: string;
+			}>;
+		};
+	};
 };
 
 type DevRequest = {
@@ -40,7 +46,6 @@ type DevResponse = {
 	end(body?: Uint8Array): void;
 };
 
-const CLIENT_RESUME_MODULE = '/src/entry-client.ts';
 const REQUEST_LOG_PATH = '/__arcade-fixture-requests';
 
 // Fixture-only SSR host. Real apps should provide this from a runtime adapter
@@ -149,8 +154,8 @@ async function renderDevRequest(runner: SsrRunner, request: Request) {
 		return new Response('Not found', { status: 404 });
 	}
 
-	const entry = (await runner.import('/src/entry-server.ts')) as SsrEntry;
-	return new Response(await entry.render(CLIENT_RESUME_MODULE), {
+	const entry = (await runner.import('/src/root.tsrx')) as SsrEntry;
+	return new Response(renderToString(entry.default), {
 		headers: { 'Content-Type': 'text/html;charset=utf-8' },
 	});
 }
@@ -159,20 +164,32 @@ async function renderPreviewRequest(root: string, outDir: string) {
 	const dist = resolve(root, outDir);
 	const resumeModuleUrl = await readClientResumeModuleUrl(dist);
 	const entry = (await import(
-		`${pathToFileURL(resolve(dist, 'server/entry-server.js')).href}?preview=${Date.now()}`
+		`${pathToFileURL(resolve(dist, 'server/root.js')).href}?preview=${Date.now()}`
 	)) as SsrEntry;
 	const modulePreloads = planModulePreloads({
 		base: '/build/',
 		bundleGraph: await readBundleGraph(dist),
 		roots: [
-			...(entry.preloadRoots ?? []),
+			...preloadRootsFromArtifact(entry.default),
 			{ name: bundleGraphRootFromUrl(resumeModuleUrl), priority: 'high' },
 		],
 	});
 
-	return new Response(await entry.render(resumeModuleUrl, modulePreloads), {
+	return new Response(renderToString(entry.default, { resumeModuleUrl, modulePreloads }), {
 		headers: { 'Content-Type': 'text/html;charset=utf-8' },
 	});
+}
+
+function preloadRootsFromArtifact(artifact: SsrEntry['default']): ModulePreloadRoot[] {
+	const view = artifact.payloadView;
+	return [
+		...(view?.events ?? []).flatMap((event) =>
+			(event.symbolIds ?? []).map((name) => ({ name, priority: 'high' as const })),
+		),
+		...(view?.domUpdates ?? []).flatMap((update) =>
+			update.symbolId ? [{ name: update.symbolId, priority: 'low' as const }] : [],
+		),
+	];
 }
 
 async function readClientResumeModuleUrl(dist: string) {

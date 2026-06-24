@@ -44,6 +44,7 @@ export type EventOnlyResumePayloadDocument = {
 
 export type EventOnlyResumeRecord = ProtocolViewPayload['events'][number];
 export type EventOnlyResumeDomUpdateRecord = ProtocolViewPayload['domUpdates'][number];
+export type EventOnlyResumeBehaviorRecord = ProtocolViewPayload['behaviors'][number];
 
 export type EventOnlyResumeGraph = {
 	read(graphNodeId: string, path?: ReadonlyArray<string>): unknown;
@@ -60,11 +61,18 @@ export type EventOnlyResumeSymbolContext = {
 	readonly domUpdate?: EventOnlyResumeDomUpdateRecord;
 	readonly locals?: Readonly<Record<string, unknown>>;
 	readonly value?: unknown;
+	readonly behaviorInputs?: ReadonlyArray<unknown>;
 };
+
+export type EventOnlyResumeBehaviorCleanup = () => void;
 
 export type EventOnlyResumeSymbol = (
 	context: EventOnlyResumeSymbolContext,
-) => void | DomJournalResult | Promise<void | DomJournalResult>;
+) =>
+	| void
+	| DomJournalResult
+	| EventOnlyResumeBehaviorCleanup
+	| Promise<void | DomJournalResult | EventOnlyResumeBehaviorCleanup>;
 
 export type ResumeEventOnlyFromPayloadDocumentInput = {
 	readonly document: EventOnlyResumePayloadDocument;
@@ -103,6 +111,7 @@ type DirtyPath = {
 
 type EventOnlyResumeContainerState = EventOnlyResumeContainer & {
 	readonly elementsByHostId: ReadonlyMap<string, EventOnlyResumeDomElement>;
+	readonly activeBehaviorHosts: Set<string>;
 };
 
 const containers = new WeakMap<EventOnlyResumeDomElement, EventOnlyResumeContainerState>();
@@ -141,6 +150,7 @@ function createEventOnlyResumeContainerState(
 	input: CreateEventOnlyResumeContainerInput,
 ): EventOnlyResumeContainerState {
 	const elementsByHostId = materializeDomLocators(input.root, input.view.locators);
+	const activeBehaviorHosts = new Set<string>();
 	const graph = createEventOnlyResumeGraph({
 		state: input.state,
 		view: input.view,
@@ -152,6 +162,7 @@ function createEventOnlyResumeContainerState(
 		graph,
 		view: input.view,
 		elementsByHostId,
+		activeBehaviorHosts,
 		dispatch(event, options = {}) {
 			return dispatchEvent({
 				event,
@@ -159,6 +170,7 @@ function createEventOnlyResumeContainerState(
 				graph,
 				loadSymbol: input.loadSymbol,
 				elementsByHostId,
+				activeBehaviorHosts,
 				element: options.element,
 				eventRecord: options.eventRecord,
 			});
@@ -238,6 +250,7 @@ async function dispatchEvent(input: {
 	readonly graph: EventOnlyResumeGraph;
 	readonly loadSymbol: ResumeEventOnlyFromPayloadDocumentInput['loadSymbol'];
 	readonly elementsByHostId: ReadonlyMap<string, EventOnlyResumeDomElement>;
+	readonly activeBehaviorHosts: Set<string>;
 	readonly element?: EventOnlyResumeDomElement;
 	readonly eventRecord?: EventOnlyResumeRecord;
 }): Promise<void> {
@@ -262,13 +275,25 @@ async function dispatchEvent(input: {
 				element: matched.element,
 				getElementHandle: noElementHandle,
 			});
-			applyDomJournalResult(
-				isPromiseLike(result) ? await result : result,
-				input.elementsByHostId,
-			);
+			const journalResult = isPromiseLike(result) ? await result : result;
+			if (typeof journalResult !== 'function') {
+				applyDomJournalResult(journalResult, input.elementsByHostId);
+			}
 		}
 	} finally {
 		await input.graph.flush();
+	}
+
+	if (input.view.behaviors.some((behavior) => !!behavior.symbolId)) {
+		const behaviorRuntime = await import('./event-only-behaviors.ts');
+		await behaviorRuntime.activateBehaviorsFromEventHost({
+			element: matched.element,
+			view: input.view,
+			graph: input.graph,
+			loadSymbol: input.loadSymbol,
+			elementsByHostId: input.elementsByHostId,
+			activeBehaviorHosts: input.activeBehaviorHosts,
+		});
 	}
 }
 
@@ -306,10 +331,10 @@ async function flushDomUpdates(input: {
 			domUpdate,
 			value: input.graph.read(domUpdate.graphNodeId, domUpdate.path),
 		});
-		applyDomJournalResult(
-			isPromiseLike(result) ? await result : result,
-			input.elementsByHostId,
-		);
+		const journalResult = isPromiseLike(result) ? await result : result;
+		if (typeof journalResult !== 'function') {
+			applyDomJournalResult(journalResult, input.elementsByHostId);
+		}
 	}
 }
 

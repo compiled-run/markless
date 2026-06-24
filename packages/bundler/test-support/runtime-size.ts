@@ -54,6 +54,7 @@ const RUNTIME_TEXT_MARKERS = [
 	'Missing arcade/state payload script',
 	'async:shared-patch',
 	'render(App, { target }) requires',
+	'Invalid render target.',
 ];
 
 export async function runtimeSizeReport(input: RuntimeSizeReportInput): Promise<RuntimeSizeReport> {

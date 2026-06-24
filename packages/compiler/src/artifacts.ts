@@ -13,6 +13,37 @@ export type SemanticComponent = {
 	readonly name: string;
 };
 
+export type SemanticComponentPropBinding =
+	| {
+			readonly name: string;
+			readonly source: string;
+			readonly kind: 'graph-reference';
+			readonly graphNodeId: string;
+			readonly graphBindingKind: SemanticGraphBinding['kind'];
+			readonly path: ReadonlyArray<string>;
+			readonly sourceSpan?: SourceSpan;
+	  }
+	| {
+			readonly name: string;
+			readonly source: string;
+			readonly kind: 'callback' | 'serializable' | 'opaque';
+			readonly sourceSpan?: SourceSpan;
+	  };
+
+export type SemanticComponentEdge = {
+	readonly id: string;
+	readonly parentComponentName: string;
+	readonly childComponentName: string;
+	readonly importSource?: string;
+	readonly sourceSpan?: SourceSpan;
+	readonly props: ReadonlyArray<SemanticComponentPropBinding>;
+	readonly children: {
+		readonly childCount: number;
+	};
+	readonly branchScopeIds: ReadonlyArray<string>;
+	readonly keyedRepeatScopeIds: ReadonlyArray<string>;
+};
+
 export type SemanticModuleImport = {
 	readonly localName: string;
 	readonly source: string;
@@ -195,6 +226,8 @@ export type SemanticStateRead = {
 export type SemanticTemplateBindingTarget =
 	| {
 			readonly kind: 'text';
+			readonly trueValue?: string;
+			readonly falseValue?: string;
 	  }
 	| {
 			readonly kind: 'attribute';
@@ -206,6 +239,8 @@ export type SemanticTemplateBindingTarget =
 	  }
 	| {
 			readonly kind: 'class';
+			readonly trueValue?: string;
+			readonly falseValue?: string;
 	  }
 	| {
 			readonly kind: 'style';
@@ -257,6 +292,7 @@ export type SemanticGraphArtifact = {
 	readonly passId: 'tsrx-semantic-graph';
 	readonly filename: string;
 	readonly components: ReadonlyArray<SemanticComponent>;
+	readonly componentEdges: ReadonlyArray<SemanticComponentEdge>;
 	readonly moduleImports: ReadonlyArray<SemanticModuleImport>;
 	readonly graphBindings: ReadonlyArray<SemanticGraphBinding>;
 	readonly sharedDefinitions: ReadonlyArray<SemanticSharedDefinition>;
@@ -437,6 +473,16 @@ export type PlannedSymbol =
 	  }
 	| {
 			readonly id: string;
+			readonly kind: 'callback-prop';
+			readonly componentEdgeId: string;
+			readonly propName: string;
+			readonly source: string;
+			readonly moduleImports?: ReadonlyArray<SemanticModuleImport>;
+			readonly reads?: ReadonlyArray<LoweredStateRead>;
+			readonly writes?: ReadonlyArray<LoweredStateWrite>;
+	  }
+	| {
+			readonly id: string;
 			readonly kind: 'dom-update';
 			readonly hostNodeId: string;
 			readonly source: string;
@@ -584,6 +630,12 @@ export type PublicRenderPlanStaticEventControl = {
 	readonly symbolIds: ReadonlyArray<string>;
 };
 
+export type PublicRenderPlanStaticHostLocator = {
+	readonly hostNodeId: string;
+	readonly tagName: string;
+	readonly hostPath: ReadonlyArray<number>;
+};
+
 export type PublicRenderPlanClassWrite = {
 	readonly source: string;
 	readonly hostPath: ReadonlyArray<number>;
@@ -646,7 +698,9 @@ export type PublicRenderPlanKeyedRepeat = {
 export type PublicRenderPlanArtifact = {
 	readonly passId: 'public-render-plan';
 	readonly rootTemplateHtml: string | null;
+	readonly directRenderTemplateHtml: string | null;
 	readonly staticHostNodeIds: ReadonlyArray<string>;
+	readonly staticHostLocators: ReadonlyArray<PublicRenderPlanStaticHostLocator>;
 	readonly staticEventControls: ReadonlyArray<PublicRenderPlanStaticEventControl>;
 	readonly staticTextWrites: ReadonlyArray<PublicRenderPlanStaticTextWrite>;
 	readonly repeatGates: ReadonlyArray<PublicRenderPlanRepeatGate>;
@@ -655,6 +709,7 @@ export type PublicRenderPlanArtifact = {
 };
 
 export type PublicRenderModuleInput = {
+	readonly source: SemanticGraphInput;
 	readonly semanticGraph: SemanticGraphArtifact;
 	readonly publicRenderPlan: PublicRenderPlanArtifact;
 	readonly symbolResolver: SymbolResolverPlan;
@@ -665,6 +720,11 @@ export type PublicRenderModuleInput = {
 export type PublicRenderModuleArtifact = {
 	readonly passId: 'public-render-module';
 	readonly moduleSource: string;
+	readonly rootExportName: string | null;
+	readonly csrModuleSource: string;
+	readonly csrExportName: string | null;
+	readonly ssrModuleSource: string;
+	readonly ssrExportName: string | null;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
 };
 

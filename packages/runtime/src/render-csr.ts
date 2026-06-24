@@ -1,8 +1,9 @@
 import type { ProtocolStatePayload, ProtocolViewPayload } from '@arcade/protocol';
 import type { EventOnlyResumeDomElement, EventOnlyResumeDomEvent } from './event-only-resume.ts';
+import type { DomJournalEntry } from './graph.ts';
 import type { RuntimeGraph } from './graph.ts';
 import type { CsrRenderContainer, CsrRenderOptions, CsrRenderOutput } from './render.ts';
-import type { ResumeSymbol } from './resume.ts';
+import type { ResumeRuntime, ResumeSymbol } from './resume.ts';
 
 export async function renderCsrRuntime(input: {
 	readonly output: CsrRenderOutput;
@@ -33,6 +34,7 @@ export async function renderCsrRuntime(input: {
 				{ capture: true },
 			);
 		}
+		output.connectRuntime?.({ graph: runtime.graph, runtime });
 
 		return {
 			phase: 'csr',
@@ -44,16 +46,23 @@ export async function renderCsrRuntime(input: {
 
 	const graph = output.graph ?? (await createFullRuntimeGraph(state, !!output.state));
 	const { createResumeRuntime } = await import('./resume.ts');
-	const runtime = createResumeRuntime({
+	let runtime: ResumeRuntime;
+	const applyDomJournal =
+		options.applyDomJournal ??
+		((entries: ReadonlyArray<DomJournalEntry>) =>
+			applyDefaultCsrDomJournal(entries, runtime));
+	runtime = createResumeRuntime({
 		root: output.root,
 		graph,
 		view,
 		loadSymbol,
 		createVisibilityObserver: options.createVisibilityObserver,
 		createRemovalObserver: options.createRemovalObserver,
-		applyDomJournal: options.applyDomJournal,
+		applyDomJournal,
 	});
 	await runtime.start();
+	output.connectRuntime?.({ graph, runtime });
+	await activateCsrBehaviors(runtime, view);
 
 	return {
 		phase: 'csr',
@@ -61,6 +70,69 @@ export async function renderCsrRuntime(input: {
 		graph,
 		runtime,
 	};
+}
+
+type CsrDomJournalTarget = {
+	textContent?: string | null;
+	setAttribute?: (name: string, value: string) => void;
+	removeAttribute?: (name: string) => void;
+	readonly [name: string]: unknown;
+};
+
+async function applyDefaultCsrDomJournal(
+	entries: ReadonlyArray<DomJournalEntry>,
+	runtime: ResumeRuntime,
+): Promise<void> {
+	const deferred: DomJournalEntry[] = [];
+	for (const entry of entries) {
+		if (entry.type === 'setText') {
+			const target = runtime.getElement(String(entry.locator)) as CsrDomJournalTarget | undefined;
+			if (target) target.textContent = stringifyDomValue(entry.value);
+			continue;
+		}
+		if (entry.type === 'setAttr') {
+			const target = runtime.getElement(String(entry.locator)) as CsrDomJournalTarget | undefined;
+			if (!target) continue;
+			if (entry.value == null || entry.value === false) {
+				target.removeAttribute?.(entry.name);
+			} else {
+				target.setAttribute?.(entry.name, stringifyDomValue(entry.value));
+			}
+			continue;
+		}
+		if (entry.type === 'setProp') {
+			const target = runtime.getElement(String(entry.locator)) as Record<string, unknown> | undefined;
+			if (target) target[entry.name] = entry.value;
+			continue;
+		}
+		deferred.push(entry);
+	}
+
+	if (deferred.length === 0) return;
+	const { applyDomJournalEntries } = await import('./dom-journal.ts');
+	applyDomJournalEntries(deferred, {
+		resolveTarget(locator) {
+			return runtime.getElement(String(locator));
+		},
+	});
+}
+
+function stringifyDomValue(value: unknown): string {
+	if (value == null) return '';
+	return String(value);
+}
+
+async function activateCsrBehaviors(
+	runtime: ResumeRuntime,
+	view: ProtocolViewPayload,
+): Promise<void> {
+	const hostNodeIds = new Set<string>();
+	for (const behavior of view.behaviors) {
+		if (behavior.symbolId) hostNodeIds.add(behavior.hostNodeId);
+	}
+	for (const hostNodeId of hostNodeIds) {
+		await runtime.activateBehaviors(hostNodeId);
+	}
 }
 
 const EMPTY_PROTOCOL_VERSION = 1 satisfies ProtocolStatePayload['version'];

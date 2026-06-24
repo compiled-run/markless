@@ -49,7 +49,9 @@ type ArcadeOutputOptions = OutputOptions | OutputOptions[] | undefined;
 type InternalArcadeRolldownOptions = ArcadeRolldownOptions & {
 	publicPath?: (fileName: string) => string;
 };
+type RolldownInputConfig = string | readonly string[] | Record<string, string> | undefined;
 const ARCADE_SKIP_DUPLICATE_BUILDS = Symbol('arcade-skip-duplicate-builds');
+const TSRX_INPUT_FILE = /\.tsrx(?:[?#].*)?$/;
 
 export function arcade(options: ArcadeViteOptions = {}): Plugin[] {
 	let manifest: ArcadeManifest | null = null;
@@ -91,7 +93,7 @@ export function arcade(options: ArcadeViteOptions = {}): Plugin[] {
 				bundleGraphAdders.add(createPreloadGraphAdder(adder)),
 		},
 		config(config) {
-			configDefaults(config);
+			configDefaults(config, options);
 		},
 		configResolved(resolvedConfig) {
 			const serve = resolvedConfig.command === 'serve';
@@ -223,13 +225,76 @@ function skipDuplicateBuilds(builder: ViteBuilder, names: readonly string[]) {
 	};
 }
 
-function configDefaults(config: UserConfig) {
+function configDefaults(config: UserConfig, options: ArcadeViteOptions) {
 	if (config.build?.lib || config.build?.ssr) {
 		return;
 	}
 
 	const build = (config.build ??= {});
+	const ssrSymbolInput = ssrTsrxInput(config, options);
+	if (ssrSymbolInput) {
+		const rolldownOptions = (build.rolldownOptions ??= {});
+		rolldownOptions.input = withSsrSymbolInput(
+			rolldownOptions.input as RolldownInputConfig,
+			ssrSymbolInput,
+		);
+	}
 	build.modulePreload ??= false;
+}
+
+function ssrTsrxInput(config: UserConfig, options: ArcadeViteOptions): string | null {
+	const environments = (config as { environments?: Record<string, unknown> }).environments;
+	const ssr = environments?.[viteEnvironmentName('server', options)] as
+		| { build?: { rolldownOptions?: { input?: unknown } } }
+		| undefined;
+	return firstTsrxInput(ssr?.build?.rolldownOptions?.input);
+}
+
+function firstTsrxInput(input: unknown): string | null {
+	if (typeof input === 'string') {
+		return TSRX_INPUT_FILE.test(input) ? input : null;
+	}
+	if (Array.isArray(input)) {
+		for (const item of input) {
+			const match = firstTsrxInput(item);
+			if (match) return match;
+		}
+		return null;
+	}
+	if (input && typeof input === 'object') {
+		for (const value of Object.values(input as Record<string, unknown>)) {
+			const match = firstTsrxInput(value);
+			if (match) return match;
+		}
+	}
+	return null;
+}
+
+function withSsrSymbolInput(
+	input: RolldownInputConfig,
+	ssrSymbolInput: string,
+): Record<string, string> {
+	if (isRolldownInputRecord(input)) {
+		if (Object.keys(input).some((name) => /symbol/i.test(name))) return input;
+		return { ...input, symbols: ssrSymbolInput };
+	}
+	if (typeof input === 'string') {
+		const name = input.endsWith('.html') ? 'index' : 'app';
+		return input === ssrSymbolInput
+			? { symbols: ssrSymbolInput }
+			: { [name]: input, symbols: ssrSymbolInput };
+	}
+	if (Array.isArray(input)) {
+		return Object.fromEntries([
+			...input.map((entry, index) => [`input${index}`, entry]),
+			['symbols', ssrSymbolInput],
+		]);
+	}
+	return { symbols: ssrSymbolInput };
+}
+
+function isRolldownInputRecord(input: RolldownInputConfig): input is Record<string, string> {
+	return !!input && typeof input === 'object' && !Array.isArray(input);
 }
 
 function withOutputDefaults(

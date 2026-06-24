@@ -45,7 +45,7 @@ function emitSymbolModule(
 	symbol: PlannedSymbol,
 	localNames: ReadonlySet<string>,
 ): GeneratedSymbolModule[] {
-	if (symbol.kind === 'event-handler') {
+	if (symbol.kind === 'event-handler' || symbol.kind === 'callback-prop') {
 		return [
 			{
 				symbolId: symbol.id,
@@ -91,14 +91,14 @@ function emitSymbolModule(
 }
 
 function emitEventHandlerModule(
-	symbol: Extract<PlannedSymbol, { readonly kind: 'event-handler' }>,
+	symbol: Extract<PlannedSymbol, { readonly kind: 'event-handler' | 'callback-prop' }>,
 	localNames: ReadonlySet<string>,
 ): string {
 	const exportName = symbolExportName(symbol.id);
 	const writes = (symbol.writes ?? []).flatMap((write) =>
 		emitEventWrite(
 			write,
-			symbol.parameters,
+			symbol.kind === 'event-handler' ? symbol.parameters : [],
 			symbol.reads ?? [],
 			symbol.moduleImports ?? [],
 			localNames,
@@ -117,7 +117,7 @@ function emitEventHandlerModule(
 }
 
 function eventModuleImports(
-	symbol: Extract<PlannedSymbol, { readonly kind: 'event-handler' }>,
+	symbol: Extract<PlannedSymbol, { readonly kind: 'event-handler' | 'callback-prop' }>,
 	emittedWrites: ReadonlyArray<string>,
 ): ReadonlyArray<SemanticModuleImport> {
 	if (emittedWrites.length === 0) return [];
@@ -251,7 +251,9 @@ function domJournalEntryProperties(
 		return [
 			`		type: ${JSON.stringify('setText')},`,
 			`		locator: ${locator},`,
-			`		value: ${value},`,
+			symbol.target.trueValue !== undefined && symbol.target.falseValue !== undefined
+				? `		value: ${value} ? ${JSON.stringify(symbol.target.trueValue)} : ${JSON.stringify(symbol.target.falseValue)},`
+				: `		value: ${value},`,
 		];
 	}
 
@@ -269,7 +271,9 @@ function domJournalEntryProperties(
 			`		type: ${JSON.stringify('setAttr')},`,
 			`		locator: ${locator},`,
 			`		name: ${JSON.stringify('class')},`,
-			`		value: ${value},`,
+			symbol.target.trueValue !== undefined && symbol.target.falseValue !== undefined
+				? `		value: ${value} ? ${JSON.stringify(symbol.target.trueValue)} : ${JSON.stringify(symbol.target.falseValue)},`
+				: `		value: ${value},`,
 		];
 	}
 

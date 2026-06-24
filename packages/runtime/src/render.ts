@@ -15,7 +15,18 @@ export type CsrRenderOutput = {
 	readonly state?: ProtocolStatePayload;
 	readonly view?: ProtocolViewPayload;
 	readonly loadSymbol?: ResumeRuntimeInput['loadSymbol'];
+	readonly connectRuntime?: (context: {
+		readonly graph: unknown;
+		readonly runtime: CsrRenderRuntime;
+	}) => void;
 };
+
+export type CsrRenderArtifact = {
+	readonly renderCsr: (props?: unknown) => CsrRenderOutput;
+	readonly preload?: () => void | Promise<void>;
+};
+
+export type CsrRenderable = (() => CsrRenderOutput) | CsrRenderArtifact;
 
 export type CsrRenderOptions = {
 	readonly target: RenderTarget;
@@ -44,14 +55,14 @@ export type CsrRenderContainer = {
 };
 
 export async function render(
-	component: () => CsrRenderOutput,
+	component: CsrRenderable,
 	options: CsrRenderOptions,
 ): Promise<CsrRenderContainer> {
-	const output = component();
-
-	mountRoot(options.target, output.root);
+	startCsrPreload(component);
+	const output = typeof component === 'function' ? component() : component.renderCsr();
 
 	if (output.graph && output.runtime) {
+		mountRoot(options.target, output.root);
 		return {
 			phase: 'csr',
 			root: output.root,
@@ -60,24 +71,41 @@ export async function render(
 		};
 	}
 
-	return import('./render-csr.ts').then((runtime) =>
+	const container = await import('./render-csr.ts').then((runtime) =>
 		runtime.renderCsrRuntime({
 			output,
 			options,
 		}),
 	);
+	mountRoot(options.target, output.root);
+	return container;
+}
+
+function startCsrPreload(component: CsrRenderable): void {
+	if (typeof component === 'function' || typeof component.preload !== 'function') return;
+
+	try {
+		const result = component.preload();
+		if (isPromiseLike(result)) {
+			void result.catch(() => {
+				// Preload hints are opportunistic; render and interaction must still work.
+			});
+		}
+	} catch {
+		// Preload hints are opportunistic; render and interaction must still work.
+	}
 }
 
 function mountRoot(target: RenderTarget, root: ResumeDomElement): void {
-	if (target.replaceChildren) {
-		target.replaceChildren(root);
-		return;
-	}
-	if (target.appendChild) {
-		target.appendChild(root);
-		return;
-	}
-	throw new TypeError(
-		'render(App, { target }) requires a target that can receive the root node.',
+	const mount = target.replaceChildren ?? target.appendChild;
+	if (!mount) throw new TypeError('Invalid render target.');
+	mount.call(target, root);
+}
+
+function isPromiseLike<T>(value: T | Promise<T>): value is Promise<T> {
+	return (
+		value !== null &&
+		(typeof value === 'object' || typeof value === 'function') &&
+		typeof (value as { readonly then?: unknown }).then === 'function'
 	);
 }

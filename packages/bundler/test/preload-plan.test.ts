@@ -1,6 +1,10 @@
 import { describe, expect, test } from 'vitest';
 import { convertManifestToBundleGraph } from '../src/build/bundle-graph.ts';
-import { planModulePreloadUrls, planModulePreloads } from '../src/build/preload-plan.ts';
+import {
+	planModulePreloadUrls,
+	planModulePreloads,
+	planSsrModulePreloads,
+} from '../src/build/preload-plan.ts';
 import type { ArcadeManifest } from '../src/types.ts';
 
 describe('module preload planning', () => {
@@ -82,6 +86,55 @@ describe('module preload planning', () => {
 			},
 		);
 	});
+
+	test('plans SSR preloads from a render artifact and resume module URL', () => {
+		const graph = convertManifestToBundleGraph(manifestWithComplexSymbolDeps());
+
+		const preloads = planSsrModulePreloads({
+			artifact: {
+				payloadView: {
+					events: [{ symbolIds: ['symbol:click'] }],
+					domUpdates: [{ symbolId: 'symbol:visible' }],
+					behaviors: [{ symbolId: 'symbol:behavior' }],
+					asyncBoundaries: [
+						{ asyncReads: [{ runnerSymbolId: 'symbol:async-runner' }] },
+					],
+				},
+			},
+			base: '/assets/',
+			bundleGraph: graph,
+			resumeModuleUrl: '/assets/build/resume.js',
+		});
+
+		expect(preloads.map((preload) => preload.href)).toEqual([
+			'/assets/build/vendor.js',
+			'/assets/build/shared.js',
+			'/assets/build/click.js',
+			'/assets/build/nested.js',
+			'/assets/build/behavior.js',
+			'/assets/build/resume.js',
+			'/assets/build/visible.js',
+			'/assets/build/async-runner.js',
+		]);
+	});
+
+	test('keeps Vite dev module URLs as SSR preload roots without a bundle graph', () => {
+		const preloads = planSsrModulePreloads({
+			artifact: { payloadView: { events: [{ symbolIds: ['symbol:click'] }] } },
+			bundleGraph: undefined,
+			resumeModuleUrl: '/src/App.tsrx?import',
+		});
+
+		expect(preloads).toEqual([
+			{
+				fetchPriority: 'high',
+				href: '/src/App.tsrx?import',
+				name: '/src/App.tsrx?import',
+				priority: 'high',
+				probability: 1,
+			},
+		]);
+	});
 });
 
 function manifestWithComplexSymbolDeps(): ArcadeManifest {
@@ -93,7 +146,6 @@ function manifestWithComplexSymbolDeps(): ArcadeManifest {
 				source: '/workspace/app/src/root.tsrx',
 				payload: { virtualModuleId: 'virtual:arcade:payload:root' },
 				resolver: { virtualModuleId: 'virtual:arcade:resolver:root' },
-				moduleManifest: { virtualModuleId: 'virtual:arcade:module-manifest:root' },
 				symbols: [
 					{
 						symbolId: 'symbol:click',
@@ -108,6 +160,20 @@ function manifestWithComplexSymbolDeps(): ArcadeManifest {
 						exportName: 'onVisible',
 						virtualModuleId: 'virtual:arcade:symbol:root:visible',
 						fileName: 'build/visible.js',
+					},
+					{
+						symbolId: 'symbol:behavior',
+						kind: 'behavior',
+						exportName: 'installBehavior',
+						virtualModuleId: 'virtual:arcade:symbol:root:behavior',
+						fileName: 'build/behavior.js',
+					},
+					{
+						symbolId: 'symbol:async-runner',
+						kind: 'async-runner',
+						exportName: 'runAsync',
+						virtualModuleId: 'virtual:arcade:symbol:root:async-runner',
+						fileName: 'build/async-runner.js',
 					},
 				],
 			},
@@ -126,6 +192,20 @@ function manifestWithComplexSymbolDeps(): ArcadeManifest {
 				total: 1900,
 				imports: ['build/shared.js'],
 				symbols: ['symbol:visible'],
+				origins: ['src/root.tsrx'],
+			},
+			'build/behavior.js': {
+				size: 900,
+				total: 1900,
+				imports: ['build/shared.js'],
+				symbols: ['symbol:behavior'],
+				origins: ['src/root.tsrx'],
+			},
+			'build/async-runner.js': {
+				size: 900,
+				total: 1900,
+				imports: ['build/shared.js'],
+				symbols: ['symbol:async-runner'],
 				origins: ['src/root.tsrx'],
 			},
 			'build/shared.js': {
@@ -160,7 +240,6 @@ function manifestWithResolverChunk(): ArcadeManifest {
 					fileName: 'build/resolver.js',
 					virtualModuleId: 'virtual:arcade:resolver:root',
 				},
-				moduleManifest: { virtualModuleId: 'virtual:arcade:module-manifest:root' },
 				symbols: [
 					{
 						symbolId: 'symbol:click',

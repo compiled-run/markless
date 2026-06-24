@@ -444,6 +444,7 @@ test('lowerStateAccess resolves array destructured aliases to indexed graph path
 		passId: 'tsrx-semantic-graph',
 		filename: 'src/Queue.tsrx',
 		components: [{ name: 'Queue' }],
+		componentEdges: [],
 		graphBindings: [
 			{
 				id: 'state:items',
@@ -513,6 +514,7 @@ test('lowerStateAccess reports a structured diagnostic for dynamic graph path wr
 		passId: 'tsrx-semantic-graph',
 		filename: 'src/Queue.tsrx',
 		components: [{ name: 'Queue' }],
+		componentEdges: [],
 		graphBindings: [
 			{
 				id: 'state:items',
@@ -579,6 +581,7 @@ test('lowerStateAccess reports a structured diagnostic for dynamic graph path re
 		passId: 'tsrx-semantic-graph',
 		filename: 'src/Queue.tsrx',
 		components: [{ name: 'Queue' }],
+		componentEdges: [],
 		graphBindings: [
 			{
 				id: 'state:items',
@@ -645,6 +648,7 @@ test('lowerStateAccess reports a structured diagnostic for writes to paths exclu
 		passId: 'tsrx-semantic-graph',
 		filename: 'src/Menu.tsrx',
 		components: [{ name: 'Menu' }],
+		componentEdges: [],
 		graphBindings: [
 			{
 				id: 'state:menu',
@@ -718,6 +722,7 @@ test('lowerStateAccess reports a structured diagnostic for optional graph writes
 		passId: 'tsrx-semantic-graph',
 		filename: 'src/Queue.tsrx',
 		components: [{ name: 'Queue' }],
+		componentEdges: [],
 		graphBindings: [
 			{
 				id: 'state:items',

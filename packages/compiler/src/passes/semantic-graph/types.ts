@@ -1,6 +1,7 @@
 import type { AnyNode } from '../../ast/nodes.ts';
 import type {
 	SemanticComponent,
+	SemanticComponentEdge,
 	SemanticBehavior,
 	SemanticElementHandleBinding,
 	SemanticEvent,
@@ -24,6 +25,7 @@ export type MutableSemanticGraphArtifact = {
 	passId: 'tsrx-semantic-graph';
 	filename: string;
 	components: SemanticComponent[];
+	componentEdges: SemanticComponentEdge[];
 	moduleImports: SemanticModuleImport[];
 	graphBindings: SemanticGraphBinding[];
 	sharedDefinitions: SemanticSharedDefinition[];
@@ -49,9 +51,14 @@ export type WalkState = {
 	readonly graph: MutableSemanticGraphArtifact;
 	readonly frameworkApiImports: ReadonlyMap<string, FrameworkApiName>;
 	readonly hostIds: WeakMap<object, string>;
+	currentComponentName: string | null;
+	currentBranchScopeIds: string[];
+	currentKeyedRepeatScopeIds: string[];
 	currentHostNodeId: string | null;
 	currentAsyncBoundaryId: string | null;
 	currentSharedDefinitionId: string | null;
+	nextComponentEdgeId: number;
+	nextBranchId: number;
 	nextHostId: number;
 	nextEventId: number;
 	nextBoundaryId: number;
@@ -64,6 +71,7 @@ export function createMutableSemanticGraphArtifact(filename: string): MutableSem
 		passId: 'tsrx-semantic-graph',
 		filename,
 		components: [],
+		componentEdges: [],
 		moduleImports: [],
 		graphBindings: [],
 		sharedDefinitions: [],
@@ -96,9 +104,14 @@ export function createWalkState(input: {
 		graph: input.graph,
 		frameworkApiImports: input.frameworkApiImports,
 		hostIds: new WeakMap<object, string>(),
+		currentComponentName: null,
+		currentBranchScopeIds: [],
+		currentKeyedRepeatScopeIds: [],
 		currentHostNodeId: null,
 		currentAsyncBoundaryId: null,
 		currentSharedDefinitionId: null,
+		nextComponentEdgeId: 0,
+		nextBranchId: 0,
 		nextHostId: 0,
 		nextEventId: 0,
 		nextBoundaryId: 0,

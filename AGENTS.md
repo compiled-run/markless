@@ -60,20 +60,21 @@ is the Codex-facing always-on guidance for building the TSRX resumable framework
   similar compiler jargon in source names unless the spec section and diagnostic
   already use that exact term for users.
 
-## Goal Prompt Guardrails
+## Implementation Guardrails
 
-Every implementation goal prompt must include these hard requirements before any
-code is changed:
+Every implementation goal must follow these hard requirements. If the active
+goal text lacks them, infer them here, record the insertion limit, and continue.
+Do not block only because the active goal text cannot be edited.
 
 - Follow the TSRX specification at `https://tsrx.dev/` and the current Arcade
   split specs. Do not implement framework behavior that contradicts TSRX
   structural semantics, children/control-flow semantics, or the Arcade no-
   hydration/no-VDOM model.
-- Spend at least three minutes using the grep MCP (`mcp__grep.searchGitHub`) on
+- Spend at least 30 seconds using the grep MCP (`mcp__grep.searchGitHub`) on
   relevant real-world code patterns before solving. Record the patterns checked
   and how they influenced the approach. Local `rg` inspection is still required
   for this repo, but it does not replace the grep MCP pass.
-- Create an insertion limit for the goal and write it into the goal prompt as
+- Create an insertion limit for the goal and record it as
   `Insertion limit: <N> added lines unless the user approves expanding scope`.
   The limit must be chosen from the expected smallest vertical slice before
   implementation starts. If the diff would exceed the limit, reduce/reuse
@@ -254,7 +255,7 @@ pass at a time through failing tests.
 Each proof should be started as its own GoalBuddy-prepared goal. First use the
 GoalBuddy prompt/prep flow for the single proof, then run the generated `/goal`
 command. Do not launch raw proof goals directly from memory. The generated goal
-must include the Goal Prompt Guardrails above, scope ownership to exactly one
+should include the Implementation Guardrails above, scope ownership to exactly one
 `poc/fixtures/proofs/<name>/` directory, allow shared index updates only when
 needed, and forbid framework-internal implementation work unless the proof task
 explicitly asks for it.

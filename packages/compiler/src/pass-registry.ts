@@ -48,6 +48,7 @@ export const defaultCompilerPasses: ReadonlyArray<CompilerPassDefinition> = [
 		description:
 			'Emit public render component factories from compiler-proven render artifacts.',
 		consumes: [
+			'source',
 			'semanticGraph',
 			'publicRenderPlan',
 			'symbolResolver',

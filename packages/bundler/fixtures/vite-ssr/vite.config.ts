@@ -7,10 +7,7 @@ export default defineConfig(({ command }) => ({
 		command === 'build'
 			? {
 					rolldownOptions: {
-						input: {
-							index: 'index.html',
-							resume: 'src/entry-client.ts',
-						},
+						input: 'index.html',
 						preserveEntrySignatures: 'exports-only',
 					},
 				}
@@ -19,7 +16,7 @@ export default defineConfig(({ command }) => ({
 		ssr: {
 			build: {
 				rolldownOptions: {
-					input: 'src/entry-server.ts',
+					input: 'src/root.tsrx',
 				},
 			},
 		},

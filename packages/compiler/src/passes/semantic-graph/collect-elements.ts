@@ -1,6 +1,14 @@
 import { isEventAttribute, normalizeEventName } from '@tsrx/core';
 import { asNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
+import {
+	getElementAttributes,
+	getElementTagName,
+	isHostTagName,
+	isIgnorableJsxTextNode,
+	trimmedStaticTextValue,
+	unwrapExpressionContainer,
+} from '../../ast/tsrx.ts';
 import type {
 	SemanticBehavior,
 	SemanticElementHandleBinding,
@@ -9,6 +17,7 @@ import type {
 	SourceSpan,
 } from '../../artifacts.ts';
 import { graphBindingMap } from '../../artifact-helpers/graph-paths.ts';
+import { collectComponentEdge } from './collect-components.ts';
 import { collectExpressionReads } from './collect-expressions.ts';
 import {
 	extractSyncPolicy,
@@ -24,6 +33,8 @@ import {
 import type { MutableSemanticGraphArtifact, SemanticGraphWalk, WalkState } from './types.ts';
 
 export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGraphWalk): void {
+	collectComponentEdge(node, state, walk);
+
 	const tagName = getElementTagName(node);
 	const previousHost = state.currentHostNodeId;
 	const isHostElement = tagName ? isHostTagName(tagName) : false;
@@ -69,6 +80,34 @@ export function collectTemplateExpression(node: AnyNode, state: WalkState): void
 		},
 		asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
 	});
+}
+
+export function collectConditionalBranchText(node: AnyNode, state: WalkState): void {
+	const test = node.test as AnyNode | undefined;
+	if (!test) return;
+
+	const consequent = sameHostStaticTextBranch(node.consequent as AnyNode | undefined, state);
+	const alternate = sameHostStaticTextBranch(node.alternate as AnyNode | undefined, state);
+	if (!consequent || !alternate) return;
+	if (consequent.tagName !== alternate.tagName) return;
+	if (consequent.staticAttributesKey !== alternate.staticAttributesKey) return;
+
+	const source = expressionSource(test, state.source);
+	const sourceSpanValue = sourceSpan(test, state.filename);
+	const target = {
+		kind: 'text' as const,
+		trueValue: consequent.text,
+		falseValue: alternate.text,
+	};
+	for (const hostNodeId of [consequent.hostNodeId, alternate.hostNodeId]) {
+		state.graph.templateReads.push({
+			hostNodeId,
+			source,
+			sourceSpan: sourceSpanValue,
+			target,
+			asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
+		});
+	}
 }
 
 export function collectElementHandleDiagnostics(graph: MutableSemanticGraphArtifact): void {
@@ -176,6 +215,19 @@ function collectAttribute(
 		return;
 	}
 
+	const conditionalClass = conditionalClassTarget(attributeName, expressionValue);
+	if (conditionalClass) {
+		state.graph.templateReads.push({
+			hostNodeId,
+			source: expressionSource(conditionalClass.test, state.source),
+			sourceSpan: sourceSpan(conditionalClass.test, state.filename),
+			target: conditionalClass.target,
+			asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
+		});
+		walk(expressionValue, state);
+		return;
+	}
+
 	if (expressionValue && expressionValue.type !== 'Literal') {
 		state.graph.templateReads.push({
 			hostNodeId,
@@ -186,6 +238,113 @@ function collectAttribute(
 		});
 		walk(expressionValue, state);
 	}
+}
+
+function conditionalClassTarget(
+	attributeName: string,
+	expressionValue: AnyNode | undefined,
+):
+	| {
+			readonly test: AnyNode;
+			readonly target: SemanticTemplateBindingTarget;
+	  }
+	| null {
+	if (attributeName !== 'class' || expressionValue?.type !== 'ConditionalExpression') {
+		return null;
+	}
+
+	const test = expressionValue.test as AnyNode | undefined;
+	const trueValue = stringLiteral(expressionValue.consequent as AnyNode | undefined);
+	const falseValue = stringLiteral(expressionValue.alternate as AnyNode | undefined);
+	if (!test || trueValue === null || falseValue === null) return null;
+
+	return {
+		test,
+		target: {
+			kind: 'class',
+			trueValue,
+			falseValue,
+		},
+	};
+}
+
+function stringLiteral(node: AnyNode | undefined): string | null {
+	return node?.type === 'Literal' && typeof node.value === 'string' ? node.value : null;
+}
+
+function sameHostStaticTextBranch(
+	node: AnyNode | undefined,
+	state: WalkState,
+):
+	| {
+			readonly hostNodeId: string;
+			readonly tagName: string;
+			readonly staticAttributesKey: string;
+			readonly text: string;
+	  }
+	| null {
+	const root = branchSingleOutput(node);
+	if (!root || (root.type !== 'Element' && root.type !== 'JSXElement')) return null;
+
+	const tagName = getElementTagName(root);
+	if (!tagName || !isHostTagName(tagName)) return null;
+
+	const hostNodeId = state.hostIds.get(root);
+	const text = singleStaticTextChild(root);
+	const staticAttributesKey = staticAttributeKey(root);
+	if (!hostNodeId || text === null || staticAttributesKey === null) return null;
+
+	return {
+		hostNodeId,
+		tagName,
+		staticAttributesKey,
+		text,
+	};
+}
+
+function branchSingleOutput(node: AnyNode | undefined): AnyNode | null {
+	if (!node) return null;
+	if (node.type === 'BlockStatement') {
+		const outputs = asNodes(node.body).filter((child) => !isIgnorableJsxTextNode(child));
+		return outputs.length === 1 ? branchSingleOutput(outputs[0]) : null;
+	}
+	if (node.type === 'ExpressionStatement') {
+		return branchSingleOutput(node.expression as AnyNode | undefined);
+	}
+	return node;
+}
+
+function singleStaticTextChild(node: AnyNode): string | null {
+	const children = asNodes(node.children).filter((child) => !isIgnorableJsxTextNode(child));
+	if (children.length !== 1) return null;
+	const child = children[0]!;
+	const text = trimmedStaticTextValue(child);
+	return text === '' ? null : text;
+}
+
+function staticAttributeKey(node: AnyNode): string | null {
+	const attributes: Array<readonly [string, string]> = [];
+	for (const attribute of getElementAttributes(node)) {
+		const name = getIdentifierName(attribute.name as AnyNode | undefined);
+		if (!name || isEventAttribute(name) || name === 'attach' || name === 'el') return null;
+
+		const value = attribute.value as AnyNode | undefined;
+		const expression = unwrapExpressionContainer(value);
+		if (!value) {
+			attributes.push([name, 'true']);
+			continue;
+		}
+		if (value.type === 'Literal' && typeof value.value !== 'object') {
+			attributes.push([name, String(value.value)]);
+			continue;
+		}
+		if (expression?.type === 'Literal' && typeof expression.value !== 'object') {
+			attributes.push([name, String(expression.value)]);
+			continue;
+		}
+		return null;
+	}
+	return JSON.stringify(attributes);
 }
 
 function bindingTargetForAttribute(attributeName: string): SemanticTemplateBindingTarget {
@@ -246,34 +405,6 @@ function fallbackSpan(filename: string): SourceSpan {
 		start: 0,
 		end: 0,
 	};
-}
-
-function getElementTagName(node: AnyNode): string | null {
-	return (
-		getIdentifierName(node.id as AnyNode | undefined) ??
-		getIdentifierName((node.openingElement as AnyNode | undefined)?.name as AnyNode | undefined)
-	);
-}
-
-function getElementAttributes(node: AnyNode): AnyNode[] {
-	const directAttributes = asNodes(node.attributes);
-	if (directAttributes.length > 0) {
-		return directAttributes;
-	}
-
-	return asNodes((node.openingElement as AnyNode | undefined)?.attributes);
-}
-
-function isHostTagName(name: string): boolean {
-	return name.length > 0 && name[0] === name[0].toLowerCase();
-}
-
-function unwrapExpressionContainer(node: AnyNode | undefined): AnyNode | undefined {
-	if (node?.type === 'JSXExpressionContainer' || node?.type === 'TSRXExpression') {
-		return node.expression as AnyNode | undefined;
-	}
-
-	return node;
 }
 
 function behaviorExpressions(node: AnyNode): AnyNode[] {

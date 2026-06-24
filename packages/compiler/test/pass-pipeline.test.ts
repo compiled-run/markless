@@ -64,6 +64,7 @@ test('default compiler passes declare stable artifact boundaries', () => {
 				passId: 'public-render-module',
 				description: expect.stringContaining('public render component'),
 				consumes: [
+					'source',
 					'semanticGraph',
 					'publicRenderPlan',
 					'symbolResolver',

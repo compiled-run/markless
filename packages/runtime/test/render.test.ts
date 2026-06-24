@@ -172,6 +172,132 @@ test('render creates a CSR container without payload scripts or the inline resum
 	expect(container.graph.read('state:count')).toBe(1);
 });
 
+test('render starts artifact-owned CSR preload work without requiring app code', async () => {
+	const root = element('MAIN');
+	const target = {
+		children: [] as FakeElement[],
+		replaceChildren(...children: FakeElement[]) {
+			this.children = children;
+		},
+	};
+	const preloads: string[] = [];
+
+	await render(
+		{
+			preload() {
+				preloads.push('started');
+			},
+			renderCsr() {
+				return { root };
+			},
+		},
+		{ target },
+	);
+
+	expect(preloads).toEqual(['started']);
+	expect(target.children).toEqual([root]);
+});
+
+test('render activates CSR behavior symbols after creating host elements', async () => {
+	const root = element('BUTTON');
+	const state = createProtocolStatePayload({
+		cells: [{ graphNodeId: 'state:count', name: 'count', valueKind: 'scalar', value: 0 }],
+	});
+	const target = {
+		children: [] as FakeElement[],
+		replaceChildren(...children: FakeElement[]) {
+			this.children = children;
+		},
+	};
+	const loadedSymbols: string[] = [];
+	const installed: string[] = [];
+
+	await render(
+		{
+			renderCsr() {
+				return {
+					root,
+					state,
+					view: {
+						...viewWithClickDomUpdate(),
+						behaviors: [
+							{
+								hostNodeId: 'h0',
+								source: 'chart',
+								functionSource: 'chart',
+								inputSources: [],
+								symbolId: 'symbol:chart',
+							},
+						],
+						elementHandles: [],
+						asyncBoundaries: [],
+					},
+					loadSymbol(symbolId: string) {
+						loadedSymbols.push(symbolId);
+						if (symbolId === 'symbol:click') {
+							return ({ graph }) => {
+								graph.write({ graphNodeId: 'state:count', value: 1 });
+							};
+						}
+						if (symbolId === 'symbol:text') {
+							return (context) => ({
+								type: 'setText',
+								locator: context.domUpdate?.hostNodeId ?? 'h0',
+								value: context.value,
+							});
+						}
+						return ({ element: host }) => {
+							installed.push(host.tagName);
+						};
+					},
+				};
+			},
+		},
+		{ target },
+	);
+
+	expect(loadedSymbols).toEqual(['symbol:chart']);
+	expect(installed).toEqual(['BUTTON']);
+	expect(target.children).toEqual([root]);
+
+	await root.listeners[0].listener(event('click', root));
+
+	expect(loadedSymbols).toEqual(['symbol:chart', 'symbol:click', 'symbol:text']);
+	expect(root.textContent).toBe('1');
+});
+
+test('render connects the CSR runtime before mounting visible DOM', async () => {
+	const order: string[] = [];
+	let connected = false;
+	const target = {
+		children: [] as FakeElement[],
+		replaceChildren(...children: FakeElement[]) {
+			order.push(`mount:${connected}`);
+			this.children = children;
+		},
+	};
+	const root = element('BUTTON');
+
+	await render(
+		() => ({
+			root,
+			state: createProtocolStatePayload({ cells: [] }),
+			view: viewWithClick(),
+			loadSymbol() {
+				return () => {};
+			},
+			connectRuntime() {
+				connected = true;
+				order.push('connect');
+			},
+		}),
+		{ target },
+	);
+
+	expect(order).toEqual(['connect', 'mount:true']);
+	expect(target.children).toEqual([root]);
+});
+
 test('render returns a compiler-provided CSR runtime without event resume startup', async () => {
 	const target = {
 		children: [] as FakeElement[],
@@ -363,6 +489,36 @@ test('renderToString emits ordered modulepreload links before interactive payloa
 	);
 	expect(html.indexOf('rel="modulepreload"')).toBeLessThan(html.indexOf('<button'));
 	expect(html.indexOf('rel="modulepreload"')).toBeLessThan(html.indexOf('data-async-resumer'));
+});
+
+test('renderToString uses compiled artifact modulepreloads by default', () => {
+	const html = renderToString({
+		modulePreloads: [{ href: '/src/App.tsrx?import', fetchPriority: 'high' }],
+		resumeModuleUrl: '/src/App.tsrx?import',
+		renderSsr: () => ({
+			html: '<button type="button">Count 0</button>',
+			state: createProtocolStatePayload({ cells: [] }),
+			view: viewWithClick(),
+		}),
+	});
+
+	expect(html).toContain(
+		'<link rel="modulepreload" href="/src/App.tsrx?import" crossorigin="anonymous" fetchpriority="high">',
+	);
+});
+
+test('renderToString uses the compiled artifact resume module URL by default', () => {
+	const resumeModuleUrl = createResumeModuleUrl('artifact-default');
+	const html = renderToString({
+		resumeModuleUrl,
+		renderSsr: () => ({
+			html: '<button type="button">Count 0</button>',
+			state: createProtocolStatePayload({ cells: [] }),
+			view: viewWithClick(),
+		}),
+	});
+
+	expect(extractResumerSource(html)).toContain(JSON.stringify(resumeModuleUrl));
 });
 
 test('renderToString inline event resumer imports the resume module only after interaction', async () => {

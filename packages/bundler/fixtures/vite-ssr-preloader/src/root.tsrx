@@ -1,12 +1,11 @@
-import { state, computed } from '@arcade/core';
+import { state } from '@arcade/core';
 import { nextCount } from './counter-flow.ts';
 
 export function App() @{
 	let count = state(0);
-	let double = computed(() => count * 2);
 
-	<>
-		<button onClick={() => count = nextCount(count)}>{count} / {double}</button>
+	<section>
+		<button data-counter onClick={() => count = nextCount(count)}>{count}</button>
 		<span>hello</span>
-	</>
+	</section>
 }

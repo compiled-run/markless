@@ -509,7 +509,7 @@ test('compileTsrxModule orchestrates source to payload scripts and resolver modu
 test('compileTsrxModule accepts the scoped umbrella authoring import', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/UmbrellaImport.tsrx',
-		source: source.replace('@arcade/core', '@arcade/arcade'),
+		source: source.replace('@arcade/core', 'arcade'),
 		symbols: [],
 	});
 
@@ -520,6 +520,91 @@ test('compileTsrxModule accepts the scoped umbrella authoring import', async () 
 			expect.objectContaining({ id: 'state:menu', name: 'menu' }),
 		]),
 	);
+});
+
+test('compileTsrxModule emits conditional class DOM updates from graph tests', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/ConditionalClass.tsrx',
+		source: `
+import { state } from '@arcade/core';
+
+export function App() @{
+	let selected = state(false);
+
+	<button class={selected ? 'library-song selected' : 'library-song'}>
+		Pick
+	</button>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.protocolView.domUpdates).toContainEqual(
+		expect.objectContaining({
+			source: 'selected',
+			graphNodeId: 'state:selected',
+			path: [],
+			target: {
+				kind: 'class',
+				trueValue: 'library-song selected',
+				falseValue: 'library-song',
+			},
+		}),
+	);
+});
+
+test('compileTsrxModule emits same-host conditional branch text DOM updates', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/ConditionalBranchText.tsrx',
+		source: `
+import { state } from '@arcade/core';
+
+export function App() @{
+	let playing = state(false);
+
+	<button onClick={() => playing = !playing}>
+		@if (playing) {
+			<span class="play-icon">Pause</span>
+		} @else {
+			<span class="play-icon">Play</span>
+		}
+	</button>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.protocolView.domUpdates).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				source: 'playing',
+				graphNodeId: 'state:playing',
+				path: [],
+				target: {
+					kind: 'text',
+					trueValue: 'Pause',
+					falseValue: 'Play',
+				},
+			}),
+		]),
+	);
+
+	const conditionalTextHostIds = new Set(
+		result.protocolView.domUpdates
+			.filter(
+				(update) =>
+					update.target?.kind === 'text' &&
+					update.target.trueValue === 'Pause' &&
+					update.target.falseValue === 'Play',
+			)
+			.map((update) => update.hostNodeId),
+	);
+
+	expect(
+		result.publicRenderPlan.staticHostLocators.some((locator) =>
+			conditionalTextHostIds.has(locator.hostNodeId),
+		),
+	).toBe(true);
 });
 
 test('compileTsrxModule emits public render direct DOM artifacts for supported keyed repeats', async () => {

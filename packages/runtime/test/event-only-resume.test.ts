@@ -8,6 +8,7 @@ type FakeElement = {
 	readonly tagName: string;
 	readonly childNodes: FakeElement[];
 	readonly parentElement?: FakeElement | null;
+	readonly attributes: Record<string, string>;
 	textContent?: string | null;
 	setAttribute?: (name: string, value: string) => void;
 	removeAttribute?: (name: string) => void;
@@ -27,7 +28,14 @@ function element(tagName: string, childNodes: FakeElement[] = []): FakeElement {
 		nodeType: 1 as const,
 		tagName,
 		childNodes,
+		attributes: {},
 		textContent: null,
+		setAttribute(name: string, value: string) {
+			this.attributes[name] = value;
+		},
+		removeAttribute(name: string) {
+			delete this.attributes[name];
+		},
 	};
 	for (const child of childNodes) {
 		(child as { parentElement?: FakeElement }).parentElement = node;
@@ -147,4 +155,50 @@ test('event-only resume dispatches lazy event symbols and flushes DOM update sym
 	expect(loadedSymbols).toEqual(['symbol:event', 'symbol:text', 'symbol:event', 'symbol:text']);
 	expect(secondResult.graph.read('state:count')).toBe(2);
 	expect(button.textContent).toBe('2');
+});
+
+test('event-only resume activates behavior symbols after an explicit trigger', async () => {
+	const button = element('BUTTON');
+	const root = element('DIV', [button]);
+	const state = createProtocolStatePayload({ cells: [] });
+	const view: ProtocolViewPayload = {
+		version: 1,
+		locators: [
+			{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'div' },
+			{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'button' },
+		],
+		events: [{ hostNodeId: 'h1', eventName: 'click', symbolIds: ['symbol:event'] }],
+		domUpdates: [],
+		behaviors: [
+			{
+				hostNodeId: 'h0',
+				source: 'installController',
+				functionSource: 'installController',
+				inputSources: [],
+				symbolId: 'symbol:behavior',
+			},
+		],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	const scripts = renderPayloadScripts({ state, view });
+	const loadedSymbols: string[] = [];
+
+	await resumeEventOnlyFromPayloadDocument({
+		document: payloadDocument(scripts.stateScript, scripts.viewScript),
+		root,
+		event: { type: 'click', target: button },
+		loadSymbol(symbolId) {
+			loadedSymbols.push(symbolId);
+			if (symbolId === 'symbol:behavior') {
+				return (context) => {
+					context.element.setAttribute?.('data-controller', 'installed');
+				};
+			}
+			return () => {};
+		},
+	});
+
+	expect(loadedSymbols).toEqual(['symbol:event', 'symbol:behavior']);
+	expect(root.attributes['data-controller']).toBe('installed');
 });

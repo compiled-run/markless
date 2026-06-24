@@ -12,7 +12,7 @@ export function createDomUpdateEntry(input: DomUpdateEntryInput): DomJournalEntr
 		return {
 			type: 'setText',
 			locator: input.locator,
-			value: input.value,
+			value: targetValue(input.target, input.value),
 		};
 	}
 
@@ -30,7 +30,7 @@ export function createDomUpdateEntry(input: DomUpdateEntryInput): DomJournalEntr
 			type: 'setAttr',
 			locator: input.locator,
 			name: 'class',
-			value: input.value,
+			value: targetValue(input.target, input.value),
 		};
 	}
 
@@ -49,4 +49,14 @@ export function createDomUpdateEntry(input: DomUpdateEntryInput): DomJournalEntr
 		name: input.target.name,
 		value: input.value,
 	};
+}
+
+function targetValue(
+	target: Extract<DomUpdateEntryInput['target'], { readonly kind: 'text' | 'class' }>,
+	value: unknown,
+): unknown {
+	if (target.trueValue !== undefined && target.falseValue !== undefined) {
+		return value ? target.trueValue : target.falseValue;
+	}
+	return value;
 }

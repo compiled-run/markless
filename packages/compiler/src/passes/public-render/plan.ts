@@ -2,6 +2,17 @@ import { isEventAttribute, normalizeEventName, parseModule } from '@tsrx/core';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource } from '../../ast/source.ts';
 import {
+	escapeAttribute,
+	escapeHtml,
+	getElementAttributes,
+	getElementTagName,
+	isHostTagName,
+	isIgnorableStaticTextNode as isIgnorableTextNode,
+	isStaticTextNode,
+	trimmedStaticTextValue,
+	unwrapExpressionContainer,
+} from '../../ast/tsrx.ts';
+import {
 	graphBindingMap,
 	resolveGraphPath,
 	semanticAliasMap,
@@ -112,7 +123,8 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 		);
 	}
 
-	const rootTemplateHtml =
+	const rootTemplateHtml = staticHtml(root, { expressionText: ' ', omitForExpressions: true });
+	const directRenderTemplateHtml =
 		staticTextWrites && staticShellSupported(root)
 			? staticHtml(root, { expressionText: ' ', omitForExpressions: true })
 			: null;
@@ -120,7 +132,20 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 	return {
 		passId: 'public-render-plan',
 		rootTemplateHtml,
+		directRenderTemplateHtml,
 		staticHostNodeIds: collectStaticHostNodeIds(root, assignedHosts),
+		staticHostLocators: input.payloadArena.view.locators.flatMap((locator) => {
+			const hostPath = hostPaths.get(locator.hostNodeId);
+			return hostPath
+				? [
+						{
+							hostNodeId: locator.hostNodeId,
+							tagName: locator.tagName,
+							hostPath,
+						},
+					]
+				: [];
+		}),
 		staticEventControls: collectStaticEventControls({
 			hostPaths,
 			payloadEvents: input.payloadArena.view.events,
@@ -137,7 +162,9 @@ function emptyPlan(): PublicRenderPlanArtifact {
 	return {
 		passId: 'public-render-plan',
 		rootTemplateHtml: null,
+		directRenderTemplateHtml: null,
 		staticHostNodeIds: [],
+		staticHostLocators: [],
 		staticEventControls: [],
 		staticTextWrites: [],
 		repeatGates: [],
@@ -545,6 +572,14 @@ function collectHostPaths(
 		let childDomIndex = 0;
 		for (const child of asNodes(node.children)) {
 			if (isIgnorableTextNode(child)) continue;
+			if (child.type === 'JSXIfExpression') {
+				for (const branchRoot of sameHostConditionalBranchRoots(child)) {
+					const branchHostNodeId = assignedHosts.hostIdByNode.get(branchRoot);
+					if (branchHostNodeId) hostPathById.set(branchHostNodeId, [...path, childDomIndex]);
+				}
+				childDomIndex++;
+				continue;
+			}
 			if (child.type === 'Element' || child.type === 'JSXElement') {
 				visit(child, [...path, childDomIndex]);
 				childDomIndex++;
@@ -556,6 +591,79 @@ function collectHostPaths(
 
 	visit(root, []);
 	return hostPathById;
+}
+
+function sameHostConditionalBranchRoots(node: AnyNode): ReadonlyArray<AnyNode> {
+	const consequent = conditionalStaticTextBranchRoot(node.consequent as AnyNode | undefined);
+	const alternate = conditionalStaticTextBranchRoot(node.alternate as AnyNode | undefined);
+	if (!consequent || !alternate) return [];
+	if (consequent.tagName !== alternate.tagName) return [];
+	if (consequent.staticAttributesKey !== alternate.staticAttributesKey) return [];
+	return [consequent.node, alternate.node];
+}
+
+function conditionalStaticTextBranchRoot(node: AnyNode | undefined):
+	| {
+			readonly node: AnyNode;
+			readonly tagName: string;
+			readonly staticAttributesKey: string;
+	  }
+	| null {
+	const root = branchSingleOutput(node);
+	if (!root || (root.type !== 'Element' && root.type !== 'JSXElement')) return null;
+	const tagName = getElementTagName(root);
+	if (!tagName || !isHostTagName(tagName)) return null;
+	if (singleStaticTextChild(root) === null) return null;
+	const staticAttributesKey = staticAttributeKey(root);
+	if (staticAttributesKey === null) return null;
+	return { node: root, tagName, staticAttributesKey };
+}
+
+function branchSingleOutput(node: AnyNode | undefined): AnyNode | null {
+	if (!node) return null;
+	if (node.type === 'BlockStatement') {
+		const outputs = asNodes(node.body).filter((child) => !isIgnorableTextNode(child));
+		return outputs.length === 1 ? branchSingleOutput(outputs[0]) : null;
+	}
+	if (node.type === 'ExpressionStatement') {
+		return branchSingleOutput(node.expression as AnyNode | undefined);
+	}
+	return node;
+}
+
+function singleStaticTextChild(node: AnyNode): string | null {
+	const children = asNodes(node.children).filter((child) => !isIgnorableTextNode(child));
+	if (children.length !== 1) return null;
+	const child = children[0]!;
+	if (!isStaticTextNode(child)) return null;
+	const value = typeof child.value === 'string' ? child.value : '';
+	const normalized = value.replace(/\s+/g, ' ').trim();
+	return normalized === '' ? null : normalized;
+}
+
+function staticAttributeKey(node: AnyNode): string | null {
+	const attributes: Array<readonly [string, string]> = [];
+	for (const attribute of getElementAttributes(node)) {
+		const name = getIdentifierName(attribute.name as AnyNode | undefined);
+		if (!name || isEventAttribute(name) || name === 'attach' || name === 'el') return null;
+
+		const value = attribute.value as AnyNode | undefined;
+		const expression = unwrapExpressionContainer(value);
+		if (!value) {
+			attributes.push([name, 'true']);
+			continue;
+		}
+		if (value.type === 'Literal' && typeof value.value !== 'object') {
+			attributes.push([name, String(value.value)]);
+			continue;
+		}
+		if (expression?.type === 'Literal' && typeof expression.value !== 'object') {
+			attributes.push([name, String(expression.value)]);
+			continue;
+		}
+		return null;
+	}
+	return JSON.stringify(attributes);
 }
 
 function collectStaticHostNodeIds(
@@ -689,7 +797,7 @@ function staticHtml(
 		readonly omitForExpressions: boolean;
 	},
 ): string {
-	if (isStaticTextNode(node)) return staticTextValue(node);
+	if (isStaticTextNode(node)) return escapeHtml(trimmedStaticTextValue(node));
 
 	if (node.type === 'JSXExpressionContainer' || node.type === 'TSRXExpression') {
 		return options.expressionText;
@@ -765,55 +873,7 @@ function staticAttributeEntry(attribute: AnyNode): ReadonlyArray<readonly [strin
 	return [[name, '']];
 }
 
-function isIgnorableTextNode(node: AnyNode): boolean {
-	return isStaticTextNode(node) && !staticTextValue(node);
-}
-
-function isStaticTextNode(node: AnyNode): boolean {
-	return node.type === 'JSXText' || node.type === 'Literal';
-}
-
-function staticTextValue(node: AnyNode): string {
-	const value = typeof node.value === 'string' ? node.value : '';
-	const normalized = value.replace(/\s+/g, ' ').trim();
-	return normalized ? escapeHtml(normalized) : '';
-}
-
 function eventHandlerExpressions(node: AnyNode): AnyNode[] {
 	if (node.type === 'ArrayExpression') return asNodes(node.elements);
 	return [node];
-}
-
-function unwrapExpressionContainer(node: AnyNode | undefined): AnyNode | undefined {
-	if (node?.type === 'JSXExpressionContainer' || node?.type === 'TSRXExpression') {
-		return node.expression as AnyNode | undefined;
-	}
-
-	return node;
-}
-
-function getElementTagName(node: AnyNode): string | null {
-	return (
-		getIdentifierName(node.id as AnyNode | undefined) ??
-		getIdentifierName((node.openingElement as AnyNode | undefined)?.name as AnyNode | undefined)
-	);
-}
-
-function getElementAttributes(node: AnyNode): AnyNode[] {
-	const directAttributes = asNodes(node.attributes);
-	if (directAttributes.length > 0) return directAttributes;
-
-	return asNodes((node.openingElement as AnyNode | undefined)?.attributes);
-}
-
-function isHostTagName(name: string): boolean {
-	return name.length > 0 && name[0] === name[0].toLowerCase();
-}
-
-function escapeHtml(value: string): string {
-	return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
-}
-
-function escapeAttribute(value: string): string {
-	return escapeHtml(value).replaceAll('"', '&quot;');
 }

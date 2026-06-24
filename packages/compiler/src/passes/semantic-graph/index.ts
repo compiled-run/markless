@@ -9,6 +9,7 @@ import {
 import { collectImports, collectModuleImports } from './imports.ts';
 import { getComponent, collectComponentProps } from './collect-components.ts';
 import {
+	collectConditionalBranchText,
 	collectElement,
 	collectElementHandleDiagnostics,
 	collectTemplateExpression,
@@ -59,7 +60,10 @@ export async function buildSemanticGraph(
 
 		graph.components.push({ name });
 		collectComponentProps(component, state);
+		const previousComponentName = state.currentComponentName;
+		state.currentComponentName = name;
 		walk(component.body as AnyNode, state);
+		state.currentComponentName = previousComponentName;
 	}
 
 	propagateAsyncComputedCapability(graph);
@@ -84,11 +88,19 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 		case 'VariableDeclaration':
 			collectVariableDeclaration(node, state);
 			break;
+		case 'JSXIfExpression':
+			walkBranch(node.consequent as AnyNode | undefined, state);
+			walkBranch(node.alternate as AnyNode | undefined, state);
+			collectConditionalBranchText(node, state);
+			return;
 		case 'JSXForExpression':
 			const repeatIndex = collectKeyedRepeat(node, state);
+			const repeat = repeatIndex === null ? null : state.graph.keyedRepeats[repeatIndex];
+			if (repeat) state.currentKeyedRepeatScopeIds.push(repeat.id);
 			for (const child of childNodes(node)) {
 				walk(child, state);
 			}
+			if (repeat) state.currentKeyedRepeatScopeIds.pop();
 			attachKeyedRepeatRowHost(node, state, repeatIndex);
 			return;
 		case 'AssignmentExpression':
@@ -118,4 +130,12 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 	for (const child of childNodes(node)) {
 		walk(child, state);
 	}
+}
+
+function walkBranch(node: AnyNode | undefined, state: WalkState): void {
+	if (!node) return;
+	const branchId = `branch:${state.nextBranchId++}`;
+	state.currentBranchScopeIds.push(branchId);
+	walk(node, state);
+	state.currentBranchScopeIds.pop();
 }
