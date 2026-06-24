@@ -80,3 +80,6 @@ VDOM.
   deferred topics and high-level build order.
 - [09-compiler-module-split-plan.md](./framework/09-compiler-module-split-plan.md)
   — concrete production compiler split target and migration order.
+- [10-render-architecture.md](./framework/10-render-architecture.md) — public
+  render shape, CSR/SSR architecture, browser resume, preload planning, and
+  build integration.
