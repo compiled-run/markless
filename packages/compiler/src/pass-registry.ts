@@ -65,9 +65,9 @@ export const defaultCompilerPasses: ReadonlyArray<CompilerPassDefinition> = [
 	},
 	{
 		passId: 'payload-scripts',
-		description: 'Render arcade/state and arcade/view data scripts and the render shell.',
+		description: 'Render arcade/state and arcade/view data scripts.',
 		consumes: ['protocolState', 'protocolView'],
-		produces: ['payloadScripts', 'renderShell'],
+		produces: ['payloadScripts'],
 	},
 	{
 		passId: 'symbol-modules',

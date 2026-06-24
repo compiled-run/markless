@@ -600,7 +600,6 @@ export type PayloadScriptsInput = {
 
 export type PayloadScriptsArtifact = {
 	readonly payloadScripts: RenderedPayloadScripts;
-	readonly renderShell: string;
 };
 
 export type PublicRenderPlanInput = {
@@ -789,7 +788,6 @@ export type CompileTsrxModuleResult = {
 	readonly protocolState: ProtocolStatePayload;
 	readonly protocolView: ProtocolViewPayload;
 	readonly payloadScripts: RenderedPayloadScripts;
-	readonly renderShell: string;
 	readonly publicRenderPlan: PublicRenderPlanArtifact;
 	readonly publicRenderModule: PublicRenderModuleArtifact;
 	readonly symbolModules: SymbolModulesArtifact;

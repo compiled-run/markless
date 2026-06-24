@@ -57,7 +57,6 @@ export async function compileTsrxModule(
 		readonly protocolState: CompileTsrxModuleResult['protocolState'];
 		readonly protocolView: CompileTsrxModuleResult['protocolView'];
 		readonly payloadScripts: PayloadScriptsArtifact['payloadScripts'];
-		readonly renderShell: PayloadScriptsArtifact['renderShell'];
 		readonly publicRenderPlan: PublicRenderPlanArtifact;
 		readonly publicRenderModule: PublicRenderModuleArtifact;
 		readonly symbolModules: SymbolModulesArtifact;
@@ -75,7 +74,6 @@ export async function compileTsrxModule(
 		protocolState: artifacts.protocolState,
 		protocolView: artifacts.protocolView,
 		payloadScripts: artifacts.payloadScripts,
-		renderShell: artifacts.renderShell,
 		publicRenderPlan: artifacts.publicRenderPlan,
 		publicRenderModule: artifacts.publicRenderModule,
 		symbolModules: artifacts.symbolModules,

@@ -450,11 +450,7 @@ test('compileTsrxModule orchestrates source to payload scripts and resolver modu
 	);
 	expect(result.payloadScripts.stateScript).toMatch(/^<script type="arcade\/state">/);
 	expect(result.payloadScripts.viewScript).toMatch(/^<script type="arcade\/view">/);
-	expect(result.renderShell).toContain('<script type="arcade/state">');
-	expect(result.renderShell).toContain('<script type="arcade/view">');
-	expect(result.renderShell.indexOf('<script type="arcade/state">')).toBeLessThan(
-		result.renderShell.indexOf('<script type="arcade/view">'),
-	);
+	expect(result).not.toHaveProperty('renderShell');
 	expect(result.symbolResolverModule).toContain('import(/* @vite-ignore */ moduleUrls[row[0]])');
 	expect(result.symbolResolverModule).not.toContain('switch (id)');
 	expect(result.symbolResolverModuleManifest).toEqual([

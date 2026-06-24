@@ -78,6 +78,8 @@ describe('TSRX Rolldown plugin structure', () => {
 			"import moduleManifest from 'virtual:arcade:module-manifest:",
 		);
 		expect(result.code).toContain('export { payloadView };');
+		expect(result.code).toContain('loadSymbol: loadSymbol,');
+		expect(result.code).not.toContain('function arcadeResumeLoadSymbol');
 		expect(result.code).toContain('const arcadeCompiledApp = {');
 		expect(result.code).toContain('renderCsr: App,');
 		expect(result.code).toContain('renderSsr(props) {');
@@ -159,6 +161,8 @@ let count = state(0);
 		expect(result.code).toContain('export async function resumeContainerEvent');
 		expect(result.code).toContain('export { arcadeSsrLoadSymbolRoute as loadSymbol };');
 		expect(result.code).toContain('function arcadeSsrLoadSymbolRoute(symbolId)');
+		expect(result.code).toContain('loadSymbol: arcadeSsrLoadSymbolRoute,');
+		expect(result.code).not.toContain('function arcadeResumeLoadSymbol');
 		expect(result.code).toContain('import("./Child.tsrx?arcade-symbols")');
 		expect(result.code).toContain("import('virtual:arcade:symbol:");
 		expect(result.code).not.toContain('document.createElement');
@@ -296,8 +300,8 @@ let active = state(true);
 		const payloadSource = (await callLoad(plugin, `\0${payloadId}`)) as string;
 		expect(payloadSource).toContain('export const state =');
 		expect(payloadSource).toContain('export const view =');
-		expect(payloadSource).toContain('export const payloadScripts =');
-		expect(payloadSource).toContain('export default payloadScripts;');
+		expect(payloadSource).not.toContain('payloadScripts');
+		expect(payloadSource).not.toContain('export default');
 		const resolverSource = (await callLoad(plugin, `\0${resolverId}`)) as string;
 		expect(resolverSource).toContain('if (id === "symbol:0")');
 		const symbolIds = ['symbol:0', 'symbol:1'].map(
@@ -343,7 +347,9 @@ let active = state(true);
 		const payloadId = `virtual:arcade:payload:${encodeURIComponent(
 			'/workspace/app/src/App.tsrx',
 		)}`;
-		expect(await callLoad(plugin, `\0${payloadId}`)).toContain('export default');
+		const payloadSource = (await callLoad(plugin, `\0${payloadId}`)) as string;
+		expect(payloadSource).toContain('export const state =');
+		expect(payloadSource).not.toContain('export default');
 
 		callBuildStart(plugin, { cwd: '/workspace/app' });
 		expect(await callLoad(plugin, `\0${payloadId}`)).toBeNull();

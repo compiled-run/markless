@@ -37,24 +37,13 @@ export function rewriteSymbolModuleExport(
 	);
 }
 
-export function payloadModule(payloadScripts: {
+export function payloadModule(payload: {
 	readonly state: unknown;
 	readonly view: unknown;
-	readonly stateScript: string;
-	readonly viewScript: string;
 }) {
 	return [
-		`export const state = ${JSON.stringify(payloadScripts.state, null, '\t')};`,
-		`export const view = ${JSON.stringify(payloadScripts.view, null, '\t')};`,
-		`export const stateScript = ${JSON.stringify(payloadScripts.stateScript)};`,
-		`export const viewScript = ${JSON.stringify(payloadScripts.viewScript)};`,
-		'export const payloadScripts = {',
-		'	state,',
-		'	view,',
-		'	stateScript,',
-		'	viewScript,',
-		'};',
-		'export default payloadScripts;',
+		`export const state = ${JSON.stringify(payload.state, null, '\t')};`,
+		`export const view = ${JSON.stringify(payload.view, null, '\t')};`,
 		'',
 	].join('\n');
 }
@@ -77,6 +66,7 @@ export function emitSourceModule(input: {
 }) {
 	const symbolsOnly = input.environment === 'client' && input.clientOutput === 'symbols-only';
 	const routeSymbols = symbolsOnly && input.symbolRoutes.length > 0;
+	const resumeSymbolLoader = routeSymbols ? 'arcadeSsrLoadSymbolRoute' : 'loadSymbol';
 	return [
 		input.environment === 'server'
 			? ''
@@ -92,7 +82,7 @@ export function emitSourceModule(input: {
 		routeSymbols ? 'const arcadeLoadLocalSymbol = loadSymbol;' : '',
 		symbolsOnly && !routeSymbols ? 'export { loadSymbol };' : '',
 		symbolsOnly ? '' : 'export { payloadView };',
-		input.environment === 'server' ? '' : emitResumeContainerEvent(),
+		input.environment === 'server' ? '' : emitResumeContainerEvent(resumeSymbolLoader),
 		'',
 		input.environment === 'server' || symbolsOnly ? '' : input.publicRenderModuleSource,
 		input.environment === 'server' || symbolsOnly ? '' : input.publicCsrModuleSource,
@@ -222,13 +212,8 @@ function emitCsrPreloadFunction(): string {
 	].join('\n');
 }
 
-function emitResumeContainerEvent(): string {
+function emitResumeContainerEvent(loadSymbolName: string): string {
 	return [
-		'function arcadeResumeLoadSymbol(symbolId) {',
-		'	if (typeof arcadeCsrLoadSymbolRoute === "function") return arcadeCsrLoadSymbolRoute(symbolId);',
-		'	if (typeof arcadeSsrLoadSymbolRoute === "function") return arcadeSsrLoadSymbolRoute(symbolId);',
-		'	return loadSymbol(symbolId);',
-		'}',
 		'export async function resumeContainerEvent(input) {',
 		'	await resumeEventOnlyFromPayloadDocument({',
 		'		document: input.root,',
@@ -236,7 +221,7 @@ function emitResumeContainerEvent(): string {
 		'		event: input.event,',
 		'		element: input.element,',
 		'		eventRecord: input.eventRecord,',
-		'		loadSymbol: arcadeResumeLoadSymbol,',
+		`		loadSymbol: ${loadSymbolName},`,
 		'	});',
 		'}',
 	].join('\n');

@@ -425,7 +425,6 @@ test('compileTsrxModule validates and returns the default pass graph', async () 
 			'protocolState',
 			'protocolView',
 			'payloadScripts',
-			'renderShell',
 			'symbolModules',
 			'symbolResolverModule',
 			'symbolResolverModuleManifest',

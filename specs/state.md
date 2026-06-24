@@ -129,8 +129,8 @@ The critical path to "full spec implementation" still requires:
   render artifacts, awaits demanded async work, serializes real
   graph/view/symbol/async snapshots into container-scoped payloads, generates
   production-sized feature-sliced inline resumers for interactive containers,
-  and uses the current payload-script-only compiler `renderShell` artifact as
-  input rather than treating it as the whole render pipeline
+  and consumes canonical payload scripts as data rather than treating payload
+  rendering as the whole render pipeline
 - browser resume that performs concrete DOM replacement/mutation behavior for
   all planned binding and async-boundary cases
 - broaden the CSR-only `packages/vitest-browser` helper from its current
@@ -322,11 +322,10 @@ in the split specs.
   current source-to-artifacts path by manually calling the pass-owned modules in
   registry order.
 - `compileTsrxModule` currently returns pass artifacts, protocol payloads,
-  canonical payload scripts, a concatenated payload-only `renderShell`, a
-  `symbolModules` artifact for current generated event-handler graph writes,
-  DOM update symbols, imported behavior function symbols, and async-computed
-  runner symbols, a generated symbol resolver module string, and a resolver
-  manifest object. It does not return a final emitted JavaScript module for
+  canonical payload scripts, a `symbolModules` artifact for current generated
+  event-handler graph writes, DOM update symbols, imported behavior function
+  symbols, and async-computed runner symbols, a generated symbol resolver module
+  string, and a resolver manifest object. It does not return a final emitted JavaScript module for
   component execution, state access rewriting, build-integrated async-runner
   chunks, broad event write forms, local/non-imported behavior symbols, or
   complete build-ready extracted symbol chunks.
@@ -1553,9 +1552,8 @@ commands are listed in the implementation/build section above.
 - initial-render gap scan confirmed the runtime package currently exposes graph,
   payload, and resume-helper modules, but no runtime initial-render entry,
   document-scanning browser bootstrap, or initial-render package test.
-- initial-render remaining-work audit clarified that the existing compiler
-  `renderShell` is a payload-script artifact, not the initial-render runtime
-  pipeline.
+- initial-render remaining-work audit clarified that payload-script rendering is
+  not the initial-render runtime pipeline.
 - final-emission audit confirmed current compiler/adapter output stops at
   artifact orchestration, payload script rendering, generated resolver strings,
   and Rolldown virtual module metadata. `transformTsrxModule` emits an
