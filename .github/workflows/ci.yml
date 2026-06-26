@@ -81,7 +81,8 @@ jobs:
                   npm run install-webdriver-ts
                   npm run install-server
 
-            - name: Install Arcade benchmark fixture
+            - name: Install baseline Arcade benchmark fixture
+              working-directory: ${{ env.ARCADE_BASE_REPO_ROOT }}
               run: pnpm bench:jsfb:prepare -- --jsfb-root "$JSFB_ROOT"
 
             - name: Validate baseline Arcade benchmark fixture
@@ -131,6 +132,9 @@ jobs:
                   if [ -d webdriver-ts/traces ]; then
                     mv webdriver-ts/traces "$ARCADE_JSFB_BASELINE_TRACES"
                   fi
+
+            - name: Install current Arcade benchmark fixture
+              run: pnpm bench:jsfb:prepare -- --jsfb-root "$JSFB_ROOT"
 
             - name: Validate current Arcade benchmark fixture
               working-directory: ${{ env.JSFB_ROOT }}
