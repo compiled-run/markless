@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -7,6 +8,17 @@ const arcadeRoot = resolve(process.env.ARCADE_REPO_ROOT ?? '../../../../..');
 function arcadePackage(path: string) {
 	return resolve(arcadeRoot, path);
 }
+
+const hasWebPackage = existsSync(arcadePackage('packages/web/src/render.ts'));
+const webOrRuntimeRender = hasWebPackage
+	? 'packages/web/src/render.ts'
+	: 'packages/runtime/src/render.ts';
+const webOrRuntimeEventOnlyResume = hasWebPackage
+	? 'packages/web/src/event-only-resume.ts'
+	: 'packages/runtime/src/event-only-resume.ts';
+const arcadeWebOrRuntimeEventOnlyResume = hasWebPackage
+	? 'packages/arcade/src/web/event-only-resume.ts'
+	: 'packages/arcade/src/runtime/event-only-resume.ts';
 
 const { arcade } = await import(
 	pathToFileURL(arcadePackage('packages/bundler/src/vite/index.ts')).href
@@ -34,11 +46,19 @@ export default {
 			},
 			{
 				find: '@arcade/web/render',
-				replacement: arcadePackage('packages/web/src/render.ts'),
+				replacement: arcadePackage(webOrRuntimeRender),
+			},
+			{
+				find: '@arcade/runtime/render',
+				replacement: arcadePackage(webOrRuntimeRender),
 			},
 			{
 				find: '@arcade/web/event-only-resume',
-				replacement: arcadePackage('packages/web/src/event-only-resume.ts'),
+				replacement: arcadePackage(webOrRuntimeEventOnlyResume),
+			},
+			{
+				find: '@arcade/runtime/event-only-resume',
+				replacement: arcadePackage(webOrRuntimeEventOnlyResume),
 			},
 			{
 				find: '@arcade/runtime',
@@ -50,7 +70,11 @@ export default {
 			},
 			{
 				find: 'arcade/web/event-only-resume',
-				replacement: arcadePackage('packages/arcade/src/web/event-only-resume.ts'),
+				replacement: arcadePackage(arcadeWebOrRuntimeEventOnlyResume),
+			},
+			{
+				find: 'arcade/runtime/event-only-resume',
+				replacement: arcadePackage(arcadeWebOrRuntimeEventOnlyResume),
 			},
 			{
 				find: 'arcade',

@@ -122,20 +122,37 @@ describe('package metadata', () => {
 
 		const preloadAlias = config.indexOf("find: 'arcade/preload'");
 		const eventOnlyResumeAlias = config.indexOf("find: 'arcade/web/event-only-resume'");
+		const runtimeEventOnlyResumeAlias = config.indexOf(
+			"find: 'arcade/runtime/event-only-resume'",
+		);
 		const webRenderAlias = config.indexOf("find: '@arcade/web/render'");
+		const runtimeRenderAlias = config.indexOf("find: '@arcade/runtime/render'");
 		const webEventOnlyResumeAlias = config.indexOf("find: '@arcade/web/event-only-resume'");
+		const runtimePackageEventOnlyResumeAlias = config.indexOf(
+			"find: '@arcade/runtime/event-only-resume'",
+		);
 		const runtimeRootAlias = config.indexOf("find: '@arcade/runtime'");
 		const rootAlias = config.indexOf("find: 'arcade'");
 
 		expect(preloadAlias).toBeGreaterThanOrEqual(0);
 		expect(eventOnlyResumeAlias).toBeGreaterThanOrEqual(0);
+		expect(runtimeEventOnlyResumeAlias).toBeGreaterThanOrEqual(0);
 		expect(webRenderAlias).toBeGreaterThanOrEqual(0);
+		expect(runtimeRenderAlias).toBeGreaterThanOrEqual(0);
 		expect(webEventOnlyResumeAlias).toBeGreaterThanOrEqual(0);
+		expect(runtimePackageEventOnlyResumeAlias).toBeGreaterThanOrEqual(0);
+		expect(runtimeRenderAlias).toBeLessThan(runtimeRootAlias);
 		expect(webEventOnlyResumeAlias).toBeLessThan(runtimeRootAlias);
+		expect(runtimePackageEventOnlyResumeAlias).toBeLessThan(runtimeRootAlias);
 		expect(preloadAlias).toBeLessThan(rootAlias);
 		expect(eventOnlyResumeAlias).toBeLessThan(rootAlias);
+		expect(runtimeEventOnlyResumeAlias).toBeLessThan(rootAlias);
+		expect(config).toContain('packages/web/src/render.ts');
+		expect(config).toContain('packages/runtime/src/render.ts');
 		expect(config).toContain('packages/arcade/src/preload.ts');
 		expect(config).toContain('packages/arcade/src/web/event-only-resume.ts');
+		expect(config).toContain('packages/arcade/src/runtime/event-only-resume.ts');
 		expect(config).toContain('packages/web/src/event-only-resume.ts');
+		expect(config).toContain('packages/runtime/src/event-only-resume.ts');
 	});
 });
