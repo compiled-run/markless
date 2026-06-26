@@ -1,5 +1,5 @@
 import { createProtocolStatePayload } from '@arcade/serializer';
-import type { ProtocolStatePayload } from '@arcade/protocol';
+import type { ProtocolStatePayload } from '@arcade/serializer';
 import type { ProtocolStatePayloadInput, SemanticSharedReturnProperty } from '../artifacts.ts';
 
 export function createProtocolStatePayloadFromArena(

@@ -185,17 +185,26 @@ path is covered by fixtures and browser tests.
 - The pnpm/vite-plus workspace scaffolding exists through root `package.json`,
   `pnpm-workspace.yaml`, `pnpm-lock.yaml`, and `vite.config.ts`.
 - Root scripts are thin vite-plus aliases. The current `vite.config.ts` uses one
-  flat pack entry map that includes the current core package entries plus
-  `vitest-browser` helper entries and one Node test project include;
-  it does not yet model package-local publish output or browser/witness test
-  projects.
-- Production framework package folders currently exist for `resumable`, `core`,
-  `protocol`, `runtime`, `serializer`, `compiler`, `bundler`, and
-  `test-utils`, with `vitest-browser` present as a CSR browser-test helper
-  package.
-- The current package inventory has package manifests for those nine package
-  folders and no `packages/server` manifest.
-- The current split-spec inventory has `00` through `09` under
+  flat pack entry map for `arcade`, runtime, serializer, compiler, bundler, and
+  `vitest-browser` entries, and the Node test project includes package tests
+  plus top-level script tests. It does not yet model package-local publish
+  output or browser/witness test projects.
+- Production framework package folders currently exist for `arcade`, `runtime`,
+  `serializer`, `compiler`, `bundler`, `typescript-plugin`, and
+  `vitest-browser`.
+- There is no production `packages/core`, `packages/protocol`,
+  `packages/test-utils`, or `packages/server` manifest. Authoring APIs live in
+  `packages/arcade`, protocol/payload contracts live in `packages/serializer`,
+  and short repo-only helpers live under top-level `scripts/test-utils` or
+  package-local test support.
+- The root workspace includes `demos/*`; the previous top-level
+  `benchmarks/js-framework-benchmark` fixture now lives under
+  `demos/js-framework-benchmark`, and the music-player CSR/SSR playgrounds now
+  live under `demos/music-player` and `demos/music-player-ssr`.
+- The current package inventory has package manifests for those seven framework
+  package folders, the TypeScript plugin package, the two music-player demos,
+  and the existing fixture packages.
+- The current split-spec inventory has `00` through `10` under
   `specs/framework/`.
 - `packages/compiler` has the initial production pass-boundary layout with
   shared artifact/diagnostic modules, AST/source helpers, graph-path helpers, a
@@ -234,13 +243,18 @@ in the split specs.
   `poc/fixtures/proofs/resumer-script/browser/index.html`, and
   `poc/fixtures/proofs/resumer-script/resumer-script.box.ts`.
 - Serializer boundaries: `packages/serializer/src/index.ts`,
+  `packages/serializer/src/protocol.ts`,
   `packages/serializer/src/value.ts`,
   `packages/serializer/src/protocol-state.ts`,
   `packages/serializer/src/payload-scripts.ts`, and
   `packages/serializer/test/*`.
-- Core/protocol/test utility surfaces: `packages/core/src/index.ts`,
-  `packages/protocol/src/index.ts`, `packages/test-utils/src/index.ts`, and
-  their package tests.
+- Authoring API and protocol/test utility surfaces:
+  `packages/arcade/src/framework-api.ts`,
+  `packages/arcade/test/framework-api.test.ts`,
+  `packages/serializer/src/protocol.ts`,
+  `packages/serializer/test/protocol.test.ts`,
+  `scripts/test-utils/payload.ts`, `scripts/test-utils/payload.test.ts`, and
+  `scripts/benchmarks/jsfb-baseline.test.ts`.
 - Curated public surface and build adapters: `packages/arcade/src/index.ts`,
   `packages/arcade/src/vite.ts`, `packages/arcade/src/rolldown.ts`,
   `packages/bundler/src/rolldown.ts`, `packages/bundler/src/vite/index.ts`,
@@ -1065,9 +1079,9 @@ in the split specs.
 - Finish production packaging/build metadata beyond the current flat root
   `dist/` output, including package-local export wiring, package build ordering,
   dependency externalization policy, and the final public/internal package split.
-- Broaden `packages/test-utils` beyond the current payload script helpers into
-  fixture harnesses, artifact assertions, browser helpers, and witness
-  integration helpers as real package/browser/pipeline tests land.
+- Keep short repo-only test helpers in package-local test support or
+  top-level `scripts/test-utils`. Promote them into a new package only after
+  real package/browser/pipeline tests prove a reusable consumer surface.
 - Add component/browser and eventual resumability end-to-end tests that prove no
   component execution on browser resume.
 
@@ -1535,15 +1549,15 @@ commands are listed in the implementation/build section above.
   globs.
 - test inventory scan confirmed 47 package test files currently match the root
   vite-plus Node test include, `packages/*/test/**/*.test.ts`.
-- package-manifest audit confirmed all nine package manifests are
+- package-manifest audit confirmed the current framework package manifests are
   `private`, export source entry points under `./src/...`, and are not wired to
-  generated `dist/` artifacts; `packages/core` additionally exposes its
-  `./vite` source subpath.
+  generated `dist/` artifacts. Retired `packages/core`, `packages/protocol`,
+  and `packages/test-utils` manifests are absent.
 - workspace/build-config audit confirmed root scripts are thin vite-plus aliases,
-  `pnpm-workspace.yaml` uses only `packages/*` as a package glob while keeping
-  shared dependency versions in the default pnpm catalog, and the current
-  `vite.config.ts` uses a flat fourteen-entry source map for `vp pack` plus a
-  Node-only package test include.
+  `pnpm-workspace.yaml` uses `packages/*`, package fixture globs, and
+  `demos/*` as workspace package globs while keeping shared dependency versions
+  in the default pnpm catalog, and the current `vite.config.ts` uses a flat
+  source map for `vp pack` plus Node package/script test includes.
 - pack-output audit confirmed `pnpm exec vp pack` currently cleans the untracked
   root `dist/` directory and emits 36 ESM/declaration files for the configured
   fourteen-entry source map plus hashed shared chunks. The command still reports
@@ -1637,23 +1651,22 @@ commands are listed in the implementation/build section above.
   harness, behavior/async-runner chunks, broader event-handler write chunks
   beyond simple updates, or full resolver table rewriting coverage beyond the
   current generated build fixture paths.
-- public-surface source/test audit confirmed `packages/core` currently
-  re-exports framework APIs, `resumeFromPayloadScripts`, the Rolldown adapter,
+- public-surface source/test audit confirmed `packages/arcade` owns framework
+  APIs directly, re-exports `resumeFromPayloadScripts`, the Rolldown adapter,
   and its `./vite` adapter subpath through private source-entry package
   manifests; current tests import those source entries directly rather than
   proving installed package export resolution.
-- core/protocol/test-utils audit confirmed support-package coverage is limited to
-  structured runtime failure metadata for compiler-rewritten framework APIs, protocol
-  version/type fixtures, canonical payload script wrapper assertions, JSON
-  script decoding, selected protocol record-count summaries for cells, computed
-  entries, locators, events, DOM updates, behaviors, element handles, and async
-  boundaries, plus a decoded human-readable payload debug dump for fixture
-  assertions.
-  It still does not prove public API stability for internal packages, protocol
-  migration/version negotiation, browser helpers, or witness integration
-  helpers.
+- authoring/protocol/test-helper audit confirmed coverage for structured
+  runtime failure metadata for compiler-rewritten framework APIs, serializer-owned
+  protocol version/type fixtures, canonical payload script wrapper assertions,
+  JSON script decoding, selected protocol record-count summaries for cells,
+  computed entries, locators, events, DOM updates, behaviors, element handles,
+  and async boundaries, plus a decoded human-readable payload debug dump for
+  fixture assertions. It still does not prove public API stability for internal
+  packages, protocol migration/version negotiation, browser helpers, or witness
+  integration helpers.
 - shared-state audit confirms current `shared()` support covers the
-  `@arcade/core` framework API stub, the authored
+  `arcade` framework API stub, the authored
   `shared(factory, options?)` call shape, the main package re-export,
   public-surface presence checks, diagnostic suggestion text, and semantic graph
   records for same-module exported shared definitions plus component-local

@@ -21,25 +21,27 @@ contract.
 
 ## Package Map
 
-Workspace packages use the `@arcade/*` scope:
+Workspace packages are private implementation boundaries unless the package map
+below says otherwise:
 
-- `packages/core` -> `@arcade/core`, public authoring APIs such as `state()`,
-  `computed()`, `element()`, and `shared()`.
-- `packages/protocol` -> `@arcade/protocol`, shared protocol and payload
-  types.
+- `packages/arcade` -> `arcade`, public authoring APIs such as `state()`,
+  `computed()`, `element()`, and `shared()`, plus curated public re-exports.
 - `packages/runtime` -> `@arcade/runtime`, graph runtime, render, and resume
   helpers.
-- `packages/serializer` -> `@arcade/serializer`, value and payload
-  serialization.
+- `packages/serializer` -> `@arcade/serializer`, value serialization plus the
+  private protocol and payload contract types consumed by compiler/runtime.
 - `packages/compiler` -> `@arcade/compiler`, compiler passes and artifacts
   for `.tsrx` files.
 - `packages/bundler` -> `@arcade/bundler`, Rolldown and Vite integration.
-- `packages/test-utils` -> `@arcade/test-utils`, test helpers.
+- `packages/typescript-plugin` -> `@arcade/typescript-plugin`, editor language
+  integration for `.tsrx` files.
 - `packages/vitest-browser` -> `@arcade/vitest-browser`, browser-mode test
   helpers.
-- `packages/arcade` -> `@arcade/arcade`, umbrella re-exports while this
-  package remains in the workspace. Do not treat it as the owner of authoring
-  APIs.
+
+There is intentionally no `packages/core`, `packages/protocol`, or
+`packages/test-utils`. Short repo-only helpers live under package-local test
+support or top-level `scripts/test-utils` until a real package boundary is
+needed.
 
 There is intentionally no `packages/server`. Initial render and browser resume
 are phases of one runtime model.
@@ -66,7 +68,7 @@ pnpm exec vp pack
 ## Development Rules
 
 - TSRX-only: Arcade components live in `.tsrx` files.
-- Import authoring APIs from `@arcade/core`.
+- Import authoring APIs from `arcade`.
 - Do not add reactivity to plain `.ts` files.
 - Do not add TSX or JSX support unless the specs are deliberately reopened.
 - Do not add hydration or VDOM behavior.
@@ -92,7 +94,7 @@ coverage.
 `pnpm test` also includes the Arcade keyed JS Framework Benchmark regression
 guard. CI creates fresh base/current JSFB results on the same runner before
 running the main test command. To run the full benchmark gate locally, follow
-[`benchmarks/js-framework-benchmark/README.md`](./benchmarks/js-framework-benchmark/README.md)
+[`demos/js-framework-benchmark/README.md`](./demos/js-framework-benchmark/README.md)
 and set `ARCADE_JSFB_RESULTS` to the fresh results directory.
 
 ## Agent Notes

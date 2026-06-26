@@ -1,4 +1,4 @@
-import { ASYNC_PROTOCOL_VERSION, type ProtocolViewPayload } from '@arcade/protocol';
+import { ASYNC_PROTOCOL_VERSION, type ProtocolViewPayload } from '@arcade/serializer';
 import { createProtocolStatePayload } from '@arcade/serializer';
 import { expect, test } from 'vitest';
 import { render, renderToString } from '../src/index.ts';

@@ -4,7 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const DEFAULT_BASELINE_PATH = join(ROOT_DIR, 'benchmarks/js-framework-benchmark/baseline.json');
+const DEFAULT_BASELINE_PATH = join(ROOT_DIR, 'demos/js-framework-benchmark/baseline.json');
 const DEFAULT_FRAMEWORK = 'arcade-keyed';
 const DEFAULT_RESULTS_PATHS = [
 	process.env.ARCADE_JSFB_RESULTS,

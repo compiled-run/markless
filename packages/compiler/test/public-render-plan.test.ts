@@ -5,7 +5,7 @@ import { planPublicRender } from '../src/passes/public-render/plan.ts';
 import { planSymbolResolver } from '../src/passes/symbol-resolver.ts';
 
 const appSource = (body: string, extra = '') =>
-	`import { state } from '@arcade/core';\n${extra}\nexport function App() @{\n${body}\n}\n`;
+	`import { state } from 'arcade';\n${extra}\nexport function App() @{\n${body}\n}\n`;
 const supportedSource = appSource(
 	`let entries = state([]); let chosen = state(null);
 <main><section>@for (const entry of entries; key entry.code) {<article class={chosen === entry.code ? 'picked' : 'plain'}><h2>{entry.title}</h2><button onClick={() => chosen = entry.code}>Choose</button></article>}</section></main>`,

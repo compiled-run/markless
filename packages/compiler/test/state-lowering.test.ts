@@ -4,7 +4,7 @@ import { buildSemanticGraph } from '../src/index.ts';
 import { lowerStateAccess } from '../src/passes/state-lowering.ts';
 
 const source = `
-import { state, computed } from '@arcade/core';
+import { state, computed } from 'arcade';
 
 export function Counter() @{
 	let count = state(0);
@@ -42,7 +42,7 @@ export function Counter() @{
 `;
 
 const readOnlyWriteSource = `
-import { state, computed } from '@arcade/core';
+import { state, computed } from 'arcade';
 
 export function Counter() @{
 	let count = state(0);
@@ -59,7 +59,7 @@ export function Greeting({ label }: { label: string }) @{
 `;
 
 const constReassignmentSource = `
-import { state } from '@arcade/core';
+import { state } from 'arcade';
 
 export function Counter() @{
 	const frozenCount = state(0);
@@ -79,7 +79,7 @@ export function Counter() @{
 `;
 
 const nestedAliasSource = `
-import { state } from '@arcade/core';
+import { state } from 'arcade';
 
 export function Queue() @{
 	const groups = state([['first'], { meta: { label: 'second' } }]);
@@ -97,7 +97,7 @@ export function Queue() @{
 `;
 
 const sharedFactorySource = `
-import { shared, state, computed } from '@arcade/core';
+import { shared, state, computed } from 'arcade';
 
 export const session = shared(() => {
 	const data = state({ user: null, status: 'anonymous' });
@@ -127,7 +127,7 @@ export function Header() @{
 `;
 
 const sharedDynamicPathSource = `
-import { shared, state } from '@arcade/core';
+import { shared, state } from 'arcade';
 
 export const session = shared(() => {
 	const data = state({ status: 'anonymous' });

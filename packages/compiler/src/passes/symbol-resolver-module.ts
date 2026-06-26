@@ -1,4 +1,4 @@
-import { ASYNC_PROTOCOL_VERSION } from '@arcade/protocol';
+import { ASYNC_PROTOCOL_VERSION } from '@arcade/serializer';
 import type { SymbolResolverModuleInput, SymbolResolverModuleManifest } from '../artifacts.ts';
 
 const SMALL_SYMBOL_SWITCH_LIMIT = 3;

@@ -1,4 +1,4 @@
-import type { ProtocolStatePayload, ProtocolViewPayload } from '@arcade/protocol';
+import type { ProtocolStatePayload, ProtocolViewPayload } from '@arcade/serializer';
 import type {
 	DomJournalEntry,
 	DomJournalResult,

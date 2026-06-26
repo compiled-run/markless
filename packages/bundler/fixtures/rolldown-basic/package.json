@@ -6,8 +6,7 @@
 		"build": "rolldown -c"
 	},
 	"dependencies": {
-		"@arcade/bundler": "workspace:*",
-		"@arcade/core": "workspace:*"
+		"@arcade/bundler": "workspace:*"
 	},
 	"devDependencies": {
 		"rolldown": "1.0.3",

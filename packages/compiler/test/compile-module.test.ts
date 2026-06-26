@@ -3,7 +3,7 @@ import { compileTsrxModule } from '../src/index.ts';
 import { deserializeGraphValue } from '../../serializer/src/index.ts';
 
 const source = `
-import { state } from '@arcade/core';
+import { state } from 'arcade';
 
 export function App() @{
 	let count = state(1);
@@ -25,7 +25,7 @@ export function App() @{
 `;
 
 const eventWriteSource = `
-import { state } from '@arcade/core';
+import { state } from 'arcade';
 import { clamp } from './math';
 import { makeItems } from './items';
 
@@ -82,7 +82,7 @@ export function App() @{
 `;
 
 const asyncComputedSource = `
-import { state, computed } from '@arcade/core';
+import { state, computed } from 'arcade';
 
 export function App() @{
 	const query = state('Ada');
@@ -502,10 +502,10 @@ test('compileTsrxModule orchestrates source to payload scripts and resolver modu
 	);
 });
 
-test('compileTsrxModule accepts the scoped umbrella authoring import', async () => {
+test('compileTsrxModule accepts the main authoring import', async () => {
 	const result = await compileTsrxModule({
-		filename: 'src/UmbrellaImport.tsrx',
-		source: source.replace('@arcade/core', 'arcade'),
+		filename: 'src/MainImport.tsrx',
+		source,
 		symbols: [],
 	});
 
@@ -522,7 +522,7 @@ test('compileTsrxModule emits conditional class DOM updates from graph tests', a
 	const result = await compileTsrxModule({
 		filename: 'src/ConditionalClass.tsrx',
 		source: `
-import { state } from '@arcade/core';
+import { state } from 'arcade';
 
 export function App() @{
 	let selected = state(false);
@@ -553,7 +553,7 @@ test('compileTsrxModule emits same-host conditional branch text DOM updates', as
 	const result = await compileTsrxModule({
 		filename: 'src/ConditionalBranchText.tsrx',
 		source: `
-import { state } from '@arcade/core';
+import { state } from 'arcade';
 
 export function App() @{
 	let playing = state(false);
@@ -607,7 +607,7 @@ test('compileTsrxModule emits public render direct DOM artifacts for supported k
 	const result = await compileTsrxModule({
 		filename: 'src/KeyedEntries.tsrx',
 		source: `
-import { state } from '@arcade/core';
+import { state } from 'arcade';
 
 export function App() @{
 	let entries = state([]); let chosen = state(null); let draft = state({ code: 'draft' });
@@ -793,7 +793,7 @@ test('compileTsrxModule public render module runs alternate keyed repeat shapes'
 	const result = await compileTsrxModule({
 		filename: 'src/Catalog.tsrx',
 		source: `
-import { state } from '@arcade/core';
+import { state } from 'arcade';
 
 export function Catalog() @{
 	let catalog = state([]);
@@ -958,7 +958,7 @@ test('compileTsrxModule public render module skips redundant empty class writes'
 	const result = await compileTsrxModule({
 		filename: 'src/Articles.tsrx',
 		source: `
-import { state } from '@arcade/core';
+import { state } from 'arcade';
 
 export function Articles() @{
 	let entries = state([]);
@@ -1055,7 +1055,7 @@ test('compileTsrxModule public render module appends initial keyed rows into an 
 	const result = await compileTsrxModule({
 		filename: 'src/InitialArticles.tsrx',
 		source: `
-import { state } from '@arcade/core';
+import { state } from 'arcade';
 
 export function InitialArticles() @{
 	let entries = state([]);
@@ -1139,7 +1139,7 @@ test('compileTsrxModule public render module replaces all-new keyed rows with th
 	const result = await compileTsrxModule({
 		filename: 'src/ReplaceArticles.tsrx',
 		source: `
-import { state } from '@arcade/core';
+import { state } from 'arcade';
 
 export function ReplaceArticles() @{
 	let entries = state([]);
@@ -1235,7 +1235,7 @@ test('compileTsrxModule public render module writes keyed text bindings through 
 	const result = await compileTsrxModule({
 		filename: 'src/TextArticles.tsrx',
 		source: `
-import { state } from '@arcade/core';
+import { state } from 'arcade';
 
 export function TextArticles() @{
 	let entries = state([]);
@@ -1338,7 +1338,7 @@ test('compileTsrxModule public render module runs static text state bindings', a
 	const result = await compileTsrxModule({
 		filename: 'src/Scoreboard.tsrx',
 		source: `
-import { state } from '@arcade/core';
+import { state } from 'arcade';
 
 export function Scoreboard() @{
 	let score = state({ total: 1 });
@@ -1429,7 +1429,7 @@ test('compileTsrxModule does not emit public render factories for non-literal di
 	const result = await compileTsrxModule({
 		filename: 'src/KeyedEntriesWithDate.tsrx',
 		source: `
-import { state } from '@arcade/core';
+import { state } from 'arcade';
 
 export function App() @{
 	let entries = state([]);
@@ -1467,7 +1467,7 @@ export function App() @{
 test('compileTsrxModule does not emit misleading public render factories for multi-component modules', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/MultiComponentEntries.tsrx',
-		source: `import { state } from '@arcade/core';
+		source: `import { state } from 'arcade';
 export function App() @{
 let entries = state([]);
 <main>@for (const entry of entries; key entry.code) {<article>{entry.title}</article>}</main>
@@ -1486,7 +1486,7 @@ test('compileTsrxModule does not emit public render factories for static shell e
 	] as const) {
 		const result = await compileTsrxModule({
 			filename: `src/StaticShell-${name}.tsrx`,
-			source: `import { state } from '@arcade/core';
+			source: `import { state } from 'arcade';
 export function App() @{
 let entries = state([]); const label = 'Entries';
 <main>${shell}<section>@for (const entry of entries; key entry.code) {<article>{entry.title}</article>}</section></main>
@@ -1501,7 +1501,7 @@ let entries = state([]); const label = 'Entries';
 test('compileTsrxModule does not emit public render factories for unsupported repeat plans', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/UnsupportedEntries.tsrx',
-		source: `import { state } from '@arcade/core';
+		source: `import { state } from 'arcade';
 export function App() @{
 let entries = state([]);
 <main><p>No entries</p>@for (const entry of entries; key entry.code) {<article>{entry.title}</article>}</main>

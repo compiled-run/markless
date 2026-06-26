@@ -10,7 +10,7 @@ import {
 	resumeFromPayloadScripts,
 	RuntimePayloadError,
 } from '../src/index.ts';
-import type { ProtocolViewPayload } from '@arcade/protocol';
+import type { ProtocolViewPayload } from '@arcade/serializer';
 
 type FakeElement = {
 	readonly nodeType: 1;

@@ -22,14 +22,14 @@ export function frameworkImportRequiredDiagnostic(
 		severity: 'error',
 		phase: 'semantic-graph',
 		title: 'Framework API must be imported',
-		message: `Cannot use ${apiName}() until it is imported from @arcade/core.`,
-		why: `${apiName}() is a compiler-rewritten @arcade/core API. The import makes ownership explicit for TypeScript, editors, junior developers, and AI agents.`,
+		message: `Cannot use ${apiName}() until it is imported from arcade.`,
+		why: `${apiName}() is a compiler-rewritten arcade API. The import makes ownership explicit for TypeScript, editors, junior developers, and AI agents.`,
 		primarySpan: sourceSpan(call, filename),
 		passId: 'tsrx-semantic-graph',
 		artifactKeys: ['semanticGraph'],
 		suggestions: [
 			{
-				message: `Add \`import { ${apiName} } from '@arcade/core';\` to this .tsrx file.`,
+				message: `Add \`import { ${apiName} } from 'arcade';\` to this .tsrx file.`,
 			},
 		],
 		docsUrl: 'https://arcadejs.com/errors/ARCADE_FRAMEWORK_IMPORT_REQUIRED',

@@ -9,7 +9,6 @@
 		"./type-service": "./src/type-service.ts"
 	},
 	"dependencies": {
-		"@arcade/protocol": "workspace:*",
 		"@arcade/serializer": "workspace:*",
 		"@tsrx/core": "catalog:"
 	}

@@ -1,4 +1,4 @@
-import { ASYNC_PROTOCOL_VERSION, type ProtocolStatePayload } from '@arcade/protocol';
+import { ASYNC_PROTOCOL_VERSION, type ProtocolStatePayload } from './protocol.ts';
 import {
 	serializeGraphValue,
 	type SerializedGraphPayload,

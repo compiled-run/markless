@@ -1,4 +1,4 @@
-import type { ProtocolStatePayload, ProtocolViewPayload } from '@arcade/protocol';
+import type { ProtocolStatePayload, ProtocolViewPayload } from './protocol.ts';
 
 export type RenderPayloadScriptsInput = {
 	readonly state: ProtocolStatePayload;

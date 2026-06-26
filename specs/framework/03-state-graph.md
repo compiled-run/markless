@@ -7,7 +7,7 @@ Author-facing graph state semantics, async derivation, shared state, identity, a
 ### Surface API
 
 The author-facing graph data model is three intent-named APIs imported from
-`@arcade/core`:
+`arcade`:
 
 - `state()` creates graph state.
 - `computed()` creates sync or async derived graph state.
@@ -21,7 +21,7 @@ The two local-state APIs, available in any `.tsrx` file (components and shared
 logic alike), must be imported by the file that uses them:
 
 ```tsrx
-import { state, computed } from '@arcade/core';
+import { state, computed } from 'arcade';
 
 export function Counter() @{
   let count = state(0);
@@ -42,7 +42,7 @@ export function Counter() @{
   if real apps demand it).
 
 ```tsrx
-import { state } from '@arcade/core';
+import { state } from 'arcade';
 
 let count = state(0);
 let session = state({ user: null, status: "anonymous" });
@@ -123,7 +123,7 @@ path, users will rebuild effects by hand with `loading`, `error`, and `data`
 state. The framework instead treats async as derived graph state:
 
 ```tsrx
-import { computed } from '@arcade/core';
+import { computed } from 'arcade';
 
 function UserRoute() @{
   const user = computed(async ({ signal }) => {
@@ -157,7 +157,7 @@ Semantics:
   sync computed:
 
 ```tsrx
-import { computed } from '@arcade/core';
+import { computed } from 'arcade';
 
 const rawUser = computed(async ({ signal }) =>
   fetchUser(route.params.userId, signal)
@@ -210,7 +210,7 @@ at the async boundary.
 The state, async, element, event, and element-behavior APIs are
 **compiler-rewritten framework APIs**, not runtime reactive values. Authors must
 import APIs such as `state`, `computed`, `shared`, and `element` from
-`@arcade/core`; bare calls are diagnostics. The compiler recognizes these
+`arcade`; bare calls are diagnostics. The compiler recognizes these
 APIs through their imported bindings, rewrites supported `.tsrx` usage, and the
 runtime stubs fail loudly if called directly without compilation. There is no
 `Signal`/`Tracked` type in the public API. Event handler props are camelCase
@@ -231,7 +231,7 @@ instead.
 
 **Imported framework APIs (compiler-rewritten).** The compiler knows every
 `state()`/`computed()` creation site whose callee resolves to an import from
-`@arcade/core`, so every read of that binding compiles to a graph read
+`arcade`, so every read of that binding compiles to a graph read
 (`_get(count)`) and every supported write compiles to a graph write — including
 reads inside closures, template expressions, destructured aliases, and
 non-component helper functions in `.tsrx` files. Reactivity crosses `.tsrx`
@@ -245,7 +245,7 @@ normal JavaScript/TypeScript AST and scope information:
 - Imported `state()` / `computed()` calls in variable declarators become graph
   bindings owned by the nearest stable TSRX graph scope. Bare calls with the
   same names are rejected with a diagnostic that asks the author to import the
-  API from `@arcade/core`.
+  API from `arcade`.
 - Reads in TSRX expression children, element attributes, event handlers,
   behavior inputs, computed bodies, and nested helper functions resolve through
   the lexical binding map and lower to graph reads when they target a known

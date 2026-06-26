@@ -8,7 +8,7 @@ High-level product contract and index. Use this as the entry point before loadin
 **Status:** Approved direction; production implementation started. See
 `../state.md` for current worktree progress.
 **Tagline:** A resumable UI framework for async-first apps.
-**Package:** `@arcade/core`
+**Package:** `arcade`
 
 ## Summary
 
@@ -53,7 +53,7 @@ JSX/TSX is explicitly **not** supported.
    subscription.
    "Signal" is an implementation detail of compiled output, never API vocabulary.
 4. **TSRX-only.** State and reactivity are language features of `.tsrx` files,
-   surfaced through compiler-rewritten imports from `@arcade/core`, not a
+   surfaced through compiler-rewritten imports from `arcade`, not a
    runtime library usable from arbitrary TS.
 5. **First-class async.** Async dataflow is a compiler-tracked graph feature, not
    an effect/task/resource wrapper. Pending/error UI is expressed with TSRX
@@ -133,12 +133,12 @@ requires exposing them. A fully static SSR container with no browser triggers
 should emit no resumer script.
 
 Monorepo libraries are implementation boundaries first, not public API
-guarantees. The repo may contain internal packages such as protocol, core,
-runtime, serializer, compiler, Rolldown, Vite, and test utilities, but v1 should
-expose only the main package and explicitly curated re-exports. `protocol` and
-`compiler` may become independently consumable once implementation tests prove
-their contracts; until then, do not document or rely on deep package APIs as
-public framework surface.
+guarantees. The repo may contain internal packages such as runtime, serializer,
+compiler, bundler, editor tooling, and browser-test helpers, but v1 should
+expose only the main `arcade` package and explicitly curated re-exports.
+Protocol and payload contract types live with serializer until implementation
+tests prove a separate public protocol package is needed; until then, do not
+document or rely on deep package APIs as public framework surface.
 
 The proof implementation lives under `poc/packages/*` and proof fixtures live
 under `poc/fixtures/proofs/*`. That POC tree is executable evidence that the
@@ -147,31 +147,31 @@ implementation begins in root `packages/*` using the same boundaries.
 
 Initial internal production package map:
 
-- `packages/core` — main authoring package for `@arcade/core`;
-  compiler-rewritten framework APIs and public types.
-- `packages/arcade` — umbrella re-export package while it remains in the
-  workspace; not the source of authoring API ownership.
-- `packages/protocol` — private shared contracts: graph IDs, symbol IDs,
-  payload schema types, manifest types, diagnostics, and protocol/version
-  constants.
+- `packages/arcade` — main authoring package for `arcade`;
+  compiler-rewritten framework APIs, public types, and curated public
+  re-exports.
 - `packages/runtime` — graph state, computed/async nodes, scheduler, DOM
   mutation journal, sync policy execution, DOM locator resolution, symbol
   resolver integration, CSR render, initial render, and browser resume.
 - `packages/serializer` — tiered value serializer and compact payload
-  encode/decode, talking to runtime through snapshot interfaces.
+  encode/decode, private graph/view payload contract types, diagnostics, and
+  protocol/version constants.
 - `packages/compiler` — TSRX semantic graph, lowering passes, capture analysis,
   symbol extraction, artifact planning, and diagnostics.
 - `packages/bundler` — Qwik-bundler-shaped build package containing the
   Rolldown-first plugin, virtual modules, symbol chunks, compact resolver table
   finalization, optional manifest/bundle-graph metadata, and Vite adapter
   dev/HMR/HTML integration.
-- `packages/test-utils` — fixture harnesses, artifact assertions,
-  serializer/resume helpers, browser helpers, and witness integration helpers.
+- `packages/typescript-plugin` — editor language integration for `.tsrx` files.
 - `packages/vitest-browser` — CSR-only Vitest browser-mode support for targeted
   real-browser DOM/runtime mechanics. It should provide framework-specific
   browser render helpers, cleanup, and Vitest browser `page` integration modeled
   after the CSR surface of `/Users/jacksm5pro/dev/open-source/vitest-browser-qwik`.
   It must not become the canonical SSR/resume proof harness.
+
+Short repo-only test helpers live under package-local test support or top-level
+`scripts/test-utils`; do not add `packages/test-utils` until a real package
+consumer surface exists.
 
 There is no `packages/server`.
 

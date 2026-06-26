@@ -1,4 +1,4 @@
-import { ASYNC_PROTOCOL_VERSION, type ProtocolViewPayload } from '@arcade/protocol';
+import { ASYNC_PROTOCOL_VERSION, type ProtocolViewPayload } from '@arcade/serializer';
 import type { ProtocolViewPayloadInput } from '../artifacts.ts';
 
 export function createProtocolViewPayload(input: ProtocolViewPayloadInput): ProtocolViewPayload {

@@ -9,7 +9,6 @@
 	},
 	"dependencies": {
 		"@arcade/bundler": "workspace:*",
-		"@arcade/core": "workspace:*",
 		"arcade": "workspace:*"
 	},
 	"devDependencies": {

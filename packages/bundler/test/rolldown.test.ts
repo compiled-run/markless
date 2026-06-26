@@ -17,7 +17,7 @@ import {
 } from './helpers.ts';
 
 const source = `
-import { state } from '@arcade/core';
+import { state } from 'arcade';
 
 export function App() @{
 	let count = state(0);
@@ -27,7 +27,7 @@ export function App() @{
 `;
 
 const keyedSource = `
-import { state } from '@arcade/core';
+import { state } from 'arcade';
 
 export function App() @{
 	let entries = state([]);
@@ -114,9 +114,7 @@ describe('TSRX Rolldown plugin structure', () => {
 			environment: 'client',
 		});
 
-		expect(result.code).toContain(
-			"import { preloadLazySymbolModules } from 'arcade/preload';",
-		);
+		expect(result.code).toContain("import { preloadLazySymbolModules } from 'arcade/preload';");
 		expect(result.code).toContain('preload: preloadCsrLazySymbols,');
 		expect(result.code).toContain('export default arcadeCompiledApp;');
 		expect(result.code).not.toContain('renderSsr(props) {');
@@ -148,7 +146,7 @@ describe('TSRX Rolldown plugin structure', () => {
 	test('transformTsrxModule emits symbol-only client roots for SSR browser symbols', async () => {
 		const result = await transformTsrxModule({
 			filename: '/workspace/app/src/App.tsrx',
-			source: `import { state } from '@arcade/core';
+			source: `import { state } from 'arcade';
 import Child from './Child.tsrx';
 export function App() @{
 let count = state(0);
@@ -181,11 +179,9 @@ let count = state(0);
 			cwd: '/workspace/app',
 			input: { index: 'index.html', symbols: 'src/App.tsrx' },
 		});
-		const result = (await callTransform(
-			plugin,
-			source,
-			'/workspace/app/src/App.tsrx',
-		)) as { code: string };
+		const result = (await callTransform(plugin, source, '/workspace/app/src/App.tsrx')) as {
+			code: string;
+		};
 
 		expect(result.code).toContain('export async function resumeContainerEvent');
 		expect(result.code).not.toContain('document.createElement');
@@ -195,7 +191,7 @@ let count = state(0);
 	test('transformTsrxModule emits a server render artifact without direct CSR emit', async () => {
 		const result = await transformTsrxModule({
 			filename: '/workspace/app/src/App.tsrx',
-			source: `import { state } from '@arcade/core';
+			source: `import { state } from 'arcade';
 export function App() @{
 let active = state(true);
 <main class={active ? 'on' : 'off'}><h1>Hello</h1></main>
@@ -204,7 +200,7 @@ let active = state(true);
 		});
 
 		expect(result.code).toContain('renderSsr(props) {');
-		expect(result.code).toContain('arcadeSsrAttribute("class", active ? \'on\' : \'off\')');
+		expect(result.code).toContain("arcadeSsrAttribute(\"class\", active ? 'on' : 'off')");
 		expect(result.code).not.toContain('renderCsr: App,');
 	});
 
@@ -466,7 +462,7 @@ function manyButtonSource(count: number): string {
 			`		<button onClick={() => value = ${index + 1}}>Set ${index + 1}</button>`,
 	).join('\n');
 	return `
-import { state } from '@arcade/core';
+import { state } from 'arcade';
 
 export function App() @{
 	let value = state(0);

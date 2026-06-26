@@ -3,7 +3,7 @@ import ts from 'typescript';
 import { compileTsrxForTypeService, compile_to_volar_mappings } from '../src/type-service.ts';
 
 test('compileTsrxForTypeService returns a Volar-shaped AST-backed type-service artifact', () => {
-	const source = `import { state } from '@arcade/core';
+	const source = `import { state } from 'arcade';
 import { Row } from './Row.tsrx';
 
 export function List({ items, emptyLabel }: { items: { id: string; tag: string; label: string; active: boolean; select(index: number): void }[]; emptyLabel: string }) @{
@@ -26,7 +26,7 @@ export function List({ items, emptyLabel }: { items: { id: string; tag: string; 
 
 	expect(result.sourceAst?.type).toBe('Program');
 	expect(result.errors).toEqual([]);
-	expect(result.code).toContain("import { state } from '@arcade/core';");
+	expect(result.code).toContain("import { state } from 'arcade';");
 	expect(result.code).toContain("import { Row } from './Row.tsrx';");
 	expect(result.code).toContain('for (const item of items)');
 	expect(result.code).toContain('const i = 0;');
@@ -43,7 +43,9 @@ export function List({ items, emptyLabel }: { items: { id: string; tag: string; 
 	expectExactMapping(result, source, 'item.select(i)');
 	expectExactMapping(result, source, 'selected');
 	expectExactMapping(result, source, 'emptyLabel');
-	expect(result.cssMappings[0]?.sourceOffsets).toEqual([source.indexOf(result.cssMappings[0]?.data?.customData?.content ?? '')]);
+	expect(result.cssMappings[0]?.sourceOffsets).toEqual([
+		source.indexOf(result.cssMappings[0]?.data?.customData?.content ?? ''),
+	]);
 	expect(result.cssMappings[0]?.lengths).toEqual([
 		result.cssMappings[0]?.data?.customData?.content?.length,
 	]);

@@ -56,7 +56,7 @@ test('configures Zed to highlight .tsrx as TSX and load the workspace plugin', (
 test('feeds TypeScript a virtual .ts service script for TSRX source', () => {
 	const plugin = getArcadeTsrxLanguagePlugin();
 	const source = `
-		import { state } from '@arcade/core';
+		import { state } from 'arcade';
 
 		export function Counter() @{
 			let count = state(0);
@@ -72,7 +72,7 @@ test('feeds TypeScript a virtual .ts service script for TSRX source', () => {
 	const serviceScript = virtualCode && plugin.typescript?.getServiceScript?.(virtualCode);
 
 	expect(serviceScript).toMatchObject({ extension: '.ts', scriptKind: ts.ScriptKind.TS });
-	expect(virtualCode?.generatedCode).toContain("import { state } from '@arcade/core';");
+	expect(virtualCode?.generatedCode).toContain("import { state } from 'arcade';");
 	expect(virtualCode?.generatedCode).toContain('count++');
 	expect(virtualCode?.generatedCode).toContain('void (count);');
 	expect(virtualCode?.generatedCode).not.toContain('<button');
@@ -88,7 +88,7 @@ test('feeds TypeScript a virtual .ts service script for TSRX source', () => {
 
 test('populates virtual code from the Arcade compiler type-service artifact', () => {
 	const plugin = getArcadeTsrxLanguagePlugin();
-	const source = `import { state } from '@arcade/core';
+	const source = `import { state } from 'arcade';
 export function App() @{
 	let count = state(0);
 	<section>
@@ -194,7 +194,7 @@ async function runTsrxTsserverProbe(): Promise<{
 	const fixtures = [
 		{
 			name: 'Counter.tsrx',
-			source: `import { state } from '@arcade/core';
+			source: `import { state } from 'arcade';
 export function App() @{
 	let count = state(0);
 	<section>
@@ -245,13 +245,13 @@ export function App() @{
 }`,
 		},
 	];
-	mkdirSync(join(project, 'node_modules/@arcade/core'), { recursive: true });
+	mkdirSync(join(project, 'node_modules/arcade'), { recursive: true });
 	writeFileSync(
-		join(project, 'node_modules/@arcade/core/package.json'),
-		JSON.stringify({ name: '@arcade/core', version: '0.0.0', types: './index.d.ts' }),
+		join(project, 'node_modules/arcade/package.json'),
+		JSON.stringify({ name: 'arcade', version: '0.0.0', types: './index.d.ts' }),
 	);
 	writeFileSync(
-		join(project, 'node_modules/@arcade/core/index.d.ts'),
+		join(project, 'node_modules/arcade/index.d.ts'),
 		'export declare function state<T>(initial: T): T;\n',
 	);
 	writeFileSync(
@@ -271,18 +271,22 @@ export function App() @{
 	);
 	for (const fixture of fixtures) writeFileSync(join(project, fixture.name), fixture.source);
 
-	const server = spawn(process.execPath, [
-		join(root, 'node_modules/typescript/lib/tsserver.js'),
-		'--globalPlugins',
-		'@arcade/typescript-plugin',
-		'--pluginProbeLocations',
-		join(root, 'node_modules'),
-		'--allowLocalPluginLoads',
-		'--logVerbosity',
-		'verbose',
-		'--logFile',
-		logFile,
-	], { cwd: project, stdio: ['pipe', 'pipe', 'pipe'] });
+	const server = spawn(
+		process.execPath,
+		[
+			join(root, 'node_modules/typescript/lib/tsserver.js'),
+			'--globalPlugins',
+			'@arcade/typescript-plugin',
+			'--pluginProbeLocations',
+			join(root, 'node_modules'),
+			'--allowLocalPluginLoads',
+			'--logVerbosity',
+			'verbose',
+			'--logFile',
+			logFile,
+		],
+		{ cwd: project, stdio: ['pipe', 'pipe', 'pipe'] },
+	);
 	let sequence = 0;
 	const pending = new Map<number, (message: any) => void>();
 	const lines = createInterface({ input: server.stdout });
@@ -319,7 +323,11 @@ export function App() @{
 		send('open', { file, projectRootPath: project });
 		const syntactic = await request('syntacticDiagnosticsSync', { file });
 		const semantic = await request('semanticDiagnosticsSync', { file });
-		results.push({ file: fixture.name, syntactic: syntactic.body ?? [], semantic: semantic.body ?? [] });
+		results.push({
+			file: fixture.name,
+			syntactic: syntactic.body ?? [],
+			semantic: semantic.body ?? [],
+		});
 	}
 	server.kill();
 	lines.close();

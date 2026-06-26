@@ -4,7 +4,7 @@ import {
 	type ProtocolSyncPolicyCondition,
 	type ProtocolStatePayload,
 	type ProtocolViewPayload,
-} from '@arcade/protocol';
+} from '@arcade/serializer';
 import { renderPayloadScripts } from '@arcade/serializer';
 
 export type SsrRenderOutput = {
@@ -35,7 +35,7 @@ export type ModulePreloadInput =
 			readonly href: string;
 			readonly fetchPriority?: 'high' | 'low' | 'auto';
 			readonly crossOrigin?: 'anonymous' | 'use-credentials';
-};
+	  };
 
 export function renderToString(
 	component: SsrRenderable,
@@ -53,8 +53,7 @@ export function renderToString(
 	const resumerScript =
 		hasPayload && browserTriggers
 			? renderInlineResumerScript(
-					options.resumerSource ??
-						defaultInlineResumerSource(resumeModuleUrl, view),
+					options.resumerSource ?? defaultInlineResumerSource(resumeModuleUrl, view),
 					options.nonce,
 				)
 			: '';

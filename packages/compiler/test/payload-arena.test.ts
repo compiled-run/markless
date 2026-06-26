@@ -3,7 +3,7 @@ import { buildSemanticGraph, lowerStateAccess } from '../src/index.ts';
 import { planPayloadArena } from '../src/passes/payload-arena.ts';
 
 const source = `
-import { state, computed, element } from '@arcade/core';
+import { state, computed, element } from 'arcade';
 
 export function App() @{
 	let count = state(0);
@@ -40,7 +40,7 @@ export function App() @{
 `;
 
 const sharedSource = `
-import { shared, state, computed } from '@arcade/core';
+import { shared, state, computed } from 'arcade';
 
 export const session = shared(() => {
 	const data = state({ user: null, status: 'anonymous' });
@@ -64,7 +64,7 @@ export function Header() @{
 `;
 
 const keyedListSource = `
-import { state } from '@arcade/core';
+import { state } from 'arcade';
 
 export function App() @{
 	const items = state([]);
@@ -258,7 +258,7 @@ test('planPayloadArena keeps distinct targets for repeated graph reads on one ho
 	const semanticGraph = await buildSemanticGraph({
 		filename: 'src/RepeatedTarget.tsrx',
 		source: `
-import { state } from '@arcade/core';
+import { state } from 'arcade';
 
 export function App() @{
 	const count = state(0);
@@ -301,7 +301,7 @@ test('planPayloadArena serializes known behavior input values without running be
 	const semanticGraph = await buildSemanticGraph({
 		filename: 'src/BehaviorInputs.tsrx',
 		source: `
-import { state, computed } from '@arcade/core';
+import { state, computed } from 'arcade';
 
 export function App() @{
 	const menu = state({ open: true, options: { color: 'red' } });
@@ -358,7 +358,7 @@ test('planPayloadArena classifies class and style binding targets', async () => 
 	const semanticGraph = await buildSemanticGraph({
 		filename: 'src/ClassStyleTargets.tsrx',
 		source: `
-import { state } from '@arcade/core';
+import { state } from 'arcade';
 
 export function App() @{
 	const activeClass = state('is-active');

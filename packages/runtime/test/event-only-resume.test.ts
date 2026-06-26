@@ -1,4 +1,4 @@
-import type { ProtocolViewPayload } from '@arcade/protocol';
+import type { ProtocolViewPayload } from '@arcade/serializer';
 import { expect, test } from 'vitest';
 import { createProtocolStatePayload, renderPayloadScripts } from '../../serializer/src/index.ts';
 import { resumeEventOnlyFromPayloadDocument } from '../src/event-only-resume.ts';

@@ -16,7 +16,7 @@ import {
 } from './helpers.ts';
 
 const source = `
-import { state } from '@arcade/core';
+import { state } from 'arcade';
 
 export function App() @{
 	let count = state(0);
@@ -183,7 +183,7 @@ describe('Vite adapter structure', () => {
 		const plugin = getAsyncPlugin();
 		const filename = '/workspace/app/src/App.tsrx';
 		const tableSource = `
-import { state } from '@arcade/core';
+import { state } from 'arcade';
 
 export function App() @{
 	let count = state(0);

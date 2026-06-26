@@ -1,6 +1,7 @@
 packages:
     - packages/*
     - packages/*/fixtures/*
+    - demos/*
     # Do not add ../native-tsrx here. @tsrx/core is an external dependency
     # boundary for this repo, and native compiler work is explicitly deferred.
 

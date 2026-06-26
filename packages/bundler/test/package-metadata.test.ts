@@ -1,18 +1,22 @@
-import { readFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { describe, expect, test } from 'vitest';
 
 const root = resolve(import.meta.dirname, '../../..');
 const frameworkPackages = [
-	'packages/core/package.json',
-	'packages/protocol/package.json',
 	'packages/serializer/package.json',
 	'packages/runtime/package.json',
 	'packages/compiler/package.json',
 	'packages/bundler/package.json',
 	'packages/arcade/package.json',
-	'packages/test-utils/package.json',
+	'packages/typescript-plugin/package.json',
 	'packages/vitest-browser/package.json',
+] as const;
+
+const retiredPackageManifests = [
+	'packages/core/package.json',
+	'packages/protocol/package.json',
+	'packages/test-utils/package.json',
 ] as const;
 
 describe('package metadata', () => {
@@ -29,6 +33,25 @@ describe('package metadata', () => {
 				false,
 			);
 		}
+	});
+
+	test('retired package shells are not workspace packages', async () => {
+		for (const packageJsonPath of retiredPackageManifests) {
+			await expect(access(resolve(root, packageJsonPath))).rejects.toThrow();
+		}
+	});
+
+	test('runnable demos are root workspace packages', async () => {
+		const workspace = await readFile(resolve(root, 'pnpm-workspace.yaml'), 'utf8');
+
+		expect(workspace).toContain('- demos/*');
+		await expect(access(resolve(root, 'benchmarks'))).rejects.toThrow();
+		await expect(access(resolve(root, 'demos/music-player/package.json'))).resolves.toBe(
+			undefined,
+		);
+		await expect(access(resolve(root, 'demos/music-player-ssr/package.json'))).resolves.toBe(
+			undefined,
+		);
 	});
 
 	test('workspace test script includes package-local Witness boxes', async () => {

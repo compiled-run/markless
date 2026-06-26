@@ -1,4 +1,4 @@
-import { state } from '@arcade/core';
+import { state } from 'arcade';
 import { nextCount } from './counter-flow.ts';
 
 export function App() @{

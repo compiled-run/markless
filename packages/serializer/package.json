@@ -6,8 +6,5 @@
 	"sideEffects": false,
 	"exports": {
 		".": "./src/index.ts"
-	},
-	"dependencies": {
-		"@arcade/protocol": "workspace:*"
 	}
 }

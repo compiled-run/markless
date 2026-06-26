@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { buildSemanticGraph } from '../src/index.ts';
 
 const source = `
-import { state, computed, element } from '@arcade/core';
+import { state, computed, element } from 'arcade';
 import { makeChart } from './chart';
 
 export function App({ label }: { label: string }) @{
@@ -45,7 +45,7 @@ export function App({ label }: { label: string }) @{
 `;
 
 const sharedSource = `
-import { shared, state, computed } from '@arcade/core';
+import { shared, state, computed } from 'arcade';
 
 export const session = shared(() => {
 	const data = state({ user: null, status: 'anonymous' });
@@ -69,7 +69,7 @@ export function Header() @{
 `;
 
 const sharedDependencySource = `
-import { shared, state } from '@arcade/core';
+import { shared, state } from 'arcade';
 
 export const session = shared(() => {
 	const data = state({ user: null });
@@ -94,7 +94,7 @@ export function CartButton() @{
 `;
 
 const keyedPanelSource = `
-import { state } from '@arcade/core';
+import { state } from 'arcade';
 
 export function App() @{
 	const panels = state([]);
@@ -114,7 +114,7 @@ export function App() @{
 `;
 
 const keyedListSource = `
-import { state } from '@arcade/core';
+import { state } from 'arcade';
 
 export function App() @{
 	const items = state([]);
@@ -132,7 +132,7 @@ export function App() @{
 `;
 
 const componentEdgeSource = `
-import { state } from '@arcade/core';
+import { state } from 'arcade';
 import { Player } from './Player.tsrx';
 export function App() @{
 	let current = state({ name: 'First' });
@@ -142,7 +142,7 @@ export function App() @{
 `;
 
 const scopedComponentEdgeSource = `
-import { state } from '@arcade/core';
+import { state } from 'arcade';
 import { Row } from './Row.tsrx';
 export function App() @{
 	const open = state(true);

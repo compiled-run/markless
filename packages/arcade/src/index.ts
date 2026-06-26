@@ -1,4 +1,4 @@
-export { computed, element, shared, state, FrameworkApiRuntimeError } from '@arcade/core';
+export { computed, element, shared, state, FrameworkApiRuntimeError } from './framework-api.ts';
 export type {
 	AsyncComputedValue,
 	ElementHandle,
@@ -7,7 +7,7 @@ export type {
 	SharedDefinition,
 	SharedOptions,
 	SharedScope,
-} from '@arcade/core';
+} from './framework-api.ts';
 export { render } from './render.ts';
 export type {
 	CsrRenderArtifact,

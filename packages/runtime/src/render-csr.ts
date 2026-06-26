@@ -1,4 +1,4 @@
-import type { ProtocolStatePayload, ProtocolViewPayload } from '@arcade/protocol';
+import type { ProtocolStatePayload, ProtocolViewPayload } from '@arcade/serializer';
 import type { EventOnlyResumeDomElement, EventOnlyResumeDomEvent } from './event-only-resume.ts';
 import type { DomJournalEntry } from './graph.ts';
 import type { RuntimeGraph } from './graph.ts';
@@ -49,8 +49,7 @@ export async function renderCsrRuntime(input: {
 	let runtime: ResumeRuntime;
 	const applyDomJournal =
 		options.applyDomJournal ??
-		((entries: ReadonlyArray<DomJournalEntry>) =>
-			applyDefaultCsrDomJournal(entries, runtime));
+		((entries: ReadonlyArray<DomJournalEntry>) => applyDefaultCsrDomJournal(entries, runtime));
 	runtime = createResumeRuntime({
 		root: output.root,
 		graph,
@@ -86,12 +85,16 @@ async function applyDefaultCsrDomJournal(
 	const deferred: DomJournalEntry[] = [];
 	for (const entry of entries) {
 		if (entry.type === 'setText') {
-			const target = runtime.getElement(String(entry.locator)) as CsrDomJournalTarget | undefined;
+			const target = runtime.getElement(String(entry.locator)) as
+				| CsrDomJournalTarget
+				| undefined;
 			if (target) target.textContent = stringifyDomValue(entry.value);
 			continue;
 		}
 		if (entry.type === 'setAttr') {
-			const target = runtime.getElement(String(entry.locator)) as CsrDomJournalTarget | undefined;
+			const target = runtime.getElement(String(entry.locator)) as
+				| CsrDomJournalTarget
+				| undefined;
 			if (!target) continue;
 			if (entry.value == null || entry.value === false) {
 				target.removeAttribute?.(entry.name);
@@ -101,7 +104,9 @@ async function applyDefaultCsrDomJournal(
 			continue;
 		}
 		if (entry.type === 'setProp') {
-			const target = runtime.getElement(String(entry.locator)) as Record<string, unknown> | undefined;
+			const target = runtime.getElement(String(entry.locator)) as
+				| Record<string, unknown>
+				| undefined;
 			if (target) target[entry.name] = entry.value;
 			continue;
 		}

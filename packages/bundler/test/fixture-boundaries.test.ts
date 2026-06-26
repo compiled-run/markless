@@ -6,23 +6,23 @@ const fixtureRoot = resolve(import.meta.dirname, '../fixtures');
 const tsrxFixtureImports = [
 	{
 		path: 'rolldown-basic/src/root.tsrx',
-		importLine: "import { state } from '@arcade/core';",
+		importLine: "import { state } from 'arcade';",
 	},
 	{
 		path: 'vite-csr/src/root.tsrx',
-		importLine: "import { state } from '@arcade/core';",
+		importLine: "import { state } from 'arcade';",
 	},
 	{
 		path: 'vite-library/src/card.tsrx',
-		importLine: "import { state } from '@arcade/core';",
+		importLine: "import { state } from 'arcade';",
 	},
 	{
 		path: 'vite-plus/src/root.tsrx',
-		importLine: "import { state } from '@arcade/core';",
+		importLine: "import { state } from 'arcade';",
 	},
 	{
 		path: 'vite-ssr/src/root.tsrx',
-		importLine: "import { state } from '@arcade/core';",
+		importLine: "import { state } from 'arcade';",
 	},
 ] as const;
 
@@ -66,7 +66,7 @@ describe('fixture framework boundaries', () => {
 	test('SSR fixture host renders the compiled TSRX artifact directly', async () => {
 		const host = await readFixture('vite-ssr/src/dev-server.ts');
 
-		expect(host).toContain("import { renderToString");
+		expect(host).toContain('import { renderToString');
 		expect(host).toContain("runner.import('/src/root.tsrx')");
 		expect(host).toContain('renderToString(entry.default');
 		expect(host).not.toContain('entry-client');

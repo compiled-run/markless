@@ -2,7 +2,7 @@ import {
 	ASYNC_PROTOCOL_VERSION,
 	type ProtocolStatePayload,
 	type ProtocolViewPayload,
-} from '@arcade/protocol';
+} from '@arcade/serializer';
 import { deserializeGraphValue, type SerializedGraphPayload } from '@arcade/serializer';
 import { applyDomJournalEntries } from './dom-journal.ts';
 import { createRuntimeGraph, type RuntimeGraph, type RuntimeGraphRead } from './graph.ts';
@@ -1475,7 +1475,7 @@ function invalidPayloadShapeError(
 		`The ${payloadType} payload did not match the resumability protocol shape required by this runtime.`,
 		[
 			{
-				message: `Regenerate the ${payloadType} payload with the matching @arcade/core compiler/runtime version.`,
+				message: `Regenerate the ${payloadType} payload with the matching arcade compiler/runtime version.`,
 			},
 		],
 	);
@@ -1498,7 +1498,7 @@ function protocolVersionMismatchError(
 		actualVersion,
 		suggestions: [
 			{
-				message: 'Use matching @arcade/core compiler and runtime package versions.',
+				message: 'Use matching arcade compiler and runtime package versions.',
 			},
 		],
 		docsUrl: 'https://arcadejs.com/errors/ARCADE_PROTOCOL_VERSION_MISMATCH',

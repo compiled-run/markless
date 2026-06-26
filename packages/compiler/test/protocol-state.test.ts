@@ -7,7 +7,7 @@ import {
 } from '../src/index.ts';
 
 const sharedSource = `
-import { shared, state, computed } from '@arcade/core';
+import { shared, state, computed } from 'arcade';
 
 export const session = shared(() => {
 	const data = state({ user: null, status: 'anonymous' });

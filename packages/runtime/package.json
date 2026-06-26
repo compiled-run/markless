@@ -15,7 +15,6 @@
 		"./resume": "./src/payload.ts"
 	},
 	"dependencies": {
-		"@arcade/protocol": "workspace:*",
 		"@arcade/serializer": "workspace:*"
 	}
 }

@@ -16,15 +16,15 @@ component work.
 For a single-root `.tsrx` app module, the normal architecture is:
 
 ```ts
-import App from "./App.tsrx";
-import { render } from "arcade";
+import App from './App.tsrx';
+import { render } from 'arcade';
 
 render(App, { target: document.getElementById('app')! });
 ```
 
 ```ts
-import App from "./App.tsrx";
-import { renderToString } from "arcade";
+import App from './App.tsrx';
+import { renderToString } from 'arcade';
 
 const html = renderToString(App);
 ```
@@ -33,7 +33,7 @@ const html = renderToString(App);
 will be re-executed during resume. Framework render functions own the
 environment-specific orchestration around that artifact.
 App render code imports `render()` and `renderToString()` from `"arcade"`, not
-from `.tsrx` modules, `@arcade/core`, or runtime deep imports.
+from `.tsrx` modules, `arcade`, or runtime deep imports.
 
 When a `.tsrx` file exports multiple top-level components and no unambiguous app
 root can be selected, app code must pass the intended compiled artifact to the

@@ -9,8 +9,6 @@ export default defineConfig({
 			neverBundle: ['rolldown', 'vite', 'vitest', 'vitest/browser'],
 		},
 		entry: {
-			'core/index': './packages/core/src/index.ts',
-			'protocol/index': './packages/protocol/src/index.ts',
 			'serializer/index': './packages/serializer/src/index.ts',
 			'compiler/index': './packages/compiler/src/index.ts',
 			'runtime/dom-journal': './packages/runtime/src/dom-journal.ts',
@@ -35,7 +33,6 @@ export default defineConfig({
 			'arcade/runtime/render-to-string': './packages/arcade/src/runtime/render-to-string.ts',
 			'arcade/runtime/resume': './packages/arcade/src/runtime/resume.ts',
 			'arcade/vite': './packages/arcade/src/vite.ts',
-			'test-utils/index': './packages/test-utils/src/index.ts',
 			'vitest-browser/index': './packages/vitest-browser/src/index.ts',
 			'vitest-browser/vitest': './packages/vitest-browser/src/vitest.ts',
 		},
@@ -45,7 +42,7 @@ export default defineConfig({
 	},
 	test: {
 		environment: 'node',
-		include: ['packages/*/test/**/*.test.ts'],
+		include: ['packages/*/test/**/*.test.ts', 'scripts/**/*.test.ts'],
 	},
 	lint: {
 		ignorePatterns: ['dist/**', 'node_modules/**'],

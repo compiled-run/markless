@@ -70,6 +70,11 @@ Do not block only because the active goal text cannot be edited.
   split specs. Do not implement framework behavior that contradicts TSRX
   structural semantics, children/control-flow semantics, or the Arcade no-
   hydration/no-VDOM model.
+- For TSRX syntax, grammar, parser, or authoring semantics, check the TSRX MCP
+  server before implementing or editing specs. Use `list-sections`,
+  `get-documentation`, or `compile-tsrx` as appropriate, and record what was
+  checked. If the TSRX MCP server is unavailable, fall back to the live
+  specification at `https://tsrx.dev/specification` and record the fallback.
 - Spend at least 30 seconds using the grep MCP (`mcp__grep.searchGitHub`) on
   relevant real-world code patterns before solving. Record the patterns checked
   and how they influenced the approach. Local `rg` inspection is still required
@@ -105,14 +110,17 @@ Expected shape:
 - current proof implementation lives under `poc/packages/*`; do not extend it
   when beginning production framework work unless the task is explicitly a POC
   maintenance task
-- production package folders are `packages/arcade`, `packages/core`,
-  `packages/protocol`, `packages/runtime`, `packages/serializer`,
-  `packages/compiler`, `packages/bundler`, `packages/test-utils`, and
-  `packages/vitest-browser`
-- `packages/core` owns the public authoring APIs for `@arcade/core`.
-  `packages/arcade` is an umbrella re-export package while it remains in the
-  workspace. The other packages are internal implementation boundaries until
-  tests prove what should become public
+- production package folders are `packages/arcade`, `packages/runtime`,
+  `packages/serializer`, `packages/compiler`, `packages/bundler`,
+  `packages/typescript-plugin`, and `packages/vitest-browser`
+- `packages/arcade` owns the public authoring APIs for `arcade` plus curated
+  public re-exports. Do not create a separate `packages/core` package
+- protocol and payload contract types live with `packages/serializer` until
+  tests prove a separate public protocol package is needed. Do not create a
+  standalone `packages/protocol` package for type-only contracts
+- short repo-only test helpers belong in package-local test support or
+  top-level `scripts/test-utils`, not a standalone `packages/test-utils`
+  package, until they have a real cross-package consumer surface
 - do not create `packages/server`
 - package/library builds are represented as multiple vite-plus `pack` configs,
   similar to QDS's `buildOrder`

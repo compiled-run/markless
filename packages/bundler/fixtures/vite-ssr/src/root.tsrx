@@ -1,4 +1,4 @@
-import { state } from '@arcade/core';
+import { state } from 'arcade';
 
 export function App() @{
 	let count = state(0);

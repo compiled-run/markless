@@ -4,7 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const FIXTURE_DIR = join(ROOT_DIR, 'benchmarks/js-framework-benchmark/frameworks/keyed/arcade');
+const FIXTURE_DIR = join(ROOT_DIR, 'demos/js-framework-benchmark/frameworks/keyed/arcade');
 
 function parseArgs(argv) {
 	const args = {};

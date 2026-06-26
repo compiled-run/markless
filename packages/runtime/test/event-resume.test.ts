@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { createProtocolStatePayload, renderPayloadScripts } from '../../serializer/src/index.ts';
 import { resumeEventFromPayloadDocument } from '../src/event-resume.ts';
-import type { ProtocolViewPayload } from '@arcade/protocol';
+import type { ProtocolViewPayload } from '@arcade/serializer';
 
 type FakeElement = {
 	nodeType: 1;

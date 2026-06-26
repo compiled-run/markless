@@ -44,9 +44,8 @@ test('main package exposes the curated author and build surface', () => {
 	expect(typeof viteArcade).toBe('function');
 });
 
-test('root and grouped runtime entries use the @arcade namespace', async () => {
+test('root and grouped runtime entries use internal package boundaries deliberately', async () => {
 	const staleScope = '@arcade' + 'js/';
-	const staleUnscopedPackage = 'arc' + 'ade/';
 	const [indexSource, runtimeSource] = await Promise.all([
 		readSource('../src/index.ts'),
 		readSource('../src/runtime.ts'),
@@ -54,9 +53,8 @@ test('root and grouped runtime entries use the @arcade namespace', async () => {
 
 	expect(indexSource).not.toContain(staleScope);
 	expect(runtimeSource).not.toContain(staleScope);
-	expect(indexSource).not.toContain(`from '${staleUnscopedPackage}`);
+	expect(indexSource).not.toContain("from 'arcade'");
 	expect(indexSource).toContain("from './render.ts'");
-	expect(indexSource).toContain("from '@arcade/core'");
 	expect(indexSource).toContain("from '@arcade/runtime/render-to-string'");
 	expect(indexSource).toContain("from '@arcade/runtime/resume'");
 	expect(indexSource).toContain("from '@arcade/bundler/rolldown'");
