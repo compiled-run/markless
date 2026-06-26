@@ -4,7 +4,7 @@ import {
 	type CsrRenderOptions,
 	type CsrRenderOutput,
 	type RenderTarget,
-} from '@arcade/runtime';
+} from '@arcade/web';
 
 export type BrowserRenderElement = RenderTarget & {
 	innerHTML?: string;

@@ -4,7 +4,7 @@ import type {
 	DomJournalResult,
 	RuntimeGraph,
 	RuntimeGraphSharedPatch,
-} from './graph.ts';
+} from '@arcade/runtime';
 
 export type ResumeDomNode = {
 	readonly nodeType: number;

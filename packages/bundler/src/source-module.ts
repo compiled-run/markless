@@ -1,7 +1,4 @@
-import type {
-	ArcadeClientOutput,
-	ArcadeEnvironment,
-} from './types.ts';
+import type { ArcadeClientOutput, ArcadeEnvironment } from './types.ts';
 
 export const ARCADE_VIRTUAL_PREFIX = 'virtual:arcade:';
 
@@ -31,16 +28,10 @@ export function rewriteSymbolModuleExport(
 	fromExportName: string,
 	toExportName: string,
 ) {
-	return source.replace(
-		`export function ${fromExportName}`,
-		`export function ${toExportName}`,
-	);
+	return source.replace(`export function ${fromExportName}`, `export function ${toExportName}`);
 }
 
-export function payloadModule(payload: {
-	readonly state: unknown;
-	readonly view: unknown;
-}) {
+export function payloadModule(payload: { readonly state: unknown; readonly view: unknown }) {
 	return [
 		`export const state = ${JSON.stringify(payload.state, null, '\t')};`,
 		`export const view = ${JSON.stringify(payload.view, null, '\t')};`,
@@ -70,7 +61,7 @@ export function emitSourceModule(input: {
 	return [
 		input.environment === 'server'
 			? ''
-			: "import { resumeEventOnlyFromPayloadDocument } from 'arcade/runtime/event-only-resume';",
+			: "import { resumeEventOnlyFromPayloadDocument } from 'arcade/web/event-only-resume';",
 		input.environment === 'client' && !symbolsOnly
 			? "import { preloadLazySymbolModules } from 'arcade/preload';"
 			: '',
@@ -158,11 +149,7 @@ function emitCompiledAppDefault(input: {
 			: [];
 	const renderSsrEntry =
 		input.ssrExportName && input.environment !== 'client'
-			? [
-					'	renderSsr(props) {',
-					`		return ${input.ssrExportName}(props);`,
-					'	},',
-				]
+			? ['	renderSsr(props) {', `		return ${input.ssrExportName}(props);`, '	},']
 			: [];
 	const resumeModuleEntry =
 		input.resumeModuleUrl && input.environment !== 'client'
@@ -177,11 +164,7 @@ function emitCompiledAppDefault(input: {
 	const metadataEntries =
 		input.environment === 'client'
 			? []
-			: [
-					...resumeModuleEntry,
-					...modulePreloadEntry,
-					'	payloadView,',
-				];
+			: [...resumeModuleEntry, ...modulePreloadEntry, '	payloadView,'];
 
 	return [
 		'const arcadeCompiledApp = {',

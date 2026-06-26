@@ -27,6 +27,11 @@ render/resume contract is not proven end to end.
 Completed slices are concentrated in:
 
 - workspace/package scaffolding and vite-plus tooling
+- the first platform package split: `packages/runtime` now exposes the
+  host-agnostic graph surface, `packages/web` owns DOM render/resume, payload
+  script decoding, browser event resume, and DOM journal helpers, and
+  `packages/arcade` curates new `arcade/web/*` re-exports while preserving
+  existing `arcade/runtime/*` compatibility wrappers
 - compiler module ownership and pass graph validation
 - semantic graph collection for early state, event, alias, async, shared
   definition/instance, and capture inputs
@@ -185,12 +190,13 @@ path is covered by fixtures and browser tests.
 - The pnpm/vite-plus workspace scaffolding exists through root `package.json`,
   `pnpm-workspace.yaml`, `pnpm-lock.yaml`, and `vite.config.ts`.
 - Root scripts are thin vite-plus aliases. The current `vite.config.ts` uses one
-  flat pack entry map for `arcade`, runtime, serializer, compiler, bundler, and
+  flat pack entry map for `arcade`, `arcade/web`, `arcade/runtime`
+  compatibility wrappers, `runtime`, `web`, serializer, compiler, bundler, and
   `vitest-browser` entries, and the Node test project includes package tests
   plus top-level script tests. It does not yet model package-local publish
   output or browser/witness test projects.
 - Production framework package folders currently exist for `arcade`, `runtime`,
-  `serializer`, `compiler`, `bundler`, `typescript-plugin`, and
+  `web`, `serializer`, `compiler`, `bundler`, `typescript-plugin`, and
   `vitest-browser`.
 - There is no production `packages/core`, `packages/protocol`,
   `packages/test-utils`, or `packages/server` manifest. Authoring APIs live in
@@ -201,10 +207,10 @@ path is covered by fixtures and browser tests.
   `benchmarks/js-framework-benchmark` fixture now lives under
   `demos/js-framework-benchmark`, and the music-player CSR/SSR playgrounds now
   live under `demos/music-player` and `demos/music-player-ssr`.
-- The current package inventory has package manifests for those seven framework
+- The current package inventory has package manifests for those eight framework
   package folders, the TypeScript plugin package, the two music-player demos,
   and the existing fixture packages.
-- The current split-spec inventory has `00` through `10` under
+- The current split-spec inventory has `00` through `11` under
   `specs/framework/`.
 - `packages/compiler` has the initial production pass-boundary layout with
   shared artifact/diagnostic modules, AST/source helpers, graph-path helpers, a
@@ -232,10 +238,14 @@ in the split specs.
   `packages/compiler/src/passes/*`, and `packages/compiler/test/*`.
 - Semantic collector split: `packages/compiler/src/passes/semantic-graph/*` and
   the focused semantic collector tests under `packages/compiler/test/`.
-- Runtime payload/resume boundaries: `packages/runtime/src/index.ts`,
-  `packages/runtime/src/dom-journal.ts`, `packages/runtime/src/graph.ts`,
-  `packages/runtime/src/payload.ts`, `packages/runtime/src/resume.ts`, and
-  `packages/runtime/test/*`.
+- Runtime graph boundary: `packages/runtime/src/index.ts`,
+  `packages/runtime/src/graph.ts`, and `packages/runtime/test/*`.
+- Web platform render/resume boundary: `packages/web/package.json`,
+  `packages/web/src/index.ts`, `packages/web/src/dom-journal.ts`,
+  `packages/web/src/dom-update.ts`, `packages/web/src/payload.ts`,
+  `packages/web/src/render.ts`, `packages/web/src/render-to-string.ts`,
+  `packages/web/src/resume.ts`, `packages/web/src/event-only-resume.ts`,
+  `packages/web/src/event-resume.ts`, and `packages/web/test/*`.
 - Resumer POC boundary: `poc/fixtures/proofs/resumer-script/README.md`,
   `poc/fixtures/proofs/resumer-script/src/resumer-source.mjs`,
   `poc/fixtures/proofs/resumer-script/src/size-report.mjs`,
@@ -302,8 +312,24 @@ in the split specs.
 - The root workspace uses pnpm and vite-plus through `package.json`,
   `pnpm-workspace.yaml`, `pnpm-lock.yaml`, and `vite.config.ts`.
 - The current vite-plus pack configuration emits ESM and declaration outputs for
-  `core`, `protocol`, `serializer`, `compiler`, `runtime`, `rolldown`, `vite`,
-  `arcade`, `arcade/vite`, and `test-utils`.
+  `serializer`, `compiler`, `runtime`, `web`, `rolldown`, `vite`, `arcade`,
+  `arcade/web`, `arcade/runtime` compatibility wrappers, `arcade/vite`, and
+  `vitest-browser`.
+- `specs/framework/11-platform-organization.md` records the package naming
+  decision for small top-level platform packages: `packages/web`,
+  `packages/mobile`, and `packages/desktop`, with OS/tooling adapters living
+  inside the owning platform package by default. For this implementation slice,
+  the insertion limit was recorded as 500 added lines unless the user approved
+  expanding scope. The required grep MCP research checked real-world package and
+  adapter patterns for `src/adapters`, subpath exports, `@angular/platform-*`,
+  and `@vue/runtime-*`; that research supported using a small `@arcade/web`
+  package boundary instead of top-level `platform-*` or `adapter-*` packages.
+- The web platform split moves DOM render/resume, payload script decoding,
+  browser event resume, DOM journal application, and web-focused tests from
+  `packages/runtime` into `packages/web`. `packages/runtime` now exposes only
+  the host-agnostic graph entry and graph subpath, while `packages/arcade`
+  exposes curated `arcade/web/*` entries plus existing `arcade/runtime/*`
+  compatibility wrappers over the web package.
 
 ### Compiler Boundaries
 
@@ -1099,7 +1125,7 @@ evidence now supersedes it.
 
 Current `vp test` receipts use the root vite-plus Node test project
 (`environment: 'node'`) and include `packages/*/test/**/*.test.ts`; at this
-ledger update, that is 48 package test files and 292 tests. Treat those results
+ledger update, that is 64 package test files and 412 tests. Treat those results
 as package/unit-integration evidence. They do not prove browser-mode component
 tests, real browser resume, broad witness HMR/build-pipeline behavior beyond the
 package-local CSR dev/browser HMR, production-build, preview client-click, SSR
@@ -1116,6 +1142,24 @@ pack-output evidence, not source-of-truth implementation state.
 
 Historical focused implementation receipts retained for context:
 
+- Platform package split verification:
+  `pnpm exec vp test packages/bundler/test/package-metadata.test.ts`,
+  `pnpm exec vp test packages/web/test/*.test.ts`,
+  `pnpm exec vp test packages/runtime/test/*.test.ts`,
+  `pnpm exec vp test packages/arcade/test/*.test.ts`,
+  `pnpm exec vp test packages/vitest-browser/test/*.test.ts`,
+  `pnpm exec vp test`,
+  `pnpm exec vp check <touched platform split files>`, `git diff --check`, and
+  `pnpm exec vp pack`. The full test receipt covered 64 files and 412 tests;
+  `vp pack` completed with existing third-party `@tsrx/core` declaration
+  warnings.
+- Platform guardrail scans:
+  `rg -n "@arcade/runtime/(render|render-to-string|resume|dom-journal|dom-update|event-only-resume|event-resume)|arcade/runtime/(render|render-to-string|resume|dom-journal|dom-update|event-only-resume|event-resume)|packages/runtime/src/(render|render-to-string|payload|resume|dom-|event-)" packages demos vite.config.ts`
+  and
+  `rg -n "packages/(platform|adapter)-|@arcade/(platform|adapter)-|platform-web|platform-mobile|platform-desktop|adapter-mobile|adapter-desktop" packages specs demos vite.config.ts package.json pnpm-workspace.yaml`;
+  the only remaining runtime-web hits are intentional `arcade/runtime/*`
+  compatibility wrapper pack entries, and the only `platform-*`/`adapter-*`
+  hits are the spec prohibition plus retired-package inventory tests.
 - `pnpm exec vp test packages/compiler/test/symbol-modules.test.ts packages/compiler/test/compile-module.test.ts`
 - `pnpm exec vp test packages/compiler/test/symbol-modules.test.ts`
 - `pnpm exec vp test packages/runtime/test/runtime-graph.test.ts`

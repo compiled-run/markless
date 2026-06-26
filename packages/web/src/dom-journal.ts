@@ -1,4 +1,4 @@
-import type { DomJournalEntry } from './graph.ts';
+import type { DomJournalEntry } from '@arcade/runtime';
 
 type InsertRangeEntry = Extract<DomJournalEntry, { readonly type: 'insertRange' }>;
 type RemoveRangeEntry = Extract<DomJournalEntry, { readonly type: 'removeRange' }>;

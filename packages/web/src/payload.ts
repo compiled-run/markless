@@ -5,7 +5,7 @@ import {
 } from '@arcade/serializer';
 import { deserializeGraphValue, type SerializedGraphPayload } from '@arcade/serializer';
 import { applyDomJournalEntries } from './dom-journal.ts';
-import { createRuntimeGraph, type RuntimeGraph, type RuntimeGraphRead } from './graph.ts';
+import { createRuntimeGraph, type RuntimeGraph, type RuntimeGraphRead } from '@arcade/runtime';
 import {
 	createResumeRuntime,
 	type ResumeDomElement,

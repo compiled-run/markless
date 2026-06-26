@@ -33,12 +33,12 @@ export default {
 				replacement: arcadePackage('packages/bundler/src/rolldown.ts'),
 			},
 			{
-				find: '@arcade/runtime/render',
-				replacement: arcadePackage('packages/runtime/src/render.ts'),
+				find: '@arcade/web/render',
+				replacement: arcadePackage('packages/web/src/render.ts'),
 			},
 			{
-				find: '@arcade/runtime/event-only-resume',
-				replacement: arcadePackage('packages/runtime/src/event-only-resume.ts'),
+				find: '@arcade/web/event-only-resume',
+				replacement: arcadePackage('packages/web/src/event-only-resume.ts'),
 			},
 			{
 				find: '@arcade/runtime',
@@ -49,8 +49,8 @@ export default {
 				replacement: arcadePackage('packages/arcade/src/preload.ts'),
 			},
 			{
-				find: 'arcade/runtime/event-only-resume',
-				replacement: arcadePackage('packages/arcade/src/runtime/event-only-resume.ts'),
+				find: 'arcade/web/event-only-resume',
+				replacement: arcadePackage('packages/arcade/src/web/event-only-resume.ts'),
 			},
 			{
 				find: 'arcade',

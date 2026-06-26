@@ -1,4 +1,4 @@
-export { render } from '@arcade/runtime/render';
+export { render } from '@arcade/web/render';
 export type {
 	CsrRenderArtifact,
 	CsrRenderContainer,
@@ -6,4 +6,4 @@ export type {
 	CsrRenderOutput,
 	CsrRenderable,
 	RenderTarget,
-} from '@arcade/runtime/render';
+} from '@arcade/web/render';

@@ -1,5 +1,5 @@
 import type { ProtocolViewPayload } from '@arcade/serializer';
-import type { DomJournalEntry } from './graph.ts';
+import type { DomJournalEntry } from '@arcade/runtime';
 
 export type DomUpdateEntryInput = {
 	readonly locator: string;

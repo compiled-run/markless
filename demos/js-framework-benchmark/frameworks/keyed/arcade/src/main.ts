@@ -1,4 +1,4 @@
-import { render } from '@arcade/runtime/render';
+import { render } from '@arcade/web/render';
 import { App } from './root.tsrx';
 
 const target = document.querySelector('#main');

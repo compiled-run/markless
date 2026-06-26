@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
+import { createRuntimeGraph } from '@arcade/runtime';
 import { createDomUpdateEntry } from '../src/dom-update.ts';
-import { createResumeRuntime, createRuntimeGraph } from '../src/index.ts';
+import { createResumeRuntime } from '../src/index.ts';
 
 type FakeElement = {
 	readonly nodeType: 1;

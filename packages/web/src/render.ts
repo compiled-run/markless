@@ -1,6 +1,6 @@
 import type { ProtocolStatePayload, ProtocolViewPayload } from '@arcade/serializer';
 import type { EventOnlyResumeContainer } from './event-only-resume.ts';
-import type { RuntimeGraph } from './graph.ts';
+import type { RuntimeGraph } from '@arcade/runtime';
 import type { ResumeDomElement, ResumeRuntime, ResumeRuntimeInput } from './resume.ts';
 
 export type RenderTarget = {

@@ -2,106 +2,107 @@ import type { ProtocolStatePayload, ProtocolViewPayload } from '@arcade/serializ
 import type {
 	DomJournalEntry,
 	DomJournalResult,
+	RuntimeGraph,
+	RuntimeGraphCall,
+	RuntimeGraphDelete,
+	RuntimeGraphSubscription,
 	RuntimeGraphUpdate,
 	RuntimeGraphWrite,
-} from './graph.ts';
+} from '@arcade/runtime';
 
-export type EventOnlyResumeDomNode = {
+export type EventResumeDomNode = {
 	readonly nodeType: number;
-	readonly childNodes?: ArrayLike<EventOnlyResumeDomNode>;
+	readonly childNodes?: ArrayLike<EventResumeDomNode>;
 };
 
-export type EventOnlyResumeDomElement = EventOnlyResumeDomNode & {
+export type EventResumeDomElement = EventResumeDomNode & {
 	readonly nodeType: 1;
 	readonly tagName: string;
-	readonly parentElement?: EventOnlyResumeDomElement | null;
+	readonly parentElement?: EventResumeDomElement | null;
 	textContent?: string | null;
-	addEventListener?: (
-		type: string,
-		listener: (event: EventOnlyResumeDomEvent) => Promise<void>,
-		options?: { readonly capture?: boolean },
-	) => void;
 	setAttribute?: (name: string, value: string) => void;
 	removeAttribute?: (name: string) => void;
 	readonly [name: string]: unknown;
 };
 
-export type EventOnlyResumeDomEvent = {
+export type EventResumeDomEvent = {
 	readonly type: string;
-	readonly target: EventOnlyResumeDomElement | null;
+	readonly target: EventResumeDomElement | null;
 	readonly [key: string]: unknown;
 };
 
-export type EventOnlyResumePayloadScriptElement = {
+export type EventResumePayloadScriptElement = {
 	readonly textContent?: string | null;
 	readonly text?: string | null;
 	readonly innerHTML?: string | null;
 };
 
-export type EventOnlyResumePayloadDocument = {
-	readonly querySelector: (selector: string) => EventOnlyResumePayloadScriptElement | null;
+export type EventResumePayloadDocument = {
+	readonly querySelector: (selector: string) => EventResumePayloadScriptElement | null;
 };
 
-export type EventOnlyResumeRecord = ProtocolViewPayload['events'][number];
-export type EventOnlyResumeDomUpdateRecord = ProtocolViewPayload['domUpdates'][number];
-export type EventOnlyResumeBehaviorRecord = ProtocolViewPayload['behaviors'][number];
+export type EventResumeRecord = ProtocolViewPayload['events'][number];
+export type EventResumeDomUpdateRecord = ProtocolViewPayload['domUpdates'][number];
 
-export type EventOnlyResumeGraph = {
-	read(graphNodeId: string, path?: ReadonlyArray<string>): unknown;
-	write(write: RuntimeGraphWrite): void;
-	update(update: RuntimeGraphUpdate): unknown;
-	flush(): Promise<void>;
-};
+export type EventResumeGraph = Pick<
+	RuntimeGraph,
+	| 'read'
+	| 'readShared'
+	| 'writeShared'
+	| 'getSharedDefinition'
+	| 'listSharedDefinitions'
+	| 'takeSharedPatches'
+	| 'applySharedPatch'
+	| 'write'
+	| 'update'
+	| 'call'
+	| 'delete'
+	| 'subscribe'
+	| 'subscribeJournal'
+	| 'flush'
+	| 'takeJournal'
+>;
 
-export type EventOnlyResumeSymbolContext = {
-	readonly graph: EventOnlyResumeGraph;
-	readonly event?: EventOnlyResumeDomEvent;
-	readonly element: EventOnlyResumeDomElement;
-	readonly getElementHandle: () => undefined;
-	readonly domUpdate?: EventOnlyResumeDomUpdateRecord;
+export type EventResumeSymbolContext = {
+	readonly graph: EventResumeGraph;
+	readonly event?: EventResumeDomEvent;
+	readonly element: EventResumeDomElement;
+	readonly getElementHandle: (handleIdOrName: string) => EventResumeDomElement | undefined;
+	readonly domUpdate?: EventResumeDomUpdateRecord;
 	readonly locals?: Readonly<Record<string, unknown>>;
 	readonly value?: unknown;
-	readonly behaviorInputs?: ReadonlyArray<unknown>;
 };
 
-export type EventOnlyResumeBehaviorCleanup = () => void;
+export type EventResumeSymbol = (
+	context: EventResumeSymbolContext,
+) => void | DomJournalResult | Promise<void | DomJournalResult>;
 
-export type EventOnlyResumeSymbol = (
-	context: EventOnlyResumeSymbolContext,
-) =>
-	| void
-	| DomJournalResult
-	| EventOnlyResumeBehaviorCleanup
-	| Promise<void | DomJournalResult | EventOnlyResumeBehaviorCleanup>;
-
-export type ResumeEventOnlyFromPayloadDocumentInput = {
-	readonly document: EventOnlyResumePayloadDocument;
-	readonly root: EventOnlyResumeDomElement;
-	readonly event: EventOnlyResumeDomEvent;
-	readonly element?: EventOnlyResumeDomElement;
-	readonly eventRecord?: EventOnlyResumeRecord;
-	readonly loadSymbol: (
-		symbolId: string,
-	) => EventOnlyResumeSymbol | Promise<EventOnlyResumeSymbol>;
+export type ResumeEventFromPayloadDocumentInput = {
+	readonly document: EventResumePayloadDocument;
+	readonly root: EventResumeDomElement;
+	readonly event: EventResumeDomEvent;
+	readonly element?: EventResumeDomElement;
+	readonly eventRecord?: EventResumeRecord;
+	readonly loadSymbol: (symbolId: string) => EventResumeSymbol | Promise<EventResumeSymbol>;
 };
 
-export type CreateEventOnlyResumeContainerInput = {
-	readonly state: ProtocolStatePayload;
-	readonly view: ProtocolViewPayload;
-	readonly root: EventOnlyResumeDomElement;
-	readonly loadSymbol: ResumeEventOnlyFromPayloadDocumentInput['loadSymbol'];
-};
-
-export type EventOnlyResumeContainer = {
-	readonly graph: EventOnlyResumeGraph;
+export type EventResumeContainer = {
+	readonly graph: EventResumeGraph;
 	readonly view: ProtocolViewPayload;
 	readonly dispatch: (
-		event: EventOnlyResumeDomEvent,
+		event: EventResumeDomEvent,
 		options?: {
-			readonly element?: EventOnlyResumeDomElement;
-			readonly eventRecord?: EventOnlyResumeRecord;
+			readonly element?: EventResumeDomElement;
+			readonly eventRecord?: EventResumeRecord;
 		},
 	) => Promise<void>;
+};
+
+export type CreateEventResumeContainerInput = {
+	readonly state: ProtocolStatePayload;
+	readonly view: ProtocolViewPayload;
+	readonly root: EventResumeDomElement;
+	readonly loadSymbol: ResumeEventFromPayloadDocumentInput['loadSymbol'];
 };
 
 type DirtyPath = {
@@ -109,22 +110,20 @@ type DirtyPath = {
 	readonly path: ReadonlyArray<string>;
 };
 
-type EventOnlyResumeContainerState = EventOnlyResumeContainer & {
-	readonly elementsByHostId: ReadonlyMap<string, EventOnlyResumeDomElement>;
-	readonly activeBehaviorHosts: Set<string>;
+type EventResumeContainerState = EventResumeContainer & {
+	readonly elementsByHostId: ReadonlyMap<string, EventResumeDomElement>;
 };
 
-const containers = new WeakMap<EventOnlyResumeDomElement, EventOnlyResumeContainerState>();
-const noElementHandle = () => undefined;
+const containers = new WeakMap<EventResumeDomElement, Promise<EventResumeContainerState>>();
 
-export async function resumeEventOnlyFromPayloadDocument(
-	input: ResumeEventOnlyFromPayloadDocumentInput,
-): Promise<EventOnlyResumeContainer> {
+export async function resumeEventFromPayloadDocument(
+	input: ResumeEventFromPayloadDocumentInput,
+): Promise<EventResumeContainer> {
 	let container = containers.get(input.root);
 	if (!container) {
 		const state = readPayloadJson<ProtocolStatePayload>(input.document, 'arcade/state');
 		const view = readPayloadJson<ProtocolViewPayload>(input.document, 'arcade/view');
-		container = createEventOnlyResumeContainerState({
+		container = createEventResumeContainerState({
 			state,
 			view,
 			root: input.root,
@@ -133,36 +132,37 @@ export async function resumeEventOnlyFromPayloadDocument(
 		containers.set(input.root, container);
 	}
 
-	await container.dispatch(input.event, {
+	const resumed = await container;
+	await resumed.dispatch(input.event, {
 		element: input.element,
 		eventRecord: input.eventRecord,
 	});
-	return container;
+	return resumed;
 }
 
-export function createEventOnlyResumeContainerFromPayloads(
-	input: CreateEventOnlyResumeContainerInput,
-): EventOnlyResumeContainer {
-	return createEventOnlyResumeContainerState(input);
+export async function createEventResumeContainerFromPayloads(
+	input: CreateEventResumeContainerInput,
+): Promise<EventResumeContainer> {
+	return createEventResumeContainerState(input);
 }
 
-function createEventOnlyResumeContainerState(
-	input: CreateEventOnlyResumeContainerInput,
-): EventOnlyResumeContainerState {
+async function createEventResumeContainerState(
+	input: CreateEventResumeContainerInput,
+): Promise<EventResumeContainerState> {
 	const elementsByHostId = materializeDomLocators(input.root, input.view.locators);
-	const activeBehaviorHosts = new Set<string>();
-	const graph = createEventOnlyResumeGraph({
+	const elementHandles = materializeElementHandles(input.root, elementsByHostId, input.view);
+	const graph = createEventResumeGraph({
 		state: input.state,
 		view: input.view,
 		loadSymbol: input.loadSymbol,
 		elementsByHostId,
+		getElementHandle: elementHandles.get,
 	});
 
 	return {
 		graph,
 		view: input.view,
 		elementsByHostId,
-		activeBehaviorHosts,
 		dispatch(event, options = {}) {
 			return dispatchEvent({
 				event,
@@ -170,7 +170,7 @@ function createEventOnlyResumeContainerState(
 				graph,
 				loadSymbol: input.loadSymbol,
 				elementsByHostId,
-				activeBehaviorHosts,
+				getElementHandle: elementHandles.get,
 				element: options.element,
 				eventRecord: options.eventRecord,
 			});
@@ -178,7 +178,7 @@ function createEventOnlyResumeContainerState(
 	};
 }
 
-function readPayloadJson<T>(document: EventOnlyResumePayloadDocument, type: string): T {
+function readPayloadJson<T>(document: EventResumePayloadDocument, type: string): T {
 	const script = document.querySelector(`script[type="${type}"]`);
 	const text = script?.textContent ?? script?.text ?? script?.innerHTML;
 	if (text == null) throw new Error(`Missing ${type} payload script.`);
@@ -188,35 +188,59 @@ function readPayloadJson<T>(document: EventOnlyResumePayloadDocument, type: stri
 	return payload as T;
 }
 
-function createEventOnlyResumeGraph(input: {
+function createEventResumeGraph(input: {
 	readonly state: ProtocolStatePayload;
 	readonly view: ProtocolViewPayload;
-	readonly loadSymbol: ResumeEventOnlyFromPayloadDocumentInput['loadSymbol'];
-	readonly elementsByHostId: ReadonlyMap<string, EventOnlyResumeDomElement>;
-}): EventOnlyResumeGraph {
+	readonly loadSymbol: ResumeEventFromPayloadDocumentInput['loadSymbol'];
+	readonly elementsByHostId: ReadonlyMap<string, EventResumeDomElement>;
+	readonly getElementHandle: (handleIdOrName: string) => EventResumeDomElement | undefined;
+}): EventResumeGraph {
 	const cells = new Map<string, unknown>();
 	const dirtyPaths: DirtyPath[] = [];
+	const subscriptions: RuntimeGraphSubscription[] = [];
+	const journal: DomJournalEntry[] = [];
+	const journalListeners: Array<
+		(entries: ReadonlyArray<DomJournalEntry>) => void | Promise<void>
+	> = [];
 
 	for (const cell of input.state.cells) {
 		cells.set(
 			cell.graphNodeId,
-			cell.value === undefined ? undefined : deserializeEventOnlyGraphValue(cell.value),
+			cell.value === undefined ? undefined : deserializeEventGraphValue(cell.value),
 		);
 	}
 
-	const graph: EventOnlyResumeGraph = {
+	const graph: EventResumeGraph = {
 		read(graphNodeId, path = []) {
 			return readPath(cells.get(graphNodeId), path);
 		},
-		write(write) {
+		readShared() {
+			return undefined;
+		},
+		writeShared() {
+			return false;
+		},
+		getSharedDefinition() {
+			return undefined;
+		},
+		listSharedDefinitions() {
+			return [];
+		},
+		takeSharedPatches() {
+			return [];
+		},
+		applySharedPatch() {
+			return false;
+		},
+		write(write: RuntimeGraphWrite) {
 			const path = write.path ?? [];
 			cells.set(
 				write.graphNodeId,
 				writePath(cells.get(write.graphNodeId), path, write.value),
 			);
-			dirtyPaths.push({ graphNodeId: write.graphNodeId, path });
+			markDirty(write.graphNodeId, path);
 		},
-		update(update) {
+		update(update: RuntimeGraphUpdate) {
 			const path = update.path ?? [];
 			const currentValue = readPath(cells.get(update.graphNodeId), path);
 			const nextValue = update.update(currentValue);
@@ -224,35 +248,93 @@ function createEventOnlyResumeGraph(input: {
 				update.graphNodeId,
 				writePath(cells.get(update.graphNodeId), path, nextValue),
 			);
-			dirtyPaths.push({ graphNodeId: update.graphNodeId, path });
+			markDirty(update.graphNodeId, path);
 			if (update.returnValue === 'previous') return currentValue;
 			if (update.returnValue === 'next') return nextValue;
 		},
+		call(call: RuntimeGraphCall) {
+			const path = call.path ?? [];
+			const target = readPath(cells.get(call.graphNodeId), path) as
+				| Record<string, unknown>
+				| undefined;
+			const method = target?.[call.method];
+			if (typeof method !== 'function') {
+				throw new TypeError(`Unsupported graph collection method "${call.method}".`);
+			}
+			const result = Reflect.apply(method, target, [...(call.args ?? [])]);
+			markDirty(call.graphNodeId, path);
+			return result;
+		},
+		delete(deletion: RuntimeGraphDelete) {
+			const result = deletePath(cells.get(deletion.graphNodeId), deletion.path);
+			if (result) markDirty(deletion.graphNodeId, deletion.path);
+			return result;
+		},
+		subscribe(subscription) {
+			subscriptions.push(subscription);
+		},
+		subscribeJournal(listener) {
+			journalListeners.push(listener);
+			return () => {
+				const index = journalListeners.indexOf(listener);
+				if (index >= 0) journalListeners.splice(index, 1);
+			};
+		},
 		async flush() {
 			while (dirtyPaths.length > 0) {
+				const pending = dirtyPaths.splice(0);
 				await flushDomUpdates({
 					graph,
-					pending: dirtyPaths.splice(0),
+					pending,
 					view: input.view,
 					loadSymbol: input.loadSymbol,
 					elementsByHostId: input.elementsByHostId,
+					getElementHandle: input.getElementHandle,
+					journal,
 				});
+				for (const subscription of subscriptions) {
+					const subscriptionPath = subscription.path ?? [];
+					const dirty = pending.some(
+						(path) =>
+							path.graphNodeId === subscription.graphNodeId &&
+							pathsIntersect(path.path, subscriptionPath),
+					);
+					if (!dirty) continue;
+					appendJournalResult(
+						journal,
+						await subscription.run(
+							graph.read(subscription.graphNodeId, subscriptionPath),
+						),
+					);
+				}
+			}
+
+			if (journalListeners.length > 0 && journal.length > 0) {
+				const entries = journal.splice(0);
+				for (const listener of journalListeners) await listener(entries);
 			}
 		},
+		takeJournal() {
+			return journal.splice(0);
+		},
 	};
+
+	function markDirty(graphNodeId: string, path: ReadonlyArray<string>): void {
+		dirtyPaths.push({ graphNodeId, path });
+	}
 
 	return graph;
 }
 
 async function dispatchEvent(input: {
-	readonly event: EventOnlyResumeDomEvent;
+	readonly event: EventResumeDomEvent;
 	readonly view: ProtocolViewPayload;
-	readonly graph: EventOnlyResumeGraph;
-	readonly loadSymbol: ResumeEventOnlyFromPayloadDocumentInput['loadSymbol'];
-	readonly elementsByHostId: ReadonlyMap<string, EventOnlyResumeDomElement>;
-	readonly activeBehaviorHosts: Set<string>;
-	readonly element?: EventOnlyResumeDomElement;
-	readonly eventRecord?: EventOnlyResumeRecord;
+	readonly graph: EventResumeGraph;
+	readonly loadSymbol: ResumeEventFromPayloadDocumentInput['loadSymbol'];
+	readonly elementsByHostId: ReadonlyMap<string, EventResumeDomElement>;
+	readonly getElementHandle: (handleIdOrName: string) => EventResumeDomElement | undefined;
+	readonly element?: EventResumeDomElement;
+	readonly eventRecord?: EventResumeRecord;
 }): Promise<void> {
 	const matched = input.eventRecord
 		? {
@@ -273,36 +355,26 @@ async function dispatchEvent(input: {
 				graph: input.graph,
 				event: input.event,
 				element: matched.element,
-				getElementHandle: noElementHandle,
+				getElementHandle: input.getElementHandle,
 			});
-			const journalResult = isPromiseLike(result) ? await result : result;
-			if (typeof journalResult !== 'function') {
-				applyDomJournalResult(journalResult, input.elementsByHostId);
-			}
+			applyDomJournalResult(
+				isPromiseLike(result) ? await result : result,
+				input.elementsByHostId,
+			);
 		}
 	} finally {
 		await input.graph.flush();
 	}
-
-	if (input.view.behaviors.some((behavior) => !!behavior.symbolId)) {
-		const behaviorRuntime = await import('./event-only-behaviors.ts');
-		await behaviorRuntime.activateBehaviorsFromEventHost({
-			element: matched.element,
-			view: input.view,
-			graph: input.graph,
-			loadSymbol: input.loadSymbol,
-			elementsByHostId: input.elementsByHostId,
-			activeBehaviorHosts: input.activeBehaviorHosts,
-		});
-	}
 }
 
 async function flushDomUpdates(input: {
-	readonly graph: EventOnlyResumeGraph;
+	readonly graph: EventResumeGraph;
 	readonly pending: ReadonlyArray<DirtyPath>;
 	readonly view: ProtocolViewPayload;
-	readonly loadSymbol: ResumeEventOnlyFromPayloadDocumentInput['loadSymbol'];
-	readonly elementsByHostId: ReadonlyMap<string, EventOnlyResumeDomElement>;
+	readonly loadSymbol: ResumeEventFromPayloadDocumentInput['loadSymbol'];
+	readonly elementsByHostId: ReadonlyMap<string, EventResumeDomElement>;
+	readonly getElementHandle: (handleIdOrName: string) => EventResumeDomElement | undefined;
+	readonly journal: DomJournalEntry[];
 }): Promise<void> {
 	const ranDomUpdates = new Set<string>();
 
@@ -327,23 +399,32 @@ async function flushDomUpdates(input: {
 		const result = symbol({
 			graph: input.graph,
 			element,
-			getElementHandle: noElementHandle,
+			getElementHandle: input.getElementHandle,
 			domUpdate,
 			value: input.graph.read(domUpdate.graphNodeId, domUpdate.path),
 		});
-		const journalResult = isPromiseLike(result) ? await result : result;
-		if (typeof journalResult !== 'function') {
-			applyDomJournalResult(journalResult, input.elementsByHostId);
-		}
+		appendJournalResult(input.journal, isPromiseLike(result) ? await result : result);
 	}
+
+	const entries = input.journal.splice(0);
+	for (const entry of entries) applyDomJournalEntry(entry, input.elementsByHostId);
+}
+
+function appendJournalResult(journal: DomJournalEntry[], result: DomJournalResult | void): void {
+	if (!result) return;
+	if (isDomJournalEntryArray(result)) {
+		journal.push(...result);
+		return;
+	}
+	journal.push(result);
 }
 
 function applyDomJournalResult(
 	result: DomJournalResult | void,
-	elementsByHostId: ReadonlyMap<string, EventOnlyResumeDomElement>,
+	elementsByHostId: ReadonlyMap<string, EventResumeDomElement>,
 ): void {
-	if (!result) return;
-	const entries = isDomJournalEntryArray(result) ? result : [result];
+	const entries: DomJournalEntry[] = [];
+	appendJournalResult(entries, result);
 	for (const entry of entries) applyDomJournalEntry(entry, elementsByHostId);
 }
 
@@ -355,7 +436,7 @@ function isDomJournalEntryArray(
 
 function applyDomJournalEntry(
 	entry: DomJournalEntry,
-	elementsByHostId: ReadonlyMap<string, EventOnlyResumeDomElement>,
+	elementsByHostId: ReadonlyMap<string, EventResumeDomElement>,
 ): void {
 	const target = elementsByHostId.get(entry.locator);
 	if (!target) return;
@@ -378,11 +459,11 @@ function applyDomJournalEntry(
 }
 
 function materializeDomLocators(
-	root: EventOnlyResumeDomElement,
+	root: EventResumeDomElement,
 	locators: ProtocolViewPayload['locators'],
-): Map<string, EventOnlyResumeDomElement> {
+): Map<string, EventResumeDomElement> {
 	const elements = collectElements(root);
-	const byHostId = new Map<string, EventOnlyResumeDomElement>();
+	const byHostId = new Map<string, EventResumeDomElement>();
 
 	for (const locator of locators) {
 		const element = elements[locator.index];
@@ -396,25 +477,46 @@ function materializeDomLocators(
 	return byHostId;
 }
 
-function collectElements(root: EventOnlyResumeDomElement): EventOnlyResumeDomElement[] {
-	const elements: EventOnlyResumeDomElement[] = [];
-	const visit = (node: EventOnlyResumeDomNode): void => {
-		if (node.nodeType === 1) elements.push(node as EventOnlyResumeDomElement);
+function collectElements(root: EventResumeDomElement): EventResumeDomElement[] {
+	const elements: EventResumeDomElement[] = [];
+	const visit = (node: EventResumeDomNode): void => {
+		if (node.nodeType === 1) elements.push(node as EventResumeDomElement);
 		for (const child of Array.from(node.childNodes ?? [])) visit(child);
 	};
 	visit(root);
 	return elements;
 }
 
+function materializeElementHandles(
+	root: EventResumeDomElement,
+	elementsByHostId: ReadonlyMap<string, EventResumeDomElement>,
+	view: ProtocolViewPayload,
+): { readonly get: (handleIdOrName: string) => EventResumeDomElement | undefined } {
+	const handles = new Map<string, EventResumeDomElement>();
+	for (const handle of view.elementHandles) {
+		const element = elementsByHostId.get(handle.hostNodeId);
+		if (!element) continue;
+		handles.set(handle.handleId, element);
+		handles.set(handle.name, element);
+	}
+
+	return {
+		get(handleIdOrName) {
+			const element = handles.get(handleIdOrName);
+			return element && containsElement(root, element) ? element : undefined;
+		},
+	};
+}
+
 function findEventRecord(
-	target: EventOnlyResumeDomElement | null,
+	target: EventResumeDomElement | null,
 	eventName: string,
 	view: ProtocolViewPayload,
-	elementsByHostId: ReadonlyMap<string, EventOnlyResumeDomElement>,
+	elementsByHostId: ReadonlyMap<string, EventResumeDomElement>,
 ):
 	| {
-			readonly element: EventOnlyResumeDomElement;
-			readonly eventRecord: EventOnlyResumeRecord;
+			readonly element: EventResumeDomElement;
+			readonly eventRecord: EventResumeRecord;
 	  }
 	| undefined {
 	for (let element = target; element; element = element.parentElement ?? null) {
@@ -427,7 +529,7 @@ function findEventRecord(
 	}
 }
 
-function deserializeEventOnlyGraphValue(payload: unknown): unknown {
+function deserializeEventGraphValue(payload: unknown): unknown {
 	if (!isRecord(payload)) return payload;
 	const records = new Map<number, Record<string, unknown>>();
 	for (const record of Array.isArray(payload.records) ? payload.records : []) {
@@ -494,6 +596,17 @@ function writePath(value: unknown, path: ReadonlyArray<string>, nextValue: unkno
 	return root;
 }
 
+function deletePath(value: unknown, path: ReadonlyArray<string>): boolean {
+	if (path.length === 0 || !isRecord(value)) return false;
+	let cursor = value;
+	for (const key of path.slice(0, -1)) {
+		const child = cursor[key];
+		if (!isRecord(child)) return false;
+		cursor = child;
+	}
+	return delete cursor[path[path.length - 1]!];
+}
+
 function pathsIntersect(a: ReadonlyArray<string>, b: ReadonlyArray<string>): boolean {
 	return startsWithPath(a, b) || startsWithPath(b, a);
 }
@@ -501,6 +614,16 @@ function pathsIntersect(a: ReadonlyArray<string>, b: ReadonlyArray<string>): boo
 function startsWithPath(path: ReadonlyArray<string>, prefix: ReadonlyArray<string>): boolean {
 	if (path.length < prefix.length) return false;
 	return prefix.every((part, index) => path[index] === part);
+}
+
+function containsElement(root: EventResumeDomElement, element: EventResumeDomElement): boolean {
+	if (root === element) return true;
+	for (const child of Array.from(root.childNodes ?? [])) {
+		if (child.nodeType === 1 && containsElement(child as EventResumeDomElement, element)) {
+			return true;
+		}
+	}
+	return false;
 }
 
 function stringifyDomValue(value: unknown): string {
