@@ -91,9 +91,9 @@ importers:
       '@arcade/bundler':
         specifier: workspace:*
         version: link:../bundler
-      '@arcade/runtime':
+      '@arcade/web':
         specifier: workspace:*
-        version: link:../runtime
+        version: link:../web
 
   packages/bundler:
     dependencies:
@@ -262,12 +262,21 @@ importers:
 
   packages/vitest-browser:
     dependencies:
-      '@arcade/runtime':
+      '@arcade/web':
         specifier: workspace:*
-        version: link:../runtime
+        version: link:../web
       vitest:
         specifier: 4.1.5
         version: 4.1.5(@types/node@24.12.2)(vite@8.0.16(@types/node@24.12.2))
+
+  packages/web:
+    dependencies:
+      '@arcade/runtime':
+        specifier: workspace:*
+        version: link:../runtime
+      '@arcade/serializer':
+        specifier: workspace:*
+        version: link:../serializer
 
 packages:
 

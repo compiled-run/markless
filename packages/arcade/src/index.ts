@@ -17,19 +17,19 @@ export type {
 	CsrRenderable,
 	RenderTarget,
 } from './render.ts';
-export { renderToString } from '@arcade/runtime/render-to-string';
+export { renderToString } from '@arcade/web/render-to-string';
 export type {
 	RenderToStringOptions,
 	SsrRenderArtifact,
 	SsrRenderable,
 	SsrRenderOutput,
-} from '@arcade/runtime/render-to-string';
-export { resumeFromPayloadDocument, resumeFromPayloadScripts } from '@arcade/runtime/resume';
+} from '@arcade/web/render-to-string';
+export { resumeFromPayloadDocument, resumeFromPayloadScripts } from '@arcade/web/resume';
 export type {
 	ResumePayloadDocumentInput,
 	ResumePayloadScriptsInput,
 	ResumePayloadScriptsResult,
-} from '@arcade/runtime/resume';
+} from '@arcade/web/resume';
 export { arcadeClient, arcadeLib, arcadeServer } from '@arcade/bundler/rolldown';
 export type {
 	ArcadeRolldownOptions,

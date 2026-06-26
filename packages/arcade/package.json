@@ -16,10 +16,18 @@
 		"./runtime/render": "./src/runtime/render.ts",
 		"./runtime/render-to-string": "./src/runtime/render-to-string.ts",
 		"./runtime/resume": "./src/runtime/resume.ts",
+		"./web": "./src/web.ts",
+		"./web/dom-journal": "./src/web/dom-journal.ts",
+		"./web/dom-update": "./src/web/dom-update.ts",
+		"./web/event-only-resume": "./src/web/event-only-resume.ts",
+		"./web/event-resume": "./src/web/event-resume.ts",
+		"./web/render": "./src/web/render.ts",
+		"./web/render-to-string": "./src/web/render-to-string.ts",
+		"./web/resume": "./src/web/resume.ts",
 		"./vite": "./src/vite.ts"
 	},
 	"dependencies": {
 		"@arcade/bundler": "workspace:*",
-		"@arcade/runtime": "workspace:*"
+		"@arcade/web": "workspace:*"
 	}
 }

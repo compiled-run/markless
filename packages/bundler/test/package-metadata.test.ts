@@ -6,6 +6,7 @@ const root = resolve(import.meta.dirname, '../../..');
 const frameworkPackages = [
 	'packages/serializer/package.json',
 	'packages/runtime/package.json',
+	'packages/web/package.json',
 	'packages/compiler/package.json',
 	'packages/bundler/package.json',
 	'packages/arcade/package.json',
@@ -17,6 +18,12 @@ const retiredPackageManifests = [
 	'packages/core/package.json',
 	'packages/protocol/package.json',
 	'packages/test-utils/package.json',
+	'packages/platform-web/package.json',
+	'packages/platform-mobile/package.json',
+	'packages/platform-desktop/package.json',
+	'packages/adapter-mobile-ios/package.json',
+	'packages/adapter-mobile-android/package.json',
+	'packages/adapter-desktop-macos/package.json',
 ] as const;
 
 describe('package metadata', () => {
@@ -39,6 +46,43 @@ describe('package metadata', () => {
 		for (const packageJsonPath of retiredPackageManifests) {
 			await expect(access(resolve(root, packageJsonPath))).rejects.toThrow();
 		}
+	});
+
+	test('web platform code has its own package boundary', async () => {
+		const runtime = JSON.parse(
+			await readFile(resolve(root, 'packages/runtime/package.json'), 'utf8'),
+		) as {
+			readonly dependencies?: Record<string, string>;
+			readonly exports?: Record<string, string>;
+		};
+		const web = JSON.parse(
+			await readFile(resolve(root, 'packages/web/package.json'), 'utf8'),
+		) as {
+			readonly name?: string;
+			readonly dependencies?: Record<string, string>;
+			readonly exports?: Record<string, string>;
+		};
+
+		expect(web.name).toBe('@arcade/web');
+		expect(web.dependencies?.['@arcade/runtime']).toBe('workspace:*');
+		expect(runtime.dependencies).not.toHaveProperty('@arcade/web');
+		expect(Object.keys(runtime.exports ?? {})).not.toEqual(
+			expect.arrayContaining([
+				'./dom-journal',
+				'./dom-update',
+				'./event-only-resume',
+				'./event-resume',
+				'./render',
+				'./render-to-string',
+				'./resume',
+			]),
+		);
+		expect(web.exports).toMatchObject({
+			'.': './src/index.ts',
+			'./render': './src/render.ts',
+			'./render-to-string': './src/render-to-string.ts',
+			'./resume': './src/payload.ts',
+		});
 	});
 
 	test('runnable demos are root workspace packages', async () => {
@@ -77,8 +121,14 @@ describe('package metadata', () => {
 		);
 
 		const preloadAlias = config.indexOf("find: 'arcade/preload'");
-		const eventOnlyResumeAlias = config.indexOf("find: 'arcade/runtime/event-only-resume'");
+		const eventOnlyResumeAlias = config.indexOf("find: 'arcade/web/event-only-resume'");
 		const runtimeEventOnlyResumeAlias = config.indexOf(
+			"find: 'arcade/runtime/event-only-resume'",
+		);
+		const webRenderAlias = config.indexOf("find: '@arcade/web/render'");
+		const runtimeRenderAlias = config.indexOf("find: '@arcade/runtime/render'");
+		const webEventOnlyResumeAlias = config.indexOf("find: '@arcade/web/event-only-resume'");
+		const runtimePackageEventOnlyResumeAlias = config.indexOf(
 			"find: '@arcade/runtime/event-only-resume'",
 		);
 		const runtimeRootAlias = config.indexOf("find: '@arcade/runtime'");
@@ -87,11 +137,22 @@ describe('package metadata', () => {
 		expect(preloadAlias).toBeGreaterThanOrEqual(0);
 		expect(eventOnlyResumeAlias).toBeGreaterThanOrEqual(0);
 		expect(runtimeEventOnlyResumeAlias).toBeGreaterThanOrEqual(0);
-		expect(runtimeEventOnlyResumeAlias).toBeLessThan(runtimeRootAlias);
+		expect(webRenderAlias).toBeGreaterThanOrEqual(0);
+		expect(runtimeRenderAlias).toBeGreaterThanOrEqual(0);
+		expect(webEventOnlyResumeAlias).toBeGreaterThanOrEqual(0);
+		expect(runtimePackageEventOnlyResumeAlias).toBeGreaterThanOrEqual(0);
+		expect(runtimeRenderAlias).toBeLessThan(runtimeRootAlias);
+		expect(webEventOnlyResumeAlias).toBeLessThan(runtimeRootAlias);
+		expect(runtimePackageEventOnlyResumeAlias).toBeLessThan(runtimeRootAlias);
 		expect(preloadAlias).toBeLessThan(rootAlias);
 		expect(eventOnlyResumeAlias).toBeLessThan(rootAlias);
-		expect(config).toContain("packages/arcade/src/preload.ts");
-		expect(config).toContain("packages/arcade/src/runtime/event-only-resume.ts");
-		expect(config).toContain("packages/runtime/src/event-only-resume.ts");
+		expect(runtimeEventOnlyResumeAlias).toBeLessThan(rootAlias);
+		expect(config).toContain('packages/web/src/render.ts');
+		expect(config).toContain('packages/runtime/src/render.ts');
+		expect(config).toContain('packages/arcade/src/preload.ts');
+		expect(config).toContain('packages/arcade/src/web/event-only-resume.ts');
+		expect(config).toContain('packages/arcade/src/runtime/event-only-resume.ts');
+		expect(config).toContain('packages/web/src/event-only-resume.ts');
+		expect(config).toContain('packages/runtime/src/event-only-resume.ts');
 	});
 });

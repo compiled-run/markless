@@ -248,6 +248,7 @@ that is a framework bug.
 - [Deferred Decisions](./08-deferred-decisions.md)
 - [Compiler Module Split Plan](./09-compiler-module-split-plan.md)
 - [Render Architecture](./10-render-architecture.md)
+- [Platform Organization](./11-platform-organization.md)
 - [Archived design thread](./archive/design-thread.md)
 
 The split files are the implementation-facing specs. The archive preserves the design conversation as a single document for historical context.

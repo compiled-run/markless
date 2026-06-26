@@ -1,6 +1,8 @@
 import { expect, test } from 'vitest';
-import { createResumeRuntime, createRuntimeGraph, RuntimeResumeError } from '../src/index.ts';
-import type { DomJournalEntry, RuntimeGraph, RuntimeGraphWrite } from '../src/index.ts';
+import { createRuntimeGraph } from '@arcade/runtime';
+import { createResumeRuntime, RuntimeResumeError } from '../src/index.ts';
+import type { RuntimeGraph, RuntimeGraphWrite } from '@arcade/runtime';
+import type { DomJournalEntry } from '../src/index.ts';
 
 type FakeElement = {
 	readonly nodeType: 1;

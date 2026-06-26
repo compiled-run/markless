@@ -83,3 +83,6 @@ VDOM.
 - [10-render-architecture.md](./framework/10-render-architecture.md) — public
   render shape, CSR/SSR architecture, browser resume, preload planning, and
   build integration.
+- [11-platform-organization.md](./framework/11-platform-organization.md) —
+  web, mobile, desktop package boundaries, platform-owned adapters, and deferred
+  `arcade/ui`.

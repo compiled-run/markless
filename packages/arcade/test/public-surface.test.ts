@@ -55,12 +55,12 @@ test('root and grouped runtime entries use internal package boundaries deliberat
 	expect(runtimeSource).not.toContain(staleScope);
 	expect(indexSource).not.toContain("from 'arcade'");
 	expect(indexSource).toContain("from './render.ts'");
-	expect(indexSource).toContain("from '@arcade/runtime/render-to-string'");
-	expect(indexSource).toContain("from '@arcade/runtime/resume'");
+	expect(indexSource).toContain("from '@arcade/web/render-to-string'");
+	expect(indexSource).toContain("from '@arcade/web/resume'");
 	expect(indexSource).toContain("from '@arcade/bundler/rolldown'");
-	expect(runtimeSource).toContain("from '@arcade/runtime/render'");
-	expect(runtimeSource).toContain("from '@arcade/runtime/render-to-string'");
-	expect(runtimeSource).toContain("from '@arcade/runtime/resume'");
+	expect(runtimeSource).toContain("from '@arcade/web/render'");
+	expect(runtimeSource).toContain("from '@arcade/web/render-to-string'");
+	expect(runtimeSource).toContain("from '@arcade/web/resume'");
 });
 
 test('root render fallback delegates mounting to the runtime render path', async () => {
