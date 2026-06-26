@@ -37,8 +37,20 @@ export default {
 				replacement: arcadePackage('packages/runtime/src/render.ts'),
 			},
 			{
+				find: '@arcade/runtime/event-only-resume',
+				replacement: arcadePackage('packages/runtime/src/event-only-resume.ts'),
+			},
+			{
 				find: '@arcade/runtime',
 				replacement: arcadePackage('packages/runtime/src/index.ts'),
+			},
+			{
+				find: 'arcade/preload',
+				replacement: arcadePackage('packages/arcade/src/preload.ts'),
+			},
+			{
+				find: 'arcade/runtime/event-only-resume',
+				replacement: arcadePackage('packages/arcade/src/runtime/event-only-resume.ts'),
 			},
 			{
 				find: 'arcade',

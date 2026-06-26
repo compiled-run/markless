@@ -69,4 +69,29 @@ describe('package metadata', () => {
 			'vp test && pnpm bench:jsfb:guard && pnpm --dir packages/bundler test:boxes',
 		);
 	});
+
+	test('JSFB fixture aliases Arcade subpath imports before the package root', async () => {
+		const config = await readFile(
+			resolve(root, 'demos/js-framework-benchmark/frameworks/keyed/arcade/vite.config.ts'),
+			'utf8',
+		);
+
+		const preloadAlias = config.indexOf("find: 'arcade/preload'");
+		const eventOnlyResumeAlias = config.indexOf("find: 'arcade/runtime/event-only-resume'");
+		const runtimeEventOnlyResumeAlias = config.indexOf(
+			"find: '@arcade/runtime/event-only-resume'",
+		);
+		const runtimeRootAlias = config.indexOf("find: '@arcade/runtime'");
+		const rootAlias = config.indexOf("find: 'arcade'");
+
+		expect(preloadAlias).toBeGreaterThanOrEqual(0);
+		expect(eventOnlyResumeAlias).toBeGreaterThanOrEqual(0);
+		expect(runtimeEventOnlyResumeAlias).toBeGreaterThanOrEqual(0);
+		expect(runtimeEventOnlyResumeAlias).toBeLessThan(runtimeRootAlias);
+		expect(preloadAlias).toBeLessThan(rootAlias);
+		expect(eventOnlyResumeAlias).toBeLessThan(rootAlias);
+		expect(config).toContain("packages/arcade/src/preload.ts");
+		expect(config).toContain("packages/arcade/src/runtime/event-only-resume.ts");
+		expect(config).toContain("packages/runtime/src/event-only-resume.ts");
+	});
 });
