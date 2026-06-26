@@ -26,18 +26,15 @@ export function createPublicProtocolView(
 				index: hostNodeIndexes.get(locator.hostNodeId) ?? locator.index,
 			})),
 		events: protocolView.events.filter((event) => hostNodeIds.has(event.hostNodeId)),
-		domUpdates: protocolView.domUpdates.filter(
-			(update) =>
-				hostNodeIds.has(update.hostNodeId) &&
-				!(
-					update.target.kind === 'text' &&
-					handledStaticTextUpdates.some(
-						(write) =>
-							write.graphNodeId === update.graphNodeId &&
-							write.source === update.source &&
-							samePath(write.path, update.path),
-					)
-				),
-		),
+		domUpdates: protocolView.domUpdates.filter((update) => {
+			if (!hostNodeIds.has(update.hostNodeId)) return false;
+			if (update.target?.kind !== 'text') return true;
+			return !handledStaticTextUpdates.some(
+				(write) =>
+					write.graphNodeId === update.graphNodeId &&
+					write.source === update.source &&
+					samePath(write.path, update.path),
+			);
+		}),
 	};
 }

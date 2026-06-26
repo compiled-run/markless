@@ -1,0 +1,25 @@
+{
+	"name": "@arcade/typescript-plugin",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"sideEffects": false,
+	"main": "./dist/index.cjs",
+	"scripts": {
+		"build:cjs": "vp pack src/index.ts --format cjs --out-dir dist --clean --no-dts --no-report"
+	},
+	"exports": {
+		".": {
+			"import": "./src/index.ts",
+			"require": "./dist/index.cjs"
+		},
+		"./language": "./src/language.ts"
+	},
+	"dependencies": {
+		"@arcade/compiler": "workspace:*",
+		"@volar/typescript": "catalog:"
+	},
+	"peerDependencies": {
+		"typescript": "catalog:"
+	}
+}

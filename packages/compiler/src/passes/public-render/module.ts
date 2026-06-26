@@ -240,7 +240,7 @@ function publicRenderRoot(
 	input: PublicRenderModuleInput,
 	componentName: string | undefined,
 ): PublicRenderRoot | null {
-	const ast = parseModule(input.source.source, input.source.filename) as AnyNode;
+	const ast = parseModule(input.source.source, input.source.filename) as unknown as AnyNode;
 	const component = findComponent(ast, componentName);
 	const root = firstComponentRoot(component);
 	return component && root ? { root, propNames: componentPropNames(component) } : null;

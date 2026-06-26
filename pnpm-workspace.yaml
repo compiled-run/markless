@@ -16,6 +16,7 @@ catalogs:
         '@types/node': ^24.3.0
         '@typescript-eslint/types': ^8.40.0
         '@volar/language-core': ~2.4.28
+        '@volar/typescript': ~2.4.28
         acorn: ^8.15.0
         esrap: ^2.2.8
         is-reference: ^3.0.3

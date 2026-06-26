@@ -33,7 +33,7 @@ import { createMutableSemanticGraphArtifact, createWalkState, type WalkState } f
 export async function buildSemanticGraph(
 	input: SemanticGraphInput,
 ): Promise<SemanticGraphArtifact> {
-	const ast = parseModule(input.source, input.filename) as AnyNode;
+	const ast = parseModule(input.source, input.filename) as unknown as AnyNode;
 	const statements = asNodes(ast.body);
 	const graph = createMutableSemanticGraphArtifact(input.filename);
 	graph.moduleImports.push(...collectModuleImports(statements));

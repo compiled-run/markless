@@ -11,5 +11,5 @@ export function parseJavaScriptModule(
 	source: string,
 	filename = 'generated.js',
 ): JavaScriptAstNode {
-	return parseModule(source, filename) as JavaScriptAstNode;
+	return parseModule(source, filename) as unknown as JavaScriptAstNode;
 }

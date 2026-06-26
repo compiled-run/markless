@@ -38,7 +38,7 @@ import type {
 // Builds the public render artifact that the module emitter consumes. This pass
 // decides what direct DOM work is compiler-proven instead of emitting code itself.
 export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlanArtifact {
-	const ast = parseModule(input.source.source, input.source.filename) as AnyNode;
+	const ast = parseModule(input.source.source, input.source.filename) as unknown as AnyNode;
 	const component = findComponent(ast);
 	const root = firstComponentRoot(component);
 	if (!root) {
