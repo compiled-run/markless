@@ -1,0 +1,5 @@
+export default function ErrorPage() @{
+	<main>
+		<h1>Something went wrong</h1>
+	</main>
+}

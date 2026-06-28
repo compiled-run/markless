@@ -1,0 +1,19 @@
+{
+	"name": "@arcade/cli",
+	"version": "0.0.0",
+	"private": true,
+	"description": "Create Arcade apps.",
+	"license": "MIT",
+	"bin": {
+		"arcade": "./src/index.ts",
+		"create-arcade": "./src/index.ts"
+	},
+	"files": [
+		"src",
+		"templates"
+	],
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts"
+	}
+}

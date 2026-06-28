@@ -1,0 +1,26 @@
+{
+	"name": "@arcade/router",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"sideEffects": false,
+	"exports": {
+		".": "./src/index.ts",
+		"./vite": "./src/vite/index.ts",
+		"./vite/runtime/create-route-discovery": "./src/vite/runtime/create-route-discovery.ts",
+		"./vite/route-href": "./src/vite/entries/route-href.ts",
+		"./typescript-plugin": "./src/typescript-plugin/index.ts"
+	},
+	"dependencies": {
+		"pathe": "catalog:",
+		"ufo": "catalog:"
+	},
+	"peerDependencies": {
+		"vite": "8.0.16"
+	},
+	"peerDependenciesMeta": {
+		"vite": {
+			"optional": true
+		}
+	}
+}

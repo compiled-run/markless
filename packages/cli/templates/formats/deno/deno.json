@@ -1,0 +1,14 @@
+{
+	"tasks": {
+		"dev": "vp dev",
+		"build": "vp build",
+		"preview": "vp preview",
+		"check": "vp check",
+		"fmt": "vp fmt",
+		"test": "vp test"
+	},
+	"imports": {
+		"arcade": "npm:arcade",
+		"@arcade/router": "npm:@arcade/router"
+	}
+}

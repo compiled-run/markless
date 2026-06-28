@@ -11,6 +11,8 @@ import {
 	shared,
 	state,
 } from '../src/index.ts';
+import { Link } from '../src/router.ts';
+import { router } from '../src/router/vite.ts';
 import { applyDomJournalEntries as narrowApplyDomJournalEntries } from '../src/runtime/dom-journal.ts';
 import { createDomUpdateEntry as createNarrowDomUpdateEntry } from '../src/runtime/dom-update.ts';
 import { resumeEventOnlyFromPayloadDocument as narrowResumeEventOnlyFromPayloadDocument } from '../src/runtime/event-only-resume.ts';
@@ -42,6 +44,8 @@ test('main package exposes the curated author and build surface', () => {
 	expect(typeof narrowResumeFromPayloadDocument).toBe('function');
 	expect(typeof arcadeClient).toBe('function');
 	expect(typeof viteArcade).toBe('function');
+	expect(typeof Link).toBe('function');
+	expect(typeof router).toBe('function');
 });
 
 test('root and grouped runtime entries use internal package boundaries deliberately', async () => {

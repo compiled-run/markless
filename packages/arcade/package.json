@@ -16,6 +16,8 @@
 		"./runtime/render": "./src/runtime/render.ts",
 		"./runtime/render-to-string": "./src/runtime/render-to-string.ts",
 		"./runtime/resume": "./src/runtime/resume.ts",
+		"./router": "./src/router.ts",
+		"./router/vite": "./src/router/vite.ts",
 		"./web": "./src/web.ts",
 		"./web/dom-journal": "./src/web/dom-journal.ts",
 		"./web/dom-update": "./src/web/dom-update.ts",
@@ -28,6 +30,7 @@
 	},
 	"dependencies": {
 		"@arcade/bundler": "workspace:*",
+		"@arcade/router": "workspace:*",
 		"@arcade/web": "workspace:*"
 	}
 }

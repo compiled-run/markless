@@ -86,11 +86,33 @@ importers:
         specifier: 8.0.16
         version: 8.0.16(@types/node@24.12.2)
 
+  fixtures/router:
+    dependencies:
+      '@arcade/router':
+        specifier: workspace:*
+        version: link:../../packages/router
+      arcade:
+        specifier: workspace:*
+        version: link:../../packages/arcade
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vite:
+        specifier: 8.0.16
+        version: 8.0.16(@types/node@24.12.2)
+      vite-plus:
+        specifier: 0.1.20
+        version: 0.1.20(@types/node@24.12.2)(typescript@5.9.3)(vite@8.0.16(@types/node@24.12.2))
+
   packages/arcade:
     dependencies:
       '@arcade/bundler':
         specifier: workspace:*
         version: link:../bundler
+      '@arcade/router':
+        specifier: workspace:*
+        version: link:../router
       '@arcade/web':
         specifier: workspace:*
         version: link:../web
@@ -231,6 +253,8 @@ importers:
         specifier: 8.0.16
         version: 8.0.16(@types/node@24.12.2)
 
+  packages/cli: {}
+
   packages/compiler:
     dependencies:
       '@arcade/serializer':
@@ -239,6 +263,18 @@ importers:
       '@tsrx/core':
         specifier: 'catalog:'
         version: 0.1.32
+
+  packages/router:
+    dependencies:
+      pathe:
+        specifier: 'catalog:'
+        version: 2.0.3
+      ufo:
+        specifier: 'catalog:'
+        version: 1.6.4
+      vite:
+        specifier: 8.0.16
+        version: 8.0.16(@types/node@24.12.2)
 
   packages/runtime:
     dependencies:
