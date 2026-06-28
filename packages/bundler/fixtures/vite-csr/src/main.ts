@@ -12,10 +12,3 @@ status.textContent = 'ready';
 
 await render(App, { target: app });
 app.appendChild(status);
-
-if (import.meta.hot) {
-	document.addEventListener('arcade:update', (event) => {
-		event.preventDefault();
-		status.textContent = event.type;
-	});
-}

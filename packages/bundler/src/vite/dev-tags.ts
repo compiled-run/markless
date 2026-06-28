@@ -1,6 +1,5 @@
 import { joinURL } from 'ufo';
 import type { GlobalInjections } from '../types.ts';
-import { ARCADE_DEV_CLIENT_PATH } from './hmr.ts';
 
 export function createDevTags() {
 	const tags: GlobalInjections[] = [];
@@ -11,16 +10,12 @@ export function createDevTags() {
 		register(tag: GlobalInjections) {
 			tags.push(tag);
 		},
-		registerViteTags(base: string, hmrEnabled: boolean) {
+		registerViteTags(base: string) {
 			if (viteTagsAdded) {
 				return;
 			}
 			viteTagsAdded = true;
-			const viteTags = [headScript(base, '/@vite/client')];
-			if (hmrEnabled) {
-				viteTags.push(headScript(base, ARCADE_DEV_CLIENT_PATH));
-			}
-			tags.unshift(...viteTags);
+			tags.unshift(headScript(base, '/@vite/client'));
 		},
 	};
 }

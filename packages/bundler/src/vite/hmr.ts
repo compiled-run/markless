@@ -1,33 +1,9 @@
 import { joinURL, parsePath } from 'ufo';
-import type {
-	DevEnvironment,
-	EnvironmentModuleNode,
-	HtmlTagDescriptor,
-	HotUpdateOptions,
-	ViteDevServer,
-} from 'vite';
+import type { DevEnvironment, EnvironmentModuleNode, HotUpdateOptions, ViteDevServer } from 'vite';
 import type { ArcadeEnvironment } from '../types.ts';
 import { fetchableDevEnvironment, arcadeEnvironment } from './environment.ts';
 
-export const ARCADE_DEV_CLIENT_ID = 'virtual:arcade-dev-client';
-export const ARCADE_DEV_CLIENT_PATH = `/@id/${ARCADE_DEV_CLIENT_ID}`;
-
-const RESOLVED_ARCADE_DEV_CLIENT_ID = `\0${ARCADE_DEV_CLIENT_ID}`;
 const SOURCE_FILE_EXTENSION = /\.tsrx$/;
-
-export const ARCADE_DEV_CLIENT_SOURCE = `
-if (import.meta.hot) {
-	import.meta.hot.on('arcade:update', (data) => {
-		const event = new CustomEvent('arcade:update', {
-			cancelable: true,
-			detail: data,
-		});
-		if (document.dispatchEvent(event)) {
-			import.meta.hot.invalidate();
-		}
-	});
-}
-`;
 
 interface ViteHmrOptions {
 	base: string;
@@ -43,28 +19,16 @@ export function createViteHmr(options: ViteHmrOptions) {
 		configureServer(nextServer: ViteDevServer) {
 			server = nextServer;
 			if (options.enabled) {
-				installFetchHmrClient(nextServer, options);
+				installFetchViteClient(nextServer, options);
 			}
 		},
 		transformIndexHtml() {
-			if (options.enabled) {
-				return hmrClientTags(options.base);
-			}
-
 			return undefined;
 		},
-		resolveId(id: string) {
-			if (id !== ARCADE_DEV_CLIENT_ID) {
-				return null;
-			}
-
-			return { id: RESOLVED_ARCADE_DEV_CLIENT_ID, moduleSideEffects: true };
+		resolveId(_id: string) {
+			return null;
 		},
-		load(id: string) {
-			if (id === RESOLVED_ARCADE_DEV_CLIENT_ID) {
-				return ARCADE_DEV_CLIENT_SOURCE;
-			}
-
+		load(_id: string) {
 			return null;
 		},
 		hotUpdate(environment: DevEnvironment | undefined, ctx: HotUpdateOptions) {
@@ -105,11 +69,9 @@ export function createViteHmr(options: ViteHmrOptions) {
 			}
 
 			const invalidated = new Set<EnvironmentModuleNode>();
-			const virtualModules = new Set<string>();
 			for (const file of files) {
 				for (const candidate of hmrCandidates(file, ctx.file)) {
 					for (const id of options.invalidateGeneratedModules?.(candidate, env) ?? []) {
-						virtualModules.add(id);
 						const module = environment.moduleGraph?.getModuleById?.(id);
 						if (!module) continue;
 
@@ -124,9 +86,9 @@ export function createViteHmr(options: ViteHmrOptions) {
 			}
 
 			hot.send({
-				type: 'custom',
-				event: 'arcade:update',
-				data: { files: [...files], virtualModules: [...virtualModules], t: ctx.timestamp },
+				type: 'full-reload',
+				path: firstChangedFile(files),
+				triggeredBy: ctx.file,
 			});
 
 			return [];
@@ -134,7 +96,7 @@ export function createViteHmr(options: ViteHmrOptions) {
 	};
 }
 
-function installFetchHmrClient(server: ViteDevServer, options: ViteHmrOptions) {
+function installFetchViteClient(server: ViteDevServer, options: ViteHmrOptions) {
 	for (const environment of Object.values(server.environments)) {
 		const fetchEnv = fetchableDevEnvironment(environment);
 		if (!fetchEnv) continue;
@@ -145,7 +107,7 @@ function installFetchHmrClient(server: ViteDevServer, options: ViteHmrOptions) {
 			if (!response.headers.get('content-type')?.includes('text/html')) return response;
 
 			const html = await response.text();
-			const nextHtml = injectHmrClient(html, options.base);
+			const nextHtml = injectViteClient(html, options.base);
 			const headers = new Headers(response.headers);
 			if (nextHtml !== html) headers.delete('content-length');
 			return new Response(nextHtml, {
@@ -157,27 +119,13 @@ function installFetchHmrClient(server: ViteDevServer, options: ViteHmrOptions) {
 	}
 }
 
-function hmrClientTags(base: string): HtmlTagDescriptor[] {
-	return [
-		{
-			tag: 'script',
-			attrs: { type: 'module', src: hmrClientPath(base) },
-			injectTo: 'head',
-		},
-	];
-}
+function injectViteClient(html: string, base: string) {
+	if (!html || html.includes('/@vite/client')) return html;
 
-function injectHmrClient(html: string, base: string) {
-	if (!html || html.includes(ARCADE_DEV_CLIENT_ID)) return html;
-
-	const tags = `<script type="module" src="${hmrClientPath(base)}"></script>`;
-	if (html.includes('</head>')) return html.replace('</head>', `${tags}</head>`);
-	if (html.includes('<head>')) return html.replace('<head>', `<head>${tags}`);
-	return html;
-}
-
-function hmrClientPath(base: string) {
-	return joinURL(base, ARCADE_DEV_CLIENT_PATH);
+	const tag = `<script type="module" src="${joinURL(base, '/@vite/client')}"></script>`;
+	if (html.includes('</head>')) return html.replace('</head>', `${tag}</head>`);
+	if (html.includes('<head>')) return html.replace('<head>', `<head>${tag}`);
+	return `${tag}${html}`;
 }
 
 function changedFiles(modules: EnvironmentModuleNode[]) {
@@ -205,4 +153,12 @@ function hmrCandidates(file: string, absoluteFile: string | undefined) {
 	const candidates = new Set<string>([file]);
 	if (absoluteFile) candidates.add(absoluteFile);
 	return candidates;
+}
+
+function firstChangedFile(files: Set<string>) {
+	for (const file of files) {
+		return file;
+	}
+
+	return undefined;
 }

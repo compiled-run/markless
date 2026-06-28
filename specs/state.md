@@ -70,25 +70,20 @@ Completed slices are concentrated in:
   `emitManifestJson` when they need the full JSON metadata asset;
   repeated transforms for the same `.tsrx` module now drop stale generated
   virtual modules before registering fresh artifacts, and the Vite adapter's
-  structural `configureServer` / `handleHotUpdate` hooks invalidate generated
-  virtual module graph nodes for changed `.tsrx` files and emit a custom
-  dev-server update payload listing the changed module plus generated virtual
-  module IDs, including server-originated hot updates routed through the
-  configured Vite client environment name; `transformIndexHtml` injects an inert
-  dev-only marker tag and a
-  requestable virtual dev-client module in Vite dev HTML contexts, and a real
-  Vite dev-server fixture proves that HTML transform, the virtual client request,
-  and a `.tsrx` source transform run through Vite; that client listens for the
-  custom update payload before redispatching it as a cancelable browser
-  `CustomEvent`, and if no consumer prevents default it asks Vite HMR to
-  invalidate the client module; the Vite adapter also defaults app builds to
+  updated `configureServer` / `hotUpdate` hooks invalidate generated virtual
+  module graph nodes for changed `.tsrx` files and send a Vite
+  `full-reload` payload with `triggeredBy` set to the edited source file,
+  including server-originated hot updates routed through the configured Vite
+  client environment name, and fetchable dev HTML responses are wrapped with
+  Vite's `/@vite/client` script so SSR pages keep receiving reload payloads
+  after the first reload; the Vite adapter also defaults app builds to
   `build.modulePreload = false` so the framework bundle-graph/resolver-table path owns
   preload decisions; package-local Witness boxes under `packages/bundler/boxes`
-  now run the Vite dev-server pipeline for the `vite-csr` fixture, edit a
-  `.tsrx` file, record the `arcade:update` custom hot payload for the
-  client environment without a Vite update payload, prove a real browser page
-  receives the cancelable custom event without navigating, and prove the CSR
-  production build emits `build/bundle-graph.json`, omits default
+  now run the Vite dev-server pipeline for the `vite-csr` and `vite-ssr`
+  fixtures, record `hmr: 'full-reload'` for the client environment, prove the
+  CSR browser page navigates after an edit, prove the SSR browser page keeps
+  navigating across repeated edits, and prove the CSR production
+  build emits `build/bundle-graph.json`, omits default
   `arcade-manifest.json`, and emits generated event-handler/DOM-update lazy chunks
   without leaking dev-HMR
   client strings; the CSR production build is also served through Vite preview
@@ -161,13 +156,13 @@ The critical path to "full spec implementation" still requires:
   dependency/cycle diagnostics, payload records, and cross-runtime patch behavior
 - broader build-pipeline proof beyond the current direct Rolldown, Vite library
   build, repeated-transform artifact cleanup, build-start cleanup, structural
-  hot-update invalidation/custom-payload/dev-client fixtures, one Vite
+  hot-update invalidation/full-reload fallback fixtures, one Vite
   dev-server transform fixture, package-local Witness dev/browser HMR receipts,
   one CSR production-build bundle-graph/no-default-manifest/no-dev-HMR-leakage receipt,
   one CSR preview client-click receipt, one SSR built-server-entry build
   receipt, one SSR built-server-entry preview browser resume-click receipt, and
   one vite-plus build/preview receipt,
-  including real DOM hot replacement beyond the fixture's custom-event consumer,
+  including real DOM hot replacement beyond the current repeated full-reload fallback,
   production SSR serving beyond the current fixture host,
   behavior/build-integrated async-runner chunks,
   broader non-binding symbol support beyond simple event-handler update chunks,
@@ -954,26 +949,20 @@ in the split specs.
   tests also simulate an HMR-style module update by retransforming the same
   `.tsrx` file and proving stale generated DOM-update virtual modules no longer
   resolve or load after the binding is removed, and a structural
-  `handleHotUpdate` test proves generated virtual module graph nodes are
-  invalidated and returned with the changed `.tsrx` module. A focused
-  `configureServer` / `handleHotUpdate` test proves the adapter emits a custom
-  `arcade:update` dev-server payload containing the changed module ID
-  and generated virtual module IDs, and a custom-environment test proves
-  server-originated hot updates send through the configured Vite client
-  environment rather than assuming the literal `client` environment name. A
+  `hotUpdate` test proves generated virtual module graph nodes are invalidated
+  for the changed `.tsrx` module before the adapter sends a Vite
+  `full-reload` payload. A custom-environment test proves server-originated hot
+  updates send the reload through the configured Vite client environment rather
+  than assuming the literal `client` environment name, and a focused fetchable
+  HTML test proves SSR dev responses receive `/@vite/client` for repeated
+  browser reloads. A
   focused Vite config test proves normal app builds default
   `build.modulePreload` to `false` while library and SSR builds keep their
-  caller-supplied defaults. A focused `transformIndexHtml` / virtual
-  module test proves Vite dev HTML contexts receive an inert
-  `arcade:dev` marker tag plus a virtual dev-client module that listens
-  for that Vite custom event and redispatches it as a browser `CustomEvent`;
-  build/no-server contexts receive neither tag. Package-local Witness boxes now
+  caller-supplied defaults. Package-local Witness boxes now
   live under `packages/bundler/boxes`: one runs the `vite-csr` dev-server
-  pipeline, edits `src/root.tsrx`, and writes a receipt whose client environment
-  outcome records `hmr: 'none'` plus the `arcade:update` framework hot
-  message; one opens a real browser page, tracks the cancelable
-  `arcade:update` browser event, and proves no navigation/reload while
-  the fixture consumes the event; and one runs a production Vite build, proving
+  pipeline, edits `src/root.tsrx`, and writes a receipt whose client
+  environment outcome records `hmr: 'full-reload'`; browser boxes cover CSR
+  single-edit reload and SSR repeated edits; and one runs a production Vite build, proving
   the emitted CSR bundle graph, generated chunks, absent default
   `arcade-manifest.json`, and absence of dev-HMR strings in production
   artifacts. A fourth package-local box serves that CSR
@@ -1655,20 +1644,12 @@ commands are listed in the implementation/build section above.
   artifacts, preventing stale generated symbol virtual modules from surviving an
   HMR-style source update that removes a binding. The current Vite adapter wraps that shell and
   forwards `transform`, `resolveId`, `load`, and `generateBundle`; its
-  structural `configureServer` / `handleHotUpdate` hooks capture a Vite dev
+  structural `configureServer` / `hotUpdate` hooks capture a Vite dev
   server, invalidate any known generated virtual module graph nodes for the
-  changed `.tsrx` file, return those nodes with the changed source module, and
-  emit a custom `arcade:update` payload listing the changed module ID
-  and generated virtual module IDs. Its `transformIndexHtml` hook injects an
-  inert `arcade:dev` marker tag plus a requestable virtual dev-client
-  module only for Vite dev HTML contexts; that virtual client listens for the
-  custom Vite event and redispatches it as a cancelable browser `CustomEvent`.
-  A focused executable virtual-client test proves the dispatcher invalidates the
-  Vite HMR module only when no consumer calls `preventDefault()`. A temporary
-  Vite dev-server fixture proves `transformIndexHtml` injects that marker and
-  client URL, `transformRequest('/@arcade/dev-client')` serves the
-  virtual client, and `transformRequest('/App.tsrx')` loads and transforms a
-  `.tsrx` source file through Vite. One direct Rolldown build fixture and one
+  changed `.tsrx` file, and send a Vite `full-reload` payload with the edited
+  source recorded as `triggeredBy`; fetchable dev HTML responses are also
+  wrapped with `/@vite/client` so SSR pages keep receiving reloads after the
+  first navigation. One direct Rolldown build fixture and one
   temporary Vite library build fixture now prove real builds write the bundle
   graph by default, omit default `arcade-manifest.json`, include generated
   payload/resolver/current event-handler and DOM-update symbol code, record
@@ -1679,9 +1660,8 @@ commands are listed in the implementation/build section above.
   accumulated transform manifests before a new build/dev cycle, preventing stale
   virtual module resolution/loading and stale manifest metadata/optional asset
   emission in focused tests.
-  Package-local Witness boxes now prove Vite dev HMR payload delivery, real
-  browser receipt of the cancelable `arcade:update` event without
-  navigation, and a CSR production build with bundle-graph artifacts, no default
+  Package-local Witness boxes now prove Vite dev full-reload fallback, real
+  browser navigation after a CSR `.tsrx` edit and repeated SSR `.tsrx` edits, and a CSR production build with bundle-graph artifacts, no default
   `arcade-manifest.json`, plus no dev-HMR string leakage. The same CSR production build is now served
   through Vite preview and proves client-created DOM can load the generated
   payload/resolver/symbol pipeline for a counter click with no console errors or
@@ -2245,28 +2225,18 @@ commands are listed in the implementation/build section above.
   runtime load, and contains no generated `switch (id)` resolver. Focused repeated-transform tests
   prove stale generated symbol virtual modules stop resolving/loading after
   a `.tsrx` update removes the binding that produced them, and structural
-  `handleHotUpdate` tests prove generated virtual module graph nodes are
-  invalidated and returned with the changed source module. A focused
-  `configureServer` / `handleHotUpdate` test proves the adapter emits a custom
-  `arcade:update` payload with the changed module ID and generated
-  virtual module IDs, and a custom-environment test proves server-originated
+  `hotUpdate` tests prove generated virtual module graph nodes are invalidated
+  for the changed source module before the adapter sends a Vite
+  `full-reload` payload. A custom-environment test proves server-originated
   hot updates use the configured client environment name. Focused Vite config
   tests prove normal app builds and SSR-mode client app builds default root
   `build.modulePreload` to `false`, client build environments also receive
   `modulePreload: false`, and library builds plus true `build.ssr` server builds
-  are left alone. A focused `transformIndexHtml` /
-  virtual module test proves dev-only inert marker tag injection plus a virtual
-  client module that listens for the custom Vite event and redispatches it as a
-  browser `CustomEvent`;
-  executable virtual-client coverage proves the event is cancelable and the
-  client falls back to `hot.invalidate()` only when no consumer prevents default.
-  A temporary Vite dev-server fixture proves real `transformIndexHtml`,
-  virtual-client `transformRequest`, and `.tsrx` source `transformRequest`
-  behavior through Vite. Package-local Witness boxes now run that fixture's
-  dev-server pipeline, edit the `.tsrx` source, record the
-  `arcade:update` custom payload in the client environment's edit
-  outcome, prove a real browser page receives the cancelable event without
-  navigating, and prove the CSR production build emits the bundle graph and lazy
+  are left alone. Package-local Witness boxes now run that fixture's
+  dev-server pipeline, edit `.tsrx` sources, record the
+  Vite `full-reload` fallback in the client environment's edit outcomes, prove
+  the CSR browser reloads once and the SSR browser keeps reloading across
+  repeated edits, and prove the CSR production build emits the bundle graph and lazy
   chunks, omits default `arcade-manifest.json`, and forbids dev-HMR client
   strings in emitted text artifacts. The CSR production build is also served by Vite
   preview and proves client-created DOM can load the generated

@@ -103,7 +103,7 @@ export function arcade(options: ArcadeViteOptions = {}): Plugin[] {
 			rolldownOptions.rootDir = resolvedConfig.root;
 			rolldownOptions.publicPath = (fileName) => joinURL(resolvedConfig.base, fileName);
 			if (serve) {
-				devTags.registerViteTags(resolvedConfig.base, hmrOptions.enabled);
+				devTags.registerViteTags(resolvedConfig.base);
 			}
 		},
 		configEnvironment(name, config) {

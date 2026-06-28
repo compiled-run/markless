@@ -151,7 +151,7 @@ describe('Vite adapter structure', () => {
 		expect(build).toHaveBeenCalledTimes(2);
 	});
 
-	test('injects and serves the Vite dev client only in dev HTML contexts', async () => {
+	test('does not install a custom dev client for the full reload fallback', async () => {
 		const plugin = getAsyncPlugin();
 
 		callConfigResolved(plugin, {
@@ -160,23 +160,9 @@ describe('Vite adapter structure', () => {
 			root: '/workspace/app',
 		});
 
-		const tags = callTransformIndexHtml(plugin, '<html></html>');
-		expect(tags).toContainEqual(
-			expect.objectContaining({
-				tag: 'script',
-				attrs: {
-					type: 'module',
-					src: '/dev/@id/virtual:arcade-dev-client',
-				},
-			}),
-		);
-		expect(await callResolveId(plugin, 'virtual:arcade-dev-client')).toMatchObject({
-			id: '\0virtual:arcade-dev-client',
-			moduleSideEffects: true,
-		});
-		expect(await callLoad(plugin, '\0virtual:arcade-dev-client')).toContain(
-			"import.meta.hot.on('arcade:update'",
-		);
+		expect(callTransformIndexHtml(plugin, '<html></html>')).toBeUndefined();
+		expect(await callResolveId(plugin, 'virtual:arcade-dev-client')).toBeNull();
+		expect(await callLoad(plugin, '\0virtual:arcade-dev-client')).toBeNull();
 	});
 
 	test('serves dev symbol resolver tables with browser-loadable symbol module URLs', async () => {
@@ -213,7 +199,7 @@ export function App() @{
 		expect(resolverSource).toContain('import(/* @vite-ignore */ moduleUrls[row[0]])');
 	});
 
-	test('hot updates invalidate generated virtual modules and send the custom event', async () => {
+	test('hot updates invalidate generated virtual modules and send a full reload', async () => {
 		const plugin = getAsyncPlugin();
 		const send = vi.fn();
 		const invalidated: unknown[] = [];
@@ -255,18 +241,11 @@ export function App() @{
 
 		expect(result).toEqual([]);
 		expect(invalidated).toContain(virtualModule);
-		expect(send).toHaveBeenCalledWith(
-			expect.objectContaining({
-				type: 'custom',
-				event: 'arcade:update',
-				data: expect.objectContaining({
-					files: ['/src/App.tsrx'],
-					virtualModules: expect.arrayContaining([
-						expect.stringContaining('virtual:arcade:payload:'),
-					]),
-				}),
-			}),
-		);
+		expect(send).toHaveBeenCalledWith({
+			type: 'full-reload',
+			path: '/src/App.tsrx',
+			triggeredBy: '/workspace/app/src/App.tsrx',
+		});
 	});
 
 	test('server hot updates forward through the configured client environment', () => {
@@ -309,13 +288,11 @@ export function App() @{
 		);
 
 		expect(result).toEqual([]);
-		expect(browserSend).toHaveBeenCalledWith(
-			expect.objectContaining({
-				type: 'custom',
-				event: 'arcade:update',
-				data: expect.objectContaining({ files: ['/src/App.tsrx'], t: 456 }),
-			}),
-		);
+		expect(browserSend).toHaveBeenCalledWith({
+			type: 'full-reload',
+			path: '/src/App.tsrx',
+			triggeredBy: '/workspace/app/src/App.tsrx',
+		});
 		expect(defaultClientSend).not.toHaveBeenCalled();
 	});
 });
