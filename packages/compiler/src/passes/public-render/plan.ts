@@ -812,12 +812,14 @@ function findComponent(ast: AnyNode): AnyNode | undefined {
 
 	for (const statement of asNodes(ast.body)) {
 		const declaration =
-			statement.type === 'ExportNamedDeclaration'
+			statement.type === 'ExportNamedDeclaration' ||
+			statement.type === 'ExportDefaultDeclaration'
 				? (statement.declaration as AnyNode | undefined)
 				: statement;
 		if (declaration?.type !== 'FunctionDeclaration') continue;
 		if (!firstComponentRoot(declaration)) continue;
 
+		if (statement.type === 'ExportDefaultDeclaration') return declaration;
 		if (statement.type === 'ExportNamedDeclaration') return declaration;
 		fallback ??= declaration;
 	}

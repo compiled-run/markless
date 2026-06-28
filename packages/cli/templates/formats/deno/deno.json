@@ -7,8 +7,10 @@
 		"fmt": "vp fmt",
 		"test": "vp test"
 	},
+	"nodeModulesDir": "auto",
 	"imports": {
 		"arcade": "npm:arcade",
-		"@arcade/router": "npm:@arcade/router"
+		"@arcade/router": "npm:@arcade/router",
+		"nitro": "npm:nitro@3.0.260429-beta"
 	}
 }

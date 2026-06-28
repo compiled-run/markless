@@ -1,6 +1,6 @@
 import { asNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, expressionSourceOrFallback, sourceSpan } from '../../ast/source.ts';
-import type { SemanticComponentPropBinding } from '../../artifacts.ts';
+import type { SemanticComponentEdge, SemanticComponentPropBinding } from '../../artifacts.ts';
 import {
 	getElementAttributes,
 	getElementTagName,
@@ -21,6 +21,11 @@ export function getComponent(node: AnyNode): AnyNode | null {
 	if (node.type === 'FunctionDeclaration') return node;
 
 	if (node.type === 'ExportNamedDeclaration') {
+		const declaration = node.declaration as AnyNode | undefined;
+		return declaration?.type === 'FunctionDeclaration' ? declaration : null;
+	}
+
+	if (node.type === 'ExportDefaultDeclaration') {
 		const declaration = node.declaration as AnyNode | undefined;
 		return declaration?.type === 'FunctionDeclaration' ? declaration : null;
 	}
@@ -149,11 +154,17 @@ function componentPropBindings(
 function componentImportSource(
 	childComponentName: string,
 	state: WalkState,
-): { readonly importSource?: string } {
+): Pick<SemanticComponentEdge, 'importSource' | 'importKind' | 'importedName'> {
 	const imported = state.graph.moduleImports.find(
 		(item) => item.localName === childComponentName,
 	);
-	return imported ? { importSource: imported.source } : {};
+	return imported
+		? {
+				importSource: imported.source,
+				importKind: imported.kind,
+				importedName: imported.importedName,
+			}
+		: {};
 }
 
 function componentChildCount(node: AnyNode): number {

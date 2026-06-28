@@ -6,8 +6,11 @@ pnpm-store/
 # Build and test output
 dist/
 coverage/
+.arcade/
+.output/
 .witness/
 .vite/
+arcade-router-env.d.ts
 playwright-report/
 test-results/
 *.tsbuildinfo

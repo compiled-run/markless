@@ -106,6 +106,19 @@ export function App() @{
 }
 `;
 
+const defaultExportPageSource = `
+import { state } from 'arcade';
+
+export default function Home() @{
+	const count = state(0);
+
+	<main>
+		<h1>Arcade Router</h1>
+		<button onClick={() => count++}>Button {count}</button>
+	</main>
+}
+`;
+
 type PublicRenderTestEvent = {
 	readonly type: string;
 	readonly target: PublicRenderTestElement | null;
@@ -374,7 +387,7 @@ function ssrRenderTestModuleSource(
 ): string {
 	const ssrSource = options.replaceChildImport
 		? result.publicRenderModule.ssrModuleSource.replace(
-				/import __arcadeSsrComponent0 from [^;]+;/,
+				/import (?:__arcadeSsrComponent0|\{ [^}]+ as __arcadeSsrComponent0 \}) from [^;]+;/,
 				'const __arcadeSsrComponent0 = globalThis.__arcadePublicRenderTestChildComponent;',
 			)
 		: result.publicRenderModule.ssrModuleSource;
@@ -525,6 +538,122 @@ test('compileTsrxModule orchestrates source to payload scripts and resolver modu
 				symbolId: 'symbol:3',
 			}),
 		]),
+	);
+});
+
+test('compileTsrxModule treats a default exported TSRX function as the public render root', async () => {
+	const result = await compileTsrxModule({
+		filename: 'pages/index.tsrx',
+		source: defaultExportPageSource,
+		symbols: [],
+	});
+
+	expect(result.semanticGraph.components).toEqual([{ name: 'Home' }]);
+	expect(result.protocolView.locators).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({ hostNodeId: 'h0', tagName: 'main' }),
+			expect.objectContaining({ hostNodeId: 'h2', tagName: 'button' }),
+		]),
+	);
+	expect(result.publicRenderModule.ssrExportName).toBe('arcadeRenderSsr');
+	expect(result.publicRenderModule.ssrModuleSource).toContain('function arcadeRenderSsr');
+	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	const output = (ssrModule.arcadeRenderSsr as () => { readonly html: string })();
+
+	expect(output.html).toBe('<main><h1>Arcade Router</h1><button>Button 0</button></main>');
+});
+
+test('compileTsrxModule passes component children into SSR component props', async () => {
+	const result = await compileTsrxModule({
+		filename: 'pages/index.tsrx',
+		source: `
+import { Link } from 'arcade/router';
+
+export default function Home() @{
+	<main>
+		<Link href="/docs">Docs</Link>
+	</main>
+}
+`,
+		symbols: [],
+	});
+	const ssrModule = await importPublicRenderTestModule(
+		ssrRenderTestModuleSource(result, { replaceChildImport: true }),
+		{
+			childComponent: {
+				renderSsr(props: { readonly children?: unknown; readonly href?: string }) {
+					return { html: `<a href="${props.href}">${props.children}</a>` };
+				},
+			},
+		},
+	);
+	const output = (ssrModule.arcadeRenderSsr as () => { readonly html: string })();
+
+	expect(output.html).toBe('<main><a href="/docs">Docs</a></main>');
+});
+
+test('compileTsrxModule preserves value imports used by public render expressions', async () => {
+	const result = await compileTsrxModule({
+		filename: 'pages/index.tsrx',
+		source: `
+import { routeHref } from 'virtual:test-route-href';
+import { Link } from 'arcade/router';
+
+export default function Home() @{
+	<main>
+		<Link href={routeHref('/docs/[...slug]', { slug: ['intro'] })}>Docs</Link>
+	</main>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderModule.ssrModuleSource).toContain(
+		'import { routeHref } from "virtual:test-route-href";',
+	);
+	expect(result.publicRenderModule.csrModuleSource).toContain(
+		'import { routeHref } from "virtual:test-route-href";',
+	);
+
+	const ssrModule = await importPublicRenderTestModule(
+		ssrRenderTestModuleSource(result, { replaceChildImport: true }).replace(
+			'import { routeHref } from "virtual:test-route-href";',
+			'const routeHref = (_pattern, params) => `/docs/${params.slug.join("/")}`;',
+		),
+		{
+			childComponent: {
+				renderSsr(props: { readonly children?: unknown; readonly href?: string }) {
+					return { html: `<a href="${props.href}">${props.children}</a>` };
+				},
+			},
+		},
+	);
+	const output = (ssrModule.arcadeRenderSsr as () => { readonly html: string })();
+
+	expect(output.html).toBe('<main><a href="/docs/intro">Docs</a></main>');
+});
+
+test('compileTsrxModule imports TSRX child components through their default SSR artifact', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/root.tsrx',
+		source: `
+import { Counter } from './Counter.tsrx';
+
+export function App() @{
+	<section>
+		<Counter />
+		<span>hello</span>
+	</section>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderModule.ssrModuleSource).toContain(
+		'import __arcadeSsrComponent0 from "./Counter.tsrx";',
+	);
+	expect(result.publicRenderModule.ssrModuleSource).not.toContain(
+		'import { Counter as __arcadeSsrComponent0 } from "./Counter.tsrx";',
 	);
 });
 

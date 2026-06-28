@@ -107,10 +107,16 @@ describe('package metadata', () => {
 		) as {
 			readonly scripts?: Record<string, string>;
 		};
+		const router = JSON.parse(
+			await readFile(resolve(root, 'packages/router/package.json'), 'utf8'),
+		) as {
+			readonly scripts?: Record<string, string>;
+		};
 
 		expect(bundler.scripts?.['test:boxes']).toBe('witness run');
+		expect(router.scripts?.['test:boxes']).toBe('witness run');
 		expect(workspace.scripts?.test).toBe(
-			'vp test && pnpm bench:jsfb:guard && pnpm --dir packages/bundler test:boxes',
+			'vp test && pnpm bench:jsfb:guard && pnpm --dir packages/bundler test:boxes && pnpm --dir packages/router test:boxes',
 		);
 	});
 

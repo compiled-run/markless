@@ -8,10 +8,18 @@
 		".": "./src/index.ts",
 		"./vite": "./src/vite/index.ts",
 		"./vite/runtime/create-route-discovery": "./src/vite/runtime/create-route-discovery.ts",
+		"./vite/runtime/create-server-entry": "./src/vite/runtime/create-server-entry.ts",
 		"./vite/route-href": "./src/vite/entries/route-href.ts",
 		"./typescript-plugin": "./src/typescript-plugin/index.ts"
 	},
+	"scripts": {
+		"test:boxes": "witness run"
+	},
 	"dependencies": {
+		"@arcade/web": "workspace:*",
+		"@tsrx/core": "catalog:",
+		"@virtualstate/navigation": "1.0.1-alpha.212",
+		"nitro": "catalog:",
 		"pathe": "catalog:",
 		"ufo": "catalog:"
 	},

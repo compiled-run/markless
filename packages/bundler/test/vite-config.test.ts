@@ -61,6 +61,23 @@ describe('Vite config integration', () => {
 		});
 	});
 
+	test('does not apply production output defaults while starting Vite dev server', () => {
+		const plugin = getArcadePlugin();
+		callConfig(plugin, {}, { command: 'serve' });
+
+		expect(
+			callConfigEnvironment(plugin, 'client', {
+				build: {
+					rolldownOptions: {
+						output: {
+							codeSplitting: false,
+						},
+					},
+				},
+			}),
+		).toBeUndefined();
+	});
+
 	test('disables Vite modulepreload only for client environment builds', () => {
 		const plugin = getArcadePlugin();
 

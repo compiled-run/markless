@@ -2,7 +2,7 @@ import { state } from 'arcade';
 import { Link } from 'arcade/router';
 
 export default function Home() @{
-	const count = state(0);
+	let count = state(0);
 
 	<main>
 		<h1>Arcade Router</h1>

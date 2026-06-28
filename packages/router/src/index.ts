@@ -120,6 +120,34 @@ export function Html(props: { readonly children?: unknown }): unknown {
 	return props.children;
 }
 
-export function Link(_props: LinkProps): unknown {
-	throw new Error('Arcade Router Link must be compiled from a .tsrx file before runtime use.');
+export const Link = Object.assign(
+	function Link(props: LinkProps = {}): unknown {
+		return props.children;
+	},
+	{
+		renderSsr(props: LinkProps = {}) {
+			const href = typeof props.href === 'string' ? props.href : '#';
+			const attributes = [
+				`href="${escapeHtml(href)}"`,
+				'data-arcade-router-link',
+				typeof props.class === 'string' ? `class="${escapeHtml(props.class)}"` : '',
+				typeof props.id === 'string' ? `id="${escapeHtml(props.id)}"` : '',
+				typeof props.target === 'string' ? `target="${escapeHtml(props.target)}"` : '',
+				typeof props.rel === 'string' ? `rel="${escapeHtml(props.rel)}"` : '',
+				props.replace ? 'data-arcade-router-replace' : '',
+				props.scroll === false ? 'data-arcade-router-scroll="manual"' : '',
+			].filter(Boolean);
+			const children = props.children == null ? '' : String(props.children);
+
+			return { html: `<a ${attributes.join(' ')}>${children}</a>` };
+		},
+	},
+);
+
+function escapeHtml(value: string): string {
+	return value
+		.replaceAll('&', '&amp;')
+		.replaceAll('<', '&lt;')
+		.replaceAll('>', '&gt;')
+		.replaceAll('"', '&quot;');
 }

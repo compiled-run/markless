@@ -1,7 +1,5 @@
-import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
-import { spawnSync, type SpawnSyncOptions } from 'node:child_process';
-import { basename, dirname, normalize, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { basename, dirname, normalize, resolve } from 'pathe';
+import { withoutTrailingSlash } from 'ufo';
 
 declare const __VERSION__: string | undefined;
 
@@ -32,17 +30,50 @@ export const STARTER_CHOICES = [
 	},
 ] as const satisfies readonly Choice<Starter>[];
 
+export type ProgramPath = string | URL;
+
+export interface ProgramDirectoryEntry {
+	readonly name: string;
+	readonly kind: 'directory' | 'file';
+}
+
+export interface ProgramFileStat {
+	isDirectory(): boolean;
+}
+
+export interface ProgramFileSystem {
+	mkdir(path: ProgramPath, options?: { readonly recursive?: boolean }): Promise<void>;
+	readDirectory(path: ProgramPath): Promise<ReadonlyArray<ProgramDirectoryEntry>>;
+	readFile(path: ProgramPath): Promise<string>;
+	stat(path: ProgramPath): Promise<ProgramFileStat | null>;
+	writeFile(path: ProgramPath, contents: string): Promise<void>;
+}
+
+export interface ProgramWritable {
+	write(chunk: string): unknown;
+}
+
+export interface ProgramCommandOptions {
+	readonly cwd: string;
+	readonly stdio: 'inherit';
+}
+
+export interface ProgramCommandResult {
+	readonly status: number | null;
+}
+
 export interface ProgramRuntime {
 	cwd(): string;
 	env: Record<string, string | undefined>;
+	fs: ProgramFileSystem;
 	isTTY: boolean;
-	stdout?: Pick<NodeJS.WriteStream, 'write'>;
-	stderr?: Pick<NodeJS.WriteStream, 'write'>;
+	stdout?: ProgramWritable;
+	stderr?: ProgramWritable;
 	spawn?: (
 		command: string,
 		args: readonly string[],
-		options: SpawnSyncOptions,
-	) => ReturnType<typeof spawnSync>;
+		options: ProgramCommandOptions,
+	) => ProgramCommandResult;
 }
 
 export interface CreateProgramConfig {
@@ -92,7 +123,7 @@ export class CreateProgram {
 		};
 	}
 
-	validate(args: readonly string[], runtime = defaultRuntime()): ValidatedCreateInput {
+	validate(args: readonly string[], runtime: ProgramRuntime): ValidatedCreateInput {
 		const parsed = parseArgs(args);
 
 		if (parsed.target) {
@@ -114,10 +145,7 @@ export class CreateProgram {
 		};
 	}
 
-	async interact(
-		input: ValidatedCreateInput,
-		runtime = defaultRuntime(),
-	): Promise<CreateOptions> {
+	async interact(input: ValidatedCreateInput, runtime: ProgramRuntime): Promise<CreateOptions> {
 		if (input.yes || !runtime.isTTY) {
 			return {
 				target: input.target!,
@@ -134,11 +162,11 @@ export class CreateProgram {
 		throw new Error('Interactive create prompts are not wired yet. Pass --yes for now.');
 	}
 
-	async execute(options: CreateOptions, runtime = defaultRuntime()): Promise<void> {
+	async execute(options: CreateOptions, runtime: ProgramRuntime): Promise<void> {
 		const targetDir = resolve(options.cwd, options.target);
 
-		await ensureWritableTarget(targetDir, options.force);
-		await writeStarter(options, targetDir);
+		await ensureWritableTarget(targetDir, options.force, runtime.fs);
+		await writeStarter(options, targetDir, runtime.fs);
 
 		if (options.git) {
 			runCommand(runtime, 'git', ['init'], targetDir);
@@ -152,7 +180,7 @@ export class CreateProgram {
 		runtime.stdout?.write(`Next:\n  cd ${options.target}\n  ${options.packageManager} dev\n`);
 	}
 
-	async run(args: readonly string[], runtime = defaultRuntime()): Promise<void> {
+	async run(args: readonly string[], runtime: ProgramRuntime): Promise<void> {
 		const input = this.validate(args, runtime);
 
 		if (input.help) {
@@ -269,11 +297,15 @@ function validateTarget(target: string): true {
 	return true;
 }
 
-async function ensureWritableTarget(targetDir: string, force: boolean): Promise<void> {
-	const targetStat = await stat(targetDir).catch(() => null);
+async function ensureWritableTarget(
+	targetDir: string,
+	force: boolean,
+	fs: ProgramFileSystem,
+): Promise<void> {
+	const targetStat = await fs.stat(targetDir);
 
 	if (!targetStat) {
-		await mkdir(targetDir, { recursive: true });
+		await fs.mkdir(targetDir, { recursive: true });
 		return;
 	}
 
@@ -281,32 +313,36 @@ async function ensureWritableTarget(targetDir: string, force: boolean): Promise<
 		throw new Error(`Target exists and is not a directory: ${targetDir}`);
 	}
 
-	const files = await readdir(targetDir);
+	const files = await fs.readDirectory(targetDir);
 	if (files.length > 0 && !force) {
 		throw new Error(`Target directory is not empty: ${targetDir}`);
 	}
 }
 
-async function writeStarter(options: CreateOptions, targetDir: string): Promise<void> {
-	const files = await starterFiles(options);
+async function writeStarter(
+	options: CreateOptions,
+	targetDir: string,
+	fs: ProgramFileSystem,
+): Promise<void> {
+	const files = await starterFiles(options, fs);
 
 	await Promise.all(
 		files.map(async (file) => {
 			const path = resolve(targetDir, file.path);
-			await mkdir(dirname(path), { recursive: true });
-			await writeFile(path, file.contents);
+			await fs.mkdir(dirname(path), { recursive: true });
+			await fs.writeFile(path, file.contents);
 		}),
 	);
 }
 
-async function starterFiles(options: CreateOptions): Promise<StarterFile[]> {
+async function starterFiles(options: CreateOptions, fs: ProgramFileSystem): Promise<StarterFile[]> {
 	const directories = [
 		new URL('common/', TEMPLATE_ROOT),
 		new URL(`formats/${options.format}/`, TEMPLATE_ROOT),
 		...starterTemplateDirectories(options.starter),
 	];
 	const files = (
-		await Promise.all(directories.map((directory) => readTemplateDirectory(directory)))
+		await Promise.all(directories.map((directory) => readTemplateDirectory(directory, fs)))
 	).flat();
 
 	return renderTemplateFiles(files, {
@@ -331,17 +367,24 @@ function starterTemplateDirectories(starter: Starter): URL[] {
 	return directories;
 }
 
-async function readTemplateDirectory(directory: URL, pathPrefix = ''): Promise<StarterFile[]> {
-	const entries = await readdir(directory, { withFileTypes: true });
+async function readTemplateDirectory(
+	directory: URL,
+	fs: ProgramFileSystem,
+	pathPrefix = '',
+): Promise<StarterFile[]> {
+	const entries = await fs.readDirectory(directory);
 	const files = await Promise.all(
 		entries.map(async (entry) => {
 			const path = `${pathPrefix}${entry.name}`;
-			const url = new URL(entry.isDirectory() ? `${entry.name}/` : entry.name, directory);
+			const url = new URL(
+				entry.kind === 'directory' ? `${entry.name}/` : entry.name,
+				directory,
+			);
 
-			if (entry.isDirectory()) return readTemplateDirectory(url, `${path}/`);
-			if (!entry.isFile()) return [];
+			if (entry.kind === 'directory') return readTemplateDirectory(url, fs, `${path}/`);
+			if (entry.kind !== 'file') return [];
 
-			return [{ path, contents: await readFile(url, 'utf-8') }];
+			return [{ path, contents: await fs.readFile(url) }];
 		}),
 	);
 
@@ -369,10 +412,6 @@ function packageName(target: string): string {
 	return name || 'arcade-app';
 }
 
-function withoutTrailingSlash(value: string): string {
-	return value.replace(/[\\/]+$/, '');
-}
-
 function inferPackageManager(env: ProgramRuntime['env']): PackageManager {
 	const userAgent = env.npm_config_user_agent ?? '';
 
@@ -389,8 +428,11 @@ function runCommand(
 	args: readonly string[],
 	cwd: string,
 ): void {
-	const spawn = runtime.spawn ?? spawnSync;
-	const result = spawn(command, [...args], { cwd, stdio: 'inherit' });
+	if (!runtime.spawn) {
+		throw new Error(`Cannot run ${command}: current runtime does not provide command spawn.`);
+	}
+
+	const result = runtime.spawn(command, [...args], { cwd, stdio: 'inherit' });
 
 	if (result.status !== 0) {
 		throw new Error(`Command failed: ${command} ${args.join(' ')}`);
@@ -413,32 +455,4 @@ Options:
   --no-git          Skip git initialization
   --force           Write into a non-empty directory
 `;
-}
-
-function defaultRuntime(): ProgramRuntime {
-	return {
-		cwd: () => process.cwd(),
-		env: process.env,
-		isTTY: Boolean(process.stdin.isTTY && process.stdout.isTTY),
-		stdout: process.stdout,
-		stderr: process.stderr,
-		spawn: spawnSync,
-	};
-}
-
-async function runCli(): Promise<void> {
-	const args = process.argv.slice(2);
-	const command = basename(process.argv[1] ?? '');
-	const createArgs = command === 'arcade' && args[0] === 'create' ? args.slice(1) : args;
-	const program = new CreateProgram();
-
-	await program.run(createArgs);
-}
-
-function isEntrypoint(scriptPath: string | undefined, moduleUrl: string): boolean {
-	return scriptPath !== undefined && resolve(scriptPath) === fileURLToPath(moduleUrl);
-}
-
-if (isEntrypoint(process.argv[1], import.meta.url)) {
-	await runCli();
 }

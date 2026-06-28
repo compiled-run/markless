@@ -5,8 +5,8 @@
 	"description": "Create Arcade apps.",
 	"license": "MIT",
 	"bin": {
-		"arcade": "./src/index.ts",
-		"create-arcade": "./src/index.ts"
+		"arcade": "./src/node.ts",
+		"create-arcade": "./src/node.ts"
 	},
 	"files": [
 		"src",
@@ -15,5 +15,9 @@
 	"type": "module",
 	"exports": {
 		".": "./src/index.ts"
+	},
+	"dependencies": {
+		"pathe": "catalog:",
+		"ufo": "catalog:"
 	}
 }

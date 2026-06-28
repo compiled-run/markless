@@ -55,6 +55,7 @@ const TSRX_INPUT_FILE = /\.tsrx(?:[?#].*)?$/;
 
 export function arcade(options: ArcadeViteOptions = {}): Plugin[] {
 	let manifest: ArcadeManifest | null = null;
+	let command: 'build' | 'serve' = 'build';
 	const bundleGraphAdders = new Set<BundleGraphAdder>();
 	const rolldownOptions: InternalArcadeRolldownOptions = { ...options };
 	rolldownOptions.bundleGraphAdders = bundleGraphAdders;
@@ -92,7 +93,8 @@ export function arcade(options: ArcadeViteOptions = {}): Plugin[] {
 			registerPreloadGraphEntries: (adder: PreloadGraphEntriesAdder) =>
 				bundleGraphAdders.add(createPreloadGraphAdder(adder)),
 		},
-		config(config) {
+		config(config, env) {
+			command = env.command;
 			configDefaults(config, options);
 		},
 		configResolved(resolvedConfig) {
@@ -107,6 +109,10 @@ export function arcade(options: ArcadeViteOptions = {}): Plugin[] {
 			}
 		},
 		configEnvironment(name, config) {
+			if (command === 'serve') {
+				return undefined;
+			}
+
 			const environment = configEnvironmentKind(name, config, options);
 			if (!environment) {
 				return undefined;

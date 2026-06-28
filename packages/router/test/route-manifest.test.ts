@@ -26,6 +26,18 @@ test('builds Arcade Router routes from .tsrx and .mdx pages only', () => {
 	]);
 });
 
+test('keeps top-level request and asset directories out of UI routes', () => {
+	const manifest = buildRouteManifestFromFileIds([
+		'/pages/index.tsrx',
+		'/api/health.tsrx',
+		'/middleware/auth.tsrx',
+		'/public/example.tsrx',
+		'/src/pages/hidden.tsrx',
+	]);
+
+	expect(routePairs(manifest)).toEqual([['/', 'pages/index.tsrx']]);
+});
+
 test('matches static routes before dynamic routes and extracts params', () => {
 	const manifest = buildRouteManifestFromFileIds([
 		'/pages/blog/[slug].tsrx',
@@ -67,6 +79,27 @@ test('fails on route conflicts across TSRX and MDX', () => {
 		['Route conflict: /docs is defined by both:', '- pages/docs.mdx', '- pages/docs.tsrx'].join(
 			'\n',
 		),
+	);
+});
+
+test('fails on static and dynamic route conflicts with exact files', () => {
+	expect(() =>
+		buildRouteManifestFromFileIds(['/pages/blog.tsrx', '/pages/blog/index.tsrx']),
+	).toThrow(
+		[
+			'Route conflict: /blog is defined by both:',
+			'- pages/blog.tsrx',
+			'- pages/blog/index.tsrx',
+		].join('\n'),
+	);
+	expect(() =>
+		buildRouteManifestFromFileIds(['/pages/blog/[id].tsrx', '/pages/blog/[slug].tsrx']),
+	).toThrow(
+		[
+			'Route conflict: /blog/:param is defined by both:',
+			'- pages/blog/[id].tsrx',
+			'- pages/blog/[slug].tsrx',
+		].join('\n'),
 	);
 });
 

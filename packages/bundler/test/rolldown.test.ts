@@ -47,6 +47,21 @@ export function App() @{
 }
 `;
 
+const defaultRouteSource = `
+import { state } from 'arcade';
+import { Link } from 'arcade/router';
+
+export default function Home() @{
+	const count = state(0);
+
+	<main>
+		<h1>Arcade Router</h1>
+		<button onClick={() => count++}>Button {count}</button>
+		<Link href="/docs">Docs</Link>
+	</main>
+}
+`;
+
 describe('TSRX Rolldown plugin structure', () => {
 	test('client build options allow generated entries to extend the app entry surface', () => {
 		expect(callOptions(arcadeClient(), {})).toMatchObject({
@@ -105,6 +120,20 @@ describe('TSRX Rolldown plugin structure', () => {
 				virtualModuleId: expect.stringContaining('virtual:arcade:symbol:'),
 			}),
 		);
+	});
+
+	test('transformTsrxModule emits a server render artifact for default route modules', async () => {
+		const result = await transformTsrxModule({
+			filename: '/workspace/app/pages/index.tsrx',
+			source: defaultRouteSource,
+		});
+
+		expect(result.code).toContain('renderSsr(props) {');
+		expect(result.code).toContain('<h1>Arcade Router</h1>');
+		expect(result.code).toContain(
+			'import { Link as __arcadeSsrComponent0 } from "arcade/router";',
+		);
+		expect(result.code).toContain('export default arcadeCompiledApp;');
 	});
 
 	test('transformTsrxModule emits a CSR-only default artifact for client builds', async () => {

@@ -1,0 +1,21 @@
+{
+	"name": "@arcade/fixture-router-docs",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"check": "vp check",
+		"dev": "vp dev",
+		"build": "vp build",
+		"test": "vp test"
+	},
+	"dependencies": {
+		"@arcade/router": "workspace:*",
+		"arcade": "workspace:*"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"vite": "8.0.16",
+		"vite-plus": "0.1.20"
+	}
+}

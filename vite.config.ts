@@ -28,8 +28,11 @@ export default defineConfig({
 			'router/vite/route-href': './packages/router/src/vite/entries/route-href.ts',
 			'router/vite/runtime/create-route-discovery':
 				'./packages/router/src/vite/runtime/create-route-discovery.ts',
+			'router/vite/runtime/create-server-entry':
+				'./packages/router/src/vite/runtime/create-server-entry.ts',
 			'router/typescript-plugin': './packages/router/src/typescript-plugin/index.ts',
 			'cli/index': './packages/cli/src/index.ts',
+			'cli/node': './packages/cli/src/node.ts',
 			'arcade/index': './packages/arcade/src/index.ts',
 			'arcade/rolldown': './packages/arcade/src/rolldown.ts',
 			'arcade/runtime': './packages/arcade/src/runtime.ts',

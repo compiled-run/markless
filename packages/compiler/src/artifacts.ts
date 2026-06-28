@@ -35,6 +35,8 @@ export type SemanticComponentEdge = {
 	readonly parentComponentName: string;
 	readonly childComponentName: string;
 	readonly importSource?: string;
+	readonly importKind?: SemanticModuleImport['kind'];
+	readonly importedName?: string;
 	readonly sourceSpan?: SourceSpan;
 	readonly props: ReadonlyArray<SemanticComponentPropBinding>;
 	readonly children: {

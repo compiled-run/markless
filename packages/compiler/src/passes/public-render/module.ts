@@ -1,6 +1,10 @@
 import { isEventAttribute, normalizeEventName, parseModule } from '@tsrx/core';
 import { deserializeGraphValue, type SerializedGraphPayload } from '@arcade/serializer';
-import type { PublicRenderModuleArtifact, PublicRenderModuleInput } from '../../artifacts.ts';
+import type {
+	PublicRenderModuleArtifact,
+	PublicRenderModuleInput,
+	SemanticModuleImport,
+} from '../../artifacts.ts';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource } from '../../ast/source.ts';
 import {
@@ -53,6 +57,10 @@ function emitPublicCsrRenderModule(
 	if (!input.publicRenderPlan.rootTemplateHtml) return '';
 
 	const imports = componentImports(input.semanticGraph.componentEdges, '__arcadeCsrComponent');
+	const valueImports = publicRenderValueImports(
+		input.semanticGraph.moduleImports,
+		input.semanticGraph.componentEdges,
+	);
 	const renderContext: CsrRenderContext = {
 		mode: 'csr',
 		childReplacements: [],
@@ -66,9 +74,8 @@ function emitPublicCsrRenderModule(
 	const hostLocators = staticHostLocators(input);
 
 	return [
-		...imports.map(
-			(item) => `import ${item.localName} from ${JSON.stringify(item.importSource)};`,
-		),
+		...imports.map(emitComponentImport),
+		...valueImports.map(emitValueImport),
 		'',
 		`const arcadeCsrHostLocators = ${JSON.stringify(hostLocators)};`,
 		'const arcadeCsrStateValues = new Map([',
@@ -142,6 +149,10 @@ function emitPublicSsrRenderModule(
 	if (!input.publicRenderPlan.rootTemplateHtml) return '';
 
 	const imports = componentImports(input.semanticGraph.componentEdges, '__arcadeSsrComponent');
+	const valueImports = publicRenderValueImports(
+		input.semanticGraph.moduleImports,
+		input.semanticGraph.componentEdges,
+	);
 	const renderContext: SsrRenderContext = {
 		mode: 'ssr',
 		componentEdges: input.semanticGraph.componentEdges,
@@ -165,9 +176,8 @@ function emitPublicSsrRenderModule(
 	const htmlExpression = emitHtmlNode(rootInfo.root, renderContext);
 
 	return [
-		...imports.map(
-			(item) => `import ${item.localName} from ${JSON.stringify(item.importSource)};`,
-		),
+		...imports.map(emitComponentImport),
+		...valueImports.map(emitValueImport),
 		'',
 		`const arcadeSsrPropEvents = ${JSON.stringify(propEvents)};`,
 		'const arcadeSsrStateValues = new Map([',
@@ -284,6 +294,8 @@ function componentImports(
 	const imports: {
 		readonly componentName: string;
 		readonly importSource: string;
+		readonly importKind?: ComponentEdge['importKind'];
+		readonly importedName?: string;
 		readonly localName: string;
 	}[] = [];
 
@@ -293,11 +305,52 @@ function componentImports(
 		imports.push({
 			componentName: edge.childComponentName,
 			importSource: edge.importSource,
+			importKind: edge.importKind,
+			importedName: edge.importedName,
 			localName: `${localPrefix}${imports.length}`,
 		});
 	}
 
 	return imports;
+}
+
+function emitComponentImport(imported: {
+	readonly importSource: string;
+	readonly importKind?: ComponentEdge['importKind'];
+	readonly importedName?: string;
+	readonly localName: string;
+	readonly componentName: string;
+}): string {
+	if (imported.importKind === 'named' && !isTsrxComponentImport(imported.importSource)) {
+		return `import { ${imported.importedName ?? imported.componentName} as ${imported.localName} } from ${JSON.stringify(imported.importSource)};`;
+	}
+	return `import ${imported.localName} from ${JSON.stringify(imported.importSource)};`;
+}
+
+function isTsrxComponentImport(importSource: string): boolean {
+	return /\.tsrx(?:[?#].*)?$/.test(importSource);
+}
+
+function publicRenderValueImports(
+	moduleImports: ReadonlyArray<SemanticModuleImport>,
+	componentEdges: PublicRenderModuleInput['semanticGraph']['componentEdges'],
+): ReadonlyArray<SemanticModuleImport> {
+	const componentLocalNames = new Set(componentEdges.map((edge) => edge.childComponentName));
+	return moduleImports.filter((moduleImport) => !componentLocalNames.has(moduleImport.localName));
+}
+
+function emitValueImport(moduleImport: SemanticModuleImport): string {
+	const source = JSON.stringify(moduleImport.source);
+	if (moduleImport.kind === 'named') {
+		const importedName = moduleImport.importedName ?? moduleImport.localName;
+		return importedName === moduleImport.localName
+			? `import { ${importedName} } from ${source};`
+			: `import { ${importedName} as ${moduleImport.localName} } from ${source};`;
+	}
+	if (moduleImport.kind === 'namespace') {
+		return `import * as ${moduleImport.localName} from ${source};`;
+	}
+	return `import ${moduleImport.localName} from ${source};`;
 }
 
 function assignSsrHostIds(
@@ -459,7 +512,7 @@ function emitSsrComponent(node: AnyNode, componentName: string, context: SsrRend
 	if (!localName) return '""';
 	const edge = context.componentEdges[context.nextComponentEdgeIndex++];
 	const childIndex = context.nextChildIndex++;
-	const props = ssrComponentPropsSource(node, context.source, edge, context.callbackSymbols);
+	const props = ssrComponentPropsSource(node, context, edge, context.callbackSymbols);
 	const placement = {
 		hostPrefix: `c${childIndex}:`,
 		symbolPrefix: `c${childIndex}:`,
@@ -503,13 +556,17 @@ function componentPropsSource(
 
 function ssrComponentPropsSource(
 	node: AnyNode,
-	source: string,
+	context: SsrRenderContext,
 	edge: ComponentEdge | undefined,
 	callbackSymbols: ReadonlyMap<string, string>,
 ): string[] {
 	const props = getElementAttributes(node).flatMap((attribute) =>
-		componentAttributePropSource(attribute, source),
+		componentAttributePropSource(attribute, context.source),
 	);
+	const children = emitHtmlChildren(node, context);
+	if (children !== '""') {
+		props.push(`children: ${children}`);
+	}
 	const callbackEntries = (edge?.props ?? []).flatMap((prop) => {
 		const callbackSymbolId = edge ? callbackSymbols.get(`${edge.id}:${prop.name}`) : undefined;
 		if (callbackSymbolId) {
@@ -665,7 +722,8 @@ function firstComponentRoot(component: AnyNode | undefined): AnyNode | null {
 function findComponent(ast: AnyNode, name: string | undefined): AnyNode | undefined {
 	for (const statement of asNodes(ast.body)) {
 		const declaration =
-			statement.type === 'ExportNamedDeclaration'
+			statement.type === 'ExportNamedDeclaration' ||
+			statement.type === 'ExportDefaultDeclaration'
 				? (statement.declaration as AnyNode | undefined)
 				: statement;
 		if (declaration?.type !== 'FunctionDeclaration') continue;
