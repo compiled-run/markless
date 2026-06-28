@@ -17,6 +17,7 @@ import type {
 	SemanticLocalBinding,
 	SemanticStateRead,
 	SemanticStateWrite,
+	SemanticTemplateBindingTarget,
 	SemanticTemplateRead,
 } from '../../artifacts.ts';
 import type { FrameworkApiName } from './imports.ts';
@@ -55,6 +56,7 @@ export type WalkState = {
 	currentBranchScopeIds: string[];
 	currentKeyedRepeatScopeIds: string[];
 	currentHostNodeId: string | null;
+	currentTextTarget: SemanticTemplateBindingTarget | null;
 	currentAsyncBoundaryId: string | null;
 	currentSharedDefinitionId: string | null;
 	nextComponentEdgeId: number;
@@ -108,6 +110,7 @@ export function createWalkState(input: {
 		currentBranchScopeIds: [],
 		currentKeyedRepeatScopeIds: [],
 		currentHostNodeId: null,
+		currentTextTarget: null,
 		currentAsyncBoundaryId: null,
 		currentSharedDefinitionId: null,
 		nextComponentEdgeId: 0,

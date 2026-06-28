@@ -6,6 +6,7 @@ import {
 	getElementTagName,
 	isHostTagName,
 	isIgnorableJsxTextNode,
+	staticTextValue,
 	trimmedStaticTextValue,
 	unwrapExpressionContainer,
 } from '../../ast/tsrx.ts';
@@ -58,9 +59,15 @@ export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGr
 		);
 	}
 
+	const previousTextTarget = state.currentTextTarget;
 	for (const child of asNodes(node.children)) {
+		state.currentTextTarget =
+			isHostElement && isTemplateExpressionChild(child)
+				? textExpressionTarget(node, child)
+				: null;
 		walk(child, state);
 	}
+	state.currentTextTarget = previousTextTarget;
 
 	state.currentHostNodeId = previousHost;
 }
@@ -75,11 +82,46 @@ export function collectTemplateExpression(node: AnyNode, state: WalkState): void
 		hostNodeId: state.currentHostNodeId,
 		source: expressionSource(expression, state.source),
 		sourceSpan: sourceSpan(expression, state.filename),
-		target: {
-			kind: 'text',
-		},
+		target: state.currentTextTarget ?? { kind: 'text' },
 		asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
 	});
+}
+
+function isTemplateExpressionChild(node: AnyNode): boolean {
+	return node.type === 'JSXExpressionContainer' || node.type === 'TSRXExpression';
+}
+
+function textExpressionTarget(
+	host: AnyNode,
+	expressionChild: AnyNode,
+): SemanticTemplateBindingTarget {
+	const children = asNodes(host.children).filter((child) => !isIgnorableJsxTextNode(child));
+	const expressionChildren = children.filter(isTemplateExpressionChild);
+	if (expressionChildren.length !== 1 || expressionChildren[0] !== expressionChild) {
+		return { kind: 'text' };
+	}
+
+	const expressionIndex = children.indexOf(expressionChild);
+	let prefix = '';
+	let suffix = '';
+	for (const child of children.slice(0, expressionIndex)) {
+		if (!isStaticTextPart(child)) return { kind: 'text' };
+		prefix += staticTextValue(child);
+	}
+	for (const child of children.slice(expressionIndex + 1)) {
+		if (!isStaticTextPart(child)) return { kind: 'text' };
+		suffix += staticTextValue(child);
+	}
+
+	return {
+		kind: 'text',
+		...(prefix ? { prefix } : {}),
+		...(suffix ? { suffix } : {}),
+	};
+}
+
+function isStaticTextPart(node: AnyNode): boolean {
+	return node.type === 'JSXText' || node.type === 'Literal';
 }
 
 export function collectConditionalBranchText(node: AnyNode, state: WalkState): void {
@@ -243,12 +285,10 @@ function collectAttribute(
 function conditionalClassTarget(
 	attributeName: string,
 	expressionValue: AnyNode | undefined,
-):
-	| {
-			readonly test: AnyNode;
-			readonly target: SemanticTemplateBindingTarget;
-	  }
-	| null {
+): {
+	readonly test: AnyNode;
+	readonly target: SemanticTemplateBindingTarget;
+} | null {
 	if (attributeName !== 'class' || expressionValue?.type !== 'ConditionalExpression') {
 		return null;
 	}
@@ -275,14 +315,12 @@ function stringLiteral(node: AnyNode | undefined): string | null {
 function sameHostStaticTextBranch(
 	node: AnyNode | undefined,
 	state: WalkState,
-):
-	| {
-			readonly hostNodeId: string;
-			readonly tagName: string;
-			readonly staticAttributesKey: string;
-			readonly text: string;
-	  }
-	| null {
+): {
+	readonly hostNodeId: string;
+	readonly tagName: string;
+	readonly staticAttributesKey: string;
+	readonly text: string;
+} | null {
 	const root = branchSingleOutput(node);
 	if (!root || (root.type !== 'Element' && root.type !== 'JSXElement')) return null;
 

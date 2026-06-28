@@ -1,9 +1,6 @@
 import { isEventAttribute, normalizeEventName, parseModule } from '@tsrx/core';
 import { deserializeGraphValue, type SerializedGraphPayload } from '@arcade/serializer';
-import type {
-	PublicRenderModuleArtifact,
-	PublicRenderModuleInput,
-} from '../../artifacts.ts';
+import type { PublicRenderModuleArtifact, PublicRenderModuleInput } from '../../artifacts.ts';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource } from '../../ast/source.ts';
 import {
@@ -89,9 +86,10 @@ function emitPublicCsrRenderModule(
 				`	arcadeCsrAttachPropEvent(root, ${JSON.stringify(event.hostPath)}, ${JSON.stringify(event.eventName)}, ${event.propName});`,
 		),
 		'	const arcadeCsrView = arcadeCsrComposeView(root, payloadView, arcadeCsrHostLocators, arcadeCsrChildren);',
+		'	const arcadeCsrState = arcadeComposeState(payloadState, arcadeCsrChildren);',
 		'	return {',
 		'		root,',
-		'		state: payloadState,',
+		'		state: arcadeCsrState,',
 		'		view: arcadeCsrView,',
 		'		loadSymbol: arcadeCsrLoadSymbol,',
 		'		connectRuntime(context) { arcadeCsrRuntimeState.graph = context.graph; for (const child of arcadeCsrChildren) child.output?.connectRuntime?.(context); },',
@@ -121,6 +119,7 @@ function emitPublicCsrRenderModule(
 		'function arcadeCsrRenderChild(component, props) { return component?.renderCsr?.(props); }',
 		'function arcadeCsrReplaceChild(root, index, child) { const placeholder = root.querySelector?.(`[data-arcade-csr-child="${index}"]`); if (placeholder && child) placeholder.replaceWith(child); else placeholder?.remove?.(); }',
 		'function arcadeCsrAttachPropEvent(root, path, eventName, handler) { const element = arcadeCsrNodeAtPath(root, path); if (handler && element?.addEventListener) element.addEventListener(eventName, handler); }',
+		'function arcadeComposeState(state, children) { const childStates = children.map((child) => child.output?.state).filter(Boolean); if (childStates.length === 0) return state; return { ...state, cells: [...(state.cells ?? []), ...childStates.flatMap((childState) => childState.cells ?? [])], computed: [...(state.computed ?? []), ...childStates.flatMap((childState) => childState.computed ?? [])], ...((state.sharedDefinitions || childStates.some((childState) => childState.sharedDefinitions?.length)) ? { sharedDefinitions: [...(state.sharedDefinitions ?? []), ...childStates.flatMap((childState) => childState.sharedDefinitions ?? [])] } : {}) }; }',
 		'function arcadeCsrComposeView(root, view, hostLocators, children) { const elements = arcadeCsrCollectElements(root); const indexByElement = new Map(elements.map((element, index) => [element, index])); const localHostIds = new Set(); const locators = []; for (const locator of hostLocators) { const element = arcadeCsrNodeAtPath(root, locator.hostPath); const index = element ? indexByElement.get(element) : undefined; if (index === undefined) continue; localHostIds.add(locator.hostNodeId); locators.push({ hostNodeId: locator.hostNodeId, strategy: "dom-order", index, tagName: locator.tagName }); } const events = view.events.filter((event) => localHostIds.has(event.hostNodeId)); const domUpdates = view.domUpdates.filter((update) => localHostIds.has(update.hostNodeId)); const behaviors = view.behaviors.filter((behavior) => localHostIds.has(behavior.hostNodeId)); const elementHandles = view.elementHandles.filter((handle) => localHostIds.has(handle.hostNodeId)); for (const child of children) arcadeCsrAppendChildView({ child, elements, indexByElement, locators, events, domUpdates, behaviors, elementHandles }); locators.sort((a, b) => a.index - b.index); return { ...view, locators, events, domUpdates, behaviors, elementHandles }; }',
 		'function arcadeCsrAppendChildView(context) { const childView = context.child.output?.view; const childRoot = context.child.output?.root; if (!childView || !childRoot) return; const childElements = arcadeCsrCollectElements(childRoot); for (const locator of childView.locators) { const element = childElements[locator.index]; const index = element ? context.indexByElement.get(element) : undefined; if (index === undefined) continue; context.locators.push({ ...locator, hostNodeId: context.child.hostPrefix + locator.hostNodeId, index }); } for (const event of childView.events) context.events.push({ ...event, hostNodeId: context.child.hostPrefix + event.hostNodeId, symbolIds: event.symbolIds.map((symbolId) => context.child.symbolPrefix + symbolId) }); for (const update of childView.domUpdates) { const mapped = arcadeCsrRemapChildGraph(update, context.child.graphProps); if (!mapped) continue; context.domUpdates.push({ ...update, hostNodeId: context.child.hostPrefix + update.hostNodeId, graphNodeId: mapped.graphNodeId, path: mapped.path, ...(update.symbolId ? { symbolId: context.child.symbolPrefix + update.symbolId } : {}) }); } for (const behavior of childView.behaviors) context.behaviors.push({ ...behavior, hostNodeId: context.child.hostPrefix + behavior.hostNodeId, ...(behavior.symbolId ? { symbolId: context.child.symbolPrefix + behavior.symbolId } : {}) }); for (const handle of childView.elementHandles) context.elementHandles.push({ ...handle, hostNodeId: context.child.hostPrefix + handle.hostNodeId }); }',
 		'function arcadeCsrRemapChildGraph(record, graphProps) { if (record.graphNodeId === "prop:props") { const propName = record.path[0]; const binding = graphProps.find((prop) => prop.name === propName); return binding ? { graphNodeId: binding.graphNodeId, path: [...binding.path, ...record.path.slice(1)] } : null; } if (record.graphNodeId.startsWith?.("prop:")) { const propName = record.graphNodeId.slice(5); const binding = graphProps.find((prop) => prop.name === propName); return binding ? { graphNodeId: binding.graphNodeId, path: [...binding.path, ...record.path] } : null; } return { graphNodeId: record.graphNodeId, path: record.path }; }',
@@ -175,15 +174,16 @@ function emitPublicSsrRenderModule(
 		stateEntries(input).join(',\n'),
 		']);',
 		'function arcadeRenderSsr(props = {}) {',
-			destructureProps(rootInfo.propNames),
-			...stateLocalLines(input, 'arcadeSsrStateValue'),
-			'	const arcadeSsrChildren = [];',
-			'	const arcadeSsrHostLocators = [];',
-			`	const html = ${htmlExpression};`,
-			'	const arcadeSsrComposition = arcadeSsrComposeView(payloadView, arcadeSsrHostLocators, arcadeSsrChildren);',
+		destructureProps(rootInfo.propNames),
+		...stateLocalLines(input, 'arcadeSsrStateValue'),
+		'	const arcadeSsrChildren = [];',
+		'	const arcadeSsrHostLocators = [];',
+		`	const html = ${htmlExpression};`,
+		'	const arcadeSsrComposition = arcadeSsrComposeView(payloadView, arcadeSsrHostLocators, arcadeSsrChildren);',
+		'	const arcadeSsrState = arcadeComposeState(payloadState, arcadeSsrChildren);',
 		'	return {',
 		'		html,',
-		'		state: payloadState,',
+		'		state: arcadeSsrState,',
 		'		view: arcadeSsrComposition.view,',
 		'		propEvents: arcadeSsrPropEvents,',
 		'		externalSymbolIds: arcadeSsrComposition.externalSymbolIds,',
@@ -194,6 +194,7 @@ function emitPublicSsrRenderModule(
 		'function arcadeSsrHost(hostLocators, hostNodeId, tagName) { hostLocators.push({ hostNodeId, strategy: "dom-order", index: hostLocators.length, tagName }); return ""; }',
 		'function arcadeSsrCallbacks(callbacks) { const result = {}; for (const key of Object.keys(callbacks)) if (callbacks[key]) result[key] = callbacks[key]; return result; }',
 		'function arcadeSsrCallbackSymbol(props, path) { let value = props?.__arcadeSsrCallbacks; for (const key of path) value = value?.[key]; return typeof value === "string" ? value : undefined; }',
+		'function arcadeComposeState(state, children) { const childStates = children.map((child) => child.output?.state).filter(Boolean); if (childStates.length === 0) return state; return { ...state, cells: [...(state.cells ?? []), ...childStates.flatMap((childState) => childState.cells ?? [])], computed: [...(state.computed ?? []), ...childStates.flatMap((childState) => childState.computed ?? [])], ...((state.sharedDefinitions || childStates.some((childState) => childState.sharedDefinitions?.length)) ? { sharedDefinitions: [...(state.sharedDefinitions ?? []), ...childStates.flatMap((childState) => childState.sharedDefinitions ?? [])] } : {}) }; }',
 		'function arcadeSsrComposeView(view, hostLocators, children) { const localHostIds = new Set(hostLocators.map((locator) => locator.hostNodeId)); const childData = children.map((child) => ({ ...child, view: child.output?.view, hostCount: child.output?.view?.locators?.length ?? 0, externalSymbolIds: new Set(child.output?.externalSymbolIds ?? []) })).filter((child) => child.view); const offsetFor = (index) => childData.reduce((total, child) => total + (child.localIndex <= index ? child.hostCount : 0), 0); const locators = hostLocators.map((locator) => ({ ...locator, index: locator.index + offsetFor(locator.index) })); const events = view.events.filter((event) => localHostIds.has(event.hostNodeId)); const domUpdates = view.domUpdates.filter((update) => localHostIds.has(update.hostNodeId)); const behaviors = view.behaviors.filter((behavior) => localHostIds.has(behavior.hostNodeId)); const elementHandles = view.elementHandles.filter((handle) => localHostIds.has(handle.hostNodeId)); const externalSymbolIds = new Set(); let inserted = 0; for (const child of childData) { arcadeSsrAppendChildView({ child, baseIndex: child.localIndex + inserted, locators, events, domUpdates, behaviors, elementHandles, externalSymbolIds }); inserted += child.hostCount; } locators.sort((a, b) => a.index - b.index); return { view: { ...view, locators, events, domUpdates, behaviors, elementHandles }, externalSymbolIds: [...externalSymbolIds] }; }',
 		'function arcadeSsrAppendChildView(context) { const childView = context.child.view; const propEvents = context.child.output?.propEvents ?? []; const callbackProps = context.child.callbackProps ?? {}; for (const locator of childView.locators) context.locators.push({ ...locator, hostNodeId: context.child.hostPrefix + locator.hostNodeId, index: context.baseIndex + locator.index }); for (const event of childView.events) { const propEvent = propEvents.find((item) => item.hostNodeId === event.hostNodeId && item.eventName === event.eventName); const callbackSymbolId = propEvent ? callbackProps[propEvent.propName] : undefined; const symbolIds = callbackSymbolId ? [callbackSymbolId] : event.symbolIds.map((symbolId) => context.child.externalSymbolIds.has(symbolId) ? symbolId : context.child.symbolPrefix + symbolId); for (const symbolId of symbolIds) if (callbackSymbolId || context.child.externalSymbolIds.has(symbolId)) context.externalSymbolIds.add(symbolId); context.events.push({ ...event, hostNodeId: context.child.hostPrefix + event.hostNodeId, symbolIds }); } for (const update of childView.domUpdates) { const mapped = arcadeSsrRemapChildGraph(update, context.child.graphProps); if (!mapped) continue; context.domUpdates.push({ ...update, hostNodeId: context.child.hostPrefix + update.hostNodeId, graphNodeId: mapped.graphNodeId, path: mapped.path, ...(update.symbolId ? { symbolId: context.child.symbolPrefix + update.symbolId } : {}) }); } for (const behavior of childView.behaviors) context.behaviors.push({ ...behavior, hostNodeId: context.child.hostPrefix + behavior.hostNodeId, ...(behavior.symbolId ? { symbolId: context.child.symbolPrefix + behavior.symbolId } : {}) }); for (const handle of childView.elementHandles) context.elementHandles.push({ ...handle, hostNodeId: context.child.hostPrefix + handle.hostNodeId }); }',
 		'function arcadeSsrRemapChildGraph(record, graphProps) { if (record.graphNodeId === "prop:props") { const propName = record.path[0]; const binding = graphProps.find((prop) => prop.name === propName); return binding ? { graphNodeId: binding.graphNodeId, path: [...binding.path, ...record.path.slice(1)] } : null; } if (record.graphNodeId.startsWith?.("prop:")) { const propName = record.graphNodeId.slice(5); const binding = graphProps.find((prop) => prop.name === propName); return binding ? { graphNodeId: binding.graphNodeId, path: [...binding.path, ...record.path] } : null; } return { graphNodeId: record.graphNodeId, path: record.path }; }',
@@ -256,10 +257,7 @@ function callbackSymbolIds(input: PublicRenderModuleInput): ReadonlyMap<string, 
 	);
 }
 
-function stateLocalLines(
-	input: PublicRenderModuleInput,
-	readStateFunctionName: string,
-): string[] {
+function stateLocalLines(input: PublicRenderModuleInput, readStateFunctionName: string): string[] {
 	return input.semanticGraph.graphBindings.flatMap((binding) =>
 		binding.kind === 'state'
 			? [`	let ${binding.name} = ${readStateFunctionName}(${JSON.stringify(binding.id)});`]
@@ -357,7 +355,10 @@ function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string {
 			nextComponentEdgeIndex: context.nextComponentEdgeIndex,
 		};
 		const consequentContext: SsrRenderContext = { ...context };
-		const consequent = emitHtmlBranch(node.consequent as AnyNode | undefined, consequentContext);
+		const consequent = emitHtmlBranch(
+			node.consequent as AnyNode | undefined,
+			consequentContext,
+		);
 		const alternateContext = {
 			...context,
 			nextChildIndex: before.nextChildIndex,
@@ -393,10 +394,7 @@ function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string {
 			? emitSsrComponent(node, tagName, context)
 			: emitCsrComponent(node, tagName, context);
 	}
-	const hostLocator =
-		context.mode === 'ssr'
-			? ssrHostLocator(node, tagName, context)
-			: '""';
+	const hostLocator = context.mode === 'ssr' ? ssrHostLocator(node, tagName, context) : '""';
 
 	const open = [`<${tagName}`];
 	const dynamicAttributes: string[] = [];
@@ -431,11 +429,7 @@ function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string {
 	]);
 }
 
-function ssrHostLocator(
-	node: AnyNode,
-	tagName: string,
-	context: SsrRenderContext,
-): string {
+function ssrHostLocator(node: AnyNode, tagName: string, context: SsrRenderContext): string {
 	const hostNodeId = context.hostIdByNode.get(node);
 	return hostNodeId
 		? `arcadeSsrHost(arcadeSsrHostLocators, ${JSON.stringify(hostNodeId)}, ${JSON.stringify(tagName)})`
@@ -460,11 +454,7 @@ function renderHelper(context: HtmlRenderContext, helper: 'Attribute' | 'Text'):
 	return `arcade${context.mode === 'ssr' ? 'Ssr' : 'Csr'}${helper}`;
 }
 
-function emitSsrComponent(
-	node: AnyNode,
-	componentName: string,
-	context: SsrRenderContext,
-): string {
+function emitSsrComponent(node: AnyNode, componentName: string, context: SsrRenderContext): string {
 	const localName = context.componentImports.get(componentName);
 	if (!localName) return '""';
 	const edge = context.componentEdges[context.nextComponentEdgeIndex++];
@@ -479,11 +469,7 @@ function emitSsrComponent(
 	return `arcadeSsrRenderChild(arcadeSsrChildren, ${localName}, { ${props.join(', ')} }, { hostPrefix: ${JSON.stringify(placement.hostPrefix)}, symbolPrefix: ${JSON.stringify(placement.symbolPrefix)}, localIndex: arcadeSsrHostLocators.length, graphProps: ${JSON.stringify(placement.graphProps)} })`;
 }
 
-function emitCsrComponent(
-	node: AnyNode,
-	componentName: string,
-	context: CsrRenderContext,
-): string {
+function emitCsrComponent(node: AnyNode, componentName: string, context: CsrRenderContext): string {
 	const localName = context.componentImports.get(componentName);
 	if (!localName) return '""';
 	const index = context.childReplacements.length;
@@ -507,9 +493,7 @@ function componentPropsSource(
 	return getElementAttributes(node).flatMap((attribute) => {
 		const name = getIdentifierName(attribute.name as AnyNode | undefined);
 		if (!name) return [];
-		const callbackSymbolId = edge
-			? callbackSymbols.get(`${edge.id}:${name}`)
-			: undefined;
+		const callbackSymbolId = edge ? callbackSymbols.get(`${edge.id}:${name}`) : undefined;
 		if (callbackSymbolId) {
 			return `${objectPropertyName(name)}: arcadeCsrCallback(${JSON.stringify(callbackSymbolId)})`;
 		}
@@ -527,9 +511,7 @@ function ssrComponentPropsSource(
 		componentAttributePropSource(attribute, source),
 	);
 	const callbackEntries = (edge?.props ?? []).flatMap((prop) => {
-		const callbackSymbolId = edge
-			? callbackSymbols.get(`${edge.id}:${prop.name}`)
-			: undefined;
+		const callbackSymbolId = edge ? callbackSymbols.get(`${edge.id}:${prop.name}`) : undefined;
 		if (callbackSymbolId) {
 			return `${JSON.stringify(prop.name)}: ${JSON.stringify(callbackSymbolId)}`;
 		}
@@ -614,7 +596,9 @@ function collectCsrPropEvents(
 				const name = getIdentifierName(attribute.name as AnyNode | undefined);
 				if (!name || !isEventAttribute(name)) continue;
 
-				const expression = unwrapExpressionContainer(attribute.value as AnyNode | undefined);
+				const expression = unwrapExpressionContainer(
+					attribute.value as AnyNode | undefined,
+				);
 				const propName = expression ? expressionSource(expression, source) : '';
 				if (!propNameSet.has(propName)) continue;
 

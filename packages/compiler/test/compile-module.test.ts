@@ -1,6 +1,8 @@
 import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../src/index.ts';
 import { deserializeGraphValue } from '../../serializer/src/index.ts';
+import { createEventOnlyResumeContainerFromPayloads } from '../../web/src/event-only-resume.ts';
+import type { ProtocolStatePayload, ProtocolViewPayload } from '../../serializer/src/index.ts';
 
 const source = `
 import { state } from 'arcade';
@@ -336,19 +338,23 @@ function parsePublicRenderTestHtml(html: string) {
 async function importPublicRenderTestModule(
 	source: string,
 	globals?: {
-		readonly document: unknown;
-		readonly loadSymbol: unknown;
+		readonly document?: unknown;
+		readonly loadSymbol?: unknown;
+		readonly childComponent?: unknown;
 	},
 ): Promise<Record<string, unknown>> {
 	const globalScope = globalThis as typeof globalThis & {
 		__arcadePublicRenderTestDocument?: unknown;
 		__arcadePublicRenderTestLoadSymbol?: unknown;
+		__arcadePublicRenderTestChildComponent?: unknown;
 	};
 	const previousDocument = globalScope.__arcadePublicRenderTestDocument;
 	const previousLoadSymbol = globalScope.__arcadePublicRenderTestLoadSymbol;
+	const previousChildComponent = globalScope.__arcadePublicRenderTestChildComponent;
 	if (globals) {
 		globalScope.__arcadePublicRenderTestDocument = globals.document;
 		globalScope.__arcadePublicRenderTestLoadSymbol = globals.loadSymbol;
+		globalScope.__arcadePublicRenderTestChildComponent = globals.childComponent;
 	}
 
 	try {
@@ -358,7 +364,27 @@ async function importPublicRenderTestModule(
 	} finally {
 		globalScope.__arcadePublicRenderTestDocument = previousDocument;
 		globalScope.__arcadePublicRenderTestLoadSymbol = previousLoadSymbol;
+		globalScope.__arcadePublicRenderTestChildComponent = previousChildComponent;
 	}
+}
+
+function ssrRenderTestModuleSource(
+	result: Awaited<ReturnType<typeof compileTsrxModule>>,
+	options: { readonly replaceChildImport?: boolean } = {},
+): string {
+	const ssrSource = options.replaceChildImport
+		? result.publicRenderModule.ssrModuleSource.replace(
+				/import __arcadeSsrComponent0 from [^;]+;/,
+				'const __arcadeSsrComponent0 = globalThis.__arcadePublicRenderTestChildComponent;',
+			)
+		: result.publicRenderModule.ssrModuleSource;
+
+	return [
+		`const payloadState = ${JSON.stringify(result.protocolState)};`,
+		`const payloadView = ${JSON.stringify(result.protocolView)};`,
+		ssrSource,
+		'export { arcadeRenderSsr };',
+	].join('\n');
 }
 
 function products(...items: ReadonlyArray<readonly [sku: string, name: string]>) {
@@ -1423,6 +1449,84 @@ export function Scoreboard() @{
 	expect(secondRendered.graph.read('state:score', ['total'])).toBe(1);
 	expect(secondButton.textContent).toBe('1');
 	expect(loadSymbolCalls.get(incrementSymbol!.id)).toBe(1);
+});
+
+test('compileTsrxModule composes imported child BUTTON counters for SSR resume', async () => {
+	const child = await compileTsrxModule({
+		filename: 'src/Counter.tsrx',
+		source: `
+import { state } from 'arcade';
+
+export function Counter() @{
+	let count = state(0);
+
+	<button onClick={() => count++}>BUTTON {count}</button>
+}
+`,
+		symbols: [],
+	});
+	const parent = await compileTsrxModule({
+		filename: 'src/App.tsrx',
+		source: `
+import { Counter } from './Counter.tsrx';
+
+export function App() @{
+	<section>
+		<Counter />
+	</section>
+}
+`,
+		symbols: [],
+	});
+
+	const childSsrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(child));
+	const parentSsrModule = await importPublicRenderTestModule(
+		ssrRenderTestModuleSource(parent, { replaceChildImport: true }),
+		{
+			childComponent: {
+				renderSsr: childSsrModule.arcadeRenderSsr,
+			},
+		},
+	);
+	const output = (
+		parentSsrModule.arcadeRenderSsr as () => {
+			readonly html: string;
+			readonly state: ProtocolStatePayload;
+			readonly view: ProtocolViewPayload;
+		}
+	)();
+	const countCell = output.state.cells.find((cell) => cell.graphNodeId === 'state:count');
+	const button = new PublicRenderTestElement('button');
+	button.textContent = 'BUTTON 0';
+	const root = new PublicRenderTestElement('section');
+	root.appendChild(button);
+	const symbolModules = new Map(
+		child.symbolModules.modules.map((module) => [module.symbolId, module]),
+	);
+	const symbolExports = new Map<string, Record<string, unknown>>();
+	for (const module of child.symbolModules.modules) {
+		symbolExports.set(module.symbolId, await importPublicRenderTestModule(module.source));
+	}
+	const container = createEventOnlyResumeContainerFromPayloads({
+		state: output.state,
+		view: output.view,
+		root: root as never,
+		loadSymbol(symbolId) {
+			const childSymbolId = symbolId.startsWith('c0:') ? symbolId.slice(3) : symbolId;
+			const module = symbolModules.get(childSymbolId);
+			if (!module) throw new Error(`Unexpected child symbol ${symbolId}`);
+			return symbolExports.get(childSymbolId)?.[module.exportName] as never;
+		},
+	});
+
+	expect(output.html).toBe('<section><button>BUTTON 0</button></section>');
+	expect(countCell).toBeDefined();
+	expect(deserializeGraphValue(countCell!.value!)).toBe(0);
+
+	await container.dispatch({ type: 'click', target: button as never });
+
+	expect(container.graph.read('state:count')).toBe(1);
+	expect(button.textContent).toBe('BUTTON 1');
 });
 
 test('compileTsrxModule does not emit public render factories for non-literal direct state values', async () => {

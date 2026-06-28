@@ -251,9 +251,7 @@ function domJournalEntryProperties(
 		return [
 			`		type: ${JSON.stringify('setText')},`,
 			`		locator: ${locator},`,
-			symbol.target.trueValue !== undefined && symbol.target.falseValue !== undefined
-				? `		value: ${value} ? ${JSON.stringify(symbol.target.trueValue)} : ${JSON.stringify(symbol.target.falseValue)},`
-				: `		value: ${value},`,
+			`		value: ${textDomUpdateValueSource(symbol.target, value)},`,
 		];
 	}
 
@@ -292,6 +290,23 @@ function domJournalEntryProperties(
 		`		name: ${JSON.stringify(symbol.target.name)},`,
 		`		value: ${value},`,
 	];
+}
+
+function textDomUpdateValueSource(
+	target: Extract<
+		Extract<PlannedSymbol, { readonly kind: 'dom-update' }>['target'],
+		{ readonly kind: 'text' }
+	>,
+	value: string,
+): string {
+	const conditional =
+		target.trueValue !== undefined && target.falseValue !== undefined
+			? `${value} ? ${JSON.stringify(target.trueValue)} : ${JSON.stringify(target.falseValue)}`
+			: null;
+	if (target.prefix === undefined && target.suffix === undefined) return conditional ?? value;
+
+	const base = conditional ? `(${conditional})` : value;
+	return `${JSON.stringify(target.prefix ?? '')} + (${base} == null ? "" : String(${base})) + ${JSON.stringify(target.suffix ?? '')}`;
 }
 
 function emitBehaviorModule(symbol: Extract<PlannedSymbol, { readonly kind: 'behavior' }>): string {

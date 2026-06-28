@@ -11,10 +11,15 @@ export function emitPublicStaticEvents(publicRenderPlan: PublicRenderPlanArtifac
 }
 
 export function emitStaticTextSyncFunction(publicRenderPlan: PublicRenderPlanArtifact): string {
-	const writes = publicRenderPlan.staticTextWrites.flatMap((write, index) => [
-		`	const textTarget${index} = nodeAtPath(root, ${JSON.stringify(write.nodePath)});`,
-		`	if (textTarget${index}) textTarget${index}.nodeValue = stringifyArcadePublicValue(${graphReadExpression(write.graphNodeId, write.path)});`,
-	]);
+	const writes = publicRenderPlan.staticTextWrites.flatMap((write, index) => {
+		const value = `stringifyArcadePublicValue(${graphReadExpression(write.graphNodeId, write.path)})`;
+		return [
+			`	const textTarget${index} = nodeAtPath(root, ${JSON.stringify(write.nodePath)});`,
+			write.prefix !== undefined || write.suffix !== undefined
+				? `	if (textTarget${index}) textTarget${index}.textContent = ${JSON.stringify(write.prefix ?? '')} + ${value} + ${JSON.stringify(write.suffix ?? '')};`
+				: `	if (textTarget${index}) textTarget${index}.nodeValue = ${value};`,
+		];
+	});
 	if (writes.length === 0) return '';
 
 	return ['function syncArcadePublicStaticText(root, graph) {', ...writes, '}'].join('\n');

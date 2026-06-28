@@ -126,6 +126,8 @@ export type ProtocolViewPayload = {
 		readonly target?:
 			| {
 					readonly kind: 'text';
+					readonly prefix?: string;
+					readonly suffix?: string;
 					readonly trueValue?: string;
 					readonly falseValue?: string;
 			  }

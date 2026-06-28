@@ -226,6 +226,8 @@ export type SemanticStateRead = {
 export type SemanticTemplateBindingTarget =
 	| {
 			readonly kind: 'text';
+			readonly prefix?: string;
+			readonly suffix?: string;
 			readonly trueValue?: string;
 			readonly falseValue?: string;
 	  }
@@ -620,6 +622,8 @@ export type PublicRenderPlanStaticTextWrite = {
 	readonly graphNodeId: string;
 	readonly path: ReadonlyArray<string>;
 	readonly nodePath: ReadonlyArray<number>;
+	readonly prefix?: string;
+	readonly suffix?: string;
 };
 
 export type PublicRenderPlanStaticEventControl = {

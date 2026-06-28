@@ -12,7 +12,7 @@ export function createDomUpdateEntry(input: DomUpdateEntryInput): DomJournalEntr
 		return {
 			type: 'setText',
 			locator: input.locator,
-			value: targetValue(input.target, input.value),
+			value: textTargetValue(input.target, input.value),
 		};
 	}
 
@@ -30,7 +30,7 @@ export function createDomUpdateEntry(input: DomUpdateEntryInput): DomJournalEntr
 			type: 'setAttr',
 			locator: input.locator,
 			name: 'class',
-			value: targetValue(input.target, input.value),
+			value: conditionalTargetValue(input.target, input.value),
 		};
 	}
 
@@ -51,7 +51,17 @@ export function createDomUpdateEntry(input: DomUpdateEntryInput): DomJournalEntr
 	};
 }
 
-function targetValue(
+function textTargetValue(
+	target: Extract<DomUpdateEntryInput['target'], { readonly kind: 'text' }>,
+	value: unknown,
+): unknown {
+	const mapped = conditionalTargetValue(target, value);
+	if (target.prefix === undefined && target.suffix === undefined) return mapped;
+
+	return `${target.prefix ?? ''}${mapped == null ? '' : String(mapped)}${target.suffix ?? ''}`;
+}
+
+function conditionalTargetValue(
 	target: Extract<DomUpdateEntryInput['target'], { readonly kind: 'text' | 'class' }>,
 	value: unknown,
 ): unknown {

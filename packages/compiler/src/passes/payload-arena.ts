@@ -163,6 +163,11 @@ function domUpdateTargetKey(
 ): string {
 	if (target.kind === 'attribute') return `attribute:${target.name}`;
 	if (target.kind === 'property') return `property:${target.name}`;
+	if (target.kind === 'text') {
+		return `text:${target.prefix ?? ''}:${target.suffix ?? ''}:${target.trueValue ?? ''}:${target.falseValue ?? ''}`;
+	}
+	if (target.kind === 'class')
+		return `class:${target.trueValue ?? ''}:${target.falseValue ?? ''}`;
 	return target.kind;
 }
 
