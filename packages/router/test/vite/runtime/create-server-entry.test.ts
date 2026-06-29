@@ -92,6 +92,32 @@ describe('server entry rendering', () => {
 		expect(html).not.toContain('src="/@id/virtual:arcade-router/resume-entry"');
 	});
 
+	it('emits a lazy Link navigation bridge without waking a client entry', async () => {
+		const entry = createServerEntry({
+			resumeEntryPath: '/@id/virtual:arcade-router/resume-entry',
+			documentModuleLoader: undefined,
+			pageModuleLoaders: {
+				'pages/index.tsrx': async () => ({
+					default: page(
+						'<main><a href="/docs/getting-started" data-arcade-router-link>Docs</a></main>',
+					),
+				}),
+			},
+			routeFileIds: ['/pages/index.tsrx', '/pages/docs/[...slug].mdx'],
+		});
+
+		const response = await entry.fetch(new Request('http://arcade-router.test/'));
+		const html = await response.text();
+
+		expect(response.status).toBe(200);
+		expect(html).toContain('data-arcade-router-link');
+		expect(html).toContain('data-arcade-router-link-resumer');
+		expect(html).toContain('import("/@id/virtual:arcade-router/resume-entry")');
+		expect(html).not.toContain('<script type="module"');
+		expect(html).not.toContain('virtual:arcade-router/client-entry');
+		expect(html).not.toContain('__arcadeRouterStartSpaNavigation');
+	});
+
 	it('renders the document module shell around routed page output', async () => {
 		const entry = createServerEntry({
 			resumeEntryPath: '/@id/virtual:arcade-router/resume-entry',

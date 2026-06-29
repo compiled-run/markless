@@ -122,8 +122,14 @@ function renderPageModule(
 		resumeModuleUrl: baseArtifact?.resumeModuleUrl,
 		renderSsr() {
 			const output = renderSsr(props);
-			return output && (output.state || output.view)
-				? { ...output, html: `${output.html}${renderRouteScript(file)}` }
+			if (!output) return output;
+			const routeScript = output.state || output.view ? renderRouteScript(file) : '';
+			const linkBridge =
+				resumeEntryPath && output.html.includes('data-arcade-router-link')
+					? renderLinkBridgeScript(resumeEntryPath)
+					: '';
+			return routeScript || linkBridge
+				? { ...output, html: `${output.html}${routeScript}${linkBridge}` }
 				: output;
 		},
 	};
@@ -180,6 +186,58 @@ function renderRouteScript(file: string): string {
 	return `<script type="arcade/route">${escapeScriptJson({ file })}</script>`;
 }
 
+function renderLinkBridgeScript(resumeEntryPath: string): string {
+	return `<script data-arcade-router-link-resumer>${escapeInlineScript(`(() => {
+	const d = document;
+	const s = d.currentScript;
+	const r = s && s.closest('[data-async-container]');
+	if (!r || r.__arcadeRouterLinkResumerStarted) return;
+	r.__arcadeRouterLinkResumerStarted = true;
+	const linkAttr = 'data-arcade-router-link';
+	const replaceAttr = 'data-arcade-router-replace';
+	const scrollAttr = 'data-arcade-router-scroll';
+	const anchorFrom = (event) => {
+		const target = event.composedPath && event.composedPath()[0] || event.target;
+		return target && target.closest ? target.closest('a[href]') : target && target.parentElement && target.parentElement.closest ? target.parentElement.closest('a[href]') : null;
+	};
+	const sameOrigin = (href) => {
+		try {
+			const url = new URL(href, location.href);
+			return url.origin === location.origin ? url : null;
+		} catch {
+			return null;
+		}
+	};
+	r.addEventListener('click', async (event) => {
+		if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.altKey || event.ctrlKey || event.shiftKey) return;
+		const anchor = anchorFrom(event);
+		if (!anchor || !anchor.hasAttribute(linkAttr) || anchor.hasAttribute('download')) return;
+		const target = anchor.getAttribute('target');
+		if (target && target !== '_self') return;
+		if (anchor.relList && anchor.relList.contains('external')) return;
+		const url = sameOrigin(anchor.href);
+		if (!url) return;
+		event.preventDefault();
+		try {
+			const mod = await import(${JSON.stringify(resumeEntryPath)});
+			const navigate = mod.navigateArcadeRouterLink;
+			if (typeof navigate === 'function') {
+				await navigate({
+					href: url.href,
+					replace: anchor.hasAttribute(replaceAttr),
+					scroll: anchor.getAttribute(scrollAttr) === 'manual' ? 'manual' : undefined,
+				});
+			} else {
+				location.assign(url.href);
+			}
+		} catch (error) {
+			setTimeout(() => { throw error; });
+			location.assign(url.href);
+		}
+	}, true);
+})();`)}</script>`;
+}
+
 function htmlAttributes(documentModule: DocumentModule | undefined, pageProps: PageComponentProps) {
 	const attributes = documentModule?.__arcadeRouterHtmlAttributes?.(pageProps) ?? {
 		lang: 'en',
@@ -213,6 +271,10 @@ function escapeHtml(value: string): string {
 
 function escapeScriptJson(value: unknown): string {
 	return JSON.stringify(value).replaceAll('<', '\\u003c');
+}
+
+function escapeInlineScript(value: string): string {
+	return value.replace(/<\/script/gi, '<\\/script');
 }
 
 function isNitroApiPathname(pathname: string) {

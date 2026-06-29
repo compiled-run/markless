@@ -1,6 +1,5 @@
 import { createRouteDiscovery } from '@arcade/router/vite/runtime/create-route-discovery';
-import { render } from '@arcade/web/render';
-import { ARCADE_ROUTER_ROUTE_EVENT, routePageProps, type RouteUpdate } from '../../route-state.ts';
+import { startRouteUpdateRenderer } from '../../route-renderer.ts';
 import { __arcadeRouterStartSpaNavigation } from '../../spa-navigation.ts';
 
 const routeDiscovery = createRouteDiscovery(
@@ -14,10 +13,7 @@ void __arcadeRouterStartSpaNavigation({
 	pageModuleLoaders: pageModules,
 	routeFileIds,
 });
-
-document.addEventListener(ARCADE_ROUTER_ROUTE_EVENT, (event) => {
-	void renderRouteUpdate((event as CustomEvent<RouteUpdate>).detail);
-});
+startRouteUpdateRenderer(document);
 
 export async function resumeContainerEvent(input: {
 	readonly root: ParentNode;
@@ -36,30 +32,6 @@ export async function resumeContainerEvent(input: {
 
 interface RouteResumeModule {
 	readonly resumeContainerEvent?: (input: unknown) => unknown;
-}
-
-interface ClientPageArtifact {
-	readonly renderCsr?: (props?: unknown) => unknown;
-	readonly renderSsr?: (props?: unknown) => { readonly html: string };
-}
-
-async function renderRouteUpdate(update: RouteUpdate) {
-	const artifact = update.page.default as ClientPageArtifact | undefined;
-	if (!artifact) {
-		return;
-	}
-
-	const props = routePageProps(update.route);
-	if (typeof artifact.renderCsr === 'function') {
-		await render({ renderCsr: () => artifact.renderCsr?.(props) } as never, {
-			target: document.body,
-		});
-		return;
-	}
-
-	if (typeof artifact.renderSsr === 'function') {
-		document.body.innerHTML = artifact.renderSsr(props).html;
-	}
 }
 
 function routeFileFromRoot(root: ParentNode): string | undefined {

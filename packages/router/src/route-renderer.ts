@@ -1,0 +1,36 @@
+import { render } from '@arcade/web/render';
+import { ARCADE_ROUTER_ROUTE_EVENT, routePageProps, type RouteUpdate } from './route-state.ts';
+
+const ROUTE_RENDERER_STARTED = '__arcadeRouterRouteRendererStarted';
+
+export function startRouteUpdateRenderer(document: Document = window.document): void {
+	const state = document as unknown as Record<string, unknown>;
+	if (state[ROUTE_RENDERER_STARTED]) return;
+	state[ROUTE_RENDERER_STARTED] = true;
+
+	document.addEventListener(ARCADE_ROUTER_ROUTE_EVENT, (event) => {
+		void renderRouteUpdate(document, (event as CustomEvent<RouteUpdate>).detail);
+	});
+}
+
+interface ClientPageArtifact {
+	readonly renderCsr?: (props?: unknown) => unknown;
+	readonly renderSsr?: (props?: unknown) => { readonly html: string };
+}
+
+async function renderRouteUpdate(document: Document, update: RouteUpdate): Promise<void> {
+	const artifact = update.page.default as ClientPageArtifact | undefined;
+	if (!artifact) return;
+
+	const props = routePageProps(update.route);
+	if (typeof artifact.renderCsr === 'function') {
+		await render({ renderCsr: () => artifact.renderCsr?.(props) } as never, {
+			target: document.body,
+		});
+		return;
+	}
+
+	if (typeof artifact.renderSsr === 'function') {
+		document.body.innerHTML = artifact.renderSsr(props).html;
+	}
+}

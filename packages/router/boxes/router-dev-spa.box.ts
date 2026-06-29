@@ -6,18 +6,19 @@ const WAIT = { timeoutMs: 10_000 };
 
 export default box(
 	{
-		name: 'router dev browser: Link uses document navigation and resumes docs lazily',
+		name: 'router dev browser: Link navigates through Navigation API without document reload',
 		tags: ['router', 'dev', 'browser', 'resume'],
 		modes: ['dev'],
 	},
-	async ({ pipeline, browser, environment, expect, receipt }) => {
-		await pipeline.dev({
-			config: (config) => ({
-				...config,
-				root: `${config.root}/${FIXTURE}`,
-				configFile: `${config.root}/${FIXTURE}/vite.config.ts`,
-			}),
-		});
+		async ({ pipeline, browser, environment, expect, receipt }) => {
+			await pipeline.dev({
+				config: (config) => ({
+					...config,
+					root: `${config.root}/${FIXTURE}`,
+					configFile: `${config.root}/${FIXTURE}/vite.config.ts`,
+					server: { ...config.server, watch: null },
+				}),
+			});
 		const indexHtml = await environment.client.request('/');
 		if (
 			indexHtml.includes('<script type="module" src="/@id/virtual:arcade-router') ||
@@ -42,18 +43,18 @@ export default box(
 		const documentRequests = (await page.networkRequests()).filter(
 			(request) => request.resourceType === 'Document',
 		);
-		if (documentRequests.length < 2) {
+		if (documentRequests.length !== 1) {
 			throw new Error(
-				`Expected Link to use document navigation, saw document requests:\n${documentRequests
+				`Expected Link to avoid document navigation, saw document requests:\n${documentRequests
 					.map((request) => `${request.method} ${request.url}`)
 					.join('\n')}`,
 			);
 		}
 		await expect.page.outcome(
 			page,
-			{ consoleErrors: 0, failedRequests: 0, navigations: 1 },
+			{ consoleErrors: 0, failedRequests: 0 },
 			WAIT,
 		);
-		await receipt.capture('router dev browser Link document navigation lazy-resumed docs route');
+		await receipt.capture('router dev browser Link SPA-navigated to lazy-resumed docs route');
 	},
 );

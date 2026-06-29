@@ -50,25 +50,35 @@ export default box(
 			await page.click(DOCS_LINK, WAIT);
 			await expect.page.text(page, 'h1', 'Docs', WAIT);
 			await expect.page.text(page, MDX_COUNTER, 'MDX Count 0', WAIT);
-			await page.click(MDX_COUNTER, WAIT);
-			await expect.page.text(page, MDX_COUNTER, 'MDX Count 1', WAIT);
-			await expect.page.text(page, BACK_BUTTON, 'Back', WAIT);
-			await page.click(BACK_BUTTON, WAIT);
-			await expect.page.text(page, 'h1', 'Arcade Router', WAIT);
-			await expect.page.text(page, DOCS_LINK, 'Docs', WAIT);
-			await expect.page.attribute(page, DOCS_LINK, 'href', '/docs/getting-started', WAIT);
-			await expect.page.text(page, COUNTER, 'Button 1', WAIT);
-			await page.click(COUNTER, WAIT);
-			await expect.page.text(page, COUNTER, 'Button 2', WAIT);
-			await expect.page.outcome(
-				page,
-				{ consoleErrors: 0, failedRequests: 0, navigations: 2 },
-				WAIT,
-			);
-			receipt.note('vite preview served SSR HTML and lazy-resumed router fixture routes');
-		} finally {
-			await preview.close();
-		}
-		await receipt.capture('router vite preview resumed built fixture counters without startup module');
-	},
-);
+				await page.click(MDX_COUNTER, WAIT);
+				await expect.page.text(page, MDX_COUNTER, 'MDX Count 1', WAIT);
+				await expect.page.text(page, BACK_BUTTON, 'Back', WAIT);
+				await page.click(BACK_BUTTON, WAIT);
+				await expect.page.text(page, 'h1', 'Arcade Router', WAIT);
+				await expect.page.text(page, DOCS_LINK, 'Docs', WAIT);
+				await expect.page.attribute(page, DOCS_LINK, 'href', '/docs/getting-started', WAIT);
+				await expect.page.text(page, COUNTER, 'Button 0', WAIT);
+				await page.click(COUNTER, WAIT);
+				await expect.page.text(page, COUNTER, 'Button 1', WAIT);
+				const documentRequests = (await page.networkRequests()).filter(
+					(request) => request.resourceType === 'Document',
+				);
+				if (documentRequests.length !== 1) {
+					throw new Error(
+						`Expected Link and back traversal to avoid document navigation, saw document requests:\n${documentRequests
+							.map((request) => `${request.method} ${request.url}`)
+							.join('\n')}`,
+					);
+				}
+				await expect.page.outcome(
+					page,
+					{ consoleErrors: 0, failedRequests: 0 },
+					WAIT,
+				);
+				receipt.note('vite preview served SSR HTML and SPA-navigated router fixture routes');
+			} finally {
+				await preview.close();
+			}
+			await receipt.capture('router vite preview SPA-navigated built fixture counters without startup module');
+		},
+	);
