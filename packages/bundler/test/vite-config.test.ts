@@ -172,6 +172,26 @@ describe('Vite config integration', () => {
 		});
 	});
 
+	test('leaves Nitro environment output owned by Nitro', () => {
+		const plugin = getArcadePlugin();
+		const nitroConfig: EnvironmentOptions = {
+			build: {
+				rolldownOptions: {
+					output: { entryFileNames: 'index.mjs' },
+				},
+			},
+		};
+
+		expect(callConfigEnvironment(plugin, 'nitro', nitroConfig)).toBeUndefined();
+		expect(
+			callOutputOptions(
+				plugin,
+				{ entryFileNames: 'index.mjs' },
+				{ environment: { name: 'nitro', config: {} } },
+			),
+		).toEqual({ entryFileNames: 'index.mjs' });
+	});
+
 	test('dispatches output defaults by Vite environment context', () => {
 		const plugin = getArcadePlugin();
 		const clientOutput = callOutputOptions(

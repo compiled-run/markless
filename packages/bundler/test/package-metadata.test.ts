@@ -1,5 +1,5 @@
 import { access, readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { resolve } from 'pathe';
 import { describe, expect, test } from 'vitest';
 
 const root = resolve(import.meta.dirname, '../../..');

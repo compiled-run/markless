@@ -244,6 +244,36 @@ class PublicRenderTestElement {
 		this.parentElement?.removeChild(this);
 	}
 
+	replaceWith(...nodes: PublicRenderTestNode[]) {
+		const parent = this.parentElement;
+		const index = parent?.childNodes.indexOf(this) ?? -1;
+		if (!parent || index < 0) return;
+		for (const node of nodes) node.parentElement?.removeChild(node);
+		for (const node of nodes) node.parentElement = parent;
+		this.parentElement = null;
+		parent.childNodes.splice(index, 1, ...nodes);
+	}
+
+	querySelector(selector: string): PublicRenderTestElement | undefined {
+		const attribute = selector.match(/^\[([^=]+)="([^"]*)"\]$/);
+		if (!attribute) return undefined;
+		const [, name, value] = attribute;
+		const visit = (node: PublicRenderTestNode): PublicRenderTestElement | undefined => {
+			if (node.nodeType !== 1) return undefined;
+			if (node.getAttribute(name!) === value) return node;
+			for (const child of node.childNodes) {
+				const match = visit(child);
+				if (match) return match;
+			}
+			return undefined;
+		};
+		for (const child of this.childNodes) {
+			const match = visit(child);
+			if (match) return match;
+		}
+		return undefined;
+	}
+
 	setAttribute(name: string, value: string) {
 		if (name === 'class') this.classWriteCount++;
 		this.attributes.set(name, value);
@@ -397,6 +427,28 @@ function ssrRenderTestModuleSource(
 		`const payloadView = ${JSON.stringify(result.protocolView)};`,
 		ssrSource,
 		'export { arcadeRenderSsr };',
+	].join('\n');
+}
+
+function csrRenderTestModuleSource(
+	result: Awaited<ReturnType<typeof compileTsrxModule>>,
+	options: { readonly replaceChildImport?: boolean } = {},
+): string {
+	const source = result.publicRenderModule.csrModuleSource ?? '';
+	const csrSource = options.replaceChildImport
+		? source.replace(
+				/import (?:__arcadeCsrComponent0|\{ [^}]+ as __arcadeCsrComponent0 \}) from [^;]+;/,
+				'const __arcadeCsrComponent0 = globalThis.__arcadePublicRenderTestChildComponent;',
+			)
+		: source;
+
+	return [
+		'const document = globalThis.__arcadePublicRenderTestDocument;',
+		'const loadSymbol = globalThis.__arcadePublicRenderTestLoadSymbol;',
+		`const payloadState = ${JSON.stringify(result.protocolState)};`,
+		`const payloadView = ${JSON.stringify(result.protocolView)};`,
+		csrSource,
+		'export { arcadeRenderCsr };',
 	].join('\n');
 }
 
@@ -590,6 +642,53 @@ export default function Home() @{
 	const output = (ssrModule.arcadeRenderSsr as () => { readonly html: string })();
 
 	expect(output.html).toBe('<main><a href="/docs">Docs</a></main>');
+});
+
+test('compileTsrxModule passes component children into CSR component props', async () => {
+	const result = await compileTsrxModule({
+		filename: 'pages/index.tsrx',
+		source: `
+import { state } from 'arcade';
+import { Link } from 'arcade/router';
+
+export default function Home() @{
+	const count = state(0);
+
+	<main>
+		<Link href="/docs">Docs</Link>
+		<button onClick={() => count++}>{count}</button>
+	</main>
+}
+`,
+		symbols: [],
+	});
+	const document = {
+		createElement(tagName: string) {
+			return tagName === 'template'
+				? new PublicRenderTestTemplate()
+				: new PublicRenderTestElement(tagName);
+		},
+	};
+	const csrModule = await importPublicRenderTestModule(
+		csrRenderTestModuleSource(result, { replaceChildImport: true }),
+		{
+			document,
+			childComponent: {
+				renderCsr(props: { readonly children?: unknown; readonly href?: string }) {
+					const anchor = new PublicRenderTestElement('a');
+					anchor.setAttribute('href', props.href ?? '');
+					anchor.textContent = String(props.children ?? '');
+					return { root: anchor };
+				},
+			},
+		},
+	);
+	const output = (csrModule.arcadeRenderCsr as () => { readonly root: PublicRenderTestElement })();
+	const anchors = elementsByTag(output.root, 'a');
+
+	expect(anchors).toHaveLength(1);
+	expect(anchors[0]?.getAttribute('href')).toBe('/docs');
+	expect(anchors[0]?.textContent).toBe('Docs');
 });
 
 test('compileTsrxModule preserves value imports used by public render expressions', async () => {

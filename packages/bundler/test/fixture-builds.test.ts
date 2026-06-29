@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { access, readFile, rm } from 'node:fs/promises';
-import { resolve } from 'node:path';
 import { promisify } from 'node:util';
+import { resolve } from 'pathe';
 import { beforeAll, describe, expect, test } from 'vitest';
 import { runtimeSizeReport } from '../test-support/runtime-size.ts';
 

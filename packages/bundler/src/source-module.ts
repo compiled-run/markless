@@ -62,9 +62,6 @@ export function emitSourceModule(input: {
 		input.environment === 'server'
 			? ''
 			: "import { resumeEventOnlyFromPayloadDocument } from 'arcade/web/event-only-resume';",
-		input.environment === 'client' && !symbolsOnly
-			? "import { preloadLazySymbolModules } from 'arcade/preload';"
-			: '',
 		symbolsOnly
 			? ''
 			: `import { state as payloadState, view as payloadView } from '${input.payloadId}';`,
@@ -183,6 +180,7 @@ function emitCsrPreloadFunction(): string {
 		'	try {',
 		'		const response = await fetch("/build/bundle-graph.json");',
 		'		if (!response.ok) return;',
+		'		const { preloadLazySymbolModules } = await import("arcade/preload");',
 		'		preloadLazySymbolModules({',
 		'			base: "/build/",',
 		'			bundleGraph: await response.json(),',

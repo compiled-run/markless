@@ -25,6 +25,9 @@ export default box(
 			{ contains: 'This MDX route is part of the top-level Arcade Router fixture.' },
 			WAIT,
 		);
+		await expect.page.text(docsPage, '[data-mdx-counter]', 'MDX Count 0', WAIT);
+		await docsPage.click('[data-mdx-counter]', WAIT);
+		await expect.page.text(docsPage, '[data-mdx-counter]', 'MDX Count 1', WAIT);
 		await expect.page.outcome(docsPage, { consoleErrors: 0, failedRequests: 0 }, WAIT);
 
 		const notFoundPage = await browser.visit('/missing');

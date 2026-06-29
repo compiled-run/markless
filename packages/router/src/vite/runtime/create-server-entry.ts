@@ -3,7 +3,7 @@ import { buildRouteManifestFromFileIds, matchRouteManifest } from '../../route-m
 import { renderToString, type ModulePreloadInput } from '@arcade/web/render-to-string';
 
 export interface ServerEntryOptions {
-	readonly clientEntryPath?: string;
+	readonly resumeEntryPath?: string;
 	readonly documentModuleLoader: (() => Promise<unknown>) | undefined;
 	readonly pageModuleLoaders: Record<string, () => Promise<unknown>>;
 	readonly routeFileIds: readonly string[];
@@ -90,11 +90,11 @@ export function createServerEntry(options: ServerEntryOptions) {
 			},
 			status,
 		};
-		const pageOutput = renderPageModule(pageModule, pageProps, file, options.clientEntryPath);
+		const pageOutput = renderPageModule(pageModule, pageProps, file, options.resumeEntryPath);
 		const documentModule = options.documentModuleLoader
 			? ((await options.documentModuleLoader()) as DocumentModule)
 			: undefined;
-		const html = renderDocument(pageOutput, documentModule, pageProps, options.clientEntryPath);
+		const html = renderDocument(pageOutput, documentModule, pageProps);
 
 		return new Response(html, {
 			status,
@@ -109,7 +109,7 @@ function renderPageModule(
 	pageModule: PageModule,
 	props: PageComponentProps,
 	file: string,
-	clientEntryPath: string | undefined,
+	resumeEntryPath: string | undefined,
 ): string {
 	const baseArtifact = pageModule.default;
 	const renderSsr = baseArtifact?.renderSsr ?? pageModule.arcadeRenderSsr;
@@ -128,7 +128,7 @@ function renderPageModule(
 		},
 	};
 	const rendered = renderToString(pageArtifact as never, {
-		resumeModuleUrl: clientEntryPath ?? baseArtifact?.resumeModuleUrl,
+		resumeModuleUrl: resumeEntryPath ?? baseArtifact?.resumeModuleUrl,
 	});
 
 	return rendered;
@@ -138,10 +138,9 @@ function renderDocument(
 	pageHtml: string,
 	documentModule: DocumentModule | undefined,
 	pageProps: PageComponentProps,
-	clientEntryPath: string | undefined,
 ): string {
 	const attributes = htmlAttributes(documentModule, pageProps);
-	const children = `${pageHtml}${renderClientEntryScript(clientEntryPath)}`;
+	const children = pageHtml;
 	const documentHtml = renderDocumentModule(documentModule, {
 		...pageProps,
 		children,
@@ -175,12 +174,6 @@ function renderDocumentModule(
 ): string | undefined {
 	const output = documentModule?.default?.renderSsr?.(props);
 	return output?.html;
-}
-
-function renderClientEntryScript(clientEntryPath: string | undefined): string {
-	return clientEntryPath
-		? `<script type="module" src="${escapeHtml(clientEntryPath)}"></script>`
-		: '';
 }
 
 function renderRouteScript(file: string): string {

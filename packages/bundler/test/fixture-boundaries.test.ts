@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { resolve } from 'pathe';
 import { describe, expect, test } from 'vitest';
 
 const fixtureRoot = resolve(import.meta.dirname, '../fixtures');
@@ -88,7 +88,7 @@ describe('fixture framework boundaries', () => {
 		expect(config).not.toContain('entryFileNames:');
 		expect(config).toContain("input: 'index.html'");
 		expect(config).not.toContain("symbols: 'src/root.tsrx'");
-		expect(config).toContain("input: 'src/root.tsrx'");
+		expect(config).toContain("input: './src/root.tsrx'");
 		expect(config).toContain("preserveEntrySignatures: 'exports-only'");
 	});
 

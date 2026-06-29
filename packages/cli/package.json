@@ -4,10 +4,6 @@
 	"private": true,
 	"description": "Create Arcade apps.",
 	"license": "MIT",
-	"bin": {
-		"arcade": "./src/node.ts",
-		"create-arcade": "./src/node.ts"
-	},
 	"files": [
 		"src",
 		"templates"

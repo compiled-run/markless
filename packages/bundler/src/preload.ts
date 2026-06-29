@@ -1,14 +1,16 @@
 export {
 	planModulePreloadUrls,
 	planModulePreloads,
-	planSsrModulePreloads,
 	type ModulePreloadFetchPriority,
 	type ModulePreloadPlanEntry,
 	type ModulePreloadPlanInput,
 	type ModulePreloadPriority,
 	type ModulePreloadRoot,
-	type SsrModulePreloadPlanInput,
 } from './build/preload-plan.ts';
+export {
+	planSsrModulePreloads,
+	type SsrModulePreloadPlanInput,
+} from './build/preload-plan-ssr.ts';
 export {
 	preloadLazySymbolModules,
 	type AppendedModulePreloads,

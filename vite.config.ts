@@ -32,7 +32,6 @@ export default defineConfig({
 				'./packages/router/src/vite/runtime/create-server-entry.ts',
 			'router/typescript-plugin': './packages/router/src/typescript-plugin/index.ts',
 			'cli/index': './packages/cli/src/index.ts',
-			'cli/node': './packages/cli/src/node.ts',
 			'arcade/index': './packages/arcade/src/index.ts',
 			'arcade/rolldown': './packages/arcade/src/rolldown.ts',
 			'arcade/runtime': './packages/arcade/src/runtime.ts',

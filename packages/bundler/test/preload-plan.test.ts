@@ -3,8 +3,8 @@ import { convertManifestToBundleGraph } from '../src/build/bundle-graph.ts';
 import {
 	planModulePreloadUrls,
 	planModulePreloads,
-	planSsrModulePreloads,
 } from '../src/build/preload-plan.ts';
+import { planSsrModulePreloads } from '../src/build/preload-plan-ssr.ts';
 import type { ArcadeManifest } from '../src/types.ts';
 
 describe('module preload planning', () => {

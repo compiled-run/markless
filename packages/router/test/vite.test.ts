@@ -111,6 +111,10 @@ test('preserves user Nitro config while adding Arcade request scanning defaults'
 		isPreview: false,
 	});
 
+	expect(userConfig.environments.ssr.build.rolldownOptions.input).toContain(
+		'virtual:arcade-router/server-entry',
+	);
+	expect(userConfig.environments.ssr.build.rollupOptions).toBeUndefined();
 	expect(result).toMatchObject({
 		nitro: {
 			apiDir: 'endpoints',
@@ -146,18 +150,21 @@ test('preserves user Nitro config while adding Arcade request scanning defaults'
 		},
 	});
 
-	expect(result?.nitro?.devServer).not.toHaveProperty('runner');
 	expect(result?.nitro?.devServer?.watch).toEqual({ include: ['api/**'] });
 
 	const nitroConfig = result?.nitro;
 	const requestPlugin = Array.isArray(nitroConfig?.rolldownConfig?.plugins)
 		? nitroConfig.rolldownConfig.plugins[0]
 		: undefined;
+	const rollupRequestPlugin = Array.isArray(nitroConfig?.rollupConfig?.plugins)
+		? nitroConfig.rollupConfig.plugins[0]
+		: undefined;
 	const transform = hookHandler((requestPlugin as Plugin | undefined)?.transform) as
 		| ((code: string, id: string) => { code: string; map: null } | undefined)
 		| undefined;
 
 	expect(requestPlugin).toMatchObject({ name: 'arcade-router:nitro-request-files' });
+	expect(rollupRequestPlugin).toMatchObject({ name: 'arcade-router:nitro-request-files' });
 	expect(
 		transform?.(
 			'export default function health(http) { return { ok: true, url: http.url.href }; }',
@@ -180,4 +187,48 @@ test('throws when users add nitro directly alongside router', () => {
 			isPreview: false,
 		}),
 	).toThrow('Remove nitro() from vite.config.ts');
+});
+
+test('preserves router resume entry exports for preview resume', () => {
+	const plugin = flattenPlugins([router()]).find(
+		(plugin) => plugin.name === 'arcade-router:vite',
+	);
+	const clientConfig = {
+		consumer: 'client',
+		root: '/project',
+		build: {
+			rolldownOptions: {
+				input: '/project/src/main.ts',
+			},
+		},
+	};
+
+	plugin?.configEnvironment?.('client', clientConfig as never);
+
+	const input = clientConfig.build.rolldownOptions.input;
+	expect(Array.isArray(input)).toBe(true);
+	expect(input[0]).toContain('virtual:arcade-router/resume-entry');
+	expect(input[1]).toBe('/project/src/main.ts');
+	expect(clientConfig.build.rolldownOptions.preserveEntrySignatures).toBe('exports-only');
+});
+
+test('scopes router virtual entry modules by resolved Vite root', () => {
+	const routePlugin = flattenPlugins([router()]).find(
+		(plugin) => plugin.name === 'arcade-router:routes',
+	);
+	const resolve = hookHandler(routePlugin?.resolveId) as
+		| ((id: string) => string | undefined)
+		| undefined;
+
+	routePlugin?.configResolved?.({ root: '/project/first' } as never);
+	const first = resolve?.('virtual:arcade-router/server-entry');
+	routePlugin?.configResolved?.({ root: '/project/second' } as never);
+	const second = resolve?.('virtual:arcade-router/server-entry');
+	const queried = resolve?.('virtual:arcade-router/resume-entry?worker');
+
+	expect(first).toContain('arcade-router-root=%2Fproject%2Ffirst');
+	expect(second).toContain('arcade-router-root=%2Fproject%2Fsecond');
+	expect(queried).toContain('worker');
+	expect(queried).toContain('arcade-router-root=%2Fproject%2Fsecond');
+	expect(first).not.toBe(second);
 });

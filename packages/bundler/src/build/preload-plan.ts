@@ -1,3 +1,4 @@
+import { joinURL } from 'ufo';
 import type { ArcadeBundleGraph } from '../types.ts';
 
 export type ModulePreloadPlanInput = {
@@ -6,28 +7,6 @@ export type ModulePreloadPlanInput = {
 	readonly base?: string;
 	readonly minProbability?: number;
 	readonly maxPreloads?: number;
-};
-
-export type SsrModulePreloadPlanInput = Omit<ModulePreloadPlanInput, 'roots'> & {
-	readonly artifact: {
-		readonly payloadView?: {
-			readonly events?: ReadonlyArray<{
-				readonly symbolIds?: ReadonlyArray<string>;
-			}>;
-			readonly domUpdates?: ReadonlyArray<{
-				readonly symbolId?: string;
-			}>;
-			readonly behaviors?: ReadonlyArray<{
-				readonly symbolId?: string;
-			}>;
-			readonly asyncBoundaries?: ReadonlyArray<{
-				readonly asyncReads?: ReadonlyArray<{
-					readonly runnerSymbolId?: string;
-				}>;
-			}>;
-		};
-	};
-	readonly resumeModuleUrl?: string;
 };
 
 export type ModulePreloadRoot =
@@ -72,25 +51,6 @@ const PRIORITY_RANK: Record<ModulePreloadPriority, number> = {
 
 export function planModulePreloadUrls(input: ModulePreloadPlanInput): string[] {
 	return planModulePreloads(input).map((preload) => preload.href);
-}
-
-export function planSsrModulePreloads(
-	input: SsrModulePreloadPlanInput,
-): ModulePreloadPlanEntry[] {
-	return planModulePreloads({
-		...input,
-		roots: [
-			...preloadRootsFromArtifact(input.artifact),
-			...(input.resumeModuleUrl
-				? [
-						{
-							name: bundleGraphRootFromUrl(input.resumeModuleUrl, input.base),
-							priority: 'high' as const,
-						},
-					]
-				: []),
-		],
-	});
 }
 
 export function planModulePreloads(input: ModulePreloadPlanInput): ModulePreloadPlanEntry[] {
@@ -193,45 +153,6 @@ export function planModulePreloads(input: ModulePreloadPlanInput): ModulePreload
 		.map(({ order: _order, ...preload }) => preload);
 }
 
-function preloadRootsFromArtifact(
-	artifact: SsrModulePreloadPlanInput['artifact'],
-): ModulePreloadRoot[] {
-	const view = artifact.payloadView;
-	return [
-		...(view?.events ?? []).flatMap((event) =>
-			(event.symbolIds ?? []).map((name) => ({ name, priority: 'high' as const })),
-		),
-		...(view?.domUpdates ?? []).flatMap((update) =>
-			update.symbolId ? [{ name: update.symbolId, priority: 'low' as const }] : [],
-		),
-		...(view?.behaviors ?? []).flatMap((behavior) =>
-			behavior.symbolId ? [{ name: behavior.symbolId, priority: 'high' as const }] : [],
-		),
-		...(view?.asyncBoundaries ?? []).flatMap((boundary) =>
-			(boundary.asyncReads ?? []).flatMap((read) =>
-				read.runnerSymbolId
-					? [{ name: read.runnerSymbolId, priority: 'low' as const }]
-					: [],
-			),
-		),
-	];
-}
-
-function bundleGraphRootFromUrl(url: string, base: string | undefined): string {
-	const parsed = new URL(url, 'http://arcade.local');
-	const pathname = parsed.pathname;
-	const pathWithQuery = `${pathname}${parsed.search}`;
-	const basePath = base ? new URL(base, 'http://arcade.local').pathname : '';
-	if (basePath && pathname.startsWith(basePath)) {
-		return `${pathname.slice(basePath.length).replace(/^\//, '')}${parsed.search}`;
-	}
-	if (pathname.startsWith('/build/')) {
-		return `${pathname.slice('/build/'.length)}${parsed.search}`;
-	}
-	if (isViteDevModuleUrl(pathWithQuery)) return pathWithQuery;
-	return pathWithQuery.replace(/^\//, '');
-}
-
 function parseBundleGraph(
 	graph: ArcadeBundleGraph | undefined,
 ): ReadonlyMap<string, ParsedBundleGraphRecord> {
@@ -267,9 +188,7 @@ function parseBundleGraph(
 
 function preloadHref(base: string | undefined, name: string): string {
 	if (!base || /^(?:[a-z]+:)?\/\//i.test(name)) return name;
-	const normalizedBase = base.endsWith('/') ? base : `${base}/`;
-	const normalizedName = name.replace(/^(?:\.\/|\/)+/, '');
-	return `${normalizedBase}${normalizedName}`;
+	return joinURL(base, name);
 }
 
 function isPreloadableModuleName(name: string): boolean {
@@ -278,8 +197,7 @@ function isPreloadableModuleName(name: string): boolean {
 
 function isViteDevModuleUrl(name: string): boolean {
 	return (
-		(name.startsWith('/') || name.startsWith('@id/')) &&
-		/(?:^|[?&])import(?:[&#]|$)/.test(name)
+		(name.startsWith('/') || name.startsWith('@id/')) && /(?:^|[?&])import(?:[&#]|$)/.test(name)
 	);
 }
 

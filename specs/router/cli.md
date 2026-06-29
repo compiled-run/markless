@@ -5,7 +5,11 @@ Status: Draft
 The migrated CLI package is `packages/cli` and publishes the create/program
 surface for Arcade apps.
 
-Primary commands:
+The reusable create program must stay host-injected and environment-agnostic.
+Do not ship an executable bin from `packages/cli` until a host-owned adapter
+boundary exists for the target runtime.
+
+Intended commands once host adapters exist:
 
 ```sh
 pnpm create arcade my-app

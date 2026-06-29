@@ -4,7 +4,7 @@ import { createServerEntry } from '../../../src/vite/runtime/create-server-entry
 describe('server entry rendering', () => {
 	it('renders matched Arcade page artifacts inside an HTML document', async () => {
 		const entry = createServerEntry({
-			clientEntryPath: '/@id/virtual:arcade-router/client-entry',
+			resumeEntryPath: '/@id/virtual:arcade-router/resume-entry',
 			documentModuleLoader: async () => ({
 				__arcadeRouterHtmlAttributes: (props: {
 					readonly status: number;
@@ -30,9 +30,9 @@ describe('server entry rendering', () => {
 		expect(html).toContain('<main>Home</main>');
 	});
 
-	it('emits resumability payloads and router client resume entry for interactive pages', async () => {
+	it('emits resumability payloads without waking a client entry on page load', async () => {
 		const entry = createServerEntry({
-			clientEntryPath: '/@id/virtual:arcade-router/client-entry',
+			resumeEntryPath: '/@id/virtual:arcade-router/resume-entry',
 			documentModuleLoader: undefined,
 			pageModuleLoaders: {
 				'pages/index.tsrx': async () => ({
@@ -87,15 +87,14 @@ describe('server entry rendering', () => {
 		expect(html.indexOf('<script type="arcade/route">')).toBeLessThan(
 			html.indexOf('<script type="arcade/state">'),
 		);
-		expect(html).toContain('import("/@id/virtual:arcade-router/client-entry")');
-		expect(html).toContain(
-			'<script type="module" src="/@id/virtual:arcade-router/client-entry"></script>',
-		);
+		expect(html).toContain('import("/@id/virtual:arcade-router/resume-entry")');
+		expect(html).not.toContain('<script type="module"');
+		expect(html).not.toContain('src="/@id/virtual:arcade-router/resume-entry"');
 	});
 
 	it('renders the document module shell around routed page output', async () => {
 		const entry = createServerEntry({
-			clientEntryPath: '/@id/virtual:arcade-router/client-entry',
+			resumeEntryPath: '/@id/virtual:arcade-router/resume-entry',
 			documentModuleLoader: async () => ({
 				__arcadeRouterHtmlAttributes: (props: { readonly status: number }) => ({
 					lang: 'en',
@@ -126,9 +125,8 @@ describe('server entry rendering', () => {
 			'<!doctype html><html lang="en" data-status="200"><head><title>/docs</title></head><body class="docs"><div data-async-container>',
 		);
 		expect(html).toContain('<main>Docs</main>');
-		expect(html).toContain(
-			'<script type="module" src="/@id/virtual:arcade-router/client-entry"></script></body></html>',
-		);
+		expect(html).not.toContain('<script type="module"');
+		expect(html).toContain('</body></html>');
 	});
 
 	it('renders matched compiler SSR exports before a default artifact wrapper is available', async () => {

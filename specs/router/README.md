@@ -13,8 +13,17 @@ file-routing and typed-route ideas, but its authoring contract is Arcade-first:
 - The router TypeScript plugin lives inside `packages/router`.
 - Top-level `api/`, `middleware/`, `pages/`, `document.tsrx`, and `public/`
   remain the app shape.
-- MDX is supported as a route file type. Importing and using TSRX components
-  inside MDX is explicitly future work.
+- MDX is supported as a route file type. MDX routes may default-import `.tsrx`
+  component artifacts and render them as MDX JSX elements. Router MDX lowers
+  component props from Satteri MDX/ESTree data for string attributes, boolean
+  shorthand attributes, and literal-safe expression attributes. Nested static
+  MDX children are passed through the TSRX `children` prop as escaped rendered
+  HTML.
+- Arcade Router MDX does not execute arbitrary MDX JavaScript during browser
+  resume. Spread attributes, non-literal expression attributes, non-literal
+  inline MDX expressions, and non-`.tsrx` component imports are unsupported
+  until the router has an explicit MDX scope/payload contract for preserving
+  those semantics without hydration or VDOM behavior.
 
 Read order:
 

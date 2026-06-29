@@ -1,6 +1,6 @@
-import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { access, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { join } from 'pathe';
 import { afterEach, expect, test } from 'vitest';
 import {
 	CreateProgram,
@@ -41,27 +41,38 @@ test('keeps supported project choices and package shape visible', async () => {
 	const packageJson = JSON.parse(
 		await readFile(new URL('../package.json', import.meta.url), 'utf-8'),
 	) as {
-		bin: Record<string, string>;
+		bin?: Record<string, string>;
 		files: string[];
 		name: string;
 	};
 
 	expect(packageJson).toMatchObject({
-		bin: {
-			arcade: './src/node.ts',
-			'create-arcade': './src/node.ts',
-		},
 		name: '@arcade/cli',
 	});
+	expect(packageJson.bin).toBeUndefined();
 	expect(packageJson.files).toContain('templates');
+	await expect(access(new URL('../src/cli.ts', import.meta.url))).rejects.toThrow();
+	await expect(access(new URL('../src/node.ts', import.meta.url))).rejects.toThrow();
+
+	const viteConfig = await readFile(new URL('../../../vite.config.ts', import.meta.url), 'utf-8');
+	expect(viteConfig).toContain("'cli/index': './packages/cli/src/index.ts'");
+	expect(viteConfig).not.toContain("'cli/cli'");
+	expect(viteConfig).not.toContain("'cli/node'");
 });
 
 test('keeps CLI templates external and uses shared path and URL helpers', async () => {
 	const source = await readFile(new URL('../src/index.ts', import.meta.url), 'utf-8');
+	const sourceFiles = await readdir(new URL('../src/', import.meta.url));
+	const sources = await Promise.all(
+		sourceFiles.map((file) => readFile(new URL(`../src/${file}`, import.meta.url), 'utf-8')),
+	);
+	const sourceText = sources.join('\n');
 
 	expect(source).toContain("from 'pathe'");
 	expect(source).toContain("from 'ufo'");
-	expect(source).not.toMatch(/from 'node:(child_process|fs|fs\/promises|path|process|url)'/);
+	expect(sourceText).not.toMatch(/from 'node:(child_process|fs|fs\/promises|path|process|url)'/);
+	expect(sourceText).not.toMatch(/\bprocess\./);
+	expect(sourceText).not.toContain('spawnSync');
 	expect(source).not.toContain('function docsHomePage');
 	expect(source).not.toContain('function tsconfig');
 	expect(source).not.toContain('function packageManifest');

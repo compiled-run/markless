@@ -11,6 +11,8 @@ type ViteEnvironmentLike = {
 	config?: ViteEnvironmentConfig;
 };
 
+const UNMANAGED_VITE_ENVIRONMENTS = new Set(['nitro']);
+
 export interface ArcadeViteEnvironmentOptions {
 	clientEnvironment?: string;
 	serverEnvironment?: string;
@@ -31,6 +33,10 @@ export function viteEnvironmentName(
 
 export function arcadeEnvironment(environment: ViteEnvironmentLike | undefined) {
 	const config = environment?.config;
+	if (isUnmanagedViteEnvironment(environment)) {
+		return 'lib';
+	}
+
 	if (!config) {
 		return 'client';
 	}
@@ -47,12 +53,20 @@ export function arcadeEnvironment(environment: ViteEnvironmentLike | undefined) 
 }
 
 export function isServerViteEnvironment(environment: ViteEnvironmentLike | undefined) {
+	if (isUnmanagedViteEnvironment(environment)) {
+		return false;
+	}
+
 	const consumer = environment?.config?.consumer;
 	if (consumer) {
 		return consumer === 'server';
 	}
 
 	return environment?.name !== undefined && environment.name !== 'client';
+}
+
+function isUnmanagedViteEnvironment(environment: ViteEnvironmentLike | undefined) {
+	return !!environment?.name && UNMANAGED_VITE_ENVIRONMENTS.has(environment.name);
 }
 
 export function transformArcadeRequest(

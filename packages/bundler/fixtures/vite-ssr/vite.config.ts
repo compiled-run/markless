@@ -16,7 +16,7 @@ export default defineConfig(({ command }) => ({
 		ssr: {
 			build: {
 				rolldownOptions: {
-					input: 'src/root.tsrx',
+					input: './src/root.tsrx',
 				},
 			},
 		},

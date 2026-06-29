@@ -25,7 +25,8 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 	const rootComponentName = input.semanticGraph.components[0]?.name;
 	const componentCount = input.semanticGraph.components.length;
 	const root = publicRenderRoot(input, rootComponentName);
-	const canUseDirectCsrModule = !!root && root.propNames.length === 0;
+	const canUseDirectCsrModule =
+		!!root && root.propNames.length === 0 && input.semanticGraph.componentEdges.length === 0;
 	const moduleSource = canUseDirectCsrModule
 		? emitDirectPublicRenderModule({
 				componentName: rootComponentName,
@@ -543,7 +544,7 @@ function componentPropsSource(
 	edge: ComponentEdge | undefined,
 	callbackSymbols: ReadonlyMap<string, string>,
 ): string[] {
-	return getElementAttributes(node).flatMap((attribute) => {
+	const props = getElementAttributes(node).flatMap((attribute) => {
 		const name = getIdentifierName(attribute.name as AnyNode | undefined);
 		if (!name) return [];
 		const callbackSymbolId = edge ? callbackSymbols.get(`${edge.id}:${name}`) : undefined;
@@ -552,6 +553,11 @@ function componentPropsSource(
 		}
 		return componentAttributePropSource(attribute, source);
 	});
+	const children = emitHtmlChildren(node, { mode: 'csr', source });
+	if (children !== '""') {
+		props.push(`children: ${children}`);
+	}
+	return props;
 }
 
 function ssrComponentPropsSource(

@@ -1,6 +1,6 @@
 import type { InputOptions, Plugin } from 'rolldown';
-import { resolve } from 'pathe';
-import { parsePath } from 'ufo';
+import { isAbsolute, relative, resolve } from 'pathe';
+import { joinURL, parsePath, withQuery, withoutLeadingSlash } from 'ufo';
 import { ARCADE_BUILD_PREFIX, ARCADE_BUNDLE_GRAPH, outputDefaults } from './build/chunking.ts';
 import {
 	ARCADE_MANIFEST,
@@ -400,8 +400,8 @@ function devBrowserVirtualModuleUrl(
 	virtualId: string,
 	publicPath: ((fileName: string) => string) | undefined,
 ) {
-	const path = `@id/${resolveVirtualId(virtualId).replace('\0', '__x00__')}`;
-	return publicPath ? publicPath(path) : `/${path}`;
+	const path = joinURL('@id', resolveVirtualId(virtualId).replace('\0', '__x00__'));
+	return publicPath ? publicPath(path) : joinURL('/', path);
 }
 
 function devBrowserSourceModuleUrl(
@@ -409,13 +409,17 @@ function devBrowserSourceModuleUrl(
 	root: string | undefined,
 	publicPath: ((fileName: string) => string) | undefined,
 ) {
-	const normalizedRoot = root && root.endsWith('/') ? root : root ? `${root}/` : '';
+	const relativeSource = root ? relative(root, source) : '';
 	const fileName =
-		normalizedRoot && source.startsWith(normalizedRoot)
-			? source.slice(normalizedRoot.length)
-			: `@fs/${source.startsWith('/') ? source.slice(1) : source}`;
-	const path = `${fileName}?import`;
-	return publicPath ? publicPath(path) : `/${path}`;
+		root && isRootRelativePath(relativeSource)
+			? relativeSource
+			: joinURL('@fs', withoutLeadingSlash(source));
+	const path = withQuery(fileName, { import: null });
+	return publicPath ? publicPath(path) : joinURL('/', path);
+}
+
+function isRootRelativePath(path: string): boolean {
+	return path !== '' && path !== '..' && !path.startsWith('../') && !isAbsolute(path);
 }
 
 function clientSymbolEntries(input: unknown, root: string | undefined): string[] {
@@ -441,7 +445,7 @@ function inputEntryValues(value: unknown): unknown[] {
 
 function normalizeInputSource(source: string, root: string | undefined) {
 	const path = pathname(source);
-	if (path.startsWith('/')) return path;
+	if (isAbsolute(path)) return path;
 	return pathname(resolve(root ?? '', path));
 }
 

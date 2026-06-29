@@ -125,24 +125,62 @@ export const Link = Object.assign(
 		return props.children;
 	},
 	{
+		renderCsr(props: LinkProps = {}) {
+			const anchor = document.createElement('a');
+			for (const [name, value] of linkAnchorAttributes(props)) {
+				anchor.setAttribute(name, value);
+			}
+			anchor.innerHTML = linkChildrenHtml(props);
+			return { root: anchor };
+		},
 		renderSsr(props: LinkProps = {}) {
-			const href = typeof props.href === 'string' ? props.href : '#';
-			const attributes = [
-				`href="${escapeHtml(href)}"`,
-				'data-arcade-router-link',
-				typeof props.class === 'string' ? `class="${escapeHtml(props.class)}"` : '',
-				typeof props.id === 'string' ? `id="${escapeHtml(props.id)}"` : '',
-				typeof props.target === 'string' ? `target="${escapeHtml(props.target)}"` : '',
-				typeof props.rel === 'string' ? `rel="${escapeHtml(props.rel)}"` : '',
-				props.replace ? 'data-arcade-router-replace' : '',
-				props.scroll === false ? 'data-arcade-router-scroll="manual"' : '',
-			].filter(Boolean);
-			const children = props.children == null ? '' : String(props.children);
+			const attributes = linkAnchorAttributes(props).map(([name, value]) =>
+				value === '' ? name : `${name}="${escapeHtml(value)}"`,
+			);
 
-			return { html: `<a ${attributes.join(' ')}>${children}</a>` };
+			return { html: `<a ${attributes.join(' ')}>${linkChildrenHtml(props)}</a>` };
 		},
 	},
 );
+
+function linkAnchorAttributes(props: LinkProps): Array<readonly [string, string]> {
+	const attributes = new Map<string, string>();
+	const input = props as Record<string, unknown>;
+
+	for (const [name, value] of Object.entries(input)) {
+		if (isLinkInternalProp(name)) continue;
+		const attributeValue = linkAttributeValue(value);
+		if (attributeValue !== undefined) attributes.set(name, attributeValue);
+	}
+
+	attributes.set('href', typeof props.href === 'string' ? props.href : '#');
+	attributes.set('data-arcade-router-link', '');
+	if (props.replace) attributes.set('data-arcade-router-replace', '');
+	if (props.scroll === false) attributes.set('data-arcade-router-scroll', 'manual');
+	return [...attributes];
+}
+
+function isLinkInternalProp(name: string): boolean {
+	return (
+		name === 'children' ||
+		name === 'params' ||
+		name === 'prefetch' ||
+		name === 'replace' ||
+		name === 'scroll' ||
+		name === '__arcadeSsrCallbacks'
+	);
+}
+
+function linkAttributeValue(value: unknown): string | undefined {
+	if (value === true) return '';
+	if (value === false || value == null) return undefined;
+	if (typeof value === 'function' || typeof value === 'symbol') return undefined;
+	return String(value);
+}
+
+function linkChildrenHtml(props: LinkProps): string {
+	return props.children == null ? '' : String(props.children);
+}
 
 function escapeHtml(value: string): string {
 	return value

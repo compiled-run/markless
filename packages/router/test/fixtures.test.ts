@@ -1,12 +1,11 @@
 import { readdir, readFile } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
-import { join, relative } from 'pathe';
+import { join, relative, resolve } from 'pathe';
 import { expect, test } from 'vitest';
 import { buildRouteManifestFromFileIds, type RouteManifest } from '../src/route-manifest.ts';
 import { createRouteTypesDeclaration } from '../src/route-types.ts';
 import { parseRequestFile, transformRequestFileSource } from '../src/request-files.ts';
 
-const repoRoot = fileURLToPath(new URL('../../..', import.meta.url));
+const repoRoot = resolve(import.meta.dirname, '../../..');
 const fixturesRoot = join(repoRoot, 'fixtures');
 const ignoredFixtureEntries = new Set([
 	'.arcade',
@@ -78,12 +77,16 @@ test('router full-stack fixture separates UI, request, and public artifacts', as
 		'package.json',
 		'pages/404.tsrx',
 		'pages/500.tsrx',
+		'pages/about.tsrx',
 		'pages/index.tsrx',
 		'public/arcade-router.txt',
 		'tsconfig.json',
 		'vite.config.ts',
 	]);
-	expect(routePairs(manifest)).toEqual([['/', 'pages/index.tsrx']]);
+	expect(routePairs(manifest)).toEqual([
+		['/', 'pages/index.tsrx'],
+		['/about', 'pages/about.tsrx'],
+	]);
 	expect(manifest.statusPages).toEqual({
 		error: 'pages/500.tsrx',
 		notFound: 'pages/404.tsrx',

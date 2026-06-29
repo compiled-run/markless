@@ -1,5 +1,5 @@
 import { normalize } from 'pathe';
-import { parsePath } from 'ufo';
+import { parsePath, withLeadingSlash } from 'ufo';
 import type { ArcadeEnvironment } from './types.ts';
 
 export function createArcadeDevGraph() {
@@ -49,12 +49,9 @@ const allEnvironments: readonly ArcadeEnvironment[] = ['client', 'server', 'lib'
 function parentKeys(parent: string) {
 	const path = pathname(parent);
 	const normalized = normalize(path);
-	let withLeadingSlash = normalized;
-	if (!withLeadingSlash.startsWith('/')) {
-		withLeadingSlash = `/${withLeadingSlash}`;
-	}
-	const barePath = withLeadingSlash.slice(1);
-	return new Set([path, normalized, withLeadingSlash, barePath]);
+	const leadingPath = withLeadingSlash(normalized);
+	const barePath = leadingPath.slice(1);
+	return new Set([path, normalized, leadingPath, barePath]);
 }
 
 function parentKey(environment: ArcadeEnvironment, parent: string) {

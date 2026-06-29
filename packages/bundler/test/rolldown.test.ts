@@ -129,7 +129,7 @@ describe('TSRX Rolldown plugin structure', () => {
 		});
 
 		expect(result.code).toContain('renderSsr(props) {');
-		expect(result.code).toContain('<h1>Arcade Router</h1>');
+		expect(result.code).toContain('"<h1>" + "Arcade Router" + "</h1>"');
 		expect(result.code).toContain(
 			'import { Link as __arcadeSsrComponent0 } from "arcade/router";',
 		);
@@ -143,7 +143,12 @@ describe('TSRX Rolldown plugin structure', () => {
 			environment: 'client',
 		});
 
-		expect(result.code).toContain("import { preloadLazySymbolModules } from 'arcade/preload';");
+		expect(result.code).not.toContain(
+			"import { preloadLazySymbolModules } from 'arcade/preload';",
+		);
+		expect(result.code).toContain(
+			'const { preloadLazySymbolModules } = await import("arcade/preload");',
+		);
 		expect(result.code).toContain('preload: preloadCsrLazySymbols,');
 		expect(result.code).toContain('export default arcadeCompiledApp;');
 		expect(result.code).not.toContain('renderSsr(props) {');

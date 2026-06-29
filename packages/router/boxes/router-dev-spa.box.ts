@@ -6,11 +6,11 @@ const WAIT = { timeoutMs: 10_000 };
 
 export default box(
 	{
-		name: 'router dev browser: SPA Link navigates to docs without reload',
-		tags: ['router', 'dev', 'browser', 'spa', 'navigation-api'],
+		name: 'router dev browser: Link uses document navigation and resumes docs lazily',
+		tags: ['router', 'dev', 'browser', 'resume'],
 		modes: ['dev'],
 	},
-	async ({ pipeline, browser, expect, receipt }) => {
+	async ({ pipeline, browser, environment, expect, receipt }) => {
 		await pipeline.dev({
 			config: (config) => ({
 				...config,
@@ -18,6 +18,13 @@ export default box(
 				configFile: `${config.root}/${FIXTURE}/vite.config.ts`,
 			}),
 		});
+		const indexHtml = await environment.client.request('/');
+		if (
+			indexHtml.includes('<script type="module" src="/@id/virtual:arcade-router') ||
+			indexHtml.includes('__arcadeRouterStartSpaNavigation')
+		) {
+			throw new Error('Router dev HTML must not wake the Arcade router runtime on SSR startup.');
+		}
 
 		const page = await browser.visit('/');
 
@@ -29,12 +36,15 @@ export default box(
 			{ contains: 'This MDX route is part of the top-level Arcade Router fixture.' },
 			WAIT,
 		);
+		await expect.page.text(page, '[data-mdx-counter]', 'MDX Count 0', WAIT);
+		await page.click('[data-mdx-counter]', WAIT);
+		await expect.page.text(page, '[data-mdx-counter]', 'MDX Count 1', WAIT);
 		const documentRequests = (await page.networkRequests()).filter(
 			(request) => request.resourceType === 'Document',
 		);
-		if (documentRequests.length !== 1) {
+		if (documentRequests.length < 2) {
 			throw new Error(
-				`Expected SPA Link to avoid a document reload, saw document requests:\n${documentRequests
+				`Expected Link to use document navigation, saw document requests:\n${documentRequests
 					.map((request) => `${request.method} ${request.url}`)
 					.join('\n')}`,
 			);
@@ -44,6 +54,6 @@ export default box(
 			{ consoleErrors: 0, failedRequests: 0, navigations: 1 },
 			WAIT,
 		);
-		await receipt.capture('router dev browser SPA Link rendered docs route without reload');
+		await receipt.capture('router dev browser Link document navigation lazy-resumed docs route');
 	},
 );

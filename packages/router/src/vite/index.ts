@@ -9,7 +9,15 @@ import {
 	type UserConfig,
 } from 'vite';
 import type { InputOption } from 'rolldown';
-import { decodePath, joinURL, parseURL, withoutLeadingSlash } from 'ufo';
+import {
+	decodePath,
+	joinURL,
+	parsePath,
+	parseQuery,
+	parseURL,
+	stringifyQuery,
+	withoutLeadingSlash,
+} from 'ufo';
 import { transformRequestFileSource } from '../request-files.ts';
 import { anchorTransformPlugin } from './anchor-transform.ts';
 import { htmlTransformPlugin } from './html-transform.ts';
@@ -18,12 +26,13 @@ import { routeTypegenPlugin } from './route-typegen.ts';
 
 const ROUTE_DISCOVERY_ID = 'virtual:arcade-router/routes';
 const CLIENT_ENTRY_ID = 'virtual:arcade-router/client-entry';
-const CLIENT_ENTRY_ORIGIN = '/entries/client-entry.ts';
-const CLIENT_ENTRY_PATH_ID = 'virtual:arcade-router/client-entry-path';
+const RESUME_ENTRY_ID = 'virtual:arcade-router/resume-entry';
+const RESUME_ENTRY_ORIGIN = '/entries/resume-entry.ts';
+const RESUME_ENTRY_PATH_ID = 'virtual:arcade-router/resume-entry-path';
 const SERVER_ENTRY_ID = 'virtual:arcade-router/server-entry';
 const ROUTE_HREF_ID = 'virtual:arcade-router/route-href';
 const PUBLIC_VIRTUAL_MODULE_ID_RE =
-	/^virtual:arcade-router\/(?:routes|client-entry|client-entry-path|server-entry|route-href)$/;
+	/^virtual:arcade-router\/(?:routes|client-entry|resume-entry|resume-entry-path|server-entry|route-href)(?:\?.*)?$/;
 const VITE_PLUGIN_FILE = decodePath(parseURL(import.meta.url).pathname);
 const VIRTUAL_ENTRY_DIR = VITE_PLUGIN_FILE.endsWith('.ts')
 	? join(dirname(VITE_PLUGIN_FILE), 'entries')
@@ -39,6 +48,7 @@ const DEFAULT_WATCH_IGNORES = [
 const virtualEntryFiles = {
 	[ROUTE_DISCOVERY_ID]: 'route-discovery.ts',
 	[CLIENT_ENTRY_ID]: 'client-entry.ts',
+	[RESUME_ENTRY_ID]: 'resume-entry.ts',
 	[SERVER_ENTRY_ID]: 'server-entry.ts',
 	[ROUTE_HREF_ID]: 'route-href.ts',
 } as const;
@@ -60,23 +70,23 @@ export function router(options: ArcadeRouterOptions = {}): PluginOption[] {
 	}
 
 	const nitroPlugins = nitro();
-	const clientEntry = clientEntryState();
+	const resumeEntry = resumeEntryState();
 
 	return [
-		routerConfigPlugin(nitroPlugins, clientEntry),
+		routerConfigPlugin(nitroPlugins, resumeEntry),
 		mdxTransformPlugin(),
 		requestFileTransformPlugin(),
 		routeTypegenPlugin(),
 		anchorTransformPlugin(),
 		htmlTransformPlugin(),
-		virtualModulesPlugin(clientEntry),
+		virtualModulesPlugin(resumeEntry),
 		nitroPlugins,
 	];
 }
 
 function routerConfigPlugin(
 	nitroPluginsFromRouter: readonly Plugin[],
-	clientEntry: ClientEntryState,
+	resumeEntry: ResumeEntryState,
 ): Plugin {
 	return {
 		name: 'arcade-router:vite',
@@ -85,11 +95,14 @@ function routerConfigPlugin(
 			throwIfUserAddedNitro(config.plugins, nitroPluginsFromRouter);
 			config.environments ??= {};
 			const ssrEnvironment = (config.environments.ssr ??= {}) as {
-				build?: { rollupOptions?: { input?: unknown } };
+				build?: { rolldownOptions?: { input?: unknown } };
 			};
 			ssrEnvironment.build ??= {};
-			ssrEnvironment.build.rollupOptions ??= {};
-			ssrEnvironment.build.rollupOptions.input ??= SERVER_ENTRY_ID;
+			ssrEnvironment.build.rolldownOptions ??= {};
+			ssrEnvironment.build.rolldownOptions.input ??= scopedVirtualEntryId(
+				SERVER_ENTRY_ID,
+				config.root,
+			);
 
 			const serverWatch = withWatchIgnores(config.server?.watch);
 
@@ -102,7 +115,7 @@ function routerConfigPlugin(
 			};
 		},
 		configResolved(config) {
-			clientEntry.base = config.base;
+			resumeEntry.base = config.base;
 		},
 		configEnvironment(_name, config) {
 			configureRouteInputs(config);
@@ -113,10 +126,10 @@ function routerConfigPlugin(
 			}
 
 			const chunk = Object.values(bundle).find(
-				(item) => item.type === 'chunk' && isClientEntryChunk(item),
+				(item) => item.type === 'chunk' && isResumeEntryChunk(item),
 			);
 			if (chunk) {
-				clientEntry.fileName = chunk.fileName;
+				resumeEntry.fileName = chunk.fileName;
 			}
 		},
 	};
@@ -126,9 +139,16 @@ function configureRouteInputs(config: EnvironmentOptions): void {
 	config.build ??= {};
 	config.build.rolldownOptions ??= {};
 	if (config.consumer === 'client') {
-		config.build.rolldownOptions.input = clientInput(config.build.rolldownOptions.input);
+		config.build.rolldownOptions.input = resumeInput(
+			config.build.rolldownOptions.input,
+			configRoot(config),
+		);
+		config.build.rolldownOptions.preserveEntrySignatures ??= 'exports-only';
 	} else {
-		config.build.rolldownOptions.input ??= SERVER_ENTRY_ID;
+		config.build.rolldownOptions.input ??= scopedVirtualEntryId(
+			SERVER_ENTRY_ID,
+			configRoot(config),
+		);
 		config.build.rolldownOptions.external = withExternal(
 			config.build.rolldownOptions.external,
 			'nitro',
@@ -218,9 +238,10 @@ function createNitroConfig(
 	return {
 		...nitroConfig,
 		apiDir: nitroConfig?.apiDir ?? 'api',
-		...(nitroConfig?.devServer ? { devServer: nitroConfig.devServer } : {}),
+		devServer: nitroConfig?.devServer,
 		routesDir: nitroConfig?.routesDir ?? '.arcade/router/nitro-routes',
 		rolldownConfig: withRequestFileBuildPlugin(nitroConfig?.rolldownConfig, root),
+		rollupConfig: withRequestFileBuildPlugin(nitroConfig?.rollupConfig, root),
 		scanDirs: [...new Set(['.', ...scanDirs])],
 		watchOptions,
 	} as NonNullable<UserConfig['nitro']>;
@@ -291,66 +312,119 @@ function isRecord(input: unknown): input is Record<string, unknown> {
 	return typeof input === 'object' && input !== null;
 }
 
-interface ClientEntryState {
+interface ResumeEntryState {
 	base: string;
 	fileName: string | undefined;
 }
 
-function clientEntryState(): ClientEntryState {
+function resumeEntryState(): ResumeEntryState {
 	return { base: '/', fileName: undefined };
 }
 
-function clientInput(input: InputOption | undefined): InputOption | undefined {
+function resumeInput(input: InputOption | undefined, root: string): InputOption | undefined {
+	const resumeEntryId = scopedVirtualEntryId(RESUME_ENTRY_ID, root);
 	if (input === undefined) {
-		return CLIENT_ENTRY_ID;
+		return resumeEntryId;
 	}
 
 	if (typeof input === 'string' || Array.isArray(input)) {
-		return [CLIENT_ENTRY_ID, ...(Array.isArray(input) ? input : [input])];
+		return [resumeEntryId, ...(Array.isArray(input) ? input : [input])];
 	}
 
 	if (isRecord(input)) {
-		return { ...input, 'arcade-router-client': CLIENT_ENTRY_ID };
+		return { ...input, 'arcade-router-resume': resumeEntryId };
 	}
 
 	return input;
 }
 
-function isClientEntryChunk(chunk: {
+function isResumeEntryChunk(chunk: {
 	readonly facadeModuleId?: string | null;
 	readonly moduleIds?: readonly string[];
 }) {
 	return [chunk.facadeModuleId, ...(chunk.moduleIds ?? [])].some((id) =>
-		id?.endsWith(CLIENT_ENTRY_ORIGIN),
+		id ? decodePath(parseURL(id).pathname).endsWith(RESUME_ENTRY_ORIGIN) : false,
 	);
 }
 
-function virtualModulesPlugin(clientEntry: ClientEntryState = clientEntryState()): Plugin {
+function virtualModulesPlugin(resumeEntry: ResumeEntryState = resumeEntryState()): Plugin {
+	let root = '';
+
 	return {
 		name: 'arcade-router:routes',
+		configResolved(config) {
+			root = config.root;
+		},
 		resolveId: {
 			filter: {
 				id: PUBLIC_VIRTUAL_MODULE_ID_RE,
 			},
 			handler(id) {
-				if (id === CLIENT_ENTRY_PATH_ID) {
-					return id;
+				const baseId = virtualModuleBaseId(id);
+				if (baseId === SERVER_ENTRY_ID) {
+					return `\0${baseId}${rootScopeQuery(root, id)}`;
+				}
+				if (baseId === RESUME_ENTRY_PATH_ID) {
+					return `\0${baseId}${rootScopeQuery(root, id)}`;
 				}
 
-				const entryFile = virtualEntryFiles[id as keyof typeof virtualEntryFiles];
+				const entryFile = virtualEntryFiles[baseId as keyof typeof virtualEntryFiles];
 				if (!entryFile) {
 					return undefined;
 				}
-				return join(VIRTUAL_ENTRY_DIR, entryFile);
+				return `${join(VIRTUAL_ENTRY_DIR, entryFile)}${rootScopeQuery(root, id)}`;
 			},
 		},
 		load(id) {
-			if (id === CLIENT_ENTRY_PATH_ID) {
-				const path = clientEntry.fileName
-					? joinURL(clientEntry.base, clientEntry.fileName)
-					: joinURL(clientEntry.base, '@id', CLIENT_ENTRY_ID);
-				return `export const clientEntryPath = ${JSON.stringify(path)};`;
+			if (id.startsWith(`\0${SERVER_ENTRY_ID}`)) {
+				return serverEntrySource(root);
+			}
+			if (id.startsWith(`\0${RESUME_ENTRY_PATH_ID}`)) {
+				const path = resumeEntry.fileName
+					? joinURL(resumeEntry.base, resumeEntry.fileName)
+					: joinURL(resumeEntry.base, '@id', scopedVirtualEntryId(RESUME_ENTRY_ID, root));
+				return `export const resumeEntryPath = ${JSON.stringify(path)};`;
 			}
 		},
 	};
+}
+
+function serverEntrySource(root: string): string {
+	const query = rootScopeQuery(root);
+	return [
+		`import { createServerEntry } from '@arcade/router/vite/runtime/create-server-entry';`,
+		`import { resumeEntryPath } from '${RESUME_ENTRY_PATH_ID}${query}';`,
+		`import { pageModuleLoaders, routeFileIds } from '${ROUTE_DISCOVERY_ID}${query}';`,
+		`const documentModuleLoaders = import.meta.glob(['/document.tsrx']);`,
+		`const entry = createServerEntry({`,
+		`  resumeEntryPath,`,
+		`  documentModuleLoader: documentModuleLoaders['/document.tsrx'],`,
+		`  pageModuleLoaders,`,
+		`  routeFileIds,`,
+		`});`,
+		`export const fetch = entry.fetch;`,
+		`export default entry;`,
+	].join('\n');
+}
+
+function rootScopeQuery(root: string, id = ''): string {
+	const parsed = parsePath(id);
+	const query = stringifyQuery({
+		...parseQuery(parsed.search),
+		'arcade-router-root': root || '.',
+	});
+	return query ? `?${query}` : '';
+}
+
+function scopedVirtualEntryId(id: string, root: string | undefined): string {
+	return `${virtualModuleBaseId(id)}${rootScopeQuery(root ?? '.', id)}`;
+}
+
+function virtualModuleBaseId(id: string): string {
+	return parsePath(id).pathname;
+}
+
+function configRoot(config: EnvironmentOptions): string {
+	const root = (config as { readonly root?: unknown }).root;
+	return typeof root === 'string' ? root : '.';
 }
