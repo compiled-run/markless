@@ -14,19 +14,35 @@ export type Choice<T extends string> = {
 };
 
 export const PROJECT_FORMAT_CHOICES = [
-	{ value: 'node', label: 'Node', hint: 'package.json' },
-	{ value: 'bun', label: 'Bun', hint: 'package.json' },
-	{ value: 'deno', label: 'Deno', hint: 'deno.json' },
+	{
+		value: 'node',
+		label: 'Node',
+		hint: 'Creates a package.json project for pnpm, npm, or yarn.',
+	},
+	{ value: 'deno', label: 'Deno', hint: 'Creates a deno.json project with npm: imports.' },
+	{ value: 'bun', label: 'Bun', hint: 'Creates a package.json project tuned for Bun.' },
 ] as const satisfies readonly Choice<ProjectFormat>[];
 
 export const STARTER_CHOICES = [
-	{ value: 'minimal', label: 'Minimal', hint: 'one page' },
-	{ value: 'app', label: 'App', hint: 'document shell and status pages' },
-	{ value: 'docs', label: 'Docs', hint: 'MDX pages' },
+	{
+		value: 'minimal',
+		label: 'Learn Arcade',
+		hint: 'A small TSRX counter app. Best first project.',
+	},
+	{
+		value: 'app',
+		label: 'Build an app',
+		hint: 'A routed app with document.tsrx plus 404 and 500 pages.',
+	},
+	{
+		value: 'docs',
+		label: 'Write docs',
+		hint: 'An MDX docs site with a layout and sidebar components.',
+	},
 	{
 		value: 'full-stack',
-		label: 'Full-stack',
-		hint: 'app plus api/ and middleware/',
+		label: 'Full-stack app',
+		hint: 'App routes plus api/ and middleware/ files.',
 	},
 ] as const satisfies readonly Choice<Starter>[];
 
@@ -62,11 +78,35 @@ export interface ProgramCommandResult {
 	readonly status: number | null;
 }
 
+export interface ProgramPromptTextOptions {
+	readonly message: string;
+	readonly placeholder?: string;
+	readonly defaultValue?: string;
+	readonly initialValue?: string;
+	readonly validate?: (value: string) => string | undefined;
+}
+
+export interface ProgramPromptSelectOptions<T extends string> {
+	readonly message: string;
+	readonly options: readonly Choice<T>[];
+	readonly initialValue: T;
+}
+
+export interface ProgramPrompts {
+	intro(message: string): void;
+	note(message: string, title?: string): void;
+	select<T extends string>(options: ProgramPromptSelectOptions<T>): Promise<T>;
+	text(options: ProgramPromptTextOptions): Promise<string>;
+	outro(message: string): void;
+	cancel(message: string): void;
+}
+
 export interface ProgramRuntime {
 	cwd(): string;
 	env: Record<string, string | undefined>;
 	fs: ProgramFileSystem;
 	isTTY: boolean;
+	prompts?: ProgramPrompts;
 	stdout?: ProgramWritable;
 	stderr?: ProgramWritable;
 	spawn?: (
@@ -112,6 +152,7 @@ type StarterFile = {
 	readonly contents: string;
 };
 
+const DEFAULT_TARGET = 'my-arcade-app';
 const TEMPLATE_ROOT = new URL('../templates/', import.meta.url);
 
 export class CreateProgram {
@@ -159,7 +200,96 @@ export class CreateProgram {
 			};
 		}
 
-		throw new Error('Interactive create prompts are not wired yet. Pass --yes for now.');
+		if (!runtime.prompts) {
+			throw new Error(
+				'Interactive create prompts require the current runtime to provide prompts.',
+			);
+		}
+
+		const prompts = runtime.prompts;
+		prompts.intro('Welcome to Arcade');
+		prompts.note(
+			'Choose a starting point, and Arcade will set up the routes, scripts, and defaults.',
+			"Let's build you an app.",
+		);
+		const starter =
+			input.starter ??
+			(await prompts.select({
+				initialValue: 'minimal',
+				message: 'What are you building today?',
+				options: STARTER_CHOICES,
+			}));
+		const target =
+			input.target ??
+			(await prompts.text({
+				defaultValue: DEFAULT_TARGET,
+				initialValue: DEFAULT_TARGET,
+				message: 'What should we call it?',
+				placeholder: DEFAULT_TARGET,
+				validate: validateTargetMessage,
+			}));
+		const format =
+			input.format ??
+			(await prompts.select({
+				initialValue: 'node',
+				message: 'Where should it run?',
+				options: PROJECT_FORMAT_CHOICES,
+			}));
+		const install =
+			input.install ??
+			(await prompts.select({
+				initialValue: 'yes',
+				message: 'Install dependencies now?',
+				options: [
+					{
+						value: 'yes',
+						label: 'Yes',
+						hint: `Runs ${input.packageManager} install after files are created.`,
+					},
+					{
+						value: 'no',
+						label: 'No',
+						hint: 'Leaves dependencies for you to install later.',
+					},
+				],
+			})) === 'yes';
+		const git =
+			input.git ??
+			(await prompts.select({
+				initialValue: 'yes',
+				message: 'Initialize git?',
+				options: [
+					{ value: 'yes', label: 'Yes', hint: 'Runs git init in the app directory.' },
+					{ value: 'no', label: 'No', hint: 'Leaves version control untouched.' },
+				],
+			})) === 'yes';
+		const options = {
+			target,
+			format,
+			starter,
+			install,
+			git,
+			force: input.force,
+			packageManager: input.packageManager,
+			cwd: input.cwd,
+		};
+
+		prompts.note(creationSummary(options), 'Ready to create?');
+		const action = await prompts.select({
+			initialValue: 'create',
+			message: 'Ready to create?',
+			options: [
+				{ value: 'create', label: 'Create app', hint: '' },
+				{ value: 'cancel', label: 'Cancel', hint: '' },
+			],
+		});
+
+		if (action !== 'create') {
+			prompts.cancel('Create cancelled.');
+			throw new Error('Create cancelled.');
+		}
+
+		return options;
 	}
 
 	async execute(options: CreateOptions, runtime: ProgramRuntime): Promise<void> {
@@ -176,8 +306,13 @@ export class CreateProgram {
 			runCommand(runtime, options.packageManager, ['install'], targetDir);
 		}
 
-		runtime.stdout?.write(`Created ${options.target}\n`);
-		runtime.stdout?.write(`Next:\n  cd ${options.target}\n  ${options.packageManager} dev\n`);
+		if (runtime.prompts) {
+			runtime.prompts.note(nextSteps(options), `Created ${options.target}`);
+			runtime.prompts.outro('Arcade app ready.');
+			return;
+		}
+
+		runtime.stdout?.write(`Created ${options.target}\n\n${nextSteps(options)}\n`);
 	}
 
 	async run(args: readonly string[], runtime: ProgramRuntime): Promise<void> {
@@ -291,10 +426,44 @@ function readChoice<T extends string>(
 	return value as T;
 }
 
+function choiceLabel<T extends string>(choices: readonly Choice<T>[], value: T): string {
+	return choices.find((choice) => choice.value === value)?.label ?? value;
+}
+
+function creationSummary(options: CreateOptions): string {
+	return [
+		`App:      ${options.target}`,
+		`Starter:  ${choiceLabel(STARTER_CHOICES, options.starter)}`,
+		`Runtime:  ${choiceLabel(PROJECT_FORMAT_CHOICES, options.format)}`,
+		`Install:  ${options.install ? `Yes, with ${options.packageManager}` : 'No'}`,
+		`Git:      ${options.git ? 'Yes' : 'No'}`,
+	].join('\n');
+}
+
+function nextSteps(options: CreateOptions): string {
+	return [
+		'Next steps:',
+		`  cd ${options.target}`,
+		`  ${options.packageManager} dev`,
+		'',
+		'Then open:',
+		'  http://localhost:5173',
+	].join('\n');
+}
+
 function validateTarget(target: string): true {
 	if (!target.trim()) throw new Error('Project name cannot be empty.');
 	if (target.includes('\0')) throw new Error('Project name contains invalid path characters.');
 	return true;
+}
+
+function validateTargetMessage(target: string): string | undefined {
+	try {
+		validateTarget(target);
+		return undefined;
+	} catch (error) {
+		return error instanceof Error ? error.message : String(error);
+	}
 }
 
 async function ensureWritableTarget(
@@ -449,7 +618,7 @@ Usage:
 
 Options:
   --yes, -y          Use defaults
-  --format <name>   node, bun, or deno
+  --format <name>   node, deno, or bun
   --starter <name>  minimal, app, docs, or full-stack
   --no-install      Skip dependency installation
   --no-git          Skip git initialization

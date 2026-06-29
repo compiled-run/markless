@@ -4,6 +4,9 @@
 	"private": true,
 	"description": "Create Arcade apps.",
 	"license": "MIT",
+	"bin": {
+		"create-arcade": "./src/node.ts"
+	},
 	"files": [
 		"src",
 		"templates"
@@ -13,6 +16,7 @@
 		".": "./src/index.ts"
 	},
 	"dependencies": {
+		"@clack/prompts": "^1.6.0",
 		"pathe": "catalog:",
 		"ufo": "catalog:"
 	}

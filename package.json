@@ -15,6 +15,7 @@
 		"test:compiler": "vp test packages/compiler/test/*.test.ts"
 	},
 	"devDependencies": {
+		"@arcade/cli": "workspace:*",
 		"@arcade/typescript-plugin": "workspace:*",
 		"@async/witness": "0.7.0",
 		"@types/node": "24.12.2",
