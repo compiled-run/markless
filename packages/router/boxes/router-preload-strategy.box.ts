@@ -78,10 +78,7 @@ export default box(
 				networkConditions: SLOW_3G,
 			})) as Page;
 			await expect.page.text(page, 'h1', 'Arcade Router', WAIT);
-			const startedPreloads = await waitForExpectedPreloadRequests(
-				page,
-				plan.expectedHrefs,
-			);
+			const startedPreloads = await waitForExpectedPreloadRequests(page, plan.expectedHrefs);
 			receipt.note(`pre-click modulepreloads:\n${timeline(startedPreloads)}`);
 			const initialJs = jsBuildRequests(await page.networkRequests());
 			const expectedPaths = new Set(plan.expectedHrefs.map((href) => pathOf(href)));
@@ -158,31 +155,56 @@ export default box(
 					`Expected direct docs startup JS to be only current route and visible Link modulepreloads, saw:\n${timeline(unexpectedDirectJs)}`,
 				);
 			}
-			await expectNoNewBuildJs(directPage, receipt, 'direct docs post-counter JS', async () => {
-				await directPage.click(MDX_COUNTER, WAIT);
-				await expect.page.text(directPage, MDX_COUNTER, 'MDX Count 1', WAIT);
-			});
+			await expectNoNewBuildJs(
+				directPage,
+				receipt,
+				'direct docs post-counter JS',
+				async () => {
+					await directPage.click(MDX_COUNTER, WAIT);
+					await expect.page.text(directPage, MDX_COUNTER, 'MDX Count 1', WAIT);
+				},
+			);
 			await expectNoNewBuildJs(directPage, receipt, 'direct docs post-input JS', async () => {
 				await directPage.click(MDX_INPUT, WAIT);
 				await expect.page.text(directPage, MDX_INPUT_STATE, 'MDX Input on', WAIT);
 			});
-			await expectNoNewBuildJs(directPage, receipt, 'direct docs-to-home Link JS', async () => {
-				await directPage.click(HOME_LINK, WAIT);
-				await expect.page.text(directPage, 'h1', 'Arcade Router', WAIT);
-				await expect.page.text(directPage, HOME_COUNTER, 'Button 0', WAIT);
-			});
-			await expectNoNewBuildJs(directPage, receipt, 'direct docs routed-home counter JS', async () => {
-				await directPage.click(HOME_COUNTER, WAIT);
-				await expect.page.text(directPage, HOME_COUNTER, 'Button 1', WAIT);
-			});
-			await expectNoNewBuildJs(directPage, receipt, 'direct docs routed-home input JS', async () => {
-				await directPage.click(HOME_INPUT, WAIT);
-				await expect.page.text(directPage, HOME_INPUT_STATE, 'Home Input on', WAIT);
-			});
-			await expectNoNewBuildJs(directPage, receipt, 'direct docs routed-home boost JS', async () => {
-				await directPage.click(HOME_BOOST, WAIT);
-				await expect.page.text(directPage, HOME_BOOST, 'Home Boost 1', WAIT);
-			});
+			await expectNoNewBuildJs(
+				directPage,
+				receipt,
+				'direct docs-to-home Link JS',
+				async () => {
+					await directPage.click(HOME_LINK, WAIT);
+					await expect.page.text(directPage, 'h1', 'Arcade Router', WAIT);
+					await expect.page.text(directPage, HOME_COUNTER, 'Button 0', WAIT);
+				},
+			);
+			await expectNoNewBuildJs(
+				directPage,
+				receipt,
+				'direct docs routed-home counter JS',
+				async () => {
+					await directPage.click(HOME_COUNTER, WAIT);
+					await expect.page.text(directPage, HOME_COUNTER, 'Button 1', WAIT);
+				},
+			);
+			await expectNoNewBuildJs(
+				directPage,
+				receipt,
+				'direct docs routed-home input JS',
+				async () => {
+					await directPage.click(HOME_INPUT, WAIT);
+					await expect.page.text(directPage, HOME_INPUT_STATE, 'Home Input on', WAIT);
+				},
+			);
+			await expectNoNewBuildJs(
+				directPage,
+				receipt,
+				'direct docs routed-home boost JS',
+				async () => {
+					await directPage.click(HOME_BOOST, WAIT);
+					await expect.page.text(directPage, HOME_BOOST, 'Home Boost 1', WAIT);
+				},
+			);
 			const directDocumentRequests = (await directPage.networkRequests()).filter(
 				(request) => request.resourceType === 'Document',
 			);
@@ -263,8 +285,8 @@ async function routeCandidatePlan(build: Build, preview: Preview): Promise<Route
 		routeImportPaths,
 		routePath: indexRoutePath,
 	});
-	assertEventRecord(chunks, matches, 'input', 'docs route');
-	assertEventRecord(chunks, homeMatches, 'input', 'home route');
+	assertEventRecord(chunks, matches, 'click', 'docs route');
+	assertEventRecord(chunks, homeMatches, 'click', 'home route');
 	if (matches.size === 0) {
 		throw new Error(
 			`Expected docs route/navigation JS candidates. Artifacts: ${[...chunks.keys()].join(', ')}`,
@@ -272,7 +294,9 @@ async function routeCandidatePlan(build: Build, preview: Preview): Promise<Route
 	}
 	const indexPreloads = modulePreloadPlacement(await preview.request('/'));
 	if (indexPreloads.bodyCount > 0) {
-		throw new Error(`Expected index modulepreloads in head, saw ${indexPreloads.bodyCount} in body.`);
+		throw new Error(
+			`Expected index modulepreloads in head, saw ${indexPreloads.bodyCount} in body.`,
+		);
 	}
 	const directDocsPreloads = modulePreloadPlacement(
 		await preview.request('/docs/getting-started'),
@@ -353,9 +377,7 @@ function assertEventRecord(
 
 function modulePreloadHrefs(html: string): string[] {
 	return [
-		...html.matchAll(
-			/<link\b(?=[^>]*\brel="modulepreload")(?=[^>]*\bhref="([^"]*)")[^>]*>/g,
-		),
+		...html.matchAll(/<link\b(?=[^>]*\brel="modulepreload")(?=[^>]*\bhref="([^"]*)")[^>]*>/g),
 	].map((match) => unescapeHtmlAttribute(match[1] ?? ''));
 }
 

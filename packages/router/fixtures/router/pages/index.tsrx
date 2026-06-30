@@ -10,11 +10,10 @@ export default function Home() @{
 		<h1>Arcade Router</h1>
 		<button data-home-counter onClick={() => count++}>Button {count}</button>
 		<label>
-			<input
+			<button
 				data-home-input
-				value="Home Input"
-				onInput={() => input = 'on'}
-			/>
+				onClick={() => input = 'on'}
+			>Home Input</button>
 			<span data-home-input-state>Home Input {input}</span>
 		</label>
 		<button data-home-boost onClick={() => boosts++}>Home Boost {boosts}</button>

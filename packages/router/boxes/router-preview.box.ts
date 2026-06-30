@@ -3,6 +3,8 @@ import { planModulePreloadUrls } from '../../bundler/src/build/preload-plan.ts';
 import type { ArcadeBundleGraph } from '../../bundler/src/types.ts';
 
 const FIXTURE = 'fixtures/router';
+const NITRO_BUILD_DIR = 'node_modules/.nitro-router-preview';
+const NITRO_OUTPUT_DIR = '.output-router-preview';
 const BUNDLE_GRAPH_REQUEST = '/build/bundle-graph.json';
 const COUNTER = 'button';
 const DOCS_LINK = 'a[data-arcade-router-link]';
@@ -22,6 +24,7 @@ export default box(
 				...config,
 				root: `${config.root}/${FIXTURE}`,
 				configFile: `${config.root}/${FIXTURE}/vite.config.ts`,
+				nitro: isolatedNitroOutput(),
 			}),
 		});
 
@@ -30,6 +33,7 @@ export default box(
 				...config,
 				root: `${config.root}/${FIXTURE}`,
 				configFile: `${config.root}/${FIXTURE}/vite.config.ts`,
+				nitro: isolatedNitroOutput(),
 			}),
 		});
 		try {
@@ -53,13 +57,8 @@ export default box(
 			await expect.page.text(page, COUNTER, 'Button 0', WAIT);
 			await expect.page.text(page, DOCS_LINK, 'Docs', WAIT);
 			await expect.page.attribute(page, DOCS_LINK, 'href', '/docs/getting-started', WAIT);
-			const preloaded = await waitForExpectedPreloadRequests(
-				page,
-				expectedPreloadHrefs,
-				0,
-			);
+			const preloaded = await waitForExpectedPreloadRequests(page, expectedPreloadHrefs, 0);
 			receipt.note(`router target interaction modulepreloads: ${formatRequests(preloaded)}`);
-			const beforeDocsLink = await page.networkRequests();
 			await page.click(DOCS_LINK, WAIT);
 			await expect.page.text(page, 'h1', 'Docs', WAIT);
 			await expect.page.text(page, MDX_COUNTER, 'MDX Count 0', WAIT);
@@ -105,6 +104,17 @@ export default box(
 		);
 	},
 );
+
+function isolatedNitroOutput() {
+	return {
+		buildDir: NITRO_BUILD_DIR,
+		output: {
+			dir: NITRO_OUTPUT_DIR,
+			publicDir: `${NITRO_OUTPUT_DIR}/public`,
+			serverDir: `${NITRO_OUTPUT_DIR}/server`,
+		},
+	};
+}
 
 type BrowserNetworkRequest = {
 	readonly method: string;
