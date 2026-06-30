@@ -50,6 +50,43 @@ test('runtime graph invalidates path subscribers and flushes concrete journal en
 	expect(graph.takeJournal()).toEqual([]);
 });
 
+test('runtime graph ignores same-value writes and updates', async () => {
+	const graph = createRuntimeGraph({
+		cells: [{ graphNodeId: 'state:status', value: 'off' }],
+	});
+	let runs = 0;
+
+	graph.subscribe({
+		id: 'dom-update:status',
+		graphNodeId: 'state:status',
+		path: [],
+		run(value) {
+			runs++;
+			return { type: 'setText', locator: 'text:status', value };
+		},
+	});
+
+	graph.write({ graphNodeId: 'state:status', value: 'on' });
+	await graph.flush();
+	expect(runs).toBe(1);
+	expect(graph.takeJournal()).toEqual([
+		{ type: 'setText', locator: 'text:status', value: 'on' },
+	]);
+
+	graph.write({ graphNodeId: 'state:status', value: 'on' });
+	await graph.flush();
+	graph.update({
+		graphNodeId: 'state:status',
+		update(value) {
+			return value;
+		},
+	});
+	await graph.flush();
+
+	expect(runs).toBe(1);
+	expect(graph.takeJournal()).toEqual([]);
+});
+
 test('runtime graph appends multiple DOM journal entries from one subscription in order', async () => {
 	const graph = createRuntimeGraph({
 		cells: [{ graphNodeId: 'state:count', value: 0 }],

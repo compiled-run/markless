@@ -100,7 +100,7 @@ test('event resume dispatches a lazy event and applies subscribed DOM updates', 
 						path: [],
 						returnValue: 'next',
 						update(value) {
-							return Number(value) + 1;
+							return Math.min(Number(value) + 1, 1);
 						},
 					});
 				};
@@ -130,7 +130,7 @@ test('event resume dispatches a lazy event and applies subscribed DOM updates', 
 						path: [],
 						returnValue: 'next',
 						update(value) {
-							return Number(value) + 1;
+							return Math.min(Number(value) + 1, 1);
 						},
 					});
 				};
@@ -144,7 +144,7 @@ test('event resume dispatches a lazy event and applies subscribed DOM updates', 
 	});
 
 	expect(secondResult).toBe(result);
-	expect(loadedSymbols).toEqual(['symbol:event', 'symbol:text', 'symbol:event', 'symbol:text']);
-	expect(secondResult.graph.read('state:count')).toBe(2);
-	expect(button.textContent).toBe('2');
+	expect(loadedSymbols).toEqual(['symbol:event', 'symbol:text', 'symbol:event']);
+	expect(secondResult.graph.read('state:count')).toBe(1);
+	expect(button.textContent).toBe('1');
 });

@@ -589,6 +589,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		write(write) {
 			const path = write.path ?? [];
 			const current = cells.get(write.graphNodeId);
+			if (Object.is(readPath(current, path), write.value)) return;
 			cells.set(write.graphNodeId, writePath(current, path, write.value));
 			markDirtyPath(write.graphNodeId, dirtyPathForGraphWrite(current, path));
 			scheduleFlush();
@@ -597,10 +598,12 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			const path = update.path ?? [];
 			const currentValue = readPath(cells.get(update.graphNodeId), path);
 			const nextValue = update.update(currentValue);
-			const current = cells.get(update.graphNodeId);
-			cells.set(update.graphNodeId, writePath(current, path, nextValue));
-			markDirtyPath(update.graphNodeId, dirtyPathForGraphWrite(current, path));
-			scheduleFlush();
+			if (!Object.is(currentValue, nextValue)) {
+				const current = cells.get(update.graphNodeId);
+				cells.set(update.graphNodeId, writePath(current, path, nextValue));
+				markDirtyPath(update.graphNodeId, dirtyPathForGraphWrite(current, path));
+				scheduleFlush();
+			}
 			if (update.returnValue === 'previous') return currentValue;
 			if (update.returnValue === 'next') return nextValue;
 		},
