@@ -135,6 +135,21 @@ describe('module preload planning', () => {
 			},
 		]);
 	});
+
+	test('keeps nested SSR resume resolver chunks above the preload threshold', () => {
+		const preloads = planSsrModulePreloads({
+			artifact: { payloadView: { events: [] } },
+			base: '/build/',
+			bundleGraph: ['resume.js', -5, 3, 'child-resolver.js', -5, 6, 'grandchild-resolver.js'],
+			resumeModuleUrl: '/build/resume.js',
+		});
+
+		expect(preloads.map((preload) => preload.href)).toEqual([
+			'/build/resume.js',
+			'/build/child-resolver.js',
+			'/build/grandchild-resolver.js',
+		]);
+	});
 });
 
 function manifestWithComplexSymbolDeps(): ArcadeManifest {

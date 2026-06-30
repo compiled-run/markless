@@ -43,12 +43,14 @@ export default box(
 			'DwTzcZxyUUg',
 			WAIT,
 		);
+		const startupPaths = new Set(startupModules.map((request) => pathOf(request.url)));
 
 		await page.click('[aria-label="Play or pause"]', WAIT);
 		await expect.page.attribute(page, '.youtube-frame-host', 'data-command', 'play', WAIT);
 		await expect.page.attribute(page, '.youtube-frame-host', 'data-playing', 'true', WAIT);
 		await expect.page.attribute(page, '.youtube-frame-host', 'data-command-version', '1', WAIT);
 		await expect.page.exists(page, 'script[src="https://www.youtube.com/iframe_api"]', WAIT);
+		assertNoNewBuildJs(await page.networkRequests(), startupPaths, 'play interaction');
 
 		await page.click('[aria-label="Next track"]', WAIT);
 		await expect.page.bodyText(page, { contains: 'Empty Crown' }, WAIT);
@@ -62,6 +64,7 @@ export default box(
 		);
 		await expect.page.attribute(page, '.track', 'data-color-start', '#4b3f72', WAIT);
 		await expect.page.attribute(page, '.track', 'data-color-end', '#d79f6f', WAIT);
+		assertNoNewBuildJs(await page.networkRequests(), startupPaths, 'next-track interaction');
 
 		await preview.close();
 		await receipt.capture('music-player ssr preview resumed youtube command state');
@@ -136,6 +139,25 @@ function assertPreloadedStartupModules(
 			);
 		}
 	}
+}
+
+function assertNoNewBuildJs(
+	requests: readonly BrowserNetworkRequest[],
+	startupPaths: ReadonlySet<string>,
+	label: string,
+): void {
+	const loadedAfterStartup = jsBuildRequests(requests).filter(
+		(request) => !startupPaths.has(pathOf(request.url)),
+	);
+	if (loadedAfterStartup.length > 0) {
+		throw new Error(
+			`Expected ${label} to use only startup modulepreloads, but saw new JS:\n${formatRequests(loadedAfterStartup)}`,
+		);
+	}
+}
+
+function pathOf(url: string): string {
+	return new URL(url).pathname;
 }
 
 function formatRequests(requests: readonly BrowserNetworkRequest[]): string {
