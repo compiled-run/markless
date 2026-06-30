@@ -208,7 +208,7 @@ test('preserves router resume entry exports for preview resume', () => {
 	const input = clientConfig.build.rolldownOptions.input;
 	expect(Array.isArray(input)).toBe(true);
 	expect(input[0]).toContain('virtual:arcade-router/resume-entry');
-	expect(input[1]).toBe('/project/src/main.ts');
+	expect(input.join('\n')).toContain('virtual:arcade-router/navigation-entry');
 	expect(clientConfig.build.rolldownOptions.preserveEntrySignatures).toBe('exports-only');
 });
 
@@ -232,3 +232,103 @@ test('scopes router virtual entry modules by resolved Vite root', () => {
 	expect(queried).toContain('arcade-router-root=%2Fproject%2Fsecond');
 	expect(first).not.toBe(second);
 });
+
+test('emits exact route modulepreload maps from client build chunks', () => {
+	const plugins = flattenPlugins([router()]);
+	const configPlugin = plugins.find((plugin) => plugin.name === 'arcade-router:vite');
+	const routePlugin = plugins.find((plugin) => plugin.name === 'arcade-router:routes');
+	const routeLoad = hookHandler(routePlugin?.load) as ((id: string) => string | undefined) | undefined;
+	const navigationChunk = chunk({
+		code: `const routePreloadsJson = globalThis.__arcadeRouterRoutePreloadsJson ?? "__ARCADE_ROUTER_ROUTE_PRELOADS__"; const routePreloadData = routePreloadsJson === "__ARCADE_ROUTER_ROUTE_PRELOADS__" ? { navigation: {}, ssr: {} } : JSON.parse(routePreloadsJson); export const routeModulePreloads = routePreloadData.navigation; export const routeSsrModulePreloads = routePreloadData.ssr;`,
+		dynamicImports: ['build/docs.js', 'build/home.js', 'build/navigation-polyfill.js'],
+		fileName: 'build/navigation.js',
+		imports: ['build/shared.js'],
+		moduleIds: ['/repo/packages/router/src/vite/entries/client-entry.ts'],
+	});
+	const resumeChunk = chunk({
+		dynamicImports: ['build/docs.js', 'build/home.js'],
+		fileName: 'build/resume.js',
+		imports: ['build/resume-runtime.js'],
+		moduleIds: ['/repo/packages/router/src/vite/entries/resume-entry.ts'],
+	});
+
+	routePlugin?.configResolved?.({ base: '/app/', root: '/project' } as never);
+	configPlugin?.configResolved?.({ base: '/app/', root: '/project' } as never);
+	configPlugin?.generateBundle?.call(
+		{ environment: { config: { consumer: 'client' } } },
+		{},
+		{
+			'build/navigation.js': navigationChunk,
+			'build/resume.js': resumeChunk,
+			'build/docs.js': chunk({
+				dynamicImports: ['build/docs-symbol.js'],
+				fileName: 'build/docs.js',
+				imports: ['build/docs-runtime.js'],
+				moduleIds: ['/project/pages/docs/[...slug].mdx'],
+			}),
+			'build/home.js': chunk({
+				fileName: 'build/home.js',
+				moduleIds: ['/project/pages/index.tsrx'],
+			}),
+			'build/docs-runtime.js': chunk({ fileName: 'build/docs-runtime.js' }),
+			'build/docs-symbol.js': chunk({ fileName: 'build/docs-symbol.js' }),
+			'build/navigation-polyfill.js': chunk({ fileName: 'build/navigation-polyfill.js' }),
+			'build/resume-runtime.js': chunk({ fileName: 'build/resume-runtime.js' }),
+			'build/shared.js': chunk({ fileName: 'build/shared.js' }),
+		},
+	);
+
+	const source = routeLoad?.('\0virtual:arcade-router/route-preloads');
+	const routePreloadData = JSON.parse(
+		source?.match(/routePreloadData = routePreloadsJson === .* \? (\{.*\}) :/)?.[1] ??
+			'{}',
+	) as {
+		readonly navigation?: Record<string, string[]>;
+		readonly ssr?: Record<string, string[]>;
+	};
+	const routePreloads = routePreloadData.navigation ?? {};
+	const ssrPreloads = routePreloadData.ssr ?? {};
+
+	expect(source).toContain('"pages/docs/[...slug].mdx"');
+	expect(navigationChunk.code).toContain('pages/docs/[...slug].mdx');
+	expect(navigationChunk.code.match(/__ARCADE_ROUTER_ROUTE_PRELOADS__/g)).toHaveLength(1);
+	expect(navigationChunk.code).toContain('JSON.parse(routePreloadsJson)');
+	expect(routePreloads['pages/docs/[...slug].mdx']).toEqual([
+		'/app/build/navigation.js',
+		'/app/build/shared.js',
+		'/app/build/navigation-polyfill.js',
+		'/app/build/docs.js',
+		'/app/build/docs-runtime.js',
+		'/app/build/docs-symbol.js',
+	]);
+	expect(routePreloads['pages/docs/[...slug].mdx']).not.toContain('/app/build/home.js');
+	expect(ssrPreloads['pages/docs/[...slug].mdx']).toEqual([
+		'/app/build/resume.js',
+		'/app/build/resume-runtime.js',
+		'/app/build/docs.js',
+		'/app/build/docs-runtime.js',
+		'/app/build/docs-symbol.js',
+	]);
+	expect(ssrPreloads['pages/docs/[...slug].mdx']).not.toContain(
+		'/app/build/navigation-polyfill.js',
+	);
+	expect(ssrPreloads['pages/docs/[...slug].mdx']).not.toContain('/app/build/home.js');
+});
+
+function chunk(overrides: {
+	readonly code?: string;
+	readonly dynamicImports?: readonly string[];
+	readonly fileName: string;
+	readonly imports?: readonly string[];
+	readonly moduleIds?: readonly string[];
+}) {
+	return {
+		code: overrides.code,
+		type: 'chunk',
+		dynamicImports: [...(overrides.dynamicImports ?? [])],
+		facadeModuleId: null,
+		fileName: overrides.fileName,
+		imports: [...(overrides.imports ?? [])],
+		moduleIds: [...(overrides.moduleIds ?? [])],
+	};
+}

@@ -183,6 +183,34 @@ describe('SPA navigation', () => {
 		});
 	});
 
+	it('starts route modulepreload work before navigating internal Link anchors', async () => {
+		const preloadedRoutes: string[] = [];
+		const { clickListener, navigatedUrls, runtimeWindow } = clickNavigationRuntime();
+
+		await __arcadeRouterStartSpaNavigation({
+			pageModuleLoaders: {
+				'pages/about.tsrx': async () => ({ default: component('about') }),
+			},
+			preloadRouteModule(file) {
+				preloadedRoutes.push(file);
+			},
+			routeFileIds: ['/pages/about.tsrx'],
+			window: runtimeWindow,
+		});
+
+		const event = clickEvent(
+			testAnchor('http://arcaderouter.test/about', {
+				link: true,
+			}),
+		);
+		clickListener()?.(event as never);
+
+		expect(preloadedRoutes).toEqual(['pages/about.tsrx']);
+		expect(navigatedUrls.map((navigation) => navigation.url)).toEqual([
+			'http://arcaderouter.test/about',
+		]);
+	});
+
 	it('leaves regular anchors to the browser', async () => {
 		let clickListener: ((event: MouseEvent) => void) | undefined;
 		let navigatedUrl: string | undefined;

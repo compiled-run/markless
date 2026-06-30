@@ -122,6 +122,7 @@ function emitComposedMdxRoute(route: MdxRoute): string {
 		'      connectRuntime(context) { for (const child of arcadeMdxChildren) child.output?.connectRuntime?.(context); },',
 		'    };',
 		'  },',
+		...renderMdxPreload(route.components),
 		'};',
 		'export default arcadeMdxPage;',
 		'',
@@ -141,6 +142,17 @@ function emitComposedMdxRoute(route: MdxRoute): string {
 		'}',
 		'',
 	].join('\n');
+}
+
+function renderMdxPreload(components: ReadonlyArray<MdxComponent>): string[] {
+	const localNames = [...new Set(components.map((component) => component.localName))];
+	return [
+		'  preload() {',
+		`    return Promise.all([${localNames
+			.map((localName) => `${localName}.preload?.()`)
+			.join(', ')}].filter(Boolean));`,
+		'  },',
+	];
 }
 
 function isMdxFile(id: string) {

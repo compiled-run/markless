@@ -48,6 +48,8 @@ This page is static markdown.
 		);
 		expect(code).toContain('renderSsr(props = {})');
 		expect(code).toContain('renderCsr(props = {})');
+		expect(code).toContain('preload()');
+		expect(code).toContain('InteractiveCounter.preload?.()');
 		expect(code).toContain('resumeContainerEvent(input)');
 		expect(code).toContain(`'@arcade/router/vite/runtime/mdx-route'`);
 		expect(code).toContain(`../../components/InteractiveCounter.tsrx?arcade-symbols`);
@@ -119,9 +121,7 @@ Nested **copy**.
 			'/project/pages/docs/[...slug].mdx',
 		);
 
-		expect(code).toContain(
-			`"children": "<p>Nested <strong>copy</strong>.</p>"`,
-		);
+		expect(code).toContain(`"children": "<p>Nested <strong>copy</strong>.</p>"`);
 	});
 
 	it('lowers literal-safe inline MDX expressions into escaped static HTML', async () => {

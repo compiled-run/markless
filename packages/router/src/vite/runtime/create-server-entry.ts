@@ -3,7 +3,10 @@ import { buildRouteManifestFromFileIds, matchRouteManifest } from '../../route-m
 import { renderToString, type ModulePreloadInput } from '@arcade/web/render-to-string';
 
 export interface ServerEntryOptions {
+	readonly navigationEntryPath?: string;
 	readonly resumeEntryPath?: string;
+	readonly routeModulePreloads?: Record<string, readonly ModulePreloadInput[]>;
+	readonly routeSsrModulePreloads?: Record<string, readonly ModulePreloadInput[]>;
 	readonly documentModuleLoader: (() => Promise<unknown>) | undefined;
 	readonly pageModuleLoaders: Record<string, () => Promise<unknown>>;
 	readonly routeFileIds: readonly string[];
@@ -18,7 +21,6 @@ interface RenderOutput {
 type SsrRender = (props?: unknown) => RenderOutput;
 
 interface SsrArtifact {
-	readonly modulePreloads?: ReadonlyArray<ModulePreloadInput>;
 	readonly renderSsr?: SsrRender;
 	readonly resumeModuleUrl?: string;
 }
@@ -34,6 +36,11 @@ interface DocumentModule {
 }
 
 type PageComponentProps = PageProps & Record<string, unknown>;
+
+interface PageHtml {
+	readonly bodyHtml: string;
+	readonly headHtml: string;
+}
 
 export function createServerEntry(options: ServerEntryOptions) {
 	const manifest = buildRouteManifestFromFileIds(options.routeFileIds);
@@ -90,7 +97,16 @@ export function createServerEntry(options: ServerEntryOptions) {
 			},
 			status,
 		};
-		const pageOutput = renderPageModule(pageModule, pageProps, file, options.resumeEntryPath);
+		const pageOutput = renderPageModule(
+			pageModule,
+			pageProps,
+			file,
+			manifest,
+			options.resumeEntryPath,
+			options.navigationEntryPath,
+			options.routeModulePreloads,
+			options.routeSsrModulePreloads,
+		);
 		const documentModule = options.documentModuleLoader
 			? ((await options.documentModuleLoader()) as DocumentModule)
 			: undefined;
@@ -109,44 +125,137 @@ function renderPageModule(
 	pageModule: PageModule,
 	props: PageComponentProps,
 	file: string,
+	manifest: ReturnType<typeof buildRouteManifestFromFileIds>,
 	resumeEntryPath: string | undefined,
-): string {
+	navigationEntryPath: string | undefined,
+	routeModulePreloads: Record<string, readonly ModulePreloadInput[]> | undefined,
+	routeSsrModulePreloads: Record<string, readonly ModulePreloadInput[]> | undefined,
+): PageHtml {
 	const baseArtifact = pageModule.default;
 	const renderSsr = baseArtifact?.renderSsr ?? pageModule.arcadeRenderSsr;
 	if (!renderSsr) {
-		return `Page module must export an Arcade compiled artifact: ${escapeHtml(file)}`;
+		return {
+			bodyHtml: `Page module must export an Arcade compiled artifact: ${escapeHtml(file)}`,
+			headHtml: '',
+		};
 	}
 
+	const output = renderSsr(props);
+	if (!output) return { bodyHtml: '', headHtml: '' };
+	const routeScript = output.state || output.view ? renderRouteScript(file) : '';
+	const linkBridge =
+		navigationEntryPath && output.html.includes('data-arcade-router-link')
+			? renderLinkBridgeScript(navigationEntryPath)
+			: '';
+	const routedOutput =
+		routeScript || linkBridge
+			? { ...output, html: `${output.html}${routeScript}${linkBridge}` }
+			: output;
+	const modulePreloads = modulePreloadsForPage(
+		file,
+		output.html,
+		props.url.href,
+		manifest,
+		routeModulePreloads,
+		routeSsrModulePreloads,
+	);
 	const pageArtifact: SsrArtifact = {
-		modulePreloads: baseArtifact?.modulePreloads,
 		resumeModuleUrl: baseArtifact?.resumeModuleUrl,
 		renderSsr() {
-			const output = renderSsr(props);
-			if (!output) return output;
-			const routeScript = output.state || output.view ? renderRouteScript(file) : '';
-			const linkBridge =
-				resumeEntryPath && output.html.includes('data-arcade-router-link')
-					? renderLinkBridgeScript(resumeEntryPath)
-					: '';
-			return routeScript || linkBridge
-				? { ...output, html: `${output.html}${routeScript}${linkBridge}` }
-				: output;
+			return routedOutput;
 		},
 	};
 	const rendered = renderToString(pageArtifact as never, {
+		modulePreloads,
 		resumeModuleUrl: resumeEntryPath ?? baseArtifact?.resumeModuleUrl,
 	});
 
-	return rendered;
+	return splitLeadingModulePreloadLinks(rendered);
+}
+
+function modulePreloadsForPage(
+	file: string,
+	html: string,
+	baseHref: string,
+	manifest: ReturnType<typeof buildRouteManifestFromFileIds>,
+	routeModulePreloads: Record<string, readonly ModulePreloadInput[]> | undefined,
+	routeSsrModulePreloads: Record<string, readonly ModulePreloadInput[]> | undefined,
+): readonly ModulePreloadInput[] | undefined {
+	const preloads: ModulePreloadInput[] = [];
+	const seen = new Set<string>();
+	addModulePreloads(preloads, seen, routeSsrModulePreloads?.[file]);
+	if (!routeModulePreloads || !html.includes('data-arcade-router-link')) {
+		return preloads.length > 0 ? preloads : undefined;
+	}
+
+	for (const href of routerLinkHrefs(html)) {
+		const url = parseSameOriginUrl(href, baseHref);
+		const match = url && matchRouteManifest(url.pathname, manifest);
+		addModulePreloads(preloads, seen, match && routeModulePreloads[match.route.file]);
+	}
+	return preloads.length > 0 ? preloads : undefined;
+}
+
+function addModulePreloads(
+	preloads: ModulePreloadInput[],
+	seen: Set<string>,
+	items: readonly ModulePreloadInput[] | undefined,
+): void {
+	for (const preload of items ?? []) {
+		const preloadHref = typeof preload === 'string' ? preload : preload.href;
+		if (!preloadHref || seen.has(preloadHref)) continue;
+		seen.add(preloadHref);
+		preloads.push(preload);
+	}
+}
+
+function splitLeadingModulePreloadLinks(html: string): PageHtml {
+	let bodyHtml = html;
+	const links: string[] = [];
+	while (bodyHtml.startsWith('<link ')) {
+		const end = bodyHtml.indexOf('>');
+		if (end === -1) break;
+		const link = bodyHtml.slice(0, end + 1);
+		if (!link.includes('rel="modulepreload"')) break;
+		links.push(link);
+		bodyHtml = bodyHtml.slice(end + 1);
+	}
+	return { bodyHtml, headHtml: links.join('') };
+}
+
+function routerLinkHrefs(html: string): string[] {
+	return [
+		...html.matchAll(
+			/<a\b(?=[^>]*\bdata-arcade-router-link(?:[\s=>]|$))(?=[^>]*\bhref="([^"]*)")[^>]*>/g,
+		),
+	].map((match) => unescapeHtmlAttribute(match[1] ?? ''));
+}
+
+function parseSameOriginUrl(href: string, base: string): URL | undefined {
+	try {
+		const current = new URL(base);
+		const url = new URL(href, current);
+		return url.origin === current.origin ? url : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+function unescapeHtmlAttribute(value: string): string {
+	return value
+		.replaceAll('&quot;', '"')
+		.replaceAll('&gt;', '>')
+		.replaceAll('&lt;', '<')
+		.replaceAll('&amp;', '&');
 }
 
 function renderDocument(
-	pageHtml: string,
+	pageHtml: PageHtml,
 	documentModule: DocumentModule | undefined,
 	pageProps: PageComponentProps,
 ): string {
 	const attributes = htmlAttributes(documentModule, pageProps);
-	const children = pageHtml;
+	const children = pageHtml.bodyHtml;
 	const documentHtml = renderDocumentModule(documentModule, {
 		...pageProps,
 		children,
@@ -155,7 +264,7 @@ function renderDocument(
 		return [
 			'<!doctype html>',
 			`<html${renderAttributes(attributes)}>`,
-			documentHtml,
+			insertHeadHtml(documentHtml, pageHtml.headHtml),
 			'</html>',
 		].join('');
 	}
@@ -166,6 +275,7 @@ function renderDocument(
 		'<head>',
 		'<meta charset="utf-8">',
 		'<meta name="viewport" content="width=device-width, initial-scale=1">',
+		pageHtml.headHtml,
 		'</head>',
 		'<body>',
 		children,
@@ -180,6 +290,13 @@ function renderDocumentModule(
 ): string | undefined {
 	const output = documentModule?.default?.renderSsr?.(props);
 	return output?.html;
+}
+
+function insertHeadHtml(documentHtml: string, headHtml: string): string {
+	if (!headHtml) return documentHtml;
+	const headEnd = documentHtml.indexOf('</head>');
+	if (headEnd === -1) return `${headHtml}${documentHtml}`;
+	return `${documentHtml.slice(0, headEnd)}${headHtml}${documentHtml.slice(headEnd)}`;
 }
 
 function renderRouteScript(file: string): string {

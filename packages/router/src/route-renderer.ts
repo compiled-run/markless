@@ -24,9 +24,12 @@ async function renderRouteUpdate(document: Document, update: RouteUpdate): Promi
 
 	const props = routePageProps(update.route);
 	if (typeof artifact.renderCsr === 'function') {
-		await render({ renderCsr: () => artifact.renderCsr?.(props) } as never, {
-			target: document.body,
-		});
+		await render(
+			{
+				renderCsr: () => artifact.renderCsr?.(props),
+			} as never,
+			{ target: document.body },
+		);
 		return;
 	}
 

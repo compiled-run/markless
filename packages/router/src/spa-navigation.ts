@@ -35,6 +35,7 @@ export interface StartSpaNavigationOptions {
 	readonly documentModuleLoader?: () => Promise<unknown>;
 	readonly loadPolyfill?: () => Promise<ArcadeRouterNavigationPolyfillModule>;
 	readonly pageModuleLoaders: Record<string, () => Promise<unknown>>;
+	readonly preloadRouteModule?: (file: string) => unknown;
 	readonly routeFileIds: readonly string[];
 	readonly window?: ArcadeRouterNavigationWindow;
 }
@@ -43,6 +44,7 @@ interface NavigationContext {
 	readonly documentModuleLoader?: () => Promise<unknown>;
 	readonly manifest: RouteManifest;
 	readonly pageModuleLoaders: Record<string, () => Promise<unknown>>;
+	readonly preloadRouteModule?: (file: string) => unknown;
 	readonly window: ArcadeRouterNavigationWindow;
 }
 
@@ -58,6 +60,7 @@ export async function __arcadeRouterStartSpaNavigation(options: StartSpaNavigati
 		documentModuleLoader: options.documentModuleLoader,
 		manifest: buildRouteManifestFromFileIds(options.routeFileIds),
 		pageModuleLoaders: options.pageModuleLoaders,
+		preloadRouteModule: options.preloadRouteModule,
 		window: runtimeWindow,
 	};
 	const navigation = await ensureNavigationRuntime(runtimeWindow, options.loadPolyfill);
@@ -114,6 +117,7 @@ async function renderRoute(url: URL, context: NavigationContext, signal: AbortSi
 		return;
 	}
 
+	preloadRouteModule(context, match.route.file);
 	const [page, document] = await Promise.all([
 		loadPageModule(),
 		context.documentModuleLoader?.(),
@@ -161,6 +165,7 @@ function handleLinkClick(
 		return;
 	}
 
+	preloadRouteModule(context, match.route.file);
 	event.preventDefault();
 	navigation.navigate(url.href, {
 		history: anchor.hasAttribute(REPLACE_ATTRIBUTE) ? 'replace' : 'push',
@@ -169,6 +174,14 @@ function handleLinkClick(
 			scroll: anchor.getAttribute(SCROLL_ATTRIBUTE) === 'manual' ? 'manual' : undefined,
 		},
 	});
+}
+
+function preloadRouteModule(context: NavigationContext, file: string): void {
+	try {
+		context.preloadRouteModule?.(file);
+	} catch {
+		// Route preloads are opportunistic; navigation still imports the route module.
+	}
 }
 
 function routeUrl(event: NavigateEvent, context: NavigationContext) {

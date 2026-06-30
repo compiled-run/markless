@@ -10,15 +10,15 @@ export default box(
 		tags: ['router', 'dev', 'browser', 'resume'],
 		modes: ['dev'],
 	},
-		async ({ pipeline, browser, environment, expect, receipt }) => {
-			await pipeline.dev({
-				config: (config) => ({
-					...config,
-					root: `${config.root}/${FIXTURE}`,
-					configFile: `${config.root}/${FIXTURE}/vite.config.ts`,
-					server: { ...config.server, watch: null },
-				}),
-			});
+	async ({ pipeline, browser, environment, expect, receipt }) => {
+		await pipeline.dev({
+			config: (config) => ({
+				...config,
+				root: `${config.root}/${FIXTURE}`,
+				configFile: `${config.root}/${FIXTURE}/vite.config.ts`,
+				server: { ...config.server, watch: null },
+			}),
+		});
 		const indexHtml = await environment.client.request('/');
 		if (
 			indexHtml.includes('<script type="module" src="/@id/virtual:arcade-router') ||
@@ -30,6 +30,16 @@ export default box(
 		const page = await browser.visit('/');
 
 		await expect.page.text(page, 'h1', 'Arcade Router', WAIT);
+		const startupRouteModuleRequests = (await page.networkRequests()).filter((request) =>
+			request.url.includes('/pages/index.tsrx?import'),
+		);
+		if (startupRouteModuleRequests.length > 0) {
+			throw new Error(
+				`Expected SSR startup to avoid current route module requests:\n${startupRouteModuleRequests
+					.map((request) => `${request.method} ${request.url}`)
+					.join('\n')}`,
+			);
+		}
 		await page.click(DOCS_LINK, WAIT);
 		await expect.page.text(page, 'h1', 'Docs', WAIT);
 		await expect.page.bodyText(

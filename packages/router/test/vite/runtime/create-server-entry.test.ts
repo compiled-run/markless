@@ -37,6 +37,7 @@ describe('server entry rendering', () => {
 			pageModuleLoaders: {
 				'pages/index.tsrx': async () => ({
 					default: page('<main><button>Count 0</button></main>', {
+						modulePreloads: [{ href: '/pages/index.tsrx?import' }],
 						state: {
 							version: 1,
 							cells: [],
@@ -87,6 +88,7 @@ describe('server entry rendering', () => {
 		expect(html.indexOf('<script type="arcade/route">')).toBeLessThan(
 			html.indexOf('<script type="arcade/state">'),
 		);
+		expect(html).not.toContain('/pages/index.tsrx?import');
 		expect(html).toContain('import("/@id/virtual:arcade-router/resume-entry")');
 		expect(html).not.toContain('<script type="module"');
 		expect(html).not.toContain('src="/@id/virtual:arcade-router/resume-entry"');
@@ -94,6 +96,7 @@ describe('server entry rendering', () => {
 
 	it('emits a lazy Link navigation bridge without waking a client entry', async () => {
 		const entry = createServerEntry({
+			navigationEntryPath: '/@id/virtual:arcade-router/navigation-entry',
 			resumeEntryPath: '/@id/virtual:arcade-router/resume-entry',
 			documentModuleLoader: undefined,
 			pageModuleLoaders: {
@@ -112,10 +115,79 @@ describe('server entry rendering', () => {
 		expect(response.status).toBe(200);
 		expect(html).toContain('data-arcade-router-link');
 		expect(html).toContain('data-arcade-router-link-resumer');
-		expect(html).toContain('import("/@id/virtual:arcade-router/resume-entry")');
+		expect(html).toContain('import("/@id/virtual:arcade-router/navigation-entry")');
+		expect(html).not.toContain('import("/@id/virtual:arcade-router/resume-entry")');
 		expect(html).not.toContain('<script type="module"');
 		expect(html).not.toContain('virtual:arcade-router/client-entry');
 		expect(html).not.toContain('__arcadeRouterStartSpaNavigation');
+	});
+
+	it('emits exact route modulepreloads for visible Link targets', async () => {
+		const entry = createServerEntry({
+			navigationEntryPath: '/build/navigation.js',
+			resumeEntryPath: '/build/resume.js',
+			routeModulePreloads: {
+				'pages/404.tsrx': ['/build/not-found.js'],
+				'pages/docs/[...slug].mdx': [
+					'/build/navigation.js',
+					'/build/docs.js',
+					'/build/docs-symbol.js',
+				],
+			},
+			documentModuleLoader: undefined,
+			pageModuleLoaders: {
+				'pages/index.tsrx': async () => ({
+					default: page(
+						'<main><a href="/docs/getting-started" data-arcade-router-link>Docs</a></main>',
+					),
+				}),
+			},
+			routeFileIds: [
+				'/pages/index.tsrx',
+				'/pages/docs/[...slug].mdx',
+				'/pages/404.tsrx',
+			],
+		});
+
+		const response = await entry.fetch(new Request('http://arcade-router.test/'));
+		const html = await response.text();
+
+		expect(html).toContain('<link rel="modulepreload" href="/build/navigation.js"');
+		expect(html).toContain('<link rel="modulepreload" href="/build/docs.js"');
+		expect(html).toContain('<link rel="modulepreload" href="/build/docs-symbol.js"');
+		expect(html).not.toContain('/build/not-found.js');
+	});
+
+	it('emits current route modulepreloads in head without requiring a router Link', async () => {
+		const entry = createServerEntry({
+			navigationEntryPath: '/build/navigation.js',
+			resumeEntryPath: '/build/resume.js',
+			routeModulePreloads: {
+				'pages/index.tsrx': ['/build/navigation.js', '/build/index.js'],
+			},
+			routeSsrModulePreloads: {
+				'pages/docs/[...slug].mdx': ['/build/resume.js', '/build/docs.js'],
+			},
+			documentModuleLoader: undefined,
+			pageModuleLoaders: {
+				'pages/docs/[...slug].mdx': async () => ({
+					default: page('<main><button data-mdx-counter>MDX Count 0</button></main>'),
+				}),
+			},
+			routeFileIds: ['/pages/index.tsrx', '/pages/docs/[...slug].mdx'],
+		});
+
+		const response = await entry.fetch(
+			new Request('http://arcade-router.test/docs/getting-started'),
+		);
+		const html = await response.text();
+		const head = html.slice(0, html.indexOf('</head>'));
+		const body = html.slice(html.indexOf('<body>'));
+
+		expect(head).toContain('<link rel="modulepreload" href="/build/resume.js"');
+		expect(head).toContain('<link rel="modulepreload" href="/build/docs.js"');
+		expect(body).not.toContain('rel="modulepreload"');
+		expect(html).not.toContain('/build/index.js');
 	});
 
 	it('renders the document module shell around routed page output', async () => {
@@ -137,6 +209,9 @@ describe('server entry rendering', () => {
 					},
 				},
 			}),
+			routeSsrModulePreloads: {
+				'pages/docs/index.tsrx': ['/build/docs-current.js'],
+			},
 			pageModuleLoaders: {
 				'pages/docs/index.tsrx': async () => ({ default: page('<main>Docs</main>') }),
 			},
@@ -148,8 +223,9 @@ describe('server entry rendering', () => {
 
 		expect(response.status).toBe(200);
 		expect(html).toContain(
-			'<!doctype html><html lang="en" data-status="200"><head><title>/docs</title></head><body class="docs"><div data-async-container>',
+			'<!doctype html><html lang="en" data-status="200"><head><title>/docs</title><link rel="modulepreload" href="/build/docs-current.js"',
 		);
+		expect(html).toContain('</head><body class="docs"><div data-async-container>');
 		expect(html).toContain('<main>Docs</main>');
 		expect(html).not.toContain('<script type="module"');
 		expect(html).toContain('</body></html>');
@@ -212,11 +288,13 @@ describe('server entry rendering', () => {
 function page(
 	html: string,
 	payload: {
+		readonly modulePreloads?: readonly { readonly href: string }[];
 		readonly state?: unknown;
 		readonly view?: unknown;
 	} = {},
 ) {
 	return {
+		modulePreloads: payload.modulePreloads,
 		renderSsr() {
 			return { html, ...payload };
 		},
