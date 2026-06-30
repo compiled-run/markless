@@ -1,15 +1,12 @@
 import type { InputOptions, Plugin } from 'rolldown';
 import { isAbsolute, relative, resolve } from 'pathe';
 import { joinURL, parsePath, withQuery, withoutLeadingSlash } from 'ufo';
-import { ARCADE_BUILD_PREFIX, ARCADE_BUNDLE_GRAPH, outputDefaults } from './build/chunking.ts';
 import {
-	ARCADE_MANIFEST,
 	ARCADE_MANIFEST_FILE,
-	type ArcadeManifestBundle,
-	createManifest,
-	devTagsManifest,
-	injectManifest,
-} from './build/manifest.ts';
+	type ArcadeBuildMetadataBundle,
+	createBuildMetadata,
+} from './build/build-metadata.ts';
+import { ARCADE_BUILD_PREFIX, ARCADE_BUNDLE_GRAPH, outputDefaults } from './build/chunking.ts';
 import { stripEmptyVitePreloadWrappers } from './build/preload-cleanup.ts';
 import {
 	compactGeneratedDirectSymbolLoaders,
@@ -21,12 +18,10 @@ import { createArcadeDevGraph } from './dev.ts';
 import { ARCADE_VIRTUAL_PREFIX, transformTsrxModule } from './transform.ts';
 import type {
 	ArcadeEnvironment,
-	ArcadeManifest,
 	ArcadeRolldownOptions,
 	ArcadeRolldownPluginApi,
 	ArcadeTransformManifest,
 	ArcadeVirtualModule,
-	ServerArcadeManifest,
 	TransformTsrxModuleResult,
 } from './types.ts';
 
@@ -37,6 +32,7 @@ export type {
 	PreloadGraphEntries,
 	PreloadGraphEntriesAdder,
 	ArcadeAsset,
+	ArcadeBuildMetadata,
 	ArcadeBundle,
 	ArcadeBundleGraph,
 	ArcadeDevServer,
@@ -46,7 +42,6 @@ export type {
 	ArcadeRolldownPluginApi,
 	ArcadeTransformManifest,
 	ArcadeVirtualModule,
-	ServerArcadeManifest,
 	TransformTsrxModuleInput,
 	TransformTsrxModuleResult,
 } from './types.ts';
@@ -57,7 +52,6 @@ type InternalArcadeRolldownOptions = ArcadeRolldownOptions & {
 	publicPath?: (fileName: string) => string;
 };
 
-const manifests = new Map<string, ArcadeManifest>();
 const TSRX_SOURCE_FILE = /\.tsrx(?:[?#].*)?$/;
 const ARCADE_SYMBOL_SOURCE_QUERY_RE = /[?&]arcade-symbols(?:[&#]|$)/;
 const SYMBOL_VIRTUAL_ID_RE = /^virtual:arcade:symbol:([^:]+):[^:]+$/;
@@ -81,7 +75,6 @@ export function createArcadeRolldownPlugin(input: {
 	const sourceVirtualModules = new Map<string, Set<string>>();
 	const clientSymbolEntrySources = new Set<string>();
 	const dev = createArcadeDevGraph();
-	let manifest: ArcadeManifest | ServerArcadeManifest | null = null;
 	let root = internalOptions.rootDir;
 	const name = pluginName(environment);
 
@@ -134,10 +127,6 @@ export function createArcadeRolldownPlugin(input: {
 				for (const source of clientSymbolEntries(input.input, currentRoot)) {
 					clientSymbolEntrySources.add(source);
 				}
-			}
-			manifest = null;
-			if (currentRoot) {
-				manifest = manifests.get(currentRoot) ?? null;
 			}
 		},
 		outputOptions(output) {
@@ -214,21 +203,6 @@ export function createArcadeRolldownPlugin(input: {
 				}
 			}
 
-			if (currentEnvironment === 'server') {
-				let serverManifest = manifest;
-				if (
-					!serverManifest &&
-					internalOptions.dev &&
-					internalOptions.devInjections?.length
-				) {
-					serverManifest = devTagsManifest(internalOptions.devInjections);
-				}
-				return {
-					code: injectManifest(transformed.code, serverManifest),
-					map: transformed.map,
-				};
-			}
-
 			return transformed;
 		},
 		generateBundle: {
@@ -248,7 +222,7 @@ export function createArcadeRolldownPlugin(input: {
 					);
 				}
 
-				const clientManifest = createManifest(
+				const clientManifest = createBuildMetadata(
 					manifestBundle,
 					transformManifests.values(),
 					getRoot(),
@@ -260,11 +234,6 @@ export function createArcadeRolldownPlugin(input: {
 						injections: internalOptions.devInjections,
 					},
 				);
-				manifest = clientManifest;
-				const currentRoot = getRoot();
-				if (currentRoot) {
-					manifests.set(currentRoot, clientManifest);
-				}
 				internalOptions.onManifest?.(clientManifest);
 
 				this.emitFile({
@@ -287,12 +256,12 @@ export function createArcadeRolldownPlugin(input: {
 }
 
 function bundleWithoutRemovedChunks(
-	bundle: ArcadeManifestBundle,
+	bundle: ArcadeBuildMetadataBundle,
 	removedFileNames: ReadonlySet<string>,
 ) {
 	if (removedFileNames.size === 0) return bundle;
 
-	const next: ArcadeManifestBundle = {};
+	const next: ArcadeBuildMetadataBundle = {};
 	for (const [key, output] of Object.entries(bundle)) {
 		if (isChunkFile(output) && removedFileNames.has(output.fileName)) continue;
 		next[key] = output;
@@ -486,11 +455,10 @@ function pathname(id: string) {
 
 export { ARCADE_BUNDLE_GRAPH, ARCADE_BUILD_PREFIX, outputDefaults } from './build/chunking.ts';
 export {
-	ARCADE_MANIFEST,
 	ARCADE_MANIFEST_FILE,
-	createManifest,
-	devTagsManifest,
-	injectManifest,
-} from './build/manifest.ts';
+	createBuildMetadata,
+	createBuildMetadata as createManifest,
+} from './build/build-metadata.ts';
 export { convertManifestToBundleGraph, createPreloadGraphAdder } from './build/bundle-graph.ts';
+export { collectHeadLinkInjections } from './build/head-links.ts';
 export { ARCADE_VIRTUAL_PREFIX, transformTsrxModule } from './transform.ts';

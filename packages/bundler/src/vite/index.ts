@@ -35,6 +35,7 @@ export type {
 	PreloadGraphContext,
 	PreloadGraphEntries,
 	PreloadGraphEntriesAdder,
+	ArcadeBuildMetadata,
 	ArcadeEnvironment,
 	ArcadeManifest,
 	ArcadeRolldownOptions,

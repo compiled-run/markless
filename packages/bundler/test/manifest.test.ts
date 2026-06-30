@@ -3,13 +3,13 @@ import {
 	convertManifestToBundleGraph,
 	createPreloadGraphAdder,
 } from '../src/build/bundle-graph.ts';
-import { ARCADE_BUNDLE_GRAPH } from '../src/build/chunking.ts';
 import {
-	ARCADE_MANIFEST,
-	createManifest,
-	injectManifest,
-	type ArcadeManifestBundle,
-} from '../src/build/manifest.ts';
+	ARCADE_MANIFEST_FILE,
+	createBuildMetadata,
+	type ArcadeBuildMetadataBundle,
+} from '../src/build/build-metadata.ts';
+import { ARCADE_BUNDLE_GRAPH } from '../src/build/chunking.ts';
+import { collectHeadLinkInjections } from '../src/build/head-links.ts';
 import type { ArcadeManifest, ArcadeTransformManifest } from '../src/types.ts';
 
 const transformManifest: ArcadeTransformManifest = {
@@ -26,9 +26,9 @@ const transformManifest: ArcadeTransformManifest = {
 	],
 };
 
-describe('arcade manifest output', () => {
-	test('creates a manifest from bundler output and transform artifacts', () => {
-		const manifest = createManifest(
+describe('arcade build metadata output', () => {
+	test('creates build metadata from bundler output and transform artifacts', () => {
+		const metadata = createBuildMetadata(
 			{
 				'build/chunk-entry.js': chunk({
 					fileName: 'build/chunk-entry.js',
@@ -68,7 +68,7 @@ describe('arcade manifest output', () => {
 			},
 		);
 
-		expect(manifest.modules[0]).toMatchObject({
+		expect(metadata.modules[0]).toMatchObject({
 			source: '/workspace/app/src/root.tsrx',
 			symbols: [
 				expect.objectContaining({
@@ -77,18 +77,23 @@ describe('arcade manifest output', () => {
 				}),
 			],
 		});
-		expect(manifest.bundles['build/chunk-entry.js']).toMatchObject({
+		expect(metadata.bundles['build/chunk-entry.js']).toMatchObject({
 			imports: ['build/chunk-symbol.js'],
 			origins: ['src/root.tsrx'],
 		});
-		expect(manifest.bundles['build/chunk-symbol.js']).toMatchObject({
+		expect(metadata.bundles['build/chunk-symbol.js']).toMatchObject({
 			symbols: ['root#click'],
 		});
-		expect(manifest.assets?.['build/root.css']).toEqual({ name: 'root.css', size: 6 });
-		expect(manifest.assets?.['build/chunk-entry.js.map']).toBeUndefined();
-		expect(manifest.bundleGraphAsset).toBe(ARCADE_BUNDLE_GRAPH);
-		expect(manifest.bundleGraph).toContain('root#click');
-		expect(manifest.injections).toContainEqual({
+		expect(metadata.assets?.['build/root.css']).toEqual({ name: 'root.css', size: 6 });
+		expect(metadata.assets?.['build/chunk-entry.js.map']).toBeUndefined();
+		expect(metadata.assets?.[ARCADE_BUNDLE_GRAPH]).toEqual({
+			name: 'bundle-graph.json',
+			size: JSON.stringify(metadata.bundleGraph).length,
+		});
+		expect(ARCADE_MANIFEST_FILE).toBe('arcade-manifest.json');
+		expect(metadata.bundleGraphAsset).toBe(ARCADE_BUNDLE_GRAPH);
+		expect(metadata.bundleGraph).toContain('root#click');
+		expect(metadata.injections).toContainEqual({
 			tag: 'link',
 			location: 'head',
 			attributes: {
@@ -96,13 +101,52 @@ describe('arcade manifest output', () => {
 				href: '/assets/build/root.css',
 			},
 		});
-		expect(manifest.manifestHash).toEqual(expect.any(String));
+	});
+
+	test('prefers Vite imported CSS metadata when collecting stylesheet head links', () => {
+		const injections = collectHeadLinkInjections(
+			{
+				'build/root.js': chunk({
+					fileName: 'build/root.js',
+					name: 'root',
+					code: 'export default {};',
+					moduleIds: ['/workspace/app/src/root.tsrx'],
+					facadeModuleId: '/workspace/app/src/root.tsrx',
+					viteMetadata: { importedCss: new Set(['build/root.css']) },
+				}),
+				'build/root.css': {
+					type: 'asset',
+					fileName: 'build/root.css',
+					name: 'root.css',
+					names: ['root.css'],
+					source: 'body{}',
+				},
+				'build/unused.css': {
+					type: 'asset',
+					fileName: 'build/unused.css',
+					name: 'unused.css',
+					names: ['unused.css'],
+					source: '.unused{}',
+				},
+			},
+			{ publicPath: (fileName) => `/assets/${fileName}` },
+		);
+
+		expect(injections).toEqual([
+			{
+				tag: 'link',
+				location: 'head',
+				attributes: {
+					rel: 'stylesheet',
+					href: '/assets/build/root.css',
+				},
+			},
+		]);
 	});
 
 	test('converts symbol and custom preload entries into the bundle graph', () => {
 		const manifest: ArcadeManifest = {
 			version: 1,
-			manifestHash: 'test',
 			modules: [
 				{
 					...transformManifest,
@@ -143,27 +187,6 @@ describe('arcade manifest output', () => {
 		expect(graph).toContain('entry-preload');
 		expect(graph).toContain('build/chunk-symbol.js');
 	});
-
-	test('injects build manifests into server output without a manifest input option', () => {
-		const manifest: ArcadeManifest = {
-			version: 1,
-			manifestHash: 'abc',
-			modules: [transformManifest],
-			bundles: {},
-			bundleGraph: ['root#click'],
-			bundleGraphAsset: ARCADE_BUNDLE_GRAPH,
-			injections: [{ tag: 'script', location: 'head', attributes: { src: '/runtime.js' } }],
-		};
-
-		const code = injectManifest(
-			`if (!${ARCADE_MANIFEST}) throw new Error(); export default ${ARCADE_MANIFEST};`,
-			manifest,
-		);
-
-		expect(code).toContain('"manifestHash":"abc"');
-		expect(code).toContain('"bundleGraph":["root#click"]');
-		expect(code).toContain('if (false) throw new Error();');
-	});
 });
 
 function chunk(input: {
@@ -174,7 +197,8 @@ function chunk(input: {
 	dynamicImports?: string[];
 	moduleIds: string[];
 	facadeModuleId: string;
-}): ArcadeManifestBundle[string] {
+	viteMetadata?: { importedCss?: Set<string> };
+}): ArcadeBuildMetadataBundle[string] {
 	return {
 		type: 'chunk',
 		fileName: input.fileName,
@@ -185,5 +209,6 @@ function chunk(input: {
 		dynamicImports: input.dynamicImports ?? [],
 		moduleIds: input.moduleIds,
 		facadeModuleId: input.facadeModuleId,
+		viteMetadata: input.viteMetadata,
 	};
 }

@@ -3,21 +3,20 @@ import type {
 	BundleGraphAdder,
 	GlobalInjections,
 	ArcadeAsset,
+	ArcadeBuildMetadata,
 	ArcadeBundle,
-	ArcadeManifest,
 	ArcadeTransformManifest,
-	ServerArcadeManifest,
 } from '../types.ts';
 import { convertManifestToBundleGraph } from './bundle-graph.ts';
+import { collectHeadLinkInjections } from './head-links.ts';
 
-export const ARCADE_MANIFEST = 'globalThis.__ARCADE_MANIFEST__';
 export const ARCADE_MANIFEST_FILE = 'arcade-manifest.json';
 
-export type ArcadeManifestBundle = Record<string, ArcadeManifestBundleItem>;
+export type ArcadeBuildMetadataBundle = Record<string, ArcadeBuildMetadataBundleItem>;
 
-export type ArcadeManifestBundleItem = ArcadeManifestAsset | ArcadeManifestChunk;
+export type ArcadeBuildMetadataBundleItem = ArcadeBuildMetadataAsset | ArcadeBuildMetadataChunk;
 
-export interface ArcadeManifestAsset {
+export interface ArcadeBuildMetadataAsset {
 	type: 'asset';
 	fileName: string;
 	name?: string;
@@ -25,7 +24,7 @@ export interface ArcadeManifestAsset {
 	source: string | Uint8Array;
 }
 
-export interface ArcadeManifestChunk {
+export interface ArcadeBuildMetadataChunk {
 	type: 'chunk';
 	fileName: string;
 	name: string;
@@ -35,12 +34,13 @@ export interface ArcadeManifestChunk {
 	dynamicImports: string[];
 	moduleIds: string[];
 	facadeModuleId?: string | null;
+	viteMetadata?: {
+		importedCss?: ReadonlySet<string> | readonly string[];
+	};
 }
 
-const STYLESHEET_ASSET_RE = /\.css$/;
-
-export function createManifest(
-	bundle: ArcadeManifestBundle,
+export function createBuildMetadata(
+	bundle: ArcadeBuildMetadataBundle,
 	transformManifests: Iterable<ArcadeTransformManifest>,
 	root: string | undefined,
 	options: {
@@ -54,13 +54,15 @@ export function createManifest(
 	const canonPath = options.canonPath ?? ((fileName: string) => fileName);
 	const publicPath = options.publicPath ?? ((fileName: string) => fileName);
 	const modules = [...transformManifests].map(cloneTransformManifest);
-	const manifest: ArcadeManifest = {
+	const metadata: ArcadeBuildMetadata = {
 		version: 1,
-		manifestHash: '',
 		modules,
 		bundles: {},
 		assets: {},
-		injections: [...(options.injections ?? [])],
+		injections: [
+			...(options.injections ?? []),
+			...collectHeadLinkInjections(bundle, { publicPath }),
+		],
 	};
 
 	for (const item of Object.values(bundle)) {
@@ -69,10 +71,7 @@ export function createManifest(
 				continue;
 			}
 
-			manifest.assets![item.fileName] = assetInfo(item);
-			if (STYLESHEET_ASSET_RE.test(item.fileName)) {
-				manifest.injections!.push(stylesheetInjection(publicPath(item.fileName)));
-			}
+			metadata.assets![item.fileName] = assetInfo(item);
 			continue;
 		}
 
@@ -103,48 +102,25 @@ export function createManifest(
 			asyncBundle.symbols = symbols;
 		}
 
-		manifest.bundles[bundleFileName] = asyncBundle;
+		metadata.bundles[bundleFileName] = asyncBundle;
 	}
 
-	computeTotals(manifest.bundles);
-	sortManifest(manifest);
+	computeTotals(metadata.bundles);
+	sortBuildMetadata(metadata);
 
 	if (options.bundleGraphAsset) {
-		manifest.bundleGraph = convertManifestToBundleGraph(manifest, options.bundleGraphAdders);
-		manifest.bundleGraphAsset = options.bundleGraphAsset;
-		manifest.assets![options.bundleGraphAsset] = {
+		metadata.bundleGraph = convertManifestToBundleGraph(metadata, options.bundleGraphAdders);
+		metadata.bundleGraphAsset = options.bundleGraphAsset;
+		metadata.assets![options.bundleGraphAsset] = {
 			name: 'bundle-graph.json',
-			size: JSON.stringify(manifest.bundleGraph).length,
+			size: JSON.stringify(metadata.bundleGraph).length,
 		};
 	}
 
-	manifest.manifestHash = '';
-	manifest.manifestHash = hash(JSON.stringify(manifest));
-	return manifest;
+	return metadata;
 }
 
-export function devTagsManifest(devTags: GlobalInjections[]): ServerArcadeManifest {
-	return { version: 1, manifestHash: 'dev', modules: [], injections: devTags };
-}
-
-export function injectManifest(
-	code: string,
-	manifest: ArcadeManifest | ServerArcadeManifest | null,
-) {
-	let value = ARCADE_MANIFEST;
-	if (manifest?.manifestHash) {
-		value = JSON.stringify({
-			version: manifest.version,
-			manifestHash: manifest.manifestHash,
-			modules: manifest.modules,
-			injections: manifest.injections,
-			bundleGraph: manifest.bundleGraph,
-			bundleGraphAsset: manifest.bundleGraphAsset,
-		});
-	}
-
-	return code.replaceAll(`!${ARCADE_MANIFEST}`, 'false').replaceAll(ARCADE_MANIFEST, value);
-}
+export const createManifest = createBuildMetadata;
 
 function cloneTransformManifest(manifest: ArcadeTransformManifest): ArcadeTransformManifest {
 	return {
@@ -157,7 +133,7 @@ function cloneTransformManifest(manifest: ArcadeTransformManifest): ArcadeTransf
 
 function finalizeVirtualModuleReferences(
 	modules: ArcadeTransformManifest[],
-	item: ArcadeManifestChunk,
+	item: ArcadeBuildMetadataChunk,
 	bundleFileName: string,
 ) {
 	const ids = new Set(
@@ -187,7 +163,7 @@ function normalizeVirtualModuleId(id: string) {
 	return id;
 }
 
-function assetInfo(item: ArcadeManifestAsset): ArcadeAsset {
+function assetInfo(item: ArcadeBuildMetadataAsset): ArcadeAsset {
 	return {
 		name: item.names?.[0] ?? item.name,
 		size: item.source.length,
@@ -195,7 +171,7 @@ function assetInfo(item: ArcadeManifestAsset): ArcadeAsset {
 }
 
 function mapBundleNames(
-	bundle: ArcadeManifestBundle,
+	bundle: ArcadeBuildMetadataBundle,
 	names: string[],
 	canonPath: (fileName: string) => string,
 ) {
@@ -209,7 +185,7 @@ function mapBundleNames(
 	});
 }
 
-function getOrigins(item: ArcadeManifestChunk, root: string | undefined) {
+function getOrigins(item: ArcadeBuildMetadataChunk, root: string | undefined) {
 	return item.moduleIds
 		.filter((id) => !id.startsWith('\0'))
 		.map((id) => {
@@ -239,18 +215,18 @@ function computeTotals(bundles: Record<string, ArcadeBundle>) {
 	}
 }
 
-function sortManifest(manifest: ArcadeManifest) {
-	manifest.modules = manifest.modules.sort((a, b) => a.source.localeCompare(b.source));
-	manifest.bundles = sortRecord(manifest.bundles);
-	manifest.assets = sortRecord(manifest.assets ?? {});
-	manifest.injections?.sort((a, b) => injectionKey(a).localeCompare(injectionKey(b)));
-	for (const bundle of Object.values(manifest.bundles)) {
+function sortBuildMetadata(metadata: ArcadeBuildMetadata) {
+	metadata.modules = metadata.modules.sort((a, b) => a.source.localeCompare(b.source));
+	metadata.bundles = sortRecord(metadata.bundles);
+	metadata.assets = sortRecord(metadata.assets ?? {});
+	metadata.injections?.sort((a, b) => injectionKey(a).localeCompare(injectionKey(b)));
+	for (const bundle of Object.values(metadata.bundles)) {
 		bundle.imports?.sort();
 		bundle.dynamicImports?.sort();
 		bundle.origins?.sort();
 		bundle.symbols?.sort();
 	}
-	for (const module of manifest.modules) {
+	for (const module of metadata.modules) {
 		module.symbols.sort((a, b) => a.symbolId.localeCompare(b.symbolId));
 	}
 }
@@ -266,26 +242,6 @@ function sortRecord<T>(record: Record<string, T>) {
 	return next;
 }
 
-function stylesheetInjection(href: string): GlobalInjections {
-	return {
-		tag: 'link',
-		location: 'head',
-		attributes: {
-			rel: 'stylesheet',
-			href,
-		},
-	};
-}
-
 function injectionKey(injection: GlobalInjections) {
 	return `${injection.location}:${injection.tag}:${injection.attributes?.href ?? ''}`;
-}
-
-function hash(value: string) {
-	let next = 5381;
-	for (let i = 0; i < value.length; i++) {
-		next = (next * 33) ^ value.charCodeAt(i);
-	}
-
-	return (next >>> 0).toString(36);
 }

@@ -119,7 +119,6 @@ function fakeLink(initialHref: string) {
 function manifestWithLazySymbolDeps(): ArcadeManifest {
 	return {
 		version: 1,
-		manifestHash: 'test',
 		modules: [
 			{
 				source: '/workspace/app/src/root.tsrx',

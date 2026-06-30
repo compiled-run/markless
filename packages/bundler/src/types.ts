@@ -11,7 +11,7 @@ export interface ArcadeRolldownOptions {
 	devServer?: ArcadeDevServer;
 	hmr?: boolean;
 	bundleGraphAdders?: Set<BundleGraphAdder>;
-	onManifest?: (manifest: ArcadeManifest) => void;
+	onManifest?: (manifest: ArcadeBuildMetadata) => void;
 	emitManifestJson?: boolean;
 	rootDir?: string;
 	buildId?: string;
@@ -61,9 +61,8 @@ export interface ArcadeSymbolManifestEntry extends ArcadeBuildModuleReference {
 	kind: string;
 }
 
-export interface ArcadeManifest {
+export interface ArcadeBuildMetadata {
 	version: number;
-	manifestHash: string;
 	modules: ArcadeTransformManifest[];
 	bundles: Record<string, ArcadeBundle>;
 	assets?: Record<string, ArcadeAsset>;
@@ -72,10 +71,7 @@ export interface ArcadeManifest {
 	injections?: GlobalInjections[];
 }
 
-export type ServerArcadeManifest = Pick<
-	ArcadeManifest,
-	'version' | 'manifestHash' | 'modules' | 'bundleGraph' | 'bundleGraphAsset' | 'injections'
->;
+export type ArcadeManifest = ArcadeBuildMetadata;
 
 export interface ArcadeBundle {
 	size: number;
@@ -102,7 +98,7 @@ export type ArcadeBundleGraph = Array<string | number>;
 export type PreloadGraphEntries = Record<string, { imports?: string[]; dynamicImports?: string[] }>;
 
 export interface PreloadGraphContext {
-	readonly manifest: ArcadeManifest;
+	readonly manifest: ArcadeBuildMetadata;
 	readonly hasBundle: (bundleName: string) => boolean;
 	readonly bundlesForOrigins: (origins: readonly string[]) => string[];
 }
@@ -111,7 +107,7 @@ export type PreloadGraphEntriesAdder = (
 	context: PreloadGraphContext,
 ) => PreloadGraphEntries | undefined;
 
-export type BundleGraphAdder = (manifest: ArcadeManifest) => PreloadGraphEntries | undefined;
+export type BundleGraphAdder = (manifest: ArcadeBuildMetadata) => PreloadGraphEntries | undefined;
 
 export type ArcadeRolldownPluginApi = {
 	invalidateGeneratedModules: (parent: string, environment?: ArcadeEnvironment) => string[];

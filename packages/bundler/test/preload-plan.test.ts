@@ -1,9 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { convertManifestToBundleGraph } from '../src/build/bundle-graph.ts';
-import {
-	planModulePreloadUrls,
-	planModulePreloads,
-} from '../src/build/preload-plan.ts';
+import { planModulePreloadUrls, planModulePreloads } from '../src/build/preload-plan.ts';
 import { planSsrModulePreloads } from '../src/build/preload-plan-ssr.ts';
 import type { ArcadeManifest } from '../src/types.ts';
 
@@ -96,9 +93,7 @@ describe('module preload planning', () => {
 					events: [{ symbolIds: ['symbol:click'] }],
 					domUpdates: [{ symbolId: 'symbol:visible' }],
 					behaviors: [{ symbolId: 'symbol:behavior' }],
-					asyncBoundaries: [
-						{ asyncReads: [{ runnerSymbolId: 'symbol:async-runner' }] },
-					],
+					asyncBoundaries: [{ asyncReads: [{ runnerSymbolId: 'symbol:async-runner' }] }],
 				},
 			},
 			base: '/assets/',
@@ -155,7 +150,6 @@ describe('module preload planning', () => {
 function manifestWithComplexSymbolDeps(): ArcadeManifest {
 	return {
 		version: 1,
-		manifestHash: 'test',
 		modules: [
 			{
 				source: '/workspace/app/src/root.tsrx',
@@ -246,7 +240,6 @@ function manifestWithComplexSymbolDeps(): ArcadeManifest {
 function manifestWithResolverChunk(): ArcadeManifest {
 	return {
 		version: 1,
-		manifestHash: 'test',
 		modules: [
 			{
 				source: '/workspace/app/src/root.tsrx',

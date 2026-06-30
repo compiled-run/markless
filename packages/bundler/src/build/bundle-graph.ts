@@ -4,9 +4,9 @@ import { withoutLeadingSlash } from 'ufo';
 import type {
 	BundleGraphAdder,
 	PreloadGraphEntriesAdder,
+	ArcadeBuildMetadata,
 	ArcadeBundle,
 	ArcadeBundleGraph,
-	ArcadeManifest,
 } from '../types.ts';
 
 type BundleGraphEdge = [string, string | null];
@@ -17,7 +17,7 @@ const SLOW_BUNDLE_TOTAL = MINIMUM_CONNECTION_BYTES_PER_SECOND * 0.5;
 const SMALL_BUNDLE_TOTAL = 1000;
 
 export function convertManifestToBundleGraph(
-	manifest: ArcadeManifest,
+	manifest: ArcadeBuildMetadata,
 	bundleGraphAdders?: Set<BundleGraphAdder>,
 ): ArcadeBundleGraph {
 	const graph = bundleGraphRecords(manifest, bundleGraphAdders);
@@ -76,7 +76,7 @@ export function createPreloadGraphAdder(addEntries: PreloadGraphEntriesAdder): B
 		});
 }
 
-function bundlesForOrigins(manifest: ArcadeManifest, origins: readonly string[]) {
+function bundlesForOrigins(manifest: ArcadeBuildMetadata, origins: readonly string[]) {
 	const normalizedOrigins = new Set(origins.map(normalizeManifestOrigin));
 	const bundles: string[] = [];
 	for (const [bundleName, bundle] of Object.entries(manifest.bundles)) {
@@ -89,7 +89,10 @@ function bundlesForOrigins(manifest: ArcadeManifest, origins: readonly string[])
 	return bundles.sort();
 }
 
-function bundleGraphRecords(manifest: ArcadeManifest, bundleGraphAdders?: Set<BundleGraphAdder>) {
+function bundleGraphRecords(
+	manifest: ArcadeBuildMetadata,
+	bundleGraphAdders?: Set<BundleGraphAdder>,
+) {
 	const graph: Record<string, BundleGraphRecord> = { ...manifest.bundles };
 	for (const module of manifest.modules) {
 		for (const symbol of module.symbols) {
@@ -111,7 +114,7 @@ function bundleGraphRecords(manifest: ArcadeManifest, bundleGraphAdders?: Set<Bu
 		}
 	}
 	if (bundleGraphAdders) {
-		const combined = { ...manifest, bundles: graph as ArcadeManifest['bundles'] };
+		const combined = { ...manifest, bundles: graph as ArcadeBuildMetadata['bundles'] };
 		for (const add of bundleGraphAdders) {
 			Object.assign(graph, add(combined));
 		}
