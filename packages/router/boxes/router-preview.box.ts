@@ -2,7 +2,7 @@ import { box } from '@async/witness';
 import { planModulePreloadUrls } from '../../bundler/src/build/preload-plan.ts';
 import type { ArcadeBundleGraph } from '../../bundler/src/types.ts';
 
-const FIXTURE = '../../fixtures/router';
+const FIXTURE = 'fixtures/router';
 const BUNDLE_GRAPH_REQUEST = '/build/bundle-graph.json';
 const COUNTER = 'button';
 const DOCS_LINK = 'a[data-arcade-router-link]';

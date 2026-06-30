@@ -206,6 +206,28 @@ let count = state(0);
 		expect(result.code).not.toContain('moduleManifest');
 	});
 
+	test('transformTsrxModule routes child symbols for full client SSR resume', async () => {
+		const result = await transformTsrxModule({
+			filename: '/workspace/app/src/App.tsrx',
+			source: `import { state } from 'arcade';
+import Child from './Child.tsrx';
+export function App() @{
+let count = state(0);
+<main><button onClick={() => count++}>{count}</button><Child count={count} /></main>
+}`,
+			environment: 'client',
+		});
+
+		expect(result.code).toContain('export async function resumeContainerEvent');
+		expect(result.code).toContain('loadSymbol: arcadeSsrLoadSymbolRoute,');
+		expect(result.code).toContain('const arcadeLoadLocalSymbol = loadSymbol;');
+		expect(result.code).toContain('function arcadeSsrLoadSymbolRoute(symbolId)');
+		expect(result.code).toContain('import("./Child.tsrx?arcade-symbols")');
+		expect(result.code).toContain('return arcadeLoadLocalSymbol(symbolId);');
+		expect(result.code).toContain('renderCsr: arcadeRenderCsr,');
+		expect(result.code).toContain('export default arcadeCompiledApp;');
+	});
+
 	test('client plugin emits symbol-only output for named symbols TSRX entries', async () => {
 		const plugin = arcadeClient();
 

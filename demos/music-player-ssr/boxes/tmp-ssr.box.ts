@@ -4,8 +4,8 @@ const WAIT = { timeoutMs: 10_000 };
 
 export default box(
 	{
-		name: 'music-player ssr: preview resumes youtube command state',
-		tags: ['music-player', 'ssr', 'preview', 'browser'],
+		name: 'music-player ssr router: preview resumes youtube command state',
+		tags: ['music-player', 'router', 'ssr', 'preview', 'browser'],
 		modes: ['build', 'preview'],
 	},
 	async ({ pipeline, expect, receipt }) => {
@@ -19,6 +19,10 @@ export default box(
 		await expect.html.contains(html, 'rel="modulepreload"');
 		if (preloadHrefs.length === 0) {
 			throw new Error('Expected SSR music player HTML to render modulepreload links.');
+		}
+		assertModulePreloadsInHead(html);
+		if (html.includes('data-arcade-router-link-resumer')) {
+			throw new Error('Music player SSR must not include the router Link resumer script.');
 		}
 		if (/<script\b[^>]*\bsrc=/.test(html)) {
 			throw new Error('Expected SSR playground HTML to keep startup JavaScript script-free.');
@@ -75,6 +79,22 @@ function modulePreloadHrefs(html: string): readonly string[] {
 	return [...html.matchAll(/<link\b(?=[^>]*\brel="modulepreload")[^>]*\bhref="([^"]+)"/g)].map(
 		(match) => match[1]!,
 	);
+}
+
+function assertModulePreloadsInHead(html: string): void {
+	const headEnd = html.indexOf('</head>');
+	const bodyStart = html.indexOf('<body>');
+	const firstPreload = html.indexOf('rel="modulepreload"');
+	if (headEnd === -1 || bodyStart === -1 || firstPreload === -1) {
+		throw new Error('Expected HTML document with modulepreload links in head.');
+	}
+	if (firstPreload > headEnd || firstPreload > bodyStart) {
+		throw new Error('Expected SSR music player modulepreloads before </head>.');
+	}
+	const bodyHtml = html.slice(bodyStart);
+	if (bodyHtml.includes('rel="modulepreload"')) {
+		throw new Error('Expected SSR music player body to contain no modulepreload links.');
+	}
 }
 
 type BrowserNetworkRequest = {

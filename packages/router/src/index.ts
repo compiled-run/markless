@@ -116,9 +116,16 @@ export function __arcadeCreateHttpContext<
 	};
 }
 
-export function Html(props: { readonly children?: unknown }): unknown {
-	return props.children;
-}
+export const Html = Object.assign(
+	function Html(props: { readonly children?: unknown }): unknown {
+		return props.children;
+	},
+	{
+		renderSsr(props: { readonly children?: unknown } = {}) {
+			return { html: props.children == null ? '' : String(props.children) };
+		},
+	},
+);
 
 export const Link = Object.assign(
 	function Link(props: LinkProps = {}): unknown {

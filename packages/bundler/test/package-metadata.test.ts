@@ -98,6 +98,47 @@ describe('package metadata', () => {
 		);
 	});
 
+	test('music player demos do not enable privileged Vite DevTools by default', async () => {
+		for (const demo of ['music-player', 'music-player-ssr']) {
+			const manifest = JSON.parse(
+				await readFile(resolve(root, `demos/${demo}/package.json`), 'utf8'),
+			) as { readonly devDependencies?: Record<string, string> };
+			const config = await readFile(resolve(root, `demos/${demo}/vite.config.ts`), 'utf8');
+
+			expect(manifest.devDependencies).not.toHaveProperty('@vitejs/devtools');
+			expect(config).not.toContain('@vitejs/devtools');
+			expect(config).not.toContain('DevTools');
+			expect(config).not.toContain('devtools: {}');
+		}
+	});
+
+	test('music player demos are router apps without custom client or SSR hosts', async () => {
+		for (const demo of ['music-player', 'music-player-ssr']) {
+			const manifest = JSON.parse(
+				await readFile(resolve(root, `demos/${demo}/package.json`), 'utf8'),
+			) as {
+				readonly scripts?: Record<string, string>;
+				readonly dependencies?: Record<string, string>;
+			};
+			const config = await readFile(resolve(root, `demos/${demo}/vite.config.ts`), 'utf8');
+
+			expect(manifest.dependencies).toHaveProperty('@arcade/router');
+			expect(manifest.scripts).not.toHaveProperty('smoke:ssr');
+			expect(config).toContain("import { router } from '@arcade/router/vite';");
+			expect(config).toContain('plugins: [arcade(), router()]');
+			expect(config).not.toContain('musicPlayerSsrHost');
+			await expect(access(resolve(root, `demos/${demo}/document.tsrx`))).resolves.toBe(
+				undefined,
+			);
+			await expect(access(resolve(root, `demos/${demo}/pages/index.tsrx`))).resolves.toBe(
+				undefined,
+			);
+			await expect(access(resolve(root, `demos/${demo}/index.html`))).rejects.toThrow();
+			await expect(access(resolve(root, `demos/${demo}/src/main.ts`))).rejects.toThrow();
+			await expect(access(resolve(root, `demos/${demo}/src/dev-server.ts`))).rejects.toThrow();
+		}
+	});
+
 	test('workspace test script includes package-local Witness boxes', async () => {
 		const workspace = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8')) as {
 			readonly scripts?: Record<string, string>;
@@ -118,6 +159,16 @@ describe('package metadata', () => {
 		expect(workspace.scripts?.test).toBe(
 			'vp test && pnpm bench:jsfb:guard && pnpm --dir packages/bundler test:boxes && pnpm --dir packages/router test:boxes',
 		);
+	});
+
+	test('router package publishes source files without local fixtures or boxes', async () => {
+		const router = JSON.parse(
+			await readFile(resolve(root, 'packages/router/package.json'), 'utf8'),
+		) as {
+			readonly files?: readonly string[];
+		};
+
+		expect(router.files).toEqual(['src']);
 	});
 
 	test('JSFB fixture aliases Arcade subpath imports before the package root', async () => {

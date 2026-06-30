@@ -1,24 +1,32 @@
 import { box } from '@async/witness';
-import { planModulePreloads, type ArcadeBundleGraph } from 'arcade/preload';
 
 const WAIT = { timeoutMs: 10_000 };
-const BUNDLE_GRAPH_REQUEST = '/build/bundle-graph.json';
-const MIN_CSR_PRELOAD_COUNT = 2;
 
 export default box(
 	{
-		name: 'music-player csr: preview updates youtube command state',
-		tags: ['music-player', 'csr', 'preview', 'browser'],
+		name: 'music-player router: preview resumes youtube command state',
+		tags: ['music-player', 'router', 'ssr', 'preview', 'browser'],
 		modes: ['build', 'preview'],
 	},
 	async ({ pipeline, expect, receipt }) => {
 		const build = await pipeline.build();
 		const preview = await pipeline.preview(build);
+		const html = await preview.request('/');
+		const preloadHrefs = modulePreloadHrefs(html);
+		await expect.html.contains(html, 'data-async-resumer');
+		await expect.html.contains(html, 'rel="modulepreload"');
+		if (preloadHrefs.length === 0) {
+			throw new Error('Expected router music player HTML to render modulepreload links.');
+		}
+		assertModulePreloadsInHead(html);
+		if (html.includes('data-arcade-router-link-resumer')) {
+			throw new Error('Music player router demo must not include the router Link resumer script.');
+		}
+		if (/<script\b[^>]*\bsrc=/.test(html)) {
+			throw new Error('Expected router music player HTML to keep startup JavaScript script-free.');
+		}
+
 		const page = await preview.browser.visit('/');
-		const expectedPreloadHrefs = expectedCsrPreloadHrefs(
-			JSON.parse(await preview.request(BUNDLE_GRAPH_REQUEST)) as ArcadeBundleGraph,
-		);
-		receipt.note(`music-player CSR expected preload JS: ${expectedPreloadHrefs.join(', ')}`);
 
 		await expect.page.bodyText(
 			page,
@@ -27,9 +35,9 @@ export default box(
 			},
 			WAIT,
 		);
-		const startupModules = await waitForExpectedPreloadRequests(page, expectedPreloadHrefs);
-		assertPreloadedStartupModules(startupModules, expectedPreloadHrefs);
-		receipt.note(`music-player CSR startup JS: ${formatRequests(startupModules)}`);
+		const startupModules = await waitForBuildRequests(page, preloadHrefs.length);
+		assertPreloadedStartupModules(startupModules, preloadHrefs);
+		receipt.note(`music-player router startup JS: ${formatRequests(startupModules)}`);
 		await expect.page.attribute(page, '.youtube-frame-host', 'data-command', 'cue', WAIT);
 		await expect.page.attribute(
 			page,
@@ -40,16 +48,16 @@ export default box(
 		);
 		await expect.page.attribute(page, '.track', 'data-color-start', '#2f4f66', WAIT);
 		await expect.page.attribute(page, '.track', 'data-color-end', '#a57c5b', WAIT);
-		await expect.page.exists(page, 'script[src="https://www.youtube.com/iframe_api"]', WAIT);
 
-		const beforeInteraction = await page.networkRequests();
+		const startupPaths = new Set(startupModules.map((request) => pathOf(request.url)));
 		await page.trackEvents('click');
 		await page.click('[aria-label="Play or pause"]', WAIT);
 		await expect.page.outcome(page, { events: { click: { atLeast: 1 } } }, WAIT);
 		await expect.page.attribute(page, '.youtube-frame-host', 'data-command', 'play', WAIT);
 		await expect.page.attribute(page, '.youtube-frame-host', 'data-playing', 'true', WAIT);
 		await expect.page.attribute(page, '.youtube-frame-host', 'data-command-version', '1', WAIT);
-		assertNoBuildScriptsLoadedAfterInteraction(beforeInteraction, await page.networkRequests());
+		await expect.page.exists(page, 'script[src="https://www.youtube.com/iframe_api"]', WAIT);
+		assertNoNewBuildJs(await page.networkRequests(), startupPaths, 'play interaction');
 
 		await page.click('[aria-label="Next track"]', WAIT);
 		await expect.page.bodyText(page, { contains: 'Empty Crown' }, WAIT);
@@ -63,11 +71,34 @@ export default box(
 		);
 		await expect.page.attribute(page, '.track', 'data-color-start', '#4b3f72', WAIT);
 		await expect.page.attribute(page, '.track', 'data-color-end', '#d79f6f', WAIT);
+		assertNoNewBuildJs(await page.networkRequests(), startupPaths, 'next-track interaction');
 
 		await preview.close();
-		await receipt.capture('music-player csr preview youtube command state');
+		await receipt.capture('music-player router preview youtube command state');
 	},
 );
+
+function modulePreloadHrefs(html: string): readonly string[] {
+	return [...html.matchAll(/<link\b(?=[^>]*\brel="modulepreload")[^>]*\bhref="([^"]+)"/g)].map(
+		(match) => match[1]!,
+	);
+}
+
+function assertModulePreloadsInHead(html: string): void {
+	const headEnd = html.indexOf('</head>');
+	const bodyStart = html.indexOf('<body>');
+	const firstPreload = html.indexOf('rel="modulepreload"');
+	if (headEnd === -1 || bodyStart === -1 || firstPreload === -1) {
+		throw new Error('Expected HTML document with modulepreload links in head.');
+	}
+	if (firstPreload > headEnd || firstPreload > bodyStart) {
+		throw new Error('Expected router music player modulepreloads before </head>.');
+	}
+	const bodyHtml = html.slice(bodyStart);
+	if (bodyHtml.includes('rel="modulepreload"')) {
+		throw new Error('Expected router music player body to contain no modulepreload links.');
+	}
+}
 
 type BrowserNetworkRequest = {
 	readonly url: string;
@@ -81,38 +112,16 @@ type NetworkRequestPage = {
 	networkRequests(): Promise<BrowserNetworkRequest[]>;
 };
 
-function expectedCsrPreloadHrefs(bundleGraph: ArcadeBundleGraph): readonly string[] {
-	const roots = bundleGraph
-		.filter((item): item is string => typeof item === 'string' && item.startsWith('symbol:'))
-		.map((name) => ({ name, priority: 'high' as const }));
-	const hrefs = planModulePreloads({
-		base: '/build/',
-		bundleGraph,
-		roots,
-	}).map((preload) => preload.href);
-
-	if (hrefs.length < MIN_CSR_PRELOAD_COUNT) {
-		throw new Error(
-			`Expected CSR music player to expose at least ${MIN_CSR_PRELOAD_COUNT} lazy symbol modulepreloads, saw ${hrefs.length}: ${hrefs.join(', ')}`,
-		);
-	}
-	return hrefs;
-}
-
-async function waitForExpectedPreloadRequests(
+async function waitForBuildRequests(
 	page: NetworkRequestPage,
-	expectedHrefs: readonly string[],
+	minCount: number,
 	timeoutMs = 10_000,
 ): Promise<readonly BrowserNetworkRequest[]> {
-	const expectedPaths = expectedHrefs.map(
-		(href) => new URL(href, 'http://fixture.local').pathname,
-	);
 	const start = Date.now();
 	let latest: readonly BrowserNetworkRequest[] = [];
 	while (Date.now() - start < timeoutMs) {
 		latest = jsBuildRequests(await page.networkRequests());
-		const requestPaths = new Set(latest.map((request) => new URL(request.url).pathname));
-		if (expectedPaths.every((path) => requestPaths.has(path))) return latest;
+		if (latest.length >= minCount) return latest;
 		await sleep(50);
 	}
 	return latest;
@@ -131,31 +140,36 @@ function assertPreloadedStartupModules(
 		const path = new URL(href, 'http://fixture.local').pathname;
 		if (!requestPaths.has(path)) {
 			throw new Error(
-				`Expected rendered modulepreload href ${path} to be fetched during CSR startup, but saw: ${formatRequests(requests)}`,
+				`Expected rendered modulepreload href ${path} to be fetched during startup, but saw: ${formatRequests(requests)}`,
 			);
 		}
 	}
 	for (const request of requests) {
 		if (request.status !== 200 || request.failedReason) {
 			throw new Error(
-				`Expected successful CSR preloaded module request, got ${request.status ?? '?'} for ${request.url}`,
+				`Expected successful preloaded module request, got ${request.status ?? '?'} for ${request.url}`,
 			);
 		}
 	}
 }
 
-function assertNoBuildScriptsLoadedAfterInteraction(
-	beforeInteraction: readonly BrowserNetworkRequest[],
-	afterInteraction: readonly BrowserNetworkRequest[],
+function assertNoNewBuildJs(
+	requests: readonly BrowserNetworkRequest[],
+	startupPaths: ReadonlySet<string>,
+	label: string,
 ): void {
-	const loadedAfterInteraction = jsBuildRequests(
-		afterInteraction.slice(beforeInteraction.length),
+	const loadedAfterStartup = jsBuildRequests(requests).filter(
+		(request) => !startupPaths.has(pathOf(request.url)),
 	);
-	if (loadedAfterInteraction.length > 0) {
+	if (loadedAfterStartup.length > 0) {
 		throw new Error(
-			`Expected preloaded CSR interaction to avoid new Arcade JS fetches after click, but saw: ${formatRequests(loadedAfterInteraction)}`,
+			`Expected ${label} to use only startup modulepreloads, but saw new JS:\n${formatRequests(loadedAfterStartup)}`,
 		);
 	}
+}
+
+function pathOf(url: string): string {
+	return new URL(url).pathname;
 }
 
 function jsBuildRequests(

@@ -644,6 +644,48 @@ export default function Home() @{
 	expect(output.html).toBe('<main><a href="/docs">Docs</a></main>');
 });
 
+test('compileTsrxModule emits SSR for an imported component root', async () => {
+	const result = await compileTsrxModule({
+		filename: 'document.tsrx',
+		source: `
+import { Html } from 'arcade/router';
+
+export default function Document({ children }: { readonly children?: unknown }) @{
+	<Html>
+		<head>
+			<title>Arcade Router</title>
+		</head>
+		<body>{children}</body>
+	</Html>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderModule.ssrExportName).toBe('arcadeRenderSsr');
+	expect(result.publicRenderModule.ssrModuleSource).toContain(
+		'import { Html as __arcadeSsrComponent0 } from "arcade/router";',
+	);
+
+	const ssrModule = await importPublicRenderTestModule(
+		ssrRenderTestModuleSource(result, { replaceChildImport: true }),
+		{
+			childComponent: {
+				renderSsr(props: { readonly children?: unknown }) {
+					return { html: String(props.children ?? '') };
+				},
+			},
+		},
+	);
+	const output = (ssrModule.arcadeRenderSsr as (props: { children: string }) => {
+		readonly html: string;
+	})({ children: '<main>Docs</main>' });
+
+	expect(output.html).toBe(
+		'<head><title>Arcade Router</title></head><body>&lt;main&gt;Docs&lt;/main&gt;</body>',
+	);
+});
+
 test('compileTsrxModule passes component children into CSR component props', async () => {
 	const result = await compileTsrxModule({
 		filename: 'pages/index.tsrx',

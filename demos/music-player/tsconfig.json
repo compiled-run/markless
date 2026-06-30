@@ -10,5 +10,5 @@
 		"noEmit": true,
 		"types": ["vite/client"]
 	},
-	"include": ["src", "index.html", "vite.config.ts"]
+	"include": ["document.tsrx", "pages", "src", "vite.config.ts"]
 }

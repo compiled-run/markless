@@ -231,6 +231,31 @@ describe('server entry rendering', () => {
 		expect(html).toContain('</body></html>');
 	});
 
+	it('inserts rendered page html through compiled document children without escaping it', async () => {
+		const entry = createServerEntry({
+			documentModuleLoader: async () => ({
+				default: {
+					renderSsr(props: { readonly children?: unknown }) {
+						return {
+							html: `<head><title>Compiled</title></head><body>${escapeTestHtml(String(props.children ?? ''))}</body>`,
+						};
+					},
+				},
+			}),
+			pageModuleLoaders: {
+				'pages/index.tsrx': async () => ({ default: page('<main>Home</main>') }),
+			},
+			routeFileIds: ['/pages/index.tsrx'],
+		});
+
+		const response = await entry.fetch(new Request('http://arcade-router.test/'));
+		const html = await response.text();
+
+		expect(html).toContain('<body><div data-async-container>');
+		expect(html).toContain('<main>Home</main>');
+		expect(html).not.toContain('&lt;main&gt;Home&lt;/main&gt;');
+	});
+
 	it('renders matched compiler SSR exports before a default artifact wrapper is available', async () => {
 		const entry = createServerEntry({
 			documentModuleLoader: undefined,
@@ -299,4 +324,12 @@ function page(
 			return { html, ...payload };
 		},
 	};
+}
+
+function escapeTestHtml(value: string): string {
+	return value
+		.replaceAll('&', '&amp;')
+		.replaceAll('<', '&lt;')
+		.replaceAll('>', '&gt;')
+		.replaceAll('"', '&quot;');
 }

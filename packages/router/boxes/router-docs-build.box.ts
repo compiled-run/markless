@@ -1,6 +1,6 @@
 import { box } from '@async/witness';
 
-const FIXTURE = '../../fixtures/router-docs';
+const FIXTURE = 'fixtures/router-docs';
 const BUNDLE_GRAPH = `${FIXTURE}/.output/public/build/bundle-graph.json`;
 
 export default box(

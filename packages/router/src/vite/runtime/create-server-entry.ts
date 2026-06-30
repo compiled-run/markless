@@ -42,6 +42,8 @@ interface PageHtml {
 	readonly headHtml: string;
 }
 
+const DOCUMENT_CHILDREN_PLACEHOLDER = '__arcade_router_document_children__';
+
 export function createServerEntry(options: ServerEntryOptions) {
 	const manifest = buildRouteManifestFromFileIds(options.routeFileIds);
 
@@ -258,13 +260,14 @@ function renderDocument(
 	const children = pageHtml.bodyHtml;
 	const documentHtml = renderDocumentModule(documentModule, {
 		...pageProps,
-		children,
+		children: DOCUMENT_CHILDREN_PLACEHOLDER,
 	});
 	if (documentHtml !== undefined) {
+		const resolvedDocumentHtml = documentHtml.replace(DOCUMENT_CHILDREN_PLACEHOLDER, children);
 		return [
 			'<!doctype html>',
 			`<html${renderAttributes(attributes)}>`,
-			insertHeadHtml(documentHtml, pageHtml.headHtml),
+			insertHeadHtml(resolvedDocumentHtml, pageHtml.headHtml),
 			'</html>',
 		].join('');
 	}

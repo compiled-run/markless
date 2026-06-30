@@ -1,6 +1,6 @@
 import { box } from '@async/witness';
 
-const FIXTURE = '../../fixtures/router';
+const FIXTURE = 'fixtures/router';
 const WAIT = { timeoutMs: 10_000 };
 
 export default box(

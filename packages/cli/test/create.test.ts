@@ -238,6 +238,8 @@ test('creates a minimal Arcade Router app with TSRX pages and Nitro-backed deps'
 		"import { router } from '@arcade/router/vite';",
 	);
 	expect(viteConfig).toContain('plugins: [arcade(), router()]');
+	expect(viteConfig).not.toContain('@vitejs/devtools');
+	expect(viteConfig).not.toContain('DevTools');
 	expect(viteConfig).not.toContain('nitro()');
 	await expect(readFile(join(appRoot, 'tsconfig.json'), 'utf-8')).resolves.not.toContain('tsx');
 	await expect(exists(join(appRoot, 'pages/index.tsx'))).resolves.toBe(false);

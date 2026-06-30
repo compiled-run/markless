@@ -1,6 +1,6 @@
 import { box } from '@async/witness';
 
-const FIXTURE = '../../fixtures/router';
+const FIXTURE = 'fixtures/router';
 const DOCS_LINK = 'a[data-arcade-router-link]';
 const WAIT = { timeoutMs: 10_000 };
 

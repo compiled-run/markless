@@ -128,6 +128,16 @@ test('preserves user Nitro config while adding Arcade request scanning defaults'
 				},
 			},
 			routesDir: '.arcade/router/nitro-routes',
+			publicAssets: [
+				{
+					baseURL: '/assets',
+					dir: '/project/dist/assets',
+				},
+				{
+					baseURL: '/assets',
+					dir: '/project/node_modules/.nitro/vite/services/ssr/assets',
+				},
+			],
 			scanDirs: ['.', 'server'],
 			watchOptions: {
 				followSymlinks: false,
@@ -151,6 +161,7 @@ test('preserves user Nitro config while adding Arcade request scanning defaults'
 	});
 
 	expect(result?.nitro?.devServer?.watch).toEqual({ include: ['api/**'] });
+	expect(userConfig.nitro.publicAssets).toBeUndefined();
 
 	const nitroConfig = result?.nitro;
 	const requestPlugin = Array.isArray(nitroConfig?.rolldownConfig?.plugins)
@@ -263,7 +274,7 @@ test('emits exact route modulepreload maps from client build chunks', () => {
 			'build/docs.js': chunk({
 				dynamicImports: ['build/docs-symbol.js'],
 				fileName: 'build/docs.js',
-				imports: ['build/docs-runtime.js'],
+				imports: ['build/docs-runtime.js', 'build/event-only.js'],
 				moduleIds: ['/project/pages/docs/[...slug].mdx'],
 			}),
 			'build/home.js': chunk({
@@ -272,6 +283,13 @@ test('emits exact route modulepreload maps from client build chunks', () => {
 			}),
 			'build/docs-runtime.js': chunk({ fileName: 'build/docs-runtime.js' }),
 			'build/docs-symbol.js': chunk({ fileName: 'build/docs-symbol.js' }),
+			'build/event-only.js': chunk({
+				dynamicImports: ['build/event-only-behaviors.js'],
+				fileName: 'build/event-only.js',
+			}),
+			'build/event-only-behaviors.js': chunk({
+				fileName: 'build/event-only-behaviors.js',
+			}),
 			'build/navigation-polyfill.js': chunk({ fileName: 'build/navigation-polyfill.js' }),
 			'build/resume-runtime.js': chunk({ fileName: 'build/resume-runtime.js' }),
 			'build/shared.js': chunk({ fileName: 'build/shared.js' }),
@@ -299,6 +317,8 @@ test('emits exact route modulepreload maps from client build chunks', () => {
 		'/app/build/navigation-polyfill.js',
 		'/app/build/docs.js',
 		'/app/build/docs-runtime.js',
+		'/app/build/event-only.js',
+		'/app/build/event-only-behaviors.js',
 		'/app/build/docs-symbol.js',
 	]);
 	expect(routePreloads['pages/docs/[...slug].mdx']).not.toContain('/app/build/home.js');
@@ -307,6 +327,8 @@ test('emits exact route modulepreload maps from client build chunks', () => {
 		'/app/build/resume-runtime.js',
 		'/app/build/docs.js',
 		'/app/build/docs-runtime.js',
+		'/app/build/event-only.js',
+		'/app/build/event-only-behaviors.js',
 		'/app/build/docs-symbol.js',
 	]);
 	expect(ssrPreloads['pages/docs/[...slug].mdx']).not.toContain(

@@ -1,6 +1,6 @@
 import { box } from '@async/witness';
 
-const FIXTURE = '../../fixtures/router-full-stack';
+const FIXTURE = 'fixtures/router-full-stack';
 const COUNTER = 'button';
 const WAIT = { timeoutMs: 10_000 };
 

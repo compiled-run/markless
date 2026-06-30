@@ -68,6 +68,9 @@ importers:
 
   demos/music-player:
     dependencies:
+      '@arcade/router':
+        specifier: workspace:*
+        version: link:../../packages/router
       arcade:
         specifier: workspace:*
         version: link:../../packages/arcade
@@ -81,9 +84,15 @@ importers:
       vite:
         specifier: 8.0.16
         version: 8.0.16(@types/node@24.12.2)
+      vite-plus:
+        specifier: 0.1.20
+        version: 0.1.20(@types/node@24.12.2)(typescript@5.9.3)(vite@8.0.16(@types/node@24.12.2))
 
   demos/music-player-ssr:
     dependencies:
+      '@arcade/router':
+        specifier: workspace:*
+        version: link:../../packages/router
       arcade:
         specifier: workspace:*
         version: link:../../packages/arcade
@@ -93,82 +102,6 @@ importers:
         version: 1.0.3
       typescript:
         specifier: 5.9.3
-        version: 5.9.3
-      vite:
-        specifier: 8.0.16
-        version: 8.0.16(@types/node@24.12.2)
-
-  fixtures/router:
-    dependencies:
-      '@arcade/router':
-        specifier: workspace:*
-        version: link:../../packages/router
-      arcade:
-        specifier: workspace:*
-        version: link:../../packages/arcade
-    devDependencies:
-      typescript:
-        specifier: 'catalog:'
-        version: 5.9.3
-      vite:
-        specifier: 8.0.16
-        version: 8.0.16(@types/node@24.12.2)
-      vite-plus:
-        specifier: 0.1.20
-        version: 0.1.20(@types/node@24.12.2)(typescript@5.9.3)(vite@8.0.16(@types/node@24.12.2))
-
-  fixtures/router-app:
-    dependencies:
-      '@arcade/router':
-        specifier: workspace:*
-        version: link:../../packages/router
-      arcade:
-        specifier: workspace:*
-        version: link:../../packages/arcade
-    devDependencies:
-      typescript:
-        specifier: 'catalog:'
-        version: 5.9.3
-      vite:
-        specifier: 8.0.16
-        version: 8.0.16(@types/node@24.12.2)
-      vite-plus:
-        specifier: 0.1.20
-        version: 0.1.20(@types/node@24.12.2)(typescript@5.9.3)(vite@8.0.16(@types/node@24.12.2))
-
-  fixtures/router-docs:
-    dependencies:
-      '@arcade/router':
-        specifier: workspace:*
-        version: link:../../packages/router
-      arcade:
-        specifier: workspace:*
-        version: link:../../packages/arcade
-    devDependencies:
-      typescript:
-        specifier: 'catalog:'
-        version: 5.9.3
-      vite:
-        specifier: 8.0.16
-        version: 8.0.16(@types/node@24.12.2)
-      vite-plus:
-        specifier: 0.1.20
-        version: 0.1.20(@types/node@24.12.2)(typescript@5.9.3)(vite@8.0.16(@types/node@24.12.2))
-
-  fixtures/router-full-stack:
-    dependencies:
-      '@arcade/router':
-        specifier: workspace:*
-        version: link:../../packages/router
-      arcade:
-        specifier: workspace:*
-        version: link:../../packages/arcade
-      nitro:
-        specifier: 'catalog:'
-        version: 3.0.260429-beta(vite@8.0.16(@types/node@24.12.2))
-    devDependencies:
-      typescript:
-        specifier: 'catalog:'
         version: 5.9.3
       vite:
         specifier: 8.0.16
@@ -375,6 +308,85 @@ importers:
       vite:
         specifier: 8.0.16
         version: 8.0.16(@types/node@24.12.2)
+
+  packages/router/fixtures/router:
+    dependencies:
+      '@arcade/router':
+        specifier: workspace:*
+        version: link:../..
+      arcade:
+        specifier: workspace:*
+        version: link:../../../arcade
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vite:
+        specifier: 8.0.16
+        version: 8.0.16(@types/node@24.12.2)
+      vite-plus:
+        specifier: 0.1.20
+        version: 0.1.20(@types/node@24.12.2)(typescript@5.9.3)(vite@8.0.16(@types/node@24.12.2))
+
+  packages/router/fixtures/router-app:
+    dependencies:
+      '@arcade/router':
+        specifier: workspace:*
+        version: link:../..
+      arcade:
+        specifier: workspace:*
+        version: link:../../../arcade
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vite:
+        specifier: 8.0.16
+        version: 8.0.16(@types/node@24.12.2)
+      vite-plus:
+        specifier: 0.1.20
+        version: 0.1.20(@types/node@24.12.2)(typescript@5.9.3)(vite@8.0.16(@types/node@24.12.2))
+
+  packages/router/fixtures/router-docs:
+    dependencies:
+      '@arcade/router':
+        specifier: workspace:*
+        version: link:../..
+      arcade:
+        specifier: workspace:*
+        version: link:../../../arcade
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vite:
+        specifier: 8.0.16
+        version: 8.0.16(@types/node@24.12.2)
+      vite-plus:
+        specifier: 0.1.20
+        version: 0.1.20(@types/node@24.12.2)(typescript@5.9.3)(vite@8.0.16(@types/node@24.12.2))
+
+  packages/router/fixtures/router-full-stack:
+    dependencies:
+      '@arcade/router':
+        specifier: workspace:*
+        version: link:../..
+      arcade:
+        specifier: workspace:*
+        version: link:../../../arcade
+      nitro:
+        specifier: 'catalog:'
+        version: 3.0.260429-beta(vite@8.0.16(@types/node@24.12.2))
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vite:
+        specifier: 8.0.16
+        version: 8.0.16(@types/node@24.12.2)
+      vite-plus:
+        specifier: 0.1.20
+        version: 0.1.20(@types/node@24.12.2)(typescript@5.9.3)(vite@8.0.16(@types/node@24.12.2))
 
   packages/runtime:
     dependencies:

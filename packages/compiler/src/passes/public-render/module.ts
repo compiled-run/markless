@@ -147,7 +147,7 @@ function emitPublicSsrRenderModule(
 	input: PublicRenderModuleInput,
 	rootInfo: PublicRenderRoot,
 ): string {
-	if (!input.publicRenderPlan.rootTemplateHtml) return '';
+	if (!input.publicRenderPlan.rootTemplateHtml && !isComponentRoot(rootInfo.root)) return '';
 
 	const imports = componentImports(input.semanticGraph.componentEdges, '__arcadeSsrComponent');
 	const valueImports = publicRenderValueImports(
@@ -256,6 +256,11 @@ function publicRenderRoot(
 	const component = findComponent(ast, componentName);
 	const root = firstComponentRoot(component);
 	return component && root ? { root, propNames: componentPropNames(component) } : null;
+}
+
+function isComponentRoot(root: AnyNode): boolean {
+	const tagName = getElementTagName(root);
+	return !!tagName && !isHostTagName(tagName);
 }
 
 function callbackSymbolIds(input: PublicRenderModuleInput): ReadonlyMap<string, string> {

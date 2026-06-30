@@ -262,11 +262,25 @@ function createNitroConfig(
 		? nitroConfig.scanDirs.filter((dir): dir is string => typeof dir === 'string')
 		: [];
 	const watchOptions = withWatchIgnores(nitroConfig?.watchOptions, serverWatchIgnored);
+	const publicAssets = Array.isArray(nitroConfig?.publicAssets)
+		? nitroConfig.publicAssets
+		: [];
 
 	return {
 		...nitroConfig,
 		apiDir: nitroConfig?.apiDir ?? 'api',
 		devServer: nitroConfig?.devServer,
+		publicAssets: [
+			{
+				baseURL: '/assets',
+				dir: join(root, 'dist/assets'),
+			},
+			{
+				baseURL: '/assets',
+				dir: join(root, 'node_modules/.nitro/vite/services/ssr/assets'),
+			},
+			...publicAssets,
+		],
 		routesDir: nitroConfig?.routesDir ?? '.arcade/router/nitro-routes',
 		rolldownConfig: withRequestFileBuildPlugin(nitroConfig?.rolldownConfig, root),
 		rollupConfig: withRequestFileBuildPlugin(nitroConfig?.rollupConfig, root),
@@ -585,9 +599,7 @@ function routeModulePreloadsFromBundle(input: {
 			}
 		}
 		includeChunk(navigationFileNames, chunksByFileName, routeChunk.fileName);
-		for (const fileName of routeChunk.dynamicImports) {
-			includeChunk(navigationFileNames, chunksByFileName, fileName);
-		}
+		includeChunk(navigationFileNames, chunksByFileName, routeChunk.fileName, true);
 		navigation[routeFile] = [...navigationFileNames].map((fileName) =>
 			joinURL(input.base, fileName),
 		);
@@ -596,10 +608,7 @@ function routeModulePreloadsFromBundle(input: {
 		if (input.resumeChunk) {
 			includeChunk(ssrFileNames, chunksByFileName, input.resumeChunk.fileName);
 		}
-		includeChunk(ssrFileNames, chunksByFileName, routeChunk.fileName);
-		for (const fileName of routeChunk.dynamicImports) {
-			includeChunk(ssrFileNames, chunksByFileName, fileName);
-		}
+		includeChunk(ssrFileNames, chunksByFileName, routeChunk.fileName, true);
 		ssr[routeFile] = [...ssrFileNames].map((fileName) => joinURL(input.base, fileName));
 	}
 	return { navigation, ssr };
@@ -609,13 +618,21 @@ function includeChunk(
 	fileNames: Set<string>,
 	chunksByFileName: ReadonlyMap<string, OutputChunkLike>,
 	fileName: string,
+	includeDynamic = false,
+	visitedDynamic: Set<string> = new Set(),
 ): void {
-	if (fileNames.has(fileName)) return;
-	fileNames.add(fileName);
+	if (!fileNames.has(fileName)) fileNames.add(fileName);
 	const chunk = chunksByFileName.get(fileName);
 	if (!chunk) return;
 	for (const imported of chunk.imports) {
-		includeChunk(fileNames, chunksByFileName, imported);
+		includeChunk(fileNames, chunksByFileName, imported, includeDynamic, visitedDynamic);
+	}
+	if (!includeDynamic || visitedDynamic.has(fileName)) {
+		return;
+	}
+	visitedDynamic.add(fileName);
+	for (const imported of chunk.dynamicImports) {
+		includeChunk(fileNames, chunksByFileName, imported, true, visitedDynamic);
 	}
 }
 

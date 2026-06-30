@@ -56,7 +56,7 @@ export function emitSourceModule(input: {
 	readonly symbolRoutes: ReadonlyArray<SourceSymbolRoute>;
 }) {
 	const symbolsOnly = input.environment === 'client' && input.clientOutput === 'symbols-only';
-	const routeSymbols = symbolsOnly && input.symbolRoutes.length > 0;
+	const routeSymbols = input.environment === 'client' && input.symbolRoutes.length > 0;
 	const resumeSymbolLoader = routeSymbols ? 'arcadeSsrLoadSymbolRoute' : 'loadSymbol';
 	return [
 		input.environment === 'server'
@@ -76,14 +76,14 @@ export function emitSourceModule(input: {
 		input.environment === 'server' || symbolsOnly ? '' : input.publicCsrModuleSource,
 		input.environment === 'client' ? '' : input.publicSsrModuleSource,
 		input.environment === 'client' && !symbolsOnly ? emitCsrPreloadFunction() : '',
-		symbolsOnly
+		routeSymbols
 			? emitLazySymbolRouteFunction(
 					input.symbolRoutes,
 					'arcadeSsrLoadSymbolRoute',
 					'arcadeLoadLocalSymbol',
 				)
 			: '',
-		routeSymbols ? 'export { arcadeSsrLoadSymbolRoute as loadSymbol };' : '',
+		symbolsOnly && routeSymbols ? 'export { arcadeSsrLoadSymbolRoute as loadSymbol };' : '',
 		symbolsOnly
 			? ''
 			: emitCompiledAppDefault({

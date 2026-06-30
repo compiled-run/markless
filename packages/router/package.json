@@ -4,6 +4,9 @@
 	"private": true,
 	"type": "module",
 	"sideEffects": false,
+	"files": [
+		"src"
+	],
 	"exports": {
 		".": "./src/index.ts",
 		"./vite": "./src/vite/index.ts",

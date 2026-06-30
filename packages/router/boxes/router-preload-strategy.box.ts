@@ -1,6 +1,6 @@
 import { box } from '@async/witness';
 
-const FIXTURE = '../../fixtures/router';
+const FIXTURE = 'fixtures/router';
 const BUNDLE_GRAPH_REQUEST = '/build/bundle-graph.json';
 const DOCS_LINK = 'a[data-arcade-router-link]';
 const HOME_COUNTER = '[data-home-counter]';

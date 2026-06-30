@@ -1,9 +1,9 @@
 import { state } from 'arcade';
-import { Nav } from './components/Nav.tsrx';
-import { Song } from './components/Song.tsrx';
-import { Player } from './components/Player.tsrx';
-import { Library } from './components/Library.tsrx';
-import { installYouTubeController } from './youtube-controller';
+import { Nav } from '../src/components/Nav.tsrx';
+import { Song } from '../src/components/Song.tsrx';
+import { Player } from '../src/components/Player.tsrx';
+import { Library } from '../src/components/Library.tsrx';
+import { installYouTubeController } from '../src/youtube-controller';
 
 export function App() @{
 	let libraryStatus = state(false);

@@ -6,7 +6,7 @@ import { createRouteTypesDeclaration } from '../src/route-types.ts';
 import { parseRequestFile, transformRequestFileSource } from '../src/request-files.ts';
 
 const repoRoot = resolve(import.meta.dirname, '../../..');
-const fixturesRoot = join(repoRoot, 'fixtures');
+const fixturesRoot = join(repoRoot, 'packages/router/fixtures');
 const ignoredFixtureEntries = new Set([
 	'.arcade',
 	'.output',
