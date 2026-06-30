@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { renderPayloadScripts } from '../src/payload-scripts.ts';
+import { decodePayloadScripts, RuntimePayloadError, renderPayloadScripts } from '../src/index.ts';
 import { createProtocolStatePayload } from '../src/protocol-state.ts';
 import { deserializeGraphValue, serializeGraphValue } from '../src/value.ts';
 
@@ -8,4 +8,6 @@ test('serializer split modules expose value, protocol-state, and payload-script 
 	expect(typeof deserializeGraphValue).toBe('function');
 	expect(typeof createProtocolStatePayload).toBe('function');
 	expect(typeof renderPayloadScripts).toBe('function');
+	expect(typeof decodePayloadScripts).toBe('function');
+	expect(typeof RuntimePayloadError).toBe('function');
 });

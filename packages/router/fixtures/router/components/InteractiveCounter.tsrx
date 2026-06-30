@@ -9,14 +9,14 @@ export default function InteractiveCounter() @{
 	<section>
 		<button data-mdx-counter onClick={() => count++}>MDX Count {count}</button>
 		<label>
-			<input
+			<button
 				data-mdx-input
-				value="MDX Input"
-				onInput={() => input = 'on'}
-			/>
+				onClick={() => input = 'on'}
+			>MDX Input</button>
 			<span data-mdx-input-state>MDX Input {input}</span>
 		</label>
 		<button data-mdx-boost onClick={() => boosts++}>MDX Boost {boosts}</button>
 		<Link href="/" data-router-home>Home</Link>
+		<Link href="/" data-router-back>Back</Link>
 	</section>
 }
