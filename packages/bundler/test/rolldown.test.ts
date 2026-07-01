@@ -136,20 +136,18 @@ describe('TSRX Rolldown plugin structure', () => {
 		expect(result.code).toContain('export default arcadeCompiledApp;');
 	});
 
-	test('transformTsrxModule emits a CSR-only default artifact for client builds', async () => {
+	test('transformTsrxModule emits a CSR-only default artifact without a runtime preload hook', async () => {
 		const result = await transformTsrxModule({
 			filename: '/workspace/app/src/App.tsrx',
 			source,
 			environment: 'client',
 		});
 
-		expect(result.code).not.toContain(
-			"import { preloadLazySymbolModules } from 'arcade/preload';",
-		);
-		expect(result.code).toContain(
-			'const { preloadLazySymbolModules } = await import("arcade/preload");',
-		);
-		expect(result.code).toContain('preload: preloadCsrLazySymbols,');
+		expect(result.code).toContain('renderCsr: App,');
+		expect(result.code).not.toContain('preloadCsrLazySymbols');
+		expect(result.code).not.toContain('bundle-graph.json');
+		expect(result.code).not.toContain('arcade/preload');
+		expect(result.code).not.toContain('preload:');
 		expect(result.code).toContain('export default arcadeCompiledApp;');
 		expect(result.code).not.toContain('renderSsr(props) {');
 		expect(result.code).not.toContain('state: payloadState');

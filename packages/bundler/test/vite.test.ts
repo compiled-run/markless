@@ -229,7 +229,7 @@ export function App() @{
 			'/workspace/app/src/App.tsrx',
 			createViteHookContext('client'),
 		);
-		const result = callHotUpdate(
+		const result = await callHotUpdate(
 			plugin,
 			{
 				file: '/workspace/app/src/App.tsrx',
@@ -248,7 +248,69 @@ export function App() @{
 		});
 	});
 
-	test('server hot updates forward through the configured client environment', () => {
+	test('hot updates with unchanged file content skip invalidation and full reload', async () => {
+		const plugin = getAsyncPlugin();
+		const send = vi.fn();
+		const virtualModule = { id: '\0virtual:arcade:payload:/src/App.tsrx' };
+		const environment = {
+			config: { consumer: 'client' },
+			hot: { send },
+			moduleGraph: {
+				getModuleById: vi.fn(() => virtualModule),
+				invalidateModule: vi.fn(),
+			},
+		};
+		const server = {
+			config: { root: '/workspace/app' },
+			environments: { client: environment },
+		};
+
+		callConfigResolved(plugin, { base: '/', command: 'serve', root: '/workspace/app' });
+		callConfigureServer(plugin, server);
+		await callTransform(
+			plugin,
+			source,
+			'/workspace/app/src/App.tsrx',
+			createViteHookContext('client'),
+		);
+
+		const hotUpdateOptions = {
+			file: '/workspace/app/src/App.tsrx',
+			modules: [],
+			timestamp: 123,
+			type: 'update',
+		};
+		const unchanged = await callHotUpdate(
+			plugin,
+			{ ...hotUpdateOptions, read: async () => source },
+			{ environment },
+		);
+
+		expect(unchanged).toEqual([]);
+		expect(environment.moduleGraph.invalidateModule).not.toHaveBeenCalled();
+		expect(send).not.toHaveBeenCalled();
+
+		const edited = await callHotUpdate(
+			plugin,
+			{ ...hotUpdateOptions, read: async () => source.replace('count++', 'count += 2') },
+			{ environment },
+		);
+
+		expect(edited).toEqual([]);
+		expect(environment.moduleGraph.invalidateModule).toHaveBeenCalledWith(
+			virtualModule,
+			expect.anything(),
+			123,
+			true,
+		);
+		expect(send).toHaveBeenCalledWith({
+			type: 'full-reload',
+			path: '/src/App.tsrx',
+			triggeredBy: '/workspace/app/src/App.tsrx',
+		});
+	});
+
+	test('server hot updates forward through the configured client environment', async () => {
 		const plugin = getPlugin(
 			arcade({ clientEnvironment: 'browser', serverEnvironment: 'edge' }),
 			'vite-plugin-arcade',
@@ -277,7 +339,7 @@ export function App() @{
 				edge: environment,
 			},
 		});
-		const result = callHotUpdate(
+		const result = await callHotUpdate(
 			plugin,
 			{
 				file: '/workspace/app/src/App.tsrx',

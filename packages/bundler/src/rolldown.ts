@@ -7,6 +7,7 @@ import {
 	createBuildMetadata,
 } from './build/build-metadata.ts';
 import { ARCADE_BUILD_PREFIX, ARCADE_BUNDLE_GRAPH, outputDefaults } from './build/chunking.ts';
+import { collectModulePreloadInjections, injectHeadLinks } from './build/head-links.ts';
 import { stripEmptyVitePreloadWrappers } from './build/preload-cleanup.ts';
 import {
 	compactGeneratedDirectSymbolLoaders,
@@ -235,6 +236,13 @@ export function createArcadeRolldownPlugin(input: {
 					},
 				);
 				internalOptions.onManifest?.(clientManifest);
+
+				injectHeadLinks(
+					bundle,
+					collectModulePreloadInjections(clientManifest.bundleGraph, {
+						publicPath: internalOptions.publicPath,
+					}),
+				);
 
 				this.emitFile({
 					type: 'asset',

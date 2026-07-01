@@ -88,7 +88,7 @@ describe('fixture framework boundaries', () => {
 		expect(config).not.toContain('entryFileNames:');
 		expect(config).toContain("input: 'index.html'");
 		expect(config).not.toContain("symbols: 'src/root.tsrx'");
-		expect(config).toContain("input: './src/root.tsrx'");
+		expect(config).toContain("input: fileURLToPath(new URL('./src/root.tsrx', import.meta.url))");
 		expect(config).toContain("preserveEntrySignatures: 'exports-only'");
 	});
 

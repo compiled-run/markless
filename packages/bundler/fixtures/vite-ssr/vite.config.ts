@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import { arcade } from '../../../arcade/src/vite.ts';
 import { fixtureSsrHost } from './src/dev-server.ts';
@@ -16,7 +17,7 @@ export default defineConfig(({ command }) => ({
 		ssr: {
 			build: {
 				rolldownOptions: {
-					input: './src/root.tsrx',
+					input: fileURLToPath(new URL('./src/root.tsrx', import.meta.url)),
 				},
 			},
 		},

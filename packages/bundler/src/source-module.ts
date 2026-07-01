@@ -75,7 +75,6 @@ export function emitSourceModule(input: {
 		input.environment === 'server' || symbolsOnly ? '' : input.publicRenderModuleSource,
 		input.environment === 'server' || symbolsOnly ? '' : input.publicCsrModuleSource,
 		input.environment === 'client' ? '' : input.publicSsrModuleSource,
-		input.environment === 'client' && !symbolsOnly ? emitCsrPreloadFunction() : '',
 		routeSymbols
 			? emitLazySymbolRouteFunction(
 					input.symbolRoutes,
@@ -130,16 +129,6 @@ function emitCompiledAppDefault(input: {
 	readonly csrExportName: string | null;
 	readonly ssrExportName: string | null;
 }): string {
-	if (input.environment === 'client' && (input.rootExportName || input.csrExportName)) {
-		return [
-			'const arcadeCompiledApp = {',
-			`	renderCsr: ${input.rootExportName ?? input.csrExportName},`,
-			'	preload: preloadCsrLazySymbols,',
-			'};',
-			'export default arcadeCompiledApp;',
-		].join('\n');
-	}
-
 	const renderCsrEntry =
 		(input.rootExportName || input.csrExportName) && input.environment !== 'server'
 			? [`	renderCsr: ${input.rootExportName ?? input.csrExportName},`]
@@ -170,26 +159,6 @@ function emitCompiledAppDefault(input: {
 		...metadataEntries,
 		'};',
 		'export default arcadeCompiledApp;',
-	].join('\n');
-}
-
-function emitCsrPreloadFunction(): string {
-	return [
-		'async function preloadCsrLazySymbols() {',
-		'	if (typeof fetch !== "function") return;',
-		'	try {',
-		'		const response = await fetch("/build/bundle-graph.json");',
-		'		if (!response.ok) return;',
-		'		const { preloadLazySymbolModules } = await import("arcade/preload");',
-		'		preloadLazySymbolModules({',
-		'			base: "/build/",',
-		'			bundleGraph: await response.json(),',
-		'			view: payloadView,',
-		'		});',
-		'	} catch {',
-		'		return;',
-		'	}',
-		'}',
 	].join('\n');
 }
 

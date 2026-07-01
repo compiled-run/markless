@@ -8,7 +8,7 @@ import type {
 	ViteDevServer,
 } from 'vite';
 import type { OutputOptions } from 'rolldown';
-import { joinURL } from 'ufo';
+import { joinURL, parsePath } from 'ufo';
 import { createPreloadGraphAdder } from '../build/bundle-graph.ts';
 import { outputDefaults } from '../build/chunking.ts';
 import { createArcadeRolldownPlugin } from '../rolldown.ts';
@@ -58,6 +58,7 @@ export function arcade(options: ArcadeViteOptions = {}): Plugin[] {
 	let manifest: ArcadeManifest | null = null;
 	let command: 'build' | 'serve' = 'build';
 	const bundleGraphAdders = new Set<BundleGraphAdder>();
+	const transformedTsrxSources = new Map<string, string>();
 	const rolldownOptions: InternalArcadeRolldownOptions = { ...options };
 	rolldownOptions.bundleGraphAdders = bundleGraphAdders;
 	rolldownOptions.onManifest = (nextManifest) => {
@@ -166,10 +167,19 @@ export function arcade(options: ArcadeViteOptions = {}): Plugin[] {
 		},
 		transform: {
 			async handler(code, id, transformOptions) {
+				if (rolldownOptions.dev === true && TSRX_INPUT_FILE.test(id)) {
+					transformedTsrxSources.set(parsePath(id).pathname, code);
+				}
 				return runHook(basePlugin.transform, this, code, id, transformOptions);
 			},
 		},
-		hotUpdate(ctx) {
+		async hotUpdate(ctx) {
+			// Watcher events for content-identical writes (e.g. editor saves without
+			// changes, or delayed FSEvents for a restored file) must not invalidate
+			// generated virtual modules or trigger a full reload.
+			if (await matchesTransformedTsrxSource(ctx, transformedTsrxSources)) {
+				return [];
+			}
 			return hmr.hotUpdate(this.environment, ctx);
 		},
 	} satisfies Plugin & { api: ArcadeVitePluginApi };
@@ -349,6 +359,24 @@ function configEnvironmentKind(
 	}
 
 	return null;
+}
+
+async function matchesTransformedTsrxSource(
+	ctx: { file?: string; type?: string; read?: () => string | Promise<string> },
+	transformedSources: ReadonlyMap<string, string>,
+): Promise<boolean> {
+	if (!ctx.file || ctx.type === 'delete' || typeof ctx.read !== 'function') {
+		return false;
+	}
+	const transformedSource = transformedSources.get(ctx.file);
+	if (transformedSource === undefined) {
+		return false;
+	}
+	try {
+		return (await ctx.read()) === transformedSource;
+	} catch {
+		return false;
+	}
 }
 
 function runHook(hook: unknown, context: unknown, ...args: unknown[]) {

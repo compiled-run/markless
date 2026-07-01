@@ -9,7 +9,10 @@ import {
 	type ArcadeBuildMetadataBundle,
 } from '../src/build/build-metadata.ts';
 import { ARCADE_BUNDLE_GRAPH } from '../src/build/chunking.ts';
-import { collectHeadLinkInjections } from '../src/build/head-links.ts';
+import {
+	collectHeadLinkInjections,
+	collectModulePreloadInjections,
+} from '../src/build/head-links.ts';
 import type { ArcadeManifest, ArcadeTransformManifest } from '../src/types.ts';
 
 const transformManifest: ArcadeTransformManifest = {
@@ -144,6 +147,25 @@ describe('arcade build metadata output', () => {
 		]);
 	});
 
+	test('collects modulepreload head links for lazy symbol bundle graph roots', () => {
+		const graph = convertManifestToBundleGraph(lazySymbolManifest());
+
+		const injections = collectModulePreloadInjections(graph);
+
+		expect(injections).toEqual(
+			['/build/shared.js', '/build/press.js', '/build/text.js'].map((href) => ({
+				tag: 'link',
+				location: 'head',
+				attributes: {
+					rel: 'modulepreload',
+					href,
+					crossorigin: 'anonymous',
+					fetchpriority: 'high',
+				},
+			})),
+		);
+	});
+
 	test('converts symbol and custom preload entries into the bundle graph', () => {
 		const manifest: ArcadeManifest = {
 			version: 1,
@@ -188,6 +210,30 @@ describe('arcade build metadata output', () => {
 		expect(graph).toContain('build/chunk-symbol.js');
 	});
 });
+
+function lazySymbolManifest(): ArcadeManifest {
+	const symbol = (name: string, kind: 'event-handler' | 'dom-update') => ({
+		symbolId: `symbol:${name}`,
+		kind,
+		exportName: name,
+		virtualModuleId: `virtual:arcade:symbol:root:${name}`,
+		fileName: `${name}.js`,
+	});
+	return {
+		version: 1,
+		modules: [
+			{
+				...transformManifest,
+				symbols: [symbol('press', 'event-handler'), symbol('text', 'dom-update')],
+			},
+		],
+		bundles: {
+			'press.js': { size: 900, total: 1900, imports: ['shared.js'], origins: ['src/root.tsrx'] },
+			'text.js': { size: 500, total: 1500, imports: ['shared.js'], origins: ['src/root.tsrx'] },
+			'shared.js': { size: 500, total: 500, origins: ['src/shared.ts'] },
+		},
+	};
+}
 
 function chunk(input: {
 	fileName: string;
