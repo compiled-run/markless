@@ -112,31 +112,59 @@ describe('package metadata', () => {
 		}
 	});
 
-	test('music player demos are router apps without custom client or SSR hosts', async () => {
-		for (const demo of ['music-player', 'music-player-ssr']) {
-			const manifest = JSON.parse(
-				await readFile(resolve(root, `demos/${demo}/package.json`), 'utf8'),
-			) as {
-				readonly scripts?: Record<string, string>;
-				readonly dependencies?: Record<string, string>;
-			};
-			const config = await readFile(resolve(root, `demos/${demo}/vite.config.ts`), 'utf8');
+	test('music player demo is a plain CSR app without router or SSR hosts', async () => {
+		const manifest = JSON.parse(
+			await readFile(resolve(root, 'demos/music-player/package.json'), 'utf8'),
+		) as {
+			readonly scripts?: Record<string, string>;
+			readonly dependencies?: Record<string, string>;
+		};
+		const config = await readFile(resolve(root, 'demos/music-player/vite.config.ts'), 'utf8');
 
-			expect(manifest.dependencies).toHaveProperty('@arcade/router');
-			expect(manifest.scripts).not.toHaveProperty('smoke:ssr');
-			expect(config).toContain("import { router } from '@arcade/router/vite';");
-			expect(config).toContain('plugins: [arcade(), router()]');
-			expect(config).not.toContain('musicPlayerSsrHost');
-			await expect(access(resolve(root, `demos/${demo}/document.tsrx`))).resolves.toBe(
-				undefined,
-			);
-			await expect(access(resolve(root, `demos/${demo}/pages/index.tsrx`))).resolves.toBe(
-				undefined,
-			);
-			await expect(access(resolve(root, `demos/${demo}/index.html`))).rejects.toThrow();
-			await expect(access(resolve(root, `demos/${demo}/src/main.ts`))).rejects.toThrow();
-			await expect(access(resolve(root, `demos/${demo}/src/dev-server.ts`))).rejects.toThrow();
-		}
+		expect(manifest.dependencies).not.toHaveProperty('@arcade/router');
+		expect(manifest.scripts).not.toHaveProperty('smoke:ssr');
+		expect(config).not.toContain('@arcade/router');
+		expect(config).toContain('plugins: [arcade()]');
+		await expect(access(resolve(root, 'demos/music-player/index.html'))).resolves.toBe(
+			undefined,
+		);
+		await expect(access(resolve(root, 'demos/music-player/src/main.ts'))).resolves.toBe(
+			undefined,
+		);
+		await expect(access(resolve(root, 'demos/music-player/document.tsrx'))).rejects.toThrow();
+		await expect(
+			access(resolve(root, 'demos/music-player/pages/index.tsrx')),
+		).rejects.toThrow();
+		await expect(
+			access(resolve(root, 'demos/music-player/src/dev-server.ts')),
+		).rejects.toThrow();
+	});
+
+	test('music player SSR demo stays a router app without custom client or SSR hosts', async () => {
+		const manifest = JSON.parse(
+			await readFile(resolve(root, 'demos/music-player-ssr/package.json'), 'utf8'),
+		) as {
+			readonly scripts?: Record<string, string>;
+			readonly dependencies?: Record<string, string>;
+		};
+		const config = await readFile(resolve(root, 'demos/music-player-ssr/vite.config.ts'), 'utf8');
+
+		expect(manifest.dependencies).toHaveProperty('@arcade/router');
+		expect(manifest.scripts).not.toHaveProperty('smoke:ssr');
+		expect(config).toContain("import { router } from '@arcade/router/vite';");
+		expect(config).toContain('plugins: [arcade(), router()]');
+		expect(config).not.toContain('musicPlayerSsrHost');
+		await expect(access(resolve(root, 'demos/music-player-ssr/document.tsrx'))).resolves.toBe(
+			undefined,
+		);
+		await expect(
+			access(resolve(root, 'demos/music-player-ssr/pages/index.tsrx')),
+		).resolves.toBe(undefined);
+		await expect(access(resolve(root, 'demos/music-player-ssr/index.html'))).rejects.toThrow();
+		await expect(access(resolve(root, 'demos/music-player-ssr/src/main.ts'))).rejects.toThrow();
+		await expect(
+			access(resolve(root, 'demos/music-player-ssr/src/dev-server.ts')),
+		).rejects.toThrow();
 	});
 
 	test('workspace test script includes package-local Witness boxes', async () => {

@@ -68,9 +68,6 @@ importers:
 
   demos/music-player:
     dependencies:
-      '@arcade/router':
-        specifier: workspace:*
-        version: link:../../packages/router
       arcade:
         specifier: workspace:*
         version: link:../../packages/arcade

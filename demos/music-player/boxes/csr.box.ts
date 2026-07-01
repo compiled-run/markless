@@ -4,8 +4,8 @@ const WAIT = { timeoutMs: 10_000 };
 
 export default box(
 	{
-		name: 'music-player router: preview resumes youtube command state',
-		tags: ['music-player', 'router', 'ssr', 'preview', 'browser'],
+		name: 'music-player csr: preview warms lazy symbols and resumes youtube command state',
+		tags: ['music-player', 'csr', 'preview', 'browser'],
 		modes: ['build', 'preview'],
 	},
 	async ({ pipeline, expect, receipt }) => {
@@ -13,17 +13,16 @@ export default box(
 		const preview = await pipeline.preview(build);
 		const html = await preview.request('/');
 		const preloadHrefs = modulePreloadHrefs(html);
-		await expect.html.contains(html, 'data-async-resumer');
 		await expect.html.contains(html, 'rel="modulepreload"');
 		if (preloadHrefs.length === 0) {
-			throw new Error('Expected router music player HTML to render modulepreload links.');
+			throw new Error('Expected CSR music player HTML to render modulepreload links.');
 		}
 		assertModulePreloadsInHead(html);
-		if (html.includes('data-arcade-router-link-resumer')) {
-			throw new Error('Music player router demo must not include the router Link resumer script.');
+		if (html.includes('data-async-resumer')) {
+			throw new Error('CSR music player HTML must not include an SSR resume payload.');
 		}
-		if (/<script\b[^>]*\bsrc=/.test(html)) {
-			throw new Error('Expected router music player HTML to keep startup JavaScript script-free.');
+		if (!/<script\b[^>]*\btype="module"[^>]*\bsrc=/.test(html)) {
+			throw new Error('Expected CSR music player HTML to load the app through a module script.');
 		}
 
 		const page = await preview.browser.visit('/');
@@ -37,7 +36,7 @@ export default box(
 		);
 		const startupModules = await waitForBuildRequests(page, preloadHrefs.length);
 		assertPreloadedStartupModules(startupModules, preloadHrefs);
-		receipt.note(`music-player router startup JS: ${formatRequests(startupModules)}`);
+		receipt.note(`music-player csr startup JS: ${formatRequests(startupModules)}`);
 		await expect.page.attribute(page, '.youtube-frame-host', 'data-command', 'cue', WAIT);
 		await expect.page.attribute(
 			page,
@@ -74,7 +73,7 @@ export default box(
 		assertNoNewBuildJs(await page.networkRequests(), startupPaths, 'next-track interaction');
 
 		await preview.close();
-		await receipt.capture('music-player router preview youtube command state');
+		await receipt.capture('music-player csr preview youtube command state');
 	},
 );
 
@@ -92,11 +91,11 @@ function assertModulePreloadsInHead(html: string): void {
 		throw new Error('Expected HTML document with modulepreload links in head.');
 	}
 	if (firstPreload > headEnd || firstPreload > bodyStart) {
-		throw new Error('Expected router music player modulepreloads before </head>.');
+		throw new Error('Expected CSR music player modulepreloads before </head>.');
 	}
 	const bodyHtml = html.slice(bodyStart);
 	if (bodyHtml.includes('rel="modulepreload"')) {
-		throw new Error('Expected router music player body to contain no modulepreload links.');
+		throw new Error('Expected CSR music player body to contain no modulepreload links.');
 	}
 }
 
