@@ -4,8 +4,8 @@ import {
 	type ProtocolSyncPolicyCondition,
 	type ProtocolStatePayload,
 	type ProtocolViewPayload,
-} from '@arcade/serializer';
-import { renderPayloadScripts } from '@arcade/serializer';
+} from '@markless/serializer';
+import { renderPayloadScripts } from '@markless/serializer';
 
 export type SsrRenderOutput = {
 	readonly html: string;
@@ -205,7 +205,7 @@ function defaultInlineResumerSource(
 	const includeGraphSyncPolicy = hasGraphSyncPolicies(view);
 	const graphSyncPolicySource = includeGraphSyncPolicy
 		? `
-	const s0 = r.querySelector('script[type="arcade/state"]');
+	const s0 = r.querySelector('script[type="markless/state"]');
 	const g = new Map();
 	const j = (s, r) => {
 		if (s === null || typeof s !== 'object') return s;
@@ -294,7 +294,7 @@ ${graphConditionSource}
 	const s = d.currentScript;
 	const r = s && s.closest('[data-async-container]');
 	if (!r) return;
-	const p = r.querySelector('script[type="arcade/view"]');
+	const p = r.querySelector('script[type="markless/view"]');
 	if (!p) return;
 	const v = JSON.parse(p.textContent || 'null');
 	const w = d.createTreeWalker(r, 1);

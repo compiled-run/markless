@@ -6,12 +6,12 @@ pnpm-store/
 # Build and test output
 dist/
 coverage/
-.arcade/
+.markless/
 .output/
 .output-router-preview/
 .witness/
 .vite/
-arcade-router-env.d.ts
+markless-router-env.d.ts
 playwright-report/
 test-results/
 *.tsbuildinfo

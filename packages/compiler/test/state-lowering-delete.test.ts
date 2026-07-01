@@ -98,7 +98,7 @@ test('lowerStateAccess reports optional delete writes as optional-chain diagnost
 	expect(lowered.writes).toEqual([]);
 	expect(lowered.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'ARCADE_STATE_OPTIONAL_CHAIN_WRITE',
+			code: 'MARKLESS_STATE_OPTIONAL_CHAIN_WRITE',
 			severity: 'error',
 			phase: 'state-lowering',
 			passId: 'state-lowering',
@@ -114,7 +114,7 @@ test('lowerStateAccess reports optional delete writes as optional-chain diagnost
 			},
 			statePath: 'menu?.open',
 			source: 'menu?.open',
-			docsUrl: 'https://arcadejs.com/errors/ARCADE_STATE_OPTIONAL_CHAIN_WRITE',
+			docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_OPTIONAL_CHAIN_WRITE',
 		}),
 	]);
 });

@@ -4,10 +4,10 @@ import type { SemanticModuleImport } from '../../artifacts.ts';
 export type FrameworkApiName = 'state' | 'computed' | 'element' | 'shared';
 
 const frameworkApiNames = new Set<FrameworkApiName>(['state', 'computed', 'element', 'shared']);
-const frameworkApiSources = new Set(['arcade']);
+const frameworkApiSources = new Set(['@markless/core']);
 
 // These imports make compiler-rewritten APIs explicit in user code.
-// A bare state() call is not enough; it must resolve to an import from arcade.
+// A bare state() call is not enough; it must resolve to an import from markless.
 export function collectImports(
 	statements: ReadonlyArray<AnyNode>,
 ): ReadonlyMap<string, FrameworkApiName> {

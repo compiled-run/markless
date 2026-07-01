@@ -1,4 +1,4 @@
-import { createRouteDiscovery } from '@arcade/router/vite/runtime/create-route-discovery';
+import { createRouteDiscovery } from '@markless/router/vite/runtime/create-route-discovery';
 
 const routeDiscovery = createRouteDiscovery(
 	import.meta.glob(['/pages/**/*.tsrx', '/pages/**/*.mdx']),

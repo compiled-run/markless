@@ -70,7 +70,7 @@ test('runtime hardening handles async races, keyed ranges, cleanup, no rollback,
 
 	const error = runtime.commitThenThrow();
 	expect(error).toMatchObject({
-		code: 'ARCADE_RUNTIME_HANDLER_THROW',
+		code: 'MARKLESS_RUNTIME_HANDLER_THROW',
 		message: 'after committed graph writes',
 		committedWritesPreserved: true,
 	});
@@ -83,7 +83,7 @@ test('runtime hardening handles async races, keyed ranges, cleanup, no rollback,
 		expect.arrayContaining([
 			expect.objectContaining({
 				kind: 'errorRecord',
-				code: 'ARCADE_RUNTIME_HANDLER_THROW',
+				code: 'MARKLESS_RUNTIME_HANDLER_THROW',
 				committedWritesPreserved: true,
 			}),
 		]),

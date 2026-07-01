@@ -26,7 +26,7 @@ type SourceTextSpan = {
 
 export type TsrxCodeMapping = CodeMapping;
 
-export type ArcadeTsrxTypeServiceResult = VolarMappingsResult;
+export type MarklessTsrxTypeServiceResult = VolarMappingsResult;
 
 const mappingData: MappingData = {
 	verification: true,
@@ -37,15 +37,15 @@ const mappingData: MappingData = {
 	format: false,
 	customData: {},
 };
-const mapStart = '\0arcade-map:';
+const mapStart = '\0markless-map:';
 const mapSeparator = '\0';
-const mapEnd = '\0/arcade-map\0';
+const mapEnd = '\0/markless-map\0';
 
 export function compileTsrxForTypeService(
 	source: string,
 	filename = 'module.tsrx',
 	options: TsrxTypeServiceOptions = {},
-): ArcadeTsrxTypeServiceResult {
+): MarklessTsrxTypeServiceResult {
 	const errors: CompileError[] = [];
 	const comments: AST.CommentWithLocation[] = [];
 	const sourceAst = parseModule(source, filename, {
@@ -107,7 +107,9 @@ function emitFunctionWithTsrxBody(node: TsrxAstNode, source: string): string {
 }
 
 function emitTsrxCodeBlock(block: TsrxAstNode, source: string): string {
-	const statements = asNodes(block.body).map((statement) => emitPlainStatement(statement, source));
+	const statements = asNodes(block.body).map((statement) =>
+		emitPlainStatement(statement, source),
+	);
 	const renderStatements = block.render ? emitTemplateNode(block.render, source) : '';
 	return ['{', ...statements, renderStatements, '}'].filter(Boolean).join('\n');
 }
@@ -115,8 +117,11 @@ function emitTsrxCodeBlock(block: TsrxAstNode, source: string): string {
 function emitPlainStatement(statement: TsrxAstNode, source: string): string {
 	const statementSpan = sourceSpan(statement);
 	if (!statementSpan) return sourceSlice(statement, source);
-	const replacements: Array<{ readonly start: number; readonly end: number; readonly text: string }> =
-		[];
+	const replacements: Array<{
+		readonly start: number;
+		readonly end: number;
+		readonly text: string;
+	}> = [];
 	collectPlainStatementTemplateReplacements(statement, source, replacements);
 	if (replacements.length === 0) return sourceSlice(statement, source);
 
@@ -198,7 +203,9 @@ function emitForExpression(node: TsrxAstNode, source: string): string {
 	if (node.index) setup.push(`const ${sourceSlice(node.index, source)} = 0;`);
 	if (node.key) setup.push(emitExpressionStatement(node.key, source));
 
-	const body = [setup.join('\n'), emitTemplateBlock(node.body, source)].filter(Boolean).join('\n');
+	const body = [setup.join('\n'), emitTemplateBlock(node.body, source)]
+		.filter(Boolean)
+		.join('\n');
 	const empty = node.empty ? `\n{\n${emitTemplateBlock(node.empty, source)}\n}` : '';
 	return `for (${sourceSlice(node.left, source)} of ${sourceSlice(node.right, source)}) {\n${body}\n}${empty}`;
 }
@@ -269,7 +276,7 @@ function collectCssMappings(ast: unknown, source: string): TsrxCodeMapping[] {
 		if (node.type !== 'JSXStyleElement' || typeof node.css !== 'string') return;
 		const span = sourceSpan(node);
 		const cssStart = source.indexOf(node.css, span?.start ?? 0);
-		const sourceOffset = cssStart === -1 ? span?.start ?? 0 : cssStart;
+		const sourceOffset = cssStart === -1 ? (span?.start ?? 0) : cssStart;
 		mappings.push({
 			...createMapping(sourceOffset, node.css.length, 0, node.css.length),
 			data: {
@@ -566,7 +573,9 @@ function collectSourceMappingSpans(
 ): SourceTextSpan[] {
 	const span = trimmedSourceSpan(node, source);
 	if (span && shouldMapWholeSourceNode(node)) {
-		return span.sourceOffset >= start && span.sourceOffset + span.text.length <= end ? [span] : [];
+		return span.sourceOffset >= start && span.sourceOffset + span.text.length <= end
+			? [span]
+			: [];
 	}
 
 	const spans: SourceTextSpan[] = [];

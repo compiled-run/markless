@@ -1,5 +1,5 @@
 {
-	"name": "@arcade/web",
+	"name": "@markless/web",
 	"version": "0.0.0",
 	"private": true,
 	"type": "module",
@@ -15,7 +15,7 @@
 		"./resume": "./src/payload.ts"
 	},
 	"dependencies": {
-		"@arcade/runtime": "workspace:*",
-		"@arcade/serializer": "workspace:*"
+		"@markless/runtime": "workspace:*",
+		"@markless/serializer": "workspace:*"
 	}
 }

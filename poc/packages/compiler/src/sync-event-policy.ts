@@ -35,7 +35,7 @@ export type SyncPolicyRecord = {
 };
 
 export type SyncEventPolicyDiagnostic = {
-	readonly code: 'ARCADE_SYNC_POLICY_UNPROVABLE_GUARD';
+	readonly code: 'MARKLESS_SYNC_POLICY_UNPROVABLE_GUARD';
 	readonly severity: 'error';
 	readonly phase: 'sync-event-policy';
 	readonly passId: 'sync-event-policy';
@@ -216,7 +216,7 @@ function collectPoliciesFromStatement(input: {
 
 		for (const method of methods) {
 			input.diagnostics.push({
-				code: 'ARCADE_SYNC_POLICY_UNPROVABLE_GUARD',
+				code: 'MARKLESS_SYNC_POLICY_UNPROVABLE_GUARD',
 				severity: 'error',
 				phase: 'sync-event-policy',
 				passId: 'sync-event-policy',
@@ -234,7 +234,7 @@ function collectPoliciesFromStatement(input: {
 							'Move DOM/runtime-dependent checks into the lazy handler, or express the sync browser policy with graph state and event fields only.',
 					},
 				],
-				docsUrl: 'https://arcadejs.com/errors/ARCADE_SYNC_POLICY_UNPROVABLE_GUARD',
+				docsUrl: 'https://markless.dev/errors/MARKLESS_SYNC_POLICY_UNPROVABLE_GUARD',
 			});
 		}
 	});

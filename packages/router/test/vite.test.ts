@@ -25,21 +25,21 @@ test('wires request-file transforms before route virtual modules', () => {
 	const plugins = flattenPlugins([router()]);
 	const names = plugins.map((plugin) => plugin.name);
 
-	expect(names).toContain('arcade-router:vite');
+	expect(names).toContain('markless-router:vite');
 	expect(names).toContain('nitro:init');
 	expect(names).toEqual(
 		expect.arrayContaining([
-			'arcade-router:vite',
-			'arcade-router:request-files',
-			'arcade-router:typegen',
-			'arcade-router:routes',
+			'markless-router:vite',
+			'markless-router:request-files',
+			'markless-router:typegen',
+			'markless-router:routes',
 			'nitro:init',
 		]),
 	);
-	expect(names.indexOf('arcade-router:vite')).toBeLessThan(
-		names.indexOf('arcade-router:request-files'),
+	expect(names.indexOf('markless-router:vite')).toBeLessThan(
+		names.indexOf('markless-router:request-files'),
 	);
-	expect(names.indexOf('arcade-router:routes')).toBeLessThan(names.indexOf('nitro:init'));
+	expect(names.indexOf('markless-router:routes')).toBeLessThan(names.indexOf('nitro:init'));
 });
 
 test('can disable Nitro for route-only fixtures and apps', () => {
@@ -47,20 +47,20 @@ test('can disable Nitro for route-only fixtures and apps', () => {
 	const names = plugins.map((plugin) => plugin.name);
 
 	expect(names).toEqual([
-		'arcade-router:mdx',
-		'arcade-router:request-files',
-		'arcade-router:typegen',
-		'arcade-router:anchors',
-		'arcade-router:html',
-		'arcade-router:routes',
+		'markless-router:mdx',
+		'markless-router:request-files',
+		'markless-router:typegen',
+		'markless-router:anchors',
+		'markless-router:html',
+		'markless-router:routes',
 	]);
-	expect(names).not.toContain('arcade-router:vite');
+	expect(names).not.toContain('markless-router:vite');
 	expect(names).not.toContain('nitro:init');
 });
 
 test('transforms top-level API and middleware files through the Vite plugin', () => {
 	const requestPlugin = flattenPlugins([router()]).find(
-		(plugin) => plugin.name === 'arcade-router:request-files',
+		(plugin) => plugin.name === 'markless-router:request-files',
 	);
 	const transform = hookHandler(requestPlugin?.transform) as
 		| ((code: string, id: string) => { code: string; map: null } | undefined)
@@ -74,13 +74,13 @@ test('transforms top-level API and middleware files through the Vite plugin', ()
 	);
 
 	expect(result?.code).toContain('defineHandler');
-	expect(result?.code).toContain('__arcadeCreateHttpContext');
+	expect(result?.code).toContain('__marklessCreateHttpContext');
 	expect(
 		transform?.('export default function Page() {}', '/project/pages/index.tsrx'),
 	).toBeUndefined();
 });
 
-test('preserves user Nitro config while adding Arcade request scanning defaults', () => {
+test('preserves user Nitro config while adding Markless request scanning defaults', () => {
 	const [plugin] = flattenPlugins([router()]);
 	const userConfig = {
 		nitro: {
@@ -112,7 +112,7 @@ test('preserves user Nitro config while adding Arcade request scanning defaults'
 	});
 
 	expect(userConfig.environments.ssr.build.rolldownOptions.input).toContain(
-		'virtual:arcade-router/server-entry',
+		'virtual:markless-router/server-entry',
 	);
 	expect(userConfig.environments.ssr.build.rollupOptions).toBeUndefined();
 	expect(result).toMatchObject({
@@ -127,7 +127,7 @@ test('preserves user Nitro config while adding Arcade request scanning defaults'
 					include: ['api/**'],
 				},
 			},
-			routesDir: '.arcade/router/nitro-routes',
+			routesDir: '.markless/router/nitro-routes',
 			publicAssets: [
 				{
 					baseURL: '/assets',
@@ -143,7 +143,7 @@ test('preserves user Nitro config while adding Arcade request scanning defaults'
 				followSymlinks: false,
 				ignored: expect.arrayContaining([
 					'**/custom-generated/**',
-					'**/.arcade/**',
+					'**/.markless/**',
 					'**/node_modules/**',
 				]),
 			},
@@ -153,7 +153,7 @@ test('preserves user Nitro config while adding Arcade request scanning defaults'
 				followSymlinks: false,
 				ignored: expect.arrayContaining([
 					'**/custom-generated/**',
-					'**/.arcade/**',
+					'**/.markless/**',
 					'**/node_modules/**',
 				]),
 			},
@@ -174,8 +174,8 @@ test('preserves user Nitro config while adding Arcade request scanning defaults'
 		| ((code: string, id: string) => { code: string; map: null } | undefined)
 		| undefined;
 
-	expect(requestPlugin).toMatchObject({ name: 'arcade-router:nitro-request-files' });
-	expect(rollupRequestPlugin).toMatchObject({ name: 'arcade-router:nitro-request-files' });
+	expect(requestPlugin).toMatchObject({ name: 'markless-router:nitro-request-files' });
+	expect(rollupRequestPlugin).toMatchObject({ name: 'markless-router:nitro-request-files' });
 	expect(
 		transform?.(
 			'export default function health(http) { return { ok: true, url: http.url.href }; }',
@@ -202,7 +202,7 @@ test('throws when users add nitro directly alongside router', () => {
 
 test('preserves router resume entry exports for preview resume', () => {
 	const plugin = flattenPlugins([router()]).find(
-		(plugin) => plugin.name === 'arcade-router:vite',
+		(plugin) => plugin.name === 'markless-router:vite',
 	);
 	const clientConfig = {
 		consumer: 'client',
@@ -218,39 +218,41 @@ test('preserves router resume entry exports for preview resume', () => {
 
 	const input = clientConfig.build.rolldownOptions.input;
 	expect(Array.isArray(input)).toBe(true);
-	expect(input[0]).toContain('virtual:arcade-router/resume-entry');
-	expect(input.join('\n')).toContain('virtual:arcade-router/navigation-entry');
+	expect(input[0]).toContain('virtual:markless-router/resume-entry');
+	expect(input.join('\n')).toContain('virtual:markless-router/navigation-entry');
 	expect(clientConfig.build.rolldownOptions.preserveEntrySignatures).toBe('exports-only');
 });
 
 test('scopes router virtual entry modules by resolved Vite root', () => {
 	const routePlugin = flattenPlugins([router()]).find(
-		(plugin) => plugin.name === 'arcade-router:routes',
+		(plugin) => plugin.name === 'markless-router:routes',
 	);
 	const resolve = hookHandler(routePlugin?.resolveId) as
 		| ((id: string) => string | undefined)
 		| undefined;
 
 	routePlugin?.configResolved?.({ root: '/project/first' } as never);
-	const first = resolve?.('virtual:arcade-router/server-entry');
+	const first = resolve?.('virtual:markless-router/server-entry');
 	routePlugin?.configResolved?.({ root: '/project/second' } as never);
-	const second = resolve?.('virtual:arcade-router/server-entry');
-	const queried = resolve?.('virtual:arcade-router/resume-entry?worker');
+	const second = resolve?.('virtual:markless-router/server-entry');
+	const queried = resolve?.('virtual:markless-router/resume-entry?worker');
 
-	expect(first).toContain('arcade-router-root=%2Fproject%2Ffirst');
-	expect(second).toContain('arcade-router-root=%2Fproject%2Fsecond');
+	expect(first).toContain('markless-router-root=%2Fproject%2Ffirst');
+	expect(second).toContain('markless-router-root=%2Fproject%2Fsecond');
 	expect(queried).toContain('worker');
-	expect(queried).toContain('arcade-router-root=%2Fproject%2Fsecond');
+	expect(queried).toContain('markless-router-root=%2Fproject%2Fsecond');
 	expect(first).not.toBe(second);
 });
 
 test('emits exact route modulepreload maps from client build chunks', () => {
 	const plugins = flattenPlugins([router()]);
-	const configPlugin = plugins.find((plugin) => plugin.name === 'arcade-router:vite');
-	const routePlugin = plugins.find((plugin) => plugin.name === 'arcade-router:routes');
-	const routeLoad = hookHandler(routePlugin?.load) as ((id: string) => string | undefined) | undefined;
+	const configPlugin = plugins.find((plugin) => plugin.name === 'markless-router:vite');
+	const routePlugin = plugins.find((plugin) => plugin.name === 'markless-router:routes');
+	const routeLoad = hookHandler(routePlugin?.load) as
+		| ((id: string) => string | undefined)
+		| undefined;
 	const navigationChunk = chunk({
-		code: `const routePreloadsJson = globalThis.__arcadeRouterRoutePreloadsJson ?? "__ARCADE_ROUTER_ROUTE_PRELOADS__"; const routePreloadData = routePreloadsJson === "__ARCADE_ROUTER_ROUTE_PRELOADS__" ? { navigation: {}, ssr: {} } : JSON.parse(routePreloadsJson); export const routeModulePreloads = routePreloadData.navigation; export const routeSsrModulePreloads = routePreloadData.ssr;`,
+		code: `const routePreloadsJson = globalThis.__marklessRouterRoutePreloadsJson ?? "__MARKLESS_ROUTER_ROUTE_PRELOADS__"; const routePreloadData = routePreloadsJson === "__MARKLESS_ROUTER_ROUTE_PRELOADS__" ? { navigation: {}, ssr: {} } : JSON.parse(routePreloadsJson); export const routeModulePreloads = routePreloadData.navigation; export const routeSsrModulePreloads = routePreloadData.ssr;`,
 		dynamicImports: ['build/docs.js', 'build/home.js', 'build/navigation-polyfill.js'],
 		fileName: 'build/navigation.js',
 		imports: ['build/shared.js'],
@@ -296,10 +298,9 @@ test('emits exact route modulepreload maps from client build chunks', () => {
 		},
 	);
 
-	const source = routeLoad?.('\0virtual:arcade-router/route-preloads');
+	const source = routeLoad?.('\0virtual:markless-router/route-preloads');
 	const routePreloadData = JSON.parse(
-		source?.match(/routePreloadData = routePreloadsJson === .* \? (\{.*\}) :/)?.[1] ??
-			'{}',
+		source?.match(/routePreloadData = routePreloadsJson === .* \? (\{.*\}) :/)?.[1] ?? '{}',
 	) as {
 		readonly navigation?: Record<string, string[]>;
 		readonly ssr?: Record<string, string[]>;
@@ -309,7 +310,7 @@ test('emits exact route modulepreload maps from client build chunks', () => {
 
 	expect(source).toContain('"pages/docs/[...slug].mdx"');
 	expect(navigationChunk.code).toContain('pages/docs/[...slug].mdx');
-	expect(navigationChunk.code.match(/__ARCADE_ROUTER_ROUTE_PRELOADS__/g)).toHaveLength(1);
+	expect(navigationChunk.code.match(/__MARKLESS_ROUTER_ROUTE_PRELOADS__/g)).toHaveLength(1);
 	expect(navigationChunk.code).toContain('JSON.parse(routePreloadsJson)');
 	expect(routePreloads['pages/docs/[...slug].mdx']).toEqual([
 		'/app/build/navigation.js',

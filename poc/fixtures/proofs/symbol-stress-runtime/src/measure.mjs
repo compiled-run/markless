@@ -112,7 +112,7 @@ async function measureEventOnlyResumer(symbolCount) {
 		button.textContent = `Symbol ${index}`;
 		return button;
 	});
-	const viewScript = root.appendChild(new FakeElement('script', { type: 'arcade/view' }));
+	const viewScript = root.appendChild(new FakeElement('script', { type: 'markless/view' }));
 	viewScript.textContent = JSON.stringify(createViewPayload(symbolCount));
 	const resumerScript = root.appendChild(
 		new FakeElement('script', { type: 'module', 'data-async-resumer': '' }),

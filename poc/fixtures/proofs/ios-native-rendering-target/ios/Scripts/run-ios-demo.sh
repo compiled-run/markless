@@ -4,8 +4,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 IOS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 SIMULATOR_NAME="${1:-iPhone 17}"
-APP_NAME="ArcadeNativeProofDemo"
-BUNDLE_ID="dev.arcade.nativeproof.demo"
+APP_NAME="MarklessNativeProofDemo"
+BUNDLE_ID="dev.markless.nativeproof.demo"
 BUILD_DIR="$IOS_DIR/.build/interactive-demo"
 APP_BUNDLE="$BUILD_DIR/$APP_NAME.app"
 
@@ -17,15 +17,15 @@ TARGET="$ARCH-apple-ios17.0-simulator"
 
 mkdir -p "$APP_BUNDLE"
 cp "$IOS_DIR/DemoApp/Info.plist" "$APP_BUNDLE/Info.plist"
-cp "$IOS_DIR/Sources/ArcadeNativeProof/Resources/artifact.json" "$APP_BUNDLE/artifact.json"
+cp "$IOS_DIR/Sources/MarklessNativeProof/Resources/artifact.json" "$APP_BUNDLE/artifact.json"
 
 xcrun --sdk iphonesimulator swiftc \
 	-target "$TARGET" \
 	-sdk "$SDK_PATH" \
 	-emit-executable \
 	-o "$APP_BUNDLE/$APP_NAME" \
-	"$IOS_DIR/Sources/ArcadeNativeProof/ArcadeArtifact.swift" \
-	"$IOS_DIR/Sources/ArcadeNativeProof/ArcadeNativeRuntime.swift" \
+	"$IOS_DIR/Sources/MarklessNativeProof/MarklessArtifact.swift" \
+	"$IOS_DIR/Sources/MarklessNativeProof/MarklessNativeRuntime.swift" \
 	"$IOS_DIR/DemoApp/DemoApp.swift" \
 	-framework Foundation \
 	-framework JavaScriptCore \

@@ -1,3 +1,3 @@
-export default function request(http: import('@arcade/router').MiddlewareHttpContext) {
-	http.response.headers.set('x-arcade-router', '1');
+export default function request(http: import('@markless/router').MiddlewareHttpContext) {
+	http.response.headers.set('x-markless-router', '1');
 }

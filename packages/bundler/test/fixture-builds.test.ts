@@ -12,7 +12,7 @@ const fixtures = [
 	{
 		filter: '@fixtures/vite-csr',
 		outputs: ['packages/bundler/fixtures/vite-csr/dist'],
-		forbiddenManifest: 'packages/bundler/fixtures/vite-csr/dist/arcade-manifest.json',
+		forbiddenManifest: 'packages/bundler/fixtures/vite-csr/dist/markless-manifest.json',
 		bundleGraph: 'packages/bundler/fixtures/vite-csr/dist/build/bundle-graph.json',
 		symbols: ['symbol:0', 'symbol:1'],
 		runtimeBudget: {
@@ -31,7 +31,7 @@ const fixtures = [
 	{
 		filter: '@fixtures/vite-ssr',
 		outputs: ['packages/bundler/fixtures/vite-ssr/dist'],
-		forbiddenManifest: 'packages/bundler/fixtures/vite-ssr/dist/arcade-manifest.json',
+		forbiddenManifest: 'packages/bundler/fixtures/vite-ssr/dist/markless-manifest.json',
 		bundleGraph: 'packages/bundler/fixtures/vite-ssr/dist/build/bundle-graph.json',
 		symbols: ['symbol:0', 'symbol:1'],
 		runtimeBudget: {
@@ -45,7 +45,7 @@ const fixtures = [
 	{
 		filter: '@fixtures/vite-plus',
 		outputs: ['packages/bundler/fixtures/vite-plus/dist'],
-		forbiddenManifest: 'packages/bundler/fixtures/vite-plus/dist/arcade-manifest.json',
+		forbiddenManifest: 'packages/bundler/fixtures/vite-plus/dist/markless-manifest.json',
 		bundleGraph: 'packages/bundler/fixtures/vite-plus/dist/build/bundle-graph.json',
 		symbols: ['symbol:0'],
 		runtimeBudget: {
@@ -61,7 +61,7 @@ const fixtures = [
 		filter: '@fixtures/rolldown-basic',
 		outputs: ['packages/bundler/fixtures/rolldown-basic/dist'],
 		forbiddenManifest:
-			'packages/bundler/fixtures/rolldown-basic/dist/client/arcade-manifest.json',
+			'packages/bundler/fixtures/rolldown-basic/dist/client/markless-manifest.json',
 		bundleGraph: 'packages/bundler/fixtures/rolldown-basic/dist/client/build/bundle-graph.json',
 		symbols: ['symbol:0', 'symbol:1'],
 	},

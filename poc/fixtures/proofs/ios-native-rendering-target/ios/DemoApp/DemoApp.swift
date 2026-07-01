@@ -1,7 +1,7 @@
 import UIKit
 
 @main
-final class ArcadeNativeProofDemoApp: UIResponder, UIApplicationDelegate {
+final class MarklessNativeProofDemoApp: UIResponder, UIApplicationDelegate {
 	var window: UIWindow?
 
 	func application(
@@ -9,7 +9,7 @@ final class ArcadeNativeProofDemoApp: UIResponder, UIApplicationDelegate {
 		didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil,
 	) -> Bool {
 		let appWindow = UIWindow(frame: UIScreen.main.bounds)
-		appWindow.rootViewController = ArcadeNativeProofDemoViewController()
+		appWindow.rootViewController = MarklessNativeProofDemoViewController()
 		appWindow.makeKeyAndVisible()
 		self.window = appWindow
 		return true
@@ -17,16 +17,16 @@ final class ArcadeNativeProofDemoApp: UIResponder, UIApplicationDelegate {
 }
 
 @MainActor
-private final class ArcadeNativeProofDemoViewController: UIViewController {
-	private var runtime: ArcadeNativeRuntime?
+private final class MarklessNativeProofDemoViewController: UIViewController {
+	private var runtime: MarklessNativeRuntime?
 
 	override func viewDidLoad() {
 		super.viewDidLoad()
 		view.backgroundColor = .systemBackground
 
 		do {
-			let artifact = try ArcadeNativeProofResources.loadArtifact(from: .main)
-			let runtime = try ArcadeNativeRuntime(artifact: artifact)
+			let artifact = try MarklessNativeProofResources.loadArtifact(from: .main)
+			let runtime = try MarklessNativeRuntime(artifact: artifact)
 			self.runtime = runtime
 
 			let root = try runtime.mount()
@@ -46,7 +46,7 @@ private final class ArcadeNativeProofDemoViewController: UIViewController {
 
 	private func showFailure(_ error: Error) {
 		let label = UILabel()
-		label.text = "Arcade native proof failed: \(error)"
+		label.text = "Markless native proof failed: \(error)"
 		label.numberOfLines = 0
 		label.textAlignment = .center
 		label.translatesAutoresizingMaskIntoConstraints = false

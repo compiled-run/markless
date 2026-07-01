@@ -1,4 +1,4 @@
-import type { DomJournalEntry } from '@arcade/runtime';
+import type { DomJournalEntry } from '@markless/runtime';
 
 type InsertRangeEntry = Extract<DomJournalEntry, { readonly type: 'insertRange' }>;
 type RemoveRangeEntry = Extract<DomJournalEntry, { readonly type: 'removeRange' }>;

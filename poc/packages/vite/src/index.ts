@@ -1,13 +1,13 @@
-import { createArcadeRolldownPlugin } from '../../rolldown/src/index.ts';
-import type { ArcadeRolldownTransformResult } from '../../rolldown/src/index.ts';
+import { createMarklessRolldownPlugin } from '../../rolldown/src/index.ts';
+import type { MarklessRolldownTransformResult } from '../../rolldown/src/index.ts';
 import type { PipelineManifest, PipelineReceipt } from '../../protocol/src/index.ts';
 
-export type ArcadeHotUpdateContext = {
+export type MarklessHotUpdateContext = {
 	readonly file: string;
 	readonly read: () => string | Promise<string>;
 };
 
-export type ArcadeHotUpdateResult = {
+export type MarklessHotUpdateResult = {
 	readonly moduleId: string;
 	readonly refreshedManifest: true;
 	readonly changedVirtualModules: ReadonlyArray<string>;
@@ -16,29 +16,34 @@ export type ArcadeHotUpdateResult = {
 	readonly transformed: boolean;
 };
 
-export type ArcadeVitePlugin = {
-	readonly name: '@arcade/bundler/vite';
+export type MarklessVitePlugin = {
+	readonly name: '@markless/bundler/vite';
 	readonly enforce: 'pre';
-	readonly arcade: {
+	readonly markless: {
 		readonly compilerModel: 'rolldown-base-plugin';
 		readonly usesSecondCompilerModel: false;
-		readonly basePluginName: '@arcade/bundler/rolldown';
+		readonly basePluginName: '@markless/bundler/rolldown';
 		readonly manifest: () => PipelineManifest;
 		readonly receipts: () => ReadonlyArray<PipelineReceipt>;
 	};
-	readonly transform: (code: string, id: string) => Promise<ArcadeRolldownTransformResult | null>;
+	readonly transform: (
+		code: string,
+		id: string,
+	) => Promise<MarklessRolldownTransformResult | null>;
 	readonly load: (id: string) => Promise<string | null>;
-	readonly handleHotUpdate: (context: ArcadeHotUpdateContext) => Promise<ArcadeHotUpdateResult>;
+	readonly handleHotUpdate: (
+		context: MarklessHotUpdateContext,
+	) => Promise<MarklessHotUpdateResult>;
 };
 
-export function createArcadeVitePlugin(): ArcadeVitePlugin {
-	const base = createArcadeRolldownPlugin();
+export function createMarklessVitePlugin(): MarklessVitePlugin {
+	const base = createMarklessRolldownPlugin();
 	const adapterReceipts: PipelineReceipt[] = [];
 
 	return {
-		name: '@arcade/bundler/vite',
+		name: '@markless/bundler/vite',
 		enforce: 'pre',
-		arcade: {
+		markless: {
 			compilerModel: 'rolldown-base-plugin',
 			usesSecondCompilerModel: false,
 			basePluginName: base.name,

@@ -1,4 +1,4 @@
-import { renderPayloadScripts } from '@arcade/serializer';
+import { renderPayloadScripts } from '@markless/serializer';
 import type { PayloadScriptsArtifact, PayloadScriptsInput } from '../artifacts.ts';
 
 export function renderPayloadScriptArtifact(input: PayloadScriptsInput): PayloadScriptsArtifact {

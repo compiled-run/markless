@@ -1,13 +1,13 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { renderToString, type SsrRenderable } from 'arcade';
+import { renderToString, type SsrRenderable } from '@markless/core';
 import {
 	planModulePreloads,
 	type ModulePreloadPlanEntry,
 	type ModulePreloadRoot,
 } from '../../../src/build/preload-plan.ts';
-import type { ArcadeBundleGraph } from '../../../src/types.ts';
+import type { MarklessBundleGraph } from '../../../src/types.ts';
 import {
 	createFetchableDevEnvironment,
 	createServerHotChannel,
@@ -46,13 +46,13 @@ type DevResponse = {
 	end(body?: Uint8Array): void;
 };
 
-const REQUEST_LOG_PATH = '/__arcade-fixture-requests';
+const REQUEST_LOG_PATH = '/__markless-fixture-requests';
 
 // Fixture-only SSR host. Real apps should provide this from a runtime adapter
-// or meta-framework; the arcade bundler only needs SSR artifacts.
+// or meta-framework; the markless bundler only needs SSR artifacts.
 export function fixtureSsrHost(): Plugin {
 	return {
-		name: 'fixture:arcade-ssr-host',
+		name: 'fixture:markless-ssr-host',
 		config() {
 			return {
 				environments: {
@@ -205,10 +205,10 @@ async function readClientResumeModuleUrl(dist: string) {
 	throw new Error('Expected built client resume module exporting resumeContainerEvent.');
 }
 
-async function readBundleGraph(dist: string): Promise<ArcadeBundleGraph | undefined> {
+async function readBundleGraph(dist: string): Promise<MarklessBundleGraph | undefined> {
 	return JSON.parse(
 		await readFile(resolve(dist, 'build/bundle-graph.json'), 'utf8'),
-	) as ArcadeBundleGraph;
+	) as MarklessBundleGraph;
 }
 
 function bundleGraphRootFromUrl(url: string): string {

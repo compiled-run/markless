@@ -1,5 +1,5 @@
 import type { Environment, ViteDevServer } from 'vite';
-import type { ArcadeEnvironment } from '../types.ts';
+import type { MarklessEnvironment } from '../types.ts';
 
 type ViteEnvironmentConfig = {
 	consumer?: string;
@@ -13,14 +13,14 @@ type ViteEnvironmentLike = {
 
 const UNMANAGED_VITE_ENVIRONMENTS = new Set(['nitro']);
 
-export interface ArcadeViteEnvironmentOptions {
+export interface MarklessViteEnvironmentOptions {
 	clientEnvironment?: string;
 	serverEnvironment?: string;
 }
 
 export function viteEnvironmentName(
-	environment: ArcadeEnvironment,
-	options: ArcadeViteEnvironmentOptions = {},
+	environment: MarklessEnvironment,
+	options: MarklessViteEnvironmentOptions = {},
 ) {
 	if (environment === 'client') {
 		return options.clientEnvironment ?? 'client';
@@ -31,7 +31,7 @@ export function viteEnvironmentName(
 	return environment;
 }
 
-export function arcadeEnvironment(environment: ViteEnvironmentLike | undefined) {
+export function marklessEnvironment(environment: ViteEnvironmentLike | undefined) {
 	const config = environment?.config;
 	if (isUnmanagedViteEnvironment(environment)) {
 		return 'lib';
@@ -69,11 +69,11 @@ function isUnmanagedViteEnvironment(environment: ViteEnvironmentLike | undefined
 	return !!environment?.name && UNMANAGED_VITE_ENVIRONMENTS.has(environment.name);
 }
 
-export function transformArcadeRequest(
+export function transformMarklessRequest(
 	server: Pick<ViteDevServer, 'environments'>,
 	url: string,
-	environment: ArcadeEnvironment,
-	options?: ArcadeViteEnvironmentOptions,
+	environment: MarklessEnvironment,
+	options?: MarklessViteEnvironmentOptions,
 ) {
 	return server.environments[viteEnvironmentName(environment, options)]?.transformRequest(url);
 }

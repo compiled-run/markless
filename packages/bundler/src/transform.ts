@@ -1,15 +1,12 @@
-import {
-	compileTsrxModule,
-	emitSymbolResolverModule,
-} from '@arcade/compiler';
+import { compileTsrxModule, emitSymbolResolverModule } from '@markless/compiler';
 import type {
-	ArcadeTransformManifest,
-	ArcadeVirtualModule,
+	MarklessTransformManifest,
+	MarklessVirtualModule,
 	TransformTsrxModuleInput,
 	TransformTsrxModuleResult,
 } from './types.ts';
 import {
-	ARCADE_VIRTUAL_PREFIX,
+	MARKLESS_VIRTUAL_PREFIX,
 	emitSourceModule,
 	payloadModule,
 	rewriteSymbolModuleExport,
@@ -17,14 +14,14 @@ import {
 	symbolVirtualModuleId,
 } from './source-module.ts';
 
-export { ARCADE_VIRTUAL_PREFIX } from './source-module.ts';
+export { MARKLESS_VIRTUAL_PREFIX } from './source-module.ts';
 
 export async function transformTsrxModule(
 	input: TransformTsrxModuleInput,
 ): Promise<TransformTsrxModuleResult> {
 	const encodedFilename = encodeURIComponent(input.filename);
-	const payloadId = `${ARCADE_VIRTUAL_PREFIX}payload:${encodedFilename}`;
-	const resolverId = `${ARCADE_VIRTUAL_PREFIX}resolver:${encodedFilename}`;
+	const payloadId = `${MARKLESS_VIRTUAL_PREFIX}payload:${encodedFilename}`;
+	const resolverId = `${MARKLESS_VIRTUAL_PREFIX}resolver:${encodedFilename}`;
 	const compiled = await compileTsrxModule({
 		filename: input.filename,
 		source: input.source,
@@ -42,11 +39,9 @@ export async function transformTsrxModule(
 		symbols: symbolRows,
 	});
 	const symbolRoutes = compiled.semanticGraph.componentEdges.flatMap((edge, index) =>
-		edge.importSource
-			? [{ prefix: `c${index}:`, importSource: edge.importSource }]
-			: [],
+		edge.importSource ? [{ prefix: `c${index}:`, importSource: edge.importSource }] : [],
 	);
-	const manifest: ArcadeTransformManifest = {
+	const manifest: MarklessTransformManifest = {
 		source: input.filename,
 		payload: { virtualModuleId: payloadId },
 		resolver: { virtualModuleId: resolverId },
@@ -57,7 +52,7 @@ export async function transformTsrxModule(
 			virtualModuleId: symbolVirtualModuleId(input.filename, module.symbolId),
 		})),
 	};
-	const virtualModules: ArcadeVirtualModule[] = [
+	const virtualModules: MarklessVirtualModule[] = [
 		{
 			id: payloadId,
 			type: 'payload',
@@ -69,7 +64,7 @@ export async function transformTsrxModule(
 			source: resolverSource,
 		},
 		...compiled.symbolModules.modules.map(
-			(module, index): ArcadeVirtualModule => ({
+			(module, index): MarklessVirtualModule => ({
 				id: symbolVirtualModuleId(input.filename, module.symbolId),
 				type: 'symbol',
 				symbolId: module.symbolId,

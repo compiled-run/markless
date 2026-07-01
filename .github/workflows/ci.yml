@@ -11,22 +11,22 @@ jobs:
         runs-on: ubuntu-latest
         timeout-minutes: 120
         env:
-            ARCADE_CI_TEMP: /tmp/arcade-ci-${{ github.run_id }}
-            ARCADE_REPO_ROOT: ${{ github.workspace }}
-            ARCADE_BASE_REPO_ROOT: /tmp/arcade-ci-${{ github.run_id }}/arcade-baseline
-            JSFB_ROOT: /tmp/arcade-ci-${{ github.run_id }}/js-framework-benchmark
-            ARCADE_JSFB_BASELINE_RESULTS: /tmp/arcade-ci-${{ github.run_id }}/arcade-jsfb/results-arcade-base
-            ARCADE_JSFB_RESULTS: /tmp/arcade-ci-${{ github.run_id }}/arcade-jsfb/results-arcade-ci
-            ARCADE_JSFB_BASELINE_TRACES: /tmp/arcade-ci-${{ github.run_id }}/arcade-jsfb/traces-arcade-base
-            ARCADE_JSFB_TRACES: /tmp/arcade-ci-${{ github.run_id }}/arcade-jsfb/traces-arcade-ci
-            JSFB_SERVER_LOG: /tmp/arcade-ci-${{ github.run_id }}/jsfb-server.log
-            ARCADE_JSFB_CI_COUNT: "5"
-            NPM_CONFIG_AUDIT: "false"
-            NPM_CONFIG_FUND: "false"
-            NPM_CONFIG_PREFER_OFFLINE: "true"
-            PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
-            PUPPETEER_SKIP_DOWNLOAD: "1"
-            CHROMEDRIVER_SKIP_DOWNLOAD: "true"
+            MARKLESS_CI_TEMP: /tmp/markless-ci-${{ github.run_id }}
+            MARKLESS_REPO_ROOT: ${{ github.workspace }}
+            MARKLESS_BASE_REPO_ROOT: /tmp/markless-ci-${{ github.run_id }}/markless-baseline
+            JSFB_ROOT: /tmp/markless-ci-${{ github.run_id }}/js-framework-benchmark
+            MARKLESS_JSFB_BASELINE_RESULTS: /tmp/markless-ci-${{ github.run_id }}/markless-jsfb/results-markless-base
+            MARKLESS_JSFB_RESULTS: /tmp/markless-ci-${{ github.run_id }}/markless-jsfb/results-markless-ci
+            MARKLESS_JSFB_BASELINE_TRACES: /tmp/markless-ci-${{ github.run_id }}/markless-jsfb/traces-markless-base
+            MARKLESS_JSFB_TRACES: /tmp/markless-ci-${{ github.run_id }}/markless-jsfb/traces-markless-ci
+            JSFB_SERVER_LOG: /tmp/markless-ci-${{ github.run_id }}/jsfb-server.log
+            MARKLESS_JSFB_CI_COUNT: '5'
+            NPM_CONFIG_AUDIT: 'false'
+            NPM_CONFIG_FUND: 'false'
+            NPM_CONFIG_PREFER_OFFLINE: 'true'
+            PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+            PUPPETEER_SKIP_DOWNLOAD: '1'
+            CHROMEDRIVER_SKIP_DOWNLOAD: 'true'
 
         steps:
             - uses: actions/checkout@v4
@@ -42,25 +42,25 @@ jobs:
                   node-version: 24
                   cache: pnpm
 
-            - name: Install Arcade dependencies
+            - name: Install Markless dependencies
               run: pnpm install --frozen-lockfile
 
             - name: Prepare CI temp directory
-              run: mkdir -p "$ARCADE_CI_TEMP"
+              run: mkdir -p "$MARKLESS_CI_TEMP"
 
             - name: Resolve benchmark baseline revision
               run: |
                   if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
-                    echo "ARCADE_BASE_SHA=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_ENV"
+                    echo "MARKLESS_BASE_SHA=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_ENV"
                   else
-                    echo "ARCADE_BASE_SHA=${{ github.event.before }}" >> "$GITHUB_ENV"
+                    echo "MARKLESS_BASE_SHA=${{ github.event.before }}" >> "$GITHUB_ENV"
                   fi
 
             - name: Checkout benchmark baseline revision
-              run: git worktree add "$ARCADE_BASE_REPO_ROOT" "$ARCADE_BASE_SHA"
+              run: git worktree add "$MARKLESS_BASE_REPO_ROOT" "$MARKLESS_BASE_SHA"
 
-            - name: Install baseline Arcade dependencies
-              working-directory: ${{ env.ARCADE_BASE_REPO_ROOT }}
+            - name: Install baseline Markless dependencies
+              working-directory: ${{ env.MARKLESS_BASE_REPO_ROOT }}
               run: pnpm install --frozen-lockfile
 
             - name: Checkout JS Framework Benchmark
@@ -81,15 +81,15 @@ jobs:
                   npm run install-webdriver-ts
                   npm run install-server
 
-            - name: Install Arcade benchmark fixture
+            - name: Install Markless benchmark fixture
               run: pnpm bench:jsfb:prepare -- --jsfb-root "$JSFB_ROOT"
 
-            - name: Validate baseline Arcade benchmark fixture
+            - name: Validate baseline Markless benchmark fixture
               working-directory: ${{ env.JSFB_ROOT }}
               env:
-                  ARCADE_REPO_ROOT: ${{ env.ARCADE_BASE_REPO_ROOT }}
+                  MARKLESS_REPO_ROOT: ${{ env.MARKLESS_BASE_REPO_ROOT }}
               run: |
-                  node --input-type=module -e "import { rebuildFrameworks } from './cli/rebuild-build-single.js'; if (!rebuildFrameworks(['keyed/arcade'], true)) process.exit(1);"
+                  node --input-type=module -e "import { rebuildFrameworks } from './cli/rebuild-build-single.js'; if (!rebuildFrameworks(['keyed/markless'], true)) process.exit(1);"
 
             - name: Start JS Framework Benchmark server
               working-directory: ${{ env.JSFB_ROOT }}
@@ -104,63 +104,63 @@ jobs:
                   cat "$JSFB_SERVER_LOG"
                   exit 1
 
-            - name: Run baseline Arcade JS Framework Benchmark
+            - name: Run baseline Markless JS Framework Benchmark
               working-directory: ${{ env.JSFB_ROOT }}
               env:
-                  ARCADE_REPO_ROOT: ${{ env.ARCADE_BASE_REPO_ROOT }}
+                  MARKLESS_REPO_ROOT: ${{ env.MARKLESS_BASE_REPO_ROOT }}
               run: |
                   set -o pipefail
-                  rm -rf webdriver-ts/results webdriver-ts/traces "$ARCADE_JSFB_BASELINE_RESULTS" "$ARCADE_JSFB_BASELINE_TRACES"
+                  rm -rf webdriver-ts/results webdriver-ts/traces "$MARKLESS_JSFB_BASELINE_RESULTS" "$MARKLESS_JSFB_BASELINE_TRACES"
                   npm run bench -- \
                     --headless \
-                    --framework keyed/arcade \
-                    --count "$ARCADE_JSFB_CI_COUNT" \
+                    --framework keyed/markless \
+                    --count "$MARKLESS_JSFB_CI_COUNT" \
                     --benchmark 01_ 02_ 03_ 04_ 05_ 06_ 07_ 08_ 09_ 40_ \
                     2>&1 | tee "$RUNNER_TEMP/jsfb-bench-baseline.log"
                   if grep -Fq "Frameworks that will be benchmarked []" "$RUNNER_TEMP/jsfb-bench-baseline.log"; then
                     exit 1
                   fi
-                  if ! compgen -G "webdriver-ts/results/*arcade*-keyed_01_run1k.json" > /dev/null; then
+                  if ! compgen -G "webdriver-ts/results/*markless*-keyed_01_run1k.json" > /dev/null; then
                     exit 1
                   fi
-                  if ! compgen -G "webdriver-ts/results/*arcade*-keyed_41_size-uncompressed.json" > /dev/null; then
+                  if ! compgen -G "webdriver-ts/results/*markless*-keyed_41_size-uncompressed.json" > /dev/null; then
                     exit 1
                   fi
-                  mkdir -p "$ARCADE_CI_TEMP/arcade-jsfb"
-                  mv webdriver-ts/results "$ARCADE_JSFB_BASELINE_RESULTS"
+                  mkdir -p "$MARKLESS_CI_TEMP/markless-jsfb"
+                  mv webdriver-ts/results "$MARKLESS_JSFB_BASELINE_RESULTS"
                   if [ -d webdriver-ts/traces ]; then
-                    mv webdriver-ts/traces "$ARCADE_JSFB_BASELINE_TRACES"
+                    mv webdriver-ts/traces "$MARKLESS_JSFB_BASELINE_TRACES"
                   fi
 
-            - name: Validate current Arcade benchmark fixture
+            - name: Validate current Markless benchmark fixture
               working-directory: ${{ env.JSFB_ROOT }}
               run: |
-                  node --input-type=module -e "import { rebuildFrameworks } from './cli/rebuild-build-single.js'; if (!rebuildFrameworks(['keyed/arcade'], true)) process.exit(1);"
+                  node --input-type=module -e "import { rebuildFrameworks } from './cli/rebuild-build-single.js'; if (!rebuildFrameworks(['keyed/markless'], true)) process.exit(1);"
 
-            - name: Run current Arcade JS Framework Benchmark
+            - name: Run current Markless JS Framework Benchmark
               working-directory: ${{ env.JSFB_ROOT }}
               run: |
                   set -o pipefail
-                  rm -rf webdriver-ts/results webdriver-ts/traces "$ARCADE_JSFB_RESULTS" "$ARCADE_JSFB_TRACES"
+                  rm -rf webdriver-ts/results webdriver-ts/traces "$MARKLESS_JSFB_RESULTS" "$MARKLESS_JSFB_TRACES"
                   npm run bench -- \
                     --headless \
-                    --framework keyed/arcade \
-                    --count "$ARCADE_JSFB_CI_COUNT" \
+                    --framework keyed/markless \
+                    --count "$MARKLESS_JSFB_CI_COUNT" \
                     --benchmark 01_ 02_ 03_ 04_ 05_ 06_ 07_ 08_ 09_ 40_ \
                     2>&1 | tee "$RUNNER_TEMP/jsfb-bench-current.log"
                   if grep -Fq "Frameworks that will be benchmarked []" "$RUNNER_TEMP/jsfb-bench-current.log"; then
                     exit 1
                   fi
-                  if ! compgen -G "webdriver-ts/results/*arcade*-keyed_01_run1k.json" > /dev/null; then
+                  if ! compgen -G "webdriver-ts/results/*markless*-keyed_01_run1k.json" > /dev/null; then
                     exit 1
                   fi
-                  if ! compgen -G "webdriver-ts/results/*arcade*-keyed_41_size-uncompressed.json" > /dev/null; then
+                  if ! compgen -G "webdriver-ts/results/*markless*-keyed_41_size-uncompressed.json" > /dev/null; then
                     exit 1
                   fi
-                  mkdir -p "$ARCADE_CI_TEMP/arcade-jsfb"
-                  mv webdriver-ts/results "$ARCADE_JSFB_RESULTS"
+                  mkdir -p "$MARKLESS_CI_TEMP/markless-jsfb"
+                  mv webdriver-ts/results "$MARKLESS_JSFB_RESULTS"
                   if [ -d webdriver-ts/traces ]; then
-                    mv webdriver-ts/traces "$ARCADE_JSFB_TRACES"
+                    mv webdriver-ts/traces "$MARKLESS_JSFB_TRACES"
                   fi
 
             - name: Run main test flow
@@ -170,11 +170,11 @@ jobs:
               if: always()
               uses: actions/upload-artifact@v4
               with:
-                  name: arcade-jsfb-results
+                  name: markless-jsfb-results
                   path: |
-                      ${{ env.ARCADE_JSFB_BASELINE_RESULTS }}
-                      ${{ env.ARCADE_JSFB_RESULTS }}
-                      ${{ env.ARCADE_JSFB_BASELINE_TRACES }}
-                      ${{ env.ARCADE_JSFB_TRACES }}
+                      ${{ env.MARKLESS_JSFB_BASELINE_RESULTS }}
+                      ${{ env.MARKLESS_JSFB_RESULTS }}
+                      ${{ env.MARKLESS_JSFB_BASELINE_TRACES }}
+                      ${{ env.MARKLESS_JSFB_TRACES }}
                       ${{ env.JSFB_SERVER_LOG }}
-                      ${{ env.ARCADE_CI_TEMP }}/jsfb-*.log
+                      ${{ env.MARKLESS_CI_TEMP }}/jsfb-*.log

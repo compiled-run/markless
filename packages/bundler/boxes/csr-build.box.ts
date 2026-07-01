@@ -3,14 +3,14 @@ import { box } from '@async/witness';
 // Product truth: a production Vite build of the CSR fixture must emit the
 // bundle graph and lazy symbol chunks through the
 // real Vite/Rolldown pipeline. Dev-only HMR wiring must not leak into those
-// production artifacts, and the full arcade manifest must not be default output.
+// production artifacts, and the full markless manifest must not be default output.
 const FIXTURE = 'fixtures/vite-csr';
-const MANIFEST = `${FIXTURE}/dist/arcade-manifest.json`;
+const MANIFEST = `${FIXTURE}/dist/markless-manifest.json`;
 const BUNDLE_GRAPH = `${FIXTURE}/dist/build/bundle-graph.json`;
 const INDEX = `${FIXTURE}/dist/index.html`;
 const FORBIDDEN_DEV_STRINGS = [
-	'virtual:arcade-dev-client',
-	'arcade:update',
+	'virtual:markless-dev-client',
+	'markless:update',
 	'import.meta.hot',
 	'location.reload',
 ];

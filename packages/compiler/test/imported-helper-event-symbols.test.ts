@@ -6,7 +6,7 @@ test('event symbols keep writes that assign imported helper call results', async
 	const semanticGraph = await buildSemanticGraph({
 		filename: 'src/ListControls.tsrx',
 		source: `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 import { appendItems, makeItems } from './items';
 
 export function App() @{
@@ -99,7 +99,7 @@ test('event symbols scope repeated inline writes by handler span', async () => {
 	const semanticGraph = await buildSemanticGraph({
 		filename: 'src/ListControls.tsrx',
 		source: `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 import { makeItems } from './items';
 
 export function App() @{

@@ -2,23 +2,23 @@
 
 Status: Draft
 
-Arcade Router generates route declarations from `pages/`.
+Markless Router generates route declarations from `pages/`.
 
 Generated files:
 
 ```txt
-arcade-router-env.d.ts
-.arcade/router/types/routes.d.ts
+markless-router-env.d.ts
+.markless/router/types/routes.d.ts
 ```
 
-Generated route types use Arcade names:
+Generated route types use Markless names:
 
 ```ts
-ArcadeRouterStaticPageHref;
-ArcadeRouterConcretePageHref;
-ArcadeRouterRoutePattern;
-ArcadeRouterRouteParams;
-ArcadeRouterLinkProps;
+MarklessRouterStaticPageHref;
+MarklessRouterConcretePageHref;
+MarklessRouterRoutePattern;
+MarklessRouterRouteParams;
+MarklessRouterLinkProps;
 ```
 
 Dynamic routes use file-route pattern syntax:
@@ -37,7 +37,7 @@ Catch-all routes accept a string, number, or readonly segment array:
 </Link>
 ```
 
-Native anchor typing for TSRX host elements is deferred until the Arcade TSRX
+Native anchor typing for TSRX host elements is deferred until the Markless TSRX
 host-element type surface is stable. The first migration slice still generates
 the route model and Link props so the later host contract can consume the same
 artifact instead of inventing a second route type system.

@@ -18,7 +18,7 @@ afterEach(async () => {
 });
 
 const makeWorkspace = async () => {
-	const root = await mkdtemp(join(tmpdir(), 'arcade-router-cli-'));
+	const root = await mkdtemp(join(tmpdir(), 'markless-router-cli-'));
 	cleanupRoots.push(root);
 	return root;
 };
@@ -32,7 +32,7 @@ test('keeps supported project choices and package shape visible', async () => {
 	expect(PROJECT_FORMAT_CHOICES.map((choice) => choice.value)).toEqual(['node', 'deno', 'bun']);
 	expect(PROJECT_FORMAT_CHOICES.map((choice) => choice.label)).toEqual(['Node', 'Deno', 'Bun']);
 	expect(STARTER_CHOICES.map(({ label, value }) => ({ label, value }))).toEqual([
-		{ label: 'Learn Arcade', value: 'minimal' },
+		{ label: 'Learn Markless', value: 'minimal' },
 		{ label: 'Build an app', value: 'app' },
 		{ label: 'Write docs', value: 'docs' },
 		{ label: 'Full-stack app', value: 'full-stack' },
@@ -51,10 +51,10 @@ test('keeps supported project choices and package shape visible', async () => {
 	};
 
 	expect(packageJson).toMatchObject({
-		name: '@arcade/cli',
+		name: '@markless/cli',
 	});
 	expect(packageJson.bin).toEqual({
-		'create-arcade': './src/node.ts',
+		'create-markless': './src/node.ts',
 	});
 	expect(packageJson.dependencies).toMatchObject({
 		'@clack/prompts': expect.any(String),
@@ -81,7 +81,7 @@ test('keeps CLI templates external and uses shared path and URL helpers', async 
 	expect(source).not.toContain('function docsHomePage');
 	expect(source).not.toContain('function tsconfig');
 	expect(source).not.toContain('function packageManifest');
-	expect(source).not.toContain('plugins: [arcade(), router()]');
+	expect(source).not.toContain('plugins: [markless(), router()]');
 });
 
 test('node executable adapter owns host APIs outside the reusable create program', async () => {
@@ -166,14 +166,14 @@ test('prompts interactively when a TTY run has no target', async () => {
 		}),
 	);
 
-	expect(events[0]).toBe('intro:Welcome to Arcade');
+	expect(events[0]).toBe('intro:Welcome to Markless');
 	expect(events).toContain(
-		"note:Let's build you an app.:Choose a starting point, and Arcade will set up the routes, scripts, and defaults.",
+		"note:Let's build you an app.:Choose a starting point, and Markless will set up the routes, scripts, and defaults.",
 	);
 	expect(events).toContain(
-		'select:What are you building today?:minimal:Learn Arcade|A small TSRX counter app. Best first project.,Build an app|A routed app with document.tsrx plus 404 and 500 pages.,Write docs|An MDX docs site with a layout and sidebar components.,Full-stack app|App routes plus api/ and middleware/ files.',
+		'select:What are you building today?:minimal:Learn Markless|A small TSRX counter app. Best first project.,Build an app|A routed app with document.tsrx plus 404 and 500 pages.,Write docs|An MDX docs site with a layout and sidebar components.,Full-stack app|App routes plus api/ and middleware/ files.',
 	);
-	expect(events).toContain('text:What should we call it?:my-arcade-app:my-arcade-app');
+	expect(events).toContain('text:What should we call it?:my-markless-app:my-markless-app');
 	expect(events).toContain(
 		'select:Where should it run?:node:Node|Creates a package.json project for pnpm, npm, or yarn.,Deno|Creates a deno.json project with npm: imports.,Bun|Creates a package.json project tuned for Bun.',
 	);
@@ -190,12 +190,12 @@ test('prompts interactively when a TTY run has no target', async () => {
 	expect(events).toContain(
 		'note:Created interactive-docs:Next steps:\n  cd interactive-docs\n  pnpm dev\n\nThen open:\n  http://localhost:5173',
 	);
-	expect(events).toContain('outro:Arcade app ready.');
+	expect(events).toContain('outro:Markless app ready.');
 	await expect(exists(join(root, 'interactive-docs/pages/index.mdx'))).resolves.toBe(true);
 	await expect(exists(join(root, 'interactive-docs/document.tsrx'))).resolves.toBe(true);
 });
 
-test('creates a minimal Arcade Router app with TSRX pages and Nitro-backed deps', async () => {
+test('creates a minimal Markless Router app with TSRX pages and Nitro-backed deps', async () => {
 	const root = await makeWorkspace();
 
 	const program = new CreateProgram();
@@ -219,8 +219,8 @@ test('creates a minimal Arcade Router app with TSRX pages and Nitro-backed deps'
 		test: 'vp test',
 	});
 	expect(packageJson.dependencies).toMatchObject({
-		'@arcade/router': expect.any(String),
-		arcade: expect.any(String),
+		'@markless/router': expect.any(String),
+		'@markless/core': expect.any(String),
 		nitro: expect.any(String),
 		'vite-plus': expect.any(String),
 	});
@@ -231,13 +231,13 @@ test('creates a minimal Arcade Router app with TSRX pages and Nitro-backed deps'
 	await expect(exists(join(appRoot, 'pages/index.tsrx'))).resolves.toBe(true);
 	await expect(exists(join(appRoot, 'public'))).resolves.toBe(true);
 	await expect(exists(join(appRoot, 'nitro.config.ts'))).resolves.toBe(false);
-	await expect(exists(join(appRoot, 'arcade.config.ts'))).resolves.toBe(false);
+	await expect(exists(join(appRoot, 'markless.config.ts'))).resolves.toBe(false);
 	await expect(exists(join(appRoot, 'src/pages'))).resolves.toBe(false);
 	await expect(exists(join(appRoot, 'pages/api'))).resolves.toBe(false);
 	await expect(readFile(join(appRoot, 'vite.config.ts'), 'utf-8')).resolves.toContain(
-		"import { router } from '@arcade/router/vite';",
+		"import { router } from '@markless/router/vite';",
 	);
-	expect(viteConfig).toContain('plugins: [arcade(), router()]');
+	expect(viteConfig).toContain('plugins: [markless(), router()]');
 	expect(viteConfig).not.toContain('@vitejs/devtools');
 	expect(viteConfig).not.toContain('DevTools');
 	expect(viteConfig).not.toContain('nitro()');
@@ -283,8 +283,8 @@ test('generates Deno format imports with Nitro available', async () => {
 
 	expect(denoJson.nodeModulesDir).toBe('auto');
 	expect(denoJson.imports).toMatchObject({
-		'@arcade/router': 'npm:@arcade/router',
-		arcade: 'npm:arcade',
+		'@markless/core': 'npm:@markless/core',
+		'@markless/router': 'npm:@markless/router',
 		nitro: 'npm:nitro@3.0.260429-beta',
 	});
 });
@@ -305,7 +305,7 @@ test('generates docs with MDX routes and component layouts only', async () => {
 	await expect(exists(join(appRoot, 'pages/docs/index.mdx'))).resolves.toBe(true);
 	await expect(exists(join(appRoot, 'components/docs/Sidebar.tsrx'))).resolves.toBe(true);
 	await expect(exists(join(appRoot, 'components/layouts/DocsLayout.tsrx'))).resolves.toBe(true);
-	expect(indexMdx).toContain('# Arcade Router Docs');
+	expect(indexMdx).toContain('# Markless Router Docs');
 	expect(catchAllMdx).toContain('<DocsLayout');
 	expect(catchAllMdx).toContain('<Content />');
 	expect(viteConfig).not.toContain('mdx');

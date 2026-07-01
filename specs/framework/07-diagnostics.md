@@ -18,7 +18,7 @@ All diagnostics use one structured shape across compiler and runtime:
 
 ```ts
 type Diagnostic = {
-	code: string; // stable, e.g. "ARCADE_CAPTURE_UNSUPPORTED_VALUE"
+	code: string; // stable, e.g. "MARKLESS_CAPTURE_UNSUPPORTED_VALUE"
 	severity: 'error' | 'warning' | 'info';
 	phase:
 		| 'parse'
@@ -53,7 +53,7 @@ cannot safely rewrite, it still gives a precise migration path.
 Example shape:
 
 ```txt
-ARCADE_CAPTURE_UNSUPPORTED_VALUE: Cannot capture local DOM node in lazy symbol
+MARKLESS_CAPTURE_UNSUPPORTED_VALUE: Cannot capture local DOM node in lazy symbol
 
 src/Menu.tsrx:13:27
   12 | const menuEl = document.querySelector("#menu");
@@ -62,7 +62,7 @@ src/Menu.tsrx:13:27
 
 Why:
   Lazy handlers run after resume. A live DOM node cannot be serialized into
-  arcade/state or recovered from a JavaScript closure.
+  markless/state or recovered from a JavaScript closure.
 
 Fix:
   Use element() plus el={...}, then read the element handle inside the handler.
@@ -83,7 +83,7 @@ codes and machine fields are compatibility surface.
 Diagnostic documentation follows the stable code:
 
 ```txt
-https://arcadejs.com/errors/ARCADE_CAPTURE_UNSUPPORTED_VALUE
+https://markless.dev/errors/MARKLESS_CAPTURE_UNSUPPORTED_VALUE
 ```
 
 Runtime diagnostics must link back to compiler artifacts whenever possible. A
@@ -95,7 +95,7 @@ without requiring users to inspect compact payload encoding.
 
 Required compile-time diagnostics include capture-rule violations,
 bare `state()`/`computed()`/`shared()`/`element()` calls that are not imported
-from `arcade`, framework APIs used outside a `.tsrx` reactive scope,
+from `@markless/core`, framework APIs used outside a `.tsrx` reactive scope,
 reactive reads after `await` in async computed bodies, async reads outside an
 async boundary, `el` used with a non-`element()` handle, one `element()` handle
 bound to multiple live host elements, an element handle stored in `state()` or

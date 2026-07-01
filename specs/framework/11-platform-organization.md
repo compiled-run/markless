@@ -1,7 +1,7 @@
 # Platform Organization
 
 Platform and adapter package boundaries for web, mobile, and desktop targets.
-This file owns platform-specific monorepo shape, not the future `arcade/ui`
+This file owns platform-specific monorepo shape, not the future `@markless/core/ui`
 component surface.
 
 ## Terms
@@ -17,7 +17,7 @@ component surface.
   integration, native bridge setup, JavaScript engine choice, asset URLs,
   packaging, HMR, test harnesses, and OS/runtime quirks.
 - **UI package** means the later cross-platform authored component layer that may
-  eventually be exposed as `arcade/ui`. It is deferred until platform contracts
+  eventually be exposed as `@markless/core/ui`. It is deferred until platform contracts
   are proven.
 
 Do not use `native` as a primary package or import name. It conflates mobile,
@@ -41,7 +41,7 @@ platform-specific code grows, split by ownership rather than public API ambition
   meaning of host elements.
 - `packages/bundler` stays the Rolldown-first build base. Platform adapters may
   consume it, but bundler internals should not become the web platform package.
-- `packages/arcade` remains the curated public package. It may re-export stable
+- `packages/core` remains the curated public package. It may re-export stable
   platform entry points after they are proven, but internal platform packages are
   not public API by default.
 
@@ -94,7 +94,7 @@ event. The web platform can map it to `click`, iOS can map it to
 owned by platform/adapters; it is not a component rerender path and not a VDOM.
 
 Host locators remain platform-owned: web can use DOM-order element/comment
-locators from `arcade/view`, while mobile and desktop can derive native host IDs
+locators from `markless/view`, while mobile and desktop can derive native host IDs
 or adapter bridge handles from the same view artifact. Shared graph state and
 symbol IDs must not depend on DOM nodes, UIKit objects, AppKit objects, or
 adapter bridge handles being serializable.
@@ -118,20 +118,20 @@ The current Vite integration remains a web adapter surface until a platform
 package owns it. Do not move web Vite behavior into mobile or desktop just
 because all adapters share build concepts.
 
-## Future `arcade/ui`
+## Future `@markless/core/ui`
 
-Do not create or export `arcade/ui` yet. The future UI layer should sit above
+Do not create or export `@markless/core/ui` yet. The future UI layer should sit above
 platform contracts, not platform implementations. A later `packages/ui` can own
 cross-platform components such as
 `base`, `select`, and `collapsible` only after at least the web platform and one
 native platform prove the same semantic component contract against their host
 capability records.
 
-The eventual public shape should be curated through `packages/arcade`, for
+The eventual public shape should be curated through `packages/core`, for
 example:
 
 ```ts
-import { base, select, collapsible } from 'arcade/ui';
+import { base, select, collapsible } from '@markless/core/ui';
 ```
 
 That import must not expose platform package internals. The UI package should
@@ -157,7 +157,7 @@ records, event records, behavior records, and journal entries.
    must prove that it consumes compiler artifacts and shared graph contracts
    without requiring hydration, VDOM reconciliation, or component execution on
    resume.
-7. Revisit `arcade/ui` only after platform capability records can express the
+7. Revisit `@markless/core/ui` only after platform capability records can express the
    needed primitives without importing web DOM or OS bridge code.
 
 ## Verification

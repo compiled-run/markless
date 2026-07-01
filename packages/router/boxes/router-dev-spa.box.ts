@@ -1,7 +1,7 @@
 import { box } from '@async/witness';
 
 const FIXTURE = 'fixtures/router';
-const DOCS_LINK = 'a[data-arcade-router-link]';
+const DOCS_LINK = 'a[data-markless-router-link]';
 const WAIT = { timeoutMs: 10_000 };
 
 export default box(
@@ -21,15 +21,17 @@ export default box(
 		});
 		const indexHtml = await environment.client.request('/');
 		if (
-			indexHtml.includes('<script type="module" src="/@id/virtual:arcade-router') ||
-			indexHtml.includes('__arcadeRouterStartSpaNavigation')
+			indexHtml.includes('<script type="module" src="/@id/virtual:markless-router') ||
+			indexHtml.includes('__marklessRouterStartSpaNavigation')
 		) {
-			throw new Error('Router dev HTML must not wake the Arcade router runtime on SSR startup.');
+			throw new Error(
+				'Router dev HTML must not wake the Markless router runtime on SSR startup.',
+			);
 		}
 
 		const page = await browser.visit('/');
 
-		await expect.page.text(page, 'h1', 'Arcade Router', WAIT);
+		await expect.page.text(page, 'h1', 'Markless Router', WAIT);
 		const startupRouteModuleRequests = (await page.networkRequests()).filter((request) =>
 			request.url.includes('/pages/index.tsrx?import'),
 		);
@@ -44,7 +46,7 @@ export default box(
 		await expect.page.text(page, 'h1', 'Docs', WAIT);
 		await expect.page.bodyText(
 			page,
-			{ contains: 'This MDX route is part of the top-level Arcade Router fixture.' },
+			{ contains: 'This MDX route is part of the top-level Markless Router fixture.' },
 			WAIT,
 		);
 		await expect.page.text(page, '[data-mdx-counter]', 'MDX Count 0', WAIT);
@@ -60,11 +62,7 @@ export default box(
 					.join('\n')}`,
 			);
 		}
-		await expect.page.outcome(
-			page,
-			{ consoleErrors: 0, failedRequests: 0 },
-			WAIT,
-		);
+		await expect.page.outcome(page, { consoleErrors: 0, failedRequests: 0 }, WAIT);
 		await receipt.capture('router dev browser Link SPA-navigated to lazy-resumed docs route');
 	},
 );

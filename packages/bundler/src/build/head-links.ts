@@ -1,6 +1,6 @@
 import { joinURL } from 'ufo';
-import type { ArcadeBundleGraph, GlobalInjections } from '../types.ts';
-import { ARCADE_BUILD_PREFIX } from './chunking.ts';
+import type { MarklessBundleGraph, GlobalInjections } from '../types.ts';
+import { MARKLESS_BUILD_PREFIX } from './chunking.ts';
 import { type ModulePreloadPlanEntry, planModulePreloads } from './preload-plan.ts';
 
 type HeadLinkBundle = Record<string, HeadLinkBundleItem>;
@@ -51,7 +51,7 @@ function stylesheetFilesFromViteMetadata(bundle: HeadLinkBundle) {
 }
 
 export function collectModulePreloadInjections(
-	bundleGraph: ArcadeBundleGraph | undefined,
+	bundleGraph: MarklessBundleGraph | undefined,
 	options: {
 		publicPath?: (fileName: string) => string;
 	} = {},
@@ -62,8 +62,8 @@ export function collectModulePreloadInjections(
 
 	return planModulePreloads({
 		base: options.publicPath
-			? options.publicPath(ARCADE_BUILD_PREFIX)
-			: joinURL('/', ARCADE_BUILD_PREFIX),
+			? options.publicPath(MARKLESS_BUILD_PREFIX)
+			: joinURL('/', MARKLESS_BUILD_PREFIX),
 		bundleGraph,
 		roots,
 	}).map(modulePreloadInjection);

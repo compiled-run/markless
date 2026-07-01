@@ -1,15 +1,15 @@
 import { defineConfig } from 'vite';
-import { arcade } from '@arcade/bundler/vite';
+import { markless } from '@markless/bundler/vite';
 
 export default defineConfig({
-	plugins: [arcade()],
+	plugins: [markless()],
 	build: {
 		lib: {
 			entry: 'src/index.ts',
 			formats: ['es'],
 		},
 		rolldownOptions: {
-			external: [/^@arcade\/arcade/],
+			external: [/^@markless\/core/],
 		},
 	},
 });

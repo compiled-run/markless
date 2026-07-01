@@ -1,6 +1,6 @@
 const routeParamPattern = /\[\.\.\.([A-Za-z_$][\w$]*)\]|\[([A-Za-z_$][\w$]*)\]/g;
 
-export function __arcadeRouteHref(
+export function __marklessRouteHref(
 	pattern: string,
 	params: Readonly<Record<string, unknown>>,
 ): string {

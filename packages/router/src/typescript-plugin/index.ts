@@ -3,7 +3,7 @@ import type * as ts from 'typescript';
 
 type TypeScript = typeof ts;
 
-type ArcadeRouterPluginConfig = {
+type MarklessRouterPluginConfig = {
 	pagesDir?: string;
 };
 
@@ -16,7 +16,7 @@ function init(modules: { typescript: TypeScript }): ts.server.PluginModule {
 	return {
 		create(info) {
 			const logger = info.project.projectService?.logger;
-			logger?.info('[arcade-router] TypeScript plugin loaded');
+			logger?.info('[markless-router] TypeScript plugin loaded');
 
 			const languageService = info.languageService;
 			const proxy = Object.create(null) as ts.LanguageService;
@@ -27,7 +27,7 @@ function init(modules: { typescript: TypeScript }): ts.server.PluginModule {
 					typeof value === 'function' ? value.bind(languageService) : value;
 			}
 
-			const pluginConfig = (info.config ?? {}) as ArcadeRouterPluginConfig;
+			const pluginConfig = (info.config ?? {}) as MarklessRouterPluginConfig;
 			const projectRoot = getProjectRoot(typeScript, info);
 			const appRoot = getConfiguredProjectRoot(info) ?? projectRoot;
 			const pagesDir = resolvePagesDir(appRoot, pluginConfig);
@@ -241,7 +241,7 @@ function getConfiguredProjectRoot(info: ts.server.PluginCreateInfo): string | un
 	}
 }
 
-function resolvePagesDir(projectRoot: string, config: ArcadeRouterPluginConfig): string {
+function resolvePagesDir(projectRoot: string, config: MarklessRouterPluginConfig): string {
 	const configured = config.pagesDir ?? 'pages';
 	return isAbsolute(configured) ? configured : resolve(projectRoot, configured);
 }

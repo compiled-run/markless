@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { createRuntimeGraph } from '@arcade/runtime';
+import { createRuntimeGraph } from '@markless/runtime';
 import { createResumeRuntime } from '../src/index.ts';
 
 type FakeElement = {

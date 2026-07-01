@@ -78,7 +78,7 @@ export async function transformTsrxForBundler(
 		},
 	];
 	const manifest: PipelineManifest = {
-		protocol: 'arcade-pipeline-poc',
+		protocol: 'markless-pipeline-poc',
 		revision,
 		transformedModules: [
 			{
@@ -173,9 +173,9 @@ function createVirtualModules(input: {
 	readonly symbolIds: ReadonlyArray<string>;
 	readonly sourceFingerprint: string;
 }): PipelineVirtualModuleRecord[] {
-	const symbolResolverId = `virtual:arcade/symbol-resolver?module=${input.moduleSlug}`;
-	const manifestId = `virtual:arcade/manifest?module=${input.moduleSlug}`;
-	const runtimeId = `virtual:arcade/runtime?module=${input.moduleSlug}`;
+	const symbolResolverId = `virtual:markless/symbol-resolver?module=${input.moduleSlug}`;
+	const manifestId = `virtual:markless/manifest?module=${input.moduleSlug}`;
+	const runtimeId = `virtual:markless/runtime?module=${input.moduleSlug}`;
 
 	return [
 		{
@@ -230,19 +230,19 @@ function transformedModuleCode(
 	const runtime = requiredVirtualModule(virtualModules, 'runtime-entry');
 
 	return [
-		'/* arcade TSRX transform */',
+		'/* markless TSRX transform */',
 		`import { loadSymbol as __asyncLoadSymbol } from ${JSON.stringify(resolver.id)};`,
 		`import { manifest as __asyncManifest } from ${JSON.stringify(manifest.id)};`,
 		`import { runtimePlan as __asyncRuntimePlan } from ${JSON.stringify(runtime.id)};`,
 		'',
-		'export const __arcade_pipeline = {',
+		'export const __markless_pipeline = {',
 		`  moduleId: ${JSON.stringify(filename)},`,
 		'  manifest: __asyncManifest,',
 		'  runtime: __asyncRuntimePlan,',
 		'  loadSymbol: __asyncLoadSymbol,',
 		'};',
 		'',
-		'export default __arcade_pipeline;',
+		'export default __markless_pipeline;',
 		'',
 	].join('\n');
 }

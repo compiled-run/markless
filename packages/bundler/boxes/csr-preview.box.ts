@@ -1,7 +1,7 @@
 import { box } from '@async/witness';
 import { planModulePreloads } from '../src/build/preload-plan.ts';
 import { runtimeSizeReport, type RuntimeSizeReport } from '../test-support/runtime-size.ts';
-import type { ArcadeBundleGraph } from '../src/types.ts';
+import type { MarklessBundleGraph } from '../src/types.ts';
 
 // Product truth: the Vite CSR fixture's production output is not only emitted
 // correctly; it can be served by Vite preview and load the generated client
@@ -12,7 +12,7 @@ const DIST = `${FIXTURE}/dist`;
 const INDEX = `${FIXTURE}/dist/index.html`;
 const BUNDLE_GRAPH_REQUEST = '/build/bundle-graph.json';
 const COUNTER = '[data-counter]';
-const REQUESTS = '/__arcade-fixture-requests';
+const REQUESTS = '/__markless-fixture-requests';
 const WAIT = { timeoutMs: 10_000 };
 const MIN_CSR_PRELOAD_COUNT = 2;
 const MAX_PRELOADED_RUNTIME_CHUNK_GZIP_BYTES = 3_000;
@@ -48,7 +48,7 @@ export default box(
 		});
 		const page = await preview.browser.visit('/');
 		const expectedPreloadHrefs = expectedCsrPreloadHrefs(
-			JSON.parse(await preview.request(BUNDLE_GRAPH_REQUEST)) as ArcadeBundleGraph,
+			JSON.parse(await preview.request(BUNDLE_GRAPH_REQUEST)) as MarklessBundleGraph,
 		);
 		receipt.note(`CSR expected lazy symbol modulepreloads: ${expectedPreloadHrefs.join(', ')}`);
 
@@ -138,7 +138,7 @@ function formatRequests(log: ScriptRequestLog): string {
 	return log.scripts.length === 0 ? '(none)' : log.scripts.join(', ');
 }
 
-function expectedCsrPreloadHrefs(bundleGraph: ArcadeBundleGraph): readonly string[] {
+function expectedCsrPreloadHrefs(bundleGraph: MarklessBundleGraph): readonly string[] {
 	const roots = bundleGraph
 		.filter((item): item is string => typeof item === 'string' && item.startsWith('symbol:'))
 		.map((name) => ({ name, priority: 'high' as const }));

@@ -3,23 +3,23 @@
 import PackageDescription
 
 let package = Package(
-	name: "ArcadeDesktopProof",
+	name: "MarklessDesktopProof",
 	platforms: [
 		.macOS(.v14),
 	],
 	products: [
-		.library(name: "ArcadeDesktopProof", targets: ["ArcadeDesktopProof"]),
+		.library(name: "MarklessDesktopProof", targets: ["MarklessDesktopProof"]),
 	],
 	targets: [
 		.target(
-			name: "ArcadeDesktopProof",
+			name: "MarklessDesktopProof",
 			resources: [
 				.process("Resources"),
 			],
 		),
 		.testTarget(
-			name: "ArcadeDesktopProofTests",
-			dependencies: ["ArcadeDesktopProof"],
+			name: "MarklessDesktopProofTests",
+			dependencies: ["MarklessDesktopProof"],
 		),
 	],
 )

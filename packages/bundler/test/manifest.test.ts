@@ -4,32 +4,32 @@ import {
 	createPreloadGraphAdder,
 } from '../src/build/bundle-graph.ts';
 import {
-	ARCADE_MANIFEST_FILE,
+	MARKLESS_MANIFEST_FILE,
 	createBuildMetadata,
-	type ArcadeBuildMetadataBundle,
+	type MarklessBuildMetadataBundle,
 } from '../src/build/build-metadata.ts';
-import { ARCADE_BUNDLE_GRAPH } from '../src/build/chunking.ts';
+import { MARKLESS_BUNDLE_GRAPH } from '../src/build/chunking.ts';
 import {
 	collectHeadLinkInjections,
 	collectModulePreloadInjections,
 } from '../src/build/head-links.ts';
-import type { ArcadeManifest, ArcadeTransformManifest } from '../src/types.ts';
+import type { MarklessManifest, MarklessTransformManifest } from '../src/types.ts';
 
-const transformManifest: ArcadeTransformManifest = {
+const transformManifest: MarklessTransformManifest = {
 	source: '/workspace/app/src/root.tsrx',
-	payload: { virtualModuleId: 'virtual:arcade:payload:root' },
-	resolver: { virtualModuleId: 'virtual:arcade:resolver:root' },
+	payload: { virtualModuleId: 'virtual:markless:payload:root' },
+	resolver: { virtualModuleId: 'virtual:markless:resolver:root' },
 	symbols: [
 		{
 			symbolId: 'root#click',
 			kind: 'event-handler',
 			exportName: 'onClick',
-			virtualModuleId: 'virtual:arcade:symbol:root:click',
+			virtualModuleId: 'virtual:markless:symbol:root:click',
 		},
 	],
 };
 
-describe('arcade build metadata output', () => {
+describe('markless build metadata output', () => {
 	test('creates build metadata from bundler output and transform artifacts', () => {
 		const metadata = createBuildMetadata(
 			{
@@ -45,8 +45,8 @@ describe('arcade build metadata output', () => {
 					fileName: 'build/chunk-symbol.js',
 					name: 'root_click',
 					code: 'export const onClick = () => {};',
-					moduleIds: ['\0virtual:arcade:symbol:root:click'],
-					facadeModuleId: '\0virtual:arcade:symbol:root:click',
+					moduleIds: ['\0virtual:markless:symbol:root:click'],
+					facadeModuleId: '\0virtual:markless:symbol:root:click',
 				}),
 				'build/root.css': {
 					type: 'asset',
@@ -66,7 +66,7 @@ describe('arcade build metadata output', () => {
 			[transformManifest],
 			'/workspace/app',
 			{
-				bundleGraphAsset: ARCADE_BUNDLE_GRAPH,
+				bundleGraphAsset: MARKLESS_BUNDLE_GRAPH,
 				publicPath: (fileName) => `/assets/${fileName}`,
 			},
 		);
@@ -89,12 +89,12 @@ describe('arcade build metadata output', () => {
 		});
 		expect(metadata.assets?.['build/root.css']).toEqual({ name: 'root.css', size: 6 });
 		expect(metadata.assets?.['build/chunk-entry.js.map']).toBeUndefined();
-		expect(metadata.assets?.[ARCADE_BUNDLE_GRAPH]).toEqual({
+		expect(metadata.assets?.[MARKLESS_BUNDLE_GRAPH]).toEqual({
 			name: 'bundle-graph.json',
 			size: JSON.stringify(metadata.bundleGraph).length,
 		});
-		expect(ARCADE_MANIFEST_FILE).toBe('arcade-manifest.json');
-		expect(metadata.bundleGraphAsset).toBe(ARCADE_BUNDLE_GRAPH);
+		expect(MARKLESS_MANIFEST_FILE).toBe('markless-manifest.json');
+		expect(metadata.bundleGraphAsset).toBe(MARKLESS_BUNDLE_GRAPH);
 		expect(metadata.bundleGraph).toContain('root#click');
 		expect(metadata.injections).toContainEqual({
 			tag: 'link',
@@ -167,7 +167,7 @@ describe('arcade build metadata output', () => {
 	});
 
 	test('converts symbol and custom preload entries into the bundle graph', () => {
-		const manifest: ArcadeManifest = {
+		const manifest: MarklessManifest = {
 			version: 1,
 			modules: [
 				{
@@ -211,12 +211,12 @@ describe('arcade build metadata output', () => {
 	});
 });
 
-function lazySymbolManifest(): ArcadeManifest {
+function lazySymbolManifest(): MarklessManifest {
 	const symbol = (name: string, kind: 'event-handler' | 'dom-update') => ({
 		symbolId: `symbol:${name}`,
 		kind,
 		exportName: name,
-		virtualModuleId: `virtual:arcade:symbol:root:${name}`,
+		virtualModuleId: `virtual:markless:symbol:root:${name}`,
 		fileName: `${name}.js`,
 	});
 	return {
@@ -228,8 +228,18 @@ function lazySymbolManifest(): ArcadeManifest {
 			},
 		],
 		bundles: {
-			'press.js': { size: 900, total: 1900, imports: ['shared.js'], origins: ['src/root.tsrx'] },
-			'text.js': { size: 500, total: 1500, imports: ['shared.js'], origins: ['src/root.tsrx'] },
+			'press.js': {
+				size: 900,
+				total: 1900,
+				imports: ['shared.js'],
+				origins: ['src/root.tsrx'],
+			},
+			'text.js': {
+				size: 500,
+				total: 1500,
+				imports: ['shared.js'],
+				origins: ['src/root.tsrx'],
+			},
 			'shared.js': { size: 500, total: 500, origins: ['src/shared.ts'] },
 		},
 	};
@@ -244,7 +254,7 @@ function chunk(input: {
 	moduleIds: string[];
 	facadeModuleId: string;
 	viteMetadata?: { importedCss?: Set<string> };
-}): ArcadeBuildMetadataBundle[string] {
+}): MarklessBuildMetadataBundle[string] {
 	return {
 		type: 'chunk',
 		fileName: input.fileName,

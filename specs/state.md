@@ -30,8 +30,8 @@ Completed slices are concentrated in:
 - the first platform package split: `packages/runtime` now exposes the
   host-agnostic graph surface, `packages/web` owns DOM render/resume, payload
   script decoding, browser event resume, and DOM journal helpers, and
-  `packages/arcade` curates new `arcade/web/*` re-exports while preserving
-  existing `arcade/runtime/*` compatibility wrappers
+  `packages/core` curates new `@markless/core/web/*` re-exports while preserving
+  existing `@markless/core/runtime/*` compatibility wrappers
 - compiler module ownership and pass graph validation
 - semantic graph collection for early state, event, alias, async, shared
   definition/instance, and capture inputs
@@ -52,7 +52,7 @@ Completed slices are concentrated in:
   timing coverage
 - a POC event-only inline resumer under
   `poc/fixtures/proofs/resumer-script` proving an already-rendered container can
-  ship compact `arcade/view` event data, install one delegated listener, execute
+  ship compact `markless/view` event data, install one delegated listener, execute
   no app code before interaction, import exactly one lazy symbol on click, update
   DOM/state, and stay under the 700 B gzip event-only budget
 - early public package re-exports and Rolldown/Vite adapter shells, including
@@ -66,7 +66,7 @@ Completed slices are concentrated in:
   filenames and final emitted chunk specifiers in the generated resolver's
   compact exported symbol table for those current generated symbols; the
   generated resolver no longer emits an app-sized `switch (id)` path, default
-  `arcade-manifest.json` emission is removed, and callers must opt in with
+  `markless-manifest.json` emission is removed, and callers must opt in with
   `emitManifestJson` when they need the full JSON metadata asset;
   repeated transforms for the same `.tsrx` module now drop stale generated
   virtual modules before registering fresh artifacts, and the Vite adapter's
@@ -84,21 +84,21 @@ Completed slices are concentrated in:
   CSR browser page navigates after an edit, prove the SSR browser page keeps
   navigating across repeated edits, and prove the CSR production
   build emits `build/bundle-graph.json`, omits default
-  `arcade-manifest.json`, and emits generated event-handler/DOM-update lazy chunks
+  `markless-manifest.json`, and emits generated event-handler/DOM-update lazy chunks
   without leaking dev-HMR
   client strings; the CSR production build is also served through Vite preview
   and proves client-created DOM can load the generated payload/resolver/symbol
   pipeline for a counter click with no console errors or failed requests; a
   package-local SSR build Witness box proves the Vite/Rolldown build emits both
   client and `ssr` environments and that the built server entry contains the
-  counter DOM plus canonical `arcade/state` and `arcade/view` payload scripts; a
+  counter DOM plus canonical `markless/state` and `markless/view` payload scripts; a
   package-local SSR preview Witness box runs the fixture's Vite app-build path,
   starts Vite preview, verifies the preview response contains server-produced
   counter DOM plus canonical payload scripts, and proves the browser entry
   resumes that DOM for a `0` to `1` counter update without box-side HTML
   rewriting; the vite-plus fixture now has a real app entry and package-local
   Witness preview receipt proving a vite-plus config can build the
-  bundle graph, omit default `arcade-manifest.json`, and serve the browser page
+  bundle graph, omit default `markless-manifest.json`, and serve the browser page
   through Vite preview;
   `buildStart` clears accumulated transform manifests and generated virtual
   modules before a new build/dev cycle
@@ -122,7 +122,7 @@ The critical path to "full spec implementation" still requires:
   current direct public-render fast path for supported static/keyed-repeat
   shapes into a complete browser render path that executes general generated
   component/render artifacts, creates a full live container, and proves browser
-  event/DOM behavior without requiring `arcade/state`, `arcade/view`, or the
+  event/DOM behavior without requiring `markless/state`, `markless/view`, or the
   resumer script
 - broaden the early SSR `renderToString(App, options)` runtime entry beyond the
   current package-level payload/resumer shell so it executes generated compiler
@@ -185,19 +185,19 @@ path is covered by fixtures and browser tests.
 - The pnpm/vite-plus workspace scaffolding exists through root `package.json`,
   `pnpm-workspace.yaml`, `pnpm-lock.yaml`, and `vite.config.ts`.
 - Root scripts are thin vite-plus aliases. The current `vite.config.ts` uses one
-  flat pack entry map for `arcade`, `arcade/web`, `arcade/runtime`
+  flat pack entry map for `@markless/core`, `@markless/core/web`, `@markless/core/runtime`
   compatibility wrappers, `runtime`, `web`, serializer, compiler, bundler, and
   `vitest-browser` entries, and the Node test project includes package tests
   plus top-level script tests. It does not yet model package-local publish
   output or browser/witness test projects.
-- Production framework package folders currently exist for `arcade`, `runtime`,
+- Production framework package folders currently exist for `@markless/core`, `runtime`,
   `web`, `serializer`, `compiler`, `bundler`, `typescript-plugin`, and
   `vitest-browser`.
-- There is no production `packages/core`, `packages/protocol`,
-  `packages/test-utils`, or `packages/server` manifest. Authoring APIs live in
-  `packages/arcade`, protocol/payload contracts live in `packages/serializer`,
-  and short repo-only helpers live under top-level `scripts/test-utils` or
-  package-local test support.
+- There is no production `packages/protocol`, `packages/test-utils`, or
+  `packages/server` manifest. Authoring APIs live in `packages/core`,
+  protocol/payload contracts live in `packages/serializer`, and short
+  repo-only helpers live under top-level `scripts/test-utils` or package-local
+  test support.
 - The root workspace includes `demos/*`; the previous top-level
   `benchmarks/js-framework-benchmark` fixture now lives under
   `demos/js-framework-benchmark`, and the music-player CSR/SSR playgrounds now
@@ -254,14 +254,14 @@ in the split specs.
   `packages/serializer/src/payload-scripts.ts`, and
   `packages/serializer/test/*`.
 - Authoring API and protocol/test utility surfaces:
-  `packages/arcade/src/framework-api.ts`,
-  `packages/arcade/test/framework-api.test.ts`,
+  `packages/core/src/framework-api.ts`,
+  `packages/core/test/framework-api.test.ts`,
   `packages/serializer/src/protocol.ts`,
   `packages/serializer/test/protocol.test.ts`,
   `scripts/test-utils/payload.ts`, `scripts/test-utils/payload.test.ts`, and
   `scripts/benchmarks/jsfb-baseline.test.ts`.
-- Curated public surface and build adapters: `packages/arcade/src/index.ts`,
-  `packages/arcade/src/vite.ts`, `packages/arcade/src/rolldown.ts`,
+- Curated public surface and build adapters: `packages/core/src/index.ts`,
+  `packages/core/src/vite.ts`, `packages/core/src/rolldown.ts`,
   `packages/bundler/src/rolldown.ts`, `packages/bundler/src/vite/index.ts`,
   and their package tests.
 
@@ -286,7 +286,7 @@ in the split specs.
   compiler implementation uses JS/TS on `@tsrx/core`, matching the
   production-started status without reopening OXC/native work.
 - Diagnostic examples use implemented stable codes and docs URL shapes such as
-  `ARCADE_CAPTURE_UNSUPPORTED_VALUE` and `https://arcadejs.com/errors/...`
+  `MARKLESS_CAPTURE_UNSUPPORTED_VALUE` and `https://markless.dev/errors/...`
   instead of placeholder diagnostic names or domains.
 - The diagnostics split spec includes the diagnostic phases currently appearing
   in package source/tests: structured compiler artifacts use `semantic-graph`,
@@ -298,7 +298,7 @@ in the split specs.
   failures use `runtime`.
 - The thin internal support packages have focused package tests for current
   narrow surfaces: `core` framework API stubs fail loudly with structured
-  `ARCADE_FRAMEWORK_API_RUNTIME_CALL` metadata when run without the TSRX compiler,
+  `MARKLESS_FRAMEWORK_API_RUNTIME_CALL` metadata when run without the TSRX compiler,
   including the authored `shared(factory, options?)` call shape; `protocol`
   exports the current protocol version and payload TypeScript shapes; and
   `test-utils` provides canonical payload script wrapper assertions, JSON
@@ -307,8 +307,8 @@ in the split specs.
 - The root workspace uses pnpm and vite-plus through `package.json`,
   `pnpm-workspace.yaml`, `pnpm-lock.yaml`, and `vite.config.ts`.
 - The current vite-plus pack configuration emits ESM and declaration outputs for
-  `serializer`, `compiler`, `runtime`, `web`, `rolldown`, `vite`, `arcade`,
-  `arcade/web`, `arcade/runtime` compatibility wrappers, `arcade/vite`, and
+  `serializer`, `compiler`, `runtime`, `web`, `rolldown`, `vite`, `@markless/core`,
+  `@markless/core/web`, `@markless/core/runtime` compatibility wrappers, `@markless/core/vite`, and
   `vitest-browser`.
 - `specs/framework/11-platform-organization.md` records the package naming
   decision for small top-level platform packages: `packages/web`,
@@ -317,13 +317,13 @@ in the split specs.
   the insertion limit was recorded as 500 added lines unless the user approved
   expanding scope. The required grep MCP research checked real-world package and
   adapter patterns for `src/adapters`, subpath exports, `@angular/platform-*`,
-  and `@vue/runtime-*`; that research supported using a small `@arcade/web`
+  and `@vue/runtime-*`; that research supported using a small `@markless/web`
   package boundary instead of top-level `platform-*` or `adapter-*` packages.
 - The web platform split moves DOM render/resume, payload script decoding,
   browser event resume, DOM journal application, and web-focused tests from
   `packages/runtime` into `packages/web`. `packages/runtime` now exposes only
-  the host-agnostic graph entry and graph subpath, while `packages/arcade`
-  exposes curated `arcade/web/*` entries plus existing `arcade/runtime/*`
+  the host-agnostic graph entry and graph subpath, while `packages/core`
+  exposes curated `@markless/core/web/*` entries plus existing `@markless/core/runtime/*`
   compatibility wrappers over the web package.
 
 ### Compiler Boundaries
@@ -386,26 +386,26 @@ in the split specs.
   definition cycles, invalid/duplicate element handle bindings, element handles
   stored in `state()`, and `attach` on components.
 - The current implemented stable diagnostic code inventory is
-  `ARCADE_STATE_MODULE_SCOPE`, `ARCADE_ASYNC_POST_AWAIT_READ`,
-  `ARCADE_ASYNC_BOUNDARY_REQUIRED`, `ARCADE_ELEMENT_HANDLE_REQUIRED`,
-  `ARCADE_ELEMENT_HANDLE_DUPLICATE`, `ARCADE_ATTACH_HOST_ELEMENT_REQUIRED`,
-  `ARCADE_SYNC_POLICY_UNEXTRACTABLE`, `ARCADE_STATE_UNRESOLVED_WRITE`,
-  `ARCADE_STATE_DYNAMIC_PATH_READ`, `ARCADE_STATE_DYNAMIC_PATH_WRITE`,
-  `ARCADE_STATE_OPTIONAL_CHAIN_WRITE`, `ARCADE_STATE_REST_ALIAS_EXCLUDED_PATH`,
-  `ARCADE_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED`,
-  `ARCADE_STATE_ELEMENT_HANDLE_UNSERIALIZABLE`, `ARCADE_STATE_READ_ONLY_WRITE`,
-  `ARCADE_STATE_CONST_REASSIGNMENT`, `ARCADE_SHARED_DEFINITION_CYCLE`,
-  `ARCADE_CAPTURE_UNSUPPORTED_VALUE`, `ARCADE_SERIALIZE_UNSUPPORTED_VALUE`,
-  `ARCADE_SYMBOL_UNKNOWN`, `ARCADE_PAYLOAD_INVALID`,
-  `ARCADE_PROTOCOL_VERSION_MISMATCH`, `ARCADE_RESUME_LOCATOR_MISSING`,
-  `ARCADE_RESUME_LOCATOR_MISMATCH`, `ARCADE_FRAMEWORK_API_RUNTIME_CALL`, and
-  `ARCADE_COMPILER_PASS_GRAPH_INVALID`.
+  `MARKLESS_STATE_MODULE_SCOPE`, `MARKLESS_ASYNC_POST_AWAIT_READ`,
+  `MARKLESS_ASYNC_BOUNDARY_REQUIRED`, `MARKLESS_ELEMENT_HANDLE_REQUIRED`,
+  `MARKLESS_ELEMENT_HANDLE_DUPLICATE`, `MARKLESS_ATTACH_HOST_ELEMENT_REQUIRED`,
+  `MARKLESS_SYNC_POLICY_UNEXTRACTABLE`, `MARKLESS_STATE_UNRESOLVED_WRITE`,
+  `MARKLESS_STATE_DYNAMIC_PATH_READ`, `MARKLESS_STATE_DYNAMIC_PATH_WRITE`,
+  `MARKLESS_STATE_OPTIONAL_CHAIN_WRITE`, `MARKLESS_STATE_REST_ALIAS_EXCLUDED_PATH`,
+  `MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED`,
+  `MARKLESS_STATE_ELEMENT_HANDLE_UNSERIALIZABLE`, `MARKLESS_STATE_READ_ONLY_WRITE`,
+  `MARKLESS_STATE_CONST_REASSIGNMENT`, `MARKLESS_SHARED_DEFINITION_CYCLE`,
+  `MARKLESS_CAPTURE_UNSUPPORTED_VALUE`, `MARKLESS_SERIALIZE_UNSUPPORTED_VALUE`,
+  `MARKLESS_SYMBOL_UNKNOWN`, `MARKLESS_PAYLOAD_INVALID`,
+  `MARKLESS_PROTOCOL_VERSION_MISMATCH`, `MARKLESS_RESUME_LOCATOR_MISSING`,
+  `MARKLESS_RESUME_LOCATOR_MISMATCH`, `MARKLESS_FRAMEWORK_API_RUNTIME_CALL`, and
+  `MARKLESS_COMPILER_PASS_GRAPH_INVALID`.
 - That inventory combines different current mechanisms: compiler passes return
   structured diagnostic objects, the pure serializer returns
-  `ARCADE_SERIALIZE_UNSUPPORTED_VALUE` diagnostics in its result object, the
+  `MARKLESS_SERIALIZE_UNSUPPORTED_VALUE` diagnostics in its result object, the
   protocol-state payload wrapper throws `ProtocolStateSerializationError`
   objects that preserve those diagnostics with cell binding/name context, and the
-  generated symbol resolver attaches `ARCADE_SYMBOL_UNKNOWN` metadata to a thrown
+  generated symbol resolver attaches `MARKLESS_SYMBOL_UNKNOWN` metadata to a thrown
   `Error` for unknown symbol IDs. Runtime payload helpers throw
   `RuntimePayloadError` objects with stable code, phase, docs URL, payload type,
   payload script selector, suggestions, and expected/actual version metadata for
@@ -434,7 +434,7 @@ in the split specs.
   node records and `attach` diagnostics.
 - Semantic graph sync-policy extraction records selected graph-state/event-field
   guard policies for synchronous `preventDefault()` / `stopPropagation()`
-  actions and reports `ARCADE_SYNC_POLICY_UNEXTRACTABLE` when a browser-critical
+  actions and reports `MARKLESS_SYNC_POLICY_UNEXTRACTABLE` when a browser-critical
   action cannot be represented in the current policy IR. Current policy
   condition variants cover graph truthiness, event-field equality,
   serializable constant truthiness for literals, static object/array reads, and
@@ -453,7 +453,7 @@ in the split specs.
 ### Capture Analysis
 
 - Semantic graph collection records local function values in `localBindings`.
-- `capture-analysis` reports `ARCADE_CAPTURE_UNSUPPORTED_VALUE` when a lazy symbol
+- `capture-analysis` reports `MARKLESS_CAPTURE_UNSUPPORTED_VALUE` when a lazy symbol
   captures a local function value.
 - Semantic graph collection propagates unsupported local binding kinds through
   simple aliases, so `capture-analysis` reports the alias name when a lazy
@@ -461,10 +461,10 @@ in the split specs.
 - Semantic graph collection records local class instance values and local DOM
   node values from document lookups or document-created elements in
   `localBindings`; `capture-analysis` reports
-  `ARCADE_CAPTURE_UNSUPPORTED_VALUE` for those captures.
+  `MARKLESS_CAPTURE_UNSUPPORTED_VALUE` for those captures.
 - Semantic graph collection records local object/array constants containing
   functions, class instances, or DOM nodes as non-serializable constants, and
-  `capture-analysis` reports `ARCADE_CAPTURE_UNSUPPORTED_VALUE` when lazy symbols
+  `capture-analysis` reports `MARKLESS_CAPTURE_UNSUPPORTED_VALUE` when lazy symbols
   capture them.
 - Semantic graph collection source allow-lists spec-listed serializable built-in
   constructors such as `Date`, `RegExp`, `Map`, `Set`, `URL`, `ArrayBuffer`, and
@@ -509,7 +509,7 @@ in the split specs.
   component parameter becomes a synthetic read-only prop binding
   (`prop:<name>` for identifier parameters or `prop:props` plus aliases for
   object patterns), prop aliases lower to that binding, and writes to props
-  report `ARCADE_STATE_READ_ONLY_WRITE`.
+  report `MARKLESS_STATE_READ_ONLY_WRITE`.
 - State lowering read-only diagnostics use binding-kind-specific explanations,
   so prop writes point at parent graph ownership instead of reusing
   computed-specific guidance.
@@ -517,13 +517,13 @@ in the split specs.
   prefix/postfix metadata for `++x`, `x++`, `--x`, and `x--` style graph writes,
   and state lowering preserves that metadata for later final emit to keep
   JavaScript expression value semantics intact.
-- State lowering reports `ARCADE_STATE_DYNAMIC_PATH_WRITE` when a write targets a
+- State lowering reports `MARKLESS_STATE_DYNAMIC_PATH_WRITE` when a write targets a
   known graph root through a non-static bracket path such as `items[index]`,
   keeping unsupported lvalue forms distinct from fully unresolved writes.
-- State lowering reports `ARCADE_STATE_DYNAMIC_PATH_READ` when a read targets a
+- State lowering reports `MARKLESS_STATE_DYNAMIC_PATH_READ` when a read targets a
   known graph root through a non-static bracket path, preventing dynamic graph
   subscriptions from silently disappearing.
-- State lowering reports `ARCADE_STATE_REST_ALIAS_EXCLUDED_PATH` when a write targets
+- State lowering reports `MARKLESS_STATE_REST_ALIAS_EXCLUDED_PATH` when a write targets
   a property path that object-rest destructuring explicitly excluded from the
   alias, keeping rest-alias mistakes distinct from generic unresolved writes.
 - Semantic graph expression collection recognizes mutating collection calls such
@@ -535,7 +535,7 @@ in the split specs.
   calls remain read artifacts for later dynamic-path diagnostics.
 - Semantic graph expression collection marks optional collection calls such as
   `items?.push(nextItem)` and optional deletes such as `delete menu?.open`; state
-  lowering reports `ARCADE_STATE_OPTIONAL_CHAIN_WRITE` instead of emitting graph
+  lowering reports `MARKLESS_STATE_OPTIONAL_CHAIN_WRITE` instead of emitting graph
   writes whose artifacts could not preserve optional-chain short-circuit
   semantics.
 - Semantic graph expression collection records static object-property
@@ -549,7 +549,7 @@ in the split specs.
   start/end DOM-order comment anchor locators, keeping boundary wiring as view
   metadata rather than render-output or VDOM state.
 - Payload arena planning records the async-capable computed reads protected by
-  each async boundary, so `arcade/view` can connect boundary anchors to demanded
+  each async boundary, so `markless/view` can connect boundary anchors to demanded
   graph data without re-walking TSRX source.
 - Payload arena planning records shared-definition state metadata with definition
   IDs, exported names, literal scopes, dependency edges, graph-backed return
@@ -569,7 +569,7 @@ in the split specs.
   the lazy symbol journal object slice.
 - Payload arena and protocol view planning carry element handle locator records,
   host behavior records with behavior function/input source metadata, and
-  behavior symbol IDs into the current `arcade/view` payload shape. Behavior
+  behavior symbol IDs into the current `markless/view` payload shape. Behavior
   records now include `inputValues` when every input can be materialized from a
   simple literal or static `state()` initial-value graph path without running
   authored behavior code, plus `inputGraphReads` rows for graph-backed state or
@@ -670,7 +670,7 @@ in the split specs.
   async-runner modules; those modules materialize static dependency roots from
   `context.graph.read` / `context.read`, preserve the authored source string, and
   call the async function with `{ key, signal, read }`, while protocol
-  `arcade/state` keeps only serializable computed identity. Broader nonliteral
+  `markless/state` keeps only serializable computed identity. Broader nonliteral
   assignment, bare local/non-imported named behavior, and nonliteral argument-bearing
   collection-call source-to-module extraction are not implemented yet. The
   Rolldown/Vite adapter path can now derive compact resolver table rows for
@@ -682,11 +682,11 @@ in the split specs.
   payload, manifest, and current generated symbol virtual modules, plus finalized
   `{ symbolId, exportName, virtualModuleId, fileName }` rows for generated
   symbols when their virtual modules appear in bundle output; the same full
-  metadata is emitted as `arcade-manifest.json` only when `emitManifestJson` is
+  metadata is emitted as `markless-manifest.json` only when `emitManifestJson` is
   explicitly enabled.
   The emitted public module manifests omit the internal pre-build symbol rows
   used to derive those finalized rows. The client bundle hook now rewrites
-  generated resolver table module URLs from `virtual:arcade:symbol:*` IDs to
+  generated resolver table module URLs from `virtual:markless:symbol:*` IDs to
   final relative chunk specifiers, fails closed if a table symbol cannot be
   mapped, and compacts duplicate final URLs after generated facade cleanup. The
   generated resolver loader source is constant-size over the table data and uses
@@ -695,7 +695,7 @@ in the split specs.
   caller-supplied symbol tables rather than real build output for all symbol
   kinds.
 - Symbol resolver module emission fails closed for unknown symbol IDs with
-  `ARCADE_SYMBOL_UNKNOWN`, `resume` phase, the missing `symbolId`, and a stable docs
+  `MARKLESS_SYMBOL_UNKNOWN`, `resume` phase, the missing `symbolId`, and a stable docs
   URL on the thrown error object.
 - Symbol resolver module emission now exports a compact tuple-style symbol table
   with protocol version, optional build/resolver identity, module URL table,
@@ -707,9 +707,9 @@ in the split specs.
   async work through the symbol resolver.
 - Protocol state planning now includes serializable async computed dependency
   graph paths and async computed snapshot records while still omitting authored
-  async runner source from `arcade/state`.
+  async runner source from `markless/state`.
 - Protocol state planning now carries shared-definition metadata from the payload
-  arena into `arcade/state` with version counters initialized to `0` and protocol
+  arena into `markless/state` with version counters initialized to `0` and protocol
   return-property records stripped of source spans. Runtime payload validation
   accepts and checks those shared-definition records when present. Runtime graph
   creation from decoded state payloads now retains those shared-definition
@@ -723,7 +723,7 @@ in the split specs.
   shared return-property paths without re-emitting them, and the resume runtime
   installs a private shared-patch listener for containers with shared
   definitions.
-- Payload script planning emits canonical JSON `arcade/state` and `arcade/view`
+- Payload script planning emits canonical JSON `markless/state` and `markless/view`
   data scripts and concatenates them into the current render-shell artifact.
   This is not the compact private arena encoding from the payload spec.
 
@@ -848,16 +848,16 @@ in the split specs.
   wires declared policy triggers to `activateBehaviors`, serializes
   computed/opaque/dynamic behavior input values, or proves behavior input reruns
   against real browser DOM removal/timing.
-- The resume runtime materializes `arcade/view` async boundary records by
+- The resume runtime materializes `markless/view` async boundary records by
   recursively walking fake-DOM comment nodes, matching raw DOM-order comment
   indexes, and exposing the boundary-side table for later async
   demand/revalidation work.
 - The payload-driven resume path now creates lazy async computed runtime graph
-  nodes from `arcade/state` dependency metadata plus `arcade/view` runner symbol
+  nodes from `markless/state` dependency metadata plus `markless/view` runner symbol
   IDs. Startup still imports no app symbols; the async runner symbol is imported
   only when the computed is demanded, receives `{ key, signal, read }` in its
   symbol context, and its return value commits as graph data rather than a DOM
-  journal entry. Fulfilled async computed snapshots in `arcade/state` seed the
+  journal entry. Fulfilled async computed snapshots in `markless/state` seed the
   runtime graph before revalidation, avoid an initial runner import/refetch, and
   revalidate through the runner only after the dependency key changes. Pending
   async computed snapshots seed the runtime graph without a startup import, then
@@ -865,8 +865,8 @@ in the split specs.
   request version. The resume runtime no longer treats async computed runner
   symbols as async-boundary DOM update symbols; boundary snapshot changes produce
   structural range journal entries instead.
-- Runtime payload helpers parse caller-supplied JSON `arcade/state` and
-  `arcade/view` script strings by exact wrapper match plus `JSON.parse`, check
+- Runtime payload helpers parse caller-supplied JSON `markless/state` and
+  `markless/view` script strings by exact wrapper match plus `JSON.parse`, check
   the required top-level state/view payload fields, including the state
   `computed` array, and shared protocol version,
   validate serialized graph value envelopes in state cell values and async
@@ -878,19 +878,19 @@ in the split specs.
   non-negative integers,
   deserialize serialized state cell values into runtime graph cells, and return
   decoded view records.
-- Runtime payload helpers can also read canonical `arcade/state` and `arcade/view`
+- Runtime payload helpers can also read canonical `markless/state` and `markless/view`
   script text from a document-like `querySelector` host, then reuse the same
   script decoder and payload-driven resume path.
 - Payload wrapper, JSON, structural shape, document lookup, and protocol-version
   failures now throw `RuntimePayloadError` instances. Focused runtime tests
-  assert `ARCADE_PAYLOAD_INVALID` metadata for payload-script wrapper failures and
-  `ARCADE_PROTOCOL_VERSION_MISMATCH` metadata with expected/actual versions for
+  assert `MARKLESS_PAYLOAD_INVALID` metadata for payload-script wrapper failures and
+  `MARKLESS_PROTOCOL_VERSION_MISMATCH` metadata with expected/actual versions for
   protocol mismatches. These errors do not yet include build/resolver hash
   mismatch metadata beyond the protocol version.
 - The runtime exposes a payload-driven resume helper that decodes caller-supplied
   payload script strings, creates the runtime graph from serialized
-  `arcade/state` cell values and lazy async computed dependency records,
-  materializes the `arcade/view` resume runtime, and starts delegated event wiring
+  `markless/state` cell values and lazy async computed dependency records,
+  materializes the `markless/view` resume runtime, and starts delegated event wiring
   plus locator/behavior/async-boundary side tables against a caller-supplied
   DOM-like root. A companion helper now reads the payload scripts from a
   document-like `querySelector` host before taking the same resume path; this
@@ -912,7 +912,7 @@ in the split specs.
 - The POC resumer fixture under `poc/fixtures/proofs/resumer-script` proves a
   deliberately tiny event-only bootstrap shape outside the production package
   pipeline. Its current measured source is 679 B raw, 465 B minified, and 346 B
-  gzip. It uses a compact `arcade/view` table of event names, event rows, module
+  gzip. It uses a compact `markless/view` table of event names, event rows, module
   specifiers, and export names, executes no app symbol before interaction, and
   imports the click symbol only after a real browser click in the Witness box.
   This is size and behavior evidence for the production target; it is not yet the
@@ -941,7 +941,7 @@ in the split specs.
   payload, resolver, manifest, and current generated event-handler/DOM-update
   symbol virtual modules while recording their emitted chunk filenames plus
   finalized generated-symbol manifest rows; default builds emit
-  `build/bundle-graph.json` but not `arcade-manifest.json`, and the generated
+  `build/bundle-graph.json` but not `markless-manifest.json`, and the generated
   resolver's compact exported symbol table uses final relative chunk specifiers
   for the current generated symbol chunks and no longer emits an app-sized
   `switch (id)` loader.
@@ -964,14 +964,14 @@ in the split specs.
   environment outcome records `hmr: 'full-reload'`; browser boxes cover CSR
   single-edit reload and SSR repeated edits; and one runs a production Vite build, proving
   the emitted CSR bundle graph, generated chunks, absent default
-  `arcade-manifest.json`, and absence of dev-HMR strings in production
+  `markless-manifest.json`, and absence of dev-HMR strings in production
   artifacts. A fourth package-local box serves that CSR
   production build through Vite preview and proves client-created DOM can load
   the generated payload/resolver/symbol pipeline for a counter click without
   console errors or failed requests. A fifth package-local box builds the
   `vite-ssr` fixture, proves the build emits both `client` and `ssr`
   environments, and asserts the built server entry contains the counter DOM plus
-  `arcade/state` and `arcade/view` payload scripts. A sixth package-local box
+  `markless/state` and `markless/view` payload scripts. A sixth package-local box
   imports that built server entry, writes its generated HTML into the preview
   index for the box run, serves the built client chunks through Vite preview,
   and proves the browser entry resumes existing server-produced DOM for the same
@@ -1135,7 +1135,7 @@ Historical focused implementation receipts retained for context:
   `pnpm exec vp test packages/bundler/test/package-metadata.test.ts`,
   `pnpm exec vp test packages/web/test/*.test.ts`,
   `pnpm exec vp test packages/runtime/test/*.test.ts`,
-  `pnpm exec vp test packages/arcade/test/*.test.ts`,
+  `pnpm exec vp test packages/core/test/*.test.ts`,
   `pnpm exec vp test packages/vitest-browser/test/*.test.ts`,
   `pnpm exec vp test`,
   `pnpm exec vp check <touched platform split files>`, `git diff --check`, and
@@ -1143,10 +1143,10 @@ Historical focused implementation receipts retained for context:
   `vp pack` completed with existing third-party `@tsrx/core` declaration
   warnings.
 - Platform guardrail scans:
-  `rg -n "@arcade/runtime/(render|render-to-string|resume|dom-journal|dom-update|event-only-resume|event-resume)|arcade/runtime/(render|render-to-string|resume|dom-journal|dom-update|event-only-resume|event-resume)|packages/runtime/src/(render|render-to-string|payload|resume|dom-|event-)" packages demos vite.config.ts`
+  `rg -n "@markless/runtime/(render|render-to-string|resume|dom-journal|dom-update|event-only-resume|event-resume)|markless/runtime/(render|render-to-string|resume|dom-journal|dom-update|event-only-resume|event-resume)|packages/runtime/src/(render|render-to-string|payload|resume|dom-|event-)" packages demos vite.config.ts`
   and
-  `rg -n "packages/(platform|adapter)-|@arcade/(platform|adapter)-|platform-web|platform-mobile|platform-desktop|adapter-mobile|adapter-desktop" packages specs demos vite.config.ts package.json pnpm-workspace.yaml`;
-  the only remaining runtime-web hits are intentional `arcade/runtime/*`
+  `rg -n "packages/(platform|adapter)-|@markless/(platform|adapter)-|platform-web|platform-mobile|platform-desktop|adapter-mobile|adapter-desktop" packages specs demos vite.config.ts package.json pnpm-workspace.yaml`;
+  the only remaining runtime-web hits are intentional `@markless/core/runtime/*`
   compatibility wrapper pack entries, and the only `platform-*`/`adapter-*`
   hits are the spec prohibition plus retired-package inventory tests.
 - `pnpm exec vp test packages/compiler/test/symbol-modules.test.ts packages/compiler/test/compile-module.test.ts`
@@ -1273,11 +1273,11 @@ as evidence for a new source change.
 - `pnpm exec vp test packages/vitest-browser/test/render.test.ts`
 - `pnpm exec vp test packages/runtime/test/resume.test.ts packages/runtime/test/payload-scripts.test.ts packages/runtime/test/behaviors.test.ts packages/runtime/test/dom-updates.test.ts`
 - `pnpm exec vp test packages/serializer/test/serializer.test.ts`
-- `pnpm exec vp test packages/arcade/test/public-surface.test.ts packages/bundler/test/rolldown.test.ts packages/bundler/test/vite.test.ts`
+- `pnpm exec vp test packages/core/test/public-surface.test.ts packages/bundler/test/rolldown.test.ts packages/bundler/test/vite.test.ts`
 - `pnpm exec vp test packages/core/test/framework-api.test.ts packages/protocol/test/protocol.test.ts packages/test-utils/test/payload-helpers.test.ts`
 - `pnpm exec vp test packages/bundler/test/vite.test.ts`
-- `pnpm exec vp test packages/bundler/test/rolldown.test.ts packages/bundler/test/vite.test.ts packages/arcade/test/public-surface.test.ts`
-- `pnpm exec vp test packages/compiler/test/symbol-resolver.test.ts packages/compiler/test/symbol-modules.test.ts packages/compiler/test/compile-module.test.ts packages/bundler/test/*.test.ts packages/arcade/test/public-surface.test.ts`
+- `pnpm exec vp test packages/bundler/test/rolldown.test.ts packages/bundler/test/vite.test.ts packages/core/test/public-surface.test.ts`
+- `pnpm exec vp test packages/compiler/test/symbol-resolver.test.ts packages/compiler/test/symbol-modules.test.ts packages/compiler/test/compile-module.test.ts packages/bundler/test/*.test.ts packages/core/test/public-surface.test.ts`
 - `pnpm exec vp test packages/compiler/test/semantic-graph.test.ts`
 - `pnpm exec vp test packages/core/test/framework-api.test.ts packages/compiler/test/semantic-graph.test.ts packages/compiler/test/state-lowering.test.ts packages/compiler/test/state-lowering-delete.test.ts packages/compiler/test/state-lowering-update.test.ts`
 - `pnpm exec vp test packages/compiler/test/*.test.ts packages/core/test/framework-api.test.ts`
@@ -1322,26 +1322,26 @@ as evidence for a new source change.
 - `(from packages/bundler) pnpm exec witness "csr preview: built app loads through vite preview" --json`
 - `(from packages/bundler) pnpm exec witness "ssr build: Rolldown server entry renders payload shell" --json`
 - `(from packages/bundler) pnpm exec witness "ssr preview: built server entry shell resumes counter click" --json`
-- `(from packages/bundler) pnpm exec witness "vite-plus preview: built app loads arcade output" --json`
+- `(from packages/bundler) pnpm exec witness "vite-plus preview: built app loads markless output" --json`
 - `(from packages/bundler) pnpm exec witness --json` (latest receipt:
   `packages/bundler/.witness/receipts/2026-06-16T00-37-49.165Z/receipt.json`)
-- `pnpm exec vp test packages/bundler/test/*.test.ts packages/arcade/test/public-surface.test.ts`
+- `pnpm exec vp test packages/bundler/test/*.test.ts packages/core/test/public-surface.test.ts`
 - `pnpm exec vp test packages/bundler/test/fixture-builds.test.ts`
-- `(from repo root) pnpm --filter @arcade/bundler exec witness run ssr-preview --mode preview`
+- `(from repo root) pnpm --filter @markless/bundler exec witness run ssr-preview --mode preview`
   (receipt:
   `packages/bundler/.witness/receipts/2026-06-16T16-19-07.583Z/receipt.json`;
   records startup script requests `(none)`, post-click requested lazy chunks,
   largest runtime-heavy post-click chunk at 43,623 raw / 12,500 gzip
   bytes, and all post-click async scripts at 45,658 raw / 13,486 gzip bytes)
-- `pnpm exec vp test packages/runtime/test/event-resume.test.ts packages/runtime/test/module-split.test.ts packages/arcade/test/public-surface.test.ts packages/bundler/test/fixture-boundaries.test.ts`
+- `pnpm exec vp test packages/runtime/test/event-resume.test.ts packages/runtime/test/module-split.test.ts packages/core/test/public-surface.test.ts packages/bundler/test/fixture-boundaries.test.ts`
 - `pnpm exec vp test packages/bundler/test/fixture-builds.test.ts`
-- `(from repo root) pnpm --filter @arcade/bundler exec witness run ssr-preview --mode preview`
+- `(from repo root) pnpm --filter @markless/bundler exec witness run ssr-preview --mode preview`
   (receipt:
   `packages/bundler/.witness/receipts/2026-06-16T16-31-44.234Z/receipt.json`;
   records startup script requests `(none)`, post-click requested lazy chunks,
   largest runtime-heavy post-click chunk at 8,258 raw / 3,154 gzip
   bytes, and all post-click async scripts at 10,293 raw / 4,140 gzip bytes)
-- `pnpm exec vp pack`; focused compiler/bundler/runtime/arcade tests; local js-framework-benchmark quick comparisons against `vanillajs-keyed` and `vanillajs-3-keyed`; `npm run rebuild-ci -- keyed/arcade` passed smoke, memory, size, keyed, and CSP checks
+- `pnpm exec vp pack`; focused compiler/bundler/runtime/markless tests; local js-framework-benchmark quick comparisons against `vanillajs-keyed` and `vanillajs-3-keyed`; `npm run rebuild-ci -- keyed/markless` passed smoke, memory, size, keyed, and CSP checks
 
 Current spec/ledger-maintenance receipts:
 
@@ -1374,10 +1374,10 @@ commands are listed in the implementation/build section above.
   Node-only APIs, hydration/VDOM/client-rerender paths, `packages/server`, and
   TSX/JSX references; hits were expected non-goal/contrast text or local
   implementation identifiers such as DOM node variables and `ArrayBuffer`.
-- diagnostic code scan compared implemented `ARCADE_*` diagnostics against the
+- diagnostic code scan compared implemented `MARKLESS_*` diagnostics against the
   diagnostics split spec and replaced placeholder example code/domain text with
   implemented stable diagnostic shapes.
-- diagnostic inventory audit confirmed 27 implemented `ARCADE_*` codes across
+- diagnostic inventory audit confirmed 27 implemented `MARKLESS_*` codes across
   semantic graph, state lowering, capture analysis, serializer unsupported-value,
   generated unknown-symbol resolver paths, and runtime payload decode/version
   paths, resume locator paths, direct framework API runtime-call paths, and compiler
@@ -1389,7 +1389,7 @@ commands are listed in the implementation/build section above.
   payload/resume errors, framework API runtime errors, and compiler
   pass-graph validation errors.
 - diagnostic-docs audit confirmed current package source and tests use hard-coded
-  `https://arcadejs.com/errors/...` URL shapes, while the repo currently has
+  `https://markless.dev/errors/...` URL shapes, while the repo currently has
   no docs, site, route, or error-page artifact for those URLs. Current evidence
   proves URL shape only, not published documentation.
 - semantic-collector audit confirmed current semantic graph coverage is
@@ -1507,11 +1507,11 @@ commands are listed in the implementation/build section above.
   small Node fake-DOM fixtures.
 - payload-script audit confirmed `renderPayloadScripts` serializes the current
   protocol state/view objects with `JSON.stringify`, escapes `<` inside the JSON,
-  and wraps the results in canonical `arcade/state` / `arcade/view` script tags.
+  and wraps the results in canonical `markless/state` / `markless/view` script tags.
   It does not implement compact typed tables, compression, streaming, or private
   production arena encoding.
 - payload-script wrapper audit confirmed serializer tests assert both opening
-  and closing `arcade/state` / `arcade/view` tags, and the runtime parser requires
+  and closing `markless/state` / `markless/view` tags, and the runtime parser requires
   the exact prefix and suffix before `JSON.parse`. The separate test-utils
   helper now also requires the exact prefix/suffix, parses canonical payload
   script JSON, can summarize decoded payload scripts for fixture assertions, and
@@ -1538,7 +1538,7 @@ commands are listed in the implementation/build section above.
   framework API runtime failures plus compiler pass-graph validation
   failures now expose structured metadata.
 - runtime payload-resume audit confirmed `resumeFromPayloadScripts` composes
-  payload decoding, runtime graph creation, `arcade/view` materialization, and
+  payload decoding, runtime graph creation, `markless/view` materialization, and
   delegated event/boundary startup for caller-supplied payload strings and a
   DOM-like root. It now also proves an async computed runner symbol is not loaded
   during startup, is loaded only when the async computed is demanded from the
@@ -1552,12 +1552,12 @@ commands are listed in the implementation/build section above.
   snapshots, including async reads with value paths such as `details.title`.
   `decodePayloadScriptsFromDocument` and
   `resumeFromPayloadDocument` add structural document-like `querySelector`
-  coverage for locating canonical `arcade/state` / `arcade/view` script contents.
+  coverage for locating canonical `markless/state` / `markless/view` script contents.
   They do not prove real DOM/browser startup behavior.
 - locator-materialization audit confirmed current runtime source uses recursive
   `childNodes` walks over fake element/comment nodes, filters element locators by
-  case-insensitive tag name, and reports structured `ARCADE_RESUME_LOCATOR_MISSING`
-  / `ARCADE_RESUME_LOCATOR_MISMATCH` errors for missing DOM-order element locators,
+  case-insensitive tag name, and reports structured `MARKLESS_RESUME_LOCATOR_MISSING`
+  / `MARKLESS_RESUME_LOCATOR_MISMATCH` errors for missing DOM-order element locators,
   tag-mismatched element locators, and missing async boundary comment anchors.
   It does not use a browser-native `TreeWalker`, skip static runs,
   ignored/nested-region metadata, or branch/list anchor streams.
@@ -1584,8 +1584,8 @@ commands are listed in the implementation/build section above.
   vite-plus Node test include, `packages/*/test/**/*.test.ts`.
 - package-manifest audit confirmed the current framework package manifests are
   `private`, export source entry points under `./src/...`, and are not wired to
-  generated `dist/` artifacts. Retired `packages/core`, `packages/protocol`,
-  and `packages/test-utils` manifests are absent.
+  generated `dist/` artifacts. `packages/core` is the public authoring package;
+  retired `packages/protocol` and `packages/test-utils` manifests are absent.
 - workspace/build-config audit confirmed root scripts are thin vite-plus aliases,
   `pnpm-workspace.yaml` uses `packages/*`, package fixture globs, and
   `demos/*` as workspace package globs while keeping shared dependency versions
@@ -1604,7 +1604,7 @@ commands are listed in the implementation/build section above.
 - final-emission audit confirmed current compiler/adapter output stops at
   artifact orchestration, payload script rendering, generated resolver strings,
   and Rolldown virtual module metadata. `transformTsrxModule` emits an
-  `__arcade_module` export plus resolver, payload, current
+  `__markless_module` export plus resolver, payload, current
   event-handler-symbol, DOM-update-symbol, and manifest virtual module IDs; it
   now statically imports the generated resolver/payload/manifest virtual modules
   so a Vite library build loads them, and the generated resolver can pull the
@@ -1634,7 +1634,7 @@ commands are listed in the implementation/build section above.
   a transform manifest object, and exposes accumulated transform manifests plus
   any bundle-exposed generated virtual-module output filenames through the
   in-memory manifest hook; `generateBundle` emits `build/bundle-graph.json` by
-  default and emits `arcade-manifest.json` only when `emitManifestJson` is
+  default and emits `markless-manifest.json` only when `emitManifestJson` is
   explicitly enabled. For current generated event-handler and DOM-update symbols,
   it also records finalized symbol rows when the symbol's virtual module has an
   emitted file name, while the emitted public module manifests omit the internal
@@ -1651,7 +1651,7 @@ commands are listed in the implementation/build section above.
   wrapped with `/@vite/client` so SSR pages keep receiving reloads after the
   first navigation. One direct Rolldown build fixture and one
   temporary Vite library build fixture now prove real builds write the bundle
-  graph by default, omit default `arcade-manifest.json`, include generated
+  graph by default, omit default `markless-manifest.json`, include generated
   payload/resolver/current event-handler and DOM-update symbol code, record
   emitted file names plus finalized symbol rows for those generated virtual
   modules, rewrite the compact resolver table to use those generated symbols'
@@ -1662,7 +1662,7 @@ commands are listed in the implementation/build section above.
   emission in focused tests.
   Package-local Witness boxes now prove Vite dev full-reload fallback, real
   browser navigation after a CSR `.tsrx` edit and repeated SSR `.tsrx` edits, and a CSR production build with bundle-graph artifacts, no default
-  `arcade-manifest.json`, plus no dev-HMR string leakage. The same CSR production build is now served
+  `markless-manifest.json`, plus no dev-HMR string leakage. The same CSR production build is now served
   through Vite preview and proves client-created DOM can load the generated
   payload/resolver/symbol pipeline for a counter click with no console errors or
   failed requests. A Vite SSR fixture now builds a server entry that contains
@@ -1675,7 +1675,7 @@ commands are listed in the implementation/build section above.
   harness, behavior/async-runner chunks, broader event-handler write chunks
   beyond simple updates, or full resolver table rewriting coverage beyond the
   current generated build fixture paths.
-- public-surface source/test audit confirmed `packages/arcade` owns framework
+- public-surface source/test audit confirmed `packages/core` owns framework
   APIs directly, re-exports `resumeFromPayloadScripts`, the Rolldown adapter,
   and its `./vite` adapter subpath through private source-entry package
   manifests; current tests import those source entries directly rather than
@@ -1690,7 +1690,7 @@ commands are listed in the implementation/build section above.
   packages, protocol migration/version negotiation, browser helpers, or witness
   integration helpers.
 - shared-state audit confirms current `shared()` support covers the
-  `arcade` framework API stub, the authored
+  `@markless/core` framework API stub, the authored
   `shared(factory, options?)` call shape, the main package re-export,
   public-surface presence checks, diagnostic suggestion text, and semantic graph
   records for same-module exported shared definitions plus component-local
@@ -1838,7 +1838,7 @@ commands are listed in the implementation/build section above.
   pure value built-ins, identity/cycles, typed-array backing-buffer identity and
   offsets, `DataView` backing-buffer identity and offsets, direct
   `serializeGraphValue` unsupported-function diagnostics, successful protocol
-  state payload construction, and canonical `arcade/state` / `arcade/view` script
+  state payload construction, and canonical `markless/state` / `markless/view` script
   wrappers. Source has encode/decode branches for the current typed-array
   family, while focused tests directly exercise `Uint8Array`, `Int16Array`, and
   `Uint16Array`.
@@ -1846,7 +1846,7 @@ commands are listed in the implementation/build section above.
   each payload arena state cell's matching semantic graph binding and passes the
   binding's syntax-evaluated `initialValue` into
   `createProtocolStatePayload`. The serializer wrapper now converts
-  `ARCADE_SERIALIZE_UNSUPPORTED_VALUE` results into `ProtocolStateSerializationError`
+  `MARKLESS_SERIALIZE_UNSUPPORTED_VALUE` results into `ProtocolStateSerializationError`
   objects that preserve the serializer diagnostic fields plus `graphNodeId` and
   `cellName`, so protocol-state construction failures keep structured diagnostic
   metadata.
@@ -1855,7 +1855,7 @@ commands are listed in the implementation/build section above.
   `evaluateInitialStateValue` reduces literals, object/array expressions, and
   simple unary expressions. Other initializer forms currently become
   `undefined` before protocol-state serialization; no focused test exercises a
-  dynamic initializer flowing into `arcade/state`.
+  dynamic initializer flowing into `markless/state`.
 - typed-array table audit confirmed the serializer source recognizes
   `Int8Array`, `Uint8Array`, `Uint8ClampedArray`, `Int16Array`, `Uint16Array`,
   `Int32Array`, `Uint32Array`, `Float32Array`, `Float64Array`, and guarded
@@ -1872,7 +1872,7 @@ commands are listed in the implementation/build section above.
 - diagnostic-inventory audit confirmed the implemented stable code list in this
   ledger matches package source for compiler, serializer, and generated resolver
   diagnostics; it also confirmed `sync-policy` is an implemented/tested
-  diagnostic phase through `ARCADE_SYNC_POLICY_UNEXTRACTABLE`.
+  diagnostic phase through `MARKLESS_SYNC_POLICY_UNEXTRACTABLE`.
 - completion-scope wording audit confirmed status entries now distinguish
   spec/tooling evidence from implementation evidence and still keep product-level
   render/resume completion explicitly unproven.
@@ -1894,7 +1894,7 @@ commands are listed in the implementation/build section above.
   payload-resume decoding as a resumed-runtime slice, not proof of the
   initial-render -> payload -> browser-resume pipeline.
 - The current payload-driven resume helper can take explicit payload script
-  strings or locate `arcade/state` / `arcade/view` scripts through a structural
+  strings or locate `markless/state` / `markless/view` scripts through a structural
   document-like `querySelector` host. It is not yet a browser bootstrap that
   proves startup in a real browser document.
 - Current payload/symbol tests prove simple DOM-order element locators against
@@ -1931,7 +1931,7 @@ commands are listed in the implementation/build section above.
   cleanup of graph state, events, DOM updates, async work, and behaviors owned by
   removed control-flow ranges.
 - Current sync-event-policy tests prove selected compiler IR extraction,
-  `ARCADE_SYNC_POLICY_UNEXTRACTABLE` object shape for one unsupported guard, and
+  `MARKLESS_SYNC_POLICY_UNEXTRACTABLE` object shape for one unsupported guard, and
   runtime execution before lazy symbol dispatch against fake DOM events. They
   also prove handler arrays preserve multiple sync-policy branches and the resume
   runtime evaluates those branches independently before lazy symbol loading.
@@ -2130,13 +2130,13 @@ commands are listed in the implementation/build section above.
   instance calls with stable source/export definition IDs, and literal scope
   options. It also proves
   same-module shared definition dependencies and a structured
-  `ARCADE_SHARED_DEFINITION_CYCLE` diagnostic for direct shared dependency cycles,
+  `MARKLESS_SHARED_DEFINITION_CYCLE` diagnostic for direct shared dependency cycles,
   and shared factory state/computed bindings whose reads and writes lower
   through shared-scoped graph IDs. It also proves graph-backed shared factory
   return properties and component shared-instance property reads/writes lowering
   through those return properties, including dynamic-path diagnostics for
   shared-instance property access, plus shared-definition metadata in the payload
-  arena and `arcade/state` protocol payload. Runtime graph creation from decoded
+  arena and `markless/state` protocol payload. Runtime graph creation from decoded
   state payloads retains shared-definition records and reads graph-backed shared
   return properties through owned graph cells; runtime graph writes can also
   target those graph-backed shared return properties, increment the retained
@@ -2159,7 +2159,7 @@ commands are listed in the implementation/build section above.
   `serializeGraphValue`, structured diagnostic propagation through
   protocol-state wrapping, successful protocol-state wrapping, and canonical
   payload script tags. Compiler coverage proves literal and object `state()`
-  initial values reaching `arcade/state` through `compileTsrxModule`. They do not
+  initial values reaching `markless/state` through `compileTsrxModule`. They do not
   prove dynamic or opaque `state()` initializer values, exhaustive typed-array
   class coverage, app-owned or third-party value class restoration, framework
   graph reference serialization, shared or async snapshot integration,
@@ -2167,7 +2167,7 @@ commands are listed in the implementation/build section above.
   component-body execution, secret-leak/resource diagnostics, compact production
   wire encoding, or integration with a real initial-render payload.
 - Current core/protocol/test-utils tests prove the framework API runtime failure
-  path and `ARCADE_FRAMEWORK_API_RUNTIME_CALL` metadata, protocol version sharing
+  path and `MARKLESS_FRAMEWORK_API_RUNTIME_CALL` metadata, protocol version sharing
   across empty state/view payloads, canonical payload script wrapper checks
   including the closing tag, payload script JSON decoding, and selected
   protocol record counting for cells, computed entries, locators, events,
@@ -2214,7 +2214,7 @@ commands are listed in the implementation/build section above.
   current event-handler and DOM-update symbol virtual modules, direct Vite wrapper hook
   forwarding for transform, resolveId, load, and generateBundle, and one
   direct Rolldown build fixture and one fixture-backed Vite library build that
-  write the bundle graph by default, omit default `arcade-manifest.json`, load
+  write the bundle graph by default, omit default `markless-manifest.json`, load
   generated payload/resolver/current event-handler and DOM-update symbol virtual
   modules, and record their emitted chunk filenames plus finalized
   generated-symbol rows without leaking internal pre-build symbol rows in the
@@ -2237,7 +2237,7 @@ commands are listed in the implementation/build section above.
   Vite `full-reload` fallback in the client environment's edit outcomes, prove
   the CSR browser reloads once and the SSR browser keeps reloading across
   repeated edits, and prove the CSR production build emits the bundle graph and lazy
-  chunks, omits default `arcade-manifest.json`, and forbids dev-HMR client
+  chunks, omits default `markless-manifest.json`, and forbids dev-HMR client
   strings in emitted text artifacts. The CSR production build is also served by Vite
   preview and proves client-created DOM can load the generated
   payload/resolver/symbol pipeline for a counter click with no console errors or
@@ -2252,7 +2252,7 @@ commands are listed in the implementation/build section above.
   runtime-heavy chunk, 2.65 KB gzip for all post-click async scripts, or three
   post-click script requests. Focused
   fixture-build tests also rebuild the CSR, SSR, vite-plus, and direct Rolldown
-  fixtures, assert default builds do not emit `arcade-manifest.json`, and enforce
+  fixtures, assert default builds do not emit `markless-manifest.json`, and enforce
   current-regression gzip ceilings for the eager entry runtime closure in
   CSR/vite-plus and all generated async scripts in SSR. The current ceilings
   are CSR 3 KB for the largest runtime-heavy chunk / 3.05 KB for the entry
@@ -2263,7 +2263,7 @@ commands are listed in the implementation/build section above.
   event-only 300-500 B gzip target / 700 B gzip hard budget as the remaining
   spec target. CSR and vite-plus fixture size checks now read the built
   `index.html` module scripts and follow static imports from emitted JavaScript
-  rather than `arcade-manifest.json`, so lazy fallback chunks remain visible in
+  rather than `markless-manifest.json`, so lazy fallback chunks remain visible in
   the build output without being counted as eager runtime bytes.
   Grep MCP research against Vite/Rolldown usage showed `@vite-ignore` is used
   for runtime/non-static imports and a Rolldown fixture documents static
@@ -2275,7 +2275,7 @@ commands are listed in the implementation/build section above.
   Generated DOM update
   symbols now emit concrete `setText`, `setAttr`, and `setProp` journal object
   literals directly, so they do not import either the broad runtime entry or the
-  helper-only `@arcade/runtime/dom-update` subpath. Generated
+  helper-only `@markless/runtime/dom-update` subpath. Generated
   event-handler modules also omit their previous `authoredSource` export;
   behavior and async-runner symbols keep their source metadata because current
   focused tests still use it for those symbol kinds. The Vite CSR/vite-plus
@@ -2289,7 +2289,7 @@ commands are listed in the implementation/build section above.
   The SSR fixture render shell imports `runtime/render-to-string`, keeping the
   SSR payload rendering and inline resumer source out of the eager CSR render
   entry. The SSR fixture browser entry now imports the narrower
-  `@arcade/runtime/event-only-resume` subpath for event-only payload
+  `@markless/runtime/event-only-resume` subpath for event-only payload
   dispatch instead of the full `runtime/resume` or broader `runtime/event-resume`
   path. The event-only resume helper reads the existing payload scripts,
   materializes DOM-order locators, dispatches the current event through the
@@ -2300,14 +2300,14 @@ commands are listed in the implementation/build section above.
   shared-patch runtime, event-resume element handles, graph collection calls, or
   delete/subscription helpers. Current
   client bundle output also strips empty Vite dynamic-import preload wrappers
-  from generated arcade runtime chunks after bundling, including empty
+  from generated markless runtime chunks after bundling, including empty
   wrappers around async fallback loaders. This preserves plain `import(...)`
   records during Vite/Rolldown resolution while removing the unused preload
   helper from emitted JS. Generated symbol-resolver table finalization now runs
   after Vite/Rolldown's tiny virtual-symbol facade cleanup, so table URLs point
   at the shared generated symbol chunk when facades are removed. The post-build
   cleanup removes those generated facade chunks from emitted JS, filters them
-  out of the bundle graph and optional arcade manifest metadata, fails closed if
+  out of the bundle graph and optional markless manifest metadata, fails closed if
   any table symbol cannot be mapped, and compacts duplicate final module URLs in
   the resolver tuple. Current
   `.tsrx` source modules import `payloadState` and `payloadView` as named
@@ -2340,7 +2340,7 @@ commands are listed in the implementation/build section above.
   `packages/bundler/.witness/receipts/2026-06-16T18-17-52.935Z/receipt.json`.
   A vite-plus fixture now has a real app entry and a package-local preview box
   that proves a vite-plus config emits the bundle graph, omits default
-  `arcade-manifest.json`, and serves browser output through Vite preview.
+  `markless-manifest.json`, and serves browser output through Vite preview.
   Focused base-plugin and Vite-wrapper tests prove `buildStart` cleanup clears
   stale generated virtual modules and accumulated transform manifests.
   They do not prove installed package export resolution, publish-ready exports,
@@ -2359,8 +2359,8 @@ commands are listed in the implementation/build section above.
 - `pnpm-workspace.yaml` deliberately keeps `../native-tsrx` out of this
   workspace, and `packages/compiler/package.json` resolves `@tsrx/core` through
   the catalog as an external dependency boundary. Do not inspect or modify that
-  sibling repository for Arcade work. Parser-backed checks should continue
-  to prove Arcade compiler artifact behavior against published `@tsrx/core`
+  sibling repository for Markless work. Parser-backed checks should continue
+  to prove Markless compiler artifact behavior against published `@tsrx/core`
   shapes instead of relying on sibling workspace parser artifacts.
 - Markdown-only `vp check` can report formatting success and then fail before
   lint analysis because there are no lintable files. For spec-only maintenance,

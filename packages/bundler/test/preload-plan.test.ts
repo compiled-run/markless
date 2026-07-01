@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { convertManifestToBundleGraph } from '../src/build/bundle-graph.ts';
 import { planModulePreloadUrls, planModulePreloads } from '../src/build/preload-plan.ts';
 import { planSsrModulePreloads } from '../src/build/preload-plan-ssr.ts';
-import type { ArcadeManifest } from '../src/types.ts';
+import type { MarklessManifest } from '../src/types.ts';
 
 describe('module preload planning', () => {
 	test('expands symbol roots through static imports and likely dynamic descendants', () => {
@@ -147,41 +147,41 @@ describe('module preload planning', () => {
 	});
 });
 
-function manifestWithComplexSymbolDeps(): ArcadeManifest {
+function manifestWithComplexSymbolDeps(): MarklessManifest {
 	return {
 		version: 1,
 		modules: [
 			{
 				source: '/workspace/app/src/root.tsrx',
-				payload: { virtualModuleId: 'virtual:arcade:payload:root' },
-				resolver: { virtualModuleId: 'virtual:arcade:resolver:root' },
+				payload: { virtualModuleId: 'virtual:markless:payload:root' },
+				resolver: { virtualModuleId: 'virtual:markless:resolver:root' },
 				symbols: [
 					{
 						symbolId: 'symbol:click',
 						kind: 'event-handler',
 						exportName: 'onClick',
-						virtualModuleId: 'virtual:arcade:symbol:root:click',
+						virtualModuleId: 'virtual:markless:symbol:root:click',
 						fileName: 'build/click.js',
 					},
 					{
 						symbolId: 'symbol:visible',
 						kind: 'event-handler',
 						exportName: 'onVisible',
-						virtualModuleId: 'virtual:arcade:symbol:root:visible',
+						virtualModuleId: 'virtual:markless:symbol:root:visible',
 						fileName: 'build/visible.js',
 					},
 					{
 						symbolId: 'symbol:behavior',
 						kind: 'behavior',
 						exportName: 'installBehavior',
-						virtualModuleId: 'virtual:arcade:symbol:root:behavior',
+						virtualModuleId: 'virtual:markless:symbol:root:behavior',
 						fileName: 'build/behavior.js',
 					},
 					{
 						symbolId: 'symbol:async-runner',
 						kind: 'async-runner',
 						exportName: 'runAsync',
-						virtualModuleId: 'virtual:arcade:symbol:root:async-runner',
+						virtualModuleId: 'virtual:markless:symbol:root:async-runner',
 						fileName: 'build/async-runner.js',
 					},
 				],
@@ -237,23 +237,23 @@ function manifestWithComplexSymbolDeps(): ArcadeManifest {
 	};
 }
 
-function manifestWithResolverChunk(): ArcadeManifest {
+function manifestWithResolverChunk(): MarklessManifest {
 	return {
 		version: 1,
 		modules: [
 			{
 				source: '/workspace/app/src/root.tsrx',
-				payload: { virtualModuleId: 'virtual:arcade:payload:root' },
+				payload: { virtualModuleId: 'virtual:markless:payload:root' },
 				resolver: {
 					fileName: 'build/resolver.js',
-					virtualModuleId: 'virtual:arcade:resolver:root',
+					virtualModuleId: 'virtual:markless:resolver:root',
 				},
 				symbols: [
 					{
 						symbolId: 'symbol:click',
 						kind: 'event-handler',
 						exportName: 'onClick',
-						virtualModuleId: 'virtual:arcade:symbol:root:click',
+						virtualModuleId: 'virtual:markless:symbol:root:click',
 						fileName: 'build/click.js',
 					},
 				],

@@ -38,15 +38,15 @@ importers:
 
   .:
     devDependencies:
-      '@arcade/cli':
-        specifier: workspace:*
-        version: link:packages/cli
-      '@arcade/typescript-plugin':
-        specifier: workspace:*
-        version: link:packages/typescript-plugin
       '@async/witness':
         specifier: 0.7.0
         version: 0.7.0(vite@8.0.16(@types/node@24.12.2))
+      '@markless/cli':
+        specifier: workspace:*
+        version: link:packages/cli
+      '@markless/typescript-plugin':
+        specifier: workspace:*
+        version: link:packages/typescript-plugin
       '@types/node':
         specifier: 24.12.2
         version: 24.12.2
@@ -68,9 +68,9 @@ importers:
 
   demos/music-player:
     dependencies:
-      arcade:
+      '@markless/core':
         specifier: workspace:*
-        version: link:../../packages/arcade
+        version: link:../../packages/core
     devDependencies:
       rolldown:
         specifier: 1.0.3
@@ -87,12 +87,12 @@ importers:
 
   demos/music-player-ssr:
     dependencies:
-      '@arcade/router':
+      '@markless/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@markless/router':
         specifier: workspace:*
         version: link:../../packages/router
-      arcade:
-        specifier: workspace:*
-        version: link:../../packages/arcade
     devDependencies:
       rolldown:
         specifier: 1.0.3
@@ -107,21 +107,9 @@ importers:
         specifier: 0.1.20
         version: 0.1.20(@types/node@24.12.2)(typescript@5.9.3)(vite@8.0.16(@types/node@24.12.2))
 
-  packages/arcade:
-    dependencies:
-      '@arcade/bundler':
-        specifier: workspace:*
-        version: link:../bundler
-      '@arcade/router':
-        specifier: workspace:*
-        version: link:../router
-      '@arcade/web':
-        specifier: workspace:*
-        version: link:../web
-
   packages/bundler:
     dependencies:
-      '@arcade/compiler':
+      '@markless/compiler':
         specifier: workspace:*
         version: link:../compiler
       '@thi.ng/dgraph':
@@ -142,7 +130,7 @@ importers:
 
   packages/bundler/fixtures/rolldown-basic:
     dependencies:
-      '@arcade/bundler':
+      '@markless/bundler':
         specifier: workspace:*
         version: link:../..
     devDependencies:
@@ -155,12 +143,12 @@ importers:
 
   packages/bundler/fixtures/vite-csr:
     dependencies:
-      '@arcade/bundler':
+      '@markless/bundler':
         specifier: workspace:*
         version: link:../..
-      arcade:
+      '@markless/core':
         specifier: workspace:*
-        version: link:../../../arcade
+        version: link:../../../core
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -171,12 +159,12 @@ importers:
 
   packages/bundler/fixtures/vite-csr-preloader:
     dependencies:
-      '@arcade/bundler':
+      '@markless/bundler':
         specifier: workspace:*
         version: link:../..
-      arcade:
+      '@markless/core':
         specifier: workspace:*
-        version: link:../../../arcade
+        version: link:../../../core
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -187,12 +175,12 @@ importers:
 
   packages/bundler/fixtures/vite-library:
     dependencies:
-      '@arcade/bundler':
+      '@markless/bundler':
         specifier: workspace:*
         version: link:../..
-      arcade:
+      '@markless/core':
         specifier: workspace:*
-        version: link:../../../arcade
+        version: link:../../../core
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -203,12 +191,12 @@ importers:
 
   packages/bundler/fixtures/vite-plus:
     dependencies:
-      '@arcade/bundler':
+      '@markless/bundler':
         specifier: workspace:*
         version: link:../..
-      arcade:
+      '@markless/core':
         specifier: workspace:*
-        version: link:../../../arcade
+        version: link:../../../core
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -225,12 +213,12 @@ importers:
 
   packages/bundler/fixtures/vite-ssr:
     dependencies:
-      '@arcade/bundler':
+      '@markless/bundler':
         specifier: workspace:*
         version: link:../..
-      arcade:
+      '@markless/core':
         specifier: workspace:*
-        version: link:../../../arcade
+        version: link:../../../core
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -241,12 +229,12 @@ importers:
 
   packages/bundler/fixtures/vite-ssr-preloader:
     dependencies:
-      '@arcade/bundler':
+      '@markless/bundler':
         specifier: workspace:*
         version: link:../..
-      arcade:
+      '@markless/core':
         specifier: workspace:*
-        version: link:../../../arcade
+        version: link:../../../core
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -269,16 +257,28 @@ importers:
 
   packages/compiler:
     dependencies:
-      '@arcade/serializer':
+      '@markless/serializer':
         specifier: workspace:*
         version: link:../serializer
       '@tsrx/core':
         specifier: 'catalog:'
         version: 0.1.32
 
+  packages/core:
+    dependencies:
+      '@markless/bundler':
+        specifier: workspace:*
+        version: link:../bundler
+      '@markless/router':
+        specifier: workspace:*
+        version: link:../router
+      '@markless/web':
+        specifier: workspace:*
+        version: link:../web
+
   packages/router:
     dependencies:
-      '@arcade/web':
+      '@markless/web':
         specifier: workspace:*
         version: link:../web
       '@tsrx/core':
@@ -308,12 +308,12 @@ importers:
 
   packages/router/fixtures/router:
     dependencies:
-      '@arcade/router':
+      '@markless/core':
+        specifier: workspace:*
+        version: link:../../../core
+      '@markless/router':
         specifier: workspace:*
         version: link:../..
-      arcade:
-        specifier: workspace:*
-        version: link:../../../arcade
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -327,12 +327,12 @@ importers:
 
   packages/router/fixtures/router-app:
     dependencies:
-      '@arcade/router':
+      '@markless/core':
+        specifier: workspace:*
+        version: link:../../../core
+      '@markless/router':
         specifier: workspace:*
         version: link:../..
-      arcade:
-        specifier: workspace:*
-        version: link:../../../arcade
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -346,12 +346,12 @@ importers:
 
   packages/router/fixtures/router-docs:
     dependencies:
-      '@arcade/router':
+      '@markless/core':
+        specifier: workspace:*
+        version: link:../../../core
+      '@markless/router':
         specifier: workspace:*
         version: link:../..
-      arcade:
-        specifier: workspace:*
-        version: link:../../../arcade
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -365,12 +365,12 @@ importers:
 
   packages/router/fixtures/router-full-stack:
     dependencies:
-      '@arcade/router':
+      '@markless/core':
+        specifier: workspace:*
+        version: link:../../../core
+      '@markless/router':
         specifier: workspace:*
         version: link:../..
-      arcade:
-        specifier: workspace:*
-        version: link:../../../arcade
       nitro:
         specifier: 'catalog:'
         version: 3.0.260429-beta(vite@8.0.16(@types/node@24.12.2))
@@ -387,7 +387,7 @@ importers:
 
   packages/runtime:
     dependencies:
-      '@arcade/serializer':
+      '@markless/serializer':
         specifier: workspace:*
         version: link:../serializer
 
@@ -395,7 +395,7 @@ importers:
 
   packages/typescript-plugin:
     dependencies:
-      '@arcade/compiler':
+      '@markless/compiler':
         specifier: workspace:*
         version: link:../compiler
       '@volar/typescript':
@@ -407,7 +407,7 @@ importers:
 
   packages/vitest-browser:
     dependencies:
-      '@arcade/web':
+      '@markless/web':
         specifier: workspace:*
         version: link:../web
       vitest:
@@ -416,10 +416,10 @@ importers:
 
   packages/web:
     dependencies:
-      '@arcade/runtime':
+      '@markless/runtime':
         specifier: workspace:*
         version: link:../runtime
-      '@arcade/serializer':
+      '@markless/serializer':
         specifier: workspace:*
         version: link:../serializer
 

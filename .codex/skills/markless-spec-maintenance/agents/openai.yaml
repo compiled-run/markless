@@ -1,0 +1,4 @@
+interface:
+    display_name: 'Markless Spec Maintenance'
+    short_description: 'Update framework specs without drift'
+    default_prompt: 'Use $markless-spec-maintenance to update the framework design spec.'

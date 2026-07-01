@@ -9,7 +9,7 @@ export type CompilerPassGraphErrorReason =
 	| 'undeclared-pass-output';
 
 export type CompilerPassGraphDiagnostic = {
-	readonly code: 'ARCADE_COMPILER_PASS_GRAPH_INVALID';
+	readonly code: 'MARKLESS_COMPILER_PASS_GRAPH_INVALID';
 	readonly severity: 'error';
 	readonly phase: 'runtime';
 	readonly title: 'Invalid compiler pass graph';
@@ -23,7 +23,7 @@ export type CompilerPassGraphDiagnostic = {
 };
 
 export class CompilerPassGraphError extends Error implements CompilerPassGraphDiagnostic {
-	readonly code = 'ARCADE_COMPILER_PASS_GRAPH_INVALID' as const;
+	readonly code = 'MARKLESS_COMPILER_PASS_GRAPH_INVALID' as const;
 	readonly severity = 'error' as const;
 	readonly phase = 'runtime' as const;
 	readonly title = 'Invalid compiler pass graph' as const;
@@ -32,7 +32,7 @@ export class CompilerPassGraphError extends Error implements CompilerPassGraphDi
 	readonly passId: string;
 	readonly artifactKeys: ReadonlyArray<string>;
 	readonly suggestions: ReadonlyArray<{ readonly message: string }>;
-	readonly docsUrl = 'https://arcadejs.com/errors/ARCADE_COMPILER_PASS_GRAPH_INVALID';
+	readonly docsUrl = 'https://markless.dev/errors/MARKLESS_COMPILER_PASS_GRAPH_INVALID';
 
 	constructor(input: {
 		readonly message: string;

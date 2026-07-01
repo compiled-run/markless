@@ -7,8 +7,8 @@
 		"build": "vite build --app"
 	},
 	"dependencies": {
-		"@arcade/bundler": "workspace:*",
-		"arcade": "workspace:*"
+		"@markless/bundler": "workspace:*",
+		"@markless/core": "workspace:*"
 	},
 	"devDependencies": {
 		"typescript": "catalog:",

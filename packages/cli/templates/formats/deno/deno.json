@@ -9,8 +9,8 @@
 	},
 	"nodeModulesDir": "auto",
 	"imports": {
-		"arcade": "npm:arcade",
-		"@arcade/router": "npm:@arcade/router",
+		"@markless/core": "npm:@markless/core",
+		"@markless/router": "npm:@markless/router",
 		"nitro": "npm:nitro@3.0.260429-beta"
 	}
 }

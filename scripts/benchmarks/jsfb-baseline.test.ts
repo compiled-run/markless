@@ -22,9 +22,17 @@ async function loadBenchmarkGuard() {
 			resultsDir: string,
 			options?: { framework?: string },
 		) => Promise<Record<string, number>>;
-		withArcadeBaselineResults: (
+		readNormalizedResults: (input: unknown, framework?: string) => Record<string, number>;
+		selectCurrentResultsForGuard: (options: {
+			baseline: unknown;
+			currentResults: Record<string, number>;
+			explicitResultsPath: boolean;
+			framework: string;
+			resultsPath: string;
+		}) => { currentResults: Record<string, number>; warning?: string };
+		withMarklessBaselineResults: (
 			baseline: unknown,
-			arcadeResults: Record<string, number>,
+			marklessResults: Record<string, number>,
 		) => unknown;
 	}>;
 }
@@ -62,14 +70,14 @@ function jsfbResult(
 }
 
 describe('js-framework-benchmark baseline guard', () => {
-	test('reads current Arcade scores from JSFB result files', async () => {
+	test('reads current Markless scores from JSFB result files', async () => {
 		const { readJsfbResultsDirectory } = await loadBenchmarkGuard();
-		const resultsDir = join(tmpdir(), `arcade-jsfb-results-${Date.now()}`);
+		const resultsDir = join(tmpdir(), `markless-jsfb-results-${Date.now()}`);
 		await mkdir(resultsDir, { recursive: true });
 
 		await writeFile(
-			join(resultsDir, 'arcade-v0.0.0-local-keyed_05_swap1k.json'),
-			jsfbResult('arcade-v0.0.0-local-keyed', '05_swap1k', 'cpu', 'total', 15.9, {
+			join(resultsDir, 'markless-v0.0.0-local-keyed_05_swap1k.json'),
+			jsfbResult('markless-v0.0.0-local-keyed', '05_swap1k', 'cpu', 'total', 15.9, {
 				geometricMean: 3.8,
 				max: 24.7,
 				mean: 17.16,
@@ -77,8 +85,8 @@ describe('js-framework-benchmark baseline guard', () => {
 			}),
 		);
 		await writeFile(
-			join(resultsDir, 'arcade-v0.0.0-local-keyed_09_clear1k_x8.json'),
-			jsfbResult('arcade-v0.0.0-local-keyed', '09_clear1k_x8', 'cpu', 'total', 9.5, {
+			join(resultsDir, 'markless-v0.0.0-local-keyed_09_clear1k_x8.json'),
+			jsfbResult('markless-v0.0.0-local-keyed', '09_clear1k_x8', 'cpu', 'total', 9.5, {
 				geometricMean: 2.6,
 				max: 11.5,
 				mean: 9.74,
@@ -86,9 +94,9 @@ describe('js-framework-benchmark baseline guard', () => {
 			}),
 		);
 		await writeFile(
-			join(resultsDir, 'arcade-v0.0.0-local-keyed_41_size-uncompressed.json'),
+			join(resultsDir, 'markless-v0.0.0-local-keyed_41_size-uncompressed.json'),
 			jsfbResult(
-				'arcade-v0.0.0-local-keyed',
+				'markless-v0.0.0-local-keyed',
 				'41_size-uncompressed',
 				'size',
 				'DEFAULT',
@@ -101,7 +109,7 @@ describe('js-framework-benchmark baseline guard', () => {
 		);
 
 		await expect(
-			readJsfbResultsDirectory(resultsDir, { framework: 'arcade-keyed' }),
+			readJsfbResultsDirectory(resultsDir, { framework: 'markless-keyed' }),
 		).resolves.toEqual({
 			'05_swap1k': 15.9,
 			'09_clear1k': 9.5,
@@ -109,8 +117,67 @@ describe('js-framework-benchmark baseline guard', () => {
 		});
 	});
 
-	test('fails on meaningful Arcade regressions while keeping peer ratios fixed', async () => {
-		const { compareBenchmarkResults, withArcadeBaselineResults } = await loadBenchmarkGuard();
+	test('reads Markless results from baseline-shaped JSON before benchmark metadata', async () => {
+		const { readNormalizedResults } = await loadBenchmarkGuard();
+
+		expect(
+			readNormalizedResults({
+				benchmarks: { cpu: ['01_run1k'] },
+				frameworks: {
+					markless: {
+						results: {
+							'01_run1k': 22.7,
+						},
+					},
+				},
+			}),
+		).toEqual({ '01_run1k': 22.7 });
+	});
+
+	test('uses committed Markless baseline when implicit JSFB results have no Markless rows', async () => {
+		const { selectCurrentResultsForGuard } = await loadBenchmarkGuard();
+		const baseline = {
+			benchmarks: {
+				cpu: ['01_run1k'],
+				size: ['41_size-uncompressed'],
+				warnOnly: ['43_first-paint'],
+			},
+			frameworks: {
+				markless: {
+					results: {
+						'01_run1k': 22.7,
+						'41_size-uncompressed': 9.5,
+						'43_first-paint': 50,
+					},
+				},
+			},
+		};
+
+		const fallback = selectCurrentResultsForGuard({
+			baseline,
+			currentResults: {},
+			explicitResultsPath: false,
+			framework: 'markless-keyed',
+			resultsPath: '/tmp/js-framework-benchmark/webdriver-ts/results',
+		});
+
+		expect(fallback.currentResults).toEqual(baseline.frameworks.markless.results);
+		expect(fallback.warning).toContain('No markless-keyed JSFB result rows');
+
+		const strict = selectCurrentResultsForGuard({
+			baseline,
+			currentResults: {},
+			explicitResultsPath: true,
+			framework: 'markless-keyed',
+			resultsPath: '/tmp/js-framework-benchmark/webdriver-ts/results',
+		});
+
+		expect(strict.currentResults).toEqual({});
+		expect(strict.warning).toBeUndefined();
+	});
+
+	test('fails on meaningful Markless regressions while keeping peer ratios fixed', async () => {
+		const { compareBenchmarkResults, withMarklessBaselineResults } = await loadBenchmarkGuard();
 		const baseline = {
 			thresholds: {
 				cpuGeomeanRegressionRatio: 1.03,
@@ -125,7 +192,7 @@ describe('js-framework-benchmark baseline guard', () => {
 				warnOnly: ['43_first-paint'],
 			},
 			frameworks: {
-				arcade: {
+				markless: {
 					results: {
 						'01_run1k': 20,
 						'02_replace1k': 20,
@@ -171,7 +238,7 @@ describe('js-framework-benchmark baseline guard', () => {
 		expect(result.ratios.ripple).toBeCloseTo(0.730297, 6);
 
 		const sameMachineResult = compareBenchmarkResults(
-			withArcadeBaselineResults(baseline, {
+			withMarklessBaselineResults(baseline, {
 				'01_run1k': 24,
 				'02_replace1k': 20,
 				'41_size-uncompressed': 10.6,
@@ -200,7 +267,7 @@ describe('js-framework-benchmark baseline guard', () => {
 				cpu: ['01_run1k', '05_swap1k', '07_create10k'],
 			},
 			frameworks: {
-				arcade: {
+				markless: {
 					results: {
 						'01_run1k': 95.1,
 						'05_swap1k': 65.5,

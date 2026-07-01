@@ -1,7 +1,7 @@
 import { box } from '@async/witness';
 
 // Product truth: editing a TSRX source file in the Vite CSR fixture runs
-// through the real Vite dev pipeline, invalidates generated arcade
+// through the real Vite dev pipeline, invalidates generated markless
 // virtual modules, and falls back to a full browser reload.
 const FIXTURE = 'fixtures/vite-csr';
 const WAIT = { timeoutMs: 10_000 };

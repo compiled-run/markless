@@ -53,13 +53,13 @@ export type RuntimeHardeningJournalEntry =
 	  }
 	| {
 			readonly kind: 'errorRecord';
-			readonly code: 'ARCADE_RUNTIME_HANDLER_THROW';
+			readonly code: 'MARKLESS_RUNTIME_HANDLER_THROW';
 			readonly message: string;
 			readonly committedWritesPreserved: true;
 	  };
 
 export type RuntimeHardeningErrorRecord = {
-	readonly code: 'ARCADE_RUNTIME_HANDLER_THROW';
+	readonly code: 'MARKLESS_RUNTIME_HANDLER_THROW';
 	readonly message: string;
 	readonly committedWritesPreserved: true;
 };
@@ -240,7 +240,7 @@ export function createRuntimeHardeningPoc(): RuntimeHardeningPoc {
 			);
 
 			const error = {
-				code: 'ARCADE_RUNTIME_HANDLER_THROW',
+				code: 'MARKLESS_RUNTIME_HANDLER_THROW',
 				message: 'after committed graph writes',
 				committedWritesPreserved: true,
 			} as const;

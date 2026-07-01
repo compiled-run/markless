@@ -1,7 +1,7 @@
 import { joinURL, parsePath } from 'ufo';
 import type { DevEnvironment, EnvironmentModuleNode, HotUpdateOptions, ViteDevServer } from 'vite';
-import type { ArcadeEnvironment } from '../types.ts';
-import { fetchableDevEnvironment, arcadeEnvironment } from './environment.ts';
+import type { MarklessEnvironment } from '../types.ts';
+import { fetchableDevEnvironment, marklessEnvironment } from './environment.ts';
 
 const SOURCE_FILE_EXTENSION = /\.tsrx$/;
 
@@ -9,7 +9,7 @@ interface ViteHmrOptions {
 	base: string;
 	clientEnvironment: string;
 	enabled: boolean;
-	invalidateGeneratedModules?: (parent: string, environment?: ArcadeEnvironment) => string[];
+	invalidateGeneratedModules?: (parent: string, environment?: MarklessEnvironment) => string[];
 }
 
 export function createViteHmr(options: ViteHmrOptions) {
@@ -36,7 +36,7 @@ export function createViteHmr(options: ViteHmrOptions) {
 				return undefined;
 			}
 
-			const env = arcadeEnvironment(environment);
+			const env = marklessEnvironment(environment);
 			if (env === 'lib') {
 				return undefined;
 			}

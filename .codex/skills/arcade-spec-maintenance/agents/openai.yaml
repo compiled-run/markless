@@ -1,4 +1,0 @@
-interface:
-    display_name: 'Arcade Spec Maintenance'
-    short_description: 'Update framework specs without drift'
-    default_prompt: 'Use $arcade-spec-maintenance to update the framework design spec.'

@@ -44,7 +44,7 @@ test('module-scope collector reports state and computed creation diagnostics', (
 
 	expect(graph.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'ARCADE_STATE_MODULE_SCOPE',
+			code: 'MARKLESS_STATE_MODULE_SCOPE',
 			phase: 'semantic-graph',
 			passId: 'tsrx-semantic-graph',
 			message: 'Cannot create "count" with state() at module scope.',

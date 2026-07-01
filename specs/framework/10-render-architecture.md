@@ -17,14 +17,14 @@ For a single-root `.tsrx` app module, the normal architecture is:
 
 ```ts
 import App from './App.tsrx';
-import { render } from 'arcade';
+import { render } from '@markless/core';
 
 render(App, { target: document.getElementById('app')! });
 ```
 
 ```ts
 import App from './App.tsrx';
-import { renderToString } from 'arcade';
+import { renderToString } from '@markless/core';
 
 const html = renderToString(App);
 ```
@@ -32,8 +32,8 @@ const html = renderToString(App);
 `App` is the compiled TSRX artifact, not a browser component constructor that
 will be re-executed during resume. Framework render functions own the
 environment-specific orchestration around that artifact.
-App render code imports `render()` and `renderToString()` from `"arcade"`, not
-from `.tsrx` modules, `arcade`, or runtime deep imports.
+App render code imports `render()` and `renderToString()` from `"@markless/core"`, not
+from `.tsrx` modules, `@markless/core`, or runtime deep imports.
 
 When a `.tsrx` file exports multiple top-level components and no unambiguous app
 root can be selected, app code must pass the intended compiled artifact to the
@@ -77,7 +77,7 @@ The CSR renderer owns:
 - returning the runtime container for cleanup or tests when needed
 
 CSR must not depend on SSR payload scripts, a resumable container boundary,
-`arcade/state`, `arcade/view`, or the inline SSR resumer. A CSR app must work
+`markless/state`, `markless/view`, or the inline SSR resumer. A CSR app must work
 when the HTML document contains only the target element and the client bundle.
 
 CSR may share runtime primitives with SSR resume after setup: graph state,
@@ -141,7 +141,7 @@ On startup, the inline resumer must not:
 - run event handlers
 - run behavior symbols
 - run async runner symbols
-- parse `arcade-manifest.json`
+- parse `markless-manifest.json`
 - scan event attributes
 - plan symbols from DOM
 - diff or reconcile DOM
@@ -186,7 +186,7 @@ details. They must not appear in app code or app config as `entry-client`,
 `?resume`, or manual resume-module imports.
 
 The default browser resume path consumes container payload data and generated
-resolver metadata. It must not require `arcade-manifest.json` at browser startup.
+resolver metadata. It must not require `markless-manifest.json` at browser startup.
 Optional manifests and bundle graphs remain build/test/preload/devtools
 artifacts.
 
@@ -413,9 +413,9 @@ Render architecture work is not complete until the following are proved by
 focused tests and fixture builds:
 
 1. CSR app code can import a compiled artifact from `./App.tsrx`, pass it to
-   `render` from `arcade`, and run without SSR payloads or a resumer.
+   `render` from `@markless/core`, and run without SSR payloads or a resumer.
 2. SSR app code can import a compiled artifact from `./App.tsrx`, pass it to
-   `renderToString` from `arcade`, and produce a resumable container
+   `renderToString` from `@markless/core`, and produce a resumable container
    without app-authored client/server entry wrappers.
 3. SSR initial HTML contains composed state/view payloads for root and child
    components.

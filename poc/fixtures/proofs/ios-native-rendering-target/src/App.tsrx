@@ -1,10 +1,10 @@
-import { state } from '@arcade/core';
+import { state } from '@markless/core';
 
 export function Counter() @{
   let count = state(0);
 
   <main>
-    <h1>Arcade iOS Proof</h1>
+    <h1>Markless iOS Proof</h1>
     <button onClick={() => count++}>Count {count}</button>
   </main>
 }

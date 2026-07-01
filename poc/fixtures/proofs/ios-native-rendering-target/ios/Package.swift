@@ -3,23 +3,23 @@
 import PackageDescription
 
 let package = Package(
-	name: "ArcadeNativeProof",
+	name: "MarklessNativeProof",
 	platforms: [
 		.iOS(.v17),
 	],
 	products: [
-		.library(name: "ArcadeNativeProof", targets: ["ArcadeNativeProof"]),
+		.library(name: "MarklessNativeProof", targets: ["MarklessNativeProof"]),
 	],
 	targets: [
 		.target(
-			name: "ArcadeNativeProof",
+			name: "MarklessNativeProof",
 			resources: [
 				.process("Resources"),
 			],
 		),
 		.testTarget(
-			name: "ArcadeNativeProofTests",
-			dependencies: ["ArcadeNativeProof"],
+			name: "MarklessNativeProofTests",
+			dependencies: ["MarklessNativeProof"],
 		),
 	],
 )

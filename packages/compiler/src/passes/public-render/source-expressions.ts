@@ -1,7 +1,7 @@
 export function itemPathReadSource(base: string, path: readonly string[]): string {
 	const key = path[0];
 	if (path.length === 1 && key && isSafePropertyName(key)) return `${base}.${key}`;
-	return `readArcadePublicPath(${base}, ${JSON.stringify(path)})`;
+	return `readMarklessPublicPath(${base}, ${JSON.stringify(path)})`;
 }
 
 export function graphReadExpression(graphNodeId: string, path: readonly string[]): string {

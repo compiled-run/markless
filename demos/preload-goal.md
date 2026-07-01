@@ -62,8 +62,8 @@ Unstaged tracked changes:
 - `demos/music-player/pages/index.tsrx` deleted
 - `demos/music-player/tsconfig.json`
 - `demos/music-player/vite.config.ts`
-- `packages/arcade/src/index.ts`
-- `packages/arcade/test/public-surface.test.ts`
+- `packages/core/src/index.ts`
+- `packages/core/test/public-surface.test.ts`
 - `packages/bundler/fixtures/vite-ssr-preloader/vite.config.ts`
 - `packages/bundler/fixtures/vite-ssr/src/dev-server.ts`
 - `packages/bundler/fixtures/vite-ssr/vite.config.ts`
@@ -95,8 +95,8 @@ Do not assume the current worktree builds.
 
 The interrupted cleanup left a known inconsistency:
 
-- `packages/bundler/src/source-module.ts` no longer exports `ARCADE_MODULE_PRELOADS_MARKER` and no longer emits the CSR `preloadCsrLazySymbols()` runtime fetch.
-- `packages/bundler/src/rolldown.ts` still imports `ARCADE_MODULE_PRELOADS_MARKER` and still contains marker replacement helpers.
+- `packages/bundler/src/source-module.ts` no longer exports `MARKLESS_MODULE_PRELOADS_MARKER` and no longer emits the CSR `preloadCsrLazySymbols()` runtime fetch.
+- `packages/bundler/src/rolldown.ts` still imports `MARKLESS_MODULE_PRELOADS_MARKER` and still contains marker replacement helpers.
 - `packages/bundler/test/rolldown.test.ts` still expects marker-based baked artifact preloads.
 
 First cleanup task should remove or replace the marker-rewrite preload attempt coherently.
@@ -108,17 +108,17 @@ The non-SSR `demos/music-player` demo was converted from router SSR shape to pla
 Added:
 
 - `demos/music-player/index.html`
-  - Static HTML with `<div id="app"></div>`.
-  - Script entry: `<script type="module" src="/src/main.ts"></script>`.
+    - Static HTML with `<div id="app"></div>`.
+    - Script entry: `<script type="module" src="/src/main.ts"></script>`.
 - `demos/music-player/src/main.ts`
-  - Imports `render` from `arcade`.
-  - Imports `App` from `./App.tsrx`.
-  - Imports `./styles.css`.
-  - Renders into `#app`.
+    - Imports `render` from `@markless/core`.
+    - Imports `App` from `./App.tsrx`.
+    - Imports `./styles.css`.
+    - Renders into `#app`.
 - `demos/music-player/src/App.tsrx`
-  - Moved the old page app component into `src`.
-  - Uses local component imports from `./components/...`.
-  - Keeps YouTube controller behavior and command state.
+    - Moved the old page app component into `src`.
+    - Uses local component imports from `./components/...`.
+    - Keeps YouTube controller behavior and command state.
 
 Deleted:
 
@@ -127,8 +127,8 @@ Deleted:
 
 Updated:
 
-- `demos/music-player/package.json` removes `@arcade/router`.
-- `demos/music-player/vite.config.ts` now uses `plugins: [arcade()]`.
+- `demos/music-player/package.json` removes `@markless/router`.
+- `demos/music-player/vite.config.ts` now uses `plugins: [markless()]`.
 - `demos/music-player/tsconfig.json` includes only `src` and `vite.config.ts`.
 - `demos/music-player/boxes/tmp-csr.box.ts` changed from SSR/router expectations to CSR expectations.
 - `pnpm-lock.yaml` removes the music-player router workspace dependency.
@@ -147,33 +147,33 @@ The router work moves route matching and route data generation away from browser
 Added:
 
 - `packages/router/src/route-matcher.ts`
-  - Owns route manifest types.
-  - Owns `normalizeRequestPathname()`.
-  - Owns `matchRouteManifest()`.
-  - Uses local path helpers instead of `pathe`/`ufo`, so browser runtime route matching has no build-time URL/path dependencies.
+    - Owns route manifest types.
+    - Owns `normalizeRequestPathname()`.
+    - Owns `matchRouteManifest()`.
+    - Uses local path helpers instead of `pathe`/`ufo`, so browser runtime route matching has no build-time URL/path dependencies.
 
 Changed:
 
 - `packages/router/src/route-manifest.ts`
-  - Now builds route manifests from file IDs.
-  - Re-exports matcher types/functions from `route-matcher.ts`.
-  - Replaces `pathe`/`ufo` helpers with local `normalizeFilePath`, `extname`, slash helpers.
+    - Now builds route manifests from file IDs.
+    - Re-exports matcher types/functions from `route-matcher.ts`.
+    - Replaces `pathe`/`ufo` helpers with local `normalizeFilePath`, `extname`, slash helpers.
 - `packages/router/src/vite/entries/client-entry.ts`
-  - Imports `pageModuleLoaders`, `routeFileIds`, and `routeManifest` from `virtual:arcade-router/routes`.
-  - No longer imports `createRouteDiscovery`.
-  - Starts SPA navigation with the manifest object, not raw route file IDs.
+    - Imports `pageModuleLoaders`, `routeFileIds`, and `routeManifest` from `virtual:markless-router/routes`.
+    - No longer imports `createRouteDiscovery`.
+    - Starts SPA navigation with the manifest object, not raw route file IDs.
 - `packages/router/src/vite/index.ts`
-  - Generates `virtual:arcade-router/routes` directly at build/plugin time.
-  - Uses `discoverPageFiles()` and `buildRouteManifestFromFileIds()`.
-  - Emits `pageModuleLoaders`, `routeFileIds`, and `routeManifest`.
-  - Route preload collection now excludes sibling route chunks and navigation polyfill chunks.
+    - Generates `virtual:markless-router/routes` directly at build/plugin time.
+    - Uses `discoverPageFiles()` and `buildRouteManifestFromFileIds()`.
+    - Emits `pageModuleLoaders`, `routeFileIds`, and `routeManifest`.
+    - Route preload collection now excludes sibling route chunks and navigation polyfill chunks.
 - `packages/router/src/vite/runtime/create-server-entry.ts`
-  - Accepts optional `routeManifest`.
-  - Falls back to building from `routeFileIds` if needed.
+    - Accepts optional `routeManifest`.
+    - Falls back to building from `routeFileIds` if needed.
 - `packages/router/src/spa-navigation.ts`
-  - Accepts `manifest` instead of `routeFileIds`.
-  - Lazily loads the Navigation API polyfill on internal Link click if `window.navigation` is missing.
-  - Guards against attaching the navigate listener multiple times.
+    - Accepts `manifest` instead of `routeFileIds`.
+    - Lazily loads the Navigation API polyfill on internal Link click if `window.navigation` is missing.
+    - Guards against attaching the navigate listener multiple times.
 
 Deleted:
 
@@ -185,18 +185,18 @@ Deleted:
 Tests updated:
 
 - `packages/router/test/vite.test.ts`
-  - Verifies generated route data has no browser route discovery helper.
-  - Verifies browser router modules avoid `pathe`/`ufo`.
-  - Updates exact route preload map expectations.
-  - Excludes navigation polyfill and sibling route chunks from route preloads.
+    - Verifies generated route data has no browser route discovery helper.
+    - Verifies browser router modules avoid `pathe`/`ufo`.
+    - Updates exact route preload map expectations.
+    - Excludes navigation polyfill and sibling route chunks from route preloads.
 - `packages/router/test/spa-navigation.test.ts`
-  - Updates callers to pass `manifest`.
-  - Adds lazy polyfill-load test.
+    - Updates callers to pass `manifest`.
+    - Adds lazy polyfill-load test.
 - `packages/router/boxes/router-preload-strategy.box.ts`
-  - Excludes Vite preload helper/polyfill-ish chunks from candidate route preload matching.
+    - Excludes Vite preload helper/polyfill-ish chunks from candidate route preload matching.
 - Router fixtures add `type="checkbox"` to input controls in:
-  - `packages/router/fixtures/router/components/InteractiveCounter.tsrx`
-  - `packages/router/fixtures/router/pages/index.tsrx`
+    - `packages/router/fixtures/router/components/InteractiveCounter.tsrx`
+    - `packages/router/fixtures/router/pages/index.tsrx`
 
 Need to verify:
 
@@ -204,17 +204,17 @@ Need to verify:
 - Removed `create-route-discovery` exports do not break public API expectations.
 - Exact route preload maps are still right after the manifest-metadata branch is applied.
 
-## What Changed: Arcade Public Surface
+## What Changed: Markless Public Surface
 
-`packages/arcade/src/index.ts` was narrowed:
+`packages/core/src/index.ts` was narrowed:
 
 - Keeps author/browser render exports such as `state`, `computed`, `element`, `shared`, `render`.
 - Removes root exports for:
-  - `renderToString`
-  - resume APIs
-  - Rolldown plugin APIs
+    - `renderToString`
+    - resume APIs
+    - Rolldown plugin APIs
 
-`packages/arcade/test/public-surface.test.ts` now expects server/build APIs through subpaths instead of the root entry.
+`packages/core/test/public-surface.test.ts` now expects server/build APIs through subpaths instead of the root entry.
 
 Need to verify:
 
@@ -246,22 +246,22 @@ This attempt should not be kept as-is.
 `packages/bundler/src/source-module.ts`:
 
 - Removed old CSR runtime preload function:
-  - `fetch("/build/bundle-graph.json")`
-  - dynamic `import("arcade/preload")`
-  - `preloadLazySymbolModules(...)`
+    - `fetch("/build/bundle-graph.json")`
+    - dynamic `import("@markless/core/preload")`
+    - `preloadLazySymbolModules(...)`
 - Removed `preload: preloadCsrLazySymbols` from CSR compiled artifact.
 - This part is directionally useful because runtime bundle graph fetch is unwanted.
 
 `packages/bundler/src/rolldown.ts`:
 
 - Added `planModulePreloads` import.
-- Added import of `ARCADE_MODULE_PRELOADS_MARKER`.
+- Added import of `MARKLESS_MODULE_PRELOADS_MARKER`.
 - Added `ArtifactModulePreload` type.
 - Added `MODULE_PRELOAD_MARKER_RE`.
 - Added server/client generateBundle marker replacement.
 - Added helpers:
-  - `rewriteGeneratedArtifactModulePreloads()`
-  - `planArtifactModulePreloads()`
+    - `rewriteGeneratedArtifactModulePreloads()`
+    - `planArtifactModulePreloads()`
 - This is rejected: too much complexity, string marker replacement, and not aligned with the manifest-removal branch.
 
 `packages/bundler/test/rolldown.test.ts`:
@@ -314,22 +314,22 @@ That is consistent with the removed route discovery helper still being reference
 ## What We Tried
 
 1. Confirmed CSR should still use modulepreload for lazy/dynamic symbol chunks.
-   - Raw CSR `index.html` does not inherently need SSR-style preload links.
-   - But CSR startup should warm lazy symbol chunks so the first interaction does not fetch new JS.
+    - Raw CSR `index.html` does not inherently need SSR-style preload links.
+    - But CSR startup should warm lazy symbol chunks so the first interaction does not fetch new JS.
 
 2. Researched real-world patterns with grep MCP.
-   - `__vitePreload` in Vite/Rolldown output showed dynamic import dependency arrays are the normal bundler-level mechanism.
-   - Other projects either emit `<link rel="modulepreload">` from build/SSR data or append deduped modulepreload links in the browser.
+    - `__vitePreload` in Vite/Rolldown output showed dynamic import dependency arrays are the normal bundler-level mechanism.
+    - Other projects either emit `<link rel="modulepreload">` from build/SSR data or append deduped modulepreload links in the browser.
 
 3. Implemented a rejected marker-based artifact preload plan.
-   - It baked finalized preload hrefs into generated TSRX artifacts by replacing a string marker during `generateBundle`.
-   - It made CSR append those links and SSR read `artifact.modulePreloads`.
-   - Focused tests passed before the cleanup interruption, but the design was too complex and not wanted.
+    - It baked finalized preload hrefs into generated TSRX artifacts by replacing a string marker during `generateBundle`.
+    - It made CSR append those links and SSR read `artifact.modulePreloads`.
+    - Focused tests passed before the cleanup interruption, but the design was too complex and not wanted.
 
 4. Partially started cleanup after operator rejection.
-   - Restored intent to keep `joinURL`.
-   - Removed source-module CSR runtime fetch and `preload` artifact hook.
-   - Did not finish cleanup, leaving `rolldown.ts` and tests inconsistent.
+    - Restored intent to keep `joinURL`.
+    - Removed source-module CSR runtime fetch and `preload` artifact hook.
+    - Did not finish cleanup, leaving `rolldown.ts` and tests inconsistent.
 
 ## Verification History
 
@@ -340,7 +340,7 @@ pnpm exec vp test packages/bundler/test/rolldown.test.ts packages/bundler/test/m
 pnpm exec vp test packages/bundler/test/fixture-builds.test.ts
 pnpm --dir packages/bundler/fixtures/vite-csr-preloader build
 pnpm --dir packages/bundler/fixtures/vite-ssr-preloader build
-pnpm exec vp test packages/bundler/test/package-metadata.test.ts packages/arcade/test/public-surface.test.ts
+pnpm exec vp test packages/bundler/test/package-metadata.test.ts packages/core/test/public-surface.test.ts
 pnpm build
 git diff --check
 ```
@@ -386,7 +386,7 @@ Intent of that branch:
 - Rename `packages/bundler/src/build/manifest.ts` to `build-metadata.ts`.
 - Move away from manifest-as-runtime concept.
 - Add `packages/bundler/src/build/head-links.ts`.
-- Keep optional `arcade-manifest.json` as explicit output only.
+- Keep optional `markless-manifest.json` as explicit output only.
 - Remove server manifest injection concept from the main runtime path.
 
 Files changed on that branch include:
@@ -433,8 +433,8 @@ Then a Worker should implement the final preload path:
 - Avoid SSR-only preload behavior.
 - Avoid broad generated-code string replacement.
 - Keep environment-specific sinks:
-  - CSR can get built HTML modulepreload links or a small build-data-driven startup sink.
-  - SSR can render head links from the same build/preload data.
+    - CSR can get built HTML modulepreload links or a small build-data-driven startup sink.
+    - SSR can render head links from the same build/preload data.
 
 ## Likely Minimal Preload Direction
 
@@ -459,7 +459,7 @@ Use narrow checks first:
 ```text
 pnpm exec vp test packages/router/test/vite.test.ts packages/router/test/spa-navigation.test.ts
 pnpm exec vp test packages/bundler/test/preload-plan.test.ts packages/bundler/test/rolldown.test.ts
-pnpm exec vp test packages/bundler/test/package-metadata.test.ts packages/arcade/test/public-surface.test.ts
+pnpm exec vp test packages/bundler/test/package-metadata.test.ts packages/core/test/public-surface.test.ts
 pnpm exec vp test packages/bundler/test/fixture-boundaries.test.ts
 ```
 

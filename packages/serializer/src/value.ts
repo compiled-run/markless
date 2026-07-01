@@ -91,7 +91,7 @@ export type SerializedGraphPayload = {
 };
 
 export type SerializationDiagnostic = {
-	readonly code: 'ARCADE_SERIALIZE_UNSUPPORTED_VALUE';
+	readonly code: 'MARKLESS_SERIALIZE_UNSUPPORTED_VALUE';
 	readonly severity: 'error';
 	readonly phase: 'serialization';
 	readonly title: 'Cannot serialize graph state value';
@@ -510,7 +510,7 @@ function unsupportedDiagnostic(
 	const valueKind = typeof value;
 
 	return {
-		code: 'ARCADE_SERIALIZE_UNSUPPORTED_VALUE',
+		code: 'MARKLESS_SERIALIZE_UNSUPPORTED_VALUE',
 		severity: 'error',
 		phase: 'serialization',
 		title: 'Cannot serialize graph state value',
@@ -525,7 +525,7 @@ function unsupportedDiagnostic(
 					'Move runtime resources into attach={...}, make the value serializable state, or derive it with computed().',
 			},
 		],
-		docsUrl: 'https://arcadejs.com/errors/ARCADE_SERIALIZE_UNSUPPORTED_VALUE',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_SERIALIZE_UNSUPPORTED_VALUE',
 	};
 }
 

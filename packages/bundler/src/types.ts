@@ -1,27 +1,27 @@
-export type ArcadeEnvironment = 'client' | 'server' | 'lib';
-export type ArcadeClientOutput = 'full' | 'symbols-only';
+export type MarklessEnvironment = 'client' | 'server' | 'lib';
+export type MarklessClientOutput = 'full' | 'symbols-only';
 
-export interface ArcadeDevServer {
-	transformRequest: (url: string, environment: ArcadeEnvironment) => Promise<unknown> | unknown;
+export interface MarklessDevServer {
+	transformRequest: (url: string, environment: MarklessEnvironment) => Promise<unknown> | unknown;
 }
 
-export interface ArcadeRolldownOptions {
+export interface MarklessRolldownOptions {
 	dev?: boolean;
 	devInjections?: GlobalInjections[];
-	devServer?: ArcadeDevServer;
+	devServer?: MarklessDevServer;
 	hmr?: boolean;
 	bundleGraphAdders?: Set<BundleGraphAdder>;
-	onManifest?: (manifest: ArcadeBuildMetadata) => void;
+	onManifest?: (manifest: MarklessBuildMetadata) => void;
 	emitManifestJson?: boolean;
 	rootDir?: string;
 	buildId?: string;
 }
 
-export type ArcadeVirtualModuleType = 'payload' | 'resolver' | 'symbol';
+export type MarklessVirtualModuleType = 'payload' | 'resolver' | 'symbol';
 
-export interface ArcadeVirtualModule {
+export interface MarklessVirtualModule {
 	id: string;
-	type: ArcadeVirtualModuleType;
+	type: MarklessVirtualModuleType;
 	source: string;
 	symbolId?: string;
 	exportName?: string;
@@ -31,49 +31,49 @@ export interface TransformTsrxModuleInput {
 	filename: string;
 	source: string;
 	buildId?: string;
-	environment?: ArcadeEnvironment;
-	clientOutput?: ArcadeClientOutput;
+	environment?: MarklessEnvironment;
+	clientOutput?: MarklessClientOutput;
 	resumeModuleUrl?: string;
 }
 
 export interface TransformTsrxModuleResult {
 	code: string;
 	map: null;
-	virtualModules: ArcadeVirtualModule[];
-	manifest: ArcadeTransformManifest;
+	virtualModules: MarklessVirtualModule[];
+	manifest: MarklessTransformManifest;
 }
 
-export interface ArcadeTransformManifest {
+export interface MarklessTransformManifest {
 	source: string;
-	payload: ArcadeBuildModuleReference;
-	resolver: ArcadeBuildModuleReference;
-	symbols: ArcadeSymbolManifestEntry[];
+	payload: MarklessBuildModuleReference;
+	resolver: MarklessBuildModuleReference;
+	symbols: MarklessSymbolManifestEntry[];
 }
 
-export interface ArcadeBuildModuleReference {
+export interface MarklessBuildModuleReference {
 	virtualModuleId: string;
 	fileName?: string;
 }
 
-export interface ArcadeSymbolManifestEntry extends ArcadeBuildModuleReference {
+export interface MarklessSymbolManifestEntry extends MarklessBuildModuleReference {
 	symbolId: string;
 	exportName: string;
 	kind: string;
 }
 
-export interface ArcadeBuildMetadata {
+export interface MarklessBuildMetadata {
 	version: number;
-	modules: ArcadeTransformManifest[];
-	bundles: Record<string, ArcadeBundle>;
-	assets?: Record<string, ArcadeAsset>;
-	bundleGraph?: ArcadeBundleGraph;
+	modules: MarklessTransformManifest[];
+	bundles: Record<string, MarklessBundle>;
+	assets?: Record<string, MarklessAsset>;
+	bundleGraph?: MarklessBundleGraph;
 	bundleGraphAsset?: string;
 	injections?: GlobalInjections[];
 }
 
-export type ArcadeManifest = ArcadeBuildMetadata;
+export type MarklessManifest = MarklessBuildMetadata;
 
-export interface ArcadeBundle {
+export interface MarklessBundle {
 	size: number;
 	total: number;
 	symbols?: string[];
@@ -82,7 +82,7 @@ export interface ArcadeBundle {
 	origins?: string[];
 }
 
-export type ArcadeAsset = {
+export type MarklessAsset = {
 	name: string | undefined;
 	size: number;
 };
@@ -93,12 +93,12 @@ export type GlobalInjections = {
 	location: 'head' | 'body';
 };
 
-export type ArcadeBundleGraph = Array<string | number>;
+export type MarklessBundleGraph = Array<string | number>;
 
 export type PreloadGraphEntries = Record<string, { imports?: string[]; dynamicImports?: string[] }>;
 
 export interface PreloadGraphContext {
-	readonly manifest: ArcadeBuildMetadata;
+	readonly manifest: MarklessBuildMetadata;
 	readonly hasBundle: (bundleName: string) => boolean;
 	readonly bundlesForOrigins: (origins: readonly string[]) => string[];
 }
@@ -107,8 +107,8 @@ export type PreloadGraphEntriesAdder = (
 	context: PreloadGraphContext,
 ) => PreloadGraphEntries | undefined;
 
-export type BundleGraphAdder = (manifest: ArcadeBuildMetadata) => PreloadGraphEntries | undefined;
+export type BundleGraphAdder = (manifest: MarklessBuildMetadata) => PreloadGraphEntries | undefined;
 
-export type ArcadeRolldownPluginApi = {
-	invalidateGeneratedModules: (parent: string, environment?: ArcadeEnvironment) => string[];
+export type MarklessRolldownPluginApi = {
+	invalidateGeneratedModules: (parent: string, environment?: MarklessEnvironment) => string[];
 };

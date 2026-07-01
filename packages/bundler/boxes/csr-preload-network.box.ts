@@ -1,6 +1,6 @@
 import { box } from '@async/witness';
 import { planModulePreloadUrls } from '../src/build/preload-plan.ts';
-import type { ArcadeBundleGraph } from '../src/types.ts';
+import type { MarklessBundleGraph } from '../src/types.ts';
 
 const FIXTURE = 'fixtures/vite-csr-preloader';
 const COUNTER = '[data-counter]';
@@ -37,7 +37,7 @@ export default box(
 			}),
 		});
 		const expectedPreloadHrefs = expectedCsrPreloadHrefs(
-			JSON.parse(await preview.request(BUNDLE_GRAPH_REQUEST)) as ArcadeBundleGraph,
+			JSON.parse(await preview.request(BUNDLE_GRAPH_REQUEST)) as MarklessBundleGraph,
 		);
 		const page = await preview.browser.visit(CSR_ROUTE, {
 			networkConditions: SLOW_NETWORK,
@@ -82,7 +82,7 @@ type NetworkRequestPage = {
 	networkRequests(): Promise<BrowserNetworkRequest[]>;
 };
 
-function expectedCsrPreloadHrefs(bundleGraph: ArcadeBundleGraph): readonly string[] {
+function expectedCsrPreloadHrefs(bundleGraph: MarklessBundleGraph): readonly string[] {
 	const roots = bundleGraph
 		.filter((item): item is string => typeof item === 'string' && item.startsWith('symbol:'))
 		.map((name) => ({ name, priority: 'high' as const }));

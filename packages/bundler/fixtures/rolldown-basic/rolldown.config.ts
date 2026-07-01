@@ -1,5 +1,5 @@
 import { defineConfig } from 'rolldown';
-import { arcadeClient, arcadeServer } from '@arcade/bundler/rolldown';
+import { marklessClient, marklessServer } from '@markless/bundler/rolldown';
 
 export default defineConfig([
 	{
@@ -8,7 +8,7 @@ export default defineConfig([
 			dir: 'dist/client',
 			format: 'esm',
 		},
-		plugins: [arcadeClient()],
+		plugins: [marklessClient()],
 	},
 	{
 		input: 'src/render.ts',
@@ -16,6 +16,6 @@ export default defineConfig([
 			dir: 'dist/render',
 			format: 'esm',
 		},
-		plugins: [arcadeServer()],
+		plugins: [marklessServer()],
 	},
 ]);

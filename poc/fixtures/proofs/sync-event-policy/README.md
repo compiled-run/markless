@@ -1,7 +1,7 @@
 # Sync Event Policy Proof
 
 This fixture defines the executable-spec surface for synchronous browser event
-policy extraction in `@arcade/core`. It is not a runtime event delegation
+policy extraction in `@markless/core`. It is not a runtime event delegation
 implementation, not a dynamic import resolver, and not final artifact JSON.
 
 The fixture source lives at [src/App.tsrx](./src/App.tsrx).

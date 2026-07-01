@@ -1,12 +1,12 @@
 import { normalize } from 'pathe';
 import { parsePath, withLeadingSlash } from 'ufo';
-import type { ArcadeEnvironment } from './types.ts';
+import type { MarklessEnvironment } from './types.ts';
 
-export function createArcadeDevGraph() {
+export function createMarklessDevGraph() {
 	const parentModules = new Map<string, Set<string>>();
 
 	return {
-		record(parent: string, ids: Iterable<string>, environment: ArcadeEnvironment) {
+		record(parent: string, ids: Iterable<string>, environment: MarklessEnvironment) {
 			const entries = [...ids];
 			for (const path of parentKeys(parent)) {
 				const key = parentKey(environment, path);
@@ -17,7 +17,7 @@ export function createArcadeDevGraph() {
 				parentModules.set(key, existing);
 			}
 		},
-		clear(parent: string, environment?: ArcadeEnvironment) {
+		clear(parent: string, environment?: MarklessEnvironment) {
 			const deleted: string[] = [];
 			for (const currentEnvironment of targetEnvironments(environment)) {
 				for (const path of parentKeys(parent)) {
@@ -36,7 +36,7 @@ export function createArcadeDevGraph() {
 	};
 }
 
-function targetEnvironments(environment: ArcadeEnvironment | undefined) {
+function targetEnvironments(environment: MarklessEnvironment | undefined) {
 	if (environment) {
 		return [environment];
 	}
@@ -44,7 +44,7 @@ function targetEnvironments(environment: ArcadeEnvironment | undefined) {
 	return allEnvironments;
 }
 
-const allEnvironments: readonly ArcadeEnvironment[] = ['client', 'server', 'lib'];
+const allEnvironments: readonly MarklessEnvironment[] = ['client', 'server', 'lib'];
 
 function parentKeys(parent: string) {
 	const path = pathname(parent);
@@ -54,7 +54,7 @@ function parentKeys(parent: string) {
 	return new Set([path, normalized, leadingPath, barePath]);
 }
 
-function parentKey(environment: ArcadeEnvironment, parent: string) {
+function parentKey(environment: MarklessEnvironment, parent: string) {
 	return `${environment}:${parent}`;
 }
 

@@ -1,0 +1,1 @@
+Markless Router static asset fixture.

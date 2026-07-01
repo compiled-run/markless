@@ -26,7 +26,7 @@ export const PROJECT_FORMAT_CHOICES = [
 export const STARTER_CHOICES = [
 	{
 		value: 'minimal',
-		label: 'Learn Arcade',
+		label: 'Learn Markless',
 		hint: 'A small TSRX counter app. Best first project.',
 	},
 	{
@@ -152,15 +152,15 @@ type StarterFile = {
 	readonly contents: string;
 };
 
-const DEFAULT_TARGET = 'my-arcade-app';
+const DEFAULT_TARGET = 'my-markless-app';
 const TEMPLATE_ROOT = new URL('../templates/', import.meta.url);
 
 export class CreateProgram {
 	configure(): CreateProgramConfig {
 		return {
-			name: 'create-arcade',
+			name: 'create-markless',
 			version: typeof __VERSION__ === 'string' ? __VERSION__ : '0.0.0',
-			description: 'Create Arcade apps',
+			description: 'Create Markless apps',
 		};
 	}
 
@@ -207,9 +207,9 @@ export class CreateProgram {
 		}
 
 		const prompts = runtime.prompts;
-		prompts.intro('Welcome to Arcade');
+		prompts.intro('Welcome to Markless');
 		prompts.note(
-			'Choose a starting point, and Arcade will set up the routes, scripts, and defaults.',
+			'Choose a starting point, and Markless will set up the routes, scripts, and defaults.',
 			"Let's build you an app.",
 		);
 		const starter =
@@ -308,7 +308,7 @@ export class CreateProgram {
 
 		if (runtime.prompts) {
 			runtime.prompts.note(nextSteps(options), `Created ${options.target}`);
-			runtime.prompts.outro('Arcade app ready.');
+			runtime.prompts.outro('Markless app ready.');
 			return;
 		}
 
@@ -578,7 +578,7 @@ function packageName(target: string): string {
 		.replace(/[^a-z0-9._-]+/g, '-')
 		.replace(/^-+|-+$/g, '');
 
-	return name || 'arcade-app';
+	return name || 'markless-app';
 }
 
 function inferPackageManager(env: ProgramRuntime['env']): PackageManager {
@@ -614,7 +614,7 @@ function helpText(config: CreateProgramConfig): string {
 ${config.description}
 
 Usage:
-  create-arcade <target> [--yes]
+  create-markless <target> [--yes]
 
 Options:
   --yes, -y          Use defaults

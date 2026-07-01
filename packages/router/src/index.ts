@@ -27,7 +27,7 @@ export type {
 	RequestFileParseResult,
 	RequestFileTransformResult,
 } from './request-files.ts';
-export { ARCADE_ROUTER_ROUTE_EVENT, dispatchRouteUpdate, routePageProps } from './route-state.ts';
+export { MARKLESS_ROUTER_ROUTE_EVENT, dispatchRouteUpdate, routePageProps } from './route-state.ts';
 export type {
 	RouteDocumentModule,
 	RoutePageModule,
@@ -45,7 +45,7 @@ export interface PageProps<Params extends object = Readonly<Record<string, strin
 	readonly status: number;
 }
 
-export interface ArcadeRouterGeneratedRoutes {}
+export interface MarklessRouterGeneratedRoutes {}
 
 export interface LinkNavigationProps {
 	readonly prefetch?: boolean | 'intent' | 'viewport';
@@ -63,7 +63,7 @@ export type DefaultLinkProps = {
 	readonly [prop: string]: unknown;
 } & LinkNavigationProps;
 
-export type LinkProps = ArcadeRouterGeneratedRoutes extends { readonly link: infer Props }
+export type LinkProps = MarklessRouterGeneratedRoutes extends { readonly link: infer Props }
 	? Props
 	: DefaultLinkProps;
 
@@ -100,7 +100,7 @@ type RuntimeHttpEvent = {
 	readonly url?: URL;
 };
 
-export function __arcadeCreateHttpContext<
+export function __marklessCreateHttpContext<
 	Params extends object = Readonly<Record<string, string>>,
 	Locals extends object = AppLocals,
 >(event: RuntimeHttpEvent): EndpointHttpContext<Params, Locals> {
@@ -161,9 +161,9 @@ function linkAnchorAttributes(props: LinkProps): Array<readonly [string, string]
 	}
 
 	attributes.set('href', typeof props.href === 'string' ? props.href : '#');
-	attributes.set('data-arcade-router-link', '');
-	if (props.replace) attributes.set('data-arcade-router-replace', '');
-	if (props.scroll === false) attributes.set('data-arcade-router-scroll', 'manual');
+	attributes.set('data-markless-router-link', '');
+	if (props.replace) attributes.set('data-markless-router-replace', '');
+	if (props.scroll === false) attributes.set('data-markless-router-scroll', 'manual');
 	return [...attributes];
 }
 
@@ -174,7 +174,7 @@ function isLinkInternalProp(name: string): boolean {
 		name === 'prefetch' ||
 		name === 'replace' ||
 		name === 'scroll' ||
-		name === '__arcadeSsrCallbacks'
+		name === '__marklessSsrCallbacks'
 	);
 }
 

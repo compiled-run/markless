@@ -10,7 +10,7 @@ import { isDirectPublicLiteralValue } from '../src/passes/public-render/state-en
 test('public render module source helpers keep generated path expressions readable', () => {
 	expect(itemPathReadSource('item', ['code'])).toBe('item.code');
 	expect(itemPathReadSource('item', ['copy', 'name'])).toBe(
-		'readArcadePublicPath(item, ["copy","name"])',
+		'readMarklessPublicPath(item, ["copy","name"])',
 	);
 	expect(graphReadExpression('state:chosen', [])).toBe('graph.read("state:chosen")');
 	expect(graphReadExpression('state:score', ['total'])).toBe(

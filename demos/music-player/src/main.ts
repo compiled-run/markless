@@ -1,4 +1,4 @@
-import { render } from 'arcade';
+import { render } from '@markless/core';
 import App from './App.tsrx';
 import './styles.css';
 

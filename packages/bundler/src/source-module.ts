@@ -1,6 +1,6 @@
-import type { ArcadeClientOutput, ArcadeEnvironment } from './types.ts';
+import type { MarklessClientOutput, MarklessEnvironment } from './types.ts';
 
-export const ARCADE_VIRTUAL_PREFIX = 'virtual:arcade:';
+export const MARKLESS_VIRTUAL_PREFIX = 'virtual:markless:';
 
 const SMALL_SYMBOL_DIRECT_LOAD_LIMIT = 8;
 
@@ -16,7 +16,7 @@ export type SourceSymbolRoute = {
 };
 
 export function symbolVirtualModuleId(filename: string, symbolId: string) {
-	return `${ARCADE_VIRTUAL_PREFIX}symbol:${encodeURIComponent(filename)}:${encodeURIComponent(symbolId)}`;
+	return `${MARKLESS_VIRTUAL_PREFIX}symbol:${encodeURIComponent(filename)}:${encodeURIComponent(symbolId)}`;
 }
 
 export function scopedSymbolExportName(filename: string, exportName: string) {
@@ -43,8 +43,8 @@ export function emitSourceModule(input: {
 	readonly filename: string;
 	readonly payloadId: string;
 	readonly resolverId: string;
-	readonly environment: ArcadeEnvironment;
-	readonly clientOutput: ArcadeClientOutput;
+	readonly environment: MarklessEnvironment;
+	readonly clientOutput: MarklessClientOutput;
 	readonly resumeModuleUrl?: string;
 	readonly publicRenderModuleSource: string;
 	readonly publicRenderRootExportName: string | null;
@@ -57,17 +57,17 @@ export function emitSourceModule(input: {
 }) {
 	const symbolsOnly = input.environment === 'client' && input.clientOutput === 'symbols-only';
 	const routeSymbols = input.environment === 'client' && input.symbolRoutes.length > 0;
-	const resumeSymbolLoader = routeSymbols ? 'arcadeSsrLoadSymbolRoute' : 'loadSymbol';
+	const resumeSymbolLoader = routeSymbols ? 'marklessSsrLoadSymbolRoute' : 'loadSymbol';
 	return [
 		input.environment === 'server'
 			? ''
-			: "import { resumeEventOnlyFromPayloadDocument } from 'arcade/web/event-only-resume';",
+			: "import { resumeEventOnlyFromPayloadDocument } from '@markless/core/web/event-only-resume';",
 		symbolsOnly
 			? ''
 			: `import { state as payloadState, view as payloadView } from '${input.payloadId}';`,
 		'',
 		emitLoadSymbol(input),
-		routeSymbols ? 'const arcadeLoadLocalSymbol = loadSymbol;' : '',
+		routeSymbols ? 'const marklessLoadLocalSymbol = loadSymbol;' : '',
 		symbolsOnly && !routeSymbols ? 'export { loadSymbol };' : '',
 		symbolsOnly ? '' : 'export { payloadView };',
 		input.environment === 'server' ? '' : emitResumeContainerEvent(resumeSymbolLoader),
@@ -78,11 +78,11 @@ export function emitSourceModule(input: {
 		routeSymbols
 			? emitLazySymbolRouteFunction(
 					input.symbolRoutes,
-					'arcadeSsrLoadSymbolRoute',
-					'arcadeLoadLocalSymbol',
+					'marklessSsrLoadSymbolRoute',
+					'marklessLoadLocalSymbol',
 				)
 			: '',
-		symbolsOnly && routeSymbols ? 'export { arcadeSsrLoadSymbolRoute as loadSymbol };' : '',
+		symbolsOnly && routeSymbols ? 'export { marklessSsrLoadSymbolRoute as loadSymbol };' : '',
 		symbolsOnly
 			? ''
 			: emitCompiledAppDefault({
@@ -118,12 +118,12 @@ function emitLazySymbolRouteFunction(
 
 function symbolRouteImportSource(importSource: string): string {
 	return importSource.includes('?')
-		? `${importSource}&arcade-symbols`
-		: `${importSource}?arcade-symbols`;
+		? `${importSource}&markless-symbols`
+		: `${importSource}?markless-symbols`;
 }
 
 function emitCompiledAppDefault(input: {
-	readonly environment: ArcadeEnvironment;
+	readonly environment: MarklessEnvironment;
 	readonly resumeModuleUrl?: string;
 	readonly rootExportName: string | null;
 	readonly csrExportName: string | null;
@@ -153,12 +153,12 @@ function emitCompiledAppDefault(input: {
 			: [...resumeModuleEntry, ...modulePreloadEntry, '	payloadView,'];
 
 	return [
-		'const arcadeCompiledApp = {',
+		'const marklessCompiledApp = {',
 		...renderCsrEntry,
 		...renderSsrEntry,
 		...metadataEntries,
 		'};',
-		'export default arcadeCompiledApp;',
+		'export default marklessCompiledApp;',
 	].join('\n');
 }
 
@@ -186,9 +186,9 @@ function emitLoadSymbol(input: {
 	}
 
 	return [
-		`const arcadeSymbolResolverModule = () => import('${input.resolverId}');`,
+		`const marklessSymbolResolverModule = () => import('${input.resolverId}');`,
 		'function loadSymbol(symbolId) {',
-		'	return arcadeSymbolResolverModule().then((mod) => mod.loadSymbol(symbolId));',
+		'	return marklessSymbolResolverModule().then((mod) => mod.loadSymbol(symbolId));',
 		'}',
 	].join('\n');
 }
@@ -198,7 +198,7 @@ function emitDirectSourceSymbolLoader(symbols: ReadonlyArray<SourceSymbolRow>): 
 		'function loadSymbol(symbolId) {',
 		...symbols.flatMap((symbol) => [
 			`	if (symbolId === ${JSON.stringify(symbol.id)}) return import('${symbol.chunk}')`,
-			`		.then((mod) => readArcadeSourceSymbol(mod, ${JSON.stringify(symbol.exportName)}));`,
+			`		.then((mod) => readMarklessSourceSymbol(mod, ${JSON.stringify(symbol.exportName)}));`,
 		]),
 		'	return Promise.reject(new Error(`Unknown async symbol ${symbolId}`));',
 		'}',
@@ -208,8 +208,8 @@ function emitDirectSourceSymbolLoader(symbols: ReadonlyArray<SourceSymbolRow>): 
 
 function emitSourceSymbolExportReader(): string {
 	return [
-		'function readArcadeSourceSymbol(mod, exportName) {',
-		'	mod.init__virtual_arcade_symbol?.();',
+		'function readMarklessSourceSymbol(mod, exportName) {',
+		'	mod.init__virtual_markless_symbol?.();',
 		'	return mod[exportName];',
 		'}',
 	].join('\n');

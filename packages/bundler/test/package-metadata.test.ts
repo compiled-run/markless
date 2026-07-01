@@ -9,13 +9,12 @@ const frameworkPackages = [
 	'packages/web/package.json',
 	'packages/compiler/package.json',
 	'packages/bundler/package.json',
-	'packages/arcade/package.json',
+	'packages/core/package.json',
 	'packages/typescript-plugin/package.json',
 	'packages/vitest-browser/package.json',
 ] as const;
 
 const retiredPackageManifests = [
-	'packages/core/package.json',
 	'packages/protocol/package.json',
 	'packages/test-utils/package.json',
 	'packages/platform-web/package.json',
@@ -63,9 +62,9 @@ describe('package metadata', () => {
 			readonly exports?: Record<string, string>;
 		};
 
-		expect(web.name).toBe('@arcade/web');
-		expect(web.dependencies?.['@arcade/runtime']).toBe('workspace:*');
-		expect(runtime.dependencies).not.toHaveProperty('@arcade/web');
+		expect(web.name).toBe('@markless/web');
+		expect(web.dependencies?.['@markless/runtime']).toBe('workspace:*');
+		expect(runtime.dependencies).not.toHaveProperty('@markless/web');
 		expect(Object.keys(runtime.exports ?? {})).not.toEqual(
 			expect.arrayContaining([
 				'./dom-journal',
@@ -121,10 +120,10 @@ describe('package metadata', () => {
 		};
 		const config = await readFile(resolve(root, 'demos/music-player/vite.config.ts'), 'utf8');
 
-		expect(manifest.dependencies).not.toHaveProperty('@arcade/router');
+		expect(manifest.dependencies).not.toHaveProperty('@markless/router');
 		expect(manifest.scripts).not.toHaveProperty('smoke:ssr');
-		expect(config).not.toContain('@arcade/router');
-		expect(config).toContain('plugins: [arcade()]');
+		expect(config).not.toContain('@markless/router');
+		expect(config).toContain('plugins: [markless()]');
 		await expect(access(resolve(root, 'demos/music-player/index.html'))).resolves.toBe(
 			undefined,
 		);
@@ -147,12 +146,15 @@ describe('package metadata', () => {
 			readonly scripts?: Record<string, string>;
 			readonly dependencies?: Record<string, string>;
 		};
-		const config = await readFile(resolve(root, 'demos/music-player-ssr/vite.config.ts'), 'utf8');
+		const config = await readFile(
+			resolve(root, 'demos/music-player-ssr/vite.config.ts'),
+			'utf8',
+		);
 
-		expect(manifest.dependencies).toHaveProperty('@arcade/router');
+		expect(manifest.dependencies).toHaveProperty('@markless/router');
 		expect(manifest.scripts).not.toHaveProperty('smoke:ssr');
-		expect(config).toContain("import { router } from '@arcade/router/vite';");
-		expect(config).toContain('plugins: [arcade(), router()]');
+		expect(config).toContain("import { router } from '@markless/router/vite';");
+		expect(config).toContain('plugins: [markless(), router()]');
 		expect(config).not.toContain('musicPlayerSsrHost');
 		await expect(access(resolve(root, 'demos/music-player-ssr/document.tsrx'))).resolves.toBe(
 			undefined,
@@ -199,25 +201,25 @@ describe('package metadata', () => {
 		expect(router.files).toEqual(['src']);
 	});
 
-	test('JSFB fixture aliases Arcade subpath imports before the package root', async () => {
+	test('JSFB fixture aliases Markless subpath imports before the package root', async () => {
 		const config = await readFile(
-			resolve(root, 'demos/js-framework-benchmark/frameworks/keyed/arcade/vite.config.ts'),
+			resolve(root, 'demos/js-framework-benchmark/frameworks/keyed/markless/vite.config.ts'),
 			'utf8',
 		);
 
-		const preloadAlias = config.indexOf("find: 'arcade/preload'");
-		const eventOnlyResumeAlias = config.indexOf("find: 'arcade/web/event-only-resume'");
+		const preloadAlias = config.indexOf("find: '@markless/core/preload'");
+		const eventOnlyResumeAlias = config.indexOf("find: '@markless/core/web/event-only-resume'");
 		const runtimeEventOnlyResumeAlias = config.indexOf(
-			"find: 'arcade/runtime/event-only-resume'",
+			"find: '@markless/core/runtime/event-only-resume'",
 		);
-		const webRenderAlias = config.indexOf("find: '@arcade/web/render'");
-		const runtimeRenderAlias = config.indexOf("find: '@arcade/runtime/render'");
-		const webEventOnlyResumeAlias = config.indexOf("find: '@arcade/web/event-only-resume'");
+		const webRenderAlias = config.indexOf("find: '@markless/web/render'");
+		const runtimeRenderAlias = config.indexOf("find: '@markless/runtime/render'");
+		const webEventOnlyResumeAlias = config.indexOf("find: '@markless/web/event-only-resume'");
 		const runtimePackageEventOnlyResumeAlias = config.indexOf(
-			"find: '@arcade/runtime/event-only-resume'",
+			"find: '@markless/runtime/event-only-resume'",
 		);
-		const runtimeRootAlias = config.indexOf("find: '@arcade/runtime'");
-		const rootAlias = config.indexOf("find: 'arcade'");
+		const runtimeRootAlias = config.indexOf("find: '@markless/runtime'");
+		const rootAlias = config.indexOf("find: '@markless/core'");
 
 		expect(preloadAlias).toBeGreaterThanOrEqual(0);
 		expect(eventOnlyResumeAlias).toBeGreaterThanOrEqual(0);
@@ -234,9 +236,9 @@ describe('package metadata', () => {
 		expect(runtimeEventOnlyResumeAlias).toBeLessThan(rootAlias);
 		expect(config).toContain('packages/web/src/render.ts');
 		expect(config).toContain('packages/runtime/src/render.ts');
-		expect(config).toContain('packages/arcade/src/preload.ts');
-		expect(config).toContain('packages/arcade/src/web/event-only-resume.ts');
-		expect(config).toContain('packages/arcade/src/runtime/event-only-resume.ts');
+		expect(config).toContain('packages/core/src/preload.ts');
+		expect(config).toContain('packages/core/src/web/event-only-resume.ts');
+		expect(config).toContain('packages/core/src/runtime/event-only-resume.ts');
 		expect(config).toContain('packages/web/src/event-only-resume.ts');
 		expect(config).toContain('packages/runtime/src/event-only-resume.ts');
 	});

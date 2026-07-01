@@ -4,22 +4,22 @@ import { withoutLeadingSlash } from 'ufo';
 import type {
 	BundleGraphAdder,
 	PreloadGraphEntriesAdder,
-	ArcadeBuildMetadata,
-	ArcadeBundle,
-	ArcadeBundleGraph,
+	MarklessBuildMetadata,
+	MarklessBundle,
+	MarklessBundleGraph,
 } from '../types.ts';
 
 type BundleGraphEdge = [string, string | null];
-type BundleGraphRecord = Partial<ArcadeBundle>;
+type BundleGraphRecord = Partial<MarklessBundle>;
 
 const MINIMUM_CONNECTION_BYTES_PER_SECOND = (300 * 1024) / 8;
 const SLOW_BUNDLE_TOTAL = MINIMUM_CONNECTION_BYTES_PER_SECOND * 0.5;
 const SMALL_BUNDLE_TOTAL = 1000;
 
 export function convertManifestToBundleGraph(
-	manifest: ArcadeBuildMetadata,
+	manifest: MarklessBuildMetadata,
 	bundleGraphAdders?: Set<BundleGraphAdder>,
-): ArcadeBundleGraph {
+): MarklessBundleGraph {
 	const graph = bundleGraphRecords(manifest, bundleGraphAdders);
 	const dag = defDGraph(bundleGraphEdges(graph));
 	const reduced = dag.copy();
@@ -76,7 +76,7 @@ export function createPreloadGraphAdder(addEntries: PreloadGraphEntriesAdder): B
 		});
 }
 
-function bundlesForOrigins(manifest: ArcadeBuildMetadata, origins: readonly string[]) {
+function bundlesForOrigins(manifest: MarklessBuildMetadata, origins: readonly string[]) {
 	const normalizedOrigins = new Set(origins.map(normalizeManifestOrigin));
 	const bundles: string[] = [];
 	for (const [bundleName, bundle] of Object.entries(manifest.bundles)) {
@@ -90,7 +90,7 @@ function bundlesForOrigins(manifest: ArcadeBuildMetadata, origins: readonly stri
 }
 
 function bundleGraphRecords(
-	manifest: ArcadeBuildMetadata,
+	manifest: MarklessBuildMetadata,
 	bundleGraphAdders?: Set<BundleGraphAdder>,
 ) {
 	const graph: Record<string, BundleGraphRecord> = { ...manifest.bundles };
@@ -114,7 +114,7 @@ function bundleGraphRecords(
 		}
 	}
 	if (bundleGraphAdders) {
-		const combined = { ...manifest, bundles: graph as ArcadeBuildMetadata['bundles'] };
+		const combined = { ...manifest, bundles: graph as MarklessBuildMetadata['bundles'] };
 		for (const add of bundleGraphAdders) {
 			Object.assign(graph, add(combined));
 		}

@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
-import { arcade } from '../../../arcade/src/vite.ts';
+import { markless } from '../../../core/src/vite.ts';
 import { fixtureSsrHost } from './src/dev-server.ts';
 
 export default defineConfig(({ command }) => ({
@@ -22,5 +22,5 @@ export default defineConfig(({ command }) => ({
 			},
 		},
 	},
-	plugins: [arcade(), fixtureSsrHost()],
+	plugins: [markless(), fixtureSsrHost()],
 }));

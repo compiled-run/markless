@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
-import { arcade } from '../src/vite/index.ts';
+import { markless } from '../src/vite/index.ts';
 import {
 	callBuildApp,
 	callConfig,
@@ -16,7 +16,7 @@ import {
 } from './helpers.ts';
 
 const source = `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 
 export function App() @{
 	let count = state(0);
@@ -50,7 +50,7 @@ describe('Vite adapter structure', () => {
 	test('wraps the Rolldown plugin with shared build state and public extension API', () => {
 		const plugin = getAsyncPlugin();
 
-		expect(plugin.name).toBe('vite-plugin-arcade');
+		expect(plugin.name).toBe('vite-plugin-markless');
 		expect(plugin.enforce).toBe('post');
 		expect(plugin.sharedDuringBuild).toBe(true);
 		expect(plugin.api?.getManifest()).toBe(null);
@@ -84,8 +84,9 @@ describe('Vite adapter structure', () => {
 					exports: ['default'],
 					imports: [],
 					dynamicImports: [],
-					moduleIds: ['\0virtual:arcade:payload:%2Fworkspace%2Fapp%2Fsrc%2FApp.tsrx'],
-					facadeModuleId: '\0virtual:arcade:payload:%2Fworkspace%2Fapp%2Fsrc%2FApp.tsrx',
+					moduleIds: ['\0virtual:markless:payload:%2Fworkspace%2Fapp%2Fsrc%2FApp.tsrx'],
+					facadeModuleId:
+						'\0virtual:markless:payload:%2Fworkspace%2Fapp%2Fsrc%2FApp.tsrx',
 				},
 			},
 			vi.fn(),
@@ -161,15 +162,15 @@ describe('Vite adapter structure', () => {
 		});
 
 		expect(callTransformIndexHtml(plugin, '<html></html>')).toBeUndefined();
-		expect(await callResolveId(plugin, 'virtual:arcade-dev-client')).toBeNull();
-		expect(await callLoad(plugin, '\0virtual:arcade-dev-client')).toBeNull();
+		expect(await callResolveId(plugin, 'virtual:markless-dev-client')).toBeNull();
+		expect(await callLoad(plugin, '\0virtual:markless-dev-client')).toBeNull();
 	});
 
 	test('serves dev symbol resolver tables with browser-loadable symbol module URLs', async () => {
 		const plugin = getAsyncPlugin();
 		const filename = '/workspace/app/src/App.tsrx';
 		const tableSource = `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 
 export function App() @{
 	let count = state(0);
@@ -191,11 +192,11 @@ export function App() @{
 
 		const resolverSource = await callLoad(
 			plugin,
-			`\0virtual:arcade:resolver:${encodeURIComponent(filename)}`,
+			`\0virtual:markless:resolver:${encodeURIComponent(filename)}`,
 		);
 
-		expect(resolverSource).toContain('/dev/@id/__x00__virtual:arcade:symbol:');
-		expect(resolverSource).not.toContain('"virtual:arcade:symbol:');
+		expect(resolverSource).toContain('/dev/@id/__x00__virtual:markless:symbol:');
+		expect(resolverSource).not.toContain('"virtual:markless:symbol:');
 		expect(resolverSource).toContain('import(/* @vite-ignore */ moduleUrls[row[0]])');
 	});
 
@@ -203,7 +204,7 @@ export function App() @{
 		const plugin = getAsyncPlugin();
 		const send = vi.fn();
 		const invalidated: unknown[] = [];
-		const virtualModule = { id: '\0virtual:arcade:payload:/src/App.tsrx' };
+		const virtualModule = { id: '\0virtual:markless:payload:/src/App.tsrx' };
 		const environment = {
 			config: { consumer: 'client' },
 			hot: { send },
@@ -251,7 +252,7 @@ export function App() @{
 	test('hot updates with unchanged file content skip invalidation and full reload', async () => {
 		const plugin = getAsyncPlugin();
 		const send = vi.fn();
-		const virtualModule = { id: '\0virtual:arcade:payload:/src/App.tsrx' };
+		const virtualModule = { id: '\0virtual:markless:payload:/src/App.tsrx' };
 		const environment = {
 			config: { consumer: 'client' },
 			hot: { send },
@@ -312,8 +313,8 @@ export function App() @{
 
 	test('server hot updates forward through the configured client environment', async () => {
 		const plugin = getPlugin(
-			arcade({ clientEnvironment: 'browser', serverEnvironment: 'edge' }),
-			'vite-plugin-arcade',
+			markless({ clientEnvironment: 'browser', serverEnvironment: 'edge' }),
+			'vite-plugin-markless',
 		);
 		const browserSend = vi.fn();
 		const defaultClientSend = vi.fn();
@@ -360,7 +361,7 @@ export function App() @{
 });
 
 function getAsyncPlugin() {
-	return getPlugin(arcade(), 'vite-plugin-arcade') as ReturnType<typeof arcade>[number] & {
+	return getPlugin(markless(), 'vite-plugin-markless') as ReturnType<typeof markless>[number] & {
 		api?: {
 			getManifest: () => unknown;
 			registerBundleGraphAdder: (adder: () => Record<string, never>) => void;

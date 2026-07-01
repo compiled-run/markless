@@ -2,21 +2,23 @@ import { relative } from 'pathe';
 import type {
 	BundleGraphAdder,
 	GlobalInjections,
-	ArcadeAsset,
-	ArcadeBuildMetadata,
-	ArcadeBundle,
-	ArcadeTransformManifest,
+	MarklessAsset,
+	MarklessBuildMetadata,
+	MarklessBundle,
+	MarklessTransformManifest,
 } from '../types.ts';
 import { convertManifestToBundleGraph } from './bundle-graph.ts';
 import { collectHeadLinkInjections } from './head-links.ts';
 
-export const ARCADE_MANIFEST_FILE = 'arcade-manifest.json';
+export const MARKLESS_MANIFEST_FILE = 'markless-manifest.json';
 
-export type ArcadeBuildMetadataBundle = Record<string, ArcadeBuildMetadataBundleItem>;
+export type MarklessBuildMetadataBundle = Record<string, MarklessBuildMetadataBundleItem>;
 
-export type ArcadeBuildMetadataBundleItem = ArcadeBuildMetadataAsset | ArcadeBuildMetadataChunk;
+export type MarklessBuildMetadataBundleItem =
+	| MarklessBuildMetadataAsset
+	| MarklessBuildMetadataChunk;
 
-export interface ArcadeBuildMetadataAsset {
+export interface MarklessBuildMetadataAsset {
 	type: 'asset';
 	fileName: string;
 	name?: string;
@@ -24,7 +26,7 @@ export interface ArcadeBuildMetadataAsset {
 	source: string | Uint8Array;
 }
 
-export interface ArcadeBuildMetadataChunk {
+export interface MarklessBuildMetadataChunk {
 	type: 'chunk';
 	fileName: string;
 	name: string;
@@ -40,8 +42,8 @@ export interface ArcadeBuildMetadataChunk {
 }
 
 export function createBuildMetadata(
-	bundle: ArcadeBuildMetadataBundle,
-	transformManifests: Iterable<ArcadeTransformManifest>,
+	bundle: MarklessBuildMetadataBundle,
+	transformManifests: Iterable<MarklessTransformManifest>,
 	root: string | undefined,
 	options: {
 		bundleGraphAsset?: string;
@@ -54,7 +56,7 @@ export function createBuildMetadata(
 	const canonPath = options.canonPath ?? ((fileName: string) => fileName);
 	const publicPath = options.publicPath ?? ((fileName: string) => fileName);
 	const modules = [...transformManifests].map(cloneTransformManifest);
-	const metadata: ArcadeBuildMetadata = {
+	const metadata: MarklessBuildMetadata = {
 		version: 1,
 		modules,
 		bundles: {},
@@ -77,7 +79,7 @@ export function createBuildMetadata(
 
 		const bundleFileName = canonPath(item.fileName);
 		const origins = getOrigins(item, root);
-		const asyncBundle: ArcadeBundle = {
+		const asyncBundle: MarklessBundle = {
 			size: item.code.length,
 			total: item.code.length,
 		};
@@ -122,7 +124,7 @@ export function createBuildMetadata(
 
 export const createManifest = createBuildMetadata;
 
-function cloneTransformManifest(manifest: ArcadeTransformManifest): ArcadeTransformManifest {
+function cloneTransformManifest(manifest: MarklessTransformManifest): MarklessTransformManifest {
 	return {
 		source: manifest.source,
 		payload: { ...manifest.payload },
@@ -132,8 +134,8 @@ function cloneTransformManifest(manifest: ArcadeTransformManifest): ArcadeTransf
 }
 
 function finalizeVirtualModuleReferences(
-	modules: ArcadeTransformManifest[],
-	item: ArcadeBuildMetadataChunk,
+	modules: MarklessTransformManifest[],
+	item: MarklessBuildMetadataChunk,
 	bundleFileName: string,
 ) {
 	const ids = new Set(
@@ -163,7 +165,7 @@ function normalizeVirtualModuleId(id: string) {
 	return id;
 }
 
-function assetInfo(item: ArcadeBuildMetadataAsset): ArcadeAsset {
+function assetInfo(item: MarklessBuildMetadataAsset): MarklessAsset {
 	return {
 		name: item.names?.[0] ?? item.name,
 		size: item.source.length,
@@ -171,7 +173,7 @@ function assetInfo(item: ArcadeBuildMetadataAsset): ArcadeAsset {
 }
 
 function mapBundleNames(
-	bundle: ArcadeBuildMetadataBundle,
+	bundle: MarklessBuildMetadataBundle,
 	names: string[],
 	canonPath: (fileName: string) => string,
 ) {
@@ -185,7 +187,7 @@ function mapBundleNames(
 	});
 }
 
-function getOrigins(item: ArcadeBuildMetadataChunk, root: string | undefined) {
+function getOrigins(item: MarklessBuildMetadataChunk, root: string | undefined) {
 	return item.moduleIds
 		.filter((id) => !id.startsWith('\0'))
 		.map((id) => {
@@ -198,7 +200,7 @@ function getOrigins(item: ArcadeBuildMetadataChunk, root: string | undefined) {
 		.sort();
 }
 
-function computeTotals(bundles: Record<string, ArcadeBundle>) {
+function computeTotals(bundles: Record<string, MarklessBundle>) {
 	const collect = (name: string, seen: Set<string>) => {
 		const bundle = bundles[name];
 		if (!bundle || seen.has(name)) return;
@@ -215,7 +217,7 @@ function computeTotals(bundles: Record<string, ArcadeBundle>) {
 	}
 }
 
-function sortBuildMetadata(metadata: ArcadeBuildMetadata) {
+function sortBuildMetadata(metadata: MarklessBuildMetadata) {
 	metadata.modules = metadata.modules.sort((a, b) => a.source.localeCompare(b.source));
 	metadata.bundles = sortRecord(metadata.bundles);
 	metadata.assets = sortRecord(metadata.assets ?? {});

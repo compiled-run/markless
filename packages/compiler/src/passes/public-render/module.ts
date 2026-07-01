@@ -1,5 +1,5 @@
 import { isEventAttribute, normalizeEventName, parseModule } from '@tsrx/core';
-import { deserializeGraphValue, type SerializedGraphPayload } from '@arcade/serializer';
+import { deserializeGraphValue, type SerializedGraphPayload } from '@markless/serializer';
 import type {
 	PublicRenderModuleArtifact,
 	PublicRenderModuleInput,
@@ -44,9 +44,9 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 		moduleSource,
 		rootExportName: moduleSource ? (rootComponentName ?? null) : null,
 		csrModuleSource,
-		csrExportName: csrModuleSource ? 'arcadeRenderCsr' : null,
+		csrExportName: csrModuleSource ? 'marklessRenderCsr' : null,
 		ssrModuleSource,
-		ssrExportName: ssrModuleSource ? 'arcadeRenderSsr' : null,
+		ssrExportName: ssrModuleSource ? 'marklessRenderSsr' : null,
 		diagnostics: input.publicRenderPlan.diagnostics,
 	};
 }
@@ -57,7 +57,7 @@ function emitPublicCsrRenderModule(
 ): string {
 	if (!input.publicRenderPlan.rootTemplateHtml) return '';
 
-	const imports = componentImports(input.semanticGraph.componentEdges, '__arcadeCsrComponent');
+	const imports = componentImports(input.semanticGraph.componentEdges, '__marklessCsrComponent');
 	const valueImports = publicRenderValueImports(
 		input.semanticGraph.moduleImports,
 		input.semanticGraph.componentEdges,
@@ -78,43 +78,43 @@ function emitPublicCsrRenderModule(
 		...imports.map(emitComponentImport),
 		...valueImports.map(emitValueImport),
 		'',
-		`const arcadeCsrHostLocators = ${JSON.stringify(hostLocators)};`,
-		'const arcadeCsrStateValues = new Map([',
+		`const marklessCsrHostLocators = ${JSON.stringify(hostLocators)};`,
+		'const marklessCsrStateValues = new Map([',
 		stateEntries(input).join(',\n'),
 		']);',
-		'function arcadeRenderCsr(props = {}) {',
+		'function marklessRenderCsr(props = {}) {',
 		destructureProps(rootInfo.propNames),
-		...stateLocalLines(input, 'arcadeCsrStateValue'),
-		'	const arcadeCsrRuntimeState = { graph: null };',
-		'	const arcadeCsrChildren = [];',
-		`	const root = arcadeCsrRootFromHtml(${emitHtmlNode(rootInfo.root, renderContext)});`,
+		...stateLocalLines(input, 'marklessCsrStateValue'),
+		'	const marklessCsrRuntimeState = { graph: null };',
+		'	const marklessCsrChildren = [];',
+		`	const root = marklessCsrRootFromHtml(${emitHtmlNode(rootInfo.root, renderContext)});`,
 		...renderContext.childReplacements,
 		...propEvents.map(
 			(event) =>
-				`	arcadeCsrAttachPropEvent(root, ${JSON.stringify(event.hostPath)}, ${JSON.stringify(event.eventName)}, ${event.propName});`,
+				`	marklessCsrAttachPropEvent(root, ${JSON.stringify(event.hostPath)}, ${JSON.stringify(event.eventName)}, ${event.propName});`,
 		),
-		'	const arcadeCsrView = arcadeCsrComposeView(root, payloadView, arcadeCsrHostLocators, arcadeCsrChildren);',
-		'	const arcadeCsrState = arcadeComposeState(payloadState, arcadeCsrChildren);',
+		'	const marklessCsrView = marklessCsrComposeView(root, payloadView, marklessCsrHostLocators, marklessCsrChildren);',
+		'	const marklessCsrState = marklessComposeState(payloadState, marklessCsrChildren);',
 		'	return {',
 		'		root,',
-		'		state: arcadeCsrState,',
-		'		view: arcadeCsrView,',
-		'		loadSymbol: arcadeCsrLoadSymbol,',
-		'		connectRuntime(context) { arcadeCsrRuntimeState.graph = context.graph; for (const child of arcadeCsrChildren) child.output?.connectRuntime?.(context); },',
+		'		state: marklessCsrState,',
+		'		view: marklessCsrView,',
+		'		loadSymbol: marklessCsrLoadSymbol,',
+		'		connectRuntime(context) { marklessCsrRuntimeState.graph = context.graph; for (const child of marklessCsrChildren) child.output?.connectRuntime?.(context); },',
 		'	};',
-		'	function arcadeCsrCallback(symbolId) {',
-		'		return async function arcadeCsrCallbackHandler(event) {',
-		'			const graph = arcadeCsrRuntimeState.graph;',
+		'	function marklessCsrCallback(symbolId) {',
+		'		return async function marklessCsrCallbackHandler(event) {',
+		'			const graph = marklessCsrRuntimeState.graph;',
 		'			if (!graph) return;',
-		'			const loaded = arcadeCsrLoadSymbol(symbolId);',
-		'			const symbol = arcadeCsrIsThenable(loaded) ? await loaded : loaded;',
+		'			const loaded = marklessCsrLoadSymbol(symbolId);',
+		'			const symbol = marklessCsrIsThenable(loaded) ? await loaded : loaded;',
 		'			const result = symbol({ graph, event, element: root, getElementHandle: () => undefined });',
-		'			if (arcadeCsrIsThenable(result)) await result;',
+		'			if (marklessCsrIsThenable(result)) await result;',
 		'			await graph.flush?.();',
 		'		};',
 		'	}',
-		'	function arcadeCsrLoadSymbol(symbolId) {',
-		'		for (const child of arcadeCsrChildren) {',
+		'	function marklessCsrLoadSymbol(symbolId) {',
+		'		for (const child of marklessCsrChildren) {',
 		'			if (symbolId.startsWith(child.symbolPrefix) && child.output?.loadSymbol) {',
 		'				return child.output.loadSymbol(symbolId.slice(child.symbolPrefix.length));',
 		'			}',
@@ -122,21 +122,21 @@ function emitPublicCsrRenderModule(
 		'		return loadSymbol(symbolId);',
 		'	}',
 		'}',
-		'function arcadeCsrStateValue(graphNodeId) { return arcadeCsrStateValues.get(graphNodeId); }',
-		'function arcadeCsrRootFromHtml(html) { const template = document.createElement("template"); template.innerHTML = html; const root = template.content.firstElementChild; if (!root) throw new Error("Arcade CSR template did not create a root element."); return root; }',
-		'function arcadeCsrRenderChild(component, props) { return component?.renderCsr?.(props); }',
-		'function arcadeCsrReplaceChild(root, index, child) { const placeholder = root.querySelector?.(`[data-arcade-csr-child="${index}"]`); if (placeholder && child) placeholder.replaceWith(child); else placeholder?.remove?.(); }',
-		'function arcadeCsrAttachPropEvent(root, path, eventName, handler) { const element = arcadeCsrNodeAtPath(root, path); if (handler && element?.addEventListener) element.addEventListener(eventName, handler); }',
-		'function arcadeComposeState(state, children) { const childStates = children.map((child) => child.output?.state).filter(Boolean); if (childStates.length === 0) return state; return { ...state, cells: [...(state.cells ?? []), ...childStates.flatMap((childState) => childState.cells ?? [])], computed: [...(state.computed ?? []), ...childStates.flatMap((childState) => childState.computed ?? [])], ...((state.sharedDefinitions || childStates.some((childState) => childState.sharedDefinitions?.length)) ? { sharedDefinitions: [...(state.sharedDefinitions ?? []), ...childStates.flatMap((childState) => childState.sharedDefinitions ?? [])] } : {}) }; }',
-		'function arcadeCsrComposeView(root, view, hostLocators, children) { const elements = arcadeCsrCollectElements(root); const indexByElement = new Map(elements.map((element, index) => [element, index])); const localHostIds = new Set(); const locators = []; for (const locator of hostLocators) { const element = arcadeCsrNodeAtPath(root, locator.hostPath); const index = element ? indexByElement.get(element) : undefined; if (index === undefined) continue; localHostIds.add(locator.hostNodeId); locators.push({ hostNodeId: locator.hostNodeId, strategy: "dom-order", index, tagName: locator.tagName }); } const events = view.events.filter((event) => localHostIds.has(event.hostNodeId)); const domUpdates = view.domUpdates.filter((update) => localHostIds.has(update.hostNodeId)); const behaviors = view.behaviors.filter((behavior) => localHostIds.has(behavior.hostNodeId)); const elementHandles = view.elementHandles.filter((handle) => localHostIds.has(handle.hostNodeId)); for (const child of children) arcadeCsrAppendChildView({ child, elements, indexByElement, locators, events, domUpdates, behaviors, elementHandles }); locators.sort((a, b) => a.index - b.index); return { ...view, locators, events, domUpdates, behaviors, elementHandles }; }',
-		'function arcadeCsrAppendChildView(context) { const childView = context.child.output?.view; const childRoot = context.child.output?.root; if (!childView || !childRoot) return; const childElements = arcadeCsrCollectElements(childRoot); for (const locator of childView.locators) { const element = childElements[locator.index]; const index = element ? context.indexByElement.get(element) : undefined; if (index === undefined) continue; context.locators.push({ ...locator, hostNodeId: context.child.hostPrefix + locator.hostNodeId, index }); } for (const event of childView.events) context.events.push({ ...event, hostNodeId: context.child.hostPrefix + event.hostNodeId, symbolIds: event.symbolIds.map((symbolId) => context.child.symbolPrefix + symbolId) }); for (const update of childView.domUpdates) { const mapped = arcadeCsrRemapChildGraph(update, context.child.graphProps); if (!mapped) continue; context.domUpdates.push({ ...update, hostNodeId: context.child.hostPrefix + update.hostNodeId, graphNodeId: mapped.graphNodeId, path: mapped.path, ...(update.symbolId ? { symbolId: context.child.symbolPrefix + update.symbolId } : {}) }); } for (const behavior of childView.behaviors) context.behaviors.push({ ...behavior, hostNodeId: context.child.hostPrefix + behavior.hostNodeId, ...(behavior.symbolId ? { symbolId: context.child.symbolPrefix + behavior.symbolId } : {}) }); for (const handle of childView.elementHandles) context.elementHandles.push({ ...handle, hostNodeId: context.child.hostPrefix + handle.hostNodeId }); }',
-		'function arcadeCsrRemapChildGraph(record, graphProps) { if (record.graphNodeId === "prop:props") { const propName = record.path[0]; const binding = graphProps.find((prop) => prop.name === propName); return binding ? { graphNodeId: binding.graphNodeId, path: [...binding.path, ...record.path.slice(1)] } : null; } if (record.graphNodeId.startsWith?.("prop:")) { const propName = record.graphNodeId.slice(5); const binding = graphProps.find((prop) => prop.name === propName); return binding ? { graphNodeId: binding.graphNodeId, path: [...binding.path, ...record.path] } : null; } return { graphNodeId: record.graphNodeId, path: record.path }; }',
-		'function arcadeCsrCollectElements(root) { const elements = []; const visit = (node) => { if (node?.nodeType === 1) elements.push(node); for (const child of Array.from(node?.childNodes ?? [])) visit(child); }; visit(root); return elements; }',
-		'function arcadeCsrNodeAtPath(root, path) { let node = root; for (const index of path) { node = node?.childNodes?.[index]; if (!node) return undefined; } return node; }',
-		'function arcadeCsrIsThenable(value) { return value !== null && (typeof value === "object" || typeof value === "function") && typeof value.then === "function"; }',
-		'function arcadeCsrText(value) { return arcadeCsrEscape(value == null ? "" : String(value)); }',
-		'function arcadeCsrAttribute(name, value) { return ` ${name}="${arcadeCsrEscape(value == null ? "" : String(value))}"`; }',
-		'function arcadeCsrEscape(value) { return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll("\\"", "&quot;"); }',
+		'function marklessCsrStateValue(graphNodeId) { return marklessCsrStateValues.get(graphNodeId); }',
+		'function marklessCsrRootFromHtml(html) { const template = document.createElement("template"); template.innerHTML = html; const root = template.content.firstElementChild; if (!root) throw new Error("Markless CSR template did not create a root element."); return root; }',
+		'function marklessCsrRenderChild(component, props) { return component?.renderCsr?.(props); }',
+		'function marklessCsrReplaceChild(root, index, child) { const placeholder = root.querySelector?.(`[data-markless-csr-child="${index}"]`); if (placeholder && child) placeholder.replaceWith(child); else placeholder?.remove?.(); }',
+		'function marklessCsrAttachPropEvent(root, path, eventName, handler) { const element = marklessCsrNodeAtPath(root, path); if (handler && element?.addEventListener) element.addEventListener(eventName, handler); }',
+		'function marklessComposeState(state, children) { const childStates = children.map((child) => child.output?.state).filter(Boolean); if (childStates.length === 0) return state; return { ...state, cells: [...(state.cells ?? []), ...childStates.flatMap((childState) => childState.cells ?? [])], computed: [...(state.computed ?? []), ...childStates.flatMap((childState) => childState.computed ?? [])], ...((state.sharedDefinitions || childStates.some((childState) => childState.sharedDefinitions?.length)) ? { sharedDefinitions: [...(state.sharedDefinitions ?? []), ...childStates.flatMap((childState) => childState.sharedDefinitions ?? [])] } : {}) }; }',
+		'function marklessCsrComposeView(root, view, hostLocators, children) { const elements = marklessCsrCollectElements(root); const indexByElement = new Map(elements.map((element, index) => [element, index])); const localHostIds = new Set(); const locators = []; for (const locator of hostLocators) { const element = marklessCsrNodeAtPath(root, locator.hostPath); const index = element ? indexByElement.get(element) : undefined; if (index === undefined) continue; localHostIds.add(locator.hostNodeId); locators.push({ hostNodeId: locator.hostNodeId, strategy: "dom-order", index, tagName: locator.tagName }); } const events = view.events.filter((event) => localHostIds.has(event.hostNodeId)); const domUpdates = view.domUpdates.filter((update) => localHostIds.has(update.hostNodeId)); const behaviors = view.behaviors.filter((behavior) => localHostIds.has(behavior.hostNodeId)); const elementHandles = view.elementHandles.filter((handle) => localHostIds.has(handle.hostNodeId)); for (const child of children) marklessCsrAppendChildView({ child, elements, indexByElement, locators, events, domUpdates, behaviors, elementHandles }); locators.sort((a, b) => a.index - b.index); return { ...view, locators, events, domUpdates, behaviors, elementHandles }; }',
+		'function marklessCsrAppendChildView(context) { const childView = context.child.output?.view; const childRoot = context.child.output?.root; if (!childView || !childRoot) return; const childElements = marklessCsrCollectElements(childRoot); for (const locator of childView.locators) { const element = childElements[locator.index]; const index = element ? context.indexByElement.get(element) : undefined; if (index === undefined) continue; context.locators.push({ ...locator, hostNodeId: context.child.hostPrefix + locator.hostNodeId, index }); } for (const event of childView.events) context.events.push({ ...event, hostNodeId: context.child.hostPrefix + event.hostNodeId, symbolIds: event.symbolIds.map((symbolId) => context.child.symbolPrefix + symbolId) }); for (const update of childView.domUpdates) { const mapped = marklessCsrRemapChildGraph(update, context.child.graphProps); if (!mapped) continue; context.domUpdates.push({ ...update, hostNodeId: context.child.hostPrefix + update.hostNodeId, graphNodeId: mapped.graphNodeId, path: mapped.path, ...(update.symbolId ? { symbolId: context.child.symbolPrefix + update.symbolId } : {}) }); } for (const behavior of childView.behaviors) context.behaviors.push({ ...behavior, hostNodeId: context.child.hostPrefix + behavior.hostNodeId, ...(behavior.symbolId ? { symbolId: context.child.symbolPrefix + behavior.symbolId } : {}) }); for (const handle of childView.elementHandles) context.elementHandles.push({ ...handle, hostNodeId: context.child.hostPrefix + handle.hostNodeId }); }',
+		'function marklessCsrRemapChildGraph(record, graphProps) { if (record.graphNodeId === "prop:props") { const propName = record.path[0]; const binding = graphProps.find((prop) => prop.name === propName); return binding ? { graphNodeId: binding.graphNodeId, path: [...binding.path, ...record.path.slice(1)] } : null; } if (record.graphNodeId.startsWith?.("prop:")) { const propName = record.graphNodeId.slice(5); const binding = graphProps.find((prop) => prop.name === propName); return binding ? { graphNodeId: binding.graphNodeId, path: [...binding.path, ...record.path] } : null; } return { graphNodeId: record.graphNodeId, path: record.path }; }',
+		'function marklessCsrCollectElements(root) { const elements = []; const visit = (node) => { if (node?.nodeType === 1) elements.push(node); for (const child of Array.from(node?.childNodes ?? [])) visit(child); }; visit(root); return elements; }',
+		'function marklessCsrNodeAtPath(root, path) { let node = root; for (const index of path) { node = node?.childNodes?.[index]; if (!node) return undefined; } return node; }',
+		'function marklessCsrIsThenable(value) { return value !== null && (typeof value === "object" || typeof value === "function") && typeof value.then === "function"; }',
+		'function marklessCsrText(value) { return marklessCsrEscape(value == null ? "" : String(value)); }',
+		'function marklessCsrAttribute(name, value) { return ` ${name}="${marklessCsrEscape(value == null ? "" : String(value))}"`; }',
+		'function marklessCsrEscape(value) { return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll("\\"", "&quot;"); }',
 		'',
 	]
 		.filter((part): part is string => part !== null && part !== '')
@@ -149,7 +149,7 @@ function emitPublicSsrRenderModule(
 ): string {
 	if (!input.publicRenderPlan.rootTemplateHtml && !isComponentRoot(rootInfo.root)) return '';
 
-	const imports = componentImports(input.semanticGraph.componentEdges, '__arcadeSsrComponent');
+	const imports = componentImports(input.semanticGraph.componentEdges, '__marklessSsrComponent');
 	const valueImports = publicRenderValueImports(
 		input.semanticGraph.moduleImports,
 		input.semanticGraph.componentEdges,
@@ -180,38 +180,38 @@ function emitPublicSsrRenderModule(
 		...imports.map(emitComponentImport),
 		...valueImports.map(emitValueImport),
 		'',
-		`const arcadeSsrPropEvents = ${JSON.stringify(propEvents)};`,
-		'const arcadeSsrStateValues = new Map([',
+		`const marklessSsrPropEvents = ${JSON.stringify(propEvents)};`,
+		'const marklessSsrStateValues = new Map([',
 		stateEntries(input).join(',\n'),
 		']);',
-		'function arcadeRenderSsr(props = {}) {',
+		'function marklessRenderSsr(props = {}) {',
 		destructureProps(rootInfo.propNames),
-		...stateLocalLines(input, 'arcadeSsrStateValue'),
-		'	const arcadeSsrChildren = [];',
-		'	const arcadeSsrHostLocators = [];',
+		...stateLocalLines(input, 'marklessSsrStateValue'),
+		'	const marklessSsrChildren = [];',
+		'	const marklessSsrHostLocators = [];',
 		`	const html = ${htmlExpression};`,
-		'	const arcadeSsrComposition = arcadeSsrComposeView(payloadView, arcadeSsrHostLocators, arcadeSsrChildren);',
-		'	const arcadeSsrState = arcadeComposeState(payloadState, arcadeSsrChildren);',
+		'	const marklessSsrComposition = marklessSsrComposeView(payloadView, marklessSsrHostLocators, marklessSsrChildren);',
+		'	const marklessSsrState = marklessComposeState(payloadState, marklessSsrChildren);',
 		'	return {',
 		'		html,',
-		'		state: arcadeSsrState,',
-		'		view: arcadeSsrComposition.view,',
-		'		propEvents: arcadeSsrPropEvents,',
-		'		externalSymbolIds: arcadeSsrComposition.externalSymbolIds,',
+		'		state: marklessSsrState,',
+		'		view: marklessSsrComposition.view,',
+		'		propEvents: marklessSsrPropEvents,',
+		'		externalSymbolIds: marklessSsrComposition.externalSymbolIds,',
 		'	};',
 		'}',
-		'function arcadeSsrStateValue(graphNodeId) { return arcadeSsrStateValues.get(graphNodeId); }',
-		'function arcadeSsrRenderChild(children, component, props, child) { const output = component?.renderSsr?.(props); if (output) children.push({ ...child, output, callbackProps: props?.__arcadeSsrCallbacks ?? {} }); return output?.html ?? ""; }',
-		'function arcadeSsrHost(hostLocators, hostNodeId, tagName) { hostLocators.push({ hostNodeId, strategy: "dom-order", index: hostLocators.length, tagName }); return ""; }',
-		'function arcadeSsrCallbacks(callbacks) { const result = {}; for (const key of Object.keys(callbacks)) if (callbacks[key]) result[key] = callbacks[key]; return result; }',
-		'function arcadeSsrCallbackSymbol(props, path) { let value = props?.__arcadeSsrCallbacks; for (const key of path) value = value?.[key]; return typeof value === "string" ? value : undefined; }',
-		'function arcadeComposeState(state, children) { const childStates = children.map((child) => child.output?.state).filter(Boolean); if (childStates.length === 0) return state; return { ...state, cells: [...(state.cells ?? []), ...childStates.flatMap((childState) => childState.cells ?? [])], computed: [...(state.computed ?? []), ...childStates.flatMap((childState) => childState.computed ?? [])], ...((state.sharedDefinitions || childStates.some((childState) => childState.sharedDefinitions?.length)) ? { sharedDefinitions: [...(state.sharedDefinitions ?? []), ...childStates.flatMap((childState) => childState.sharedDefinitions ?? [])] } : {}) }; }',
-		'function arcadeSsrComposeView(view, hostLocators, children) { const localHostIds = new Set(hostLocators.map((locator) => locator.hostNodeId)); const childData = children.map((child) => ({ ...child, view: child.output?.view, hostCount: child.output?.view?.locators?.length ?? 0, externalSymbolIds: new Set(child.output?.externalSymbolIds ?? []) })).filter((child) => child.view); const offsetFor = (index) => childData.reduce((total, child) => total + (child.localIndex <= index ? child.hostCount : 0), 0); const locators = hostLocators.map((locator) => ({ ...locator, index: locator.index + offsetFor(locator.index) })); const events = view.events.filter((event) => localHostIds.has(event.hostNodeId)); const domUpdates = view.domUpdates.filter((update) => localHostIds.has(update.hostNodeId)); const behaviors = view.behaviors.filter((behavior) => localHostIds.has(behavior.hostNodeId)); const elementHandles = view.elementHandles.filter((handle) => localHostIds.has(handle.hostNodeId)); const externalSymbolIds = new Set(); let inserted = 0; for (const child of childData) { arcadeSsrAppendChildView({ child, baseIndex: child.localIndex + inserted, locators, events, domUpdates, behaviors, elementHandles, externalSymbolIds }); inserted += child.hostCount; } locators.sort((a, b) => a.index - b.index); return { view: { ...view, locators, events, domUpdates, behaviors, elementHandles }, externalSymbolIds: [...externalSymbolIds] }; }',
-		'function arcadeSsrAppendChildView(context) { const childView = context.child.view; const propEvents = context.child.output?.propEvents ?? []; const callbackProps = context.child.callbackProps ?? {}; for (const locator of childView.locators) context.locators.push({ ...locator, hostNodeId: context.child.hostPrefix + locator.hostNodeId, index: context.baseIndex + locator.index }); for (const event of childView.events) { const propEvent = propEvents.find((item) => item.hostNodeId === event.hostNodeId && item.eventName === event.eventName); const callbackSymbolId = propEvent ? callbackProps[propEvent.propName] : undefined; const symbolIds = callbackSymbolId ? [callbackSymbolId] : event.symbolIds.map((symbolId) => context.child.externalSymbolIds.has(symbolId) ? symbolId : context.child.symbolPrefix + symbolId); for (const symbolId of symbolIds) if (callbackSymbolId || context.child.externalSymbolIds.has(symbolId)) context.externalSymbolIds.add(symbolId); context.events.push({ ...event, hostNodeId: context.child.hostPrefix + event.hostNodeId, symbolIds }); } for (const update of childView.domUpdates) { const mapped = arcadeSsrRemapChildGraph(update, context.child.graphProps); if (!mapped) continue; context.domUpdates.push({ ...update, hostNodeId: context.child.hostPrefix + update.hostNodeId, graphNodeId: mapped.graphNodeId, path: mapped.path, ...(update.symbolId ? { symbolId: context.child.symbolPrefix + update.symbolId } : {}) }); } for (const behavior of childView.behaviors) context.behaviors.push({ ...behavior, hostNodeId: context.child.hostPrefix + behavior.hostNodeId, ...(behavior.symbolId ? { symbolId: context.child.symbolPrefix + behavior.symbolId } : {}) }); for (const handle of childView.elementHandles) context.elementHandles.push({ ...handle, hostNodeId: context.child.hostPrefix + handle.hostNodeId }); }',
-		'function arcadeSsrRemapChildGraph(record, graphProps) { if (record.graphNodeId === "prop:props") { const propName = record.path[0]; const binding = graphProps.find((prop) => prop.name === propName); return binding ? { graphNodeId: binding.graphNodeId, path: [...binding.path, ...record.path.slice(1)] } : null; } if (record.graphNodeId.startsWith?.("prop:")) { const propName = record.graphNodeId.slice(5); const binding = graphProps.find((prop) => prop.name === propName); return binding ? { graphNodeId: binding.graphNodeId, path: [...binding.path, ...record.path] } : null; } return { graphNodeId: record.graphNodeId, path: record.path }; }',
-		'function arcadeSsrText(value) { return arcadeSsrEscape(value == null ? "" : String(value)); }',
-		'function arcadeSsrAttribute(name, value) { return ` ${name}="${arcadeSsrEscape(value == null ? "" : String(value))}"`; }',
-		'function arcadeSsrEscape(value) { return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll("\\"", "&quot;"); }',
+		'function marklessSsrStateValue(graphNodeId) { return marklessSsrStateValues.get(graphNodeId); }',
+		'function marklessSsrRenderChild(children, component, props, child) { const output = component?.renderSsr?.(props); if (output) children.push({ ...child, output, callbackProps: props?.__marklessSsrCallbacks ?? {} }); return output?.html ?? ""; }',
+		'function marklessSsrHost(hostLocators, hostNodeId, tagName) { hostLocators.push({ hostNodeId, strategy: "dom-order", index: hostLocators.length, tagName }); return ""; }',
+		'function marklessSsrCallbacks(callbacks) { const result = {}; for (const key of Object.keys(callbacks)) if (callbacks[key]) result[key] = callbacks[key]; return result; }',
+		'function marklessSsrCallbackSymbol(props, path) { let value = props?.__marklessSsrCallbacks; for (const key of path) value = value?.[key]; return typeof value === "string" ? value : undefined; }',
+		'function marklessComposeState(state, children) { const childStates = children.map((child) => child.output?.state).filter(Boolean); if (childStates.length === 0) return state; return { ...state, cells: [...(state.cells ?? []), ...childStates.flatMap((childState) => childState.cells ?? [])], computed: [...(state.computed ?? []), ...childStates.flatMap((childState) => childState.computed ?? [])], ...((state.sharedDefinitions || childStates.some((childState) => childState.sharedDefinitions?.length)) ? { sharedDefinitions: [...(state.sharedDefinitions ?? []), ...childStates.flatMap((childState) => childState.sharedDefinitions ?? [])] } : {}) }; }',
+		'function marklessSsrComposeView(view, hostLocators, children) { const localHostIds = new Set(hostLocators.map((locator) => locator.hostNodeId)); const childData = children.map((child) => ({ ...child, view: child.output?.view, hostCount: child.output?.view?.locators?.length ?? 0, externalSymbolIds: new Set(child.output?.externalSymbolIds ?? []) })).filter((child) => child.view); const offsetFor = (index) => childData.reduce((total, child) => total + (child.localIndex <= index ? child.hostCount : 0), 0); const locators = hostLocators.map((locator) => ({ ...locator, index: locator.index + offsetFor(locator.index) })); const events = view.events.filter((event) => localHostIds.has(event.hostNodeId)); const domUpdates = view.domUpdates.filter((update) => localHostIds.has(update.hostNodeId)); const behaviors = view.behaviors.filter((behavior) => localHostIds.has(behavior.hostNodeId)); const elementHandles = view.elementHandles.filter((handle) => localHostIds.has(handle.hostNodeId)); const externalSymbolIds = new Set(); let inserted = 0; for (const child of childData) { marklessSsrAppendChildView({ child, baseIndex: child.localIndex + inserted, locators, events, domUpdates, behaviors, elementHandles, externalSymbolIds }); inserted += child.hostCount; } locators.sort((a, b) => a.index - b.index); return { view: { ...view, locators, events, domUpdates, behaviors, elementHandles }, externalSymbolIds: [...externalSymbolIds] }; }',
+		'function marklessSsrAppendChildView(context) { const childView = context.child.view; const propEvents = context.child.output?.propEvents ?? []; const callbackProps = context.child.callbackProps ?? {}; for (const locator of childView.locators) context.locators.push({ ...locator, hostNodeId: context.child.hostPrefix + locator.hostNodeId, index: context.baseIndex + locator.index }); for (const event of childView.events) { const propEvent = propEvents.find((item) => item.hostNodeId === event.hostNodeId && item.eventName === event.eventName); const callbackSymbolId = propEvent ? callbackProps[propEvent.propName] : undefined; const symbolIds = callbackSymbolId ? [callbackSymbolId] : event.symbolIds.map((symbolId) => context.child.externalSymbolIds.has(symbolId) ? symbolId : context.child.symbolPrefix + symbolId); for (const symbolId of symbolIds) if (callbackSymbolId || context.child.externalSymbolIds.has(symbolId)) context.externalSymbolIds.add(symbolId); context.events.push({ ...event, hostNodeId: context.child.hostPrefix + event.hostNodeId, symbolIds }); } for (const update of childView.domUpdates) { const mapped = marklessSsrRemapChildGraph(update, context.child.graphProps); if (!mapped) continue; context.domUpdates.push({ ...update, hostNodeId: context.child.hostPrefix + update.hostNodeId, graphNodeId: mapped.graphNodeId, path: mapped.path, ...(update.symbolId ? { symbolId: context.child.symbolPrefix + update.symbolId } : {}) }); } for (const behavior of childView.behaviors) context.behaviors.push({ ...behavior, hostNodeId: context.child.hostPrefix + behavior.hostNodeId, ...(behavior.symbolId ? { symbolId: context.child.symbolPrefix + behavior.symbolId } : {}) }); for (const handle of childView.elementHandles) context.elementHandles.push({ ...handle, hostNodeId: context.child.hostPrefix + handle.hostNodeId }); }',
+		'function marklessSsrRemapChildGraph(record, graphProps) { if (record.graphNodeId === "prop:props") { const propName = record.path[0]; const binding = graphProps.find((prop) => prop.name === propName); return binding ? { graphNodeId: binding.graphNodeId, path: [...binding.path, ...record.path.slice(1)] } : null; } if (record.graphNodeId.startsWith?.("prop:")) { const propName = record.graphNodeId.slice(5); const binding = graphProps.find((prop) => prop.name === propName); return binding ? { graphNodeId: binding.graphNodeId, path: [...binding.path, ...record.path] } : null; } return { graphNodeId: record.graphNodeId, path: record.path }; }',
+		'function marklessSsrText(value) { return marklessSsrEscape(value == null ? "" : String(value)); }',
+		'function marklessSsrAttribute(name, value) { return ` ${name}="${marklessSsrEscape(value == null ? "" : String(value))}"`; }',
+		'function marklessSsrEscape(value) { return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll("\\"", "&quot;"); }',
 		'',
 	]
 		.filter((part): part is string => part !== null && part !== '')
@@ -491,7 +491,7 @@ function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string {
 function ssrHostLocator(node: AnyNode, tagName: string, context: SsrRenderContext): string {
 	const hostNodeId = context.hostIdByNode.get(node);
 	return hostNodeId
-		? `arcadeSsrHost(arcadeSsrHostLocators, ${JSON.stringify(hostNodeId)}, ${JSON.stringify(tagName)})`
+		? `marklessSsrHost(marklessSsrHostLocators, ${JSON.stringify(hostNodeId)}, ${JSON.stringify(tagName)})`
 		: '""';
 }
 
@@ -510,7 +510,7 @@ function emitHtmlChildren(node: AnyNode, context: HtmlRenderContext): string {
 }
 
 function renderHelper(context: HtmlRenderContext, helper: 'Attribute' | 'Text'): string {
-	return `arcade${context.mode === 'ssr' ? 'Ssr' : 'Csr'}${helper}`;
+	return `markless${context.mode === 'ssr' ? 'Ssr' : 'Csr'}${helper}`;
 }
 
 function emitSsrComponent(node: AnyNode, componentName: string, context: SsrRenderContext): string {
@@ -525,7 +525,7 @@ function emitSsrComponent(node: AnyNode, componentName: string, context: SsrRend
 		graphProps: graphReferenceProps(edge),
 	};
 
-	return `arcadeSsrRenderChild(arcadeSsrChildren, ${localName}, { ${props.join(', ')} }, { hostPrefix: ${JSON.stringify(placement.hostPrefix)}, symbolPrefix: ${JSON.stringify(placement.symbolPrefix)}, localIndex: arcadeSsrHostLocators.length, graphProps: ${JSON.stringify(placement.graphProps)} })`;
+	return `marklessSsrRenderChild(marklessSsrChildren, ${localName}, { ${props.join(', ')} }, { hostPrefix: ${JSON.stringify(placement.hostPrefix)}, symbolPrefix: ${JSON.stringify(placement.symbolPrefix)}, localIndex: marklessSsrHostLocators.length, graphProps: ${JSON.stringify(placement.graphProps)} })`;
 }
 
 function emitCsrComponent(node: AnyNode, componentName: string, context: CsrRenderContext): string {
@@ -534,13 +534,13 @@ function emitCsrComponent(node: AnyNode, componentName: string, context: CsrRend
 	const index = context.childReplacements.length;
 	const edge = context.componentEdges[context.nextComponentEdgeIndex++];
 	const props = componentPropsSource(node, context.source, edge, context.callbackSymbols);
-	const childName = `arcadeCsrChild${index}`;
+	const childName = `marklessCsrChild${index}`;
 	context.childReplacements.push(
-		`	const ${childName} = arcadeCsrRenderChild(${localName}, { ${props.join(', ')} });`,
-		`	arcadeCsrReplaceChild(root, ${index}, ${childName}?.root);`,
-		`	arcadeCsrChildren.push({ hostPrefix: ${JSON.stringify(`c${index}:`)}, symbolPrefix: ${JSON.stringify(`c${index}:`)}, output: ${childName}, graphProps: ${JSON.stringify(graphReferenceProps(edge))} });`,
+		`	const ${childName} = marklessCsrRenderChild(${localName}, { ${props.join(', ')} });`,
+		`	marklessCsrReplaceChild(root, ${index}, ${childName}?.root);`,
+		`	marklessCsrChildren.push({ hostPrefix: ${JSON.stringify(`c${index}:`)}, symbolPrefix: ${JSON.stringify(`c${index}:`)}, output: ${childName}, graphProps: ${JSON.stringify(graphReferenceProps(edge))} });`,
 	);
-	return JSON.stringify(`<span data-arcade-csr-child="${index}"></span>`);
+	return JSON.stringify(`<span data-markless-csr-child="${index}"></span>`);
 }
 
 function componentPropsSource(
@@ -554,7 +554,7 @@ function componentPropsSource(
 		if (!name) return [];
 		const callbackSymbolId = edge ? callbackSymbols.get(`${edge.id}:${name}`) : undefined;
 		if (callbackSymbolId) {
-			return `${objectPropertyName(name)}: arcadeCsrCallback(${JSON.stringify(callbackSymbolId)})`;
+			return `${objectPropertyName(name)}: marklessCsrCallback(${JSON.stringify(callbackSymbolId)})`;
 		}
 		return componentAttributePropSource(attribute, source);
 	});
@@ -585,16 +585,18 @@ function ssrComponentPropsSource(
 		}
 		if (prop.kind !== 'graph-reference') return [];
 		if (prop.graphNodeId === 'prop:props') {
-			return `${JSON.stringify(prop.name)}: arcadeSsrCallbackSymbol(props, ${JSON.stringify(prop.path)})`;
+			return `${JSON.stringify(prop.name)}: marklessSsrCallbackSymbol(props, ${JSON.stringify(prop.path)})`;
 		}
 		if (prop.graphNodeId.startsWith('prop:')) {
-			return `${JSON.stringify(prop.name)}: arcadeSsrCallbackSymbol(props, ${JSON.stringify([prop.graphNodeId.slice(5), ...prop.path])})`;
+			return `${JSON.stringify(prop.name)}: marklessSsrCallbackSymbol(props, ${JSON.stringify([prop.graphNodeId.slice(5), ...prop.path])})`;
 		}
 		return [];
 	});
 
 	if (callbackEntries.length > 0) {
-		props.push(`__arcadeSsrCallbacks: arcadeSsrCallbacks({ ${callbackEntries.join(', ')} })`);
+		props.push(
+			`__marklessSsrCallbacks: marklessSsrCallbacks({ ${callbackEntries.join(', ')} })`,
+		);
 	}
 	return props;
 }

@@ -3,7 +3,7 @@
 Status: Draft
 
 The migrated CLI package is `packages/cli` and publishes the create/program
-surface for Arcade apps.
+surface for Markless apps.
 
 The reusable create program must stay host-injected and environment-agnostic.
 The executable bin is a thin host-owned adapter for Node. It owns `process`,
@@ -13,7 +13,7 @@ project creation to the reusable `CreateProgram`.
 Supported command:
 
 ```sh
-create-arcade my-app
+create-markless my-app
 ```
 
 The create lifecycle remains:
@@ -25,12 +25,12 @@ configure -> validate -> interact -> execute
 The generated app uses:
 
 ```ts
-import { arcade } from 'arcade/vite';
-import { router } from 'arcade/router/vite';
+import { markless } from '@markless/core/vite';
+import { router } from '@markless/core/router/vite';
 import { defineConfig } from 'vite-plus';
 
 export default defineConfig({
-	plugins: [arcade(), router()],
+	plugins: [markless(), router()],
 });
 ```
 
@@ -39,13 +39,13 @@ or JSX pages. Interactive TTY runs are a Clack-backed onboarding flow, not raw
 flag collection or a manually printed text menu:
 
 ```txt
-◇ Welcome to Arcade
+◇ Welcome to Markless
 
   Let's build you an app.
-  Choose a starting point, and Arcade will set up the routes, scripts, and defaults.
+  Choose a starting point, and Markless will set up the routes, scripts, and defaults.
 
 ? What are you building today?
-  › Learn Arcade
+  › Learn Markless
     A small TSRX counter app. Best first project.
 
     Build an app
@@ -75,7 +75,7 @@ highlighted, important labels stay prominent, and descriptions render as prompt
 hints. It also asks whether to install dependencies and initialize git, explains
 each choice, shows a `Ready to create?` summary, and lets the user create or
 cancel before files are written. Runtime choices must be ordered Node, Deno, Bun.
-Starter labels map to existing template IDs: Learn Arcade -> `minimal`, Build
+Starter labels map to existing template IDs: Learn Markless -> `minimal`, Build
 an app -> `app`, Write docs -> `docs`, and Full-stack app -> `full-stack`.
 
 Non-interactive flags remain stable for tests and agent-driven setup, including

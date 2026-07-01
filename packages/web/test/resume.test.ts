@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
-import { createRuntimeGraph } from '@arcade/runtime';
+import { createRuntimeGraph } from '@markless/runtime';
 import { createResumeRuntime, RuntimeResumeError } from '../src/index.ts';
-import type { RuntimeGraph, RuntimeGraphWrite } from '@arcade/runtime';
+import type { RuntimeGraph, RuntimeGraphWrite } from '@markless/runtime';
 import type { DomJournalEntry } from '../src/index.ts';
 
 type FakeElement = {
@@ -825,7 +825,7 @@ test('resume runtime reports structured errors for mismatched DOM-order locators
 
 	expect(error).toBeInstanceOf(RuntimeResumeError);
 	expect(error).toMatchObject({
-		code: 'ARCADE_RESUME_LOCATOR_MISMATCH',
+		code: 'MARKLESS_RESUME_LOCATOR_MISMATCH',
 		severity: 'error',
 		phase: 'resume',
 		title: 'Resume locator matched a different element',
@@ -833,11 +833,11 @@ test('resume runtime reports structured errors for mismatched DOM-order locators
 		elementLocator: 'dom-order:1',
 		expectedTagName: 'button',
 		actualTagName: 'input',
-		docsUrl: 'https://arcadejs.com/errors/ARCADE_RESUME_LOCATOR_MISMATCH',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_RESUME_LOCATOR_MISMATCH',
 	});
 	expect(error).toMatchObject({
 		message: 'Resume locator h1 expected <button> at DOM order index 1 but found <input>.',
-		why: expect.stringContaining('arcade/view'),
+		why: expect.stringContaining('markless/view'),
 	});
 });
 
@@ -879,13 +879,13 @@ test('resume runtime reports structured errors for missing async boundary anchor
 
 	expect(error).toBeInstanceOf(RuntimeResumeError);
 	expect(error).toMatchObject({
-		code: 'ARCADE_RESUME_LOCATOR_MISSING',
+		code: 'MARKLESS_RESUME_LOCATOR_MISSING',
 		severity: 'error',
 		phase: 'resume',
 		title: 'Resume locator did not match the document',
 		boundaryId: 'boundary:0',
 		elementLocator: 'dom-order-comment:1',
-		docsUrl: 'https://arcadejs.com/errors/ARCADE_RESUME_LOCATOR_MISSING',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_RESUME_LOCATOR_MISSING',
 	});
 	expect(error).toMatchObject({
 		message: 'Resume locator boundary:0 endAnchor expected a comment at DOM order index 1.',

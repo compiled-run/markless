@@ -3,7 +3,7 @@ import { buildSemanticGraph, lowerStateAccess, planPayloadArena } from '../src/i
 import { planSymbolResolver } from '../src/passes/symbol-resolver.ts';
 
 const source = `
-import { state, computed } from 'arcade';
+import { state, computed } from '@markless/core';
 import { Child } from './Child.tsrx';
 import { chart, resizeCanvas } from './behaviors';
 import { clamp } from './math';
@@ -163,7 +163,7 @@ test('planSymbolResolver keeps compound and binary assignment writes with their 
 	const semanticGraph = await buildSemanticGraph({
 		filename: 'src/Assignments.tsrx',
 		source: `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 
 export function App() @{
 	const profile = state({ step: 2 });
@@ -222,7 +222,7 @@ test('planSymbolResolver ignores module import names that only appear in event s
 	const semanticGraph = await buildSemanticGraph({
 		filename: 'src/EventImportString.tsrx',
 		source: `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 import { clamp } from './math';
 
 export function App() @{

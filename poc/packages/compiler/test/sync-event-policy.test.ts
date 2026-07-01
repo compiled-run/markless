@@ -73,17 +73,17 @@ test('sync-event-policy extraction proves sync browser policy split', async () =
 
 	const diagnostic = artifact.diagnostics.find(
 		(candidate) =>
-			candidate.code === 'ARCADE_SYNC_POLICY_UNPROVABLE_GUARD' &&
+			candidate.code === 'MARKLESS_SYNC_POLICY_UNPROVABLE_GUARD' &&
 			candidate.eventName === 'submit',
 	);
 
 	expect(diagnostic).toMatchObject({
-		code: 'ARCADE_SYNC_POLICY_UNPROVABLE_GUARD',
+		code: 'MARKLESS_SYNC_POLICY_UNPROVABLE_GUARD',
 		severity: 'error',
 		phase: 'sync-event-policy',
 		passId: 'sync-event-policy',
 		method: 'preventDefault',
-		docsUrl: 'https://arcadejs.com/errors/ARCADE_SYNC_POLICY_UNPROVABLE_GUARD',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_SYNC_POLICY_UNPROVABLE_GUARD',
 	});
 	expect(normalizeSource(diagnostic?.guardSource ?? '')).toContain(
 		'!shortcuts.allowSubmit && values.get("confirm") !== "yes"',

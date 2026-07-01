@@ -1,4 +1,4 @@
-# Arcade — Claude Code Guidance
+# Markless — Claude Code Guidance
 
 @AGENTS.md
 
@@ -8,9 +8,9 @@ notes below only map its Codex-specific references onto Claude Code.
 ## Claude Code Mapping
 
 - Project skills live under `.claude/skills/` (mirrored from `.codex/skills/`).
-  Where `AGENTS.md` says `$arcade-implementation` or `$arcade-spec-maintenance`,
-  use the Skill tool: `arcade-implementation` for implementation work,
-  `arcade-spec-maintenance` for spec edits, and `review-with-engineer-lenses`
+  Where `AGENTS.md` says `$markless-implementation` or `$markless-spec-maintenance`,
+  use the Skill tool: `markless-implementation` for implementation work,
+  `markless-spec-maintenance` for spec edits, and `review-with-engineer-lenses`
   for reviewing API/docs/DX changes.
 - Where skills say `apply_patch`, use the Edit/Write tools.
 - The `.codex/rules/*.rules` command policies are ported to

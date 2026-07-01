@@ -1,7 +1,7 @@
 import type { EnvironmentOptions } from 'vite';
 import { describe, expect, test, vi } from 'vitest';
-import { arcade } from '../src/vite/index.ts';
-import type { ArcadeManifest } from '../src/types.ts';
+import { markless } from '../src/vite/index.ts';
+import type { MarklessManifest } from '../src/types.ts';
 import {
 	callConfigEnvironment,
 	callConfigResolved,
@@ -14,11 +14,11 @@ import {
 
 describe('Vite config integration', () => {
 	test('shares plugin state across app build environments', () => {
-		expect(getArcadePlugin().sharedDuringBuild).toBe(true);
+		expect(getMarklessPlugin().sharedDuringBuild).toBe(true);
 	});
 
 	test('sets output defaults on Vite client and server environments', () => {
-		const plugin = getArcadePlugin();
+		const plugin = getMarklessPlugin();
 		const clientConfig: EnvironmentOptions = {
 			build: {
 				rolldownOptions: {
@@ -62,7 +62,7 @@ describe('Vite config integration', () => {
 	});
 
 	test('does not apply production output defaults while starting Vite dev server', () => {
-		const plugin = getArcadePlugin();
+		const plugin = getMarklessPlugin();
 		callConfig(plugin, {}, { command: 'serve' });
 
 		expect(
@@ -79,7 +79,7 @@ describe('Vite config integration', () => {
 	});
 
 	test('disables Vite modulepreload only for client environment builds', () => {
-		const plugin = getArcadePlugin();
+		const plugin = getMarklessPlugin();
 
 		expect(callConfigEnvironment(plugin, 'client', {})).toMatchObject({
 			build: {
@@ -94,7 +94,7 @@ describe('Vite config integration', () => {
 	});
 
 	test('adds the SSR TSRX artifact as a client symbol root', () => {
-		const plugin = getArcadePlugin();
+		const plugin = getMarklessPlugin();
 		const config = {
 			build: {
 				rolldownOptions: {
@@ -121,7 +121,7 @@ describe('Vite config integration', () => {
 	});
 
 	test('defaults SSR environment output from only the TSRX artifact input', () => {
-		const plugin = getArcadePlugin();
+		const plugin = getMarklessPlugin();
 
 		expect(
 			callConfigEnvironment(plugin, 'ssr', {
@@ -147,7 +147,7 @@ describe('Vite config integration', () => {
 	});
 
 	test('defaults custom server-like environments without requiring consumer config', () => {
-		const plugin = getArcadePlugin();
+		const plugin = getMarklessPlugin();
 
 		expect(
 			callConfigEnvironment(plugin, 'edge', {
@@ -173,7 +173,7 @@ describe('Vite config integration', () => {
 	});
 
 	test('leaves Nitro environment output owned by Nitro', () => {
-		const plugin = getArcadePlugin();
+		const plugin = getMarklessPlugin();
 		const nitroConfig: EnvironmentOptions = {
 			build: {
 				rolldownOptions: {
@@ -193,7 +193,7 @@ describe('Vite config integration', () => {
 	});
 
 	test('dispatches output defaults by Vite environment context', () => {
-		const plugin = getArcadePlugin();
+		const plugin = getMarklessPlugin();
 		const clientOutput = callOutputOptions(
 			plugin,
 			{ dir: 'dist/client' },
@@ -207,8 +207,8 @@ describe('Vite config integration', () => {
 			hoistTransitiveImports: false,
 		});
 		expect(clientOutput.codeSplitting?.groups?.map((group) => group.name)).toEqual([
-			'arcade-runtime',
-			'arcade-symbols',
+			'markless-runtime',
+			'markless-symbols',
 		]);
 		expect(
 			callOutputOptions(plugin, { dir: 'dist/server' }, createViteHookContext('server')),
@@ -229,8 +229,8 @@ describe('Vite config integration', () => {
 	});
 
 	test('uses Vite base for stylesheet manifest injections', () => {
-		let manifest: ArcadeManifest | undefined;
-		const plugin = getArcadePlugin({ onManifest: (next) => (manifest = next) });
+		let manifest: MarklessManifest | undefined;
+		const plugin = getMarklessPlugin({ onManifest: (next) => (manifest = next) });
 
 		callConfigResolved(plugin, {
 			base: '/docs/',
@@ -263,8 +263,10 @@ describe('Vite config integration', () => {
 	});
 });
 
-function getArcadePlugin(options: Parameters<typeof arcade>[0] = {}) {
-	return getPlugin(arcade(options), 'vite-plugin-arcade') as ReturnType<typeof arcade>[number] & {
+function getMarklessPlugin(options: Parameters<typeof markless>[0] = {}) {
+	return getPlugin(markless(options), 'vite-plugin-markless') as ReturnType<
+		typeof markless
+	>[number] & {
 		sharedDuringBuild?: boolean;
 	};
 }

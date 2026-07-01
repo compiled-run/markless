@@ -24,26 +24,26 @@ import { htmlTransformPlugin } from './html-transform.ts';
 import { mdxTransformPlugin } from './mdx.ts';
 import { routeTypegenPlugin } from './route-typegen.ts';
 
-const ROUTE_DISCOVERY_ID = 'virtual:arcade-router/routes';
-const CLIENT_ENTRY_ID = 'virtual:arcade-router/client-entry';
-const RESUME_ENTRY_ID = 'virtual:arcade-router/resume-entry';
+const ROUTE_DISCOVERY_ID = 'virtual:markless-router/routes';
+const CLIENT_ENTRY_ID = 'virtual:markless-router/client-entry';
+const RESUME_ENTRY_ID = 'virtual:markless-router/resume-entry';
 const RESUME_ENTRY_ORIGIN = '/entries/resume-entry.ts';
-const RESUME_ENTRY_PATH_ID = 'virtual:arcade-router/resume-entry-path';
-const NAVIGATION_ENTRY_ID = 'virtual:arcade-router/navigation-entry';
+const RESUME_ENTRY_PATH_ID = 'virtual:markless-router/resume-entry-path';
+const NAVIGATION_ENTRY_ID = 'virtual:markless-router/navigation-entry';
 const NAVIGATION_ENTRY_ORIGIN = '/entries/client-entry.ts';
-const NAVIGATION_ENTRY_PATH_ID = 'virtual:arcade-router/navigation-entry-path';
-const ROUTE_PRELOADS_ID = 'virtual:arcade-router/route-preloads';
-const ROUTE_PRELOADS_PLACEHOLDER = '__ARCADE_ROUTER_ROUTE_PRELOADS__';
-const SERVER_ENTRY_ID = 'virtual:arcade-router/server-entry';
-const ROUTE_HREF_ID = 'virtual:arcade-router/route-href';
+const NAVIGATION_ENTRY_PATH_ID = 'virtual:markless-router/navigation-entry-path';
+const ROUTE_PRELOADS_ID = 'virtual:markless-router/route-preloads';
+const ROUTE_PRELOADS_PLACEHOLDER = '__MARKLESS_ROUTER_ROUTE_PRELOADS__';
+const SERVER_ENTRY_ID = 'virtual:markless-router/server-entry';
+const ROUTE_HREF_ID = 'virtual:markless-router/route-href';
 const PUBLIC_VIRTUAL_MODULE_ID_RE =
-	/^virtual:arcade-router\/(?:routes|client-entry|resume-entry|resume-entry-path|navigation-entry|navigation-entry-path|route-preloads|server-entry|route-href)(?:\?.*)?$/;
+	/^virtual:markless-router\/(?:routes|client-entry|resume-entry|resume-entry-path|navigation-entry|navigation-entry-path|route-preloads|server-entry|route-href)(?:\?.*)?$/;
 const VITE_PLUGIN_FILE = decodePath(parseURL(import.meta.url).pathname);
 const VIRTUAL_ENTRY_DIR = VITE_PLUGIN_FILE.endsWith('.ts')
 	? join(dirname(VITE_PLUGIN_FILE), 'entries')
 	: join(dirname(dirname(VITE_PLUGIN_FILE)), 'entries');
 const DEFAULT_WATCH_IGNORES = [
-	'**/.arcade/**',
+	'**/.markless/**',
 	'**/.nitro/**',
 	'**/.output/**',
 	'**/node_modules/**',
@@ -59,11 +59,11 @@ const virtualEntryFiles = {
 	[ROUTE_HREF_ID]: 'route-href.ts',
 } as const;
 
-export interface ArcadeRouterOptions {
+export interface MarklessRouterOptions {
 	nitro?: boolean;
 }
 
-export function router(options: ArcadeRouterOptions = {}): PluginOption[] {
+export function router(options: MarklessRouterOptions = {}): PluginOption[] {
 	if (options.nitro === false) {
 		return [
 			mdxTransformPlugin(),
@@ -99,7 +99,7 @@ function routerConfigPlugin(
 	routePreloads: RoutePreloadState,
 ): Plugin {
 	return {
-		name: 'arcade-router:vite',
+		name: 'markless-router:vite',
 		enforce: 'pre',
 		config(config: UserConfig) {
 			throwIfUserAddedNitro(config.plugins, nitroPluginsFromRouter);
@@ -201,7 +201,7 @@ function requestFileTransformPlugin(): Plugin {
 	let root = '';
 
 	return {
-		name: 'arcade-router:request-files',
+		name: 'markless-router:request-files',
 		enforce: 'pre',
 		configResolved(config: ResolvedConfig) {
 			root = config.root;
@@ -240,7 +240,7 @@ function requestFileIdForTransform(root: string, id: string): string | undefined
 
 function requestFileBuildTransformPlugin(root: string): Plugin {
 	return {
-		name: 'arcade-router:nitro-request-files',
+		name: 'markless-router:nitro-request-files',
 		transform(code, id) {
 			const fileId = requestFileIdForTransform(root, id);
 			if (!fileId) {
@@ -262,9 +262,7 @@ function createNitroConfig(
 		? nitroConfig.scanDirs.filter((dir): dir is string => typeof dir === 'string')
 		: [];
 	const watchOptions = withWatchIgnores(nitroConfig?.watchOptions, serverWatchIgnored);
-	const publicAssets = Array.isArray(nitroConfig?.publicAssets)
-		? nitroConfig.publicAssets
-		: [];
+	const publicAssets = Array.isArray(nitroConfig?.publicAssets) ? nitroConfig.publicAssets : [];
 
 	return {
 		...nitroConfig,
@@ -281,7 +279,7 @@ function createNitroConfig(
 			},
 			...publicAssets,
 		],
-		routesDir: nitroConfig?.routesDir ?? '.arcade/router/nitro-routes',
+		routesDir: nitroConfig?.routesDir ?? '.markless/router/nitro-routes',
 		rolldownConfig: withRequestFileBuildPlugin(nitroConfig?.rolldownConfig, root),
 		rollupConfig: withRequestFileBuildPlugin(nitroConfig?.rollupConfig, root),
 		scanDirs: [...new Set(['.', ...scanDirs])],
@@ -345,7 +343,7 @@ function throwIfUserAddedNitro(
 
 	if (duplicateNitroPlugin) {
 		throw new Error(
-			'Arcade Router wires Nitro internally. Remove nitro() from vite.config.ts and keep plugins: [arcade(), router()].',
+			'Markless Router wires Nitro internally. Remove nitro() from vite.config.ts and keep plugins: [markless(), router()].',
 		);
 	}
 }
@@ -392,8 +390,8 @@ function routerClientInput(input: InputOption | undefined, root: string): InputO
 	if (isRecord(input)) {
 		return {
 			...input,
-			'arcade-router-resume': resumeEntryId,
-			'arcade-router-navigation': navigationEntryId,
+			'markless-router-resume': resumeEntryId,
+			'markless-router-navigation': navigationEntryId,
 		};
 	}
 
@@ -420,7 +418,7 @@ function virtualModulesPlugin(
 	let root = '';
 
 	return {
-		name: 'arcade-router:routes',
+		name: 'markless-router:routes',
 		configResolved(config) {
 			root = config.root;
 		},
@@ -483,7 +481,7 @@ function entryPathSource(
 function serverEntrySource(root: string): string {
 	const query = rootScopeQuery(root);
 	return [
-		`import { createServerEntry } from '@arcade/router/vite/runtime/create-server-entry';`,
+		`import { createServerEntry } from '@markless/router/vite/runtime/create-server-entry';`,
 		`import { resumeEntryPath } from '${RESUME_ENTRY_PATH_ID}${query}';`,
 		`import { navigationEntryPath } from '${NAVIGATION_ENTRY_PATH_ID}${query}';`,
 		`import { routeModulePreloads, routeSsrModulePreloads } from '${ROUTE_PRELOADS_ID}${query}';`,
@@ -507,14 +505,14 @@ function rootScopeQuery(root: string, id = ''): string {
 	const parsed = parsePath(id);
 	const query = stringifyQuery({
 		...parseQuery(parsed.search),
-		'arcade-router-root': root || '.',
+		'markless-router-root': root || '.',
 	});
 	return query ? `?${query}` : '';
 }
 
 function routePreloadsSource(state: RoutePreloadState): string {
 	return [
-		`const routePreloadsJson = globalThis.__arcadeRouterRoutePreloadsJson ?? ${JSON.stringify(ROUTE_PRELOADS_PLACEHOLDER)};`,
+		`const routePreloadsJson = globalThis.__marklessRouterRoutePreloadsJson ?? ${JSON.stringify(ROUTE_PRELOADS_PLACEHOLDER)};`,
 		`const routePreloadData = routePreloadsJson === ${JSON.stringify(ROUTE_PRELOADS_PLACEHOLDER)} ? ${JSON.stringify(state.routes)} : JSON.parse(routePreloadsJson);`,
 		`export const routeModulePreloads = routePreloadData.navigation ?? {};`,
 		`export const routeSsrModulePreloads = routePreloadData.ssr ?? {};`,
@@ -655,7 +653,10 @@ function routeFileForChunk(root: string, chunk: OutputChunkLike): string | undef
 	}
 }
 
-function routeFileForModuleId(root: string, moduleId: string | null | undefined): string | undefined {
+function routeFileForModuleId(
+	root: string,
+	moduleId: string | null | undefined,
+): string | undefined {
 	if (!moduleId || moduleId.startsWith('\0')) return undefined;
 	const pathname = decodePath(parseURL(moduleId).pathname);
 	if (!isAbsolute(pathname)) return undefined;

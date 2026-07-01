@@ -1,4 +1,4 @@
-import { ASYNC_PROTOCOL_VERSION } from '@arcade/serializer';
+import { ASYNC_PROTOCOL_VERSION } from '@markless/serializer';
 import type { SymbolResolverModuleInput, SymbolResolverModuleManifest } from '../artifacts.ts';
 
 const SMALL_SYMBOL_SWITCH_LIMIT = 3;
@@ -55,7 +55,7 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'',
 		'function runGeneratedSymbolChunkInitializers(mod) {',
 		'	for (const name in mod) {',
-		'		if (!name.startsWith("init__virtual_arcade_symbol")) continue;',
+		'		if (!name.startsWith("init__virtual_markless_symbol")) continue;',
 		'		const init = mod[name];',
 		'		if (typeof init === "function") init();',
 		'	}',
@@ -63,10 +63,10 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'',
 		'function createUnknownSymbolError(id) {',
 		'	return Object.assign(new Error(`Unknown async symbol ${id}`), {',
-		'		code: "ARCADE_SYMBOL_UNKNOWN",',
+		'		code: "MARKLESS_SYMBOL_UNKNOWN",',
 		'		phase: "resume",',
 		'		symbolId: String(id),',
-		'		docsUrl: "https://arcadejs.com/errors/ARCADE_SYMBOL_UNKNOWN",',
+		'		docsUrl: "https://markless.dev/errors/MARKLESS_SYMBOL_UNKNOWN",',
 		'	});',
 		'}',
 		'',
@@ -76,7 +76,7 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 function emitSmallSymbolResolverModule(input: SymbolResolverModuleInput): string {
 	const symbolBranches = input.symbols.flatMap((symbol) => [
 		`	if (id === ${JSON.stringify(symbol.id)}) return import(/* @vite-ignore */ ${JSON.stringify(symbol.chunk)})`,
-		`		.then((mod) => { mod.init__virtual_arcade_symbol?.(); return mod${moduleExportAccess(symbol.exportName)}; });`,
+		`		.then((mod) => { mod.init__virtual_markless_symbol?.(); return mod${moduleExportAccess(symbol.exportName)}; });`,
 	]);
 
 	return [

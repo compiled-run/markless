@@ -22,7 +22,9 @@ export default box(
 			throw new Error('CSR music player HTML must not include an SSR resume payload.');
 		}
 		if (!/<script\b[^>]*\btype="module"[^>]*\bsrc=/.test(html)) {
-			throw new Error('Expected CSR music player HTML to load the app through a module script.');
+			throw new Error(
+				'Expected CSR music player HTML to load the app through a module script.',
+			);
 		}
 
 		const page = await preview.browser.visit('/');

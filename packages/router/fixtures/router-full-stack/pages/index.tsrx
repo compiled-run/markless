@@ -1,10 +1,10 @@
-import { state } from 'arcade';
+import { state } from '@markless/core';
 
 export default function Home() @{
 	let count = state(0);
 
 	<main>
-		<h1>Arcade Full Stack</h1>
+		<h1>Markless Full Stack</h1>
 		<button onClick={() => count++}>Count {count}</button>
 	</main>
 }

@@ -2,7 +2,7 @@ import { box } from '@async/witness';
 
 const FIXTURE = 'fixtures/router';
 const BUNDLE_GRAPH_REQUEST = '/build/bundle-graph.json';
-const DOCS_LINK = 'a[data-arcade-router-link]';
+const DOCS_LINK = 'a[data-markless-router-link]';
 const HOME_COUNTER = '[data-home-counter]';
 const HOME_INPUT = '[data-home-input]';
 const HOME_INPUT_STATE = '[data-home-input-state]';
@@ -77,7 +77,7 @@ export default box(
 			const page = (await preview.browser.visit('/', {
 				networkConditions: SLOW_3G,
 			})) as Page;
-			await expect.page.text(page, 'h1', 'Arcade Router', WAIT);
+			await expect.page.text(page, 'h1', 'Markless Router', WAIT);
 			const startedPreloads = await waitForExpectedPreloadRequests(page, plan.expectedHrefs);
 			receipt.note(`pre-click modulepreloads:\n${timeline(startedPreloads)}`);
 			const initialJs = jsBuildRequests(await page.networkRequests());
@@ -174,7 +174,7 @@ export default box(
 				'direct docs-to-home Link JS',
 				async () => {
 					await directPage.click(HOME_LINK, WAIT);
-					await expect.page.text(directPage, 'h1', 'Arcade Router', WAIT);
+					await expect.page.text(directPage, 'h1', 'Markless Router', WAIT);
 					await expect.page.text(directPage, HOME_COUNTER, 'Button 0', WAIT);
 				},
 			);
@@ -346,7 +346,7 @@ function publicBuildPath(path: string): string | undefined {
 }
 
 function isRouterNavigationChunk(code: string): boolean {
-	return code.includes('navigateArcadeRouterLink') || code.includes('__arcadeRouterLink');
+	return code.includes('navigateMarklessRouterLink') || code.includes('__marklessRouterLink');
 }
 
 function isDocsRouteChunk(code: string): boolean {
@@ -354,7 +354,7 @@ function isDocsRouteChunk(code: string): boolean {
 }
 
 function isHomeRouteChunk(code: string): boolean {
-	return code.includes('data-home-counter') || code.includes('<h1>Arcade Router</h1>');
+	return code.includes('data-home-counter') || code.includes('<h1>Markless Router</h1>');
 }
 
 function assertEventRecord(

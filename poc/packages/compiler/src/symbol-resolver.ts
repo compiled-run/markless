@@ -59,7 +59,7 @@ export type InlineSyncPolicyRecord = {
 };
 
 export type FailClosedSymbolCase = {
-	readonly code: 'ARCADE_SYMBOL_UNKNOWN' | 'ARCADE_SYMBOL_MANIFEST_MISMATCH';
+	readonly code: 'MARKLESS_SYMBOL_UNKNOWN' | 'MARKLESS_SYMBOL_MANIFEST_MISMATCH';
 	readonly stage: 'symbol-resolution';
 	readonly action: 'fail-closed';
 	readonly message: string;
@@ -147,14 +147,14 @@ export async function planSymbolResolver(
 		})),
 		failClosedCases: [
 			{
-				code: 'ARCADE_SYMBOL_UNKNOWN',
+				code: 'MARKLESS_SYMBOL_UNKNOWN',
 				stage: 'symbol-resolution',
 				action: 'fail-closed',
 				message:
 					'Reject a resume or event dispatch request when the symbol ID is not present.',
 			},
 			{
-				code: 'ARCADE_SYMBOL_MANIFEST_MISMATCH',
+				code: 'MARKLESS_SYMBOL_MANIFEST_MISMATCH',
 				stage: 'symbol-resolution',
 				action: 'fail-closed',
 				message:

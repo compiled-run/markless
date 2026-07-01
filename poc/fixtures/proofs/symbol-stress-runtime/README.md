@@ -11,7 +11,7 @@ The proof exercises two surfaces:
   loader is table-based and not a generated `switch`;
 - the existing event-only resumer source and fake DOM from
   `poc/fixtures/proofs/resumer-script`, proving startup and delegated event
-  dispatch still execute distinct symbol paths when `arcade/view` contains many
+  dispatch still execute distinct symbol paths when `markless/view` contains many
   rows.
 
 Run:

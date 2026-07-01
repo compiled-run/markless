@@ -1,7 +1,4 @@
-import {
-	compileTsrxForTypeService,
-	type TsrxCodeMapping,
-} from '@arcade/compiler/type-service';
+import { compileTsrxForTypeService, type TsrxCodeMapping } from '@markless/compiler/type-service';
 
 type FileNameOrUri = string | { readonly fsPath: string };
 type ScriptSnapshot = {
@@ -15,44 +12,48 @@ type VirtualCodeSnapshot = {
 	getChangeRange(): undefined;
 };
 
-export const ARCADE_TSRX_LANGUAGE_ID = 'arcade-tsrx';
-export const ARCADE_TSRX_EXTENSIONS = ['.tsrx'];
+export const MARKLESS_TSRX_LANGUAGE_ID = 'markless-tsrx';
+export const MARKLESS_TSRX_EXTENSIONS = ['.tsrx'];
 
 const SCRIPT_KIND_TS = 3;
 const SCRIPT_KIND_DEFERRED = 7;
 
-export function isArcadeTsrxFile(fileName: FileNameOrUri): boolean {
-	return ARCADE_TSRX_EXTENSIONS.some((extension) =>
+export function isMarklessTsrxFile(fileName: FileNameOrUri): boolean {
+	return MARKLESS_TSRX_EXTENSIONS.some((extension) =>
 		normalizeFileName(fileName).endsWith(extension),
 	);
 }
 
-export function getArcadeTsrxLanguagePlugin(): any {
+export function getMarklessTsrxLanguagePlugin(): any {
 	return {
 		getLanguageId(fileNameOrUri: FileNameOrUri) {
-			if (isArcadeTsrxFile(fileNameOrUri)) return ARCADE_TSRX_LANGUAGE_ID;
+			if (isMarklessTsrxFile(fileNameOrUri)) return MARKLESS_TSRX_LANGUAGE_ID;
 		},
-		createVirtualCode(fileNameOrUri: FileNameOrUri, languageId: unknown, snapshot: ScriptSnapshot) {
-			if (!shouldCreateArcadeTsrxVirtualCode(fileNameOrUri, languageId)) return undefined;
-			return new ArcadeTsrxVirtualCode(normalizeFileName(fileNameOrUri), snapshot);
+		createVirtualCode(
+			fileNameOrUri: FileNameOrUri,
+			languageId: unknown,
+			snapshot: ScriptSnapshot,
+		) {
+			if (!shouldCreateMarklessTsrxVirtualCode(fileNameOrUri, languageId)) return undefined;
+			return new MarklessTsrxVirtualCode(normalizeFileName(fileNameOrUri), snapshot);
 		},
 		updateVirtualCode(
 			_fileNameOrUri: FileNameOrUri,
 			virtualCode: unknown,
 			snapshot: ScriptSnapshot,
 		) {
-			if (!(virtualCode instanceof ArcadeTsrxVirtualCode)) return undefined;
+			if (!(virtualCode instanceof MarklessTsrxVirtualCode)) return undefined;
 			virtualCode.update(snapshot);
 			return virtualCode;
 		},
 		typescript: {
-			extraFileExtensions: ARCADE_TSRX_EXTENSIONS.map((extension) => ({
+			extraFileExtensions: MARKLESS_TSRX_EXTENSIONS.map((extension) => ({
 				extension: extension.slice(1),
 				isMixedContent: false,
 				scriptKind: SCRIPT_KIND_DEFERRED,
 			})),
 			getServiceScript(virtualCode) {
-				if (virtualCode.languageId !== ARCADE_TSRX_LANGUAGE_ID) return undefined;
+				if (virtualCode.languageId !== MARKLESS_TSRX_LANGUAGE_ID) return undefined;
 				return {
 					code: virtualCode,
 					extension: '.ts',
@@ -63,10 +64,10 @@ export function getArcadeTsrxLanguagePlugin(): any {
 	};
 }
 
-export class ArcadeTsrxVirtualCode {
+export class MarklessTsrxVirtualCode {
 	id = 'root';
-	languageId = ARCADE_TSRX_LANGUAGE_ID;
-	embeddedCodes: ArcadeTsrxCssVirtualCode[] = [];
+	languageId = MARKLESS_TSRX_LANGUAGE_ID;
+	embeddedCodes: MarklessTsrxCssVirtualCode[] = [];
 	codegenStacks: unknown[] = [];
 	generatedCode = '';
 	mappings: TsrxCodeMapping[] = [];
@@ -96,7 +97,7 @@ export class ArcadeTsrxVirtualCode {
 		this.sourceAst = compiled.sourceAst;
 		this.usageErrors = compiled.errors;
 		this.embeddedCodes = compiled.cssMappings.map(
-			(mapping, index) => new ArcadeTsrxCssVirtualCode(this.fileName, mapping, index),
+			(mapping, index) => new MarklessTsrxCssVirtualCode(this.fileName, mapping, index),
 		);
 		this.snapshot = {
 			getText: (start, end) => this.generatedCode.substring(start, end),
@@ -107,7 +108,7 @@ export class ArcadeTsrxVirtualCode {
 	}
 }
 
-class ArcadeTsrxCssVirtualCode {
+class MarklessTsrxCssVirtualCode {
 	languageId = 'css';
 	embeddedCodes: [] = [];
 	codegenStacks: unknown[] = [];
@@ -145,15 +146,15 @@ function normalizeFileName(fileNameOrUri: FileNameOrUri): string {
 		: fileNameOrUri.fsPath.replace(/\\/g, '/');
 }
 
-function shouldCreateArcadeTsrxVirtualCode(
+function shouldCreateMarklessTsrxVirtualCode(
 	fileNameOrUri: FileNameOrUri,
 	languageId: unknown,
 ): boolean {
-	return isArcadeTsrxFile(fileNameOrUri) && isArcadeTsrxLanguageId(languageId);
+	return isMarklessTsrxFile(fileNameOrUri) && isMarklessTsrxLanguageId(languageId);
 }
 
-function isArcadeTsrxLanguageId(languageId: unknown): boolean {
-	if (languageId === ARCADE_TSRX_LANGUAGE_ID) return true;
+function isMarklessTsrxLanguageId(languageId: unknown): boolean {
+	if (languageId === MARKLESS_TSRX_LANGUAGE_ID) return true;
 	if (typeof languageId !== 'string') return false;
 	const normalizedLanguageId = languageId.toLowerCase();
 	return (

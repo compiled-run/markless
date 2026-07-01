@@ -1,4 +1,4 @@
-# Arcade Project Rules
+# Markless Project Rules
 
 This repo is currently specification-first. When implementation starts, this file
 is the Codex-facing always-on guidance for building the TSRX resumable framework.
@@ -12,8 +12,8 @@ is the Codex-facing always-on guidance for building the TSRX resumable framework
 - Treat `specs/framework/archive/design-thread.md` as historical context, not the
   current implementation contract.
 - Project-local task skills live under `.codex/skills/`. Use
-  `$arcade-implementation` for implementation work and
-  `$arcade-spec-maintenance` for spec edits when available.
+  `$markless-implementation` for implementation work and
+  `$markless-spec-maintenance` for spec edits when available.
 
 ## Core Framework Constraints
 
@@ -32,9 +32,9 @@ is the Codex-facing always-on guidance for building the TSRX resumable framework
 - First compiler implementation is JS/TS on `@tsrx/core`. OXC/native work is
   deferred until the framework behavior and artifact contracts are proven.
 - Do not use the sibling `../native-tsrx` repository for this project: do not
-  inspect it, edit it, run commands in it, or make Arcade work depend on changes
+  inspect it, edit it, run commands in it, or make Markless work depend on changes
   there. Treat `@tsrx/core` as an external dependency boundary; when a parser
-  artifact is missing, keep Arcade tests at the compiler artifact boundary,
+  artifact is missing, keep Markless tests at the compiler artifact boundary,
   document the caveat, or ask the user before any dependency work.
 - Core packages are runtime-agnostic ESM. Avoid `node:*`, `fs`, `path`,
   `process`, `Buffer`, and Node-only assumptions in shared compiler/runtime code.
@@ -66,9 +66,9 @@ Every implementation goal must follow these hard requirements. If the active
 goal text lacks them, infer them here, record the insertion limit, and continue.
 Do not block only because the active goal text cannot be edited.
 
-- Follow the TSRX specification at `https://tsrx.dev/` and the current Arcade
+- Follow the TSRX specification at `https://tsrx.dev/` and the current Markless
   split specs. Do not implement framework behavior that contradicts TSRX
-  structural semantics, children/control-flow semantics, or the Arcade no-
+  structural semantics, children/control-flow semantics, or the Markless no-
   hydration/no-VDOM model.
 - For TSRX syntax, grammar, parser, or authoring semantics, check the TSRX MCP
   server before implementing or editing specs. Use `list-sections`,
@@ -110,11 +110,11 @@ Expected shape:
 - current proof implementation lives under `poc/packages/*`; do not extend it
   when beginning production framework work unless the task is explicitly a POC
   maintenance task
-- production package folders are `packages/arcade`, `packages/runtime`,
+- production package folders are `packages/core`, `packages/runtime`,
   `packages/serializer`, `packages/compiler`, `packages/bundler`,
   `packages/typescript-plugin`, and `packages/vitest-browser`
-- `packages/arcade` owns the public authoring APIs for `arcade` plus curated
-  public re-exports. Do not create a separate `packages/core` package
+- `packages/core` owns the public authoring APIs for `@markless/core` plus curated
+  public re-exports
 - protocol and payload contract types live with `packages/serializer` until
   tests prove a separate public protocol package is needed. Do not create a
   standalone `packages/protocol` package for type-only contracts

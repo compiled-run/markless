@@ -22,7 +22,7 @@ export default box(
 		await expect.page.text(docsPage, 'h1', 'Docs', WAIT);
 		await expect.page.bodyText(
 			docsPage,
-			{ contains: 'This MDX route is part of the top-level Arcade Router fixture.' },
+			{ contains: 'This MDX route is part of the top-level Markless Router fixture.' },
 			WAIT,
 		);
 		await expect.page.text(docsPage, '[data-mdx-counter]', 'MDX Count 0', WAIT);

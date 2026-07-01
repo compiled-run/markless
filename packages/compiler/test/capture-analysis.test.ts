@@ -8,7 +8,7 @@ import {
 import { analyzeCaptures } from '../src/passes/capture-analysis.ts';
 
 const source = `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 
 export function App() @{
 	let count = state(0);
@@ -63,7 +63,7 @@ test('analyzeCaptures records extracted symbol sources without re-walking source
 
 test('analyzeCaptures reports unsupported local function captures in lazy symbols', async () => {
 	const invalidSource = `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 
 export function App() @{
 	let count = state(0);
@@ -87,7 +87,7 @@ export function App() @{
 
 	expect(captureAnalysis.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'ARCADE_CAPTURE_UNSUPPORTED_VALUE',
+			code: 'MARKLESS_CAPTURE_UNSUPPORTED_VALUE',
 			severity: 'error',
 			phase: 'capture-analysis',
 			passId: 'capture-analysis',
@@ -103,14 +103,14 @@ export function App() @{
 						'Move the helper to module scope, inline the derivation, or represent durable data with state()/computed().',
 				},
 			],
-			docsUrl: 'https://arcadejs.com/errors/ARCADE_CAPTURE_UNSUPPORTED_VALUE',
+			docsUrl: 'https://markless.dev/errors/MARKLESS_CAPTURE_UNSUPPORTED_VALUE',
 		}),
 	]);
 });
 
 test('analyzeCaptures reports unsupported local function aliases captured in lazy symbols', async () => {
 	const invalidSource = `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 
 export function App() @{
 	let count = state(0);
@@ -145,7 +145,7 @@ export function App() @{
 	]);
 	expect(captureAnalysis.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'ARCADE_CAPTURE_UNSUPPORTED_VALUE',
+			code: 'MARKLESS_CAPTURE_UNSUPPORTED_VALUE',
 			severity: 'error',
 			phase: 'capture-analysis',
 			passId: 'capture-analysis',
@@ -160,7 +160,7 @@ export function App() @{
 
 test('analyzeCaptures reports non-serializable local constant captures in lazy symbols', async () => {
 	const invalidSource = `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 
 export function App() @{
 	let count = state(0);
@@ -190,7 +190,7 @@ export function App() @{
 	]);
 	expect(captureAnalysis.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'ARCADE_CAPTURE_UNSUPPORTED_VALUE',
+			code: 'MARKLESS_CAPTURE_UNSUPPORTED_VALUE',
 			severity: 'error',
 			phase: 'capture-analysis',
 			passId: 'capture-analysis',
@@ -211,7 +211,7 @@ export function App() @{
 
 test('analyzeCaptures allows serializable Date constants captured in lazy symbols', async () => {
 	const validSource = `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 
 export function App() @{
 	let count = state(0);
@@ -239,7 +239,7 @@ export function App() @{
 
 test('analyzeCaptures reports non-serializable values inside serializable built-in constants', async () => {
 	const invalidSource = `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 
 export function App() @{
 	let count = state(0);
@@ -269,7 +269,7 @@ export function App() @{
 	]);
 	expect(captureAnalysis.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'ARCADE_CAPTURE_UNSUPPORTED_VALUE',
+			code: 'MARKLESS_CAPTURE_UNSUPPORTED_VALUE',
 			severity: 'error',
 			phase: 'capture-analysis',
 			passId: 'capture-analysis',
@@ -284,7 +284,7 @@ export function App() @{
 
 test('analyzeCaptures reports non-serializable local aliases inside serializable built-in constants', async () => {
 	const invalidSource = `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 
 export function App() @{
 	let count = state(0);
@@ -319,7 +319,7 @@ export function App() @{
 	]);
 	expect(captureAnalysis.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'ARCADE_CAPTURE_UNSUPPORTED_VALUE',
+			code: 'MARKLESS_CAPTURE_UNSUPPORTED_VALUE',
 			severity: 'error',
 			phase: 'capture-analysis',
 			passId: 'capture-analysis',
@@ -334,7 +334,7 @@ export function App() @{
 
 test('analyzeCaptures reports non-serializable local constants copied through object spread', async () => {
 	const invalidSource = `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 
 export function App() @{
 	let count = state(0);
@@ -369,7 +369,7 @@ export function App() @{
 	]);
 	expect(captureAnalysis.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'ARCADE_CAPTURE_UNSUPPORTED_VALUE',
+			code: 'MARKLESS_CAPTURE_UNSUPPORTED_VALUE',
 			severity: 'error',
 			phase: 'capture-analysis',
 			passId: 'capture-analysis',
@@ -384,7 +384,7 @@ export function App() @{
 
 test('analyzeCaptures reports destructured non-serializable local constants captured in lazy symbols', async () => {
 	const invalidSource = `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 
 export function App() @{
 	let count = state(0);
@@ -419,7 +419,7 @@ export function App() @{
 	]);
 	expect(captureAnalysis.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'ARCADE_CAPTURE_UNSUPPORTED_VALUE',
+			code: 'MARKLESS_CAPTURE_UNSUPPORTED_VALUE',
 			severity: 'error',
 			phase: 'capture-analysis',
 			passId: 'capture-analysis',
@@ -434,7 +434,7 @@ export function App() @{
 
 test('analyzeCaptures reports unsupported inline destructured values captured in lazy symbols', async () => {
 	const invalidSource = `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 
 export function App() @{
 	let count = state(0);
@@ -464,7 +464,7 @@ export function App() @{
 	]);
 	expect(captureAnalysis.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'ARCADE_CAPTURE_UNSUPPORTED_VALUE',
+			code: 'MARKLESS_CAPTURE_UNSUPPORTED_VALUE',
 			severity: 'error',
 			phase: 'capture-analysis',
 			passId: 'capture-analysis',
@@ -479,7 +479,7 @@ export function App() @{
 
 test('analyzeCaptures ignores unsupported local names that only appear in string literals', async () => {
 	const validSource = `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 
 export function App() @{
 	let count = state(0);
@@ -512,7 +512,7 @@ export function App() @{
 
 test('analyzeCaptures ignores unsupported local names that only appear as member properties', async () => {
 	const validSource = `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 
 export function App() @{
 	const data = state({ format: 'ready' });
@@ -545,7 +545,7 @@ export function App() @{
 
 test('analyzeCaptures ignores unsupported local names that only appear as object property keys', async () => {
 	const validSource = `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 
 export function App() @{
 	let count = state(0);
@@ -578,7 +578,7 @@ export function App() @{
 
 test('analyzeCaptures ignores unsupported local names that only appear as object method keys', async () => {
 	const validSource = `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 
 export function App() @{
 	let count = state(0);
@@ -611,7 +611,7 @@ export function App() @{
 
 test('analyzeCaptures ignores unsupported local names shadowed by lazy symbol parameters', async () => {
 	const validSource = `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 
 export function App() @{
 	let count = state(0);
@@ -644,7 +644,7 @@ export function App() @{
 
 test('analyzeCaptures ignores unsupported local names shadowed by lazy symbol body declarations', async () => {
 	const validSource = `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 
 export function App() @{
 	let count = state(0);
@@ -682,7 +682,7 @@ export function App() @{
 
 test('analyzeCaptures reports unsupported local class instance captures in lazy symbols', async () => {
 	const invalidSource = `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 
 class Formatter {
 	format(value) {
@@ -718,7 +718,7 @@ export function App() @{
 	]);
 	expect(captureAnalysis.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'ARCADE_CAPTURE_UNSUPPORTED_VALUE',
+			code: 'MARKLESS_CAPTURE_UNSUPPORTED_VALUE',
 			severity: 'error',
 			phase: 'capture-analysis',
 			passId: 'capture-analysis',
@@ -734,14 +734,14 @@ export function App() @{
 						'Represent durable data with state()/computed(), hoist serializable helpers to module scope, or move DOM-backed setup into a host element behavior with attach.',
 				},
 			],
-			docsUrl: 'https://arcadejs.com/errors/ARCADE_CAPTURE_UNSUPPORTED_VALUE',
+			docsUrl: 'https://markless.dev/errors/MARKLESS_CAPTURE_UNSUPPORTED_VALUE',
 		}),
 	]);
 });
 
 test('analyzeCaptures reports unsupported local DOM node captures in lazy symbols', async () => {
 	const invalidSource = `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 
 export function App() @{
 	let count = state(0);
@@ -771,7 +771,7 @@ export function App() @{
 	]);
 	expect(captureAnalysis.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'ARCADE_CAPTURE_UNSUPPORTED_VALUE',
+			code: 'MARKLESS_CAPTURE_UNSUPPORTED_VALUE',
 			severity: 'error',
 			phase: 'capture-analysis',
 			passId: 'capture-analysis',
@@ -787,14 +787,14 @@ export function App() @{
 						'Use element() with el={...} for DOM locators, or move DOM-backed setup into a host element behavior with attach.',
 				},
 			],
-			docsUrl: 'https://arcadejs.com/errors/ARCADE_CAPTURE_UNSUPPORTED_VALUE',
+			docsUrl: 'https://markless.dev/errors/MARKLESS_CAPTURE_UNSUPPORTED_VALUE',
 		}),
 	]);
 });
 
 test('analyzeCaptures reports unsupported locally created DOM node captures in lazy symbols', async () => {
 	const invalidSource = `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 
 export function App() @{
 	let count = state(0);
@@ -824,7 +824,7 @@ export function App() @{
 	]);
 	expect(captureAnalysis.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'ARCADE_CAPTURE_UNSUPPORTED_VALUE',
+			code: 'MARKLESS_CAPTURE_UNSUPPORTED_VALUE',
 			severity: 'error',
 			phase: 'capture-analysis',
 			passId: 'capture-analysis',
@@ -840,7 +840,7 @@ export function App() @{
 						'Use element() with el={...} for DOM locators, or move DOM-backed setup into a host element behavior with attach.',
 				},
 			],
-			docsUrl: 'https://arcadejs.com/errors/ARCADE_CAPTURE_UNSUPPORTED_VALUE',
+			docsUrl: 'https://markless.dev/errors/MARKLESS_CAPTURE_UNSUPPORTED_VALUE',
 		}),
 	]);
 });

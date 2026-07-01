@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { createRuntimeGraph } from '@arcade/runtime';
+import { createRuntimeGraph } from '@markless/runtime';
 import { createDomUpdateEntry } from '../src/dom-update.ts';
 import { createResumeRuntime } from '../src/index.ts';
 

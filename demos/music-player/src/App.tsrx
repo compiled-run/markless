@@ -1,4 +1,4 @@
-import { state } from 'arcade';
+import { state } from '@markless/core';
 import { Nav } from './components/Nav.tsrx';
 import { Song } from './components/Song.tsrx';
 import { Player } from './components/Player.tsrx';

@@ -1,5 +1,5 @@
 {
-	"name": "@arcade/bundler",
+	"name": "@markless/bundler",
 	"version": "0.0.0",
 	"private": true,
 	"type": "module",
@@ -13,7 +13,7 @@
 		"test:boxes": "witness run"
 	},
 	"dependencies": {
-		"@arcade/compiler": "workspace:*",
+		"@markless/compiler": "workspace:*",
 		"@thi.ng/dgraph": "catalog:",
 		"pathe": "catalog:",
 		"ufo": "catalog:"

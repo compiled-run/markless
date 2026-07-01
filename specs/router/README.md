@@ -1,14 +1,14 @@
-# Arcade Router Specs
+# Markless Router Specs
 
 Status: Draft
 
-Arcade Router is the routing layer migrated into Arcade. The source proof used a
-standalone router TypeScript plugin package. Arcade Router keeps the
-file-routing and typed-route ideas, but its authoring contract is Arcade-first:
+Markless Router is the routing layer migrated into Markless. The source proof used a
+standalone router TypeScript plugin package. Markless Router keeps the
+file-routing and typed-route ideas, but its authoring contract is Markless-first:
 
 - UI route modules are `.tsrx` or `.mdx`.
 - `.tsx` and `.jsx` route modules are not supported.
-- Public imports use Arcade names: `@arcade/router` or curated `arcade/router`
+- Public imports use Markless names: `@markless/router` or curated `@markless/core/router`
   re-exports.
 - The router TypeScript plugin lives inside `packages/router`.
 - Top-level `api/`, `middleware/`, `pages/`, `document.tsrx`, and `public/`
@@ -19,7 +19,7 @@ file-routing and typed-route ideas, but its authoring contract is Arcade-first:
   shorthand attributes, and literal-safe expression attributes. Nested static
   MDX children are passed through the TSRX `children` prop as escaped rendered
   HTML.
-- Arcade Router MDX does not execute arbitrary MDX JavaScript during browser
+- Markless Router MDX does not execute arbitrary MDX JavaScript during browser
   resume. Spread attributes, non-literal expression attributes, non-literal
   inline MDX expressions, and non-`.tsrx` component imports are unsupported
   until the router has an explicit MDX scope/payload contract for preserving
@@ -33,5 +33,5 @@ Read order:
 
 The first migration slice intentionally ports the route manifest, route type
 generation, request-file parsing, CLI starter surface, and router package
-boundaries. Renderer adapter code from the source proof is not copied as Arcade
-behavior because Arcade SSR/resume must stay artifact-first and TSRX-only.
+boundaries. Renderer adapter code from the source proof is not copied as Markless
+behavior because Markless SSR/resume must stay artifact-first and TSRX-only.

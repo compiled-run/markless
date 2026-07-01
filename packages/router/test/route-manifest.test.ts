@@ -8,7 +8,7 @@ import {
 const routePairs = (manifest: RouteManifest) =>
 	manifest.routes.map((route) => [route.pathname, route.file]);
 
-test('builds Arcade Router routes from .tsrx and .mdx pages only', () => {
+test('builds Markless Router routes from .tsrx and .mdx pages only', () => {
 	const manifest = buildRouteManifestFromFileIds([
 		'/pages/index.tsrx',
 		'/pages/about.tsrx',

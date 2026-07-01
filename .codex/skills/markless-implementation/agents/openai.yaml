@@ -1,0 +1,4 @@
+interface:
+    display_name: 'Markless Implementation'
+    short_description: 'Implement the Markless TSRX framework'
+    default_prompt: 'Use $markless-implementation to implement the next framework slice.'

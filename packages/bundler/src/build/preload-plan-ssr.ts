@@ -30,9 +30,7 @@ export type SsrModulePreloadPlanInput = Omit<ModulePreloadPlanInput, 'roots'> & 
 
 const SSR_RESUME_MIN_PROBABILITY = 0;
 
-export function planSsrModulePreloads(
-	input: SsrModulePreloadPlanInput,
-): ModulePreloadPlanEntry[] {
+export function planSsrModulePreloads(input: SsrModulePreloadPlanInput): ModulePreloadPlanEntry[] {
 	return planModulePreloads({
 		...input,
 		minProbability: input.minProbability ?? SSR_RESUME_MIN_PROBABILITY,

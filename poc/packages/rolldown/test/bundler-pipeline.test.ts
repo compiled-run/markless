@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test } from 'vitest';
-import { createArcadeRolldownPlugin } from '../src/index.ts';
+import { createMarklessRolldownPlugin } from '../src/index.ts';
 
 const fixturePath = 'fixtures/proofs/bundler-pipeline/src/App.tsrx';
 
@@ -11,13 +11,13 @@ async function readFixture(): Promise<string> {
 
 test('Rolldown POC plugin sees TSRX, delegates transform, and exposes virtual modules', async () => {
 	const source = await readFixture();
-	const plugin = createArcadeRolldownPlugin();
+	const plugin = createMarklessRolldownPlugin();
 	const result = await plugin.transform(source, fixturePath);
 
 	expect(result).toEqual(
 		expect.objectContaining({
 			moduleId: fixturePath,
-			code: expect.stringContaining('arcade TSRX transform'),
+			code: expect.stringContaining('markless TSRX transform'),
 		}),
 	);
 	expect(plugin.manifest().transformedModules).toEqual([

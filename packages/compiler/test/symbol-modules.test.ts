@@ -115,9 +115,7 @@ test('emitSymbolModules emits conditional text DOM update values', () => {
 
 	expect(artifact.modules).toHaveLength(1);
 	expect(artifact.modules[0].source).toContain('type: "setText"');
-	expect(artifact.modules[0].source).toContain(
-		'value: context.value ? "Pause" : "Play"',
-	);
+	expect(artifact.modules[0].source).toContain('value: context.value ? "Pause" : "Play"');
 });
 
 test('emitSymbolModules emits repeat-local assignment values through context locals', () => {

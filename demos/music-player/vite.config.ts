@@ -1,6 +1,6 @@
-import { arcade } from 'arcade/vite';
+import { markless } from '@markless/core/vite';
 import { defineConfig } from 'vite-plus';
 
 export default defineConfig({
-	plugins: [arcade()],
+	plugins: [markless()],
 });

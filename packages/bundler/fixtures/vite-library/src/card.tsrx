@@ -1,4 +1,4 @@
-import { state } from 'arcade';
+import { state } from '@markless/core';
 
 export function Card() @{
 	let title = state("Library card");

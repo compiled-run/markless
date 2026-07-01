@@ -1,7 +1,7 @@
-import type { ProtocolStatePayload, ProtocolViewPayload } from '@arcade/serializer';
+import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer';
 import type { EventOnlyResumeDomElement, EventOnlyResumeDomEvent } from './event-only-resume.ts';
-import type { DomJournalEntry } from '@arcade/runtime';
-import type { RuntimeGraph } from '@arcade/runtime';
+import type { DomJournalEntry } from '@markless/runtime';
+import type { RuntimeGraph } from '@markless/runtime';
 import type { CsrRenderContainer, CsrRenderOptions, CsrRenderOutput } from './render.ts';
 import type { ResumeRuntime, ResumeSymbol } from './resume.ts';
 
@@ -192,6 +192,6 @@ async function createFullRuntimeGraph(
 		return createRuntimeGraphFromStatePayload(state);
 	}
 
-	const { createRuntimeGraph } = await import('@arcade/runtime');
+	const { createRuntimeGraph } = await import('@markless/runtime');
 	return createRuntimeGraph({ cells: [] });
 }

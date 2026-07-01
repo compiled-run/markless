@@ -1,4 +1,4 @@
-import { Link } from 'arcade/router';
+import { Link } from '@markless/core/router';
 
 export default function NotFound() @{
 	<main>

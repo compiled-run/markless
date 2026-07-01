@@ -5,18 +5,18 @@ import {
 } from './route-manifest.ts';
 import { dispatchRouteUpdate, type RouteDocumentModule } from './route-state.ts';
 
-const STARTED = '__arcadeRouterSpaNavigationStarted';
-const LINK_ATTRIBUTE = 'data-arcade-router-link';
-const REPLACE_ATTRIBUTE = 'data-arcade-router-replace';
-const SCROLL_ATTRIBUTE = 'data-arcade-router-scroll';
-const LINK_INFO = '__arcadeRouterLink';
+const STARTED = '__marklessRouterSpaNavigationStarted';
+const LINK_ATTRIBUTE = 'data-markless-router-link';
+const REPLACE_ATTRIBUTE = 'data-markless-router-replace';
+const SCROLL_ATTRIBUTE = 'data-markless-router-scroll';
+const LINK_INFO = '__marklessRouterLink';
 
-export type ArcadeRouterNavigationRuntime = Pick<Navigation, 'addEventListener' | 'navigate'>;
+export type MarklessRouterNavigationRuntime = Pick<Navigation, 'addEventListener' | 'navigate'>;
 
-export interface ArcadeRouterNavigationWindow {
+export interface MarklessRouterNavigationWindow {
 	readonly document: Document;
 	readonly location: Location;
-	navigation?: ArcadeRouterNavigationRuntime;
+	navigation?: MarklessRouterNavigationRuntime;
 	addEventListener(
 		type: 'click',
 		listener: (event: MouseEvent) => void,
@@ -24,20 +24,20 @@ export interface ArcadeRouterNavigationWindow {
 	): void;
 }
 
-export interface ArcadeRouterNavigationPolyfillModule {
+export interface MarklessRouterNavigationPolyfillModule {
 	applyPolyfill(options: {
 		readonly interceptEvents: boolean;
-		readonly window: ArcadeRouterNavigationWindow;
+		readonly window: MarklessRouterNavigationWindow;
 	}): unknown;
 }
 
 export interface StartSpaNavigationOptions {
 	readonly documentModuleLoader?: () => Promise<unknown>;
-	readonly loadPolyfill?: () => Promise<ArcadeRouterNavigationPolyfillModule>;
+	readonly loadPolyfill?: () => Promise<MarklessRouterNavigationPolyfillModule>;
 	readonly pageModuleLoaders: Record<string, () => Promise<unknown>>;
 	readonly preloadRouteModule?: (file: string) => unknown;
 	readonly routeFileIds: readonly string[];
-	readonly window?: ArcadeRouterNavigationWindow;
+	readonly window?: MarklessRouterNavigationWindow;
 }
 
 interface NavigationContext {
@@ -45,10 +45,10 @@ interface NavigationContext {
 	readonly manifest: RouteManifest;
 	readonly pageModuleLoaders: Record<string, () => Promise<unknown>>;
 	readonly preloadRouteModule?: (file: string) => unknown;
-	readonly window: ArcadeRouterNavigationWindow;
+	readonly window: MarklessRouterNavigationWindow;
 }
 
-export async function __arcadeRouterStartSpaNavigation(options: StartSpaNavigationOptions) {
+export async function __marklessRouterStartSpaNavigation(options: StartSpaNavigationOptions) {
 	const runtimeWindow = options.window ?? browserWindow();
 	const state = runtimeWindow as unknown as Record<string, unknown>;
 	if (state[STARTED]) {
@@ -76,16 +76,16 @@ export async function __arcadeRouterStartSpaNavigation(options: StartSpaNavigati
 }
 
 export async function ensureNavigationRuntime(
-	runtimeWindow: ArcadeRouterNavigationWindow = browserWindow(),
-	loadPolyfill?: () => Promise<ArcadeRouterNavigationPolyfillModule>,
+	runtimeWindow: MarklessRouterNavigationWindow = browserWindow(),
+	loadPolyfill?: () => Promise<MarklessRouterNavigationPolyfillModule>,
 ) {
 	if (!runtimeWindow.navigation) {
 		const { applyPolyfill } = (await (loadPolyfill?.() ??
-			import('@virtualstate/navigation'))) as ArcadeRouterNavigationPolyfillModule;
+			import('@virtualstate/navigation'))) as MarklessRouterNavigationPolyfillModule;
 		runtimeWindow.navigation = applyPolyfill({
 			interceptEvents: false,
 			window: runtimeWindow,
-		}) as ArcadeRouterNavigationRuntime;
+		}) as MarklessRouterNavigationRuntime;
 	}
 
 	return runtimeWindow.navigation;
@@ -141,7 +141,7 @@ async function renderRoute(url: URL, context: NavigationContext, signal: AbortSi
 function handleLinkClick(
 	event: MouseEvent,
 	context: NavigationContext,
-	navigation: ArcadeRouterNavigationRuntime,
+	navigation: MarklessRouterNavigationRuntime,
 ) {
 	if (
 		event.defaultPrevented ||
@@ -186,7 +186,7 @@ function preloadRouteModule(context: NavigationContext, file: string): void {
 
 function routeUrl(event: NavigateEvent, context: NavigationContext) {
 	if (
-		!isArcadeRouterNavigation(event) ||
+		!isMarklessRouterNavigation(event) ||
 		event.canIntercept === false ||
 		event.navigationType === 'reload' ||
 		event.hashChange ||
@@ -200,7 +200,7 @@ function routeUrl(event: NavigateEvent, context: NavigationContext) {
 	return url && matchRouteManifest(url.pathname, context.manifest) ? url : undefined;
 }
 
-function isArcadeRouterNavigation(event: NavigateEvent) {
+function isMarklessRouterNavigation(event: NavigateEvent) {
 	const info = event.info as Record<string, unknown> | undefined;
 	return info?.[LINK_INFO] === true || event.navigationType === 'traverse';
 }
@@ -246,6 +246,6 @@ function isEligibleLink(anchor: HTMLAnchorElement) {
 	);
 }
 
-function browserWindow(): ArcadeRouterNavigationWindow {
-	return window as unknown as ArcadeRouterNavigationWindow;
+function browserWindow(): MarklessRouterNavigationWindow {
+	return window as unknown as MarklessRouterNavigationWindow;
 }

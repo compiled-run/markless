@@ -1,10 +1,10 @@
-import type { ProtocolViewPayload } from '@arcade/serializer';
+import type { ProtocolViewPayload } from '@markless/serializer';
 import type {
 	DomJournalEntry,
 	DomJournalResult,
 	RuntimeGraph,
 	RuntimeGraphSharedPatch,
-} from '@arcade/runtime';
+} from '@markless/runtime';
 
 export type ResumeDomNode = {
 	readonly nodeType: number;
@@ -224,8 +224,8 @@ export type ResumeRuntime = {
 };
 
 export type RuntimeResumeErrorCode =
-	| 'ARCADE_RESUME_LOCATOR_MISSING'
-	| 'ARCADE_RESUME_LOCATOR_MISMATCH';
+	| 'MARKLESS_RESUME_LOCATOR_MISSING'
+	| 'MARKLESS_RESUME_LOCATOR_MISMATCH';
 
 export type RuntimeResumeDiagnostic = {
 	readonly code: RuntimeResumeErrorCode;
@@ -1050,22 +1050,22 @@ function missingElementLocatorError(
 	locator: ResumeViewRecord['locators'][number],
 ): RuntimeResumeError {
 	return new RuntimeResumeError({
-		code: 'ARCADE_RESUME_LOCATOR_MISSING',
+		code: 'MARKLESS_RESUME_LOCATOR_MISSING',
 		severity: 'error',
 		phase: 'resume',
 		title: 'Resume locator did not match the document',
 		message: `Resume locator ${locator.hostNodeId} expected <${locator.tagName}> at DOM order index ${String(locator.index)}.`,
-		why: 'The arcade/view payload points at an element that was not present in the resumed document. The runtime cannot safely attach events, behaviors, element handles, or DOM updates to a missing host node.',
+		why: 'The markless/view payload points at an element that was not present in the resumed document. The runtime cannot safely attach events, behaviors, element handles, or DOM updates to a missing host node.',
 		hostNodeId: locator.hostNodeId,
 		elementLocator: domOrderLocator(locator.index),
 		expectedTagName: locator.tagName.toLowerCase(),
 		suggestions: [
 			{
 				message:
-					'Regenerate the arcade/view payload from the same initial render output that the browser is resuming.',
+					'Regenerate the markless/view payload from the same initial render output that the browser is resuming.',
 			},
 		],
-		docsUrl: 'https://arcadejs.com/errors/ARCADE_RESUME_LOCATOR_MISSING',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_RESUME_LOCATOR_MISSING',
 	});
 }
 
@@ -1075,12 +1075,12 @@ function mismatchedElementLocatorError(
 ): RuntimeResumeError {
 	const expectedTagName = locator.tagName.toLowerCase();
 	return new RuntimeResumeError({
-		code: 'ARCADE_RESUME_LOCATOR_MISMATCH',
+		code: 'MARKLESS_RESUME_LOCATOR_MISMATCH',
 		severity: 'error',
 		phase: 'resume',
 		title: 'Resume locator matched a different element',
 		message: `Resume locator ${locator.hostNodeId} expected <${expectedTagName}> at DOM order index ${String(locator.index)} but found <${actualTagName}>.`,
-		why: 'The arcade/view payload no longer matches the document being resumed. The runtime cannot safely reuse a DOM-order locator when the element at that position has a different tag.',
+		why: 'The markless/view payload no longer matches the document being resumed. The runtime cannot safely reuse a DOM-order locator when the element at that position has a different tag.',
 		hostNodeId: locator.hostNodeId,
 		elementLocator: domOrderLocator(locator.index),
 		expectedTagName,
@@ -1088,10 +1088,10 @@ function mismatchedElementLocatorError(
 		suggestions: [
 			{
 				message:
-					'Resume the exact document produced with the matching arcade/view payload, or regenerate the payload after changing markup.',
+					'Resume the exact document produced with the matching markless/view payload, or regenerate the payload after changing markup.',
 			},
 		],
-		docsUrl: 'https://arcadejs.com/errors/ARCADE_RESUME_LOCATOR_MISMATCH',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_RESUME_LOCATOR_MISMATCH',
 	});
 }
 
@@ -1101,21 +1101,21 @@ function missingCommentAnchorError(
 	index: number,
 ): RuntimeResumeError {
 	return new RuntimeResumeError({
-		code: 'ARCADE_RESUME_LOCATOR_MISSING',
+		code: 'MARKLESS_RESUME_LOCATOR_MISSING',
 		severity: 'error',
 		phase: 'resume',
 		title: 'Resume locator did not match the document',
 		message: `Resume locator ${boundaryId} ${anchorName} expected a comment at DOM order index ${String(index)}.`,
-		why: 'The arcade/view payload references an async boundary comment anchor that was not present in the resumed document. The runtime needs both comment anchors before it can replace pending, fulfilled, or rejected boundary content.',
+		why: 'The markless/view payload references an async boundary comment anchor that was not present in the resumed document. The runtime needs both comment anchors before it can replace pending, fulfilled, or rejected boundary content.',
 		boundaryId,
 		elementLocator: domOrderCommentLocator(index),
 		suggestions: [
 			{
 				message:
-					'Keep compiler-generated async boundary comments in the initial render output and resume with the matching arcade/view payload.',
+					'Keep compiler-generated async boundary comments in the initial render output and resume with the matching markless/view payload.',
 			},
 		],
-		docsUrl: 'https://arcadejs.com/errors/ARCADE_RESUME_LOCATOR_MISSING',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_RESUME_LOCATOR_MISSING',
 	});
 }
 

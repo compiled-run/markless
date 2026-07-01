@@ -1,5 +1,5 @@
-import { state } from 'arcade';
-import { Link } from 'arcade/router';
+import { state } from '@markless/core';
+import { Link } from '@markless/core/router';
 
 export default function InteractiveCounter() @{
 	let count = state(0);

@@ -3,7 +3,7 @@ import {
 	type ModulePreloadPlanEntry,
 	type ModulePreloadRoot,
 } from './preload-plan.ts';
-import type { ArcadeBundleGraph } from '../types.ts';
+import type { MarklessBundleGraph } from '../types.ts';
 
 export type LazySymbolPreloadView = {
 	readonly events?: ReadonlyArray<{
@@ -24,7 +24,7 @@ export type LazySymbolPreloadView = {
 
 export type PreloadLazySymbolModulesInput = {
 	readonly view: LazySymbolPreloadView;
-	readonly bundleGraph: ArcadeBundleGraph | undefined;
+	readonly bundleGraph: MarklessBundleGraph | undefined;
 	readonly base?: string;
 	readonly document?: ModulePreloadDocument;
 	readonly minProbability?: number;

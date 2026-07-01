@@ -1,4 +1,4 @@
-import type { ProtocolStatePayload } from '@arcade/serializer';
+import type { ProtocolStatePayload } from '@markless/serializer';
 
 export type RuntimeGraphCell = {
 	readonly graphNodeId: string;

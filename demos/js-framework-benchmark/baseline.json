@@ -1,10 +1,10 @@
 {
-	"schemaVersion": "arcade-jsfb-baseline/v1",
+	"schemaVersion": "markless-jsfb-baseline/v1",
 	"source": {
 		"benchmarkSuite": "js-framework-benchmark",
 		"scope": "keyed",
-		"framework": "arcade-keyed",
-		"notes": "Accepted local full comparison from the Arcade benchmark optimization pass using JSFB values.total.median for CPU rows. Lower numbers are better."
+		"framework": "markless-keyed",
+		"notes": "Accepted local full comparison from the Markless benchmark optimization pass using JSFB values.total.median for CPU rows. Lower numbers are better."
 	},
 	"thresholds": {
 		"cpuGeomeanRegressionRatio": 1.03,
@@ -29,8 +29,8 @@
 		"warnOnly": ["43_first-paint"]
 	},
 	"frameworks": {
-		"arcade": {
-			"displayName": "Arcade",
+		"markless": {
+			"displayName": "Markless",
 			"results": {
 				"01_run1k": 22.7,
 				"02_replace1k": 25.1,

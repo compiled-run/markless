@@ -1,5 +1,5 @@
 {
-	"name": "@arcade/compiler",
+	"name": "@markless/compiler",
 	"version": "0.0.0",
 	"private": true,
 	"type": "module",
@@ -9,7 +9,7 @@
 		"./type-service": "./src/type-service.ts"
 	},
 	"dependencies": {
-		"@arcade/serializer": "workspace:*",
+		"@markless/serializer": "workspace:*",
 		"@tsrx/core": "catalog:"
 	}
 }

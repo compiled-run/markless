@@ -28,7 +28,7 @@ export function routeTypegenPlugin(): Plugin {
 	let root = '';
 
 	return {
-		name: 'arcade-router:typegen',
+		name: 'markless-router:typegen',
 		configResolved(config) {
 			root = config.root;
 		},
