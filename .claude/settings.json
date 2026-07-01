@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "ask": [
+      "Bash(pnpm add:*)",
+      "Bash(pnpm install:*)",
+      "Bash(pnpm i:*)",
+      "Bash(pnpm update:*)",
+      "Bash(npm add:*)",
+      "Bash(npm install:*)",
+      "Bash(npm i:*)",
+      "Bash(npm update:*)",
+      "Bash(yarn add:*)",
+      "Bash(yarn install:*)",
+      "Bash(yarn update:*)",
+      "Bash(bun add:*)",
+      "Bash(bun install:*)",
+      "Bash(bun i:*)",
+      "Bash(bun update:*)"
+    ],
+    "deny": [
+      "Bash(esbuild:*)",
+      "Bash(terser:*)",
+      "Bash(rollup:*)",
+      "Bash(webpack:*)",
+      "Bash(swc:*)",
+      "Bash(babel:*)",
+      "Bash(npx esbuild:*)",
+      "Bash(npx terser:*)",
+      "Bash(npx rollup:*)",
+      "Bash(npx webpack:*)",
+      "Bash(npx swc:*)",
+      "Bash(npx babel:*)",
+      "Bash(pnpm exec esbuild:*)",
+      "Bash(pnpm exec terser:*)",
+      "Bash(pnpm exec rollup:*)",
+      "Bash(pnpm exec webpack:*)",
+      "Bash(pnpm exec swc:*)",
+      "Bash(pnpm exec babel:*)"
+    ]
+  }
+}

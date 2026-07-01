@@ -8,6 +8,7 @@ dist/
 coverage/
 .arcade/
 .output/
+.output-router-preview/
 .witness/
 .vite/
 arcade-router-env.d.ts
