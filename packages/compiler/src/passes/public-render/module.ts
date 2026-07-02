@@ -230,7 +230,7 @@ function emitPublicSsrRenderModule(
 		'function marklessSsrStateValue(graphNodeId) { return marklessSsrStateValues.get(graphNodeId); }',
 		'function marklessSsrRenderChild(children, component, props, child) { const output = component?.renderSsr?.(props); if (output) children.push({ ...child, output, callbackProps: props?.__marklessSsrCallbacks ?? {} }); return output?.html ?? ""; }',
 		'function marklessSsrHost(hostLocators, hostNodeId, tagName) { hostLocators.push({ hostNodeId, strategy: "dom-order", index: hostLocators.length + (hostLocators.marklessSsrExtraElements ?? 0), tagName }); return ""; }',
-		'function marklessSsrDynamicTagName(hostLocators, value) { if (value === null || value === undefined || value === false || value === "") return null; const tag = String(value); if (!/^[a-zA-Z][a-zA-Z0-9:_.-]*$/.test(tag)) throw new Error("MARKLESS_DYNAMIC_TAG_INVALID: " + tag); hostLocators.marklessSsrExtraElements = (hostLocators.marklessSsrExtraElements ?? 0) + 1; return tag; }',
+		'function marklessSsrDynamicTagName(value) { if (value === null || value === undefined || value === false || value === "") return null; const tag = String(value); if (!/^[a-zA-Z][a-zA-Z0-9:_.-]*$/.test(tag)) throw new Error("MARKLESS_DYNAMIC_TAG_INVALID: " + tag); return tag; }',
 		'function marklessSsrRepeatRows(hostLocators, items, renderRow, elementsPerRow, renderEmpty) { const list = Array.isArray(items) ? items : Array.from(items ?? []); if (list.length === 0) return renderEmpty ? renderEmpty() : ""; const html = list.map(renderRow).join(""); hostLocators.marklessSsrExtraElements = (hostLocators.marklessSsrExtraElements ?? 0) + list.length * elementsPerRow; return html; }',
 		'function marklessSsrCallbacks(callbacks) { const result = {}; for (const key of Object.keys(callbacks)) if (callbacks[key]) result[key] = callbacks[key]; return result; }',
 		'function marklessSsrCallbackSymbol(props, path) { let value = props?.__marklessSsrCallbacks; for (const key of path) value = value?.[key]; return typeof value === "string" ? value : undefined; }',
@@ -415,7 +415,8 @@ function assignSsrHostIds(
 
 		if (node.type === 'Element' || node.type === 'JSXElement') {
 			const tagName = getElementTagName(node);
-			if (tagName && isHostTagName(tagName)) {
+			const isHost = tagName ? isHostTagName(tagName) : !!getDynamicTagExpression(node);
+			if (isHost) {
 				const hostNodeId = hostNodeIds[index++];
 				if (hostNodeId) hostIdByNode.set(node, hostNodeId);
 			}
@@ -706,10 +707,18 @@ function emitDynamicTagHtml(node: AnyNode, context: HtmlRenderContext): string {
 			: '""';
 	const tagValueExpression =
 		context.mode === 'ssr'
-			? `marklessSsrDynamicTagName(marklessSsrHostLocators, ${expressionSource(tagExpression, context.source)})`
+			? `marklessSsrDynamicTagName(${expressionSource(tagExpression, context.source)})`
 			: `marklessCsrDynamicTagName(${expressionSource(tagExpression, context.source)})`;
+	// Rendered dynamic elements claim a real dom-order locator carrying the
+	// runtime tag, so events/attach/el on them resolve like any host element.
+	const dynamicHostId = context.mode === 'ssr' ? context.hostIdByNode.get(node) : undefined;
+	const dynamicHostLocator =
+		context.mode === 'ssr' && dynamicHostId && !context.insideRepeatRow
+			? `marklessSsrHost(marklessSsrHostLocators, ${JSON.stringify(dynamicHostId)}, marklessDynamicTag)`
+			: '""';
 
 	return `((marklessDynamicTag) => marklessDynamicTag ? ${joinSsrExpressions([
+		dynamicHostLocator,
 		'("<" + marklessDynamicTag)',
 		attributesExpression,
 		JSON.stringify('>'),

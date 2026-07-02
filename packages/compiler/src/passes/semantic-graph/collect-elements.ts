@@ -3,6 +3,7 @@ import { asNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import {
 	getElementAttributes,
+	getDynamicTagExpression,
 	getElementTagName,
 	isHostTagName,
 	isIgnorableJsxTextNode,
@@ -38,13 +39,15 @@ export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGr
 
 	const tagName = getElementTagName(node);
 	const previousHost = state.currentHostNodeId;
-	const isHostElement = tagName ? isHostTagName(tagName) : false;
+	// Dynamic <{expr}> elements are host elements whose tag is only known at
+	// render time; '*' marks that in host records and planned locators.
+	const isHostElement = tagName ? isHostTagName(tagName) : !!getDynamicTagExpression(node);
 	let hostNodeId = previousHost;
 
-	if (tagName && isHostElement) {
+	if (isHostElement) {
 		hostNodeId = `h${state.nextHostId++}`;
 		state.hostIds.set(node, hostNodeId);
-		state.graph.hostNodes.push({ id: hostNodeId, tagName });
+		state.graph.hostNodes.push({ id: hostNodeId, tagName: tagName ?? '*' });
 		state.currentHostNodeId = hostNodeId;
 	}
 

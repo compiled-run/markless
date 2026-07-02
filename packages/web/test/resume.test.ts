@@ -98,6 +98,37 @@ async function settleMicrotasks(count = 4): Promise<void> {
 	}
 }
 
+test('resume runtime skips tagName validation for wildcard locators', () => {
+	const child = { nodeType: 1, tagName: 'ARTICLE', childNodes: [], addEventListener() {} };
+	const root = {
+		nodeType: 1,
+		tagName: 'MAIN',
+		childNodes: [child],
+		addEventListener() {},
+	};
+	const runtime = createResumeRuntime({
+		root: root as never,
+		graph: {
+			read: () => undefined,
+			write: () => undefined,
+			subscribe: () => () => undefined,
+			subscribeJournal: () => () => undefined,
+			flush: async () => undefined,
+		} as never,
+		view: {
+			locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 1, tagName: '*' }],
+			events: [],
+			domUpdates: [],
+			behaviors: [],
+			elementHandles: [],
+			asyncBoundaries: [],
+		} as never,
+		loadSymbol: () => () => undefined,
+	});
+
+	expect(runtime.getElement('h0')).toBe(child);
+});
+
 test('resume runtime materializes view records and dispatches lazy symbols after sync policy', async () => {
 	const input = element('INPUT');
 	const root = element('SECTION', [input]);

@@ -167,9 +167,8 @@ test.each([
 
 test.each([
 	[
-		'dynamic tag',
-		appSource(`let tag = state('div'); let count = state(0);
-<section><{tag} onClick={() => count++}>Hi</{tag}></section>`),
+		'member-expression component',
+		appSource(`<section><ui.Row /></section>`, `const ui = { Row() @{ <li>Hi</li> } };`),
 	],
 	[
 		'@try',

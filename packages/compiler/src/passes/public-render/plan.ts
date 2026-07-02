@@ -5,6 +5,7 @@ import {
 	escapeAttribute,
 	escapeHtml,
 	getComponentFunction,
+	getDynamicTagExpression,
 	getElementAttributes,
 	getElementTagName,
 	isHostTagName,
@@ -302,22 +303,22 @@ function collectUnsupportedConstructDiagnostics(root: AnyNode, filename: string)
 	const visit = (node: AnyNode): void => {
 		if (
 			(node.type === 'Element' || node.type === 'JSXElement') &&
-			(node.isDynamic === true || !getElementTagName(node)) &&
-			getElementAttributes(node).some((attribute) => {
-				if (isSpreadAttribute(attribute)) return false;
-				const name = getIdentifierName(attribute.name as AnyNode | undefined);
-				return !!name && (isEventAttribute(name) || name === 'attach' || name === 'el');
-			})
+			!getElementTagName(node) &&
+			node.isDynamic !== true &&
+			!getDynamicTagExpression(node)
 		) {
+			// Bare member-expression element names (<ui.Row />): method/namespace
+			// component references need same-module child component support, which
+			// does not exist yet. Recorded host decision: kept out, fail loud.
 			diagnostics.push(
 				unsupportedRenderConstructDiagnostic({
-					label: 'dynamic tag',
+					label: 'member-expression component',
 					message:
-						'Events, attach behaviors, and el handles on dynamic <{expression}> tags are dropped because dynamic elements have no host records yet.',
+						'Member-expression component references render nothing because same-module child components are not supported yet.',
 					node,
 					filename,
 					suggestion:
-						'Move the event or behavior to a statically named wrapper element, or branch with @if over static tag choices.',
+						'Move the component to its own module and import it, or use a plain top-level component name.',
 				}),
 			);
 		} else if (
@@ -845,7 +846,8 @@ function assignHostIds(root: AnyNode, hostNodeIds: ReadonlyArray<string>): Assig
 
 		if (node.type === 'Element' || node.type === 'JSXElement') {
 			const tagName = getElementTagName(node);
-			if (tagName && isHostTagName(tagName)) {
+			const isHost = tagName ? isHostTagName(tagName) : !!getDynamicTagExpression(node);
+			if (isHost) {
 				const hostNodeId = hostNodeIds[index++];
 				if (hostNodeId) {
 					hostIdByNode.set(node, hostNodeId);

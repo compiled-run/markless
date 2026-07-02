@@ -652,6 +652,54 @@ export function App() @{
 	);
 });
 
+test('compileTsrxModule wires events on dynamic tags with rendered-tag locators', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/DynamicButton.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let tag = state('article');
+	let count = state(0);
+
+	<section>
+		<{tag} class="card" onClick={() => count++}>Hi</{tag}>
+		<footer>Done</footer>
+	</section>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.diagnostics).toEqual([]);
+	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	const output = (
+		ssrModule.marklessRenderSsr as () => {
+			readonly html: string;
+			readonly view: {
+				readonly locators: ReadonlyArray<Record<string, unknown>>;
+				readonly events: ReadonlyArray<{
+					readonly eventName: string;
+					readonly symbolIds: ReadonlyArray<string>;
+				}>;
+			};
+		}
+	)();
+
+	expect(output.html).toBe(
+		'<section><article class="card">Hi</article><footer>Done</footer></section>',
+	);
+	// The dynamic element claims a real locator carrying its rendered tag.
+	expect(output.view.locators).toEqual([
+		expect.objectContaining({ tagName: 'section', index: 0 }),
+		expect.objectContaining({ tagName: 'article', index: 1 }),
+		expect.objectContaining({ tagName: 'footer', index: 2 }),
+	]);
+	const click = output.view.events.find((entry) => entry.eventName === 'click');
+	expect(click).toBeDefined();
+	expect(click!.symbolIds.length).toBeGreaterThan(0);
+});
+
 test('compileTsrxModule renders nothing for a nullish dynamic tag in SSR html', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/DynamicCard.tsrx',

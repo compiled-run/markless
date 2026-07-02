@@ -1000,9 +1000,11 @@ function materializeDomLocators(
 			throw missingElementLocatorError(locator);
 		}
 
+		// '*' marks compiler-planned locators for dynamic <{expr}> elements,
+		// whose tag is only known at render time.
 		const expectedTagName = locator.tagName.toLowerCase();
 		const actualTagName = element.tagName.toLowerCase();
-		if (actualTagName !== expectedTagName) {
+		if (expectedTagName !== '*' && actualTagName !== expectedTagName) {
 			throw mismatchedElementLocatorError(locator, actualTagName);
 		}
 
