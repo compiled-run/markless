@@ -46,9 +46,52 @@ jobs:
             - name: Run router pipeline boxes
               run: pnpm --dir packages/router test:boxes
 
-    benchmark:
+    changes:
         runs-on: ubuntu-latest
-        timeout-minutes: 120
+        timeout-minutes: 10
+        outputs:
+            bench: ${{ steps.filter.outputs.bench }}
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Decide whether benchmarks can be affected
+              id: filter
+              run: |
+                  if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+                    base="${{ github.event.pull_request.base.sha }}"
+                  else
+                    base="${{ github.event.before }}"
+                  fi
+                  bench=true
+                  if [ -n "$base" ] && git cat-file -e "$base^{commit}" 2>/dev/null; then
+                    changed=$(git diff --name-only "$base" HEAD)
+                    # Skip benchmarking only when every changed file is docs/spec-only.
+                    if [ -n "$changed" ] && ! printf '%s\n' "$changed" | grep -qvE '^(specs/|docs/|\.claude/|\.codex/|LICENSE$|.*\.md$)'; then
+                      bench=false
+                    fi
+                  fi
+                  echo "bench=$bench" >> "$GITHUB_OUTPUT"
+                  echo "benchmarks needed: $bench"
+
+    benchmark:
+        needs: changes
+        if: needs.changes.outputs.bench == 'true'
+        runs-on: ubuntu-latest
+        timeout-minutes: 30
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - shard: select
+                      benchmarks: 04_
+                    - shard: create
+                      benchmarks: 01_ 07_ 40_
+                    - shard: update
+                      benchmarks: 02_ 03_ 05_
+                    - shard: list
+                      benchmarks: 06_ 08_ 09_
         env:
             MARKLESS_CI_TEMP: /tmp/markless-ci-${{ github.run_id }}
             MARKLESS_REPO_ROOT: ${{ github.workspace }}
@@ -60,6 +103,7 @@ jobs:
             MARKLESS_JSFB_TRACES: /tmp/markless-ci-${{ github.run_id }}/markless-jsfb/traces-markless-ci
             JSFB_SERVER_LOG: /tmp/markless-ci-${{ github.run_id }}/jsfb-server.log
             MARKLESS_JSFB_CI_COUNT: '5'
+            MARKLESS_JSFB_BENCHMARKS: ${{ matrix.benchmarks }}
             NPM_CONFIG_AUDIT: 'false'
             NPM_CONFIG_FUND: 'false'
             NPM_CONFIG_PREFER_OFFLINE: 'true'
@@ -143,7 +187,7 @@ jobs:
                   cat "$JSFB_SERVER_LOG"
                   exit 1
 
-            - name: Run baseline Markless JS Framework Benchmark
+            - name: Run baseline Markless JS Framework Benchmark shard
               working-directory: ${{ env.JSFB_ROOT }}
               env:
                   MARKLESS_REPO_ROOT: ${{ env.MARKLESS_BASE_REPO_ROOT }}
@@ -154,15 +198,12 @@ jobs:
                     --headless \
                     --framework keyed/markless \
                     --count "$MARKLESS_JSFB_CI_COUNT" \
-                    --benchmark 01_ 02_ 03_ 04_ 05_ 06_ 07_ 08_ 09_ 40_ \
+                    --benchmark $MARKLESS_JSFB_BENCHMARKS \
                     2>&1 | tee "$RUNNER_TEMP/jsfb-bench-baseline.log"
                   if grep -Fq "Frameworks that will be benchmarked []" "$RUNNER_TEMP/jsfb-bench-baseline.log"; then
                     exit 1
                   fi
-                  if ! compgen -G "webdriver-ts/results/*markless*-keyed_01_run1k.json" > /dev/null; then
-                    exit 1
-                  fi
-                  if ! compgen -G "webdriver-ts/results/*markless*-keyed_41_size-uncompressed.json" > /dev/null; then
+                  if ! compgen -G "webdriver-ts/results/*markless*-keyed_*.json" > /dev/null; then
                     exit 1
                   fi
                   mkdir -p "$MARKLESS_CI_TEMP/markless-jsfb"
@@ -176,7 +217,7 @@ jobs:
               run: |
                   node --input-type=module -e "import { rebuildFrameworks } from './cli/rebuild-build-single.js'; if (!rebuildFrameworks(['keyed/markless'], true)) process.exit(1);"
 
-            - name: Run current Markless JS Framework Benchmark
+            - name: Run current Markless JS Framework Benchmark shard
               working-directory: ${{ env.JSFB_ROOT }}
               run: |
                   set -o pipefail
@@ -185,15 +226,12 @@ jobs:
                     --headless \
                     --framework keyed/markless \
                     --count "$MARKLESS_JSFB_CI_COUNT" \
-                    --benchmark 01_ 02_ 03_ 04_ 05_ 06_ 07_ 08_ 09_ 40_ \
+                    --benchmark $MARKLESS_JSFB_BENCHMARKS \
                     2>&1 | tee "$RUNNER_TEMP/jsfb-bench-current.log"
                   if grep -Fq "Frameworks that will be benchmarked []" "$RUNNER_TEMP/jsfb-bench-current.log"; then
                     exit 1
                   fi
-                  if ! compgen -G "webdriver-ts/results/*markless*-keyed_01_run1k.json" > /dev/null; then
-                    exit 1
-                  fi
-                  if ! compgen -G "webdriver-ts/results/*markless*-keyed_41_size-uncompressed.json" > /dev/null; then
+                  if ! compgen -G "webdriver-ts/results/*markless*-keyed_*.json" > /dev/null; then
                     exit 1
                   fi
                   mkdir -p "$MARKLESS_CI_TEMP/markless-jsfb"
@@ -202,18 +240,39 @@ jobs:
                     mv webdriver-ts/traces "$MARKLESS_JSFB_TRACES"
                   fi
 
-            - name: Compare benchmark results against baseline
-              run: pnpm bench:jsfb:guard
-
-            - name: Upload JSFB results
+            - name: Upload JSFB shard results
               if: always()
               uses: actions/upload-artifact@v4
               with:
-                  name: markless-jsfb-results
+                  name: markless-jsfb-results-${{ matrix.shard }}
                   path: |
                       ${{ env.MARKLESS_JSFB_BASELINE_RESULTS }}
                       ${{ env.MARKLESS_JSFB_RESULTS }}
                       ${{ env.MARKLESS_JSFB_BASELINE_TRACES }}
                       ${{ env.MARKLESS_JSFB_TRACES }}
                       ${{ env.JSFB_SERVER_LOG }}
-                      ${{ env.MARKLESS_CI_TEMP }}/jsfb-*.log
+
+    benchmark-guard:
+        needs: [changes, benchmark]
+        if: needs.changes.outputs.bench == 'true'
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+        env:
+            MARKLESS_JSFB_BASELINE_RESULTS: ${{ github.workspace }}/.jsfb-merged/markless-jsfb/results-markless-base
+            MARKLESS_JSFB_RESULTS: ${{ github.workspace }}/.jsfb-merged/markless-jsfb/results-markless-ci
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+
+            - name: Download JSFB shard results
+              uses: actions/download-artifact@v4
+              with:
+                  pattern: markless-jsfb-results-*
+                  merge-multiple: true
+                  path: .jsfb-merged
+
+            - name: Compare benchmark results against baseline
+              run: node scripts/benchmarks/jsfb-baseline.mjs compare
