@@ -13,6 +13,7 @@ import {
 	getElementTagName,
 	isHostTagName,
 	isIgnorableJsxTextNode as isIgnorableTextNode,
+	isSpreadAttribute,
 	isStaticTextNode,
 	staticTextValue,
 	unwrapExpressionContainer,
@@ -136,6 +137,7 @@ function emitPublicCsrRenderModule(
 		'function marklessCsrIsThenable(value) { return value !== null && (typeof value === "object" || typeof value === "function") && typeof value.then === "function"; }',
 		'function marklessCsrText(value) { return marklessCsrEscape(value == null ? "" : String(value)); }',
 		'function marklessCsrAttribute(name, value) { return ` ${name}="${marklessCsrEscape(value == null ? "" : String(value))}"`; }',
+		'function marklessCsrSpreadAttributes(values) { let html = ""; for (const key of Object.keys(values ?? {})) { if (!/^[A-Za-z_][\\w.:-]*$/.test(key) || /^on[A-Z]/.test(key) || key === "attach" || key === "el" || key === "children") continue; const value = values[key]; if (value === null || value === undefined || value === false) continue; html += value === true ? ` ${key}=""` : marklessCsrAttribute(key, value); } return html; }',
 		'function marklessCsrEscape(value) { return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll("\\"", "&quot;"); }',
 		'',
 	]
@@ -165,6 +167,10 @@ function emitPublicSsrRenderModule(
 			rootInfo.root,
 			input.semanticGraph.hostNodes.map((host) => host.id),
 		),
+		keyedRepeats: input.semanticGraph.keyedRepeats,
+		repeatGates: input.publicRenderPlan.repeatGates,
+		nextRepeatIndex: 0,
+		insideRepeatRow: false,
 		source: input.source.source,
 	};
 	const hostLocators = staticHostLocators(input);
@@ -202,7 +208,8 @@ function emitPublicSsrRenderModule(
 		'}',
 		'function marklessSsrStateValue(graphNodeId) { return marklessSsrStateValues.get(graphNodeId); }',
 		'function marklessSsrRenderChild(children, component, props, child) { const output = component?.renderSsr?.(props); if (output) children.push({ ...child, output, callbackProps: props?.__marklessSsrCallbacks ?? {} }); return output?.html ?? ""; }',
-		'function marklessSsrHost(hostLocators, hostNodeId, tagName) { hostLocators.push({ hostNodeId, strategy: "dom-order", index: hostLocators.length, tagName }); return ""; }',
+		'function marklessSsrHost(hostLocators, hostNodeId, tagName) { hostLocators.push({ hostNodeId, strategy: "dom-order", index: hostLocators.length + (hostLocators.marklessSsrExtraElements ?? 0), tagName }); return ""; }',
+		'function marklessSsrRepeatRows(hostLocators, items, renderRow, elementsPerRow) { const list = Array.isArray(items) ? items : Array.from(items ?? []); const html = list.map(renderRow).join(""); hostLocators.marklessSsrExtraElements = (hostLocators.marklessSsrExtraElements ?? 0) + list.length * elementsPerRow; return html; }',
 		'function marklessSsrCallbacks(callbacks) { const result = {}; for (const key of Object.keys(callbacks)) if (callbacks[key]) result[key] = callbacks[key]; return result; }',
 		'function marklessSsrCallbackSymbol(props, path) { let value = props?.__marklessSsrCallbacks; for (const key of path) value = value?.[key]; return typeof value === "string" ? value : undefined; }',
 		'function marklessComposeState(state, children) { const childStates = children.map((child) => child.output?.state).filter(Boolean); if (childStates.length === 0) return state; return { ...state, cells: [...(state.cells ?? []), ...childStates.flatMap((childState) => childState.cells ?? [])], computed: [...(state.computed ?? []), ...childStates.flatMap((childState) => childState.computed ?? [])], ...((state.sharedDefinitions || childStates.some((childState) => childState.sharedDefinitions?.length)) ? { sharedDefinitions: [...(state.sharedDefinitions ?? []), ...childStates.flatMap((childState) => childState.sharedDefinitions ?? [])] } : {}) }; }',
@@ -211,6 +218,7 @@ function emitPublicSsrRenderModule(
 		'function marklessSsrRemapChildGraph(record, graphProps) { if (record.graphNodeId === "prop:props") { const propName = record.path[0]; const binding = graphProps.find((prop) => prop.name === propName); return binding ? { graphNodeId: binding.graphNodeId, path: [...binding.path, ...record.path.slice(1)] } : null; } if (record.graphNodeId.startsWith?.("prop:")) { const propName = record.graphNodeId.slice(5); const binding = graphProps.find((prop) => prop.name === propName); return binding ? { graphNodeId: binding.graphNodeId, path: [...binding.path, ...record.path] } : null; } return { graphNodeId: record.graphNodeId, path: record.path }; }',
 		'function marklessSsrText(value) { return marklessSsrEscape(value == null ? "" : String(value)); }',
 		'function marklessSsrAttribute(name, value) { return ` ${name}="${marklessSsrEscape(value == null ? "" : String(value))}"`; }',
+		'function marklessSsrSpreadAttributes(values) { let html = ""; for (const key of Object.keys(values ?? {})) { if (!/^[A-Za-z_][\\w.:-]*$/.test(key) || /^on[A-Z]/.test(key) || key === "attach" || key === "el" || key === "children") continue; const value = values[key]; if (value === null || value === undefined || value === false) continue; html += value === true ? ` ${key}=""` : marklessSsrAttribute(key, value); } return html; }',
 		'function marklessSsrEscape(value) { return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll("\\"", "&quot;"); }',
 		'',
 	]
@@ -226,6 +234,10 @@ type SsrRenderContext = {
 	nextComponentEdgeIndex: number;
 	nextChildIndex: number;
 	readonly hostIdByNode: ReadonlyMap<AnyNode, string>;
+	readonly keyedRepeats: PublicRenderModuleInput['semanticGraph']['keyedRepeats'];
+	readonly repeatGates: PublicRenderModuleInput['publicRenderPlan']['repeatGates'];
+	nextRepeatIndex: number;
+	readonly insideRepeatRow: boolean;
 	readonly source: string;
 };
 
@@ -435,7 +447,9 @@ function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string {
 		return `(${testSource} ? ${consequent} : ${alternate})`;
 	}
 
-	if (node.type === 'JSXForExpression') return '""';
+	if (node.type === 'JSXForExpression') {
+		return context.mode === 'ssr' ? emitSsrRepeatRows(node, context) : '""';
+	}
 
 	if (node.type === 'ExpressionStatement') {
 		const expression = node.expression as AnyNode | undefined;
@@ -454,6 +468,17 @@ function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string {
 			: emitCsrComponent(node, tagName, context);
 	}
 	const hostLocator = context.mode === 'ssr' ? ssrHostLocator(node, tagName, context) : '""';
+
+	if (getElementAttributes(node).some(isSpreadAttribute)) {
+		return joinSsrExpressions([
+			hostLocator,
+			JSON.stringify(`<${tagName}`),
+			`${renderHelper(context, 'SpreadAttributes')}({ ${mergedAttributeEntries(node, context.source).join(', ')} })`,
+			JSON.stringify('>'),
+			emitHtmlChildren(node, context),
+			JSON.stringify(`</${tagName}>`),
+		]);
+	}
 
 	const open = [`<${tagName}`];
 	const dynamicAttributes: string[] = [];
@@ -489,10 +514,66 @@ function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string {
 }
 
 function ssrHostLocator(node: AnyNode, tagName: string, context: SsrRenderContext): string {
+	// Row instances repeat per item, so a single dom-order locator cannot name
+	// them yet; branch/list locator streams own that later. Rows render without
+	// locators and marklessSsrRepeatRows shifts the indexes of later hosts.
+	if (context.insideRepeatRow) return '""';
 	const hostNodeId = context.hostIdByNode.get(node);
 	return hostNodeId
 		? `marklessSsrHost(marklessSsrHostLocators, ${JSON.stringify(hostNodeId)}, ${JSON.stringify(tagName)})`
 		: '""';
+}
+
+// Emits SSR html for a supported keyed repeat by mapping the live collection
+// through the authored row template. Bails to the empty string (the prior
+// behavior) whenever the row shape is not a single all-host-element subtree.
+function emitSsrRepeatRows(node: AnyNode, context: SsrRenderContext): string {
+	const repeat = context.keyedRepeats[context.nextRepeatIndex++];
+	if (!repeat) return '""';
+	const gate = context.repeatGates.find((item) => item.repeatId === repeat.id);
+	if (!gate?.supported) return '""';
+	if (context.componentEdges.length > 0) return '""';
+
+	const row = singleRepeatRowElement(node);
+	if (!row || !allHostElementRow(row)) return '""';
+
+	const rowContext: SsrRenderContext = { ...context, insideRepeatRow: true };
+	const rowHtml = emitHtmlNode(row, rowContext);
+	const rowParams = repeat.indexName
+		? `(${repeat.itemName}, ${repeat.indexName})`
+		: `(${repeat.itemName})`;
+	return `marklessSsrRepeatRows(marklessSsrHostLocators, ${repeat.collectionSource}, ${rowParams} => ${rowHtml}, ${countRowElements(row)})`;
+}
+
+function singleRepeatRowElement(node: AnyNode): AnyNode | null {
+	const children = asNodes((node.body as AnyNode | undefined)?.body).filter(
+		(child) => !isIgnorableTextNode(child),
+	);
+	const [row] = children;
+	if (children.length !== 1 || !row) return null;
+	return row.type === 'Element' || row.type === 'JSXElement' ? row : null;
+}
+
+// Element counts per row must be static for locator shifting, so rows may only
+// contain host elements, text, and expression children — no control flow,
+// components, or nested repeats.
+function allHostElementRow(node: AnyNode): boolean {
+	if (isStaticTextNode(node)) return true;
+	if (node.type === 'JSXExpressionContainer' || node.type === 'TSRXExpression') return true;
+	if (node.type !== 'Element' && node.type !== 'JSXElement') return false;
+	const tagName = getElementTagName(node);
+	if (!tagName || !isHostTagName(tagName)) return false;
+	return asNodes(node.children).every(
+		(child) => isIgnorableTextNode(child) || allHostElementRow(child),
+	);
+}
+
+function countRowElements(node: AnyNode): number {
+	const isElement = node.type === 'Element' || node.type === 'JSXElement' ? 1 : 0;
+	return asNodes(node.children).reduce(
+		(total, child) => total + countRowElements(child),
+		isElement,
+	);
 }
 
 function emitHtmlBranch(node: AnyNode | undefined, context: HtmlRenderContext): string {
@@ -509,8 +590,33 @@ function emitHtmlChildren(node: AnyNode, context: HtmlRenderContext): string {
 	);
 }
 
-function renderHelper(context: HtmlRenderContext, helper: 'Attribute' | 'Text'): string {
+function renderHelper(
+	context: HtmlRenderContext,
+	helper: 'Attribute' | 'SpreadAttributes' | 'Text',
+): string {
 	return `markless${context.mode === 'ssr' ? 'Ssr' : 'Csr'}${helper}`;
+}
+
+// Elements with a spread merge every attribute into one object so JS object
+// semantics decide override order; the runtime helper renders the merged entries.
+function mergedAttributeEntries(node: AnyNode, source: string): string[] {
+	return getElementAttributes(node).flatMap((attribute) => {
+		if (isSpreadAttribute(attribute)) {
+			const argument = attribute.argument as AnyNode | undefined;
+			return argument ? [`...(${expressionSource(argument, source)})`] : [];
+		}
+		const name = getIdentifierName(attribute.name as AnyNode | undefined);
+		if (!name || isEventAttribute(name) || name === 'attach' || name === 'el') return [];
+		const value = attribute.value as AnyNode | undefined;
+		const expression = unwrapExpressionContainer(value);
+		if (!value) return [`${objectPropertyName(name)}: true`];
+		if (value.type === 'Literal') {
+			return [`${objectPropertyName(name)}: ${JSON.stringify(value.value)}`];
+		}
+		if (expression)
+			return [`${objectPropertyName(name)}: ${expressionSource(expression, source)}`];
+		return [];
+	});
 }
 
 function emitSsrComponent(node: AnyNode, componentName: string, context: SsrRenderContext): string {
@@ -610,6 +716,10 @@ function graphReferenceProps(edge: ComponentEdge | undefined) {
 }
 
 function componentAttributePropSource(attribute: AnyNode, source: string): string[] {
+	if (isSpreadAttribute(attribute)) {
+		const argument = attribute.argument as AnyNode | undefined;
+		return argument ? [`...(${expressionSource(argument, source)})`] : [];
+	}
 	const name = getIdentifierName(attribute.name as AnyNode | undefined);
 	if (!name) return [];
 	const propertyName = objectPropertyName(name);

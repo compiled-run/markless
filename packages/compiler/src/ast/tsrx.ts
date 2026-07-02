@@ -1,5 +1,11 @@
 import { asNodes, getIdentifierName, type AnyNode } from './nodes.ts';
 
+// Spread attributes carry no name node; callers that iterate named attributes
+// must branch on this before reading `attribute.name`.
+export function isSpreadAttribute(node: AnyNode): boolean {
+	return node.type === 'SpreadAttribute' || node.type === 'JSXSpreadAttribute';
+}
+
 export function getElementTagName(node: AnyNode): string | null {
 	return (
 		getIdentifierName(node.id as AnyNode | undefined) ??

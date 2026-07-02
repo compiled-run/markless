@@ -8,6 +8,7 @@ import {
 	getElementTagName,
 	isHostTagName,
 	isIgnorableStaticTextNode as isIgnorableTextNode,
+	isSpreadAttribute,
 	isStaticTextNode,
 	staticTextValue,
 	trimmedStaticTextValue,
@@ -19,6 +20,10 @@ import {
 	semanticAliasMap,
 	splitStaticGraphPath,
 } from '../../artifact-helpers/graph-paths.ts';
+import {
+	unsupportedRenderConstructDiagnostic,
+	unsupportedRenderRootDiagnostic,
+} from './diagnostics.ts';
 import type {
 	PayloadKeyedRepeat,
 	PlannedSymbol,
@@ -43,7 +48,7 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 	const component = findComponent(ast);
 	const root = firstComponentRoot(component);
 	if (!root) {
-		return emptyPlan();
+		return emptyPlan(componentRootDiagnostics(ast, input.source.filename));
 	}
 
 	const assignedHosts = assignHostIds(
@@ -155,11 +160,22 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 		staticTextWrites: staticTextWrites ?? [],
 		repeatGates,
 		keyedRepeats,
-		diagnostics: [],
+		diagnostics: [
+			...collectUnsupportedConstructDiagnostics(root, input.source.filename),
+			...repeatRenderDiagnostics({
+				componentEdgeCount: input.semanticGraph.componentEdges.length,
+				filename: input.source.filename,
+				keyedRepeats,
+				repeatGates,
+				repeatNodeById,
+			}),
+		],
 	};
 }
 
-function emptyPlan(): PublicRenderPlanArtifact {
+function emptyPlan(
+	diagnostics: ReadonlyArray<PublicRenderPlanArtifact['diagnostics'][number]> = [],
+): PublicRenderPlanArtifact {
 	return {
 		passId: 'public-render-plan',
 		rootTemplateHtml: null,
@@ -170,8 +186,192 @@ function emptyPlan(): PublicRenderPlanArtifact {
 		staticTextWrites: [],
 		repeatGates: [],
 		keyedRepeats: [],
-		diagnostics: [],
+		diagnostics,
 	};
+}
+
+// Constructs the module emitter cannot render yet must fail loud here; their
+// content would otherwise silently disappear from CSR/SSR HTML.
+function collectUnsupportedConstructDiagnostics(root: AnyNode, filename: string) {
+	const diagnostics: ReturnType<typeof unsupportedRenderConstructDiagnostic>[] = [];
+
+	const visit = (node: AnyNode): void => {
+		if (node.type === 'JSXSwitchExpression') {
+			diagnostics.push(
+				unsupportedRenderConstructDiagnostic({
+					label: '@switch',
+					message:
+						'@switch case content is dropped from rendered HTML because the render module cannot emit it yet.',
+					node,
+					filename,
+					suggestion:
+						'Rewrite the branches with @if/@else until @switch rendering is supported.',
+				}),
+			);
+		} else if (node.type === 'JSXTryExpression') {
+			diagnostics.push(
+				unsupportedRenderConstructDiagnostic({
+					label: '@try/@pending/@catch',
+					message:
+						'@try/@pending/@catch branch content is dropped from rendered HTML because the render module cannot emit async boundary branches yet.',
+					node,
+					filename,
+					suggestion:
+						'Keep the async boundary, but expect no branch HTML from the public render path until boundary rendering is supported.',
+				}),
+			);
+		} else if (node.type === 'JSXStyleElement') {
+			diagnostics.push(
+				unsupportedRenderConstructDiagnostic({
+					label: '<style>',
+					message:
+						'<style> blocks are dropped from rendered HTML because style scoping is not implemented yet.',
+					node,
+					filename,
+					suggestion:
+						'Move the CSS into an imported stylesheet until <style> scoping lands.',
+				}),
+			);
+		} else if (
+			(node.type === 'Element' || node.type === 'JSXElement') &&
+			(node.isDynamic === true || !getElementTagName(node))
+		) {
+			diagnostics.push(
+				unsupportedRenderConstructDiagnostic({
+					label: 'dynamic tag',
+					message:
+						'Dynamic <{expression}> tags are dropped from rendered HTML because dynamic tag lowering is not implemented yet.',
+					node,
+					filename,
+					suggestion: 'Use a static tag name, or branch with @if over the tag choices.',
+				}),
+			);
+		} else if (node.type === 'JSXForExpression' && node.empty) {
+			diagnostics.push(
+				unsupportedRenderConstructDiagnostic({
+					label: '@empty',
+					message:
+						'@empty content is dropped from rendered HTML because the render module does not emit empty-list branches yet.',
+					node: node.empty as AnyNode,
+					filename,
+					suggestion:
+						'Wrap the list in @if to render the empty case until @empty is supported.',
+				}),
+			);
+		}
+
+		for (const child of childNodes(node)) visit(child);
+	};
+
+	visit(root);
+	return diagnostics;
+}
+
+function repeatRenderDiagnostics(input: {
+	readonly componentEdgeCount: number;
+	readonly filename: string;
+	readonly keyedRepeats: ReadonlyArray<PublicRenderPlanKeyedRepeat>;
+	readonly repeatGates: ReadonlyArray<PublicRenderPlanRepeatGate>;
+	readonly repeatNodeById: ReadonlyMap<string, AnyNode>;
+}) {
+	return input.repeatGates.flatMap((gate) => {
+		const node = input.repeatNodeById.get(gate.repeatId);
+		if (!node) return [];
+		if (!gate.supported) {
+			return [
+				unsupportedRenderConstructDiagnostic({
+					label: '@for',
+					message: `The @for rows are not compiler-proven (reason: ${gate.reason}), so the render module drops the list content.`,
+					node,
+					filename: input.filename,
+					suggestion:
+						'Reshape the rows into a single host element with directly readable item bindings.',
+				}),
+			];
+		}
+		if (input.componentEdgeCount > 0) {
+			return [
+				unsupportedRenderConstructDiagnostic({
+					label: '@for',
+					message:
+						'Keyed repeat rows are skipped in SSR output when the module renders component children, so the list content is dropped.',
+					node,
+					filename: input.filename,
+					suggestion:
+						'Keep the repeat in a component without child components until repeat rows compose with component children.',
+				}),
+			];
+		}
+		if (!input.keyedRepeats.some((repeat) => repeat.repeatId === gate.repeatId)) {
+			return [
+				unsupportedRenderConstructDiagnostic({
+					label: '@for',
+					message:
+						'The @for rows could not be planned even though the repeat gate is supported, so the render module drops the list content.',
+					node,
+					filename: input.filename,
+					suggestion:
+						'Keep the repeat directly inside a host parent element with a single row root.',
+				}),
+			];
+		}
+		return [];
+	});
+}
+
+// findComponent only accepts components that already have an element root, so
+// fragment-rooted and return-form components would silently plan nothing.
+// This scan exists purely to explain those shapes; plain helper functions in a
+// .tsrx module (no template content) stay diagnostic-free.
+function componentRootDiagnostics(ast: AnyNode, filename: string) {
+	for (const statement of asNodes(ast.body)) {
+		const declaration =
+			statement.type === 'ExportNamedDeclaration' ||
+			statement.type === 'ExportDefaultDeclaration'
+				? (statement.declaration as AnyNode | undefined)
+				: statement;
+		if (declaration?.type !== 'FunctionDeclaration') continue;
+		const body = declaration.body as AnyNode | undefined;
+		if (!body) continue;
+
+		const fragment = childNodes(body).find(
+			(child) => child.type === 'Fragment' || child.type === 'JSXFragment',
+		);
+		if (fragment) {
+			return [
+				unsupportedRenderRootDiagnostic({
+					message:
+						'Fragment-rooted components render nothing because the public render path needs one host or component element as the root.',
+					node: fragment,
+					filename,
+					suggestion:
+						'Wrap the fragment children in a single host element such as <div> or <section>.',
+				}),
+			];
+		}
+
+		const returnedTemplate = childNodes(body).find(
+			(child) =>
+				child.type === 'ReturnStatement' &&
+				['Element', 'JSXElement', 'Fragment', 'JSXFragment'].includes(
+					(child.argument as AnyNode | undefined)?.type ?? '',
+				),
+		);
+		if (returnedTemplate) {
+			return [
+				unsupportedRenderRootDiagnostic({
+					message:
+						'Returning template content renders nothing because the public render path only reads elements placed directly in the @{...} component body.',
+					node: returnedTemplate,
+					filename,
+					suggestion:
+						'Place the element directly in the component body instead of returning it.',
+				}),
+			];
+		}
+	}
+
+	return [];
 }
 
 function collectStaticTextWrites(input: {
@@ -864,6 +1064,7 @@ function staticHtml(
 
 function staticShellSupported(node: AnyNode): boolean {
 	if (node.type !== 'Element' && node.type !== 'JSXElement') return false;
+	if (getElementAttributes(node).some(isSpreadAttribute)) return false;
 	if (
 		getElementAttributes(node).some((attribute) => {
 			const name = getIdentifierName(attribute.name as AnyNode | undefined);

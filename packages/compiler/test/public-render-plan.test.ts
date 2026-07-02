@@ -154,7 +154,104 @@ test.each([
 			reason,
 		},
 	]);
-	expect(plan.diagnostics).toEqual([]);
+	expect(plan.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
+			severity: 'error',
+			phase: 'public-render',
+			passId: 'public-render-plan',
+			message: expect.stringContaining(reason),
+		}),
+	]);
+});
+
+test.each([
+	[
+		'@switch',
+		appSource(
+			`let kind = state('a');
+<section>@switch (kind) { @case 'a': { <p>A</p> } @default: { <p>D</p> } }</section>`,
+		),
+	],
+	[
+		'dynamic tag',
+		appSource(`const Tag = 'div';
+<section><{Tag}>Hi</{Tag}></section>`),
+	],
+	[
+		'<style>',
+		appSource(`<section class="card"><style>.card { color: red; }</style>Hi</section>`),
+	],
+	[
+		'@try',
+		appSource(
+			`let value = state('ready');
+<section>@try { <p>{value}</p> } @catch { <p>Broken</p> }</section>`,
+		),
+	],
+	[
+		'@empty',
+		appSource(
+			`let items = state([]);
+<ul>@for (const item of items; key item.id) {<li>{item.name}</li>} @empty {<li>None</li>}</ul>`,
+		),
+	],
+])(
+	'planPublicRender reports %s content the render module would silently drop',
+	async (label, source) => {
+		const { plan } = await createRenderPlan('src/Unsupported.tsrx', source);
+
+		expect(plan.diagnostics).toEqual([
+			expect.objectContaining({
+				code: 'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
+				severity: 'error',
+				phase: 'public-render',
+				passId: 'public-render-plan',
+				title: expect.stringContaining(label),
+				primarySpan: expect.objectContaining({ filename: 'src/Unsupported.tsrx' }),
+				docsUrl: 'https://markless.dev/errors/MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
+			}),
+		]);
+	},
+);
+
+test('planPublicRender reports a fragment component root instead of planning nothing', async () => {
+	const { plan } = await createRenderPlan(
+		'src/FragmentRoot.tsrx',
+		appSource(`<><p>One</p><p>Two</p></>`),
+	);
+
+	expect(plan.rootTemplateHtml).toBe(null);
+	expect(plan.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_PUBLIC_RENDER_ROOT_UNSUPPORTED',
+			severity: 'error',
+			phase: 'public-render',
+			passId: 'public-render-plan',
+			primarySpan: expect.objectContaining({ filename: 'src/FragmentRoot.tsrx' }),
+		}),
+	]);
+});
+
+test('planPublicRender reports supported repeat rows skipped by component children', async () => {
+	const { plan } = await createRenderPlan(
+		'src/MixedList.tsrx',
+		appSource(
+			`let entries = state([]);
+<main><Header title="Entries" /><section>@for (const entry of entries; key entry.code) {<article><h2>{entry.title}</h2></article>}</section></main>`,
+			`import { Header } from './Header.tsrx';`,
+		),
+	);
+
+	expect(plan.repeatGates).toEqual([{ repeatId: 'repeat:0', supported: true }]);
+	expect(plan.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
+			severity: 'error',
+			phase: 'public-render',
+			message: expect.stringContaining('component children'),
+		}),
+	]);
 });
 
 async function createRenderPlan(filename: string, source: string) {

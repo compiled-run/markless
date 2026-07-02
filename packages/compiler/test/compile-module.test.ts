@@ -615,6 +615,84 @@ test('compileTsrxModule treats a default exported TSRX function as the public re
 	expect(output.html).toBe('<main><h1>Markless Router</h1><button>Button 0</button></main>');
 });
 
+test('compileTsrxModule renders host element spread attributes in SSR html', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/SpreadCard.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	const meta = state({ id: 'main', title: 'Hero', hidden: false, onClick: 'ignored' });
+
+	<section data-kind="card" {...meta} title="Final">Hi</section>
+}
+`,
+		symbols: [],
+	});
+
+	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	const output = (ssrModule.marklessRenderSsr as () => { readonly html: string })();
+
+	expect(output.html).toBe('<section data-kind="card" id="main" title="Final">Hi</section>');
+});
+
+test('compileTsrxModule renders supported keyed repeat rows in SSR html', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/EntryList.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let entries = state([
+		{ code: 'a', title: 'Alpha' },
+		{ code: 'b', title: 'Beta' },
+	]);
+	let chosen = state('');
+
+	<main>
+		<section>
+			@for (const entry of entries; key entry.code) {
+				<article>
+					<h2>{entry.title}</h2>
+					<button onClick={() => chosen = entry.code}>Choose</button>
+				</article>
+			}
+		</section>
+		<button onClick={() => chosen = ''}>Reset</button>
+	</main>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.repeatGates).toEqual([
+		expect.objectContaining({ repeatId: 'repeat:0', supported: true }),
+	]);
+	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	const output = (
+		ssrModule.marklessRenderSsr as () => {
+			readonly html: string;
+			readonly view: { readonly locators: ReadonlyArray<Record<string, unknown>> };
+		}
+	)();
+
+	expect(output.html).toBe(
+		'<main><section>' +
+			'<article><h2>Alpha</h2><button>Choose</button></article>' +
+			'<article><h2>Beta</h2><button>Choose</button></article>' +
+			'</section><button>Reset</button></main>',
+	);
+	// The trailing button's dom-order index must count the six row elements
+	// (2 rows x article/h2/button) so browser resume locates the right node.
+	expect(output.view.locators).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({ tagName: 'main', index: 0 }),
+			expect.objectContaining({ tagName: 'section', index: 1 }),
+			expect.objectContaining({ tagName: 'button', index: 8 }),
+		]),
+	);
+});
+
 test('compileTsrxModule passes component children into SSR component props', async () => {
 	const result = await compileTsrxModule({
 		filename: 'pages/index.tsrx',

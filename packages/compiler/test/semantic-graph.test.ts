@@ -131,6 +131,24 @@ export function App() @{
 }
 `;
 
+const indexedKeyedListSource = `
+import { state } from '@markless/core';
+
+export function App() @{
+	const items = state([]);
+
+	<section>
+		<ul>
+			@for (const item of items; index i; key item.key) {
+				<li>
+					<button onClick={() => console.log(item.key)}>{item.name}</button>
+				</li>
+			}
+		</ul>
+	</section>
+}
+`;
+
 const componentEdgeSource = `
 import { state } from '@markless/core';
 import { Player } from './Player.tsrx';
@@ -383,6 +401,30 @@ test('buildSemanticGraph records keyed repeat structure across alternate host sh
 			parentHostNodeId: listParent?.id,
 			rowHostNodeId: listRow?.id,
 			itemName: 'item',
+			collectionSource: 'items',
+			collectionGraphNodeId: 'state:items',
+			collectionPath: [],
+			keySource: 'item.key',
+			keyPath: ['key'],
+		},
+	]);
+});
+
+test('buildSemanticGraph keeps keyed repeats registered when an index clause is authored', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/IndexedList.tsrx',
+		source: indexedKeyedListSource,
+	});
+	const parent = graph.hostNodes.find((hostNode) => hostNode.tagName === 'ul');
+	const row = graph.hostNodes.find((hostNode) => hostNode.tagName === 'li');
+
+	expect(graph.keyedRepeats).toEqual([
+		{
+			id: 'repeat:0',
+			parentHostNodeId: parent?.id,
+			rowHostNodeId: row?.id,
+			itemName: 'item',
+			indexName: 'i',
 			collectionSource: 'items',
 			collectionGraphNodeId: 'state:items',
 			collectionPath: [],

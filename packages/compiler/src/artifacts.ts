@@ -128,6 +128,7 @@ export type SemanticKeyedRepeat = {
 	readonly parentHostNodeId: string;
 	readonly rowHostNodeId?: string;
 	readonly itemName: string;
+	readonly indexName?: string;
 	readonly collectionSource: string;
 	readonly collectionGraphNodeId?: string;
 	readonly collectionPath: ReadonlyArray<string>;
