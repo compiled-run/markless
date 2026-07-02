@@ -7,7 +7,8 @@ import {
 	propagateAsyncComputedCapability,
 } from './collect-async.ts';
 import { collectImports, collectModuleImports } from './imports.ts';
-import { getComponent, collectComponentProps } from './collect-components.ts';
+import { collectComponentProps } from './collect-components.ts';
+import { getComponentFunction } from '../../ast/tsrx.ts';
 import {
 	collectConditionalBranchText,
 	collectElement,
@@ -22,6 +23,7 @@ import {
 	collectUpdate,
 } from './collect-expressions.ts';
 import { collectModuleScopeGraphCreation } from './collect-module-scope.ts';
+import { submoduleUnsupportedDiagnostic } from './diagnostics.ts';
 import {
 	collectSharedDefinitionDependencies,
 	collectSharedFactoryGraph,
@@ -47,22 +49,21 @@ export async function buildSemanticGraph(
 
 	for (const statement of statements) {
 		collectModuleScopeGraphCreation(statement, state);
+		collectSubmoduleDiagnostics(statement, state);
 	}
 
 	collectSharedDefinitionDependencies(statements, state);
 	collectSharedFactoryGraph(statements, state, walk);
 
 	for (const statement of statements) {
-		const component = getComponent(statement);
-		const name = getIdentifierName(component?.id as AnyNode | undefined);
+		const componentFunction = getComponentFunction(statement);
+		if (!componentFunction) continue;
 
-		if (!component || !name) continue;
-
-		graph.components.push({ name });
-		collectComponentProps(component, state);
+		graph.components.push({ name: componentFunction.name });
+		collectComponentProps(componentFunction.node, state);
 		const previousComponentName = state.currentComponentName;
-		state.currentComponentName = name;
-		walk(component.body as AnyNode, state);
+		state.currentComponentName = componentFunction.name;
+		walk(componentFunction.node.body as AnyNode, state);
 		state.currentComponentName = previousComponentName;
 	}
 
@@ -92,6 +93,18 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 			walkBranch(node.consequent as AnyNode | undefined, state);
 			walkBranch(node.alternate as AnyNode | undefined, state);
 			collectConditionalBranchText(node, state);
+			return;
+		case 'JSXSwitchExpression':
+			walk(node.discriminant as AnyNode | undefined, state);
+			for (const switchCase of asNodes(node.cases)) {
+				walk(switchCase.test as AnyNode | undefined, state);
+				const caseBranchId = `branch:${state.nextBranchId++}`;
+				state.currentBranchScopeIds.push(caseBranchId);
+				for (const caseChild of asNodes(switchCase.consequent)) {
+					walk(caseChild, state);
+				}
+				state.currentBranchScopeIds.pop();
+			}
 			return;
 		case 'JSXForExpression':
 			const repeatIndex = collectKeyedRepeat(node, state);
@@ -129,6 +142,38 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 
 	for (const child of childNodes(node)) {
 		walk(child, state);
+	}
+}
+
+// Fail-loud placeholder for TSRX submodules until the host boundary decision
+// in specs/framework/08-deferred-decisions.md is accepted and implemented.
+function collectSubmoduleDiagnostics(statement: AnyNode, state: WalkState): void {
+	const declaration =
+		statement.type === 'ExportNamedDeclaration'
+			? ((statement.declaration as AnyNode | undefined) ?? statement)
+			: statement;
+
+	if (declaration.type === 'TSModuleDeclaration') {
+		const name = getIdentifierName(declaration.id as AnyNode | undefined) ?? 'unknown';
+		state.graph.diagnostics.push(
+			submoduleUnsupportedDiagnostic('module-block', name, declaration, state.filename),
+		);
+		return;
+	}
+
+	if (statement.type === 'ImportDeclaration') {
+		const source = statement.source as AnyNode | undefined;
+		if (source?.type === 'Identifier') {
+			const name = getIdentifierName(source) ?? 'unknown';
+			state.graph.diagnostics.push(
+				submoduleUnsupportedDiagnostic(
+					'identifier-import',
+					name,
+					statement,
+					state.filename,
+				),
+			);
+		}
 	}
 }
 

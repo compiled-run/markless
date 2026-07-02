@@ -9,10 +9,14 @@ import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/
 import { expressionSource } from '../../ast/source.ts';
 import {
 	escapeAttribute,
+	getComponentFunction,
+	getDynamicTagExpression,
 	getElementAttributes,
 	getElementTagName,
 	isHostTagName,
 	isIgnorableJsxTextNode as isIgnorableTextNode,
+	isPlainHostTemplateNode,
+	isSpreadAttribute,
 	isStaticTextNode,
 	staticTextValue,
 	unwrapExpressionContainer,
@@ -25,8 +29,15 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 	const rootComponentName = input.semanticGraph.components[0]?.name;
 	const componentCount = input.semanticGraph.components.length;
 	const root = publicRenderRoot(input, rootComponentName);
+	// Fragment roots are SSR-only until CSR adopts the mount target as the
+	// container root (T006 D3): marklessCsrRootFromHtml would silently mount
+	// only the first sibling via firstElementChild.
+	const isFragmentRoot = !!root && isFragmentNode(root.root);
 	const canUseDirectCsrModule =
-		!!root && root.propNames.length === 0 && input.semanticGraph.componentEdges.length === 0;
+		!!root &&
+		!isFragmentRoot &&
+		root.propNames.length === 0 &&
+		input.semanticGraph.componentEdges.length === 0;
 	const moduleSource = canUseDirectCsrModule
 		? emitDirectPublicRenderModule({
 				componentName: rootComponentName,
@@ -38,7 +49,8 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 			})
 		: '';
 	const ssrModuleSource = root ? emitPublicSsrRenderModule(input, root) : '';
-	const csrModuleSource = !moduleSource && root ? emitPublicCsrRenderModule(input, root) : '';
+	const csrModuleSource =
+		!moduleSource && root && !isFragmentRoot ? emitPublicCsrRenderModule(input, root) : '';
 	return {
 		passId: 'public-render-module',
 		moduleSource,
@@ -69,6 +81,10 @@ function emitPublicCsrRenderModule(
 		componentImports: new Map(imports.map((item) => [item.componentName, item.localName])),
 		callbackSymbols: callbackSymbolIds(input),
 		nextComponentEdgeIndex: 0,
+		keyedRepeats: input.semanticGraph.keyedRepeats,
+		repeatGates: input.publicRenderPlan.repeatGates,
+		nextRepeatIndex: 0,
+		styleScopeClass: input.publicRenderPlan.styleScopes[0]?.scopeId ?? null,
 		source: input.source.source,
 	};
 	const propEvents = collectCsrPropEvents(rootInfo.root, rootInfo.propNames, input.source.source);
@@ -136,6 +152,9 @@ function emitPublicCsrRenderModule(
 		'function marklessCsrIsThenable(value) { return value !== null && (typeof value === "object" || typeof value === "function") && typeof value.then === "function"; }',
 		'function marklessCsrText(value) { return marklessCsrEscape(value == null ? "" : String(value)); }',
 		'function marklessCsrAttribute(name, value) { return ` ${name}="${marklessCsrEscape(value == null ? "" : String(value))}"`; }',
+		'function marklessCsrRepeatRows(items, renderRow, renderEmpty) { const list = Array.isArray(items) ? items : Array.from(items ?? []); if (list.length === 0) return renderEmpty ? renderEmpty() : ""; return list.map(renderRow).join(""); }',
+		'function marklessCsrDynamicTagName(value) { if (value === null || value === undefined || value === false || value === "") return null; const tag = String(value); if (!/^[a-zA-Z][a-zA-Z0-9:_.-]*$/.test(tag)) throw new Error("MARKLESS_DYNAMIC_TAG_INVALID: " + tag); return tag; }',
+		'function marklessCsrSpreadAttributes(values, scopeClass) { let html = ""; let classSeen = false; for (const key of Object.keys(values ?? {})) { if (!/^[A-Za-z_][\\w.:-]*$/.test(key) || /^on[A-Z]/.test(key) || key === "attach" || key === "el" || key === "children") continue; const value = values[key]; if (value === null || value === undefined || value === false) continue; if (key === "class" && scopeClass) { classSeen = true; html += marklessCsrAttribute("class", (value === true ? "" : String(value)) + " " + scopeClass); continue; } html += value === true ? ` ${key}=""` : marklessCsrAttribute(key, value); } if (scopeClass && !classSeen) html += ` class="${scopeClass}"`; return html; }',
 		'function marklessCsrEscape(value) { return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll("\\"", "&quot;"); }',
 		'',
 	]
@@ -165,6 +184,14 @@ function emitPublicSsrRenderModule(
 			rootInfo.root,
 			input.semanticGraph.hostNodes.map((host) => host.id),
 		),
+		keyedRepeats: input.semanticGraph.keyedRepeats,
+		repeatGates: input.publicRenderPlan.repeatGates,
+		nextRepeatIndex: 0,
+		insideRepeatRow: false,
+		asyncBoundaries: input.semanticGraph.asyncBoundaries,
+		asyncBoundaryGates: input.publicRenderPlan.asyncBoundaryGates,
+		nextAsyncBoundaryIndex: 0,
+		styleScopeClass: input.publicRenderPlan.styleScopes[0]?.scopeId ?? null,
 		source: input.source.source,
 	};
 	const hostLocators = staticHostLocators(input);
@@ -202,7 +229,9 @@ function emitPublicSsrRenderModule(
 		'}',
 		'function marklessSsrStateValue(graphNodeId) { return marklessSsrStateValues.get(graphNodeId); }',
 		'function marklessSsrRenderChild(children, component, props, child) { const output = component?.renderSsr?.(props); if (output) children.push({ ...child, output, callbackProps: props?.__marklessSsrCallbacks ?? {} }); return output?.html ?? ""; }',
-		'function marklessSsrHost(hostLocators, hostNodeId, tagName) { hostLocators.push({ hostNodeId, strategy: "dom-order", index: hostLocators.length, tagName }); return ""; }',
+		'function marklessSsrHost(hostLocators, hostNodeId, tagName) { hostLocators.push({ hostNodeId, strategy: "dom-order", index: hostLocators.length + (hostLocators.marklessSsrExtraElements ?? 0), tagName }); return ""; }',
+		'function marklessSsrDynamicTagName(hostLocators, value) { if (value === null || value === undefined || value === false || value === "") return null; const tag = String(value); if (!/^[a-zA-Z][a-zA-Z0-9:_.-]*$/.test(tag)) throw new Error("MARKLESS_DYNAMIC_TAG_INVALID: " + tag); hostLocators.marklessSsrExtraElements = (hostLocators.marklessSsrExtraElements ?? 0) + 1; return tag; }',
+		'function marklessSsrRepeatRows(hostLocators, items, renderRow, elementsPerRow, renderEmpty) { const list = Array.isArray(items) ? items : Array.from(items ?? []); if (list.length === 0) return renderEmpty ? renderEmpty() : ""; const html = list.map(renderRow).join(""); hostLocators.marklessSsrExtraElements = (hostLocators.marklessSsrExtraElements ?? 0) + list.length * elementsPerRow; return html; }',
 		'function marklessSsrCallbacks(callbacks) { const result = {}; for (const key of Object.keys(callbacks)) if (callbacks[key]) result[key] = callbacks[key]; return result; }',
 		'function marklessSsrCallbackSymbol(props, path) { let value = props?.__marklessSsrCallbacks; for (const key of path) value = value?.[key]; return typeof value === "string" ? value : undefined; }',
 		'function marklessComposeState(state, children) { const childStates = children.map((child) => child.output?.state).filter(Boolean); if (childStates.length === 0) return state; return { ...state, cells: [...(state.cells ?? []), ...childStates.flatMap((childState) => childState.cells ?? [])], computed: [...(state.computed ?? []), ...childStates.flatMap((childState) => childState.computed ?? [])], ...((state.sharedDefinitions || childStates.some((childState) => childState.sharedDefinitions?.length)) ? { sharedDefinitions: [...(state.sharedDefinitions ?? []), ...childStates.flatMap((childState) => childState.sharedDefinitions ?? [])] } : {}) }; }',
@@ -211,6 +240,7 @@ function emitPublicSsrRenderModule(
 		'function marklessSsrRemapChildGraph(record, graphProps) { if (record.graphNodeId === "prop:props") { const propName = record.path[0]; const binding = graphProps.find((prop) => prop.name === propName); return binding ? { graphNodeId: binding.graphNodeId, path: [...binding.path, ...record.path.slice(1)] } : null; } if (record.graphNodeId.startsWith?.("prop:")) { const propName = record.graphNodeId.slice(5); const binding = graphProps.find((prop) => prop.name === propName); return binding ? { graphNodeId: binding.graphNodeId, path: [...binding.path, ...record.path] } : null; } return { graphNodeId: record.graphNodeId, path: record.path }; }',
 		'function marklessSsrText(value) { return marklessSsrEscape(value == null ? "" : String(value)); }',
 		'function marklessSsrAttribute(name, value) { return ` ${name}="${marklessSsrEscape(value == null ? "" : String(value))}"`; }',
+		'function marklessSsrSpreadAttributes(values, scopeClass) { let html = ""; let classSeen = false; for (const key of Object.keys(values ?? {})) { if (!/^[A-Za-z_][\\w.:-]*$/.test(key) || /^on[A-Z]/.test(key) || key === "attach" || key === "el" || key === "children") continue; const value = values[key]; if (value === null || value === undefined || value === false) continue; if (key === "class" && scopeClass) { classSeen = true; html += marklessSsrAttribute("class", (value === true ? "" : String(value)) + " " + scopeClass); continue; } html += value === true ? ` ${key}=""` : marklessSsrAttribute(key, value); } if (scopeClass && !classSeen) html += ` class="${scopeClass}"`; return html; }',
 		'function marklessSsrEscape(value) { return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll("\\"", "&quot;"); }',
 		'',
 	]
@@ -226,6 +256,14 @@ type SsrRenderContext = {
 	nextComponentEdgeIndex: number;
 	nextChildIndex: number;
 	readonly hostIdByNode: ReadonlyMap<AnyNode, string>;
+	readonly keyedRepeats: PublicRenderModuleInput['semanticGraph']['keyedRepeats'];
+	readonly repeatGates: PublicRenderModuleInput['publicRenderPlan']['repeatGates'];
+	nextRepeatIndex: number;
+	readonly insideRepeatRow: boolean;
+	readonly asyncBoundaries: PublicRenderModuleInput['semanticGraph']['asyncBoundaries'];
+	readonly asyncBoundaryGates: PublicRenderModuleInput['publicRenderPlan']['asyncBoundaryGates'];
+	nextAsyncBoundaryIndex: number;
+	readonly styleScopeClass: string | null;
 	readonly source: string;
 };
 
@@ -236,6 +274,12 @@ type CsrRenderContext = {
 	readonly componentImports: ReadonlyMap<string, string>;
 	readonly callbackSymbols: ReadonlyMap<string, string>;
 	nextComponentEdgeIndex: number;
+	// Optional because component-children emission builds a partial context;
+	// repeats inside projected children keep the prior render-nothing behavior.
+	readonly keyedRepeats?: PublicRenderModuleInput['semanticGraph']['keyedRepeats'];
+	readonly repeatGates?: PublicRenderModuleInput['publicRenderPlan']['repeatGates'];
+	nextRepeatIndex?: number;
+	readonly styleScopeClass?: string | null;
 	readonly source: string;
 };
 
@@ -435,7 +479,21 @@ function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string {
 		return `(${testSource} ? ${consequent} : ${alternate})`;
 	}
 
-	if (node.type === 'JSXForExpression') return '""';
+	if (node.type === 'JSXSwitchExpression') {
+		return emitSwitchHtml(node, context);
+	}
+
+	if (node.type === 'JSXForExpression') {
+		return context.mode === 'ssr'
+			? emitSsrRepeatRows(node, context)
+			: emitCsrRepeatRows(node, context);
+	}
+
+	if (node.type === 'JSXTryExpression') {
+		return context.mode === 'ssr' ? emitSsrAsyncBoundary(node, context) : '""';
+	}
+
+	if (node.type === 'JSXStyleElement') return '""';
 
 	if (node.type === 'ExpressionStatement') {
 		const expression = node.expression as AnyNode | undefined;
@@ -447,7 +505,7 @@ function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string {
 	}
 
 	const tagName = getElementTagName(node);
-	if (!tagName) return '""';
+	if (!tagName) return emitDynamicTagHtml(node, context);
 	if (!isHostTagName(tagName)) {
 		return context.mode === 'ssr'
 			? emitSsrComponent(node, tagName, context)
@@ -455,25 +513,45 @@ function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string {
 	}
 	const hostLocator = context.mode === 'ssr' ? ssrHostLocator(node, tagName, context) : '""';
 
+	const scopeClass = context.styleScopeClass ?? null;
+
+	if (getElementAttributes(node).some(isSpreadAttribute)) {
+		return joinSsrExpressions([
+			hostLocator,
+			JSON.stringify(`<${tagName}`),
+			`${renderHelper(context, 'SpreadAttributes')}({ ${mergedAttributeEntries(node, context.source).join(', ')} }, ${JSON.stringify(scopeClass)})`,
+			JSON.stringify('>'),
+			emitHtmlChildren(node, context),
+			JSON.stringify(`</${tagName}>`),
+		]);
+	}
+
 	const open = [`<${tagName}`];
 	const dynamicAttributes: string[] = [];
+	let scopeClassHandled = scopeClass === null;
 	for (const attribute of getElementAttributes(node)) {
 		const name = getIdentifierName(attribute.name as AnyNode | undefined);
 		if (!name || isEventAttribute(name) || name === 'attach' || name === 'el') continue;
 		const value = attribute.value as AnyNode | undefined;
 		const expression = unwrapExpressionContainer(value);
+		const scopeSuffix = name === 'class' && scopeClass ? ` ${scopeClass}` : '';
+		if (scopeSuffix) scopeClassHandled = true;
 		if (!value) {
-			open.push(` ${name}=""`);
+			open.push(` ${name}="${scopeSuffix.trim()}"`);
 		} else if (value.type === 'Literal' && typeof value.value !== 'object') {
-			open.push(` ${name}="${escapeAttribute(String(value.value))}"`);
+			open.push(` ${name}="${escapeAttribute(String(value.value))}${scopeSuffix}"`);
 		} else if (expression?.type === 'Literal' && typeof expression.value !== 'object') {
-			open.push(` ${name}="${escapeAttribute(String(expression.value))}"`);
+			open.push(` ${name}="${escapeAttribute(String(expression.value))}${scopeSuffix}"`);
 		} else if (expression) {
+			const valueSource = scopeSuffix
+				? `((marklessClassValue) => (marklessClassValue == null ? "" : String(marklessClassValue)) + ${JSON.stringify(scopeSuffix)})(${expressionSource(expression, context.source)})`
+				: expressionSource(expression, context.source);
 			dynamicAttributes.push(
-				`${renderHelper(context, 'Attribute')}(${JSON.stringify(name)}, ${expressionSource(expression, context.source)})`,
+				`${renderHelper(context, 'Attribute')}(${JSON.stringify(name)}, ${valueSource})`,
 			);
 		}
 	}
+	if (!scopeClassHandled && scopeClass) open.push(` class="${scopeClass}"`);
 
 	const openExpression =
 		dynamicAttributes.length === 0
@@ -489,10 +567,211 @@ function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string {
 }
 
 function ssrHostLocator(node: AnyNode, tagName: string, context: SsrRenderContext): string {
+	// Row instances repeat per item, so a single dom-order locator cannot name
+	// them yet; branch/list locator streams own that later. Rows render without
+	// locators and marklessSsrRepeatRows shifts the indexes of later hosts.
+	if (context.insideRepeatRow) return '""';
 	const hostNodeId = context.hostIdByNode.get(node);
 	return hostNodeId
 		? `marklessSsrHost(marklessSsrHostLocators, ${JSON.stringify(hostNodeId)}, ${JSON.stringify(tagName)})`
 		: '""';
+}
+
+// Emits SSR html for a supported keyed repeat by mapping the live collection
+// through the authored row template. Bails to the empty string (the prior
+// behavior) whenever the row shape is not a single all-host-element subtree.
+function emitSsrRepeatRows(node: AnyNode, context: SsrRenderContext): string {
+	const repeat = context.keyedRepeats[context.nextRepeatIndex++];
+	if (!repeat) return '""';
+	const gate = context.repeatGates.find((item) => item.repeatId === repeat.id);
+	if (!gate?.supported) return '""';
+	if (context.componentEdges.length > 0) return '""';
+
+	const row = singleRepeatRowElement(node);
+	if (!row || !isPlainHostTemplateNode(row)) return '""';
+
+	// The @empty branch renders at most once, so it emits with the normal
+	// context: its locators push only when the branch is actually taken.
+	const emptyBlock = node.empty as AnyNode | undefined;
+	const emptyChildren = emptyBlock
+		? asNodes(emptyBlock.body).filter((child) => !isIgnorableTextNode(child))
+		: [];
+	if (emptyChildren.some((child) => !isPlainHostTemplateNode(child))) return '""';
+
+	const rowContext: SsrRenderContext = { ...context, insideRepeatRow: true };
+	const rowHtml = emitHtmlNode(row, rowContext);
+	const rowParams = repeat.indexName
+		? `(${repeat.itemName}, ${repeat.indexName})`
+		: `(${repeat.itemName})`;
+	const emptyThunk =
+		emptyChildren.length > 0
+			? `() => ${joinSsrExpressions(emptyChildren.map((child) => emitHtmlNode(child, context)))}`
+			: 'null';
+	return `marklessSsrRepeatRows(marklessSsrHostLocators, ${repeat.collectionSource}, ${rowParams} => ${rowHtml}, ${countRowElements(row)}, ${emptyThunk})`;
+}
+
+// Supported async boundaries emit their payload-planned comment anchors with
+// the @pending branch between them; the browser runtime replaces that range
+// once the boundary settles. @try/@catch content stays out of SSR html because
+// renderSsr is synchronous and cannot await async work yet.
+function emitSsrAsyncBoundary(node: AnyNode, context: SsrRenderContext): string {
+	const boundary = context.asyncBoundaries[context.nextAsyncBoundaryIndex++];
+	// Nested boundaries never render, but their indexes must stay consumed so
+	// later boundaries keep matching the payload arena's document order.
+	context.nextAsyncBoundaryIndex += countDescendantBoundaries(node);
+	if (!boundary) return '""';
+	const gate = context.asyncBoundaryGates.find((item) => item.boundaryId === boundary.id);
+	if (!gate?.supported) return '""';
+
+	const pendingChildren = asNodes((node.pending as AnyNode | undefined)?.body).filter(
+		(child) => !isIgnorableTextNode(child),
+	);
+	return joinSsrExpressions([
+		JSON.stringify(`<!--markless:async:${boundary.id}-->`),
+		joinSsrExpressions(pendingChildren.map((child) => emitHtmlNode(child, context))),
+		JSON.stringify(`<!--/markless:async:${boundary.id}-->`),
+	]);
+}
+
+function countDescendantBoundaries(node: AnyNode): number {
+	return childNodes(node).reduce(
+		(total, child) =>
+			total + (child.type === 'JSXTryExpression' ? 1 : 0) + countDescendantBoundaries(child),
+		0,
+	);
+}
+
+// CSR string emission for supported keyed repeats. Unlike SSR there is no
+// locator-index bookkeeping: CSR composition resolves hosts through authored
+// child paths, and supported repeat parents contain only the repeat, so row
+// insertion cannot shift any sibling path.
+function emitCsrRepeatRows(node: AnyNode, context: CsrRenderContext): string {
+	if (!context.keyedRepeats || !context.repeatGates) return '""';
+	const repeat = context.keyedRepeats[context.nextRepeatIndex ?? 0];
+	context.nextRepeatIndex = (context.nextRepeatIndex ?? 0) + 1;
+	if (!repeat) return '""';
+	const gate = context.repeatGates.find((item) => item.repeatId === repeat.id);
+	if (!gate?.supported) return '""';
+
+	const row = singleRepeatRowElement(node);
+	if (!row || !isPlainHostTemplateNode(row)) return '""';
+
+	const emptyBlock = node.empty as AnyNode | undefined;
+	const emptyChildren = emptyBlock
+		? asNodes(emptyBlock.body).filter((child) => !isIgnorableTextNode(child))
+		: [];
+	if (emptyChildren.some((child) => !isPlainHostTemplateNode(child))) return '""';
+
+	const rowHtml = emitHtmlNode(row, context);
+	const rowParams = repeat.indexName
+		? `(${repeat.itemName}, ${repeat.indexName})`
+		: `(${repeat.itemName})`;
+	const emptyThunk =
+		emptyChildren.length > 0
+			? `() => ${joinSsrExpressions(emptyChildren.map((child) => emitHtmlNode(child, context)))}`
+			: 'null';
+	return `marklessCsrRepeatRows(${repeat.collectionSource}, ${rowParams} => ${rowHtml}, ${emptyThunk})`;
+}
+
+function singleRepeatRowElement(node: AnyNode): AnyNode | null {
+	const children = asNodes((node.body as AnyNode | undefined)?.body).filter(
+		(child) => !isIgnorableTextNode(child),
+	);
+	const [row] = children;
+	if (children.length !== 1 || !row) return null;
+	return row.type === 'Element' || row.type === 'JSXElement' ? row : null;
+}
+
+function countRowElements(node: AnyNode): number {
+	const isElement = node.type === 'Element' || node.type === 'JSXElement' ? 1 : 0;
+	return asNodes(node.children).reduce(
+		(total, child) => total + countRowElements(child),
+		isElement,
+	);
+}
+
+// Dynamic <{expr}> tags resolve the tag value at render time. The runtime
+// helper is the XSS gate: it rejects non-tag-name strings before any string
+// concatenation, renders nothing for nullish/false/empty values, and (SSR)
+// counts the rendered element so later dom-order locators stay correct.
+function emitDynamicTagHtml(node: AnyNode, context: HtmlRenderContext): string {
+	const tagExpression = getDynamicTagExpression(node);
+	if (!tagExpression) return '""';
+
+	const attributeEntries = mergedAttributeEntries(node, context.source);
+	const dynamicScopeClass = context.styleScopeClass ?? null;
+	const attributesExpression =
+		attributeEntries.length > 0 || dynamicScopeClass
+			? `${renderHelper(context, 'SpreadAttributes')}({ ${attributeEntries.join(', ')} }, ${JSON.stringify(dynamicScopeClass)})`
+			: '""';
+	const tagValueExpression =
+		context.mode === 'ssr'
+			? `marklessSsrDynamicTagName(marklessSsrHostLocators, ${expressionSource(tagExpression, context.source)})`
+			: `marklessCsrDynamicTagName(${expressionSource(tagExpression, context.source)})`;
+
+	return `((marklessDynamicTag) => marklessDynamicTag ? ${joinSsrExpressions([
+		'("<" + marklessDynamicTag)',
+		attributesExpression,
+		JSON.stringify('>'),
+		emitHtmlChildren(node, context),
+		'("</" + marklessDynamicTag + ">")',
+	])} : "")(${tagValueExpression})`;
+}
+
+// @switch renders as one IIFE binding the discriminant once (so getters and
+// calls are not re-evaluated per case) around a strict-equality ternary chain.
+// No matching case and no @default renders nothing, matching @if's untaken
+// branch behavior.
+function emitSwitchHtml(node: AnyNode, context: HtmlRenderContext): string {
+	const discriminant = node.discriminant as AnyNode | undefined;
+	const discriminantSource = discriminant
+		? expressionSource(discriminant, context.source)
+		: 'undefined';
+
+	const before =
+		context.mode === 'ssr'
+			? {
+					nextChildIndex: context.nextChildIndex,
+					nextComponentEdgeIndex: context.nextComponentEdgeIndex,
+				}
+			: null;
+	let maxChildIndex = before?.nextChildIndex ?? 0;
+	let maxComponentEdgeIndex = before?.nextComponentEdgeIndex ?? 0;
+
+	const emitCaseBody = (switchCase: AnyNode): string => {
+		const children = asNodes(switchCase.consequent);
+		if (context.mode === 'csr' || !before) {
+			return joinSsrExpressions(children.map((child) => emitHtmlNode(child, context)));
+		}
+		const caseContext: SsrRenderContext = { ...context, ...before };
+		const body = joinSsrExpressions(children.map((child) => emitHtmlNode(child, caseContext)));
+		maxChildIndex = Math.max(maxChildIndex, caseContext.nextChildIndex);
+		maxComponentEdgeIndex = Math.max(maxComponentEdgeIndex, caseContext.nextComponentEdgeIndex);
+		return body;
+	};
+
+	let defaultBody = '""';
+	const testedCases: Array<{ readonly testSource: string; readonly body: string }> = [];
+	for (const switchCase of asNodes(node.cases)) {
+		const test = switchCase.test as AnyNode | undefined;
+		const body = emitCaseBody(switchCase);
+		if (!test) {
+			defaultBody = body;
+			continue;
+		}
+		testedCases.push({ testSource: expressionSource(test, context.source), body });
+	}
+
+	if (context.mode === 'ssr' && before) {
+		context.nextChildIndex = maxChildIndex;
+		context.nextComponentEdgeIndex = maxComponentEdgeIndex;
+	}
+
+	let expression = defaultBody;
+	for (const testedCase of [...testedCases].reverse()) {
+		expression = `(marklessSwitchValue === (${testedCase.testSource}) ? ${testedCase.body} : ${expression})`;
+	}
+	return `((marklessSwitchValue) => ${expression})(${discriminantSource})`;
 }
 
 function emitHtmlBranch(node: AnyNode | undefined, context: HtmlRenderContext): string {
@@ -509,8 +788,33 @@ function emitHtmlChildren(node: AnyNode, context: HtmlRenderContext): string {
 	);
 }
 
-function renderHelper(context: HtmlRenderContext, helper: 'Attribute' | 'Text'): string {
+function renderHelper(
+	context: HtmlRenderContext,
+	helper: 'Attribute' | 'SpreadAttributes' | 'Text',
+): string {
 	return `markless${context.mode === 'ssr' ? 'Ssr' : 'Csr'}${helper}`;
+}
+
+// Elements with a spread merge every attribute into one object so JS object
+// semantics decide override order; the runtime helper renders the merged entries.
+function mergedAttributeEntries(node: AnyNode, source: string): string[] {
+	return getElementAttributes(node).flatMap((attribute) => {
+		if (isSpreadAttribute(attribute)) {
+			const argument = attribute.argument as AnyNode | undefined;
+			return argument ? [`...(${expressionSource(argument, source)})`] : [];
+		}
+		const name = getIdentifierName(attribute.name as AnyNode | undefined);
+		if (!name || isEventAttribute(name) || name === 'attach' || name === 'el') return [];
+		const value = attribute.value as AnyNode | undefined;
+		const expression = unwrapExpressionContainer(value);
+		if (!value) return [`${objectPropertyName(name)}: true`];
+		if (value.type === 'Literal') {
+			return [`${objectPropertyName(name)}: ${JSON.stringify(value.value)}`];
+		}
+		if (expression)
+			return [`${objectPropertyName(name)}: ${expressionSource(expression, source)}`];
+		return [];
+	});
 }
 
 function emitSsrComponent(node: AnyNode, componentName: string, context: SsrRenderContext): string {
@@ -610,6 +914,10 @@ function graphReferenceProps(edge: ComponentEdge | undefined) {
 }
 
 function componentAttributePropSource(attribute: AnyNode, source: string): string[] {
+	if (isSpreadAttribute(attribute)) {
+		const argument = attribute.argument as AnyNode | undefined;
+		return argument ? [`...(${expressionSource(argument, source)})`] : [];
+	}
 	const name = getIdentifierName(attribute.name as AnyNode | undefined);
 	if (!name) return [];
 	const propertyName = objectPropertyName(name);
@@ -658,7 +966,14 @@ function collectCsrPropEvents(
 	}> = [];
 
 	const visit = (node: AnyNode, path: ReadonlyArray<number>): void => {
-		if (node.type !== 'Element' && node.type !== 'JSXElement') return;
+		if (
+			node.type !== 'Element' &&
+			node.type !== 'JSXElement' &&
+			node.type !== 'Fragment' &&
+			node.type !== 'JSXFragment'
+		) {
+			return;
+		}
 
 		const tagName = getElementTagName(node);
 		if (tagName && isHostTagName(tagName)) {
@@ -727,21 +1042,46 @@ function firstComponentRoot(component: AnyNode | undefined): AnyNode | null {
 
 	for (const child of childNodes(body)) {
 		if (child.type === 'Element' || child.type === 'JSXElement') return child;
+		if (child.type === 'Fragment' || child.type === 'JSXFragment') {
+			return supportedFragmentRoot(child);
+		}
+		// TSRX allows `return <element>;` at the function-body level of @{...}.
+		if (child.type === 'ReturnStatement') {
+			const argument = child.argument as AnyNode | undefined;
+			if (argument && (argument.type === 'Element' || argument.type === 'JSXElement')) {
+				return argument;
+			}
+			if (argument && (argument.type === 'Fragment' || argument.type === 'JSXFragment')) {
+				return supportedFragmentRoot(argument);
+			}
+		}
 	}
 
 	return null;
 }
 
+// Mirrors the plan pass gate: only all-plain-host fragment roots render.
+function supportedFragmentRoot(fragment: AnyNode): AnyNode | null {
+	const children = asNodes(fragment.children).filter((child) => !isIgnorableTextNode(child));
+	const supported =
+		children.length > 0 &&
+		children.every(
+			(child) =>
+				(child.type === 'Element' || child.type === 'JSXElement') &&
+				isPlainHostTemplateNode(child),
+		);
+	return supported ? fragment : null;
+}
+
+function isFragmentNode(node: AnyNode | undefined): boolean {
+	return node?.type === 'Fragment' || node?.type === 'JSXFragment';
+}
+
 function findComponent(ast: AnyNode, name: string | undefined): AnyNode | undefined {
 	for (const statement of asNodes(ast.body)) {
-		const declaration =
-			statement.type === 'ExportNamedDeclaration' ||
-			statement.type === 'ExportDefaultDeclaration'
-				? (statement.declaration as AnyNode | undefined)
-				: statement;
-		if (declaration?.type !== 'FunctionDeclaration') continue;
-		const componentName = getIdentifierName(declaration.id as AnyNode | undefined);
-		if (!name || componentName === name) return declaration;
+		const componentFunction = getComponentFunction(statement);
+		if (!componentFunction) continue;
+		if (!name || componentFunction.name === name) return componentFunction.node;
 	}
 
 	return undefined;

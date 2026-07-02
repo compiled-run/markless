@@ -17,6 +17,7 @@ export type CompilerDiagnostic = {
 		| 'state-lowering'
 		| 'capture-analysis'
 		| 'sync-policy'
+		| 'public-render'
 		| 'serialization'
 		| 'payload'
 		| 'resume'

@@ -114,6 +114,32 @@ function viewWithElementHandle(): ProtocolViewPayload {
 	};
 }
 
+function viewWithAsyncBoundary(): ProtocolViewPayload {
+	return {
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'p' }],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [
+			{
+				id: 'boundary:0',
+				startAnchor: { strategy: 'dom-order-comment', index: 0 },
+				endAnchor: { strategy: 'dom-order-comment', index: 1 },
+				asyncReads: [
+					{
+						source: 'details',
+						graphNodeId: 'computed:details',
+						path: ['title'],
+						runnerSymbolId: 'symbol:details-runner',
+					},
+				],
+			},
+		],
+	};
+}
+
 function staticView(): ProtocolViewPayload {
 	return {
 		version: ASYNC_PROTOCOL_VERSION,
@@ -433,6 +459,78 @@ test('renderToString emits an SSR container and omits the resumer for static out
 	expect(html).toContain('type="markless/state"');
 	expect(html).toContain('type="markless/view"');
 	expect(html).not.toContain('data-async-resumer');
+});
+
+test('renderToString keeps fragment sibling roots as direct container children and offsets their locators', () => {
+	const html = renderToString({
+		renderSsr: () => ({
+			html: '<header>Site</header><button type="button">0</button>',
+			state: createProtocolStatePayload({ cells: [] }),
+			view: {
+				version: ASYNC_PROTOCOL_VERSION,
+				locators: [
+					{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'header' },
+					{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'button' },
+				],
+				events: [{ hostNodeId: 'h1', eventName: 'click', symbolIds: ['symbol:click'] }],
+				domUpdates: [],
+				behaviors: [],
+				elementHandles: [],
+				asyncBoundaries: [],
+			},
+		}),
+	});
+
+	// Fragment-rooted SSR html is concatenated sibling roots. The container must
+	// keep both siblings as its direct children with no extra wrapper element,
+	// so container-scoped locator indexes stay aligned to the element walk.
+	expect(html).toContain(
+		'<div data-async-container><header>Site</header><button type="button">0</button>',
+	);
+
+	const view = JSON.parse(extractScriptText(html, 'markless/view')) as ProtocolViewPayload;
+
+	// The container div is walk-element 0, so both flat dom-order sibling
+	// locators are offset by +1 (0 -> 1 and 1 -> 2).
+	expect(view.locators).toEqual([
+		{ hostNodeId: 'h0', strategy: 'dom-order', index: 1, tagName: 'header' },
+		{ hostNodeId: 'h1', strategy: 'dom-order', index: 2, tagName: 'button' },
+	]);
+	expect(view.events).toEqual([
+		{ hostNodeId: 'h1', eventName: 'click', symbolIds: ['symbol:click'] },
+	]);
+});
+
+test('renderToString keeps async boundary anchors as the only comments in document order', () => {
+	const html = renderToString(
+		() => ({
+			html: '<!--markless:async:boundary:0--><p>Pending</p><!--/markless:async:boundary:0-->',
+			state: createProtocolStatePayload({ cells: [] }),
+			view: viewWithAsyncBoundary(),
+		}),
+		{
+			nonce: 'nonce-1',
+			resumerSource: 'globalThis.__started = true;',
+		},
+	);
+
+	expect(html).toContain('data-async-container');
+	expect(html).toContain('<script type="markless/state">');
+	expect(html).toContain('<script type="markless/view">');
+	expect(html).toContain('dom-order-comment');
+
+	// Container wrapping, payload scripts, and the inline resumer must not add
+	// comment nodes: flat comment-anchor indexes stay aligned only if the two
+	// compiler-emitted anchors are the only comments in the container.
+	expect(html.match(/<!--/g)).toHaveLength(2);
+
+	const startIndex = html.indexOf('<!--markless:async:boundary:0-->');
+	const endIndex = html.indexOf('<!--/markless:async:boundary:0-->');
+	expect(startIndex).toBeGreaterThanOrEqual(0);
+	expect(endIndex).toBeGreaterThan(startIndex);
+	expect(startIndex).toBeLessThan(html.indexOf('<p>Pending</p>'));
+	expect(html.indexOf('<p>Pending</p>')).toBeLessThan(endIndex);
+	expect(endIndex).toBeLessThan(html.indexOf('<script type="markless/state">'));
 });
 
 test('renderToString emits one inline resumer for SSR containers with browser triggers', () => {

@@ -52,7 +52,14 @@ export async function transformTsrxModule(
 			virtualModuleId: symbolVirtualModuleId(input.filename, module.symbolId),
 		})),
 	};
+	// Scoped <style> CSS ships through the bundler's CSS pipeline: a virtual
+	// .css module imported by the transformed module, never inline JS.
+	const styleScope = compiled.publicRenderPlan.styleScopes[0];
+	const styleId = styleScope ? `${MARKLESS_VIRTUAL_PREFIX}style:${encodedFilename}.css` : null;
 	const virtualModules: MarklessVirtualModule[] = [
+		...(styleScope && styleId
+			? [{ id: styleId, type: 'style' as const, source: styleScope.cssText }]
+			: []),
 		{
 			id: payloadId,
 			type: 'payload',
@@ -78,23 +85,26 @@ export async function transformTsrxModule(
 		),
 	];
 
+	const styleImport = styleId ? `import ${JSON.stringify(styleId)};\n` : '';
 	return {
-		code: emitSourceModule({
-			filename: input.filename,
-			payloadId,
-			resolverId,
-			environment: input.environment ?? 'lib',
-			clientOutput: input.clientOutput ?? 'full',
-			resumeModuleUrl: input.resumeModuleUrl,
-			publicRenderModuleSource: compiled.publicRenderModule.moduleSource,
-			publicRenderRootExportName: compiled.publicRenderModule.rootExportName,
-			publicCsrModuleSource: compiled.publicRenderModule.csrModuleSource,
-			publicRenderCsrExportName: compiled.publicRenderModule.csrExportName,
-			publicSsrModuleSource: compiled.publicRenderModule.ssrModuleSource,
-			publicRenderSsrExportName: compiled.publicRenderModule.ssrExportName,
-			symbols: symbolRows,
-			symbolRoutes,
-		}),
+		code:
+			styleImport +
+			emitSourceModule({
+				filename: input.filename,
+				payloadId,
+				resolverId,
+				environment: input.environment ?? 'lib',
+				clientOutput: input.clientOutput ?? 'full',
+				resumeModuleUrl: input.resumeModuleUrl,
+				publicRenderModuleSource: compiled.publicRenderModule.moduleSource,
+				publicRenderRootExportName: compiled.publicRenderModule.rootExportName,
+				publicCsrModuleSource: compiled.publicRenderModule.csrModuleSource,
+				publicRenderCsrExportName: compiled.publicRenderModule.csrExportName,
+				publicSsrModuleSource: compiled.publicRenderModule.ssrModuleSource,
+				publicRenderSsrExportName: compiled.publicRenderModule.ssrExportName,
+				symbols: symbolRows,
+				symbolRoutes,
+			}),
 		map: null,
 		virtualModules,
 		manifest,

@@ -27,11 +27,13 @@ export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | nu
 		semanticAliasMap(state.graph, state.currentSharedDefinitionId ?? null),
 	);
 
+	const indexName = getIdentifierName(node.index as AnyNode | undefined);
 	const repeatIndex = state.graph.keyedRepeats.length;
 	state.graph.keyedRepeats.push({
 		id: `repeat:${repeatIndex}`,
 		parentHostNodeId: state.currentHostNodeId,
 		itemName,
+		...(indexName ? { indexName } : {}),
 		collectionSource,
 		...(resolvedCollection
 			? {

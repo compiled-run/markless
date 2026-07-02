@@ -4,10 +4,13 @@ import { expressionSource } from '../../ast/source.ts';
 import {
 	escapeAttribute,
 	escapeHtml,
+	getComponentFunction,
 	getElementAttributes,
 	getElementTagName,
 	isHostTagName,
 	isIgnorableStaticTextNode as isIgnorableTextNode,
+	isPlainHostTemplateNode,
+	isSpreadAttribute,
 	isStaticTextNode,
 	staticTextValue,
 	trimmedStaticTextValue,
@@ -19,10 +22,16 @@ import {
 	semanticAliasMap,
 	splitStaticGraphPath,
 } from '../../artifact-helpers/graph-paths.ts';
+import {
+	unsupportedRenderConstructDiagnostic,
+	unsupportedRenderRootDiagnostic,
+} from './diagnostics.ts';
+import { collectStyleScopes } from './style-scopes.ts';
 import type {
 	PayloadKeyedRepeat,
 	PlannedSymbol,
 	PublicRenderPlanArtifact,
+	PublicRenderPlanAsyncBoundaryGate,
 	PublicRenderPlanClassWrite,
 	PublicRenderPlanEventControl,
 	PublicRenderPlanInput,
@@ -43,7 +52,7 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 	const component = findComponent(ast);
 	const root = firstComponentRoot(component);
 	if (!root) {
-		return emptyPlan();
+		return emptyPlan(componentRootDiagnostics(ast, input.source.filename));
 	}
 
 	const assignedHosts = assignHostIds(
@@ -91,7 +100,7 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 			symbols: input.symbolResolver.symbols,
 		});
 		repeatGates.push(gate);
-		if (!gate.supported) continue;
+		if (!gate.supported || gate.ssrOnly) continue;
 
 		const row = singleRowRoot(repeatNode);
 		const parentLocator = locatorByHostNodeId.get(payloadRepeat.parentHostNodeId);
@@ -124,6 +133,45 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 		);
 	}
 
+	const styleScopeCollection = collectStyleScopes(root, input.source.filename);
+	const boundaryNodes = collectAsyncBoundaryNodes(root);
+	const asyncBoundaryGates: PublicRenderPlanAsyncBoundaryGate[] =
+		input.payloadArena.view.asyncBoundaries.map((boundary, index) => {
+			const found = boundaryNodes[index];
+			if (!found) {
+				return {
+					boundaryId: boundary.id,
+					supported: false,
+					reason: 'conditional-boundary-unsupported',
+				};
+			}
+			if (found.nested || found.containsNested) {
+				return {
+					boundaryId: boundary.id,
+					supported: false,
+					reason: 'nested-boundary-unsupported',
+				};
+			}
+			if (found.conditional) {
+				return {
+					boundaryId: boundary.id,
+					supported: false,
+					reason: 'conditional-boundary-unsupported',
+				};
+			}
+			const pendingChildren = asNodes(
+				(found.node.pending as AnyNode | undefined)?.body,
+			).filter((child) => !isIgnorableTextNode(child));
+			if (pendingChildren.some((child) => !isPlainHostTemplateNode(child))) {
+				return {
+					boundaryId: boundary.id,
+					supported: false,
+					reason: 'pending-branch-unsupported',
+				};
+			}
+			return { boundaryId: boundary.id, supported: true };
+		});
+
 	const rootTemplateHtml = staticHtml(root, { expressionText: ' ', omitForExpressions: true });
 	const directRenderTemplateHtml =
 		staticTextWrites && staticShellSupported(root)
@@ -155,11 +203,81 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 		staticTextWrites: staticTextWrites ?? [],
 		repeatGates,
 		keyedRepeats,
-		diagnostics: [],
+		asyncBoundaryGates,
+		styleScopes: styleScopeCollection.styleScopes,
+		diagnostics: [
+			...styleScopeCollection.diagnostics,
+			...collectUnsupportedConstructDiagnostics(root, input.source.filename),
+			...repeatRenderDiagnostics({
+				componentEdgeCount: input.semanticGraph.componentEdges.length,
+				filename: input.source.filename,
+				keyedRepeats,
+				repeatGates,
+				repeatNodeById,
+			}),
+			...asyncBoundaryGates.flatMap((gate, index) => {
+				const found = boundaryNodes[index];
+				if (gate.supported || !found) return [];
+				return [
+					unsupportedRenderConstructDiagnostic({
+						label: '@try/@pending/@catch',
+						message: `The async boundary branches are dropped from rendered HTML (reason: ${gate.reason}); only top-level boundaries with plain-host @pending content render anchors today.`,
+						node: found.node,
+						filename: input.source.filename,
+						suggestion:
+							'Move the boundary out of nested control flow, or keep the @pending branch to host elements, text, and expressions.',
+					}),
+				];
+			}),
+		],
 	};
 }
 
-function emptyPlan(): PublicRenderPlanArtifact {
+type AsyncBoundaryNode = {
+	readonly node: AnyNode;
+	readonly nested: boolean;
+	containsNested: boolean;
+	readonly conditional: boolean;
+};
+
+// Boundary anchors use flat document-order comment indexes, so a boundary is
+// only renderable when its anchors always materialize: top-level (no nesting,
+// no conditional control flow) with a statically known @pending shape.
+function collectAsyncBoundaryNodes(root: AnyNode): AsyncBoundaryNode[] {
+	const found: AsyncBoundaryNode[] = [];
+	const boundaryStack: AsyncBoundaryNode[] = [];
+
+	const visit = (node: AnyNode, conditional: boolean): void => {
+		if (node.type === 'JSXTryExpression') {
+			const entry: AsyncBoundaryNode = {
+				node,
+				nested: boundaryStack.length > 0,
+				containsNested: false,
+				conditional,
+			};
+			for (const outer of boundaryStack) outer.containsNested = true;
+			found.push(entry);
+			boundaryStack.push(entry);
+			for (const child of childNodes(node)) visit(child, conditional);
+			boundaryStack.pop();
+			return;
+		}
+		const entersControlFlow =
+			node.type === 'JSXIfExpression' ||
+			node.type === 'JSXSwitchExpression' ||
+			node.type === 'JSXForExpression';
+		for (const child of childNodes(node)) {
+			visit(child, conditional || entersControlFlow);
+		}
+	};
+
+	visit(root, false);
+	return found;
+}
+
+function emptyPlan(
+	diagnostics: ReadonlyArray<PublicRenderPlanArtifact['diagnostics'][number]> = [],
+): PublicRenderPlanArtifact {
 	return {
 		passId: 'public-render-plan',
 		rootTemplateHtml: null,
@@ -170,8 +288,160 @@ function emptyPlan(): PublicRenderPlanArtifact {
 		staticTextWrites: [],
 		repeatGates: [],
 		keyedRepeats: [],
-		diagnostics: [],
+		asyncBoundaryGates: [],
+		styleScopes: [],
+		diagnostics,
 	};
+}
+
+// Constructs the module emitter cannot render yet must fail loud here; their
+// content would otherwise silently disappear from CSR/SSR HTML.
+function collectUnsupportedConstructDiagnostics(root: AnyNode, filename: string) {
+	const diagnostics: ReturnType<typeof unsupportedRenderConstructDiagnostic>[] = [];
+
+	const visit = (node: AnyNode): void => {
+		if (
+			(node.type === 'Element' || node.type === 'JSXElement') &&
+			(node.isDynamic === true || !getElementTagName(node)) &&
+			getElementAttributes(node).some((attribute) => {
+				if (isSpreadAttribute(attribute)) return false;
+				const name = getIdentifierName(attribute.name as AnyNode | undefined);
+				return !!name && (isEventAttribute(name) || name === 'attach' || name === 'el');
+			})
+		) {
+			diagnostics.push(
+				unsupportedRenderConstructDiagnostic({
+					label: 'dynamic tag',
+					message:
+						'Events, attach behaviors, and el handles on dynamic <{expression}> tags are dropped because dynamic elements have no host records yet.',
+					node,
+					filename,
+					suggestion:
+						'Move the event or behavior to a statically named wrapper element, or branch with @if over static tag choices.',
+				}),
+			);
+		} else if (
+			node.type === 'JSXForExpression' &&
+			node.empty &&
+			!asNodes((node.empty as AnyNode).body).every(
+				(child) => isIgnorableTextNode(child) || isPlainHostTemplateNode(child),
+			)
+		) {
+			diagnostics.push(
+				unsupportedRenderConstructDiagnostic({
+					label: '@empty',
+					message:
+						'@empty content with components or control flow is dropped from rendered HTML; only host elements, text, and expressions render in the empty branch.',
+					node: node.empty as AnyNode,
+					filename,
+					suggestion:
+						'Keep the @empty branch to host elements, text, and expressions, or wrap the list in @if for richer empty states.',
+				}),
+			);
+		}
+
+		for (const child of childNodes(node)) visit(child);
+	};
+
+	visit(root);
+	return diagnostics;
+}
+
+function repeatRenderDiagnostics(input: {
+	readonly componentEdgeCount: number;
+	readonly filename: string;
+	readonly keyedRepeats: ReadonlyArray<PublicRenderPlanKeyedRepeat>;
+	readonly repeatGates: ReadonlyArray<PublicRenderPlanRepeatGate>;
+	readonly repeatNodeById: ReadonlyMap<string, AnyNode>;
+}) {
+	return input.repeatGates.flatMap((gate) => {
+		const node = input.repeatNodeById.get(gate.repeatId);
+		if (!node) return [];
+		if (!gate.supported) {
+			return [
+				unsupportedRenderConstructDiagnostic({
+					label: '@for',
+					message: `The @for rows are not compiler-proven (reason: ${gate.reason}), so the render module drops the list content.`,
+					node,
+					filename: input.filename,
+					suggestion:
+						'Reshape the rows into a single host element with directly readable item bindings.',
+				}),
+			];
+		}
+		if (input.componentEdgeCount > 0) {
+			return [
+				unsupportedRenderConstructDiagnostic({
+					label: '@for',
+					message:
+						'Keyed repeat rows are skipped in SSR output when the module renders component children, so the list content is dropped.',
+					node,
+					filename: input.filename,
+					suggestion:
+						'Keep the repeat in a component without child components until repeat rows compose with component children.',
+				}),
+			];
+		}
+		if (
+			!gate.ssrOnly &&
+			!input.keyedRepeats.some((repeat) => repeat.repeatId === gate.repeatId)
+		) {
+			return [
+				unsupportedRenderConstructDiagnostic({
+					label: '@for',
+					message:
+						'The @for rows could not be planned even though the repeat gate is supported, so the render module drops the list content.',
+					node,
+					filename: input.filename,
+					suggestion:
+						'Keep the repeat directly inside a host parent element with a single row root.',
+				}),
+			];
+		}
+		return [];
+	});
+}
+
+// findComponent only accepts components that already have an element root, so
+// fragment-rooted and return-form components would silently plan nothing.
+// This scan exists purely to explain those shapes; plain helper functions in a
+// .tsrx module (no template content) stay diagnostic-free.
+function componentRootDiagnostics(ast: AnyNode, filename: string) {
+	for (const statement of asNodes(ast.body)) {
+		const componentFunction = getComponentFunction(statement);
+		const body = componentFunction?.node.body as AnyNode | undefined;
+		if (!body) continue;
+
+		// Direct fragments and `return <>...</>` both need the multi-root
+		// story; single-element returns are supported by firstComponentRoot.
+		const fragment = childNodes(body).find(
+			(child) =>
+				child.type === 'Fragment' ||
+				child.type === 'JSXFragment' ||
+				(child.type === 'ReturnStatement' &&
+					['Fragment', 'JSXFragment'].includes(
+						(child.argument as AnyNode | undefined)?.type ?? '',
+					)),
+		);
+		if (fragment) {
+			const fragmentNode =
+				fragment.type === 'ReturnStatement'
+					? ((fragment.argument as AnyNode | undefined) ?? fragment)
+					: fragment;
+			if (supportedFragmentRoot(fragmentNode)) continue;
+			return [
+				unsupportedRenderRootDiagnostic({
+					message: `Fragment roots render only when every top-level child is a plain host element; this fragment has a ${unsupportedFragmentChildKind(fragmentNode)}, which needs the dynamic fragment anchor work.`,
+					node: fragmentNode,
+					filename,
+					suggestion:
+						'Wrap the fragment children in a single host element such as <div> or <section>, or keep top-level children to plain host elements.',
+				}),
+			];
+		}
+	}
+
+	return [];
 }
 
 function collectStaticTextWrites(input: {
@@ -273,47 +543,30 @@ function supportedRepeatGate(input: {
 	readonly source: string;
 	readonly symbols: ReadonlyArray<PlannedSymbol>;
 }): PublicRenderPlanRepeatGate {
-	const unsupported = unsupportedRepeatReason(input);
-	if (unsupported) {
-		return {
+	const unsupportedReason = (reason: PublicRenderPlanUnsupportedReason) =>
+		({
 			repeatId: input.payloadRepeat.id,
 			supported: false,
-			reason: unsupported,
-		};
-	}
+			reason,
+		}) as const;
 
-	return {
-		repeatId: input.payloadRepeat.id,
-		supported: true,
-	};
-}
-
-function unsupportedRepeatReason(input: {
-	readonly aliases: ReturnType<typeof semanticAliasMap>;
-	readonly assignedHosts: AssignedHosts;
-	readonly bindings: ReadonlyMap<string, SemanticGraphBinding>;
-	readonly payloadRepeat: PayloadKeyedRepeat;
-	readonly repeatNode: AnyNode;
-	readonly semanticRepeat: SemanticKeyedRepeat;
-	readonly source: string;
-	readonly symbols: ReadonlyArray<PlannedSymbol>;
-}): PublicRenderPlanUnsupportedReason | null {
 	const parent = input.assignedHosts.nodeByHostId.get(input.payloadRepeat.parentHostNodeId);
-	if (!parent) return 'repeat-parent-locator-missing';
+	if (!parent) return unsupportedReason('repeat-parent-locator-missing');
 
 	if (!parentContainsOnlyRepeat(parent, input.repeatNode)) {
-		return 'repeat-parent-must-contain-only-repeat';
+		return unsupportedReason('repeat-parent-must-contain-only-repeat');
 	}
 
 	const row = singleRowRoot(input.repeatNode);
-	if (!row) return 'single-row-root-required';
+	if (!row) return unsupportedReason('single-row-root-required');
 
-	if (containsNestedRepeat(row)) return 'nested-repeat-unsupported';
+	if (containsNestedRepeat(row)) return unsupportedReason('nested-repeat-unsupported');
 
 	const rowPlan = collectRowPlan({
 		aliases: input.aliases,
 		assignedHosts: input.assignedHosts,
 		bindings: input.bindings,
+		indexName: input.semanticRepeat.indexName,
 		itemName: input.semanticRepeat.itemName,
 		keyPath: input.payloadRepeat.keyPath,
 		repeatId: input.payloadRepeat.id,
@@ -321,9 +574,11 @@ function unsupportedRepeatReason(input: {
 		source: input.source,
 		symbols: input.symbols,
 	});
-	if (!rowPlan) return 'unsupported-row-binding';
+	if (!rowPlan) return unsupportedReason('unsupported-row-binding');
 
-	return null;
+	return rowPlan.usesIndex
+		? { repeatId: input.payloadRepeat.id, supported: true, ssrOnly: true }
+		: { repeatId: input.payloadRepeat.id, supported: true };
 }
 
 function planKeyedRepeat(input: {
@@ -361,12 +616,14 @@ type RowPlan = {
 	readonly textWrites: ReadonlyArray<PublicRenderPlanTextWrite>;
 	readonly classWrites: ReadonlyArray<PublicRenderPlanClassWrite>;
 	readonly eventControls: ReadonlyArray<PublicRenderPlanEventControl>;
+	readonly usesIndex: boolean;
 };
 
 function collectRowPlan(input: {
 	readonly aliases: ReturnType<typeof semanticAliasMap>;
 	readonly assignedHosts: AssignedHosts;
 	readonly bindings: ReadonlyMap<string, SemanticGraphBinding>;
+	readonly indexName?: string;
 	readonly itemName: string;
 	readonly keyPath: ReadonlyArray<string>;
 	readonly repeatId: string;
@@ -377,6 +634,7 @@ function collectRowPlan(input: {
 	const textWrites: PublicRenderPlanTextWrite[] = [];
 	const classWrites: PublicRenderPlanClassWrite[] = [];
 	const eventControls: PublicRenderPlanEventControl[] = [];
+	let usesIndex = false;
 
 	const visitElement = (node: AnyNode, hostPath: ReadonlyArray<number>): boolean => {
 		const hostNodeId = input.assignedHosts.hostIdByNode.get(node);
@@ -449,7 +707,17 @@ function collectRowPlan(input: {
 
 				const source = expressionSource(expression, input.source);
 				const itemPath = itemPathFromSource(input.itemName, source);
-				if (!itemPath) return false;
+				if (!itemPath) {
+					// A bare index read renders in SSR rows (the map callback binds
+					// it) but has no direct-DOM update plan, so it only flags the
+					// row as ssr-only instead of rejecting the repeat.
+					if (input.indexName && source === input.indexName) {
+						usesIndex = true;
+						childDomIndex++;
+						continue;
+					}
+					return false;
+				}
 
 				textWrites.push({
 					source,
@@ -478,6 +746,7 @@ function collectRowPlan(input: {
 		textWrites,
 		classWrites,
 		eventControls,
+		usesIndex,
 	};
 }
 
@@ -625,6 +894,16 @@ function collectHostPaths(
 			childDomIndex++;
 		}
 	};
+
+	if (root.type === 'Fragment' || root.type === 'JSXFragment') {
+		let rootDomIndex = 0;
+		for (const child of asNodes(root.children)) {
+			if (isIgnorableTextNode(child)) continue;
+			visit(child, [rootDomIndex]);
+			rootDomIndex++;
+		}
+		return hostPathById;
+	}
 
 	visit(root, []);
 	return hostPathById;
@@ -802,26 +1081,77 @@ function firstComponentRoot(component: AnyNode | undefined): AnyNode | null {
 
 	for (const child of childNodes(body)) {
 		if (child.type === 'Element' || child.type === 'JSXElement') return child;
+		if (child.type === 'Fragment' || child.type === 'JSXFragment') {
+			return supportedFragmentRoot(child);
+		}
+		// TSRX allows `return <element>;` at the function-body level of @{...}.
+		if (child.type === 'ReturnStatement') {
+			const argument = child.argument as AnyNode | undefined;
+			if (argument && (argument.type === 'Element' || argument.type === 'JSXElement')) {
+				return argument;
+			}
+			if (argument && (argument.type === 'Fragment' || argument.type === 'JSXFragment')) {
+				return supportedFragmentRoot(argument);
+			}
+		}
 	}
 
 	return null;
+}
+
+// Fragment roots render only when every top-level child is a plain host
+// element: the SSR container owns the multi-root range, but dynamic children
+// (components, control flow) need the comment-anchor work and stay diagnosed.
+function supportedFragmentRoot(fragment: AnyNode): AnyNode | null {
+	const children = asNodes(fragment.children).filter((child) => !isIgnorableTextNode(child));
+	const supported =
+		children.length > 0 &&
+		children.every(
+			(child) =>
+				(child.type === 'Element' || child.type === 'JSXElement') &&
+				isPlainHostTemplateNode(child),
+		);
+	return supported ? fragment : null;
+}
+
+function unsupportedFragmentChildKind(fragment: AnyNode): string {
+	for (const child of asNodes(fragment.children)) {
+		if (isIgnorableTextNode(child)) continue;
+		if (
+			child.type === 'JSXIfExpression' ||
+			child.type === 'JSXSwitchExpression' ||
+			child.type === 'JSXForExpression' ||
+			child.type === 'JSXTryExpression'
+		) {
+			return 'control-flow child';
+		}
+		if (child.type === 'Element' || child.type === 'JSXElement') {
+			if (!isPlainHostTemplateNode(child)) return 'component or dynamic child';
+			continue;
+		}
+		if (child.type === 'JSXExpressionContainer' || child.type === 'TSRXExpression') {
+			return 'expression child';
+		}
+		return `${String(child.type)} child`;
+	}
+	return 'empty fragment';
 }
 
 function findComponent(ast: AnyNode): AnyNode | undefined {
 	let fallback: AnyNode | undefined;
 
 	for (const statement of asNodes(ast.body)) {
-		const declaration =
-			statement.type === 'ExportNamedDeclaration' ||
-			statement.type === 'ExportDefaultDeclaration'
-				? (statement.declaration as AnyNode | undefined)
-				: statement;
-		if (declaration?.type !== 'FunctionDeclaration') continue;
-		if (!firstComponentRoot(declaration)) continue;
+		const componentFunction = getComponentFunction(statement);
+		if (!componentFunction) continue;
+		if (!firstComponentRoot(componentFunction.node)) continue;
 
-		if (statement.type === 'ExportDefaultDeclaration') return declaration;
-		if (statement.type === 'ExportNamedDeclaration') return declaration;
-		fallback ??= declaration;
+		if (
+			statement.type === 'ExportDefaultDeclaration' ||
+			statement.type === 'ExportNamedDeclaration'
+		) {
+			return componentFunction.node;
+		}
+		fallback ??= componentFunction.node;
 	}
 
 	return fallback;
@@ -846,6 +1176,12 @@ function staticHtml(
 		return row ? staticHtml(row, options) : '';
 	}
 
+	if (node.type === 'Fragment' || node.type === 'JSXFragment') {
+		return asNodes(node.children)
+			.map((child) => staticHtml(child, options))
+			.join('');
+	}
+
 	if (node.type !== 'Element' && node.type !== 'JSXElement') return '';
 
 	const tagName = getElementTagName(node);
@@ -864,6 +1200,8 @@ function staticHtml(
 
 function staticShellSupported(node: AnyNode): boolean {
 	if (node.type !== 'Element' && node.type !== 'JSXElement') return false;
+	if (node.isDynamic === true || !getElementTagName(node)) return false;
+	if (getElementAttributes(node).some(isSpreadAttribute)) return false;
 	if (
 		getElementAttributes(node).some((attribute) => {
 			const name = getIdentifierName(attribute.name as AnyNode | undefined);

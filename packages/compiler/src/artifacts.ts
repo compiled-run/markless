@@ -128,6 +128,7 @@ export type SemanticKeyedRepeat = {
 	readonly parentHostNodeId: string;
 	readonly rowHostNodeId?: string;
 	readonly itemName: string;
+	readonly indexName?: string;
 	readonly collectionSource: string;
 	readonly collectionGraphNodeId?: string;
 	readonly collectionPath: ReadonlyArray<string>;
@@ -677,6 +678,10 @@ export type PublicRenderPlanRepeatGate =
 	| {
 			readonly repeatId: string;
 			readonly supported: true;
+			// Rows read the @for index clause: SSR emission renders them, but the
+			// direct-DOM runtime stays off because it cannot rewrite index text on
+			// reorder yet.
+			readonly ssrOnly?: true;
 	  }
 	| {
 			readonly repeatId: string;
@@ -700,6 +705,20 @@ export type PublicRenderPlanKeyedRepeat = {
 	readonly eventControls: ReadonlyArray<PublicRenderPlanEventControl>;
 };
 
+export type PublicRenderPlanAsyncBoundaryGate =
+	| {
+			readonly boundaryId: string;
+			readonly supported: true;
+	  }
+	| {
+			readonly boundaryId: string;
+			readonly supported: false;
+			readonly reason:
+				| 'nested-boundary-unsupported'
+				| 'conditional-boundary-unsupported'
+				| 'pending-branch-unsupported';
+	  };
+
 export type PublicRenderPlanArtifact = {
 	readonly passId: 'public-render-plan';
 	readonly rootTemplateHtml: string | null;
@@ -710,6 +729,8 @@ export type PublicRenderPlanArtifact = {
 	readonly staticTextWrites: ReadonlyArray<PublicRenderPlanStaticTextWrite>;
 	readonly repeatGates: ReadonlyArray<PublicRenderPlanRepeatGate>;
 	readonly keyedRepeats: ReadonlyArray<PublicRenderPlanKeyedRepeat>;
+	readonly asyncBoundaryGates: ReadonlyArray<PublicRenderPlanAsyncBoundaryGate>;
+	readonly styleScopes: ReadonlyArray<{ readonly scopeId: string; readonly cssText: string }>;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
 };
 

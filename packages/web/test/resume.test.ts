@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { createRuntimeGraph } from '@markless/runtime';
-import { createResumeRuntime, RuntimeResumeError } from '../src/index.ts';
+import { applyDomJournalEntries, createResumeRuntime, RuntimeResumeError } from '../src/index.ts';
 import type { RuntimeGraph, RuntimeGraphWrite } from '@markless/runtime';
 import type { DomJournalEntry } from '../src/index.ts';
 
@@ -795,6 +795,63 @@ test('resume runtime dispatches delegated events from nested targets to the owne
 	const click = event('click', label, '');
 	await root.listeners[0].listener(click);
 
+	expect(handledElements).toEqual(['BUTTON']);
+	expect(graph.read('state:count')).toBe(1);
+});
+
+test('resume runtime materializes container-offset fragment sibling roots and dispatches events on the second sibling', async () => {
+	const header = element('HEADER');
+	const button = element('BUTTON');
+	// Container shape produced by renderToString for a fragment-rooted
+	// component: the container div directly holds the concatenated sibling
+	// roots, so the container is walk-element 0 and the siblings are 1 and 2.
+	const root = element('DIV', [header, button]);
+	const graph = createRuntimeGraph({
+		cells: [{ graphNodeId: 'state:count', value: 0 }],
+	});
+	const loadedSymbols: string[] = [];
+	const handledElements: string[] = [];
+
+	const resume = createResumeRuntime({
+		root,
+		graph,
+		view: {
+			locators: [
+				{ hostNodeId: 'h0', strategy: 'dom-order', index: 1, tagName: 'header' },
+				{ hostNodeId: 'h1', strategy: 'dom-order', index: 2, tagName: 'button' },
+			],
+			events: [
+				{
+					hostNodeId: 'h1',
+					eventName: 'click',
+					symbolIds: ['symbol:click'],
+				},
+			],
+			domUpdates: [],
+			behaviors: [],
+			elementHandles: [],
+			asyncBoundaries: [],
+		},
+		loadSymbol(symbolId) {
+			loadedSymbols.push(symbolId);
+			return ({ element: ownerElement, graph: runtimeGraph }) => {
+				handledElements.push(ownerElement.tagName);
+				runtimeGraph.update({
+					graphNodeId: 'state:count',
+					update: (value) => Number(value) + 1,
+				});
+			};
+		},
+	});
+
+	await resume.start();
+
+	expect(resume.getElement('h0')).toBe(header);
+	expect(resume.getElement('h1')).toBe(button);
+
+	await root.listeners[0].listener(event('click', button, ''));
+
+	expect(loadedSymbols).toEqual(['symbol:click']);
 	expect(handledElements).toEqual(['BUTTON']);
 	expect(graph.read('state:count')).toBe(1);
 });
@@ -1840,6 +1897,65 @@ test('resume runtime materializes async boundary comment anchors', async () => {
 	});
 });
 
+test('resume runtime indexes fragment sibling elements and async boundary comments independently', async () => {
+	const header = element('HEADER');
+	const button = element('BUTTON');
+	const start = comment('markless:async:boundary:0');
+	const paragraph = element('P');
+	const end = comment('/markless:async:boundary:0');
+	// Fragment container: two plain sibling roots followed by one async
+	// boundary comment pair. The sibling elements precede the comments in
+	// document order, but comment anchors are indexed among comments only
+	// (0 and 1), while elements are indexed among elements only.
+	const root = element('DIV', [header, button, start, paragraph, end]);
+	const graph = createRuntimeGraph({ cells: [] });
+
+	const resume = createResumeRuntime({
+		root,
+		graph,
+		view: {
+			locators: [
+				{ hostNodeId: 'h0', strategy: 'dom-order', index: 1, tagName: 'header' },
+				{ hostNodeId: 'h1', strategy: 'dom-order', index: 2, tagName: 'button' },
+				{ hostNodeId: 'h2', strategy: 'dom-order', index: 3, tagName: 'p' },
+			],
+			events: [],
+			domUpdates: [],
+			behaviors: [],
+			elementHandles: [],
+			asyncBoundaries: [
+				{
+					id: 'boundary:0',
+					startAnchor: { strategy: 'dom-order-comment', index: 0 },
+					endAnchor: { strategy: 'dom-order-comment', index: 1 },
+					asyncReads: [
+						{
+							source: 'details.title',
+							graphNodeId: 'computed:details',
+							path: ['title'],
+							runnerSymbolId: 'symbol:details',
+						},
+					],
+				},
+			],
+		},
+		loadSymbol() {
+			return () => undefined;
+		},
+	});
+
+	await resume.start();
+
+	// Comment anchors are unaffected by the sibling elements before them.
+	expect(resume.getAsyncBoundary('boundary:0')?.startAnchor).toBe(start);
+	expect(resume.getAsyncBoundary('boundary:0')?.endAnchor).toBe(end);
+
+	// Element locators are unaffected by the comment anchors between them.
+	expect(resume.getElement('h0')).toBe(header);
+	expect(resume.getElement('h1')).toBe(button);
+	expect(resume.getElement('h2')).toBe(paragraph);
+});
+
 test('resume runtime emits structural async boundary journal entries without symbol imports', async () => {
 	const result = deferred<{ readonly title: string }>();
 	const start = comment('async:boundary:0:start');
@@ -2116,6 +2232,171 @@ test('resume runtime does not treat async runner symbols as DOM update symbols',
 		},
 	]);
 });
+
+test('resume runtime aligns two sibling async boundaries and replaces only the settled range', async () => {
+	const firstResult = deferred<string>();
+	const secondResult = deferred<string>();
+	const firstStart = comment('markless:async:boundary:0');
+	const firstPending = element('P');
+	const firstEnd = comment('/markless:async:boundary:0');
+	const divider = element('HR');
+	const secondStart = comment('markless:async:boundary:1');
+	const secondPending = element('P');
+	const secondEnd = comment('/markless:async:boundary:1');
+	const root = rangeElement('SECTION', [
+		firstStart,
+		firstPending,
+		firstEnd,
+		divider,
+		secondStart,
+		secondPending,
+		secondEnd,
+	]);
+	const renderedSnapshots: string[] = [];
+	let renderedNode: FakeComment | undefined;
+	const graph = createRuntimeGraph({
+		cells: [{ graphNodeId: 'state:userId', value: 'a' }],
+		asyncComputed: [
+			{
+				graphNodeId: 'computed:first',
+				dependencies: [{ graphNodeId: 'state:userId', path: [] }],
+				key: (read) => read('state:userId'),
+				run() {
+					return firstResult.promise;
+				},
+			},
+			{
+				graphNodeId: 'computed:second',
+				dependencies: [{ graphNodeId: 'state:userId', path: [] }],
+				key: (read) => read('state:userId'),
+				run() {
+					return secondResult.promise;
+				},
+			},
+		],
+	});
+
+	const resume = createResumeRuntime({
+		root,
+		graph,
+		view: {
+			locators: [
+				{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'section' },
+				{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'p' },
+				{ hostNodeId: 'h2', strategy: 'dom-order', index: 2, tagName: 'hr' },
+				{ hostNodeId: 'h3', strategy: 'dom-order', index: 3, tagName: 'p' },
+			],
+			events: [],
+			domUpdates: [],
+			behaviors: [],
+			elementHandles: [],
+			asyncBoundaries: [
+				{
+					id: 'boundary:0',
+					startAnchor: { strategy: 'dom-order-comment', index: 0 },
+					endAnchor: { strategy: 'dom-order-comment', index: 1 },
+					asyncReads: [
+						{
+							source: 'first',
+							graphNodeId: 'computed:first',
+							path: [],
+							runnerSymbolId: 'symbol:first-runner',
+						},
+					],
+				},
+				{
+					id: 'boundary:1',
+					startAnchor: { strategy: 'dom-order-comment', index: 2 },
+					endAnchor: { strategy: 'dom-order-comment', index: 3 },
+					asyncReads: [
+						{
+							source: 'second',
+							graphNodeId: 'computed:second',
+							path: [],
+							runnerSymbolId: 'symbol:second-runner',
+						},
+					],
+				},
+			],
+		},
+		loadSymbol() {
+			return () => undefined;
+		},
+		applyDomJournal(entries) {
+			applyDomJournalEntries(entries, {
+				resolveTarget(locator) {
+					const match = /^async-boundary:(.+):(start|end)$/.exec(locator);
+					if (!match) return undefined;
+					const boundary = resume.getAsyncBoundary(match[1]);
+					return match[2] === 'start' ? boundary?.startAnchor : boundary?.endAnchor;
+				},
+				renderAsyncSnapshot(fragment) {
+					const snapshot = fragment.snapshot as { readonly status: string };
+					renderedSnapshots.push(`${fragment.boundaryId}:${snapshot.status}`);
+					renderedNode = comment(`rendered:${fragment.boundaryId}:${snapshot.status}`);
+					return [renderedNode];
+				},
+			});
+		},
+	});
+
+	await resume.start();
+
+	// Flat document-order comment indexes: boundary i owns comments i*2 and i*2+1.
+	expect(resume.getAsyncBoundary('boundary:0')?.startAnchor).toBe(firstStart);
+	expect(resume.getAsyncBoundary('boundary:0')?.endAnchor).toBe(firstEnd);
+	expect(resume.getAsyncBoundary('boundary:1')?.startAnchor).toBe(secondStart);
+	expect(resume.getAsyncBoundary('boundary:1')?.endAnchor).toBe(secondEnd);
+
+	graph.read('computed:second');
+	await graph.flush();
+	secondResult.resolve('Second');
+	await drainMicrotasks();
+	await graph.flush();
+
+	expect(renderedSnapshots).toEqual(['boundary:1:pending', 'boundary:1:fulfilled']);
+	expect(root.childNodes).toHaveLength(7);
+	expect(root.childNodes[0]).toBe(firstStart);
+	expect(root.childNodes[1]).toBe(firstPending);
+	expect(root.childNodes[2]).toBe(firstEnd);
+	expect(root.childNodes[3]).toBe(divider);
+	expect(root.childNodes[4]).toBe(secondStart);
+	expect(root.childNodes[5]).toBe(renderedNode);
+	expect(root.childNodes[6]).toBe(secondEnd);
+	expect(root.childNodes.includes(secondPending)).toBe(false);
+	expect(firstPending.parentElement).toBe(root);
+});
+
+type FakeRangeParentElement = FakeElement & {
+	insertBefore(node: FakeNode, before: FakeNode | null): FakeNode;
+	removeChild(node: FakeNode): FakeNode;
+};
+
+function rangeElement(tagName: string, childNodes: FakeNode[]): FakeRangeParentElement {
+	const parent = element(tagName, childNodes) as FakeRangeParentElement;
+	parent.insertBefore = (node, before) => {
+		const currentIndex = parent.childNodes.indexOf(node);
+		if (currentIndex >= 0) parent.childNodes.splice(currentIndex, 1);
+
+		const beforeIndex = before === null ? -1 : parent.childNodes.indexOf(before);
+		const insertIndex = beforeIndex >= 0 ? beforeIndex : parent.childNodes.length;
+		parent.childNodes.splice(insertIndex, 0, node);
+		setParentNode(node, parent);
+		return node;
+	};
+	parent.removeChild = (node) => {
+		const index = parent.childNodes.indexOf(node);
+		if (index >= 0) parent.childNodes.splice(index, 1);
+		setParentNode(node, null);
+		return node;
+	};
+	for (const child of parent.childNodes) setParentNode(child, parent);
+	return parent;
+}
+
+function setParentNode(node: FakeNode, parent: FakeRangeParentElement | null): void {
+	(node as { parentNode?: FakeRangeParentElement | null }).parentNode = parent;
+}
 
 function deferred<T>(): {
 	readonly promise: Promise<T>;

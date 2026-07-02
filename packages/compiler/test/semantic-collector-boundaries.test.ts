@@ -5,10 +5,8 @@ import {
 	collectGraphDependencies,
 	propagateAsyncComputedCapability,
 } from '../src/passes/semantic-graph/collect-async.ts';
-import {
-	collectComponentProps,
-	getComponent,
-} from '../src/passes/semantic-graph/collect-components.ts';
+import { collectComponentProps } from '../src/passes/semantic-graph/collect-components.ts';
+import { getComponentFunction } from '../src/ast/tsrx.ts';
 import {
 	collectElement,
 	collectElementHandleDiagnostics,
@@ -22,7 +20,7 @@ test('semantic graph collector modules expose their owning domains', () => {
 	expect(typeof collectGraphDependencies).toBe('function');
 	expect(typeof propagateAsyncComputedCapability).toBe('function');
 	expect(typeof collectComponentProps).toBe('function');
-	expect(typeof getComponent).toBe('function');
+	expect(typeof getComponentFunction).toBe('function');
 	expect(typeof collectElement).toBe('function');
 	expect(typeof collectElementHandleDiagnostics).toBe('function');
 	expect(typeof collectTemplateExpression).toBe('function');

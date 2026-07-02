@@ -25,6 +25,21 @@ export function App() @{
 }
 `;
 
+const styledSource = `
+import { state } from '@markless/core';
+
+export function App() @{
+	let label = state('Hi');
+
+	<section class="card">
+		<style>
+			.card { color: red; }
+		</style>
+		<p>{label}</p>
+	</section>
+}
+`;
+
 const keyedSource = `
 import { state } from '@markless/core';
 
@@ -499,3 +514,17 @@ ${buttons}
 }
 `;
 }
+
+test('transformTsrxModule emits a scoped style virtual CSS module and imports it', async () => {
+	const result = await transformTsrxModule({
+		filename: 'src/StyledCard.tsrx',
+		source: styledSource,
+		buildId: 'test-build',
+	});
+
+	const styleModule = result.virtualModules.find((module) => module.type === 'style');
+	expect(styleModule).toBeDefined();
+	expect(styleModule!.id).toMatch(/^virtual:markless:style:.*\.css$/);
+	expect(styleModule!.source).toMatch(/\.card\.mk-[a-z0-9]+ \{ color: red; \}/);
+	expect(result.code).toContain(`import ${JSON.stringify(styleModule!.id)};`);
+});

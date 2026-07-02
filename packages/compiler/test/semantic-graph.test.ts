@@ -131,6 +131,24 @@ export function App() @{
 }
 `;
 
+const indexedKeyedListSource = `
+import { state } from '@markless/core';
+
+export function App() @{
+	const items = state([]);
+
+	<section>
+		<ul>
+			@for (const item of items; index i; key item.key) {
+				<li>
+					<button onClick={() => console.log(item.key)}>{item.name}</button>
+				</li>
+			}
+		</ul>
+	</section>
+}
+`;
+
 const componentEdgeSource = `
 import { state } from '@markless/core';
 import { Player } from './Player.tsrx';
@@ -389,6 +407,126 @@ test('buildSemanticGraph records keyed repeat structure across alternate host sh
 			keySource: 'item.key',
 			keyPath: ['key'],
 		},
+	]);
+});
+
+test('buildSemanticGraph keeps keyed repeats registered when an index clause is authored', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/IndexedList.tsrx',
+		source: indexedKeyedListSource,
+	});
+	const parent = graph.hostNodes.find((hostNode) => hostNode.tagName === 'ul');
+	const row = graph.hostNodes.find((hostNode) => hostNode.tagName === 'li');
+
+	expect(graph.keyedRepeats).toEqual([
+		{
+			id: 'repeat:0',
+			parentHostNodeId: parent?.id,
+			rowHostNodeId: row?.id,
+			itemName: 'item',
+			indexName: 'i',
+			collectionSource: 'items',
+			collectionGraphNodeId: 'state:items',
+			collectionPath: [],
+			keySource: 'item.key',
+			keyPath: ['key'],
+		},
+	]);
+});
+
+test('buildSemanticGraph recognizes arrow-function components', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/ArrowApp.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export const App = () => @{
+	let count = state(0);
+
+	<main>
+		<button onClick={() => count++}>{count}</button>
+	</main>
+}
+`,
+	});
+
+	expect(graph.components).toEqual([{ name: 'App' }]);
+	expect(graph.diagnostics).toEqual([]);
+	expect(graph.graphBindings).toEqual(
+		expect.arrayContaining([expect.objectContaining({ id: 'state:count', name: 'count' })]),
+	);
+	expect(graph.hostNodes.map((host) => host.tagName)).toEqual(['main', 'button']);
+});
+
+test('buildSemanticGraph diagnoses TSRX submodules as unsupported', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/ServerData.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+module server {
+	export function loadData() {
+		return 'from-server';
+	}
+}
+
+import { loadData } from server;
+
+export function App() @{
+	let label = state('Hi');
+
+	<main>
+		<p>{label}</p>
+	</main>
+}
+`,
+	});
+
+	expect(graph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_SUBMODULE_UNSUPPORTED',
+			severity: 'error',
+			phase: 'semantic-graph',
+			passId: 'tsrx-semantic-graph',
+			primarySpan: expect.objectContaining({ filename: 'src/ServerData.tsrx' }),
+			docsUrl: 'https://markless.dev/errors/MARKLESS_SUBMODULE_UNSUPPORTED',
+		}),
+		expect.objectContaining({
+			code: 'MARKLESS_SUBMODULE_UNSUPPORTED',
+			message: expect.stringContaining('import'),
+		}),
+	]);
+});
+
+test('buildSemanticGraph records branch scopes for @switch cases', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/SwitchScopes.tsrx',
+		source: `
+import { state } from '@markless/core';
+import { Badge } from './Badge.tsrx';
+
+export function App() @{
+	let kind = state('a');
+
+	<section>
+		@switch (kind) {
+			@case 'a': { <Badge label="A" /> }
+			@default: { <Badge label="D" /> }
+		}
+	</section>
+}
+`,
+	});
+
+	expect(graph.componentEdges).toEqual([
+		expect.objectContaining({
+			childComponentName: 'Badge',
+			branchScopeIds: ['branch:0'],
+		}),
+		expect.objectContaining({
+			childComponentName: 'Badge',
+			branchScopeIds: ['branch:1'],
+		}),
 	]);
 });
 
