@@ -238,7 +238,13 @@ export function compareBenchmarkResults(baseline, currentResults) {
 		currentCpu.push(current);
 		baselineCpu.push(previous);
 		const ratio = current / previous;
-		if (ratio > (thresholds.cpuBenchmarkRegressionRatio ?? 1.07)) {
+		// Above the clear threshold the row is outside same-runner noise, so it
+		// fails on its own even when the geomean stays inside its gate.
+		if (ratio > (thresholds.cpuBenchmarkClearRegressionRatio ?? 1.25)) {
+			failures.push(
+				`${key} clearly regressed from ${previous} to ${current} (${formatRatio(ratio)} of baseline).`,
+			);
+		} else if (ratio > (thresholds.cpuBenchmarkRegressionRatio ?? 1.07)) {
 			cpuBenchmarkRegressions.push(
 				`${key} regressed from ${previous} to ${current} (${formatRatio(ratio)} of baseline).`,
 			);
@@ -247,17 +253,20 @@ export function compareBenchmarkResults(baseline, currentResults) {
 
 	const currentGeo = geometricMean(currentCpu);
 	const baselineGeo = geometricMean(baselineCpu);
-	let cpuGeomeanDidNotRegress = false;
+	// Individual CPU rows on shared runners drift by more than the row
+	// threshold even between identical revisions, so row overruns only become
+	// failures when the geomean gate itself fails.
+	let cpuGeomeanWithinThreshold = false;
 	if (currentGeo !== undefined && baselineGeo !== undefined) {
 		const ratio = currentGeo / baselineGeo;
-		cpuGeomeanDidNotRegress = ratio <= 1;
-		if (ratio > (thresholds.cpuGeomeanRegressionRatio ?? 1.03)) {
+		cpuGeomeanWithinThreshold = ratio <= (thresholds.cpuGeomeanRegressionRatio ?? 1.03);
+		if (!cpuGeomeanWithinThreshold) {
 			failures.push(
 				`CPU geomean regressed from ${baselineGeo.toFixed(2)} to ${currentGeo.toFixed(2)} (${formatRatio(ratio)} of baseline).`,
 			);
 		}
 	}
-	if (cpuGeomeanDidNotRegress) warnings.push(...cpuBenchmarkRegressions);
+	if (cpuGeomeanWithinThreshold) warnings.push(...cpuBenchmarkRegressions);
 	else failures.push(...cpuBenchmarkRegressions);
 
 	for (const key of sizeBenchmarks) {
