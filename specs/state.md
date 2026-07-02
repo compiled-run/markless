@@ -1024,6 +1024,12 @@ tests that execute the generated SSR/CSR modules:
   `CsrRenderContainer.root` mount-target decision; dynamic fragment shapes
   stay diagnosed with scoped reasons
 
+Update (same day): the owner ratified all three pending decisions — <style>
+Option A and submodule Option A accepted into `01-tsrx-host-contract.md`, and
+CSR fragment roots now render via mount-target-as-container-root
+(`10-render-architecture.md` "Fragment Root Ownership"); the CSR fragment
+gate is lifted.
+
 Caveats: keyed repeats with `index` reads gate as `ssrOnly` (direct-DOM
 runtime cannot rewrite index text on reorder); async boundaries render the
 @pending branch only (resolved-branch SSR belongs to initial-render awaiting);

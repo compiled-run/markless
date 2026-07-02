@@ -32,6 +32,11 @@ type FakeEvent = {
 	stopPropagation?: () => void;
 };
 
+type FakeFragment = {
+	readonly nodeType: 11;
+	readonly childNodes: FakeElement[];
+};
+
 function element(tagName: string, childNodes: FakeElement[] = []): FakeElement {
 	const node: FakeElement = {
 		nodeType: 1,
@@ -194,6 +199,78 @@ test('render creates a CSR container without payload scripts or the inline resum
 
 	await container.root.listeners[0].listener(event('click', container.root));
 
+	expect(loadedSymbols).toEqual(['symbol:click']);
+	expect(container.graph.read('state:count')).toBe(1);
+});
+
+test('render adopts the mount target as container root for fragment-rooted components', async () => {
+	const header = element('HEADER');
+	const button = element('BUTTON');
+	button.textContent = 'Count 0';
+	const target = element('DIV') as FakeElement & {
+		replaceChildren(...children: Array<FakeElement | FakeFragment>): void;
+	};
+	target.replaceChildren = (...children) => {
+		// Real DOM expands document fragments on insertion.
+		target.childNodes.length = 0;
+		for (const child of children) {
+			if (child.nodeType === 11) {
+				for (const fragmentChild of child.childNodes) {
+					fragmentChild.parentElement = target;
+					target.childNodes.push(fragmentChild);
+				}
+				child.childNodes.length = 0;
+				continue;
+			}
+			child.parentElement = target;
+			target.childNodes.push(child);
+		}
+	};
+	const fragment: FakeFragment = { nodeType: 11, childNodes: [header, button] };
+	const state = createProtocolStatePayload({
+		cells: [{ graphNodeId: 'state:count', name: 'count', valueKind: 'scalar', value: 0 }],
+	});
+	const view: ProtocolViewPayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		// Fragment-relative locators: the compiled CSR module indexes the
+		// fragment children 0..n with no root element in the walk.
+		locators: [
+			{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'header' },
+			{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'button' },
+		],
+		events: [{ hostNodeId: 'h1', eventName: 'click', symbolIds: ['symbol:click'] }],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	const loadedSymbols: string[] = [];
+
+	const container = await render(
+		() => ({
+			root: fragment as unknown as Parameters<typeof render>[0] extends never
+				? never
+				: FakeElement,
+			state,
+			view,
+			loadSymbol(symbolId: string) {
+				loadedSymbols.push(symbolId);
+				return ({ graph }: { graph: { write(input: unknown): void } }) => {
+					graph.write({ graphNodeId: 'state:count', value: 1 });
+				};
+			},
+		}),
+		{ target },
+	);
+
+	// Ratified D3 semantics: the mount target is the container root.
+	expect(container.root).toBe(target);
+	expect(target.childNodes.map((child) => child.tagName)).toEqual(['HEADER', 'BUTTON']);
+	// Delegation lives on the target, and fragment-relative locators were
+	// offset +1 so the second sibling still resolves after adoption.
+	await target.listeners
+		.find((entry) => entry.type === 'click')!
+		.listener(event('click', button));
 	expect(loadedSymbols).toEqual(['symbol:click']);
 	expect(container.graph.read('state:count')).toBe(1);
 });

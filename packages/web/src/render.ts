@@ -71,6 +71,25 @@ export async function render(
 		};
 	}
 
+	// Fragment-rooted components: DOM expands the fragment on mount, so the
+	// runtime must be created AFTER mounting, with the mount target as the
+	// container root (owner-ratified D3 semantics). Fragment-relative locator
+	// indexes shift +1 because the root element joins the dom-order walk —
+	// the same discipline containerScopedView applies for SSR containers.
+	if ((output.root as { readonly nodeType?: number }).nodeType === 11) {
+		mountRoot(options.target, output.root);
+		return await import('./render-csr.ts').then((runtime) =>
+			runtime.renderCsrRuntime({
+				output: {
+					...output,
+					root: options.target as unknown as ResumeDomElement,
+					view: output.view ? offsetElementLocators(output.view, 1) : output.view,
+				},
+				options,
+			}),
+		);
+	}
+
 	const container = await import('./render-csr.ts').then((runtime) =>
 		runtime.renderCsrRuntime({
 			output,
@@ -79,6 +98,16 @@ export async function render(
 	);
 	mountRoot(options.target, output.root);
 	return container;
+}
+
+function offsetElementLocators(view: ProtocolViewPayload, offset: number): ProtocolViewPayload {
+	return {
+		...view,
+		locators: view.locators.map((locator) => ({
+			...locator,
+			index: locator.index + offset,
+		})),
+	};
 }
 
 function startCsrPreload(component: CsrRenderable): void {

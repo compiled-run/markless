@@ -1013,9 +1013,10 @@ export function App() @{
 	});
 
 	expect(result.publicRenderPlan.diagnostics).toEqual([]);
-	// CSR stays gated until the CsrRenderContainer.root decision (T006 D3).
-	expect(result.publicRenderModule.csrModuleSource).toBe('');
+	// Direct module stays off; the standard CSR module renders fragments
+	// (owner-ratified target-as-root semantics).
 	expect(result.publicRenderModule.moduleSource).toBe('');
+	expect(result.publicRenderModule.csrModuleSource).not.toBe('');
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
 	const output = (
 		ssrModule.marklessRenderSsr as () => {
@@ -1034,6 +1035,59 @@ export function App() @{
 		expect.objectContaining({ tagName: 'button', index: 1 }),
 	]);
 	expect(output.view.events).toEqual([expect.objectContaining({ eventName: 'click' })]);
+});
+
+test('compileTsrxModule builds fragment-rooted CSR output as a fragment with child locators', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/FragmentCard.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let count = state(0);
+
+	<>
+		<header>Site</header>
+		<button onClick={() => count++}>{count}</button>
+	</>
+}
+`,
+		symbols: [],
+	});
+
+	const document = {
+		createElement(tagName: string) {
+			return tagName === 'template'
+				? new PublicRenderTestTemplate()
+				: new PublicRenderTestElement(tagName);
+		},
+	};
+	const csrModule = await importPublicRenderTestModule(csrRenderTestModuleSource(result), {
+		document,
+	});
+	const output = (
+		csrModule.marklessRenderCsr as () => {
+			readonly root: {
+				readonly nodeType: number;
+				readonly childNodes: ReadonlyArray<PublicRenderTestElement>;
+			};
+			readonly view: { readonly locators: ReadonlyArray<Record<string, unknown>> };
+		}
+	)();
+
+	// The root is a document fragment holding both sibling roots.
+	expect(output.root.nodeType).toBe(11);
+	expect(
+		output.root.childNodes
+			.filter((child) => child.nodeType === 1)
+			.map((child) => child.tagName),
+	).toEqual(['header', 'button']);
+	// Locators are fragment-relative (no root element in the walk); the web
+	// render() entry offsets them +1 when the mount target becomes the root.
+	expect(output.view.locators).toEqual([
+		expect.objectContaining({ tagName: 'header', index: 0 }),
+		expect.objectContaining({ tagName: 'button', index: 1 }),
+	]);
 });
 
 test('compileTsrxModule renders async boundary anchors with @pending content in SSR html', async () => {

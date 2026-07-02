@@ -18,7 +18,7 @@ their prerequisites exist:
   plan.
 - Server functions / RPC story. See "TSRX Submodule Host Boundary (Decision
   Draft)" below for the submodule-shaped slice of this decision.
-- Scoped `<style>` blocks. See "Scoped Style Blocks (Decision Draft)" below.
+- Scoped `<style>` blocks: ACCEPTED 2026-07-02, see `01-tsrx-host-contract.md`.
 - Devtools (graph visualization).
 - Strict no-inline CSP mode for the resumer, including external bootstrap
   emission, hash/nonce automation beyond caller-provided `renderToString`
@@ -81,7 +81,9 @@ transport or fall back to non-streaming initial render.
 
 ## Scoped Style Blocks (Decision Draft)
 
-Status: awaiting owner decision. TSRX parses `<style>` blocks into CSS AST but
+Status: ACCEPTED (Option A, 2026-07-02) — the accepted contract lives in
+`01-tsrx-host-contract.md` "Scoped style blocks"; this draft is retained for
+the rejected alternatives. TSRX parses `<style>` blocks into CSS AST but
 explicitly leaves scoping semantics to the host. Today the compiler drops
 `<style>` content from rendered HTML and emits
 `MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT`, so authors get a loud signal
@@ -121,7 +123,10 @@ metadata (`style-composition` records across components) stays deferred.
 
 ## TSRX Submodule Host Boundary (Decision Draft)
 
-Status: awaiting owner decision. TSRX parses `module server { ... }` blocks
+Status: ACCEPTED (Option A, 2026-07-02) — the fail-loud diagnostic ships; the
+accepted host behavior lives in `01-tsrx-host-contract.md` "Submodules".
+Option B remains the recorded target semantics. TSRX parses
+`module server { ... }` blocks
 and identifier-source imports (`import { loadData } from server;`), but this
 host defines no boundary semantics. Today the constructs parse as plain
 TypeScript namespaces with no splitting, no diagnostics, and no ledger entry —

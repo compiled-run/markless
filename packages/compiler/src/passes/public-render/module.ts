@@ -29,9 +29,9 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 	const rootComponentName = input.semanticGraph.components[0]?.name;
 	const componentCount = input.semanticGraph.components.length;
 	const root = publicRenderRoot(input, rootComponentName);
-	// Fragment roots are SSR-only until CSR adopts the mount target as the
-	// container root (T006 D3): marklessCsrRootFromHtml would silently mount
-	// only the first sibling via firstElementChild.
+	// Fragment roots use the standard CSR module (root = document fragment;
+	// the web render() entry adopts the mount target as container root per the
+	// ratified D3 decision). The direct module keeps its single-element shape.
 	const isFragmentRoot = !!root && isFragmentNode(root.root);
 	const canUseDirectCsrModule =
 		!!root &&
@@ -49,8 +49,7 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 			})
 		: '';
 	const ssrModuleSource = root ? emitPublicSsrRenderModule(input, root) : '';
-	const csrModuleSource =
-		!moduleSource && root && !isFragmentRoot ? emitPublicCsrRenderModule(input, root) : '';
+	const csrModuleSource = !moduleSource && root ? emitPublicCsrRenderModule(input, root) : '';
 	return {
 		passId: 'public-render-module',
 		moduleSource,
@@ -103,7 +102,7 @@ function emitPublicCsrRenderModule(
 		...stateLocalLines(input, 'marklessCsrStateValue'),
 		'	const marklessCsrRuntimeState = { graph: null };',
 		'	const marklessCsrChildren = [];',
-		`	const root = marklessCsrRootFromHtml(${emitHtmlNode(rootInfo.root, renderContext)});`,
+		`	const root = ${isFragmentNode(rootInfo.root) ? 'marklessCsrFragmentFromHtml' : 'marklessCsrRootFromHtml'}(${emitHtmlNode(rootInfo.root, renderContext)});`,
 		...renderContext.childReplacements,
 		...propEvents.map(
 			(event) =>
@@ -139,6 +138,7 @@ function emitPublicCsrRenderModule(
 		'	}',
 		'}',
 		'function marklessCsrStateValue(graphNodeId) { return marklessCsrStateValues.get(graphNodeId); }',
+		'function marklessCsrFragmentFromHtml(html) { const template = document.createElement("template"); template.innerHTML = html; return template.content; }',
 		'function marklessCsrRootFromHtml(html) { const template = document.createElement("template"); template.innerHTML = html; const root = template.content.firstElementChild; if (!root) throw new Error("Markless CSR template did not create a root element."); return root; }',
 		'function marklessCsrRenderChild(component, props) { return component?.renderCsr?.(props); }',
 		'function marklessCsrReplaceChild(root, index, child) { const placeholder = root.querySelector?.(`[data-markless-csr-child="${index}"]`); if (placeholder && child) placeholder.replaceWith(child); else placeholder?.remove?.(); }',
