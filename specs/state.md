@@ -993,6 +993,44 @@ in the split specs.
   have no delivery channel beyond unit tests until an SSR/render consumer
   exists.
 
+### TSRX Construct Rendering Tranches (2026-07-02)
+
+Commits 584000e, 04e2c2e, 5f4cef8, 567343d, 1aaa259 on `tsrx-advanced` add
+public-render support, all landed test-first with behavioral compile-module
+tests that execute the generated SSR/CSR modules:
+
+- spread attributes (merged-object emission, event/attach/el keys skipped),
+  @for SSR row emission with dom-order locator shifting, @for `index` clause
+  collection, and fail-loud `MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT` /
+  `MARKLESS_PUBLIC_RENDER_ROOT_UNSUPPORTED` diagnostics for constructs the
+  emitter cannot render
+- @switch/@case/@default rendering (discriminant bound once in an IIFE ternary
+  chain; per-case branch scope IDs like @if) in SSR and CSR string paths
+- @for @empty rendering (SSR zero-iteration thunk; CSR string path) restricted
+  to plain-host content
+- dynamic `<{expr}>` tags behind a runtime regex tag-name gate (nullish
+  renders nothing, invalid names throw `MARKLESS_DYNAMIC_TAG_INVALID`)
+- component discovery widened to arrow-function/function-expression
+  declarations with `@{}` bodies and function-body-level `return <element>`
+  roots (host decision recorded in `getComponentFunction`); fragment returns
+  stay diagnosed
+- @try/@pending/@catch: plan-level `asyncBoundaryGates` (top-level,
+  non-conditional, plain-host @pending only); SSR emits
+  `<!--markless:async:boundary:N-->` anchors with the @pending branch between
+  them; packages/web tests pin flat comment-index alignment and range
+  replacement
+- fragment roots: plain-host-only fragments plan and render in SSR with
+  contiguous sibling locators; CSR/direct paths gated off pending the
+  `CsrRenderContainer.root` mount-target decision; dynamic fragment shapes
+  stay diagnosed with scoped reasons
+
+Caveats: keyed repeats with `index` reads gate as `ssrOnly` (direct-DOM
+runtime cannot rewrite index text on reorder); async boundaries render the
+@pending branch only (resolved-branch SSR belongs to initial-render awaiting);
+CSR fragment rendering is blocked on the owner's `CsrRenderContainer.root`
+semantics decision; `<style>` and TSRX submodules have decision drafts in
+`specs/framework/08-deferred-decisions.md` awaiting owner review.
+
 ## Remaining Major Work
 
 - Continue state-lvalue coverage beyond the current focused cases, including
@@ -1018,19 +1056,19 @@ in the split specs.
   emitted DOM update chunks from the current symbol module artifact, broader
   event write module emission, behavior and async-runner module emission, and
   generated DOM operation wiring for those DOM updates.
-- Implement TSRX control-flow identity support beyond the current generic AST
-  walk, including keyed loop scope records, positional/unkeyed loop diagnostics
-  for stateful or interactive bodies, branch-local graph scope records, branch
-  disposal diagnostics, branch/list payload locators, and runtime disposal of
+- Implement TSRX control-flow identity support beyond the current branch-scope
+  records for @if/@switch and keyed repeat records, including positional/unkeyed
+  loop diagnostics for stateful or interactive bodies, branch disposal
+  diagnostics, branch/list payload locators, and runtime disposal of
   branch/list-owned graph state, DOM updates, events, async work, and behaviors.
 - Implement children/projection support beyond current prop aliases, including
   opaque projection artifacts, projection-site payload metadata, pass-through and
   wrapping behavior, disposal semantics, and diagnostics for inspecting, mapping,
   cloning, counting, or mutating `children`.
-- Implement TSRX dynamic tag/component and scoped-style handling beyond current
-  static tag-name collection, including dynamic `<{expr}>` artifacts,
-  host/component ownership decisions, style-scope and style-composition records,
-  payload/runtime metadata, and focused diagnostics.
+- Extend dynamic tag support beyond the current render-time tag gate (host
+  records for events/attach/el on dynamic elements), and implement scoped-style
+  handling once the `<style>` decision draft in
+  `specs/framework/08-deferred-decisions.md` is accepted.
 - Implement authored template-comment and statement-container lexical-scope
   support beyond current generic AST traversal, including preservation or skip
   rules for authored comments, comment-aware locator planning, statement-scope
