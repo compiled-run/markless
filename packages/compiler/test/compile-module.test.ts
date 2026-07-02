@@ -950,6 +950,48 @@ export function App() @{
 	);
 });
 
+test('compileTsrxModule renders fragment-rooted components in SSR html', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/FragmentCard.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let count = state(0);
+
+	<>
+		<header>Site</header>
+		<button onClick={() => count++}>{count}</button>
+	</>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.diagnostics).toEqual([]);
+	// CSR stays gated until the CsrRenderContainer.root decision (T006 D3).
+	expect(result.publicRenderModule.csrModuleSource).toBe('');
+	expect(result.publicRenderModule.moduleSource).toBe('');
+	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	const output = (
+		ssrModule.marklessRenderSsr as () => {
+			readonly html: string;
+			readonly view: {
+				readonly locators: ReadonlyArray<Record<string, unknown>>;
+				readonly events: ReadonlyArray<Record<string, unknown>>;
+			};
+		}
+	)();
+
+	expect(output.html).toBe('<header>Site</header><button>0</button>');
+	// Sibling roots take flat contiguous dom-order slots.
+	expect(output.view.locators).toEqual([
+		expect.objectContaining({ tagName: 'header', index: 0 }),
+		expect.objectContaining({ tagName: 'button', index: 1 }),
+	]);
+	expect(output.view.events).toEqual([expect.objectContaining({ eventName: 'click' })]);
+});
+
 test('compileTsrxModule renders async boundary anchors with @pending content in SSR html', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/AsyncCard.tsrx',

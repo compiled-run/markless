@@ -29,8 +29,15 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 	const rootComponentName = input.semanticGraph.components[0]?.name;
 	const componentCount = input.semanticGraph.components.length;
 	const root = publicRenderRoot(input, rootComponentName);
+	// Fragment roots are SSR-only until CSR adopts the mount target as the
+	// container root (T006 D3): marklessCsrRootFromHtml would silently mount
+	// only the first sibling via firstElementChild.
+	const isFragmentRoot = !!root && isFragmentNode(root.root);
 	const canUseDirectCsrModule =
-		!!root && root.propNames.length === 0 && input.semanticGraph.componentEdges.length === 0;
+		!!root &&
+		!isFragmentRoot &&
+		root.propNames.length === 0 &&
+		input.semanticGraph.componentEdges.length === 0;
 	const moduleSource = canUseDirectCsrModule
 		? emitDirectPublicRenderModule({
 				componentName: rootComponentName,
@@ -42,7 +49,8 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 			})
 		: '';
 	const ssrModuleSource = root ? emitPublicSsrRenderModule(input, root) : '';
-	const csrModuleSource = !moduleSource && root ? emitPublicCsrRenderModule(input, root) : '';
+	const csrModuleSource =
+		!moduleSource && root && !isFragmentRoot ? emitPublicCsrRenderModule(input, root) : '';
 	return {
 		passId: 'public-render-module',
 		moduleSource,
@@ -942,7 +950,14 @@ function collectCsrPropEvents(
 	}> = [];
 
 	const visit = (node: AnyNode, path: ReadonlyArray<number>): void => {
-		if (node.type !== 'Element' && node.type !== 'JSXElement') return;
+		if (
+			node.type !== 'Element' &&
+			node.type !== 'JSXElement' &&
+			node.type !== 'Fragment' &&
+			node.type !== 'JSXFragment'
+		) {
+			return;
+		}
 
 		const tagName = getElementTagName(node);
 		if (tagName && isHostTagName(tagName)) {
@@ -1011,16 +1026,39 @@ function firstComponentRoot(component: AnyNode | undefined): AnyNode | null {
 
 	for (const child of childNodes(body)) {
 		if (child.type === 'Element' || child.type === 'JSXElement') return child;
+		if (child.type === 'Fragment' || child.type === 'JSXFragment') {
+			return supportedFragmentRoot(child);
+		}
 		// TSRX allows `return <element>;` at the function-body level of @{...}.
 		if (child.type === 'ReturnStatement') {
 			const argument = child.argument as AnyNode | undefined;
 			if (argument && (argument.type === 'Element' || argument.type === 'JSXElement')) {
 				return argument;
 			}
+			if (argument && (argument.type === 'Fragment' || argument.type === 'JSXFragment')) {
+				return supportedFragmentRoot(argument);
+			}
 		}
 	}
 
 	return null;
+}
+
+// Mirrors the plan pass gate: only all-plain-host fragment roots render.
+function supportedFragmentRoot(fragment: AnyNode): AnyNode | null {
+	const children = asNodes(fragment.children).filter((child) => !isIgnorableTextNode(child));
+	const supported =
+		children.length > 0 &&
+		children.every(
+			(child) =>
+				(child.type === 'Element' || child.type === 'JSXElement') &&
+				isPlainHostTemplateNode(child),
+		);
+	return supported ? fragment : null;
+}
+
+function isFragmentNode(node: AnyNode | undefined): boolean {
+	return node?.type === 'Fragment' || node?.type === 'JSXFragment';
 }
 
 function findComponent(ast: AnyNode, name: string | undefined): AnyNode | undefined {

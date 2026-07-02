@@ -461,6 +461,46 @@ test('renderToString emits an SSR container and omits the resumer for static out
 	expect(html).not.toContain('data-async-resumer');
 });
 
+test('renderToString keeps fragment sibling roots as direct container children and offsets their locators', () => {
+	const html = renderToString({
+		renderSsr: () => ({
+			html: '<header>Site</header><button type="button">0</button>',
+			state: createProtocolStatePayload({ cells: [] }),
+			view: {
+				version: ASYNC_PROTOCOL_VERSION,
+				locators: [
+					{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'header' },
+					{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'button' },
+				],
+				events: [{ hostNodeId: 'h1', eventName: 'click', symbolIds: ['symbol:click'] }],
+				domUpdates: [],
+				behaviors: [],
+				elementHandles: [],
+				asyncBoundaries: [],
+			},
+		}),
+	});
+
+	// Fragment-rooted SSR html is concatenated sibling roots. The container must
+	// keep both siblings as its direct children with no extra wrapper element,
+	// so container-scoped locator indexes stay aligned to the element walk.
+	expect(html).toContain(
+		'<div data-async-container><header>Site</header><button type="button">0</button>',
+	);
+
+	const view = JSON.parse(extractScriptText(html, 'markless/view')) as ProtocolViewPayload;
+
+	// The container div is walk-element 0, so both flat dom-order sibling
+	// locators are offset by +1 (0 -> 1 and 1 -> 2).
+	expect(view.locators).toEqual([
+		{ hostNodeId: 'h0', strategy: 'dom-order', index: 1, tagName: 'header' },
+		{ hostNodeId: 'h1', strategy: 'dom-order', index: 2, tagName: 'button' },
+	]);
+	expect(view.events).toEqual([
+		{ hostNodeId: 'h1', eventName: 'click', symbolIds: ['symbol:click'] },
+	]);
+});
+
 test('renderToString keeps async boundary anchors as the only comments in document order', () => {
 	const html = renderToString(
 		() => ({

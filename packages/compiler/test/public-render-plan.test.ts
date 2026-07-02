@@ -246,10 +246,28 @@ test('planPublicRender keeps conditional async boundaries gated and diagnosed', 
 	]);
 });
 
-test('planPublicRender reports a fragment component root instead of planning nothing', async () => {
+test('planPublicRender plans plain host-element fragment roots', async () => {
 	const { plan } = await createRenderPlan(
 		'src/FragmentRoot.tsrx',
-		appSource(`<><p>One</p><p>Two</p></>`),
+		appSource(`let label = state('Hi');
+<><header>{label}</header><p>Two</p></>`),
+	);
+
+	expect(plan.rootTemplateHtml).toBe('<header> </header><p>Two</p>');
+	expect(plan.diagnostics).toEqual([]);
+	expect(plan.staticHostLocators).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({ tagName: 'header', hostPath: [0] }),
+			expect.objectContaining({ tagName: 'p', hostPath: [1] }),
+		]),
+	);
+});
+
+test('planPublicRender keeps dynamic fragment roots diagnosed with a scoped reason', async () => {
+	const { plan } = await createRenderPlan(
+		'src/DynamicFragmentRoot.tsrx',
+		appSource(`let label = state('Hi');
+<>@if (label) { <p>A</p> }</>`),
 	);
 
 	expect(plan.rootTemplateHtml).toBe(null);
@@ -259,7 +277,8 @@ test('planPublicRender reports a fragment component root instead of planning not
 			severity: 'error',
 			phase: 'public-render',
 			passId: 'public-render-plan',
-			primarySpan: expect.objectContaining({ filename: 'src/FragmentRoot.tsrx' }),
+			message: expect.stringContaining('control-flow'),
+			primarySpan: expect.objectContaining({ filename: 'src/DynamicFragmentRoot.tsrx' }),
 		}),
 	]);
 });

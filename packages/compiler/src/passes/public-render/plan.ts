@@ -431,14 +431,18 @@ function componentRootDiagnostics(ast: AnyNode, filename: string) {
 					)),
 		);
 		if (fragment) {
+			const fragmentNode =
+				fragment.type === 'ReturnStatement'
+					? ((fragment.argument as AnyNode | undefined) ?? fragment)
+					: fragment;
+			if (supportedFragmentRoot(fragmentNode)) continue;
 			return [
 				unsupportedRenderRootDiagnostic({
-					message:
-						'Fragment-rooted components render nothing because the public render path needs one host or component element as the root.',
-					node: fragment,
+					message: `Fragment roots render only when every top-level child is a plain host element; this fragment has a ${unsupportedFragmentChildKind(fragmentNode)}, which needs the dynamic fragment anchor work.`,
+					node: fragmentNode,
 					filename,
 					suggestion:
-						'Wrap the fragment children in a single host element such as <div> or <section>.',
+						'Wrap the fragment children in a single host element such as <div> or <section>, or keep top-level children to plain host elements.',
 				}),
 			];
 		}
@@ -898,6 +902,16 @@ function collectHostPaths(
 		}
 	};
 
+	if (root.type === 'Fragment' || root.type === 'JSXFragment') {
+		let rootDomIndex = 0;
+		for (const child of asNodes(root.children)) {
+			if (isIgnorableTextNode(child)) continue;
+			visit(child, [rootDomIndex]);
+			rootDomIndex++;
+		}
+		return hostPathById;
+	}
+
 	visit(root, []);
 	return hostPathById;
 }
@@ -1074,16 +1088,60 @@ function firstComponentRoot(component: AnyNode | undefined): AnyNode | null {
 
 	for (const child of childNodes(body)) {
 		if (child.type === 'Element' || child.type === 'JSXElement') return child;
+		if (child.type === 'Fragment' || child.type === 'JSXFragment') {
+			return supportedFragmentRoot(child);
+		}
 		// TSRX allows `return <element>;` at the function-body level of @{...}.
 		if (child.type === 'ReturnStatement') {
 			const argument = child.argument as AnyNode | undefined;
 			if (argument && (argument.type === 'Element' || argument.type === 'JSXElement')) {
 				return argument;
 			}
+			if (argument && (argument.type === 'Fragment' || argument.type === 'JSXFragment')) {
+				return supportedFragmentRoot(argument);
+			}
 		}
 	}
 
 	return null;
+}
+
+// Fragment roots render only when every top-level child is a plain host
+// element: the SSR container owns the multi-root range, but dynamic children
+// (components, control flow) need the comment-anchor work and stay diagnosed.
+function supportedFragmentRoot(fragment: AnyNode): AnyNode | null {
+	const children = asNodes(fragment.children).filter((child) => !isIgnorableTextNode(child));
+	const supported =
+		children.length > 0 &&
+		children.every(
+			(child) =>
+				(child.type === 'Element' || child.type === 'JSXElement') &&
+				isPlainHostTemplateNode(child),
+		);
+	return supported ? fragment : null;
+}
+
+function unsupportedFragmentChildKind(fragment: AnyNode): string {
+	for (const child of asNodes(fragment.children)) {
+		if (isIgnorableTextNode(child)) continue;
+		if (
+			child.type === 'JSXIfExpression' ||
+			child.type === 'JSXSwitchExpression' ||
+			child.type === 'JSXForExpression' ||
+			child.type === 'JSXTryExpression'
+		) {
+			return 'control-flow child';
+		}
+		if (child.type === 'Element' || child.type === 'JSXElement') {
+			if (!isPlainHostTemplateNode(child)) return 'component or dynamic child';
+			continue;
+		}
+		if (child.type === 'JSXExpressionContainer' || child.type === 'TSRXExpression') {
+			return 'expression child';
+		}
+		return `${String(child.type)} child`;
+	}
+	return 'empty fragment';
 }
 
 function findComponent(ast: AnyNode): AnyNode | undefined {
@@ -1123,6 +1181,12 @@ function staticHtml(
 		if (options.omitForExpressions) return '';
 		const row = singleRowRoot(node);
 		return row ? staticHtml(row, options) : '';
+	}
+
+	if (node.type === 'Fragment' || node.type === 'JSXFragment') {
+		return asNodes(node.children)
+			.map((child) => staticHtml(child, options))
+			.join('');
 	}
 
 	if (node.type !== 'Element' && node.type !== 'JSXElement') return '';

@@ -799,6 +799,63 @@ test('resume runtime dispatches delegated events from nested targets to the owne
 	expect(graph.read('state:count')).toBe(1);
 });
 
+test('resume runtime materializes container-offset fragment sibling roots and dispatches events on the second sibling', async () => {
+	const header = element('HEADER');
+	const button = element('BUTTON');
+	// Container shape produced by renderToString for a fragment-rooted
+	// component: the container div directly holds the concatenated sibling
+	// roots, so the container is walk-element 0 and the siblings are 1 and 2.
+	const root = element('DIV', [header, button]);
+	const graph = createRuntimeGraph({
+		cells: [{ graphNodeId: 'state:count', value: 0 }],
+	});
+	const loadedSymbols: string[] = [];
+	const handledElements: string[] = [];
+
+	const resume = createResumeRuntime({
+		root,
+		graph,
+		view: {
+			locators: [
+				{ hostNodeId: 'h0', strategy: 'dom-order', index: 1, tagName: 'header' },
+				{ hostNodeId: 'h1', strategy: 'dom-order', index: 2, tagName: 'button' },
+			],
+			events: [
+				{
+					hostNodeId: 'h1',
+					eventName: 'click',
+					symbolIds: ['symbol:click'],
+				},
+			],
+			domUpdates: [],
+			behaviors: [],
+			elementHandles: [],
+			asyncBoundaries: [],
+		},
+		loadSymbol(symbolId) {
+			loadedSymbols.push(symbolId);
+			return ({ element: ownerElement, graph: runtimeGraph }) => {
+				handledElements.push(ownerElement.tagName);
+				runtimeGraph.update({
+					graphNodeId: 'state:count',
+					update: (value) => Number(value) + 1,
+				});
+			};
+		},
+	});
+
+	await resume.start();
+
+	expect(resume.getElement('h0')).toBe(header);
+	expect(resume.getElement('h1')).toBe(button);
+
+	await root.listeners[0].listener(event('click', button, ''));
+
+	expect(loadedSymbols).toEqual(['symbol:click']);
+	expect(handledElements).toEqual(['BUTTON']);
+	expect(graph.read('state:count')).toBe(1);
+});
+
 test('resume runtime reports structured errors for mismatched DOM-order locators', () => {
 	const input = element('INPUT');
 	const root = element('SECTION', [input]);
@@ -1838,6 +1895,65 @@ test('resume runtime materializes async boundary comment anchors', async () => {
 			},
 		],
 	});
+});
+
+test('resume runtime indexes fragment sibling elements and async boundary comments independently', async () => {
+	const header = element('HEADER');
+	const button = element('BUTTON');
+	const start = comment('markless:async:boundary:0');
+	const paragraph = element('P');
+	const end = comment('/markless:async:boundary:0');
+	// Fragment container: two plain sibling roots followed by one async
+	// boundary comment pair. The sibling elements precede the comments in
+	// document order, but comment anchors are indexed among comments only
+	// (0 and 1), while elements are indexed among elements only.
+	const root = element('DIV', [header, button, start, paragraph, end]);
+	const graph = createRuntimeGraph({ cells: [] });
+
+	const resume = createResumeRuntime({
+		root,
+		graph,
+		view: {
+			locators: [
+				{ hostNodeId: 'h0', strategy: 'dom-order', index: 1, tagName: 'header' },
+				{ hostNodeId: 'h1', strategy: 'dom-order', index: 2, tagName: 'button' },
+				{ hostNodeId: 'h2', strategy: 'dom-order', index: 3, tagName: 'p' },
+			],
+			events: [],
+			domUpdates: [],
+			behaviors: [],
+			elementHandles: [],
+			asyncBoundaries: [
+				{
+					id: 'boundary:0',
+					startAnchor: { strategy: 'dom-order-comment', index: 0 },
+					endAnchor: { strategy: 'dom-order-comment', index: 1 },
+					asyncReads: [
+						{
+							source: 'details.title',
+							graphNodeId: 'computed:details',
+							path: ['title'],
+							runnerSymbolId: 'symbol:details',
+						},
+					],
+				},
+			],
+		},
+		loadSymbol() {
+			return () => undefined;
+		},
+	});
+
+	await resume.start();
+
+	// Comment anchors are unaffected by the sibling elements before them.
+	expect(resume.getAsyncBoundary('boundary:0')?.startAnchor).toBe(start);
+	expect(resume.getAsyncBoundary('boundary:0')?.endAnchor).toBe(end);
+
+	// Element locators are unaffected by the comment anchors between them.
+	expect(resume.getElement('h0')).toBe(header);
+	expect(resume.getElement('h1')).toBe(button);
+	expect(resume.getElement('h2')).toBe(paragraph);
 });
 
 test('resume runtime emits structural async boundary journal entries without symbol imports', async () => {
