@@ -1,0 +1,17 @@
+{
+	"name": "@fixtures/vite-csr-styles",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "vite",
+		"build": "vite build"
+	},
+	"dependencies": {
+		"@markless/bundler": "workspace:*",
+		"@markless/core": "workspace:*"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"vite": "8.0.16"
+	}
+}
