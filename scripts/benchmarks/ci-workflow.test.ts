@@ -21,12 +21,14 @@ describe('CI benchmark workflow', () => {
 			'run: pnpm bench:jsfb:prepare -- --jsfb-root "$JSFB_ROOT"',
 			fixtureInstall,
 		);
-		expect(fixturePrepare).toBeLessThan(
-			find('- name: Validate baseline Markless benchmark fixture'),
-		);
-		expect(fixturePrepare).toBeLessThan(
-			find('- name: Validate current Markless benchmark fixture'),
-		);
+		const pairedRun = find('- name: Run interleaved baseline/current benchmark pairs');
+		expect(fixturePrepare).toBeLessThan(pairedRun);
+		// The shared fixture is rebuilt per side from that side's revision root,
+		// and baseline/current pairs run back-to-back per benchmark so the guard
+		// compares results from the same runner-speed window.
+		find('MARKLESS_REPO_ROOT="$repo_root" node --input-type=module', pairedRun);
+		find('run_side baseline "$bench" "$MARKLESS_BASE_REPO_ROOT"', pairedRun);
+		find('run_side current "$bench" "$MARKLESS_REPO_ROOT"', pairedRun);
 		expect(workflow).not.toContain('- name: Install baseline Markless benchmark fixture');
 		expect(workflow).not.toContain('- name: Install current Markless benchmark fixture');
 	});

@@ -290,4 +290,104 @@ describe('js-framework-benchmark baseline guard', () => {
 			expect.stringContaining('05_swap1k regressed from 65.5 to 72.5'),
 		]);
 	});
+
+	test('warns for individual CPU row noise while the geomean stays inside its threshold', async () => {
+		const { compareBenchmarkResults } = await loadBenchmarkGuard();
+		const baseline = {
+			thresholds: {
+				cpuGeomeanRegressionRatio: 1.03,
+				cpuBenchmarkRegressionRatio: 1.07,
+			},
+			benchmarks: {
+				cpu: ['01_run1k', '05_swap1k', '06_remove-one-1k', '07_create10k'],
+			},
+			frameworks: {
+				markless: {
+					results: {
+						'01_run1k': 95.1,
+						'05_swap1k': 60.6,
+						'06_remove-one-1k': 41.1,
+						'07_create10k': 1425.8,
+					},
+				},
+			},
+		};
+
+		// Same-runner noise on one small benchmark (+13.9%) while the geomean
+		// only moves ~+2.8% — inside the 1.03 gate. Must warn, not fail.
+		const result = compareBenchmarkResults(baseline, {
+			'01_run1k': 94.8,
+			'05_swap1k': 59.8,
+			'06_remove-one-1k': 46.8,
+			'07_create10k': 1419.4,
+		});
+
+		expect(result.currentCpuGeomean).toBeGreaterThan(result.baselineCpuGeomean);
+		expect(result.currentCpuGeomean / result.baselineCpuGeomean).toBeLessThan(1.03);
+		expect(result.ok).toBe(true);
+		expect(result.failures).toEqual([]);
+		expect(result.warnings).toEqual([
+			expect.stringContaining('06_remove-one-1k regressed from 41.1 to 46.8'),
+		]);
+	});
+
+	test('fails a clear single-benchmark regression even when the geomean stays inside its threshold', async () => {
+		const { compareBenchmarkResults } = await loadBenchmarkGuard();
+		const baseline = {
+			thresholds: {
+				cpuGeomeanRegressionRatio: 1.03,
+				cpuBenchmarkRegressionRatio: 1.07,
+				cpuBenchmarkClearRegressionRatio: 1.25,
+			},
+			benchmarks: {
+				cpu: [
+					'01_run1k',
+					'02_replace1k',
+					'03_update10th1k',
+					'04_select1k',
+					'05_swap1k',
+					'06_remove-one-1k',
+					'07_create10k',
+					'08_create1k-after1k',
+					'09_clear1k',
+				],
+			},
+			frameworks: {
+				markless: {
+					results: {
+						'01_run1k': 95.1,
+						'02_replace1k': 107.2,
+						'03_update10th1k': 57.3,
+						'04_select1k': 22.5,
+						'05_swap1k': 60.6,
+						'06_remove-one-1k': 41.1,
+						'07_create10k': 1425.8,
+						'08_create1k-after1k': 82.4,
+						'09_clear1k': 24.3,
+					},
+				},
+			},
+		};
+
+		// One benchmark clearly regresses (+28%) while the other eight are
+		// flat, so the geomean only moves ~+2.8% — inside the 1.03 gate.
+		// Runner noise tops out well below +25%, so it must fail, not warn.
+		const result = compareBenchmarkResults(baseline, {
+			'01_run1k': 94.8,
+			'02_replace1k': 106.9,
+			'03_update10th1k': 57.2,
+			'04_select1k': 22.4,
+			'05_swap1k': 77.6,
+			'06_remove-one-1k': 41.3,
+			'07_create10k': 1421.6,
+			'08_create1k-after1k': 82.1,
+			'09_clear1k': 24.2,
+		});
+
+		expect(result.currentCpuGeomean / result.baselineCpuGeomean).toBeLessThan(1.03);
+		expect(result.ok).toBe(false);
+		expect(result.failures).toEqual([
+			expect.stringContaining('05_swap1k clearly regressed from 60.6 to 77.6'),
+		]);
+	});
 });
