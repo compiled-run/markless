@@ -1,7 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
 import {
 	MARKLESS_BUNDLE_GRAPH,
-	MARKLESS_MANIFEST_FILE,
 	marklessLib,
 	marklessClient,
 	marklessServer,
@@ -382,22 +381,12 @@ let active = state(true);
 	});
 
 	test('buildStart clears stale virtual modules and transform manifests', async () => {
-		let manifest:
-			| {
-					modules?: unknown[];
-			  }
-			| undefined;
-		const plugin = marklessClient({
-			onManifest: (next) => {
-				manifest = next;
-			},
-		});
+		const plugin = marklessClient();
 
 		callBuildStart(plugin, { cwd: '/workspace/app' });
 		await callTransform(plugin, source, '/workspace/app/src/App.tsrx');
-		const payloadId = `virtual:markless:payload:${encodeURIComponent(
-			'/workspace/app/src/App.tsrx',
-		)}`;
+		const encoded = encodeURIComponent('/workspace/app/src/App.tsrx');
+		const payloadId = `virtual:markless:payload:${encoded}`;
 		const payloadSource = (await callLoad(plugin, `\0${payloadId}`)) as string;
 		expect(payloadSource).toContain('export const state =');
 		expect(payloadSource).not.toContain('export default');
@@ -405,27 +394,30 @@ let active = state(true);
 		callBuildStart(plugin, { cwd: '/workspace/app' });
 		expect(await callLoad(plugin, `\0${payloadId}`)).toBeNull();
 		const emitFile = vi.fn();
-		callGenerateBundle(plugin, {}, emitFile);
-		expect(manifest?.modules).toEqual([]);
-		expect(emittedAsset(emitFile, MARKLESS_MANIFEST_FILE)).toBeUndefined();
+		const symbolId = `virtual:markless:symbol:${encoded}:${encodeURIComponent('symbol:0')}`;
+		callGenerateBundle(
+			plugin,
+			{
+				'build/chunk-0.js': {
+					type: 'chunk',
+					fileName: 'build/chunk-0.js',
+					name: 'chunk-0',
+					code: 'export default {};',
+					exports: ['default'],
+					imports: [],
+					dynamicImports: [],
+					moduleIds: [`\0${symbolId}`],
+					facadeModuleId: `\0${symbolId}`,
+				},
+			},
+			emitFile,
+		);
+		const graph = emittedAsset(emitFile, MARKLESS_BUNDLE_GRAPH);
+		expect(JSON.parse(String(graph?.source))).not.toContain('symbol:0');
 	});
 
-	test('generateBundle emits bundle graph and in-memory manifest metadata from build output', async () => {
-		let manifest:
-			| {
-					version?: number;
-					modules?: Array<{
-						source?: string;
-						symbols?: Array<{ fileName?: string }>;
-					}>;
-					bundleGraphAsset?: string;
-			  }
-			| undefined;
-		const plugin = marklessClient({
-			onManifest: (next) => {
-				manifest = next as never;
-			},
-		});
+	test('generateBundle emits the bundle graph from build output', async () => {
+		const plugin = marklessClient();
 		const emitFile = vi.fn();
 
 		callBuildStart(plugin, { cwd: '/workspace/app' });
@@ -463,19 +455,13 @@ let active = state(true);
 
 		callGenerateBundle(plugin, bundle, emitFile);
 
-		expect(manifest).toMatchObject({
-			version: 1,
-			modules: [expect.objectContaining({ source: '/workspace/app/src/App.tsrx' })],
-		});
-		expect(manifest?.bundleGraphAsset).toBe(MARKLESS_BUNDLE_GRAPH);
-		expect(manifest?.modules[0]?.symbols[0]?.fileName).toMatch(/^chunk-\d+\.js$/);
-		expect(emitFile).toHaveBeenCalledWith(
-			expect.objectContaining({
-				type: 'asset',
-				fileName: MARKLESS_BUNDLE_GRAPH,
-			}),
-		);
-		expect(emittedAsset(emitFile, MARKLESS_MANIFEST_FILE)).toBeUndefined();
+		const graphAsset = emittedAsset(emitFile, MARKLESS_BUNDLE_GRAPH);
+		const graph = JSON.parse(String(graphAsset?.source)) as Array<string | number>;
+		expect(graph).toContain('symbol:0');
+		expect(graph).toContain('symbol:1');
+		expect(
+			graph.some((entry) => typeof entry === 'string' && /^chunk-\d+\.js$/.test(entry)),
+		).toBe(true);
 		const resolverChunk = Object.values(bundle).find(
 			(item): item is { code: string; moduleIds: string[] } =>
 				typeof item === 'object' &&
@@ -488,21 +474,6 @@ let active = state(true);
 		expect(resolverChunk?.code).toContain('if (id === "symbol:0")');
 		expect(resolverChunk?.code).toContain('import(/* @vite-ignore */ "./chunk-');
 		expect(resolverChunk?.code).not.toContain('virtual:markless:symbol:');
-	});
-
-	test('generateBundle emits markless-manifest.json only when explicitly requested', () => {
-		const plugin = marklessClient({ emitManifestJson: true });
-		const emitFile = vi.fn();
-
-		callBuildStart(plugin, { cwd: '/workspace/app' });
-		callGenerateBundle(plugin, {}, emitFile);
-
-		const manifestAsset = emittedAsset(emitFile, MARKLESS_MANIFEST_FILE);
-		expect(manifestAsset).toMatchObject({
-			type: 'asset',
-			fileName: MARKLESS_MANIFEST_FILE,
-		});
-		expect(JSON.parse(String(manifestAsset?.source)).modules).toEqual([]);
 	});
 });
 

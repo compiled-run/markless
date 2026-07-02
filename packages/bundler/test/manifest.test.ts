@@ -4,7 +4,6 @@ import {
 	createPreloadGraphAdder,
 } from '../src/build/bundle-graph.ts';
 import {
-	MARKLESS_MANIFEST_FILE,
 	createBuildMetadata,
 	type MarklessBuildMetadataBundle,
 } from '../src/build/build-metadata.ts';
@@ -93,7 +92,6 @@ describe('markless build metadata output', () => {
 			name: 'bundle-graph.json',
 			size: JSON.stringify(metadata.bundleGraph).length,
 		});
-		expect(MARKLESS_MANIFEST_FILE).toBe('markless-manifest.json');
 		expect(metadata.bundleGraphAsset).toBe(MARKLESS_BUNDLE_GRAPH);
 		expect(metadata.bundleGraph).toContain('root#click');
 		expect(metadata.injections).toContainEqual({

@@ -102,8 +102,8 @@ Four implementation areas:
    generated compact symbol resolver table with finalized chunk specifiers. Any
    manifest-like metadata is for adapters, preload graphs, diagnostics,
    devtools, or cached initial-render fragments; the default browser symbol
-   loading path consumes the resolver table and payload data, not
-   `markless-manifest.json`.
+   loading path consumes the resolver table and payload data, not build
+   metadata files.
 
 Do not split the framework into separate "server" and "client" products or
 packages. The authoring model is one unified render/resume model: CSR render,
@@ -160,7 +160,7 @@ Initial internal production package map:
   symbol extraction, artifact planning, and diagnostics.
 - `packages/bundler` — Qwik-bundler-shaped build package containing the
   Rolldown-first plugin, virtual modules, symbol chunks, compact resolver table
-  finalization, optional manifest/bundle-graph metadata, and Vite adapter
+  finalization, bundle-graph metadata, and Vite adapter
   dev/HMR/HTML integration.
 - `packages/typescript-plugin` — editor language integration for `.tsrx` files.
 - `packages/vitest-browser` — CSR-only Vitest browser-mode support for targeted
@@ -183,7 +183,7 @@ tooling surface, so pnpm scripts should be thin aliases for `vp pack`,
 
 The build architecture is Rolldown-first, not Vite-first. The base Rolldown
 plugin owns compiler transforms, virtual modules, emitted symbol chunks,
-compact resolver table finalization, optional manifest metadata, diagnostics,
+compact resolver table finalization, bundle-graph metadata, diagnostics,
 and browser/initial-render/library build modes. The Vite plugin is an adapter
 that wraps the Rolldown plugin with
 Vite-specific environment detection, dev-server transforms, HMR, HTML/dev-tag
@@ -194,10 +194,10 @@ injection, build orchestration, and public extension APIs. This mirrors the
 Default production JavaScript chunks emitted by the framework build integration
 use neutral bundler vocabulary: client chunks are written under
 `build/chunk-[hash].js`, and server-side non-entry chunks use
-`chunk-[hash].js`. The generated resolver table and any optional
-manifest/bundle-graph metadata carry symbol meaning; production chunk filenames
+`chunk-[hash].js`. The generated resolver table and bundle-graph metadata
+carry symbol meaning; production chunk filenames
 should not expose compiler terms such as symbol kinds. The browser runtime must
-not need `markless-manifest.json` to recover that meaning.
+not need build metadata files to recover that meaning.
 
 Build scripts and production optimization must go through Rolldown or Vite.
 Do not add standalone esbuild, terser, Rollup, SWC, webpack, Babel build
@@ -228,7 +228,7 @@ The implementation rules are:
 - generated code uses standard ESM and `import()`; the symbol resolver receives
   already-normalized URLs/specifiers from build integration's finalized resolver
   table/bundle metadata rather than doing environment-specific path math at
-  runtime or parsing `markless-manifest.json` in browser startup
+  runtime or parsing build metadata in browser startup
 - Node/Vite/Rolldown-specific behavior lives only in adapter packages or clearly
   isolated integration modules, never in the semantic compiler/runtime core
 

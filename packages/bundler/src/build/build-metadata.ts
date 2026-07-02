@@ -10,8 +10,6 @@ import type {
 import { convertManifestToBundleGraph } from './bundle-graph.ts';
 import { collectHeadLinkInjections } from './head-links.ts';
 
-export const MARKLESS_MANIFEST_FILE = 'markless-manifest.json';
-
 export type MarklessBuildMetadataBundle = Record<string, MarklessBuildMetadataBundleItem>;
 
 export type MarklessBuildMetadataBundleItem =
@@ -121,8 +119,6 @@ export function createBuildMetadata(
 
 	return metadata;
 }
-
-export const createManifest = createBuildMetadata;
 
 function cloneTransformManifest(manifest: MarklessTransformManifest): MarklessTransformManifest {
 	return {

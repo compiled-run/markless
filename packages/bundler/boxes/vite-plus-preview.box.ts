@@ -4,7 +4,6 @@ import { box } from '@async/witness';
 // vite-plus config, matching the repo's preferred tooling surface.
 const FIXTURE = 'fixtures/vite-plus';
 const INDEX = `${FIXTURE}/dist/index.html`;
-const MANIFEST = `${FIXTURE}/dist/markless-manifest.json`;
 const BUNDLE_GRAPH = `${FIXTURE}/dist/build/bundle-graph.json`;
 const DASHBOARD = '[data-dashboard]';
 const WAIT = { timeoutMs: 10_000 };
@@ -26,7 +25,6 @@ export default box(
 
 		await expect.build.environment(build, 'client');
 		await expect.build.artifact(build, INDEX);
-		assertBuildDoesNotInclude(build, MANIFEST);
 		await expect.build.artifact(build, BUNDLE_GRAPH);
 		await expect.artifact.text(build, INDEX, { contains: '/build/chunk-' });
 		await expect.artifact.json(await build.artifact(BUNDLE_GRAPH), (json) => {
@@ -48,12 +46,3 @@ export default box(
 		await receipt.capture('vite-plus preview loaded markless output');
 	},
 );
-
-function assertBuildDoesNotInclude(
-	build: { readonly artifacts: readonly { readonly path: string }[] },
-	path: string,
-): void {
-	if (build.artifacts.some((artifact) => artifact.path === path)) {
-		throw new Error(`Expected production build not to emit ${path}.`);
-	}
-}

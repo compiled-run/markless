@@ -280,9 +280,9 @@ closures. The build integration finalizes module URL/specifier entries after
 chunk emission, then the browser receives only the resolver table needed for the
 current build or page, plus enough build/protocol identity to fail closed if
 `markless/view` references a symbol the resolver does not know. The default
-browser runtime must not fetch or parse `markless-manifest.json` to discover
-symbol chunks. If a manifest is emitted, it is build/tooling/adapter metadata,
-not the runtime symbol-loading primitive.
+browser runtime must not fetch or parse build metadata such as the bundle
+graph to discover symbol chunks; that output is build/tooling/adapter
+metadata, not the runtime symbol-loading primitive.
 
 The same resolver path is used for event handlers, DOM update symbols,
 `attach={...}` behavior symbols, async computed run functions, and other lazy

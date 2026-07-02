@@ -980,6 +980,18 @@ in the split specs.
   virtual modules plus accumulated transform manifests before a new build/dev
   cycle, so stale virtual modules do not resolve/load and no stale manifest
   metadata or opt-in manifest asset is emitted after cleanup.
+- The opt-in `markless-manifest.json` asset with its `emitManifestJson` option,
+  the `onManifest` in-memory manifest callback, and the Vite plugin's
+  `api.getManifest()` accessor were removed as unused surface with no in-repo
+  consumer. `createBuildMetadata` still runs on every client build to derive
+  `build/bundle-graph.json`, injected head links, and finalized resolver rows;
+  bundler tests and boxes now observe that behavior through the emitted
+  bundle-graph asset and injected HTML instead of a manifest callback. Earlier
+  ledger entries mentioning the manifest asset or these hooks describe behavior
+  that predates this removal. Caveat: stylesheet head-link injection records
+  (`collectHeadLinkInjections` output on build metadata `injections`) currently
+  have no delivery channel beyond unit tests until an SSR/render consumer
+  exists.
 
 ## Remaining Major Work
 

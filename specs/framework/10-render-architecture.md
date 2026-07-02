@@ -141,7 +141,7 @@ On startup, the inline resumer must not:
 - run event handlers
 - run behavior symbols
 - run async runner symbols
-- parse `markless-manifest.json`
+- parse build metadata
 - scan event attributes
 - plan symbols from DOM
 - diff or reconcile DOM
@@ -186,9 +186,8 @@ details. They must not appear in app code or app config as `entry-client`,
 `?resume`, or manual resume-module imports.
 
 The default browser resume path consumes container payload data and generated
-resolver metadata. It must not require `markless-manifest.json` at browser startup.
-Optional manifests and bundle graphs remain build/test/preload/devtools
-artifacts.
+resolver metadata. It must not require build metadata at browser startup.
+Bundle graphs remain build/test/preload/devtools artifacts.
 
 ## Preload Architecture
 

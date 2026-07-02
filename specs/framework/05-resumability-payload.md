@@ -137,9 +137,9 @@ inside those scripts are private render/resume protocol.
 
 Symbol URL/export metadata for browser resume is carried by a generated compact
 resolver table or equivalent payload-adjacent module code. The default resumer
-must not fetch or parse `markless-manifest.json` to discover chunks or exports. If
-`markless-manifest.json` is emitted, it is optional build/tooling/preload/devtools
-or adapter metadata and must be unnecessary for the default browser startup and
+must not fetch or parse build metadata such as the bundle graph to discover
+chunks or exports; that output is build/tooling/preload/devtools or adapter
+metadata and must be unnecessary for the default browser startup and
 symbol-loading path.
 
 The SSR container also includes a tiny inline or module resumer bootstrap. That

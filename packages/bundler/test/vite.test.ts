@@ -53,14 +53,17 @@ describe('Vite adapter structure', () => {
 		expect(plugin.name).toBe('vite-plugin-markless');
 		expect(plugin.enforce).toBe('post');
 		expect(plugin.sharedDuringBuild).toBe(true);
-		expect(plugin.api?.getManifest()).toBe(null);
 		expect(plugin.api?.registerBundleGraphAdder).toEqual(expect.any(Function));
 		expect(plugin.api?.registerPreloadGraphEntries).toEqual(expect.any(Function));
 		expect(plugin.api?.registerDevInjection).toEqual(expect.any(Function));
 	});
 
-	test('uses sharedDuringBuild closure to expose the client manifest to same-build consumers', async () => {
+	test('applies the Vite base to head links injected into built HTML', async () => {
 		const plugin = getAsyncPlugin();
+		const encoded = encodeURIComponent('/workspace/app/src/App.tsrx');
+		const symbolId = (name: string) =>
+			`\0virtual:markless:symbol:${encoded}:${encodeURIComponent(name)}`;
+		const html = { type: 'asset', fileName: 'index.html', source: '<head></head>' };
 
 		callConfigResolved(plugin, {
 			base: '/docs/',
@@ -76,27 +79,30 @@ describe('Vite adapter structure', () => {
 		callGenerateBundle(
 			plugin,
 			{
-				'build/chunk-payload.js': {
-					type: 'chunk',
-					fileName: 'build/chunk-payload.js',
-					name: 'chunk-payload',
-					code: 'export default {};',
-					exports: ['default'],
-					imports: [],
-					dynamicImports: [],
-					moduleIds: ['\0virtual:markless:payload:%2Fworkspace%2Fapp%2Fsrc%2FApp.tsrx'],
-					facadeModuleId:
-						'\0virtual:markless:payload:%2Fworkspace%2Fapp%2Fsrc%2FApp.tsrx',
-				},
+				'index.html': html,
+				...Object.fromEntries(
+					['symbol:0', 'symbol:1'].map((name, index) => [
+						`build/chunk-${index}.js`,
+						{
+							type: 'chunk',
+							fileName: `build/chunk-${index}.js`,
+							name: `chunk-${index}`,
+							code: 'export default {};',
+							exports: ['default'],
+							imports: [],
+							dynamicImports: [],
+							moduleIds: [symbolId(name)],
+							facadeModuleId: symbolId(name),
+						},
+					]),
+				),
 			},
 			vi.fn(),
 			createViteHookContext('client'),
 		);
 
-		expect(plugin.api?.getManifest()).toMatchObject({
-			version: 1,
-			modules: [expect.objectContaining({ source: '/workspace/app/src/App.tsrx' })],
-		});
+		expect(html.source).toContain('rel="modulepreload"');
+		expect(html.source).toContain('href="/docs/build/chunk-');
 	});
 
 	test('prebuilds the configured client and server environments once', async () => {
@@ -363,7 +369,6 @@ export function App() @{
 function getAsyncPlugin() {
 	return getPlugin(markless(), 'vite-plugin-markless') as ReturnType<typeof markless>[number] & {
 		api?: {
-			getManifest: () => unknown;
 			registerBundleGraphAdder: (adder: () => Record<string, never>) => void;
 			registerDevInjection: (injection: unknown) => void;
 			registerPreloadGraphEntries: (adder: () => Record<string, never>) => void;

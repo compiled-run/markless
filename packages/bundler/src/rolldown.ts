@@ -1,11 +1,7 @@
 import type { InputOptions, Plugin } from 'rolldown';
 import { isAbsolute, relative, resolve } from 'pathe';
 import { joinURL, parsePath, withQuery, withoutLeadingSlash } from 'ufo';
-import {
-	MARKLESS_MANIFEST_FILE,
-	type MarklessBuildMetadataBundle,
-	createBuildMetadata,
-} from './build/build-metadata.ts';
+import { type MarklessBuildMetadataBundle, createBuildMetadata } from './build/build-metadata.ts';
 import { MARKLESS_BUILD_PREFIX, MARKLESS_BUNDLE_GRAPH, outputDefaults } from './build/chunking.ts';
 import { collectModulePreloadInjections, injectHeadLinks } from './build/head-links.ts';
 import { stripEmptyVitePreloadWrappers } from './build/preload-cleanup.ts';
@@ -235,7 +231,6 @@ export function createMarklessRolldownPlugin(input: {
 						injections: internalOptions.devInjections,
 					},
 				);
-				internalOptions.onManifest?.(clientManifest);
 
 				injectHeadLinks(
 					bundle,
@@ -249,13 +244,6 @@ export function createMarklessRolldownPlugin(input: {
 					fileName: MARKLESS_BUNDLE_GRAPH,
 					source: JSON.stringify(clientManifest.bundleGraph),
 				});
-				if (internalOptions.emitManifestJson === true) {
-					this.emitFile({
-						type: 'asset',
-						fileName: MARKLESS_MANIFEST_FILE,
-						source: JSON.stringify(clientManifest, null, '\t'),
-					});
-				}
 			},
 		},
 	} satisfies Plugin & { api: MarklessRolldownPluginApi };
@@ -462,11 +450,7 @@ function pathname(id: string) {
 }
 
 export { MARKLESS_BUNDLE_GRAPH, MARKLESS_BUILD_PREFIX, outputDefaults } from './build/chunking.ts';
-export {
-	MARKLESS_MANIFEST_FILE,
-	createBuildMetadata,
-	createBuildMetadata as createManifest,
-} from './build/build-metadata.ts';
+export { createBuildMetadata } from './build/build-metadata.ts';
 export { convertManifestToBundleGraph, createPreloadGraphAdder } from './build/bundle-graph.ts';
 export { collectHeadLinkInjections } from './build/head-links.ts';
 export { MARKLESS_VIRTUAL_PREFIX, transformTsrxModule } from './transform.ts';

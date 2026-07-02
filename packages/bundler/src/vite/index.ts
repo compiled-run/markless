@@ -17,7 +17,6 @@ import {
 	type GlobalInjections,
 	type PreloadGraphEntriesAdder,
 	type MarklessEnvironment,
-	type MarklessManifest,
 	type MarklessRolldownOptions,
 } from '../types.ts';
 import { createDevTags } from './dev-tags.ts';
@@ -55,16 +54,11 @@ const MARKLESS_SKIP_DUPLICATE_BUILDS = Symbol('markless-skip-duplicate-builds');
 const TSRX_INPUT_FILE = /\.tsrx(?:[?#].*)?$/;
 
 export function markless(options: MarklessViteOptions = {}): Plugin[] {
-	let manifest: MarklessManifest | null = null;
 	let command: 'build' | 'serve' = 'build';
 	const bundleGraphAdders = new Set<BundleGraphAdder>();
 	const transformedTsrxSources = new Map<string, string>();
 	const rolldownOptions: InternalMarklessRolldownOptions = { ...options };
 	rolldownOptions.bundleGraphAdders = bundleGraphAdders;
-	rolldownOptions.onManifest = (nextManifest) => {
-		manifest = nextManifest;
-		options.onManifest?.(nextManifest);
-	};
 	const hmrOptions = {
 		base: '/',
 		clientEnvironment: viteEnvironmentName('client', options),
@@ -89,7 +83,6 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 		sharedDuringBuild: true,
 		api: {
 			...basePlugin.api,
-			getManifest: () => manifest,
 			registerBundleGraphAdder: (adder: BundleGraphAdder) => bundleGraphAdders.add(adder),
 			registerDevInjection: (injection: GlobalInjections) => devTags.register(injection),
 			registerPreloadGraphEntries: (adder: PreloadGraphEntriesAdder) =>
@@ -388,7 +381,6 @@ function runHook(hook: unknown, context: unknown, ...args: unknown[]) {
 
 type MarklessVitePluginApi = {
 	invalidateGeneratedModules: (parent: string, environment?: MarklessEnvironment) => string[];
-	getManifest?: () => MarklessManifest | null;
 	registerBundleGraphAdder?: (adder: BundleGraphAdder) => void;
 	registerDevInjection?: (injection: GlobalInjections) => void;
 	registerPreloadGraphEntries?: (adder: PreloadGraphEntriesAdder) => void;

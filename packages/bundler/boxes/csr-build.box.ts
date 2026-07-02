@@ -3,9 +3,8 @@ import { box } from '@async/witness';
 // Product truth: a production Vite build of the CSR fixture must emit the
 // bundle graph and lazy symbol chunks through the
 // real Vite/Rolldown pipeline. Dev-only HMR wiring must not leak into those
-// production artifacts, and the full markless manifest must not be default output.
+// production artifacts.
 const FIXTURE = 'fixtures/vite-csr';
-const MANIFEST = `${FIXTURE}/dist/markless-manifest.json`;
 const BUNDLE_GRAPH = `${FIXTURE}/dist/build/bundle-graph.json`;
 const INDEX = `${FIXTURE}/dist/index.html`;
 const FORBIDDEN_DEV_STRINGS = [
@@ -17,7 +16,7 @@ const FORBIDDEN_DEV_STRINGS = [
 
 export default box(
 	{
-		name: 'csr build: bundle graph describes tsrx symbols without default manifest',
+		name: 'csr build: bundle graph describes tsrx symbols',
 		tags: ['csr', 'build'],
 		modes: ['build'],
 	},
@@ -32,7 +31,6 @@ export default box(
 
 		await expect.build.environment(build, 'client');
 		await expect.build.artifact(build, INDEX);
-		assertBuildDoesNotInclude(build, MANIFEST);
 		await expect.build.artifact(build, BUNDLE_GRAPH);
 
 		await expect.artifact.json(await build.artifact(BUNDLE_GRAPH), (json) => {
@@ -53,12 +51,3 @@ export default box(
 		await receipt.capture('csr production build artifacts verified');
 	},
 );
-
-function assertBuildDoesNotInclude(
-	build: { readonly artifacts: readonly { readonly path: string }[] },
-	path: string,
-): void {
-	if (build.artifacts.some((artifact) => artifact.path === path)) {
-		throw new Error(`Expected production build not to emit ${path}.`);
-	}
-}

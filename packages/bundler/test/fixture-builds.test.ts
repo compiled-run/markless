@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { access, readFile, rm } from 'node:fs/promises';
+import { readFile, rm } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { resolve } from 'pathe';
 import { beforeAll, describe, expect, test } from 'vitest';
@@ -12,7 +12,6 @@ const fixtures = [
 	{
 		filter: '@fixtures/vite-csr',
 		outputs: ['packages/bundler/fixtures/vite-csr/dist'],
-		forbiddenManifest: 'packages/bundler/fixtures/vite-csr/dist/markless-manifest.json',
 		bundleGraph: 'packages/bundler/fixtures/vite-csr/dist/build/bundle-graph.json',
 		symbols: ['symbol:0', 'symbol:1'],
 		runtimeBudget: {
@@ -31,7 +30,6 @@ const fixtures = [
 	{
 		filter: '@fixtures/vite-ssr',
 		outputs: ['packages/bundler/fixtures/vite-ssr/dist'],
-		forbiddenManifest: 'packages/bundler/fixtures/vite-ssr/dist/markless-manifest.json',
 		bundleGraph: 'packages/bundler/fixtures/vite-ssr/dist/build/bundle-graph.json',
 		symbols: ['symbol:0', 'symbol:1'],
 		runtimeBudget: {
@@ -45,7 +43,6 @@ const fixtures = [
 	{
 		filter: '@fixtures/vite-plus',
 		outputs: ['packages/bundler/fixtures/vite-plus/dist'],
-		forbiddenManifest: 'packages/bundler/fixtures/vite-plus/dist/markless-manifest.json',
 		bundleGraph: 'packages/bundler/fixtures/vite-plus/dist/build/bundle-graph.json',
 		symbols: ['symbol:0'],
 		runtimeBudget: {
@@ -60,8 +57,6 @@ const fixtures = [
 	{
 		filter: '@fixtures/rolldown-basic',
 		outputs: ['packages/bundler/fixtures/rolldown-basic/dist'],
-		forbiddenManifest:
-			'packages/bundler/fixtures/rolldown-basic/dist/client/markless-manifest.json',
 		bundleGraph: 'packages/bundler/fixtures/rolldown-basic/dist/client/build/bundle-graph.json',
 		symbols: ['symbol:0', 'symbol:1'],
 	},
@@ -84,10 +79,6 @@ describe('fixture builds', () => {
 			);
 
 			await execPnpm(['--filter', fixture.filter, 'build']);
-
-			if ('forbiddenManifest' in fixture) {
-				expect(await exists(resolve(root, fixture.forbiddenManifest))).toBe(false);
-			}
 
 			if ('bundleGraph' in fixture) {
 				const graph = JSON.parse(
@@ -129,15 +120,6 @@ describe('fixture builds', () => {
 		}, 120_000);
 	}
 });
-
-async function exists(path: string): Promise<boolean> {
-	try {
-		await access(path);
-		return true;
-	} catch {
-		return false;
-	}
-}
 
 async function readModuleScripts(fileName: string): Promise<string[]> {
 	const html = await readFile(fileName, 'utf8');

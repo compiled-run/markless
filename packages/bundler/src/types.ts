@@ -11,8 +11,6 @@ export interface MarklessRolldownOptions {
 	devServer?: MarklessDevServer;
 	hmr?: boolean;
 	bundleGraphAdders?: Set<BundleGraphAdder>;
-	onManifest?: (manifest: MarklessBuildMetadata) => void;
-	emitManifestJson?: boolean;
 	rootDir?: string;
 	buildId?: string;
 }

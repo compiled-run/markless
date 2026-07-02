@@ -1,12 +1,9 @@
 import type { EnvironmentOptions } from 'vite';
-import { describe, expect, test, vi } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import { markless } from '../src/vite/index.ts';
-import type { MarklessManifest } from '../src/types.ts';
 import {
 	callConfigEnvironment,
-	callConfigResolved,
 	callConfig,
-	callGenerateBundle,
 	callOutputOptions,
 	createViteHookContext,
 	getPlugin,
@@ -225,40 +222,6 @@ describe('Vite config integration', () => {
 			),
 		).toEqual({
 			entryFileNames: '[name].js',
-		});
-	});
-
-	test('uses Vite base for stylesheet manifest injections', () => {
-		let manifest: MarklessManifest | undefined;
-		const plugin = getMarklessPlugin({ onManifest: (next) => (manifest = next) });
-
-		callConfigResolved(plugin, {
-			base: '/docs/',
-			command: 'build',
-			root: '/workspace/app',
-		});
-		callGenerateBundle(
-			plugin,
-			{
-				'assets/root.css': {
-					type: 'asset',
-					fileName: 'assets/root.css',
-					name: 'root.css',
-					names: ['root.css'],
-					source: 'body{}',
-				},
-			},
-			vi.fn(),
-			createViteHookContext('client'),
-		);
-
-		expect(manifest?.injections).toContainEqual({
-			tag: 'link',
-			location: 'head',
-			attributes: {
-				rel: 'stylesheet',
-				href: '/docs/assets/root.css',
-			},
 		});
 	});
 });

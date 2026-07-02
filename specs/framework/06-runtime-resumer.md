@@ -180,7 +180,7 @@ symbol IDs, chunk emission, finalized module URL/specifier tables, feature
 selection, and minified inline source generation. The generated loader source is
 constant-size over compact row data and may use
 `import(/* @vite-ignore */ url)` against finalized chunk specifiers. The resumer
-must not scan event attributes, discover chunks, parse `markless-manifest.json`,
+must not scan event attributes, discover chunks, parse build metadata,
 plan symbols, decode the whole graph, run the DOM journal, start behaviors,
 demand async boundaries, or include visibility/sync-policy code unless the
 container payload needs that feature.
