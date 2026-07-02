@@ -273,6 +273,38 @@ export function attachHostElementRequiredDiagnostic(
 	};
 }
 
+// TSRX parses `module server { ... }` blocks and identifier-source imports,
+// but this host has not implemented server/client splitting. Decision draft:
+// specs/framework/08-deferred-decisions.md "TSRX Submodule Host Boundary".
+export function submoduleUnsupportedDiagnostic(
+	kind: 'module-block' | 'identifier-import',
+	name: string,
+	node: AnyNode,
+	filename: string,
+): SemanticGraphDiagnostic {
+	return {
+		code: 'MARKLESS_SUBMODULE_UNSUPPORTED',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: 'TSRX submodules are not supported by this host yet',
+		message:
+			kind === 'module-block'
+				? `The submodule block "module ${name} { ... }" has no server/client boundary semantics in markless yet; its code runs wherever this module runs.`
+				: `The identifier-source import "import ... from ${name};" has no submodule resolution in markless yet; nothing is split out of the client bundle.`,
+		why: 'TSRX defines submodule syntax but defers boundary semantics to the host. Until markless implements splitting, treating this as supported would silently ship server-intended code to the client.',
+		primarySpan: sourceSpan(node, filename),
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		suggestions: [
+			{
+				message:
+					'Move the code into a separate module with a string import specifier, or wait for the submodule host boundary decision in specs/framework/08-deferred-decisions.md.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_SUBMODULE_UNSUPPORTED',
+	};
+}
+
 export function fallbackSpan(filename: string): SourceSpan {
 	return {
 		filename,

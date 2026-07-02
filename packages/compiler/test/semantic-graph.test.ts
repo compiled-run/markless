@@ -458,6 +458,46 @@ export const App = () => @{
 	expect(graph.hostNodes.map((host) => host.tagName)).toEqual(['main', 'button']);
 });
 
+test('buildSemanticGraph diagnoses TSRX submodules as unsupported', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/ServerData.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+module server {
+	export function loadData() {
+		return 'from-server';
+	}
+}
+
+import { loadData } from server;
+
+export function App() @{
+	let label = state('Hi');
+
+	<main>
+		<p>{label}</p>
+	</main>
+}
+`,
+	});
+
+	expect(graph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_SUBMODULE_UNSUPPORTED',
+			severity: 'error',
+			phase: 'semantic-graph',
+			passId: 'tsrx-semantic-graph',
+			primarySpan: expect.objectContaining({ filename: 'src/ServerData.tsrx' }),
+			docsUrl: 'https://markless.dev/errors/MARKLESS_SUBMODULE_UNSUPPORTED',
+		}),
+		expect.objectContaining({
+			code: 'MARKLESS_SUBMODULE_UNSUPPORTED',
+			message: expect.stringContaining('import'),
+		}),
+	]);
+});
+
 test('buildSemanticGraph records branch scopes for @switch cases', async () => {
 	const graph = await buildSemanticGraph({
 		filename: 'src/SwitchScopes.tsrx',

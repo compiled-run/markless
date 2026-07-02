@@ -1,5 +1,5 @@
 import { parseModule } from '@tsrx/core';
-import { asNodes, childNodes, type AnyNode } from '../../ast/nodes.ts';
+import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import type { SemanticGraphArtifact, SemanticGraphInput } from '../../artifacts.ts';
 import {
 	collectAsyncBoundary,
@@ -23,6 +23,7 @@ import {
 	collectUpdate,
 } from './collect-expressions.ts';
 import { collectModuleScopeGraphCreation } from './collect-module-scope.ts';
+import { submoduleUnsupportedDiagnostic } from './diagnostics.ts';
 import {
 	collectSharedDefinitionDependencies,
 	collectSharedFactoryGraph,
@@ -48,6 +49,7 @@ export async function buildSemanticGraph(
 
 	for (const statement of statements) {
 		collectModuleScopeGraphCreation(statement, state);
+		collectSubmoduleDiagnostics(statement, state);
 	}
 
 	collectSharedDefinitionDependencies(statements, state);
@@ -140,6 +142,38 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 
 	for (const child of childNodes(node)) {
 		walk(child, state);
+	}
+}
+
+// Fail-loud placeholder for TSRX submodules until the host boundary decision
+// in specs/framework/08-deferred-decisions.md is accepted and implemented.
+function collectSubmoduleDiagnostics(statement: AnyNode, state: WalkState): void {
+	const declaration =
+		statement.type === 'ExportNamedDeclaration'
+			? ((statement.declaration as AnyNode | undefined) ?? statement)
+			: statement;
+
+	if (declaration.type === 'TSModuleDeclaration') {
+		const name = getIdentifierName(declaration.id as AnyNode | undefined) ?? 'unknown';
+		state.graph.diagnostics.push(
+			submoduleUnsupportedDiagnostic('module-block', name, declaration, state.filename),
+		);
+		return;
+	}
+
+	if (statement.type === 'ImportDeclaration') {
+		const source = statement.source as AnyNode | undefined;
+		if (source?.type === 'Identifier') {
+			const name = getIdentifierName(source) ?? 'unknown';
+			state.graph.diagnostics.push(
+				submoduleUnsupportedDiagnostic(
+					'identifier-import',
+					name,
+					statement,
+					state.filename,
+				),
+			);
+		}
 	}
 }
 
