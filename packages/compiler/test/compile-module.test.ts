@@ -1138,6 +1138,49 @@ export function App() @{
 	]);
 });
 
+test('compileTsrxModule ships only gate-supported async boundary anchors, re-indexed', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/NestedAsync.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let value = state('ready');
+
+	<section>
+		@try {
+			<div>
+				<p>{value}</p>
+				@try { <em>{value}</em> } @pending { <em>Inner</em> } @catch { <em>Broken</em> }
+			</div>
+		} @pending { <p>Loading</p> } @catch { <p>Broken</p> }
+		<article>
+			@try { <span>{value}</span> } @pending { <span>Later</span> } @catch { <span>Nope</span> }
+		</article>
+	</section>
+}
+`,
+		symbols: [],
+	});
+
+	// Boundary 0 contains boundary 1 (both unsupported: nested); boundary 2 is
+	// inside <article> at the top level of its parent... it is conditional-free
+	// and non-nested, so it gates supported.
+	const supported = result.publicRenderPlan.asyncBoundaryGates.filter((gate) => gate.supported);
+	expect(supported).toHaveLength(1);
+
+	// The runtime payload must ship ONLY anchors that the SSR emitter actually
+	// emits, re-indexed contiguously — otherwise resume throws
+	// missingCommentAnchorError on the phantom records.
+	expect(result.protocolView.asyncBoundaries).toHaveLength(1);
+	expect(result.protocolView.asyncBoundaries[0]).toEqual(
+		expect.objectContaining({
+			startAnchor: expect.objectContaining({ strategy: 'dom-order-comment', index: 0 }),
+			endAnchor: expect.objectContaining({ strategy: 'dom-order-comment', index: 1 }),
+		}),
+	);
+});
+
 test('compileTsrxModule renders async boundary anchors with @pending content in SSR html', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/AsyncCard.tsrx',

@@ -206,6 +206,7 @@ test('planPayloadArena separates graph state from view wiring metadata', async (
 	expect(payload.view.asyncBoundaries).toEqual([
 		{
 			id: 'boundary:0',
+			kind: 'async-boundary',
 			startAnchor: {
 				strategy: 'dom-order-comment',
 				index: 0,

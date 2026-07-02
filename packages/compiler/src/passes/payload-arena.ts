@@ -96,8 +96,11 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 			},
 		];
 	});
+	// First kind of the unified comment-anchor stream; branch anchors join the
+	// same document-order allocator in the branch-reactivity slices.
 	const asyncBoundaries = input.semanticGraph.asyncBoundaries.map((boundary, index) => ({
 		id: boundary.id,
+		kind: 'async-boundary' as const,
 		startAnchor: {
 			strategy: 'dom-order-comment' as const,
 			index: index * 2,

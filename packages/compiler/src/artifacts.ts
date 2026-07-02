@@ -371,6 +371,7 @@ export type PayloadArenaDiagnostic = StateLoweringDiagnostic;
 
 export type PayloadAsyncBoundary = {
 	readonly id: string;
+	readonly kind: 'async-boundary';
 	readonly startAnchor: {
 		readonly strategy: 'dom-order-comment';
 		readonly index: number;
@@ -596,6 +597,7 @@ export type ProtocolStatePayloadInput = {
 export type ProtocolViewPayloadInput = {
 	readonly payloadArena: PayloadArenaArtifact;
 	readonly symbolResolver: SymbolResolverPlan;
+	readonly publicRenderPlan: PublicRenderPlanArtifact;
 };
 
 export type PayloadScriptsInput = {

@@ -53,13 +53,20 @@ export function createProtocolViewPayload(input: ProtocolViewPayloadInput): Prot
 			symbolId: behaviorSymbols.get(behavior.hostNodeId)?.[index],
 		})),
 		elementHandles: input.payloadArena.view.elementHandles,
-		asyncBoundaries: input.payloadArena.view.asyncBoundaries.map((boundary) => ({
-			...boundary,
-			asyncReads: boundary.asyncReads.map((read) => ({
-				...read,
-				runnerSymbolId: asyncRunnerSymbols.get(read.graphNodeId),
-			})),
-		})),
+		// Only gate-supported boundaries have SSR-emitted anchors; shipping
+		// records for ungated boundaries would make resume throw
+		// missingCommentAnchorError. Re-index contiguously over the emitted set.
+		asyncBoundaries: supportedAsyncBoundaries(input).map(
+			({ kind: _kind, ...boundary }, index) => ({
+				...boundary,
+				startAnchor: { ...boundary.startAnchor, index: index * 2 },
+				endAnchor: { ...boundary.endAnchor, index: index * 2 + 1 },
+				asyncReads: boundary.asyncReads.map((read) => ({
+					...read,
+					runnerSymbolId: asyncRunnerSymbols.get(read.graphNodeId),
+				})),
+			}),
+		),
 	};
 }
 
@@ -74,4 +81,13 @@ function domUpdateTargetKey(
 	if (target.kind === 'class')
 		return `class:${target.trueValue ?? ''}:${target.falseValue ?? ''}`;
 	return target.kind;
+}
+
+function supportedAsyncBoundaries(input: ProtocolViewPayloadInput) {
+	const supported = new Set(
+		input.publicRenderPlan.asyncBoundaryGates.flatMap((gate) =>
+			gate.supported ? [gate.boundaryId] : [],
+		),
+	);
+	return input.payloadArena.view.asyncBoundaries.filter((boundary) => supported.has(boundary.id));
 }
