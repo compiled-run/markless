@@ -43,7 +43,6 @@ const VIRTUAL_ENTRY_DIR = VITE_PLUGIN_FILE.endsWith('.ts')
 	? join(dirname(VITE_PLUGIN_FILE), 'entries')
 	: join(dirname(dirname(VITE_PLUGIN_FILE)), 'entries');
 const DEFAULT_WATCH_IGNORES = [
-	'**/.markless/**',
 	'**/.nitro/**',
 	'**/.output/**',
 	'**/node_modules/**',
@@ -279,7 +278,7 @@ function createNitroConfig(
 			},
 			...publicAssets,
 		],
-		routesDir: nitroConfig?.routesDir ?? '.markless/router/nitro-routes',
+		routesDir: nitroConfig?.routesDir ?? '.output/markless/router/nitro-routes',
 		rolldownConfig: withRequestFileBuildPlugin(nitroConfig?.rolldownConfig, root),
 		rollupConfig: withRequestFileBuildPlugin(nitroConfig?.rollupConfig, root),
 		scanDirs: [...new Set(['.', ...scanDirs])],

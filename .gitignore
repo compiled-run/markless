@@ -6,7 +6,6 @@ pnpm-store/
 # Build and test output
 dist/
 coverage/
-.markless/
 .output/
 .output-router-preview/
 .witness/

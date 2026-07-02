@@ -8,7 +8,7 @@ Generated files:
 
 ```txt
 markless-router-env.d.ts
-.markless/router/types/routes.d.ts
+.output/markless/router/types/routes.d.ts
 ```
 
 Generated route types use Markless names:

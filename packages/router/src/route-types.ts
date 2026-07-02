@@ -1,9 +1,9 @@
 import type { RouteManifest, RouteManifestRoute } from './route-manifest.ts';
 
 export const routeTypesEnvPath = 'markless-router-env.d.ts';
-export const routeTypesOutputPath = '.markless/router/types/routes.d.ts';
+export const routeTypesOutputPath = '.output/markless/router/types/routes.d.ts';
 export const routeTypesEnvDeclaration =
-	'/// <reference path="./.markless/router/types/routes.d.ts" />\n';
+	'/// <reference path="./.output/markless/router/types/routes.d.ts" />\n';
 
 export function createRouteTypesDeclaration(manifest: RouteManifest): string {
 	const routes = manifest.routes;

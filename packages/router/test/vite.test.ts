@@ -127,7 +127,7 @@ test('preserves user Nitro config while adding Markless request scanning default
 					include: ['api/**'],
 				},
 			},
-			routesDir: '.markless/router/nitro-routes',
+			routesDir: '.output/markless/router/nitro-routes',
 			publicAssets: [
 				{
 					baseURL: '/assets',
@@ -143,7 +143,7 @@ test('preserves user Nitro config while adding Markless request scanning default
 				followSymlinks: false,
 				ignored: expect.arrayContaining([
 					'**/custom-generated/**',
-					'**/.markless/**',
+					'**/.output/**',
 					'**/node_modules/**',
 				]),
 			},
@@ -153,7 +153,7 @@ test('preserves user Nitro config while adding Markless request scanning default
 				followSymlinks: false,
 				ignored: expect.arrayContaining([
 					'**/custom-generated/**',
-					'**/.markless/**',
+					'**/.output/**',
 					'**/node_modules/**',
 				]),
 			},
