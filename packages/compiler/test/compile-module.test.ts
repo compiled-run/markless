@@ -950,6 +950,50 @@ export function App() @{
 	);
 });
 
+test('compileTsrxModule scopes <style> blocks and renders scope classes in SSR html', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/StyledCard.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let label = state('Hi');
+
+	<section class="card">
+		<style>
+			.card { color: red; }
+			.card h2, .title { font-size: 2rem; }
+		</style>
+		<h2 class="title">{label}</h2>
+		<footer>Done</footer>
+	</section>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.diagnostics).toEqual([]);
+	const styleScope = result.publicRenderPlan.styleScopes[0];
+	expect(styleScope).toEqual(
+		expect.objectContaining({ scopeId: expect.stringMatching(/^mk-[a-z0-9]+$/) }),
+	);
+	const scope = styleScope!.scopeId;
+	// Every selector's subject compound gains the scope class.
+	expect(styleScope!.cssText).toContain(`.card.${scope} { color: red; }`);
+	expect(styleScope!.cssText).toContain(
+		`.card h2.${scope}, .title.${scope} { font-size: 2rem; }`,
+	);
+
+	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	const output = (ssrModule.marklessRenderSsr as () => { readonly html: string })();
+
+	// Host elements gain the scope class; the <style> block itself emits no HTML.
+	expect(output.html).toBe(
+		`<section class="card ${scope}"><h2 class="title ${scope}">Hi</h2><footer class="${scope}">Done</footer></section>`,
+	);
+	expect(output.html).not.toContain('<style');
+});
+
 test('compileTsrxModule renders fragment-rooted components in SSR html', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/FragmentCard.tsrx',

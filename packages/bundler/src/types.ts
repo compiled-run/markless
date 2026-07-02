@@ -15,7 +15,7 @@ export interface MarklessRolldownOptions {
 	buildId?: string;
 }
 
-export type MarklessVirtualModuleType = 'payload' | 'resolver' | 'symbol';
+export type MarklessVirtualModuleType = 'payload' | 'resolver' | 'symbol' | 'style';
 
 export interface MarklessVirtualModule {
 	id: string;

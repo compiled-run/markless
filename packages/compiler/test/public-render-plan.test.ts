@@ -172,10 +172,6 @@ test.each([
 <section><{tag} onClick={() => count++}>Hi</{tag}></section>`),
 	],
 	[
-		'<style>',
-		appSource(`<section class="card"><style>.card { color: red; }</style>Hi</section>`),
-	],
-	[
 		'@try',
 		appSource(
 			`let value = state('ready');

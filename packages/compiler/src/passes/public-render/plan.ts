@@ -26,6 +26,7 @@ import {
 	unsupportedRenderConstructDiagnostic,
 	unsupportedRenderRootDiagnostic,
 } from './diagnostics.ts';
+import { collectStyleScopes } from './style-scopes.ts';
 import type {
 	PayloadKeyedRepeat,
 	PlannedSymbol,
@@ -132,6 +133,7 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 		);
 	}
 
+	const styleScopeCollection = collectStyleScopes(root, input.source.filename);
 	const boundaryNodes = collectAsyncBoundaryNodes(root);
 	const asyncBoundaryGates: PublicRenderPlanAsyncBoundaryGate[] =
 		input.payloadArena.view.asyncBoundaries.map((boundary, index) => {
@@ -202,7 +204,9 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 		repeatGates,
 		keyedRepeats,
 		asyncBoundaryGates,
+		styleScopes: styleScopeCollection.styleScopes,
 		diagnostics: [
+			...styleScopeCollection.diagnostics,
 			...collectUnsupportedConstructDiagnostics(root, input.source.filename),
 			...repeatRenderDiagnostics({
 				componentEdgeCount: input.semanticGraph.componentEdges.length,
@@ -285,6 +289,7 @@ function emptyPlan(
 		repeatGates: [],
 		keyedRepeats: [],
 		asyncBoundaryGates: [],
+		styleScopes: [],
 		diagnostics,
 	};
 }
@@ -295,19 +300,7 @@ function collectUnsupportedConstructDiagnostics(root: AnyNode, filename: string)
 	const diagnostics: ReturnType<typeof unsupportedRenderConstructDiagnostic>[] = [];
 
 	const visit = (node: AnyNode): void => {
-		if (node.type === 'JSXStyleElement') {
-			diagnostics.push(
-				unsupportedRenderConstructDiagnostic({
-					label: '<style>',
-					message:
-						'<style> blocks are dropped from rendered HTML because style scoping is not implemented yet.',
-					node,
-					filename,
-					suggestion:
-						'Move the CSS into an imported stylesheet until <style> scoping lands.',
-				}),
-			);
-		} else if (
+		if (
 			(node.type === 'Element' || node.type === 'JSXElement') &&
 			(node.isDynamic === true || !getElementTagName(node)) &&
 			getElementAttributes(node).some((attribute) => {

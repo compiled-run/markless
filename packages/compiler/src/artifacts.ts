@@ -730,6 +730,7 @@ export type PublicRenderPlanArtifact = {
 	readonly repeatGates: ReadonlyArray<PublicRenderPlanRepeatGate>;
 	readonly keyedRepeats: ReadonlyArray<PublicRenderPlanKeyedRepeat>;
 	readonly asyncBoundaryGates: ReadonlyArray<PublicRenderPlanAsyncBoundaryGate>;
+	readonly styleScopes: ReadonlyArray<{ readonly scopeId: string; readonly cssText: string }>;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
 };
 

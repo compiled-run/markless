@@ -84,6 +84,7 @@ function emitPublicCsrRenderModule(
 		keyedRepeats: input.semanticGraph.keyedRepeats,
 		repeatGates: input.publicRenderPlan.repeatGates,
 		nextRepeatIndex: 0,
+		styleScopeClass: input.publicRenderPlan.styleScopes[0]?.scopeId ?? null,
 		source: input.source.source,
 	};
 	const propEvents = collectCsrPropEvents(rootInfo.root, rootInfo.propNames, input.source.source);
@@ -153,7 +154,7 @@ function emitPublicCsrRenderModule(
 		'function marklessCsrAttribute(name, value) { return ` ${name}="${marklessCsrEscape(value == null ? "" : String(value))}"`; }',
 		'function marklessCsrRepeatRows(items, renderRow, renderEmpty) { const list = Array.isArray(items) ? items : Array.from(items ?? []); if (list.length === 0) return renderEmpty ? renderEmpty() : ""; return list.map(renderRow).join(""); }',
 		'function marklessCsrDynamicTagName(value) { if (value === null || value === undefined || value === false || value === "") return null; const tag = String(value); if (!/^[a-zA-Z][a-zA-Z0-9:_.-]*$/.test(tag)) throw new Error("MARKLESS_DYNAMIC_TAG_INVALID: " + tag); return tag; }',
-		'function marklessCsrSpreadAttributes(values) { let html = ""; for (const key of Object.keys(values ?? {})) { if (!/^[A-Za-z_][\\w.:-]*$/.test(key) || /^on[A-Z]/.test(key) || key === "attach" || key === "el" || key === "children") continue; const value = values[key]; if (value === null || value === undefined || value === false) continue; html += value === true ? ` ${key}=""` : marklessCsrAttribute(key, value); } return html; }',
+		'function marklessCsrSpreadAttributes(values, scopeClass) { let html = ""; let classSeen = false; for (const key of Object.keys(values ?? {})) { if (!/^[A-Za-z_][\\w.:-]*$/.test(key) || /^on[A-Z]/.test(key) || key === "attach" || key === "el" || key === "children") continue; const value = values[key]; if (value === null || value === undefined || value === false) continue; if (key === "class" && scopeClass) { classSeen = true; html += marklessCsrAttribute("class", (value === true ? "" : String(value)) + " " + scopeClass); continue; } html += value === true ? ` ${key}=""` : marklessCsrAttribute(key, value); } if (scopeClass && !classSeen) html += ` class="${scopeClass}"`; return html; }',
 		'function marklessCsrEscape(value) { return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll("\\"", "&quot;"); }',
 		'',
 	]
@@ -190,6 +191,7 @@ function emitPublicSsrRenderModule(
 		asyncBoundaries: input.semanticGraph.asyncBoundaries,
 		asyncBoundaryGates: input.publicRenderPlan.asyncBoundaryGates,
 		nextAsyncBoundaryIndex: 0,
+		styleScopeClass: input.publicRenderPlan.styleScopes[0]?.scopeId ?? null,
 		source: input.source.source,
 	};
 	const hostLocators = staticHostLocators(input);
@@ -238,7 +240,7 @@ function emitPublicSsrRenderModule(
 		'function marklessSsrRemapChildGraph(record, graphProps) { if (record.graphNodeId === "prop:props") { const propName = record.path[0]; const binding = graphProps.find((prop) => prop.name === propName); return binding ? { graphNodeId: binding.graphNodeId, path: [...binding.path, ...record.path.slice(1)] } : null; } if (record.graphNodeId.startsWith?.("prop:")) { const propName = record.graphNodeId.slice(5); const binding = graphProps.find((prop) => prop.name === propName); return binding ? { graphNodeId: binding.graphNodeId, path: [...binding.path, ...record.path] } : null; } return { graphNodeId: record.graphNodeId, path: record.path }; }',
 		'function marklessSsrText(value) { return marklessSsrEscape(value == null ? "" : String(value)); }',
 		'function marklessSsrAttribute(name, value) { return ` ${name}="${marklessSsrEscape(value == null ? "" : String(value))}"`; }',
-		'function marklessSsrSpreadAttributes(values) { let html = ""; for (const key of Object.keys(values ?? {})) { if (!/^[A-Za-z_][\\w.:-]*$/.test(key) || /^on[A-Z]/.test(key) || key === "attach" || key === "el" || key === "children") continue; const value = values[key]; if (value === null || value === undefined || value === false) continue; html += value === true ? ` ${key}=""` : marklessSsrAttribute(key, value); } return html; }',
+		'function marklessSsrSpreadAttributes(values, scopeClass) { let html = ""; let classSeen = false; for (const key of Object.keys(values ?? {})) { if (!/^[A-Za-z_][\\w.:-]*$/.test(key) || /^on[A-Z]/.test(key) || key === "attach" || key === "el" || key === "children") continue; const value = values[key]; if (value === null || value === undefined || value === false) continue; if (key === "class" && scopeClass) { classSeen = true; html += marklessSsrAttribute("class", (value === true ? "" : String(value)) + " " + scopeClass); continue; } html += value === true ? ` ${key}=""` : marklessSsrAttribute(key, value); } if (scopeClass && !classSeen) html += ` class="${scopeClass}"`; return html; }',
 		'function marklessSsrEscape(value) { return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll("\\"", "&quot;"); }',
 		'',
 	]
@@ -261,6 +263,7 @@ type SsrRenderContext = {
 	readonly asyncBoundaries: PublicRenderModuleInput['semanticGraph']['asyncBoundaries'];
 	readonly asyncBoundaryGates: PublicRenderModuleInput['publicRenderPlan']['asyncBoundaryGates'];
 	nextAsyncBoundaryIndex: number;
+	readonly styleScopeClass: string | null;
 	readonly source: string;
 };
 
@@ -276,6 +279,7 @@ type CsrRenderContext = {
 	readonly keyedRepeats?: PublicRenderModuleInput['semanticGraph']['keyedRepeats'];
 	readonly repeatGates?: PublicRenderModuleInput['publicRenderPlan']['repeatGates'];
 	nextRepeatIndex?: number;
+	readonly styleScopeClass?: string | null;
 	readonly source: string;
 };
 
@@ -489,6 +493,8 @@ function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string {
 		return context.mode === 'ssr' ? emitSsrAsyncBoundary(node, context) : '""';
 	}
 
+	if (node.type === 'JSXStyleElement') return '""';
+
 	if (node.type === 'ExpressionStatement') {
 		const expression = node.expression as AnyNode | undefined;
 		return expression ? emitHtmlNode(expression, context) : '""';
@@ -507,11 +513,13 @@ function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string {
 	}
 	const hostLocator = context.mode === 'ssr' ? ssrHostLocator(node, tagName, context) : '""';
 
+	const scopeClass = context.styleScopeClass ?? null;
+
 	if (getElementAttributes(node).some(isSpreadAttribute)) {
 		return joinSsrExpressions([
 			hostLocator,
 			JSON.stringify(`<${tagName}`),
-			`${renderHelper(context, 'SpreadAttributes')}({ ${mergedAttributeEntries(node, context.source).join(', ')} })`,
+			`${renderHelper(context, 'SpreadAttributes')}({ ${mergedAttributeEntries(node, context.source).join(', ')} }, ${JSON.stringify(scopeClass)})`,
 			JSON.stringify('>'),
 			emitHtmlChildren(node, context),
 			JSON.stringify(`</${tagName}>`),
@@ -520,23 +528,30 @@ function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string {
 
 	const open = [`<${tagName}`];
 	const dynamicAttributes: string[] = [];
+	let scopeClassHandled = scopeClass === null;
 	for (const attribute of getElementAttributes(node)) {
 		const name = getIdentifierName(attribute.name as AnyNode | undefined);
 		if (!name || isEventAttribute(name) || name === 'attach' || name === 'el') continue;
 		const value = attribute.value as AnyNode | undefined;
 		const expression = unwrapExpressionContainer(value);
+		const scopeSuffix = name === 'class' && scopeClass ? ` ${scopeClass}` : '';
+		if (scopeSuffix) scopeClassHandled = true;
 		if (!value) {
-			open.push(` ${name}=""`);
+			open.push(` ${name}="${scopeSuffix.trim()}"`);
 		} else if (value.type === 'Literal' && typeof value.value !== 'object') {
-			open.push(` ${name}="${escapeAttribute(String(value.value))}"`);
+			open.push(` ${name}="${escapeAttribute(String(value.value))}${scopeSuffix}"`);
 		} else if (expression?.type === 'Literal' && typeof expression.value !== 'object') {
-			open.push(` ${name}="${escapeAttribute(String(expression.value))}"`);
+			open.push(` ${name}="${escapeAttribute(String(expression.value))}${scopeSuffix}"`);
 		} else if (expression) {
+			const valueSource = scopeSuffix
+				? `((marklessClassValue) => (marklessClassValue == null ? "" : String(marklessClassValue)) + ${JSON.stringify(scopeSuffix)})(${expressionSource(expression, context.source)})`
+				: expressionSource(expression, context.source);
 			dynamicAttributes.push(
-				`${renderHelper(context, 'Attribute')}(${JSON.stringify(name)}, ${expressionSource(expression, context.source)})`,
+				`${renderHelper(context, 'Attribute')}(${JSON.stringify(name)}, ${valueSource})`,
 			);
 		}
 	}
+	if (!scopeClassHandled && scopeClass) open.push(` class="${scopeClass}"`);
 
 	const openExpression =
 		dynamicAttributes.length === 0
@@ -684,9 +699,10 @@ function emitDynamicTagHtml(node: AnyNode, context: HtmlRenderContext): string {
 	if (!tagExpression) return '""';
 
 	const attributeEntries = mergedAttributeEntries(node, context.source);
+	const dynamicScopeClass = context.styleScopeClass ?? null;
 	const attributesExpression =
-		attributeEntries.length > 0
-			? `${renderHelper(context, 'SpreadAttributes')}({ ${attributeEntries.join(', ')} })`
+		attributeEntries.length > 0 || dynamicScopeClass
+			? `${renderHelper(context, 'SpreadAttributes')}({ ${attributeEntries.join(', ')} }, ${JSON.stringify(dynamicScopeClass)})`
 			: '""';
 	const tagValueExpression =
 		context.mode === 'ssr'
