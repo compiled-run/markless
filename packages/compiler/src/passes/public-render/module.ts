@@ -9,6 +9,7 @@ import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/
 import { expressionSource } from '../../ast/source.ts';
 import {
 	escapeAttribute,
+	getComponentFunction,
 	getDynamicTagExpression,
 	getElementAttributes,
 	getElementTagName,
@@ -72,6 +73,9 @@ function emitPublicCsrRenderModule(
 		componentImports: new Map(imports.map((item) => [item.componentName, item.localName])),
 		callbackSymbols: callbackSymbolIds(input),
 		nextComponentEdgeIndex: 0,
+		keyedRepeats: input.semanticGraph.keyedRepeats,
+		repeatGates: input.publicRenderPlan.repeatGates,
+		nextRepeatIndex: 0,
 		source: input.source.source,
 	};
 	const propEvents = collectCsrPropEvents(rootInfo.root, rootInfo.propNames, input.source.source);
@@ -139,6 +143,7 @@ function emitPublicCsrRenderModule(
 		'function marklessCsrIsThenable(value) { return value !== null && (typeof value === "object" || typeof value === "function") && typeof value.then === "function"; }',
 		'function marklessCsrText(value) { return marklessCsrEscape(value == null ? "" : String(value)); }',
 		'function marklessCsrAttribute(name, value) { return ` ${name}="${marklessCsrEscape(value == null ? "" : String(value))}"`; }',
+		'function marklessCsrRepeatRows(items, renderRow, renderEmpty) { const list = Array.isArray(items) ? items : Array.from(items ?? []); if (list.length === 0) return renderEmpty ? renderEmpty() : ""; return list.map(renderRow).join(""); }',
 		'function marklessCsrDynamicTagName(value) { if (value === null || value === undefined || value === false || value === "") return null; const tag = String(value); if (!/^[a-zA-Z][a-zA-Z0-9:_.-]*$/.test(tag)) throw new Error("MARKLESS_DYNAMIC_TAG_INVALID: " + tag); return tag; }',
 		'function marklessCsrSpreadAttributes(values) { let html = ""; for (const key of Object.keys(values ?? {})) { if (!/^[A-Za-z_][\\w.:-]*$/.test(key) || /^on[A-Z]/.test(key) || key === "attach" || key === "el" || key === "children") continue; const value = values[key]; if (value === null || value === undefined || value === false) continue; html += value === true ? ` ${key}=""` : marklessCsrAttribute(key, value); } return html; }',
 		'function marklessCsrEscape(value) { return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll("\\"", "&quot;"); }',
@@ -252,6 +257,11 @@ type CsrRenderContext = {
 	readonly componentImports: ReadonlyMap<string, string>;
 	readonly callbackSymbols: ReadonlyMap<string, string>;
 	nextComponentEdgeIndex: number;
+	// Optional because component-children emission builds a partial context;
+	// repeats inside projected children keep the prior render-nothing behavior.
+	readonly keyedRepeats?: PublicRenderModuleInput['semanticGraph']['keyedRepeats'];
+	readonly repeatGates?: PublicRenderModuleInput['publicRenderPlan']['repeatGates'];
+	nextRepeatIndex?: number;
 	readonly source: string;
 };
 
@@ -456,7 +466,9 @@ function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string {
 	}
 
 	if (node.type === 'JSXForExpression') {
-		return context.mode === 'ssr' ? emitSsrRepeatRows(node, context) : '""';
+		return context.mode === 'ssr'
+			? emitSsrRepeatRows(node, context)
+			: emitCsrRepeatRows(node, context);
 	}
 
 	if (node.type === 'ExpressionStatement') {
@@ -563,6 +575,38 @@ function emitSsrRepeatRows(node: AnyNode, context: SsrRenderContext): string {
 			? `() => ${joinSsrExpressions(emptyChildren.map((child) => emitHtmlNode(child, context)))}`
 			: 'null';
 	return `marklessSsrRepeatRows(marklessSsrHostLocators, ${repeat.collectionSource}, ${rowParams} => ${rowHtml}, ${countRowElements(row)}, ${emptyThunk})`;
+}
+
+// CSR string emission for supported keyed repeats. Unlike SSR there is no
+// locator-index bookkeeping: CSR composition resolves hosts through authored
+// child paths, and supported repeat parents contain only the repeat, so row
+// insertion cannot shift any sibling path.
+function emitCsrRepeatRows(node: AnyNode, context: CsrRenderContext): string {
+	if (!context.keyedRepeats || !context.repeatGates) return '""';
+	const repeat = context.keyedRepeats[context.nextRepeatIndex ?? 0];
+	context.nextRepeatIndex = (context.nextRepeatIndex ?? 0) + 1;
+	if (!repeat) return '""';
+	const gate = context.repeatGates.find((item) => item.repeatId === repeat.id);
+	if (!gate?.supported) return '""';
+
+	const row = singleRepeatRowElement(node);
+	if (!row || !isPlainHostTemplateNode(row)) return '""';
+
+	const emptyBlock = node.empty as AnyNode | undefined;
+	const emptyChildren = emptyBlock
+		? asNodes(emptyBlock.body).filter((child) => !isIgnorableTextNode(child))
+		: [];
+	if (emptyChildren.some((child) => !isPlainHostTemplateNode(child))) return '""';
+
+	const rowHtml = emitHtmlNode(row, context);
+	const rowParams = repeat.indexName
+		? `(${repeat.itemName}, ${repeat.indexName})`
+		: `(${repeat.itemName})`;
+	const emptyThunk =
+		emptyChildren.length > 0
+			? `() => ${joinSsrExpressions(emptyChildren.map((child) => emitHtmlNode(child, context)))}`
+			: 'null';
+	return `marklessCsrRepeatRows(${repeat.collectionSource}, ${rowParams} => ${rowHtml}, ${emptyThunk})`;
 }
 
 function singleRepeatRowElement(node: AnyNode): AnyNode | null {
@@ -926,6 +970,13 @@ function firstComponentRoot(component: AnyNode | undefined): AnyNode | null {
 
 	for (const child of childNodes(body)) {
 		if (child.type === 'Element' || child.type === 'JSXElement') return child;
+		// TSRX allows `return <element>;` at the function-body level of @{...}.
+		if (child.type === 'ReturnStatement') {
+			const argument = child.argument as AnyNode | undefined;
+			if (argument && (argument.type === 'Element' || argument.type === 'JSXElement')) {
+				return argument;
+			}
+		}
 	}
 
 	return null;
@@ -933,14 +984,9 @@ function firstComponentRoot(component: AnyNode | undefined): AnyNode | null {
 
 function findComponent(ast: AnyNode, name: string | undefined): AnyNode | undefined {
 	for (const statement of asNodes(ast.body)) {
-		const declaration =
-			statement.type === 'ExportNamedDeclaration' ||
-			statement.type === 'ExportDefaultDeclaration'
-				? (statement.declaration as AnyNode | undefined)
-				: statement;
-		if (declaration?.type !== 'FunctionDeclaration') continue;
-		const componentName = getIdentifierName(declaration.id as AnyNode | undefined);
-		if (!name || componentName === name) return declaration;
+		const componentFunction = getComponentFunction(statement);
+		if (!componentFunction) continue;
+		if (!name || componentFunction.name === name) return componentFunction.node;
 	}
 
 	return undefined;

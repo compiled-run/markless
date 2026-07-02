@@ -434,6 +434,30 @@ test('buildSemanticGraph keeps keyed repeats registered when an index clause is 
 	]);
 });
 
+test('buildSemanticGraph recognizes arrow-function components', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/ArrowApp.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export const App = () => @{
+	let count = state(0);
+
+	<main>
+		<button onClick={() => count++}>{count}</button>
+	</main>
+}
+`,
+	});
+
+	expect(graph.components).toEqual([{ name: 'App' }]);
+	expect(graph.diagnostics).toEqual([]);
+	expect(graph.graphBindings).toEqual(
+		expect.arrayContaining([expect.objectContaining({ id: 'state:count', name: 'count' })]),
+	);
+	expect(graph.hostNodes.map((host) => host.tagName)).toEqual(['main', 'button']);
+});
+
 test('buildSemanticGraph records branch scopes for @switch cases', async () => {
 	const graph = await buildSemanticGraph({
 		filename: 'src/SwitchScopes.tsrx',

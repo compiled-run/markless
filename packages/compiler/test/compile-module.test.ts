@@ -763,6 +763,55 @@ export function App() @{
 	);
 });
 
+test('compileTsrxModule renders an arrow-function component in SSR html', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/ArrowCard.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export const App = () => @{
+	let label = state('Hello');
+
+	<main>
+		<p>{label}</p>
+	</main>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.semanticGraph.components).toEqual([{ name: 'App' }]);
+	expect(result.publicRenderPlan.diagnostics).toEqual([]);
+	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	const output = (ssrModule.marklessRenderSsr as () => { readonly html: string })();
+
+	expect(output.html).toBe('<main><p>Hello</p></main>');
+});
+
+test('compileTsrxModule renders a return-form component body in SSR html', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/ReturnCard.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let label = state('Hello');
+
+	return <main>
+		<p>{label}</p>
+	</main>;
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.diagnostics).toEqual([]);
+	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	const output = (ssrModule.marklessRenderSsr as () => { readonly html: string })();
+
+	expect(output.html).toBe('<main><p>Hello</p></main>');
+});
+
 test('compileTsrxModule renders keyed repeat rows that read the index clause in SSR html', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/IndexedRows.tsrx',
@@ -1085,6 +1134,148 @@ export default function Home() @{
 	expect(anchors).toHaveLength(1);
 	expect(anchors[0]?.getAttribute('href')).toBe('/docs');
 	expect(anchors[0]?.textContent).toBe('Docs');
+});
+
+test('compileTsrxModule renders @switch and dynamic tags in the CSR string path', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/CsrParity.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App({ heading }) @{
+	let kind = state('beta');
+	let tag = state('article');
+
+	<main>
+		<h1>{heading}</h1>
+		@switch (kind) {
+			@case 'alpha': { <p>A</p> }
+			@case 'beta': { <p>B</p> }
+			@default: { <p>D</p> }
+		}
+		<{tag} class="card">Hi</{tag}>
+	</main>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.diagnostics).toEqual([]);
+	const document = {
+		createElement(tagName: string) {
+			return tagName === 'template'
+				? new PublicRenderTestTemplate()
+				: new PublicRenderTestElement(tagName);
+		},
+	};
+	const csrModule = await importPublicRenderTestModule(csrRenderTestModuleSource(result), {
+		document,
+	});
+	const output = (
+		csrModule.marklessRenderCsr as (props: { readonly heading: string }) => {
+			readonly root: PublicRenderTestElement;
+		}
+	)({ heading: 'Cards' });
+
+	expect(elementsByTag(output.root, 'p').map((element) => element.textContent)).toEqual(['B']);
+	const articles = elementsByTag(output.root, 'article');
+	expect(articles).toHaveLength(1);
+	expect(articles[0]?.getAttribute('class')).toBe('card');
+	expect(articles[0]?.textContent).toBe('Hi');
+});
+
+test('compileTsrxModule renders keyed repeat rows in the CSR string path', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/CsrRows.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App({ heading }) @{
+	let items = state([
+		{ id: 'a', name: 'Alpha' },
+		{ id: 'b', name: 'Beta' },
+	]);
+
+	<main>
+		<h1>{heading}</h1>
+		<ul>
+			@for (const item of items; key item.id) {
+				<li>{item.name}</li>
+			} @empty {
+				<li>No items yet</li>
+			}
+		</ul>
+	</main>
+}
+`,
+		symbols: [],
+	});
+
+	const document = {
+		createElement(tagName: string) {
+			return tagName === 'template'
+				? new PublicRenderTestTemplate()
+				: new PublicRenderTestElement(tagName);
+		},
+	};
+	const csrModule = await importPublicRenderTestModule(csrRenderTestModuleSource(result), {
+		document,
+	});
+	const output = (
+		csrModule.marklessRenderCsr as (props: { readonly heading: string }) => {
+			readonly root: PublicRenderTestElement;
+		}
+	)({ heading: 'Cards' });
+
+	expect(elementsByTag(output.root, 'li').map((element) => element.textContent)).toEqual([
+		'Alpha',
+		'Beta',
+	]);
+});
+
+test('compileTsrxModule renders the @empty branch in the CSR string path', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/CsrEmpty.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App({ heading }) @{
+	let items = state([]);
+
+	<main>
+		<h1>{heading}</h1>
+		<ul>
+			@for (const item of items; key item.id) {
+				<li>{item.name}</li>
+			} @empty {
+				<li>No items yet</li>
+			}
+		</ul>
+	</main>
+}
+`,
+		symbols: [],
+	});
+
+	const document = {
+		createElement(tagName: string) {
+			return tagName === 'template'
+				? new PublicRenderTestTemplate()
+				: new PublicRenderTestElement(tagName);
+		},
+	};
+	const csrModule = await importPublicRenderTestModule(csrRenderTestModuleSource(result), {
+		document,
+	});
+	const output = (
+		csrModule.marklessRenderCsr as (props: { readonly heading: string }) => {
+			readonly root: PublicRenderTestElement;
+		}
+	)({ heading: 'Cards' });
+
+	expect(elementsByTag(output.root, 'li').map((element) => element.textContent)).toEqual([
+		'No items yet',
+	]);
 });
 
 test('compileTsrxModule preserves value imports used by public render expressions', async () => {

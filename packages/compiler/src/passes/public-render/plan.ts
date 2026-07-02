@@ -4,6 +4,7 @@ import { expressionSource } from '../../ast/source.ts';
 import {
 	escapeAttribute,
 	escapeHtml,
+	getComponentFunction,
 	getElementAttributes,
 	getElementTagName,
 	isHostTagName,
@@ -329,17 +330,20 @@ function repeatRenderDiagnostics(input: {
 // .tsrx module (no template content) stay diagnostic-free.
 function componentRootDiagnostics(ast: AnyNode, filename: string) {
 	for (const statement of asNodes(ast.body)) {
-		const declaration =
-			statement.type === 'ExportNamedDeclaration' ||
-			statement.type === 'ExportDefaultDeclaration'
-				? (statement.declaration as AnyNode | undefined)
-				: statement;
-		if (declaration?.type !== 'FunctionDeclaration') continue;
-		const body = declaration.body as AnyNode | undefined;
+		const componentFunction = getComponentFunction(statement);
+		const body = componentFunction?.node.body as AnyNode | undefined;
 		if (!body) continue;
 
+		// Direct fragments and `return <>...</>` both need the multi-root
+		// story; single-element returns are supported by firstComponentRoot.
 		const fragment = childNodes(body).find(
-			(child) => child.type === 'Fragment' || child.type === 'JSXFragment',
+			(child) =>
+				child.type === 'Fragment' ||
+				child.type === 'JSXFragment' ||
+				(child.type === 'ReturnStatement' &&
+					['Fragment', 'JSXFragment'].includes(
+						(child.argument as AnyNode | undefined)?.type ?? '',
+					)),
 		);
 		if (fragment) {
 			return [
@@ -350,26 +354,6 @@ function componentRootDiagnostics(ast: AnyNode, filename: string) {
 					filename,
 					suggestion:
 						'Wrap the fragment children in a single host element such as <div> or <section>.',
-				}),
-			];
-		}
-
-		const returnedTemplate = childNodes(body).find(
-			(child) =>
-				child.type === 'ReturnStatement' &&
-				['Element', 'JSXElement', 'Fragment', 'JSXFragment'].includes(
-					(child.argument as AnyNode | undefined)?.type ?? '',
-				),
-		);
-		if (returnedTemplate) {
-			return [
-				unsupportedRenderRootDiagnostic({
-					message:
-						'Returning template content renders nothing because the public render path only reads elements placed directly in the @{...} component body.',
-					node: returnedTemplate,
-					filename,
-					suggestion:
-						'Place the element directly in the component body instead of returning it.',
 				}),
 			];
 		}
@@ -1005,6 +989,13 @@ function firstComponentRoot(component: AnyNode | undefined): AnyNode | null {
 
 	for (const child of childNodes(body)) {
 		if (child.type === 'Element' || child.type === 'JSXElement') return child;
+		// TSRX allows `return <element>;` at the function-body level of @{...}.
+		if (child.type === 'ReturnStatement') {
+			const argument = child.argument as AnyNode | undefined;
+			if (argument && (argument.type === 'Element' || argument.type === 'JSXElement')) {
+				return argument;
+			}
+		}
 	}
 
 	return null;
@@ -1014,17 +1005,17 @@ function findComponent(ast: AnyNode): AnyNode | undefined {
 	let fallback: AnyNode | undefined;
 
 	for (const statement of asNodes(ast.body)) {
-		const declaration =
-			statement.type === 'ExportNamedDeclaration' ||
-			statement.type === 'ExportDefaultDeclaration'
-				? (statement.declaration as AnyNode | undefined)
-				: statement;
-		if (declaration?.type !== 'FunctionDeclaration') continue;
-		if (!firstComponentRoot(declaration)) continue;
+		const componentFunction = getComponentFunction(statement);
+		if (!componentFunction) continue;
+		if (!firstComponentRoot(componentFunction.node)) continue;
 
-		if (statement.type === 'ExportDefaultDeclaration') return declaration;
-		if (statement.type === 'ExportNamedDeclaration') return declaration;
-		fallback ??= declaration;
+		if (
+			statement.type === 'ExportDefaultDeclaration' ||
+			statement.type === 'ExportNamedDeclaration'
+		) {
+			return componentFunction.node;
+		}
+		fallback ??= componentFunction.node;
 	}
 
 	return fallback;

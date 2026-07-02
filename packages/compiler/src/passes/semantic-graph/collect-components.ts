@@ -17,22 +17,6 @@ import { collectExpressionReads } from './collect-expressions.ts';
 import { collectObjectPatternAliases } from './collect-aliases.ts';
 import type { SemanticGraphWalk, WalkState } from './types.ts';
 
-export function getComponent(node: AnyNode): AnyNode | null {
-	if (node.type === 'FunctionDeclaration') return node;
-
-	if (node.type === 'ExportNamedDeclaration') {
-		const declaration = node.declaration as AnyNode | undefined;
-		return declaration?.type === 'FunctionDeclaration' ? declaration : null;
-	}
-
-	if (node.type === 'ExportDefaultDeclaration') {
-		const declaration = node.declaration as AnyNode | undefined;
-		return declaration?.type === 'FunctionDeclaration' ? declaration : null;
-	}
-
-	return null;
-}
-
 export function collectComponentProps(component: AnyNode, state: WalkState): void {
 	const firstParam = asNodes(component.params)[0];
 	if (!firstParam) return;

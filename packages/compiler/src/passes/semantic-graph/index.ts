@@ -1,5 +1,5 @@
 import { parseModule } from '@tsrx/core';
-import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
+import { asNodes, childNodes, type AnyNode } from '../../ast/nodes.ts';
 import type { SemanticGraphArtifact, SemanticGraphInput } from '../../artifacts.ts';
 import {
 	collectAsyncBoundary,
@@ -7,7 +7,8 @@ import {
 	propagateAsyncComputedCapability,
 } from './collect-async.ts';
 import { collectImports, collectModuleImports } from './imports.ts';
-import { getComponent, collectComponentProps } from './collect-components.ts';
+import { collectComponentProps } from './collect-components.ts';
+import { getComponentFunction } from '../../ast/tsrx.ts';
 import {
 	collectConditionalBranchText,
 	collectElement,
@@ -53,16 +54,14 @@ export async function buildSemanticGraph(
 	collectSharedFactoryGraph(statements, state, walk);
 
 	for (const statement of statements) {
-		const component = getComponent(statement);
-		const name = getIdentifierName(component?.id as AnyNode | undefined);
+		const componentFunction = getComponentFunction(statement);
+		if (!componentFunction) continue;
 
-		if (!component || !name) continue;
-
-		graph.components.push({ name });
-		collectComponentProps(component, state);
+		graph.components.push({ name: componentFunction.name });
+		collectComponentProps(componentFunction.node, state);
 		const previousComponentName = state.currentComponentName;
-		state.currentComponentName = name;
-		walk(component.body as AnyNode, state);
+		state.currentComponentName = componentFunction.name;
+		walk(componentFunction.node.body as AnyNode, state);
 		state.currentComponentName = previousComponentName;
 	}
 

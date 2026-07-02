@@ -6,6 +6,40 @@ export function isSpreadAttribute(node: AnyNode): boolean {
 	return node.type === 'SpreadAttribute' || node.type === 'JSXSpreadAttribute';
 }
 
+// Host decision (TSRX defers component recognition to the host): Markless
+// treats these module statements as components — function declarations, and
+// const/let declarations whose initializer is an arrow or function expression
+// with a TSRX @{...} body. The name comes from the declaration or declarator.
+export function getComponentFunction(
+	statement: AnyNode,
+): { readonly node: AnyNode; readonly name: string } | null {
+	const declaration =
+		statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration'
+			? ((statement.declaration as AnyNode | undefined) ?? statement)
+			: statement;
+	if (!declaration || typeof declaration !== 'object') return null;
+
+	if (declaration.type === 'FunctionDeclaration') {
+		const name = getIdentifierName(declaration.id as AnyNode | undefined);
+		return name ? { node: declaration, name } : null;
+	}
+
+	if (declaration.type === 'VariableDeclaration') {
+		const [declarator] = asNodes(declaration.declarations);
+		const name = getIdentifierName(declarator?.id as AnyNode | undefined);
+		const init = declarator?.init as AnyNode | undefined;
+		if (!name || !init) return null;
+		const isFunctionForm =
+			init.type === 'ArrowFunctionExpression' || init.type === 'FunctionExpression';
+		if (!isFunctionForm) return null;
+		// Only TSRX-producing bodies count; plain helper arrows stay helpers.
+		if ((init.body as AnyNode | undefined)?.type !== 'JSXCodeBlock') return null;
+		return { node: init, name };
+	}
+
+	return null;
+}
+
 // Dynamic tags author the tag position as an expression container:
 // <{expr}>...</{expr}>. Returns the tag expression, or undefined for a
 // statically named element.
