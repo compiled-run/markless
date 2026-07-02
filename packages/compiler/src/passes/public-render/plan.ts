@@ -30,6 +30,7 @@ import type {
 	PayloadKeyedRepeat,
 	PlannedSymbol,
 	PublicRenderPlanArtifact,
+	PublicRenderPlanAsyncBoundaryGate,
 	PublicRenderPlanClassWrite,
 	PublicRenderPlanEventControl,
 	PublicRenderPlanInput,
@@ -131,6 +132,44 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 		);
 	}
 
+	const boundaryNodes = collectAsyncBoundaryNodes(root);
+	const asyncBoundaryGates: PublicRenderPlanAsyncBoundaryGate[] =
+		input.payloadArena.view.asyncBoundaries.map((boundary, index) => {
+			const found = boundaryNodes[index];
+			if (!found) {
+				return {
+					boundaryId: boundary.id,
+					supported: false,
+					reason: 'conditional-boundary-unsupported',
+				};
+			}
+			if (found.nested || found.containsNested) {
+				return {
+					boundaryId: boundary.id,
+					supported: false,
+					reason: 'nested-boundary-unsupported',
+				};
+			}
+			if (found.conditional) {
+				return {
+					boundaryId: boundary.id,
+					supported: false,
+					reason: 'conditional-boundary-unsupported',
+				};
+			}
+			const pendingChildren = asNodes(
+				(found.node.pending as AnyNode | undefined)?.body,
+			).filter((child) => !isIgnorableTextNode(child));
+			if (pendingChildren.some((child) => !isPlainHostTemplateNode(child))) {
+				return {
+					boundaryId: boundary.id,
+					supported: false,
+					reason: 'pending-branch-unsupported',
+				};
+			}
+			return { boundaryId: boundary.id, supported: true };
+		});
+
 	const rootTemplateHtml = staticHtml(root, { expressionText: ' ', omitForExpressions: true });
 	const directRenderTemplateHtml =
 		staticTextWrites && staticShellSupported(root)
@@ -162,6 +201,7 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 		staticTextWrites: staticTextWrites ?? [],
 		repeatGates,
 		keyedRepeats,
+		asyncBoundaryGates,
 		diagnostics: [
 			...collectUnsupportedConstructDiagnostics(root, input.source.filename),
 			...repeatRenderDiagnostics({
@@ -171,8 +211,64 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 				repeatGates,
 				repeatNodeById,
 			}),
+			...asyncBoundaryGates.flatMap((gate, index) => {
+				const found = boundaryNodes[index];
+				if (gate.supported || !found) return [];
+				return [
+					unsupportedRenderConstructDiagnostic({
+						label: '@try/@pending/@catch',
+						message: `The async boundary branches are dropped from rendered HTML (reason: ${gate.reason}); only top-level boundaries with plain-host @pending content render anchors today.`,
+						node: found.node,
+						filename: input.source.filename,
+						suggestion:
+							'Move the boundary out of nested control flow, or keep the @pending branch to host elements, text, and expressions.',
+					}),
+				];
+			}),
 		],
 	};
+}
+
+type AsyncBoundaryNode = {
+	readonly node: AnyNode;
+	readonly nested: boolean;
+	containsNested: boolean;
+	readonly conditional: boolean;
+};
+
+// Boundary anchors use flat document-order comment indexes, so a boundary is
+// only renderable when its anchors always materialize: top-level (no nesting,
+// no conditional control flow) with a statically known @pending shape.
+function collectAsyncBoundaryNodes(root: AnyNode): AsyncBoundaryNode[] {
+	const found: AsyncBoundaryNode[] = [];
+	const boundaryStack: AsyncBoundaryNode[] = [];
+
+	const visit = (node: AnyNode, conditional: boolean): void => {
+		if (node.type === 'JSXTryExpression') {
+			const entry: AsyncBoundaryNode = {
+				node,
+				nested: boundaryStack.length > 0,
+				containsNested: false,
+				conditional,
+			};
+			for (const outer of boundaryStack) outer.containsNested = true;
+			found.push(entry);
+			boundaryStack.push(entry);
+			for (const child of childNodes(node)) visit(child, conditional);
+			boundaryStack.pop();
+			return;
+		}
+		const entersControlFlow =
+			node.type === 'JSXIfExpression' ||
+			node.type === 'JSXSwitchExpression' ||
+			node.type === 'JSXForExpression';
+		for (const child of childNodes(node)) {
+			visit(child, conditional || entersControlFlow);
+		}
+	};
+
+	visit(root, false);
+	return found;
 }
 
 function emptyPlan(
@@ -188,6 +284,7 @@ function emptyPlan(
 		staticTextWrites: [],
 		repeatGates: [],
 		keyedRepeats: [],
+		asyncBoundaryGates: [],
 		diagnostics,
 	};
 }
@@ -198,19 +295,7 @@ function collectUnsupportedConstructDiagnostics(root: AnyNode, filename: string)
 	const diagnostics: ReturnType<typeof unsupportedRenderConstructDiagnostic>[] = [];
 
 	const visit = (node: AnyNode): void => {
-		if (node.type === 'JSXTryExpression') {
-			diagnostics.push(
-				unsupportedRenderConstructDiagnostic({
-					label: '@try/@pending/@catch',
-					message:
-						'@try/@pending/@catch branch content is dropped from rendered HTML because the render module cannot emit async boundary branches yet.',
-					node,
-					filename,
-					suggestion:
-						'Keep the async boundary, but expect no branch HTML from the public render path until boundary rendering is supported.',
-				}),
-			);
-		} else if (node.type === 'JSXStyleElement') {
+		if (node.type === 'JSXStyleElement') {
 			diagnostics.push(
 				unsupportedRenderConstructDiagnostic({
 					label: '<style>',

@@ -179,7 +179,7 @@ test.each([
 		'@try',
 		appSource(
 			`let value = state('ready');
-<section>@try { <p>{value}</p> } @catch { <p>Broken</p> }</section>`,
+<section>@if (value) { @try { <p>{value}</p> } @pending { <p>Loading</p> } @catch { <p>Broken</p> } }</section>`,
 		),
 	],
 	[
@@ -207,6 +207,44 @@ test.each([
 		]);
 	},
 );
+
+test('planPublicRender gates a top-level plain-pending async boundary as supported', async () => {
+	const { plan } = await createRenderPlan(
+		'src/AsyncCard.tsrx',
+		appSource(
+			`let value = state('ready');
+<section>@try { <p>{value}</p> } @pending { <p>Loading</p> } @catch { <p>Broken</p> }</section>`,
+		),
+	);
+
+	expect(plan.asyncBoundaryGates).toEqual([{ boundaryId: 'boundary:0', supported: true }]);
+	expect(plan.diagnostics).toEqual([]);
+});
+
+test('planPublicRender keeps conditional async boundaries gated and diagnosed', async () => {
+	const { plan } = await createRenderPlan(
+		'src/ConditionalAsync.tsrx',
+		appSource(
+			`let value = state('ready');
+<section>@if (value) { @try { <p>{value}</p> } @pending { <p>Loading</p> } @catch { <p>Broken</p> } }</section>`,
+		),
+	);
+
+	expect(plan.asyncBoundaryGates).toEqual([
+		{
+			boundaryId: 'boundary:0',
+			supported: false,
+			reason: 'conditional-boundary-unsupported',
+		},
+	]);
+	expect(plan.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
+			title: expect.stringContaining('@try'),
+			message: expect.stringContaining('conditional-boundary-unsupported'),
+		}),
+	]);
+});
 
 test('planPublicRender reports a fragment component root instead of planning nothing', async () => {
 	const { plan } = await createRenderPlan(

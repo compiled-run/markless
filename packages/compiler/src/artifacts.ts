@@ -705,6 +705,20 @@ export type PublicRenderPlanKeyedRepeat = {
 	readonly eventControls: ReadonlyArray<PublicRenderPlanEventControl>;
 };
 
+export type PublicRenderPlanAsyncBoundaryGate =
+	| {
+			readonly boundaryId: string;
+			readonly supported: true;
+	  }
+	| {
+			readonly boundaryId: string;
+			readonly supported: false;
+			readonly reason:
+				| 'nested-boundary-unsupported'
+				| 'conditional-boundary-unsupported'
+				| 'pending-branch-unsupported';
+	  };
+
 export type PublicRenderPlanArtifact = {
 	readonly passId: 'public-render-plan';
 	readonly rootTemplateHtml: string | null;
@@ -715,6 +729,7 @@ export type PublicRenderPlanArtifact = {
 	readonly staticTextWrites: ReadonlyArray<PublicRenderPlanStaticTextWrite>;
 	readonly repeatGates: ReadonlyArray<PublicRenderPlanRepeatGate>;
 	readonly keyedRepeats: ReadonlyArray<PublicRenderPlanKeyedRepeat>;
+	readonly asyncBoundaryGates: ReadonlyArray<PublicRenderPlanAsyncBoundaryGate>;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
 };
 

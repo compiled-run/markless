@@ -950,6 +950,50 @@ export function App() @{
 	);
 });
 
+test('compileTsrxModule renders async boundary anchors with @pending content in SSR html', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/AsyncCard.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let value = state('ready');
+
+	<section>
+		@try { <p>{value}</p> } @pending { <p>Loading</p> } @catch { <p>Broken</p> }
+		<footer>Done</footer>
+	</section>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.diagnostics).toEqual([]);
+	expect(result.publicRenderPlan.asyncBoundaryGates).toEqual([
+		{ boundaryId: 'boundary:0', supported: true },
+	]);
+	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	const output = (
+		ssrModule.marklessRenderSsr as () => {
+			readonly html: string;
+			readonly view: { readonly locators: ReadonlyArray<Record<string, unknown>> };
+		}
+	)();
+
+	// Exactly two comments wrap only the @pending branch; @try/@catch content
+	// stays out of SSR html until the runtime resolves the boundary.
+	expect(output.html).toBe(
+		'<section>' +
+			'<!--markless:async:boundary:0--><p>Loading</p><!--/markless:async:boundary:0-->' +
+			'<footer>Done</footer></section>',
+	);
+	// Comments are not elements: the footer's dom-order element index only
+	// counts section, pending <p>, footer.
+	expect(output.view.locators).toEqual(
+		expect.arrayContaining([expect.objectContaining({ tagName: 'footer', index: 2 })]),
+	);
+});
+
 test('compileTsrxModule renders the matching @switch case in SSR html', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/SwitchCard.tsrx',

@@ -179,6 +179,9 @@ function emitPublicSsrRenderModule(
 		repeatGates: input.publicRenderPlan.repeatGates,
 		nextRepeatIndex: 0,
 		insideRepeatRow: false,
+		asyncBoundaries: input.semanticGraph.asyncBoundaries,
+		asyncBoundaryGates: input.publicRenderPlan.asyncBoundaryGates,
+		nextAsyncBoundaryIndex: 0,
 		source: input.source.source,
 	};
 	const hostLocators = staticHostLocators(input);
@@ -247,6 +250,9 @@ type SsrRenderContext = {
 	readonly repeatGates: PublicRenderModuleInput['publicRenderPlan']['repeatGates'];
 	nextRepeatIndex: number;
 	readonly insideRepeatRow: boolean;
+	readonly asyncBoundaries: PublicRenderModuleInput['semanticGraph']['asyncBoundaries'];
+	readonly asyncBoundaryGates: PublicRenderModuleInput['publicRenderPlan']['asyncBoundaryGates'];
+	nextAsyncBoundaryIndex: number;
 	readonly source: string;
 };
 
@@ -471,6 +477,10 @@ function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string {
 			: emitCsrRepeatRows(node, context);
 	}
 
+	if (node.type === 'JSXTryExpression') {
+		return context.mode === 'ssr' ? emitSsrAsyncBoundary(node, context) : '""';
+	}
+
 	if (node.type === 'ExpressionStatement') {
 		const expression = node.expression as AnyNode | undefined;
 		return expression ? emitHtmlNode(expression, context) : '""';
@@ -575,6 +585,37 @@ function emitSsrRepeatRows(node: AnyNode, context: SsrRenderContext): string {
 			? `() => ${joinSsrExpressions(emptyChildren.map((child) => emitHtmlNode(child, context)))}`
 			: 'null';
 	return `marklessSsrRepeatRows(marklessSsrHostLocators, ${repeat.collectionSource}, ${rowParams} => ${rowHtml}, ${countRowElements(row)}, ${emptyThunk})`;
+}
+
+// Supported async boundaries emit their payload-planned comment anchors with
+// the @pending branch between them; the browser runtime replaces that range
+// once the boundary settles. @try/@catch content stays out of SSR html because
+// renderSsr is synchronous and cannot await async work yet.
+function emitSsrAsyncBoundary(node: AnyNode, context: SsrRenderContext): string {
+	const boundary = context.asyncBoundaries[context.nextAsyncBoundaryIndex++];
+	// Nested boundaries never render, but their indexes must stay consumed so
+	// later boundaries keep matching the payload arena's document order.
+	context.nextAsyncBoundaryIndex += countDescendantBoundaries(node);
+	if (!boundary) return '""';
+	const gate = context.asyncBoundaryGates.find((item) => item.boundaryId === boundary.id);
+	if (!gate?.supported) return '""';
+
+	const pendingChildren = asNodes((node.pending as AnyNode | undefined)?.body).filter(
+		(child) => !isIgnorableTextNode(child),
+	);
+	return joinSsrExpressions([
+		JSON.stringify(`<!--markless:async:${boundary.id}-->`),
+		joinSsrExpressions(pendingChildren.map((child) => emitHtmlNode(child, context))),
+		JSON.stringify(`<!--/markless:async:${boundary.id}-->`),
+	]);
+}
+
+function countDescendantBoundaries(node: AnyNode): number {
+	return childNodes(node).reduce(
+		(total, child) =>
+			total + (child.type === 'JSXTryExpression' ? 1 : 0) + countDescendantBoundaries(child),
+		0,
+	);
 }
 
 // CSR string emission for supported keyed repeats. Unlike SSR there is no

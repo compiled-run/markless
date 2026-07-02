@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { createRuntimeGraph } from '@markless/runtime';
-import { createResumeRuntime, RuntimeResumeError } from '../src/index.ts';
+import { applyDomJournalEntries, createResumeRuntime, RuntimeResumeError } from '../src/index.ts';
 import type { RuntimeGraph, RuntimeGraphWrite } from '@markless/runtime';
 import type { DomJournalEntry } from '../src/index.ts';
 
@@ -2116,6 +2116,171 @@ test('resume runtime does not treat async runner symbols as DOM update symbols',
 		},
 	]);
 });
+
+test('resume runtime aligns two sibling async boundaries and replaces only the settled range', async () => {
+	const firstResult = deferred<string>();
+	const secondResult = deferred<string>();
+	const firstStart = comment('markless:async:boundary:0');
+	const firstPending = element('P');
+	const firstEnd = comment('/markless:async:boundary:0');
+	const divider = element('HR');
+	const secondStart = comment('markless:async:boundary:1');
+	const secondPending = element('P');
+	const secondEnd = comment('/markless:async:boundary:1');
+	const root = rangeElement('SECTION', [
+		firstStart,
+		firstPending,
+		firstEnd,
+		divider,
+		secondStart,
+		secondPending,
+		secondEnd,
+	]);
+	const renderedSnapshots: string[] = [];
+	let renderedNode: FakeComment | undefined;
+	const graph = createRuntimeGraph({
+		cells: [{ graphNodeId: 'state:userId', value: 'a' }],
+		asyncComputed: [
+			{
+				graphNodeId: 'computed:first',
+				dependencies: [{ graphNodeId: 'state:userId', path: [] }],
+				key: (read) => read('state:userId'),
+				run() {
+					return firstResult.promise;
+				},
+			},
+			{
+				graphNodeId: 'computed:second',
+				dependencies: [{ graphNodeId: 'state:userId', path: [] }],
+				key: (read) => read('state:userId'),
+				run() {
+					return secondResult.promise;
+				},
+			},
+		],
+	});
+
+	const resume = createResumeRuntime({
+		root,
+		graph,
+		view: {
+			locators: [
+				{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'section' },
+				{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'p' },
+				{ hostNodeId: 'h2', strategy: 'dom-order', index: 2, tagName: 'hr' },
+				{ hostNodeId: 'h3', strategy: 'dom-order', index: 3, tagName: 'p' },
+			],
+			events: [],
+			domUpdates: [],
+			behaviors: [],
+			elementHandles: [],
+			asyncBoundaries: [
+				{
+					id: 'boundary:0',
+					startAnchor: { strategy: 'dom-order-comment', index: 0 },
+					endAnchor: { strategy: 'dom-order-comment', index: 1 },
+					asyncReads: [
+						{
+							source: 'first',
+							graphNodeId: 'computed:first',
+							path: [],
+							runnerSymbolId: 'symbol:first-runner',
+						},
+					],
+				},
+				{
+					id: 'boundary:1',
+					startAnchor: { strategy: 'dom-order-comment', index: 2 },
+					endAnchor: { strategy: 'dom-order-comment', index: 3 },
+					asyncReads: [
+						{
+							source: 'second',
+							graphNodeId: 'computed:second',
+							path: [],
+							runnerSymbolId: 'symbol:second-runner',
+						},
+					],
+				},
+			],
+		},
+		loadSymbol() {
+			return () => undefined;
+		},
+		applyDomJournal(entries) {
+			applyDomJournalEntries(entries, {
+				resolveTarget(locator) {
+					const match = /^async-boundary:(.+):(start|end)$/.exec(locator);
+					if (!match) return undefined;
+					const boundary = resume.getAsyncBoundary(match[1]);
+					return match[2] === 'start' ? boundary?.startAnchor : boundary?.endAnchor;
+				},
+				renderAsyncSnapshot(fragment) {
+					const snapshot = fragment.snapshot as { readonly status: string };
+					renderedSnapshots.push(`${fragment.boundaryId}:${snapshot.status}`);
+					renderedNode = comment(`rendered:${fragment.boundaryId}:${snapshot.status}`);
+					return [renderedNode];
+				},
+			});
+		},
+	});
+
+	await resume.start();
+
+	// Flat document-order comment indexes: boundary i owns comments i*2 and i*2+1.
+	expect(resume.getAsyncBoundary('boundary:0')?.startAnchor).toBe(firstStart);
+	expect(resume.getAsyncBoundary('boundary:0')?.endAnchor).toBe(firstEnd);
+	expect(resume.getAsyncBoundary('boundary:1')?.startAnchor).toBe(secondStart);
+	expect(resume.getAsyncBoundary('boundary:1')?.endAnchor).toBe(secondEnd);
+
+	graph.read('computed:second');
+	await graph.flush();
+	secondResult.resolve('Second');
+	await drainMicrotasks();
+	await graph.flush();
+
+	expect(renderedSnapshots).toEqual(['boundary:1:pending', 'boundary:1:fulfilled']);
+	expect(root.childNodes).toHaveLength(7);
+	expect(root.childNodes[0]).toBe(firstStart);
+	expect(root.childNodes[1]).toBe(firstPending);
+	expect(root.childNodes[2]).toBe(firstEnd);
+	expect(root.childNodes[3]).toBe(divider);
+	expect(root.childNodes[4]).toBe(secondStart);
+	expect(root.childNodes[5]).toBe(renderedNode);
+	expect(root.childNodes[6]).toBe(secondEnd);
+	expect(root.childNodes.includes(secondPending)).toBe(false);
+	expect(firstPending.parentElement).toBe(root);
+});
+
+type FakeRangeParentElement = FakeElement & {
+	insertBefore(node: FakeNode, before: FakeNode | null): FakeNode;
+	removeChild(node: FakeNode): FakeNode;
+};
+
+function rangeElement(tagName: string, childNodes: FakeNode[]): FakeRangeParentElement {
+	const parent = element(tagName, childNodes) as FakeRangeParentElement;
+	parent.insertBefore = (node, before) => {
+		const currentIndex = parent.childNodes.indexOf(node);
+		if (currentIndex >= 0) parent.childNodes.splice(currentIndex, 1);
+
+		const beforeIndex = before === null ? -1 : parent.childNodes.indexOf(before);
+		const insertIndex = beforeIndex >= 0 ? beforeIndex : parent.childNodes.length;
+		parent.childNodes.splice(insertIndex, 0, node);
+		setParentNode(node, parent);
+		return node;
+	};
+	parent.removeChild = (node) => {
+		const index = parent.childNodes.indexOf(node);
+		if (index >= 0) parent.childNodes.splice(index, 1);
+		setParentNode(node, null);
+		return node;
+	};
+	for (const child of parent.childNodes) setParentNode(child, parent);
+	return parent;
+}
+
+function setParentNode(node: FakeNode, parent: FakeRangeParentElement | null): void {
+	(node as { parentNode?: FakeRangeParentElement | null }).parentNode = parent;
+}
 
 function deferred<T>(): {
 	readonly promise: Promise<T>;
