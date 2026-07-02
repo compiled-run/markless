@@ -14,9 +14,11 @@ export type DecodedPayloadScripts = {
 	readonly view: ProtocolViewPayload;
 };
 
-export type RuntimePayloadType = 'arcade/state' | 'arcade/view';
+export type RuntimePayloadType = 'markless/state' | 'markless/view';
 
-export type RuntimePayloadErrorCode = 'ARCADE_PAYLOAD_INVALID' | 'ARCADE_PROTOCOL_VERSION_MISMATCH';
+export type RuntimePayloadErrorCode =
+	| 'MARKLESS_PAYLOAD_INVALID'
+	| 'MARKLESS_PROTOCOL_VERSION_MISMATCH';
 
 export type RuntimePayloadDiagnostic = {
 	readonly code: RuntimePayloadErrorCode;
@@ -64,13 +66,13 @@ export class RuntimePayloadError extends Error implements RuntimePayloadDiagnost
 }
 
 export function decodePayloadScripts(input: EncodedPayloadScripts): DecodedPayloadScripts {
-	const state = parseDataScript(input.stateScript, 'arcade/state') as ProtocolStatePayload;
-	const view = parseDataScript(input.viewScript, 'arcade/view') as ProtocolViewPayload;
+	const state = parseDataScript(input.stateScript, 'markless/state') as ProtocolStatePayload;
+	const view = parseDataScript(input.viewScript, 'markless/view') as ProtocolViewPayload;
 
 	assertProtocolStatePayload(state);
 	assertProtocolViewPayload(view);
-	assertProtocolVersion(state.version, 'arcade/state');
-	assertProtocolVersion(view.version, 'arcade/view');
+	assertProtocolVersion(state.version, 'markless/state');
+	assertProtocolVersion(view.version, 'markless/view');
 
 	return { state, view };
 }
@@ -113,20 +115,20 @@ export function assertProtocolStatePayload(
 ): asserts payload is ProtocolStatePayload {
 	if (!isRecord(payload)) {
 		throw invalidPayloadShapeError(
-			'arcade/state',
-			'Invalid arcade/state payload: expected object.',
+			'markless/state',
+			'Invalid markless/state payload: expected object.',
 		);
 	}
 	if (!('version' in payload)) {
 		throw invalidPayloadShapeError(
-			'arcade/state',
-			'Invalid arcade/state payload: expected version.',
+			'markless/state',
+			'Invalid markless/state payload: expected version.',
 		);
 	}
-	const cells = requiredPayloadArrayField(payload, 'cells', 'arcade/state');
+	const cells = requiredPayloadArrayField(payload, 'cells', 'markless/state');
 
 	for (const [index, cell] of cells.entries()) {
-		const context = `arcade/state cell[${index}]`;
+		const context = `markless/state cell[${index}]`;
 		assertRecordShape(cell, context);
 		assertStringField(cell, 'graphNodeId', context);
 		assertStringField(cell, 'name', context);
@@ -134,10 +136,10 @@ export function assertProtocolStatePayload(
 		if ('value' in cell) assertSerializedGraphPayload(cell.value, `${context}.value`);
 	}
 
-	const computedEntries = requiredPayloadArrayField(payload, 'computed', 'arcade/state');
+	const computedEntries = requiredPayloadArrayField(payload, 'computed', 'markless/state');
 
 	for (const [index, computed] of computedEntries.entries()) {
-		const context = `arcade/state computed[${index}]`;
+		const context = `markless/state computed[${index}]`;
 		assertRecordShape(computed, context);
 		assertStringField(computed, 'graphNodeId', context);
 		assertStringField(computed, 'name', context);
@@ -154,26 +156,26 @@ export function assertProtocolViewPayload(
 ): asserts payload is ProtocolViewPayload {
 	if (!isRecord(payload)) {
 		throw invalidPayloadShapeError(
-			'arcade/view',
-			'Invalid arcade/view payload: expected object.',
+			'markless/view',
+			'Invalid markless/view payload: expected object.',
 		);
 	}
 	if (!('version' in payload)) {
 		throw invalidPayloadShapeError(
-			'arcade/view',
-			'Invalid arcade/view payload: expected version.',
+			'markless/view',
+			'Invalid markless/view payload: expected version.',
 		);
 	}
 
-	const locators = requiredPayloadArrayField(payload, 'locators', 'arcade/view');
-	const events = requiredPayloadArrayField(payload, 'events', 'arcade/view');
-	const domUpdates = requiredPayloadArrayField(payload, 'domUpdates', 'arcade/view');
-	const behaviors = requiredPayloadArrayField(payload, 'behaviors', 'arcade/view');
-	const elementHandles = requiredPayloadArrayField(payload, 'elementHandles', 'arcade/view');
-	const asyncBoundaries = requiredPayloadArrayField(payload, 'asyncBoundaries', 'arcade/view');
+	const locators = requiredPayloadArrayField(payload, 'locators', 'markless/view');
+	const events = requiredPayloadArrayField(payload, 'events', 'markless/view');
+	const domUpdates = requiredPayloadArrayField(payload, 'domUpdates', 'markless/view');
+	const behaviors = requiredPayloadArrayField(payload, 'behaviors', 'markless/view');
+	const elementHandles = requiredPayloadArrayField(payload, 'elementHandles', 'markless/view');
+	const asyncBoundaries = requiredPayloadArrayField(payload, 'asyncBoundaries', 'markless/view');
 
 	for (const [index, locator] of locators.entries()) {
-		const context = `arcade/view locator[${index}]`;
+		const context = `markless/view locator[${index}]`;
 		assertRecordShape(locator, context);
 		assertStringField(locator, 'hostNodeId', context);
 		assertLiteralField(locator, 'strategy', 'dom-order', context);
@@ -182,7 +184,7 @@ export function assertProtocolViewPayload(
 	}
 
 	for (const [index, event] of events.entries()) {
-		const context = `arcade/view event[${index}]`;
+		const context = `markless/view event[${index}]`;
 		assertRecordShape(event, context);
 		assertStringField(event, 'hostNodeId', context);
 		assertStringField(event, 'eventName', context);
@@ -193,7 +195,7 @@ export function assertProtocolViewPayload(
 	}
 
 	for (const [index, domUpdate] of domUpdates.entries()) {
-		const context = `arcade/view domUpdate[${index}]`;
+		const context = `markless/view domUpdate[${index}]`;
 		assertRecordShape(domUpdate, context);
 		assertStringField(domUpdate, 'hostNodeId', context);
 		assertStringField(domUpdate, 'source', context);
@@ -204,7 +206,7 @@ export function assertProtocolViewPayload(
 	}
 
 	for (const [index, behavior] of behaviors.entries()) {
-		const context = `arcade/view behavior[${index}]`;
+		const context = `markless/view behavior[${index}]`;
 		assertRecordShape(behavior, context);
 		assertStringField(behavior, 'hostNodeId', context);
 		assertStringField(behavior, 'source', context);
@@ -216,7 +218,7 @@ export function assertProtocolViewPayload(
 	}
 
 	for (const [index, handle] of elementHandles.entries()) {
-		const context = `arcade/view elementHandle[${index}]`;
+		const context = `markless/view elementHandle[${index}]`;
 		assertRecordShape(handle, context);
 		assertStringField(handle, 'hostNodeId', context);
 		assertStringField(handle, 'handleId', context);
@@ -224,7 +226,7 @@ export function assertProtocolViewPayload(
 	}
 
 	for (const [index, boundary] of asyncBoundaries.entries()) {
-		const context = `arcade/view asyncBoundary[${index}]`;
+		const context = `markless/view asyncBoundary[${index}]`;
 		assertRecordShape(boundary, context);
 		assertStringField(boundary, 'id', context);
 		assertCommentAnchor(boundary.startAnchor, `${context}.startAnchor`);
@@ -406,13 +408,13 @@ function assertOptionalSharedDefinitions(record: Record<string, unknown>): void 
 	if (record.sharedDefinitions === undefined) return;
 	if (!Array.isArray(record.sharedDefinitions)) {
 		throw invalidPayloadShapeError(
-			'arcade/state',
-			'Invalid arcade/state payload: expected sharedDefinitions array.',
+			'markless/state',
+			'Invalid markless/state payload: expected sharedDefinitions array.',
 		);
 	}
 
 	for (const [index, definition] of record.sharedDefinitions.entries()) {
-		const context = `arcade/state sharedDefinitions[${index}]`;
+		const context = `markless/state sharedDefinitions[${index}]`;
 		assertRecordShape(definition, context);
 		assertStringField(definition, 'id', context);
 		assertStringField(definition, 'name', context);
@@ -1171,7 +1173,7 @@ export function payloadInvalidError(
 	suggestions: ReadonlyArray<{ readonly message: string }>,
 ): RuntimePayloadError {
 	return new RuntimePayloadError({
-		code: 'ARCADE_PAYLOAD_INVALID',
+		code: 'MARKLESS_PAYLOAD_INVALID',
 		severity: 'error',
 		phase: 'payload',
 		title: 'Invalid resumability payload',
@@ -1180,7 +1182,7 @@ export function payloadInvalidError(
 		payloadType,
 		payloadScript: payloadScriptSelector(payloadType),
 		suggestions,
-		docsUrl: 'https://arcadejs.com/errors/ARCADE_PAYLOAD_INVALID',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_PAYLOAD_INVALID',
 	});
 }
 
@@ -1194,7 +1196,7 @@ function invalidPayloadShapeError(
 		`The ${payloadType} payload did not match the resumability protocol shape required by this runtime.`,
 		[
 			{
-				message: `Regenerate the ${payloadType} payload with the matching arcade compiler/runtime version.`,
+				message: `Regenerate the ${payloadType} payload with the matching markless compiler/runtime version.`,
 			},
 		],
 	);
@@ -1205,7 +1207,7 @@ function protocolVersionMismatchError(
 	actualVersion: unknown,
 ): RuntimePayloadError {
 	return new RuntimePayloadError({
-		code: 'ARCADE_PROTOCOL_VERSION_MISMATCH',
+		code: 'MARKLESS_PROTOCOL_VERSION_MISMATCH',
 		severity: 'error',
 		phase: 'payload',
 		title: 'Unsupported resumability protocol version',
@@ -1217,15 +1219,15 @@ function protocolVersionMismatchError(
 		actualVersion,
 		suggestions: [
 			{
-				message: 'Use matching arcade compiler and runtime package versions.',
+				message: 'Use matching markless compiler and runtime package versions.',
 			},
 		],
-		docsUrl: 'https://arcadejs.com/errors/ARCADE_PROTOCOL_VERSION_MISMATCH',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_PROTOCOL_VERSION_MISMATCH',
 	});
 }
 
 function contextPayloadType(context: string): RuntimePayloadType {
-	return context.startsWith('arcade/state') ? 'arcade/state' : 'arcade/view';
+	return context.startsWith('markless/state') ? 'markless/state' : 'markless/view';
 }
 
 export function payloadScriptSelector(type: RuntimePayloadType): string {

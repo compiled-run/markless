@@ -31,7 +31,7 @@ export default box(
 		});
 		try {
 			const html = await preview.request('/');
-			await expect.html.contains(html, '<h1>Arcade Router Docs</h1>');
+			await expect.html.contains(html, '<h1>Markless Router Docs</h1>');
 			await expect.html.contains(html, 'This page is the docs fixture home route.');
 			receipt.note('vite preview served / for router-docs');
 		} finally {

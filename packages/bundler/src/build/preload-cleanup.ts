@@ -1,4 +1,4 @@
-import { parseJavaScriptModule, type JavaScriptAstNode } from '@arcade/compiler';
+import { parseJavaScriptModule, type JavaScriptAstNode } from '@markless/compiler';
 
 export function stripEmptyVitePreloadWrappers(code: string): string {
 	const withoutDirectImports = stripDirectEmptyPreloadWrappers(code);

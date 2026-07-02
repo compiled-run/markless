@@ -1,5 +1,5 @@
-import { deserializeGraphValue } from '@arcade/serializer';
-import type { SerializedGraphPayload } from '@arcade/serializer';
+import { deserializeGraphValue } from '@markless/serializer';
+import type { SerializedGraphPayload } from '@markless/serializer';
 import type { PublicRenderModuleInput } from '../../artifacts.ts';
 
 type ProtocolState = PublicRenderModuleInput['protocolState'];

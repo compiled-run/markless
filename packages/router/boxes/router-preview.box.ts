@@ -1,13 +1,13 @@
 import { box } from '@async/witness';
 import { planModulePreloadUrls } from '../../bundler/src/build/preload-plan.ts';
-import type { ArcadeBundleGraph } from '../../bundler/src/types.ts';
+import type { MarklessBundleGraph } from '../../bundler/src/types.ts';
 
 const FIXTURE = 'fixtures/router';
 const NITRO_BUILD_DIR = 'node_modules/.nitro-router-preview';
 const NITRO_OUTPUT_DIR = '.output-router-preview';
 const BUNDLE_GRAPH_REQUEST = '/build/bundle-graph.json';
 const COUNTER = 'button';
-const DOCS_LINK = 'a[data-arcade-router-link]';
+const DOCS_LINK = 'a[data-markless-router-link]';
 const BACK_BUTTON = '[data-router-back]';
 const MDX_COUNTER = '[data-mdx-counter]';
 const WAIT = { timeoutMs: 10_000 };
@@ -38,12 +38,12 @@ export default box(
 		});
 		try {
 			const expectedPreloadHrefs = expectedInteractionPreloadHrefs(
-				JSON.parse(await preview.request(BUNDLE_GRAPH_REQUEST)) as ArcadeBundleGraph,
+				JSON.parse(await preview.request(BUNDLE_GRAPH_REQUEST)) as MarklessBundleGraph,
 			);
 			const indexHtml = await preview.request('/');
-			await expect.html.contains(indexHtml, '<h1>Arcade Router</h1>');
+			await expect.html.contains(indexHtml, '<h1>Markless Router</h1>');
 			await expect.html.contains(indexHtml, 'Button 0');
-			await expect.html.contains(indexHtml, 'data-arcade-router-link');
+			await expect.html.contains(indexHtml, 'data-markless-router-link');
 			await expect.html.contains(indexHtml, 'data-async-resumer');
 			if (indexHtml.includes('<script type="module"')) {
 				throw new Error(
@@ -53,7 +53,7 @@ export default box(
 
 			const page = await preview.browser.visit('/');
 
-			await expect.page.text(page, 'h1', 'Arcade Router', WAIT);
+			await expect.page.text(page, 'h1', 'Markless Router', WAIT);
 			await expect.page.text(page, COUNTER, 'Button 0', WAIT);
 			await expect.page.text(page, DOCS_LINK, 'Docs', WAIT);
 			await expect.page.attribute(page, DOCS_LINK, 'href', '/docs/getting-started', WAIT);
@@ -74,7 +74,7 @@ export default box(
 			}
 			await expect.page.text(page, BACK_BUTTON, 'Back', WAIT);
 			await page.click(BACK_BUTTON, WAIT);
-			await expect.page.text(page, 'h1', 'Arcade Router', WAIT);
+			await expect.page.text(page, 'h1', 'Markless Router', WAIT);
 			await expect.page.text(page, DOCS_LINK, 'Docs', WAIT);
 			await expect.page.attribute(page, DOCS_LINK, 'href', '/docs/getting-started', WAIT);
 			await expect.page.text(page, COUNTER, 'Button 0', WAIT);
@@ -125,7 +125,7 @@ type NetworkRequestPage = {
 	networkRequests(): Promise<readonly BrowserNetworkRequest[]>;
 };
 
-function expectedInteractionPreloadHrefs(bundleGraph: ArcadeBundleGraph): readonly string[] {
+function expectedInteractionPreloadHrefs(bundleGraph: MarklessBundleGraph): readonly string[] {
 	const roots = bundleGraph
 		.filter((item): item is string => typeof item === 'string' && item.startsWith('symbol:'))
 		.map((name) => ({ name, priority: 'high' as const }));

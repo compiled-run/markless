@@ -2,7 +2,7 @@
 
 Status: Draft
 
-Arcade Router maps files under top-level `pages/` to URL routes.
+Markless Router maps files under top-level `pages/` to URL routes.
 
 Supported page extensions:
 
@@ -40,5 +40,5 @@ is not supported.
 
 The router package may integrate with an HTTP runtime through an adapter, but
 shared route manifesting and request-file parsing must stay runtime-agnostic.
-Renderer work must consume Arcade compiled `.tsrx` artifacts; it must not
+Renderer work must consume Markless compiled `.tsrx` artifacts; it must not
 reintroduce TSX, hydration, VDOM, or app-authored client/server entry ceremony.

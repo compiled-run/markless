@@ -1,4 +1,4 @@
-import { state } from 'arcade';
+import { state } from '@markless/core';
 
 export function App() @{
 	let count = state(0);

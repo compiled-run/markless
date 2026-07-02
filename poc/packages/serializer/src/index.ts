@@ -1,5 +1,5 @@
 export type RuntimeSerializerDiagnostic = {
-	readonly code: 'ARCADE_SERIALIZE_WEAK_COLLECTION' | 'ARCADE_SERIALIZE_SECRET_LEAK';
+	readonly code: 'MARKLESS_SERIALIZE_WEAK_COLLECTION' | 'MARKLESS_SERIALIZE_SECRET_LEAK';
 	readonly severity: 'error' | 'warning';
 	readonly phase: 'serialization';
 	readonly statePath: string;
@@ -62,7 +62,7 @@ function cloneValue(value: unknown, context: CloneContext, statePath: string): u
 	if (typeof value === 'string') {
 		if (looksSecret(value) || looksSecretPath(statePath)) {
 			context.diagnostics.push({
-				code: 'ARCADE_SERIALIZE_SECRET_LEAK',
+				code: 'MARKLESS_SERIALIZE_SECRET_LEAK',
 				severity: 'warning',
 				phase: 'serialization',
 				statePath,
@@ -93,7 +93,7 @@ function cloneValue(value: unknown, context: CloneContext, statePath: string): u
 
 	if (value instanceof WeakMap || value instanceof WeakSet) {
 		context.diagnostics.push({
-			code: 'ARCADE_SERIALIZE_WEAK_COLLECTION',
+			code: 'MARKLESS_SERIALIZE_WEAK_COLLECTION',
 			severity: 'error',
 			phase: 'serialization',
 			statePath,

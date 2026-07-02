@@ -1,12 +1,12 @@
 import { createLanguageServicePlugin } from '@volar/typescript/lib/quickstart/createLanguageServicePlugin.js';
-import { getArcadeTsrxLanguagePlugin } from './language.ts';
+import { getMarklessTsrxLanguagePlugin } from './language.ts';
 
 const plugin = createLanguageServicePlugin(() => ({
-	languagePlugins: [getArcadeTsrxLanguagePlugin()],
+	languagePlugins: [getMarklessTsrxLanguagePlugin()],
 }));
 
-Object.defineProperty(plugin, '__getArcadeTsrxLanguagePlugin', {
-	value: getArcadeTsrxLanguagePlugin,
+Object.defineProperty(plugin, '__getMarklessTsrxLanguagePlugin', {
+	value: getMarklessTsrxLanguagePlugin,
 });
 
 export default plugin;

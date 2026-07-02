@@ -69,9 +69,7 @@ test('runtime graph ignores same-value writes and updates', async () => {
 	graph.write({ graphNodeId: 'state:status', value: 'on' });
 	await graph.flush();
 	expect(runs).toBe(1);
-	expect(graph.takeJournal()).toEqual([
-		{ type: 'setText', locator: 'text:status', value: 'on' },
-	]);
+	expect(graph.takeJournal()).toEqual([{ type: 'setText', locator: 'text:status', value: 'on' }]);
 
 	graph.write({ graphNodeId: 'state:status', value: 'on' });
 	await graph.flush();

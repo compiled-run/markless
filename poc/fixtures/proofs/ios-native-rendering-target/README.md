@@ -1,6 +1,6 @@
 # iOS Native Rendering Target
 
-This proof checks whether an Arcade-style host-neutral graph/projection artifact
+This proof checks whether an Markless-style host-neutral graph/projection artifact
 can drive real iOS native controls through JavaScriptCore.
 
 It is intentionally narrow:
@@ -18,13 +18,13 @@ islands, or production compiler integration.
 ## Authored Shape
 
 ```tsrx
-import { state } from '@arcade/core';
+import { state } from '@markless/core';
 
 export function Counter() @{
   let count = state(0);
 
   <main>
-    <h1>Arcade iOS Proof</h1>
+    <h1>Markless iOS Proof</h1>
     <button onClick={() => count++}>Count {count}</button>
   </main>
 }
@@ -61,7 +61,7 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcrun simctl list devic
 Then run from this proof's `ios` directory:
 
 ```sh
-xcodebuild test -scheme ArcadeNativeProof -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath .build/xcode-derived -resultBundlePath .build/ArcadeNativeProof.xcresult
+xcodebuild test -scheme MarklessNativeProof -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath .build/xcode-derived -resultBundlePath .build/MarklessNativeProof.xcresult
 ```
 
 If the local simulator name differs, use the nearest available iPhone simulator.
@@ -74,7 +74,7 @@ To build, install, open Simulator, and launch the tappable UIKit demo:
 bash poc/fixtures/proofs/ios-native-rendering-target/ios/Scripts/run-ios-demo.sh
 ```
 
-The screen shows `Arcade iOS Proof` and a native count button. Tapping the
+The screen shows `Markless iOS Proof` and a native count button. Tapping the
 button runs the JavaScriptCore symbol, mutates the graph, and updates the native
 button title.
 

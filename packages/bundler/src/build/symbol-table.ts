@@ -1,5 +1,5 @@
 import { dirname, relative } from 'pathe';
-import { ARCADE_VIRTUAL_PREFIX } from '../transform.ts';
+import { MARKLESS_VIRTUAL_PREFIX } from '../transform.ts';
 
 type GeneratedChunk = {
 	readonly type: 'chunk';
@@ -14,8 +14,8 @@ export type SymbolTableUrlRewriteResult = {
 	readonly unresolved: readonly string[];
 };
 
-const SYMBOL_VIRTUAL_PREFIX = `${ARCADE_VIRTUAL_PREFIX}symbol:`;
-const SYMBOL_VIRTUAL_STRING_RE = /(["'`])((?:virtual:arcade:symbol:)[^"'`]+)\1/g;
+const SYMBOL_VIRTUAL_PREFIX = `${MARKLESS_VIRTUAL_PREFIX}symbol:`;
+const SYMBOL_VIRTUAL_STRING_RE = /(["'`])((?:virtual:markless:symbol:)[^"'`]+)\1/g;
 const SYMBOL_MANIFEST_TUPLE_RE =
 	/(\[1,(?:null|["'`][^"'`]*["'`]),(?:null|["'`][^"'`]*["'`]),)(\[[^\]]*\]),(\[[^\]]*\]),(\{[^}]*\})(\])/g;
 const STRING_LITERAL_RE = /(["'`])([^"'`]*)\1/g;

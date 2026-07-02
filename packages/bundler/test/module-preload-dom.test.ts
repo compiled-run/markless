@@ -5,7 +5,7 @@ import {
 	preloadLazySymbolModules,
 } from '../src/build/module-preload-dom.ts';
 import { convertManifestToBundleGraph } from '../src/build/bundle-graph.ts';
-import type { ArcadeManifest } from '../src/types.ts';
+import type { MarklessManifest } from '../src/types.ts';
 
 describe('CSR module preload DOM helpers', () => {
 	test('extracts lazy symbol roots from the rendered view without render entry chunks', () => {
@@ -116,28 +116,27 @@ function fakeLink(initialHref: string) {
 	};
 }
 
-function manifestWithLazySymbolDeps(): ArcadeManifest {
+function manifestWithLazySymbolDeps(): MarklessManifest {
 	return {
 		version: 1,
-		manifestHash: 'test',
 		modules: [
 			{
 				source: '/workspace/app/src/root.tsrx',
-				payload: { virtualModuleId: 'virtual:arcade:payload:root' },
-				resolver: { virtualModuleId: 'virtual:arcade:resolver:root' },
+				payload: { virtualModuleId: 'virtual:markless:payload:root' },
+				resolver: { virtualModuleId: 'virtual:markless:resolver:root' },
 				symbols: [
 					{
 						symbolId: 'symbol:press',
 						kind: 'event-handler',
 						exportName: 'onPress',
-						virtualModuleId: 'virtual:arcade:symbol:root:press',
+						virtualModuleId: 'virtual:markless:symbol:root:press',
 						fileName: 'build/press.js',
 					},
 					{
 						symbolId: 'symbol:text',
 						kind: 'dom-update',
 						exportName: 'text',
-						virtualModuleId: 'virtual:arcade:symbol:root:text',
+						virtualModuleId: 'virtual:markless:symbol:root:text',
 						fileName: 'build/text.js',
 					},
 				],

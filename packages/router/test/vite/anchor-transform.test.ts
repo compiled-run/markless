@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vite-plus/test';
 import { parseAst } from 'vite';
-import { __arcadeRouteHref } from '../../src/vite/entries/route-href.ts';
+import { __marklessRouteHref } from '../../src/vite/entries/route-href.ts';
 import { anchorTransformPlugin, transformAnchorSource } from '../../src/vite/anchor-transform.ts';
 import type { RouteTypegenFileSystem } from '../../src/vite/route-typegen.ts';
 
@@ -25,10 +25,10 @@ describe('anchor transform', () => {
 		const transformed = transform(source);
 
 		expect(transformed).toContain(
-			'import { __arcadeRouteHref } from "virtual:arcade-router/route-href";',
+			'import { __marklessRouteHref } from "virtual:markless-router/route-href";',
 		);
 		expect(transformed).toContain(
-			'<a class="post" href={__arcadeRouteHref("/blog/[slug]", { slug })} target="_self" aria-current="page" onClick={() => {}}>',
+			'<a class="post" href={__marklessRouteHref("/blog/[slug]", { slug })} target="_self" aria-current="page" onClick={() => {}}>',
 		);
 		expect(transformed).not.toContain('params=');
 	});
@@ -50,7 +50,7 @@ describe('anchor transform', () => {
 	});
 
 	it('lowers imported Link route patterns and preserves Link runtime props', () => {
-		const source = `import { Link } from "@arcade/router";
+		const source = `import { Link } from "@markless/router";
 
 export default () => {
   const slug = "hello";
@@ -66,16 +66,16 @@ export default () => {
 		const transformed = transform(source);
 
 		expect(transformed).toContain(
-			'import { __arcadeRouteHref } from "virtual:arcade-router/route-href";',
+			'import { __marklessRouteHref } from "virtual:markless-router/route-href";',
 		);
 		expect(transformed).toContain(
-			'<Link class="post" href={__arcadeRouteHref("/blog/[slug]", { slug })} prefetch="intent" replace scroll={false}>',
+			'<Link class="post" href={__marklessRouteHref("/blog/[slug]", { slug })} prefetch="intent" replace scroll={false}>',
 		);
 		expect(transformed).not.toContain('params=');
 	});
 
-	it('lowers imported Link route patterns from the public arcade/router entry', () => {
-		const source = `import { Link } from "arcade/router";
+	it('lowers imported Link route patterns from the public markless/router entry', () => {
+		const source = `import { Link } from "@markless/core/router";
 
 export default function Home() {
 	const slug = ["getting-started"];
@@ -89,10 +89,10 @@ export default function Home() {
 		const transformed = transform(source);
 
 		expect(transformed).toContain(
-			'import { __arcadeRouteHref } from "virtual:arcade-router/route-href";',
+			'import { __marklessRouteHref } from "virtual:markless-router/route-href";',
 		);
 		expect(transformed).toContain(
-			'<Link href={__arcadeRouteHref("/docs/[...slug]", { slug })}>',
+			'<Link href={__marklessRouteHref("/docs/[...slug]", { slug })}>',
 		);
 		expect(transformed).not.toContain('params=');
 	});
@@ -139,13 +139,13 @@ export default function Home() {
 		);
 
 		expect(result?.code).toContain(
-			'href={__arcadeRouteHref("/blog/[slug]", { slug: "hello" })}',
+			'href={__marklessRouteHref("/blog/[slug]", { slug: "hello" })}',
 		);
 		expect(result?.code).not.toContain('params=');
 	});
 
 	it('does not rewrite static Links or unrelated Link components', () => {
-		const source = `import { Link } from "@arcade/router";
+		const source = `import { Link } from "@markless/router";
 import { Link as DesignLink } from "./design";
 
 export default () => {
@@ -170,7 +170,7 @@ export default () => {
 	it('rejects route-pattern Links that do not match pages', () => {
 		expect(() =>
 			transform(
-				`import { Link } from "@arcade/router";
+				`import { Link } from "@markless/router";
 
 export default () => <Link href="/missing/[slug]" params={{ slug: "x" }} />;`,
 			),
@@ -196,25 +196,25 @@ export default () => <Link href="/missing/[slug]" params={{ slug: "x" }} />;`,
 	});
 
 	it('encodes dynamic and catch-all params', () => {
-		expect(__arcadeRouteHref('/blog/[slug]', { slug: 'hello world' })).toBe(
+		expect(__marklessRouteHref('/blog/[slug]', { slug: 'hello world' })).toBe(
 			'/blog/hello%20world',
 		);
-		expect(__arcadeRouteHref('/blog/[slug]', { slug: 'a/b' })).toBe('/blog/a%2Fb');
-		expect(__arcadeRouteHref('/docs/[...slug]', { slug: 'guides/getting-started' })).toBe(
+		expect(__marklessRouteHref('/blog/[slug]', { slug: 'a/b' })).toBe('/blog/a%2Fb');
+		expect(__marklessRouteHref('/docs/[...slug]', { slug: 'guides/getting-started' })).toBe(
 			'/docs/guides/getting-started',
 		);
 		expect(
-			__arcadeRouteHref('/docs/[...slug]', {
+			__marklessRouteHref('/docs/[...slug]', {
 				slug: ['guides', 'getting started'],
 			}),
 		).toBe('/docs/guides/getting%20started');
 	});
 
 	it('rejects empty catch-all params', () => {
-		expect(() => __arcadeRouteHref('/docs/[...slug]', { slug: '' })).toThrow(
+		expect(() => __marklessRouteHref('/docs/[...slug]', { slug: '' })).toThrow(
 			'Typed route error: /docs/[...slug] requires a non-empty catch-all param.',
 		);
-		expect(() => __arcadeRouteHref('/docs/[...slug]', { slug: [] })).toThrow(
+		expect(() => __marklessRouteHref('/docs/[...slug]', { slug: [] })).toThrow(
 			'Typed route error: /docs/[...slug] requires a non-empty catch-all param.',
 		);
 	});

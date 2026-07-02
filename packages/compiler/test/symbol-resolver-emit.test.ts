@@ -44,7 +44,7 @@ test('emitSymbolResolverModule emits compact table rows with a constant loader',
 	expect(output).not.toContain('case "symbol:key":');
 	expect(output).not.toContain('case "symbol:domUpdate":');
 	expect(output).toContain('throw createUnknownSymbolError(id);');
-	expect(output).toContain('code: "ARCADE_SYMBOL_UNKNOWN"');
+	expect(output).toContain('code: "MARKLESS_SYMBOL_UNKNOWN"');
 
 	const generatedModule = (await import(
 		`data:text/javascript,${encodeURIComponent(output)}`
@@ -101,7 +101,7 @@ test('emitSymbolResolverModule runs generated init exports for small symbol tabl
 	const moduleUrl = `data:text/javascript,${encodeURIComponent(
 		[
 			'let initialized = false;',
-			'export function init__virtual_arcade_symbol() { initialized = true; }',
+			'export function init__virtual_markless_symbol() { initialized = true; }',
 			'export function symbol_0() { return initialized ? "ready" : "cold"; }',
 		].join('\n'),
 	)}`;
@@ -115,7 +115,7 @@ test('emitSymbolResolverModule runs generated init exports for small symbol tabl
 		],
 	});
 
-	expect(output).toContain('mod.init__virtual_arcade_symbol?.();');
+	expect(output).toContain('mod.init__virtual_markless_symbol?.();');
 
 	const generatedModule = (await import(
 		`data:text/javascript,${encodeURIComponent(output)}`
@@ -131,7 +131,7 @@ test('emitSymbolResolverModule runs generated symbol chunk init exports before r
 	const moduleUrl = `data:text/javascript,${encodeURIComponent(
 		[
 			'let initialized = false;',
-			'export function init__virtual_arcade_symbol__root() { initialized = true; }',
+			'export function init__virtual_markless_symbol__root() { initialized = true; }',
 			'export function symbol_0() { return initialized ? "ready" : "cold"; }',
 			'export function symbol_1() { return "one"; }',
 			'export function symbol_2() { return "two"; }',
@@ -183,10 +183,10 @@ test('emitSymbolResolverModule fails closed for unknown symbols with structured 
 	};
 
 	await expect(generatedModule.loadSymbol('symbol:missing')).rejects.toMatchObject({
-		code: 'ARCADE_SYMBOL_UNKNOWN',
+		code: 'MARKLESS_SYMBOL_UNKNOWN',
 		phase: 'resume',
 		symbolId: 'symbol:missing',
-		docsUrl: 'https://arcadejs.com/errors/ARCADE_SYMBOL_UNKNOWN',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_SYMBOL_UNKNOWN',
 	});
 	await expect(generatedModule.loadSymbol('symbol:missing')).rejects.toThrow(
 		'Unknown async symbol symbol:missing',

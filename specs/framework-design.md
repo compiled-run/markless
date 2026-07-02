@@ -1,4 +1,4 @@
-# Arcade TSRX Framework — Design
+# Markless TSRX Framework — Design
 
 This file has been split into implementation-facing specs under
 [specs/framework](./framework/00-overview.md).
@@ -49,7 +49,7 @@ Source order:
 
 TSRX owns the authoring syntax and structural control-flow semantics. The
 framework compiler consumes TSRX parser/codegen-plugin artifacts and adds the
-`arcade` host semantics: graph references, state lowering, capture
+`@markless/core` host semantics: graph references, state lowering, capture
 diagnostics, symbol extraction, payload planning, and render/resume protocol
 wiring.
 
@@ -85,4 +85,4 @@ VDOM.
   build integration.
 - [11-platform-organization.md](./framework/11-platform-organization.md) —
   web, mobile, desktop package boundaries, platform-owned adapters, and deferred
-  `arcade/ui`.
+  `@markless/core/ui`.

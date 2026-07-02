@@ -1,4 +1,4 @@
-import { Html } from '@arcade/router';
+import { Html } from '@markless/router';
 
 export default function Document({ children }: { readonly children?: unknown }) @{
 	<Html>

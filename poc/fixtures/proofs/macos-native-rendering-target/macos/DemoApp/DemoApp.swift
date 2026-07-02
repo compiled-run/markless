@@ -2,23 +2,23 @@ import AppKit
 import Foundation
 
 @main
-final class ArcadeDesktopProofDemo: NSObject, NSApplicationDelegate {
+final class MarklessDesktopProofDemo: NSObject, NSApplicationDelegate {
 	private var desktopFrame: NSWindow?
-	private var runtime: ArcadeDesktopRuntime?
+	private var runtime: MarklessDesktopRuntime?
 
 	static func main() {
 		if CommandLine.arguments.contains("--verify-launch") {
 			do {
 				try verifyLaunch()
 			} catch {
-				fputs("ArcadeDesktopProofDemo verify failed: \(error)\n", stderr)
+				fputs("MarklessDesktopProofDemo verify failed: \(error)\n", stderr)
 				exit(1)
 			}
 			return
 		}
 
 		let app = NSApplication.shared
-		let delegate = ArcadeDesktopProofDemo()
+		let delegate = MarklessDesktopProofDemo()
 		app.delegate = delegate
 		app.setActivationPolicy(.regular)
 		app.run()
@@ -26,8 +26,8 @@ final class ArcadeDesktopProofDemo: NSObject, NSApplicationDelegate {
 
 	func applicationDidFinishLaunching(_ notification: Notification) {
 		do {
-			let artifact = try ArcadeDesktopProofResources.loadArtifact()
-			let runtime = try ArcadeDesktopRuntime(artifact: artifact)
+			let artifact = try MarklessDesktopProofResources.loadArtifact()
+			let runtime = try MarklessDesktopRuntime(artifact: artifact)
 			let root = try runtime.mount()
 			root.translatesAutoresizingMaskIntoConstraints = false
 
@@ -37,7 +37,7 @@ final class ArcadeDesktopProofDemo: NSObject, NSApplicationDelegate {
 				backing: .buffered,
 				defer: false,
 			)
-			frame.title = "Arcade macOS Proof"
+			frame.title = "Markless macOS Proof"
 			frame.contentView = root
 			frame.center()
 			frame.makeKeyAndOrderFront(nil)
@@ -55,14 +55,14 @@ final class ArcadeDesktopProofDemo: NSObject, NSApplicationDelegate {
 	@MainActor
 	private static func verifyLaunch() throws {
 		_ = NSApplication.shared
-		let artifact = try ArcadeDesktopProofResources.loadArtifact()
-		let runtime = try ArcadeDesktopRuntime(artifact: artifact)
+		let artifact = try MarklessDesktopProofResources.loadArtifact()
+		let runtime = try MarklessDesktopRuntime(artifact: artifact)
 		let root = try runtime.mount()
 
 		guard root is NSStackView else {
 			throw VerificationError.unexpectedRoot
 		}
-		guard try runtime.textValue(hostNodeId: "host:title") == "Arcade macOS Proof" else {
+		guard try runtime.textValue(hostNodeId: "host:title") == "Markless macOS Proof" else {
 			throw VerificationError.unexpectedTitle
 		}
 		guard try runtime.textValue(hostNodeId: "host:buttonText") == "Count 0" else {
@@ -78,7 +78,7 @@ final class ArcadeDesktopProofDemo: NSObject, NSApplicationDelegate {
 			throw VerificationError.unexpectedUpdatedText
 		}
 
-		print("{\"launchStatus\":\"verified\",\"title\":\"Arcade macOS Proof\",\"buttonText\":\"Count 1\"}")
+		print("{\"launchStatus\":\"verified\",\"title\":\"Markless macOS Proof\",\"buttonText\":\"Count 1\"}")
 	}
 
 	private enum VerificationError: Error {

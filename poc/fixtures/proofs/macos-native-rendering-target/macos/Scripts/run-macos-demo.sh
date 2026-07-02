@@ -9,7 +9,7 @@ if [[ "${1:-}" == "--verify-launch" ]]; then
 	VERIFY_LAUNCH=1
 fi
 
-APP_NAME="ArcadeDesktopProofDemo"
+APP_NAME="MarklessDesktopProofDemo"
 BUILD_DIR="$MACOS_DIR/.build/interactive-demo"
 APP_BUNDLE="$BUILD_DIR/$APP_NAME.app"
 CONTENTS_DIR="$APP_BUNDLE/Contents"
@@ -23,14 +23,14 @@ SDK_PATH="$(xcrun --sdk macosx --show-sdk-path)"
 rm -rf "$APP_BUNDLE"
 mkdir -p "$MACOS_BUNDLE_DIR" "$RESOURCES_DIR"
 cp "$MACOS_DIR/DemoApp/Info.plist" "$CONTENTS_DIR/Info.plist"
-cp "$MACOS_DIR/Sources/ArcadeDesktopProof/Resources/artifact.json" "$RESOURCES_DIR/artifact.json"
+cp "$MACOS_DIR/Sources/MarklessDesktopProof/Resources/artifact.json" "$RESOURCES_DIR/artifact.json"
 
 xcrun --sdk macosx swiftc \
 	-sdk "$SDK_PATH" \
 	-emit-executable \
 	-o "$MACOS_BUNDLE_DIR/$APP_NAME" \
-	"$MACOS_DIR/Sources/ArcadeDesktopProof/ArcadeArtifact.swift" \
-	"$MACOS_DIR/Sources/ArcadeDesktopProof/ArcadeDesktopRuntime.swift" \
+	"$MACOS_DIR/Sources/MarklessDesktopProof/MarklessArtifact.swift" \
+	"$MACOS_DIR/Sources/MarklessDesktopProof/MarklessDesktopRuntime.swift" \
 	"$MACOS_DIR/DemoApp/DemoApp.swift" \
 	-framework AppKit \
 	-framework Foundation \

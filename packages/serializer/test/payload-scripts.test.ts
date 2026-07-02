@@ -4,9 +4,9 @@ import {
 	renderPayloadScripts,
 	deserializeGraphValue,
 } from '../src/index.ts';
-import type { ProtocolViewPayload } from '@arcade/serializer';
+import type { ProtocolViewPayload } from '@markless/serializer';
 
-test('renderPayloadScripts emits canonical arcade/state and arcade/view data scripts', () => {
+test('renderPayloadScripts emits canonical markless/state and markless/view data scripts', () => {
 	const shared = { id: 1 };
 	const state = createProtocolStatePayload({
 		cells: [
@@ -37,9 +37,9 @@ test('renderPayloadScripts emits canonical arcade/state and arcade/view data scr
 
 	const scripts = renderPayloadScripts({ state, view });
 
-	expect(scripts.stateScript).toMatch(/^<script type="arcade\/state">/);
+	expect(scripts.stateScript).toMatch(/^<script type="markless\/state">/);
 	expect(scripts.stateScript).toMatch(/<\/script>$/);
-	expect(scripts.viewScript).toMatch(/^<script type="arcade\/view">/);
+	expect(scripts.viewScript).toMatch(/^<script type="markless\/view">/);
 	expect(scripts.viewScript).toMatch(/<\/script>$/);
 	expect(scripts.state.cells[0].value).toBeDefined();
 

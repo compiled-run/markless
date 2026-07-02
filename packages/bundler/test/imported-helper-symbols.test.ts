@@ -5,7 +5,7 @@ test('transformTsrxModule serves imported helper assignment event symbols', asyn
 	const result = await transformTsrxModule({
 		filename: '/workspace/app/src/ListControls.tsrx',
 		source: `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 import { appendItems, makeItems } from './items';
 
 export function App() @{

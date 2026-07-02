@@ -4,7 +4,7 @@ import {
 	type CsrRenderOptions,
 	type CsrRenderOutput,
 	type RenderTarget,
-} from '@arcade/web';
+} from '@markless/web';
 
 export type BrowserRenderElement = RenderTarget & {
 	innerHTML?: string;
@@ -124,6 +124,6 @@ function globalDocument(): BrowserRenderDocument {
 	}
 
 	throw new Error(
-		'@arcade/vitest-browser render() requires a browser document or an explicit document option.',
+		'@markless/vitest-browser render() requires a browser document or an explicit document option.',
 	);
 }

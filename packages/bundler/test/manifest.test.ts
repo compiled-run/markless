@@ -3,32 +3,35 @@ import {
 	convertManifestToBundleGraph,
 	createPreloadGraphAdder,
 } from '../src/build/bundle-graph.ts';
-import { ARCADE_BUNDLE_GRAPH } from '../src/build/chunking.ts';
 import {
-	ARCADE_MANIFEST,
-	createManifest,
-	injectManifest,
-	type ArcadeManifestBundle,
-} from '../src/build/manifest.ts';
-import type { ArcadeManifest, ArcadeTransformManifest } from '../src/types.ts';
+	MARKLESS_MANIFEST_FILE,
+	createBuildMetadata,
+	type MarklessBuildMetadataBundle,
+} from '../src/build/build-metadata.ts';
+import { MARKLESS_BUNDLE_GRAPH } from '../src/build/chunking.ts';
+import {
+	collectHeadLinkInjections,
+	collectModulePreloadInjections,
+} from '../src/build/head-links.ts';
+import type { MarklessManifest, MarklessTransformManifest } from '../src/types.ts';
 
-const transformManifest: ArcadeTransformManifest = {
+const transformManifest: MarklessTransformManifest = {
 	source: '/workspace/app/src/root.tsrx',
-	payload: { virtualModuleId: 'virtual:arcade:payload:root' },
-	resolver: { virtualModuleId: 'virtual:arcade:resolver:root' },
+	payload: { virtualModuleId: 'virtual:markless:payload:root' },
+	resolver: { virtualModuleId: 'virtual:markless:resolver:root' },
 	symbols: [
 		{
 			symbolId: 'root#click',
 			kind: 'event-handler',
 			exportName: 'onClick',
-			virtualModuleId: 'virtual:arcade:symbol:root:click',
+			virtualModuleId: 'virtual:markless:symbol:root:click',
 		},
 	],
 };
 
-describe('arcade manifest output', () => {
-	test('creates a manifest from bundler output and transform artifacts', () => {
-		const manifest = createManifest(
+describe('markless build metadata output', () => {
+	test('creates build metadata from bundler output and transform artifacts', () => {
+		const metadata = createBuildMetadata(
 			{
 				'build/chunk-entry.js': chunk({
 					fileName: 'build/chunk-entry.js',
@@ -42,8 +45,8 @@ describe('arcade manifest output', () => {
 					fileName: 'build/chunk-symbol.js',
 					name: 'root_click',
 					code: 'export const onClick = () => {};',
-					moduleIds: ['\0virtual:arcade:symbol:root:click'],
-					facadeModuleId: '\0virtual:arcade:symbol:root:click',
+					moduleIds: ['\0virtual:markless:symbol:root:click'],
+					facadeModuleId: '\0virtual:markless:symbol:root:click',
 				}),
 				'build/root.css': {
 					type: 'asset',
@@ -63,12 +66,12 @@ describe('arcade manifest output', () => {
 			[transformManifest],
 			'/workspace/app',
 			{
-				bundleGraphAsset: ARCADE_BUNDLE_GRAPH,
+				bundleGraphAsset: MARKLESS_BUNDLE_GRAPH,
 				publicPath: (fileName) => `/assets/${fileName}`,
 			},
 		);
 
-		expect(manifest.modules[0]).toMatchObject({
+		expect(metadata.modules[0]).toMatchObject({
 			source: '/workspace/app/src/root.tsrx',
 			symbols: [
 				expect.objectContaining({
@@ -77,18 +80,23 @@ describe('arcade manifest output', () => {
 				}),
 			],
 		});
-		expect(manifest.bundles['build/chunk-entry.js']).toMatchObject({
+		expect(metadata.bundles['build/chunk-entry.js']).toMatchObject({
 			imports: ['build/chunk-symbol.js'],
 			origins: ['src/root.tsrx'],
 		});
-		expect(manifest.bundles['build/chunk-symbol.js']).toMatchObject({
+		expect(metadata.bundles['build/chunk-symbol.js']).toMatchObject({
 			symbols: ['root#click'],
 		});
-		expect(manifest.assets?.['build/root.css']).toEqual({ name: 'root.css', size: 6 });
-		expect(manifest.assets?.['build/chunk-entry.js.map']).toBeUndefined();
-		expect(manifest.bundleGraphAsset).toBe(ARCADE_BUNDLE_GRAPH);
-		expect(manifest.bundleGraph).toContain('root#click');
-		expect(manifest.injections).toContainEqual({
+		expect(metadata.assets?.['build/root.css']).toEqual({ name: 'root.css', size: 6 });
+		expect(metadata.assets?.['build/chunk-entry.js.map']).toBeUndefined();
+		expect(metadata.assets?.[MARKLESS_BUNDLE_GRAPH]).toEqual({
+			name: 'bundle-graph.json',
+			size: JSON.stringify(metadata.bundleGraph).length,
+		});
+		expect(MARKLESS_MANIFEST_FILE).toBe('markless-manifest.json');
+		expect(metadata.bundleGraphAsset).toBe(MARKLESS_BUNDLE_GRAPH);
+		expect(metadata.bundleGraph).toContain('root#click');
+		expect(metadata.injections).toContainEqual({
 			tag: 'link',
 			location: 'head',
 			attributes: {
@@ -96,13 +104,71 @@ describe('arcade manifest output', () => {
 				href: '/assets/build/root.css',
 			},
 		});
-		expect(manifest.manifestHash).toEqual(expect.any(String));
+	});
+
+	test('prefers Vite imported CSS metadata when collecting stylesheet head links', () => {
+		const injections = collectHeadLinkInjections(
+			{
+				'build/root.js': chunk({
+					fileName: 'build/root.js',
+					name: 'root',
+					code: 'export default {};',
+					moduleIds: ['/workspace/app/src/root.tsrx'],
+					facadeModuleId: '/workspace/app/src/root.tsrx',
+					viteMetadata: { importedCss: new Set(['build/root.css']) },
+				}),
+				'build/root.css': {
+					type: 'asset',
+					fileName: 'build/root.css',
+					name: 'root.css',
+					names: ['root.css'],
+					source: 'body{}',
+				},
+				'build/unused.css': {
+					type: 'asset',
+					fileName: 'build/unused.css',
+					name: 'unused.css',
+					names: ['unused.css'],
+					source: '.unused{}',
+				},
+			},
+			{ publicPath: (fileName) => `/assets/${fileName}` },
+		);
+
+		expect(injections).toEqual([
+			{
+				tag: 'link',
+				location: 'head',
+				attributes: {
+					rel: 'stylesheet',
+					href: '/assets/build/root.css',
+				},
+			},
+		]);
+	});
+
+	test('collects modulepreload head links for lazy symbol bundle graph roots', () => {
+		const graph = convertManifestToBundleGraph(lazySymbolManifest());
+
+		const injections = collectModulePreloadInjections(graph);
+
+		expect(injections).toEqual(
+			['/build/shared.js', '/build/press.js', '/build/text.js'].map((href) => ({
+				tag: 'link',
+				location: 'head',
+				attributes: {
+					rel: 'modulepreload',
+					href,
+					crossorigin: 'anonymous',
+					fetchpriority: 'high',
+				},
+			})),
+		);
 	});
 
 	test('converts symbol and custom preload entries into the bundle graph', () => {
-		const manifest: ArcadeManifest = {
+		const manifest: MarklessManifest = {
 			version: 1,
-			manifestHash: 'test',
 			modules: [
 				{
 					...transformManifest,
@@ -143,28 +209,41 @@ describe('arcade manifest output', () => {
 		expect(graph).toContain('entry-preload');
 		expect(graph).toContain('build/chunk-symbol.js');
 	});
-
-	test('injects build manifests into server output without a manifest input option', () => {
-		const manifest: ArcadeManifest = {
-			version: 1,
-			manifestHash: 'abc',
-			modules: [transformManifest],
-			bundles: {},
-			bundleGraph: ['root#click'],
-			bundleGraphAsset: ARCADE_BUNDLE_GRAPH,
-			injections: [{ tag: 'script', location: 'head', attributes: { src: '/runtime.js' } }],
-		};
-
-		const code = injectManifest(
-			`if (!${ARCADE_MANIFEST}) throw new Error(); export default ${ARCADE_MANIFEST};`,
-			manifest,
-		);
-
-		expect(code).toContain('"manifestHash":"abc"');
-		expect(code).toContain('"bundleGraph":["root#click"]');
-		expect(code).toContain('if (false) throw new Error();');
-	});
 });
+
+function lazySymbolManifest(): MarklessManifest {
+	const symbol = (name: string, kind: 'event-handler' | 'dom-update') => ({
+		symbolId: `symbol:${name}`,
+		kind,
+		exportName: name,
+		virtualModuleId: `virtual:markless:symbol:root:${name}`,
+		fileName: `${name}.js`,
+	});
+	return {
+		version: 1,
+		modules: [
+			{
+				...transformManifest,
+				symbols: [symbol('press', 'event-handler'), symbol('text', 'dom-update')],
+			},
+		],
+		bundles: {
+			'press.js': {
+				size: 900,
+				total: 1900,
+				imports: ['shared.js'],
+				origins: ['src/root.tsrx'],
+			},
+			'text.js': {
+				size: 500,
+				total: 1500,
+				imports: ['shared.js'],
+				origins: ['src/root.tsrx'],
+			},
+			'shared.js': { size: 500, total: 500, origins: ['src/shared.ts'] },
+		},
+	};
+}
 
 function chunk(input: {
 	fileName: string;
@@ -174,7 +253,8 @@ function chunk(input: {
 	dynamicImports?: string[];
 	moduleIds: string[];
 	facadeModuleId: string;
-}): ArcadeManifestBundle[string] {
+	viteMetadata?: { importedCss?: Set<string> };
+}): MarklessBuildMetadataBundle[string] {
 	return {
 		type: 'chunk',
 		fileName: input.fileName,
@@ -185,5 +265,6 @@ function chunk(input: {
 		dynamicImports: input.dynamicImports ?? [],
 		moduleIds: input.moduleIds,
 		facadeModuleId: input.facadeModuleId,
+		viteMetadata: input.viteMetadata,
 	};
 }

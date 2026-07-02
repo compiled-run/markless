@@ -5,7 +5,7 @@ import { createEventOnlyResumeContainerFromPayloads } from '../../web/src/event-
 import type { ProtocolStatePayload, ProtocolViewPayload } from '../../serializer/src/index.ts';
 
 const source = `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 
 export function App() @{
 	let count = state(1);
@@ -27,7 +27,7 @@ export function App() @{
 `;
 
 const eventWriteSource = `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 import { clamp } from './math';
 import { makeItems } from './items';
 
@@ -84,7 +84,7 @@ export function App() @{
 `;
 
 const asyncComputedSource = `
-import { state, computed } from 'arcade';
+import { state, computed } from '@markless/core';
 
 export function App() @{
 	const query = state('Ada');
@@ -107,13 +107,13 @@ export function App() @{
 `;
 
 const defaultExportPageSource = `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 
 export default function Home() @{
 	const count = state(0);
 
 	<main>
-		<h1>Arcade Router</h1>
+		<h1>Markless Router</h1>
 		<button onClick={() => count++}>Button {count}</button>
 	</main>
 }
@@ -387,17 +387,17 @@ async function importPublicRenderTestModule(
 	},
 ): Promise<Record<string, unknown>> {
 	const globalScope = globalThis as typeof globalThis & {
-		__arcadePublicRenderTestDocument?: unknown;
-		__arcadePublicRenderTestLoadSymbol?: unknown;
-		__arcadePublicRenderTestChildComponent?: unknown;
+		__marklessPublicRenderTestDocument?: unknown;
+		__marklessPublicRenderTestLoadSymbol?: unknown;
+		__marklessPublicRenderTestChildComponent?: unknown;
 	};
-	const previousDocument = globalScope.__arcadePublicRenderTestDocument;
-	const previousLoadSymbol = globalScope.__arcadePublicRenderTestLoadSymbol;
-	const previousChildComponent = globalScope.__arcadePublicRenderTestChildComponent;
+	const previousDocument = globalScope.__marklessPublicRenderTestDocument;
+	const previousLoadSymbol = globalScope.__marklessPublicRenderTestLoadSymbol;
+	const previousChildComponent = globalScope.__marklessPublicRenderTestChildComponent;
 	if (globals) {
-		globalScope.__arcadePublicRenderTestDocument = globals.document;
-		globalScope.__arcadePublicRenderTestLoadSymbol = globals.loadSymbol;
-		globalScope.__arcadePublicRenderTestChildComponent = globals.childComponent;
+		globalScope.__marklessPublicRenderTestDocument = globals.document;
+		globalScope.__marklessPublicRenderTestLoadSymbol = globals.loadSymbol;
+		globalScope.__marklessPublicRenderTestChildComponent = globals.childComponent;
 	}
 
 	try {
@@ -405,9 +405,9 @@ async function importPublicRenderTestModule(
 			`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`
 		)) as Record<string, unknown>;
 	} finally {
-		globalScope.__arcadePublicRenderTestDocument = previousDocument;
-		globalScope.__arcadePublicRenderTestLoadSymbol = previousLoadSymbol;
-		globalScope.__arcadePublicRenderTestChildComponent = previousChildComponent;
+		globalScope.__marklessPublicRenderTestDocument = previousDocument;
+		globalScope.__marklessPublicRenderTestLoadSymbol = previousLoadSymbol;
+		globalScope.__marklessPublicRenderTestChildComponent = previousChildComponent;
 	}
 }
 
@@ -417,8 +417,8 @@ function ssrRenderTestModuleSource(
 ): string {
 	const ssrSource = options.replaceChildImport
 		? result.publicRenderModule.ssrModuleSource.replace(
-				/import (?:__arcadeSsrComponent0|\{ [^}]+ as __arcadeSsrComponent0 \}) from [^;]+;/,
-				'const __arcadeSsrComponent0 = globalThis.__arcadePublicRenderTestChildComponent;',
+				/import (?:__marklessSsrComponent0|\{ [^}]+ as __marklessSsrComponent0 \}) from [^;]+;/,
+				'const __marklessSsrComponent0 = globalThis.__marklessPublicRenderTestChildComponent;',
 			)
 		: result.publicRenderModule.ssrModuleSource;
 
@@ -426,7 +426,7 @@ function ssrRenderTestModuleSource(
 		`const payloadState = ${JSON.stringify(result.protocolState)};`,
 		`const payloadView = ${JSON.stringify(result.protocolView)};`,
 		ssrSource,
-		'export { arcadeRenderSsr };',
+		'export { marklessRenderSsr };',
 	].join('\n');
 }
 
@@ -437,18 +437,18 @@ function csrRenderTestModuleSource(
 	const source = result.publicRenderModule.csrModuleSource ?? '';
 	const csrSource = options.replaceChildImport
 		? source.replace(
-				/import (?:__arcadeCsrComponent0|\{ [^}]+ as __arcadeCsrComponent0 \}) from [^;]+;/,
-				'const __arcadeCsrComponent0 = globalThis.__arcadePublicRenderTestChildComponent;',
+				/import (?:__marklessCsrComponent0|\{ [^}]+ as __marklessCsrComponent0 \}) from [^;]+;/,
+				'const __marklessCsrComponent0 = globalThis.__marklessPublicRenderTestChildComponent;',
 			)
 		: source;
 
 	return [
-		'const document = globalThis.__arcadePublicRenderTestDocument;',
-		'const loadSymbol = globalThis.__arcadePublicRenderTestLoadSymbol;',
+		'const document = globalThis.__marklessPublicRenderTestDocument;',
+		'const loadSymbol = globalThis.__marklessPublicRenderTestLoadSymbol;',
 		`const payloadState = ${JSON.stringify(result.protocolState)};`,
 		`const payloadView = ${JSON.stringify(result.protocolView)};`,
 		csrSource,
-		'export { arcadeRenderCsr };',
+		'export { marklessRenderCsr };',
 	].join('\n');
 }
 
@@ -539,8 +539,8 @@ test('compileTsrxModule orchestrates source to payload scripts and resolver modu
 			}),
 		]),
 	);
-	expect(result.payloadScripts.stateScript).toMatch(/^<script type="arcade\/state">/);
-	expect(result.payloadScripts.viewScript).toMatch(/^<script type="arcade\/view">/);
+	expect(result.payloadScripts.stateScript).toMatch(/^<script type="markless\/state">/);
+	expect(result.payloadScripts.viewScript).toMatch(/^<script type="markless\/view">/);
 	expect(result).not.toHaveProperty('renderShell');
 	expect(result.symbolResolverModule).toContain('import(/* @vite-ignore */ moduleUrls[row[0]])');
 	expect(result.symbolResolverModule).not.toContain('switch (id)');
@@ -607,19 +607,19 @@ test('compileTsrxModule treats a default exported TSRX function as the public re
 			expect.objectContaining({ hostNodeId: 'h2', tagName: 'button' }),
 		]),
 	);
-	expect(result.publicRenderModule.ssrExportName).toBe('arcadeRenderSsr');
-	expect(result.publicRenderModule.ssrModuleSource).toContain('function arcadeRenderSsr');
+	expect(result.publicRenderModule.ssrExportName).toBe('marklessRenderSsr');
+	expect(result.publicRenderModule.ssrModuleSource).toContain('function marklessRenderSsr');
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
-	const output = (ssrModule.arcadeRenderSsr as () => { readonly html: string })();
+	const output = (ssrModule.marklessRenderSsr as () => { readonly html: string })();
 
-	expect(output.html).toBe('<main><h1>Arcade Router</h1><button>Button 0</button></main>');
+	expect(output.html).toBe('<main><h1>Markless Router</h1><button>Button 0</button></main>');
 });
 
 test('compileTsrxModule passes component children into SSR component props', async () => {
 	const result = await compileTsrxModule({
 		filename: 'pages/index.tsrx',
 		source: `
-import { Link } from 'arcade/router';
+import { Link } from '@markless/core/router';
 
 export default function Home() @{
 	<main>
@@ -639,7 +639,7 @@ export default function Home() @{
 			},
 		},
 	);
-	const output = (ssrModule.arcadeRenderSsr as () => { readonly html: string })();
+	const output = (ssrModule.marklessRenderSsr as () => { readonly html: string })();
 
 	expect(output.html).toBe('<main><a href="/docs">Docs</a></main>');
 });
@@ -648,12 +648,12 @@ test('compileTsrxModule emits SSR for an imported component root', async () => {
 	const result = await compileTsrxModule({
 		filename: 'document.tsrx',
 		source: `
-import { Html } from 'arcade/router';
+import { Html } from '@markless/core/router';
 
 export default function Document({ children }: { readonly children?: unknown }) @{
 	<Html>
 		<head>
-			<title>Arcade Router</title>
+			<title>Markless Router</title>
 		</head>
 		<body>{children}</body>
 	</Html>
@@ -662,9 +662,9 @@ export default function Document({ children }: { readonly children?: unknown }) 
 		symbols: [],
 	});
 
-	expect(result.publicRenderModule.ssrExportName).toBe('arcadeRenderSsr');
+	expect(result.publicRenderModule.ssrExportName).toBe('marklessRenderSsr');
 	expect(result.publicRenderModule.ssrModuleSource).toContain(
-		'import { Html as __arcadeSsrComponent0 } from "arcade/router";',
+		'import { Html as __marklessSsrComponent0 } from "@markless/core/router";',
 	);
 
 	const ssrModule = await importPublicRenderTestModule(
@@ -677,12 +677,14 @@ export default function Document({ children }: { readonly children?: unknown }) 
 			},
 		},
 	);
-	const output = (ssrModule.arcadeRenderSsr as (props: { children: string }) => {
-		readonly html: string;
-	})({ children: '<main>Docs</main>' });
+	const output = (
+		ssrModule.marklessRenderSsr as (props: { children: string }) => {
+			readonly html: string;
+		}
+	)({ children: '<main>Docs</main>' });
 
 	expect(output.html).toBe(
-		'<head><title>Arcade Router</title></head><body>&lt;main&gt;Docs&lt;/main&gt;</body>',
+		'<head><title>Markless Router</title></head><body>&lt;main&gt;Docs&lt;/main&gt;</body>',
 	);
 });
 
@@ -690,8 +692,8 @@ test('compileTsrxModule passes component children into CSR component props', asy
 	const result = await compileTsrxModule({
 		filename: 'pages/index.tsrx',
 		source: `
-import { state } from 'arcade';
-import { Link } from 'arcade/router';
+import { state } from '@markless/core';
+import { Link } from '@markless/core/router';
 
 export default function Home() @{
 	const count = state(0);
@@ -725,7 +727,9 @@ export default function Home() @{
 			},
 		},
 	);
-	const output = (csrModule.arcadeRenderCsr as () => { readonly root: PublicRenderTestElement })();
+	const output = (
+		csrModule.marklessRenderCsr as () => { readonly root: PublicRenderTestElement }
+	)();
 	const anchors = elementsByTag(output.root, 'a');
 
 	expect(anchors).toHaveLength(1);
@@ -738,7 +742,7 @@ test('compileTsrxModule preserves value imports used by public render expression
 		filename: 'pages/index.tsrx',
 		source: `
 import { routeHref } from 'virtual:test-route-href';
-import { Link } from 'arcade/router';
+import { Link } from '@markless/core/router';
 
 export default function Home() @{
 	<main>
@@ -769,7 +773,7 @@ export default function Home() @{
 			},
 		},
 	);
-	const output = (ssrModule.arcadeRenderSsr as () => { readonly html: string })();
+	const output = (ssrModule.marklessRenderSsr as () => { readonly html: string })();
 
 	expect(output.html).toBe('<main><a href="/docs/intro">Docs</a></main>');
 });
@@ -791,10 +795,10 @@ export function App() @{
 	});
 
 	expect(result.publicRenderModule.ssrModuleSource).toContain(
-		'import __arcadeSsrComponent0 from "./Counter.tsrx";',
+		'import __marklessSsrComponent0 from "./Counter.tsrx";',
 	);
 	expect(result.publicRenderModule.ssrModuleSource).not.toContain(
-		'import { Counter as __arcadeSsrComponent0 } from "./Counter.tsrx";',
+		'import { Counter as __marklessSsrComponent0 } from "./Counter.tsrx";',
 	);
 });
 
@@ -818,7 +822,7 @@ test('compileTsrxModule emits conditional class DOM updates from graph tests', a
 	const result = await compileTsrxModule({
 		filename: 'src/ConditionalClass.tsrx',
 		source: `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 
 export function App() @{
 	let selected = state(false);
@@ -849,7 +853,7 @@ test('compileTsrxModule emits same-host conditional branch text DOM updates', as
 	const result = await compileTsrxModule({
 		filename: 'src/ConditionalBranchText.tsrx',
 		source: `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 
 export function App() @{
 	let playing = state(false);
@@ -903,7 +907,7 @@ test('compileTsrxModule emits public render direct DOM artifacts for supported k
 	const result = await compileTsrxModule({
 		filename: 'src/KeyedEntries.tsrx',
 		source: `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 
 export function App() @{
 	let entries = state([]); let chosen = state(null); let draft = state({ code: 'draft' });
@@ -961,36 +965,36 @@ export function App() @{
 	]);
 	for (const expected of [
 		'export function App()',
-		'const graph = createArcadePublicGraph()',
+		'const graph = createMarklessPublicGraph()',
 		'runtime: { async dispatch() {} }',
 	]) {
 		expect(moduleSource).toContain(expected);
 	}
-	expect(moduleSource).not.toContain('function createArcadePublicRuntime');
+	expect(moduleSource).not.toContain('function createMarklessPublicRuntime');
 	expect(moduleSource).not.toContain('view: { version: 1');
-	expect(moduleSource).toContain('!sameArcadePublicKeys(state.keys, nextKeys)');
+	expect(moduleSource).toContain('!sameMarklessPublicKeys(state.keys, nextKeys)');
 	expect(moduleSource).toContain(
 		'const repeatState0 = { rows: new Map(), keys: [], classValue: undefined };',
 	);
-	expect(moduleSource).toContain('createArcadePublicLoadSymbol(root, repeatState0)');
+	expect(moduleSource).toContain('createMarklessPublicLoadSymbol(root, repeatState0)');
 	expect(moduleSource).toContain(
-		'syncArcadePublicRepeat0(root, graph, componentLoadSymbol, repeatState0);',
+		'syncMarklessPublicRepeat0(root, graph, componentLoadSymbol, repeatState0);',
 	);
 	expect(moduleSource).toContain(
-		'syncArcadePublicRepeat0(root, context.graph, loadArcadePublicSymbol, repeatState0);',
+		'syncMarklessPublicRepeat0(root, context.graph, loadMarklessPublicSymbol, repeatState0);',
 	);
-	expect(moduleSource).not.toContain('function syncArcadePublicRepeats');
-	expect(moduleSource).not.toContain('const arcadePublicRepeatStates');
+	expect(moduleSource).not.toContain('function syncMarklessPublicRepeats');
+	expect(moduleSource).not.toContain('const marklessPublicRepeatStates');
 	expect(moduleSource).not.toContain('function repeatState(root) {');
 	expect(moduleSource).not.toContain('function repeatState(root, planIndex)');
 	expect(moduleSource).not.toContain('states = []');
-	expect(moduleSource).toContain('function createArcadePublicRepeat0Record(row, item)');
-	expect(moduleSource).toContain('function createArcadePublicRepeat0Row()');
-	expect(moduleSource).toContain('let arcadePublicRepeat0Template;');
-	expect(moduleSource).toContain('const rowRoot = createArcadePublicRepeat0Row();');
-	expect(moduleSource).toContain('record = createArcadePublicRepeat0Record(rowRoot, item);');
-	expect(moduleSource).not.toContain('createArcadePublicRow(');
-	expect(moduleSource).not.toContain('arcadePublicRowTemplates');
+	expect(moduleSource).toContain('function createMarklessPublicRepeat0Record(row, item)');
+	expect(moduleSource).toContain('function createMarklessPublicRepeat0Row()');
+	expect(moduleSource).toContain('let marklessPublicRepeat0Template;');
+	expect(moduleSource).toContain('const rowRoot = createMarklessPublicRepeat0Row();');
+	expect(moduleSource).toContain('record = createMarklessPublicRepeat0Record(rowRoot, item);');
+	expect(moduleSource).not.toContain('createMarklessPublicRow(');
+	expect(moduleSource).not.toContain('marklessPublicRowTemplates');
 	expect(moduleSource).toContain('text0: row.childNodes?.[0]?.childNodes?.[0],');
 	expect(moduleSource).toContain('class0: row,');
 	expect(moduleSource).not.toContain('record.targets');
@@ -1003,14 +1007,14 @@ export function App() @{
 	expect(moduleSource).toContain('const textTarget0 = record.text0;');
 	expect(moduleSource).toContain('item.code');
 	expect(moduleSource).toContain('item.title');
-	expect(moduleSource).not.toContain('readArcadePublicPath(item, ["code"])');
-	expect(moduleSource).not.toContain('readArcadePublicPath(item, ["title"])');
+	expect(moduleSource).not.toContain('readMarklessPublicPath(item, ["code"])');
+	expect(moduleSource).not.toContain('readMarklessPublicPath(item, ["title"])');
 	expect(moduleSource).not.toContain('nodeAtPath(record.root');
 	expect(moduleSource).not.toContain('nodeAtPath(row');
 	expect(moduleSource).toContain('function nodeAtPath(root, path)');
 	expect(moduleSource).not.toContain('await graph.flush();');
 	expect(moduleSource).toContain('graph.flush();');
-	expect(moduleSource).toContain('function readArcadePublicRepeat0ClassValues(graph)');
+	expect(moduleSource).toContain('function readMarklessPublicRepeat0ClassValues(graph)');
 	expect(moduleSource).toContain(
 		'const collectionDirty = graph.isDirty?.("state:entries") ?? true;',
 	);
@@ -1019,21 +1023,23 @@ export function App() @{
 	expect(moduleSource).toContain('return graph.read("state:chosen");');
 	expect(moduleSource).not.toContain('graph.read("state:entries", [])');
 	expect(moduleSource).not.toContain('graph.read("state:chosen", [])');
-	expect(moduleSource).toContain('const classValue = readArcadePublicRepeat0ClassValues(graph);');
-	expect(moduleSource).toContain('writeArcadePublicRepeat0Row(record, item, classValue);');
-	expect(moduleSource).toContain('attachArcadePublicRepeat0Events(record);');
+	expect(moduleSource).toContain(
+		'const classValue = readMarklessPublicRepeat0ClassValues(graph);',
+	);
+	expect(moduleSource).toContain('writeMarklessPublicRepeat0Row(record, item, classValue);');
+	expect(moduleSource).toContain('attachMarklessPublicRepeat0Events(record);');
 	expect(moduleSource).not.toContain(
-		'attachArcadePublicRepeat0Events(record, graph, loadSymbolForRepeat);',
+		'attachMarklessPublicRepeat0Events(record, graph, loadSymbolForRepeat);',
 	);
 	expect(moduleSource).toContain(
-		'delegateArcadePublicRepeat0Events(parent, graph, loadSymbolForRepeat);',
+		'delegateMarklessPublicRepeat0Events(parent, graph, loadSymbolForRepeat);',
 	);
 	expect(moduleSource).toContain('event0: row.childNodes?.[1],');
 	expect(moduleSource).toContain('const element0 = record.event0;');
 	expect(moduleSource).not.toContain('const element0 = record.root.childNodes?.[1];');
-	expect(moduleSource).toContain('element0.__arcadePublicRepeat0Event0 = record;');
+	expect(moduleSource).toContain('element0.__marklessPublicRepeat0Event0 = record;');
 	expect(moduleSource).toContain('parent.addEventListener("click"');
-	expect(moduleSource).toContain('const record = eventTarget?.__arcadePublicRepeat0Event0;');
+	expect(moduleSource).toContain('const record = eventTarget?.__marklessPublicRepeat0Event0;');
 	expect(moduleSource).not.toContain('element0.addEventListener("click"');
 	expect(moduleSource).toContain('const dirtyGraphNodeIds = new Set();');
 	expect(moduleSource).toContain('const dirtyArrayIndexes = new Map();');
@@ -1045,27 +1051,27 @@ export function App() @{
 	);
 	expect(moduleSource).toContain('const dirtyIndexes = graph.dirtyIndexes?.("state:entries");');
 	expect(moduleSource).toContain(
-		'patchArcadePublicRepeat0DirtyRows(state, items, dirtyIndexes, classValue)',
+		'patchMarklessPublicRepeat0DirtyRows(state, items, dirtyIndexes, classValue)',
 	);
-	expect(moduleSource).toContain('function replaceArcadePublicRows(parent, state, keys)');
+	expect(moduleSource).toContain('function replaceMarklessPublicRows(parent, state, keys)');
 	expect(moduleSource).toContain('document.createDocumentFragment()');
 	expect(moduleSource).toContain('const newRows = document.createDocumentFragment();');
 	expect(moduleSource).toContain('newRows.appendChild(record.root);');
 	expect(moduleSource).toContain('parent.appendChild?.(newRows);');
-	expect(moduleSource).toContain('pruneArcadePublicRows(state, nextKeys)');
+	expect(moduleSource).toContain('pruneMarklessPublicRows(state, nextKeys)');
 	expect(moduleSource).toContain('const record = state.rows.get(matchValue);');
 	expect(moduleSource).not.toContain('const liveKeys = new Set();');
 	expect(moduleSource).not.toContain('const nodes = [];');
 	expect(moduleSource).not.toContain('const mismatch = [];');
-	expect(moduleSource).not.toContain('function appendArcadePublicRows');
-	expect(moduleSource).not.toContain('parent.replaceChildren(...arcadePublicRowsForKeys');
+	expect(moduleSource).not.toContain('function appendMarklessPublicRows');
+	expect(moduleSource).not.toContain('parent.replaceChildren(...marklessPublicRowsForKeys');
 	expect(moduleSource).not.toContain('events: new Set()');
 	expect(moduleSource).not.toContain('record.events');
-	expect(moduleSource).not.toContain('arcadePublicEventMatch');
+	expect(moduleSource).not.toContain('marklessPublicEventMatch');
 	expect(moduleSource).not.toContain('eventTargets');
-	expect(moduleSource).not.toContain('findArcadePublicRepeatEventRecord');
+	expect(moduleSource).not.toContain('findMarklessPublicRepeatEventRecord');
 	expect(moduleSource).toMatch(
-		/call\(call\)[\s\S]*delete\(deletion\)[\s\S]*clearArcadePublicRows/,
+		/call\(call\)[\s\S]*delete\(deletion\)[\s\S]*clearMarklessPublicRows/,
 	);
 	expect(moduleSource).toContain(
 		'if (parent.replaceChildren) parent.replaceChildren(); else parent.textContent = "";',
@@ -1075,11 +1081,11 @@ export function App() @{
 	);
 	for (const unexpected of [
 		'state: payloadState',
-		'view: arcadePublicView',
+		'view: marklessPublicView',
 		'payloadView',
-		'arcadePublicHostNodeIds',
-		'arcadePublicHostNodeIndexes',
-		'arcadePublicRepeatPlans',
+		'marklessPublicHostNodeIds',
+		'marklessPublicHostNodeIndexes',
+		'marklessPublicRepeatPlans',
 	]) {
 		expect(moduleSource).not.toContain(unexpected);
 	}
@@ -1089,7 +1095,7 @@ test('compileTsrxModule public render module runs alternate keyed repeat shapes'
 	const result = await compileTsrxModule({
 		filename: 'src/Catalog.tsrx',
 		source: `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 
 export function Catalog() @{
 	let catalog = state([]);
@@ -1171,8 +1177,8 @@ export function Catalog() @{
 	};
 	const publicModule = await importPublicRenderTestModule(
 		[
-			'const document = globalThis.__arcadePublicRenderTestDocument;',
-			'const loadSymbol = globalThis.__arcadePublicRenderTestLoadSymbol;',
+			'const document = globalThis.__marklessPublicRenderTestDocument;',
+			'const loadSymbol = globalThis.__marklessPublicRenderTestLoadSymbol;',
 			result.publicRenderModule.moduleSource,
 		].join('\n'),
 		{ document, loadSymbol },
@@ -1254,7 +1260,7 @@ test('compileTsrxModule public render module skips redundant empty class writes'
 	const result = await compileTsrxModule({
 		filename: 'src/Articles.tsrx',
 		source: `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 
 export function Articles() @{
 	let entries = state([]);
@@ -1318,8 +1324,8 @@ export function Articles() @{
 	};
 	const publicModule = await importPublicRenderTestModule(
 		[
-			'const document = globalThis.__arcadePublicRenderTestDocument;',
-			'const loadSymbol = globalThis.__arcadePublicRenderTestLoadSymbol;',
+			'const document = globalThis.__marklessPublicRenderTestDocument;',
+			'const loadSymbol = globalThis.__marklessPublicRenderTestLoadSymbol;',
 			result.publicRenderModule.moduleSource,
 		].join('\n'),
 		{ document, loadSymbol },
@@ -1351,7 +1357,7 @@ test('compileTsrxModule public render module appends initial keyed rows into an 
 	const result = await compileTsrxModule({
 		filename: 'src/InitialArticles.tsrx',
 		source: `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 
 export function InitialArticles() @{
 	let entries = state([]);
@@ -1400,8 +1406,8 @@ export function InitialArticles() @{
 	};
 	const publicModule = await importPublicRenderTestModule(
 		[
-			'const document = globalThis.__arcadePublicRenderTestDocument;',
-			'const loadSymbol = globalThis.__arcadePublicRenderTestLoadSymbol;',
+			'const document = globalThis.__marklessPublicRenderTestDocument;',
+			'const loadSymbol = globalThis.__marklessPublicRenderTestLoadSymbol;',
 			result.publicRenderModule.moduleSource,
 		].join('\n'),
 		{ document, loadSymbol },
@@ -1435,7 +1441,7 @@ test('compileTsrxModule public render module replaces all-new keyed rows with th
 	const result = await compileTsrxModule({
 		filename: 'src/ReplaceArticles.tsrx',
 		source: `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 
 export function ReplaceArticles() @{
 	let entries = state([]);
@@ -1502,8 +1508,8 @@ export function ReplaceArticles() @{
 	};
 	const publicModule = await importPublicRenderTestModule(
 		[
-			'const document = globalThis.__arcadePublicRenderTestDocument;',
-			'const loadSymbol = globalThis.__arcadePublicRenderTestLoadSymbol;',
+			'const document = globalThis.__marklessPublicRenderTestDocument;',
+			'const loadSymbol = globalThis.__marklessPublicRenderTestLoadSymbol;',
 			result.publicRenderModule.moduleSource,
 		].join('\n'),
 		{ document, loadSymbol },
@@ -1531,7 +1537,7 @@ test('compileTsrxModule public render module writes keyed text bindings through 
 	const result = await compileTsrxModule({
 		filename: 'src/TextArticles.tsrx',
 		source: `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 
 export function TextArticles() @{
 	let entries = state([]);
@@ -1596,8 +1602,8 @@ export function TextArticles() @{
 	};
 	const publicModule = await importPublicRenderTestModule(
 		[
-			'const document = globalThis.__arcadePublicRenderTestDocument;',
-			'const loadSymbol = globalThis.__arcadePublicRenderTestLoadSymbol;',
+			'const document = globalThis.__marklessPublicRenderTestDocument;',
+			'const loadSymbol = globalThis.__marklessPublicRenderTestLoadSymbol;',
 			result.publicRenderModule.moduleSource,
 		].join('\n'),
 		{ document, loadSymbol },
@@ -1634,7 +1640,7 @@ test('compileTsrxModule public render module runs static text state bindings', a
 	const result = await compileTsrxModule({
 		filename: 'src/Scoreboard.tsrx',
 		source: `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 
 export function Scoreboard() @{
 	let score = state({ total: 1 });
@@ -1665,7 +1671,7 @@ export function Scoreboard() @{
 		},
 	]);
 	expect(result.publicRenderModule.moduleSource).toContain(
-		'function syncArcadePublicStaticText(root, graph)',
+		'function syncMarklessPublicStaticText(root, graph)',
 	);
 
 	const incrementExports = await importPublicRenderTestModule(incrementModule!.source);
@@ -1686,8 +1692,8 @@ export function Scoreboard() @{
 	};
 	const publicModule = await importPublicRenderTestModule(
 		[
-			'const document = globalThis.__arcadePublicRenderTestDocument;',
-			'const loadSymbol = globalThis.__arcadePublicRenderTestLoadSymbol;',
+			'const document = globalThis.__marklessPublicRenderTestDocument;',
+			'const loadSymbol = globalThis.__marklessPublicRenderTestLoadSymbol;',
 			result.publicRenderModule.moduleSource,
 		].join('\n'),
 		{ document, loadSymbol },
@@ -1725,7 +1731,7 @@ test('compileTsrxModule composes imported child BUTTON counters for SSR resume',
 	const child = await compileTsrxModule({
 		filename: 'src/Counter.tsrx',
 		source: `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 
 export function Counter() @{
 	let count = state(0);
@@ -1754,12 +1760,12 @@ export function App() @{
 		ssrRenderTestModuleSource(parent, { replaceChildImport: true }),
 		{
 			childComponent: {
-				renderSsr: childSsrModule.arcadeRenderSsr,
+				renderSsr: childSsrModule.marklessRenderSsr,
 			},
 		},
 	);
 	const output = (
-		parentSsrModule.arcadeRenderSsr as () => {
+		parentSsrModule.marklessRenderSsr as () => {
 			readonly html: string;
 			readonly state: ProtocolStatePayload;
 			readonly view: ProtocolViewPayload;
@@ -1803,7 +1809,7 @@ test('compileTsrxModule does not emit public render factories for non-literal di
 	const result = await compileTsrxModule({
 		filename: 'src/KeyedEntriesWithDate.tsrx',
 		source: `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 
 export function App() @{
 	let entries = state([]);
@@ -1832,16 +1838,16 @@ export function App() @{
 		expect.objectContaining({ graphNodeId: 'state:created' }),
 	]);
 	expect(result.publicRenderModule.moduleSource).toBe('');
-	expect(result.publicRenderModule.moduleSource).not.toContain('createArcadePublicGraph');
+	expect(result.publicRenderModule.moduleSource).not.toContain('createMarklessPublicGraph');
 	expect(result.publicRenderModule.moduleSource).not.toContain(
-		'runtime: createArcadePublicRuntime(graph)',
+		'runtime: createMarklessPublicRuntime(graph)',
 	);
 });
 
 test('compileTsrxModule does not emit misleading public render factories for multi-component modules', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/MultiComponentEntries.tsrx',
-		source: `import { state } from 'arcade';
+		source: `import { state } from '@markless/core';
 export function App() @{
 let entries = state([]);
 <main>@for (const entry of entries; key entry.code) {<article>{entry.title}</article>}</main>
@@ -1860,7 +1866,7 @@ test('compileTsrxModule does not emit public render factories for static shell e
 	] as const) {
 		const result = await compileTsrxModule({
 			filename: `src/StaticShell-${name}.tsrx`,
-			source: `import { state } from 'arcade';
+			source: `import { state } from '@markless/core';
 export function App() @{
 let entries = state([]); const label = 'Entries';
 <main>${shell}<section>@for (const entry of entries; key entry.code) {<article>{entry.title}</article>}</section></main>
@@ -1875,7 +1881,7 @@ let entries = state([]); const label = 'Entries';
 test('compileTsrxModule does not emit public render factories for unsupported repeat plans', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/UnsupportedEntries.tsrx',
-		source: `import { state } from 'arcade';
+		source: `import { state } from '@markless/core';
 export function App() @{
 let entries = state([]);
 <main><p>No entries</p>@for (const entry of entries; key entry.code) {<article>{entry.title}</article>}</main>

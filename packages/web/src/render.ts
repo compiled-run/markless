@@ -1,6 +1,6 @@
-import type { ProtocolStatePayload, ProtocolViewPayload } from '@arcade/serializer';
+import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer';
 import type { EventOnlyResumeContainer } from './event-only-resume.ts';
-import type { RuntimeGraph } from '@arcade/runtime';
+import type { RuntimeGraph } from '@markless/runtime';
 import type { ResumeDomElement, ResumeRuntime, ResumeRuntimeInput } from './resume.ts';
 
 export type RenderTarget = {

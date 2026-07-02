@@ -7,12 +7,12 @@
 		"types": ["vite/client"],
 		"plugins": [
 			{
-				"name": "@arcade/typescript-plugin"
+				"name": "@markless/typescript-plugin"
 			},
 			{
-				"name": "@arcade/router/typescript-plugin"
+				"name": "@markless/router/typescript-plugin"
 			}
 		]
 	},
-	"include": ["arcade-router-env.d.ts", "document.tsrx", "pages", "vite.config.ts"]
+	"include": ["markless-router-env.d.ts", "document.tsrx", "pages", "vite.config.ts"]
 }

@@ -43,15 +43,15 @@ test('Link renders router anchors while preserving user attributes', () => {
 
 	expect(root.tagName).toBe('a');
 	expect(root.getAttribute('href')).toBe('/docs/getting-started');
-	expect(root.hasAttribute('data-arcade-router-link')).toBe(true);
+	expect(root.hasAttribute('data-markless-router-link')).toBe(true);
 	expect(root.getAttribute('class')).toBe('nav-link');
 	expect(root.getAttribute('target')).toBe('_self');
 	expect(root.getAttribute('rel')).toBe('author');
 	expect(root.getAttribute('aria-current')).toBe('page');
 	expect(root.getAttribute('data-testid')).toBe('docs-link');
 	expect(root.getAttribute('download')).toBe('');
-	expect(root.hasAttribute('data-arcade-router-replace')).toBe(true);
-	expect(root.getAttribute('data-arcade-router-scroll')).toBe('manual');
+	expect(root.hasAttribute('data-markless-router-replace')).toBe(true);
+	expect(root.getAttribute('data-markless-router-scroll')).toBe('manual');
 	expect(root.hasAttribute('disabled')).toBe(false);
 	expect(root.hasAttribute('onClick')).toBe(false);
 	expect(root.hasAttribute('params')).toBe(false);
@@ -61,13 +61,13 @@ test('Link renders router anchors while preserving user attributes', () => {
 	const ssr = Link.renderSsr(props).html;
 
 	expect(ssr).toContain('href="/docs/getting-started"');
-	expect(ssr).toContain('data-arcade-router-link');
+	expect(ssr).toContain('data-markless-router-link');
 	expect(ssr).toContain('class="nav-link"');
 	expect(ssr).toContain('aria-current="page"');
 	expect(ssr).toContain('data-testid="docs-link"');
 	expect(ssr).toContain('download');
-	expect(ssr).toContain('data-arcade-router-replace');
-	expect(ssr).toContain('data-arcade-router-scroll="manual"');
+	expect(ssr).toContain('data-markless-router-replace');
+	expect(ssr).toContain('data-markless-router-scroll="manual"');
 	expect(ssr).toContain('>Docs <strong>now</strong></a>');
 	expect(ssr).not.toContain('params=');
 	expect(ssr).not.toContain('prefetch=');

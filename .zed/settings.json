@@ -15,8 +15,8 @@
 					"tsserver": {
 						"globalPlugins": [
 							{
-								"name": "@arcade/typescript-plugin",
-								"location": "./node_modules/@arcade/typescript-plugin",
+								"name": "@markless/typescript-plugin",
+								"location": "./node_modules/@markless/typescript-plugin",
 								"languages": ["typescriptreact"],
 								"configNamespace": "typescript"
 							}

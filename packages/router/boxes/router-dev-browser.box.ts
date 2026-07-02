@@ -2,7 +2,7 @@ import { box } from '@async/witness';
 
 const FIXTURE = 'fixtures/router';
 const COUNTER = 'button';
-const DOCS_LINK = 'a[data-arcade-router-link]';
+const DOCS_LINK = 'a[data-markless-router-link]';
 const WAIT = { timeoutMs: 10_000 };
 
 export default box(
@@ -22,7 +22,7 @@ export default box(
 
 		const page = await browser.visit('/');
 
-		await expect.page.text(page, 'h1', 'Arcade Router', WAIT);
+		await expect.page.text(page, 'h1', 'Markless Router', WAIT);
 		await expect.page.text(page, COUNTER, 'Button 0', WAIT);
 		await expect.page.text(page, DOCS_LINK, 'Docs', WAIT);
 		await expect.page.attribute(page, DOCS_LINK, 'href', '/docs/getting-started', WAIT);

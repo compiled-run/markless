@@ -21,7 +21,7 @@ export default box(
 
 		const page = await browser.visit('/');
 
-		await expect.page.text(page, 'h1', 'Arcade Full Stack', WAIT);
+		await expect.page.text(page, 'h1', 'Markless Full Stack', WAIT);
 		await expect.page.text(page, COUNTER, 'Count 0', WAIT);
 		await page.click(COUNTER, WAIT);
 		await expect.page.text(page, COUNTER, 'Count 1', WAIT);
@@ -37,16 +37,16 @@ export default box(
 				`Expected API response to include middleware requestId, saw ${api.text}`,
 			);
 		}
-		if (api.headers['x-arcade-router'] !== '1') {
+		if (api.headers['x-markless-router'] !== '1') {
 			throw new Error(
-				`Expected API middleware/header flow to set x-arcade-router, saw ${api.headers['x-arcade-router'] ?? '<missing>'}`,
+				`Expected API middleware/header flow to set x-markless-router, saw ${api.headers['x-markless-router'] ?? '<missing>'}`,
 			);
 		}
 
-		const asset = await environment.client.fetch('/arcade-router.txt');
+		const asset = await environment.client.fetch('/markless-router.txt');
 		await expect.response.matches(asset, {
 			status: 200,
-			contains: 'Arcade Router static asset fixture.',
+			contains: 'Markless Router static asset fixture.',
 		});
 
 		await expect.page.outcome(page, { consoleErrors: 0, failedRequests: 0 }, WAIT);

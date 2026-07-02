@@ -15,27 +15,23 @@ async function readJson(path) {
 
 const artifact = await readJson('src/artifact.json');
 const source = await readText('src/App.tsrx');
-const runtime = await readText(
-	'macos/Sources/ArcadeDesktopProof/ArcadeDesktopRuntime.swift',
-);
+const runtime = await readText('macos/Sources/MarklessDesktopProof/MarklessDesktopRuntime.swift');
 const test = await readText(
-	'macos/Tests/ArcadeDesktopProofTests/ArcadeDesktopProofTests.swift',
+	'macos/Tests/MarklessDesktopProofTests/MarklessDesktopProofTests.swift',
 );
 const demoApp = await readText('macos/DemoApp/DemoApp.swift');
 const demoInfo = await readText('macos/DemoApp/Info.plist');
 const demoRunner = await readText('macos/Scripts/run-macos-demo.sh');
 
 assert.match(source, /state\(0\)/);
-assert.match(source, /Arcade macOS Proof/);
+assert.match(source, /Markless macOS Proof/);
 assert.match(source, /onClick=\{\(\) => count\+\+\}/);
 
-assert.equal(artifact.schema, 'arcade-native-rendering-proof/v0');
+assert.equal(artifact.schema, 'markless-native-rendering-proof/v0');
 assert.equal(artifact.targetProfile, 'portable-host');
 assert.equal(artifact.nativeTarget, 'macos-appkit');
 
-assert.deepEqual(artifact.graph.cells, [
-	{ id: 'state:count', initial: 0, type: 'number' },
-]);
+assert.deepEqual(artifact.graph.cells, [{ id: 'state:count', initial: 0, type: 'number' }]);
 
 assert.deepEqual(
 	artifact.host.nodes.map((node) => [node.id, node.type]),
@@ -81,10 +77,10 @@ assert.match(test, /Count 1/);
 assert.match(test, /testNativeButtonActivationRunsJavaScriptCoreSymbol/);
 
 assert.match(demoApp, /NSApplicationDelegate/);
-assert.match(demoApp, /ArcadeDesktopRuntime/);
+assert.match(demoApp, /MarklessDesktopRuntime/);
 assert.match(demoApp, /mount\(\)/);
 assert.match(demoApp, /verifyLaunch/);
-assert.match(demoInfo, /ArcadeDesktopProofDemo/);
+assert.match(demoInfo, /MarklessDesktopProofDemo/);
 assert.match(demoRunner, /swiftc/);
 assert.match(demoRunner, /--verify-launch/);
 assert.match(demoRunner, /open "\$APP_BUNDLE"/);

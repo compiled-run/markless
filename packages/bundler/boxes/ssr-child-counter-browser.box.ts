@@ -22,7 +22,7 @@ export function App() @{
 }
 `,
 			[`${FIXTURE}/src/Counter.tsrx`]: {
-				create: `import { state } from 'arcade';
+				create: `import { state } from '@markless/core';
 
 export function Counter() @{
 \tlet count = state(0);

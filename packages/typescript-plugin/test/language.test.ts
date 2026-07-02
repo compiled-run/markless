@@ -7,26 +7,26 @@ import { createInterface } from 'node:readline';
 import ts from 'typescript';
 import { expect, test } from 'vitest';
 import {
-	ARCADE_TSRX_LANGUAGE_ID,
-	getArcadeTsrxLanguagePlugin,
-	isArcadeTsrxFile,
+	MARKLESS_TSRX_LANGUAGE_ID,
+	getMarklessTsrxLanguagePlugin,
+	isMarklessTsrxFile,
 } from '../src/language.ts';
 
 const require = createRequire(import.meta.url);
 
-test('registers .tsrx through the Arcade language plugin without mixed TSX parsing', () => {
-	const plugin = getArcadeTsrxLanguagePlugin();
+test('registers .tsrx through the Markless language plugin without mixed TSX parsing', () => {
+	const plugin = getMarklessTsrxLanguagePlugin();
 
-	expect(isArcadeTsrxFile('/workspace/src/App.tsrx')).toBe(true);
-	expect(isArcadeTsrxFile('/workspace/src/App.tsx')).toBe(false);
-	expect(plugin.getLanguageId?.('/workspace/src/App.tsrx')).toBe(ARCADE_TSRX_LANGUAGE_ID);
+	expect(isMarklessTsrxFile('/workspace/src/App.tsrx')).toBe(true);
+	expect(isMarklessTsrxFile('/workspace/src/App.tsx')).toBe(false);
+	expect(plugin.getLanguageId?.('/workspace/src/App.tsrx')).toBe(MARKLESS_TSRX_LANGUAGE_ID);
 	expect(
 		plugin.createVirtualCode?.(
 			'/workspace/src/App.tsrx',
 			'typescriptreact',
 			ts.ScriptSnapshot.fromString('export function App() @{}'),
 		)?.languageId,
-	).toBe(ARCADE_TSRX_LANGUAGE_ID);
+	).toBe(MARKLESS_TSRX_LANGUAGE_ID);
 	expect(plugin.typescript?.extraFileExtensions).toEqual([
 		{ extension: 'tsrx', isMixedContent: false, scriptKind: ts.ScriptKind.Deferred },
 	]);
@@ -45,8 +45,8 @@ test('configures Zed to highlight .tsrx as TSX and load the workspace plugin', (
 	});
 	expect(settings.lsp?.vtsls?.settings?.vtsls?.tsserver?.globalPlugins).toEqual([
 		{
-			name: '@arcade/typescript-plugin',
-			location: './node_modules/@arcade/typescript-plugin',
+			name: '@markless/typescript-plugin',
+			location: './node_modules/@markless/typescript-plugin',
 			languages: ['typescriptreact'],
 			configNamespace: 'typescript',
 		},
@@ -54,25 +54,25 @@ test('configures Zed to highlight .tsrx as TSX and load the workspace plugin', (
 });
 
 test('feeds TypeScript a virtual .ts service script for TSRX source', () => {
-	const plugin = getArcadeTsrxLanguagePlugin();
+	const plugin = getMarklessTsrxLanguagePlugin();
 	const source = `
-		import { state } from 'arcade';
+		import { state } from '@markless/core';
 
 		export function Counter() @{
 			let count = state(0);
 			<button class="counter" onClick={() => count++}>{count}</button>
 		}
 	`;
-	const fileName = join(process.cwd(), 'packages/arcade/src/Counter.tsrx');
+	const fileName = join(process.cwd(), 'packages/core/src/Counter.tsrx');
 	const virtualCode = plugin.createVirtualCode?.(
 		fileName,
-		ARCADE_TSRX_LANGUAGE_ID,
+		MARKLESS_TSRX_LANGUAGE_ID,
 		ts.ScriptSnapshot.fromString(source),
 	);
 	const serviceScript = virtualCode && plugin.typescript?.getServiceScript?.(virtualCode);
 
 	expect(serviceScript).toMatchObject({ extension: '.ts', scriptKind: ts.ScriptKind.TS });
-	expect(virtualCode?.generatedCode).toContain("import { state } from 'arcade';");
+	expect(virtualCode?.generatedCode).toContain("import { state } from '@markless/core';");
 	expect(virtualCode?.generatedCode).toContain('count++');
 	expect(virtualCode?.generatedCode).toContain('void (count);');
 	expect(virtualCode?.generatedCode).not.toContain('<button');
@@ -86,9 +86,9 @@ test('feeds TypeScript a virtual .ts service script for TSRX source', () => {
 	).toEqual([]);
 });
 
-test('populates virtual code from the Arcade compiler type-service artifact', () => {
-	const plugin = getArcadeTsrxLanguagePlugin();
-	const source = `import { state } from 'arcade';
+test('populates virtual code from the Markless compiler type-service artifact', () => {
+	const plugin = getMarklessTsrxLanguagePlugin();
+	const source = `import { state } from '@markless/core';
 export function App() @{
 	let count = state(0);
 	<section>
@@ -96,10 +96,10 @@ export function App() @{
 		<style>.counter { color: red; }</style>
 	</section>
 }`;
-	const fileName = join(process.cwd(), 'packages/arcade/src/App.tsrx');
+	const fileName = join(process.cwd(), 'packages/core/src/App.tsrx');
 	const virtualCode = plugin.createVirtualCode?.(
 		fileName,
-		ARCADE_TSRX_LANGUAGE_ID,
+		MARKLESS_TSRX_LANGUAGE_ID,
 		ts.ScriptSnapshot.fromString(source),
 	) as any;
 
@@ -124,11 +124,11 @@ test('package CommonJS entry is generated into dist instead of maintained in src
 
 test('exports a generated CommonJS factory for tsserver plugin loading', () => {
 	ensureGeneratedCjsBuild();
-	const cjsPlugin = require('@arcade/typescript-plugin') as any;
-	const languagePlugin = cjsPlugin.__getArcadeTsrxLanguagePlugin?.();
+	const cjsPlugin = require('@markless/typescript-plugin') as any;
+	const languagePlugin = cjsPlugin.__getMarklessTsrxLanguagePlugin?.();
 	const virtualCode = languagePlugin?.createVirtualCode?.(
-		join(process.cwd(), 'packages/arcade/src/App.tsrx'),
-		ARCADE_TSRX_LANGUAGE_ID,
+		join(process.cwd(), 'packages/core/src/App.tsrx'),
+		MARKLESS_TSRX_LANGUAGE_ID,
 		ts.ScriptSnapshot.fromString('export function App() @{ <span>ok</span> }'),
 	) as any;
 
@@ -189,12 +189,12 @@ async function runTsrxTsserverProbe(): Promise<{
 }> {
 	ensureGeneratedCjsBuild();
 	const root = process.cwd();
-	const project = mkdtempSync(join(tmpdir(), 'arcade-tsserver-project-'));
+	const project = mkdtempSync(join(tmpdir(), 'markless-tsserver-project-'));
 	const logFile = join(project, 'tsserver.log');
 	const fixtures = [
 		{
 			name: 'Counter.tsrx',
-			source: `import { state } from 'arcade';
+			source: `import { state } from '@markless/core';
 export function App() @{
 	let count = state(0);
 	<section>
@@ -245,13 +245,13 @@ export function App() @{
 }`,
 		},
 	];
-	mkdirSync(join(project, 'node_modules/arcade'), { recursive: true });
+	mkdirSync(join(project, 'node_modules/@markless/core'), { recursive: true });
 	writeFileSync(
-		join(project, 'node_modules/arcade/package.json'),
-		JSON.stringify({ name: 'arcade', version: '0.0.0', types: './index.d.ts' }),
+		join(project, 'node_modules/@markless/core/package.json'),
+		JSON.stringify({ name: '@markless/core', version: '0.0.0', types: './index.d.ts' }),
 	);
 	writeFileSync(
-		join(project, 'node_modules/arcade/index.d.ts'),
+		join(project, 'node_modules/@markless/core/index.d.ts'),
 		'export declare function state<T>(initial: T): T;\n',
 	);
 	writeFileSync(
@@ -262,7 +262,7 @@ export function App() @{
 				module: 'ESNext',
 				moduleResolution: 'Bundler',
 				noEmit: true,
-				plugins: [{ name: '@arcade/typescript-plugin' }],
+				plugins: [{ name: '@markless/typescript-plugin' }],
 				skipLibCheck: true,
 				target: 'ES2022',
 			},
@@ -276,7 +276,7 @@ export function App() @{
 		[
 			join(root, 'node_modules/typescript/lib/tsserver.js'),
 			'--globalPlugins',
-			'@arcade/typescript-plugin',
+			'@markless/typescript-plugin',
 			'--pluginProbeLocations',
 			join(root, 'node_modules'),
 			'--allowLocalPluginLoads',
@@ -332,7 +332,7 @@ export function App() @{
 	server.kill();
 	lines.close();
 	const log = existsSync(logFile) ? readFileSync(logFile, 'utf8') : '';
-	return { loadedPlugin: log.includes('@arcade/typescript-plugin'), results };
+	return { loadedPlugin: log.includes('@markless/typescript-plugin'), results };
 }
 
 let generatedCjsBuildReady = false;

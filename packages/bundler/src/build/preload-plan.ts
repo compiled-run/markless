@@ -1,8 +1,8 @@
 import { joinURL } from 'ufo';
-import type { ArcadeBundleGraph } from '../types.ts';
+import type { MarklessBundleGraph } from '../types.ts';
 
 export type ModulePreloadPlanInput = {
-	readonly bundleGraph: ArcadeBundleGraph | undefined;
+	readonly bundleGraph: MarklessBundleGraph | undefined;
 	readonly roots: readonly ModulePreloadRoot[];
 	readonly base?: string;
 	readonly minProbability?: number;
@@ -154,7 +154,7 @@ export function planModulePreloads(input: ModulePreloadPlanInput): ModulePreload
 }
 
 function parseBundleGraph(
-	graph: ArcadeBundleGraph | undefined,
+	graph: MarklessBundleGraph | undefined,
 ): ReadonlyMap<string, ParsedBundleGraphRecord> {
 	const records = new Map<string, ParsedBundleGraphRecord>();
 	if (!graph) return records;

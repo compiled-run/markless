@@ -1,14 +1,14 @@
-import { render } from '@arcade/web/render';
-import { ARCADE_ROUTER_ROUTE_EVENT, routePageProps, type RouteUpdate } from './route-state.ts';
+import { render } from '@markless/web/render';
+import { MARKLESS_ROUTER_ROUTE_EVENT, routePageProps, type RouteUpdate } from './route-state.ts';
 
-const ROUTE_RENDERER_STARTED = '__arcadeRouterRouteRendererStarted';
+const ROUTE_RENDERER_STARTED = '__marklessRouterRouteRendererStarted';
 
 export function startRouteUpdateRenderer(document: Document = window.document): void {
 	const state = document as unknown as Record<string, unknown>;
 	if (state[ROUTE_RENDERER_STARTED]) return;
 	state[ROUTE_RENDERER_STARTED] = true;
 
-	document.addEventListener(ARCADE_ROUTER_ROUTE_EVENT, (event) => {
+	document.addEventListener(MARKLESS_ROUTER_ROUTE_EVENT, (event) => {
 		void renderRouteUpdate(document, (event as CustomEvent<RouteUpdate>).detail);
 	});
 }

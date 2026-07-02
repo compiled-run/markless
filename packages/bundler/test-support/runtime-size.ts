@@ -39,7 +39,7 @@ export type RuntimeSizeReport = {
 
 const RUNTIME_ORIGIN_MARKERS = [
 	'/protocol/src/',
-	'/arcade/src/runtime.ts',
+	'/core/src/runtime.ts',
 	'/runtime/src/',
 	'/serializer/src/',
 ];
@@ -51,7 +51,7 @@ const RUNTIME_TEXT_MARKERS = [
 	'createRuntimeGraph',
 	'createRuntimeGraphFromStatePayload',
 	'resumeContainerEvent',
-	'Missing arcade/state payload script',
+	'Missing markless/state payload script',
 	'async:shared-patch',
 	'render(App, { target }) requires',
 	'Invalid render target.',

@@ -275,8 +275,8 @@ function connectedPageHtml(input: {
 		'  <button id="select-symbol" type="button">Select symbol</button>',
 		'  <output id="journal-output"></output>',
 		'</main>',
-		`<script type="arcade/state">${JSON.stringify(input.state)}</script>`,
-		`<script type="arcade/view">${JSON.stringify({
+		`<script type="markless/state">${JSON.stringify(input.state)}</script>`,
+		`<script type="markless/view">${JSON.stringify({
 			moduleId: input.moduleId,
 			events: [
 				{

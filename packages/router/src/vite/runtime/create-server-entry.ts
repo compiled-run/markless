@@ -1,6 +1,6 @@
 import type { PageProps } from '../../index.ts';
 import { buildRouteManifestFromFileIds, matchRouteManifest } from '../../route-manifest.ts';
-import { renderToString, type ModulePreloadInput } from '@arcade/web/render-to-string';
+import { renderToString, type ModulePreloadInput } from '@markless/web/render-to-string';
 
 export interface ServerEntryOptions {
 	readonly navigationEntryPath?: string;
@@ -27,12 +27,14 @@ interface SsrArtifact {
 
 interface PageModule {
 	readonly default?: SsrArtifact;
-	readonly arcadeRenderSsr?: SsrRender;
+	readonly marklessRenderSsr?: SsrRender;
 }
 
 interface DocumentModule {
 	readonly default?: SsrArtifact;
-	readonly __arcadeRouterHtmlAttributes?: (props: PageComponentProps) => Record<string, unknown>;
+	readonly __marklessRouterHtmlAttributes?: (
+		props: PageComponentProps,
+	) => Record<string, unknown>;
 }
 
 type PageComponentProps = PageProps & Record<string, unknown>;
@@ -42,7 +44,7 @@ interface PageHtml {
 	readonly headHtml: string;
 }
 
-const DOCUMENT_CHILDREN_PLACEHOLDER = '__arcade_router_document_children__';
+const DOCUMENT_CHILDREN_PLACEHOLDER = '__markless_router_document_children__';
 
 export function createServerEntry(options: ServerEntryOptions) {
 	const manifest = buildRouteManifestFromFileIds(options.routeFileIds);
@@ -134,10 +136,10 @@ function renderPageModule(
 	routeSsrModulePreloads: Record<string, readonly ModulePreloadInput[]> | undefined,
 ): PageHtml {
 	const baseArtifact = pageModule.default;
-	const renderSsr = baseArtifact?.renderSsr ?? pageModule.arcadeRenderSsr;
+	const renderSsr = baseArtifact?.renderSsr ?? pageModule.marklessRenderSsr;
 	if (!renderSsr) {
 		return {
-			bodyHtml: `Page module must export an Arcade compiled artifact: ${escapeHtml(file)}`,
+			bodyHtml: `Page module must export an Markless compiled artifact: ${escapeHtml(file)}`,
 			headHtml: '',
 		};
 	}
@@ -146,7 +148,7 @@ function renderPageModule(
 	if (!output) return { bodyHtml: '', headHtml: '' };
 	const routeScript = output.state || output.view ? renderRouteScript(file) : '';
 	const linkBridge =
-		navigationEntryPath && output.html.includes('data-arcade-router-link')
+		navigationEntryPath && output.html.includes('data-markless-router-link')
 			? renderLinkBridgeScript(navigationEntryPath)
 			: '';
 	const routedOutput =
@@ -186,7 +188,7 @@ function modulePreloadsForPage(
 	const preloads: ModulePreloadInput[] = [];
 	const seen = new Set<string>();
 	addModulePreloads(preloads, seen, routeSsrModulePreloads?.[file]);
-	if (!routeModulePreloads || !html.includes('data-arcade-router-link')) {
+	if (!routeModulePreloads || !html.includes('data-markless-router-link')) {
 		return preloads.length > 0 ? preloads : undefined;
 	}
 
@@ -228,7 +230,7 @@ function splitLeadingModulePreloadLinks(html: string): PageHtml {
 function routerLinkHrefs(html: string): string[] {
 	return [
 		...html.matchAll(
-			/<a\b(?=[^>]*\bdata-arcade-router-link(?:[\s=>]|$))(?=[^>]*\bhref="([^"]*)")[^>]*>/g,
+			/<a\b(?=[^>]*\bdata-markless-router-link(?:[\s=>]|$))(?=[^>]*\bhref="([^"]*)")[^>]*>/g,
 		),
 	].map((match) => unescapeHtmlAttribute(match[1] ?? ''));
 }
@@ -303,19 +305,19 @@ function insertHeadHtml(documentHtml: string, headHtml: string): string {
 }
 
 function renderRouteScript(file: string): string {
-	return `<script type="arcade/route">${escapeScriptJson({ file })}</script>`;
+	return `<script type="@markless/core/route">${escapeScriptJson({ file })}</script>`;
 }
 
 function renderLinkBridgeScript(resumeEntryPath: string): string {
-	return `<script data-arcade-router-link-resumer>${escapeInlineScript(`(() => {
+	return `<script data-markless-router-link-resumer>${escapeInlineScript(`(() => {
 	const d = document;
 	const s = d.currentScript;
 	const r = s && s.closest('[data-async-container]');
-	if (!r || r.__arcadeRouterLinkResumerStarted) return;
-	r.__arcadeRouterLinkResumerStarted = true;
-	const linkAttr = 'data-arcade-router-link';
-	const replaceAttr = 'data-arcade-router-replace';
-	const scrollAttr = 'data-arcade-router-scroll';
+	if (!r || r.__marklessRouterLinkResumerStarted) return;
+	r.__marklessRouterLinkResumerStarted = true;
+	const linkAttr = 'data-markless-router-link';
+	const replaceAttr = 'data-markless-router-replace';
+	const scrollAttr = 'data-markless-router-scroll';
 	const anchorFrom = (event) => {
 		const target = event.composedPath && event.composedPath()[0] || event.target;
 		return target && target.closest ? target.closest('a[href]') : target && target.parentElement && target.parentElement.closest ? target.parentElement.closest('a[href]') : null;
@@ -340,7 +342,7 @@ function renderLinkBridgeScript(resumeEntryPath: string): string {
 		event.preventDefault();
 		try {
 			const mod = await import(${JSON.stringify(resumeEntryPath)});
-			const navigate = mod.navigateArcadeRouterLink;
+			const navigate = mod.navigateMarklessRouterLink;
 			if (typeof navigate === 'function') {
 				await navigate({
 					href: url.href,
@@ -359,7 +361,7 @@ function renderLinkBridgeScript(resumeEntryPath: string): string {
 }
 
 function htmlAttributes(documentModule: DocumentModule | undefined, pageProps: PageComponentProps) {
-	const attributes = documentModule?.__arcadeRouterHtmlAttributes?.(pageProps) ?? {
+	const attributes = documentModule?.__marklessRouterHtmlAttributes?.(pageProps) ?? {
 		lang: 'en',
 	};
 	const normalized: Record<string, string> = {};

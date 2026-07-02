@@ -1,7 +1,7 @@
-# Contributing To Arcade
+# Contributing To Markless
 
 This file is for people and AI agents changing the repo. The README explains
-what Arcade is; this file explains how the workspace is organized and how to
+what Markless is; this file explains how the workspace is organized and how to
 make changes safely.
 
 ## Start Here
@@ -24,24 +24,24 @@ contract.
 Workspace packages are private implementation boundaries unless the package map
 below says otherwise:
 
-- `packages/arcade` -> `arcade`, public authoring APIs such as `state()`,
+- `packages/core` -> `@markless/core`, public authoring APIs such as `state()`,
   `computed()`, `element()`, and `shared()`, plus curated public re-exports.
-- `packages/runtime` -> `@arcade/runtime`, graph runtime, render, and resume
+- `packages/runtime` -> `@markless/runtime`, graph runtime, render, and resume
   helpers.
-- `packages/serializer` -> `@arcade/serializer`, value serialization plus the
+- `packages/serializer` -> `@markless/serializer`, value serialization plus the
   private protocol and payload contract types consumed by compiler/runtime.
-- `packages/compiler` -> `@arcade/compiler`, compiler passes and artifacts
+- `packages/compiler` -> `@markless/compiler`, compiler passes and artifacts
   for `.tsrx` files.
-- `packages/bundler` -> `@arcade/bundler`, Rolldown and Vite integration.
-- `packages/typescript-plugin` -> `@arcade/typescript-plugin`, editor language
+- `packages/bundler` -> `@markless/bundler`, Rolldown and Vite integration.
+- `packages/typescript-plugin` -> `@markless/typescript-plugin`, editor language
   integration for `.tsrx` files.
-- `packages/vitest-browser` -> `@arcade/vitest-browser`, browser-mode test
+- `packages/vitest-browser` -> `@markless/vitest-browser`, browser-mode test
   helpers.
 
-There is intentionally no `packages/core`, `packages/protocol`, or
-`packages/test-utils`. Short repo-only helpers live under package-local test
-support or top-level `scripts/test-utils` until a real package boundary is
-needed.
+There is intentionally no standalone `packages/protocol` or
+`packages/test-utils`. Protocol types live with `packages/serializer`, and short
+repo-only helpers live under package-local test support or top-level
+`scripts/test-utils` until a real package boundary is needed.
 
 There is intentionally no `packages/server`. Initial render and browser resume
 are phases of one runtime model.
@@ -67,8 +67,8 @@ pnpm exec vp pack
 
 ## Development Rules
 
-- TSRX-only: Arcade components live in `.tsrx` files.
-- Import authoring APIs from `arcade`.
+- TSRX-only: Markless components live in `.tsrx` files.
+- Import authoring APIs from `@markless/core`.
 - Do not add reactivity to plain `.ts` files.
 - Do not add TSX or JSX support unless the specs are deliberately reopened.
 - Do not add hydration or VDOM behavior.
@@ -91,19 +91,19 @@ Compiler tests should assert pass artifacts and diagnostics whenever possible.
 End-to-end fixture tests are useful, but they do not replace pass-level
 coverage.
 
-`pnpm test` also includes the Arcade keyed JS Framework Benchmark regression
+`pnpm test` also includes the Markless keyed JS Framework Benchmark regression
 guard. CI creates fresh base/current JSFB results on the same runner before
 running the main test command. To run the full benchmark gate locally, follow
 [`demos/js-framework-benchmark/README.md`](./demos/js-framework-benchmark/README.md)
-and set `ARCADE_JSFB_RESULTS` to the fresh results directory.
+and set `MARKLESS_JSFB_RESULTS` to the fresh results directory.
 
 ## Agent Notes
 
 Use project-local skills when available:
 
-- `$arcade-implementation` for compiler, runtime, bundler, package, or test
+- `$markless-implementation` for compiler, runtime, bundler, package, or test
   work.
-- `$arcade-spec-maintenance` for spec edits.
+- `$markless-spec-maintenance` for spec edits.
 
 Ignore generated and local-output folders while scanning:
 

@@ -416,10 +416,10 @@ function localizeDefaultExport(
 		code: `${sourceText.slice(
 			0,
 			directDefaultMatch.index,
-		)}const __arcade_request_handler__ =${sourceText.slice(
+		)}const __markless_request_handler__ =${sourceText.slice(
 			directDefaultMatch.index + directDefaultMatch[0].length,
 		)}`,
-		name: '__arcade_request_handler__',
+		name: '__markless_request_handler__',
 	};
 }
 
@@ -430,17 +430,17 @@ function requestFileWrapperSource(
 ): string {
 	const defineImport =
 		requestFile.kind === 'api' && requestFile.cache
-			? 'import { defineCachedHandler as __arcade_define_handler__ } from "nitro/cache";'
-			: 'import { defineHandler as __arcade_define_handler__ } from "nitro";';
+			? 'import { defineCachedHandler as __markless_define_handler__ } from "nitro/cache";'
+			: 'import { defineHandler as __markless_define_handler__ } from "nitro";';
 	const wrappedHandler = `(event) =>
-	${handlerName}(__arcade_create_http_context__(event))`;
+	${handlerName}(__markless_create_http_context__(event))`;
 	const wrappedDefault =
 		requestFile.kind === 'api' && requestFile.cache
-			? `__arcade_define_handler__(${wrappedHandler}, cache)`
-			: `__arcade_define_handler__(${wrappedHandler})`;
+			? `__markless_define_handler__(${wrappedHandler}, cache)`
+			: `__markless_define_handler__(${wrappedHandler})`;
 
 	return `${defineImport}
-import { __arcadeCreateHttpContext as __arcade_create_http_context__ } from "@arcade/router";
+import { __marklessCreateHttpContext as __markless_create_http_context__ } from "@markless/router";
 
 ${sourceText.trimEnd()}
 

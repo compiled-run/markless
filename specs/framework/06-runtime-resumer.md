@@ -36,7 +36,7 @@ Every runtime graph implementation must preserve:
 This graph is not a virtual DOM. It does not store a virtual element tree,
 virtual child arrays, component render-output snapshots, or a reconciliation
 target. State writes invalidate graph subscribers directly; DOM update symbols
-patch located real DOM nodes in place. `arcade/view` records and graph DOM update
+patch located real DOM nodes in place. `markless/view` records and graph DOM update
 records may describe how to find/update existing DOM, but they are not an
 alternate UI tree to diff.
 
@@ -131,8 +131,8 @@ container owns:
 - shared-state container scope
 
 CSR must not depend on SSR artifacts. A CSR app must still render and handle
-events when the document has no resumable container markup, no `arcade/state`, no
-`arcade/view`, and no inline resumer script.
+events when the document has no resumable container markup, no `markless/state`, no
+`markless/view`, and no inline resumer script.
 
 CSR may share the live container, delegated event, symbol resolver, graph, and
 scheduler machinery after `render()` has created the DOM and runtime graph. It
@@ -167,7 +167,7 @@ SSR containers with no browser triggers emit no resumer script.
 For the event-only v1 path, the resumer owns only:
 
 - locating the current SSR container
-- reading the compact `arcade/view` data for that container
+- reading the compact `markless/view` data for that container
 - materializing locator side tables against the existing DOM
 - installing delegated listeners for the event names present in that data
 - walking from `event.target` to the container root
@@ -180,7 +180,7 @@ symbol IDs, chunk emission, finalized module URL/specifier tables, feature
 selection, and minified inline source generation. The generated loader source is
 constant-size over compact row data and may use
 `import(/* @vite-ignore */ url)` against finalized chunk specifiers. The resumer
-must not scan event attributes, discover chunks, parse `arcade-manifest.json`,
+must not scan event attributes, discover chunks, parse `markless-manifest.json`,
 plan symbols, decode the whole graph, run the DOM journal, start behaviors,
 demand async boundaries, or include visibility/sync-policy code unless the
 container payload needs that feature.
@@ -212,7 +212,7 @@ event-handler attributes.
   materialize its captured graph references and element handles, and run
   handlers in authored order. The resolver owns the dynamic import, including
   any `import(/* @vite-ignore */ url)` runtime import form; event props are only
-  encoded symbol IDs in `arcade/view`.
+  encoded symbol IDs in `markless/view`.
 - Element handles resolve from serialized DOM locators at handler execution time.
   If the element was removed or the locator no longer matches, the handle reads
   as `undefined`.

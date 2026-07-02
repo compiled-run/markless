@@ -193,17 +193,17 @@ test('serializer-values fixture emits unsupported diagnostics and secret warning
 	const artifact = await fixtureArtifact();
 
 	for (const [statePath, code, valueKind] of [
-		['unsupported.domNode', 'ARCADE_SERIALIZE_DOM_NODE', 'HTMLElement'],
+		['unsupported.domNode', 'MARKLESS_SERIALIZE_DOM_NODE', 'HTMLElement'],
 		[
 			'unsupported.elementHandleInState',
-			'ARCADE_SERIALIZE_ELEMENT_HANDLE_IN_STATE',
+			'MARKLESS_SERIALIZE_ELEMENT_HANDLE_IN_STATE',
 			'element-handle',
 		],
-		['unsupported.request', 'ARCADE_SERIALIZE_RUNTIME_VALUE', 'Request'],
-		['unsupported.stream', 'ARCADE_SERIALIZE_STREAM', 'ReadableStream'],
-		['unsupported.socket', 'ARCADE_SERIALIZE_RUNTIME_VALUE', 'WebSocket'],
-		['unsupported.weakState', 'ARCADE_SERIALIZE_WEAK_COLLECTION', 'WeakMap'],
-		['unsupported.runtimeBox', 'ARCADE_SERIALIZE_RESOURCE_CLASS', 'RuntimeBox'],
+		['unsupported.request', 'MARKLESS_SERIALIZE_RUNTIME_VALUE', 'Request'],
+		['unsupported.stream', 'MARKLESS_SERIALIZE_STREAM', 'ReadableStream'],
+		['unsupported.socket', 'MARKLESS_SERIALIZE_RUNTIME_VALUE', 'WebSocket'],
+		['unsupported.weakState', 'MARKLESS_SERIALIZE_WEAK_COLLECTION', 'WeakMap'],
+		['unsupported.runtimeBox', 'MARKLESS_SERIALIZE_RESOURCE_CLASS', 'RuntimeBox'],
 	] as const) {
 		expect(diagnostic(artifact, statePath, code)).toMatchObject({
 			severity: 'error',
@@ -211,7 +211,7 @@ test('serializer-values fixture emits unsupported diagnostics and secret warning
 			passId: 'serializer-values-planning',
 			statePath,
 			valueKind,
-			docsUrl: `https://arcadejs.com/errors/${code}`,
+			docsUrl: `https://markless.dev/errors/${code}`,
 		});
 	}
 
@@ -220,7 +220,7 @@ test('serializer-values fixture emits unsupported diagnostics and secret warning
 		'stateArena.secretWarning.tokenPreview',
 		'unsupported.secretToken',
 	]) {
-		expect(diagnostic(artifact, statePath, 'ARCADE_SERIALIZE_SECRET_LEAK')).toMatchObject({
+		expect(diagnostic(artifact, statePath, 'MARKLESS_SERIALIZE_SECRET_LEAK')).toMatchObject({
 			severity: 'warning',
 			phase: 'serialization',
 			passId: 'serializer-values-planning',

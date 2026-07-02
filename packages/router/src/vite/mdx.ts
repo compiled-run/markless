@@ -17,7 +17,7 @@ import { decodePath, parseURL } from 'ufo';
 
 export function mdxTransformPlugin(): Plugin {
 	return {
-		name: 'arcade-router:mdx',
+		name: 'markless-router:mdx',
 		enforce: 'pre',
 		transform: {
 			order: 'pre',
@@ -40,12 +40,12 @@ export async function transformMdxRoute(source: string, id: string) {
 	const html = route.parts.map((part) => (part.kind === 'html' ? part.html : '')).join('');
 	if (route.components.length === 0) {
 		return [
-			'const arcadeMdxPage = {',
+			'const marklessMdxPage = {',
 			'  renderSsr() {',
 			`    return { html: ${JSON.stringify(html)} };`,
 			'  }',
 			'};',
-			'export default arcadeMdxPage;',
+			'export default marklessMdxPage;',
 			'',
 		].join('\n');
 	}
@@ -89,42 +89,42 @@ type MdxPart =
 
 function emitComposedMdxRoute(route: MdxRoute): string {
 	return [
-		`import { resumeEventOnlyFromPayloadDocument } from 'arcade/runtime/event-only-resume';`,
-		`import { composeMdxState, composeMdxView, loadMdxSymbol, renderMdxChild, replaceMdxChild, rootFromMdxHtml } from '@arcade/router/vite/runtime/mdx-route';`,
+		`import { resumeEventOnlyFromPayloadDocument } from '@markless/core/runtime/event-only-resume';`,
+		`import { composeMdxState, composeMdxView, loadMdxSymbol, renderMdxChild, replaceMdxChild, rootFromMdxHtml } from '@markless/router/vite/runtime/mdx-route';`,
 		...route.imports,
 		'',
-		`const arcadeMdxParts = ${JSON.stringify(route.parts)};`,
-		`const arcadeMdxSymbolLoaders = ${renderSymbolLoaders(route.components)};`,
+		`const marklessMdxParts = ${JSON.stringify(route.parts)};`,
+		`const marklessMdxSymbolLoaders = ${renderSymbolLoaders(route.components)};`,
 		'',
-		'const arcadeMdxPage = {',
+		'const marklessMdxPage = {',
 		'  renderSsr(props = {}) {',
-		'    const arcadeMdxChildren = [];',
+		'    const marklessMdxChildren = [];',
 		`    const html = ${renderHtmlExpression(route, 'ssr')};`,
-		'    const state = composeMdxState(arcadeMdxChildren);',
-		'    const view = composeMdxView(arcadeMdxParts, arcadeMdxChildren, 0);',
+		'    const state = composeMdxState(marklessMdxChildren);',
+		'    const view = composeMdxView(marklessMdxParts, marklessMdxChildren, 0);',
 		'    return { html, ...(state ? { state } : {}), ...(view ? { view } : {}) };',
 		'  },',
 		'  renderCsr(props = {}) {',
-		'    const arcadeMdxChildren = [];',
+		'    const marklessMdxChildren = [];',
 		`    const root = rootFromMdxHtml(${renderCsrHtml(route)});`,
 		...route.components.flatMap((component, index) => [
-			`    const arcadeMdxChild${index} = ${component.localName}.renderCsr?.(${componentPropsExpression(component)});`,
-			`    replaceMdxChild(root, ${index}, arcadeMdxChild${index}?.root);`,
-			`    if (arcadeMdxChild${index}) arcadeMdxChildren.push({ componentIndex: ${index}, hostPrefix: ${JSON.stringify(component.prefix)}, symbolPrefix: ${JSON.stringify(component.prefix)}, output: arcadeMdxChild${index} });`,
+			`    const marklessMdxChild${index} = ${component.localName}.renderCsr?.(${componentPropsExpression(component)});`,
+			`    replaceMdxChild(root, ${index}, marklessMdxChild${index}?.root);`,
+			`    if (marklessMdxChild${index}) marklessMdxChildren.push({ componentIndex: ${index}, hostPrefix: ${JSON.stringify(component.prefix)}, symbolPrefix: ${JSON.stringify(component.prefix)}, output: marklessMdxChild${index} });`,
 		]),
-		'    const state = composeMdxState(arcadeMdxChildren);',
-		'    const view = composeMdxView(arcadeMdxParts, arcadeMdxChildren, 1);',
+		'    const state = composeMdxState(marklessMdxChildren);',
+		'    const view = composeMdxView(marklessMdxParts, marklessMdxChildren, 1);',
 		'    return {',
 		'      root,',
 		'      ...(state ? { state } : {}),',
 		'      ...(view ? { view } : {}),',
-		'      loadSymbol(symbolId) { return arcadeMdxLoadSymbol(symbolId, arcadeMdxChildren); },',
-		'      connectRuntime(context) { for (const child of arcadeMdxChildren) child.output?.connectRuntime?.(context); },',
+		'      loadSymbol(symbolId) { return marklessMdxLoadSymbol(symbolId, marklessMdxChildren); },',
+		'      connectRuntime(context) { for (const child of marklessMdxChildren) child.output?.connectRuntime?.(context); },',
 		'    };',
 		'  },',
 		...renderMdxPreload(route.components),
 		'};',
-		'export default arcadeMdxPage;',
+		'export default marklessMdxPage;',
 		'',
 		'export async function resumeContainerEvent(input) {',
 		'  await resumeEventOnlyFromPayloadDocument({',
@@ -133,12 +133,12 @@ function emitComposedMdxRoute(route: MdxRoute): string {
 		'    event: input.event,',
 		'    element: input.element,',
 		'    eventRecord: input.eventRecord,',
-		'    loadSymbol: arcadeMdxLoadSymbol,',
+		'    loadSymbol: marklessMdxLoadSymbol,',
 		'  });',
 		'}',
 		'',
-		'function arcadeMdxLoadSymbol(symbolId, children = []) {',
-		'  return loadMdxSymbol(symbolId, children, arcadeMdxSymbolLoaders);',
+		'function marklessMdxLoadSymbol(symbolId, children = []) {',
+		'  return loadMdxSymbol(symbolId, children, marklessMdxSymbolLoaders);',
 		'}',
 		'',
 	].join('\n');
@@ -168,7 +168,7 @@ function parseMdxRoute(source: string, id: string): MdxRoute {
 	let root: HastNode;
 	try {
 		const importCollector = defineHastPlugin({
-			name: 'arcade-router-mdx-imports',
+			name: 'markless-router-mdx-imports',
 			mdxjsEsm(node) {
 				for (const imported of tsrxImportsFromProgram(node.parseExpression(), id)) {
 					if (!importedComponents.has(imported.localName)) {
@@ -204,13 +204,13 @@ function parseMdxRoute(source: string, id: string): MdxRoute {
 function tsrxImportsFromProgram(program: EstreeProgram | null, id: string): MdxImportedComponent[] {
 	const imports: MdxImportedComponent[] = [];
 	if (!program) {
-		throw new Error(`Arcade Router MDX could not parse ESM import syntax: ${id}`);
+		throw new Error(`Markless Router MDX could not parse ESM import syntax: ${id}`);
 	}
 
 	for (const statement of program.body) {
 		if (statement.type !== 'ImportDeclaration') {
 			throw new Error(
-				`Arcade Router MDX only supports importing TSRX components before content: ${id}`,
+				`Markless Router MDX only supports importing TSRX components before content: ${id}`,
 			);
 		}
 
@@ -227,7 +227,7 @@ function tsrxImportsFromProgram(program: EstreeProgram | null, id: string): MdxI
 			statement.specifiers.length !== 1
 		) {
 			throw new Error(
-				`Arcade Router MDX currently supports default imports from .tsrx files only: ${id}`,
+				`Markless Router MDX currently supports default imports from .tsrx files only: ${id}`,
 			);
 		}
 
@@ -274,7 +274,7 @@ function componentPart(node: MdxJsxElementNode, context: RoutePartsContext): Mdx
 	const name = node.name;
 	const imported = name ? context.importedComponents.get(name) : undefined;
 	if (!imported) {
-		throw new Error(`Arcade Router MDX component is not imported from .tsrx: ${name}`);
+		throw new Error(`Markless Router MDX component is not imported from .tsrx: ${name}`);
 	}
 
 	const componentIndex = context.components.length;
@@ -327,7 +327,7 @@ function normalizeStaticHastNode(node: HastNode, id: string): HastNode[] {
 	}
 	if (isMdxJsxFlowElement(node) || isMdxJsxTextElement(node)) {
 		throw new Error(
-			`Arcade Router MDX only supports imported TSRX components as route-level MDX elements or static markdown children: ${id}`,
+			`Markless Router MDX only supports imported TSRX components as route-level MDX elements or static markdown children: ${id}`,
 		);
 	}
 	if (isMdxExpression(node)) {
@@ -352,7 +352,7 @@ function componentProps(node: MdxJsxElementNode, id: string): MdxProp[] {
 function componentProp(attribute: MdxJsxAttributeNode, id: string): MdxProp {
 	if (attribute.type === 'mdxJsxExpressionAttribute') {
 		throw new Error(
-			`Arcade Router MDX cannot lower spread attributes because they depend on MDX JavaScript scope that Arcade does not execute during resume: ${id}`,
+			`Markless Router MDX cannot lower spread attributes because they depend on MDX JavaScript scope that Markless does not execute during resume: ${id}`,
 		);
 	}
 	const value = attribute.value;
@@ -372,13 +372,13 @@ function literalSafeExpressionValue(source: string, id: string): unknown {
 	const program = parseMdxExpressionValue(source, id);
 	if (!program) {
 		throw new Error(
-			`Arcade Router MDX only supports literal-safe expressions in attributes and markdown: ${id}`,
+			`Markless Router MDX only supports literal-safe expressions in attributes and markdown: ${id}`,
 		);
 	}
 	const statement = program.body[0] as EstreeNode | undefined;
 	if (program.body.length !== 1 || statement?.type !== 'ExpressionStatement') {
 		throw new Error(
-			`Arcade Router MDX only supports literal-safe expressions in attributes and markdown: ${id}`,
+			`Markless Router MDX only supports literal-safe expressions in attributes and markdown: ${id}`,
 		);
 	}
 	return evaluateLiteralExpression(statement.expression as EstreeNode, id);
@@ -389,7 +389,7 @@ function parseMdxExpressionValue(source: string, id: string): EstreeProgram | nu
 	let program: EstreeProgram | null = null;
 	try {
 		const expressionParser = defineHastPlugin({
-			name: 'arcade-router-mdx-expression',
+			name: 'markless-router-mdx-expression',
 			mdxFlowExpression(node) {
 				program = node.parseExpression();
 			},
@@ -484,7 +484,7 @@ function literalValueExpression(value: unknown, id: string): string {
 
 function literalExpressionError(id: string) {
 	return new Error(
-		`Arcade Router MDX only supports literal-safe expressions in attributes and markdown: ${id}`,
+		`Markless Router MDX only supports literal-safe expressions in attributes and markdown: ${id}`,
 	);
 }
 
@@ -494,11 +494,11 @@ function renderHtmlExpression(route: MdxRoute, mode: 'ssr' | 'csr'): string {
 			if (part.kind === 'html') return JSON.stringify(part.html);
 			if (mode === 'csr')
 				return JSON.stringify(
-					`<span data-arcade-mdx-child="${part.componentIndex}"></span>`,
+					`<span data-markless-mdx-child="${part.componentIndex}"></span>`,
 				);
 
 			const component = route.components[part.componentIndex]!;
-			return `renderMdxChild(arcadeMdxChildren, ${component.localName}, ${componentPropsExpression(component)}, { componentIndex: ${part.componentIndex}, hostPrefix: ${JSON.stringify(component.prefix)}, symbolPrefix: ${JSON.stringify(component.prefix)} })`;
+			return `renderMdxChild(marklessMdxChildren, ${component.localName}, ${componentPropsExpression(component)}, { componentIndex: ${part.componentIndex}, hostPrefix: ${JSON.stringify(component.prefix)}, symbolPrefix: ${JSON.stringify(component.prefix)} })`;
 		}),
 	);
 }
@@ -513,7 +513,7 @@ function componentPropsExpression(component: MdxComponent): string {
 }
 
 function renderCsrHtml(route: MdxRoute): string {
-	return `"<main data-arcade-mdx-root>" + ${renderHtmlExpression(route, 'csr')} + "</main>"`;
+	return `"<main data-markless-mdx-root>" + ${renderHtmlExpression(route, 'csr')} + "</main>"`;
 }
 
 function joinExpressions(expressions: ReadonlyArray<string>): string {
@@ -538,7 +538,7 @@ function renderSymbolLoaders(components: ReadonlyArray<MdxComponent>): string {
 	return `[${components
 		.map(
 			(component) =>
-				`{ prefix: ${JSON.stringify(component.prefix)}, loadSymbol(symbolId) { return import(${JSON.stringify(`${component.specifier}?arcade-symbols`)}).then((mod) => mod.loadSymbol(symbolId.slice(${component.prefix.length}))); } }`,
+				`{ prefix: ${JSON.stringify(component.prefix)}, loadSymbol(symbolId) { return import(${JSON.stringify(`${component.specifier}?markless-symbols`)}).then((mod) => mod.loadSymbol(symbolId.slice(${component.prefix.length}))); } }`,
 		)
 		.join(', ')}]`;
 }

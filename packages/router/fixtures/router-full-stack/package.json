@@ -1,5 +1,5 @@
 {
-	"name": "@arcade/fixture-router-full-stack",
+	"name": "@markless/fixture-router-full-stack",
 	"version": "0.0.0",
 	"private": true,
 	"type": "module",
@@ -10,8 +10,8 @@
 		"test": "vp test"
 	},
 	"dependencies": {
-		"@arcade/router": "workspace:*",
-		"arcade": "workspace:*",
+		"@markless/core": "workspace:*",
+		"@markless/router": "workspace:*",
 		"nitro": "catalog:"
 	},
 	"devDependencies": {

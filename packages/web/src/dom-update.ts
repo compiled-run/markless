@@ -1,5 +1,5 @@
-import type { ProtocolViewPayload } from '@arcade/serializer';
-import type { DomJournalEntry } from '@arcade/runtime';
+import type { ProtocolViewPayload } from '@markless/serializer';
+import type { DomJournalEntry } from '@markless/runtime';
 
 export type DomUpdateEntryInput = {
 	readonly locator: string;

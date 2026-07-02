@@ -21,7 +21,7 @@ export default box(
 
 		const page = await browser.visit('/');
 
-		await expect.page.text(page, HEADING, 'Arcade Router Docs', WAIT);
+		await expect.page.text(page, HEADING, 'Markless Router Docs', WAIT);
 		await expect.page.outcome(page, { consoleErrors: 0, failedRequests: 0 }, WAIT);
 		await receipt.capture('router docs dev served home page');
 	},

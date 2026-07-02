@@ -226,7 +226,7 @@ behavior can be lazy-loaded or diagnosed independently from the others.
 
 Extracted symbols are lazy-loaded, but normal framework-owned wiring does not
 turn into QRL-like user values or per-node DOM closures. Authored event props
-compile to encoded `arcade/view` records:
+compile to encoded `markless/view` records:
 
 ```txt
 DOM locator + event name + optional sync policy IR + ordered handler symbol IDs
@@ -234,7 +234,7 @@ DOM locator + event name + optional sync policy IR + ordered handler symbol IDs
 
 The generated HTML does not need an `onClick={async (...) => import(...)}` shape,
 and production output should not require per-node event attributes. The
-`arcade/view` arena locates nodes by DOM-order streams, skip runs, branch anchors,
+`markless/view` arena locates nodes by DOM-order streams, skip runs, branch anchors,
 or other private locator data, then the resumer builds internal side tables such
 as `WeakMap<Element, EventRecord>`.
 
@@ -247,7 +247,7 @@ execution.
 
 Dynamic imports are owned by a generated symbol resolver, not by each event prop.
 The resolver is a page/build-scoped module or equivalent compact runtime table
-that maps symbol IDs from `arcade/view` to chunks and exports:
+that maps symbol IDs from `markless/view` to chunks and exports:
 
 ```ts
 const symbolManifest = [
@@ -279,8 +279,8 @@ generated `switch (id)`, no generated `case` per symbol, and no per-node import
 closures. The build integration finalizes module URL/specifier entries after
 chunk emission, then the browser receives only the resolver table needed for the
 current build or page, plus enough build/protocol identity to fail closed if
-`arcade/view` references a symbol the resolver does not know. The default
-browser runtime must not fetch or parse `arcade-manifest.json` to discover
+`markless/view` references a symbol the resolver does not know. The default
+browser runtime must not fetch or parse `markless-manifest.json` to discover
 symbol chunks. If a manifest is emitted, it is build/tooling/adapter metadata,
 not the runtime symbol-loading primitive.
 

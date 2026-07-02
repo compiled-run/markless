@@ -1,0 +1,36 @@
+{
+	"name": "@markless/core",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"sideEffects": false,
+	"exports": {
+		".": "./src/index.ts",
+		"./preload": "./src/preload.ts",
+		"./rolldown": "./src/rolldown.ts",
+		"./runtime": "./src/runtime.ts",
+		"./runtime/dom-journal": "./src/runtime/dom-journal.ts",
+		"./runtime/dom-update": "./src/runtime/dom-update.ts",
+		"./runtime/event-only-resume": "./src/runtime/event-only-resume.ts",
+		"./runtime/event-resume": "./src/runtime/event-resume.ts",
+		"./runtime/render": "./src/runtime/render.ts",
+		"./runtime/render-to-string": "./src/runtime/render-to-string.ts",
+		"./runtime/resume": "./src/runtime/resume.ts",
+		"./router": "./src/router.ts",
+		"./router/vite": "./src/router/vite.ts",
+		"./web": "./src/web.ts",
+		"./web/dom-journal": "./src/web/dom-journal.ts",
+		"./web/dom-update": "./src/web/dom-update.ts",
+		"./web/event-only-resume": "./src/web/event-only-resume.ts",
+		"./web/event-resume": "./src/web/event-resume.ts",
+		"./web/render": "./src/web/render.ts",
+		"./web/render-to-string": "./src/web/render-to-string.ts",
+		"./web/resume": "./src/web/resume.ts",
+		"./vite": "./src/vite.ts"
+	},
+	"dependencies": {
+		"@markless/bundler": "workspace:*",
+		"@markless/router": "workspace:*",
+		"@markless/web": "workspace:*"
+	}
+}

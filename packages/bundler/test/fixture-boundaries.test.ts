@@ -6,23 +6,23 @@ const fixtureRoot = resolve(import.meta.dirname, '../fixtures');
 const tsrxFixtureImports = [
 	{
 		path: 'rolldown-basic/src/root.tsrx',
-		importLine: "import { state } from 'arcade';",
+		importLine: "import { state } from '@markless/core';",
 	},
 	{
 		path: 'vite-csr/src/root.tsrx',
-		importLine: "import { state } from 'arcade';",
+		importLine: "import { state } from '@markless/core';",
 	},
 	{
 		path: 'vite-library/src/card.tsrx',
-		importLine: "import { state } from 'arcade';",
+		importLine: "import { state } from '@markless/core';",
 	},
 	{
 		path: 'vite-plus/src/root.tsrx',
-		importLine: "import { state } from 'arcade';",
+		importLine: "import { state } from '@markless/core';",
 	},
 	{
 		path: 'vite-ssr/src/root.tsrx',
-		importLine: "import { state } from 'arcade';",
+		importLine: "import { state } from '@markless/core';",
 	},
 ] as const;
 
@@ -44,9 +44,9 @@ describe('fixture framework boundaries', () => {
 			expect(source).not.toContain('applyDomJournalEntries');
 			expect(source).not.toContain('applyDomJournal');
 		}
-		expect(csrEntry).toContain("import { render } from 'arcade';");
+		expect(csrEntry).toContain("import { render } from '@markless/core';");
 		expect(csrEntry).not.toContain('resumeFromPayloadScripts');
-		expect(vitePlusEntry).toContain("import { render } from 'arcade';");
+		expect(vitePlusEntry).toContain("import { render } from '@markless/core';");
 		expect(vitePlusEntry).not.toContain('resumeFromPayloadScripts');
 	});
 
@@ -88,7 +88,9 @@ describe('fixture framework boundaries', () => {
 		expect(config).not.toContain('entryFileNames:');
 		expect(config).toContain("input: 'index.html'");
 		expect(config).not.toContain("symbols: 'src/root.tsrx'");
-		expect(config).toContain("input: './src/root.tsrx'");
+		expect(config).toContain(
+			"input: fileURLToPath(new URL('./src/root.tsrx', import.meta.url))",
+		);
 		expect(config).toContain("preserveEntrySignatures: 'exports-only'");
 	});
 
@@ -122,7 +124,7 @@ describe('fixture framework boundaries', () => {
 		const config = await readFixture('vite-csr/vite.config.ts');
 
 		expect(config).toContain('configurePreviewServer');
-		expect(config).toContain('__arcade-fixture-requests');
+		expect(config).toContain('__markless-fixture-requests');
 		expect(config).toContain('isScriptRequest');
 	});
 

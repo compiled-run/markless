@@ -14,9 +14,9 @@ assert.equal(
 	'static SSR must not emit the inline resumer',
 );
 assert.equal(
-	staticHtml.includes('type="arcade/view"'),
+	staticHtml.includes('type="markless/view"'),
 	false,
-	'static SSR without browser triggers must not emit arcade/view wiring',
+	'static SSR without browser triggers must not emit markless/view wiring',
 );
 
 const interactiveHtml = renderEventOnlySsrHtml();

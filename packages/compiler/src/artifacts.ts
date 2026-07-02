@@ -1,5 +1,5 @@
-import type { ProtocolStatePayload, ProtocolViewPayload } from '@arcade/serializer';
-import type { RenderedPayloadScripts } from '@arcade/serializer';
+import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer';
+import type { RenderedPayloadScripts } from '@markless/serializer';
 import type { CompilerDiagnostic, SourceSpan } from './diagnostics.ts';
 
 export type { CompilerDiagnostic, DiagnosticSuggestion, SourceSpan } from './diagnostics.ts';
@@ -190,17 +190,17 @@ export type SemanticEvent = {
 
 export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 	readonly code:
-		| 'ARCADE_FRAMEWORK_IMPORT_REQUIRED'
-		| 'ARCADE_STATE_MODULE_SCOPE'
-		| 'ARCADE_ASYNC_POST_AWAIT_READ'
-		| 'ARCADE_ASYNC_BOUNDARY_REQUIRED'
-		| 'ARCADE_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED'
-		| 'ARCADE_STATE_ELEMENT_HANDLE_UNSERIALIZABLE'
-		| 'ARCADE_SHARED_DEFINITION_CYCLE'
-		| 'ARCADE_ELEMENT_HANDLE_REQUIRED'
-		| 'ARCADE_ELEMENT_HANDLE_DUPLICATE'
-		| 'ARCADE_ATTACH_HOST_ELEMENT_REQUIRED'
-		| 'ARCADE_SYNC_POLICY_UNEXTRACTABLE';
+		| 'MARKLESS_FRAMEWORK_IMPORT_REQUIRED'
+		| 'MARKLESS_STATE_MODULE_SCOPE'
+		| 'MARKLESS_ASYNC_POST_AWAIT_READ'
+		| 'MARKLESS_ASYNC_BOUNDARY_REQUIRED'
+		| 'MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED'
+		| 'MARKLESS_STATE_ELEMENT_HANDLE_UNSERIALIZABLE'
+		| 'MARKLESS_SHARED_DEFINITION_CYCLE'
+		| 'MARKLESS_ELEMENT_HANDLE_REQUIRED'
+		| 'MARKLESS_ELEMENT_HANDLE_DUPLICATE'
+		| 'MARKLESS_ATTACH_HOST_ELEMENT_REQUIRED'
+		| 'MARKLESS_SYNC_POLICY_UNEXTRACTABLE';
 	readonly phase: 'semantic-graph' | 'sync-policy';
 	readonly passId: 'tsrx-semantic-graph';
 };
@@ -322,13 +322,13 @@ export type StateLoweringInput = {
 
 export type StateLoweringDiagnostic = CompilerDiagnostic & {
 	readonly code:
-		| 'ARCADE_STATE_UNRESOLVED_WRITE'
-		| 'ARCADE_STATE_DYNAMIC_PATH_READ'
-		| 'ARCADE_STATE_DYNAMIC_PATH_WRITE'
-		| 'ARCADE_STATE_OPTIONAL_CHAIN_WRITE'
-		| 'ARCADE_STATE_REST_ALIAS_EXCLUDED_PATH'
-		| 'ARCADE_STATE_READ_ONLY_WRITE'
-		| 'ARCADE_STATE_CONST_REASSIGNMENT';
+		| 'MARKLESS_STATE_UNRESOLVED_WRITE'
+		| 'MARKLESS_STATE_DYNAMIC_PATH_READ'
+		| 'MARKLESS_STATE_DYNAMIC_PATH_WRITE'
+		| 'MARKLESS_STATE_OPTIONAL_CHAIN_WRITE'
+		| 'MARKLESS_STATE_REST_ALIAS_EXCLUDED_PATH'
+		| 'MARKLESS_STATE_READ_ONLY_WRITE'
+		| 'MARKLESS_STATE_CONST_REASSIGNMENT';
 	readonly phase: 'state-lowering';
 	readonly passId: 'state-lowering';
 	readonly source: string;
@@ -532,7 +532,7 @@ export type CaptureAnalysisInput = {
 };
 
 export type CaptureAnalysisDiagnostic = CompilerDiagnostic & {
-	readonly code: 'ARCADE_CAPTURE_UNSUPPORTED_VALUE';
+	readonly code: 'MARKLESS_CAPTURE_UNSUPPORTED_VALUE';
 	readonly phase: 'capture-analysis';
 	readonly passId: 'capture-analysis';
 	readonly symbolId?: string;

@@ -15,10 +15,8 @@ async function readJson(path) {
 
 const artifact = await readJson('src/artifact.json');
 const source = await readText('src/App.tsrx');
-const runtime = await readText('ios/Sources/ArcadeNativeProof/ArcadeNativeRuntime.swift');
-const test = await readText(
-	'ios/Tests/ArcadeNativeProofTests/ArcadeNativeProofTests.swift',
-);
+const runtime = await readText('ios/Sources/MarklessNativeProof/MarklessNativeRuntime.swift');
+const test = await readText('ios/Tests/MarklessNativeProofTests/MarklessNativeProofTests.swift');
 const demoApp = await readText('ios/DemoApp/DemoApp.swift');
 const demoInfo = await readText('ios/DemoApp/Info.plist');
 const demoRunner = await readText('ios/Scripts/run-ios-demo.sh');
@@ -26,12 +24,10 @@ const demoRunner = await readText('ios/Scripts/run-ios-demo.sh');
 assert.match(source, /state\(0\)/);
 assert.match(source, /onClick=\{\(\) => count\+\+\}/);
 
-assert.equal(artifact.schema, 'arcade-native-rendering-proof/v0');
+assert.equal(artifact.schema, 'markless-native-rendering-proof/v0');
 assert.equal(artifact.targetProfile, 'portable-host');
 
-assert.deepEqual(artifact.graph.cells, [
-	{ id: 'state:count', initial: 0, type: 'number' },
-]);
+assert.deepEqual(artifact.graph.cells, [{ id: 'state:count', initial: 0, type: 'number' }]);
 
 assert.deepEqual(
 	artifact.host.nodes.map((node) => [node.id, node.type]),
@@ -75,9 +71,9 @@ assert.match(test, /Count 1/);
 assert.match(test, /testNativeButtonActivationRunsJavaScriptCoreSymbol/);
 
 assert.match(demoApp, /UIApplicationDelegate/);
-assert.match(demoApp, /ArcadeNativeRuntime/);
+assert.match(demoApp, /MarklessNativeRuntime/);
 assert.match(demoApp, /mount\(\)/);
-assert.match(demoInfo, /ArcadeNativeProofDemo/);
+assert.match(demoInfo, /MarklessNativeProofDemo/);
 assert.match(demoRunner, /simctl install/);
 assert.match(demoRunner, /simctl launch/);
 
@@ -115,12 +111,12 @@ console.log(
 		{
 			proof: 'ios-native-rendering-target',
 			hostNodes: artifact.host.nodes.length,
-				graphCells: artifact.graph.cells.length,
-				events: artifact.host.events.length,
-				textBindings: artifact.host.textBindings.length,
-				swiftCorePath: 'UIKit + JavaScriptCore',
-				simulatorStatus: 'verified by xcodebuild XCTest receipt',
-			},
+			graphCells: artifact.graph.cells.length,
+			events: artifact.host.events.length,
+			textBindings: artifact.host.textBindings.length,
+			swiftCorePath: 'UIKit + JavaScriptCore',
+			simulatorStatus: 'verified by xcodebuild XCTest receipt',
+		},
 		null,
 		2,
 	),

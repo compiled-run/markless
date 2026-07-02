@@ -4,9 +4,9 @@ import { buildRouteManifestFromFileIds } from '../route-manifest.ts';
 import type { Plugin } from 'vite';
 import { discoverPageFiles, type RouteTypegenFileSystem } from './route-typegen.ts';
 
-const ROUTE_HREF_HELPER_ID = 'virtual:arcade-router/route-href';
+const ROUTE_HREF_HELPER_ID = 'virtual:markless-router/route-href';
 const JSX_FILE_FILTER = /\.(?:[jt]sx|tsrx)(?:$|\?)/;
-const ROUTER_IMPORT_SOURCES = new Set(['@arcade/router', 'arcade/router']);
+const ROUTER_IMPORT_SOURCES = new Set(['@markless/router', '@markless/core/router']);
 
 type RouteParam = RouteManifestRoute['params'][number];
 export type RoutePatternMap = ReadonlyMap<string, readonly RouteParam[]>;
@@ -38,7 +38,7 @@ export function anchorTransformPlugin(): Plugin {
 	};
 
 	return {
-		name: 'arcade-router:anchors',
+		name: 'markless-router:anchors',
 		transform: {
 			order: 'pre',
 			filter: {
@@ -107,7 +107,7 @@ export function transformAnchorSource(
 	}
 
 	const edits: Edit[] = [];
-	const linkNames = arcadeRouterLinkImportNames(ast);
+	const linkNames = marklessRouterLinkImportNames(ast);
 
 	walk(ast, (current) => {
 		if (current.type !== 'JSXOpeningElement') {
@@ -145,7 +145,7 @@ export function transformAnchorSource(
 
 		edits.push({
 			...rangeOf(href),
-			text: `href={__arcadeRouteHref(${JSON.stringify(hrefValue)}, ${slice(
+			text: `href={__marklessRouteHref(${JSON.stringify(hrefValue)}, ${slice(
 				code,
 				paramsExpression,
 			)})}`,
@@ -160,7 +160,7 @@ export function transformAnchorSource(
 	return `${helperImport()}${applyEdits(code, edits)}`;
 }
 
-function arcadeRouterLinkImportNames(ast: Node) {
+function marklessRouterLinkImportNames(ast: Node) {
 	const names = new Set<string>();
 
 	walk(ast, (current) => {
@@ -232,7 +232,7 @@ function objectLiteralKeys(expression: Node) {
 }
 
 function helperImport() {
-	return `import { __arcadeRouteHref } from "${ROUTE_HREF_HELPER_ID}";\n`;
+	return `import { __marklessRouteHref } from "${ROUTE_HREF_HELPER_ID}";\n`;
 }
 
 function missingParamsMessage(pattern: string, routeParams: readonly RouteParam[]) {

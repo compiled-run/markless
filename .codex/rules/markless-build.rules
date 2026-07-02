@@ -1,0 +1,54 @@
+# Markless build command policy.
+#
+# Codex .rules files control command approval behavior. The source guidance is:
+# framework build scripts and production optimization must use Rolldown or Vite
+# only. Do not introduce standalone esbuild, terser, Rollup, SWC, webpack, Babel
+# build pipelines, or similar secondary transformers/minifiers.
+
+prefix_rule(
+    pattern = ["rg", "-n"],
+    decision = "allow",
+    justification = "Read-only scans for forbidden build tooling and runtime-specific imports are safe.",
+    match = [
+        "rg -n \"esbuild|terser|rollup|webpack|swc|babel\" package.json specs .codex",
+        "rg -n \"node:|from ['\\\"](fs|path|url)['\\\"]|process|Buffer\" packages src specs .codex",
+    ],
+)
+
+prefix_rule(
+    pattern = [["pnpm", "npm", "yarn", "bun"], ["add", "install", "i", "update"]],
+    decision = "prompt",
+    justification = "Dependency changes must be reviewed so build tooling stays limited to Rolldown/Vite and core packages stay runtime-agnostic.",
+    match = [
+        "pnpm add rolldown",
+        "pnpm add vite",
+        "pnpm add pathe",
+        "pnpm add ufo",
+        "pnpm add esbuild",
+        "pnpm add terser",
+        "npm i vite",
+        "yarn add rolldown",
+        "bun add ufo",
+    ],
+    not_match = [
+        "pnpm test",
+        "pnpm build",
+        "npm run build",
+        "yarn test",
+        "bun test",
+    ],
+)
+
+prefix_rule(
+    pattern = [["esbuild", "terser", "rollup", "webpack", "swc", "babel"]],
+    decision = "forbidden",
+    justification = "Do not run standalone secondary build/minify/transform tools for this framework; use Rolldown or Vite.",
+    match = [
+        "esbuild src/index.ts --bundle",
+        "terser dist/index.js",
+        "rollup -c",
+        "webpack --mode production",
+        "swc src -d dist",
+        "babel src -d dist",
+    ],
+)

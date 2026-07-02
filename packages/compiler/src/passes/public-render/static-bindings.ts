@@ -12,7 +12,7 @@ export function emitPublicStaticEvents(publicRenderPlan: PublicRenderPlanArtifac
 
 export function emitStaticTextSyncFunction(publicRenderPlan: PublicRenderPlanArtifact): string {
 	const writes = publicRenderPlan.staticTextWrites.flatMap((write, index) => {
-		const value = `stringifyArcadePublicValue(${graphReadExpression(write.graphNodeId, write.path)})`;
+		const value = `stringifyMarklessPublicValue(${graphReadExpression(write.graphNodeId, write.path)})`;
 		return [
 			`	const textTarget${index} = nodeAtPath(root, ${JSON.stringify(write.nodePath)});`,
 			write.prefix !== undefined || write.suffix !== undefined
@@ -22,5 +22,5 @@ export function emitStaticTextSyncFunction(publicRenderPlan: PublicRenderPlanArt
 	});
 	if (writes.length === 0) return '';
 
-	return ['function syncArcadePublicStaticText(root, graph) {', ...writes, '}'].join('\n');
+	return ['function syncMarklessPublicStaticText(root, graph) {', ...writes, '}'].join('\n');
 }

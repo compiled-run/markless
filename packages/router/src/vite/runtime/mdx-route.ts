@@ -85,13 +85,13 @@ export function rootFromMdxHtml(html: string): Element {
 	template.innerHTML = html;
 	const root = template.content.firstElementChild;
 	if (!root) {
-		throw new Error('Arcade Router MDX render did not produce a root element.');
+		throw new Error('Markless Router MDX render did not produce a root element.');
 	}
 	return root;
 }
 
 export function replaceMdxChild(root: ParentNode, index: number, child: ChildNode | undefined) {
-	const placeholder = root.querySelector?.(`[data-arcade-mdx-child="${index}"]`);
+	const placeholder = root.querySelector?.(`[data-markless-mdx-child="${index}"]`);
 	if (placeholder && child) {
 		placeholder.replaceWith(child);
 		return;
@@ -194,7 +194,7 @@ export function loadMdxSymbol(
 		}
 	}
 
-	return Promise.reject(new Error(`Unknown Arcade MDX symbol ${symbolId}`));
+	return Promise.reject(new Error(`Unknown Markless MDX symbol ${symbolId}`));
 }
 
 function appendMdxChildView(context: {

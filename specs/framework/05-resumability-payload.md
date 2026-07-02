@@ -54,7 +54,7 @@ If a class wraps DOM or runtime resources, it is not a value class. Put the
 resource setup on the host element with `attach={...}` or recreate it from
 serializable state.
 
-### Arcade containers
+### Markless containers
 
 `renderToString(App, options)` emits an SSR resumable container. The container is
 the runtime and microfrontend boundary: it owns a rendered DOM root, graph
@@ -67,7 +67,7 @@ patches, element handles, and diagnostics do not leak across sibling or nested
 microfrontends.
 
 CSR `render(App, { target })` creates the same logical runtime boundary in
-memory, but it does not consume or emit `arcade/state`, `arcade/view`, or the
+memory, but it does not consume or emit `markless/state`, `markless/view`, or the
 resumer script. CSR must work like a regular browser app from an empty target
 and app bundle.
 
@@ -120,15 +120,15 @@ per-node `on:click` attributes to know what code is on the page. By default, the
 core renderer emits two inert data scripts:
 
 ```html
-<script type="arcade/state">
+<script type="markless/state">
 	...
 </script>
-<script type="arcade/view">
+<script type="markless/view">
 	...
 </script>
 ```
 
-`arcade/state` carries the state arena. `arcade/view` carries the view/wiring
+`markless/state` carries the state arena. `markless/view` carries the view/wiring
 arena. The renderer may merge, split, or stream these payloads when the
 resumer/runtime protocol supports it, but these two script types are the
 canonical core containers and the names used by documentation, devtools, and
@@ -137,8 +137,8 @@ inside those scripts are private render/resume protocol.
 
 Symbol URL/export metadata for browser resume is carried by a generated compact
 resolver table or equivalent payload-adjacent module code. The default resumer
-must not fetch or parse `arcade-manifest.json` to discover chunks or exports. If
-`arcade-manifest.json` is emitted, it is optional build/tooling/preload/devtools
+must not fetch or parse `markless-manifest.json` to discover chunks or exports. If
+`markless-manifest.json` is emitted, it is optional build/tooling/preload/devtools
 or adapter metadata and must be unnecessary for the default browser startup and
 symbol-loading path.
 
@@ -158,7 +158,7 @@ that ships it, plus gzip; authored source length is not an acceptance criterion.
 That measured scope includes only:
 
 - finding the current SSR container
-- reading compact `arcade/view` data
+- reading compact `markless/view` data
 - materializing DOM locator side tables
 - installing the delegated listener set required by the event table
 - walking `event.target` back to the container root
@@ -176,7 +176,7 @@ browser-immediate cancellation/propagation do not pay for sync-policy dispatch;
 static pages pay 0 B for the resumer.
 
 The compiler/bundler/render pipeline owns the expensive decisions: whether a
-resumer is emitted at all, compact `arcade/view` encoding, DOM-order locator
+resumer is emitted at all, compact `markless/view` encoding, DOM-order locator
 assignment, event-symbol extraction, symbol chunking, module/export tables,
 feature selection, minification, and inlining. The resumer is a trapdoor data
 interpreter for an already-rendered container, not the bundler, graph runtime, or
@@ -199,12 +199,12 @@ VNode format and does not imply a client VDOM or component re-render path.
 
 ### View locator materialization
 
-The v1 `arcade/view` locator model uses a browser-native `TreeWalker` over
+The v1 `markless/view` locator model uses a browser-native `TreeWalker` over
 `ELEMENT` and `COMMENT` nodes to materialize encoded DOM-order records onto the
 existing initially-rendered DOM. This is a locator-decoding step only:
 
 ```txt
-arcade/view locator stream
+markless/view locator stream
 -> TreeWalker over existing DOM
 -> skip static nodes and ignored/nested regions
 -> attach records to real elements/comment anchors
@@ -224,7 +224,7 @@ runtime record.
 
 This is deliberately not VDOM recovery. The `TreeWalker` pass does not
 materialize component VNodes, child VNode trees, or client render functions. It
-only maps compact `arcade/view` metadata to existing DOM nodes so later graph
+only maps compact `markless/view` metadata to existing DOM nodes so later graph
 writes, events, visibility triggers, and behavior setup can address those nodes
 directly.
 

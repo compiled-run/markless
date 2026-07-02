@@ -8,9 +8,9 @@ import { parseRequestFile, transformRequestFileSource } from '../src/request-fil
 const repoRoot = resolve(import.meta.dirname, '../../..');
 const fixturesRoot = join(repoRoot, 'packages/router/fixtures');
 const ignoredFixtureEntries = new Set([
-	'.arcade',
+	'.markless',
 	'.output',
-	'arcade-router-env.d.ts',
+	'markless-router-env.d.ts',
 	'node_modules',
 ]);
 
@@ -37,7 +37,7 @@ test('router app fixture exposes root UI and status page artifacts', async () =>
 		error: 'pages/500.tsrx',
 		notFound: 'pages/404.tsrx',
 	});
-	expect(createRouteTypesDeclaration(manifest)).toContain('ArcadeRouterStaticPageHref');
+	expect(createRouteTypesDeclaration(manifest)).toContain('MarklessRouterStaticPageHref');
 });
 
 test('router docs fixture exposes MDX docs routes and catch-all types', async () => {
@@ -61,7 +61,9 @@ test('router docs fixture exposes MDX docs routes and catch-all types', async ()
 		['/docs', 'pages/docs/index.mdx'],
 		['/docs/**', 'pages/docs/[...slug].mdx'],
 	]);
-	expect(declaration).toContain('export type ArcadeRouterRoutePattern =\n\t| "/docs/[...slug]";');
+	expect(declaration).toContain(
+		'export type MarklessRouterRoutePattern =\n\t| "/docs/[...slug]";',
+	);
 	expect(declaration).toContain('readonly slug: string | number | readonly (string | number)[];');
 });
 
@@ -79,7 +81,7 @@ test('router full-stack fixture separates UI, request, and public artifacts', as
 		'pages/500.tsrx',
 		'pages/about.tsrx',
 		'pages/index.tsrx',
-		'public/arcade-router.txt',
+		'public/markless-router.txt',
 		'tsconfig.json',
 		'vite.config.ts',
 	]);
@@ -106,10 +108,10 @@ test('router full-stack fixture separates UI, request, and public artifacts', as
 		kind: 'middleware',
 	});
 	expect(transformRequestFileSource('api/health.ts', healthSource)?.code).toContain(
-		'import { defineHandler as __arcade_define_handler__ } from "nitro";',
+		'import { defineHandler as __markless_define_handler__ } from "nitro";',
 	);
 	expect(transformRequestFileSource('middleware/request.ts', middlewareSource)?.code).toContain(
-		'__arcadeCreateHttpContext',
+		'__marklessCreateHttpContext',
 	);
 });
 

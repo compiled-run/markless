@@ -135,12 +135,12 @@ test('symbol-resolver fixture plans lazy symbols and generated resolver ownershi
 	expect(artifact.failClosedCases).toEqual(
 		expect.arrayContaining([
 			expect.objectContaining({
-				code: 'ARCADE_SYMBOL_UNKNOWN',
+				code: 'MARKLESS_SYMBOL_UNKNOWN',
 				stage: 'symbol-resolution',
 				action: 'fail-closed',
 			}),
 			expect.objectContaining({
-				code: 'ARCADE_SYMBOL_MANIFEST_MISMATCH',
+				code: 'MARKLESS_SYMBOL_MANIFEST_MISMATCH',
 				stage: 'symbol-resolution',
 				action: 'fail-closed',
 			}),

@@ -9,7 +9,7 @@ export async function resumeContainerEvent(input: {
 	const pageModule = loadPageModule ? await loadPageModule() : undefined;
 	const resume = (pageModule as RouteResumeModule | undefined)?.resumeContainerEvent;
 	if (typeof resume !== 'function') {
-		throw new Error(`Arcade Router could not resume route module: ${file ?? '<unknown>'}`);
+		throw new Error(`Markless Router could not resume route module: ${file ?? '<unknown>'}`);
 	}
 	await resume(input);
 }
@@ -19,7 +19,7 @@ interface RouteResumeModule {
 }
 
 function routeFileFromRoot(root: ParentNode): string | undefined {
-	const script = root.querySelector?.('script[type="arcade/route"]');
+	const script = root.querySelector?.('script[type="@markless/core/route"]');
 	const text = script?.textContent;
 	if (!text) {
 		return undefined;

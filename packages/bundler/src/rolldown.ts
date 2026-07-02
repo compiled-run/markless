@@ -1,15 +1,13 @@
 import type { InputOptions, Plugin } from 'rolldown';
 import { isAbsolute, relative, resolve } from 'pathe';
 import { joinURL, parsePath, withQuery, withoutLeadingSlash } from 'ufo';
-import { ARCADE_BUILD_PREFIX, ARCADE_BUNDLE_GRAPH, outputDefaults } from './build/chunking.ts';
 import {
-	ARCADE_MANIFEST,
-	ARCADE_MANIFEST_FILE,
-	type ArcadeManifestBundle,
-	createManifest,
-	devTagsManifest,
-	injectManifest,
-} from './build/manifest.ts';
+	MARKLESS_MANIFEST_FILE,
+	type MarklessBuildMetadataBundle,
+	createBuildMetadata,
+} from './build/build-metadata.ts';
+import { MARKLESS_BUILD_PREFIX, MARKLESS_BUNDLE_GRAPH, outputDefaults } from './build/chunking.ts';
+import { collectModulePreloadInjections, injectHeadLinks } from './build/head-links.ts';
 import { stripEmptyVitePreloadWrappers } from './build/preload-cleanup.ts';
 import {
 	compactGeneratedDirectSymbolLoaders,
@@ -17,16 +15,14 @@ import {
 	rewriteGeneratedSymbolInitExports,
 } from './build/symbol-facade-cleanup.ts';
 import { rewriteGeneratedSymbolTableUrls } from './build/symbol-table.ts';
-import { createArcadeDevGraph } from './dev.ts';
-import { ARCADE_VIRTUAL_PREFIX, transformTsrxModule } from './transform.ts';
+import { createMarklessDevGraph } from './dev.ts';
+import { MARKLESS_VIRTUAL_PREFIX, transformTsrxModule } from './transform.ts';
 import type {
-	ArcadeEnvironment,
-	ArcadeManifest,
-	ArcadeRolldownOptions,
-	ArcadeRolldownPluginApi,
-	ArcadeTransformManifest,
-	ArcadeVirtualModule,
-	ServerArcadeManifest,
+	MarklessEnvironment,
+	MarklessRolldownOptions,
+	MarklessRolldownPluginApi,
+	MarklessTransformManifest,
+	MarklessVirtualModule,
 	TransformTsrxModuleResult,
 } from './types.ts';
 
@@ -36,52 +32,50 @@ export type {
 	PreloadGraphContext,
 	PreloadGraphEntries,
 	PreloadGraphEntriesAdder,
-	ArcadeAsset,
-	ArcadeBundle,
-	ArcadeBundleGraph,
-	ArcadeDevServer,
-	ArcadeEnvironment,
-	ArcadeManifest,
-	ArcadeRolldownOptions,
-	ArcadeRolldownPluginApi,
-	ArcadeTransformManifest,
-	ArcadeVirtualModule,
-	ServerArcadeManifest,
+	MarklessAsset,
+	MarklessBuildMetadata,
+	MarklessBundle,
+	MarklessBundleGraph,
+	MarklessDevServer,
+	MarklessEnvironment,
+	MarklessManifest,
+	MarklessRolldownOptions,
+	MarklessRolldownPluginApi,
+	MarklessTransformManifest,
+	MarklessVirtualModule,
 	TransformTsrxModuleInput,
 	TransformTsrxModuleResult,
 } from './types.ts';
 
-type Environment = ArcadeEnvironment | ((context: unknown) => ArcadeEnvironment);
-export type ArcadeRolldownPlugin = Plugin & { api: ArcadeRolldownPluginApi };
-type InternalArcadeRolldownOptions = ArcadeRolldownOptions & {
+type Environment = MarklessEnvironment | ((context: unknown) => MarklessEnvironment);
+export type MarklessRolldownPlugin = Plugin & { api: MarklessRolldownPluginApi };
+type InternalMarklessRolldownOptions = MarklessRolldownOptions & {
 	publicPath?: (fileName: string) => string;
 };
 
-const manifests = new Map<string, ArcadeManifest>();
 const TSRX_SOURCE_FILE = /\.tsrx(?:[?#].*)?$/;
-const ARCADE_SYMBOL_SOURCE_QUERY_RE = /[?&]arcade-symbols(?:[&#]|$)/;
-const SYMBOL_VIRTUAL_ID_RE = /^virtual:arcade:symbol:([^:]+):[^:]+$/;
-const SYMBOL_VIRTUAL_STRING_RE = /(["'`])((?:virtual:arcade:symbol:)[^"'`]+)\1/g;
+const MARKLESS_SYMBOL_SOURCE_QUERY_RE = /[?&]markless-symbols(?:[&#]|$)/;
+const SYMBOL_VIRTUAL_ID_RE = /^virtual:markless:symbol:([^:]+):[^:]+$/;
+const SYMBOL_VIRTUAL_STRING_RE = /(["'`])((?:virtual:markless:symbol:)[^"'`]+)\1/g;
 
-export const arcadeClient = (options: ArcadeRolldownOptions = {}) =>
-	createArcadeRolldownPlugin({ environment: 'client', options });
-export const arcadeServer = (options: ArcadeRolldownOptions = {}) =>
-	createArcadeRolldownPlugin({ environment: 'server', options });
-export const arcadeLib = (options: ArcadeRolldownOptions = {}) =>
-	createArcadeRolldownPlugin({ environment: 'lib', options });
+export const marklessClient = (options: MarklessRolldownOptions = {}) =>
+	createMarklessRolldownPlugin({ environment: 'client', options });
+export const marklessServer = (options: MarklessRolldownOptions = {}) =>
+	createMarklessRolldownPlugin({ environment: 'server', options });
+export const marklessLib = (options: MarklessRolldownOptions = {}) =>
+	createMarklessRolldownPlugin({ environment: 'lib', options });
 
-export function createArcadeRolldownPlugin(input: {
+export function createMarklessRolldownPlugin(input: {
 	environment: Environment;
-	options?: ArcadeRolldownOptions;
-}): ArcadeRolldownPlugin {
+	options?: MarklessRolldownOptions;
+}): MarklessRolldownPlugin {
 	const environment = input.environment;
-	const internalOptions = (input.options ?? {}) as InternalArcadeRolldownOptions;
-	const virtualModules = new Map<string, ArcadeVirtualModule>();
-	const transformManifests = new Map<string, ArcadeTransformManifest>();
+	const internalOptions = (input.options ?? {}) as InternalMarklessRolldownOptions;
+	const virtualModules = new Map<string, MarklessVirtualModule>();
+	const transformManifests = new Map<string, MarklessTransformManifest>();
 	const sourceVirtualModules = new Map<string, Set<string>>();
 	const clientSymbolEntrySources = new Set<string>();
-	const dev = createArcadeDevGraph();
-	let manifest: ArcadeManifest | ServerArcadeManifest | null = null;
+	const dev = createMarklessDevGraph();
 	let root = internalOptions.rootDir;
 	const name = pluginName(environment);
 
@@ -99,7 +93,7 @@ export function createArcadeRolldownPlugin(input: {
 
 	const plugin = {
 		api: {
-			invalidateGeneratedModules(parent: string, currentEnvironment?: ArcadeEnvironment) {
+			invalidateGeneratedModules(parent: string, currentEnvironment?: MarklessEnvironment) {
 				const ids = dev.clear(parent, currentEnvironment);
 				for (const id of ids) {
 					virtualModules.delete(id);
@@ -135,10 +129,6 @@ export function createArcadeRolldownPlugin(input: {
 					clientSymbolEntrySources.add(source);
 				}
 			}
-			manifest = null;
-			if (currentRoot) {
-				manifest = manifests.get(currentRoot) ?? null;
-			}
 		},
 		outputOptions(output) {
 			return outputDefaults(output, getEnvironment(this));
@@ -172,7 +162,7 @@ export function createArcadeRolldownPlugin(input: {
 			if (!TSRX_SOURCE_FILE.test(id)) {
 				return null;
 			}
-			if (virtualId.startsWith(ARCADE_VIRTUAL_PREFIX)) {
+			if (virtualId.startsWith(MARKLESS_VIRTUAL_PREFIX)) {
 				return null;
 			}
 			const source = pathname(id);
@@ -214,21 +204,6 @@ export function createArcadeRolldownPlugin(input: {
 				}
 			}
 
-			if (currentEnvironment === 'server') {
-				let serverManifest = manifest;
-				if (
-					!serverManifest &&
-					internalOptions.dev &&
-					internalOptions.devInjections?.length
-				) {
-					serverManifest = devTagsManifest(internalOptions.devInjections);
-				}
-				return {
-					code: injectManifest(transformed.code, serverManifest),
-					map: transformed.map,
-				};
-			}
-
 			return transformed;
 		},
 		generateBundle: {
@@ -244,55 +219,57 @@ export function createArcadeRolldownPlugin(input: {
 				const tableRewrite = rewriteGeneratedSymbolTableUrls(manifestBundle);
 				if (tableRewrite.unresolved.length > 0) {
 					this.error(
-						`Arcade symbol resolver table contains unresolved generated symbol chunks: ${tableRewrite.unresolved.join(', ')}`,
+						`Markless symbol resolver table contains unresolved generated symbol chunks: ${tableRewrite.unresolved.join(', ')}`,
 					);
 				}
 
-				const clientManifest = createManifest(
+				const clientManifest = createBuildMetadata(
 					manifestBundle,
 					transformManifests.values(),
 					getRoot(),
 					{
-						bundleGraphAsset: ARCADE_BUNDLE_GRAPH,
+						bundleGraphAsset: MARKLESS_BUNDLE_GRAPH,
 						bundleGraphAdders: internalOptions.bundleGraphAdders,
 						canonPath: stripBuildPrefix,
 						publicPath: internalOptions.publicPath,
 						injections: internalOptions.devInjections,
 					},
 				);
-				manifest = clientManifest;
-				const currentRoot = getRoot();
-				if (currentRoot) {
-					manifests.set(currentRoot, clientManifest);
-				}
 				internalOptions.onManifest?.(clientManifest);
+
+				injectHeadLinks(
+					bundle,
+					collectModulePreloadInjections(clientManifest.bundleGraph, {
+						publicPath: internalOptions.publicPath,
+					}),
+				);
 
 				this.emitFile({
 					type: 'asset',
-					fileName: ARCADE_BUNDLE_GRAPH,
+					fileName: MARKLESS_BUNDLE_GRAPH,
 					source: JSON.stringify(clientManifest.bundleGraph),
 				});
 				if (internalOptions.emitManifestJson === true) {
 					this.emitFile({
 						type: 'asset',
-						fileName: ARCADE_MANIFEST_FILE,
+						fileName: MARKLESS_MANIFEST_FILE,
 						source: JSON.stringify(clientManifest, null, '\t'),
 					});
 				}
 			},
 		},
-	} satisfies Plugin & { api: ArcadeRolldownPluginApi };
+	} satisfies Plugin & { api: MarklessRolldownPluginApi };
 
 	return plugin;
 }
 
 function bundleWithoutRemovedChunks(
-	bundle: ArcadeManifestBundle,
+	bundle: MarklessBuildMetadataBundle,
 	removedFileNames: ReadonlySet<string>,
 ) {
 	if (removedFileNames.size === 0) return bundle;
 
-	const next: ArcadeManifestBundle = {};
+	const next: MarklessBuildMetadataBundle = {};
 	for (const [key, output] of Object.entries(bundle)) {
 		if (isChunkFile(output) && removedFileNames.has(output.fileName)) continue;
 		next[key] = output;
@@ -337,20 +314,20 @@ function isChunkWithCode(output: unknown): output is {
 
 function pluginName(environment: Environment) {
 	if (typeof environment === 'function') {
-		return 'arcade:rolldown';
+		return 'markless:rolldown';
 	}
 
-	return `arcade:rolldown:${environment}`;
+	return `markless:rolldown:${environment}`;
 }
 
 function registerTransformArtifacts(input: {
 	source: string;
 	result: TransformTsrxModuleResult;
-	virtualModules: Map<string, ArcadeVirtualModule>;
-	transformManifests: Map<string, ArcadeTransformManifest>;
+	virtualModules: Map<string, MarklessVirtualModule>;
+	transformManifests: Map<string, MarklessTransformManifest>;
 	sourceVirtualModules: Map<string, Set<string>>;
-	dev: ReturnType<typeof createArcadeDevGraph>;
-	environment: ArcadeEnvironment;
+	dev: ReturnType<typeof createMarklessDevGraph>;
+	environment: MarklessEnvironment;
 }) {
 	const ids = new Set<string>();
 	for (const module of input.result.virtualModules) {
@@ -364,7 +341,7 @@ function registerTransformArtifacts(input: {
 
 function clearSourceVirtualModules(
 	source: string,
-	virtualModules: Map<string, ArcadeVirtualModule>,
+	virtualModules: Map<string, MarklessVirtualModule>,
 	sourceVirtualModules: Map<string, Set<string>>,
 ) {
 	const stale = sourceVirtualModules.get(source);
@@ -376,13 +353,13 @@ function clearSourceVirtualModules(
 }
 
 function stripBuildPrefix(fileName: string) {
-	return fileName.startsWith(ARCADE_BUILD_PREFIX)
-		? fileName.slice(ARCADE_BUILD_PREFIX.length)
+	return fileName.startsWith(MARKLESS_BUILD_PREFIX)
+		? fileName.slice(MARKLESS_BUILD_PREFIX.length)
 		: fileName;
 }
 
 function virtualModuleSourceForLoad(
-	module: ArcadeVirtualModule,
+	module: MarklessVirtualModule,
 	options: {
 		readonly dev: boolean;
 		readonly publicPath?: (fileName: string) => string;
@@ -450,7 +427,7 @@ function normalizeInputSource(source: string, root: string | undefined) {
 }
 
 function isSymbolOnlySourceRequest(id: string): boolean {
-	return ARCADE_SYMBOL_SOURCE_QUERY_RE.test(id);
+	return MARKLESS_SYMBOL_SOURCE_QUERY_RE.test(id);
 }
 
 function sourceForSymbolVirtualImporter(importer: string | undefined): string | null {
@@ -484,13 +461,12 @@ function pathname(id: string) {
 	return parsePath(id).pathname;
 }
 
-export { ARCADE_BUNDLE_GRAPH, ARCADE_BUILD_PREFIX, outputDefaults } from './build/chunking.ts';
+export { MARKLESS_BUNDLE_GRAPH, MARKLESS_BUILD_PREFIX, outputDefaults } from './build/chunking.ts';
 export {
-	ARCADE_MANIFEST,
-	ARCADE_MANIFEST_FILE,
-	createManifest,
-	devTagsManifest,
-	injectManifest,
-} from './build/manifest.ts';
+	MARKLESS_MANIFEST_FILE,
+	createBuildMetadata,
+	createBuildMetadata as createManifest,
+} from './build/build-metadata.ts';
 export { convertManifestToBundleGraph, createPreloadGraphAdder } from './build/bundle-graph.ts';
-export { ARCADE_VIRTUAL_PREFIX, transformTsrxModule } from './transform.ts';
+export { collectHeadLinkInjections } from './build/head-links.ts';
+export { MARKLESS_VIRTUAL_PREFIX, transformTsrxModule } from './transform.ts';

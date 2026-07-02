@@ -170,7 +170,7 @@ function invalidWriteDiagnostic(input: {
 
 	if (sourceRoot && input.computedNames.has(sourceRoot)) {
 		return createDiagnostic({
-			code: 'ARCADE_STATE_COMPUTED_READONLY',
+			code: 'MARKLESS_STATE_COMPUTED_READONLY',
 			sourceTarget,
 			statePath: sourceRoot,
 			span,
@@ -183,7 +183,7 @@ function invalidWriteDiagnostic(input: {
 
 	if (computedSource) {
 		return createDiagnostic({
-			code: 'ARCADE_STATE_COMPUTED_READONLY',
+			code: 'MARKLESS_STATE_COMPUTED_READONLY',
 			sourceTarget,
 			statePath: computedSource,
 			span,
@@ -196,7 +196,7 @@ function invalidWriteDiagnostic(input: {
 
 	if (resolved.alias?.kind === 'props-path' || resolved.segments[0]?.text === 'props') {
 		return createDiagnostic({
-			code: 'ARCADE_STATE_PROPS_READONLY',
+			code: 'MARKLESS_STATE_PROPS_READONLY',
 			sourceTarget,
 			statePath: resolved.target,
 			span,
@@ -209,7 +209,7 @@ function invalidWriteDiagnostic(input: {
 
 	if (resolved.alias?.kind === 'state-path' && resolved.alias.writability === 'ambiguous-write') {
 		return createDiagnostic({
-			code: 'ARCADE_STATE_ALIAS_AMBIGUOUS_WRITE',
+			code: 'MARKLESS_STATE_ALIAS_AMBIGUOUS_WRITE',
 			sourceTarget,
 			statePath: resolved.alias.source ?? undefined,
 			span,
@@ -222,7 +222,7 @@ function invalidWriteDiagnostic(input: {
 
 	if (resolved.alias?.kind === 'state-path' && resolved.alias.writability === 'local-copy') {
 		return createDiagnostic({
-			code: 'ARCADE_STATE_ALIAS_LOCAL_COPY',
+			code: 'MARKLESS_STATE_ALIAS_LOCAL_COPY',
 			sourceTarget,
 			statePath: resolved.alias.source ?? undefined,
 			span,
@@ -250,7 +250,7 @@ function createDiagnostic(input: DiagnosticInput): StateLoweringDiagnostic {
 		artifactKeys: [`write:${input.sourceTarget}`],
 		statePath: input.statePath,
 		suggestions: [{ message: input.suggestion }],
-		docsUrl: `https://arcadejs.com/errors/${input.code}`,
+		docsUrl: `https://markless.dev/errors/${input.code}`,
 	};
 }
 

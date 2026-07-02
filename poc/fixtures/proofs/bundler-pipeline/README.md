@@ -1,6 +1,6 @@
 # Bundler Pipeline Proof
 
-This fixture is the executable spec for the minimal `@arcade/core`
+This fixture is the executable spec for the minimal `@markless/core`
 bundler-pipeline POC. It is intentionally authored as normal `.tsrx` source and
 does not include hand-written final artifact JSON.
 

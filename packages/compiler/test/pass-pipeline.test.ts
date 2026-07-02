@@ -9,7 +9,7 @@ import {
 } from '../src/index.ts';
 
 const source = `
-import { state } from 'arcade';
+import { state } from '@markless/core';
 
 export function App() @{
 	let count = state(0);
@@ -195,14 +195,14 @@ test('validateCompilerPassGraph exposes structured diagnostics for invalid pass 
 
 	expect(duplicatePass).toBeInstanceOf(CompilerPassGraphError);
 	expect(duplicatePass).toMatchObject({
-		code: 'ARCADE_COMPILER_PASS_GRAPH_INVALID',
+		code: 'MARKLESS_COMPILER_PASS_GRAPH_INVALID',
 		severity: 'error',
 		phase: 'runtime',
 		title: 'Invalid compiler pass graph',
 		reason: 'duplicate-pass-id',
 		passId: 'state-lowering',
 		artifactKeys: [],
-		docsUrl: 'https://arcadejs.com/errors/ARCADE_COMPILER_PASS_GRAPH_INVALID',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_COMPILER_PASS_GRAPH_INVALID',
 	});
 	expect(duplicatePass).toMatchObject({
 		message: 'Compiler pass "state-lowering" is declared more than once.',
@@ -230,7 +230,7 @@ test('validateCompilerPassGraph exposes structured diagnostics for invalid pass 
 	);
 
 	expect(duplicateProducer).toMatchObject({
-		code: 'ARCADE_COMPILER_PASS_GRAPH_INVALID',
+		code: 'MARKLESS_COMPILER_PASS_GRAPH_INVALID',
 		reason: 'duplicate-artifact-producer',
 		passId: 'two',
 		artifactKeys: ['semanticGraph'],
@@ -251,7 +251,7 @@ test('validateCompilerPassGraph exposes structured diagnostics for invalid pass 
 	);
 
 	expect(missingArtifact).toMatchObject({
-		code: 'ARCADE_COMPILER_PASS_GRAPH_INVALID',
+		code: 'MARKLESS_COMPILER_PASS_GRAPH_INVALID',
 		reason: 'missing-artifact',
 		passId: 'state-lowering',
 		artifactKeys: ['semanticGraph'],
@@ -278,7 +278,7 @@ test('validateCompilerPassGraph exposes structured diagnostics for invalid pass 
 	);
 
 	expect(cycle).toMatchObject({
-		code: 'ARCADE_COMPILER_PASS_GRAPH_INVALID',
+		code: 'MARKLESS_COMPILER_PASS_GRAPH_INVALID',
 		reason: 'dependency-cycle',
 		passId: 'one,two',
 		artifactKeys: ['oneArtifact', 'twoArtifact'],

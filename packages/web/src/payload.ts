@@ -9,16 +9,16 @@ import {
 	type ProtocolViewPayload,
 	type RuntimePayloadType,
 	type SerializedGraphPayload,
-} from '@arcade/serializer';
+} from '@markless/serializer';
 export {
 	decodePayloadScripts,
 	RuntimePayloadError,
 	type RuntimePayloadDiagnostic,
 	type RuntimePayloadErrorCode,
 	type RuntimePayloadType,
-} from '@arcade/serializer';
+} from '@markless/serializer';
 import { applyDomJournalEntries } from './dom-journal.ts';
-import { createRuntimeGraph, type RuntimeGraph, type RuntimeGraphRead } from '@arcade/runtime';
+import { createRuntimeGraph, type RuntimeGraph, type RuntimeGraphRead } from '@markless/runtime';
 import {
 	createResumeRuntime,
 	type ResumeDomElement,
@@ -61,8 +61,8 @@ export function readPayloadScriptsFromDocument(
 	document: PayloadScriptDocument,
 ): EncodedPayloadScripts {
 	return {
-		stateScript: readPayloadScriptFromDocument(document, 'arcade/state'),
-		viewScript: readPayloadScriptFromDocument(document, 'arcade/view'),
+		stateScript: readPayloadScriptFromDocument(document, 'markless/state'),
+		viewScript: readPayloadScriptFromDocument(document, 'markless/view'),
 	};
 }
 

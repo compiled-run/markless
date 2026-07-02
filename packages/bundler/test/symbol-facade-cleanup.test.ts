@@ -7,7 +7,8 @@ import {
 
 describe('generated symbol facade cleanup', () => {
 	test('rewrites resolver imports to shared symbol chunks and removes generated facades', () => {
-		const symbolVirtualId = '\0virtual:arcade:symbol:%2Fworkspace%2Fsrc%2Froot.tsrx:symbol%3A0';
+		const symbolVirtualId =
+			'\0virtual:markless:symbol:%2Fworkspace%2Fsrc%2Froot.tsrx:symbol%3A0';
 		const bundle = {
 			'build/runtime.js': {
 				type: 'chunk',
@@ -17,7 +18,7 @@ describe('generated symbol facade cleanup', () => {
 				imports: [],
 				dynamicImports: ['build/symbol-0.js'],
 				moduleIds: [
-					'\0virtual:arcade:resolver:%2Fworkspace%2Fsrc%2Froot.tsrx',
+					'\0virtual:markless:resolver:%2Fworkspace%2Fsrc%2Froot.tsrx',
 					'/workspace/src/root.tsrx',
 				],
 			},
@@ -54,7 +55,8 @@ describe('generated symbol facade cleanup', () => {
 	});
 
 	test('rewrites source helper imports to shared symbol chunks and removes generated facades', () => {
-		const symbolVirtualId = '\0virtual:arcade:symbol:%2Fworkspace%2Fsrc%2Froot.tsrx:symbol%3A0';
+		const symbolVirtualId =
+			'\0virtual:markless:symbol:%2Fworkspace%2Fsrc%2Froot.tsrx:symbol%3A0';
 		const bundle = {
 			'build/app.js': {
 				type: 'chunk',
@@ -98,7 +100,8 @@ describe('generated symbol facade cleanup', () => {
 	});
 
 	test('keeps facades when the imported chunk does not export every facade export', () => {
-		const symbolVirtualId = '\0virtual:arcade:symbol:%2Fworkspace%2Fsrc%2Froot.tsrx:symbol%3A0';
+		const symbolVirtualId =
+			'\0virtual:markless:symbol:%2Fworkspace%2Fsrc%2Froot.tsrx:symbol%3A0';
 		const bundle = {
 			'build/runtime.js': {
 				type: 'chunk',
@@ -108,7 +111,7 @@ describe('generated symbol facade cleanup', () => {
 				imports: [],
 				dynamicImports: ['build/symbol-0.js'],
 				moduleIds: [
-					'\0virtual:arcade:resolver:%2Fworkspace%2Fsrc%2Froot.tsrx',
+					'\0virtual:markless:resolver:%2Fworkspace%2Fsrc%2Froot.tsrx',
 					'/workspace/src/root.tsrx',
 				],
 			},
@@ -141,8 +144,9 @@ describe('generated symbol facade cleanup', () => {
 	});
 
 	test('shortens generated symbol chunk init export aliases', () => {
-		const symbolVirtualId = '\0virtual:arcade:symbol:%2Fworkspace%2Fsrc%2Froot.tsrx:symbol%3A0';
-		const firstInit = 'init__virtual_arcade_symbol__2Fworkspace_2Fsrc_2Froot_2Etsrx';
+		const symbolVirtualId =
+			'\0virtual:markless:symbol:%2Fworkspace%2Fsrc%2Froot.tsrx:symbol%3A0';
+		const firstInit = 'init__virtual_markless_symbol__2Fworkspace_2Fsrc_2Froot_2Etsrx';
 		const bundle = {
 			'build/runtime.js': {
 				type: 'chunk',
@@ -152,7 +156,7 @@ describe('generated symbol facade cleanup', () => {
 				imports: [],
 				dynamicImports: ['build/shared.js'],
 				moduleIds: [
-					'\0virtual:arcade:resolver:%2Fworkspace%2Fsrc%2Froot.tsrx',
+					'\0virtual:markless:resolver:%2Fworkspace%2Fsrc%2Froot.tsrx',
 					'/workspace/src/root.tsrx',
 				],
 			},
@@ -171,21 +175,22 @@ describe('generated symbol facade cleanup', () => {
 
 		expect(result.renamed).toBe(1);
 		expect(bundle['build/shared.js']?.exports).toEqual([
-			'init__virtual_arcade_symbol',
+			'init__virtual_markless_symbol',
 			'symbol_0',
 		]);
 		expect(bundle['build/shared.js']?.code).toBe(
-			'function a(){}function symbol_0(){}export{a as init__virtual_arcade_symbol,symbol_0};',
+			'function a(){}function symbol_0(){}export{a as init__virtual_markless_symbol,symbol_0};',
 		);
 		expect(bundle['build/runtime.js']?.code).toBe(
-			'function load(){return import("./shared.js").then(mod=>(mod.init__virtual_arcade_symbol(),mod.symbol_0))}',
+			'function load(){return import("./shared.js").then(mod=>(mod.init__virtual_markless_symbol(),mod.symbol_0))}',
 		);
 	});
 
 	test('collapses generated symbol init exports into one stable chunk initializer', () => {
-		const symbolVirtualId = '\0virtual:arcade:symbol:%2Fworkspace%2Fsrc%2Froot.tsrx:symbol%3A0';
-		const firstInit = 'init__virtual_arcade_symbol__2Fworkspace_2Fsrc_2Froot_2Etsrx';
-		const secondInit = 'init__virtual_arcade_symbol__2Fworkspace_2Fsrc_2Froot_2Etsrx$1';
+		const symbolVirtualId =
+			'\0virtual:markless:symbol:%2Fworkspace%2Fsrc%2Froot.tsrx:symbol%3A0';
+		const firstInit = 'init__virtual_markless_symbol__2Fworkspace_2Fsrc_2Froot_2Etsrx';
+		const secondInit = 'init__virtual_markless_symbol__2Fworkspace_2Fsrc_2Froot_2Etsrx$1';
 		const bundle = {
 			'build/shared.js': {
 				type: 'chunk',
@@ -201,11 +206,11 @@ describe('generated symbol facade cleanup', () => {
 		rewriteGeneratedSymbolInitExports(bundle);
 
 		expect(bundle['build/shared.js']?.exports).toEqual([
-			'init__virtual_arcade_symbol',
+			'init__virtual_markless_symbol',
 			'symbol_0',
 		]);
 		expect(bundle['build/shared.js']?.code).toBe(
-			'function a(){}function b(){}function symbol_0(){}function $i(){a();b()}export{$i as init__virtual_arcade_symbol,symbol_0};',
+			'function a(){}function b(){}function symbol_0(){}function $i(){a();b()}export{$i as init__virtual_markless_symbol,symbol_0};',
 		);
 	});
 
@@ -214,7 +219,7 @@ describe('generated symbol facade cleanup', () => {
 			'build/app.js': {
 				type: 'chunk',
 				fileName: 'build/app.js',
-				code: 'function o(e){return e==="symbol:0"?import("./shared.js").then(e=>s(e,"symbol_0")):e==="symbol:1"?import("./shared.js").then(e=>s(e,"symbol_1")):Promise.reject(Error(`Unknown async symbol ${e}`))}function s(e,t){return e.init__virtual_arcade_symbol?.(),e[t]}',
+				code: 'function o(e){return e==="symbol:0"?import("./shared.js").then(e=>s(e,"symbol_0")):e==="symbol:1"?import("./shared.js").then(e=>s(e,"symbol_1")):Promise.reject(Error(`Unknown async symbol ${e}`))}function s(e,t){return e.init__virtual_markless_symbol?.(),e[t]}',
 				exports: [],
 				imports: [],
 				dynamicImports: ['build/shared.js'],
@@ -226,7 +231,7 @@ describe('generated symbol facade cleanup', () => {
 
 		expect(result.compacted).toBe(1);
 		expect(bundle['build/app.js']?.code).toBe(
-			'let $m;function o(e){let t=+e.slice(7);if(e===`symbol:${t}`&&t>=0&&t<2){if($m)return s($m,`symbol_${t}`);return import("./shared.js").then(e=>($m=e,s(e,`symbol_${t}`)))}return Promise.reject(Error(`Unknown async symbol ${e}`))}function s(e,t){return e.init__virtual_arcade_symbol?.(),e[t]}',
+			'let $m;function o(e){let t=+e.slice(7);if(e===`symbol:${t}`&&t>=0&&t<2){if($m)return s($m,`symbol_${t}`);return import("./shared.js").then(e=>($m=e,s(e,`symbol_${t}`)))}return Promise.reject(Error(`Unknown async symbol ${e}`))}function s(e,t){return e.init__virtual_markless_symbol?.(),e[t]}',
 		);
 	});
 

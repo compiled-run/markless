@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vite-plus/test';
 import { createServerEntry } from '../../../src/vite/runtime/create-server-entry.ts';
 
 describe('server entry rendering', () => {
-	it('renders matched Arcade page artifacts inside an HTML document', async () => {
+	it('renders matched Markless page artifacts inside an HTML document', async () => {
 		const entry = createServerEntry({
-			resumeEntryPath: '/@id/virtual:arcade-router/resume-entry',
+			resumeEntryPath: '/@id/virtual:markless-router/resume-entry',
 			documentModuleLoader: async () => ({
-				__arcadeRouterHtmlAttributes: (props: {
+				__marklessRouterHtmlAttributes: (props: {
 					readonly status: number;
 					readonly url: { readonly pathname: string };
 				}) => ({
@@ -21,7 +21,7 @@ describe('server entry rendering', () => {
 			routeFileIds: ['/pages/index.tsrx'],
 		});
 
-		const response = await entry.fetch(new Request('http://arcade-router.test/'));
+		const response = await entry.fetch(new Request('http://markless-router.test/'));
 		const html = await response.text();
 
 		expect(response.status).toBe(200);
@@ -32,7 +32,7 @@ describe('server entry rendering', () => {
 
 	it('emits resumability payloads without waking a client entry on page load', async () => {
 		const entry = createServerEntry({
-			resumeEntryPath: '/@id/virtual:arcade-router/resume-entry',
+			resumeEntryPath: '/@id/virtual:markless-router/resume-entry',
 			documentModuleLoader: undefined,
 			pageModuleLoaders: {
 				'pages/index.tsrx': async () => ({
@@ -77,49 +77,51 @@ describe('server entry rendering', () => {
 			routeFileIds: ['/pages/index.tsrx'],
 		});
 
-		const response = await entry.fetch(new Request('http://arcade-router.test/'));
+		const response = await entry.fetch(new Request('http://markless-router.test/'));
 		const html = await response.text();
 
 		expect(response.status).toBe(200);
 		expect(html).toContain('data-async-container');
-		expect(html).toContain('<script type="arcade/state">');
-		expect(html).toContain('<script type="arcade/view">');
-		expect(html).toContain('<script type="arcade/route">{"file":"pages/index.tsrx"}</script>');
-		expect(html.indexOf('<script type="arcade/route">')).toBeLessThan(
-			html.indexOf('<script type="arcade/state">'),
+		expect(html).toContain('<script type="markless/state">');
+		expect(html).toContain('<script type="markless/view">');
+		expect(html).toContain(
+			'<script type="@markless/core/route">{"file":"pages/index.tsrx"}</script>',
+		);
+		expect(html.indexOf('<script type="@markless/core/route">')).toBeLessThan(
+			html.indexOf('<script type="markless/state">'),
 		);
 		expect(html).not.toContain('/pages/index.tsrx?import');
-		expect(html).toContain('import("/@id/virtual:arcade-router/resume-entry")');
+		expect(html).toContain('import("/@id/virtual:markless-router/resume-entry")');
 		expect(html).not.toContain('<script type="module"');
-		expect(html).not.toContain('src="/@id/virtual:arcade-router/resume-entry"');
+		expect(html).not.toContain('src="/@id/virtual:markless-router/resume-entry"');
 	});
 
 	it('emits a lazy Link navigation bridge without waking a client entry', async () => {
 		const entry = createServerEntry({
-			navigationEntryPath: '/@id/virtual:arcade-router/navigation-entry',
-			resumeEntryPath: '/@id/virtual:arcade-router/resume-entry',
+			navigationEntryPath: '/@id/virtual:markless-router/navigation-entry',
+			resumeEntryPath: '/@id/virtual:markless-router/resume-entry',
 			documentModuleLoader: undefined,
 			pageModuleLoaders: {
 				'pages/index.tsrx': async () => ({
 					default: page(
-						'<main><a href="/docs/getting-started" data-arcade-router-link>Docs</a></main>',
+						'<main><a href="/docs/getting-started" data-markless-router-link>Docs</a></main>',
 					),
 				}),
 			},
 			routeFileIds: ['/pages/index.tsrx', '/pages/docs/[...slug].mdx'],
 		});
 
-		const response = await entry.fetch(new Request('http://arcade-router.test/'));
+		const response = await entry.fetch(new Request('http://markless-router.test/'));
 		const html = await response.text();
 
 		expect(response.status).toBe(200);
-		expect(html).toContain('data-arcade-router-link');
-		expect(html).toContain('data-arcade-router-link-resumer');
-		expect(html).toContain('import("/@id/virtual:arcade-router/navigation-entry")');
-		expect(html).not.toContain('import("/@id/virtual:arcade-router/resume-entry")');
+		expect(html).toContain('data-markless-router-link');
+		expect(html).toContain('data-markless-router-link-resumer');
+		expect(html).toContain('import("/@id/virtual:markless-router/navigation-entry")');
+		expect(html).not.toContain('import("/@id/virtual:markless-router/resume-entry")');
 		expect(html).not.toContain('<script type="module"');
-		expect(html).not.toContain('virtual:arcade-router/client-entry');
-		expect(html).not.toContain('__arcadeRouterStartSpaNavigation');
+		expect(html).not.toContain('virtual:markless-router/client-entry');
+		expect(html).not.toContain('__marklessRouterStartSpaNavigation');
 	});
 
 	it('emits exact route modulepreloads for visible Link targets', async () => {
@@ -138,18 +140,14 @@ describe('server entry rendering', () => {
 			pageModuleLoaders: {
 				'pages/index.tsrx': async () => ({
 					default: page(
-						'<main><a href="/docs/getting-started" data-arcade-router-link>Docs</a></main>',
+						'<main><a href="/docs/getting-started" data-markless-router-link>Docs</a></main>',
 					),
 				}),
 			},
-			routeFileIds: [
-				'/pages/index.tsrx',
-				'/pages/docs/[...slug].mdx',
-				'/pages/404.tsrx',
-			],
+			routeFileIds: ['/pages/index.tsrx', '/pages/docs/[...slug].mdx', '/pages/404.tsrx'],
 		});
 
-		const response = await entry.fetch(new Request('http://arcade-router.test/'));
+		const response = await entry.fetch(new Request('http://markless-router.test/'));
 		const html = await response.text();
 
 		expect(html).toContain('<link rel="modulepreload" href="/build/navigation.js"');
@@ -178,7 +176,7 @@ describe('server entry rendering', () => {
 		});
 
 		const response = await entry.fetch(
-			new Request('http://arcade-router.test/docs/getting-started'),
+			new Request('http://markless-router.test/docs/getting-started'),
 		);
 		const html = await response.text();
 		const head = html.slice(0, html.indexOf('</head>'));
@@ -192,9 +190,9 @@ describe('server entry rendering', () => {
 
 	it('renders the document module shell around routed page output', async () => {
 		const entry = createServerEntry({
-			resumeEntryPath: '/@id/virtual:arcade-router/resume-entry',
+			resumeEntryPath: '/@id/virtual:markless-router/resume-entry',
 			documentModuleLoader: async () => ({
-				__arcadeRouterHtmlAttributes: (props: { readonly status: number }) => ({
+				__marklessRouterHtmlAttributes: (props: { readonly status: number }) => ({
 					lang: 'en',
 					'data-status': String(props.status),
 				}),
@@ -218,7 +216,7 @@ describe('server entry rendering', () => {
 			routeFileIds: ['/pages/docs/index.tsrx'],
 		});
 
-		const response = await entry.fetch(new Request('http://arcade-router.test/docs'));
+		const response = await entry.fetch(new Request('http://markless-router.test/docs'));
 		const html = await response.text();
 
 		expect(response.status).toBe(200);
@@ -248,7 +246,7 @@ describe('server entry rendering', () => {
 			routeFileIds: ['/pages/index.tsrx'],
 		});
 
-		const response = await entry.fetch(new Request('http://arcade-router.test/'));
+		const response = await entry.fetch(new Request('http://markless-router.test/'));
 		const html = await response.text();
 
 		expect(html).toContain('<body><div data-async-container>');
@@ -261,13 +259,13 @@ describe('server entry rendering', () => {
 			documentModuleLoader: undefined,
 			pageModuleLoaders: {
 				'pages/index.tsrx': async () => ({
-					arcadeRenderSsr: () => ({ html: '<main>Home</main>' }),
+					marklessRenderSsr: () => ({ html: '<main>Home</main>' }),
 				}),
 			},
 			routeFileIds: ['/pages/index.tsrx'],
 		});
 
-		const response = await entry.fetch(new Request('http://arcade-router.test/'));
+		const response = await entry.fetch(new Request('http://markless-router.test/'));
 		const html = await response.text();
 
 		expect(response.status).toBe(200);
@@ -284,14 +282,16 @@ describe('server entry rendering', () => {
 			routeFileIds: ['/pages/404.tsrx'],
 		});
 
-		const response = await entry.fetch(new Request('http://arcade-router.test/nope?from=test'));
+		const response = await entry.fetch(
+			new Request('http://markless-router.test/nope?from=test'),
+		);
 		const html = await response.text();
 
 		expect(response.status).toBe(404);
 		expect(html).toContain('<main>Missing</main>');
 	});
 
-	it('returns a useful 500 body when a matched page is not an Arcade artifact', async () => {
+	it('returns a useful 500 body when a matched page is not an Markless artifact', async () => {
 		const entry = createServerEntry({
 			documentModuleLoader: undefined,
 			pageModuleLoaders: {
@@ -300,12 +300,12 @@ describe('server entry rendering', () => {
 			routeFileIds: ['/pages/index.tsrx'],
 		});
 
-		const response = await entry.fetch(new Request('http://arcade-router.test/'));
+		const response = await entry.fetch(new Request('http://markless-router.test/'));
 		const html = await response.text();
 
 		expect(response.status).toBe(200);
 		expect(html).toContain(
-			'Page module must export an Arcade compiled artifact: pages/index.tsrx',
+			'Page module must export an Markless compiled artifact: pages/index.tsrx',
 		);
 	});
 });

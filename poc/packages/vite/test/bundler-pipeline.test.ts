@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test } from 'vitest';
-import { createArcadeVitePlugin } from '../src/index.ts';
+import { createMarklessVitePlugin } from '../src/index.ts';
 
 const fixturePath = 'fixtures/proofs/bundler-pipeline/src/App.tsrx';
 
@@ -11,26 +11,26 @@ async function readFixture(): Promise<string> {
 
 test('Vite POC adapter delegates to Rolldown transform and refreshes HMR artifacts', async () => {
 	const source = await readFixture();
-	const plugin = createArcadeVitePlugin();
+	const plugin = createMarklessVitePlugin();
 
-	expect(plugin.arcade.compilerModel).toBe('rolldown-base-plugin');
-	expect(plugin.arcade.usesSecondCompilerModel).toBe(false);
+	expect(plugin.markless.compilerModel).toBe('rolldown-base-plugin');
+	expect(plugin.markless.usesSecondCompilerModel).toBe(false);
 
 	const result = await plugin.transform(source, fixturePath);
 	expect(result).toEqual(
 		expect.objectContaining({
 			moduleId: fixturePath,
-			code: expect.stringContaining('arcade TSRX transform'),
+			code: expect.stringContaining('markless TSRX transform'),
 		}),
 	);
 
-	const before = plugin.arcade.manifest();
+	const before = plugin.markless.manifest();
 	const updatedSource = source.replace('pipeline ready', 'pipeline hmr ready');
 	const hmr = await plugin.handleHotUpdate({
 		file: fixturePath,
 		read: async () => updatedSource,
 	});
-	const after = plugin.arcade.manifest();
+	const after = plugin.markless.manifest();
 
 	expect(hmr).toEqual(
 		expect.objectContaining({
@@ -46,7 +46,7 @@ test('Vite POC adapter delegates to Rolldown transform and refreshes HMR artifac
 	expect(after.transformedModules[0]?.sourceFingerprint).not.toBe(
 		before.transformedModules[0]?.sourceFingerprint,
 	);
-	expect(plugin.arcade.receipts()).toEqual(
+	expect(plugin.markless.receipts()).toEqual(
 		expect.arrayContaining([
 			expect.objectContaining({ stage: 'vite-transform', moduleId: fixturePath }),
 			expect.objectContaining({ stage: 'hmr-update', moduleId: fixturePath }),

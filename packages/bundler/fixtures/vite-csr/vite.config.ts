@@ -1,5 +1,5 @@
 import { defineConfig, type Plugin } from 'vite';
-import { arcade } from '@arcade/bundler/vite';
+import { markless } from '@markless/bundler/vite';
 
 type PreviewRequest = {
 	readonly url?: string;
@@ -13,10 +13,10 @@ type PreviewResponse = {
 	end(body?: string): void;
 };
 
-const REQUEST_LOG_PATH = '/__arcade-fixture-requests';
+const REQUEST_LOG_PATH = '/__markless-fixture-requests';
 
 export default defineConfig({
-	plugins: [arcade(), fixtureScriptRequestLog()],
+	plugins: [markless(), fixtureScriptRequestLog()],
 });
 
 function fixtureScriptRequestLog(): Plugin {

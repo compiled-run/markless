@@ -6,7 +6,7 @@
 		"build": "rolldown -c"
 	},
 	"dependencies": {
-		"@arcade/bundler": "workspace:*"
+		"@markless/bundler": "workspace:*"
 	},
 	"devDependencies": {
 		"rolldown": "1.0.3",

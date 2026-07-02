@@ -5,7 +5,7 @@ than the production runtime:
 
 - static SSR emits no resumer;
 - event-only SSR emits one container-scoped inline bootstrap;
-- event metadata lives in `arcade/view`, not per-node event attributes;
+- event metadata lives in `markless/view`, not per-node event attributes;
 - startup installs a delegated listener and imports no app or symbol module;
 - the click symbol imports only after interaction;
 - size is measured with Rolldown/OXC minification plus gzip.

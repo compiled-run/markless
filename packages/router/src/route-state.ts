@@ -1,6 +1,6 @@
 import type { PageProps } from './index.ts';
 
-export const ARCADE_ROUTER_ROUTE_EVENT = 'arcaderouternavigate';
+export const MARKLESS_ROUTER_ROUTE_EVENT = 'marklessrouternavigate';
 
 export interface RouteState {
 	readonly file: string;
@@ -38,7 +38,7 @@ export function routePageProps(route: RouteState): PageProps {
 
 export function dispatchRouteUpdate(document: Document, update: RouteUpdate): void {
 	document.dispatchEvent(
-		new CustomEvent<RouteUpdate>(ARCADE_ROUTER_ROUTE_EVENT, {
+		new CustomEvent<RouteUpdate>(MARKLESS_ROUTER_ROUTE_EVENT, {
 			detail: update,
 		}),
 	);

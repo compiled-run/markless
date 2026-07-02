@@ -36,7 +36,7 @@ function unsupportedCaptureDiagnostic(
 	binding: SemanticLocalBinding,
 ): CaptureAnalysisDiagnostic {
 	return {
-		code: 'ARCADE_CAPTURE_UNSUPPORTED_VALUE',
+		code: 'MARKLESS_CAPTURE_UNSUPPORTED_VALUE',
 		severity: 'error',
 		phase: 'capture-analysis',
 		title: `Cannot capture local ${bindingKindLabel(binding.kind)} in lazy symbol`,
@@ -52,7 +52,7 @@ function unsupportedCaptureDiagnostic(
 				message: suggestionForBinding(binding.kind),
 			},
 		],
-		docsUrl: 'https://arcadejs.com/errors/ARCADE_CAPTURE_UNSUPPORTED_VALUE',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_CAPTURE_UNSUPPORTED_VALUE',
 	};
 }
 

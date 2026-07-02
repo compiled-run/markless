@@ -1,8 +1,8 @@
 import { defineConfig } from 'vite-plus';
-import { arcade } from '@arcade/bundler/vite';
+import { markless } from '@markless/bundler/vite';
 
 export default defineConfig({
-	plugins: [arcade()],
+	plugins: [markless()],
 	test: {
 		environment: 'node',
 		include: ['src/**/*.test.ts'],

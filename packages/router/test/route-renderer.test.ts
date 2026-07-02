@@ -36,7 +36,7 @@ describe('route update renderer', () => {
 				file: 'pages/docs.tsrx',
 				params: {},
 				status: 200,
-				url: 'http://arcade.test/docs',
+				url: 'http://markless.test/docs',
 			},
 		});
 		await Promise.resolve();

@@ -415,7 +415,7 @@ function unextractableSyncPolicyDiagnostic(
 	const actionLabel = actionCall?.action ?? 'preventDefault/stopPropagation';
 
 	return {
-		code: 'ARCADE_SYNC_POLICY_UNEXTRACTABLE',
+		code: 'MARKLESS_SYNC_POLICY_UNEXTRACTABLE',
 		severity: 'error',
 		phase: 'sync-policy',
 		title: 'Cannot extract synchronous event policy',
@@ -433,7 +433,7 @@ function unextractableSyncPolicyDiagnostic(
 					'Move the browser-critical condition into graph state and simple event-field comparisons, or remove preventDefault()/stopPropagation() from the lazy handler.',
 			},
 		],
-		docsUrl: 'https://arcadejs.com/errors/ARCADE_SYNC_POLICY_UNEXTRACTABLE',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_SYNC_POLICY_UNEXTRACTABLE',
 	};
 }
 

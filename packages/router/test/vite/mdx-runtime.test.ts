@@ -5,7 +5,7 @@ import {
 	loadMdxSymbol,
 } from '../../src/vite/runtime/mdx-route.ts';
 
-describe('Arcade Router MDX route runtime helpers', () => {
+describe('Markless Router MDX route runtime helpers', () => {
 	it('composes child state payloads for one MDX route container', () => {
 		const state = composeMdxState([
 			{

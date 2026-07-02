@@ -1,4 +1,4 @@
-import { state } from 'arcade';
+import { state } from '@markless/core';
 import { nextCount } from './counter-flow.ts';
 
 export function App() @{

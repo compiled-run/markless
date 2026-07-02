@@ -1,9 +1,9 @@
-# Arcade TSRX Framework — Design
+# Markless TSRX Framework — Design
 
 **Date:** 2026-06-12
 **Status:** Approved direction, pre-implementation
 **Tagline:** A resumable UI framework for async-first apps.
-**Package:** `@arcade/core`
+**Package:** `@markless/core`
 
 ## Summary
 
@@ -102,7 +102,7 @@ Five pieces:
    (plus a shared IntersectionObserver for `onVisible`-wired elements),
    lazy-loads symbols on first interaction or visibility, re-attaches bindings
    on first relevant state change. No hydration pass, no component execution.
-5. **Build integration** — a Rolldown plugin base exported by `@arcade/core`,
+5. **Build integration** — a Rolldown plugin base exported by `@markless/core`,
    with framework adapters such as Vite consuming that base plugin. Extracted
    symbols become code-split entry points, and production builds emit the
    generated symbol resolver plus manifest metadata needed by the server
@@ -481,7 +481,7 @@ disposed with it.
 The compiler should diagnose React-style child manipulation in v1:
 
 ```txt
-children is an opaque template projection in @arcade/core.
+children is an opaque template projection in @markless/core.
 Render it with {children}, pass it through, or wrap it; do not inspect or map it.
 ```
 
@@ -1081,7 +1081,7 @@ no annotation:
 
 Extracted symbols are lazy-loaded, but normal framework-owned wiring does not
 turn into QRL-like user values or per-node DOM closures. Authored event props
-compile to encoded `arcade/view` records:
+compile to encoded `markless/view` records:
 
 ```txt
 DOM locator + event name + optional sync policy IR + ordered handler symbol IDs
@@ -1089,13 +1089,13 @@ DOM locator + event name + optional sync policy IR + ordered handler symbol IDs
 
 The generated HTML does not need an `onClick={async (...) => import(...)}` shape,
 and production output should not require per-node event attributes. The
-`arcade/view` arena locates nodes by DOM-order streams, skip runs, branch anchors,
+`markless/view` arena locates nodes by DOM-order streams, skip runs, branch anchors,
 or other private locator data, then the resumer builds internal side tables such
 as `WeakMap<Element, EventRecord>`.
 
 Dynamic imports are owned by a generated symbol resolver, not by each event prop.
 The resolver is a page/build-scoped module or equivalent compact runtime table
-that maps symbol IDs from `arcade/view` to chunks and exports:
+that maps symbol IDs from `markless/view` to chunks and exports:
 
 ```ts
 export function loadSymbol(id: number) {
@@ -1113,7 +1113,7 @@ export function loadSymbol(id: number) {
 The exact resolver syntax is private build output. The full symbol manifest is a
 build/server artifact. The browser receives only the resolver/table needed for
 the current build or page, plus enough build/protocol identity to fail closed if
-`arcade/view` references a symbol the resolver does not know.
+`markless/view` references a symbol the resolver does not know.
 
 The same resolver path is used for event handlers, DOM binding symbols,
 `use={...}` behavior symbols, async computed run functions, and other lazy
@@ -1239,15 +1239,15 @@ scripts, rather than relying on verbose JSON objects or scattered per-node
 attributes. By default, the core renderer emits two inert data scripts:
 
 ```html
-<script type="arcade/state">
+<script type="markless/state">
 	...
 </script>
-<script type="arcade/view">
+<script type="markless/view">
 	...
 </script>
 ```
 
-`arcade/state` carries the state arena. `arcade/view` carries the view/wiring
+`markless/state` carries the state arena. `markless/view` carries the view/wiring
 arena. The renderer may merge, split, or stream these payloads when the
 resumer/runtime protocol supports it, but these two script types are the
 canonical core containers and the names used by documentation, devtools, and
@@ -1262,12 +1262,12 @@ VNode format and does not imply a client VDOM or component re-render path.
 
 ### View locator materialization
 
-The v1 `arcade/view` locator model uses a browser-native `TreeWalker` over
+The v1 `markless/view` locator model uses a browser-native `TreeWalker` over
 `ELEMENT` and `COMMENT` nodes to materialize encoded DOM-order records onto the
 existing server-rendered DOM. This is a locator-decoding step only:
 
 ```txt
-arcade/view locator stream
+markless/view locator stream
 -> TreeWalker over existing DOM
 -> skip static nodes and ignored/nested regions
 -> attach records to real elements/comment anchors
@@ -1287,7 +1287,7 @@ runtime record.
 
 This is deliberately not VDOM recovery. The `TreeWalker` pass does not
 materialize component VNodes, child VNode trees, or client render functions. It
-only maps compact `arcade/view` metadata to existing DOM nodes so later graph
+only maps compact `markless/view` metadata to existing DOM nodes so later graph
 writes, events, visibility triggers, and behavior setup can address those nodes
 directly.
 
@@ -1309,7 +1309,7 @@ included.
   resolve each symbol through the generated symbol resolver, materialize its
   captured graph references and element handles, and run handlers in authored
   order. The resolver owns the dynamic import; event props are only encoded
-  symbol IDs in `arcade/view`.
+  symbol IDs in `markless/view`.
 - Element handles resolve from serialized DOM locators at handler execution time.
   If the element was removed or the locator no longer matches, the handle reads
   as `undefined`.
@@ -1357,7 +1357,7 @@ All diagnostics use one structured shape across compiler and runtime:
 
 ```ts
 type Diagnostic = {
-	code: string; // stable, e.g. "ARCADE_CAPTURE_DOM_NODE"
+	code: string; // stable, e.g. "MARKLESS_CAPTURE_DOM_NODE"
 	severity: 'error' | 'warning' | 'info';
 	phase:
 		| 'parse'
@@ -1391,7 +1391,7 @@ cannot safely rewrite, it still gives a precise migration path.
 Example shape:
 
 ```txt
-ARCADE_CAPTURE_DOM_NODE: Cannot capture a DOM node in a lazy event handler
+MARKLESS_CAPTURE_DOM_NODE: Cannot capture a DOM node in a lazy event handler
 
 src/Menu.tsrx:13:27
   12 | const menuEl = document.querySelector("#menu");
@@ -1400,7 +1400,7 @@ src/Menu.tsrx:13:27
 
 Why:
   Lazy handlers run after resume. A live DOM node cannot be serialized into
-  arcade/state or recovered from a JavaScript closure.
+  markless/state or recovered from a JavaScript closure.
 
 Fix:
   Use element() plus el={...}, then read the element handle inside the handler.
@@ -1421,7 +1421,7 @@ codes and machine fields are compatibility surface.
 Diagnostic documentation follows the stable code:
 
 ```txt
-https://corejs.dev/errors/ARCADE_CAPTURE_DOM_NODE
+https://corejs.dev/errors/MARKLESS_CAPTURE_DOM_NODE
 ```
 
 Runtime diagnostics must link back to compiler artifacts whenever possible. A

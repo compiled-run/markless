@@ -21,7 +21,7 @@ export default box(
 			throw new Error('Expected SSR music player HTML to render modulepreload links.');
 		}
 		assertModulePreloadsInHead(html);
-		if (html.includes('data-arcade-router-link-resumer')) {
+		if (html.includes('data-markless-router-link-resumer')) {
 			throw new Error('Music player SSR must not include the router Link resumer script.');
 		}
 		if (/<script\b[^>]*\bsrc=/.test(html)) {

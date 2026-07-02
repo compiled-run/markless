@@ -8,23 +8,23 @@ import type {
 	ViteDevServer,
 } from 'vite';
 import type { OutputOptions } from 'rolldown';
-import { joinURL } from 'ufo';
+import { joinURL, parsePath } from 'ufo';
 import { createPreloadGraphAdder } from '../build/bundle-graph.ts';
 import { outputDefaults } from '../build/chunking.ts';
-import { createArcadeRolldownPlugin } from '../rolldown.ts';
+import { createMarklessRolldownPlugin } from '../rolldown.ts';
 import {
 	type BundleGraphAdder,
 	type GlobalInjections,
 	type PreloadGraphEntriesAdder,
-	type ArcadeEnvironment,
-	type ArcadeManifest,
-	type ArcadeRolldownOptions,
+	type MarklessEnvironment,
+	type MarklessManifest,
+	type MarklessRolldownOptions,
 } from '../types.ts';
 import { createDevTags } from './dev-tags.ts';
 import {
 	isServerViteEnvironment,
-	arcadeEnvironment,
-	transformArcadeRequest,
+	marklessEnvironment,
+	transformMarklessRequest,
 	viteEnvironmentName,
 } from './environment.ts';
 import { createViteHmr } from './hmr.ts';
@@ -35,29 +35,31 @@ export type {
 	PreloadGraphContext,
 	PreloadGraphEntries,
 	PreloadGraphEntriesAdder,
-	ArcadeEnvironment,
-	ArcadeManifest,
-	ArcadeRolldownOptions,
+	MarklessBuildMetadata,
+	MarklessEnvironment,
+	MarklessManifest,
+	MarklessRolldownOptions,
 } from '../types.ts';
 
-export interface ArcadeViteOptions extends ArcadeRolldownOptions {
+export interface MarklessViteOptions extends MarklessRolldownOptions {
 	clientEnvironment?: string;
 	serverEnvironment?: string;
 }
 
-type ArcadeOutputOptions = OutputOptions | OutputOptions[] | undefined;
-type InternalArcadeRolldownOptions = ArcadeRolldownOptions & {
+type MarklessOutputOptions = OutputOptions | OutputOptions[] | undefined;
+type InternalMarklessRolldownOptions = MarklessRolldownOptions & {
 	publicPath?: (fileName: string) => string;
 };
 type RolldownInputConfig = string | readonly string[] | Record<string, string> | undefined;
-const ARCADE_SKIP_DUPLICATE_BUILDS = Symbol('arcade-skip-duplicate-builds');
+const MARKLESS_SKIP_DUPLICATE_BUILDS = Symbol('markless-skip-duplicate-builds');
 const TSRX_INPUT_FILE = /\.tsrx(?:[?#].*)?$/;
 
-export function arcade(options: ArcadeViteOptions = {}): Plugin[] {
-	let manifest: ArcadeManifest | null = null;
+export function markless(options: MarklessViteOptions = {}): Plugin[] {
+	let manifest: MarklessManifest | null = null;
 	let command: 'build' | 'serve' = 'build';
 	const bundleGraphAdders = new Set<BundleGraphAdder>();
-	const rolldownOptions: InternalArcadeRolldownOptions = { ...options };
+	const transformedTsrxSources = new Map<string, string>();
+	const rolldownOptions: InternalMarklessRolldownOptions = { ...options };
 	rolldownOptions.bundleGraphAdders = bundleGraphAdders;
 	rolldownOptions.onManifest = (nextManifest) => {
 		manifest = nextManifest;
@@ -67,12 +69,12 @@ export function arcade(options: ArcadeViteOptions = {}): Plugin[] {
 		base: '/',
 		clientEnvironment: viteEnvironmentName('client', options),
 		enabled: false,
-		invalidateGeneratedModules: (parent: string, environment?: ArcadeEnvironment) =>
-			arcadePlugin.api.invalidateGeneratedModules(parent, environment),
+		invalidateGeneratedModules: (parent: string, environment?: MarklessEnvironment) =>
+			marklessPlugin.api.invalidateGeneratedModules(parent, environment),
 	};
 	const devTags = createDevTags();
 	rolldownOptions.devInjections = devTags.tags;
-	const basePlugin = createArcadeRolldownPlugin({
+	const basePlugin = createMarklessRolldownPlugin({
 		environment: getBuildEnvironment,
 		options: rolldownOptions,
 	}) as Plugin & {
@@ -80,9 +82,9 @@ export function arcade(options: ArcadeViteOptions = {}): Plugin[] {
 	};
 	const hmr = createViteHmr(hmrOptions);
 
-	const arcadePlugin = {
+	const marklessPlugin = {
 		...basePlugin,
-		name: 'vite-plugin-arcade',
+		name: 'vite-plugin-markless',
 		enforce: 'post',
 		sharedDuringBuild: true,
 		api: {
@@ -138,13 +140,13 @@ export function arcade(options: ArcadeViteOptions = {}): Plugin[] {
 		buildApp: {
 			order: 'pre',
 			handler(builder) {
-				return buildArcadeEnvironments(builder, options);
+				return buildMarklessEnvironments(builder, options);
 			},
 		},
 		configureServer(server: ViteDevServer) {
 			rolldownOptions.devServer = {
 				transformRequest: (url, environment) =>
-					transformArcadeRequest(server, url, environment, options),
+					transformMarklessRequest(server, url, environment, options),
 			};
 			hmr.configureServer(server);
 		},
@@ -165,18 +167,27 @@ export function arcade(options: ArcadeViteOptions = {}): Plugin[] {
 		},
 		transform: {
 			async handler(code, id, transformOptions) {
+				if (rolldownOptions.dev === true && TSRX_INPUT_FILE.test(id)) {
+					transformedTsrxSources.set(parsePath(id).pathname, code);
+				}
 				return runHook(basePlugin.transform, this, code, id, transformOptions);
 			},
 		},
-		hotUpdate(ctx) {
+		async hotUpdate(ctx) {
+			// Watcher events for content-identical writes (e.g. editor saves without
+			// changes, or delayed FSEvents for a restored file) must not invalidate
+			// generated virtual modules or trigger a full reload.
+			if (await matchesTransformedTsrxSource(ctx, transformedTsrxSources)) {
+				return [];
+			}
 			return hmr.hotUpdate(this.environment, ctx);
 		},
-	} satisfies Plugin & { api: ArcadeVitePluginApi };
+	} satisfies Plugin & { api: MarklessVitePluginApi };
 
-	return [arcadePlugin];
+	return [marklessPlugin];
 }
 
-async function buildArcadeEnvironments(builder: ViteBuilder, options: ArcadeViteOptions) {
+async function buildMarklessEnvironments(builder: ViteBuilder, options: MarklessViteOptions) {
 	const environments = buildEnvironments(builder, options);
 	const names = environments.map((environment) => environment.name);
 	skipDuplicateBuilds(builder, names);
@@ -188,7 +199,7 @@ async function buildArcadeEnvironments(builder: ViteBuilder, options: ArcadeVite
 	}
 }
 
-function buildEnvironments(builder: ViteBuilder, options: ArcadeViteOptions) {
+function buildEnvironments(builder: ViteBuilder, options: MarklessViteOptions) {
 	const environments = new Map<string, BuildEnvironment>();
 	for (const name of [
 		viteEnvironmentName('client', options),
@@ -201,7 +212,7 @@ function buildEnvironments(builder: ViteBuilder, options: ArcadeViteOptions) {
 	}
 
 	for (const environment of Object.values(builder.environments)) {
-		if (arcadeEnvironment(environment) === 'server') {
+		if (marklessEnvironment(environment) === 'server') {
 			environments.set(environment.name, environment);
 		}
 	}
@@ -211,17 +222,17 @@ function buildEnvironments(builder: ViteBuilder, options: ArcadeViteOptions) {
 
 function skipDuplicateBuilds(builder: ViteBuilder, names: readonly string[]) {
 	const guarded = builder as ViteBuilder & {
-		[ARCADE_SKIP_DUPLICATE_BUILDS]?: Set<string>;
+		[MARKLESS_SKIP_DUPLICATE_BUILDS]?: Set<string>;
 	};
 
-	const guardedNames = guarded[ARCADE_SKIP_DUPLICATE_BUILDS] ?? new Set<string>();
+	const guardedNames = guarded[MARKLESS_SKIP_DUPLICATE_BUILDS] ?? new Set<string>();
 	for (const name of names) {
 		guardedNames.add(name);
 	}
 
-	if (guarded[ARCADE_SKIP_DUPLICATE_BUILDS]) return;
+	if (guarded[MARKLESS_SKIP_DUPLICATE_BUILDS]) return;
 
-	guarded[ARCADE_SKIP_DUPLICATE_BUILDS] = guardedNames;
+	guarded[MARKLESS_SKIP_DUPLICATE_BUILDS] = guardedNames;
 	const build = builder.build.bind(builder);
 	builder.build = (environment: BuildEnvironment) => {
 		if (guardedNames.has(environment.name) && environment.isBuilt) {
@@ -231,7 +242,7 @@ function skipDuplicateBuilds(builder: ViteBuilder, names: readonly string[]) {
 	};
 }
 
-function configDefaults(config: UserConfig, options: ArcadeViteOptions) {
+function configDefaults(config: UserConfig, options: MarklessViteOptions) {
 	if (config.build?.lib || config.build?.ssr) {
 		return;
 	}
@@ -248,7 +259,7 @@ function configDefaults(config: UserConfig, options: ArcadeViteOptions) {
 	build.modulePreload ??= false;
 }
 
-function ssrTsrxInput(config: UserConfig, options: ArcadeViteOptions): string | null {
+function ssrTsrxInput(config: UserConfig, options: MarklessViteOptions): string | null {
 	const environments = (config as { environments?: Record<string, unknown> }).environments;
 	const ssr = environments?.[viteEnvironmentName('server', options)] as
 		| { build?: { rolldownOptions?: { input?: unknown } } }
@@ -304,8 +315,8 @@ function isRolldownInputRecord(input: RolldownInputConfig): input is Record<stri
 }
 
 function withOutputDefaults(
-	output: ArcadeOutputOptions,
-	environment: ArcadeEnvironment,
+	output: MarklessOutputOptions,
+	environment: MarklessEnvironment,
 ): OutputOptions | OutputOptions[] {
 	if (Array.isArray(output)) {
 		return output.map((item) => outputDefaults(item, environment));
@@ -318,7 +329,7 @@ function withOutputDefaults(
 	return outputDefaults(output, environment);
 }
 
-function defaultOutDir(environment: ArcadeEnvironment) {
+function defaultOutDir(environment: MarklessEnvironment) {
 	if (environment === 'server') {
 		return 'dist/server';
 	}
@@ -329,8 +340,8 @@ function defaultOutDir(environment: ArcadeEnvironment) {
 function configEnvironmentKind(
 	name: string,
 	config: EnvironmentOptions,
-	options: ArcadeViteOptions,
-): ArcadeEnvironment | null {
+	options: MarklessViteOptions,
+): MarklessEnvironment | null {
 	if (config.build?.lib) {
 		return null;
 	}
@@ -350,6 +361,24 @@ function configEnvironmentKind(
 	return null;
 }
 
+async function matchesTransformedTsrxSource(
+	ctx: { file?: string; type?: string; read?: () => string | Promise<string> },
+	transformedSources: ReadonlyMap<string, string>,
+): Promise<boolean> {
+	if (!ctx.file || ctx.type === 'delete' || typeof ctx.read !== 'function') {
+		return false;
+	}
+	const transformedSource = transformedSources.get(ctx.file);
+	if (transformedSource === undefined) {
+		return false;
+	}
+	try {
+		return (await ctx.read()) === transformedSource;
+	} catch {
+		return false;
+	}
+}
+
 function runHook(hook: unknown, context: unknown, ...args: unknown[]) {
 	if (typeof hook !== 'function') {
 		return null;
@@ -357,17 +386,17 @@ function runHook(hook: unknown, context: unknown, ...args: unknown[]) {
 	return hook.call(context, ...args);
 }
 
-type ArcadeVitePluginApi = {
-	invalidateGeneratedModules: (parent: string, environment?: ArcadeEnvironment) => string[];
-	getManifest?: () => ArcadeManifest | null;
+type MarklessVitePluginApi = {
+	invalidateGeneratedModules: (parent: string, environment?: MarklessEnvironment) => string[];
+	getManifest?: () => MarklessManifest | null;
 	registerBundleGraphAdder?: (adder: BundleGraphAdder) => void;
 	registerDevInjection?: (injection: GlobalInjections) => void;
 	registerPreloadGraphEntries?: (adder: PreloadGraphEntriesAdder) => void;
 };
 
-function getBuildEnvironment(context: unknown): ArcadeEnvironment {
+function getBuildEnvironment(context: unknown): MarklessEnvironment {
 	const pluginContext = context as { environment?: Environment };
-	return arcadeEnvironment(pluginContext.environment);
+	return marklessEnvironment(pluginContext.environment);
 }
 
-export type ArcadeVitePlugin = ReturnType<typeof arcade>[number];
+export type MarklessVitePlugin = ReturnType<typeof markless>[number];

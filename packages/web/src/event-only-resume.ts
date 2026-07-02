@@ -1,10 +1,10 @@
-import type { ProtocolStatePayload, ProtocolViewPayload } from '@arcade/serializer';
+import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer';
 import type {
 	DomJournalEntry,
 	DomJournalResult,
 	RuntimeGraphUpdate,
 	RuntimeGraphWrite,
-} from '@arcade/runtime';
+} from '@markless/runtime';
 
 export type EventOnlyResumeDomNode = {
 	readonly nodeType: number;
@@ -122,8 +122,8 @@ export async function resumeEventOnlyFromPayloadDocument(
 ): Promise<EventOnlyResumeContainer> {
 	let container = containers.get(input.root);
 	if (!container) {
-		const state = readPayloadJson<ProtocolStatePayload>(input.document, 'arcade/state');
-		const view = readPayloadJson<ProtocolViewPayload>(input.document, 'arcade/view');
+		const state = readPayloadJson<ProtocolStatePayload>(input.document, 'markless/state');
+		const view = readPayloadJson<ProtocolViewPayload>(input.document, 'markless/view');
 		container = createEventOnlyResumeContainerState({
 			state,
 			view,

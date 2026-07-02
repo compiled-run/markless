@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vite-plus/test';
 import {
-	__arcadeRouterStartSpaNavigation,
+	__marklessRouterStartSpaNavigation,
 	handleNavigateEvent,
-	type ArcadeRouterNavigationWindow,
+	type MarklessRouterNavigationWindow,
 } from '../src/spa-navigation.ts';
-import { ARCADE_ROUTER_ROUTE_EVENT } from '../src/route-state.ts';
+import { MARKLESS_ROUTER_ROUTE_EVENT } from '../src/route-state.ts';
 
 describe('SPA navigation', () => {
 	it('renders the next route from the client page module graph', async () => {
 		const document = new EventTarget() as Document;
 		let update: CustomEvent['detail'];
-		document.addEventListener(ARCADE_ROUTER_ROUTE_EVENT, (event) => {
+		document.addEventListener(MARKLESS_ROUTER_ROUTE_EVENT, (event) => {
 			update = (event as CustomEvent).detail;
 		});
 		const context = {
@@ -31,11 +31,11 @@ describe('SPA navigation', () => {
 			},
 			window: {
 				document,
-				location: { href: 'http://arcaderouter.test/' },
+				location: { href: 'http://marklessrouter.test/' },
 			},
 		};
-		const event = navigateEvent('http://arcaderouter.test/about', {
-			info: { __arcadeRouterLink: true },
+		const event = navigateEvent('http://marklessrouter.test/about', {
+			info: { __marklessRouterLink: true },
 		});
 
 		expect(handleNavigateEvent(event, context as never)).toBe(true);
@@ -45,7 +45,7 @@ describe('SPA navigation', () => {
 			file: 'pages/about.tsrx',
 			params: {},
 			status: 200,
-			url: 'http://arcaderouter.test/about',
+			url: 'http://marklessrouter.test/about',
 		});
 		expect(update?.page.default()).toBe('about');
 		expect(update?.document.default()).toBe('document');
@@ -57,11 +57,11 @@ describe('SPA navigation', () => {
 			pageModuleLoaders: {},
 			window: {
 				document: new EventTarget(),
-				location: { href: 'http://arcaderouter.test/' },
+				location: { href: 'http://marklessrouter.test/' },
 			},
 		};
-		const event = navigateEvent('http://arcaderouter.test/file.pdf', {
-			info: { __arcadeRouterLink: true },
+		const event = navigateEvent('http://marklessrouter.test/file.pdf', {
+			info: { __marklessRouterLink: true },
 		});
 
 		expect(handleNavigateEvent(event, context as never)).toBe(false);
@@ -84,10 +84,10 @@ describe('SPA navigation', () => {
 			pageModuleLoaders: {},
 			window: {
 				document: new EventTarget(),
-				location: { href: 'http://arcaderouter.test/' },
+				location: { href: 'http://marklessrouter.test/' },
 			},
 		};
-		const event = navigateEvent('http://arcaderouter.test/about');
+		const event = navigateEvent('http://marklessrouter.test/about');
 
 		expect(handleNavigateEvent(event, context as never)).toBe(false);
 		expect(event.intercepted).toBeUndefined();
@@ -98,23 +98,23 @@ describe('SPA navigation', () => {
 		const runtimeWindow = {
 			addEventListener() {},
 			document: new EventTarget(),
-			location: { href: 'http://arcaderouter.test/' },
+			location: { href: 'http://marklessrouter.test/' },
 			navigation: {
 				addEventListener(type: string, listener: (event: NavigateEvent) => void) {
 					listeners[type] = listener;
 				},
 				navigate() {},
 			},
-		} as unknown as ArcadeRouterNavigationWindow;
+		} as unknown as MarklessRouterNavigationWindow;
 
-		await __arcadeRouterStartSpaNavigation({
+		await __marklessRouterStartSpaNavigation({
 			pageModuleLoaders: {
 				'pages/index.tsrx': async () => ({ default: component('home') }),
 			},
 			routeFileIds: ['/pages/index.tsrx'],
 			window: runtimeWindow,
 		});
-		await __arcadeRouterStartSpaNavigation({
+		await __marklessRouterStartSpaNavigation({
 			pageModuleLoaders: {},
 			routeFileIds: [],
 			window: runtimeWindow,
@@ -141,7 +141,7 @@ describe('SPA navigation', () => {
 				}
 			},
 			document: new EventTarget(),
-			location: { href: 'http://arcaderouter.test/' },
+			location: { href: 'http://marklessrouter.test/' },
 			navigation: {
 				addEventListener() {},
 				navigate(
@@ -154,12 +154,12 @@ describe('SPA navigation', () => {
 					navigated = { url, options };
 				},
 			},
-		} as unknown as ArcadeRouterNavigationWindow;
-		const anchor = testAnchor('http://arcaderouter.test/about', {
+		} as unknown as MarklessRouterNavigationWindow;
+		const anchor = testAnchor('http://marklessrouter.test/about', {
 			link: true,
 		});
 
-		await __arcadeRouterStartSpaNavigation({
+		await __marklessRouterStartSpaNavigation({
 			pageModuleLoaders: {
 				'pages/about.tsrx': async () => ({ default: component('about') }),
 			},
@@ -172,11 +172,11 @@ describe('SPA navigation', () => {
 
 		expect(event.prevented).toBe(true);
 		expect(navigated).toEqual({
-			url: 'http://arcaderouter.test/about',
+			url: 'http://marklessrouter.test/about',
 			options: {
 				history: 'push',
 				info: {
-					__arcadeRouterLink: true,
+					__marklessRouterLink: true,
 					scroll: undefined,
 				},
 			},
@@ -187,7 +187,7 @@ describe('SPA navigation', () => {
 		const preloadedRoutes: string[] = [];
 		const { clickListener, navigatedUrls, runtimeWindow } = clickNavigationRuntime();
 
-		await __arcadeRouterStartSpaNavigation({
+		await __marklessRouterStartSpaNavigation({
 			pageModuleLoaders: {
 				'pages/about.tsrx': async () => ({ default: component('about') }),
 			},
@@ -199,7 +199,7 @@ describe('SPA navigation', () => {
 		});
 
 		const event = clickEvent(
-			testAnchor('http://arcaderouter.test/about', {
+			testAnchor('http://marklessrouter.test/about', {
 				link: true,
 			}),
 		);
@@ -207,7 +207,7 @@ describe('SPA navigation', () => {
 
 		expect(preloadedRoutes).toEqual(['pages/about.tsrx']);
 		expect(navigatedUrls.map((navigation) => navigation.url)).toEqual([
-			'http://arcaderouter.test/about',
+			'http://marklessrouter.test/about',
 		]);
 	});
 
@@ -221,17 +221,17 @@ describe('SPA navigation', () => {
 				}
 			},
 			document: new EventTarget(),
-			location: { href: 'http://arcaderouter.test/' },
+			location: { href: 'http://marklessrouter.test/' },
 			navigation: {
 				addEventListener() {},
 				navigate(url: string) {
 					navigatedUrl = url;
 				},
 			},
-		} as unknown as ArcadeRouterNavigationWindow;
-		const anchor = testAnchor('http://arcaderouter.test/about');
+		} as unknown as MarklessRouterNavigationWindow;
+		const anchor = testAnchor('http://marklessrouter.test/about');
 
-		await __arcadeRouterStartSpaNavigation({
+		await __marklessRouterStartSpaNavigation({
 			pageModuleLoaders: {
 				'pages/about.tsrx': async () => ({ default: component('about') }),
 			},
@@ -256,15 +256,15 @@ describe('SPA navigation', () => {
 				}
 			},
 			document: new EventTarget(),
-			location: { href: 'http://arcaderouter.test/' },
+			location: { href: 'http://marklessrouter.test/' },
 			navigation: {
 				addEventListener() {},
 				navigate(url: string) {
 					navigatedUrl = url;
 				},
 			},
-		} as unknown as ArcadeRouterNavigationWindow;
-		const anchor = testAnchor('http://arcaderouter.test/about', {
+		} as unknown as MarklessRouterNavigationWindow;
+		const anchor = testAnchor('http://marklessrouter.test/about', {
 			link: true,
 		});
 		const textTarget = {
@@ -273,7 +273,7 @@ describe('SPA navigation', () => {
 			},
 		};
 
-		await __arcadeRouterStartSpaNavigation({
+		await __marklessRouterStartSpaNavigation({
 			pageModuleLoaders: {
 				'pages/about.tsrx': async () => ({ default: component('about') }),
 			},
@@ -285,7 +285,7 @@ describe('SPA navigation', () => {
 		clickListener?.(event as never);
 
 		expect(event.prevented).toBe(true);
-		expect(navigatedUrl).toBe('http://arcaderouter.test/about');
+		expect(navigatedUrl).toBe('http://marklessrouter.test/about');
 	});
 
 	it('leaves ineligible Link clicks to the browser', async () => {
@@ -299,33 +299,33 @@ describe('SPA navigation', () => {
 				name: 'external origin',
 			},
 			{
-				anchor: testAnchor('http://arcaderouter.test/about', {
+				anchor: testAnchor('http://marklessrouter.test/about', {
 					link: true,
 					target: '_blank',
 				}),
 				name: 'target',
 			},
 			{
-				anchor: testAnchor('http://arcaderouter.test/about', {
+				anchor: testAnchor('http://marklessrouter.test/about', {
 					download: true,
 					link: true,
 				}),
 				name: 'download',
 			},
 			{
-				anchor: testAnchor('http://arcaderouter.test/about', {
+				anchor: testAnchor('http://marklessrouter.test/about', {
 					link: true,
 					relExternal: true,
 				}),
 				name: 'rel external',
 			},
 			{
-				anchor: testAnchor('http://arcaderouter.test/about', { link: true }),
+				anchor: testAnchor('http://marklessrouter.test/about', { link: true }),
 				event: { metaKey: true },
 				name: 'modifier key',
 			},
 			{
-				anchor: testAnchor('http://arcaderouter.test/about', { link: true }),
+				anchor: testAnchor('http://marklessrouter.test/about', { link: true }),
 				event: { button: 1 },
 				name: 'non-primary click',
 			},
@@ -344,7 +344,7 @@ describe('SPA navigation', () => {
 
 	it('passes replace and manual scroll options to the Navigation API', async () => {
 		const { clickListener, navigatedUrls } = await startClickNavigation();
-		const anchor = testAnchor('http://arcaderouter.test/about', {
+		const anchor = testAnchor('http://marklessrouter.test/about', {
 			link: true,
 			replace: true,
 			scroll: 'manual',
@@ -359,11 +359,11 @@ describe('SPA navigation', () => {
 				options: {
 					history: 'replace',
 					info: {
-						__arcadeRouterLink: true,
+						__marklessRouterLink: true,
 						scroll: 'manual',
 					},
 				},
-				url: 'http://arcaderouter.test/about',
+				url: 'http://marklessrouter.test/about',
 			},
 		]);
 	});
@@ -371,11 +371,11 @@ describe('SPA navigation', () => {
 	it('enhances back and forward traverse events for known routes', async () => {
 		const document = new EventTarget() as Document;
 		let update: CustomEvent['detail'];
-		document.addEventListener(ARCADE_ROUTER_ROUTE_EVENT, (event) => {
+		document.addEventListener(MARKLESS_ROUTER_ROUTE_EVENT, (event) => {
 			update = (event as CustomEvent).detail;
 		});
 		const context = aboutRouteContext({ document });
-		const event = navigateEvent('http://arcaderouter.test/about', {
+		const event = navigateEvent('http://marklessrouter.test/about', {
 			navigationType: 'traverse',
 		});
 
@@ -386,15 +386,15 @@ describe('SPA navigation', () => {
 			file: 'pages/about.tsrx',
 			params: {},
 			status: 200,
-			url: 'http://arcaderouter.test/about',
+			url: 'http://marklessrouter.test/about',
 		});
 	});
 
 	it('leaves hash-only navigations to the platform', () => {
 		const context = aboutRouteContext();
-		const event = navigateEvent('http://arcaderouter.test/about#section', {
+		const event = navigateEvent('http://marklessrouter.test/about#section', {
 			hashChange: true,
-			info: { __arcadeRouterLink: true },
+			info: { __marklessRouterLink: true },
 		});
 
 		expect(handleNavigateEvent(event, context as never)).toBe(false);
@@ -403,11 +403,11 @@ describe('SPA navigation', () => {
 
 	it('passes platform scroll and focus behavior to intercepted navigations', () => {
 		const context = aboutRouteContext();
-		const defaultEvent = navigateEvent('http://arcaderouter.test/about', {
-			info: { __arcadeRouterLink: true },
+		const defaultEvent = navigateEvent('http://marklessrouter.test/about', {
+			info: { __marklessRouterLink: true },
 		});
-		const manualScrollEvent = navigateEvent('http://arcaderouter.test/about', {
-			info: { __arcadeRouterLink: true, scroll: 'manual' },
+		const manualScrollEvent = navigateEvent('http://marklessrouter.test/about', {
+			info: { __marklessRouterLink: true, scroll: 'manual' },
 		});
 
 		expect(handleNavigateEvent(defaultEvent, context as never)).toBe(true);
@@ -426,7 +426,7 @@ describe('SPA navigation', () => {
 	it('does not commit stale route updates after navigation abort', async () => {
 		const document = new EventTarget() as Document;
 		const updates: CustomEvent['detail'][] = [];
-		document.addEventListener(ARCADE_ROUTER_ROUTE_EVENT, (event) => {
+		document.addEventListener(MARKLESS_ROUTER_ROUTE_EVENT, (event) => {
 			updates.push((event as CustomEvent).detail);
 		});
 		const slowPage = deferred<{ default: () => string }>();
@@ -455,15 +455,15 @@ describe('SPA navigation', () => {
 			},
 			window: {
 				document,
-				location: { href: 'http://arcaderouter.test/' },
+				location: { href: 'http://marklessrouter.test/' },
 			},
 		};
-		const slowEvent = navigateEvent('http://arcaderouter.test/slow', {
-			info: { __arcadeRouterLink: true },
+		const slowEvent = navigateEvent('http://marklessrouter.test/slow', {
+			info: { __marklessRouterLink: true },
 			signal: slowAbort.signal,
 		});
-		const fastEvent = navigateEvent('http://arcaderouter.test/fast', {
-			info: { __arcadeRouterLink: true },
+		const fastEvent = navigateEvent('http://marklessrouter.test/fast', {
+			info: { __marklessRouterLink: true },
 		});
 
 		expect(handleNavigateEvent(slowEvent, context as never)).toBe(true);
@@ -483,8 +483,8 @@ describe('SPA navigation', () => {
 				notFound: 'pages/404.tsrx',
 			},
 		});
-		const event = navigateEvent('http://arcaderouter.test/missing', {
-			info: { __arcadeRouterLink: true },
+		const event = navigateEvent('http://marklessrouter.test/missing', {
+			info: { __marklessRouterLink: true },
 		});
 
 		expect(handleNavigateEvent(event, context as never)).toBe(false);
@@ -564,15 +564,15 @@ function testAnchor(
 			if (name === 'target') {
 				return options.target ?? null;
 			}
-			if (name === 'data-arcade-router-scroll') {
+			if (name === 'data-markless-router-scroll') {
 				return options.scroll;
 			}
 			return undefined;
 		},
 		hasAttribute(name: string) {
 			return (
-				(options.link === true && name === 'data-arcade-router-link') ||
-				(options.replace === true && name === 'data-arcade-router-replace') ||
+				(options.link === true && name === 'data-markless-router-link') ||
+				(options.replace === true && name === 'data-markless-router-replace') ||
 				(options.download === true && name === 'download')
 			);
 		},
@@ -591,7 +591,7 @@ interface ClickEventOptions {
 
 async function startClickNavigation() {
 	const runtime = clickNavigationRuntime();
-	await __arcadeRouterStartSpaNavigation({
+	await __marklessRouterStartSpaNavigation({
 		pageModuleLoaders: {
 			'pages/about.tsrx': async () => ({ default: component('about') }),
 		},
@@ -617,7 +617,7 @@ function clickNavigationRuntime() {
 			}
 		},
 		document: new EventTarget(),
-		location: { href: 'http://arcaderouter.test/' },
+		location: { href: 'http://marklessrouter.test/' },
 		navigation: {
 			addEventListener() {},
 			navigate(
@@ -630,7 +630,7 @@ function clickNavigationRuntime() {
 				navigatedUrls.push({ options, url });
 			},
 		},
-	} as unknown as ArcadeRouterNavigationWindow;
+	} as unknown as MarklessRouterNavigationWindow;
 
 	return {
 		clickListener: () => clickListener,
@@ -662,7 +662,7 @@ function aboutRouteContext(
 		},
 		window: {
 			document: options.document ?? new EventTarget(),
-			location: { href: 'http://arcaderouter.test/' },
+			location: { href: 'http://marklessrouter.test/' },
 		},
 	};
 }

@@ -39,7 +39,10 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 	for (const edge of input.semanticGraph.componentEdges) {
 		for (const prop of edge.props) {
 			if (prop.kind !== 'callback') continue;
-			const moduleImports = referencedModuleImports(input.semanticGraph.moduleImports, prop.source);
+			const moduleImports = referencedModuleImports(
+				input.semanticGraph.moduleImports,
+				prop.source,
+			);
 			symbols.push({
 				id: `symbol:${nextSymbolId++}`,
 				kind: 'callback-prop',

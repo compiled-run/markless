@@ -122,8 +122,8 @@ function walkElements(root) {
 
 function matchesSelector(element, selector) {
 	if (selector === '[data-async]') return element.hasAttribute('data-async');
-	if (selector === 'script[type="arcade/view"]') {
-		return element.tagName === 'SCRIPT' && element.getAttribute('type') === 'arcade/view';
+	if (selector === 'script[type="markless/view"]') {
+		return element.tagName === 'SCRIPT' && element.getAttribute('type') === 'markless/view';
 	}
 	return false;
 }

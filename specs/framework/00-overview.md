@@ -2,13 +2,13 @@
 
 High-level product contract and index. Use this as the entry point before loading a narrower spec.
 
-**Original title:** Arcade TSRX Framework — Design
+**Original title:** Markless TSRX Framework — Design
 
 **Date:** 2026-06-12
 **Status:** Approved direction; production implementation started. See
 `../state.md` for current worktree progress.
 **Tagline:** A resumable UI framework for async-first apps.
-**Package:** `arcade`
+**Package:** `@markless/core`
 
 ## Summary
 
@@ -53,7 +53,7 @@ JSX/TSX is explicitly **not** supported.
    subscription.
    "Signal" is an implementation detail of compiled output, never API vocabulary.
 4. **TSRX-only.** State and reactivity are language features of `.tsrx` files,
-   surfaced through compiler-rewritten imports from `arcade`, not a
+   surfaced through compiler-rewritten imports from `@markless/core`, not a
    runtime library usable from arbitrary TS.
 5. **First-class async.** Async dataflow is a compiler-tracked graph feature, not
    an effect/task/resource wrapper. Pending/error UI is expressed with TSRX
@@ -96,14 +96,14 @@ Four implementation areas:
    visibility, or another explicit trigger. No hydration pass, no component
    execution during browser resume.
 4. **Build integration** — a Rolldown plugin base exported by
-   `@arcade/bundler`,
+   `@markless/bundler`,
    with framework adapters such as Vite consuming that base plugin. Extracted
    symbols become code-split entry points, and production builds emit a
    generated compact symbol resolver table with finalized chunk specifiers. Any
    manifest-like metadata is for adapters, preload graphs, diagnostics,
    devtools, or cached initial-render fragments; the default browser symbol
    loading path consumes the resolver table and payload data, not
-   `arcade-manifest.json`.
+   `markless-manifest.json`.
 
 Do not split the framework into separate "server" and "client" products or
 packages. The authoring model is one unified render/resume model: CSR render,
@@ -117,7 +117,7 @@ Container vocabulary is shared across CSR and SSR:
 - A **CSR container** is created live by `render(App, { target })`. It owns the
   root target, graph instance, event delegation scope, symbol resolver, shared
   state scope, and cleanup/unmount boundary. It does not require pre-existing
-  special markup, `arcade/state`, `arcade/view`, or the resumer script. Component
+  special markup, `markless/state`, `markless/view`, or the resumer script. Component
   bodies execute because CSR must create the DOM and graph from an empty target.
 - An **SSR resumable container** is emitted by `renderToString(App, options)`.
   It owns the rendered DOM boundary, container-scoped payload scripts, symbol
@@ -135,7 +135,7 @@ should emit no resumer script.
 Monorepo libraries are implementation boundaries first, not public API
 guarantees. The repo may contain internal packages such as runtime, serializer,
 compiler, bundler, editor tooling, and browser-test helpers, but v1 should
-expose only the main `arcade` package and explicitly curated re-exports.
+expose only the main `@markless/core` package and explicitly curated re-exports.
 Protocol and payload contract types live with serializer until implementation
 tests prove a separate public protocol package is needed; until then, do not
 document or rely on deep package APIs as public framework surface.
@@ -147,7 +147,7 @@ implementation begins in root `packages/*` using the same boundaries.
 
 Initial internal production package map:
 
-- `packages/arcade` — main authoring package for `arcade`;
+- `packages/core` — main authoring package for `@markless/core`;
   compiler-rewritten framework APIs, public types, and curated public
   re-exports.
 - `packages/runtime` — graph state, computed/async nodes, scheduler, DOM
@@ -197,7 +197,7 @@ use neutral bundler vocabulary: client chunks are written under
 `chunk-[hash].js`. The generated resolver table and any optional
 manifest/bundle-graph metadata carry symbol meaning; production chunk filenames
 should not expose compiler terms such as symbol kinds. The browser runtime must
-not need `arcade-manifest.json` to recover that meaning.
+not need `markless-manifest.json` to recover that meaning.
 
 Build scripts and production optimization must go through Rolldown or Vite.
 Do not add standalone esbuild, terser, Rollup, SWC, webpack, Babel build
@@ -228,7 +228,7 @@ The implementation rules are:
 - generated code uses standard ESM and `import()`; the symbol resolver receives
   already-normalized URLs/specifiers from build integration's finalized resolver
   table/bundle metadata rather than doing environment-specific path math at
-  runtime or parsing `arcade-manifest.json` in browser startup
+  runtime or parsing `markless-manifest.json` in browser startup
 - Node/Vite/Rolldown-specific behavior lives only in adapter packages or clearly
   isolated integration modules, never in the semantic compiler/runtime core
 

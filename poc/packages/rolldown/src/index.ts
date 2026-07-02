@@ -5,21 +5,24 @@ import type {
 import { transformTsrxForBundler } from '../../compiler/src/index.ts';
 import type { PipelineManifest, PipelineReceipt } from '../../protocol/src/index.ts';
 
-export type ArcadeRolldownTransformResult = BundlerTransformedModule & {
+export type MarklessRolldownTransformResult = BundlerTransformedModule & {
 	readonly moduleId: string;
 	readonly artifact: BundlerPipelineTransformArtifact;
 };
 
-export type ArcadeRolldownPlugin = {
-	readonly name: '@arcade/bundler/rolldown';
-	readonly transform: (code: string, id: string) => Promise<ArcadeRolldownTransformResult | null>;
+export type MarklessRolldownPlugin = {
+	readonly name: '@markless/bundler/rolldown';
+	readonly transform: (
+		code: string,
+		id: string,
+	) => Promise<MarklessRolldownTransformResult | null>;
 	readonly load: (id: string) => Promise<string | null>;
 	readonly manifest: () => PipelineManifest;
 	readonly receipts: () => ReadonlyArray<PipelineReceipt>;
 	readonly artifactFor: (id: string) => BundlerPipelineTransformArtifact | undefined;
 };
 
-export function createArcadeRolldownPlugin(): ArcadeRolldownPlugin {
+export function createMarklessRolldownPlugin(): MarklessRolldownPlugin {
 	const artifacts = new Map<string, BundlerPipelineTransformArtifact>();
 	const virtualModules = new Map<string, string>();
 	const receipts: PipelineReceipt[] = [];
@@ -27,7 +30,7 @@ export function createArcadeRolldownPlugin(): ArcadeRolldownPlugin {
 	let revision = 0;
 
 	return {
-		name: '@arcade/bundler/rolldown',
+		name: '@markless/bundler/rolldown',
 		async transform(code, id) {
 			if (!id.endsWith('.tsrx')) return null;
 
@@ -95,7 +98,7 @@ export function createArcadeRolldownPlugin(): ArcadeRolldownPlugin {
 
 function emptyManifest(): PipelineManifest {
 	return {
-		protocol: 'arcade-pipeline-poc',
+		protocol: 'markless-pipeline-poc',
 		revision: 0,
 		transformedModules: [],
 		virtualModules: [],

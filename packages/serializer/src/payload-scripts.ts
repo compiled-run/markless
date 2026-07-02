@@ -16,12 +16,12 @@ export function renderPayloadScripts(input: RenderPayloadScriptsInput): Rendered
 	return {
 		state: input.state,
 		view: input.view,
-		stateScript: renderDataScript('arcade/state', input.state),
-		viewScript: renderDataScript('arcade/view', input.view),
+		stateScript: renderDataScript('markless/state', input.state),
+		viewScript: renderDataScript('markless/view', input.view),
 	};
 }
 
-function renderDataScript(type: 'arcade/state' | 'arcade/view', payload: unknown): string {
+function renderDataScript(type: 'markless/state' | 'markless/view', payload: unknown): string {
 	return `<script type="${type}">${escapeScriptJson(JSON.stringify(payload))}</script>`;
 }
 

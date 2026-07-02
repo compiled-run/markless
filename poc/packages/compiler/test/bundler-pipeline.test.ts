@@ -20,9 +20,9 @@ test('bundler-pipeline fixture produces a compiler transform artifact', async ()
 	expect(artifact.filename).toBe(fixturePath);
 	expect(artifact.sourceKind).toBe('tsrx');
 	expect(artifact.transformedModule.id).toBe(fixturePath);
-	expect(artifact.transformedModule.code).toContain('arcade TSRX transform');
-	expect(artifact.transformedModule.code).toContain('virtual:arcade/runtime');
-	expect(artifact.transformedModule.code).toContain('virtual:arcade/symbol-resolver');
+	expect(artifact.transformedModule.code).toContain('markless TSRX transform');
+	expect(artifact.transformedModule.code).toContain('virtual:markless/runtime');
+	expect(artifact.transformedModule.code).toContain('virtual:markless/symbol-resolver');
 
 	expect(artifact.virtualModules.map((module) => module.kind)).toEqual([
 		'symbol-resolver',

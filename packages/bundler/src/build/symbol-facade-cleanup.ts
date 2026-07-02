@@ -1,5 +1,5 @@
 import { dirname, join, normalize, relative } from 'pathe';
-import { ARCADE_VIRTUAL_PREFIX } from '../transform.ts';
+import { MARKLESS_VIRTUAL_PREFIX } from '../transform.ts';
 
 type GeneratedChunk = {
 	readonly type: 'chunk';
@@ -36,7 +36,7 @@ type DirectSymbolLoaderBranch = {
 };
 
 const TSRX_SOURCE_FILE = /\.tsrx(?:[?#].*)?$/;
-const SYMBOL_INIT_EXPORT_PREFIX = 'init__virtual_arcade_symbol';
+const SYMBOL_INIT_EXPORT_PREFIX = 'init__virtual_markless_symbol';
 const STRING_LITERAL_SOURCE =
 	String.raw`(?:"[^"\\]*(?:\\.[^"\\]*)*"|'[^'\\]*(?:\\.[^'\\]*)*'|` +
 	'`[^`\\\\]*(?:\\\\.[^`\\\\]*)*`)';
@@ -202,7 +202,7 @@ function findSymbolFacadeRewrite(
 
 function isGeneratedSymbolFacade(chunk: GeneratedChunk): boolean {
 	const facadeModuleId = chunk.facadeModuleId ? normalizeVirtualId(chunk.facadeModuleId) : '';
-	return facadeModuleId.startsWith(`${ARCADE_VIRTUAL_PREFIX}symbol:`);
+	return facadeModuleId.startsWith(`${MARKLESS_VIRTUAL_PREFIX}symbol:`);
 }
 
 function isGeneratedSymbolInitExport(name: string): boolean {
@@ -553,7 +553,7 @@ function relativeChunkSpecifier(importerFileName: string, targetFileName: string
 function isGeneratedAsyncChunk(chunk: GeneratedChunk): boolean {
 	return chunk.moduleIds.some((id) => {
 		const normalized = normalizeVirtualId(id);
-		return normalized.startsWith(ARCADE_VIRTUAL_PREFIX) || TSRX_SOURCE_FILE.test(id);
+		return normalized.startsWith(MARKLESS_VIRTUAL_PREFIX) || TSRX_SOURCE_FILE.test(id);
 	});
 }
 

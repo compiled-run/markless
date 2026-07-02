@@ -1,5 +1,5 @@
 {
-	"name": "@arcade/vitest-browser",
+	"name": "@markless/vitest-browser",
 	"version": "0.0.0",
 	"private": true,
 	"type": "module",
@@ -9,7 +9,7 @@
 		"./vitest": "./src/vitest.ts"
 	},
 	"dependencies": {
-		"@arcade/web": "workspace:*"
+		"@markless/web": "workspace:*"
 	},
 	"peerDependencies": {
 		"vitest": "4.1.5"

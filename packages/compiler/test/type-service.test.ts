@@ -3,7 +3,7 @@ import ts from 'typescript';
 import { compileTsrxForTypeService, compile_to_volar_mappings } from '../src/type-service.ts';
 
 test('compileTsrxForTypeService returns a Volar-shaped AST-backed type-service artifact', () => {
-	const source = `import { state } from 'arcade';
+	const source = `import { state } from '@markless/core';
 import { Row } from './Row.tsrx';
 
 export function List({ items, emptyLabel }: { items: { id: string; tag: string; label: string; active: boolean; select(index: number): void }[]; emptyLabel: string }) @{
@@ -26,7 +26,7 @@ export function List({ items, emptyLabel }: { items: { id: string; tag: string; 
 
 	expect(result.sourceAst?.type).toBe('Program');
 	expect(result.errors).toEqual([]);
-	expect(result.code).toContain("import { state } from 'arcade';");
+	expect(result.code).toContain("import { state } from '@markless/core';");
 	expect(result.code).toContain("import { Row } from './Row.tsrx';");
 	expect(result.code).toContain('for (const item of items)');
 	expect(result.code).toContain('const i = 0;');
@@ -52,7 +52,7 @@ export function List({ items, emptyLabel }: { items: { id: string; tag: string; 
 	expect(result.cssMappings[0]?.data?.customData?.content).toContain('.row { color: red; }');
 });
 
-test('compile_to_volar_mappings aliases the Arcade type-service artifact for TSRX tooling', () => {
+test('compile_to_volar_mappings aliases the Markless type-service artifact for TSRX tooling', () => {
 	const source = `export function App() @{ <button onClick={() => count++}>{count}</button> }`;
 
 	const result = compile_to_volar_mappings(source, 'App.tsrx', { loose: true });

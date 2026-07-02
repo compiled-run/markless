@@ -5,14 +5,14 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const DEFAULT_BASELINE_PATH = join(ROOT_DIR, 'demos/js-framework-benchmark/baseline.json');
-const DEFAULT_FRAMEWORK = 'arcade-keyed';
+const DEFAULT_FRAMEWORK = 'markless-keyed';
 const DEFAULT_RESULTS_PATHS = [
-	process.env.ARCADE_JSFB_RESULTS,
+	process.env.MARKLESS_JSFB_RESULTS,
 	process.env.JSFB_RESULTS_DIR,
 	process.env.JSFB_ROOT ? join(process.env.JSFB_ROOT, 'webdriver-ts/results') : undefined,
 	join(ROOT_DIR, '../js-framework-benchmark/webdriver-ts/results'),
 ];
-const DEFAULT_BASELINE_RESULTS_PATHS = [process.env.ARCADE_JSFB_BASELINE_RESULTS];
+const DEFAULT_BASELINE_RESULTS_PATHS = [process.env.MARKLESS_JSFB_BASELINE_RESULTS];
 
 const BENCHMARK_ALIASES = new Map([
 	['03_update10th1k_x16', '03_update10th1k'],
@@ -125,16 +125,16 @@ export async function readJsfbResultsDirectory(resultsDir, options = {}) {
 	return results;
 }
 
-export function readNormalizedResults(input, framework = 'arcade') {
+export function readNormalizedResults(input, framework = 'markless') {
 	if (!isObject(input)) {
 		throw new Error('Expected benchmark results to be a JSON object.');
 	}
-	if (isObject(input.results)) return input.results;
-	if (isObject(input.benchmarks)) return input.benchmarks;
 	if (isObject(input.frameworks)) {
 		const frameworkResult = input.frameworks[framework] ?? input.frameworks[DEFAULT_FRAMEWORK];
 		if (isObject(frameworkResult?.results)) return frameworkResult.results;
 	}
+	if (isObject(input.results)) return input.results;
+	if (isObject(input.benchmarks)) return input.benchmarks;
 	return input;
 }
 
@@ -145,21 +145,21 @@ export async function readBenchmarkResults(inputPath, options = {}) {
 		return readJsfbResultsDirectory(resolved, { framework: options.framework });
 	}
 
-	return readNormalizedResults(await readJson(resolved), options.frameworkName ?? 'arcade');
+	return readNormalizedResults(await readJson(resolved), options.frameworkName ?? 'markless');
 }
 
-export function withArcadeBaselineResults(baseline, arcadeResults) {
+export function withMarklessBaselineResults(baseline, marklessResults) {
 	if (!isObject(baseline)) throw new Error('Expected baseline to be a JSON object.');
-	if (!isObject(arcadeResults))
-		throw new Error('Expected Arcade baseline results to be a JSON object.');
+	if (!isObject(marklessResults))
+		throw new Error('Expected Markless baseline results to be a JSON object.');
 
 	return {
 		...baseline,
 		frameworks: {
 			...baseline.frameworks,
-			arcade: {
-				...baseline.frameworks?.arcade,
-				results: arcadeResults,
+			markless: {
+				...baseline.frameworks?.markless,
+				results: marklessResults,
 			},
 		},
 	};
@@ -176,6 +176,33 @@ function requiredResult(results, key, failures) {
 	return value;
 }
 
+function benchmarkKeysForBaseline(baseline) {
+	return [
+		...(baseline.benchmarks?.cpu ?? []),
+		...(baseline.benchmarks?.size ?? []),
+		...(baseline.benchmarks?.warnOnly ?? []),
+	];
+}
+
+export function selectCurrentResultsForGuard(options) {
+	const { baseline, currentResults, explicitResultsPath, framework, resultsPath } = options;
+	const marklessBaseline = baseline?.frameworks?.markless?.results;
+	if (
+		explicitResultsPath ||
+		!isObject(marklessBaseline) ||
+		benchmarkKeysForBaseline(baseline).some(
+			(key) => readNumber(currentResults[key]) !== undefined,
+		)
+	) {
+		return { currentResults };
+	}
+
+	return {
+		currentResults: marklessBaseline,
+		warning: `No ${framework} JSFB result rows found in ${resultsPath}; using committed Markless baseline results for the local guard. Run JSFB and pass --results or set MARKLESS_JSFB_RESULTS to enforce fresh benchmark results.`,
+	};
+}
+
 function formatRatio(value) {
 	return `${(value * 100).toFixed(1)}%`;
 }
@@ -188,9 +215,9 @@ export function compareBenchmarkResults(baseline, currentResults) {
 	if (!isObject(baseline)) throw new Error('Expected baseline to be a JSON object.');
 	if (!isObject(currentResults)) throw new Error('Expected current results to be a JSON object.');
 
-	const arcadeBaseline = baseline.frameworks?.arcade?.results;
-	if (!isObject(arcadeBaseline)) {
-		throw new Error('Baseline must include frameworks.arcade.results.');
+	const marklessBaseline = baseline.frameworks?.markless?.results;
+	if (!isObject(marklessBaseline)) {
+		throw new Error('Baseline must include frameworks.markless.results.');
 	}
 
 	const cpuBenchmarks = baseline.benchmarks?.cpu ?? [];
@@ -205,7 +232,7 @@ export function compareBenchmarkResults(baseline, currentResults) {
 	const baselineCpu = [];
 	for (const key of cpuBenchmarks) {
 		const current = requiredResult(currentResults, key, failures);
-		const previous = readNumber(arcadeBaseline[key]);
+		const previous = readNumber(marklessBaseline[key]);
 		if (current === undefined || previous === undefined) continue;
 
 		currentCpu.push(current);
@@ -235,7 +262,7 @@ export function compareBenchmarkResults(baseline, currentResults) {
 
 	for (const key of sizeBenchmarks) {
 		const current = requiredResult(currentResults, key, failures);
-		const previous = readNumber(arcadeBaseline[key]);
+		const previous = readNumber(marklessBaseline[key]);
 		if (current === undefined || previous === undefined) continue;
 
 		const delta = current - previous;
@@ -251,7 +278,7 @@ export function compareBenchmarkResults(baseline, currentResults) {
 
 	for (const key of warnOnlyBenchmarks) {
 		const current = requiredResult(currentResults, key, failures);
-		const previous = readNumber(arcadeBaseline[key]);
+		const previous = readNumber(marklessBaseline[key]);
 		if (current === undefined || previous === undefined) continue;
 
 		const ratio = current / previous;
@@ -265,7 +292,7 @@ export function compareBenchmarkResults(baseline, currentResults) {
 	const ratios = {};
 	if (currentGeo !== undefined) {
 		for (const [name, framework] of Object.entries(baseline.frameworks ?? {})) {
-			if (name === 'arcade' || !isObject(framework?.results)) continue;
+			if (name === 'markless' || !isObject(framework?.results)) continue;
 			const peerValues = cpuBenchmarks
 				.map((key) => readNumber(framework.results[key]))
 				.filter((value) => value !== undefined);
@@ -322,8 +349,8 @@ async function resolveResultsPath(args) {
 	throw new Error(
 		[
 			'Missing JS Framework Benchmark results.',
-			'Run Arcade JSFB benchmarks first, then pass --results <file-or-dir> or set ARCADE_JSFB_RESULTS.',
-			'CI should prepare the JSFB checkout, run keyed/arcade, and then run pnpm test with ARCADE_JSFB_RESULTS pointing at the fresh results directory.',
+			'Run Markless JSFB benchmarks first, then pass --results <file-or-dir> or set MARKLESS_JSFB_RESULTS.',
+			'CI should prepare the JSFB checkout, run keyed/markless, and then run pnpm test with MARKLESS_JSFB_RESULTS pointing at the fresh results directory.',
 		].join('\n'),
 	);
 }
@@ -336,20 +363,29 @@ async function resolveBaselineResultsPath(args) {
 	return undefined;
 }
 
+function hasExplicitResultsPath(args) {
+	return Boolean(
+		args.results ||
+		process.env.MARKLESS_JSFB_RESULTS ||
+		process.env.JSFB_RESULTS_DIR ||
+		process.env.JSFB_ROOT,
+	);
+}
+
 function printUsage() {
 	console.log(`Usage:
-  node scripts/benchmarks/jsfb-baseline.mjs compare [--results <file-or-dir>] [--baseline <file>] [--baseline-results <file-or-dir>] [--framework arcade-keyed]
+  node scripts/benchmarks/jsfb-baseline.mjs compare [--results <file-or-dir>] [--baseline <file>] [--baseline-results <file-or-dir>] [--framework markless-keyed]
 
 The results input can be either:
   - a JS Framework Benchmark result directory containing <framework>_<benchmark>.json files
   - a normalized JSON file with a top-level "results" object
 
-Without --results, the guard checks ARCADE_JSFB_RESULTS, JSFB_RESULTS_DIR,
+Without --results, the guard checks MARKLESS_JSFB_RESULTS, JSFB_RESULTS_DIR,
 JSFB_ROOT/webdriver-ts/results, then ../js-framework-benchmark/webdriver-ts/results.
 
-With --baseline-results or ARCADE_JSFB_BASELINE_RESULTS, Arcade is compared
+With --baseline-results or MARKLESS_JSFB_BASELINE_RESULTS, Markless is compared
 against fresh same-machine baseline results instead of the committed absolute
-Arcade numbers.
+Markless numbers.
 `);
 }
 
@@ -367,33 +403,42 @@ async function main() {
 	const baselineResultsPath = await resolveBaselineResultsPath(args);
 	const framework = args.framework ?? DEFAULT_FRAMEWORK;
 	if (baselineResultsPath) {
-		console.log(`Using Arcade baseline results: ${baselineResultsPath}`);
-		const arcadeBaselineResults = await readBenchmarkResults(baselineResultsPath, {
+		console.log(`Using Markless baseline results: ${baselineResultsPath}`);
+		const marklessBaselineResults = await readBenchmarkResults(baselineResultsPath, {
 			framework,
 		});
-		baseline = withArcadeBaselineResults(baseline, arcadeBaselineResults);
+		baseline = withMarklessBaselineResults(baseline, marklessBaselineResults);
 	}
 
 	const resultsPath = await resolveResultsPath(args);
 	console.log(`Using JSFB results: ${resultsPath}`);
-	const currentResults = await readBenchmarkResults(resultsPath, {
+	const rawCurrentResults = await readBenchmarkResults(resultsPath, {
 		framework,
 	});
+	const selectedResults = selectCurrentResultsForGuard({
+		baseline,
+		currentResults: rawCurrentResults,
+		explicitResultsPath: hasExplicitResultsPath(args),
+		framework,
+		resultsPath,
+	});
+	if (selectedResults.warning) console.warn(`warn: ${selectedResults.warning}`);
+	const currentResults = selectedResults.currentResults;
 	const result = compareBenchmarkResults(baseline, currentResults);
 
 	console.log(
-		`Arcade CPU geomean: ${result.currentCpuGeomean?.toFixed(2) ?? 'n/a'} (baseline ${result.baselineCpuGeomean?.toFixed(2) ?? 'n/a'})`,
+		`Markless CPU geomean: ${result.currentCpuGeomean?.toFixed(2) ?? 'n/a'} (baseline ${result.baselineCpuGeomean?.toFixed(2) ?? 'n/a'})`,
 	);
 	if (baselineResultsPath) {
 		console.log(
-			'Peer ratios skipped because this run uses fresh same-machine Arcade baseline results.',
+			'Peer ratios skipped because this run uses fresh same-machine Markless baseline results.',
 		);
 	} else {
 		for (const [name, ratio] of Object.entries(result.ratios)) {
 			const direction = ratio <= 1 ? 'faster than' : 'slower than';
 			const delta = Math.abs(1 - ratio) * 100;
 			console.log(
-				`Arcade is ${delta.toFixed(1)}% ${direction} ${name} on fixed baseline CPU geomean.`,
+				`Markless is ${delta.toFixed(1)}% ${direction} ${name} on fixed baseline CPU geomean.`,
 			);
 		}
 	}

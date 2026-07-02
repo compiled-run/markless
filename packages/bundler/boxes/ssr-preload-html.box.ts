@@ -33,8 +33,8 @@ export default box(
 		});
 		const html = await preview.request(SSR_ROUTE);
 		await expect.html.contains(html, 'data-counter');
-		await expect.html.contains(html, 'type="arcade/state"');
-		await expect.html.contains(html, 'type="arcade/view"');
+		await expect.html.contains(html, 'type="markless/state"');
+		await expect.html.contains(html, 'type="markless/view"');
 		await expect.html.contains(html, 'rel="modulepreload"');
 
 		const hrefs = modulePreloadHrefs(html);

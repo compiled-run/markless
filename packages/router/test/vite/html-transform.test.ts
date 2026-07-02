@@ -4,12 +4,12 @@ import { transformHtmlSource } from '../../src/vite/html-transform.ts';
 
 describe('html transform', () => {
 	it('appends html attribute helper from document.tsx root Html props', () => {
-		const source = `import { Html } from "@arcade/router";
-import type { PageProps } from "@arcade/router";
+		const source = `import { Html } from "@markless/router";
+import type { PageProps } from "@markless/router";
 
 export default (props: PageProps) => {
   return (
-    <Html lang="en" data-path={props.url.pathname} data-status={String(props.status)} data-arcadeRouter>
+    <Html lang="en" data-path={props.url.pathname} data-status={String(props.status)} data-marklessRouter>
       <head />
       <body>
         {props.children}
@@ -23,18 +23,18 @@ export default (props: PageProps) => {
 
 		expect(transformed).toContain('export default (props: PageProps)');
 		expect(transformed).toContain(
-			'export function __arcadeRouterHtmlAttributes(props: PageProps)',
+			'export function __marklessRouterHtmlAttributes(props: PageProps)',
 		);
 		expect(transformed).toContain('"lang": "en"');
 		expect(transformed).toContain('"data-path": props.url.pathname');
 		expect(transformed).toContain('"data-status": String(props.status)');
-		expect(transformed).toContain('"data-arcadeRouter": true');
-		expect(transformed).not.toContain('arcadeRouter-html');
+		expect(transformed).toContain('"data-marklessRouter": true');
+		expect(transformed).not.toContain('marklessRouter-html');
 		expect(transformed).not.toContain('html.replace');
 	});
 
 	it('appends html attribute helper from document.jsx root Html props', () => {
-		const source = `import { Html } from "@arcade/router";
+		const source = `import { Html } from "@markless/router";
 
 export default (props) => {
   return (
@@ -49,14 +49,14 @@ export default (props) => {
 
 		const transformed = transform(source, 'jsx', '/project/document.jsx');
 
-		expect(transformed).toContain('export function __arcadeRouterHtmlAttributes(props)');
+		expect(transformed).toContain('export function __marklessRouterHtmlAttributes(props)');
 		expect(transformed).toContain('"data-path": props.url.pathname');
 	});
 
 	it('rejects document.tsx when the default component root is not Html', () => {
 		expect(() =>
 			transform(
-				`import { Html } from "@arcade/router";
+				`import { Html } from "@markless/router";
 
 export default () => {
   return <body />;
@@ -64,14 +64,14 @@ export default () => {
 `,
 			),
 		).toThrow(
-			'ArcadeRouter expected document.tsx or document.jsx to return <Html> at the top level',
+			'MarklessRouter expected document.tsx or document.jsx to return <Html> at the top level',
 		);
 	});
 
 	it('rejects Html attributes that capture render-time locals', () => {
 		expect(() =>
 			transform(
-				`import { Html } from "@arcade/router";
+				`import { Html } from "@markless/router";
 
 export default (props) => {
   const section = props.url.pathname.split("/")[1] || "home";
@@ -86,13 +86,13 @@ export default (props) => {
 };
 `,
 			),
-		).toThrow('ArcadeRouter cannot use "section" in <Html data-section={...}>');
+		).toThrow('MarklessRouter cannot use "section" in <Html data-section={...}>');
 	});
 
 	it('rejects Html spread attributes', () => {
 		expect(() =>
 			transform(
-				`import { Html } from "@arcade/router";
+				`import { Html } from "@markless/router";
 
 export default (props) => {
   return (
@@ -105,7 +105,7 @@ export default (props) => {
 };
 `,
 			),
-		).toThrow('ArcadeRouter does not support spreading props onto <Html> yet');
+		).toThrow('MarklessRouter does not support spreading props onto <Html> yet');
 	});
 });
 

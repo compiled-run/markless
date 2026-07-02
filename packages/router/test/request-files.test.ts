@@ -104,25 +104,27 @@ test('diagnoses invalid request files', () => {
 	]);
 });
 
-test('wraps API and middleware files for Nitro with Arcade HTTP context', () => {
+test('wraps API and middleware files for Nitro with Markless HTTP context', () => {
 	expect(
 		transformRequestFileSource(
 			'api/users/[id].get.ts',
 			'export default async function (http) { return http.params.id; }',
 		)?.code,
 	).toContain(
-		'import { __arcadeCreateHttpContext as __arcade_create_http_context__ } from "@arcade/router";',
+		'import { __marklessCreateHttpContext as __markless_create_http_context__ } from "@markless/router";',
 	);
 	expect(
 		transformRequestFileSource(
 			'api/posts.get.ts',
 			'export const cache = { maxAge: 60 }; export default function () {}',
 		)?.code,
-	).toContain('import { defineCachedHandler as __arcade_define_handler__ } from "nitro/cache";');
+	).toContain(
+		'import { defineCachedHandler as __markless_define_handler__ } from "nitro/cache";',
+	);
 	expect(
 		transformRequestFileSource(
 			'middleware/01.auth.ts',
 			'const auth = (http) => { http.locals.user = {}; }; export default auth;',
 		)?.code,
-	).toContain('auth(__arcade_create_http_context__(event))');
+	).toContain('auth(__markless_create_http_context__(event))');
 });

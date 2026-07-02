@@ -1,12 +1,12 @@
 /**
  * Users write one document boundary with <Html> for SSR and CSR. SSR needs
- * those attributes before Arcade renders the page, so this transform extracts
+ * those attributes before Markless renders the page, so this transform extracts
  * root <Html> props into a helper while runtime Html stays children-only.
  */
 
 import type { Plugin } from 'vite';
 
-const HELPER = '__arcadeRouterHtmlAttributes';
+const HELPER = '__marklessRouterHtmlAttributes';
 const SAFE_GLOBALS = new Set(['String', 'Number', 'Boolean', 'Math', 'JSON']);
 const DOCUMENT_FILE_LABEL = 'document.tsx or document.jsx';
 const DOCUMENT_FILE_FILTER = /(?:^|\/)document\.[tj]sx(?:$|\?)/;
@@ -21,7 +21,7 @@ type Node = {
 
 export function htmlTransformPlugin(): Plugin {
 	return {
-		name: 'arcade-router:html',
+		name: 'markless-router:html',
 		transform: {
 			order: 'pre',
 			filter: {
@@ -43,13 +43,13 @@ export function htmlTransformPlugin(): Plugin {
 export function transformHtmlSource(code: string, astInput: unknown) {
 	const ast = node(astInput);
 	if (!ast) {
-		fail(`ArcadeRouter could not read ${DOCUMENT_FILE_LABEL}. Check it for syntax errors.`);
+		fail(`MarklessRouter could not read ${DOCUMENT_FILE_LABEL}. Check it for syntax errors.`);
 	}
 
 	const fn = findDefaultDocumentFunction(ast);
 	if (fn?.type !== 'ArrowFunctionExpression' && fn?.type !== 'FunctionExpression') {
 		fail(
-			`ArcadeRouter needs to see your document body in ${DOCUMENT_FILE_LABEL}. Write \`export default (props) => <Html>...</Html>\` instead of passing a named function.`,
+			`MarklessRouter needs to see your document body in ${DOCUMENT_FILE_LABEL}. Write \`export default (props) => <Html>...</Html>\` instead of passing a named function.`,
 		);
 	}
 
@@ -85,7 +85,7 @@ function findDefaultDocumentFunction(ast: Node) {
 	}
 
 	fail(
-		`ArcadeRouter could not find the document function. ${DOCUMENT_FILE_LABEL} must default export \`() => <Html>...</Html>\`.`,
+		`MarklessRouter could not find the document function. ${DOCUMENT_FILE_LABEL} must default export \`() => <Html>...</Html>\`.`,
 	);
 }
 
@@ -102,13 +102,13 @@ function findReturnedHtml(fn: Node) {
 
 	if (returned?.type !== 'JSXElement') {
 		fail(
-			`ArcadeRouter expected ${DOCUMENT_FILE_LABEL} to return <Html> at the top level. Wrap your document shell in \`<Html>...</Html>\`.`,
+			`MarklessRouter expected ${DOCUMENT_FILE_LABEL} to return <Html> at the top level. Wrap your document shell in \`<Html>...</Html>\`.`,
 		);
 	}
 
 	if (jsxName(node(node(returned.openingElement)?.name)) !== 'Html') {
 		fail(
-			`ArcadeRouter expected ${DOCUMENT_FILE_LABEL} to return <Html> at the top level. Put <head> and <body> inside \`<Html>...</Html>\`.`,
+			`MarklessRouter expected ${DOCUMENT_FILE_LABEL} to return <Html> at the top level. Put <head> and <body> inside \`<Html>...</Html>\`.`,
 		);
 	}
 
@@ -118,14 +118,14 @@ function findReturnedHtml(fn: Node) {
 function htmlAttr(code: string, attr: Node, propsName: string | undefined) {
 	if (attr.type === 'JSXSpreadAttribute') {
 		fail(
-			'ArcadeRouter does not support spreading props onto <Html> yet. Write each html attribute directly, like `<Html lang="en">`.',
+			'MarklessRouter does not support spreading props onto <Html> yet. Write each html attribute directly, like `<Html lang="en">`.',
 		);
 	}
 
 	const name = jsxName(node(attr.name));
 	if (!name) {
 		fail(
-			'ArcadeRouter found an unsupported <Html> attribute name. Use plain html attributes like `lang`, `class`, or `data-theme`.',
+			'MarklessRouter found an unsupported <Html> attribute name. Use plain html attributes like `lang`, `class`, or `data-theme`.',
 		);
 	}
 
@@ -140,21 +140,21 @@ function htmlAttr(code: string, attr: Node, propsName: string | undefined) {
 
 	if (value.type !== 'JSXExpressionContainer') {
 		fail(
-			`ArcadeRouter could not understand the <Html> "${name}" attribute. Use a string or JSX expression, like \`${name}="value"\` or \`${name}={props.url.pathname}\`.`,
+			`MarklessRouter could not understand the <Html> "${name}" attribute. Use a string or JSX expression, like \`${name}="value"\` or \`${name}={props.url.pathname}\`.`,
 		);
 	}
 
 	const expression = unwrap(node(value.expression));
 	if (!expression || expression.type === 'JSXEmptyExpression') {
 		fail(
-			`ArcadeRouter found an empty <Html> "${name}" attribute expression. Add a value or remove the attribute.`,
+			`MarklessRouter found an empty <Html> "${name}" attribute expression. Add a value or remove the attribute.`,
 		);
 	}
 
 	const ref = unsupportedIdentifier(expression, propsName);
 	if (ref) {
 		fail(
-			`ArcadeRouter cannot use "${ref}" in <Html ${name}={...}> because html attributes are read before Arcade renders ${DOCUMENT_FILE_LABEL}. Use props directly, like \`${name}={props.url.pathname}\`, or a literal value.`,
+			`MarklessRouter cannot use "${ref}" in <Html ${name}={...}> because html attributes are read before Markless renders ${DOCUMENT_FILE_LABEL}. Use props directly, like \`${name}={props.url.pathname}\`, or a literal value.`,
 		);
 	}
 

@@ -1,6 +1,6 @@
 # macOS Native Rendering Target
 
-This proof checks whether an Arcade-style host-neutral graph/projection artifact
+This proof checks whether an Markless-style host-neutral graph/projection artifact
 can drive real macOS desktop controls through JavaScriptCore.
 
 It is intentionally narrow:
@@ -18,13 +18,13 @@ DOM islands, or production compiler integration.
 ## Authored Shape
 
 ```tsrx
-import { state } from '@arcade/core';
+import { state } from '@markless/core';
 
 export function Counter() @{
   let count = state(0);
 
   <main>
-    <h1>Arcade macOS Proof</h1>
+    <h1>Markless macOS Proof</h1>
     <button onClick={() => count++}>Count {count}</button>
   </main>
 }
@@ -67,7 +67,7 @@ To build and open the clickable AppKit demo:
 bash poc/fixtures/proofs/macos-native-rendering-target/macos/Scripts/run-macos-demo.sh
 ```
 
-The window shows `Arcade macOS Proof` and a native count button. Clicking the
+The window shows `Markless macOS Proof` and a native count button. Clicking the
 button runs the JavaScriptCore symbol, mutates the graph, and updates the native
 button title.
 

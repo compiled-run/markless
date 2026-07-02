@@ -1,4 +1,4 @@
-import type { ProtocolStatePayload, ProtocolViewPayload } from '@arcade/serializer';
+import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer';
 
 export type PayloadScriptPair = {
 	readonly stateScript: string;
@@ -58,14 +58,14 @@ export type PayloadDebugDump = {
 };
 
 export function assertPayloadScriptTypes(input: PayloadScriptPair): void {
-	assertPayloadScriptWrapper(input.stateScript, 'arcade/state');
-	assertPayloadScriptWrapper(input.viewScript, 'arcade/view');
+	assertPayloadScriptWrapper(input.stateScript, 'markless/state');
+	assertPayloadScriptWrapper(input.viewScript, 'markless/view');
 }
 
 export function decodePayloadScriptPair(input: PayloadScriptPair): DecodedPayloadScriptPair {
 	return {
-		state: parsePayloadScript(input.stateScript, 'arcade/state') as ProtocolStatePayload,
-		view: parsePayloadScript(input.viewScript, 'arcade/view') as ProtocolViewPayload,
+		state: parsePayloadScript(input.stateScript, 'markless/state') as ProtocolStatePayload,
+		view: parsePayloadScript(input.viewScript, 'markless/view') as ProtocolViewPayload,
 	};
 }
 
@@ -141,7 +141,7 @@ export function summarizeProtocolPayload(input: {
 	};
 }
 
-function parsePayloadScript(script: string, type: 'arcade/state' | 'arcade/view'): unknown {
+function parsePayloadScript(script: string, type: 'markless/state' | 'markless/view'): unknown {
 	assertPayloadScriptWrapper(script, type);
 
 	try {
@@ -161,13 +161,16 @@ function cloneDomUpdateTarget(
 	return { kind: 'text' };
 }
 
-function assertPayloadScriptWrapper(script: string, type: 'arcade/state' | 'arcade/view'): void {
+function assertPayloadScriptWrapper(
+	script: string,
+	type: 'markless/state' | 'markless/view',
+): void {
 	if (!script.startsWith(scriptPrefix(type)) || !script.endsWith(scriptSuffix)) {
 		throw new Error(`Expected ${type} payload script.`);
 	}
 }
 
-function scriptPrefix(type: 'arcade/state' | 'arcade/view'): string {
+function scriptPrefix(type: 'markless/state' | 'markless/view'): string {
 	return `<script type="${type}">`;
 }
 

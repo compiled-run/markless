@@ -1,6 +1,6 @@
 # Proof Fixtures
 
-These fixtures are executable specs for the first `@arcade/core`
+These fixtures are executable specs for the first `@markless/core`
 implementation. They are not a throwaway POC implementation.
 
 Each proof directory should contain authored `.tsrx` source and a README that
@@ -49,7 +49,7 @@ a time through failing tests.
   behavior.
 - [`resumer-script`](./resumer-script/): isolated event-only SSR inline resumer
   proof. It checks that static SSR emits no resumer, event metadata lives in
-  `arcade/view`, startup imports no app or symbol code, the first click imports
+  `markless/view`, startup imports no app or symbol code, the first click imports
   the matching symbol, and the inline bootstrap reports a reproducible
   minified+gzip size against the 700 B target.
 - [`symbol-stress-runtime`](./symbol-stress-runtime/): POC runtime stress proof
@@ -57,11 +57,11 @@ a time through failing tests.
   loading and event-only resumer dispatch for multiple symbol-count
   cardinalities without relying on the current POC TSRX dependency path.
 - [`ios-native-rendering-target`](./ios-native-rendering-target/): iOS native
-  target scaffold proving a serialized Arcade-style graph/projection artifact
+  target scaffold proving a serialized Markless-style graph/projection artifact
   can create UIKit controls, run a JavaScriptCore event symbol, and flush graph
   state back into native text when full Xcode simulator tooling is available.
 - [`macos-native-rendering-target`](./macos-native-rendering-target/): macOS
-  desktop target scaffold proving a serialized Arcade-style graph/projection
+  desktop target scaffold proving a serialized Markless-style graph/projection
   artifact can create AppKit controls, run a JavaScriptCore event symbol, and
   flush graph state back into native text when Xcode macOS tooling is available.
 

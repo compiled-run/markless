@@ -1,4 +1,4 @@
-import { render } from 'arcade';
+import { render } from '@markless/core';
 import Dashboard from './root.tsrx';
 
 const app = document.querySelector('#app');
