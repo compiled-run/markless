@@ -9,6 +9,7 @@
 	"thresholds": {
 		"cpuGeomeanRegressionRatio": 1.03,
 		"cpuBenchmarkRegressionRatio": 1.07,
+		"cpuBenchmarkClearRegressionRatio": 1.25,
 		"firstPaintRegressionRatio": 1.2,
 		"gzipSizeRegressionKb": 0.15,
 		"rawSizeRegressionKb": 0.5
