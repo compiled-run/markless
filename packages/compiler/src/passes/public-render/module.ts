@@ -9,10 +9,12 @@ import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/
 import { expressionSource } from '../../ast/source.ts';
 import {
 	escapeAttribute,
+	getDynamicTagExpression,
 	getElementAttributes,
 	getElementTagName,
 	isHostTagName,
 	isIgnorableJsxTextNode as isIgnorableTextNode,
+	isPlainHostTemplateNode,
 	isSpreadAttribute,
 	isStaticTextNode,
 	staticTextValue,
@@ -137,6 +139,7 @@ function emitPublicCsrRenderModule(
 		'function marklessCsrIsThenable(value) { return value !== null && (typeof value === "object" || typeof value === "function") && typeof value.then === "function"; }',
 		'function marklessCsrText(value) { return marklessCsrEscape(value == null ? "" : String(value)); }',
 		'function marklessCsrAttribute(name, value) { return ` ${name}="${marklessCsrEscape(value == null ? "" : String(value))}"`; }',
+		'function marklessCsrDynamicTagName(value) { if (value === null || value === undefined || value === false || value === "") return null; const tag = String(value); if (!/^[a-zA-Z][a-zA-Z0-9:_.-]*$/.test(tag)) throw new Error("MARKLESS_DYNAMIC_TAG_INVALID: " + tag); return tag; }',
 		'function marklessCsrSpreadAttributes(values) { let html = ""; for (const key of Object.keys(values ?? {})) { if (!/^[A-Za-z_][\\w.:-]*$/.test(key) || /^on[A-Z]/.test(key) || key === "attach" || key === "el" || key === "children") continue; const value = values[key]; if (value === null || value === undefined || value === false) continue; html += value === true ? ` ${key}=""` : marklessCsrAttribute(key, value); } return html; }',
 		'function marklessCsrEscape(value) { return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll("\\"", "&quot;"); }',
 		'',
@@ -209,7 +212,8 @@ function emitPublicSsrRenderModule(
 		'function marklessSsrStateValue(graphNodeId) { return marklessSsrStateValues.get(graphNodeId); }',
 		'function marklessSsrRenderChild(children, component, props, child) { const output = component?.renderSsr?.(props); if (output) children.push({ ...child, output, callbackProps: props?.__marklessSsrCallbacks ?? {} }); return output?.html ?? ""; }',
 		'function marklessSsrHost(hostLocators, hostNodeId, tagName) { hostLocators.push({ hostNodeId, strategy: "dom-order", index: hostLocators.length + (hostLocators.marklessSsrExtraElements ?? 0), tagName }); return ""; }',
-		'function marklessSsrRepeatRows(hostLocators, items, renderRow, elementsPerRow) { const list = Array.isArray(items) ? items : Array.from(items ?? []); const html = list.map(renderRow).join(""); hostLocators.marklessSsrExtraElements = (hostLocators.marklessSsrExtraElements ?? 0) + list.length * elementsPerRow; return html; }',
+		'function marklessSsrDynamicTagName(hostLocators, value) { if (value === null || value === undefined || value === false || value === "") return null; const tag = String(value); if (!/^[a-zA-Z][a-zA-Z0-9:_.-]*$/.test(tag)) throw new Error("MARKLESS_DYNAMIC_TAG_INVALID: " + tag); hostLocators.marklessSsrExtraElements = (hostLocators.marklessSsrExtraElements ?? 0) + 1; return tag; }',
+		'function marklessSsrRepeatRows(hostLocators, items, renderRow, elementsPerRow, renderEmpty) { const list = Array.isArray(items) ? items : Array.from(items ?? []); if (list.length === 0) return renderEmpty ? renderEmpty() : ""; const html = list.map(renderRow).join(""); hostLocators.marklessSsrExtraElements = (hostLocators.marklessSsrExtraElements ?? 0) + list.length * elementsPerRow; return html; }',
 		'function marklessSsrCallbacks(callbacks) { const result = {}; for (const key of Object.keys(callbacks)) if (callbacks[key]) result[key] = callbacks[key]; return result; }',
 		'function marklessSsrCallbackSymbol(props, path) { let value = props?.__marklessSsrCallbacks; for (const key of path) value = value?.[key]; return typeof value === "string" ? value : undefined; }',
 		'function marklessComposeState(state, children) { const childStates = children.map((child) => child.output?.state).filter(Boolean); if (childStates.length === 0) return state; return { ...state, cells: [...(state.cells ?? []), ...childStates.flatMap((childState) => childState.cells ?? [])], computed: [...(state.computed ?? []), ...childStates.flatMap((childState) => childState.computed ?? [])], ...((state.sharedDefinitions || childStates.some((childState) => childState.sharedDefinitions?.length)) ? { sharedDefinitions: [...(state.sharedDefinitions ?? []), ...childStates.flatMap((childState) => childState.sharedDefinitions ?? [])] } : {}) }; }',
@@ -447,6 +451,10 @@ function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string {
 		return `(${testSource} ? ${consequent} : ${alternate})`;
 	}
 
+	if (node.type === 'JSXSwitchExpression') {
+		return emitSwitchHtml(node, context);
+	}
+
 	if (node.type === 'JSXForExpression') {
 		return context.mode === 'ssr' ? emitSsrRepeatRows(node, context) : '""';
 	}
@@ -461,7 +469,7 @@ function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string {
 	}
 
 	const tagName = getElementTagName(node);
-	if (!tagName) return '""';
+	if (!tagName) return emitDynamicTagHtml(node, context);
 	if (!isHostTagName(tagName)) {
 		return context.mode === 'ssr'
 			? emitSsrComponent(node, tagName, context)
@@ -535,14 +543,26 @@ function emitSsrRepeatRows(node: AnyNode, context: SsrRenderContext): string {
 	if (context.componentEdges.length > 0) return '""';
 
 	const row = singleRepeatRowElement(node);
-	if (!row || !allHostElementRow(row)) return '""';
+	if (!row || !isPlainHostTemplateNode(row)) return '""';
+
+	// The @empty branch renders at most once, so it emits with the normal
+	// context: its locators push only when the branch is actually taken.
+	const emptyBlock = node.empty as AnyNode | undefined;
+	const emptyChildren = emptyBlock
+		? asNodes(emptyBlock.body).filter((child) => !isIgnorableTextNode(child))
+		: [];
+	if (emptyChildren.some((child) => !isPlainHostTemplateNode(child))) return '""';
 
 	const rowContext: SsrRenderContext = { ...context, insideRepeatRow: true };
 	const rowHtml = emitHtmlNode(row, rowContext);
 	const rowParams = repeat.indexName
 		? `(${repeat.itemName}, ${repeat.indexName})`
 		: `(${repeat.itemName})`;
-	return `marklessSsrRepeatRows(marklessSsrHostLocators, ${repeat.collectionSource}, ${rowParams} => ${rowHtml}, ${countRowElements(row)})`;
+	const emptyThunk =
+		emptyChildren.length > 0
+			? `() => ${joinSsrExpressions(emptyChildren.map((child) => emitHtmlNode(child, context)))}`
+			: 'null';
+	return `marklessSsrRepeatRows(marklessSsrHostLocators, ${repeat.collectionSource}, ${rowParams} => ${rowHtml}, ${countRowElements(row)}, ${emptyThunk})`;
 }
 
 function singleRepeatRowElement(node: AnyNode): AnyNode | null {
@@ -554,26 +574,95 @@ function singleRepeatRowElement(node: AnyNode): AnyNode | null {
 	return row.type === 'Element' || row.type === 'JSXElement' ? row : null;
 }
 
-// Element counts per row must be static for locator shifting, so rows may only
-// contain host elements, text, and expression children — no control flow,
-// components, or nested repeats.
-function allHostElementRow(node: AnyNode): boolean {
-	if (isStaticTextNode(node)) return true;
-	if (node.type === 'JSXExpressionContainer' || node.type === 'TSRXExpression') return true;
-	if (node.type !== 'Element' && node.type !== 'JSXElement') return false;
-	const tagName = getElementTagName(node);
-	if (!tagName || !isHostTagName(tagName)) return false;
-	return asNodes(node.children).every(
-		(child) => isIgnorableTextNode(child) || allHostElementRow(child),
-	);
-}
-
 function countRowElements(node: AnyNode): number {
 	const isElement = node.type === 'Element' || node.type === 'JSXElement' ? 1 : 0;
 	return asNodes(node.children).reduce(
 		(total, child) => total + countRowElements(child),
 		isElement,
 	);
+}
+
+// Dynamic <{expr}> tags resolve the tag value at render time. The runtime
+// helper is the XSS gate: it rejects non-tag-name strings before any string
+// concatenation, renders nothing for nullish/false/empty values, and (SSR)
+// counts the rendered element so later dom-order locators stay correct.
+function emitDynamicTagHtml(node: AnyNode, context: HtmlRenderContext): string {
+	const tagExpression = getDynamicTagExpression(node);
+	if (!tagExpression) return '""';
+
+	const attributeEntries = mergedAttributeEntries(node, context.source);
+	const attributesExpression =
+		attributeEntries.length > 0
+			? `${renderHelper(context, 'SpreadAttributes')}({ ${attributeEntries.join(', ')} })`
+			: '""';
+	const tagValueExpression =
+		context.mode === 'ssr'
+			? `marklessSsrDynamicTagName(marklessSsrHostLocators, ${expressionSource(tagExpression, context.source)})`
+			: `marklessCsrDynamicTagName(${expressionSource(tagExpression, context.source)})`;
+
+	return `((marklessDynamicTag) => marklessDynamicTag ? ${joinSsrExpressions([
+		'("<" + marklessDynamicTag)',
+		attributesExpression,
+		JSON.stringify('>'),
+		emitHtmlChildren(node, context),
+		'("</" + marklessDynamicTag + ">")',
+	])} : "")(${tagValueExpression})`;
+}
+
+// @switch renders as one IIFE binding the discriminant once (so getters and
+// calls are not re-evaluated per case) around a strict-equality ternary chain.
+// No matching case and no @default renders nothing, matching @if's untaken
+// branch behavior.
+function emitSwitchHtml(node: AnyNode, context: HtmlRenderContext): string {
+	const discriminant = node.discriminant as AnyNode | undefined;
+	const discriminantSource = discriminant
+		? expressionSource(discriminant, context.source)
+		: 'undefined';
+
+	const before =
+		context.mode === 'ssr'
+			? {
+					nextChildIndex: context.nextChildIndex,
+					nextComponentEdgeIndex: context.nextComponentEdgeIndex,
+				}
+			: null;
+	let maxChildIndex = before?.nextChildIndex ?? 0;
+	let maxComponentEdgeIndex = before?.nextComponentEdgeIndex ?? 0;
+
+	const emitCaseBody = (switchCase: AnyNode): string => {
+		const children = asNodes(switchCase.consequent);
+		if (context.mode === 'csr' || !before) {
+			return joinSsrExpressions(children.map((child) => emitHtmlNode(child, context)));
+		}
+		const caseContext: SsrRenderContext = { ...context, ...before };
+		const body = joinSsrExpressions(children.map((child) => emitHtmlNode(child, caseContext)));
+		maxChildIndex = Math.max(maxChildIndex, caseContext.nextChildIndex);
+		maxComponentEdgeIndex = Math.max(maxComponentEdgeIndex, caseContext.nextComponentEdgeIndex);
+		return body;
+	};
+
+	let defaultBody = '""';
+	const testedCases: Array<{ readonly testSource: string; readonly body: string }> = [];
+	for (const switchCase of asNodes(node.cases)) {
+		const test = switchCase.test as AnyNode | undefined;
+		const body = emitCaseBody(switchCase);
+		if (!test) {
+			defaultBody = body;
+			continue;
+		}
+		testedCases.push({ testSource: expressionSource(test, context.source), body });
+	}
+
+	if (context.mode === 'ssr' && before) {
+		context.nextChildIndex = maxChildIndex;
+		context.nextComponentEdgeIndex = maxComponentEdgeIndex;
+	}
+
+	let expression = defaultBody;
+	for (const testedCase of [...testedCases].reverse()) {
+		expression = `(marklessSwitchValue === (${testedCase.testSource}) ? ${testedCase.body} : ${expression})`;
+	}
+	return `((marklessSwitchValue) => ${expression})(${discriminantSource})`;
 }
 
 function emitHtmlBranch(node: AnyNode | undefined, context: HtmlRenderContext): string {

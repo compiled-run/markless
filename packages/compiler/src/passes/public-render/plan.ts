@@ -8,6 +8,7 @@ import {
 	getElementTagName,
 	isHostTagName,
 	isIgnorableStaticTextNode as isIgnorableTextNode,
+	isPlainHostTemplateNode,
 	isSpreadAttribute,
 	isStaticTextNode,
 	staticTextValue,
@@ -96,7 +97,7 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 			symbols: input.symbolResolver.symbols,
 		});
 		repeatGates.push(gate);
-		if (!gate.supported) continue;
+		if (!gate.supported || gate.ssrOnly) continue;
 
 		const row = singleRowRoot(repeatNode);
 		const parentLocator = locatorByHostNodeId.get(payloadRepeat.parentHostNodeId);
@@ -196,19 +197,7 @@ function collectUnsupportedConstructDiagnostics(root: AnyNode, filename: string)
 	const diagnostics: ReturnType<typeof unsupportedRenderConstructDiagnostic>[] = [];
 
 	const visit = (node: AnyNode): void => {
-		if (node.type === 'JSXSwitchExpression') {
-			diagnostics.push(
-				unsupportedRenderConstructDiagnostic({
-					label: '@switch',
-					message:
-						'@switch case content is dropped from rendered HTML because the render module cannot emit it yet.',
-					node,
-					filename,
-					suggestion:
-						'Rewrite the branches with @if/@else until @switch rendering is supported.',
-				}),
-			);
-		} else if (node.type === 'JSXTryExpression') {
+		if (node.type === 'JSXTryExpression') {
 			diagnostics.push(
 				unsupportedRenderConstructDiagnostic({
 					label: '@try/@pending/@catch',
@@ -234,28 +223,40 @@ function collectUnsupportedConstructDiagnostics(root: AnyNode, filename: string)
 			);
 		} else if (
 			(node.type === 'Element' || node.type === 'JSXElement') &&
-			(node.isDynamic === true || !getElementTagName(node))
+			(node.isDynamic === true || !getElementTagName(node)) &&
+			getElementAttributes(node).some((attribute) => {
+				if (isSpreadAttribute(attribute)) return false;
+				const name = getIdentifierName(attribute.name as AnyNode | undefined);
+				return !!name && (isEventAttribute(name) || name === 'attach' || name === 'el');
+			})
 		) {
 			diagnostics.push(
 				unsupportedRenderConstructDiagnostic({
 					label: 'dynamic tag',
 					message:
-						'Dynamic <{expression}> tags are dropped from rendered HTML because dynamic tag lowering is not implemented yet.',
+						'Events, attach behaviors, and el handles on dynamic <{expression}> tags are dropped because dynamic elements have no host records yet.',
 					node,
 					filename,
-					suggestion: 'Use a static tag name, or branch with @if over the tag choices.',
+					suggestion:
+						'Move the event or behavior to a statically named wrapper element, or branch with @if over static tag choices.',
 				}),
 			);
-		} else if (node.type === 'JSXForExpression' && node.empty) {
+		} else if (
+			node.type === 'JSXForExpression' &&
+			node.empty &&
+			!asNodes((node.empty as AnyNode).body).every(
+				(child) => isIgnorableTextNode(child) || isPlainHostTemplateNode(child),
+			)
+		) {
 			diagnostics.push(
 				unsupportedRenderConstructDiagnostic({
 					label: '@empty',
 					message:
-						'@empty content is dropped from rendered HTML because the render module does not emit empty-list branches yet.',
+						'@empty content with components or control flow is dropped from rendered HTML; only host elements, text, and expressions render in the empty branch.',
 					node: node.empty as AnyNode,
 					filename,
 					suggestion:
-						'Wrap the list in @if to render the empty case until @empty is supported.',
+						'Keep the @empty branch to host elements, text, and expressions, or wrap the list in @if for richer empty states.',
 				}),
 			);
 		}
@@ -302,7 +303,10 @@ function repeatRenderDiagnostics(input: {
 				}),
 			];
 		}
-		if (!input.keyedRepeats.some((repeat) => repeat.repeatId === gate.repeatId)) {
+		if (
+			!gate.ssrOnly &&
+			!input.keyedRepeats.some((repeat) => repeat.repeatId === gate.repeatId)
+		) {
 			return [
 				unsupportedRenderConstructDiagnostic({
 					label: '@for',
@@ -473,47 +477,30 @@ function supportedRepeatGate(input: {
 	readonly source: string;
 	readonly symbols: ReadonlyArray<PlannedSymbol>;
 }): PublicRenderPlanRepeatGate {
-	const unsupported = unsupportedRepeatReason(input);
-	if (unsupported) {
-		return {
+	const unsupportedReason = (reason: PublicRenderPlanUnsupportedReason) =>
+		({
 			repeatId: input.payloadRepeat.id,
 			supported: false,
-			reason: unsupported,
-		};
-	}
+			reason,
+		}) as const;
 
-	return {
-		repeatId: input.payloadRepeat.id,
-		supported: true,
-	};
-}
-
-function unsupportedRepeatReason(input: {
-	readonly aliases: ReturnType<typeof semanticAliasMap>;
-	readonly assignedHosts: AssignedHosts;
-	readonly bindings: ReadonlyMap<string, SemanticGraphBinding>;
-	readonly payloadRepeat: PayloadKeyedRepeat;
-	readonly repeatNode: AnyNode;
-	readonly semanticRepeat: SemanticKeyedRepeat;
-	readonly source: string;
-	readonly symbols: ReadonlyArray<PlannedSymbol>;
-}): PublicRenderPlanUnsupportedReason | null {
 	const parent = input.assignedHosts.nodeByHostId.get(input.payloadRepeat.parentHostNodeId);
-	if (!parent) return 'repeat-parent-locator-missing';
+	if (!parent) return unsupportedReason('repeat-parent-locator-missing');
 
 	if (!parentContainsOnlyRepeat(parent, input.repeatNode)) {
-		return 'repeat-parent-must-contain-only-repeat';
+		return unsupportedReason('repeat-parent-must-contain-only-repeat');
 	}
 
 	const row = singleRowRoot(input.repeatNode);
-	if (!row) return 'single-row-root-required';
+	if (!row) return unsupportedReason('single-row-root-required');
 
-	if (containsNestedRepeat(row)) return 'nested-repeat-unsupported';
+	if (containsNestedRepeat(row)) return unsupportedReason('nested-repeat-unsupported');
 
 	const rowPlan = collectRowPlan({
 		aliases: input.aliases,
 		assignedHosts: input.assignedHosts,
 		bindings: input.bindings,
+		indexName: input.semanticRepeat.indexName,
 		itemName: input.semanticRepeat.itemName,
 		keyPath: input.payloadRepeat.keyPath,
 		repeatId: input.payloadRepeat.id,
@@ -521,9 +508,11 @@ function unsupportedRepeatReason(input: {
 		source: input.source,
 		symbols: input.symbols,
 	});
-	if (!rowPlan) return 'unsupported-row-binding';
+	if (!rowPlan) return unsupportedReason('unsupported-row-binding');
 
-	return null;
+	return rowPlan.usesIndex
+		? { repeatId: input.payloadRepeat.id, supported: true, ssrOnly: true }
+		: { repeatId: input.payloadRepeat.id, supported: true };
 }
 
 function planKeyedRepeat(input: {
@@ -561,12 +550,14 @@ type RowPlan = {
 	readonly textWrites: ReadonlyArray<PublicRenderPlanTextWrite>;
 	readonly classWrites: ReadonlyArray<PublicRenderPlanClassWrite>;
 	readonly eventControls: ReadonlyArray<PublicRenderPlanEventControl>;
+	readonly usesIndex: boolean;
 };
 
 function collectRowPlan(input: {
 	readonly aliases: ReturnType<typeof semanticAliasMap>;
 	readonly assignedHosts: AssignedHosts;
 	readonly bindings: ReadonlyMap<string, SemanticGraphBinding>;
+	readonly indexName?: string;
 	readonly itemName: string;
 	readonly keyPath: ReadonlyArray<string>;
 	readonly repeatId: string;
@@ -577,6 +568,7 @@ function collectRowPlan(input: {
 	const textWrites: PublicRenderPlanTextWrite[] = [];
 	const classWrites: PublicRenderPlanClassWrite[] = [];
 	const eventControls: PublicRenderPlanEventControl[] = [];
+	let usesIndex = false;
 
 	const visitElement = (node: AnyNode, hostPath: ReadonlyArray<number>): boolean => {
 		const hostNodeId = input.assignedHosts.hostIdByNode.get(node);
@@ -649,7 +641,17 @@ function collectRowPlan(input: {
 
 				const source = expressionSource(expression, input.source);
 				const itemPath = itemPathFromSource(input.itemName, source);
-				if (!itemPath) return false;
+				if (!itemPath) {
+					// A bare index read renders in SSR rows (the map callback binds
+					// it) but has no direct-DOM update plan, so it only flags the
+					// row as ssr-only instead of rejecting the repeat.
+					if (input.indexName && source === input.indexName) {
+						usesIndex = true;
+						childDomIndex++;
+						continue;
+					}
+					return false;
+				}
 
 				textWrites.push({
 					source,
@@ -678,6 +680,7 @@ function collectRowPlan(input: {
 		textWrites,
 		classWrites,
 		eventControls,
+		usesIndex,
 	};
 }
 
@@ -1064,6 +1067,7 @@ function staticHtml(
 
 function staticShellSupported(node: AnyNode): boolean {
 	if (node.type !== 'Element' && node.type !== 'JSXElement') return false;
+	if (node.isDynamic === true || !getElementTagName(node)) return false;
 	if (getElementAttributes(node).some(isSpreadAttribute)) return false;
 	if (
 		getElementAttributes(node).some((attribute) => {

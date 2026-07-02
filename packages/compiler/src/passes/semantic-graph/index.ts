@@ -93,6 +93,18 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 			walkBranch(node.alternate as AnyNode | undefined, state);
 			collectConditionalBranchText(node, state);
 			return;
+		case 'JSXSwitchExpression':
+			walk(node.discriminant as AnyNode | undefined, state);
+			for (const switchCase of asNodes(node.cases)) {
+				walk(switchCase.test as AnyNode | undefined, state);
+				const caseBranchId = `branch:${state.nextBranchId++}`;
+				state.currentBranchScopeIds.push(caseBranchId);
+				for (const caseChild of asNodes(switchCase.consequent)) {
+					walk(caseChild, state);
+				}
+				state.currentBranchScopeIds.pop();
+			}
+			return;
 		case 'JSXForExpression':
 			const repeatIndex = collectKeyedRepeat(node, state);
 			const repeat = repeatIndex === null ? null : state.graph.keyedRepeats[repeatIndex];

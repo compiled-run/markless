@@ -434,6 +434,38 @@ test('buildSemanticGraph keeps keyed repeats registered when an index clause is 
 	]);
 });
 
+test('buildSemanticGraph records branch scopes for @switch cases', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/SwitchScopes.tsrx',
+		source: `
+import { state } from '@markless/core';
+import { Badge } from './Badge.tsrx';
+
+export function App() @{
+	let kind = state('a');
+
+	<section>
+		@switch (kind) {
+			@case 'a': { <Badge label="A" /> }
+			@default: { <Badge label="D" /> }
+		}
+	</section>
+}
+`,
+	});
+
+	expect(graph.componentEdges).toEqual([
+		expect.objectContaining({
+			childComponentName: 'Badge',
+			branchScopeIds: ['branch:0'],
+		}),
+		expect.objectContaining({
+			childComponentName: 'Badge',
+			branchScopeIds: ['branch:1'],
+		}),
+	]);
+});
+
 test('buildSemanticGraph records shared definitions and instance calls', async () => {
 	const graph = await buildSemanticGraph({
 		filename: 'src/session.tsrx',

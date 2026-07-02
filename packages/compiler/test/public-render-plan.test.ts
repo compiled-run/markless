@@ -167,16 +167,9 @@ test.each([
 
 test.each([
 	[
-		'@switch',
-		appSource(
-			`let kind = state('a');
-<section>@switch (kind) { @case 'a': { <p>A</p> } @default: { <p>D</p> } }</section>`,
-		),
-	],
-	[
 		'dynamic tag',
-		appSource(`const Tag = 'div';
-<section><{Tag}>Hi</{Tag}></section>`),
+		appSource(`let tag = state('div'); let count = state(0);
+<section><{tag} onClick={() => count++}>Hi</{tag}></section>`),
 	],
 	[
 		'<style>',
@@ -193,7 +186,7 @@ test.each([
 		'@empty',
 		appSource(
 			`let items = state([]);
-<ul>@for (const item of items; key item.id) {<li>{item.name}</li>} @empty {<li>None</li>}</ul>`,
+<ul>@for (const item of items; key item.id) {<li>{item.name}</li>} @empty {<li>@if (true) { <em>none</em> }</li>}</ul>`,
 		),
 	],
 ])(

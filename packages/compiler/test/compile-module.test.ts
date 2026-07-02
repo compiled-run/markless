@@ -615,6 +615,76 @@ test('compileTsrxModule treats a default exported TSRX function as the public re
 	expect(output.html).toBe('<main><h1>Markless Router</h1><button>Button 0</button></main>');
 });
 
+test('compileTsrxModule renders dynamic tags from state values in SSR html', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/DynamicCard.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let tag = state('article');
+	let chosen = state('');
+
+	<section>
+		<{tag} class="card">Hi</{tag}>
+		<button onClick={() => chosen = 'x'}>Go</button>
+	</section>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.diagnostics).toEqual([]);
+	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	const output = (
+		ssrModule.marklessRenderSsr as () => {
+			readonly html: string;
+			readonly view: { readonly locators: ReadonlyArray<Record<string, unknown>> };
+		}
+	)();
+
+	expect(output.html).toBe(
+		'<section><article class="card">Hi</article><button>Go</button></section>',
+	);
+	// The rendered dynamic element occupies dom-order slot 1; the button shifts past it.
+	expect(output.view.locators).toEqual(
+		expect.arrayContaining([expect.objectContaining({ tagName: 'button', index: 2 })]),
+	);
+});
+
+test('compileTsrxModule renders nothing for a nullish dynamic tag in SSR html', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/DynamicCard.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let tag = state(null);
+	let chosen = state('');
+
+	<section>
+		<{tag} class="card">Hi</{tag}>
+		<button onClick={() => chosen = 'x'}>Go</button>
+	</section>
+}
+`,
+		symbols: [],
+	});
+
+	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	const output = (
+		ssrModule.marklessRenderSsr as () => {
+			readonly html: string;
+			readonly view: { readonly locators: ReadonlyArray<Record<string, unknown>> };
+		}
+	)();
+
+	expect(output.html).toBe('<section><button>Go</button></section>');
+	expect(output.view.locators).toEqual(
+		expect.arrayContaining([expect.objectContaining({ tagName: 'button', index: 1 })]),
+	);
+});
+
 test('compileTsrxModule renders host element spread attributes in SSR html', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/SpreadCard.tsrx',
@@ -691,6 +761,208 @@ export function App() @{
 			expect.objectContaining({ tagName: 'button', index: 8 }),
 		]),
 	);
+});
+
+test('compileTsrxModule renders keyed repeat rows that read the index clause in SSR html', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/IndexedRows.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let items = state([
+		{ id: 'a', name: 'Alpha' },
+		{ id: 'b', name: 'Beta' },
+	]);
+	let chosen = state('');
+
+	<main>
+		<ul>
+			@for (const item of items; index i; key item.id) {
+				<li>{i}{item.name}</li>
+			}
+		</ul>
+		<button onClick={() => chosen = 'x'}>Go</button>
+	</main>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.diagnostics).toEqual([]);
+	expect(result.publicRenderPlan.repeatGates).toEqual([
+		{ repeatId: 'repeat:0', supported: true, ssrOnly: true },
+	]);
+	// Index-reading rows stay off the direct-DOM runtime, which cannot rewrite
+	// index text on reorder yet.
+	expect(result.publicRenderPlan.keyedRepeats).toEqual([]);
+
+	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	const output = (
+		ssrModule.marklessRenderSsr as () => {
+			readonly html: string;
+			readonly view: { readonly locators: ReadonlyArray<Record<string, unknown>> };
+		}
+	)();
+
+	expect(output.html).toBe(
+		'<main><ul><li>0Alpha</li><li>1Beta</li></ul><button>Go</button></main>',
+	);
+	expect(output.view.locators).toEqual(
+		expect.arrayContaining([expect.objectContaining({ tagName: 'button', index: 4 })]),
+	);
+});
+
+test('compileTsrxModule renders the @empty branch when the keyed repeat has no items', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/EmptyList.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let items = state([]);
+	let chosen = state('');
+
+	<main>
+		<ul>
+			@for (const item of items; key item.id) {
+				<li>{item.name}</li>
+			} @empty {
+				<li>No items yet</li>
+			}
+		</ul>
+		<button onClick={() => chosen = 'x'}>Add</button>
+	</main>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.diagnostics).toEqual([]);
+	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	const output = (
+		ssrModule.marklessRenderSsr as () => {
+			readonly html: string;
+			readonly view: { readonly locators: ReadonlyArray<Record<string, unknown>> };
+		}
+	)();
+
+	expect(output.html).toBe('<main><ul><li>No items yet</li></ul><button>Add</button></main>');
+	// The taken @empty branch occupies a real dom-order slot; later hosts shift.
+	expect(output.view.locators).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({ tagName: 'li', index: 2 }),
+			expect.objectContaining({ tagName: 'button', index: 3 }),
+		]),
+	);
+});
+
+test('compileTsrxModule skips the @empty branch when keyed repeat rows render', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/EmptyList.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let items = state([
+		{ id: 'a', name: 'Alpha' },
+		{ id: 'b', name: 'Beta' },
+	]);
+	let chosen = state('');
+
+	<main>
+		<ul>
+			@for (const item of items; key item.id) {
+				<li>{item.name}</li>
+			} @empty {
+				<li>No items yet</li>
+			}
+		</ul>
+		<button onClick={() => chosen = 'x'}>Add</button>
+	</main>
+}
+`,
+		symbols: [],
+	});
+
+	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	const output = (
+		ssrModule.marklessRenderSsr as () => {
+			readonly html: string;
+			readonly view: { readonly locators: ReadonlyArray<Record<string, unknown>> };
+		}
+	)();
+
+	expect(output.html).toBe(
+		'<main><ul><li>Alpha</li><li>Beta</li></ul><button>Add</button></main>',
+	);
+	expect(output.view.locators).toEqual(
+		expect.arrayContaining([expect.objectContaining({ tagName: 'button', index: 4 })]),
+	);
+});
+
+test('compileTsrxModule renders the matching @switch case in SSR html', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/SwitchCard.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let kind = state('beta');
+
+	<section>
+		@switch (kind) {
+			@case 'alpha': { <p>A</p> }
+			@case 'beta': { <p>B</p> }
+			@default: { <p>D</p> }
+		}
+	</section>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.diagnostics).toEqual([]);
+	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	const output = (
+		ssrModule.marklessRenderSsr as () => {
+			readonly html: string;
+			readonly view: { readonly locators: ReadonlyArray<Record<string, unknown>> };
+		}
+	)();
+
+	expect(output.html).toBe('<section><p>B</p></section>');
+	// Only the rendered case's element may claim a dom-order locator slot.
+	expect(output.view.locators).toEqual([
+		expect.objectContaining({ tagName: 'section', index: 0 }),
+		expect.objectContaining({ tagName: 'p', index: 1 }),
+	]);
+});
+
+test('compileTsrxModule renders the @switch default case when no test matches', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/SwitchCard.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let kind = state('other');
+
+	<section>
+		@switch (kind) {
+			@case 'alpha': { <p>A</p> }
+			@default: { <p>D</p> }
+		}
+	</section>
+}
+`,
+		symbols: [],
+	});
+
+	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	const output = (ssrModule.marklessRenderSsr as () => { readonly html: string })();
+
+	expect(output.html).toBe('<section><p>D</p></section>');
 });
 
 test('compileTsrxModule passes component children into SSR component props', async () => {

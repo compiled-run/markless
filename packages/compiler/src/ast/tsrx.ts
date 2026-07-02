@@ -6,6 +6,31 @@ export function isSpreadAttribute(node: AnyNode): boolean {
 	return node.type === 'SpreadAttribute' || node.type === 'JSXSpreadAttribute';
 }
 
+// Dynamic tags author the tag position as an expression container:
+// <{expr}>...</{expr}>. Returns the tag expression, or undefined for a
+// statically named element.
+export function getDynamicTagExpression(node: AnyNode): AnyNode | undefined {
+	const name = (node.id ?? (node.openingElement as AnyNode | undefined)?.name) as
+		| AnyNode
+		| undefined;
+	return unwrapExpressionContainer(name);
+}
+
+// True when a template subtree contains only host elements, static text, and
+// expression children — the shapes SSR string emission can render without
+// component, control-flow, or style handling. Used to gate repeat rows and
+// @empty branches, whose element counts must be statically known.
+export function isPlainHostTemplateNode(node: AnyNode): boolean {
+	if (isStaticTextNode(node)) return true;
+	if (node.type === 'JSXExpressionContainer' || node.type === 'TSRXExpression') return true;
+	if (node.type !== 'Element' && node.type !== 'JSXElement') return false;
+	const tagName = getElementTagName(node);
+	if (!tagName || !isHostTagName(tagName)) return false;
+	return asNodes(node.children).every(
+		(child) => isIgnorableJsxTextNode(child) || isPlainHostTemplateNode(child),
+	);
+}
+
 export function getElementTagName(node: AnyNode): string | null {
 	return (
 		getIdentifierName(node.id as AnyNode | undefined) ??

@@ -678,6 +678,10 @@ export type PublicRenderPlanRepeatGate =
 	| {
 			readonly repeatId: string;
 			readonly supported: true;
+			// Rows read the @for index clause: SSR emission renders them, but the
+			// direct-DOM runtime stays off because it cannot rewrite index text on
+			// reorder yet.
+			readonly ssrOnly?: true;
 	  }
 	| {
 			readonly repeatId: string;
