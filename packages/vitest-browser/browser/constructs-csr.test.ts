@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from 'vitest';
 import { cleanup, render } from '../src/index.ts';
+import ArmEvents from './fixtures/arm-events.tsrx';
 import AsyncDetails from './fixtures/async-details.tsrx';
 import AttachBehavior from './fixtures/attach-behavior.tsrx';
 import DynamicTag from './fixtures/dynamic-tag.tsrx';
@@ -72,6 +73,23 @@ test('CSR: @if without @else flips the empty alternate range round-trip', async 
 
 	toggle.click();
 	await expect.poll(() => container.querySelector('p.only')?.textContent).toBe('Shown');
+});
+
+test('CSR: buttons inside @if arms dispatch from the taken and flipped-in arm', async () => {
+	// Arm-host records ride the branch armRecords (L4 S3b): the rendered arm's
+	// button must dispatch, and after a flip the new arm's button must too.
+	const screen = await render(ArmEvents);
+	const container = queryContainer(screen.container);
+	const note = requireElement<HTMLOutputElement>(container, 'output[data-note]');
+
+	expect(note.textContent).toBe('none');
+	requireElement<HTMLButtonElement>(container, 'button[data-open]').click();
+	await expect.poll(() => note.textContent).toBe('from-open');
+
+	requireElement<HTMLButtonElement>(container, 'button[data-toggle]').click();
+	await expect.poll(() => container.querySelector('button[data-closed]')).not.toBeNull();
+	requireElement<HTMLButtonElement>(container, 'button[data-closed]').click();
+	await expect.poll(() => note.textContent).toBe('from-closed');
 });
 
 test('CSR: @switch with @default flips across all three arms by clicking', async () => {

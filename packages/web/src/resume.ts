@@ -162,6 +162,27 @@ type ResumeDispatchMatch =
 	| { readonly element: ResumeDomElement; readonly eventRecord: ResumeEventRecord }
 	| { readonly element: ResumeDomElement; readonly rowMatch: ResumeRowEventMatch };
 
+// Per-arm records (compiler L4 S3a contract): everything the resume runtime
+// rewires when an arm materializes, addressed by arm-relative raw childNodes
+// host paths. The protocol types the dom-update/behavior/handle arm entries
+// loosely (Record<string, unknown>); they carry the matching flat record
+// shape plus a hostPath.
+export type ResumeBranchArmRecordSet = NonNullable<
+	NonNullable<ProtocolViewPayload['branches']>[number]['armRecords']
+>[number];
+
+type ResumeArmDomUpdateRecord = ProtocolViewPayload['domUpdates'][number] & {
+	readonly hostPath: ReadonlyArray<number>;
+};
+
+type ResumeArmBehaviorRecord = ResumeBehaviorRecord & {
+	readonly hostPath: ReadonlyArray<number>;
+};
+
+type ResumeArmElementHandleRecord = ProtocolViewPayload['elementHandles'][number] & {
+	readonly hostPath: ReadonlyArray<number>;
+};
+
 export type ResumeBranchRecord = {
 	readonly id: string;
 	readonly startAnchor: ResumeDomComment;
@@ -171,6 +192,7 @@ export type ResumeBranchRecord = {
 		NonNullable<ProtocolViewPayload['branches']>[number]['testReads']
 	>;
 	readonly armTests?: ReadonlyArray<unknown>;
+	readonly armRecords?: ReadonlyArray<ResumeBranchArmRecordSet>;
 };
 
 // A lazy branch-update symbol returns the newly selected arm plus the rebuilt
@@ -364,9 +386,11 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 		input.dispatchSharedPatch ?? defaultSharedPatchDispatcher(input.root);
 	const applyDomJournal = input.applyDomJournal;
 	if (applyDomJournal) {
-		input.graph.subscribeJournal((entries) => {
+		input.graph.subscribeJournal(async (entries) => {
 			disposeRemovedRangeHosts(entries);
-			return applyDomJournal(entries);
+			await applyDomJournal(entries);
+			// A flipped-in arm's records go live only once its DOM exists.
+			await materializeFlippedBranchArms(entries);
 		});
 	}
 	let visibilityObserver: ResumeVisibilityObserver | undefined;
@@ -496,10 +520,18 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 	}
 
 	const branchesById = new Map<string, ResumeBranchRecord>();
+	const currentArmByBranchId = new Map<string, number>();
 	for (const branch of materializeBranchLocators(input.root, input.view.branches ?? [])) {
 		branchesById.set(branch.id, branch);
+		// Delegated listeners install once at start(), so every arm's event
+		// names register up front — a flip-in may introduce an event type no
+		// flat record uses.
+		for (const armRecordSet of branch.armRecords ?? []) {
+			for (const armEvent of armRecordSet.events) eventTypes.add(armEvent.eventName);
+		}
 		// Seed the arm from the current test value; no symbol load until a flip.
 		let currentArm = readBranchArm(input.graph, branch);
+		currentArmByBranchId.set(branch.id, currentArm);
 		for (const testRead of branch.testReads) {
 			input.graph.subscribe({
 				id: `branch-test:${branch.id}:${testRead.graphNodeId}:${testRead.path.join('.')}`,
@@ -520,6 +552,7 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 					if (!isResumeBranchUpdate(update)) return;
 
 					currentArm = update.arm;
+					currentArmByBranchId.set(branch.id, update.arm);
 					const fragment = input.renderBranchHtml
 						? input.renderBranchHtml(update.html)
 						: update.html;
@@ -529,6 +562,147 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 					];
 				},
 			});
+		}
+	}
+
+	// Startup: the SSR-taken (or CSR-rendered) arm is already live between the
+	// anchors, so its arm records materialize now. Behavior activation waits
+	// for start(); flip-ins activate inside the journal listener instead.
+	const startupArmBehaviorHostIds: string[] = [];
+	for (const branch of branchesById.values()) {
+		const armIndex = currentArmByBranchId.get(branch.id);
+		if (armIndex === undefined) continue;
+
+		startupArmBehaviorHostIds.push(...materializeBranchArmRecords(branch, armIndex));
+	}
+
+	// One arm's records (events, dom updates, behaviors, element handles) go
+	// live against the DOM currently between the branch anchors. Hosts register
+	// under synthetic ids (branch:<id>:arm:<n>:<path>) inside elementsByHostId,
+	// so range disposal releases their wiring exactly like flat hosts. Returns
+	// the behavior host ids the caller must activate.
+	function materializeBranchArmRecords(branch: ResumeBranchRecord, armIndex: number): string[] {
+		const armRecordSet = branch.armRecords?.[armIndex];
+		if (!armRecordSet) return [];
+
+		const armNodes = nodesBetweenAnchors(input.root, branch.startAnchor, branch.endAnchor);
+		const claimHost = (
+			hostPath: ReadonlyArray<number>,
+		): { readonly hostNodeId: string; readonly element: ResumeDomElement } | undefined => {
+			const element = armRecordHost(armNodes, hostPath);
+			if (!element) return undefined;
+
+			const hostNodeId = `branch:${branch.id}:arm:${String(armIndex)}:${hostPath.join('.')}`;
+			// Re-materializing an arm resurrects hosts disposed on flip-out.
+			disposedHosts.delete(hostNodeId);
+			elementsByHostId.set(hostNodeId, element);
+			return { hostNodeId, element };
+		};
+
+		for (const armEvent of armRecordSet.events) {
+			const host = claimHost(armEvent.hostPath);
+			if (!host) continue;
+
+			let recordsByEventName = eventRecords.get(host.element);
+			if (!recordsByEventName) {
+				recordsByEventName = new Map();
+				eventRecords.set(host.element, recordsByEventName);
+			}
+			recordsByEventName.set(armEvent.eventName, {
+				hostNodeId: host.hostNodeId,
+				eventName: armEvent.eventName,
+				syncPolicy: armEvent.syncPolicy,
+				symbolIds: armEvent.symbolIds,
+			});
+		}
+
+		const armDomUpdates = armRecordSet.domUpdates as ReadonlyArray<ResumeArmDomUpdateRecord>;
+		for (const armDomUpdate of armDomUpdates) {
+			if (!armDomUpdate.symbolId) continue;
+
+			const host = claimHost(armDomUpdate.hostPath);
+			if (!host) continue;
+
+			const element = host.element;
+			const release = input.graph.subscribe({
+				id: `arm-dom-update:${host.hostNodeId}:${armDomUpdate.graphNodeId}:${armDomUpdate.path.join('.')}`,
+				graphNodeId: armDomUpdate.graphNodeId,
+				path: armDomUpdate.path,
+				async run(value) {
+					const symbol = await input.loadSymbol(armDomUpdate.symbolId!);
+					return (await symbol({
+						graph: input.graph,
+						element,
+						getElementHandle: elementHandles.get,
+						domUpdate: armDomUpdate,
+						value,
+					})) as DomJournalResult | void;
+				},
+			});
+			storeHostSubscription(host.hostNodeId, release);
+		}
+
+		const armBehaviorsByHostId = new Map<string, ResumeBehaviorRecord[]>();
+		const armBehaviors = armRecordSet.behaviors as ReadonlyArray<ResumeArmBehaviorRecord>;
+		for (const armBehavior of armBehaviors) {
+			const host = claimHost(armBehavior.hostPath);
+			if (!host) continue;
+
+			const records = armBehaviorsByHostId.get(host.hostNodeId) ?? [];
+			records.push({ ...armBehavior, hostNodeId: host.hostNodeId });
+			armBehaviorsByHostId.set(host.hostNodeId, records);
+
+			for (const inputGraphRead of armBehavior.inputGraphReads ?? []) {
+				const release = input.graph.subscribe({
+					id: `behavior-input:${host.hostNodeId}:${inputGraphRead.inputIndex}:${inputGraphRead.graphNodeId}:${inputGraphRead.path.join('.')}`,
+					graphNodeId: inputGraphRead.graphNodeId,
+					path: inputGraphRead.path,
+					async run() {
+						if (!activeBehaviorHosts.has(host.hostNodeId)) return;
+
+						await activateBehaviors(host.hostNodeId, { flush: false });
+					},
+				});
+				storeHostSubscription(host.hostNodeId, release);
+			}
+		}
+		for (const [hostNodeId, records] of armBehaviorsByHostId) {
+			// set() replaces stale records left by an earlier materialization.
+			behaviorRecordsByHostId.set(hostNodeId, records);
+		}
+
+		const armHandles =
+			armRecordSet.elementHandles as ReadonlyArray<ResumeArmElementHandleRecord>;
+		for (const armHandle of armHandles) {
+			const host = claimHost(armHandle.hostPath);
+			if (!host) continue;
+
+			elementHandles.register(host.hostNodeId, armHandle, host.element);
+		}
+
+		return [...armBehaviorsByHostId.keys()];
+	}
+
+	// Branch flips insert the new arm through the journal; after the DOM
+	// insertion applies, the selected arm's records materialize and its
+	// behaviors attach. S2 disposal already released the outgoing hosts.
+	async function materializeFlippedBranchArms(
+		entries: ReadonlyArray<DomJournalEntry>,
+	): Promise<void> {
+		for (const entry of entries) {
+			if (entry.type !== 'insertRange') continue;
+			if (!entry.locator.startsWith('branch:') || !entry.locator.endsWith(':start')) continue;
+
+			const branchId = entry.locator.slice('branch:'.length, -':start'.length);
+			const branch = branchesById.get(branchId);
+			const armIndex = currentArmByBranchId.get(branchId);
+			if (!branch || armIndex === undefined) continue;
+
+			for (const hostNodeId of materializeBranchArmRecords(branch, armIndex)) {
+				// flush:false — this runs inside the graph's own flush; writes
+				// made by attaching behaviors schedule the next flush themselves.
+				await activateBehaviors(hostNodeId, { flush: false });
+			}
 		}
 	}
 
@@ -925,6 +1099,14 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 
 			installVisibilityObserver();
 			installRemovalObserver();
+
+			// The taken arm's behaviors attach on materialization; startup
+			// defers them here so runtime creation stays synchronous.
+			const armBehaviorHostIds = startupArmBehaviorHostIds.splice(0);
+			for (const hostNodeId of armBehaviorHostIds) {
+				await activateBehaviors(hostNodeId, { flush: false });
+			}
+			if (armBehaviorHostIds.length > 0) await flushRuntimeGraph();
 		},
 		dispatch,
 		activateBehaviors,
@@ -1022,6 +1204,7 @@ function materializeBranchLocators(
 			symbolId: branch.symbolId,
 			testReads: branch.testReads,
 			armTests: branch.armTests,
+			armRecords: branch.armRecords,
 		});
 	}
 
@@ -1233,22 +1416,35 @@ function materializeElementHandles(
 	handles: ResumeViewRecord['elementHandles'],
 ): {
 	readonly get: (handleIdOrName: string) => ResumeDomElement | undefined;
+	readonly register: (
+		hostNodeId: string,
+		handle: { readonly handleId: string; readonly name: string },
+		element: ResumeDomElement,
+	) => void;
 	readonly deleteHost: (hostNodeId: string) => void;
 } {
 	const byHandleId = new Map<string, ResumeDomElement>();
 	const byName = new Map<string, ResumeDomElement>();
 	const keysByHostId = new Map<string, { readonly handleId: string; readonly name: string }>();
 
+	function register(
+		hostNodeId: string,
+		handle: { readonly handleId: string; readonly name: string },
+		element: ResumeDomElement,
+	): void {
+		byHandleId.set(handle.handleId, element);
+		byName.set(handle.name, element);
+		keysByHostId.set(hostNodeId, {
+			handleId: handle.handleId,
+			name: handle.name,
+		});
+	}
+
 	for (const handle of handles) {
 		const element = elementsByHostId.get(handle.hostNodeId);
 		if (!element) continue;
 
-		byHandleId.set(handle.handleId, element);
-		byName.set(handle.name, element);
-		keysByHostId.set(handle.hostNodeId, {
-			handleId: handle.handleId,
-			name: handle.name,
-		});
+		register(handle.hostNodeId, handle, element);
 	}
 
 	return {
@@ -1258,6 +1454,7 @@ function materializeElementHandles(
 				byHandleId.get(handleIdOrName) ?? byName.get(handleIdOrName),
 			);
 		},
+		register,
 		deleteHost(hostNodeId) {
 			const keys = keysByHostId.get(hostNodeId);
 			if (!keys) return;
@@ -1370,6 +1567,53 @@ function rowEventHost(
 		if (!current) return undefined;
 	}
 	return current.nodeType === 1 ? (current as ResumeDomElement) : undefined;
+}
+
+// The nodes one arm rendered between the branch anchors, in order. Anchors
+// are siblings, so the walk finds their shared parent and collects the raw
+// childNodes between them. Arms render compact (no ignorable whitespace), so
+// every non-ignorable child occupies one childNodes slot.
+function nodesBetweenAnchors(
+	root: ResumeDomElement,
+	startAnchor: ResumeDomComment,
+	endAnchor: ResumeDomComment,
+): ResumeDomNode[] {
+	const nodes: ResumeDomNode[] = [];
+
+	function visit(node: ResumeDomNode): boolean {
+		let withinRange = false;
+		for (const child of node.childNodes ?? []) {
+			if (child === startAnchor) {
+				withinRange = true;
+				continue;
+			}
+			if (child === endAnchor) return true;
+			if (withinRange) {
+				nodes.push(child);
+			} else if (visit(child)) {
+				return true;
+			}
+		}
+		return withinRange;
+	}
+
+	visit(root);
+	return nodes;
+}
+
+// armRecords hostPath: the first segment indexes the arm's top-level nodes
+// between the anchors; the remaining segments descend raw childNodes exactly
+// like keyed repeat rowEvents.
+function armRecordHost(
+	armNodes: ReadonlyArray<ResumeDomNode>,
+	hostPath: ReadonlyArray<number>,
+): ResumeDomElement | undefined {
+	const [firstIndex, ...childPath] = hostPath;
+	if (firstIndex === undefined) return undefined;
+
+	const topLevelNode = armNodes[firstIndex];
+	if (!topLevelNode || topLevelNode.nodeType !== 1) return undefined;
+	return rowEventHost(topLevelNode as ResumeDomElement, childPath);
 }
 
 // Mirrors the SSR repeat helper's Array.from collection normalization.

@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from 'vitest';
 import { cleanup, renderSSR } from '../src/index.ts';
+import ArmEvents from './fixtures/arm-events.tsrx';
 import AsyncDetails from './fixtures/async-details.tsrx';
 import AttachBehavior from './fixtures/attach-behavior.tsrx';
 import DynamicTag from './fixtures/dynamic-tag.tsrx';
@@ -67,6 +68,24 @@ test('SSR: @if without @else flips the empty alternate range round-trip', async 
 
 	toggle.click();
 	await expect.poll(() => container.querySelector('p.only')?.textContent).toBe('Shown');
+});
+
+test('SSR: buttons inside @if arms resume from the taken and flipped-in arm', async () => {
+	// S3a regression coverage: the SSR-taken arm's records materialize at
+	// startup (they left every flat payload stream), and a flip rewires the
+	// new arm's button through the branch armRecords.
+	const screen = await renderSSR(ArmEvents);
+	const container = screen.container;
+	const note = requireElement<HTMLOutputElement>(container, 'output[data-note]');
+
+	expect(note.textContent).toBe('none');
+	requireElement<HTMLButtonElement>(container, 'button[data-open]').click();
+	await expect.poll(() => note.textContent).toBe('from-open');
+
+	requireElement<HTMLButtonElement>(container, 'button[data-toggle]').click();
+	await expect.poll(() => container.querySelector('button[data-closed]')).not.toBeNull();
+	requireElement<HTMLButtonElement>(container, 'button[data-closed]').click();
+	await expect.poll(() => note.textContent).toBe('from-closed');
 });
 
 test('SSR: @switch with @default flips across all three arms after resume', async () => {
