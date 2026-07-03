@@ -58,6 +58,7 @@ export async function renderCsrRuntime(input: {
 		createVisibilityObserver: options.createVisibilityObserver,
 		createRemovalObserver: options.createRemovalObserver,
 		applyDomJournal,
+		renderBranchHtml: options.renderBranchHtml ?? globalDocumentBranchHtml(),
 	});
 	await runtime.start();
 	output.connectRuntime?.({ graph, runtime });
@@ -117,6 +118,11 @@ async function applyDefaultCsrDomJournal(
 	const { applyDomJournalEntries } = await import('./dom-journal.ts');
 	applyDomJournalEntries(deferred, {
 		resolveTarget(locator) {
+			const branchAnchor = /^branch:(.+?)(:start|:end)$/.exec(String(locator));
+			if (branchAnchor) {
+				const record = runtime.getBranch(branchAnchor[1]!);
+				return branchAnchor[2] === ':end' ? record?.endAnchor : record?.startAnchor;
+			}
 			return runtime.getElement(String(locator));
 		},
 	});
@@ -177,6 +183,8 @@ function canUseEventOnlyCsrRuntime(
 	if (view.behaviors.length > 0) return false;
 	if (view.elementHandles.length > 0) return false;
 	if (view.asyncBoundaries.length > 0) return false;
+	// Branch flips need graph subscriptions and range replacement.
+	if ((view.branches?.length ?? 0) > 0) return false;
 	if (view.events.some((event) => event.eventName === 'visible' || !!event.syncPolicy)) {
 		return false;
 	}
@@ -194,4 +202,29 @@ async function createFullRuntimeGraph(
 
 	const { createRuntimeGraph } = await import('@markless/runtime');
 	return createRuntimeGraph({ cells: [] });
+}
+
+// CSR runs where the compiled module already used the document global to
+// build its root, so the same document parses branch flip fragments.
+function globalDocumentBranchHtml():
+	| ((html: string) => ReadonlyArray<import('./resume.ts').ResumeDomNode>)
+	| undefined {
+	const documentHost = (
+		globalThis as {
+			readonly document?: {
+				readonly createElement?: (tagName: string) => {
+					innerHTML: string;
+					readonly content?: { readonly childNodes?: ArrayLike<unknown> };
+				};
+			};
+		}
+	).document;
+	if (typeof documentHost?.createElement !== 'function') return undefined;
+	return (html) => {
+		const template = documentHost.createElement!('template');
+		template.innerHTML = html;
+		return Array.from(template.content?.childNodes ?? []) as ReadonlyArray<
+			import('./resume.ts').ResumeDomNode
+		>;
+	};
 }

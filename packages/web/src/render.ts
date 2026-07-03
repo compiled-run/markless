@@ -34,6 +34,7 @@ export type CsrRenderOptions = {
 	readonly createVisibilityObserver?: ResumeRuntimeInput['createVisibilityObserver'];
 	readonly createRemovalObserver?: ResumeRuntimeInput['createRemovalObserver'];
 	readonly applyDomJournal?: ResumeRuntimeInput['applyDomJournal'];
+	readonly renderBranchHtml?: ResumeRuntimeInput['renderBranchHtml'];
 };
 
 type CompilerProvidedCsrRuntime = {

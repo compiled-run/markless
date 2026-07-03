@@ -342,6 +342,15 @@ class PublicRenderTestFragment {
 	}
 }
 
+class PublicRenderTestComment {
+	readonly nodeType = 8;
+	parentElement: PublicRenderTestContainer | null = null;
+	constructor(readonly textContent: string) {}
+	get tagName(): string {
+		return '#comment';
+	}
+}
+
 class PublicRenderTestTemplate {
 	readonly content = new PublicRenderTestFragment();
 
@@ -353,10 +362,14 @@ class PublicRenderTestTemplate {
 function parsePublicRenderTestHtml(html: string) {
 	const root = new PublicRenderTestElement('#root');
 	const stack = [root];
-	const tokens = html.match(/<\/?[^>]+>|[^<]+/g) ?? [];
+	const tokens = html.match(/<!--[\s\S]*?-->|<\/?[^>]+>|[^<]+/g) ?? [];
 
 	for (const token of tokens) {
 		const parent = stack[stack.length - 1]!;
+		if (token.startsWith('<!--')) {
+			parent.appendChild(new PublicRenderTestComment(token.slice(4, -3)));
+			continue;
+		}
 		if (token.startsWith('</')) {
 			stack.pop();
 			continue;
@@ -1500,6 +1513,60 @@ export default function Home() @{
 	expect(anchors).toHaveLength(1);
 	expect(anchors[0]?.getAttribute('href')).toBe('/docs');
 	expect(anchors[0]?.textContent).toBe('Docs');
+});
+
+test('compileTsrxModule emits branch anchors in the CSR string path', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/CsrBranch.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App({ heading }) @{
+	let open = state(true);
+
+	<main>
+		<h1>{heading}</h1>
+		@if (open) { <p>Shown</p> } @else { <p>Hidden</p> }
+	</main>
+}
+`,
+		symbols: [],
+	});
+
+	const document = {
+		createElement(tagName: string) {
+			return tagName === 'template'
+				? new PublicRenderTestTemplate()
+				: new PublicRenderTestElement(tagName);
+		},
+	};
+	const csrModule = await importPublicRenderTestModule(csrRenderTestModuleSource(result), {
+		document,
+	});
+	const output = (
+		csrModule.marklessRenderCsr as (props: { readonly heading: string }) => {
+			readonly root: PublicRenderTestElement;
+			readonly view: { readonly branches?: ReadonlyArray<Record<string, unknown>> };
+		}
+	)({ heading: 'Cards' });
+
+	// The CSR-built DOM contains the same anchor comments SSR emits, so the
+	// same resume runtime can flip the range on the live graph.
+	const kinds = output.root.childNodes.map((child) =>
+		child.nodeType === 8
+			? `#comment:${(child as { textContent?: string }).textContent}`
+			: (child as PublicRenderTestElement).tagName,
+	);
+	expect(kinds).toEqual([
+		'h1',
+		'#comment:markless:branch:branch-site:0',
+		'p',
+		'#comment:/markless:branch:branch-site:0',
+	]);
+	// The composed view carries the payload branch records for the runtime.
+	expect(output.view.branches).toEqual([
+		expect.objectContaining({ id: 'branch-site:0', symbolId: expect.any(String) }),
+	]);
 });
 
 test('compileTsrxModule renders @switch and dynamic tags in the CSR string path', async () => {

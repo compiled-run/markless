@@ -83,6 +83,9 @@ function emitPublicCsrRenderModule(
 		keyedRepeats: input.semanticGraph.keyedRepeats,
 		repeatGates: input.publicRenderPlan.repeatGates,
 		nextRepeatIndex: 0,
+		branchSites: input.semanticGraph.branchSites,
+		branchReactivityGates: input.publicRenderPlan.branchReactivityGates,
+		nextBranchSiteIndex: 0,
 		styleScopeClass: input.publicRenderPlan.styleScopes[0]?.scopeId ?? null,
 		source: input.source.source,
 	};
@@ -287,6 +290,9 @@ type CsrRenderContext = {
 	readonly keyedRepeats?: PublicRenderModuleInput['semanticGraph']['keyedRepeats'];
 	readonly repeatGates?: PublicRenderModuleInput['publicRenderPlan']['repeatGates'];
 	nextRepeatIndex?: number;
+	readonly branchSites?: PublicRenderModuleInput['semanticGraph']['branchSites'];
+	readonly branchReactivityGates?: PublicRenderModuleInput['publicRenderPlan']['branchReactivityGates'];
+	nextBranchSiteIndex?: number;
 	readonly styleScopeClass?: string | null;
 	readonly source: string;
 };
@@ -459,7 +465,24 @@ function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string {
 		const test = node.test as AnyNode | undefined;
 		const testSource = test ? expressionSource(test, context.source) : 'false';
 		if (context.mode === 'csr') {
-			return `(${testSource} ? ${emitHtmlBranch(node.consequent as AnyNode | undefined, context)} : ${emitHtmlBranch(node.alternate as AnyNode | undefined, context)})`;
+			const csrSite = context.branchSites?.[context.nextBranchSiteIndex ?? 0];
+			if (context.branchSites) {
+				context.nextBranchSiteIndex = (context.nextBranchSiteIndex ?? 0) + 1;
+			}
+			const csrGate = csrSite
+				? context.branchReactivityGates?.find((item) => item.branchSiteId === csrSite.id)
+				: undefined;
+			const ternary = `(${testSource} ? ${emitHtmlBranch(node.consequent as AnyNode | undefined, context)} : ${emitHtmlBranch(node.alternate as AnyNode | undefined, context)})`;
+			if (csrSite && csrGate?.supported) {
+				// The CSR-built DOM carries the same anchors, so the same resume
+				// runtime flips the range on the live graph (arm seeds from reads).
+				return joinSsrExpressions([
+					JSON.stringify(`<!--markless:branch:${csrSite.id}-->`),
+					ternary,
+					JSON.stringify(`<!--/markless:branch:${csrSite.id}-->`),
+				]);
+			}
+			return ternary;
 		}
 
 		const site = context.branchSites[context.nextBranchSiteIndex++];
@@ -765,12 +788,13 @@ function emitDynamicTagHtml(node: AnyNode, context: HtmlRenderContext): string {
 // No matching case and no @default renders nothing, matching @if's untaken
 // branch behavior.
 function emitSwitchHtml(node: AnyNode, context: HtmlRenderContext): string {
-	const site =
-		context.mode === 'ssr' ? context.branchSites[context.nextBranchSiteIndex++] : undefined;
-	const siteGate =
-		site && context.mode === 'ssr'
-			? context.branchReactivityGates.find((item) => item.branchSiteId === site.id)
-			: undefined;
+	const site = context.branchSites?.[context.nextBranchSiteIndex ?? 0];
+	if (context.branchSites) {
+		context.nextBranchSiteIndex = (context.nextBranchSiteIndex ?? 0) + 1;
+	}
+	const siteGate = site
+		? context.branchReactivityGates?.find((item) => item.branchSiteId === site.id)
+		: undefined;
 	const discriminant = node.discriminant as AnyNode | undefined;
 	const discriminantSource = discriminant
 		? expressionSource(discriminant, context.source)

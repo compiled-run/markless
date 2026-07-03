@@ -47,8 +47,30 @@ function element(tagName: string, childNodes: FakeElement[] = []): FakeElement {
 			this.listeners.push({ type, listener, options });
 		},
 	};
+	(node as unknown as { removeChild(child: unknown): unknown }).removeChild = (
+		child: unknown,
+	) => {
+		const index = node.childNodes.indexOf(child as FakeElement);
+		if (index >= 0) node.childNodes.splice(index, 1);
+		(child as { parentNode?: unknown }).parentNode = null;
+		return child;
+	};
+	(node as unknown as { insertBefore(child: unknown, before: unknown): unknown }).insertBefore = (
+		child: unknown,
+		before: unknown,
+	) => {
+		const index = before ? node.childNodes.indexOf(before as FakeElement) : -1;
+		(child as { parentNode?: unknown }).parentNode = node;
+		node.childNodes.splice(
+			index >= 0 ? index : node.childNodes.length,
+			0,
+			child as FakeElement,
+		);
+		return child;
+	};
 	for (const child of childNodes) {
 		child.parentElement = node;
+		(child as unknown as { parentNode?: unknown }).parentNode = node;
 	}
 	return node;
 }
@@ -273,6 +295,76 @@ test('render adopts the mount target as container root for fragment-rooted compo
 		.listener(event('click', button));
 	expect(loadedSymbols).toEqual(['symbol:click']);
 	expect(container.graph.read('state:count')).toBe(1);
+});
+
+test('render flips CSR branch ranges through the full resume runtime', async () => {
+	const startAnchor = {
+		nodeType: 8 as const,
+		textContent: 'markless:branch:branch-site:0',
+	} as unknown as FakeElement;
+	const shown = element('P');
+	const endAnchor = {
+		nodeType: 8 as const,
+		textContent: '/markless:branch:branch-site:0',
+	} as unknown as FakeElement;
+	const root = element('MAIN', [startAnchor, shown, endAnchor]);
+	const target = {
+		children: [] as FakeElement[],
+		replaceChildren(...children: FakeElement[]) {
+			this.children = children;
+		},
+	};
+	const state = createProtocolStatePayload({
+		cells: [{ graphNodeId: 'state:open', name: 'open', valueKind: 'scalar', value: true }],
+	});
+	const view: ProtocolViewPayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'main' }],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+		branches: [
+			{
+				id: 'branch-site:0',
+				startAnchor: { strategy: 'dom-order-comment', index: 0 },
+				endAnchor: { strategy: 'dom-order-comment', index: 1 },
+				symbolId: 'symbol:flip',
+				testReads: [{ source: 'open', graphNodeId: 'state:open', path: [] }],
+			},
+		],
+	};
+	const loadedSymbols: string[] = [];
+	const replacement = element('SPAN');
+
+	const container = await render(
+		() => ({
+			root,
+			state,
+			view,
+			loadSymbol(symbolId: string) {
+				loadedSymbols.push(symbolId);
+				return () => ({ arm: 1, html: '<span>Hidden</span>' });
+			},
+		}),
+		{
+			target,
+			renderBranchHtml: () => [replacement as never],
+		},
+	);
+
+	// Branch-bearing views must take the full resume runtime, and the arm
+	// seeds from graph reads with no symbol load at startup.
+	expect(loadedSymbols).toEqual([]);
+
+	container.graph.write({ graphNodeId: 'state:open', value: false });
+	await container.graph.flush?.();
+
+	expect(loadedSymbols).toEqual(['symbol:flip']);
+	expect(
+		root.childNodes.map((child) => (child.nodeType === 8 ? '#comment' : child.tagName)),
+	).toEqual(['#comment', 'SPAN', '#comment']);
 });
 
 test('render starts artifact-owned CSR preload work without requiring app code', async () => {
