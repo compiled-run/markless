@@ -2202,3 +2202,42 @@ export function App() @{
 	});
 	expect(run({ graph: graph(false, 'On') })).toEqual({ arm: 1, html: '<p>Off</p>' });
 });
+
+test('emitSymbolModules emits switch flip modules selecting arms by case tests', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/SwitchFlipModule.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let kind = state('a');
+
+	<section>
+		@switch (kind) {
+			@case 'a': { <p>A</p> }
+			@case 'b': { <p>B</p> }
+			@default: { <p>D</p> }
+		}
+	</section>
+}
+`,
+		symbols: [],
+	});
+
+	const branchModule = result.symbolModules.modules.find(
+		(module) => module.kind === 'branch-update',
+	);
+	expect(branchModule).toBeDefined();
+	expect(result.protocolView.branches?.[0]).toEqual(
+		expect.objectContaining({ armTests: ['a', 'b', null] }),
+	);
+	const imported = (await import(
+		`data:text/javascript;charset=utf-8,${encodeURIComponent(branchModule!.source)}`
+	)) as Record<string, (context: unknown) => { arm: number; html: string }>;
+	const run = imported[branchModule!.exportName]!;
+	const graph = (kind: string) => ({ read: () => kind });
+
+	expect(run({ graph: graph('a') })).toEqual({ arm: 0, html: '<p>A</p>' });
+	expect(run({ graph: graph('b') })).toEqual({ arm: 1, html: '<p>B</p>' });
+	expect(run({ graph: graph('zzz') })).toEqual({ arm: 2, html: '<p>D</p>' });
+});

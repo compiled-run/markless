@@ -175,7 +175,7 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 	const branchArmsPlans = input.semanticGraph.branchSites.flatMap((site, index) => {
 		const gate = branchReactivityGates[index];
 		const found = branchNodes[index];
-		if (!gate?.supported || !found || site.kind !== 'if') return [];
+		if (!gate?.supported || !found) return [];
 		const testResolved = resolveGraphPath(site.testSource, bindings, aliases);
 		const arms = branchArms(found.node).map((arm) =>
 			buildBranchArmParts(
@@ -187,6 +187,11 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 			),
 		);
 		if (arms.some((arm) => arm === null)) return [];
+		let armTests: unknown[] | null = null;
+		if (site.kind === 'switch') {
+			armTests = switchArmTests(found.node);
+			if (armTests === null) return [];
+		}
 		return [
 			{
 				branchSiteId: site.id,
@@ -194,6 +199,7 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 					? { graphNodeId: testResolved.binding.id, path: testResolved.path }
 					: null,
 				arms: arms as ReadonlyArray<ReadonlyArray<PublicRenderPlanBranchArmPart>>,
+				...(armTests ? { armTests } : {}),
 			},
 		];
 	});
@@ -423,6 +429,22 @@ function collectBranchSiteNodes(root: AnyNode): BranchSiteNode[] {
 
 	visit(root, false);
 	return found;
+}
+
+// Literal case-test values per switch arm (null marks @default); any
+// non-literal test disqualifies the site from flip wiring.
+function switchArmTests(node: AnyNode): unknown[] | null {
+	const tests: unknown[] = [];
+	for (const switchCase of asNodes(node.cases)) {
+		const test = switchCase.test as AnyNode | undefined;
+		if (!test) {
+			tests.push(null);
+			continue;
+		}
+		if (test.type !== 'Literal' || typeof test.value === 'object') return null;
+		tests.push(test.value);
+	}
+	return tests;
 }
 
 function branchArms(node: AnyNode): AnyNode[][] {

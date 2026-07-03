@@ -42,10 +42,17 @@ function emitBranchUpdateModule(
 	const testExpression = arms.testRead
 		? `context.graph.read(${JSON.stringify(arms.testRead.graphNodeId)}${arms.testRead.path.length > 0 ? `, ${JSON.stringify(arms.testRead.path)}` : ''})`
 		: 'undefined';
+	const armSelector = arms.armTests
+		? `marklessSelectSwitchArm(${testExpression}, ${JSON.stringify(arms.armTests)})`
+		: `(${testExpression}) ? 0 : 1`;
+	const selectorHelper = arms.armTests
+		? 'function marklessSelectSwitchArm(value, tests) { for (let index = 0; index < tests.length; index++) { if (tests[index] !== null && value === tests[index]) return index; } return tests.indexOf(null); }'
+		: null;
 	const source = [
 		`const marklessBranchArms = ${JSON.stringify(arms.arms)};`,
+		...(selectorHelper ? [selectorHelper] : []),
 		`export function ${exportName}(context) {`,
-		`	const arm = (${testExpression}) ? 0 : 1;`,
+		`	const arm = ${armSelector};`,
 		'	const parts = marklessBranchArms[arm] ?? [];',
 		'	const html = parts.map((part) => part.text !== undefined ? part.text : marklessBranchText(context.graph.read(part.read.graphNodeId, part.read.path))).join("");',
 		'	return { arm, html };',

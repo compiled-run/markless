@@ -747,6 +747,9 @@ export type PublicRenderPlanBranchArms = {
 		readonly path: ReadonlyArray<string>;
 	} | null;
 	readonly arms: ReadonlyArray<ReadonlyArray<PublicRenderPlanBranchArmPart>>;
+	// Switch sites: literal case-test values per arm, null for @default.
+	// Absent for if-sites (truthiness selects arm 0/1).
+	readonly armTests?: ReadonlyArray<unknown>;
 };
 
 export type PublicRenderPlanBranchGate =

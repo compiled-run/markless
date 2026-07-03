@@ -173,6 +173,7 @@ export type ProtocolViewPayload = {
 		readonly startAnchor: { readonly strategy: 'dom-order-comment'; readonly index: number };
 		readonly endAnchor: { readonly strategy: 'dom-order-comment'; readonly index: number };
 		readonly symbolId?: string;
+		readonly armTests?: ReadonlyArray<unknown>;
 		readonly testReads?: ReadonlyArray<{
 			readonly source: string;
 			readonly graphNodeId: string;

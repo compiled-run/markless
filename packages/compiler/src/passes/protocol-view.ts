@@ -135,6 +135,9 @@ function supportedBranchRecords(input: ProtocolViewPayloadInput) {
 			symbol.kind === 'branch-update' ? [[symbol.branchSiteId, symbol] as const] : [],
 		),
 	);
+	const armsBySite = new Map(
+		(input.publicRenderPlan.branchArms ?? []).map((entry) => [entry.branchSiteId, entry]),
+	);
 	return (input.payloadArena.view.branchSites ?? [])
 		.filter((site) => branchIds.has(site.id))
 		.map((site) => ({
@@ -147,7 +150,8 @@ function supportedBranchRecords(input: ProtocolViewPayloadInput) {
 				strategy: 'dom-order-comment' as const,
 				index: emittedPairRank(input, site.id) * 2 + 1,
 			},
-			symbolId: branchSymbols.get(site.id)?.id,
+			symbolId: armsBySite.get(site.id) ? branchSymbols.get(site.id)?.id : undefined,
 			testReads: branchSymbols.get(site.id)?.testReads ?? [],
+			armTests: armsBySite.get(site.id)?.armTests,
 		}));
 }
