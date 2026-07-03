@@ -64,6 +64,8 @@ export type WalkState = {
 	nextHostId: number;
 	nextEventId: number;
 	nextBoundaryId: number;
+	nextBranchSiteId: number;
+	nextAnchorOrder: number;
 };
 
 export type SemanticGraphWalk = (node: AnyNode | null | undefined, state: WalkState) => void;
@@ -90,6 +92,7 @@ export function createMutableSemanticGraphArtifact(filename: string): MutableSem
 		templateReads: [],
 		stateWrites: [],
 		asyncBoundaries: [],
+		branchSites: [],
 		diagnostics: [],
 	};
 }
@@ -118,6 +121,8 @@ export function createWalkState(input: {
 		nextHostId: 0,
 		nextEventId: 0,
 		nextBoundaryId: 0,
+		nextBranchSiteId: 0,
+		nextAnchorOrder: 0,
 	};
 }
 

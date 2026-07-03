@@ -136,6 +136,16 @@ export type SemanticKeyedRepeat = {
 	readonly keyPath: ReadonlyArray<string>;
 };
 
+// A reactive branch site (@if or @switch) sharing the unified document-order
+// comment-anchor allocator with async boundaries.
+export type SemanticBranchSite = {
+	readonly id: string;
+	readonly kind: 'if' | 'switch';
+	readonly armCount: number;
+	readonly testSource: string;
+	readonly anchorOrder: number;
+};
+
 export type SemanticSyncPolicyCondition =
 	| {
 			readonly type: 'and';
@@ -313,7 +323,8 @@ export type SemanticGraphArtifact = {
 	readonly stateReads: ReadonlyArray<SemanticStateRead>;
 	readonly templateReads: ReadonlyArray<SemanticTemplateRead>;
 	readonly stateWrites: ReadonlyArray<SemanticStateWrite>;
-	readonly asyncBoundaries: ReadonlyArray<{ readonly id: string }>;
+	readonly asyncBoundaries: ReadonlyArray<{ readonly id: string; readonly anchorOrder: number }>;
+	readonly branchSites: ReadonlyArray<SemanticBranchSite>;
 	readonly diagnostics: ReadonlyArray<SemanticGraphDiagnostic>;
 };
 
@@ -707,6 +718,20 @@ export type PublicRenderPlanKeyedRepeat = {
 	readonly eventControls: ReadonlyArray<PublicRenderPlanEventControl>;
 };
 
+export type PublicRenderPlanBranchGate =
+	| {
+			readonly branchSiteId: string;
+			readonly supported: true;
+	  }
+	| {
+			readonly branchSiteId: string;
+			readonly supported: false;
+			readonly reason:
+				| 'nested-branch-unsupported'
+				| 'conditional-branch-unsupported'
+				| 'arm-content-unsupported';
+	  };
+
 export type PublicRenderPlanAsyncBoundaryGate =
 	| {
 			readonly boundaryId: string;
@@ -732,6 +757,7 @@ export type PublicRenderPlanArtifact = {
 	readonly repeatGates: ReadonlyArray<PublicRenderPlanRepeatGate>;
 	readonly keyedRepeats: ReadonlyArray<PublicRenderPlanKeyedRepeat>;
 	readonly asyncBoundaryGates: ReadonlyArray<PublicRenderPlanAsyncBoundaryGate>;
+	readonly branchReactivityGates: ReadonlyArray<PublicRenderPlanBranchGate>;
 	readonly styleScopes: ReadonlyArray<{ readonly scopeId: string; readonly cssText: string }>;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
 };

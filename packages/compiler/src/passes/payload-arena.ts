@@ -96,18 +96,23 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 			},
 		];
 	});
-	// First kind of the unified comment-anchor stream; branch anchors join the
-	// same document-order allocator in the branch-reactivity slices.
-	const asyncBoundaries = input.semanticGraph.asyncBoundaries.map((boundary, index) => ({
+	// Unified comment-anchor stream: branch sites and async boundaries share
+	// one document-order allocator (rank derives from collection anchorOrder).
+	const anchorRank = new Map(
+		[...input.semanticGraph.branchSites, ...input.semanticGraph.asyncBoundaries]
+			.sort((left, right) => left.anchorOrder - right.anchorOrder)
+			.map((record, rank) => [record.id, rank] as const),
+	);
+	const asyncBoundaries = input.semanticGraph.asyncBoundaries.map((boundary) => ({
 		id: boundary.id,
 		kind: 'async-boundary' as const,
 		startAnchor: {
 			strategy: 'dom-order-comment' as const,
-			index: index * 2,
+			index: (anchorRank.get(boundary.id) ?? 0) * 2,
 		},
 		endAnchor: {
 			strategy: 'dom-order-comment' as const,
-			index: index * 2 + 1,
+			index: (anchorRank.get(boundary.id) ?? 0) * 2 + 1,
 		},
 		asyncReads: uniqueBy(
 			input.semanticGraph.templateReads.flatMap((read) => {

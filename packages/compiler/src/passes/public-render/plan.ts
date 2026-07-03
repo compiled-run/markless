@@ -33,6 +33,7 @@ import type {
 	PlannedSymbol,
 	PublicRenderPlanArtifact,
 	PublicRenderPlanAsyncBoundaryGate,
+	PublicRenderPlanBranchGate,
 	PublicRenderPlanClassWrite,
 	PublicRenderPlanEventControl,
 	PublicRenderPlanInput,
@@ -135,6 +136,41 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 	}
 
 	const styleScopeCollection = collectStyleScopes(root, input.source.filename);
+	const branchNodes = collectBranchSiteNodes(root);
+	const branchReactivityGates: PublicRenderPlanBranchGate[] = input.semanticGraph.branchSites.map(
+		(site, index) => {
+			const found = branchNodes[index];
+			if (!found || found.nested || found.containsNested) {
+				return {
+					branchSiteId: site.id,
+					supported: false,
+					reason: 'nested-branch-unsupported',
+				};
+			}
+			if (found.conditional) {
+				return {
+					branchSiteId: site.id,
+					supported: false,
+					reason: 'conditional-branch-unsupported',
+				};
+			}
+			const arms = branchArms(found.node);
+			const armsSupported =
+				arms.length > 0 &&
+				arms.every((arm) =>
+					branchArmSupported(arm, bindings, aliases, input.source.source),
+				);
+			if (!armsSupported) {
+				return {
+					branchSiteId: site.id,
+					supported: false,
+					reason: 'arm-content-unsupported',
+				};
+			}
+			return { branchSiteId: site.id, supported: true };
+		},
+	);
+
 	const boundaryNodes = collectAsyncBoundaryNodes(root);
 	const asyncBoundaryGates: PublicRenderPlanAsyncBoundaryGate[] =
 		input.payloadArena.view.asyncBoundaries.map((boundary, index) => {
@@ -205,6 +241,7 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 		repeatGates,
 		keyedRepeats,
 		asyncBoundaryGates,
+		branchReactivityGates,
 		styleScopes: styleScopeCollection.styleScopes,
 		diagnostics: [
 			...styleScopeCollection.diagnostics,
@@ -240,6 +277,101 @@ type AsyncBoundaryNode = {
 	containsNested: boolean;
 	readonly conditional: boolean;
 };
+
+type BranchSiteNode = {
+	readonly node: AnyNode;
+	readonly nested: boolean;
+	containsNested: boolean;
+	readonly conditional: boolean;
+};
+
+// Branch sites gate like async boundaries: reactive flipping needs anchors
+// that always materialize, so only top-level, non-nested sites with
+// record-free plain-host arms (graph-resolvable expressions only) qualify.
+function collectBranchSiteNodes(root: AnyNode): BranchSiteNode[] {
+	const found: BranchSiteNode[] = [];
+	const branchStack: BranchSiteNode[] = [];
+
+	const visit = (node: AnyNode, conditional: boolean): void => {
+		if (node.type === 'JSXIfExpression' || node.type === 'JSXSwitchExpression') {
+			const entry: BranchSiteNode = {
+				node,
+				nested: branchStack.length > 0,
+				containsNested: false,
+				conditional,
+			};
+			for (const outer of branchStack) outer.containsNested = true;
+			found.push(entry);
+			branchStack.push(entry);
+			for (const child of childNodes(node)) visit(child, conditional);
+			branchStack.pop();
+			return;
+		}
+		const entersControlFlow =
+			node.type === 'JSXForExpression' || node.type === 'JSXTryExpression';
+		for (const child of childNodes(node)) {
+			visit(child, conditional || entersControlFlow);
+		}
+	};
+
+	visit(root, false);
+	return found;
+}
+
+function branchArms(node: AnyNode): AnyNode[][] {
+	if (node.type === 'JSXIfExpression') {
+		return [node.consequent, node.alternate].flatMap((arm) => {
+			const armNode = arm as AnyNode | undefined;
+			if (!armNode) return [];
+			const children = armNode.type === 'BlockStatement' ? asNodes(armNode.body) : [armNode];
+			return [children.filter((child) => !isIgnorableTextNode(child))];
+		});
+	}
+	return asNodes(node.cases).map((switchCase) =>
+		asNodes(switchCase.consequent).filter((child) => !isIgnorableTextNode(child)),
+	);
+}
+
+function branchArmSupported(
+	arm: ReadonlyArray<AnyNode>,
+	bindings: ReadonlyMap<string, SemanticGraphBinding>,
+	aliases: ReturnType<typeof semanticAliasMap>,
+	source: string,
+): boolean {
+	return arm.every(
+		(child) =>
+			isPlainHostTemplateNode(child) &&
+			armNodeRecordFreeAndResolvable(child, bindings, aliases, source),
+	);
+}
+
+function armNodeRecordFreeAndResolvable(
+	node: AnyNode,
+	bindings: ReadonlyMap<string, SemanticGraphBinding>,
+	aliases: ReturnType<typeof semanticAliasMap>,
+	source: string,
+): boolean {
+	if (isStaticTextNode(node)) return true;
+	if (node.type === 'JSXExpressionContainer' || node.type === 'TSRXExpression') {
+		const expression = node.expression as AnyNode | undefined;
+		if (!expression) return false;
+		const graph = resolveGraphPath(expressionSource(expression, source), bindings, aliases);
+		return !!graph && graph.binding.kind === 'state';
+	}
+	if (node.type !== 'Element' && node.type !== 'JSXElement') return false;
+	for (const attribute of getElementAttributes(node)) {
+		if (isSpreadAttribute(attribute)) return false;
+		const name = getIdentifierName(attribute.name as AnyNode | undefined);
+		if (!!name && (isEventAttribute(name) || name === 'attach' || name === 'el')) {
+			return false;
+		}
+	}
+	return asNodes(node.children).every(
+		(child) =>
+			isIgnorableTextNode(child) ||
+			armNodeRecordFreeAndResolvable(child, bindings, aliases, source),
+	);
+}
 
 // Boundary anchors use flat document-order comment indexes, so a boundary is
 // only renderable when its anchors always materialize: top-level (no nesting,
@@ -290,6 +422,7 @@ function emptyPlan(
 		repeatGates: [],
 		keyedRepeats: [],
 		asyncBoundaryGates: [],
+		branchReactivityGates: [],
 		styleScopes: [],
 		diagnostics,
 	};

@@ -23,7 +23,7 @@ export function collectAsyncBoundary(
 	const boundaryId = `boundary:${state.nextBoundaryId++}`;
 	const previousBoundaryId = state.currentAsyncBoundaryId;
 
-	state.graph.asyncBoundaries.push({ id: boundaryId });
+	state.graph.asyncBoundaries.push({ id: boundaryId, anchorOrder: state.nextAnchorOrder++ });
 	state.currentAsyncBoundaryId = boundaryId;
 
 	for (const child of childNodes(node)) {

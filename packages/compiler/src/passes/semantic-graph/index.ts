@@ -29,6 +29,7 @@ import {
 	collectSharedFactoryGraph,
 } from './collect-shared.ts';
 import { attachKeyedRepeatRowHost, collectKeyedRepeat } from './collect-repeat.ts';
+import { collectBranchSite } from './collect-branches.ts';
 import { collectVariableDeclaration } from './collect-state.ts';
 import { createMutableSemanticGraphArtifact, createWalkState, type WalkState } from './types.ts';
 
@@ -90,11 +91,13 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 			collectVariableDeclaration(node, state);
 			break;
 		case 'JSXIfExpression':
+			collectBranchSite(node, state);
 			walkBranch(node.consequent as AnyNode | undefined, state);
 			walkBranch(node.alternate as AnyNode | undefined, state);
 			collectConditionalBranchText(node, state);
 			return;
 		case 'JSXSwitchExpression':
+			collectBranchSite(node, state);
 			walk(node.discriminant as AnyNode | undefined, state);
 			for (const switchCase of asNodes(node.cases)) {
 				walk(switchCase.test as AnyNode | undefined, state);

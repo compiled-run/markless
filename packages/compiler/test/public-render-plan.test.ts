@@ -203,6 +203,58 @@ test.each([
 	},
 );
 
+test('planPublicRender gates plain-host record-free branch sites as supported', async () => {
+	const { plan } = await createRenderPlan(
+		'src/BranchCard.tsrx',
+		appSource(
+			`let open = state(true);
+<section>@if (open) { <p>Shown</p> } @else { <p>Hidden</p> }</section>`,
+		),
+	);
+
+	expect(plan.branchReactivityGates).toEqual([
+		{ branchSiteId: 'branch-site:0', supported: true },
+	]);
+	expect(plan.diagnostics).toEqual([]);
+});
+
+test('planPublicRender gates event-bearing and conditional branch arms as unsupported', async () => {
+	const { plan: eventPlan } = await createRenderPlan(
+		'src/EventBranch.tsrx',
+		appSource(
+			`let open = state(true); let count = state(0);
+<section>@if (open) { <button onClick={() => count++}>Go</button> }</section>`,
+		),
+	);
+	expect(eventPlan.branchReactivityGates).toEqual([
+		{
+			branchSiteId: 'branch-site:0',
+			supported: false,
+			reason: 'arm-content-unsupported',
+		},
+	]);
+
+	const { plan: nestedPlan } = await createRenderPlan(
+		'src/NestedBranch.tsrx',
+		appSource(
+			`let open = state(true); let inner = state(false);
+<section>@if (open) { <div>@if (inner) { <p>In</p> }</div> }</section>`,
+		),
+	);
+	expect(nestedPlan.branchReactivityGates).toEqual([
+		expect.objectContaining({
+			branchSiteId: 'branch-site:0',
+			supported: false,
+			reason: 'nested-branch-unsupported',
+		}),
+		expect.objectContaining({
+			branchSiteId: 'branch-site:1',
+			supported: false,
+			reason: 'nested-branch-unsupported',
+		}),
+	]);
+});
+
 test('planPublicRender gates a top-level plain-pending async boundary as supported', async () => {
 	const { plan } = await createRenderPlan(
 		'src/AsyncCard.tsrx',
