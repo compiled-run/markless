@@ -151,6 +151,7 @@ export type ResumeBranchRecord = {
 	readonly testReads: NonNullable<
 		NonNullable<ProtocolViewPayload['branches']>[number]['testReads']
 	>;
+	readonly armTests?: ReadonlyArray<unknown>;
 };
 
 // A lazy branch-update symbol returns the newly selected arm plus the rebuilt
@@ -768,7 +769,18 @@ function asyncBoundaryStartLocator(boundaryId: string): string {
 // testReads[0] is the branch test expression: truthy selects arm 0, else arm 1.
 function readBranchArm(graph: RuntimeGraph, branch: ResumeBranchRecord): number {
 	const testRead = branch.testReads[0]!;
-	return graph.read(testRead.graphNodeId, testRead.path) ? 0 : 1;
+	const value = graph.read(testRead.graphNodeId, testRead.path);
+	// Switch sites select by literal case tests with @default as fallback;
+	// if-sites select by truthiness.
+	if (branch.armTests) {
+		for (let index = 0; index < branch.armTests.length; index++) {
+			if (branch.armTests[index] !== null && value === branch.armTests[index]) {
+				return index;
+			}
+		}
+		return branch.armTests.indexOf(null);
+	}
+	return value ? 0 : 1;
 }
 
 function isResumeBranchUpdate(value: unknown): value is ResumeBranchUpdate {
@@ -805,6 +817,7 @@ function materializeBranchLocators(
 			endAnchor,
 			symbolId: branch.symbolId,
 			testReads: branch.testReads,
+			armTests: branch.armTests,
 		});
 	}
 

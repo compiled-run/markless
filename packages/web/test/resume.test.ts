@@ -98,6 +98,84 @@ async function settleMicrotasks(count = 4): Promise<void> {
 	}
 }
 
+test('resume runtime selects switch arms by case tests when seeding and flipping', async () => {
+	const startAnchor = { nodeType: 8 as const, textContent: 'markless:branch:branch-site:0' };
+	const armNode = {
+		nodeType: 1 as const,
+		tagName: 'P',
+		childNodes: [],
+		addEventListener() {},
+	};
+	const endAnchor = { nodeType: 8 as const, textContent: '/markless:branch:branch-site:0' };
+	const children = [startAnchor, armNode, endAnchor] as Array<Record<string, unknown>>;
+	const root = {
+		nodeType: 1 as const,
+		tagName: 'MAIN',
+		childNodes: children,
+		addEventListener() {},
+	};
+	for (const child of children) child.parentNode = root;
+	let kind = 'b';
+	const subscriptions: Array<{ run(): unknown }> = [];
+	const graph = {
+		read: () => kind,
+		subscribe(subscription: { run(): unknown }) {
+			subscriptions.push(subscription);
+			return () => undefined;
+		},
+		subscribeJournal: () => () => undefined,
+		listSharedDefinitions: () => [],
+		flush: async () => undefined,
+	};
+	const loaded: string[] = [];
+	const applied: unknown[] = [];
+	const runtime = createResumeRuntime({
+		root: root as never,
+		graph: graph as never,
+		view: {
+			locators: [],
+			events: [],
+			domUpdates: [],
+			behaviors: [],
+			elementHandles: [],
+			asyncBoundaries: [],
+			branches: [
+				{
+					id: 'branch-site:0',
+					startAnchor: { strategy: 'dom-order-comment', index: 0 },
+					endAnchor: { strategy: 'dom-order-comment', index: 1 },
+					symbolId: 'symbol:flip',
+					armTests: ['a', 'b', null],
+					testReads: [{ source: 'kind', graphNodeId: 'state:kind', path: [] }],
+				},
+			],
+		} as never,
+		loadSymbol(symbolId: string) {
+			loaded.push(symbolId);
+			return () => ({ arm: 2, html: '<p>D</p>' });
+		},
+		applyDomJournal: (entries) => {
+			applied.push(...entries);
+		},
+	});
+	await runtime.start();
+
+	// Seed: kind 'b' selects arm 1 by case tests, not truthiness (which would
+	// give arm 0 for any truthy string).
+	expect(loaded).toEqual([]);
+
+	// Writing another matching case value that maps to the SAME arm is a no-op.
+	kind = 'b';
+	await subscriptions[0]!.run();
+	expect(loaded).toEqual([]);
+
+	// A non-matching value falls to @default (arm 2) and flips.
+	kind = 'zzz';
+	const entries = (await subscriptions[0]!.run()) as unknown[];
+	expect(loaded).toEqual(['symbol:flip']);
+	expect(entries).toHaveLength(2);
+});
+
 test('resume runtime skips tagName validation for wildcard locators', () => {
 	const child = { nodeType: 1, tagName: 'ARTICLE', childNodes: [], addEventListener() {} };
 	const root = {
