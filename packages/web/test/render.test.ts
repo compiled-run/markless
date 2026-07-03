@@ -725,6 +725,46 @@ test('renderToString emits one inline resumer for SSR containers with browser tr
 	expect(html).toContain('globalThis.__started');
 });
 
+test('renderToString emits the resumer for keyed-repeat row events', () => {
+	const html = renderToString(
+		() => ({
+			html: '<section><article><h2>Alpha</h2><button>Choose</button></article></section>',
+			state: createProtocolStatePayload({ cells: [] }),
+			view: {
+				version: ASYNC_PROTOCOL_VERSION,
+				locators: [],
+				events: [],
+				domUpdates: [],
+				behaviors: [],
+				elementHandles: [],
+				asyncBoundaries: [],
+				keyedRepeats: [
+					{
+						id: 'repeat:0',
+						parentHostNodeId: 'h1',
+						collectionGraphNodeId: 'state:entries',
+						collectionPath: [],
+						keyPath: ['code'],
+						itemName: 'entry',
+						rowElementCount: 3,
+						rowEvents: [{ hostPath: [1], eventName: 'click', symbolIds: ['symbol:0'] }],
+					},
+				],
+			},
+		}),
+		{ resumeModuleUrl: '/app.js' },
+	);
+
+	// Row events are browser triggers: keyed-only pages must bootstrap the
+	// resumer, and the inline delegation must forward unmatched clicks of row
+	// event types so the full runtime can resolve the row.
+	expect(html).toContain('data-async-resumer');
+	// The inline source collects row event types from the payload and forwards
+	// unmatched events of those types without a record.
+	expect(html).toContain('keyedRepeats ?? []');
+	expect(html).toContain('eventRecord: null');
+});
+
 test('renderToString emits ordered modulepreload links before interactive payload startup', () => {
 	const html = renderToString(
 		() => ({

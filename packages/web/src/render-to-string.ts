@@ -118,7 +118,9 @@ function hasBrowserTriggers(view: ProtocolViewPayload): boolean {
 		view.behaviors.some((behavior) => !!behavior.symbolId) ||
 		view.asyncBoundaries.some((boundary) =>
 			boundary.asyncReads.some((read) => !!read.runnerSymbolId),
-		)
+		) ||
+		// Keyed repeat row events live on rowEvents, not view.events.
+		(view.keyedRepeats ?? []).some((repeat) => repeat.rowEvents.length > 0)
 	);
 }
 
@@ -309,7 +311,8 @@ ${syncPolicySource}
 		const k = e.hostNodeId + '\\n' + e.eventName;
 		m.set(k, e);
 	}
-	for (const t of new Set(v.events.map((e) => e.eventName).filter((e) => e !== 'visible'))) {
+	const rw = new Set((v.keyedRepeats ?? []).flatMap((k) => k.rowEvents.map((e) => e.eventName)));
+	for (const t of new Set([...v.events.map((e) => e.eventName), ...rw].filter((e) => e !== 'visible'))) {
 		r.addEventListener(t, async (e) => {
 			if (r.__asyncResumeRuntimeStarted) return;
 			for (let a = e.target; a; a = a.parentElement) {
@@ -319,9 +322,13 @@ ${syncPolicySource}
 ${runSyncPolicy}
 					const mod = await import(${JSON.stringify(resumeModuleUrl)});
 					await mod.resumeContainerEvent({ root: r, event: e, element: a, eventRecord: record });
-					break;
+					return;
 				}
 				if (a === r) break;
+			}
+			if (rw.has(e.type)) {
+				const mod = await import(${JSON.stringify(resumeModuleUrl)});
+				await mod.resumeContainerEvent({ root: r, event: e, element: e.target, eventRecord: null });
 			}
 		}, true);
 	}
