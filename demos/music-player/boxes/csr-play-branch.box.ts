@@ -40,9 +40,13 @@ export default box(
 		await expect.page.text(page, PLAY_ICON, PLAYING_ICON, WAIT);
 		await expect.page.attribute(page, PLAY_TOGGLE, 'class', 'play active', WAIT);
 		await expect.page.attribute(page, '.youtube-frame-host', 'data-command', 'play', WAIT);
+		// Exactness contract: no chunk may load post-click that was not in the
+		// startup preloaded set.
 		const afterClickScripts = await jsBuildRequestPaths(page);
 		const lazyChunks = afterClickScripts.filter((path) => !startupScripts.includes(path));
-		receipt.note(`csr play-branch post-click lazy JS: ${formatPaths(lazyChunks)}`);
+		if (lazyChunks.length > 0) {
+			throw new Error(`Post-click chunks were not preloaded: ${formatPaths(lazyChunks)}`);
+		}
 
 		// Round-trip truth: clicking again restores the paused arm without stale
 		// leftovers from the playing arm.

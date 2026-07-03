@@ -192,6 +192,39 @@ describe('markless build metadata output', () => {
 		expect(hrefs).not.toContain('/build/kit.js');
 	});
 
+	test('unions emitted-code dynamic imports the chunk metadata never carried', () => {
+		// generateBundle rewrites can leave real dynamic imports in shipped code
+		// (template-literal specifiers to init facades) that rolldown's
+		// chunk.dynamicImports metadata does not list — the graph then has
+		// zero-incoming-edge chunks that execute post-click unpreloaded. The
+		// graph's dynamic edges must match the SHIPPED code.
+		const metadata = createBuildMetadata(
+			{
+				'build/chunk-shell.js': chunk({
+					fileName: 'build/chunk-shell.js',
+					name: 'shell',
+					code: 'export async function open(){ const mod = await import(`./chunk-drawer.js`); return mod; }',
+					moduleIds: ['/workspace/app/src/shell.ts'],
+					facadeModuleId: '/workspace/app/src/shell.ts',
+				}),
+				'build/chunk-drawer.js': chunk({
+					fileName: 'build/chunk-drawer.js',
+					name: 'drawer',
+					code: 'export const drawer = 1;',
+					moduleIds: ['/workspace/app/src/drawer.ts'],
+					facadeModuleId: '/workspace/app/src/drawer.ts',
+				}),
+			} as never,
+			[],
+			'/workspace/app',
+			{},
+		);
+
+		expect(metadata.bundles['build/chunk-shell.js']?.dynamicImports).toContain(
+			'build/chunk-drawer.js',
+		);
+	});
+
 	test('collects modulepreload head links for lazy symbol bundle graph roots', () => {
 		const graph = convertManifestToBundleGraph(lazySymbolManifest());
 

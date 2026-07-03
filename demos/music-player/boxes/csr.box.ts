@@ -50,6 +50,7 @@ export default box(
 		await expect.page.attribute(page, '.track', 'data-color-start', '#2f4f66', WAIT);
 		await expect.page.attribute(page, '.track', 'data-color-end', '#a57c5b', WAIT);
 
+		const startupPaths = new Set(startupModules.map((request) => pathOf(request.url)));
 		await page.trackEvents('click');
 		await page.click('[aria-label="Play or pause"]', WAIT);
 		await expect.page.outcome(page, { events: { click: { atLeast: 1 } } }, WAIT);
@@ -57,20 +58,10 @@ export default box(
 		await expect.page.attribute(page, '.youtube-frame-host', 'data-playing', 'true', WAIT);
 		await expect.page.attribute(page, '.youtube-frame-host', 'data-command-version', '1', WAIT);
 		await expect.page.exists(page, 'script[src="https://www.youtube.com/iframe_api"]', WAIT);
-		// The play click flips the icon branch, which lazily loads the DOM
-		// journal chunks on first interaction — correct resumability behavior.
-		// The old no-new-JS assertion had pinned the broken era in which the
-		// branch never flipped (demo-app-regressions goal).
-		const afterPlayRequests = await page.networkRequests();
-		for (const request of jsBuildRequests(afterPlayRequests)) {
-			if (request.status !== 200 || request.failedReason) {
-				throw new Error(`Play-interaction chunk failed: ${request.url}`);
-			}
-		}
-		// Later interactions must not load anything beyond the post-play set.
-		const afterPlayPaths = new Set(
-			jsBuildRequests(afterPlayRequests).map((request) => pathOf(request.url)),
-		);
+		// Exactness contract (preloader-router-regressions goal): the preload
+		// plan covers every interaction-reachable chunk, so the play click must
+		// load NOTHING beyond the startup preloaded set.
+		assertNoNewBuildJs(await page.networkRequests(), startupPaths, 'play interaction');
 
 		await page.click('[aria-label="Next track"]', WAIT);
 		await expect.page.bodyText(page, { contains: 'Empty Crown' }, WAIT);
@@ -84,7 +75,7 @@ export default box(
 		);
 		await expect.page.attribute(page, '.track', 'data-color-start', '#4b3f72', WAIT);
 		await expect.page.attribute(page, '.track', 'data-color-end', '#d79f6f', WAIT);
-		assertNoNewBuildJs(await page.networkRequests(), afterPlayPaths, 'next-track interaction');
+		assertNoNewBuildJs(await page.networkRequests(), startupPaths, 'next-track interaction');
 
 		await preview.close();
 		await receipt.capture('music-player csr preview youtube command state');
