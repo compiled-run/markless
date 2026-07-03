@@ -2241,3 +2241,32 @@ export function App() @{
 	expect(run({ graph: graph('b') })).toEqual({ arm: 1, html: '<p>B</p>' });
 	expect(run({ graph: graph('zzz') })).toEqual({ arm: 2, html: '<p>D</p>' });
 });
+
+test('emitSymbolModules keeps element-handle calls in event handlers, in statement order', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/FocusBox.tsrx',
+		source: `
+import { element, state } from '@markless/core';
+
+export function App() @{
+	let status = state('idle');
+	const box = element();
+
+	<main>
+		<input el={box} placeholder="Name" />
+		<button onClick={() => { box.focus(); status = 'focused'; }}>Focus</button>
+		<output>{status}</output>
+	</main>
+}
+`,
+		symbols: [],
+	});
+
+	const handler = result.symbolModules.modules.find((m) => m.kind === 'event-handler');
+	expect(handler).toBeDefined();
+	const focusCall = handler!.source.indexOf('context.getElementHandle("box")?.focus()');
+	const statusWrite = handler!.source.indexOf('state:status');
+	// The handle call must be emitted, and before the write (authored order).
+	expect(focusCall).toBeGreaterThanOrEqual(0);
+	expect(statusWrite).toBeGreaterThan(focusCall);
+});

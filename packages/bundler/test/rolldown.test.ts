@@ -578,4 +578,25 @@ export function App() @{
 	// runtime silently drops them, so keyed modules take the full runtime.
 	expect(keyed.code).toContain('resumeFromPayloadDocument');
 	expect(keyed.code).not.toContain('resumeEventOnlyFromPayloadDocument');
+
+	const handles = await transformTsrxModule({
+		filename: '/workspace/app/src/Focus.tsrx',
+		source: `
+import { element, state } from '@markless/core';
+
+export function App() @{
+	let status = state('idle');
+	const box = element();
+
+	<main>
+		<input el={box} placeholder="Name" />
+		<button onClick={() => { box.focus(); status = 'focused'; }}>Focus</button>
+	</main>
+}
+`,
+		environment: 'client',
+	});
+	// Element handles materialize only in the full runtime.
+	expect(handles.code).toContain('resumeFromPayloadDocument');
+	expect(handles.code).not.toContain('resumeEventOnlyFromPayloadDocument');
 });

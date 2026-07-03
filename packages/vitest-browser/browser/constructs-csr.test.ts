@@ -202,7 +202,7 @@ test('CSR: attach={...} behavior runs against the real host element', async () =
 	await expect.poll(() => taps.textContent).toBe('1');
 });
 
-test.fails('CSR: el={...} element handle methods run inside an event handler', async () => {
+test('CSR: el={...} element handle methods run inside an event handler', async () => {
 	// KNOWN RED (bug): the compiled event symbol silently drops the
 	// `box.focus()` element-handle call — the emitted handler module contains
 	// only the `status = 'focused'` graph write. The state write lands but the

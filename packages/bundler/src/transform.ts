@@ -97,7 +97,9 @@ export async function transformTsrxModule(
 				clientOutput: input.clientOutput ?? 'full',
 				needsFullResume:
 					(compiled.protocolView.branches?.length ?? 0) > 0 ||
-					(compiled.protocolView.keyedRepeats?.length ?? 0) > 0,
+					(compiled.protocolView.keyedRepeats?.length ?? 0) > 0 ||
+					// Element handles materialize only in the full runtime.
+					compiled.protocolView.elementHandles.length > 0,
 				resumeModuleUrl: input.resumeModuleUrl,
 				publicRenderModuleSource: compiled.publicRenderModule.moduleSource,
 				publicRenderRootExportName: compiled.publicRenderModule.rootExportName,

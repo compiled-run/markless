@@ -37,6 +37,10 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 				order,
 				reads: eventReads(source, input.stateLowering?.reads),
 				writes: eventWrites(source, input.stateLowering?.writes, sourceSpan),
+				elementHandleCalls: collectElementHandleCalls(
+					source,
+					input.payloadArena.view.elementHandles,
+				),
 			});
 		}
 	}
@@ -331,4 +335,37 @@ function findModuleImport(
 	if (!rootName) return undefined;
 
 	return imports.find((item) => item.localName === rootName);
+}
+
+// Handler statements like box.focus() reference element() handles; they must
+// survive into the emitted symbol (the runtime resolves the handle by name).
+// Matches direct method calls on a known handle name and records the offset
+// so emission can interleave them with lowered writes in authored order.
+function collectElementHandleCalls(
+	source: string,
+	elementHandles: ReadonlyArray<{ readonly name: string }>,
+): ReadonlyArray<{
+	readonly handleName: string;
+	readonly method: string;
+	readonly argumentSources: ReadonlyArray<string>;
+	readonly offset: number;
+}> {
+	if (elementHandles.length === 0) return [];
+	const names = new Set(elementHandles.map((handle) => handle.name));
+	const calls: Array<{
+		handleName: string;
+		method: string;
+		argumentSources: string[];
+		offset: number;
+	}> = [];
+	const callPattern = /(?<![\w$.])([A-Za-z_$][\w$]*)\.([A-Za-z_$][\w$]*)\(([^()]*)\)/g;
+	for (const match of source.matchAll(callPattern)) {
+		const [, handleName, method, argsSource] = match;
+		if (!handleName || !method || !names.has(handleName)) continue;
+		const argumentSources = argsSource!.trim()
+			? argsSource!.split(',').map((argument) => argument.trim())
+			: [];
+		calls.push({ handleName, method, argumentSources, offset: match.index ?? 0 });
+	}
+	return calls;
 }

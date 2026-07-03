@@ -140,15 +140,30 @@ function emitEventHandlerModule(
 	localNames: ReadonlySet<string>,
 ): string {
 	const exportName = symbolExportName(symbol.id);
-	const writes = (symbol.writes ?? []).flatMap((write) =>
-		emitEventWrite(
-			write,
-			symbol.kind === 'event-handler' ? symbol.parameters : [],
-			symbol.reads ?? [],
-			symbol.moduleImports ?? [],
-			localNames,
+	const parameters = symbol.kind === 'event-handler' ? symbol.parameters : [];
+	// Statements interleave by their offset in the handler source so handle
+	// calls and writes keep authored order.
+	const statements = [
+		...(symbol.writes ?? []).map((write) => ({
+			offset: write.source ? symbol.source.indexOf(write.source) : -1,
+			lines: emitEventWrite(
+				write,
+				parameters,
+				symbol.reads ?? [],
+				symbol.moduleImports ?? [],
+				localNames,
+			),
+		})),
+		...(symbol.kind === 'event-handler' ? (symbol.elementHandleCalls ?? []) : []).map(
+			(call) => ({
+				offset: call.offset,
+				lines: emitElementHandleCall(call, parameters),
+			}),
 		),
-	);
+	]
+		.filter((statement) => statement.lines.length > 0)
+		.sort((left, right) => left.offset - right.offset);
+	const writes = statements.flatMap((statement) => statement.lines);
 	const imports = eventModuleImports(symbol, writes);
 
 	return [
@@ -1606,4 +1621,26 @@ function emitModuleImport(moduleImport: SemanticModuleImport): string {
 		return `import { ${moduleImport.localName} } from ${source};`;
 	}
 	return `import { ${moduleImport.importedName} as ${moduleImport.localName} } from ${source};`;
+}
+
+// Element-handle method calls run against the runtime-resolved host element.
+// Arguments stay restricted to literals and event parameters; anything richer
+// keeps the current unsupported behavior until capture analysis owns it.
+function emitElementHandleCall(
+	call: {
+		readonly handleName: string;
+		readonly method: string;
+		readonly argumentSources: ReadonlyArray<string>;
+	},
+	parameters: ReadonlyArray<string>,
+): string[] {
+	const literalPattern =
+		/^(?:'[^']*'|"[^"]*"|`[^`]*`|-?\d+(?:\.\d+)?|true|false|null|undefined)$/;
+	const supported = call.argumentSources.every(
+		(argument) => literalPattern.test(argument) || parameters.includes(argument),
+	);
+	if (!supported) return [];
+	return [
+		`\tcontext.getElementHandle(${JSON.stringify(call.handleName)})?.${call.method}(${call.argumentSources.join(', ')});`,
+	];
 }

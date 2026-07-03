@@ -489,6 +489,14 @@ export type PlannedSymbol =
 			readonly order: number;
 			readonly reads?: ReadonlyArray<LoweredStateRead>;
 			readonly writes?: ReadonlyArray<LoweredStateWrite>;
+			// Method calls on element() handles inside the handler, with their
+			// offset into the handler source for statement-order emission.
+			readonly elementHandleCalls?: ReadonlyArray<{
+				readonly handleName: string;
+				readonly method: string;
+				readonly argumentSources: ReadonlyArray<string>;
+				readonly offset: number;
+			}>;
 	  }
 	| {
 			readonly id: string;
