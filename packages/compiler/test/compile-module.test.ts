@@ -1191,6 +1191,40 @@ export function App() @{
 	);
 });
 
+test('compileTsrxModule plans branch-update symbols wired onto protocol branch records', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/BranchSymbol.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let open = state(true);
+
+	<section>
+		@if (open) { <p>Shown</p> } @else { <p>Hidden</p> }
+	</section>
+}
+`,
+		symbols: [],
+	});
+
+	const planned = result.symbolResolver.symbols.find((symbol) => symbol.kind === 'branch-update');
+	expect(planned).toEqual(
+		expect.objectContaining({
+			kind: 'branch-update',
+			branchSiteId: 'branch-site:0',
+			testSource: 'open',
+		}),
+	);
+	expect(result.protocolView.branches).toEqual([
+		expect.objectContaining({
+			id: 'branch-site:0',
+			symbolId: planned!.id,
+			testReads: [expect.objectContaining({ graphNodeId: 'state:open', path: [] })],
+		}),
+	]);
+});
+
 test('compileTsrxModule ships only gate-supported async boundary anchors, re-indexed', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/NestedAsync.tsrx',

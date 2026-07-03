@@ -526,6 +526,17 @@ export type PlannedSymbol =
 			readonly source: string;
 			readonly dependencies?: ReadonlyArray<SemanticGraphDependency>;
 			readonly moduleImports?: ReadonlyArray<SemanticModuleImport>;
+	  }
+	| {
+			readonly id: string;
+			readonly kind: 'branch-update';
+			readonly branchSiteId: string;
+			readonly testSource: string;
+			readonly testReads: ReadonlyArray<{
+				readonly source: string;
+				readonly graphNodeId: string;
+				readonly path: ReadonlyArray<string>;
+			}>;
 	  };
 
 export type SymbolResolverPlan = {

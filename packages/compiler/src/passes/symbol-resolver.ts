@@ -7,6 +7,11 @@ import type {
 	SymbolResolverInput,
 	SymbolResolverPlan,
 } from '../artifacts.ts';
+import {
+	graphBindingMap,
+	resolveGraphPath,
+	semanticAliasMap,
+} from '../artifact-helpers/graph-paths.ts';
 
 export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPlan {
 	const symbols: PlannedSymbol[] = [];
@@ -97,6 +102,29 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 				? { dependencies: computed.dependencies }
 				: {}),
 			...(moduleImports.length > 0 ? { moduleImports } : {}),
+		});
+	}
+
+	// Branch flip symbols (gate-blind like the arena; protocol-view wires only
+	// gate-supported ones onto branch records).
+	const branchBindings = graphBindingMap(input.semanticGraph);
+	const branchAliases = semanticAliasMap(input.semanticGraph);
+	for (const site of input.semanticGraph.branchSites) {
+		const resolved = resolveGraphPath(site.testSource, branchBindings, branchAliases);
+		symbols.push({
+			id: `symbol:${nextSymbolId++}`,
+			kind: 'branch-update',
+			branchSiteId: site.id,
+			testSource: site.testSource,
+			testReads: resolved
+				? [
+						{
+							source: site.testSource,
+							graphNodeId: resolved.binding.id,
+							path: resolved.path,
+						},
+					]
+				: [],
 		});
 	}
 

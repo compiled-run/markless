@@ -130,6 +130,11 @@ function emittedPairRank(input: ProtocolViewPayloadInput, id: string): number {
 
 function supportedBranchRecords(input: ProtocolViewPayloadInput) {
 	const branchIds = supportedBranchIds(input);
+	const branchSymbols = new Map(
+		input.symbolResolver.symbols.flatMap((symbol) =>
+			symbol.kind === 'branch-update' ? [[symbol.branchSiteId, symbol] as const] : [],
+		),
+	);
 	return (input.payloadArena.view.branchSites ?? [])
 		.filter((site) => branchIds.has(site.id))
 		.map((site) => ({
@@ -142,5 +147,7 @@ function supportedBranchRecords(input: ProtocolViewPayloadInput) {
 				strategy: 'dom-order-comment' as const,
 				index: emittedPairRank(input, site.id) * 2 + 1,
 			},
+			symbolId: branchSymbols.get(site.id)?.id,
+			testReads: branchSymbols.get(site.id)?.testReads ?? [],
 		}));
 }

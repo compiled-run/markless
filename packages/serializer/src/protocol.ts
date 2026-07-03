@@ -172,6 +172,12 @@ export type ProtocolViewPayload = {
 		readonly id: string;
 		readonly startAnchor: { readonly strategy: 'dom-order-comment'; readonly index: number };
 		readonly endAnchor: { readonly strategy: 'dom-order-comment'; readonly index: number };
+		readonly symbolId?: string;
+		readonly testReads?: ReadonlyArray<{
+			readonly source: string;
+			readonly graphNodeId: string;
+			readonly path: ReadonlyArray<string>;
+		}>;
 	}>;
 	readonly asyncBoundaries: ReadonlyArray<{
 		readonly id: string;
