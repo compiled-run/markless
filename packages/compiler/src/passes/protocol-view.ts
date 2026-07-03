@@ -63,6 +63,7 @@ export function createProtocolViewPayload(input: ProtocolViewPayloadInput): Prot
 		asyncBoundaries: supportedAsyncBoundaries(input).map(
 			({ kind: _kind, anchorOrder: _order, ...boundary }) => ({
 				...boundary,
+				updateSymbolId: boundaryUpdateSymbols(input).get(boundary.id),
 				startAnchor: {
 					...boundary.startAnchor,
 					index: emittedPairRank(input, boundary.id) * 2,
@@ -184,4 +185,17 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 			},
 		];
 	});
+}
+
+function boundaryUpdateSymbols(input: ProtocolViewPayloadInput): ReadonlyMap<string, string> {
+	const armsBoundaries = new Set(
+		(input.publicRenderPlan.asyncBoundaryArms ?? []).map((entry) => entry.boundaryId),
+	);
+	return new Map(
+		input.symbolResolver.symbols.flatMap((symbol) =>
+			symbol.kind === 'async-boundary-update' && armsBoundaries.has(symbol.boundaryId)
+				? [[symbol.boundaryId, symbol.id] as const]
+				: [],
+		),
+	);
 }

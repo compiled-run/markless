@@ -1,5 +1,6 @@
 import type {
 	GeneratedSymbolModule,
+	PublicRenderPlanAsyncBoundaryArms,
 	PublicRenderPlanBranchArms,
 	LoweredStateRead,
 	LoweredStateWrite,
@@ -17,6 +18,9 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 	const branchArmsBySite = new Map(
 		(input.publicRenderPlan?.branchArms ?? []).map((entry) => [entry.branchSiteId, entry]),
 	);
+	const boundaryArmsById = new Map(
+		(input.publicRenderPlan?.asyncBoundaryArms ?? []).map((entry) => [entry.boundaryId, entry]),
+	);
 
 	return {
 		passId: 'symbol-modules',
@@ -24,6 +28,10 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 			if (symbol.kind === 'branch-update') {
 				const arms = branchArmsBySite.get(symbol.branchSiteId);
 				return arms ? [emitBranchUpdateModule(symbol, arms)] : [];
+			}
+			if (symbol.kind === 'async-boundary-update') {
+				const arms = boundaryArmsById.get(symbol.boundaryId);
+				return arms ? [emitAsyncBoundaryUpdateModule(symbol, arms)] : [];
 			}
 			return emitSymbolModule(symbol, localNamesBySymbol.get(symbol.id) ?? emptyLocalNames);
 		}),
@@ -1643,4 +1651,25 @@ function emitElementHandleCall(
 	return [
 		`\tcontext.getElementHandle(${JSON.stringify(call.handleName)})?.${call.method}(${call.argumentSources.join(', ')});`,
 	];
+}
+
+// A boundary settle module: the runtime passes the settled status; the module
+// picks the @try or @catch arm and rebuilds its HTML from static parts plus
+// graph reads (the settled value already lives in the graph).
+function emitAsyncBoundaryUpdateModule(
+	symbol: Extract<PlannedSymbol, { kind: 'async-boundary-update' }>,
+	arms: PublicRenderPlanAsyncBoundaryArms,
+): GeneratedSymbolModule {
+	const exportName = symbolExportName(symbol.id);
+	const source = [
+		`const marklessBoundaryArms = ${JSON.stringify(arms.arms)};`,
+		`export function ${exportName}(context) {`,
+		'	const arm = context.status === "rejected" ? 1 : 0;',
+		'	const parts = marklessBoundaryArms[arm] ?? [];',
+		'	const html = parts.map((part) => part.text !== undefined ? part.text : marklessBoundaryText(context.graph.read(part.read.graphNodeId, part.read.path))).join("");',
+		'	return { arm, html };',
+		'}',
+		'function marklessBoundaryText(value) { return String(value == null ? "" : value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;"); }',
+	].join('\n');
+	return { symbolId: symbol.id, kind: symbol.kind, exportName, source };
 }

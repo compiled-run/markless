@@ -206,6 +206,33 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 	});
 
 	const boundaryNodes = collectAsyncBoundaryNodes(root);
+	const asyncBoundaryArms = input.semanticGraph.asyncBoundaries.flatMap((boundarySite, index) => {
+		const boundaryNode = boundaryNodes[index];
+		if (!boundaryNode || boundaryNode.nested || boundaryNode.containsNested) return [];
+		const tryChildren = asNodes((boundaryNode.node.block as AnyNode | undefined)?.body).filter(
+			(child) => !isIgnorableTextNode(child),
+		);
+		const handler = boundaryNode.node.handler as AnyNode | undefined;
+		const catchChildren = asNodes((handler?.body as AnyNode | undefined)?.body).filter(
+			(child) => !isIgnorableTextNode(child),
+		);
+		const arms = [tryChildren, catchChildren].map((arm) =>
+			buildBranchArmParts(
+				arm,
+				bindings,
+				aliases,
+				input.source.source,
+				scopeClassOf(styleScopeCollection),
+			),
+		);
+		if (arms.some((arm) => arm === null)) return [];
+		return [
+			{
+				boundaryId: boundarySite.id,
+				arms: arms as ReadonlyArray<ReadonlyArray<PublicRenderPlanBranchArmPart>>,
+			},
+		];
+	});
 	const asyncBoundaryGates: PublicRenderPlanAsyncBoundaryGate[] =
 		input.payloadArena.view.asyncBoundaries.map((boundary, index) => {
 			const found = boundaryNodes[index];
@@ -277,6 +304,7 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 		asyncBoundaryGates,
 		branchReactivityGates,
 		branchArms: branchArmsPlans,
+		asyncBoundaryArms,
 		styleScopes: styleScopeCollection.styleScopes,
 		diagnostics: [
 			...styleScopeCollection.diagnostics,
@@ -357,7 +385,11 @@ function buildBranchArmParts(
 			const expression = node.expression as AnyNode | undefined;
 			if (!expression) return false;
 			const graph = resolveGraphPath(expressionSource(expression, source), bindings, aliases);
-			if (!graph || graph.binding.kind !== 'state') return false;
+			// State and computed reads both resolve through the live graph at
+			// flip/settle time.
+			if (!graph || (graph.binding.kind !== 'state' && graph.binding.kind !== 'computed')) {
+				return false;
+			}
 			parts.push({ read: { graphNodeId: graph.binding.id, path: graph.path } });
 			return true;
 		}
@@ -562,6 +594,7 @@ function emptyPlan(
 		asyncBoundaryGates: [],
 		branchReactivityGates: [],
 		branchArms: [],
+		asyncBoundaryArms: [],
 		styleScopes: [],
 		diagnostics,
 	};

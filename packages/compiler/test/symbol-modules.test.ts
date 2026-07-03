@@ -2270,3 +2270,50 @@ export function App() @{
 	expect(focusCall).toBeGreaterThanOrEqual(0);
 	expect(statusWrite).toBeGreaterThan(focusCall);
 });
+
+test('emitSymbolModules emits async-boundary-update modules rendering settled arms', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/AsyncFlip.tsrx',
+		source: `
+import { computed, state } from '@markless/core';
+
+export function App() @{
+	let query = state('markless');
+	let details = computed(async () => {
+		return { title: 'Result: ' + query };
+	});
+
+	<main>
+		@try { <p>{details.title}</p> } @pending { <p>Loading</p> } @catch { <p>Broken</p> }
+	</main>
+}
+`,
+		symbols: [],
+	});
+
+	const update = result.symbolModules.modules.find(
+		(module) => module.kind === 'async-boundary-update',
+	);
+	expect(update).toBeDefined();
+	// Protocol boundary records carry the update symbol for the runtime.
+	expect(result.protocolView.asyncBoundaries[0]).toEqual(
+		expect.objectContaining({ updateSymbolId: update!.symbolId }),
+	);
+
+	const imported = (await import(
+		`data:text/javascript;charset=utf-8,${encodeURIComponent(update!.source)}`
+	)) as Record<string, (context: unknown) => { arm: number; html: string }>;
+	const run = imported[update!.exportName]!;
+	const graph = {
+		read: (graphNodeId: string, path?: ReadonlyArray<string>) =>
+			graphNodeId === 'computed:details' && path?.[0] === 'title'
+				? 'Result: markless'
+				: undefined,
+	};
+	// Fulfilled renders the @try arm from graph reads; rejected renders @catch.
+	expect(run({ graph, status: 'fulfilled' })).toEqual({
+		arm: 0,
+		html: '<p>Result: markless</p>',
+	});
+	expect(run({ graph, status: 'rejected' })).toEqual({ arm: 1, html: '<p>Broken</p>' });
+});

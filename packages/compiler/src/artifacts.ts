@@ -537,6 +537,12 @@ export type PlannedSymbol =
 	  }
 	| {
 			readonly id: string;
+			readonly kind: 'async-boundary-update';
+			readonly boundaryId: string;
+			readonly graphNodeId: string;
+	  }
+	| {
+			readonly id: string;
 			readonly kind: 'branch-update';
 			readonly branchSiteId: string;
 			readonly testSource: string;
@@ -763,6 +769,12 @@ export type PublicRenderPlanBranchArms = {
 	readonly armTests?: ReadonlyArray<unknown>;
 };
 
+export type PublicRenderPlanAsyncBoundaryArms = {
+	readonly boundaryId: string;
+	// arms[0] = fulfilled (@try), arms[1] = rejected (@catch).
+	readonly arms: ReadonlyArray<ReadonlyArray<PublicRenderPlanBranchArmPart>>;
+};
+
 export type PublicRenderPlanBranchGate =
 	| {
 			readonly branchSiteId: string;
@@ -804,6 +816,7 @@ export type PublicRenderPlanArtifact = {
 	readonly asyncBoundaryGates: ReadonlyArray<PublicRenderPlanAsyncBoundaryGate>;
 	readonly branchReactivityGates: ReadonlyArray<PublicRenderPlanBranchGate>;
 	readonly branchArms: ReadonlyArray<PublicRenderPlanBranchArms>;
+	readonly asyncBoundaryArms: ReadonlyArray<PublicRenderPlanAsyncBoundaryArms>;
 	readonly styleScopes: ReadonlyArray<{ readonly scopeId: string; readonly cssText: string }>;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
 };

@@ -197,6 +197,7 @@ export type ProtocolViewPayload = {
 	}>;
 	readonly asyncBoundaries: ReadonlyArray<{
 		readonly id: string;
+		readonly updateSymbolId?: string;
 		readonly startAnchor: {
 			readonly strategy: 'dom-order-comment';
 			readonly index: number;

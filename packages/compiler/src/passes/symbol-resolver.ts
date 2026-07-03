@@ -109,6 +109,19 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 		});
 	}
 
+	// Boundary settle symbols (gate-blind; protocol-view wires only boundaries
+	// with a plan arms entry).
+	for (const boundary of input.payloadArena.view.asyncBoundaries) {
+		const read = boundary.asyncReads[0];
+		if (!read) continue;
+		symbols.push({
+			id: `symbol:${nextSymbolId++}`,
+			kind: 'async-boundary-update',
+			boundaryId: boundary.id,
+			graphNodeId: read.graphNodeId,
+		});
+	}
+
 	// Branch flip symbols (gate-blind like the arena; protocol-view wires only
 	// gate-supported ones onto branch records).
 	const branchBindings = graphBindingMap(input.semanticGraph);
