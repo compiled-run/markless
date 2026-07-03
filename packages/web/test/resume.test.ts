@@ -2459,3 +2459,100 @@ function captureThrown(run: () => unknown): unknown {
 
 	throw new Error('Expected callback to throw.');
 }
+
+test('resume runtime replaces branch ranges lazily when the test arm flips', async () => {
+	const start = comment('markless:branch:branch-site:0');
+	const shown = element('P');
+	const end = comment('/markless:branch:branch-site:0');
+	const sibling = element('SPAN');
+	const root = rangeElement('SECTION', [start, shown, end, sibling]);
+	const hidden = element('P');
+	const loadedSymbols: string[] = [];
+	const renderedHtml: string[] = [];
+	const subscriptions: Array<{
+		readonly graphNodeId: string;
+		readonly path?: ReadonlyArray<string>;
+		readonly run: (value: unknown) => unknown;
+	}> = [];
+	let open = true;
+	const graph = {
+		read: (graphNodeId: string) => (graphNodeId === 'state:open' ? open : undefined),
+		subscribe: (subscription: (typeof subscriptions)[number]) =>
+			void subscriptions.push(subscription),
+		subscribeJournal: () => () => undefined,
+		flush: async () => undefined,
+	} as unknown as RuntimeGraph;
+
+	createResumeRuntime({
+		root,
+		graph,
+		view: {
+			locators: [],
+			events: [],
+			domUpdates: [],
+			behaviors: [],
+			elementHandles: [],
+			asyncBoundaries: [],
+			branches: [
+				{
+					id: 'branch-site:0',
+					startAnchor: { strategy: 'dom-order-comment', index: 0 },
+					endAnchor: { strategy: 'dom-order-comment', index: 1 },
+					symbolId: 'symbol:flip',
+					testReads: [{ source: 'open', graphNodeId: 'state:open', path: [] }],
+				},
+				// Static branch record without symbolId/testReads is skipped
+				// entirely, so its out-of-range anchors must never resolve.
+				{
+					id: 'branch-site:static',
+					startAnchor: { strategy: 'dom-order-comment', index: 8 },
+					endAnchor: { strategy: 'dom-order-comment', index: 9 },
+				},
+			],
+		},
+		loadSymbol(symbolId) {
+			loadedSymbols.push(symbolId);
+			return () => ({ arm: open ? 0 : 1, html: open ? '<p>Shown</p>' : '<p>Hidden</p>' });
+		},
+		renderBranchHtml(html) {
+			renderedHtml.push(html);
+			return [hidden];
+		},
+	});
+
+	// Seeding the current arm reads the graph without loading any symbol.
+	expect(loadedSymbols).toEqual([]);
+	expect(subscriptions).toEqual([
+		expect.objectContaining({ graphNodeId: 'state:open', path: [] }),
+	]);
+
+	open = false;
+	const entries = (await subscriptions[0]!.run(false)) as DomJournalEntry[];
+	expect(loadedSymbols).toEqual(['symbol:flip']);
+	expect(renderedHtml).toEqual(['<p>Hidden</p>']);
+	expect(entries).toEqual([
+		{ type: 'removeRange', locator: 'branch:branch-site:0' },
+		{ type: 'insertRange', locator: 'branch:branch-site:0:start', fragment: [hidden] },
+	]);
+
+	applyDomJournalEntries(entries, {
+		resolveTarget(locator) {
+			if (locator === 'branch:branch-site:0:start') return start;
+			if (locator === 'branch:branch-site:0:end') return end;
+			return undefined;
+		},
+	});
+
+	expect(root.childNodes).toHaveLength(4);
+	expect(root.childNodes[0]).toBe(start);
+	expect(root.childNodes[1]).toBe(hidden);
+	expect(root.childNodes[2]).toBe(end);
+	expect(root.childNodes[3]).toBe(sibling);
+	expect(root.childNodes.includes(shown)).toBe(false);
+
+	// Same test value again: arm unchanged, so no symbol load and no journal ops.
+	const second = await subscriptions[0]!.run(false);
+	expect(second).toBeUndefined();
+	expect(loadedSymbols).toEqual(['symbol:flip']);
+	expect(renderedHtml).toEqual(['<p>Hidden</p>']);
+});

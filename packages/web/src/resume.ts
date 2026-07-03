@@ -143,6 +143,23 @@ export type ResumeAsyncBoundaryRead =
 
 export type ResumeBehaviorRecord = ProtocolViewPayload['behaviors'][number];
 
+export type ResumeBranchRecord = {
+	readonly id: string;
+	readonly startAnchor: ResumeDomComment;
+	readonly endAnchor: ResumeDomComment;
+	readonly symbolId: string;
+	readonly testReads: NonNullable<
+		NonNullable<ProtocolViewPayload['branches']>[number]['testReads']
+	>;
+};
+
+// A lazy branch-update symbol returns the newly selected arm plus the rebuilt
+// HTML for the range between the branch comment anchors.
+export type ResumeBranchUpdate = {
+	readonly arm: number;
+	readonly html: string;
+};
+
 export type ResumeViewRecord = {
 	readonly locators: ReadonlyArray<{
 		readonly hostNodeId: string;
@@ -155,6 +172,7 @@ export type ResumeViewRecord = {
 	readonly behaviors: ProtocolViewPayload['behaviors'];
 	readonly elementHandles: ProtocolViewPayload['elementHandles'];
 	readonly asyncBoundaries: ProtocolViewPayload['asyncBoundaries'];
+	readonly branches?: ProtocolViewPayload['branches'];
 };
 
 export type ResumeSymbolContext = {
@@ -180,7 +198,8 @@ export type ResumeSymbol = (
 	| void
 	| DomJournalResult
 	| ResumeBehaviorCleanup
-	| Promise<void | DomJournalResult | ResumeBehaviorCleanup>;
+	| ResumeBranchUpdate
+	| Promise<void | DomJournalResult | ResumeBehaviorCleanup | ResumeBranchUpdate>;
 
 export type ResumeRuntimeErrorContext = {
 	readonly phase: 'event';
@@ -203,6 +222,8 @@ export type ResumeRuntimeInput = {
 	readonly graph: RuntimeGraph;
 	readonly view: ResumeViewRecord;
 	readonly loadSymbol: (symbolId: string) => ResumeSymbol | Promise<ResumeSymbol>;
+	// Builds DOM nodes from branch-update HTML; browser default arrives with S6.
+	readonly renderBranchHtml?: (html: string) => ReadonlyArray<ResumeDomNode>;
 	readonly createVisibilityObserver?: ResumeVisibilityObserverFactory;
 	readonly createRemovalObserver?: ResumeRemovalObserverFactory;
 	readonly applyDomJournal?: (entries: ReadonlyArray<DomJournalEntry>) => void | Promise<void>;
@@ -367,6 +388,41 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 				path: [],
 				run(snapshot) {
 					return createAsyncBoundaryJournalEntries(asyncBoundary, asyncRead, snapshot);
+				},
+			});
+		}
+	}
+
+	for (const branch of materializeBranchLocators(input.root, input.view.branches ?? [])) {
+		// Seed the arm from the current test value; no symbol load until a flip.
+		let currentArm = readBranchArm(input.graph, branch);
+		for (const testRead of branch.testReads) {
+			input.graph.subscribe({
+				id: `branch-test:${branch.id}:${testRead.graphNodeId}:${testRead.path.join('.')}`,
+				graphNodeId: testRead.graphNodeId,
+				path: testRead.path,
+				async run() {
+					const newArm = readBranchArm(input.graph, branch);
+					if (newArm === currentArm) return;
+
+					const loadedSymbol = input.loadSymbol(branch.symbolId);
+					const symbol = isPromiseLike(loadedSymbol) ? await loadedSymbol : loadedSymbol;
+					const maybeUpdate = symbol({
+						graph: input.graph,
+						element: input.root,
+						getElementHandle: elementHandles.get,
+					});
+					const update = isPromiseLike(maybeUpdate) ? await maybeUpdate : maybeUpdate;
+					if (!isResumeBranchUpdate(update)) return;
+
+					currentArm = update.arm;
+					const fragment = input.renderBranchHtml
+						? input.renderBranchHtml(update.html)
+						: update.html;
+					return [
+						{ type: 'removeRange', locator: `branch:${branch.id}` },
+						{ type: 'insertRange', locator: `branch:${branch.id}:start`, fragment },
+					];
 				},
 			});
 		}
@@ -701,6 +757,52 @@ function asyncBoundaryRangeLocator(boundaryId: string): string {
 
 function asyncBoundaryStartLocator(boundaryId: string): string {
 	return `async-boundary:${boundaryId}:start`;
+}
+
+// testReads[0] is the branch test expression: truthy selects arm 0, else arm 1.
+function readBranchArm(graph: RuntimeGraph, branch: ResumeBranchRecord): number {
+	const testRead = branch.testReads[0]!;
+	return graph.read(testRead.graphNodeId, testRead.path) ? 0 : 1;
+}
+
+function isResumeBranchUpdate(value: unknown): value is ResumeBranchUpdate {
+	const update = value as { readonly arm?: unknown; readonly html?: unknown } | null;
+	return typeof update?.arm === 'number' && typeof update?.html === 'string';
+}
+
+function materializeBranchLocators(
+	root: ResumeDomElement,
+	branches: NonNullable<ResumeViewRecord['branches']>,
+): ResumeBranchRecord[] {
+	const records: ResumeBranchRecord[] = [];
+	if (branches.length === 0) return records;
+
+	// Branch anchors and async boundary anchors index one flat document-order
+	// comment stream, so both kinds share the same absolute indexes.
+	const comments = walkComments(root);
+	for (const branch of branches) {
+		// Records without an update symbol or test reads are static: skipped entirely.
+		if (!branch.symbolId || !branch.testReads || branch.testReads.length === 0) continue;
+
+		const startAnchor = comments[branch.startAnchor.index];
+		const endAnchor = comments[branch.endAnchor.index];
+		if (!startAnchor) {
+			throw missingCommentAnchorError(branch.id, 'startAnchor', branch.startAnchor.index);
+		}
+		if (!endAnchor) {
+			throw missingCommentAnchorError(branch.id, 'endAnchor', branch.endAnchor.index);
+		}
+
+		records.push({
+			id: branch.id,
+			startAnchor,
+			endAnchor,
+			symbolId: branch.symbolId,
+			testReads: branch.testReads,
+		});
+	}
+
+	return records;
 }
 
 function behaviorInputs(
