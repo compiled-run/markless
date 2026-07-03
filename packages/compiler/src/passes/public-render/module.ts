@@ -248,6 +248,7 @@ function emitPublicSsrRenderModule(
 		'async function marklessSsrRunAsyncComputed(snapshots, graphNodeId, run) { const signal = new AbortController().signal; try { const value = await run({ key: null, signal }); const snapshot = { status: "fulfilled", version: 1, key: null, value }; snapshots.push({ graphNodeId, snapshot }); return snapshot; } catch (error) { const snapshot = { status: "rejected", version: 1, key: null, error }; snapshots.push({ graphNodeId, snapshot }); return snapshot; } }',
 		'function marklessSsrAttachSnapshots(state, snapshots) { if (snapshots.length === 0) return state; const byId = new Map(snapshots.map((entry) => [entry.graphNodeId, entry.snapshot])); return { ...state, computed: (state.computed ?? []).map((computed) => byId.has(computed.graphNodeId) ? { ...computed, snapshot: byId.get(computed.graphNodeId) } : computed) }; }',
 		'function marklessSsrMergeBranches(payloadBranches, runtimeBranches) { const takenById = new Map(runtimeBranches.map((branch) => [branch.id, branch.takenArm])); return (payloadBranches ?? []).map((branch) => takenById.has(branch.id) ? { ...branch, takenArm: takenById.get(branch.id) } : branch); }',
+		'function marklessSsrArmHost(hostLocators) { hostLocators.marklessSsrExtraElements = (hostLocators.marklessSsrExtraElements ?? 0) + 1; return ""; }',
 		'function marklessSsrHost(hostLocators, hostNodeId, tagName) { hostLocators.push({ hostNodeId, strategy: "dom-order", index: hostLocators.length + (hostLocators.marklessSsrExtraElements ?? 0), tagName }); return ""; }',
 		'function marklessSsrDynamicTagName(value) { if (value === null || value === undefined || value === false || value === "") return null; const tag = String(value); if (!/^[a-zA-Z][a-zA-Z0-9:_.-]*$/.test(tag)) throw new Error("MARKLESS_DYNAMIC_TAG_INVALID: " + tag); return tag; }',
 		'function marklessSsrRepeatRows(hostLocators, items, renderRow, elementsPerRow, renderEmpty) { const list = Array.isArray(items) ? items : Array.from(items ?? []); if (list.length === 0) return renderEmpty ? renderEmpty() : ""; const html = list.map(renderRow).join(""); hostLocators.marklessSsrExtraElements = (hostLocators.marklessSsrExtraElements ?? 0) + list.length * elementsPerRow; return html; }',
@@ -290,6 +291,10 @@ type SsrRenderContext = {
 	readonly branchSites: PublicRenderModuleInput['semanticGraph']['branchSites'];
 	readonly branchReactivityGates: PublicRenderModuleInput['publicRenderPlan']['branchReactivityGates'];
 	nextBranchSiteIndex: number;
+	// Inside a gate-supported branch arm, host elements skip the locator
+	// stream (their records rewire via arm-relative host paths) but must
+	// still shift later locator indexes — the repeat-row extras discipline.
+	insideSupportedBranchArm?: boolean;
 	readonly styleScopeClass: string | null;
 	readonly source: string;
 };
@@ -512,7 +517,10 @@ function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string {
 			nextChildIndex: context.nextChildIndex,
 			nextComponentEdgeIndex: context.nextComponentEdgeIndex,
 		};
-		const consequentContext: SsrRenderContext = { ...context };
+		const consequentContext: SsrRenderContext = {
+			...context,
+			insideSupportedBranchArm: context.insideSupportedBranchArm || !!gate?.supported,
+		};
 		const consequent = emitHtmlBranch(
 			node.consequent as AnyNode | undefined,
 			consequentContext,
@@ -649,6 +657,9 @@ function ssrHostLocator(node: AnyNode, tagName: string, context: SsrRenderContex
 	// them yet; branch/list locator streams own that later. Rows render without
 	// locators and marklessSsrRepeatRows shifts the indexes of later hosts.
 	if (context.insideRepeatRow) return '""';
+	if (context.insideSupportedBranchArm) {
+		return 'marklessSsrArmHost(marklessSsrHostLocators)';
+	}
 	const hostNodeId = context.hostIdByNode.get(node);
 	return hostNodeId
 		? `marklessSsrHost(marklessSsrHostLocators, ${JSON.stringify(hostNodeId)}, ${JSON.stringify(tagName)})`
@@ -894,7 +905,12 @@ function emitSwitchHtml(node: AnyNode, context: HtmlRenderContext): string {
 		if (context.mode === 'csr' || !before) {
 			return joinSsrExpressions(children.map((child) => emitHtmlNode(child, context)));
 		}
-		const caseContext: SsrRenderContext = { ...context, ...before };
+		const caseContext: SsrRenderContext = {
+			...context,
+			...before,
+			insideSupportedBranchArm:
+				(context as SsrRenderContext).insideSupportedBranchArm || !!siteGate?.supported,
+		};
 		const body = joinSsrExpressions(children.map((child) => emitHtmlNode(child, caseContext)));
 		maxChildIndex = Math.max(maxChildIndex, caseContext.nextChildIndex);
 		maxComponentEdgeIndex = Math.max(maxComponentEdgeIndex, caseContext.nextComponentEdgeIndex);

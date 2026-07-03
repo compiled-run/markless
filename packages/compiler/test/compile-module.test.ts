@@ -1235,6 +1235,89 @@ export function App() @{
 	]);
 });
 
+test('compileTsrxModule plans arm records for branch arms with events', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/ArmEvents.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let open = state(true);
+	let note = state('');
+
+	<main>
+		@if (open) {
+			<section>
+				<button onClick={() => note = 'from-open'}>Open action</button>
+			</section>
+		} @else {
+			<section>
+				<button onClick={() => note = 'from-closed'}>Closed action</button>
+			</section>
+		}
+		<output>{note}</output>
+	</main>
+}
+`,
+		symbols: [],
+	});
+
+	// Arms with events are now gate-supported…
+	expect(result.publicRenderPlan.branchReactivityGates).toEqual([
+		{ branchSiteId: 'branch-site:0', supported: true },
+	]);
+	// …and their event records ride the branch record as arm-relative host
+	// paths (the L2 rowEvents convention), one entry per arm.
+	expect(result.protocolView.branches?.[0]).toEqual(
+		expect.objectContaining({
+			id: 'branch-site:0',
+			armRecords: [
+				expect.objectContaining({
+					events: [
+						expect.objectContaining({
+							hostPath: [0, 0],
+							eventName: 'click',
+							symbolIds: [expect.any(String)],
+						}),
+					],
+				}),
+				expect.objectContaining({
+					events: [
+						expect.objectContaining({
+							hostPath: [0, 0],
+							eventName: 'click',
+							symbolIds: [expect.any(String)],
+						}),
+					],
+				}),
+			],
+		}),
+	);
+	// Arm host events leave the flat stream — they can never match by
+	// dom-order locator after a flip.
+	expect(result.protocolView.events).toEqual([]);
+	// Arm hosts leave the locator stream with extras compensation, so the
+	// trailing <output> locator index still counts them.
+	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	const output = await (
+		ssrModule.marklessRenderSsr as () => Promise<{
+			readonly html: string;
+			readonly view: {
+				readonly locators: ReadonlyArray<{
+					readonly hostNodeId: string;
+					readonly index: number;
+					readonly tagName: string;
+				}>;
+			};
+		}>
+	)();
+	const outputLocator = output.view.locators.find((locator) => locator.tagName === 'output');
+	expect(outputLocator).toBeDefined();
+	// main(0), section(1), button(2) -> output at dom-order index 3.
+	expect(outputLocator!.index).toBe(3);
+	expect(output.view.locators.some((locator) => locator.tagName === 'button')).toBe(false);
+});
+
 test('compileTsrxModule emits branch anchors around the taken arm with union re-indexing', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/BranchFlip.tsrx',
@@ -1452,9 +1535,10 @@ export function App() @{
 		'<section><!--markless:branch:branch-site:0--><p>B</p><!--/markless:branch:branch-site:0--></section>',
 	);
 	// Only the rendered case's element may claim a dom-order locator slot.
+	// Arm hosts ride armRecords since L4 (single convention for all arms);
+	// only the section remains in the flat locator stream.
 	expect(output.view.locators).toEqual([
 		expect.objectContaining({ tagName: 'section', index: 0 }),
-		expect.objectContaining({ tagName: 'p', index: 1 }),
 	]);
 });
 
@@ -2044,7 +2128,13 @@ export function App() @{
 		symbols: [],
 	});
 
-	expect(result.protocolView.domUpdates).toEqual(
+	// L4: the spans are arm hosts of a gate-supported branch site, so the
+	// same-host conditional text update rides the branch armRecords instead
+	// of the flat stream (dom-order locators cannot name flip-replaced arms).
+	const armDomUpdates = (result.protocolView.branches ?? []).flatMap((branch) =>
+		(branch.armRecords ?? []).flatMap((arm) => arm.domUpdates),
+	);
+	expect(armDomUpdates).toEqual(
 		expect.arrayContaining([
 			expect.objectContaining({
 				source: 'playing',
@@ -2058,23 +2148,7 @@ export function App() @{
 			}),
 		]),
 	);
-
-	const conditionalTextHostIds = new Set(
-		result.protocolView.domUpdates
-			.filter(
-				(update) =>
-					update.target?.kind === 'text' &&
-					update.target.trueValue === 'Pause' &&
-					update.target.falseValue === 'Play',
-			)
-			.map((update) => update.hostNodeId),
-	);
-
-	expect(
-		result.publicRenderPlan.staticHostLocators.some((locator) =>
-			conditionalTextHostIds.has(locator.hostNodeId),
-		),
-	).toBe(true);
+	expect(result.protocolView.domUpdates).toEqual([]);
 });
 
 test('compileTsrxModule emits public render direct DOM artifacts for supported keyed repeats', async () => {

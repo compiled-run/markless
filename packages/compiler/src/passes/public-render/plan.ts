@@ -193,6 +193,7 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 			armTests = switchArmTests(found.node);
 			if (armTests === null) return [];
 		}
+		const armHosts = branchArms(found.node).map((arm) => collectArmHosts(arm, assignedHosts));
 		return [
 			{
 				branchSiteId: site.id,
@@ -200,6 +201,7 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 					? { graphNodeId: testResolved.binding.id, path: testResolved.path }
 					: null,
 				arms: arms as ReadonlyArray<ReadonlyArray<PublicRenderPlanBranchArmPart>>,
+				armHosts,
 				...(armTests ? { armTests } : {}),
 			},
 		];
@@ -402,6 +404,8 @@ function buildBranchArmParts(
 			if (isSpreadAttribute(attribute)) return false;
 			const name = getIdentifierName(attribute.name as AnyNode | undefined);
 			if (!name) return false;
+			// Record attributes are runtime wiring, not HTML.
+			if (isEventAttribute(name) || name === 'attach' || name === 'el') continue;
 			const value = attribute.value as AnyNode | undefined;
 			const expression = unwrapExpressionContainer(value);
 			const literal = !value
@@ -488,6 +492,34 @@ function switchArmTests(node: AnyNode): unknown[] | null {
 	return tests;
 }
 
+// Arm hosts are addressed by arm-relative raw childNodes paths (the same
+// convention keyed repeat rows use): arms render compact, so every
+// non-ignorable child occupies one childNodes slot.
+function collectArmHosts(
+	arm: ReadonlyArray<AnyNode>,
+	assignedHosts: AssignedHosts,
+): ReadonlyArray<{ readonly hostPath: ReadonlyArray<number>; readonly hostNodeId: string }> {
+	const hosts: Array<{ hostPath: ReadonlyArray<number>; hostNodeId: string }> = [];
+	const visit = (node: AnyNode, path: ReadonlyArray<number>): void => {
+		if (node.type !== 'Element' && node.type !== 'JSXElement') return;
+		const hostNodeId = assignedHosts.hostIdByNode.get(node);
+		if (hostNodeId) hosts.push({ hostPath: path, hostNodeId });
+		let childIndex = 0;
+		for (const child of asNodes(node.children)) {
+			if (isIgnorableTextNode(child)) continue;
+			visit(child, [...path, childIndex]);
+			childIndex++;
+		}
+	};
+	let index = 0;
+	for (const node of arm) {
+		if (isIgnorableTextNode(node)) continue;
+		visit(node, [index]);
+		index++;
+	}
+	return hosts;
+}
+
 function branchArms(node: AnyNode): AnyNode[][] {
 	if (node.type === 'JSXIfExpression') {
 		return [node.consequent, node.alternate].flatMap((arm) => {
@@ -529,12 +561,11 @@ function armNodeRecordFreeAndResolvable(
 		return !!graph && graph.binding.kind === 'state';
 	}
 	if (node.type !== 'Element' && node.type !== 'JSXElement') return false;
+	// Events, attach behaviors, and element handles are allowed since L4:
+	// their records ride the branch record as arm-relative host paths and the
+	// resume runtime rewires them on flip. Spreads still disqualify.
 	for (const attribute of getElementAttributes(node)) {
 		if (isSpreadAttribute(attribute)) return false;
-		const name = getIdentifierName(attribute.name as AnyNode | undefined);
-		if (!!name && (isEventAttribute(name) || name === 'attach' || name === 'el')) {
-			return false;
-		}
 	}
 	return asNodes(node.children).every(
 		(child) =>

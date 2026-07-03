@@ -218,7 +218,7 @@ test('planPublicRender gates plain-host record-free branch sites as supported', 
 	expect(plan.diagnostics).toEqual([]);
 });
 
-test('planPublicRender gates event-bearing and conditional branch arms as unsupported', async () => {
+test('planPublicRender supports event-bearing arms and gates conditional ones', async () => {
 	const { plan: eventPlan } = await createRenderPlan(
 		'src/EventBranch.tsrx',
 		appSource(
@@ -226,12 +226,10 @@ test('planPublicRender gates event-bearing and conditional branch arms as unsupp
 <section>@if (open) { <button onClick={() => count++}>Go</button> }</section>`,
 		),
 	);
+	// L4 lifted the record-free requirement: event-bearing arms are supported
+	// and their records ride the branch record as arm-relative host paths.
 	expect(eventPlan.branchReactivityGates).toEqual([
-		{
-			branchSiteId: 'branch-site:0',
-			supported: false,
-			reason: 'arm-content-unsupported',
-		},
+		{ branchSiteId: 'branch-site:0', supported: true },
 	]);
 
 	const { plan: nestedPlan } = await createRenderPlan(

@@ -767,6 +767,14 @@ export type PublicRenderPlanBranchArms = {
 	// Switch sites: literal case-test values per arm, null for @default.
 	// Absent for if-sites (truthiness selects arm 0/1).
 	readonly armTests?: ReadonlyArray<unknown>;
+	// Per arm: hosts addressed by arm-relative raw childNodes paths, so the
+	// runtime can rewire their records after a flip.
+	readonly armHosts?: ReadonlyArray<
+		ReadonlyArray<{
+			readonly hostPath: ReadonlyArray<number>;
+			readonly hostNodeId: string;
+		}>
+	>;
 };
 
 export type PublicRenderPlanAsyncBoundaryArms = {

@@ -35,19 +35,28 @@ export function createProtocolViewPayload(input: ProtocolViewPayloadInput): Prot
 
 	return {
 		version: ASYNC_PROTOCOL_VERSION,
-		locators: input.payloadArena.view.locators,
-		events: input.payloadArena.view.events.map((event) => ({
-			hostNodeId: event.hostNodeId,
-			eventName: event.eventName,
-			syncPolicy: event.syncPolicy,
-			symbolIds: eventSymbols.get(`${event.hostNodeId}:${event.eventName}`) ?? [],
-		})),
-		domUpdates: input.payloadArena.view.domUpdates.map((domUpdate) => ({
-			...domUpdate,
-			symbolId: domUpdateSymbols.get(
-				`${domUpdate.hostNodeId}:${domUpdateTargetKey(domUpdate.target)}:${domUpdate.graphNodeId}:${domUpdate.source}`,
-			),
-		})),
+		// Arm hosts ride branch armRecords (single convention for all arms):
+		// they leave every flat stream, since dom-order locators cannot name
+		// elements that a flip replaces.
+		locators: input.payloadArena.view.locators.filter(
+			(locator) => !armHostIds(input).has(locator.hostNodeId),
+		),
+		events: input.payloadArena.view.events
+			.filter((event) => !armHostIds(input).has(event.hostNodeId))
+			.map((event) => ({
+				hostNodeId: event.hostNodeId,
+				eventName: event.eventName,
+				syncPolicy: event.syncPolicy,
+				symbolIds: eventSymbols.get(`${event.hostNodeId}:${event.eventName}`) ?? [],
+			})),
+		domUpdates: input.payloadArena.view.domUpdates
+			.filter((domUpdate) => !armHostIds(input).has(domUpdate.hostNodeId))
+			.map((domUpdate) => ({
+				...domUpdate,
+				symbolId: domUpdateSymbols.get(
+					`${domUpdate.hostNodeId}:${domUpdateTargetKey(domUpdate.target)}:${domUpdate.graphNodeId}:${domUpdate.source}`,
+				),
+			})),
 		behaviors: input.payloadArena.view.behaviors.map((behavior, index) => ({
 			...behavior,
 			symbolId: behaviorSymbols.get(behavior.hostNodeId)?.[index],
@@ -155,6 +164,7 @@ function supportedBranchRecords(input: ProtocolViewPayloadInput) {
 			symbolId: armsBySite.get(site.id) ? branchSymbols.get(site.id)?.id : undefined,
 			testReads: branchSymbols.get(site.id)?.testReads ?? [],
 			armTests: armsBySite.get(site.id)?.armTests,
+			armRecords: branchArmRecords(input, site.id),
 		}));
 }
 
@@ -198,4 +208,72 @@ function boundaryUpdateSymbols(input: ProtocolViewPayloadInput): ReadonlyMap<str
 				: [],
 		),
 	);
+}
+
+function armHostIds(input: ProtocolViewPayloadInput): ReadonlySet<string> {
+	return new Set(
+		(input.publicRenderPlan.branchArms ?? []).flatMap((entry) =>
+			(entry.armHosts ?? []).flatMap((arm) => arm.map((host) => host.hostNodeId)),
+		),
+	);
+}
+
+// Per-arm records for gate-supported branch sites: everything the resume
+// runtime must rewire when an arm flips in, addressed by arm-relative host
+// paths (the keyed-repeat rowEvents convention).
+function branchArmRecords(input: ProtocolViewPayloadInput, branchSiteId: string) {
+	const arms = (input.publicRenderPlan.branchArms ?? []).find(
+		(entry) => entry.branchSiteId === branchSiteId,
+	);
+	if (!arms?.armHosts) return undefined;
+	const eventSymbols = new Map<string, string[]>();
+	const domUpdateSymbols = new Map<string, string>();
+	for (const symbol of input.symbolResolver.symbols) {
+		if (symbol.kind === 'event-handler') {
+			const key = `${symbol.hostNodeId}:${symbol.eventName}`;
+			const symbols = eventSymbols.get(key) ?? [];
+			symbols[symbol.order] = symbol.id;
+			eventSymbols.set(key, symbols);
+		}
+		if (symbol.kind === 'dom-update') {
+			domUpdateSymbols.set(
+				`${symbol.hostNodeId}:${domUpdateTargetKey(symbol.target)}:${symbol.graphNodeId}:${symbol.source}`,
+				symbol.id,
+			);
+		}
+	}
+	return arms.armHosts.map((armHostList) => {
+		const hostIds = new Map(armHostList.map((host) => [host.hostNodeId, host.hostPath]));
+		return {
+			events: input.payloadArena.view.events
+				.filter((event) => hostIds.has(event.hostNodeId))
+				.map((event) => ({
+					hostPath: hostIds.get(event.hostNodeId)!,
+					eventName: event.eventName,
+					syncPolicy: event.syncPolicy,
+					symbolIds: eventSymbols.get(`${event.hostNodeId}:${event.eventName}`) ?? [],
+				})),
+			domUpdates: input.payloadArena.view.domUpdates
+				.filter((domUpdate) => hostIds.has(domUpdate.hostNodeId))
+				.map((domUpdate) => ({
+					...domUpdate,
+					hostPath: hostIds.get(domUpdate.hostNodeId)!,
+					symbolId: domUpdateSymbols.get(
+						`${domUpdate.hostNodeId}:${domUpdateTargetKey(domUpdate.target)}:${domUpdate.graphNodeId}:${domUpdate.source}`,
+					),
+				})),
+			behaviors: input.payloadArena.view.behaviors
+				.filter((behavior) => hostIds.has(behavior.hostNodeId))
+				.map((behavior) => ({
+					...behavior,
+					hostPath: hostIds.get(behavior.hostNodeId)!,
+				})),
+			elementHandles: input.payloadArena.view.elementHandles
+				.filter((handle) => hostIds.has(handle.hostNodeId))
+				.map((handle) => ({
+					...handle,
+					hostPath: hostIds.get(handle.hostNodeId)!,
+				})),
+		};
+	});
 }
