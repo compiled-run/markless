@@ -42,6 +42,7 @@ export type ResumePayloadScriptsInput = EncodedPayloadScripts & {
 	readonly createVisibilityObserver?: ResumeRuntimeInput['createVisibilityObserver'];
 	readonly createRemovalObserver?: ResumeRuntimeInput['createRemovalObserver'];
 	readonly applyDomJournal?: ResumeRuntimeInput['applyDomJournal'];
+	readonly renderBranchHtml?: ResumeRuntimeInput['renderBranchHtml'];
 };
 
 export type ResumePayloadDocumentInput = Omit<
@@ -231,6 +232,11 @@ export async function resumeFromPayloadScripts(
 		((entries) =>
 			applyDomJournalEntries(entries, {
 				resolveTarget(locator) {
+					const branchAnchor = /^branch:(.+?)(:start|:end)$/.exec(String(locator));
+					if (branchAnchor) {
+						const record = runtime?.getBranch(branchAnchor[1]!);
+						return branchAnchor[2] === ':end' ? record?.endAnchor : record?.startAnchor;
+					}
 					return runtime?.getElement(String(locator));
 				},
 			}));
@@ -242,6 +248,7 @@ export async function resumeFromPayloadScripts(
 		createVisibilityObserver: input.createVisibilityObserver,
 		createRemovalObserver: input.createRemovalObserver,
 		applyDomJournal,
+		renderBranchHtml: input.renderBranchHtml,
 	});
 
 	await runtime.start();
@@ -264,7 +271,33 @@ export async function resumeFromPayloadDocument(
 		createVisibilityObserver: input.createVisibilityObserver,
 		createRemovalObserver: input.createRemovalObserver,
 		applyDomJournal: input.applyDomJournal,
+		renderBranchHtml: input.renderBranchHtml ?? documentTemplateBranchHtml(input.document),
 	});
+}
+
+// Browser default for branch flip fragments: parse the rebuilt arm HTML
+// through a <template> owned by the payload document. Hosts without
+// createElement (bare script decoders in tests) simply provide no default.
+function documentTemplateBranchHtml(
+	document: PayloadScriptDocument,
+): ResumeRuntimeInput['renderBranchHtml'] {
+	const createElement = (
+		document as {
+			readonly createElement?: (tagName: string) => {
+				innerHTML: string;
+				readonly content?: { readonly childNodes?: ArrayLike<unknown> };
+			};
+		}
+	).createElement;
+	if (typeof createElement !== 'function') return undefined;
+	return (html) => {
+		const template = createElement.call(document, 'template');
+		template.innerHTML = html;
+		// Snapshot: insertion moves live childNodes out of the template.
+		return Array.from(template.content?.childNodes ?? []) as ReturnType<
+			NonNullable<ResumeRuntimeInput['renderBranchHtml']>
+		>;
+	};
 }
 
 function readPayloadScriptFromDocument(

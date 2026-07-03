@@ -1352,3 +1352,105 @@ function captureThrown(run: () => unknown): unknown {
 
 	throw new Error('Expected callback to throw.');
 }
+
+test('resumeFromPayloadDocument builds branch flip fragments through the document template', async () => {
+	const { resumeFromPayloadDocument } = await import('../src/payload.ts');
+	const startComment = {
+		nodeType: 8 as const,
+		textContent: 'markless:branch:branch-site:0',
+		parentNode: null as unknown,
+	};
+	const endComment = {
+		nodeType: 8 as const,
+		textContent: '/markless:branch:branch-site:0',
+		parentNode: null as unknown,
+	};
+	const shown = fakeElement('P');
+	const root = fakeElement('MAIN', [startComment, shown, endComment]);
+	const state = JSON.stringify({
+		version: 1,
+		cells: [
+			{
+				graphNodeId: 'state:open',
+				name: 'open',
+				valueKind: 'scalar',
+				value: { version: 1, root: true, records: [] },
+			},
+		],
+		computed: [],
+	});
+	const view = JSON.stringify({
+		version: 1,
+		locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'main' }],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+		branches: [
+			{
+				id: 'branch-site:0',
+				startAnchor: { strategy: 'dom-order-comment', index: 0 },
+				endAnchor: { strategy: 'dom-order-comment', index: 1 },
+				symbolId: 'symbol:flip',
+				testReads: [{ source: 'open', graphNodeId: 'state:open', path: [] }],
+			},
+		],
+	});
+	const insertedTag = 'SPAN';
+	const templateNodes = [fakeElement(insertedTag)];
+	const template = {
+		innerHTML: '',
+		content: { childNodes: templateNodes },
+	};
+	const documentFake = {
+		querySelector(selector: string) {
+			if (selector.includes('markless/state')) return { textContent: state };
+			if (selector.includes('markless/view')) return { textContent: view };
+			return null;
+		},
+		createElement(tagName: string) {
+			expect(tagName).toBe('template');
+			return template;
+		},
+	};
+
+	const result = await resumeFromPayloadDocument({
+		document: documentFake as never,
+		root: root as never,
+		loadSymbol: () => () => ({ arm: 1, html: '<span>Hidden</span>' }),
+	});
+
+	result.graph.write({ graphNodeId: 'state:open', value: false });
+	await result.graph.flush?.();
+
+	// The default fragment builder parsed the flip html via the document
+	// template and inserted the resulting node between the anchors.
+	expect(
+		root.childNodes.map((child) => (child as { tagName?: string }).tagName ?? '#comment'),
+	).toEqual(['#comment', insertedTag, '#comment']);
+});
+
+function fakeElement(tagName: string, childNodes: unknown[] = []) {
+	const node = {
+		nodeType: 1 as const,
+		tagName,
+		childNodes: childNodes as Array<Record<string, unknown>>,
+		listeners: [] as unknown[],
+		addEventListener() {},
+		removeChild(child: Record<string, unknown>) {
+			const index = node.childNodes.indexOf(child);
+			if (index >= 0) node.childNodes.splice(index, 1);
+			(child as { parentNode?: unknown }).parentNode = null;
+			return child;
+		},
+		insertBefore(child: Record<string, unknown>, before: Record<string, unknown> | null) {
+			const index = before ? node.childNodes.indexOf(before) : -1;
+			(child as { parentNode?: unknown }).parentNode = node;
+			node.childNodes.splice(index >= 0 ? index : node.childNodes.length, 0, child);
+			return child;
+		},
+	};
+	for (const child of childNodes as Array<{ parentNode?: unknown }>) child.parentNode = node;
+	return node;
+}

@@ -241,6 +241,7 @@ export type ResumeRuntime = {
 	readonly activateBehaviors: (hostNodeId: string) => Promise<void>;
 	readonly getElement: (hostNodeId: string) => ResumeDomElement | undefined;
 	readonly getAsyncBoundary: (boundaryId: string) => ResumeAsyncBoundaryRecord | undefined;
+	readonly getBranch: (branchId: string) => ResumeBranchRecord | undefined;
 	readonly disposeHost: (hostNodeId: string) => void;
 };
 
@@ -393,7 +394,9 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 		}
 	}
 
+	const branchesById = new Map<string, ResumeBranchRecord>();
 	for (const branch of materializeBranchLocators(input.root, input.view.branches ?? [])) {
+		branchesById.set(branch.id, branch);
 		// Seed the arm from the current test value; no symbol load until a flip.
 		let currentArm = readBranchArm(input.graph, branch);
 		for (const testRead of branch.testReads) {
@@ -725,6 +728,9 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 		},
 		getAsyncBoundary(boundaryId) {
 			return asyncBoundariesById.get(boundaryId);
+		},
+		getBranch(branchId) {
+			return branchesById.get(branchId);
 		},
 		disposeHost,
 	};
