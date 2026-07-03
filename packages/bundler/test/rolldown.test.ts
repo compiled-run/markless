@@ -530,3 +530,52 @@ test('transformTsrxModule emits a scoped style virtual CSS module and imports it
 	expect(styleModule!.source).toMatch(/\.card\.mk-[a-z0-9]+ \{ color: red; \}/);
 	expect(result.code).toContain(`import ${JSON.stringify(styleModule!.id)};`);
 });
+
+test('transformTsrxModule escalates branch- and repeat-bearing modules to the full resume runtime', async () => {
+	const plain = await transformTsrxModule({
+		filename: '/workspace/app/src/Plain.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let count = state(0);
+
+	<main>
+		<button onClick={() => count++}>Add</button>
+		<output>{count}</output>
+	</main>
+}
+`,
+		environment: 'client',
+	});
+	expect(plain.code).toContain('resumeEventOnlyFromPayloadDocument');
+	expect(plain.code).not.toContain('resumeFromPayloadDocument');
+
+	const keyed = await transformTsrxModule({
+		filename: '/workspace/app/src/Rows.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let entries = state([{ code: 'a', title: 'Alpha' }]);
+	let chosen = state('');
+
+	<main>
+		<section>
+			@for (const entry of entries; key entry.code) {
+				<article>
+					<h2>{entry.title}</h2>
+					<button onClick={() => chosen = entry.code}>Choose</button>
+				</article>
+			}
+		</section>
+	</main>
+}
+`,
+		environment: 'client',
+	});
+	// Row events need graph subscriptions and locals dispatch: the event-only
+	// runtime silently drops them, so keyed modules take the full runtime.
+	expect(keyed.code).toContain('resumeFromPayloadDocument');
+	expect(keyed.code).not.toContain('resumeEventOnlyFromPayloadDocument');
+});

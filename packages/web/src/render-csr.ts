@@ -183,8 +183,10 @@ function canUseEventOnlyCsrRuntime(
 	if (view.behaviors.length > 0) return false;
 	if (view.elementHandles.length > 0) return false;
 	if (view.asyncBoundaries.length > 0) return false;
-	// Branch flips need graph subscriptions and range replacement.
+	// Branch flips need graph subscriptions and range replacement; keyed row
+	// events need locals dispatch. Both require the full resume runtime.
 	if ((view.branches?.length ?? 0) > 0) return false;
+	if ((view.keyedRepeats?.length ?? 0) > 0) return false;
 	if (view.events.some((event) => event.eventName === 'visible' || !!event.syncPolicy)) {
 		return false;
 	}
