@@ -41,7 +41,11 @@ type ParsedBundleGraphRecord = {
 	readonly deps: readonly ParsedBundleGraphEdge[];
 };
 
-const DEFAULT_MIN_PROBABILITY = 0.5;
+// Exactness is the preload contract: every chunk reachable from an
+// interaction's symbol roots can execute post-click, so it preloads by
+// default regardless of dynamic-edge probability (matching the SSR
+// planner). Callers relax deliberately via minProbability/maxPreloads.
+const DEFAULT_MIN_PROBABILITY = 0;
 const JAVASCRIPT_MODULE_RE = /\.(?:mjs|js)(?:[?#].*)?$/;
 const PRIORITY_RANK: Record<ModulePreloadPriority, number> = {
 	high: 2,

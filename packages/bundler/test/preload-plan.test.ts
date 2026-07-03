@@ -23,6 +23,73 @@ describe('module preload planning', () => {
 		]);
 	});
 
+	test('plans chained dynamic descendants by default (exact preloads, no waterfalls)', () => {
+		// Alternate-shaped graph (per the fixture-hardcoding guardrail): a
+		// wizard flow whose panel chunk dynamically imports a validator, which
+		// dynamically imports a formatter. Chained dynamic-edge probabilities
+		// decay below the old 0.5 default, so these interaction-reachable
+		// chunks were pruned from CSR head preloads — they executed post-click
+		// without ever being preloaded. Exactness is the contract: everything
+		// reachable from an interaction's roots preloads BY DEFAULT.
+		const graph = convertManifestToBundleGraph({
+			version: 1,
+			modules: [
+				{
+					source: '/workspace/app/src/wizard.tsrx',
+					payload: { virtualModuleId: 'virtual:markless:payload:wizard' },
+					resolver: { virtualModuleId: 'virtual:markless:resolver:wizard' },
+					symbols: [
+						{
+							symbolId: 'symbol:advance',
+							kind: 'event-handler',
+							exportName: 'onAdvance',
+							virtualModuleId: 'virtual:markless:symbol:wizard:advance',
+							fileName: 'build/panel.js',
+						},
+					],
+				},
+			],
+			bundles: {
+				'build/panel.js': {
+					size: 700,
+					total: 700,
+					imports: [],
+					dynamicImports: ['build/validator.js'],
+					symbols: ['symbol:advance'],
+					origins: ['src/wizard.tsrx'],
+				},
+				// Unrelated origin + large total mirrors the real pruned chunks
+				// (framework runtime modules dynamically imported cross-origin):
+				// edge probability lands below the old 0.5 default.
+				'build/validator.js': {
+					size: 40000,
+					total: 40000,
+					imports: [],
+					dynamicImports: ['build/formatter.js'],
+					symbols: [],
+					origins: ['src/shared-runtime.ts'],
+				},
+				'build/formatter.js': {
+					size: 40000,
+					total: 40000,
+					imports: [],
+					symbols: [],
+					origins: ['src/format-runtime.ts'],
+				},
+			},
+		} as never);
+
+		const preloads = planModulePreloadUrls({
+			base: '/assets/',
+			bundleGraph: graph,
+			roots: ['symbol:advance'],
+		});
+
+		expect(preloads).toContain('/assets/build/panel.js');
+		expect(preloads).toContain('/assets/build/validator.js');
+		expect(preloads).toContain('/assets/build/formatter.js');
+	});
+
 	test('dedupes shared transitive chunks across multiple symbol roots', () => {
 		const graph = convertManifestToBundleGraph(manifestWithComplexSymbolDeps());
 
