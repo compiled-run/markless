@@ -624,4 +624,26 @@ export function App() @{
 	// Async boundary settle and revalidation live only in the full runtime.
 	expect(boundaries.code).toContain('resumeFromPayloadDocument');
 	expect(boundaries.code).not.toContain('resumeEventOnlyFromPayloadDocument');
+
+	const withChild = await transformTsrxModule({
+		filename: '/workspace/app/src/Shell.tsrx',
+		source: `
+import { state } from '@markless/core';
+import { StatusBadge } from './StatusBadge.tsrx';
+
+export function Shell() @{
+	let streaming = state(true);
+
+	<main>
+		<button onClick={() => streaming = !streaming}>Toggle</button>
+		<StatusBadge active={streaming} />
+	</main>
+}
+`,
+		environment: 'client',
+	});
+	// Child components may compose branches/boundaries/handles into the served
+	// payload that the parent module cannot see at compile time: escalate.
+	expect(withChild.code).toContain('resumeFromPayloadDocument');
+	expect(withChild.code).not.toContain('resumeEventOnlyFromPayloadDocument');
 });

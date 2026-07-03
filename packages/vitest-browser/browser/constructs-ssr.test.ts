@@ -8,6 +8,7 @@ import ElementHandle from './fixtures/element-handle.tsrx';
 import FragmentRoot from './fixtures/fragment-root.tsrx';
 import FragmentBranch from './fixtures/fragment-branch.tsrx';
 import ProjectedCard from './fixtures/projected-card.tsrx';
+import Dashboard from './fixtures/dashboard.tsrx';
 import InputEcho from './fixtures/input-echo.tsrx';
 import OnlyIf from './fixtures/only-if.tsrx';
 import RowsChoose from './fixtures/rows-choose.tsrx';
@@ -254,4 +255,20 @@ test.fails('SSR: static children projection renders inside the wrapping componen
 	const button = container.querySelector('button');
 	(button as HTMLButtonElement).click();
 	await expect.poll(() => container.querySelector('output')?.textContent).toBe('clicked');
+});
+
+test('SSR: a child component @if driven by a parent prop resumes and flips', async () => {
+	// The demo-app regression shape, server-rendered: the child branch record
+	// must survive composition into the served payload so the resumed page can
+	// flip it from the parent-graph write.
+	const screen = await renderSSR(Dashboard);
+	const container = screen.container;
+
+	expect(container.querySelector('em.live')?.textContent).toBe('Live');
+	const button = container.querySelector('button');
+	(button as HTMLButtonElement).click();
+	await expect.poll(() => container.querySelector('em.idle')?.textContent).toBe('Idle');
+
+	(button as HTMLButtonElement).click();
+	await expect.poll(() => container.querySelector('em.live')?.textContent).toBe('Live');
 });

@@ -3219,6 +3219,72 @@ export function Dashboard() @{
 	]);
 });
 
+test('compileTsrxModule composes child-component branch records in SSR views', async () => {
+	const child = await compileTsrxModule({
+		filename: 'src/StatusBadge.tsrx',
+		source: `
+export function StatusBadge({ active }) @{
+	<span class="badge">
+		@if (active) { <em class="live">Live</em> } @else { <em class="idle">Idle</em> }
+	</span>
+}
+`,
+		symbols: [],
+	});
+	const parent = await compileTsrxModule({
+		filename: 'src/Dashboard.tsrx',
+		source: `
+import { state } from '@markless/core';
+import { StatusBadge } from './StatusBadge.tsrx';
+
+export function Dashboard() @{
+	let streaming = state(true);
+
+	<main>
+		<button onClick={() => streaming = !streaming}>Toggle</button>
+		<StatusBadge active={streaming} />
+	</main>
+}
+`,
+		symbols: [],
+	});
+
+	const childSsrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(child));
+	const parentSsrModule = await importPublicRenderTestModule(
+		ssrRenderTestModuleSource(parent, { replaceChildImport: true }),
+		{ childComponent: { renderSsr: childSsrModule.marklessRenderSsr } },
+	);
+	const output = await (
+		parentSsrModule.marklessRenderSsr as () => Promise<{
+			readonly html: string;
+			readonly view: {
+				readonly branches?: ReadonlyArray<{
+					readonly id: string;
+					readonly takenArm?: number;
+					readonly startAnchor: { readonly index: number };
+					readonly endAnchor: { readonly index: number };
+					readonly testReads?: ReadonlyArray<{ readonly graphNodeId: string }>;
+				}>;
+			};
+		}>
+	)();
+
+	// The served html carries prefixed anchor ids so instances cannot collide…
+	expect(output.html).toContain('<!--markless:branch:c0:branch-site:0-->');
+	expect(output.html).toContain('<em class="live">Live</em>');
+	// …and the composed payload carries the child branch record: prefixed id,
+	// runtime takenArm, remapped test read, anchors matching the html scan.
+	expect(output.view.branches).toEqual([
+		expect.objectContaining({
+			id: 'c0:branch-site:0',
+			takenArm: 0,
+			startAnchor: expect.objectContaining({ index: 0 }),
+			endAnchor: expect.objectContaining({ index: 1 }),
+			testReads: [expect.objectContaining({ graphNodeId: 'state:streaming' })],
+		}),
+	]);
+});
+
 test('compileTsrxModule composes imported child BUTTON counters for SSR resume', async () => {
 	const child = await compileTsrxModule({
 		filename: 'src/Counter.tsrx',
