@@ -383,6 +383,7 @@ export type PayloadArenaDiagnostic = StateLoweringDiagnostic;
 export type PayloadAsyncBoundary = {
 	readonly id: string;
 	readonly kind: 'async-boundary';
+	readonly anchorOrder: number;
 	readonly startAnchor: {
 		readonly strategy: 'dom-order-comment';
 		readonly index: number;
@@ -465,6 +466,7 @@ export type PayloadArenaArtifact = {
 			readonly name: string;
 		}>;
 		readonly asyncBoundaries: ReadonlyArray<PayloadAsyncBoundary>;
+		readonly branchSites: ReadonlyArray<{ readonly id: string; readonly anchorOrder: number }>;
 	};
 	readonly diagnostics: ReadonlyArray<PayloadArenaDiagnostic>;
 };

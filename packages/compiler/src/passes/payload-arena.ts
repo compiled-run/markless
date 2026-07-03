@@ -106,6 +106,7 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 	const asyncBoundaries = input.semanticGraph.asyncBoundaries.map((boundary) => ({
 		id: boundary.id,
 		kind: 'async-boundary' as const,
+		anchorOrder: boundary.anchorOrder,
 		startAnchor: {
 			strategy: 'dom-order-comment' as const,
 			index: (anchorRank.get(boundary.id) ?? 0) * 2,
@@ -161,6 +162,10 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 			behaviors,
 			elementHandles,
 			asyncBoundaries,
+			branchSites: input.semanticGraph.branchSites.map((site) => ({
+				id: site.id,
+				anchorOrder: site.anchorOrder,
+			})),
 		},
 		diagnostics: input.stateLowering.diagnostics,
 	};

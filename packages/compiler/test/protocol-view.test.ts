@@ -216,5 +216,6 @@ function allSupportedPlan(payloadArena: {
 			boundaryId: boundary.id,
 			supported: true as const,
 		})),
+		branchReactivityGates: [],
 	} as never;
 }

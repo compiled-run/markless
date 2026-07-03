@@ -56,11 +56,20 @@ export function createProtocolViewPayload(input: ProtocolViewPayloadInput): Prot
 		// Only gate-supported boundaries have SSR-emitted anchors; shipping
 		// records for ungated boundaries would make resume throw
 		// missingCommentAnchorError. Re-index contiguously over the emitted set.
+		// Branch and boundary anchor pairs share one document-order stream, so
+		// re-indexing allocates over the emitted union in anchorOrder.
+		branches: supportedBranchRecords(input),
 		asyncBoundaries: supportedAsyncBoundaries(input).map(
-			({ kind: _kind, ...boundary }, index) => ({
+			({ kind: _kind, anchorOrder: _order, ...boundary }) => ({
 				...boundary,
-				startAnchor: { ...boundary.startAnchor, index: index * 2 },
-				endAnchor: { ...boundary.endAnchor, index: index * 2 + 1 },
+				startAnchor: {
+					...boundary.startAnchor,
+					index: emittedPairRank(input, boundary.id) * 2,
+				},
+				endAnchor: {
+					...boundary.endAnchor,
+					index: emittedPairRank(input, boundary.id) * 2 + 1,
+				},
 				asyncReads: boundary.asyncReads.map((read) => ({
 					...read,
 					runnerSymbolId: asyncRunnerSymbols.get(read.graphNodeId),
@@ -90,4 +99,48 @@ function supportedAsyncBoundaries(input: ProtocolViewPayloadInput) {
 		),
 	);
 	return input.payloadArena.view.asyncBoundaries.filter((boundary) => supported.has(boundary.id));
+}
+
+function supportedBranchIds(input: ProtocolViewPayloadInput): ReadonlySet<string> {
+	return new Set(
+		(input.publicRenderPlan.branchReactivityGates ?? []).flatMap((gate) =>
+			gate.supported ? [gate.branchSiteId] : [],
+		),
+	);
+}
+
+function emittedAnchorPairs(input: ProtocolViewPayloadInput) {
+	const branchIds = supportedBranchIds(input);
+	const supportedBoundaryIds = new Set(
+		input.publicRenderPlan.asyncBoundaryGates.flatMap((gate) =>
+			gate.supported ? [gate.boundaryId] : [],
+		),
+	);
+	return [
+		...(input.payloadArena.view.branchSites ?? []).filter((site) => branchIds.has(site.id)),
+		...input.payloadArena.view.asyncBoundaries
+			.filter((boundary) => supportedBoundaryIds.has(boundary.id))
+			.map((boundary) => ({ id: boundary.id, anchorOrder: boundary.anchorOrder })),
+	].sort((left, right) => left.anchorOrder - right.anchorOrder);
+}
+
+function emittedPairRank(input: ProtocolViewPayloadInput, id: string): number {
+	return emittedAnchorPairs(input).findIndex((pair) => pair.id === id);
+}
+
+function supportedBranchRecords(input: ProtocolViewPayloadInput) {
+	const branchIds = supportedBranchIds(input);
+	return (input.payloadArena.view.branchSites ?? [])
+		.filter((site) => branchIds.has(site.id))
+		.map((site) => ({
+			id: site.id,
+			startAnchor: {
+				strategy: 'dom-order-comment' as const,
+				index: emittedPairRank(input, site.id) * 2,
+			},
+			endAnchor: {
+				strategy: 'dom-order-comment' as const,
+				index: emittedPairRank(input, site.id) * 2 + 1,
+			},
+		}));
 }

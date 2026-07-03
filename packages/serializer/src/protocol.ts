@@ -168,6 +168,11 @@ export type ProtocolViewPayload = {
 		readonly handleId: string;
 		readonly name: string;
 	}>;
+	readonly branches?: ReadonlyArray<{
+		readonly id: string;
+		readonly startAnchor: { readonly strategy: 'dom-order-comment'; readonly index: number };
+		readonly endAnchor: { readonly strategy: 'dom-order-comment'; readonly index: number };
+	}>;
 	readonly asyncBoundaries: ReadonlyArray<{
 		readonly id: string;
 		readonly startAnchor: {

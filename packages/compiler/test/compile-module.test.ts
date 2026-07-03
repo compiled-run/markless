@@ -1138,6 +1138,59 @@ export function App() @{
 	]);
 });
 
+test('compileTsrxModule emits branch anchors around the taken arm with union re-indexing', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/BranchFlip.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let open = state(true);
+	let value = state('ready');
+
+	<section>
+		@if (open) { <p>Shown</p> } @else { <p>Hidden</p> }
+		@try { <em>{value}</em> } @pending { <em>Loading</em> } @catch { <em>Broken</em> }
+	</section>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.branchReactivityGates).toEqual([
+		{ branchSiteId: 'branch-site:0', supported: true },
+	]);
+	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	const output = (
+		ssrModule.marklessRenderSsr as () => {
+			readonly html: string;
+			readonly view: {
+				readonly branches?: ReadonlyArray<Record<string, unknown>>;
+			};
+		}
+	)();
+
+	// Anchors wrap only the taken arm; the async boundary keeps its own pair.
+	expect(output.html).toBe(
+		'<section>' +
+			'<!--markless:branch:branch-site:0--><p>Shown</p><!--/markless:branch:branch-site:0-->' +
+			'<!--markless:async:boundary:0--><em>Loading</em><!--/markless:async:boundary:0-->' +
+			'</section>',
+	);
+	// The runtime records which arm rendered.
+	expect(output.view.branches).toEqual([
+		expect.objectContaining({ id: 'branch-site:0', takenArm: 0 }),
+	]);
+	// Union re-indexing: the branch pair takes comment indexes 0/1, so the
+	// boundary's payload anchors shift to 2/3.
+	expect(result.protocolView.asyncBoundaries[0]).toEqual(
+		expect.objectContaining({
+			startAnchor: expect.objectContaining({ index: 2 }),
+			endAnchor: expect.objectContaining({ index: 3 }),
+		}),
+	);
+});
+
 test('compileTsrxModule ships only gate-supported async boundary anchors, re-indexed', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/NestedAsync.tsrx',
@@ -1255,7 +1308,9 @@ export function App() @{
 		}
 	)();
 
-	expect(output.html).toBe('<section><p>B</p></section>');
+	expect(output.html).toBe(
+		'<section><!--markless:branch:branch-site:0--><p>B</p><!--/markless:branch:branch-site:0--></section>',
+	);
 	// Only the rendered case's element may claim a dom-order locator slot.
 	expect(output.view.locators).toEqual([
 		expect.objectContaining({ tagName: 'section', index: 0 }),
@@ -1286,7 +1341,9 @@ export function App() @{
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
 	const output = (ssrModule.marklessRenderSsr as () => { readonly html: string })();
 
-	expect(output.html).toBe('<section><p>D</p></section>');
+	expect(output.html).toBe(
+		'<section><!--markless:branch:branch-site:0--><p>D</p><!--/markless:branch:branch-site:0--></section>',
+	);
 });
 
 test('compileTsrxModule passes component children into SSR component props', async () => {

@@ -191,6 +191,9 @@ function emitPublicSsrRenderModule(
 		asyncBoundaries: input.semanticGraph.asyncBoundaries,
 		asyncBoundaryGates: input.publicRenderPlan.asyncBoundaryGates,
 		nextAsyncBoundaryIndex: 0,
+		branchSites: input.semanticGraph.branchSites,
+		branchReactivityGates: input.publicRenderPlan.branchReactivityGates,
+		nextBranchSiteIndex: 0,
 		styleScopeClass: input.publicRenderPlan.styleScopes[0]?.scopeId ?? null,
 		source: input.source.source,
 	};
@@ -215,6 +218,7 @@ function emitPublicSsrRenderModule(
 		destructureProps(rootInfo.propNames),
 		...stateLocalLines(input, 'marklessSsrStateValue'),
 		'	const marklessSsrChildren = [];',
+		'	const marklessSsrBranches = [];',
 		'	const marklessSsrHostLocators = [];',
 		`	const html = ${htmlExpression};`,
 		'	const marklessSsrComposition = marklessSsrComposeView(payloadView, marklessSsrHostLocators, marklessSsrChildren);',
@@ -222,13 +226,14 @@ function emitPublicSsrRenderModule(
 		'	return {',
 		'		html,',
 		'		state: marklessSsrState,',
-		'		view: marklessSsrComposition.view,',
+		'		view: { ...marklessSsrComposition.view, branches: marklessSsrBranches },',
 		'		propEvents: marklessSsrPropEvents,',
 		'		externalSymbolIds: marklessSsrComposition.externalSymbolIds,',
 		'	};',
 		'}',
 		'function marklessSsrStateValue(graphNodeId) { return marklessSsrStateValues.get(graphNodeId); }',
 		'function marklessSsrRenderChild(children, component, props, child) { const output = component?.renderSsr?.(props); if (output) children.push({ ...child, output, callbackProps: props?.__marklessSsrCallbacks ?? {} }); return output?.html ?? ""; }',
+		'function marklessSsrBranchArm(branches, id, takenArm) { branches.push({ id, takenArm }); return ""; }',
 		'function marklessSsrHost(hostLocators, hostNodeId, tagName) { hostLocators.push({ hostNodeId, strategy: "dom-order", index: hostLocators.length + (hostLocators.marklessSsrExtraElements ?? 0), tagName }); return ""; }',
 		'function marklessSsrDynamicTagName(value) { if (value === null || value === undefined || value === false || value === "") return null; const tag = String(value); if (!/^[a-zA-Z][a-zA-Z0-9:_.-]*$/.test(tag)) throw new Error("MARKLESS_DYNAMIC_TAG_INVALID: " + tag); return tag; }',
 		'function marklessSsrRepeatRows(hostLocators, items, renderRow, elementsPerRow, renderEmpty) { const list = Array.isArray(items) ? items : Array.from(items ?? []); if (list.length === 0) return renderEmpty ? renderEmpty() : ""; const html = list.map(renderRow).join(""); hostLocators.marklessSsrExtraElements = (hostLocators.marklessSsrExtraElements ?? 0) + list.length * elementsPerRow; return html; }',
@@ -263,6 +268,9 @@ type SsrRenderContext = {
 	readonly asyncBoundaries: PublicRenderModuleInput['semanticGraph']['asyncBoundaries'];
 	readonly asyncBoundaryGates: PublicRenderModuleInput['publicRenderPlan']['asyncBoundaryGates'];
 	nextAsyncBoundaryIndex: number;
+	readonly branchSites: PublicRenderModuleInput['semanticGraph']['branchSites'];
+	readonly branchReactivityGates: PublicRenderModuleInput['publicRenderPlan']['branchReactivityGates'];
+	nextBranchSiteIndex: number;
 	readonly styleScopeClass: string | null;
 	readonly source: string;
 };
@@ -454,6 +462,10 @@ function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string {
 			return `(${testSource} ? ${emitHtmlBranch(node.consequent as AnyNode | undefined, context)} : ${emitHtmlBranch(node.alternate as AnyNode | undefined, context)})`;
 		}
 
+		const site = context.branchSites[context.nextBranchSiteIndex++];
+		const gate = site
+			? context.branchReactivityGates.find((item) => item.branchSiteId === site.id)
+			: undefined;
 		const before = {
 			nextChildIndex: context.nextChildIndex,
 			nextComponentEdgeIndex: context.nextComponentEdgeIndex,
@@ -463,8 +475,11 @@ function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string {
 			node.consequent as AnyNode | undefined,
 			consequentContext,
 		);
+		// Child/component counters reset per arm (one arm renders at runtime);
+		// semantic-order counters continue sequentially across arms so nested
+		// sites keep their document-order alignment.
 		const alternateContext = {
-			...context,
+			...consequentContext,
 			nextChildIndex: before.nextChildIndex,
 			nextComponentEdgeIndex: before.nextComponentEdgeIndex,
 		};
@@ -477,6 +492,24 @@ function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string {
 			consequentContext.nextComponentEdgeIndex,
 			alternateContext.nextComponentEdgeIndex,
 		);
+		context.nextRepeatIndex = alternateContext.nextRepeatIndex;
+		context.nextAsyncBoundaryIndex = alternateContext.nextAsyncBoundaryIndex;
+		context.nextBranchSiteIndex = alternateContext.nextBranchSiteIndex;
+
+		if (site && gate?.supported) {
+			// Anchors always materialize; only the taken arm renders between them.
+			return joinSsrExpressions([
+				JSON.stringify(`<!--markless:branch:${site.id}-->`),
+				`(${testSource} ? ${joinSsrExpressions([
+					`marklessSsrBranchArm(marklessSsrBranches, ${JSON.stringify(site.id)}, 0)`,
+					consequent,
+				])} : ${joinSsrExpressions([
+					`marklessSsrBranchArm(marklessSsrBranches, ${JSON.stringify(site.id)}, 1)`,
+					alternate,
+				])})`,
+				JSON.stringify(`<!--/markless:branch:${site.id}-->`),
+			]);
+		}
 		return `(${testSource} ? ${consequent} : ${alternate})`;
 	}
 
@@ -732,6 +765,12 @@ function emitDynamicTagHtml(node: AnyNode, context: HtmlRenderContext): string {
 // No matching case and no @default renders nothing, matching @if's untaken
 // branch behavior.
 function emitSwitchHtml(node: AnyNode, context: HtmlRenderContext): string {
+	const site =
+		context.mode === 'ssr' ? context.branchSites[context.nextBranchSiteIndex++] : undefined;
+	const siteGate =
+		site && context.mode === 'ssr'
+			? context.branchReactivityGates.find((item) => item.branchSiteId === site.id)
+			: undefined;
 	const discriminant = node.discriminant as AnyNode | undefined;
 	const discriminantSource = discriminant
 		? expressionSource(discriminant, context.source)
@@ -780,7 +819,15 @@ function emitSwitchHtml(node: AnyNode, context: HtmlRenderContext): string {
 	for (const testedCase of [...testedCases].reverse()) {
 		expression = `(marklessSwitchValue === (${testedCase.testSource}) ? ${testedCase.body} : ${expression})`;
 	}
-	return `((marklessSwitchValue) => ${expression})(${discriminantSource})`;
+	const chain = `((marklessSwitchValue) => ${expression})(${discriminantSource})`;
+	if (site && siteGate?.supported) {
+		return joinSsrExpressions([
+			JSON.stringify(`<!--markless:branch:${site.id}-->`),
+			chain,
+			JSON.stringify(`<!--/markless:branch:${site.id}-->`),
+		]);
+	}
+	return chain;
 }
 
 function emitHtmlBranch(node: AnyNode | undefined, context: HtmlRenderContext): string {
