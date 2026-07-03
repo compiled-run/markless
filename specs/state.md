@@ -125,19 +125,32 @@ The critical path to "full spec implementation" still requires:
   event/DOM behavior without requiring `markless/state`, `markless/view`, or the
   resumer script
 - broaden the early SSR `renderToString(App, options)` runtime entry beyond the
-  current package-level payload/resumer shell so it executes generated compiler
-  render artifacts, awaits demanded async work, serializes real
-  graph/view/symbol/async snapshots into container-scoped payloads, generates
-  production-sized feature-sliced inline resumers for interactive containers,
-  and consumes canonical payload scripts as data rather than treating payload
-  rendering as the whole render pipeline
-- browser resume that performs concrete DOM replacement/mutation behavior for
-  all planned binding and async-boundary cases
-- broaden the CSR-only `packages/vitest-browser` helper from its current
-  DOM-like package tests into targeted Vitest browser-mode runtime DOM mechanics
-  where SSR/initial-render output is not under test, including event timing, DOM
-  journal application, `IntersectionObserver`, element handle lookup, and
-  microtask behavior
+  current payload/resumer shell so it generates production-sized feature-sliced
+  inline resumers for interactive containers. Landed 2026-07-03: `renderToString`
+  is async and v1 initial render awaits demanded async work inside supported
+  boundaries — the generated `marklessRenderSsr` runs the authored async
+  computed inline with an abortable signal, serves the resolved `@try`/`@catch`
+  arm between the boundary anchors, and serializes the fulfilled/rejected
+  snapshot (envelope-encoded via `serializeRuntimeAsyncSnapshots`) so resumed
+  pages start zero runners; browser runners are revalidation-only
+- browser resume DOM replacement for planned binding and async-boundary cases.
+  Landed 2026-07-03 for the supported gated set: branch flips (`@if`/`@switch`
+  via lazy `branch-update` symbols), keyed repeat row events with item locals,
+  async boundary settle/revalidation (`async-boundary-update` symbols reading
+  settled values through authored graph paths), each witness-proven
+  (`ssr-branch-flip`, `ssr-rows-dispatch`, `ssr-async-settle` boxes). Caveats:
+  settle modules do not bind the `@catch` error parameter yet (static/graph
+  arms only); snapshot `key` serializes as null in v1 (revalidation recomputes
+  dependency keys); list patching/moveRange for keyed repeats remains deferred
+- `packages/vitest-browser` now hosts a real browser-mode harness (2026-07-03):
+  a root vite-plus playwright browser test project, `renderServerHTML` (script
+  re-insertion + SSR fingerprint rejection), and a minimal `renderSSR` transform
+  plugin (ssrLoadModule + renderToString on the shared dev server; symbol URLs
+  resolve with no warm-up). A full TSRX-construct matrix (13 CSR + 13 SSR tests)
+  runs in headless Chromium in the normal `vp test` flow; v1 limits (no props,
+  no local components in test files) fail loudly at transform time. Owner note:
+  spec 00's "must not become the canonical SSR/resume proof harness" wording
+  should be revisited — witness remains the gate for pipeline/build claims
 - full `onVisible` visibility-event support beyond the current host-agnostic
   observer hook and structural global `IntersectionObserver` adapter coverage,
   including current value read semantics, generated-build integration, real
