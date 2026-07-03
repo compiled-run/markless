@@ -96,15 +96,24 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 			},
 		];
 	});
-	const asyncBoundaries = input.semanticGraph.asyncBoundaries.map((boundary, index) => ({
+	// Unified comment-anchor stream: branch sites and async boundaries share
+	// one document-order allocator (rank derives from collection anchorOrder).
+	const anchorRank = new Map(
+		[...input.semanticGraph.branchSites, ...input.semanticGraph.asyncBoundaries]
+			.sort((left, right) => left.anchorOrder - right.anchorOrder)
+			.map((record, rank) => [record.id, rank] as const),
+	);
+	const asyncBoundaries = input.semanticGraph.asyncBoundaries.map((boundary) => ({
 		id: boundary.id,
+		kind: 'async-boundary' as const,
+		anchorOrder: boundary.anchorOrder,
 		startAnchor: {
 			strategy: 'dom-order-comment' as const,
-			index: index * 2,
+			index: (anchorRank.get(boundary.id) ?? 0) * 2,
 		},
 		endAnchor: {
 			strategy: 'dom-order-comment' as const,
-			index: index * 2 + 1,
+			index: (anchorRank.get(boundary.id) ?? 0) * 2 + 1,
 		},
 		asyncReads: uniqueBy(
 			input.semanticGraph.templateReads.flatMap((read) => {
@@ -153,6 +162,10 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 			behaviors,
 			elementHandles,
 			asyncBoundaries,
+			branchSites: input.semanticGraph.branchSites.map((site) => ({
+				id: site.id,
+				anchorOrder: site.anchorOrder,
+			})),
 		},
 		diagnostics: input.stateLowering.diagnostics,
 	};
@@ -195,7 +208,16 @@ function behaviorInputGraphReads(
 	const graphReads = inputSources.flatMap((inputSource, inputIndex) => {
 		const resolved = resolveGraphPath(inputSource, bindings, aliases);
 		if (!resolved) return [];
-		if (resolved.binding.kind !== 'state' && resolved.binding.kind !== 'computed') return [];
+		// Prop reads stay in the record so composition can remap them to the
+		// parent graph node — dropping them left composed child behaviors
+		// activating with undefined inputs.
+		if (
+			resolved.binding.kind !== 'state' &&
+			resolved.binding.kind !== 'computed' &&
+			resolved.binding.kind !== 'prop'
+		) {
+			return [];
+		}
 
 		return [
 			{

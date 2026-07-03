@@ -136,6 +136,16 @@ export type SemanticKeyedRepeat = {
 	readonly keyPath: ReadonlyArray<string>;
 };
 
+// A reactive branch site (@if or @switch) sharing the unified document-order
+// comment-anchor allocator with async boundaries.
+export type SemanticBranchSite = {
+	readonly id: string;
+	readonly kind: 'if' | 'switch';
+	readonly armCount: number;
+	readonly testSource: string;
+	readonly anchorOrder: number;
+};
+
 export type SemanticSyncPolicyCondition =
 	| {
 			readonly type: 'and';
@@ -313,7 +323,8 @@ export type SemanticGraphArtifact = {
 	readonly stateReads: ReadonlyArray<SemanticStateRead>;
 	readonly templateReads: ReadonlyArray<SemanticTemplateRead>;
 	readonly stateWrites: ReadonlyArray<SemanticStateWrite>;
-	readonly asyncBoundaries: ReadonlyArray<{ readonly id: string }>;
+	readonly asyncBoundaries: ReadonlyArray<{ readonly id: string; readonly anchorOrder: number }>;
+	readonly branchSites: ReadonlyArray<SemanticBranchSite>;
 	readonly diagnostics: ReadonlyArray<SemanticGraphDiagnostic>;
 };
 
@@ -371,6 +382,8 @@ export type PayloadArenaDiagnostic = StateLoweringDiagnostic;
 
 export type PayloadAsyncBoundary = {
 	readonly id: string;
+	readonly kind: 'async-boundary';
+	readonly anchorOrder: number;
 	readonly startAnchor: {
 		readonly strategy: 'dom-order-comment';
 		readonly index: number;
@@ -453,6 +466,7 @@ export type PayloadArenaArtifact = {
 			readonly name: string;
 		}>;
 		readonly asyncBoundaries: ReadonlyArray<PayloadAsyncBoundary>;
+		readonly branchSites: ReadonlyArray<{ readonly id: string; readonly anchorOrder: number }>;
 	};
 	readonly diagnostics: ReadonlyArray<PayloadArenaDiagnostic>;
 };
@@ -475,6 +489,14 @@ export type PlannedSymbol =
 			readonly order: number;
 			readonly reads?: ReadonlyArray<LoweredStateRead>;
 			readonly writes?: ReadonlyArray<LoweredStateWrite>;
+			// Method calls on element() handles inside the handler, with their
+			// offset into the handler source for statement-order emission.
+			readonly elementHandleCalls?: ReadonlyArray<{
+				readonly handleName: string;
+				readonly method: string;
+				readonly argumentSources: ReadonlyArray<string>;
+				readonly offset: number;
+			}>;
 	  }
 	| {
 			readonly id: string;
@@ -512,6 +534,23 @@ export type PlannedSymbol =
 			readonly source: string;
 			readonly dependencies?: ReadonlyArray<SemanticGraphDependency>;
 			readonly moduleImports?: ReadonlyArray<SemanticModuleImport>;
+	  }
+	| {
+			readonly id: string;
+			readonly kind: 'async-boundary-update';
+			readonly boundaryId: string;
+			readonly graphNodeId: string;
+	  }
+	| {
+			readonly id: string;
+			readonly kind: 'branch-update';
+			readonly branchSiteId: string;
+			readonly testSource: string;
+			readonly testReads: ReadonlyArray<{
+				readonly source: string;
+				readonly graphNodeId: string;
+				readonly path: ReadonlyArray<string>;
+			}>;
 	  };
 
 export type SymbolResolverPlan = {
@@ -596,6 +635,7 @@ export type ProtocolStatePayloadInput = {
 export type ProtocolViewPayloadInput = {
 	readonly payloadArena: PayloadArenaArtifact;
 	readonly symbolResolver: SymbolResolverPlan;
+	readonly publicRenderPlan: PublicRenderPlanArtifact;
 };
 
 export type PayloadScriptsInput = {
@@ -692,6 +732,7 @@ export type PublicRenderPlanRepeatGate =
 export type PublicRenderPlanKeyedRepeat = {
 	readonly repeatId: string;
 	readonly parentHostNodeId: string;
+	readonly rowElementCount?: number;
 	readonly parentLocator: PayloadArenaArtifact['view']['locators'][number];
 	readonly parentPath: ReadonlyArray<number>;
 	readonly rowHostNodeId?: string;
@@ -700,10 +741,61 @@ export type PublicRenderPlanKeyedRepeat = {
 	readonly collectionPath: ReadonlyArray<string>;
 	readonly keyPath: ReadonlyArray<string>;
 	readonly rowTemplateHtml: string;
+	// Rendered when the collection is empty; null when no supported @empty block.
+	readonly emptyTemplateHtml: string | null;
 	readonly textWrites: ReadonlyArray<PublicRenderPlanTextWrite>;
 	readonly classWrites: ReadonlyArray<PublicRenderPlanClassWrite>;
 	readonly eventControls: ReadonlyArray<PublicRenderPlanEventControl>;
 };
+
+export type PublicRenderPlanBranchArmPart =
+	| { readonly text: string }
+	| {
+			readonly read: {
+				readonly graphNodeId: string;
+				readonly path: ReadonlyArray<string>;
+			};
+	  };
+
+export type PublicRenderPlanBranchArms = {
+	readonly branchSiteId: string;
+	readonly testRead: {
+		readonly graphNodeId: string;
+		readonly path: ReadonlyArray<string>;
+	} | null;
+	readonly arms: ReadonlyArray<ReadonlyArray<PublicRenderPlanBranchArmPart>>;
+	// Switch sites: literal case-test values per arm, null for @default.
+	// Absent for if-sites (truthiness selects arm 0/1).
+	readonly armTests?: ReadonlyArray<unknown>;
+	// Per arm: hosts addressed by arm-relative raw childNodes paths, so the
+	// runtime can rewire their records after a flip.
+	readonly armHosts?: ReadonlyArray<
+		ReadonlyArray<{
+			readonly hostPath: ReadonlyArray<number>;
+			readonly hostNodeId: string;
+		}>
+	>;
+};
+
+export type PublicRenderPlanAsyncBoundaryArms = {
+	readonly boundaryId: string;
+	// arms[0] = fulfilled (@try), arms[1] = rejected (@catch).
+	readonly arms: ReadonlyArray<ReadonlyArray<PublicRenderPlanBranchArmPart>>;
+};
+
+export type PublicRenderPlanBranchGate =
+	| {
+			readonly branchSiteId: string;
+			readonly supported: true;
+	  }
+	| {
+			readonly branchSiteId: string;
+			readonly supported: false;
+			readonly reason:
+				| 'nested-branch-unsupported'
+				| 'conditional-branch-unsupported'
+				| 'arm-content-unsupported';
+	  };
 
 export type PublicRenderPlanAsyncBoundaryGate =
 	| {
@@ -730,6 +822,9 @@ export type PublicRenderPlanArtifact = {
 	readonly repeatGates: ReadonlyArray<PublicRenderPlanRepeatGate>;
 	readonly keyedRepeats: ReadonlyArray<PublicRenderPlanKeyedRepeat>;
 	readonly asyncBoundaryGates: ReadonlyArray<PublicRenderPlanAsyncBoundaryGate>;
+	readonly branchReactivityGates: ReadonlyArray<PublicRenderPlanBranchGate>;
+	readonly branchArms: ReadonlyArray<PublicRenderPlanBranchArms>;
+	readonly asyncBoundaryArms: ReadonlyArray<PublicRenderPlanAsyncBoundaryArms>;
 	readonly styleScopes: ReadonlyArray<{ readonly scopeId: string; readonly cssText: string }>;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
 };

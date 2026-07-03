@@ -204,6 +204,7 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 						protocolView: createProtocolViewPayload({
 							payloadArena: inputs.payloadArena as PayloadArenaArtifact,
 							symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
+							publicRenderPlan: inputs.publicRenderPlan as PublicRenderPlanArtifact,
 						}),
 					};
 				},

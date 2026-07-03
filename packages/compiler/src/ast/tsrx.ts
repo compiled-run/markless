@@ -47,7 +47,12 @@ export function getDynamicTagExpression(node: AnyNode): AnyNode | undefined {
 	const name = (node.id ?? (node.openingElement as AnyNode | undefined)?.name) as
 		| AnyNode
 		| undefined;
-	return unwrapExpressionContainer(name);
+	// Only true expression containers are dynamic tags; member-expression
+	// names (<ui.Row />) are component references, not runtime tag values.
+	if (name?.type === 'JSXExpressionContainer' || name?.type === 'TSRXExpression') {
+		return name.expression as AnyNode | undefined;
+	}
+	return undefined;
 }
 
 // True when a template subtree contains only host elements, static text, and

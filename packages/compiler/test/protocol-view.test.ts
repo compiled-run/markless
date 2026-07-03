@@ -59,7 +59,11 @@ test('createProtocolViewPayload links payload arena records to lazy symbol IDs',
 	const payloadArena = planPayloadArena({ semanticGraph, stateLowering });
 	const symbolResolver = planSymbolResolver({ semanticGraph, payloadArena });
 
-	const view = createProtocolViewPayload({ payloadArena, symbolResolver });
+	const view = createProtocolViewPayload({
+		payloadArena,
+		symbolResolver,
+		publicRenderPlan: allSupportedPlan(payloadArena),
+	});
 
 	expect(view.version).toBe(1);
 	expect(view.events).toEqual(
@@ -127,7 +131,11 @@ test('createProtocolViewPayload links async boundary reads to runner symbols', a
 	const payloadArena = planPayloadArena({ semanticGraph, stateLowering });
 	const symbolResolver = planSymbolResolver({ semanticGraph, payloadArena });
 
-	const view = createProtocolViewPayload({ payloadArena, symbolResolver });
+	const view = createProtocolViewPayload({
+		payloadArena,
+		symbolResolver,
+		publicRenderPlan: allSupportedPlan(payloadArena),
+	});
 
 	expect(view.asyncBoundaries).toEqual([
 		{
@@ -169,7 +177,11 @@ export function App() @{
 	const payloadArena = planPayloadArena({ semanticGraph, stateLowering });
 	const symbolResolver = planSymbolResolver({ semanticGraph, payloadArena });
 
-	const view = createProtocolViewPayload({ payloadArena, symbolResolver });
+	const view = createProtocolViewPayload({
+		payloadArena,
+		symbolResolver,
+		publicRenderPlan: allSupportedPlan(payloadArena),
+	});
 
 	expect(view.domUpdates).toEqual([
 		{
@@ -195,3 +207,16 @@ export function App() @{
 		},
 	]);
 });
+
+function allSupportedPlan(payloadArena: {
+	readonly view: { readonly asyncBoundaries: ReadonlyArray<{ readonly id: string }> };
+}) {
+	return {
+		asyncBoundaryGates: payloadArena.view.asyncBoundaries.map((boundary) => ({
+			boundaryId: boundary.id,
+			supported: true as const,
+		})),
+		branchReactivityGates: [],
+		keyedRepeats: [],
+	} as never;
+}

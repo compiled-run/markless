@@ -58,6 +58,9 @@ export default box(
 		await expect.page.attribute(page, '.youtube-frame-host', 'data-playing', 'true', WAIT);
 		await expect.page.attribute(page, '.youtube-frame-host', 'data-command-version', '1', WAIT);
 		await expect.page.exists(page, 'script[src="https://www.youtube.com/iframe_api"]', WAIT);
+		// Exactness contract (preloader-router-regressions goal): the preload
+		// plan covers every interaction-reachable chunk, so the play click must
+		// load NOTHING beyond the startup preloaded set.
 		assertNoNewBuildJs(await page.networkRequests(), startupPaths, 'play interaction');
 
 		await page.click('[aria-label="Next track"]', WAIT);

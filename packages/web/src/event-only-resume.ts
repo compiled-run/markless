@@ -391,7 +391,12 @@ function materializeDomLocators(
 	for (const locator of locators) {
 		const element = elements[locator.index];
 		if (!element) throw new Error(`Missing resume locator ${locator.hostNodeId}.`);
-		if (element.tagName.toLowerCase() !== locator.tagName.toLowerCase()) {
+		// '*' marks dynamic-tag hosts whose rendered tag is unknowable at
+		// compile time; skip validation like the full resume runtime does.
+		if (
+			locator.tagName !== '*' &&
+			element.tagName.toLowerCase() !== locator.tagName.toLowerCase()
+		) {
 			throw new Error(`Mismatched resume locator ${locator.hostNodeId}.`);
 		}
 		byHostId.set(locator.hostNodeId, element);

@@ -5,7 +5,7 @@ import {
 	type ProtocolStatePayload,
 	type ProtocolViewPayload,
 } from '@markless/serializer';
-import { renderPayloadScripts } from '@markless/serializer';
+import { renderPayloadScripts, serializeRuntimeAsyncSnapshots } from '@markless/serializer';
 
 export type SsrRenderOutput = {
 	readonly html: string;
@@ -37,13 +37,19 @@ export type ModulePreloadInput =
 			readonly crossOrigin?: 'anonymous' | 'use-credentials';
 	  };
 
-export function renderToString(
+export async function renderToString(
 	component: SsrRenderable,
 	options: RenderToStringOptions = {},
 ): string {
-	const output = renderSsrOutput(component);
+	const output = await renderSsrOutput(component);
 	const hasPayload = !!output.state || !!output.view;
-	const state = output.state ?? emptyStatePayload();
+	const rawState = output.state ?? emptyStatePayload();
+	// Runtime-attached async snapshots carry raw key/value; the served payload
+	// needs envelope-encoded fields or resume rejects it on first interaction.
+	const state = {
+		...rawState,
+		computed: serializeRuntimeAsyncSnapshots(rawState.computed ?? []),
+	};
 	const view = containerScopedView(output.view ?? emptyViewPayload());
 	const payloadScripts = hasPayload ? renderPayloadScripts({ state, view }) : undefined;
 	const resumeModuleUrl = options.resumeModuleUrl ?? artifactResumeModuleUrl(component);
@@ -71,7 +77,7 @@ export function renderToString(
 		.join('');
 }
 
-function renderSsrOutput(component: SsrRenderable): SsrRenderOutput {
+async function renderSsrOutput(component: SsrRenderable): Promise<SsrRenderOutput> {
 	if (typeof component === 'function') return component();
 	if (component && typeof component.renderSsr === 'function') return component.renderSsr();
 	throw new TypeError('renderToString(App) requires a compiled TSRX artifact.');
@@ -118,6 +124,12 @@ function hasBrowserTriggers(view: ProtocolViewPayload): boolean {
 		view.behaviors.some((behavior) => !!behavior.symbolId) ||
 		view.asyncBoundaries.some((boundary) =>
 			boundary.asyncReads.some((read) => !!read.runnerSymbolId),
+		) ||
+		// Keyed repeat row events live on rowEvents, not view.events.
+		(view.keyedRepeats ?? []).some((repeat) => repeat.rowEvents.length > 0) ||
+		// Branch arm events live on armRecords, not view.events.
+		(view.branches ?? []).some((branch) =>
+			(branch.armRecords ?? []).some((arm) => arm.events.length > 0),
 		)
 	);
 }
@@ -309,7 +321,8 @@ ${syncPolicySource}
 		const k = e.hostNodeId + '\\n' + e.eventName;
 		m.set(k, e);
 	}
-	for (const t of new Set(v.events.map((e) => e.eventName).filter((e) => e !== 'visible'))) {
+	const rw = new Set([...(v.keyedRepeats ?? []).flatMap((k) => k.rowEvents.map((e) => e.eventName)), ...(v.branches ?? []).flatMap((k) => (k.armRecords ?? []).flatMap((a) => a.events.map((e) => e.eventName)))]);
+	for (const t of new Set([...v.events.map((e) => e.eventName), ...rw].filter((e) => e !== 'visible'))) {
 		r.addEventListener(t, async (e) => {
 			if (r.__asyncResumeRuntimeStarted) return;
 			for (let a = e.target; a; a = a.parentElement) {
@@ -319,9 +332,13 @@ ${syncPolicySource}
 ${runSyncPolicy}
 					const mod = await import(${JSON.stringify(resumeModuleUrl)});
 					await mod.resumeContainerEvent({ root: r, event: e, element: a, eventRecord: record });
-					break;
+					return;
 				}
 				if (a === r) break;
+			}
+			if (rw.has(e.type)) {
+				const mod = await import(${JSON.stringify(resumeModuleUrl)});
+				await mod.resumeContainerEvent({ root: r, event: e, element: e.target, eventRecord: null });
 			}
 		}, true);
 	}

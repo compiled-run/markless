@@ -32,6 +32,11 @@ type FakeEvent = {
 	stopPropagation?: () => void;
 };
 
+type FakeFragment = {
+	readonly nodeType: 11;
+	readonly childNodes: FakeElement[];
+};
+
 function element(tagName: string, childNodes: FakeElement[] = []): FakeElement {
 	const node: FakeElement = {
 		nodeType: 1,
@@ -42,8 +47,30 @@ function element(tagName: string, childNodes: FakeElement[] = []): FakeElement {
 			this.listeners.push({ type, listener, options });
 		},
 	};
+	(node as unknown as { removeChild(child: unknown): unknown }).removeChild = (
+		child: unknown,
+	) => {
+		const index = node.childNodes.indexOf(child as FakeElement);
+		if (index >= 0) node.childNodes.splice(index, 1);
+		(child as { parentNode?: unknown }).parentNode = null;
+		return child;
+	};
+	(node as unknown as { insertBefore(child: unknown, before: unknown): unknown }).insertBefore = (
+		child: unknown,
+		before: unknown,
+	) => {
+		const index = before ? node.childNodes.indexOf(before as FakeElement) : -1;
+		(child as { parentNode?: unknown }).parentNode = node;
+		node.childNodes.splice(
+			index >= 0 ? index : node.childNodes.length,
+			0,
+			child as FakeElement,
+		);
+		return child;
+	};
 	for (const child of childNodes) {
 		child.parentElement = node;
+		(child as unknown as { parentNode?: unknown }).parentNode = node;
 	}
 	return node;
 }
@@ -196,6 +223,148 @@ test('render creates a CSR container without payload scripts or the inline resum
 
 	expect(loadedSymbols).toEqual(['symbol:click']);
 	expect(container.graph.read('state:count')).toBe(1);
+});
+
+test('render adopts the mount target as container root for fragment-rooted components', async () => {
+	const header = element('HEADER');
+	const button = element('BUTTON');
+	button.textContent = 'Count 0';
+	const target = element('DIV') as FakeElement & {
+		replaceChildren(...children: Array<FakeElement | FakeFragment>): void;
+	};
+	target.replaceChildren = (...children) => {
+		// Real DOM expands document fragments on insertion.
+		target.childNodes.length = 0;
+		for (const child of children) {
+			if (child.nodeType === 11) {
+				for (const fragmentChild of child.childNodes) {
+					fragmentChild.parentElement = target;
+					target.childNodes.push(fragmentChild);
+				}
+				child.childNodes.length = 0;
+				continue;
+			}
+			child.parentElement = target;
+			target.childNodes.push(child);
+		}
+	};
+	const fragment: FakeFragment = { nodeType: 11, childNodes: [header, button] };
+	const state = createProtocolStatePayload({
+		cells: [{ graphNodeId: 'state:count', name: 'count', valueKind: 'scalar', value: 0 }],
+	});
+	const view: ProtocolViewPayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		// Fragment-relative locators: the compiled CSR module indexes the
+		// fragment children 0..n with no root element in the walk.
+		locators: [
+			{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'header' },
+			{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'button' },
+		],
+		events: [{ hostNodeId: 'h1', eventName: 'click', symbolIds: ['symbol:click'] }],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	const loadedSymbols: string[] = [];
+
+	const container = await render(
+		() => ({
+			root: fragment as unknown as Parameters<typeof render>[0] extends never
+				? never
+				: FakeElement,
+			state,
+			view,
+			loadSymbol(symbolId: string) {
+				loadedSymbols.push(symbolId);
+				return ({ graph }: { graph: { write(input: unknown): void } }) => {
+					graph.write({ graphNodeId: 'state:count', value: 1 });
+				};
+			},
+		}),
+		{ target },
+	);
+
+	// Ratified D3 semantics: the mount target is the container root.
+	expect(container.root).toBe(target);
+	expect(target.childNodes.map((child) => child.tagName)).toEqual(['HEADER', 'BUTTON']);
+	// Delegation lives on the target, and fragment-relative locators were
+	// offset +1 so the second sibling still resolves after adoption.
+	await target.listeners
+		.find((entry) => entry.type === 'click')!
+		.listener(event('click', button));
+	expect(loadedSymbols).toEqual(['symbol:click']);
+	expect(container.graph.read('state:count')).toBe(1);
+});
+
+test('render flips CSR branch ranges through the full resume runtime', async () => {
+	const startAnchor = {
+		nodeType: 8 as const,
+		textContent: 'markless:branch:branch-site:0',
+	} as unknown as FakeElement;
+	const shown = element('P');
+	const endAnchor = {
+		nodeType: 8 as const,
+		textContent: '/markless:branch:branch-site:0',
+	} as unknown as FakeElement;
+	const root = element('MAIN', [startAnchor, shown, endAnchor]);
+	const target = {
+		children: [] as FakeElement[],
+		replaceChildren(...children: FakeElement[]) {
+			this.children = children;
+		},
+	};
+	const state = createProtocolStatePayload({
+		cells: [{ graphNodeId: 'state:open', name: 'open', valueKind: 'scalar', value: true }],
+	});
+	const view: ProtocolViewPayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'main' }],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+		branches: [
+			{
+				id: 'branch-site:0',
+				startAnchor: { strategy: 'dom-order-comment', index: 0 },
+				endAnchor: { strategy: 'dom-order-comment', index: 1 },
+				symbolId: 'symbol:flip',
+				testReads: [{ source: 'open', graphNodeId: 'state:open', path: [] }],
+			},
+		],
+	};
+	const loadedSymbols: string[] = [];
+	const replacement = element('SPAN');
+
+	const container = await render(
+		() => ({
+			root,
+			state,
+			view,
+			loadSymbol(symbolId: string) {
+				loadedSymbols.push(symbolId);
+				return () => ({ arm: 1, html: '<span>Hidden</span>' });
+			},
+		}),
+		{
+			target,
+			renderBranchHtml: () => [replacement as never],
+		},
+	);
+
+	// Branch-bearing views must take the full resume runtime, and the arm
+	// seeds from graph reads with no symbol load at startup.
+	expect(loadedSymbols).toEqual([]);
+
+	container.graph.write({ graphNodeId: 'state:open', value: false });
+	await container.graph.flush?.();
+
+	expect(loadedSymbols).toEqual(['symbol:flip']);
+	expect(
+		root.childNodes.map((child) => (child.nodeType === 8 ? '#comment' : child.tagName)),
+	).toEqual(['#comment', 'SPAN', '#comment']);
 });
 
 test('render starts artifact-owned CSR preload work without requiring app code', async () => {
@@ -442,9 +611,9 @@ test('render falls back from the event-only path when element handles are presen
 	expect(resolvedHandle).toBe(button);
 });
 
-test('renderToString emits an SSR container and omits the resumer for static output', () => {
+test('renderToString emits an SSR container and omits the resumer for static output', async () => {
 	let componentBodyRuns = 0;
-	const html = renderToString(() => {
+	const html = await renderToString(() => {
 		componentBodyRuns++;
 		return {
 			html: '<p>Static</p>',
@@ -461,8 +630,8 @@ test('renderToString emits an SSR container and omits the resumer for static out
 	expect(html).not.toContain('data-async-resumer');
 });
 
-test('renderToString keeps fragment sibling roots as direct container children and offsets their locators', () => {
-	const html = renderToString({
+test('renderToString keeps fragment sibling roots as direct container children and offsets their locators', async () => {
+	const html = await renderToString({
 		renderSsr: () => ({
 			html: '<header>Site</header><button type="button">0</button>',
 			state: createProtocolStatePayload({ cells: [] }),
@@ -501,8 +670,8 @@ test('renderToString keeps fragment sibling roots as direct container children a
 	]);
 });
 
-test('renderToString keeps async boundary anchors as the only comments in document order', () => {
-	const html = renderToString(
+test('renderToString keeps async boundary anchors as the only comments in document order', async () => {
+	const html = await renderToString(
 		() => ({
 			html: '<!--markless:async:boundary:0--><p>Pending</p><!--/markless:async:boundary:0-->',
 			state: createProtocolStatePayload({ cells: [] }),
@@ -533,8 +702,8 @@ test('renderToString keeps async boundary anchors as the only comments in docume
 	expect(endIndex).toBeLessThan(html.indexOf('<script type="markless/state">'));
 });
 
-test('renderToString emits one inline resumer for SSR containers with browser triggers', () => {
-	const html = renderToString(
+test('renderToString emits one inline resumer for SSR containers with browser triggers', async () => {
+	const html = await renderToString(
 		() => ({
 			html: '<button type="button">Count 0</button>',
 			state: createProtocolStatePayload({ cells: [] }),
@@ -556,8 +725,134 @@ test('renderToString emits one inline resumer for SSR containers with browser tr
 	expect(html).toContain('globalThis.__started');
 });
 
-test('renderToString emits ordered modulepreload links before interactive payload startup', () => {
-	const html = renderToString(
+test('renderToString wakes the runtime for arm-record event types', async () => {
+	const html = await renderToString(
+		() => ({
+			html: '<main><!--markless:branch:branch-site:0--><section><button>Go</button></section><!--/markless:branch:branch-site:0--></main>',
+			state: createProtocolStatePayload({ cells: [] }),
+			view: {
+				version: ASYNC_PROTOCOL_VERSION,
+				locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'main' }],
+				events: [],
+				domUpdates: [],
+				behaviors: [],
+				elementHandles: [],
+				asyncBoundaries: [],
+				branches: [
+					{
+						id: 'branch-site:0',
+						startAnchor: { strategy: 'dom-order-comment', index: 0 },
+						endAnchor: { strategy: 'dom-order-comment', index: 1 },
+						symbolId: 'symbol:flip',
+						testReads: [{ source: 'open', graphNodeId: 'state:open', path: [] }],
+						armRecords: [
+							{
+								events: [
+									{
+										hostPath: [0, 0],
+										eventName: 'click',
+										symbolIds: ['symbol:go'],
+									},
+								],
+								domUpdates: [],
+								behaviors: [],
+								elementHandles: [],
+							},
+						],
+					},
+				],
+			},
+		}),
+		{ resumeModuleUrl: '/app.js' },
+	);
+
+	// A click on an arm host may be the page's FIRST interaction: the inline
+	// resumer must include arm-record event types in its wake set and forward
+	// unmatched events so the full runtime resolves the arm match.
+	expect(html).toContain('data-async-resumer');
+	expect(html).toContain('armRecords');
+	expect(html).toContain('eventRecord: null');
+});
+
+test('renderToString serializes runtime-attached async snapshots into valid payloads', async () => {
+	const html = await renderToString(
+		() => ({
+			html: '<p>Hello Ada</p>',
+			state: {
+				...createProtocolStatePayload({ cells: [] }),
+				computed: [
+					{
+						graphNodeId: 'computed:details',
+						name: 'details',
+						async: true,
+						// Runtime-attached snapshot: raw values, not envelopes.
+						snapshot: {
+							status: 'fulfilled',
+							version: 1,
+							key: null,
+							value: { title: 'Hello Ada' },
+						},
+					},
+				],
+			} as never,
+			view: viewWithClick(),
+			resumeModuleUrl: '/app.js',
+		}),
+		{ resumeModuleUrl: '/app.js' },
+	);
+
+	const stateJson = /<script type="markless\/state">(.*?)<\/script>/.exec(html)?.[1];
+	expect(stateJson).toBeDefined();
+	// The served payload must decode: raw snapshot key/value are serialized
+	// into graph envelopes (the browser threw MARKLESS_PAYLOAD_INVALID on
+	// first interaction otherwise — caught by the browser matrix).
+	const { assertProtocolStatePayload } =
+		await import('../../serializer/src/protocol-validation.ts');
+	expect(() => assertProtocolStatePayload(JSON.parse(stateJson!))).not.toThrow();
+});
+
+test('renderToString emits the resumer for keyed-repeat row events', async () => {
+	const html = await renderToString(
+		() => ({
+			html: '<section><article><h2>Alpha</h2><button>Choose</button></article></section>',
+			state: createProtocolStatePayload({ cells: [] }),
+			view: {
+				version: ASYNC_PROTOCOL_VERSION,
+				locators: [],
+				events: [],
+				domUpdates: [],
+				behaviors: [],
+				elementHandles: [],
+				asyncBoundaries: [],
+				keyedRepeats: [
+					{
+						id: 'repeat:0',
+						parentHostNodeId: 'h1',
+						collectionGraphNodeId: 'state:entries',
+						collectionPath: [],
+						keyPath: ['code'],
+						itemName: 'entry',
+						rowElementCount: 3,
+						rowEvents: [{ hostPath: [1], eventName: 'click', symbolIds: ['symbol:0'] }],
+					},
+				],
+			},
+		}),
+		{ resumeModuleUrl: '/app.js' },
+	);
+
+	// Row events are browser triggers: keyed-only pages must bootstrap the
+	// resumer, and the inline delegation must forward unmatched clicks of row
+	// event types so the full runtime can resolve the row.
+	expect(html).toContain('data-async-resumer');
+	// The inline source collects row event types from the payload and forwards
+	// unmatched events of those types without a record.
+	expect(html).toContain('keyedRepeats ?? []');
+	expect(html).toContain('eventRecord: null');
+});
+
+test('renderToString emits ordered modulepreload links before interactive payload startup', async () => {
+	const html = await renderToString(
 		() => ({
 			html: '<button type="button">Count 0</button>',
 			state: createProtocolStatePayload({ cells: [] }),
@@ -589,8 +884,8 @@ test('renderToString emits ordered modulepreload links before interactive payloa
 	expect(html.indexOf('rel="modulepreload"')).toBeLessThan(html.indexOf('data-async-resumer'));
 });
 
-test('renderToString uses compiled artifact modulepreloads by default', () => {
-	const html = renderToString({
+test('renderToString uses compiled artifact modulepreloads by default', async () => {
+	const html = await renderToString({
 		modulePreloads: [{ href: '/src/App.tsrx?import', fetchPriority: 'high' }],
 		resumeModuleUrl: '/src/App.tsrx?import',
 		renderSsr: () => ({
@@ -605,9 +900,9 @@ test('renderToString uses compiled artifact modulepreloads by default', () => {
 	);
 });
 
-test('renderToString uses the compiled artifact resume module URL by default', () => {
+test('renderToString uses the compiled artifact resume module URL by default', async () => {
 	const resumeModuleUrl = createResumeModuleUrl('artifact-default');
-	const html = renderToString({
+	const html = await renderToString({
 		resumeModuleUrl,
 		renderSsr: () => ({
 			html: '<button type="button">Count 0</button>',
@@ -621,7 +916,7 @@ test('renderToString uses the compiled artifact resume module URL by default', (
 
 test('renderToString inline event resumer imports the resume module only after interaction', async () => {
 	const resumeModuleUrl = createResumeModuleUrl();
-	const html = renderToString(
+	const html = await renderToString(
 		() => ({
 			html: '<button type="button">Count 0</button>',
 			state: createProtocolStatePayload({ cells: [] }),
@@ -705,7 +1000,7 @@ test('renderToString inline event resumer imports the resume module only after i
 
 test('renderToString inline event resumer steps aside after runtime startup', async () => {
 	const resumeModuleUrl = createResumeRuntimeStartedModuleUrl();
-	const html = renderToString(
+	const html = await renderToString(
 		() => ({
 			html: '<button type="button">Count 0</button>',
 			state: createProtocolStatePayload({ cells: [] }),
@@ -776,8 +1071,8 @@ test('renderToString inline event resumer steps aside after runtime startup', as
 	}
 });
 
-test('renderToString event-only inline resumer omits sync-policy feature code', () => {
-	const html = renderToString(
+test('renderToString event-only inline resumer omits sync-policy feature code', async () => {
+	const html = await renderToString(
 		() => ({
 			html: '<button type="button">Count 0</button>',
 			state: createProtocolStatePayload({ cells: [] }),
@@ -795,7 +1090,7 @@ test('renderToString event-only inline resumer omits sync-policy feature code', 
 
 test('renderToString inline event resumer runs sync policy before importing resume module', async () => {
 	const resumeModuleUrl = createResumeModuleUrl('sync-policy');
-	const html = renderToString(
+	const html = await renderToString(
 		() => ({
 			html: '<button type="button">Close</button>',
 			state: createProtocolStatePayload({ cells: [] }),
@@ -888,7 +1183,7 @@ test('renderToString inline event resumer runs sync policy before importing resu
 
 test('renderToString inline event resumer evaluates sync policy before importing symbols', async () => {
 	const resumeModuleUrl = createSyncPolicyResumeModuleUrl();
-	const html = renderToString(
+	const html = await renderToString(
 		() => ({
 			html: '<button type="button">Save</button>',
 			state: createProtocolStatePayload({ cells: [] }),
@@ -991,7 +1286,7 @@ test('renderToString inline event resumer evaluates sync policy before importing
 
 test('renderToString inline event resumer reads graph-backed sync policy before importing symbols', async () => {
 	const resumeModuleUrl = createSyncPolicyResumeModuleUrl('graph-policy');
-	const html = renderToString(
+	const html = await renderToString(
 		() => ({
 			html: '<button type="button">Close</button>',
 			state: createProtocolStatePayload({
@@ -1105,7 +1400,7 @@ test('renderToString inline event resumer reads graph-backed sync policy before 
 
 test('renderToString inline event resumer reads built-in graph values for sync policy', async () => {
 	const resumeModuleUrl = createSyncPolicyResumeModuleUrl('map-policy');
-	const html = renderToString(
+	const html = await renderToString(
 		() => ({
 			html: '<button type="button">Filter</button>',
 			state: createProtocolStatePayload({
@@ -1265,3 +1560,76 @@ export async function resumeContainerEvent({ event }) {
 `;
 	return `data:text/javascript,${encodeURIComponent(source)}`;
 }
+
+test('render starts pending CSR async boundary runners and settles the range', async () => {
+	const startAnchor = {
+		nodeType: 8 as const,
+		textContent: 'markless:async:boundary:0',
+	} as unknown as FakeElement;
+	const pending = element('P');
+	const endAnchor = {
+		nodeType: 8 as const,
+		textContent: '/markless:async:boundary:0',
+	} as unknown as FakeElement;
+	const root = element('MAIN', [startAnchor, pending, endAnchor]);
+	const target = {
+		children: [] as FakeElement[],
+		replaceChildren(...children: FakeElement[]) {
+			this.children = children;
+		},
+	};
+	const state = createProtocolStatePayload({
+		cells: [{ graphNodeId: 'state:userId', name: 'userId', valueKind: 'scalar', value: 'ada' }],
+		computed: [
+			{
+				graphNodeId: 'computed:details',
+				name: 'details',
+				async: true,
+				dependencies: [{ graphNodeId: 'state:userId', path: [] }],
+			},
+		],
+	});
+	const view: ProtocolViewPayload = {
+		...viewWithAsyncBoundary(),
+		locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'main' }],
+		asyncBoundaries: viewWithAsyncBoundary().asyncBoundaries.map((boundary) => ({
+			...boundary,
+			updateSymbolId: 'symbol:boundary-update',
+		})),
+	};
+	const loadedSymbols: string[] = [];
+	const replacement = element('SPAN');
+
+	const container = await render(
+		() => ({
+			root,
+			state,
+			view,
+			loadSymbol(symbolId: string) {
+				loadedSymbols.push(symbolId);
+				if (symbolId === 'symbol:details-runner') {
+					return async ({ key }) => ({ title: `User ${String(key)}` });
+				}
+				return ({ graph, status }) => ({
+					arm: status === 'rejected' ? 1 : 0,
+					html: `<span>${String(graph.read('computed:details', ['value', 'title']))}</span>`,
+				});
+			},
+		}),
+		{
+			target,
+			renderBranchHtml: () => [replacement as never],
+		},
+	);
+
+	for (let index = 0; index < 6; index++) await Promise.resolve();
+	await container.graph.flush?.();
+	for (let index = 0; index < 6; index++) await Promise.resolve();
+
+	// The CSR graph wires the boundary runner through loadSymbol, demands it at
+	// creation, and the default CSR applier replaces the boundary range.
+	expect(loadedSymbols).toEqual(['symbol:details-runner', 'symbol:boundary-update']);
+	expect(
+		root.childNodes.map((child) => (child.nodeType === 8 ? '#comment' : child.tagName)),
+	).toEqual(['#comment', 'SPAN', '#comment']);
+});

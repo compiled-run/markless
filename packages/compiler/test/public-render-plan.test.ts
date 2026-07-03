@@ -167,9 +167,8 @@ test.each([
 
 test.each([
 	[
-		'dynamic tag',
-		appSource(`let tag = state('div'); let count = state(0);
-<section><{tag} onClick={() => count++}>Hi</{tag}></section>`),
+		'member-expression component',
+		appSource(`<section><ui.Row /></section>`, `const ui = { Row() @{ <li>Hi</li> } };`),
 	],
 	[
 		'@try',
@@ -203,6 +202,56 @@ test.each([
 		]);
 	},
 );
+
+test('planPublicRender gates plain-host record-free branch sites as supported', async () => {
+	const { plan } = await createRenderPlan(
+		'src/BranchCard.tsrx',
+		appSource(
+			`let open = state(true);
+<section>@if (open) { <p>Shown</p> } @else { <p>Hidden</p> }</section>`,
+		),
+	);
+
+	expect(plan.branchReactivityGates).toEqual([
+		{ branchSiteId: 'branch-site:0', supported: true },
+	]);
+	expect(plan.diagnostics).toEqual([]);
+});
+
+test('planPublicRender supports event-bearing arms and gates conditional ones', async () => {
+	const { plan: eventPlan } = await createRenderPlan(
+		'src/EventBranch.tsrx',
+		appSource(
+			`let open = state(true); let count = state(0);
+<section>@if (open) { <button onClick={() => count++}>Go</button> }</section>`,
+		),
+	);
+	// L4 lifted the record-free requirement: event-bearing arms are supported
+	// and their records ride the branch record as arm-relative host paths.
+	expect(eventPlan.branchReactivityGates).toEqual([
+		{ branchSiteId: 'branch-site:0', supported: true },
+	]);
+
+	const { plan: nestedPlan } = await createRenderPlan(
+		'src/NestedBranch.tsrx',
+		appSource(
+			`let open = state(true); let inner = state(false);
+<section>@if (open) { <div>@if (inner) { <p>In</p> }</div> }</section>`,
+		),
+	);
+	expect(nestedPlan.branchReactivityGates).toEqual([
+		expect.objectContaining({
+			branchSiteId: 'branch-site:0',
+			supported: false,
+			reason: 'nested-branch-unsupported',
+		}),
+		expect.objectContaining({
+			branchSiteId: 'branch-site:1',
+			supported: false,
+			reason: 'nested-branch-unsupported',
+		}),
+	]);
+});
 
 test('planPublicRender gates a top-level plain-pending async boundary as supported', async () => {
 	const { plan } = await createRenderPlan(
@@ -259,11 +308,13 @@ test('planPublicRender plans plain host-element fragment roots', async () => {
 	);
 });
 
-test('planPublicRender keeps dynamic fragment roots diagnosed with a scoped reason', async () => {
+test('planPublicRender keeps component-child fragment roots diagnosed with a scoped reason', async () => {
+	// Control-flow fragment children are supported since L4; component and
+	// bare-expression children still need the projection/anchor work.
 	const { plan } = await createRenderPlan(
 		'src/DynamicFragmentRoot.tsrx',
 		appSource(`let label = state('Hi');
-<>@if (label) { <p>A</p> }</>`),
+<>{label}</>`),
 	);
 
 	expect(plan.rootTemplateHtml).toBe(null);
@@ -273,7 +324,6 @@ test('planPublicRender keeps dynamic fragment roots diagnosed with a scoped reas
 			severity: 'error',
 			phase: 'public-render',
 			passId: 'public-render-plan',
-			message: expect.stringContaining('control-flow'),
 			primarySpan: expect.objectContaining({ filename: 'src/DynamicFragmentRoot.tsrx' }),
 		}),
 	]);
@@ -318,3 +368,64 @@ async function createRenderPlan(filename: string, source: string) {
 
 	return { plan, payloadArena, semanticGraph, stateLowering, symbolResolver };
 }
+
+test('planPublicRender diagnoses React-style children inspection as opaque', async () => {
+	const { plan } = await createRenderPlan(
+		'src/ChildrenMap.tsrx',
+		`import { state } from '@markless/core';
+
+export function Card({ children }) @{
+	const items = children.map((child) => child);
+
+	<section>
+		<ul>{items}</ul>
+	</section>
+}
+`,
+	);
+
+	// Spec 01: children are an opaque compiler-owned template projection —
+	// inspect/map/clone/count/mutate must diagnose, not silently misbehave.
+	expect(plan.diagnostics).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				code: 'MARKLESS_CHILDREN_OPAQUE',
+				severity: 'error',
+				phase: 'public-render',
+				message: expect.stringContaining('opaque'),
+			}),
+		]),
+	);
+});
+
+test('planPublicRender diagnoses children.length reads as opaque', async () => {
+	const { plan } = await createRenderPlan(
+		'src/ChildrenCount.tsrx',
+		`export function Card({ children }) @{
+	const count = children.length;
+
+	<section data-count={count}>{children}</section>
+}
+`,
+	);
+
+	expect(plan.diagnostics).toEqual(
+		expect.arrayContaining([expect.objectContaining({ code: 'MARKLESS_CHILDREN_OPAQUE' })]),
+	);
+});
+
+test('planPublicRender keeps plain children placement undiagnosed', async () => {
+	const { plan } = await createRenderPlan(
+		'src/ChildrenPlain.tsrx',
+		`export function Card({ children }) @{
+	<section>{children}</section>
+}
+`,
+	);
+
+	expect(
+		(plan.diagnostics ?? []).filter(
+			(diagnostic) => diagnostic.code === 'MARKLESS_CHILDREN_OPAQUE',
+		),
+	).toEqual([]);
+});

@@ -1650,3 +1650,87 @@ async function drainMicrotasks(): Promise<void> {
 	await Promise.resolve();
 	await Promise.resolve();
 }
+
+test('graph reads async computed paths through the fulfilled value', async () => {
+	const graph = createRuntimeGraph({
+		cells: [{ graphNodeId: 'state:query', value: 'Ada' }],
+		asyncComputed: [
+			{
+				graphNodeId: 'computed:details',
+				dependencies: [{ graphNodeId: 'state:query', path: [] }],
+				key: (read) => read('state:query'),
+				run: async () => ({ title: 'Hello Ada' }),
+			},
+		],
+	} as never);
+	graph.read('computed:details', ['status']);
+	await new Promise((resolve) => setTimeout(resolve, 20));
+
+	// Authored reads like details.title resolve through the settled value;
+	// snapshot meta keys stay reserved.
+	expect(graph.read('computed:details', ['title'])).toBe('Hello Ada');
+	expect(graph.read('computed:details', ['value', 'title'])).toBe('Hello Ada');
+	expect(graph.read('computed:details', ['status'])).toBe('fulfilled');
+});
+
+test('graph revalidates a settled-snapshot async computed after a dependency write', async () => {
+	let runs = 0;
+	const graph = createRuntimeGraph({
+		cells: [{ graphNodeId: 'state:query', value: 'Ada' }],
+		asyncComputed: [
+			{
+				graphNodeId: 'computed:details',
+				dependencies: [{ graphNodeId: 'state:query', path: [] }],
+				initialSnapshot: {
+					status: 'fulfilled',
+					version: 1,
+					key: 'Ada',
+					value: { title: 'Hello Ada' },
+				},
+				key: (read) => read('state:query'),
+				run: async ({ read }) => {
+					runs++;
+					return { title: 'Hello ' + read('state:query') };
+				},
+			},
+		],
+	} as never);
+
+	// Reading a settled snapshot starts no runner (resumed pages do no work)…
+	graph.read('computed:details', ['status']);
+	await new Promise((resolve) => setTimeout(resolve, 10));
+	expect(runs).toBe(0);
+
+	// …but the node is demanded: a dependency write revalidates it.
+	graph.write({ graphNodeId: 'state:query', value: 'Grace' });
+	await new Promise((resolve) => setTimeout(resolve, 20));
+	expect(runs).toBe(1);
+	expect(graph.read('computed:details', ['title'])).toBe('Hello Grace');
+});
+
+test('graph subscribe returns an unsubscribe that stops the subscription firing', async () => {
+	const fired: string[] = [];
+	const graph = createRuntimeGraph({
+		cells: [{ graphNodeId: 'state:count', value: 0 }],
+	} as never);
+	const unsubscribe = graph.subscribe({
+		id: 'sub:count',
+		graphNodeId: 'state:count',
+		path: [],
+		run() {
+			fired.push('fired');
+		},
+	} as never) as unknown as (() => void) | void;
+
+	graph.write({ graphNodeId: 'state:count', value: 1 });
+	await (graph as { flush?: () => Promise<void> }).flush?.();
+	expect(fired).toEqual(['fired']);
+
+	// Disposal contract (spec 01:66-74): removed scopes unsubscribe their
+	// graph wiring; an unsubscribed subscription must never fire again.
+	expect(typeof unsubscribe).toBe('function');
+	unsubscribe!();
+	graph.write({ graphNodeId: 'state:count', value: 2 });
+	await (graph as { flush?: () => Promise<void> }).flush?.();
+	expect(fired).toEqual(['fired']);
+});

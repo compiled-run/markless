@@ -299,8 +299,12 @@ let active = state(true);
 		expect(result.code).not.toContain('function createMarklessPublicRuntime');
 		expect(result.code).toContain('attachMarklessPublicStaticEvents');
 		expect(result.code).toContain('const marklessSsrState = marklessComposeState');
-		expect(result.code).toContain('state: marklessSsrState');
-		expect(result.code).toContain('view: marklessSsrComposition.view');
+		expect(result.code).toContain(
+			'state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots)',
+		);
+		expect(result.code).toContain(
+			'view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) }',
+		);
 		expect(result.code).not.toContain('view: marklessPublicView');
 		expect(result.code).not.toContain('payloadView.locators.filter');
 		expect(result.code).not.toContain('marklessPublicHostNodeIndexes');
@@ -527,4 +531,119 @@ test('transformTsrxModule emits a scoped style virtual CSS module and imports it
 	expect(styleModule!.id).toMatch(/^virtual:markless:style:.*\.css$/);
 	expect(styleModule!.source).toMatch(/\.card\.mk-[a-z0-9]+ \{ color: red; \}/);
 	expect(result.code).toContain(`import ${JSON.stringify(styleModule!.id)};`);
+});
+
+test('transformTsrxModule escalates branch- and repeat-bearing modules to the full resume runtime', async () => {
+	const plain = await transformTsrxModule({
+		filename: '/workspace/app/src/Plain.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let count = state(0);
+
+	<main>
+		<button onClick={() => count++}>Add</button>
+		<output>{count}</output>
+	</main>
+}
+`,
+		environment: 'client',
+	});
+	expect(plain.code).toContain('resumeEventOnlyFromPayloadDocument');
+	expect(plain.code).not.toContain('resumeFromPayloadDocument');
+
+	const keyed = await transformTsrxModule({
+		filename: '/workspace/app/src/Rows.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let entries = state([{ code: 'a', title: 'Alpha' }]);
+	let chosen = state('');
+
+	<main>
+		<section>
+			@for (const entry of entries; key entry.code) {
+				<article>
+					<h2>{entry.title}</h2>
+					<button onClick={() => chosen = entry.code}>Choose</button>
+				</article>
+			}
+		</section>
+	</main>
+}
+`,
+		environment: 'client',
+	});
+	// Row events need graph subscriptions and locals dispatch: the event-only
+	// runtime silently drops them, so keyed modules take the full runtime.
+	expect(keyed.code).toContain('resumeFromPayloadDocument');
+	expect(keyed.code).not.toContain('resumeEventOnlyFromPayloadDocument');
+
+	const handles = await transformTsrxModule({
+		filename: '/workspace/app/src/Focus.tsrx',
+		source: `
+import { element, state } from '@markless/core';
+
+export function App() @{
+	let status = state('idle');
+	const box = element();
+
+	<main>
+		<input el={box} placeholder="Name" />
+		<button onClick={() => { box.focus(); status = 'focused'; }}>Focus</button>
+	</main>
+}
+`,
+		environment: 'client',
+	});
+	// Element handles materialize only in the full runtime.
+	expect(handles.code).toContain('resumeFromPayloadDocument');
+	expect(handles.code).not.toContain('resumeEventOnlyFromPayloadDocument');
+
+	const boundaries = await transformTsrxModule({
+		filename: '/workspace/app/src/Async.tsrx',
+		source: `
+import { computed, state } from '@markless/core';
+
+export function App() @{
+	let query = state('markless');
+	let details = computed(async () => {
+		return { title: 'Result: ' + query };
+	});
+
+	<main>
+		<button onClick={() => query = 'vite'}>Search</button>
+		@try { <p>{details.title}</p> } @pending { <p>Loading</p> } @catch { <p>Broken</p> }
+	</main>
+}
+`,
+		environment: 'client',
+	});
+	// Async boundary settle and revalidation live only in the full runtime.
+	expect(boundaries.code).toContain('resumeFromPayloadDocument');
+	expect(boundaries.code).not.toContain('resumeEventOnlyFromPayloadDocument');
+
+	const withChild = await transformTsrxModule({
+		filename: '/workspace/app/src/Shell.tsrx',
+		source: `
+import { state } from '@markless/core';
+import { StatusBadge } from './StatusBadge.tsrx';
+
+export function Shell() @{
+	let streaming = state(true);
+
+	<main>
+		<button onClick={() => streaming = !streaming}>Toggle</button>
+		<StatusBadge active={streaming} />
+	</main>
+}
+`,
+		environment: 'client',
+	});
+	// Child components may compose branches/boundaries/handles into the served
+	// payload that the parent module cannot see at compile time: escalate.
+	expect(withChild.code).toContain('resumeFromPayloadDocument');
+	expect(withChild.code).not.toContain('resumeEventOnlyFromPayloadDocument');
 });

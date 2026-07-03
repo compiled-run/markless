@@ -2,7 +2,12 @@ import { expect, test } from 'vitest';
 import { createRuntimeGraph } from '@markless/runtime';
 import { applyDomJournalEntries, createResumeRuntime, RuntimeResumeError } from '../src/index.ts';
 import type { RuntimeGraph, RuntimeGraphWrite } from '@markless/runtime';
-import type { DomJournalEntry } from '../src/index.ts';
+import type {
+	DomJournalEntry,
+	ResumeEventRecord,
+	ResumeKeyedRepeatRowEvent,
+	ResumeViewRecord,
+} from '../src/index.ts';
 
 type FakeElement = {
 	readonly nodeType: 1;
@@ -97,6 +102,115 @@ async function settleMicrotasks(count = 4): Promise<void> {
 		await Promise.resolve();
 	}
 }
+
+test('resume runtime selects switch arms by case tests when seeding and flipping', async () => {
+	const startAnchor = { nodeType: 8 as const, textContent: 'markless:branch:branch-site:0' };
+	const armNode = {
+		nodeType: 1 as const,
+		tagName: 'P',
+		childNodes: [],
+		addEventListener() {},
+	};
+	const endAnchor = { nodeType: 8 as const, textContent: '/markless:branch:branch-site:0' };
+	const children = [startAnchor, armNode, endAnchor] as Array<Record<string, unknown>>;
+	const root = {
+		nodeType: 1 as const,
+		tagName: 'MAIN',
+		childNodes: children,
+		addEventListener() {},
+	};
+	for (const child of children) child.parentNode = root;
+	let kind = 'b';
+	const subscriptions: Array<{ run(): unknown }> = [];
+	const graph = {
+		read: () => kind,
+		subscribe(subscription: { run(): unknown }) {
+			subscriptions.push(subscription);
+			return () => undefined;
+		},
+		subscribeJournal: () => () => undefined,
+		listSharedDefinitions: () => [],
+		flush: async () => undefined,
+	};
+	const loaded: string[] = [];
+	const applied: unknown[] = [];
+	const runtime = createResumeRuntime({
+		root: root as never,
+		graph: graph as never,
+		view: {
+			locators: [],
+			events: [],
+			domUpdates: [],
+			behaviors: [],
+			elementHandles: [],
+			asyncBoundaries: [],
+			branches: [
+				{
+					id: 'branch-site:0',
+					startAnchor: { strategy: 'dom-order-comment', index: 0 },
+					endAnchor: { strategy: 'dom-order-comment', index: 1 },
+					symbolId: 'symbol:flip',
+					armTests: ['a', 'b', null],
+					testReads: [{ source: 'kind', graphNodeId: 'state:kind', path: [] }],
+				},
+			],
+		} as never,
+		loadSymbol(symbolId: string) {
+			loaded.push(symbolId);
+			return () => ({ arm: 2, html: '<p>D</p>' });
+		},
+		applyDomJournal: (entries) => {
+			applied.push(...entries);
+		},
+	});
+	await runtime.start();
+
+	// Seed: kind 'b' selects arm 1 by case tests, not truthiness (which would
+	// give arm 0 for any truthy string).
+	expect(loaded).toEqual([]);
+
+	// Writing another matching case value that maps to the SAME arm is a no-op.
+	kind = 'b';
+	await subscriptions[0]!.run();
+	expect(loaded).toEqual([]);
+
+	// A non-matching value falls to @default (arm 2) and flips.
+	kind = 'zzz';
+	const entries = (await subscriptions[0]!.run()) as unknown[];
+	expect(loaded).toEqual(['symbol:flip']);
+	expect(entries).toHaveLength(2);
+});
+
+test('resume runtime skips tagName validation for wildcard locators', () => {
+	const child = { nodeType: 1, tagName: 'ARTICLE', childNodes: [], addEventListener() {} };
+	const root = {
+		nodeType: 1,
+		tagName: 'MAIN',
+		childNodes: [child],
+		addEventListener() {},
+	};
+	const runtime = createResumeRuntime({
+		root: root as never,
+		graph: {
+			read: () => undefined,
+			write: () => undefined,
+			subscribe: () => () => undefined,
+			subscribeJournal: () => () => undefined,
+			flush: async () => undefined,
+		} as never,
+		view: {
+			locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 1, tagName: '*' }],
+			events: [],
+			domUpdates: [],
+			behaviors: [],
+			elementHandles: [],
+			asyncBoundaries: [],
+		} as never,
+		loadSymbol: () => () => undefined,
+	});
+
+	expect(runtime.getElement('h0')).toBe(child);
+});
 
 test('resume runtime materializes view records and dispatches lazy symbols after sync policy', async () => {
 	const input = element('INPUT');
@@ -2428,3 +2542,994 @@ function captureThrown(run: () => unknown): unknown {
 
 	throw new Error('Expected callback to throw.');
 }
+
+test('resume runtime replaces branch ranges lazily when the test arm flips', async () => {
+	const start = comment('markless:branch:branch-site:0');
+	const shown = element('P');
+	const end = comment('/markless:branch:branch-site:0');
+	const sibling = element('SPAN');
+	const root = rangeElement('SECTION', [start, shown, end, sibling]);
+	const hidden = element('P');
+	const loadedSymbols: string[] = [];
+	const renderedHtml: string[] = [];
+	const subscriptions: Array<{
+		readonly graphNodeId: string;
+		readonly path?: ReadonlyArray<string>;
+		readonly run: (value: unknown) => unknown;
+	}> = [];
+	let open = true;
+	const graph = {
+		read: (graphNodeId: string) => (graphNodeId === 'state:open' ? open : undefined),
+		subscribe: (subscription: (typeof subscriptions)[number]) =>
+			void subscriptions.push(subscription),
+		subscribeJournal: () => () => undefined,
+		flush: async () => undefined,
+	} as unknown as RuntimeGraph;
+
+	createResumeRuntime({
+		root,
+		graph,
+		view: {
+			locators: [],
+			events: [],
+			domUpdates: [],
+			behaviors: [],
+			elementHandles: [],
+			asyncBoundaries: [],
+			branches: [
+				{
+					id: 'branch-site:0',
+					startAnchor: { strategy: 'dom-order-comment', index: 0 },
+					endAnchor: { strategy: 'dom-order-comment', index: 1 },
+					symbolId: 'symbol:flip',
+					testReads: [{ source: 'open', graphNodeId: 'state:open', path: [] }],
+				},
+				// Static branch record without symbolId/testReads is skipped
+				// entirely, so its out-of-range anchors must never resolve.
+				{
+					id: 'branch-site:static',
+					startAnchor: { strategy: 'dom-order-comment', index: 8 },
+					endAnchor: { strategy: 'dom-order-comment', index: 9 },
+				},
+			],
+		},
+		loadSymbol(symbolId) {
+			loadedSymbols.push(symbolId);
+			return () => ({ arm: open ? 0 : 1, html: open ? '<p>Shown</p>' : '<p>Hidden</p>' });
+		},
+		renderBranchHtml(html) {
+			renderedHtml.push(html);
+			return [hidden];
+		},
+	});
+
+	// Seeding the current arm reads the graph without loading any symbol.
+	expect(loadedSymbols).toEqual([]);
+	expect(subscriptions).toEqual([
+		expect.objectContaining({ graphNodeId: 'state:open', path: [] }),
+	]);
+
+	open = false;
+	const entries = (await subscriptions[0]!.run(false)) as DomJournalEntry[];
+	expect(loadedSymbols).toEqual(['symbol:flip']);
+	expect(renderedHtml).toEqual(['<p>Hidden</p>']);
+	expect(entries).toEqual([
+		{ type: 'removeRange', locator: 'branch:branch-site:0' },
+		{ type: 'insertRange', locator: 'branch:branch-site:0:start', fragment: [hidden] },
+	]);
+
+	applyDomJournalEntries(entries, {
+		resolveTarget(locator) {
+			if (locator === 'branch:branch-site:0:start') return start;
+			if (locator === 'branch:branch-site:0:end') return end;
+			return undefined;
+		},
+	});
+
+	expect(root.childNodes).toHaveLength(4);
+	expect(root.childNodes[0]).toBe(start);
+	expect(root.childNodes[1]).toBe(hidden);
+	expect(root.childNodes[2]).toBe(end);
+	expect(root.childNodes[3]).toBe(sibling);
+	expect(root.childNodes.includes(shown)).toBe(false);
+
+	// Same test value again: arm unchanged, so no symbol load and no journal ops.
+	const second = await subscriptions[0]!.run(false);
+	expect(second).toBeUndefined();
+	expect(loadedSymbols).toEqual(['symbol:flip']);
+	expect(renderedHtml).toEqual(['<p>Hidden</p>']);
+});
+
+// Shared keyed repeat fixture: TBODY parent with two TR rows whose hostPath
+// [1] event hosts are the row buttons, plus a trailing FOOTER whose dom-order
+// locator index (8) already counts the SSR-rendered row elements.
+function keyedRepeatFixture(options: {
+	readonly rowEvents: ResumeKeyedRepeatRowEvent[];
+	readonly events?: ResumeEventRecord[];
+}) {
+	const firstRowButton = element('BUTTON');
+	const secondRowButton = element('BUTTON');
+	const tbody = element('TBODY', [
+		element('TR', [element('TD'), firstRowButton]),
+		element('TR', [element('TD'), secondRowButton]),
+	]);
+	const footer = element('FOOTER');
+	const root = element('SECTION', [tbody, footer]);
+	const view: ResumeViewRecord = {
+		locators: [
+			{ hostNodeId: 'h0', strategy: 'dom-order', index: 1, tagName: 'tbody' },
+			{ hostNodeId: 'h1', strategy: 'dom-order', index: 8, tagName: 'footer' },
+		],
+		events: options.events ?? [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+		keyedRepeats: [
+			{
+				id: 'repeat:0',
+				parentHostNodeId: 'h0',
+				collectionGraphNodeId: 'state:rows',
+				collectionPath: [],
+				keyPath: ['id'],
+				itemName: 'entry',
+				rowElementCount: 3,
+				rowEvents: options.rowEvents,
+			},
+		],
+	};
+	const loadedSymbols: string[] = [];
+	const loadSymbol = (symbolId: string) => {
+		loadedSymbols.push(symbolId);
+		return () => undefined;
+	};
+	return { root, firstRowButton, secondRowButton, footer, view, loadedSymbols, loadSymbol };
+}
+
+test('resume runtime materializes keyed repeat row event hosts from the live collection', async () => {
+	const { root, firstRowButton, secondRowButton, footer, view, loadedSymbols, loadSymbol } =
+		keyedRepeatFixture({
+			rowEvents: [{ hostPath: [1], eventName: 'click', symbolIds: ['symbol:row'] }],
+		});
+	const graph = createRuntimeGraph({
+		cells: [{ graphNodeId: 'state:rows', value: [{ id: 1 }, { id: 2 }] }],
+	});
+
+	const resume = createResumeRuntime({ root, graph, view, loadSymbol });
+
+	await resume.start();
+
+	// Row events register the delegated capture listener even though no
+	// ordinary view event uses "click".
+	expect(root.listeners.map((listener) => listener.type)).toContain('click');
+
+	// Both rows' hostPath [1] hosts carry row event records.
+	await resume.dispatch(event('click', firstRowButton, ''));
+	await resume.dispatch(event('click', secondRowButton, ''));
+	expect(loadedSymbols).toEqual(['symbol:row', 'symbol:row']);
+
+	// Elements outside the repeat never match row records.
+	await resume.dispatch(event('click', footer, ''));
+	expect(loadedSymbols).toHaveLength(2);
+
+	// A trailing dom-order locator after the repeat rows still resolves.
+	expect(resume.getElement('h1')).toBe(footer);
+});
+
+test('resume runtime materializes zero keyed repeat rows without throwing', async () => {
+	const { root, firstRowButton, view, loadedSymbols, loadSymbol } = keyedRepeatFixture({
+		rowEvents: [{ hostPath: [1], eventName: 'click', symbolIds: ['symbol:row'] }],
+	});
+	// Empty collection: SSR took @empty, so the parent's element children are
+	// not rows and no row record may attach to any of them.
+	const graph = createRuntimeGraph({ cells: [{ graphNodeId: 'state:rows', value: [] }] });
+
+	const resume = createResumeRuntime({ root, graph, view, loadSymbol });
+
+	await resume.start();
+	await resume.dispatch(event('click', firstRowButton, ''));
+	expect(loadedSymbols).toEqual([]);
+});
+
+test('resume runtime dispatches keyed repeat row events with fresh row locals', async () => {
+	const { root, firstRowButton, secondRowButton, footer, view } = keyedRepeatFixture({
+		rowEvents: [
+			{
+				hostPath: [1],
+				eventName: 'click',
+				symbolIds: ['symbol:row'],
+				syncPolicy: {
+					when: { type: 'event-equals', field: 'key', value: 'Enter' },
+					actions: ['preventDefault'],
+				},
+			},
+		],
+		events: [{ hostNodeId: 'h1', eventName: 'click', symbolIds: ['symbol:footer'] }],
+	});
+	const firstItem = { id: 1, label: 'one' };
+	const secondItem = { id: 2, label: 'two' };
+	const graph = createRuntimeGraph({
+		cells: [
+			{ graphNodeId: 'state:rows', value: [firstItem, secondItem] },
+			{ graphNodeId: 'state:selected', value: 0 },
+		],
+	});
+	graph.subscribe({
+		id: 'dom-update:selected',
+		graphNodeId: 'state:selected',
+		path: [],
+		run(value) {
+			return { type: 'setText', locator: 'selected', value };
+		},
+	});
+	const loadedSymbols: string[] = [];
+	const receivedLocals: Array<Record<string, unknown> | undefined> = [];
+
+	const resume = createResumeRuntime({
+		root,
+		graph,
+		view,
+		loadSymbol(symbolId) {
+			loadedSymbols.push(symbolId);
+			if (symbolId === 'symbol:footer') return () => undefined;
+			return ({ graph: runtimeGraph, locals }) => {
+				receivedLocals.push(locals as Record<string, unknown> | undefined);
+				const entry = (locals as { readonly entry: { readonly id: number } }).entry;
+				runtimeGraph.write({ graphNodeId: 'state:selected', path: [], value: entry.id });
+			};
+		},
+	});
+
+	await resume.start();
+
+	const firstClick = event('click', firstRowButton, 'Enter');
+	await resume.dispatch(firstClick);
+	expect(loadedSymbols).toEqual(['symbol:row']);
+	expect(receivedLocals[0]?.entry).toBe(firstItem);
+	// The row sync policy runs through the shared helper before the symbol.
+	expect(firstClick.defaultPrevented).toBe(true);
+	// Handler graph writes flush like ordinary event dispatch.
+	expect(graph.read('state:selected')).toBe(1);
+	expect(graph.takeJournal()).toEqual([{ type: 'setText', locator: 'selected', value: 1 }]);
+
+	await resume.dispatch(event('click', secondRowButton, 'x'));
+	expect(receivedLocals[1]?.entry).toBe(secondItem);
+	expect(graph.read('state:selected')).toBe(2);
+
+	// Row index and collection are both read fresh at dispatch time, so a
+	// reordered collection maps the same DOM row to its new item.
+	graph.write({ graphNodeId: 'state:rows', path: [], value: [secondItem, firstItem] });
+	await graph.flush();
+	await resume.dispatch(event('click', firstRowButton, 'x'));
+	expect(receivedLocals[2]?.entry).toBe(secondItem);
+
+	// A same-named event on a non-row host resolves through ordinary records.
+	await resume.dispatch(event('click', footer, 'x'));
+	expect(loadedSymbols).toEqual(['symbol:row', 'symbol:row', 'symbol:row', 'symbol:footer']);
+});
+
+test('resume runtime keeps settled async boundary snapshots idle at startup', async () => {
+	const start = comment('markless:async:boundary:0');
+	const settled = element('P');
+	const end = comment('/markless:async:boundary:0');
+	const root = element('SECTION', [start, settled, end]);
+	const loadedSymbols: string[] = [];
+	const applied: DomJournalEntry[] = [];
+	let runnerRuns = 0;
+	const graph = createRuntimeGraph({
+		cells: [{ graphNodeId: 'state:userId', value: 'ada' }],
+		asyncComputed: [
+			{
+				graphNodeId: 'computed:details',
+				dependencies: [{ graphNodeId: 'state:userId', path: [] }],
+				initialSnapshot: {
+					status: 'fulfilled',
+					version: 1,
+					key: 'ada',
+					value: { title: 'User ada' },
+				},
+				key: (read) => read('state:userId'),
+				run() {
+					runnerRuns++;
+					return { title: 'User ada' };
+				},
+			},
+		],
+	});
+	const resume = createResumeRuntime({
+		root,
+		graph,
+		view: updatableBoundaryView(),
+		loadSymbol(symbolId) {
+			loadedSymbols.push(symbolId);
+			return () => undefined;
+		},
+		applyDomJournal(entries) {
+			applied.push(...entries);
+		},
+	});
+
+	await resume.start();
+	await drainMicrotasks();
+	await graph.flush();
+
+	// The graph consumed the settled SSR snapshot: zero runners, zero symbol
+	// loads, and no range replacement at startup.
+	expect(runnerRuns).toBe(0);
+	expect(loadedSymbols).toEqual([]);
+	expect(applied).toEqual([]);
+});
+
+test('resume runtime starts unsettled async boundary runners at creation and settles the range', async () => {
+	const start = comment('markless:async:boundary:0');
+	const pending = element('P');
+	const end = comment('/markless:async:boundary:0');
+	const root = element('SECTION', [start, pending, end]);
+	const loadedSymbols: string[] = [];
+	const applied: DomJournalEntry[] = [];
+	const renderedHtml: string[] = [];
+	const runs: Array<{ readonly key: unknown; readonly signal: AbortSignal }> = [];
+	let result = deferred<{ title: string }>();
+	const graph = createRuntimeGraph({
+		cells: [{ graphNodeId: 'state:userId', value: 'ada' }],
+		asyncComputed: [
+			{
+				graphNodeId: 'computed:details',
+				dependencies: [{ graphNodeId: 'state:userId', path: [] }],
+				key: (read) => read('state:userId'),
+				run({ key, signal }) {
+					runs.push({ key, signal });
+					return result.promise;
+				},
+			},
+		],
+	});
+	const fragmentNode = element('P');
+	const resume = createResumeRuntime({
+		root,
+		graph,
+		view: updatableBoundaryView(),
+		loadSymbol(symbolId) {
+			loadedSymbols.push(symbolId);
+			return ({ graph: runtimeGraph, status }) => ({
+				arm: status === 'rejected' ? 1 : 0,
+				html: `<p>${String(runtimeGraph.read('computed:details', ['value', 'title']))}</p>`,
+			});
+		},
+		renderBranchHtml(html) {
+			renderedHtml.push(html);
+			return [fragmentNode];
+		},
+		applyDomJournal(entries) {
+			applied.push(...entries);
+		},
+	});
+
+	// CSR mounts render @pending between the anchors, so an unsettled boundary
+	// is a local demand: the runner starts at runtime creation.
+	expect(runs).toHaveLength(1);
+	expect(runs[0]).toMatchObject({ key: 'ada' });
+	expect(loadedSymbols).toEqual([]);
+
+	await resume.start();
+	result.resolve({ title: 'User ada' });
+	await drainMicrotasks();
+	await graph.flush();
+
+	expect(loadedSymbols).toEqual(['symbol:boundary-update']);
+	expect(renderedHtml).toEqual(['<p>User ada</p>']);
+	expect(applied).toEqual([
+		{ type: 'removeRange', locator: 'async-boundary:boundary:0' },
+		{
+			type: 'insertRange',
+			locator: 'async-boundary:boundary:0:start',
+			fragment: [fragmentNode],
+		},
+	]);
+
+	// Revalidation: a dependency write aborts the previous run, re-runs the
+	// runner, and replaces the boundary range again after the new settle.
+	applied.length = 0;
+	result = deferred<{ title: string }>();
+	graph.write({ graphNodeId: 'state:userId', value: 'grace' });
+	await graph.flush();
+
+	expect(runs).toHaveLength(2);
+	expect(runs[0]!.signal.aborted).toBe(true);
+	expect(runs[1]).toMatchObject({ key: 'grace' });
+
+	result.resolve({ title: 'User grace' });
+	await drainMicrotasks();
+	await graph.flush();
+
+	expect(renderedHtml).toEqual(['<p>User ada</p>', '<p>User grace</p>']);
+	expect(applied).toEqual([
+		{ type: 'removeRange', locator: 'async-boundary:boundary:0' },
+		{
+			type: 'insertRange',
+			locator: 'async-boundary:boundary:0:start',
+			fragment: [fragmentNode],
+		},
+	]);
+});
+
+// One async boundary whose settled arms rebuild through an update symbol.
+function updatableBoundaryView(): ResumeViewRecord {
+	return {
+		locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'section' }],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [
+			{
+				id: 'boundary:0',
+				updateSymbolId: 'symbol:boundary-update',
+				startAnchor: { strategy: 'dom-order-comment', index: 0 },
+				endAnchor: { strategy: 'dom-order-comment', index: 1 },
+				asyncReads: [
+					{
+						source: 'details',
+						graphNodeId: 'computed:details',
+						path: [],
+						runnerSymbolId: 'symbol:details-runner',
+					},
+				],
+			},
+		],
+	};
+}
+
+test('resume runtime disposes branch-range hosts before applying removeRange', async () => {
+	const start = comment('markless:branch:branch-site:0');
+	const arm = element('BUTTON');
+	const end = comment('/markless:branch:branch-site:0');
+	const root = rangeElement('SECTION', [start, arm, end]);
+	const replacement = element('P');
+	const loadedSymbols: string[] = [];
+	const applied: DomJournalEntry[] = [];
+	const cleanupParents: unknown[] = [];
+	const handleReads: unknown[] = [];
+	const graph = createRuntimeGraph({
+		cells: [
+			{ graphNodeId: 'state:open', value: true },
+			{ graphNodeId: 'state:label', value: 'a' },
+		],
+	});
+	const resume = createResumeRuntime({
+		root,
+		graph,
+		view: {
+			locators: [
+				{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'section' },
+				{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'button' },
+			],
+			events: [{ hostNodeId: 'h0', eventName: 'click', symbolIds: ['symbol:read-handle'] }],
+			domUpdates: [
+				{
+					hostNodeId: 'h1',
+					source: 'label',
+					graphNodeId: 'state:label',
+					path: [],
+					symbolId: 'symbol:dom-update',
+				},
+			],
+			behaviors: [
+				{
+					hostNodeId: 'h1',
+					source: 'chart()',
+					functionSource: 'chart',
+					inputSources: [],
+					inputValues: [],
+					symbolId: 'symbol:chart',
+				},
+			],
+			elementHandles: [{ hostNodeId: 'h1', handleId: 'handle:arm', name: 'armButton' }],
+			asyncBoundaries: [],
+			branches: [
+				{
+					id: 'branch-site:0',
+					startAnchor: { strategy: 'dom-order-comment', index: 0 },
+					endAnchor: { strategy: 'dom-order-comment', index: 1 },
+					symbolId: 'symbol:flip',
+					testReads: [{ source: 'open', graphNodeId: 'state:open', path: [] }],
+				},
+			],
+		},
+		loadSymbol(symbolId) {
+			loadedSymbols.push(symbolId);
+			if (symbolId === 'symbol:chart') {
+				return () => () =>
+					cleanupParents.push((arm as { readonly parentNode?: unknown }).parentNode);
+			}
+			if (symbolId === 'symbol:flip') {
+				return ({ graph: runtimeGraph }) => ({
+					arm: runtimeGraph.read('state:open') ? 0 : 1,
+					html: '<p>Flipped</p>',
+				});
+			}
+			if (symbolId === 'symbol:read-handle') {
+				return (context) => void handleReads.push(context.getElementHandle('handle:arm'));
+			}
+			return () => undefined;
+		},
+		renderBranchHtml: () => [replacement],
+		applyDomJournal(entries) {
+			applied.push(...entries);
+			applyDomJournalEntries(entries, {
+				resolveTarget(locator) {
+					if (locator === 'branch:branch-site:0:start') return start;
+					if (locator === 'branch:branch-site:0:end') return end;
+					return undefined;
+				},
+			});
+		},
+	});
+
+	await resume.start();
+	await resume.activateBehaviors('h1');
+	graph.write({ graphNodeId: 'state:label', value: 'b' });
+	await graph.flush();
+	expect(loadedSymbols).toEqual(['symbol:chart', 'symbol:dom-update']);
+
+	// Flip the branch arm: the outgoing range removes through the DOM journal.
+	graph.write({ graphNodeId: 'state:open', value: false });
+	await graph.flush();
+	await drainMicrotasks();
+	await graph.flush();
+
+	// The behavior cleanup ran before the host detached from its parent.
+	expect(cleanupParents).toEqual([root]);
+	expect(root.childNodes.includes(arm)).toBe(false);
+	expect(root.childNodes[1]).toBe(replacement);
+
+	// The removed host's dom-update subscription released with the range.
+	graph.write({ graphNodeId: 'state:label', value: 'c' });
+	await graph.flush();
+	expect(loadedSymbols.filter((id) => id === 'symbol:dom-update')).toHaveLength(1);
+
+	// The removed host's element handle reads undefined.
+	await root.listeners
+		.find((entry) => entry.type === 'click')!
+		.listener(event('click', root, ''));
+	expect(handleReads).toEqual([undefined]);
+
+	// The branch's own test-read subscription survives: flipping back works.
+	graph.write({ graphNodeId: 'state:open', value: true });
+	await graph.flush();
+	await drainMicrotasks();
+	await graph.flush();
+	expect(loadedSymbols.filter((id) => id === 'symbol:flip')).toHaveLength(2);
+	expect(applied.filter((entry) => entry.type === 'removeRange')).toHaveLength(2);
+});
+
+// Branch armRecords view (L4 S3b): arm 0 renders <section><button/></section>
+// between the anchors (button event hostPath [0, 0], section text update
+// hostPath [0]); arm 1 renders a bare <button/> (event hostPath [0]).
+function armRecordsView(arm0Extras?: {
+	readonly behaviors?: ReadonlyArray<Record<string, unknown>>;
+	readonly elementHandles?: ReadonlyArray<Record<string, unknown>>;
+}): ResumeViewRecord {
+	return {
+		locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'main' }],
+		events: [{ hostNodeId: 'h0', eventName: 'click', symbolIds: ['symbol:read-handle'] }],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+		branches: [
+			{
+				id: 'branch-site:0',
+				startAnchor: { strategy: 'dom-order-comment', index: 0 },
+				endAnchor: { strategy: 'dom-order-comment', index: 1 },
+				symbolId: 'symbol:flip',
+				testReads: [{ source: 'open', graphNodeId: 'state:open', path: [] }],
+				armRecords: [
+					{
+						events: [
+							{
+								hostPath: [0, 0],
+								eventName: 'click',
+								symbolIds: ['symbol:arm-click'],
+							},
+						],
+						domUpdates: [
+							{
+								hostNodeId: 'h-arm',
+								source: 'label',
+								graphNodeId: 'state:label',
+								path: [],
+								hostPath: [0],
+								symbolId: 'symbol:arm-text',
+							},
+						],
+						behaviors: arm0Extras?.behaviors ?? [],
+						elementHandles: arm0Extras?.elementHandles ?? [],
+					},
+					{
+						events: [
+							{
+								hostPath: [0],
+								eventName: 'click',
+								symbolIds: ['symbol:closed-click'],
+							},
+						],
+						domUpdates: [],
+						behaviors: [],
+						elementHandles: [],
+					},
+				],
+			},
+		],
+	};
+}
+
+test('resume runtime materializes the taken arm records at startup', async () => {
+	const start = comment('markless:branch:branch-site:0');
+	const armButton = element('BUTTON');
+	const armSection = element('SECTION', [armButton]);
+	const end = comment('/markless:branch:branch-site:0');
+	const root = rangeElement('MAIN', [start, armSection, end]);
+	const graph = createRuntimeGraph({
+		cells: [
+			{ graphNodeId: 'state:open', value: true },
+			{ graphNodeId: 'state:label', value: 'a' },
+		],
+	});
+	const loadedSymbols: string[] = [];
+	const updateElements: unknown[] = [];
+	const resume = createResumeRuntime({
+		root,
+		graph,
+		view: armRecordsView(),
+		loadSymbol(symbolId) {
+			loadedSymbols.push(symbolId);
+			if (symbolId === 'symbol:arm-text') {
+				return ({ element: host }) => void updateElements.push(host);
+			}
+			return () => undefined;
+		},
+	});
+	await resume.start();
+
+	// Arm event names install the delegated listener; nothing loads eagerly.
+	expect(root.listeners.map((listener) => listener.type)).toContain('click');
+	expect(loadedSymbols).toEqual([]);
+
+	// The SSR-taken arm's button dispatches its lazy symbol (S3a regression:
+	// arm records were inert because arm hosts left every flat stream).
+	await resume.dispatch(event('click', armButton, ''));
+	expect(loadedSymbols).toEqual(['symbol:arm-click']);
+
+	// The arm dom-update subscription runs against the arm host element.
+	graph.write({ graphNodeId: 'state:label', value: 'b' });
+	await graph.flush();
+	expect(loadedSymbols).toEqual(['symbol:arm-click', 'symbol:arm-text']);
+	expect(updateElements).toEqual([armSection]);
+});
+
+test('resume runtime rewires arm records across branch flips', async () => {
+	const start = comment('markless:branch:branch-site:0');
+	const armButton = element('BUTTON');
+	const armSection = element('SECTION', [armButton]);
+	const end = comment('/markless:branch:branch-site:0');
+	const root = rangeElement('MAIN', [start, armSection, end]);
+	const closedButton = element('BUTTON');
+	const reopenedButton = element('BUTTON');
+	const reopenedSection = element('SECTION', [reopenedButton]);
+	const graph = createRuntimeGraph({
+		cells: [
+			{ graphNodeId: 'state:open', value: true },
+			{ graphNodeId: 'state:label', value: 'a' },
+		],
+	});
+	const loadedSymbols: string[] = [];
+	const resume = createResumeRuntime({
+		root,
+		graph,
+		view: armRecordsView(),
+		loadSymbol(symbolId) {
+			loadedSymbols.push(symbolId);
+			if (symbolId === 'symbol:flip') {
+				return ({ graph: runtimeGraph }) => ({
+					arm: runtimeGraph.read('state:open') ? 0 : 1,
+					html: '<button></button>',
+				});
+			}
+			return () => undefined;
+		},
+		renderBranchHtml: () => (graph.read('state:open') ? [reopenedSection] : [closedButton]),
+		applyDomJournal(entries) {
+			applyDomJournalEntries(entries, {
+				resolveTarget(locator) {
+					if (locator === 'branch:branch-site:0:start') return start;
+					if (locator === 'branch:branch-site:0:end') return end;
+					return undefined;
+				},
+			});
+		},
+	});
+	await resume.start();
+
+	// Flip to arm 1.
+	graph.write({ graphNodeId: 'state:open', value: false });
+	await graph.flush();
+	await drainMicrotasks();
+	await graph.flush();
+	expect(root.childNodes[1]).toBe(closedButton);
+
+	// The new arm's button dispatches its own symbol.
+	await resume.dispatch(event('click', closedButton, ''));
+	expect(loadedSymbols).toContain('symbol:closed-click');
+
+	// The outgoing arm's dom-update subscription released with the range and
+	// its event record no longer dispatches.
+	graph.write({ graphNodeId: 'state:label', value: 'b' });
+	await graph.flush();
+	expect(loadedSymbols.filter((id) => id === 'symbol:arm-text')).toHaveLength(0);
+	await resume.dispatch(event('click', armButton, ''));
+	expect(loadedSymbols.filter((id) => id === 'symbol:arm-click')).toHaveLength(0);
+
+	// Flip back to arm 0: its records are live again against the fresh DOM.
+	graph.write({ graphNodeId: 'state:open', value: true });
+	await graph.flush();
+	await drainMicrotasks();
+	await graph.flush();
+	await resume.dispatch(event('click', reopenedButton, ''));
+	expect(loadedSymbols.filter((id) => id === 'symbol:arm-click')).toHaveLength(1);
+	graph.write({ graphNodeId: 'state:label', value: 'c' });
+	await graph.flush();
+	expect(loadedSymbols.filter((id) => id === 'symbol:arm-text')).toHaveLength(1);
+});
+
+test('resume runtime activates arm behaviors and handles on materialize and disposes them on flip-out', async () => {
+	const start = comment('markless:branch:branch-site:0');
+	const armSection = element('SECTION');
+	const end = comment('/markless:branch:branch-site:0');
+	const root = rangeElement('MAIN', [start, armSection, end]);
+	const replacement = element('BUTTON');
+	const graph = createRuntimeGraph({ cells: [{ graphNodeId: 'state:open', value: true }] });
+	const loadedSymbols: string[] = [];
+	const cleanupParents: unknown[] = [];
+	const handleReads: unknown[] = [];
+	const resume = createResumeRuntime({
+		root,
+		graph,
+		view: armRecordsView({
+			behaviors: [
+				{
+					hostPath: [0],
+					hostNodeId: 'h-arm',
+					source: 'chart()',
+					functionSource: 'chart',
+					inputSources: [],
+					inputValues: [],
+					symbolId: 'symbol:arm-behavior',
+				},
+			],
+			elementHandles: [
+				{ hostPath: [0], hostNodeId: 'h-arm', handleId: 'handle:arm', name: 'armEl' },
+			],
+		}),
+		loadSymbol(symbolId) {
+			loadedSymbols.push(symbolId);
+			if (symbolId === 'symbol:arm-behavior') {
+				return () => () =>
+					cleanupParents.push(
+						(armSection as { readonly parentNode?: unknown }).parentNode,
+					);
+			}
+			if (symbolId === 'symbol:read-handle') {
+				return (context) => void handleReads.push(context.getElementHandle('handle:arm'));
+			}
+			if (symbolId === 'symbol:flip') {
+				return ({ graph: runtimeGraph }) => ({
+					arm: runtimeGraph.read('state:open') ? 0 : 1,
+					html: '<button></button>',
+				});
+			}
+			return () => undefined;
+		},
+		renderBranchHtml: () => [replacement],
+		applyDomJournal(entries) {
+			applyDomJournalEntries(entries, {
+				resolveTarget(locator) {
+					if (locator === 'branch:branch-site:0:start') return start;
+					if (locator === 'branch:branch-site:0:end') return end;
+					return undefined;
+				},
+			});
+		},
+	});
+
+	// Materialized arm behaviors attach at start(), not runtime creation.
+	expect(loadedSymbols).toEqual([]);
+	await resume.start();
+	expect(loadedSymbols).toEqual(['symbol:arm-behavior']);
+
+	// The arm's element handle resolves for lazy symbols while the arm is live.
+	await resume.dispatch(event('click', root, ''));
+	expect(handleReads).toEqual([armSection]);
+
+	// Flip out: the behavior cleanup runs before the host detaches (S2 range
+	// disposal catches the synthetic-keyed hosts) and the handle reads undefined.
+	graph.write({ graphNodeId: 'state:open', value: false });
+	await graph.flush();
+	await drainMicrotasks();
+	await graph.flush();
+	expect(cleanupParents).toEqual([root]);
+	expect(root.childNodes.includes(armSection)).toBe(false);
+	await resume.dispatch(event('click', root, ''));
+	expect(handleReads).toEqual([armSection, undefined]);
+});
+
+test('resume runtime disposes pending-range hosts when an async boundary settles', async () => {
+	const start = comment('markless:async:boundary:0');
+	const pending = element('P');
+	const end = comment('/markless:async:boundary:0');
+	const root = rangeElement('SECTION', [start, pending, end]);
+	const fragmentNode = element('P');
+	const loadedSymbols: string[] = [];
+	const applied: DomJournalEntry[] = [];
+	const cleanupParents: unknown[] = [];
+	let result = deferred<{ title: string }>();
+	const graph = createRuntimeGraph({
+		cells: [
+			{ graphNodeId: 'state:userId', value: 'ada' },
+			{ graphNodeId: 'state:tick', value: 0 },
+		],
+		asyncComputed: [
+			{
+				graphNodeId: 'computed:details',
+				dependencies: [{ graphNodeId: 'state:userId', path: [] }],
+				key: (read) => read('state:userId'),
+				run: () => result.promise,
+			},
+		],
+	});
+	const resume = createResumeRuntime({
+		root,
+		graph,
+		view: {
+			...updatableBoundaryView(),
+			locators: [
+				{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'section' },
+				{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'p' },
+			],
+			domUpdates: [
+				{
+					hostNodeId: 'h1',
+					source: 'tick',
+					graphNodeId: 'state:tick',
+					path: [],
+					symbolId: 'symbol:pending-update',
+				},
+			],
+			behaviors: [
+				{
+					hostNodeId: 'h1',
+					source: 'spinner()',
+					functionSource: 'spinner',
+					inputSources: [],
+					inputValues: [],
+					symbolId: 'symbol:spinner',
+				},
+			],
+		},
+		loadSymbol(symbolId) {
+			loadedSymbols.push(symbolId);
+			if (symbolId === 'symbol:spinner') {
+				return () => () =>
+					cleanupParents.push((pending as { readonly parentNode?: unknown }).parentNode);
+			}
+			if (symbolId === 'symbol:boundary-update') {
+				return ({ status }) => ({
+					arm: status === 'rejected' ? 1 : 0,
+					html: '<p>Done</p>',
+				});
+			}
+			return () => undefined;
+		},
+		renderBranchHtml: () => [fragmentNode],
+		applyDomJournal(entries) {
+			applied.push(...entries);
+			applyDomJournalEntries(entries, {
+				resolveTarget(locator) {
+					if (locator === 'async-boundary:boundary:0:start') return start;
+					if (locator === 'async-boundary:boundary:0:end') return end;
+					return undefined;
+				},
+			});
+		},
+	});
+
+	await resume.start();
+	await resume.activateBehaviors('h1');
+	graph.write({ graphNodeId: 'state:tick', value: 1 });
+	await graph.flush();
+	expect(loadedSymbols).toEqual(['symbol:spinner', 'symbol:pending-update']);
+
+	result.resolve({ title: 'User ada' });
+	await drainMicrotasks();
+	await graph.flush();
+
+	// The @pending host cleaned up before the range detached, and its
+	// dom-update subscription released with it.
+	expect(cleanupParents).toEqual([root]);
+	expect(root.childNodes.includes(pending)).toBe(false);
+	graph.write({ graphNodeId: 'state:tick', value: 2 });
+	await graph.flush();
+	expect(loadedSymbols.filter((id) => id === 'symbol:pending-update')).toHaveLength(1);
+
+	// The boundary's own subscription survives: revalidation settles again.
+	applied.length = 0;
+	result = deferred<{ title: string }>();
+	graph.write({ graphNodeId: 'state:userId', value: 'grace' });
+	await graph.flush();
+	result.resolve({ title: 'User grace' });
+	await drainMicrotasks();
+	await graph.flush();
+	expect(applied.filter((entry) => entry.type === 'removeRange')).toHaveLength(1);
+});
+
+test('resume runtime activates ancestor behavior hosts on descendant dispatch', async () => {
+	const button = {
+		nodeType: 1 as const,
+		tagName: 'BUTTON',
+		childNodes: [],
+		addEventListener() {},
+	};
+	const shell = {
+		nodeType: 1 as const,
+		tagName: 'DIV',
+		childNodes: [button] as unknown[],
+		addEventListener() {},
+	};
+	const root = {
+		nodeType: 1 as const,
+		tagName: 'MAIN',
+		childNodes: [shell] as unknown[],
+		addEventListener() {},
+	};
+	(button as { parentElement?: unknown }).parentElement = shell;
+	(shell as { parentElement?: unknown }).parentElement = root;
+	const loaded: string[] = [];
+	const graph = {
+		read: () => undefined,
+		subscribe: () => () => undefined,
+		subscribeJournal: () => () => undefined,
+		listSharedDefinitions: () => [],
+		flush: async () => undefined,
+	};
+	const runtime = createResumeRuntime({
+		root: root as never,
+		graph: graph as never,
+		view: {
+			locators: [
+				{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'main' },
+				{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'div' },
+				{ hostNodeId: 'h2', strategy: 'dom-order', index: 2, tagName: 'button' },
+			],
+			events: [{ hostNodeId: 'h2', eventName: 'click', symbolIds: ['symbol:click'] }],
+			domUpdates: [],
+			// The ancestor DIV owns an attach behavior (the event-only runtime
+			// activated ancestor hosts on dispatch; the full runtime must too —
+			// the music-player App-root controller silently stopped activating
+			// when escalation moved the page off the event-only path).
+			behaviors: [{ hostNodeId: 'h1', symbolId: 'symbol:controller', inputSources: [] }],
+			elementHandles: [],
+			asyncBoundaries: [],
+		} as never,
+		loadSymbol(symbolId: string) {
+			loaded.push(symbolId);
+			return () => undefined;
+		},
+		applyDomJournal: () => undefined,
+	});
+	await runtime.start();
+	expect(loaded).toEqual([]);
+
+	await runtime.dispatch({ type: 'click', target: button } as never);
+	expect(loaded).toContain('symbol:controller');
+	expect(loaded).toContain('symbol:click');
+});

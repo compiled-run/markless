@@ -498,6 +498,39 @@ export function App() @{
 	]);
 });
 
+test('buildSemanticGraph records branch sites with anchor order shared with async boundaries', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/BranchSites.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let open = state(true);
+	let value = state('ready');
+
+	<section>
+		@if (open) { <p>Shown</p> } @else { <p>Hidden</p> }
+		@try { <em>{value}</em> } @pending { <em>Loading</em> } @catch { <em>Broken</em> }
+	</section>
+}
+`,
+	});
+
+	expect(graph.branchSites).toEqual([
+		expect.objectContaining({
+			id: 'branch-site:0',
+			kind: 'if',
+			armCount: 2,
+			testSource: 'open',
+			anchorOrder: 0,
+		}),
+	]);
+	// The async boundary shares the same document-order anchor allocator.
+	expect(graph.asyncBoundaries).toEqual([
+		expect.objectContaining({ id: 'boundary:0', anchorOrder: 1 }),
+	]);
+});
+
 test('buildSemanticGraph records branch scopes for @switch cases', async () => {
 	const graph = await buildSemanticGraph({
 		filename: 'src/SwitchScopes.tsrx',

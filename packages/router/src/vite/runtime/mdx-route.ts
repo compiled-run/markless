@@ -25,8 +25,10 @@ export type MdxChild = {
 };
 
 export type MdxComponentArtifact = {
-	readonly renderSsr?: (props?: unknown) => MdxRenderOutput;
-	readonly renderCsr?: (props?: unknown) => MdxRenderOutput;
+	// MaybePromise: compiled artifacts are async — a sync type here is what
+	// let unawaited .html reads slip past vp check.
+	readonly renderSsr?: (props?: unknown) => MdxRenderOutput | Promise<MdxRenderOutput>;
+	readonly renderCsr?: (props?: unknown) => MdxRenderOutput | Promise<MdxRenderOutput>;
 };
 
 export type MdxSymbolLoader = {
@@ -69,13 +71,16 @@ type MdxViewPayload = {
 	readonly asyncBoundaries?: readonly unknown[];
 };
 
-export function renderMdxChild(
+export async function renderMdxChild(
 	children: MdxChild[],
 	component: MdxComponentArtifact,
 	props: unknown,
 	child: Omit<MdxChild, 'output'>,
-): string {
-	const output = component.renderSsr?.(props);
+): Promise<string> {
+	// Compiled marklessRenderSsr is async (initial render awaits demanded
+	// async work); the unawaited Promise passed the truthy guard while .html
+	// read undefined — the MDX child silently dropped from SSR html.
+	const output = await component.renderSsr?.(props);
 	if (output) children.push({ ...child, output });
 	return output?.html ?? '';
 }

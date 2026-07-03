@@ -46,6 +46,7 @@ export function emitSourceModule(input: {
 	readonly environment: MarklessEnvironment;
 	readonly clientOutput: MarklessClientOutput;
 	readonly resumeModuleUrl?: string;
+	readonly needsFullResume?: boolean;
 	readonly publicRenderModuleSource: string;
 	readonly publicRenderRootExportName: string | null;
 	readonly publicCsrModuleSource: string;
@@ -61,7 +62,9 @@ export function emitSourceModule(input: {
 	return [
 		input.environment === 'server'
 			? ''
-			: "import { resumeEventOnlyFromPayloadDocument } from '@markless/core/web/event-only-resume';",
+			: input.needsFullResume
+				? "import { resumeFromPayloadDocument } from '@markless/core/web/resume';"
+				: "import { resumeEventOnlyFromPayloadDocument } from '@markless/core/web/event-only-resume';",
 		symbolsOnly
 			? ''
 			: `import { state as payloadState, view as payloadView } from '${input.payloadId}';`,
@@ -70,7 +73,9 @@ export function emitSourceModule(input: {
 		routeSymbols ? 'const marklessLoadLocalSymbol = loadSymbol;' : '',
 		symbolsOnly && !routeSymbols ? 'export { loadSymbol };' : '',
 		symbolsOnly ? '' : 'export { payloadView };',
-		input.environment === 'server' ? '' : emitResumeContainerEvent(resumeSymbolLoader),
+		input.environment === 'server'
+			? ''
+			: emitResumeContainerEvent(resumeSymbolLoader, input.needsFullResume ?? false),
 		'',
 		input.environment === 'server' || symbolsOnly ? '' : input.publicRenderModuleSource,
 		input.environment === 'server' || symbolsOnly ? '' : input.publicCsrModuleSource,
@@ -162,7 +167,23 @@ function emitCompiledAppDefault(input: {
 	].join('\n');
 }
 
-function emitResumeContainerEvent(loadSymbolName: string): string {
+function emitResumeContainerEvent(loadSymbolName: string, needsFullResume: boolean): string {
+	if (needsFullResume) {
+		// Branch flips need graph subscriptions and range replacement: start the
+		// full resume runtime once, mark the container so the inline resumer
+		// steps aside, and dispatch the pending event through the runtime.
+		return [
+			'export async function resumeContainerEvent(input) {',
+			'	input.root.__asyncResumeRuntimeStarted = true;',
+			'	const { runtime } = await resumeFromPayloadDocument({',
+			'		document: input.root,',
+			'		root: input.root,',
+			`		loadSymbol: ${loadSymbolName},`,
+			'	});',
+			'	await runtime.dispatch(input.event, { syncPolicyAlreadyApplied: true });',
+			'}',
+		].join('\n');
+	}
 	return [
 		'export async function resumeContainerEvent(input) {',
 		'	await resumeEventOnlyFromPayloadDocument({',

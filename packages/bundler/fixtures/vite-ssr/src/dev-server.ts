@@ -155,7 +155,7 @@ async function renderDevRequest(runner: SsrRunner, request: Request) {
 	}
 
 	const entry = (await runner.import('/src/root.tsrx')) as SsrEntry;
-	return new Response(renderToString(entry.default), {
+	return new Response(await renderToString(entry.default), {
 		headers: { 'Content-Type': 'text/html;charset=utf-8' },
 	});
 }
@@ -175,7 +175,7 @@ async function renderPreviewRequest(root: string, outDir: string) {
 		],
 	});
 
-	return new Response(renderToString(entry.default, { resumeModuleUrl, modulePreloads }), {
+	return new Response(await renderToString(entry.default, { resumeModuleUrl, modulePreloads }), {
 		headers: { 'Content-Type': 'text/html;charset=utf-8' },
 	});
 }

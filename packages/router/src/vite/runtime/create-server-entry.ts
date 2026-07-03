@@ -18,7 +18,7 @@ interface RenderOutput {
 	readonly view?: unknown;
 }
 
-type SsrRender = (props?: unknown) => RenderOutput;
+type SsrRender = (props?: unknown) => RenderOutput | Promise<RenderOutput>;
 
 interface SsrArtifact {
 	readonly renderSsr?: SsrRender;
@@ -62,7 +62,9 @@ export function createServerEntry(options: ServerEntryOptions) {
 
 		try {
 			return await renderPage(url, match.route.file, match.params, 200);
-		} catch {
+		} catch (error) {
+			// Surface the stack: a silent 500 hid the async-renderSsr break.
+			console.error('[markless-router] page render failed:', error);
 			return renderStatusPage(url, manifest.statusPages.error, 500, 'Internal Server Error');
 		}
 	}
@@ -101,7 +103,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 			},
 			status,
 		};
-		const pageOutput = renderPageModule(
+		const pageOutput = await renderPageModule(
 			pageModule,
 			pageProps,
 			file,
@@ -114,7 +116,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 		const documentModule = options.documentModuleLoader
 			? ((await options.documentModuleLoader()) as DocumentModule)
 			: undefined;
-		const html = renderDocument(pageOutput, documentModule, pageProps);
+		const html = await renderDocument(pageOutput, documentModule, pageProps);
 
 		return new Response(html, {
 			status,
@@ -125,7 +127,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 	return { fetch };
 }
 
-function renderPageModule(
+async function renderPageModule(
 	pageModule: PageModule,
 	props: PageComponentProps,
 	file: string,
@@ -134,7 +136,7 @@ function renderPageModule(
 	navigationEntryPath: string | undefined,
 	routeModulePreloads: Record<string, readonly ModulePreloadInput[]> | undefined,
 	routeSsrModulePreloads: Record<string, readonly ModulePreloadInput[]> | undefined,
-): PageHtml {
+): Promise<PageHtml> {
 	const baseArtifact = pageModule.default;
 	const renderSsr = baseArtifact?.renderSsr ?? pageModule.marklessRenderSsr;
 	if (!renderSsr) {
@@ -144,7 +146,9 @@ function renderPageModule(
 		};
 	}
 
-	const output = renderSsr(props);
+	// Compiled marklessRenderSsr is async (initial render awaits demanded
+	// async work); interpolating the un-awaited Promise served 500s.
+	const output = await renderSsr(props);
 	if (!output) return { bodyHtml: '', headHtml: '' };
 	const routeScript = output.state || output.view ? renderRouteScript(file) : '';
 	const linkBridge =
@@ -169,7 +173,7 @@ function renderPageModule(
 			return routedOutput;
 		},
 	};
-	const rendered = renderToString(pageArtifact as never, {
+	const rendered = await renderToString(pageArtifact as never, {
 		modulePreloads,
 		resumeModuleUrl: resumeEntryPath ?? baseArtifact?.resumeModuleUrl,
 	});
@@ -253,14 +257,14 @@ function unescapeHtmlAttribute(value: string): string {
 		.replaceAll('&amp;', '&');
 }
 
-function renderDocument(
+async function renderDocument(
 	pageHtml: PageHtml,
 	documentModule: DocumentModule | undefined,
 	pageProps: PageComponentProps,
-): string {
+): Promise<string> {
 	const attributes = htmlAttributes(documentModule, pageProps);
 	const children = pageHtml.bodyHtml;
-	const documentHtml = renderDocumentModule(documentModule, {
+	const documentHtml = await renderDocumentModule(documentModule, {
 		...pageProps,
 		children: DOCUMENT_CHILDREN_PLACEHOLDER,
 	});
@@ -289,11 +293,11 @@ function renderDocument(
 	].join('');
 }
 
-function renderDocumentModule(
+async function renderDocumentModule(
 	documentModule: DocumentModule | undefined,
 	props: PageComponentProps & { readonly children: string },
-): string | undefined {
-	const output = documentModule?.default?.renderSsr?.(props);
+): Promise<string | undefined> {
+	const output = await documentModule?.default?.renderSsr?.(props);
 	return output?.html;
 }
 

@@ -236,6 +236,15 @@ export function createMarklessRolldownPlugin(input: {
 					bundle,
 					collectModulePreloadInjections(clientManifest.bundleGraph, {
 						publicPath: internalOptions.publicPath,
+						entryChunks: Object.values(bundle)
+							.filter(
+								(output): output is { fileName: string } =>
+									!!output &&
+									typeof output === 'object' &&
+									(output as { type?: string }).type === 'chunk' &&
+									(output as { isEntry?: boolean }).isEntry === true,
+							)
+							.map((chunk) => stripBuildPrefix(chunk.fileName)),
 					}),
 				);
 

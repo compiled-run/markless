@@ -133,6 +133,7 @@ export type ResumeEventRecord = {
 
 export type ResumeAsyncBoundaryRecord = {
 	readonly id: string;
+	readonly updateSymbolId?: string;
 	readonly startAnchor: ResumeDomComment;
 	readonly endAnchor: ResumeDomComment;
 	readonly asyncReads: ProtocolViewPayload['asyncBoundaries'][number]['asyncReads'];
@@ -142,6 +143,64 @@ export type ResumeAsyncBoundaryRead =
 	ProtocolViewPayload['asyncBoundaries'][number]['asyncReads'][number];
 
 export type ResumeBehaviorRecord = ProtocolViewPayload['behaviors'][number];
+
+export type ResumeKeyedRepeatRecord = NonNullable<ProtocolViewPayload['keyedRepeats']>[number];
+
+export type ResumeKeyedRepeatRowEvent = ResumeKeyedRepeatRecord['rowEvents'][number];
+
+// One materialized row event host with the row root that positions it.
+type ResumeRowEventMatch = {
+	readonly repeat: ResumeKeyedRepeatRecord;
+	readonly parent: ResumeDomElement;
+	readonly rowRoot: ResumeDomElement;
+	readonly rowEvent: ResumeKeyedRepeatRowEvent;
+};
+
+type ResumeRowEventRecords = WeakMap<ResumeDomElement, Map<string, ResumeRowEventMatch>>;
+
+type ResumeDispatchMatch =
+	| { readonly element: ResumeDomElement; readonly eventRecord: ResumeEventRecord }
+	| { readonly element: ResumeDomElement; readonly rowMatch: ResumeRowEventMatch };
+
+// Per-arm records (compiler L4 S3a contract): everything the resume runtime
+// rewires when an arm materializes, addressed by arm-relative raw childNodes
+// host paths. The protocol types the dom-update/behavior/handle arm entries
+// loosely (Record<string, unknown>); they carry the matching flat record
+// shape plus a hostPath.
+export type ResumeBranchArmRecordSet = NonNullable<
+	NonNullable<ProtocolViewPayload['branches']>[number]['armRecords']
+>[number];
+
+type ResumeArmDomUpdateRecord = ProtocolViewPayload['domUpdates'][number] & {
+	readonly hostPath: ReadonlyArray<number>;
+};
+
+type ResumeArmBehaviorRecord = ResumeBehaviorRecord & {
+	readonly hostPath: ReadonlyArray<number>;
+};
+
+type ResumeArmElementHandleRecord = ProtocolViewPayload['elementHandles'][number] & {
+	readonly hostPath: ReadonlyArray<number>;
+};
+
+export type ResumeBranchRecord = {
+	readonly id: string;
+	readonly startAnchor: ResumeDomComment;
+	readonly endAnchor: ResumeDomComment;
+	readonly symbolId: string;
+	readonly testReads: NonNullable<
+		NonNullable<ProtocolViewPayload['branches']>[number]['testReads']
+	>;
+	readonly armTests?: ReadonlyArray<unknown>;
+	readonly armRecords?: ReadonlyArray<ResumeBranchArmRecordSet>;
+};
+
+// A lazy branch-update symbol returns the newly selected arm plus the rebuilt
+// HTML for the range between the branch comment anchors.
+export type ResumeBranchUpdate = {
+	readonly arm: number;
+	readonly html: string;
+};
 
 export type ResumeViewRecord = {
 	readonly locators: ReadonlyArray<{
@@ -155,6 +214,8 @@ export type ResumeViewRecord = {
 	readonly behaviors: ProtocolViewPayload['behaviors'];
 	readonly elementHandles: ProtocolViewPayload['elementHandles'];
 	readonly asyncBoundaries: ProtocolViewPayload['asyncBoundaries'];
+	readonly branches?: ProtocolViewPayload['branches'];
+	readonly keyedRepeats?: ProtocolViewPayload['keyedRepeats'];
 };
 
 export type ResumeSymbolContext = {
@@ -165,11 +226,19 @@ export type ResumeSymbolContext = {
 	readonly event?: ResumeDomEvent;
 	readonly element: ResumeDomElement;
 	readonly getElementHandle: (handleIdOrName: string) => ResumeDomElement | undefined;
+	// Keyed repeat row values; lowered symbols read context.locals.<itemName>.
+	readonly locals?: Readonly<Record<string, unknown>>;
+	// Runtime-computed branch arm; composed records remap test reads, so the
+	// flip module defers to this over its baked child-local test expression.
+	readonly arm?: number;
 	readonly behaviorInputs?: ReadonlyArray<unknown>;
 	readonly domUpdate?: ProtocolViewPayload['domUpdates'][number];
 	readonly value?: unknown;
 	readonly asyncBoundary?: ResumeAsyncBoundaryRecord;
 	readonly asyncRead?: ResumeAsyncBoundaryRead;
+	// Settled async outcome passed to boundary update symbols, which pick the
+	// @try or @catch arm from it and rebuild the arm HTML from graph reads.
+	readonly status?: 'fulfilled' | 'rejected';
 };
 
 export type ResumeBehaviorCleanup = () => void;
@@ -180,7 +249,8 @@ export type ResumeSymbol = (
 	| void
 	| DomJournalResult
 	| ResumeBehaviorCleanup
-	| Promise<void | DomJournalResult | ResumeBehaviorCleanup>;
+	| ResumeBranchUpdate
+	| Promise<void | DomJournalResult | ResumeBehaviorCleanup | ResumeBranchUpdate>;
 
 export type ResumeRuntimeErrorContext = {
 	readonly phase: 'event';
@@ -203,6 +273,8 @@ export type ResumeRuntimeInput = {
 	readonly graph: RuntimeGraph;
 	readonly view: ResumeViewRecord;
 	readonly loadSymbol: (symbolId: string) => ResumeSymbol | Promise<ResumeSymbol>;
+	// Builds DOM nodes from branch-update HTML; browser default arrives with S6.
+	readonly renderBranchHtml?: (html: string) => ReadonlyArray<ResumeDomNode>;
 	readonly createVisibilityObserver?: ResumeVisibilityObserverFactory;
 	readonly createRemovalObserver?: ResumeRemovalObserverFactory;
 	readonly applyDomJournal?: (entries: ReadonlyArray<DomJournalEntry>) => void | Promise<void>;
@@ -220,6 +292,7 @@ export type ResumeRuntime = {
 	readonly activateBehaviors: (hostNodeId: string) => Promise<void>;
 	readonly getElement: (hostNodeId: string) => ResumeDomElement | undefined;
 	readonly getAsyncBoundary: (boundaryId: string) => ResumeAsyncBoundaryRecord | undefined;
+	readonly getBranch: (branchId: string) => ResumeBranchRecord | undefined;
 	readonly disposeHost: (hostNodeId: string) => void;
 };
 
@@ -306,12 +379,22 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 		input.view.elementHandles,
 	);
 	const hostCleanups = new Map<string, ResumeHostCleanup[]>();
+	// Graph unsubscribes owned by one host element, released when that host's
+	// range is removed. Branch test-read and async boundary subscriptions
+	// belong to the range owner itself and survive range replacement.
+	const hostSubscriptionReleases = new Map<string, Array<() => void>>();
 	const behaviorRecordsByHostId = groupBehaviorRecords(input.view.behaviors);
 	const activeBehaviorHosts = new Set<string>();
 	const dispatchSharedPatch =
 		input.dispatchSharedPatch ?? defaultSharedPatchDispatcher(input.root);
-	if (input.applyDomJournal) {
-		input.graph.subscribeJournal(input.applyDomJournal);
+	const applyDomJournal = input.applyDomJournal;
+	if (applyDomJournal) {
+		input.graph.subscribeJournal(async (entries) => {
+			disposeRemovedRangeHosts(entries);
+			await applyDomJournal(entries);
+			// A flipped-in arm's records go live only once its DOM exists.
+			await materializeFlippedBranchArms(entries);
+		});
 	}
 	let visibilityObserver: ResumeVisibilityObserver | undefined;
 	let removalObserver: ResumeRemovalObserver | undefined;
@@ -336,13 +419,37 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 		eventTypes.add(eventRecord.eventName);
 	}
 
+	// SSR renders keyed repeat rows as the parent's first items.length element
+	// children; @empty replaces the rows, so an empty collection maps to none.
+	const rowEventRecords: ResumeRowEventRecords = new WeakMap();
+	for (const repeat of input.view.keyedRepeats ?? []) {
+		const parent = elementsByHostId.get(repeat.parentHostNodeId);
+		if (!parent) continue;
+
+		const items = readRepeatCollection(input.graph, repeat);
+		for (const rowRoot of elementChildren(parent).slice(0, items.length)) {
+			for (const rowEvent of repeat.rowEvents) {
+				const host = rowEventHost(rowRoot, rowEvent.hostPath);
+				if (!host) continue;
+
+				let recordsByEventName = rowEventRecords.get(host);
+				if (!recordsByEventName) {
+					recordsByEventName = new Map();
+					rowEventRecords.set(host, recordsByEventName);
+				}
+				recordsByEventName.set(rowEvent.eventName, { repeat, parent, rowRoot, rowEvent });
+				eventTypes.add(rowEvent.eventName);
+			}
+		}
+	}
+
 	for (const domUpdate of input.view.domUpdates) {
 		if (!domUpdate.symbolId) continue;
 
 		const element = elementsByHostId.get(domUpdate.hostNodeId);
 		if (!element) continue;
 
-		input.graph.subscribe({
+		const release = input.graph.subscribe({
 			id: `view-dom-update:${domUpdate.hostNodeId}:${domUpdate.graphNodeId}:${domUpdate.path.join('.')}`,
 			graphNodeId: domUpdate.graphNodeId,
 			path: domUpdate.path,
@@ -357,6 +464,7 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 				})) as DomJournalResult | void;
 			},
 		});
+		storeHostSubscription(domUpdate.hostNodeId, release);
 	}
 
 	for (const asyncBoundary of asyncBoundariesById.values()) {
@@ -366,15 +474,247 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 				graphNodeId: asyncRead.graphNodeId,
 				path: [],
 				run(snapshot) {
+					if (asyncBoundary.updateSymbolId) {
+						return settleAsyncBoundaryRange(asyncBoundary, snapshot);
+					}
 					return createAsyncBoundaryJournalEntries(asyncBoundary, asyncRead, snapshot);
+				},
+			});
+		}
+
+		// CSR mounts render @pending between the anchors, so an unsettled
+		// boundary is a local demand: reading the async node starts its runner
+		// now. Settled SSR snapshots make this read a no-op, keeping resumed
+		// pages at zero runners at startup.
+		if (asyncBoundary.updateSymbolId) {
+			for (const asyncRead of asyncBoundary.asyncReads) {
+				input.graph.read(asyncRead.graphNodeId, ['status']);
+			}
+		}
+	}
+
+	// Loads the boundary's update symbol after a settle, rebuilds the settled
+	// arm HTML from the graph, and replaces the range between the anchors.
+	// Pending snapshots keep the current DOM: browser runs are revalidation.
+	async function settleAsyncBoundaryRange(
+		boundary: ResumeAsyncBoundaryRecord,
+		snapshot: unknown,
+	): Promise<DomJournalResult | void> {
+		const status = (snapshot as { readonly status?: unknown } | null)?.status;
+		if (status !== 'fulfilled' && status !== 'rejected') return;
+
+		const loadedSymbol = input.loadSymbol(boundary.updateSymbolId!);
+		const symbol = isPromiseLike(loadedSymbol) ? await loadedSymbol : loadedSymbol;
+		const maybeUpdate = symbol({
+			graph: input.graph,
+			status,
+			element: input.root,
+			getElementHandle: elementHandles.get,
+			asyncBoundary: boundary,
+		});
+		const update = isPromiseLike(maybeUpdate) ? await maybeUpdate : maybeUpdate;
+		if (!isResumeBranchUpdate(update)) return;
+
+		const fragment = input.renderBranchHtml ? input.renderBranchHtml(update.html) : update.html;
+		return [
+			{ type: 'removeRange', locator: asyncBoundaryRangeLocator(boundary.id) },
+			{ type: 'insertRange', locator: asyncBoundaryStartLocator(boundary.id), fragment },
+		];
+	}
+
+	const branchesById = new Map<string, ResumeBranchRecord>();
+	const currentArmByBranchId = new Map<string, number>();
+	for (const branch of materializeBranchLocators(input.root, input.view.branches ?? [])) {
+		branchesById.set(branch.id, branch);
+		// Delegated listeners install once at start(), so every arm's event
+		// names register up front — a flip-in may introduce an event type no
+		// flat record uses.
+		for (const armRecordSet of branch.armRecords ?? []) {
+			for (const armEvent of armRecordSet.events) eventTypes.add(armEvent.eventName);
+		}
+		// Seed the arm from the current test value; no symbol load until a flip.
+		let currentArm = readBranchArm(input.graph, branch);
+		currentArmByBranchId.set(branch.id, currentArm);
+		for (const testRead of branch.testReads) {
+			input.graph.subscribe({
+				id: `branch-test:${branch.id}:${testRead.graphNodeId}:${testRead.path.join('.')}`,
+				graphNodeId: testRead.graphNodeId,
+				path: testRead.path,
+				async run() {
+					const newArm = readBranchArm(input.graph, branch);
+					if (newArm === currentArm) return;
+
+					const loadedSymbol = input.loadSymbol(branch.symbolId);
+					const symbol = isPromiseLike(loadedSymbol) ? await loadedSymbol : loadedSymbol;
+					const maybeUpdate = symbol({
+						graph: input.graph,
+						// The record's testReads are composition-remapped; the module's
+						// baked test expression is child-local. The runtime's arm wins.
+						arm: newArm,
+						element: input.root,
+						getElementHandle: elementHandles.get,
+					});
+					const update = isPromiseLike(maybeUpdate) ? await maybeUpdate : maybeUpdate;
+					if (!isResumeBranchUpdate(update)) return;
+
+					currentArm = update.arm;
+					currentArmByBranchId.set(branch.id, update.arm);
+					const fragment = input.renderBranchHtml
+						? input.renderBranchHtml(update.html)
+						: update.html;
+					return [
+						{ type: 'removeRange', locator: `branch:${branch.id}` },
+						{ type: 'insertRange', locator: `branch:${branch.id}:start`, fragment },
+					];
 				},
 			});
 		}
 	}
 
+	// Startup: the SSR-taken (or CSR-rendered) arm is already live between the
+	// anchors, so its arm records materialize now. Behavior activation waits
+	// for start(); flip-ins activate inside the journal listener instead.
+	const startupArmBehaviorHostIds: string[] = [];
+	for (const branch of branchesById.values()) {
+		const armIndex = currentArmByBranchId.get(branch.id);
+		if (armIndex === undefined) continue;
+
+		startupArmBehaviorHostIds.push(...materializeBranchArmRecords(branch, armIndex));
+	}
+
+	// One arm's records (events, dom updates, behaviors, element handles) go
+	// live against the DOM currently between the branch anchors. Hosts register
+	// under synthetic ids (branch:<id>:arm:<n>:<path>) inside elementsByHostId,
+	// so range disposal releases their wiring exactly like flat hosts. Returns
+	// the behavior host ids the caller must activate.
+	function materializeBranchArmRecords(branch: ResumeBranchRecord, armIndex: number): string[] {
+		const armRecordSet = branch.armRecords?.[armIndex];
+		if (!armRecordSet) return [];
+
+		const armNodes = nodesBetweenAnchors(input.root, branch.startAnchor, branch.endAnchor);
+		const claimHost = (
+			hostPath: ReadonlyArray<number>,
+		): { readonly hostNodeId: string; readonly element: ResumeDomElement } | undefined => {
+			const element = armRecordHost(armNodes, hostPath);
+			if (!element) return undefined;
+
+			const hostNodeId = `branch:${branch.id}:arm:${String(armIndex)}:${hostPath.join('.')}`;
+			// Re-materializing an arm resurrects hosts disposed on flip-out.
+			disposedHosts.delete(hostNodeId);
+			elementsByHostId.set(hostNodeId, element);
+			return { hostNodeId, element };
+		};
+
+		for (const armEvent of armRecordSet.events) {
+			const host = claimHost(armEvent.hostPath);
+			if (!host) continue;
+
+			let recordsByEventName = eventRecords.get(host.element);
+			if (!recordsByEventName) {
+				recordsByEventName = new Map();
+				eventRecords.set(host.element, recordsByEventName);
+			}
+			recordsByEventName.set(armEvent.eventName, {
+				hostNodeId: host.hostNodeId,
+				eventName: armEvent.eventName,
+				syncPolicy: armEvent.syncPolicy,
+				symbolIds: armEvent.symbolIds,
+			});
+		}
+
+		const armDomUpdates = armRecordSet.domUpdates as ReadonlyArray<ResumeArmDomUpdateRecord>;
+		for (const armDomUpdate of armDomUpdates) {
+			if (!armDomUpdate.symbolId) continue;
+
+			const host = claimHost(armDomUpdate.hostPath);
+			if (!host) continue;
+
+			const element = host.element;
+			const release = input.graph.subscribe({
+				id: `arm-dom-update:${host.hostNodeId}:${armDomUpdate.graphNodeId}:${armDomUpdate.path.join('.')}`,
+				graphNodeId: armDomUpdate.graphNodeId,
+				path: armDomUpdate.path,
+				async run(value) {
+					const symbol = await input.loadSymbol(armDomUpdate.symbolId!);
+					return (await symbol({
+						graph: input.graph,
+						element,
+						getElementHandle: elementHandles.get,
+						domUpdate: armDomUpdate,
+						value,
+					})) as DomJournalResult | void;
+				},
+			});
+			storeHostSubscription(host.hostNodeId, release);
+		}
+
+		const armBehaviorsByHostId = new Map<string, ResumeBehaviorRecord[]>();
+		const armBehaviors = armRecordSet.behaviors as ReadonlyArray<ResumeArmBehaviorRecord>;
+		for (const armBehavior of armBehaviors) {
+			const host = claimHost(armBehavior.hostPath);
+			if (!host) continue;
+
+			const records = armBehaviorsByHostId.get(host.hostNodeId) ?? [];
+			records.push({ ...armBehavior, hostNodeId: host.hostNodeId });
+			armBehaviorsByHostId.set(host.hostNodeId, records);
+
+			for (const inputGraphRead of armBehavior.inputGraphReads ?? []) {
+				const release = input.graph.subscribe({
+					id: `behavior-input:${host.hostNodeId}:${inputGraphRead.inputIndex}:${inputGraphRead.graphNodeId}:${inputGraphRead.path.join('.')}`,
+					graphNodeId: inputGraphRead.graphNodeId,
+					path: inputGraphRead.path,
+					async run() {
+						if (!activeBehaviorHosts.has(host.hostNodeId)) return;
+
+						await activateBehaviors(host.hostNodeId, { flush: false });
+					},
+				});
+				storeHostSubscription(host.hostNodeId, release);
+			}
+		}
+		for (const [hostNodeId, records] of armBehaviorsByHostId) {
+			// set() replaces stale records left by an earlier materialization.
+			behaviorRecordsByHostId.set(hostNodeId, records);
+		}
+
+		const armHandles =
+			armRecordSet.elementHandles as ReadonlyArray<ResumeArmElementHandleRecord>;
+		for (const armHandle of armHandles) {
+			const host = claimHost(armHandle.hostPath);
+			if (!host) continue;
+
+			elementHandles.register(host.hostNodeId, armHandle, host.element);
+		}
+
+		return [...armBehaviorsByHostId.keys()];
+	}
+
+	// Branch flips insert the new arm through the journal; after the DOM
+	// insertion applies, the selected arm's records materialize and its
+	// behaviors attach. S2 disposal already released the outgoing hosts.
+	async function materializeFlippedBranchArms(
+		entries: ReadonlyArray<DomJournalEntry>,
+	): Promise<void> {
+		for (const entry of entries) {
+			if (entry.type !== 'insertRange') continue;
+			if (!entry.locator.startsWith('branch:') || !entry.locator.endsWith(':start')) continue;
+
+			const branchId = entry.locator.slice('branch:'.length, -':start'.length);
+			const branch = branchesById.get(branchId);
+			const armIndex = currentArmByBranchId.get(branchId);
+			if (!branch || armIndex === undefined) continue;
+
+			for (const hostNodeId of materializeBranchArmRecords(branch, armIndex)) {
+				// flush:false — this runs inside the graph's own flush; writes
+				// made by attaching behaviors schedule the next flush themselves.
+				await activateBehaviors(hostNodeId, { flush: false });
+			}
+		}
+	}
+
 	for (const behaviorRecord of input.view.behaviors) {
 		for (const inputGraphRead of behaviorRecord.inputGraphReads ?? []) {
-			input.graph.subscribe({
+			const release = input.graph.subscribe({
 				id: `behavior-input:${behaviorRecord.hostNodeId}:${inputGraphRead.inputIndex}:${inputGraphRead.graphNodeId}:${inputGraphRead.path.join('.')}`,
 				graphNodeId: inputGraphRead.graphNodeId,
 				path: inputGraphRead.path,
@@ -384,7 +724,56 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 					await activateBehaviors(behaviorRecord.hostNodeId, { flush: false });
 				},
 			});
+			storeHostSubscription(behaviorRecord.hostNodeId, release);
 		}
+	}
+
+	function storeHostSubscription(hostNodeId: string, release: () => void): void {
+		// Test fakes may stub graph.subscribe without returning an unsubscribe.
+		if (typeof release !== 'function') return;
+
+		const releases = hostSubscriptionReleases.get(hostNodeId) ?? [];
+		releases.push(release);
+		hostSubscriptionReleases.set(hostNodeId, releases);
+	}
+
+	// Spec 06-runtime-resumer: removed nodes clean up their behaviors before
+	// their locators are discarded. Applying a removeRange journal entry for a
+	// branch or async boundary range disposes every host element inside the
+	// range synchronously before the DOM removal happens.
+	function disposeRemovedRangeHosts(entries: ReadonlyArray<DomJournalEntry>): void {
+		for (const entry of entries) {
+			if (entry.type !== 'removeRange') continue;
+
+			const range = ownedRangeAnchors(entry.locator);
+			if (!range) continue;
+
+			const removedElements = elementsBetweenAnchors(
+				input.root,
+				range.startAnchor,
+				range.endAnchor,
+			);
+			for (const hostNodeId of hostIdsInsideRemovedElements(
+				elementsByHostId,
+				removedElements,
+			)) {
+				disposeHost(hostNodeId);
+			}
+		}
+	}
+
+	function ownedRangeAnchors(
+		locator: string,
+	):
+		| { readonly startAnchor: ResumeDomComment; readonly endAnchor: ResumeDomComment }
+		| undefined {
+		if (locator.startsWith('branch:')) {
+			return branchesById.get(locator.slice('branch:'.length));
+		}
+		if (locator.startsWith('async-boundary:')) {
+			return asyncBoundariesById.get(locator.slice('async-boundary:'.length));
+		}
+		return undefined;
 	}
 
 	async function dispatch(
@@ -394,8 +783,13 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 		const target = event.target;
 		if (!target) return;
 
-		const matched = findEventRecord(target, event.type, eventRecords);
+		const matched = findDispatchMatch(target, event.type, eventRecords, rowEventRecords);
 		if (!matched) return;
+
+		if ('rowMatch' in matched) {
+			await dispatchRowEvent(matched.element, matched.rowMatch, event, options);
+			return;
+		}
 
 		const { element, eventRecord } = matched;
 
@@ -404,6 +798,13 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 
 		let activeSymbolId: string | undefined;
 		try {
+			// Ancestor hosts activate too (event-only parity): an attach behavior
+			// on a container — the music-player App-root controller — must run
+			// when any descendant is interacted with, not only its own host.
+			for (const hostNodeId of behaviorHostIdsForAncestors(element)) {
+				const ancestorActivation = activateBehaviorsFromTrigger(hostNodeId);
+				if (ancestorActivation) await ancestorActivation;
+			}
 			const behaviorActivation = activateBehaviorsFromTrigger(eventRecord.hostNodeId);
 			if (behaviorActivation) await behaviorActivation;
 
@@ -424,6 +825,53 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 				phase: 'event',
 				hostNodeId: eventRecord.hostNodeId,
 				eventName: eventRecord.eventName,
+				symbolId: activeSymbolId,
+				event,
+				element,
+			});
+			throw error;
+		} finally {
+			await flushRuntimeGraph();
+		}
+	}
+
+	async function dispatchRowEvent(
+		element: ResumeDomElement,
+		match: ResumeRowEventMatch,
+		event: ResumeDomEvent,
+		options: ResumeDispatchOptions,
+	): Promise<void> {
+		const { repeat, parent, rowRoot, rowEvent } = match;
+
+		if (rowEvent.syncPolicy && !options.syncPolicyAlreadyApplied)
+			runSyncPolicyActions(rowEvent.syncPolicy, input.graph, event);
+
+		let activeSymbolId: string | undefined;
+		try {
+			// Row identity is positional: the row index among the parent's element
+			// children and the collection are both read fresh at dispatch time.
+			const rowIndex = elementChildren(parent).indexOf(rowRoot);
+			const items = readRepeatCollection(input.graph, repeat);
+			const locals = { [repeat.itemName]: rowIndex >= 0 ? items[rowIndex] : undefined };
+
+			for (const symbolId of rowEvent.symbolIds) {
+				activeSymbolId = symbolId;
+				const loadedSymbol = input.loadSymbol(symbolId);
+				const symbol = isPromiseLike(loadedSymbol) ? await loadedSymbol : loadedSymbol;
+				const result = symbol({
+					graph: input.graph,
+					event,
+					element,
+					getElementHandle: elementHandles.get,
+					locals,
+				});
+				if (isPromiseLike(result)) await result;
+			}
+		} catch (error) {
+			await reportRuntimeError(error, {
+				phase: 'event',
+				hostNodeId: repeat.parentHostNodeId,
+				eventName: rowEvent.eventName,
 				symbolId: activeSymbolId,
 				event,
 				element,
@@ -463,6 +911,22 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 	): Promise<void> {
 		if (!isResumeSharedPatchEvent(event)) return;
 		if (input.graph.applySharedPatch(event.detail)) await flushRuntimeGraph();
+	}
+
+	function behaviorHostIdsForAncestors(element: ResumeDomElement | undefined): string[] {
+		const hostIdByElement = new Map<ResumeDomElement, string>();
+		for (const hostNodeId of behaviorRecordsByHostId.keys()) {
+			const hostElement = elementsByHostId.get(hostNodeId);
+			if (hostElement) hostIdByElement.set(hostElement, hostNodeId);
+		}
+		const hostNodeIds: string[] = [];
+		let current: ResumeDomElement | undefined = element;
+		while (current) {
+			const hostNodeId = hostIdByElement.get(current);
+			if (hostNodeId) hostNodeIds.push(hostNodeId);
+			current = (current as { readonly parentElement?: ResumeDomElement }).parentElement;
+		}
+		return hostNodeIds;
 	}
 
 	function activateBehaviorsFromTrigger(hostNodeId: string): Promise<void> | undefined {
@@ -640,6 +1104,9 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 
 		runHostCleanups(hostNodeId);
 
+		for (const release of hostSubscriptionReleases.get(hostNodeId) ?? []) release();
+		hostSubscriptionReleases.delete(hostNodeId);
+
 		if (elementsByHostId.size === 0) {
 			removalObserver?.disconnect?.();
 			removalObserver = undefined;
@@ -661,6 +1128,14 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 
 			installVisibilityObserver();
 			installRemovalObserver();
+
+			// The taken arm's behaviors attach on materialization; startup
+			// defers them here so runtime creation stays synchronous.
+			const armBehaviorHostIds = startupArmBehaviorHostIds.splice(0);
+			for (const hostNodeId of armBehaviorHostIds) {
+				await activateBehaviors(hostNodeId, { flush: false });
+			}
+			if (armBehaviorHostIds.length > 0) await flushRuntimeGraph();
 		},
 		dispatch,
 		activateBehaviors,
@@ -669,6 +1144,9 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 		},
 		getAsyncBoundary(boundaryId) {
 			return asyncBoundariesById.get(boundaryId);
+		},
+		getBranch(branchId) {
+			return branchesById.get(branchId);
 		},
 		disposeHost,
 	};
@@ -701,6 +1179,65 @@ function asyncBoundaryRangeLocator(boundaryId: string): string {
 
 function asyncBoundaryStartLocator(boundaryId: string): string {
 	return `async-boundary:${boundaryId}:start`;
+}
+
+// testReads[0] is the branch test expression: truthy selects arm 0, else arm 1.
+function readBranchArm(graph: RuntimeGraph, branch: ResumeBranchRecord): number {
+	const testRead = branch.testReads[0]!;
+	const value = graph.read(testRead.graphNodeId, testRead.path);
+	// Switch sites select by literal case tests with @default as fallback;
+	// if-sites select by truthiness.
+	if (branch.armTests) {
+		for (let index = 0; index < branch.armTests.length; index++) {
+			if (branch.armTests[index] !== null && value === branch.armTests[index]) {
+				return index;
+			}
+		}
+		return branch.armTests.indexOf(null);
+	}
+	return value ? 0 : 1;
+}
+
+function isResumeBranchUpdate(value: unknown): value is ResumeBranchUpdate {
+	const update = value as { readonly arm?: unknown; readonly html?: unknown } | null;
+	return typeof update?.arm === 'number' && typeof update?.html === 'string';
+}
+
+function materializeBranchLocators(
+	root: ResumeDomElement,
+	branches: NonNullable<ResumeViewRecord['branches']>,
+): ResumeBranchRecord[] {
+	const records: ResumeBranchRecord[] = [];
+	if (branches.length === 0) return records;
+
+	// Branch anchors and async boundary anchors index one flat document-order
+	// comment stream, so both kinds share the same absolute indexes.
+	const comments = walkComments(root);
+	for (const branch of branches) {
+		// Records without an update symbol or test reads are static: skipped entirely.
+		if (!branch.symbolId || !branch.testReads || branch.testReads.length === 0) continue;
+
+		const startAnchor = comments[branch.startAnchor.index];
+		const endAnchor = comments[branch.endAnchor.index];
+		if (!startAnchor) {
+			throw missingCommentAnchorError(branch.id, 'startAnchor', branch.startAnchor.index);
+		}
+		if (!endAnchor) {
+			throw missingCommentAnchorError(branch.id, 'endAnchor', branch.endAnchor.index);
+		}
+
+		records.push({
+			id: branch.id,
+			startAnchor,
+			endAnchor,
+			symbolId: branch.symbolId,
+			testReads: branch.testReads,
+			armTests: branch.armTests,
+			armRecords: branch.armRecords,
+		});
+	}
+
+	return records;
 }
 
 function behaviorInputs(
@@ -854,6 +1391,36 @@ function collectRemovedElements(
 	}
 }
 
+// Range anchors are siblings, so a document-order walk between them collects
+// exactly the removed sibling subtrees (elements plus their descendants).
+function elementsBetweenAnchors(
+	root: ResumeDomElement,
+	startAnchor: ResumeDomComment,
+	endAnchor: ResumeDomComment,
+): Set<ResumeDomElement> {
+	const inside = new Set<ResumeDomElement>();
+	let withinRange = false;
+
+	function visit(node: ResumeDomNode): void {
+		if (node === startAnchor) {
+			withinRange = true;
+			return;
+		}
+		if (node === endAnchor) {
+			withinRange = false;
+			return;
+		}
+		if (withinRange && node.nodeType === 1) inside.add(node as ResumeDomElement);
+
+		for (const child of node.childNodes ?? []) {
+			visit(child);
+		}
+	}
+
+	visit(root);
+	return inside;
+}
+
 function hostIdsInsideRemovedElements(
 	elementsByHostId: Map<string, ResumeDomElement>,
 	removedElements: Set<ResumeDomElement>,
@@ -878,22 +1445,35 @@ function materializeElementHandles(
 	handles: ResumeViewRecord['elementHandles'],
 ): {
 	readonly get: (handleIdOrName: string) => ResumeDomElement | undefined;
+	readonly register: (
+		hostNodeId: string,
+		handle: { readonly handleId: string; readonly name: string },
+		element: ResumeDomElement,
+	) => void;
 	readonly deleteHost: (hostNodeId: string) => void;
 } {
 	const byHandleId = new Map<string, ResumeDomElement>();
 	const byName = new Map<string, ResumeDomElement>();
 	const keysByHostId = new Map<string, { readonly handleId: string; readonly name: string }>();
 
+	function register(
+		hostNodeId: string,
+		handle: { readonly handleId: string; readonly name: string },
+		element: ResumeDomElement,
+	): void {
+		byHandleId.set(handle.handleId, element);
+		byName.set(handle.name, element);
+		keysByHostId.set(hostNodeId, {
+			handleId: handle.handleId,
+			name: handle.name,
+		});
+	}
+
 	for (const handle of handles) {
 		const element = elementsByHostId.get(handle.hostNodeId);
 		if (!element) continue;
 
-		byHandleId.set(handle.handleId, element);
-		byName.set(handle.name, element);
-		keysByHostId.set(handle.hostNodeId, {
-			handleId: handle.handleId,
-			name: handle.name,
-		});
+		register(handle.hostNodeId, handle, element);
 	}
 
 	return {
@@ -903,6 +1483,7 @@ function materializeElementHandles(
 				byHandleId.get(handleIdOrName) ?? byName.get(handleIdOrName),
 			);
 		},
+		register,
 		deleteHost(hostNodeId) {
 			const keys = keysByHostId.get(hostNodeId);
 			if (!keys) return;
@@ -961,6 +1542,7 @@ function materializeAsyncBoundaryLocators(
 
 		byBoundaryId.set(boundary.id, {
 			id: boundary.id,
+			updateSymbolId: boundary.updateSymbolId,
 			startAnchor,
 			endAnchor,
 			asyncReads: boundary.asyncReads,
@@ -970,14 +1552,20 @@ function materializeAsyncBoundaryLocators(
 	return byBoundaryId;
 }
 
-function findEventRecord(
+// One walk from the event target toward the root: the closest element with
+// either a keyed repeat row event record or an ordinary host record wins.
+function findDispatchMatch(
 	target: ResumeDomElement,
 	eventName: string,
 	eventRecords: WeakMap<ResumeDomElement, Map<string, ResumeEventRecord>>,
-): { readonly element: ResumeDomElement; readonly eventRecord: ResumeEventRecord } | null {
+	rowEventRecords: ResumeRowEventRecords,
+): ResumeDispatchMatch | null {
 	let current: ResumeDomElement | null | undefined = target;
 
 	while (current) {
+		const rowMatch = rowEventRecords.get(current)?.get(eventName);
+		if (rowMatch) return { element: current, rowMatch };
+
 		const eventRecord = eventRecords.get(current)?.get(eventName);
 		if (eventRecord) return { element: current, eventRecord };
 
@@ -985,6 +1573,88 @@ function findEventRecord(
 	}
 
 	return null;
+}
+
+function elementChildren(element: ResumeDomElement): ResumeDomElement[] {
+	const children: ResumeDomElement[] = [];
+	for (const child of element.childNodes ?? []) {
+		if (child.nodeType === 1) children.push(child as ResumeDomElement);
+	}
+	return children;
+}
+
+// hostPath mirrors the compiler row plan (public-render/plan.ts collectRowPlan)
+// and the generated direct-DOM path: each segment indexes childNodes directly,
+// because row HTML renders without ignorable whitespace nodes.
+function rowEventHost(
+	rowRoot: ResumeDomElement,
+	hostPath: ReadonlyArray<number>,
+): ResumeDomElement | undefined {
+	let current: ResumeDomNode | undefined = rowRoot;
+	for (const index of hostPath) {
+		current = current.childNodes?.[index];
+		if (!current) return undefined;
+	}
+	return current.nodeType === 1 ? (current as ResumeDomElement) : undefined;
+}
+
+// The nodes one arm rendered between the branch anchors, in order. Anchors
+// are siblings, so the walk finds their shared parent and collects the raw
+// childNodes between them. Arms render compact (no ignorable whitespace), so
+// every non-ignorable child occupies one childNodes slot.
+function nodesBetweenAnchors(
+	root: ResumeDomElement,
+	startAnchor: ResumeDomComment,
+	endAnchor: ResumeDomComment,
+): ResumeDomNode[] {
+	const nodes: ResumeDomNode[] = [];
+
+	function visit(node: ResumeDomNode): boolean {
+		let withinRange = false;
+		for (const child of node.childNodes ?? []) {
+			if (child === startAnchor) {
+				withinRange = true;
+				continue;
+			}
+			if (child === endAnchor) return true;
+			if (withinRange) {
+				nodes.push(child);
+			} else if (visit(child)) {
+				return true;
+			}
+		}
+		return withinRange;
+	}
+
+	visit(root);
+	return nodes;
+}
+
+// armRecords hostPath: the first segment indexes the arm's top-level nodes
+// between the anchors; the remaining segments descend raw childNodes exactly
+// like keyed repeat rowEvents.
+function armRecordHost(
+	armNodes: ReadonlyArray<ResumeDomNode>,
+	hostPath: ReadonlyArray<number>,
+): ResumeDomElement | undefined {
+	const [firstIndex, ...childPath] = hostPath;
+	if (firstIndex === undefined) return undefined;
+
+	const topLevelNode = armNodes[firstIndex];
+	if (!topLevelNode || topLevelNode.nodeType !== 1) return undefined;
+	return rowEventHost(topLevelNode as ResumeDomElement, childPath);
+}
+
+// Mirrors the SSR repeat helper's Array.from collection normalization.
+function readRepeatCollection(
+	graph: RuntimeGraph,
+	repeat: ResumeKeyedRepeatRecord,
+): ReadonlyArray<unknown> {
+	if (!repeat.collectionGraphNodeId) return [];
+
+	const value = graph.read(repeat.collectionGraphNodeId, repeat.collectionPath);
+	if (Array.isArray(value)) return value;
+	return Array.from((value ?? []) as Iterable<unknown>);
 }
 
 function materializeDomLocators(
@@ -1000,9 +1670,11 @@ function materializeDomLocators(
 			throw missingElementLocatorError(locator);
 		}
 
+		// '*' marks compiler-planned locators for dynamic <{expr}> elements,
+		// whose tag is only known at render time.
 		const expectedTagName = locator.tagName.toLowerCase();
 		const actualTagName = element.tagName.toLowerCase();
-		if (actualTagName !== expectedTagName) {
+		if (expectedTagName !== '*' && actualTagName !== expectedTagName) {
 			throw mismatchedElementLocatorError(locator, actualTagName);
 		}
 

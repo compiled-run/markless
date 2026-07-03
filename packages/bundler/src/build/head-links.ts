@@ -54,11 +54,25 @@ export function collectModulePreloadInjections(
 	bundleGraph: MarklessBundleGraph | undefined,
 	options: {
 		publicPath?: (fileName: string) => string;
+		// Entry chunk names (bundle-graph normalized). Entries root the plan
+		// with edges:'dynamic-only': their static closure is already loading
+		// via the script tag, so only interaction-reachable dynamic targets
+		// (the resume runtime's journal/settle modules) join the head links.
+		entryChunks?: readonly string[];
 	} = {},
 ): GlobalInjections[] {
-	const roots = (bundleGraph ?? [])
-		.filter((name): name is string => typeof name === 'string' && name.startsWith('symbol:'))
-		.map((name) => ({ name, priority: 'high' as const }));
+	const roots = [
+		...(bundleGraph ?? [])
+			.filter(
+				(name): name is string => typeof name === 'string' && name.startsWith('symbol:'),
+			)
+			.map((name) => ({ name, priority: 'high' as const })),
+		...(options.entryChunks ?? []).map((name) => ({
+			name,
+			priority: 'auto' as const,
+			edges: 'dynamic-only' as const,
+		})),
+	];
 
 	return planModulePreloads({
 		base: options.publicPath

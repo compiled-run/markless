@@ -119,6 +119,19 @@ control flow, they must be part of the locator/payload plan and proved by
 fixtures. They must not become an ad hoc VDOM or render-output reconciliation
 layer.
 
+## Fragment Root Ownership (accepted 2026-07-02)
+
+Fragment-rooted components have no single root element, so the render range
+is owned by the environment container: in SSR the resumable container div, in
+CSR the mount target. `render(App, { target })` mounts the compiled document
+fragment first (DOM expands it into the target), then creates the runtime
+with the target as the container root; `CsrRenderContainer.root` therefore
+means the container root, which is the mount target for fragment-rooted
+components and the created root element otherwise. Fragment-relative
+dom-order locators shift +1 when the target joins the walk, mirroring the
+SSR container offset. Only fragments whose top-level children are all plain
+host elements render; dynamic fragment shapes await the comment-anchor work.
+
 ## Browser Resume Architecture
 
 Browser resume is automatic for an SSR resumable container. The inline resumer

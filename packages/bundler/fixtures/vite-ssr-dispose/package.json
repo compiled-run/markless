@@ -1,0 +1,17 @@
+{
+	"name": "@fixtures/vite-ssr-dispose",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "vite --mode ssr",
+		"build": "vite build --app"
+	},
+	"dependencies": {
+		"@markless/bundler": "workspace:*",
+		"@markless/core": "workspace:*"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"vite": "8.0.16"
+	}
+}

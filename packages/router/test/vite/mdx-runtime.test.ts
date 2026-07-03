@@ -3,6 +3,7 @@ import {
 	composeMdxState,
 	composeMdxView,
 	loadMdxSymbol,
+	renderMdxChild,
 } from '../../src/vite/runtime/mdx-route.ts';
 
 describe('Markless Router MDX route runtime helpers', () => {
@@ -119,5 +120,32 @@ describe('Markless Router MDX route runtime helpers', () => {
 				],
 			),
 		).toBe('live:symbol:click');
+	});
+});
+
+describe('renderMdxChild with async compiled artifacts', () => {
+	it('awaits an async renderSsr and returns its html', async () => {
+		// Compiled marklessRenderSsr is async since the initial-render awaiting
+		// work. The unawaited Promise passed the truthy guard while .html read
+		// undefined — the MDX child (counter AND home Link) silently dropped,
+		// which broke both router-dev-routes and router-preload-strategy.
+		const children: unknown[] = [];
+		const html = await renderMdxChild(
+			children as never,
+			{
+				renderSsr: async () => ({
+					html: '<div data-mdx-counter>MDX Count 0</div>',
+					state: { version: 1, cells: [], computed: [] },
+				}),
+			} as never,
+			{},
+			{ componentIndex: 0, hostPrefix: 'm0:', symbolPrefix: 'm0:' } as never,
+		);
+
+		expect(html).toBe('<div data-mdx-counter>MDX Count 0</div>');
+		expect(children).toHaveLength(1);
+		expect((children[0] as { output: { html: string } }).output.html).toBe(
+			'<div data-mdx-counter>MDX Count 0</div>',
+		);
 	});
 });

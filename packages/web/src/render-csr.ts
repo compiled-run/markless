@@ -44,7 +44,15 @@ export async function renderCsrRuntime(input: {
 		};
 	}
 
-	const graph = output.graph ?? (await createFullRuntimeGraph(state, !!output.state));
+	const graph =
+		output.graph ??
+		(await createFullRuntimeGraph({
+			state,
+			view,
+			root: output.root,
+			loadSymbol,
+			hasAuthoredState: !!output.state,
+		}));
 	const { createResumeRuntime } = await import('./resume.ts');
 	let runtime: ResumeRuntime;
 	const applyDomJournal =
@@ -58,6 +66,7 @@ export async function renderCsrRuntime(input: {
 		createVisibilityObserver: options.createVisibilityObserver,
 		createRemovalObserver: options.createRemovalObserver,
 		applyDomJournal,
+		renderBranchHtml: options.renderBranchHtml ?? globalDocumentBranchHtml(),
 	});
 	await runtime.start();
 	output.connectRuntime?.({ graph, runtime });
@@ -117,6 +126,14 @@ async function applyDefaultCsrDomJournal(
 	const { applyDomJournalEntries } = await import('./dom-journal.ts');
 	applyDomJournalEntries(deferred, {
 		resolveTarget(locator) {
+			const rangeAnchor = /^(branch|async-boundary):(.+?):(start|end)$/.exec(String(locator));
+			if (rangeAnchor) {
+				const record =
+					rangeAnchor[1] === 'branch'
+						? runtime.getBranch(rangeAnchor[2]!)
+						: runtime.getAsyncBoundary(rangeAnchor[2]!);
+				return rangeAnchor[3] === 'end' ? record?.endAnchor : record?.startAnchor;
+			}
 			return runtime.getElement(String(locator));
 		},
 	});
@@ -177,21 +194,60 @@ function canUseEventOnlyCsrRuntime(
 	if (view.behaviors.length > 0) return false;
 	if (view.elementHandles.length > 0) return false;
 	if (view.asyncBoundaries.length > 0) return false;
+	// Branch flips need graph subscriptions and range replacement; keyed row
+	// events need locals dispatch. Both require the full resume runtime.
+	if ((view.branches?.length ?? 0) > 0) return false;
+	if ((view.keyedRepeats?.length ?? 0) > 0) return false;
 	if (view.events.some((event) => event.eventName === 'visible' || !!event.syncPolicy)) {
 		return false;
 	}
 	return true;
 }
 
-async function createFullRuntimeGraph(
-	state: ProtocolStatePayload,
-	hasAuthoredState: boolean,
-): Promise<RuntimeGraph> {
-	if (hasAuthoredState) {
-		const { createRuntimeGraphFromStatePayload } = await import('./payload.ts');
-		return createRuntimeGraphFromStatePayload(state);
+// CSR mounts share the resume graph wiring so async boundary runners load
+// through the same generated symbol resolver as browser resume.
+async function createFullRuntimeGraph(input: {
+	readonly state: ProtocolStatePayload;
+	readonly view: ProtocolViewPayload;
+	readonly root: CsrRenderOutput['root'];
+	readonly loadSymbol: NonNullable<CsrRenderOutput['loadSymbol']>;
+	readonly hasAuthoredState: boolean;
+}): Promise<RuntimeGraph> {
+	if (input.hasAuthoredState) {
+		const { createRuntimeGraphFromResumePayload } = await import('./payload.ts');
+		return createRuntimeGraphFromResumePayload({
+			state: input.state,
+			view: input.view,
+			root: input.root,
+			loadSymbol: input.loadSymbol,
+		});
 	}
 
 	const { createRuntimeGraph } = await import('@markless/runtime');
 	return createRuntimeGraph({ cells: [] });
+}
+
+// CSR runs where the compiled module already used the document global to
+// build its root, so the same document parses branch flip fragments.
+function globalDocumentBranchHtml():
+	| ((html: string) => ReadonlyArray<import('./resume.ts').ResumeDomNode>)
+	| undefined {
+	const documentHost = (
+		globalThis as {
+			readonly document?: {
+				readonly createElement?: (tagName: string) => {
+					innerHTML: string;
+					readonly content?: { readonly childNodes?: ArrayLike<unknown> };
+				};
+			};
+		}
+	).document;
+	if (typeof documentHost?.createElement !== 'function') return undefined;
+	return (html) => {
+		const template = documentHost.createElement!('template');
+		template.innerHTML = html;
+		return Array.from(template.content?.childNodes ?? []) as ReadonlyArray<
+			import('./resume.ts').ResumeDomNode
+		>;
+	};
 }

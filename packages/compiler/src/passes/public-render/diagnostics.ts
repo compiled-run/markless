@@ -27,6 +27,30 @@ export function unsupportedRenderConstructDiagnostic(input: {
 	};
 }
 
+// Spec 01-tsrx-host-contract: children are an opaque compiler-owned template
+// projection. Inspecting or transforming them React-style is diagnosed.
+export function childrenOpacityDiagnostic(input: {
+	readonly node: AnyNode;
+	readonly filename: string;
+}): CompilerDiagnostic {
+	return {
+		code: 'MARKLESS_CHILDREN_OPAQUE',
+		severity: 'error',
+		phase: 'public-render',
+		title: 'children cannot be inspected or transformed',
+		message:
+			'children is an opaque template projection: place it with {children}, wrap it, or pass it through — mapping, counting, indexing, or mutating it is not supported.',
+		why: 'The compiler owns children projection; there is no render-output array to inspect, so React-style children access would silently misbehave.',
+		primarySpan: sourceSpan(input.node, input.filename),
+		passId: 'public-render-plan',
+		artifactKeys: ['publicRenderPlan'],
+		suggestions: [
+			{ message: 'Render {children} directly or move per-item rendering to the parent.' },
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_CHILDREN_OPAQUE',
+	};
+}
+
 export function unsupportedRenderRootDiagnostic(input: {
 	readonly message: string;
 	readonly node: AnyNode;

@@ -42,6 +42,7 @@ export type ResumePayloadScriptsInput = EncodedPayloadScripts & {
 	readonly createVisibilityObserver?: ResumeRuntimeInput['createVisibilityObserver'];
 	readonly createRemovalObserver?: ResumeRuntimeInput['createRemovalObserver'];
 	readonly applyDomJournal?: ResumeRuntimeInput['applyDomJournal'];
+	readonly renderBranchHtml?: ResumeRuntimeInput['renderBranchHtml'];
 };
 
 export type ResumePayloadDocumentInput = Omit<
@@ -85,7 +86,9 @@ export function createRuntimeGraphFromStatePayload(payload: ProtocolStatePayload
 	});
 }
 
-function createRuntimeGraphFromResumePayload(input: {
+// Builds the resume/CSR runtime graph: payload cells plus async computed
+// nodes whose runners load through the generated symbol resolver.
+export function createRuntimeGraphFromResumePayload(input: {
 	readonly state: ProtocolStatePayload;
 	readonly view: ProtocolViewPayload;
 	readonly root: ResumeDomElement;
@@ -231,6 +234,16 @@ export async function resumeFromPayloadScripts(
 		((entries) =>
 			applyDomJournalEntries(entries, {
 				resolveTarget(locator) {
+					const rangeAnchor = /^(branch|async-boundary):(.+?):(start|end)$/.exec(
+						String(locator),
+					);
+					if (rangeAnchor) {
+						const record =
+							rangeAnchor[1] === 'branch'
+								? runtime?.getBranch(rangeAnchor[2]!)
+								: runtime?.getAsyncBoundary(rangeAnchor[2]!);
+						return rangeAnchor[3] === 'end' ? record?.endAnchor : record?.startAnchor;
+					}
 					return runtime?.getElement(String(locator));
 				},
 			}));
@@ -242,6 +255,7 @@ export async function resumeFromPayloadScripts(
 		createVisibilityObserver: input.createVisibilityObserver,
 		createRemovalObserver: input.createRemovalObserver,
 		applyDomJournal,
+		renderBranchHtml: input.renderBranchHtml,
 	});
 
 	await runtime.start();
@@ -264,7 +278,46 @@ export async function resumeFromPayloadDocument(
 		createVisibilityObserver: input.createVisibilityObserver,
 		createRemovalObserver: input.createRemovalObserver,
 		applyDomJournal: input.applyDomJournal,
+		renderBranchHtml: input.renderBranchHtml ?? documentTemplateBranchHtml(input.document),
 	});
+}
+
+// Browser default for branch flip fragments: parse the rebuilt arm HTML
+// through a <template> owned by the payload document. Hosts without
+// createElement (bare script decoders in tests) simply provide no default.
+function documentTemplateBranchHtml(
+	document: PayloadScriptDocument,
+): ResumeRuntimeInput['renderBranchHtml'] {
+	// The "document" may be a container element (payload scripts live inside
+	// it); fall back to its ownerDocument for element creation.
+	const documentLike = document as {
+		readonly createElement?: (tagName: string) => {
+			innerHTML: string;
+			readonly content?: { readonly childNodes?: ArrayLike<unknown> };
+		};
+		readonly ownerDocument?: {
+			readonly createElement?: (tagName: string) => {
+				innerHTML: string;
+				readonly content?: { readonly childNodes?: ArrayLike<unknown> };
+			};
+		};
+	};
+	const host =
+		typeof documentLike.createElement === 'function'
+			? documentLike
+			: typeof documentLike.ownerDocument?.createElement === 'function'
+				? documentLike.ownerDocument
+				: undefined;
+	const createElement = host?.createElement;
+	if (!host || typeof createElement !== 'function') return undefined;
+	return (html) => {
+		const template = createElement.call(host, 'template');
+		template.innerHTML = html;
+		// Snapshot: insertion moves live childNodes out of the template.
+		return Array.from(template.content?.childNodes ?? []) as ReturnType<
+			NonNullable<ResumeRuntimeInput['renderBranchHtml']>
+		>;
+	};
 }
 
 function readPayloadScriptFromDocument(

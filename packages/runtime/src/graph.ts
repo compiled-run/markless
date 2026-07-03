@@ -165,7 +165,7 @@ export type RuntimeGraph = {
 	readonly update: (update: RuntimeGraphUpdate) => unknown;
 	readonly call: (call: RuntimeGraphCall) => unknown;
 	readonly delete: (deletion: RuntimeGraphDelete) => boolean;
-	readonly subscribe: (subscription: RuntimeGraphSubscription) => void;
+	readonly subscribe: (subscription: RuntimeGraphSubscription) => () => void;
 	readonly subscribeJournal: (listener: DomJournalListener) => () => void;
 	readonly flush: () => Promise<void>;
 	readonly takeJournal: () => DomJournalEntry[];
@@ -223,6 +223,8 @@ type CollectionMutationSnapshot =
 			readonly target: Date;
 	  };
 
+const ASYNC_SNAPSHOT_META_KEYS = new Set(['status', 'version', 'key', 'error', 'value']);
+
 export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	const cells = new Map<string, unknown>();
 	const computedNodes = new Map<string, RuntimeComputedNode>();
@@ -279,7 +281,15 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		const asyncComputed = asyncComputedNodes.get(graphNodeId);
 		if (asyncComputed) {
 			demandAsyncComputed(asyncComputed);
-			return readPath(asyncComputed.snapshot, path);
+			// Authored reads (details.title) resolve through the settled value;
+			// snapshot meta keys (status/version/key/error/value) stay reserved
+			// so runtime records can read them explicitly.
+			const [head, ...rest] = path;
+			if (head === undefined || ASYNC_SNAPSHOT_META_KEYS.has(head)) {
+				return readPath(asyncComputed.snapshot, path);
+			}
+			const snapshot = asyncComputed.snapshot as { readonly value?: unknown };
+			return readPath(snapshot.value, [head, ...rest]);
 		}
 
 		return readPath(cells.get(graphNodeId), path);
@@ -631,6 +641,12 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		},
 		subscribe(subscription) {
 			subscriptions.push(subscription);
+			// Disposal contract: removed scopes unsubscribe their graph wiring
+			// (spec 01-tsrx-host-contract "branch scope disposal").
+			return () => {
+				const index = subscriptions.indexOf(subscription);
+				if (index >= 0) subscriptions.splice(index, 1);
+			};
 		},
 		subscribeJournal(listener) {
 			journalListeners.push(listener);

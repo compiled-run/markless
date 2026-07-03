@@ -104,6 +104,17 @@ export function createProtocolStatePayload(input: ProtocolStatePayloadInput): Pr
 	};
 }
 
+// Render paths attach raw snapshots at runtime (SSR awaits async work, then
+// records the settled result); the served payload needs envelope-encoded
+// key/value fields, so hosts re-encode through this before emitting scripts.
+export function serializeRuntimeAsyncSnapshots(
+	computed: ProtocolStatePayload['computed'],
+): ProtocolStatePayload['computed'] {
+	return computed.map((record) =>
+		serializeComputedSnapshot(record as never),
+	) as ProtocolStatePayload['computed'];
+}
+
 function serializeComputedSnapshot(
 	computed: NonNullable<ProtocolStatePayloadInput['computed']>[number],
 ): ProtocolStatePayload['computed'][number] {

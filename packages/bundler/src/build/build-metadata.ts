@@ -8,6 +8,7 @@ import type {
 	MarklessTransformManifest,
 } from '../types.ts';
 import { convertManifestToBundleGraph } from './bundle-graph.ts';
+import { scanEmittedDynamicImports } from './dynamic-import-scan.ts';
 import { collectHeadLinkInjections } from './head-links.ts';
 
 export type MarklessBuildMetadataBundle = Record<string, MarklessBuildMetadataBundleItem>;
@@ -85,7 +86,19 @@ export function createBuildMetadata(
 		if (imports.length > 0) {
 			asyncBundle.imports = imports;
 		}
-		const dynamicImports = mapBundleNames(bundle, item.dynamicImports, canonPath);
+		// Union code-derived edges: rewrites leave real dynamic imports the
+		// chunk metadata never carried (see dynamic-import-scan.ts). Metadata
+		// edges are never removed — over-coverage is contract-safe.
+		const dynamicImports = [
+			...new Set([
+				...mapBundleNames(bundle, item.dynamicImports, canonPath),
+				...mapBundleNames(
+					bundle,
+					scanEmittedDynamicImports(item.code, item.fileName),
+					canonPath,
+				),
+			]),
+		];
 		if (dynamicImports.length > 0) {
 			asyncBundle.dynamicImports = dynamicImports;
 		}

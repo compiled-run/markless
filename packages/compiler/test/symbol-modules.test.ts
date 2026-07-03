@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import { emitSymbolModules } from '../src/passes/symbol-modules.ts';
+import { compileTsrxModule } from '../src/compile-module.ts';
 
 test('emitSymbolModules emits event, callback, and DOM update modules', () => {
 	const artifact = emitSymbolModules({
@@ -2161,4 +2162,186 @@ test('emitSymbolModules emits logical compound assignments for event handler mod
 	expect(artifact.modules[0].source).toContain(
 		'return value && context.graph.read("state:profile", ["enabled"]);',
 	);
+});
+
+test('emitSymbolModules emits branch-update flip modules from plan arm parts', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/BranchFlipModule.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let open = state(true);
+	let label = state('On');
+
+	<section>
+		@if (open) { <p class="badge">{label}</p> } @else { <p>Off</p> }
+	</section>
+}
+`,
+		symbols: [],
+	});
+
+	const branchModule = result.symbolModules.modules.find(
+		(module) => module.kind === 'branch-update',
+	);
+	expect(branchModule).toBeDefined();
+	const imported = (await import(
+		`data:text/javascript;charset=utf-8,${encodeURIComponent(branchModule!.source)}`
+	)) as Record<string, (context: unknown) => { arm: number; html: string }>;
+	const run = imported[branchModule!.exportName]!;
+
+	const graph = (open: boolean, label: string) => ({
+		read(graphNodeId: string) {
+			return graphNodeId === 'state:open' ? open : label;
+		},
+	});
+	expect(run({ graph: graph(true, 'On') })).toEqual({
+		arm: 0,
+		html: '<p class="badge">On</p>',
+	});
+	expect(run({ graph: graph(false, 'On') })).toEqual({ arm: 1, html: '<p>Off</p>' });
+});
+
+test('emitSymbolModules emits switch flip modules selecting arms by case tests', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/SwitchFlipModule.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let kind = state('a');
+
+	<section>
+		@switch (kind) {
+			@case 'a': { <p>A</p> }
+			@case 'b': { <p>B</p> }
+			@default: { <p>D</p> }
+		}
+	</section>
+}
+`,
+		symbols: [],
+	});
+
+	const branchModule = result.symbolModules.modules.find(
+		(module) => module.kind === 'branch-update',
+	);
+	expect(branchModule).toBeDefined();
+	expect(result.protocolView.branches?.[0]).toEqual(
+		expect.objectContaining({ armTests: ['a', 'b', null] }),
+	);
+	const imported = (await import(
+		`data:text/javascript;charset=utf-8,${encodeURIComponent(branchModule!.source)}`
+	)) as Record<string, (context: unknown) => { arm: number; html: string }>;
+	const run = imported[branchModule!.exportName]!;
+	const graph = (kind: string) => ({ read: () => kind });
+
+	expect(run({ graph: graph('a') })).toEqual({ arm: 0, html: '<p>A</p>' });
+	expect(run({ graph: graph('b') })).toEqual({ arm: 1, html: '<p>B</p>' });
+	expect(run({ graph: graph('zzz') })).toEqual({ arm: 2, html: '<p>D</p>' });
+});
+
+test('emitSymbolModules keeps element-handle calls in event handlers, in statement order', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/FocusBox.tsrx',
+		source: `
+import { element, state } from '@markless/core';
+
+export function App() @{
+	let status = state('idle');
+	const box = element();
+
+	<main>
+		<input el={box} placeholder="Name" />
+		<button onClick={() => { box.focus(); status = 'focused'; }}>Focus</button>
+		<output>{status}</output>
+	</main>
+}
+`,
+		symbols: [],
+	});
+
+	const handler = result.symbolModules.modules.find((m) => m.kind === 'event-handler');
+	expect(handler).toBeDefined();
+	const focusCall = handler!.source.indexOf('context.getElementHandle("box")?.focus()');
+	const statusWrite = handler!.source.indexOf('state:status');
+	// The handle call must be emitted, and before the write (authored order).
+	expect(focusCall).toBeGreaterThanOrEqual(0);
+	expect(statusWrite).toBeGreaterThan(focusCall);
+});
+
+test('emitSymbolModules emits async-boundary-update modules rendering settled arms', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/AsyncFlip.tsrx',
+		source: `
+import { computed, state } from '@markless/core';
+
+export function App() @{
+	let query = state('markless');
+	let details = computed(async () => {
+		return { title: 'Result: ' + query };
+	});
+
+	<main>
+		@try { <p>{details.title}</p> } @pending { <p>Loading</p> } @catch { <p>Broken</p> }
+	</main>
+}
+`,
+		symbols: [],
+	});
+
+	const update = result.symbolModules.modules.find(
+		(module) => module.kind === 'async-boundary-update',
+	);
+	expect(update).toBeDefined();
+	// Protocol boundary records carry the update symbol for the runtime.
+	expect(result.protocolView.asyncBoundaries[0]).toEqual(
+		expect.objectContaining({ updateSymbolId: update!.symbolId }),
+	);
+
+	const imported = (await import(
+		`data:text/javascript;charset=utf-8,${encodeURIComponent(update!.source)}`
+	)) as Record<string, (context: unknown) => { arm: number; html: string }>;
+	const run = imported[update!.exportName]!;
+	const graph = {
+		read: (graphNodeId: string, path?: ReadonlyArray<string>) =>
+			graphNodeId === 'computed:details' && path?.[0] === 'title'
+				? 'Result: markless'
+				: undefined,
+	};
+	// Fulfilled renders the @try arm from graph reads; rejected renders @catch.
+	expect(run({ graph, status: 'fulfilled' })).toEqual({
+		arm: 0,
+		html: '<p>Result: markless</p>',
+	});
+	expect(run({ graph, status: 'rejected' })).toEqual({ arm: 1, html: '<p>Broken</p>' });
+});
+
+test('branch-update modules defer to the runtime-computed arm when provided', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/PropBranch.tsrx',
+		source: `
+export function Badge({ active }) @{
+	<span>
+		@if (active) { <em>Live</em> } @else { <em>Idle</em> }
+	</span>
+}
+`,
+		symbols: [],
+	});
+	const update = result.symbolModules.modules.find((m) => m.kind === 'branch-update');
+	expect(update).toBeDefined();
+	const imported = (await import(
+		`data:text/javascript;charset=utf-8,${encodeURIComponent(update!.source)}`
+	)) as Record<string, (context: unknown) => { arm: number; html: string }>;
+	const run = imported[update!.exportName]!;
+
+	// Composed views remap the record's test reads, but the module's baked
+	// test expression still reads the child-local prop node — which the
+	// composed graph does not have. The runtime computes the arm from the
+	// remapped reads and passes it; the module must defer to it.
+	const graph = { read: () => undefined };
+	expect(run({ graph, arm: 0 })).toEqual({ arm: 0, html: '<em>Live</em>' });
+	expect(run({ graph, arm: 1 })).toEqual({ arm: 1, html: '<em>Idle</em>' });
 });

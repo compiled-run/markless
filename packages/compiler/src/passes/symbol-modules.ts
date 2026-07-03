@@ -1,5 +1,7 @@
 import type {
 	GeneratedSymbolModule,
+	PublicRenderPlanAsyncBoundaryArms,
+	PublicRenderPlanBranchArms,
 	LoweredStateRead,
 	LoweredStateWrite,
 	PlannedSymbol,
@@ -13,12 +15,63 @@ import type {
 export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtifact {
 	const localNamesBySymbol = publicRenderLocalNamesBySymbol(input.publicRenderPlan);
 
+	const branchArmsBySite = new Map(
+		(input.publicRenderPlan?.branchArms ?? []).map((entry) => [entry.branchSiteId, entry]),
+	);
+	const boundaryArmsById = new Map(
+		(input.publicRenderPlan?.asyncBoundaryArms ?? []).map((entry) => [entry.boundaryId, entry]),
+	);
+
 	return {
 		passId: 'symbol-modules',
-		modules: input.symbolResolver.symbols.flatMap((symbol) =>
-			emitSymbolModule(symbol, localNamesBySymbol.get(symbol.id) ?? emptyLocalNames),
-		),
+		modules: input.symbolResolver.symbols.flatMap((symbol) => {
+			if (symbol.kind === 'branch-update') {
+				const arms = branchArmsBySite.get(symbol.branchSiteId);
+				return arms ? [emitBranchUpdateModule(symbol, arms)] : [];
+			}
+			if (symbol.kind === 'async-boundary-update') {
+				const arms = boundaryArmsById.get(symbol.boundaryId);
+				return arms ? [emitAsyncBoundaryUpdateModule(symbol, arms)] : [];
+			}
+			return emitSymbolModule(symbol, localNamesBySymbol.get(symbol.id) ?? emptyLocalNames);
+		}),
 		diagnostics: input.captureAnalysis.diagnostics,
+	};
+}
+
+// A branch flip module: evaluate the compiled test through graph reads, pick
+// the arm, and rebuild that arm's HTML from static parts plus graph-read
+// slots. Whole-range replacement only — no diffing, no component execution.
+function emitBranchUpdateModule(
+	symbol: Extract<PlannedSymbol, { kind: 'branch-update' }>,
+	arms: PublicRenderPlanBranchArms,
+): GeneratedSymbolModule {
+	const exportName = symbolExportName(symbol.id);
+	const testExpression = arms.testRead
+		? `context.graph.read(${JSON.stringify(arms.testRead.graphNodeId)}${arms.testRead.path.length > 0 ? `, ${JSON.stringify(arms.testRead.path)}` : ''})`
+		: 'undefined';
+	const armSelector = arms.armTests
+		? `marklessSelectSwitchArm(${testExpression}, ${JSON.stringify(arms.armTests)})`
+		: `(${testExpression}) ? 0 : 1`;
+	const selectorHelper = arms.armTests
+		? 'function marklessSelectSwitchArm(value, tests) { for (let index = 0; index < tests.length; index++) { if (tests[index] !== null && value === tests[index]) return index; } return tests.indexOf(null); }'
+		: null;
+	const source = [
+		`const marklessBranchArms = ${JSON.stringify(arms.arms)};`,
+		...(selectorHelper ? [selectorHelper] : []),
+		`export function ${exportName}(context) {`,
+		`	const arm = context.arm ?? (${armSelector});`,
+		'	const parts = marklessBranchArms[arm] ?? [];',
+		'	const html = parts.map((part) => part.text !== undefined ? part.text : marklessBranchText(context.graph.read(part.read.graphNodeId, part.read.path))).join("");',
+		'	return { arm, html };',
+		'}',
+		'function marklessBranchText(value) { return String(value == null ? "" : value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;"); }',
+	].join('\n');
+	return {
+		symbolId: symbol.id,
+		kind: symbol.kind,
+		exportName,
+		source,
 	};
 }
 
@@ -95,15 +148,30 @@ function emitEventHandlerModule(
 	localNames: ReadonlySet<string>,
 ): string {
 	const exportName = symbolExportName(symbol.id);
-	const writes = (symbol.writes ?? []).flatMap((write) =>
-		emitEventWrite(
-			write,
-			symbol.kind === 'event-handler' ? symbol.parameters : [],
-			symbol.reads ?? [],
-			symbol.moduleImports ?? [],
-			localNames,
+	const parameters = symbol.kind === 'event-handler' ? symbol.parameters : [];
+	// Statements interleave by their offset in the handler source so handle
+	// calls and writes keep authored order.
+	const statements = [
+		...(symbol.writes ?? []).map((write) => ({
+			offset: write.source ? symbol.source.indexOf(write.source) : -1,
+			lines: emitEventWrite(
+				write,
+				parameters,
+				symbol.reads ?? [],
+				symbol.moduleImports ?? [],
+				localNames,
+			),
+		})),
+		...(symbol.kind === 'event-handler' ? (symbol.elementHandleCalls ?? []) : []).map(
+			(call) => ({
+				offset: call.offset,
+				lines: emitElementHandleCall(call, parameters),
+			}),
 		),
-	);
+	]
+		.filter((statement) => statement.lines.length > 0)
+		.sort((left, right) => left.offset - right.offset);
+	const writes = statements.flatMap((statement) => statement.lines);
 	const imports = eventModuleImports(symbol, writes);
 
 	return [
@@ -1561,4 +1629,47 @@ function emitModuleImport(moduleImport: SemanticModuleImport): string {
 		return `import { ${moduleImport.localName} } from ${source};`;
 	}
 	return `import { ${moduleImport.importedName} as ${moduleImport.localName} } from ${source};`;
+}
+
+// Element-handle method calls run against the runtime-resolved host element.
+// Arguments stay restricted to literals and event parameters; anything richer
+// keeps the current unsupported behavior until capture analysis owns it.
+function emitElementHandleCall(
+	call: {
+		readonly handleName: string;
+		readonly method: string;
+		readonly argumentSources: ReadonlyArray<string>;
+	},
+	parameters: ReadonlyArray<string>,
+): string[] {
+	const literalPattern =
+		/^(?:'[^']*'|"[^"]*"|`[^`]*`|-?\d+(?:\.\d+)?|true|false|null|undefined)$/;
+	const supported = call.argumentSources.every(
+		(argument) => literalPattern.test(argument) || parameters.includes(argument),
+	);
+	if (!supported) return [];
+	return [
+		`\tcontext.getElementHandle(${JSON.stringify(call.handleName)})?.${call.method}(${call.argumentSources.join(', ')});`,
+	];
+}
+
+// A boundary settle module: the runtime passes the settled status; the module
+// picks the @try or @catch arm and rebuilds its HTML from static parts plus
+// graph reads (the settled value already lives in the graph).
+function emitAsyncBoundaryUpdateModule(
+	symbol: Extract<PlannedSymbol, { kind: 'async-boundary-update' }>,
+	arms: PublicRenderPlanAsyncBoundaryArms,
+): GeneratedSymbolModule {
+	const exportName = symbolExportName(symbol.id);
+	const source = [
+		`const marklessBoundaryArms = ${JSON.stringify(arms.arms)};`,
+		`export function ${exportName}(context) {`,
+		'	const arm = context.status === "rejected" ? 1 : 0;',
+		'	const parts = marklessBoundaryArms[arm] ?? [];',
+		'	const html = parts.map((part) => part.text !== undefined ? part.text : marklessBoundaryText(context.graph.read(part.read.graphNodeId, part.read.path))).join("");',
+		'	return { arm, html };',
+		'}',
+		'function marklessBoundaryText(value) { return String(value == null ? "" : value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;"); }',
+	].join('\n');
+	return { symbolId: symbol.id, kind: symbol.kind, exportName, source };
 }

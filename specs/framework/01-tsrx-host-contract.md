@@ -116,6 +116,30 @@ State declared inside @if is disposed when the branch is removed.
 Move it above the @if if it should persist.
 ```
 
+### Scoped style blocks (accepted 2026-07-02)
+
+Markless scopes `<style>` blocks with a compile-time scope class (Option A of
+the former decision draft). Each component module with a `<style>` block gets
+a stable build-hashed scope class (`mk-<hash>` from the module filename).
+Every selector's subject compound gains the scope class, at-rule blocks are
+descended, and `@keyframes` contents are left untransformed. Host elements
+the component renders gain the scope class in emitted HTML across static,
+dynamic, spread, and dynamic-tag attribute paths. The compiled CSS ships as a
+bundler-owned virtual `.css` module imported by the transformed module, so
+Vite/Rolldown's CSS pipeline owns bundling and delivery; no JavaScript runs
+to apply styles. Style blocks that cannot be scope-compiled keep a fail-loud
+`MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT` diagnostic. Style composition
+metadata and `:global(...)`-style escapes remain unspecified.
+
+### Submodules (accepted 2026-07-02)
+
+TSRX submodule blocks (`module name { ... }`) and identifier-source imports
+(`import { x } from name;`) have no server/client boundary semantics in this
+host yet. The compiler emits `MARKLESS_SUBMODULE_UNSUPPORTED` for both shapes
+so server-intended code never silently ships to the client. The full
+server-boundary contract remains a deferred decision recorded in
+`08-deferred-decisions.md` under the server-functions entry.
+
 ### Children and projection
 
 TSRX's current documented convention is that composite components accept nested
