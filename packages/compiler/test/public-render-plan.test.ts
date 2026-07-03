@@ -368,3 +368,64 @@ async function createRenderPlan(filename: string, source: string) {
 
 	return { plan, payloadArena, semanticGraph, stateLowering, symbolResolver };
 }
+
+test('planPublicRender diagnoses React-style children inspection as opaque', async () => {
+	const { plan } = await createRenderPlan(
+		'src/ChildrenMap.tsrx',
+		`import { state } from '@markless/core';
+
+export function Card({ children }) @{
+	const items = children.map((child) => child);
+
+	<section>
+		<ul>{items}</ul>
+	</section>
+}
+`,
+	);
+
+	// Spec 01: children are an opaque compiler-owned template projection —
+	// inspect/map/clone/count/mutate must diagnose, not silently misbehave.
+	expect(plan.diagnostics).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				code: 'MARKLESS_CHILDREN_OPAQUE',
+				severity: 'error',
+				phase: 'public-render',
+				message: expect.stringContaining('opaque'),
+			}),
+		]),
+	);
+});
+
+test('planPublicRender diagnoses children.length reads as opaque', async () => {
+	const { plan } = await createRenderPlan(
+		'src/ChildrenCount.tsrx',
+		`export function Card({ children }) @{
+	const count = children.length;
+
+	<section data-count={count}>{children}</section>
+}
+`,
+	);
+
+	expect(plan.diagnostics).toEqual(
+		expect.arrayContaining([expect.objectContaining({ code: 'MARKLESS_CHILDREN_OPAQUE' })]),
+	);
+});
+
+test('planPublicRender keeps plain children placement undiagnosed', async () => {
+	const { plan } = await createRenderPlan(
+		'src/ChildrenPlain.tsrx',
+		`export function Card({ children }) @{
+	<section>{children}</section>
+}
+`,
+	);
+
+	expect(
+		(plan.diagnostics ?? []).filter(
+			(diagnostic) => diagnostic.code === 'MARKLESS_CHILDREN_OPAQUE',
+		),
+	).toEqual([]);
+});

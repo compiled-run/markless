@@ -24,6 +24,7 @@ import {
 	splitStaticGraphPath,
 } from '../../artifact-helpers/graph-paths.ts';
 import {
+	childrenOpacityDiagnostic,
 	unsupportedRenderConstructDiagnostic,
 	unsupportedRenderRootDiagnostic,
 } from './diagnostics.ts';
@@ -311,6 +312,7 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 		diagnostics: [
 			...styleScopeCollection.diagnostics,
 			...collectUnsupportedConstructDiagnostics(root, input.source.filename),
+			...collectChildrenOpacityDiagnostics(ast, input.source.filename),
 			...repeatRenderDiagnostics({
 				componentEdgeCount: input.semanticGraph.componentEdges.length,
 				filename: input.source.filename,
@@ -633,6 +635,41 @@ function emptyPlan(
 
 // Constructs the module emitter cannot render yet must fail loud here; their
 // content would otherwise silently disappear from CSR/SSR HTML.
+// Children are an opaque compiler-owned template projection (spec
+// 01-tsrx-host-contract): React-style inspection — mapping, counting,
+// indexing, cloning, or mutating `children` — must diagnose loudly instead
+// of silently misbehaving. Plain `{children}` placement stays supported.
+function collectChildrenOpacityDiagnostics(ast: AnyNode, filename: string) {
+	const diagnostics: ReturnType<typeof childrenOpacityDiagnostic>[] = [];
+	for (const statement of asNodes(ast.body)) {
+		const component = getComponentFunction(statement);
+		if (!component || !componentDeclaresChildren(component.node)) continue;
+		const visit = (node: AnyNode): void => {
+			if (
+				node.type === 'MemberExpression' &&
+				getIdentifierName(node.object as AnyNode | undefined) === 'children'
+			) {
+				diagnostics.push(childrenOpacityDiagnostic({ node, filename }));
+				return;
+			}
+			for (const child of childNodes(node)) visit(child);
+		};
+		visit(component.node);
+	}
+	return diagnostics;
+}
+
+function componentDeclaresChildren(componentNode: AnyNode): boolean {
+	for (const param of asNodes(componentNode.params)) {
+		if (param.type !== 'ObjectPattern') continue;
+		for (const property of asNodes(param.properties)) {
+			const key = (property as { key?: AnyNode }).key;
+			if (getIdentifierName(key) === 'children') return true;
+		}
+	}
+	return false;
+}
+
 function collectUnsupportedConstructDiagnostics(root: AnyNode, filename: string) {
 	const diagnostics: ReturnType<typeof unsupportedRenderConstructDiagnostic>[] = [];
 

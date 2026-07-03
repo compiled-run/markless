@@ -7,6 +7,7 @@ import DynamicTag from './fixtures/dynamic-tag.tsrx';
 import ElementHandle from './fixtures/element-handle.tsrx';
 import FragmentRoot from './fixtures/fragment-root.tsrx';
 import FragmentBranch from './fixtures/fragment-branch.tsrx';
+import ProjectedCard from './fixtures/projected-card.tsrx';
 import InputEcho from './fixtures/input-echo.tsrx';
 import OnlyIf from './fixtures/only-if.tsrx';
 import RowsChoose from './fixtures/rows-choose.tsrx';
@@ -237,4 +238,23 @@ test('SSR: fragment root with an @if child flips the branch range', async () => 
 	(button as HTMLButtonElement).click();
 	await expect.poll(() => container.querySelector('p.off')?.textContent).toBe('Hidden');
 	expect(container.querySelector('p.on')).toBeNull();
+});
+
+test.fails('SSR: static children projection renders inside the wrapping component', async () => {
+	// KNOWN RED (deferred design, T012 Q2): children placement projects raw
+	// HTML correctly since the S5 escape fix, but hosts inside projected
+	// element children keep caller-coordinate locators while rendering inside
+	// the child component — resume throws Mismatched resume locator. The
+	// projection-metadata design (spec 01:163-166 names it, defines no shape)
+	// is deferred; this test flips green when it lands.
+	const screen = await renderSSR(ProjectedCard);
+	const container = screen.container;
+
+	// Spec 01: children place as an opaque template projection.
+	const projected = container.querySelector('section.card p.projected');
+	expect(projected?.textContent).toBe('Projected content');
+
+	const button = container.querySelector('button');
+	(button as HTMLButtonElement).click();
+	await expect.poll(() => container.querySelector('output')?.textContent).toBe('clicked');
 });

@@ -92,6 +92,7 @@ function emitPublicCsrRenderModule(
 		asyncBoundaries: input.semanticGraph.asyncBoundaries,
 		asyncBoundaryGates: input.publicRenderPlan.asyncBoundaryGates,
 		nextAsyncBoundaryIndex: 0,
+		hasChildrenProp: rootInfo.propNames.includes('children'),
 		styleScopeClass: input.publicRenderPlan.styleScopes[0]?.scopeId ?? null,
 		source: input.source.source,
 	};
@@ -161,6 +162,7 @@ function emitPublicCsrRenderModule(
 		'function marklessCsrAuthoredChild(parent, index) { const children = parent?.childNodes; if (!children) return undefined; let slot = 0; for (let position = 0; position < children.length; position++) { const child = children[position]; if (child.nodeType === 8) { const text = child.textContent ?? ""; const range = /^markless:(branch|async)/.test(text); if (range) { const end = "/" + text; let close = position + 1; while (close < children.length && !(children[close].nodeType === 8 && children[close].textContent === end)) close++; if (slot === index) return child; slot++; position = close; continue; } continue; } if (slot === index) return child; slot++; } return undefined; }',
 		'function marklessCsrIsThenable(value) { return value !== null && (typeof value === "object" || typeof value === "function") && typeof value.then === "function"; }',
 		'function marklessCsrText(value) { return marklessCsrEscape(value == null ? "" : String(value)); }',
+		'function marklessCsrChildrenHtml(value) { return value == null ? "" : String(value); }',
 		'function marklessCsrAttribute(name, value) { return ` ${name}="${marklessCsrEscape(value == null ? "" : String(value))}"`; }',
 		'function marklessCsrRepeatRows(items, renderRow, renderEmpty) { const list = Array.isArray(items) ? items : Array.from(items ?? []); if (list.length === 0) return renderEmpty ? renderEmpty() : ""; return list.map(renderRow).join(""); }',
 		'function marklessCsrDynamicTagName(value) { if (value === null || value === undefined || value === false || value === "") return null; const tag = String(value); if (!/^[a-zA-Z][a-zA-Z0-9:_.-]*$/.test(tag)) throw new Error("MARKLESS_DYNAMIC_TAG_INVALID: " + tag); return tag; }',
@@ -202,6 +204,7 @@ function emitPublicSsrRenderModule(
 		asyncBoundaryGates: input.publicRenderPlan.asyncBoundaryGates,
 		nextAsyncBoundaryIndex: 0,
 		asyncRunners: collectSsrAsyncRunners(input),
+		hasChildrenProp: rootInfo.propNames.includes('children'),
 		branchSites: input.semanticGraph.branchSites,
 		branchReactivityGates: input.publicRenderPlan.branchReactivityGates,
 		nextBranchSiteIndex: 0,
@@ -260,6 +263,7 @@ function emitPublicSsrRenderModule(
 		'function marklessSsrAppendChildView(context) { const childView = context.child.view; const propEvents = context.child.output?.propEvents ?? []; const callbackProps = context.child.callbackProps ?? {}; for (const locator of childView.locators) context.locators.push({ ...locator, hostNodeId: context.child.hostPrefix + locator.hostNodeId, index: context.baseIndex + locator.index }); for (const event of childView.events) { const propEvent = propEvents.find((item) => item.hostNodeId === event.hostNodeId && item.eventName === event.eventName); const callbackSymbolId = propEvent ? callbackProps[propEvent.propName] : undefined; const symbolIds = callbackSymbolId ? [callbackSymbolId] : event.symbolIds.map((symbolId) => context.child.externalSymbolIds.has(symbolId) ? symbolId : context.child.symbolPrefix + symbolId); for (const symbolId of symbolIds) if (callbackSymbolId || context.child.externalSymbolIds.has(symbolId)) context.externalSymbolIds.add(symbolId); context.events.push({ ...event, hostNodeId: context.child.hostPrefix + event.hostNodeId, symbolIds }); } for (const update of childView.domUpdates) { const mapped = marklessSsrRemapChildGraph(update, context.child.graphProps); if (!mapped) continue; context.domUpdates.push({ ...update, hostNodeId: context.child.hostPrefix + update.hostNodeId, graphNodeId: mapped.graphNodeId, path: mapped.path, ...(update.symbolId ? { symbolId: context.child.symbolPrefix + update.symbolId } : {}) }); } for (const behavior of childView.behaviors) context.behaviors.push({ ...behavior, hostNodeId: context.child.hostPrefix + behavior.hostNodeId, ...(behavior.symbolId ? { symbolId: context.child.symbolPrefix + behavior.symbolId } : {}) }); for (const handle of childView.elementHandles) context.elementHandles.push({ ...handle, hostNodeId: context.child.hostPrefix + handle.hostNodeId }); }',
 		'function marklessSsrRemapChildGraph(record, graphProps) { if (record.graphNodeId === "prop:props") { const propName = record.path[0]; const binding = graphProps.find((prop) => prop.name === propName); return binding ? { graphNodeId: binding.graphNodeId, path: [...binding.path, ...record.path.slice(1)] } : null; } if (record.graphNodeId.startsWith?.("prop:")) { const propName = record.graphNodeId.slice(5); const binding = graphProps.find((prop) => prop.name === propName); return binding ? { graphNodeId: binding.graphNodeId, path: [...binding.path, ...record.path] } : null; } return { graphNodeId: record.graphNodeId, path: record.path }; }',
 		'function marklessSsrText(value) { return marklessSsrEscape(value == null ? "" : String(value)); }',
+		'function marklessSsrChildrenHtml(value) { return value == null ? "" : String(value); }',
 		'function marklessSsrAttribute(name, value) { return ` ${name}="${marklessSsrEscape(value == null ? "" : String(value))}"`; }',
 		'function marklessSsrSpreadAttributes(values, scopeClass) { let html = ""; let classSeen = false; for (const key of Object.keys(values ?? {})) { if (!/^[A-Za-z_][\\w.:-]*$/.test(key) || /^on[A-Z]/.test(key) || key === "attach" || key === "el" || key === "children") continue; const value = values[key]; if (value === null || value === undefined || value === false) continue; if (key === "class" && scopeClass) { classSeen = true; html += marklessSsrAttribute("class", (value === true ? "" : String(value)) + " " + scopeClass); continue; } html += value === true ? ` ${key}=""` : marklessSsrAttribute(key, value); } if (scopeClass && !classSeen) html += ` class="${scopeClass}"`; return html; }',
 		'function marklessSsrEscape(value) { return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll("\\"", "&quot;"); }',
@@ -481,9 +485,17 @@ function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string {
 
 	if (node.type === 'JSXExpressionContainer' || node.type === 'TSRXExpression') {
 		const expression = node.expression as AnyNode | undefined;
-		return expression
-			? `${renderHelper(context, 'Text')}(${expressionSource(expression, context.source)})`
-			: '""';
+		if (!expression) return '""';
+		// Children placement is an opaque template projection: the prop carries
+		// compiler-rendered HTML from the parent edge, so it interpolates raw.
+		// Escaping it would turn projected markup into visible text.
+		if (
+			context.hasChildrenProp &&
+			expressionSource(expression, context.source) === 'children'
+		) {
+			return `${renderHelper(context, 'ChildrenHtml')}(children)`;
+		}
+		return `${renderHelper(context, 'Text')}(${expressionSource(expression, context.source)})`;
 	}
 
 	if (node.type === 'JSXIfExpression') {
@@ -966,7 +978,7 @@ function emitHtmlChildren(node: AnyNode, context: HtmlRenderContext): string {
 
 function renderHelper(
 	context: HtmlRenderContext,
-	helper: 'Attribute' | 'SpreadAttributes' | 'Text',
+	helper: 'Attribute' | 'ChildrenHtml' | 'SpreadAttributes' | 'Text',
 ): string {
 	return `markless${context.mode === 'ssr' ? 'Ssr' : 'Csr'}${helper}`;
 }

@@ -1235,6 +1235,36 @@ export function App() @{
 	]);
 });
 
+test('compileTsrxModule places children as raw template projection', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Card.tsrx',
+		source: `
+export function Card({ children }) @{
+	<section class="card">
+		<h2>Card</h2>
+		{children}
+	</section>
+}
+`,
+		symbols: [],
+	});
+
+	// Children placement is a template projection of compiler-rendered HTML —
+	// escaping it (marklessSsrText) turns projected markup into visible text.
+	expect(result.publicRenderModule.ssrModuleSource).toContain(
+		'marklessSsrChildrenHtml(children)',
+	);
+	expect(result.publicRenderModule.ssrModuleSource).not.toContain('marklessSsrText(children)');
+
+	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	const output = await (
+		ssrModule.marklessRenderSsr as (props: {
+			readonly children?: string;
+		}) => Promise<{ readonly html: string }>
+	)({ children: '<p class="projected">Projected content</p>' });
+	expect(output.html).toContain('<p class="projected">Projected content</p>');
+});
+
 test('compileTsrxModule supports control-flow children in fragment roots', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/FragmentBranch.tsrx',
@@ -1760,7 +1790,7 @@ export default function Document({ children }: { readonly children?: unknown }) 
 	)({ children: '<main>Docs</main>' });
 
 	expect(output.html).toBe(
-		'<head><title>Markless Router</title></head><body>&lt;main&gt;Docs&lt;/main&gt;</body>',
+		'<head><title>Markless Router</title></head><body><main>Docs</main></body>',
 	);
 });
 
