@@ -3285,6 +3285,149 @@ export function Dashboard() @{
 	]);
 });
 
+test('compileTsrxModule offsets sibling children by element count, not locator count', async () => {
+	const badge = await compileTsrxModule({
+		filename: 'src/StatusBadge.tsrx',
+		source: `
+export function StatusBadge({ active }) @{
+	<span class="badge">
+		@if (active) { <em class="live">Live</em> } @else { <em class="idle">Idle</em> }
+	</span>
+}
+`,
+		symbols: [],
+	});
+	const parent = await compileTsrxModule({
+		filename: 'src/Shell.tsrx',
+		source: `
+import { state } from '@markless/core';
+import { StatusBadge } from './StatusBadge.tsrx';
+
+export function Shell() @{
+	let streaming = state(true);
+
+	<main>
+		<button onClick={() => streaming = !streaming}>Toggle</button>
+		<StatusBadge active={streaming} />
+		<footer>Tail</footer>
+	</main>
+}
+`,
+		symbols: [],
+	});
+
+	const childSsrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(badge));
+	const parentSsrModule = await importPublicRenderTestModule(
+		ssrRenderTestModuleSource(parent, { replaceChildImport: true }),
+		{ childComponent: { renderSsr: childSsrModule.marklessRenderSsr } },
+	);
+	const output = await (
+		parentSsrModule.marklessRenderSsr as () => Promise<{
+			readonly html: string;
+			readonly view: {
+				readonly locators: ReadonlyArray<{
+					readonly tagName: string;
+					readonly index: number;
+				}>;
+			};
+		}>
+	)();
+
+	// dom-order elements: main(0), button(1), span.badge(2), em(3 — the
+	// child's ARM host: an element WITHOUT a locator), footer(4). Offsetting
+	// by locator count would place the footer at 4 - 1 = index 3 (the em) —
+	// the demo-app resume abort (RuntimeResumeError c3:h0).
+	const footer = output.view.locators.find((locator) => locator.tagName === 'footer');
+	expect(footer).toBeDefined();
+	expect(footer!.index).toBe(4);
+});
+
+test('compileTsrxModule remaps composed child behavior input reads', async () => {
+	const parent = await compileTsrxModule({
+		filename: 'src/Deck.tsrx',
+		source: `
+import { state } from '@markless/core';
+import { FrameHost } from './FrameHost.tsrx';
+
+export function Deck() @{
+	let clip = state('abc123');
+
+	<main>
+		<FrameHost videoId={clip} />
+	</main>
+}
+`,
+		symbols: [],
+	});
+
+	const parentSsrModule = await importPublicRenderTestModule(
+		ssrRenderTestModuleSource(parent, { replaceChildImport: true }),
+		{
+			childComponent: {
+				// Stubbed child output: a behavior whose input reads the child's
+				// videoId prop (the arena keeps prop reads in the record so
+				// composition can remap them).
+				renderSsr: () => ({
+					html: '<div class="frame"></div>',
+					state: { version: 1, cells: [], computed: [] },
+					view: {
+						version: 1,
+						locators: [
+							{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'div' },
+						],
+						events: [],
+						domUpdates: [],
+						behaviors: [
+							{
+								hostNodeId: 'h0',
+								source: 'loadFrame(videoId)',
+								functionSource: 'loadFrame',
+								inputSources: ['videoId'],
+								inputGraphReads: [
+									{
+										inputIndex: 0,
+										source: 'videoId',
+										graphNodeId: 'prop:props',
+										path: ['videoId'],
+									},
+								],
+								symbolId: 'symbol:0',
+							},
+						],
+						elementHandles: [],
+						asyncBoundaries: [],
+					},
+				}),
+			},
+		},
+	);
+	const output = await (
+		parentSsrModule.marklessRenderSsr as () => Promise<{
+			readonly view: {
+				readonly behaviors: ReadonlyArray<{
+					readonly hostNodeId: string;
+					readonly inputGraphReads?: ReadonlyArray<{
+						readonly graphNodeId: string;
+						readonly path: ReadonlyArray<string>;
+					}>;
+				}>;
+			};
+		}>
+	)();
+
+	// The composed behavior's input reads must point at the parent graph node,
+	// not the child-local prop node the composed graph does not have —
+	// otherwise the behavior activates with undefined inputs (the demo's
+	// YouTube controller class of failure).
+	const composed = output.view.behaviors.find((behavior) =>
+		behavior.hostNodeId.startsWith('c0:'),
+	);
+	expect(composed).toBeDefined();
+	expect(composed!.inputGraphReads ?? []).toEqual([
+		expect.objectContaining({ graphNodeId: 'state:clip', path: [] }),
+	]);
+});
+
 test('compileTsrxModule composes imported child BUTTON counters for SSR resume', async () => {
 	const child = await compileTsrxModule({
 		filename: 'src/Counter.tsrx',

@@ -798,6 +798,13 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 
 		let activeSymbolId: string | undefined;
 		try {
+			// Ancestor hosts activate too (event-only parity): an attach behavior
+			// on a container — the music-player App-root controller — must run
+			// when any descendant is interacted with, not only its own host.
+			for (const hostNodeId of behaviorHostIdsForAncestors(element)) {
+				const ancestorActivation = activateBehaviorsFromTrigger(hostNodeId);
+				if (ancestorActivation) await ancestorActivation;
+			}
 			const behaviorActivation = activateBehaviorsFromTrigger(eventRecord.hostNodeId);
 			if (behaviorActivation) await behaviorActivation;
 
@@ -904,6 +911,22 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 	): Promise<void> {
 		if (!isResumeSharedPatchEvent(event)) return;
 		if (input.graph.applySharedPatch(event.detail)) await flushRuntimeGraph();
+	}
+
+	function behaviorHostIdsForAncestors(element: ResumeDomElement | undefined): string[] {
+		const hostIdByElement = new Map<ResumeDomElement, string>();
+		for (const hostNodeId of behaviorRecordsByHostId.keys()) {
+			const hostElement = elementsByHostId.get(hostNodeId);
+			if (hostElement) hostIdByElement.set(hostElement, hostNodeId);
+		}
+		const hostNodeIds: string[] = [];
+		let current: ResumeDomElement | undefined = element;
+		while (current) {
+			const hostNodeId = hostIdByElement.get(current);
+			if (hostNodeId) hostNodeIds.push(hostNodeId);
+			current = (current as { readonly parentElement?: ResumeDomElement }).parentElement;
+		}
+		return hostNodeIds;
 	}
 
 	function activateBehaviorsFromTrigger(hostNodeId: string): Promise<void> | undefined {

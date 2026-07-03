@@ -3471,3 +3471,65 @@ test('resume runtime disposes pending-range hosts when an async boundary settles
 	await graph.flush();
 	expect(applied.filter((entry) => entry.type === 'removeRange')).toHaveLength(1);
 });
+
+test('resume runtime activates ancestor behavior hosts on descendant dispatch', async () => {
+	const button = {
+		nodeType: 1 as const,
+		tagName: 'BUTTON',
+		childNodes: [],
+		addEventListener() {},
+	};
+	const shell = {
+		nodeType: 1 as const,
+		tagName: 'DIV',
+		childNodes: [button] as unknown[],
+		addEventListener() {},
+	};
+	const root = {
+		nodeType: 1 as const,
+		tagName: 'MAIN',
+		childNodes: [shell] as unknown[],
+		addEventListener() {},
+	};
+	(button as { parentElement?: unknown }).parentElement = shell;
+	(shell as { parentElement?: unknown }).parentElement = root;
+	const loaded: string[] = [];
+	const graph = {
+		read: () => undefined,
+		subscribe: () => () => undefined,
+		subscribeJournal: () => () => undefined,
+		listSharedDefinitions: () => [],
+		flush: async () => undefined,
+	};
+	const runtime = createResumeRuntime({
+		root: root as never,
+		graph: graph as never,
+		view: {
+			locators: [
+				{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'main' },
+				{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'div' },
+				{ hostNodeId: 'h2', strategy: 'dom-order', index: 2, tagName: 'button' },
+			],
+			events: [{ hostNodeId: 'h2', eventName: 'click', symbolIds: ['symbol:click'] }],
+			domUpdates: [],
+			// The ancestor DIV owns an attach behavior (the event-only runtime
+			// activated ancestor hosts on dispatch; the full runtime must too —
+			// the music-player App-root controller silently stopped activating
+			// when escalation moved the page off the event-only path).
+			behaviors: [{ hostNodeId: 'h1', symbolId: 'symbol:controller', inputSources: [] }],
+			elementHandles: [],
+			asyncBoundaries: [],
+		} as never,
+		loadSymbol(symbolId: string) {
+			loaded.push(symbolId);
+			return () => undefined;
+		},
+		applyDomJournal: () => undefined,
+	});
+	await runtime.start();
+	expect(loaded).toEqual([]);
+
+	await runtime.dispatch({ type: 'click', target: button } as never);
+	expect(loaded).toContain('symbol:controller');
+	expect(loaded).toContain('symbol:click');
+});

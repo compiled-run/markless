@@ -58,11 +58,32 @@ export default box(
 		const lazyChunks = afterClickScripts.filter((path) => !startupScripts.includes(path));
 		receipt.note(`ssr play-branch post-click lazy JS: ${formatPaths(lazyChunks)}`);
 
+		// Command-state depth (absorbed from the retired tmp-ssr box): the
+		// App-root attach controller activated on the first interaction and
+		// drives the YouTube command state, including the iframe API script.
+		await expect.page.attribute(page, '.youtube-frame-host', 'data-playing', 'true', WAIT);
+		await expect.page.exists(page, 'script[src="https://www.youtube.com/iframe_api"]', WAIT);
+
 		// Round-trip truth: clicking again restores the paused arm.
 		await page.click(PLAY_TOGGLE, WAIT);
 		await expect.page.text(page, PLAY_ICON, PAUSED_ICON, WAIT);
 		await expect.page.attribute(page, PLAY_TOGGLE, 'class', 'play', WAIT);
 		await expect.page.attribute(page, '.youtube-frame-host', 'data-command', 'pause', WAIT);
+
+		// Track navigation exercises composed events and dom updates deeper in
+		// the tree (also absorbed from the retired tmp-ssr box).
+		await page.click('[aria-label="Next track"]', WAIT);
+		await expect.page.bodyText(page, { contains: 'Empty Crown' }, WAIT);
+		// Paused next-track cues the new video (playing next-track loads it);
+		// the video id change proves the composed dom updates flowed.
+		await expect.page.attribute(page, '.youtube-frame-host', 'data-command', 'cue', WAIT);
+		await expect.page.attribute(
+			page,
+			'.youtube-frame-host',
+			'data-video-id',
+			'm_qlgFQs7E4',
+			WAIT,
+		);
 
 		await expect.page.outcome(page, { consoleErrors: 0, failedRequests: 0 }, WAIT);
 		await preview.close();

@@ -208,7 +208,16 @@ function behaviorInputGraphReads(
 	const graphReads = inputSources.flatMap((inputSource, inputIndex) => {
 		const resolved = resolveGraphPath(inputSource, bindings, aliases);
 		if (!resolved) return [];
-		if (resolved.binding.kind !== 'state' && resolved.binding.kind !== 'computed') return [];
+		// Prop reads stay in the record so composition can remap them to the
+		// parent graph node — dropping them left composed child behaviors
+		// activating with undefined inputs.
+		if (
+			resolved.binding.kind !== 'state' &&
+			resolved.binding.kind !== 'computed' &&
+			resolved.binding.kind !== 'prop'
+		) {
+			return [];
+		}
 
 		return [
 			{

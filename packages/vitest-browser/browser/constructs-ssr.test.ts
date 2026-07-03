@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, onTestFinished } from 'vitest';
 import { cleanup, renderSSR } from '../src/index.ts';
 import ArmEvents from './fixtures/arm-events.tsrx';
 import AsyncDetails from './fixtures/async-details.tsrx';
@@ -239,6 +239,14 @@ test('SSR: fragment root with an @if child flips the branch range', async () => 
 });
 
 test.fails('SSR: static children projection renders inside the wrapping component', async () => {
+	// The deferred misindex also surfaces as an ASYNC RuntimeResumeError after
+	// the resumer script runs; contain it so the ledgered failure stays the
+	// assertion below rather than an unhandled rejection failing the run.
+	const swallowDeferredMisindex = (event: PromiseRejectionEvent) => {
+		if (String(event.reason).includes('Resume locator')) event.preventDefault();
+	};
+	window.addEventListener('unhandledrejection', swallowDeferredMisindex);
+	onTestFinished(() => window.removeEventListener('unhandledrejection', swallowDeferredMisindex));
 	// KNOWN RED (deferred design, T012 Q2): children placement projects raw
 	// HTML correctly since the S5 escape fix, but hosts inside projected
 	// element children keep caller-coordinate locators while rendering inside
