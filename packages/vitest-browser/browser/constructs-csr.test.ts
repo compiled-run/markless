@@ -1,0 +1,218 @@
+import { afterEach, expect, test } from 'vitest';
+import { cleanup, render } from '../src/index.ts';
+import AsyncDetails from './fixtures/async-details.tsrx';
+import AttachBehavior from './fixtures/attach-behavior.tsrx';
+import DynamicTag from './fixtures/dynamic-tag.tsrx';
+import ElementHandle from './fixtures/element-handle.tsrx';
+import FragmentRoot from './fixtures/fragment-root.tsrx';
+import InputEcho from './fixtures/input-echo.tsrx';
+import OnlyIf from './fixtures/only-if.tsrx';
+import RowsChoose from './fixtures/rows-choose.tsrx';
+import RowsEmpty from './fixtures/rows-empty.tsrx';
+import RowsIndex from './fixtures/rows-index.tsrx';
+import ScopedStyle from './fixtures/scoped-style.tsrx';
+import SpreadClass from './fixtures/spread-class.tsrx';
+import SwitchArms from './fixtures/switch-arms.tsrx';
+
+afterEach(() => cleanup());
+
+function queryContainer(container: unknown): HTMLElement {
+	return container as HTMLElement;
+}
+
+function requireElement<T extends Element>(container: HTMLElement, selector: string): T {
+	const element = container.querySelector<T>(selector);
+	if (!element) throw new Error(`Expected "${selector}" in the rendered DOM.`);
+	return element;
+}
+
+test('CSR: input and click events both drive the same state text binding', async () => {
+	const screen = await render(InputEcho);
+	const container = queryContainer(screen.container);
+	const input = requireElement<HTMLInputElement>(container, 'input[data-name]');
+	const echo = requireElement<HTMLOutputElement>(container, 'output[data-echo]');
+
+	expect(echo.textContent).toBe('start');
+	expect(input.value).toBe('start');
+
+	input.value = 'typed';
+	input.dispatchEvent(new Event('input', { bubbles: true }));
+	await expect.poll(() => echo.textContent).toBe('typed');
+
+	requireElement<HTMLButtonElement>(container, 'button[data-reset]').click();
+	await expect.poll(() => echo.textContent).toBe('reset');
+});
+
+test('CSR: spread attributes render and a conditional class binding flips on click', async () => {
+	const screen = await render(SpreadClass);
+	const container = queryContainer(screen.container);
+	const section = requireElement<HTMLElement>(container, 'section[data-kind="card"]');
+
+	expect(section.getAttribute('id')).toBe('hero');
+	expect(section.getAttribute('role')).toBe('note');
+	expect(section.hasAttribute('hidden')).toBe(false);
+	// Literal attributes after the spread win over spread entries.
+	expect(section.getAttribute('title')).toBe('Final');
+
+	const button = requireElement<HTMLButtonElement>(container, 'button[data-pick]');
+	expect(button.className).toBe('chip plain');
+	button.click();
+	await expect.poll(() => button.className).toBe('chip picked');
+});
+
+test('CSR: @if without @else flips the empty alternate range round-trip', async () => {
+	const screen = await render(OnlyIf);
+	const container = queryContainer(screen.container);
+	const toggle = requireElement<HTMLButtonElement>(container, 'button[data-toggle]');
+
+	expect(container.querySelector('p.only')?.textContent).toBe('Shown');
+
+	toggle.click();
+	await expect.poll(() => container.querySelector('p.only')).toBeNull();
+
+	toggle.click();
+	await expect.poll(() => container.querySelector('p.only')?.textContent).toBe('Shown');
+});
+
+test('CSR: @switch with @default flips across all three arms by clicking', async () => {
+	const screen = await render(SwitchArms);
+	const container = queryContainer(screen.container);
+
+	expect(container.querySelector('p.arm-a')?.textContent).toBe('Alpha arm');
+
+	requireElement<HTMLButtonElement>(container, 'button[data-to-beta]').click();
+	await expect.poll(() => container.querySelector('p.arm-b')?.textContent).toBe('Beta arm');
+	expect(container.querySelector('p.arm-a')).toBeNull();
+
+	requireElement<HTMLButtonElement>(container, 'button[data-to-other]').click();
+	await expect.poll(() => container.querySelector('p.arm-d')?.textContent).toBe('Default arm');
+	expect(container.querySelector('p.arm-b')).toBeNull();
+
+	requireElement<HTMLButtonElement>(container, 'button[data-to-alpha]').click();
+	await expect.poll(() => container.querySelector('p.arm-a')?.textContent).toBe('Alpha arm');
+	expect(container.querySelector('p.arm-d')).toBeNull();
+});
+
+test('CSR: keyed @for rows dispatch per-row locals from the clicked row', async () => {
+	const screen = await render(RowsChoose);
+	const container = queryContainer(screen.container);
+	const rows = Array.from(container.querySelectorAll('article'));
+	const chosen = requireElement<HTMLOutputElement>(container, 'output[data-chosen]');
+
+	expect(rows.map((row) => row.querySelector('h2')?.textContent)).toEqual([
+		'Alpha',
+		'Beta',
+		'Gamma',
+	]);
+	expect(chosen.textContent).toBe('none');
+
+	const secondRowButton = rows[1]?.querySelector<HTMLButtonElement>('button');
+	if (!secondRowButton) throw new Error('Expected a button in the second rendered row.');
+	secondRowButton.click();
+	await expect.poll(() => chosen.textContent).toBe('beta');
+});
+
+test.fails('CSR: keyed @for renders the @empty branch for an initially empty collection', async () => {
+	// KNOWN RED (bug): the compiled direct CSR module drops the @empty branch
+	// entirely — "No items yet" never appears in moduleSource, while the SSR
+	// module renders it. The list silently renders as an empty <ul>, which
+	// violates the compiler's own fail-loud rule for dropped content.
+	const screen = await render(RowsEmpty);
+	const container = queryContainer(screen.container);
+
+	expect(container.querySelector('li.empty')?.textContent).toBe('No items yet');
+	expect(container.querySelector('li.row')).toBeNull();
+});
+
+test('CSR: keyed @for with an index clause renders index text per row', async () => {
+	// The compiler gates index-reading repeats as ssrOnly (no rowEvents are
+	// shipped because reorder cannot rewrite index text yet); initial render
+	// must still show correct index text in both modes.
+	const screen = await render(RowsIndex);
+	const container = queryContainer(screen.container);
+	const rows = Array.from(container.querySelectorAll('li'));
+
+	expect(rows.map((row) => row.textContent)).toEqual(['0Alpha', '1Beta']);
+});
+
+test.fails('CSR: async computed shows @pending first, then the resolved @try content', async () => {
+	// KNOWN RED (bug): the compiled CSR module contains neither the async
+	// boundary comment anchors nor the @pending "Loading" content, so render()
+	// throws RuntimeResumeError "Resume locator boundary:0 startAnchor expected
+	// a comment at DOM order index 0" before any content is shown.
+	const screen = await render(AsyncDetails);
+	const container = queryContainer(screen.container);
+
+	expect(container.querySelector('p.pending')?.textContent).toBe('Loading');
+	expect(container.querySelector('p.done')).toBeNull();
+
+	await expect.poll(() => container.querySelector('p.done')?.textContent).toBe('Hello Ada');
+	expect(container.querySelector('p.pending')).toBeNull();
+});
+
+test.fails('CSR: dynamic tag <{expr}> renders the computed element', async () => {
+	// KNOWN RED (bug): the view payload gives the dynamic element a wildcard
+	// locator (tagName "*"), and the CSR resume runtime rejects it with
+	// "Mismatched resume locator h1." even though the compiled module rendered
+	// the <article> correctly. SSR resume accepts the same payload.
+	const screen = await render(DynamicTag);
+	const container = queryContainer(screen.container);
+	const card = requireElement<HTMLElement>(container, 'section > .card');
+
+	expect(card.tagName).toBe('ARTICLE');
+	expect(card.textContent).toBe('Hi');
+});
+
+test('CSR: fragment-rooted component mounts sibling roots and dispatches events', async () => {
+	const screen = await render(FragmentRoot);
+	const container = queryContainer(screen.container);
+
+	expect(container.querySelector('header')?.textContent).toBe('Site');
+	const button = requireElement<HTMLButtonElement>(container, 'button[data-count]');
+	expect(button.textContent).toBe('0');
+
+	button.click();
+	await expect.poll(() => button.textContent).toBe('1');
+});
+
+test('CSR: scoped <style> adds the mk-* scope class merged with author classes', async () => {
+	const screen = await render(ScopedStyle);
+	const container = queryContainer(screen.container);
+	const section = requireElement<HTMLElement>(container, 'section');
+	const heading = requireElement<HTMLHeadingElement>(container, 'h2');
+
+	const scopeClass = Array.from(section.classList).find((name) => name.startsWith('mk-'));
+	expect(scopeClass).toMatch(/^mk-[a-z0-9]+$/);
+	expect(section.classList.contains('card')).toBe(true);
+	expect(heading.classList.contains('title')).toBe(true);
+	expect(heading.classList.contains(scopeClass ?? '')).toBe(true);
+	// The <style> block itself must not appear in rendered output.
+	expect(container.querySelector('style')).toBeNull();
+});
+
+test('CSR: attach={...} behavior runs against the real host element', async () => {
+	const screen = await render(AttachBehavior);
+	const container = queryContainer(screen.container);
+	const host = requireElement<HTMLParagraphElement>(container, 'p[data-host]');
+
+	await expect.poll(() => host.getAttribute('data-behavior')).toBe('on');
+
+	const taps = requireElement<HTMLOutputElement>(container, 'output[data-taps]');
+	host.click();
+	await expect.poll(() => taps.textContent).toBe('1');
+});
+
+test.fails('CSR: el={...} element handle methods run inside an event handler', async () => {
+	// KNOWN RED (bug): the compiled event symbol silently drops the
+	// `box.focus()` element-handle call — the emitted handler module contains
+	// only the `status = 'focused'` graph write. The state write lands but the
+	// input never receives focus, so authored behavior is lost silently.
+	const screen = await render(ElementHandle);
+	const container = queryContainer(screen.container);
+	const input = requireElement<HTMLInputElement>(container, 'input[data-box]');
+	const status = requireElement<HTMLOutputElement>(container, 'output[data-status]');
+
+	requireElement<HTMLButtonElement>(container, 'button[data-focus]').click();
+	await expect.poll(() => status.textContent).toBe('focused');
+	expect(document.activeElement).toBe(input);
+});
