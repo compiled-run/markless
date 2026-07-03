@@ -95,6 +95,7 @@ export async function transformTsrxModule(
 				resolverId,
 				environment: input.environment ?? 'lib',
 				clientOutput: input.clientOutput ?? 'full',
+				needsFullResume: (compiled.protocolView.branches?.length ?? 0) > 0,
 				resumeModuleUrl: input.resumeModuleUrl,
 				publicRenderModuleSource: compiled.publicRenderModule.moduleSource,
 				publicRenderRootExportName: compiled.publicRenderModule.rootExportName,

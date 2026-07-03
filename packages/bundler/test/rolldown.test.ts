@@ -301,7 +301,7 @@ let active = state(true);
 		expect(result.code).toContain('const marklessSsrState = marklessComposeState');
 		expect(result.code).toContain('state: marklessSsrState');
 		expect(result.code).toContain(
-			'view: { ...marklessSsrComposition.view, branches: marklessSsrBranches }',
+			'view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) }',
 		);
 		expect(result.code).not.toContain('view: marklessPublicView');
 		expect(result.code).not.toContain('payloadView.locators.filter');

@@ -281,17 +281,30 @@ export async function resumeFromPayloadDocument(
 function documentTemplateBranchHtml(
 	document: PayloadScriptDocument,
 ): ResumeRuntimeInput['renderBranchHtml'] {
-	const createElement = (
-		document as {
+	// The "document" may be a container element (payload scripts live inside
+	// it); fall back to its ownerDocument for element creation.
+	const documentLike = document as {
+		readonly createElement?: (tagName: string) => {
+			innerHTML: string;
+			readonly content?: { readonly childNodes?: ArrayLike<unknown> };
+		};
+		readonly ownerDocument?: {
 			readonly createElement?: (tagName: string) => {
 				innerHTML: string;
 				readonly content?: { readonly childNodes?: ArrayLike<unknown> };
 			};
-		}
-	).createElement;
-	if (typeof createElement !== 'function') return undefined;
+		};
+	};
+	const host =
+		typeof documentLike.createElement === 'function'
+			? documentLike
+			: typeof documentLike.ownerDocument?.createElement === 'function'
+				? documentLike.ownerDocument
+				: undefined;
+	const createElement = host?.createElement;
+	if (!host || typeof createElement !== 'function') return undefined;
 	return (html) => {
-		const template = createElement.call(document, 'template');
+		const template = createElement.call(host, 'template');
 		template.innerHTML = html;
 		// Snapshot: insertion moves live childNodes out of the template.
 		return Array.from(template.content?.childNodes ?? []) as ReturnType<

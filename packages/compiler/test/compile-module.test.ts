@@ -1238,9 +1238,18 @@ export function App() @{
 			'<!--markless:async:boundary:0--><em>Loading</em><!--/markless:async:boundary:0-->' +
 			'</section>',
 	);
-	// The runtime records which arm rendered.
+	// The runtime's takenArm merges INTO the payload branch records — it must
+	// never replace them, or the served payload loses symbolId/testReads and
+	// the browser silently treats the branch as static (caught by the
+	// ssr-branch-flip witness box).
 	expect(output.view.branches).toEqual([
-		expect.objectContaining({ id: 'branch-site:0', takenArm: 0 }),
+		expect.objectContaining({
+			id: 'branch-site:0',
+			takenArm: 0,
+			symbolId: expect.any(String),
+			testReads: [expect.objectContaining({ graphNodeId: 'state:open' })],
+			startAnchor: expect.objectContaining({ strategy: 'dom-order-comment' }),
+		}),
 	]);
 	// Union re-indexing: the branch pair takes comment indexes 0/1, so the
 	// boundary's payload anchors shift to 2/3.
