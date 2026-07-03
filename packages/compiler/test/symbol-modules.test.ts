@@ -2317,3 +2317,31 @@ export function App() @{
 	});
 	expect(run({ graph, status: 'rejected' })).toEqual({ arm: 1, html: '<p>Broken</p>' });
 });
+
+test('branch-update modules defer to the runtime-computed arm when provided', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/PropBranch.tsrx',
+		source: `
+export function Badge({ active }) @{
+	<span>
+		@if (active) { <em>Live</em> } @else { <em>Idle</em> }
+	</span>
+}
+`,
+		symbols: [],
+	});
+	const update = result.symbolModules.modules.find((m) => m.kind === 'branch-update');
+	expect(update).toBeDefined();
+	const imported = (await import(
+		`data:text/javascript;charset=utf-8,${encodeURIComponent(update!.source)}`
+	)) as Record<string, (context: unknown) => { arm: number; html: string }>;
+	const run = imported[update!.exportName]!;
+
+	// Composed views remap the record's test reads, but the module's baked
+	// test expression still reads the child-local prop node — which the
+	// composed graph does not have. The runtime computes the arm from the
+	// remapped reads and passes it; the module must defer to it.
+	const graph = { read: () => undefined };
+	expect(run({ graph, arm: 0 })).toEqual({ arm: 0, html: '<em>Live</em>' });
+	expect(run({ graph, arm: 1 })).toEqual({ arm: 1, html: '<em>Idle</em>' });
+});

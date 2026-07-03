@@ -3126,6 +3126,99 @@ export function Scoreboard() @{
 	expect(loadSymbolCalls.get(incrementSymbol!.id)).toBe(1);
 });
 
+test('compileTsrxModule composes child-component branch records in CSR views', async () => {
+	const child = await compileTsrxModule({
+		filename: 'src/StatusBadge.tsrx',
+		source: `
+export function StatusBadge({ active }) @{
+	<span class="badge">
+		@if (active) { <em class="live">Live</em> } @else { <em class="idle">Idle</em> }
+	</span>
+}
+`,
+		symbols: [],
+	});
+	const parent = await compileTsrxModule({
+		filename: 'src/Dashboard.tsrx',
+		source: `
+import { state } from '@markless/core';
+import { StatusBadge } from './StatusBadge.tsrx';
+
+export function Dashboard() @{
+	let streaming = state(true);
+
+	<main>
+		<button onClick={() => streaming = !streaming}>Toggle</button>
+		<StatusBadge active={streaming} />
+	</main>
+}
+`,
+		symbols: [],
+	});
+
+	expect(child.publicRenderPlan.branchReactivityGates).toEqual([
+		{ branchSiteId: 'branch-site:0', supported: true },
+	]);
+
+	const document = {
+		createElement(tagName: string) {
+			return tagName === 'template'
+				? new PublicRenderTestTemplate()
+				: new PublicRenderTestElement(tagName);
+		},
+	};
+	const childCsrModule = await importPublicRenderTestModule(csrRenderTestModuleSource(child), {
+		document,
+	});
+	const parentCsrModule = await importPublicRenderTestModule(
+		csrRenderTestModuleSource(parent, { replaceChildImport: true }),
+		{
+			document,
+			childComponent: { renderCsr: childCsrModule.marklessRenderCsr },
+		},
+	);
+	const output = (
+		parentCsrModule.marklessRenderCsr as () => {
+			readonly root: PublicRenderTestElement;
+			readonly view: {
+				readonly branches?: ReadonlyArray<{
+					readonly id: string;
+					readonly startAnchor: { readonly index: number };
+					readonly endAnchor: { readonly index: number };
+					readonly testReads?: ReadonlyArray<{ readonly graphNodeId: string }>;
+				}>;
+			};
+		}
+	)();
+
+	// The child's @if record must reach the composed view: prefixed id,
+	// test read remapped to the parent graph node, and anchor indexes
+	// resolved against the composed comment stream (the child's anchors are
+	// the only comments, so indexes 0 and 1).
+	expect(output.view.branches).toEqual([
+		expect.objectContaining({
+			id: 'c0:branch-site:0',
+			startAnchor: expect.objectContaining({ index: 0 }),
+			endAnchor: expect.objectContaining({ index: 1 }),
+			testReads: [expect.objectContaining({ graphNodeId: 'state:streaming' })],
+		}),
+	]);
+	// The composed DOM's anchor comments carry the prefixed id, so multiple
+	// instances of the same child cannot collide.
+	const comments: string[] = [];
+	const walk = (node: { childNodes?: ReadonlyArray<Record<string, unknown>> }): void => {
+		for (const childNode of node.childNodes ?? []) {
+			if (childNode.nodeType === 8) comments.push(String(childNode.textContent));
+			walk(childNode as never);
+		}
+	};
+	walk(output.root as never);
+	expect(comments).toEqual([
+		'markless:branch:c0:branch-site:0',
+		'/markless:branch:c0:branch-site:0',
+	]);
+});
+
 test('compileTsrxModule composes imported child BUTTON counters for SSR resume', async () => {
 	const child = await compileTsrxModule({
 		filename: 'src/Counter.tsrx',

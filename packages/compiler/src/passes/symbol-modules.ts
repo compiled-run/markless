@@ -60,7 +60,7 @@ function emitBranchUpdateModule(
 		`const marklessBranchArms = ${JSON.stringify(arms.arms)};`,
 		...(selectorHelper ? [selectorHelper] : []),
 		`export function ${exportName}(context) {`,
-		`	const arm = ${armSelector};`,
+		`	const arm = context.arm ?? (${armSelector});`,
 		'	const parts = marklessBranchArms[arm] ?? [];',
 		'	const html = parts.map((part) => part.text !== undefined ? part.text : marklessBranchText(context.graph.read(part.read.graphNodeId, part.read.path))).join("");',
 		'	return { arm, html };',

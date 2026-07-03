@@ -228,6 +228,9 @@ export type ResumeSymbolContext = {
 	readonly getElementHandle: (handleIdOrName: string) => ResumeDomElement | undefined;
 	// Keyed repeat row values; lowered symbols read context.locals.<itemName>.
 	readonly locals?: Readonly<Record<string, unknown>>;
+	// Runtime-computed branch arm; composed records remap test reads, so the
+	// flip module defers to this over its baked child-local test expression.
+	readonly arm?: number;
 	readonly behaviorInputs?: ReadonlyArray<unknown>;
 	readonly domUpdate?: ProtocolViewPayload['domUpdates'][number];
 	readonly value?: unknown;
@@ -545,6 +548,9 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 					const symbol = isPromiseLike(loadedSymbol) ? await loadedSymbol : loadedSymbol;
 					const maybeUpdate = symbol({
 						graph: input.graph,
+						// The record's testReads are composition-remapped; the module's
+						// baked test expression is child-local. The runtime's arm wins.
+						arm: newArm,
 						element: input.root,
 						getElementHandle: elementHandles.get,
 					});
