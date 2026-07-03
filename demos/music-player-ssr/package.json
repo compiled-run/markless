@@ -8,7 +8,8 @@
 		"dev": "vp dev",
 		"build": "vp build",
 		"preview": "vp preview",
-		"test": "vp test"
+		"test": "vp test",
+		"test:boxes": "witness run"
 	},
 	"dependencies": {
 		"@markless/core": "workspace:*",
