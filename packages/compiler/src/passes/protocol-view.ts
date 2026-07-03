@@ -56,6 +56,7 @@ export function createProtocolViewPayload(input: ProtocolViewPayloadInput): Prot
 		// Only gate-supported boundaries have SSR-emitted anchors; shipping
 		// records for ungated boundaries would make resume throw
 		// missingCommentAnchorError. Re-index contiguously over the emitted set.
+		keyedRepeats: resumableKeyedRepeats(input),
 		// Branch and boundary anchor pairs share one document-order stream, so
 		// re-indexing allocates over the emitted union in anchorOrder.
 		branches: supportedBranchRecords(input),
@@ -154,4 +155,33 @@ function supportedBranchRecords(input: ProtocolViewPayloadInput) {
 			testReads: branchSymbols.get(site.id)?.testReads ?? [],
 			armTests: armsBySite.get(site.id)?.armTests,
 		}));
+}
+
+// Row event symbols already exist on the row host nodes; the record maps
+// row-relative host paths to them so resume can dispatch per row instance
+// with keys derived from the serialized collection by row index.
+function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
+	const planEntries = new Map(
+		input.publicRenderPlan.keyedRepeats.map((entry) => [entry.repeatId, entry]),
+	);
+	return (input.payloadArena.view.keyedRepeats ?? []).flatMap((repeat) => {
+		const plan = planEntries.get(repeat.id);
+		if (!plan || plan.rowElementCount === undefined) return [];
+		return [
+			{
+				id: repeat.id,
+				parentHostNodeId: repeat.parentHostNodeId,
+				collectionGraphNodeId: repeat.collectionGraphNodeId,
+				collectionPath: repeat.collectionPath,
+				keyPath: repeat.keyPath,
+				itemName: plan.itemName,
+				rowElementCount: plan.rowElementCount,
+				rowEvents: plan.eventControls.map((control) => ({
+					hostPath: control.hostPath,
+					eventName: control.eventName,
+					symbolIds: [control.symbolId],
+				})),
+			},
+		];
+	});
 }

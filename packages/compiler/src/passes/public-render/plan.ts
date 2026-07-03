@@ -312,6 +312,14 @@ type AsyncBoundaryNode = {
 	readonly conditional: boolean;
 };
 
+function countPlanRowElements(node: AnyNode): number {
+	const isElement = node.type === 'Element' || node.type === 'JSXElement' ? 1 : 0;
+	return asNodes(node.children).reduce(
+		(total, child) => total + countPlanRowElements(child),
+		isElement,
+	);
+}
+
 function scopeClassOf(collection: {
 	readonly styleScopes: ReadonlyArray<{ readonly scopeId: string }>;
 }): string | null {
@@ -870,6 +878,7 @@ function planKeyedRepeat(input: {
 			expressionText: ' ',
 			omitForExpressions: false,
 		}),
+		rowElementCount: countPlanRowElements(input.row),
 		textWrites: input.rowPlan.textWrites,
 		classWrites: input.rowPlan.classWrites,
 		eventControls: input.rowPlan.eventControls,

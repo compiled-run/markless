@@ -217,5 +217,6 @@ function allSupportedPlan(payloadArena: {
 			supported: true as const,
 		})),
 		branchReactivityGates: [],
+		keyedRepeats: [],
 	} as never;
 }

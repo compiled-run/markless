@@ -767,6 +767,54 @@ export function App() @{
 	expect(output.html).toBe('<section data-kind="card" id="main" title="Final">Hi</section>');
 });
 
+test('compileTsrxModule ships keyed repeat records with row events in the view payload', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/ResumableRows.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let entries = state([
+		{ code: 'a', title: 'Alpha' },
+		{ code: 'b', title: 'Beta' },
+	]);
+	let chosen = state('');
+
+	<main>
+		<section>
+			@for (const entry of entries; key entry.code) {
+				<article>
+					<h2>{entry.title}</h2>
+					<button onClick={() => chosen = entry.code}>Choose</button>
+				</article>
+			}
+		</section>
+	</main>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.protocolView.keyedRepeats).toEqual([
+		expect.objectContaining({
+			id: 'repeat:0',
+			parentHostNodeId: expect.any(String),
+			collectionGraphNodeId: 'state:entries',
+			collectionPath: [],
+			keyPath: ['code'],
+			itemName: 'entry',
+			rowElementCount: 3,
+			rowEvents: [
+				expect.objectContaining({
+					eventName: 'click',
+					hostPath: [1],
+					symbolIds: [expect.any(String)],
+				}),
+			],
+		}),
+	]);
+});
+
 test('compileTsrxModule renders supported keyed repeat rows in SSR html', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/EntryList.tsrx',

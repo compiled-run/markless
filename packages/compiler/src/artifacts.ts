@@ -718,6 +718,7 @@ export type PublicRenderPlanRepeatGate =
 export type PublicRenderPlanKeyedRepeat = {
 	readonly repeatId: string;
 	readonly parentHostNodeId: string;
+	readonly rowElementCount?: number;
 	readonly parentLocator: PayloadArenaArtifact['view']['locators'][number];
 	readonly parentPath: ReadonlyArray<number>;
 	readonly rowHostNodeId?: string;

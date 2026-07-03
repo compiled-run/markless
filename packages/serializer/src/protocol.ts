@@ -168,6 +168,21 @@ export type ProtocolViewPayload = {
 		readonly handleId: string;
 		readonly name: string;
 	}>;
+	readonly keyedRepeats?: ReadonlyArray<{
+		readonly id: string;
+		readonly parentHostNodeId: string;
+		readonly collectionGraphNodeId?: string;
+		readonly collectionPath: ReadonlyArray<string>;
+		readonly keyPath: ReadonlyArray<string>;
+		readonly itemName: string;
+		readonly rowElementCount: number;
+		readonly rowEvents: ReadonlyArray<{
+			readonly hostPath: ReadonlyArray<number>;
+			readonly eventName: string;
+			readonly symbolIds: ReadonlyArray<string>;
+			readonly syncPolicy?: ProtocolSyncPolicy;
+		}>;
+	}>;
 	readonly branches?: ReadonlyArray<{
 		readonly id: string;
 		readonly startAnchor: { readonly strategy: 'dom-order-comment'; readonly index: number };
