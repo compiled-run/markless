@@ -731,6 +731,24 @@ export type PublicRenderPlanKeyedRepeat = {
 	readonly eventControls: ReadonlyArray<PublicRenderPlanEventControl>;
 };
 
+export type PublicRenderPlanBranchArmPart =
+	| { readonly text: string }
+	| {
+			readonly read: {
+				readonly graphNodeId: string;
+				readonly path: ReadonlyArray<string>;
+			};
+	  };
+
+export type PublicRenderPlanBranchArms = {
+	readonly branchSiteId: string;
+	readonly testRead: {
+		readonly graphNodeId: string;
+		readonly path: ReadonlyArray<string>;
+	} | null;
+	readonly arms: ReadonlyArray<ReadonlyArray<PublicRenderPlanBranchArmPart>>;
+};
+
 export type PublicRenderPlanBranchGate =
 	| {
 			readonly branchSiteId: string;
@@ -771,6 +789,7 @@ export type PublicRenderPlanArtifact = {
 	readonly keyedRepeats: ReadonlyArray<PublicRenderPlanKeyedRepeat>;
 	readonly asyncBoundaryGates: ReadonlyArray<PublicRenderPlanAsyncBoundaryGate>;
 	readonly branchReactivityGates: ReadonlyArray<PublicRenderPlanBranchGate>;
+	readonly branchArms: ReadonlyArray<PublicRenderPlanBranchArms>;
 	readonly styleScopes: ReadonlyArray<{ readonly scopeId: string; readonly cssText: string }>;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
 };

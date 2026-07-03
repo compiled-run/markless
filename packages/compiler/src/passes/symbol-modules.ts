@@ -1,5 +1,6 @@
 import type {
 	GeneratedSymbolModule,
+	PublicRenderPlanBranchArms,
 	LoweredStateRead,
 	LoweredStateWrite,
 	PlannedSymbol,
@@ -13,12 +14,49 @@ import type {
 export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtifact {
 	const localNamesBySymbol = publicRenderLocalNamesBySymbol(input.publicRenderPlan);
 
+	const branchArmsBySite = new Map(
+		(input.publicRenderPlan?.branchArms ?? []).map((entry) => [entry.branchSiteId, entry]),
+	);
+
 	return {
 		passId: 'symbol-modules',
-		modules: input.symbolResolver.symbols.flatMap((symbol) =>
-			emitSymbolModule(symbol, localNamesBySymbol.get(symbol.id) ?? emptyLocalNames),
-		),
+		modules: input.symbolResolver.symbols.flatMap((symbol) => {
+			if (symbol.kind === 'branch-update') {
+				const arms = branchArmsBySite.get(symbol.branchSiteId);
+				return arms ? [emitBranchUpdateModule(symbol, arms)] : [];
+			}
+			return emitSymbolModule(symbol, localNamesBySymbol.get(symbol.id) ?? emptyLocalNames);
+		}),
 		diagnostics: input.captureAnalysis.diagnostics,
+	};
+}
+
+// A branch flip module: evaluate the compiled test through graph reads, pick
+// the arm, and rebuild that arm's HTML from static parts plus graph-read
+// slots. Whole-range replacement only — no diffing, no component execution.
+function emitBranchUpdateModule(
+	symbol: Extract<PlannedSymbol, { kind: 'branch-update' }>,
+	arms: PublicRenderPlanBranchArms,
+): GeneratedSymbolModule {
+	const exportName = symbolExportName(symbol.id);
+	const testExpression = arms.testRead
+		? `context.graph.read(${JSON.stringify(arms.testRead.graphNodeId)}${arms.testRead.path.length > 0 ? `, ${JSON.stringify(arms.testRead.path)}` : ''})`
+		: 'undefined';
+	const source = [
+		`const marklessBranchArms = ${JSON.stringify(arms.arms)};`,
+		`export function ${exportName}(context) {`,
+		`	const arm = (${testExpression}) ? 0 : 1;`,
+		'	const parts = marklessBranchArms[arm] ?? [];',
+		'	const html = parts.map((part) => part.text !== undefined ? part.text : marklessBranchText(context.graph.read(part.read.graphNodeId, part.read.path))).join("");',
+		'	return { arm, html };',
+		'}',
+		'function marklessBranchText(value) { return String(value == null ? "" : value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;"); }',
+	].join('\n');
+	return {
+		symbolId: symbol.id,
+		kind: symbol.kind,
+		exportName,
+		source,
 	};
 }
 

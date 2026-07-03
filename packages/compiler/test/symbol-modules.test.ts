@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import { emitSymbolModules } from '../src/passes/symbol-modules.ts';
+import { compileTsrxModule } from '../src/compile-module.ts';
 
 test('emitSymbolModules emits event, callback, and DOM update modules', () => {
 	const artifact = emitSymbolModules({
@@ -2161,4 +2162,43 @@ test('emitSymbolModules emits logical compound assignments for event handler mod
 	expect(artifact.modules[0].source).toContain(
 		'return value && context.graph.read("state:profile", ["enabled"]);',
 	);
+});
+
+test('emitSymbolModules emits branch-update flip modules from plan arm parts', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/BranchFlipModule.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let open = state(true);
+	let label = state('On');
+
+	<section>
+		@if (open) { <p class="badge">{label}</p> } @else { <p>Off</p> }
+	</section>
+}
+`,
+		symbols: [],
+	});
+
+	const branchModule = result.symbolModules.modules.find(
+		(module) => module.kind === 'branch-update',
+	);
+	expect(branchModule).toBeDefined();
+	const imported = (await import(
+		`data:text/javascript;charset=utf-8,${encodeURIComponent(branchModule!.source)}`
+	)) as Record<string, (context: unknown) => { arm: number; html: string }>;
+	const run = imported[branchModule!.exportName]!;
+
+	const graph = (open: boolean, label: string) => ({
+		read(graphNodeId: string) {
+			return graphNodeId === 'state:open' ? open : label;
+		},
+	});
+	expect(run({ graph: graph(true, 'On') })).toEqual({
+		arm: 0,
+		html: '<p class="badge">On</p>',
+	});
+	expect(run({ graph: graph(false, 'On') })).toEqual({ arm: 1, html: '<p>Off</p>' });
 });

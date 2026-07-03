@@ -33,6 +33,7 @@ import type {
 	PlannedSymbol,
 	PublicRenderPlanArtifact,
 	PublicRenderPlanAsyncBoundaryGate,
+	PublicRenderPlanBranchArmPart,
 	PublicRenderPlanBranchGate,
 	PublicRenderPlanClassWrite,
 	PublicRenderPlanEventControl,
@@ -171,6 +172,32 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 		},
 	);
 
+	const branchArmsPlans = input.semanticGraph.branchSites.flatMap((site, index) => {
+		const gate = branchReactivityGates[index];
+		const found = branchNodes[index];
+		if (!gate?.supported || !found || site.kind !== 'if') return [];
+		const testResolved = resolveGraphPath(site.testSource, bindings, aliases);
+		const arms = branchArms(found.node).map((arm) =>
+			buildBranchArmParts(
+				arm,
+				bindings,
+				aliases,
+				input.source.source,
+				scopeClassOf(styleScopeCollection),
+			),
+		);
+		if (arms.some((arm) => arm === null)) return [];
+		return [
+			{
+				branchSiteId: site.id,
+				testRead: testResolved
+					? { graphNodeId: testResolved.binding.id, path: testResolved.path }
+					: null,
+				arms: arms as ReadonlyArray<ReadonlyArray<PublicRenderPlanBranchArmPart>>,
+			},
+		];
+	});
+
 	const boundaryNodes = collectAsyncBoundaryNodes(root);
 	const asyncBoundaryGates: PublicRenderPlanAsyncBoundaryGate[] =
 		input.payloadArena.view.asyncBoundaries.map((boundary, index) => {
@@ -242,6 +269,7 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 		keyedRepeats,
 		asyncBoundaryGates,
 		branchReactivityGates,
+		branchArms: branchArmsPlans,
 		styleScopes: styleScopeCollection.styleScopes,
 		diagnostics: [
 			...styleScopeCollection.diagnostics,
@@ -277,6 +305,85 @@ type AsyncBoundaryNode = {
 	containsNested: boolean;
 	readonly conditional: boolean;
 };
+
+function scopeClassOf(collection: {
+	readonly styleScopes: ReadonlyArray<{ readonly scopeId: string }>;
+}): string | null {
+	return collection.styleScopes[0]?.scopeId ?? null;
+}
+
+// Compiles a gated branch arm into render parts: static HTML text plus graph
+// read slots. Bails (null) on anything beyond literal attributes, static
+// text, and state-resolvable expressions, so unsupported shapes simply keep
+// their static render (no symbol gets wired).
+function buildBranchArmParts(
+	arm: ReadonlyArray<AnyNode>,
+	bindings: ReadonlyMap<string, SemanticGraphBinding>,
+	aliases: ReturnType<typeof semanticAliasMap>,
+	source: string,
+	scopeClass: string | null,
+): ReadonlyArray<PublicRenderPlanBranchArmPart> | null {
+	const parts: PublicRenderPlanBranchArmPart[] = [];
+	const pushText = (text: string): void => {
+		const last = parts[parts.length - 1];
+		if (last && 'text' in last) {
+			parts[parts.length - 1] = { text: last.text + text };
+			return;
+		}
+		parts.push({ text });
+	};
+
+	const visit = (node: AnyNode): boolean => {
+		if (isStaticTextNode(node)) {
+			pushText(escapeHtml(trimmedStaticTextValue(node)));
+			return true;
+		}
+		if (node.type === 'JSXExpressionContainer' || node.type === 'TSRXExpression') {
+			const expression = node.expression as AnyNode | undefined;
+			if (!expression) return false;
+			const graph = resolveGraphPath(expressionSource(expression, source), bindings, aliases);
+			if (!graph || graph.binding.kind !== 'state') return false;
+			parts.push({ read: { graphNodeId: graph.binding.id, path: graph.path } });
+			return true;
+		}
+		if (node.type !== 'Element' && node.type !== 'JSXElement') return false;
+		const tagName = getElementTagName(node);
+		if (!tagName || !isHostTagName(tagName)) return false;
+		let open = `<${tagName}`;
+		let classSeen = false;
+		for (const attribute of getElementAttributes(node)) {
+			if (isSpreadAttribute(attribute)) return false;
+			const name = getIdentifierName(attribute.name as AnyNode | undefined);
+			if (!name) return false;
+			const value = attribute.value as AnyNode | undefined;
+			const expression = unwrapExpressionContainer(value);
+			const literal = !value
+				? ''
+				: value.type === 'Literal' && typeof value.value !== 'object'
+					? String(value.value)
+					: expression?.type === 'Literal' && typeof expression.value !== 'object'
+						? String(expression.value)
+						: null;
+			if (literal === null) return false;
+			const scopeSuffix = name === 'class' && scopeClass ? ` ${scopeClass}` : '';
+			if (scopeSuffix) classSeen = true;
+			open += ` ${name}="${escapeAttribute(literal)}${scopeSuffix}"`;
+		}
+		if (scopeClass && !classSeen) open += ` class="${scopeClass}"`;
+		pushText(`${open}>`);
+		for (const child of asNodes(node.children)) {
+			if (isIgnorableTextNode(child)) continue;
+			if (!visit(child)) return false;
+		}
+		pushText(`</${tagName}>`);
+		return true;
+	};
+
+	for (const node of arm) {
+		if (!visit(node)) return null;
+	}
+	return parts;
+}
 
 type BranchSiteNode = {
 	readonly node: AnyNode;
@@ -423,6 +530,7 @@ function emptyPlan(
 		keyedRepeats: [],
 		asyncBoundaryGates: [],
 		branchReactivityGates: [],
+		branchArms: [],
 		styleScopes: [],
 		diagnostics,
 	};
