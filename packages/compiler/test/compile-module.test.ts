@@ -1608,6 +1608,62 @@ export default function Home() @{
 	expect(anchors[0]?.textContent).toBe('Docs');
 });
 
+test('compileTsrxModule emits async boundary anchors and @pending in the CSR string path', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/CsrAsync.tsrx',
+		source: `
+import { computed, state } from '@markless/core';
+
+export function App() @{
+	let query = state('markless');
+	let details = computed(async () => {
+		return { title: 'Result: ' + query };
+	});
+
+	<main>
+		<h1>Search</h1>
+		@try { <p>{details.title}</p> } @pending { <p>Loading</p> } @catch { <p>Broken</p> }
+	</main>
+}
+`,
+		symbols: [],
+	});
+
+	// Boundary-bearing components must not take the direct CSR module: the
+	// direct module has no boundary handling, and the payload ships anchor
+	// records that would fail materialization.
+	expect(result.publicRenderModule.moduleSource).not.toContain(
+		'runtime: { async dispatch() {} }',
+	);
+
+	const document = {
+		createElement(tagName: string) {
+			return tagName === 'template'
+				? new PublicRenderTestTemplate()
+				: new PublicRenderTestElement(tagName);
+		},
+	};
+	const csrModule = await importPublicRenderTestModule(csrRenderTestModuleSource(result), {
+		document,
+	});
+	const output = (
+		csrModule.marklessRenderCsr as () => { readonly root: PublicRenderTestElement }
+	)();
+	const kinds = output.root.childNodes.map((child) =>
+		child.nodeType === 8
+			? `#comment:${(child as { textContent?: string }).textContent}`
+			: (child as PublicRenderTestElement).tagName,
+	);
+	// CSR mount is a local demand: anchors + @pending render synchronously;
+	// the runner starts at runtime creation and settle replaces the range.
+	expect(kinds).toEqual([
+		'h1',
+		'#comment:markless:async:boundary:0',
+		'p',
+		'#comment:/markless:async:boundary:0',
+	]);
+});
+
 test('compileTsrxModule emits branch anchors in the CSR string path', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/CsrBranch.tsrx',

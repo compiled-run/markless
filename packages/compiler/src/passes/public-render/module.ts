@@ -37,7 +37,10 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 		!!root &&
 		!isFragmentRoot &&
 		root.propNames.length === 0 &&
-		input.semanticGraph.componentEdges.length === 0;
+		input.semanticGraph.componentEdges.length === 0 &&
+		// The direct module has no async boundary handling; boundary-bearing
+		// shapes take the standard runtime module.
+		!input.publicRenderPlan.asyncBoundaryGates.some((gate) => gate.supported);
 	const moduleSource = canUseDirectCsrModule
 		? emitDirectPublicRenderModule({
 				componentName: rootComponentName,
@@ -86,6 +89,9 @@ function emitPublicCsrRenderModule(
 		branchSites: input.semanticGraph.branchSites,
 		branchReactivityGates: input.publicRenderPlan.branchReactivityGates,
 		nextBranchSiteIndex: 0,
+		asyncBoundaries: input.semanticGraph.asyncBoundaries,
+		asyncBoundaryGates: input.publicRenderPlan.asyncBoundaryGates,
+		nextAsyncBoundaryIndex: 0,
 		styleScopeClass: input.publicRenderPlan.styleScopes[0]?.scopeId ?? null,
 		source: input.source.source,
 	};
@@ -294,6 +300,9 @@ type CsrRenderContext = {
 	readonly branchSites?: PublicRenderModuleInput['semanticGraph']['branchSites'];
 	readonly branchReactivityGates?: PublicRenderModuleInput['publicRenderPlan']['branchReactivityGates'];
 	nextBranchSiteIndex?: number;
+	readonly asyncBoundaries?: PublicRenderModuleInput['semanticGraph']['asyncBoundaries'];
+	readonly asyncBoundaryGates?: PublicRenderModuleInput['publicRenderPlan']['asyncBoundaryGates'];
+	nextAsyncBoundaryIndex?: number;
 	readonly styleScopeClass?: string | null;
 	readonly source: string;
 };
@@ -548,7 +557,9 @@ function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string {
 	}
 
 	if (node.type === 'JSXTryExpression') {
-		return context.mode === 'ssr' ? emitSsrAsyncBoundary(node, context) : '""';
+		// CSR mount is a local demand: the same anchors + @pending emit
+		// synchronously and the runner settles the range after creation.
+		return emitAsyncBoundaryHtml(node, context);
 	}
 
 	if (node.type === 'JSXStyleElement') return '""';
@@ -672,13 +683,14 @@ function emitSsrRepeatRows(node: AnyNode, context: SsrRenderContext): string {
 // the @pending branch between them; the browser runtime replaces that range
 // once the boundary settles. @try/@catch content stays out of SSR html because
 // renderSsr is synchronous and cannot await async work yet.
-function emitSsrAsyncBoundary(node: AnyNode, context: SsrRenderContext): string {
+function emitAsyncBoundaryHtml(node: AnyNode, context: HtmlRenderContext): string {
+	if (!context.asyncBoundaries || context.nextAsyncBoundaryIndex === undefined) return '""';
 	const boundary = context.asyncBoundaries[context.nextAsyncBoundaryIndex++];
 	// Nested boundaries never render, but their indexes must stay consumed so
 	// later boundaries keep matching the payload arena's document order.
 	context.nextAsyncBoundaryIndex += countDescendantBoundaries(node);
 	if (!boundary) return '""';
-	const gate = context.asyncBoundaryGates.find((item) => item.boundaryId === boundary.id);
+	const gate = context.asyncBoundaryGates?.find((item) => item.boundaryId === boundary.id);
 	if (!gate?.supported) return '""';
 
 	const pendingChildren = asNodes((node.pending as AnyNode | undefined)?.body).filter(
