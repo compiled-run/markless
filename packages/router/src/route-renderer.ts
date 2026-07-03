@@ -15,7 +15,12 @@ export function startRouteUpdateRenderer(document: Document = window.document): 
 
 interface ClientPageArtifact {
 	readonly renderCsr?: (props?: unknown) => unknown;
-	readonly renderSsr?: (props?: unknown) => { readonly html: string };
+	// MaybePromise: compiled renderSsr is async — the sync type let an
+	// unawaited .html read pass vp check (fourth missed call site of the
+	// async migration).
+	readonly renderSsr?: (
+		props?: unknown,
+	) => { readonly html: string } | Promise<{ readonly html: string }>;
 }
 
 async function renderRouteUpdate(document: Document, update: RouteUpdate): Promise<void> {
@@ -34,6 +39,6 @@ async function renderRouteUpdate(document: Document, update: RouteUpdate): Promi
 	}
 
 	if (typeof artifact.renderSsr === 'function') {
-		document.body.innerHTML = artifact.renderSsr(props).html;
+		document.body.innerHTML = (await artifact.renderSsr(props)).html;
 	}
 }

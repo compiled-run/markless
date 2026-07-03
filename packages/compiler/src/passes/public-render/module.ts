@@ -721,10 +721,11 @@ function emitSsrRepeatRows(node: AnyNode, context: SsrRenderContext): string {
 	return `marklessSsrRepeatRows(marklessSsrHostLocators, ${repeat.collectionSource}, ${rowParams} => ${rowHtml}, ${countRowElements(row)}, ${emptyThunk})`;
 }
 
-// Supported async boundaries emit their payload-planned comment anchors with
-// the @pending branch between them; the browser runtime replaces that range
-// once the boundary settles. @try/@catch content stays out of SSR html because
-// renderSsr is synchronous and cannot await async work yet.
+// Supported async boundaries emit their payload-planned comment anchors.
+// SSR awaits the demanded async computed inline (renderSsr is async) and
+// renders the resolved @try or @catch arm between the anchors; boundaries
+// without a runner, and the CSR string path, render @pending — the browser
+// runtime settles that range after creation.
 function emitAsyncBoundaryHtml(node: AnyNode, context: HtmlRenderContext): string {
 	if (!context.asyncBoundaries || context.nextAsyncBoundaryIndex === undefined) return '""';
 	const boundary = context.asyncBoundaries[context.nextAsyncBoundaryIndex++];

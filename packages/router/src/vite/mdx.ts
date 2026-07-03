@@ -97,7 +97,7 @@ function emitComposedMdxRoute(route: MdxRoute): string {
 		`const marklessMdxSymbolLoaders = ${renderSymbolLoaders(route.components)};`,
 		'',
 		'const marklessMdxPage = {',
-		'  renderSsr(props = {}) {',
+		'  async renderSsr(props = {}) {',
 		'    const marklessMdxChildren = [];',
 		`    const html = ${renderHtmlExpression(route, 'ssr')};`,
 		'    const state = composeMdxState(marklessMdxChildren);',
@@ -498,7 +498,7 @@ function renderHtmlExpression(route: MdxRoute, mode: 'ssr' | 'csr'): string {
 				);
 
 			const component = route.components[part.componentIndex]!;
-			return `renderMdxChild(marklessMdxChildren, ${component.localName}, ${componentPropsExpression(component)}, { componentIndex: ${part.componentIndex}, hostPrefix: ${JSON.stringify(component.prefix)}, symbolPrefix: ${JSON.stringify(component.prefix)} })`;
+			return `(await renderMdxChild(marklessMdxChildren, ${component.localName}, ${componentPropsExpression(component)}, { componentIndex: ${part.componentIndex}, hostPrefix: ${JSON.stringify(component.prefix)}, symbolPrefix: ${JSON.stringify(component.prefix)} }))`;
 		}),
 	);
 }
