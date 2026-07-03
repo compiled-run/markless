@@ -150,7 +150,7 @@ test.fails('CSR: async computed shows @pending first, then the resolved @try con
 	expect(container.querySelector('p.pending')).toBeNull();
 });
 
-test.fails('CSR: dynamic tag <{expr}> renders the computed element', async () => {
+test('CSR: dynamic tag <{expr}> renders the computed element', async () => {
 	// KNOWN RED (bug): the view payload gives the dynamic element a wildcard
 	// locator (tagName "*"), and the CSR resume runtime rejects it with
 	// "Mismatched resume locator h1." even though the compiled module rendered

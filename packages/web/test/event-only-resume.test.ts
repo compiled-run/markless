@@ -202,3 +202,38 @@ test('event-only resume activates behavior symbols after an explicit trigger', a
 	expect(loadedSymbols).toEqual(['symbol:event', 'symbol:behavior']);
 	expect(root.attributes['data-controller']).toBe('installed');
 });
+
+test('event-only resume accepts wildcard dynamic-tag locators', async () => {
+	const widget = element('H1');
+	const button = element('BUTTON');
+	const root = element('DIV', [widget, button]);
+	const state = createProtocolStatePayload({
+		cells: [{ graphNodeId: 'state:count', name: 'count', valueKind: 'scalar', value: 0 }],
+	});
+	const view: ProtocolViewPayload = {
+		version: 1,
+		locators: [
+			{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'div' },
+			// Dynamic tags <{expr}> compile to wildcard locators: the rendered
+			// tag is unknowable at compile time, so validation must skip it —
+			// the full resume runtime already does.
+			{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: '*' },
+			{ hostNodeId: 'h2', strategy: 'dom-order', index: 2, tagName: 'button' },
+		],
+		events: [{ hostNodeId: 'h2', eventName: 'click', symbolIds: ['symbol:event'] }],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	const scripts = renderPayloadScripts({ state, view });
+
+	const result = await resumeEventOnlyFromPayloadDocument({
+		document: payloadDocument(scripts.stateScript, scripts.viewScript),
+		root,
+		event: { type: 'click', target: button },
+		loadSymbol: () => () => undefined,
+	});
+
+	expect(result.graph.read('state:count')).toBe(0);
+});
