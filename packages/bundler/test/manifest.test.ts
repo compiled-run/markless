@@ -145,6 +145,53 @@ describe('markless build metadata output', () => {
 		]);
 	});
 
+	test('plans entry-chain dynamic imports through dynamic-only entry roots', () => {
+		// The resume runtime's own dynamic imports (journal/settle modules) hang
+		// off the ENTRY chunk, not off any symbol root: the injection collector
+		// must accept entry chunks as dynamic-only roots so those
+		// interaction-reachable chunks preload without re-linking the entry's
+		// already-loading static closure.
+		const graph = convertManifestToBundleGraph({
+			version: 1,
+			modules: [],
+			bundles: {
+				'main.js': {
+					size: 700,
+					total: 700,
+					imports: ['kit.js'],
+					symbols: [],
+					origins: ['src/main.ts'],
+				},
+				'kit.js': {
+					size: 700,
+					total: 700,
+					imports: [],
+					dynamicImports: ['applier.js'],
+					symbols: [],
+					origins: ['src/kit-runtime.ts'],
+				},
+				'applier.js': {
+					size: 40000,
+					total: 40000,
+					imports: [],
+					symbols: [],
+					origins: ['src/applier-runtime.ts'],
+				},
+			},
+		} as never);
+
+		const injections = collectModulePreloadInjections(graph, {
+			entryChunks: ['main.js'],
+		});
+
+		const hrefs = injections.map(
+			(injection) => (injection.attributes as { href: string }).href,
+		);
+		expect(hrefs).toContain('/build/applier.js');
+		expect(hrefs).not.toContain('/build/main.js');
+		expect(hrefs).not.toContain('/build/kit.js');
+	});
+
 	test('collects modulepreload head links for lazy symbol bundle graph roots', () => {
 		const graph = convertManifestToBundleGraph(lazySymbolManifest());
 

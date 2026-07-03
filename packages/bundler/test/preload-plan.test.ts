@@ -90,6 +90,60 @@ describe('module preload planning', () => {
 		expect(preloads).toContain('/assets/build/formatter.js');
 	});
 
+	test('dynamic-only roots plan only across dynamic edges (entry baseline suppressed)', () => {
+		// Entry chunks are already loading via their script tag: a dynamic-only
+		// root suppresses the entry's static closure and plans exactly the
+		// chunks reachable across a dynamic edge, plus their static closures —
+		// the not-yet-loaded interaction-reachable set.
+		const graph = convertManifestToBundleGraph({
+			version: 1,
+			modules: [],
+			bundles: {
+				'build/entry.js': {
+					size: 700,
+					total: 700,
+					imports: ['build/setup.js'],
+					dynamicImports: [],
+					symbols: [],
+					origins: ['src/entry.ts'],
+				},
+				'build/setup.js': {
+					size: 700,
+					total: 700,
+					imports: [],
+					dynamicImports: ['build/lazy-tool.js'],
+					symbols: [],
+					origins: ['src/kit-runtime.ts'],
+				},
+				'build/lazy-tool.js': {
+					size: 40000,
+					total: 40000,
+					imports: ['build/tool-core.js'],
+					symbols: [],
+					origins: ['src/tool-runtime.ts'],
+				},
+				'build/tool-core.js': {
+					size: 40000,
+					total: 40000,
+					imports: [],
+					symbols: [],
+					origins: ['src/tool-core-runtime.ts'],
+				},
+			},
+		} as never);
+
+		const preloads = planModulePreloadUrls({
+			base: '/assets/',
+			bundleGraph: graph,
+			roots: [{ name: 'build/entry.js', edges: 'dynamic-only' }],
+		});
+
+		expect(preloads).toContain('/assets/build/lazy-tool.js');
+		expect(preloads).toContain('/assets/build/tool-core.js');
+		expect(preloads).not.toContain('/assets/build/entry.js');
+		expect(preloads).not.toContain('/assets/build/setup.js');
+	});
+
 	test('dedupes shared transitive chunks across multiple symbol roots', () => {
 		const graph = convertManifestToBundleGraph(manifestWithComplexSymbolDeps());
 

@@ -15,6 +15,10 @@ export type ModulePreloadRoot =
 			readonly name: string;
 			readonly priority?: ModulePreloadPriority;
 			readonly fetchPriority?: ModulePreloadFetchPriority;
+			// 'dynamic-only': the root and its static closure are already being
+			// loaded (an entry chunk's script tag); plan only what a dynamic
+			// edge reaches, plus that target's full static closure.
+			readonly edges?: 'all' | 'dynamic-only';
 	  };
 
 export type ModulePreloadPriority = 'high' | 'auto' | 'low';
@@ -107,20 +111,23 @@ export function planModulePreloads(input: ModulePreloadPlanInput): ModulePreload
 		priority: ModulePreloadPriority,
 		fetchPriority: ModulePreloadFetchPriority | undefined,
 		seen: ReadonlySet<string>,
+		suppressed = false,
 	) => {
 		if (probability < minProbability || planned.size >= maxPreloads) return;
 
-		const priorityRank = PRIORITY_RANK[priority];
-		const previousBest = bestVisitByNode.get(name);
-		if (
-			previousBest &&
-			(previousBest.priorityRank > priorityRank ||
-				(previousBest.priorityRank === priorityRank &&
-					previousBest.probability >= probability))
-		) {
-			return;
+		if (!suppressed) {
+			const priorityRank = PRIORITY_RANK[priority];
+			const previousBest = bestVisitByNode.get(name);
+			if (
+				previousBest &&
+				(previousBest.priorityRank > priorityRank ||
+					(previousBest.priorityRank === priorityRank &&
+						previousBest.probability >= probability))
+			) {
+				return;
+			}
+			bestVisitByNode.set(name, { priorityRank, probability });
 		}
-		bestVisitByNode.set(name, { priorityRank, probability });
 
 		if (seen.has(name)) return;
 		const nextSeen = new Set(seen);
@@ -128,23 +135,46 @@ export function planModulePreloads(input: ModulePreloadPlanInput): ModulePreload
 
 		const record = graph.get(name);
 		if (!record) {
-			addModule(name, probability, priority, fetchPriority);
+			if (!suppressed) addModule(name, probability, priority, fetchPriority);
 			return;
 		}
 
 		for (const dep of record.deps.filter((item) => item.kind === 'static')) {
-			visit(dep.name, probability * dep.probability, priority, fetchPriority, nextSeen);
+			visit(
+				dep.name,
+				probability * dep.probability,
+				priority,
+				fetchPriority,
+				nextSeen,
+				suppressed,
+			);
 		}
-		addModule(name, probability, priority, fetchPriority);
+		if (!suppressed) addModule(name, probability, priority, fetchPriority);
 		for (const dep of record.deps.filter((item) => item.kind === 'dynamic')) {
 			const edgeProbability = JAVASCRIPT_MODULE_RE.test(name) ? dep.probability : 1;
-			visit(dep.name, probability * edgeProbability, priority, fetchPriority, nextSeen);
+			// Crossing a dynamic edge lifts suppression: the target is NOT part
+			// of the already-loading baseline, so it plans with its closure.
+			visit(
+				dep.name,
+				probability * edgeProbability,
+				priority,
+				fetchPriority,
+				nextSeen,
+				false,
+			);
 		}
 	};
 
 	for (const root of input.roots) {
 		const normalized = normalizeRoot(root);
-		visit(normalized.name, 1, normalized.priority, normalized.fetchPriority, new Set());
+		visit(
+			normalized.name,
+			1,
+			normalized.priority,
+			normalized.fetchPriority,
+			new Set(),
+			normalized.edges === 'dynamic-only',
+		);
 	}
 
 	return [...planned.values()]
@@ -209,6 +239,7 @@ function normalizeRoot(root: ModulePreloadRoot): {
 	readonly name: string;
 	readonly priority: ModulePreloadPriority;
 	readonly fetchPriority?: ModulePreloadFetchPriority;
+	readonly edges?: 'all' | 'dynamic-only';
 } {
 	if (typeof root === 'string') {
 		return { name: root, priority: 'auto', fetchPriority: 'auto' };
@@ -217,6 +248,7 @@ function normalizeRoot(root: ModulePreloadRoot): {
 	return {
 		name: root.name,
 		priority,
+		edges: root.edges,
 		fetchPriority: root.fetchPriority ?? priorityToFetchPriority(priority),
 	};
 }
