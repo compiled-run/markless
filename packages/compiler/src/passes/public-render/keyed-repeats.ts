@@ -36,6 +36,7 @@ export function emitRepeatFunctions(
 ): ReadonlyArray<string> {
 	return publicRenderPlan.keyedRepeats.flatMap((repeat, index) => [
 		emitRepeatRowFunction(repeat, index),
+		emitRepeatEmptyFunction(repeat, index),
 		emitRepeatRecordFunction(repeat, index),
 		emitRepeatSyncFunction(repeat, index, options),
 		emitRepeatPatchFunction(repeat, index),
@@ -102,9 +103,28 @@ function emitRepeatSyncFunction(
 		: `\n\tconst state = repeatState(root, ${index});`;
 
 	return [
-		`function syncMarklessPublicRepeat${index}(root, graph, loadSymbolForRepeat${stateParameter}) {\n\tconst parent = ${domNodePathExpression('root', repeat.parentPath)};\n\tif (!parent?.replaceChildren) return;${stateDeclaration}${delegateEventsCall}\n\tconst collectionDirty = graph.isDirty?.(${JSON.stringify(repeat.collectionGraphNodeId)}) ?? true;\n\tconst classDirty = ${classDirtyExpression(repeat)};\n\tif (!collectionDirty && state.keys.length > 0) {\n\t\tif (classDirty) {\n\t\t\tconst ${classValueName} = readMarklessPublicRepeat${index}ClassValues(graph);\n\t\t\tupdateMarklessPublicRepeat${index}Classes(state, ${classValueName});\n\t\t\tstate.${classStateName} = ${classValueName};\n\t\t}\n\t\treturn;\n\t}\n\tconst items = ${graphReadExpression(repeat.collectionGraphNodeId, repeat.collectionPath)};\n\tif (!Array.isArray(items)) return;\n\tif (items.length === 0) { clearMarklessPublicRows(parent, state); return; }\n\tconst ${classValueName} = readMarklessPublicRepeat${index}ClassValues(graph);\n\tconst hadRows = state.keys.length > 0;\n\tconst dirtyIndexes = graph.dirtyIndexes?.(${JSON.stringify(repeat.collectionGraphNodeId)});\n\tif (hadRows && dirtyIndexes && dirtyIndexes.length < items.length && patchMarklessPublicRepeat${index}DirtyRows(state, items, dirtyIndexes, ${classValueName})) {\n\t\tif (classDirty) updateMarklessPublicRepeat${index}Classes(state, ${classValueName});\n\t\tstate.${classStateName} = ${classValueName};\n\t\treturn;\n\t}\n\tlet canAppend = hadRows && state.keys.length < items.length;\n\tlet reusedRows = 0;\n\tconst newRows = document.createDocumentFragment();\n\tconst nextKeys = [];`,
+		`function syncMarklessPublicRepeat${index}(root, graph, loadSymbolForRepeat${stateParameter}) {\n\tconst parent = ${domNodePathExpression('root', repeat.parentPath)};\n\tif (!parent?.replaceChildren) return;${stateDeclaration}${delegateEventsCall}\n\tconst collectionDirty = graph.isDirty?.(${JSON.stringify(repeat.collectionGraphNodeId)}) ?? true;\n\tconst classDirty = ${classDirtyExpression(repeat)};\n\tif (!collectionDirty && state.keys.length > 0) {\n\t\tif (classDirty) {\n\t\t\tconst ${classValueName} = readMarklessPublicRepeat${index}ClassValues(graph);\n\t\t\tupdateMarklessPublicRepeat${index}Classes(state, ${classValueName});\n\t\t\tstate.${classStateName} = ${classValueName};\n\t\t}\n\t\treturn;\n\t}\n\tconst items = ${graphReadExpression(repeat.collectionGraphNodeId, repeat.collectionPath)};\n\tif (!Array.isArray(items)) return;\n\tif (items.length === 0) { clearMarklessPublicRows(parent, state); renderMarklessPublicRepeat${index}Empty(parent); return; }\n\tconst ${classValueName} = readMarklessPublicRepeat${index}ClassValues(graph);\n\tconst hadRows = state.keys.length > 0;\n\tconst dirtyIndexes = graph.dirtyIndexes?.(${JSON.stringify(repeat.collectionGraphNodeId)});\n\tif (hadRows && dirtyIndexes && dirtyIndexes.length < items.length && patchMarklessPublicRepeat${index}DirtyRows(state, items, dirtyIndexes, ${classValueName})) {\n\t\tif (classDirty) updateMarklessPublicRepeat${index}Classes(state, ${classValueName});\n\t\tstate.${classStateName} = ${classValueName};\n\t\treturn;\n\t}\n\tlet canAppend = hadRows && state.keys.length < items.length;\n\tlet reusedRows = 0;\n\tconst newRows = document.createDocumentFragment();\n\tconst nextKeys = [];`,
 		`	for (let index = 0; index < items.length; index++) {\n\t\tconst item = items[index];\n\t\tconst key = ${itemPathReadSource('item', repeat.keyPath)};\n\t\tif (canAppend && index < state.keys.length && state.keys[index] !== key) canAppend = false;\n\t\tnextKeys.push(key);\n\t\tlet record = state.rows.get(key);\n\t\tif (!record) {\n\t\t\tconst rowRoot = createMarklessPublicRepeat${index}Row();\n\t\t\trecord = createMarklessPublicRepeat${index}Record(rowRoot, item);\n\t\t\tstate.rows.set(key, record);\n\t\t\twriteMarklessPublicRepeat${index}Row(record, item, ${classValueName});${attachEventsCall}\n\t\t\tnewRows.appendChild(record.root);\n\t\t} else if (record.item !== item) {\n\t\t\treusedRows++;\n\t\t\trecord.item = item;\n\t\t\twriteMarklessPublicRepeat${index}Row(record, item, ${classValueName});\n\t\t} else {\n\t\t\treusedRows++;\n\t\t\trecord.item = item;\n\t\t}\n\t}`,
 		`	if (!hadRows) {\n\t\tif (parent.childNodes?.length === 0 && parent.appendChild) parent.appendChild(newRows);\n\t\telse parent.replaceChildren(newRows);\n\t} else if (parent.childNodes?.length === 0) {\n\t\treplaceMarklessPublicRows(parent, state, nextKeys);\n\t} else if (canAppend) {\n\t\tparent.appendChild?.(newRows);\n\t} else if (reusedRows === 0) {\n\t\tparent.replaceChildren(newRows);\n\t} else if (!sameMarklessPublicKeys(state.keys, nextKeys) &&\n\t\t!removeMarklessPublicMissingKey(parent, state, nextKeys) &&\n\t\t!swapMarklessPublicRows(parent, state, nextKeys)) {\n\t\treplaceMarklessPublicRows(parent, state, nextKeys);\n\t}\n\tif (state.rows.size !== nextKeys.length) pruneMarklessPublicRows(state, nextKeys);\n\tif (hadRows) updateMarklessPublicRepeat${index}Classes(state, ${classValueName});\n\tstate.${classStateName} = ${classValueName};\n\tstate.keys = nextKeys;\n}`,
+		'',
+	].join('\n');
+}
+
+function emitRepeatEmptyFunction(repeat: KeyedRepeatPlan, index: number) {
+	if (!repeat.emptyTemplateHtml) {
+		return [`function renderMarklessPublicRepeat${index}Empty() {}`, ''].join('\n');
+	}
+	const templateName = `marklessPublicRepeat${index}EmptyTemplate`;
+	return [
+		`let ${templateName};`,
+		`function renderMarklessPublicRepeat${index}Empty(parent) {`,
+		`\tif (!${templateName}) {`,
+		`\t\t${templateName} = document.createElement("template");`,
+		`\t\t${templateName}.innerHTML = ${JSON.stringify(repeat.emptyTemplateHtml)};`,
+		'\t}',
+		`\tconst content = ${templateName}.content.cloneNode(true);`,
+		'\tif (parent.replaceChildren) parent.replaceChildren(content);',
+		'}',
 		'',
 	].join('\n');
 }

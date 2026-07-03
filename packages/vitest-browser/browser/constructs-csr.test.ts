@@ -112,7 +112,7 @@ test('CSR: keyed @for rows dispatch per-row locals from the clicked row', async 
 	await expect.poll(() => chosen.textContent).toBe('beta');
 });
 
-test.fails('CSR: keyed @for renders the @empty branch for an initially empty collection', async () => {
+test('CSR: keyed @for renders the @empty branch for an initially empty collection', async () => {
 	// KNOWN RED (bug): the compiled direct CSR module drops the @empty branch
 	// entirely — "No items yet" never appears in moduleSource, while the SSR
 	// module renders it. The list silently renders as an empty <ul>, which

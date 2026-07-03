@@ -727,6 +727,8 @@ export type PublicRenderPlanKeyedRepeat = {
 	readonly collectionPath: ReadonlyArray<string>;
 	readonly keyPath: ReadonlyArray<string>;
 	readonly rowTemplateHtml: string;
+	// Rendered when the collection is empty; null when no supported @empty block.
+	readonly emptyTemplateHtml: string | null;
 	readonly textWrites: ReadonlyArray<PublicRenderPlanTextWrite>;
 	readonly classWrites: ReadonlyArray<PublicRenderPlanClassWrite>;
 	readonly eventControls: ReadonlyArray<PublicRenderPlanEventControl>;

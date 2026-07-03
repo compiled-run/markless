@@ -767,6 +767,42 @@ export function App() @{
 	expect(output.html).toBe('<section data-kind="card" id="main" title="Final">Hi</section>');
 });
 
+test('compileTsrxModule renders the @empty branch in the direct render module', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/EmptyRows.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let entries = state([]);
+
+	<main>
+		<ul>
+			@for (const entry of entries; key entry.code) {
+				<li>{entry.title}</li>
+			} @empty {
+				<p>No drafts</p>
+			}
+		</ul>
+	</main>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.keyedRepeats).toEqual([
+		expect.objectContaining({
+			repeatId: 'repeat:0',
+			emptyTemplateHtml: '<p>No drafts</p>',
+		}),
+	]);
+	const moduleSource = result.publicRenderModule.moduleSource;
+	// The direct sync renders the empty branch when the collection is empty
+	// instead of leaving a silently blank parent (browser-matrix bug).
+	expect(moduleSource).toContain('No drafts');
+	expect(moduleSource).toContain('renderMarklessPublicRepeat0Empty');
+});
+
 test('compileTsrxModule ships keyed repeat records with row events in the view payload', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/ResumableRows.tsrx',

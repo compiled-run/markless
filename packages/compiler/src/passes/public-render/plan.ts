@@ -129,6 +129,7 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 				parentLocator,
 				parentPath,
 				row,
+				repeatNode,
 				rowPlan,
 				semanticRepeat,
 				source: input.source.source,
@@ -853,11 +854,28 @@ function supportedRepeatGate(input: {
 		: { repeatId: input.payloadRepeat.id, supported: true };
 }
 
+// The @empty block renders when the collection is empty. Only plain-host
+// static content compiles to a template; anything richer keeps the current
+// blank-parent behavior until specified.
+function repeatEmptyTemplateHtml(repeatNode: AnyNode): string | null {
+	const emptyBlock = repeatNode.empty as AnyNode | undefined;
+	if (!emptyBlock) return null;
+	const children = asNodes(emptyBlock.body).filter((child) => !isIgnorableTextNode(child));
+	if (children.length === 0 || children.some((child) => !isPlainHostTemplateNode(child))) {
+		return null;
+	}
+	const html = children
+		.map((child) => staticHtml(child, { expressionText: ' ', omitForExpressions: false }))
+		.join('');
+	return html || null;
+}
+
 function planKeyedRepeat(input: {
 	readonly payloadRepeat: PayloadKeyedRepeat;
 	readonly parentLocator: PublicRenderPlanKeyedRepeat['parentLocator'];
 	readonly parentPath: ReadonlyArray<number>;
 	readonly row: AnyNode;
+	readonly repeatNode: AnyNode;
 	readonly rowPlan: RowPlan;
 	readonly semanticRepeat: SemanticKeyedRepeat;
 	readonly source: string;
@@ -878,6 +896,7 @@ function planKeyedRepeat(input: {
 			expressionText: ' ',
 			omitForExpressions: false,
 		}),
+		emptyTemplateHtml: repeatEmptyTemplateHtml(input.repeatNode),
 		rowElementCount: countPlanRowElements(input.row),
 		textWrites: input.rowPlan.textWrites,
 		classWrites: input.rowPlan.classWrites,
