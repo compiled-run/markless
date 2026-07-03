@@ -216,9 +216,6 @@ test('SSR: attach={...} behavior activates from the first host interaction', asy
 });
 
 test('SSR: el={...} element handle methods run inside a resumed event handler', async () => {
-	// KNOWN RED (bug): same silent drop as CSR — the compiled event symbol
-	// omits the `box.focus()` element-handle call, keeping only the graph
-	// write, so the resumed click never focuses the input.
 	const screen = await renderSSR(ElementHandle);
 	const container = screen.container;
 	const input = requireElement<HTMLInputElement>(container, 'input[data-box]');

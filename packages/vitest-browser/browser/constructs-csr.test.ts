@@ -133,10 +133,6 @@ test('CSR: keyed @for rows dispatch per-row locals from the clicked row', async 
 });
 
 test('CSR: keyed @for renders the @empty branch for an initially empty collection', async () => {
-	// KNOWN RED (bug): the compiled direct CSR module drops the @empty branch
-	// entirely — "No items yet" never appears in moduleSource, while the SSR
-	// module renders it. The list silently renders as an empty <ul>, which
-	// violates the compiler's own fail-loud rule for dropped content.
 	const screen = await render(RowsEmpty);
 	const container = queryContainer(screen.container);
 
@@ -170,10 +166,6 @@ test('CSR: async computed shows @pending first, then the resolved @try content',
 });
 
 test('CSR: dynamic tag <{expr}> renders the computed element', async () => {
-	// KNOWN RED (bug): the view payload gives the dynamic element a wildcard
-	// locator (tagName "*"), and the CSR resume runtime rejects it with
-	// "Mismatched resume locator h1." even though the compiled module rendered
-	// the <article> correctly. SSR resume accepts the same payload.
 	const screen = await render(DynamicTag);
 	const container = queryContainer(screen.container);
 	const card = requireElement<HTMLElement>(container, 'section > .card');
@@ -222,10 +214,6 @@ test('CSR: attach={...} behavior runs against the real host element', async () =
 });
 
 test('CSR: el={...} element handle methods run inside an event handler', async () => {
-	// KNOWN RED (bug): the compiled event symbol silently drops the
-	// `box.focus()` element-handle call — the emitted handler module contains
-	// only the `status = 'focused'` graph write. The state write lands but the
-	// input never receives focus, so authored behavior is lost silently.
 	const screen = await render(ElementHandle);
 	const container = queryContainer(screen.container);
 	const input = requireElement<HTMLInputElement>(container, 'input[data-box]');
