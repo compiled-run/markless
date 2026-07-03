@@ -126,20 +126,23 @@ test('SSR: keyed @for with an index clause renders index text per row', async ()
 	expect(rows.map((row) => row.textContent)).toEqual(['0Alpha', '1Beta']);
 });
 
-test.fails('SSR: async computed serves @pending, then resume settles the @try content', async () => {
-	// KNOWN RED (bug): the server correctly renders the @pending branch with
-	// boundary comment anchors and ships the runner symbol
-	// (runnerSymbolId in view.asyncBoundaries), but the resumed page never
-	// kicks the async computed run — the boundary shows "Loading" forever with
-	// no interaction available to trigger it.
+test('SSR: async computed serves the resolved arm and revalidates on a write', async () => {
+	// Spec-conformant expectation (Judge T010, replacing the earlier ledger
+	// test that asserted @pending-first): v1 initial render AWAITS demanded
+	// async nodes, so the server serves the resolved @try arm and the resumed
+	// page starts zero runners. A dependency write revalidates: the runner
+	// re-runs and the settle module replaces the range with the new value.
 	const screen = await renderSSR(AsyncDetails);
 	const container = screen.container;
 
-	expect(container.querySelector('p.pending')?.textContent).toBe('Loading');
-	expect(container.querySelector('p.done')).toBeNull();
-
-	await expect.poll(() => container.querySelector('p.done')?.textContent).toBe('Hello Ada');
+	expect(container.querySelector('p.done')?.textContent).toBe('Hello Ada');
 	expect(container.querySelector('p.pending')).toBeNull();
+
+	const button = container.querySelector('button');
+	expect(button?.textContent).toBe('Revalidate');
+	(button as HTMLButtonElement).click();
+
+	await expect.poll(() => container.querySelector('p.done')?.textContent).toBe('Hello Grace');
 });
 
 test('SSR: dynamic tag <{expr}> renders the computed element', async () => {

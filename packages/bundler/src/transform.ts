@@ -99,7 +99,9 @@ export async function transformTsrxModule(
 					(compiled.protocolView.branches?.length ?? 0) > 0 ||
 					(compiled.protocolView.keyedRepeats?.length ?? 0) > 0 ||
 					// Element handles materialize only in the full runtime.
-					compiled.protocolView.elementHandles.length > 0,
+					compiled.protocolView.elementHandles.length > 0 ||
+					// Async boundary settle/revalidation lives only in the full runtime.
+					compiled.protocolView.asyncBoundaries.length > 0,
 				resumeModuleUrl: input.resumeModuleUrl,
 				publicRenderModuleSource: compiled.publicRenderModule.moduleSource,
 				publicRenderRootExportName: compiled.publicRenderModule.rootExportName,

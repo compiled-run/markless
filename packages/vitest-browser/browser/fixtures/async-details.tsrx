@@ -1,7 +1,7 @@
 import { computed, state } from '@markless/core';
 
 export function App() @{
-	const query = state('Ada');
+	let query = state('Ada');
 	const details = computed(async ({ signal }) => {
 		const q = query;
 		await new Promise((resolve) => setTimeout(resolve, 40));
@@ -10,12 +10,13 @@ export function App() @{
 	});
 
 	<section>
+		<button onClick={() => query = 'Grace'}>Revalidate</button>
 		@try {
 			<p class="done">{details.title}</p>
 		} @pending {
 			<p class="pending">Loading</p>
-		} @catch (error) {
-			<p class="broken">{error.message}</p>
+		} @catch {
+			<p class="broken">Broken</p>
 		}
 	</section>
 }

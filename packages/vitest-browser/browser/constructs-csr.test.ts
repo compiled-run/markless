@@ -135,11 +135,10 @@ test('CSR: keyed @for with an index clause renders index text per row', async ()
 	expect(rows.map((row) => row.textContent)).toEqual(['0Alpha', '1Beta']);
 });
 
-test.fails('CSR: async computed shows @pending first, then the resolved @try content', async () => {
-	// KNOWN RED (bug): the compiled CSR module contains neither the async
-	// boundary comment anchors nor the @pending "Loading" content, so render()
-	// throws RuntimeResumeError "Resume locator boundary:0 startAnchor expected
-	// a comment at DOM order index 0" before any content is shown.
+test('CSR: async computed shows @pending first, then the resolved @try content', async () => {
+	// CSR mount is a local demand: @pending renders between the boundary
+	// anchors, the runner starts at runtime creation, and settle replaces the
+	// range with the resolved @try arm.
 	const screen = await render(AsyncDetails);
 	const container = queryContainer(screen.container);
 

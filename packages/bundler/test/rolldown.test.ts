@@ -601,4 +601,27 @@ export function App() @{
 	// Element handles materialize only in the full runtime.
 	expect(handles.code).toContain('resumeFromPayloadDocument');
 	expect(handles.code).not.toContain('resumeEventOnlyFromPayloadDocument');
+
+	const boundaries = await transformTsrxModule({
+		filename: '/workspace/app/src/Async.tsrx',
+		source: `
+import { computed, state } from '@markless/core';
+
+export function App() @{
+	let query = state('markless');
+	let details = computed(async () => {
+		return { title: 'Result: ' + query };
+	});
+
+	<main>
+		<button onClick={() => query = 'vite'}>Search</button>
+		@try { <p>{details.title}</p> } @pending { <p>Loading</p> } @catch { <p>Broken</p> }
+	</main>
+}
+`,
+		environment: 'client',
+	});
+	// Async boundary settle and revalidation live only in the full runtime.
+	expect(boundaries.code).toContain('resumeFromPayloadDocument');
+	expect(boundaries.code).not.toContain('resumeEventOnlyFromPayloadDocument');
 });

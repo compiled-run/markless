@@ -5,7 +5,7 @@ import {
 	type ProtocolStatePayload,
 	type ProtocolViewPayload,
 } from '@markless/serializer';
-import { renderPayloadScripts } from '@markless/serializer';
+import { renderPayloadScripts, serializeRuntimeAsyncSnapshots } from '@markless/serializer';
 
 export type SsrRenderOutput = {
 	readonly html: string;
@@ -43,7 +43,13 @@ export async function renderToString(
 ): string {
 	const output = await renderSsrOutput(component);
 	const hasPayload = !!output.state || !!output.view;
-	const state = output.state ?? emptyStatePayload();
+	const rawState = output.state ?? emptyStatePayload();
+	// Runtime-attached async snapshots carry raw key/value; the served payload
+	// needs envelope-encoded fields or resume rejects it on first interaction.
+	const state = {
+		...rawState,
+		computed: serializeRuntimeAsyncSnapshots(rawState.computed ?? []),
+	};
 	const view = containerScopedView(output.view ?? emptyViewPayload());
 	const payloadScripts = hasPayload ? renderPayloadScripts({ state, view }) : undefined;
 	const resumeModuleUrl = options.resumeModuleUrl ?? artifactResumeModuleUrl(component);

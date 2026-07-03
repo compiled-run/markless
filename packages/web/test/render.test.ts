@@ -725,6 +725,43 @@ test('renderToString emits one inline resumer for SSR containers with browser tr
 	expect(html).toContain('globalThis.__started');
 });
 
+test('renderToString serializes runtime-attached async snapshots into valid payloads', async () => {
+	const html = await renderToString(
+		() => ({
+			html: '<p>Hello Ada</p>',
+			state: {
+				...createProtocolStatePayload({ cells: [] }),
+				computed: [
+					{
+						graphNodeId: 'computed:details',
+						name: 'details',
+						async: true,
+						// Runtime-attached snapshot: raw values, not envelopes.
+						snapshot: {
+							status: 'fulfilled',
+							version: 1,
+							key: null,
+							value: { title: 'Hello Ada' },
+						},
+					},
+				],
+			} as never,
+			view: viewWithClick(),
+			resumeModuleUrl: '/app.js',
+		}),
+		{ resumeModuleUrl: '/app.js' },
+	);
+
+	const stateJson = /<script type="markless\/state">(.*?)<\/script>/.exec(html)?.[1];
+	expect(stateJson).toBeDefined();
+	// The served payload must decode: raw snapshot key/value are serialized
+	// into graph envelopes (the browser threw MARKLESS_PAYLOAD_INVALID on
+	// first interaction otherwise — caught by the browser matrix).
+	const { assertProtocolStatePayload } =
+		await import('../../serializer/src/protocol-validation.ts');
+	expect(() => assertProtocolStatePayload(JSON.parse(stateJson!))).not.toThrow();
+});
+
 test('renderToString emits the resumer for keyed-repeat row events', async () => {
 	const html = await renderToString(
 		() => ({
