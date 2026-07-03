@@ -1465,8 +1465,17 @@ function supportedFragmentRoot(fragment: AnyNode): AnyNode | null {
 		children.length > 0 &&
 		children.every(
 			(child) =>
-				(child.type === 'Element' || child.type === 'JSXElement') &&
-				isPlainHostTemplateNode(child),
+				((child.type === 'Element' || child.type === 'JSXElement') &&
+					isPlainHostTemplateNode(child)) ||
+				// Control-flow children reuse their own gates verbatim: fragment
+				// top level counts as top-level, so @if/@switch/@for/@try
+				// children gate exactly like element-rooted ones (per-construct
+				// gates decide support; unsupported shapes keep their existing
+				// diagnostics/static behavior).
+				child.type === 'JSXIfExpression' ||
+				child.type === 'JSXSwitchExpression' ||
+				child.type === 'JSXForExpression' ||
+				child.type === 'JSXTryExpression',
 		);
 	return supported ? fragment : null;
 }

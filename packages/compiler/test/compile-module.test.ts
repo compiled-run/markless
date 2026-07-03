@@ -1235,6 +1235,40 @@ export function App() @{
 	]);
 });
 
+test('compileTsrxModule supports control-flow children in fragment roots', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/FragmentBranch.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let open = state(true);
+
+	<>
+		<h1>Panel</h1>
+		@if (open) { <p>Shown</p> } @else { <p>Hidden</p> }
+	</>
+}
+`,
+		symbols: [],
+	});
+
+	// Fragment top level counts as top-level for the branch gates: the @if
+	// child is gate-eligible instead of a fragment-root diagnostic.
+	expect(result.diagnostics ?? []).toEqual([]);
+	expect(result.publicRenderPlan.branchReactivityGates).toEqual([
+		{ branchSiteId: 'branch-site:0', supported: true },
+	]);
+	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	const output = await (
+		ssrModule.marklessRenderSsr as () => Promise<{ readonly html: string }>
+	)();
+	expect(output.html).toBe(
+		'<h1>Panel</h1>' +
+			'<!--markless:branch:branch-site:0--><p>Shown</p><!--/markless:branch:branch-site:0-->',
+	);
+});
+
 test('compileTsrxModule resolves CSR host paths across branch anchor ranges', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/AfterBranch.tsrx',

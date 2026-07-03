@@ -1236,15 +1236,20 @@ function firstComponentRoot(component: AnyNode | undefined): AnyNode | null {
 	return null;
 }
 
-// Mirrors the plan pass gate: only all-plain-host fragment roots render.
+// Mirrors the plan pass gate: plain-host or gate-eligible control-flow
+// children render; component/expression children stay diagnosed.
 function supportedFragmentRoot(fragment: AnyNode): AnyNode | null {
 	const children = asNodes(fragment.children).filter((child) => !isIgnorableTextNode(child));
 	const supported =
 		children.length > 0 &&
 		children.every(
 			(child) =>
-				(child.type === 'Element' || child.type === 'JSXElement') &&
-				isPlainHostTemplateNode(child),
+				((child.type === 'Element' || child.type === 'JSXElement') &&
+					isPlainHostTemplateNode(child)) ||
+				child.type === 'JSXIfExpression' ||
+				child.type === 'JSXSwitchExpression' ||
+				child.type === 'JSXForExpression' ||
+				child.type === 'JSXTryExpression',
 		);
 	return supported ? fragment : null;
 }

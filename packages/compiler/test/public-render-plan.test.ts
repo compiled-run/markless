@@ -308,11 +308,13 @@ test('planPublicRender plans plain host-element fragment roots', async () => {
 	);
 });
 
-test('planPublicRender keeps dynamic fragment roots diagnosed with a scoped reason', async () => {
+test('planPublicRender keeps component-child fragment roots diagnosed with a scoped reason', async () => {
+	// Control-flow fragment children are supported since L4; component and
+	// bare-expression children still need the projection/anchor work.
 	const { plan } = await createRenderPlan(
 		'src/DynamicFragmentRoot.tsrx',
 		appSource(`let label = state('Hi');
-<>@if (label) { <p>A</p> }</>`),
+<>{label}</>`),
 	);
 
 	expect(plan.rootTemplateHtml).toBe(null);
@@ -322,7 +324,6 @@ test('planPublicRender keeps dynamic fragment roots diagnosed with a scoped reas
 			severity: 'error',
 			phase: 'public-render',
 			passId: 'public-render-plan',
-			message: expect.stringContaining('control-flow'),
 			primarySpan: expect.objectContaining({ filename: 'src/DynamicFragmentRoot.tsrx' }),
 		}),
 	]);

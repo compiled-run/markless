@@ -6,6 +6,7 @@ import AttachBehavior from './fixtures/attach-behavior.tsrx';
 import DynamicTag from './fixtures/dynamic-tag.tsrx';
 import ElementHandle from './fixtures/element-handle.tsrx';
 import FragmentRoot from './fixtures/fragment-root.tsrx';
+import FragmentBranch from './fixtures/fragment-branch.tsrx';
 import InputEcho from './fixtures/input-echo.tsrx';
 import OnlyIf from './fixtures/only-if.tsrx';
 import RowsChoose from './fixtures/rows-choose.tsrx';
@@ -232,4 +233,15 @@ test('CSR: el={...} element handle methods run inside an event handler', async (
 	requireElement<HTMLButtonElement>(container, 'button[data-focus]').click();
 	await expect.poll(() => status.textContent).toBe('focused');
 	expect(document.activeElement).toBe(input);
+});
+
+test('CSR: fragment root with an @if child flips the branch range', async () => {
+	const screen = await render(FragmentBranch);
+	const container = queryContainer(screen.container);
+
+	expect(container.querySelector('p.on')?.textContent).toBe('Shown');
+	const button = container.querySelector('button');
+	(button as HTMLButtonElement).click();
+	await expect.poll(() => container.querySelector('p.off')?.textContent).toBe('Hidden');
+	expect(container.querySelector('p.on')).toBeNull();
 });
