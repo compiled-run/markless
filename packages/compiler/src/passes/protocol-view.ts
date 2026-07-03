@@ -57,11 +57,15 @@ export function createProtocolViewPayload(input: ProtocolViewPayloadInput): Prot
 					`${domUpdate.hostNodeId}:${domUpdateTargetKey(domUpdate.target)}:${domUpdate.graphNodeId}:${domUpdate.source}`,
 				),
 			})),
-		behaviors: input.payloadArena.view.behaviors.map((behavior, index) => ({
-			...behavior,
-			symbolId: behaviorSymbols.get(behavior.hostNodeId)?.[index],
-		})),
-		elementHandles: input.payloadArena.view.elementHandles,
+		behaviors: input.payloadArena.view.behaviors
+			.filter((behavior) => !armHostIds(input).has(behavior.hostNodeId))
+			.map((behavior, index) => ({
+				...behavior,
+				symbolId: behaviorSymbols.get(behavior.hostNodeId)?.[index],
+			})),
+		elementHandles: input.payloadArena.view.elementHandles.filter(
+			(handle) => !armHostIds(input).has(handle.hostNodeId),
+		),
 		// Only gate-supported boundaries have SSR-emitted anchors; shipping
 		// records for ungated boundaries would make resume throw
 		// missingCommentAnchorError. Re-index contiguously over the emitted set.
@@ -264,9 +268,10 @@ function branchArmRecords(input: ProtocolViewPayloadInput, branchSiteId: string)
 				})),
 			behaviors: input.payloadArena.view.behaviors
 				.filter((behavior) => hostIds.has(behavior.hostNodeId))
-				.map((behavior) => ({
+				.map((behavior, index) => ({
 					...behavior,
 					hostPath: hostIds.get(behavior.hostNodeId)!,
+					symbolId: behaviorSymbolsForArms(input).get(behavior.hostNodeId)?.[index],
 				})),
 			elementHandles: input.payloadArena.view.elementHandles
 				.filter((handle) => hostIds.has(handle.hostNodeId))
@@ -276,4 +281,15 @@ function branchArmRecords(input: ProtocolViewPayloadInput, branchSiteId: string)
 				})),
 		};
 	});
+}
+
+function behaviorSymbolsForArms(input: ProtocolViewPayloadInput): ReadonlyMap<string, string[]> {
+	const behaviorSymbols = new Map<string, string[]>();
+	for (const symbol of input.symbolResolver.symbols) {
+		if (symbol.kind !== 'behavior') continue;
+		const symbols = behaviorSymbols.get(symbol.hostNodeId) ?? [];
+		symbols[symbol.order] = symbol.id;
+		behaviorSymbols.set(symbol.hostNodeId, symbols);
+	}
+	return behaviorSymbols;
 }

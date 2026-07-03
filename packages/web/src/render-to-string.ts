@@ -126,7 +126,11 @@ function hasBrowserTriggers(view: ProtocolViewPayload): boolean {
 			boundary.asyncReads.some((read) => !!read.runnerSymbolId),
 		) ||
 		// Keyed repeat row events live on rowEvents, not view.events.
-		(view.keyedRepeats ?? []).some((repeat) => repeat.rowEvents.length > 0)
+		(view.keyedRepeats ?? []).some((repeat) => repeat.rowEvents.length > 0) ||
+		// Branch arm events live on armRecords, not view.events.
+		(view.branches ?? []).some((branch) =>
+			(branch.armRecords ?? []).some((arm) => arm.events.length > 0),
+		)
 	);
 }
 
@@ -317,7 +321,7 @@ ${syncPolicySource}
 		const k = e.hostNodeId + '\\n' + e.eventName;
 		m.set(k, e);
 	}
-	const rw = new Set((v.keyedRepeats ?? []).flatMap((k) => k.rowEvents.map((e) => e.eventName)));
+	const rw = new Set([...(v.keyedRepeats ?? []).flatMap((k) => k.rowEvents.map((e) => e.eventName)), ...(v.branches ?? []).flatMap((k) => (k.armRecords ?? []).flatMap((a) => a.events.map((e) => e.eventName)))]);
 	for (const t of new Set([...v.events.map((e) => e.eventName), ...rw].filter((e) => e !== 'visible'))) {
 		r.addEventListener(t, async (e) => {
 			if (r.__asyncResumeRuntimeStarted) return;

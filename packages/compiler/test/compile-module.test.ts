@@ -1235,6 +1235,93 @@ export function App() @{
 	]);
 });
 
+test('compileTsrxModule resolves CSR host paths across branch anchor ranges', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/AfterBranch.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let open = state(true);
+	let note = state('none');
+
+	<main>
+		@if (open) { <section><button onClick={() => note = 'clicked'}>Go</button></section> } @else { <p>Off</p> }
+		<output>{note}</output>
+	</main>
+}
+`,
+		symbols: [],
+	});
+
+	const document = {
+		createElement(tagName: string) {
+			return tagName === 'template'
+				? new PublicRenderTestTemplate()
+				: new PublicRenderTestElement(tagName);
+		},
+	};
+	const csrModule = await importPublicRenderTestModule(csrRenderTestModuleSource(result), {
+		document,
+	});
+	const output = (
+		csrModule.marklessRenderCsr as () => {
+			readonly view: {
+				readonly locators: ReadonlyArray<{
+					readonly tagName: string;
+					readonly index: number;
+				}>;
+			};
+		}
+	)();
+	// The authored path counts the branch as ONE slot; the built DOM has
+	// anchors + arm content in that position. Hosts after the branch must
+	// still resolve (S3b browser finding: RuntimeResumeError locator
+	// mismatch for the trailing output).
+	const outputLocator = output.view.locators.find((locator) => locator.tagName === 'output');
+	expect(outputLocator).toBeDefined();
+	// dom-order elements: main(0), section(1), button(2), output(3).
+	expect(outputLocator!.index).toBe(3);
+});
+
+test('compileTsrxModule keeps arm behaviors and handles out of the flat streams', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/ArmBehavior.tsrx',
+		source: `
+import { attach, element, state } from '@markless/core';
+
+export function App() @{
+	let open = state(true);
+	const box = element();
+
+	<main>
+		@if (open) {
+			<section el={box} attach={(host) => { host.dataset.ready = 'yes'; }}>
+				<p>On</p>
+			</section>
+		} @else {
+			<p>Off</p>
+		}
+	</main>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.branchReactivityGates).toEqual([
+		{ branchSiteId: 'branch-site:0', supported: true },
+	]);
+	// Arm-host behaviors and handles ride armRecords exclusively.
+	expect(result.protocolView.behaviors).toEqual([]);
+	expect(result.protocolView.elementHandles).toEqual([]);
+	expect(result.protocolView.branches?.[0]?.armRecords?.[0]).toEqual(
+		expect.objectContaining({
+			behaviors: [expect.objectContaining({ hostPath: [0] })],
+			elementHandles: [expect.objectContaining({ hostPath: [0], name: 'box' })],
+		}),
+	);
+});
+
 test('compileTsrxModule plans arm records for branch arms with events', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/ArmEvents.tsrx',

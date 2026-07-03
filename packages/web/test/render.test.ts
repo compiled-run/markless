@@ -725,6 +725,55 @@ test('renderToString emits one inline resumer for SSR containers with browser tr
 	expect(html).toContain('globalThis.__started');
 });
 
+test('renderToString wakes the runtime for arm-record event types', async () => {
+	const html = await renderToString(
+		() => ({
+			html: '<main><!--markless:branch:branch-site:0--><section><button>Go</button></section><!--/markless:branch:branch-site:0--></main>',
+			state: createProtocolStatePayload({ cells: [] }),
+			view: {
+				version: ASYNC_PROTOCOL_VERSION,
+				locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'main' }],
+				events: [],
+				domUpdates: [],
+				behaviors: [],
+				elementHandles: [],
+				asyncBoundaries: [],
+				branches: [
+					{
+						id: 'branch-site:0',
+						startAnchor: { strategy: 'dom-order-comment', index: 0 },
+						endAnchor: { strategy: 'dom-order-comment', index: 1 },
+						symbolId: 'symbol:flip',
+						testReads: [{ source: 'open', graphNodeId: 'state:open', path: [] }],
+						armRecords: [
+							{
+								events: [
+									{
+										hostPath: [0, 0],
+										eventName: 'click',
+										symbolIds: ['symbol:go'],
+									},
+								],
+								domUpdates: [],
+								behaviors: [],
+								elementHandles: [],
+							},
+						],
+					},
+				],
+			},
+		}),
+		{ resumeModuleUrl: '/app.js' },
+	);
+
+	// A click on an arm host may be the page's FIRST interaction: the inline
+	// resumer must include arm-record event types in its wake set and forward
+	// unmatched events so the full runtime resolves the arm match.
+	expect(html).toContain('data-async-resumer');
+	expect(html).toContain('armRecords');
+	expect(html).toContain('eventRecord: null');
+});
+
 test('renderToString serializes runtime-attached async snapshots into valid payloads', async () => {
 	const html = await renderToString(
 		() => ({
