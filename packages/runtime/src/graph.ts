@@ -165,7 +165,7 @@ export type RuntimeGraph = {
 	readonly update: (update: RuntimeGraphUpdate) => unknown;
 	readonly call: (call: RuntimeGraphCall) => unknown;
 	readonly delete: (deletion: RuntimeGraphDelete) => boolean;
-	readonly subscribe: (subscription: RuntimeGraphSubscription) => void;
+	readonly subscribe: (subscription: RuntimeGraphSubscription) => () => void;
 	readonly subscribeJournal: (listener: DomJournalListener) => () => void;
 	readonly flush: () => Promise<void>;
 	readonly takeJournal: () => DomJournalEntry[];
@@ -641,6 +641,12 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		},
 		subscribe(subscription) {
 			subscriptions.push(subscription);
+			// Disposal contract: removed scopes unsubscribe their graph wiring
+			// (spec 01-tsrx-host-contract "branch scope disposal").
+			return () => {
+				const index = subscriptions.indexOf(subscription);
+				if (index >= 0) subscriptions.splice(index, 1);
+			};
 		},
 		subscribeJournal(listener) {
 			journalListeners.push(listener);

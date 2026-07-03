@@ -1707,3 +1707,30 @@ test('graph revalidates a settled-snapshot async computed after a dependency wri
 	expect(runs).toBe(1);
 	expect(graph.read('computed:details', ['title'])).toBe('Hello Grace');
 });
+
+test('graph subscribe returns an unsubscribe that stops the subscription firing', async () => {
+	const fired: string[] = [];
+	const graph = createRuntimeGraph({
+		cells: [{ graphNodeId: 'state:count', value: 0 }],
+	} as never);
+	const unsubscribe = graph.subscribe({
+		id: 'sub:count',
+		graphNodeId: 'state:count',
+		path: [],
+		run() {
+			fired.push('fired');
+		},
+	} as never) as unknown as (() => void) | void;
+
+	graph.write({ graphNodeId: 'state:count', value: 1 });
+	await (graph as { flush?: () => Promise<void> }).flush?.();
+	expect(fired).toEqual(['fired']);
+
+	// Disposal contract (spec 01:66-74): removed scopes unsubscribe their
+	// graph wiring; an unsubscribed subscription must never fire again.
+	expect(typeof unsubscribe).toBe('function');
+	unsubscribe!();
+	graph.write({ graphNodeId: 'state:count', value: 2 });
+	await (graph as { flush?: () => Promise<void> }).flush?.();
+	expect(fired).toEqual(['fired']);
+});
