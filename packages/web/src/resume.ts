@@ -133,6 +133,7 @@ export type ResumeEventRecord = {
 
 export type ResumeAsyncBoundaryRecord = {
 	readonly id: string;
+	readonly updateSymbolId?: string;
 	readonly startAnchor: ResumeDomComment;
 	readonly endAnchor: ResumeDomComment;
 	readonly asyncReads: ProtocolViewPayload['asyncBoundaries'][number]['asyncReads'];
@@ -210,6 +211,9 @@ export type ResumeSymbolContext = {
 	readonly value?: unknown;
 	readonly asyncBoundary?: ResumeAsyncBoundaryRecord;
 	readonly asyncRead?: ResumeAsyncBoundaryRead;
+	// Settled async outcome passed to boundary update symbols, which pick the
+	// @try or @catch arm from it and rebuild the arm HTML from graph reads.
+	readonly status?: 'fulfilled' | 'rejected';
 };
 
 export type ResumeBehaviorCleanup = () => void;
@@ -434,10 +438,52 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 				graphNodeId: asyncRead.graphNodeId,
 				path: [],
 				run(snapshot) {
+					if (asyncBoundary.updateSymbolId) {
+						return settleAsyncBoundaryRange(asyncBoundary, snapshot);
+					}
 					return createAsyncBoundaryJournalEntries(asyncBoundary, asyncRead, snapshot);
 				},
 			});
 		}
+
+		// CSR mounts render @pending between the anchors, so an unsettled
+		// boundary is a local demand: reading the async node starts its runner
+		// now. Settled SSR snapshots make this read a no-op, keeping resumed
+		// pages at zero runners at startup.
+		if (asyncBoundary.updateSymbolId) {
+			for (const asyncRead of asyncBoundary.asyncReads) {
+				input.graph.read(asyncRead.graphNodeId, ['status']);
+			}
+		}
+	}
+
+	// Loads the boundary's update symbol after a settle, rebuilds the settled
+	// arm HTML from the graph, and replaces the range between the anchors.
+	// Pending snapshots keep the current DOM: browser runs are revalidation.
+	async function settleAsyncBoundaryRange(
+		boundary: ResumeAsyncBoundaryRecord,
+		snapshot: unknown,
+	): Promise<DomJournalResult | void> {
+		const status = (snapshot as { readonly status?: unknown } | null)?.status;
+		if (status !== 'fulfilled' && status !== 'rejected') return;
+
+		const loadedSymbol = input.loadSymbol(boundary.updateSymbolId!);
+		const symbol = isPromiseLike(loadedSymbol) ? await loadedSymbol : loadedSymbol;
+		const maybeUpdate = symbol({
+			graph: input.graph,
+			status,
+			element: input.root,
+			getElementHandle: elementHandles.get,
+			asyncBoundary: boundary,
+		});
+		const update = isPromiseLike(maybeUpdate) ? await maybeUpdate : maybeUpdate;
+		if (!isResumeBranchUpdate(update)) return;
+
+		const fragment = input.renderBranchHtml ? input.renderBranchHtml(update.html) : update.html;
+		return [
+			{ type: 'removeRange', locator: asyncBoundaryRangeLocator(boundary.id) },
+			{ type: 'insertRange', locator: asyncBoundaryStartLocator(boundary.id), fragment },
+		];
 	}
 
 	const branchesById = new Map<string, ResumeBranchRecord>();
@@ -1179,6 +1225,7 @@ function materializeAsyncBoundaryLocators(
 
 		byBoundaryId.set(boundary.id, {
 			id: boundary.id,
+			updateSymbolId: boundary.updateSymbolId,
 			startAnchor,
 			endAnchor,
 			asyncReads: boundary.asyncReads,

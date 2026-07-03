@@ -1454,3 +1454,62 @@ function fakeElement(tagName: string, childNodes: unknown[] = []) {
 	for (const child of childNodes as Array<{ parentNode?: unknown }>) child.parentNode = node;
 	return node;
 }
+
+test('payload document resume settles pending async boundaries through the default journal applier', async () => {
+	const { resumeFromPayloadDocument } = await import('../src/payload.ts');
+	const startComment = {
+		nodeType: 8 as const,
+		textContent: 'markless:async:boundary:0',
+		parentNode: null as unknown,
+	};
+	const endComment = {
+		nodeType: 8 as const,
+		textContent: '/markless:async:boundary:0',
+		parentNode: null as unknown,
+	};
+	const pending = fakeElement('P');
+	const root = fakeElement('MAIN', [startComment, pending, endComment]);
+	const loadedSymbols: string[] = [];
+	const state =
+		'{"version":1,"cells":[{"graphNodeId":"state:userId","name":"userId","valueKind":"scalar","value":{"version":1,"root":"ada","records":[]}}],"computed":[{"graphNodeId":"computed:details","name":"details","async":true,"dependencies":[{"graphNodeId":"state:userId","path":[]}]}]}';
+	const view =
+		'{"version":1,"locators":[{"hostNodeId":"h0","strategy":"dom-order","index":0,"tagName":"main"}],"events":[],"domUpdates":[],"behaviors":[],"elementHandles":[],"asyncBoundaries":[{"id":"boundary:0","updateSymbolId":"symbol:boundary-update","startAnchor":{"strategy":"dom-order-comment","index":0},"endAnchor":{"strategy":"dom-order-comment","index":1},"asyncReads":[{"source":"details","graphNodeId":"computed:details","path":[],"runnerSymbolId":"symbol:details-runner"}]}]}';
+	const insertedTag = 'SPAN';
+	const template = { innerHTML: '', content: { childNodes: [fakeElement(insertedTag)] } };
+	const documentFake = {
+		querySelector(selector: string) {
+			if (selector.includes('markless/state')) return { textContent: state };
+			if (selector.includes('markless/view')) return { textContent: view };
+			return null;
+		},
+		createElement: () => template,
+	};
+
+	const result = await resumeFromPayloadDocument({
+		document: documentFake as never,
+		root: root as never,
+		loadSymbol(symbolId) {
+			loadedSymbols.push(symbolId);
+			if (symbolId === 'symbol:details-runner') {
+				return async (context) => ({ title: `User ${String(context.key)}` });
+			}
+			return ({ graph, status }) => ({
+				arm: status === 'rejected' ? 1 : 0,
+				html: `<span>${String(graph.read('computed:details', ['value', 'title']))}</span>`,
+			});
+		},
+	});
+
+	await settleMicrotasks();
+	await result.graph.flush();
+	await settleMicrotasks();
+
+	// The unsettled CSR boundary demanded its runner at creation, and the
+	// default applier resolved the async-boundary range anchors and inserted
+	// the settled arm parsed through the document template.
+	expect(loadedSymbols).toEqual(['symbol:details-runner', 'symbol:boundary-update']);
+	expect(template.innerHTML).toBe('<span>User ada</span>');
+	expect(
+		root.childNodes.map((child) => (child as { tagName?: string }).tagName ?? '#comment'),
+	).toEqual(['#comment', insertedTag, '#comment']);
+});

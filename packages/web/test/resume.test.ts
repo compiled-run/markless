@@ -2807,3 +2807,175 @@ test('resume runtime dispatches keyed repeat row events with fresh row locals', 
 	await resume.dispatch(event('click', footer, 'x'));
 	expect(loadedSymbols).toEqual(['symbol:row', 'symbol:row', 'symbol:row', 'symbol:footer']);
 });
+
+test('resume runtime keeps settled async boundary snapshots idle at startup', async () => {
+	const start = comment('markless:async:boundary:0');
+	const settled = element('P');
+	const end = comment('/markless:async:boundary:0');
+	const root = element('SECTION', [start, settled, end]);
+	const loadedSymbols: string[] = [];
+	const applied: DomJournalEntry[] = [];
+	let runnerRuns = 0;
+	const graph = createRuntimeGraph({
+		cells: [{ graphNodeId: 'state:userId', value: 'ada' }],
+		asyncComputed: [
+			{
+				graphNodeId: 'computed:details',
+				dependencies: [{ graphNodeId: 'state:userId', path: [] }],
+				initialSnapshot: {
+					status: 'fulfilled',
+					version: 1,
+					key: 'ada',
+					value: { title: 'User ada' },
+				},
+				key: (read) => read('state:userId'),
+				run() {
+					runnerRuns++;
+					return { title: 'User ada' };
+				},
+			},
+		],
+	});
+	const resume = createResumeRuntime({
+		root,
+		graph,
+		view: updatableBoundaryView(),
+		loadSymbol(symbolId) {
+			loadedSymbols.push(symbolId);
+			return () => undefined;
+		},
+		applyDomJournal(entries) {
+			applied.push(...entries);
+		},
+	});
+
+	await resume.start();
+	await drainMicrotasks();
+	await graph.flush();
+
+	// The graph consumed the settled SSR snapshot: zero runners, zero symbol
+	// loads, and no range replacement at startup.
+	expect(runnerRuns).toBe(0);
+	expect(loadedSymbols).toEqual([]);
+	expect(applied).toEqual([]);
+});
+
+test('resume runtime starts unsettled async boundary runners at creation and settles the range', async () => {
+	const start = comment('markless:async:boundary:0');
+	const pending = element('P');
+	const end = comment('/markless:async:boundary:0');
+	const root = element('SECTION', [start, pending, end]);
+	const loadedSymbols: string[] = [];
+	const applied: DomJournalEntry[] = [];
+	const renderedHtml: string[] = [];
+	const runs: Array<{ readonly key: unknown; readonly signal: AbortSignal }> = [];
+	let result = deferred<{ title: string }>();
+	const graph = createRuntimeGraph({
+		cells: [{ graphNodeId: 'state:userId', value: 'ada' }],
+		asyncComputed: [
+			{
+				graphNodeId: 'computed:details',
+				dependencies: [{ graphNodeId: 'state:userId', path: [] }],
+				key: (read) => read('state:userId'),
+				run({ key, signal }) {
+					runs.push({ key, signal });
+					return result.promise;
+				},
+			},
+		],
+	});
+	const fragmentNode = element('P');
+	const resume = createResumeRuntime({
+		root,
+		graph,
+		view: updatableBoundaryView(),
+		loadSymbol(symbolId) {
+			loadedSymbols.push(symbolId);
+			return ({ graph: runtimeGraph, status }) => ({
+				arm: status === 'rejected' ? 1 : 0,
+				html: `<p>${String(runtimeGraph.read('computed:details', ['value', 'title']))}</p>`,
+			});
+		},
+		renderBranchHtml(html) {
+			renderedHtml.push(html);
+			return [fragmentNode];
+		},
+		applyDomJournal(entries) {
+			applied.push(...entries);
+		},
+	});
+
+	// CSR mounts render @pending between the anchors, so an unsettled boundary
+	// is a local demand: the runner starts at runtime creation.
+	expect(runs).toHaveLength(1);
+	expect(runs[0]).toMatchObject({ key: 'ada' });
+	expect(loadedSymbols).toEqual([]);
+
+	await resume.start();
+	result.resolve({ title: 'User ada' });
+	await drainMicrotasks();
+	await graph.flush();
+
+	expect(loadedSymbols).toEqual(['symbol:boundary-update']);
+	expect(renderedHtml).toEqual(['<p>User ada</p>']);
+	expect(applied).toEqual([
+		{ type: 'removeRange', locator: 'async-boundary:boundary:0' },
+		{
+			type: 'insertRange',
+			locator: 'async-boundary:boundary:0:start',
+			fragment: [fragmentNode],
+		},
+	]);
+
+	// Revalidation: a dependency write aborts the previous run, re-runs the
+	// runner, and replaces the boundary range again after the new settle.
+	applied.length = 0;
+	result = deferred<{ title: string }>();
+	graph.write({ graphNodeId: 'state:userId', value: 'grace' });
+	await graph.flush();
+
+	expect(runs).toHaveLength(2);
+	expect(runs[0]!.signal.aborted).toBe(true);
+	expect(runs[1]).toMatchObject({ key: 'grace' });
+
+	result.resolve({ title: 'User grace' });
+	await drainMicrotasks();
+	await graph.flush();
+
+	expect(renderedHtml).toEqual(['<p>User ada</p>', '<p>User grace</p>']);
+	expect(applied).toEqual([
+		{ type: 'removeRange', locator: 'async-boundary:boundary:0' },
+		{
+			type: 'insertRange',
+			locator: 'async-boundary:boundary:0:start',
+			fragment: [fragmentNode],
+		},
+	]);
+});
+
+// One async boundary whose settled arms rebuild through an update symbol.
+function updatableBoundaryView(): ResumeViewRecord {
+	return {
+		locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'section' }],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [
+			{
+				id: 'boundary:0',
+				updateSymbolId: 'symbol:boundary-update',
+				startAnchor: { strategy: 'dom-order-comment', index: 0 },
+				endAnchor: { strategy: 'dom-order-comment', index: 1 },
+				asyncReads: [
+					{
+						source: 'details',
+						graphNodeId: 'computed:details',
+						path: [],
+						runnerSymbolId: 'symbol:details-runner',
+					},
+				],
+			},
+		],
+	};
+}

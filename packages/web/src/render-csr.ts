@@ -44,7 +44,15 @@ export async function renderCsrRuntime(input: {
 		};
 	}
 
-	const graph = output.graph ?? (await createFullRuntimeGraph(state, !!output.state));
+	const graph =
+		output.graph ??
+		(await createFullRuntimeGraph({
+			state,
+			view,
+			root: output.root,
+			loadSymbol,
+			hasAuthoredState: !!output.state,
+		}));
 	const { createResumeRuntime } = await import('./resume.ts');
 	let runtime: ResumeRuntime;
 	const applyDomJournal =
@@ -118,10 +126,13 @@ async function applyDefaultCsrDomJournal(
 	const { applyDomJournalEntries } = await import('./dom-journal.ts');
 	applyDomJournalEntries(deferred, {
 		resolveTarget(locator) {
-			const branchAnchor = /^branch:(.+?)(:start|:end)$/.exec(String(locator));
-			if (branchAnchor) {
-				const record = runtime.getBranch(branchAnchor[1]!);
-				return branchAnchor[2] === ':end' ? record?.endAnchor : record?.startAnchor;
+			const rangeAnchor = /^(branch|async-boundary):(.+?):(start|end)$/.exec(String(locator));
+			if (rangeAnchor) {
+				const record =
+					rangeAnchor[1] === 'branch'
+						? runtime.getBranch(rangeAnchor[2]!)
+						: runtime.getAsyncBoundary(rangeAnchor[2]!);
+				return rangeAnchor[3] === 'end' ? record?.endAnchor : record?.startAnchor;
 			}
 			return runtime.getElement(String(locator));
 		},
@@ -193,13 +204,23 @@ function canUseEventOnlyCsrRuntime(
 	return true;
 }
 
-async function createFullRuntimeGraph(
-	state: ProtocolStatePayload,
-	hasAuthoredState: boolean,
-): Promise<RuntimeGraph> {
-	if (hasAuthoredState) {
-		const { createRuntimeGraphFromStatePayload } = await import('./payload.ts');
-		return createRuntimeGraphFromStatePayload(state);
+// CSR mounts share the resume graph wiring so async boundary runners load
+// through the same generated symbol resolver as browser resume.
+async function createFullRuntimeGraph(input: {
+	readonly state: ProtocolStatePayload;
+	readonly view: ProtocolViewPayload;
+	readonly root: CsrRenderOutput['root'];
+	readonly loadSymbol: NonNullable<CsrRenderOutput['loadSymbol']>;
+	readonly hasAuthoredState: boolean;
+}): Promise<RuntimeGraph> {
+	if (input.hasAuthoredState) {
+		const { createRuntimeGraphFromResumePayload } = await import('./payload.ts');
+		return createRuntimeGraphFromResumePayload({
+			state: input.state,
+			view: input.view,
+			root: input.root,
+			loadSymbol: input.loadSymbol,
+		});
 	}
 
 	const { createRuntimeGraph } = await import('@markless/runtime');

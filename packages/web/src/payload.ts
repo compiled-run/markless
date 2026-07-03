@@ -86,7 +86,9 @@ export function createRuntimeGraphFromStatePayload(payload: ProtocolStatePayload
 	});
 }
 
-function createRuntimeGraphFromResumePayload(input: {
+// Builds the resume/CSR runtime graph: payload cells plus async computed
+// nodes whose runners load through the generated symbol resolver.
+export function createRuntimeGraphFromResumePayload(input: {
 	readonly state: ProtocolStatePayload;
 	readonly view: ProtocolViewPayload;
 	readonly root: ResumeDomElement;
@@ -232,10 +234,15 @@ export async function resumeFromPayloadScripts(
 		((entries) =>
 			applyDomJournalEntries(entries, {
 				resolveTarget(locator) {
-					const branchAnchor = /^branch:(.+?)(:start|:end)$/.exec(String(locator));
-					if (branchAnchor) {
-						const record = runtime?.getBranch(branchAnchor[1]!);
-						return branchAnchor[2] === ':end' ? record?.endAnchor : record?.startAnchor;
+					const rangeAnchor = /^(branch|async-boundary):(.+?):(start|end)$/.exec(
+						String(locator),
+					);
+					if (rangeAnchor) {
+						const record =
+							rangeAnchor[1] === 'branch'
+								? runtime?.getBranch(rangeAnchor[2]!)
+								: runtime?.getAsyncBoundary(rangeAnchor[2]!);
+						return rangeAnchor[3] === 'end' ? record?.endAnchor : record?.startAnchor;
 					}
 					return runtime?.getElement(String(locator));
 				},

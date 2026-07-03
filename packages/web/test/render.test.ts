@@ -1474,3 +1474,76 @@ export async function resumeContainerEvent({ event }) {
 `;
 	return `data:text/javascript,${encodeURIComponent(source)}`;
 }
+
+test('render starts pending CSR async boundary runners and settles the range', async () => {
+	const startAnchor = {
+		nodeType: 8 as const,
+		textContent: 'markless:async:boundary:0',
+	} as unknown as FakeElement;
+	const pending = element('P');
+	const endAnchor = {
+		nodeType: 8 as const,
+		textContent: '/markless:async:boundary:0',
+	} as unknown as FakeElement;
+	const root = element('MAIN', [startAnchor, pending, endAnchor]);
+	const target = {
+		children: [] as FakeElement[],
+		replaceChildren(...children: FakeElement[]) {
+			this.children = children;
+		},
+	};
+	const state = createProtocolStatePayload({
+		cells: [{ graphNodeId: 'state:userId', name: 'userId', valueKind: 'scalar', value: 'ada' }],
+		computed: [
+			{
+				graphNodeId: 'computed:details',
+				name: 'details',
+				async: true,
+				dependencies: [{ graphNodeId: 'state:userId', path: [] }],
+			},
+		],
+	});
+	const view: ProtocolViewPayload = {
+		...viewWithAsyncBoundary(),
+		locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'main' }],
+		asyncBoundaries: viewWithAsyncBoundary().asyncBoundaries.map((boundary) => ({
+			...boundary,
+			updateSymbolId: 'symbol:boundary-update',
+		})),
+	};
+	const loadedSymbols: string[] = [];
+	const replacement = element('SPAN');
+
+	const container = await render(
+		() => ({
+			root,
+			state,
+			view,
+			loadSymbol(symbolId: string) {
+				loadedSymbols.push(symbolId);
+				if (symbolId === 'symbol:details-runner') {
+					return async ({ key }) => ({ title: `User ${String(key)}` });
+				}
+				return ({ graph, status }) => ({
+					arm: status === 'rejected' ? 1 : 0,
+					html: `<span>${String(graph.read('computed:details', ['value', 'title']))}</span>`,
+				});
+			},
+		}),
+		{
+			target,
+			renderBranchHtml: () => [replacement as never],
+		},
+	);
+
+	for (let index = 0; index < 6; index++) await Promise.resolve();
+	await container.graph.flush?.();
+	for (let index = 0; index < 6; index++) await Promise.resolve();
+
+	// The CSR graph wires the boundary runner through loadSymbol, demands it at
+	// creation, and the default CSR applier replaces the boundary range.
+	expect(loadedSymbols).toEqual(['symbol:details-runner', 'symbol:boundary-update']);
+	expect(
+		root.childNodes.map((child) => (child.nodeType === 8 ? '#comment' : child.tagName)),
+	).toEqual(['#comment', 'SPAN', '#comment']);
+});
