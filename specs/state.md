@@ -133,6 +133,20 @@ The critical path to "full spec implementation" still requires:
   arm between the boundary anchors, and serializes the fulfilled/rejected
   snapshot (envelope-encoded via `serializeRuntimeAsyncSnapshots`) so resumed
   pages start zero runners; browser runners are revalidation-only
+- branch/list/boundary disposal and arm records (landed 2026-07-03, L4):
+  `graph.subscribe` returns an unsubscribe; removed ranges dispose their hosts
+  at journal-apply time (behavior cleanups run while still attached, per
+  06:222-224 — witness-proven via `ssr-branch-dispose`); branch arms may
+  contain events/behaviors/handles/text bindings, carried as arm-relative
+  armRecords and rewired on flip with flip-back rematerialization; fragment
+  roots accept gate-eligible control-flow children; `{children}` places as
+  raw template projection (an escaping bug shipped visible markup as text —
+  fixed) and React-style children inspection diagnoses MARKLESS_CHILDREN_OPAQUE.
+  Deferred, owner-visible: arm-local state()/async disposal, moveRange
+  disposal, list mutation reactivity (new L-item pending owner ratification),
+  projection metadata for records/locators inside projected element children
+  (two test.fails ledger entries in the browser matrix), row-event syncPolicy
+  emission, @catch error-param binding in settle modules
 - browser resume DOM replacement for planned binding and async-boundary cases.
   Landed 2026-07-03 for the supported gated set: branch flips (`@if`/`@switch`
   via lazy `branch-update` symbols), keyed repeat row events with item locals,
