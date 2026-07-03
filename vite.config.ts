@@ -61,8 +61,16 @@ export default defineConfig({
 		clean: true,
 	},
 	test: {
-		environment: 'node',
-		include: ['packages/*/test/**/*.test.ts', 'scripts/**/*.test.ts'],
+		projects: [
+			{
+				test: {
+					name: 'node',
+					environment: 'node',
+					include: ['packages/*/test/**/*.test.ts', 'scripts/**/*.test.ts'],
+				},
+			},
+			'packages/vitest-browser/vitest.config.ts',
+		],
 	},
 	lint: {
 		ignorePatterns: ['dist/**', 'node_modules/**'],
