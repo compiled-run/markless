@@ -19,6 +19,9 @@ const webOrRuntimeEventOnlyResume = hasWebPackage
 const marklessWebOrRuntimeEventOnlyResume = hasWebPackage
 	? 'packages/core/src/web/event-only-resume.ts'
 	: 'packages/core/src/runtime/event-only-resume.ts';
+const marklessWebOrRuntimeResume = hasWebPackage
+	? 'packages/core/src/web/resume.ts'
+	: 'packages/core/src/runtime/resume.ts';
 
 const { markless } = await import(
 	pathToFileURL(marklessPackage('packages/bundler/src/vite/index.ts')).href
@@ -75,6 +78,17 @@ export default {
 			{
 				find: '@markless/core/runtime/event-only-resume',
 				replacement: marklessPackage(marklessWebOrRuntimeEventOnlyResume),
+			},
+			{
+				// Keyed-row modules escalate the emitted browser entry to the
+				// full resume runtime; without this alias the catch-all below
+				// resolves index.ts + '/web/resume' (Not a directory).
+				find: '@markless/core/web/resume',
+				replacement: marklessPackage(marklessWebOrRuntimeResume),
+			},
+			{
+				find: '@markless/core/runtime/resume',
+				replacement: marklessPackage(marklessWebOrRuntimeResume),
 			},
 			{
 				find: '@markless/core',
