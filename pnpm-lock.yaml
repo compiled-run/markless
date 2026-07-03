@@ -275,6 +275,22 @@ importers:
         specifier: 8.0.16
         version: 8.0.16(@types/node@24.12.2)
 
+  packages/bundler/fixtures/vite-ssr-dispose:
+    dependencies:
+      '@markless/bundler':
+        specifier: workspace:*
+        version: link:../..
+      '@markless/core':
+        specifier: workspace:*
+        version: link:../../../core
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vite:
+        specifier: 8.0.16
+        version: 8.0.16(@types/node@24.12.2)
+
   packages/bundler/fixtures/vite-ssr-preloader:
     dependencies:
       '@markless/bundler':
