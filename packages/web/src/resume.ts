@@ -143,6 +143,24 @@ export type ResumeAsyncBoundaryRead =
 
 export type ResumeBehaviorRecord = ProtocolViewPayload['behaviors'][number];
 
+export type ResumeKeyedRepeatRecord = NonNullable<ProtocolViewPayload['keyedRepeats']>[number];
+
+export type ResumeKeyedRepeatRowEvent = ResumeKeyedRepeatRecord['rowEvents'][number];
+
+// One materialized row event host with the row root that positions it.
+type ResumeRowEventMatch = {
+	readonly repeat: ResumeKeyedRepeatRecord;
+	readonly parent: ResumeDomElement;
+	readonly rowRoot: ResumeDomElement;
+	readonly rowEvent: ResumeKeyedRepeatRowEvent;
+};
+
+type ResumeRowEventRecords = WeakMap<ResumeDomElement, Map<string, ResumeRowEventMatch>>;
+
+type ResumeDispatchMatch =
+	| { readonly element: ResumeDomElement; readonly eventRecord: ResumeEventRecord }
+	| { readonly element: ResumeDomElement; readonly rowMatch: ResumeRowEventMatch };
+
 export type ResumeBranchRecord = {
 	readonly id: string;
 	readonly startAnchor: ResumeDomComment;
@@ -174,6 +192,7 @@ export type ResumeViewRecord = {
 	readonly elementHandles: ProtocolViewPayload['elementHandles'];
 	readonly asyncBoundaries: ProtocolViewPayload['asyncBoundaries'];
 	readonly branches?: ProtocolViewPayload['branches'];
+	readonly keyedRepeats?: ProtocolViewPayload['keyedRepeats'];
 };
 
 export type ResumeSymbolContext = {
@@ -184,6 +203,8 @@ export type ResumeSymbolContext = {
 	readonly event?: ResumeDomEvent;
 	readonly element: ResumeDomElement;
 	readonly getElementHandle: (handleIdOrName: string) => ResumeDomElement | undefined;
+	// Keyed repeat row values; lowered symbols read context.locals.<itemName>.
+	readonly locals?: Readonly<Record<string, unknown>>;
 	readonly behaviorInputs?: ReadonlyArray<unknown>;
 	readonly domUpdate?: ProtocolViewPayload['domUpdates'][number];
 	readonly value?: unknown;
@@ -359,6 +380,30 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 		eventTypes.add(eventRecord.eventName);
 	}
 
+	// SSR renders keyed repeat rows as the parent's first items.length element
+	// children; @empty replaces the rows, so an empty collection maps to none.
+	const rowEventRecords: ResumeRowEventRecords = new WeakMap();
+	for (const repeat of input.view.keyedRepeats ?? []) {
+		const parent = elementsByHostId.get(repeat.parentHostNodeId);
+		if (!parent) continue;
+
+		const items = readRepeatCollection(input.graph, repeat);
+		for (const rowRoot of elementChildren(parent).slice(0, items.length)) {
+			for (const rowEvent of repeat.rowEvents) {
+				const host = rowEventHost(rowRoot, rowEvent.hostPath);
+				if (!host) continue;
+
+				let recordsByEventName = rowEventRecords.get(host);
+				if (!recordsByEventName) {
+					recordsByEventName = new Map();
+					rowEventRecords.set(host, recordsByEventName);
+				}
+				recordsByEventName.set(rowEvent.eventName, { repeat, parent, rowRoot, rowEvent });
+				eventTypes.add(rowEvent.eventName);
+			}
+		}
+	}
+
 	for (const domUpdate of input.view.domUpdates) {
 		if (!domUpdate.symbolId) continue;
 
@@ -454,8 +499,13 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 		const target = event.target;
 		if (!target) return;
 
-		const matched = findEventRecord(target, event.type, eventRecords);
+		const matched = findDispatchMatch(target, event.type, eventRecords, rowEventRecords);
 		if (!matched) return;
+
+		if ('rowMatch' in matched) {
+			await dispatchRowEvent(matched.element, matched.rowMatch, event, options);
+			return;
+		}
 
 		const { element, eventRecord } = matched;
 
@@ -484,6 +534,53 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 				phase: 'event',
 				hostNodeId: eventRecord.hostNodeId,
 				eventName: eventRecord.eventName,
+				symbolId: activeSymbolId,
+				event,
+				element,
+			});
+			throw error;
+		} finally {
+			await flushRuntimeGraph();
+		}
+	}
+
+	async function dispatchRowEvent(
+		element: ResumeDomElement,
+		match: ResumeRowEventMatch,
+		event: ResumeDomEvent,
+		options: ResumeDispatchOptions,
+	): Promise<void> {
+		const { repeat, parent, rowRoot, rowEvent } = match;
+
+		if (rowEvent.syncPolicy && !options.syncPolicyAlreadyApplied)
+			runSyncPolicyActions(rowEvent.syncPolicy, input.graph, event);
+
+		let activeSymbolId: string | undefined;
+		try {
+			// Row identity is positional: the row index among the parent's element
+			// children and the collection are both read fresh at dispatch time.
+			const rowIndex = elementChildren(parent).indexOf(rowRoot);
+			const items = readRepeatCollection(input.graph, repeat);
+			const locals = { [repeat.itemName]: rowIndex >= 0 ? items[rowIndex] : undefined };
+
+			for (const symbolId of rowEvent.symbolIds) {
+				activeSymbolId = symbolId;
+				const loadedSymbol = input.loadSymbol(symbolId);
+				const symbol = isPromiseLike(loadedSymbol) ? await loadedSymbol : loadedSymbol;
+				const result = symbol({
+					graph: input.graph,
+					event,
+					element,
+					getElementHandle: elementHandles.get,
+					locals,
+				});
+				if (isPromiseLike(result)) await result;
+			}
+		} catch (error) {
+			await reportRuntimeError(error, {
+				phase: 'event',
+				hostNodeId: repeat.parentHostNodeId,
+				eventName: rowEvent.eventName,
 				symbolId: activeSymbolId,
 				event,
 				element,
@@ -1091,14 +1188,20 @@ function materializeAsyncBoundaryLocators(
 	return byBoundaryId;
 }
 
-function findEventRecord(
+// One walk from the event target toward the root: the closest element with
+// either a keyed repeat row event record or an ordinary host record wins.
+function findDispatchMatch(
 	target: ResumeDomElement,
 	eventName: string,
 	eventRecords: WeakMap<ResumeDomElement, Map<string, ResumeEventRecord>>,
-): { readonly element: ResumeDomElement; readonly eventRecord: ResumeEventRecord } | null {
+	rowEventRecords: ResumeRowEventRecords,
+): ResumeDispatchMatch | null {
 	let current: ResumeDomElement | null | undefined = target;
 
 	while (current) {
+		const rowMatch = rowEventRecords.get(current)?.get(eventName);
+		if (rowMatch) return { element: current, rowMatch };
+
 		const eventRecord = eventRecords.get(current)?.get(eventName);
 		if (eventRecord) return { element: current, eventRecord };
 
@@ -1106,6 +1209,41 @@ function findEventRecord(
 	}
 
 	return null;
+}
+
+function elementChildren(element: ResumeDomElement): ResumeDomElement[] {
+	const children: ResumeDomElement[] = [];
+	for (const child of element.childNodes ?? []) {
+		if (child.nodeType === 1) children.push(child as ResumeDomElement);
+	}
+	return children;
+}
+
+// hostPath mirrors the compiler row plan (public-render/plan.ts collectRowPlan)
+// and the generated direct-DOM path: each segment indexes childNodes directly,
+// because row HTML renders without ignorable whitespace nodes.
+function rowEventHost(
+	rowRoot: ResumeDomElement,
+	hostPath: ReadonlyArray<number>,
+): ResumeDomElement | undefined {
+	let current: ResumeDomNode | undefined = rowRoot;
+	for (const index of hostPath) {
+		current = current.childNodes?.[index];
+		if (!current) return undefined;
+	}
+	return current.nodeType === 1 ? (current as ResumeDomElement) : undefined;
+}
+
+// Mirrors the SSR repeat helper's Array.from collection normalization.
+function readRepeatCollection(
+	graph: RuntimeGraph,
+	repeat: ResumeKeyedRepeatRecord,
+): ReadonlyArray<unknown> {
+	if (!repeat.collectionGraphNodeId) return [];
+
+	const value = graph.read(repeat.collectionGraphNodeId, repeat.collectionPath);
+	if (Array.isArray(value)) return value;
+	return Array.from((value ?? []) as Iterable<unknown>);
 }
 
 function materializeDomLocators(

@@ -2,7 +2,12 @@ import { expect, test } from 'vitest';
 import { createRuntimeGraph } from '@markless/runtime';
 import { applyDomJournalEntries, createResumeRuntime, RuntimeResumeError } from '../src/index.ts';
 import type { RuntimeGraph, RuntimeGraphWrite } from '@markless/runtime';
-import type { DomJournalEntry } from '../src/index.ts';
+import type {
+	DomJournalEntry,
+	ResumeEventRecord,
+	ResumeKeyedRepeatRowEvent,
+	ResumeViewRecord,
+} from '../src/index.ts';
 
 type FakeElement = {
 	readonly nodeType: 1;
@@ -2633,4 +2638,172 @@ test('resume runtime replaces branch ranges lazily when the test arm flips', asy
 	expect(second).toBeUndefined();
 	expect(loadedSymbols).toEqual(['symbol:flip']);
 	expect(renderedHtml).toEqual(['<p>Hidden</p>']);
+});
+
+// Shared keyed repeat fixture: TBODY parent with two TR rows whose hostPath
+// [1] event hosts are the row buttons, plus a trailing FOOTER whose dom-order
+// locator index (8) already counts the SSR-rendered row elements.
+function keyedRepeatFixture(options: {
+	readonly rowEvents: ResumeKeyedRepeatRowEvent[];
+	readonly events?: ResumeEventRecord[];
+}) {
+	const firstRowButton = element('BUTTON');
+	const secondRowButton = element('BUTTON');
+	const tbody = element('TBODY', [
+		element('TR', [element('TD'), firstRowButton]),
+		element('TR', [element('TD'), secondRowButton]),
+	]);
+	const footer = element('FOOTER');
+	const root = element('SECTION', [tbody, footer]);
+	const view: ResumeViewRecord = {
+		locators: [
+			{ hostNodeId: 'h0', strategy: 'dom-order', index: 1, tagName: 'tbody' },
+			{ hostNodeId: 'h1', strategy: 'dom-order', index: 8, tagName: 'footer' },
+		],
+		events: options.events ?? [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+		keyedRepeats: [
+			{
+				id: 'repeat:0',
+				parentHostNodeId: 'h0',
+				collectionGraphNodeId: 'state:rows',
+				collectionPath: [],
+				keyPath: ['id'],
+				itemName: 'entry',
+				rowElementCount: 3,
+				rowEvents: options.rowEvents,
+			},
+		],
+	};
+	const loadedSymbols: string[] = [];
+	const loadSymbol = (symbolId: string) => {
+		loadedSymbols.push(symbolId);
+		return () => undefined;
+	};
+	return { root, firstRowButton, secondRowButton, footer, view, loadedSymbols, loadSymbol };
+}
+
+test('resume runtime materializes keyed repeat row event hosts from the live collection', async () => {
+	const { root, firstRowButton, secondRowButton, footer, view, loadedSymbols, loadSymbol } =
+		keyedRepeatFixture({
+			rowEvents: [{ hostPath: [1], eventName: 'click', symbolIds: ['symbol:row'] }],
+		});
+	const graph = createRuntimeGraph({
+		cells: [{ graphNodeId: 'state:rows', value: [{ id: 1 }, { id: 2 }] }],
+	});
+
+	const resume = createResumeRuntime({ root, graph, view, loadSymbol });
+
+	await resume.start();
+
+	// Row events register the delegated capture listener even though no
+	// ordinary view event uses "click".
+	expect(root.listeners.map((listener) => listener.type)).toContain('click');
+
+	// Both rows' hostPath [1] hosts carry row event records.
+	await resume.dispatch(event('click', firstRowButton, ''));
+	await resume.dispatch(event('click', secondRowButton, ''));
+	expect(loadedSymbols).toEqual(['symbol:row', 'symbol:row']);
+
+	// Elements outside the repeat never match row records.
+	await resume.dispatch(event('click', footer, ''));
+	expect(loadedSymbols).toHaveLength(2);
+
+	// A trailing dom-order locator after the repeat rows still resolves.
+	expect(resume.getElement('h1')).toBe(footer);
+});
+
+test('resume runtime materializes zero keyed repeat rows without throwing', async () => {
+	const { root, firstRowButton, view, loadedSymbols, loadSymbol } = keyedRepeatFixture({
+		rowEvents: [{ hostPath: [1], eventName: 'click', symbolIds: ['symbol:row'] }],
+	});
+	// Empty collection: SSR took @empty, so the parent's element children are
+	// not rows and no row record may attach to any of them.
+	const graph = createRuntimeGraph({ cells: [{ graphNodeId: 'state:rows', value: [] }] });
+
+	const resume = createResumeRuntime({ root, graph, view, loadSymbol });
+
+	await resume.start();
+	await resume.dispatch(event('click', firstRowButton, ''));
+	expect(loadedSymbols).toEqual([]);
+});
+
+test('resume runtime dispatches keyed repeat row events with fresh row locals', async () => {
+	const { root, firstRowButton, secondRowButton, footer, view } = keyedRepeatFixture({
+		rowEvents: [
+			{
+				hostPath: [1],
+				eventName: 'click',
+				symbolIds: ['symbol:row'],
+				syncPolicy: {
+					when: { type: 'event-equals', field: 'key', value: 'Enter' },
+					actions: ['preventDefault'],
+				},
+			},
+		],
+		events: [{ hostNodeId: 'h1', eventName: 'click', symbolIds: ['symbol:footer'] }],
+	});
+	const firstItem = { id: 1, label: 'one' };
+	const secondItem = { id: 2, label: 'two' };
+	const graph = createRuntimeGraph({
+		cells: [
+			{ graphNodeId: 'state:rows', value: [firstItem, secondItem] },
+			{ graphNodeId: 'state:selected', value: 0 },
+		],
+	});
+	graph.subscribe({
+		id: 'dom-update:selected',
+		graphNodeId: 'state:selected',
+		path: [],
+		run(value) {
+			return { type: 'setText', locator: 'selected', value };
+		},
+	});
+	const loadedSymbols: string[] = [];
+	const receivedLocals: Array<Record<string, unknown> | undefined> = [];
+
+	const resume = createResumeRuntime({
+		root,
+		graph,
+		view,
+		loadSymbol(symbolId) {
+			loadedSymbols.push(symbolId);
+			if (symbolId === 'symbol:footer') return () => undefined;
+			return ({ graph: runtimeGraph, locals }) => {
+				receivedLocals.push(locals as Record<string, unknown> | undefined);
+				const entry = (locals as { readonly entry: { readonly id: number } }).entry;
+				runtimeGraph.write({ graphNodeId: 'state:selected', path: [], value: entry.id });
+			};
+		},
+	});
+
+	await resume.start();
+
+	const firstClick = event('click', firstRowButton, 'Enter');
+	await resume.dispatch(firstClick);
+	expect(loadedSymbols).toEqual(['symbol:row']);
+	expect(receivedLocals[0]?.entry).toBe(firstItem);
+	// The row sync policy runs through the shared helper before the symbol.
+	expect(firstClick.defaultPrevented).toBe(true);
+	// Handler graph writes flush like ordinary event dispatch.
+	expect(graph.read('state:selected')).toBe(1);
+	expect(graph.takeJournal()).toEqual([{ type: 'setText', locator: 'selected', value: 1 }]);
+
+	await resume.dispatch(event('click', secondRowButton, 'x'));
+	expect(receivedLocals[1]?.entry).toBe(secondItem);
+	expect(graph.read('state:selected')).toBe(2);
+
+	// Row index and collection are both read fresh at dispatch time, so a
+	// reordered collection maps the same DOM row to its new item.
+	graph.write({ graphNodeId: 'state:rows', path: [], value: [secondItem, firstItem] });
+	await graph.flush();
+	await resume.dispatch(event('click', firstRowButton, 'x'));
+	expect(receivedLocals[2]?.entry).toBe(secondItem);
+
+	// A same-named event on a non-row host resolves through ordinary records.
+	await resume.dispatch(event('click', footer, 'x'));
+	expect(loadedSymbols).toEqual(['symbol:row', 'symbol:row', 'symbol:row', 'symbol:footer']);
 });
