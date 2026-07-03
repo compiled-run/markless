@@ -623,7 +623,7 @@ test('compileTsrxModule treats a default exported TSRX function as the public re
 	expect(result.publicRenderModule.ssrExportName).toBe('marklessRenderSsr');
 	expect(result.publicRenderModule.ssrModuleSource).toContain('function marklessRenderSsr');
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
-	const output = (ssrModule.marklessRenderSsr as () => { readonly html: string })();
+	const output = await (ssrModule.marklessRenderSsr as () => { readonly html: string })();
 
 	expect(output.html).toBe('<main><h1>Markless Router</h1><button>Button 0</button></main>');
 });
@@ -649,7 +649,7 @@ export function App() @{
 
 	expect(result.publicRenderPlan.diagnostics).toEqual([]);
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
-	const output = (
+	const output = await (
 		ssrModule.marklessRenderSsr as () => {
 			readonly html: string;
 			readonly view: { readonly locators: ReadonlyArray<Record<string, unknown>> };
@@ -686,7 +686,7 @@ export function App() @{
 
 	expect(result.publicRenderPlan.diagnostics).toEqual([]);
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
-	const output = (
+	const output = await (
 		ssrModule.marklessRenderSsr as () => {
 			readonly html: string;
 			readonly view: {
@@ -733,7 +733,7 @@ export function App() @{
 	});
 
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
-	const output = (
+	const output = await (
 		ssrModule.marklessRenderSsr as () => {
 			readonly html: string;
 			readonly view: { readonly locators: ReadonlyArray<Record<string, unknown>> };
@@ -762,7 +762,7 @@ export function App() @{
 	});
 
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
-	const output = (ssrModule.marklessRenderSsr as () => { readonly html: string })();
+	const output = await (ssrModule.marklessRenderSsr as () => { readonly html: string })();
 
 	expect(output.html).toBe('<section data-kind="card" id="main" title="Final">Hi</section>');
 });
@@ -884,7 +884,7 @@ export function App() @{
 		expect.objectContaining({ repeatId: 'repeat:0', supported: true }),
 	]);
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
-	const output = (
+	const output = await (
 		ssrModule.marklessRenderSsr as () => {
 			readonly html: string;
 			readonly view: { readonly locators: ReadonlyArray<Record<string, unknown>> };
@@ -928,7 +928,7 @@ export const App = () => @{
 	expect(result.semanticGraph.components).toEqual([{ name: 'App' }]);
 	expect(result.publicRenderPlan.diagnostics).toEqual([]);
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
-	const output = (ssrModule.marklessRenderSsr as () => { readonly html: string })();
+	const output = await (ssrModule.marklessRenderSsr as () => { readonly html: string })();
 
 	expect(output.html).toBe('<main><p>Hello</p></main>');
 });
@@ -952,7 +952,7 @@ export function App() @{
 
 	expect(result.publicRenderPlan.diagnostics).toEqual([]);
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
-	const output = (ssrModule.marklessRenderSsr as () => { readonly html: string })();
+	const output = await (ssrModule.marklessRenderSsr as () => { readonly html: string })();
 
 	expect(output.html).toBe('<main><p>Hello</p></main>');
 });
@@ -992,7 +992,7 @@ export function App() @{
 	expect(result.publicRenderPlan.keyedRepeats).toEqual([]);
 
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
-	const output = (
+	const output = await (
 		ssrModule.marklessRenderSsr as () => {
 			readonly html: string;
 			readonly view: { readonly locators: ReadonlyArray<Record<string, unknown>> };
@@ -1034,7 +1034,7 @@ export function App() @{
 
 	expect(result.publicRenderPlan.diagnostics).toEqual([]);
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
-	const output = (
+	const output = await (
 		ssrModule.marklessRenderSsr as () => {
 			readonly html: string;
 			readonly view: { readonly locators: ReadonlyArray<Record<string, unknown>> };
@@ -1080,7 +1080,7 @@ export function App() @{
 	});
 
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
-	const output = (
+	const output = await (
 		ssrModule.marklessRenderSsr as () => {
 			readonly html: string;
 			readonly view: { readonly locators: ReadonlyArray<Record<string, unknown>> };
@@ -1130,7 +1130,7 @@ export function App() @{
 	);
 
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
-	const output = (ssrModule.marklessRenderSsr as () => { readonly html: string })();
+	const output = await (ssrModule.marklessRenderSsr as () => { readonly html: string })();
 
 	// Host elements gain the scope class; the <style> block itself emits no HTML.
 	expect(output.html).toBe(
@@ -1163,7 +1163,7 @@ export function App() @{
 	expect(result.publicRenderModule.moduleSource).toBe('');
 	expect(result.publicRenderModule.csrModuleSource).not.toBe('');
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
-	const output = (
+	const output = await (
 		ssrModule.marklessRenderSsr as () => {
 			readonly html: string;
 			readonly view: {
@@ -1258,7 +1258,7 @@ export function App() @{
 		{ branchSiteId: 'branch-site:0', supported: true },
 	]);
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
-	const output = (
+	const output = await (
 		ssrModule.marklessRenderSsr as () => {
 			readonly html: string;
 			readonly view: {
@@ -1397,7 +1397,7 @@ export function App() @{
 		{ boundaryId: 'boundary:0', supported: true },
 	]);
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
-	const output = (
+	const output = await (
 		ssrModule.marklessRenderSsr as () => {
 			readonly html: string;
 			readonly view: { readonly locators: ReadonlyArray<Record<string, unknown>> };
@@ -1441,7 +1441,7 @@ export function App() @{
 
 	expect(result.publicRenderPlan.diagnostics).toEqual([]);
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
-	const output = (
+	const output = await (
 		ssrModule.marklessRenderSsr as () => {
 			readonly html: string;
 			readonly view: { readonly locators: ReadonlyArray<Record<string, unknown>> };
@@ -1479,7 +1479,7 @@ export function App() @{
 	});
 
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
-	const output = (ssrModule.marklessRenderSsr as () => { readonly html: string })();
+	const output = await (ssrModule.marklessRenderSsr as () => { readonly html: string })();
 
 	expect(output.html).toBe(
 		'<section><!--markless:branch:branch-site:0--><p>D</p><!--/markless:branch:branch-site:0--></section>',
@@ -1510,7 +1510,7 @@ export default function Home() @{
 			},
 		},
 	);
-	const output = (ssrModule.marklessRenderSsr as () => { readonly html: string })();
+	const output = await (ssrModule.marklessRenderSsr as () => { readonly html: string })();
 
 	expect(output.html).toBe('<main><a href="/docs">Docs</a></main>');
 });
@@ -1548,7 +1548,7 @@ export default function Document({ children }: { readonly children?: unknown }) 
 			},
 		},
 	);
-	const output = (
+	const output = await (
 		ssrModule.marklessRenderSsr as (props: { children: string }) => {
 			readonly html: string;
 		}
@@ -1606,6 +1606,57 @@ export default function Home() @{
 	expect(anchors).toHaveLength(1);
 	expect(anchors[0]?.getAttribute('href')).toBe('/docs');
 	expect(anchors[0]?.textContent).toBe('Docs');
+});
+
+test('compileTsrxModule awaits demanded async work and serves the resolved arm in SSR', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/SsrAwait.tsrx',
+		source: `
+import { computed, state } from '@markless/core';
+
+export function App() @{
+	let query = state('markless');
+	let details = computed(async () => {
+		return { title: 'Result: ' + query };
+	});
+
+	<main>
+		<h1>Search</h1>
+		@try { <p>{details.title}</p> } @pending { <p>Loading</p> } @catch { <p>Broken</p> }
+	</main>
+}
+`,
+		symbols: [],
+	});
+
+	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	const output = await (
+		ssrModule.marklessRenderSsr as () => Promise<{
+			readonly html: string;
+			readonly state: {
+				readonly computed: ReadonlyArray<Record<string, unknown>>;
+			};
+		}>
+	)();
+
+	// v1 initial render awaits demanded async nodes (spec 03:181) and serves
+	// the resolved @try arm between the same anchors — never @pending.
+	expect(output.html).toBe(
+		'<main><h1>Search</h1>' +
+			'<!--markless:async:boundary:0--><p>Result: markless</p><!--/markless:async:boundary:0-->' +
+			'</main>',
+	);
+	// The payload carries the settled snapshot so resume starts zero runners.
+	expect(output.state.computed).toEqual([
+		expect.objectContaining({
+			graphNodeId: 'computed:details',
+			snapshot: expect.objectContaining({
+				status: 'fulfilled',
+				version: 1,
+				value: { title: 'Result: markless' },
+			}),
+		}),
+	]);
 });
 
 test('compileTsrxModule emits async boundary anchors and @pending in the CSR string path', async () => {
@@ -1896,7 +1947,7 @@ export default function Home() @{
 			},
 		},
 	);
-	const output = (ssrModule.marklessRenderSsr as () => { readonly html: string })();
+	const output = await (ssrModule.marklessRenderSsr as () => { readonly html: string })();
 
 	expect(output.html).toBe('<main><a href="/docs/intro">Docs</a></main>');
 });
@@ -2887,7 +2938,7 @@ export function App() @{
 			},
 		},
 	);
-	const output = (
+	const output = await (
 		parentSsrModule.marklessRenderSsr as () => {
 			readonly html: string;
 			readonly state: ProtocolStatePayload;

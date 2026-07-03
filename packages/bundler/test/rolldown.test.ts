@@ -299,7 +299,9 @@ let active = state(true);
 		expect(result.code).not.toContain('function createMarklessPublicRuntime');
 		expect(result.code).toContain('attachMarklessPublicStaticEvents');
 		expect(result.code).toContain('const marklessSsrState = marklessComposeState');
-		expect(result.code).toContain('state: marklessSsrState');
+		expect(result.code).toContain(
+			'state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots)',
+		);
 		expect(result.code).toContain(
 			'view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) }',
 		);

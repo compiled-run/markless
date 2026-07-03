@@ -38,7 +38,7 @@ const renderSsrCommand: BrowserCommand<
 				`Available exports: ${Object.keys(moduleExports).join(', ')}`,
 		);
 	}
-	return { html: renderToString(artifact) };
+	return { html: await renderToString(artifact) };
 };
 
 export function testSSR(): Plugin {

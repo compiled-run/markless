@@ -611,9 +611,9 @@ test('render falls back from the event-only path when element handles are presen
 	expect(resolvedHandle).toBe(button);
 });
 
-test('renderToString emits an SSR container and omits the resumer for static output', () => {
+test('renderToString emits an SSR container and omits the resumer for static output', async () => {
 	let componentBodyRuns = 0;
-	const html = renderToString(() => {
+	const html = await renderToString(() => {
 		componentBodyRuns++;
 		return {
 			html: '<p>Static</p>',
@@ -630,8 +630,8 @@ test('renderToString emits an SSR container and omits the resumer for static out
 	expect(html).not.toContain('data-async-resumer');
 });
 
-test('renderToString keeps fragment sibling roots as direct container children and offsets their locators', () => {
-	const html = renderToString({
+test('renderToString keeps fragment sibling roots as direct container children and offsets their locators', async () => {
+	const html = await renderToString({
 		renderSsr: () => ({
 			html: '<header>Site</header><button type="button">0</button>',
 			state: createProtocolStatePayload({ cells: [] }),
@@ -670,8 +670,8 @@ test('renderToString keeps fragment sibling roots as direct container children a
 	]);
 });
 
-test('renderToString keeps async boundary anchors as the only comments in document order', () => {
-	const html = renderToString(
+test('renderToString keeps async boundary anchors as the only comments in document order', async () => {
+	const html = await renderToString(
 		() => ({
 			html: '<!--markless:async:boundary:0--><p>Pending</p><!--/markless:async:boundary:0-->',
 			state: createProtocolStatePayload({ cells: [] }),
@@ -702,8 +702,8 @@ test('renderToString keeps async boundary anchors as the only comments in docume
 	expect(endIndex).toBeLessThan(html.indexOf('<script type="markless/state">'));
 });
 
-test('renderToString emits one inline resumer for SSR containers with browser triggers', () => {
-	const html = renderToString(
+test('renderToString emits one inline resumer for SSR containers with browser triggers', async () => {
+	const html = await renderToString(
 		() => ({
 			html: '<button type="button">Count 0</button>',
 			state: createProtocolStatePayload({ cells: [] }),
@@ -725,8 +725,8 @@ test('renderToString emits one inline resumer for SSR containers with browser tr
 	expect(html).toContain('globalThis.__started');
 });
 
-test('renderToString emits the resumer for keyed-repeat row events', () => {
-	const html = renderToString(
+test('renderToString emits the resumer for keyed-repeat row events', async () => {
+	const html = await renderToString(
 		() => ({
 			html: '<section><article><h2>Alpha</h2><button>Choose</button></article></section>',
 			state: createProtocolStatePayload({ cells: [] }),
@@ -765,8 +765,8 @@ test('renderToString emits the resumer for keyed-repeat row events', () => {
 	expect(html).toContain('eventRecord: null');
 });
 
-test('renderToString emits ordered modulepreload links before interactive payload startup', () => {
-	const html = renderToString(
+test('renderToString emits ordered modulepreload links before interactive payload startup', async () => {
+	const html = await renderToString(
 		() => ({
 			html: '<button type="button">Count 0</button>',
 			state: createProtocolStatePayload({ cells: [] }),
@@ -798,8 +798,8 @@ test('renderToString emits ordered modulepreload links before interactive payloa
 	expect(html.indexOf('rel="modulepreload"')).toBeLessThan(html.indexOf('data-async-resumer'));
 });
 
-test('renderToString uses compiled artifact modulepreloads by default', () => {
-	const html = renderToString({
+test('renderToString uses compiled artifact modulepreloads by default', async () => {
+	const html = await renderToString({
 		modulePreloads: [{ href: '/src/App.tsrx?import', fetchPriority: 'high' }],
 		resumeModuleUrl: '/src/App.tsrx?import',
 		renderSsr: () => ({
@@ -814,9 +814,9 @@ test('renderToString uses compiled artifact modulepreloads by default', () => {
 	);
 });
 
-test('renderToString uses the compiled artifact resume module URL by default', () => {
+test('renderToString uses the compiled artifact resume module URL by default', async () => {
 	const resumeModuleUrl = createResumeModuleUrl('artifact-default');
-	const html = renderToString({
+	const html = await renderToString({
 		resumeModuleUrl,
 		renderSsr: () => ({
 			html: '<button type="button">Count 0</button>',
@@ -830,7 +830,7 @@ test('renderToString uses the compiled artifact resume module URL by default', (
 
 test('renderToString inline event resumer imports the resume module only after interaction', async () => {
 	const resumeModuleUrl = createResumeModuleUrl();
-	const html = renderToString(
+	const html = await renderToString(
 		() => ({
 			html: '<button type="button">Count 0</button>',
 			state: createProtocolStatePayload({ cells: [] }),
@@ -914,7 +914,7 @@ test('renderToString inline event resumer imports the resume module only after i
 
 test('renderToString inline event resumer steps aside after runtime startup', async () => {
 	const resumeModuleUrl = createResumeRuntimeStartedModuleUrl();
-	const html = renderToString(
+	const html = await renderToString(
 		() => ({
 			html: '<button type="button">Count 0</button>',
 			state: createProtocolStatePayload({ cells: [] }),
@@ -985,8 +985,8 @@ test('renderToString inline event resumer steps aside after runtime startup', as
 	}
 });
 
-test('renderToString event-only inline resumer omits sync-policy feature code', () => {
-	const html = renderToString(
+test('renderToString event-only inline resumer omits sync-policy feature code', async () => {
+	const html = await renderToString(
 		() => ({
 			html: '<button type="button">Count 0</button>',
 			state: createProtocolStatePayload({ cells: [] }),
@@ -1004,7 +1004,7 @@ test('renderToString event-only inline resumer omits sync-policy feature code', 
 
 test('renderToString inline event resumer runs sync policy before importing resume module', async () => {
 	const resumeModuleUrl = createResumeModuleUrl('sync-policy');
-	const html = renderToString(
+	const html = await renderToString(
 		() => ({
 			html: '<button type="button">Close</button>',
 			state: createProtocolStatePayload({ cells: [] }),
@@ -1097,7 +1097,7 @@ test('renderToString inline event resumer runs sync policy before importing resu
 
 test('renderToString inline event resumer evaluates sync policy before importing symbols', async () => {
 	const resumeModuleUrl = createSyncPolicyResumeModuleUrl();
-	const html = renderToString(
+	const html = await renderToString(
 		() => ({
 			html: '<button type="button">Save</button>',
 			state: createProtocolStatePayload({ cells: [] }),
@@ -1200,7 +1200,7 @@ test('renderToString inline event resumer evaluates sync policy before importing
 
 test('renderToString inline event resumer reads graph-backed sync policy before importing symbols', async () => {
 	const resumeModuleUrl = createSyncPolicyResumeModuleUrl('graph-policy');
-	const html = renderToString(
+	const html = await renderToString(
 		() => ({
 			html: '<button type="button">Close</button>',
 			state: createProtocolStatePayload({
@@ -1314,7 +1314,7 @@ test('renderToString inline event resumer reads graph-backed sync policy before 
 
 test('renderToString inline event resumer reads built-in graph values for sync policy', async () => {
 	const resumeModuleUrl = createSyncPolicyResumeModuleUrl('map-policy');
-	const html = renderToString(
+	const html = await renderToString(
 		() => ({
 			html: '<button type="button">Filter</button>',
 			state: createProtocolStatePayload({

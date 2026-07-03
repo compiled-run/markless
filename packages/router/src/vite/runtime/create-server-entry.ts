@@ -101,7 +101,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 			},
 			status,
 		};
-		const pageOutput = renderPageModule(
+		const pageOutput = await renderPageModule(
 			pageModule,
 			pageProps,
 			file,
@@ -125,7 +125,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 	return { fetch };
 }
 
-function renderPageModule(
+async function renderPageModule(
 	pageModule: PageModule,
 	props: PageComponentProps,
 	file: string,
@@ -134,7 +134,7 @@ function renderPageModule(
 	navigationEntryPath: string | undefined,
 	routeModulePreloads: Record<string, readonly ModulePreloadInput[]> | undefined,
 	routeSsrModulePreloads: Record<string, readonly ModulePreloadInput[]> | undefined,
-): PageHtml {
+): Promise<PageHtml> {
 	const baseArtifact = pageModule.default;
 	const renderSsr = baseArtifact?.renderSsr ?? pageModule.marklessRenderSsr;
 	if (!renderSsr) {
@@ -169,7 +169,7 @@ function renderPageModule(
 			return routedOutput;
 		},
 	};
-	const rendered = renderToString(pageArtifact as never, {
+	const rendered = await renderToString(pageArtifact as never, {
 		modulePreloads,
 		resumeModuleUrl: resumeEntryPath ?? baseArtifact?.resumeModuleUrl,
 	});

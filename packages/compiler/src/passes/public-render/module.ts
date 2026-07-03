@@ -200,6 +200,7 @@ function emitPublicSsrRenderModule(
 		asyncBoundaries: input.semanticGraph.asyncBoundaries,
 		asyncBoundaryGates: input.publicRenderPlan.asyncBoundaryGates,
 		nextAsyncBoundaryIndex: 0,
+		asyncRunners: collectSsrAsyncRunners(input),
 		branchSites: input.semanticGraph.branchSites,
 		branchReactivityGates: input.publicRenderPlan.branchReactivityGates,
 		nextBranchSiteIndex: 0,
@@ -223,26 +224,29 @@ function emitPublicSsrRenderModule(
 		'const marklessSsrStateValues = new Map([',
 		stateEntries(input).join(',\n'),
 		']);',
-		'function marklessRenderSsr(props = {}) {',
+		'async function marklessRenderSsr(props = {}) {',
 		destructureProps(rootInfo.propNames),
 		...stateLocalLines(input, 'marklessSsrStateValue'),
 		'	const marklessSsrChildren = [];',
 		'	const marklessSsrBranches = [];',
+		'	const marklessSsrAsyncSnapshots = [];',
 		'	const marklessSsrHostLocators = [];',
 		`	const html = ${htmlExpression};`,
 		'	const marklessSsrComposition = marklessSsrComposeView(payloadView, marklessSsrHostLocators, marklessSsrChildren);',
 		'	const marklessSsrState = marklessComposeState(payloadState, marklessSsrChildren);',
 		'	return {',
 		'		html,',
-		'		state: marklessSsrState,',
+		'		state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots),',
 		'		view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) },',
 		'		propEvents: marklessSsrPropEvents,',
 		'		externalSymbolIds: marklessSsrComposition.externalSymbolIds,',
 		'	};',
 		'}',
 		'function marklessSsrStateValue(graphNodeId) { return marklessSsrStateValues.get(graphNodeId); }',
-		'function marklessSsrRenderChild(children, component, props, child) { const output = component?.renderSsr?.(props); if (output) children.push({ ...child, output, callbackProps: props?.__marklessSsrCallbacks ?? {} }); return output?.html ?? ""; }',
+		'async function marklessSsrRenderChild(children, component, props, child) { const output = await component?.renderSsr?.(props); if (output) children.push({ ...child, output, callbackProps: props?.__marklessSsrCallbacks ?? {} }); return output?.html ?? ""; }',
 		'function marklessSsrBranchArm(branches, id, takenArm) { branches.push({ id, takenArm }); return ""; }',
+		'async function marklessSsrRunAsyncComputed(snapshots, graphNodeId, run) { const signal = new AbortController().signal; try { const value = await run({ key: null, signal }); const snapshot = { status: "fulfilled", version: 1, key: null, value }; snapshots.push({ graphNodeId, snapshot }); return snapshot; } catch (error) { const snapshot = { status: "rejected", version: 1, key: null, error }; snapshots.push({ graphNodeId, snapshot }); return snapshot; } }',
+		'function marklessSsrAttachSnapshots(state, snapshots) { if (snapshots.length === 0) return state; const byId = new Map(snapshots.map((entry) => [entry.graphNodeId, entry.snapshot])); return { ...state, computed: (state.computed ?? []).map((computed) => byId.has(computed.graphNodeId) ? { ...computed, snapshot: byId.get(computed.graphNodeId) } : computed) }; }',
 		'function marklessSsrMergeBranches(payloadBranches, runtimeBranches) { const takenById = new Map(runtimeBranches.map((branch) => [branch.id, branch.takenArm])); return (payloadBranches ?? []).map((branch) => takenById.has(branch.id) ? { ...branch, takenArm: takenById.get(branch.id) } : branch); }',
 		'function marklessSsrHost(hostLocators, hostNodeId, tagName) { hostLocators.push({ hostNodeId, strategy: "dom-order", index: hostLocators.length + (hostLocators.marklessSsrExtraElements ?? 0), tagName }); return ""; }',
 		'function marklessSsrDynamicTagName(value) { if (value === null || value === undefined || value === false || value === "") return null; const tag = String(value); if (!/^[a-zA-Z][a-zA-Z0-9:_.-]*$/.test(tag)) throw new Error("MARKLESS_DYNAMIC_TAG_INVALID: " + tag); return tag; }',
@@ -278,6 +282,11 @@ type SsrRenderContext = {
 	readonly asyncBoundaries: PublicRenderModuleInput['semanticGraph']['asyncBoundaries'];
 	readonly asyncBoundaryGates: PublicRenderModuleInput['publicRenderPlan']['asyncBoundaryGates'];
 	nextAsyncBoundaryIndex: number;
+	// boundaryId -> the async computed the SSR render awaits inline.
+	readonly asyncRunners?: ReadonlyMap<
+		string,
+		{ readonly graphNodeId: string; readonly name: string; readonly source: string }
+	>;
 	readonly branchSites: PublicRenderModuleInput['semanticGraph']['branchSites'];
 	readonly branchReactivityGates: PublicRenderModuleInput['publicRenderPlan']['branchReactivityGates'];
 	nextBranchSiteIndex: number;
@@ -696,11 +705,68 @@ function emitAsyncBoundaryHtml(node: AnyNode, context: HtmlRenderContext): strin
 	const pendingChildren = asNodes((node.pending as AnyNode | undefined)?.body).filter(
 		(child) => !isIgnorableTextNode(child),
 	);
+	const pendingHtml = joinSsrExpressions(
+		pendingChildren.map((child) => emitHtmlNode(child, context)),
+	);
+	const runner = context.mode === 'ssr' ? context.asyncRunners?.get(boundary.id) : undefined;
+	if (context.mode === 'ssr' && runner) {
+		// v1 initial render awaits demanded async nodes and serves the settled
+		// arm; the payload snapshot lets resume start zero runners (spec 03/06).
+		const tryChildren = asNodes((node.block as AnyNode | undefined)?.body).filter(
+			(child) => !isIgnorableTextNode(child),
+		);
+		const tryHtml = joinSsrExpressions(
+			tryChildren.map((child) => emitHtmlNode(child, context)),
+		);
+		const handler = node.handler as AnyNode | undefined;
+		const catchChildren = asNodes((handler?.body as AnyNode | undefined)?.body).filter(
+			(child) => !isIgnorableTextNode(child),
+		);
+		const catchHtml = joinSsrExpressions(
+			catchChildren.map((child) => emitHtmlNode(child, context)),
+		);
+		const catchParam =
+			getIdentifierName(handler?.param as AnyNode | undefined) ?? 'marklessSsrAsyncError';
+		return joinSsrExpressions([
+			JSON.stringify(`<!--markless:async:${boundary.id}-->`),
+			`(((marklessSsrAsyncSnapshot) => marklessSsrAsyncSnapshot.status === "fulfilled" ? ((${runner.name}) => ${tryHtml})(marklessSsrAsyncSnapshot.value) : ((${catchParam}) => ${catchHtml})(marklessSsrAsyncSnapshot.error))(await marklessSsrRunAsyncComputed(marklessSsrAsyncSnapshots, ${JSON.stringify(runner.graphNodeId)}, ${runner.source})))`,
+			JSON.stringify(`<!--/markless:async:${boundary.id}-->`),
+		]);
+	}
 	return joinSsrExpressions([
 		JSON.stringify(`<!--markless:async:${boundary.id}-->`),
-		joinSsrExpressions(pendingChildren.map((child) => emitHtmlNode(child, context))),
+		pendingHtml,
 		JSON.stringify(`<!--/markless:async:${boundary.id}-->`),
 	]);
+}
+
+// The runner's authored async function, keyed by the boundary that demands
+// it. SSR awaits it inline; state locals put its free reads in scope.
+function collectSsrAsyncRunners(
+	input: PublicRenderModuleInput,
+): ReadonlyMap<
+	string,
+	{ readonly graphNodeId: string; readonly name: string; readonly source: string }
+> {
+	const runnersByGraphNode = new Map(
+		input.symbolResolver.symbols.flatMap((symbol) =>
+			symbol.kind === 'async-computed-runner'
+				? [[symbol.graphNodeId, { name: symbol.name, source: symbol.source }] as const]
+				: [],
+		),
+	);
+	const byBoundary = new Map<
+		string,
+		{ readonly graphNodeId: string; readonly name: string; readonly source: string }
+	>();
+	for (const boundary of input.protocolView.asyncBoundaries) {
+		const read = boundary.asyncReads[0];
+		const runner = read ? runnersByGraphNode.get(read.graphNodeId) : undefined;
+		if (read && runner) {
+			byBoundary.set(boundary.id, { graphNodeId: read.graphNodeId, ...runner });
+		}
+	}
+	return byBoundary;
 }
 
 function countDescendantBoundaries(node: AnyNode): number {
@@ -922,7 +988,7 @@ function emitSsrComponent(node: AnyNode, componentName: string, context: SsrRend
 		graphProps: graphReferenceProps(edge),
 	};
 
-	return `marklessSsrRenderChild(marklessSsrChildren, ${localName}, { ${props.join(', ')} }, { hostPrefix: ${JSON.stringify(placement.hostPrefix)}, symbolPrefix: ${JSON.stringify(placement.symbolPrefix)}, localIndex: marklessSsrHostLocators.length, graphProps: ${JSON.stringify(placement.graphProps)} })`;
+	return `(await marklessSsrRenderChild(marklessSsrChildren, ${localName}, { ${props.join(', ')} }, { hostPrefix: ${JSON.stringify(placement.hostPrefix)}, symbolPrefix: ${JSON.stringify(placement.symbolPrefix)}, localIndex: marklessSsrHostLocators.length, graphProps: ${JSON.stringify(placement.graphProps)} }))`;
 }
 
 function emitCsrComponent(node: AnyNode, componentName: string, context: CsrRenderContext): string {

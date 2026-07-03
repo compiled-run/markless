@@ -37,11 +37,11 @@ export type ModulePreloadInput =
 			readonly crossOrigin?: 'anonymous' | 'use-credentials';
 	  };
 
-export function renderToString(
+export async function renderToString(
 	component: SsrRenderable,
 	options: RenderToStringOptions = {},
 ): string {
-	const output = renderSsrOutput(component);
+	const output = await renderSsrOutput(component);
 	const hasPayload = !!output.state || !!output.view;
 	const state = output.state ?? emptyStatePayload();
 	const view = containerScopedView(output.view ?? emptyViewPayload());
@@ -71,7 +71,7 @@ export function renderToString(
 		.join('');
 }
 
-function renderSsrOutput(component: SsrRenderable): SsrRenderOutput {
+async function renderSsrOutput(component: SsrRenderable): Promise<SsrRenderOutput> {
 	if (typeof component === 'function') return component();
 	if (component && typeof component.renderSsr === 'function') return component.renderSsr();
 	throw new TypeError('renderToString(App) requires a compiled TSRX artifact.');
