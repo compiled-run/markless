@@ -354,12 +354,20 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 		input.view.elementHandles,
 	);
 	const hostCleanups = new Map<string, ResumeHostCleanup[]>();
+	// Graph unsubscribes owned by one host element, released when that host's
+	// range is removed. Branch test-read and async boundary subscriptions
+	// belong to the range owner itself and survive range replacement.
+	const hostSubscriptionReleases = new Map<string, Array<() => void>>();
 	const behaviorRecordsByHostId = groupBehaviorRecords(input.view.behaviors);
 	const activeBehaviorHosts = new Set<string>();
 	const dispatchSharedPatch =
 		input.dispatchSharedPatch ?? defaultSharedPatchDispatcher(input.root);
-	if (input.applyDomJournal) {
-		input.graph.subscribeJournal(input.applyDomJournal);
+	const applyDomJournal = input.applyDomJournal;
+	if (applyDomJournal) {
+		input.graph.subscribeJournal((entries) => {
+			disposeRemovedRangeHosts(entries);
+			return applyDomJournal(entries);
+		});
 	}
 	let visibilityObserver: ResumeVisibilityObserver | undefined;
 	let removalObserver: ResumeRemovalObserver | undefined;
@@ -414,7 +422,7 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 		const element = elementsByHostId.get(domUpdate.hostNodeId);
 		if (!element) continue;
 
-		input.graph.subscribe({
+		const release = input.graph.subscribe({
 			id: `view-dom-update:${domUpdate.hostNodeId}:${domUpdate.graphNodeId}:${domUpdate.path.join('.')}`,
 			graphNodeId: domUpdate.graphNodeId,
 			path: domUpdate.path,
@@ -429,6 +437,7 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 				})) as DomJournalResult | void;
 			},
 		});
+		storeHostSubscription(domUpdate.hostNodeId, release);
 	}
 
 	for (const asyncBoundary of asyncBoundariesById.values()) {
@@ -525,7 +534,7 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 
 	for (const behaviorRecord of input.view.behaviors) {
 		for (const inputGraphRead of behaviorRecord.inputGraphReads ?? []) {
-			input.graph.subscribe({
+			const release = input.graph.subscribe({
 				id: `behavior-input:${behaviorRecord.hostNodeId}:${inputGraphRead.inputIndex}:${inputGraphRead.graphNodeId}:${inputGraphRead.path.join('.')}`,
 				graphNodeId: inputGraphRead.graphNodeId,
 				path: inputGraphRead.path,
@@ -535,7 +544,56 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 					await activateBehaviors(behaviorRecord.hostNodeId, { flush: false });
 				},
 			});
+			storeHostSubscription(behaviorRecord.hostNodeId, release);
 		}
+	}
+
+	function storeHostSubscription(hostNodeId: string, release: () => void): void {
+		// Test fakes may stub graph.subscribe without returning an unsubscribe.
+		if (typeof release !== 'function') return;
+
+		const releases = hostSubscriptionReleases.get(hostNodeId) ?? [];
+		releases.push(release);
+		hostSubscriptionReleases.set(hostNodeId, releases);
+	}
+
+	// Spec 06-runtime-resumer: removed nodes clean up their behaviors before
+	// their locators are discarded. Applying a removeRange journal entry for a
+	// branch or async boundary range disposes every host element inside the
+	// range synchronously before the DOM removal happens.
+	function disposeRemovedRangeHosts(entries: ReadonlyArray<DomJournalEntry>): void {
+		for (const entry of entries) {
+			if (entry.type !== 'removeRange') continue;
+
+			const range = ownedRangeAnchors(entry.locator);
+			if (!range) continue;
+
+			const removedElements = elementsBetweenAnchors(
+				input.root,
+				range.startAnchor,
+				range.endAnchor,
+			);
+			for (const hostNodeId of hostIdsInsideRemovedElements(
+				elementsByHostId,
+				removedElements,
+			)) {
+				disposeHost(hostNodeId);
+			}
+		}
+	}
+
+	function ownedRangeAnchors(
+		locator: string,
+	):
+		| { readonly startAnchor: ResumeDomComment; readonly endAnchor: ResumeDomComment }
+		| undefined {
+		if (locator.startsWith('branch:')) {
+			return branchesById.get(locator.slice('branch:'.length));
+		}
+		if (locator.startsWith('async-boundary:')) {
+			return asyncBoundariesById.get(locator.slice('async-boundary:'.length));
+		}
+		return undefined;
 	}
 
 	async function dispatch(
@@ -843,6 +901,9 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 
 		runHostCleanups(hostNodeId);
 
+		for (const release of hostSubscriptionReleases.get(hostNodeId) ?? []) release();
+		hostSubscriptionReleases.delete(hostNodeId);
+
 		if (elementsByHostId.size === 0) {
 			removalObserver?.disconnect?.();
 			removalObserver = undefined;
@@ -1116,6 +1177,36 @@ function collectRemovedElements(
 	for (const child of element.childNodes ?? []) {
 		collectRemovedElements(child, removedElements);
 	}
+}
+
+// Range anchors are siblings, so a document-order walk between them collects
+// exactly the removed sibling subtrees (elements plus their descendants).
+function elementsBetweenAnchors(
+	root: ResumeDomElement,
+	startAnchor: ResumeDomComment,
+	endAnchor: ResumeDomComment,
+): Set<ResumeDomElement> {
+	const inside = new Set<ResumeDomElement>();
+	let withinRange = false;
+
+	function visit(node: ResumeDomNode): void {
+		if (node === startAnchor) {
+			withinRange = true;
+			return;
+		}
+		if (node === endAnchor) {
+			withinRange = false;
+			return;
+		}
+		if (withinRange && node.nodeType === 1) inside.add(node as ResumeDomElement);
+
+		for (const child of node.childNodes ?? []) {
+			visit(child);
+		}
+	}
+
+	visit(root);
+	return inside;
 }
 
 function hostIdsInsideRemovedElements(

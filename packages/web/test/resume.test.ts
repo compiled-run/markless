@@ -2979,3 +2979,235 @@ function updatableBoundaryView(): ResumeViewRecord {
 		],
 	};
 }
+
+test('resume runtime disposes branch-range hosts before applying removeRange', async () => {
+	const start = comment('markless:branch:branch-site:0');
+	const arm = element('BUTTON');
+	const end = comment('/markless:branch:branch-site:0');
+	const root = rangeElement('SECTION', [start, arm, end]);
+	const replacement = element('P');
+	const loadedSymbols: string[] = [];
+	const applied: DomJournalEntry[] = [];
+	const cleanupParents: unknown[] = [];
+	const handleReads: unknown[] = [];
+	const graph = createRuntimeGraph({
+		cells: [
+			{ graphNodeId: 'state:open', value: true },
+			{ graphNodeId: 'state:label', value: 'a' },
+		],
+	});
+	const resume = createResumeRuntime({
+		root,
+		graph,
+		view: {
+			locators: [
+				{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'section' },
+				{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'button' },
+			],
+			events: [{ hostNodeId: 'h0', eventName: 'click', symbolIds: ['symbol:read-handle'] }],
+			domUpdates: [
+				{
+					hostNodeId: 'h1',
+					source: 'label',
+					graphNodeId: 'state:label',
+					path: [],
+					symbolId: 'symbol:dom-update',
+				},
+			],
+			behaviors: [
+				{
+					hostNodeId: 'h1',
+					source: 'chart()',
+					functionSource: 'chart',
+					inputSources: [],
+					inputValues: [],
+					symbolId: 'symbol:chart',
+				},
+			],
+			elementHandles: [{ hostNodeId: 'h1', handleId: 'handle:arm', name: 'armButton' }],
+			asyncBoundaries: [],
+			branches: [
+				{
+					id: 'branch-site:0',
+					startAnchor: { strategy: 'dom-order-comment', index: 0 },
+					endAnchor: { strategy: 'dom-order-comment', index: 1 },
+					symbolId: 'symbol:flip',
+					testReads: [{ source: 'open', graphNodeId: 'state:open', path: [] }],
+				},
+			],
+		},
+		loadSymbol(symbolId) {
+			loadedSymbols.push(symbolId);
+			if (symbolId === 'symbol:chart') {
+				return () => () =>
+					cleanupParents.push((arm as { readonly parentNode?: unknown }).parentNode);
+			}
+			if (symbolId === 'symbol:flip') {
+				return ({ graph: runtimeGraph }) => ({
+					arm: runtimeGraph.read('state:open') ? 0 : 1,
+					html: '<p>Flipped</p>',
+				});
+			}
+			if (symbolId === 'symbol:read-handle') {
+				return (context) => void handleReads.push(context.getElementHandle('handle:arm'));
+			}
+			return () => undefined;
+		},
+		renderBranchHtml: () => [replacement],
+		applyDomJournal(entries) {
+			applied.push(...entries);
+			applyDomJournalEntries(entries, {
+				resolveTarget(locator) {
+					if (locator === 'branch:branch-site:0:start') return start;
+					if (locator === 'branch:branch-site:0:end') return end;
+					return undefined;
+				},
+			});
+		},
+	});
+
+	await resume.start();
+	await resume.activateBehaviors('h1');
+	graph.write({ graphNodeId: 'state:label', value: 'b' });
+	await graph.flush();
+	expect(loadedSymbols).toEqual(['symbol:chart', 'symbol:dom-update']);
+
+	// Flip the branch arm: the outgoing range removes through the DOM journal.
+	graph.write({ graphNodeId: 'state:open', value: false });
+	await graph.flush();
+	await drainMicrotasks();
+	await graph.flush();
+
+	// The behavior cleanup ran before the host detached from its parent.
+	expect(cleanupParents).toEqual([root]);
+	expect(root.childNodes.includes(arm)).toBe(false);
+	expect(root.childNodes[1]).toBe(replacement);
+
+	// The removed host's dom-update subscription released with the range.
+	graph.write({ graphNodeId: 'state:label', value: 'c' });
+	await graph.flush();
+	expect(loadedSymbols.filter((id) => id === 'symbol:dom-update')).toHaveLength(1);
+
+	// The removed host's element handle reads undefined.
+	await root.listeners
+		.find((entry) => entry.type === 'click')!
+		.listener(event('click', root, ''));
+	expect(handleReads).toEqual([undefined]);
+
+	// The branch's own test-read subscription survives: flipping back works.
+	graph.write({ graphNodeId: 'state:open', value: true });
+	await graph.flush();
+	await drainMicrotasks();
+	await graph.flush();
+	expect(loadedSymbols.filter((id) => id === 'symbol:flip')).toHaveLength(2);
+	expect(applied.filter((entry) => entry.type === 'removeRange')).toHaveLength(2);
+});
+
+test('resume runtime disposes pending-range hosts when an async boundary settles', async () => {
+	const start = comment('markless:async:boundary:0');
+	const pending = element('P');
+	const end = comment('/markless:async:boundary:0');
+	const root = rangeElement('SECTION', [start, pending, end]);
+	const fragmentNode = element('P');
+	const loadedSymbols: string[] = [];
+	const applied: DomJournalEntry[] = [];
+	const cleanupParents: unknown[] = [];
+	let result = deferred<{ title: string }>();
+	const graph = createRuntimeGraph({
+		cells: [
+			{ graphNodeId: 'state:userId', value: 'ada' },
+			{ graphNodeId: 'state:tick', value: 0 },
+		],
+		asyncComputed: [
+			{
+				graphNodeId: 'computed:details',
+				dependencies: [{ graphNodeId: 'state:userId', path: [] }],
+				key: (read) => read('state:userId'),
+				run: () => result.promise,
+			},
+		],
+	});
+	const resume = createResumeRuntime({
+		root,
+		graph,
+		view: {
+			...updatableBoundaryView(),
+			locators: [
+				{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'section' },
+				{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'p' },
+			],
+			domUpdates: [
+				{
+					hostNodeId: 'h1',
+					source: 'tick',
+					graphNodeId: 'state:tick',
+					path: [],
+					symbolId: 'symbol:pending-update',
+				},
+			],
+			behaviors: [
+				{
+					hostNodeId: 'h1',
+					source: 'spinner()',
+					functionSource: 'spinner',
+					inputSources: [],
+					inputValues: [],
+					symbolId: 'symbol:spinner',
+				},
+			],
+		},
+		loadSymbol(symbolId) {
+			loadedSymbols.push(symbolId);
+			if (symbolId === 'symbol:spinner') {
+				return () => () =>
+					cleanupParents.push((pending as { readonly parentNode?: unknown }).parentNode);
+			}
+			if (symbolId === 'symbol:boundary-update') {
+				return ({ status }) => ({
+					arm: status === 'rejected' ? 1 : 0,
+					html: '<p>Done</p>',
+				});
+			}
+			return () => undefined;
+		},
+		renderBranchHtml: () => [fragmentNode],
+		applyDomJournal(entries) {
+			applied.push(...entries);
+			applyDomJournalEntries(entries, {
+				resolveTarget(locator) {
+					if (locator === 'async-boundary:boundary:0:start') return start;
+					if (locator === 'async-boundary:boundary:0:end') return end;
+					return undefined;
+				},
+			});
+		},
+	});
+
+	await resume.start();
+	await resume.activateBehaviors('h1');
+	graph.write({ graphNodeId: 'state:tick', value: 1 });
+	await graph.flush();
+	expect(loadedSymbols).toEqual(['symbol:spinner', 'symbol:pending-update']);
+
+	result.resolve({ title: 'User ada' });
+	await drainMicrotasks();
+	await graph.flush();
+
+	// The @pending host cleaned up before the range detached, and its
+	// dom-update subscription released with it.
+	expect(cleanupParents).toEqual([root]);
+	expect(root.childNodes.includes(pending)).toBe(false);
+	graph.write({ graphNodeId: 'state:tick', value: 2 });
+	await graph.flush();
+	expect(loadedSymbols.filter((id) => id === 'symbol:pending-update')).toHaveLength(1);
+
+	// The boundary's own subscription survives: revalidation settles again.
+	applied.length = 0;
+	result = deferred<{ title: string }>();
+	graph.write({ graphNodeId: 'state:userId', value: 'grace' });
+	await graph.flush();
+	result.resolve({ title: 'User grace' });
+	await drainMicrotasks();
+	await graph.flush();
+	expect(applied.filter((entry) => entry.type === 'removeRange')).toHaveLength(1);
+});
