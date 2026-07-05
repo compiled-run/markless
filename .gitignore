@@ -25,3 +25,4 @@ docs/goals/
 # Vitest browser-mode failure artifacts (churn on every red run)
 packages/vitest-browser/.vitest-attachments/
 packages/vitest-browser/browser/__screenshots__/
+.fable-codex/

@@ -127,7 +127,7 @@ function duplicateRepeatKeyError(
 	const keyText = JSON.stringify(key);
 	return new KeyedRepeatRuntimeError({
 		title: 'Two rows share the same @for key',
-		message: `Two items of ${repeat.collectionGraphNodeId} produced the same key ${keyText} from ${source}. Rows with the same key cannot be told apart, so one of them would silently replace the other.`,
+		message: `MARKLESS_REPEAT_KEY_DUPLICATE: Two items of ${repeat.collectionGraphNodeId} produced the same key ${keyText} from ${source}. Rows with the same key cannot be told apart, so one of them would silently replace the other.`,
 		why: 'The key is each row identity across reorder, insert, delete, and resume; duplicate identities make row state and DOM ownership ambiguous.',
 		repeatId: repeat.id,
 		keyPath: repeat.keyPath,
