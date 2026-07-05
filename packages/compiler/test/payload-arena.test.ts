@@ -81,6 +81,21 @@ export function App() @{
 }
 `;
 
+const repeatedHandleSource = `
+import { state, element } from '@markless/core';
+
+export function App() @{
+	const rows = state([{ id: 'a' }]);
+	let rowInput = element<HTMLInputElement>();
+
+	<ul>
+		@for (const row of rows; key row.id) {
+			<li><input el={rowInput} value={row.id} /></li>
+		}
+	</ul>
+}
+`;
+
 test('planPayloadArena separates graph state from view wiring metadata', async () => {
 	const semanticGraph = await buildSemanticGraph({
 		filename: 'src/App.tsrx',
@@ -254,6 +269,21 @@ test('planPayloadArena carries keyed repeat metadata into the resumable view pla
 			keyPath: ['key'],
 		},
 	]);
+});
+
+test('B918 does not emit flat element handle records for repeated hosts', async () => {
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/RepeatedHandles.tsrx',
+		source: repeatedHandleSource,
+	});
+	const stateLowering = lowerStateAccess({ semanticGraph });
+
+	const payload = planPayloadArena({ semanticGraph, stateLowering });
+
+	expect(semanticGraph.diagnostics).toEqual([
+		expect.objectContaining({ code: 'MARKLESS_ELEMENT_HANDLE_DUPLICATE' }),
+	]);
+	expect(payload.view.elementHandles).toEqual([]);
 });
 
 test('planPayloadArena keeps distinct targets for repeated graph reads on one host', async () => {

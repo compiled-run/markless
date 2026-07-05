@@ -3,6 +3,7 @@ import { expressionSource, expressionSourceOrFallback } from '../../ast/source.t
 import {
 	moduleScopeGraphCreationDiagnostic,
 	frameworkImportRequiredDiagnostic,
+	moduleScopeElementDiagnostic,
 } from './diagnostics.ts';
 import { evaluateSyncPolicyConstant } from './collect-state.ts';
 import { getFrameworkApiForCall, getCallName, isFrameworkApiName } from './imports.ts';
@@ -47,6 +48,13 @@ export function collectModuleScopeGraphCreation(statement: AnyNode, state: WalkS
 
 		if (frameworkApi === 'shared' && name && init) {
 			collectSharedDefinition({ name, init, state });
+			continue;
+		}
+
+		if (frameworkApi === 'element') {
+			state.graph.diagnostics.push(
+				moduleScopeElementDiagnostic(moduleScopeDeclarationName(id, state.source), init, state.filename),
+			);
 			continue;
 		}
 

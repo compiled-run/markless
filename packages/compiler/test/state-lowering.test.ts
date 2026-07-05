@@ -58,6 +58,20 @@ export function Greeting({ label }: { label: string }) @{
 }
 `;
 
+const elementHandleWriteSource = `
+import { state, element } from '@markless/core';
+
+export function Handles() @{
+	let input = element<HTMLInputElement>();
+	const saved = state({ current: null });
+
+	<>
+		<button onClick={() => saved.current = input}>Save</button>
+		<input el={input} />
+	</>
+}
+`;
+
 const constReassignmentSource = `
 import { state } from '@markless/core';
 
@@ -329,6 +343,25 @@ test('lowerStateAccess reports optional-chain deletes collected from real source
 			phase: 'state-lowering',
 			source: 'menu?.a',
 			statePath: 'menu?.a',
+		}),
+	]);
+});
+
+test('B918 reports element handles written into state', async () => {
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/Handles.tsrx',
+		source: elementHandleWriteSource,
+	});
+
+	const lowered = lowerStateAccess({ semanticGraph });
+
+	expect(lowered.writes).toEqual([]);
+	expect(lowered.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_STATE_ELEMENT_HANDLE_UNSERIALIZABLE',
+			phase: 'state-lowering',
+			message: expect.stringContaining('input'),
+			statePath: 'saved.current',
 		}),
 	]);
 });

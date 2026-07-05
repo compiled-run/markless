@@ -96,6 +96,33 @@ export function Handles() @{
 }
 `;
 
+const b918HandleGuardsSource = `
+import { state, element } from '@markless/core';
+
+const moduleHandle = element<HTMLInputElement>();
+
+function Field(props: { forwarded: unknown }) @{
+	<input el={props.forwarded} />
+}
+
+export function Handles() @{
+	let input = element<HTMLInputElement>();
+	let unbound = element<HTMLButtonElement>();
+	const saved = state({ current: null });
+	saved.current = input;
+
+	<section>
+		<Field forwarded={input} />
+		<p>{unbound}</p>
+		<p>{input.textContent}</p>
+		@for (const row of state([{ id: 'a' }]); key row.id) {
+			<input el={input} value={row.id} />
+		}
+		<input el={moduleHandle} />
+	</section>
+}
+`;
+
 const templateAsValueSource = `import { state, computed } from '@markless/core'; export function App() @{ const banner = <h1>Hi</h1>; const rows = []; rows.push(<li>One</li>); const view = state(<p>Stored</p>); const card = computed(() => <article>Card</article>); const tiles = [<span>Tile</span>]; <section>{banner}{rows}{view}{card}{tiles}</section> }`;
 
 const componentAttachSource = `
@@ -879,6 +906,75 @@ test('buildSemanticGraph reports element handles stored in state', async () => {
 				},
 			],
 			docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_ELEMENT_HANDLE_UNSERIALIZABLE',
+		}),
+	]);
+});
+
+test('B918 reports honest element handle guard diagnostics', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/Handles.tsrx',
+		source: b918HandleGuardsSource,
+	});
+
+	expect(graph.diagnostics.map((diagnostic) => diagnostic.code)).toEqual(
+		expect.arrayContaining([
+		'MARKLESS_ELEMENT_MODULE_SCOPE',
+		'MARKLESS_ELEMENT_HANDLE_PROP_UNSUPPORTED',
+		'MARKLESS_ELEMENT_HANDLE_UNBOUND',
+		'MARKLESS_ELEMENT_HANDLE_RENDER_READ',
+		'MARKLESS_ELEMENT_HANDLE_DUPLICATE',
+	]),
+	);
+	expect(graph.diagnostics).toEqual(expect.arrayContaining([
+		expect.objectContaining({
+			code: 'MARKLESS_ELEMENT_MODULE_SCOPE',
+			message: expect.stringContaining('moduleHandle'),
+		}),
+		expect.objectContaining({
+			code: 'MARKLESS_ELEMENT_HANDLE_PROP_UNSUPPORTED',
+			message: expect.stringContaining('props.forwarded'),
+		}),
+		expect.objectContaining({
+			code: 'MARKLESS_ELEMENT_HANDLE_UNBOUND',
+			severity: 'warning',
+			message: expect.stringContaining('unbound'),
+		}),
+		expect.objectContaining({
+			code: 'MARKLESS_ELEMENT_HANDLE_RENDER_READ',
+			message: expect.stringContaining('input.textContent'),
+		}),
+		expect.objectContaining({
+			code: 'MARKLESS_ELEMENT_HANDLE_DUPLICATE',
+			message: expect.stringContaining('inside a keyed repeat'),
+			elementLocator: 'h4',
+		}),
+	]));
+	expect(graph.diagnostics.map((diagnostic) => diagnostic.message).join('\n')).not.toContain(
+		'not an element() handle',
+	);
+});
+
+test('B918 allows suppressing unbound handle warnings at the read site', async () => {
+	const source = `
+import { element } from '@markless/core';
+
+export function Handles() @{
+	let unbound = element<HTMLButtonElement>();
+
+	<section>
+		// markless-allow MARKLESS_ELEMENT_HANDLE_UNBOUND: read intentionally observes undefined before binding
+		<p>{unbound}</p>
+	</section>
+}
+`;
+	const graph = await buildSemanticGraph({ filename: 'src/Handles.tsrx', source });
+
+	expect(graph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_ELEMENT_HANDLE_UNBOUND',
+			severity: 'warning',
+			suppressed: true,
+			suppressionReason: 'read intentionally observes undefined before binding',
 		}),
 	]);
 });

@@ -168,6 +168,22 @@ export function moduleScopeGraphCreationDiagnostic(
 	};
 }
 
+export function moduleScopeElementDiagnostic(
+	name: string,
+	init: AnyNode | undefined,
+	filename: string,
+): SemanticGraphDiagnostic {
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_ELEMENT_MODULE_SCOPE',
+		title: 'element() cannot be created at module scope',
+		message: `Cannot create element handle "${name}" at module scope.`,
+		why: 'Element handles are per-render DOM locators. A module-scope handle would be shared across requests and cannot point at one document-owned host element.',
+		span: init ? sourceSpan(init, filename) : fallbackSpan(filename),
+		suggestion: 'Move element() creation into the component that owns the host element and bind it with el={handle}.',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_MODULE_SCOPE',
+	});
+}
+
 export function unstableStateCreationSiteDiagnostic(input: {
 	readonly name: string;
 	readonly apiName: 'state' | 'computed';
@@ -546,16 +562,77 @@ export function elementHandleRequiredDiagnostic(
 	};
 }
 
+export function elementHandlePropUnsupportedDiagnostic(
+	binding: SemanticElementHandleBinding,
+): SemanticGraphDiagnostic {
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_ELEMENT_HANDLE_PROP_UNSUPPORTED',
+		title: 'Prop-forwarded element handles are not supported yet',
+		message: `Cannot bind el={${binding.handleName}} because prop-forwarded element handles need handle tracking across component edges, which this compiler slice does not support yet.`,
+		why: 'The Markless element-handle model allows handles to pass through component props, but the current semantic graph only proves same-component handle ownership.',
+		span: binding.sourceSpan,
+		suggestion: 'For now, create and bind the element() handle in the component that renders the host element. Prop-handle forwarding will be enabled by the dedicated capability slice.',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_PROP_UNSUPPORTED',
+	});
+}
+
+export function unboundElementHandleDiagnostic(input: {
+	readonly handleName: string;
+	readonly source: string;
+	readonly sourceSpan?: SourceSpan;
+}): SemanticGraphDiagnostic {
+	return {
+		code: 'MARKLESS_ELEMENT_HANDLE_UNBOUND',
+		severity: 'warning',
+		phase: 'semantic-graph',
+		title: 'element() handle is read before it is bound',
+		message: `Reading element handle "${input.source}" will produce undefined because "${input.handleName}" is never bound with el={${input.handleName}} in this component.`,
+		why: 'element() handles are DOM locator references, not state. A read is only useful after the handle has a host element binding that resume can locate.',
+		primarySpan: input.sourceSpan,
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		source: input.source,
+		suggestions: [
+			{
+				message:
+					'Bind the handle to one host element with el={handle}, or remove the read if undefined is intentional.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_UNBOUND',
+	};
+}
+
+export function elementHandleRenderReadDiagnostic(input: {
+	readonly handleName: string;
+	readonly source: string;
+	readonly sourceSpan?: SourceSpan;
+}): SemanticGraphDiagnostic {
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_ELEMENT_HANDLE_RENDER_READ',
+		title: 'DOM handles cannot be read while rendering',
+		message: `Cannot render "${input.source}" because "${input.handleName}" is an element() handle, not serializable graph state.`,
+		why: 'During initial render the browser DOM element does not exist, and browser resume does not rerun component bodies. Element handles are available to lazy event or behavior code after resume locates the host node.',
+		span: input.sourceSpan,
+		suggestion: 'Read DOM properties inside an event handler or attach behavior, and render serializable state() or computed() data instead.',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_RENDER_READ',
+	});
+}
+
 export function duplicateElementHandleDiagnostic(
 	binding: SemanticElementHandleBinding,
 ): SemanticGraphDiagnostic {
+	const repeated = binding.keyedRepeatScopeIds.length > 0;
 	return {
 		code: 'MARKLESS_ELEMENT_HANDLE_DUPLICATE',
 		severity: 'error',
 		phase: 'semantic-graph',
 		title: 'element() handle is bound more than once',
-		message: `Cannot bind element handle "${binding.handleName}" to multiple live host elements.`,
-		why: 'A resumed element handle must resolve to one current DOM locator. Binding one handle to multiple live elements would make lazy event code ambiguous.',
+		message: repeated
+			? `Cannot bind element handle "${binding.handleName}" inside a keyed repeat because one authored handle would point at many row host elements.`
+			: `Cannot bind element handle "${binding.handleName}" to multiple live host elements.`,
+		why: repeated
+			? 'Each repeated row has its own DOM locator. A single element() handle cannot serialize one stable locator for every row instance.'
+			: 'A resumed element handle must resolve to one current DOM locator. Binding one handle to multiple live elements would make lazy event code ambiguous.',
 		primarySpan: binding.sourceSpan,
 		passId: 'tsrx-semantic-graph',
 		artifactKeys: ['semanticGraph'],

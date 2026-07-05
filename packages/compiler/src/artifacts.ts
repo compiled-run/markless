@@ -215,6 +215,10 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_SHARED_DEFINITION_CYCLE'
 		| 'MARKLESS_ELEMENT_HANDLE_REQUIRED'
 		| 'MARKLESS_ELEMENT_HANDLE_DUPLICATE'
+		| 'MARKLESS_ELEMENT_HANDLE_UNBOUND'
+		| 'MARKLESS_ELEMENT_HANDLE_PROP_UNSUPPORTED'
+		| 'MARKLESS_ELEMENT_MODULE_SCOPE'
+		| 'MARKLESS_ELEMENT_HANDLE_RENDER_READ'
 		| 'MARKLESS_ATTACH_HOST_ELEMENT_REQUIRED'
 		| 'MARKLESS_EVENT_HANDLER_NOT_A_FUNCTION'
 		| 'MARKLESS_SYNC_POLICY_UNEXTRACTABLE'
@@ -297,6 +301,7 @@ export type SemanticElementHandleBinding = {
 	readonly hostNodeId: string;
 	readonly handleName: string;
 	readonly sourceSpan?: SourceSpan;
+	readonly keyedRepeatScopeIds: ReadonlyArray<string>;
 };
 
 export type SemanticBehavior = {
@@ -366,6 +371,7 @@ export type StateLoweringDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_STATE_CONST_REASSIGNMENT'
 		| 'MARKLESS_STATE_STALE_LOCAL_WRITE'
 		| 'MARKLESS_STATE_MODULE_ESCAPE'
+		| 'MARKLESS_STATE_ELEMENT_HANDLE_UNSERIALIZABLE'
 		| 'MARKLESS_TEMPLATE_EXPRESSION_STATIC';
 	readonly phase: 'state-lowering';
 	readonly passId: 'state-lowering';
