@@ -7,6 +7,7 @@ import {
 	getElementTagName,
 	isHostTagName,
 	isIgnorableJsxTextNode,
+	isSpreadAttribute,
 	staticTextValue,
 	trimmedStaticTextValue,
 	unwrapExpressionContainer,
@@ -35,10 +36,15 @@ import {
 } from './collect-sync-policy.ts';
 import {
 	attachHostElementRequiredDiagnostic,
+	attributeObjectValueDiagnostic,
+	duplicateAttributeDiagnostic,
 	duplicateElementHandleDiagnostic,
 	elementHandleRequiredDiagnostic,
 	elementHandlePropUnsupportedDiagnostic,
 	elementHandleRenderReadDiagnostic,
+	eventSpreadUnsupportedDiagnostic,
+	spreadStaticSnapshotDiagnostic,
+	styleObjectUnsupportedDiagnostic,
 	unboundElementHandleDiagnostic,
 } from './diagnostics.ts';
 import type { MutableSemanticGraphArtifact, SemanticGraphWalk, WalkState } from './types.ts';
@@ -60,6 +66,7 @@ export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGr
 		state.currentHostNodeId = hostNodeId;
 	}
 
+	collectDuplicateAttributeDiagnostics(node, state, tagName, isHostElement);
 	for (const attribute of getElementAttributes(node)) {
 		collectAttribute(
 			attribute,
@@ -254,6 +261,11 @@ function collectAttribute(
 	ownerTagName: string | null,
 	isHostElement: boolean,
 ): void {
+	if (isSpreadAttribute(attribute)) {
+		collectSpreadAttribute(attribute, state, walk, hostNodeId);
+		return;
+	}
+
 	const attributeName = getIdentifierName(attribute.name as AnyNode | undefined);
 	if (!attributeName) return;
 
@@ -353,6 +365,8 @@ function collectAttribute(
 	}
 
 	if (expressionValue && expressionValue.type !== 'Literal') {
+		const attributeDiagnostic = attributeValueDiagnostic(attributeName, expressionValue, state);
+		if (attributeDiagnostic) state.graph.diagnostics.push(attributeDiagnostic);
 		state.graph.templateReads.push({
 			hostNodeId,
 			source: expressionSource(expressionValue, state.source),
@@ -362,6 +376,114 @@ function collectAttribute(
 		});
 		walk(expressionValue, state);
 	}
+}
+
+function collectDuplicateAttributeDiagnostics(
+	node: AnyNode,
+	state: WalkState,
+	tagName: string | null,
+	isHostElement: boolean,
+): void {
+	if (!isHostElement) return;
+	const seen = new Map<string, AnyNode>();
+	for (const attribute of getElementAttributes(node)) {
+		if (isSpreadAttribute(attribute)) continue;
+		const name = getIdentifierName(attribute.name as AnyNode | undefined);
+		if (!name || isEventAttribute(name) || name === 'attach' || name === 'el') continue;
+		const previous = seen.get(name);
+		if (previous) {
+			state.graph.diagnostics.push(
+				duplicateAttributeDiagnostic({
+					tagName,
+					attributeName: name,
+					duplicate: attribute,
+					filename: state.filename,
+				}),
+			);
+			continue;
+		}
+		seen.set(name, attribute);
+	}
+}
+
+function collectSpreadAttribute(
+	attribute: AnyNode,
+	state: WalkState,
+	walk: SemanticGraphWalk,
+	hostNodeId: string | null,
+): void {
+	const argument = attribute.argument as AnyNode | undefined;
+	if (!argument) return;
+	if (!hostNodeId) {
+		walk(argument, state);
+		return;
+	}
+
+	const spreadSource = expressionSource(argument, state.source);
+	const objectKeys = staticObjectKeys(resolveStaticObjectExpression(argument, state));
+	const eventKeys = objectKeys.filter(isSpreadEventKey);
+	if (eventKeys.length > 0) {
+		state.graph.diagnostics.push(
+			eventSpreadUnsupportedDiagnostic({
+				spreadSource,
+				keys: eventKeys,
+				node: argument,
+				filename: state.filename,
+			}),
+		);
+		walk(argument, state);
+		return;
+	}
+
+	const resolved = resolveGraphPath(spreadSource, graphBindingMap(state.graph), semanticAliasMap(state.graph));
+	if (resolved?.binding.kind === 'state' || resolved?.binding.kind === 'computed') {
+		state.graph.diagnostics.push(
+			spreadStaticSnapshotDiagnostic({
+				spreadSource,
+				node: argument,
+				filename: state.filename,
+			}),
+		);
+	}
+	walk(argument, state);
+}
+
+function attributeValueDiagnostic(
+	attributeName: string,
+	expressionValue: AnyNode,
+	state: WalkState,
+): SemanticGraphDiagnostic | null {
+	const valueSource = expressionSource(expressionValue, state.source);
+	if (isLowercaseEventAttributeName(attributeName) && isFunctionExpressionLike(expressionValue)) {
+		return attributeObjectValueDiagnostic({
+			attributeName,
+			valueSource,
+			node: expressionValue,
+			filename: state.filename,
+			eventSuggestion: eventAttributeSuggestion(attributeName),
+		});
+	}
+
+	const resolved = resolveGraphPath(valueSource, graphBindingMap(state.graph), semanticAliasMap(state.graph));
+	const isObjectValue =
+		expressionValue.type === 'ObjectExpression' ||
+		expressionValue.type === 'ArrayExpression' ||
+		(resolved?.path.length === 0 &&
+			(resolved.binding.valueKind === 'object' || resolved.binding.valueKind === 'array'));
+	if (!isObjectValue) return null;
+	if (attributeName === 'style') {
+		return styleObjectUnsupportedDiagnostic({
+			valueSource,
+			node: expressionValue,
+			filename: state.filename,
+		});
+	}
+	return attributeObjectValueDiagnostic({
+		attributeName,
+		valueSource,
+		node: expressionValue,
+		filename: state.filename,
+	});
 }
 
 function resolvePropForwardedElementHandle(
@@ -519,6 +641,49 @@ function bindingTargetForAttribute(attributeName: string): SemanticTemplateBindi
 
 function isDomPropertyBindingName(attributeName: string): boolean {
 	return attributeName === 'value' || attributeName === 'checked' || attributeName === 'selected';
+}
+
+function resolveStaticObjectExpression(node: AnyNode, state: WalkState): AnyNode | null {
+	if (node.type === 'ObjectExpression') return node;
+	const name = getIdentifierName(node);
+	if (!name) return null;
+	let found: AnyNode | null = null;
+	const ast = parseModule(state.source, state.filename) as unknown as AnyNode;
+	walkNode(ast, (candidate) => {
+		if (found || candidate.type !== 'VariableDeclarator') return;
+		const id = candidate.id as AnyNode | undefined;
+		const init = candidate.init as AnyNode | undefined;
+		if (getIdentifierName(id) === name && init?.type === 'ObjectExpression') found = init;
+	});
+	return found;
+}
+
+function staticObjectKeys(node: AnyNode | null): string[] {
+	if (!node || node.type !== 'ObjectExpression') return [];
+	return asNodes(node.properties).flatMap((property) => {
+		if (property.type !== 'Property') return [];
+		const key = property.key as AnyNode | undefined;
+		const name = getIdentifierName(key);
+		if (name) return [name];
+		if (key?.type === 'Literal' && typeof key.value === 'string') return [key.value];
+		return [];
+	});
+}
+
+function isSpreadEventKey(key: string): boolean {
+	return /^on[A-Z]/.test(key) || key === 'attach' || key === 'el';
+}
+
+function isLowercaseEventAttributeName(attributeName: string): boolean {
+	return /^on[a-z]/.test(attributeName);
+}
+
+function eventAttributeSuggestion(attributeName: string): string {
+	return `on${attributeName.slice(2, 3).toUpperCase()}${attributeName.slice(3)}`;
+}
+
+function isFunctionExpressionLike(node: AnyNode): boolean {
+	return node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression';
 }
 
 function unextractableSyncPolicyDiagnostic(attributeName: string, value: AnyNode | undefined, handlers: ReadonlyArray<AnyNode>, state: Pick<WalkState, 'filename' | 'source'>): SemanticGraphDiagnostic {
