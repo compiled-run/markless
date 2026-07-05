@@ -47,6 +47,17 @@ export async function buildSemanticGraph(
 		graph,
 		frameworkApiImports,
 	});
+	state.walk = walk;
+	for (const statement of statements) {
+		const declaration =
+			statement.type === 'ExportNamedDeclaration'
+				? ((statement.declaration as AnyNode | undefined) ?? statement)
+				: statement;
+		if (declaration.type !== 'FunctionDeclaration') continue;
+		if (getComponentFunction(statement)) continue;
+		const name = getIdentifierName(declaration.id as AnyNode | undefined);
+		if (name) state.helperFunctions.set(name, declaration);
+	}
 
 	for (const statement of statements) {
 		collectModuleScopeGraphCreation(statement, state);
@@ -55,17 +66,6 @@ export async function buildSemanticGraph(
 
 	collectSharedDefinitionDependencies(statements, state);
 	collectSharedFactoryGraph(statements, state, walk);
-
-	for (const statement of statements) {
-		if (getComponentFunction(statement)) continue;
-		const declaration =
-			statement.type === 'ExportNamedDeclaration'
-				? ((statement.declaration as AnyNode | undefined) ?? statement)
-				: statement;
-		if (declaration.type === 'FunctionDeclaration') {
-			withCreationSite(state, 'helper', () => walk(declaration.body as AnyNode, state));
-		}
-	}
 
 	for (const statement of statements) {
 		const componentFunction = getComponentFunction(statement);

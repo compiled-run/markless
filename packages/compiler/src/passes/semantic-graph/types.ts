@@ -63,6 +63,9 @@ export type WalkState = {
 	currentSharedDefinitionId: string | null;
 	currentCreationSite: 'computed' | 'handler' | 'helper' | 'branch' | 'loop' | null;
 	currentFunctionSite: 'computed' | 'handler' | 'helper' | null;
+	currentHelperCall: HelperStateCallSite | null;
+	helperFunctions: Map<string, AnyNode>;
+	walk: SemanticGraphWalk | null;
 	nextComponentEdgeId: number;
 	nextBranchId: number;
 	nextHostId: number;
@@ -123,6 +126,9 @@ export function createWalkState(input: {
 		currentSharedDefinitionId: null,
 		currentCreationSite: null,
 		currentFunctionSite: null,
+		currentHelperCall: null,
+		helperFunctions: new Map(),
+		walk: null,
 		nextComponentEdgeId: 0,
 		nextBranchId: 0,
 		nextHostId: 0,
@@ -134,3 +140,9 @@ export function createWalkState(input: {
 }
 
 export type ModuleScopeDeclarationNode = AnyNode;
+
+export type HelperStateCallSite = {
+	readonly componentName: string;
+	readonly localName: string;
+	readonly helperName: string;
+};

@@ -373,13 +373,6 @@ const unstableCreationCases = [
 		cell: 'state:item',
 		source: `import { state } from '@markless/core'; export function App() @{ for (let i = 0; i < 3; i++) { const item = state(i); } <p>done</p> }`,
 	},
-	{
-		name: 'helper functions',
-		code: 'MARKLESS_STATE_HELPER_RETURN_UNSUPPORTED',
-		message: 'helper-created state is coming',
-		cell: 'state:inner',
-		source: `import { state } from '@markless/core'; function useCounter() { let inner = state(0); return inner; } export function App() @{ const count = useCounter(); <button onClick={() => count++}>{count}</button> }`,
-	},
 ] as const;
 
 for (const scenario of unstableCreationCases) {
@@ -415,6 +408,30 @@ test('buildSemanticGraph keeps stable component-body and module-scope creation a
 		'MARKLESS_STATE_MODULE_SCOPE',
 	]);
 	expect(protocolState.cells.map((cell) => cell.graphNodeId)).toEqual(['state:count']);
+});
+
+test('B905s2 helper-created state records call-site cells and keeps unsupported sites gated', async () => {
+	const [same, two, branch, cross] = await Promise.all([
+		buildSemanticGraph({ filename: 'src/HelperCounter.tsrx', source: `import { state } from '@markless/core'; function counterPair() { const n = state(3); return n; } export function App() @{ const count = counterPair(); <button onClick={() => count++}>{count}</button> }` }),
+		buildSemanticGraph({ filename: 'src/TwoCounters.tsrx', source: `import { state } from '@markless/core'; function counterPair() { const n = state(1); return n; } export function Left() @{ const left = counterPair(); <button onClick={() => left++}>{left}</button> } export function Right() @{ const right = counterPair(); <button onClick={() => right++}>{right}</button> }` }),
+		buildSemanticGraph({ filename: 'src/HelperBranch.tsrx', source: `import { state } from '@markless/core'; function makeToggle() { if (true) { const enabled = state(false); return enabled; } return false; } export function App() @{ const active = makeToggle(); <p>{active}</p> }` }),
+		buildSemanticGraph({ filename: 'src/App.tsrx', source: `import { counterPair } from './helpers.tsrx'; export function App() @{ const count = counterPair(); <button onClick={() => count++}>{count}</button> }` }),
+	]);
+
+	expect(same.diagnostics).toEqual([]);
+	expect(same.graphBindings).toEqual([
+		expect.objectContaining({ id: 'state:App.count.counterPair.n', name: 'App_count_counterPair_n', initialValue: 3 }),
+	]);
+	expect(same.aliases).toEqual([
+		expect.objectContaining({ name: 'count', target: 'App_count_counterPair_n', declarationKind: 'let' }),
+	]);
+	expect(same.stateWrites).toEqual([expect.objectContaining({ target: 'count' })]);
+	expect(two.graphBindings.map((binding) => binding.id)).toEqual([
+		'state:Left.left.counterPair.n',
+		'state:Right.right.counterPair.n',
+	]);
+	expect(branch.diagnostics[0]).toEqual(expect.objectContaining({ code: 'MARKLESS_STATE_CREATION_SITE_UNSTABLE' }));
+	expect(cross.diagnostics[0]).toEqual(expect.objectContaining({ code: 'MARKLESS_STATE_HELPER_RETURN_UNSUPPORTED' }));
 });
 
 test('buildSemanticGraph records component edges from TSRX AST', async () => {

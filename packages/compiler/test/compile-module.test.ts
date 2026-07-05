@@ -3728,6 +3728,46 @@ export function Scoreboard() @{
 	expect(loadSymbolCalls.get(incrementSymbol!.id)).toBe(1);
 });
 
+test('B905s2 compile output renders and updates same-module helper-created state', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/HelperCounter.tsrx',
+		source: `import { state } from '@markless/core'; function counterPair() { const n = state(5); return n; } export function App() @{ const count = counterPair(); <button onClick={() => count++}>{count}</button> }`,
+		symbols: [],
+	});
+	const incrementSymbol = result.symbolResolver.symbols.find((symbol) =>
+		symbol.source.includes('count++'),
+	);
+	const incrementModule = result.symbolModules.modules.find(
+		(module) => module.symbolId === incrementSymbol?.id,
+	);
+
+	expect(result.semanticGraph.diagnostics).toEqual([]);
+	expect(result.stateLowering.diagnostics).toEqual([]);
+	expect(payloadStateCellValue(result.protocolState, 'state:App.count.counterPair.n')).toBe(5);
+	expect(incrementModule?.source).toContain('graphNodeId: "state:App.count.counterPair.n"');
+
+	const incrementExports = await importPublicRenderTestModule(incrementModule!.source);
+	const document = { createElement: (tagName: string) => tagName === 'template' ? new PublicRenderTestTemplate() : new PublicRenderTestElement(tagName) };
+	const csrSource = `const document = globalThis.__marklessPublicRenderTestDocument; const loadSymbol = () => undefined; const payloadState = ${JSON.stringify(result.protocolState)}; const payloadView = ${JSON.stringify(result.protocolView)}; const state = (value) => value;\n${result.publicRenderModule.csrModuleSource}\nexport { marklessRenderCsr };`;
+	const csrModule = await importPublicRenderTestModule(csrSource, { document });
+	const rendered = (csrModule.marklessRenderCsr as () => unknown)() as { readonly root: PublicRenderTestElement };
+	const button = elementsByTag(rendered.root, 'button')[0]!;
+	let value = 5;
+	const handler = incrementExports[incrementModule!.exportName] as (context: any) => unknown;
+
+	expect(button.textContent).toBe('5');
+	handler({
+		graph: {
+			update(input) {
+				expect(input.graphNodeId).toBe('state:App.count.counterPair.n');
+				value = input.update(value) as number;
+				return value;
+			},
+		},
+	});
+	expect(value).toBe(6);
+});
+
 test('compileTsrxModule composes child-component branch records in CSR views', async () => {
 	const child = await compileTsrxModule({
 		filename: 'src/StatusBadge.tsrx',
