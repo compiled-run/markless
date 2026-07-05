@@ -96,3 +96,35 @@ export function noRenderableRootDiagnostic(input: {
 		docsUrl: 'https://markless.dev/errors/MARKLESS_PUBLIC_RENDER_ROOT_UNSUPPORTED',
 	};
 }
+
+export function unsupportedRenderBodyDiagnostic(input: { readonly node: AnyNode; readonly filename: string; readonly message: string; readonly suggestion: string; }): CompilerDiagnostic {
+	return {
+		code: 'MARKLESS_RENDER_BODY_UNSUPPORTED',
+		severity: 'error',
+		phase: 'public-render',
+		title: 'Component body statement is not supported by the render module',
+		message: input.message,
+		why: 'Component bodies execute during initial render. A body statement the emitter cannot represent would otherwise be deleted from CSR and SSR output.',
+		primarySpan: sourceSpan(input.node, input.filename),
+		passId: 'public-render-plan',
+		artifactKeys: ['publicRenderPlan'],
+		suggestions: [{ message: input.suggestion }],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_RENDER_BODY_UNSUPPORTED',
+	};
+}
+
+export function conditionalComponentRootDiagnostic(input: { readonly node: AnyNode; readonly filename: string; readonly componentName: string; }): CompilerDiagnostic {
+	return {
+		code: 'MARKLESS_COMPONENT_ROOT_CONDITIONAL',
+		severity: 'error',
+		phase: 'public-render',
+		title: 'Component root is conditional',
+		message: `${input.componentName} has a second template return, so the public render module cannot choose one component root without deleting statement flow.`,
+		why: 'Initial render executes component bodies, but resume needs one planned root with stable locators. Multiple or conditional template returns need branch records before they can render.',
+		primarySpan: sourceSpan(input.node, input.filename),
+		passId: 'public-render-plan',
+		artifactKeys: ['publicRenderPlan'],
+		suggestions: [{ message: 'Use a single root with @if/@else inside it, or return null before the one root for a guard clause.' }],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_COMPONENT_ROOT_CONDITIONAL',
+	};
+}
