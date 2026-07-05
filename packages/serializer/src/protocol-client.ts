@@ -1,5 +1,5 @@
-import { ASYNC_PROTOCOL_VERSION } from './protocol.ts';
 import type { ProtocolStatePayload, ProtocolViewPayload } from './protocol.ts';
+const ASYNC_PROTOCOL_VERSION = 1;
 export type EncodedPayloadScripts = { readonly stateScript: string; readonly viewScript: string };
 export type DecodedPayloadScripts = {
 	readonly state: ProtocolStatePayload;
