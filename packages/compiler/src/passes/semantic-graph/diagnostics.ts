@@ -16,7 +16,22 @@ export function frameworkImportRequiredDiagnostic(
 	apiName: FrameworkApiName,
 	call: AnyNode,
 	filename: string,
+	shadowedLocal?: boolean,
+	source = '',
 ): SemanticGraphDiagnostic {
+	const callSource = expressionSource(call, source);
+	if (shadowedLocal) {
+		return semanticGraphDiagnostic({
+			code: 'MARKLESS_FRAMEWORK_IMPORT_REQUIRED',
+			title: 'Framework API must be imported',
+			message: `\`${callSource}\` calls your local function \`${apiName}\`, but in \`.tsrx\` files \`${apiName}\` is a compiler-recognized markless API name. Rename the local function, or import the framework API from \`@markless/core\`.`,
+			why: 'The compiler recognizes `state`/`computed`/`element`/`shared` by name in `.tsrx` reactive scopes so that graph ownership stays unambiguous for readers and tools.',
+			span: sourceSpan(call, filename),
+			suggestion: `Rename the helper (before: \`function ${apiName}(value) { ... }\` — after: \`function doubleValue(value) { ... }\`), or, if graph state was intended, delete the helper and add \`import { ${apiName} } from '@markless/core';\`.`,
+			docsUrl: 'https://markless.dev/errors/MARKLESS_FRAMEWORK_IMPORT_REQUIRED',
+		});
+	}
+
 	return {
 		code: 'MARKLESS_FRAMEWORK_IMPORT_REQUIRED',
 		severity: 'error',
@@ -33,6 +48,97 @@ export function frameworkImportRequiredDiagnostic(
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_FRAMEWORK_IMPORT_REQUIRED',
+	};
+}
+
+export function frameworkApiAliasUnsupportedDiagnostic(input: {
+	readonly localName: string;
+	readonly apiName: FrameworkApiName;
+	readonly declarationKind: string;
+	readonly init: AnyNode;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_FRAMEWORK_API_ALIAS_UNSUPPORTED',
+		title: 'Framework APIs cannot be aliased or passed as values',
+		message: `\`${input.declarationKind} ${input.localName} = ${input.apiName}\` copies the framework API \`${input.apiName}\` into a plain variable. \`${input.localName}(5)\` would not create graph state — the compiler only rewrites calls made through the imported name.`,
+		why: `${input.apiName}() is compiled away into graph cells; it has no runtime function value that an alias could call.`,
+		span: sourceSpan(input.init, input.filename),
+		suggestion:
+			'Call the imported API directly — before: `const makeState = state; let x = makeState(5);` — after: `let x = state(5);`. For a reusable initialization pattern, wrap the VALUE, not the API (`const defaults = () => ({ open: false }); const menu = state(defaults());`).',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_FRAMEWORK_API_ALIAS_UNSUPPORTED',
+	});
+}
+
+export function nestedStateCreationDiagnostic(input: {
+	readonly outerApi: 'state' | 'computed';
+	readonly nestedApi: FrameworkApiName;
+	readonly name: string;
+	readonly init: AnyNode;
+	readonly filename: string;
+	readonly source: string;
+}): SemanticGraphDiagnostic {
+	const initSource = expressionSource(input.init, input.source);
+	const stateInState = input.outerApi === 'state' && input.nestedApi === 'state';
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_STATE_NESTED_CREATION',
+		title: stateInState
+			? 'state() cannot be the initial value of another state()'
+			: 'A framework API call cannot be a graph value',
+		message: stateInState
+			? `\`${initSource}\` declares graph state whose initial value is another state() call. \`${input.name}\` cannot store graph state as its value.`
+			: `\`${initSource}\` creates a computed whose value would be another ${input.nestedApi}() call. \`${input.name}\` derives a value; it cannot derive graph nodes.`,
+		why: stateInState
+			? 'A graph cell serializes plain data across the resume boundary; a state() call declares a cell and has no serializable value form.'
+			: `${input.nestedApi}() declares a graph node at compile time; it has no runtime value form that a cell or derive result can hold.`,
+		span: sourceSpan(input.init, input.filename),
+		suggestion: stateInState
+			? 'Before: `const x = state(state(5));` — After: `const x = state(5);`.'
+			: 'Derive the value directly — before: `const outer = computed(() => computed(() => count));` — after: `const outer = computed(() => count);`.',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_NESTED_CREATION',
+	});
+}
+
+export function computedDependencyCycleDiagnostic(input: {
+	readonly name: string;
+	readonly init: AnyNode;
+	readonly filename: string;
+	readonly source: string;
+}): SemanticGraphDiagnostic {
+	const initSource = expressionSource(input.init, input.source);
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_COMPUTED_DEPENDENCY_CYCLE',
+		title: 'A computed cannot depend on itself',
+		message: `\`${initSource}\` reads \`${input.name}\` — the value it is defining. \`${input.name}\` cannot be derived from \`${input.name}\`.`,
+		why: 'A derive is a pull-based graph node; a cycle in its dependencies means there is no order in which the graph can produce the value.',
+		span: sourceSpan(input.init, input.filename),
+		suggestion:
+			'Reference the source binding you meant to derive from, or rename one of the two values if this was a shadowing typo.',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_COMPUTED_DEPENDENCY_CYCLE',
+	});
+}
+
+function semanticGraphDiagnostic(input: {
+	readonly code: SemanticGraphDiagnostic['code'];
+	readonly title: string;
+	readonly message: string;
+	readonly why: string;
+	readonly span?: SourceSpan;
+	readonly suggestion: string;
+	readonly docsUrl: string;
+}): SemanticGraphDiagnostic {
+	return {
+		code: input.code,
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: input.title,
+		message: input.message,
+		why: input.why,
+		primarySpan: input.span,
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		suggestions: [{ message: input.suggestion }],
+		docsUrl: input.docsUrl,
 	};
 }
 

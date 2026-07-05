@@ -331,6 +331,66 @@ test('buildSemanticGraph reports missing framework API imports', async () => {
 	]);
 });
 
+test('B915 reports framework API misuse at the semantic graph site', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/FrameworkApiMisuse.tsrx',
+		source: `import { state, computed } from '@markless/core'; export function App() @{ let count = state(1); const nestedState = state(state(5)); const nestedComputed = computed(() => computed(() => count)); const self = computed(() => self ? 1 : 2); const makeState = state; let hidden = makeState(5); <p>{count} {nestedState} {nestedComputed} {self} {hidden}</p> }`,
+	});
+
+	expect(graph.diagnostics).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				code: 'MARKLESS_STATE_NESTED_CREATION',
+				title: 'state() cannot be the initial value of another state()',
+				message:
+					'`state(state(5))` declares graph state whose initial value is another state() call. `nestedState` cannot store graph state as its value.',
+			}),
+			expect.objectContaining({
+				code: 'MARKLESS_STATE_NESTED_CREATION',
+				title: 'A framework API call cannot be a graph value',
+				message:
+					'`computed(() => computed(() => count))` creates a computed whose value would be another computed() call. `nestedComputed` derives a value; it cannot derive graph nodes.',
+			}),
+			expect.objectContaining({
+				code: 'MARKLESS_COMPUTED_DEPENDENCY_CYCLE',
+				title: 'A computed cannot depend on itself',
+				message:
+					'`computed(() => self ? 1 : 2)` reads `self` — the value it is defining. `self` cannot be derived from `self`.',
+			}),
+			expect.objectContaining({
+				code: 'MARKLESS_FRAMEWORK_API_ALIAS_UNSUPPORTED',
+				title: 'Framework APIs cannot be aliased or passed as values',
+				message:
+					'`const makeState = state` copies the framework API `state` into a plain variable. `makeState(5)` would not create graph state — the compiler only rewrites calls made through the imported name.',
+			}),
+		]),
+	);
+	expect(graph.graphBindings.map((binding) => binding.name)).toEqual(['count']);
+});
+
+test('B915 reports local framework API shadowing without import-only guidance', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/ShadowedState.tsrx',
+		source: `function state(value) { return value * 2; } export function App() @{ const x = state(5); <p>{x}</p> }`,
+	});
+
+	expect(graph.graphBindings).toEqual([]);
+	expect(graph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_FRAMEWORK_IMPORT_REQUIRED',
+			message:
+				'`state(5)` calls your local function `state`, but in `.tsrx` files `state` is a compiler-recognized markless API name. Rename the local function, or import the framework API from `@markless/core`.',
+			suggestions: [
+				{
+					message:
+						'Rename the helper (before: `function state(value) { ... }` — after: `function doubleValue(value) { ... }`), or, if graph state was intended, delete the helper and add `import { state } from \'@markless/core\';`.',
+				},
+			],
+		}),
+	]);
+	expect(graph.graphBindings.map((binding) => binding.id)).not.toContain('prop:value');
+});
+
 test('buildSemanticGraph reports state writes inside template expressions', async () => {
 	const graph = await buildSemanticGraph({
 		filename: 'src/TemplateWrite.tsrx',
