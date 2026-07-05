@@ -24,9 +24,16 @@ export function extractSyncPolicy(
 	node: AnyNode | undefined,
 	state: Pick<WalkState, 'graph' | 'source'>,
 ): SemanticSyncPolicy | undefined {
+	return extractSyncPolicyFromHandlers(handlerExpressions(node), state);
+}
+
+export function extractSyncPolicyFromHandlers(
+	handlers: ReadonlyArray<AnyNode>,
+	state: Pick<WalkState, 'graph' | 'source'>,
+): SemanticSyncPolicy | undefined {
 	const branches: SemanticSyncPolicyBranch[] = [];
 
-	for (const handler of handlerExpressions(node)) {
+	for (const handler of handlers) {
 		const eventParam = getIdentifierName(asNodes(handler.params)[0]) ?? 'event';
 		const policy = extractSyncPolicyFromBody(
 			handler.body as AnyNode | undefined,
@@ -67,6 +74,30 @@ export function firstSyncPolicyActionCall(
 	return found;
 }
 
+export function firstDetachedSyncPolicyReference(node: AnyNode | undefined): {
+	readonly action: SemanticSyncPolicyAction;
+	readonly alias: string;
+	readonly start: number;
+	readonly end: number;
+} | null {
+	let detached: { action: SemanticSyncPolicyAction; alias: string; start: number; end: number } | null = null;
+
+	walkNode(node, (candidate) => {
+		if (detached || candidate.type !== 'VariableDeclarator') return;
+		const alias = getIdentifierName(candidate.id as AnyNode | undefined);
+		const init = candidate.init as AnyNode | undefined;
+		if (!alias || init?.type !== 'MemberExpression') return;
+
+		const action = getStaticPropertyName(init.property as AnyNode | undefined);
+		if (action !== 'preventDefault' && action !== 'stopPropagation') return;
+		if (!callsIdentifier(node, alias)) return;
+
+		detached = { action, alias, start: candidate.start ?? init.start ?? 0, end: candidate.end ?? init.end ?? 0 };
+	});
+
+	return detached;
+}
+
 function handlerExpressions(node: AnyNode | undefined): AnyNode[] {
 	if (!node) return [];
 	if (node.type === 'ArrayExpression') return asNodes(node.elements);
@@ -82,7 +113,17 @@ function extractSyncPolicyFromBody(
 
 	const statements = body.type === 'BlockStatement' ? asNodes(body.body) : [body];
 	for (const statement of statements) {
-		if (statement.type !== 'IfStatement') continue;
+		if (statement.type !== 'IfStatement') {
+			const expression =
+				statement.type === 'ExpressionStatement'
+					? (statement.expression as AnyNode | undefined)
+					: statement;
+			const action = syncActionCall(expression, eventParam);
+			if (action) {
+				return { when: { type: 'constant-truthy', value: true }, actions: [action] };
+			}
+			continue;
+		}
 
 		const actions = extractSyncActions(statement.consequent as AnyNode | undefined, eventParam);
 		if (actions.length === 0) continue;
@@ -116,6 +157,20 @@ function extractSyncActions(
 	});
 
 	return uniqueBy(actions, (action) => action);
+}
+
+function syncActionCall(node: AnyNode | undefined, eventParam: string): SemanticSyncPolicyAction | null {
+	if (node?.type !== 'CallExpression') return null;
+
+	const callee = node.callee as AnyNode | undefined;
+	if (callee?.type !== 'MemberExpression') return null;
+	if (getIdentifierName(callee.object as AnyNode | undefined) !== eventParam) return null;
+
+	const propertyName = getStaticPropertyName(callee.property as AnyNode | undefined);
+	if (propertyName === 'preventDefault' || propertyName === 'stopPropagation') {
+		return propertyName;
+	}
+	return null;
 }
 
 function extractSyncCondition(
@@ -157,6 +212,13 @@ function extractSyncCondition(
 			return { type: 'event-equals', field: rightField, value: leftValue.value };
 		}
 
+		const constants = state.graph.syncPolicyConstants ?? [];
+		const leftSyncValue = syncPolicyStaticValue(node.left as AnyNode | undefined, constants);
+		const rightSyncValue = syncPolicyStaticValue(node.right as AnyNode | undefined, constants);
+		if (leftSyncValue.ok && rightSyncValue.ok) {
+			return { type: 'constant-truthy', value: leftSyncValue.value === rightSyncValue.value };
+		}
+
 		return undefined;
 	}
 
@@ -194,6 +256,22 @@ function extractSyncCondition(
 		graphNodeId: resolved.binding.id,
 		path: resolved.path,
 	};
+}
+
+function syncPolicyStaticValue(node: AnyNode | undefined, constants: ReadonlyArray<{ readonly name: string; readonly value: unknown }>): { readonly ok: true; readonly value: unknown } | { readonly ok: false } {
+	const literal = literalValue(node);
+	if (literal.ok) return literal;
+	if (!node) return { ok: false };
+	return syncPolicyConstantValue(node, constants);
+}
+
+function callsIdentifier(node: AnyNode | undefined, name: string): boolean {
+	let found = false;
+	walkNode(node, (candidate) => {
+		if (found || candidate.type !== 'CallExpression') return;
+		found = getIdentifierName(candidate.callee as AnyNode | undefined) === name;
+	});
+	return found;
 }
 
 function syncPolicyConstantValue(

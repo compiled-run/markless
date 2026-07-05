@@ -134,6 +134,9 @@ export function Form() @{
 }
 `;
 
+const detachedSyncPolicySource = `import { state } from '@markless/core'; export function Link() @{ let count = state(0); <a href="/next" onClick={(event) => { const pd = event.preventDefault; pd(); count++; }}>Next {count}</a> }`;
+const eventExpressionSource = `import { state } from '@markless/core'; export function Counter() @{ let count = state(0); <button onClick={count++}>{count}</button> }`;
+
 const graphDestructureDefaultSource = `
 import { state } from '@markless/core';
 
@@ -422,7 +425,6 @@ test('buildSemanticGraph reports unextractable synchronous event policy', async 
 
 	expect(graph.events).toEqual([
 		expect.objectContaining({
-			eventName: 'click',
 			hasSyncPolicyCandidate: true,
 			syncPolicy: undefined,
 		}),
@@ -450,6 +452,52 @@ test('buildSemanticGraph reports unextractable synchronous event policy', async 
 				},
 			],
 			docsUrl: 'https://markless.dev/errors/MARKLESS_SYNC_POLICY_UNEXTRACTABLE',
+		}),
+	]);
+});
+
+test('B914 reports detached sync policy references with the truthful reason', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/Link.tsrx',
+		source: detachedSyncPolicySource,
+	});
+	const detachedStart = detachedSyncPolicySource.indexOf('pd = event.preventDefault');
+
+	expect(graph.events).toEqual([
+		expect.objectContaining({
+			eventName: 'click',
+			hasSyncPolicyCandidate: true,
+			syncPolicy: undefined,
+		}),
+	]);
+	expect(graph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_SYNC_POLICY_UNEXTRACTABLE',
+			phase: 'sync-policy',
+			message:
+				'`pd = event.preventDefault` detaches preventDefault from the event, so the compiler cannot prove when the default action is cancelled for onClick.',
+			why: 'preventDefault() and stopPropagation() must run before lazy handler symbols load; a detached reference hides which action runs and under what condition.',
+			primarySpan: expect.objectContaining({ start: detachedStart }),
+		}),
+	]);
+});
+
+test('B914 reports non-function event prop expressions', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/Counter.tsrx',
+		source: eventExpressionSource,
+	});
+	const expressionStart = eventExpressionSource.indexOf('count++');
+
+	expect(graph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_EVENT_HANDLER_NOT_A_FUNCTION',
+			phase: 'semantic-graph',
+			title: 'Event props need a function',
+			message:
+				'`onClick={count++}` passes the result of `count++`, not a function. The expression would run once while rendering, and the click would receive a number.',
+			why: 'An event prop compiles to a lazy handler symbol that runs on the browser event; only a function or an array of functions can be that handler.',
+			primarySpan: expect.objectContaining({ start: expressionStart }),
 		}),
 	]);
 });

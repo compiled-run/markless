@@ -113,3 +113,30 @@ test('sync-policy collector extracts graph and event-field guard policy', () => 
 		actions: ['preventDefault', 'stopPropagation'],
 	});
 });
+
+test('sync-policy collector extracts bare unconditional action policy', () => {
+	const handler = {
+		type: 'ArrowFunctionExpression',
+		params: [{ type: 'Identifier', name: 'event' }],
+		body: {
+			type: 'BlockStatement',
+			body: [
+				{
+					type: 'CallExpression',
+					callee: {
+						type: 'MemberExpression',
+						object: { type: 'Identifier', name: 'event' },
+						property: { type: 'Identifier', name: 'preventDefault' },
+					},
+				},
+			],
+		},
+	} satisfies AnyNode;
+	const graph = createMutableSemanticGraphArtifact('src/App.tsrx');
+
+	expect(hasSyncEventPolicyCandidate(handler)).toBe(true);
+	expect(extractSyncPolicy(handler, { graph, source: '(event) => { event.preventDefault(); }' })).toEqual({
+		when: { type: 'constant-truthy', value: true },
+		actions: ['preventDefault'],
+	});
+});
