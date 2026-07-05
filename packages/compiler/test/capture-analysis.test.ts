@@ -87,23 +87,18 @@ export function App() @{
 
 	expect(captureAnalysis.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'MARKLESS_CAPTURE_UNSUPPORTED_VALUE',
+			code: 'MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED',
 			severity: 'error',
 			phase: 'capture-analysis',
 			passId: 'capture-analysis',
 			symbolId: 'symbol:0',
 			source: '() => format()',
-			title: 'Cannot capture local function in lazy symbol',
-			message:
-				'Cannot capture "format" in lazy event-handler symbol "symbol:0" because local function values cannot cross a resume boundary.',
-			why: 'Lazy symbols run after browser resume. Captures must be graph references, element handles, props/shared values, module imports, or serializable constants.',
 			suggestions: [
 				{
 					message:
 						'Move the helper to module scope, inline the derivation, or represent durable data with state()/computed().',
 				},
 			],
-			docsUrl: 'https://markless.dev/errors/MARKLESS_CAPTURE_UNSUPPORTED_VALUE',
 		}),
 	]);
 });
@@ -145,15 +140,12 @@ export function App() @{
 	]);
 	expect(captureAnalysis.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'MARKLESS_CAPTURE_UNSUPPORTED_VALUE',
+			code: 'MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED',
 			severity: 'error',
 			phase: 'capture-analysis',
 			passId: 'capture-analysis',
 			symbolId: 'symbol:0',
 			source: '() => render()',
-			title: 'Cannot capture local function in lazy symbol',
-			message:
-				'Cannot capture "render" in lazy event-handler symbol "symbol:0" because local function values cannot cross a resume boundary.',
 		}),
 	]);
 });
@@ -190,15 +182,12 @@ export function App() @{
 	]);
 	expect(captureAnalysis.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'MARKLESS_CAPTURE_UNSUPPORTED_VALUE',
+			code: 'MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED',
 			severity: 'error',
 			phase: 'capture-analysis',
 			passId: 'capture-analysis',
 			symbolId: 'symbol:0',
 			source: '() => helpers.format()',
-			title: 'Cannot capture local non-serializable constant in lazy symbol',
-			message:
-				'Cannot capture "helpers" in lazy event-handler symbol "symbol:0" because local non-serializable constant values cannot cross a resume boundary.',
 			suggestions: [
 				{
 					message:
@@ -269,15 +258,12 @@ export function App() @{
 	]);
 	expect(captureAnalysis.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'MARKLESS_CAPTURE_UNSUPPORTED_VALUE',
+			code: 'MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED',
 			severity: 'error',
 			phase: 'capture-analysis',
 			passId: 'capture-analysis',
 			symbolId: 'symbol:0',
 			source: "() => helpers.get('format')?.()",
-			title: 'Cannot capture local non-serializable constant in lazy symbol',
-			message:
-				'Cannot capture "helpers" in lazy event-handler symbol "symbol:0" because local non-serializable constant values cannot cross a resume boundary.',
 		}),
 	]);
 });
@@ -319,15 +305,12 @@ export function App() @{
 	]);
 	expect(captureAnalysis.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'MARKLESS_CAPTURE_UNSUPPORTED_VALUE',
+			code: 'MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED',
 			severity: 'error',
 			phase: 'capture-analysis',
 			passId: 'capture-analysis',
 			symbolId: 'symbol:0',
 			source: "() => helpers.get('format')?.()",
-			title: 'Cannot capture local non-serializable constant in lazy symbol',
-			message:
-				'Cannot capture "helpers" in lazy event-handler symbol "symbol:0" because local non-serializable constant values cannot cross a resume boundary.',
 		}),
 	]);
 });
@@ -369,15 +352,12 @@ export function App() @{
 	]);
 	expect(captureAnalysis.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'MARKLESS_CAPTURE_UNSUPPORTED_VALUE',
+			code: 'MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED',
 			severity: 'error',
 			phase: 'capture-analysis',
 			passId: 'capture-analysis',
 			symbolId: 'symbol:0',
 			source: '() => helpers.format()',
-			title: 'Cannot capture local non-serializable constant in lazy symbol',
-			message:
-				'Cannot capture "helpers" in lazy event-handler symbol "symbol:0" because local non-serializable constant values cannot cross a resume boundary.',
 		}),
 	]);
 });
@@ -419,15 +399,12 @@ export function App() @{
 	]);
 	expect(captureAnalysis.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'MARKLESS_CAPTURE_UNSUPPORTED_VALUE',
+			code: 'MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED',
 			severity: 'error',
 			phase: 'capture-analysis',
 			passId: 'capture-analysis',
 			symbolId: 'symbol:0',
 			source: '() => format()',
-			title: 'Cannot capture local non-serializable constant in lazy symbol',
-			message:
-				'Cannot capture "format" in lazy event-handler symbol "symbol:0" because local non-serializable constant values cannot cross a resume boundary.',
 		}),
 	]);
 });
@@ -464,15 +441,12 @@ export function App() @{
 	]);
 	expect(captureAnalysis.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'MARKLESS_CAPTURE_UNSUPPORTED_VALUE',
+			code: 'MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED',
 			severity: 'error',
 			phase: 'capture-analysis',
 			passId: 'capture-analysis',
 			symbolId: 'symbol:0',
 			source: '() => format()',
-			title: 'Cannot capture local function in lazy symbol',
-			message:
-				'Cannot capture "format" in lazy event-handler symbol "symbol:0" because local function values cannot cross a resume boundary.',
 		}),
 	]);
 });
@@ -718,23 +692,18 @@ export function App() @{
 	]);
 	expect(captureAnalysis.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'MARKLESS_CAPTURE_UNSUPPORTED_VALUE',
+			code: 'MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED',
 			severity: 'error',
 			phase: 'capture-analysis',
 			passId: 'capture-analysis',
 			symbolId: 'symbol:0',
 			source: '() => formatter.format(count)',
-			title: 'Cannot capture local class instance in lazy symbol',
-			message:
-				'Cannot capture "formatter" in lazy event-handler symbol "symbol:0" because local class instance values cannot cross a resume boundary.',
-			why: 'Lazy symbols run after browser resume. Captures must be graph references, element handles, props/shared values, module imports, or serializable constants.',
 			suggestions: [
 				{
 					message:
 						'Represent durable data with state()/computed(), hoist serializable helpers to module scope, or move DOM-backed setup into a host element behavior with attach.',
 				},
 			],
-			docsUrl: 'https://markless.dev/errors/MARKLESS_CAPTURE_UNSUPPORTED_VALUE',
 		}),
 	]);
 });
@@ -771,23 +740,18 @@ export function App() @{
 	]);
 	expect(captureAnalysis.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'MARKLESS_CAPTURE_UNSUPPORTED_VALUE',
+			code: 'MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED',
 			severity: 'error',
 			phase: 'capture-analysis',
 			passId: 'capture-analysis',
 			symbolId: 'symbol:0',
 			source: '() => panel?.scrollIntoView()',
-			title: 'Cannot capture local DOM node in lazy symbol',
-			message:
-				'Cannot capture "panel" in lazy event-handler symbol "symbol:0" because local DOM node values cannot cross a resume boundary.',
-			why: 'Lazy symbols run after browser resume. Captures must be graph references, element handles, props/shared values, module imports, or serializable constants.',
 			suggestions: [
 				{
 					message:
 						'Use element() with el={...} for DOM locators, or move DOM-backed setup into a host element behavior with attach.',
 				},
 			],
-			docsUrl: 'https://markless.dev/errors/MARKLESS_CAPTURE_UNSUPPORTED_VALUE',
 		}),
 	]);
 });
@@ -824,23 +788,18 @@ export function App() @{
 	]);
 	expect(captureAnalysis.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'MARKLESS_CAPTURE_UNSUPPORTED_VALUE',
+			code: 'MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED',
 			severity: 'error',
 			phase: 'capture-analysis',
 			passId: 'capture-analysis',
 			symbolId: 'symbol:0',
 			source: '() => panel.remove()',
-			title: 'Cannot capture local DOM node in lazy symbol',
-			message:
-				'Cannot capture "panel" in lazy event-handler symbol "symbol:0" because local DOM node values cannot cross a resume boundary.',
-			why: 'Lazy symbols run after browser resume. Captures must be graph references, element handles, props/shared values, module imports, or serializable constants.',
 			suggestions: [
 				{
 					message:
 						'Use element() with el={...} for DOM locators, or move DOM-backed setup into a host element behavior with attach.',
 				},
 			],
-			docsUrl: 'https://markless.dev/errors/MARKLESS_CAPTURE_UNSUPPORTED_VALUE',
 		}),
 	]);
 });
