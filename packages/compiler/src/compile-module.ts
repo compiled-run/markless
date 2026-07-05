@@ -14,6 +14,7 @@ import type {
 	SymbolResolverModuleManifest,
 	SymbolResolverPlan,
 } from './artifacts.ts';
+import type { SourceSpan } from './diagnostics.ts';
 import { runCompilerPassPipeline } from './pass-pipeline.ts';
 import { defaultCompilerPasses } from './pass-registry.ts';
 import { analyzeCaptures } from './passes/capture-analysis.ts';
@@ -24,6 +25,7 @@ import { planPublicRender } from './passes/public-render/plan.ts';
 import { createProtocolStatePayloadFromArena } from './passes/protocol-state.ts';
 import { createProtocolViewPayload } from './passes/protocol-view.ts';
 import { buildSemanticGraph } from './passes/semantic-graph/index.ts';
+import { createMutableSemanticGraphArtifact } from './passes/semantic-graph/types.ts';
 import { lowerStateAccess } from './passes/state-lowering.ts';
 import { emitSymbolModules } from './passes/symbol-modules.ts';
 import {
@@ -89,7 +91,15 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 			return {
 				...pass,
 				async run({ inputs }) {
-					return { semanticGraph: await buildSemanticGraph(sourceInput(inputs.source)) };
+					const source = sourceInput(inputs.source);
+					try {
+						return { semanticGraph: await buildSemanticGraph(source) };
+					} catch (error) {
+						if (!isExternalParserSyntaxError(error)) throw error;
+						const semanticGraph = createMutableSemanticGraphArtifact(source.filename);
+						semanticGraph.diagnostics.push(parseErrorDiagnostic(error, source));
+						return { semanticGraph };
+					}
 				},
 			};
 		}
@@ -151,10 +161,14 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 			return {
 				...pass,
 				run({ inputs }) {
+					const semanticGraph = inputs.semanticGraph as SemanticGraphArtifact;
+					if (hasExternalParseDiagnostic(semanticGraph)) {
+						return { publicRenderPlan: emptyPublicRenderPlanArtifact() };
+					}
 					return {
 						publicRenderPlan: planPublicRender({
 							source: sourceInput(inputs.source),
-							semanticGraph: inputs.semanticGraph as SemanticGraphArtifact,
+							semanticGraph,
 							payloadArena: inputs.payloadArena as PayloadArenaArtifact,
 							symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
 						}),
@@ -167,10 +181,14 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 			return {
 				...pass,
 				run({ inputs }) {
+					const semanticGraph = inputs.semanticGraph as SemanticGraphArtifact;
+					if (hasExternalParseDiagnostic(semanticGraph)) {
+						return { publicRenderModule: emptyPublicRenderModuleArtifact() };
+					}
 					return {
 						publicRenderModule: emitPublicRenderModule({
 							source: sourceInput(inputs.source),
-							semanticGraph: inputs.semanticGraph as SemanticGraphArtifact,
+							semanticGraph,
 							publicRenderPlan: inputs.publicRenderPlan as PublicRenderPlanArtifact,
 							symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
 							protocolState:
@@ -259,4 +277,64 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 
 function sourceInput(value: unknown): CompileTsrxModuleInput {
 	return value as CompileTsrxModuleInput;
+}
+
+function isExternalParserSyntaxError(error: unknown): error is SyntaxError {
+	return (
+		error instanceof SyntaxError ||
+		(typeof error === 'object' && error !== null && (error as { readonly name?: unknown }).name === 'SyntaxError')
+	);
+}
+
+function parseErrorDiagnostic(
+	error: SyntaxError,
+	source: CompileTsrxModuleInput,
+): SemanticGraphArtifact['diagnostics'][number] {
+	const message = error.message;
+	return {
+		code: 'MARKLESS_PARSE_ERROR',
+		severity: 'error',
+		phase: 'parse',
+		title: 'TSRX parser rejected this source',
+		message: `@tsrx/core reported: ${message}`,
+		why: 'The source could not enter the Markless compiler because the TSRX parser failed at phase parse (external @tsrx/core). Markless treats @tsrx/core as an external dependency boundary, so the original parser message is preserved here instead of changing the parser.',
+		primarySpan: parserErrorSpan(error, source),
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		suggestions: [{ message: 'Check the TSRX syntax rules at https://tsrx.dev/specification and rewrite this source into supported TSRX syntax.' }],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_PARSE_ERROR',
+	};
+}
+
+function parserErrorSpan(
+	error: SyntaxError,
+	source: CompileTsrxModuleInput,
+): SourceSpan | undefined {
+	const position = (error as SyntaxError & { readonly pos?: unknown }).pos;
+	if (typeof position !== 'number') return undefined;
+	const start = Math.max(0, Math.min(source.source.length, position));
+	return { filename: source.filename, start, end: Math.min(source.source.length, start + 1) };
+}
+
+function hasExternalParseDiagnostic(semanticGraph: SemanticGraphArtifact): boolean {
+	return semanticGraph.diagnostics.some(
+		(diagnostic) => diagnostic.phase === 'parse' && diagnostic.code === 'MARKLESS_PARSE_ERROR',
+	);
+}
+
+function emptyPublicRenderPlanArtifact(): PublicRenderPlanArtifact {
+	return {
+		passId: 'public-render-plan', rootTemplateHtml: null, directRenderTemplateHtml: null,
+		staticHostNodeIds: [], staticHostLocators: [], staticEventControls: [], staticTextWrites: [],
+		repeatGates: [], keyedRepeats: [], asyncBoundaryGates: [], branchReactivityGates: [],
+		branchArms: [], asyncBoundaryArms: [], styleScopes: [], diagnostics: [],
+	};
+}
+
+function emptyPublicRenderModuleArtifact(): PublicRenderModuleArtifact {
+	return {
+		passId: 'public-render-module', moduleSource: '', rootExportName: null,
+		csrModuleSource: '', csrExportName: null, ssrModuleSource: '', ssrExportName: null,
+		diagnostics: [],
+	};
 }

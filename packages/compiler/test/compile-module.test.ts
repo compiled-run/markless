@@ -151,6 +151,71 @@ export default function Home() @{
 }
 `;
 
+test('compileTsrxModule wraps @tsrx/core parse SyntaxErrors as structured diagnostics', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/DynamicTagCall.tsrx',
+		source: `
+export function App() @{
+	const tag = () => 'section';
+
+	<{tag()}>
+		<p>Hi</p>
+	</{tag()}>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.semanticGraph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_PARSE_ERROR',
+			severity: 'error',
+			phase: 'parse',
+			title: 'TSRX parser rejected this source',
+			passId: 'tsrx-semantic-graph',
+			artifactKeys: ['semanticGraph'],
+			docsUrl: 'https://markless.dev/errors/MARKLESS_PARSE_ERROR',
+		}),
+	]);
+	expect(result.semanticGraph.diagnostics[0]?.message).toContain(
+		'Dynamic element names must be an identifier, member expression, static string, or runtime expression; calls, spreads, string concatenation, string interpolation, and static null, undefined, boolean, number, object, and array literals are not valid tag names.',
+	);
+	expect(result.semanticGraph.diagnostics[0]?.why).toContain(
+		'phase parse (external @tsrx/core)',
+	);
+	expect(result.semanticGraph.diagnostics[0]?.suggestions[0]?.message).toContain(
+		'https://tsrx.dev/specification',
+	);
+});
+
+test('compileTsrxModule does not swallow non-parser compiler bugs', async () => {
+	await expect(
+		compileTsrxModule({
+			filename: 'src/Bug.tsrx',
+			source: null as unknown as string,
+			symbols: [],
+		}),
+	).rejects.toThrow();
+});
+
+test('compileTsrxModule keeps valid source output byte-identical', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/App.tsrx',
+		source: plainStateTextSource,
+		symbols: [],
+	});
+	const again = await compileTsrxModule({
+		filename: 'src/App.tsrx',
+		source: plainStateTextSource,
+		symbols: [],
+	});
+
+	expect(again.publicRenderModule.ssrModuleSource).toBe(result.publicRenderModule.ssrModuleSource);
+	expect(again.publicRenderModule.csrModuleSource).toBe(result.publicRenderModule.csrModuleSource);
+	expect(again.symbolResolverModule).toBe(result.symbolResolverModule);
+	expect(result.semanticGraph.diagnostics).toEqual([]);
+});
+
 type PublicRenderTestEvent = {
 	readonly type: string;
 	readonly target: PublicRenderTestElement | null;
