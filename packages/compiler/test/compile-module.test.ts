@@ -117,6 +117,17 @@ export function App() @{
 }
 `;
 
+const wholeBindingAliasEventSource = `
+import { state } from '@markless/core';
+
+export function App() @{
+	let origin = state(0);
+	let mirror = origin;
+
+	<button onClick={() => mirror++}>{origin}</button>
+}
+`;
+
 const plainStateTextSource = `
 import { state } from '@markless/core';
 
@@ -4338,6 +4349,31 @@ test('compileTsrxModule emits generated event modules for supported graph write 
 	expect(logicalModule).toContain(
 		'return value && context.graph.read("state:profile", ["enabled"]);',
 	);
+});
+
+test('compileTsrxModule emits handler writes through whole-binding aliases', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/WholeBindingAliasEvent.tsrx',
+		source: wholeBindingAliasEventSource,
+		symbols: [],
+	});
+
+	const symbol = result.symbolResolver.symbols.find(
+		(symbol) => symbol.kind === 'event-handler' && symbol.source.includes('mirror++'),
+	);
+	const module = result.symbolModules.modules.find((item) => item.symbolId === symbol?.id);
+
+	expect(result.semanticGraph.aliases).toEqual([
+		expect.objectContaining({
+			name: 'mirror',
+			target: 'origin',
+			declarationKind: 'let',
+		}),
+	]);
+	expect(result.stateLowering.diagnostics).toEqual([]);
+	expect(module?.source).toContain('context.graph.update({');
+	expect(module?.source).toContain('graphNodeId: "state:origin"');
+	expect(module?.source).toContain('path: []');
 });
 
 test('compileTsrxModule emits async computed runner modules without serializing runner source', async () => {

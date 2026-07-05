@@ -145,6 +145,30 @@ export function Menu() @{
 }
 `;
 
+const templateWriteSource = `
+import { state } from '@markless/core';
+
+export function Counter() @{
+	let count = state(0);
+
+	<p>{count++}</p>
+}
+`;
+
+const computedWriteSource = `
+import { state, computed } from '@markless/core';
+
+export function Counter() @{
+	let count = state(1);
+	const doubled = computed(() => {
+		count++;
+		return count * 2;
+	});
+
+	<p>{doubled}</p>
+}
+`;
+
 const sharedCycleSource = `
 import { shared } from '@markless/core';
 
@@ -300,6 +324,63 @@ test('buildSemanticGraph reports missing framework API imports', async () => {
 					message: "Add `import { element } from '@markless/core';` to this .tsrx file.",
 				},
 			],
+		}),
+	]);
+});
+
+test('buildSemanticGraph reports state writes inside template expressions', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/TemplateWrite.tsrx',
+		source: templateWriteSource,
+	});
+	const writeStart = templateWriteSource.indexOf('count++');
+
+	expect(graph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_STATE_WRITE_IN_TEMPLATE',
+			severity: 'error',
+			phase: 'semantic-graph',
+			title: 'Cannot write state inside a template expression',
+			message:
+				'`count++` writes to `count` while rendering its value. A template expression is a DOM read; writing `count` there would re-trigger the same DOM update that is rendering it.',
+			why: 'DOM updates are the only effects in the demand-driven graph; a write inside a DOM read creates a self-waking cycle that cannot resume.',
+			primarySpan: {
+				filename: 'src/TemplateWrite.tsrx',
+				start: writeStart,
+				end: writeStart + 'count'.length,
+			},
+			statePath: 'count',
+			source: 'count++',
+			docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_WRITE_IN_TEMPLATE',
+		}),
+	]);
+});
+
+test('buildSemanticGraph reports state writes inside computed derives', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/ComputedWrite.tsrx',
+		source: computedWriteSource,
+	});
+	const writeStart = computedWriteSource.indexOf('count++');
+
+	expect(graph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_STATE_WRITE_IN_COMPUTED',
+			severity: 'error',
+			phase: 'semantic-graph',
+			passId: 'tsrx-semantic-graph',
+			title: 'A computed cannot write graph state',
+			message:
+				'`count++` writes to `count` while deriving a computed value. A computed is a graph read, so writing graph state there would re-trigger the same derivation.',
+			why: 'A computed is a demand-driven read in the graph; the only effects in the system are compiler-generated DOM updates, so a write inside a derive is a self-waking cycle that cannot resume.',
+			primarySpan: {
+				filename: 'src/ComputedWrite.tsrx',
+				start: writeStart,
+				end: writeStart + 'count'.length,
+			},
+			statePath: 'count',
+			source: 'count++',
+			docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_WRITE_IN_COMPUTED',
 		}),
 	]);
 });

@@ -34,6 +34,32 @@ export function collectDestructuredAliases(
 	collectArrayPatternAliases(id, targetBase, declarationKind, state);
 }
 
+export function collectWholeBindingAlias(
+	id: AnyNode | undefined,
+	init: AnyNode,
+	declarationKind: SemanticGraphBinding['declarationKind'],
+	state: WalkState,
+): void {
+	const local = localAliasIdentifier(id);
+	if (!local) return;
+
+	const resolved = resolveGraphPath(
+		expressionSource(init, state.source),
+		graphBindingMap(state.graph, currentGraphScope(state)),
+		semanticAliasMap(state.graph, currentGraphScope(state)),
+	);
+	if (!resolved) return;
+	if (resolved.path.length > 0) return;
+
+	state.graph.aliases.push({
+		name: local.name,
+		target: graphPathSource(resolved.binding, resolved.path),
+		...sharedScope(state),
+		declarationKind,
+		sourceSpan: sourceSpan(local, state.filename),
+	});
+}
+
 export function collectObjectPatternAliases(
 	pattern: AnyNode,
 	targetBase: string,

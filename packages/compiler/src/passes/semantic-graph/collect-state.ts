@@ -2,7 +2,7 @@ import { asNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import type { SemanticGraphBinding, SemanticLocalBinding, SourceSpan } from '../../artifacts.ts';
 import { getFrameworkApiForCall, getCallName, isFrameworkApiName } from './imports.ts';
-import { collectDestructuredAliases } from './collect-aliases.ts';
+import { collectDestructuredAliases, collectWholeBindingAlias } from './collect-aliases.ts';
 import { collectAsyncComputedPostAwaitReads, collectGraphDependencies } from './collect-async.ts';
 import {
 	collectExpressionReads,
@@ -27,6 +27,7 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 		const init = declaration.init as AnyNode | undefined;
 		if (init) {
 			collectDestructuredAliases(id, init, declarationKind, state);
+			collectWholeBindingAlias(id, init, declarationKind, state);
 			collectUnsupportedDestructuredLocalBindings(id, init, declarationKind, state);
 		}
 

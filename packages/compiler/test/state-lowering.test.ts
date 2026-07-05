@@ -151,6 +151,27 @@ export function Header() @{
 }
 `;
 
+const optionalDeleteSource = `
+import { state } from '@markless/core';
+
+export function Menu() @{
+	const menu = state({ a: 1 });
+
+	<button onClick={() => { delete menu?.a; }}>{menu.a}</button>
+}
+`;
+
+const wholeBindingAliasSource = `
+import { state } from '@markless/core';
+
+export function Counter() @{
+	let origin = state(0);
+	let mirror = origin;
+
+	<button onClick={() => mirror++}>{origin}</button>
+}
+`;
+
 test('lowerStateAccess resolves plain reads and writes to graph operations', async () => {
 	const semanticGraph = await buildSemanticGraph({
 		filename: 'src/Counter.tsrx',
@@ -282,6 +303,68 @@ test('lowerStateAccess resolves plain reads and writes to graph operations', asy
 		expect.arrayContaining([expect.objectContaining({ source: 'menuRest.title' })]),
 	);
 
+	expect(lowered.diagnostics).toEqual([]);
+});
+
+test('lowerStateAccess reports optional-chain deletes collected from real source', async () => {
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/OptionalDelete.tsrx',
+		source: optionalDeleteSource,
+	});
+
+	const lowered = lowerStateAccess({ semanticGraph });
+
+	expect(semanticGraph.stateWrites).toEqual([
+		expect.objectContaining({
+			target: 'menu?.a',
+			operation: 'delete',
+			optional: true,
+		}),
+	]);
+	expect(lowered.writes).toEqual([]);
+	expect(lowered.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_STATE_OPTIONAL_CHAIN_WRITE',
+			severity: 'error',
+			phase: 'state-lowering',
+			source: 'menu?.a',
+			statePath: 'menu?.a',
+		}),
+	]);
+});
+
+test('lowerStateAccess resolves whole-binding aliases to the original graph node', async () => {
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/WholeBindingAlias.tsrx',
+		source: wholeBindingAliasSource,
+	});
+
+	const lowered = lowerStateAccess({ semanticGraph });
+
+	expect(semanticGraph.aliases).toEqual([
+		expect.objectContaining({
+			name: 'mirror',
+			target: 'origin',
+			declarationKind: 'let',
+		}),
+	]);
+	expect(lowered.reads).toEqual(
+		expect.arrayContaining([
+			{
+				source: 'origin',
+				graphNodeId: 'state:origin',
+				path: [],
+			},
+		]),
+	);
+	expect(lowered.writes).toEqual([
+		expect.objectContaining({
+			source: 'mirror',
+			graphNodeId: 'state:origin',
+			path: [],
+			operation: 'update',
+		}),
+	]);
 	expect(lowered.diagnostics).toEqual([]);
 });
 
