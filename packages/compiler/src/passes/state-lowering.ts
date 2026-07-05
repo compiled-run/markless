@@ -25,6 +25,20 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 	const diagnostics: StateLoweringDiagnostic[] = [];
 
 	for (const read of input.semanticGraph.templateReads) {
+		if (read.computedGraphNodeId) {
+			const computed = input.semanticGraph.graphBindings.find(
+				(binding) => binding.id === read.computedGraphNodeId,
+			);
+			for (const dependency of computed?.dependencies ?? []) {
+				reads.push({
+					source: dependency.source,
+					graphNodeId: dependency.graphNodeId,
+					path: dependency.path,
+				});
+			}
+			continue;
+		}
+
 		const lookup = scopedGraphLookup(input, null);
 		const resolved = resolveStateGraphPath(input, read.source, lookup, null);
 		if (!resolved) {

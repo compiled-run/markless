@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import type { SemanticGraphArtifact } from '../src/artifacts.ts';
 import { buildSemanticGraph } from '../src/index.ts';
+import { planPayloadArena } from '../src/passes/payload-arena.ts';
 import { lowerStateAccess } from '../src/passes/state-lowering.ts';
 
 const source = `
@@ -1081,33 +1082,80 @@ test('B913 keeps whole-binding state aliases lowered to graph writes', async () 
 	]);
 });
 
-test('B910 composite ternary over state emits loud static template expression gate', async () => {
-	const ternarySource = `import { state } from '@markless/core'; export function App() @{ let a = state(true); <p>{a ? 'x' : 'y'}</p> }`;
+test('T005 composite ternary template expression lowers all graph reads into one live text site', async () => {
+	const ternarySource = `import { state } from '@markless/core';
+export function App() @{
+	let flag = state(true);
+	const user = state({ pro: false, name: 'Ada' });
+	<p>{flag ? user.name : 'guest'}</p>
+}`;
 	const semanticGraph = await buildSemanticGraph({
 		filename: 'src/CompositeTernary.tsrx',
 		source: ternarySource,
 	});
 
 	const lowered = lowerStateAccess({ semanticGraph });
+	const payload = planPayloadArena({ semanticGraph, stateLowering: lowered });
 
-	expect(lowered.diagnostics).toEqual([
+	expect(lowered.diagnostics).toEqual([]);
+	expect(lowered.reads).toEqual([
+		expect.objectContaining({ source: 'flag', graphNodeId: 'state:flag', path: [] }),
+		expect.objectContaining({ source: 'user.name', graphNodeId: 'state:user', path: ['name'] }),
+	]);
+	expect(payload.state.computed).toEqual([
 		expect.objectContaining({
-			code: 'MARKLESS_TEMPLATE_EXPRESSION_STATIC',
-			severity: 'error',
-			phase: 'state-lowering',
-			title: 'This expression reads state but never updates',
-			message:
-				"This text reads `a`, but only plain reads like `{a}` update the page today. The expression renders its initial value and never changes when `a` changes.",
-			why: 'Each template read compiles to a graph subscription with a DOM-update record; composite expressions are not lowered yet, so no subscription exists to wake this text.',
-			source: "a ? 'x' : 'y'",
-			suggestions: [
-				{
-					message:
-						"Hoist the logic into a derived value: `const label = computed(() => a ? 'x' : 'y');` with `<p>{label}</p>`.",
-				},
+			graphNodeId: 'computed:templateExpression:0',
+			name: 'marklessTemplateExpression0',
+			async: false,
+			functionSource: "() => flag ? user.name : 'guest'",
+			dependencies: [
+				{ source: 'flag', graphNodeId: 'state:flag', path: [] },
+				{ source: 'user.name', graphNodeId: 'state:user', path: ['name'] },
 			],
-			docsUrl: 'https://markless.dev/errors/MARKLESS_TEMPLATE_EXPRESSION_STATIC',
 		}),
+	]);
+	expect(payload.view.domUpdates).toEqual([
+		expect.objectContaining({
+			hostNodeId: 'h0',
+			source: "flag ? user.name : 'guest'",
+			graphNodeId: 'computed:templateExpression:0',
+			path: [],
+			target: { kind: 'text' },
+		}),
+	]);
+});
+
+test('T005 effectful composite template expressions stay behind the static gate', async () => {
+	const source = `import { state } from '@markless/core';
+function label(value) { return value ? 'on' : 'off'; }
+export function App() @{
+	let flag = state(true);
+	let local = false;
+	<section>
+		<p>{(() => flag ? 'on' : 'off')()}</p>
+		<p>{label(flag)}</p>
+		<p>{local = flag}</p>
+		<p>{flag && local}</p>
+	</section>
+}`;
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/CompositeStaticGate.tsrx',
+		source,
+	});
+
+	const lowered = lowerStateAccess({ semanticGraph });
+
+	expect(lowered.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+		'MARKLESS_TEMPLATE_EXPRESSION_STATIC',
+		'MARKLESS_TEMPLATE_EXPRESSION_STATIC',
+		'MARKLESS_TEMPLATE_EXPRESSION_STATIC',
+		'MARKLESS_TEMPLATE_EXPRESSION_STATIC',
+	]);
+	expect(lowered.diagnostics.map((diagnostic) => diagnostic.source)).toEqual([
+		"(() => flag ? 'on' : 'off')()",
+		'label(flag)',
+		'local = flag',
+		'flag && local',
 	]);
 });
 

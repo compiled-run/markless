@@ -71,6 +71,18 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 		},
 	);
 	const viewDomUpdates = input.semanticGraph.templateReads.flatMap((read) => {
+		if (read.computedGraphNodeId) {
+			return [
+				{
+					hostNodeId: read.hostNodeId,
+					source: read.source,
+					graphNodeId: read.computedGraphNodeId,
+					path: [],
+					target: read.target,
+				},
+			];
+		}
+
 		const resolved = resolveGraphPath(read.source, bindings, aliases);
 		if (!resolved) return [];
 
