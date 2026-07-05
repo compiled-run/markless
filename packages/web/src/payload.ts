@@ -1,19 +1,20 @@
 import {
-	decodePayloadScripts,
 	deserializeGraphValue,
-	type DecodedPayloadScripts,
-	type EncodedPayloadScripts,
-	type ProtocolStatePayload,
-	type ProtocolViewPayload,
 	type SerializedGraphPayload,
-} from '@markless/serializer';
+} from '@markless/serializer/decode';
+import type {
+	DecodedPayloadScripts,
+	EncodedPayloadScripts,
+} from '@markless/serializer/protocol-validation';
+import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer/protocol';
+import { decodePayloadScripts } from '@markless/serializer/protocol-validation';
 export {
 	decodePayloadScripts,
 	RuntimePayloadError,
 	type RuntimePayloadDiagnostic,
 	type RuntimePayloadErrorCode,
 	type RuntimePayloadType,
-} from '@markless/serializer';
+} from '@markless/serializer/protocol-validation';
 export {
 	decodePayloadScriptsFromDocument,
 	readPayloadScriptsFromDocument,
