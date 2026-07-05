@@ -5,6 +5,7 @@ import { expect, test } from 'vitest';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const entry = join(repoRoot, 'packages/web/src/event-only-resume.ts');
+const renderCsrEntry = join(repoRoot, 'packages/web/src/render-csr.ts');
 const sourceByteLimit = 90000;
 
 const forbiddenClosureFiles = [
@@ -22,6 +23,16 @@ test('event-only resume keeps its static source import closure lean', () => {
 		expect(relativeClosure).not.toContain(forbidden);
 	}
 	expect(closure.sourceBytes).toBeLessThanOrEqual(sourceByteLimit);
+});
+
+test('render-csr keeps full resume apply helpers out of its static import closure', () => {
+	const closure = collectStaticImportClosure(renderCsrEntry);
+	const relativeClosure = closure.files.map((file) => toRepoPath(file)).sort();
+	const source = closure.files.map((file) => readFileSync(file, 'utf8')).join('\n');
+
+	expect(relativeClosure).not.toContain('packages/web/src/resume.ts');
+	expect(relativeClosure).not.toContain('packages/web/src/dom-journal.ts');
+	expect(source).not.toContain('findRepeatItemByKey');
 });
 
 function collectStaticImportClosure(startFile: string) {

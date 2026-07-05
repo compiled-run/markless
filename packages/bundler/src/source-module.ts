@@ -62,13 +62,14 @@ export function emitSourceModule(input: {
 	return [
 		input.environment === 'server'
 			? ''
-			: input.needsFullResume
-				? "import { resumeFromPayloadDocument } from '@markless/core/web/resume';"
-				: "import { resumeEventOnlyFromPayloadDocument } from '@markless/core/web/event-only-resume';",
+			: "import { resumeEventOnlyFromPayloadDocument } from '@markless/core/web/event-only-resume';",
 		symbolsOnly
 			? ''
 			: `import { state as payloadState, view as payloadView } from '${input.payloadId}';`,
 		'',
+		input.environment === 'client' && input.needsFullResume
+			? "const marklessFullResumeModule = import('@markless/core/web/resume');"
+			: '',
 		emitLoadSymbol(input),
 		routeSymbols ? 'const marklessLoadLocalSymbol = loadSymbol;' : '',
 		symbolsOnly && !routeSymbols ? 'export { loadSymbol };' : '',
@@ -175,6 +176,7 @@ function emitResumeContainerEvent(loadSymbolName: string, needsFullResume: boole
 		return [
 			'export async function resumeContainerEvent(input) {',
 			'	input.root.__asyncResumeRuntimeStarted = true;',
+			'	const { resumeFromPayloadDocument } = await marklessFullResumeModule;',
 			'	const { runtime } = await resumeFromPayloadDocument({',
 			'		document: input.root,',
 			'		root: input.root,',

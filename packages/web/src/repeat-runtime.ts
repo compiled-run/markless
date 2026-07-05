@@ -10,22 +10,16 @@ export class KeyedRepeatRuntimeError extends Error {
 	readonly code = 'MARKLESS_REPEAT_KEY_DUPLICATE';
 	readonly severity = 'error';
 	readonly phase = 'runtime';
-	readonly title: string;
-	readonly why: string;
 	readonly repeatId: string;
 	readonly keyPath: ReadonlyArray<string>;
 	readonly collidingValue: unknown;
-	readonly suggestions: ReadonlyArray<{ readonly message: string }>;
 	readonly docsUrl: string;
 
 	constructor(diagnostic: {
-		readonly title: string;
 		readonly message: string;
-		readonly why: string;
 		readonly repeatId: string;
 		readonly keyPath: ReadonlyArray<string>;
 		readonly collidingValue: unknown;
-		readonly suggestions: ReadonlyArray<{ readonly message: string }>;
 		readonly docsUrl: string;
 	}) {
 		super(diagnostic.message);
@@ -35,12 +29,9 @@ export class KeyedRepeatRuntimeError extends Error {
 			configurable: true,
 		});
 		this.name = 'KeyedRepeatRuntimeError';
-		this.title = diagnostic.title;
-		this.why = diagnostic.why;
 		this.repeatId = diagnostic.repeatId;
 		this.keyPath = diagnostic.keyPath;
 		this.collidingValue = diagnostic.collidingValue;
-		this.suggestions = diagnostic.suggestions;
 		this.docsUrl = diagnostic.docsUrl;
 	}
 }
@@ -96,17 +87,6 @@ export function repeatItemKey(
 	return readPath(item, repeat.keyPath);
 }
 
-export function findRepeatItemByKey(
-	items: ReadonlyArray<unknown>,
-	repeat: RuntimeKeyedRepeatRecord,
-	key: unknown,
-): unknown {
-	for (const item of items) {
-		if (Object.is(repeatItemKey(item, repeat), key)) return item;
-	}
-	return undefined;
-}
-
 function assertUniqueRepeatKeys(
 	repeat: RuntimeKeyedRepeatRecord,
 	items: ReadonlyArray<unknown>,
@@ -126,18 +106,10 @@ function duplicateRepeatKeyError(
 	const source = `${repeat.itemName}.${repeat.keyPath.join('.')}`;
 	const keyText = JSON.stringify(key);
 	return new KeyedRepeatRuntimeError({
-		title: 'Two rows share the same @for key',
-		message: `MARKLESS_REPEAT_KEY_DUPLICATE: Two items of ${repeat.collectionGraphNodeId} produced the same key ${keyText} from ${source}. Rows with the same key cannot be told apart, so one of them would silently replace the other.`,
-		why: 'The key is each row identity across reorder, insert, delete, and resume; duplicate identities make row state and DOM ownership ambiguous.',
+		message: `MARKLESS_REPEAT_KEY_DUPLICATE: Duplicate @for key ${keyText} from ${source}.`,
 		repeatId: repeat.id,
 		keyPath: repeat.keyPath,
 		collidingValue: key,
-		suggestions: [
-			{
-				message:
-					'Key by a field that is unique per item, or make the key compound where the data allows it. If the data has no unique field, key by position with index i; key i.',
-			},
-		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_REPEAT_KEY_DUPLICATE',
 	});
 }

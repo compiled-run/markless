@@ -3665,7 +3665,9 @@ export function DuplicateArticles() @{
 	expect(() => publicModule.DuplicateArticles()).toThrowError(
 		expect.objectContaining({
 			code: 'MARKLESS_REPEAT_KEY_DUPLICATE',
+			message: 'MARKLESS_REPEAT_KEY_DUPLICATE: Duplicate @for key "fruit" from entry.code.',
 			phase: 'runtime',
+			docsUrl: 'https://markless.dev/errors/MARKLESS_REPEAT_KEY_DUPLICATE',
 			repeatId: 'repeat:0',
 			keyPath: ['code'],
 			collidingValue: 'fruit',

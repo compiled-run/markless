@@ -6,9 +6,9 @@ import type {
 	RuntimeGraphSharedPatch,
 } from '@markless/runtime';
 import {
-	findRepeatItemByKey,
 	readKeyedRepeatCollection,
 	repeatItemKey,
+	type RuntimeKeyedRepeatRecord,
 	validateKeyedRepeatGraphKeys,
 } from './repeat-runtime.ts';
 import {
@@ -29,6 +29,17 @@ export type {
 	RuntimeResumeErrorCode,
 } from './inline/resume-errors.ts';
 export { runSyncPolicyActions } from './inline/sync-policy-core.ts';
+
+function findRepeatItemByKey(
+	items: ReadonlyArray<unknown>,
+	repeat: RuntimeKeyedRepeatRecord,
+	key: unknown,
+): unknown {
+	for (const item of items) {
+		if (Object.is(repeatItemKey(item, repeat), key)) return item;
+	}
+	return undefined;
+}
 
 export type ResumeDomNode = {
 	readonly nodeType: number;

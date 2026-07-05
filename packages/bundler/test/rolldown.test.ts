@@ -576,10 +576,14 @@ export function App() @{
 `,
 		environment: 'client',
 	});
-	// Row events need graph subscriptions and locals dispatch: the event-only
-	// runtime silently drops them, so keyed modules take the full runtime.
+	// Row events need graph subscriptions and locals dispatch: the static entry
+	// wires event-only first, then dynamically hands off to the full runtime.
+	expect(keyed.code).toContain('resumeEventOnlyFromPayloadDocument');
 	expect(keyed.code).toContain('resumeFromPayloadDocument');
-	expect(keyed.code).not.toContain('resumeEventOnlyFromPayloadDocument');
+	expect(keyed.code).toContain("import('@markless/core/web/resume')");
+	expect(keyed.code).not.toContain(
+		"import { resumeFromPayloadDocument } from '@markless/core/web/resume';",
+	);
 
 	const handles = await transformTsrxModule({
 		filename: '/workspace/app/src/Focus.tsrx',
@@ -598,9 +602,13 @@ export function App() @{
 `,
 		environment: 'client',
 	});
-	// Element handles materialize only in the full runtime.
+	// Element handles materialize only after the dynamic full-runtime handoff.
+	expect(handles.code).toContain('resumeEventOnlyFromPayloadDocument');
 	expect(handles.code).toContain('resumeFromPayloadDocument');
-	expect(handles.code).not.toContain('resumeEventOnlyFromPayloadDocument');
+	expect(handles.code).toContain("import('@markless/core/web/resume')");
+	expect(handles.code).not.toContain(
+		"import { resumeFromPayloadDocument } from '@markless/core/web/resume';",
+	);
 
 	const boundaries = await transformTsrxModule({
 		filename: '/workspace/app/src/Async.tsrx',
@@ -621,9 +629,13 @@ export function App() @{
 `,
 		environment: 'client',
 	});
-	// Async boundary settle and revalidation live only in the full runtime.
+	// Async boundary settle and revalidation live behind the dynamic full-runtime handoff.
+	expect(boundaries.code).toContain('resumeEventOnlyFromPayloadDocument');
 	expect(boundaries.code).toContain('resumeFromPayloadDocument');
-	expect(boundaries.code).not.toContain('resumeEventOnlyFromPayloadDocument');
+	expect(boundaries.code).toContain("import('@markless/core/web/resume')");
+	expect(boundaries.code).not.toContain(
+		"import { resumeFromPayloadDocument } from '@markless/core/web/resume';",
+	);
 
 	const withChild = await transformTsrxModule({
 		filename: '/workspace/app/src/Shell.tsrx',
@@ -643,7 +655,11 @@ export function Shell() @{
 		environment: 'client',
 	});
 	// Child components may compose branches/boundaries/handles into the served
-	// payload that the parent module cannot see at compile time: escalate.
+	// payload: wire event-only first, then dynamically escalate.
+	expect(withChild.code).toContain('resumeEventOnlyFromPayloadDocument');
 	expect(withChild.code).toContain('resumeFromPayloadDocument');
-	expect(withChild.code).not.toContain('resumeEventOnlyFromPayloadDocument');
+	expect(withChild.code).toContain("import('@markless/core/web/resume')");
+	expect(withChild.code).not.toContain(
+		"import { resumeFromPayloadDocument } from '@markless/core/web/resume';",
+	);
 });
