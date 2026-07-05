@@ -108,6 +108,30 @@ test('T130 keeps a loud gate for imported helpers without module graph interface
 	]);
 });
 
+test('B919 reports imported module-scope state exports instead of compiling a dead snapshot', async () => {
+	const [, app] = await compileTsrxModulesWithInterfaces([
+		{
+			filename: 'src/session.tsrx',
+			importSource: './session.tsrx',
+			source: `import { state } from '@markless/core'; export const count = state(0);`,
+		},
+		{
+			filename: 'src/App.tsrx',
+			source: `import { count } from './session.tsrx'; export function App() @{ <p>{count}</p> }`,
+		},
+	]);
+
+	expect(app.semanticGraph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_STATE_CROSS_MODULE_IMPORT',
+			message: 'Cannot import graph state "count" from "./session.tsrx" into "src/App.tsrx".',
+			why: expect.stringContaining('per-request graph ownership'),
+		}),
+	]);
+	expect(app.stateLowering.diagnostics).toEqual([]);
+	expect(app.protocolState.cells).toEqual([]);
+});
+
 test('T130 keeps same-module helper-created state behavior unchanged', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/HelperCounter.tsrx',

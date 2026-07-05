@@ -82,12 +82,19 @@ export type ModuleGraphInterfaceHelperReturn = {
 	readonly functionSource?: string;
 };
 
-export type ModuleGraphInterfaceExport = {
-	readonly exportName: string;
-	readonly localName: string;
-	readonly kind: 'function';
-	readonly returns: ModuleGraphInterfaceHelperReturn;
-};
+export type ModuleGraphInterfaceExport =
+	| {
+			readonly exportName: string;
+			readonly localName: string;
+			readonly kind: 'function';
+			readonly returns: ModuleGraphInterfaceHelperReturn;
+	  }
+	| {
+			readonly exportName: string;
+			readonly localName: string;
+			readonly kind: 'graph-binding';
+			readonly bindingKind: 'state' | 'computed';
+	  };
 
 export type ModuleGraphInterfaceArtifact = {
 	readonly passId: 'module-graph-interface';
@@ -233,6 +240,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_STATE_MODULE_SCOPE'
 		| 'MARKLESS_STATE_CREATION_SITE_UNSTABLE'
 		| 'MARKLESS_STATE_HELPER_RETURN_UNSUPPORTED'
+		| 'MARKLESS_STATE_CROSS_MODULE_IMPORT'
 		| 'MARKLESS_STATE_NESTED_CREATION'
 		| 'MARKLESS_COMPUTED_DEPENDENCY_CYCLE'
 		| 'MARKLESS_ASYNC_POST_AWAIT_READ'
@@ -242,6 +250,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_STATE_WRITE_IN_TEMPLATE'
 		| 'MARKLESS_STATE_WRITE_IN_COMPUTED'
 		| 'MARKLESS_SHARED_DEFINITION_CYCLE'
+		| 'MARKLESS_SHARED_SCOPE_INVALID'
 		| 'MARKLESS_ELEMENT_HANDLE_REQUIRED'
 		| 'MARKLESS_ELEMENT_HANDLE_DUPLICATE'
 		| 'MARKLESS_ELEMENT_HANDLE_UNBOUND'

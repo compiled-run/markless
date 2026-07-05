@@ -248,6 +248,24 @@ export function crossModuleHelperStateReturnUnsupportedDiagnostic(input: {
 	});
 }
 
+export function crossModuleStateImportDiagnostic(input: {
+	readonly importedName: string;
+	readonly sourceModule: string;
+	readonly filename: string;
+	readonly sourceSpan?: SourceSpan;
+}): SemanticGraphDiagnostic {
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_STATE_CROSS_MODULE_IMPORT',
+		title: 'Imported module-scope state is not resumable',
+		message: `Cannot import graph state "${input.importedName}" from "${input.sourceModule}" into "${input.filename}".`,
+		why: 'Module-scope state has no per-request graph ownership. Importing it would compile reads as dead snapshots and writes as plain module mutation instead of connecting to this document payload.',
+		span: input.sourceSpan,
+		suggestion:
+			'Move the state() call into the component that owns it, or expose request/container/page lifetime data with shared() and import that shared() definition instead.',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_CROSS_MODULE_IMPORT',
+	});
+}
+
 export function unsupportedHelperStateReturnDiagnostic(input: {
 	readonly helperName: string;
 	readonly source: string;
@@ -533,6 +551,29 @@ export function sharedDefinitionCycleDiagnostic(input: {
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_SHARED_DEFINITION_CYCLE',
 	};
+}
+
+export function invalidSharedScopeDiagnostic(input: {
+	readonly valueSource?: string;
+	readonly valueSpan?: SourceSpan;
+}): SemanticGraphDiagnostic {
+	const valid = '"request", "container", and "page"';
+	const literal = input.valueSource?.startsWith("'") || input.valueSource?.startsWith('"');
+	const valueText = literal
+		? `"${input.valueSource?.slice(1, -1)}"`
+		: input.valueSource;
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_SHARED_SCOPE_INVALID',
+		title: 'shared() scope must be valid',
+		message: literal
+			? `Unknown shared() scope ${valueText}. Valid scopes are ${valid}.`
+			: `shared() scope must be a string literal. Valid scopes are ${valid}.`,
+		why: 'shared() scope controls graph lifetime. Silently dropping an unknown scope changes whether data is request, container, or page owned.',
+		span: input.valueSpan,
+		suggestion:
+			'Use `shared(factory, { scope: "request" })`, `shared(factory, { scope: "container" })`, or `shared(factory, { scope: "page" })`.',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_SHARED_SCOPE_INVALID',
+	});
 }
 
 export function elementHandleRequiredDiagnostic(

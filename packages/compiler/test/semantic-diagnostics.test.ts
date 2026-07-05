@@ -406,6 +406,56 @@ test('buildSemanticGraph reports shared definition dependency cycles', async () 
 	]);
 });
 
+test('B919 reports unknown shared scope strings', async () => {
+	const invalidScopeSource = `import { shared } from '@markless/core'; export const session = shared(() => ({}), { scope: 'session' });`;
+	const graph = await buildSemanticGraph({
+		filename: 'src/session.tsrx',
+		source: invalidScopeSource,
+	});
+	const scopeStart = invalidScopeSource.indexOf("'session'");
+
+	expect(graph.sharedDefinitions).toEqual([
+		expect.objectContaining({
+			name: 'session',
+		}),
+	]);
+	expect(graph.sharedDefinitions[0]).not.toHaveProperty('scope');
+	expect(graph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_SHARED_SCOPE_INVALID',
+			message:
+				'Unknown shared() scope "session". Valid scopes are "request", "container", and "page".',
+			primarySpan: {
+				filename: 'src/session.tsrx',
+				start: scopeStart,
+				end: scopeStart + "'session'".length,
+			},
+		}),
+	]);
+});
+
+test('B919 reports non-literal shared scope values', async () => {
+	const dynamicScopeSource = `import { shared } from '@markless/core'; const scope = 'request'; export const session = shared(() => ({}), { scope });`;
+	const graph = await buildSemanticGraph({
+		filename: 'src/session.tsrx',
+		source: dynamicScopeSource,
+	});
+	const scopeStart = dynamicScopeSource.lastIndexOf('scope');
+
+	expect(graph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_SHARED_SCOPE_INVALID',
+			message:
+				'shared() scope must be a string literal. Valid scopes are "request", "container", and "page".',
+			primarySpan: {
+				filename: 'src/session.tsrx',
+				start: scopeStart,
+				end: scopeStart + 'scope'.length,
+			},
+		}),
+	]);
+});
+
 test('buildSemanticGraph reports missing framework API imports', async () => {
 	const graph = await buildSemanticGraph({
 		filename: 'src/Counter.tsrx',
