@@ -12,22 +12,24 @@ import {
 	emitRepeatSupportFunctions,
 	publicRepeatSyncCall,
 } from './keyed-repeats.ts';
+import type { PublicRenderRootSelection } from './plan.ts';
 import { emitPublicStaticEvents, emitStaticTextSyncFunction } from './static-bindings.ts';
 import { emitDirectPublicStateEntries } from './state-entries.ts';
 import { createPublicProtocolView } from './view-filter.ts';
 
 // Emits the specialized direct-DOM CSR path for simple single-component modules.
 export function emitDirectPublicRenderModule(input: {
-	readonly componentName: string | undefined;
+	readonly rootSelection: PublicRenderRootSelection | null;
 	readonly componentCount: number;
 	readonly publicRenderPlan: PublicRenderPlanArtifact;
 	readonly protocolState: PublicRenderModuleInput['protocolState'];
 	readonly protocolView: PublicRenderModuleInput['protocolView'];
 	readonly symbolResolver: SymbolResolverPlan;
 }) {
+	const componentName = input.rootSelection?.componentName;
 	if (
 		!input.publicRenderPlan.directRenderTemplateHtml ||
-		!input.componentName ||
+		!componentName ||
 		input.componentCount !== 1 ||
 		!canEmitPublicRenderModule(input.publicRenderPlan)
 	) {
@@ -51,7 +53,7 @@ export function emitDirectPublicRenderModule(input: {
 	const repeatStateName = hasSingleRepeat ? 'repeatState0' : null;
 	const hasStaticEvents = input.publicRenderPlan.staticEventControls.length > 0;
 	const hasStaticTextWrites = input.publicRenderPlan.staticTextWrites.length > 0;
-	const componentFactory = emitComponentFactory(input.componentName, {
+	const componentFactory = emitComponentFactory(componentName, {
 		repeatSyncCall: publicRepeatSyncCall(
 			input.publicRenderPlan,
 			'graph',

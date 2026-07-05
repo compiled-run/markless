@@ -628,6 +628,92 @@ test('compileTsrxModule treats a default exported TSRX function as the public re
 	expect(output.html).toBe('<main><h1>Markless Router</h1><button>Button 0</button></main>');
 });
 
+test('compileTsrxModule ignores plain helpers above the exported render root', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/HelperBeforeRoot.tsrx',
+		source: `
+function formatLabel(value) { return String(value).toUpperCase(); }
+
+export function Dashboard() @{
+	<article>{formatLabel('ready')}</article>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.semanticGraph.components).toEqual([{ name: 'Dashboard' }]);
+	expect(result.publicRenderPlan.diagnostics).toEqual([]);
+	expect(result.publicRenderModule.ssrModuleSource).toContain('function marklessRenderSsr');
+	expect(result.publicRenderModule.csrModuleSource).toContain('function marklessRenderCsr');
+});
+
+test('compileTsrxModule roots plan and module emit at the exported component', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/ExportedRootChoice.tsrx',
+		source: `
+function Preview() @{
+	<aside>Preview only</aside>
+}
+
+export function Dashboard() @{
+	<main>Chosen root</main>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.rootTemplateHtml).toBe('<main>Chosen root</main>');
+	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	const output = await (ssrModule.marklessRenderSsr as () => { readonly html: string })();
+
+	expect(output.html).toBe('<main>Chosen root</main>');
+});
+
+test('compileTsrxModule diagnoses modules with no renderable component root', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/OnlyHelpers.tsrx',
+		source: `
+function readMessage() { return 'hello'; }
+function double(value) { return value * 2; }
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderModule.moduleSource).toBe('');
+	expect(result.publicRenderModule.csrModuleSource).toBe('');
+	expect(result.publicRenderModule.ssrModuleSource).toBe('');
+	expect(result.publicRenderModule.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_PUBLIC_RENDER_ROOT_UNSUPPORTED',
+			severity: 'error',
+			phase: 'public-render',
+			title: 'No renderable component root was found',
+			message: expect.stringContaining('No component with a TSRX template root was found'),
+			docsUrl: 'https://markless.dev/errors/MARKLESS_PUBLIC_RENDER_ROOT_UNSUPPORTED',
+		}),
+	]);
+});
+
+test('compileTsrxModule keeps single-component SSR html unchanged', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/SingleCard.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let label = state('Stable');
+
+	<section><h2>{label}</h2><p>Static</p></section>
+}
+`,
+		symbols: [],
+	});
+	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	const output = await (ssrModule.marklessRenderSsr as () => { readonly html: string })();
+
+	expect(output.html).toBe('<section><h2>Stable</h2><p>Static</p></section>');
+});
+
 test('compileTsrxModule renders dynamic tags from state values in SSR html', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/DynamicCard.tsrx',

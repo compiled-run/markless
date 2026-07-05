@@ -71,3 +71,28 @@ export function unsupportedRenderRootDiagnostic(input: {
 		docsUrl: 'https://markless.dev/errors/MARKLESS_PUBLIC_RENDER_ROOT_UNSUPPORTED',
 	};
 }
+
+export function noRenderableRootDiagnostic(input: {
+	readonly node: AnyNode;
+	readonly filename: string;
+}): CompilerDiagnostic {
+	return {
+		code: 'MARKLESS_PUBLIC_RENDER_ROOT_UNSUPPORTED',
+		severity: 'error',
+		phase: 'public-render',
+		title: 'No renderable component root was found',
+		message:
+			'No component with a TSRX template root was found, so the compiled module would render nothing.',
+		why: 'The render module anchors one root component structure and its locators for resume; without a template root there is nothing to anchor.',
+		primarySpan: sourceSpan(input.node, input.filename),
+		passId: 'public-render-plan',
+		artifactKeys: ['publicRenderPlan'],
+		suggestions: [
+			{
+				message:
+					'Export a TSRX component with an @{...} template body, or pass an explicit compiled component artifact when multiple roots exist.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_PUBLIC_RENDER_ROOT_UNSUPPORTED',
+	};
+}

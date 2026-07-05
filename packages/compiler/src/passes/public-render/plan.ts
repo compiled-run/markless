@@ -25,6 +25,7 @@ import {
 } from '../../artifact-helpers/graph-paths.ts';
 import {
 	childrenOpacityDiagnostic,
+	noRenderableRootDiagnostic,
 	unsupportedRenderConstructDiagnostic,
 	unsupportedRenderRootDiagnostic,
 } from './diagnostics.ts';
@@ -53,11 +54,11 @@ import type {
 // decides what direct DOM work is compiler-proven instead of emitting code itself.
 export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlanArtifact {
 	const ast = parseModule(input.source.source, input.source.filename) as unknown as AnyNode;
-	const component = findComponent(ast);
-	const root = firstComponentRoot(component);
-	if (!root) {
+	const selectedRoot = selectPublicRenderRoot(ast);
+	if (!selectedRoot) {
 		return emptyPlan(componentRootDiagnostics(ast, input.source.filename));
 	}
+	const root = selectedRoot.root;
 
 	const assignedHosts = assignHostIds(
 		root,
@@ -815,7 +816,7 @@ function componentRootDiagnostics(ast: AnyNode, filename: string) {
 		}
 	}
 
-	return [];
+	return [noRenderableRootDiagnostic({ node: ast, filename })];
 }
 
 function collectStaticTextWrites(input: {
@@ -1469,7 +1470,13 @@ function containsNestedRepeat(node: AnyNode): boolean {
 	return childNodes(node).some(visit);
 }
 
-function firstComponentRoot(component: AnyNode | undefined): AnyNode | null {
+export type PublicRenderRootSelection = {
+	readonly component: AnyNode;
+	readonly componentName: string;
+	readonly root: AnyNode;
+};
+
+export function firstComponentRoot(component: AnyNode | undefined): AnyNode | null {
 	const body = component?.body as AnyNode | undefined;
 	if (!body) return null;
 
@@ -1491,6 +1498,32 @@ function firstComponentRoot(component: AnyNode | undefined): AnyNode | null {
 	}
 
 	return null;
+}
+
+export function selectPublicRenderRoot(ast: AnyNode): PublicRenderRootSelection | null {
+	let fallback: PublicRenderRootSelection | null = null;
+
+	for (const statement of asNodes(ast.body)) {
+		const componentFunction = getComponentFunction(statement);
+		if (!componentFunction) continue;
+		const root = firstComponentRoot(componentFunction.node);
+		if (!root) continue;
+
+		const selection = {
+			component: componentFunction.node,
+			componentName: componentFunction.name,
+			root,
+		};
+		if (
+			statement.type === 'ExportDefaultDeclaration' ||
+			statement.type === 'ExportNamedDeclaration'
+		) {
+			return selection;
+		}
+		fallback ??= selection;
+	}
+
+	return fallback;
 }
 
 // Fragment roots render only when every top-level child is a plain host
@@ -1538,26 +1571,6 @@ function unsupportedFragmentChildKind(fragment: AnyNode): string {
 		return `${String(child.type)} child`;
 	}
 	return 'empty fragment';
-}
-
-function findComponent(ast: AnyNode): AnyNode | undefined {
-	let fallback: AnyNode | undefined;
-
-	for (const statement of asNodes(ast.body)) {
-		const componentFunction = getComponentFunction(statement);
-		if (!componentFunction) continue;
-		if (!firstComponentRoot(componentFunction.node)) continue;
-
-		if (
-			statement.type === 'ExportDefaultDeclaration' ||
-			statement.type === 'ExportNamedDeclaration'
-		) {
-			return componentFunction.node;
-		}
-		fallback ??= componentFunction.node;
-	}
-
-	return fallback;
 }
 
 function staticHtml(
