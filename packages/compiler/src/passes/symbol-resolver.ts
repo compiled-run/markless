@@ -102,7 +102,7 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 
 		symbols.push({
 			id: `symbol:${nextSymbolId++}`,
-			kind: 'async-computed-runner',
+			kind: computed.async ? 'async-computed-runner' : 'sync-computed-derive',
 			graphNodeId: computed.graphNodeId,
 			name: computed.name,
 			source,

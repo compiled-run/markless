@@ -141,6 +141,7 @@ export function App() @{
 			graphNodeId: 'computed:doubled',
 			name: 'doubled',
 			async: false,
+			deriveSymbolId: 'symbol:1',
 			dependencies: [{ graphNodeId: 'state:count', path: [] }],
 		},
 	]);
