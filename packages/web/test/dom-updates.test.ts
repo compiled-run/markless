@@ -25,7 +25,7 @@ test('resume runtime registers async view DOM updates as graph subscriptions', a
 	});
 	const loadedSymbols: string[] = [];
 
-	createResumeRuntime({
+	await createResumeRuntime({
 		root,
 		graph,
 		view: {

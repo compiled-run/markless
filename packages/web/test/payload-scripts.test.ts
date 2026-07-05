@@ -154,7 +154,7 @@ test('runtime decodes async payload scripts into graph state and resume view rec
 		},
 	});
 
-	resume.start();
+	await resume.start();
 
 	const keydown: FakeEvent = {
 		type: 'keydown',
