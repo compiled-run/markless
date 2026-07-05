@@ -5,7 +5,7 @@ import {
 	type DecodedPayloadScripts,
 	type EncodedPayloadScripts,
 	type RuntimePayloadType,
-} from '../../../serializer/src/protocol-validation.ts';
+} from '../../../serializer/src/protocol-client.ts';
 
 export type PayloadScriptElement = {
 	readonly textContent?: string | null;

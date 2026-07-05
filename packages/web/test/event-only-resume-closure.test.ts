@@ -6,8 +6,11 @@ import { expect, test } from 'vitest';
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const entry = join(repoRoot, 'packages/web/src/event-only-resume.ts');
 const resumeEntry = join(repoRoot, 'packages/web/src/resume.ts');
+const payloadEntry = join(repoRoot, 'packages/web/src/payload.ts');
 const renderCsrEntry = join(repoRoot, 'packages/web/src/render-csr.ts');
-const sourceByteLimit = 90000;
+// 3,000 gzip bytes * the observed ~3.7 raw:minified+gzip ratio leaves an
+// 11,100 byte raw-source proxy budget for the production client closure.
+const sourceByteLimit = 11100;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts', 'packages/web/src/render.ts',
@@ -33,6 +36,15 @@ test('event-only resume keeps its static source import closure lean', () => {
 	expect(closure.sourceBytes).toBeLessThanOrEqual(sourceByteLimit);
 });
 
+test('payload resume keeps its static source import closure lean', () => {
+	const closure = collectStaticImportClosure(payloadEntry);
+	const relativeClosure = closure.files.map((file) => toRepoPath(file)).sort();
+
+	expect(relativeClosure).not.toContain('packages/serializer/src/protocol-validation.ts');
+	expect(relativeClosure).not.toContain('packages/serializer/src/value.ts');
+	expect(closure.sourceBytes).toBeLessThanOrEqual(sourceByteLimit);
+});
+
 test('render-csr keeps full resume apply helpers out of its static import closure', () => {
 	const closure = collectStaticImportClosure(renderCsrEntry);
 	const relativeClosure = closure.files.map((file) => toRepoPath(file)).sort();
@@ -43,8 +55,12 @@ test('render-csr keeps full resume apply helpers out of its static import closur
 	expect(source).not.toContain('findRepeatItemByKey');
 });
 
-test('full browser resume does not statically reach serializer encode modules', () => {
-	const closure = collectStaticImportClosure(resumeEntry);
+test.each([
+	['full browser resume', resumeEntry],
+	['payload resume', payloadEntry],
+	['render-csr', renderCsrEntry],
+])('%s does not statically reach serializer encode modules', (_name, startFile) => {
+	const closure = collectStaticImportClosure(startFile);
 	const relativeClosure = closure.files.map((file) => toRepoPath(file)).sort();
 
 	for (const forbidden of forbiddenResumeSerializerFiles) {

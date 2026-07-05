@@ -1,24 +1,6 @@
 import type { ProtocolStatePayload, ProtocolViewPayload } from '../../serializer/src/protocol.ts';
-import {
-	deserializeGraphValue,
-	type SerializedGraphPayload,
-} from '../../serializer/src/value-decode.ts';
-import type {
-	DomJournalEntry,
-	DomJournalResult,
-	RuntimeGraphCall,
-	RuntimeGraphUpdate,
-	RuntimeGraphWrite,
-} from '@markless/runtime';
-import { decodePayloadScriptsFromDocument } from './inline/payload-document.ts';
-import {
-	mismatchedElementLocatorError,
-	missingElementLocatorError,
-} from './inline/resume-errors.ts';
-import {
-	runSyncPolicyActions,
-	type SyncPolicyDomEvent,
-} from './inline/sync-policy-core.ts';
+import type { DomJournalResult } from '@markless/runtime';
+import type { EventOnlyResumeGraph } from './event-only-graph.ts';
 
 export type EventOnlyResumeDomNode = {
 	readonly nodeType: number;
@@ -69,17 +51,7 @@ export type EventOnlyResumeRecord = ProtocolViewPayload['events'][number];
 export type EventOnlyResumeDomUpdateRecord = ProtocolViewPayload['domUpdates'][number];
 export type EventOnlyResumeBehaviorRecord = ProtocolViewPayload['behaviors'][number];
 
-type EventOnlySyncComputedRecord = ProtocolStatePayload['computed'][number] & {
-	readonly deriveSymbolId: string;
-};
-
-export type EventOnlyResumeGraph = {
-	read(graphNodeId: string, path?: ReadonlyArray<string>): unknown;
-	write(write: RuntimeGraphWrite): void;
-	update(update: RuntimeGraphUpdate): unknown;
-	call(call: RuntimeGraphCall): unknown;
-	flush(): Promise<void>;
-};
+export type { EventOnlyResumeGraph } from './event-only-graph.ts';
 
 export type EventOnlyResumeSymbolContext = {
 	readonly graph: EventOnlyResumeGraph;
@@ -133,11 +105,6 @@ export type EventOnlyResumeContainer = {
 	readonly dispose: () => void;
 };
 
-type DirtyPath = {
-	readonly graphNodeId: string;
-	readonly path: ReadonlyArray<string>;
-};
-
 type EventOnlyResumeContainerState = EventOnlyResumeContainer & {
 	readonly elementsByHostId: ReadonlyMap<string, EventOnlyResumeDomElement>;
 	readonly activeBehaviorHosts: Set<string>;
@@ -151,8 +118,9 @@ export async function resumeEventOnlyFromPayloadDocument(
 ): Promise<EventOnlyResumeContainer> {
 	let container = containers.get(input.root);
 	if (!container) {
+		const { decodePayloadScriptsFromDocument } = await import('./inline/payload-document.ts');
 		const { state, view } = decodePayloadScriptsFromDocument(input.document);
-		container = createEventOnlyResumeContainerState({
+		container = await createEventOnlyResumeContainerState({
 			state,
 			view,
 			root: input.root,
@@ -170,15 +138,16 @@ export async function resumeEventOnlyFromPayloadDocument(
 
 export function createEventOnlyResumeContainerFromPayloads(
 	input: CreateEventOnlyResumeContainerInput,
-): EventOnlyResumeContainer {
+): Promise<EventOnlyResumeContainer> {
 	return createEventOnlyResumeContainerState(input);
 }
 
-function createEventOnlyResumeContainerState(
+async function createEventOnlyResumeContainerState(
 	input: CreateEventOnlyResumeContainerInput,
-): EventOnlyResumeContainerState {
-	const elementsByHostId = materializeDomLocators(input.root, input.view.locators);
+): Promise<EventOnlyResumeContainerState> {
+	const elementsByHostId = await materializeDomLocators(input.root, input.view.locators);
 	const activeBehaviorHosts = new Set<string>();
+	const { createEventOnlyResumeGraph } = await import('./event-only-graph.ts');
 	const graph = createEventOnlyResumeGraph({
 		state: input.state,
 		view: input.view,
@@ -212,94 +181,6 @@ function createEventOnlyResumeContainerState(
 	};
 }
 
-function createEventOnlyResumeGraph(input: {
-	readonly state: ProtocolStatePayload;
-	readonly view: ProtocolViewPayload;
-	readonly loadSymbol: ResumeEventOnlyFromPayloadDocumentInput['loadSymbol'];
-	readonly root: EventOnlyResumeDomElement;
-	readonly elementsByHostId: ReadonlyMap<string, EventOnlyResumeDomElement>;
-}): EventOnlyResumeGraph {
-	const existingCells = input.root.__marklessEventOnlyGraph;
-	const cells = existingCells ?? new Map<string, unknown>();
-	const dirtyPaths: DirtyPath[] = [];
-
-	if (!existingCells) {
-		for (const cell of input.state.cells) {
-			cells.set(
-				cell.graphNodeId,
-				cell.value === undefined
-					? undefined
-					: deserializeGraphValue(cell.value as SerializedGraphPayload),
-			);
-		}
-		input.root.__marklessEventOnlyGraph = cells;
-	}
-
-	const graph: EventOnlyResumeGraph = {
-		read(graphNodeId, path = []) {
-			return readPath(cells.get(graphNodeId), path);
-		},
-		write(write) {
-			const path = write.path ?? [];
-			const currentValue = readPath(cells.get(write.graphNodeId), path);
-			if (Object.is(currentValue, write.value)) return;
-			cells.set(
-				write.graphNodeId,
-				writePath(cells.get(write.graphNodeId), path, write.value),
-			);
-			dirtyPaths.push({ graphNodeId: write.graphNodeId, path });
-		},
-		update(update) {
-			const path = update.path ?? [];
-			const currentValue = readPath(cells.get(update.graphNodeId), path);
-			const nextValue = update.update(currentValue);
-			if (!Object.is(currentValue, nextValue)) {
-				cells.set(
-					update.graphNodeId,
-					writePath(cells.get(update.graphNodeId), path, nextValue),
-				);
-				dirtyPaths.push({ graphNodeId: update.graphNodeId, path });
-			}
-			if (update.returnValue === 'previous') return currentValue;
-			if (update.returnValue === 'next') return nextValue;
-		},
-		call(call) {
-			const path = call.path ?? [];
-			const target = readPath(cells.get(call.graphNodeId), path) as
-				| Record<string, unknown>
-				| undefined;
-			const method = target?.[call.method];
-			if (typeof method !== 'function') {
-				throw new TypeError(`Unsupported graph collection method "${call.method}".`);
-			}
-			const result = Reflect.apply(method, target, [...(call.args ?? [])]);
-			dirtyPaths.push({ graphNodeId: call.graphNodeId, path });
-			return result;
-		},
-		async flush() {
-			while (dirtyPaths.length > 0) {
-				const pending = dirtyPaths.splice(0);
-				await flushSyncComputeds({
-					graph,
-					pending,
-					state: input.state,
-					loadSymbol: input.loadSymbol,
-					root: input.root,
-				});
-				await flushDomUpdates({
-					graph,
-					pending,
-					view: input.view,
-					loadSymbol: input.loadSymbol,
-					elementsByHostId: input.elementsByHostId,
-				});
-			}
-		},
-	};
-
-	return graph;
-}
-
 async function dispatchEvent(input: {
 	readonly event: EventOnlyResumeDomEvent;
 	readonly view: ProtocolViewPayload;
@@ -323,10 +204,11 @@ async function dispatchEvent(input: {
 
 	try {
 		if (matched.eventRecord.syncPolicy) {
+			const { runSyncPolicyActions } = await import('./inline/sync-policy-core.ts');
 			runSyncPolicyActions(
 				matched.eventRecord.syncPolicy,
 				input.graph,
-				input.event as SyncPolicyDomEvent,
+				input.event,
 			);
 		}
 		for (const symbolId of matched.eventRecord.symbolIds) {
@@ -340,6 +222,7 @@ async function dispatchEvent(input: {
 			});
 			const journalResult = isPromiseLike(result) ? await result : result;
 			if (typeof journalResult !== 'function') {
+				const { applyDomJournalResult } = await import('./event-only-graph.ts');
 				applyDomJournalResult(journalResult, input.elementsByHostId);
 			}
 		}
@@ -360,134 +243,26 @@ async function dispatchEvent(input: {
 	}
 }
 
-async function flushSyncComputeds(input: {
-	readonly graph: EventOnlyResumeGraph;
-	readonly pending: ReadonlyArray<DirtyPath>;
-	readonly state: ProtocolStatePayload;
-	readonly loadSymbol: ResumeEventOnlyFromPayloadDocumentInput['loadSymbol'];
-	readonly root: EventOnlyResumeDomElement;
-}): Promise<void> {
-	const ranComputeds = new Set<string>();
-
-	for (const computed of syncComputedRecords(input.state)) {
-		const dirty = (computed.dependencies ?? []).some((dependency) =>
-			input.pending.some(
-				(path) =>
-					path.graphNodeId === dependency.graphNodeId &&
-					pathsIntersect(path.path, dependency.path),
-			),
-		);
-		if (!dirty || ranComputeds.has(computed.graphNodeId)) continue;
-
-		ranComputeds.add(computed.graphNodeId);
-		const loadedSymbol = input.loadSymbol(computed.deriveSymbolId);
-		const symbol = isPromiseLike(loadedSymbol) ? await loadedSymbol : loadedSymbol;
-		const result = symbol({
-			graph: input.graph,
-			element: input.root,
-			getElementHandle: noElementHandle,
-		});
-		const value = isPromiseLike(result) ? await result : result;
-		input.graph.write({ graphNodeId: computed.graphNodeId, value });
-	}
-}
-
-async function flushDomUpdates(input: {
-	readonly graph: EventOnlyResumeGraph;
-	readonly pending: ReadonlyArray<DirtyPath>;
-	readonly view: ProtocolViewPayload;
-	readonly loadSymbol: ResumeEventOnlyFromPayloadDocumentInput['loadSymbol'];
-	readonly elementsByHostId: ReadonlyMap<string, EventOnlyResumeDomElement>;
-}): Promise<void> {
-	const ranDomUpdates = new Set<string>();
-
-	for (const domUpdate of input.view.domUpdates) {
-		if (!domUpdate.symbolId) continue;
-		const dirty = input.pending.some(
-			(path) =>
-				path.graphNodeId === domUpdate.graphNodeId &&
-				pathsIntersect(path.path, domUpdate.path),
-		);
-		if (!dirty) continue;
-
-		const key = `${domUpdate.hostNodeId}\n${domUpdate.graphNodeId}\n${domUpdate.path.join('.')}`;
-		if (ranDomUpdates.has(key)) continue;
-		ranDomUpdates.add(key);
-
-		const element = input.elementsByHostId.get(domUpdate.hostNodeId);
-		if (!element) continue;
-
-		const loadedSymbol = input.loadSymbol(domUpdate.symbolId);
-		const symbol = isPromiseLike(loadedSymbol) ? await loadedSymbol : loadedSymbol;
-		const result = symbol({
-			graph: input.graph,
-			element,
-			getElementHandle: noElementHandle,
-			domUpdate,
-			value: input.graph.read(domUpdate.graphNodeId, domUpdate.path),
-		});
-		const journalResult = isPromiseLike(result) ? await result : result;
-		if (typeof journalResult !== 'function') {
-			applyDomJournalResult(journalResult, input.elementsByHostId);
-		}
-	}
-}
-
-function applyDomJournalResult(
-	result: DomJournalResult | void,
-	elementsByHostId: ReadonlyMap<string, EventOnlyResumeDomElement>,
-): void {
-	if (!result) return;
-	const entries = isDomJournalEntryArray(result) ? result : [result];
-	for (const entry of entries) applyDomJournalEntry(entry, elementsByHostId);
-}
-
-function isDomJournalEntryArray(
-	result: DomJournalResult,
-): result is ReadonlyArray<DomJournalEntry> {
-	return Array.isArray(result);
-}
-
-function applyDomJournalEntry(
-	entry: DomJournalEntry,
-	elementsByHostId: ReadonlyMap<string, EventOnlyResumeDomElement>,
-): void {
-	const target = elementsByHostId.get(entry.locator);
-	if (!target) return;
-
-	if (entry.type === 'setText') {
-		target.textContent = stringifyDomValue(entry.value);
-		return;
-	}
-	if (entry.type === 'setAttr') {
-		if (entry.value == null || entry.value === false) {
-			target.removeAttribute?.(entry.name);
-			return;
-		}
-		target.setAttribute?.(entry.name, stringifyDomValue(entry.value));
-		return;
-	}
-	if (entry.type === 'setProp') {
-		(target as Record<string, unknown>)[entry.name] = entry.value;
-	}
-}
-
-function materializeDomLocators(
+async function materializeDomLocators(
 	root: EventOnlyResumeDomElement,
 	locators: ProtocolViewPayload['locators'],
-): Map<string, EventOnlyResumeDomElement> {
+): Promise<Map<string, EventOnlyResumeDomElement>> {
 	const elements = collectElements(root);
 	const byHostId = new Map<string, EventOnlyResumeDomElement>();
 
 	for (const locator of locators) {
 		const element = elements[locator.index];
-		if (!element) throw missingElementLocatorError(locator);
+		if (!element) {
+			const { missingElementLocatorError } = await import('./inline/resume-errors.ts');
+			throw missingElementLocatorError(locator);
+		}
 		// '*' marks dynamic-tag hosts whose rendered tag is unknowable at
 		// compile time; skip validation like the full resume runtime does.
 		if (
 			locator.tagName !== '*' &&
 			element.tagName.toLowerCase() !== locator.tagName.toLowerCase()
 		) {
+			const { mismatchedElementLocatorError } = await import('./inline/resume-errors.ts');
 			throw mismatchedElementLocatorError(locator, element.tagName.toLowerCase());
 		}
 		byHostId.set(locator.hostNodeId, element);
@@ -525,55 +300,6 @@ function findEventRecord(
 			}
 		}
 	}
-}
-
-function readPath(value: unknown, path: ReadonlyArray<string>): unknown {
-	let cursor = value as Record<string, unknown> | null | undefined;
-	for (const key of path) {
-		if (cursor == null) return undefined;
-		cursor = cursor[key] as Record<string, unknown> | null | undefined;
-	}
-	return cursor;
-}
-
-function writePath(value: unknown, path: ReadonlyArray<string>, nextValue: unknown): unknown {
-	if (path.length === 0) return nextValue;
-
-	const root = isRecord(value) ? value : {};
-	let cursor = root;
-	for (const key of path.slice(0, -1)) {
-		const child = cursor[key];
-		if (!isRecord(child)) cursor[key] = {};
-		cursor = cursor[key] as Record<string, unknown>;
-	}
-	cursor[path[path.length - 1]!] = nextValue;
-	return root;
-}
-
-function pathsIntersect(a: ReadonlyArray<string>, b: ReadonlyArray<string>): boolean {
-	return startsWithPath(a, b) || startsWithPath(b, a);
-}
-
-function startsWithPath(path: ReadonlyArray<string>, prefix: ReadonlyArray<string>): boolean {
-	if (path.length < prefix.length) return false;
-	return prefix.every((part, index) => path[index] === part);
-}
-
-function syncComputedRecords(state: ProtocolStatePayload): EventOnlySyncComputedRecord[] {
-	return state.computed.filter(
-		(computed): computed is EventOnlySyncComputedRecord =>
-			computed.async === false &&
-			typeof (computed as EventOnlySyncComputedRecord).deriveSymbolId === 'string',
-	);
-}
-
-function stringifyDomValue(value: unknown): string {
-	if (value == null) return '';
-	return String(value);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === 'object' && value !== null;
 }
 
 function isPromiseLike<T>(value: T | Promise<T>): value is Promise<T> {
