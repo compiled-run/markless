@@ -4070,6 +4070,41 @@ export function Deck() @{
 	]);
 });
 
+test('B908 Unit B emits same-file function declaration behavior factories', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/BehaviorFactory.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+function installChart(options) {
+	return (canvas) => {
+		canvas.dataset.points = String(options.points);
+	};
+}
+
+export function App() @{
+	const config = state({ points: 3 });
+
+	<canvas attach={installChart(config)} />
+}
+`,
+		symbols: [],
+	});
+
+	const behavior = result.protocolView.behaviors.find(
+		(record) => record.source === 'installChart(config)',
+	);
+	expect(behavior?.symbolId).toBeDefined();
+
+	const module = result.symbolModules.modules.find(
+		(item) => item.symbolId === behavior?.symbolId,
+	);
+	expect(module?.kind).toBe('behavior');
+	expect(module?.source).toContain('function installChart(options) {');
+	expect(module?.source).toContain('canvas.dataset.points = String(options.points);');
+	expect(module?.source).toContain('const behavior = (function installChart(options)');
+});
+
 test('compileTsrxModule composes imported child BUTTON counters for SSR resume', async () => {
 	const child = await compileTsrxModule({
 		filename: 'src/Counter.tsrx',

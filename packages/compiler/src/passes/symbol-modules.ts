@@ -276,10 +276,16 @@ function spliceEventHandlerBody(
 					.map((line) => line.replace(/^\t/, ''))
 					.join('\n')
 					.replace(/;$/, '');
-				const start = call.offset - bodyStartInHandlerSource;
+				let start = call.offset - bodyStartInHandlerSource;
 				if (start < 0 || start >= bodySource.length) return [];
 
-				const end = sourceStatementEnd(bodySource, start);
+				let end = call.endOffset - bodyStartInHandlerSource;
+				if (end <= start || end > bodySource.length) return [];
+				if (bodySource.slice(start, end) !== call.source) {
+					start = bodySource.indexOf(call.source);
+					end = start + call.source.length;
+				}
+				if (start < 0 || end <= start || end > bodySource.length) return [];
 				return [{ start, end, replacement }];
 			},
 		),
@@ -380,14 +386,6 @@ function indentBody(source: string): string[] {
 function leadingWhitespaceLength(source: string): number {
 	const match = /^\s*/.exec(source);
 	return match ? match[0].length : 0;
-}
-
-function sourceStatementEnd(source: string, start: number): number {
-	for (let index = start; index < source.length; index++) {
-		if (source[index] === ';') return index;
-	}
-
-	return source.length;
 }
 
 function emitEventWrite(

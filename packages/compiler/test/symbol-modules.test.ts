@@ -271,6 +271,18 @@ test('emitSymbolModules emits imported behavior modules with deferred input valu
 	});
 
 	expect(artifact.modules).toHaveLength(1);
+	expect(artifact.modules[0].source).toBe(`import { chart } from "./behaviors";
+
+export const authoredSource = "chart(config)";
+export const behaviorFunctionSource = "chart";
+export const behaviorInputSources = ["config"];
+
+export function symbol_chart(context) {
+	const inputs = context.behaviorInputs ?? new Array(1).fill(undefined);
+	const behavior = chart(...inputs);
+	return behavior(context.element);
+}
+`);
 	expect(artifact.modules[0]).toMatchObject({
 		symbolId: 'symbol:chart',
 		kind: 'behavior',
@@ -310,6 +322,16 @@ test('emitSymbolModules emits inline behavior function modules without imports',
 	});
 
 	expect(artifact.modules).toHaveLength(1);
+	expect(artifact.modules[0].source).toBe(`export const authoredSource = "(element) => element.focus()";
+export const behaviorFunctionSource = "(element) => element.focus()";
+export const behaviorInputSources = [];
+
+export function symbol_autofocus(context) {
+	const inputs = [];
+	const behavior = (element) => element.focus();
+	return behavior(context.element);
+}
+`);
 	expect(artifact.modules[0]).toMatchObject({
 		symbolId: 'symbol:autofocus',
 		kind: 'behavior',
@@ -1659,6 +1681,74 @@ test('B908 preserves simple count++ handler semantics as a spliced graph write',
 	expect(source).toContain('graphNodeId: "state:count"');
 	expect(source).toContain('return Number(value) + 1;');
 	expect(source).not.toContain('count++');
+});
+
+test('B908 Unit B emits authored optional-chain element handle calls', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/OptionalFocusBox.tsrx',
+		source: `
+import { element } from '@markless/core';
+
+export function App() @{
+	const input = element<HTMLInputElement>();
+
+	<>
+		<input el={input} />
+		<button onClick={() => input?.focus()}>Focus</button>
+	</>
+}
+`,
+		symbols: [],
+	});
+
+	const handler = result.symbolModules.modules.find((m) => m.kind === 'event-handler');
+	expect(handler?.source).toContain('context.getElementHandle("input")?.focus();');
+});
+
+test('B908 Unit B collects element handle calls inside nested callbacks', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/DeferredFocusBox.tsrx',
+		source: `
+import { element } from '@markless/core';
+
+export function App() @{
+	const input = element<HTMLInputElement>();
+
+	<>
+		<input el={input} />
+		<button onClick={() => { setTimeout(() => input.focus(), 1); }}>Focus</button>
+	</>
+}
+`,
+		symbols: [],
+	});
+
+	const handler = result.symbolModules.modules.find((m) => m.kind === 'event-handler');
+	expect(handler?.source).toContain('setTimeout(() => context.getElementHandle("input")?.focus(), 1);');
+});
+
+test('B908 Unit B ignores element handle lookalikes inside string literals', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/StringLookalikeFocusBox.tsrx',
+		source: `
+import { element, state } from '@markless/core';
+
+export function App() @{
+	const input = element<HTMLInputElement>();
+	let label = state('');
+
+	<>
+		<input el={input} />
+		<button onClick={() => { label = "input.focus()"; }}>{label}</button>
+	</>
+}
+`,
+		symbols: [],
+	});
+
+	const handler = result.symbolModules.modules.find((m) => m.kind === 'event-handler');
+	expect(handler?.source).toContain('"input.focus()"');
+	expect(handler?.source).not.toContain('getElementHandle');
 });
 
 function emitEventHandlerSource(symbol: any): string {

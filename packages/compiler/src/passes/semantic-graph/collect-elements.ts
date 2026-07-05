@@ -240,7 +240,7 @@ function collectAttribute(
 			for (const behavior of behaviorExpressions(expressionValue)) {
 				state.graph.behaviors.push({
 					hostNodeId,
-					...behaviorSourceParts(behavior, state.source),
+					...behaviorSourceParts(behavior, state),
 				});
 			}
 			collectExpressionReads(expressionValue, state);
@@ -453,24 +453,38 @@ function behaviorExpressions(node: AnyNode): AnyNode[] {
 	return [node];
 }
 
-function behaviorSourceParts(node: AnyNode, source: string): Omit<SemanticBehavior, 'hostNodeId'> {
-	const behaviorSource = expressionSource(node, source);
+function behaviorSourceParts(
+	node: AnyNode,
+	state: WalkState,
+): Omit<SemanticBehavior, 'hostNodeId'> {
+	const behaviorSource = expressionSource(node, state.source);
 
 	if (node.type !== 'CallExpression') {
 		return {
 			source: behaviorSource,
-			functionSource: behaviorSource,
+			functionSource: localFunctionDeclarationSource(node, state) ?? behaviorSource,
 			inputSources: [],
 		};
 	}
 
 	const callee = node.callee as AnyNode | undefined;
+	const calleeSource = callee ? expressionSource(callee, state.source) : behaviorSource;
 
 	return {
 		source: behaviorSource,
-		functionSource: callee ? expressionSource(callee, source) : behaviorSource,
-		inputSources: asNodes(node.arguments).map((argument) => expressionSource(argument, source)),
+		functionSource: localFunctionDeclarationSource(callee, state) ?? calleeSource,
+		inputSources: asNodes(node.arguments).map((argument) =>
+			expressionSource(argument, state.source),
+		),
 	};
+}
+
+function localFunctionDeclarationSource(node: AnyNode | undefined, state: WalkState): string | null {
+	const name = getIdentifierName(node);
+	if (!name) return null;
+
+	const declaration = state.helperFunctions.get(name);
+	return declaration ? expressionSource(declaration, state.source) : null;
 }
 
 function eventHandlerExpressions(node: AnyNode | undefined): AnyNode[] {

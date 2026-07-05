@@ -57,6 +57,28 @@ function unsupportedCaptureDiagnostic(
 		};
 	}
 
+	if (symbol.kind === 'behavior') {
+		return {
+			code: 'MARKLESS_BEHAVIOR_SYMBOL_EMIT_UNSUPPORTED',
+			severity: 'error',
+			phase: 'capture-analysis',
+			title: 'This element behavior cannot run in the browser yet',
+			message: `Cannot emit lazy behavior symbol "${symbol.symbolId}" because it reads component-local "${binding.name}", a local ${bindingKindLabel(binding.kind)} value that cannot cross a resume boundary.`,
+			why: 'Element behavior symbols run after browser resume. Behavior factories may use module functions, graph inputs, element handles, props/shared values, or serializable capture-plane inputs; unsupported body locals would otherwise become missing behavior code.',
+			primarySpan: binding.sourceSpan,
+			passId: 'capture-analysis',
+			artifactKeys: ['semanticGraph', 'symbolResolver', 'captureAnalysis'],
+			symbolId: symbol.symbolId,
+			source: symbol.source,
+			suggestions: [
+				{
+					message: suggestionForBinding(binding.kind),
+				},
+			],
+			docsUrl: 'https://markless.dev/errors/MARKLESS_BEHAVIOR_SYMBOL_EMIT_UNSUPPORTED',
+		};
+	}
+
 	return {
 		code: 'MARKLESS_CAPTURE_UNSUPPORTED_VALUE',
 		severity: 'error',
