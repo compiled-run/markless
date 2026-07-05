@@ -24,6 +24,7 @@ import {
 import {
 	computedDependencyCycleDiagnostic,
 	crossModuleHelperStateReturnUnsupportedDiagnostic,
+	crossModuleStateImportDiagnostic,
 	frameworkApiAliasUnsupportedDiagnostic,
 	frameworkImportRequiredDiagnostic,
 	helperStateReturnUnsupportedDiagnostic,
@@ -303,10 +304,26 @@ export function collectModuleGraphInterface(input: {
 	readonly state: WalkState;
 }): ModuleGraphInterfaceArtifact {
 	const exportedHelpers: ModuleGraphInterfaceArtifact['exports'] = [];
+	reportImportedModuleScopeGraphBindings(input.state);
 
 	for (const statement of input.statements) {
 		if (statement.type !== 'ExportNamedDeclaration') continue;
 		const declaration = statement.declaration as AnyNode | undefined;
+		if (declaration?.type === 'VariableDeclaration') {
+			for (const declarator of asNodes(declaration.declarations)) {
+				const localName = getIdentifierName(declarator.id as AnyNode | undefined);
+				const init = declarator.init as AnyNode | undefined;
+				const frameworkApi = getFrameworkApiForCall(init, input.state.frameworkApiImports);
+				if (!localName || (frameworkApi !== 'state' && frameworkApi !== 'computed')) continue;
+				exportedHelpers.push({
+					exportName: localName,
+					localName,
+					kind: 'graph-binding',
+					bindingKind: frameworkApi,
+				});
+			}
+			continue;
+		}
 		if (declaration?.type !== 'FunctionDeclaration') continue;
 
 		const localName = getIdentifierName(declaration.id as AnyNode | undefined);
@@ -328,6 +345,28 @@ export function collectModuleGraphInterface(input: {
 		filename: input.state.filename,
 		exports: exportedHelpers,
 	};
+}
+
+function reportImportedModuleScopeGraphBindings(state: WalkState): void {
+	for (const moduleImport of state.graph.moduleImports) {
+		if (moduleImport.kind !== 'named') continue;
+		const moduleInterface = state.importedModuleInterfaces[moduleImport.source];
+		if (!moduleInterface) continue;
+		const exportName = moduleImport.importedName ?? moduleImport.localName;
+		const graphExport = moduleInterface.exports.find(
+			(candidate) =>
+				candidate.kind === 'graph-binding' && candidate.exportName === exportName,
+		);
+		if (!graphExport) continue;
+
+		state.graph.diagnostics.push(
+			crossModuleStateImportDiagnostic({
+				importedName: exportName,
+				sourceModule: moduleImport.source,
+				filename: state.filename,
+			}),
+		);
+	}
 }
 
 function directHelperGraphReturn(

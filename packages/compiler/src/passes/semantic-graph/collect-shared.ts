@@ -12,7 +12,7 @@ import {
 	resolveGraphPath,
 	semanticAliasMap,
 } from '../../artifact-helpers/graph-paths.ts';
-import { sharedDefinitionCycleDiagnostic } from './diagnostics.ts';
+import { invalidSharedScopeDiagnostic, sharedDefinitionCycleDiagnostic } from './diagnostics.ts';
 import { getCallName, getFrameworkApiForCall } from './imports.ts';
 import type { SemanticGraphWalk, WalkState } from './types.ts';
 
@@ -23,7 +23,7 @@ export function collectSharedDefinition(input: {
 }): void {
 	const args = asNodes(input.init.arguments);
 	const factory = args[0];
-	const scope = sharedScopeFromOptions(args[1]);
+	const scope = sharedScopeFromOptions(args[1], input.state);
 	const definition: SemanticSharedDefinition = {
 		id: sharedDefinitionId(input.state.filename, input.name),
 		name: input.name,
@@ -486,7 +486,10 @@ function canonicalCycleKey(cycleNames: ReadonlyArray<string>): string {
 	return canonical ?? cycleNames.join('->');
 }
 
-function sharedScopeFromOptions(node: AnyNode | undefined): SemanticSharedScope | undefined {
+function sharedScopeFromOptions(
+	node: AnyNode | undefined,
+	state: WalkState,
+): SemanticSharedScope | undefined {
 	if (node?.type !== 'ObjectExpression') return undefined;
 
 	for (const property of asNodes(node.properties)) {
@@ -496,10 +499,24 @@ function sharedScopeFromOptions(node: AnyNode | undefined): SemanticSharedScope 
 		if (key !== 'scope') continue;
 
 		const value = property.value as AnyNode | undefined;
-		if (value?.type !== 'Literal') return undefined;
+		if (value?.type !== 'Literal') {
+			state.graph.diagnostics.push(
+				invalidSharedScopeDiagnostic({
+					valueSource: value ? expressionSource(value, state.source) : undefined,
+					valueSpan: value ? sourceSpan(value, state.filename) : sourceSpan(property, state.filename),
+				}),
+			);
+			return undefined;
+		}
 		if (value.value === 'request' || value.value === 'container' || value.value === 'page') {
 			return value.value;
 		}
+		state.graph.diagnostics.push(
+			invalidSharedScopeDiagnostic({
+				valueSource: expressionSource(value, state.source),
+				valueSpan: sourceSpan(value, state.filename),
+			}),
+		);
 	}
 
 	return undefined;
