@@ -340,7 +340,8 @@ export type StateLoweringDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_STATE_OPTIONAL_CHAIN_WRITE'
 		| 'MARKLESS_STATE_REST_ALIAS_EXCLUDED_PATH'
 		| 'MARKLESS_STATE_READ_ONLY_WRITE'
-		| 'MARKLESS_STATE_CONST_REASSIGNMENT';
+		| 'MARKLESS_STATE_CONST_REASSIGNMENT'
+		| 'MARKLESS_TEMPLATE_EXPRESSION_STATIC';
 	readonly phase: 'state-lowering';
 	readonly passId: 'state-lowering';
 	readonly source: string;

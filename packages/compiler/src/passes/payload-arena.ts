@@ -23,7 +23,7 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 			valueKind: binding.valueKind ?? 'unknown',
 		}));
 	const computed = input.semanticGraph.graphBindings
-		.filter((binding) => binding.kind === 'computed' && binding.async === true)
+		.filter((binding) => binding.kind === 'computed')
 		.map((binding) => ({
 			graphNodeId: binding.id,
 			name: binding.name,

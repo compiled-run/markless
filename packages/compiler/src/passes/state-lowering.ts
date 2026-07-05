@@ -42,6 +42,22 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 						input.semanticGraph.filename,
 					),
 				);
+				continue;
+			}
+			const staticExpressionReadSource = templateExpressionGraphReadSource(
+				read.source,
+				lookup,
+			);
+			if (staticExpressionReadSource) {
+				diagnostics.push(
+					templateExpressionStaticDiagnostic({
+						source: read.source,
+						readSource: staticExpressionReadSource,
+						sourceSpan: read.sourceSpan,
+						filename: input.semanticGraph.filename,
+					}),
+				);
+				continue;
 			}
 			continue;
 		}
@@ -177,6 +193,37 @@ type ResolvedStateGraphPath = {
 	readonly path: ReadonlyArray<string>;
 };
 
+function templateExpressionGraphReadSource(
+	source: string,
+	lookup: GraphLookup,
+): string | null {
+	if (!isCompositeTemplateExpression(source)) return null;
+
+	const candidates = [
+		...lookup.bindings.keys(),
+		...lookup.aliases.keys(),
+	].sort((left, right) => right.length - left.length);
+	for (const name of candidates) {
+		if (sourceContainsIdentifier(source, name)) return name;
+	}
+
+	return null;
+}
+
+function isCompositeTemplateExpression(source: string): boolean {
+	return /[?:+\-*\/%<>=!&|()[\]{}]/.test(source);
+}
+
+function sourceContainsIdentifier(source: string, identifier: string): boolean {
+	return new RegExp(`(^|[^$0-9A-Z_a-z])${escapeRegExp(identifier)}(?=$|[^$0-9A-Z_a-z])`).test(
+		source,
+	);
+}
+
+function escapeRegExp(value: string): string {
+	return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function scopedGraphLookup(
 	input: StateLoweringInput,
 	sharedDefinitionId: string | null,
@@ -236,6 +283,39 @@ function findLast<T>(values: ReadonlyArray<T>, predicate: (value: T) => boolean)
 	}
 
 	return undefined;
+}
+
+function templateExpressionStaticDiagnostic({
+	source,
+	readSource,
+	sourceSpan,
+	filename,
+}: {
+	readonly source: string;
+	readonly readSource: string;
+	readonly sourceSpan?: SourceSpan;
+	readonly filename: string;
+}): StateLoweringDiagnostic {
+	return {
+		code: 'MARKLESS_TEMPLATE_EXPRESSION_STATIC',
+		severity: 'error',
+		phase: 'state-lowering',
+		title: 'This expression reads state but never updates',
+		message: `This text reads \`${readSource}\`, but only plain reads like \`{${readSource}}\` update the page today. The expression renders its initial value and never changes when \`${readSource}\` changes.`,
+		why: 'Each template read compiles to a graph subscription with a DOM-update record; composite expressions are not lowered yet, so no subscription exists to wake this text.',
+		primarySpan: sourceSpan ?? fallbackSpan(filename),
+		passId: 'state-lowering',
+		artifactKeys: ['semanticGraph', 'stateLowering'],
+		statePath: readSource,
+		source,
+		suggestions: [
+			{
+				message:
+					"Hoist the logic into a derived value: `const label = computed(() => a ? 'x' : 'y');` with `<p>{label}</p>`.",
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_TEMPLATE_EXPRESSION_STATIC',
+	};
 }
 
 function unresolvedWriteDiagnostic(

@@ -106,6 +106,27 @@ export function App() @{
 }
 `;
 
+const syncComputedSource = `
+import { state, computed } from '@markless/core';
+
+export function App() @{
+	let count = state(2);
+	const doubled = computed(() => count * 2);
+
+	<p>{doubled}</p>
+}
+`;
+
+const plainStateTextSource = `
+import { state } from '@markless/core';
+
+export function App() @{
+	let count = state(2);
+
+	<p>{count}</p>
+}
+`;
+
 const defaultExportPageSource = `
 import { state } from '@markless/core';
 
@@ -680,6 +701,78 @@ base += 1;
 const n = state(base);`,
 		3,
 	);
+});
+
+test('B910 sync computed over state renders derived value in executed CSR html and SSR html', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/SyncComputed.tsrx',
+		source: syncComputedSource,
+		symbols: [],
+	});
+
+	const csrOutput = (await renderTestCsr(result)) as { readonly root: PublicRenderTestElement };
+	const ssrOutput = await renderTestSsr(result);
+
+	expect(csrOutput.root.textContent).toBe('4');
+	expect(ssrOutput.html).toBe('<p>4</p>');
+	expect(result.protocolView.domUpdates).toEqual([
+		expect.objectContaining({
+			source: 'doubled',
+			graphNodeId: 'computed:doubled',
+			path: [],
+			target: { kind: 'text' },
+		}),
+	]);
+});
+
+test('B910 SSR module source is not empty for a sync-computed component', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/SyncComputed.tsrx',
+		source: syncComputedSource,
+		symbols: [],
+	});
+
+	expect(result.publicRenderModule.ssrModuleSource).toContain('function marklessRenderSsr');
+	expect(result.publicRenderModule.ssrModuleSource).toContain('const doubled');
+});
+
+test('B910 regressions keep async computed and plain state binding artifacts stable', async () => {
+	const asyncResult = await compileTsrxModule({
+		filename: 'src/AsyncComputed.tsrx',
+		source: asyncComputedSource,
+		symbols: [],
+	});
+	const plainResult = await compileTsrxModule({
+		filename: 'src/PlainState.tsrx',
+		source: plainStateTextSource,
+		symbols: [],
+	});
+
+	expect(asyncResult.protocolState.computed).toEqual([
+		{
+			graphNodeId: 'computed:details',
+			name: 'details',
+			async: true,
+			dependencies: [{ graphNodeId: 'state:query', path: [] }],
+		},
+	]);
+	expect(asyncResult.protocolView.asyncBoundaries[0]?.asyncReads[0]).toMatchObject({
+		source: 'details.title',
+		graphNodeId: 'computed:details',
+		path: ['title'],
+		runnerSymbolId: 'symbol:1',
+	});
+	expect(plainResult.protocolView.domUpdates).toEqual([
+		{
+			hostNodeId: 'h0',
+			source: 'count',
+			graphNodeId: 'state:count',
+			path: [],
+			target: { kind: 'text' },
+			symbolId: 'symbol:0',
+		},
+	]);
+	expect(plainResult.publicRenderModule.ssrModuleSource).toContain('<p>" + marklessSsrText(count) + "</p>');
 });
 
 test('literal state initializers keep their exact protocol payload artifact', async () => {
