@@ -7,7 +7,9 @@ import { collectAsyncComputedPostAwaitReads, collectGraphDependencies } from './
 import { collectExpressionReads } from './collect-expressions.ts';
 import {
 	frameworkImportRequiredDiagnostic,
+	helperStateReturnUnsupportedDiagnostic,
 	stateElementHandleUnsupportedDiagnostic,
+	unstableStateCreationSiteDiagnostic,
 } from './diagnostics.ts';
 import type { WalkState } from './types.ts';
 import { collectSharedInstance } from './collect-shared.ts';
@@ -101,6 +103,10 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 		}
 
 		if (frameworkApi === 'state') {
+			if (state.currentCreationSite) {
+				reportUnstableCreationSite(name, 'state', init, state.currentCreationSite, state);
+				continue;
+			}
 			const initial = firstArgument(init);
 			const evaluatedInitial = evaluateInitialStateValue(initial);
 			const elementHandle = findElementHandleStateValue(initial, state);
@@ -135,6 +141,10 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 		}
 
 		if (frameworkApi === 'computed') {
+			if (state.currentCreationSite) {
+				reportUnstableCreationSite(name, 'computed', init, state.currentCreationSite, state);
+				continue;
+			}
 			const body = firstArgument(init);
 			const isAsync = body?.async === true;
 			const dependencies = collectGraphDependencies(body, state);
@@ -165,6 +175,35 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 			});
 		}
 	}
+}
+
+function reportUnstableCreationSite(
+	name: string,
+	apiName: 'state' | 'computed',
+	init: AnyNode,
+	site: NonNullable<WalkState['currentCreationSite']>,
+	state: WalkState,
+): void {
+	if (site === 'helper') {
+		state.graph.diagnostics.push(
+			helperStateReturnUnsupportedDiagnostic({
+				name,
+				apiName,
+				init,
+				filename: state.filename,
+			}),
+		);
+		return;
+	}
+	state.graph.diagnostics.push(
+		unstableStateCreationSiteDiagnostic({
+			name,
+			apiName,
+			site,
+			init,
+			filename: state.filename,
+		}),
+	);
 }
 
 function graphBindingId(
