@@ -49,7 +49,7 @@ function readPath(value: unknown, path: ReadonlyArray<string>): unknown {
 	for (const key of path) { if (cursor == null) return undefined; cursor = cursor[key] as Record<string, unknown> | null | undefined; }
 	return cursor;
 }
-function elementChildren(element: ResumeDomElement): ResumeDomElement[] { return (element.childNodes ?? []).filter((child): child is ResumeDomElement => child.nodeType === 1); }
+function elementChildren(element: ResumeDomElement): ResumeDomElement[] { return Array.from(element.childNodes ?? []).filter((child): child is ResumeDomElement => child.nodeType === 1); }
 function rowEventHost(rowRoot: ResumeDomElement, hostPath: ReadonlyArray<number>): ResumeDomElement | undefined {
 	let current: import('./resume-types.ts').ResumeDomNode | undefined = rowRoot;
 	for (const index of hostPath) { current = current.childNodes?.[index]; if (!current) return; }
