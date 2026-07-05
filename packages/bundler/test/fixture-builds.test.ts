@@ -4,6 +4,7 @@ import { promisify } from 'node:util';
 import { resolve } from 'pathe';
 import { beforeAll, describe, expect, test } from 'vitest';
 import { runtimeSizeReport } from '../test-support/runtime-size.ts';
+import { assertRuntimeBudget, pageFetchScriptsFromHtml } from './fixture-budget.ts';
 
 const exec = promisify(execFile);
 const root = resolve(import.meta.dirname, '../../..');
@@ -18,8 +19,10 @@ const fixtures = [
 			dist: 'packages/bundler/fixtures/vite-csr/dist',
 			entryHtml: 'packages/bundler/fixtures/vite-csr/dist/index.html',
 			maxRuntimeChunkGzipBytes: 3_100,
-			maxAsyncScriptsGzipBytes: 3_200,
-			maxAsyncScriptCount: 2,
+			maxPageFetchGzipBytes: 3_200,
+			maxScriptCount: 2,
+			// anti-bloat wall — tightened by the runtime-stdlib goal; any increase must be justified
+			maxEmittedRuntimeGzipBytes: 11_340,
 			forbidVitePreloadHelper: true,
 		},
 	},
@@ -34,9 +37,12 @@ const fixtures = [
 		symbols: ['symbol:0', 'symbol:1'],
 		runtimeBudget: {
 			dist: 'packages/bundler/fixtures/vite-ssr/dist',
+			entryHtml: 'packages/bundler/fixtures/vite-ssr/dist/index.html',
 			maxRuntimeChunkGzipBytes: 2_175,
-			maxAsyncScriptsGzipBytes: 4_100,
-			maxAsyncScriptCount: 7,
+			maxPageFetchGzipBytes: 4_100,
+			maxScriptCount: 7,
+			// anti-bloat wall — tightened by the runtime-stdlib goal; any increase must be justified
+			maxEmittedRuntimeGzipBytes: 8_200,
 			forbidVitePreloadHelper: true,
 		},
 	},
@@ -49,8 +55,10 @@ const fixtures = [
 			dist: 'packages/bundler/fixtures/vite-plus/dist',
 			entryHtml: 'packages/bundler/fixtures/vite-plus/dist/index.html',
 			maxRuntimeChunkGzipBytes: 2_950,
-			maxAsyncScriptsGzipBytes: 3_000,
-			maxAsyncScriptCount: 2,
+			maxPageFetchGzipBytes: 3_000,
+			maxScriptCount: 2,
+			// anti-bloat wall — tightened by the runtime-stdlib goal; any increase must be justified
+			maxEmittedRuntimeGzipBytes: 11_210,
 			forbidVitePreloadHelper: true,
 		},
 	},
@@ -91,42 +99,26 @@ describe('fixture builds', () => {
 			}
 
 			if ('runtimeBudget' in fixture) {
-				const scripts =
-					'entryHtml' in fixture.runtimeBudget
-						? await readModuleScripts(resolve(root, fixture.runtimeBudget.entryHtml))
-						: undefined;
-				const report = await runtimeSizeReport({
+				const pageFetchScripts = pageFetchScriptsFromHtml(
+					await readFile(resolve(root, fixture.runtimeBudget.entryHtml), 'utf8'),
+				);
+				const pageFetchReport = await runtimeSizeReport({
 					dist: resolve(root, fixture.runtimeBudget.dist),
-					scripts,
-					includeStaticImports: !!scripts,
+					scripts: pageFetchScripts,
+					includeStaticImports: true,
 				});
-				expect(report.runtimeChunks.length, report.summary).toBeGreaterThan(0);
-				expect(report.largestRuntimeChunk?.gzipBytes, report.summary).toBeLessThanOrEqual(
-					fixture.runtimeBudget.maxRuntimeChunkGzipBytes,
-				);
-				expect(report.asyncScripts.gzipBytes, report.summary).toBeLessThanOrEqual(
-					fixture.runtimeBudget.maxAsyncScriptsGzipBytes,
-				);
-				expect(report.asyncScripts.count, report.summary).toBeLessThanOrEqual(
-					fixture.runtimeBudget.maxAsyncScriptCount,
-				);
-				if (fixture.runtimeBudget.forbidVitePreloadHelper) {
-					const chunksWithVitePreloadHelper = report.runtimeChunks
-						.filter((chunk) => chunk.hasVitePreloadHelper)
-						.map((chunk) => chunk.fileName);
-					expect(chunksWithVitePreloadHelper, report.summary).toEqual([]);
-				}
+				const emittedReport = await runtimeSizeReport({
+					dist: resolve(root, fixture.runtimeBudget.dist),
+				});
+				assertRuntimeBudget({
+					budget: fixture.runtimeBudget,
+					emittedReport,
+					pageFetchReport,
+				});
 			}
 		}, 120_000);
 	}
 });
-
-async function readModuleScripts(fileName: string): Promise<string[]> {
-	const html = await readFile(fileName, 'utf8');
-	return [
-		...html.matchAll(/<script\b[^>]*\btype=["']module["'][^>]*\bsrc=["']([^"']+)["']/g),
-	].map((match) => match[1]!);
-}
 
 async function execPnpm(args: string[]) {
 	try {
