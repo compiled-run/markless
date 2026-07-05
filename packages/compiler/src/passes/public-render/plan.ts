@@ -67,6 +67,7 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 		return emptyPlan(componentRootDiagnostics(ast, input.source.filename));
 	}
 	const root = selectedRoot.root;
+	const componentRoots = sameModuleComponentRoots(ast);
 	const undeclaredTemplateReadDiagnostics = collectUndeclaredTemplateReadDiagnostics({
 		ast,
 		component: selectedRoot.component,
@@ -83,7 +84,7 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 	}
 
 	const assignedHosts = assignHostIds(
-		root,
+		ast,
 		input.semanticGraph.hostNodes.map((host) => host.id),
 	);
 	const hostPaths = collectHostPaths(root, assignedHosts);
@@ -296,10 +297,20 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 			return { boundaryId: boundary.id, supported: true };
 		});
 
-	const rootTemplateHtml = staticHtml(root, { expressionText: ' ', omitForExpressions: true });
+	const rootTemplateHtml = staticHtml(root, {
+		componentRoots,
+		componentStack: [selectedRoot.componentName],
+		expressionText: ' ',
+		omitForExpressions: true,
+	});
 	const directRenderTemplateHtml =
 		staticTextWrites && staticShellSupported(root)
-			? staticHtml(root, { expressionText: ' ', omitForExpressions: true })
+			? staticHtml(root, {
+					componentRoots,
+					componentStack: [selectedRoot.componentName],
+					expressionText: ' ',
+					omitForExpressions: true,
+				})
 			: null;
 
 	return {
@@ -342,6 +353,11 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 				keyedRepeats,
 				repeatGates,
 				repeatNodeById,
+			}),
+			...branchRenderDiagnostics({
+				branchGates: branchReactivityGates,
+				branchNodes,
+				filename: input.source.filename,
 			}),
 			...asyncBoundaryGates.flatMap((gate, index) => {
 				const found = boundaryNodes[index];
@@ -761,8 +777,7 @@ function repeatRenderDiagnostics(input: {
 					message: `The @for rows are not compiler-proven (reason: ${gate.reason}), so the render module drops the list content.`,
 					node,
 					filename: input.filename,
-					suggestion:
-						'Reshape the rows into a single host element with directly readable item bindings.',
+					suggestion: repeatUnsupportedSuggestion(node, gate.reason),
 				}),
 			];
 		}
@@ -797,6 +812,56 @@ function repeatRenderDiagnostics(input: {
 		}
 		return [];
 	});
+}
+
+function repeatUnsupportedSuggestion(
+	node: AnyNode,
+	reason: PublicRenderPlanUnsupportedReason,
+): string {
+	const row = singleRowRoot(node);
+	const tagName = row ? getElementTagName(row) : null;
+	if (reason === 'unsupported-row-binding' && tagName && !isHostTagName(tagName)) {
+		return `Rows that render a component (<${tagName} />) are not supported by the render path yet; render host-element rows, or lift the component's markup into the row until component rows ship.`;
+	}
+	return 'Reshape the rows into a single host element with directly readable item bindings.';
+}
+
+function branchRenderDiagnostics(input: {
+	readonly branchGates: ReadonlyArray<PublicRenderPlanBranchGate>;
+	readonly branchNodes: ReadonlyArray<BranchSiteNode>;
+	readonly filename: string;
+}) {
+	return input.branchGates.flatMap((gate, index) => {
+		const found = input.branchNodes[index];
+		if (gate.supported || !found) return [];
+		const label = found.node.type === 'JSXSwitchExpression' ? '@switch' : '@if';
+		const componentName = firstComponentName(found.node);
+		const componentDetail = componentName ? ` contain a component (<${componentName} />), and` : '';
+		const suggestion = componentName
+			? 'Move the condition inside the component, or put host elements in the arms until component arms are supported.'
+			: 'Move the branch out of nested control flow, or keep branch arms to host elements, text, and graph-resolvable expressions.';
+		return [
+			unsupportedRenderConstructDiagnostic({
+				label,
+				message: `The arms of ${label}${componentDetail} are not compiler-proven (reason: ${gate.reason}), so the branch would render its initial content and never update.`,
+				node: found.node,
+				filename: input.filename,
+				suggestion,
+			}),
+		];
+	});
+}
+
+function firstComponentName(node: AnyNode): string | null {
+	if (node.type === 'Element' || node.type === 'JSXElement') {
+		const tagName = getElementTagName(node);
+		if (tagName && !isHostTagName(tagName)) return tagName;
+	}
+	for (const child of childNodes(node)) {
+		const found = firstComponentName(child);
+		if (found) return found;
+	}
+	return null;
 }
 
 // findComponent only accepts components that already have an element root, so
@@ -1797,6 +1862,8 @@ function unsupportedFragmentChildKind(fragment: AnyNode): string {
 function staticHtml(
 	node: AnyNode,
 	options: {
+		readonly componentRoots?: ReadonlyMap<string, AnyNode>;
+		readonly componentStack?: ReadonlyArray<string>;
 		readonly expressionText: string;
 		readonly omitForExpressions: boolean;
 	},
@@ -1822,7 +1889,15 @@ function staticHtml(
 	if (node.type !== 'Element' && node.type !== 'JSXElement') return '';
 
 	const tagName = getElementTagName(node);
-	if (!tagName || !isHostTagName(tagName)) return '';
+	if (!tagName) return '';
+	if (!isHostTagName(tagName)) {
+		const componentRoot = options.componentRoots?.get(tagName);
+		if (!componentRoot || options.componentStack?.includes(tagName)) return '';
+		return staticHtml(componentRoot, {
+			...options,
+			componentStack: [...(options.componentStack ?? []), tagName],
+		});
+	}
 
 	const attributes = getElementAttributes(node)
 		.flatMap((attribute) => staticAttributeEntry(attribute))
@@ -1833,6 +1908,17 @@ function staticHtml(
 		.join('');
 
 	return `<${tagName}${attributes}>${children}</${tagName}>`;
+}
+
+function sameModuleComponentRoots(ast: AnyNode): ReadonlyMap<string, AnyNode> {
+	const roots = new Map<string, AnyNode>();
+	for (const statement of asNodes(ast.body)) {
+		const component = getComponentFunction(statement);
+		if (!component) continue;
+		const root = firstComponentRoot(component.node);
+		if (root) roots.set(component.name, root);
+	}
+	return roots;
 }
 
 function staticShellSupported(node: AnyNode): boolean {
