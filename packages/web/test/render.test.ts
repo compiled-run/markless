@@ -285,8 +285,9 @@ test('render rejects duplicate runtime keys before mounting CSR output', async (
 		),
 	).rejects.toMatchObject({
 		code: 'MARKLESS_REPEAT_KEY_DUPLICATE',
+		message: 'MARKLESS_REPEAT_KEY_DUPLICATE: Duplicate @for key "fruit" from row.category.',
 		phase: 'runtime',
-		title: 'Two rows share the same @for key',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_REPEAT_KEY_DUPLICATE',
 		keyPath: ['category'],
 		collidingValue: 'fruit',
 	});
@@ -762,8 +763,9 @@ test('renderToString rejects duplicate runtime keys before serving SSR output', 
 		})),
 	).rejects.toMatchObject({
 		code: 'MARKLESS_REPEAT_KEY_DUPLICATE',
+		message: 'MARKLESS_REPEAT_KEY_DUPLICATE: Duplicate @for key "fruit" from row.category.',
 		phase: 'runtime',
-		title: 'Two rows share the same @for key',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_REPEAT_KEY_DUPLICATE',
 		keyPath: ['category'],
 		collidingValue: 'fruit',
 	});

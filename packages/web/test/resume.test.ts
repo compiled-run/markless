@@ -2804,8 +2804,9 @@ test('resume runtime rejects duplicate keyed repeat values before row materializ
 	expect(() => createResumeRuntime({ root, graph, view, loadSymbol })).toThrowError(
 		expect.objectContaining({
 			code: 'MARKLESS_REPEAT_KEY_DUPLICATE',
+			message: 'MARKLESS_REPEAT_KEY_DUPLICATE: Duplicate @for key "fruit" from entry.id.',
 			phase: 'runtime',
-			title: 'Two rows share the same @for key',
+			docsUrl: 'https://markless.dev/errors/MARKLESS_REPEAT_KEY_DUPLICATE',
 			repeatId: 'repeat:0',
 			keyPath: ['id'],
 			collidingValue: 'fruit',
