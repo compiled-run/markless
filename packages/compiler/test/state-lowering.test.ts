@@ -872,6 +872,31 @@ test('lowerStateAccess resolves prop reads and reports prop writes as read-only'
 	]);
 });
 
+test('lowerStateAccess explains unresolved plain local writes without suggesting local mutation', async () => {
+	const localWriteSource = `import { computed } from '@markless/core'; export function Scoreboard() @{ let subtotal = 0; const bonus = computed(() => 1); subtotal += bonus; <p>{bonus}</p> }`;
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/Scoreboard.tsrx',
+		source: localWriteSource,
+	});
+
+	const lowered = lowerStateAccess({ semanticGraph });
+
+	expect(lowered.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_STATE_UNRESOLVED_WRITE',
+			message: 'Cannot write to "subtotal" because it does not resolve to graph state.',
+			why: 'The compiler owns reads and writes through state() graph cells. Writes to plain locals in a component body are not representable yet.',
+			suggestions: [
+				{
+					message:
+						'Keep mutable values in state() and write through that binding, derive the value in computed(), or compute it with a single expression that does not reassign a local.',
+				},
+			],
+			docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_UNRESOLVED_WRITE',
+		}),
+	]);
+});
+
 test('lowerStateAccess reports a structured diagnostic for const graph binding reassignment', async () => {
 	const semanticGraph = await buildSemanticGraph({
 		filename: 'src/ConstState.tsrx',

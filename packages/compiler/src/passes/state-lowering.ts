@@ -248,7 +248,7 @@ function unresolvedWriteDiagnostic(
 		phase: 'state-lowering',
 		title: 'Cannot resolve graph write target',
 		message: `Cannot write to "${write.target}" because it does not resolve to graph state.`,
-		why: 'Only state() bindings and supported graph paths can be mutated across a resume boundary.',
+		why: 'The compiler owns reads and writes through state() graph cells. Writes to plain locals in a component body are not representable yet.',
 		primarySpan: write.targetSpan ?? fallbackSpan(filename),
 		passId: 'state-lowering',
 		artifactKeys: ['semanticGraph', 'stateLowering'],
@@ -257,7 +257,7 @@ function unresolvedWriteDiagnostic(
 		suggestions: [
 			{
 				message:
-					'Write to a state() binding, a path inside object state, or move non-graph mutation into normal local code.',
+					'Keep mutable values in state() and write through that binding, derive the value in computed(), or compute it with a single expression that does not reassign a local.',
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_UNRESOLVED_WRITE',
