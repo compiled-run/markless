@@ -1343,6 +1343,64 @@ test('runtime resumes from async payload scripts found in a document-like root',
 	expect(resumed.decoded.view).toEqual(view);
 });
 
+test('runtime treats a second payload resume for one container as an already-resumed no-op warning', async () => {
+	const button = element('BUTTON');
+	const root = element('SECTION', [button]);
+	const state = createProtocolStatePayload({
+		cells: [
+			{
+				graphNodeId: 'state:count',
+				name: 'count',
+				valueKind: 'scalar',
+				value: 0,
+			},
+		],
+	});
+	const view: ProtocolViewPayload = {
+		version: 1,
+		locators: [
+			{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'section' },
+			{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'button' },
+		],
+		events: [{ hostNodeId: 'h1', eventName: 'click', symbolIds: ['symbol:click'] }],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	const scripts = renderPayloadScripts({ state, view });
+	const first = await resumeFromPayloadDocument({
+		document: payloadDocument(scripts.stateScript, scripts.viewScript),
+		root,
+		loadSymbol: () => () => undefined,
+	});
+
+	expect((root as FakeElement & { __asyncResumeRuntimeStarted?: boolean }).__asyncResumeRuntimeStarted).toBe(
+		true,
+	);
+
+	const second = await resumeFromPayloadDocument({
+		document: payloadDocument(scripts.stateScript, scripts.viewScript),
+		root,
+		loadSymbol: () => {
+			throw new Error('second resume must not wire a new runtime');
+		},
+	});
+
+	expect(second.runtime).toBe(first.runtime);
+	expect(second.graph).toBe(first.graph);
+	expect(root.listeners).toHaveLength(1);
+	expect(second.warnings).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_RESUME_ALREADY_RESUMED',
+			severity: 'warning',
+			phase: 'resume',
+			title: 'This container was already resumed',
+			docsUrl: 'https://markless.dev/errors/MARKLESS_RESUME_ALREADY_RESUMED',
+		}),
+	]);
+});
+
 function captureThrown(run: () => unknown): unknown {
 	try {
 		run();

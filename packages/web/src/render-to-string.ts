@@ -218,7 +218,8 @@ function defaultInlineResumerSource(
 	const graphSyncPolicySource = includeGraphSyncPolicy
 		? `
 	const s0 = r.querySelector('script[type="markless/state"]');
-	const g = new Map();
+	const g = r.__marklessEventOnlyGraph || new Map();
+	r.__marklessEventOnlyGraph = g;
 	const j = (s, r) => {
 		if (s === null || typeof s !== 'object') return s;
 		if ('$ref' in s) {
@@ -254,13 +255,14 @@ function defaultInlineResumerSource(
 		if (s.$type === 'url') return new URL(s.value);
 		return s.value;
 	};
-	if (s0) {
+	if (s0 && !r.__marklessEventOnlyGraphInitialized) {
 		const s1 = JSON.parse(s0.textContent || 'null');
 		for (const c of s1.cells || []) {
 			if (!c.value) continue;
 			const r0 = new Map((c.value.records || []).map((r) => [r.id, r]));
 			g.set(c.graphNodeId, j(c.value.root, r0));
 		}
+		r.__marklessEventOnlyGraphInitialized = true;
 	}
 	const G = (id, path) => {
 		let value = g.get(id);

@@ -56,7 +56,21 @@ export type ResumePayloadScriptsResult = {
 	readonly decoded: DecodedPayloadScripts;
 	readonly graph: RuntimeGraph;
 	readonly runtime: ResumeRuntime;
+	readonly warnings?: ReadonlyArray<ResumeAlreadyResumedWarning>;
 };
+
+export type ResumeAlreadyResumedWarning = {
+	readonly code: 'MARKLESS_RESUME_ALREADY_RESUMED';
+	readonly severity: 'warning';
+	readonly phase: 'resume';
+	readonly title: string;
+	readonly message: string;
+	readonly why: string;
+	readonly suggestions: ReadonlyArray<{ readonly message: string }>;
+	readonly docsUrl: string;
+};
+
+const resumedPayloadContainers = new WeakMap<ResumeDomElement, ResumePayloadScriptsResult>();
 
 export function readPayloadScriptsFromDocument(
 	document: PayloadScriptDocument,
@@ -221,6 +235,9 @@ function dependencyKey(
 export async function resumeFromPayloadScripts(
 	input: ResumePayloadScriptsInput,
 ): Promise<ResumePayloadScriptsResult> {
+	const resumed = alreadyResumedPayload(input.root);
+	if (resumed) return resumed;
+
 	const decoded = decodePayloadScripts(input);
 	const graph = createRuntimeGraphFromResumePayload({
 		state: decoded.state,
@@ -259,17 +276,24 @@ export async function resumeFromPayloadScripts(
 	});
 
 	await runtime.start();
+	(input.root as ResumeDomElement & { __asyncResumeRuntimeStarted?: boolean })
+		.__asyncResumeRuntimeStarted = true;
 
-	return {
+	const result = {
 		decoded,
 		graph,
 		runtime,
 	};
+	resumedPayloadContainers.set(input.root, result);
+	return result;
 }
 
 export async function resumeFromPayloadDocument(
 	input: ResumePayloadDocumentInput,
 ): Promise<ResumePayloadScriptsResult> {
+	const resumed = alreadyResumedPayload(input.root);
+	if (resumed) return resumed;
+
 	const scripts = readPayloadScriptsFromDocument(input.document);
 	return resumeFromPayloadScripts({
 		...scripts,
@@ -280,6 +304,35 @@ export async function resumeFromPayloadDocument(
 		applyDomJournal: input.applyDomJournal,
 		renderBranchHtml: input.renderBranchHtml ?? documentTemplateBranchHtml(input.document),
 	});
+}
+
+function alreadyResumedPayload(root: ResumeDomElement): ResumePayloadScriptsResult | undefined {
+	const resumed = resumedPayloadContainers.get(root);
+	if (!resumed) return undefined;
+
+	return {
+		...resumed,
+		warnings: [alreadyResumedWarning()],
+	};
+}
+
+function alreadyResumedWarning(): ResumeAlreadyResumedWarning {
+	return {
+		code: 'MARKLESS_RESUME_ALREADY_RESUMED',
+		severity: 'warning',
+		phase: 'resume',
+		title: 'This container was already resumed',
+		message:
+			'resumeFromPayloadDocument was called again on a container that already has a live resume runtime. A second runtime would dispatch every event twice.',
+		why: 'Resume attaches the container event wiring and graph once; a container has exactly one resume runtime for its payload.',
+		suggestions: [
+			{
+				message:
+					'Resume each served container once from one entry point; dispose the previous runtime before intentionally resuming again.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_RESUME_ALREADY_RESUMED',
+	};
 }
 
 // Browser default for branch flip fragments: parse the rebuilt arm HTML

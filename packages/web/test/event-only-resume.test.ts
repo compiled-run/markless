@@ -59,6 +59,130 @@ function scriptContent(script: string): string {
 	return script.replace(/^<script type="markless\/(?:state|view)">/, '').replace('</script>', '');
 }
 
+function replaceScriptJson(script: string, value: unknown): string {
+	return script.replace(/>[\s\S]*<\/script>$/, `>${JSON.stringify(value)}</script>`);
+}
+
+test('event-only resume rejects structure-tampered payloads with structured payload errors', async () => {
+	const button = element('BUTTON');
+	const root = element('DIV', [button]);
+	const state = createProtocolStatePayload({
+		cells: [{ graphNodeId: 'state:count', name: 'count', valueKind: 'scalar', value: 0 }],
+	});
+	const view: ProtocolViewPayload = {
+		version: 1,
+		locators: [
+			{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'div' },
+			{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'button' },
+		],
+		events: [{ hostNodeId: 'h1', eventName: 'click', symbolIds: ['symbol:event'] }],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	const scripts = renderPayloadScripts({ state, view });
+	const tamperedState = replaceScriptJson(scripts.stateScript, { version: 1, cells: 'tampered' });
+
+	await expect(
+		resumeEventOnlyFromPayloadDocument({
+			document: payloadDocument(tamperedState, scripts.viewScript),
+			root,
+			event: { type: 'click', target: button },
+			loadSymbol: () => ({ graph }) => {
+				graph.update({
+					graphNodeId: 'state:count',
+					update(value) {
+						return Number(value) + 1;
+					},
+				});
+			},
+		}),
+	).rejects.toMatchObject({
+		code: 'MARKLESS_PAYLOAD_INVALID',
+		severity: 'error',
+		phase: 'payload',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_PAYLOAD_INVALID',
+	});
+});
+
+test('event-only resume reports locator mismatch with the full runtime diagnostic shape', async () => {
+	const button = element('BUTTON');
+	const root = element('DIV', [button]);
+	const state = createProtocolStatePayload({ cells: [] });
+	const view: ProtocolViewPayload = {
+		version: 1,
+		locators: [
+			{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'section' },
+		],
+		events: [{ hostNodeId: 'h0', eventName: 'click', symbolIds: ['symbol:event'] }],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	const scripts = renderPayloadScripts({ state, view });
+
+	await expect(
+		resumeEventOnlyFromPayloadDocument({
+			document: payloadDocument(scripts.stateScript, scripts.viewScript),
+			root,
+			event: { type: 'click', target: button },
+			loadSymbol: () => () => undefined,
+		}),
+	).rejects.toMatchObject({
+		code: 'MARKLESS_RESUME_LOCATOR_MISMATCH',
+		severity: 'error',
+		phase: 'resume',
+		title: 'Resume locator matched a different element',
+		hostNodeId: 'h0',
+		elementLocator: 'dom-order:0',
+		expectedTagName: 'section',
+		actualTagName: 'div',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_RESUME_LOCATOR_MISMATCH',
+	});
+});
+
+test('event-only graph dispatches built-in method calls like the full graph', async () => {
+	const button = element('BUTTON');
+	const root = element('DIV', [button]);
+	const state = createProtocolStatePayload({
+		cells: [
+			{
+				graphNodeId: 'state:stamp',
+				name: 'stamp',
+				valueKind: 'object',
+				value: new Date('2026-01-15T00:00:00.000Z'),
+			},
+		],
+	});
+	const view: ProtocolViewPayload = {
+		version: 1,
+		locators: [
+			{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'div' },
+			{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'button' },
+		],
+		events: [{ hostNodeId: 'h1', eventName: 'click', symbolIds: ['symbol:event'] }],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	const scripts = renderPayloadScripts({ state, view });
+
+	const result = await resumeEventOnlyFromPayloadDocument({
+		document: payloadDocument(scripts.stateScript, scripts.viewScript),
+		root,
+		event: { type: 'click', target: button },
+		loadSymbol: () => ({ graph }) => {
+			graph.call({ graphNodeId: 'state:stamp', method: 'setMonth', args: [2] });
+		},
+	});
+
+	expect(result.graph.read('state:stamp')).toBeInstanceOf(Date);
+	expect((result.graph.read('state:stamp') as Date).getMonth()).toBe(2);
+});
+
 test('event-only resume dispatches lazy event symbols and flushes DOM update symbols', async () => {
 	const button = element('BUTTON');
 	const root = element('DIV', [button]);
@@ -70,6 +194,12 @@ test('event-only resume dispatches lazy event symbols and flushes DOM update sym
 				valueKind: 'scalar',
 				value: 0,
 			},
+			{
+				graphNodeId: 'state:locked',
+				name: 'locked',
+				valueKind: 'scalar',
+				value: true,
+			},
 		],
 	});
 	const view: ProtocolViewPayload = {
@@ -78,7 +208,17 @@ test('event-only resume dispatches lazy event symbols and flushes DOM update sym
 			{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'div' },
 			{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'button' },
 		],
-		events: [{ hostNodeId: 'h1', eventName: 'click', symbolIds: ['symbol:event'] }],
+		events: [
+			{
+				hostNodeId: 'h1',
+				eventName: 'click',
+				syncPolicy: {
+					when: { type: 'graph-truthy', graphNodeId: 'state:locked', path: [] },
+					actions: ['preventDefault'],
+				},
+				symbolIds: ['symbol:event'],
+			},
+		],
 		domUpdates: [
 			{
 				hostNodeId: 'h1',
@@ -95,14 +235,22 @@ test('event-only resume dispatches lazy event symbols and flushes DOM update sym
 	};
 	const scripts = renderPayloadScripts({ state, view });
 	const loadedSymbols: string[] = [];
+	let firstDefaultPrevented = false;
 	const result = await resumeEventOnlyFromPayloadDocument({
 		document: payloadDocument(scripts.stateScript, scripts.viewScript),
 		root,
-		event: { type: 'click', target: button },
+		event: {
+			type: 'click',
+			target: button,
+			preventDefault() {
+				firstDefaultPrevented = true;
+			},
+		},
 		loadSymbol(symbolId) {
 			loadedSymbols.push(symbolId);
 			if (symbolId === 'symbol:event') {
 				return (context) => {
+					context.graph.write({ graphNodeId: 'state:locked', value: false });
 					context.graph.update({
 						graphNodeId: 'state:count',
 						path: [],
@@ -122,13 +270,21 @@ test('event-only resume dispatches lazy event symbols and flushes DOM update sym
 	});
 
 	expect(loadedSymbols).toEqual(['symbol:event', 'symbol:text']);
+	expect(firstDefaultPrevented).toBe(true);
 	expect(result.graph.read('state:count')).toBe(1);
 	expect(button.textContent).toBe('1');
 
+	let secondDefaultPrevented = false;
 	const secondResult = await resumeEventOnlyFromPayloadDocument({
 		document: payloadDocument(scripts.stateScript, scripts.viewScript),
 		root,
-		event: { type: 'click', target: button },
+		event: {
+			type: 'click',
+			target: button,
+			preventDefault() {
+				secondDefaultPrevented = true;
+			},
+		},
 		loadSymbol(symbolId) {
 			loadedSymbols.push(symbolId);
 			if (symbolId === 'symbol:event') {
@@ -153,6 +309,7 @@ test('event-only resume dispatches lazy event symbols and flushes DOM update sym
 
 	expect(secondResult).toBe(result);
 	expect(loadedSymbols).toEqual(['symbol:event', 'symbol:text', 'symbol:event']);
+	expect(secondDefaultPrevented).toBe(false);
 	expect(secondResult.graph.read('state:count')).toBe(1);
 	expect(button.textContent).toBe('1');
 });

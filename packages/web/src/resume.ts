@@ -1718,7 +1718,7 @@ function walkComments(root: ResumeDomElement): ResumeDomComment[] {
 	return comments;
 }
 
-function missingElementLocatorError(
+export function missingElementLocatorError(
 	locator: ResumeViewRecord['locators'][number],
 ): RuntimeResumeError {
 	return new RuntimeResumeError({
@@ -1741,7 +1741,7 @@ function missingElementLocatorError(
 	});
 }
 
-function mismatchedElementLocatorError(
+export function mismatchedElementLocatorError(
 	locator: ResumeViewRecord['locators'][number],
 	actualTagName: string,
 ): RuntimeResumeError {
@@ -1823,9 +1823,9 @@ function evaluateSyncPolicy(
 	return event[condition.field] === condition.value;
 }
 
-function runSyncPolicyActions(
+export function runSyncPolicyActions(
 	policy: ResumeSyncPolicy,
-	graph: RuntimeGraph,
+	graph: Pick<RuntimeGraph, 'read'>,
 	event: ResumeDomEvent,
 ): void {
 	for (const branch of syncPolicyBranches(policy)) {
