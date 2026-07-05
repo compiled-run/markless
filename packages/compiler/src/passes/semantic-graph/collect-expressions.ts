@@ -17,6 +17,7 @@ export function collectAssignment(node: AnyNode, state: WalkState): void {
 	state.graph.stateWrites.push({
 		target: expressionSource(target, state.source),
 		...sharedScope(state),
+		...writeScope(state),
 		targetSpan: sourceSpan(target, state.filename),
 		operation: 'assign',
 		assignmentOperator: operator === '=' ? undefined : operator,
@@ -32,6 +33,7 @@ export function collectUpdate(node: AnyNode, state: WalkState): void {
 	state.graph.stateWrites.push({
 		target: expressionSource(target, state.source),
 		...sharedScope(state),
+		...writeScope(state),
 		targetSpan: sourceSpan(target, state.filename),
 		operation: 'update',
 		prefix: node.prefix === true,
@@ -66,6 +68,7 @@ export function collectCollectionCall(node: AnyNode, state: WalkState): void {
 	state.graph.stateWrites.push({
 		target: expressionSource(target, state.source),
 		...sharedScope(state),
+		...writeScope(state),
 		targetSpan: sourceSpan(target, state.filename),
 		operation: 'call',
 		method,
@@ -107,6 +110,7 @@ export function collectDelete(node: AnyNode, state: WalkState): void {
 	state.graph.stateWrites.push({
 		target: expressionSource(originalTarget ?? target, state.source),
 		...sharedScope(state),
+		...writeScope(state),
 		targetSpan: sourceSpan(originalTarget ?? target, state.filename),
 		operation: 'delete',
 		optional: target.optional === true || isChainExpression(originalTarget),
@@ -234,6 +238,21 @@ function sharedScope(state: WalkState): { readonly sharedDefinitionId?: string }
 	return state.currentSharedDefinitionId
 		? { sharedDefinitionId: state.currentSharedDefinitionId }
 		: {};
+}
+
+function writeScope(
+	state: WalkState,
+): { readonly writeScope: 'component' | 'handler' | 'helper' | 'computed' | 'module'; readonly componentName?: string } {
+	if (state.currentFunctionSite) {
+		return {
+			writeScope: state.currentFunctionSite,
+			componentName: state.currentComponentName ?? undefined,
+		};
+	}
+
+	return state.currentComponentName
+		? { writeScope: 'component', componentName: state.currentComponentName }
+		: { writeScope: 'module' };
 }
 
 function getStaticMemberPropertyName(member: AnyNode): string | null {

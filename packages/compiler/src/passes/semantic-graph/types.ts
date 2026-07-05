@@ -15,6 +15,7 @@ import type {
 	SemanticHostNode,
 	SemanticKeyedRepeat,
 	SemanticLocalBinding,
+	SemanticLocalDeclaration,
 	SemanticStateRead,
 	SemanticStateWrite,
 	SemanticTemplateBindingTarget,
@@ -38,6 +39,7 @@ export type MutableSemanticGraphArtifact = {
 	behaviors: SemanticBehavior[];
 	elementHandleBindings: SemanticElementHandleBinding[];
 	localBindings: SemanticLocalBinding[];
+	localDeclarations: SemanticLocalDeclaration[];
 	aliases: SemanticGraphAlias[];
 	stateReads: SemanticStateRead[];
 	templateReads: SemanticTemplateRead[];
@@ -60,6 +62,7 @@ export type WalkState = {
 	currentAsyncBoundaryId: string | null;
 	currentSharedDefinitionId: string | null;
 	currentCreationSite: 'computed' | 'handler' | 'helper' | 'branch' | 'loop' | null;
+	currentFunctionSite: 'computed' | 'handler' | 'helper' | null;
 	nextComponentEdgeId: number;
 	nextBranchId: number;
 	nextHostId: number;
@@ -88,6 +91,7 @@ export function createMutableSemanticGraphArtifact(filename: string): MutableSem
 		behaviors: [],
 		elementHandleBindings: [],
 		localBindings: [],
+		localDeclarations: [],
 		aliases: [],
 		stateReads: [],
 		templateReads: [],
@@ -118,6 +122,7 @@ export function createWalkState(input: {
 		currentAsyncBoundaryId: null,
 		currentSharedDefinitionId: null,
 		currentCreationSite: null,
+		currentFunctionSite: null,
 		nextComponentEdgeId: 0,
 		nextBranchId: 0,
 		nextHostId: 0,

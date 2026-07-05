@@ -1042,6 +1042,18 @@ test('compileTsrxModule renders plain body local template reads in CSR and SSR m
 	expect((await renderTestSsr(result)).html).toBe('<main>render-once</main>');
 });
 
+test('B913 compileTsrxModule renders component-body accumulator locals in CSR and SSR modules', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/AccumulatorLocal.tsrx',
+		source: `export function App() @{ const rows = [1, 2, 3]; let total = 0; for (const row of rows) { total += row; } <main>{total}</main> }`,
+		symbols: [],
+	});
+	expect(result.semanticGraph.diagnostics).toEqual([]);
+	expect(result.stateLowering.diagnostics).toEqual([]);
+	expect(((await renderTestCsr(result)) as { readonly root: PublicRenderTestElement }).root.textContent).toBe('6');
+	expect((await renderTestSsr(result)).html).toBe('<main>6</main>');
+});
+
 test('compileTsrxModule renders module-scope const template reads in CSR and SSR modules', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/ModuleConstTemplateRead.tsrx',

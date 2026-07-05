@@ -37,6 +37,13 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 
 		if (!id || !name || !init) continue;
 
+		state.graph.localDeclarations.push({
+			name,
+			scope: localDeclarationScope(state),
+			componentName: state.currentComponentName ?? undefined,
+			aliasOf: moduleAliasTarget(init, state),
+		});
+
 		if (callName && isFrameworkApiName(callName) && !frameworkApi) {
 			state.graph.diagnostics.push(
 				frameworkImportRequiredDiagnostic(callName, init, state.filename),
@@ -251,6 +258,18 @@ function sharedScope(state: WalkState): { readonly sharedDefinitionId?: string }
 	return state.currentSharedDefinitionId
 		? { sharedDefinitionId: state.currentSharedDefinitionId }
 		: {};
+}
+
+function localDeclarationScope(state: WalkState): 'component' | 'function' {
+	return state.currentFunctionSite ? 'function' : 'component';
+}
+
+function moduleAliasTarget(init: AnyNode, state: WalkState): string | undefined {
+	const source = expressionSource(init, state.source);
+	const declaration = state.graph.localDeclarations.find(
+		(candidate) => candidate.scope === 'module' && candidate.name === source,
+	);
+	return declaration?.aliasOf ?? declaration?.name;
 }
 
 function collectUnsupportedDestructuredLocalBindings(

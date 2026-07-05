@@ -222,6 +222,8 @@ export type SemanticStateWrite = {
 	readonly target: string;
 	readonly sharedDefinitionId?: string;
 	readonly targetSpan?: SourceSpan;
+	readonly writeScope?: 'component' | 'handler' | 'helper' | 'computed' | 'module';
+	readonly componentName?: string;
 	readonly operation: 'assign' | 'update' | 'call' | 'delete';
 	readonly assignmentOperator?: string;
 	readonly valueSource?: string;
@@ -300,6 +302,13 @@ export type SemanticLocalBinding = {
 	readonly sourceSpan?: SourceSpan;
 };
 
+export type SemanticLocalDeclaration = {
+	readonly name: string;
+	readonly scope: 'module' | 'component' | 'function';
+	readonly componentName?: string;
+	readonly aliasOf?: string;
+};
+
 export type SemanticSyncPolicyConstant = {
 	readonly name: string;
 	readonly value: unknown;
@@ -321,6 +330,7 @@ export type SemanticGraphArtifact = {
 	readonly behaviors: ReadonlyArray<SemanticBehavior>;
 	readonly elementHandleBindings: ReadonlyArray<SemanticElementHandleBinding>;
 	readonly localBindings: ReadonlyArray<SemanticLocalBinding>;
+	readonly localDeclarations: ReadonlyArray<SemanticLocalDeclaration>;
 	readonly aliases: ReadonlyArray<SemanticGraphAlias>;
 	readonly stateReads: ReadonlyArray<SemanticStateRead>;
 	readonly templateReads: ReadonlyArray<SemanticTemplateRead>;
@@ -343,6 +353,8 @@ export type StateLoweringDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_STATE_REST_ALIAS_EXCLUDED_PATH'
 		| 'MARKLESS_STATE_READ_ONLY_WRITE'
 		| 'MARKLESS_STATE_CONST_REASSIGNMENT'
+		| 'MARKLESS_STATE_STALE_LOCAL_WRITE'
+		| 'MARKLESS_STATE_MODULE_ESCAPE'
 		| 'MARKLESS_TEMPLATE_EXPRESSION_STATIC';
 	readonly phase: 'state-lowering';
 	readonly passId: 'state-lowering';

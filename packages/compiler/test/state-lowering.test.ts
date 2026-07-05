@@ -955,8 +955,8 @@ test('lowerStateAccess resolves prop reads and reports prop writes as read-only'
 	]);
 });
 
-test('lowerStateAccess explains unresolved plain local writes without suggesting local mutation', async () => {
-	const localWriteSource = `import { computed } from '@markless/core'; export function Scoreboard() @{ let subtotal = 0; const bonus = computed(() => 1); subtotal += bonus; <p>{bonus}</p> }`;
+test('lowerStateAccess explains unresolved writes without rejecting declared plain locals', async () => {
+	const localWriteSource = `export function Scoreboard() @{ <button onClick={() => missing += 1}>Missing</button> }`;
 	const semanticGraph = await buildSemanticGraph({
 		filename: 'src/Scoreboard.tsrx',
 		source: localWriteSource,
@@ -967,15 +967,83 @@ test('lowerStateAccess explains unresolved plain local writes without suggesting
 	expect(lowered.diagnostics).toEqual([
 		expect.objectContaining({
 			code: 'MARKLESS_STATE_UNRESOLVED_WRITE',
-			message: 'Cannot write to "subtotal" because it does not resolve to graph state.',
-			why: 'The compiler owns reads and writes through state() graph cells. Writes to plain locals in a component body are not representable yet.',
-			suggestions: [
-				{
-					message:
-						'Keep mutable values in state() and write through that binding, derive the value in computed(), or compute it with a single expression that does not reassign a local.',
-				},
-			],
-			docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_UNRESOLVED_WRITE',
+			message: 'Cannot write to "missing" because the compiler cannot resolve that target.',
+			why: 'This write is not a known state() graph path, graph alias, declared plain local, or classified module-scope binding.',
+		}),
+	]);
+});
+
+test('B913 allows handler-internal scratch locals', async () => {
+	const scratchSource = `export function Scratch() @{ <button onClick={() => { let next = 1; next += 2; console.log(next); }}>Run</button> }`;
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/Scratch.tsrx',
+		source: scratchSource,
+	});
+
+	const lowered = lowerStateAccess({ semanticGraph });
+
+	expect(lowered.diagnostics).toEqual([]);
+});
+
+test('B913 reports stale UI when a handler writes a component local read by the template', async () => {
+	const staleSource = `export function Counter() @{ let count = 0; <button onClick={() => count++}>{count}</button> }`;
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/StaleLocal.tsrx',
+		source: staleSource,
+	});
+
+	const lowered = lowerStateAccess({ semanticGraph });
+
+	expect(lowered.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_STATE_STALE_LOCAL_WRITE',
+			message:
+				'Cannot write to "count" from a handler because the template reads the component local "count" only during initial render.',
+			why: 'Component bodies run for initial render only. Template reads re-render after events only when they subscribe through state(), so this handler write would leave the UI stale after resume.',
+		}),
+	]);
+});
+
+test('B913 reports module-scope writes and aliases as cross-request escapes', async () => {
+	const moduleEscapeSource = `let counter = 0; const registry = []; export function App() @{ const alias = counter; <button onClick={() => { counter++; alias++; registry.push(counter); }}>Save</button> }`;
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/ModuleEscape.tsrx',
+		source: moduleEscapeSource,
+	});
+
+	const lowered = lowerStateAccess({ semanticGraph });
+
+	expect(lowered.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+		'MARKLESS_STATE_MODULE_ESCAPE',
+		'MARKLESS_STATE_MODULE_ESCAPE',
+		'MARKLESS_STATE_MODULE_ESCAPE',
+	]);
+	expect(lowered.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+		'Cannot write to "counter" because it lives at module scope and would be shared across requests.',
+		'Cannot write to "alias" because it aliases module-scope "counter", which would be shared across requests.',
+		'Cannot write to "registry" because it lives at module scope and would be shared across requests.',
+	]);
+	expect(lowered.diagnostics[0]?.why).toBe(
+		'Module-scope storage outlives a single server render. A handler could read or overwrite data from another user because the value is not part of this document payload.',
+	);
+});
+
+test('B913 keeps whole-binding state aliases lowered to graph writes', async () => {
+	const aliasSource = `import { state } from '@markless/core'; export function App() @{ let origin = state(0); let mirror = origin; <button onClick={() => mirror++}>{origin}</button> }`;
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/StateAlias.tsrx',
+		source: aliasSource,
+	});
+
+	const lowered = lowerStateAccess({ semanticGraph });
+
+	expect(lowered.diagnostics).toEqual([]);
+	expect(lowered.writes).toEqual([
+		expect.objectContaining({
+			source: 'mirror',
+			graphNodeId: 'state:origin',
+			path: [],
+			operation: 'update',
 		}),
 	]);
 });
