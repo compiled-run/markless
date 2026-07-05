@@ -245,6 +245,87 @@ export function duplicateElementHandleDiagnostic(
 	};
 }
 
+export function repeatKeyRequiredDiagnostic(input: {
+	readonly node: AnyNode;
+	readonly itemName: string;
+	readonly collectionSource: string;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	return {
+		code: 'MARKLESS_REPEAT_KEY_REQUIRED',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: 'This @for needs a key',
+		message: `@for (const ${input.itemName} of ${input.collectionSource}) repeats reactive state without a key. When ${input.collectionSource} changes, the rows of this list have no identity to update, reorder, or resume by.`,
+		why: 'A keyed loop item keeps its state, events, and DOM attached to the same logical item across reorder, insert, and delete; without a key there is no stable identity root.',
+		primarySpan: sourceSpan(input.node, input.filename),
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		suggestions: [
+			{
+				message: `Add a stable domain key such as \`@for (const ${input.itemName} of ${input.collectionSource}; key ${input.itemName}.id)\`, or key by position with \`index i; key i\` when state should follow the slot.`,
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_REPEAT_KEY_REQUIRED',
+	} as SemanticGraphDiagnostic;
+}
+
+export function repeatKeyIsIndexDiagnostic(input: {
+	readonly node: AnyNode;
+	readonly itemName: string;
+	readonly indexName: string;
+	readonly collectionSource: string;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	return {
+		code: 'MARKLESS_REPEAT_KEY_IS_INDEX',
+		severity: 'warning',
+		phase: 'semantic-graph',
+		title: 'Keying by index makes row identity follow the position',
+		message: `key ${input.indexName} identifies each row of ${input.collectionSource} by its position, not by its data. If ${input.collectionSource} reorders, inserts, or deletes, any row-local state, event wiring, and DOM reuse stay with the slot number.`,
+		why: 'The key is the identity root for a repeated graph scope; a positional key pins that scope to the slot, which is only correct when state genuinely belongs to the position.',
+		primarySpan: sourceSpan(input.node, input.filename),
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		suggestions: [
+			{
+				message: `Key by a stable field of the item when state belongs to the item, such as \`@for (const ${input.itemName} of ${input.collectionSource}; key ${input.itemName}.id)\`. Keep \`key ${input.indexName}\` when state should follow the slot.`,
+			},
+			{
+				message:
+					'To silence this warning for one site, add `// markless-allow MARKLESS_REPEAT_KEY_IS_INDEX: state follows the slot intentionally` on the @for header line.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_REPEAT_KEY_IS_INDEX',
+	} as SemanticGraphDiagnostic;
+}
+
+export function repeatKeyUnstableDiagnostic(input: {
+	readonly keyNode: AnyNode;
+	readonly itemName: string;
+	readonly collectionSource: string;
+	readonly keySource: string;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	return {
+		code: 'MARKLESS_REPEAT_KEY_UNSTABLE',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: '@for key must identify the item stably',
+		message: `key ${input.keySource} does not derive identity from ${input.itemName} or an explicit index alias. Row state, event wiring, and DOM reuse follow the key, so rows of ${input.collectionSource} could not be matched with themselves reliably.`,
+		why: 'The key is the stable identity root for a repeated graph scope across reorder, insert, delete, and resume; a value that is not derived from the item or its position cannot identify anything.',
+		primarySpan: sourceSpan(input.keyNode, input.filename),
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		suggestions: [
+			{
+				message: `Key by a stable field of ${input.itemName}, such as \`key ${input.itemName}.id\`, or key by position with \`index i; key i\` when state should follow the slot.`,
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_REPEAT_KEY_UNSTABLE',
+	} as SemanticGraphDiagnostic;
+}
+
 export function attachHostElementRequiredDiagnostic(
 	ownerTagName: string | null,
 	value: AnyNode,

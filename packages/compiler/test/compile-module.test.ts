@@ -1384,6 +1384,78 @@ export function App() @{
 	);
 });
 
+test('compileTsrxModule renders positional-key repeat rows in SSR and CSR output', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/PositionRows.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let records = state([
+		{ uuid: 'x', label: 'One' },
+		{ uuid: 'y', label: 'Two' },
+	]);
+
+	<section>
+		@for (const record of records; index slot; key slot) {
+			<p>{record.label}</p>
+		}
+	</section>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.semanticGraph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_REPEAT_KEY_IS_INDEX',
+			severity: 'warning',
+		}),
+	]);
+	expect(result.publicRenderPlan.repeatGates).toEqual([
+		{ repeatId: 'repeat:0', supported: true, ssrOnly: true },
+	]);
+	expect(result.publicRenderPlan.keyedRepeats).toEqual([]);
+
+	const ssrOutput = await renderTestSsr(result);
+	const csrOutput = (await renderTestCsr(result)) as { readonly root: PublicRenderTestElement };
+
+	expect(ssrOutput.html).toBe('<section><p>One</p><p>Two</p></section>');
+	expect(elementsByTag(csrOutput.root, 'p').map((element) => element.textContent)).toEqual([
+		'One',
+		'Two',
+	]);
+});
+
+test('compileTsrxModule keeps ordinary keyed repeat SSR html unchanged', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/StableRows.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let records = state([
+		{ uuid: 'x', label: 'One' },
+		{ uuid: 'y', label: 'Two' },
+	]);
+
+	<section>
+		@for (const record of records; key record.uuid) {
+			<p>{record.label}</p>
+		}
+	</section>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.semanticGraph.diagnostics).toEqual([]);
+	expect(result.publicRenderPlan.repeatGates).toEqual([{ repeatId: 'repeat:0', supported: true }]);
+	const ssrOutput = await renderTestSsr(result);
+
+	expect(ssrOutput.html).toBe('<section><p>One</p><p>Two</p></section>');
+});
+
 test('compileTsrxModule renders the @empty branch when the keyed repeat has no items', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/EmptyList.tsrx',

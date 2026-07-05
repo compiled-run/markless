@@ -1172,7 +1172,7 @@ function supportedRepeatGate(input: {
 	});
 	if (!rowPlan) return unsupportedReason('unsupported-row-binding');
 
-	return rowPlan.usesIndex
+	return rowPlan.usesIndex || input.semanticRepeat.keySource === input.semanticRepeat.indexName
 		? { repeatId: input.payloadRepeat.id, supported: true, ssrOnly: true }
 		: { repeatId: input.payloadRepeat.id, supported: true };
 }
