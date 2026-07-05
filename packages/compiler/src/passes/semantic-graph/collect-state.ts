@@ -4,11 +4,16 @@ import type { SemanticGraphBinding, SemanticLocalBinding, SourceSpan } from '../
 import { getFrameworkApiForCall, getCallName, isFrameworkApiName } from './imports.ts';
 import { collectDestructuredAliases } from './collect-aliases.ts';
 import { collectAsyncComputedPostAwaitReads, collectGraphDependencies } from './collect-async.ts';
-import { collectExpressionReads } from './collect-expressions.ts';
+import {
+	collectExpressionReads,
+	findTemplateValue,
+	markTemplateValueHandled,
+} from './collect-expressions.ts';
 import {
 	frameworkImportRequiredDiagnostic,
 	helperStateReturnUnsupportedDiagnostic,
 	stateElementHandleUnsupportedDiagnostic,
+	templateAsValueDiagnostic,
 	unstableStateCreationSiteDiagnostic,
 } from './diagnostics.ts';
 import type { WalkState } from './types.ts';
@@ -102,12 +107,31 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 			});
 		}
 
+		if (!frameworkApi) {
+			const templateValue = findTemplateValue(init);
+			if (templateValue) {
+				reportTemplateAsValue(
+					state,
+					templateValue,
+					`${declarationKind ?? 'const'} ${name} = ${expressionSource(init, state.source)}`,
+					name,
+				);
+				markTemplateValueHandled(templateValue);
+			}
+		}
+
 		if (frameworkApi === 'state') {
 			if (state.currentCreationSite) {
 				reportUnstableCreationSite(name, 'state', init, state.currentCreationSite, state);
 				continue;
 			}
 			const initial = firstArgument(init);
+			const templateValue = findTemplateValue(initial);
+			if (templateValue) {
+				reportTemplateAsValue(state, templateValue, expressionSource(init, state.source), name);
+				markTemplateValueHandled(templateValue);
+				continue;
+			}
 			const evaluatedInitial = evaluateInitialStateValue(initial);
 			const elementHandle = findElementHandleStateValue(initial, state);
 			if (elementHandle) {
@@ -146,6 +170,12 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 				continue;
 			}
 			const body = firstArgument(init);
+			const templateValue = findComputedTemplateValue(body);
+			if (templateValue) {
+				reportTemplateAsValue(state, templateValue, expressionSource(init, state.source), name);
+				markTemplateValueHandled(templateValue);
+				continue;
+			}
 			const isAsync = body?.async === true;
 			const dependencies = collectGraphDependencies(body, state);
 			state.graph.graphBindings.push({
@@ -574,6 +604,44 @@ function variableDeclarationKind(node: AnyNode): SemanticGraphBinding['declarati
 
 function firstArgument(node: AnyNode): AnyNode | undefined {
 	return asNodes(node.arguments)[0];
+}
+
+function reportTemplateAsValue(
+	state: WalkState,
+	node: AnyNode,
+	siteSource: string,
+	name?: string,
+): void {
+	state.graph.diagnostics.push(
+		templateAsValueDiagnostic({ siteSource, name, node, filename: state.filename }),
+	);
+}
+
+function findComputedTemplateValue(node: AnyNode | undefined): AnyNode | null {
+	if (!node) return null;
+	if (node.type === 'ArrowFunctionExpression') {
+		const body = node.body as AnyNode | undefined;
+		const template = findTemplateValue(body);
+		if (template) return template;
+		return findReturnTemplateValue(body);
+	}
+	if (node.type === 'FunctionExpression') {
+		return findReturnTemplateValue(node.body as AnyNode | undefined);
+	}
+	return null;
+}
+
+function findReturnTemplateValue(node: AnyNode | undefined): AnyNode | null {
+	if (!node) return null;
+	if (node.type === 'ReturnStatement') {
+		const argument = node.argument as AnyNode | undefined;
+		return findTemplateValue(argument);
+	}
+	for (const child of asNodes(node.body)) {
+		const found = findReturnTemplateValue(child);
+		if (found) return found;
+	}
+	return null;
 }
 
 function initialValueKind(node: AnyNode | undefined): SemanticGraphBinding['valueKind'] {
