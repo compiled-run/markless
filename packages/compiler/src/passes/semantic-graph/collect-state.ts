@@ -1,7 +1,12 @@
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import type { SemanticGraphBinding, SemanticLocalBinding, SourceSpan } from '../../artifacts.ts';
-import { getFrameworkApiForCall, getCallName, isFrameworkApiName } from './imports.ts';
+import {
+	getFrameworkApiForCall,
+	getCallName,
+	isFrameworkApiName,
+	type FrameworkApiName,
+} from './imports.ts';
 import { collectDestructuredAliases, collectWholeBindingAlias } from './collect-aliases.ts';
 import { collectAsyncComputedPostAwaitReads, collectGraphDependencies } from './collect-async.ts';
 import {
@@ -10,9 +15,12 @@ import {
 	markTemplateValueHandled,
 } from './collect-expressions.ts';
 import {
+	computedDependencyCycleDiagnostic,
 	crossModuleHelperStateReturnUnsupportedDiagnostic,
+	frameworkApiAliasUnsupportedDiagnostic,
 	frameworkImportRequiredDiagnostic,
 	helperStateReturnUnsupportedDiagnostic,
+	nestedStateCreationDiagnostic,
 	stateElementHandleUnsupportedDiagnostic,
 	unsupportedHelperStateReturnDiagnostic,
 	templateAsValueDiagnostic,
@@ -49,14 +57,34 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 			aliasOf: moduleAliasTarget(init, state),
 		});
 
-		if (collectHelperReturnAlias(id, name, init, declarationKind, state)) {
+		if (callName && isFrameworkApiName(callName) && !frameworkApi) {
+			state.graph.diagnostics.push(
+				frameworkImportRequiredDiagnostic(
+					callName,
+					init,
+					state.filename,
+					isLocalFrameworkApiShadow(callName, state),
+					state.source,
+				),
+			);
 			continue;
 		}
 
-		if (callName && isFrameworkApiName(callName) && !frameworkApi) {
+		const aliasedFrameworkApi = frameworkApiValueReference(init, state);
+		if (aliasedFrameworkApi) {
 			state.graph.diagnostics.push(
-				frameworkImportRequiredDiagnostic(callName, init, state.filename),
+				frameworkApiAliasUnsupportedDiagnostic({
+					localName: name,
+					apiName: aliasedFrameworkApi,
+					declarationKind: declarationKind ?? 'const',
+					init,
+					filename: state.filename,
+				}),
 			);
+			continue;
+		}
+
+		if (collectHelperReturnAlias(id, name, init, declarationKind, state)) {
 			continue;
 		}
 
@@ -143,6 +171,20 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 				continue;
 			}
 			const initial = firstArgument(init);
+			const nestedApi = findNestedFrameworkApiCall(initial, state);
+			if (nestedApi) {
+				state.graph.diagnostics.push(
+					nestedStateCreationDiagnostic({
+						outerApi: 'state',
+						nestedApi,
+						name,
+						init,
+						filename: state.filename,
+						source: state.source,
+					}),
+				);
+				continue;
+			}
 			const templateValue = findTemplateValue(initial);
 			if (templateValue) {
 				reportTemplateAsValue(state, templateValue, expressionSource(init, state.source), name);
@@ -187,6 +229,31 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 				continue;
 			}
 			const body = firstArgument(init);
+			const nestedApi = findNestedFrameworkApiCall(body, state);
+			if (nestedApi) {
+				state.graph.diagnostics.push(
+					nestedStateCreationDiagnostic({
+						outerApi: 'computed',
+						nestedApi,
+						name,
+						init,
+						filename: state.filename,
+						source: state.source,
+					}),
+				);
+				continue;
+			}
+			if (readsIdentifier(body, name)) {
+				state.graph.diagnostics.push(
+					computedDependencyCycleDiagnostic({
+						name,
+						init,
+						filename: state.filename,
+						source: state.source,
+					}),
+				);
+				continue;
+			}
 			const templateValue = findComputedTemplateValue(body);
 			if (templateValue) {
 				reportTemplateAsValue(state, templateValue, expressionSource(init, state.source), name);
@@ -412,6 +479,66 @@ function sharedScope(state: WalkState): { readonly sharedDefinitionId?: string }
 
 function localDeclarationScope(state: WalkState): 'component' | 'function' {
 	return state.currentFunctionSite ? 'function' : 'component';
+}
+
+function frameworkApiValueReference(
+	node: AnyNode,
+	state: WalkState,
+): FrameworkApiName | null {
+	const name = getIdentifierName(node);
+	return name ? (state.frameworkApiImports.get(name) ?? null) : null;
+}
+
+function isLocalFrameworkApiShadow(name: FrameworkApiName, state: WalkState): boolean {
+	if (state.helperFunctions.has(name)) return true;
+	return state.graph.localDeclarations.some(
+		(declaration) =>
+			declaration.name === name &&
+			(declaration.scope === 'component' || declaration.scope === 'function'),
+	);
+}
+
+function findNestedFrameworkApiCall(
+	node: AnyNode | undefined,
+	state: WalkState,
+): FrameworkApiName | null {
+	let found: FrameworkApiName | null = null;
+
+	const visit = (candidate: AnyNode | undefined): void => {
+		if (!candidate || found) return;
+		const frameworkApi = getFrameworkApiForCall(candidate, state.frameworkApiImports);
+		if (frameworkApi) {
+			found = frameworkApi;
+			return;
+		}
+
+		for (const child of childNodes(candidate)) visit(child);
+	};
+
+	visit(node);
+	return found;
+}
+
+function readsIdentifier(node: AnyNode | undefined, name: string): boolean {
+	let found = false;
+
+	const visit = (candidate: AnyNode | undefined): void => {
+		if (!candidate || found) return;
+		if (candidate.type === 'Identifier' && getIdentifierName(candidate) === name) {
+			found = true;
+			return;
+		}
+		if (candidate.type === 'Property') {
+			if (candidate.computed === true) visit(candidate.key as AnyNode | undefined);
+			visit(candidate.value as AnyNode | undefined);
+			return;
+		}
+
+		for (const child of childNodes(candidate)) visit(child);
+	};
+
+	visit(node);
+	return found;
 }
 
 function moduleAliasTarget(init: AnyNode, state: WalkState): string | undefined {
