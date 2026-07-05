@@ -4463,7 +4463,7 @@ export function App() @{
 	for (const module of child.symbolModules.modules) {
 		symbolExports.set(module.symbolId, await importPublicRenderTestModule(module.source));
 	}
-	const container = createEventOnlyResumeContainerFromPayloads({
+	const container = await createEventOnlyResumeContainerFromPayloads({
 		state: output.state,
 		view: output.view,
 		root: root as never,

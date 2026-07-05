@@ -232,7 +232,7 @@ async function createFullRuntimeGraph(input: {
 	readonly hasAuthoredState: boolean;
 }): Promise<RuntimeGraph> {
 	if (input.hasAuthoredState) {
-		const { createRuntimeGraphFromResumePayload } = await import('./payload.ts');
+		const { createRuntimeGraphFromResumePayload } = await import('./payload-full.ts');
 		return createRuntimeGraphFromResumePayload({
 			state: input.state,
 			view: input.view,
