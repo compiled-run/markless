@@ -213,6 +213,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_ELEMENT_HANDLE_REQUIRED'
 		| 'MARKLESS_ELEMENT_HANDLE_DUPLICATE'
 		| 'MARKLESS_ATTACH_HOST_ELEMENT_REQUIRED'
+		| 'MARKLESS_EVENT_HANDLER_NOT_A_FUNCTION'
 		| 'MARKLESS_SYNC_POLICY_UNEXTRACTABLE';
 	readonly phase: 'semantic-graph' | 'sync-policy';
 	readonly passId: 'tsrx-semantic-graph';
