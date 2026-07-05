@@ -4716,3 +4716,117 @@ test('compileTsrxModule emits async computed runner modules without serializing 
 	);
 	expect(result.protocolView.asyncBoundaries[0]?.asyncReads[0]?.runnerSymbolId).toBe('symbol:1');
 });
+
+test('compileTsrxModule plans async reads for derives with try/catch/finally', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/AsyncTryCatchComputed.tsrx',
+		source: `
+import { computed, state } from '@markless/core';
+
+export function App() @{
+	const query = state('Ada');
+	const details = computed(async () => {
+		try {
+			const title = query;
+			await Promise.resolve();
+			return { title };
+		} catch {
+			return { title: 'guest' };
+		} finally {
+			const seen = query;
+			void seen;
+		}
+	});
+
+	<main>
+		@try { <p>{details.title}</p> } @pending { <p>Loading</p> } @catch { <p>Broken</p> }
+	</main>
+}
+`,
+		symbols: [],
+	});
+	const update = result.symbolModules.modules.find(
+		(module) => module.kind === 'async-boundary-update',
+	);
+
+	expect(result.semanticGraph.asyncBoundaries).toEqual([
+		expect.objectContaining({ id: 'boundary:0' }),
+	]);
+	expect(result.protocolView.asyncBoundaries).toEqual([
+		expect.objectContaining({
+			id: 'boundary:0',
+			updateSymbolId: update?.symbolId,
+			asyncReads: [
+				expect.objectContaining({
+					source: 'details.title',
+					graphNodeId: 'computed:details',
+					path: ['title'],
+					runnerSymbolId: 'symbol:1',
+				}),
+			],
+		}),
+	]);
+
+	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	const output = await (ssrModule.marklessRenderSsr as () => Promise<{ readonly html: string }>)();
+
+	expect(output.html).toBe(
+		'<main><!--markless:async:boundary:0--><p>Ada</p><!--/markless:async:boundary:0--></main>',
+	);
+});
+
+test('compileTsrxModule SSR resolves an async derive that catches its own error', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/AsyncCaughtValue.tsrx',
+		source: `
+import { computed } from '@markless/core';
+
+export function App() @{
+	const details = computed(async () => {
+		try {
+			throw new Error('handled');
+		} catch {
+			return { title: 'Fallback value' };
+		}
+	});
+
+	<main>
+		@try { <p>{details.title}</p> } @pending { <p>Loading</p> } @catch { <p>Broken</p> }
+	</main>
+}
+`,
+		symbols: [],
+	});
+	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	const output = await (ssrModule.marklessRenderSsr as () => Promise<{ readonly html: string }>)();
+
+	expect(output.html).toBe(
+		'<main><!--markless:async:boundary:0--><p>Fallback value</p><!--/markless:async:boundary:0--></main>',
+	);
+});
+
+test('compileTsrxModule SSR routes uncaught async derive failures to @catch', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/AsyncUncaughtError.tsrx',
+		source: `
+import { computed } from '@markless/core';
+
+export function App() @{
+	const details = computed(async () => {
+		throw new Error('unhandled');
+	});
+
+	<main>
+		@try { <p>{details.title}</p> } @pending { <p>Loading</p> } @catch { <p>Broken</p> }
+	</main>
+}
+`,
+		symbols: [],
+	});
+	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	const output = await (ssrModule.marklessRenderSsr as () => Promise<{ readonly html: string }>)();
+
+	expect(output.html).toBe(
+		'<main><!--markless:async:boundary:0--><p>Broken</p><!--/markless:async:boundary:0--></main>',
+	);
+});
