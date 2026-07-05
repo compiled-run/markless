@@ -68,6 +68,10 @@ export type EventOnlyResumeRecord = ProtocolViewPayload['events'][number];
 export type EventOnlyResumeDomUpdateRecord = ProtocolViewPayload['domUpdates'][number];
 export type EventOnlyResumeBehaviorRecord = ProtocolViewPayload['behaviors'][number];
 
+type EventOnlySyncComputedRecord = ProtocolStatePayload['computed'][number] & {
+	readonly deriveSymbolId: string;
+};
+
 export type EventOnlyResumeGraph = {
 	read(graphNodeId: string, path?: ReadonlyArray<string>): unknown;
 	write(write: RuntimeGraphWrite): void;
@@ -273,9 +277,17 @@ function createEventOnlyResumeGraph(input: {
 		},
 		async flush() {
 			while (dirtyPaths.length > 0) {
+				const pending = dirtyPaths.splice(0);
+				await flushSyncComputeds({
+					graph,
+					pending,
+					state: input.state,
+					loadSymbol: input.loadSymbol,
+					root: input.root,
+				});
 				await flushDomUpdates({
 					graph,
-					pending: dirtyPaths.splice(0),
+					pending,
 					view: input.view,
 					loadSymbol: input.loadSymbol,
 					elementsByHostId: input.elementsByHostId,
@@ -344,6 +356,38 @@ async function dispatchEvent(input: {
 			elementsByHostId: input.elementsByHostId,
 			activeBehaviorHosts: input.activeBehaviorHosts,
 		});
+	}
+}
+
+async function flushSyncComputeds(input: {
+	readonly graph: EventOnlyResumeGraph;
+	readonly pending: ReadonlyArray<DirtyPath>;
+	readonly state: ProtocolStatePayload;
+	readonly loadSymbol: ResumeEventOnlyFromPayloadDocumentInput['loadSymbol'];
+	readonly root: EventOnlyResumeDomElement;
+}): Promise<void> {
+	const ranComputeds = new Set<string>();
+
+	for (const computed of syncComputedRecords(input.state)) {
+		const dirty = (computed.dependencies ?? []).some((dependency) =>
+			input.pending.some(
+				(path) =>
+					path.graphNodeId === dependency.graphNodeId &&
+					pathsIntersect(path.path, dependency.path),
+			),
+		);
+		if (!dirty || ranComputeds.has(computed.graphNodeId)) continue;
+
+		ranComputeds.add(computed.graphNodeId);
+		const loadedSymbol = input.loadSymbol(computed.deriveSymbolId);
+		const symbol = isPromiseLike(loadedSymbol) ? await loadedSymbol : loadedSymbol;
+		const result = symbol({
+			graph: input.graph,
+			element: input.root,
+			getElementHandle: noElementHandle,
+		});
+		const value = isPromiseLike(result) ? await result : result;
+		input.graph.write({ graphNodeId: computed.graphNodeId, value });
 	}
 }
 
@@ -512,6 +556,14 @@ function pathsIntersect(a: ReadonlyArray<string>, b: ReadonlyArray<string>): boo
 function startsWithPath(path: ReadonlyArray<string>, prefix: ReadonlyArray<string>): boolean {
 	if (path.length < prefix.length) return false;
 	return prefix.every((part, index) => path[index] === part);
+}
+
+function syncComputedRecords(state: ProtocolStatePayload): EventOnlySyncComputedRecord[] {
+	return state.computed.filter(
+		(computed): computed is EventOnlySyncComputedRecord =>
+			computed.async === false &&
+			typeof (computed as EventOnlySyncComputedRecord).deriveSymbolId === 'string',
+	);
 }
 
 function stringifyDomValue(value: unknown): string {

@@ -78,6 +78,7 @@ export async function renderCsrRuntime(input: {
 	runtime = createResumeRuntime({
 		root: output.root,
 		graph,
+		state,
 		view,
 		loadSymbol,
 		createVisibilityObserver: options.createVisibilityObserver,

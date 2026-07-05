@@ -1,6 +1,12 @@
 import { expect, test } from 'vitest';
 import { createRuntimeGraph } from '@markless/runtime';
-import { applyDomJournalEntries, createResumeRuntime, RuntimeResumeError } from '../src/index.ts';
+import { createProtocolStatePayload } from '@markless/serializer';
+import {
+	applyDomJournalEntries,
+	createResumeRuntime,
+	createRuntimeGraphFromResumePayload,
+	RuntimeResumeError,
+} from '../src/index.ts';
 import type { RuntimeGraph, RuntimeGraphWrite } from '@markless/runtime';
 import type {
 	DomJournalEntry,
@@ -106,6 +112,36 @@ function event(type: string, target: FakeElement, key: string): FakeEvent {
 			this.propagationStopped = true;
 		},
 	};
+}
+
+function syncComputedPayloads() {
+	return {
+		state: {
+			...createProtocolStatePayload({
+				cells: [{ graphNodeId: 'state:count', name: 'count', valueKind: 'scalar', value: 2 }],
+			}),
+			computed: [{
+				graphNodeId: 'computed:doubled', name: 'doubled', async: false,
+				deriveSymbolId: 'symbol:derive',
+				dependencies: [{ graphNodeId: 'state:count', path: [] }],
+			}],
+		},
+		view: {
+			version: 1,
+			locators: [
+				{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'section' },
+				{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'output' },
+			],
+			events: [],
+			domUpdates: [{
+				hostNodeId: 'h1', source: 'doubled', graphNodeId: 'computed:doubled',
+				path: [], target: { kind: 'text' }, symbolId: 'symbol:text',
+			}],
+			behaviors: [],
+			elementHandles: [],
+			asyncBoundaries: [],
+		},
+	} as const;
 }
 
 async function settleMicrotasks(count = 4): Promise<void> {
@@ -221,6 +257,58 @@ test('resume runtime skips tagName validation for wildcard locators', () => {
 	});
 
 	expect(runtime.getElement('h0')).toBe(child);
+});
+
+test('resume payload sync computed derives after dependency writes and updates DOM sites', async () => {
+	const output = element('OUTPUT');
+	const root = element('SECTION', [output]);
+	const { state, view } = syncComputedPayloads();
+	const loadedSymbols: string[] = [];
+	const appliedEntries: unknown[] = [];
+	const loadSymbol = (symbolId: string) => {
+		loadedSymbols.push(symbolId);
+		if (symbolId === 'symbol:derive') {
+			return ({ graph: runtimeGraph }) => Number(runtimeGraph.read('state:count')) * 2;
+		}
+		return (context) => ({
+			type: 'setText',
+			locator: context.domUpdate?.hostNodeId ?? 'h1',
+			value: context.value,
+		});
+	};
+	const graph = createRuntimeGraphFromResumePayload({
+		state,
+		view,
+		root,
+		loadSymbol,
+	});
+
+	const runtime = createResumeRuntime({
+		root,
+		graph,
+		state,
+		view,
+		loadSymbol,
+		applyDomJournal(entries) {
+			appliedEntries.push(...entries);
+		},
+	});
+	await runtime.start();
+
+	graph.write({ graphNodeId: 'state:count', value: 3 });
+	await graph.flush();
+
+	expect(loadedSymbols).toEqual(['symbol:derive', 'symbol:text']);
+	expect(graph.read('computed:doubled')).toBe(6);
+	expect(appliedEntries).toEqual([{ type: 'setText', locator: 'h1', value: 6 }]);
+
+	loadedSymbols.length = 0;
+	runtime.dispose();
+	graph.write({ graphNodeId: 'state:count', value: 4 });
+	await graph.flush();
+
+	expect(loadedSymbols).toEqual([]);
+	expect(graph.read('computed:doubled')).toBe(6);
 });
 
 test('resume runtime materializes view records and dispatches lazy symbols after sync policy', async () => {

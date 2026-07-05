@@ -1,4 +1,4 @@
-import type { ProtocolViewPayload } from '@markless/serializer';
+import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer';
 import type {
 	DomJournalEntry,
 	DomJournalResult,
@@ -283,6 +283,7 @@ export type ResumeSharedPatchDispatcher = (patch: RuntimeGraphSharedPatch) => vo
 export type ResumeRuntimeInput = {
 	readonly root: ResumeDomElement;
 	readonly graph: RuntimeGraph;
+	readonly state?: ProtocolStatePayload;
 	readonly view: ResumeViewRecord;
 	readonly loadSymbol: (symbolId: string) => ResumeSymbol | Promise<ResumeSymbol>;
 	// Builds DOM nodes from branch-update HTML; browser default arrives with S6.
@@ -370,6 +371,10 @@ type ResumeHostCleanup = {
 
 const SHARED_PATCH_EVENT_TYPE = 'async:shared-patch';
 
+type ResumeSyncComputedRecord = ProtocolStatePayload['computed'][number] & {
+	readonly deriveSymbolId: string;
+};
+
 export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 	validateKeyedRepeatGraphKeys(input.graph, input.view);
 	const elementsByHostId = materializeDomLocators(input.root, input.view.locators);
@@ -413,6 +418,29 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 	}
 	let visibilityObserver: ResumeVisibilityObserver | undefined;
 	let removalObserver: ResumeRemovalObserver | undefined;
+
+	for (const computed of syncComputedRecords(input.state)) {
+		for (const dependency of computed.dependencies ?? []) {
+			const release = input.graph.subscribe({
+				id: `sync-computed:${computed.graphNodeId}`,
+				graphNodeId: dependency.graphNodeId,
+				path: dependency.path,
+				async run() {
+					const loadedSymbol = input.loadSymbol(computed.deriveSymbolId);
+					const symbol = isPromiseLike(loadedSymbol) ? await loadedSymbol : loadedSymbol;
+					const result = symbol({
+						graph: input.graph,
+						read: input.graph.read,
+						element: input.root,
+						getElementHandle: elementHandles.get,
+					});
+					const value = isPromiseLike(result) ? await result : result;
+					input.graph.write({ graphNodeId: computed.graphNodeId, value });
+				},
+			});
+			storeContainerSubscription(release);
+		}
+	}
 
 	for (const eventRecord of input.view.events) {
 		const element = elementsByHostId.get(eventRecord.hostNodeId);
@@ -1329,6 +1357,16 @@ function groupBehaviorRecords(
 	}
 
 	return byHostId;
+}
+
+function syncComputedRecords(
+	state: ProtocolStatePayload | undefined,
+): ResumeSyncComputedRecord[] {
+	return (state?.computed ?? []).filter(
+		(computed): computed is ResumeSyncComputedRecord =>
+			computed.async === false &&
+			typeof (computed as ResumeSyncComputedRecord).deriveSymbolId === 'string',
+	);
 }
 
 function isVisibleEntry(entry: ResumeVisibilityEntry): boolean {
