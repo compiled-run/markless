@@ -1,7 +1,4 @@
-import {
-	deserializeGraphValue,
-	type SerializedGraphPayload,
-} from '../../serializer/src/value-decode.ts';
+import type { SerializedGraphPayload, SerializedSlot } from '../../serializer/src/value-decode-client.ts';
 import type { ProtocolStatePayload, ProtocolViewPayload } from '../../serializer/src/protocol.ts';
 import type {
 	DomJournalEntry,
@@ -29,13 +26,13 @@ type EventOnlySyncComputedRecord = ProtocolStatePayload['computed'][number] & {
 	readonly deriveSymbolId: string;
 };
 const noElementHandle = () => undefined;
-export function createEventOnlyResumeGraph(input: {
+export async function createEventOnlyResumeGraph(input: {
 	readonly state: ProtocolStatePayload;
 	readonly view: ProtocolViewPayload;
 	readonly loadSymbol: (symbolId: string) => EventOnlyResumeSymbol | Promise<EventOnlyResumeSymbol>;
 	readonly root: EventOnlyResumeDomElement;
 	readonly elementsByHostId: ReadonlyMap<string, EventOnlyResumeDomElement>;
-}): EventOnlyResumeGraph {
+}): Promise<EventOnlyResumeGraph> {
 	const existingCells = input.root.__marklessEventOnlyGraph;
 	const cells = existingCells ?? new Map<string, unknown>();
 	const dirtyPaths: DirtyPath[] = [];
@@ -45,7 +42,7 @@ export function createEventOnlyResumeGraph(input: {
 				cell.graphNodeId,
 				cell.value === undefined
 					? undefined
-					: deserializeGraphValue(cell.value as SerializedGraphPayload),
+					: await decodeEventOnlyCellValue(cell.value as SerializedGraphPayload),
 			);
 		}
 		input.root.__marklessEventOnlyGraph = cells;
@@ -109,6 +106,23 @@ export function createEventOnlyResumeGraph(input: {
 		},
 	};
 	return graph;
+}
+async function decodeEventOnlyCellValue(payload: SerializedGraphPayload): Promise<unknown> {
+	if (payload.records.length === 0) return decodeScalarSlot(payload.root);
+	const { deserializeGraphValueForClient } = await import('../../serializer/src/value-decode-client.ts');
+	return deserializeGraphValueForClient(payload);
+}
+function decodeScalarSlot(slot: SerializedSlot): unknown {
+	if (
+		slot === null ||
+		typeof slot === 'string' ||
+		typeof slot === 'number' ||
+		typeof slot === 'boolean'
+	) return slot;
+	if (slot.$type === 'undefined') return undefined;
+	if (slot.$type === 'bigint') return BigInt(slot.value);
+	if (slot.$type === 'date') return new Date(slot.value);
+	return undefined;
 }
 async function flushSyncComputeds(input: {
 	readonly graph: EventOnlyResumeGraph;

@@ -11,13 +11,9 @@ export function deserializeGraphValue(payload: SerializedGraphPayload): unknown 
 		if (record.type === 'map') shells.set(record.id, new Map());
 		if (record.type === 'set') shells.set(record.id, new Set());
 		if (record.type === 'date') shells.set(record.id, new Date(record.value));
-		if (record.type === 'regexp') {
-			shells.set(record.id, new RegExp(record.source, record.flags));
-		}
+		if (record.type === 'regexp') shells.set(record.id, new RegExp(record.source, record.flags));
 		if (record.type === 'url') shells.set(record.id, new URL(record.value));
-		if (record.type === 'array-buffer') {
-			shells.set(record.id, new Uint8Array(record.bytes).buffer);
-		}
+		if (record.type === 'array-buffer') shells.set(record.id, new Uint8Array(record.bytes).buffer);
 	}
 
 	for (const record of payload.records) {
@@ -84,45 +80,22 @@ function decodeSlot(slot: SerializedSlot, shells: ReadonlyMap<number, unknown>):
 	return undefined;
 }
 
+type TypedArrayConstructor = new (
+	buffer: ArrayBuffer,
+	byteOffset: number,
+	length: number,
+) => unknown;
+
 function createTypedArray(
 	record: Extract<SerializedRecord, { readonly type: 'typed-array' }>,
 	shells: ReadonlyMap<number, unknown>,
 ): unknown {
 	const buffer = decodeSlot(record.buffer, shells);
 	if (!(buffer instanceof ArrayBuffer)) return undefined;
-
-	if (record.arrayType === 'Int8Array') {
-		return new Int8Array(buffer, record.byteOffset, record.length);
-	}
-	if (record.arrayType === 'Uint8Array') {
-		return new Uint8Array(buffer, record.byteOffset, record.length);
-	}
-	if (record.arrayType === 'Uint8ClampedArray') {
-		return new Uint8ClampedArray(buffer, record.byteOffset, record.length);
-	}
-	if (record.arrayType === 'Int16Array') {
-		return new Int16Array(buffer, record.byteOffset, record.length);
-	}
-	if (record.arrayType === 'Uint16Array') {
-		return new Uint16Array(buffer, record.byteOffset, record.length);
-	}
-	if (record.arrayType === 'Int32Array') {
-		return new Int32Array(buffer, record.byteOffset, record.length);
-	}
-	if (record.arrayType === 'Uint32Array') {
-		return new Uint32Array(buffer, record.byteOffset, record.length);
-	}
-	if (record.arrayType === 'Float32Array') {
-		return new Float32Array(buffer, record.byteOffset, record.length);
-	}
-	if (record.arrayType === 'Float64Array') {
-		return new Float64Array(buffer, record.byteOffset, record.length);
-	}
-	if (record.arrayType === 'BigInt64Array') {
-		return new BigInt64Array(buffer, record.byteOffset, record.length);
-	}
-
-	return new BigUint64Array(buffer, record.byteOffset, record.length);
+	const constructor = (globalThis as Record<string, unknown>)[record.arrayType];
+	return typeof constructor === 'function'
+		? new (constructor as TypedArrayConstructor)(buffer, record.byteOffset, record.length)
+		: undefined;
 }
 
 function createDataView(

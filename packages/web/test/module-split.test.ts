@@ -39,3 +39,20 @@ test('web render entry does not statically import event-only resume fallback cod
 	expect(renderSource).not.toMatch(/import\(\s*['"]\.\/resume\.ts['"]\s*\)/);
 	expect(renderSource).not.toMatch(/import\(\s*['"]\.\/payload\.ts['"]\s*\)/);
 });
+
+test('event-only graph gates object value decoding behind payload shape', async () => {
+	const graphSource = await readSource('../src/event-only-graph.ts');
+
+	expect(graphSource).not.toMatch(/import\s*\{[\s\S]*deserializeGraphValueForClient/);
+	expect(graphSource).toContain("import('../../serializer/src/value-decode-client.ts')");
+});
+
+test('full resume avoids the server value decoder in browser chunks', async () => {
+	const payloadSource = await readSource('../src/payload-full.ts');
+	const repeatSource = await readSource('../src/repeat-runtime.ts');
+
+	expect(payloadSource).toContain("@markless/serializer/decode-client");
+	expect(repeatSource).toContain("@markless/serializer/decode-client");
+	expect(payloadSource).not.toContain("@markless/serializer/decode'");
+	expect(repeatSource).not.toContain("@markless/serializer/decode'");
+});

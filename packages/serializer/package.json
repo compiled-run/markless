@@ -7,6 +7,7 @@
 	"exports": {
 		".": "./src/index.ts",
 		"./decode": "./src/value-decode.ts",
+		"./decode-client": "./src/value-decode-client.ts",
 		"./protocol": "./src/protocol.ts",
 		"./protocol-validation": "./src/protocol-validation.ts"
 	}

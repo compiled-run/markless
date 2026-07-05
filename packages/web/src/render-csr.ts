@@ -4,7 +4,6 @@ import type { DomJournalEntry } from '@markless/runtime';
 import type { RuntimeGraph } from '@markless/runtime';
 import type { CsrRenderContainer, CsrRenderOptions, CsrRenderOutput } from './render.ts';
 import type { ResumeRuntime, ResumeSymbol } from './resume.ts';
-import { validateKeyedRepeatGraphKeys } from './repeat-runtime.ts';
 
 export async function renderCsrRuntime(input: {
 	readonly output: CsrRenderOutput;
@@ -69,7 +68,10 @@ export async function renderCsrRuntime(input: {
 			loadSymbol,
 			hasAuthoredState: !!output.state,
 		}));
-	validateKeyedRepeatGraphKeys(graph, view);
+	if ((view.keyedRepeats?.length ?? 0) > 0) {
+		const { validateKeyedRepeatGraphKeys } = await import('./repeat-runtime.ts');
+		validateKeyedRepeatGraphKeys(graph, view);
+	}
 	const { createResumeRuntime } = await import('./resume.ts');
 	let runtime: ResumeRuntime;
 	const applyDomJournal =
@@ -233,7 +235,7 @@ async function createFullRuntimeGraph(input: {
 }): Promise<RuntimeGraph> {
 	if (input.hasAuthoredState) {
 		const { createRuntimeGraphFromResumePayload } = await import('./payload-full.ts');
-		return createRuntimeGraphFromResumePayload({
+		return await createRuntimeGraphFromResumePayload({
 			state: input.state,
 			view: input.view,
 			root: input.root,

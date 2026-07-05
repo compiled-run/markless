@@ -1,4 +1,7 @@
-import { deserializeGraphValue, type SerializedGraphPayload } from '@markless/serializer/decode';
+import {
+	deserializeGraphValueForClient,
+	type SerializedGraphPayload,
+} from '@markless/serializer/decode-client';
 import {
 	decodePayloadScripts,
 	type DecodedPayloadScripts,
@@ -37,45 +40,63 @@ export type ResumePayloadScriptsInput = EncodedPayloadScripts & Pick<
 	| 'applyDomJournal'
 	| 'renderBranchHtml'> & { readonly root: ResumeDomElement };
 
-export type ResumePayloadDocumentInput = Omit<ResumePayloadScriptsInput, 'stateScript' | 'viewScript'> & { readonly document: PayloadScriptDocument };
+export type ResumePayloadDocumentInput = Omit<
+	ResumePayloadScriptsInput,
+	'stateScript' | 'viewScript'
+> & { readonly document: PayloadScriptDocument };
 
 export type ResumePayloadScriptsResult = {
-	readonly decoded: DecodedPayloadScripts; readonly graph: RuntimeGraph; readonly runtime: ResumeRuntime;
+	readonly decoded: DecodedPayloadScripts;
+	readonly graph: RuntimeGraph;
+	readonly runtime: ResumeRuntime;
 	readonly warnings?: ReadonlyArray<ResumeAlreadyResumedWarning>;
 };
 
 export type ResumeAlreadyResumedWarning = {
-	readonly code: 'MARKLESS_RESUME_ALREADY_RESUMED'; readonly severity: 'warning'; readonly phase: 'resume';
-	readonly title: string; readonly message: string; readonly why: string;
-	readonly suggestions: ReadonlyArray<{ readonly message: string }>; readonly docsUrl: string;
+	readonly code: 'MARKLESS_RESUME_ALREADY_RESUMED';
+	readonly severity: 'warning';
+	readonly phase: 'resume';
+	readonly title: string;
+	readonly message: string;
+	readonly why: string;
+	readonly suggestions: ReadonlyArray<{ readonly message: string }>;
+	readonly docsUrl: string;
 };
 
 const resumedPayloadContainers = new WeakMap<ResumeDomElement, ResumePayloadScriptsResult>();
 
-export function createRuntimeGraphFromStatePayload(payload: ProtocolStatePayload): RuntimeGraph {
+export async function createRuntimeGraphFromStatePayload(
+	payload: ProtocolStatePayload,
+): Promise<RuntimeGraph> {
 	return createRuntimeGraph({
-		cells: payload.cells.map((cell) => ({
-			graphNodeId: cell.graphNodeId,
-			value: cell.value === undefined ? undefined : deserializeGraphValue(cell.value as SerializedGraphPayload),
-		})),
+		cells: await decodeStateCells(payload),
 		sharedDefinitions: payload.sharedDefinitions,
 	});
 }
 
-export function createRuntimeGraphFromResumePayload(input: {
+async function decodeStateCells(payload: ProtocolStatePayload) {
+	return Promise.all(
+		payload.cells.map(async (cell) => ({
+			graphNodeId: cell.graphNodeId,
+			value: cell.value === undefined
+				? undefined
+				: await deserializeGraphValueForClient(cell.value as SerializedGraphPayload),
+		})),
+	);
+}
+
+export async function createRuntimeGraphFromResumePayload(input: {
 	readonly state: ProtocolStatePayload;
 	readonly view: ProtocolViewPayload;
 	readonly root: ResumeDomElement;
 	readonly loadSymbol: ResumeRuntimeInput['loadSymbol'];
-}): RuntimeGraph {
+}): Promise<RuntimeGraph> {
 	let graph!: RuntimeGraph;
+	const asyncComputed = await asyncComputedFromPayload(input, () => graph);
 	graph = createRuntimeGraph({
-		cells: input.state.cells.map((cell) => ({
-			graphNodeId: cell.graphNodeId,
-			value: cell.value === undefined ? undefined : deserializeGraphValue(cell.value as SerializedGraphPayload),
-		})),
+		cells: await decodeStateCells(input.state),
 		sharedDefinitions: input.state.sharedDefinitions,
-		asyncComputed: asyncComputedFromPayload(input, () => graph),
+		asyncComputed,
 	});
 	return graph;
 }
@@ -87,7 +108,7 @@ export async function resumeFromPayloadScripts(
 	if (resumed) return resumed;
 
 	const decoded = decodePayloadScripts(input);
-	const graph = createRuntimeGraphFromResumePayload({
+	const graph = await createRuntimeGraphFromResumePayload({
 		state: decoded.state,
 		view: decoded.view,
 		root: input.root,
@@ -161,9 +182,9 @@ export async function resumeFromPayloadDocument(
 function asyncComputedFromPayload(
 	input: Parameters<typeof createRuntimeGraphFromResumePayload>[0],
 	graphRef: () => RuntimeGraph,
-) {
+): Promise<NonNullable<Parameters<typeof createRuntimeGraph>[0]['asyncComputed']>> {
 	const runnerSymbols = asyncRunnerSymbolsByGraphNode(input.view);
-	return input.state.computed.flatMap((computed) => {
+	return Promise.all(input.state.computed.flatMap(async (computed) => {
 		if (computed.async !== true) return [];
 		const runnerSymbolId = runnerSymbols.get(computed.graphNodeId);
 		if (!runnerSymbolId) return [];
@@ -172,7 +193,7 @@ function asyncComputedFromPayload(
 			graphNodeId: computed.graphNodeId,
 			dependencies,
 			initialSnapshot: computed.snapshot
-				? deserializeAsyncComputedSnapshot(computed.snapshot)
+				? await deserializeAsyncComputedSnapshot(computed.snapshot)
 				: undefined,
 			key: (read: RuntimeGraphRead) => dependencyKey(dependencies, read),
 			run: async ({ key, signal, read }) => {
@@ -187,28 +208,30 @@ function asyncComputedFromPayload(
 				});
 			},
 		}];
-	});
+	})).then((entries) => entries.flat());
 }
 
-function deserializeAsyncComputedSnapshot(
+async function deserializeAsyncComputedSnapshot(
 	snapshot: NonNullable<ProtocolStatePayload['computed'][number]['snapshot']>,
 ) {
 	if (snapshot.status === 'idle') return snapshot;
-	const key = deserializeGraphValue(snapshot.key as SerializedGraphPayload);
-	if (snapshot.status === 'pending') return { status: snapshot.status, version: snapshot.version, key };
+	const key = await deserializeGraphValueForClient(snapshot.key as SerializedGraphPayload);
+	if (snapshot.status === 'pending') {
+		return { status: snapshot.status, version: snapshot.version, key };
+	}
 	if (snapshot.status === 'fulfilled') {
 		return {
 			status: snapshot.status,
 			version: snapshot.version,
 			key,
-			value: deserializeGraphValue(snapshot.value as SerializedGraphPayload),
+			value: await deserializeGraphValueForClient(snapshot.value as SerializedGraphPayload),
 		};
 	}
 	return {
 		status: snapshot.status,
 		version: snapshot.version,
 		key,
-		error: deserializeGraphValue(snapshot.error as SerializedGraphPayload),
+		error: await deserializeGraphValueForClient(snapshot.error as SerializedGraphPayload),
 	};
 }
 
