@@ -2,6 +2,7 @@ import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serial
 import type { EventOnlyResumeContainer } from './event-only-resume.ts';
 import type { RuntimeGraph } from '@markless/runtime';
 import type { ResumeDomElement, ResumeRuntime, ResumeRuntimeInput } from './resume.ts';
+import { validateKeyedRepeatGraphKeys, validateKeyedRepeatPayloadKeys } from './repeat-runtime.ts';
 
 export type RenderTarget = {
 	readonly replaceChildren?: (...children: ReadonlyArray<ResumeDomElement>) => void;
@@ -61,8 +62,12 @@ export async function render(
 ): Promise<CsrRenderContainer> {
 	startCsrPreload(component);
 	const output = typeof component === 'function' ? component() : component.renderCsr();
+	if (output.view && output.state) {
+		validateKeyedRepeatPayloadKeys({ state: output.state, view: output.view });
+	}
 
 	if (output.graph && output.runtime) {
+		if (output.view) validateKeyedRepeatGraphKeys(output.graph, output.view);
 		mountRoot(options.target, output.root);
 		return {
 			phase: 'csr',

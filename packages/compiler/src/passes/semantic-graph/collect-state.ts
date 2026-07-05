@@ -947,6 +947,7 @@ function initialValueKind(node: AnyNode | undefined): SemanticGraphBinding['valu
 	if (node.type === 'ObjectExpression') return 'object';
 	if (node.type === 'ArrayExpression') return 'array';
 	if (node.type === 'Literal') return 'scalar';
+	if (node.type === 'Identifier' && getIdentifierName(node) === 'undefined') return 'scalar';
 
 	return 'unknown';
 }
@@ -957,6 +958,9 @@ function evaluateInitialStateValue(
 	if (!node) return { ok: false };
 
 	if (node.type === 'Literal') return { ok: true, value: node.value };
+	if (node.type === 'Identifier' && getIdentifierName(node) === 'undefined') {
+		return { ok: true, value: undefined };
+	}
 	if (node.type === 'ObjectExpression') return evaluateObjectExpression(node);
 	if (node.type === 'ArrayExpression') {
 		const values: unknown[] = [];

@@ -25,6 +25,11 @@ type FakeElement = {
 		listener: (event: FakeEvent) => Promise<void>,
 		options?: { readonly capture?: boolean },
 	): void;
+	removeEventListener?(
+		type: string,
+		listener: (event: FakeEvent) => Promise<void>,
+		options?: { readonly capture?: boolean },
+	): void;
 	dispatchEvent(event: FakeDispatchedEvent): boolean;
 };
 
@@ -62,6 +67,12 @@ function element(tagName: string, childNodes: FakeNode[] = []): FakeElement {
 		listeners: [],
 		addEventListener(type, listener, options) {
 			this.listeners.push({ type, listener, options });
+		},
+		removeEventListener(type, listener) {
+			const index = this.listeners.findIndex(
+				(entry) => entry.type === type && entry.listener === listener,
+			);
+			if (index >= 0) this.listeners.splice(index, 1);
 		},
 		dispatchEvent(event) {
 			this.dispatchedEvents.push(event);
@@ -2686,6 +2697,34 @@ function keyedRepeatFixture(options: {
 	return { root, firstRowButton, secondRowButton, footer, view, loadedSymbols, loadSymbol };
 }
 
+test('resume runtime rejects duplicate keyed repeat values before row materialization', async () => {
+	const { root, view, loadSymbol } = keyedRepeatFixture({
+		rowEvents: [{ hostPath: [1], eventName: 'click', symbolIds: ['symbol:row'] }],
+	});
+	const graph = createRuntimeGraph({
+		cells: [
+			{
+				graphNodeId: 'state:rows',
+				value: [
+					{ id: 'fruit', label: 'apple' },
+					{ id: 'fruit', label: 'pear' },
+				],
+			},
+		],
+	});
+
+	expect(() => createResumeRuntime({ root, graph, view, loadSymbol })).toThrowError(
+		expect.objectContaining({
+			code: 'MARKLESS_REPEAT_KEY_DUPLICATE',
+			phase: 'runtime',
+			title: 'Two rows share the same @for key',
+			repeatId: 'repeat:0',
+			keyPath: ['id'],
+			collidingValue: 'fruit',
+		}),
+	);
+});
+
 test('resume runtime materializes keyed repeat row event hosts from the live collection', async () => {
 	const { root, firstRowButton, secondRowButton, footer, view, loadedSymbols, loadSymbol } =
 		keyedRepeatFixture({
@@ -2796,16 +2835,171 @@ test('resume runtime dispatches keyed repeat row events with fresh row locals', 
 	expect(receivedLocals[1]?.entry).toBe(secondItem);
 	expect(graph.read('state:selected')).toBe(2);
 
-	// Row index and collection are both read fresh at dispatch time, so a
-	// reordered collection maps the same DOM row to its new item.
+	// Row keys, not positions, own row identity: the same DOM row keeps its
+	// original logical item after the collection reorders.
 	graph.write({ graphNodeId: 'state:rows', path: [], value: [secondItem, firstItem] });
 	await graph.flush();
 	await resume.dispatch(event('click', firstRowButton, 'x'));
-	expect(receivedLocals[2]?.entry).toBe(secondItem);
+	expect(receivedLocals[2]?.entry).toBe(firstItem);
 
 	// A same-named event on a non-row host resolves through ordinary records.
 	await resume.dispatch(event('click', footer, 'x'));
 	expect(loadedSymbols).toEqual(['symbol:row', 'symbol:row', 'symbol:row', 'symbol:footer']);
+});
+
+test('resume runtime wakes keyed repeats on collection writes', async () => {
+	const firstRow = element('TR');
+	const secondRow = element('TR');
+	const thirdRow = element('TR');
+	const tbody = rangeElement('TBODY', [firstRow, secondRow, thirdRow]) as FakeRangeParentElement & {
+		appendChild(node: FakeNode): FakeNode;
+	};
+	tbody.appendChild = (node) => tbody.insertBefore(node, null);
+	const root = element('SECTION', [tbody]);
+	const firstItem = { id: 'alpha' };
+	const secondItem = { id: 'beta' };
+	const thirdItem = { id: 'gamma' };
+	const graph = createRuntimeGraph({
+		cells: [{ graphNodeId: 'state:rows', value: [firstItem, secondItem, thirdItem] }],
+	});
+	const view: ResumeViewRecord = {
+		locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 1, tagName: 'tbody' }],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+		keyedRepeats: [
+			{
+				id: 'repeat:0',
+				parentHostNodeId: 'h0',
+				collectionGraphNodeId: 'state:rows',
+				collectionPath: [],
+				keyPath: ['id'],
+				itemName: 'entry',
+				rowElementCount: 1,
+				rowEvents: [],
+			},
+		],
+	};
+
+	createResumeRuntime({ root, graph, view, loadSymbol: () => () => undefined });
+	graph.write({ graphNodeId: 'state:rows', value: [thirdItem, secondItem, firstItem] });
+	await graph.flush();
+
+	expect(tbody.childNodes).toEqual([thirdRow, secondRow, firstRow]);
+});
+
+test('resume runtime dispose removes listeners, subscriptions, and host cleanups', async () => {
+	const button = element('BUTTON');
+	const root = element('SECTION', [button]);
+	const graph = createRuntimeGraph({
+		cells: [{ graphNodeId: 'state:count', value: 0 }],
+	});
+	const cleanups: string[] = [];
+	const resume = createResumeRuntime({
+		root,
+		graph,
+		view: {
+			locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 1, tagName: 'button' }],
+			events: [{ hostNodeId: 'h0', eventName: 'click', symbolIds: ['symbol:click'] }],
+			domUpdates: [
+				{
+					hostNodeId: 'h0',
+					source: 'count',
+					graphNodeId: 'state:count',
+					path: [],
+					target: { kind: 'text' },
+					symbolId: 'symbol:text',
+				},
+			],
+			behaviors: [{ hostNodeId: 'h0', symbolId: 'symbol:behavior', inputSources: [] }],
+			elementHandles: [],
+			asyncBoundaries: [],
+		} as never,
+		loadSymbol(symbolId) {
+			if (symbolId === 'symbol:behavior') return () => () => cleanups.push('behavior');
+			return () => undefined;
+		},
+	});
+	await resume.start();
+	await resume.activateBehaviors('h0');
+
+	expect(root.listeners.map((listener) => listener.type)).toEqual(['click']);
+	resume.dispose();
+	graph.write({ graphNodeId: 'state:count', value: 1 });
+	await graph.flush();
+
+	expect(root.listeners).toEqual([]);
+	expect(cleanups).toEqual(['behavior']);
+	expect(graph.takeJournal()).toEqual([]);
+});
+
+test('resume runtime dispose releases container-owned graph subscriptions', () => {
+	const root = element('SECTION', [
+		comment('markless:branch:branch-site:0'),
+		comment('/markless:branch:branch-site:0'),
+		comment('markless:async:boundary:0'),
+		comment('/markless:async:boundary:0'),
+	]);
+	const released: string[] = [];
+	const graph = {
+		read: (graphNodeId: string) => (graphNodeId === 'state:open' ? true : undefined),
+		subscribe(subscription: { readonly id: string }) {
+			return () => released.push(subscription.id);
+		},
+		subscribeJournal() {
+			return () => released.push('journal');
+		},
+		listSharedDefinitions: () => [],
+		flush: async () => undefined,
+	} as unknown as RuntimeGraph;
+
+	const resume = createResumeRuntime({
+		root,
+		graph,
+		view: {
+			locators: [],
+			events: [],
+			domUpdates: [],
+			behaviors: [],
+			elementHandles: [],
+			asyncBoundaries: [
+				{
+					id: 'boundary:0',
+					startAnchor: { strategy: 'dom-order-comment', index: 2 },
+					endAnchor: { strategy: 'dom-order-comment', index: 3 },
+					asyncReads: [
+						{
+							source: 'details',
+							graphNodeId: 'async:details',
+							path: [],
+							runnerSymbolId: 'symbol:details',
+						},
+					],
+				},
+			],
+			branches: [
+				{
+					id: 'branch-site:0',
+					startAnchor: { strategy: 'dom-order-comment', index: 0 },
+					endAnchor: { strategy: 'dom-order-comment', index: 1 },
+					symbolId: 'symbol:branch',
+					testReads: [{ source: 'open', graphNodeId: 'state:open', path: [] }],
+				},
+			],
+		} as never,
+		loadSymbol: () => () => undefined,
+		applyDomJournal: async () => undefined,
+	});
+
+	resume.dispose();
+
+	expect(released).toEqual([
+		'journal',
+		'async-boundary:boundary:0:async:details:',
+		'branch-test:branch-site:0:state:open:',
+	]);
 });
 
 test('resume runtime keeps settled async boundary snapshots idle at startup', async () => {

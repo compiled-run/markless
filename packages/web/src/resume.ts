@@ -5,6 +5,12 @@ import type {
 	RuntimeGraph,
 	RuntimeGraphSharedPatch,
 } from '@markless/runtime';
+import {
+	findRepeatItemByKey,
+	readKeyedRepeatCollection,
+	repeatItemKey,
+	validateKeyedRepeatGraphKeys,
+} from './repeat-runtime.ts';
 
 export type ResumeDomNode = {
 	readonly nodeType: number;
@@ -17,6 +23,11 @@ export type ResumeDomElement = ResumeDomNode & {
 	readonly childNodes?: ReadonlyArray<ResumeDomNode>;
 	readonly parentElement?: ResumeDomElement | null;
 	readonly addEventListener?: (
+		type: string,
+		listener: (event: ResumeDomEvent) => Promise<void>,
+		options?: { readonly capture?: boolean },
+	) => void;
+	readonly removeEventListener?: (
 		type: string,
 		listener: (event: ResumeDomEvent) => Promise<void>,
 		options?: { readonly capture?: boolean },
@@ -153,6 +164,7 @@ type ResumeRowEventMatch = {
 	readonly repeat: ResumeKeyedRepeatRecord;
 	readonly parent: ResumeDomElement;
 	readonly rowRoot: ResumeDomElement;
+	readonly rowKey: unknown;
 	readonly rowEvent: ResumeKeyedRepeatRowEvent;
 };
 
@@ -294,6 +306,7 @@ export type ResumeRuntime = {
 	readonly getAsyncBoundary: (boundaryId: string) => ResumeAsyncBoundaryRecord | undefined;
 	readonly getBranch: (branchId: string) => ResumeBranchRecord | undefined;
 	readonly disposeHost: (hostNodeId: string) => void;
+	readonly dispose: () => void;
 };
 
 export type RuntimeResumeErrorCode =
@@ -358,6 +371,7 @@ type ResumeHostCleanup = {
 const SHARED_PATCH_EVENT_TYPE = 'async:shared-patch';
 
 export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
+	validateKeyedRepeatGraphKeys(input.graph, input.view);
 	const elementsByHostId = materializeDomLocators(input.root, input.view.locators);
 	const asyncBoundariesById = materializeAsyncBoundaryLocators(
 		input.root,
@@ -383,18 +397,19 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 	// range is removed. Branch test-read and async boundary subscriptions
 	// belong to the range owner itself and survive range replacement.
 	const hostSubscriptionReleases = new Map<string, Array<() => void>>();
+	const containerSubscriptionReleases: Array<() => void> = [];
 	const behaviorRecordsByHostId = groupBehaviorRecords(input.view.behaviors);
 	const activeBehaviorHosts = new Set<string>();
 	const dispatchSharedPatch =
 		input.dispatchSharedPatch ?? defaultSharedPatchDispatcher(input.root);
 	const applyDomJournal = input.applyDomJournal;
 	if (applyDomJournal) {
-		input.graph.subscribeJournal(async (entries) => {
+		storeContainerSubscription(input.graph.subscribeJournal(async (entries) => {
 			disposeRemovedRangeHosts(entries);
 			await applyDomJournal(entries);
 			// A flipped-in arm's records go live only once its DOM exists.
 			await materializeFlippedBranchArms(entries);
-		});
+		}));
 	}
 	let visibilityObserver: ResumeVisibilityObserver | undefined;
 	let removalObserver: ResumeRemovalObserver | undefined;
@@ -426,8 +441,11 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 		const parent = elementsByHostId.get(repeat.parentHostNodeId);
 		if (!parent) continue;
 
-		const items = readRepeatCollection(input.graph, repeat);
-		for (const rowRoot of elementChildren(parent).slice(0, items.length)) {
+		const items = readKeyedRepeatCollection(input.graph, repeat);
+		const rowRootsByKey = new Map<unknown, ResumeDomElement>();
+		for (const [rowIndex, rowRoot] of elementChildren(parent).slice(0, items.length).entries()) {
+			const rowKey = repeatItemKey(items[rowIndex], repeat);
+			rowRootsByKey.set(rowKey, rowRoot);
 			for (const rowEvent of repeat.rowEvents) {
 				const host = rowEventHost(rowRoot, rowEvent.hostPath);
 				if (!host) continue;
@@ -437,10 +455,26 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 					recordsByEventName = new Map();
 					rowEventRecords.set(host, recordsByEventName);
 				}
-				recordsByEventName.set(rowEvent.eventName, { repeat, parent, rowRoot, rowEvent });
+				recordsByEventName.set(rowEvent.eventName, {
+					repeat,
+					parent,
+					rowRoot,
+					rowKey,
+					rowEvent,
+				});
 				eventTypes.add(rowEvent.eventName);
 			}
 		}
+		const release = input.graph.subscribe({
+			id: `keyed-repeat:${repeat.id}:${repeat.collectionGraphNodeId}:${repeat.collectionPath.join('.')}`,
+			graphNodeId: repeat.collectionGraphNodeId,
+			path: repeat.collectionPath,
+			run() {
+				validateKeyedRepeatGraphKeys(input.graph, { keyedRepeats: [repeat] });
+				applyKeyedRepeatRowOrder(input.graph, repeat, parent, rowRootsByKey);
+			},
+		});
+		storeContainerSubscription(release);
 	}
 
 	for (const domUpdate of input.view.domUpdates) {
@@ -469,7 +503,7 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 
 	for (const asyncBoundary of asyncBoundariesById.values()) {
 		for (const asyncRead of asyncBoundary.asyncReads) {
-			input.graph.subscribe({
+			const release = input.graph.subscribe({
 				id: `async-boundary:${asyncBoundary.id}:${asyncRead.graphNodeId}:${asyncRead.path.join('.')}`,
 				graphNodeId: asyncRead.graphNodeId,
 				path: [],
@@ -480,6 +514,7 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 					return createAsyncBoundaryJournalEntries(asyncBoundary, asyncRead, snapshot);
 				},
 			});
+			storeContainerSubscription(release);
 		}
 
 		// CSR mounts render @pending between the anchors, so an unsettled
@@ -536,7 +571,7 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 		let currentArm = readBranchArm(input.graph, branch);
 		currentArmByBranchId.set(branch.id, currentArm);
 		for (const testRead of branch.testReads) {
-			input.graph.subscribe({
+			const release = input.graph.subscribe({
 				id: `branch-test:${branch.id}:${testRead.graphNodeId}:${testRead.path.join('.')}`,
 				graphNodeId: testRead.graphNodeId,
 				path: testRead.path,
@@ -568,6 +603,7 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 					];
 				},
 			});
+			storeContainerSubscription(release);
 		}
 	}
 
@@ -737,6 +773,10 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 		hostSubscriptionReleases.set(hostNodeId, releases);
 	}
 
+	function storeContainerSubscription(release: () => void): void {
+		if (typeof release === 'function') containerSubscriptionReleases.push(release);
+	}
+
 	// Spec 06-runtime-resumer: removed nodes clean up their behaviors before
 	// their locators are discarded. Applying a removeRange journal entry for a
 	// branch or async boundary range disposes every host element inside the
@@ -841,18 +881,16 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 		event: ResumeDomEvent,
 		options: ResumeDispatchOptions,
 	): Promise<void> {
-		const { repeat, parent, rowRoot, rowEvent } = match;
+		const { repeat, rowKey, rowEvent } = match;
 
 		if (rowEvent.syncPolicy && !options.syncPolicyAlreadyApplied)
 			runSyncPolicyActions(rowEvent.syncPolicy, input.graph, event);
 
 		let activeSymbolId: string | undefined;
 		try {
-			// Row identity is positional: the row index among the parent's element
-			// children and the collection are both read fresh at dispatch time.
-			const rowIndex = elementChildren(parent).indexOf(rowRoot);
-			const items = readRepeatCollection(input.graph, repeat);
-			const locals = { [repeat.itemName]: rowIndex >= 0 ? items[rowIndex] : undefined };
+			validateKeyedRepeatGraphKeys(input.graph, { keyedRepeats: [repeat] });
+			const items = readKeyedRepeatCollection(input.graph, repeat);
+			const locals = { [repeat.itemName]: findRepeatItemByKey(items, repeat, rowKey) };
 
 			for (const symbolId of rowEvent.symbolIds) {
 				activeSymbolId = symbolId;
@@ -1113,6 +1151,23 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 		}
 	}
 
+	function dispose(): void {
+		for (const eventType of eventTypes) {
+			input.root.removeEventListener?.(eventType, dispatch, { capture: true });
+		}
+		input.root.removeEventListener?.(
+			SHARED_PATCH_EVENT_TYPE,
+			receiveSharedPatch as (event: ResumeDomEvent) => Promise<void>,
+			{ capture: true },
+		);
+		visibilityObserver?.disconnect?.();
+		visibilityObserver = undefined;
+		removalObserver?.disconnect?.();
+		removalObserver = undefined;
+		for (const hostNodeId of Array.from(elementsByHostId.keys())) disposeHost(hostNodeId);
+		for (const release of containerSubscriptionReleases.splice(0)) release();
+	}
+
 	return {
 		async start() {
 			for (const eventType of eventTypes) {
@@ -1149,6 +1204,7 @@ export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
 			return branchesById.get(branchId);
 		},
 		disposeHost,
+		dispose,
 	};
 }
 
@@ -1583,6 +1639,31 @@ function elementChildren(element: ResumeDomElement): ResumeDomElement[] {
 	return children;
 }
 
+function applyKeyedRepeatRowOrder(
+	graph: RuntimeGraph,
+	repeat: ResumeKeyedRepeatRecord,
+	parent: ResumeDomElement,
+	rowRootsByKey: Map<unknown, ResumeDomElement>,
+): void {
+	const nextRows: ResumeDomElement[] = [];
+	for (const item of readKeyedRepeatCollection(graph, repeat)) {
+		const rowRoot = rowRootsByKey.get(repeatItemKey(item, repeat));
+		if (!rowRoot) return;
+		nextRows.push(rowRoot);
+	}
+	const mutableParent = parent as ResumeDomElement & {
+		readonly appendChild?: (node: ResumeDomElement) => unknown;
+		readonly insertBefore?: (node: ResumeDomElement, before: ResumeDomNode | null) => unknown;
+	};
+	for (const rowRoot of nextRows) {
+		if (mutableParent.appendChild) {
+			mutableParent.appendChild(rowRoot);
+		} else {
+			mutableParent.insertBefore?.(rowRoot, null);
+		}
+	}
+}
+
 // hostPath mirrors the compiler row plan (public-render/plan.ts collectRowPlan)
 // and the generated direct-DOM path: each segment indexes childNodes directly,
 // because row HTML renders without ignorable whitespace nodes.
@@ -1643,18 +1724,6 @@ function armRecordHost(
 	const topLevelNode = armNodes[firstIndex];
 	if (!topLevelNode || topLevelNode.nodeType !== 1) return undefined;
 	return rowEventHost(topLevelNode as ResumeDomElement, childPath);
-}
-
-// Mirrors the SSR repeat helper's Array.from collection normalization.
-function readRepeatCollection(
-	graph: RuntimeGraph,
-	repeat: ResumeKeyedRepeatRecord,
-): ReadonlyArray<unknown> {
-	if (!repeat.collectionGraphNodeId) return [];
-
-	const value = graph.read(repeat.collectionGraphNodeId, repeat.collectionPath);
-	if (Array.isArray(value)) return value;
-	return Array.from((value ?? []) as Iterable<unknown>);
 }
 
 function materializeDomLocators(

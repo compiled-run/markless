@@ -34,6 +34,11 @@ export type EventOnlyResumeDomElement = EventOnlyResumeDomNode & {
 		listener: (event: EventOnlyResumeDomEvent) => Promise<void>,
 		options?: { readonly capture?: boolean },
 	) => void;
+	removeEventListener?: (
+		type: string,
+		listener: (event: EventOnlyResumeDomEvent) => Promise<void>,
+		options?: { readonly capture?: boolean },
+	) => void;
 	setAttribute?: (name: string, value: string) => void;
 	removeAttribute?: (name: string) => void;
 	__marklessEventOnlyGraph?: Map<string, unknown>;
@@ -120,6 +125,7 @@ export type EventOnlyResumeContainer = {
 			readonly eventRecord?: EventOnlyResumeRecord;
 		},
 	) => Promise<void>;
+	readonly dispose: () => void;
 };
 
 type DirtyPath = {
@@ -192,6 +198,11 @@ function createEventOnlyResumeContainerState(
 				element: options.element,
 				eventRecord: options.eventRecord,
 			});
+		},
+		dispose() {
+			containers.delete(input.root);
+			delete input.root.__marklessEventOnlyGraph;
+			activeBehaviorHosts.clear();
 		},
 	};
 }

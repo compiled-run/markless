@@ -1,5 +1,6 @@
 import {
 	render as renderCsrContainer,
+	disposeResumedPayload,
 	type CsrRenderable,
 	type CsrRenderContainer,
 	type CsrRenderOptions,
@@ -40,6 +41,7 @@ type MountedContainer = {
 	readonly container: BrowserRenderElement;
 	readonly document: BrowserRenderDocument;
 	readonly removeOnCleanup: boolean;
+	readonly runtime?: CsrRenderContainer;
 };
 
 const mountedContainers = new Map<BrowserRenderElement, MountedContainer>();
@@ -179,14 +181,15 @@ function createRenderResult(
 	mounted: MountedContainer & { readonly baseElement: BrowserRenderElement },
 	runtime: CsrRenderContainer,
 ): BrowserRenderResult {
-	mountedContainers.set(mounted.container, mounted);
+	const mountedRuntime = { ...mounted, runtime };
+	mountedContainers.set(mounted.container, mountedRuntime);
 
 	return {
 		container: mounted.container,
 		baseElement: mounted.baseElement,
 		runtime,
 		unmount() {
-			destroyContainer(mounted);
+			destroyContainer(mountedRuntime);
 		},
 		asFragment() {
 			return mounted.document
@@ -197,6 +200,10 @@ function createRenderResult(
 }
 
 function destroyContainer(mounted: MountedContainer): void {
+	(mounted.runtime?.runtime as { readonly dispose?: () => void } | undefined)?.dispose?.();
+	for (const root of serverRuntimeRoots(mounted.container)) {
+		disposeResumedPayload(root);
+	}
 	mounted.container.replaceChildren?.();
 	mounted.container.innerHTML = '';
 	mountedContainers.delete(mounted.container);
@@ -204,6 +211,18 @@ function destroyContainer(mounted: MountedContainer): void {
 	if (mounted.removeOnCleanup) {
 		mounted.container.parentNode?.removeChild?.(mounted.container);
 	}
+}
+
+function serverRuntimeRoots(container: BrowserRenderElement): HTMLElement[] {
+	const root = container as unknown as HTMLElement;
+	const roots =
+		typeof root.querySelectorAll === 'function'
+			? Array.from(root.querySelectorAll<HTMLElement>('[data-async-container]'))
+			: [];
+	if (typeof root.matches === 'function' && root.matches('[data-async-container]')) {
+		roots.unshift(root);
+	}
+	return roots;
 }
 
 function globalDocument(): BrowserRenderDocument {

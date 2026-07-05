@@ -9,9 +9,11 @@ export function emitDirectPublicStateEntries(protocolState: ProtocolState): stri
 
 	for (const cell of protocolState.cells) {
 		if (cell.valueKind === 'unknown') return null;
-		if (cell.value === undefined) return null;
 
-		const value = deserializeGraphValue(cell.value as SerializedGraphPayload);
+		const value =
+			cell.value === undefined
+				? undefined
+				: deserializeGraphValue(cell.value as SerializedGraphPayload);
 		if (!isDirectPublicLiteralValue(value)) return null;
 		entries.push(`[${JSON.stringify(cell.graphNodeId)}, ${literalExpression(value)}]`);
 	}
@@ -20,6 +22,7 @@ export function emitDirectPublicStateEntries(protocolState: ProtocolState): stri
 }
 
 export function isDirectPublicLiteralValue(value: unknown, seen = new Set<object>()): boolean {
+	if (value === undefined) return true;
 	if (value === null) return true;
 	if (typeof value === 'string' || typeof value === 'boolean') return true;
 	if (typeof value === 'number') return Number.isFinite(value);
