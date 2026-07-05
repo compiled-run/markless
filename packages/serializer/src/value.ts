@@ -121,7 +121,7 @@ export function serializeGraphValue(value: unknown): SerializationResult {
 	const records: SerializedRecord[] = [];
 
 	const root = encodeSlot(value, [], seen, records, diagnostics);
-	if (diagnostics.length > 0) {
+	if (root === undefined || diagnostics.length > 0) {
 		return {
 			ok: false,
 			diagnostics,
@@ -207,7 +207,7 @@ function encodeSlot(
 	seen: WeakMap<object, number>,
 	records: SerializedRecord[],
 	diagnostics: SerializationDiagnostic[],
-): SerializedSlot | null {
+): SerializedSlot | undefined {
 	if (value === null) return null;
 	if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
 		return value;
@@ -217,12 +217,12 @@ function encodeSlot(
 
 	if (typeof value === 'function' || typeof value === 'symbol') {
 		diagnostics.push(unsupportedDiagnostic(value, path));
-		return null;
+		return undefined;
 	}
 
 	if (!isObject(value)) {
 		diagnostics.push(unsupportedDiagnostic(value, path));
-		return null;
+		return undefined;
 	}
 
 	if (value instanceof Date) {
@@ -346,7 +346,7 @@ function encodeSlot(
 				records,
 				diagnostics,
 			);
-			if (keySlot && valueSlot) {
+			if (keySlot !== undefined && valueSlot !== undefined) {
 				(record.entries as Array<readonly [SerializedSlot, SerializedSlot]>).push([
 					keySlot,
 					valueSlot,
@@ -367,10 +367,15 @@ function encodeSlot(
 		let index = 0;
 		for (const item of value) {
 			const slot = encodeSlot(item, [...path, `set:${index}`], seen, records, diagnostics);
-			if (slot) (record.values as SerializedSlot[]).push(slot);
+			if (slot !== undefined) (record.values as SerializedSlot[]).push(slot);
 			index++;
 		}
 		return { $ref: id };
+	}
+
+	if (!isPlainObject(value)) {
+		diagnostics.push(unsupportedDiagnostic(value, path));
+		return undefined;
 	}
 
 	const record: Extract<SerializedRecord, { readonly type: 'object' }> = {
@@ -382,7 +387,9 @@ function encodeSlot(
 
 	for (const [key, item] of Object.entries(value)) {
 		const slot = encodeSlot(item, [...path, key], seen, records, diagnostics);
-		if (slot) (record.fields as Array<readonly [string, SerializedSlot]>).push([key, slot]);
+		if (slot !== undefined) {
+			(record.fields as Array<readonly [string, SerializedSlot]>).push([key, slot]);
+		}
 	}
 
 	return { $ref: id };
@@ -507,7 +514,9 @@ function unsupportedDiagnostic(
 	value: unknown,
 	path: ReadonlyArray<string>,
 ): SerializationDiagnostic {
-	const valueKind = typeof value;
+	const valueKind = describeUnsupportedValue(value);
+	const formattedPath = formatPath(path);
+	const isClassOrHost = isObject(value) && !isPlainObject(value);
 
 	return {
 		code: 'MARKLESS_SERIALIZE_UNSUPPORTED_VALUE',
@@ -515,14 +524,19 @@ function unsupportedDiagnostic(
 		phase: 'serialization',
 		title: 'Cannot serialize graph state value',
 		path,
-		statePath: formatPath(path),
+		statePath: formattedPath,
 		valueKind,
-		message: `Cannot serialize value at ${formatPath(path)} because ${valueKind} values are not durable graph state.`,
-		why: 'Serialization is for durable graph state. Functions and host/runtime resources cannot be restored during resume.',
+		message: isClassOrHost
+			? `Cannot serialize value at ${formattedPath} because ${valueKind} is a live host/class resource that is not durable graph state and would resume as an empty/plain object.`
+			: `Cannot serialize value at ${formattedPath} because ${valueKind} values are not durable graph state.`,
+		why: isClassOrHost
+			? 'Serialization is for durable graph state. Host and runtime resources cannot be reconstructed from a payload during resume.'
+			: 'Serialization is for durable graph state. Functions and host/runtime resources cannot be restored during resume.',
 		suggestions: [
 			{
-				message:
-					'Move runtime resources into attach={...}, make the value serializable state, or derive it with computed().',
+				message: isClassOrHost
+					? 'Keep live resources in attach={...} behaviors and store serializable connection data such as URLs and status flags in state.'
+					: 'Move runtime resources into attach={...}, make the value serializable state, or derive it with computed().',
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_SERIALIZE_UNSUPPORTED_VALUE',
@@ -537,6 +551,16 @@ function isObject(value: unknown): value is object {
 	return typeof value === 'object' && value !== null;
 }
 
-function isSerializedSlot(value: SerializedSlot | null): value is SerializedSlot {
-	return value !== null;
+function isPlainObject(value: object): boolean {
+	const prototype = Object.getPrototypeOf(value);
+	return prototype === Object.prototype || prototype === null;
+}
+
+function describeUnsupportedValue(value: unknown): string {
+	if (isObject(value)) return value.constructor?.name ?? 'object';
+	return typeof value;
+}
+
+function isSerializedSlot(value: SerializedSlot | undefined): value is SerializedSlot {
+	return value !== undefined;
 }
