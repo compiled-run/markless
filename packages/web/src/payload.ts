@@ -288,6 +288,14 @@ export async function resumeFromPayloadScripts(
 	return result;
 }
 
+export function disposeResumedPayload(root: ResumeDomElement): void {
+	const resumed = resumedPayloadContainers.get(root);
+	resumed?.runtime.dispose();
+	resumedPayloadContainers.delete(root);
+	delete (root as ResumeDomElement & { __asyncResumeRuntimeStarted?: boolean })
+		.__asyncResumeRuntimeStarted;
+}
+
 export async function resumeFromPayloadDocument(
 	input: ResumePayloadDocumentInput,
 ): Promise<ResumePayloadScriptsResult> {

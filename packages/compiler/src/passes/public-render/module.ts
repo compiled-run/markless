@@ -23,6 +23,7 @@ import {
 } from '../../ast/tsrx.ts';
 import { emitDirectPublicRenderModule } from './direct-module.ts';
 import { selectPublicRenderRoot } from './plan.ts';
+import { itemPathReadSource } from './source-expressions.ts';
 
 // Emits the optional direct-DOM module used by public render() after the plan proves
 // the component shape can run through this specialized path.
@@ -183,7 +184,10 @@ function emitPublicCsrRenderModule(
 			'function marklessCsrText(value) { return marklessCsrEscape(value == null ? "" : String(value)); }',
 		'function marklessCsrChildrenHtml(value) { return value == null ? "" : String(value); }',
 		'function marklessCsrAttribute(name, value) { return ` ${name}="${marklessCsrEscape(value == null ? "" : String(value))}"`; }',
-		'function marklessCsrRepeatRows(items, renderRow, renderEmpty) { const list = Array.isArray(items) ? items : Array.from(items ?? []); if (list.length === 0) return renderEmpty ? renderEmpty() : ""; return list.map(renderRow).join(""); }',
+		'function marklessCsrRepeatRows(items, keyForRow, repeatId, itemName, keyPath, renderRow, renderEmpty) { const list = Array.isArray(items) ? items : Array.from(items ?? []); marklessAssertUniqueRepeatKeys(list, keyForRow, repeatId, itemName, keyPath); if (list.length === 0) return renderEmpty ? renderEmpty() : ""; return list.map(renderRow).join(""); }',
+		'function marklessAssertUniqueRepeatKeys(items, keyForRow, repeatId, itemName, keyPath) { const seen = new Set(); for (const item of items) { const key = keyForRow(item); if (seen.has(key)) throw marklessRepeatDuplicateKeyError(repeatId, itemName, keyPath, key); seen.add(key); } }',
+		'function marklessRepeatDuplicateKeyError(repeatId, itemName, keyPath, key) { const source = `${itemName}.${keyPath.join(".")}`; const keyText = JSON.stringify(key); const message = `Two items produced the same key ${keyText} from ${source}. Rows with the same key cannot be told apart, so one of them would silently replace the other.`; const error = new Error(message); Object.defineProperty(error, "message", { value: message, enumerable: true, configurable: true }); error.name = "KeyedRepeatRuntimeError"; error.code = "MARKLESS_REPEAT_KEY_DUPLICATE"; error.severity = "error"; error.phase = "runtime"; error.title = "Two rows share the same @for key"; error.why = "The key is each row identity across reorder, insert, delete, and resume; duplicate identities make row state and DOM ownership ambiguous."; error.repeatId = repeatId; error.keyPath = keyPath; error.collidingValue = key; error.suggestions = [{ message: "Key by a field that is unique per item, or make the key compound where the data allows it. If the data has no unique field, key by position with index i; key i." }]; error.docsUrl = "https://markless.dev/errors/MARKLESS_REPEAT_KEY_DUPLICATE"; return error; }',
+		'function readMarklessPublicPath(value, path) { let current = value; for (const key of path) current = current?.[key]; return current; }',
 		'function marklessCsrDynamicTagName(value) { if (value === null || value === undefined || value === false || value === "") return null; const tag = String(value); if (!/^[a-zA-Z][a-zA-Z0-9:_.-]*$/.test(tag)) throw new Error("MARKLESS_DYNAMIC_TAG_INVALID: " + tag); return tag; }',
 		'function marklessCsrSpreadAttributes(values, scopeClass) { let html = ""; let classSeen = false; for (const key of Object.keys(values ?? {})) { if (!/^[A-Za-z_][\\w.:-]*$/.test(key) || /^on[A-Z]/.test(key) || key === "attach" || key === "el" || key === "children") continue; const value = values[key]; if (value === null || value === undefined || value === false) continue; if (key === "class" && scopeClass) { classSeen = true; html += marklessCsrAttribute("class", (value === true ? "" : String(value)) + " " + scopeClass); continue; } html += value === true ? ` ${key}=""` : marklessCsrAttribute(key, value); } if (scopeClass && !classSeen) html += ` class="${scopeClass}"`; return html; }',
 		'function marklessCsrEscape(value) { return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll("\\"", "&quot;"); }',
@@ -278,7 +282,10 @@ function emitPublicSsrRenderModule(
 		'function marklessSsrArmHost(hostLocators) { hostLocators.marklessSsrExtraElements = (hostLocators.marklessSsrExtraElements ?? 0) + 1; return ""; }',
 		'function marklessSsrHost(hostLocators, hostNodeId, tagName) { hostLocators.push({ hostNodeId, strategy: "dom-order", index: hostLocators.length + (hostLocators.marklessSsrExtraElements ?? 0), tagName }); return ""; }',
 		'function marklessSsrDynamicTagName(value) { if (value === null || value === undefined || value === false || value === "") return null; const tag = String(value); if (!/^[a-zA-Z][a-zA-Z0-9:_.-]*$/.test(tag)) throw new Error("MARKLESS_DYNAMIC_TAG_INVALID: " + tag); return tag; }',
-		'function marklessSsrRepeatRows(hostLocators, items, renderRow, elementsPerRow, renderEmpty) { const list = Array.isArray(items) ? items : Array.from(items ?? []); if (list.length === 0) return renderEmpty ? renderEmpty() : ""; const html = list.map(renderRow).join(""); hostLocators.marklessSsrExtraElements = (hostLocators.marklessSsrExtraElements ?? 0) + list.length * elementsPerRow; return html; }',
+		'function marklessSsrRepeatRows(hostLocators, items, keyForRow, repeatId, itemName, keyPath, renderRow, elementsPerRow, renderEmpty) { const list = Array.isArray(items) ? items : Array.from(items ?? []); marklessAssertUniqueRepeatKeys(list, keyForRow, repeatId, itemName, keyPath); if (list.length === 0) return renderEmpty ? renderEmpty() : ""; const html = list.map(renderRow).join(""); hostLocators.marklessSsrExtraElements = (hostLocators.marklessSsrExtraElements ?? 0) + list.length * elementsPerRow; return html; }',
+		'function marklessAssertUniqueRepeatKeys(items, keyForRow, repeatId, itemName, keyPath) { const seen = new Set(); for (const item of items) { const key = keyForRow(item); if (seen.has(key)) throw marklessRepeatDuplicateKeyError(repeatId, itemName, keyPath, key); seen.add(key); } }',
+		'function marklessRepeatDuplicateKeyError(repeatId, itemName, keyPath, key) { const source = `${itemName}.${keyPath.join(".")}`; const keyText = JSON.stringify(key); const message = `Two items produced the same key ${keyText} from ${source}. Rows with the same key cannot be told apart, so one of them would silently replace the other.`; const error = new Error(message); Object.defineProperty(error, "message", { value: message, enumerable: true, configurable: true }); error.name = "KeyedRepeatRuntimeError"; error.code = "MARKLESS_REPEAT_KEY_DUPLICATE"; error.severity = "error"; error.phase = "runtime"; error.title = "Two rows share the same @for key"; error.why = "The key is each row identity across reorder, insert, delete, and resume; duplicate identities make row state and DOM ownership ambiguous."; error.repeatId = repeatId; error.keyPath = keyPath; error.collidingValue = key; error.suggestions = [{ message: "Key by a field that is unique per item, or make the key compound where the data allows it. If the data has no unique field, key by position with index i; key i." }]; error.docsUrl = "https://markless.dev/errors/MARKLESS_REPEAT_KEY_DUPLICATE"; return error; }',
+		'function readMarklessPublicPath(value, path) { let current = value; for (const key of path) current = current?.[key]; return current; }',
 		'function marklessSsrCallbacks(callbacks) { const result = {}; for (const key of Object.keys(callbacks)) if (callbacks[key]) result[key] = callbacks[key]; return result; }',
 		'function marklessSsrCallbackSymbol(props, path) { let value = props?.__marklessSsrCallbacks; for (const key of path) value = value?.[key]; return typeof value === "string" ? value : undefined; }',
 		'function marklessComposeState(state, children) { const childStates = children.map((child) => child.output?.state).filter(Boolean); if (childStates.length === 0) return state; return { ...state, cells: [...(state.cells ?? []), ...childStates.flatMap((childState) => childState.cells ?? [])], computed: [...(state.computed ?? []), ...childStates.flatMap((childState) => childState.computed ?? [])], ...((state.sharedDefinitions || childStates.some((childState) => childState.sharedDefinitions?.length)) ? { sharedDefinitions: [...(state.sharedDefinitions ?? []), ...childStates.flatMap((childState) => childState.sharedDefinitions ?? [])] } : {}) }; }',
@@ -876,7 +883,7 @@ function emitSsrRepeatRows(node: AnyNode, context: SsrRenderContext): string {
 		emptyChildren.length > 0
 			? `() => ${joinSsrExpressions(emptyChildren.map((child) => emitHtmlNode(child, context)))}`
 			: 'null';
-	return `marklessSsrRepeatRows(marklessSsrHostLocators, ${repeat.collectionSource}, ${rowParams} => ${rowHtml}, ${countRowElements(row)}, ${emptyThunk})`;
+	return `marklessSsrRepeatRows(marklessSsrHostLocators, ${repeat.collectionSource}, ${repeat.itemName} => ${itemPathReadSource(repeat.itemName, repeat.keyPath)}, ${JSON.stringify(repeat.id)}, ${JSON.stringify(repeat.itemName)}, ${JSON.stringify(repeat.keyPath)}, ${rowParams} => ${rowHtml}, ${countRowElements(row)}, ${emptyThunk})`;
 }
 
 // Supported async boundaries emit their payload-planned comment anchors.
@@ -998,7 +1005,7 @@ function emitCsrRepeatRows(node: AnyNode, context: CsrRenderContext): string {
 		emptyChildren.length > 0
 			? `() => ${joinSsrExpressions(emptyChildren.map((child) => emitHtmlNode(child, context)))}`
 			: 'null';
-	return `marklessCsrRepeatRows(${repeat.collectionSource}, ${rowParams} => ${rowHtml}, ${emptyThunk})`;
+	return `marklessCsrRepeatRows(${repeat.collectionSource}, ${repeat.itemName} => ${itemPathReadSource(repeat.itemName, repeat.keyPath)}, ${JSON.stringify(repeat.id)}, ${JSON.stringify(repeat.itemName)}, ${JSON.stringify(repeat.keyPath)}, ${rowParams} => ${rowHtml}, ${emptyThunk})`;
 }
 
 function singleRepeatRowElement(node: AnyNode): AnyNode | null {

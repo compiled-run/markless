@@ -372,6 +372,12 @@ class PublicRenderTestFragment {
 		child.parentElement = null;
 		return child;
 	}
+
+	cloneNode(deep = false) {
+		const clone = new PublicRenderTestFragment();
+		if (deep) clone.replaceChildren(...this.childNodes.map((child) => child.cloneNode(true)));
+		return clone;
+	}
 }
 
 class PublicRenderTestComment {
@@ -392,7 +398,11 @@ class PublicRenderTestTemplate {
 }
 
 function publicRenderTestDocument() {
-	return { createElement: (tagName: string) => tagName === 'template' ? new PublicRenderTestTemplate() : new PublicRenderTestElement(tagName) };
+	return {
+		createElement: (tagName: string) =>
+			tagName === 'template' ? new PublicRenderTestTemplate() : new PublicRenderTestElement(tagName),
+		createDocumentFragment: () => new PublicRenderTestFragment(),
+	};
 }
 
 async function renderTestCsr(result: Awaited<ReturnType<typeof compileTsrxModule>>, props?: unknown) {
@@ -3023,7 +3033,10 @@ export function App() @{
 		'const collectionDirty = graph.isDirty?.("state:entries") ?? true;',
 	);
 	expect(moduleSource).toContain('const classDirty = graph.isDirty?.("state:chosen");');
-	expect(moduleSource).toContain('const items = graph.read("state:entries");');
+	expect(moduleSource).toContain('const itemsValue = graph.read("state:entries");');
+	expect(moduleSource).toContain(
+		'const items = Array.isArray(itemsValue) ? itemsValue : Array.from(itemsValue ?? []);',
+	);
 	expect(moduleSource).toContain('return graph.read("state:chosen");');
 	expect(moduleSource).not.toContain('graph.read("state:entries", [])');
 	expect(moduleSource).not.toContain('graph.read("state:chosen", [])');
@@ -3439,6 +3452,121 @@ export function InitialArticles() @{
 	]);
 	expect(appendCalls).toBeGreaterThan(0);
 	expect(replaceCalls).toBe(0);
+});
+
+test('compileTsrxModule public render module rejects duplicate runtime keys', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/DuplicateArticles.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function DuplicateArticles() @{
+	let entries = state([
+		{ code: 'fruit', title: 'Apple' },
+		{ code: 'fruit', title: 'Pear' },
+	]);
+
+	<section>
+		@for (const entry of entries; key entry.code) {
+			<article>{entry.title}</article>
+		}
+	</section>
+}
+`,
+		symbols: [],
+	});
+	const document = {
+		createElement(tagName: string) {
+			if (tagName === 'template') return new PublicRenderTestTemplate();
+			return new PublicRenderTestElement(tagName);
+		},
+		createDocumentFragment() {
+			return new PublicRenderTestFragment();
+		},
+	};
+	const publicModule = await importPublicRenderTestModule(
+		[
+			'const document = globalThis.__marklessPublicRenderTestDocument;',
+			'const loadSymbol = () => undefined;',
+			result.publicRenderModule.moduleSource,
+		].join('\n'),
+		{ document },
+	);
+
+	expect(() => publicModule.DuplicateArticles()).toThrowError(
+		expect.objectContaining({
+			code: 'MARKLESS_REPEAT_KEY_DUPLICATE',
+			phase: 'runtime',
+			repeatId: 'repeat:0',
+			keyPath: ['code'],
+			collidingValue: 'fruit',
+		}),
+	);
+});
+
+test('compileTsrxModule public render module recovers keyed rows from undefined state', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/UndefinedArticles.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function UndefinedArticles() @{
+	let entries = state(undefined);
+
+	<section>
+		<button onClick={() => entries = [{ code: 'alpha', title: 'Alpha' }, { code: 'beta', title: 'Beta' }]}>Load</button>
+		<ul>
+			@for (const entry of entries; key entry.code) {
+				<li class="row">{entry.title}</li>
+			} @empty {
+				<li class="empty">No items yet</li>
+			}
+		</ul>
+	</section>
+}
+`,
+		symbols: [],
+	});
+	const loadEntriesSymbol = result.symbolResolver.symbols.find((symbol) =>
+		symbol.source.includes("'Alpha'"),
+	);
+	expect(loadEntriesSymbol).toBeDefined();
+
+	const document = publicRenderTestDocument();
+	const publicModule = await importPublicRenderTestModule(
+		[
+			'const document = globalThis.__marklessPublicRenderTestDocument;',
+			'const loadSymbol = globalThis.__marklessPublicRenderTestLoadSymbol;',
+			result.publicRenderModule.moduleSource,
+		].join('\n'),
+		{
+			document,
+			loadSymbol(symbolId: string) {
+				if (symbolId === loadEntriesSymbol?.id) {
+					return ({ graph }: { readonly graph: PublicRenderTestGraph }) => {
+						graph.write({
+							graphNodeId: 'state:entries',
+							value: [
+								{ code: 'alpha', title: 'Alpha' },
+								{ code: 'beta', title: 'Beta' },
+							],
+						});
+					};
+				}
+				throw new Error(`Unexpected public render test symbol ${symbolId}`);
+			},
+		},
+	);
+	const rendered = publicModule.UndefinedArticles() as { readonly root: PublicRenderTestElement };
+
+	expect(elementsByTag(rendered.root, 'li').map((row) => row.textContent)).toEqual([
+		'No items yet',
+	]);
+	await elementsByTag(rendered.root, 'button')[0]!.dispatch('click');
+	expect(elementsByTag(rendered.root, 'li').map((row) => row.textContent)).toEqual([
+		'Alpha',
+		'Beta',
+	]);
 });
 
 test('compileTsrxModule public render module replaces all-new keyed rows with the built fragment', async () => {

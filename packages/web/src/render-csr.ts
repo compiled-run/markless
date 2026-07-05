@@ -4,6 +4,7 @@ import type { DomJournalEntry } from '@markless/runtime';
 import type { RuntimeGraph } from '@markless/runtime';
 import type { CsrRenderContainer, CsrRenderOptions, CsrRenderOutput } from './render.ts';
 import type { ResumeRuntime, ResumeSymbol } from './resume.ts';
+import { validateKeyedRepeatGraphKeys } from './repeat-runtime.ts';
 
 export async function renderCsrRuntime(input: {
 	readonly output: CsrRenderOutput;
@@ -25,22 +26,37 @@ export async function renderCsrRuntime(input: {
 				typeof createEventOnlyResumeContainerFromPayloads
 			>[0]['loadSymbol'],
 		});
+		const eventListeners: Array<{
+			readonly eventName: string;
+			readonly listener: (event: EventOnlyResumeDomEvent) => Promise<void>;
+		}> = [];
 		for (const eventName of new Set(view.events.map((event) => event.eventName))) {
-			output.root.addEventListener?.(
-				eventName,
-				async (event: EventOnlyResumeDomEvent) => {
-					await runtime.dispatch(event);
-				},
-				{ capture: true },
-			);
+			const listener = async (event: EventOnlyResumeDomEvent) => {
+				await runtime.dispatch(event);
+			};
+			output.root.addEventListener?.(eventName, listener, { capture: true });
+			eventListeners.push({ eventName, listener });
 		}
+		const disposableRuntime = {
+			...runtime,
+			dispose() {
+				for (const entry of eventListeners) {
+					(output.root as EventOnlyResumeDomElement).removeEventListener?.(
+						entry.eventName,
+						entry.listener,
+						{ capture: true },
+					);
+				}
+				runtime.dispose();
+			},
+		};
 		output.connectRuntime?.({ graph: runtime.graph, runtime });
 
 		return {
 			phase: 'csr',
 			root: output.root,
 			graph: runtime.graph as RuntimeGraph,
-			runtime,
+			runtime: disposableRuntime,
 		};
 	}
 
@@ -53,6 +69,7 @@ export async function renderCsrRuntime(input: {
 			loadSymbol,
 			hasAuthoredState: !!output.state,
 		}));
+	validateKeyedRepeatGraphKeys(graph, view);
 	const { createResumeRuntime } = await import('./resume.ts');
 	let runtime: ResumeRuntime;
 	const applyDomJournal =

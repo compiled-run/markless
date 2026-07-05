@@ -179,6 +179,35 @@ function staticView(): ProtocolViewPayload {
 	};
 }
 
+function duplicateKeyRepeatView(): ProtocolViewPayload {
+	return {
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'ul' }],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+		keyedRepeats: [{
+			id: 'repeat:0', parentHostNodeId: 'h0', collectionGraphNodeId: 'state:rows',
+			collectionPath: [], keyPath: ['category'], itemName: 'row', rowElementCount: 1,
+			rowEvents: [],
+		}],
+	};
+}
+
+const duplicateRows = [
+	{ category: 'fruit', label: 'apple' },
+	{ category: 'fruit', label: 'pear' },
+	{ category: 'veg', label: 'kale' },
+];
+
+function duplicateRowsState() {
+	return createProtocolStatePayload({
+		cells: [{ graphNodeId: 'state:rows', name: 'rows', valueKind: 'array', value: duplicateRows }],
+	});
+}
+
 test('render creates a CSR container without payload scripts or the inline resumer', async () => {
 	const target = {
 		children: [] as FakeElement[],
@@ -223,6 +252,29 @@ test('render creates a CSR container without payload scripts or the inline resum
 
 	expect(loadedSymbols).toEqual(['symbol:click']);
 	expect(container.graph.read('state:count')).toBe(1);
+});
+
+test('render rejects duplicate runtime keys before mounting CSR output', async () => {
+	const target = { children: [] as FakeElement[], replaceChildren(...children: FakeElement[]) { this.children = children; } };
+
+	await expect(
+		render(
+			() => ({
+				root: element('UL', duplicateRows.map(() => element('LI'))),
+				state: duplicateRowsState(),
+				view: duplicateKeyRepeatView(),
+				loadSymbol: () => () => undefined,
+			}),
+			{ target },
+		),
+	).rejects.toMatchObject({
+		code: 'MARKLESS_REPEAT_KEY_DUPLICATE',
+		phase: 'runtime',
+		title: 'Two rows share the same @for key',
+		keyPath: ['category'],
+		collidingValue: 'fruit',
+	});
+	expect(target.children).toEqual([]);
 });
 
 test('render adopts the mount target as container root for fragment-rooted components', async () => {
@@ -628,6 +680,22 @@ test('renderToString emits an SSR container and omits the resumer for static out
 	expect(html).toContain('type="markless/state"');
 	expect(html).toContain('type="markless/view"');
 	expect(html).not.toContain('data-async-resumer');
+});
+
+test('renderToString rejects duplicate runtime keys before serving SSR output', async () => {
+	await expect(
+		renderToString(() => ({
+			html: '<ul><li>apple</li><li>pear</li><li>kale</li></ul>',
+			state: duplicateRowsState(),
+			view: duplicateKeyRepeatView(),
+		})),
+	).rejects.toMatchObject({
+		code: 'MARKLESS_REPEAT_KEY_DUPLICATE',
+		phase: 'runtime',
+		title: 'Two rows share the same @for key',
+		keyPath: ['category'],
+		collidingValue: 'fruit',
+	});
 });
 
 test('renderToString keeps fragment sibling roots as direct container children and offsets their locators', async () => {
