@@ -300,6 +300,7 @@ export type SemanticTemplateRead = {
 export type SemanticElementHandleBinding = {
 	readonly hostNodeId: string;
 	readonly handleName: string;
+	readonly componentName?: string;
 	readonly sourceSpan?: SourceSpan;
 	readonly keyedRepeatScopeIds: ReadonlyArray<string>;
 };

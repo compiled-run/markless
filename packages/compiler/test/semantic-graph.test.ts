@@ -471,6 +471,60 @@ test('buildSemanticGraph records component edges from TSRX AST', async () => {
 	});
 });
 
+test('B918 records element handle props and accepts same-module prop forwarding', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/ForwardedHandle.tsrx',
+		source: `import { element } from '@markless/core'; function Field(props: { input: unknown }) @{ <input el={props.input} /> } export function App() @{ const field = element<HTMLInputElement>(); <section><Field input={field} /><button onClick={() => field.focus()}>Focus</button></section> }`,
+	});
+
+	expect(graph.diagnostics).toEqual([]);
+	expect(graph.componentEdges[0]).toEqual(
+		expect.objectContaining({
+			parentComponentName: 'App',
+			childComponentName: 'Field',
+			props: [
+				expect.objectContaining({
+					name: 'input',
+					source: 'field',
+					kind: 'graph-reference',
+					graphBindingKind: 'element',
+					graphNodeId: 'element:field',
+					path: [],
+				}),
+			],
+		}),
+	);
+	expect(graph.elementHandleBindings).toEqual([
+		expect.objectContaining({
+			hostNodeId: 'h0',
+			handleName: 'props.input',
+			componentName: 'Field',
+		}),
+	]);
+});
+
+test('B918 records element handle props on imported child edges', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/App.tsrx',
+		source: `import { element } from '@markless/core'; import { Field } from './Field.tsrx'; export function App() @{ const field = element<HTMLInputElement>(); <section><Field input={field} /><button onClick={() => field.focus()}>Focus</button></section> }`,
+	});
+
+	expect(graph.diagnostics).toEqual([]);
+	expect(graph.componentEdges[0]).toEqual(
+		expect.objectContaining({
+			childComponentName: 'Field',
+			importSource: './Field.tsrx',
+			props: [
+				expect.objectContaining({
+					name: 'input',
+					graphBindingKind: 'element',
+					graphNodeId: 'element:field',
+				}),
+			],
+		}),
+	);
+});
+
 test('buildSemanticGraph records keyed repeat structure across alternate host shapes', async () => {
 	const panelGraph = await buildSemanticGraph({
 		filename: 'src/Panels.tsrx',

@@ -15,11 +15,15 @@ import type {
 	SemanticBehavior,
 	SemanticElementHandleBinding,
 	SemanticGraphDiagnostic,
-	SemanticGraphAlias,
+	SemanticGraphBinding,
 	SemanticTemplateBindingTarget,
 	SourceSpan,
 } from '../../artifacts.ts';
-import { graphBindingMap, resolveGraphPath } from '../../artifact-helpers/graph-paths.ts';
+import {
+	graphBindingMap,
+	resolveGraphPath,
+	semanticAliasMap,
+} from '../../artifact-helpers/graph-paths.ts';
 import { collectComponentEdge } from './collect-components.ts';
 import { collectExpressionReads } from './collect-expressions.ts';
 import {
@@ -162,7 +166,7 @@ export function collectConditionalBranchText(node: AnyNode, state: WalkState): v
 
 export function collectElementHandleDiagnostics(graph: MutableSemanticGraphArtifact): void {
 	const bindings = graphBindingMap(graph);
-	const aliases = new Map<string, SemanticGraphAlias>();
+	const aliases = semanticAliasMap(graph);
 	const validElementHandleBindings: SemanticElementHandleBinding[] = [];
 	const moduleElementNames = new Set(
 		graph.diagnostics
@@ -175,6 +179,16 @@ export function collectElementHandleDiagnostics(graph: MutableSemanticGraphArtif
 		const resolved = resolveGraphPath(binding.handleName, bindings, aliases);
 		const graphBinding = resolved?.binding;
 		if (moduleElementNames.has(binding.handleName)) continue;
+		const forwarded = resolved
+			? resolvePropForwardedElementHandle(binding, resolved, graph)
+			: null;
+		if (forwarded) {
+			validElementHandleBindings.push({
+				...binding,
+				handleName: forwarded.name,
+			});
+			continue;
+		}
 		if (graphBinding?.kind === 'prop') {
 			graph.diagnostics.push(elementHandlePropUnsupportedDiagnostic(binding));
 			continue;
@@ -317,6 +331,7 @@ function collectAttribute(
 			state.graph.elementHandleBindings.push({
 				hostNodeId,
 				handleName: expressionSource(expressionValue, state.source),
+				componentName: state.currentComponentName ?? undefined,
 				sourceSpan: sourceSpan(expressionValue, state.filename),
 				keyedRepeatScopeIds: [...state.currentKeyedRepeatScopeIds],
 			});
@@ -347,6 +362,39 @@ function collectAttribute(
 		});
 		walk(expressionValue, state);
 	}
+}
+
+function resolvePropForwardedElementHandle(
+	binding: SemanticElementHandleBinding,
+	resolved: {
+		readonly binding: SemanticGraphBinding;
+		readonly path: ReadonlyArray<string>;
+	},
+	graph: MutableSemanticGraphArtifact,
+): { readonly name: string } | null {
+	if (resolved.binding.kind !== 'prop' || !binding.componentName) return null;
+
+	const propName = resolved.path[0];
+	if (!propName || resolved.path.length !== 1) return null;
+
+	const edgeProp = graph.componentEdges
+		.filter((edge) => edge.childComponentName === binding.componentName)
+		.flatMap((edge) => edge.props)
+		.find(
+			(prop) =>
+				prop.name === propName &&
+				prop.kind === 'graph-reference' &&
+				prop.graphBindingKind === 'element' &&
+				prop.path.length === 0,
+		);
+	if (!edgeProp) return null;
+
+	const handle = graph.graphBindings.find(
+		(graphBinding) => graphBinding.id === edgeProp.graphNodeId,
+	);
+	if (!handle || handle.kind !== 'element') return null;
+
+	return { name: handle.name };
 }
 
 function conditionalClassTarget(

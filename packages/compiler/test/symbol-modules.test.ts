@@ -1796,6 +1796,33 @@ export function App() @{
 	expect(handler?.source).not.toContain('getElementHandle');
 });
 
+test('B918 emits parent handler handle calls for same-module prop-forwarded handles', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/ForwardedFocusBox.tsrx',
+		source: `
+import { element } from '@markless/core';
+
+function Field(props: { input: unknown }) @{
+	<input el={props.input} />
+}
+
+export function App() @{
+	const field = element<HTMLInputElement>();
+
+	<section>
+		<Field input={field} />
+		<button onClick={() => field.focus()}>Focus</button>
+	</section>
+}
+`,
+		symbols: [],
+	});
+
+	const handler = result.symbolModules.modules.find((m) => m.kind === 'event-handler');
+	expect(result.semanticGraph.diagnostics).toEqual([]);
+	expect(handler?.source).toContain('context.getElementHandle("field")?.focus();');
+});
+
 function emitEventHandlerSource(symbol: any): string {
 	return emitSymbolModules({
 		symbolResolver: {
