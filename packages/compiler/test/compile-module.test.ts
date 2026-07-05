@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { compileTsrxModule } from '../src/index.ts';
 import { deserializeGraphValue } from '../../serializer/src/index.ts';
 import { createEventOnlyResumeContainerFromPayloads } from '../../web/src/event-only-resume.ts';
@@ -359,6 +359,22 @@ class PublicRenderTestTemplate {
 	}
 }
 
+function publicRenderTestDocument() {
+	return { createElement: (tagName: string) => tagName === 'template' ? new PublicRenderTestTemplate() : new PublicRenderTestElement(tagName) };
+}
+
+async function renderTestCsr(result: Awaited<ReturnType<typeof compileTsrxModule>>, props?: unknown) {
+	const module = await importPublicRenderTestModule(csrRenderTestModuleSource(result), {
+		document: publicRenderTestDocument(),
+	});
+	return (module.marklessRenderCsr as (props?: unknown) => unknown)(props);
+}
+
+async function renderTestSsr(result: Awaited<ReturnType<typeof compileTsrxModule>>, props?: unknown) {
+	const module = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	return (module.marklessRenderSsr as (props?: unknown) => Promise<{ readonly html: string }>)(props);
+}
+
 function parsePublicRenderTestHtml(html: string) {
 	const root = new PublicRenderTestElement('#root');
 	const stack = [root];
@@ -712,6 +728,153 @@ export function App() @{
 	const output = await (ssrModule.marklessRenderSsr as () => { readonly html: string })();
 
 	expect(output.html).toBe('<section><h2>Stable</h2><p>Static</p></section>');
+});
+
+test('compileTsrxModule executes state-reading body statements once in CSR and SSR render modules', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/RenderBodyLog.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App({ kind = 'demo' }) @{
+	console.log('before');
+	const token = state(7);
+	console.log(token);
+
+	<p data-kind={kind}>{token}</p>
+}
+`,
+		symbols: [],
+	});
+	const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+	try {
+		const csrOutput = await renderTestCsr(result, { kind: 'demo' }) as {
+			readonly root: PublicRenderTestElement;
+		};
+		expect(csrOutput.root.textContent).toBe('7');
+
+		const ssrOutput = await renderTestSsr(result, { kind: 'demo' });
+		expect(ssrOutput.html).toBe('<p data-kind="demo">7</p>');
+		expect(log.mock.calls).toEqual([['before'], [7], ['before'], [7]]);
+	} finally {
+		log.mockRestore();
+	}
+});
+
+test('compileTsrxModule keeps plain body statements in authored order in CSR and SSR modules', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/RenderBodyPlainStatements.tsrx',
+		source: `
+export function App({ suffix = 'tail' }) @{
+	let segments = [];
+	segments.push('head');
+	segments.push(suffix);
+	const label = segments.join('-');
+
+	<main>{label}</main>
+}
+`,
+		symbols: [],
+	});
+	const csrSource = result.publicRenderModule.csrModuleSource;
+	const ssrSource = result.publicRenderModule.ssrModuleSource;
+
+	for (const source of [csrSource, ssrSource]) {
+		expect(source.indexOf('let segments = [];')).toBeGreaterThan(-1);
+		expect(source.indexOf("segments.push('head');")).toBeGreaterThan(
+			source.indexOf('let segments = [];'),
+		);
+		expect(source.indexOf('segments.push(suffix);')).toBeGreaterThan(
+			source.indexOf("segments.push('head');"),
+		);
+		expect(source.indexOf("const label = segments.join('-');")).toBeGreaterThan(
+			source.indexOf('segments.push(suffix);'),
+		);
+	}
+	expect(csrSource.indexOf('const root = marklessCsrRootFromHtml')).toBeGreaterThan(
+		csrSource.indexOf("const label = segments.join('-');"),
+	);
+	expect(ssrSource.indexOf('const html = ')).toBeGreaterThan(
+		ssrSource.indexOf("const label = segments.join('-');"),
+	);
+
+	const csrOutput = await renderTestCsr(result, { suffix: 'tail' }) as {
+		readonly root: PublicRenderTestElement;
+	};
+	expect(csrOutput.root.textContent).toBe('head-tail');
+
+	const ssrOutput = await renderTestSsr(result, { suffix: 'tail' });
+	expect(ssrOutput.html).toBe('<main>head-tail</main>');
+});
+
+test('compileTsrxModule lets pre-root guard clauses render nothing in CSR modules', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/RenderBodyGuard.tsrx',
+		source: `
+export function App({ hidden = false }) @{
+	if (hidden) return null;
+
+	<section>Visible</section>
+}
+`,
+		symbols: [],
+	});
+	expect(await renderTestCsr(result, { hidden: true })).toBeNull();
+	const visible = await renderTestCsr(result, { hidden: false }) as {
+		readonly root: PublicRenderTestElement;
+	};
+	expect(visible.root.textContent).toBe('Visible');
+});
+
+test('compileTsrxModule diagnoses conditional component roots instead of deleting statement flow', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/ConditionalRoot.tsrx',
+		source: `
+export function App({ choice = false }) @{
+	if (choice) return <a>First</a>;
+	return <b>Second</b>;
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_COMPONENT_ROOT_CONDITIONAL',
+			severity: 'error',
+			phase: 'public-render',
+			title: expect.stringContaining('Component root is conditional'),
+			message: expect.stringContaining('second template return'),
+			docsUrl: 'https://markless.dev/errors/MARKLESS_COMPONENT_ROOT_CONDITIONAL',
+		}),
+	]);
+});
+
+test('compileTsrxModule diagnoses body statements the render module cannot represent', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/UnsupportedBodyStatement.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	const count = state(1), label = 'ready';
+
+	<p>{count}</p>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_RENDER_BODY_UNSUPPORTED',
+			severity: 'error',
+			phase: 'public-render',
+			title: expect.stringContaining('Component body statement is not supported'),
+			message: expect.stringContaining('count'),
+			docsUrl: 'https://markless.dev/errors/MARKLESS_RENDER_BODY_UNSUPPORTED',
+		}),
+	]);
 });
 
 test('compileTsrxModule renders dynamic tags from state values in SSR html', async () => {

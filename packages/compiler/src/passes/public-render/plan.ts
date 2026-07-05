@@ -25,7 +25,9 @@ import {
 } from '../../artifact-helpers/graph-paths.ts';
 import {
 	childrenOpacityDiagnostic,
+	conditionalComponentRootDiagnostic,
 	noRenderableRootDiagnostic,
+	unsupportedRenderBodyDiagnostic,
 	unsupportedRenderConstructDiagnostic,
 	unsupportedRenderRootDiagnostic,
 } from './diagnostics.ts';
@@ -54,6 +56,11 @@ import type {
 // decides what direct DOM work is compiler-proven instead of emitting code itself.
 export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlanArtifact {
 	const ast = parseModule(input.source.source, input.source.filename) as unknown as AnyNode;
+	const conditionalRootDiagnostics = componentConditionalRootDiagnostics(ast, input.source.filename);
+	if (conditionalRootDiagnostics.length > 0) return emptyPlan(conditionalRootDiagnostics);
+	const unsupportedBodyDiagnostics = componentUnsupportedBodyDiagnostics(ast, input.source.filename, input.source.source);
+	if (unsupportedBodyDiagnostics.length > 0) return emptyPlan(unsupportedBodyDiagnostics);
+
 	const selectedRoot = selectPublicRenderRoot(ast);
 	if (!selectedRoot) {
 		return emptyPlan(componentRootDiagnostics(ast, input.source.filename));
@@ -817,6 +824,101 @@ function componentRootDiagnostics(ast: AnyNode, filename: string) {
 	}
 
 	return [noRenderableRootDiagnostic({ node: ast, filename })];
+}
+
+function componentConditionalRootDiagnostics(ast: AnyNode, filename: string) {
+	for (const statement of asNodes(ast.body)) {
+		const componentFunction = getComponentFunction(statement);
+		const body = componentFunction?.node.body as AnyNode | undefined;
+		if (!body) continue;
+
+		const returns = templateReturnStatements(body);
+		if (returns.length > 1) return [conditionalComponentRootDiagnostic({
+			node: returns[1]!, filename, componentName: componentFunction.name,
+		})];
+	}
+	return [];
+}
+
+function componentUnsupportedBodyDiagnostics(ast: AnyNode, filename: string, source: string) {
+	for (const statement of asNodes(ast.body)) {
+		const componentFunction = getComponentFunction(statement);
+		const body = componentFunction?.node.body as AnyNode | undefined;
+		if (!body) continue;
+		const root = firstComponentRoot(componentFunction.node);
+
+		for (const bodyStatement of childNodes(body)) {
+			if (isIgnorableTextNode(bodyStatement)) continue;
+			if (bodyStatement === root || returnArgument(bodyStatement) === root) continue;
+			const message = unsupportedBodyStatementMessage(bodyStatement, source);
+			if (!message) continue;
+			return [unsupportedRenderBodyDiagnostic({
+				node: bodyStatement, filename, message,
+				suggestion: 'Split framework declarations into their own statements so the render module can preserve body order.',
+			})];
+		}
+	}
+	return [];
+}
+
+function unsupportedBodyStatementMessage(statement: AnyNode, source: string): string | null {
+	const declarations = statement.type === 'VariableDeclaration' ? asNodes(statement.declarations) : [];
+	const frameworkDeclarations = declarations.filter((declaration) =>
+		loweredFrameworkCalls.has(frameworkCallName(declaration.init as AnyNode | undefined)),
+	);
+	if (frameworkDeclarations.length > 0 && declarations.length !== 1) {
+		const names = frameworkDeclarations
+			.map((declaration) => getIdentifierName(declaration.id as AnyNode | undefined))
+			.filter((name): name is string => !!name);
+		const label = names.length > 0 ? names.join(', ') : expressionSource(statement, source);
+		return `Cannot emit ${JSON.stringify(label)} because it mixes a framework declaration with other declarations.`;
+	}
+	return expressionSource(statement, source)
+		? null
+		: 'Cannot emit this component body statement because the compiler cannot recover its authored source.';
+}
+
+const loweredFrameworkCalls = new Set(['state', 'computed', 'element', 'handler']);
+
+function frameworkCallName(node: AnyNode | null | undefined): string {
+	return node?.type === 'CallExpression' ? (getIdentifierName(node.callee as AnyNode | undefined) ?? '') : '';
+}
+
+function returnArgument(statement: AnyNode): AnyNode | undefined {
+	return statement.type === 'ReturnStatement' ? (statement.argument as AnyNode | undefined) : undefined;
+}
+
+function templateReturnStatements(node: AnyNode): AnyNode[] {
+	const returns: AnyNode[] = [];
+	const visit = (child: AnyNode | null | undefined): void => {
+		if (!child || typeof child !== 'object') return;
+		if (isFunctionNode(child) && child !== node) return;
+		if (child.type === 'ReturnStatement' && isTemplateRoot(child.argument as AnyNode | undefined)) {
+			returns.push(child);
+			return;
+		}
+		for (const grandchild of childNodes(child)) visit(grandchild);
+	};
+	for (const child of childNodes(node)) visit(child);
+	return returns;
+}
+
+function isFunctionNode(node: AnyNode): boolean {
+	return (
+		node.type === 'FunctionDeclaration' ||
+		node.type === 'FunctionExpression' ||
+		node.type === 'ArrowFunctionExpression'
+	);
+}
+
+function isTemplateRoot(node: AnyNode | null | undefined): boolean {
+	return (
+		node?.type === 'Element' ||
+		node?.type === 'JSXElement' ||
+		node?.type === 'Fragment' ||
+		node?.type === 'JSXFragment' ||
+		node?.type === 'JSXIfExpression'
+	);
 }
 
 function collectStaticTextWrites(input: {

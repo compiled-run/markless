@@ -33,6 +33,7 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 	const componentCount = input.semanticGraph.components.length;
 	const root = rootSelection
 		? {
+				component: rootSelection.component,
 				root: rootSelection.root,
 				propNames: componentPropNames(rootSelection.component),
 			}
@@ -44,6 +45,7 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 	const canUseDirectCsrModule =
 		!!root &&
 		!isFragmentRoot &&
+		!hasExecutableBodyStatements(root.component, root.root, input.source.source) &&
 		root.propNames.length === 0 &&
 		input.semanticGraph.componentEdges.length === 0 &&
 		// The direct module has no async boundary handling; boundary-bearing
@@ -117,10 +119,11 @@ function emitPublicCsrRenderModule(
 		']);',
 		'function marklessRenderCsr(props = {}) {',
 		destructureProps(rootInfo.propNames),
-		...stateLocalLines(input, 'marklessCsrStateValue'),
-		'	const marklessCsrRuntimeState = { graph: null };',
-		'	const marklessCsrChildren = [];',
-		`	const root = ${isFragmentNode(rootInfo.root) ? 'marklessCsrFragmentFromHtml' : 'marklessCsrRootFromHtml'}(${emitHtmlNode(rootInfo.root, renderContext)});`,
+		...renderBodyLines(input, rootInfo, 'marklessCsrStateValue', [
+			'const marklessCsrRuntimeState = { graph: null };',
+			'const marklessCsrChildren = [];',
+			`const root = ${isFragmentNode(rootInfo.root) ? 'marklessCsrFragmentFromHtml' : 'marklessCsrRootFromHtml'}(${emitHtmlNode(rootInfo.root, renderContext)});`,
+		]),
 		...renderContext.childReplacements,
 		...propEvents.map(
 			(event) =>
@@ -242,12 +245,13 @@ function emitPublicSsrRenderModule(
 		']);',
 		'async function marklessRenderSsr(props = {}) {',
 		destructureProps(rootInfo.propNames),
-		...stateLocalLines(input, 'marklessSsrStateValue'),
-		'	const marklessSsrChildren = [];',
-		'	const marklessSsrBranches = [];',
-		'	const marklessSsrAsyncSnapshots = [];',
-		'	const marklessSsrHostLocators = [];',
-		`	const html = ${htmlExpression};`,
+		...renderBodyLines(input, rootInfo, 'marklessSsrStateValue', [
+			'const marklessSsrChildren = [];',
+			'const marklessSsrBranches = [];',
+			'const marklessSsrAsyncSnapshots = [];',
+			'const marklessSsrHostLocators = [];',
+			`const html = ${htmlExpression};`,
+		]),
 		'	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren);',
 		'	const marklessSsrState = marklessComposeState(payloadState, marklessSsrChildren);',
 		'	return {',
@@ -346,11 +350,14 @@ type CsrRenderContext = {
 type HtmlRenderContext = SsrRenderContext | CsrRenderContext;
 
 type PublicRenderRoot = {
+	readonly component: AnyNode;
 	readonly root: AnyNode;
 	readonly propNames: ReadonlyArray<string>;
 };
 
+type GraphBinding = PublicRenderModuleInput['semanticGraph']['graphBindings'][number];
 type ComponentEdge = PublicRenderModuleInput['semanticGraph']['componentEdges'][number];
+const loweredFrameworkCalls = new Set(['computed', 'element', 'handler']);
 
 function isComponentRoot(root: AnyNode): boolean {
 	const tagName = getElementTagName(root);
@@ -367,12 +374,90 @@ function callbackSymbolIds(input: PublicRenderModuleInput): ReadonlyMap<string, 
 	);
 }
 
-function stateLocalLines(input: PublicRenderModuleInput, readStateFunctionName: string): string[] {
-	return input.semanticGraph.graphBindings.flatMap((binding) =>
-		binding.kind === 'state'
-			? [`	let ${binding.name} = ${readStateFunctionName}(${JSON.stringify(binding.id)});`]
-			: [],
+function renderBodyLines(
+	input: PublicRenderModuleInput,
+	rootInfo: PublicRenderRoot,
+	readStateFunctionName: string,
+	rootLines: ReadonlyArray<string>,
+): string[] {
+	const body = rootInfo.component.body as AnyNode | undefined;
+	if (!body) return indentLines(rootLines);
+
+	const stateBindings = new Map<string, GraphBinding>(
+		input.semanticGraph.graphBindings.flatMap((binding) =>
+			binding.kind === 'state' ? [[binding.name, binding]] : [],
+		),
 	);
+	const lines: string[] = [];
+	let emittedRoot = false;
+	for (const statement of childNodes(body)) {
+		if (isIgnorableTextNode(statement)) continue;
+		if (statement === rootInfo.root || returnArgument(statement) === rootInfo.root) {
+			lines.push(...rootLines);
+			emittedRoot = true;
+			continue;
+		}
+
+		const stateLine = stateDeclarationLine(statement, stateBindings, readStateFunctionName);
+		if (stateLine) { lines.push(stateLine); continue; }
+		if (isLoweredFrameworkDeclaration(statement)) continue;
+
+		const source = expressionSource(statement, input.source.source);
+		if (source) lines.push(source);
+	}
+	if (!emittedRoot) lines.push(...rootLines);
+	return indentLines(lines);
+}
+
+function stateDeclarationLine(statement: AnyNode, stateBindings: ReadonlyMap<string, GraphBinding>, readStateFunctionName: string): string | null {
+	if (statement.type !== 'VariableDeclaration') return null;
+	const declarations = asNodes(statement.declarations);
+	if (declarations.length !== 1) return null;
+	const declaration = declarations[0]!;
+	const name = getIdentifierName(declaration.id as AnyNode | undefined);
+	const binding = name ? stateBindings.get(name) : undefined;
+	if (!binding || !isFrameworkCall(declaration.init as AnyNode | undefined, 'state')) return null;
+	return `let ${binding.name} = ${readStateFunctionName}(${JSON.stringify(binding.id)});`;
+}
+
+function isStateDeclaration(statement: AnyNode): boolean {
+	return statement.type === 'VariableDeclaration' && asNodes(statement.declarations).some((declaration) => isFrameworkCall(declaration.init as AnyNode | undefined, 'state'));
+}
+
+function isLoweredFrameworkDeclaration(statement: AnyNode): boolean {
+	if (statement.type !== 'VariableDeclaration') return false;
+	return asNodes(statement.declarations).some((declaration) => {
+		const init = declaration.init as AnyNode | undefined;
+		return !!frameworkCallName(init) && loweredFrameworkCalls.has(frameworkCallName(init)!);
+	});
+}
+
+function isFrameworkCall(node: AnyNode | null | undefined, name: string): boolean {
+	return frameworkCallName(node) === name;
+}
+
+function frameworkCallName(node: AnyNode | null | undefined): string | null {
+	return node?.type === 'CallExpression' ? getIdentifierName(node.callee as AnyNode | undefined) : null;
+}
+
+function returnArgument(statement: AnyNode): AnyNode | undefined {
+	return statement.type === 'ReturnStatement' ? (statement.argument as AnyNode | undefined) : undefined;
+}
+
+function indentLines(lines: ReadonlyArray<string>): string[] {
+	return lines.flatMap((line) => line.split('\n').map((part) => `	${part}`));
+}
+
+function hasExecutableBodyStatements(component: AnyNode, root: AnyNode, source: string): boolean {
+	const body = component.body as AnyNode | undefined;
+	if (!body) return false;
+	for (const statement of childNodes(body)) {
+		if (isIgnorableTextNode(statement)) continue;
+		if (statement === root || returnArgument(statement) === root) continue;
+		if (isStateDeclaration(statement) || isLoweredFrameworkDeclaration(statement)) continue;
+		if (expressionSource(statement, source)) return true;
+	}
+	return false;
 }
 
 function destructureProps(propNames: ReadonlyArray<string>): string | null {
