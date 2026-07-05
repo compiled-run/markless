@@ -111,6 +111,58 @@ export function helperStateReturnUnsupportedDiagnostic(input: {
 	};
 }
 
+export function crossModuleHelperStateReturnUnsupportedDiagnostic(input: {
+	readonly helperName: string;
+	readonly sourceModule: string;
+	readonly init: AnyNode;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	return helperReturnUnsupportedDiagnostic({
+		title: 'Cross-module helper-created state is not supported yet',
+		message: `Cannot call cross-module helper "${input.helperName}" from "${input.sourceModule}" as component state. This slice supports same-module helper-created state only.`,
+		why: 'The compiler can now connect same-module helper-created state to a component call site, but this worktree does not have the multi-module harness needed to prove imported helper call trees.',
+		suggestion: 'Move the helper into this .tsrx module for now, or declare the state in the component body and pass it to imported helper code.',
+		span: sourceSpan(input.init, input.filename),
+	});
+}
+
+export function unsupportedHelperStateReturnDiagnostic(input: {
+	readonly helperName: string;
+	readonly source: string;
+	readonly init: AnyNode;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	return helperReturnUnsupportedDiagnostic({
+		title: 'Helper-created state return shape is not supported yet',
+		message: `Cannot connect helper "${input.helperName}" return value "${input.source}" to graph state. This slice supports returning one state() or computed() binding directly.`,
+		why: 'Object-return and more complex helper return shapes need additional return-path alias artifacts before reads, writes, and payload cells can stay unambiguous.',
+		suggestion: 'Return the graph binding directly from the same-module helper, or declare the state in the component body for now.',
+		span: sourceSpan(input.init, input.filename),
+	});
+}
+
+function helperReturnUnsupportedDiagnostic(input: {
+	readonly title: string;
+	readonly message: string;
+	readonly why: string;
+	readonly suggestion: string;
+	readonly span: SourceSpan;
+}): SemanticGraphDiagnostic {
+	return {
+		code: 'MARKLESS_STATE_HELPER_RETURN_UNSUPPORTED',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: input.title,
+		message: input.message,
+		why: input.why,
+		primarySpan: input.span,
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		suggestions: [{ message: input.suggestion }],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_HELPER_RETURN_UNSUPPORTED',
+	};
+}
+
 function unstableCreationSiteText(
 	site: 'computed' | 'handler' | 'branch' | 'loop',
 	name: string,
