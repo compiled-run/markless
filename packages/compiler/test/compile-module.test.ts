@@ -117,6 +117,30 @@ export function App() @{
 }
 `;
 
+const libraryComponentSource = `
+import { state } from '@markless/core';
+
+export function titleCopy(value) {
+	return value.toUpperCase();
+}
+
+export function Card() @{
+	let title = state("Library card");
+
+	<article>{titleCopy(title)}</article>
+}
+
+export function Badge() @{
+	let label = state("New");
+
+	<span>{label}</span>
+}
+`;
+
+function countOccurrences(source: string, needle: string): number {
+	return source.split(needle).length - 1;
+}
+
 const wholeBindingAliasEventSource = `
 import { state } from '@markless/core';
 
@@ -762,6 +786,21 @@ test('compileTsrxModule orchestrates source to payload scripts and resolver modu
 			}),
 		]),
 	);
+});
+
+test('public render helpers are emitted once when CSR and SSR library modules are combined', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/card.tsrx',
+		source: libraryComponentSource,
+		symbols: [],
+	});
+
+	const combinedModuleSource = [
+		result.publicRenderModule.csrModuleSource,
+		result.publicRenderModule.ssrModuleSource,
+	].join('\n');
+
+	expect(countOccurrences(combinedModuleSource, 'function readMarklessPublicPath')).toBe(1);
 });
 
 test('executed modules deliver object-path state initializer snapshots', async () => {
