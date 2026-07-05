@@ -1,6 +1,7 @@
 import { parseModule } from '@tsrx/core';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import type { SemanticGraphArtifact, SemanticGraphInput } from '../../artifacts.ts';
+import { applyMarklessAllowDirectives } from '../../diagnostics.ts';
 import {
 	collectAsyncBoundary,
 	collectAsyncBoundaryDiagnostics,
@@ -83,7 +84,17 @@ export async function buildSemanticGraph(
 	collectElementHandleDiagnostics(graph);
 	collectAsyncBoundaryDiagnostics(graph);
 
-	return graph;
+	return {
+		...graph,
+		diagnostics: applyMarklessAllowDirectives({
+			source: input.source,
+			filename: input.filename,
+			diagnostics: graph.diagnostics,
+			phase: 'semantic-graph',
+			passId: 'tsrx-semantic-graph',
+			artifactKeys: ['semanticGraph'],
+		}) as SemanticGraphArtifact['diagnostics'],
+	};
 }
 
 function walk(node: AnyNode | null | undefined, state: WalkState): void {

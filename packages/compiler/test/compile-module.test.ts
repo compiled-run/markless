@@ -1538,6 +1538,7 @@ export function App() @{
 	]);
 
 	<section>
+		// markless-allow MARKLESS_REPEAT_KEY_IS_INDEX: static list, order never changes
 		@for (const record of records; index slot; key slot) {
 			<p>{record.label}</p>
 		}
@@ -1551,6 +1552,8 @@ export function App() @{
 		expect.objectContaining({
 			code: 'MARKLESS_REPEAT_KEY_IS_INDEX',
 			severity: 'warning',
+			suppressed: true,
+			suppressionReason: 'static list, order never changes',
 		}),
 	]);
 	expect(result.publicRenderPlan.repeatGates).toEqual([

@@ -137,6 +137,18 @@ export function Form() @{
 const detachedSyncPolicySource = `import { state } from '@markless/core'; export function Link() @{ let count = state(0); <a href="/next" onClick={(event) => { const pd = event.preventDefault; pd(); count++; }}>Next {count}</a> }`;
 const eventExpressionSource = `import { state } from '@markless/core'; export function Counter() @{ let count = state(0); <button onClick={count++}>{count}</button> }`;
 
+function repeatAllowSource(...sites: readonly string[]): string {
+	return `import { state } from '@markless/core'; export function App() @{ const rows = state([{ id: 'a' }]); <ul>${sites.join('\n')}</ul> }`;
+}
+
+function repeatSite(header: string, allow = ''): string {
+	return `${allow ? `// markless-allow ${allow}\n` : ''}@for (${header}) { <li>{row.id}</li> }`;
+}
+
+async function repeatDiagnostics(...sites: readonly string[]) {
+	return (await buildSemanticGraph({ filename: 'src/Repeat.tsrx', source: repeatAllowSource(...sites) })).diagnostics;
+}
+
 const graphDestructureDefaultSource = `
 import { state } from '@markless/core';
 
@@ -237,6 +249,101 @@ test('buildSemanticGraph reports module-scope graph state creation', async () =>
 				end: computedStart + 'computed(() => leaked * 2)'.length,
 			},
 			docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_MODULE_SCOPE',
+		}),
+	]);
+});
+
+test('buildSemanticGraph marks allowed index-key warnings as suppressed with the reason', async () => {
+	const diagnostics = await repeatDiagnostics(
+		repeatSite(
+			'const row of rows; index i; key i',
+			'MARKLESS_REPEAT_KEY_IS_INDEX: static list, order never changes',
+		),
+	);
+
+	expect(diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_REPEAT_KEY_IS_INDEX',
+			severity: 'warning',
+			suppressed: true,
+			suppressionReason: 'static list, order never changes',
+		}),
+	]);
+});
+
+test('buildSemanticGraph keeps markless-allow per site for index-key warnings', async () => {
+	const diagnostics = await repeatDiagnostics(
+		repeatSite(
+			'const row of rows; index i; key i',
+			'MARKLESS_REPEAT_KEY_IS_INDEX: first list is positional',
+		),
+		repeatSite('const row of rows; index slot; key slot'),
+	);
+
+	expect(diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_REPEAT_KEY_IS_INDEX',
+			suppressed: true,
+			suppressionReason: 'first list is positional',
+		}),
+		expect.objectContaining({
+			code: 'MARKLESS_REPEAT_KEY_IS_INDEX',
+			severity: 'warning',
+		}),
+	]);
+	expect(diagnostics[1]).not.toHaveProperty('suppressed');
+});
+
+test('buildSemanticGraph keeps errors unsuppressed and warns about markless-allow error codes', async () => {
+	const diagnostics = await repeatDiagnostics(
+		repeatSite(
+			'const row of rows',
+			'MARKLESS_REPEAT_KEY_REQUIRED: fixture keeps append-only order',
+		),
+	);
+
+	expect(diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_REPEAT_KEY_REQUIRED',
+			severity: 'error',
+		}),
+		expect.objectContaining({
+			code: 'MARKLESS_ALLOW_ERROR_UNSUPPRESSIBLE',
+			severity: 'warning',
+			message: expect.stringContaining('MARKLESS_REPEAT_KEY_REQUIRED'),
+		}),
+	]);
+	expect(diagnostics[0]).not.toHaveProperty('suppressed');
+});
+
+test('buildSemanticGraph warns when markless-allow omits the required reason', async () => {
+	const diagnostics = await repeatDiagnostics(
+		repeatSite('const row of rows; index i; key i', 'MARKLESS_REPEAT_KEY_IS_INDEX'),
+	);
+
+	expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+		'MARKLESS_REPEAT_KEY_IS_INDEX',
+		'MARKLESS_ALLOW_REASON_REQUIRED',
+	]);
+	expect(diagnostics[0]).not.toHaveProperty('suppressed');
+	expect(diagnostics[1]).toEqual(
+		expect.objectContaining({
+			severity: 'warning',
+			message: expect.stringContaining('// markless-allow CODE: reason'),
+		}),
+	);
+});
+
+test('buildSemanticGraph warns when markless-allow is stale for a site', async () => {
+	const diagnostics = await repeatDiagnostics(
+		repeatSite('const row of rows; key row.id', 'MARKLESS_REPEAT_KEY_IS_INDEX: stale'),
+	);
+
+	expect(diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_ALLOW_STALE',
+			severity: 'warning',
+			message: expect.stringContaining('MARKLESS_REPEAT_KEY_IS_INDEX'),
 		}),
 	]);
 });
