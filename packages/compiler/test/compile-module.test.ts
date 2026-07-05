@@ -1190,6 +1190,62 @@ test('compileTsrxModule renders prop template reads in CSR and SSR modules', asy
 	expect((await renderTestSsr(result, { label: 'prop value' })).html).toBe('<main>prop value</main>');
 });
 
+test('T005 compileTsrxModule renders pure composite template expressions in CSR and SSR modules', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/CompositeTemplateExpressions.tsrx',
+		source: `import { state } from '@markless/core';
+export function App() @{
+	let flag = state(true);
+	let count = state(2);
+	const user = state({ pro: false, name: 'Ada' });
+	const name = state(null);
+	<section>
+		<p>{flag ? 'Close' : 'Open'}</p>
+		<p>{user.pro ? user.name : 'guest'}</p>
+		<p>{count + 1}</p>
+		<p>{flag && user.name}</p>
+		<p>{name ?? 'anon'}</p>
+		<p>{\`Hi \${user.name}\`}</p>
+	</section>
+}`,
+		symbols: [],
+	});
+
+	const csr = (await renderTestCsr(result)) as { readonly root: PublicRenderTestElement };
+	const ssr = await renderTestSsr(result);
+
+	expect(csr.root.textContent).toBe('Closeguest3AdaanonHi Ada');
+	expect(ssr.html).toContain('<p>Close</p>');
+	expect(ssr.html).toContain('<p>guest</p>');
+	expect(ssr.html).toContain('<p>3</p>');
+	expect(ssr.html).toContain('<p>Ada</p>');
+	expect(ssr.html).toContain('<p>anon</p>');
+	expect(ssr.html).toContain('<p>Hi Ada</p>');
+	expect(result.diagnostics ?? []).toEqual([]);
+	expect(result.protocolView.domUpdates.map((update) => update.source)).toEqual([
+		"flag ? 'Close' : 'Open'",
+		"user.pro ? user.name : 'guest'",
+		'count + 1',
+		'flag && user.name',
+		"name ?? 'anon'",
+		'`Hi ${user.name}`',
+	]);
+	expect(result.protocolState.computed.map((computed) => computed.dependencies)).toEqual([
+		[{ graphNodeId: 'state:flag', path: [] }],
+		[
+			{ graphNodeId: 'state:user', path: ['pro'] },
+			{ graphNodeId: 'state:user', path: ['name'] },
+		],
+		[{ graphNodeId: 'state:count', path: [] }],
+		[
+			{ graphNodeId: 'state:flag', path: [] },
+			{ graphNodeId: 'state:user', path: ['name'] },
+		],
+		[{ graphNodeId: 'state:name', path: [] }],
+		[{ graphNodeId: 'state:user', path: ['name'] }],
+	]);
+});
+
 test('compileTsrxModule lets pre-root guard clauses render nothing in CSR modules', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/RenderBodyGuard.tsrx',

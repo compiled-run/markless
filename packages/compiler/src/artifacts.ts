@@ -337,6 +337,7 @@ export type SemanticTemplateRead = {
 	readonly hostNodeId: string;
 	readonly target: SemanticTemplateBindingTarget;
 	readonly asyncBoundaryId?: string;
+	readonly computedGraphNodeId?: string;
 };
 
 export type SemanticElementHandleBinding = {
