@@ -113,6 +113,23 @@ export function unsupportedRenderBodyDiagnostic(input: { readonly node: AnyNode;
 	};
 }
 
+export function undeclaredTemplateReadDiagnostic(input: { readonly name: string; readonly node: AnyNode; readonly filename: string; }): CompilerDiagnostic {
+	const message = `${input.name} would throw ReferenceError when the render module runs because no prop, body declaration, module declaration, or import with that name is in scope.`;
+	return {
+		code: 'MARKLESS_TEMPLATE_READ_UNDECLARED',
+		severity: 'error',
+		phase: 'public-render',
+		title: 'Template read is not declared in render scope',
+		message,
+		why: 'Public CSR and SSR render modules execute template expressions directly during initial render. An identifier that is not declared in the emitted render scope would crash instead of rendering HTML.',
+		primarySpan: sourceSpan(input.node, input.filename),
+		passId: 'public-render-plan',
+		artifactKeys: ['publicRenderPlan'],
+		suggestions: [{ message: `Declare ${input.name} in the component body, pass it as a prop, import it, or hoist it to a module-scope declaration before reading it in the template.` }],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_TEMPLATE_READ_UNDECLARED',
+	};
+}
+
 export function conditionalComponentRootDiagnostic(input: { readonly node: AnyNode; readonly filename: string; readonly componentName: string; }): CompilerDiagnostic {
 	return {
 		code: 'MARKLESS_COMPONENT_ROOT_CONDITIONAL',

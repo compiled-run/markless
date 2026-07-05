@@ -27,6 +27,7 @@ import {
 	childrenOpacityDiagnostic,
 	conditionalComponentRootDiagnostic,
 	noRenderableRootDiagnostic,
+	undeclaredTemplateReadDiagnostic,
 	unsupportedRenderBodyDiagnostic,
 	unsupportedRenderConstructDiagnostic,
 	unsupportedRenderRootDiagnostic,
@@ -66,6 +67,20 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 		return emptyPlan(componentRootDiagnostics(ast, input.source.filename));
 	}
 	const root = selectedRoot.root;
+	const undeclaredTemplateReadDiagnostics = collectUndeclaredTemplateReadDiagnostics({
+		ast,
+		component: selectedRoot.component,
+		filename: input.source.filename,
+		moduleImports: input.semanticGraph.moduleImports.map((moduleImport) => moduleImport.localName),
+		repeatLocals: input.semanticGraph.keyedRepeats.flatMap((repeat) =>
+			repeat.indexName ? [repeat.itemName, repeat.indexName] : [repeat.itemName],
+		),
+		root,
+		source: input.source.source,
+	});
+	if (undeclaredTemplateReadDiagnostics.length > 0) {
+		return emptyPlan(undeclaredTemplateReadDiagnostics);
+	}
 
 	const assignedHosts = assignHostIds(
 		root,
@@ -860,6 +875,110 @@ function componentUnsupportedBodyDiagnostics(ast: AnyNode, filename: string, sou
 	}
 	return [];
 }
+
+function collectUndeclaredTemplateReadDiagnostics(input: {
+	readonly ast: AnyNode;
+	readonly component: AnyNode;
+	readonly filename: string;
+	readonly moduleImports: ReadonlyArray<string>;
+	readonly repeatLocals: ReadonlyArray<string>;
+	readonly root: AnyNode;
+	readonly source: string;
+}) {
+	const scope = new Set([...knownRenderGlobals, ...input.moduleImports, ...input.repeatLocals, ...declarations(asNodes(input.ast.body).filter((statement) => !getComponentFunction(statement))), ...componentPropNames(input.component), ...declarations(childNodes(input.component.body as AnyNode | undefined)), ...catchNames(input.root)]);
+	for (const read of emittedTemplateReads(input.root, input.source)) {
+		const name = [...identifiersFromSource(read.source)].find((identifier) => !scope.has(identifier));
+		if (!name) continue;
+		return [undeclaredTemplateReadDiagnostic({ name, node: read.node, filename: input.filename })];
+	}
+	return [];
+}
+
+function declarations(nodes: ReadonlyArray<AnyNode>): string[] {
+	return nodes.flatMap((node) => {
+		node = node.type === 'ExportNamedDeclaration' ? (node.declaration as AnyNode | undefined) ?? node : node;
+		if (node.type === 'VariableDeclaration') return asNodes(node.declarations).flatMap((declaration) => bindingNames(declaration.id as AnyNode | undefined));
+		if (node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration') return bindingNames(node.id as AnyNode | undefined);
+		return [];
+	});
+}
+
+function bindingNames(node: AnyNode | undefined): string[] {
+	if (node?.type === 'AssignmentPattern') return bindingNames(node.left as AnyNode | undefined);
+	const name = getIdentifierName(node);
+	return name ? [name] : [];
+}
+
+function catchNames(root: AnyNode): string[] {
+	const names: string[] = [];
+	const visit = (node: AnyNode | null | undefined): void => {
+		if (!node || typeof node !== 'object') return;
+		if (node.type === 'CatchClause') names.push(...bindingNames(node.param as AnyNode | undefined));
+		for (const child of childNodes(node)) visit(child);
+	};
+	visit(root);
+	return names;
+}
+
+function componentPropNames(component: AnyNode): string[] {
+	const param = asNodes(component.params)[0];
+	if (!param) return [];
+	const name = getIdentifierName(param);
+	if (name) return [name];
+	return param.type === 'ObjectPattern'
+		? asNodes(param.properties).flatMap((property) => {
+				const prop = property as AnyNode;
+				return bindingNames((prop.value as AnyNode | undefined) ?? (prop.key as AnyNode | undefined));
+			})
+		: [];
+}
+
+function emittedTemplateReads(root: AnyNode, fileSource: string): Array<{ readonly source: string; readonly node: AnyNode }> {
+	const reads: Array<{ readonly source: string; readonly node: AnyNode }> = [];
+	const add = (node: AnyNode | undefined) => {
+		if (!node) return;
+		const source = expressionSource(node, fileSource);
+		if (source) reads.push({ source, node });
+	};
+	const visitTemplate = (node: AnyNode | null | undefined): void => {
+		if (!node || typeof node !== 'object') return;
+			if (node.type === 'JSXExpressionContainer' || node.type === 'TSRXExpression') { add(node.expression as AnyNode | undefined); return; }
+			if (node.type === 'JSXIfExpression') add(node.test as AnyNode | undefined);
+			if (node.type === 'JSXSwitchExpression') {
+				add(node.discriminant as AnyNode | undefined);
+				for (const switchCase of asNodes(node.cases)) add(switchCase.test as AnyNode | undefined);
+			}
+		if (node.type === 'JSXForExpression') {
+			add(node.collection as AnyNode | undefined);
+			add(node.key as AnyNode | undefined);
+		}
+		add(getDynamicTagExpression(node) ?? undefined);
+		for (const attribute of getElementAttributes(node)) {
+			const attributeName = getIdentifierName(attribute.name as AnyNode | undefined) ?? '';
+			if (isEventAttribute(attributeName) || attributeName === 'attach' || attributeName === 'el') continue;
+			add(isSpreadAttribute(attribute) ? attribute.argument as AnyNode | undefined : unwrapExpressionContainer(attribute.value as AnyNode | undefined));
+		}
+		for (const child of childNodes(node)) visitTemplate(child);
+	};
+	visitTemplate(root);
+	return reads;
+}
+
+function identifiersFromSource(source: string): Set<string> {
+	const stripped = source.replaceAll(/(['"`])(?:\\.|(?!\1)[\s\S])*\1/g, '');
+	const names = new Set<string>();
+	for (const match of stripped.matchAll(/\b[A-Za-z_$][\w$]*\b/g)) {
+		const index = match.index ?? 0;
+		const name = match[0]!;
+		const before = stripped[index - 1];
+		const after = stripped.slice(index + name.length).trimStart()[0];
+		if (before === '.' || after === ':') continue;
+		names.add(name);
+	}
+	return names;
+}
+
+const knownRenderGlobals = new Set('Array Boolean Date Infinity Intl JSON Map Math NaN Number Object RegExp Set String false null true URL URLSearchParams undefined'.split(' '));
 
 function unsupportedBodyStatementMessage(statement: AnyNode, source: string): string | null {
 	const declarations = statement.type === 'VariableDeclaration' ? asNodes(statement.declarations) : [];
