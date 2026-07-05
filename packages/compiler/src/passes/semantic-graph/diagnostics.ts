@@ -278,14 +278,20 @@ export function stateWriteInTemplateDiagnostic(input: {
 	readonly target: string;
 	readonly targetSpan?: SourceSpan;
 	readonly filename: string;
+	readonly branchCondition?: boolean;
 }): SemanticGraphDiagnostic {
+	const message = input.branchCondition
+		? `\`${input.source}\` assigns to \`${input.target}\` while deciding which branch to render. A branch test is a read; writing \`${input.target}\` there would re-trigger the very update that is evaluating it. If you meant a comparison, write \`===\`.`
+		: `\`${input.source}\` writes to \`${input.target}\` while rendering its value. A template expression is a DOM read; writing \`${input.target}\` there would re-trigger the same DOM update that is rendering it.`;
 	return {
 		code: 'MARKLESS_STATE_WRITE_IN_TEMPLATE',
 		severity: 'error',
 		phase: 'semantic-graph',
 		title: 'Cannot write state inside a template expression',
-		message: `\`${input.source}\` writes to \`${input.target}\` while rendering its value. A template expression is a DOM read; writing \`${input.target}\` there would re-trigger the same DOM update that is rendering it.`,
-		why: 'DOM updates are the only effects in the demand-driven graph; a write inside a DOM read creates a self-waking cycle that cannot resume.',
+		message,
+		why: input.branchCondition
+			? 'DOM updates are the only effects in the demand-driven graph; a write inside a branch test creates a self-waking cycle that cannot resume.'
+			: 'DOM updates are the only effects in the demand-driven graph; a write inside a DOM read creates a self-waking cycle that cannot resume.',
 		primarySpan: input.targetSpan ?? fallbackSpan(input.filename),
 		passId: 'tsrx-semantic-graph',
 		artifactKeys: ['semanticGraph'],

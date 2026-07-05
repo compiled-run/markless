@@ -667,7 +667,7 @@ function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string {
 
 	if (node.type === 'JSXIfExpression') {
 		const test = node.test as AnyNode | undefined;
-		const testSource = test ? expressionSource(test, context.source) : 'false';
+		const testSource = `(${test ? expressionSource(test, context.source) : 'false'})`;
 		if (context.mode === 'csr') {
 			const csrSite = context.branchSites?.[context.nextBranchSiteIndex ?? 0];
 			if (context.branchSites) {
@@ -1067,9 +1067,7 @@ function emitSwitchHtml(node: AnyNode, context: HtmlRenderContext): string {
 		? context.branchReactivityGates?.find((item) => item.branchSiteId === site.id)
 		: undefined;
 	const discriminant = node.discriminant as AnyNode | undefined;
-	const discriminantSource = discriminant
-		? expressionSource(discriminant, context.source)
-		: 'undefined';
+	const discriminantSource = `(${discriminant ? expressionSource(discriminant, context.source) : 'undefined'})`;
 
 	const before =
 		context.mode === 'ssr'
