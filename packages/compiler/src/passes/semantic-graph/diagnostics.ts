@@ -245,6 +245,34 @@ export function stateElementHandleUnsupportedDiagnostic(input: {
 	};
 }
 
+export function templateAsValueDiagnostic(input: {
+	readonly siteSource: string;
+	readonly name?: string;
+	readonly node: AnyNode;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	const target = input.name ? ` in "${input.name}"` : '';
+	return {
+		code: 'MARKLESS_TEMPLATE_AS_VALUE',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: 'A template is not a value',
+		message: `${input.siteSource} puts a template${target} where Markless needs runtime data. Templates compile into page structure with locators, not values to store, pass, or serialize.`,
+		why: 'Markless has no VDOM. Templates compile to DOM structure and resume locators, so there is no render-output object that can live in state, a computed value, a local variable, or an array.',
+		primarySpan: sourceSpan(input.node, input.filename),
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		source: input.siteSource,
+		suggestions: [
+			{
+				message:
+					'Keep templates in the tree. Use @if/@for for conditional or repeated structure, extract child components for reusable structure, or pass nested content through children projection.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_TEMPLATE_AS_VALUE',
+	};
+}
+
 export function sharedDefinitionCycleDiagnostic(input: {
 	readonly cycle: ReadonlyArray<string>;
 	readonly closingDependency: SemanticSharedDependency;

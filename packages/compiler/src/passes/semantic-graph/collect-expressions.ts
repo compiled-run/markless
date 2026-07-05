@@ -1,5 +1,6 @@
 import { asNodes, childNodes, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
+import { templateAsValueDiagnostic } from './diagnostics.ts';
 import type { WalkState } from './types.ts';
 
 export function collectAssignment(node: AnyNode, state: WalkState): void {
@@ -42,6 +43,19 @@ export function collectCollectionCall(node: AnyNode, state: WalkState): void {
 	const target = callee.object as AnyNode | undefined;
 	if (!target) return;
 
+	for (const argument of asNodes(node.arguments)) {
+		const templateValue = findTemplateValue(argument);
+		if (!templateValue) continue;
+		state.graph.diagnostics.push(
+			templateAsValueDiagnostic({
+				siteSource: expressionSource(node, state.source),
+				node: templateValue,
+				filename: state.filename,
+			}),
+		);
+		markTemplateValueHandled(templateValue);
+	}
+
 	state.graph.stateWrites.push({
 		target: expressionSource(target, state.source),
 		...sharedScope(state),
@@ -53,6 +67,26 @@ export function collectCollectionCall(node: AnyNode, state: WalkState): void {
 		),
 		optional: node.optional === true || callee.optional === true,
 	});
+}
+
+const templateValueTypes = new Set([
+	'Element', 'JSXElement', 'Fragment', 'JSXFragment',
+	'JSXIfExpression', 'JSXForExpression', 'JSXSwitchExpression', 'JSXTryExpression',
+]);
+
+export function findTemplateValue(node: AnyNode | undefined): AnyNode | null {
+	if (!node) return null;
+	if (templateValueTypes.has(node.type)) return node;
+	if (node.type !== 'ArrayExpression') return null;
+	for (const element of asNodes(node.elements)) {
+		const found = findTemplateValue(element);
+		if (found) return found;
+	}
+	return null;
+}
+
+export function markTemplateValueHandled(node: AnyNode): void {
+	Object.assign(node, { type: 'MarklessTemplateValue' });
 }
 
 export function collectDelete(node: AnyNode, state: WalkState): void {

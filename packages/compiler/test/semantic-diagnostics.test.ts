@@ -96,6 +96,8 @@ export function Handles() @{
 }
 `;
 
+const templateAsValueSource = `import { state, computed } from '@markless/core'; export function App() @{ const banner = <h1>Hi</h1>; const rows = []; rows.push(<li>One</li>); const view = state(<p>Stored</p>); const card = computed(() => <article>Card</article>); const tiles = [<span>Tile</span>]; <section>{banner}{rows}{view}{card}{tiles}</section> }`;
+
 const componentAttachSource = `
 import { state } from '@markless/core';
 
@@ -555,6 +557,47 @@ test('buildSemanticGraph reports element handles stored in state', async () => {
 			docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_ELEMENT_HANDLE_UNSERIALIZABLE',
 		}),
 	]);
+});
+
+test('buildSemanticGraph reports templates stored or passed as runtime values', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/TemplateAsValue.tsrx',
+		source: templateAsValueSource,
+	});
+
+	const diagnostics = graph.diagnostics.filter(
+		(diagnostic) => diagnostic.code === 'MARKLESS_TEMPLATE_AS_VALUE',
+	);
+	expect(diagnostics).toHaveLength(5);
+	expect(diagnostics[0]).toEqual(
+		expect.objectContaining({
+			severity: 'error',
+			phase: 'semantic-graph',
+			title: 'A template is not a value',
+			message: expect.stringContaining('banner'),
+			why: expect.stringContaining('no VDOM'),
+			suggestions: [expect.objectContaining({ message: expect.stringContaining('@if/@for') })],
+			docsUrl: 'https://markless.dev/errors/MARKLESS_TEMPLATE_AS_VALUE',
+		}),
+	);
+	expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+		expect.stringContaining('banner'),
+		expect.stringContaining('rows.push(<li>One</li>)'),
+		expect.stringContaining('state(<p>Stored</p>)'),
+		expect.stringContaining('computed(() => <article>Card</article>)'),
+		expect.stringContaining('tiles'),
+	]);
+	expect(graph.hostNodes.map((host) => host.tagName)).toEqual(['section']);
+	expect(graph.graphBindings.map((binding) => binding.id)).not.toContain('state:view');
+	expect(graph.graphBindings.map((binding) => binding.id)).not.toContain('computed:card');
+});
+
+test('buildSemanticGraph keeps legal template structure positions valid', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/LegalTemplateStructure.tsrx',
+		source: `import { state } from '@markless/core'; import { Link } from '@markless/core/router'; export function App() @{ const open = state(true); <main>@if (open) { <h1>Open</h1> } @else { <h1>Closed</h1> }<Link><strong>Projected</strong></Link></main> }`,
+	});
+	expect(graph.diagnostics).toEqual([]);
 });
 
 test('buildSemanticGraph reports attach on components instead of treating it as a host behavior', async () => {

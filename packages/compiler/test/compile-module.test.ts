@@ -995,6 +995,31 @@ test('compileTsrxModule diagnoses undeclared template reads before public render
 	expect(result.publicRenderModule.moduleSource).not.toContain('missingLabel');
 });
 
+test('compileTsrxModule reports template-as-value before undeclared local reads', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/TemplateAsValue.tsrx',
+		source: `import { state } from '@markless/core';
+export function App() @{
+	const banner = <h1>Hi</h1>;
+	const rows = [];
+	rows.push(<li>One</li>);
+	const view = state(<p>Stored</p>);
+	const tiles = [<span>Tile</span>];
+	<section>{banner}{rows}{view}{tiles}</section>
+}`,
+		symbols: [],
+	});
+
+	expect(result.semanticGraph.diagnostics.map((diagnostic) => diagnostic.code)).toEqual(
+		expect.arrayContaining(['MARKLESS_TEMPLATE_AS_VALUE']),
+	);
+	expect(result.semanticGraph.hostNodes.map((host) => host.tagName)).toEqual(['section']);
+	expect(result.protocolView.locators.map((locator) => locator.tagName)).toEqual(['section']);
+	expect(result.protocolState.cells.map((cell) => cell.graphNodeId)).not.toContain('state:view');
+	expect(result.publicRenderModule.moduleSource).not.toContain('marklessSsrText(banner)');
+	expect(result.publicRenderModule.moduleSource).not.toContain('marklessSsrText(rows)');
+});
+
 test('compileTsrxModule renders plain body local template reads in CSR and SSR modules', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/PlainBodyLocalTemplateRead.tsrx',
