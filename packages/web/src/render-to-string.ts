@@ -53,7 +53,7 @@ export async function renderToString(
 		computed: serializeRuntimeAsyncSnapshots(rawState.computed ?? []),
 	};
 	const view = containerScopedView(output.view ?? emptyViewPayload());
-	validateKeyedRepeatPayloadKeys({ state, view });
+	await validateKeyedRepeatPayloadKeys({ state, view });
 	const payloadScripts = hasPayload ? renderPayloadScripts({ state, view }) : undefined;
 	const resumeModuleUrl = options.resumeModuleUrl ?? artifactResumeModuleUrl(component);
 	const browserTriggers = hasBrowserTriggers(view, state);

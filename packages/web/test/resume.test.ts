@@ -276,7 +276,7 @@ test('resume payload sync computed derives after dependency writes and updates D
 			value: context.value,
 		});
 	};
-	const graph = createRuntimeGraphFromResumePayload({
+	const graph = await createRuntimeGraphFromResumePayload({
 		state,
 		view,
 		root,

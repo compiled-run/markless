@@ -140,7 +140,7 @@ test('runtime decodes async payload scripts into graph state and resume view rec
 		stateScript: scripts.stateScript,
 		viewScript: scripts.viewScript,
 	});
-	const graph = createRuntimeGraphFromStatePayload(decoded.state);
+	const graph = await createRuntimeGraphFromStatePayload(decoded.state);
 	const loadedSymbols: string[] = [];
 	const resume = createResumeRuntime({
 		root,
@@ -202,7 +202,7 @@ test('runtime decodes async payload scripts from a document-like script lookup',
 	});
 });
 
-test('runtime decodes shared definition metadata from async state payload scripts', () => {
+test('runtime decodes shared definition metadata from async state payload scripts', async () => {
 	const state = createProtocolStatePayload({
 		cells: [
 			{
@@ -257,7 +257,7 @@ test('runtime decodes shared definition metadata from async state payload script
 	};
 	const scripts = renderPayloadScripts({ state, view });
 	const decoded = decodePayloadScripts(scripts);
-	const graph = createRuntimeGraphFromStatePayload(decoded.state);
+	const graph = await createRuntimeGraphFromStatePayload(decoded.state);
 
 	expect(decoded.state.sharedDefinitions).toEqual([
 		{
@@ -354,7 +354,7 @@ test('runtime decodes shared definition metadata from async state payload script
 	expect(graph.takeSharedPatches()).toEqual([]);
 });
 
-test('runtime folds received shared patch records into decoded graph state', () => {
+test('runtime folds received shared patch records into decoded graph state', async () => {
 	const state = createProtocolStatePayload({
 		cells: [
 			{
@@ -404,8 +404,8 @@ test('runtime folds received shared patch records into decoded graph state', () 
 		asyncBoundaries: [],
 	};
 	const decoded = decodePayloadScripts(renderPayloadScripts({ state, view }));
-	const sourceGraph = createRuntimeGraphFromStatePayload(decoded.state);
-	const receiverGraph = createRuntimeGraphFromStatePayload(decoded.state);
+	const sourceGraph = await createRuntimeGraphFromStatePayload(decoded.state);
+	const receiverGraph = await createRuntimeGraphFromStatePayload(decoded.state);
 
 	sourceGraph.writeShared({
 		definitionId: 'shared:src/session.tsrx#session',

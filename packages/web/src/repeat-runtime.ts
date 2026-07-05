@@ -1,7 +1,7 @@
 import {
-	deserializeGraphValue,
+	deserializeGraphValueForClient,
 	type SerializedGraphPayload,
-} from '@markless/serializer/decode';
+} from '@markless/serializer/decode-client';
 import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer/protocol';
 import type { RuntimeGraph } from '@markless/runtime';
 
@@ -46,18 +46,19 @@ export function validateKeyedRepeatGraphKeys(
 	}
 }
 
-export function validateKeyedRepeatPayloadKeys(input: {
+export async function validateKeyedRepeatPayloadKeys(input: {
 	readonly state: ProtocolStatePayload;
 	readonly view: Pick<ProtocolViewPayload, 'keyedRepeats'>;
-}): void {
-	const cells = new Map(
-		input.state.cells.map((cell) => [
+}): Promise<void> {
+	const entries = await Promise.all(
+		input.state.cells.map(async (cell) => [
 			cell.graphNodeId,
 			cell.value === undefined
 				? undefined
-				: deserializeGraphValue(cell.value as SerializedGraphPayload),
-		]),
+				: await deserializeGraphValueForClient(cell.value as SerializedGraphPayload),
+		] as const),
 	);
+	const cells = new Map(entries);
 	validateKeyedRepeatGraphKeys(
 		{
 			read(graphNodeId, path = []) {

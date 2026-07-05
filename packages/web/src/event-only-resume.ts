@@ -148,7 +148,7 @@ async function createEventOnlyResumeContainerState(
 	const elementsByHostId = await materializeDomLocators(input.root, input.view.locators);
 	const activeBehaviorHosts = new Set<string>();
 	const { createEventOnlyResumeGraph } = await import('./event-only-graph.ts');
-	const graph = createEventOnlyResumeGraph({
+	const graph = await createEventOnlyResumeGraph({
 		state: input.state,
 		view: input.view,
 		loadSymbol: input.loadSymbol,
