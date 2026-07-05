@@ -375,6 +375,41 @@ async function renderTestSsr(result: Awaited<ReturnType<typeof compileTsrxModule
 	return (module.marklessRenderSsr as (props?: unknown) => Promise<{ readonly html: string }>)(props);
 }
 
+function payloadStateCellValue(state: ProtocolStatePayload, graphNodeId: string): unknown {
+	const cell = state.cells.find((candidate) => candidate.graphNodeId === graphNodeId);
+	expect(cell).toBeDefined();
+	expect(JSON.stringify(cell)).not.toContain('"$type":"undefined"');
+	return deserializeGraphValue(cell!.value!);
+}
+
+async function expectRuntimeInitializerSnapshot(
+	body: string,
+	expected: number,
+): Promise<void> {
+	const result = await compileTsrxModule({
+		filename: 'src/StateInit.tsrx',
+		source: `import { state } from '@markless/core';
+export function App() @{
+${body}
+<output>{n}</output>
+}`,
+		symbols: [],
+	});
+	const csrOutput = (await renderTestCsr(result)) as {
+		readonly root: PublicRenderTestElement;
+		readonly state: ProtocolStatePayload;
+	};
+	const ssrOutput = (await renderTestSsr(result)) as {
+		readonly html: string;
+		readonly state: ProtocolStatePayload;
+	};
+
+	expect(csrOutput.root.textContent).toBe(String(expected));
+	expect(payloadStateCellValue(csrOutput.state, 'state:n')).toBe(expected);
+	expect(ssrOutput.html).toBe(`<output>${expected}</output>`);
+	expect(payloadStateCellValue(ssrOutput.state, 'state:n')).toBe(expected);
+}
+
 function parsePublicRenderTestHtml(html: string) {
 	const root = new PublicRenderTestElement('#root');
 	const stack = [root];
@@ -620,6 +655,52 @@ test('compileTsrxModule orchestrates source to payload scripts and resolver modu
 			}),
 		]),
 	);
+});
+
+test('executed modules deliver object-path state initializer snapshots', async () => {
+	await expectRuntimeInitializerSnapshot(
+		`const cfg = { start: 7 };
+const n = state(cfg.start);`,
+		7,
+	);
+});
+
+test('executed modules deliver identifier state initializer snapshots', async () => {
+	await expectRuntimeInitializerSnapshot(
+		`const seed = 3;
+const n = state(seed);`,
+		3,
+	);
+});
+
+test('executed modules evaluate state initializers after earlier body statements', async () => {
+	await expectRuntimeInitializerSnapshot(
+		`let base = 2;
+base += 1;
+const n = state(base);`,
+		3,
+	);
+});
+
+test('literal state initializers keep their exact protocol payload artifact', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/LiteralStateInit.tsrx',
+		source: `import { state } from '@markless/core';
+export function App() @{
+const n = state(5);
+<output>{n}</output>
+}`,
+		symbols: [],
+	});
+
+	expect(result.protocolState.cells).toEqual([
+		{
+			graphNodeId: 'state:n',
+			name: 'n',
+			valueKind: 'scalar',
+			value: { version: 1, root: 5, records: [] },
+		},
+	]);
 });
 
 test('compileTsrxModule treats a default exported TSRX function as the public render root', async () => {
