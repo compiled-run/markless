@@ -1,9 +1,8 @@
 import {
 	deserializeGraphValue,
-	type ProtocolStatePayload,
-	type ProtocolViewPayload,
 	type SerializedGraphPayload,
-} from '@markless/serializer';
+} from '@markless/serializer/decode';
+import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer/protocol';
 import type { RuntimeGraph } from '@markless/runtime';
 
 export class KeyedRepeatRuntimeError extends Error {

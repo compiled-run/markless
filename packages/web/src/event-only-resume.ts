@@ -2,7 +2,7 @@ import type { ProtocolStatePayload, ProtocolViewPayload } from '../../serializer
 import {
 	deserializeGraphValue,
 	type SerializedGraphPayload,
-} from '../../serializer/src/value.ts';
+} from '../../serializer/src/value-decode.ts';
 import type {
 	DomJournalEntry,
 	DomJournalResult,

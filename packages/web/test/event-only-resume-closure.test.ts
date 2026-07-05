@@ -5,6 +5,7 @@ import { expect, test } from 'vitest';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const entry = join(repoRoot, 'packages/web/src/event-only-resume.ts');
+const resumeEntry = join(repoRoot, 'packages/web/src/resume.ts');
 const renderCsrEntry = join(repoRoot, 'packages/web/src/render-csr.ts');
 const sourceByteLimit = 90000;
 
@@ -13,6 +14,13 @@ const forbiddenClosureFiles = [
 	'packages/web/src/render-csr.ts', 'packages/web/src/render-to-string.ts',
 	'packages/web/src/payload.ts', 'packages/web/src/repeat-runtime.ts',
 	'packages/serializer/src/index.ts', 'packages/serializer/src/payload-scripts.ts',
+] as const;
+
+const forbiddenResumeSerializerFiles = [
+	'packages/serializer/src/index.ts',
+	'packages/serializer/src/payload-scripts.ts',
+	'packages/serializer/src/protocol-state.ts',
+	'packages/serializer/src/value.ts',
 ] as const;
 
 test('event-only resume keeps its static source import closure lean', () => {
@@ -33,6 +41,15 @@ test('render-csr keeps full resume apply helpers out of its static import closur
 	expect(relativeClosure).not.toContain('packages/web/src/resume.ts');
 	expect(relativeClosure).not.toContain('packages/web/src/dom-journal.ts');
 	expect(source).not.toContain('findRepeatItemByKey');
+});
+
+test('full browser resume does not statically reach serializer encode modules', () => {
+	const closure = collectStaticImportClosure(resumeEntry);
+	const relativeClosure = closure.files.map((file) => toRepoPath(file)).sort();
+
+	for (const forbidden of forbiddenResumeSerializerFiles) {
+		expect(relativeClosure).not.toContain(forbidden);
+	}
 });
 
 function collectStaticImportClosure(startFile: string) {

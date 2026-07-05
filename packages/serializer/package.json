@@ -5,6 +5,9 @@
 	"type": "module",
 	"sideEffects": false,
 	"exports": {
-		".": "./src/index.ts"
+		".": "./src/index.ts",
+		"./decode": "./src/value-decode.ts",
+		"./protocol": "./src/protocol.ts",
+		"./protocol-validation": "./src/protocol-validation.ts"
 	}
 }
