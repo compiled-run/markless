@@ -22,46 +22,19 @@ const baseReport = {
 };
 
 describe('fixture runtime budget assertions', () => {
-	test('accepts a page fetch set and emitted runtime within budget', () => {
+	test('accepts an emitted runtime within budget', () => {
 		expect(() =>
 			assertRuntimeBudget({
 				budget: {
 					maxEmittedRuntimeGzipBytes: 1_000,
-					maxPageFetchGzipBytes: 500,
 					maxRuntimeChunkGzipBytes: 200,
-					maxScriptCount: 3,
 				},
 				emittedReport: {
 					...baseReport,
 					asyncScripts: { count: 4, gzipBytes: 900, rawBytes: 1_800 },
-				},
-				pageFetchReport: {
-					...baseReport,
-					asyncScripts: { count: 2, gzipBytes: 450, rawBytes: 900 },
 				},
 			}),
 		).not.toThrow();
-	});
-
-	test('fails when a page fetch set exceeds its historical user-cost budget', () => {
-		expect(() =>
-			assertRuntimeBudget({
-				budget: {
-					maxEmittedRuntimeGzipBytes: 1_000,
-					maxPageFetchGzipBytes: 500,
-					maxRuntimeChunkGzipBytes: 200,
-					maxScriptCount: 3,
-				},
-				emittedReport: {
-					...baseReport,
-					asyncScripts: { count: 4, gzipBytes: 900, rawBytes: 1_800 },
-				},
-				pageFetchReport: {
-					...baseReport,
-					asyncScripts: { count: 2, gzipBytes: 501, rawBytes: 1_002 },
-				},
-			}),
-		).toThrow(/page fetch gzip budget exceeded: 501 > 500/);
 	});
 
 	test('fails when total emitted runtime exceeds the anti-bloat wall', () => {
@@ -69,19 +42,16 @@ describe('fixture runtime budget assertions', () => {
 			assertRuntimeBudget({
 				budget: {
 					maxEmittedRuntimeGzipBytes: 1_000,
-					maxPageFetchGzipBytes: 500,
 					maxRuntimeChunkGzipBytes: 200,
-					maxScriptCount: 3,
 				},
 				emittedReport: {
 					...baseReport,
-					asyncScripts: { count: 4, gzipBytes: 1_001, rawBytes: 2_002 },
-				},
-				pageFetchReport: {
-					...baseReport,
-					asyncScripts: { count: 2, gzipBytes: 450, rawBytes: 900 },
+					runtimeChunks: [
+						{ ...baseReport.runtimeChunks[0], gzipBytes: 1_001, rawBytes: 2_002 },
+					],
+					largestRuntimeChunk: undefined,
 				},
 			}),
-		).toThrow(/emitted runtime gzip wall exceeded: 1001 > 1000/);
+		).toThrow(/emitted runtime gzip wall exceeded/);
 	});
 });

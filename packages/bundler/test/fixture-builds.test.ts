@@ -4,7 +4,7 @@ import { promisify } from 'node:util';
 import { resolve } from 'pathe';
 import { beforeAll, describe, expect, test } from 'vitest';
 import { runtimeSizeReport } from '../test-support/runtime-size.ts';
-import { assertRuntimeBudget, pageFetchScriptsFromHtml } from './fixture-budget.ts';
+import { assertRuntimeBudget } from './fixture-budget.ts';
 
 const exec = promisify(execFile);
 const root = resolve(import.meta.dirname, '../../..');
@@ -19,10 +19,8 @@ const fixtures = [
 			dist: 'packages/bundler/fixtures/vite-csr/dist',
 			entryHtml: 'packages/bundler/fixtures/vite-csr/dist/index.html',
 			maxRuntimeChunkGzipBytes: 3_100,
-			maxPageFetchGzipBytes: 3_200,
-			maxScriptCount: 2,
 			// anti-bloat wall — tightened by the runtime-stdlib goal; any increase must be justified
-			maxEmittedRuntimeGzipBytes: 11_340,
+			maxEmittedRuntimeGzipBytes: 14_300, // anti-bloat wall (runtime-classified chunks, measured 14,004); tightened by the runtime-stdlib goal
 			forbidVitePreloadHelper: true,
 		},
 	},
@@ -39,10 +37,8 @@ const fixtures = [
 			dist: 'packages/bundler/fixtures/vite-ssr/dist',
 			entryHtml: 'packages/bundler/fixtures/vite-ssr/dist/index.html',
 			maxRuntimeChunkGzipBytes: 2_175,
-			maxPageFetchGzipBytes: 4_100,
-			maxScriptCount: 7,
 			// anti-bloat wall — tightened by the runtime-stdlib goal; any increase must be justified
-			maxEmittedRuntimeGzipBytes: 8_200,
+			maxEmittedRuntimeGzipBytes: 2_600, // anti-bloat wall (runtime-classified chunks, measured ~1,772); tightened by the runtime-stdlib goal
 			forbidVitePreloadHelper: true,
 		},
 	},
@@ -55,10 +51,8 @@ const fixtures = [
 			dist: 'packages/bundler/fixtures/vite-plus/dist',
 			entryHtml: 'packages/bundler/fixtures/vite-plus/dist/index.html',
 			maxRuntimeChunkGzipBytes: 2_950,
-			maxPageFetchGzipBytes: 3_000,
-			maxScriptCount: 2,
 			// anti-bloat wall — tightened by the runtime-stdlib goal; any increase must be justified
-			maxEmittedRuntimeGzipBytes: 11_210,
+			maxEmittedRuntimeGzipBytes: 14_200, // anti-bloat wall (runtime-classified chunks, measured 13,931); tightened by the runtime-stdlib goal
 			forbidVitePreloadHelper: true,
 		},
 	},
@@ -99,22 +93,12 @@ describe('fixture builds', () => {
 			}
 
 			if ('runtimeBudget' in fixture) {
-				const pageFetchScripts = pageFetchScriptsFromHtml(
-					await readFile(resolve(root, fixture.runtimeBudget.entryHtml), 'utf8'),
-				);
-				const pageFetchReport = await runtimeSizeReport({
-					dist: resolve(root, fixture.runtimeBudget.dist),
-					scripts: pageFetchScripts,
-					includeStaticImports: true,
-				});
+				// Owner ruling 2026-07-05: no per-page fetch metric — 'emitted = required'
+				// assertions arrive with the runtime-stdlib goal. The wall guards bloat.
 				const emittedReport = await runtimeSizeReport({
 					dist: resolve(root, fixture.runtimeBudget.dist),
 				});
-				assertRuntimeBudget({
-					budget: fixture.runtimeBudget,
-					emittedReport,
-					pageFetchReport,
-				});
+				assertRuntimeBudget({ budget: fixture.runtimeBudget, emittedReport });
 			}
 		}, 120_000);
 	}

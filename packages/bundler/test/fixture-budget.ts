@@ -2,18 +2,15 @@ import type { RuntimeSizeReport } from '../test-support/runtime-size.ts';
 
 export type RuntimeBudget = {
 	readonly maxRuntimeChunkGzipBytes: number;
-	readonly maxPageFetchGzipBytes: number;
-	readonly maxScriptCount: number;
 	readonly maxEmittedRuntimeGzipBytes: number;
 	readonly forbidVitePreloadHelper?: boolean;
 };
 
 export function assertRuntimeBudget(input: {
 	readonly budget: RuntimeBudget;
-	readonly pageFetchReport: RuntimeSizeReport;
 	readonly emittedReport: RuntimeSizeReport;
 }) {
-	const { budget, emittedReport, pageFetchReport } = input;
+	const { budget, emittedReport } = input;
 	assert(
 		emittedReport.runtimeChunks.length > 0,
 		`expected at least one runtime-heavy emitted chunk\n${emittedReport.summary}`,
@@ -22,17 +19,16 @@ export function assertRuntimeBudget(input: {
 		(emittedReport.largestRuntimeChunk?.gzipBytes ?? 0) <= budget.maxRuntimeChunkGzipBytes,
 		`largest runtime chunk gzip budget exceeded: ${emittedReport.largestRuntimeChunk?.gzipBytes ?? 0} > ${budget.maxRuntimeChunkGzipBytes}\n${emittedReport.summary}`,
 	);
-	assert(
-		pageFetchReport.asyncScripts.gzipBytes <= budget.maxPageFetchGzipBytes,
-		`page fetch gzip budget exceeded: ${pageFetchReport.asyncScripts.gzipBytes} > ${budget.maxPageFetchGzipBytes}\n${pageFetchReport.summary}`,
+	// Owner ruling 2026-07-05: no per-page fetch metric — fetched-but-unexecuted code is
+	// cheap under progressive execution; 'emitted = required' assertions arrive with the
+	// runtime-stdlib goal. The emitted wall + per-chunk caps guard bloat.
+	const emittedRuntimeGzipBytes = emittedReport.runtimeChunks.reduce(
+		(total, chunk) => total + chunk.gzipBytes,
+		0,
 	);
 	assert(
-		pageFetchReport.asyncScripts.count <= budget.maxScriptCount,
-		`page fetch script count budget exceeded: ${pageFetchReport.asyncScripts.count} > ${budget.maxScriptCount}\n${pageFetchReport.summary}`,
-	);
-	assert(
-		emittedReport.asyncScripts.gzipBytes <= budget.maxEmittedRuntimeGzipBytes,
-		`emitted runtime gzip wall exceeded: ${emittedReport.asyncScripts.gzipBytes} > ${budget.maxEmittedRuntimeGzipBytes}\n${emittedReport.summary}`,
+		emittedRuntimeGzipBytes <= budget.maxEmittedRuntimeGzipBytes,
+		`emitted runtime gzip wall exceeded: ${emittedRuntimeGzipBytes} > ${budget.maxEmittedRuntimeGzipBytes}\n${emittedReport.summary}`,
 	);
 	if (budget.forbidVitePreloadHelper) {
 		const chunksWithVitePreloadHelper = emittedReport.runtimeChunks
