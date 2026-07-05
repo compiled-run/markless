@@ -1,6 +1,10 @@
 import { createProtocolStatePayload } from '@markless/serializer';
 import type { ProtocolStatePayload } from '@markless/serializer';
-import type { ProtocolStatePayloadInput, SemanticSharedReturnProperty } from '../artifacts.ts';
+import type {
+	ProtocolStatePayloadInput,
+	SemanticSharedReturnProperty,
+} from '../artifacts.ts';
+import { planSymbolResolver } from './symbol-resolver.ts';
 
 type StateBindingWithInitializer = ProtocolStatePayloadInput['semanticGraph']['graphBindings'][number] & {
 	readonly initialValueKnown?: boolean;
@@ -9,10 +13,14 @@ type StateBindingWithInitializer = ProtocolStatePayloadInput['semanticGraph']['g
 export function createProtocolStatePayloadFromArena(
 	input: ProtocolStatePayloadInput,
 ): ProtocolStatePayload {
+	const deriveSymbolIds = syncDeriveSymbolIds(input);
 	const computed = input.payloadArena.state.computed.map((computed) => ({
 		graphNodeId: computed.graphNodeId,
 		name: computed.name,
 		async: computed.async,
+		...(!computed.async && deriveSymbolIds.has(computed.graphNodeId)
+			? { deriveSymbolId: deriveSymbolIds.get(computed.graphNodeId) }
+			: {}),
 		...(computed.dependencies && computed.dependencies.length > 0
 			? {
 					dependencies: computed.dependencies.map((dependency) => ({
@@ -70,6 +78,25 @@ export function createProtocolStatePayloadFromArena(
 			}).cells[0]!;
 		}),
 	};
+}
+
+function syncDeriveSymbolIds(
+	input: ProtocolStatePayloadInput,
+): ReadonlyMap<string, string> {
+	const symbolResolver =
+		input.symbolResolver ??
+		planSymbolResolver({
+			semanticGraph: input.semanticGraph,
+			payloadArena: input.payloadArena,
+		});
+
+	return new Map(
+		symbolResolver.symbols.flatMap((symbol) =>
+			symbol.kind === 'sync-computed-derive'
+				? [[symbol.graphNodeId, symbol.id] as const]
+				: [],
+		),
+	);
 }
 
 function protocolReturnProperty(

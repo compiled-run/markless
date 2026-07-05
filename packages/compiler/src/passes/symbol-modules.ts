@@ -131,6 +131,17 @@ function emitSymbolModule(
 		];
 	}
 
+	if (symbol.kind === 'sync-computed-derive') {
+		return [
+			{
+				symbolId: symbol.id,
+				kind: symbol.kind,
+				exportName: symbolExportName(symbol.id),
+				source: emitSyncComputedDeriveModule(symbol),
+			},
+		];
+	}
+
 	if (symbol.kind !== 'dom-update') return [];
 
 	return [
@@ -637,6 +648,59 @@ function emitAsyncComputedRunnerModule(
 		'}',
 		'',
 	].join('\n');
+}
+
+function emitSyncComputedDeriveModule(
+	symbol: Extract<PlannedSymbol, { readonly kind: 'sync-computed-derive' }>,
+): string {
+	const exportName = symbolExportName(symbol.id);
+	const body = syncComputedDeriveBody(symbol);
+	const imports = uniqueModuleImports(
+		(symbol.moduleImports ?? []).filter((moduleImport) =>
+			sourceReferencesIdentifier(body, moduleImport.localName),
+		),
+	);
+
+	return [
+		...imports.map(emitModuleImport),
+		...(imports.length > 0 ? [''] : []),
+		`export const authoredSource = ${JSON.stringify(symbol.source)};`,
+		'',
+		`export function ${exportName}(context) {`,
+		...indentBody(body),
+		'}',
+		'',
+	].join('\n');
+}
+
+function syncComputedDeriveBody(
+	symbol: Extract<PlannedSymbol, { readonly kind: 'sync-computed-derive' }>,
+): string {
+	const body = eventHandlerBodySource(symbol.source);
+	if (!body) return 'return undefined;';
+
+	let emitted = body.source;
+	const replacements = (symbol.dependencies ?? [])
+		.flatMap((dependency) =>
+			readBodySpans(body.source, dependency).map((span) => ({
+				...span,
+				replacement: graphReadCallSource(
+					'context.graph.read',
+					dependency.graphNodeId,
+					dependency.path,
+				),
+			})),
+		)
+		.sort((left, right) => right.start - left.start || right.end - left.end);
+
+	for (const replacement of replacements) {
+		emitted =
+			emitted.slice(0, replacement.start) +
+			replacement.replacement +
+			emitted.slice(replacement.end);
+	}
+
+	return emitted.trim() || 'return undefined;';
 }
 
 function asyncRunnerDependencyDeclarations(

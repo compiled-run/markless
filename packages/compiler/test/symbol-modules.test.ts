@@ -465,6 +465,51 @@ test('emitSymbolModules emits async computed runner modules from planned sources
 	);
 });
 
+test('emitSymbolModules emits sync computed derive modules from planned sources', () => {
+	const artifact = emitSymbolModules({
+		symbolResolver: {
+			passId: 'symbol-resolver',
+			dynamicImportOwner: 'generated-symbol-resolver',
+			symbols: [
+				{
+					id: 'symbol:doubledDerive',
+					kind: 'sync-computed-derive',
+					graphNodeId: 'computed:doubled',
+					name: 'doubled',
+					source: '() => count * 2',
+					dependencies: [
+						{
+							source: 'count',
+							graphNodeId: 'state:count',
+							path: [],
+						},
+					],
+				},
+			],
+			syncPolicies: [],
+			diagnostics: [],
+		},
+		captureAnalysis: {
+			passId: 'capture-analysis',
+			extractedSymbols: [],
+			diagnostics: [],
+		},
+	});
+
+	expect(artifact.modules).toHaveLength(1);
+	expect(artifact.modules[0]).toMatchObject({
+		symbolId: 'symbol:doubledDerive',
+		kind: 'sync-computed-derive',
+		exportName: 'symbol_doubledDerive',
+	});
+	expect(artifact.modules[0].source).toContain(
+		'export const authoredSource = "() => count * 2";',
+	);
+	expect(artifact.modules[0].source).toContain(
+		'return context.graph.read("state:count") * 2;',
+	);
+});
+
 test('emitSymbolModules emits static delete writes for event handler modules', () => {
 	const artifact = emitSymbolModules({
 		symbolResolver: {

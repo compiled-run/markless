@@ -159,6 +159,51 @@ test('planSymbolResolver assigns lazy symbols while resolver owns import boundar
 	expect(plan.diagnostics).toEqual([]);
 });
 
+test('planSymbolResolver assigns derive symbols for sync computed records', async () => {
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/SyncComputed.tsrx',
+		source: `
+import { state, computed } from '@markless/core';
+
+export function App() @{
+	let count = state(2);
+	const doubled = computed(() => count * 2);
+
+	<p>{doubled}</p>
+}
+`,
+	});
+	const stateLowering = lowerStateAccess({ semanticGraph });
+	const payloadArena = planPayloadArena({ semanticGraph, stateLowering });
+
+	const plan = planSymbolResolver({
+		semanticGraph,
+		payloadArena,
+		stateLowering,
+	});
+
+	expect(plan.symbols).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				id: 'symbol:1',
+				kind: 'sync-computed-derive',
+				graphNodeId: 'computed:doubled',
+				name: 'doubled',
+				source: '() => count * 2',
+				dependencies: [{ source: 'count', graphNodeId: 'state:count', path: [] }],
+			}),
+		]),
+	);
+	expect(plan.symbols).not.toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				kind: 'async-computed-runner',
+				graphNodeId: 'computed:doubled',
+			}),
+		]),
+	);
+});
+
 test('planSymbolResolver keeps compound and binary assignment writes with their own handlers', async () => {
 	const semanticGraph = await buildSemanticGraph({
 		filename: 'src/Assignments.tsrx',

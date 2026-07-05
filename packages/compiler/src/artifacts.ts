@@ -567,6 +567,15 @@ export type PlannedSymbol =
 	  }
 	| {
 			readonly id: string;
+			readonly kind: 'sync-computed-derive';
+			readonly graphNodeId: string;
+			readonly name: string;
+			readonly source: string;
+			readonly dependencies?: ReadonlyArray<SemanticGraphDependency>;
+			readonly moduleImports?: ReadonlyArray<SemanticModuleImport>;
+	  }
+	| {
+			readonly id: string;
 			readonly kind: 'async-boundary-update';
 			readonly boundaryId: string;
 			readonly graphNodeId: string;
@@ -663,6 +672,7 @@ export type SymbolResolverModuleManifest = readonly [
 export type ProtocolStatePayloadInput = {
 	readonly semanticGraph: SemanticGraphArtifact;
 	readonly payloadArena: PayloadArenaArtifact;
+	readonly symbolResolver?: SymbolResolverPlan;
 };
 
 export type ProtocolViewPayloadInput = {
