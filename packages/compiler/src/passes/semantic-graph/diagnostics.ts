@@ -273,6 +273,62 @@ export function templateAsValueDiagnostic(input: {
 	};
 }
 
+export function stateWriteInTemplateDiagnostic(input: {
+	readonly source: string;
+	readonly target: string;
+	readonly targetSpan?: SourceSpan;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	return {
+		code: 'MARKLESS_STATE_WRITE_IN_TEMPLATE',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: 'Cannot write state inside a template expression',
+		message: `\`${input.source}\` writes to \`${input.target}\` while rendering its value. A template expression is a DOM read; writing \`${input.target}\` there would re-trigger the same DOM update that is rendering it.`,
+		why: 'DOM updates are the only effects in the demand-driven graph; a write inside a DOM read creates a self-waking cycle that cannot resume.',
+		primarySpan: input.targetSpan ?? fallbackSpan(input.filename),
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		statePath: input.target,
+		source: input.source,
+		suggestions: [
+			{
+				message:
+					'Render the value directly and move the mutation to an event handler or another explicit write site.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_WRITE_IN_TEMPLATE',
+	};
+}
+
+export function stateWriteInComputedDiagnostic(input: {
+	readonly source: string;
+	readonly target: string;
+	readonly targetSpan?: SourceSpan;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	return {
+		code: 'MARKLESS_STATE_WRITE_IN_COMPUTED',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: 'A computed cannot write graph state',
+		message: `\`${input.source}\` writes to \`${input.target}\` while deriving a computed value. A computed is a graph read, so writing graph state there would re-trigger the same derivation.`,
+		why: 'A computed is a demand-driven read in the graph; the only effects in the system are compiler-generated DOM updates, so a write inside a derive is a self-waking cycle that cannot resume.',
+		primarySpan: input.targetSpan ?? fallbackSpan(input.filename),
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		statePath: input.target,
+		source: input.source,
+		suggestions: [
+			{
+				message:
+					'Keep computed() pure. Move graph writes to an event handler and derive only from graph reads.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_WRITE_IN_COMPUTED',
+	};
+}
+
 export function sharedDefinitionCycleDiagnostic(input: {
 	readonly cycle: ReadonlyArray<string>;
 	readonly closingDependency: SemanticSharedDependency;
