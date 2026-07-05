@@ -319,7 +319,8 @@ function emitPublicSsrRenderModule(
 		'',
 	]
 		.filter((part): part is string => part !== null && part !== '')
-		.join('\n');
+		.join('\n')
+		.replaceAll('readMarklessPublicPath', 'marklessSsrReadPublicPath');
 }
 
 type SsrRenderContext = {

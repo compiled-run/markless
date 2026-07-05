@@ -1,3 +1,4 @@
+import { gzipSync } from 'node:zlib';
 import { ASYNC_PROTOCOL_VERSION, type ProtocolViewPayload } from '@markless/serializer';
 import { createProtocolStatePayload } from '@markless/serializer';
 import { expect, test } from 'vitest';
@@ -1537,6 +1538,50 @@ test('renderToString inline event resumer reads graph-backed sync policy before 
 	}
 });
 
+test('renderToString emits graph sync-policy inline runtime once for repeated payloads', async () => {
+	const inlineRuntimeRegistry = new Set<string>();
+	const renderContainer = () =>
+		renderToString(
+			() => ({
+				html: '<button type="button">Close</button>',
+				state: createProtocolStatePayload({
+					cells: [
+						{
+							graphNodeId: 'state:menu',
+							name: 'menu',
+							valueKind: 'object',
+							value: { open: true },
+						},
+					],
+				}),
+				view: {
+					...viewWithClick(),
+					events: [
+						{
+							hostNodeId: 'h0',
+							eventName: 'click',
+							syncPolicy: {
+								when: {
+									type: 'graph-truthy',
+									graphNodeId: 'state:menu',
+									path: ['open'],
+								},
+								actions: ['preventDefault'],
+							},
+							symbolIds: ['symbol:click'],
+						},
+					],
+				},
+			}),
+			{ resumeModuleUrl: '/async-resume.js', inlineRuntimeRegistry },
+		);
+	const documentHtml = (await Promise.all([renderContainer(), renderContainer(), renderContainer()])).join('');
+	const inlineSources = extractAllResumerSources(documentHtml).join('\n');
+
+	expect(countOccurrences(inlineSources, 'const M = globalThis.__marklessInlineSyncPolicy')).toBe(1);
+	expect(gzipSync(inlineSources).length).toBeLessThan(2000);
+});
+
 test('renderToString inline event resumer reads built-in graph values for sync policy', async () => {
 	const resumeModuleUrl = createSyncPolicyResumeModuleUrl('map-policy');
 	const html = await renderToString(
@@ -1662,6 +1707,16 @@ function extractResumerSource(html: string): string {
 	const match = /<script data-async-resumer(?: nonce="[^"]+")?>([\s\S]*?)<\/script>/.exec(html);
 	if (!match) throw new Error('Expected inline resumer script.');
 	return match[1]!;
+}
+
+function extractAllResumerSources(html: string): string[] {
+	return [...html.matchAll(/<script data-async-resumer(?: nonce="[^"]+")?>([\s\S]*?)<\/script>/g)].map(
+		(match) => match[1]!,
+	);
+}
+
+function countOccurrences(source: string, needle: string): number {
+	return source.split(needle).length - 1;
 }
 
 function createResumeModuleUrl(cacheKey = 'default'): string {
