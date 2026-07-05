@@ -510,8 +510,10 @@ export type PlannedSymbol =
 			readonly elementHandleCalls?: ReadonlyArray<{
 				readonly handleName: string;
 				readonly method: string;
+				readonly source: string;
 				readonly argumentSources: ReadonlyArray<string>;
 				readonly offset: number;
+				readonly endOffset: number;
 			}>;
 	  }
 	| {
@@ -591,6 +593,7 @@ export type CaptureAnalysisInput = {
 export type CaptureAnalysisDiagnostic = CompilerDiagnostic & {
 	readonly code:
 		| 'MARKLESS_CAPTURE_UNSUPPORTED_VALUE'
+		| 'MARKLESS_BEHAVIOR_SYMBOL_EMIT_UNSUPPORTED'
 		| 'MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED';
 	readonly phase: 'capture-analysis';
 	readonly passId: 'capture-analysis';

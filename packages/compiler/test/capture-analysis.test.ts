@@ -803,3 +803,43 @@ export function App() @{
 		}),
 	]);
 });
+
+test('B908 Unit B reports behavior factory captures with behavior emit diagnostic', async () => {
+	const invalidSource = `
+import { state } from '@markless/core';
+
+export function App() @{
+	let label = state('');
+	const localFormatter = () => label;
+	const installLabel = () => (element) => {
+		element.textContent = localFormatter();
+	};
+
+	<canvas attach={installLabel()} />
+}
+`;
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/BehaviorCapture.tsrx',
+		source: invalidSource,
+	});
+	const stateLowering = lowerStateAccess({ semanticGraph });
+	const payloadArena = planPayloadArena({ semanticGraph, stateLowering });
+	const symbolResolver = planSymbolResolver({ semanticGraph, payloadArena });
+
+	const captureAnalysis = analyzeCaptures({
+		semanticGraph,
+		symbolResolver,
+	});
+
+	expect(captureAnalysis.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_BEHAVIOR_SYMBOL_EMIT_UNSUPPORTED',
+			severity: 'error',
+			phase: 'capture-analysis',
+			passId: 'capture-analysis',
+			symbolId: 'symbol:0',
+			source: 'installLabel()',
+			message: expect.stringContaining('installLabel'),
+		}),
+	]);
+});
