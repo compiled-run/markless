@@ -567,11 +567,12 @@ export function elementHandlePropUnsupportedDiagnostic(
 ): SemanticGraphDiagnostic {
 	return semanticGraphDiagnostic({
 		code: 'MARKLESS_ELEMENT_HANDLE_PROP_UNSUPPORTED',
-		title: 'Prop-forwarded element handles are not supported yet',
-		message: `Cannot bind el={${binding.handleName}} because prop-forwarded element handles need handle tracking across component edges, which this compiler slice does not support yet.`,
-		why: 'The Markless element-handle model allows handles to pass through component props, but the current semantic graph only proves same-component handle ownership.',
+		title: 'Nested prop-forwarded element handles are not supported yet',
+		message: `Cannot bind el={${binding.handleName}} because this slice only supports element handles passed as direct component props, not through arrays or nested object props.`,
+		why: 'Direct prop forwarding has one parent-owned element() handle for one child prop. Array and nested object containers need deeper edge tracking before the compiler can prove the owning handle.',
 		span: binding.sourceSpan,
-		suggestion: 'For now, create and bind the element() handle in the component that renders the host element. Prop-handle forwarding will be enabled by the dedicated capability slice.',
+		suggestion:
+			'Pass the element() handle as its own component prop for now, or bind it in the component that renders the host element.',
 		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_PROP_UNSUPPORTED',
 	});
 }

@@ -286,6 +286,25 @@ test('B918 does not emit flat element handle records for repeated hosts', async 
 	expect(payload.view.elementHandles).toEqual([]);
 });
 
+test('B918 plans a prop-forwarded handle on the child host under the parent handle id', async () => {
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/ForwardedHandle.tsrx',
+		source: `import { element } from '@markless/core'; function Field(props: { input: unknown }) @{ <input el={props.input} /> } export function App() @{ const field = element<HTMLInputElement>(); <section><Field input={field} /></section> }`,
+	});
+	const stateLowering = lowerStateAccess({ semanticGraph });
+
+	const payload = planPayloadArena({ semanticGraph, stateLowering });
+
+	expect(semanticGraph.diagnostics).toEqual([]);
+	expect(payload.view.elementHandles).toEqual([
+		{
+			hostNodeId: 'h0',
+			handleId: 'element:field',
+			name: 'field',
+		},
+	]);
+});
+
 test('planPayloadArena keeps distinct targets for repeated graph reads on one host', async () => {
 	const semanticGraph = await buildSemanticGraph({
 		filename: 'src/RepeatedTarget.tsrx',

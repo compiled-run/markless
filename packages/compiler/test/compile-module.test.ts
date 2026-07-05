@@ -4347,6 +4347,53 @@ export function App() @{
 	expect(button.textContent).toBe('BUTTON 1');
 });
 
+test('B918 same-module prop-forwarded handle resolves for parent event handlers', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/ForwardedFocusBox.tsrx',
+		source: `
+import { element } from '@markless/core';
+
+function Field(inputProps: { input: unknown }) @{
+	<input el={inputProps.input} />
+}
+
+export function App() @{
+	const field = element<HTMLInputElement>();
+
+	<section>
+		<Field input={field} />
+		<button onClick={() => field.focus()}>Focus</button>
+	</section>
+}
+`,
+		symbols: [],
+	});
+
+	const input = new PublicRenderTestElement('input') as PublicRenderTestElement & {
+		focus: () => void;
+	};
+	input.focus = vi.fn();
+	const module = result.symbolModules.modules.find((item) => item.kind === 'event-handler');
+	expect(module).toBeDefined();
+	const exports = await importPublicRenderTestModule(module!.source);
+	const handler = exports[module!.exportName] as (context: {
+		readonly getElementHandle: (name: string) => unknown;
+	}) => void;
+
+	expect(result.semanticGraph.diagnostics).toEqual([]);
+	expect(result.protocolView.elementHandles).toEqual([
+		expect.objectContaining({ handleId: 'element:field', name: 'field' }),
+	]);
+
+	handler({
+		getElementHandle(name) {
+			return name === 'field' ? input : undefined;
+		},
+	});
+
+	expect(input.focus).toHaveBeenCalledTimes(1);
+});
+
 test('compileTsrxModule does not emit public render factories for non-literal direct state values', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/KeyedEntriesWithDate.tsrx',

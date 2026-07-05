@@ -102,7 +102,7 @@ import { state, element } from '@markless/core';
 const moduleHandle = element<HTMLInputElement>();
 
 function Field(props: { forwarded: unknown }) @{
-	<input el={props.forwarded} />
+	<input />
 }
 
 export function Handles() @{
@@ -919,7 +919,6 @@ test('B918 reports honest element handle guard diagnostics', async () => {
 	expect(graph.diagnostics.map((diagnostic) => diagnostic.code)).toEqual(
 		expect.arrayContaining([
 		'MARKLESS_ELEMENT_MODULE_SCOPE',
-		'MARKLESS_ELEMENT_HANDLE_PROP_UNSUPPORTED',
 		'MARKLESS_ELEMENT_HANDLE_UNBOUND',
 		'MARKLESS_ELEMENT_HANDLE_RENDER_READ',
 		'MARKLESS_ELEMENT_HANDLE_DUPLICATE',
@@ -929,10 +928,6 @@ test('B918 reports honest element handle guard diagnostics', async () => {
 		expect.objectContaining({
 			code: 'MARKLESS_ELEMENT_MODULE_SCOPE',
 			message: expect.stringContaining('moduleHandle'),
-		}),
-		expect.objectContaining({
-			code: 'MARKLESS_ELEMENT_HANDLE_PROP_UNSUPPORTED',
-			message: expect.stringContaining('props.forwarded'),
 		}),
 		expect.objectContaining({
 			code: 'MARKLESS_ELEMENT_HANDLE_UNBOUND',
@@ -951,6 +946,23 @@ test('B918 reports honest element handle guard diagnostics', async () => {
 	]));
 	expect(graph.diagnostics.map((diagnostic) => diagnostic.message).join('\n')).not.toContain(
 		'not an element() handle',
+	);
+
+	const nestedGraph = await buildSemanticGraph({
+		filename: 'src/NestedHandles.tsrx',
+		source: `import { element } from '@markless/core'; function ObjectField(props: { forwarded: unknown }) @{ <input el={props.forwarded.current} /> } function ArrayField(props: { forwarded: unknown }) @{ <input el={props.forwarded[0]} /> } export function App() @{ const input = element<HTMLInputElement>(); <section><ObjectField forwarded={{ current: input }} /><ArrayField forwarded={[input]} /></section> }`,
+	});
+	expect(nestedGraph.diagnostics).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				code: 'MARKLESS_ELEMENT_HANDLE_PROP_UNSUPPORTED',
+				message: expect.stringContaining('props.forwarded.current'),
+			}),
+			expect.objectContaining({
+				code: 'MARKLESS_ELEMENT_HANDLE_PROP_UNSUPPORTED',
+				message: expect.stringContaining('props.forwarded[0]'),
+			}),
+		]),
 	);
 });
 
