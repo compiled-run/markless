@@ -9,7 +9,6 @@ import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/
 import { expressionSource } from '../../ast/source.ts';
 import {
 	escapeAttribute,
-	getComponentFunction,
 	getDynamicTagExpression,
 	getElementAttributes,
 	getElementTagName,
@@ -22,13 +21,22 @@ import {
 	unwrapExpressionContainer,
 } from '../../ast/tsrx.ts';
 import { emitDirectPublicRenderModule } from './direct-module.ts';
+import { selectPublicRenderRoot } from './plan.ts';
 
 // Emits the optional direct-DOM module used by public render() after the plan proves
 // the component shape can run through this specialized path.
 export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRenderModuleArtifact {
-	const rootComponentName = input.semanticGraph.components[0]?.name;
+	const rootSelection = selectPublicRenderRoot(
+		parseModule(input.source.source, input.source.filename) as unknown as AnyNode,
+	);
+	const rootComponentName = rootSelection?.componentName;
 	const componentCount = input.semanticGraph.components.length;
-	const root = publicRenderRoot(input, rootComponentName);
+	const root = rootSelection
+		? {
+				root: rootSelection.root,
+				propNames: componentPropNames(rootSelection.component),
+			}
+		: null;
 	// Fragment roots use the standard CSR module (root = document fragment;
 	// the web render() entry adopts the mount target as container root per the
 	// ratified D3 decision). The direct module keeps its single-element shape.
@@ -43,7 +51,7 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 		!input.publicRenderPlan.asyncBoundaryGates.some((gate) => gate.supported);
 	const moduleSource = canUseDirectCsrModule
 		? emitDirectPublicRenderModule({
-				componentName: rootComponentName,
+				rootSelection,
 				componentCount,
 				publicRenderPlan: input.publicRenderPlan,
 				protocolState: input.protocolState,
@@ -343,16 +351,6 @@ type PublicRenderRoot = {
 };
 
 type ComponentEdge = PublicRenderModuleInput['semanticGraph']['componentEdges'][number];
-
-function publicRenderRoot(
-	input: PublicRenderModuleInput,
-	componentName: string | undefined,
-): PublicRenderRoot | null {
-	const ast = parseModule(input.source.source, input.source.filename) as unknown as AnyNode;
-	const component = findComponent(ast, componentName);
-	const root = firstComponentRoot(component);
-	return component && root ? { root, propNames: componentPropNames(component) } : null;
-}
 
 function isComponentRoot(root: AnyNode): boolean {
 	const tagName = getElementTagName(root);
@@ -1234,58 +1232,6 @@ function componentPropNames(component: AnyNode): string[] {
 	});
 }
 
-function firstComponentRoot(component: AnyNode | undefined): AnyNode | null {
-	const body = component?.body as AnyNode | undefined;
-	if (!body) return null;
-
-	for (const child of childNodes(body)) {
-		if (child.type === 'Element' || child.type === 'JSXElement') return child;
-		if (child.type === 'Fragment' || child.type === 'JSXFragment') {
-			return supportedFragmentRoot(child);
-		}
-		// TSRX allows `return <element>;` at the function-body level of @{...}.
-		if (child.type === 'ReturnStatement') {
-			const argument = child.argument as AnyNode | undefined;
-			if (argument && (argument.type === 'Element' || argument.type === 'JSXElement')) {
-				return argument;
-			}
-			if (argument && (argument.type === 'Fragment' || argument.type === 'JSXFragment')) {
-				return supportedFragmentRoot(argument);
-			}
-		}
-	}
-
-	return null;
-}
-
-// Mirrors the plan pass gate: plain-host or gate-eligible control-flow
-// children render; component/expression children stay diagnosed.
-function supportedFragmentRoot(fragment: AnyNode): AnyNode | null {
-	const children = asNodes(fragment.children).filter((child) => !isIgnorableTextNode(child));
-	const supported =
-		children.length > 0 &&
-		children.every(
-			(child) =>
-				((child.type === 'Element' || child.type === 'JSXElement') &&
-					isPlainHostTemplateNode(child)) ||
-				child.type === 'JSXIfExpression' ||
-				child.type === 'JSXSwitchExpression' ||
-				child.type === 'JSXForExpression' ||
-				child.type === 'JSXTryExpression',
-		);
-	return supported ? fragment : null;
-}
-
 function isFragmentNode(node: AnyNode | undefined): boolean {
 	return node?.type === 'Fragment' || node?.type === 'JSXFragment';
-}
-
-function findComponent(ast: AnyNode, name: string | undefined): AnyNode | undefined {
-	for (const statement of asNodes(ast.body)) {
-		const componentFunction = getComponentFunction(statement);
-		if (!componentFunction) continue;
-		if (!name || componentFunction.name === name) return componentFunction.node;
-	}
-
-	return undefined;
 }
