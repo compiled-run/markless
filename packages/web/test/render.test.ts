@@ -1323,6 +1323,7 @@ test('renderToString inline event resumer reads graph-backed sync policy before 
 	const state = extractScriptText(html, 'markless/state');
 	const view = JSON.parse(extractScriptText(html, 'markless/view')) as ProtocolViewPayload;
 	const resumerSource = extractResumerSource(html);
+	expect(resumerSource).toContain('__marklessEventOnlyGraph');
 	const button = element('BUTTON');
 	const root = element('DIV', [button]);
 	const listeners: Array<(event: FakeEvent) => Promise<void>> = [];

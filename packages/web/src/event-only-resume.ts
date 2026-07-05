@@ -1,10 +1,23 @@
-import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer';
+import {
+	deserializeGraphValue,
+	type ProtocolStatePayload,
+	type ProtocolViewPayload,
+	type SerializedGraphPayload,
+} from '@markless/serializer';
 import type {
 	DomJournalEntry,
 	DomJournalResult,
+	RuntimeGraphCall,
 	RuntimeGraphUpdate,
 	RuntimeGraphWrite,
 } from '@markless/runtime';
+import { decodePayloadScriptsFromDocument } from './payload.ts';
+import {
+	mismatchedElementLocatorError,
+	missingElementLocatorError,
+	runSyncPolicyActions,
+	type ResumeDomEvent,
+} from './resume.ts';
 
 export type EventOnlyResumeDomNode = {
 	readonly nodeType: number;
@@ -23,12 +36,16 @@ export type EventOnlyResumeDomElement = EventOnlyResumeDomNode & {
 	) => void;
 	setAttribute?: (name: string, value: string) => void;
 	removeAttribute?: (name: string) => void;
+	__marklessEventOnlyGraph?: Map<string, unknown>;
+	__asyncResumeRuntimeStarted?: boolean;
 	readonly [name: string]: unknown;
 };
 
 export type EventOnlyResumeDomEvent = {
 	readonly type: string;
 	readonly target: EventOnlyResumeDomElement | null;
+	readonly preventDefault?: () => void;
+	readonly stopPropagation?: () => void;
 	readonly [key: string]: unknown;
 };
 
@@ -50,6 +67,7 @@ export type EventOnlyResumeGraph = {
 	read(graphNodeId: string, path?: ReadonlyArray<string>): unknown;
 	write(write: RuntimeGraphWrite): void;
 	update(update: RuntimeGraphUpdate): unknown;
+	call(call: RuntimeGraphCall): unknown;
 	flush(): Promise<void>;
 };
 
@@ -122,8 +140,7 @@ export async function resumeEventOnlyFromPayloadDocument(
 ): Promise<EventOnlyResumeContainer> {
 	let container = containers.get(input.root);
 	if (!container) {
-		const state = readPayloadJson<ProtocolStatePayload>(input.document, 'markless/state');
-		const view = readPayloadJson<ProtocolViewPayload>(input.document, 'markless/view');
+		const { state, view } = decodePayloadScriptsFromDocument(input.document);
 		container = createEventOnlyResumeContainerState({
 			state,
 			view,
@@ -155,6 +172,7 @@ function createEventOnlyResumeContainerState(
 		state: input.state,
 		view: input.view,
 		loadSymbol: input.loadSymbol,
+		root: input.root,
 		elementsByHostId,
 	});
 
@@ -178,30 +196,27 @@ function createEventOnlyResumeContainerState(
 	};
 }
 
-function readPayloadJson<T>(document: EventOnlyResumePayloadDocument, type: string): T {
-	const script = document.querySelector(`script[type="${type}"]`);
-	const text = script?.textContent ?? script?.text ?? script?.innerHTML;
-	if (text == null) throw new Error(`Missing ${type} payload script.`);
-
-	const payload = JSON.parse(text) as { readonly version?: unknown };
-	if (payload.version !== 1) throw new Error(`Unsupported ${type} payload version.`);
-	return payload as T;
-}
-
 function createEventOnlyResumeGraph(input: {
 	readonly state: ProtocolStatePayload;
 	readonly view: ProtocolViewPayload;
 	readonly loadSymbol: ResumeEventOnlyFromPayloadDocumentInput['loadSymbol'];
+	readonly root: EventOnlyResumeDomElement;
 	readonly elementsByHostId: ReadonlyMap<string, EventOnlyResumeDomElement>;
 }): EventOnlyResumeGraph {
-	const cells = new Map<string, unknown>();
+	const existingCells = input.root.__marklessEventOnlyGraph;
+	const cells = existingCells ?? new Map<string, unknown>();
 	const dirtyPaths: DirtyPath[] = [];
 
-	for (const cell of input.state.cells) {
-		cells.set(
-			cell.graphNodeId,
-			cell.value === undefined ? undefined : deserializeEventOnlyGraphValue(cell.value),
-		);
+	if (!existingCells) {
+		for (const cell of input.state.cells) {
+			cells.set(
+				cell.graphNodeId,
+				cell.value === undefined
+					? undefined
+					: deserializeGraphValue(cell.value as SerializedGraphPayload),
+			);
+		}
+		input.root.__marklessEventOnlyGraph = cells;
 	}
 
 	const graph: EventOnlyResumeGraph = {
@@ -231,6 +246,19 @@ function createEventOnlyResumeGraph(input: {
 			}
 			if (update.returnValue === 'previous') return currentValue;
 			if (update.returnValue === 'next') return nextValue;
+		},
+		call(call) {
+			const path = call.path ?? [];
+			const target = readPath(cells.get(call.graphNodeId), path) as
+				| Record<string, unknown>
+				| undefined;
+			const method = target?.[call.method];
+			if (typeof method !== 'function') {
+				throw new TypeError(`Unsupported graph collection method "${call.method}".`);
+			}
+			const result = Reflect.apply(method, target, [...(call.args ?? [])]);
+			dirtyPaths.push({ graphNodeId: call.graphNodeId, path });
+			return result;
 		},
 		async flush() {
 			while (dirtyPaths.length > 0) {
@@ -270,6 +298,13 @@ async function dispatchEvent(input: {
 	if (!matched?.element) return;
 
 	try {
+		if (matched.eventRecord.syncPolicy) {
+			runSyncPolicyActions(
+				matched.eventRecord.syncPolicy,
+				input.graph,
+				input.event as ResumeDomEvent,
+			);
+		}
 		for (const symbolId of matched.eventRecord.symbolIds) {
 			const loadedSymbol = input.loadSymbol(symbolId);
 			const symbol = isPromiseLike(loadedSymbol) ? await loadedSymbol : loadedSymbol;
@@ -390,14 +425,14 @@ function materializeDomLocators(
 
 	for (const locator of locators) {
 		const element = elements[locator.index];
-		if (!element) throw new Error(`Missing resume locator ${locator.hostNodeId}.`);
+		if (!element) throw missingElementLocatorError(locator);
 		// '*' marks dynamic-tag hosts whose rendered tag is unknowable at
 		// compile time; skip validation like the full resume runtime does.
 		if (
 			locator.tagName !== '*' &&
 			element.tagName.toLowerCase() !== locator.tagName.toLowerCase()
 		) {
-			throw new Error(`Mismatched resume locator ${locator.hostNodeId}.`);
+			throw mismatchedElementLocatorError(locator, element.tagName.toLowerCase());
 		}
 		byHostId.set(locator.hostNodeId, element);
 	}
@@ -434,50 +469,6 @@ function findEventRecord(
 			}
 		}
 	}
-}
-
-function deserializeEventOnlyGraphValue(payload: unknown): unknown {
-	if (!isRecord(payload)) return payload;
-	const records = new Map<number, Record<string, unknown>>();
-	for (const record of Array.isArray(payload.records) ? payload.records : []) {
-		if (isRecord(record) && typeof record.id === 'number') records.set(record.id, record);
-	}
-	return deserializeSlot(payload.root, records);
-}
-
-function deserializeSlot(
-	slot: unknown,
-	records: ReadonlyMap<number, Record<string, unknown>>,
-): unknown {
-	if (
-		slot === null ||
-		typeof slot === 'string' ||
-		typeof slot === 'number' ||
-		typeof slot === 'boolean'
-	) {
-		return slot;
-	}
-	if (!isRecord(slot)) return undefined;
-	if ('$ref' in slot && typeof slot.$ref === 'number') {
-		const record = records.get(slot.$ref);
-		if (!record) return undefined;
-		if (record.type === 'object') {
-			const object: Record<string, unknown> = {};
-			for (const [key, value] of Array.isArray(record.fields) ? record.fields : []) {
-				if (typeof key === 'string') object[key] = deserializeSlot(value, records);
-			}
-			return object;
-		}
-		if (record.type === 'array') {
-			return (Array.isArray(record.items) ? record.items : []).map((value) =>
-				deserializeSlot(value, records),
-			);
-		}
-		return undefined;
-	}
-	if (slot.$type === 'undefined') return undefined;
-	if (slot.$type === 'bigint' && typeof slot.value === 'string') return BigInt(slot.value);
-	return undefined;
 }
 
 function readPath(value: unknown, path: ReadonlyArray<string>): unknown {
