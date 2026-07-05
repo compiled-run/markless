@@ -147,10 +147,12 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 		case 'ArrowFunctionExpression':
 		case 'FunctionExpression':
 		case 'FunctionDeclaration':
-			withCreationSite(state, state.currentHostNodeId ? 'handler' : 'helper', () => {
-				for (const child of childNodes(node)) {
-					walk(child, state);
-				}
+			withFunctionSite(state, state.currentHostNodeId ? 'handler' : 'helper', () => {
+				withCreationSite(state, state.currentHostNodeId ? 'handler' : 'helper', () => {
+					for (const child of childNodes(node)) {
+						walk(child, state);
+					}
+				});
 			});
 			return;
 		case 'AssignmentExpression':
@@ -172,7 +174,9 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 			collectCollectionCall(node, state);
 			if (getFrameworkApiForCall(node, state.frameworkApiImports) === 'computed') {
 				const [body, ...rest] = asNodes(node.arguments);
-				withCreationSite(state, 'computed', () => walk(body, state));
+				withFunctionSite(state, 'computed', () => {
+					withCreationSite(state, 'computed', () => walk(body, state));
+				});
 				for (const argument of rest) walk(argument, state);
 				return;
 			}
@@ -237,4 +241,15 @@ function withCreationSite(
 	state.currentCreationSite = previous ?? site;
 	run();
 	state.currentCreationSite = previous;
+}
+
+function withFunctionSite(
+	state: WalkState,
+	site: NonNullable<WalkState['currentFunctionSite']>,
+	run: () => void,
+): void {
+	const previous = state.currentFunctionSite;
+	state.currentFunctionSite = site;
+	run();
+	state.currentFunctionSite = previous;
 }

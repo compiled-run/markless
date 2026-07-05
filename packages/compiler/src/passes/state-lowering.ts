@@ -4,6 +4,7 @@ import type {
 	SemanticGraphAlias,
 	SemanticGraphArtifact,
 	SemanticGraphBinding,
+	SemanticLocalDeclaration,
 	SemanticStateWrite,
 	SourceSpan,
 	StateLoweringArtifact,
@@ -137,6 +138,20 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 				);
 				continue;
 			}
+
+			const moduleTarget = moduleScopeWriteTarget(write, input.semanticGraph);
+			if (moduleTarget) {
+				diagnostics.push(moduleEscapeDiagnostic(write, moduleTarget, input.semanticGraph.filename));
+				continue;
+			}
+
+			const staleLocal = staleLocalWriteTarget(write, input.semanticGraph);
+			if (staleLocal) {
+				diagnostics.push(staleLocalWriteDiagnostic(write, staleLocal, input.semanticGraph.filename));
+				continue;
+			}
+
+			if (isAllowedPlainLocalWrite(write, input.semanticGraph)) continue;
 
 			diagnostics.push(unresolvedWriteDiagnostic(write, input.semanticGraph.filename));
 			continue;
@@ -327,20 +342,63 @@ function unresolvedWriteDiagnostic(
 		severity: 'error',
 		phase: 'state-lowering',
 		title: 'Cannot resolve graph write target',
-		message: `Cannot write to "${write.target}" because it does not resolve to graph state.`,
-		why: 'The compiler owns reads and writes through state() graph cells. Writes to plain locals in a component body are not representable yet.',
+		message: `Cannot write to "${write.target}" because the compiler cannot resolve that target.`,
+		why: 'This write is not a known state() graph path, graph alias, declared plain local, or classified module-scope binding.',
 		primarySpan: write.targetSpan ?? fallbackSpan(filename),
 		passId: 'state-lowering',
 		artifactKeys: ['semanticGraph', 'stateLowering'],
 		statePath: write.target,
 		source: write.target,
-		suggestions: [
-			{
-				message:
-					'Keep mutable values in state() and write through that binding, derive the value in computed(), or compute it with a single expression that does not reassign a local.',
-			},
-		],
+		suggestions: [{ message: 'Declare the local before writing it, or move UI-changing values into state() so Markless can serialize and resume the update.' }],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_UNRESOLVED_WRITE',
+	};
+}
+
+function staleLocalWriteDiagnostic(
+	write: SemanticStateWrite,
+	local: SemanticLocalDeclaration,
+	filename: string,
+): StateLoweringDiagnostic {
+	const name = local.name;
+	return {
+		code: 'MARKLESS_STATE_STALE_LOCAL_WRITE',
+		severity: 'error',
+		phase: 'state-lowering',
+		title: 'Handler write would leave the template stale',
+		message: `Cannot write to "${write.target}" from a handler because the template reads the component local "${name}" only during initial render.`,
+		why: 'Component bodies run for initial render only. Template reads re-render after events only when they subscribe through state(), so this handler write would leave the UI stale after resume.',
+		primarySpan: write.targetSpan ?? fallbackSpan(filename),
+		passId: 'state-lowering',
+		artifactKeys: ['semanticGraph', 'stateLowering'],
+		statePath: write.target,
+		source: write.target,
+		suggestions: [{ message: `Move "${name}" into state(), then write ${name}++ so Markless can serialize the cell and update subscribed DOM.` }],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_STALE_LOCAL_WRITE',
+	};
+}
+
+function moduleEscapeDiagnostic(
+	write: SemanticStateWrite,
+	target: ModuleWriteTarget,
+	filename: string,
+): StateLoweringDiagnostic {
+	const aliasText = target.aliasName
+		? ` because it aliases module-scope "${target.moduleName}", which would be shared across requests`
+		: ' because it lives at module scope and would be shared across requests';
+	return {
+		code: 'MARKLESS_STATE_MODULE_ESCAPE',
+		severity: 'error',
+		phase: 'state-lowering',
+		title: 'Module-scope storage cannot be written from render or handlers',
+		message: `Cannot write to "${write.target}"${aliasText}.`,
+		why: 'Module-scope storage outlives a single server render. A handler could read or overwrite data from another user because the value is not part of this document payload.',
+		primarySpan: write.targetSpan ?? fallbackSpan(filename),
+		passId: 'state-lowering',
+		artifactKeys: ['semanticGraph', 'stateLowering'],
+		statePath: write.target,
+		source: write.target,
+		suggestions: [{ message: 'Keep per-document values inside state(), or use shared() for named request/container/page dataflow instead of module variables.' }],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_MODULE_ESCAPE',
 	};
 }
 
@@ -553,6 +611,75 @@ function isDynamicGraphPathSource(
 	if (resolveGraphPath(root, bindings, aliases) !== null) return true;
 
 	return graph?.sharedInstances.some((instance) => instance.localName === root) ?? false;
+}
+
+type ModuleWriteTarget = { readonly moduleName: string; readonly aliasName?: string };
+
+function moduleScopeWriteTarget(
+	write: SemanticStateWrite,
+	graph: SemanticGraphArtifact,
+): ModuleWriteTarget | null {
+	const root = graphPathRoot(write.target);
+	if (!root || write.writeScope === 'module') return null;
+
+	const declaration = findLocalDeclaration(root, graph.localDeclarations);
+	if (!declaration) return null;
+	const moduleName =
+		declaration.scope === 'module'
+			? (declaration.aliasOf ?? declaration.name)
+			: moduleAliasDeclarationName(declaration, graph.localDeclarations);
+	if (!moduleName) return null;
+
+	return moduleName === root ? { moduleName } : { moduleName, aliasName: root };
+}
+
+function moduleAliasDeclarationName(
+	declaration: SemanticLocalDeclaration,
+	declarations: ReadonlyArray<SemanticLocalDeclaration>,
+): string | null {
+	if (!declaration.aliasOf) return null;
+	const target = findLocalDeclaration(declaration.aliasOf, declarations);
+	return target?.scope === 'module' ? (target.aliasOf ?? target.name) : null;
+}
+
+function staleLocalWriteTarget(
+	write: SemanticStateWrite,
+	graph: SemanticGraphArtifact,
+): SemanticLocalDeclaration | null {
+	if (write.writeScope !== 'handler') return null;
+	const root = graphPathRoot(write.target);
+	if (!root) return null;
+	const declaration = findLocalDeclaration(root, graph.localDeclarations);
+	return declaration?.scope === 'component' &&
+		declaration.componentName === write.componentName &&
+		graph.templateReads.some((read) => graphPathRoot(read.source) === root)
+		? declaration
+		: null;
+}
+
+function isAllowedPlainLocalWrite(
+	write: SemanticStateWrite,
+	graph: SemanticGraphArtifact,
+): boolean {
+	const root = graphPathRoot(write.target);
+	if (!root) return false;
+	const declaration = findLocalDeclaration(root, graph.localDeclarations);
+	if (!declaration || declaration.aliasOf) return false;
+	if (declaration.scope === 'module') return false;
+	return write.writeScope === 'component'
+		? declaration.scope === 'component' && declaration.componentName === write.componentName
+		: declaration.scope === 'function';
+}
+
+function findLocalDeclaration(
+	name: string,
+	declarations: ReadonlyArray<SemanticLocalDeclaration>,
+): SemanticLocalDeclaration | undefined {
+	for (let index = declarations.length - 1; index >= 0; index--) {
+		const declaration = declarations[index];
+		if (declaration?.name === name) return declaration;
+	}
+	return undefined;
 }
 
 function findRestAliasExcludedPath(
