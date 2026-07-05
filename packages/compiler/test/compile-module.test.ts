@@ -1877,6 +1877,18 @@ export function App() @{
 	);
 });
 
+test('compileTsrxModule parenthesizes non-atomic @if tests in SSR output', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/BranchPrecedence.tsrx',
+		source: `import { state } from '@markless/core'; export function App() @{ let primary = state(null); let fallback = state(true); <section>@if (primary ?? fallback) { <p>Shown</p> } @else { <p>Hidden</p> }</section> }`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderModule.ssrModuleSource).toContain(
+		'((primary ?? fallback) ? marklessSsrBranchArm',
+	);
+});
+
 test('compileTsrxModule resolves CSR host paths across branch anchor ranges', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/AfterBranch.tsrx',

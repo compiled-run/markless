@@ -356,6 +356,34 @@ test('buildSemanticGraph reports state writes inside template expressions', asyn
 	]);
 });
 
+test('buildSemanticGraph reports assignment writes inside branch conditions', async () => {
+	const source = `import { state } from '@markless/core'; export function App() @{ let open = state(false); <section>@if (open = true) { <p>Always?</p> }</section> }`;
+	const graph = await buildSemanticGraph({
+		filename: 'src/BranchAssignment.tsrx',
+		source,
+	});
+	const writeStart = source.indexOf('open = true');
+
+	expect(graph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_STATE_WRITE_IN_TEMPLATE',
+			severity: 'error',
+			phase: 'semantic-graph',
+			title: 'Cannot write state inside a template expression',
+			message:
+				'`@if (open = true)` assigns to `open` while deciding which branch to render. A branch test is a read; writing `open` there would re-trigger the very update that is evaluating it. If you meant a comparison, write `===`.',
+			primarySpan: {
+				filename: 'src/BranchAssignment.tsrx',
+				start: writeStart,
+				end: writeStart + 'open'.length,
+			},
+			statePath: 'open',
+			source: '@if (open = true)',
+			docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_WRITE_IN_TEMPLATE',
+		}),
+	]);
+});
+
 test('buildSemanticGraph reports state writes inside computed derives', async () => {
 	const graph = await buildSemanticGraph({
 		filename: 'src/ComputedWrite.tsrx',
