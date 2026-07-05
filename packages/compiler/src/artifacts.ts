@@ -499,6 +499,7 @@ export type PlannedSymbol =
 			readonly hostNodeId: string;
 			readonly eventName: string;
 			readonly source: string;
+			readonly sourceSpan?: SourceSpan;
 			readonly parameters: ReadonlyArray<string>;
 			readonly moduleImports?: ReadonlyArray<SemanticModuleImport>;
 			readonly order: number;
@@ -519,6 +520,7 @@ export type PlannedSymbol =
 			readonly componentEdgeId: string;
 			readonly propName: string;
 			readonly source: string;
+			readonly sourceSpan?: SourceSpan;
 			readonly moduleImports?: ReadonlyArray<SemanticModuleImport>;
 			readonly reads?: ReadonlyArray<LoweredStateRead>;
 			readonly writes?: ReadonlyArray<LoweredStateWrite>;
@@ -587,7 +589,9 @@ export type CaptureAnalysisInput = {
 };
 
 export type CaptureAnalysisDiagnostic = CompilerDiagnostic & {
-	readonly code: 'MARKLESS_CAPTURE_UNSUPPORTED_VALUE';
+	readonly code:
+		| 'MARKLESS_CAPTURE_UNSUPPORTED_VALUE'
+		| 'MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED';
 	readonly phase: 'capture-analysis';
 	readonly passId: 'capture-analysis';
 	readonly symbolId?: string;

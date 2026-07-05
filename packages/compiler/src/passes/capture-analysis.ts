@@ -35,6 +35,28 @@ function unsupportedCaptureDiagnostic(
 	},
 	binding: SemanticLocalBinding,
 ): CaptureAnalysisDiagnostic {
+	if (symbol.kind === 'event-handler' || symbol.kind === 'callback-prop') {
+		return {
+			code: 'MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED',
+			severity: 'error',
+			phase: 'capture-analysis',
+			title: 'This event handler cannot run in the browser yet',
+			message: `Cannot emit lazy ${symbol.kind} symbol "${symbol.symbolId}" because it reads component-local "${binding.name}", a local ${bindingKindLabel(binding.kind)} value that cannot cross a resume boundary.`,
+			why: 'Lazy handler symbols run after browser resume. Handler bodies may use graph references, element handles, props/shared values, module imports, or serializable capture-plane inputs; unsupported body locals would otherwise become silent no-op code.',
+			primarySpan: binding.sourceSpan,
+			passId: 'capture-analysis',
+			artifactKeys: ['semanticGraph', 'symbolResolver', 'captureAnalysis'],
+			symbolId: symbol.symbolId,
+			source: symbol.source,
+			suggestions: [
+				{
+					message: suggestionForBinding(binding.kind),
+				},
+			],
+			docsUrl: 'https://markless.dev/errors/MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED',
+		};
+	}
+
 	return {
 		code: 'MARKLESS_CAPTURE_UNSUPPORTED_VALUE',
 		severity: 'error',
