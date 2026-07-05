@@ -267,6 +267,7 @@ export async function resumeFromPayloadScripts(
 	runtime = createResumeRuntime({
 		root: input.root,
 		graph,
+		state: decoded.state,
 		view: decoded.view,
 		loadSymbol: input.loadSymbol,
 		createVisibilityObserver: input.createVisibilityObserver,

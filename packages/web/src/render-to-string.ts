@@ -55,7 +55,7 @@ export async function renderToString(
 	validateKeyedRepeatPayloadKeys({ state, view });
 	const payloadScripts = hasPayload ? renderPayloadScripts({ state, view }) : undefined;
 	const resumeModuleUrl = options.resumeModuleUrl ?? artifactResumeModuleUrl(component);
-	const browserTriggers = hasBrowserTriggers(view);
+	const browserTriggers = hasBrowserTriggers(view, state);
 	const modulePreloads =
 		options.modulePreloads ?? (browserTriggers ? artifactModulePreloads(component) : undefined);
 	const resumerScript =
@@ -120,9 +120,15 @@ function renderModulePreloadLinks(
 	return links.join('');
 }
 
-function hasBrowserTriggers(view: ProtocolViewPayload): boolean {
+function hasBrowserTriggers(view: ProtocolViewPayload, state: ProtocolStatePayload): boolean {
 	return (
 		view.events.length > 0 ||
+		state.computed.some(
+			(computed) =>
+				computed.async === false &&
+				typeof (computed as { readonly deriveSymbolId?: unknown }).deriveSymbolId ===
+					'string',
+		) ||
 		view.behaviors.some((behavior) => !!behavior.symbolId) ||
 		view.asyncBoundaries.some((boundary) =>
 			boundary.asyncReads.some((read) => !!read.runnerSymbolId),

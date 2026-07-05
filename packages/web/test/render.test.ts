@@ -107,6 +107,21 @@ function viewWithClickDomUpdate(): ProtocolViewPayload {
 	};
 }
 
+function viewWithClickSyncComputedDomUpdate(): ProtocolViewPayload {
+	return {
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'button' }],
+		events: [{ hostNodeId: 'h0', eventName: 'click', symbolIds: ['symbol:click'] }],
+		domUpdates: [{
+			hostNodeId: 'h0', source: 'doubled', graphNodeId: 'computed:doubled',
+			path: [], target: { kind: 'text' }, symbolId: 'symbol:text',
+		}],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+}
+
 function viewWithSyncPolicy(): ProtocolViewPayload {
 	return {
 		version: ASYNC_PROTOCOL_VERSION,
@@ -631,6 +646,61 @@ test('render uses the narrow CSR event path to apply DOM update symbols', async 
 	expect(loadedSymbols).toEqual(['symbol:click', 'symbol:text']);
 	expect(container.graph.read('state:count')).toBe(1);
 	expect(button.textContent).toBe('1');
+});
+
+test('render wires CSR sync computed dependencies through the full runtime', async () => {
+	const target = {
+		children: [] as FakeElement[],
+		replaceChildren(...children: FakeElement[]) {
+			this.children = children;
+		},
+	};
+	const button = element('BUTTON');
+	button.textContent = '4';
+	const state = {
+		...createProtocolStatePayload({
+			cells: [{ graphNodeId: 'state:count', name: 'count', valueKind: 'scalar', value: 2 }],
+		}),
+		computed: [{
+			graphNodeId: 'computed:doubled', name: 'doubled', async: false,
+			deriveSymbolId: 'symbol:derive',
+			dependencies: [{ graphNodeId: 'state:count', path: [] }],
+		}],
+	};
+	const loadedSymbols: string[] = [];
+
+	const container = await render(
+		() => ({
+			root: button,
+			state: state as never,
+			view: viewWithClickSyncComputedDomUpdate(),
+			loadSymbol(symbolId: string) {
+				loadedSymbols.push(symbolId);
+				if (symbolId === 'symbol:click') {
+					return ({ graph }) =>
+						graph.update({
+							graphNodeId: 'state:count', path: [], returnValue: 'next',
+							update: (value) => Number(value) + 1,
+						});
+				}
+				if (symbolId === 'symbol:derive') {
+					return ({ graph }) => Number(graph.read('state:count')) * 2;
+				}
+				return (context) => ({
+					type: 'setText',
+					locator: context.domUpdate?.hostNodeId ?? 'h0',
+					value: context.value,
+				});
+			},
+		}),
+		{ target },
+	);
+
+	await container.root.listeners[0].listener(event('click', container.root));
+
+	expect(loadedSymbols).toEqual(['symbol:click', 'symbol:derive', 'symbol:text']);
+	expect(container.graph.read('computed:doubled')).toBe(6);
+	expect(button.textContent).toBe('6');
 });
 
 test('render falls back from the event-only path when element handles are present', async () => {
