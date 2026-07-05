@@ -240,10 +240,10 @@ export function crossModuleHelperStateReturnUnsupportedDiagnostic(input: {
 	readonly filename: string;
 }): SemanticGraphDiagnostic {
 	return helperReturnUnsupportedDiagnostic({
-		title: 'Cross-module helper-created state is not supported yet',
-		message: `Cannot call cross-module helper "${input.helperName}" from "${input.sourceModule}" as component state. This slice supports same-module helper-created state only.`,
-		why: 'The compiler can now connect same-module helper-created state to a component call site, but this worktree does not have the multi-module harness needed to prove imported helper call trees.',
-		suggestion: 'Move the helper into this .tsrx module for now, or declare the state in the component body and pass it to imported helper code.',
+		title: 'Imported helper-created state needs module analysis',
+		message: `Cannot call imported helper "${input.helperName}" from "${input.sourceModule}" as component state because graph analysis is not available for that module.`,
+		why: 'Per-module compilation can connect helper-created state only when the imported module was compiled with a module graph interface that describes exported helper graph semantics.',
+		suggestion: 'Compile the helper module with interface output and pass that interface to this module compile, or declare the state in this component body for now.',
 		span: sourceSpan(input.init, input.filename),
 	});
 }

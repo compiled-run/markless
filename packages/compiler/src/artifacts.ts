@@ -7,6 +7,7 @@ export type { CompilerDiagnostic, DiagnosticSuggestion, SourceSpan } from './dia
 export type SemanticGraphInput = {
 	readonly filename: string;
 	readonly source: string;
+	readonly importedModuleInterfaces?: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
 };
 
 export type SemanticComponent = {
@@ -66,6 +67,32 @@ export type SemanticGraphBinding = {
 	readonly asyncCapable?: boolean;
 	readonly dependencies?: ReadonlyArray<SemanticGraphDependency>;
 	readonly functionSource?: string;
+};
+
+export type ModuleGraphInterfaceHelperReturn = {
+	readonly kind: 'state' | 'computed';
+	readonly localName: string;
+	readonly declarationKind?: SemanticGraphBinding['declarationKind'];
+	readonly writable: boolean;
+	readonly valueKind?: SemanticGraphBinding['valueKind'];
+	readonly initialValue?: unknown;
+	readonly initializerSource?: string;
+	readonly async?: boolean;
+	readonly asyncCapable?: boolean;
+	readonly functionSource?: string;
+};
+
+export type ModuleGraphInterfaceExport = {
+	readonly exportName: string;
+	readonly localName: string;
+	readonly kind: 'function';
+	readonly returns: ModuleGraphInterfaceHelperReturn;
+};
+
+export type ModuleGraphInterfaceArtifact = {
+	readonly passId: 'module-graph-interface';
+	readonly filename: string;
+	readonly exports: ReadonlyArray<ModuleGraphInterfaceExport>;
 };
 
 export type SemanticSharedScope = 'request' | 'container' | 'page';
@@ -204,6 +231,8 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_FRAMEWORK_IMPORT_REQUIRED'
 		| 'MARKLESS_FRAMEWORK_API_ALIAS_UNSUPPORTED'
 		| 'MARKLESS_STATE_MODULE_SCOPE'
+		| 'MARKLESS_STATE_CREATION_SITE_UNSTABLE'
+		| 'MARKLESS_STATE_HELPER_RETURN_UNSUPPORTED'
 		| 'MARKLESS_STATE_NESTED_CREATION'
 		| 'MARKLESS_COMPUTED_DEPENDENCY_CYCLE'
 		| 'MARKLESS_ASYNC_POST_AWAIT_READ'
@@ -357,6 +386,7 @@ export type SemanticGraphArtifact = {
 	readonly stateWrites: ReadonlyArray<SemanticStateWrite>;
 	readonly asyncBoundaries: ReadonlyArray<{ readonly id: string; readonly anchorOrder: number }>;
 	readonly branchSites: ReadonlyArray<SemanticBranchSite>;
+	readonly moduleGraphInterface: ModuleGraphInterfaceArtifact;
 	readonly diagnostics: ReadonlyArray<SemanticGraphDiagnostic>;
 };
 
@@ -956,6 +986,7 @@ export type CompilerPassGraph = {
 export type CompileTsrxModuleResult = {
 	readonly passGraph: CompilerPassGraph;
 	readonly semanticGraph: SemanticGraphArtifact;
+	readonly moduleGraphInterface: ModuleGraphInterfaceArtifact;
 	readonly stateLowering: StateLoweringArtifact;
 	readonly payloadArena: PayloadArenaArtifact;
 	readonly symbolResolver: SymbolResolverPlan;

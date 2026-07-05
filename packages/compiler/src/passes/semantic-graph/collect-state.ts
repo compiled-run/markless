@@ -1,6 +1,13 @@
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
-import type { SemanticGraphBinding, SemanticLocalBinding, SourceSpan } from '../../artifacts.ts';
+import type {
+	ModuleGraphInterfaceArtifact,
+	ModuleGraphInterfaceHelperReturn,
+	SemanticGraphBinding,
+	SemanticLocalBinding,
+	SemanticModuleImport,
+	SourceSpan,
+} from '../../artifacts.ts';
 import {
 	getFrameworkApiForCall,
 	getCallName,
@@ -291,6 +298,98 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 	}
 }
 
+export function collectModuleGraphInterface(input: {
+	readonly statements: ReadonlyArray<AnyNode>;
+	readonly state: WalkState;
+}): ModuleGraphInterfaceArtifact {
+	const exportedHelpers: ModuleGraphInterfaceArtifact['exports'] = [];
+
+	for (const statement of input.statements) {
+		if (statement.type !== 'ExportNamedDeclaration') continue;
+		const declaration = statement.declaration as AnyNode | undefined;
+		if (declaration?.type !== 'FunctionDeclaration') continue;
+
+		const localName = getIdentifierName(declaration.id as AnyNode | undefined);
+		if (!localName) continue;
+
+		const returns = directHelperGraphReturn(declaration, input.state);
+		if (!returns) continue;
+
+		exportedHelpers.push({
+			exportName: localName,
+			localName,
+			kind: 'function',
+			returns,
+		});
+	}
+
+	return {
+		passId: 'module-graph-interface',
+		filename: input.state.filename,
+		exports: exportedHelpers,
+	};
+}
+
+function directHelperGraphReturn(
+	declaration: AnyNode,
+	state: WalkState,
+): ModuleGraphInterfaceHelperReturn | null {
+	const body = declaration.body as AnyNode | undefined;
+	const returnedName = getIdentifierName(findDirectReturnArgument(body));
+	if (!returnedName) return null;
+
+	for (const statement of asNodes(body?.body)) {
+		if (statement.type !== 'VariableDeclaration') continue;
+
+		const declarationKind = variableDeclarationKind(statement);
+		for (const declarator of asNodes(statement.declarations)) {
+			if (getIdentifierName(declarator.id as AnyNode | undefined) !== returnedName) continue;
+
+			const init = declarator.init as AnyNode | undefined;
+			const frameworkApi = getFrameworkApiForCall(init, state.frameworkApiImports);
+			if (frameworkApi !== 'state' && frameworkApi !== 'computed') return null;
+
+			if (frameworkApi === 'state') {
+				const initial = firstArgument(init!);
+				const evaluatedInitial = evaluateInitialStateValue(initial);
+				return {
+					kind: 'state',
+					localName: returnedName,
+					declarationKind,
+					writable: true,
+					valueKind: initialValueKind(initial),
+					...(evaluatedInitial.ok
+						? { initialValue: evaluatedInitial.value }
+						: initial
+							? { initializerSource: expressionSource(initial, state.source) }
+							: {}),
+				};
+			}
+
+			const bodyArgument = firstArgument(init!);
+			return {
+				kind: 'computed',
+				localName: returnedName,
+				declarationKind,
+				writable: false,
+				async: bodyArgument?.async === true,
+				asyncCapable: bodyArgument?.async === true,
+				functionSource: bodyArgument ? expressionSource(bodyArgument, state.source) : undefined,
+			};
+		}
+	}
+
+	return null;
+}
+
+function findDirectReturnArgument(body: AnyNode | undefined): AnyNode | undefined {
+	for (const statement of asNodes(body?.body)) {
+		if (statement.type === 'ReturnStatement') return statement.argument as AnyNode | undefined;
+	}
+
+	return undefined;
+}
+
 function reportUnstableCreationSite(
 	name: string,
 	apiName: 'state' | 'computed',
@@ -355,6 +454,20 @@ function collectHelperReturnAlias(
 
 	const crossModuleSource = crossModuleHelperSource(helperName, state);
 	if (crossModuleSource) {
+		const imported = moduleImportForHelper(helperName, state);
+		const target = imported
+			? collectImportedHelperBindingForCall(imported, localName, state)
+			: null;
+		if (target) {
+			state.graph.aliases.push({
+				name: localName,
+				target,
+				...sharedScope(state),
+				declarationKind: 'let',
+				sourceSpan: sourceSpan(id, state.filename),
+			});
+			return true;
+		}
 		state.graph.diagnostics.push(
 			crossModuleHelperStateReturnUnsupportedDiagnostic({
 				helperName,
@@ -390,6 +503,60 @@ function collectHelperReturnAlias(
 		sourceSpan: sourceSpan(id, state.filename),
 	});
 	return true;
+}
+
+function collectImportedHelperBindingForCall(
+	moduleImport: SemanticModuleImport,
+	localName: string,
+	state: WalkState,
+): string | null {
+	if (!state.currentComponentName) return null;
+
+	const moduleInterface = state.importedModuleInterfaces[moduleImport.source];
+	if (!moduleInterface) return null;
+
+	const exportName = moduleImport.importedName ?? moduleImport.localName;
+	const helperExport = moduleInterface.exports.find(
+		(candidate) => candidate.exportName === exportName && candidate.kind === 'function',
+	);
+	if (!helperExport) return null;
+
+	const previousCall = state.currentHelperCall;
+	state.currentHelperCall = {
+		componentName: state.currentComponentName,
+		localName,
+		helperName: moduleImport.localName,
+	};
+	const target = graphBindingName(helperExport.returns.localName, state);
+	state.graph.graphBindings.push(graphBindingFromInterfaceReturn(helperExport.returns, state));
+	state.currentHelperCall = previousCall;
+	return target;
+}
+
+function graphBindingFromInterfaceReturn(
+	helperReturn: ModuleGraphInterfaceHelperReturn,
+	state: WalkState,
+): SemanticGraphBinding & { readonly initialValueKnown?: boolean; readonly initializerSource?: string } {
+	return {
+		id: graphBindingId(helperReturn.kind, helperReturn.localName, state),
+		name: graphBindingName(helperReturn.localName, state),
+		kind: helperReturn.kind,
+		...sharedScope(state),
+		declarationKind: 'let',
+		writable: helperReturn.kind === 'state',
+		valueKind: helperReturn.valueKind,
+		...('initialValue' in helperReturn
+			? { initialValue: helperReturn.initialValue, initialValueKnown: true }
+			: {}),
+		...(helperReturn.initializerSource
+			? { initializerSource: helperReturn.initializerSource }
+			: {}),
+		...(helperReturn.async !== undefined ? { async: helperReturn.async } : {}),
+		...(helperReturn.asyncCapable !== undefined
+			? { asyncCapable: helperReturn.asyncCapable }
+			: {}),
+		...(helperReturn.functionSource ? { functionSource: helperReturn.functionSource } : {}),
+	};
 }
 
 function collectHelperBindingForCall(
@@ -442,13 +609,20 @@ function findReturnArgument(node: AnyNode | undefined): AnyNode | undefined {
 }
 
 function crossModuleHelperSource(helperName: string, state: WalkState): string | null {
+	return moduleImportForHelper(helperName, state)?.source ?? null;
+}
+
+function moduleImportForHelper(
+	helperName: string,
+	state: WalkState,
+): SemanticModuleImport | null {
 	const imported = state.graph.moduleImports.find(
 		(moduleImport) =>
 			moduleImport.localName === helperName &&
 			moduleImport.source.endsWith('.tsrx') &&
 			(!moduleImport.importedName || moduleImport.importedName === moduleImport.localName),
 	);
-	return imported?.source ?? null;
+	return imported ?? null;
 }
 
 function graphBindingId(

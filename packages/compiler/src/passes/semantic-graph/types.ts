@@ -8,6 +8,7 @@ import type {
 	SemanticGraphAlias,
 	SemanticGraphBinding,
 	SemanticGraphDiagnostic,
+	ModuleGraphInterfaceArtifact,
 	SemanticModuleImport,
 	SemanticSharedDefinition,
 	SemanticSharedInstance,
@@ -46,6 +47,7 @@ export type MutableSemanticGraphArtifact = {
 	stateWrites: SemanticStateWrite[];
 	asyncBoundaries: Array<{ readonly id: string }>;
 	diagnostics: SemanticGraphDiagnostic[];
+	moduleGraphInterface: ModuleGraphInterfaceArtifact;
 };
 
 export type WalkState = {
@@ -53,6 +55,7 @@ export type WalkState = {
 	readonly source: string;
 	readonly graph: MutableSemanticGraphArtifact;
 	readonly frameworkApiImports: ReadonlyMap<string, FrameworkApiName>;
+	readonly importedModuleInterfaces: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
 	readonly hostIds: WeakMap<object, string>;
 	currentComponentName: string | null;
 	currentBranchScopeIds: string[];
@@ -101,6 +104,11 @@ export function createMutableSemanticGraphArtifact(filename: string): MutableSem
 		stateWrites: [],
 		asyncBoundaries: [],
 		branchSites: [],
+		moduleGraphInterface: {
+			passId: 'module-graph-interface',
+			filename,
+			exports: [],
+		},
 		diagnostics: [],
 	};
 }
@@ -110,12 +118,14 @@ export function createWalkState(input: {
 	readonly source: string;
 	readonly graph: MutableSemanticGraphArtifact;
 	readonly frameworkApiImports: ReadonlyMap<string, FrameworkApiName>;
+	readonly importedModuleInterfaces?: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
 }): WalkState {
 	return {
 		filename: input.filename,
 		source: input.source,
 		graph: input.graph,
 		frameworkApiImports: input.frameworkApiImports,
+		importedModuleInterfaces: input.importedModuleInterfaces ?? {},
 		hostIds: new WeakMap<object, string>(),
 		currentComponentName: null,
 		currentBranchScopeIds: [],

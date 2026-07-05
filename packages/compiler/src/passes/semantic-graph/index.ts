@@ -31,7 +31,7 @@ import {
 } from './collect-shared.ts';
 import { attachKeyedRepeatRowHost, collectKeyedRepeat } from './collect-repeat.ts';
 import { collectBranchSite } from './collect-branches.ts';
-import { collectVariableDeclaration } from './collect-state.ts';
+import { collectModuleGraphInterface, collectVariableDeclaration } from './collect-state.ts';
 import { createMutableSemanticGraphArtifact, createWalkState, type WalkState } from './types.ts';
 
 export async function buildSemanticGraph(
@@ -47,6 +47,7 @@ export async function buildSemanticGraph(
 		source: input.source,
 		graph,
 		frameworkApiImports,
+		importedModuleInterfaces: input.importedModuleInterfaces,
 	});
 	state.walk = walk;
 	for (const statement of statements) {
@@ -59,6 +60,7 @@ export async function buildSemanticGraph(
 		const name = getIdentifierName(declaration.id as AnyNode | undefined);
 		if (name) state.helperFunctions.set(name, declaration);
 	}
+	graph.moduleGraphInterface = collectModuleGraphInterface({ statements, state });
 
 	for (const statement of statements) {
 		collectModuleScopeGraphCreation(statement, state);

@@ -67,6 +67,7 @@ export async function compileTsrxModule(
 	return {
 		passGraph: pipeline.passGraph,
 		semanticGraph: artifacts.semanticGraph,
+		moduleGraphInterface: artifacts.semanticGraph.moduleGraphInterface,
 		stateLowering: artifacts.stateLowering,
 		payloadArena: artifacts.payloadArena,
 		symbolResolver: artifacts.symbolResolver,
