@@ -217,16 +217,16 @@ export function helperStateReturnUnsupportedDiagnostic(input: {
 		code: 'MARKLESS_STATE_HELPER_RETURN_UNSUPPORTED',
 		severity: 'error',
 		phase: 'semantic-graph',
-		title: 'Helper-created state is not supported yet',
-		message: `${input.apiName}() creates "${input.name}" inside a helper function. helper-created state is coming, but this compiler slice cannot yet connect the helper return value to the component graph binding.`,
-		why: 'The spec allows helper-created graph state, but the current compiler does not track graph cells through helper return values. Shipping a payload cell now would leave component reads and writes outside the graph.',
+		title: 'Helper-created state return shape is not supported',
+		message: `${input.apiName}() creates "${input.name}" inside a helper function, but the compiler cannot connect this helper return shape to the component graph binding.`,
+		why: 'The compiler supports same-module direct helper returns and compiled imported helpers. This gate remains for residual helper shapes such as object returns, nested return chains, or imported helpers without module graph interface data.',
 		primarySpan: sourceSpan(input.init, input.filename),
 		passId: 'tsrx-semantic-graph',
 		artifactKeys: ['semanticGraph'],
 		suggestions: [
 			{
 				message:
-					'For now, inline the state() or computed() declaration into the component body and pass the value to helper code.',
+					'Return the graph binding directly from the helper, compile the imported helper with interface output, or declare the state in the component body.',
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_HELPER_RETURN_UNSUPPORTED',

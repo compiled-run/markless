@@ -27,6 +27,7 @@ import {
 	childrenOpacityDiagnostic,
 	conditionalComponentRootDiagnostic,
 	noRenderableRootDiagnostic,
+	repeatRowStateScopeUnsupportedDiagnostic,
 	undeclaredTemplateReadDiagnostic,
 	unsupportedRenderBodyDiagnostic,
 	unsupportedRenderConstructDiagnostic,
@@ -771,6 +772,15 @@ function repeatRenderDiagnostics(input: {
 		const node = input.repeatNodeById.get(gate.repeatId);
 		if (!node) return [];
 		if (!gate.supported) {
+			const creation = repeatRowStateCreation(node);
+			if (creation) {
+				return [
+					repeatRowStateScopeUnsupportedDiagnostic({
+						...creation,
+						filename: input.filename,
+					}),
+				];
+			}
 			return [
 				unsupportedRenderConstructDiagnostic({
 					label: '@for',
@@ -812,6 +822,25 @@ function repeatRenderDiagnostics(input: {
 		}
 		return [];
 	});
+}
+
+function repeatRowStateCreation(
+	node: AnyNode,
+): { readonly apiName: 'state' | 'computed'; readonly name: string; readonly node: AnyNode } | null {
+	for (const child of asNodes((node.body as AnyNode | undefined)?.body)) {
+		if (isIgnorableTextNode(child)) continue;
+		if (child.type !== 'VariableDeclaration') continue;
+		for (const declaration of asNodes(child.declarations)) {
+			const init = declaration.init as AnyNode | undefined;
+			if (!init || init.type !== 'CallExpression') continue;
+			const apiName = getIdentifierName(init.callee as AnyNode | undefined);
+			if (apiName !== 'state' && apiName !== 'computed') continue;
+			const name = getIdentifierName(declaration.id as AnyNode | undefined);
+			if (!name) continue;
+			return { apiName, name, node: init };
+		}
+	}
+	return null;
 }
 
 function repeatUnsupportedSuggestion(

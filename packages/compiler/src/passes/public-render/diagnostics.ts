@@ -27,6 +27,32 @@ export function unsupportedRenderConstructDiagnostic(input: {
 	};
 }
 
+export function repeatRowStateScopeUnsupportedDiagnostic(input: {
+	readonly apiName: 'state' | 'computed';
+	readonly name: string;
+	readonly node: AnyNode;
+	readonly filename: string;
+}): CompilerDiagnostic {
+	return {
+		code: 'MARKLESS_STATE_REPEAT_ROW_SCOPE_UNSUPPORTED',
+		severity: 'error',
+		phase: 'public-render',
+		title: 'Per-row state in keyed repeats is not supported yet',
+		message: `${input.apiName}() creates "${input.name}" inside a keyed @for row. Per-row cells need per-row graph scopes, which do not exist yet.`,
+		why: 'Keys give rows identity, but each row would need its own cell keyed by row identity across reorder and resume. The current graph payload can only plan stable component-owned cells.',
+		primarySpan: sourceSpan(input.node, input.filename),
+		passId: 'public-render-plan',
+		artifactKeys: ['publicRenderPlan'],
+		suggestions: [
+			{
+				message:
+					'Lift the state to a collection on the parent: use one state() holding per-row data keyed by the row key.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_REPEAT_ROW_SCOPE_UNSUPPORTED',
+	};
+}
+
 // Spec 01-tsrx-host-contract: children are an opaque compiler-owned template
 // projection. Inspecting or transforming them React-style is diagnosed.
 export function childrenOpacityDiagnostic(input: {
