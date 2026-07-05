@@ -1,9 +1,8 @@
+import type { ProtocolStatePayload, ProtocolViewPayload } from '../../serializer/src/protocol.ts';
 import {
 	deserializeGraphValue,
-	type ProtocolStatePayload,
-	type ProtocolViewPayload,
 	type SerializedGraphPayload,
-} from '@markless/serializer';
+} from '../../serializer/src/value.ts';
 import type {
 	DomJournalEntry,
 	DomJournalResult,
@@ -11,13 +10,15 @@ import type {
 	RuntimeGraphUpdate,
 	RuntimeGraphWrite,
 } from '@markless/runtime';
-import { decodePayloadScriptsFromDocument } from './payload.ts';
+import { decodePayloadScriptsFromDocument } from './inline/payload-document.ts';
 import {
 	mismatchedElementLocatorError,
 	missingElementLocatorError,
+} from './inline/resume-errors.ts';
+import {
 	runSyncPolicyActions,
-	type ResumeDomEvent,
-} from './resume.ts';
+	type SyncPolicyDomEvent,
+} from './inline/sync-policy-core.ts';
 
 export type EventOnlyResumeDomNode = {
 	readonly nodeType: number;
@@ -325,7 +326,7 @@ async function dispatchEvent(input: {
 			runSyncPolicyActions(
 				matched.eventRecord.syncPolicy,
 				input.graph,
-				input.event as ResumeDomEvent,
+				input.event as SyncPolicyDomEvent,
 			);
 		}
 		for (const symbolId of matched.eventRecord.symbolIds) {
