@@ -2826,6 +2826,39 @@ export function App() @{
 	);
 });
 
+test('B917 compileTsrxModule renders same-module child components in CSR and SSR', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/SameModuleCard.tsrx',
+		source: `
+import { state } from '@markless/core';
+export function App() @{
+	let count = state(7);
+	<main><Card value={count} /><button>+</button></main>
+}
+function Card({ value }) @{
+	<article class="card"><strong>{value}</strong></article>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.rootTemplateHtml).toBe(
+		'<main><article class="card"><strong> </strong></article><button>+</button></main>',
+	);
+
+	const csrOutput = (await renderTestCsr(result)) as {
+		readonly root: PublicRenderTestElement;
+	};
+	const ssrOutput = (await renderTestSsr(result)) as {
+		readonly html: string;
+	};
+
+	expect(csrOutput.root.textContent).toBe('7+');
+	expect(ssrOutput.html).toBe(
+		'<main><article class="card"><strong>7</strong></article><button>+</button></main>',
+	);
+});
+
 test('compileTsrxModule accepts the main authoring import', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/MainImport.tsrx',

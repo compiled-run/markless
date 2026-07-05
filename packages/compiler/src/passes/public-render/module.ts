@@ -22,20 +22,20 @@ import {
 	unwrapExpressionContainer,
 } from '../../ast/tsrx.ts';
 import { emitDirectPublicRenderModule } from './direct-module.ts';
-import { selectPublicRenderRoot } from './plan.ts';
+import { firstComponentRoot, selectPublicRenderRoot } from './plan.ts';
 import { itemPathReadSource } from './source-expressions.ts';
 
 // Emits the optional direct-DOM module used by public render() after the plan proves
 // the component shape can run through this specialized path.
 export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRenderModuleArtifact {
-	const rootSelection = selectPublicRenderRoot(
-		parseModule(input.source.source, input.source.filename) as unknown as AnyNode,
-	);
+	const ast = parseModule(input.source.source, input.source.filename) as unknown as AnyNode;
+	const rootSelection = selectPublicRenderRoot(ast);
 	const rootComponentName = rootSelection?.componentName;
 	const componentCount = input.semanticGraph.components.length;
 	const root = rootSelection
 		? {
 				component: rootSelection.component,
+				componentName: rootSelection.componentName,
 				root: rootSelection.root,
 				propNames: componentPropNames(rootSelection.component),
 			}
@@ -83,7 +83,7 @@ function emitPublicCsrRenderModule(
 ): string {
 	if (!input.publicRenderPlan.rootTemplateHtml) return '';
 
-	const imports = componentImports(input.semanticGraph.componentEdges, '__marklessCsrComponent');
+	const references = componentReferences(input.semanticGraph.componentEdges, '__marklessCsrComponent');
 	const valueImports = publicRenderValueImports(
 		input.semanticGraph.moduleImports,
 		input.semanticGraph.componentEdges,
@@ -91,8 +91,8 @@ function emitPublicCsrRenderModule(
 	const renderContext: CsrRenderContext = {
 		mode: 'csr',
 		childReplacements: [],
-		componentEdges: input.semanticGraph.componentEdges,
-		componentImports: new Map(imports.map((item) => [item.componentName, item.localName])),
+		componentEdges: componentEdgesFor(input, rootInfo.componentName),
+		componentImports: new Map(references.map((item) => [item.componentName, item.localName])),
 		callbackSymbols: callbackSymbolIds(input),
 		nextComponentEdgeIndex: 0,
 		keyedRepeats: input.semanticGraph.keyedRepeats,
@@ -112,9 +112,12 @@ function emitPublicCsrRenderModule(
 	const hostLocators = staticHostLocators(input);
 
 	return [
-		...imports.map(emitComponentImport),
+		...references.flatMap((reference) =>
+			reference.importSource ? [emitComponentImport(reference)] : [],
+		),
 		...valueImports.map(emitValueImport),
 		...moduleScopeLines(input.source.source, input.source.filename),
+		...emitSameModuleCsrComponents(input, references, rootInfo.componentName),
 		'',
 		`const marklessCsrHostLocators = ${JSON.stringify(hostLocators)};`,
 		'const marklessCsrStateValues = new Map([',
@@ -169,6 +172,7 @@ function emitPublicCsrRenderModule(
 		'function marklessCsrReplaceChild(root, index, child) { const placeholder = root.querySelector?.(`[data-markless-csr-child="${index}"]`); if (placeholder && child) placeholder.replaceWith(child); else placeholder?.remove?.(); }',
 		'function marklessCsrAttachPropEvent(root, path, eventName, handler) { const element = marklessCsrNodeAtPath(root, path); if (handler && element?.addEventListener) element.addEventListener(eventName, handler); }',
 		'function marklessComposeState(state, children) { const childStates = children.map((child) => child.output?.state).filter(Boolean); if (childStates.length === 0) return state; return { ...state, cells: [...(state.cells ?? []), ...childStates.flatMap((childState) => childState.cells ?? [])], computed: [...(state.computed ?? []), ...childStates.flatMap((childState) => childState.computed ?? [])], ...((state.sharedDefinitions || childStates.some((childState) => childState.sharedDefinitions?.length)) ? { sharedDefinitions: [...(state.sharedDefinitions ?? []), ...childStates.flatMap((childState) => childState.sharedDefinitions ?? [])] } : {}) }; }',
+		'function marklessViewWithoutAnchors(view) { return { ...view, branches: [], asyncBoundaries: [] }; }',
 		'function marklessCsrComposeView(root, view, hostLocators, children) { const elements = marklessCsrCollectElements(root); const indexByElement = new Map(elements.map((element, index) => [element, index])); const localHostIds = new Set(); const locators = []; const branches = [...(view.branches ?? [])]; const asyncBoundaries = [...(view.asyncBoundaries ?? [])]; for (const locator of hostLocators) { const element = marklessCsrNodeAtPath(root, locator.hostPath); const index = element ? indexByElement.get(element) : undefined; if (index === undefined) continue; localHostIds.add(locator.hostNodeId); locators.push({ hostNodeId: locator.hostNodeId, strategy: "dom-order", index, tagName: locator.tagName }); } const events = view.events.filter((event) => localHostIds.has(event.hostNodeId)); const domUpdates = view.domUpdates.filter((update) => localHostIds.has(update.hostNodeId)); const behaviors = view.behaviors.filter((behavior) => localHostIds.has(behavior.hostNodeId)); const elementHandles = view.elementHandles.filter((handle) => localHostIds.has(handle.hostNodeId)); for (const child of children) marklessCsrAppendChildView({ child, elements, indexByElement, locators, events, domUpdates, behaviors, elementHandles, branches, asyncBoundaries }); locators.sort((a, b) => a.index - b.index); return { ...view, locators, events, domUpdates, behaviors, elementHandles, branches: marklessCsrResolveAnchorRecords(root, "branch", branches), asyncBoundaries: marklessCsrResolveAnchorRecords(root, "async", asyncBoundaries) }; }',
 		'function marklessCsrAppendChildView(context) { const childView = context.child.output?.view; const childRoot = context.child.output?.root; if (!childView || !childRoot) return; const childElements = marklessCsrCollectElements(childRoot); for (const locator of childView.locators) { const element = childElements[locator.index]; const index = element ? context.indexByElement.get(element) : undefined; if (index === undefined) continue; context.locators.push({ ...locator, hostNodeId: context.child.hostPrefix + locator.hostNodeId, index }); } for (const event of childView.events) context.events.push({ ...event, hostNodeId: context.child.hostPrefix + event.hostNodeId, symbolIds: event.symbolIds.map((symbolId) => context.child.symbolPrefix + symbolId) }); for (const update of childView.domUpdates) { const mapped = marklessCsrRemapChildGraph(update, context.child.graphProps); if (!mapped) continue; context.domUpdates.push({ ...update, hostNodeId: context.child.hostPrefix + update.hostNodeId, graphNodeId: mapped.graphNodeId, path: mapped.path, ...(update.symbolId ? { symbolId: context.child.symbolPrefix + update.symbolId } : {}) }); } for (const behavior of childView.behaviors) context.behaviors.push({ ...behavior, hostNodeId: context.child.hostPrefix + behavior.hostNodeId, ...(behavior.inputGraphReads ? { inputGraphReads: behavior.inputGraphReads.map((read) => { const mapped = marklessCsrRemapChildGraph(read, context.child.graphProps); return mapped ? { ...read, graphNodeId: mapped.graphNodeId, path: mapped.path } : read; }) } : {}), ...(behavior.symbolId ? { symbolId: context.child.symbolPrefix + behavior.symbolId } : {}) }); for (const handle of childView.elementHandles) context.elementHandles.push({ ...handle, hostNodeId: context.child.hostPrefix + handle.hostNodeId }); for (const branch of childView.branches ?? []) { const prefixedId = context.child.hostPrefix + branch.id; marklessCsrRenameAnchors(childRoot, "branch", branch.id, prefixedId); context.branches.push({ ...branch, id: prefixedId, testReads: marklessCsrRemapChildReads(branch.testReads, context.child.graphProps, prefixedId), ...(branch.symbolId ? { symbolId: context.child.symbolPrefix + branch.symbolId } : {}), ...(branch.armRecords ? { armRecords: branch.armRecords.map((arm) => marklessCsrPrefixArmRecord(arm, context.child)) } : {}) }); } for (const boundary of childView.asyncBoundaries ?? []) { const prefixedId = context.child.hostPrefix + boundary.id; marklessCsrRenameAnchors(childRoot, "async", boundary.id, prefixedId); context.asyncBoundaries.push({ ...boundary, id: prefixedId, asyncReads: marklessCsrRemapChildReads(boundary.asyncReads, context.child.graphProps, prefixedId).map((read) => ({ ...read, ...(read.runnerSymbolId ? { runnerSymbolId: context.child.symbolPrefix + read.runnerSymbolId } : {}) })), ...(boundary.updateSymbolId ? { updateSymbolId: context.child.symbolPrefix + boundary.updateSymbolId } : {}) }); } }',
 		'function marklessCsrRemapChildGraph(record, graphProps) { if (record.graphNodeId === "prop:props") { const propName = record.path[0]; const binding = graphProps.find((prop) => prop.name === propName); return binding ? { graphNodeId: binding.graphNodeId, path: [...binding.path, ...record.path.slice(1)] } : null; } if (record.graphNodeId.startsWith?.("prop:")) { const propName = record.graphNodeId.slice(5); const binding = graphProps.find((prop) => prop.name === propName); return binding ? { graphNodeId: binding.graphNodeId, path: [...binding.path, ...record.path] } : null; } return { graphNodeId: record.graphNodeId, path: record.path }; }',
@@ -203,15 +207,15 @@ function emitPublicSsrRenderModule(
 ): string {
 	if (!input.publicRenderPlan.rootTemplateHtml && !isComponentRoot(rootInfo.root)) return '';
 
-	const imports = componentImports(input.semanticGraph.componentEdges, '__marklessSsrComponent');
+	const references = componentReferences(input.semanticGraph.componentEdges, '__marklessSsrComponent');
 	const valueImports = publicRenderValueImports(
 		input.semanticGraph.moduleImports,
 		input.semanticGraph.componentEdges,
 	);
 	const renderContext: SsrRenderContext = {
 		mode: 'ssr',
-		componentEdges: input.semanticGraph.componentEdges,
-		componentImports: new Map(imports.map((item) => [item.componentName, item.localName])),
+		componentEdges: componentEdgesFor(input, rootInfo.componentName),
+		componentImports: new Map(references.map((item) => [item.componentName, item.localName])),
 		callbackSymbols: callbackSymbolIds(input),
 		nextComponentEdgeIndex: 0,
 		nextChildIndex: 0,
@@ -244,9 +248,12 @@ function emitPublicSsrRenderModule(
 	const htmlExpression = emitHtmlNode(rootInfo.root, renderContext);
 
 	return [
-		...imports.map(emitComponentImport),
+		...references.flatMap((reference) =>
+			reference.importSource ? [emitComponentImport(reference)] : [],
+		),
 		...valueImports.map(emitValueImport),
 		...moduleScopeLines(input.source.source, input.source.filename),
+		...emitSameModuleSsrComponents(input, references, rootInfo.componentName),
 		'',
 		`const marklessSsrPropEvents = ${JSON.stringify(propEvents)};`,
 		'const marklessSsrStateValues = new Map([',
@@ -289,6 +296,7 @@ function emitPublicSsrRenderModule(
 		'function marklessSsrCallbacks(callbacks) { const result = {}; for (const key of Object.keys(callbacks)) if (callbacks[key]) result[key] = callbacks[key]; return result; }',
 		'function marklessSsrCallbackSymbol(props, path) { let value = props?.__marklessSsrCallbacks; for (const key of path) value = value?.[key]; return typeof value === "string" ? value : undefined; }',
 		'function marklessComposeState(state, children) { const childStates = children.map((child) => child.output?.state).filter(Boolean); if (childStates.length === 0) return state; return { ...state, cells: [...(state.cells ?? []), ...childStates.flatMap((childState) => childState.cells ?? [])], computed: [...(state.computed ?? []), ...childStates.flatMap((childState) => childState.computed ?? [])], ...((state.sharedDefinitions || childStates.some((childState) => childState.sharedDefinitions?.length)) ? { sharedDefinitions: [...(state.sharedDefinitions ?? []), ...childStates.flatMap((childState) => childState.sharedDefinitions ?? [])] } : {}) }; }',
+		'function marklessViewWithoutAnchors(view) { return { ...view, branches: [], asyncBoundaries: [] }; }',
 		'function marklessSsrComposeView(html, view, hostLocators, children) { const localHostIds = new Set(hostLocators.map((locator) => locator.hostNodeId)); const childData = children.map((child) => ({ ...child, view: child.output?.view, hostCount: child.output?.elementCount ?? child.output?.view?.locators?.length ?? 0, externalSymbolIds: new Set(child.output?.externalSymbolIds ?? []) })).filter((child) => child.view); const offsetFor = (index) => childData.reduce((total, child) => total + (child.localIndex <= index ? child.hostCount : 0), 0); const locators = hostLocators.map((locator) => ({ ...locator, index: locator.index + offsetFor(locator.index) })); const events = view.events.filter((event) => localHostIds.has(event.hostNodeId)); const domUpdates = view.domUpdates.filter((update) => localHostIds.has(update.hostNodeId)); const behaviors = view.behaviors.filter((behavior) => localHostIds.has(behavior.hostNodeId)); const elementHandles = view.elementHandles.filter((handle) => localHostIds.has(handle.hostNodeId)); const branches = [...(view.branches ?? [])]; const asyncBoundaries = [...(view.asyncBoundaries ?? [])]; const externalSymbolIds = new Set(); let inserted = 0; for (const child of childData) { marklessSsrAppendChildView({ child, baseIndex: child.localIndex + inserted, locators, events, domUpdates, behaviors, elementHandles, branches, asyncBoundaries, externalSymbolIds }); inserted += child.hostCount; } locators.sort((a, b) => a.index - b.index); return { view: { ...view, locators, events, domUpdates, behaviors, elementHandles, branches: marklessSsrResolveAnchorRecords(html, "branch", branches), asyncBoundaries: marklessSsrResolveAnchorRecords(html, "async", asyncBoundaries) }, elementCount: hostLocators.length + (hostLocators.marklessSsrExtraElements ?? 0) + childData.reduce((total, child) => total + child.hostCount, 0), externalSymbolIds: [...externalSymbolIds] }; }',
 		'function marklessSsrAppendChildView(context) { const childView = context.child.view; const propEvents = context.child.output?.propEvents ?? []; const callbackProps = context.child.callbackProps ?? {}; for (const locator of childView.locators) context.locators.push({ ...locator, hostNodeId: context.child.hostPrefix + locator.hostNodeId, index: context.baseIndex + locator.index }); for (const event of childView.events) { const propEvent = propEvents.find((item) => item.hostNodeId === event.hostNodeId && item.eventName === event.eventName); const callbackSymbolId = propEvent ? callbackProps[propEvent.propName] : undefined; const symbolIds = callbackSymbolId ? [callbackSymbolId] : event.symbolIds.map((symbolId) => context.child.externalSymbolIds.has(symbolId) ? symbolId : context.child.symbolPrefix + symbolId); for (const symbolId of symbolIds) if (callbackSymbolId || context.child.externalSymbolIds.has(symbolId)) context.externalSymbolIds.add(symbolId); context.events.push({ ...event, hostNodeId: context.child.hostPrefix + event.hostNodeId, symbolIds }); } for (const update of childView.domUpdates) { const mapped = marklessSsrRemapChildGraph(update, context.child.graphProps); if (!mapped) continue; context.domUpdates.push({ ...update, hostNodeId: context.child.hostPrefix + update.hostNodeId, graphNodeId: mapped.graphNodeId, path: mapped.path, ...(update.symbolId ? { symbolId: context.child.symbolPrefix + update.symbolId } : {}) }); } for (const behavior of childView.behaviors) context.behaviors.push({ ...behavior, hostNodeId: context.child.hostPrefix + behavior.hostNodeId, ...(behavior.inputGraphReads ? { inputGraphReads: behavior.inputGraphReads.map((read) => { const mapped = marklessSsrRemapChildGraph(read, context.child.graphProps); return mapped ? { ...read, graphNodeId: mapped.graphNodeId, path: mapped.path } : read; }) } : {}), ...(behavior.symbolId ? { symbolId: context.child.symbolPrefix + behavior.symbolId } : {}) }); for (const handle of childView.elementHandles) context.elementHandles.push({ ...handle, hostNodeId: context.child.hostPrefix + handle.hostNodeId }); for (const branch of childView.branches ?? []) context.branches.push({ ...branch, id: context.child.hostPrefix + branch.id, testReads: marklessSsrRemapChildReads(branch.testReads, context.child.graphProps, context.child.hostPrefix + branch.id), ...(branch.symbolId ? { symbolId: context.child.symbolPrefix + branch.symbolId } : {}), ...(branch.armRecords ? { armRecords: branch.armRecords.map((arm) => marklessSsrPrefixArmRecord(arm, context.child)) } : {}) }); for (const boundary of childView.asyncBoundaries ?? []) context.asyncBoundaries.push({ ...boundary, id: context.child.hostPrefix + boundary.id, asyncReads: marklessSsrRemapChildReads(boundary.asyncReads, context.child.graphProps, context.child.hostPrefix + boundary.id).map((read) => ({ ...read, ...(read.runnerSymbolId ? { runnerSymbolId: context.child.symbolPrefix + read.runnerSymbolId } : {}) })), ...(boundary.updateSymbolId ? { updateSymbolId: context.child.symbolPrefix + boundary.updateSymbolId } : {}) }); }',
 		'function marklessSsrRemapChildGraph(record, graphProps) { if (record.graphNodeId === "prop:props") { const propName = record.path[0]; const binding = graphProps.find((prop) => prop.name === propName); return binding ? { graphNodeId: binding.graphNodeId, path: [...binding.path, ...record.path.slice(1)] } : null; } if (record.graphNodeId.startsWith?.("prop:")) { const propName = record.graphNodeId.slice(5); const binding = graphProps.find((prop) => prop.name === propName); return binding ? { graphNodeId: binding.graphNodeId, path: [...binding.path, ...record.path] } : null; } return { graphNodeId: record.graphNodeId, path: record.path }; }',
@@ -365,6 +373,7 @@ type HtmlRenderContext = SsrRenderContext | CsrRenderContext;
 
 type PublicRenderRoot = {
 	readonly component: AnyNode;
+	readonly componentName: string;
 	readonly root: AnyNode;
 	readonly propNames: ReadonlyArray<string>;
 };
@@ -554,44 +563,185 @@ function staticHostLocators(input: PublicRenderModuleInput) {
 	}));
 }
 
-function componentImports(
-	componentEdges: PublicRenderModuleInput['semanticGraph']['componentEdges'],
-	localPrefix: string,
-) {
-	const imports: {
-		readonly componentName: string;
-		readonly importSource: string;
-		readonly importKind?: ComponentEdge['importKind'];
-		readonly importedName?: string;
-		readonly localName: string;
-	}[] = [];
-
-	for (const edge of componentEdges) {
-		if (!edge.importSource) continue;
-		if (imports.some((item) => item.componentName === edge.childComponentName)) continue;
-		imports.push({
-			componentName: edge.childComponentName,
-			importSource: edge.importSource,
-			importKind: edge.importKind,
-			importedName: edge.importedName,
-			localName: `${localPrefix}${imports.length}`,
-		});
-	}
-
-	return imports;
-}
-
-function emitComponentImport(imported: {
-	readonly importSource: string;
+type ComponentReference = {
+	readonly componentName: string;
+	readonly importSource?: string;
 	readonly importKind?: ComponentEdge['importKind'];
 	readonly importedName?: string;
 	readonly localName: string;
-	readonly componentName: string;
-}): string {
+};
+
+function componentReferences(
+	componentEdges: PublicRenderModuleInput['semanticGraph']['componentEdges'],
+	localPrefix: string,
+): ComponentReference[] {
+	const references: ComponentReference[] = [];
+
+	for (const edge of componentEdges) {
+		if (references.some((item) => item.componentName === edge.childComponentName)) continue;
+		references.push({
+			componentName: edge.childComponentName,
+			...(edge.importSource ? { importSource: edge.importSource } : {}),
+			importKind: edge.importKind,
+			importedName: edge.importedName,
+			localName: `${localPrefix}${references.length}`,
+		});
+	}
+
+	return references;
+}
+
+function emitComponentImport(imported: ComponentReference & { readonly importSource: string }): string {
 	if (imported.importKind === 'named' && !isTsrxComponentImport(imported.importSource)) {
 		return `import { ${imported.importedName ?? imported.componentName} as ${imported.localName} } from ${JSON.stringify(imported.importSource)};`;
 	}
 	return `import ${imported.localName} from ${JSON.stringify(imported.importSource)};`;
+}
+
+function emitSameModuleCsrComponents(
+	input: PublicRenderModuleInput,
+	references: ReadonlyArray<ComponentReference>,
+	rootComponentName: string,
+): string[] {
+	const ast = parseModule(input.source.source, input.source.filename) as unknown as AnyNode;
+	const componentMap = sameModuleComponentMap(ast);
+	const referenceMap = new Map(references.map((item) => [item.componentName, item.localName]));
+	return references.flatMap((reference) => {
+		if (reference.importSource || reference.componentName === rootComponentName) return [];
+		const component = componentMap.get(reference.componentName);
+		const root = firstComponentRoot(component);
+		if (!component || !root) return [];
+		const rootInfo = {
+			component,
+			componentName: reference.componentName,
+			root,
+			propNames: componentPropNames(component),
+		};
+		const renderContext: CsrRenderContext = {
+			mode: 'csr',
+			childReplacements: [],
+			componentEdges: componentEdgesFor(input, reference.componentName),
+			componentImports: referenceMap,
+			callbackSymbols: callbackSymbolIds(input),
+			nextComponentEdgeIndex: 0,
+			keyedRepeats: [],
+			repeatGates: [],
+			nextRepeatIndex: 0,
+			branchSites: [],
+			branchReactivityGates: [],
+			nextBranchSiteIndex: 0,
+			asyncBoundaries: [],
+			asyncBoundaryGates: [],
+			nextAsyncBoundaryIndex: 0,
+			hasChildrenProp: rootInfo.propNames.includes('children'),
+			styleScopeClass: input.publicRenderPlan.styleScopes[0]?.scopeId ?? null,
+			source: input.source.source,
+		};
+		const functionName = `marklessRenderCsr${reference.componentName}`;
+		return [
+			`const ${reference.localName} = { renderCsr: ${functionName} };`,
+			`function ${functionName}(props = {}) {`,
+			destructureProps(rootInfo.propNames),
+			'	const marklessCsrPayloadState = { ...marklessCloneState(payloadState), cells: [], computed: [] };',
+			'	const marklessCsrRenderStateValues = new Map(marklessCsrStateValues);',
+			...renderBodyLines(input, rootInfo, 'marklessStateValue', 'marklessCsrRenderStateValues', 'marklessCsrPayloadState', [
+				'const marklessCsrRuntimeState = { graph: null };',
+				'const marklessCsrChildren = [];',
+				`const root = ${isFragmentNode(rootInfo.root) ? 'marklessCsrFragmentFromHtml' : 'marklessCsrRootFromHtml'}(${emitHtmlNode(rootInfo.root, renderContext)});`,
+			]),
+			...renderContext.childReplacements,
+			'	const marklessCsrView = marklessCsrComposeView(root, marklessViewWithoutAnchors(payloadView), [], marklessCsrChildren);',
+			'	const marklessCsrState = marklessComposeState(marklessCsrPayloadState, marklessCsrChildren);',
+			'	return { root, state: marklessCsrState, view: marklessCsrView, loadSymbol, connectRuntime(context) { marklessCsrRuntimeState.graph = context.graph; for (const child of marklessCsrChildren) child.output?.connectRuntime?.(context); } };',
+			'}',
+		].filter((line): line is string => line !== null);
+	});
+}
+
+function emitSameModuleSsrComponents(
+	input: PublicRenderModuleInput,
+	references: ReadonlyArray<ComponentReference>,
+	rootComponentName: string,
+): string[] {
+	const ast = parseModule(input.source.source, input.source.filename) as unknown as AnyNode;
+	const componentMap = sameModuleComponentMap(ast);
+	const referenceMap = new Map(references.map((item) => [item.componentName, item.localName]));
+	const hostIdByNode = assignSsrHostIds(
+		ast,
+		input.semanticGraph.hostNodes.map((host) => host.id),
+	);
+	return references.flatMap((reference) => {
+		if (reference.importSource || reference.componentName === rootComponentName) return [];
+		const component = componentMap.get(reference.componentName);
+		const root = firstComponentRoot(component);
+		if (!component || !root) return [];
+		const rootInfo = {
+			component,
+			componentName: reference.componentName,
+			root,
+			propNames: componentPropNames(component),
+		};
+		const renderContext: SsrRenderContext = {
+			mode: 'ssr',
+			componentEdges: componentEdgesFor(input, reference.componentName),
+			componentImports: referenceMap,
+			callbackSymbols: callbackSymbolIds(input),
+			nextComponentEdgeIndex: 0,
+			nextChildIndex: 0,
+			hostIdByNode,
+			keyedRepeats: [],
+			repeatGates: [],
+			nextRepeatIndex: 0,
+			insideRepeatRow: false,
+			asyncBoundaries: [],
+			asyncBoundaryGates: [],
+			nextAsyncBoundaryIndex: 0,
+			asyncRunners: new Map(),
+			hasChildrenProp: rootInfo.propNames.includes('children'),
+			branchSites: [],
+			branchReactivityGates: [],
+			nextBranchSiteIndex: 0,
+			styleScopeClass: input.publicRenderPlan.styleScopes[0]?.scopeId ?? null,
+			source: input.source.source,
+		};
+		const functionName = `marklessRenderSsr${reference.componentName}`;
+		return [
+			`const ${reference.localName} = { renderSsr: ${functionName} };`,
+			`async function ${functionName}(props = {}) {`,
+			destructureProps(rootInfo.propNames),
+			'	const marklessSsrPayloadState = { ...marklessCloneState(payloadState), cells: [], computed: [] };',
+			'	const marklessSsrRenderStateValues = new Map(marklessSsrStateValues);',
+			...renderBodyLines(input, rootInfo, 'marklessStateValue', 'marklessSsrRenderStateValues', 'marklessSsrPayloadState', [
+				'const marklessSsrChildren = [];',
+				'const marklessSsrBranches = [];',
+				'const marklessSsrAsyncSnapshots = [];',
+				'const marklessSsrHostLocators = [];',
+				`const html = ${emitHtmlNode(rootInfo.root, renderContext)};`,
+			]),
+			'	const marklessSsrComposition = marklessSsrComposeView(html, marklessViewWithoutAnchors(payloadView), marklessSsrHostLocators, marklessSsrChildren);',
+			'	const marklessSsrState = marklessComposeState(marklessSsrPayloadState, marklessSsrChildren);',
+			'	return { html, state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots), view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) }, elementCount: marklessSsrComposition.elementCount, propEvents: [], externalSymbolIds: marklessSsrComposition.externalSymbolIds };',
+			'}',
+		].filter((line): line is string => line !== null);
+	});
+}
+
+function sameModuleComponentMap(ast: AnyNode): ReadonlyMap<string, AnyNode> {
+	const components = new Map<string, AnyNode>();
+	for (const statement of asNodes(ast.body)) {
+		const component = getComponentFunction(statement);
+		if (component) components.set(component.name, component.node);
+	}
+	return components;
+}
+
+function componentEdgesFor(
+	input: PublicRenderModuleInput,
+	componentName: string,
+): PublicRenderModuleInput['semanticGraph']['componentEdges'] {
+	return input.semanticGraph.componentEdges.filter(
+		(edge) => edge.parentComponentName === componentName,
+	);
 }
 
 function isTsrxComponentImport(importSource: string): boolean {
