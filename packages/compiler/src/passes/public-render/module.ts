@@ -121,7 +121,9 @@ function emitPublicCsrRenderModule(
 		']);',
 		'function marklessRenderCsr(props = {}) {',
 		destructureProps(rootInfo.propNames),
-		...renderBodyLines(input, rootInfo, 'marklessCsrStateValue', [
+		'	const marklessCsrPayloadState = marklessCloneState(payloadState);',
+		'	const marklessCsrRenderStateValues = new Map(marklessCsrStateValues);',
+		...renderBodyLines(input, rootInfo, 'marklessStateValue', 'marklessCsrRenderStateValues', 'marklessCsrPayloadState', [
 			'const marklessCsrRuntimeState = { graph: null };',
 			'const marklessCsrChildren = [];',
 			`const root = ${isFragmentNode(rootInfo.root) ? 'marklessCsrFragmentFromHtml' : 'marklessCsrRootFromHtml'}(${emitHtmlNode(rootInfo.root, renderContext)});`,
@@ -132,7 +134,7 @@ function emitPublicCsrRenderModule(
 				`	marklessCsrAttachPropEvent(root, ${JSON.stringify(event.hostPath)}, ${JSON.stringify(event.eventName)}, ${event.propName});`,
 		),
 		'	const marklessCsrView = marklessCsrComposeView(root, payloadView, marklessCsrHostLocators, marklessCsrChildren);',
-		'	const marklessCsrState = marklessComposeState(payloadState, marklessCsrChildren);',
+		'	const marklessCsrState = marklessComposeState(marklessCsrPayloadState, marklessCsrChildren);',
 		'	return {',
 		'		root,',
 		'		state: marklessCsrState,',
@@ -160,7 +162,6 @@ function emitPublicCsrRenderModule(
 		'		return loadSymbol(symbolId);',
 		'	}',
 		'}',
-		'function marklessCsrStateValue(graphNodeId) { return marklessCsrStateValues.get(graphNodeId); }',
 		'function marklessCsrFragmentFromHtml(html) { const template = document.createElement("template"); template.innerHTML = html; return template.content; }',
 		'function marklessCsrRootFromHtml(html) { const template = document.createElement("template"); template.innerHTML = html; const root = template.content.firstElementChild; if (!root) throw new Error("Markless CSR template did not create a root element."); return root; }',
 		'function marklessCsrRenderChild(component, props) { return component?.renderCsr?.(props); }',
@@ -177,8 +178,9 @@ function emitPublicCsrRenderModule(
 		'function marklessCsrCollectElements(root) { const elements = []; const visit = (node) => { if (node?.nodeType === 1) elements.push(node); for (const child of Array.from(node?.childNodes ?? [])) visit(child); }; visit(root); return elements; }',
 		'function marklessCsrNodeAtPath(root, path) { let node = root; for (const index of path) { node = marklessCsrAuthoredChild(node, index); if (!node) return undefined; } return node; }',
 		'function marklessCsrAuthoredChild(parent, index) { const children = parent?.childNodes; if (!children) return undefined; let slot = 0; for (let position = 0; position < children.length; position++) { const child = children[position]; if (child.nodeType === 8) { const text = child.textContent ?? ""; const range = /^markless:(branch|async)/.test(text); if (range) { const end = "/" + text; let close = position + 1; while (close < children.length && !(children[close].nodeType === 8 && children[close].textContent === end)) close++; if (slot === index) return child; slot++; position = close; continue; } continue; } if (slot === index) return child; slot++; } return undefined; }',
-		'function marklessCsrIsThenable(value) { return value !== null && (typeof value === "object" || typeof value === "function") && typeof value.then === "function"; }',
-		'function marklessCsrText(value) { return marklessCsrEscape(value == null ? "" : String(value)); }',
+			'function marklessCsrIsThenable(value) { return value !== null && (typeof value === "object" || typeof value === "function") && typeof value.then === "function"; }',
+			...stateRuntimeLines,
+			'function marklessCsrText(value) { return marklessCsrEscape(value == null ? "" : String(value)); }',
 		'function marklessCsrChildrenHtml(value) { return value == null ? "" : String(value); }',
 		'function marklessCsrAttribute(name, value) { return ` ${name}="${marklessCsrEscape(value == null ? "" : String(value))}"`; }',
 		'function marklessCsrRepeatRows(items, renderRow, renderEmpty) { const list = Array.isArray(items) ? items : Array.from(items ?? []); if (list.length === 0) return renderEmpty ? renderEmpty() : ""; return list.map(renderRow).join(""); }',
@@ -248,7 +250,9 @@ function emitPublicSsrRenderModule(
 		']);',
 		'async function marklessRenderSsr(props = {}) {',
 		destructureProps(rootInfo.propNames),
-		...renderBodyLines(input, rootInfo, 'marklessSsrStateValue', [
+		'	const marklessSsrPayloadState = marklessCloneState(payloadState);',
+		'	const marklessSsrRenderStateValues = new Map(marklessSsrStateValues);',
+		...renderBodyLines(input, rootInfo, 'marklessStateValue', 'marklessSsrRenderStateValues', 'marklessSsrPayloadState', [
 			'const marklessSsrChildren = [];',
 			'const marklessSsrBranches = [];',
 			'const marklessSsrAsyncSnapshots = [];',
@@ -256,7 +260,7 @@ function emitPublicSsrRenderModule(
 			`const html = ${htmlExpression};`,
 		]),
 		'	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren);',
-		'	const marklessSsrState = marklessComposeState(payloadState, marklessSsrChildren);',
+		'	const marklessSsrState = marklessComposeState(marklessSsrPayloadState, marklessSsrChildren);',
 		'	return {',
 		'		html,',
 		'		state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots),',
@@ -266,7 +270,6 @@ function emitPublicSsrRenderModule(
 		'		externalSymbolIds: marklessSsrComposition.externalSymbolIds,',
 		'	};',
 		'}',
-		'function marklessSsrStateValue(graphNodeId) { return marklessSsrStateValues.get(graphNodeId); }',
 		'async function marklessSsrRenderChild(children, component, props, child) { const output = await component?.renderSsr?.(props); if (!output) return ""; let html = output.html ?? ""; for (const branch of output.view?.branches ?? []) html = marklessSsrPrefixAnchorHtml(html, "branch", branch.id, child.hostPrefix + branch.id); for (const boundary of output.view?.asyncBoundaries ?? []) html = marklessSsrPrefixAnchorHtml(html, "async", boundary.id, child.hostPrefix + boundary.id); children.push({ ...child, output: { ...output, html }, callbackProps: props?.__marklessSsrCallbacks ?? {} }); return html; }',
 		'function marklessSsrBranchArm(branches, id, takenArm) { branches.push({ id, takenArm }); return ""; }',
 		'async function marklessSsrRunAsyncComputed(snapshots, graphNodeId, run) { const signal = new AbortController().signal; try { const value = await run({ key: null, signal }); const snapshot = { status: "fulfilled", version: 1, key: null, value }; snapshots.push({ graphNodeId, snapshot }); return snapshot; } catch (error) { const snapshot = { status: "rejected", version: 1, key: null, error }; snapshots.push({ graphNodeId, snapshot }); return snapshot; } }',
@@ -283,10 +286,11 @@ function emitPublicSsrRenderModule(
 		'function marklessSsrAppendChildView(context) { const childView = context.child.view; const propEvents = context.child.output?.propEvents ?? []; const callbackProps = context.child.callbackProps ?? {}; for (const locator of childView.locators) context.locators.push({ ...locator, hostNodeId: context.child.hostPrefix + locator.hostNodeId, index: context.baseIndex + locator.index }); for (const event of childView.events) { const propEvent = propEvents.find((item) => item.hostNodeId === event.hostNodeId && item.eventName === event.eventName); const callbackSymbolId = propEvent ? callbackProps[propEvent.propName] : undefined; const symbolIds = callbackSymbolId ? [callbackSymbolId] : event.symbolIds.map((symbolId) => context.child.externalSymbolIds.has(symbolId) ? symbolId : context.child.symbolPrefix + symbolId); for (const symbolId of symbolIds) if (callbackSymbolId || context.child.externalSymbolIds.has(symbolId)) context.externalSymbolIds.add(symbolId); context.events.push({ ...event, hostNodeId: context.child.hostPrefix + event.hostNodeId, symbolIds }); } for (const update of childView.domUpdates) { const mapped = marklessSsrRemapChildGraph(update, context.child.graphProps); if (!mapped) continue; context.domUpdates.push({ ...update, hostNodeId: context.child.hostPrefix + update.hostNodeId, graphNodeId: mapped.graphNodeId, path: mapped.path, ...(update.symbolId ? { symbolId: context.child.symbolPrefix + update.symbolId } : {}) }); } for (const behavior of childView.behaviors) context.behaviors.push({ ...behavior, hostNodeId: context.child.hostPrefix + behavior.hostNodeId, ...(behavior.inputGraphReads ? { inputGraphReads: behavior.inputGraphReads.map((read) => { const mapped = marklessSsrRemapChildGraph(read, context.child.graphProps); return mapped ? { ...read, graphNodeId: mapped.graphNodeId, path: mapped.path } : read; }) } : {}), ...(behavior.symbolId ? { symbolId: context.child.symbolPrefix + behavior.symbolId } : {}) }); for (const handle of childView.elementHandles) context.elementHandles.push({ ...handle, hostNodeId: context.child.hostPrefix + handle.hostNodeId }); for (const branch of childView.branches ?? []) context.branches.push({ ...branch, id: context.child.hostPrefix + branch.id, testReads: marklessSsrRemapChildReads(branch.testReads, context.child.graphProps, context.child.hostPrefix + branch.id), ...(branch.symbolId ? { symbolId: context.child.symbolPrefix + branch.symbolId } : {}), ...(branch.armRecords ? { armRecords: branch.armRecords.map((arm) => marklessSsrPrefixArmRecord(arm, context.child)) } : {}) }); for (const boundary of childView.asyncBoundaries ?? []) context.asyncBoundaries.push({ ...boundary, id: context.child.hostPrefix + boundary.id, asyncReads: marklessSsrRemapChildReads(boundary.asyncReads, context.child.graphProps, context.child.hostPrefix + boundary.id).map((read) => ({ ...read, ...(read.runnerSymbolId ? { runnerSymbolId: context.child.symbolPrefix + read.runnerSymbolId } : {}) })), ...(boundary.updateSymbolId ? { updateSymbolId: context.child.symbolPrefix + boundary.updateSymbolId } : {}) }); }',
 		'function marklessSsrRemapChildGraph(record, graphProps) { if (record.graphNodeId === "prop:props") { const propName = record.path[0]; const binding = graphProps.find((prop) => prop.name === propName); return binding ? { graphNodeId: binding.graphNodeId, path: [...binding.path, ...record.path.slice(1)] } : null; } if (record.graphNodeId.startsWith?.("prop:")) { const propName = record.graphNodeId.slice(5); const binding = graphProps.find((prop) => prop.name === propName); return binding ? { graphNodeId: binding.graphNodeId, path: [...binding.path, ...record.path] } : null; } return { graphNodeId: record.graphNodeId, path: record.path }; }',
 		'function marklessSsrPrefixAnchorHtml(html, kind, id, prefixedId) { return html.replaceAll(`<!--markless:${kind}:${id}-->`, `<!--markless:${kind}:${prefixedId}-->`).replaceAll(`<!--/markless:${kind}:${id}-->`, `<!--/markless:${kind}:${prefixedId}-->`); }',
-		'function marklessSsrRemapChildReads(reads, graphProps, recordId) { return (reads ?? []).map((read) => { const mapped = marklessSsrRemapChildGraph(read, graphProps); if (!mapped) throw new Error("MARKLESS_COMPOSED_READ_UNMAPPED: " + recordId); return { ...read, graphNodeId: mapped.graphNodeId, path: mapped.path }; }); }',
-		'function marklessSsrPrefixArmRecord(arm, child) { return { ...arm, events: (arm.events ?? []).map((event) => ({ ...event, symbolIds: event.symbolIds.map((symbolId) => child.symbolPrefix + symbolId) })), domUpdates: (arm.domUpdates ?? []).map((update) => { const mapped = marklessSsrRemapChildGraph(update, child.graphProps); return mapped ? { ...update, graphNodeId: mapped.graphNodeId, path: mapped.path, ...(update.symbolId ? { symbolId: child.symbolPrefix + update.symbolId } : {}) } : update; }) }; }',
-		'function marklessSsrResolveAnchorRecords(html, kind, records) { if (records.length === 0) return records; const pattern = /<!--([\\s\\S]*?)-->/g; const indexByText = new Map(); let match; let index = 0; while ((match = pattern.exec(html)) !== null) { if (!indexByText.has(match[1])) indexByText.set(match[1], index); index++; } return records.map((record) => { const start = indexByText.get(`markless:${kind}:${record.id}`); const end = indexByText.get(`/markless:${kind}:${record.id}`); if (start === undefined || end === undefined) throw new Error(`MARKLESS_COMPOSED_ANCHOR_MISSING: ${kind}:${record.id}`); return { ...record, startAnchor: { ...record.startAnchor, index: start }, endAnchor: { ...record.endAnchor, index: end } }; }); }',
-		'function marklessSsrText(value) { return marklessSsrEscape(value == null ? "" : String(value)); }',
+			'function marklessSsrRemapChildReads(reads, graphProps, recordId) { return (reads ?? []).map((read) => { const mapped = marklessSsrRemapChildGraph(read, graphProps); if (!mapped) throw new Error("MARKLESS_COMPOSED_READ_UNMAPPED: " + recordId); return { ...read, graphNodeId: mapped.graphNodeId, path: mapped.path }; }); }',
+			'function marklessSsrPrefixArmRecord(arm, child) { return { ...arm, events: (arm.events ?? []).map((event) => ({ ...event, symbolIds: event.symbolIds.map((symbolId) => child.symbolPrefix + symbolId) })), domUpdates: (arm.domUpdates ?? []).map((update) => { const mapped = marklessSsrRemapChildGraph(update, child.graphProps); return mapped ? { ...update, graphNodeId: mapped.graphNodeId, path: mapped.path, ...(update.symbolId ? { symbolId: child.symbolPrefix + update.symbolId } : {}) } : update; }) }; }',
+			'function marklessSsrResolveAnchorRecords(html, kind, records) { if (records.length === 0) return records; const pattern = /<!--([\\s\\S]*?)-->/g; const indexByText = new Map(); let match; let index = 0; while ((match = pattern.exec(html)) !== null) { if (!indexByText.has(match[1])) indexByText.set(match[1], index); index++; } return records.map((record) => { const start = indexByText.get(`markless:${kind}:${record.id}`); const end = indexByText.get(`/markless:${kind}:${record.id}`); if (start === undefined || end === undefined) throw new Error(`MARKLESS_COMPOSED_ANCHOR_MISSING: ${kind}:${record.id}`); return { ...record, startAnchor: { ...record.startAnchor, index: start }, endAnchor: { ...record.endAnchor, index: end } }; }); }',
+			...stateRuntimeLines,
+			'function marklessSsrText(value) { return marklessSsrEscape(value == null ? "" : String(value)); }',
 		'function marklessSsrChildrenHtml(value) { return value == null ? "" : String(value); }',
 		'function marklessSsrAttribute(name, value) { return ` ${name}="${marklessSsrEscape(value == null ? "" : String(value))}"`; }',
 		'function marklessSsrSpreadAttributes(values, scopeClass) { let html = ""; let classSeen = false; for (const key of Object.keys(values ?? {})) { if (!/^[A-Za-z_][\\w.:-]*$/.test(key) || /^on[A-Z]/.test(key) || key === "attach" || key === "el" || key === "children") continue; const value = values[key]; if (value === null || value === undefined || value === false) continue; if (key === "class" && scopeClass) { classSeen = true; html += marklessSsrAttribute("class", (value === true ? "" : String(value)) + " " + scopeClass); continue; } html += value === true ? ` ${key}=""` : marklessSsrAttribute(key, value); } if (scopeClass && !classSeen) html += ` class="${scopeClass}"`; return html; }',
@@ -358,6 +362,14 @@ type PublicRenderRoot = {
 	readonly propNames: ReadonlyArray<string>;
 };
 
+const stateRuntimeLines = [
+	'function marklessCloneState(state) { return { ...state, cells: (state.cells ?? []).map((cell) => ({ ...cell })), computed: [...(state.computed ?? [])], ...(state.sharedDefinitions ? { sharedDefinitions: [...state.sharedDefinitions] } : {}) }; }',
+	'function marklessStateValue(values, state, graphNodeId, value) { if (arguments.length > 3) { values.set(graphNodeId, value); marklessSetStatePayloadValue(state, graphNodeId, value); return value; } return values.get(graphNodeId); }',
+	'function marklessSetStatePayloadValue(state, graphNodeId, value) { const cell = state.cells?.find((candidate) => candidate.graphNodeId === graphNodeId); if (cell) cell.value = marklessSerializeGraphValue(value); }',
+	'function marklessSerializeGraphValue(value) { const records = []; const seen = new Map(); return { version: 1, root: marklessSerializeSlot(value, records, seen), records }; }',
+	'function marklessSerializeSlot(value, records, seen) { if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") return value; if (value === undefined) return { $type: "undefined" }; if (typeof value === "bigint") return { $type: "bigint", value: String(value) }; if (typeof value === "function" || typeof value === "symbol") throw new Error("MARKLESS_SERIALIZE_UNSUPPORTED_VALUE"); if (seen.has(value)) return { $ref: seen.get(value) }; const id = records.length; seen.set(value, id); if (value instanceof Date) { records.push({ id, type: "date", value: value.toISOString() }); return { $ref: id }; } if (value instanceof RegExp) { records.push({ id, type: "regexp", source: value.source, flags: value.flags }); return { $ref: id }; } if (value instanceof URL) { records.push({ id, type: "url", value: value.toString() }); return { $ref: id }; } if (Array.isArray(value)) { const record = { id, type: "array", items: [] }; records.push(record); for (const item of value) record.items.push(marklessSerializeSlot(item, records, seen)); return { $ref: id }; } const prototype = Object.getPrototypeOf(value); if (prototype !== Object.prototype && prototype !== null) throw new Error("MARKLESS_SERIALIZE_UNSUPPORTED_VALUE"); const record = { id, type: "object", fields: [] }; records.push(record); for (const key of Object.keys(value)) record.fields.push([key, marklessSerializeSlot(value[key], records, seen)]); return { $ref: id }; }',
+] as const;
+
 type GraphBinding = PublicRenderModuleInput['semanticGraph']['graphBindings'][number];
 type ComponentEdge = PublicRenderModuleInput['semanticGraph']['componentEdges'][number];
 const loweredFrameworkCalls = new Set(['computed', 'element', 'handler']);
@@ -380,7 +392,9 @@ function callbackSymbolIds(input: PublicRenderModuleInput): ReadonlyMap<string, 
 function renderBodyLines(
 	input: PublicRenderModuleInput,
 	rootInfo: PublicRenderRoot,
-	readStateFunctionName: string,
+	stateValueFunctionName: string,
+	stateValuesName: string,
+	statePayloadName: string,
 	rootLines: ReadonlyArray<string>,
 ): string[] {
 	const body = rootInfo.component.body as AnyNode | undefined;
@@ -401,7 +415,13 @@ function renderBodyLines(
 			continue;
 		}
 
-		const stateLine = stateDeclarationLine(statement, stateBindings, readStateFunctionName);
+		const stateLine = stateDeclarationLine(
+			statement,
+			stateBindings,
+			stateValueFunctionName,
+			stateValuesName,
+			statePayloadName,
+		);
 		if (stateLine) { lines.push(stateLine); continue; }
 		if (isLoweredFrameworkDeclaration(statement)) continue;
 
@@ -424,7 +444,13 @@ function moduleScopeLines(source: string, filename: string): string[] {
 	});
 }
 
-function stateDeclarationLine(statement: AnyNode, stateBindings: ReadonlyMap<string, GraphBinding>, readStateFunctionName: string): string | null {
+function stateDeclarationLine(
+	statement: AnyNode,
+	stateBindings: ReadonlyMap<string, GraphBinding>,
+	stateValueFunctionName: string,
+	stateValuesName: string,
+	statePayloadName: string,
+): string | null {
 	if (statement.type !== 'VariableDeclaration') return null;
 	const declarations = asNodes(statement.declarations);
 	if (declarations.length !== 1) return null;
@@ -432,7 +458,11 @@ function stateDeclarationLine(statement: AnyNode, stateBindings: ReadonlyMap<str
 	const name = getIdentifierName(declaration.id as AnyNode | undefined);
 	const binding = name ? stateBindings.get(name) : undefined;
 	if (!binding || !isFrameworkCall(declaration.init as AnyNode | undefined, 'state')) return null;
-	return `let ${binding.name} = ${readStateFunctionName}(${JSON.stringify(binding.id)});`;
+	const initializerSource = (binding as GraphBinding & { readonly initializerSource?: string }).initializerSource;
+	const args = [stateValuesName, statePayloadName, JSON.stringify(binding.id), initializerSource].filter(
+		(arg): arg is string => arg !== undefined,
+	);
+	return `let ${binding.name} = ${stateValueFunctionName}(${args.join(', ')});`;
 }
 
 function isStateDeclaration(statement: AnyNode): boolean {
@@ -581,7 +611,7 @@ function assignSsrHostIds(
 
 function stateEntries(input: PublicRenderModuleInput): string[] {
 	return input.protocolState.cells.flatMap((cell) => {
-		if (cell.value === undefined || cell.valueKind === 'unknown') return [];
+		if (cell.value === undefined) return [];
 		const value = deserializeGraphValue(cell.value as SerializedGraphPayload);
 		return `	[${JSON.stringify(cell.graphNodeId)}, ${JSON.stringify(value)}]`;
 	});

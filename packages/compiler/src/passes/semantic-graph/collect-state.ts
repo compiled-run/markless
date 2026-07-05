@@ -102,6 +102,7 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 
 		if (frameworkApi === 'state') {
 			const initial = firstArgument(init);
+			const evaluatedInitial = evaluateInitialStateValue(initial);
 			const elementHandle = findElementHandleStateValue(initial, state);
 			if (elementHandle) {
 				state.graph.diagnostics.push(
@@ -113,7 +114,10 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 					}),
 				);
 			}
-			state.graph.graphBindings.push({
+				const binding: SemanticGraphBinding & {
+					readonly initialValueKnown?: boolean;
+					readonly initializerSource?: string;
+				} = {
 				id: graphBindingId('state', name, state),
 				name,
 				kind: 'state',
@@ -121,8 +125,13 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 				declarationKind,
 				writable: true,
 				valueKind: initialValueKind(initial),
-				initialValue: evaluateInitialStateValue(initial),
-			});
+				...(evaluatedInitial.ok
+					? { initialValue: evaluatedInitial.value, initialValueKnown: true }
+					: initial
+						? { initializerSource: expressionSource(initial, state.source) }
+						: {}),
+			};
+			state.graph.graphBindings.push(binding);
 		}
 
 		if (frameworkApi === 'computed') {
@@ -538,21 +547,31 @@ function initialValueKind(node: AnyNode | undefined): SemanticGraphBinding['valu
 	return 'unknown';
 }
 
-function evaluateInitialStateValue(node: AnyNode | undefined): unknown {
-	if (!node) return undefined;
+function evaluateInitialStateValue(
+	node: AnyNode | undefined,
+): { readonly ok: true; readonly value: unknown } | { readonly ok: false } {
+	if (!node) return { ok: false };
 
-	if (node.type === 'Literal') return node.value;
+	if (node.type === 'Literal') return { ok: true, value: node.value };
 	if (node.type === 'ObjectExpression') return evaluateObjectExpression(node);
-	if (node.type === 'ArrayExpression')
-		return asNodes(node.elements).map(evaluateInitialStateValue);
+	if (node.type === 'ArrayExpression') {
+		const values: unknown[] = [];
+		for (const element of asNodes(node.elements)) {
+			const value = evaluateInitialStateValue(element);
+			if (!value.ok) return { ok: false };
+			values.push(value.value);
+		}
+		return { ok: true, value: values };
+	}
 	if (node.type === 'UnaryExpression') {
 		const argument = evaluateInitialStateValue(node.argument as AnyNode | undefined);
-		if (node.operator === '-') return -Number(argument);
-		if (node.operator === '+') return Number(argument);
-		if (node.operator === '!') return !argument;
+		if (!argument.ok) return { ok: false };
+		if (node.operator === '-') return { ok: true, value: -Number(argument.value) };
+		if (node.operator === '+') return { ok: true, value: Number(argument.value) };
+		if (node.operator === '!') return { ok: true, value: !argument.value };
 	}
 
-	return undefined;
+	return { ok: false };
 }
 
 export function evaluateSyncPolicyConstant(
@@ -679,19 +698,23 @@ function evaluateSyncPolicyAddConstant(
 	return { ok: true, value: Number(left) + Number(right) };
 }
 
-function evaluateObjectExpression(node: AnyNode): Record<string, unknown> {
+function evaluateObjectExpression(
+	node: AnyNode,
+): { readonly ok: true; readonly value: Record<string, unknown> } | { readonly ok: false } {
 	const output: Record<string, unknown> = {};
 
 	for (const property of asNodes(node.properties)) {
-		if (property.type !== 'Property') continue;
+		if (property.type !== 'Property') return { ok: false };
 
 		const key = objectPropertyKey(property.key as AnyNode | undefined);
-		if (!key) continue;
+		if (!key) return { ok: false };
 
-		output[key] = evaluateInitialStateValue(property.value as AnyNode | undefined);
+		const value = evaluateInitialStateValue(property.value as AnyNode | undefined);
+		if (!value.ok) return { ok: false };
+		output[key] = value.value;
 	}
 
-	return output;
+	return { ok: true, value: output };
 }
 
 function objectPropertyKey(node: AnyNode | undefined): string | null {
