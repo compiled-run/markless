@@ -163,6 +163,10 @@ export function Form() @{
 
 const detachedSyncPolicySource = `import { state } from '@markless/core'; export function Link() @{ let count = state(0); <a href="/next" onClick={(event) => { const pd = event.preventDefault; pd(); count++; }}>Next {count}</a> }`;
 const eventExpressionSource = `import { state } from '@markless/core'; export function Counter() @{ let count = state(0); <button onClick={count++}>{count}</button> }`;
+const attributeDisciplineSource = `import { state } from '@markless/core';
+export function App() @{ let count = state(0); const menu = state({ open: false }); const handlers = { onClick: () => count++, onInput: (event) => { count++; } }; <section><input {...handlers} />
+// markless-allow MARKLESS_SPREAD_STATIC_SNAPSHOT: static attribute snapshot is intentional here
+<div {...menu}>Menu</div><div data-menu={menu}>Menu</div><div style={{ color: 'red' }}>Style</div><div id="a" id="b">Duplicate</div><button onclick={() => count++}>Bad case</button><p data-count={count} data-open={menu.open} hidden={false}>Scalars</p></section> }`;
 
 function repeatAllowSource(...sites: readonly string[]): string {
 	return `import { state } from '@markless/core'; export function App() @{ const rows = state([{ id: 'a' }]); <ul>${sites.join('\n')}</ul> }`;
@@ -694,6 +698,45 @@ test('B914 reports non-function event prop expressions', async () => {
 			primarySpan: expect.objectContaining({ start: expressionStart }),
 		}),
 	]);
+});
+
+test('B921 reports attribute and spread value discipline diagnostics without flagging scalar attributes', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/AttributeDiscipline.tsrx',
+		source: attributeDisciplineSource,
+	});
+	const byCode = (code: string) => graph.diagnostics.filter((item) => item.code === code);
+
+	expect(byCode('MARKLESS_EVENT_SPREAD_UNSUPPORTED')[0]).toEqual(
+		expect.objectContaining({ severity: 'error', message: expect.stringContaining('onClick') }),
+	);
+	expect(byCode('MARKLESS_SPREAD_STATIC_SNAPSHOT')[0]).toEqual(
+		expect.objectContaining({
+			severity: 'warning',
+			suppressed: true,
+			suppressionReason: 'static attribute snapshot is intentional here',
+		}),
+	);
+	expect(byCode('MARKLESS_ATTRIBUTE_DUPLICATE')[0]).toEqual(
+		expect.objectContaining({ severity: 'error', message: expect.stringContaining('id') }),
+	);
+	expect(byCode('MARKLESS_STYLE_OBJECT_UNSUPPORTED')[0]).toEqual(
+		expect.objectContaining({ severity: 'error', message: expect.stringContaining('style={{ color:') }),
+	);
+	expect(byCode('MARKLESS_ATTRIBUTE_OBJECT_VALUE')).toEqual([
+		expect.objectContaining({ message: expect.stringContaining('data-menu="[object Object]"') }),
+		expect.objectContaining({ message: expect.stringContaining('did you mean `onClick`') }),
+	]);
+	expect(graph.diagnostics).not.toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				message: expect.stringContaining('data-count'),
+			}),
+			expect.objectContaining({
+				message: expect.stringContaining('data-open'),
+			}),
+		]),
+	);
 });
 
 test('buildSemanticGraph reports reactive reads after await in async computed bodies', async () => {

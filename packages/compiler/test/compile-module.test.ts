@@ -1295,6 +1295,38 @@ export function App() @{
 	expect(output.html).toBe('<section data-kind="card" id="main" title="Final">Hi</section>');
 });
 
+test('B921 keeps string, number, and boolean attribute rendering intact', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/ScalarAttributes.tsrx',
+		source: `import { state } from '@markless/core';
+export function App() @{ const label = state('Menu'); const count = state(3); const open = state(true); <section data-label={label} data-count={count} data-open={open}>Hi</section> }`,
+		symbols: [],
+	});
+
+	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	const output = await (ssrModule.marklessRenderSsr as () => { readonly html: string })();
+
+	expect(result.semanticGraph.diagnostics).toEqual([]);
+	expect(output.html).toBe('<section data-label="Menu" data-count="3" data-open="true">Hi</section>');
+});
+
+test('B921 rejects spread handler bags before render modules interpolate undeclared spread sources', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/SpreadHandlers.tsrx',
+		source: `import { state } from '@markless/core';
+export function App() @{ let count = state(0); const handlers = { onClick: () => count++ }; <button {...handlers}>{count}</button> }`,
+		symbols: [],
+	});
+
+	expect(result.semanticGraph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_EVENT_SPREAD_UNSUPPORTED',
+			severity: 'error',
+		}),
+	]);
+	expect(result.publicRenderModule.ssrModuleSource + result.publicRenderModule.csrModuleSource).not.toContain('...(handlers)');
+});
+
 test('compileTsrxModule renders the @empty branch in the direct render module', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/EmptyRows.tsrx',

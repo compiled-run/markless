@@ -29,6 +29,12 @@ import { itemPathReadSource } from './source-expressions.ts';
 // the component shape can run through this specialized path.
 export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRenderModuleArtifact {
 	const ast = parseModule(input.source.source, input.source.filename) as unknown as AnyNode;
+	if (input.semanticGraph.diagnostics.some((item) => item.code === 'MARKLESS_EVENT_SPREAD_UNSUPPORTED')) {
+		return {
+			passId: 'public-render-module', moduleSource: '', rootExportName: null, csrModuleSource: '',
+			csrExportName: null, ssrModuleSource: '', ssrExportName: null, diagnostics: input.publicRenderPlan.diagnostics,
+		};
+	}
 	const rootSelection = selectPublicRenderRoot(ast);
 	const rootComponentName = rootSelection?.componentName;
 	const componentCount = input.semanticGraph.components.length;
