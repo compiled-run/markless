@@ -807,6 +807,53 @@ export function App({ suffix = 'tail' }) @{
 	expect(ssrOutput.html).toBe('<main>head-tail</main>');
 });
 
+test('compileTsrxModule diagnoses undeclared template reads before public render emit', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/UndeclaredTemplateRead.tsrx',
+		source: `export function App() @{ <main>{missingLabel}</main> }`,
+		symbols: [],
+	});
+	expect(result.publicRenderPlan.diagnostics).toEqual([
+		expect.objectContaining({ code: 'MARKLESS_TEMPLATE_READ_UNDECLARED', severity: 'error', phase: 'public-render', message: expect.stringContaining('missingLabel'), docsUrl: 'https://markless.dev/errors/MARKLESS_TEMPLATE_READ_UNDECLARED' }),
+	]);
+	expect(result.publicRenderModule.csrModuleSource).toBe('');
+	expect(result.publicRenderModule.ssrModuleSource).toBe('');
+	expect(result.publicRenderModule.moduleSource).not.toContain('missingLabel');
+});
+
+test('compileTsrxModule renders plain body local template reads in CSR and SSR modules', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/PlainBodyLocalTemplateRead.tsrx',
+		source: `export function App() @{ const label = 'render-once'; <main>{label}</main> }`,
+		symbols: [],
+	});
+	expect(result.publicRenderPlan.diagnostics).toEqual([]);
+	expect(((await renderTestCsr(result)) as { readonly root: PublicRenderTestElement }).root.textContent).toBe('render-once');
+	expect((await renderTestSsr(result)).html).toBe('<main>render-once</main>');
+});
+
+test('compileTsrxModule renders module-scope const template reads in CSR and SSR modules', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/ModuleConstTemplateRead.tsrx',
+		source: `const title = 'Module title'; export function App() @{ <main>{title}</main> }`,
+		symbols: [],
+	});
+	expect(result.publicRenderPlan.diagnostics).toEqual([]);
+	expect(((await renderTestCsr(result)) as { readonly root: PublicRenderTestElement }).root.textContent).toBe('Module title');
+	expect((await renderTestSsr(result)).html).toBe('<main>Module title</main>');
+});
+
+test('compileTsrxModule renders prop template reads in CSR and SSR modules', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/PropTemplateRead.tsrx',
+		source: `export function App({ label = 'prop value' }) @{ <main>{label}</main> }`,
+		symbols: [],
+	});
+	expect(result.publicRenderPlan.diagnostics).toEqual([]);
+	expect(((await renderTestCsr(result, { label: 'prop value' })) as { readonly root: PublicRenderTestElement }).root.textContent).toBe('prop value');
+	expect((await renderTestSsr(result, { label: 'prop value' })).html).toBe('<main>prop value</main>');
+});
+
 test('compileTsrxModule lets pre-root guard clauses render nothing in CSR modules', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/RenderBodyGuard.tsrx',

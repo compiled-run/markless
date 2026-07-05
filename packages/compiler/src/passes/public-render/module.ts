@@ -9,6 +9,7 @@ import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/
 import { expressionSource } from '../../ast/source.ts';
 import {
 	escapeAttribute,
+	getComponentFunction,
 	getDynamicTagExpression,
 	getElementAttributes,
 	getElementTagName,
@@ -112,6 +113,7 @@ function emitPublicCsrRenderModule(
 	return [
 		...imports.map(emitComponentImport),
 		...valueImports.map(emitValueImport),
+		...moduleScopeLines(input.source.source, input.source.filename),
 		'',
 		`const marklessCsrHostLocators = ${JSON.stringify(hostLocators)};`,
 		'const marklessCsrStateValues = new Map([',
@@ -238,6 +240,7 @@ function emitPublicSsrRenderModule(
 	return [
 		...imports.map(emitComponentImport),
 		...valueImports.map(emitValueImport),
+		...moduleScopeLines(input.source.source, input.source.filename),
 		'',
 		`const marklessSsrPropEvents = ${JSON.stringify(propEvents)};`,
 		'const marklessSsrStateValues = new Map([',
@@ -407,6 +410,18 @@ function renderBodyLines(
 	}
 	if (!emittedRoot) lines.push(...rootLines);
 	return indentLines(lines);
+}
+
+function moduleScopeLines(source: string, filename: string): string[] {
+	const ast = parseModule(source, filename) as unknown as AnyNode;
+	return asNodes(ast.body).flatMap((statement) => {
+		if (statement.type === 'ImportDeclaration' || getComponentFunction(statement)) return [];
+		const declaration = statement.type === 'ExportNamedDeclaration' ? (statement.declaration as AnyNode | undefined) : statement;
+		if (!declaration) return [];
+		if (declaration.type !== 'VariableDeclaration' && declaration.type !== 'FunctionDeclaration' && declaration.type !== 'ClassDeclaration') return [];
+		const sourceText = expressionSource(declaration, source);
+		return sourceText ? [sourceText] : [];
+	});
 }
 
 function stateDeclarationLine(statement: AnyNode, stateBindings: ReadonlyMap<string, GraphBinding>, readStateFunctionName: string): string | null {
