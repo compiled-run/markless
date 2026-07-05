@@ -370,7 +370,7 @@ test('resume runtime materializes view records and dispatches lazy symbols after
 		},
 	});
 
-	resume.start();
+	await resume.start();
 
 	expect(root.listeners).toEqual([
 		expect.objectContaining({
@@ -1096,26 +1096,17 @@ test('resume runtime reports structured errors for mismatched DOM-order locators
 	expect(error).toBeInstanceOf(RuntimeResumeError);
 	expect(error).toMatchObject({
 		code: 'MARKLESS_RESUME_LOCATOR_MISMATCH',
-		severity: 'error',
-		phase: 'resume',
-		title: 'Resume locator matched a different element',
-		hostNodeId: 'h1',
-		elementLocator: 'dom-order:1',
-		expectedTagName: 'button',
-		actualTagName: 'input',
-		docsUrl: 'https://markless.dev/errors/MARKLESS_RESUME_LOCATOR_MISMATCH',
-	});
-	expect(error).toMatchObject({
 		message: 'Resume locator h1 expected <button> at DOM order index 1 but found <input>.',
-		why: expect.stringContaining('markless/view'),
+		docsUrl: 'https://markless.dev/errors/MARKLESS_RESUME_LOCATOR_MISMATCH',
 	});
 });
 
-test('resume runtime reports structured errors for missing async boundary anchors', () => {
+test('resume runtime reports structured errors for missing async boundary anchors', async () => {
 	const start = comment('async:boundary:0:start');
 	const root = element('SECTION', [start]);
-	const error = captureThrown(() =>
-		createResumeRuntime({
+
+	await expect(async () => {
+		const resume = createResumeRuntime({
 			root,
 			graph: createRuntimeGraph({ cells: [] }),
 			view: {
@@ -1144,22 +1135,12 @@ test('resume runtime reports structured errors for missing async boundary anchor
 			loadSymbol() {
 				return () => undefined;
 			},
-		}),
-	);
-
-	expect(error).toBeInstanceOf(RuntimeResumeError);
-	expect(error).toMatchObject({
+		});
+		await resume.start();
+	}).rejects.toMatchObject({
 		code: 'MARKLESS_RESUME_LOCATOR_MISSING',
-		severity: 'error',
-		phase: 'resume',
-		title: 'Resume locator did not match the document',
-		boundaryId: 'boundary:0',
-		elementLocator: 'dom-order-comment:1',
 		docsUrl: 'https://markless.dev/errors/MARKLESS_RESUME_LOCATOR_MISSING',
-	});
-	expect(error).toMatchObject({
 		message: 'Resume locator boundary:0 endAnchor expected a comment at DOM order index 1.',
-		why: expect.stringContaining('comment anchor'),
 	});
 });
 
@@ -2665,7 +2646,7 @@ test('resume runtime replaces branch ranges lazily when the test arm flips', asy
 		flush: async () => undefined,
 	} as unknown as RuntimeGraph;
 
-	createResumeRuntime({
+	const resume = createResumeRuntime({
 		root,
 		graph,
 		view: {
@@ -2702,6 +2683,7 @@ test('resume runtime replaces branch ranges lazily when the test arm flips', asy
 		},
 	});
 
+	await resume.start();
 	// Seeding the current arm reads the graph without loading any symbol.
 	expect(loadedSymbols).toEqual([]);
 	expect(subscriptions).toEqual([
@@ -2801,7 +2783,10 @@ test('resume runtime rejects duplicate keyed repeat values before row materializ
 		],
 	});
 
-	expect(() => createResumeRuntime({ root, graph, view, loadSymbol })).toThrowError(
+	await expect(async () => {
+		const resume = createResumeRuntime({ root, graph, view, loadSymbol });
+		await resume.start();
+	}).rejects.toThrowError(
 		expect.objectContaining({
 			code: 'MARKLESS_REPEAT_KEY_DUPLICATE',
 			message: 'MARKLESS_REPEAT_KEY_DUPLICATE: Duplicate @for key "fruit" from entry.id.',
@@ -2972,7 +2957,7 @@ test('resume runtime wakes keyed repeats on collection writes', async () => {
 		],
 	};
 
-	createResumeRuntime({ root, graph, view, loadSymbol: () => () => undefined });
+	await createResumeRuntime({ root, graph, view, loadSymbol: () => () => undefined }).start();
 	graph.write({ graphNodeId: 'state:rows', value: [thirdItem, secondItem, firstItem] });
 	await graph.flush();
 
@@ -3024,7 +3009,7 @@ test('resume runtime dispose removes listeners, subscriptions, and host cleanups
 	expect(graph.takeJournal()).toEqual([]);
 });
 
-test('resume runtime dispose releases container-owned graph subscriptions', () => {
+test('resume runtime dispose releases container-owned graph subscriptions', async () => {
 	const root = element('SECTION', [
 		comment('markless:branch:branch-site:0'),
 		comment('/markless:branch:branch-site:0'),
@@ -3082,6 +3067,7 @@ test('resume runtime dispose releases container-owned graph subscriptions', () =
 		applyDomJournal: async () => undefined,
 	});
 
+	await resume.start();
 	resume.dispose();
 
 	expect(released).toEqual([
@@ -3188,13 +3174,13 @@ test('resume runtime starts unsettled async boundary runners at creation and set
 		},
 	});
 
+	await resume.start();
 	// CSR mounts render @pending between the anchors, so an unsettled boundary
-	// is a local demand: the runner starts at runtime creation.
+	// is a local demand: the runner starts during runtime startup.
 	expect(runs).toHaveLength(1);
 	expect(runs[0]).toMatchObject({ key: 'ada' });
 	expect(loadedSymbols).toEqual([]);
 
-	await resume.start();
 	result.resolve({ title: 'User ada' });
 	await drainMicrotasks();
 	await graph.flush();

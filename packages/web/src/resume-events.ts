@@ -1,0 +1,70 @@
+import type { RuntimeGraph } from '@markless/runtime';
+import type { ElementHandleRegistry, ResumeDispatchOptions, ResumeDomElement, ResumeDomEvent, ResumeEventRecord, ResumeKeyedRepeatRecord, ResumeKeyedRepeatRowEvent, ResumeRuntimeErrorContext, ResumeRuntimeInput } from './resume-types.ts';
+
+export type ResumeRowEventMatch = { readonly repeat: ResumeKeyedRepeatRecord; readonly parent: ResumeDomElement; readonly rowRoot: ResumeDomElement; readonly rowKey: unknown; readonly rowEvent: ResumeKeyedRepeatRowEvent };
+export type ResumeRowEventRecords = WeakMap<ResumeDomElement, Map<string, ResumeRowEventMatch>>;
+export type ResumeEventWiring = ReturnType<typeof createEventWiring>;
+
+export function createEventWiring(input: {
+	readonly graph: RuntimeGraph; readonly loadSymbol: ResumeRuntimeInput['loadSymbol']; readonly elementsByHostId: Map<string, ResumeDomElement>; readonly elementHandles: ElementHandleRegistry;
+	readonly eventTypes: Set<string>; readonly disposedHosts: Set<string>; readonly flushRuntimeGraph: () => Promise<void>; readonly reportRuntimeError: (error: unknown, context: ResumeRuntimeErrorContext) => Promise<void>;
+	readonly activateBehaviorsFromTrigger: (hostNodeId: string) => Promise<void> | undefined; readonly behaviorHostIdsForAncestors: (element: ResumeDomElement | undefined) => string[];
+}) {
+	const eventRecords = new WeakMap<ResumeDomElement, Map<string, ResumeEventRecord>>();
+	const rowEventRecords: ResumeRowEventRecords = new WeakMap();
+	let runPolicy: undefined | ((policy: ResumeEventRecord['syncPolicy'], graph: RuntimeGraph, event: ResumeDomEvent) => void);
+	const addEventRecord = (element: ResumeDomElement, record: ResumeEventRecord) => {
+		let byName = eventRecords.get(element); if (!byName) { byName = new Map(); eventRecords.set(element, byName); }
+		byName.set(record.eventName, record); input.eventTypes.add(record.eventName);
+	};
+	const addRowEvent = (host: ResumeDomElement, match: ResumeRowEventMatch) => {
+		let byName = rowEventRecords.get(host); if (!byName) { byName = new Map(); rowEventRecords.set(host, byName); }
+		byName.set(match.rowEvent.eventName, match); input.eventTypes.add(match.rowEvent.eventName);
+	};
+	async function prepareSyncPolicy(viewEvents: ReadonlyArray<ResumeEventRecord>, rowEvents: ReadonlyArray<ResumeKeyedRepeatRowEvent>): Promise<void> {
+		if (![...viewEvents, ...rowEvents].some((record) => record.syncPolicy)) return;
+		runPolicy = (await import('./inline/sync-policy-core.ts')).runSyncPolicyActions as never;
+	}
+	async function dispatch(event: ResumeDomEvent, options: ResumeDispatchOptions = {}): Promise<void> {
+		const target = event.target; if (!target) return;
+		const matched = findDispatchMatch(target, event.type, eventRecords, rowEventRecords); if (!matched) return;
+		if ('rowMatch' in matched) return dispatchRowEvent(matched.element, matched.rowMatch, event, options);
+		const { element, eventRecord } = matched;
+		if (eventRecord.syncPolicy && !options.syncPolicyAlreadyApplied) runPolicy?.(eventRecord.syncPolicy, input.graph, event);
+		let activeSymbolId: string | undefined;
+		try {
+			for (const hostNodeId of input.behaviorHostIdsForAncestors(element)) { const activation = input.activateBehaviorsFromTrigger(hostNodeId); if (activation) await activation; }
+			const activation = input.activateBehaviorsFromTrigger(eventRecord.hostNodeId); if (activation) await activation;
+			for (const symbolId of eventRecord.symbolIds) { activeSymbolId = symbolId; const symbol = await input.loadSymbol(symbolId); const result = symbol({ graph: input.graph, event, element, getElementHandle: input.elementHandles.get }); if (isPromiseLike(result)) await result; }
+		} catch (error) {
+			await input.reportRuntimeError(error, { phase: 'event', hostNodeId: eventRecord.hostNodeId, eventName: eventRecord.eventName, symbolId: activeSymbolId, event, element }); throw error;
+		} finally { await input.flushRuntimeGraph(); }
+	}
+	async function dispatchRowEvent(element: ResumeDomElement, match: ResumeRowEventMatch, event: ResumeDomEvent, options: ResumeDispatchOptions): Promise<void> {
+		const { findRepeatItemByKey, readKeyedRepeatCollection, validateOneRepeat } = await import('./resume-keyed-repeats.ts');
+		const { repeat, rowKey, rowEvent } = match;
+		if (rowEvent.syncPolicy && !options.syncPolicyAlreadyApplied) runPolicy?.(rowEvent.syncPolicy, input.graph, event);
+		let activeSymbolId: string | undefined;
+		try {
+			validateOneRepeat(input.graph, repeat);
+			const locals = { [repeat.itemName]: findRepeatItemByKey(readKeyedRepeatCollection(input.graph, repeat), repeat, rowKey) };
+			for (const symbolId of rowEvent.symbolIds) { activeSymbolId = symbolId; const symbol = await input.loadSymbol(symbolId); const result = symbol({ graph: input.graph, event, element, getElementHandle: input.elementHandles.get, locals }); if (isPromiseLike(result)) await result; }
+		} catch (error) {
+			await input.reportRuntimeError(error, { phase: 'event', hostNodeId: repeat.parentHostNodeId, eventName: rowEvent.eventName, symbolId: activeSymbolId, event, element }); throw error;
+		} finally { await input.flushRuntimeGraph(); }
+	}
+	return { eventRecords, rowEventRecords, addEventRecord, addRowEvent, prepareSyncPolicy, dispatch };
+}
+
+function findDispatchMatch(target: ResumeDomElement, eventName: string, eventRecords: WeakMap<ResumeDomElement, Map<string, ResumeEventRecord>>, rowEventRecords: ResumeRowEventRecords) {
+	let current: ResumeDomElement | null | undefined = target;
+	while (current) {
+		const rowMatch = rowEventRecords.get(current)?.get(eventName); if (rowMatch) return { element: current, rowMatch };
+		const eventRecord = eventRecords.get(current)?.get(eventName); if (eventRecord) return { element: current, eventRecord };
+		current = current.parentElement;
+	}
+	return null;
+}
+function isPromiseLike<T>(value: T | PromiseLike<T>): value is PromiseLike<T> {
+	return value !== null && (typeof value === 'object' || typeof value === 'function') && typeof (value as { readonly then?: unknown }).then === 'function';
+}

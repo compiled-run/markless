@@ -6,8 +6,16 @@ import { expect, test } from 'vitest';
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const entry = join(repoRoot, 'packages/web/src/event-only-resume.ts');
 const resumeEntry = join(repoRoot, 'packages/web/src/resume.ts');
+const resumeRuntimeEntry = join(repoRoot, 'packages/web/src/resume-runtime.ts');
 const payloadEntry = join(repoRoot, 'packages/web/src/payload.ts');
 const renderCsrEntry = join(repoRoot, 'packages/web/src/render-csr.ts');
+const resumeOnDemandEntries = [
+	join(repoRoot, 'packages/web/src/resume-async-boundaries.ts'),
+	join(repoRoot, 'packages/web/src/resume-behaviors.ts'),
+	join(repoRoot, 'packages/web/src/resume-branches.ts'),
+	join(repoRoot, 'packages/web/src/resume-keyed-repeats.ts'),
+	join(repoRoot, 'packages/web/src/resume-sync-computed.ts'),
+] as const;
 // 3,000 gzip bytes * the observed ~3.7 raw:minified+gzip ratio leaves an
 // 11,100 byte raw-source proxy budget for the production client closure.
 const sourceByteLimit = 11100;
@@ -65,6 +73,13 @@ test.each([
 
 	for (const forbidden of forbiddenResumeSerializerFiles) {
 		expect(relativeClosure).not.toContain(forbidden);
+	}
+});
+
+test('resume core and on-demand runtime modules keep static source closures lean', () => {
+	for (const entry of [resumeEntry, resumeRuntimeEntry, ...resumeOnDemandEntries]) {
+		const closure = collectStaticImportClosure(entry);
+		expect(closure.sourceBytes).toBeLessThanOrEqual(sourceByteLimit);
 	}
 });
 

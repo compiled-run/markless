@@ -106,7 +106,7 @@ test('event-only resume rejects structure-tampered payloads with structured payl
 	});
 });
 
-test('event-only resume reports locator mismatch with the full runtime diagnostic shape', async () => {
+test('event-only resume reports locator mismatch with slim runtime diagnostics', async () => {
 	const button = element('BUTTON');
 	const root = element('DIV', [button]);
 	const state = createProtocolStatePayload({ cells: [] });
@@ -132,13 +132,7 @@ test('event-only resume reports locator mismatch with the full runtime diagnosti
 		}),
 	).rejects.toMatchObject({
 		code: 'MARKLESS_RESUME_LOCATOR_MISMATCH',
-		severity: 'error',
-		phase: 'resume',
-		title: 'Resume locator matched a different element',
-		hostNodeId: 'h0',
-		elementLocator: 'dom-order:0',
-		expectedTagName: 'section',
-		actualTagName: 'div',
+		message: 'Resume locator h0 expected <section> at DOM order index 0 but found <div>.',
 		docsUrl: 'https://markless.dev/errors/MARKLESS_RESUME_LOCATOR_MISMATCH',
 	});
 });
