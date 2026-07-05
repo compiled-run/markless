@@ -434,6 +434,105 @@ test('buildSemanticGraph keeps keyed repeats registered when an index clause is 
 	]);
 });
 
+test('buildSemanticGraph diagnoses dynamic repeats that omit a key', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/MissingKey.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let records = state([{ uuid: 'x', title: 'One' }]);
+
+	<ol>
+		@for (const record of records) {
+			<li>{record.title}</li>
+		}
+	</ol>
+}
+`,
+	});
+
+	expect(graph.keyedRepeats).toEqual([]);
+	expect(graph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_REPEAT_KEY_REQUIRED',
+			severity: 'error',
+			phase: 'semantic-graph',
+		}),
+	]);
+});
+
+test('buildSemanticGraph accepts positional repeat keys and warns about slot identity', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/PositionKey.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let records = state([{ uuid: 'x', title: 'One' }]);
+
+	<ol>
+		@for (const record of records; index slot; key slot) {
+			<li>{record.title}</li>
+		}
+	</ol>
+}
+`,
+	});
+	const parent = graph.hostNodes.find((hostNode) => hostNode.tagName === 'ol');
+	const row = graph.hostNodes.find((hostNode) => hostNode.tagName === 'li');
+
+	expect(graph.keyedRepeats).toEqual([
+		{
+			id: 'repeat:0',
+			parentHostNodeId: parent?.id,
+			rowHostNodeId: row?.id,
+			itemName: 'record',
+			indexName: 'slot',
+			collectionSource: 'records',
+			collectionGraphNodeId: 'state:records',
+			collectionPath: [],
+			keySource: 'slot',
+			keyPath: [],
+		},
+	]);
+	expect(graph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_REPEAT_KEY_IS_INDEX',
+			severity: 'warning',
+			phase: 'semantic-graph',
+		}),
+	]);
+});
+
+test('buildSemanticGraph diagnoses repeat keys that are not stable item identity', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/RandomKey.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let records = state([{ uuid: 'x', title: 'One' }]);
+
+	<ol>
+		@for (const record of records; key Math.random()) {
+			<li>{record.title}</li>
+		}
+	</ol>
+}
+`,
+	});
+
+	expect(graph.keyedRepeats).toEqual([]);
+	expect(graph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_REPEAT_KEY_UNSTABLE',
+			severity: 'error',
+			phase: 'semantic-graph',
+		}),
+	]);
+});
+
 test('buildSemanticGraph recognizes arrow-function components', async () => {
 	const graph = await buildSemanticGraph({
 		filename: 'src/ArrowApp.tsrx',

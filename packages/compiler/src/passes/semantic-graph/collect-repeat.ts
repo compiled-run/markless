@@ -6,6 +6,11 @@ import {
 	semanticAliasMap,
 	splitStaticGraphPath,
 } from '../../artifact-helpers/graph-paths.ts';
+import {
+	repeatKeyIsIndexDiagnostic,
+	repeatKeyRequiredDiagnostic,
+	repeatKeyUnstableDiagnostic,
+} from './diagnostics.ts';
 import type { WalkState } from './types.ts';
 
 export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | null {
@@ -14,12 +19,51 @@ export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | nu
 	const itemName = repeatItemName(node);
 	const collectionNode = node.right as AnyNode | undefined;
 	const keyNode = node.key as AnyNode | undefined;
-	if (!itemName || !collectionNode || !keyNode) return null;
+	if (!itemName || !collectionNode) return null;
 
 	const collectionSource = expressionSource(collectionNode, state.source);
+	if (!collectionSource) return null;
+	if (!keyNode) {
+		state.graph.diagnostics.push(
+			repeatKeyRequiredDiagnostic({
+				node,
+				itemName,
+				collectionSource,
+				filename: state.filename,
+			}),
+		);
+		return null;
+	}
+
 	const keySource = expressionSource(keyNode, state.source);
+	if (!keySource) return null;
+
+	const indexName = getIdentifierName(node.index as AnyNode | undefined);
 	const keyPath = itemKeyPath(itemName, keySource);
-	if (!collectionSource || !keySource || !keyPath) return null;
+	const isIndexKey = Boolean(indexName && keySource === indexName);
+	if (!keyPath && !isIndexKey) {
+		state.graph.diagnostics.push(
+			repeatKeyUnstableDiagnostic({
+				keyNode,
+				itemName,
+				collectionSource,
+				keySource,
+				filename: state.filename,
+			}),
+		);
+		return null;
+	}
+	if (isIndexKey && indexName) {
+		state.graph.diagnostics.push(
+			repeatKeyIsIndexDiagnostic({
+				node,
+				itemName,
+				indexName,
+				collectionSource,
+				filename: state.filename,
+			}),
+		);
+	}
 
 	const resolvedCollection = resolveGraphPath(
 		collectionSource,
@@ -27,7 +71,6 @@ export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | nu
 		semanticAliasMap(state.graph, state.currentSharedDefinitionId ?? null),
 	);
 
-	const indexName = getIdentifierName(node.index as AnyNode | undefined);
 	const repeatIndex = state.graph.keyedRepeats.length;
 	state.graph.keyedRepeats.push({
 		id: `repeat:${repeatIndex}`,
@@ -44,7 +87,7 @@ export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | nu
 					collectionPath: [],
 				}),
 		keySource,
-		keyPath,
+		keyPath: keyPath ?? [],
 	});
 	return repeatIndex;
 }
