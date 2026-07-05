@@ -62,6 +62,83 @@ export function moduleScopeGraphCreationDiagnostic(
 	};
 }
 
+export function unstableStateCreationSiteDiagnostic(input: {
+	readonly name: string;
+	readonly apiName: 'state' | 'computed';
+	readonly site: 'computed' | 'handler' | 'branch' | 'loop';
+	readonly init: AnyNode;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	const siteText = unstableCreationSiteText(input.site, input.name);
+	return {
+		code: 'MARKLESS_STATE_CREATION_SITE_UNSTABLE',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: 'state() and computed() need a stable creation site',
+		message: `${input.apiName}() creates "${input.name}" ${siteText.message}. That would ship a graph cell whose identity does not match when this code runs.`,
+		why: `${siteText.why} Graph cells are planned into the payload before rendering, so each authored declaration needs one stable component-body or shared owner.`,
+		primarySpan: sourceSpan(input.init, input.filename),
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		suggestions: [{ message: siteText.fix }],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_CREATION_SITE_UNSTABLE',
+	};
+}
+
+export function helperStateReturnUnsupportedDiagnostic(input: {
+	readonly name: string;
+	readonly apiName: 'state' | 'computed';
+	readonly init: AnyNode;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	return {
+		code: 'MARKLESS_STATE_HELPER_RETURN_UNSUPPORTED',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: 'Helper-created state is not supported yet',
+		message: `${input.apiName}() creates "${input.name}" inside a helper function. helper-created state is coming, but this compiler slice cannot yet connect the helper return value to the component graph binding.`,
+		why: 'The spec allows helper-created graph state, but the current compiler does not track graph cells through helper return values. Shipping a payload cell now would leave component reads and writes outside the graph.',
+		primarySpan: sourceSpan(input.init, input.filename),
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		suggestions: [
+			{
+				message:
+					'For now, inline the state() or computed() declaration into the component body and pass the value to helper code.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_HELPER_RETURN_UNSUPPORTED',
+	};
+}
+
+function unstableCreationSiteText(
+	site: 'computed' | 'handler' | 'branch' | 'loop',
+	name: string,
+): { readonly message: string; readonly why: string; readonly fix: string } {
+	return {
+		computed: {
+			message: `inside the computed that derives "${name}"`,
+			why: 'A computed body re-runs whenever the graph needs its value, so a cell created there could be recreated on demand instead of keeping its own value.',
+			fix: 'Declare the cell in the component body and derive from it inside computed().',
+		},
+		handler: {
+			message: 'inside an event handler',
+			why: 'An event handler runs once per event, so a cell created there would be recreated per interaction instead of existing as durable graph state.',
+			fix: 'Declare the cell in the component body and write to it from the event handler.',
+		},
+		branch: {
+			message: 'inside a branch',
+			why: 'A branch may or may not run for a request, but the payload must know every graph cell before rendering.',
+			fix: 'Declare the cell unconditionally in the component body and branch only around the UI or value that uses it.',
+		},
+		loop: {
+			message: 'inside a loop',
+			why: 'A loop body can run any number of times, so one authored declaration cannot map to one stable payload cell.',
+			fix: 'Declare component-level state outside the loop; use keyed repeat row graph scope when per-row state is supported.',
+		},
+	}[site];
+}
+
 export function asyncPostAwaitReadDiagnostic(
 	computedName: string,
 	read: SemanticStateRead,

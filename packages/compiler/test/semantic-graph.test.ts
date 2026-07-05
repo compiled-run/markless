@@ -1,5 +1,10 @@
 import { expect, test } from 'vitest';
-import { buildSemanticGraph } from '../src/index.ts';
+import {
+	buildSemanticGraph,
+	createProtocolStatePayloadFromArena,
+	lowerStateAccess,
+	planPayloadArena,
+} from '../src/index.ts';
 
 const source = `
 import { state, computed, element } from '@markless/core';
@@ -327,6 +332,89 @@ test('buildSemanticGraph creates the first production compiler artifact', async 
 	);
 
 	expect(graph.asyncBoundaries).toHaveLength(1);
+});
+
+async function graphAndProtocolState(source: string) {
+	const semanticGraph = await buildSemanticGraph({ filename: 'src/App.tsrx', source });
+	const stateLowering = lowerStateAccess({ semanticGraph });
+	const payloadArena = planPayloadArena({ semanticGraph, stateLowering });
+	return {
+		semanticGraph,
+		protocolState: createProtocolStatePayloadFromArena({ semanticGraph, payloadArena }),
+	};
+}
+
+const unstableCreationCases = [
+	{
+		name: 'computed derives',
+		code: 'MARKLESS_STATE_CREATION_SITE_UNSTABLE',
+		message: 'inside the computed',
+		cell: 'state:tmp',
+		source: `import { state, computed } from '@markless/core'; export function App() @{ const total = computed(() => { const tmp = state(0); return tmp + 1; }); <p>{total}</p> }`,
+	},
+	{
+		name: 'event handlers',
+		code: 'MARKLESS_STATE_CREATION_SITE_UNSTABLE',
+		message: 'inside an event handler',
+		cell: 'state:draft',
+		source: `import { state } from '@markless/core'; export function App() @{ <button onClick={() => { let draft = state(''); draft = 'hello'; }}>New</button> }`,
+	},
+	{
+		name: 'branches',
+		code: 'MARKLESS_STATE_CREATION_SITE_UNSTABLE',
+		message: 'inside a branch',
+		cell: 'state:extra',
+		source: `import { state } from '@markless/core'; export function App() @{ const flag = state(true); if (flag) { const extra = state(0); } <p>{flag}</p> }`,
+	},
+	{
+		name: 'loops',
+		code: 'MARKLESS_STATE_CREATION_SITE_UNSTABLE',
+		message: 'inside a loop',
+		cell: 'state:item',
+		source: `import { state } from '@markless/core'; export function App() @{ for (let i = 0; i < 3; i++) { const item = state(i); } <p>done</p> }`,
+	},
+	{
+		name: 'helper functions',
+		code: 'MARKLESS_STATE_HELPER_RETURN_UNSUPPORTED',
+		message: 'helper-created state is coming',
+		cell: 'state:inner',
+		source: `import { state } from '@markless/core'; function useCounter() { let inner = state(0); return inner; } export function App() @{ const count = useCounter(); <button onClick={() => count++}>{count}</button> }`,
+	},
+] as const;
+
+for (const scenario of unstableCreationCases) {
+	test(`buildSemanticGraph rejects state creation inside ${scenario.name} without shipping a cell`, async () => {
+		const { semanticGraph, protocolState } = await graphAndProtocolState(scenario.source);
+
+		expect(semanticGraph.diagnostics).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: scenario.code,
+					message: expect.stringContaining(scenario.message),
+				}),
+			]),
+		);
+		expect(semanticGraph.graphBindings.map((binding) => binding.id)).not.toContain(
+			scenario.cell,
+		);
+		expect(protocolState.cells.map((cell) => cell.graphNodeId)).not.toContain(scenario.cell);
+	});
+}
+
+test('buildSemanticGraph keeps stable component-body and module-scope creation artifacts unchanged', async () => {
+	const { semanticGraph, protocolState } = await graphAndProtocolState(
+		`import { state, computed } from '@markless/core'; const leaked = state(1); export const doubled = computed(() => leaked * 2); export function App() @{ let count = state(0); const label = computed(() => count + 1); <p>{count} {label}</p> }`,
+	);
+
+	expect(semanticGraph.graphBindings).toEqual([
+		expect.objectContaining({ id: 'state:count', name: 'count', kind: 'state' }),
+		expect.objectContaining({ id: 'computed:label', name: 'label', kind: 'computed' }),
+	]);
+	expect(semanticGraph.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+		'MARKLESS_STATE_MODULE_SCOPE',
+		'MARKLESS_STATE_MODULE_SCOPE',
+	]);
+	expect(protocolState.cells.map((cell) => cell.graphNodeId)).toEqual(['state:count']);
 });
 
 test('buildSemanticGraph records component edges from TSRX AST', async () => {
