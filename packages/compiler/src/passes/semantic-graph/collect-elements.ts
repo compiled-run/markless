@@ -15,10 +15,11 @@ import type {
 	SemanticBehavior,
 	SemanticElementHandleBinding,
 	SemanticGraphDiagnostic,
+	SemanticGraphAlias,
 	SemanticTemplateBindingTarget,
 	SourceSpan,
 } from '../../artifacts.ts';
-import { graphBindingMap } from '../../artifact-helpers/graph-paths.ts';
+import { graphBindingMap, resolveGraphPath } from '../../artifact-helpers/graph-paths.ts';
 import { collectComponentEdge } from './collect-components.ts';
 import { collectExpressionReads } from './collect-expressions.ts';
 import {
@@ -32,6 +33,9 @@ import {
 	attachHostElementRequiredDiagnostic,
 	duplicateElementHandleDiagnostic,
 	elementHandleRequiredDiagnostic,
+	elementHandlePropUnsupportedDiagnostic,
+	elementHandleRenderReadDiagnostic,
+	unboundElementHandleDiagnostic,
 } from './diagnostics.ts';
 import type { MutableSemanticGraphArtifact, SemanticGraphWalk, WalkState } from './types.ts';
 
@@ -158,12 +162,29 @@ export function collectConditionalBranchText(node: AnyNode, state: WalkState): v
 
 export function collectElementHandleDiagnostics(graph: MutableSemanticGraphArtifact): void {
 	const bindings = graphBindingMap(graph);
+	const aliases = new Map<string, SemanticGraphAlias>();
 	const validElementHandleBindings: SemanticElementHandleBinding[] = [];
+	const moduleElementNames = new Set(
+		graph.diagnostics
+			.filter((diagnostic) => diagnostic.code === 'MARKLESS_ELEMENT_MODULE_SCOPE')
+			.map((diagnostic) => moduleScopeElementName(diagnostic.message))
+			.filter((name): name is string => name !== null),
+	);
 
 	for (const binding of graph.elementHandleBindings) {
-		const graphBinding = bindings.get(binding.handleName);
-		if (!graphBinding || graphBinding.kind !== 'element') {
+		const resolved = resolveGraphPath(binding.handleName, bindings, aliases);
+		const graphBinding = resolved?.binding;
+		if (moduleElementNames.has(binding.handleName)) continue;
+		if (graphBinding?.kind === 'prop') {
+			graph.diagnostics.push(elementHandlePropUnsupportedDiagnostic(binding));
+			continue;
+		}
+		if (!graphBinding || graphBinding.kind !== 'element' || resolved.path.length > 0) {
 			graph.diagnostics.push(elementHandleRequiredDiagnostic(binding, graphBinding));
+			continue;
+		}
+		if (binding.keyedRepeatScopeIds.length > 0) {
+			graph.diagnostics.push(duplicateElementHandleDiagnostic(binding));
 			continue;
 		}
 
@@ -179,6 +200,36 @@ export function collectElementHandleDiagnostics(graph: MutableSemanticGraphArtif
 
 		graph.diagnostics.push(duplicateElementHandleDiagnostic(binding));
 	}
+
+	const boundHandleNames = new Set(validElementHandleBindings.map((binding) => binding.handleName));
+	for (const read of graph.templateReads) {
+		const resolved = resolveGraphPath(read.source, bindings, aliases);
+		if (!resolved || resolved.binding.kind !== 'element') continue;
+		const handleName = resolved.binding.name;
+		if (resolved.path.length > 0) {
+			graph.diagnostics.push(
+				elementHandleRenderReadDiagnostic({
+					handleName,
+					source: read.source,
+					sourceSpan: read.sourceSpan,
+				}),
+			);
+			continue;
+		}
+		if (!boundHandleNames.has(handleName)) {
+			graph.diagnostics.push(
+				unboundElementHandleDiagnostic({
+					handleName,
+					source: read.source,
+					sourceSpan: read.sourceSpan,
+				}),
+			);
+		}
+	}
+}
+
+function moduleScopeElementName(message: string): string | null {
+	return /^Cannot create element handle "([^"]+)"/.exec(message)?.[1] ?? null;
 }
 
 function collectAttribute(
@@ -267,6 +318,7 @@ function collectAttribute(
 				hostNodeId,
 				handleName: expressionSource(expressionValue, state.source),
 				sourceSpan: sourceSpan(expressionValue, state.filename),
+				keyedRepeatScopeIds: [...state.currentKeyedRepeatScopeIds],
 			});
 		}
 		return;

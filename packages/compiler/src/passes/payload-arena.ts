@@ -85,6 +85,8 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 		];
 	});
 	const elementHandles = input.semanticGraph.elementHandleBindings.flatMap((binding) => {
+		if (binding.keyedRepeatScopeIds.length > 0) return [];
+
 		const graphBinding = bindings.get(binding.handleName);
 		if (!graphBinding || graphBinding.kind !== 'element') return [];
 

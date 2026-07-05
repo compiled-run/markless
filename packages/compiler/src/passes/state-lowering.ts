@@ -162,6 +162,14 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 			continue;
 		}
 
+		const elementHandleValue = elementHandleWriteValue(write, lookup);
+		if (elementHandleValue) {
+			diagnostics.push(
+				stateElementHandleWriteDiagnostic(write, elementHandleValue, input.semanticGraph.filename),
+			);
+			continue;
+		}
+
 		if (isConstAliasReassignment(write, lookup.aliases)) {
 			diagnostics.push(constBindingReassignmentDiagnostic(write));
 			continue;
@@ -330,6 +338,44 @@ function templateExpressionStaticDiagnostic({
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_TEMPLATE_EXPRESSION_STATIC',
+	};
+}
+
+function elementHandleWriteValue(
+	write: SemanticStateWrite,
+	lookup: GraphLookup,
+): SemanticGraphBinding | null {
+	if (!write.valueSource) return null;
+	const resolved = resolveGraphPath(write.valueSource, lookup.bindings, lookup.aliases);
+	return resolved?.binding.kind === 'element' && resolved.path.length === 0
+		? resolved.binding
+		: null;
+}
+
+function stateElementHandleWriteDiagnostic(
+	write: SemanticStateWrite,
+	handle: SemanticGraphBinding,
+	filename: string,
+): StateLoweringDiagnostic {
+	return {
+		code: 'MARKLESS_STATE_ELEMENT_HANDLE_UNSERIALIZABLE',
+		severity: 'error',
+		phase: 'state-lowering',
+		title: 'element() handles cannot be stored in state',
+		message: `Cannot write element handle "${handle.name}" into state path "${write.target}" because element handles are DOM locators, not serializable graph data.`,
+		why: 'state() writes are serialized into markless/state and replayed without running component bodies. An element() handle resolves through DOM locator metadata and must stay outside serialized graph state.',
+		primarySpan: write.targetSpan ?? fallbackSpan(filename),
+		passId: 'state-lowering',
+		artifactKeys: ['semanticGraph', 'stateLowering'],
+		statePath: write.target,
+		source: write.valueSource ?? write.target,
+		suggestions: [
+			{
+				message:
+					'Keep element handles in element() bindings and bind them with el={handle}. Store serializable ids, flags, or data in state() instead.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_ELEMENT_HANDLE_UNSERIALIZABLE',
 	};
 }
 
