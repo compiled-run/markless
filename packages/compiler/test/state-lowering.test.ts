@@ -897,6 +897,36 @@ test('lowerStateAccess explains unresolved plain local writes without suggesting
 	]);
 });
 
+test('B910 composite ternary over state emits loud static template expression gate', async () => {
+	const ternarySource = `import { state } from '@markless/core'; export function App() @{ let a = state(true); <p>{a ? 'x' : 'y'}</p> }`;
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/CompositeTernary.tsrx',
+		source: ternarySource,
+	});
+
+	const lowered = lowerStateAccess({ semanticGraph });
+
+	expect(lowered.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_TEMPLATE_EXPRESSION_STATIC',
+			severity: 'error',
+			phase: 'state-lowering',
+			title: 'This expression reads state but never updates',
+			message:
+				"This text reads `a`, but only plain reads like `{a}` update the page today. The expression renders its initial value and never changes when `a` changes.",
+			why: 'Each template read compiles to a graph subscription with a DOM-update record; composite expressions are not lowered yet, so no subscription exists to wake this text.',
+			source: "a ? 'x' : 'y'",
+			suggestions: [
+				{
+					message:
+						"Hoist the logic into a derived value: `const label = computed(() => a ? 'x' : 'y');` with `<p>{label}</p>`.",
+				},
+			],
+			docsUrl: 'https://markless.dev/errors/MARKLESS_TEMPLATE_EXPRESSION_STATIC',
+		}),
+	]);
+});
+
 test('lowerStateAccess reports a structured diagnostic for const graph binding reassignment', async () => {
 	const semanticGraph = await buildSemanticGraph({
 		filename: 'src/ConstState.tsrx',

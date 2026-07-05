@@ -113,3 +113,35 @@ export function App() @{
 	});
 	expect(JSON.stringify(cell)).not.toContain('"$type":"undefined"');
 });
+
+test('B910 sync computed cell and dependencies are present in protocol payload', async () => {
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/sync-computed.tsrx',
+		source: `
+import { state, computed } from '@markless/core';
+
+export function App() @{
+	let count = state(2);
+	const doubled = computed(() => count * 2);
+
+	<p>{doubled}</p>
+}
+`,
+	});
+	const stateLowering = lowerStateAccess({ semanticGraph });
+	const payloadArena = planPayloadArena({ semanticGraph, stateLowering });
+
+	const state = createProtocolStatePayloadFromArena({
+		semanticGraph,
+		payloadArena,
+	});
+
+	expect(state.computed).toEqual([
+		{
+			graphNodeId: 'computed:doubled',
+			name: 'doubled',
+			async: false,
+			dependencies: [{ graphNodeId: 'state:count', path: [] }],
+		},
+	]);
+});

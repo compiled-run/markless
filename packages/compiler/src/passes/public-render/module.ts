@@ -405,6 +405,11 @@ function renderBodyLines(
 			binding.kind === 'state' ? [[binding.name, binding]] : [],
 		),
 	);
+	const computedBindings = new Map<string, GraphBinding>(
+		input.semanticGraph.graphBindings.flatMap((binding) =>
+			binding.kind === 'computed' ? [[binding.name, binding]] : [],
+		),
+	);
 	const lines: string[] = [];
 	let emittedRoot = false;
 	for (const statement of childNodes(body)) {
@@ -423,6 +428,8 @@ function renderBodyLines(
 			statePayloadName,
 		);
 		if (stateLine) { lines.push(stateLine); continue; }
+		const computedLine = computedDeclarationLine(statement, computedBindings);
+		if (computedLine) { lines.push(computedLine); continue; }
 		if (isLoweredFrameworkDeclaration(statement)) continue;
 
 		const source = expressionSource(statement, input.source.source);
@@ -442,6 +449,29 @@ function moduleScopeLines(source: string, filename: string): string[] {
 		const sourceText = expressionSource(declaration, source);
 		return sourceText ? [sourceText] : [];
 	});
+}
+
+function computedDeclarationLine(
+	statement: AnyNode,
+	computedBindings: ReadonlyMap<string, GraphBinding>,
+): string | null {
+	if (statement.type !== 'VariableDeclaration') return null;
+	const declarations = asNodes(statement.declarations);
+	if (declarations.length !== 1) return null;
+	const declaration = declarations[0]!;
+	const name = getIdentifierName(declaration.id as AnyNode | undefined);
+	const binding = name ? computedBindings.get(name) : undefined;
+	if (
+		!binding ||
+		binding.async === true ||
+		!binding.functionSource ||
+		!isFrameworkCall(declaration.init as AnyNode | undefined, 'computed')
+	) {
+		return null;
+	}
+
+	const declarationKind = binding.declarationKind ?? 'const';
+	return `${declarationKind} ${binding.name} = (${binding.functionSource})();`;
 }
 
 function stateDeclarationLine(
