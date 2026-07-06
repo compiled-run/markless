@@ -143,6 +143,46 @@ describe('generated symbol facade cleanup', () => {
 		expect(bundle['build/symbol-0.js']).toBeDefined();
 	});
 
+	test('leaves import-bearing per-symbol chunks loadable without shared-facade rewrites', () => {
+		const symbolVirtualId =
+			'\0virtual:markless:symbol:%2Fworkspace%2Fsrc%2Froot.tsrx:symbol%3A0';
+		const bundle = {
+			'build/runtime.js': {
+				type: 'chunk',
+				fileName: 'build/runtime.js',
+				code: 'function load(id){return id==="symbol:0"?import("./symbol-0.js").then(m=>readSymbol(m,"symbol_0")):id==="symbol:1"?import("./symbol-1.js").then(m=>readSymbol(m,"symbol_1")):Promise.reject(Error(`Unknown async symbol ${id}`))}',
+				exports: ['load'],
+				imports: [],
+				dynamicImports: ['build/symbol-0.js', 'build/symbol-1.js'],
+				moduleIds: ['/workspace/src/root.tsrx'],
+			},
+			'build/symbol-0.js': {
+				type: 'chunk',
+				fileName: 'build/symbol-0.js',
+				code: 'import{click}from"./fns-click.js";function init__virtual_markless_symbol(){}function symbol_0(e){return click(e)}export{init__virtual_markless_symbol,symbol_0};',
+				exports: ['init__virtual_markless_symbol', 'symbol_0'],
+				imports: ['build/fns-click.js'],
+				dynamicImports: [],
+				moduleIds: [symbolVirtualId],
+				facadeModuleId: symbolVirtualId,
+				isDynamicEntry: true,
+			},
+		};
+
+		const removed = rewriteGeneratedSymbolFacadeImports(bundle);
+		const compacted = compactGeneratedDirectSymbolLoaders(bundle);
+
+		expect([...removed]).toEqual([]);
+		expect(compacted.compacted).toBe(0);
+		expect(bundle['build/runtime.js']?.code).toContain('import("./symbol-0.js")');
+		expect(bundle['build/runtime.js']?.code).toContain('import("./symbol-1.js")');
+		expect(bundle['build/runtime.js']?.dynamicImports).toEqual([
+			'build/symbol-0.js',
+			'build/symbol-1.js',
+		]);
+		expect(bundle['build/symbol-0.js']).toBeDefined();
+	});
+
 	test('shortens generated symbol chunk init export aliases', () => {
 		const symbolVirtualId =
 			'\0virtual:markless:symbol:%2Fworkspace%2Fsrc%2Froot.tsrx:symbol%3A0';

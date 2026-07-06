@@ -18,6 +18,9 @@ const COUNTER = '[data-counter]';
 const REQUESTS = '/__markless-fixture-requests';
 const WAIT = { timeoutMs: 10_000 };
 const MAX_PRELOADED_RUNTIME_CHUNK_GZIP_BYTES = 2_175;
+const PREVIOUS_COUNTER_CLICK_EXECUTED_GZIP_BYTES = 6_600;
+const MAX_COUNTER_CLICK_EXECUTED_GZIP_BYTES = 6_199; // measured 5,904 on 2026-07-06; tighten-only.
+const MAX_FIRST_INTERACTION_TOTAL_GZIP_BYTES = 40_260; // measured 38,345 on 2026-07-06; tighten-only.
 
 export default box(
 	{
@@ -87,6 +90,18 @@ export default box(
 				`Expected SSR preview counter click to execute only allowed runtime modules, but saw forbidden modules: ${forbidden.join(', ')}`,
 			);
 		}
+		for (const expected of ['web/fns/write-scalar', 'web/fns/update-text']) {
+			if (!executed.includes(expected)) throw new Error(`Expected ${expected}. Saw: ${executed.join(', ')}`);
+		}
+		for (const excluded of ['web/dom-journal', 'web/payload', 'web/payload-document']) {
+			if (executed.includes(excluded)) throw new Error(`Unexpected ${excluded}. Saw: ${executed.join(', ')}`);
+		}
+		const executionSizes = JSON.parse(await preview.request('/build/execution-sizes.json')) as ExecutionSizeMap;
+		const counterClickGzip = executedGzipReport(executed, executionSizes);
+		receipt.note(`SSR counter click executed gzip: before=${PREVIOUS_COUNTER_CLICK_EXECUTED_GZIP_BYTES} after=${counterClickGzip.gzipBytes} budget=${MAX_COUNTER_CLICK_EXECUTED_GZIP_BYTES}\n${counterClickGzip.summary}`);
+		if (counterClickGzip.missing.length > 0 || counterClickGzip.gzipBytes > MAX_COUNTER_CLICK_EXECUTED_GZIP_BYTES) {
+			throw new Error(`SSR counter click executed gzip budget failed.\n${counterClickGzip.summary}`);
+		}
 		const afterInteraction = await readScriptRequests(preview);
 		receipt.note(`SSR interaction script requests: ${formatRequests(afterInteraction)}`);
 		receipt.note(
@@ -94,6 +109,16 @@ export default box(
 				scripts: afterInteraction.scripts.slice(beforeInteraction.scripts.length),
 			})}`,
 		);
+		const firstInteractionSize = await runtimeSizeReport({
+			dist: DIST,
+			scripts: [...new Set(afterInteraction.scripts)],
+		});
+		receipt.note(`SSR first-interaction total size:\n${firstInteractionSize.summary}`);
+		if (firstInteractionSize.asyncScripts.gzipBytes > MAX_FIRST_INTERACTION_TOTAL_GZIP_BYTES) {
+			throw new Error(
+				`SSR first-interaction total gzip budget exceeded: ${firstInteractionSize.asyncScripts.gzipBytes} > ${MAX_FIRST_INTERACTION_TOTAL_GZIP_BYTES}\n${firstInteractionSize.summary}`,
+			);
+		}
 		await expect.page.outcome(page, { consoleErrors: 0, failedRequests: 0 }, WAIT);
 
 		await preview.close();
@@ -104,6 +129,8 @@ export default box(
 type ScriptRequestLog = {
 	readonly scripts: readonly string[];
 };
+
+type ExecutionSizeMap = Record<string, { readonly gzip: number; readonly chunk: string }>;
 
 type Requestable = {
 	request(path: string): Promise<string>;
@@ -178,6 +205,55 @@ function assertRuntimeSizeBudget(report: RuntimeSizeReport): void {
 			`SSR preloaded runtime chunks still include the Vite preload helper: ${chunksWithVitePreloadHelper.join(', ')}\n${report.summary}`,
 		);
 	}
+}
+
+function executedGzipReport(executed: readonly string[], sizes: ExecutionSizeMap): {
+	readonly gzipBytes: number;
+	readonly missing: readonly string[];
+	readonly summary: string;
+} {
+	const counted = new Map<string, { readonly id: string; readonly entry: ExecutionSizeMap[string] }>();
+	const missing: string[] = [];
+	for (const id of executed) {
+		if (isMeasurementOnlyExecution(id)) continue;
+		const entry = executionSizeFor(id, sizes);
+		if (!entry) {
+			missing.push(id);
+			continue;
+		}
+		counted.set(entry.chunk, { id, entry });
+	}
+	const rows = [...counted.values()].sort((a, b) => a.entry.chunk.localeCompare(b.entry.chunk));
+	return {
+		gzipBytes: rows.reduce((total, row) => total + row.entry.gzip, 0),
+		missing,
+		summary: rows.map((row) => `${row.id} ${row.entry.chunk} gzip=${row.entry.gzip}`).join('\n'),
+	};
+}
+
+function executionSizeFor(id: string, sizes: ExecutionSizeMap): ExecutionSizeMap[string] | undefined {
+	const normalizedIds = [
+		id,
+		id.replace(/^(runtime|serializer|web)\//, '$1:'),
+		id.replace(/^core\/web\//, 'web:'),
+	];
+	for (const normalized of normalizedIds) {
+		const entry = sizes[normalized];
+		if (entry) return entry;
+	}
+
+	const chunk = id.replace(/^\.\//, '').replace(/^\/?build\//, '');
+	const entries = Object.entries(sizes).filter(([, entry]) => entry.chunk === chunk);
+	return entries.find(([key]) => key.startsWith('symbol:'))?.[1] ?? entries[0]?.[1];
+}
+
+function isMeasurementOnlyExecution(id: string): boolean {
+	return (
+		id === 'virtual:markless:dev-log' ||
+		id === 'web/dev-log' ||
+		id === 'web/execution-log-target' ||
+		id.startsWith('virtual:markless:resume:')
+	);
 }
 
 function executedFromHtml(html: string): string[] {

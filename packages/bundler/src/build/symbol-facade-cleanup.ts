@@ -1,5 +1,5 @@
 import { dirname, join, normalize, relative } from 'pathe';
-import { MARKLESS_VIRTUAL_PREFIX } from '../transform.ts';
+import { MARKLESS_VIRTUAL_PREFIX } from '../source-module.ts';
 
 type GeneratedChunk = {
 	readonly type: 'chunk';
