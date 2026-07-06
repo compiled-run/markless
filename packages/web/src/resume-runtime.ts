@@ -1,20 +1,21 @@
 import type { DomJournalEntry, DomJournalResult } from '@markless/runtime';
 import type {
-	ResumeAsyncBoundaryRecord, ResumeBehaviorRecord, ResumeDispatchOptions, ResumeDomElement, ResumeDomEvent, ResumePreparedCore, ResumeRuntime, ResumeRuntimeErrorContext, ResumeRuntimeInput, ResumeSharedPatchDispatcher,
+	ResumeBehaviorRecord, ResumeDispatchOptions, ResumeDomElement, ResumeDomEvent, ResumePreparedCore, ResumeRuntime, ResumeRuntimeErrorContext, ResumeRuntimeInput,
 } from './resume-types.ts';
 
 const SHARED_PATCH_EVENT_TYPE = 'async:shared-patch';
 type BehaviorRuntime = ReturnType<typeof import('./resume-behaviors.ts')['createBehaviorRuntime']>;
 type BranchRuntime = ReturnType<typeof import('./resume-branches.ts')['wireBranches']>;
 type EventWiring = ReturnType<typeof import('./resume-events.ts')['createEventWiring']>;
+type SharedPatchRuntime = ReturnType<typeof import('./resume-shared-patch.ts')['createResumeSharedPatchRuntime']>;
 
 export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumePreparedCore): ResumeRuntime {
 	const { elementsByHostId, elementHandles } = prepared;
 	const eventTypes = new Set<string>(), disposedHosts = new Set<string>();
 	const hostSubscriptionReleases = new Map<string, Array<() => void>>(), containerSubscriptionReleases: Array<() => void> = [];
 	let asyncBoundariesById = prepared.asyncBoundariesById;
-	let behaviorRuntime: BehaviorRuntime | undefined, branchRuntime: BranchRuntime | undefined, syncComputedRuntimeWired = false;
-	let events: EventWiring | undefined, fallbackSharedPatchDispatcher: ResumeSharedPatchDispatcher | undefined;
+	let behaviorRuntime: BehaviorRuntime | undefined, branchRuntime: BranchRuntime | undefined;
+	let events: EventWiring | undefined, sharedPatchRuntime: SharedPatchRuntime | undefined;
 	const behaviorHostIds = new Set(input.view.behaviors.map((behavior) => behavior.hostNodeId));
 
 	const storeHostSubscription = (hostNodeId: string, release: () => void) => {
@@ -26,7 +27,7 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 	const flushRuntimeGraph = async () => {
 		await input.graph.flush();
 		const patches = input.graph.takeSharedPatches?.() ?? []; if (patches.length === 0) return;
-		const dispatchSharedPatch = await getSharedPatchDispatcher(); if (!dispatchSharedPatch) return;
+		const dispatchSharedPatch = input.dispatchSharedPatch ?? (await getSharedPatchRuntime()).dispatchSharedPatch; if (!dispatchSharedPatch) return;
 		for (const patch of patches) {
 			const result = dispatchSharedPatch(patch); if (isPromiseLike(result)) await result;
 		}
@@ -35,12 +36,16 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 		if (!input.onError) return;
 		try { const result = input.onError(error, context); if (isPromiseLike(result)) await result; } catch {}
 	};
-	async function getSharedPatchDispatcher(): Promise<ResumeSharedPatchDispatcher | undefined> {
-		if (input.dispatchSharedPatch) return input.dispatchSharedPatch;
-		if (fallbackSharedPatchDispatcher || !input.root.dispatchEvent) return fallbackSharedPatchDispatcher;
-		fallbackSharedPatchDispatcher = (await import('./resume-handoff.ts')).defaultSharedPatchDispatcher(input.root);
-		return fallbackSharedPatchDispatcher;
+	async function getSharedPatchRuntime(): Promise<SharedPatchRuntime> {
+		if (sharedPatchRuntime) return sharedPatchRuntime;
+		const { createResumeSharedPatchRuntime } = await import('./resume-shared-patch.ts');
+		sharedPatchRuntime = createResumeSharedPatchRuntime({ root: input.root, graph: input.graph });
+		return sharedPatchRuntime;
 	}
+	const receiveSharedPatch = async (event: ResumeDomEvent): Promise<void> => {
+		const runtime = await getSharedPatchRuntime();
+		if (await runtime.receiveSharedPatch(event)) await flushRuntimeGraph();
+	};
 	async function getEvents(): Promise<EventWiring> {
 		if (events) return events;
 		const { createEventWiring } = await import('./resume-events.ts');
@@ -106,45 +111,6 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 		}
 		return ids;
 	}
-	function wireAsyncBoundariesWithoutLoadingCapability(): void {
-		for (const boundary of asyncBoundariesById.values()) {
-			for (const asyncRead of boundary.asyncReads) storeContainerSubscription(input.graph.subscribe({
-				id: `async-boundary:${boundary.id}:${asyncRead.graphNodeId}:${asyncRead.path.join('.')}`,
-				graphNodeId: asyncRead.graphNodeId,
-				path: [],
-				run(snapshot) {
-					if (!boundary.updateSymbolId) return [
-						{ type: 'removeRange', locator: `async-boundary:${boundary.id}` },
-						{ type: 'insertRange', locator: `async-boundary:${boundary.id}:start`, fragment: { type: 'async-boundary-snapshot', boundaryId: boundary.id, graphNodeId: asyncRead.graphNodeId, path: asyncRead.path, snapshot } },
-					] as DomJournalEntry[];
-					return settleAsyncBoundaryRange(boundary, snapshot);
-				},
-			}));
-			if (boundary.updateSymbolId) for (const asyncRead of boundary.asyncReads) input.graph.read(asyncRead.graphNodeId, ['status']);
-		}
-	}
-	function wireSyncComputedDemandTriggersWithoutLoadingCapability(): void {
-		const records = (input.state?.computed ?? []).filter((computed) => computed.async === false && typeof (computed as { readonly deriveSymbolId?: unknown }).deriveSymbolId === 'string') as Array<NonNullable<ResumeRuntimeInput['state']>['computed'][number] & { readonly deriveSymbolId: string }>;
-		for (const computed of records) for (const dependency of computed.dependencies ?? []) storeContainerSubscription(input.graph.subscribe({
-			id: `sync-computed-demand:${computed.graphNodeId}:${dependency.graphNodeId}:${dependency.path.join('.')}`,
-			graphNodeId: dependency.graphNodeId,
-			path: dependency.path,
-			async run() { if (syncComputedRuntimeWired) return; syncComputedRuntimeWired = true; (await import('./resume-sync-computed.ts')).wireSyncComputed({ graph: input.graph, state: input.state, root: input.root, loadSymbol: input.loadSymbol, elementHandles, storeContainerSubscription }); },
-		}));
-	}
-	async function settleAsyncBoundaryRange(boundary: ResumeAsyncBoundaryRecord, snapshot: unknown): Promise<DomJournalResult | void> {
-		const status = (snapshot as { readonly status?: unknown } | null)?.status;
-		if (status !== 'fulfilled' && status !== 'rejected') return;
-		const symbol = await input.loadSymbol(boundary.updateSymbolId!);
-		const update = await symbol({ graph: input.graph, status, element: input.root, getElementHandle: elementHandles.get, asyncBoundary: boundary });
-		if (!isResumeBranchUpdate(update)) return;
-		const fragment = input.renderBranchHtml ? input.renderBranchHtml(update.html) : update.html;
-		return [{ type: 'removeRange', locator: `async-boundary:${boundary.id}` }, { type: 'insertRange', locator: `async-boundary:${boundary.id}:start`, fragment }];
-	}
-	async function receiveSharedPatch(event: ResumeDomEvent): Promise<void> {
-		const { isResumeSharedPatchEvent } = await import('./resume-handoff.ts');
-		if (isResumeSharedPatchEvent(event) && input.graph.applySharedPatch(event.detail)) await flushRuntimeGraph();
-	}
 	function disposeHost(hostNodeId: string): void {
 		disposedHosts.add(hostNodeId);
 		const element = elementsByHostId.get(hostNodeId);
@@ -170,11 +136,15 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 			await input.applyDomJournal!(entries);
 			await branchRuntime?.materializeFlippedBranchArms(entries, (hostNodeId) => behaviorRuntime!.activateBehaviors(hostNodeId, { flush: false }));
 		}));
-		wireSyncComputedDemandTriggersWithoutLoadingCapability();
+		if ((input.state?.computed ?? []).some((computed) => computed.async === false && typeof (computed as { readonly deriveSymbolId?: unknown }).deriveSymbolId === 'string')) {
+			(await import('./resume-sync-demand.ts')).wireSyncComputedDemandTriggersWithoutLoadingCapability({ graph: input.graph, state: input.state, root: input.root, loadSymbol: input.loadSymbol, elementHandles, storeContainerSubscription });
+		}
 		if ((input.view.keyedRepeats ?? []).length > 0) {
 			(await import('./resume-keyed-repeats.ts')).wireKeyedRepeats({ graph: input.graph, view: input.view, elementsByHostId, events, storeContainerSubscription });
 		}
-		if (input.view.asyncBoundaries.length > 0) wireAsyncBoundariesWithoutLoadingCapability();
+		if (input.view.asyncBoundaries.length > 0) {
+			(await import('./resume-async-wiring.ts')).wireAsyncBoundariesWithoutLoadingCapability({ asyncBoundariesById, graph: input.graph, root: input.root, loadSymbol: input.loadSymbol, renderBranchHtml: input.renderBranchHtml, elementHandles, storeContainerSubscription });
+		}
 		if (input.view.events.some((event) => event.eventName === 'visible')) {
 			const behaviors = await loadBehaviorRuntime(); behaviors.installVisibilityObserver(); behaviors.installRemovalObserver();
 		}
@@ -206,10 +176,6 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 			const removed = locators.elementsBetweenAnchors(input.root, boundary.startAnchor, boundary.endAnchor);
 			for (const id of locators.hostIdsInsideRemovedElements(elementsByHostId, removed)) disposeHost(id);
 		}
-	}
-	function isResumeBranchUpdate(value: unknown): value is { readonly arm: number; readonly html: string } {
-		const update = value as { readonly arm?: unknown; readonly html?: unknown } | null;
-		return typeof update?.arm === 'number' && typeof update?.html === 'string';
 	}
 }
 
