@@ -69,16 +69,17 @@ export function createRuntimeDemandMap(input: {
 		runtimeModuleIds: runtimeModuleIdsForSymbol(symbol, emittedModules.get(symbol.id)),
 	}));
 	const symbolDemand = new Map(symbols.map((symbol) => [symbol.symbolId, symbol.runtimeModuleIds]));
-	const scalarOnly = isScalarOnlyModule(input.symbolResolver, input.protocolView);
+	const scalarEventKeys = scalarCoreEventKeys(input.symbolResolver, input.protocolView);
+	const scalarEvents = scalarEventKeys.size > 0;
 	const scalarRows = isScalarOnlyKeyedRepeatModule(input.symbolResolver, input.protocolView);
 	const payloadRecords = payloadDemandRecords(input.protocolView, symbolDemand, renderRuntimeModuleIds, {
-		scalarOnly,
+		scalarEventKeys,
 		scalarRows,
 	});
 	return {
 		passId: 'runtime-demand-map',
 		version: 1,
-		recordKinds: recordKindPhases({ scalarOnly, scalarRows }),
+		recordKinds: recordKindPhases({ scalarEvents, scalarRows }),
 		symbols,
 		payloadRecords,
 		actions: actionDemandRecords(input.symbolResolver, input.protocolView, payloadRecords, symbolDemand, scalarRows),
@@ -100,37 +101,52 @@ export function createRuntimeDemandMap(input: {
 	};
 }
 
-function recordKindPhases(input: { readonly scalarOnly: boolean; readonly scalarRows: boolean }): RuntimeDemandMapArtifact['recordKinds'] {
+function recordKindPhases(input: {
+	readonly scalarEvents: boolean;
+	readonly scalarRows: boolean;
+}): RuntimeDemandMapArtifact['recordKinds'] {
 	return RECORD_KINDS.map((kind) => ({
 		kind,
 		replaced: (
-			(input.scalarOnly && (kind === 'event' || kind === 'dom-update')) ||
+			(input.scalarEvents && (kind === 'event' || kind === 'dom-update')) ||
 			(input.scalarRows && (kind === 'keyed-repeat' || kind === 'dom-update'))
 		),
 	}));
 }
 
-function isScalarOnlyModule(resolver: SymbolResolverPlan, view: ProtocolViewPayload): boolean {
-	if ((view.events?.length ?? 0) === 0 || (view.domUpdates?.length ?? 0) === 0) return false;
-	if ((view.branches?.length ?? 0) > 0) return false;
-	if ((view.asyncBoundaries?.length ?? 0) > 0) return false;
-	if ((view.behaviors?.length ?? 0) > 0) return false;
-	if ((view.elementHandles?.length ?? 0) > 0) return false;
+function scalarCoreEventKeys(resolver: SymbolResolverPlan, view: ProtocolViewPayload): ReadonlySet<string> {
+	if ((view.events?.length ?? 0) === 0 || (view.domUpdates?.length ?? 0) === 0) return new Set();
+	if ((view.branches?.length ?? 0) > 0) return new Set();
+	if ((view.asyncBoundaries?.length ?? 0) > 0) return new Set();
+	if ((view.behaviors?.length ?? 0) > 0) return new Set();
+	if ((view.elementHandles?.length ?? 0) > 0) return new Set();
 
 	const symbolsById = new Map(resolver.symbols.map((symbol) => [symbol.id, symbol]));
-	const eventSymbolIds = (view.events ?? []).flatMap((event) => event.symbolIds ?? []);
-	if (eventSymbolIds.length === 0) return false;
-	if (!eventSymbolIds.every((symbolId) => {
-		const symbol = symbolsById.get(symbolId);
-		return symbol?.kind === 'event-handler' && isScalarWriteOnlyEventSymbol(symbol);
-	})) return false;
-
-	const domUpdateSymbolIds = (view.domUpdates ?? []).map((update) => update.symbolId);
-	if (domUpdateSymbolIds.some((symbolId) => !symbolId)) return false;
-	return domUpdateSymbolIds.every((symbolId) => {
-		const symbol = symbolsById.get(symbolId!);
-		return symbol?.kind === 'dom-update' && isTextUpdateSymbol(symbol);
-	});
+	const rowSymbolIds = new Set(
+		(view.keyedRepeats ?? []).flatMap((repeat) =>
+			repeat.rowEvents.flatMap((event) => event.symbolIds ?? []),
+		),
+	);
+	return new Set(
+		(view.events ?? [])
+			.filter((event) =>
+				(event.symbolIds ?? []).length > 0 &&
+				!(event.symbolIds ?? []).some((symbolId) => rowSymbolIds.has(symbolId)) &&
+				(event.symbolIds ?? []).every((symbolId) => {
+					const symbol = symbolsById.get(symbolId);
+					return (
+						symbol?.kind === 'event-handler' &&
+						isScalarWriteOnlyEventSymbol(symbol) &&
+						!writesDemandNonTextRuntime(symbol.writes ?? [], view) &&
+						textDomUpdatesForWrites(symbol.writes ?? [], view).every((update) => {
+							const updateSymbol = update.symbolId ? symbolsById.get(update.symbolId) : undefined;
+							return updateSymbol?.kind === 'dom-update' && isTextUpdateSymbol(updateSymbol);
+						})
+					);
+				})
+			)
+			.map((event) => eventKey(event.hostNodeId, event.eventName)),
+	);
 }
 
 function isScalarOnlyKeyedRepeatModule(resolver: SymbolResolverPlan, view: ProtocolViewPayload): boolean {
@@ -273,9 +289,8 @@ function payloadDemandRecords(
 	view: ProtocolViewPayload,
 	symbolDemand: ReadonlyMap<string, ReadonlyArray<string>>,
 	renderRuntimeModuleIds: ReadonlyArray<string>,
-	replacement: { readonly scalarOnly: boolean; readonly scalarRows: boolean },
+	replacement: { readonly scalarEventKeys: ReadonlySet<string>; readonly scalarRows: boolean },
 ): RuntimeDemandMapArtifact['payloadRecords'] {
-	const eventDispatchCore = replacement.scalarOnly ? SCALAR_LEAN_DISPATCH_CORE : DISPATCH_CORE;
 	const rowDispatchCore = replacement.scalarRows ? ROW_LEAN_DISPATCH_CORE : FULL_TIER;
 	return [
 		...(view.events ?? []).map((event) => ({
@@ -285,7 +300,9 @@ function payloadDemandRecords(
 			eventName: event.eventName,
 			symbolIds: event.symbolIds ?? [],
 			runtimeModuleIds: unique([
-				...eventDispatchCore,
+				...(replacement.scalarEventKeys.has(eventKey(event.hostNodeId, event.eventName))
+					? SCALAR_LEAN_DISPATCH_CORE
+					: DISPATCH_CORE),
 				...(event.syncPolicy ? SYNC_POLICY : []),
 				...symbolIdsDemand(event.symbolIds ?? [], symbolDemand),
 			]),
@@ -457,6 +474,10 @@ function symbolIdsDemand(
 	symbolDemand: ReadonlyMap<string, ReadonlyArray<string>>,
 ): ReadonlyArray<string> {
 	return symbolIds.flatMap((symbolId) => symbolDemand.get(symbolId) ?? []);
+}
+
+function eventKey(hostNodeId: string, eventName: string): string {
+	return `${hostNodeId}:${eventName}`;
 }
 
 function unique(values: ReadonlyArray<string | undefined>): string[] {

@@ -23,15 +23,22 @@ describe('markless chunking defaults', () => {
 		});
 		expect(clientOutput.codeSplitting?.groups?.map((group) => group.name)).toEqual(
 			expect.arrayContaining([
-				'markless-web-fns',
 				'markless-resume-branches',
-				'markless-resume-repeats',
 				'markless-resume-behaviors',
+				'markless-event-behaviors',
+				'markless-resume-repeats',
+				'markless-resume-async',
+				'markless-resume-shared-patch',
+				'markless-resume-runtime',
 				'markless-resume-runtime-start',
 				'markless-resume-runtime-shared',
 				'markless-resume-events',
+				'markless-resume-handoff',
 				'markless-resume-locators',
+				'markless-resume-errors',
+				'markless-resume-sync-computed',
 				'markless-resume-sync-demand',
+				'markless-payload-full',
 				'markless-runtime-graph-core',
 				'markless-runtime-graph-collections',
 				'markless-runtime-graph-computed',
@@ -42,6 +49,12 @@ describe('markless chunking defaults', () => {
 				'markless-payload-graph-construct',
 				'markless-inline-payload-document',
 				'markless-payload-document',
+				'markless-dom-journal',
+				'markless-protocol-decode',
+				'markless-value-decode',
+				'markless-payload-leaves',
+				'markless-dev-log',
+				'markless-resume-core',
 				'markless-runtime',
 			]),
 		);
@@ -63,15 +76,22 @@ describe('markless chunking defaults', () => {
 
 		expect(output.codeSplitting?.groups?.map((group) => group.name)).toEqual(
 			expect.arrayContaining([
-				'markless-web-fns',
 				'markless-resume-branches',
-				'markless-resume-repeats',
 				'markless-resume-behaviors',
+				'markless-event-behaviors',
+				'markless-resume-repeats',
+				'markless-resume-async',
+				'markless-resume-shared-patch',
+				'markless-resume-runtime',
 				'markless-resume-runtime-start',
 				'markless-resume-runtime-shared',
 				'markless-resume-events',
+				'markless-resume-handoff',
 				'markless-resume-locators',
+				'markless-resume-errors',
+				'markless-resume-sync-computed',
 				'markless-resume-sync-demand',
+				'markless-payload-full',
 				'markless-runtime-graph-core',
 				'markless-runtime-graph-collections',
 				'markless-runtime-graph-computed',
@@ -82,6 +102,12 @@ describe('markless chunking defaults', () => {
 				'markless-payload-graph-construct',
 				'markless-inline-payload-document',
 				'markless-payload-document',
+				'markless-dom-journal',
+				'markless-protocol-decode',
+				'markless-value-decode',
+				'markless-payload-leaves',
+				'markless-dev-log',
+				'markless-resume-core',
 				'markless-runtime',
 				'vendor',
 			]),
@@ -110,8 +136,10 @@ describe('markless chunking defaults', () => {
 		expect(groups.get('markless-resume-async')?.test('/repo/packages/web/src/resume-async-wiring.ts')).toBe(
 			true,
 		);
-		expect(groups.get('markless-web-fns')?.test('/repo/packages/web/src/fns/csr.ts')).toBe(
-			true,
+		// The web fns leaves intentionally stay ungrouped: force-merging them
+		// defeated one-function-per-chunk execution and raised shipped bytes.
+		expect(firstMatchingGroupName(groups, '/repo/packages/web/src/fns/csr.ts')).toBe(
+			undefined,
 		);
 		expect(groups.get('markless-resume-branches')?.test('/repo/packages/core/src/web/resume-branches.ts')).toBe(
 			true,
