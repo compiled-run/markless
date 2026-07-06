@@ -3073,7 +3073,7 @@ test('resume runtime dispose releases container-owned graph subscriptions', asyn
 	expect(released).toEqual([
 		'journal',
 		'async-boundary:boundary:0:async:details:',
-		'branch-test:branch-site:0:state:open:',
+		'branch-demand:branch-site:0:state:open:',
 	]);
 });
 
@@ -3433,7 +3433,7 @@ function armRecordsView(arm0Extras?: {
 	};
 }
 
-test('resume runtime materializes the taken arm records at startup', async () => {
+test('resume runtime leaves branch arm records inert until the branch is demanded', async () => {
 	const start = comment('markless:branch:branch-site:0');
 	const armButton = element('BUTTON');
 	const armSection = element('SECTION', [armButton]);
@@ -3461,20 +3461,17 @@ test('resume runtime materializes the taken arm records at startup', async () =>
 	});
 	await resume.start();
 
-	// Arm event names install the delegated listener; nothing loads eagerly.
+	// Branch arm event names do not install delegated listeners or load eagerly.
 	expect(root.listeners.map((listener) => listener.type)).toContain('click');
 	expect(loadedSymbols).toEqual([]);
 
-	// The SSR-taken arm's button dispatches its lazy symbol (S3a regression:
-	// arm records were inert because arm hosts left every flat stream).
 	await resume.dispatch(event('click', armButton, ''));
-	expect(loadedSymbols).toEqual(['symbol:arm-click']);
+	expect(loadedSymbols).toEqual(['symbol:read-handle']);
 
-	// The arm dom-update subscription runs against the arm host element.
 	graph.write({ graphNodeId: 'state:label', value: 'b' });
 	await graph.flush();
-	expect(loadedSymbols).toEqual(['symbol:arm-click', 'symbol:arm-text']);
-	expect(updateElements).toEqual([armSection]);
+	expect(loadedSymbols).toEqual(['symbol:read-handle']);
+	expect(updateElements).toEqual([]);
 });
 
 test('resume runtime rewires arm records across branch flips', async () => {
@@ -3611,14 +3608,13 @@ test('resume runtime activates arm behaviors and handles on materialize and disp
 		},
 	});
 
-	// Materialized arm behaviors attach at start(), not runtime creation.
+	// Branch arm behaviors and handles are not materialized at startup.
 	expect(loadedSymbols).toEqual([]);
 	await resume.start();
-	expect(loadedSymbols).toEqual(['symbol:arm-behavior']);
+	expect(loadedSymbols).toEqual([]);
 
-	// The arm's element handle resolves for lazy symbols while the arm is live.
 	await resume.dispatch(event('click', root, ''));
-	expect(handleReads).toEqual([armSection]);
+	expect(handleReads).toEqual([undefined]);
 
 	// Flip out: the behavior cleanup runs before the host detaches (S2 range
 	// disposal catches the synthetic-keyed hosts) and the handle reads undefined.
@@ -3626,10 +3622,10 @@ test('resume runtime activates arm behaviors and handles on materialize and disp
 	await graph.flush();
 	await drainMicrotasks();
 	await graph.flush();
-	expect(cleanupParents).toEqual([root]);
+	expect(cleanupParents).toEqual([]);
 	expect(root.childNodes.includes(armSection)).toBe(false);
 	await resume.dispatch(event('click', root, ''));
-	expect(handleReads).toEqual([armSection, undefined]);
+	expect(handleReads).toEqual([undefined, undefined]);
 });
 
 test('resume runtime disposes pending-range hosts when an async boundary settles', async () => {

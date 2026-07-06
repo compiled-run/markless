@@ -6,6 +6,7 @@ export type ModuleGroup =
 	| 'branch'
 	| 'async-boundary'
 	| 'behavior'
+	| 'full-tier-dispatch-core'
 	| 'full-resume-core';
 
 export type PayloadRecordInventory = {
@@ -53,15 +54,15 @@ export const MODULE_GROUPS: Record<ModuleGroup, ReadonlySet<string>> = {
 	branch: new Set(['web/resume-branches']),
 	'async-boundary': new Set(['web/resume-async-boundaries']),
 	behavior: new Set(['web/event-only-behaviors', 'web/resume-behaviors']),
-	'full-resume-core': new Set([
+	'full-tier-dispatch-core': new Set([
 		'core/web/resume',
-		'web/payload-full',
 		'web/resume',
-		'web/resume-events',
-		'web/resume-locators',
 		'web/resume-runtime',
-		'web/resume-handoff',
-		'web/resume-sync-computed',
+		'web/resume-events',
+		'web/payload-full',
+	]),
+	'full-resume-core': new Set([
+		'web/resume-locators',
 	]),
 };
 
@@ -91,6 +92,7 @@ function structurallyReachableGroups(
 	action: RuntimeDispatchAction,
 ): Set<Exclude<ModuleGroup, 'dispatch-core'>> {
 	const groups = new Set<Exclude<ModuleGroup, 'dispatch-core'>>();
+	if (requiresFullRuntimeTier(inventory)) groups.add('full-tier-dispatch-core');
 	const matchingEvent = (inventory.events ?? []).find(
 		(event) => event.hostNodeId === action.hostNodeId && event.eventName === action.eventName,
 	);
@@ -118,13 +120,25 @@ function structurallyReachableGroups(
 	}
 	for (const branch of inventory.branches ?? []) {
 		for (const arm of branch.armRecords ?? []) {
-			if (arm.events?.some((event) => event.eventName === action.eventName)) groups.add('branch');
+			if (
+				action.recordKind !== 'keyed-repeat-row' &&
+				arm.events?.some((event) => event.eventName === action.eventName)
+			) groups.add('branch');
 			if (arm.domUpdates?.length) groups.add('dom-update');
 			if (arm.behaviors?.length) groups.add('behavior');
 			if (arm.elementHandles?.length) groups.add('full-resume-core');
 		}
 	}
 	return groups;
+}
+
+function requiresFullRuntimeTier(inventory: PayloadRecordInventory): boolean {
+	return (
+		(inventory.branches?.length ?? 0) > 0 ||
+		(inventory.keyedRepeats?.length ?? 0) > 0 ||
+		(inventory.elementHandles?.length ?? 0) > 0 ||
+		(inventory.asyncBoundaries?.length ?? 0) > 0
+	);
 }
 
 function isMarklessRuntimeModule(id: string): boolean {

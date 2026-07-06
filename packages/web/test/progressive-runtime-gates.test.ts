@@ -11,6 +11,7 @@ type FakeElement = {
 		readonly type: string;
 		readonly listener: (event: FakeEvent) => Promise<void>;
 	}>;
+	dispatchEvent?: () => boolean;
 	addEventListener(type: string, listener: (event: FakeEvent) => Promise<void>): void;
 	removeEventListener(type: string, listener: (event: FakeEvent) => Promise<void>): void;
 };
@@ -22,11 +23,12 @@ afterEach(() => {
 	vi.doUnmock('../src/resume-async-boundaries.ts');
 	vi.doUnmock('../src/resume-behaviors.ts');
 	vi.doUnmock('../src/resume-branches.ts');
+	vi.doUnmock('../src/resume-handoff.ts');
 	vi.resetModules();
 });
 
 test('full resume row dispatch does not import unrelated declared capabilities', async () => {
-	let asyncBoundaryImports = 0, behaviorImports = 0, branchImports = 0;
+	let asyncBoundaryImports = 0, behaviorImports = 0, branchImports = 0, handoffImports = 0;
 	vi.doMock('../src/resume-async-boundaries.ts', () => {
 		asyncBoundaryImports++;
 		return { wireAsyncBoundaries: vi.fn(() => new Map()) };
@@ -57,6 +59,13 @@ test('full resume row dispatch does not import unrelated declared capabilities',
 			})),
 		};
 	});
+	vi.doMock('../src/resume-handoff.ts', () => {
+		handoffImports++;
+		return {
+			defaultSharedPatchDispatcher: vi.fn(),
+			isResumeSharedPatchEvent: vi.fn(() => false),
+		};
+	});
 
 	const { createResumeRuntime } = await import('../src/resume.ts');
 	const button = element('BUTTON');
@@ -71,6 +80,7 @@ test('full resume row dispatch does not import unrelated declared capabilities',
 		element('P'),
 		comment('branch end'),
 	]);
+	root.dispatchEvent = () => true;
 	const graph = createRuntimeGraph({
 		cells: [
 			{ graphNodeId: 'state:rows', value: [{ id: 'north' }] },
@@ -94,6 +104,101 @@ test('full resume row dispatch does not import unrelated declared capabilities',
 	expect(loadedSymbols).toEqual(['symbol:row']);
 	expect(asyncBoundaryImports).toBe(0);
 	expect(behaviorImports).toBe(0);
+	expect(branchImports).toBe(0);
+	expect(handoffImports).toBe(0);
+});
+
+test('branch source writes import branch capability once and apply current arm', async () => {
+	let branchImports = 0;
+	vi.doMock('../src/resume-branches.ts', async () => {
+		branchImports++;
+		return await vi.importActual('../src/resume-branches.ts');
+	});
+
+	const { createResumeRuntime } = await import('../src/resume.ts');
+	const start = comment('branch start');
+	const shown = element('P');
+	const end = comment('branch end');
+	const root = element('SECTION', [start, shown, end]);
+	const hidden = element('P');
+	const graph = createRuntimeGraph({ cells: [{ graphNodeId: 'state:flag', value: true }] });
+	const loadedSymbols: string[] = [];
+	const applied: unknown[] = [];
+	const runtime = createResumeRuntime({
+		root,
+		graph,
+		view: branchCapabilityView(),
+		loadSymbol(symbolId) {
+			loadedSymbols.push(symbolId);
+			return ({ graph: runtimeGraph }) => ({
+				arm: runtimeGraph.read('state:flag') ? 0 : 1,
+				html: '<p>Hidden</p>',
+			});
+		},
+		renderBranchHtml: () => [hidden],
+		applyDomJournal(entries) {
+			applied.push(...entries);
+		},
+	});
+
+	await runtime.start();
+	expect(branchImports).toBe(0);
+
+	graph.write({ graphNodeId: 'state:flag', value: false });
+	await graph.flush();
+
+	expect(branchImports).toBe(1);
+	expect(loadedSymbols).toEqual(['symbol:branch']);
+	expect(applied).toEqual([
+		{ type: 'removeRange', locator: 'branch:site:0' },
+		{ type: 'insertRange', locator: 'branch:site:0:start', fragment: [hidden] },
+	]);
+});
+
+test('row collection writes do not import unrelated branch capabilities', async () => {
+	let branchImports = 0;
+	vi.doMock('../src/resume-branches.ts', async () => {
+		branchImports++;
+		return await vi.importActual('../src/resume-branches.ts');
+	});
+
+	const { createResumeRuntime } = await import('../src/resume.ts');
+	const root = element('SECTION', [
+		element('TBODY', [element('TR')]),
+		comment('branch start'),
+		element('P'),
+		comment('branch end'),
+	]);
+	const graph = createRuntimeGraph({
+		cells: [
+			{ graphNodeId: 'state:rows', value: [{ id: 'north' }] },
+			{ graphNodeId: 'state:flag', value: true },
+		],
+	});
+	const runtime = createResumeRuntime({
+		root,
+		graph,
+		view: {
+			...branchCapabilityView(),
+			locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 1, tagName: 'tbody' }],
+			keyedRepeats: [{
+				id: 'repeat:0',
+				parentHostNodeId: 'h0',
+				collectionGraphNodeId: 'state:rows',
+				collectionPath: [],
+				keyPath: ['id'],
+				itemName: 'row',
+				rowElementCount: 1,
+				rowEvents: [],
+			}],
+		},
+		loadSymbol: () => () => undefined,
+	});
+
+	await runtime.start();
+	graph.write({ graphNodeId: 'state:rows', value: [{ id: 'south' }] });
+	await graph.flush();
+
 	expect(branchImports).toBe(0);
 });
 
@@ -135,6 +240,29 @@ function progressiveMixedView(): ResumeViewRecord {
 			rowElementCount: 2,
 			rowEvents: [{ hostPath: [0], eventName: 'click', symbolIds: ['symbol:row'] }],
 		}],
+	};
+}
+
+function branchCapabilityView(): ResumeViewRecord {
+	return {
+		locators: [],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+		branches: [{
+			id: 'site:0',
+			symbolId: 'symbol:branch',
+			startAnchor: { strategy: 'dom-order-comment', index: 0 },
+			endAnchor: { strategy: 'dom-order-comment', index: 1 },
+			testReads: [{ graphNodeId: 'state:flag', path: [] }],
+			armRecords: [
+				{ events: [{ hostPath: [0], eventName: 'click', symbolIds: ['symbol:arm'] }], domUpdates: [], behaviors: [], elementHandles: [] },
+				{ events: [], domUpdates: [], behaviors: [], elementHandles: [] },
+			],
+		}],
+		keyedRepeats: [],
 	};
 }
 
