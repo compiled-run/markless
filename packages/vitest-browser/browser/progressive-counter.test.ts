@@ -1,6 +1,5 @@
 import { afterEach, expect, test } from 'vitest';
 import {
-	MODULE_GROUPS,
 	deriveAllowedModules,
 	forbiddenExecutedModules,
 } from '../../bundler/test-support/execution-expectations.ts';
