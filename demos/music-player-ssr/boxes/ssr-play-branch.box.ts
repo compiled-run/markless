@@ -33,6 +33,9 @@ export default box(
 		await expect.html.contains(html, 'aria-label="Play or pause"');
 		await expect.html.contains(html, '<!--markless:branch:');
 		await expect.html.contains(html, 'data-async-resumer');
+		const preloadHrefs = modulePreloadHrefs(html);
+		await assertModulePreloadsServe(preview, preloadHrefs);
+		receipt.note(`ssr play-branch modulepreload hrefs: ${formatPaths(preloadHrefs)}`);
 		// Scope the arm check to the rendered toggle button: the payload scripts
 		// legitimately serialize both arm templates elsewhere in the document.
 		assertRenderedToggleArm(html);
@@ -116,6 +119,25 @@ function assertRenderedToggleArm(html: string): void {
 		throw new Error(
 			`Expected SSR to render only the paused @else arm inside the toggle, got: ${rendered.trim()}`,
 		);
+	}
+}
+
+function modulePreloadHrefs(html: string): readonly string[] {
+	return [...html.matchAll(/<link\b(?=[^>]*\brel="modulepreload")[^>]*\bhref="([^"]+)"/g)]
+		.map((match) => match[1]!)
+		.filter((href, index, hrefs) => hrefs.indexOf(href) === index);
+}
+
+async function assertModulePreloadsServe(
+	preview: { request(path: string): Promise<string> },
+	hrefs: readonly string[],
+): Promise<void> {
+	if (hrefs.length === 0) {
+		throw new Error('Expected SSR music player HTML to render modulepreload links.');
+	}
+	for (const href of hrefs) {
+		const path = new URL(href, 'http://markless.local').pathname;
+		await preview.request(path);
 	}
 }
 

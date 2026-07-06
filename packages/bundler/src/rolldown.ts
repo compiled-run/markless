@@ -191,6 +191,7 @@ export function createMarklessRolldownPlugin(input: {
 			if (!TSRX_SOURCE_FILE.test(id)) {
 				if (
 					currentEnvironment === 'client' &&
+					internalOptions.dev === true &&
 					normalizeExecutionLogMode(internalOptions.executionLog) !== 'never' &&
 					isMarklessRuntimeModule(id)
 				) {
@@ -216,6 +217,8 @@ export function createMarklessRolldownPlugin(input: {
 				source: code,
 				buildId: internalOptions.buildId,
 				executionLog: normalizeExecutionLogMode(internalOptions.executionLog),
+				executionLogModuleHooks:
+					internalOptions.dev === true && currentEnvironment === 'client',
 				environment: currentEnvironment,
 				clientOutput:
 					currentEnvironment === 'client' &&
