@@ -19,8 +19,8 @@ test('expectations derive allowed runtime modules from the generated demand map'
 		executionLog: 'always',
 	});
 	const payload = payloadView(result.virtualModules.find((module) => module.type === 'payload')?.source);
-	const click = payload.events[0];
-	const allowed = deriveAllowedModules(payload, {
+	const click = payload.view.events[0];
+	const allowed = deriveAllowedModules(payload.view, payload.runtimeDemandMap, {
 		hostNodeId: click.hostNodeId,
 		eventName: click.eventName,
 		executionLog: true,
@@ -74,8 +74,8 @@ test('payload virtual module keeps runtime demand metadata out of the resumable 
 
 test('unreplaced action kinds allow the structurally derived interpreter chain', async () => {
 	const { payload } = await counterPayload();
-	const click = payload.events[0];
-	const allowed = deriveAllowedModules(payload, {
+	const click = payload.view.events[0];
+	const allowed = deriveAllowedModules(payload.view, payload.runtimeDemandMap, {
 		hostNodeId: click.hostNodeId,
 		eventName: click.eventName,
 	});
@@ -97,9 +97,9 @@ test('keyed repeat row actions allow render-module catalog helper imports', asyn
 		`,
 	});
 	const payload = payloadView(result.virtualModules.find((module) => module.type === 'payload')?.source);
-	const repeat = payload.keyedRepeats[0];
+	const repeat = payload.view.keyedRepeats[0];
 	const rowClick = repeat.rowEvents[0];
-	const allowed = deriveAllowedModules(payload, {
+	const allowed = deriveAllowedModules(payload.view, payload.runtimeDemandMap, {
 		hostNodeId: repeat.parentHostNodeId,
 		eventName: rowClick.eventName,
 		recordKind: 'keyed-repeat-row',
@@ -110,7 +110,7 @@ test('keyed repeat row actions allow render-module catalog helper imports', asyn
 
 test('replaced action kinds tighten back to the exact demand set', async () => {
 	const { payload } = await counterPayload();
-	const click = payload.events[0];
+	const click = payload.view.events[0];
 	const replacedPayload = {
 		...payload,
 		runtimeDemandMap: {
@@ -121,7 +121,7 @@ test('replaced action kinds tighten back to the exact demand set', async () => {
 			})),
 		},
 	};
-	const allowed = deriveAllowedModules(replacedPayload, {
+	const allowed = deriveAllowedModules(payload.view, replacedPayload.runtimeDemandMap, {
 		hostNodeId: click.hostNodeId,
 		eventName: click.eventName,
 	});
@@ -144,7 +144,7 @@ test('wrong demand map entries fail expectations and emitted-equals-required', a
 	});
 	const payloadModule = result.virtualModules.find((module) => module.type === 'payload');
 	const payload = payloadView(payloadModule?.source);
-	const click = payload.events[0];
+	const click = payload.view.events[0];
 	const missingFromMap = {
 		...payload.runtimeDemandMap,
 		symbols: payload.runtimeDemandMap.symbols.map((symbol: any) =>
@@ -158,7 +158,7 @@ test('wrong demand map entries fail expectations and emitted-equals-required', a
 		})),
 	};
 	const corruptedPayload = { ...payload, runtimeDemandMap: missingFromMap };
-	const allowed = deriveAllowedModules(corruptedPayload, {
+	const allowed = deriveAllowedModules(payload.view, corruptedPayload.runtimeDemandMap, {
 		hostNodeId: click.hostNodeId,
 		eventName: click.eventName,
 	});
@@ -199,7 +199,7 @@ async function counterPayload(): Promise<{ readonly payload: any }> {
 
 function payloadView(source: string | undefined): any {
 	return {
-		...payloadViewOnly(source),
+		view: payloadViewOnly(source),
 		runtimeDemandMap: payloadRuntimeDemandMap(source),
 	};
 }

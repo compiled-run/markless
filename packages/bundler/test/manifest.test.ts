@@ -231,7 +231,7 @@ describe('markless build metadata output', () => {
 		const injections = collectModulePreloadInjections(graph);
 
 		expect(injections).toEqual(
-			['/build/shared.js', '/build/press.js', '/build/text.js'].map((href) => ({
+			['/build/shared.js', '/build/branch-runtime.js', '/build/press.js', '/build/text.js'].map((href) => ({
 				tag: 'link',
 				location: 'head',
 				attributes: {
@@ -302,6 +302,14 @@ function lazySymbolManifest(): MarklessManifest {
 		modules: [
 			{
 				...transformManifest,
+				runtimeDemandMap: {
+					version: 1,
+					recordKinds: [],
+					symbols: [{ symbolId: 'symbol:press', kind: 'event-handler', runtimeModuleIds: ['web/resume-branches'] }],
+					payloadRecords: [],
+					actions: [],
+					unknownRecordModuleIds: [],
+				},
 				symbols: [symbol('press', 'event-handler'), symbol('text', 'dom-update')],
 			},
 		],
@@ -317,6 +325,11 @@ function lazySymbolManifest(): MarklessManifest {
 				total: 1500,
 				imports: ['shared.js'],
 				origins: ['src/root.tsrx'],
+			},
+			'branch-runtime.js': {
+				size: 700,
+				total: 700,
+				origins: ['../packages/web/src/resume-branches.ts'],
 			},
 			'shared.js': { size: 500, total: 500, origins: ['src/shared.ts'] },
 		},

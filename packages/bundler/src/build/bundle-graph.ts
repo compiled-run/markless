@@ -94,7 +94,14 @@ function bundleGraphRecords(
 	bundleGraphAdders?: Set<BundleGraphAdder>,
 ) {
 	const graph: Record<string, BundleGraphRecord> = { ...manifest.bundles };
+	const runtimeBundles = runtimeBundleNamesByModuleId(manifest);
 	for (const module of manifest.modules) {
+		const runtimeModuleIdsBySymbolId = new Map(
+			(module.runtimeDemandMap?.symbols ?? []).map((symbol) => [
+				symbol.symbolId,
+				symbol.runtimeModuleIds,
+			]),
+		);
 		for (const symbol of module.symbols) {
 			if (!symbol.fileName) continue;
 			const bundle = manifest.bundles[symbol.fileName];
@@ -102,10 +109,12 @@ function bundleGraphRecords(
 				...(bundle?.imports ?? []),
 				...(module.resolver.fileName ? [module.resolver.fileName] : []),
 			];
+			const runtimeDemandBundles = (runtimeModuleIdsBySymbolId.get(symbol.symbolId) ?? [])
+				.flatMap((id) => runtimeBundles.get(id) ?? []);
 			const symbolBundle: BundleGraphRecord = {
 				size: 0,
 				total: 0,
-				dynamicImports: [symbol.fileName],
+				dynamicImports: [...new Set([symbol.fileName, ...runtimeDemandBundles])],
 			};
 			if (imports.length > 0) {
 				symbolBundle.imports = imports;
@@ -141,6 +150,31 @@ function bundleGraphRecords(
 		}
 	}
 	return graph;
+}
+
+function runtimeBundleNamesByModuleId(manifest: MarklessBuildMetadata): ReadonlyMap<string, string[]> {
+	const entries = new Map<string, string[]>();
+	for (const [bundleName, bundle] of Object.entries(manifest.bundles)) {
+		for (const origin of bundle.origins ?? []) {
+			const runtimeModuleId = runtimeModuleIdFromOrigin(origin);
+			if (!runtimeModuleId) continue;
+			entries.set(runtimeModuleId, [...(entries.get(runtimeModuleId) ?? []), bundleName]);
+		}
+	}
+	for (const [id, names] of entries) entries.set(id, names.sort());
+	return entries;
+}
+
+function runtimeModuleIdFromOrigin(origin: string): string | undefined {
+	const normalized = normalizeManifestOrigin(origin);
+	for (const [prefix, marker] of [
+		['web', 'packages/web/src/'],
+		['core', 'packages/core/src/'],
+	] as const) {
+		const index = normalized.lastIndexOf(marker);
+		if (index === -1 || !normalized.endsWith('.ts')) continue;
+		return `${prefix}/${normalized.slice(index + marker.length, -'.ts'.length)}`;
+	}
 }
 
 function dynamicImportMarker(

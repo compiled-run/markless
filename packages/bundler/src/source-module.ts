@@ -44,9 +44,7 @@ export function payloadModule(payload: {
 }) {
 	return [
 		`export const state = ${JSON.stringify(payload.state, null, '\t')};`,
-		payload.runtimeDemandMap === undefined
-			? ''
-			: `export const runtimeDemandMap = ${JSON.stringify(payload.runtimeDemandMap, null, '\t')};`,
+		`export const runtimeDemandMap = ${JSON.stringify(payload.runtimeDemandMap, null, '\t')};`,
 		`export const view = ${JSON.stringify(payload.view, null, '\t')};`,
 		'',
 	].join('\n');
@@ -82,13 +80,14 @@ export function emitSourceModule(input: {
 	return [
 		symbolsOnly
 			? ''
-			: `import { state as payloadState, view as payloadView } from '${input.payloadId}';`,
+			: `import { state as payloadState, view as payloadView, runtimeDemandMap as payloadRuntimeDemandMap } from '${input.payloadId}';`,
 		'',
 		emitLoadSymbol(input),
 		input.environment === 'client' && input.executionLog !== 'never' ? emitExecutionLogLoader() : '',
 		routeSymbols ? 'const marklessLoadLocalSymbol = loadSymbol;' : '',
 		symbolsOnly && !routeSymbols ? 'export { loadSymbol };' : '',
 		symbolsOnly ? '' : 'export { payloadView };',
+		symbolsOnly ? '' : 'export { payloadRuntimeDemandMap };',
 		// Dev only: re-export the resume entry from the virtual resume module so the
 		// inline resumer can import THIS source module (keeping the .tsrx in the client
 		// module graph — vite's no-accepting-boundary full-reload depends on it).

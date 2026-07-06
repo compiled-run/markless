@@ -16,7 +16,6 @@ export type PayloadRecordInventory = {
 	readonly asyncBoundaries?: ReadonlyArray<unknown>;
 	readonly behaviors?: ReadonlyArray<{ readonly hostNodeId: string }>;
 	readonly elementHandles?: ReadonlyArray<{ readonly hostNodeId: string }>;
-	readonly runtimeDemandMap?: RuntimeDemandMapManifest;
 };
 
 export type RuntimeDispatchAction = {
@@ -43,21 +42,17 @@ const KNOWN_PAYLOAD_RECORD_KEYS = new Set([
 	'asyncBoundaries',
 	'behaviors',
 	'elementHandles',
-	'runtimeDemandMap',
 ]);
 
 export function deriveAllowedModules(
 	payloadRecordInventory: PayloadRecordInventory,
+	runtimeDemandMap: RuntimeDemandMapManifest,
 	action: RuntimeDispatchAction,
 ): ReadonlySet<string> {
-	const map = payloadRecordInventory.runtimeDemandMap;
-	if (!map) {
-		throw new Error('Expected payload runtimeDemandMap for generated execution expectations.');
-	}
 	const allowed = new Set(
 		hasUnknownRecordKind(payloadRecordInventory)
-			? map.unknownRecordModuleIds
-			: exactActionModules(map, action),
+			? runtimeDemandMap.unknownRecordModuleIds
+			: exactActionModules(runtimeDemandMap, action),
 	);
 	if (action.executionLog) {
 		for (const id of OBSERVABILITY_MODULES) allowed.add(id);

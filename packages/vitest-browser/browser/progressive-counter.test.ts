@@ -4,7 +4,9 @@ import {
 	forbiddenExecutedModules,
 } from '../../bundler/test-support/execution-expectations.ts';
 import { cleanup, renderSSRPhased } from '../src/index.ts';
-import EventOnly from './fixtures/progressive-event-only.tsrx';
+import EventOnly, {
+	payloadRuntimeDemandMap as eventOnlyRuntimeDemandMap,
+} from './fixtures/progressive-event-only.tsrx';
 import {
 	actionForElement,
 	executedModules,
@@ -30,7 +32,7 @@ test('progressive execution: counter dispatch executes only the event dispatch c
 	await expect.poll(() => button.textContent).toBe('Count 1');
 
 	const executed = executedModules();
-	const allowed = deriveAllowedModules(view, action);
+	const allowed = deriveAllowedModules(view, eventOnlyRuntimeDemandMap, action);
 	expect(forbiddenExecutedModules(executed, allowed)).toEqual([]);
 	// Positive direction (dispatch-core actually executes) is asserted in the witness box
 	// (boxes/ssr-preview.box.ts) where the page is fresh; in this harness the runtime

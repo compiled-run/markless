@@ -97,7 +97,7 @@ describe('TSRX Rolldown plugin structure', () => {
 
 		expect(result.code).not.toContain('export const marklessSource');
 		expect(result.code).toContain(
-			"import { state as payloadState, view as payloadView } from 'virtual:markless:payload:",
+			"import { state as payloadState, view as payloadView, runtimeDemandMap as payloadRuntimeDemandMap } from 'virtual:markless:payload:",
 		);
 		expect(result.code).not.toContain('import { loadSymbol, symbolManifest }');
 		expect(result.code).not.toContain('const marklessSymbolResolverModule');
@@ -108,6 +108,7 @@ describe('TSRX Rolldown plugin structure', () => {
 			"import moduleManifest from 'virtual:markless:module-manifest:",
 		);
 		expect(result.code).toContain('export { payloadView };');
+		expect(result.code).toContain('export { payloadRuntimeDemandMap };');
 		expect(result.code).not.toContain('loadSymbol: loadSymbol,');
 		expect(result.code).not.toContain('function marklessResumeLoadSymbol');
 		expect(result.code).toContain('const marklessCompiledApp = {');
