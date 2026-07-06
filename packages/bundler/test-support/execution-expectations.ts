@@ -160,7 +160,7 @@ function isAllowedDispatchCoreVirtual(id: string): boolean {
 }
 
 const INTERPRETER_ROOTS_BY_KIND: Record<string, ReadonlyArray<string>> = {
-	event: ['core/web/event-only-resume', 'web/event-only-resume'],
+	event: ['core/web/resume', 'web/resume'],
 	'dom-update': ['core/web/resume', 'web/resume', 'web/fns/csr', 'web/fns/html', 'web/fns/state'],
 	branch: ['core/web/resume', 'web/resume'],
 	'async-boundary': ['core/web/resume', 'web/resume'],
@@ -187,9 +187,7 @@ function unique(values: ReadonlyArray<string | undefined>): string[] {
 
 const INTERPRETER_CHAIN_EXCLUDED_MODULES = new Set(['web/dom-journal']);
 const RUNTIME_IMPORT_EDGES: Record<string, ReadonlyArray<string>> = {
-	'core/web/event-only-resume': ['web/event-only-resume'],
 	'core/web/resume': ['web/resume'],
-	'web/event-only-resume': ['web/event-only-behaviors', 'web/event-only-graph', 'web/execution-log-target', 'web/inline/payload-document', 'web/inline/resume-errors', 'web/inline/sync-policy-core', 'web/payload'],
 	'web/payload': ['web/payload-full'],
 	'web/payload-full': ['web/payload-document', 'web/payload-graph-construct', 'web/payload-resume', 'web/payload-resume-registry'],
 	'web/payload-resume': ['web/dom-journal', 'web/payload-full', 'web/payload-graph-construct', 'web/payload-resume-registry', 'web/resume'],

@@ -1,5 +1,6 @@
 import type { EventOnlyResumeContainer, EventOnlyResumeDomElement, EventOnlyResumeRecord, ResumeEventOnlyFromPayloadDocumentInput } from './types.ts';
 import type { LeanActionPlan, LeanPlan, RuntimeDemandMap } from './lean-shared.ts';
+import { resumeFullEventOnly } from './lean-shared.ts';
 import type { ProtocolSyncPolicyCondition } from '../../../serializer/src/protocol.ts';
 
 export async function resumeScalarCoreEventFromPayloadDocument(
@@ -75,12 +76,6 @@ export function isScalarCoreLeanResumeShape(input: {
 	}) !== null;
 }
 
-async function resumeFullEventOnly(input: ResumeEventOnlyFromPayloadDocumentInput): Promise<EventOnlyResumeContainer> {
-	if (import.meta.env?.DEV) console.warn('markless: scalar-core lean resume fell back to full event container');
-	const { resumeEventOnlyFromPayloadDocument } = await import('../event-only-resume.ts');
-	return resumeEventOnlyFromPayloadDocument(input);
-}
-
 function scalarAction(eventRecord: EventOnlyResumeRecord, runtimeDemandMap: unknown) {
 	const demandMap = runtimeDemandMap as RuntimeDemandMap | undefined;
 	if (!demandMap?.recordKinds || !demandMap.actions) return undefined;
@@ -111,12 +106,17 @@ function readScalarCorePlanFromDocument(
 
 function readScalarCorePlan(input: {
 	readonly state: { readonly cells: ReadonlyArray<any>; readonly computed: ReadonlyArray<any> };
-	readonly view: { readonly locators: ReadonlyArray<any>; readonly domUpdates: ReadonlyArray<any> };
+	readonly view: {
+		readonly locators: ReadonlyArray<any>;
+		readonly domUpdates: ReadonlyArray<any>;
+		readonly behaviors?: ReadonlyArray<unknown>;
+	};
 	readonly eventRecord?: EventOnlyResumeRecord;
 	readonly plan: LeanActionPlan;
 	readonly graphNodeIds: ReadonlyArray<string>;
 }): LeanPlan | null {
 	if (!input.eventRecord || readComputedEntries(input.state.computed).length > 0) return null;
+	if ((input.view.behaviors?.length ?? 0) > 0) return null;
 	const cellIds = new Set([input.plan.cell, ...input.graphNodeIds]);
 	const cells = readScalarStateCells(input.state.cells, cellIds);
 	if (cells.length !== cellIds.size) return null;

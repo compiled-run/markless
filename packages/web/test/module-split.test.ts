@@ -2,10 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { expect, test } from 'vitest';
 import { applyDomJournalEntries } from '../src/dom-journal.ts';
 import { createDomUpdateEntry } from '../src/dom-update.ts';
-import {
-	createEventOnlyResumeContainerFromPayloads,
-	resumeEventOnlyFromPayloadDocument,
-} from '../src/event-only-resume.ts';
+import { resumeEventOnlyFromPayloadDocument } from '../src/event-only-resume.ts';
 import { resumeEventFromPayloadDocument } from '../src/event-resume.ts';
 import { decodePayloadScripts } from '../src/payload.ts';
 import { render } from '../src/render.ts';
@@ -19,7 +16,6 @@ function readSource(relativePath: string): Promise<string> {
 test('web package owns DOM render, resume, payload, and journal modules', () => {
 	expect(typeof applyDomJournalEntries).toBe('function');
 	expect(typeof createDomUpdateEntry).toBe('function');
-	expect(typeof createEventOnlyResumeContainerFromPayloads).toBe('function');
 	expect(typeof resumeEventOnlyFromPayloadDocument).toBe('function');
 	expect(typeof resumeEventFromPayloadDocument).toBe('function');
 	expect(typeof decodePayloadScripts).toBe('function');
@@ -41,13 +37,6 @@ test('web render entry does not statically import event-only resume fallback cod
 	expect(renderSource).not.toMatch(/import\(\s*['"]\.\/payload\.ts['"]\s*\)/);
 	expect(renderCsrSource).toContain("import(\n\t\t\t'./payload-graph-construct.ts'");
 	expect(renderCsrSource).not.toContain("import('./payload-full.ts')");
-});
-
-test('event-only graph gates object value decoding behind payload shape', async () => {
-	const graphSource = await readSource('../src/event-only-graph.ts');
-
-	expect(graphSource).not.toMatch(/import\s*\{[\s\S]*deserializeGraphValueForClient/);
-	expect(graphSource).toContain("import('../../serializer/src/value-decode-client.ts')");
 });
 
 test('full resume avoids the server value decoder in browser chunks', async () => {

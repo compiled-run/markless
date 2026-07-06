@@ -1,6 +1,14 @@
-import type { ProtocolStatePayload, ProtocolViewPayload } from '../../../serializer/src/protocol.ts';
+import type { ProtocolViewPayload } from '../../../serializer/src/protocol.ts';
 import type { DomJournalResult } from '@markless/runtime';
-import type { EventOnlyResumeGraph } from '../event-only-graph.ts';
+import type { RuntimeGraphCall, RuntimeGraphUpdate, RuntimeGraphWrite } from '@markless/runtime';
+
+export type EventOnlyResumeGraph = {
+	read(graphNodeId: string, path?: ReadonlyArray<string>): unknown;
+	write(write: RuntimeGraphWrite): void;
+	update(update: RuntimeGraphUpdate): unknown;
+	call(call: RuntimeGraphCall): unknown;
+	flush(): Promise<void>;
+};
 
 export type EventOnlyResumeDomNode = {
 	readonly nodeType: number;
@@ -83,13 +91,7 @@ export type ResumeEventOnlyFromPayloadDocumentInput = {
 	readonly loadSymbol: (
 		symbolId: string,
 	) => EventOnlyResumeSymbol | Promise<EventOnlyResumeSymbol>;
-};
-
-export type CreateEventOnlyResumeContainerInput = {
-	readonly state: ProtocolStatePayload;
-	readonly view: ProtocolViewPayload;
-	readonly root: EventOnlyResumeDomElement;
-	readonly loadSymbol: ResumeEventOnlyFromPayloadDocumentInput['loadSymbol'];
+	readonly loadFullResume?: (input: ResumeEventOnlyFromPayloadDocumentInput) => unknown;
 };
 
 export type EventOnlyResumeContainer = {
