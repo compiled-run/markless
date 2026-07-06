@@ -156,7 +156,8 @@ function findHostNodeIdForTarget<T>(
 		if (node.nodeType === Node.ELEMENT_NODE) elements.push(node as HTMLElement);
 		for (const child of Array.from(node.childNodes)) visit(child);
 	};
-	visit(root);
+	// dom-order locator indices are based at the markless container (index 0), not the harness wrapper.
+	visit(root.querySelector('[data-async-container]') ?? root);
 	const byHostId = new Map<string, HTMLElement>();
 	// Mirrors packages/web/src/event-only-resume.ts materializeDomLocators/collectElements.
 	for (const locator of view.locators ?? []) {
