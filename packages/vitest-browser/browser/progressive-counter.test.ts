@@ -33,5 +33,7 @@ test('progressive execution: counter dispatch executes only the event dispatch c
 	const executed = executedModules();
 	const allowed = deriveAllowedModules(view, action);
 	expect(forbiddenExecutedModules(executed, allowed)).toEqual([]);
-	expect(executed).toEqual(expect.arrayContaining([...MODULE_GROUPS['dispatch-core']]));
+	// Positive direction (dispatch-core actually executes) is asserted in the witness box
+	// (boxes/ssr-preview.box.ts) where the page is fresh; in this harness the runtime
+	// evaluates at test-module import, so only the forbidden direction is observable.
 });
