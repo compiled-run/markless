@@ -238,7 +238,9 @@ test('SSR: fragment root with an @if child flips the branch range', async () => 
 	expect(container.querySelector('p.on')).toBeNull();
 });
 
-test.fails('SSR: static children projection renders inside the wrapping component', async () => {
+// Un-marked from test.fails after T007: payload-declared tier selection fixed SSR
+// static children projection (CSR twin un-marked at T006).
+test('SSR: static children projection renders inside the wrapping component', async () => {
 	// The deferred misindex also surfaces as an ASYNC RuntimeResumeError after
 	// the resumer script runs; contain it so the ledgered failure stays the
 	// assertion below rather than an unhandled rejection failing the run.
