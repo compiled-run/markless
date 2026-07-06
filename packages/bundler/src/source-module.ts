@@ -127,9 +127,7 @@ export function emitSourceModule(input: {
 }
 
 export function emitResumeModule(input: {
-	readonly payloadId: string;
 	readonly resolverId: string;
-	readonly runtimeDemandMap?: unknown;
 	readonly needsFullResume?: boolean;
 	readonly symbols: ReadonlyArray<SourceSymbolRow>;
 	readonly symbolRoutes: ReadonlyArray<SourceSymbolRoute>;
@@ -138,8 +136,6 @@ export function emitResumeModule(input: {
 	const routeSymbols = input.symbolRoutes.length > 0;
 	const resumeSymbolLoader = routeSymbols ? 'marklessSsrLoadSymbolRoute' : 'loadSymbol';
 	return [
-		`import { runtimeDemandMap as payloadRuntimeDemandMap } from '${input.payloadId}';`,
-		'',
 		input.executionLog === 'never' ? '' : emitExecutionLogLoader(),
 		'',
 		emitLoadSymbol(input),
@@ -152,7 +148,7 @@ export function emitResumeModule(input: {
 				)
 			: '',
 		routeSymbols ? 'export { marklessSsrLoadSymbolRoute as loadSymbol };' : '',
-		emitResumeContainerEvent(resumeSymbolLoader, input.needsFullResume ?? false, scalarLeanReplaced(input.runtimeDemandMap)),
+		emitResumeContainerEvent(resumeSymbolLoader, input.needsFullResume ?? false),
 		'',
 	]
 		.filter((line): line is string => line !== null)
@@ -242,7 +238,7 @@ function emitCompiledAppDefault(input: {
 	].join('\n');
 }
 
-function emitResumeContainerEvent(loadSymbolName: string, needsFullResume: boolean, scalarLean: boolean): string {
+function emitResumeContainerEvent(loadSymbolName: string, needsFullResume: boolean): string {
 	const fullResumeHandoff = [
 		'async function marklessFullResumeHandoff(handoff) {',
 		'	handoff.root.__asyncResumeRuntimeStarted = true;',
@@ -266,23 +262,6 @@ function emitResumeContainerEvent(loadSymbolName: string, needsFullResume: boole
 			'}',
 		].join('\n');
 	}
-	if (scalarLean) {
-		return [
-			'export async function resumeContainerEvent(input) {',
-			"	const { resumeScalarEventFromPayloadDocument } = await import('@markless/web/event-only-lean/scalar-resume');",
-			'	await resumeScalarEventFromPayloadDocument({',
-			'		document: input.root,',
-			'		root: input.root,',
-			'		event: input.event,',
-			'		element: input.element,',
-			'		eventRecord: input.eventRecord,',
-			'		runtimeDemandMap: payloadRuntimeDemandMap,',
-			'		syncPolicyAlreadyApplied: !!input.eventRecord,',
-			`		loadSymbol: ${loadSymbolName},`,
-			'	});',
-			'}',
-		].join('\n');
-	}
 	return [
 		'export async function resumeContainerEvent(input) {',
 		"	const { resumeEventOnlyFromPayloadDocument } = await import('@markless/core/web/event-only-resume');",
@@ -292,19 +271,11 @@ function emitResumeContainerEvent(loadSymbolName: string, needsFullResume: boole
 		'		event: input.event,',
 		'		element: input.element,',
 		'		eventRecord: input.eventRecord,',
-		'		runtimeDemandMap: payloadRuntimeDemandMap,',
 		'		syncPolicyAlreadyApplied: !!input.eventRecord,',
 		`		loadSymbol: ${loadSymbolName},`,
 		'	});',
 		'}',
 	].join('\n');
-}
-
-function scalarLeanReplaced(runtimeDemandMap: unknown): boolean {
-	const recordKinds = (runtimeDemandMap as { readonly recordKinds?: ReadonlyArray<{ readonly kind: string; readonly replaced: boolean }> })?.recordKinds;
-	if (!recordKinds) return false;
-	const replaced = new Map(recordKinds.map((record) => [record.kind, record.replaced]));
-	return replaced.get('event') === true && replaced.get('dom-update') === true;
 }
 
 function emitExecutionLogLoader(): string {

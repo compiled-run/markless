@@ -14,10 +14,6 @@ const DISPATCH_CORE = [
 	'web/inline/payload-document',
 	'web/event-only-graph',
 ];
-const SCALAR_LEAN_DISPATCH_CORE = [
-	'web/event-only-lean/scalar-resume',
-	'web/inline/payload-document',
-];
 const SYNC_POLICY = ['web/inline/sync-policy-core'];
 const DOM_UPDATE: string[] = [];
 const KEYED_REPEAT = ['web/repeat-runtime', 'web/resume-keyed-repeats'];
@@ -37,7 +33,8 @@ const FULL_TIER = [
 	'web/payload-graph-construct',
 	'web/resume-async-wiring',
 ];
-const RECORD_KINDS = ['async-boundary', 'behavior', 'branch', 'dom-update', 'element-handle', 'event', 'keyed-repeat'] as const;
+const RECORD_KIND_PHASES = ['async-boundary', 'behavior', 'branch', 'dom-update', 'element-handle', 'event', 'keyed-repeat']
+	.map((kind) => ({ kind, replaced: false }));
 
 export function createRuntimeDemandMap(input: {
 	readonly symbolResolver: SymbolResolverPlan;
@@ -57,18 +54,16 @@ export function createRuntimeDemandMap(input: {
 		runtimeModuleIds: runtimeModuleIdsForSymbol(symbol, emittedModules.get(symbol.id)),
 	}));
 	const symbolDemand = new Map(symbols.map((symbol) => [symbol.symbolId, symbol.runtimeModuleIds]));
-	const scalarOnly = isScalarOnlyModule(input.symbolResolver, input.protocolView);
-	const payloadRecords = payloadDemandRecords(input.protocolView, symbolDemand, renderRuntimeModuleIds, scalarOnly);
+	const payloadRecords = payloadDemandRecords(input.protocolView, symbolDemand, renderRuntimeModuleIds);
 	return {
 		passId: 'runtime-demand-map',
 		version: 1,
-		recordKinds: recordKindPhases(scalarOnly),
+		recordKinds: RECORD_KIND_PHASES,
 		symbols,
 		payloadRecords,
 		actions: actionDemandRecords(input.symbolResolver, input.protocolView, payloadRecords, symbolDemand),
 		unknownRecordModuleIds: unique([
 			...DISPATCH_CORE,
-			...SCALAR_LEAN_DISPATCH_CORE,
 			...SYNC_POLICY,
 			...DOM_UPDATE,
 			'web/dom-update',
@@ -81,74 +76,6 @@ export function createRuntimeDemandMap(input: {
 			...FULL_TIER,
 		]),
 	};
-}
-
-function recordKindPhases(scalarOnly: boolean): RuntimeDemandMapArtifact['recordKinds'] {
-	return RECORD_KINDS.map((kind) => ({
-		kind,
-		replaced: scalarOnly && (kind === 'event' || kind === 'dom-update'),
-	}));
-}
-
-function isScalarOnlyModule(resolver: SymbolResolverPlan, view: ProtocolViewPayload): boolean {
-	if ((view.events?.length ?? 0) === 0 || (view.domUpdates?.length ?? 0) === 0) return false;
-	if ((view.keyedRepeats?.length ?? 0) > 0) return false;
-	if ((view.branches?.length ?? 0) > 0) return false;
-	if ((view.asyncBoundaries?.length ?? 0) > 0) return false;
-	if ((view.behaviors?.length ?? 0) > 0) return false;
-	if ((view.elementHandles?.length ?? 0) > 0) return false;
-
-	const symbolsById = new Map(resolver.symbols.map((symbol) => [symbol.id, symbol]));
-	const eventSymbolIds = (view.events ?? []).flatMap((event) => event.symbolIds ?? []);
-	if (eventSymbolIds.length === 0) return false;
-	if (!eventSymbolIds.every((symbolId) => {
-		const symbol = symbolsById.get(symbolId);
-		return symbol?.kind === 'event-handler' && isScalarWriteOnlyEventSymbol(symbol);
-	})) return false;
-
-	const domUpdateSymbolIds = (view.domUpdates ?? []).map((update) => update.symbolId);
-	if (domUpdateSymbolIds.some((symbolId) => !symbolId)) return false;
-	return domUpdateSymbolIds.every((symbolId) => {
-		const symbol = symbolsById.get(symbolId!);
-		return symbol?.kind === 'dom-update' && isTextUpdateSymbol(symbol);
-	});
-}
-
-function isScalarWriteOnlyEventSymbol(
-	symbol: Extract<PlannedSymbol, { readonly kind: 'event-handler' }>,
-): boolean {
-	if ((symbol.writes ?? []).length !== 1) return false;
-	if ((symbol.moduleImports ?? []).length > 0 || (symbol.elementHandleCalls ?? []).length > 0) return false;
-	const write = symbol.writes?.[0];
-	if (!write || write.path.length !== 0) return false;
-	if (write.operation === 'update') return !!write.updateOperator;
-	if (write.operation !== 'assign' || write.assignmentOperator) return false;
-	return literalValueSource(write.valueSource) !== null;
-}
-
-function isTextUpdateSymbol(symbol: Extract<PlannedSymbol, { readonly kind: 'dom-update' }>): boolean {
-	const target = symbol.target;
-	return target?.kind === 'text' &&
-		target.prefix === undefined &&
-		target.suffix === undefined &&
-		target.trueValue === undefined &&
-		target.falseValue === undefined;
-}
-
-function literalValueSource(source: string | undefined): string | null {
-	if (!source) return null;
-	const trimmed = source.trim();
-	if (/^-?\d+(?:\.\d+)?$/.test(trimmed)) return trimmed;
-	if (trimmed === 'true' || trimmed === 'false' || trimmed === 'null' || trimmed === 'undefined') {
-		return trimmed;
-	}
-	if (
-		(trimmed.startsWith("'") && trimmed.endsWith("'")) ||
-		(trimmed.startsWith('"') && trimmed.endsWith('"'))
-	) {
-		return JSON.stringify(trimmed.slice(1, -1));
-	}
-	return null;
 }
 
 function runtimeModuleIdsForSymbol(
@@ -173,9 +100,7 @@ function payloadDemandRecords(
 	view: ProtocolViewPayload,
 	symbolDemand: ReadonlyMap<string, ReadonlyArray<string>>,
 	renderRuntimeModuleIds: ReadonlyArray<string>,
-	scalarOnly: boolean,
 ): RuntimeDemandMapArtifact['payloadRecords'] {
-	const eventDispatchCore = scalarOnly ? SCALAR_LEAN_DISPATCH_CORE : DISPATCH_CORE;
 	return [
 		...(view.events ?? []).map((event) => ({
 			recordId: `event:${event.hostNodeId}:${event.eventName}`,
@@ -184,7 +109,7 @@ function payloadDemandRecords(
 			eventName: event.eventName,
 			symbolIds: event.symbolIds ?? [],
 			runtimeModuleIds: unique([
-				...eventDispatchCore,
+				...DISPATCH_CORE,
 				...(event.syncPolicy ? SYNC_POLICY : []),
 				...symbolIdsDemand(event.symbolIds ?? [], symbolDemand),
 			]),
@@ -256,10 +181,6 @@ function actionDemandRecords(
 				eventName: event.eventName,
 				recordKind: 'event' as const,
 				recordKinds: unique(['event', ...branchKinds, ...subscriberRecords.map((record) => record.kind)]),
-				payloadRecordIds: unique([
-					`event:${event.hostNodeId}:${event.eventName}`,
-					...subscriberRecords.map((record) => record.recordId),
-				]),
 				runtimeModuleIds: unique([
 					...recordModules(records, `event:${event.hostNodeId}:${event.eventName}`),
 					...branchDemand,
@@ -278,10 +199,6 @@ function actionDemandRecords(
 						'keyed-repeat',
 						...branchKinds,
 						...subscriberRecords.map((record) => record.kind),
-					]),
-					payloadRecordIds: unique([
-						`keyed-repeat:${repeat.id}`,
-						...subscriberRecords.map((record) => record.recordId),
 					]),
 					runtimeModuleIds: unique([
 						...recordModules(records, `keyed-repeat:${repeat.id}`),

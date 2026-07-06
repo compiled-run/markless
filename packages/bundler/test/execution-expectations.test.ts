@@ -31,38 +31,13 @@ test('expectations derive allowed runtime modules from the generated demand map'
 	).not.toThrow();
 	expect(allowed).toContain('web/fns/write-scalar');
 	expect(allowed).toContain('web/fns/update-text');
-	expect(allowed).toContain('web/event-only-lean/scalar-resume');
+	expect(allowed).toContain('web/event-only-resume');
 	expect(allowed).toContain('web/execution-log-target');
-	expect(allowed).not.toContain('web/event-only-resume');
-	expect(allowed).not.toContain('web/event-only-graph');
 	expect(allowed).not.toContain('web/dom-journal');
 });
 
 test('generated demand map carries per-kind replacement phase flags', async () => {
 	const { payload } = await counterPayload();
-
-	expect(payload.runtimeDemandMap.recordKinds).toEqual(
-		['async-boundary', 'behavior', 'branch', 'dom-update', 'element-handle', 'event', 'keyed-repeat']
-			.map((kind) => ({ kind, replaced: kind === 'dom-update' || kind === 'event' })),
-	);
-	expect(payload.runtimeDemandMap.actions[0].payloadRecordIds).toEqual([
-		`dom-update:${payload.view.domUpdates[0].hostNodeId}:${payload.view.domUpdates[0].symbolId}`,
-		`event:${payload.view.events[0].hostNodeId}:${payload.view.events[0].eventName}`,
-	]);
-});
-
-test('mixed scalar modules leave replacement phase flags open', async () => {
-	const result = await transformTsrxModule({
-		filename: '/workspace/app/Mixed.tsrx',
-		source: `
-			import { state } from '@markless/core';
-			export function Mixed() @{
-				let menu = state({ open: false });
-				<button onClick={() => menu.open = true} className={menu.open ? 'open' : 'closed'}>Open</button>
-			}
-		`,
-	});
-	const payload = payloadView(result.virtualModules.find((module) => module.type === 'payload')?.source);
 
 	expect(payload.runtimeDemandMap.recordKinds).toEqual(
 		['async-boundary', 'behavior', 'branch', 'dom-update', 'element-handle', 'event', 'keyed-repeat']
@@ -97,20 +72,10 @@ test('payload virtual module keeps runtime demand metadata out of the resumable 
 	expect(demandMap).toEqual(result.manifest.runtimeDemandMap);
 });
 
-test('mixed action kinds allow the structurally derived interpreter chain', async () => {
+test('unreplaced action kinds allow the structurally derived interpreter chain', async () => {
 	const { payload } = await counterPayload();
-	const mixedPayload = {
-		...payload,
-		runtimeDemandMap: {
-			...payload.runtimeDemandMap,
-			recordKinds: payload.runtimeDemandMap.recordKinds.map((kind: any) => ({
-				...kind,
-				replaced: false,
-			})),
-		},
-	};
 	const click = payload.view.events[0];
-	const allowed = deriveAllowedModules(payload.view, mixedPayload.runtimeDemandMap, {
+	const allowed = deriveAllowedModules(payload.view, payload.runtimeDemandMap, {
 		hostNodeId: click.hostNodeId,
 		eventName: click.eventName,
 	});

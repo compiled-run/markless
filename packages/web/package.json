@@ -9,7 +9,6 @@
 		"./dom-journal": "./src/dom-journal.ts",
 		"./dom-update": "./src/dom-update.ts",
 		"./event-only-resume": "./src/event-only-resume.ts",
-		"./event-only-lean/scalar-resume": "./src/event-only-lean/scalar-resume.ts",
 		"./event-resume": "./src/event-resume.ts",
 		"./fns/*": "./src/fns/*.ts",
 		"./payload": "./src/payload.ts",

@@ -715,7 +715,6 @@ export type RuntimeDemandMapAction = {
 	readonly eventName: string;
 	readonly recordKind: 'event' | 'keyed-repeat-row';
 	readonly recordKinds: ReadonlyArray<string>;
-	readonly payloadRecordIds: ReadonlyArray<string>;
 	readonly runtimeModuleIds: ReadonlyArray<string>;
 };
 
