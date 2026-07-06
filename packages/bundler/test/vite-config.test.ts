@@ -204,6 +204,7 @@ describe('Vite config integration', () => {
 			hoistTransitiveImports: false,
 		});
 		expect(clientOutput.codeSplitting?.groups?.map((group) => group.name)).toEqual([
+			'markless-web-fns',
 			'markless-resume-branches',
 			'markless-resume-behaviors',
 			'markless-event-behaviors',

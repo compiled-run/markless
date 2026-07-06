@@ -1,7 +1,25 @@
-export const stateRuntimeLines = [
-	'function marklessCloneState(state) { return { ...state, cells: (state.cells ?? []).map((cell) => ({ ...cell })), computed: [...(state.computed ?? [])], ...(state.sharedDefinitions ? { sharedDefinitions: [...state.sharedDefinitions] } : {}) }; }',
-	'function marklessStateValue(values, state, graphNodeId, value) { if (arguments.length > 3) { values.set(graphNodeId, value); marklessSetStatePayloadValue(state, graphNodeId, value); return value; } return values.get(graphNodeId); }',
-	'function marklessSetStatePayloadValue(state, graphNodeId, value) { const cell = state.cells?.find((candidate) => candidate.graphNodeId === graphNodeId); if (cell) cell.value = marklessSerializeGraphValue(value); }',
-	'function marklessSerializeGraphValue(value) { const records = []; const seen = new Map(); return { version: 1, root: marklessSerializeSlot(value, records, seen), records }; }',
-	'function marklessSerializeSlot(value, records, seen) { if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") return value; if (value === undefined) return { $type: "undefined" }; if (typeof value === "bigint") return { $type: "bigint", value: String(value) }; if (typeof value === "function" || typeof value === "symbol") throw new Error("MARKLESS_SERIALIZE_UNSUPPORTED_VALUE"); if (seen.has(value)) return { $ref: seen.get(value) }; const id = records.length; seen.set(value, id); if (value instanceof Date) { records.push({ id, type: "date", value: value.toISOString() }); return { $ref: id }; } if (value instanceof RegExp) { records.push({ id, type: "regexp", source: value.source, flags: value.flags }); return { $ref: id }; } if (value instanceof URL) { records.push({ id, type: "url", value: value.toString() }); return { $ref: id }; } if (Array.isArray(value)) { const record = { id, type: "array", items: [] }; records.push(record); for (const item of value) record.items.push(marklessSerializeSlot(item, records, seen)); return { $ref: id }; } const prototype = Object.getPrototypeOf(value); if (prototype !== Object.prototype && prototype !== null) throw new Error("MARKLESS_SERIALIZE_UNSUPPORTED_VALUE"); const record = { id, type: "object", fields: [] }; records.push(record); for (const key of Object.keys(value)) record.fields.push([key, marklessSerializeSlot(value[key], records, seen)]); return { $ref: id }; }',
-] as const;
+export type CatalogHelperImport = {
+	readonly module: string;
+	readonly names: ReadonlyArray<string>;
+};
+
+export function emitCatalogHelperImports(
+	source: string,
+	imports: ReadonlyArray<CatalogHelperImport>,
+): string[] {
+	return imports.flatMap((entry) => {
+		const names = entry.names.filter((name) => referencesIdentifier(source, name));
+		return names.length > 0
+			? [`import { ${names.join(', ')} } from '@markless/web/fns/${entry.module}';`]
+			: [];
+	});
+}
+
+function referencesIdentifier(source: string, name: string): boolean {
+	return new RegExp(`\\b${name}\\b`).test(source);
+}
+
+export const stateRuntimeImports = {
+	module: 'state',
+	names: ['marklessCloneState', 'marklessStateValue'],
+} as const satisfies CatalogHelperImport;

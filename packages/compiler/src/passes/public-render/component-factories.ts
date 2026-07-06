@@ -37,7 +37,7 @@ export function emitComponentFactory(
 		...repeatStateDeclaration,
 		`	const componentLoadSymbol = createMarklessPublicLoadSymbol(${loadSymbolArguments});`,
 		...syncStaticText,
-		'	attachMarklessPublicStaticEvents(root, graph, componentLoadSymbol);',
+		'	attachMarklessPublicStaticEvents(root, graph, componentLoadSymbol, marklessPublicStaticEvents);',
 		...syncRepeats,
 		'	return {',
 		'		root,',

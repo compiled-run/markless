@@ -23,6 +23,7 @@ describe('markless chunking defaults', () => {
 		});
 		expect(clientOutput.codeSplitting?.groups?.map((group) => group.name)).toEqual(
 			expect.arrayContaining([
+				'markless-web-fns',
 				'markless-resume-branches',
 				'markless-resume-repeats',
 				'markless-resume-behaviors',
@@ -63,6 +64,7 @@ describe('markless chunking defaults', () => {
 
 		expect(output.codeSplitting?.groups?.map((group) => group.name)).toEqual(
 			expect.arrayContaining([
+				'markless-web-fns',
 				'markless-resume-branches',
 				'markless-resume-repeats',
 				'markless-resume-behaviors',
@@ -96,6 +98,9 @@ describe('markless chunking defaults', () => {
 		);
 
 		expect(groups.get('markless-resume-async')?.test('/repo/packages/web/src/resume-async-wiring.ts')).toBe(
+			true,
+		);
+		expect(groups.get('markless-web-fns')?.test('/repo/packages/web/src/fns/csr.ts')).toBe(
 			true,
 		);
 		expect(groups.get('markless-resume-branches')?.test('/repo/packages/core/src/web/resume-branches.ts')).toBe(
