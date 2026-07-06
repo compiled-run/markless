@@ -283,16 +283,8 @@ test('emitSymbolModules emits concrete DOM journal entries for each binding targ
 			},
 		});
 
-		expect(artifact.modules[0].source).not.toContain('createDomUpdateEntry');
-		if (targetCase.target.kind === 'text') {
-			expect(artifact.modules[0].source).toContain(
-				"import { marklessUpdateText } from '@markless/web/fns/update-text';",
-			);
-			expect(artifact.modules[0].source).toContain('return marklessUpdateText(context, {');
-			expect(artifact.modules[0].source).toContain('hostNodeId: "h1"');
-			continue;
-		}
 		expect(artifact.modules[0].source).not.toContain('import ');
+		expect(artifact.modules[0].source).not.toContain('createDomUpdateEntry');
 		for (const expected of targetCase.expected) {
 			expect(artifact.modules[0].source).toContain(expected);
 		}
@@ -963,7 +955,7 @@ test('emitSymbolModules emits event field assignments for event handler modules'
 		kind: 'event-handler',
 		exportName: 'symbol_input',
 	});
-	expect(artifact.modules[0].source).toContain('marklessWriteScalar(context, {');
+	expect(artifact.modules[0].source).toContain('context.graph.write({');
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:query"');
 	expect(artifact.modules[0].source).toContain('path: []');
 	expect(artifact.modules[0].source).toContain('value: context.element?.value');
@@ -1078,7 +1070,7 @@ test('emitSymbolModules emits binary graph-read assignment values for event hand
 		kind: 'event-handler',
 		exportName: 'symbol_add',
 	});
-	expect(artifact.modules[0].source).toContain('marklessWriteScalar(context, {');
+	expect(artifact.modules[0].source).toContain('context.graph.write({');
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:total"');
 	expect(artifact.modules[0].source).toContain('path: []');
 	expect(artifact.modules[0].source).toContain(
@@ -1144,7 +1136,7 @@ test('emitSymbolModules emits nested parenthesized graph-read assignment values 
 		kind: 'event-handler',
 		exportName: 'symbol_scale',
 	});
-	expect(artifact.modules[0].source).toContain('marklessWriteScalar(context, {');
+	expect(artifact.modules[0].source).toContain('context.graph.write({');
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:total"');
 	expect(artifact.modules[0].source).toContain('path: []');
 	expect(artifact.modules[0].source).toContain(
@@ -1210,7 +1202,7 @@ test('emitSymbolModules emits conditional graph-read assignment values for event
 		kind: 'event-handler',
 		exportName: 'symbol_choose',
 	});
-	expect(artifact.modules[0].source).toContain('marklessWriteScalar(context, {');
+	expect(artifact.modules[0].source).toContain('context.graph.write({');
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:total"');
 	expect(artifact.modules[0].source).toContain('path: []');
 	expect(artifact.modules[0].source).toContain(
@@ -1266,7 +1258,7 @@ test('emitSymbolModules emits array literal assignment values for event handler 
 		kind: 'event-handler',
 		exportName: 'symbol_replace',
 	});
-	expect(artifact.modules[0].source).toContain('marklessWriteScalar(context, {');
+	expect(artifact.modules[0].source).toContain('context.graph.write({');
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:items"');
 	expect(artifact.modules[0].source).toContain('path: []');
 	expect(artifact.modules[0].source).toContain(
@@ -1327,7 +1319,7 @@ test('emitSymbolModules emits array literal spread assignment values for event h
 		kind: 'event-handler',
 		exportName: 'symbol_replace',
 	});
-	expect(artifact.modules[0].source).toContain('marklessWriteScalar(context, {');
+	expect(artifact.modules[0].source).toContain('context.graph.write({');
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:items"');
 	expect(artifact.modules[0].source).toContain('path: []');
 	expect(artifact.modules[0].source).toContain(
@@ -1383,7 +1375,7 @@ test('emitSymbolModules preserves sparse array literal assignment holes', () => 
 		kind: 'event-handler',
 		exportName: 'symbol_replace',
 	});
-	expect(artifact.modules[0].source).toContain('marklessWriteScalar(context, {');
+	expect(artifact.modules[0].source).toContain('context.graph.write({');
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:items"');
 	expect(artifact.modules[0].source).toContain('path: []');
 	expect(artifact.modules[0].source).toContain('value: [, context.graph.read("state:nextItem")]');
@@ -1442,7 +1434,7 @@ test('emitSymbolModules emits object literal assignment values for event handler
 		kind: 'event-handler',
 		exportName: 'symbol_replace',
 	});
-	expect(artifact.modules[0].source).toContain('marklessWriteScalar(context, {');
+	expect(artifact.modules[0].source).toContain('context.graph.write({');
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:settings"');
 	expect(artifact.modules[0].source).toContain('path: []');
 	expect(artifact.modules[0].source).toContain(
@@ -1503,7 +1495,7 @@ test('emitSymbolModules emits object spread assignment values for event handler 
 		kind: 'event-handler',
 		exportName: 'symbol_replace',
 	});
-	expect(artifact.modules[0].source).toContain('marklessWriteScalar(context, {');
+	expect(artifact.modules[0].source).toContain('context.graph.write({');
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:settings"');
 	expect(artifact.modules[0].source).toContain('path: []');
 	expect(artifact.modules[0].source).toContain(
@@ -1564,7 +1556,7 @@ test('emitSymbolModules emits computed object-key assignment values for event ha
 		kind: 'event-handler',
 		exportName: 'symbol_replace',
 	});
-	expect(artifact.modules[0].source).toContain('marklessWriteScalar(context, {');
+	expect(artifact.modules[0].source).toContain('context.graph.write({');
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:settings"');
 	expect(artifact.modules[0].source).toContain('path: []');
 	expect(artifact.modules[0].source).toContain(
@@ -1625,7 +1617,7 @@ test('emitSymbolModules emits static call assignment values for event handler mo
 		kind: 'event-handler',
 		exportName: 'symbol_clamp',
 	});
-	expect(artifact.modules[0].source).toContain('marklessWriteScalar(context, {');
+	expect(artifact.modules[0].source).toContain('context.graph.write({');
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:total"');
 	expect(artifact.modules[0].source).toContain('path: []');
 	expect(artifact.modules[0].source).toContain(
@@ -1695,7 +1687,7 @@ test('emitSymbolModules re-emits imported helper calls for event handler modules
 		exportName: 'symbol_clamp',
 	});
 	expect(artifact.modules[0].source).toContain('import { clamp } from "./math";');
-	expect(artifact.modules[0].source).toContain('marklessWriteScalar(context, {');
+	expect(artifact.modules[0].source).toContain('context.graph.write({');
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:total"');
 	expect(artifact.modules[0].source).toContain('path: []');
 	expect(artifact.modules[0].source).toContain(
@@ -1726,9 +1718,7 @@ test('B908 emits async handler bodies with await ordering before spliced writes'
 
 	expect(source).toContain('export async function symbol_asyncSave(context) {');
 	expect(source).toContain('const event = context.event;');
-	expect(source.indexOf('await save();')).toBeLessThan(
-		source.indexOf('marklessWriteScalar(context, {'),
-	);
+	expect(source.indexOf('await save();')).toBeLessThan(source.indexOf('context.graph.update({'));
 });
 
 test('B908 preserves setTimeout deferral while splicing nested writes', () => {
@@ -1740,7 +1730,7 @@ test('B908 preserves setTimeout deferral while splicing nested writes', () => {
 
 	expect(source).toContain('setTimeout(() => {');
 	expect(source).toContain('}, 50);');
-	expect(source).toContain('marklessWriteScalar(context, {');
+	expect(source).toContain('context.graph.update({');
 });
 
 test('B908 preserves guard clauses around spliced handler writes', () => {
@@ -1751,7 +1741,7 @@ test('B908 preserves guard clauses around spliced handler writes', () => {
 	});
 
 	expect(source).toContain('if (enabled) return;');
-	expect(source).toContain('marklessWriteScalar(context, {');
+	expect(source).toContain('context.graph.update({');
 });
 
 test('B908 reports unsupported captured body locals by name for handler emit', async () => {
@@ -1785,7 +1775,7 @@ test('B908 preserves simple count++ handler semantics as a spliced graph write',
 		writes: [countUpdateWrite()],
 	});
 
-	expect(source).toContain('marklessWriteScalar(context, {');
+	expect(source).toContain('context.graph.update({');
 	expect(source).toContain('graphNodeId: "state:count"');
 	expect(source).toContain('return Number(value) + 1;');
 	expect(source).not.toContain('count++');
@@ -2028,7 +2018,7 @@ test('emitSymbolModules preserves bare local helper call assignment values in au
 		kind: 'event-handler',
 		exportName: 'symbol_localClamp',
 	});
-	expect(artifact.modules[0].source).toContain('marklessWriteScalar(context, {');
+	expect(artifact.modules[0].source).toContain('context.graph.write({');
 	expect(artifact.modules[0].source).toContain(
 		'value: clamp(context.graph.read("state:total"), context.graph.read("state:profile", ["step"]))',
 	);
@@ -2320,7 +2310,7 @@ test('emitSymbolModules emits prefix unary graph-read assignment values for even
 		kind: 'event-handler',
 		exportName: 'symbol_negate',
 	});
-	expect(negateModule?.source).toContain('marklessWriteScalar(context, {');
+	expect(negateModule?.source).toContain('context.graph.write({');
 	expect(negateModule?.source).toContain('graphNodeId: "state:total"');
 	expect(negateModule?.source).toContain('path: []');
 	expect(negateModule?.source).toContain('value: -context.graph.read("state:profile", ["step"])');

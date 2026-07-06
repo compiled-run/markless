@@ -733,7 +733,7 @@ export function AlternateSubmit() @{
 	);
 	expect(submitSymbol?.source).not.toContain('preventDefault');
 	expect(submitSymbol?.source).not.toContain('stopPropagation');
-	expect(submitSymbol?.source).toContain('marklessWriteScalar(context, {');
+	expect(submitSymbol?.source).toContain('context.graph.write');
 });
 
 test('compileTsrxModule orchestrates source to payload scripts and resolver module', async () => {
@@ -4850,7 +4850,7 @@ test('compileTsrxModule emits generated event modules for supported graph write 
 
 	const binaryAddModule = eventModuleSource('total = total + profile.step');
 
-	expect(binaryAddModule).toContain('marklessWriteScalar(context, {');
+	expect(binaryAddModule).toContain('context.graph.write({');
 	expect(binaryAddModule).toContain('graphNodeId: "state:total"');
 	expect(binaryAddModule).toContain('path: []');
 	expect(binaryAddModule).toContain(
@@ -4859,7 +4859,7 @@ test('compileTsrxModule emits generated event modules for supported graph write 
 
 	const nestedAddModule = eventModuleSource('total = (total + profile.step) * profile.scale');
 
-	expect(nestedAddModule).toContain('marklessWriteScalar(context, {');
+	expect(nestedAddModule).toContain('context.graph.write({');
 	expect(nestedAddModule).toContain('graphNodeId: "state:total"');
 	expect(nestedAddModule).toContain('path: []');
 	expect(nestedAddModule).toContain(
@@ -4868,7 +4868,7 @@ test('compileTsrxModule emits generated event modules for supported graph write 
 
 	const conditionalModule = eventModuleSource('total = menu.open ? profile.step : total');
 
-	expect(conditionalModule).toContain('marklessWriteScalar(context, {');
+	expect(conditionalModule).toContain('context.graph.write({');
 	expect(conditionalModule).toContain('graphNodeId: "state:total"');
 	expect(conditionalModule).toContain('path: []');
 	expect(conditionalModule).toContain(
@@ -4877,7 +4877,7 @@ test('compileTsrxModule emits generated event modules for supported graph write 
 
 	const callValueModule = eventModuleSource('total = Math.max(total, profile.step)');
 
-	expect(callValueModule).toContain('marklessWriteScalar(context, {');
+	expect(callValueModule).toContain('context.graph.write({');
 	expect(callValueModule).toContain('graphNodeId: "state:total"');
 	expect(callValueModule).toContain('path: []');
 	expect(callValueModule).toContain(
@@ -4887,7 +4887,7 @@ test('compileTsrxModule emits generated event modules for supported graph write 
 	const importedCallValueModule = eventModuleSource('total = clamp(total, profile.step)');
 
 	expect(importedCallValueModule).toContain('import { clamp } from "./math";');
-	expect(importedCallValueModule).toContain('marklessWriteScalar(context, {');
+	expect(importedCallValueModule).toContain('context.graph.write({');
 	expect(importedCallValueModule).toContain('graphNodeId: "state:total"');
 	expect(importedCallValueModule).toContain('path: []');
 	expect(importedCallValueModule).toContain(
@@ -4896,7 +4896,7 @@ test('compileTsrxModule emits generated event modules for supported graph write 
 
 	const arrayLiteralModule = eventModuleSource('items = [nextItem');
 
-	expect(arrayLiteralModule).toContain('marklessWriteScalar(context, {');
+	expect(arrayLiteralModule).toContain('context.graph.write({');
 	expect(arrayLiteralModule).toContain('graphNodeId: "state:items"');
 	expect(arrayLiteralModule).toContain('path: []');
 	expect(arrayLiteralModule).toContain(
@@ -4905,7 +4905,7 @@ test('compileTsrxModule emits generated event modules for supported graph write 
 
 	const arraySpreadModule = eventModuleSource('items = [...nextItems');
 
-	expect(arraySpreadModule).toContain('marklessWriteScalar(context, {');
+	expect(arraySpreadModule).toContain('context.graph.write({');
 	expect(arraySpreadModule).toContain('graphNodeId: "state:items"');
 	expect(arraySpreadModule).toContain('path: []');
 	expect(arraySpreadModule).toContain(
@@ -4914,7 +4914,7 @@ test('compileTsrxModule emits generated event modules for supported graph write 
 
 	const objectLiteralModule = eventModuleSource('settings = { title: menu.title');
 
-	expect(objectLiteralModule).toContain('marklessWriteScalar(context, {');
+	expect(objectLiteralModule).toContain('context.graph.write({');
 	expect(objectLiteralModule).toContain('graphNodeId: "state:settings"');
 	expect(objectLiteralModule).toContain('path: []');
 	expect(objectLiteralModule).toContain(
@@ -4923,7 +4923,7 @@ test('compileTsrxModule emits generated event modules for supported graph write 
 
 	const objectSpreadModule = eventModuleSource('settings = { ...settings, title: menu.title');
 
-	expect(objectSpreadModule).toContain('marklessWriteScalar(context, {');
+	expect(objectSpreadModule).toContain('context.graph.write({');
 	expect(objectSpreadModule).toContain('graphNodeId: "state:settings"');
 	expect(objectSpreadModule).toContain('path: []');
 	expect(objectSpreadModule).toContain(
@@ -4932,7 +4932,7 @@ test('compileTsrxModule emits generated event modules for supported graph write 
 
 	const computedKeyModule = eventModuleSource('settings = { [menu.title]: profile.step');
 
-	expect(computedKeyModule).toContain('marklessWriteScalar(context, {');
+	expect(computedKeyModule).toContain('context.graph.write({');
 	expect(computedKeyModule).toContain('graphNodeId: "state:settings"');
 	expect(computedKeyModule).toContain('path: []');
 	expect(computedKeyModule).toContain(
@@ -4969,7 +4969,7 @@ test('compileTsrxModule emits handler writes through whole-binding aliases', asy
 		}),
 	]);
 	expect(result.stateLowering.diagnostics).toEqual([]);
-	expect(module?.source).toContain('marklessWriteScalar(context, {');
+	expect(module?.source).toContain('context.graph.update({');
 	expect(module?.source).toContain('graphNodeId: "state:origin"');
 	expect(module?.source).toContain('path: []');
 });
