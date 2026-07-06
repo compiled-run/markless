@@ -78,7 +78,7 @@ export const defaultCompilerPasses: ReadonlyArray<CompilerPassDefinition> = [
 	{
 		passId: 'runtime-demand-map',
 		description: 'Map emitted symbols and payload records to exact runtime module demands.',
-		consumes: ['symbolResolver', 'symbolModules', 'protocolView'],
+		consumes: ['symbolResolver', 'symbolModules', 'publicRenderModule', 'protocolView'],
 		produces: ['runtimeDemandMap'],
 	},
 	{

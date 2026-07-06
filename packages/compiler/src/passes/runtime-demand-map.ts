@@ -1,5 +1,6 @@
 import type {
 	GeneratedSymbolModule,
+	PublicRenderModuleArtifact,
 	PlannedSymbol,
 	RuntimeDemandMapArtifact,
 	SymbolModulesArtifact,
@@ -38,16 +39,22 @@ const RECORD_KIND_PHASES = ['async-boundary', 'behavior', 'branch', 'dom-update'
 export function createRuntimeDemandMap(input: {
 	readonly symbolResolver: SymbolResolverPlan;
 	readonly symbolModules: SymbolModulesArtifact;
+	readonly publicRenderModule: PublicRenderModuleArtifact;
 	readonly protocolView: ProtocolViewPayload;
 }): RuntimeDemandMapArtifact {
 	const emittedModules = new Map(input.symbolModules.modules.map((module) => [module.symbolId, module]));
+	const renderRuntimeModuleIds = runtimeModuleIdsFromSources([
+		input.publicRenderModule.moduleSource,
+		input.publicRenderModule.csrModuleSource,
+		input.publicRenderModule.ssrModuleSource,
+	]);
 	const symbols = input.symbolResolver.symbols.map((symbol) => ({
 		symbolId: symbol.id,
 		kind: symbol.kind,
 		runtimeModuleIds: runtimeModuleIdsForSymbol(symbol, emittedModules.get(symbol.id)),
 	}));
 	const symbolDemand = new Map(symbols.map((symbol) => [symbol.symbolId, symbol.runtimeModuleIds]));
-	const payloadRecords = payloadDemandRecords(input.protocolView, symbolDemand);
+	const payloadRecords = payloadDemandRecords(input.protocolView, symbolDemand, renderRuntimeModuleIds);
 	return {
 		passId: 'runtime-demand-map',
 		version: 1,
@@ -76,9 +83,15 @@ function runtimeModuleIdsForSymbol(
 	module: GeneratedSymbolModule | undefined,
 ): ReadonlyArray<string> {
 	if (!module) return [];
+	return runtimeModuleIdsFromSources([module.source]);
+}
+
+function runtimeModuleIdsFromSources(sources: ReadonlyArray<string>): ReadonlyArray<string> {
 	return unique(
-		[...module.source.matchAll(/from ['"]@markless\/web\/fns\/([^'"]+)['"]/g)].map(
-			(match) => `web/fns/${match[1]}`,
+		sources.flatMap((source) =>
+			[...source.matchAll(/from ['"]@markless\/web\/fns\/([^'"]+)['"]/g)].map(
+				(match) => `web/fns/${match[1]}`,
+			),
 		),
 	);
 }
@@ -86,6 +99,7 @@ function runtimeModuleIdsForSymbol(
 function payloadDemandRecords(
 	view: ProtocolViewPayload,
 	symbolDemand: ReadonlyMap<string, ReadonlyArray<string>>,
+	renderRuntimeModuleIds: ReadonlyArray<string>,
 ): RuntimeDemandMapArtifact['payloadRecords'] {
 	return [
 		...(view.events ?? []).map((event) => ({
@@ -111,7 +125,7 @@ function payloadDemandRecords(
 			recordId: `keyed-repeat:${record.id}`,
 			kind: 'keyed-repeat',
 			hostNodeId: record.parentHostNodeId,
-			runtimeModuleIds: unique([...FULL_TIER, ...KEYED_REPEAT]),
+			runtimeModuleIds: unique([...FULL_TIER, ...KEYED_REPEAT, ...renderRuntimeModuleIds]),
 		})),
 		...(view.branches ?? []).map((record) => ({
 			recordId: `branch:${record.id}`,
