@@ -128,12 +128,7 @@ export function assertProtocolStatePayload(
 	const cells = requiredPayloadArrayField(payload, 'cells', 'markless/state');
 
 	for (const [index, cell] of cells.entries()) {
-		const context = `markless/state cell[${index}]`;
-		assertRecordShape(cell, context);
-		assertStringField(cell, 'graphNodeId', context);
-		assertStringField(cell, 'name', context);
-		assertStateValueKind(cell, context);
-		if ('value' in cell) assertSerializedGraphPayload(cell.value, `${context}.value`);
+		assertProtocolStateCellPayload(cell, `markless/state cell[${index}]`);
 	}
 
 	const computedEntries = requiredPayloadArrayField(payload, 'computed', 'markless/state');
@@ -149,6 +144,17 @@ export function assertProtocolStatePayload(
 	}
 
 	assertOptionalSharedDefinitions(payload);
+}
+
+export function assertProtocolStateCellPayload(
+	cell: unknown,
+	context: string,
+): asserts cell is ProtocolStatePayload['cells'][number] {
+	assertRecordShape(cell, context);
+	assertStringField(cell, 'graphNodeId', context);
+	assertStringField(cell, 'name', context);
+	assertStateValueKind(cell, context);
+	if ('value' in cell) assertSerializedGraphPayload(cell.value, `${context}.value`);
 }
 
 export function assertProtocolViewPayload(

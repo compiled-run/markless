@@ -1,4 +1,9 @@
-import { compileTsrxModule, emitSymbolResolverModule } from '@markless/compiler';
+import {
+	compileTsrxModule,
+	emitSymbolResolverModule,
+	type RuntimeDemandMapArtifact,
+} from '@markless/compiler';
+import type { ProtocolViewPayload } from '@markless/serializer';
 import type {
 	MarklessTransformManifest,
 	MarklessVirtualModule,
@@ -88,11 +93,7 @@ export async function transformTsrxModule(
 				resolverId,
 				runtimeDemandMap: compiled.runtimeDemandMap,
 				executionLog: input.executionLog,
-				needsFullResume:
-					(compiled.protocolView.branches?.length ?? 0) > 0 ||
-					(compiled.protocolView.keyedRepeats?.length ?? 0) > 0 ||
-					compiled.protocolView.elementHandles.length > 0 ||
-					compiled.protocolView.asyncBoundaries.length > 0,
+				needsFullResume: needsFullResume(compiled.protocolView, compiled.runtimeDemandMap),
 				symbols: symbolRows,
 				symbolRoutes,
 			}),
@@ -129,13 +130,7 @@ export async function transformTsrxModule(
 					executionLog: input.executionLog,
 					headInjections: input.headInjections,
 					devResumeReexport: input.devResumeReexport === true,
-					needsFullResume:
-						(compiled.protocolView.branches?.length ?? 0) > 0 ||
-						(compiled.protocolView.keyedRepeats?.length ?? 0) > 0 ||
-						// Element handles materialize only in the full runtime.
-						compiled.protocolView.elementHandles.length > 0 ||
-						// Async boundary settle/revalidation lives only in the full runtime.
-						compiled.protocolView.asyncBoundaries.length > 0,
+					needsFullResume: needsFullResume(compiled.protocolView, compiled.runtimeDemandMap),
 					resumeModuleUrl: input.resumeModuleUrl,
 					publicRenderModuleSource: compiled.publicRenderModule.moduleSource,
 					publicRenderRootExportName: compiled.publicRenderModule.rootExportName,
@@ -150,4 +145,19 @@ export async function transformTsrxModule(
 		virtualModules,
 		manifest,
 	};
+}
+
+function needsFullResume(
+	view: ProtocolViewPayload,
+	runtimeDemandMap: RuntimeDemandMapArtifact,
+): boolean {
+	if ((view.branches?.length ?? 0) > 0) return true;
+	if (view.elementHandles.length > 0) return true;
+	if (view.asyncBoundaries.length > 0) return true;
+	if ((view.keyedRepeats?.length ?? 0) === 0) return false;
+	return !recordKindReplaced(runtimeDemandMap, 'keyed-repeat');
+}
+
+function recordKindReplaced(runtimeDemandMap: RuntimeDemandMapArtifact, kind: string): boolean {
+	return runtimeDemandMap.recordKinds.some((record) => record.kind === kind && record.replaced === true);
 }

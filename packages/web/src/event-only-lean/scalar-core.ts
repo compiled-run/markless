@@ -1,6 +1,12 @@
 import type { EventOnlyResumeContainer, EventOnlyResumeDomElement, EventOnlyResumeRecord, ResumeEventOnlyFromPayloadDocumentInput } from './types.ts';
 import type { LeanActionPlan, LeanPlan, RuntimeDemandMap } from './lean-shared.ts';
-import { executeLeanActionPlanWrite, shadowLeanActionPlanGraph } from './lean-shared.ts';
+import {
+	cellValueNeedsFullDecode,
+	executeLeanActionPlanWrite,
+	readLeanComputedEntries,
+	readLeanStateCells,
+	shadowLeanActionPlanGraph,
+} from './lean-shared.ts';
 import { marklessLocateHost } from '../fns/locate-host.ts';
 import { marklessResolveResult } from '../fns/resolve-result.ts';
 import { marklessCreateScalarCoreGraph } from '../fns/scalar-core-graph.ts';
@@ -120,9 +126,9 @@ function readScalarCorePlan(input: {
 	readonly plan: LeanActionPlan;
 	readonly graphNodeIds: ReadonlyArray<string>;
 }): LeanPlan | null {
-	if (!input.eventRecord || input.state.computed.length > 0) return null;
+	if (!input.eventRecord || readLeanComputedEntries(input.state.computed).length > 0) return null;
 	const cellIds = new Set([input.plan.cell, ...input.graphNodeIds]);
-	const cells = input.state.cells.filter((cell) => cellIds.has(cell.graphNodeId));
+	const cells = readLeanStateCells(input.state.cells, cellIds);
 	if (cells.length !== cellIds.size) return null;
 	if (cells.some((cell) => cell.valueKind !== 'scalar' || cellValueNeedsFullDecode(cell.value))) return null;
 	const domUpdates = input.plan.textUpdates.flatMap((update) => {
@@ -153,8 +159,4 @@ function readPayloadScript(document: ResumeEventOnlyFromPayloadDocumentInput['do
 		throw Object.assign(new Error('MARKLESS_LEAN_PAYLOAD_MISSING'), { code: 'MARKLESS_LEAN_PAYLOAD_MISSING', site: type });
 	}
 	return JSON.parse(text);
-}
-
-function cellValueNeedsFullDecode(value: unknown): boolean {
-	return Boolean(value && typeof value === 'object' && Array.isArray((value as { readonly records?: unknown }).records) && (value as { readonly records: ReadonlyArray<unknown> }).records.length > 0);
 }

@@ -170,6 +170,53 @@ test('event-only resume rejects structure-tampered payloads with structured payl
 	});
 });
 
+test('event-only scalar lean route rejects a tampered consumed cell slot', async () => {
+	const button = element('BUTTON');
+	const root = element('DIV', [button, element('OUTPUT')]);
+	const state = createProtocolStatePayload({
+		cells: [{ graphNodeId: 'state:count', name: 'count', valueKind: 'scalar', value: 0 }],
+	});
+	const eventRecord = { hostNodeId: 'hButton', eventName: 'click', symbolIds: ['symbol:event'] };
+	const domUpdate = { hostNodeId: 'hOutput', source: 'count', graphNodeId: 'state:count', path: [], target: { kind: 'text' as const }, symbolId: 'symbol:text' };
+	const view: ProtocolViewPayload = {
+		version: 1,
+		locators: [
+			{ hostNodeId: 'hButton', strategy: 'dom-order', index: 1, tagName: 'button' },
+			{ hostNodeId: 'hOutput', strategy: 'dom-order', index: 2, tagName: 'output' },
+		],
+		events: [eventRecord],
+		domUpdates: [domUpdate],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	const runtimeDemandMap = scalarRuntimeDemandMap({ eventRecord, domUpdate }) as {
+		actions: Array<{ plan: { write: { kind: string; updateOperator?: string }; textUpdates: unknown[] } }>;
+	};
+	runtimeDemandMap.actions[0]!.plan.write = { kind: 'update', updateOperator: '++' };
+	const tamperedCell = {
+		...state.cells[0]!,
+		value: { version: 1, root: { $type: 'date', value: 'not-a-date' }, records: [] },
+	};
+	const scripts = renderPayloadScripts({ state: { ...state, cells: [tamperedCell] }, view });
+
+	await expect(
+		resumeScalarEventFromPayloadDocument({
+			document: payloadDocument(scripts.stateScript, scripts.viewScript),
+			root,
+			event: { type: 'click', target: button },
+			eventRecord,
+			runtimeDemandMap,
+			loadSymbol: () => () => undefined,
+		}),
+	).rejects.toMatchObject({
+		code: 'MARKLESS_PAYLOAD_INVALID',
+		message: expect.stringContaining('markless/state cell[0].value.root'),
+		payloadType: 'markless/state',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_PAYLOAD_INVALID',
+	});
+});
+
 test('event-only resume reports locator mismatch with slim runtime diagnostics', async () => {
 	const button = element('BUTTON');
 	const root = element('DIV', [button]);

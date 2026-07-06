@@ -1,6 +1,14 @@
 import type { ProtocolStatePayload, ProtocolSyncPolicyCondition, ProtocolViewPayload } from '../../../serializer/src/protocol.ts';
+import { assertProtocolStateCellPayload, payloadInvalidError } from '../../../serializer/src/protocol-validation.ts';
 import type { SerializedGraphPayload, SerializedSlot } from '../../../serializer/src/value-decode-client.ts';
-import type { EventOnlyResumeContainer, EventOnlyResumeDomElement, EventOnlyResumeDomNode, EventOnlyResumeRecord, EventOnlyResumeSymbol, ResumeEventOnlyFromPayloadDocumentInput } from './types.ts';
+import type {
+	EventOnlyResumeContainer,
+	EventOnlyResumeDomElement,
+	EventOnlyResumeDomNode,
+	EventOnlyResumeRecord,
+	EventOnlyResumeSymbol,
+	ResumeEventOnlyFromPayloadDocumentInput,
+} from './types.ts';
 import { marklessUpdateText } from '../fns/update-text.ts';
 import { marklessWriteScalar } from '../fns/write-scalar.ts';
 
@@ -124,6 +132,32 @@ export function cellValueNeedsFullDecode(value: unknown): boolean {
 	return Boolean(value && typeof value === 'object' && Array.isArray((value as { readonly records?: unknown }).records) && (value as { readonly records: ReadonlyArray<unknown> }).records.length > 0);
 }
 
+export function readLeanStateCells(
+	cells: unknown,
+	cellIds: ReadonlySet<string>,
+): ProtocolStatePayload['cells'] {
+	if (!Array.isArray(cells)) {
+		throw leanPayloadShapeError('Invalid markless/state payload: expected cells array.');
+	}
+	const matchingCells: ProtocolStatePayload['cells'][number][] = [];
+	for (const [index, cell] of cells.entries()) {
+		const graphNodeId = cell && typeof cell === 'object'
+			? (cell as { readonly graphNodeId?: unknown }).graphNodeId
+			: undefined;
+		if (typeof graphNodeId !== 'string' || !cellIds.has(graphNodeId)) continue;
+		assertProtocolStateCellPayload(cell, `markless/state cell[${index}]`);
+		matchingCells.push(cell);
+	}
+	return matchingCells;
+}
+
+export function readLeanComputedEntries(computed: unknown): ReadonlyArray<unknown> {
+	if (!Array.isArray(computed)) {
+		throw leanPayloadShapeError('Invalid markless/state payload: expected computed array.');
+	}
+	return computed;
+}
+
 export async function resumeFullEventOnly(input: ResumeEventOnlyFromPayloadDocumentInput): Promise<EventOnlyResumeContainer> {
 	if (import.meta.env?.DEV) console.warn('markless: lean resume fell back to full event container');
 	const { resumeEventOnlyFromPayloadDocument } = await import('../event-only-resume.ts');
@@ -237,6 +271,15 @@ function leanEscalation(site?: string): never {
 		code: 'MARKLESS_SCALAR_LEAN_ESCALATE',
 		site: site ?? '?',
 	});
+}
+
+function leanPayloadShapeError(message: string): Error {
+	return payloadInvalidError(
+		'markless/state',
+		message,
+		'The markless/state payload did not match the resumability protocol shape required by this runtime.',
+		[{ message: 'Regenerate the markless/state payload with the matching markless compiler/runtime version.' }],
+	);
 }
 
 function isPromiseLike<T>(value: T | Promise<T>): value is Promise<T> {
