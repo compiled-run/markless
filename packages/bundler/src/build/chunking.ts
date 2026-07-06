@@ -56,9 +56,18 @@ const WEB_RUNTIME_CAPABILITY_GROUPS = [
 		test: fileBasenamePattern('payload', 'payload-document'),
 	},
 	{ name: 'markless-resume-core', test: fileBasenamePattern('resume') },
+	{ name: 'markless-runtime-graph-core', test: fileBasenamePattern('graph-core') },
+	{ name: 'markless-runtime-graph-collections', test: fileBasenamePattern('graph-collections') },
+	{ name: 'markless-runtime-graph-computed', test: fileBasenamePattern('graph-computed') },
+	{ name: 'markless-runtime-graph-async', test: fileBasenamePattern('graph-async') },
+	{ name: 'markless-runtime-graph-scheduler', test: fileBasenamePattern('graph-scheduler') },
+	{ name: 'markless-runtime-graph-shared', test: fileBasenamePattern('graph-shared') },
 	// Workspace-source paths: @markless/runtime + serializer resolve to packages/*/src
 	// in this monorepo, so the package-name groups below never match them.
-	{ name: 'markless-graph', test: /[/\\](?:runtime[/\\]src|core[/\\]src[/\\]runtime)[/\\]?/ },
+	{
+		name: 'markless-graph',
+		test: /[/\\](?:runtime[/\\]src[/\\](?!graph-(?:core|collections|computed|async|scheduler|shared)\.ts)|core[/\\]src[/\\]runtime)[/\\]?/,
+	},
 	{ name: 'markless-serializer', test: /[/\\]serializer[/\\]src[/\\](?!protocol-validation)/ },
 ];
 
