@@ -62,6 +62,7 @@ const WEB_RUNTIME_CAPABILITY_GROUPS = [
 		name: 'markless-payload-leaves',
 		test: fileBasenamePattern('payload', 'payload-document'),
 	},
+	{ name: 'markless-dev-log', test: /virtual:markless:dev-log|[/\\]web[/\\]src[/\\]dev-log\.ts(?:[?#].*)?$/ },
 	{ name: 'markless-resume-core', test: fileBasenamePattern('resume') },
 	{ name: 'markless-runtime-graph-core', test: fileBasenamePattern('graph-core') },
 	{ name: 'markless-runtime-graph-collections', test: fileBasenamePattern('graph-collections') },

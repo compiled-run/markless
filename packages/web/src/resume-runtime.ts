@@ -35,7 +35,7 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 		if (events) return events;
 		const { createEventWiring } = await import('./resume-events.ts');
 		events = createEventWiring({
-			graph: input.graph, loadSymbol: input.loadSymbol, elementsByHostId, elementHandles, eventTypes, disposedHosts, flushRuntimeGraph, reportRuntimeError,
+			graph: input.graph, loadSymbol: input.loadSymbol, elementsByHostId, elementHandles, view: input.view, eventTypes, disposedHosts, flushRuntimeGraph, reportRuntimeError,
 				activateBehaviorsFromTrigger: async (hostNodeId) => {
 					if (!behaviorHostIds.has(hostNodeId) && !behaviorRuntime) return;
 					return (await loadBehaviorRuntime()).activateBehaviorsFromTrigger(hostNodeId);

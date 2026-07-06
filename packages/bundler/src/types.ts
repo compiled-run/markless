@@ -1,5 +1,6 @@
 export type MarklessEnvironment = 'client' | 'server' | 'lib';
 export type MarklessClientOutput = 'full' | 'symbols-only';
+export type MarklessExecutionLogMode = 'auto' | 'never' | 'always';
 
 export interface MarklessDevServer {
 	transformRequest: (url: string, environment: MarklessEnvironment) => Promise<unknown> | unknown;
@@ -9,6 +10,7 @@ export interface MarklessRolldownOptions {
 	dev?: boolean;
 	devInjections?: GlobalInjections[];
 	devServer?: MarklessDevServer;
+	executionLog?: MarklessExecutionLogMode;
 	hmr?: boolean;
 	bundleGraphAdders?: Set<BundleGraphAdder>;
 	rootDir?: string;
@@ -34,6 +36,7 @@ export interface TransformTsrxModuleInput {
 	clientOutput?: MarklessClientOutput;
 	resumeModuleUrl?: string;
 	headInjections?: GlobalInjections[];
+	executionLog?: MarklessExecutionLogMode;
 }
 
 export interface TransformTsrxModuleResult {
@@ -90,6 +93,7 @@ export type MarklessAsset = {
 export type GlobalInjections = {
 	tag: string;
 	attributes?: Record<string, string>;
+	children?: string;
 	location: 'head' | 'body';
 };
 
