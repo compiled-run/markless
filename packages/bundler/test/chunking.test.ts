@@ -33,6 +33,7 @@ describe('markless chunking defaults', () => {
 				'markless-runtime-graph-scheduler',
 				'markless-runtime-graph-shared',
 				'markless-payload-graph-construct',
+				'markless-payload-document',
 				'markless-runtime',
 				'markless-symbols',
 			]),
@@ -65,6 +66,7 @@ describe('markless chunking defaults', () => {
 				'markless-runtime-graph-scheduler',
 				'markless-runtime-graph-shared',
 				'markless-payload-graph-construct',
+				'markless-payload-document',
 				'markless-runtime',
 				'markless-symbols',
 				'vendor',
@@ -94,6 +96,14 @@ describe('markless chunking defaults', () => {
 		expect(
 			groups.get('markless-payload-graph-construct')?.test(
 				'/repo/packages/web/src/payload-graph-construct.ts',
+			),
+		).toBe(true);
+		expect(groups.get('markless-payload-document')?.test('/repo/packages/web/src/payload-document.ts')).toBe(
+			true,
+		);
+		expect(
+			groups.get('markless-payload-document')?.test(
+				'/repo/packages/web/src/payload-resume-registry.ts',
 			),
 		).toBe(true);
 		expect(groups.get('markless-resume-shared-patch')?.test('/repo/packages/web/src/resume-shared-patch.ts')).toBe(
