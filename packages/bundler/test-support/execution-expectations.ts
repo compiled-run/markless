@@ -161,7 +161,7 @@ function isAllowedDispatchCoreVirtual(id: string): boolean {
 
 const INTERPRETER_ROOTS_BY_KIND: Record<string, ReadonlyArray<string>> = {
 	event: ['core/web/resume', 'web/resume'],
-	'dom-update': ['core/web/resume', 'web/resume', 'web/fns/csr', 'web/fns/html', 'web/fns/state'],
+	'dom-update': ['core/web/resume', 'web/resume'],
 	branch: ['core/web/resume', 'web/resume'],
 	'async-boundary': ['core/web/resume', 'web/resume'],
 	behavior: ['core/web/resume', 'web/resume'],
@@ -188,11 +188,6 @@ function unique(values: ReadonlyArray<string | undefined>): string[] {
 const INTERPRETER_CHAIN_EXCLUDED_MODULES = new Set(['web/dom-journal']);
 const RUNTIME_IMPORT_EDGES: Record<string, ReadonlyArray<string>> = {
 	'core/web/resume': ['web/resume'],
-	'web/payload': ['web/payload-full'],
-	'web/payload-full': ['web/payload-document', 'web/payload-graph-construct', 'web/payload-resume', 'web/payload-resume-registry'],
-	'web/payload-resume': ['web/dom-journal', 'web/payload-full', 'web/payload-graph-construct', 'web/payload-resume-registry', 'web/resume'],
-	'web/resume': ['web/inline/resume-errors', 'web/resume-runtime'],
-	'web/resume-events': ['web/execution-log-target', 'web/inline/sync-policy-core', 'web/resume-keyed-repeats'],
-	'web/resume-runtime': ['web/resume-behaviors', 'web/resume-branches', 'web/resume-events', 'web/resume-runtime-shared', 'web/resume-runtime-start'],
-	'web/resume-runtime-start': ['web/resume-async-wiring', 'web/resume-keyed-repeats', 'web/resume-locators', 'web/resume-runtime-shared', 'web/resume-sync-demand'],
+	'web/resume': ['web/resume-runtime', 'web/resume-locators', 'web/payload-full', 'web/payload-resume', 'web/payload-graph-construct', 'web/resume-async-wiring', 'web/runtime-error-reporting'],
+	'web/resume-runtime': ['web/resume-events', 'web/resume-runtime-shared', 'web/resume-runtime-start'],
 };

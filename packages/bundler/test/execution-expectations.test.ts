@@ -125,6 +125,11 @@ test('mixed action kinds allow the structurally derived interpreter chain', asyn
 
 	expect([...allowed].filter((id) => JUDGE_COUNTER_INTERPRETER_CHAIN_SET.has(id)).sort())
 		.toEqual([...JUDGE_COUNTER_INTERPRETER_CHAIN].sort());
+	expect(allowed).not.toContain('web/fns/csr');
+	expect(allowed).not.toContain('web/fns/html');
+	expect(allowed).not.toContain('web/fns/state');
+	expect(allowed).not.toContain('web/inline/sync-policy-core');
+	expect(allowed).not.toContain('web/payload');
 });
 
 test('keyed repeat row actions allow render-module catalog helper imports', async () => {
@@ -289,7 +294,10 @@ test('wrong demand map entries fail expectations and emitted-equals-required', a
 	).toThrow(/missing=\[web\/fns\/not-emitted\]/);
 });
 
-const JUDGE_COUNTER_INTERPRETER_CHAIN = ['web/fns/csr', 'web/fns/html', 'web/fns/state', 'web/inline/sync-policy-core', 'web/payload', 'web/payload-graph-construct', 'web/payload-resume', 'web/resume-events', 'web/resume-runtime', 'web/resume-runtime-shared', 'web/resume-runtime-start'] as const;
+// T014 tier-collapse receipt: the event-only middle tier was deleted. Mixed
+// unreplaced actions now fall through to the full dispatch core plus shared
+// runtime error reporting.
+const JUDGE_COUNTER_INTERPRETER_CHAIN = ['core/web/resume', 'web/resume', 'web/resume-runtime', 'web/resume-runtime-shared', 'web/resume-runtime-start', 'web/resume-events', 'web/resume-locators', 'web/payload-full', 'web/payload-resume', 'web/payload-graph-construct', 'web/resume-async-wiring', 'web/runtime-error-reporting'] as const;
 const JUDGE_COUNTER_INTERPRETER_CHAIN_SET = new Set<string>(JUDGE_COUNTER_INTERPRETER_CHAIN);
 
 async function counterPayload(): Promise<{ readonly payload: any }> {
