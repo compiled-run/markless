@@ -6,13 +6,21 @@ Author-facing graph state semantics, async derivation, shared state, identity, a
 
 ### Surface API
 
-The author-facing graph data model is three intent-named APIs imported from
+The author-facing graph data model is four intent-named APIs imported from
 `@markless/core`:
 
 - `state()` creates graph state.
 - `computed()` creates sync or async derived graph state.
 - `shared()` creates a named graph root that can be shared across request,
   container, page, or component-library UI graph instances.
+- `storage()` creates device-durable graph state: the same reactive cell as
+  `state()`, whose value survives reloads on the current device. See
+  "Device-durable state — `storage()`".
+
+The three creation APIs form one scope ladder: `state()` is request-scoped,
+`shared()` is app/graph-instance-scoped, `storage()` is device-scoped and
+durable. All three produce the same kind of graph cell; only ownership and
+lifetime differ.
 
 Signals, stores, subscriptions, and object-state representation are
 implementation details of graph management. `onVisible` is an element event
@@ -677,3 +685,96 @@ This keeps `shared()` from replacing local state. Use `state()` for
 self-contained component state. Use `shared()` when a named graph must be
 resolved by multiple independently-authored pieces, across a request/page or
 inside a design-system widget.
+
+### Device-durable state — `storage()`
+
+`storage()` creates a graph cell whose value survives reloads on the current
+device. It is the device-scoped rung of the scope ladder, not a data layer:
+it owns preferences and UI state with a declared fallback, and it explicitly
+does not own server data, sync, caches, or conflict resolution. Those are
+separate systems.
+
+```tsrx
+import { storage } from '@markless/core';
+
+export function ThemeToggle() @{
+  let theme = storage('theme', 'system'); // 'system' | 'light' | 'dark'
+
+  <button onClick={() => theme = theme === 'dark' ? 'light' : 'dark'}>
+    {theme}
+  </button>
+}
+```
+
+#### Contract
+
+- `storage(key, initial, options?)`. The key is a required static string
+  literal; the compiler namespaces it with an app-configurable prefix
+  (default `markless:`). A bare string is always a key — never a mechanism
+  name.
+- The returned cell is identical to `state()` in reads, writes, reactivity,
+  granularity, and serialization rules. Persistence is a lifecycle property
+  of the cell, not a different reactivity model. `storage()` is not a
+  `store()` primitive; that decision is unchanged.
+- The cell is a device-scoped singleton. Every component instance reading the
+  same key reads the same cell.
+- The graph is the source of truth. Reads never touch the underlying storage;
+  the stored value hydrates the cell once, and writes reach storage as a
+  write-through subscriber after the normal flush. Storage timing (sync
+  localStorage, async native databases) is invisible to authors: no `await`,
+  no loading states.
+- The declared initial value is the structural fallback. A missing, corrupt,
+  undecodable, or shape-mismatched stored value resolves to the declared
+  initial — the same path as every first visit. Hydration validates the
+  decoded value against the shape of the declared initial; a mismatch falls
+  back and emits a dev-mode diagnostic. Key renames are therefore safe by
+  construction and need no migration ceremony.
+
+#### Mechanism resolution
+
+Call sites declare intent, never mechanisms. The compiled record carries the
+key and tier only. Each platform host registers a driver for the device tier
+(web: `localStorage`; native hosts: their local database), following the
+host-adapter rule. Per-cell driver overrides name a registered driver in
+`options`; the compiler validates built-in driver names against the build
+targets (an unknown driver for a target is a compile error listing the
+registered drivers), and the runtime fails closed on drivers a booted host
+lacks (structured error, declared-initial fallback). Custom drivers register
+through the host at app setup.
+
+#### Rendering modes
+
+- CSR: the driver hydrates the cell before first render; the first paint uses
+  the stored value.
+- SSR: the server renders the declared initial (it cannot read device
+  storage); the stored value applies when the record hydrates on the client.
+  Layout-affecting `storage()` state on SSR pages may therefore visibly
+  settle after resume. The server-visible tier and a pre-paint read flag
+  that remove this are deferred (see 08-deferred-decisions.md). Writes to
+  `storage()` cells during SSR render update the in-request graph only and
+  never reach any device store.
+- The storage runtime module is a payload-declared capability: pages that
+  create no `storage()` cells ship none of it.
+
+#### Failure modes and diagnostics
+
+Storage write failures (quota, denied access, private-mode limits) never
+break the flush: the cell degrades to memory-only for the session and emits
+one dev-mode diagnostic per cell. Compile-time diagnostics:
+
+- `MARKLESS_STORAGE_KEY_COLLISION` — two declarations derive the same
+  namespaced key for the same driver; names both sites; fix: give one an
+  explicit distinct key.
+- `MARKLESS_STORAGE_DRIVER_UNKNOWN` — the named driver is not registered for
+  a build target; lists registered drivers.
+- `MARKLESS_STORAGE_IN_REPEAT_ROW` — `storage()` created inside a keyed
+  repeat row; per-row identity cannot map to one device key; fix: lift to a
+  keyed collection on the parent.
+- `MARKLESS_STORAGE_VALUE_UNSERIALIZABLE` — reuses the serializer's
+  supported-value rules; storage cells accept only serializable values.
+- Dynamic (non-literal) keys are unsupported and diagnosed; a static-key
+  workaround is suggested.
+
+Unsupported in v1 and recorded as deferred: session-scoped tier, the
+server-visible (cookie) tier, custom driver registration surface, cross-tab
+sync, and the pre-paint read flag.

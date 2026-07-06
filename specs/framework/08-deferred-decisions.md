@@ -19,6 +19,23 @@ their prerequisites exist:
 - Server functions / RPC story. See "TSRX Submodule Host Boundary (Decision
   Draft)" below for the submodule-shaped slice of this decision.
 - Scoped `<style>` blocks: ACCEPTED 2026-07-02, see `01-tsrx-host-contract.md`.
+- `storage()` extensions (core contract ACCEPTED 2026-07-05, see
+  `03-state-graph.md` "Device-durable state"): session-scoped tier; the
+  server-visible (cookie) tier including SSR `Set-Cookie` emission and the
+  zero-settle first paint it enables; custom driver registration surface
+  (`defineStorage`); cross-tab sync; the pre-paint read flag for
+  layout-affecting storage state on SSR pages; dynamic keys.
+- Ingress sources (external world → readonly graph cell): `media()` for
+  `matchMedia`-backed cells and a constrained generic bridge primitive. Until
+  then, the documented recipe is an `attach` behavior writing a `state()`
+  cell.
+- Function-exact runtime emission (accepted direction, researched 2026-07-05):
+  runtime authored as fine-grained functions; compiler emits per-route imports
+  of exactly the functions each route's records/constructs require; bundler
+  packs per-route chunks over a shared core; emitted-equals-required assertions
+  replace runtime capability gating; size walls tighten accordingly. Includes
+  migrating compiler-inlined helper strings in emitted modules to runtime
+  imports. See 06-runtime-resumer.md "Progressive runtime execution".
 - Devtools (graph visualization).
 - Strict no-inline CSP mode for the resumer, including external bootstrap
   emission, hash/nonce automation beyond caller-provided `renderToString`

@@ -199,6 +199,89 @@ inline classic script with a caller-provided nonce from
 detection, nonce discovery, hash generation, `eval`, `new Function`, or inline
 event-handler attributes.
 
+### Progressive runtime execution
+
+The runtime contract generalizes the inline resumer's discipline to the whole
+browser runtime: **execution is proportional to the user's action, never to the
+page's content or to the framework's feature set.** The fastest work is work
+that never runs; the runtime is architected so the necessary work for one
+interaction is the only work that interaction pays for.
+
+Load-time invariant: **the only code that executes at load is the inline
+resumer** (the bootstrap tier below, ~600 B class). Every external runtime
+module may be `modulepreload`ed — fetching is cheap and explicitly not the
+cost metric; fetched-but-unexecuted code costs no main-thread work. The cost
+metric for this contract is **executed bytes per action**.
+
+Three gates, in order:
+
+1. **Declared.** The payload's record inventory is the runtime capability
+   manifest. A runtime capability module (keyed-repeat identity, async
+   boundaries, sync-computed derivation, device storage, and future record
+   kinds) may load only when the container's payload declares records of that
+   kind. Pages without a record kind ship and load none of its runtime.
+2. **Demanded.** A loaded capability executes only when demanded: an
+   interaction dispatches a symbol, a graph write wakes subscribers of the
+   touched paths, a visible boundary needs its async value. Loading a module
+   because the payload declares it never executes feature work by itself;
+   wiring is bounded by the records present, execution by the writes and
+   events that actually occur.
+3. **Minimal per action.** The execution set of one interaction is: the
+   delegated listener walk, the sync-policy records for that target/event, the
+   symbol chain for that element/event, the graph writes it performs, and the
+   subscribers of exactly the written paths — plus the capability modules those
+   subscribers require. Nothing else executes. In particular: no capability
+   module executes for record kinds the action did not touch, no component
+   body executes ever, and the full runtime never executes as a unit at any
+   single moment unless one action genuinely touches every capability on the
+   page.
+
+Per-action execution granularity is a chunking requirement, not just a gating
+requirement: the runtime chunk graph must place dynamic-import boundaries
+between capabilities AND between sub-capability paths, finely enough that a
+simple action executes only a few-hundred-byte slice of runtime (a scalar
+counter click is the canonical case: event dispatch, one scalar write, one
+text update — a ~400 B-class execution set, never the whole event tier, never
+keyed-repeat/form-policy/async code the action did not touch).
+
+Tier model implied by the gates:
+
+- **Bootstrap** (the inline resumer above): listener installation and record
+  lookup only; its size targets are unchanged and load-bearing.
+- **Interaction tier**: decode-lean, locator materialization, event dispatch,
+  sync policy — enough for full correctness of first interactions while
+  heavier capabilities stream in behind the handoff gate.
+- **Capability modules**: one per record kind, payload-gated, independently
+  loadable because compile-time analysis (not a shared interpreter) carries
+  the semantics.
+
+Accepted end state (see 08-deferred-decisions.md): **function-exact runtime
+emission** — the runtime authored as fine-grained functions, the compiler
+emitting per-route imports of exactly the functions that route's records and
+constructs require, the bundler packing per-route chunks over a shared core.
+Capability modules are the current granularity; function-exact emission is the
+same contract at its limit and supersedes runtime capability checks with
+static, per-route truth.
+
+Verification contract:
+
+- Emitted-runtime size walls and per-chunk caps in the bundler fixture tests
+  guard total bloat regardless of chunking; chunk splitting must never be used
+  to hide runtime growth. Preloaded-bytes caps are not part of this contract:
+  budgets on fetch measure the wrong axis and must not be added or enforced as
+  execution proxies.
+- Per-action executed-bytes budgets in browser-mode tests are the primary
+  progressive-execution guard: after load, only the inline resumer has
+  executed; after one action, the executed runtime module set and its byte
+  total match that action's minimal path.
+- Browser-mode tests assert execution gating directly: after load, no
+  capability module has executed; after one interaction, only the touched
+  capability executed. Run-distribution (N-of-M) evidence is required for
+  runtime timing claims.
+- With function-exact emission, an emitted-equals-required assertion (the
+  function set in a route's output matches the set its constructs demand)
+  becomes the primary guard, and the size walls tighten to match.
+
 ### Resume behavior
 
 - One container-scoped delegated event listener (capture phase) from the resumer.
