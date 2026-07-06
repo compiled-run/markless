@@ -10,13 +10,14 @@ import type {
 import type {
 	EventOnlyResumeDomElement,
 	EventOnlyResumeSymbol,
-} from './event-only-resume.ts';
+} from './event-only-lean/types.ts';
 export type EventOnlyResumeGraph = {
 	read(graphNodeId: string, path?: ReadonlyArray<string>): unknown;
 	write(write: RuntimeGraphWrite): void;
 	update(update: RuntimeGraphUpdate): unknown;
 	call(call: RuntimeGraphCall): unknown;
 	flush(): Promise<void>;
+	materializeAll?(): Promise<void>;
 };
 type DirtyPath = {
 	readonly graphNodeId: string;
@@ -32,27 +33,50 @@ export async function createEventOnlyResumeGraph(input: {
 	readonly loadSymbol: (symbolId: string) => EventOnlyResumeSymbol | Promise<EventOnlyResumeSymbol>;
 	readonly root: EventOnlyResumeDomElement;
 	readonly elementsByHostId: ReadonlyMap<string, EventOnlyResumeDomElement>;
+	readonly resolveElementByHostId?: (hostNodeId: string) => Promise<EventOnlyResumeDomElement | undefined>;
 }): Promise<EventOnlyResumeGraph> {
 	const existingCells = input.root.__marklessEventOnlyGraph;
 	const cells = existingCells ?? new Map<string, unknown>();
+	const cellPayloads = new Map(input.state.cells.map((cell) => [cell.graphNodeId, cell.value]));
 	const dirtyPaths: DirtyPath[] = [];
 	if (!existingCells) {
-		for (const cell of input.state.cells) {
-			cells.set(
-				cell.graphNodeId,
-				cell.value === undefined
-					? undefined
-					: await decodeEventOnlyCellValue(cell.value as SerializedGraphPayload),
-			);
-		}
 		input.root.__marklessEventOnlyGraph = cells;
 	}
+	const materializeCell = (graphNodeId: string): void => {
+		if (cells.has(graphNodeId)) return;
+		const payload = cellPayloads.get(graphNodeId);
+		if (payload === undefined) {
+			cells.set(graphNodeId, undefined);
+			return;
+		}
+		const graphPayload = payload as SerializedGraphPayload;
+		if (graphPayload.records.length > 0) throw leanGraphEscalation(graphNodeId);
+		cells.set(graphNodeId, decodeScalarSlot(graphPayload.root));
+	};
+	const materializeAll = async (): Promise<void> => {
+		for (const [graphNodeId, payload] of cellPayloads) {
+			if (cells.has(graphNodeId)) continue;
+			cells.set(
+				graphNodeId,
+				payload === undefined
+					? undefined
+					: await decodeEventOnlyCellValue(payload as SerializedGraphPayload),
+			);
+		}
+	};
 	const graph: EventOnlyResumeGraph = {
 		read(graphNodeId, path = []) {
+			materializeCell(graphNodeId);
 			return readPath(cells.get(graphNodeId), path);
 		},
 		write(write) {
 			const path = write.path ?? [];
+			if (!cells.has(write.graphNodeId) && path.length === 0) {
+				cells.set(write.graphNodeId, write.value);
+				dirtyPaths.push({ graphNodeId: write.graphNodeId, path });
+				return;
+			}
+			materializeCell(write.graphNodeId);
 			const currentValue = readPath(cells.get(write.graphNodeId), path);
 			if (Object.is(currentValue, write.value)) return;
 			cells.set(write.graphNodeId, writePath(cells.get(write.graphNodeId), path, write.value));
@@ -60,6 +84,7 @@ export async function createEventOnlyResumeGraph(input: {
 		},
 		update(update) {
 			const path = update.path ?? [];
+			materializeCell(update.graphNodeId);
 			const currentValue = readPath(cells.get(update.graphNodeId), path);
 			const nextValue = update.update(currentValue);
 			if (!Object.is(currentValue, nextValue)) {
@@ -74,6 +99,7 @@ export async function createEventOnlyResumeGraph(input: {
 		},
 		call(call) {
 			const path = call.path ?? [];
+			materializeCell(call.graphNodeId);
 			const target = readPath(cells.get(call.graphNodeId), path) as
 				| Record<string, unknown>
 				| undefined;
@@ -101,11 +127,19 @@ export async function createEventOnlyResumeGraph(input: {
 					view: input.view,
 					loadSymbol: input.loadSymbol,
 					elementsByHostId: input.elementsByHostId,
+					resolveElementByHostId: input.resolveElementByHostId,
 				});
 			}
 		},
+		materializeAll,
 	};
 	return graph;
+}
+
+function leanGraphEscalation(graphNodeId: string): Error {
+	const error = new Error(`Event-only lean graph needs full decode for ${graphNodeId}.`);
+	(error as { code?: string }).code = 'MARKLESS_EVENT_ONLY_LEAN_ESCALATE';
+	return error;
 }
 async function decodeEventOnlyCellValue(payload: SerializedGraphPayload): Promise<unknown> {
 	if (payload.records.length === 0) return decodeScalarSlot(payload.root);
@@ -159,6 +193,7 @@ async function flushDomUpdates(input: {
 	readonly view: ProtocolViewPayload;
 	readonly loadSymbol: (symbolId: string) => EventOnlyResumeSymbol | Promise<EventOnlyResumeSymbol>;
 	readonly elementsByHostId: ReadonlyMap<string, EventOnlyResumeDomElement>;
+	readonly resolveElementByHostId?: (hostNodeId: string) => Promise<EventOnlyResumeDomElement | undefined>;
 }): Promise<void> {
 	const ranDomUpdates = new Set<string>();
 	for (const domUpdate of input.view.domUpdates) {
@@ -172,7 +207,9 @@ async function flushDomUpdates(input: {
 		const key = `${domUpdate.hostNodeId}\n${domUpdate.graphNodeId}\n${domUpdate.path.join('.')}`;
 		if (ranDomUpdates.has(key)) continue;
 		ranDomUpdates.add(key);
-		const element = input.elementsByHostId.get(domUpdate.hostNodeId);
+		const element =
+			input.elementsByHostId.get(domUpdate.hostNodeId) ??
+			(await input.resolveElementByHostId?.(domUpdate.hostNodeId));
 		if (!element) continue;
 		const symbol = await resolveSymbol(input.loadSymbol(domUpdate.symbolId));
 		const result = await resolveResult(

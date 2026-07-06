@@ -1,5 +1,5 @@
 import type { ProtocolViewPayload } from '@markless/serializer';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { createProtocolStatePayload, renderPayloadScripts } from '../../serializer/src/index.ts';
 import { resumeEventOnlyFromPayloadDocument } from '../src/event-only-resume.ts';
 
@@ -306,6 +306,122 @@ test('event-only resume dispatches lazy event symbols and flushes DOM update sym
 	expect(secondDefaultPrevented).toBe(false);
 	expect(secondResult.graph.read('state:count')).toBe(1);
 	expect(button.textContent).toBe('1');
+});
+
+test('event-only resume leaves unrelated locators dormant during dispatch', async () => {
+	const button = element('BUTTON');
+	const unused = element('SPAN');
+	const root = element('DIV', [button, unused]);
+	const state = createProtocolStatePayload({
+		cells: [{ graphNodeId: 'state:count', name: 'count', valueKind: 'scalar', value: 0 }],
+	});
+	const view: ProtocolViewPayload = {
+		version: 1,
+		locators: [
+			{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'div' },
+			{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'button' },
+			{ hostNodeId: 'h2', strategy: 'dom-order', index: 2, tagName: 'section' },
+		],
+		events: [{ hostNodeId: 'h1', eventName: 'click', symbolIds: ['symbol:event'] }],
+		domUpdates: [
+			{
+				hostNodeId: 'h1',
+				source: 'count',
+				graphNodeId: 'state:count',
+				path: [],
+				target: { kind: 'text' },
+				symbolId: 'symbol:text',
+			},
+		],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	const scripts = renderPayloadScripts({ state, view });
+
+	await expect(
+		resumeEventOnlyFromPayloadDocument({
+			document: payloadDocument(scripts.stateScript, scripts.viewScript),
+			root,
+			event: { type: 'click', target: button },
+			loadSymbol(symbolId) {
+				if (symbolId === 'symbol:event') {
+					return ({ graph }) => graph.write({ graphNodeId: 'state:count', value: 1 });
+				}
+				return ({ value }) => ({ type: 'setText', locator: 'h1', value });
+			},
+		}),
+	).resolves.toMatchObject({
+		view,
+	});
+	expect(button.textContent).toBe('1');
+});
+
+test('event-only resume does not invoke heavy value decode for untouched object cells', async () => {
+	vi.resetModules();
+	const heavyDecode = vi.fn(() => {
+		throw new Error('heavy decode should stay dormant');
+	});
+	vi.doMock('../../serializer/src/value-decode-client.ts', () => ({
+		deserializeGraphValueForClient: heavyDecode,
+	}));
+	const { resumeEventOnlyFromPayloadDocument } = await import('../src/event-only-resume.ts');
+	const button = element('BUTTON');
+	const root = element('DIV', [button]);
+	const state = createProtocolStatePayload({
+		cells: [
+			{ graphNodeId: 'state:count', name: 'count', valueKind: 'scalar', value: 0 },
+			{
+				graphNodeId: 'state:stamp',
+				name: 'stamp',
+				valueKind: 'object',
+				value: new Date('2026-01-15T00:00:00.000Z'),
+			},
+		],
+	});
+	const view: ProtocolViewPayload = {
+		version: 1,
+		locators: [
+			{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'div' },
+			{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'button' },
+		],
+		events: [{ hostNodeId: 'h1', eventName: 'click', symbolIds: ['symbol:event'] }],
+		domUpdates: [
+			{
+				hostNodeId: 'h1',
+				source: 'count',
+				graphNodeId: 'state:count',
+				path: [],
+				target: { kind: 'text' },
+				symbolId: 'symbol:text',
+			},
+		],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	const scripts = renderPayloadScripts({ state, view });
+
+	await resumeEventOnlyFromPayloadDocument({
+		document: payloadDocument(scripts.stateScript, scripts.viewScript),
+		root,
+		event: { type: 'click', target: button },
+		loadSymbol(symbolId) {
+			if (symbolId === 'symbol:event') {
+				return ({ graph }) => graph.update({
+					graphNodeId: 'state:count',
+					update(value) {
+						return Number(value) + 1;
+					},
+				});
+			}
+			return ({ value }) => ({ type: 'setText', locator: 'h1', value });
+		},
+	});
+
+	expect(heavyDecode).not.toHaveBeenCalled();
+	expect(button.textContent).toBe('1');
+	vi.doUnmock('../../serializer/src/value-decode-client.ts');
 });
 
 test('event-only resume skips sync policy when the inline resumer already applied it', async () => {
