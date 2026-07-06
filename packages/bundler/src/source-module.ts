@@ -152,7 +152,7 @@ export function emitResumeModule(input: {
 				)
 			: '',
 		routeSymbols ? 'export { marklessSsrLoadSymbolRoute as loadSymbol };' : '',
-		emitResumeContainerEvent(resumeSymbolLoader, input.needsFullResume ?? false, scalarLeanReplaced(input.runtimeDemandMap)),
+		emitResumeContainerEvent(resumeSymbolLoader, input.needsFullResume ?? false, leanResumeMode(input.runtimeDemandMap)),
 		'',
 	]
 		.filter((line): line is string => line !== null)
@@ -242,7 +242,7 @@ function emitCompiledAppDefault(input: {
 	].join('\n');
 }
 
-function emitResumeContainerEvent(loadSymbolName: string, needsFullResume: boolean, scalarLean: boolean): string {
+function emitResumeContainerEvent(loadSymbolName: string, needsFullResume: boolean, leanMode: LeanResumeMode): string {
 	const fullResumeHandoff = [
 		'async function marklessFullResumeHandoff(handoff) {',
 		'	handoff.root.__asyncResumeRuntimeStarted = true;',
@@ -266,11 +266,8 @@ function emitResumeContainerEvent(loadSymbolName: string, needsFullResume: boole
 			'}',
 		].join('\n');
 	}
-	if (scalarLean) {
-		return [
-			'export async function resumeContainerEvent(input) {',
-			"	const { resumeScalarEventFromPayloadDocument } = await import('@markless/web/event-only-lean/scalar-resume');",
-			'	await resumeScalarEventFromPayloadDocument({',
+	if (leanMode !== 'none') {
+		const leanInput = [
 			'		document: input.root,',
 			'		root: input.root,',
 			'		event: input.event,',
@@ -280,6 +277,30 @@ function emitResumeContainerEvent(loadSymbolName: string, needsFullResume: boole
 			'		syncPolicyAlreadyApplied: !!input.eventRecord,',
 			`		loadSymbol: ${loadSymbolName},`,
 			'	});',
+		];
+		const scalarCore = [
+			"	const { resumeScalarCoreEventFromPayloadDocument } = await import('@markless/web/event-only-lean/scalar-core');",
+			'	await resumeScalarCoreEventFromPayloadDocument({',
+			...leanInput,
+		];
+		const row = [
+			"	const { resumeScalarRowEventFromPayloadDocument } = await import('@markless/web/event-only-lean/row');",
+			'	await resumeScalarRowEventFromPayloadDocument({',
+			...leanInput,
+		];
+		if (leanMode === 'scalar') {
+			return ['export async function resumeContainerEvent(input) {', ...scalarCore, '}'].join('\n');
+		}
+		if (leanMode === 'row') {
+			return ['export async function resumeContainerEvent(input) {', ...row, '}'].join('\n');
+		}
+		return [
+			'export async function resumeContainerEvent(input) {',
+			'	if (input.eventRecord) {',
+			...scalarCore.map((line) => `	${line}`),
+			'		return;',
+			'	}',
+			...row,
 			'}',
 		].join('\n');
 	}
@@ -300,14 +321,18 @@ function emitResumeContainerEvent(loadSymbolName: string, needsFullResume: boole
 	].join('\n');
 }
 
-function scalarLeanReplaced(runtimeDemandMap: unknown): boolean {
+type LeanResumeMode = 'none' | 'scalar' | 'row' | 'mixed';
+
+function leanResumeMode(runtimeDemandMap: unknown): LeanResumeMode {
 	const recordKinds = (runtimeDemandMap as { readonly recordKinds?: ReadonlyArray<{ readonly kind: string; readonly replaced: boolean }> })?.recordKinds;
-	if (!recordKinds) return false;
+	if (!recordKinds) return 'none';
 	const replaced = new Map(recordKinds.map((record) => [record.kind, record.replaced]));
-	return replaced.get('dom-update') === true && (
-		replaced.get('event') === true ||
-		replaced.get('keyed-repeat') === true
-	);
+	const scalar = replaced.get('event') === true && replaced.get('dom-update') === true;
+	const row = replaced.get('keyed-repeat') === true && replaced.get('dom-update') === true;
+	if (scalar && row) return 'mixed';
+	if (scalar) return 'scalar';
+	if (row) return 'row';
+	return 'none';
 }
 
 function emitExecutionLogLoader(): string {

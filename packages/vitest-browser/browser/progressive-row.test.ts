@@ -35,7 +35,9 @@ test('progressive execution: qualifying row dispatch stays on the lean keyed-rep
 	const executed = executedModules();
 	const allowed = deriveAllowedModules(view, rowMixedRuntimeDemandMap, rowAction);
 	expect(forbiddenExecutedModules(executed, allowed)).toEqual([]);
-	expect(executed).toContain('web/event-only-lean/scalar-resume');
+	expect(executed).toContain('web/event-only-lean/row');
+	expect(executed).not.toContain('web/event-only-lean/scalar-core');
+	expect(executed).not.toContain('web/event-only-lean/scalar-resume');
 	expect(executed).toContain('web/resume-keyed-repeats');
 	expect(executed).not.toContain('web/resume-async-boundaries');
 	expect(executed).not.toContain('web/resume-branches');
