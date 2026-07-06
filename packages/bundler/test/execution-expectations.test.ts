@@ -64,15 +64,8 @@ test('keyed repeat row actions allow render-module catalog helper imports', asyn
 			import { state } from '@markless/core';
 			export function Rows() @{
 				let selected = state('none');
-				const rows = state([{ id: 'a', label: 'Alpha' }]);
-				<section>
-					@for (const row of rows; key row.id) {
-						<article>
-							<button onClick={() => selected = row.id}>{row.label}</button>
-						</article>
-					}
-					<output>{selected}</output>
-				</section>
+				let rows = state([]);
+				<main><section>@for (const row of rows; key row.id) {<article><button onClick={() => selected = row.id}>Choose</button></article>}</section></main>
 			}
 		`,
 	});
