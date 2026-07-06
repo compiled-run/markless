@@ -76,3 +76,20 @@ test('payload-full keeps heavy resume dependencies behind dynamic gates', async 
 		);
 	}
 });
+
+test('resume runtime split points keep capability code in separate modules', async () => {
+	const runtimeSource = await readSource('../src/resume-runtime.ts');
+	const asyncWiringSource = await readSource('../src/resume-async-wiring.ts');
+	const sharedPatchSource = await readSource('../src/resume-shared-patch.ts');
+	const syncDemandSource = await readSource('../src/resume-sync-demand.ts');
+
+	expect(runtimeSource).toContain("import('./resume-async-wiring.ts')");
+	expect(runtimeSource).toContain("import('./resume-shared-patch.ts')");
+	expect(runtimeSource).toContain("import('./resume-sync-demand.ts')");
+	expect(runtimeSource).not.toContain('function wireAsyncBoundariesWithoutLoadingCapability');
+	expect(runtimeSource).not.toContain('function receiveSharedPatch');
+	expect(runtimeSource).not.toContain('function wireSyncComputedDemandTriggersWithoutLoadingCapability');
+	expect(asyncWiringSource).toContain('settleAsyncBoundaryRange');
+	expect(sharedPatchSource).toContain('receiveSharedPatch');
+	expect(syncDemandSource).toContain('wireSyncComputedDemandTriggersWithoutLoadingCapability');
+});

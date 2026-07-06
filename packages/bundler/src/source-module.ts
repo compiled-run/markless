@@ -19,6 +19,10 @@ export function symbolVirtualModuleId(filename: string, symbolId: string) {
 	return `${MARKLESS_VIRTUAL_PREFIX}symbol:${encodeURIComponent(filename)}:${encodeURIComponent(symbolId)}`;
 }
 
+export function resumeVirtualModuleId(filename: string) {
+	return `${MARKLESS_VIRTUAL_PREFIX}resume:${encodeURIComponent(filename)}`;
+}
+
 export function scopedSymbolExportName(filename: string, exportName: string) {
 	return `${exportName}_${stringHash(filename)}`;
 }
@@ -58,11 +62,7 @@ export function emitSourceModule(input: {
 }) {
 	const symbolsOnly = input.environment === 'client' && input.clientOutput === 'symbols-only';
 	const routeSymbols = input.environment === 'client' && input.symbolRoutes.length > 0;
-	const resumeSymbolLoader = routeSymbols ? 'marklessSsrLoadSymbolRoute' : 'loadSymbol';
 	return [
-		input.environment === 'server'
-			? ''
-			: "import { resumeEventOnlyFromPayloadDocument } from '@markless/core/web/event-only-resume';",
 		symbolsOnly
 			? ''
 			: `import { state as payloadState, view as payloadView } from '${input.payloadId}';`,
@@ -71,9 +71,6 @@ export function emitSourceModule(input: {
 		routeSymbols ? 'const marklessLoadLocalSymbol = loadSymbol;' : '',
 		symbolsOnly && !routeSymbols ? 'export { loadSymbol };' : '',
 		symbolsOnly ? '' : 'export { payloadView };',
-		input.environment === 'server'
-			? ''
-			: emitResumeContainerEvent(resumeSymbolLoader, input.needsFullResume ?? false),
 		'',
 		input.environment === 'server' || symbolsOnly ? '' : input.publicRenderModuleSource,
 		input.environment === 'server' || symbolsOnly ? '' : input.publicCsrModuleSource,
@@ -95,6 +92,36 @@ export function emitSourceModule(input: {
 					csrExportName: input.publicRenderCsrExportName,
 					ssrExportName: input.publicRenderSsrExportName,
 				}),
+		'',
+	]
+		.filter((line): line is string => line !== null)
+		.join('\n');
+}
+
+export function emitResumeModule(input: {
+	readonly resolverId: string;
+	readonly needsFullResume?: boolean;
+	readonly symbols: ReadonlyArray<SourceSymbolRow>;
+	readonly symbolRoutes: ReadonlyArray<SourceSymbolRoute>;
+}) {
+	const routeSymbols = input.symbolRoutes.length > 0;
+	const resumeSymbolLoader = routeSymbols ? 'marklessSsrLoadSymbolRoute' : 'loadSymbol';
+	return [
+		input.needsFullResume
+			? ''
+			: "import { resumeEventOnlyFromPayloadDocument } from '@markless/core/web/event-only-resume';",
+		'',
+		emitLoadSymbol(input),
+		routeSymbols ? 'const marklessLoadLocalSymbol = loadSymbol;' : '',
+		routeSymbols
+			? emitLazySymbolRouteFunction(
+					input.symbolRoutes,
+					'marklessSsrLoadSymbolRoute',
+					'marklessLoadLocalSymbol',
+				)
+			: '',
+		routeSymbols ? 'export { marklessSsrLoadSymbolRoute as loadSymbol };' : '',
+		emitResumeContainerEvent(resumeSymbolLoader, input.needsFullResume ?? false),
 		'',
 	]
 		.filter((line): line is string => line !== null)

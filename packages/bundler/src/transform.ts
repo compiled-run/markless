@@ -7,14 +7,16 @@ import type {
 } from './types.ts';
 import {
 	MARKLESS_VIRTUAL_PREFIX,
+	emitResumeModule,
 	emitSourceModule,
 	payloadModule,
+	resumeVirtualModuleId,
 	rewriteSymbolModuleExport,
 	scopedSymbolExportName,
 	symbolVirtualModuleId,
 } from './source-module.ts';
 
-export { MARKLESS_VIRTUAL_PREFIX } from './source-module.ts';
+export { MARKLESS_VIRTUAL_PREFIX, resumeVirtualModuleId } from './source-module.ts';
 
 export async function transformTsrxModule(
 	input: TransformTsrxModuleInput,
@@ -22,6 +24,7 @@ export async function transformTsrxModule(
 	const encodedFilename = encodeURIComponent(input.filename);
 	const payloadId = `${MARKLESS_VIRTUAL_PREFIX}payload:${encodedFilename}`;
 	const resolverId = `${MARKLESS_VIRTUAL_PREFIX}resolver:${encodedFilename}`;
+	const resumeId = resumeVirtualModuleId(input.filename);
 	const compiled = await compileTsrxModule({
 		filename: input.filename,
 		source: input.source,
@@ -69,6 +72,20 @@ export async function transformTsrxModule(
 			id: resolverId,
 			type: 'resolver',
 			source: resolverSource,
+		},
+		{
+			id: resumeId,
+			type: 'resume',
+			source: emitResumeModule({
+				resolverId,
+				needsFullResume:
+					(compiled.protocolView.branches?.length ?? 0) > 0 ||
+					(compiled.protocolView.keyedRepeats?.length ?? 0) > 0 ||
+					compiled.protocolView.elementHandles.length > 0 ||
+					compiled.protocolView.asyncBoundaries.length > 0,
+				symbols: symbolRows,
+				symbolRoutes,
+			}),
 		},
 		...compiled.symbolModules.modules.map(
 			(module, index): MarklessVirtualModule => ({

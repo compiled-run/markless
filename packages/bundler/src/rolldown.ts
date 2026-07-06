@@ -1,6 +1,6 @@
 import type { InputOptions, Plugin } from 'rolldown';
-import { isAbsolute, relative, resolve } from 'pathe';
-import { joinURL, parsePath, withQuery, withoutLeadingSlash } from 'ufo';
+import { isAbsolute, resolve } from 'pathe';
+import { joinURL, parsePath } from 'ufo';
 import { type MarklessBuildMetadataBundle, createBuildMetadata } from './build/build-metadata.ts';
 import { MARKLESS_BUILD_PREFIX, MARKLESS_BUNDLE_GRAPH, outputDefaults } from './build/chunking.ts';
 import { collectModulePreloadInjections, injectHeadLinks } from './build/head-links.ts';
@@ -12,7 +12,7 @@ import {
 } from './build/symbol-facade-cleanup.ts';
 import { rewriteGeneratedSymbolTableUrls } from './build/symbol-table.ts';
 import { createMarklessDevGraph } from './dev.ts';
-import { MARKLESS_VIRTUAL_PREFIX, transformTsrxModule } from './transform.ts';
+import { MARKLESS_VIRTUAL_PREFIX, resumeVirtualModuleId, transformTsrxModule } from './transform.ts';
 import type {
 	MarklessEnvironment,
 	MarklessRolldownOptions,
@@ -175,7 +175,10 @@ export function createMarklessRolldownPlugin(input: {
 						: undefined,
 				resumeModuleUrl:
 					internalOptions.dev === true && currentEnvironment === 'server'
-						? devBrowserSourceModuleUrl(source, getRoot(), internalOptions.publicPath)
+						? devBrowserVirtualModuleUrl(
+								resumeVirtualModuleId(source),
+								internalOptions.publicPath,
+							)
 						: undefined,
 			});
 			registerTransformArtifacts({
@@ -190,7 +193,9 @@ export function createMarklessRolldownPlugin(input: {
 
 			if (currentEnvironment === 'client' && !internalOptions.dev) {
 				for (const module of transformed.virtualModules.filter(
-					(item) => item.type === 'symbol',
+					(item) =>
+						item.type === 'symbol' ||
+						(item.type === 'resume' && clientSymbolEntrySources.has(source)),
 				)) {
 					this.emitFile({
 						type: 'chunk',
@@ -376,24 +381,6 @@ function devBrowserVirtualModuleUrl(
 ) {
 	const path = joinURL('@id', resolveVirtualId(virtualId).replace('\0', '__x00__'));
 	return publicPath ? publicPath(path) : joinURL('/', path);
-}
-
-function devBrowserSourceModuleUrl(
-	source: string,
-	root: string | undefined,
-	publicPath: ((fileName: string) => string) | undefined,
-) {
-	const relativeSource = root ? relative(root, source) : '';
-	const fileName =
-		root && isRootRelativePath(relativeSource)
-			? relativeSource
-			: joinURL('@fs', withoutLeadingSlash(source));
-	const path = withQuery(fileName, { import: null });
-	return publicPath ? publicPath(path) : joinURL('/', path);
-}
-
-function isRootRelativePath(path: string): boolean {
-	return path !== '' && path !== '..' && !path.startsWith('../') && !isAbsolute(path);
 }
 
 function clientSymbolEntries(input: unknown, root: string | undefined): string[] {

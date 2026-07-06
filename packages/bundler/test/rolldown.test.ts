@@ -119,7 +119,7 @@ describe('TSRX Rolldown plugin structure', () => {
 		expect(result.code).toContain('export default marklessCompiledApp;');
 		expect(result.code).not.toContain('source: marklessSource');
 		expect(result.virtualModules.map((item) => item.type)).toEqual(
-			expect.arrayContaining(['payload', 'resolver', 'symbol']),
+			expect.arrayContaining(['payload', 'resolver', 'resume', 'symbol']),
 		);
 		expect(result.manifest.source).toBe('/workspace/app/src/App.tsrx');
 		expect(result.manifest.symbols).toContainEqual(
@@ -158,6 +158,8 @@ describe('TSRX Rolldown plugin structure', () => {
 		});
 
 		expect(result.code).toContain('renderCsr: App,');
+		expect(result.code).not.toContain('resumeEventOnlyFromPayloadDocument');
+		expect(result.code).not.toContain('resumeContainerEvent');
 		expect(result.code).not.toContain('preloadCsrLazySymbols');
 		expect(result.code).not.toContain('bundle-graph.json');
 		expect(result.code).not.toContain('@markless/core/preload');
@@ -202,10 +204,12 @@ let count = state(0);
 			clientOutput: 'symbols-only',
 		});
 
-		expect(result.code).toContain('export async function resumeContainerEvent');
+		const resumeModule = result.virtualModules.find((module) => module.type === 'resume');
+		expect(result.code).not.toContain('export async function resumeContainerEvent');
+		expect(resumeModule?.source).toContain('export async function resumeContainerEvent');
 		expect(result.code).toContain('export { marklessSsrLoadSymbolRoute as loadSymbol };');
 		expect(result.code).toContain('function marklessSsrLoadSymbolRoute(symbolId)');
-		expect(result.code).toContain('loadSymbol: marklessSsrLoadSymbolRoute,');
+		expect(resumeModule?.source).toContain('loadSymbol: marklessSsrLoadSymbolRoute,');
 		expect(result.code).not.toContain('function marklessResumeLoadSymbol');
 		expect(result.code).toContain('import("./Child.tsrx?markless-symbols")');
 		expect(result.code).toContain("import('virtual:markless:symbol:");
@@ -230,8 +234,10 @@ let count = state(0);
 			environment: 'client',
 		});
 
-		expect(result.code).toContain('export async function resumeContainerEvent');
-		expect(result.code).toContain('loadSymbol: marklessSsrLoadSymbolRoute,');
+		const resumeModule = result.virtualModules.find((module) => module.type === 'resume');
+		expect(result.code).not.toContain('export async function resumeContainerEvent');
+		expect(resumeModule?.source).toContain('export async function resumeContainerEvent');
+		expect(resumeModule?.source).toContain('loadSymbol: marklessSsrLoadSymbolRoute,');
 		expect(result.code).toContain('const marklessLoadLocalSymbol = loadSymbol;');
 		expect(result.code).toContain('function marklessSsrLoadSymbolRoute(symbolId)');
 		expect(result.code).toContain('import("./Child.tsrx?markless-symbols")');
@@ -251,7 +257,7 @@ let count = state(0);
 			code: string;
 		};
 
-		expect(result.code).toContain('export async function resumeContainerEvent');
+		expect(result.code).not.toContain('export async function resumeContainerEvent');
 		expect(result.code).not.toContain('document.createElement');
 		expect(result.code).not.toContain('export default App;');
 	});
@@ -278,7 +284,7 @@ let active = state(true);
 			source,
 		});
 
-		expect(result.code).toContain('export async function resumeContainerEvent');
+		expect(result.code).not.toContain('export async function resumeContainerEvent');
 		expect(result.code).not.toContain('export function render(');
 		expect(result.code).not.toContain('export function renderToString(');
 	});
@@ -359,12 +365,16 @@ let active = state(true);
 		const encoded = encodeURIComponent('/workspace/app/src/App.tsrx');
 		const payloadId = `virtual:markless:payload:${encoded}`;
 		const resolverId = `virtual:markless:resolver:${encoded}`;
+		const resumeId = `virtual:markless:resume:${encoded}`;
 
 		expect(result.code).toContain('virtual:markless:payload:');
 		expect(payloadId).toBeTruthy();
 		expect(resolverId).toBeTruthy();
 		expect(await callResolveId(plugin, payloadId!)).toEqual(
 			expect.objectContaining({ id: `\0${payloadId}` }),
+		);
+		expect(await callResolveId(plugin, resumeId)).toEqual(
+			expect.objectContaining({ id: `\0${resumeId}` }),
 		);
 		const payloadSource = (await callLoad(plugin, `\0${payloadId}`)) as string;
 		expect(payloadSource).toContain('export const state =');
@@ -373,6 +383,9 @@ let active = state(true);
 		expect(payloadSource).not.toContain('export default');
 		const resolverSource = (await callLoad(plugin, `\0${resolverId}`)) as string;
 		expect(resolverSource).toContain('if (id === "symbol:0")');
+		const resumeSource = (await callLoad(plugin, `\0${resumeId}`)) as string;
+		expect(resumeSource).toContain('export async function resumeContainerEvent');
+		expect(resumeSource).toContain('resumeEventOnlyFromPayloadDocument');
 		const symbolIds = ['symbol:0', 'symbol:1'].map(
 			(symbolId) => `virtual:markless:symbol:${encoded}:${encodeURIComponent(symbolId)}`,
 		);
@@ -448,6 +461,7 @@ let active = state(true);
 		const entryVirtualIds = [
 			`virtual:markless:payload:${encoded}`,
 			`virtual:markless:resolver:${encoded}`,
+			`virtual:markless:resume:${encoded}`,
 		];
 		const resolverId = `virtual:markless:resolver:${encoded}`;
 		const resolverSource = (await callLoad(plugin, `\0${resolverId}`)) as string;
@@ -550,7 +564,9 @@ export function App() @{
 `,
 		environment: 'client',
 	});
-	expect(plain.code).toContain('resumeEventOnlyFromPayloadDocument');
+	const plainResume = plain.virtualModules.find((module) => module.type === 'resume');
+	expect(plain.code).not.toContain('resumeEventOnlyFromPayloadDocument');
+	expect(plainResume?.source).toContain('resumeEventOnlyFromPayloadDocument');
 	expect(plain.code).not.toContain(
 		"import { resumeFromPayloadDocument } from '@markless/core/web/resume';",
 	);
@@ -578,11 +594,13 @@ export function App() @{
 `,
 		environment: 'client',
 	});
-	// Row events need graph subscriptions and locals dispatch: the static entry
-	// wires event-only first, then dynamically hands off to the full runtime.
-	expect(keyed.code).toContain('resumeEventOnlyFromPayloadDocument');
-	expect(keyed.code).toContain('resumeFromPayloadDocument');
-	expect(keyed.code).toContain("import('@markless/core/web/resume')");
+	// Row events need graph subscriptions and locals dispatch: the resume entry
+	// dynamically hands off to the full runtime.
+	const keyedResume = keyed.virtualModules.find((module) => module.type === 'resume');
+	expect(keyed.code).not.toContain('resumeEventOnlyFromPayloadDocument');
+	expect(keyed.code).not.toContain('resumeFromPayloadDocument');
+	expect(keyedResume?.source).toContain('resumeFromPayloadDocument');
+	expect(keyedResume?.source).toContain("import('@markless/core/web/resume')");
 	expect(keyed.code).not.toContain(
 		"import { resumeFromPayloadDocument } from '@markless/core/web/resume';",
 	);
@@ -605,9 +623,11 @@ export function App() @{
 		environment: 'client',
 	});
 	// Element handles materialize only after the dynamic full-runtime handoff.
-	expect(handles.code).toContain('resumeEventOnlyFromPayloadDocument');
-	expect(handles.code).toContain('resumeFromPayloadDocument');
-	expect(handles.code).toContain("import('@markless/core/web/resume')");
+	const handlesResume = handles.virtualModules.find((module) => module.type === 'resume');
+	expect(handles.code).not.toContain('resumeEventOnlyFromPayloadDocument');
+	expect(handles.code).not.toContain('resumeFromPayloadDocument');
+	expect(handlesResume?.source).toContain('resumeFromPayloadDocument');
+	expect(handlesResume?.source).toContain("import('@markless/core/web/resume')");
 	expect(handles.code).not.toContain(
 		"import { resumeFromPayloadDocument } from '@markless/core/web/resume';",
 	);
@@ -632,9 +652,11 @@ export function App() @{
 		environment: 'client',
 	});
 	// Async boundary settle and revalidation live behind the dynamic full-runtime handoff.
-	expect(boundaries.code).toContain('resumeEventOnlyFromPayloadDocument');
-	expect(boundaries.code).toContain('resumeFromPayloadDocument');
-	expect(boundaries.code).toContain("import('@markless/core/web/resume')");
+	const boundariesResume = boundaries.virtualModules.find((module) => module.type === 'resume');
+	expect(boundaries.code).not.toContain('resumeEventOnlyFromPayloadDocument');
+	expect(boundaries.code).not.toContain('resumeFromPayloadDocument');
+	expect(boundariesResume?.source).toContain('resumeFromPayloadDocument');
+	expect(boundariesResume?.source).toContain("import('@markless/core/web/resume')");
 	expect(boundaries.code).not.toContain(
 		"import { resumeFromPayloadDocument } from '@markless/core/web/resume';",
 	);
@@ -658,7 +680,9 @@ export function Shell() @{
 	});
 	// Child components alone are not payload records. The served payload
 	// inventory decides whether the event-only tier can handle the page.
-	expect(withChild.code).toContain('resumeEventOnlyFromPayloadDocument');
+	const withChildResume = withChild.virtualModules.find((module) => module.type === 'resume');
+	expect(withChild.code).not.toContain('resumeEventOnlyFromPayloadDocument');
+	expect(withChildResume?.source).toContain('resumeEventOnlyFromPayloadDocument');
 	expect(withChild.code).not.toContain('loadFullResume: marklessFullResumeHandoff');
 	expect(withChild.code).not.toContain("import('@markless/core/web/resume')");
 	expect(withChild.code).not.toContain(
