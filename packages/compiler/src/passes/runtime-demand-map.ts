@@ -21,6 +21,7 @@ const SCALAR_LEAN_DISPATCH_CORE = [
 	'web/fns/resolve-result',
 	'web/fns/scalar-core-graph',
 	'web/fns/sync-policy-graph-ids',
+	'web/event-only-lean/lean-shared',
 ];
 const ROW_LEAN_DISPATCH_CORE = [
 	'web/event-only-lean/row',
