@@ -93,6 +93,10 @@ function structurallyReachableGroups(
 ): Set<Exclude<ModuleGroup, 'dispatch-core'>> {
 	const groups = new Set<Exclude<ModuleGroup, 'dispatch-core'>>();
 	if (requiresFullRuntimeTier(inventory)) groups.add('full-tier-dispatch-core');
+	// PM ruling for spec 06 gate 2: branch wiring is bounded by declared
+	// branch records and wires eagerly after write-demand broke arm-event
+	// wiring twice. Async and behavior capabilities stay demand-gated.
+	if ((inventory.branches?.length ?? 0) > 0) groups.add('branch');
 	const matchingEvent = (inventory.events ?? []).find(
 		(event) => event.hostNodeId === action.hostNodeId && event.eventName === action.eventName,
 	);
@@ -125,7 +129,6 @@ function structurallyReachableGroups(
 				arm.events?.some((event) => event.eventName === action.eventName)
 			) groups.add('branch');
 			if (arm.domUpdates?.length) groups.add('dom-update');
-			if (arm.behaviors?.length) groups.add('behavior');
 			if (arm.elementHandles?.length) groups.add('full-resume-core');
 		}
 	}

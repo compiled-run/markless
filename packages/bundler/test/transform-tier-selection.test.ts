@@ -46,6 +46,8 @@ test('payload tier selection does not escalate on component edges alone', async 
 	});
 
 	expect(result.code).toContain('resumeEventOnlyFromPayloadDocument');
-	expect(result.code).not.toContain('resumeFromPayloadDocument');
-	expect(result.code).not.toContain("import('@markless/core/web/resume')");
+	expect(result.code).toContain('loadFullResume: marklessFullResumeHandoff');
+	expect(result.code).not.toContain(
+		"import { resumeFromPayloadDocument } from '@markless/core/web/resume';",
+	);
 });

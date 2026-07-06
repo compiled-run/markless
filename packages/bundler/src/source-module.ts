@@ -166,24 +166,31 @@ function emitCompiledAppDefault(input: {
 }
 
 function emitResumeContainerEvent(loadSymbolName: string, needsFullResume: boolean): string {
+	const fullResumeHandoff = [
+		'async function marklessFullResumeHandoff(handoff) {',
+		'	handoff.root.__asyncResumeRuntimeStarted = true;',
+		"	const { resumeFromPayloadDocument } = await import('@markless/core/web/resume');",
+		'	const { runtime } = await resumeFromPayloadDocument({',
+		'		document: handoff.document,',
+		'		root: handoff.root,',
+		`		loadSymbol: ${loadSymbolName},`,
+		'	});',
+		'	await runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: true });',
+		'}',
+	].join('\n');
 	if (needsFullResume) {
 		// Branch flips need graph subscriptions and range replacement: start the
 		// full resume runtime once, mark the container so the inline resumer
 		// steps aside, and dispatch the pending event through the runtime.
 		return [
+			fullResumeHandoff,
 			'export async function resumeContainerEvent(input) {',
-			'	input.root.__asyncResumeRuntimeStarted = true;',
-			"	const { resumeFromPayloadDocument } = await import('@markless/core/web/resume');",
-			'	const { runtime } = await resumeFromPayloadDocument({',
-			'		document: input.root,',
-			'		root: input.root,',
-			`		loadSymbol: ${loadSymbolName},`,
-			'	});',
-			'	await runtime.dispatch(input.event, { syncPolicyAlreadyApplied: true });',
+			'	await marklessFullResumeHandoff({ ...input, document: input.root });',
 			'}',
 		].join('\n');
 	}
 	return [
+		fullResumeHandoff,
 		'export async function resumeContainerEvent(input) {',
 		'	await resumeEventOnlyFromPayloadDocument({',
 		'		document: input.root,',
@@ -193,6 +200,7 @@ function emitResumeContainerEvent(loadSymbolName: string, needsFullResume: boole
 		'		eventRecord: input.eventRecord,',
 		'		syncPolicyAlreadyApplied: !!input.eventRecord,',
 		`		loadSymbol: ${loadSymbolName},`,
+		'		loadFullResume: marklessFullResumeHandoff,',
 		'	});',
 		'}',
 	].join('\n');
