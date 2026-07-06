@@ -14,6 +14,9 @@ export function executedModulesPlugin(): Plugin {
 			return {
 				code:
 					`(globalThis.__marklessExecutedModules ??= new Set()).add(${JSON.stringify(normalized)});\n` +
+					// Mirror into the DOM so witness boxes (no page.evaluate API) can read execution
+					// state through page.content(). Test builds only; guarded for non-DOM contexts.
+					`typeof document !== 'undefined' && document.documentElement && document.documentElement.setAttribute('data-markless-executed', [...globalThis.__marklessExecutedModules].sort().join(' '));\n` +
 					code,
 				map: null,
 			};

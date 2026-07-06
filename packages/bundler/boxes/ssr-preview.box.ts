@@ -58,7 +58,7 @@ export default box(
 		const page = await preview.browser.visit('/');
 
 		await expect.page.text(page, COUNTER, '0', WAIT);
-		const loadExecuted = await readExecutedModules(page);
+		const loadExecuted = executedFromHtml(await page.content());
 		if (loadExecuted.length > 0) {
 			throw new Error(
 				`Expected SSR preview load to execute zero runtime modules, but saw: ${loadExecuted.join(', ')}`,
@@ -76,7 +76,10 @@ export default box(
 
 		await page.click(COUNTER, WAIT);
 		await expect.page.text(page, COUNTER, '1', WAIT);
-		const { view, action, executed } = await readCounterExecution(page);
+		const clickedHtml = await page.content();
+		const executed = executedFromHtml(clickedHtml);
+		const view = viewPayloadFromHtml(clickedHtml);
+		const action = counterClickAction(view);
 		const allowed = deriveAllowedModules(view, action);
 		const forbidden = forbiddenExecutedModules(executed, allowed);
 		if (forbidden.length > 0) {
@@ -104,10 +107,6 @@ type ScriptRequestLog = {
 
 type Requestable = {
 	request(path: string): Promise<string>;
-};
-
-type BrowserPage = {
-	evaluate<T>(callback: () => T | Promise<T>): Promise<T>;
 };
 
 function assertHtmlHasPreloadsWithoutExternalScripts(html: string): void {
@@ -158,45 +157,11 @@ function assertStartupPreloadsFetched(
 	return [...new Set(log.scripts.filter((script) => expectedPathSet.has(script)))];
 }
 
-async function readExecutedModules(page: BrowserPage): Promise<string[]> {
-	return page.evaluate(() => {
-		const runtimeGlobal = globalThis as typeof globalThis & {
-			__marklessExecutedModules?: Set<string>;
-		};
-		return [...(runtimeGlobal.__marklessExecutedModules ?? new Set())].sort();
-	});
-}
 
-async function readCounterExecution(page: BrowserPage): Promise<{
-	readonly view: PayloadRecordInventory;
-	readonly action: { readonly hostNodeId: string; readonly eventName: string; readonly syncPolicy?: unknown };
-	readonly executed: readonly string[];
-}> {
-	return page.evaluate(() => {
-		const root = document.querySelector<HTMLElement>('[data-async-container]');
-		const counter = document.querySelector<HTMLElement>('[data-counter]');
-		const script = root?.querySelector<HTMLScriptElement>('script[type="markless/view"]');
-		if (!root || !counter || !script) {
-			throw new Error('Expected resumed counter root, button, and view payload.');
-		}
-		const runtimeGlobal = globalThis as typeof globalThis & {
-			__marklessExecutedModules?: Set<string>;
-		};
-		const view = JSON.parse(script.textContent ?? 'null') as PayloadRecordInventory;
-		const elements = [root, ...Array.from(root.querySelectorAll<HTMLElement>('*'))];
-		const index = elements.indexOf(counter);
-		const hostNodeId = view.locators?.find((locator) => locator.index === index)?.hostNodeId;
-		const record = view.events?.find(
-			(event) => event.hostNodeId === hostNodeId && event.eventName === 'click',
-		);
-		if (!hostNodeId || !record) throw new Error(`Expected counter click record at DOM index ${index}.`);
-		return {
-			view,
-			action: { hostNodeId, eventName: 'click', syncPolicy: record.syncPolicy },
-			executed: [...(runtimeGlobal.__marklessExecutedModules ?? new Set())].sort(),
-		};
-	});
-}
+
+
+
+
 
 function assertRuntimeSizeBudget(report: RuntimeSizeReport): void {
 	const largestRuntimeChunk = report.largestRuntimeChunk?.gzipBytes ?? 0;
@@ -213,4 +178,27 @@ function assertRuntimeSizeBudget(report: RuntimeSizeReport): void {
 			`SSR preloaded runtime chunks still include the Vite preload helper: ${chunksWithVitePreloadHelper.join(', ')}\n${report.summary}`,
 		);
 	}
+}
+
+function executedFromHtml(html: string): string[] {
+	const match = html.match(/data-markless-executed="([^"]*)"/);
+	return match && match[1] ? match[1].split(' ').filter(Boolean).sort() : [];
+}
+
+function viewPayloadFromHtml(html: string): PayloadRecordInventory {
+	const match = html.match(/<script type="markless\/view"[^>]*>([\s\S]*?)<\/script>/);
+	if (!match) throw new Error('Expected markless/view payload in resumed page HTML.');
+	return JSON.parse(match[1]) as PayloadRecordInventory;
+}
+
+function counterClickAction(view: PayloadRecordInventory): {
+	readonly hostNodeId: string;
+	readonly eventName: string;
+	readonly syncPolicy?: unknown;
+} {
+	const clicks = (view.events ?? []).filter((event) => event.eventName === 'click');
+	if (clicks.length !== 1) {
+		throw new Error(`Expected exactly one click event record in the preview fixture, saw ${clicks.length}.`);
+	}
+	return { hostNodeId: clicks[0].hostNodeId, eventName: 'click', syncPolicy: clicks[0].syncPolicy };
 }
