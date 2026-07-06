@@ -60,6 +60,7 @@ export const MODULE_GROUPS: Record<ModuleGroup, ReadonlySet<string>> = {
 		'web/resume-runtime',
 		// T007e/h/i/j file splits of resume-runtime/payload-full — same plane, new names:
 		'web/resume-runtime-shared',
+		'web/resume-runtime-start',
 		'web/resume-events',
 		'web/payload-full',
 		'web/payload-resume',
