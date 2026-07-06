@@ -195,10 +195,11 @@ function counterClickAction(view: PayloadRecordInventory): {
 	readonly hostNodeId: string;
 	readonly eventName: string;
 	readonly syncPolicy?: unknown;
+	readonly executionLog?: boolean;
 } {
 	const clicks = (view.events ?? []).filter((event) => event.eventName === 'click');
 	if (clicks.length !== 1) {
 		throw new Error(`Expected exactly one click event record in the preview fixture, saw ${clicks.length}.`);
 	}
-	return { hostNodeId: clicks[0].hostNodeId, eventName: 'click', syncPolicy: clicks[0].syncPolicy };
+	return { hostNodeId: clicks[0].hostNodeId, eventName: 'click', syncPolicy: clicks[0].syncPolicy, executionLog: true };
 }

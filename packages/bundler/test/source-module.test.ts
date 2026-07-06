@@ -63,3 +63,12 @@ test('emitSourceModule keeps event-only entries out of the full-runtime graph', 
 		"import { resumeFromPayloadDocument } from '@markless/core/web/resume';",
 	);
 });
+
+test('emitResumeModule emits the execution log loader only when logging is enabled', () => {
+	expect(emitResumeModule({ ...baseInput, executionLog: 'auto' })).toContain(
+		'globalThis.__mxLoadLog ||= () => import("virtual:markless:dev-log");',
+	);
+	expect(emitResumeModule({ ...baseInput, executionLog: 'never' })).not.toContain(
+		'virtual:markless:dev-log',
+	);
+});

@@ -38,6 +38,7 @@ type EventOnlyResumeContainerState = EventOnlyResumeContainer & {
 type FullResumeHandoffInput = ResumeEventOnlyFromPayloadDocumentInput & { readonly loadFullResume?: (input: ResumeEventOnlyFromPayloadDocumentInput) => unknown };
 type ExecutionLogGlobal = typeof globalThis & {
 	__mxLog?: Set<string>;
+	__mxLoadLog?: () => Promise<{ readonly logMarklessInteraction?: (input: unknown) => void }>;
 	__mxLogInteraction?: (input: {
 		readonly eventName: string;
 		readonly eventRecord?: EventOnlyResumeRecord | null;
@@ -275,7 +276,7 @@ async function dispatchEvent(input: {
 			activeBehaviorHosts: input.activeBehaviorHosts,
 		});
 	}
-	marklessLogInteraction({
+	await marklessLogInteraction({
 		eventName: input.event.type,
 		eventRecord: matched.eventRecord,
 		before: beforeExecution,
@@ -288,16 +289,24 @@ function marklessExecutionLogSnapshot(): Set<string> | undefined {
 	return log ? new Set(log) : undefined;
 }
 
-function marklessLogInteraction(input: {
+async function marklessLogInteraction(input: {
 	readonly eventName: string;
 	readonly eventRecord?: EventOnlyResumeRecord | null;
 	readonly before?: ReadonlySet<string>;
 	readonly view: ProtocolViewPayload;
-}): void {
+}): Promise<void> {
 	const global = globalThis as ExecutionLogGlobal;
-	const after = global.__mxLog ? new Set(global.__mxLog) : undefined;
-	if (!after) return;
-	global.__mxLogInteraction?.({ ...input, after });
+	if (!global.__mxLog) return;
+	if (global.__mxLogInteraction) {
+		global.__mxLogInteraction({ ...input, after: new Set(global.__mxLog) });
+		return;
+	}
+	try {
+		const log = await global.__mxLoadLog?.();
+		log?.logMarklessInteraction?.({ ...input, after: new Set(global.__mxLog) });
+	} catch {
+		// Execution logging is observability only; app dispatch must not depend on it.
+	}
 }
 
 function isLeanGraphEscalation(error: unknown): boolean {

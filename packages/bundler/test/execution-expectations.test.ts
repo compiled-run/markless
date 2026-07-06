@@ -1,5 +1,8 @@
 import { expect, test } from 'vitest';
-import { deriveAllowedModules } from '../test-support/execution-expectations.ts';
+import {
+	deriveAllowedModules,
+	forbiddenExecutedModules,
+} from '../test-support/execution-expectations.ts';
 
 test('full-tier row dispatch allows only the full dispatch spine and touched row capability', () => {
 	const allowed = deriveAllowedModules({
@@ -13,4 +16,13 @@ test('full-tier row dispatch allows only the full dispatch spine and touched row
 	expect(allowed).not.toContain('web/resume-behaviors');
 	expect(allowed).not.toContain('web/resume-sync-computed');
 	expect(allowed).not.toContain('web/resume-handoff');
+});
+
+test('execution log chunk is classified as observability allowed after logged dispatch', () => {
+	const allowed = deriveAllowedModules({
+		events: [{ hostNodeId: 'h0', eventName: 'click' }],
+	}, { hostNodeId: 'h0', eventName: 'click', executionLog: true });
+
+	expect(allowed).toContain('virtual:markless:dev-log');
+	expect(forbiddenExecutedModules(['virtual:markless:dev-log'], allowed)).toEqual([]);
 });

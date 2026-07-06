@@ -1159,6 +1159,24 @@ test('renderToString inline event resumer imports the resume module only after i
 	}
 });
 
+test('renderToString execution log activation stays inline and mirrors summary without imports', async () => {
+	const html = await renderToString(
+		() => ({
+			html: '<button type="button">Count 0</button>',
+			state: createProtocolStatePayload({ cells: [] }),
+			view: viewWithClick(),
+		}),
+		{ executionLog: 'always', resumeModuleUrl: '/resume.js' },
+	);
+	const resumerSource = extractResumerSource(html);
+
+	expect(resumerSource).not.toContain('startMarklessExecutionLog');
+	expect(resumerSource).not.toContain('preloadedModuleCount');
+	expect(resumerSource).toContain('globalThis.__mxLog = globalThis.__mxLog || new Set()');
+	expect(resumerSource).toContain('console.log(summary)');
+	expect(resumerSource).toContain("setAttribute('data-markless-log-summary', summary)");
+});
+
 test('renderToString inline event resumer steps aside after runtime startup', async () => {
 	const resumeModuleUrl = createResumeRuntimeStartedModuleUrl();
 	const html = await renderToString(

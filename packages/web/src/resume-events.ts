@@ -6,6 +6,7 @@ export type ResumeRowEventRecords = WeakMap<ResumeDomElement, Map<string, Resume
 export type ResumeEventWiring = ReturnType<typeof createEventWiring>;
 type ExecutionLogGlobal = typeof globalThis & {
 	__mxLog?: Set<string>;
+	__mxLoadLog?: () => Promise<{ readonly logMarklessInteraction?: (input: unknown) => void }>;
 	__mxLogInteraction?: (input: {
 		readonly eventName: string;
 		readonly eventRecord?: ResumeEventRecord | ResumeKeyedRepeatRowEvent | null;
@@ -52,7 +53,7 @@ export function createEventWiring(input: {
 			await input.reportRuntimeError(error, { phase: 'event', hostNodeId: eventRecord.hostNodeId, eventName: eventRecord.eventName, symbolId: activeSymbolId, event, element }); throw error;
 		} finally {
 			await input.flushRuntimeGraph();
-			marklessLogInteraction({
+			await marklessLogInteraction({
 				eventName: event.type,
 				eventRecord,
 				before: beforeExecution,
@@ -74,7 +75,7 @@ export function createEventWiring(input: {
 			await input.reportRuntimeError(error, { phase: 'event', hostNodeId: repeat.parentHostNodeId, eventName: rowEvent.eventName, symbolId: activeSymbolId, event, element }); throw error;
 		} finally {
 			await input.flushRuntimeGraph();
-			marklessLogInteraction({
+			await marklessLogInteraction({
 				eventName: event.type,
 				eventRecord: rowEvent,
 				before: beforeExecution,
@@ -90,16 +91,24 @@ function marklessExecutionLogSnapshot(): Set<string> | undefined {
 	return log ? new Set(log) : undefined;
 }
 
-function marklessLogInteraction(input: {
+async function marklessLogInteraction(input: {
 	readonly eventName: string;
 	readonly eventRecord?: ResumeEventRecord | ResumeKeyedRepeatRowEvent | null;
 	readonly before?: ReadonlySet<string>;
 	readonly view: ResumeRuntimeInput['view'];
-}): void {
+}): Promise<void> {
 	const global = globalThis as ExecutionLogGlobal;
-	const after = global.__mxLog ? new Set(global.__mxLog) : undefined;
-	if (!after) return;
-	global.__mxLogInteraction?.({ ...input, after });
+	if (!global.__mxLog) return;
+	if (global.__mxLogInteraction) {
+		global.__mxLogInteraction({ ...input, after: new Set(global.__mxLog) });
+		return;
+	}
+	try {
+		const log = await global.__mxLoadLog?.();
+		log?.logMarklessInteraction?.({ ...input, after: new Set(global.__mxLog) });
+	} catch {
+		// Execution logging is observability only; app dispatch must not depend on it.
+	}
 }
 
 function findDispatchMatch(target: ResumeDomElement, eventName: string, eventRecords: WeakMap<ResumeDomElement, Map<string, ResumeEventRecord>>, rowEventRecords: ResumeRowEventRecords) {
