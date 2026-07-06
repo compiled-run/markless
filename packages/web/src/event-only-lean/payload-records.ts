@@ -187,10 +187,8 @@ function readPayloadScriptText(document: EventOnlyResumePayloadDocument, type: '
 }
 
 function payloadRecordError(type: string): Error {
-	return Object.assign(new Error(`MARKLESS_LEAN_PAYLOAD_MISSING: Missing ${type} payload script.`), {
+	return Object.assign(new Error('MARKLESS_LEAN_PAYLOAD_MISSING'), {
 		code: 'MARKLESS_LEAN_PAYLOAD_MISSING',
-		severity: 'error',
-		phase: 'payload',
-		docsUrl: 'https://markless.dev/errors/MARKLESS_LEAN_PAYLOAD_MISSING',
+		site: type,
 	});
 }
