@@ -19,9 +19,6 @@ their prerequisites exist:
 - Server functions / RPC story. See "TSRX Submodule Host Boundary (Decision
   Draft)" below for the submodule-shaped slice of this decision.
 - Scoped `<style>` blocks: ACCEPTED 2026-07-02, see `01-tsrx-host-contract.md`.
-- Device persistence. A `storage()` scope primitive was drafted and retired
-  2026-07-05: persistence is out of framework scope. If revisited, it belongs
-  in a separate package built on public graph contracts, not in `@markless/core`.
 - Ingress sources (external world → readonly graph cell): `media()` for
   `matchMedia`-backed cells and a constrained generic bridge primitive. Until
   then, the documented recipe is an `attach` behavior writing a `state()`
