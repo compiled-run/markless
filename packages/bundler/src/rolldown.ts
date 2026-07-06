@@ -341,6 +341,20 @@ export function createMarklessRolldownPlugin(input: {
 					clientManifest,
 					stripBuildPrefix,
 				));
+				// The demand map lives in payload-module exports (tree-shaken from built
+				// pages by design); ship it as a build asset so witness boxes and tooling
+				// can derive allowed execution sets against real builds.
+				this.emitFile({
+					type: 'asset',
+					fileName: `${MARKLESS_BUILD_PREFIX}execution-demand.json`,
+					source: JSON.stringify(
+						Object.fromEntries(
+							clientManifest.modules
+								.filter((module) => module.runtimeDemandMap)
+								.map((module) => [module.source, module.runtimeDemandMap]),
+						),
+					),
+				});
 			},
 		},
 	} satisfies Plugin & { api: MarklessRolldownPluginApi };

@@ -83,7 +83,17 @@ export default box(
 		const executed = executedFromHtml(clickedHtml);
 		const view = viewPayloadFromHtml(clickedHtml);
 		const action = counterClickAction(view);
-		const allowed = deriveAllowedModules(view, action);
+		// The demand map ships as a build asset (payload-module exports are
+		// tree-shaken from built pages by design).
+		const demandByModule = JSON.parse(
+			await preview.request('/build/execution-demand.json'),
+		) as Record<string, unknown>;
+		const runtimeDemandMap = Object.values(demandByModule)[0];
+		const allowed = deriveAllowedModules(
+			view,
+			runtimeDemandMap as Parameters<typeof deriveAllowedModules>[1],
+			{ ...action, executionLog: true },
+		);
 		const forbidden = forbiddenExecutedModules(executed, allowed);
 		if (forbidden.length > 0) {
 			throw new Error(
