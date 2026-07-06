@@ -81,7 +81,9 @@ export function emitSourceModule(input: {
 		// inline resumer can import THIS source module (keeping the .tsrx in the client
 		// module graph — vite's no-accepting-boundary full-reload depends on it).
 		// Production never emits this edge: CSR builds must not reach resume code.
-		input.devResumeReexport && input.environment === 'client' && !symbolsOnly
+		// (emitted in every client variant incl. symbols-only — the inline resumer's
+		// dev resumeModuleUrl points here and expects the resume entry.)
+		input.devResumeReexport && input.environment === 'client'
 			? `export { resumeContainerEvent } from '${resumeVirtualModuleId(input.filename)}';`
 			: '',
 		'',

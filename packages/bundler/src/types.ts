@@ -28,6 +28,7 @@ export interface MarklessVirtualModule {
 export interface TransformTsrxModuleInput {
 	filename: string;
 	source: string;
+	devResumeReexport?: boolean;
 	buildId?: string;
 	environment?: MarklessEnvironment;
 	clientOutput?: MarklessClientOutput;
