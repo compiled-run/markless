@@ -317,7 +317,7 @@ export function createMarklessRolldownPlugin(input: {
 				if (executionLogInjection) injectHeadLinks(bundle, [executionLogInjection]);
 				injectHeadLinks(
 					bundle,
-					collectModulePreloadInjections(clientManifest.bundleGraph, {
+					collectModulePreloadInjections(clientManifest, {
 						publicPath: internalOptions.publicPath,
 						entryChunks: Object.values(bundle)
 							.filter(

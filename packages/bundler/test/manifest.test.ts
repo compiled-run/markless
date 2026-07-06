@@ -244,6 +244,51 @@ describe('markless build metadata output', () => {
 		);
 	});
 
+	test('collects metadata-backed modulepreloads for every per-symbol chunk', () => {
+		const metadata = createBuildMetadata(
+			{
+				'build/chunk-play.js': chunk({
+					fileName: 'build/chunk-play.js',
+					name: 'play',
+					code: 'export const symbol_1_play = () => {};',
+					imports: ['build/shared.js'],
+					moduleIds: ['\0virtual:markless:symbol:root:play'],
+					facadeModuleId: '\0virtual:markless:symbol:root:play',
+				}),
+				'build/chunk-write.js': chunk({
+					fileName: 'build/chunk-write.js',
+					name: 'write',
+					code: 'export const symbol_2_write = () => {};',
+					imports: ['build/shared.js'],
+					moduleIds: ['\0virtual:markless:symbol:root:write'],
+					facadeModuleId: '\0virtual:markless:symbol:root:write',
+				}),
+				'build/shared.js': chunk({
+					fileName: 'build/shared.js',
+					name: 'shared',
+					code: 'export const shared = 1;',
+					moduleIds: ['/workspace/app/src/shared.ts'],
+					facadeModuleId: '/workspace/app/src/shared.ts',
+				}),
+			},
+			[
+				{
+					...transformManifest,
+					symbols: [
+						{ symbolId: 'action:play', kind: 'event-handler', exportName: 'symbol_1_play', virtualModuleId: 'virtual:markless:symbol:root:play' },
+						{ symbolId: 'action:write', kind: 'event-handler', exportName: 'symbol_2_write', virtualModuleId: 'virtual:markless:symbol:root:write' },
+					],
+				},
+			],
+			'/workspace/app',
+			{ bundleGraphAsset: MARKLESS_BUNDLE_GRAPH },
+		);
+
+		const hrefs = collectModulePreloadInjections(metadata).map((injection) => (injection.attributes as { href: string }).href);
+
+		expect(hrefs).toEqual(['/build/shared.js', '/build/chunk-play.js', '/build/chunk-write.js']);
+	});
+
 	test('converts symbol and custom preload entries into the bundle graph', () => {
 		const manifest: MarklessManifest = {
 			version: 1,
