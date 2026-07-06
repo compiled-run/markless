@@ -305,18 +305,9 @@ function emitResumeContainerEvent(loadSymbolName: string, needsFullResume: boole
 		].join('\n');
 	}
 	return [
+		fullResumeHandoff,
 		'export async function resumeContainerEvent(input) {',
-		"	const { resumeEventOnlyFromPayloadDocument } = await import('@markless/core/web/event-only-resume');",
-		'	await resumeEventOnlyFromPayloadDocument({',
-		'		document: input.root,',
-		'		root: input.root,',
-		'		event: input.event,',
-		'		element: input.element,',
-		'		eventRecord: input.eventRecord,',
-		'		runtimeDemandMap: payloadRuntimeDemandMap,',
-		'		syncPolicyAlreadyApplied: !!input.eventRecord,',
-		`		loadSymbol: ${loadSymbolName},`,
-		'	});',
+		'	await marklessFullResumeHandoff({ ...input, document: input.root });',
 		'}',
 	].join('\n');
 }

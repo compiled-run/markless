@@ -10,10 +10,17 @@ import type {
 import type { ProtocolViewPayload } from '@markless/serializer';
 
 const DISPATCH_CORE = [
-	'core/web/event-only-resume',
-	'web/event-only-resume',
-	'web/inline/payload-document',
-	'web/event-only-graph',
+	'core/web/resume',
+	'web/resume',
+	'web/resume-runtime',
+	'web/resume-runtime-shared',
+	'web/resume-runtime-start',
+	'web/resume-events',
+	'web/resume-locators',
+	'web/payload-full',
+	'web/payload-resume',
+	'web/payload-graph-construct',
+	'web/resume-async-wiring',
 ];
 const SCALAR_LEAN_DISPATCH_CORE = [
 	'web/event-only-lean/scalar-core',
@@ -28,7 +35,7 @@ const DOM_UPDATE: string[] = [];
 const KEYED_REPEAT = ['web/repeat-runtime', 'web/resume-keyed-repeats'];
 const BRANCH = ['web/resume-branches'];
 const ASYNC_BOUNDARY = ['web/resume-async-boundaries'];
-const BEHAVIOR = ['web/event-only-behaviors', 'web/resume-behaviors'];
+const BEHAVIOR = ['web/resume-behaviors'];
 const FULL_RESUME_CORE = ['web/resume-locators'];
 const FULL_TIER = [
 	'core/web/resume',

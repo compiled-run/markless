@@ -159,8 +159,19 @@ export function readLeanComputedEntries(computed: unknown): ReadonlyArray<unknow
 
 export async function resumeFullEventOnly(input: ResumeEventOnlyFromPayloadDocumentInput): Promise<EventOnlyResumeContainer> {
 	if (import.meta.env?.DEV) console.warn('markless: lean resume fell back to full event container');
-	const { resumeEventOnlyFromPayloadDocument } = await import('../event-only-resume.ts');
-	return resumeEventOnlyFromPayloadDocument(input);
+	if (input.loadFullResume) {
+		await input.loadFullResume(input);
+		return undefined as unknown as EventOnlyResumeContainer;
+	}
+	input.root.__asyncResumeRuntimeStarted = true;
+	const { resumeFromPayloadDocument } = await import('../payload.ts');
+	const { runtime } = await resumeFromPayloadDocument({
+		document: input.document,
+		root: input.root,
+		loadSymbol: input.loadSymbol,
+	});
+	await runtime.dispatch(input.event, { syncPolicyAlreadyApplied: true });
+	return undefined as unknown as EventOnlyResumeContainer;
 }
 
 export async function resolveSymbol(value: EventOnlyResumeSymbol | Promise<EventOnlyResumeSymbol>): Promise<EventOnlyResumeSymbol> {

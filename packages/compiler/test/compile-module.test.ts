@@ -1,7 +1,7 @@
 import { expect, test, vi } from 'vitest';
 import { compileTsrxModule } from '../src/index.ts';
-import { deserializeGraphValue } from '../../serializer/src/index.ts';
-import { createEventOnlyResumeContainerFromPayloads } from '../../web/src/event-only-resume.ts';
+import { deserializeGraphValue, renderPayloadScripts } from '../../serializer/src/index.ts';
+import { resumeFromPayloadScripts } from '../../web/src/payload.ts';
 import type { ProtocolStatePayload, ProtocolViewPayload } from '../../serializer/src/index.ts';
 
 const source = `
@@ -4616,9 +4616,12 @@ export function App() @{
 	for (const module of child.symbolModules.modules) {
 		symbolExports.set(module.symbolId, await importPublicRenderTestModule(module.source));
 	}
-	const container = await createEventOnlyResumeContainerFromPayloads({
+	const scripts = renderPayloadScripts({
 		state: output.state,
 		view: output.view,
+	});
+	const { graph, runtime } = await resumeFromPayloadScripts({
+		...scripts,
 		root: root as never,
 		loadSymbol(symbolId) {
 			const childSymbolId = symbolId.startsWith('c0:') ? symbolId.slice(3) : symbolId;
@@ -4632,9 +4635,9 @@ export function App() @{
 	expect(countCell).toBeDefined();
 	expect(deserializeGraphValue(countCell!.value!)).toBe(0);
 
-	await container.dispatch({ type: 'click', target: button as never });
+	await runtime.dispatch({ type: 'click', target: button as never });
 
-	expect(container.graph.read('state:count')).toBe(1);
+	expect(graph.read('state:count')).toBe(1);
 	expect(button.textContent).toBe('BUTTON 1');
 });
 

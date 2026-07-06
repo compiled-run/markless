@@ -1,5 +1,4 @@
 import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer';
-import type { EventOnlyResumeDomElement, EventOnlyResumeDomEvent } from './event-only-resume.ts';
 import type { DomJournalEntry } from '@markless/runtime';
 import type { RuntimeGraph } from '@markless/runtime';
 import type { CsrRenderContainer, CsrRenderOptions, CsrRenderOutput } from './render.ts';
@@ -18,53 +17,6 @@ export async function renderCsrRuntime(input: {
 	const state = output.state ?? emptyStatePayload();
 	const view = output.view ?? emptyViewPayload();
 	const loadSymbol = output.loadSymbol ?? options.loadSymbol ?? missingLoadSymbol;
-
-	if (canUseEventOnlyCsrRuntime(output, state, view)) {
-		const { createEventOnlyResumeContainerFromPayloads } =
-			await import('./event-only-resume.ts');
-		const runtime = await createEventOnlyResumeContainerFromPayloads({
-			root: output.root as EventOnlyResumeDomElement,
-			state,
-			view,
-			loadSymbol: loadSymbol as unknown as Parameters<
-				typeof createEventOnlyResumeContainerFromPayloads
-			>[0]['loadSymbol'],
-		});
-		const eventListeners: Array<{
-			readonly eventName: string;
-			readonly listener: (event: EventOnlyResumeDomEvent) => Promise<void>;
-		}> = [];
-		const eventNames = view.events.map((event) => String(event.eventName));
-		for (const eventName of new Set<string>(eventNames)) {
-			const listener = async (event: EventOnlyResumeDomEvent) => {
-				await runtime.dispatch(event);
-			};
-			output.root.addEventListener?.(eventName, listener, { capture: true });
-			eventListeners.push({ eventName, listener });
-		}
-		const disposableRuntime = {
-			...runtime,
-			dispose() {
-				for (const entry of eventListeners) {
-					(output.root as EventOnlyResumeDomElement).removeEventListener?.(
-						entry.eventName,
-						entry.listener,
-						{ capture: true },
-					);
-				}
-				runtime.dispose();
-			},
-		};
-		output.connectRuntime?.({ graph: runtime.graph, runtime });
-		await marklessLogCsrSummary();
-
-		return {
-			phase: 'csr',
-			root: output.root,
-			graph: runtime.graph as RuntimeGraph,
-			runtime: disposableRuntime,
-		};
-	}
 
 	const graph =
 		output.graph ??
@@ -220,27 +172,6 @@ function emptyViewPayload(): ProtocolViewPayload {
 
 function missingLoadSymbol(symbolId: string): ResumeSymbol {
 	throw new Error(`Cannot load async symbol ${symbolId} without a generated symbol resolver.`);
-}
-
-function canUseEventOnlyCsrRuntime(
-	output: CsrRenderOutput,
-	state: ProtocolStatePayload,
-	view: ProtocolViewPayload,
-): boolean {
-	if (output.graph) return false;
-	if ((state.sharedDefinitions?.length ?? 0) > 0) return false;
-	if (state.computed.length > 0) return false;
-	if (view.behaviors.length > 0) return false;
-	if (view.elementHandles.length > 0) return false;
-	if (view.asyncBoundaries.length > 0) return false;
-	// Branch flips need graph subscriptions and range replacement; keyed row
-	// events need locals dispatch. Both require the full resume runtime.
-	if ((view.branches?.length ?? 0) > 0) return false;
-	if ((view.keyedRepeats?.length ?? 0) > 0) return false;
-	if (view.events.some((event) => event.eventName === 'visible' || !!event.syncPolicy)) {
-		return false;
-	}
-	return true;
 }
 
 // CSR mounts share the resume graph wiring so async boundary runners load

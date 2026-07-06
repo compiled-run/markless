@@ -206,7 +206,6 @@ describe('Vite config integration', () => {
 		expect(clientOutput.codeSplitting?.groups?.map((group) => group.name)).toEqual([
 			'markless-resume-branches',
 			'markless-resume-behaviors',
-			'markless-event-behaviors',
 			'markless-resume-repeats',
 			'markless-resume-async',
 			'markless-resume-shared-patch',

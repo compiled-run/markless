@@ -828,10 +828,11 @@ export function Shell() @{
 		environment: 'client',
 	});
 	// Child components alone are not payload records. The served payload
-	// inventory decides whether the event-only tier can handle the page.
+	// inventory decides whether the lean tier can handle the page.
 	const withChildResume = withChild.virtualModules.find((module) => module.type === 'resume');
 	expect(withChild.code).not.toContain('resumeEventOnlyFromPayloadDocument');
-	expect(withChildResume?.source).toContain('resumeEventOnlyFromPayloadDocument');
+	expect(withChildResume?.source).not.toContain('resumeEventOnlyFromPayloadDocument');
+	expect(withChildResume?.source).toContain("import('@markless/core/web/resume')");
 	expect(withChild.code).not.toContain('loadFullResume: marklessFullResumeHandoff');
 	expect(withChild.code).not.toContain("import('@markless/core/web/resume')");
 	expect(withChild.code).not.toContain(

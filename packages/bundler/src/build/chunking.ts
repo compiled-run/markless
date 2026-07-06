@@ -13,7 +13,6 @@ export const MARKLESS_BUNDLE_GRAPH = `${MARKLESS_BUILD_PREFIX}bundle-graph.json`
 const WEB_RUNTIME_CAPABILITY_GROUPS = [
 	{ name: 'markless-resume-branches', test: fileBasenamePattern('resume-branches') },
 	{ name: 'markless-resume-behaviors', test: fileBasenamePattern('resume-behaviors') },
-	{ name: 'markless-event-behaviors', test: fileBasenamePattern('event-only-behaviors') },
 	{
 		name: 'markless-resume-repeats',
 		test: fileBasenamePattern('resume-keyed-repeats', 'repeat-runtime'),
