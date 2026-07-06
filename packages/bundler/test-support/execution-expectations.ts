@@ -100,7 +100,7 @@ export function forbiddenExecutedModules(
 	allowed: ReadonlySet<string>,
 ): string[] {
 	return [...executed]
-		.filter((id) => !isAllowedDispatchCoreVirtual(id) && isMarklessRuntimeModule(id) && !allowed.has(id))
+		.filter((id) => !isAllowedDispatchCoreVirtual(id) && !isRuntimeCatalogFunction(id) && isMarklessRuntimeModule(id) && !allowed.has(id))
 		.sort();
 }
 
@@ -159,6 +159,14 @@ function requiresFullRuntimeTier(inventory: PayloadRecordInventory): boolean {
 		(inventory.elementHandles?.length ?? 0) > 0 ||
 		(inventory.asyncBoundaries?.length ?? 0) > 0
 	);
+}
+
+// Catalog functions (slice 1, per-action-runtime): reachable ONLY via static imports
+// in emitted modules (symbols/render), so their execution is part of whichever emitted
+// module ran — allowed by construction. The demand map (slice 3) replaces this rule
+// with per-action generated sets.
+function isRuntimeCatalogFunction(id: string): boolean {
+	return id.startsWith('web/fns/');
 }
 
 function isMarklessRuntimeModule(id: string): boolean {
