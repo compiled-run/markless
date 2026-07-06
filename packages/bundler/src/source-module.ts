@@ -129,7 +129,7 @@ export function emitResumeModule(input: {
 	const routeSymbols = input.symbolRoutes.length > 0;
 	const resumeSymbolLoader = routeSymbols ? 'marklessSsrLoadSymbolRoute' : 'loadSymbol';
 	return [
-		input.executionLog === 'never' ? '' : emitStartExecutionLog(),
+		input.executionLog === 'never' ? '' : emitExecutionLogLoader(),
 		'',
 		emitLoadSymbol(input),
 		routeSymbols ? 'const marklessLoadLocalSymbol = loadSymbol;' : '',
@@ -271,13 +271,8 @@ function emitResumeContainerEvent(loadSymbolName: string, needsFullResume: boole
 	].join('\n');
 }
 
-function emitStartExecutionLog(): string {
-	return [
-		'export async function startMarklessExecutionLog(input) {',
-		`	const log = await import(${JSON.stringify(MARKLESS_EXECUTION_LOG_MODULE_ID)});`,
-		'	return log.installMarklessExecutionLog(input);',
-		'}',
-	].join('\n');
+function emitExecutionLogLoader(): string {
+	return `globalThis.__mxLoadLog ||= () => import(${JSON.stringify(MARKLESS_EXECUTION_LOG_MODULE_ID)});`;
 }
 
 function emitLoadSymbol(input: {

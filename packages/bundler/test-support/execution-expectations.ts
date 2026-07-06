@@ -6,6 +6,7 @@ export type ModuleGroup =
 	| 'branch'
 	| 'async-boundary'
 	| 'behavior'
+	| 'observability'
 	| 'full-tier-dispatch-core'
 	| 'full-resume-core';
 
@@ -39,6 +40,7 @@ export type RuntimeDispatchAction = {
 	readonly eventName: string;
 	readonly recordKind?: 'event' | 'keyed-repeat-row';
 	readonly syncPolicy?: unknown;
+	readonly executionLog?: boolean;
 };
 
 export const MODULE_GROUPS: Record<ModuleGroup, ReadonlySet<string>> = {
@@ -54,6 +56,7 @@ export const MODULE_GROUPS: Record<ModuleGroup, ReadonlySet<string>> = {
 	branch: new Set(['web/resume-branches']),
 	'async-boundary': new Set(['web/resume-async-boundaries']),
 	behavior: new Set(['web/event-only-behaviors', 'web/resume-behaviors']),
+	observability: new Set(['virtual:markless:dev-log']),
 	'full-tier-dispatch-core': new Set([
 		'core/web/resume',
 		'web/resume',
@@ -81,6 +84,7 @@ export function deriveAllowedModules(
 ): ReadonlySet<string> {
 	const allowed = new Set(MODULE_GROUPS['dispatch-core']);
 	const groups = structurallyReachableGroups(payloadRecordInventory, action);
+	if (action.executionLog) groups.add('observability');
 	for (const group of groups) {
 		for (const id of MODULE_GROUPS[group]) allowed.add(id);
 	}
@@ -154,7 +158,7 @@ function requiresFullRuntimeTier(inventory: PayloadRecordInventory): boolean {
 }
 
 function isMarklessRuntimeModule(id: string): boolean {
-	return id.startsWith('web/') || id.startsWith('core/');
+	return id.startsWith('web/') || id.startsWith('core/') || id === 'virtual:markless:dev-log';
 }
 
 function isAllowedDispatchCoreVirtual(id: string): boolean {

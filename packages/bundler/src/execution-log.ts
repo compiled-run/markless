@@ -19,6 +19,7 @@ export function injectExecutionLogModuleHook(
 
 export function executionLogVirtualModuleSource(): string {
 	return `
+globalThis.__mxLog?.add(${JSON.stringify(MARKLESS_EXECUTION_LOG_MODULE_ID)});
 function modules(log) {
 	return log ? [...log] : [];
 }
@@ -45,7 +46,11 @@ export function installMarklessExecutionLog(input = {}) {
 	const moduleSizes = input.moduleSizes;
 	const preloaded = input.preloadedModuleCount || document.querySelectorAll('link[rel="modulepreload"]').length;
 	const current = modules(log);
-	console.log('markless: resumed — ' + bytesText(current, moduleSizes) + ', ' + preloaded + ' modules preloaded (' + current.length + ' executed)');
+	if (input.printResumeSummary !== false) {
+		const summary = 'markless: resumed — ' + bytesText(current, moduleSizes) + ', ' + preloaded + ' modules preloaded (' + current.length + ' executed)';
+		console.log(summary);
+		document.documentElement?.setAttribute('data-markless-log-summary', summary);
+	}
 	globalThis.__mxLogInteraction = (event) => {
 		const after = modules(log);
 		const before = event.before || new Set();
@@ -55,6 +60,10 @@ export function installMarklessExecutionLog(input = {}) {
 		for (const row of causeRows({ ...event, after: new Set(after) })) console.log(row);
 		console.groupEnd();
 	};
+}
+export function logMarklessInteraction(event) {
+	installMarklessExecutionLog({ printResumeSummary: false });
+	globalThis.__mxLogInteraction?.(event);
 }
 `;
 }
