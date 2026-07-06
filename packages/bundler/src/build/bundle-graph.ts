@@ -122,6 +122,13 @@ function bundleGraphRecords(
 			graph[symbol.symbolId] = symbolBundle;
 		}
 	}
+	for (const [bundleName, bundle] of Object.entries(graph)) {
+		for (const symbolId of bundle.symbols ?? []) {
+			if (symbolId === bundleName) continue;
+			const symbolBundle = graph[symbolId] ?? { size: 0, total: 0 };
+			graph[symbolId] = appendDynamicImport(symbolBundle, bundleName);
+		}
+	}
 	if (bundleGraphAdders) {
 		const combined = { ...manifest, bundles: graph as MarklessBuildMetadata['bundles'] };
 		for (const add of bundleGraphAdders) {
@@ -150,6 +157,14 @@ function bundleGraphRecords(
 		}
 	}
 	return graph;
+}
+
+function appendDynamicImport(bundle: BundleGraphRecord, dependency: string): BundleGraphRecord {
+	if (bundle.dynamicImports?.includes(dependency)) return bundle;
+	return {
+		...bundle,
+		dynamicImports: [...(bundle.dynamicImports ?? []), dependency],
+	};
 }
 
 function runtimeBundleNamesByModuleId(manifest: MarklessBuildMetadata): ReadonlyMap<string, string[]> {

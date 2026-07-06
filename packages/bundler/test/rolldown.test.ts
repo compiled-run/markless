@@ -593,6 +593,51 @@ let count = state(0);
 		expect(resolverChunk?.code).toContain('import(/* @vite-ignore */ "./chunk-');
 		expect(resolverChunk?.code).not.toContain('virtual:markless:symbol:');
 	});
+
+	test('generateBundle injects every compact graph symbol preload into HTML', async () => {
+		const plugin = marklessClient();
+		const emitFile = vi.fn();
+		const html = { type: 'asset', fileName: 'index.html', source: '<head></head>' };
+		const filename = '/workspace/app/src/App.tsrx';
+		const encoded = encodeURIComponent(filename);
+
+		callBuildStart(plugin, { cwd: '/workspace/app' });
+		await callTransform(plugin, source, filename);
+		const symbolChunks = ['symbol:0', 'symbol:1'].map((symbolId, index) => {
+			const virtualId = `\0virtual:markless:symbol:${encoded}:${encodeURIComponent(symbolId)}`;
+			return [
+				`build/chunk-symbol-${index}.js`,
+				{
+					type: 'chunk',
+					fileName: `build/chunk-symbol-${index}.js`,
+					name: `chunk-symbol-${index}`,
+					code: 'export default {};',
+					exports: ['default'],
+					imports: [],
+					dynamicImports: [],
+					moduleIds: [virtualId],
+					facadeModuleId: virtualId,
+				},
+			] as const;
+		});
+
+		await callGenerateBundle(
+			plugin,
+			{
+				'index.html': html,
+				...Object.fromEntries(symbolChunks),
+			},
+			emitFile,
+		);
+
+		const htmlHrefs = [
+			...html.source.matchAll(/<link\b[^>]*\brel=["']modulepreload["'][^>]*\bhref=["']([^"']+)["']/g),
+		]
+			.map((match) => match[1]!)
+			.sort();
+
+		expect(htmlHrefs).toEqual(['/build/chunk-symbol-0.js', '/build/chunk-symbol-1.js']);
+	});
 });
 
 function emittedAsset(emitFile: ReturnType<typeof vi.fn>, fileName: string) {
