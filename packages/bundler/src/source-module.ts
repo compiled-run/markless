@@ -1,4 +1,6 @@
 import type { MarklessClientOutput, MarklessEnvironment } from './types.ts';
+import { MARKLESS_EXECUTION_LOG_MODULE_ID } from './execution-log.ts';
+import type { MarklessExecutionLogMode } from './types.ts';
 
 export const MARKLESS_VIRTUAL_PREFIX = 'virtual:markless:';
 
@@ -53,8 +55,10 @@ export function emitSourceModule(input: {
 	readonly headInjections?: ReadonlyArray<{
 		readonly tag: string;
 		readonly attributes?: Record<string, string>;
+		readonly children?: string;
 		readonly location: 'head' | 'body';
 	}>;
+	readonly executionLog?: MarklessExecutionLogMode;
 	readonly needsFullResume?: boolean;
 	readonly devResumeReexport?: boolean;
 	readonly publicRenderModuleSource: string;
@@ -102,6 +106,7 @@ export function emitSourceModule(input: {
 			? ''
 			: emitCompiledAppDefault({
 					environment: input.environment,
+					executionLog: input.executionLog,
 					headInjections: input.headInjections,
 					resumeModuleUrl: input.resumeModuleUrl,
 					rootExportName: input.publicRenderRootExportName,
@@ -119,13 +124,12 @@ export function emitResumeModule(input: {
 	readonly needsFullResume?: boolean;
 	readonly symbols: ReadonlyArray<SourceSymbolRow>;
 	readonly symbolRoutes: ReadonlyArray<SourceSymbolRoute>;
+	readonly executionLog?: MarklessExecutionLogMode;
 }) {
 	const routeSymbols = input.symbolRoutes.length > 0;
 	const resumeSymbolLoader = routeSymbols ? 'marklessSsrLoadSymbolRoute' : 'loadSymbol';
 	return [
-		input.needsFullResume
-			? ''
-			: "import { resumeEventOnlyFromPayloadDocument } from '@markless/core/web/event-only-resume';",
+		input.executionLog === 'never' ? '' : emitStartExecutionLog(),
 		'',
 		emitLoadSymbol(input),
 		routeSymbols ? 'const marklessLoadLocalSymbol = loadSymbol;' : '',
@@ -170,9 +174,11 @@ function symbolRouteImportSource(importSource: string): string {
 
 function emitCompiledAppDefault(input: {
 	readonly environment: MarklessEnvironment;
+	readonly executionLog?: MarklessExecutionLogMode;
 	readonly headInjections?: ReadonlyArray<{
 		readonly tag: string;
 		readonly attributes?: Record<string, string>;
+		readonly children?: string;
 		readonly location: 'head' | 'body';
 	}>;
 	readonly resumeModuleUrl?: string;
@@ -205,7 +211,15 @@ function emitCompiledAppDefault(input: {
 	const metadataEntries =
 		input.environment === 'client'
 			? []
-			: [...headInjectionEntry, ...resumeModuleEntry, ...modulePreloadEntry, '	payloadView,'];
+			: [
+					...headInjectionEntry,
+					...resumeModuleEntry,
+					...modulePreloadEntry,
+					input.executionLog && input.executionLog !== 'never'
+						? `	executionLog: ${JSON.stringify(input.executionLog)},`
+						: '',
+					'	payloadView,',
+				];
 
 	return [
 		'const marklessCompiledApp = {',
@@ -243,6 +257,7 @@ function emitResumeContainerEvent(loadSymbolName: string, needsFullResume: boole
 	}
 	return [
 		'export async function resumeContainerEvent(input) {',
+		"	const { resumeEventOnlyFromPayloadDocument } = await import('@markless/core/web/event-only-resume');",
 		'	await resumeEventOnlyFromPayloadDocument({',
 		'		document: input.root,',
 		'		root: input.root,',
@@ -252,6 +267,15 @@ function emitResumeContainerEvent(loadSymbolName: string, needsFullResume: boole
 		'		syncPolicyAlreadyApplied: !!input.eventRecord,',
 		`		loadSymbol: ${loadSymbolName},`,
 		'	});',
+		'}',
+	].join('\n');
+}
+
+function emitStartExecutionLog(): string {
+	return [
+		'export async function startMarklessExecutionLog(input) {',
+		`	const log = await import(${JSON.stringify(MARKLESS_EXECUTION_LOG_MODULE_ID)});`,
+		'	return log.installMarklessExecutionLog(input);',
 		'}',
 	].join('\n');
 }

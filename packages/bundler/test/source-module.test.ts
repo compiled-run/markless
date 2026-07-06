@@ -53,7 +53,7 @@ test('emitSourceModule keeps event-only entries out of the full-runtime graph', 
 	expect(code).not.toContain('resumeEventOnlyFromPayloadDocument');
 	expect(code).not.toContain('export async function resumeContainerEvent');
 	expect(resumeCode).toContain(
-		"import { resumeEventOnlyFromPayloadDocument } from '@markless/core/web/event-only-resume';",
+		"const { resumeEventOnlyFromPayloadDocument } = await import('@markless/core/web/event-only-resume');",
 	);
 	expect(resumeCode).toContain('export async function resumeContainerEvent');
 	expect(code).not.toContain('loadFullResume: marklessFullResumeHandoff');

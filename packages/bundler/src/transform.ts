@@ -15,6 +15,7 @@ import {
 	scopedSymbolExportName,
 	symbolVirtualModuleId,
 } from './source-module.ts';
+import { injectExecutionLogModuleHook } from './execution-log.ts';
 
 export { MARKLESS_VIRTUAL_PREFIX, resumeVirtualModuleId } from './source-module.ts';
 
@@ -78,6 +79,7 @@ export async function transformTsrxModule(
 			type: 'resume',
 			source: emitResumeModule({
 				resolverId,
+				executionLog: input.executionLog,
 				needsFullResume:
 					(compiled.protocolView.branches?.length ?? 0) > 0 ||
 					(compiled.protocolView.keyedRepeats?.length ?? 0) > 0 ||
@@ -93,10 +95,14 @@ export async function transformTsrxModule(
 				type: 'symbol',
 				symbolId: module.symbolId,
 				exportName: symbolRows[index]!.exportName,
-				source: rewriteSymbolModuleExport(
-					module.source,
-					module.exportName,
-					symbolRows[index]!.exportName,
+				source: injectExecutionLogModuleHook(
+					rewriteSymbolModuleExport(
+						module.source,
+						module.exportName,
+						symbolRows[index]!.exportName,
+					),
+					`symbol:${module.symbolId}`,
+					input.executionLog,
 				),
 			}),
 		),
@@ -112,6 +118,7 @@ export async function transformTsrxModule(
 					resolverId,
 					environment: input.environment ?? 'lib',
 					clientOutput: input.clientOutput ?? 'full',
+					executionLog: input.executionLog,
 					headInjections: input.headInjections,
 					devResumeReexport: input.devResumeReexport === true,
 					needsFullResume:

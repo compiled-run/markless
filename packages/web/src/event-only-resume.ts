@@ -36,6 +36,16 @@ type EventOnlyResumeContainerState = EventOnlyResumeContainer & {
 	readonly activeBehaviorHosts: Set<string>;
 };
 type FullResumeHandoffInput = ResumeEventOnlyFromPayloadDocumentInput & { readonly loadFullResume?: (input: ResumeEventOnlyFromPayloadDocumentInput) => unknown };
+type ExecutionLogGlobal = typeof globalThis & {
+	__mxLog?: Set<string>;
+	__mxLogInteraction?: (input: {
+		readonly eventName: string;
+		readonly eventRecord?: EventOnlyResumeRecord | null;
+		readonly before?: ReadonlySet<string>;
+		readonly after?: ReadonlySet<string>;
+		readonly view: ProtocolViewPayload;
+	}) => void;
+};
 
 const containers = new WeakMap<EventOnlyResumeDomElement, EventOnlyResumeContainerState>();
 const noElementHandle = () => undefined;
@@ -184,6 +194,7 @@ async function dispatchEvent(input: {
 	readonly eventRecord?: EventOnlyResumeRecord;
 	readonly syncPolicyAlreadyApplied?: boolean;
 }): Promise<void> {
+	const beforeExecution = marklessExecutionLogSnapshot();
 	const matched = input.eventRecord
 		? {
 				element:
@@ -264,6 +275,29 @@ async function dispatchEvent(input: {
 			activeBehaviorHosts: input.activeBehaviorHosts,
 		});
 	}
+	marklessLogInteraction({
+		eventName: input.event.type,
+		eventRecord: matched.eventRecord,
+		before: beforeExecution,
+		view: input.view,
+	});
+}
+
+function marklessExecutionLogSnapshot(): Set<string> | undefined {
+	const log = (globalThis as ExecutionLogGlobal).__mxLog;
+	return log ? new Set(log) : undefined;
+}
+
+function marklessLogInteraction(input: {
+	readonly eventName: string;
+	readonly eventRecord?: EventOnlyResumeRecord | null;
+	readonly before?: ReadonlySet<string>;
+	readonly view: ProtocolViewPayload;
+}): void {
+	const global = globalThis as ExecutionLogGlobal;
+	const after = global.__mxLog ? new Set(global.__mxLog) : undefined;
+	if (!after) return;
+	global.__mxLogInteraction?.({ ...input, after });
 }
 
 function isLeanGraphEscalation(error: unknown): boolean {

@@ -228,6 +228,7 @@ describe('Vite config integration', () => {
 			'markless-protocol-decode',
 			'markless-value-decode',
 			'markless-payload-leaves',
+			'markless-dev-log',
 			'markless-resume-core',
 			'markless-runtime-graph-core',
 			'markless-runtime-graph-collections',

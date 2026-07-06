@@ -12,6 +12,12 @@ import {
 } from './build/symbol-facade-cleanup.ts';
 import { rewriteGeneratedSymbolTableUrls } from './build/symbol-table.ts';
 import { createMarklessDevGraph } from './dev.ts';
+import {
+	MARKLESS_EXECUTION_LOG_MODULE_ID,
+	executionLogVirtualModuleSource,
+	injectExecutionLogModuleHook,
+	normalizeExecutionLogMode,
+} from './execution-log.ts';
 import { MARKLESS_VIRTUAL_PREFIX, resumeVirtualModuleId, transformTsrxModule } from './transform.ts';
 import type {
 	MarklessEnvironment,
@@ -134,6 +140,9 @@ export function createMarklessRolldownPlugin(input: {
 		},
 		async resolveId(source, importer) {
 			const normalized = normalizeVirtualId(source);
+			if (normalized === MARKLESS_EXECUTION_LOG_MODULE_ID) {
+				return { id: resolveVirtualId(MARKLESS_EXECUTION_LOG_MODULE_ID), moduleSideEffects: true };
+			}
 			if (virtualModules.has(normalized)) {
 				return { id: resolveVirtualId(normalized), moduleSideEffects: true };
 			}
@@ -150,6 +159,9 @@ export function createMarklessRolldownPlugin(input: {
 			return null;
 		},
 		load(id) {
+			if (normalizeVirtualId(id) === MARKLESS_EXECUTION_LOG_MODULE_ID) {
+				return executionLogVirtualModuleSource();
+			}
 			const module = virtualModules.get(normalizeVirtualId(id));
 			if (module) {
 				return virtualModuleSourceForLoad(module, {
@@ -163,6 +175,20 @@ export function createMarklessRolldownPlugin(input: {
 			const currentEnvironment = getEnvironment(this);
 			const virtualId = normalizeVirtualId(id);
 			if (!TSRX_SOURCE_FILE.test(id)) {
+				if (
+					currentEnvironment === 'client' &&
+					normalizeExecutionLogMode(internalOptions.executionLog) !== 'never' &&
+					isMarklessRuntimeModule(id)
+				) {
+					return {
+						code: injectExecutionLogModuleHook(
+							code,
+							executionLogRuntimeModuleId(id),
+							internalOptions.executionLog,
+						),
+						map: null,
+					};
+				}
 				return null;
 			}
 			if (virtualId.startsWith(MARKLESS_VIRTUAL_PREFIX)) {
@@ -174,6 +200,7 @@ export function createMarklessRolldownPlugin(input: {
 				filename: source,
 				source: code,
 				buildId: internalOptions.buildId,
+				executionLog: normalizeExecutionLogMode(internalOptions.executionLog),
 				environment: currentEnvironment,
 				clientOutput:
 					currentEnvironment === 'client' &&
@@ -473,6 +500,17 @@ function sourceForResumeVirtualImporter(importer: string | undefined): string | 
 
 function isRelativeImport(source: string): boolean {
 	return source.startsWith('./') || source.startsWith('../');
+}
+
+function isMarklessRuntimeModule(id: string): boolean {
+	const path = pathname(id);
+	return /[/\\](?:web|runtime|serializer)[/\\]src[/\\].+\.ts$/.test(path);
+}
+
+function executionLogRuntimeModuleId(id: string): string {
+	const path = pathname(id);
+	const match = path.match(/[/\\](web|runtime|serializer)[/\\]src[/\\]([^?#]+)\.ts$/);
+	return match ? `${match[1]}:${match[2].replace(/[/\\]/g, '/')}` : path;
 }
 
 function normalizeVirtualId(id: string) {

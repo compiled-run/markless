@@ -6,6 +6,7 @@ import {
 	type ProtocolViewPayload,
 } from '@markless/serializer';
 import { renderPayloadScripts, serializeRuntimeAsyncSnapshots } from '@markless/serializer';
+import type { MarklessExecutionLogMode } from './dev-log.ts';
 import { validateKeyedRepeatPayloadKeys } from './repeat-runtime.ts';
 
 export type SsrRenderOutput = {
@@ -19,6 +20,7 @@ export type SsrRenderArtifact = {
 	readonly headInjections?: ReadonlyArray<RenderHeadInjection>;
 	readonly modulePreloads?: ReadonlyArray<ModulePreloadInput>;
 	readonly resumeModuleUrl?: string;
+	readonly executionLog?: MarklessExecutionLogMode;
 };
 
 export type SsrRenderable = (() => SsrRenderOutput) | SsrRenderArtifact;
@@ -30,6 +32,7 @@ export type RenderToStringOptions = {
 	readonly containerId?: string;
 	readonly modulePreloads?: ReadonlyArray<ModulePreloadInput>;
 	readonly inlineRuntimeRegistry?: Set<string>;
+	readonly executionLog?: MarklessExecutionLogMode;
 };
 
 export type ModulePreloadInput =
@@ -43,6 +46,7 @@ export type ModulePreloadInput =
 export type RenderHeadInjection = {
 	readonly tag: string;
 	readonly attributes?: Record<string, string>;
+	readonly children?: string;
 	readonly location: 'head' | 'body';
 };
 
@@ -63,6 +67,7 @@ export async function renderToString(
 	await validateKeyedRepeatPayloadKeys({ state, view });
 	const payloadScripts = hasPayload ? renderPayloadScripts({ state, view }) : undefined;
 	const resumeModuleUrl = options.resumeModuleUrl ?? artifactResumeModuleUrl(component);
+	const executionLog = options.executionLog ?? artifactExecutionLog(component) ?? 'never';
 	const browserTriggers = hasBrowserTriggers(view, state);
 	const modulePreloads =
 		options.modulePreloads ?? (browserTriggers ? artifactModulePreloads(component) : undefined);
@@ -70,7 +75,12 @@ export async function renderToString(
 		hasPayload && browserTriggers
 			? renderInlineResumerScript(
 					options.resumerSource ??
-						defaultInlineResumerSource(resumeModuleUrl, view, options.inlineRuntimeRegistry),
+						defaultInlineResumerSource(
+							resumeModuleUrl,
+							view,
+							options.inlineRuntimeRegistry,
+							executionLog,
+						),
 					options.nonce,
 				)
 			: '';
@@ -111,6 +121,10 @@ function artifactHeadInjections(
 	return typeof component === 'object' ? component.headInjections : undefined;
 }
 
+function artifactExecutionLog(component: SsrRenderable): MarklessExecutionLogMode | undefined {
+	return typeof component === 'object' ? component.executionLog : undefined;
+}
+
 function renderHeadInjections(
 	injections: ReadonlyArray<RenderHeadInjection> | undefined,
 	nonce: string | undefined,
@@ -133,7 +147,7 @@ function renderHeadInjection(injection: RenderHeadInjection, nonce: string | und
 	const suffix = renderedAttributes ? ` ${renderedAttributes}` : '';
 	return injection.tag === 'link'
 		? `<${injection.tag}${suffix}>`
-		: `<${injection.tag}${suffix}></${injection.tag}>`;
+		: `<${injection.tag}${suffix}>${escapeInlineScript(injection.children ?? '')}</${injection.tag}>`;
 }
 
 function renderModulePreloadLinks(
@@ -265,6 +279,7 @@ function defaultInlineResumerSource(
 	resumeModuleUrl: string | undefined,
 	view: ProtocolViewPayload,
 	inlineRuntimeRegistry?: Set<string>,
+	executionLog: MarklessExecutionLogMode = 'never',
 ): string {
 	if (!resumeModuleUrl) {
 		return '(() => {})();';
@@ -314,12 +329,32 @@ ${graphConditionSource}
 		? `
 					if (record.syncPolicy) ${includeSharedSyncPolicyRuntime ? 'globalThis.__marklessInlineSyncPolicy.y(record.syncPolicy, e, r)' : 'y(record.syncPolicy, e)'};`
 		: '';
+	const executionLogPredicate =
+		executionLog === 'always'
+			? 'true'
+			: "/^https?:\\/\\/(?:localhost|127\\.0\\.0\\.1|\\[::1\\])(?::|$)/.test(l.origin) || new URLSearchParams(l.search).has('markless-log') || (() => { try { return localStorage.getItem('marklessLog') === '1'; } catch { return false; } })()";
+	const executionLogSource =
+		executionLog === 'never'
+			? ''
+			: `
+	const logOn = (() => {
+		const l = location;
+		if (${executionLogPredicate}) return true;
+		return false;
+	})();
+	if (logOn) {
+		globalThis.__mxLog = globalThis.__mxLog || new Set();
+		import(${JSON.stringify(resumeModuleUrl)}).then((m) => m.startMarklessExecutionLog?.({
+			preloadedModuleCount: d.querySelectorAll('link[rel="modulepreload"]').length,
+		}));
+	}`;
 
 	return `(() => {
 	const d = document;
 	const s = d.currentScript;
 	const r = s && s.closest('[data-async-container]');
 	if (!r) return;
+${executionLogSource}
 	const p = r.querySelector('script[type="markless/view"]');
 	if (!p) return;
 	const v = JSON.parse(p.textContent || 'null');

@@ -40,6 +40,7 @@ export default box(
 		// Resume truth: the paused arm comes from the payload, then the click
 		// flips the icon branch to the playing arm.
 		const page = await preview.browser.visit('/');
+		await waitForConsoleMessage(page, 'markless: resumed', WAIT);
 		await expect.page.bodyText(
 			page,
 			{ contains: 'Do I Clench My Fists? (Slowed + Reverb)' },
@@ -52,6 +53,7 @@ export default box(
 
 		await page.click(PLAY_TOGGLE, WAIT);
 		await expect.page.text(page, PLAY_ICON, PLAYING_ICON, WAIT);
+		await waitForConsoleMessage(page, 'markless: click', WAIT);
 		await expect.page.attribute(page, PLAY_TOGGLE, 'class', 'play active', WAIT);
 		await expect.page.attribute(page, '.youtube-frame-host', 'data-command', 'play', WAIT);
 		const afterClickScripts = await jsBuildRequestPaths(page);
@@ -119,6 +121,25 @@ function assertRenderedToggleArm(html: string): void {
 type NetworkRequestPage = {
 	networkRequests(): Promise<ReadonlyArray<{ readonly url: string; readonly method: string }>>;
 };
+
+type ConsoleEvidencePage = {
+	consoleMessages(): Promise<ReadonlyArray<{ readonly text: string }>>;
+};
+
+async function waitForConsoleMessage(
+	page: ConsoleEvidencePage,
+	text: string,
+	options: { readonly timeoutMs: number },
+): Promise<void> {
+	const started = Date.now();
+	while (Date.now() - started < options.timeoutMs) {
+		const messages = await page.consoleMessages();
+		if (messages.some((message) => message.text.includes(text))) return;
+		await new Promise((resolve) => setTimeout(resolve, 25));
+	}
+	const messages = (await page.consoleMessages()).map((message) => message.text).join('\n');
+	throw new Error(`Expected console message containing ${JSON.stringify(text)}, saw:\n${messages}`);
+}
 
 async function jsBuildRequestPaths(page: NetworkRequestPage): Promise<readonly string[]> {
 	const requests = await page.networkRequests();
