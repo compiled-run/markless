@@ -654,11 +654,11 @@ export function Shell() @{
 `,
 		environment: 'client',
 	});
-	// Child components may compose branches/boundaries/handles into the served
-	// payload: wire event-only first, then dynamically escalate.
+	// Child components alone are not payload records. The served payload
+	// inventory decides whether the event-only tier can handle the page.
 	expect(withChild.code).toContain('resumeEventOnlyFromPayloadDocument');
-	expect(withChild.code).toContain('resumeFromPayloadDocument');
-	expect(withChild.code).toContain("import('@markless/core/web/resume')");
+	expect(withChild.code).not.toContain('resumeFromPayloadDocument');
+	expect(withChild.code).not.toContain("import('@markless/core/web/resume')");
 	expect(withChild.code).not.toContain(
 		"import { resumeFromPayloadDocument } from '@markless/core/web/resume';",
 	);

@@ -1,22 +1,15 @@
 import {
-	deserializeGraphValueForClient,
-	type SerializedGraphPayload,
-} from '@markless/serializer/decode-client';
-import {
 	decodePayloadScripts,
 	type DecodedPayloadScripts,
 	type EncodedPayloadScripts,
-} from '@markless/serializer/protocol-validation';
+	RuntimePayloadError,
+	type RuntimePayloadDiagnostic,
+	type RuntimePayloadErrorCode,
+	type RuntimePayloadType,
+} from '../../serializer/src/protocol-validation.ts';
+import type { SerializedGraphPayload } from '../../serializer/src/value-decode-client.ts';
 import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer/protocol';
-import { createRuntimeGraph, type RuntimeGraph, type RuntimeGraphRead } from '@markless/runtime';
-import { applyDomJournalEntries } from './dom-journal.ts';
-import { readPayloadScriptsFromDocument, type PayloadScriptDocument } from './inline/payload-document.ts';
-import {
-	createResumeRuntime,
-	type ResumeDomElement,
-	type ResumeRuntime,
-	type ResumeRuntimeInput,
-} from './resume.ts';
+import type { ResumeDomElement, ResumeRuntime, ResumeRuntimeInput } from './resume.ts';
 
 export {
 	decodePayloadScripts,
@@ -24,13 +17,18 @@ export {
 	type RuntimePayloadDiagnostic,
 	type RuntimePayloadErrorCode,
 	type RuntimePayloadType,
-} from '@markless/serializer/protocol-validation';
-export {
-	decodePayloadScriptsFromDocument,
-	readPayloadScriptsFromDocument,
-	type PayloadScriptDocument,
-	type PayloadScriptElement,
-} from './inline/payload-document.ts';
+};
+export type PayloadScriptElement = {
+	readonly textContent?: string | null;
+	readonly text?: string | null;
+	readonly innerHTML?: string | null;
+};
+export type PayloadScriptDocument = {
+	readonly querySelector: (selector: string) => PayloadScriptElement | null;
+};
+type RuntimeModule = typeof import('@markless/runtime');
+type RuntimeGraph = import('@markless/runtime').RuntimeGraph;
+type RuntimeGraphRead = import('@markless/runtime').RuntimeGraphRead;
 
 export type ResumePayloadScriptsInput = EncodedPayloadScripts & Pick<
 	ResumeRuntimeInput,
@@ -64,10 +62,15 @@ export type ResumeAlreadyResumedWarning = {
 };
 
 const resumedPayloadContainers = new WeakMap<ResumeDomElement, ResumePayloadScriptsResult>();
+let runtimeModulePromise: Promise<RuntimeModule> | undefined;
+let valueDecoderPromise:
+	| Promise<typeof import('../../serializer/src/value-decode-client.ts')>
+	| undefined;
 
 export async function createRuntimeGraphFromStatePayload(
 	payload: ProtocolStatePayload,
 ): Promise<RuntimeGraph> {
+	const { createRuntimeGraph } = await runtimeModule();
 	return createRuntimeGraph({
 		cells: await decodeStateCells(payload),
 		sharedDefinitions: payload.sharedDefinitions,
@@ -80,7 +83,7 @@ async function decodeStateCells(payload: ProtocolStatePayload) {
 			graphNodeId: cell.graphNodeId,
 			value: cell.value === undefined
 				? undefined
-				: await deserializeGraphValueForClient(cell.value as SerializedGraphPayload),
+				: await deserializeGraphValue(cell.value as SerializedGraphPayload),
 		})),
 	);
 }
@@ -91,6 +94,7 @@ export async function createRuntimeGraphFromResumePayload(input: {
 	readonly root: ResumeDomElement;
 	readonly loadSymbol: ResumeRuntimeInput['loadSymbol'];
 }): Promise<RuntimeGraph> {
+	const { createRuntimeGraph } = await runtimeModule();
 	let graph!: RuntimeGraph;
 	const asyncComputed = await asyncComputedFromPayload(input, () => graph);
 	graph = createRuntimeGraph({
@@ -117,7 +121,8 @@ export async function resumeFromPayloadScripts(
 	let runtime: ResumeRuntime | undefined;
 	const applyDomJournal =
 		input.applyDomJournal ??
-		((entries) =>
+		(async (entries) => {
+			const { applyDomJournalEntries } = await import('./dom-journal.ts');
 			applyDomJournalEntries(entries, {
 				resolveTarget(locator) {
 					const rangeAnchor = /^(branch|async-boundary):(.+?):(start|end)$/.exec(
@@ -132,7 +137,9 @@ export async function resumeFromPayloadScripts(
 					}
 					return runtime?.getElement(String(locator));
 				},
-			}));
+			});
+		});
+	const { createResumeRuntime } = await import('./resume.ts');
 	runtime = createResumeRuntime({
 		root: input.root,
 		graph,
@@ -182,7 +189,7 @@ export async function resumeFromPayloadDocument(
 function asyncComputedFromPayload(
 	input: Parameters<typeof createRuntimeGraphFromResumePayload>[0],
 	graphRef: () => RuntimeGraph,
-): Promise<NonNullable<Parameters<typeof createRuntimeGraph>[0]['asyncComputed']>> {
+): Promise<NonNullable<Parameters<RuntimeModule['createRuntimeGraph']>[0]['asyncComputed']>> {
 	const runnerSymbols = asyncRunnerSymbolsByGraphNode(input.view);
 	return Promise.all(input.state.computed.flatMap(async (computed) => {
 		if (computed.async !== true) return [];
@@ -215,7 +222,7 @@ async function deserializeAsyncComputedSnapshot(
 	snapshot: NonNullable<ProtocolStatePayload['computed'][number]['snapshot']>,
 ) {
 	if (snapshot.status === 'idle') return snapshot;
-	const key = await deserializeGraphValueForClient(snapshot.key as SerializedGraphPayload);
+	const key = await deserializeGraphValue(snapshot.key as SerializedGraphPayload);
 	if (snapshot.status === 'pending') {
 		return { status: snapshot.status, version: snapshot.version, key };
 	}
@@ -224,14 +231,14 @@ async function deserializeAsyncComputedSnapshot(
 			status: snapshot.status,
 			version: snapshot.version,
 			key,
-			value: await deserializeGraphValueForClient(snapshot.value as SerializedGraphPayload),
+			value: await deserializeGraphValue(snapshot.value as SerializedGraphPayload),
 		};
 	}
 	return {
 		status: snapshot.status,
 		version: snapshot.version,
 		key,
-		error: await deserializeGraphValueForClient(snapshot.error as SerializedGraphPayload),
+		error: await deserializeGraphValue(snapshot.error as SerializedGraphPayload),
 	};
 }
 
@@ -275,6 +282,72 @@ function alreadyResumedWarning(): ResumeAlreadyResumedWarning {
 		suggestions: [{ message: 'Resume each served container once, or dispose before resuming again.' }],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_RESUME_ALREADY_RESUMED',
 	};
+}
+
+export function readPayloadScriptsFromDocument(
+	document: PayloadScriptDocument,
+): EncodedPayloadScripts {
+	return {
+		stateScript: readPayloadScriptFromDocument(document, 'markless/state'),
+		viewScript: readPayloadScriptFromDocument(document, 'markless/view'),
+	};
+}
+
+export function decodePayloadScriptsFromDocument(
+	document: PayloadScriptDocument,
+): DecodedPayloadScripts {
+	return decodePayloadScripts(readPayloadScriptsFromDocument(document));
+}
+
+function readPayloadScriptFromDocument(
+	document: PayloadScriptDocument,
+	type: RuntimePayloadType,
+): string {
+	const selector = `script[type="${type}"]`;
+	const element = document.querySelector(selector);
+	if (!element) {
+		throw new RuntimePayloadError({
+			code: 'MARKLESS_PAYLOAD_INVALID',
+			severity: 'error',
+			phase: 'payload',
+			title: 'Invalid Markless payload',
+			payloadType: type,
+			payloadScript: '',
+			message: `Missing ${type} payload script.`,
+			why: `Browser resume requires the ${selector} script to exist before decoding.`,
+			suggestions: [{ message: `Include a ${selector} script in the rendered document.` }],
+			docsUrl: 'https://markless.dev/errors/MARKLESS_PAYLOAD_INVALID',
+		});
+	}
+
+	const text = element.textContent ?? element.text ?? element.innerHTML;
+	if (text == null) {
+		throw new RuntimePayloadError({
+			code: 'MARKLESS_PAYLOAD_INVALID',
+			severity: 'error',
+			phase: 'payload',
+			title: 'Invalid Markless payload',
+			payloadType: type,
+			payloadScript: '',
+			message: `Missing ${type} payload script content.`,
+			why: `Browser resume found ${selector}, but it did not expose text content.`,
+			suggestions: [{ message: `Render JSON payload content inside ${selector}.` }],
+			docsUrl: 'https://markless.dev/errors/MARKLESS_PAYLOAD_INVALID',
+		});
+	}
+
+	return `<script type="${type}">${text}</script>`;
+}
+
+function runtimeModule(): Promise<RuntimeModule> {
+	runtimeModulePromise ??= import('@markless/runtime');
+	return runtimeModulePromise;
+}
+
+async function deserializeGraphValue(payload: SerializedGraphPayload): Promise<unknown> {
+	valueDecoderPromise ??= import('../../serializer/src/value-decode-client.ts');
+	const { deserializeGraphValueForClient } = await valueDecoderPromise;
+	return deserializeGraphValueForClient(payload);
 }
 
 function documentTemplateBranchHtml(
