@@ -13,14 +13,10 @@ export async function marklessDispatchScalar(input: {
 	readonly syncPolicyAlreadyApplied?: boolean;
 }): Promise<void> {
 	if (!input.eventRecord) {
-		const error = new Error('MARKLESS_SCALAR_DISPATCH_RECORD_MISSING: Cannot dispatch scalar event without a matched event record.');
-		Object.assign(error, {
+		throw Object.assign(new Error('MARKLESS_SCALAR_DISPATCH_RECORD_MISSING'), {
 			code: 'MARKLESS_SCALAR_DISPATCH_RECORD_MISSING',
-			severity: 'error',
-			phase: 'runtime',
-			docsUrl: 'https://markless.dev/errors/MARKLESS_SCALAR_DISPATCH_RECORD_MISSING',
+			site: 'dispatch-record',
 		});
-		throw error;
 	}
 	return input.container.dispatch(input.event, {
 		element: input.element,

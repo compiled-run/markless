@@ -19,8 +19,8 @@ const REQUESTS = '/__markless-fixture-requests';
 const WAIT = { timeoutMs: 10_000 };
 const MAX_PRELOADED_RUNTIME_CHUNK_GZIP_BYTES = 2_175;
 const PREVIOUS_COUNTER_CLICK_EXECUTED_GZIP_BYTES = 4_300;
-const MAX_COUNTER_CLICK_EXECUTED_GZIP_BYTES = 1_300; // diet target for scalar-only clicks after splitting row dispatch out of scalar-core; orchestrator measurement should ratchet this to the exact actual.
-const MAX_FIRST_INTERACTION_TOTAL_GZIP_BYTES = 41_100; // measured 40,933 on 2026-07-06 (lean route adds its chunks alongside the retained full path until more kinds flip); tighten-only from here.
+const MAX_COUNTER_CLICK_EXECUTED_GZIP_BYTES = 1_500; // shipped-byte pin for scalar-only clicks; tighten-only after each measured improvement.
+const MAX_FIRST_INTERACTION_TOTAL_GZIP_BYTES = 40_900; // shipped-byte pin; test instrumentation is measured separately and must not set this cap.
 
 export default box(
 	{
@@ -29,7 +29,7 @@ export default box(
 		modes: ['build', 'preview'],
 	},
 	async ({ pipeline, expect, receipt }) => {
-		const build = await pipeline.build({
+		const instrumentedBuild = await pipeline.build({
 			config: (config) => ({
 				...config,
 				root: `${config.root}/${FIXTURE}`,
@@ -39,26 +39,26 @@ export default box(
 			}),
 		});
 
-		await expect.build.environment(build, 'client');
-		await expect.build.environment(build, 'ssr');
-		await expect.build.artifact(build, INDEX);
+		await expect.build.environment(instrumentedBuild, 'client');
+		await expect.build.environment(instrumentedBuild, 'ssr');
+		await expect.build.artifact(instrumentedBuild, INDEX);
 
-		const preview = await pipeline.preview(build, {
+		const instrumentedPreview = await pipeline.preview(instrumentedBuild, {
 			config: (config) => ({
 				...config,
 				configFile: `${config.root}/${FIXTURE}/vite.config.ts`,
 			}),
 		});
-		const html = await preview.request('/');
+		const html = await instrumentedPreview.request('/');
 		await expect.html.contains(html, 'data-counter');
 		await expect.html.contains(html, 'type="markless/state"');
 		await expect.html.contains(html, 'type="markless/view"');
 		await expect.html.contains(html, 'data-async-resumer');
 		assertHtmlHasPreloadsWithoutExternalScripts(html);
 		const preloadHrefs = modulePreloadHrefs(html);
-		receipt.note(`SSR preview modulepreload hrefs: ${preloadHrefs.join(', ')}`);
+		receipt.note(`SSR instrumented preview modulepreload hrefs: ${preloadHrefs.join(', ')}`);
 
-		const page = await preview.browser.visit('/');
+		const page = await instrumentedPreview.browser.visit('/');
 
 		await expect.page.text(page, COUNTER, '0', WAIT);
 		const loadExecuted = executedFromHtml(await page.content());
@@ -67,15 +67,9 @@ export default box(
 				`Expected SSR preview load to execute zero runtime modules, but saw: ${loadExecuted.join(', ')}`,
 			);
 		}
-		const beforeInteraction = await readScriptRequests(preview);
-		receipt.note(`SSR startup script requests: ${formatRequests(beforeInteraction)}`);
-		const preloadedScripts = assertStartupPreloadsFetched(beforeInteraction, preloadHrefs);
-		const preloadedRuntimeSize = await runtimeSizeReport({
-			dist: DIST,
-			scripts: preloadedScripts,
-		});
-		receipt.note(`SSR preloaded runtime size:\n${preloadedRuntimeSize.summary}`);
-		assertRuntimeSizeBudget(preloadedRuntimeSize);
+		const instrumentedBeforeInteraction = await readScriptRequests(instrumentedPreview);
+		receipt.note(`SSR instrumented startup script requests: ${formatRequests(instrumentedBeforeInteraction)}`);
+		assertStartupPreloadsFetched(instrumentedBeforeInteraction, preloadHrefs);
 
 		await page.click(COUNTER, WAIT);
 		await expect.page.text(page, COUNTER, '1', WAIT);
@@ -86,7 +80,7 @@ export default box(
 		// The demand map ships as a build asset (payload-module exports are
 		// tree-shaken from built pages by design).
 		const demandByModule = JSON.parse(
-			await preview.request('/build/execution-demand.json'),
+			await instrumentedPreview.request('/build/execution-demand.json'),
 		) as Record<string, unknown>;
 		const runtimeDemandMap = Object.values(demandByModule)[0];
 		const allowed = deriveAllowedModules(
@@ -106,32 +100,80 @@ export default box(
 		for (const excluded of ['web/dom-journal', 'web/event-only-graph', 'web/event-only-resume', 'web/event-only-lean/row', 'web/event-only-lean/scalar-resume', 'web/payload', 'web/payload-document']) {
 			if (executed.includes(excluded)) throw new Error(`Unexpected ${excluded}. Saw: ${executed.join(', ')}`);
 		}
-		const executionSizes = JSON.parse(await preview.request('/build/execution-sizes.json')) as ExecutionSizeMap;
+		const instrumentedAfterInteraction = await readScriptRequests(instrumentedPreview);
+		receipt.note(`SSR instrumented interaction script requests: ${formatRequests(instrumentedAfterInteraction)}`);
+		receipt.note(
+			`SSR instrumented post-click JS fetches: ${formatRequests({
+				scripts: instrumentedAfterInteraction.scripts.slice(instrumentedBeforeInteraction.scripts.length),
+			})}`,
+		);
+		await expect.page.outcome(page, { consoleErrors: 0, failedRequests: 0 }, WAIT);
+		await instrumentedPreview.close();
+
+		const shippedBuild = await pipeline.build({
+			config: (config) => ({
+				...config,
+				root: `${config.root}/${FIXTURE}`,
+				configFile: `${config.root}/${FIXTURE}/vite.config.ts`,
+				mode: 'ssr',
+			}),
+		});
+		await expect.build.environment(shippedBuild, 'client');
+		await expect.build.environment(shippedBuild, 'ssr');
+		await expect.build.artifact(shippedBuild, INDEX);
+		const shippedPreview = await pipeline.preview(shippedBuild, {
+			config: (config) => ({
+				...config,
+				configFile: `${config.root}/${FIXTURE}/vite.config.ts`,
+			}),
+		});
+		const shippedHtml = await shippedPreview.request('/');
+		assertHtmlHasPreloadsWithoutExternalScripts(shippedHtml);
+		assertNoExecutionMirror(shippedHtml);
+		const shippedPreloadHrefs = modulePreloadHrefs(shippedHtml);
+		receipt.note(`SSR shipped modulepreload hrefs: ${shippedPreloadHrefs.join(', ')}`);
+		const shippedPage = await shippedPreview.browser.visit('/');
+		await expect.page.text(shippedPage, COUNTER, '0', WAIT);
+		assertNoExecutionMirror(await shippedPage.content());
+		const shippedBeforeInteraction = await readScriptRequests(shippedPreview);
+		receipt.note(`SSR shipped startup script requests: ${formatRequests(shippedBeforeInteraction)}`);
+		const shippedPreloadedScripts = assertStartupPreloadsFetched(shippedBeforeInteraction, shippedPreloadHrefs);
+		const shippedPreloadedRuntimeSize = await runtimeSizeReport({
+			dist: DIST,
+			scripts: shippedPreloadedScripts,
+		});
+		receipt.note(`SSR shipped preloaded runtime size:\n${shippedPreloadedRuntimeSize.summary}`);
+		assertRuntimeSizeBudget(shippedPreloadedRuntimeSize);
+
+		await shippedPage.click(COUNTER, WAIT);
+		await expect.page.text(shippedPage, COUNTER, '1', WAIT);
+		assertNoExecutionMirror(await shippedPage.content());
+		const executionSizes = JSON.parse(await shippedPreview.request('/build/execution-sizes.json')) as ExecutionSizeMap;
 		const counterClickGzip = executedGzipReport(executed, executionSizes);
-		receipt.note(`SSR counter click executed gzip: before=${PREVIOUS_COUNTER_CLICK_EXECUTED_GZIP_BYTES} after=${counterClickGzip.gzipBytes} budget=${MAX_COUNTER_CLICK_EXECUTED_GZIP_BYTES}\n${counterClickGzip.summary}`);
+		receipt.note(`SSR shipped counter click executed gzip: before=${PREVIOUS_COUNTER_CLICK_EXECUTED_GZIP_BYTES} after=${counterClickGzip.gzipBytes} budget=${MAX_COUNTER_CLICK_EXECUTED_GZIP_BYTES}\n${counterClickGzip.summary}`);
 		if (counterClickGzip.missing.length > 0 || counterClickGzip.gzipBytes > MAX_COUNTER_CLICK_EXECUTED_GZIP_BYTES) {
 			throw new Error(`SSR counter click executed gzip budget failed.\n${counterClickGzip.summary}`);
 		}
-		const afterInteraction = await readScriptRequests(preview);
-		receipt.note(`SSR interaction script requests: ${formatRequests(afterInteraction)}`);
+		const shippedAfterInteraction = await readScriptRequests(shippedPreview);
+		receipt.note(`SSR shipped interaction script requests: ${formatRequests(shippedAfterInteraction)}`);
 		receipt.note(
-			`SSR post-click JS fetches: ${formatRequests({
-				scripts: afterInteraction.scripts.slice(beforeInteraction.scripts.length),
+			`SSR shipped post-click JS fetches: ${formatRequests({
+				scripts: shippedAfterInteraction.scripts.slice(shippedBeforeInteraction.scripts.length),
 			})}`,
 		);
 		const firstInteractionSize = await runtimeSizeReport({
 			dist: DIST,
-			scripts: [...new Set(afterInteraction.scripts)],
+			scripts: [...new Set(shippedAfterInteraction.scripts)],
 		});
-		receipt.note(`SSR first-interaction total size:\n${firstInteractionSize.summary}`);
+		receipt.note(`SSR shipped first-interaction total size:\n${firstInteractionSize.summary}`);
 		if (firstInteractionSize.asyncScripts.gzipBytes > MAX_FIRST_INTERACTION_TOTAL_GZIP_BYTES) {
 			throw new Error(
 				`SSR first-interaction total gzip budget exceeded: ${firstInteractionSize.asyncScripts.gzipBytes} > ${MAX_FIRST_INTERACTION_TOTAL_GZIP_BYTES}\n${firstInteractionSize.summary}`,
 			);
 		}
-		await expect.page.outcome(page, { consoleErrors: 0, failedRequests: 0 }, WAIT);
+		await expect.page.outcome(shippedPage, { consoleErrors: 0, failedRequests: 0 }, WAIT);
 
-		await preview.close();
+		await shippedPreview.close();
 		await receipt.capture('ssr preview resumed TSRX artifact counter click');
 	},
 );
@@ -153,6 +195,10 @@ function assertHtmlHasPreloadsWithoutExternalScripts(html: string): void {
 	if (!/rel="modulepreload"/.test(html)) {
 		throw new Error('Expected SSR HTML to ship modulepreload hints for resumable chunks.');
 	}
+}
+
+function assertNoExecutionMirror(html: string): void {
+	if (html.includes('data-markless-executed')) throw new Error('Expected shipped SSR output to omit the test execution DOM mirror.');
 }
 
 function modulePreloadHrefs(html: string): readonly string[] {

@@ -1,4 +1,5 @@
 import type { ResumeDomEvent, ResumeRuntimeErrorContext, ResumeRuntimeInput } from './resume-types.ts';
+import { enrichRuntimeErrorForReporting } from './runtime-error-reporting.ts';
 
 export const SHARED_PATCH_EVENT_TYPE = 'async:shared-patch';
 
@@ -26,7 +27,7 @@ export function createResumeRuntimeShared(input: ResumeRuntimeInput) {
 	) => {
 		if (!input.onError) return;
 		try {
-			const result = input.onError(error, context);
+			const result = input.onError(enrichRuntimeErrorForReporting(error, context), context);
 			if (isPromiseLike(result)) await result;
 		} catch {}
 	};

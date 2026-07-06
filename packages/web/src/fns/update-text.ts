@@ -12,14 +12,10 @@ export function marklessUpdateText(context: TextUpdateContext, fallbackHostNodeI
 } {
 	const locator = context.domUpdate?.hostNodeId ?? fallbackHostNodeId;
 	if (!locator) {
-		const error = new Error('MARKLESS_TEXT_UPDATE_RECORD_MISSING: Cannot apply text update without a DOM update record.');
-		Object.assign(error, {
+		throw Object.assign(new Error('MARKLESS_TEXT_UPDATE_RECORD_MISSING'), {
 			code: 'MARKLESS_TEXT_UPDATE_RECORD_MISSING',
-			severity: 'error',
-			phase: 'runtime',
-			docsUrl: 'https://markless.dev/errors/MARKLESS_TEXT_UPDATE_RECORD_MISSING',
+			site: 'text-record',
 		});
-		throw error;
 	}
 	return { type: 'setText', locator, value: context.value };
 }

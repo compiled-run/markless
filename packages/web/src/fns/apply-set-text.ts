@@ -19,10 +19,8 @@ export function marklessApplySetText(result: unknown, elementsByHostId: Map<stri
 }
 
 function marklessSetTextError(site: string): Error {
-	return Object.assign(new Error('MARKLESS_SCALAR_LEAN_ESCALATE: Scalar core cannot serve site=' + site), {
+	return Object.assign(new Error('MARKLESS_SCALAR_LEAN_ESCALATE'), {
 		code: 'MARKLESS_SCALAR_LEAN_ESCALATE',
-		severity: 'error',
-		phase: 'runtime',
-		docsUrl: 'https://markless.dev/errors/MARKLESS_SCALAR_LEAN_ESCALATE',
+		site,
 	});
 }

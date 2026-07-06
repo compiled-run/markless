@@ -32,10 +32,10 @@ type ScalarWriteInput =
 	  };
 
 export function marklessWriteScalar(context: ScalarWriteContext, input: ScalarWriteInput): unknown {
-	if (!context.graph) throw marklessScalarLeafError('MARKLESS_SCALAR_WRITE_GRAPH_MISSING', input.graphNodeId);
-	if ((input.path?.length ?? 0) !== 0) throw marklessScalarLeafError('MARKLESS_SCALAR_WRITE_SHAPE', input.graphNodeId);
+	if (!context.graph) throw marklessScalarLeafError('MARKLESS_SCALAR_WRITE_GRAPH_MISSING', 'write-graph');
+	if ((input.path?.length ?? 0) !== 0) throw marklessScalarLeafError('MARKLESS_SCALAR_WRITE_SHAPE', 'write-path');
 	if (context.graph.hasCell?.(input.graphNodeId) === false) {
-		throw marklessScalarLeafError('MARKLESS_SCALAR_WRITE_CELL_MISSING', input.graphNodeId);
+		throw marklessScalarLeafError('MARKLESS_SCALAR_WRITE_CELL_MISSING', 'write-cell');
 	}
 	context.graph.read?.(input.graphNodeId, []);
 	if ('update' in input) {
@@ -49,14 +49,6 @@ export function marklessWriteScalar(context: ScalarWriteContext, input: ScalarWr
 	context.graph.write({ graphNodeId: input.graphNodeId, path: [], value: input.value });
 }
 
-function marklessScalarLeafError(code: string, graphNodeId: string): Error {
-	const error = new Error(`${code}: Cannot apply scalar write for ${graphNodeId}.`);
-	Object.assign(error, {
-		code,
-		severity: 'error',
-		phase: 'runtime',
-		docsUrl: `https://markless.dev/errors/${code}`,
-		graphNodeId,
-	});
-	return error;
+function marklessScalarLeafError(code: string, site: string): Error {
+	return Object.assign(new Error(code), { code, site });
 }
