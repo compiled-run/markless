@@ -59,7 +59,7 @@ export function outputDefaults(
 	}
 
 	next.entryFileNames ??= `${MARKLESS_BUILD_PREFIX}chunk-[hash].js`;
-	next.chunkFileNames ??= `${MARKLESS_BUILD_PREFIX}[name]-[hash].js`;
+	next.chunkFileNames ??= `${MARKLESS_BUILD_PREFIX}chunk-[hash].js`;
 	next.minifyInternalExports = false;
 	next.strictExecutionOrder = true;
 	next.codeSplitting = marklessCodeSplitting(next.codeSplitting);
