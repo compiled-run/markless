@@ -1,4 +1,4 @@
-import type { SerializedGraphPayload, SerializedSlot } from '../../serializer/src/value-decode-client.ts';
+import type { SerializedGraphPayload } from '../../serializer/src/value-decode-client.ts';
 import type { ProtocolStatePayload, ProtocolViewPayload } from '../../serializer/src/protocol.ts';
 import type {
 	DomJournalEntry,
@@ -11,6 +11,13 @@ import type {
 	EventOnlyResumeDomElement,
 	EventOnlyResumeSymbol,
 } from './event-only-lean/types.ts';
+import {
+	decodeScalarSlot,
+	eventOnlyGraphCells,
+	pathsIntersect,
+	readPath,
+	writePath,
+} from './event-only-lean/scalar.ts';
 export type EventOnlyResumeGraph = {
 	read(graphNodeId: string, path?: ReadonlyArray<string>): unknown;
 	write(write: RuntimeGraphWrite): void;
@@ -35,13 +42,9 @@ export async function createEventOnlyResumeGraph(input: {
 	readonly elementsByHostId: ReadonlyMap<string, EventOnlyResumeDomElement>;
 	readonly resolveElementByHostId?: (hostNodeId: string) => Promise<EventOnlyResumeDomElement | undefined>;
 }): Promise<EventOnlyResumeGraph> {
-	const existingCells = input.root.__marklessEventOnlyGraph;
-	const cells = existingCells ?? new Map<string, unknown>();
+	const cells = eventOnlyGraphCells(input.root);
 	const cellPayloads = new Map(input.state.cells.map((cell) => [cell.graphNodeId, cell.value]));
 	const dirtyPaths: DirtyPath[] = [];
-	if (!existingCells) {
-		input.root.__marklessEventOnlyGraph = cells;
-	}
 	const materializeCell = (graphNodeId: string): void => {
 		if (cells.has(graphNodeId)) return;
 		const payload = cellPayloads.get(graphNodeId);
@@ -146,18 +149,6 @@ async function decodeEventOnlyCellValue(payload: SerializedGraphPayload): Promis
 	const { deserializeGraphValueForClient } = await import('../../serializer/src/value-decode-client.ts');
 	return deserializeGraphValueForClient(payload);
 }
-function decodeScalarSlot(slot: SerializedSlot): unknown {
-	if (
-		slot === null ||
-		typeof slot === 'string' ||
-		typeof slot === 'number' ||
-		typeof slot === 'boolean'
-	) return slot;
-	if (slot.$type === 'undefined') return undefined;
-	if (slot.$type === 'bigint') return BigInt(slot.value);
-	if (slot.$type === 'date') return new Date(slot.value);
-	return undefined;
-}
 async function flushSyncComputeds(input: {
 	readonly graph: EventOnlyResumeGraph;
 	readonly pending: ReadonlyArray<DirtyPath>;
@@ -261,39 +252,9 @@ function syncComputedRecords(state: ProtocolStatePayload): EventOnlySyncComputed
 			typeof (computed as EventOnlySyncComputedRecord).deriveSymbolId === 'string',
 	);
 }
-function readPath(value: unknown, path: ReadonlyArray<string>): unknown {
-	let cursor = value as Record<string, unknown> | null | undefined;
-	for (const key of path) {
-		if (cursor == null) return undefined;
-		cursor = cursor[key] as Record<string, unknown> | null | undefined;
-	}
-	return cursor;
-}
-function writePath(value: unknown, path: ReadonlyArray<string>, nextValue: unknown): unknown {
-	if (path.length === 0) return nextValue;
-	const root = isRecord(value) ? value : {};
-	let cursor = root;
-	for (const key of path.slice(0, -1)) {
-		const child = cursor[key];
-		if (!isRecord(child)) cursor[key] = {};
-		cursor = cursor[key] as Record<string, unknown>;
-	}
-	cursor[path[path.length - 1]!] = nextValue;
-	return root;
-}
-function pathsIntersect(a: ReadonlyArray<string>, b: ReadonlyArray<string>): boolean {
-	return startsWithPath(a, b) || startsWithPath(b, a);
-}
-function startsWithPath(path: ReadonlyArray<string>, prefix: ReadonlyArray<string>): boolean {
-	if (path.length < prefix.length) return false;
-	return prefix.every((part, index) => path[index] === part);
-}
 function stringifyDomValue(value: unknown): string {
 	if (value == null) return '';
 	return String(value);
-}
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === 'object' && value !== null;
 }
 async function resolveSymbol(
 	value: EventOnlyResumeSymbol | Promise<EventOnlyResumeSymbol>,

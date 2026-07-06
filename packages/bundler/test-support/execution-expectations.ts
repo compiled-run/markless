@@ -45,13 +45,10 @@ export type RuntimeDispatchAction = {
 
 export const MODULE_GROUPS: Record<ModuleGroup, ReadonlySet<string>> = {
 	'dispatch-core': new Set([
-		'core/web/event-only-resume',
-		'web/event-only-resume',
-		'web/inline/payload-document',
-		'web/event-only-graph',
+		'web/fns/dispatch-scalar',
 	]),
 	'sync-policy': new Set(['web/inline/sync-policy-core']),
-	'dom-update': new Set(['web/dom-journal', 'web/dom-update']),
+	'dom-update': new Set(['web/fns/update-text']),
 	'keyed-repeat': new Set(['web/repeat-runtime', 'web/resume-keyed-repeats']),
 	branch: new Set(['web/resume-branches']),
 	'async-boundary': new Set(['web/resume-async-boundaries']),
@@ -166,7 +163,7 @@ function requiresFullRuntimeTier(inventory: PayloadRecordInventory): boolean {
 // module ran — allowed by construction. The demand map (slice 3) replaces this rule
 // with per-action generated sets.
 function isRuntimeCatalogFunction(id: string): boolean {
-	return id.startsWith('web/fns/');
+	return id === 'web/fns/write-scalar';
 }
 
 function isMarklessRuntimeModule(id: string): boolean {

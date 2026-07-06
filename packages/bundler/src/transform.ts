@@ -80,6 +80,7 @@ export async function transformTsrxModule(
 			id: resumeId,
 			type: 'resume',
 			source: emitResumeModule({
+				payloadId,
 				resolverId,
 				executionLog: input.executionLog,
 				needsFullResume:
