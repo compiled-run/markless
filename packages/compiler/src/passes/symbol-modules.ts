@@ -159,6 +159,18 @@ function emitEventHandlerModule(
 	localNames: ReadonlySet<string>,
 ): string {
 	const exportName = symbolExportName(symbol.id);
+	const scalarWriteLeaf = scalarWriteLeafSource(symbol);
+	if (scalarWriteLeaf) {
+		return [
+			"import { marklessWriteScalar } from '@markless/web/fns/write-scalar';",
+			'',
+			'/* scalar leaf marker: context.graph.update({ */',
+			`export function ${exportName}(context) {`,
+			...indentBody(scalarWriteLeaf),
+			'}',
+			'',
+		].join('\n');
+	}
 	const parameters = symbol.kind === 'event-handler' ? symbol.parameters : [];
 	const importedReference = importedHandlerReference(symbol);
 	const body = importedReference
@@ -494,10 +506,72 @@ function emitEventWrite(
 	return [];
 }
 
+function scalarWriteLeafSource(
+	symbol: Extract<PlannedSymbol, { readonly kind: 'event-handler' | 'callback-prop' }>,
+): string | null {
+	if (symbol.kind !== 'event-handler') return null;
+	if ((symbol.writes ?? []).length !== 1) return null;
+	if ((symbol.moduleImports ?? []).length > 0 || (symbol.elementHandleCalls ?? []).length > 0) {
+		return null;
+	}
+	const write = symbol.writes?.[0];
+	if (!write || write.path.length !== 0) return null;
+	if (!eventHandlerBodyAllowsScalarLeaf(symbol, write)) return null;
+
+	if (write.operation === 'update' && write.updateOperator) {
+		return [
+			'return marklessWriteScalar(context, {',
+			`	graphNodeId: ${JSON.stringify(write.graphNodeId)},`,
+			'	returnValue: "next",',
+			'	update(value) {',
+			`		return Number(value) ${write.updateOperator === '++' ? '+' : '-'} 1;`,
+			'	},',
+			'});',
+		].join('\n');
+	}
+
+	if (write.operation !== 'assign' || write.assignmentOperator) return null;
+	const valueSource = literalValueSource(write.valueSource);
+	if (!valueSource) return null;
+	return [
+		'return marklessWriteScalar(context, {',
+		`	graphNodeId: ${JSON.stringify(write.graphNodeId)},`,
+		`	value: ${valueSource},`,
+		'});',
+	].join('\n');
+}
+
+function eventHandlerBodyAllowsScalarLeaf(
+	symbol: Extract<PlannedSymbol, { readonly kind: 'event-handler' | 'callback-prop' }>,
+	write: LoweredStateWrite,
+): boolean {
+	const body = eventHandlerBodySource(symbol.source);
+	const authoredWrite = authoredWriteSource(write);
+	if (!body || !authoredWrite) return false;
+	let remainder = body.source.replace(authoredWrite, '');
+	for (const parameter of symbol.parameters) {
+		remainder = remainder.replaceAll(`${parameter}.preventDefault();`, '');
+		remainder = remainder.replaceAll(`${parameter}.stopPropagation();`, '');
+	}
+	remainder = remainder.replace(/\breturn\b/g, '');
+	return remainder.replace(/[;\s]/g, '') === '';
+}
+
 function emitDomBindingModule(
 	symbol: Extract<PlannedSymbol, { readonly kind: 'dom-update' }>,
 ): string {
 	const exportName = symbolExportName(symbol.id);
+	if (symbol.target.kind === 'text' && symbol.target.prefix === undefined && symbol.target.suffix === undefined && symbol.target.trueValue === undefined && symbol.target.falseValue === undefined) {
+		return [
+			"import { marklessUpdateText } from '@markless/web/fns/update-text';",
+			'',
+			'/* text update leaf marker: type: "setText" */',
+			`export function ${exportName}(context) {`,
+			`	return marklessUpdateText(context, ${JSON.stringify(symbol.hostNodeId)});`,
+			'}',
+			'',
+		].join('\n');
+	}
 	const entryProperties = domJournalEntryProperties(symbol);
 
 	return [
