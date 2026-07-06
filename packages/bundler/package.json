@@ -14,6 +14,7 @@
 	},
 	"dependencies": {
 		"@markless/compiler": "workspace:*",
+		"@markless/web": "workspace:*",
 		"@thi.ng/dgraph": "catalog:",
 		"pathe": "catalog:",
 		"ufo": "catalog:"

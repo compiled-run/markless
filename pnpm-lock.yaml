@@ -112,6 +112,9 @@ importers:
       '@markless/compiler':
         specifier: workspace:*
         version: link:../compiler
+      '@markless/web':
+        specifier: workspace:*
+        version: link:../web
       '@thi.ng/dgraph':
         specifier: 'catalog:'
         version: 2.1.209

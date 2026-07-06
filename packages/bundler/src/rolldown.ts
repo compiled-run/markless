@@ -144,6 +144,15 @@ export function createMarklessRolldownPlugin(input: {
 			return outputDefaults(output, getEnvironment(this));
 		},
 		async resolveId(source, importer) {
+			// Emitted modules import runtime catalog functions as '@markless/web/fns/*'.
+			// Apps depend on @markless/core only, so the bundler resolves the catalog
+			// from its own dependency on @markless/web (generated-code-only surface).
+			if (source.startsWith('@markless/web/fns/')) {
+				const resolved = import.meta.resolve(source);
+				if (resolved?.startsWith('file://')) {
+					return { id: decodeURIComponent(resolved.slice('file://'.length)) };
+				}
+			}
 			const normalized = normalizeVirtualId(source);
 			if (normalized === MARKLESS_EXECUTION_LOG_MODULE_ID) {
 				return { id: resolveVirtualId(MARKLESS_EXECUTION_LOG_MODULE_ID), moduleSideEffects: true };
