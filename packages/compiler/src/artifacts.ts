@@ -714,12 +714,17 @@ export type RuntimeDemandMapAction = {
 	readonly hostNodeId: string;
 	readonly eventName: string;
 	readonly recordKind: 'event' | 'keyed-repeat-row';
+	readonly recordKinds: ReadonlyArray<string>;
 	readonly runtimeModuleIds: ReadonlyArray<string>;
 };
 
 export type RuntimeDemandMapArtifact = {
 	readonly passId: 'runtime-demand-map';
 	readonly version: 1;
+	readonly recordKinds: ReadonlyArray<{
+		readonly kind: string;
+		readonly replaced: boolean;
+	}>;
 	readonly symbols: ReadonlyArray<{
 		readonly symbolId: string;
 		readonly kind: PlannedSymbol['kind'];
