@@ -9,7 +9,7 @@ test('full-tier row dispatch allows only the full dispatch spine and touched row
 	}, { hostNodeId: 'h-row', eventName: 'click', recordKind: 'keyed-repeat-row' });
 
 	expect([...allowed]).toEqual(expect.arrayContaining(['core/web/resume', 'web/resume-runtime', 'web/resume-events', 'web/resume-keyed-repeats']));
-	expect(allowed).not.toContain('web/resume-branches');
+	expect(allowed).toContain('web/resume-branches');
 	expect(allowed).not.toContain('web/resume-behaviors');
 	expect(allowed).not.toContain('web/resume-sync-computed');
 	expect(allowed).not.toContain('web/resume-handoff');

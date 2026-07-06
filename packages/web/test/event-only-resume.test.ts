@@ -563,3 +563,52 @@ test('event-only resume accepts wildcard dynamic-tag locators', async () => {
 
 	expect(result.graph.read('state:count')).toBe(0);
 });
+
+test('event-only resume hands unsupported served view records to the full runtime', async () => {
+	for (const extra of [
+		{
+			branches: [{
+				id: 'branch-site:0',
+				startAnchor: { strategy: 'dom-order-comment', index: 0 },
+				endAnchor: { strategy: 'dom-order-comment', index: 1 },
+				symbolId: 'symbol:branch',
+				testReads: [],
+			}],
+		},
+		{ futureRecords: [{ id: 'future:0' }] },
+	]) {
+		const button = element('BUTTON');
+		const root = element('DIV', [button]);
+		const state = createProtocolStatePayload({ cells: [] });
+		const view = {
+			version: 1,
+			locators: [
+				{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'div' },
+				{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'button' },
+			],
+			events: [{ hostNodeId: 'h1', eventName: 'click', symbolIds: ['symbol:event'] }],
+			domUpdates: [],
+			behaviors: [],
+			elementHandles: [],
+			asyncBoundaries: [],
+			...extra,
+		} as ProtocolViewPayload & { readonly futureRecords?: ReadonlyArray<{ readonly id: string }> };
+		const scripts = renderPayloadScripts({ state, view });
+		const document = payloadDocument(scripts.stateScript, scripts.viewScript);
+		const fullResume = vi.fn(async () => undefined);
+		const loadSymbol = vi.fn(() => () => undefined);
+
+		await resumeEventOnlyFromPayloadDocument({
+			document,
+			root,
+			event: { type: 'click', target: button },
+			loadSymbol,
+			loadFullResume: fullResume,
+		} as Parameters<typeof resumeEventOnlyFromPayloadDocument>[0] & {
+			readonly loadFullResume: typeof fullResume;
+		});
+
+		expect(fullResume).toHaveBeenCalledWith(expect.objectContaining({ document, root, loadSymbol }));
+		expect(loadSymbol).not.toHaveBeenCalled();
+	}
+});

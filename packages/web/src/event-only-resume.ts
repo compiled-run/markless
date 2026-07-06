@@ -35,6 +35,11 @@ type EventOnlyResumeContainerState = EventOnlyResumeContainer & {
 	readonly locatorsByHostId: ReadonlyMap<string, ProtocolViewPayload['locators'][number]>;
 	readonly activeBehaviorHosts: Set<string>;
 };
+type FullResumeHandoffInput = ResumeEventOnlyFromPayloadDocumentInput & {
+	readonly loadFullResume?: (
+		input: ResumeEventOnlyFromPayloadDocumentInput,
+	) => unknown | Promise<unknown>;
+};
 
 const containers = new WeakMap<EventOnlyResumeDomElement, EventOnlyResumeContainerState>();
 const noElementHandle = () => undefined;
@@ -46,6 +51,24 @@ export async function resumeEventOnlyFromPayloadDocument(
 	if (!container) {
 		const { decodePayloadScriptsFromDocument } = await import('./inline/payload-document.ts');
 		const { state, view } = decodePayloadScriptsFromDocument(input.document);
+		if (viewNeedsFullResume(view)) {
+			const loadFullResume = (input as FullResumeHandoffInput).loadFullResume;
+			if (!loadFullResume) {
+				throw new Error(
+					'Event-only resume cannot dispatch a payload that declares full-resume view records.',
+				);
+			}
+			await loadFullResume({
+				document: input.document,
+				root: input.root,
+				event: input.event,
+				element: input.element,
+				eventRecord: input.eventRecord,
+				syncPolicyAlreadyApplied: input.syncPolicyAlreadyApplied,
+				loadSymbol: input.loadSymbol,
+			});
+			return undefined as unknown as EventOnlyResumeContainer;
+		}
 		container = await createEventOnlyResumeContainerState({
 			state,
 			view,
@@ -62,6 +85,29 @@ export async function resumeEventOnlyFromPayloadDocument(
 	});
 	return container;
 }
+
+function viewNeedsFullResume(view: ProtocolViewPayload): boolean {
+	if ((view.branches?.length ?? 0) > 0) return true;
+	if ((view.keyedRepeats?.length ?? 0) > 0) return true;
+	if (view.elementHandles.length > 0) return true;
+	if (view.asyncBoundaries.length > 0) return true;
+	for (const key of Object.keys(view)) {
+		if (!eventOnlyViewRecordKeys.has(key)) return true;
+	}
+	return false;
+}
+
+const eventOnlyViewRecordKeys = new Set([
+	'version',
+	'locators',
+	'events',
+	'domUpdates',
+	'behaviors',
+	'elementHandles',
+	'keyedRepeats',
+	'branches',
+	'asyncBoundaries',
+]);
 
 export function createEventOnlyResumeContainerFromPayloads(
 	input: CreateEventOnlyResumeContainerInput,
