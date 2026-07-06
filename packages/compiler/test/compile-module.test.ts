@@ -2148,9 +2148,10 @@ export function Card({ children }) @{
 	const output = await (
 		ssrModule.marklessRenderSsr as (props: {
 			readonly children?: string;
-		}) => Promise<{ readonly html: string }>
+		}) => Promise<{ readonly elementCount: number; readonly html: string }>
 	)({ children: '<p class="projected">Projected content</p>' });
 	expect(output.html).toContain('<p class="projected">Projected content</p>');
+	expect(output.elementCount).toBe(3);
 });
 
 test('compileTsrxModule supports control-flow children in fragment roots', async () => {

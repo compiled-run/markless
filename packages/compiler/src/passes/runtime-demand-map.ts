@@ -32,6 +32,8 @@ const FULL_TIER = [
 	'web/payload-graph-construct',
 	'web/resume-async-wiring',
 ];
+const RECORD_KIND_PHASES = ['async-boundary', 'behavior', 'branch', 'dom-update', 'element-handle', 'event', 'keyed-repeat']
+	.map((kind) => ({ kind, replaced: false }));
 
 export function createRuntimeDemandMap(input: {
 	readonly symbolResolver: SymbolResolverPlan;
@@ -49,6 +51,7 @@ export function createRuntimeDemandMap(input: {
 	return {
 		passId: 'runtime-demand-map',
 		version: 1,
+		recordKinds: RECORD_KIND_PHASES,
 		symbols,
 		payloadRecords,
 		actions: actionDemandRecords(input.symbolResolver, input.protocolView, payloadRecords, symbolDemand),
@@ -155,40 +158,53 @@ function actionDemandRecords(
 	symbolDemand: ReadonlyMap<string, ReadonlyArray<string>>,
 ): RuntimeDemandMapArtifact['actions'] {
 	const branchDemand = view.branches?.length ? modulesForKind(records, 'branch') : [];
+	const branchKinds = view.branches?.length ? ['branch'] : [];
 	return [
-		...(view.events ?? []).map((event) => ({
-			hostNodeId: event.hostNodeId,
-			eventName: event.eventName,
-			recordKind: 'event' as const,
-			runtimeModuleIds: unique([
-				...recordModules(records, `event:${event.hostNodeId}:${event.eventName}`),
-				...branchDemand,
-				...writeSubscriberDemands(resolver, event.symbolIds ?? [], view, records),
-			]),
-		})),
-		...(view.keyedRepeats ?? []).flatMap((repeat) =>
-			repeat.rowEvents.map((event) => ({
-				hostNodeId: repeat.parentHostNodeId,
+		...(view.events ?? []).map((event) => {
+			const subscriberRecords = writeSubscriberRecords(resolver, event.symbolIds ?? [], view, records);
+			return {
+				hostNodeId: event.hostNodeId,
 				eventName: event.eventName,
-				recordKind: 'keyed-repeat-row' as const,
+				recordKind: 'event' as const,
+				recordKinds: unique(['event', ...branchKinds, ...subscriberRecords.map((record) => record.kind)]),
 				runtimeModuleIds: unique([
-					...recordModules(records, `keyed-repeat:${repeat.id}`),
-					...(event.syncPolicy ? SYNC_POLICY : []),
-					...symbolIdsDemand(event.symbolIds ?? [], symbolDemand),
+					...recordModules(records, `event:${event.hostNodeId}:${event.eventName}`),
 					...branchDemand,
-					...writeSubscriberDemands(resolver, event.symbolIds ?? [], view, records),
+					...subscriberRecords.flatMap((record) => record.runtimeModuleIds),
 				]),
-			})),
+			};
+		}),
+		...(view.keyedRepeats ?? []).flatMap((repeat) =>
+			repeat.rowEvents.map((event) => {
+				const subscriberRecords = writeSubscriberRecords(resolver, event.symbolIds ?? [], view, records);
+				return {
+					hostNodeId: repeat.parentHostNodeId,
+					eventName: event.eventName,
+					recordKind: 'keyed-repeat-row' as const,
+					recordKinds: unique([
+						'keyed-repeat',
+						...branchKinds,
+						...subscriberRecords.map((record) => record.kind),
+					]),
+					runtimeModuleIds: unique([
+						...recordModules(records, `keyed-repeat:${repeat.id}`),
+						...(event.syncPolicy ? SYNC_POLICY : []),
+						...symbolIdsDemand(event.symbolIds ?? [], symbolDemand),
+						...branchDemand,
+						...subscriberRecords.flatMap((record) => record.runtimeModuleIds),
+					]),
+				};
+			}),
 		),
 	];
 }
 
-function writeSubscriberDemands(
+function writeSubscriberRecords(
 	resolver: SymbolResolverPlan,
 	symbolIds: ReadonlyArray<string>,
 	view: ProtocolViewPayload,
 	records: RuntimeDemandMapArtifact['payloadRecords'],
-): ReadonlyArray<string> {
+): RuntimeDemandMapArtifact['payloadRecords'] {
 	const writes = resolver.symbols.flatMap((symbol) =>
 		symbolIds.includes(symbol.id) && (symbol.kind === 'event-handler' || symbol.kind === 'callback-prop')
 			? symbol.writes ?? []
@@ -202,14 +218,14 @@ function writeSubscriberDemands(
 				record.recordId === `dom-update:${update.hostNodeId}:${update.symbolId ?? ''}` &&
 				writes.some((write) => write.graphNodeId === update.graphNodeId && startsWithPath(update.path, write.path)),
 			),
-		).flatMap((record) => record.runtimeModuleIds),
+		),
 		...records.filter((record) =>
 			record.kind === 'async-boundary' &&
 			view.asyncBoundaries?.some((boundary) =>
 				record.recordId === `async-boundary:${boundary.id}` &&
 				boundary.asyncReads.some((read) => writes.some((write) => write.graphNodeId === read.graphNodeId)),
 			),
-		).flatMap((record) => record.runtimeModuleIds),
+		),
 	];
 }
 

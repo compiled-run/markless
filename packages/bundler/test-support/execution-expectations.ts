@@ -112,7 +112,34 @@ function exactActionModules(
 			`Demand map has no action entry for ${recordKind}:${action.hostNodeId}:${action.eventName}.`,
 		);
 	}
-	return match.runtimeModuleIds;
+	return [
+		...match.runtimeModuleIds,
+		...interpreterModulesForUnreplacedKinds(
+			map,
+			(match as { readonly recordKinds?: ReadonlyArray<string> }).recordKinds ?? [
+				recordKind === 'keyed-repeat-row' ? 'keyed-repeat' : recordKind,
+			],
+		),
+	];
+}
+
+function interpreterModulesForUnreplacedKinds(
+	map: RuntimeDemandMapManifest,
+	kinds: ReadonlyArray<string>,
+): ReadonlyArray<string> {
+	const phases = new Map(
+		((map as { readonly recordKinds?: ReadonlyArray<{ readonly kind: string; readonly replaced: boolean }> })
+			.recordKinds ?? []).map((kind) => [kind.kind, kind.replaced]),
+	);
+	return unique(
+		kinds.flatMap((kind) =>
+			phases.get(kind) === false ? interpreterChainForKind(kind) : [],
+		),
+	);
+}
+
+function interpreterChainForKind(kind: string): ReadonlyArray<string> {
+	return runtimeImportClosure(INTERPRETER_ROOTS_BY_KIND[kind] ?? []);
 }
 
 function runtimeImportsFromSource(source: string): string[] {
@@ -136,3 +163,44 @@ function isMarklessRuntimeModule(id: string): boolean {
 function isAllowedDispatchCoreVirtual(id: string): boolean {
 	return id.startsWith('virtual:markless:payload:') || id.startsWith('virtual:markless:symbol:');
 }
+
+const INTERPRETER_ROOTS_BY_KIND: Record<string, ReadonlyArray<string>> = {
+	event: ['core/web/event-only-resume', 'web/event-only-resume'],
+	'dom-update': ['core/web/resume', 'web/resume', 'web/fns/csr', 'web/fns/html', 'web/fns/state'],
+	'keyed-repeat': ['core/web/resume', 'web/resume'],
+	branch: ['core/web/resume', 'web/resume'],
+	'async-boundary': ['core/web/resume', 'web/resume'],
+	behavior: ['core/web/resume', 'web/resume'],
+	'element-handle': ['core/web/resume', 'web/resume'],
+};
+
+function runtimeImportClosure(roots: ReadonlyArray<string>): ReadonlyArray<string> {
+	const seen = new Set<string>();
+	const queue = [...roots];
+	for (const id of queue) {
+		if (seen.has(id)) continue;
+		seen.add(id);
+		for (const dep of RUNTIME_IMPORT_EDGES[id] ?? []) queue.push(dep);
+	}
+	return [...seen]
+		.filter((id) => isMarklessRuntimeModule(id) && !INTERPRETER_CHAIN_EXCLUDED_MODULES.has(id))
+		.sort();
+}
+
+function unique(values: ReadonlyArray<string | undefined>): string[] {
+	return [...new Set(values.filter((value): value is string => !!value))].sort();
+}
+
+const INTERPRETER_CHAIN_EXCLUDED_MODULES = new Set(['web/dom-journal']);
+const RUNTIME_IMPORT_EDGES: Record<string, ReadonlyArray<string>> = {
+	'core/web/event-only-resume': ['web/event-only-resume'],
+	'core/web/resume': ['web/resume'],
+	'web/event-only-resume': ['web/event-only-behaviors', 'web/event-only-graph', 'web/execution-log-target', 'web/inline/payload-document', 'web/inline/resume-errors', 'web/inline/sync-policy-core', 'web/payload'],
+	'web/payload': ['web/payload-full'],
+	'web/payload-full': ['web/payload-document', 'web/payload-graph-construct', 'web/payload-resume', 'web/payload-resume-registry'],
+	'web/payload-resume': ['web/dom-journal', 'web/payload-full', 'web/payload-graph-construct', 'web/payload-resume-registry', 'web/resume'],
+	'web/resume': ['web/inline/resume-errors', 'web/resume-runtime'],
+	'web/resume-events': ['web/execution-log-target', 'web/inline/sync-policy-core', 'web/resume-keyed-repeats'],
+	'web/resume-runtime': ['web/resume-behaviors', 'web/resume-branches', 'web/resume-events', 'web/resume-runtime-shared', 'web/resume-runtime-start'],
+	'web/resume-runtime-start': ['web/resume-async-wiring', 'web/resume-keyed-repeats', 'web/resume-locators', 'web/resume-runtime-shared', 'web/resume-sync-demand'],
+};
