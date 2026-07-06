@@ -45,6 +45,8 @@ export async function transformTsrxModule(
 	const symbolRoutes = compiled.semanticGraph.componentEdges.flatMap((edge, index) =>
 		edge.importSource ? [{ prefix: `c${index}:`, importSource: edge.importSource }] : [],
 	);
+	const executionLogModuleHookMode =
+		input.executionLogModuleHooks === false ? 'never' : input.executionLog;
 	const manifest: MarklessTransformManifest = {
 		source: input.filename,
 		payload: { virtualModuleId: payloadId },
@@ -102,7 +104,7 @@ export async function transformTsrxModule(
 						symbolRows[index]!.exportName,
 					),
 					`symbol:${module.symbolId}`,
-					input.executionLog,
+					executionLogModuleHookMode,
 				),
 			}),
 		),

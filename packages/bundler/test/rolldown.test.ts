@@ -473,6 +473,29 @@ let count = state(0);
 		expect(result.code).not.toContain('renderCsr:');
 	});
 
+	test('production client execution logging does not alter hash-bearing modules', async () => {
+		const plugin = marklessClient({ executionLog: 'auto' });
+		const filename = '/workspace/app/src/App.tsrx';
+
+		callBuildStart(plugin, { cwd: '/workspace/app' });
+
+		expect(
+			await callTransform(
+				plugin,
+				'export const runtime = true;',
+				'/workspace/app/packages/web/src/event-only-resume.ts',
+			),
+		).toBeNull();
+
+		await callTransform(plugin, source, filename);
+		const symbolId =
+			`virtual:markless:symbol:${encodeURIComponent(filename)}:${encodeURIComponent('symbol:0')}`;
+		const symbolSource = (await callLoad(plugin, `\0${symbolId}`)) as string;
+
+		expect(symbolSource).not.toContain('__mxLog?.add');
+		expect(symbolSource).toContain('export function symbol_0_');
+	});
+
 	test('buildStart clears stale virtual modules and transform manifests', async () => {
 		const plugin = marklessClient();
 
