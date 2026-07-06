@@ -2,9 +2,38 @@ import type { RuntimeGraph } from '@markless/runtime';
 import type { ResumeDomElement, ResumeKeyedRepeatRecord, ResumeViewRecord } from './resume-types.ts';
 import type { ResumeEventWiring } from './resume-events.ts';
 
-export function validateOneRepeat(graph: RuntimeGraph, repeat: ResumeKeyedRepeatRecord): void { assertUniqueRepeatKeys(repeat, readKeyedRepeatCollection(graph, repeat)); }
+type RepeatReadableGraph = Pick<RuntimeGraph, 'read'>;
+
+export function validateOneRepeat(graph: RepeatReadableGraph, repeat: ResumeKeyedRepeatRecord): void { assertUniqueRepeatKeys(repeat, readKeyedRepeatCollection(graph, repeat)); }
 export function findRepeatItemByKey(items: ReadonlyArray<unknown>, repeat: ResumeKeyedRepeatRecord, key: unknown): unknown {
 	for (const item of items) if (Object.is(repeatItemKey(item, repeat), key)) return item;
+}
+export function findKeyedRepeatRowEventMatch(input: {
+	readonly graph: RepeatReadableGraph;
+	readonly view: Pick<ResumeViewRecord, 'keyedRepeats'>;
+	readonly elementsByHostId: Map<string, ResumeDomElement>;
+	readonly target: ResumeDomElement | null | undefined;
+	readonly eventName: string;
+	readonly materializeHost: (hostNodeId: string) => ResumeDomElement | undefined;
+}): { readonly element: ResumeDomElement; readonly match: import('./resume-events.ts').ResumeRowEventMatch } | undefined {
+	for (let element = input.target; element; element = element.parentElement ?? null) {
+		for (const repeat of input.view.keyedRepeats ?? []) {
+			const rowEvents = repeat.rowEvents.filter((rowEvent) => rowEvent.eventName === input.eventName);
+			if (rowEvents.length === 0) continue;
+			validateOneRepeat(input.graph, repeat);
+			const parent = input.elementsByHostId.get(repeat.parentHostNodeId) ?? input.materializeHost(repeat.parentHostNodeId);
+			if (!parent) continue;
+			const items = readKeyedRepeatCollection(input.graph, repeat);
+			for (const [rowIndex, rowRoot] of elementChildren(parent).slice(0, items.length).entries()) {
+				const rowKey = repeatItemKey(items[rowIndex], repeat);
+				for (const rowEvent of rowEvents) {
+					if (rowEventHost(rowRoot, rowEvent.hostPath) === element) {
+						return { element, match: { repeat, parent, rowRoot, rowKey, rowEvent } };
+					}
+				}
+			}
+		}
+	}
 }
 export function wireKeyedRepeats(input: { readonly graph: RuntimeGraph; readonly view: ResumeViewRecord; readonly elementsByHostId: Map<string, ResumeDomElement>; readonly events: ResumeEventWiring; readonly storeContainerSubscription: (release: () => void) => void }): void {
 	for (const repeat of input.view.keyedRepeats ?? []) validateOneRepeat(input.graph, repeat);

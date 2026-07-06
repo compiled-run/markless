@@ -2674,10 +2674,12 @@ async function marklessRenderSsr(props = {}) {
 	};
 }",
     "symbolModules": "symbol:0
+import { marklessWriteScalar } from '@markless/web/fns/write-scalar';
+
+/* scalar leaf marker: context.graph.update({ */
 export function symbol_0(context) {
-	return context.graph.write({
+	return marklessWriteScalar(context, {
 		graphNodeId: "state:chosen",
-		path: [],
 		value: context.locals?.entry?.code,
 	});
 }

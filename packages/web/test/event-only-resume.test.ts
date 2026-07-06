@@ -89,6 +89,32 @@ function scalarRuntimeDemandMap(input: {
 	};
 }
 
+function rowRuntimeDemandMap(input: {
+	readonly repeat: NonNullable<ProtocolViewPayload['keyedRepeats']>[number];
+	readonly rowEvent: NonNullable<ProtocolViewPayload['keyedRepeats']>[number]['rowEvents'][number];
+	readonly domUpdate: ProtocolViewPayload['domUpdates'][number];
+	readonly replaced?: boolean;
+}): unknown {
+	const replaced = input.replaced ?? true;
+	return {
+		recordKinds: ['async-boundary', 'behavior', 'branch', 'dom-update', 'element-handle', 'event', 'keyed-repeat']
+			.map((kind) => ({
+				kind,
+				replaced: replaced && (kind === 'dom-update' || kind === 'keyed-repeat'),
+			})),
+		actions: [{
+			hostNodeId: input.repeat.parentHostNodeId,
+			eventName: input.rowEvent.eventName,
+			recordKind: 'keyed-repeat-row',
+			recordKinds: ['dom-update', 'keyed-repeat'],
+			payloadRecordIds: [
+				`dom-update:${input.domUpdate.hostNodeId}:${input.domUpdate.symbolId ?? ''}`,
+				`keyed-repeat:${input.repeat.id}`,
+			],
+		}],
+	};
+}
+
 test('event-only resume rejects structure-tampered payloads with structured payload errors', async () => {
 	const button = element('BUTTON');
 	const root = element('DIV', [button]);
@@ -593,6 +619,137 @@ test('event-only scalar lean route falls back to the full event container for be
 
 	expect(output.textContent).toBe('1');
 	expect(root.attributes['data-controller']).toBe('installed');
+});
+
+test('event-only scalar lean row route dispatches scalar writes and ignores handler returns', async () => {
+	const button = element('BUTTON');
+	const row = element('ARTICLE', [button]);
+	const parent = element('SECTION', [row]);
+	const output = element('OUTPUT');
+	const root = element('DIV', [parent, output]);
+	const state = createProtocolStatePayload({
+		cells: [
+			{ graphNodeId: 'state:chosen', name: 'chosen', valueKind: 'scalar', value: 'none' },
+			{ graphNodeId: 'state:cards', name: 'cards', valueKind: 'array', value: [{ key: 'north' }] },
+		],
+	});
+	const domUpdate = {
+		hostNodeId: 'hOutput',
+		source: 'chosen',
+		graphNodeId: 'state:chosen',
+		path: [],
+		target: { kind: 'text' as const },
+		symbolId: 'symbol:text',
+	};
+	const repeat = {
+		id: 'repeat:0',
+		parentHostNodeId: 'hParent',
+		collectionGraphNodeId: 'state:cards',
+		collectionPath: [],
+		keyPath: ['key'],
+		itemName: 'card',
+		rowElementCount: 1,
+		rowEvents: [{ hostPath: [0], eventName: 'click', symbolIds: ['symbol:row'] }],
+	};
+	const view: ProtocolViewPayload = {
+		version: 1,
+		locators: [
+			{ hostNodeId: 'hParent', strategy: 'dom-order', index: 1, tagName: 'section' },
+			{ hostNodeId: 'hOutput', strategy: 'dom-order', index: 4, tagName: 'output' },
+		],
+		events: [],
+		domUpdates: [domUpdate],
+		behaviors: [],
+		elementHandles: [],
+		keyedRepeats: [repeat],
+		branches: [],
+		asyncBoundaries: [],
+	};
+	const runtimeDemandMap = rowRuntimeDemandMap({ repeat, rowEvent: repeat.rowEvents[0], domUpdate });
+	const scripts = renderPayloadScripts({ state, view });
+
+	expect(isScalarLeanResumeShape({ state, view, eventName: 'click', runtimeDemandMap })).toBe(true);
+
+	await resumeScalarEventFromPayloadDocument({
+		document: payloadDocument(scripts.stateScript, scripts.viewScript),
+		root,
+		event: { type: 'click', target: button },
+		runtimeDemandMap,
+		loadSymbol(symbolId) {
+			if (symbolId === 'symbol:row') {
+				return ({ graph, locals }) => {
+					graph.write({ graphNodeId: 'state:chosen', value: (locals?.card as { readonly key: string }).key });
+					return { type: 'setText', locator: 'hOutput', value: 'handler-return-ignored' };
+				};
+			}
+			return ({ value }) => ({ type: 'setText', locator: 'hOutput', value });
+		},
+	});
+
+	expect(output.textContent).toBe('north');
+});
+
+test('event-only scalar lean row fallback creates the full event path cold', async () => {
+	const button = element('BUTTON');
+	const parent = element('SECTION', [element('ARTICLE', [button])]);
+	const root = element('DIV', [parent]);
+	const state = createProtocolStatePayload({
+		cells: [
+			{ graphNodeId: 'state:chosen', name: 'chosen', valueKind: 'scalar', value: 'none' },
+			{ graphNodeId: 'state:cards', name: 'cards', valueKind: 'array', value: [{ key: 'north' }] },
+		],
+	});
+	const domUpdate = {
+		hostNodeId: 'hParent',
+		source: 'chosen',
+		graphNodeId: 'state:chosen',
+		path: [],
+		target: { kind: 'attribute' as const, name: 'data-selected' },
+		symbolId: 'symbol:attr',
+	};
+	const repeat = {
+		id: 'repeat:0',
+		parentHostNodeId: 'hParent',
+		collectionGraphNodeId: 'state:cards',
+		collectionPath: [],
+		keyPath: ['key'],
+		itemName: 'card',
+		rowElementCount: 2,
+		rowEvents: [{ hostPath: [0], eventName: 'click', symbolIds: ['symbol:row'] }],
+	};
+	const view: ProtocolViewPayload = {
+		version: 1,
+		locators: [{ hostNodeId: 'hParent', strategy: 'dom-order', index: 1, tagName: 'section' }],
+		events: [],
+		domUpdates: [domUpdate],
+		behaviors: [],
+		elementHandles: [],
+		keyedRepeats: [repeat],
+		branches: [],
+		asyncBoundaries: [],
+	};
+	const scripts = renderPayloadScripts({ state, view });
+	let coldFullFallback = false;
+
+	expect(isScalarLeanResumeShape({
+		state,
+		view,
+		eventName: 'click',
+		runtimeDemandMap: rowRuntimeDemandMap({ repeat, rowEvent: repeat.rowEvents[0], domUpdate }),
+	})).toBe(false);
+
+	await resumeScalarEventFromPayloadDocument({
+		document: payloadDocument(scripts.stateScript, scripts.viewScript),
+		root,
+		event: { type: 'click', target: button },
+		runtimeDemandMap: rowRuntimeDemandMap({ repeat, rowEvent: repeat.rowEvents[0], domUpdate, replaced: false }),
+		loadSymbol: () => () => undefined,
+		loadFullResume() {
+			coldFullFallback = true;
+		},
+	} as Parameters<typeof resumeScalarEventFromPayloadDocument>[0] & { readonly loadFullResume: () => void });
+
+	expect(coldFullFallback).toBe(true);
 });
 
 test('event-only resume does not invoke heavy value decode for untouched object cells', async () => {

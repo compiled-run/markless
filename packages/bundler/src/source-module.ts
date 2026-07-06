@@ -304,7 +304,10 @@ function scalarLeanReplaced(runtimeDemandMap: unknown): boolean {
 	const recordKinds = (runtimeDemandMap as { readonly recordKinds?: ReadonlyArray<{ readonly kind: string; readonly replaced: boolean }> })?.recordKinds;
 	if (!recordKinds) return false;
 	const replaced = new Map(recordKinds.map((record) => [record.kind, record.replaced]));
-	return replaced.get('event') === true && replaced.get('dom-update') === true;
+	return replaced.get('dom-update') === true && (
+		replaced.get('event') === true ||
+		replaced.get('keyed-repeat') === true
+	);
 }
 
 function emitExecutionLogLoader(): string {

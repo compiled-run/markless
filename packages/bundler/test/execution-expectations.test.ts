@@ -127,7 +127,7 @@ test('keyed repeat row actions allow render-module catalog helper imports', asyn
 			export function Rows() @{
 				let selected = state('none');
 				let rows = state([]);
-				<main><section>@for (const row of rows; key row.id) {<article><button onClick={() => selected = row.id}>Choose</button></article>}</section></main>
+				<main><section>@for (const row of rows; key row.id) {<article><button onClick={() => selected = row.id}>Choose</button></article>}</section><output>{selected}</output></main>
 			}
 		`,
 	});
@@ -140,7 +140,29 @@ test('keyed repeat row actions allow render-module catalog helper imports', asyn
 		recordKind: 'keyed-repeat-row',
 	});
 
-	expect(allowed).toContain('web/fns/repeats');
+	expect(payload.runtimeDemandMap.recordKinds).toContainEqual({ kind: 'keyed-repeat', replaced: true });
+	expect(payload.runtimeDemandMap.recordKinds).toContainEqual({ kind: 'dom-update', replaced: true });
+	expect(allowed).toContain('web/event-only-lean/scalar-resume');
+	expect(allowed).toContain('web/resume-keyed-repeats');
+	expect([...allowed].filter((id) => JUDGE_COUNTER_INTERPRETER_CHAIN_SET.has(id))).toEqual([]);
+});
+
+test('keyed repeat row actions with non-text subscribers stay unreplaced', async () => {
+	const result = await transformTsrxModule({
+		filename: '/workspace/app/RowsInput.tsrx',
+		source: `
+			import { state } from '@markless/core';
+			export function RowsInput() @{
+				let selected = state('none');
+				let rows = state([{ id: 'north' }]);
+				<main><section>@for (const row of rows; key row.id) {<article><button onClick={() => selected = row.id}>Choose</button></article>}</section><input value={selected} /></main>
+			}
+		`,
+	});
+	const payload = payloadView(result.virtualModules.find((module) => module.type === 'payload')?.source);
+
+	expect(payload.runtimeDemandMap.recordKinds).toContainEqual({ kind: 'keyed-repeat', replaced: false });
+	expect(payload.runtimeDemandMap.recordKinds).toContainEqual({ kind: 'dom-update', replaced: false });
 });
 
 test('replaced action kinds tighten back to the exact demand set', async () => {

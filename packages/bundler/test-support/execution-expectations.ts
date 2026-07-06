@@ -162,7 +162,6 @@ function isAllowedDispatchCoreVirtual(id: string): boolean {
 const INTERPRETER_ROOTS_BY_KIND: Record<string, ReadonlyArray<string>> = {
 	event: ['core/web/event-only-resume', 'web/event-only-resume'],
 	'dom-update': ['core/web/resume', 'web/resume', 'web/fns/csr', 'web/fns/html', 'web/fns/state'],
-	'keyed-repeat': ['core/web/resume', 'web/resume'],
 	branch: ['core/web/resume', 'web/resume'],
 	'async-boundary': ['core/web/resume', 'web/resume'],
 	behavior: ['core/web/resume', 'web/resume'],
