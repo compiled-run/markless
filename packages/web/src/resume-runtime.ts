@@ -202,7 +202,11 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 		if (input.view.events.some((event) => event.eventName === 'visible')) {
 			const behaviors = await loadBehaviorRuntime(); behaviors.installVisibilityObserver(); behaviors.installRemovalObserver();
 		}
-		wireBranchDemandTriggersWithoutLoadingCapability();
+		// Branches wire eagerly when DECLARED (spec 06 gate 2: wiring is bounded by the
+		// records present). Write-demand-triggered branch loading broke flipped-in arm
+		// event wiring and child-prop branch resume twice (T007/T007b); revisit only with
+		// a hardened trigger design. Declared-but-absent capabilities still never load.
+		if ((input.view.branches ?? []).length > 0) await loadBranchRuntime();
 		for (const eventType of eventTypes) input.root.addEventListener?.(eventType, events.dispatch, { capture: true });
 		if ((input.graph.listSharedDefinitions?.() ?? []).length > 0) input.root.addEventListener?.(SHARED_PATCH_EVENT_TYPE, receiveSharedPatch, { capture: true });
 	}
