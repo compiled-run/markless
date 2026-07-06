@@ -20,7 +20,7 @@ const REQUESTS = '/__markless-fixture-requests';
 const WAIT = { timeoutMs: 10_000 };
 const MAX_PRELOADED_RUNTIME_CHUNK_GZIP_BYTES = 2_175;
 const PREVIOUS_COUNTER_CLICK_EXECUTED_GZIP_BYTES = 4_092;
-const MAX_COUNTER_CLICK_EXECUTED_GZIP_BYTES = 3_250; // measured SHIPPED 3,146 (2026-07-06, plan-as-data cut -946); tighten-only — remaining fat: the merged scalar closure chunk 2,297gz (partial derivation survival in lean-shared/record access)
+const MAX_COUNTER_CLICK_EXECUTED_GZIP_BYTES = 3_250; // measured SHIPPED 3,187 (2026-07-06); tighten-only. Composition: scalar-core 2,575 (fail-closed dispatcher ~honest floor) + write-scalar 418 + shared 194.
 const MAX_FIRST_INTERACTION_TOTAL_GZIP_BYTES = 40_900; // shipped-byte pin; test instrumentation is measured separately and must not set this cap.
 
 export default box(
@@ -95,7 +95,9 @@ export default box(
 				`Expected SSR preview counter click to execute only allowed runtime modules, but saw forbidden modules: ${forbidden.join(', ')}`,
 			);
 		}
-		for (const expected of ['web/fns/write-scalar', 'web/fns/update-text']) {
+		// T013 consolidated the hot-path leaves into scalar-core (per-module wrapper
+		// tax made separate tiny leaves cost more than one merged module).
+		for (const expected of ['web/event-only-lean/scalar-core']) {
 			if (!executed.includes(expected)) throw new Error(`Expected ${expected}. Saw: ${executed.join(', ')}`);
 		}
 		for (const excluded of ['web/dom-journal', 'web/event-only-graph', 'web/event-only-resume', 'web/event-only-lean/row', 'web/event-only-lean/scalar-resume', 'web/payload', 'web/payload-document']) {
