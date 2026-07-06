@@ -2,6 +2,7 @@ import { box } from '@async/witness';
 
 const FIXTURE = 'fixtures/router';
 const BUNDLE_GRAPH_REQUEST = '/build/bundle-graph.json';
+const EXECUTION_SIZES_REQUEST = '/build/execution-sizes.json';
 const DOCS_LINK = 'a[data-markless-router-link]';
 const HOME_COUNTER = '[data-home-counter]';
 const HOME_INPUT = '[data-home-input]';
@@ -36,6 +37,7 @@ type Request = {
 	readonly status: number | null;
 };
 type Page = {
+	allowedLazyHrefs?: readonly string[];
 	click(selector: string, wait?: typeof WAIT): Promise<void>;
 	networkRequests(): Promise<Request[]>;
 	clearNetworkEmulation(): Promise<void>;
@@ -77,6 +79,7 @@ export default box(
 			const page = (await preview.browser.visit('/', {
 				networkConditions: SLOW_3G,
 			})) as Page;
+			page.allowedLazyHrefs = plan.observabilityHrefs;
 			await expect.page.text(page, 'h1', 'Markless Router', WAIT);
 			const startedPreloads = await waitForExpectedPreloadRequests(page, plan.expectedHrefs);
 			receipt.note(`pre-click modulepreloads:\n${timeline(startedPreloads)}`);
@@ -137,6 +140,7 @@ export default box(
 			const directPage = (await preview.browser.visit('/docs/getting-started', {
 				networkConditions: SLOW_3G,
 			})) as Page;
+			directPage.allowedLazyHrefs = plan.observabilityHrefs;
 			await expect.page.text(directPage, 'h1', 'Docs', WAIT);
 			await expect.page.text(directPage, MDX_COUNTER, 'MDX Count 0', WAIT);
 			await expect.page.text(directPage, HOME_LINK, 'Home', WAIT);
@@ -233,6 +237,7 @@ type RouteCandidatePlan = {
 	readonly directDocsHrefs: readonly string[];
 	readonly directDocsRequiredHrefs: readonly string[];
 	readonly expectedHrefs: readonly string[];
+	readonly observabilityHrefs: readonly string[];
 	readonly requiredHrefs: readonly string[];
 	readonly forbiddenRouteHrefs: readonly string[];
 };
@@ -310,6 +315,7 @@ async function routeCandidatePlan(build: Build, preview: Preview): Promise<Route
 		);
 	}
 	const expectedHrefs = indexPreloads.hrefs;
+	const observabilityHrefs = await observabilityChunkHrefs(chunks, preview);
 	const requiredHrefs = [...matches].sort().map((path) => `/${path}`);
 	const directDocsRequiredHrefs = [...homeMatches].sort().map((path) => `/${path}`);
 	const expectedPaths = new Set(expectedHrefs.map((href) => pathOf(href)));
@@ -332,6 +338,7 @@ async function routeCandidatePlan(build: Build, preview: Preview): Promise<Route
 		directDocsHrefs: directDocsPreloads.hrefs,
 		directDocsRequiredHrefs,
 		expectedHrefs,
+		observabilityHrefs,
 		requiredHrefs,
 		forbiddenRouteHrefs: [...routeImportPaths]
 			.filter((path) => path !== docsRoutePath && path !== indexRoutePath)
@@ -343,6 +350,38 @@ async function routeCandidatePlan(build: Build, preview: Preview): Promise<Route
 function publicBuildPath(path: string): string | undefined {
 	const index = path.indexOf('build/');
 	return index === -1 || !path.endsWith('.js') ? undefined : path.slice(index);
+}
+
+async function observabilityChunkHrefs(chunks: ReadonlyMap<string, string>, preview: Preview): Promise<string[]> {
+	const hrefs = new Set<string>();
+	for (const [moduleId, entry] of Object.entries(await executionSizes(preview))) {
+		if (typeof entry?.chunk === 'string' && isObservabilityChunk(chunks, moduleId, entry.chunk)) {
+			hrefs.add(`/${entry.chunk}`);
+		}
+	}
+	for (const [path, code] of chunks) {
+		if (code.includes('virtual:markless:dev-log') || code.includes('__mxLogInteraction')) {
+			hrefs.add(`/${path}`);
+		}
+	}
+	return [...hrefs].sort();
+}
+
+async function executionSizes(preview: Preview): Promise<Record<string, { readonly chunk?: string }>> {
+	try {
+		return JSON.parse(await preview.request(EXECUTION_SIZES_REQUEST)) as Record<string, { readonly chunk?: string }>;
+	} catch {
+		return {};
+	}
+}
+
+function isObservabilityChunk(chunks: ReadonlyMap<string, string>, moduleId: string, path: string): boolean {
+	const code = chunks.get(path) ?? '';
+	return (
+		moduleId === 'web:dev-log' ||
+		moduleId === 'web:execution-log-target' ||
+		code.includes('virtual:markless:dev-log')
+	);
 }
 
 function isRouterNavigationChunk(code: string): boolean {
@@ -499,7 +538,12 @@ async function expectNoNewBuildJs(
 ): Promise<void> {
 	const before = await page.networkRequests();
 	await action();
-	const requests = jsBuildRequests((await page.networkRequests()).slice(before.length));
+	const allowedLazyPaths = new Set((page.allowedLazyHrefs ?? []).map((href) => pathOf(href)));
+	// The dev execution log wakes from runtime predicates, so preloading it would
+	// overstate the route plan. Keep the post-click exactness check for app chunks.
+	const requests = jsBuildRequests((await page.networkRequests()).slice(before.length)).filter(
+		(request) => !allowedLazyPaths.has(pathOf(request.url)),
+	);
 	receipt.note(`${label}:\n${timeline(requests)}`);
 	if (requests.length > 0) {
 		throw new Error(`Expected preloaded JS to avoid ${label}, saw:\n${timeline(requests)}`);

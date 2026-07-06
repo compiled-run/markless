@@ -24,5 +24,14 @@ test('execution log chunk is classified as observability allowed after logged di
 	}, { hostNodeId: 'h0', eventName: 'click', executionLog: true });
 
 	expect(allowed).toContain('virtual:markless:dev-log');
-	expect(forbiddenExecutedModules(['virtual:markless:dev-log'], allowed)).toEqual([]);
+	expect(allowed).toContain('web/dev-log');
+	expect(allowed).toContain('web/execution-log-target');
+	expect(forbiddenExecutedModules([
+		'virtual:markless:dev-log',
+		'web/dev-log',
+		'web/execution-log-target',
+	], allowed)).toEqual([]);
+	expect(forbiddenExecutedModules(['web/execution-log-target'], deriveAllowedModules({
+		events: [{ hostNodeId: 'h0', eventName: 'click' }],
+	}, { hostNodeId: 'h0', eventName: 'click' }))).toEqual(['web/execution-log-target']);
 });

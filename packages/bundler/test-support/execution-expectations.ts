@@ -56,7 +56,11 @@ export const MODULE_GROUPS: Record<ModuleGroup, ReadonlySet<string>> = {
 	branch: new Set(['web/resume-branches']),
 	'async-boundary': new Set(['web/resume-async-boundaries']),
 	behavior: new Set(['web/event-only-behaviors', 'web/resume-behaviors']),
-	observability: new Set(['virtual:markless:dev-log']),
+	observability: new Set([
+		'virtual:markless:dev-log',
+		'web/dev-log',
+		'web/execution-log-target',
+	]),
 	'full-tier-dispatch-core': new Set([
 		'core/web/resume',
 		'web/resume',
