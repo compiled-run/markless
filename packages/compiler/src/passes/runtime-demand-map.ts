@@ -15,8 +15,20 @@ const DISPATCH_CORE = [
 	'web/event-only-graph',
 ];
 const SCALAR_LEAN_DISPATCH_CORE = [
-	'web/event-only-lean/scalar-resume',
-	'web/inline/payload-document',
+	'web/event-only-lean/scalar-core',
+	'web/event-only-lean/payload-records',
+	'web/fns/apply-set-text',
+	'web/fns/locate-host',
+	'web/fns/resolve-result',
+	'web/fns/scalar-core-graph',
+	'web/fns/scalar-core-plan',
+	'web/fns/sync-policy-graph-ids',
+];
+const ROW_LEAN_DISPATCH_CORE = [
+	'web/event-only-lean/row',
+	'web/event-only-lean/lean-shared',
+	'web/event-only-lean/payload-records',
+	'web/fns/sync-policy-graph-ids',
 ];
 const SYNC_POLICY = ['web/inline/sync-policy-core'];
 const DOM_UPDATE: string[] = [];
@@ -73,6 +85,7 @@ export function createRuntimeDemandMap(input: {
 		unknownRecordModuleIds: unique([
 			...DISPATCH_CORE,
 			...SCALAR_LEAN_DISPATCH_CORE,
+			...ROW_LEAN_DISPATCH_CORE,
 			...SYNC_POLICY,
 			...DOM_UPDATE,
 			'web/dom-update',
@@ -99,7 +112,6 @@ function recordKindPhases(input: { readonly scalarOnly: boolean; readonly scalar
 
 function isScalarOnlyModule(resolver: SymbolResolverPlan, view: ProtocolViewPayload): boolean {
 	if ((view.events?.length ?? 0) === 0 || (view.domUpdates?.length ?? 0) === 0) return false;
-	if ((view.keyedRepeats?.length ?? 0) > 0) return false;
 	if ((view.branches?.length ?? 0) > 0) return false;
 	if ((view.asyncBoundaries?.length ?? 0) > 0) return false;
 	if ((view.behaviors?.length ?? 0) > 0) return false;
@@ -263,7 +275,8 @@ function payloadDemandRecords(
 	renderRuntimeModuleIds: ReadonlyArray<string>,
 	replacement: { readonly scalarOnly: boolean; readonly scalarRows: boolean },
 ): RuntimeDemandMapArtifact['payloadRecords'] {
-	const eventDispatchCore = replacement.scalarOnly || replacement.scalarRows ? SCALAR_LEAN_DISPATCH_CORE : DISPATCH_CORE;
+	const eventDispatchCore = replacement.scalarOnly ? SCALAR_LEAN_DISPATCH_CORE : DISPATCH_CORE;
+	const rowDispatchCore = replacement.scalarRows ? ROW_LEAN_DISPATCH_CORE : FULL_TIER;
 	return [
 		...(view.events ?? []).map((event) => ({
 			recordId: `event:${event.hostNodeId}:${event.eventName}`,
@@ -289,7 +302,7 @@ function payloadDemandRecords(
 			kind: 'keyed-repeat',
 			hostNodeId: record.parentHostNodeId,
 			runtimeModuleIds: unique([
-				...(replacement.scalarRows ? SCALAR_LEAN_DISPATCH_CORE : FULL_TIER),
+				...rowDispatchCore,
 				...KEYED_REPEAT,
 				...(replacement.scalarRows ? [] : renderRuntimeModuleIds),
 			]),

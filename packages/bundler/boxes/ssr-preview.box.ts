@@ -18,8 +18,8 @@ const COUNTER = '[data-counter]';
 const REQUESTS = '/__markless-fixture-requests';
 const WAIT = { timeoutMs: 10_000 };
 const MAX_PRELOADED_RUNTIME_CHUNK_GZIP_BYTES = 2_175;
-const PREVIOUS_COUNTER_CLICK_EXECUTED_GZIP_BYTES = 6_600;
-const MAX_COUNTER_CLICK_EXECUTED_GZIP_BYTES = 4_300; // measured 4,183 in the REAL preview page 2026-07-06 (worker 3,517 estimate missed the lean dispatch core); tighten-only from here.
+const PREVIOUS_COUNTER_CLICK_EXECUTED_GZIP_BYTES = 4_300;
+const MAX_COUNTER_CLICK_EXECUTED_GZIP_BYTES = 1_300; // diet target for scalar-only clicks after splitting row dispatch out of scalar-core; orchestrator measurement should ratchet this to the exact actual.
 const MAX_FIRST_INTERACTION_TOTAL_GZIP_BYTES = 41_100; // measured 40,933 on 2026-07-06 (lean route adds its chunks alongside the retained full path until more kinds flip); tighten-only from here.
 
 export default box(
@@ -103,7 +103,7 @@ export default box(
 		for (const expected of ['web/fns/write-scalar', 'web/fns/update-text']) {
 			if (!executed.includes(expected)) throw new Error(`Expected ${expected}. Saw: ${executed.join(', ')}`);
 		}
-		for (const excluded of ['web/dom-journal', 'web/event-only-graph', 'web/event-only-resume', 'web/payload', 'web/payload-document']) {
+		for (const excluded of ['web/dom-journal', 'web/event-only-graph', 'web/event-only-resume', 'web/event-only-lean/row', 'web/event-only-lean/scalar-resume', 'web/payload', 'web/payload-document']) {
 			if (executed.includes(excluded)) throw new Error(`Unexpected ${excluded}. Saw: ${executed.join(', ')}`);
 		}
 		const executionSizes = JSON.parse(await preview.request('/build/execution-sizes.json')) as ExecutionSizeMap;

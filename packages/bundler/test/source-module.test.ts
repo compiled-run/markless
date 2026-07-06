@@ -76,8 +76,45 @@ test('emitResumeModule routes replaced scalar actions through the scalar resume 
 	});
 
 	expect(resumeCode).toContain(
-		"const { resumeScalarEventFromPayloadDocument } = await import('@markless/web/event-only-lean/scalar-resume');",
+		"const { resumeScalarCoreEventFromPayloadDocument } = await import('@markless/web/event-only-lean/scalar-core');",
 	);
+	expect(resumeCode).not.toContain('@markless/web/event-only-lean/row');
+	expect(resumeCode).not.toContain('resumeEventOnlyFromPayloadDocument');
+});
+
+test('emitResumeModule keeps row actions behind the row lean entry', () => {
+	const resumeCode = emitResumeModule({
+		...baseInput,
+		runtimeDemandMap: {
+			recordKinds: [
+				{ kind: 'keyed-repeat', replaced: true },
+				{ kind: 'dom-update', replaced: true },
+			],
+		},
+	});
+
+	expect(resumeCode).toContain(
+		"const { resumeScalarRowEventFromPayloadDocument } = await import('@markless/web/event-only-lean/row');",
+	);
+	expect(resumeCode).not.toContain('@markless/web/event-only-lean/scalar-core');
+	expect(resumeCode).not.toContain('resumeEventOnlyFromPayloadDocument');
+});
+
+test('emitResumeModule branches only for mixed scalar and row lean routes', () => {
+	const resumeCode = emitResumeModule({
+		...baseInput,
+		runtimeDemandMap: {
+			recordKinds: [
+				{ kind: 'event', replaced: true },
+				{ kind: 'keyed-repeat', replaced: true },
+				{ kind: 'dom-update', replaced: true },
+			],
+		},
+	});
+
+	expect(resumeCode).toContain('if (input.eventRecord)');
+	expect(resumeCode).toContain('@markless/web/event-only-lean/scalar-core');
+	expect(resumeCode).toContain('@markless/web/event-only-lean/row');
 	expect(resumeCode).not.toContain('resumeEventOnlyFromPayloadDocument');
 });
 

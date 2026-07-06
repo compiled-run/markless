@@ -31,7 +31,11 @@ test('expectations derive allowed runtime modules from the generated demand map'
 	).not.toThrow();
 	expect(allowed).toContain('web/fns/write-scalar');
 	expect(allowed).toContain('web/fns/update-text');
-	expect(allowed).toContain('web/event-only-lean/scalar-resume');
+	expect(allowed).toContain('web/fns/scalar-core-graph');
+	expect(allowed).toContain('web/fns/scalar-core-plan');
+	expect(allowed).toContain('web/event-only-lean/scalar-core');
+	expect(allowed).toContain('web/event-only-lean/payload-records');
+	expect(allowed).not.toContain('web/event-only-lean/row');
 	expect(allowed).toContain('web/execution-log-target');
 	expect(allowed).not.toContain('web/event-only-resume');
 	expect(allowed).not.toContain('web/event-only-graph');
@@ -142,9 +146,51 @@ test('keyed repeat row actions allow render-module catalog helper imports', asyn
 
 	expect(payload.runtimeDemandMap.recordKinds).toContainEqual({ kind: 'keyed-repeat', replaced: true });
 	expect(payload.runtimeDemandMap.recordKinds).toContainEqual({ kind: 'dom-update', replaced: true });
-	expect(allowed).toContain('web/event-only-lean/scalar-resume');
+	expect(allowed).toContain('web/event-only-lean/row');
+	expect(allowed).toContain('web/event-only-lean/lean-shared');
+	expect(allowed).toContain('web/event-only-lean/payload-records');
+	expect(allowed).not.toContain('web/event-only-lean/scalar-core');
 	expect(allowed).toContain('web/resume-keyed-repeats');
 	expect([...allowed].filter((id) => JUDGE_COUNTER_INTERPRETER_CHAIN_SET.has(id))).toEqual([]);
+});
+
+test('mixed scalar and row actions keep exact lean modules per action', async () => {
+	const result = await transformTsrxModule({
+		filename: '/workspace/app/MixedRows.tsrx',
+		source: `
+			import { state } from '@markless/core';
+			export function MixedRows() @{
+				let count = state(0);
+				let selected = state('none');
+				let rows = state([{ id: 'north' }]);
+				<main>
+					<button onClick={() => count++}>{count}</button>
+					<section>@for (const row of rows; key row.id) {<article><button onClick={() => selected = row.id}>Choose</button></article>}</section>
+					<output>{selected}</output>
+				</main>
+			}
+		`,
+	});
+	const payload = payloadView(result.virtualModules.find((module) => module.type === 'payload')?.source);
+	const counterClick = payload.view.events[0];
+	const repeat = payload.view.keyedRepeats[0];
+	const rowClick = repeat.rowEvents[0];
+	const counterAllowed = deriveAllowedModules(payload.view, payload.runtimeDemandMap, {
+		hostNodeId: counterClick.hostNodeId,
+		eventName: counterClick.eventName,
+	});
+	const rowAllowed = deriveAllowedModules(payload.view, payload.runtimeDemandMap, {
+		hostNodeId: repeat.parentHostNodeId,
+		eventName: rowClick.eventName,
+		recordKind: 'keyed-repeat-row',
+	});
+
+	expect(payload.runtimeDemandMap.recordKinds).toContainEqual({ kind: 'event', replaced: true });
+	expect(payload.runtimeDemandMap.recordKinds).toContainEqual({ kind: 'keyed-repeat', replaced: true });
+	expect(counterAllowed).toContain('web/event-only-lean/scalar-core');
+	expect(counterAllowed).not.toContain('web/event-only-lean/row');
+	expect(rowAllowed).toContain('web/event-only-lean/row');
+	expect(rowAllowed).not.toContain('web/event-only-lean/scalar-core');
 });
 
 test('keyed repeat row actions with non-text subscribers stay unreplaced', async () => {
@@ -185,6 +231,8 @@ test('replaced action kinds tighten back to the exact demand set', async () => {
 
 	expect(allowed).toContain('web/fns/write-scalar');
 	expect(allowed).toContain('web/fns/update-text');
+	expect(allowed).toContain('web/fns/scalar-core-graph');
+	expect(allowed).toContain('web/fns/scalar-core-plan');
 	expect([...allowed].filter((id) => JUDGE_COUNTER_INTERPRETER_CHAIN_SET.has(id))).toEqual([]);
 });
 
