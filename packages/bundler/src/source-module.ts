@@ -37,9 +37,16 @@ export function rewriteSymbolModuleExport(
 	return source.replace(`export function ${fromExportName}`, `export function ${toExportName}`);
 }
 
-export function payloadModule(payload: { readonly state: unknown; readonly view: unknown }) {
+export function payloadModule(payload: {
+	readonly state: unknown;
+	readonly runtimeDemandMap?: unknown;
+	readonly view: unknown;
+}) {
 	return [
 		`export const state = ${JSON.stringify(payload.state, null, '\t')};`,
+		payload.runtimeDemandMap === undefined
+			? ''
+			: `export const runtimeDemandMap = ${JSON.stringify(payload.runtimeDemandMap, null, '\t')};`,
 		`export const view = ${JSON.stringify(payload.view, null, '\t')};`,
 		'',
 	].join('\n');

@@ -45,6 +45,33 @@ test('generated demand map carries per-kind replacement phase flags', async () =
 	);
 });
 
+test('payload virtual module keeps runtime demand metadata out of the resumable view', async () => {
+	const result = await transformTsrxModule({
+		filename: '/workspace/app/ProjectedCard.tsrx',
+		source: `
+			import { state } from '@markless/core';
+			import { Card } from './card.tsrx';
+			export function App() @{
+				let note = state('none');
+				<main>
+					<Card>
+						<button onClick={() => note = 'clicked'}>Go</button>
+						<output>{note}</output>
+					</Card>
+				</main>
+			}
+		`,
+	});
+	const payloadModule = result.virtualModules.find((module) => module.type === 'payload');
+	const view = payloadViewOnly(payloadModule?.source);
+	const demandMap = payloadRuntimeDemandMap(payloadModule?.source);
+	const projectedClick = view.events.find((event: any) => event.eventName === 'click');
+
+	expect(view.runtimeDemandMap).toBeUndefined();
+	expect(projectedClick?.symbolIds).toEqual(['symbol:0']);
+	expect(demandMap).toEqual(result.manifest.runtimeDemandMap);
+});
+
 test('unreplaced action kinds allow the structurally derived interpreter chain', async () => {
 	const { payload } = await counterPayload();
 	const click = payload.events[0];
@@ -171,7 +198,20 @@ async function counterPayload(): Promise<{ readonly payload: any }> {
 }
 
 function payloadView(source: string | undefined): any {
+	return {
+		...payloadViewOnly(source),
+		runtimeDemandMap: payloadRuntimeDemandMap(source),
+	};
+}
+
+function payloadViewOnly(source: string | undefined): any {
 	const match = source?.match(/export const view = ([\s\S]*);\s*$/);
 	if (!match) throw new Error('Expected payload virtual module to export view.');
+	return JSON.parse(match[1]);
+}
+
+function payloadRuntimeDemandMap(source: string | undefined): any {
+	const match = source?.match(/export const runtimeDemandMap = ([\s\S]*?);\nexport const view = /);
+	if (!match) throw new Error('Expected payload virtual module to export runtimeDemandMap.');
 	return JSON.parse(match[1]);
 }
