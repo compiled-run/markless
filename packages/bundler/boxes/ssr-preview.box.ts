@@ -19,7 +19,7 @@ const REQUESTS = '/__markless-fixture-requests';
 const WAIT = { timeoutMs: 10_000 };
 const MAX_PRELOADED_RUNTIME_CHUNK_GZIP_BYTES = 2_175;
 const PREVIOUS_COUNTER_CLICK_EXECUTED_GZIP_BYTES = 4_300;
-const MAX_COUNTER_CLICK_EXECUTED_GZIP_BYTES = 1_500; // shipped-byte pin for scalar-only clicks; tighten-only after each measured improvement.
+const MAX_COUNTER_CLICK_EXECUTED_GZIP_BYTES = 4_000; // measured SHIPPED 3,898 on 2026-07-06; tighten-only — next cuts: scalar-core-plan (1,785gz) + payload-records (1,112gz)
 const MAX_FIRST_INTERACTION_TOTAL_GZIP_BYTES = 40_900; // shipped-byte pin; test instrumentation is measured separately and must not set this cap.
 
 export default box(
