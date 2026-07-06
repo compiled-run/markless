@@ -48,12 +48,20 @@ export async function resumeEventOnlyFromPayloadDocument(
 		const { decodePayloadScriptsFromDocument } = await import('./inline/payload-document.ts');
 		const { state, view } = decodePayloadScriptsFromDocument(input.document);
 		if (viewNeedsFullResume(view)) {
-			const loadFullResume = (input as FullResumeHandoffInput).loadFullResume;
-			if (!loadFullResume) {
-				throw new Error(
-					'Event-only resume cannot dispatch a payload that declares full-resume view records.',
-				);
-			}
+			// Fail-closed escalation owned HERE (not the emitted entry): compile time cannot
+			// see child-component records; a dynamic edge from this async chunk keeps the
+			// full runtime in its own chunks (entry-carried specifiers merged chunks: 5667>2175).
+			const loadFullResume = (input as FullResumeHandoffInput).loadFullResume ?? (async (handoff) => {
+				const rootWithFlag = handoff.root as typeof handoff.root & { __asyncResumeRuntimeStarted?: boolean };
+				rootWithFlag.__asyncResumeRuntimeStarted = true;
+				const { resumeFromPayloadDocument } = await import('./payload.ts');
+				const { runtime } = await resumeFromPayloadDocument({
+					document: handoff.document,
+					root: handoff.root,
+					loadSymbol: handoff.loadSymbol,
+				});
+				await runtime.dispatch(handoff.event!, { syncPolicyAlreadyApplied: true });
+			});
 			await loadFullResume({
 				document: input.document,
 				root: input.root,
