@@ -119,12 +119,15 @@ test('resume runtime split points keep capability code in separate modules', asy
 
 test('lean scalar core does not import row or full payload-document code', async () => {
 	const scalarCoreSource = await readSource('../src/event-only-lean/scalar-core.ts');
+	const leanSharedSource = await readSource('../src/event-only-lean/lean-shared.ts');
 	const rowSource = await readSource('../src/event-only-lean/row.ts');
 
 	expect(scalarCoreSource).not.toContain("import('./payload-records.ts')");
 	expect(scalarCoreSource).not.toContain('readScalarCorePayloadRecordsFromDocument');
 	expect(scalarCoreSource).not.toContain('resume-keyed-repeats');
 	expect(scalarCoreSource).not.toContain('payload-document');
+	expect(scalarCoreSource).not.toContain('protocol-validation');
+	expect(leanSharedSource).not.toContain('protocol-validation');
 	expect(rowSource).toContain('resume-keyed-repeats');
 	expect(rowSource).not.toContain('readRowPayloadRecordsFromDocument');
 	expect(rowSource).not.toContain("from './scalar-core.ts'");

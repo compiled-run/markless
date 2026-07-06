@@ -1,5 +1,4 @@
 import type { ProtocolStatePayload, ProtocolSyncPolicyCondition, ProtocolViewPayload } from '../../../serializer/src/protocol.ts';
-import { assertProtocolStateCellPayload, payloadInvalidError } from '../../../serializer/src/protocol-validation.ts';
 import type { SerializedGraphPayload, SerializedSlot } from '../../../serializer/src/value-decode-client.ts';
 import type {
 	EventOnlyResumeContainer,
@@ -145,7 +144,7 @@ export function readLeanStateCells(
 			? (cell as { readonly graphNodeId?: unknown }).graphNodeId
 			: undefined;
 		if (typeof graphNodeId !== 'string' || !cellIds.has(graphNodeId)) continue;
-		assertProtocolStateCellPayload(cell, `markless/state cell[${index}]`);
+		assertLeanStateCellPayload(cell, `markless/state cell[${index}]`);
 		matchingCells.push(cell);
 	}
 	return matchingCells;
@@ -274,12 +273,30 @@ function leanEscalation(site?: string): never {
 }
 
 function leanPayloadShapeError(message: string): Error {
-	return payloadInvalidError(
-		'markless/state',
+	return Object.assign(new Error(message), {
+		code: 'MARKLESS_PAYLOAD_INVALID',
+		severity: 'error',
+		phase: 'payload',
+		title: 'Invalid resumability payload',
 		message,
-		'The markless/state payload did not match the resumability protocol shape required by this runtime.',
-		[{ message: 'Regenerate the markless/state payload with the matching markless compiler/runtime version.' }],
-	);
+		why: 'The markless/state payload did not match the resumability protocol shape required by this runtime.',
+		payloadType: 'markless/state',
+		payloadScript: 'script[type="markless/state"]',
+		suggestions: [{ message: 'Regenerate the markless/state payload with the matching markless compiler/runtime version.' }],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_PAYLOAD_INVALID',
+	});
+}
+
+function assertLeanStateCellPayload(cell: unknown, context: string): asserts cell is ProtocolStatePayload['cells'][number] {
+	if (!cell || typeof cell !== 'object') throw leanPayloadShapeError(`Invalid ${context}: expected object.`);
+	const record = cell as { readonly graphNodeId?: unknown; readonly name?: unknown; readonly valueKind?: unknown; readonly value?: unknown };
+	if (typeof record.graphNodeId !== 'string') throw leanPayloadShapeError(`Invalid ${context}: expected graphNodeId string.`);
+	if (typeof record.name !== 'string') throw leanPayloadShapeError(`Invalid ${context}: expected name string.`);
+	if (!['scalar', 'object', 'array', 'unknown'].includes(record.valueKind as string)) throw leanPayloadShapeError(`Invalid ${context}: expected supported valueKind.`);
+	if (!record.value || typeof record.value !== 'object') throw leanPayloadShapeError(`Invalid ${context}.value: expected value payload.`);
+	const value = record.value as { readonly version?: unknown; readonly records?: unknown };
+	if (value.version !== 1) throw leanPayloadShapeError(`Invalid ${context}.value: expected version 1.`);
+	if (!Array.isArray(value.records)) throw leanPayloadShapeError(`Invalid ${context}.value: expected records array.`);
 }
 
 function isPromiseLike<T>(value: T | Promise<T>): value is Promise<T> {

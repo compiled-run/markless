@@ -17,16 +17,11 @@ const DISPATCH_CORE = [
 ];
 const SCALAR_LEAN_DISPATCH_CORE = [
 	'web/event-only-lean/scalar-core',
-	'web/fns/locate-host',
-	'web/fns/resolve-result',
 	'web/fns/scalar-core-graph',
-	'web/fns/sync-policy-graph-ids',
-	'web/event-only-lean/lean-shared',
 ];
 const ROW_LEAN_DISPATCH_CORE = [
 	'web/event-only-lean/row',
 	'web/event-only-lean/lean-shared',
-	'web/fns/sync-policy-graph-ids',
 ];
 const SYNC_POLICY = ['web/inline/sync-policy-core'];
 const DOM_UPDATE: string[] = [];
