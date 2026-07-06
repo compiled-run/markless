@@ -51,8 +51,28 @@ test('full resume avoids the server value decoder in browser chunks', async () =
 	const payloadSource = await readSource('../src/payload-full.ts');
 	const repeatSource = await readSource('../src/repeat-runtime.ts');
 
-	expect(payloadSource).toContain("@markless/serializer/decode-client");
+	expect(payloadSource).toContain("import('../../serializer/src/value-decode-client.ts')");
 	expect(repeatSource).toContain("@markless/serializer/decode-client");
 	expect(payloadSource).not.toContain("@markless/serializer/decode'");
 	expect(repeatSource).not.toContain("@markless/serializer/decode'");
+});
+
+test('payload-full keeps heavy resume dependencies behind dynamic gates', async () => {
+	const payloadSource = await readSource('../src/payload-full.ts');
+	const runtimeImports = [...payloadSource.matchAll(/^import[\s\S]*?;\n/gm)]
+		.map((match) => match[0])
+		.filter((statement) => !statement.startsWith('import type '));
+
+	for (const specifier of [
+		'@markless/serializer/decode-client',
+		'@markless/serializer/protocol-validation',
+		'@markless/runtime',
+		'./dom-journal.ts',
+		'./inline/payload-document.ts',
+		'./resume.ts',
+	]) {
+		expect(runtimeImports).not.toContainEqual(
+			expect.stringContaining(`from '${specifier}'`),
+		);
+	}
 });

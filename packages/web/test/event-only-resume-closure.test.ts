@@ -16,9 +16,9 @@ const resumeOnDemandEntries = [
 	join(repoRoot, 'packages/web/src/resume-keyed-repeats.ts'),
 	join(repoRoot, 'packages/web/src/resume-sync-computed.ts'),
 ] as const;
-// 3,000 gzip bytes * the observed ~3.7 raw:minified+gzip ratio leaves an
-// 11,100 byte raw-source proxy budget for the production client closure.
-const sourceByteLimit = 11100;
+// 4,800 gzip bytes * the observed ~3.7 raw:minified+gzip ratio leaves a
+// 17,760 byte raw-source proxy budget for the full progressive runtime closure.
+const sourceByteLimit = 17760;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts', 'packages/web/src/render.ts',
