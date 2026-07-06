@@ -33,6 +33,11 @@ their prerequisites exist:
   replace runtime capability gating; size walls tighten accordingly. Includes
   migrating compiler-inlined helper strings in emitted modules to runtime
   imports. See 06-runtime-resumer.md "Progressive runtime execution".
+- Dev-mode execution visibility: the executed-modules transform (built for the
+  progressive-execution validations) enabled in dev builds, exposing what
+  executed vs. merely preloaded — ideally with record-level causality ("module
+  X woke because record Y matched this event/write"). Until then, developers
+  use the Chrome Coverage tab and Performance profiler.
 - Devtools (graph visualization).
 - Strict no-inline CSP mode for the resumer, including external bootstrap
   emission, hash/nonce automation beyond caller-provided `renderToString`
