@@ -16,13 +16,20 @@ describe('markless chunking defaults', () => {
 		expect(clientOutput).toMatchObject({
 			dir: 'dist/client',
 			entryFileNames: 'build/chunk-[hash].js',
-			chunkFileNames: 'build/[name]-[hash].js',
+			chunkFileNames: 'build/chunk-[hash].js',
 			hoistTransitiveImports: false,
 			minifyInternalExports: false,
 			strictExecutionOrder: true,
 		});
 		expect(clientOutput.codeSplitting?.groups?.map((group) => group.name)).toEqual(
-			expect.arrayContaining(['markless-runtime', 'markless-symbols']),
+			expect.arrayContaining([
+				'markless-resume-branches',
+				'markless-resume-repeats',
+				'markless-resume-behaviors',
+				'markless-payload-graph-construct',
+				'markless-runtime',
+				'markless-symbols',
+			]),
 		);
 		expect(outputDefaults({ dir: 'dist/server' }, 'server')).toMatchObject({
 			dir: 'dist/server',
@@ -41,7 +48,15 @@ describe('markless chunking defaults', () => {
 		}, 'client') as MarklessOutputOptions;
 
 		expect(output.codeSplitting?.groups?.map((group) => group.name)).toEqual(
-			expect.arrayContaining(['markless-runtime', 'markless-symbols', 'vendor']),
+			expect.arrayContaining([
+				'markless-resume-branches',
+				'markless-resume-repeats',
+				'markless-resume-behaviors',
+				'markless-payload-graph-construct',
+				'markless-runtime',
+				'markless-symbols',
+				'vendor',
+			]),
 		);
 		expect(output.codeSplitting?.groups?.at(-1)).toBe(userGroup);
 	});
@@ -52,9 +67,29 @@ describe('markless chunking defaults', () => {
 			output.codeSplitting?.groups?.map((group) => [group.name, group.test]) ?? [],
 		);
 
-		expect(groups.get('markless-resume-async')?.test('/repo/packages/web/src/resume-async-wiring.ts')).toBe(true);
-		expect(groups.get('markless-resume-shared-patch')?.test('/repo/packages/web/src/resume-shared-patch.ts')).toBe(true);
-		expect(groups.get('markless-resume-wiring')?.test('/repo/packages/web/src/resume-sync-demand.ts')).toBe(true);
+		expect(groups.get('markless-resume-async')?.test('/repo/packages/web/src/resume-async-wiring.ts')).toBe(
+			true,
+		);
+		expect(groups.get('markless-resume-branches')?.test('/repo/packages/core/src/web/resume-branches.ts')).toBe(
+			true,
+		);
+		expect(groups.get('markless-resume-repeats')?.test('/repo/packages/web/src/resume-keyed-repeats.ts')).toBe(
+			true,
+		);
+		expect(groups.get('markless-resume-behaviors')?.test('/repo/packages/core/src/web/resume-behaviors.ts')).toBe(
+			true,
+		);
+		expect(
+			groups.get('markless-payload-graph-construct')?.test(
+				'/repo/packages/web/src/payload-graph-construct.ts',
+			),
+		).toBe(true);
+		expect(groups.get('markless-resume-shared-patch')?.test('/repo/packages/web/src/resume-shared-patch.ts')).toBe(
+			true,
+		);
+		expect(groups.get('markless-resume-wiring')?.test('/repo/packages/web/src/resume-sync-demand.ts')).toBe(
+			true,
+		);
 	});
 
 	test('rejects boolean code splitting for client builds', () => {

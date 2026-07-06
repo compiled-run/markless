@@ -30,6 +30,7 @@ test('web package owns DOM render, resume, payload, and journal modules', () => 
 
 test('web render entry does not statically import event-only resume fallback code', async () => {
 	const renderSource = await readSource('../src/render.ts');
+	const renderCsrSource = await readSource('../src/render-csr.ts');
 
 	expect(renderSource).not.toMatch(
 		/import\s*\{[\s\S]*createEventOnlyResumeContainerFromPayloads[\s\S]*\}\s*from\s+['"]\.\/event-only-resume\.ts['"]/,
@@ -38,6 +39,8 @@ test('web render entry does not statically import event-only resume fallback cod
 	expect(renderSource).not.toMatch(/import\(\s*['"]\.\/event-only-resume\.ts['"]\s*\)/);
 	expect(renderSource).not.toMatch(/import\(\s*['"]\.\/resume\.ts['"]\s*\)/);
 	expect(renderSource).not.toMatch(/import\(\s*['"]\.\/payload\.ts['"]\s*\)/);
+	expect(renderCsrSource).toContain("import(\n\t\t\t'./payload-graph-construct.ts'");
+	expect(renderCsrSource).not.toContain("import('./payload-full.ts')");
 });
 
 test('event-only graph gates object value decoding behind payload shape', async () => {
@@ -49,9 +52,12 @@ test('event-only graph gates object value decoding behind payload shape', async 
 
 test('full resume avoids the server value decoder in browser chunks', async () => {
 	const payloadSource = await readSource('../src/payload-full.ts');
+	const graphSource = await readSource('../src/payload-graph-construct.ts');
 	const repeatSource = await readSource('../src/repeat-runtime.ts');
 
-	expect(payloadSource).toContain("import('../../serializer/src/value-decode-client.ts')");
+	expect(payloadSource).toContain("import('./payload-graph-construct.ts')");
+	expect(payloadSource).not.toContain("import('../../serializer/src/value-decode-client.ts')");
+	expect(graphSource).toContain("import('../../serializer/src/value-decode-client.ts')");
 	expect(repeatSource).toContain("@markless/serializer/decode-client");
 	expect(payloadSource).not.toContain("@markless/serializer/decode'");
 	expect(repeatSource).not.toContain("@markless/serializer/decode'");
@@ -75,6 +81,17 @@ test('payload-full keeps heavy resume dependencies behind dynamic gates', async 
 			expect.stringContaining(`from '${specifier}'`),
 		);
 	}
+});
+
+test('payload graph construction is isolated behind a payload-full dynamic import', async () => {
+	const payloadSource = await readSource('../src/payload-full.ts');
+	const graphSource = await readSource('../src/payload-graph-construct.ts');
+
+	expect(payloadSource).toContain("import('./payload-graph-construct.ts')");
+	expect(payloadSource).not.toContain("from '@markless/runtime'");
+	expect(payloadSource).not.toContain('asyncRunnerSymbolsByGraphNode');
+	expect(graphSource).toContain('createRuntimeGraphFromResumePayload');
+	expect(graphSource).toContain('asyncRunnerSymbolsByGraphNode');
 });
 
 test('resume runtime split points keep capability code in separate modules', async () => {

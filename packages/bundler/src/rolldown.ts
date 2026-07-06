@@ -46,6 +46,7 @@ export type {
 type Environment = MarklessEnvironment | ((context: unknown) => MarklessEnvironment);
 export type MarklessRolldownPlugin = Plugin & { api: MarklessRolldownPluginApi };
 type InternalMarklessRolldownOptions = MarklessRolldownOptions & {
+	emitResumeModules?: boolean;
 	publicPath?: (fileName: string) => string;
 };
 
@@ -195,7 +196,9 @@ export function createMarklessRolldownPlugin(input: {
 				for (const module of transformed.virtualModules.filter(
 					(item) =>
 						item.type === 'symbol' ||
-						(item.type === 'resume' && clientSymbolEntrySources.has(source)),
+						(item.type === 'resume' &&
+							internalOptions.emitResumeModules === true &&
+							clientSymbolEntrySources.has(source)),
 				)) {
 					this.emitFile({
 						type: 'chunk',

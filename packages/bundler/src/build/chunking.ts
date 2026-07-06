@@ -11,25 +11,60 @@ export const MARKLESS_BUNDLE_GRAPH = `${MARKLESS_BUILD_PREFIX}bundle-graph.json`
 // fixture-builds.test.ts). Named groups FORCE-merge their matches into one chunk,
 // so every group here must stay under the walls on its own (~8K raw / ~2K gz).
 const WEB_RUNTIME_CAPABILITY_GROUPS = [
-	{ name: 'markless-resume-branches', test: /[/\\](?:web[/\\]src|core[/\\]src(?:[/\\]web)?)[/\\]resume-branches\.ts/ },
-	{ name: 'markless-resume-behaviors', test: /[/\\](?:web[/\\]src|core[/\\]src(?:[/\\]web)?)[/\\]resume-behaviors\.ts/ },
-	{ name: 'markless-event-behaviors', test: /[/\\](?:web[/\\]src|core[/\\]src(?:[/\\]web)?)[/\\]event-only-behaviors\.ts/ },
-	{ name: 'markless-resume-repeats', test: /[/\\](?:web[/\\]src|core[/\\]src(?:[/\\]web)?)[/\\](resume-keyed-repeats|repeat-runtime)\.ts/ },
-	{ name: 'markless-resume-async', test: /[/\\](?:web[/\\]src|core[/\\]src(?:[/\\]web)?)[/\\](resume-async-boundaries|resume-async-wiring)\.ts/ },
-	{ name: 'markless-resume-shared-patch', test: /[/\\](?:web[/\\]src|core[/\\]src(?:[/\\]web)?)[/\\]resume-shared-patch\.ts/ },
-	{ name: 'markless-resume-runtime', test: /[/\\](?:web[/\\]src|core[/\\]src(?:[/\\]web)?)[/\\]resume-runtime\.ts/ },
-	{ name: 'markless-resume-wiring', test: /[/\\](?:web[/\\]src|core[/\\]src(?:[/\\]web)?)[/\\](resume-events|resume-handoff|resume-locators|resume-sync-computed|resume-sync-demand)\.ts/ },
-	{ name: 'markless-payload-full', test: /[/\\](?:web[/\\]src|core[/\\]src(?:[/\\]web)?)[/\\]payload-full\.ts/ },
-	{ name: 'markless-dom-journal', test: /[/\\](?:web[/\\]src|core[/\\]src(?:[/\\]web)?)[/\\]dom-journal\.ts/ },
-	{ name: 'markless-protocol-decode', test: /[/\\]serializer[/\\]src[/\\](protocol-client|protocol-state)\.ts/ },
-	{ name: 'markless-value-decode', test: /[/\\]serializer[/\\]src[/\\](value-decode-client|value-decode-extensions)\.ts/ },
-	{ name: 'markless-payload-leaves', test: /[/\\](?:web[/\\]src|core[/\\]src(?:[/\\]web)?)[/\\](payload|inline[/\\]payload-document)\.ts/ },
-	{ name: 'markless-resume-core', test: /[/\\](?:web[/\\]src|core[/\\]src(?:[/\\]web)?)[/\\]resume\.ts/ },
+	{ name: 'markless-resume-branches', test: fileBasenamePattern('resume-branches') },
+	{ name: 'markless-resume-behaviors', test: fileBasenamePattern('resume-behaviors') },
+	{ name: 'markless-event-behaviors', test: fileBasenamePattern('event-only-behaviors') },
+	{
+		name: 'markless-resume-repeats',
+		test: fileBasenamePattern('resume-keyed-repeats', 'repeat-runtime'),
+	},
+	{
+		name: 'markless-resume-async',
+		test: fileBasenamePattern('resume-async-boundaries', 'resume-async-wiring'),
+	},
+	{
+		name: 'markless-resume-shared-patch',
+		test: fileBasenamePattern('resume-shared-patch'),
+	},
+	{ name: 'markless-resume-runtime', test: fileBasenamePattern('resume-runtime') },
+	{
+		name: 'markless-resume-wiring',
+		test: fileBasenamePattern(
+			'resume-events',
+			'resume-handoff',
+			'resume-locators',
+			'resume-sync-computed',
+			'resume-sync-demand',
+		),
+	},
+	{ name: 'markless-payload-full', test: fileBasenamePattern('payload-full') },
+	{
+		name: 'markless-payload-graph-construct',
+		test: fileBasenamePattern('payload-graph-construct'),
+	},
+	{ name: 'markless-dom-journal', test: fileBasenamePattern('dom-journal') },
+	{
+		name: 'markless-protocol-decode',
+		test: fileBasenamePattern('protocol-client', 'protocol-state'),
+	},
+	{
+		name: 'markless-value-decode',
+		test: fileBasenamePattern('value-decode-client', 'value-decode-extensions'),
+	},
+	{
+		name: 'markless-payload-leaves',
+		test: fileBasenamePattern('payload', 'payload-document'),
+	},
+	{ name: 'markless-resume-core', test: fileBasenamePattern('resume') },
 	// Workspace-source paths: @markless/runtime + serializer resolve to packages/*/src
 	// in this monorepo, so the package-name groups below never match them.
 	{ name: 'markless-graph', test: /[/\\](?:runtime[/\\]src|core[/\\]src[/\\]runtime)[/\\]?/ },
 	{ name: 'markless-serializer', test: /[/\\]serializer[/\\]src[/\\](?!protocol-validation)/ },
 ];
+
+function fileBasenamePattern(...names: string[]): RegExp {
+	return new RegExp(`[/\\\\](?:${names.join('|')})\\.ts(?:[?#].*)?$`);
+}
 
 const MARKLESS_RUNTIME_GROUPS = [
 	...WEB_RUNTIME_CAPABILITY_GROUPS,

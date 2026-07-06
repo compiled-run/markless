@@ -204,6 +204,23 @@ describe('Vite config integration', () => {
 			hoistTransitiveImports: false,
 		});
 		expect(clientOutput.codeSplitting?.groups?.map((group) => group.name)).toEqual([
+			'markless-resume-branches',
+			'markless-resume-behaviors',
+			'markless-event-behaviors',
+			'markless-resume-repeats',
+			'markless-resume-async',
+			'markless-resume-shared-patch',
+			'markless-resume-runtime',
+			'markless-resume-wiring',
+			'markless-payload-full',
+			'markless-payload-graph-construct',
+			'markless-dom-journal',
+			'markless-protocol-decode',
+			'markless-value-decode',
+			'markless-payload-leaves',
+			'markless-resume-core',
+			'markless-graph',
+			'markless-serializer',
 			'markless-runtime',
 			'markless-symbols',
 		]);
