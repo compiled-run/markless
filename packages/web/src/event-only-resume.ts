@@ -1,5 +1,6 @@
 import type { ProtocolStatePayload, ProtocolViewPayload } from '../../serializer/src/protocol.ts';
 import type { EventOnlyResumeGraph } from './event-only-graph.ts';
+import { describeMarklessEventTarget } from './execution-log-target.ts';
 import type {
 	CreateEventOnlyResumeContainerInput,
 	EventOnlyResumeBehaviorRecord,
@@ -45,7 +46,10 @@ type ExecutionLogGlobal = typeof globalThis & {
 		readonly before?: ReadonlySet<string>;
 		readonly after?: ReadonlySet<string>;
 		readonly view: ProtocolViewPayload;
-	}) => void;
+		readonly selector?: string;
+		readonly dispatchModuleId?: string;
+		readonly noMatch?: boolean;
+	}) => void | Promise<void>;
 };
 
 const containers = new WeakMap<EventOnlyResumeDomElement, EventOnlyResumeContainerState>();
@@ -217,7 +221,18 @@ async function dispatchEvent(input: {
 				locatorsByHostId: input.locatorsByHostId,
 				elementsByHostId: input.elementsByHostId,
 			});
-	if (!matched?.element) return;
+	if (!matched?.element) {
+		await marklessLogInteraction({
+			eventName: input.event.type,
+			eventRecord: null,
+			before: beforeExecution,
+			view: input.view,
+			selector: describeMarklessEventTarget(input.event.target),
+			dispatchModuleId: 'web:event-only-resume',
+			noMatch: true,
+		});
+		return;
+	}
 
 	let retryWithFullDecode = true;
 	while (true) {
@@ -281,6 +296,8 @@ async function dispatchEvent(input: {
 		eventRecord: matched.eventRecord,
 		before: beforeExecution,
 		view: input.view,
+		selector: describeMarklessEventTarget(matched.element),
+		dispatchModuleId: 'web:event-only-resume',
 	});
 }
 
@@ -294,16 +311,19 @@ async function marklessLogInteraction(input: {
 	readonly eventRecord?: EventOnlyResumeRecord | null;
 	readonly before?: ReadonlySet<string>;
 	readonly view: ProtocolViewPayload;
+	readonly selector?: string;
+	readonly dispatchModuleId?: string;
+	readonly noMatch?: boolean;
 }): Promise<void> {
 	const global = globalThis as ExecutionLogGlobal;
 	if (!global.__mxLog) return;
 	if (global.__mxLogInteraction) {
-		global.__mxLogInteraction({ ...input, after: new Set(global.__mxLog) });
+		await global.__mxLogInteraction({ ...input, after: new Set(global.__mxLog) });
 		return;
 	}
 	try {
 		const log = await global.__mxLoadLog?.();
-		log?.logMarklessInteraction?.({ ...input, after: new Set(global.__mxLog) });
+		await log?.logMarklessInteraction?.({ ...input, after: new Set(global.__mxLog) });
 	} catch {
 		// Execution logging is observability only; app dispatch must not depend on it.
 	}

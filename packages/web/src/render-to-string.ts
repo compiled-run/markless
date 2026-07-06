@@ -392,6 +392,11 @@ ${runSyncPolicy}
 			if (rw.has(e.type)) {
 				const mod = await import(${JSON.stringify(resumeModuleUrl)});
 				await mod.resumeContainerEvent({ root: r, event: e, element: e.target, eventRecord: null });
+				return;
+			}
+			if (globalThis.__mxLog) {
+				const mod = await import(${JSON.stringify(resumeModuleUrl)});
+				await mod.resumeContainerEvent({ root: r, event: e, element: e.target, eventRecord: null });
 			}
 		}, true);
 	}

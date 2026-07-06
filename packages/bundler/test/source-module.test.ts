@@ -72,3 +72,12 @@ test('emitResumeModule emits the execution log loader only when logging is enabl
 		'virtual:markless:dev-log',
 	);
 });
+
+test('emitSourceModule emits the CSR execution log loader only when logging is enabled', () => {
+	expect(emitSourceModule({ ...baseInput, executionLog: 'auto' })).toContain(
+		'globalThis.__mxLoadLog ||= () => import("virtual:markless:dev-log");',
+	);
+	expect(emitSourceModule({ ...baseInput, executionLog: 'never' })).not.toContain(
+		'virtual:markless:dev-log',
+	);
+});

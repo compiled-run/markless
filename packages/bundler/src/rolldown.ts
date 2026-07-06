@@ -14,6 +14,9 @@ import { rewriteGeneratedSymbolTableUrls } from './build/symbol-table.ts';
 import { createMarklessDevGraph } from './dev.ts';
 import {
 	MARKLESS_EXECUTION_LOG_MODULE_ID,
+	MARKLESS_EXECUTION_SIZES,
+	createExecutionSizesAsset,
+	executionLogActivationInjection,
 	executionLogVirtualModuleSource,
 	injectExecutionLogModuleHook,
 	normalizeExecutionLogMode,
@@ -80,6 +83,7 @@ export function createMarklessRolldownPlugin(input: {
 	const transformManifests = new Map<string, MarklessTransformManifest>();
 	const sourceVirtualModules = new Map<string, Set<string>>();
 	const clientSymbolEntrySources = new Set<string>();
+	const executionLogEstimatedSizes = new Map<string, number>();
 	const dev = createMarklessDevGraph();
 	let root = internalOptions.rootDir;
 	const name = pluginName(environment);
@@ -126,6 +130,7 @@ export function createMarklessRolldownPlugin(input: {
 			virtualModules.clear();
 			transformManifests.clear();
 			sourceVirtualModules.clear();
+			executionLogEstimatedSizes.clear();
 			dev.reset();
 
 			const currentRoot = getRoot();
@@ -160,7 +165,16 @@ export function createMarklessRolldownPlugin(input: {
 		},
 		load(id) {
 			if (normalizeVirtualId(id) === MARKLESS_EXECUTION_LOG_MODULE_ID) {
-				return executionLogVirtualModuleSource();
+				return executionLogVirtualModuleSource({
+					moduleSizes:
+						internalOptions.dev === true && getEnvironment(this) === 'client'
+							? executionLogEstimatedSizes
+							: undefined,
+					sizesUrl:
+						internalOptions.dev === true
+							? undefined
+							: internalOptions.publicPath?.(MARKLESS_EXECUTION_SIZES) ?? `/${MARKLESS_EXECUTION_SIZES}`,
+				});
 			}
 			const module = virtualModules.get(normalizeVirtualId(id));
 			if (module) {
@@ -180,6 +194,7 @@ export function createMarklessRolldownPlugin(input: {
 					normalizeExecutionLogMode(internalOptions.executionLog) !== 'never' &&
 					isMarklessRuntimeModule(id)
 				) {
+					executionLogEstimatedSizes.set(executionLogRuntimeModuleId(id), code.length);
 					return {
 						code: injectExecutionLogModuleHook(
 							code,
@@ -229,6 +244,7 @@ export function createMarklessRolldownPlugin(input: {
 				virtualModules,
 				transformManifests,
 				sourceVirtualModules,
+				executionLogEstimatedSizes,
 				dev,
 				environment: currentEnvironment,
 			});
@@ -257,7 +273,7 @@ export function createMarklessRolldownPlugin(input: {
 		},
 		generateBundle: {
 			order: 'post',
-			handler(_, bundle) {
+			async handler(_, bundle) {
 				if (getEnvironment(this) !== 'client') return;
 
 				stripEmptyPreloadWrappersFromChunks(bundle);
@@ -285,19 +301,21 @@ export function createMarklessRolldownPlugin(input: {
 					},
 				);
 
+				const executionLogInjection = executionLogActivationInjection(internalOptions.executionLog);
+				if (executionLogInjection) injectHeadLinks(bundle, [executionLogInjection]);
 				injectHeadLinks(
 					bundle,
 					collectModulePreloadInjections(clientManifest.bundleGraph, {
 						publicPath: internalOptions.publicPath,
 						entryChunks: Object.values(bundle)
 							.filter(
-								(output): output is { fileName: string } =>
+								(output) =>
 									!!output &&
 									typeof output === 'object' &&
 									(output as { type?: string }).type === 'chunk' &&
 									(output as { isEntry?: boolean }).isEntry === true,
 							)
-							.map((chunk) => stripBuildPrefix(chunk.fileName)),
+							.map((chunk) => stripBuildPrefix((chunk as { fileName: string }).fileName)),
 					}),
 				);
 
@@ -306,6 +324,11 @@ export function createMarklessRolldownPlugin(input: {
 					fileName: MARKLESS_BUNDLE_GRAPH,
 					source: JSON.stringify(clientManifest.bundleGraph),
 				});
+				this.emitFile(await createExecutionSizesAsset(
+					manifestBundle,
+					clientManifest,
+					stripBuildPrefix,
+				));
 			},
 		},
 	} satisfies Plugin & { api: MarklessRolldownPluginApi };
@@ -376,6 +399,7 @@ function registerTransformArtifacts(input: {
 	virtualModules: Map<string, MarklessVirtualModule>;
 	transformManifests: Map<string, MarklessTransformManifest>;
 	sourceVirtualModules: Map<string, Set<string>>;
+	executionLogEstimatedSizes: Map<string, number>;
 	dev: ReturnType<typeof createMarklessDevGraph>;
 	environment: MarklessEnvironment;
 }) {
@@ -383,6 +407,12 @@ function registerTransformArtifacts(input: {
 	for (const module of input.result.virtualModules) {
 		input.virtualModules.set(module.id, module);
 		ids.add(module.id);
+		if (input.environment === 'client' && module.type === 'symbol' && module.symbolId) {
+			input.executionLogEstimatedSizes.set(
+				module.symbolId.startsWith('symbol:') ? module.symbolId : `symbol:${module.symbolId}`,
+				module.source.length,
+			);
+		}
 	}
 	input.transformManifests.set(input.source, input.result.manifest);
 	input.sourceVirtualModules.set(input.source, ids);

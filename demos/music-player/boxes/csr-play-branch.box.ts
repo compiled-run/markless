@@ -24,6 +24,7 @@ export default box(
 		// Mount truth: the app renders paused — the @else arm shows the play
 		// glyph and the toggle button carries the paused class binding.
 		const page = await preview.browser.visit('/');
+		await waitForLogSummaryAttribute(page, WAIT);
 		await expect.page.bodyText(
 			page,
 			{ contains: 'Do I Clench My Fists? (Slowed + Reverb)' },
@@ -40,6 +41,7 @@ export default box(
 		await expect.page.text(page, PLAY_ICON, PLAYING_ICON, WAIT);
 		await expect.page.attribute(page, PLAY_TOGGLE, 'class', 'play active', WAIT);
 		await expect.page.attribute(page, '.youtube-frame-host', 'data-command', 'play', WAIT);
+		await waitForLogInteractionAttribute(page, 1, WAIT);
 		// Exactness contract: no chunk may load post-click that was not in the
 		// startup preloaded set.
 		const afterClickScripts = await jsBuildRequestPaths(page);
@@ -54,6 +56,7 @@ export default box(
 		await expect.page.text(page, PLAY_ICON, PAUSED_ICON, WAIT);
 		await expect.page.attribute(page, PLAY_TOGGLE, 'class', 'play', WAIT);
 		await expect.page.attribute(page, '.youtube-frame-host', 'data-command', 'pause', WAIT);
+		await waitForLogInteractionAttribute(page, 2, WAIT);
 
 		await expect.page.outcome(page, { consoleErrors: 0, failedRequests: 0 }, WAIT);
 		await preview.close();
@@ -64,6 +67,42 @@ export default box(
 type NetworkRequestPage = {
 	networkRequests(): Promise<ReadonlyArray<{ readonly url: string; readonly method: string }>>;
 };
+
+type ContentPage = {
+	content(): Promise<string>;
+};
+
+async function waitForLogSummaryAttribute(
+	page: ContentPage,
+	options: { readonly timeoutMs: number },
+): Promise<void> {
+	await waitForLogMirror(page, options, /data-markless-log-summary="markless: rendered — \d+ modules? executed \(\d+(?:\.\d+)? KB\)"/, /data-markless-log-summary="[^"]*est\./, 'Expected data-markless-log-summary to mirror the CSR render summary.');
+}
+
+async function waitForLogInteractionAttribute(
+	page: ContentPage,
+	count: number,
+	options: { readonly timeoutMs: number },
+): Promise<void> {
+	await waitForLogMirror(page, options, /data-markless-log-last="markless: click \[[^"]+\] · woke \d+ modules · ran warm \d+ modules · \d+(?:\.\d+)? KB"/, /data-markless-log-last="[^"]*est\./, `Expected interaction ${count} to mirror a real-KB execution log line.`, new RegExp(`data-markless-log-interactions="${count}"`));
+}
+
+async function waitForLogMirror(
+	page: ContentPage,
+	options: { readonly timeoutMs: number },
+	pattern: RegExp,
+	estPattern: RegExp,
+	message: string,
+	extraPattern?: RegExp,
+): Promise<void> {
+	const started = Date.now();
+	while (Date.now() - started < options.timeoutMs) {
+		const html = await page.content();
+		if ((!extraPattern || extraPattern.test(html)) && pattern.test(html) && !estPattern.test(html)) return;
+		await new Promise((resolve) => setTimeout(resolve, 25));
+	}
+	throw new Error(message);
+}
 
 async function jsBuildRequestPaths(page: NetworkRequestPage): Promise<readonly string[]> {
 	const requests = await page.networkRequests();

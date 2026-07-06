@@ -5,6 +5,11 @@ import type { RuntimeGraph } from '@markless/runtime';
 import type { CsrRenderContainer, CsrRenderOptions, CsrRenderOutput } from './render.ts';
 import type { ResumeRuntime, ResumeSymbol } from './resume.ts';
 
+type ExecutionLogGlobal = typeof globalThis & {
+	__mxLog?: Set<string>;
+	__mxLoadLog?: () => Promise<{ readonly logMarklessRenderSummary?: (input?: unknown) => unknown }>;
+};
+
 export async function renderCsrRuntime(input: {
 	readonly output: CsrRenderOutput;
 	readonly options: CsrRenderOptions;
@@ -29,7 +34,8 @@ export async function renderCsrRuntime(input: {
 			readonly eventName: string;
 			readonly listener: (event: EventOnlyResumeDomEvent) => Promise<void>;
 		}> = [];
-		for (const eventName of new Set(view.events.map((event) => event.eventName))) {
+		const eventNames = view.events.map((event) => String(event.eventName));
+		for (const eventName of new Set<string>(eventNames)) {
 			const listener = async (event: EventOnlyResumeDomEvent) => {
 				await runtime.dispatch(event);
 			};
@@ -50,6 +56,7 @@ export async function renderCsrRuntime(input: {
 			},
 		};
 		output.connectRuntime?.({ graph: runtime.graph, runtime });
+		await marklessLogCsrSummary();
 
 		return {
 			phase: 'csr',
@@ -91,6 +98,7 @@ export async function renderCsrRuntime(input: {
 	await runtime.start();
 	output.connectRuntime?.({ graph, runtime });
 	await activateCsrBehaviors(runtime, view);
+	await marklessLogCsrSummary();
 
 	return {
 		phase: 'csr',
@@ -98,6 +106,17 @@ export async function renderCsrRuntime(input: {
 		graph,
 		runtime,
 	};
+}
+
+async function marklessLogCsrSummary(): Promise<void> {
+	const global = globalThis as ExecutionLogGlobal;
+	if (!global.__mxLog) return;
+	try {
+		const log = await global.__mxLoadLog?.();
+		await log?.logMarklessRenderSummary?.();
+	} catch {
+		// Execution logging is observability only; render must not depend on it.
+	}
 }
 
 type CsrDomJournalTarget = {

@@ -78,6 +78,7 @@ export function emitSourceModule(input: {
 			: `import { state as payloadState, view as payloadView } from '${input.payloadId}';`,
 		'',
 		emitLoadSymbol(input),
+		input.environment === 'client' && input.executionLog !== 'never' ? emitExecutionLogLoader() : '',
 		routeSymbols ? 'const marklessLoadLocalSymbol = loadSymbol;' : '',
 		symbolsOnly && !routeSymbols ? 'export { loadSymbol };' : '',
 		symbolsOnly ? '' : 'export { payloadView };',
