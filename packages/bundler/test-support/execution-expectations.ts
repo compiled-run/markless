@@ -81,7 +81,9 @@ export function forbiddenExecutedModules(
 	executed: Iterable<string>,
 	allowed: ReadonlySet<string>,
 ): string[] {
-	return [...executed].filter((id) => isMarklessRuntimeModule(id) && !allowed.has(id)).sort();
+	return [...executed]
+		.filter((id) => !isAllowedDispatchCoreVirtual(id) && isMarklessRuntimeModule(id) && !allowed.has(id))
+		.sort();
 }
 
 function structurallyReachableGroups(
@@ -126,5 +128,9 @@ function structurallyReachableGroups(
 }
 
 function isMarklessRuntimeModule(id: string): boolean {
-	return id.startsWith('web/') || id.startsWith('core/') || id.startsWith('virtual:markless:');
+	return id.startsWith('web/') || id.startsWith('core/');
+}
+
+function isAllowedDispatchCoreVirtual(id: string): boolean {
+	return id.startsWith('virtual:markless:payload:') || id.startsWith('virtual:markless:symbol:');
 }
