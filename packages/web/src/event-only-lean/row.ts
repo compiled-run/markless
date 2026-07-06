@@ -4,26 +4,26 @@ import type { ResumeDomElement } from '../resume-types.ts';
 import {
 	cellValueNeedsFullDecode,
 	createLeanScalarGraph,
+	executeLeanActionPlanWrite,
+	type LeanActionPlan,
 	type LeanPlan,
 	materializeHostLocator,
 	type RuntimeDemandMap,
 	resolveResult,
 	resolveSymbol,
 	resumeFullEventOnly,
+	shadowLeanActionPlanGraph,
 	syncPolicyGraphNodeIds,
 } from './lean-shared.ts';
 
 export async function resumeScalarRowEventFromPayloadDocument(
 	input: ResumeEventOnlyFromPayloadDocumentInput,
 ): Promise<EventOnlyResumeContainer> {
-	const { readRowPayloadRecordsFromDocument } = await import('./payload-records.ts');
-	const payload = readRowPayloadRecordsFromDocument(input.document, {
-		eventName: input.event.type,
-		runtimeDemandMap: input.runtimeDemandMap,
-	});
-	if (!payload) return resumeFullEventOnly(input);
-	const { state, view } = payload;
-	const plan = scalarRowLeanResumePlan({ state, view, runtimeDemandMap: input.runtimeDemandMap, eventName: input.event.type });
+	const action = rowAction(input.event.type, input.runtimeDemandMap);
+	if (!action?.plan) return resumeFullEventOnly(input);
+	const state = readPayloadScript(input.document, 'markless/state') as ProtocolStatePayload;
+	const view = readPayloadScript(input.document, 'markless/view') as ProtocolViewPayload;
+	const plan = scalarRowLeanResumePlan({ state, view, actionPlan: action.plan, eventName: input.event.type });
 	if (!plan) return resumeFullEventOnly(input);
 
 	const elementsByHostId = new Map<string, EventOnlyResumeDomElement>();
@@ -55,10 +55,11 @@ export async function resumeScalarRowEventFromPayloadDocument(
 			rowDispatch.match.rowKey,
 		),
 	};
+	executeLeanActionPlanWrite(graph, action.plan, rowLocals);
 	for (const symbolId of activeRecord.symbolIds) {
 		const symbol = await resolveSymbol(input.loadSymbol(symbolId));
 		void await resolveResult(symbol({
-			graph,
+			graph: shadowLeanActionPlanGraph(graph),
 			event: input.event,
 			element: rowDispatch.element,
 			getElementHandle: () => undefined,
@@ -94,43 +95,32 @@ export function isScalarRowLeanResumeShape(input: {
 	readonly eventName?: string;
 	readonly runtimeDemandMap?: unknown;
 }): boolean {
-	return scalarRowLeanResumePlan(input) !== null;
+	const action = rowAction(input.eventName, input.runtimeDemandMap);
+	return !!action?.plan && scalarRowLeanResumePlan({ ...input, actionPlan: action.plan }) !== null;
 }
 
 function scalarRowLeanResumePlan(input: {
 	readonly state: ProtocolStatePayload;
 	readonly view: ProtocolViewPayload;
 	readonly eventName?: string;
-	readonly runtimeDemandMap?: unknown;
+	readonly actionPlan: LeanActionPlan;
 }): LeanPlan | null {
 	if (input.state.computed.some((computed) => computed.async === false)) return null;
 	if ((input.view.elementHandles?.length ?? 0) > 0) return null;
-	const demandMap = input.runtimeDemandMap as RuntimeDemandMap | undefined;
-	if (!demandMap?.recordKinds || !demandMap.actions) return null;
-	const replaced = new Map(demandMap.recordKinds.map((record) => [record.kind, record.replaced]));
-	if (replaced.get('keyed-repeat') !== true || replaced.get('dom-update') !== true) return null;
-	const action = demandMap.actions.find((candidate) =>
-		candidate.recordKind === 'keyed-repeat-row' &&
-		(!input.eventName || candidate.eventName === input.eventName)
-	);
-	if (!action?.payloadRecordIds) return null;
-	if ((action.recordKinds ?? []).some((kind) => kind !== 'keyed-repeat' && kind !== 'dom-update')) return null;
-	const recordIds = new Set(action.payloadRecordIds);
-	const keyedRepeats = (input.view.keyedRepeats ?? []).filter((record) => recordIds.has(`keyed-repeat:${record.id}`));
+	if (input.actionPlan.kind !== 'row' || input.actionPlan.version !== 1 || !input.actionPlan.repeatId) return null;
+	const keyedRepeats = (input.view.keyedRepeats ?? []).filter((record) => record.id === input.actionPlan.repeatId);
 	if (keyedRepeats.length !== 1) return null;
 	const repeat = keyedRepeats[0]!;
 	if (!repeat.collectionGraphNodeId) return null;
-	const rowEvent = repeat.rowEvents.find((event) => event.eventName === action.eventName);
+	const rowEvent = repeat.rowEvents.find((event) => !input.eventName || event.eventName === input.eventName);
 	if (!rowEvent) return null;
-	const domUpdates = input.view.domUpdates.filter((record) =>
-		recordIds.has(`dom-update:${record.hostNodeId}:${record.symbolId ?? ''}`),
-	);
+	const domUpdates = planDomUpdates(input.view, input.actionPlan);
 	if (domUpdates.length === 0 || domUpdates.some((record) => !record.symbolId || record.target?.kind !== 'text')) return null;
 	const scalarCellIds = new Set([
-		...domUpdates.map((record) => record.graphNodeId),
+		input.actionPlan.cell,
 		...syncPolicyGraphNodeIds(rowEvent.syncPolicy),
 	]);
-	const fullDecodeCellIds = new Set([repeat.collectionGraphNodeId]);
+	const fullDecodeCellIds = new Set(input.actionPlan.fullDecodeCells ?? [repeat.collectionGraphNodeId]);
 	const cellIds = new Set([...scalarCellIds, ...fullDecodeCellIds]);
 	const cells = input.state.cells.filter((cell) => cellIds.has(cell.graphNodeId));
 	if (cells.length !== cellIds.size) return null;
@@ -149,4 +139,38 @@ function scalarRowLeanResumePlan(input: {
 		cells,
 		fullDecodeCellIds,
 	};
+}
+
+function rowAction(eventName: string | undefined, runtimeDemandMap: unknown) {
+	const demandMap = runtimeDemandMap as RuntimeDemandMap | undefined;
+	if (!eventName || !demandMap?.recordKinds || !demandMap.actions) return undefined;
+	const replaced = new Map(demandMap.recordKinds.map((record) => [record.kind, record.replaced]));
+	if (replaced.get('keyed-repeat') !== true || replaced.get('dom-update') !== true) return undefined;
+	return demandMap.actions.find((candidate) =>
+		candidate.recordKind === 'keyed-repeat-row' &&
+		candidate.eventName === eventName &&
+		candidate.plan?.version === 1 &&
+		candidate.plan.kind === 'row',
+	);
+}
+
+function planDomUpdates(view: ProtocolViewPayload, actionPlan: LeanActionPlan): ProtocolViewPayload['domUpdates'] {
+	return actionPlan.textUpdates.flatMap((plan) => {
+		const record = view.domUpdates.find((candidate) =>
+			candidate.hostNodeId === plan.hostNodeId &&
+			candidate.graphNodeId === plan.graphNodeId &&
+			candidate.symbolId === plan.symbolId &&
+			candidate.target?.kind === 'text',
+		);
+		return record ? [record] : [];
+	});
+}
+
+function readPayloadScript(document: ResumeEventOnlyFromPayloadDocumentInput['document'], type: 'markless/state' | 'markless/view') {
+	const element = document.querySelector(`script[type="${type}"]`);
+	const text = element?.textContent ?? element?.text ?? element?.innerHTML;
+	if (text == null) {
+		throw Object.assign(new Error('MARKLESS_LEAN_PAYLOAD_MISSING'), { code: 'MARKLESS_LEAN_PAYLOAD_MISSING', site: type });
+	}
+	return JSON.parse(text);
 }

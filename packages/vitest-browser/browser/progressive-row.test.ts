@@ -4,9 +4,9 @@ import {
 	forbiddenExecutedModules,
 } from '../../bundler/test-support/execution-expectations.ts';
 import { cleanup, renderSSRPhased } from '../src/index.ts';
-import RowMixed, {
-	payloadRuntimeDemandMap as rowMixedRuntimeDemandMap,
-} from './fixtures/progressive-row-mixed.tsrx';
+import RowQualifying, {
+	payloadRuntimeDemandMap as rowQualifyingRuntimeDemandMap,
+} from './fixtures/progressive-row-qualifying.tsrx';
 import {
 	actionForKeyedRepeat,
 	executedModules,
@@ -22,18 +22,18 @@ afterEach(async () => {
 });
 
 test('progressive execution: qualifying row dispatch stays on the lean keyed-repeat path', async () => {
-	const screen = await renderProgressiveSSR(renderSSRPhased(RowMixed));
+	const screen = await renderProgressiveSSR(renderSSRPhased(RowQualifying));
 	const container = screen.container;
 	const view = readViewPayload(container);
-	const rowButton = requireElement<HTMLButtonElement>(container, 'article[data-mixed-row] button');
+	const rowButton = requireElement<HTMLButtonElement>(container, 'article[data-row] button');
 	const rowAction = actionForKeyedRepeat(container, rowButton, 'click');
 
 	rowButton.click();
-	await expect.poll(() => requireElement<HTMLOutputElement>(container, 'output[data-mixed-choice]').textContent)
+	await expect.poll(() => requireElement<HTMLOutputElement>(container, 'output[data-choice]').textContent)
 		.toBe('north');
 
 	const executed = executedModules();
-	const allowed = deriveAllowedModules(view, rowMixedRuntimeDemandMap, rowAction);
+	const allowed = deriveAllowedModules(view, rowQualifyingRuntimeDemandMap, rowAction);
 	expect(forbiddenExecutedModules(executed, allowed)).toEqual([]);
 	expect(executed).toContain('web/event-only-lean/row');
 	expect(executed).not.toContain('web/event-only-lean/scalar-core');

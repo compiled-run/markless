@@ -32,9 +32,7 @@ test('expectations derive allowed runtime modules from the generated demand map'
 	expect(allowed).toContain('web/fns/write-scalar');
 	expect(allowed).toContain('web/fns/update-text');
 	expect(allowed).toContain('web/fns/scalar-core-graph');
-	expect(allowed).toContain('web/fns/scalar-core-plan');
 	expect(allowed).toContain('web/event-only-lean/scalar-core');
-	expect(allowed).toContain('web/event-only-lean/payload-records');
 	expect(allowed).not.toContain('web/event-only-lean/row');
 	expect(allowed).toContain('web/execution-log-target');
 	expect(allowed).not.toContain('web/event-only-resume');
@@ -53,6 +51,12 @@ test('generated demand map carries per-kind replacement phase flags', async () =
 		`dom-update:${payload.view.domUpdates[0].hostNodeId}:${payload.view.domUpdates[0].symbolId}`,
 		`event:${payload.view.events[0].hostNodeId}:${payload.view.events[0].eventName}`,
 	]);
+	expect(payload.runtimeDemandMap.actions[0].plan).toMatchObject({
+		version: 1,
+		kind: 'scalar',
+		cell: payload.view.domUpdates[0].graphNodeId,
+		symbolId: payload.view.events[0].symbolIds[0],
+	});
 });
 
 test('mixed scalar modules leave replacement phase flags open', async () => {
@@ -148,10 +152,11 @@ test('keyed repeat row actions allow render-module catalog helper imports', asyn
 	expect(payload.runtimeDemandMap.recordKinds).toContainEqual({ kind: 'dom-update', replaced: true });
 	expect(allowed).toContain('web/event-only-lean/row');
 	expect(allowed).toContain('web/event-only-lean/lean-shared');
-	expect(allowed).toContain('web/event-only-lean/payload-records');
 	expect(allowed).not.toContain('web/event-only-lean/scalar-core');
 	expect(allowed).toContain('web/resume-keyed-repeats');
 	expect([...allowed].filter((id) => JUDGE_COUNTER_INTERPRETER_CHAIN_SET.has(id))).toEqual([]);
+	expect(payload.runtimeDemandMap.actions.find((action: any) => action.recordKind === 'keyed-repeat-row')?.plan)
+		.toMatchObject({ version: 1, kind: 'row', cell: payload.view.domUpdates[0].graphNodeId, repeatId: repeat.id });
 });
 
 test('mixed scalar and row actions keep exact lean modules per action', async () => {
@@ -232,7 +237,6 @@ test('replaced action kinds tighten back to the exact demand set', async () => {
 	expect(allowed).toContain('web/fns/write-scalar');
 	expect(allowed).toContain('web/fns/update-text');
 	expect(allowed).toContain('web/fns/scalar-core-graph');
-	expect(allowed).toContain('web/fns/scalar-core-plan');
 	expect([...allowed].filter((id) => JUDGE_COUNTER_INTERPRETER_CHAIN_SET.has(id))).toEqual([]);
 });
 

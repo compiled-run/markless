@@ -1,41 +1,8 @@
 import { expect, test, vi } from 'vitest';
-import { marklessDispatchScalar } from '../src/fns/dispatch-scalar.ts';
 import { marklessCreateScalarCoreGraph } from '../src/fns/scalar-core-graph.ts';
 import { marklessUpdateText } from '../src/fns/update-text.ts';
 import { marklessWriteScalar } from '../src/fns/write-scalar.ts';
 import { enrichRuntimeErrorForReporting } from '../src/runtime-error-reporting.ts';
-
-test('scalar dispatch leaf delegates to the existing container dispatch flow', async () => {
-	const dispatch = vi.fn(async () => undefined);
-	const event = { type: 'click', target: null };
-	const eventRecord = { hostNodeId: 'h1', eventName: 'click', symbolIds: ['symbol:click'] };
-
-	await marklessDispatchScalar({
-		container: { graph: {} as never, view: {} as never, dispatch, dispose: vi.fn() },
-		event,
-		eventRecord,
-		syncPolicyAlreadyApplied: true,
-	});
-
-	expect(dispatch).toHaveBeenCalledWith(event, {
-		element: undefined,
-		eventRecord,
-		syncPolicyAlreadyApplied: true,
-	});
-});
-
-test('scalar dispatch leaf fails loudly when no event record was matched', async () => {
-	await expect(
-		marklessDispatchScalar({
-			container: { graph: {} as never, view: {} as never, dispatch: vi.fn(), dispose: vi.fn() },
-			event: { type: 'click', target: null },
-		}),
-	).rejects.toMatchObject({
-		message: 'MARKLESS_SCALAR_DISPATCH_RECORD_MISSING',
-		code: 'MARKLESS_SCALAR_DISPATCH_RECORD_MISSING',
-		site: 'dispatch-record',
-	});
-});
 
 test('scalar write leaf fails loudly when no graph is available', () => {
 	expect(() =>

@@ -1,7 +1,6 @@
-import { marklessApplySetText } from './apply-set-text.ts';
-import { marklessResolveResult } from './resolve-result.ts';
+import { marklessUpdateText } from './update-text.ts';
 
-export function marklessCreateScalarCoreGraph(plan, elementsByHostId, loadSymbol) {
+export function marklessCreateScalarCoreGraph(plan, elementsByHostId, _loadSymbol) {
 	const values = new Map(plan.cells.map((cell) => [cell.graphNodeId, marklessDecodeScalarSlot(cell.value?.root)]));
 	const dirty: string[] = [];
 	const graph = {
@@ -34,14 +33,10 @@ export function marklessCreateScalarCoreGraph(plan, elementsByHostId, loadSymbol
 					if (!pending.includes(update.graphNodeId) || !update.symbolId) continue;
 					const element = elementsByHostId.get(update.hostNodeId);
 					if (!element) continue;
-					const symbol = await marklessResolveResult(loadSymbol(update.symbolId));
-					const result = await marklessResolveResult(symbol({
-						graph,
-						element,
-						getElementHandle: () => undefined,
+					const result = marklessUpdateText({
 						domUpdate: update,
 						value: values.get(update.graphNodeId),
-					}));
+					}, update.hostNodeId);
 					marklessApplySetText(result, elementsByHostId);
 				}
 			}
@@ -63,4 +58,14 @@ function marklessScalarCoreError(site: string): never {
 		code: 'MARKLESS_SCALAR_LEAN_ESCALATE',
 		site,
 	});
+}
+
+function marklessApplySetText(result, elementsByHostId): void {
+	if (!result || typeof result === 'function') return;
+	const entries = Array.isArray(result) ? result : [result];
+	for (const entry of entries) {
+		if (entry.type !== 'setText') throw marklessScalarCoreError('journal-type');
+		const target = elementsByHostId.get(entry.locator);
+		if (target) target.textContent = entry.value == null ? '' : String(entry.value);
+	}
 }

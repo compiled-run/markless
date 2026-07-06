@@ -1,6 +1,8 @@
 import type { ProtocolStatePayload, ProtocolSyncPolicyCondition, ProtocolViewPayload } from '../../../serializer/src/protocol.ts';
 import type { SerializedGraphPayload, SerializedSlot } from '../../../serializer/src/value-decode-client.ts';
 import type { EventOnlyResumeContainer, EventOnlyResumeDomElement, EventOnlyResumeDomNode, EventOnlyResumeRecord, EventOnlyResumeSymbol, ResumeEventOnlyFromPayloadDocumentInput } from './types.ts';
+import { marklessUpdateText } from '../fns/update-text.ts';
+import { marklessWriteScalar } from '../fns/write-scalar.ts';
 
 export type RuntimeDemandMap = {
 	readonly recordKinds?: ReadonlyArray<{ readonly kind: string; readonly replaced: boolean }>;
@@ -10,7 +12,19 @@ export type RuntimeDemandMap = {
 		readonly recordKind: string;
 		readonly recordKinds?: ReadonlyArray<string>;
 		readonly payloadRecordIds?: ReadonlyArray<string>;
+		readonly plan?: LeanActionPlan;
 	}>;
+};
+
+export type LeanActionPlan = {
+	readonly version: 1;
+	readonly kind: 'scalar' | 'row';
+	readonly symbolId: string;
+	readonly cell: string;
+	readonly write: { readonly kind: 'assign' | 'update'; readonly value?: unknown; readonly valueKind?: 'undefined'; readonly localPath?: ReadonlyArray<string>; readonly updateOperator?: '++' | '--' };
+	readonly textUpdates: ReadonlyArray<{ readonly hostNodeId: string; readonly graphNodeId: string; readonly symbolId: string; readonly prefix?: string }>;
+	readonly repeatId?: string;
+	readonly fullDecodeCells?: ReadonlyArray<string>;
 };
 
 export type LeanPlan = {
@@ -25,7 +39,7 @@ export type LeanPlan = {
 export async function createLeanScalarGraph(
 	plan: LeanPlan,
 	elementsByHostId: Map<string, EventOnlyResumeDomElement>,
-	loadSymbol: ResumeEventOnlyFromPayloadDocumentInput['loadSymbol'],
+	_loadSymbol: ResumeEventOnlyFromPayloadDocumentInput['loadSymbol'],
 ): Promise<EventOnlyResumeContainer['graph']> {
 	const cells = new Map<string, unknown>();
 	const payloads = new Map(plan.cells.map((cell) => [cell.graphNodeId, cell.value]));
@@ -72,14 +86,10 @@ export async function createLeanScalarGraph(
 					if (!pending.some((path) => path.graphNodeId === update.graphNodeId)) continue;
 					const element = elementsByHostId.get(update.hostNodeId);
 					if (!element || !update.symbolId) continue;
-					const symbol = await resolveSymbol(loadSymbol(update.symbolId));
-					const result = await resolveResult(symbol({
-						graph,
-						element,
-						getElementHandle: () => undefined,
+					const result = marklessUpdateText({
 						domUpdate: update,
 						value: graph.read(update.graphNodeId),
-					}));
+					}, update.hostNodeId);
 					applyTextJournal(result, elementsByHostId);
 				}
 			}
@@ -130,6 +140,38 @@ export async function resolveResult(value: ReturnType<EventOnlyResumeSymbol>): P
 
 export function uniqueStrings(values: ReadonlyArray<string>): string[] {
 	return [...new Set(values)].sort();
+}
+
+export function executeLeanActionPlanWrite(
+	graph: EventOnlyResumeContainer['graph'],
+	plan: LeanActionPlan,
+	locals: Record<string, unknown> = {},
+): void {
+	if (plan.write.kind === 'update') {
+		marklessWriteScalar({ graph }, {
+			graphNodeId: plan.cell,
+			returnValue: 'next',
+			update(value) {
+				return Number(value) + (plan.write.updateOperator === '--' ? -1 : 1);
+			},
+		});
+		return;
+	}
+	marklessWriteScalar({ graph }, {
+		graphNodeId: plan.cell,
+		value: plan.write.localPath ? readPath(locals, plan.write.localPath) : plan.write.valueKind === 'undefined' ? undefined : plan.write.value,
+	});
+}
+
+export function shadowLeanActionPlanGraph(graph: EventOnlyResumeContainer['graph']): EventOnlyResumeContainer['graph'] {
+	return {
+		...graph,
+		write() {},
+		update(update) {
+			const value = graph.read(update.graphNodeId, update.path ?? []);
+			return update.returnValue === 'previous' || update.returnValue === 'next' ? value : undefined;
+		},
+	};
 }
 
 function readPath(value: unknown, path: ReadonlyArray<string>): unknown {

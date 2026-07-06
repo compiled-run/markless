@@ -2,6 +2,7 @@ import type {
 	GeneratedSymbolModule,
 	PublicRenderModuleArtifact,
 	PlannedSymbol,
+	RuntimeDemandMapActionPlan,
 	RuntimeDemandMapArtifact,
 	SymbolModulesArtifact,
 	SymbolResolverPlan,
@@ -16,18 +17,14 @@ const DISPATCH_CORE = [
 ];
 const SCALAR_LEAN_DISPATCH_CORE = [
 	'web/event-only-lean/scalar-core',
-	'web/event-only-lean/payload-records',
-	'web/fns/apply-set-text',
 	'web/fns/locate-host',
 	'web/fns/resolve-result',
 	'web/fns/scalar-core-graph',
-	'web/fns/scalar-core-plan',
 	'web/fns/sync-policy-graph-ids',
 ];
 const ROW_LEAN_DISPATCH_CORE = [
 	'web/event-only-lean/row',
 	'web/event-only-lean/lean-shared',
-	'web/event-only-lean/payload-records',
 	'web/fns/sync-policy-graph-ids',
 ];
 const SYNC_POLICY = ['web/inline/sync-policy-core'];
@@ -130,7 +127,7 @@ function scalarCoreEventKeys(resolver: SymbolResolverPlan, view: ProtocolViewPay
 	return new Set(
 		(view.events ?? [])
 			.filter((event) =>
-				(event.symbolIds ?? []).length > 0 &&
+				(event.symbolIds ?? []).length === 1 &&
 				!(event.symbolIds ?? []).some((symbolId) => rowSymbolIds.has(symbolId)) &&
 				(event.symbolIds ?? []).every((symbolId) => {
 					const symbol = symbolsById.get(symbolId);
@@ -151,6 +148,9 @@ function scalarCoreEventKeys(resolver: SymbolResolverPlan, view: ProtocolViewPay
 
 function isScalarOnlyKeyedRepeatModule(resolver: SymbolResolverPlan, view: ProtocolViewPayload): boolean {
 	if ((view.keyedRepeats?.length ?? 0) === 0 || (view.domUpdates?.length ?? 0) === 0) return false;
+	if ((view.branches?.length ?? 0) > 0) return false;
+	if ((view.asyncBoundaries?.length ?? 0) > 0) return false;
+	if ((view.behaviors?.length ?? 0) > 0) return false;
 	if ((view.elementHandles?.length ?? 0) > 0) return false;
 	const symbolsById = new Map(resolver.symbols.map((symbol) => [symbol.id, symbol]));
 	const rowEvents = (view.keyedRepeats ?? []).flatMap((repeat) =>
@@ -159,7 +159,7 @@ function isScalarOnlyKeyedRepeatModule(resolver: SymbolResolverPlan, view: Proto
 	if (rowEvents.length === 0) return false;
 	for (const { repeat, event } of rowEvents) {
 		const eventSymbols = (event.symbolIds ?? []).map((symbolId) => symbolsById.get(symbolId));
-		if (eventSymbols.length === 0) return false;
+		if (eventSymbols.length !== 1) return false;
 		if (!eventSymbols.every((symbol) =>
 			symbol?.kind === 'event-handler' &&
 			isScalarWriteOnlyEventSymbol(symbol, new Set([repeat.itemName])) &&
@@ -221,6 +221,19 @@ function literalValueSource(source: string | undefined): string | null {
 function localPathValueSource(source: string | undefined, localNames: ReadonlySet<string>): boolean {
 	const parts = source?.trim().split('.') ?? [];
 	return parts.length >= 2 && parts.every(isIdentifier) && localNames.has(parts[0] ?? '');
+}
+
+function localValuePath(source: string | undefined, localNames: ReadonlySet<string>): ReadonlyArray<string> | null {
+	const parts = source?.trim().split('.') ?? [];
+	return parts.length >= 2 && parts.every(isIdentifier) && localNames.has(parts[0] ?? '')
+		? parts
+		: null;
+}
+
+function literalPlanValue(source: string | undefined): unknown {
+	const literal = literalValueSource(source);
+	if (literal === null) return undefined;
+	return JSON.parse(literal);
 }
 
 function writesDemandNonTextRuntime(
@@ -374,6 +387,7 @@ function actionDemandRecords(
 	return [
 		...(view.events ?? []).map((event) => {
 			const subscriberRecords = writeSubscriberRecords(resolver, event.symbolIds ?? [], view, records);
+			const plan = scalarActionPlan(resolver, event, view, subscriberRecords);
 			return {
 				hostNodeId: event.hostNodeId,
 				eventName: event.eventName,
@@ -388,6 +402,7 @@ function actionDemandRecords(
 					...branchDemand,
 					...subscriberRecords.flatMap((record) => record.runtimeModuleIds),
 				]),
+				...(plan ? { plan } : {}),
 			};
 		}),
 		...(view.keyedRepeats ?? []).flatMap((repeat) =>
@@ -395,6 +410,7 @@ function actionDemandRecords(
 				const subscriberRecords = writeSubscriberRecords(resolver, event.symbolIds ?? [], view, records);
 				const eagerBranchKinds = scalarRows ? [] : branchKinds;
 				const eagerBranchDemand = scalarRows ? [] : branchDemand;
+				const plan = scalarRows ? rowActionPlan(resolver, repeat, event, view, subscriberRecords) : undefined;
 				return {
 					hostNodeId: repeat.parentHostNodeId,
 					eventName: event.eventName,
@@ -415,10 +431,111 @@ function actionDemandRecords(
 						...eagerBranchDemand,
 						...subscriberRecords.flatMap((record) => record.runtimeModuleIds),
 					]),
+					...(plan ? { plan } : {}),
 				};
 			}),
 		),
 	];
+}
+
+function scalarActionPlan(
+	resolver: SymbolResolverPlan,
+	event: ProtocolViewPayload['events'][number],
+	view: ProtocolViewPayload,
+	records: RuntimeDemandMapArtifact['payloadRecords'],
+): RuntimeDemandMapActionPlan | undefined {
+	const symbol = event.symbolIds.length === 1 ? resolver.symbols.find((candidate) => candidate.id === event.symbolIds[0]) : undefined;
+	if (!symbol || symbol.kind !== 'event-handler') return undefined;
+	if (!isScalarWriteOnlyEventSymbol(symbol)) return undefined;
+	const write = symbol.writes?.[0];
+	if (!write) return undefined;
+	if (!textUpdatesUseScalarLeafSymbols(resolver, symbol.writes ?? [], view)) return undefined;
+	const textUpdates = planTextUpdates(write.graphNodeId, records, view);
+	if (textUpdates.length === 0) return undefined;
+	return {
+		version: 1,
+		kind: 'scalar',
+		symbolId: symbol.id,
+		cell: write.graphNodeId,
+		write: planWriteShape(write, new Set()),
+		textUpdates,
+	};
+}
+
+function rowActionPlan(
+	resolver: SymbolResolverPlan,
+	repeat: NonNullable<ProtocolViewPayload['keyedRepeats']>[number],
+	event: NonNullable<ProtocolViewPayload['keyedRepeats']>[number]['rowEvents'][number],
+	view: ProtocolViewPayload,
+	records: RuntimeDemandMapArtifact['payloadRecords'],
+): RuntimeDemandMapActionPlan | undefined {
+	const symbol = event.symbolIds.length === 1 ? resolver.symbols.find((candidate) => candidate.id === event.symbolIds[0]) : undefined;
+	if (!symbol || symbol.kind !== 'event-handler') return undefined;
+	if (!isScalarWriteOnlyEventSymbol(symbol, new Set([repeat.itemName]))) return undefined;
+	const write = symbol.writes?.[0];
+	if (!write || !repeat.collectionGraphNodeId) return undefined;
+	if (!textUpdatesUseScalarLeafSymbols(resolver, symbol.writes ?? [], view)) return undefined;
+	const textUpdates = planTextUpdates(write.graphNodeId, records, view);
+	if (textUpdates.length === 0) return undefined;
+	return {
+		version: 1,
+		kind: 'row',
+		symbolId: symbol.id,
+		cell: write.graphNodeId,
+		write: planWriteShape(write, new Set([repeat.itemName])),
+		textUpdates,
+		repeatId: repeat.id,
+		fullDecodeCells: [repeat.collectionGraphNodeId],
+	};
+}
+
+function planTextUpdates(
+	graphNodeId: string,
+	records: RuntimeDemandMapArtifact['payloadRecords'],
+	view: ProtocolViewPayload,
+): RuntimeDemandMapActionPlan['textUpdates'] {
+	const recordIds = new Set(records.map((record) => record.recordId));
+	return (view.domUpdates ?? []).flatMap((update) => {
+		if (
+			update.graphNodeId !== graphNodeId ||
+			update.target?.kind !== 'text' ||
+			!update.symbolId ||
+			!recordIds.has(`dom-update:${update.hostNodeId}:${update.symbolId}`)
+		) return [];
+		return [{ hostNodeId: update.hostNodeId, graphNodeId: update.graphNodeId, symbolId: update.symbolId, ...(update.target.prefix ? { prefix: update.target.prefix } : {}) }];
+	});
+}
+
+function textUpdatesUseScalarLeafSymbols(
+	resolver: SymbolResolverPlan,
+	writes: ReadonlyArray<NonNullable<Extract<PlannedSymbol, { readonly kind: 'event-handler' }>['writes']>[number]>,
+	view: ProtocolViewPayload,
+): boolean {
+	const symbolsById = new Map(resolver.symbols.map((symbol) => [symbol.id, symbol]));
+	return textDomUpdatesForWrites(writes, view).every((update) => {
+		const updateSymbol = update.symbolId ? symbolsById.get(update.symbolId) : undefined;
+		return updateSymbol?.kind === 'dom-update' && isTextUpdateSymbol(updateSymbol);
+	});
+}
+
+function planWriteShape(
+	write: NonNullable<Extract<PlannedSymbol, { readonly kind: 'event-handler' }>['writes']>[number],
+	localNames: ReadonlySet<string>,
+): RuntimeDemandMapActionPlan['write'] {
+	if (write.operation === 'update') {
+		return {
+			kind: 'update',
+			...(write.updateOperator ? { updateOperator: write.updateOperator } : {}),
+		};
+	}
+	const localPath = localValuePath(write.valueSource, localNames);
+	if (literalValueSource(write.valueSource) === 'undefined') {
+		return { kind: 'assign', valueKind: 'undefined' };
+	}
+	return {
+		kind: 'assign',
+		...(localPath ? { localPath } : { value: literalPlanValue(write.valueSource) }),
+	};
 }
 
 function writeSubscriberRecords(
