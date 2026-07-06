@@ -35,11 +35,7 @@ type EventOnlyResumeContainerState = EventOnlyResumeContainer & {
 	readonly locatorsByHostId: ReadonlyMap<string, ProtocolViewPayload['locators'][number]>;
 	readonly activeBehaviorHosts: Set<string>;
 };
-type FullResumeHandoffInput = ResumeEventOnlyFromPayloadDocumentInput & {
-	readonly loadFullResume?: (
-		input: ResumeEventOnlyFromPayloadDocumentInput,
-	) => unknown | Promise<unknown>;
-};
+type FullResumeHandoffInput = ResumeEventOnlyFromPayloadDocumentInput & { readonly loadFullResume?: (input: ResumeEventOnlyFromPayloadDocumentInput) => unknown };
 
 const containers = new WeakMap<EventOnlyResumeDomElement, EventOnlyResumeContainerState>();
 const noElementHandle = () => undefined;

@@ -190,7 +190,6 @@ function emitResumeContainerEvent(loadSymbolName: string, needsFullResume: boole
 		].join('\n');
 	}
 	return [
-		fullResumeHandoff,
 		'export async function resumeContainerEvent(input) {',
 		'	await resumeEventOnlyFromPayloadDocument({',
 		'		document: input.root,',
@@ -200,7 +199,6 @@ function emitResumeContainerEvent(loadSymbolName: string, needsFullResume: boole
 		'		eventRecord: input.eventRecord,',
 		'		syncPolicyAlreadyApplied: !!input.eventRecord,',
 		`		loadSymbol: ${loadSymbolName},`,
-		'		loadFullResume: marklessFullResumeHandoff,',
 		'	});',
 		'}',
 	].join('\n');
