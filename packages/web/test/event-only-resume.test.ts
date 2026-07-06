@@ -387,8 +387,7 @@ test('event-only scalar lean route keeps only the dispatched record and text sub
 	const button = element('BUTTON');
 	const output = element('OUTPUT');
 	const other = element('SPAN');
-	const section = element('SECTION', [button, output, other]);
-	const root = element('DIV', [section]);
+	const root = element('DIV', [button, output, other]);
 	const state = createProtocolStatePayload({
 		cells: [
 			{ graphNodeId: 'state:count', name: 'count', valueKind: 'scalar', value: 0 },
@@ -399,10 +398,9 @@ test('event-only scalar lean route keeps only the dispatched record and text sub
 		version: 1,
 		locators: [
 			{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'div' },
-			{ hostNodeId: 'h4', strategy: 'dom-order', index: 1, tagName: 'section' },
-			{ hostNodeId: 'h1', strategy: 'dom-order', index: 2, tagName: 'button' },
-			{ hostNodeId: 'h2', strategy: 'dom-order', index: 3, tagName: 'output' },
-			{ hostNodeId: 'h3', strategy: 'dom-order', index: 4, tagName: 'span' },
+			{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'button' },
+			{ hostNodeId: 'h2', strategy: 'dom-order', index: 2, tagName: 'output' },
+			{ hostNodeId: 'h3', strategy: 'dom-order', index: 3, tagName: 'span' },
 		],
 		events: [
 			{ hostNodeId: 'h1', eventName: 'click', symbolIds: ['symbol:event'] },
@@ -461,36 +459,6 @@ test('event-only scalar lean route keeps only the dispatched record and text sub
 	expect(result.view.domUpdates).toEqual([view.domUpdates[0]]);
 	expect(result.view.locators.map((locator) => locator.hostNodeId)).toEqual(['h1', 'h2']);
 	expect(result.graph.read('state:count')).toBe(1);
-	expect(output.textContent).toBe('1');
-});
-
-test('event-only scalar lean route falls back for direct SSR container children', async () => {
-	const button = element('BUTTON'), output = element('OUTPUT'), other = element('SPAN');
-	const root = element('DIV', [button, output, other]);
-	const state = createProtocolStatePayload({ cells: [
-		{ graphNodeId: 'state:count', name: 'count', valueKind: 'scalar', value: 0 },
-		{ graphNodeId: 'state:other', name: 'other', valueKind: 'scalar', value: 10 },
-	] });
-	const eventRecord = { hostNodeId: 'h1', eventName: 'click', symbolIds: ['symbol:event'] };
-	const domUpdate = { hostNodeId: 'h2', source: 'count', graphNodeId: 'state:count', path: [], target: { kind: 'text' as const }, symbolId: 'symbol:text' };
-	const view: ProtocolViewPayload = {
-		version: 1,
-		locators: [{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'button' }, { hostNodeId: 'h2', strategy: 'dom-order', index: 2, tagName: 'output' }, { hostNodeId: 'h3', strategy: 'dom-order', index: 3, tagName: 'span' }],
-		events: [eventRecord, { hostNodeId: 'h3', eventName: 'mouseover', symbolIds: ['symbol:other'] }],
-		domUpdates: [domUpdate, { hostNodeId: 'h3', source: 'other', graphNodeId: 'state:other', path: [], target: { kind: 'text' }, symbolId: 'symbol:otherText' }],
-		behaviors: [], elementHandles: [], asyncBoundaries: [],
-	};
-	const scripts = renderPayloadScripts({ state, view });
-	const result = await resumeScalarEventFromPayloadDocument({
-		document: payloadDocument(scripts.stateScript, scripts.viewScript), root, event: { type: 'click', target: button },
-		eventRecord, runtimeDemandMap: scalarRuntimeDemandMap({ eventRecord, domUpdate }),
-		loadSymbol(symbolId) {
-			if (symbolId === 'symbol:event') return ({ graph }) => graph.update({ graphNodeId: 'state:count', update: (value) => Number(value) + 1 });
-			return ({ value }) => ({ type: 'setText', locator: 'h2', value });
-		},
-	});
-
-	expect(result.view.locators.map((locator) => locator.hostNodeId)).toEqual(['h1', 'h2', 'h3']);
 	expect(output.textContent).toBe('1');
 });
 

@@ -40,8 +40,6 @@ export async function resumeScalarEventFromPayloadDocument(
 		materializeHostLocator(input.root, plan.locators, elementsByHostId, plan.eventRecord.hostNodeId) ??
 		input.event.target;
 	if (!element) return resumeFullEventOnly(input);
-	// Direct SSR container children include single-root and fragment sibling roots; keep them on the proven full path for now.
-	if (element.parentElement === input.root) return resumeFullEventOnly(input);
 	for (const update of plan.domUpdates) {
 		if (!materializeHostLocator(input.root, plan.locators, elementsByHostId, update.hostNodeId)) {
 			return resumeFullEventOnly(input);
