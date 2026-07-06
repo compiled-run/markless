@@ -217,7 +217,7 @@ Three gates, in order:
 
 1. **Declared.** The payload's record inventory is the runtime capability
    manifest. A runtime capability module (keyed-repeat identity, async
-   boundaries, sync-computed derivation, device storage, and future record
+   boundaries, sync-computed derivation, and future record
    kinds) may load only when the container's payload declares records of that
    kind. Pages without a record kind ship and load none of its runtime.
 2. **Demanded.** A loaded capability executes only when demanded: an
