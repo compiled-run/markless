@@ -345,7 +345,7 @@ ${graphConditionSource}
 	if (logOn) {
 		const log = globalThis.__mxLog = globalThis.__mxLog || new Set();
 		const executed = [...log];
-		const preloaded = d.querySelectorAll('link[rel="modulepreload"]').length;
+		const preloaded = d.querySelectorAll('link[rel=modulepreload]').length;
 		const bytes = executed.length === 1 ? '1 module executed' : executed.length + ' modules executed';
 		const summary = 'markless: resumed — ' + bytes + ', ' + preloaded + ' modules preloaded (' + executed.length + ' executed)';
 		console.log(summary);

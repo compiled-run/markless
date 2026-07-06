@@ -40,7 +40,7 @@ const renderSsrCommand: BrowserCommand<
 				`Available exports: ${Object.keys(moduleExports).join(', ')}`,
 		);
 	}
-	return { html: await renderToString(artifact) };
+	return { html: await renderToString(artifact, { executionLog: 'never' }) };
 };
 
 export function testSSR(): Plugin {

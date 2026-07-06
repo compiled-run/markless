@@ -1083,7 +1083,7 @@ test('renderToString inline event resumer imports the resume module only after i
 			state: createProtocolStatePayload({ cells: [] }),
 			view: viewWithClick(),
 		}),
-		{ resumeModuleUrl },
+		{ executionLog: 'never', resumeModuleUrl },
 	);
 	const view = JSON.parse(extractScriptText(html, 'markless/view')) as ProtocolViewPayload;
 	const resumerSource = extractResumerSource(html);
@@ -1177,6 +1177,43 @@ test('renderToString execution log activation stays inline and mirrors summary w
 	expect(resumerSource).toContain("setAttribute('data-markless-log-summary', summary)");
 });
 
+test('renderToString defaults to auto execution log bootstrap for interactive SSR', async () => {
+	const html = await renderToString(
+		() => ({
+			html: '<button type="button">Count 0</button>',
+			state: createProtocolStatePayload({ cells: [] }),
+			view: viewWithClick(),
+		}),
+		{ resumeModuleUrl: '/resume.js' },
+	);
+	const resumerSource = extractResumerSource(html);
+
+	expect(resumerSource).toContain('localhost|127\\.0\\.0\\.1|\\[::1\\]');
+	expect(resumerSource).toContain("new URLSearchParams(l.search).has('markless-log')");
+	expect(resumerSource).toContain("localStorage.getItem('marklessLog') === '1'");
+	expect(resumerSource).toContain('globalThis.__mxLog = globalThis.__mxLog || new Set()');
+	expect(resumerSource).toContain("querySelectorAll('link[rel=modulepreload]')");
+	expect(resumerSource).not.toContain('rel="modulepreload"');
+});
+
+test('renderToString strips execution log bootstrap when executionLog is never', async () => {
+	const html = await renderToString(
+		() => ({
+			html: '<button type="button">Count 0</button>',
+			state: createProtocolStatePayload({ cells: [] }),
+			view: viewWithClick(),
+		}),
+		{ executionLog: 'never', resumeModuleUrl: '/resume.js' },
+	);
+	const resumerSource = extractResumerSource(html);
+
+	expect(resumerSource).not.toContain('__mxLog');
+	expect(resumerSource).not.toContain('markless-log');
+	expect(resumerSource).not.toContain('marklessLog');
+	expect(resumerSource).not.toContain('data-markless-log-summary');
+	expect(resumerSource).not.toContain('querySelectorAll');
+});
+
 test('renderToString inline event resumer steps aside after runtime startup', async () => {
 	const resumeModuleUrl = createResumeRuntimeStartedModuleUrl();
 	const html = await renderToString(
@@ -1185,7 +1222,7 @@ test('renderToString inline event resumer steps aside after runtime startup', as
 			state: createProtocolStatePayload({ cells: [] }),
 			view: viewWithClick(),
 		}),
-		{ resumeModuleUrl },
+		{ executionLog: 'never', resumeModuleUrl },
 	);
 	const view = JSON.parse(extractScriptText(html, 'markless/view')) as ProtocolViewPayload;
 	const resumerSource = extractResumerSource(html);
@@ -1275,7 +1312,7 @@ test('renderToString inline event resumer runs sync policy before importing resu
 			state: createProtocolStatePayload({ cells: [] }),
 			view: viewWithSyncPolicy(),
 		}),
-		{ resumeModuleUrl },
+		{ executionLog: 'never', resumeModuleUrl },
 	);
 	const view = JSON.parse(extractScriptText(html, 'markless/view')) as ProtocolViewPayload;
 	const resumerSource = extractResumerSource(html);
@@ -1387,7 +1424,7 @@ test('renderToString inline event resumer evaluates sync policy before importing
 				],
 			},
 		}),
-		{ resumeModuleUrl },
+		{ executionLog: 'never', resumeModuleUrl },
 	);
 	const view = JSON.parse(extractScriptText(html, 'markless/view')) as ProtocolViewPayload;
 	const resumerSource = extractResumerSource(html);
@@ -1497,7 +1534,7 @@ test('renderToString inline event resumer reads graph-backed sync policy before 
 				],
 			},
 		}),
-		{ resumeModuleUrl },
+		{ executionLog: 'never', resumeModuleUrl },
 	);
 	const state = extractScriptText(html, 'markless/state');
 	const view = JSON.parse(extractScriptText(html, 'markless/view')) as ProtocolViewPayload;
@@ -1613,7 +1650,7 @@ test('renderToString emits graph sync-policy inline runtime once for repeated pa
 					],
 				},
 			}),
-			{ resumeModuleUrl: '/async-resume.js', inlineRuntimeRegistry },
+			{ executionLog: 'never', resumeModuleUrl: '/async-resume.js', inlineRuntimeRegistry },
 		);
 	const documentHtml = (await Promise.all([renderContainer(), renderContainer(), renderContainer()])).join('');
 	const inlineSources = extractAllResumerSources(documentHtml).join('\n');
@@ -1656,7 +1693,7 @@ test('renderToString inline event resumer reads built-in graph values for sync p
 				],
 			},
 		}),
-		{ resumeModuleUrl },
+		{ executionLog: 'never', resumeModuleUrl },
 	);
 	const state = extractScriptText(html, 'markless/state');
 	const view = JSON.parse(extractScriptText(html, 'markless/view')) as ProtocolViewPayload;
