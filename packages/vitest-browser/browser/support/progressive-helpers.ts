@@ -7,6 +7,7 @@ import type { SsrPhasedRenderResult, SsrRenderResult } from '../../src/index.ts'
 
 declare global {
 	var __marklessExecutedModules: Set<string> | undefined;
+	var __mxLog: Set<string> | undefined;
 }
 
 export async function renderProgressiveSSR(
@@ -36,7 +37,13 @@ export function actionForElement(
 		const record = view.events?.find((event) => event.hostNodeId === hostNodeId && event.eventName === eventName);
 		return record ? { syncPolicy: record.syncPolicy } : undefined;
 	});
-	if (match) return { hostNodeId: match.hostNodeId, eventName, syncPolicy: match.value.syncPolicy };
+	if (match) {
+		return withExecutionLog({
+			hostNodeId: match.hostNodeId,
+			eventName,
+			syncPolicy: match.value.syncPolicy,
+		});
+	}
 	throw new Error(`Expected payload event record for ${eventName} on clicked element or ancestor.`);
 }
 
@@ -53,8 +60,18 @@ export function actionForKeyedRepeat(
 				record.rowEvents.some((event) => event.eventName === eventName),
 		),
 	);
-	if (match) return { hostNodeId: match.hostNodeId, eventName, recordKind: 'keyed-repeat-row' };
+	if (match) {
+		return withExecutionLog({
+			hostNodeId: match.hostNodeId,
+			eventName,
+			recordKind: 'keyed-repeat-row',
+		});
+	}
 	throw new Error(`Expected keyed repeat row event for ${eventName} on clicked element or ancestor.`);
+}
+
+function withExecutionLog(action: RuntimeDispatchAction): RuntimeDispatchAction {
+	return globalThis.__mxLog instanceof Set ? { ...action, executionLog: true } : action;
 }
 
 function findHostNodeIdForTarget<T>(
