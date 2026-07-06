@@ -49,7 +49,7 @@ test('progressive execution: row dispatch does not execute unrelated async, bran
 	const screen = await renderSSR(RowMixed);
 	const container = screen.container;
 	const view = readViewPayload(container);
-	const rowButton = requireElement<HTMLButtonElement>(container, 'button[data-mixed-row]');
+	const rowButton = requireElement<HTMLButtonElement>(container, '.mixed-row button');
 	const rowAction = actionForKeyedRepeat(view, 'click');
 	resetExecutedModules();
 

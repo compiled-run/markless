@@ -27,6 +27,7 @@ test('emitSourceModule keeps full resume behind a dynamic handoff', () => {
 		"import { resumeEventOnlyFromPayloadDocument } from '@markless/core/web/event-only-resume';",
 	);
 	expect(code).toContain("import('@markless/core/web/resume')");
+	expect(code).not.toMatch(/^\s*const\s+marklessFullResumeModule\s*=\s*import\(/m);
 	expect(code).not.toContain(
 		"import { resumeFromPayloadDocument } from '@markless/core/web/resume';",
 	);
