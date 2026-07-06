@@ -21,10 +21,17 @@ const DISPATCH_CORE = [
 	'web/payload-resume',
 	'web/payload-graph-construct',
 	'web/resume-async-wiring',
+	// Error enrichment is dispatch infrastructure (T012): loaded by the shared
+	// runtime on any dispatch path, not a capability.
+	'web/runtime-error-reporting',
 ];
 const SCALAR_LEAN_DISPATCH_CORE = [
 	'web/event-only-lean/scalar-core',
 	'web/fns/scalar-core-graph',
+	// The thin router (post tier collapse) pulls shared lean glue + the error
+	// reporting enrichment on every lean dispatch.
+	'web/event-only-lean/lean-shared',
+	'web/runtime-error-reporting',
 ];
 const ROW_LEAN_DISPATCH_CORE = [
 	'web/event-only-lean/row',
