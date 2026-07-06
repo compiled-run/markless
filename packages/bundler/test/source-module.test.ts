@@ -64,6 +64,23 @@ test('emitSourceModule keeps event-only entries out of the full-runtime graph', 
 	);
 });
 
+test('emitResumeModule routes replaced scalar actions through the scalar resume entry', () => {
+	const resumeCode = emitResumeModule({
+		...baseInput,
+		runtimeDemandMap: {
+			recordKinds: [
+				{ kind: 'event', replaced: true },
+				{ kind: 'dom-update', replaced: true },
+			],
+		},
+	});
+
+	expect(resumeCode).toContain(
+		"const { resumeScalarEventFromPayloadDocument } = await import('@markless/web/event-only-lean/scalar-resume');",
+	);
+	expect(resumeCode).not.toContain('resumeEventOnlyFromPayloadDocument');
+});
+
 test('emitResumeModule emits the execution log loader only when logging is enabled', () => {
 	expect(emitResumeModule({ ...baseInput, executionLog: 'auto' })).toContain(
 		'globalThis.__mxLoadLog ||= () => import("virtual:markless:dev-log");',

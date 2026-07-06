@@ -78,6 +78,7 @@ export type ResumeEventOnlyFromPayloadDocumentInput = {
 	readonly event: EventOnlyResumeDomEvent;
 	readonly element?: EventOnlyResumeDomElement;
 	readonly eventRecord?: EventOnlyResumeRecord;
+	readonly runtimeDemandMap?: unknown;
 	readonly syncPolicyAlreadyApplied?: boolean;
 	readonly loadSymbol: (
 		symbolId: string,

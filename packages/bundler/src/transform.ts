@@ -84,7 +84,9 @@ export async function transformTsrxModule(
 			id: resumeId,
 			type: 'resume',
 			source: emitResumeModule({
+				payloadId,
 				resolverId,
+				runtimeDemandMap: compiled.runtimeDemandMap,
 				executionLog: input.executionLog,
 				needsFullResume:
 					(compiled.protocolView.branches?.length ?? 0) > 0 ||
