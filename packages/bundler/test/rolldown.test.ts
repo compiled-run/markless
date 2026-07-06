@@ -659,7 +659,8 @@ export function Shell() @{
 	// Child components alone are not payload records. The served payload
 	// inventory decides whether the event-only tier can handle the page.
 	expect(withChild.code).toContain('resumeEventOnlyFromPayloadDocument');
-	expect(withChild.code).toContain('loadFullResume: marklessFullResumeHandoff');
+	expect(withChild.code).not.toContain('loadFullResume: marklessFullResumeHandoff');
+	expect(withChild.code).not.toContain("import('@markless/core/web/resume')");
 	expect(withChild.code).not.toContain(
 		"import { resumeFromPayloadDocument } from '@markless/core/web/resume';",
 	);

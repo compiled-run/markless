@@ -27,7 +27,7 @@ afterEach(() => {
 	vi.resetModules();
 });
 
-test('full resume row dispatch does not import unrelated declared capabilities', async () => {
+test('full resume row dispatch wires declared branches but not unrelated async or behavior capabilities', async () => {
 	let asyncBoundaryImports = 0, behaviorImports = 0, branchImports = 0, handoffImports = 0;
 	vi.doMock('../src/resume-async-boundaries.ts', () => {
 		asyncBoundaryImports++;
@@ -104,11 +104,13 @@ test('full resume row dispatch does not import unrelated declared capabilities',
 	expect(loadedSymbols).toEqual(['symbol:row']);
 	expect(asyncBoundaryImports).toBe(0);
 	expect(behaviorImports).toBe(0);
-	expect(branchImports).toBe(0);
+	// PM ruling, spec 06 gate 2: declared branch records wire eagerly; async and
+	// behavior capability groups remain demand-gated.
+	expect(branchImports).toBe(1);
 	expect(handoffImports).toBe(0);
 });
 
-test('branch source writes import branch capability once and apply current arm', async () => {
+test('branch records wire eagerly once and source writes still apply the current arm', async () => {
 	let branchImports = 0;
 	vi.doMock('../src/resume-branches.ts', async () => {
 		branchImports++;
@@ -142,7 +144,8 @@ test('branch source writes import branch capability once and apply current arm',
 	});
 
 	await runtime.start();
-	expect(branchImports).toBe(0);
+	// PM ruling, spec 06 gate 2: branches wire eagerly when declared.
+	expect(branchImports).toBe(1);
 
 	graph.write({ graphNodeId: 'state:flag', value: false });
 	await graph.flush();
@@ -155,8 +158,27 @@ test('branch source writes import branch capability once and apply current arm',
 	]);
 });
 
-test('row collection writes do not import unrelated branch capabilities', async () => {
-	let branchImports = 0;
+test('row collection writes do not import unrelated async or behavior capabilities', async () => {
+	let asyncBoundaryImports = 0, behaviorImports = 0, branchImports = 0;
+	vi.doMock('../src/resume-async-boundaries.ts', () => {
+		asyncBoundaryImports++;
+		return { wireAsyncBoundaries: vi.fn(() => new Map()) };
+	});
+	vi.doMock('../src/resume-behaviors.ts', () => {
+		behaviorImports++;
+		return {
+			createBehaviorRuntime: vi.fn(() => ({
+				addBehaviorRecords: vi.fn(),
+				activateBehaviors: vi.fn(),
+				activateBehaviorsFromTrigger: vi.fn(),
+				behaviorHostIdsForAncestors: vi.fn(() => []),
+				disconnect: vi.fn(),
+				disposeBehaviorHost: vi.fn(),
+				installRemovalObserver: vi.fn(),
+				installVisibilityObserver: vi.fn(),
+			})),
+		};
+	});
 	vi.doMock('../src/resume-branches.ts', async () => {
 		branchImports++;
 		return await vi.importActual('../src/resume-branches.ts');
@@ -199,7 +221,11 @@ test('row collection writes do not import unrelated branch capabilities', async 
 	graph.write({ graphNodeId: 'state:rows', value: [{ id: 'south' }] });
 	await graph.flush();
 
-	expect(branchImports).toBe(0);
+	// PM ruling, spec 06 gate 2: declared branch records wire eagerly; the row
+	// write still must not demand async or behavior capabilities.
+	expect(branchImports).toBe(1);
+	expect(asyncBoundaryImports).toBe(0);
+	expect(behaviorImports).toBe(0);
 });
 
 function progressiveMixedView(): ResumeViewRecord {

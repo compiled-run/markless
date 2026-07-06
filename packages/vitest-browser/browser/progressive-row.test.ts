@@ -20,7 +20,7 @@ afterEach(async () => {
 	await cleanup();
 });
 
-test('progressive execution: row dispatch does not execute unrelated async, branch, or behavior modules', async () => {
+test('progressive execution: row dispatch allows declared branch wiring without async or behavior modules', async () => {
 	const screen = await renderProgressiveSSR(renderSSRPhased(RowMixed));
 	const container = screen.container;
 	const view = readViewPayload(container);
@@ -36,6 +36,8 @@ test('progressive execution: row dispatch does not execute unrelated async, bran
 	expect(forbiddenExecutedModules(executed, allowed)).toEqual([]);
 	expect(executed.some((id) => MODULE_GROUPS['keyed-repeat'].has(id))).toBe(true);
 	expect(executed.some((id) => MODULE_GROUPS['async-boundary'].has(id))).toBe(false);
-	expect(executed.some((id) => MODULE_GROUPS.branch.has(id))).toBe(false);
+	// PM ruling, spec 06 gate 2: declared branch records wire eagerly; async and
+	// behavior capability groups remain demand-gated.
+	expect(executed.some((id) => MODULE_GROUPS.branch.has(id))).toBe(true);
 	expect(executed.some((id) => MODULE_GROUPS.behavior.has(id))).toBe(false);
 });

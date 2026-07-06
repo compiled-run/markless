@@ -1,6 +1,6 @@
 import type { DomJournalEntry, DomJournalResult } from '@markless/runtime';
 import type {
-	ResumeAsyncBoundaryRecord, ResumeBehaviorRecord, ResumeBranchRecord, ResumeDispatchOptions, ResumeDomElement, ResumeDomEvent, ResumePreparedCore, ResumeRuntime, ResumeRuntimeErrorContext, ResumeRuntimeInput, ResumeSharedPatchDispatcher,
+	ResumeAsyncBoundaryRecord, ResumeBehaviorRecord, ResumeDispatchOptions, ResumeDomElement, ResumeDomEvent, ResumePreparedCore, ResumeRuntime, ResumeRuntimeErrorContext, ResumeRuntimeInput, ResumeSharedPatchDispatcher,
 } from './resume-types.ts';
 
 const SHARED_PATCH_EVENT_TYPE = 'async:shared-patch';
@@ -14,15 +14,8 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 	const hostSubscriptionReleases = new Map<string, Array<() => void>>(), containerSubscriptionReleases: Array<() => void> = [];
 	let asyncBoundariesById = prepared.asyncBoundariesById;
 	let behaviorRuntime: BehaviorRuntime | undefined, branchRuntime: BranchRuntime | undefined, syncComputedRuntimeWired = false;
-	const branchesById = new Map<string, {
-		readonly id: string; readonly startAnchor: import('./resume-types.ts').ResumeDomComment;
-		readonly endAnchor: import('./resume-types.ts').ResumeDomComment; readonly symbolId: string;
-		readonly testReads: ReadonlyArray<{ readonly graphNodeId: string; readonly path: ReadonlyArray<string> }>;
-		readonly armTests?: ReadonlyArray<unknown>;
-	}>();
 	let events: EventWiring | undefined, fallbackSharedPatchDispatcher: ResumeSharedPatchDispatcher | undefined;
 	const behaviorHostIds = new Set(input.view.behaviors.map((behavior) => behavior.hostNodeId));
-	const demandBranchArmById = new Map<string, number>();
 
 	const storeHostSubscription = (hostNodeId: string, release: () => void) => {
 		if (typeof release !== 'function') return;
@@ -91,15 +84,18 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 	}
 	async function loadBranchRuntime(options: { readonly skipStartupBranchIds?: ReadonlySet<string> } = {}): Promise<BranchRuntime> {
 		if (branchRuntime) return branchRuntime;
-		const eventTypesBefore = new Set(eventTypes), behaviors = await loadBehaviorRuntime();
+		const eventTypesBefore = new Set(eventTypes), behaviors = viewHasBranchArmBehaviors(input.view) ? await loadBehaviorRuntime() : undefined;
 		branchRuntime = (await import('./resume-branches.ts')).wireBranches({
-			root: input.root, graph: input.graph, view: input.view, loadSymbol: input.loadSymbol, renderBranchHtml: input.renderBranchHtml, elementsByHostId, disposedHosts, elementHandles, events: await getEvents(), eventTypes, storeContainerSubscription, storeHostSubscription, addBehaviorRecords: behaviors.addBehaviorRecords,
+			root: input.root, graph: input.graph, view: input.view, loadSymbol: input.loadSymbol, renderBranchHtml: input.renderBranchHtml, elementsByHostId, disposedHosts, elementHandles, events: await getEvents(), eventTypes, storeContainerSubscription, storeHostSubscription, addBehaviorRecords: behaviors?.addBehaviorRecords ?? (() => {}),
 			skipStartupBranchIds: options.skipStartupBranchIds,
 		});
 		for (const eventType of eventTypes) if (!eventTypesBefore.has(eventType)) input.root.addEventListener?.(eventType, events!.dispatch, { capture: true });
 		for (const hostNodeId of branchRuntime.startupArmBehaviorHostIds) await behaviorRuntime?.activateBehaviors(hostNodeId, { flush: false });
 		if (branchRuntime.startupArmBehaviorHostIds.length > 0) await flushRuntimeGraph();
 		return branchRuntime;
+	}
+	function viewHasBranchArmBehaviors(view: ResumeRuntimeInput['view']): boolean {
+		return (view.branches ?? []).some((branch) => (branch.armRecords ?? []).some((arm) => (arm.behaviors?.length ?? 0) > 0));
 	}
 	function pendingBehaviorHostIdsForAncestors(element: ResumeDomElement | undefined): string[] {
 		const ids: string[] = [];
@@ -127,21 +123,6 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 			if (boundary.updateSymbolId) for (const asyncRead of boundary.asyncReads) input.graph.read(asyncRead.graphNodeId, ['status']);
 		}
 	}
-	function wireBranchDemandTriggersWithoutLoadingCapability(): void {
-		const comments = walkComments(input.root);
-		for (const branch of input.view.branches ?? []) { if (!branch.symbolId || !branch.testReads?.length) continue;
-			const startAnchor = comments[branch.startAnchor.index], endAnchor = comments[branch.endAnchor.index]; if (!startAnchor || !endAnchor) continue;
-			const record: ResumeBranchRecord = { id: branch.id, startAnchor, endAnchor, symbolId: branch.symbolId, testReads: branch.testReads, armTests: branch.armTests, armRecords: branch.armRecords };
-			branchesById.set(record.id, record); demandBranchArmById.set(record.id, readBranchArm(record));
-			for (const testRead of record.testReads) storeContainerSubscription(input.graph.subscribe({ id: `branch-demand:${record.id}:${testRead.graphNodeId}:${testRead.path.join('.')}`, graphNodeId: testRead.graphNodeId, path: testRead.path, async run() {
-				if (branchRuntime) return; const newArm = readBranchArm(record); if (newArm === demandBranchArmById.get(record.id)) return;
-				demandBranchArmById.set(record.id, newArm); await loadBranchRuntime({ skipStartupBranchIds: new Set([record.id]) });
-				const update = await (await input.loadSymbol(record.symbolId))({ graph: input.graph, arm: newArm, element: input.root, getElementHandle: elementHandles.get });
-				if (!isResumeBranchUpdate(update)) return; const fragment = input.renderBranchHtml ? input.renderBranchHtml(update.html) : update.html;
-				return [{ type: 'removeRange', locator: `branch:${record.id}` }, { type: 'insertRange', locator: `branch:${record.id}:start`, fragment }] as DomJournalResult;
-			} }));
-		}
-	}
 	function wireSyncComputedDemandTriggersWithoutLoadingCapability(): void {
 		const records = (input.state?.computed ?? []).filter((computed) => computed.async === false && typeof (computed as { readonly deriveSymbolId?: unknown }).deriveSymbolId === 'string') as Array<NonNullable<ResumeRuntimeInput['state']>['computed'][number] & { readonly deriveSymbolId: string }>;
 		for (const computed of records) for (const dependency of computed.dependencies ?? []) storeContainerSubscription(input.graph.subscribe({
@@ -159,11 +140,6 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 		if (!isResumeBranchUpdate(update)) return;
 		const fragment = input.renderBranchHtml ? input.renderBranchHtml(update.html) : update.html;
 		return [{ type: 'removeRange', locator: `async-boundary:${boundary.id}` }, { type: 'insertRange', locator: `async-boundary:${boundary.id}:start`, fragment }];
-	}
-	function readBranchArm(branch: { readonly testReads: ReadonlyArray<{ readonly graphNodeId: string; readonly path: ReadonlyArray<string> }>; readonly armTests?: ReadonlyArray<unknown> }): number {
-		const read = branch.testReads[0]!, value = input.graph.read(read.graphNodeId, read.path);
-		if (branch.armTests) { for (let index = 0; index < branch.armTests.length; index++) if (branch.armTests[index] !== null && value === branch.armTests[index]) return index; return branch.armTests.indexOf(null); }
-		return value ? 0 : 1;
 	}
 	async function receiveSharedPatch(event: ResumeDomEvent): Promise<void> {
 		const { isResumeSharedPatchEvent } = await import('./resume-handoff.ts');
@@ -216,7 +192,7 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 		activateBehaviors: async (hostNodeId: string) => (await loadBehaviorRuntime()).activateBehaviors(hostNodeId),
 		getElement: (hostNodeId: string) => connectedElement(input.root, elementsByHostId.get(hostNodeId)),
 		getAsyncBoundary: (boundaryId: string) => asyncBoundariesById.get(boundaryId),
-		getBranch: (branchId: string) => branchRuntime?.branchesById.get(branchId) ?? branchesById.get(branchId),
+		getBranch: (branchId: string) => branchRuntime?.branchesById.get(branchId),
 		disposeHost,
 		dispose,
 	};
@@ -234,14 +210,6 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 	function isResumeBranchUpdate(value: unknown): value is { readonly arm: number; readonly html: string } {
 		const update = value as { readonly arm?: unknown; readonly html?: unknown } | null;
 		return typeof update?.arm === 'number' && typeof update?.html === 'string';
-	}
-	function walkComments(root: ResumeDomElement): Array<Extract<ResumeDomElement['childNodes'], ReadonlyArray<unknown>>[number] & { readonly nodeType: 8 }> {
-		const comments: Array<Extract<ResumeDomElement['childNodes'], ReadonlyArray<unknown>>[number] & { readonly nodeType: 8 }> = [];
-		(function visit(node: import('./resume-types.ts').ResumeDomNode): void {
-			if (node.nodeType === 8) comments.push(node as never);
-			for (const child of node.childNodes ?? []) visit(child);
-		})(root);
-		return comments;
 	}
 }
 

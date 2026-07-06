@@ -33,14 +33,14 @@ test('emitSourceModule keeps full resume behind a dynamic handoff', () => {
 	);
 });
 
-test('emitSourceModule gives event-only resume a lazy full-runtime escalation path', () => {
+test('emitSourceModule keeps event-only entries out of the full-runtime graph', () => {
 	const code = emitSourceModule({
 		...baseInput,
 		needsFullResume: false,
 	});
 
-	expect(code).toContain('loadFullResume: marklessFullResumeHandoff');
-	expect(code).toContain("import('@markless/core/web/resume')");
+	expect(code).not.toContain('loadFullResume: marklessFullResumeHandoff');
+	expect(code).not.toContain("import('@markless/core/web/resume')");
 	expect(code).not.toMatch(/^\s*const\s+marklessFullResumeModule\s*=\s*import\(/m);
 	expect(code).not.toContain(
 		"import { resumeFromPayloadDocument } from '@markless/core/web/resume';",
