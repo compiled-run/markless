@@ -191,6 +191,7 @@ function emitResumeContainerEvent(loadSymbolName: string, needsFullResume: boole
 		'		event: input.event,',
 		'		element: input.element,',
 		'		eventRecord: input.eventRecord,',
+		'		syncPolicyAlreadyApplied: !!input.eventRecord,',
 		`		loadSymbol: ${loadSymbolName},`,
 		'	});',
 		'}',

@@ -692,6 +692,38 @@ function textNodesByTag(root: PublicRenderTestElement, tagName: string): PublicR
 	return textNodes;
 }
 
+test('compileTsrxModule strips extracted sync policy calls from emitted handler symbols', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/AlternateSubmit.tsrx',
+		source: `import { state } from '@markless/core';
+export function AlternateSubmit() @{
+	const gate = state({ armed: true, label: 'Queued' });
+	let saved = state(false);
+	<form onSubmit={(evt) => {
+		if (gate.armed && evt.submitter === 'publish') {
+			evt.preventDefault();
+			evt.stopPropagation();
+			saved = true;
+		}
+	}}>
+		<button value="publish">{gate.label}</button>
+		{saved}
+	</form>
+}`,
+		symbols: [],
+	});
+	const submitSymbol = result.symbolModules.modules.find(
+		(module) => module.kind === 'event-handler',
+	);
+
+	expect(result.protocolView.events[0]?.syncPolicy).toEqual(
+		expect.objectContaining({ actions: ['preventDefault', 'stopPropagation'] }),
+	);
+	expect(submitSymbol?.source).not.toContain('preventDefault');
+	expect(submitSymbol?.source).not.toContain('stopPropagation');
+	expect(submitSymbol?.source).toContain('context.graph.write');
+});
+
 test('compileTsrxModule orchestrates source to payload scripts and resolver module', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/App.tsrx',
@@ -726,7 +758,7 @@ test('compileTsrxModule orchestrates source to payload scripts and resolver modu
 		expect.arrayContaining([
 			expect.objectContaining({
 				kind: 'event-handler',
-				source: "(event) => {\n\t\t\t\tif (menu.open && event.key === 'Escape') {\n\t\t\t\t\tevent.preventDefault();\n\t\t\t\t\tmenu.open = false;\n\t\t\t\t}\n\t\t\t}",
+				source: "(event) => {\n\t\t\t\tif (menu.open && event.key === 'Escape') {\n\t\t\t\t\tmenu.open = false;\n\t\t\t\t}\n\t\t\t}",
 			}),
 			expect.objectContaining({
 				kind: 'event-handler',

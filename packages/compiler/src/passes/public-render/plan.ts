@@ -1,5 +1,5 @@
 import { isEventAttribute, normalizeEventName, parseModule } from '@tsrx/core';
-import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
+import { asNodes, childNodes, getIdentifierName, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource } from '../../ast/source.ts';
 import {
 	escapeAttribute,
@@ -41,6 +41,8 @@ import { collectRowPlan, planKeyedRepeat, supportedRepeatGate } from './repeat-p
 import { firstComponentRoot, sameModuleComponentRoots, selectPublicRenderRoot, singleRowRoot, staticHtml, staticShellSupported } from './template.ts';
 import { collectStaticTextWrites } from './text-bindings.ts';
 import { branchRenderDiagnostics, collectChildrenOpacityDiagnostics, collectUndeclaredTemplateReadDiagnostics, collectUnsupportedConstructDiagnostics, componentConditionalRootDiagnostics, componentRootDiagnostics, componentUnsupportedBodyDiagnostics, emptyPlan, repeatRenderDiagnostics } from './validation.ts';
+import { parseJavaScriptModule } from '../../js-ast.ts';
+import { extractedSyncPolicyActionCalls } from '../semantic-graph/collect-sync-policy.ts';
 import type {
 	PayloadKeyedRepeat,
 	PlannedSymbol,
@@ -57,8 +59,11 @@ import type {
 	PublicRenderPlanStaticTextWrite,
 	PublicRenderPlanTextWrite,
 	PublicRenderPlanUnsupportedReason,
+	SemanticGraphArtifact,
 	SemanticGraphBinding,
 	SemanticKeyedRepeat,
+	SemanticSyncPolicy,
+	SemanticSyncPolicyAction,
 } from '../../artifacts.ts';
 
 // Builds the public render artifact that the module emitter consumes. This pass
@@ -76,6 +81,7 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 	}
 	const root = selectedRoot.root;
 	const componentRoots = sameModuleComponentRoots(ast);
+	stripExtractedSyncPolicyCalls(input.symbolResolver.symbols, input.semanticGraph);
 	const undeclaredTemplateReadDiagnostics = collectUndeclaredTemplateReadDiagnostics({
 		ast,
 		component: selectedRoot.component,
@@ -385,5 +391,103 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 	};
 }
 
+function stripExtractedSyncPolicyCalls(
+	symbols: ReadonlyArray<PlannedSymbol>,
+	semanticGraph: SemanticGraphArtifact,
+): void {
+	for (const event of semanticGraph.events) {
+		if (!event.syncPolicy) continue;
+		const actions = syncPolicyActionSet(event.syncPolicy);
+		if (actions.size === 0) continue;
+
+		for (const symbol of symbols) {
+			if (
+				symbol.kind !== 'event-handler' ||
+				symbol.hostNodeId !== event.hostNodeId ||
+				symbol.eventName !== event.eventName
+			) {
+				continue;
+			}
+				const stripped = stripSyncPolicyCallsFromHandlerSource(
+					symbol.source,
+					symbol.parameters[0] ?? 'event',
+					actions,
+					semanticGraph,
+				);
+			if (stripped !== symbol.source) {
+				(symbol as { source: string }).source = stripped;
+			}
+		}
+	}
+}
+
+function syncPolicyActionSet(policy: SemanticSyncPolicy): ReadonlySet<SemanticSyncPolicyAction> {
+	const actions = new Set<SemanticSyncPolicyAction>();
+	const branches = 'branches' in policy ? policy.branches : [policy];
+	for (const branch of branches) {
+		for (const action of branch.actions) actions.add(action);
+	}
+	return actions;
+}
+
+function stripSyncPolicyCallsFromHandlerSource(
+	source: string,
+	eventParam: string,
+	actions: ReadonlySet<SemanticSyncPolicyAction>,
+	semanticGraph: SemanticGraphArtifact,
+): string {
+	const prefix = 'const __marklessHandler = ';
+	const wrappedSource = `${prefix}${source};`;
+	let handler: AnyNode | undefined;
+	try {
+		const ast = parseJavaScriptModule(wrappedSource, 'markless-handler.js') as AnyNode;
+		walkNode(ast, (node) => {
+			if (handler) return;
+			if (
+				node.type === 'ArrowFunctionExpression' ||
+				node.type === 'FunctionExpression' ||
+				node.type === 'FunctionDeclaration'
+			) {
+				handler = node;
+			}
+		});
+	} catch {
+		return source;
+	}
+
+	const body = handler?.body as AnyNode | undefined;
+	const replacements = extractedSyncPolicyActionCalls(body, eventParam, actions, {
+		graph: semanticGraph as never,
+		source: wrappedSource,
+	})
+		.flatMap((node) => removableCallSpan(source, (node.start ?? 0) - prefix.length, (node.end ?? 0) - prefix.length))
+		.sort((left, right) => right.start - left.start);
+	if (replacements.length === 0) return source;
+
+	let stripped = source;
+	for (const replacement of replacements) {
+		stripped =
+			stripped.slice(0, replacement.start) +
+			stripped.slice(replacement.end);
+	}
+	return stripped;
+}
+
+function removableCallSpan(
+	source: string,
+	start: number,
+	end: number,
+): Array<{ readonly start: number; readonly end: number }> {
+	if (start < 0 || end <= start || end > source.length) return [];
+	let removeEnd = end;
+	while (source[removeEnd] === ' ' || source[removeEnd] === '\t') removeEnd++;
+	if (source[removeEnd] === ';') removeEnd++;
+	const lineStart = source.lastIndexOf('\n', start - 1) + 1;
+	const linePrefix = source.slice(lineStart, start);
+	if (/^[\t ]*$/.test(linePrefix) && source[removeEnd] === '\n') {
+		return [{ start: lineStart, end: removeEnd + 1 }];
+	}
+	return [{ start, end: removeEnd }];
+}
 
 export { firstComponentRoot, selectPublicRenderRoot } from './template.ts';
