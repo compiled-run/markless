@@ -21,7 +21,7 @@ afterEach(async () => {
 	await cleanup();
 });
 
-test('progressive execution: row dispatch allows declared branch wiring without async or behavior modules', async () => {
+test('progressive execution: qualifying row dispatch stays on the lean keyed-repeat path', async () => {
 	const screen = await renderProgressiveSSR(renderSSRPhased(RowMixed));
 	const container = screen.container;
 	const view = readViewPayload(container);
@@ -35,11 +35,10 @@ test('progressive execution: row dispatch allows declared branch wiring without 
 	const executed = executedModules();
 	const allowed = deriveAllowedModules(view, rowMixedRuntimeDemandMap, rowAction);
 	expect(forbiddenExecutedModules(executed, allowed)).toEqual([]);
+	expect(executed).toContain('web/event-only-lean/scalar-resume');
 	expect(executed).toContain('web/resume-keyed-repeats');
 	expect(executed).not.toContain('web/resume-async-boundaries');
-	// PM ruling, spec 06 gate 2: declared branch records wire eagerly; async and
-	// behavior capability groups remain demand-gated.
-	expect(executed).toContain('web/resume-branches');
+	expect(executed).not.toContain('web/resume-branches');
 	expect(executed).not.toContain('web/resume-behaviors');
 	expect(executed).not.toContain('web/event-only-behaviors');
 });

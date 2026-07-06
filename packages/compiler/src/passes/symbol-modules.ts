@@ -159,7 +159,7 @@ function emitEventHandlerModule(
 	localNames: ReadonlySet<string>,
 ): string {
 	const exportName = symbolExportName(symbol.id);
-	const scalarWriteLeaf = scalarWriteLeafSource(symbol);
+	const scalarWriteLeaf = scalarWriteLeafSource(symbol, localNames);
 	if (scalarWriteLeaf) {
 		return [
 			"import { marklessWriteScalar } from '@markless/web/fns/write-scalar';",
@@ -508,6 +508,7 @@ function emitEventWrite(
 
 function scalarWriteLeafSource(
 	symbol: Extract<PlannedSymbol, { readonly kind: 'event-handler' | 'callback-prop' }>,
+	localNames: ReadonlySet<string>,
 ): string | null {
 	if (symbol.kind !== 'event-handler') return null;
 	if ((symbol.writes ?? []).length !== 1) return null;
@@ -531,7 +532,7 @@ function scalarWriteLeafSource(
 	}
 
 	if (write.operation !== 'assign' || write.assignmentOperator) return null;
-	const valueSource = literalValueSource(write.valueSource);
+	const valueSource = literalValueSource(write.valueSource) ?? localValueSource(write.valueSource, localNames);
 	if (!valueSource) return null;
 	return [
 		'return marklessWriteScalar(context, {',

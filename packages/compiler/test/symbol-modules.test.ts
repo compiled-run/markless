@@ -208,9 +208,9 @@ test('emitSymbolModules emits conditional text DOM update values', () => {
 test('emitSymbolModules emits repeat-local assignment values through context locals', () => {
 	const artifact = emitSelectAssignmentSymbol('entry.code', repeatLocalPublicRenderPlan());
 
-	expect(artifact.modules[0].source).toContain('context.graph.write({');
+	expect(artifact.modules[0].source).toContain("import { marklessWriteScalar } from '@markless/web/fns/write-scalar';");
+	expect(artifact.modules[0].source).toContain('return marklessWriteScalar(context, {');
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:selected"');
-	expect(artifact.modules[0].source).toContain('path: []');
 	expect(artifact.modules[0].source).toContain('value: context.locals?.entry?.code');
 });
 
