@@ -72,7 +72,7 @@ export async function transformTsrxModule(
 			type: 'payload',
 			source: payloadModule({
 				...compiled.payloadScripts,
-				view: { ...compiled.payloadScripts.view, runtimeDemandMap: compiled.runtimeDemandMap },
+				runtimeDemandMap: compiled.runtimeDemandMap,
 			}),
 		},
 		{
