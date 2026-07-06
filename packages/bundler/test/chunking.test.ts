@@ -26,6 +26,12 @@ describe('markless chunking defaults', () => {
 				'markless-resume-branches',
 				'markless-resume-repeats',
 				'markless-resume-behaviors',
+				'markless-runtime-graph-core',
+				'markless-runtime-graph-collections',
+				'markless-runtime-graph-computed',
+				'markless-runtime-graph-async',
+				'markless-runtime-graph-scheduler',
+				'markless-runtime-graph-shared',
 				'markless-payload-graph-construct',
 				'markless-runtime',
 				'markless-symbols',
@@ -52,6 +58,12 @@ describe('markless chunking defaults', () => {
 				'markless-resume-branches',
 				'markless-resume-repeats',
 				'markless-resume-behaviors',
+				'markless-runtime-graph-core',
+				'markless-runtime-graph-collections',
+				'markless-runtime-graph-computed',
+				'markless-runtime-graph-async',
+				'markless-runtime-graph-scheduler',
+				'markless-runtime-graph-shared',
 				'markless-payload-graph-construct',
 				'markless-runtime',
 				'markless-symbols',
@@ -89,6 +101,41 @@ describe('markless chunking defaults', () => {
 		);
 		expect(groups.get('markless-resume-wiring')?.test('/repo/packages/web/src/resume-sync-demand.ts')).toBe(
 			true,
+		);
+	});
+
+	test('maps runtime graph planes to separate bounded groups', () => {
+		const output = outputDefaults({}, 'client') as MarklessOutputOptions;
+		const groups = new Map(
+			output.codeSplitting?.groups?.map((group) => [group.name, group.test]) ?? [],
+		);
+
+		expect(groups.get('markless-runtime-graph-core')?.test('/repo/packages/runtime/src/graph-core.ts')).toBe(
+			true,
+		);
+		expect(
+			groups.get('markless-runtime-graph-collections')?.test(
+				'/repo/packages/runtime/src/graph-collections.ts',
+			),
+		).toBe(true);
+		expect(
+			groups.get('markless-runtime-graph-computed')?.test(
+				'/repo/packages/runtime/src/graph-computed.ts',
+			),
+		).toBe(true);
+		expect(groups.get('markless-runtime-graph-async')?.test('/repo/packages/runtime/src/graph-async.ts')).toBe(
+			true,
+		);
+		expect(
+			groups.get('markless-runtime-graph-scheduler')?.test(
+				'/repo/packages/runtime/src/graph-scheduler.ts',
+			),
+		).toBe(true);
+		expect(groups.get('markless-runtime-graph-shared')?.test('/repo/packages/runtime/src/graph-shared.ts')).toBe(
+			true,
+		);
+		expect(groups.get('markless-graph')?.test('/repo/packages/runtime/src/graph-core.ts')).toBe(
+			false,
 		);
 	});
 
