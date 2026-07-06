@@ -85,6 +85,11 @@ function scalarRuntimeDemandMap(input: {
 				`event:${input.eventRecord.hostNodeId}:${input.eventRecord.eventName}`,
 				`dom-update:${input.domUpdate.hostNodeId}:${input.domUpdate.symbolId ?? ''}`,
 			],
+			plan: {
+				version: 1, kind: 'scalar', symbolId: input.eventRecord.symbolIds[0], cell: input.domUpdate.graphNodeId,
+				write: { kind: 'assign', value: 1 },
+				textUpdates: [{ hostNodeId: input.domUpdate.hostNodeId, graphNodeId: input.domUpdate.graphNodeId, symbolId: input.domUpdate.symbolId }],
+			},
 		}],
 	};
 }
@@ -111,6 +116,13 @@ function rowRuntimeDemandMap(input: {
 				`dom-update:${input.domUpdate.hostNodeId}:${input.domUpdate.symbolId ?? ''}`,
 				`keyed-repeat:${input.repeat.id}`,
 			],
+			plan: {
+				version: 1, kind: 'row', symbolId: input.rowEvent.symbolIds[0], cell: input.domUpdate.graphNodeId,
+				write: { kind: 'assign', localPath: [input.repeat.itemName, ...(input.repeat.keyPath ?? [])] },
+				textUpdates: [{ hostNodeId: input.domUpdate.hostNodeId, graphNodeId: input.domUpdate.graphNodeId, symbolId: input.domUpdate.symbolId }],
+				repeatId: input.repeat.id,
+				fullDecodeCells: input.repeat.collectionGraphNodeId ? [input.repeat.collectionGraphNodeId] : [],
+			},
 		}],
 	};
 }
@@ -548,7 +560,7 @@ test('event-only scalar lean predicate accepts structural scalar shape and rejec
 		view,
 		eventRecord,
 		runtimeDemandMap: scalarRuntimeDemandMap({ eventRecord, domUpdate: textUpdate, replaced: false }),
-	})).toBe(true);
+	})).toBe(false);
 	expect(isScalarLeanResumeShape({
 		state,
 		view: {

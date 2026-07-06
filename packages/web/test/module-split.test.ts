@@ -121,12 +121,11 @@ test('lean scalar core does not import row or full payload-document code', async
 	const scalarCoreSource = await readSource('../src/event-only-lean/scalar-core.ts');
 	const rowSource = await readSource('../src/event-only-lean/row.ts');
 
-	expect(scalarCoreSource).toContain("import('./payload-records.ts')");
-	expect(scalarCoreSource).toContain('readScalarCorePayloadRecordsFromDocument');
-	expect(scalarCoreSource).not.toContain('readLeanPayloadRecordsFromDocument');
+	expect(scalarCoreSource).not.toContain("import('./payload-records.ts')");
+	expect(scalarCoreSource).not.toContain('readScalarCorePayloadRecordsFromDocument');
 	expect(scalarCoreSource).not.toContain('resume-keyed-repeats');
 	expect(scalarCoreSource).not.toContain('payload-document');
 	expect(rowSource).toContain('resume-keyed-repeats');
-	expect(rowSource).toContain('readRowPayloadRecordsFromDocument');
+	expect(rowSource).not.toContain('readRowPayloadRecordsFromDocument');
 	expect(rowSource).not.toContain("from './scalar-core.ts'");
 });

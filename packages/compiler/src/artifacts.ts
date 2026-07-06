@@ -717,6 +717,18 @@ export type RuntimeDemandMapAction = {
 	readonly recordKinds: ReadonlyArray<string>;
 	readonly payloadRecordIds: ReadonlyArray<string>;
 	readonly runtimeModuleIds: ReadonlyArray<string>;
+	readonly plan?: RuntimeDemandMapActionPlan;
+};
+
+export type RuntimeDemandMapActionPlan = {
+	readonly version: 1;
+	readonly kind: 'scalar' | 'row';
+	readonly symbolId: string;
+	readonly cell: string;
+	readonly write: { readonly kind: 'assign' | 'update'; readonly value?: unknown; readonly valueKind?: 'undefined'; readonly localPath?: ReadonlyArray<string>; readonly updateOperator?: '++' | '--' };
+	readonly textUpdates: ReadonlyArray<{ readonly hostNodeId: string; readonly graphNodeId: string; readonly symbolId: string; readonly prefix?: string }>;
+	readonly repeatId?: string;
+	readonly fullDecodeCells?: ReadonlyArray<string>;
 };
 
 export type RuntimeDemandMapArtifact = {
