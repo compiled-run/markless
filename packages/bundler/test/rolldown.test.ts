@@ -415,6 +415,45 @@ let active = state(true);
 		expect(result).toEqual({ id: '/workspace/app/src/items.ts' });
 	});
 
+	test('base plugin resolves transformed virtual resume symbol routes from the source module', async () => {
+		const plugin = marklessClient();
+		const filename = '/workspace/app/src/ProgressiveFullTier.tsrx';
+		const source = `import { state } from '@markless/core';
+import Child from './progressive-child-panel.tsrx';
+export function App() @{
+let count = state(0);
+<main><button onClick={() => count++}>{count}</button><Child count={count} /></main>
+}`;
+		await callBuildStart(plugin, { cwd: '/workspace/app' });
+		await callTransform(plugin, source, filename);
+
+		const resumeId = `virtual:markless:resume:${encodeURIComponent(filename)}`;
+		const resumeSource = (await callLoad(plugin, `\0${resumeId}`)) as string;
+		const symbolRouteSpecifiers = [
+			...resumeSource.matchAll(/import\("([^"]+\?markless-symbols)"\)/g),
+		].map((match) => match[1]!);
+		const resolve = vi.fn(async () => ({
+			id: '/workspace/app/src/progressive-child-panel.tsrx?markless-symbols',
+		}));
+
+		expect(symbolRouteSpecifiers).toEqual(['./progressive-child-panel.tsrx?markless-symbols']);
+		const result = await callResolveId(
+			plugin,
+			symbolRouteSpecifiers[0]!,
+			`\0${resumeId}`,
+			{ resolve },
+		);
+
+		expect(resolve).toHaveBeenCalledWith(
+			'./progressive-child-panel.tsrx?markless-symbols',
+			filename,
+			{ skipSelf: true },
+		);
+		expect(result).toEqual({
+			id: '/workspace/app/src/progressive-child-panel.tsrx?markless-symbols',
+		});
+	});
+
 	test('buildStart clears stale virtual modules and transform manifests', async () => {
 		const plugin = marklessClient();
 

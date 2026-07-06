@@ -1137,6 +1137,29 @@ test('runtime rejects payload scripts with malformed sync policy records', () =>
 	).toThrow('Invalid markless/view event[0].syncPolicy.when: expected graphNodeId string.');
 });
 
+test('runtime rejects payload scripts with malformed optional view records', () => {
+	const validState =
+		'<script type="markless/state">{"version":1,"cells":[],"computed":[]}</script>';
+
+	expect(() =>
+		decodePayloadScripts({
+			stateScript: validState,
+			viewScript:
+				'<script type="markless/view">{"version":1,"locators":[],"events":[],"domUpdates":[],"behaviors":[],"elementHandles":[],"asyncBoundaries":[],"keyedRepeats":[{"id":"repeat:0","parentHostNodeId":"h0","collectionPath":[],"keyPath":[],"itemName":"row","rowElementCount":1,"rowEvents":[{"hostPath":"0","eventName":"click","symbolIds":[]}]}]}</script>',
+		}),
+	).toThrow(
+		'Invalid markless/view keyedRepeat[0].rowEvents[0]: expected hostPath array.',
+	);
+
+	expect(() =>
+		decodePayloadScripts({
+			stateScript: validState,
+			viewScript:
+				'<script type="markless/view">{"version":1,"locators":[],"events":[],"domUpdates":[],"behaviors":[],"elementHandles":[],"asyncBoundaries":[],"branches":[{"id":"branch:0","startAnchor":{"strategy":"dom-order-comment","index":0},"endAnchor":{"strategy":"dom-order-comment","index":1},"testReads":[{"source":"open","path":[]}]}]}</script>',
+		}),
+	).toThrow('Invalid markless/view branch[0].testReads[0]: expected graphNodeId string.');
+});
+
 test('runtime payload decode errors expose structured payload diagnostics', () => {
 	const validView =
 		'<script type="markless/view">{"version":1,"locators":[],"events":[],"domUpdates":[],"behaviors":[],"elementHandles":[],"asyncBoundaries":[]}</script>';

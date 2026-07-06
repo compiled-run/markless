@@ -233,6 +233,9 @@ export function assertProtocolViewPayload(
 		assertCommentAnchor(boundary.endAnchor, `${context}.endAnchor`);
 		assertAsyncBoundaryReads(boundary.asyncReads, context);
 	}
+
+	assertOptionalKeyedRepeats(payload);
+	assertOptionalBranches(payload);
 }
 
 function assertProtocolVersion(version: unknown, type: RuntimePayloadType): void {
@@ -339,6 +342,28 @@ function assertStringArrayField(
 	}
 }
 
+function assertNonNegativeIntegerArrayField(
+	record: Record<string, unknown>,
+	key: string,
+	context: string,
+): void {
+	if (!Array.isArray(record[key])) {
+		throw invalidPayloadShapeError(
+			contextPayloadType(context),
+			`Invalid ${context}: expected ${key} array.`,
+		);
+	}
+
+	for (const value of record[key]) {
+		if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+			throw invalidPayloadShapeError(
+				contextPayloadType(context),
+				`Invalid ${context}: expected ${key} non-negative integer array.`,
+			);
+		}
+	}
+}
+
 function assertOptionalStringArrayField(
 	record: Record<string, unknown>,
 	key: string,
@@ -359,6 +384,121 @@ function assertOptionalArrayField(
 			contextPayloadType(context),
 			`Invalid ${context}: expected ${key} array.`,
 		);
+	}
+}
+
+function assertOptionalKeyedRepeats(record: Record<string, unknown>): void {
+	if (record.keyedRepeats === undefined) return;
+	if (!Array.isArray(record.keyedRepeats)) {
+		throw invalidPayloadShapeError(
+			'markless/view',
+			'Invalid markless/view payload: expected keyedRepeats array.',
+		);
+	}
+
+	for (const [index, repeat] of record.keyedRepeats.entries()) {
+		const context = `markless/view keyedRepeat[${index}]`;
+		assertRecordShape(repeat, context);
+		assertStringField(repeat, 'id', context);
+		assertStringField(repeat, 'parentHostNodeId', context);
+		assertOptionalStringField(repeat, 'collectionGraphNodeId', context);
+		assertStringArrayField(repeat, 'collectionPath', context);
+		assertStringArrayField(repeat, 'keyPath', context);
+		assertStringField(repeat, 'itemName', context);
+		assertNonNegativeIntegerField(repeat, 'rowElementCount', context);
+		assertRowEvents(repeat.rowEvents, `${context}.rowEvents`);
+	}
+}
+
+function assertOptionalBranches(record: Record<string, unknown>): void {
+	if (record.branches === undefined) return;
+	if (!Array.isArray(record.branches)) {
+		throw invalidPayloadShapeError(
+			'markless/view',
+			'Invalid markless/view payload: expected branches array.',
+		);
+	}
+
+	for (const [index, branch] of record.branches.entries()) {
+		const context = `markless/view branch[${index}]`;
+		assertRecordShape(branch, context);
+		assertStringField(branch, 'id', context);
+		assertCommentAnchor(branch.startAnchor, `${context}.startAnchor`);
+		assertCommentAnchor(branch.endAnchor, `${context}.endAnchor`);
+		assertOptionalStringField(branch, 'symbolId', context);
+		assertOptionalGraphReads(branch, 'testReads', context);
+		if (branch.armTests !== undefined && !Array.isArray(branch.armTests)) {
+			throw invalidPayloadShapeError(
+				contextPayloadType(context),
+				`Invalid ${context}: expected armTests array.`,
+			);
+		}
+		assertOptionalBranchArmRecords(branch, context);
+	}
+}
+
+function assertOptionalBranchArmRecords(
+	record: Record<string, unknown>,
+	context: string,
+): void {
+	if (record.armRecords === undefined) return;
+	if (!Array.isArray(record.armRecords)) {
+		throw invalidPayloadShapeError(
+			contextPayloadType(context),
+			`Invalid ${context}: expected armRecords array.`,
+		);
+	}
+
+	for (const [index, arm] of record.armRecords.entries()) {
+		const armContext = `${context}.armRecords[${index}]`;
+		assertRecordShape(arm, armContext);
+		assertRowEvents(arm.events, `${armContext}.events`);
+		assertOptionalArrayField(arm, 'domUpdates', armContext);
+		assertOptionalArrayField(arm, 'behaviors', armContext);
+		assertOptionalArrayField(arm, 'elementHandles', armContext);
+	}
+}
+
+function assertRowEvents(value: unknown, context: string): void {
+	if (!Array.isArray(value)) {
+		throw invalidPayloadShapeError(
+			contextPayloadType(context),
+			`Invalid ${context}: expected array.`,
+		);
+	}
+
+	for (const [index, event] of value.entries()) {
+		const eventContext = `${context}[${index}]`;
+		assertRecordShape(event, eventContext);
+		assertNonNegativeIntegerArrayField(event, 'hostPath', eventContext);
+		assertStringField(event, 'eventName', eventContext);
+		assertStringArrayField(event, 'symbolIds', eventContext);
+		if (event.syncPolicy !== undefined) {
+			assertSyncPolicy(event.syncPolicy, `${eventContext}.syncPolicy`);
+		}
+	}
+}
+
+function assertOptionalGraphReads(
+	record: Record<string, unknown>,
+	key: string,
+	context: string,
+): void {
+	const reads = record[key];
+	if (reads === undefined) return;
+	if (!Array.isArray(reads)) {
+		throw invalidPayloadShapeError(
+			contextPayloadType(context),
+			`Invalid ${context}: expected ${key} array.`,
+		);
+	}
+
+	for (const [index, read] of reads.entries()) {
+		const readContext = `${context}.${key}[${index}]`;
+		assertRecordShape(read, readContext);
+		assertStringField(read, 'source', readContext);
+		assertStringField(read, 'graphNodeId', readContext);
+		assertStringArrayField(read, 'path', readContext);
 	}
 }
 

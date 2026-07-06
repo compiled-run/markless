@@ -11,11 +11,13 @@ import type { ResumeDomElement, ResumeRuntime, ResumeRuntimeInput } from './resu
 import type { ResumePayloadGraphInput } from './payload-graph-construct.ts';
 import {
 	deleteResumedPayload,
-	getAlreadyResumedPayload,
-	setResumedPayload,
 	type ResumeAlreadyResumedWarning,
 } from './payload-resume-registry.ts';
-export * from './payload-document.ts';
+export type {
+	PayloadScriptDocument,
+	PayloadScriptElement,
+	ResumePayloadDocumentInput,
+} from './payload-document.ts';
 
 export {
 	RuntimePayloadError,
@@ -95,56 +97,15 @@ export async function createRuntimeGraphFromResumePayload(
 export async function resumeFromPayloadScripts(
 	input: ResumePayloadScriptsInput,
 ): Promise<ResumePayloadScriptsResult> {
-	const resumed = getAlreadyResumedPayload(input.root);
-	if (resumed) return resumed;
+	const resume = await import('./payload-resume.ts');
+	return resume.resumeFromPayloadScriptsImpl(input);
+}
 
-	const decoded = decodePayloadScripts(input);
-	const graph = await createRuntimeGraphFromResumePayload({
-		state: decoded.state,
-		view: decoded.view,
-		root: input.root,
-		loadSymbol: input.loadSymbol,
-	});
-	let runtime: ResumeRuntime | undefined;
-	const applyDomJournal =
-		input.applyDomJournal ??
-		(async (entries) => {
-			const { applyDomJournalEntries } = await import('./dom-journal.ts');
-			applyDomJournalEntries(entries, {
-				resolveTarget(locator) {
-					const rangeAnchor = /^(branch|async-boundary):(.+?):(start|end)$/.exec(
-						String(locator),
-					);
-					if (rangeAnchor) {
-						const record =
-							rangeAnchor[1] === 'branch'
-								? runtime?.getBranch(rangeAnchor[2]!)
-								: runtime?.getAsyncBoundary(rangeAnchor[2]!);
-						return rangeAnchor[3] === 'end' ? record?.endAnchor : record?.startAnchor;
-					}
-					return runtime?.getElement(String(locator));
-				},
-			});
-		});
-	const { createResumeRuntime } = await import('./resume.ts');
-	runtime = createResumeRuntime({
-		root: input.root,
-		graph,
-		state: decoded.state,
-		view: decoded.view,
-		loadSymbol: input.loadSymbol,
-		createVisibilityObserver: input.createVisibilityObserver,
-		createRemovalObserver: input.createRemovalObserver,
-		applyDomJournal,
-		renderBranchHtml: input.renderBranchHtml,
-	});
-	await runtime.start();
-	(input.root as ResumeDomElement & { __asyncResumeRuntimeStarted?: boolean })
-		.__asyncResumeRuntimeStarted = true;
-
-	const result = { decoded, graph, runtime };
-	setResumedPayload(input.root, result);
-	return result;
+export async function resumeFromPayloadDocument(
+	input: import('./payload-document.ts').ResumePayloadDocumentInput,
+): Promise<ResumePayloadScriptsResult> {
+	const documentPayload = await import('./payload-document.ts');
+	return documentPayload.resumeFromPayloadDocument(input);
 }
 
 export function disposeResumedPayload(root: ResumeDomElement): void {

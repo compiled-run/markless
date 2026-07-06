@@ -53,6 +53,7 @@ type InternalMarklessRolldownOptions = MarklessRolldownOptions & {
 const TSRX_SOURCE_FILE = /\.tsrx(?:[?#].*)?$/;
 const MARKLESS_SYMBOL_SOURCE_QUERY_RE = /[?&]markless-symbols(?:[&#]|$)/;
 const SYMBOL_VIRTUAL_ID_RE = /^virtual:markless:symbol:([^:]+):[^:]+$/;
+const RESUME_VIRTUAL_ID_RE = /^virtual:markless:resume:([^:]+)$/;
 const SYMBOL_VIRTUAL_STRING_RE = /(["'`])((?:virtual:markless:symbol:)[^"'`]+)\1/g;
 
 export const marklessClient = (options: MarklessRolldownOptions = {}) =>
@@ -139,6 +140,10 @@ export function createMarklessRolldownPlugin(input: {
 			const symbolSource = sourceForSymbolVirtualImporter(importer);
 			if (symbolSource && isRelativeImport(source)) {
 				return await this.resolve(source, symbolSource, { skipSelf: true });
+			}
+			const resumeSource = sourceForResumeVirtualImporter(importer);
+			if (resumeSource && isRelativeImport(source)) {
+				return await this.resolve(source, resumeSource, { skipSelf: true });
 			}
 
 			return null;
@@ -421,6 +426,13 @@ function sourceForSymbolVirtualImporter(importer: string | undefined): string | 
 	if (!importer) return null;
 
 	const match = normalizeVirtualId(importer).match(SYMBOL_VIRTUAL_ID_RE);
+	return match?.[1] ? decodeURIComponent(match[1]) : null;
+}
+
+function sourceForResumeVirtualImporter(importer: string | undefined): string | null {
+	if (!importer) return null;
+
+	const match = normalizeVirtualId(importer).match(RESUME_VIRTUAL_ID_RE);
 	return match?.[1] ? decodeURIComponent(match[1]) : null;
 }
 

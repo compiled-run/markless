@@ -26,12 +26,17 @@ describe('markless chunking defaults', () => {
 				'markless-resume-branches',
 				'markless-resume-repeats',
 				'markless-resume-behaviors',
+				'markless-resume-runtime-shared',
+				'markless-resume-events',
+				'markless-resume-locators',
+				'markless-resume-sync-demand',
 				'markless-runtime-graph-core',
 				'markless-runtime-graph-collections',
 				'markless-runtime-graph-computed',
 				'markless-runtime-graph-async',
 				'markless-runtime-graph-scheduler',
 				'markless-runtime-graph-shared',
+				'markless-payload-resume',
 				'markless-payload-graph-construct',
 				'markless-payload-document',
 				'markless-runtime',
@@ -59,12 +64,17 @@ describe('markless chunking defaults', () => {
 				'markless-resume-branches',
 				'markless-resume-repeats',
 				'markless-resume-behaviors',
+				'markless-resume-runtime-shared',
+				'markless-resume-events',
+				'markless-resume-locators',
+				'markless-resume-sync-demand',
 				'markless-runtime-graph-core',
 				'markless-runtime-graph-collections',
 				'markless-runtime-graph-computed',
 				'markless-runtime-graph-async',
 				'markless-runtime-graph-scheduler',
 				'markless-runtime-graph-shared',
+				'markless-payload-resume',
 				'markless-payload-graph-construct',
 				'markless-payload-document',
 				'markless-runtime',
@@ -94,6 +104,9 @@ describe('markless chunking defaults', () => {
 			true,
 		);
 		expect(
+			groups.get('markless-payload-resume')?.test('/repo/packages/web/src/payload-resume.ts'),
+		).toBe(true);
+		expect(
 			groups.get('markless-payload-graph-construct')?.test(
 				'/repo/packages/web/src/payload-graph-construct.ts',
 			),
@@ -109,7 +122,19 @@ describe('markless chunking defaults', () => {
 		expect(groups.get('markless-resume-shared-patch')?.test('/repo/packages/web/src/resume-shared-patch.ts')).toBe(
 			true,
 		);
-		expect(groups.get('markless-resume-wiring')?.test('/repo/packages/web/src/resume-sync-demand.ts')).toBe(
+		expect(groups.get('markless-resume-runtime-shared')?.test('/repo/packages/web/src/resume-runtime-shared.ts')).toBe(
+			true,
+		);
+		expect(groups.get('markless-resume-events')?.test('/repo/packages/web/src/resume-events.ts')).toBe(
+			true,
+		);
+		expect(groups.get('markless-resume-locators')?.test('/repo/packages/web/src/resume-locators.ts')).toBe(
+			true,
+		);
+		expect(groups.get('markless-resume-errors')?.test('/repo/packages/web/src/inline/resume-errors.ts')).toBe(
+			true,
+		);
+		expect(groups.get('markless-resume-sync-demand')?.test('/repo/packages/web/src/resume-sync-demand.ts')).toBe(
 			true,
 		);
 	});
