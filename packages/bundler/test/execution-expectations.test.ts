@@ -57,6 +57,37 @@ test('unreplaced action kinds allow the structurally derived interpreter chain',
 		.toEqual([...JUDGE_COUNTER_INTERPRETER_CHAIN].sort());
 });
 
+test('keyed repeat row actions allow render-module catalog helper imports', async () => {
+	const result = await transformTsrxModule({
+		filename: '/workspace/app/Rows.tsrx',
+		source: `
+			import { state } from '@markless/core';
+			export function Rows() @{
+				let selected = state('none');
+				const rows = state([{ id: 'a', label: 'Alpha' }]);
+				<section>
+					@for (const row of rows; key row.id) {
+						<article>
+							<button onClick={() => selected = row.id}>{row.label}</button>
+						</article>
+					}
+					<output>{selected}</output>
+				</section>
+			}
+		`,
+	});
+	const payload = payloadView(result.virtualModules.find((module) => module.type === 'payload')?.source);
+	const repeat = payload.keyedRepeats[0];
+	const rowClick = repeat.rowEvents[0];
+	const allowed = deriveAllowedModules(payload, {
+		hostNodeId: repeat.parentHostNodeId,
+		eventName: rowClick.eventName,
+		recordKind: 'keyed-repeat-row',
+	});
+
+	expect(allowed).toContain('web/fns/repeats');
+});
+
 test('replaced action kinds tighten back to the exact demand set', async () => {
 	const { payload } = await counterPayload();
 	const click = payload.events[0];

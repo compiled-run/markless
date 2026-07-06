@@ -273,6 +273,8 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 						runtimeDemandMap: createRuntimeDemandMap({
 							symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
 							symbolModules: inputs.symbolModules as SymbolModulesArtifact,
+							publicRenderModule:
+								inputs.publicRenderModule as CompileTsrxModuleResult['publicRenderModule'],
 							protocolView:
 								inputs.protocolView as CompileTsrxModuleResult['protocolView'],
 						}),

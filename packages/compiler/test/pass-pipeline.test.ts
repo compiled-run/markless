@@ -95,7 +95,7 @@ test('default compiler passes declare stable artifact boundaries', () => {
 			expect.objectContaining({
 				passId: 'runtime-demand-map',
 				description: expect.stringContaining('runtime module demands'),
-				consumes: ['symbolResolver', 'symbolModules', 'protocolView'],
+				consumes: ['symbolResolver', 'symbolModules', 'publicRenderModule', 'protocolView'],
 				produces: ['runtimeDemandMap'],
 			}),
 		]),
