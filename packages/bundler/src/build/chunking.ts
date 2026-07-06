@@ -90,6 +90,10 @@ const MARKLESS_RUNTIME_GROUPS = [
 		name: 'markless-runtime',
 		test: /[/\\]@markless[/\\]runtime[/\\]/,
 	},
+	{
+		name: 'markless-symbols',
+		test: /virtual:markless:symbol:/,
+	},
 ] satisfies NonNullable<CodeSplittingOptions['groups']>;
 
 export function outputDefaults(

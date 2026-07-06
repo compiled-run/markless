@@ -165,9 +165,6 @@ function emitEventHandlerModule(
 		? `return ${symbol.source.trim()}(context.event);`
 		: eventHandlerAuthoredBody(symbol, localNames);
 	const imports = eventModuleImports(symbol, body);
-	const helperImports = !importedReference && canEmitWithScalarWriteHelper(symbol)
-		? ["import { marklessWriteScalar } from '@markless/web/fns/write-scalar';"]
-		: [];
 	const asyncKeyword = !importedReference && eventHandlerIsAsync(symbol.source) ? 'async ' : '';
 	const parameterDeclarations =
 		!importedReference && parameters.length > 0
@@ -175,9 +172,8 @@ function emitEventHandlerModule(
 			: [];
 
 	return [
-		...helperImports,
 		...imports.map(emitModuleImport),
-		...(imports.length > 0 || helperImports.length > 0 ? [''] : []),
+		...(imports.length > 0 ? [''] : []),
 		`export ${asyncKeyword}function ${exportName}(context) {`,
 		...parameterDeclarations,
 		...indentBody(body),
@@ -410,36 +406,6 @@ function emitEventWrite(
 	moduleImports: ReadonlyArray<SemanticModuleImport>,
 	localNames: ReadonlySet<string>,
 ): string[] {
-	if (canEmitScalarWriteHelper(write)) {
-		const valueSource = eventWriteValueSource(
-			write.valueSource,
-			eventParameters,
-			graphReads,
-			moduleImports,
-			localNames,
-		);
-		if (write.operation === 'assign' && !write.assignmentOperator && valueSource) {
-			return [
-				'	marklessWriteScalar(context, {',
-				`		graphNodeId: ${JSON.stringify(write.graphNodeId)},`,
-				'		path: [],',
-				`		value: ${valueSource},`,
-				'	});',
-			];
-		}
-		if (write.operation === 'update' && write.updateOperator) {
-			return [
-				'	marklessWriteScalar(context, {',
-				`		graphNodeId: ${JSON.stringify(write.graphNodeId)},`,
-				'		path: [],',
-				'		update(value) {',
-				`			return Number(value) ${write.updateOperator === '++' ? '+' : '-'} 1;`,
-				'		},',
-				'	});',
-			];
-		}
-	}
-
 	if (write.operation === 'assign' && !write.assignmentOperator) {
 		const valueSource = eventWriteValueSource(
 			write.valueSource,
@@ -528,37 +494,10 @@ function emitEventWrite(
 	return [];
 }
 
-function canEmitWithScalarWriteHelper(
-	symbol: Extract<PlannedSymbol, { readonly kind: 'event-handler' | 'callback-prop' }>,
-): boolean {
-	return (symbol.writes ?? []).some(canEmitScalarWriteHelper);
-}
-
-function canEmitScalarWriteHelper(write: LoweredStateWrite): boolean {
-	return (
-		write.path.length === 0 &&
-		((write.operation === 'assign' && !write.assignmentOperator) ||
-			(write.operation === 'update' && !!write.updateOperator))
-	);
-}
-
 function emitDomBindingModule(
 	symbol: Extract<PlannedSymbol, { readonly kind: 'dom-update' }>,
 ): string {
 	const exportName = symbolExportName(symbol.id);
-	if (symbol.target.kind === 'text') {
-		return [
-			"import { marklessUpdateText } from '@markless/web/fns/update-text';",
-			'',
-			`export function ${exportName}(context) {`,
-			'	return marklessUpdateText(context, {',
-			`		hostNodeId: ${JSON.stringify(symbol.hostNodeId)},`,
-			...textDomUpdateInputProperties(symbol.target),
-			'	});',
-			'}',
-			'',
-		].join('\n');
-	}
 	const entryProperties = domJournalEntryProperties(symbol);
 
 	return [
@@ -569,20 +508,6 @@ function emitDomBindingModule(
 		'}',
 		'',
 	].join('\n');
-}
-
-function textDomUpdateInputProperties(
-	target: Extract<
-		Extract<PlannedSymbol, { readonly kind: 'dom-update' }>['target'],
-		{ readonly kind: 'text' }
-	>,
-): string[] {
-	return [
-		...(target.prefix === undefined ? [] : [`		prefix: ${JSON.stringify(target.prefix)},`]),
-		...(target.suffix === undefined ? [] : [`		suffix: ${JSON.stringify(target.suffix)},`]),
-		...(target.trueValue === undefined ? [] : [`		trueValue: ${JSON.stringify(target.trueValue)},`]),
-		...(target.falseValue === undefined ? [] : [`		falseValue: ${JSON.stringify(target.falseValue)},`]),
-	];
 }
 
 function domJournalEntryProperties(

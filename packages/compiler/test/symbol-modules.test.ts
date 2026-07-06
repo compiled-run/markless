@@ -69,9 +69,6 @@ test('emitSymbolModules emits event, callback, and DOM update modules', () => {
 		kind: 'event-handler',
 		exportName: 'symbol_click',
 	});
-	expect(artifact.modules[0].source).toContain(
-		"import { marklessWriteScalar } from '@markless/web/fns/write-scalar';",
-	);
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:count"');
 	expect(artifact.modules[0].source).toContain('return Number(value) + 1;');
 	expect(artifact.modules[1]).toMatchObject({
@@ -79,9 +76,6 @@ test('emitSymbolModules emits event, callback, and DOM update modules', () => {
 		kind: 'callback-prop',
 		exportName: 'symbol_onNext',
 	});
-	expect(artifact.modules[1].source).toContain(
-		"import { marklessWriteScalar } from '@markless/web/fns/write-scalar';",
-	);
 	expect(artifact.modules[1].source).toContain('graphNodeId: "state:playing"');
 	expect(artifact.modules[1].source).toContain('value: true');
 	expect(artifact.modules[2]).toMatchObject({
@@ -89,7 +83,6 @@ test('emitSymbolModules emits event, callback, and DOM update modules', () => {
 		kind: 'dom-update',
 		exportName: 'symbol_domUpdate',
 	});
-	expect(artifact.modules[2].source).not.toContain('@markless/web/fns/update-text');
 	expect(artifact.modules[2].source).toContain('type: "setProp"');
 	expect(artifact.modules[2].source).toContain('locator: context.domUpdate?.hostNodeId ?? "h1"');
 	expect(artifact.modules[2].source).toContain('name: "value"');
@@ -122,63 +115,17 @@ test('emitSymbolModules emits conditional text DOM update values', () => {
 	});
 
 	expect(artifact.modules).toHaveLength(1);
-	expect(artifact.modules[0].source).toContain(
-		"import { marklessUpdateText } from '@markless/web/fns/update-text';",
-	);
-	expect(artifact.modules[0].source).toContain('hostNodeId: "h2"');
-	expect(artifact.modules[0].source).toContain('trueValue: "Pause"');
-	expect(artifact.modules[0].source).toContain('falseValue: "Play"');
+	expect(artifact.modules[0].source).toContain('type: "setText"');
+	expect(artifact.modules[0].source).toContain('value: context.value ? "Pause" : "Play"');
 });
 
 test('emitSymbolModules emits repeat-local assignment values through context locals', () => {
 	const artifact = emitSelectAssignmentSymbol('entry.code', repeatLocalPublicRenderPlan());
 
-	expect(artifact.modules[0].source).toContain(
-		"import { marklessWriteScalar } from '@markless/web/fns/write-scalar';",
-	);
-	expect(artifact.modules[0].source).toContain('marklessWriteScalar(context, {');
+	expect(artifact.modules[0].source).toContain('context.graph.write({');
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:selected"');
 	expect(artifact.modules[0].source).toContain('path: []');
 	expect(artifact.modules[0].source).toContain('value: context.locals?.entry?.code');
-});
-
-test('emitSymbolModules leaves non-scalar writes on the existing graph emission', () => {
-	const artifact = emitSymbolModules({
-		symbolResolver: {
-			passId: 'symbol-resolver',
-			dynamicImportOwner: 'generated-symbol-resolver',
-			symbols: [
-				{
-					id: 'symbol:objectWrite',
-					kind: 'event-handler',
-					hostNodeId: 'h2',
-					eventName: 'click',
-					source: '() => menu.open = true',
-					parameters: [],
-					writes: [
-						{
-							source: 'menu.open',
-							graphNodeId: 'state:menu',
-							path: ['open'],
-							operation: 'assign',
-							valueSource: 'true',
-						},
-					],
-				},
-			],
-			syncPolicies: [],
-			diagnostics: [],
-		},
-		captureAnalysis: {
-			passId: 'capture-analysis',
-			extractedSymbols: [],
-			diagnostics: [],
-		},
-	});
-
-	expect(artifact.modules[0].source).not.toContain('@markless/web/fns/write-scalar');
-	expect(artifact.modules[0].source).toContain('context.graph.write({');
-	expect(artifact.modules[0].source).toContain('path: ["open"]');
 });
 
 function emitSelectAssignmentSymbol(valueSource: string, publicRenderPlan?: any) {

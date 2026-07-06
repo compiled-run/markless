@@ -240,6 +240,7 @@ describe('Vite config integration', () => {
 			'markless-graph',
 			'markless-serializer',
 			'markless-runtime',
+			'markless-symbols',
 		]);
 		expect(
 			callOutputOptions(plugin, { dir: 'dist/server' }, createViteHookContext('server')),

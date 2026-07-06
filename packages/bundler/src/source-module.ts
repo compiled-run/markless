@@ -121,7 +121,6 @@ export function emitSourceModule(input: {
 }
 
 export function emitResumeModule(input: {
-	readonly payloadId: string;
 	readonly resolverId: string;
 	readonly needsFullResume?: boolean;
 	readonly symbols: ReadonlyArray<SourceSymbolRow>;
@@ -131,9 +130,6 @@ export function emitResumeModule(input: {
 	const routeSymbols = input.symbolRoutes.length > 0;
 	const resumeSymbolLoader = routeSymbols ? 'marklessSsrLoadSymbolRoute' : 'loadSymbol';
 	return [
-		input.needsFullResume
-			? ''
-			: `import { state as payloadState, view as payloadView } from '${input.payloadId}';`,
 		input.executionLog === 'never' ? '' : emitExecutionLogLoader(),
 		'',
 		emitLoadSymbol(input),
@@ -262,14 +258,14 @@ function emitResumeContainerEvent(loadSymbolName: string, needsFullResume: boole
 	}
 	return [
 		'export async function resumeContainerEvent(input) {',
-		"	const { marklessDispatchScalarEvent } = await import('@markless/web/fns/dispatch-scalar');",
-		'	await marklessDispatchScalarEvent({',
-		'		state: payloadState,',
-		'		view: payloadView,',
+		"	const { resumeEventOnlyFromPayloadDocument } = await import('@markless/core/web/event-only-resume');",
+		'	await resumeEventOnlyFromPayloadDocument({',
+		'		document: input.root,',
 		'		root: input.root,',
 		'		event: input.event,',
 		'		element: input.element,',
 		'		eventRecord: input.eventRecord,',
+		'		syncPolicyAlreadyApplied: !!input.eventRecord,',
 		`		loadSymbol: ${loadSymbolName},`,
 		'	});',
 		'}',

@@ -32,9 +32,7 @@ test('execution size asset maps runtime and symbol log ids to raw and gzip chunk
 				imports: [],
 				dynamicImports: [],
 				moduleIds: [
-					'/workspace/packages/web/src/fns/dispatch-scalar.ts',
-					'\0virtual:markless:resume:%2Fworkspace%2Fsrc%2FApp.tsrx',
-					'\0virtual:markless:payload:%2Fworkspace%2Fsrc%2FApp.tsrx',
+					'/workspace/packages/web/src/event-only-resume.ts',
 					'\0virtual:markless:symbol:%2Fworkspace%2Fsrc%2FApp.tsrx:play',
 				],
 				facadeModuleId: null,
@@ -62,16 +60,10 @@ test('execution size asset maps runtime and symbol log ids to raw and gzip chunk
 	const sizes = JSON.parse(String(asset.source)) as Record<string, { raw: number; gzip: number; chunk: string }>;
 
 	expect(asset.fileName).toBe('build/execution-sizes.json');
-	expect(sizes['web:fns/dispatch-scalar']).toMatchObject({
+	expect(sizes['web:event-only-resume']).toMatchObject({
 		raw: code.length,
 		chunk: 'chunk-play.js',
 	});
-	expect(sizes['web:fns/dispatch-scalar']!.gzip).toBeGreaterThan(0);
-	expect(sizes['symbol:play']).toEqual(sizes['web:fns/dispatch-scalar']);
-	expect(sizes['virtual:markless:resume:%2Fworkspace%2Fsrc%2FApp.tsrx']).toEqual(
-		sizes['web:fns/dispatch-scalar'],
-	);
-	expect(sizes['virtual:markless:payload:%2Fworkspace%2Fsrc%2FApp.tsrx']).toEqual(
-		sizes['web:fns/dispatch-scalar'],
-	);
+	expect(sizes['web:event-only-resume']!.gzip).toBeGreaterThan(0);
+	expect(sizes['symbol:play']).toEqual(sizes['web:event-only-resume']);
 });

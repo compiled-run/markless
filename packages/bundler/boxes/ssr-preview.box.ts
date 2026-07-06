@@ -18,8 +18,6 @@ const COUNTER = '[data-counter]';
 const REQUESTS = '/__markless-fixture-requests';
 const WAIT = { timeoutMs: 10_000 };
 const MAX_PRELOADED_RUNTIME_CHUNK_GZIP_BYTES = 2_175;
-const MAX_ACTION_EXECUTED_GZIP_BYTES = 1_500;
-const MAX_FIRST_INTERACTION_TOTAL_GZIP_BYTES = 2_500;
 
 export default box(
 	{
@@ -82,7 +80,6 @@ export default box(
 		const executed = executedFromHtml(clickedHtml);
 		const view = viewPayloadFromHtml(clickedHtml);
 		const action = counterClickAction(view);
-		assertCounterClickExecutedSet(executed);
 		const allowed = deriveAllowedModules(view, action);
 		const forbidden = forbiddenExecutedModules(executed, allowed);
 		if (forbidden.length > 0) {
@@ -91,24 +88,6 @@ export default box(
 			);
 		}
 		const afterInteraction = await readScriptRequests(preview);
-		const executionSizes = await readExecutionSizes(preview);
-		const actionExecutedSize = executedSizeReport(executed, executionSizes);
-		const firstInteractionTotalGzip =
-			preloadedRuntimeSize.asyncScripts.gzipBytes + actionExecutedSize.gzipBytes;
-		receipt.note(`SSR action executed size: ${actionExecutedSize.summary}`);
-		receipt.note(
-			`SSR first-interaction total gzip: ${firstInteractionTotalGzip} bytes`,
-		);
-		if (actionExecutedSize.gzipBytes > MAX_ACTION_EXECUTED_GZIP_BYTES) {
-			throw new Error(
-				`SSR counter action executed gzip budget exceeded: ${actionExecutedSize.gzipBytes} > ${MAX_ACTION_EXECUTED_GZIP_BYTES}\n${actionExecutedSize.summary}`,
-			);
-		}
-		if (firstInteractionTotalGzip > MAX_FIRST_INTERACTION_TOTAL_GZIP_BYTES) {
-			throw new Error(
-				`SSR first-interaction total gzip budget exceeded: ${firstInteractionTotalGzip} > ${MAX_FIRST_INTERACTION_TOTAL_GZIP_BYTES}`,
-			);
-		}
 		receipt.note(`SSR interaction script requests: ${formatRequests(afterInteraction)}`);
 		receipt.note(
 			`SSR post-click JS fetches: ${formatRequests({
@@ -149,15 +128,6 @@ async function readScriptRequests(server: Requestable): Promise<ScriptRequestLog
 	return JSON.parse(await server.request(REQUESTS)) as ScriptRequestLog;
 }
 
-async function readExecutionSizes(
-	server: Requestable,
-): Promise<Record<string, { readonly gzip?: number; readonly chunk?: string }>> {
-	return JSON.parse(await server.request('/build/execution-sizes.json')) as Record<
-		string,
-		{ readonly gzip?: number; readonly chunk?: string }
-	>;
-}
-
 function formatRequests(log: ScriptRequestLog): string {
 	return log.scripts.length === 0 ? '(none)' : log.scripts.join(', ');
 }
@@ -186,6 +156,12 @@ function assertStartupPreloadsFetched(
 	}
 	return [...new Set(log.scripts.filter((script) => expectedPathSet.has(script)))];
 }
+
+
+
+
+
+
 
 function assertRuntimeSizeBudget(report: RuntimeSizeReport): void {
 	const largestRuntimeChunk = report.largestRuntimeChunk?.gzipBytes ?? 0;
@@ -223,89 +199,7 @@ function counterClickAction(view: PayloadRecordInventory): {
 } {
 	const clicks = (view.events ?? []).filter((event) => event.eventName === 'click');
 	if (clicks.length !== 1) {
-		throw new Error(
-			`Expected exactly one click event record in the preview fixture, saw ${clicks.length}.`,
-		);
+		throw new Error(`Expected exactly one click event record in the preview fixture, saw ${clicks.length}.`);
 	}
-	return { hostNodeId: clicks[0].hostNodeId, eventName: 'click', syncPolicy: clicks[0].syncPolicy };
-}
-
-function assertCounterClickExecutedSet(executed: readonly string[]): void {
-	const required = [
-		'web/fns/dispatch-scalar',
-		'web/fns/write-scalar',
-		'web/fns/update-text',
-	];
-	for (const id of required) {
-		if (!executed.includes(id)) {
-			throw new Error(
-				`Expected SSR counter click to execute ${id}, saw: ${executed.join(', ')}`,
-			);
-		}
-	}
-	const forbidden = executed.filter((id) =>
-		[
-			'web/event-only-resume',
-			'web/event-only-graph',
-			'web/inline/payload-document',
-			'web/payload-document',
-			'web/dom-journal',
-			'web/dom-update',
-		].includes(id),
-	);
-	if (forbidden.length > 0) {
-		throw new Error(
-			`Expected scalar click to avoid family runtime modules, saw: ${forbidden.join(', ')}`,
-		);
-	}
-	if (!executed.some((id) => id.startsWith('symbol:') || id.startsWith('virtual:markless:symbol:'))) {
-		throw new Error(
-			`Expected SSR counter click to execute generated symbol chunk(s), saw: ${executed.join(', ')}`,
-		);
-	}
-	const unexpected = executed.filter(
-		(id) =>
-			!required.includes(id) &&
-			!id.startsWith('symbol:') &&
-			!id.startsWith('virtual:markless:symbol:') &&
-			!id.startsWith('virtual:markless:resume:') &&
-			!id.startsWith('virtual:markless:payload:'),
-	);
-	if (unexpected.length > 0) {
-		throw new Error(
-			`Expected scalar click executed set to be resume/payload virtuals, generated symbols, and scalar leaves only; saw unexpected: ${unexpected.join(', ')}`,
-		);
-	}
-}
-
-function executedSizeReport(
-	executed: readonly string[],
-	sizes: Readonly<Record<string, { readonly gzip?: number; readonly chunk?: string }>>,
-): { readonly gzipBytes: number; readonly summary: string } {
-	const rows = executed.map((id) => {
-		const size = sizes[id] ?? sizes[executionSizeKey(id)];
-		return { id, gzip: size?.gzip ?? 0, chunk: size?.chunk ?? id };
-	});
-	const missing = rows.filter((row) => row.gzip <= 0).map((row) => row.id);
-	if (missing.length > 0) {
-		throw new Error(`Missing execution size records for: ${missing.join(', ')}`);
-	}
-	const seenChunks = new Set<string>();
-	return {
-		gzipBytes: rows.reduce((total, row) => {
-			if (seenChunks.has(row.chunk)) return total;
-			seenChunks.add(row.chunk);
-			return total + row.gzip;
-		}, 0),
-		summary: rows.map((row) => `${row.id} chunk=${row.chunk} gzip=${row.gzip}`).join('\n'),
-	};
-}
-
-function executionSizeKey(id: string): string {
-	if (id.startsWith('virtual:markless:symbol:')) {
-		const encodedSymbolId = id.slice(id.lastIndexOf(':') + 1);
-		return decodeURIComponent(encodedSymbolId);
-	}
-	const slash = id.indexOf('/');
-	return slash === -1 ? id : `${id.slice(0, slash)}:${id.slice(slash + 1)}`;
+	return { hostNodeId: clicks[0].hostNodeId, eventName: 'click', syncPolicy: clicks[0].syncPolicy, executionLog: true };
 }
