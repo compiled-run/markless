@@ -2,6 +2,7 @@ import { describe, expect, test, vi } from 'vitest';
 import { markless } from '../src/vite/index.ts';
 import {
 	callBuildApp,
+	callBuildStart,
 	callConfig,
 	callConfigResolved,
 	callConfigureServer,
@@ -156,6 +157,70 @@ describe('Vite adapter structure', () => {
 		await builder.build(edge);
 
 		expect(build).toHaveBeenCalledTimes(2);
+	});
+
+	test('does not emit client resume chunks without a configured SSR TSRX root', async () => {
+		const plugin = getAsyncPlugin();
+		const emitFile = vi.fn();
+
+		callConfig(plugin, {}, { command: 'build', mode: 'production' });
+		callConfigResolved(plugin, {
+			base: '/',
+			command: 'build',
+			root: '/workspace/app',
+		});
+		callBuildStart(plugin, { cwd: '/workspace/app', input: { symbols: 'src/App.tsrx' } });
+		await callTransform(
+			plugin,
+			source,
+			'/workspace/app/src/App.tsrx',
+			{ ...createViteHookContext('client'), emitFile },
+		);
+
+		expect(emitFile.mock.calls.map((call) => call[0])).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					id: expect.stringContaining('virtual:markless:symbol:'),
+				}),
+			]),
+		);
+		expect(emitFile.mock.calls.map((call) => call[0].id)).not.toContain(
+			`virtual:markless:resume:${encodeURIComponent('/workspace/app/src/App.tsrx')}`,
+		);
+	});
+
+	test('emits client resume chunks when an SSR TSRX root owns browser resume', async () => {
+		const plugin = getAsyncPlugin();
+		const emitFile = vi.fn();
+		const config = {
+			environments: {
+				ssr: {
+					build: {
+						rolldownOptions: {
+							input: 'src/App.tsrx',
+						},
+					},
+				},
+			},
+		};
+
+		callConfig(plugin, config, { command: 'build', mode: 'production' });
+		callConfigResolved(plugin, {
+			base: '/',
+			command: 'build',
+			root: '/workspace/app',
+		});
+		callBuildStart(plugin, { cwd: '/workspace/app', input: { symbols: 'src/App.tsrx' } });
+		await callTransform(
+			plugin,
+			source,
+			'/workspace/app/src/App.tsrx',
+			{ ...createViteHookContext('client'), emitFile },
+		);
+
+		expect(emitFile.mock.calls.map((call) => call[0].id)).toContain(
+			`virtual:markless:resume:${encodeURIComponent('/workspace/app/src/App.tsrx')}`,
+		);
 	});
 
 	test('does not install a custom dev client for the full reload fallback', async () => {
