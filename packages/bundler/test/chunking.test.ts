@@ -43,7 +43,6 @@ describe('markless chunking defaults', () => {
 				'markless-inline-payload-document',
 				'markless-payload-document',
 				'markless-runtime',
-				'markless-symbols',
 			]),
 		);
 		expect(outputDefaults({ dir: 'dist/server' }, 'server')).toMatchObject({
@@ -84,11 +83,22 @@ describe('markless chunking defaults', () => {
 				'markless-inline-payload-document',
 				'markless-payload-document',
 				'markless-runtime',
-				'markless-symbols',
 				'vendor',
 			]),
 		);
 		expect(output.codeSplitting?.groups?.at(-1)).toBe(userGroup);
+	});
+
+	test('does not force-merge virtual symbol modules into one chunk group', () => {
+		const output = outputDefaults({}, 'client') as MarklessOutputOptions;
+		const groups = new Map(
+			output.codeSplitting?.groups?.map((group) => [group.name, group.test]) ?? [],
+		);
+
+		expect(groups.has('markless-symbols')).toBe(false);
+		expect(firstMatchingGroupName(groups, 'virtual:markless:symbol:/src/root.tsrx:symbol:0')).toBe(
+			undefined,
+		);
 	});
 
 	test('maps split resume capability files to bounded runtime groups', () => {
