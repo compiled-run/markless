@@ -27,6 +27,7 @@ const WEB_RUNTIME_CAPABILITY_GROUPS = [
 		test: fileBasenamePattern('resume-shared-patch'),
 	},
 	{ name: 'markless-resume-runtime', test: fileBasenamePattern('resume-runtime') },
+	{ name: 'markless-resume-runtime-start', test: fileBasenamePattern('resume-runtime-start') },
 	{ name: 'markless-resume-runtime-shared', test: fileBasenamePattern('resume-runtime-shared') },
 	{ name: 'markless-resume-events', test: fileBasenamePattern('resume-events') },
 	{ name: 'markless-resume-handoff', test: fileBasenamePattern('resume-handoff') },

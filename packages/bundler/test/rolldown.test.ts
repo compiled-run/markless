@@ -4,6 +4,7 @@ import {
 	marklessLib,
 	marklessClient,
 	marklessServer,
+	resumeVirtualModuleId,
 	transformTsrxModule,
 } from '../src/rolldown.ts';
 import {
@@ -451,7 +452,25 @@ let count = state(0);
 		);
 		expect(result).toEqual({
 			id: '/workspace/app/src/progressive-child-panel.tsrx?markless-symbols',
-		});
+			});
+	});
+
+	test('client resume source requests serve the generated resume module only', async () => {
+		const plugin = marklessClient();
+		const filename = '/workspace/app/pages/index.tsrx';
+
+		callBuildStart(plugin, { cwd: '/workspace/app' });
+		const result = (await callTransform(plugin, source, `${filename}?markless-resume`)) as {
+			code: string;
+		};
+
+		expect(resumeVirtualModuleId(filename)).toBe(
+			`virtual:markless:resume:${encodeURIComponent(filename)}`,
+		);
+		expect(result.code).toContain('export async function resumeContainerEvent');
+		expect(result.code).toContain('resumeEventOnlyFromPayloadDocument');
+		expect(result.code).not.toContain('const marklessCompiledApp = {');
+		expect(result.code).not.toContain('renderCsr:');
 	});
 
 	test('buildStart clears stale virtual modules and transform manifests', async () => {

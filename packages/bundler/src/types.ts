@@ -32,6 +32,7 @@ export interface TransformTsrxModuleInput {
 	environment?: MarklessEnvironment;
 	clientOutput?: MarklessClientOutput;
 	resumeModuleUrl?: string;
+	headInjections?: GlobalInjections[];
 }
 
 export interface TransformTsrxModuleResult {

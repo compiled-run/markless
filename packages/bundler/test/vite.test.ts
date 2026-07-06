@@ -237,6 +237,26 @@ describe('Vite adapter structure', () => {
 		expect(await callLoad(plugin, '\0virtual:markless-dev-client')).toBeNull();
 	});
 
+	test('threads the Vite client tag into dev SSR artifacts', async () => {
+		const plugin = getAsyncPlugin();
+
+		callConfigResolved(plugin, {
+			base: '/dev/',
+			command: 'serve',
+			root: '/workspace/app',
+		});
+		const result = (await callTransform(
+			plugin,
+			source,
+			'/workspace/app/src/App.tsrx',
+			createViteHookContext('server'),
+		)) as { code: string };
+
+		expect(result.code).toContain('headInjections:');
+		expect(result.code).toContain('"src":"/dev/@vite/client"');
+		expect(result.code).toContain('resumeModuleUrl: "/dev/@id/__x00__virtual:markless:resume:');
+	});
+
 	test('serves dev symbol resolver tables with browser-loadable symbol module URLs', async () => {
 		const plugin = getAsyncPlugin();
 		const filename = '/workspace/app/src/App.tsrx';

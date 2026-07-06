@@ -1,4 +1,4 @@
-import type { DomJournalEntry, DomJournalResult } from '@markless/runtime';
+import type { DomJournalResult } from '@markless/runtime';
 import type {
 	ResumeBehaviorRecord, ResumeDispatchOptions, ResumeDomElement, ResumeDomEvent, ResumePreparedCore, ResumeRuntime, ResumeRuntimeInput,
 } from './resume-types.ts';
@@ -13,7 +13,7 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 	const { elementsByHostId, elementHandles } = prepared;
 	const eventTypes = new Set<string>(), disposedHosts = new Set<string>();
 	const hostSubscriptionReleases = new Map<string, Array<() => void>>(), containerSubscriptionReleases: Array<() => void> = [];
-	let asyncBoundariesById = prepared.asyncBoundariesById;
+		const asyncBoundariesById = prepared.asyncBoundariesById;
 	let behaviorRuntime: BehaviorRuntime | undefined, branchRuntime: BranchRuntime | undefined;
 	let events: EventWiring | undefined, runtimeShared: RuntimeShared | undefined;
 	const behaviorHostIds = new Set(input.view.behaviors.map((behavior) => behavior.hostNodeId));
@@ -36,12 +36,14 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 		const { createEventWiring } = await import('./resume-events.ts');
 		events = createEventWiring({
 			graph: input.graph, loadSymbol: input.loadSymbol, elementsByHostId, elementHandles, eventTypes, disposedHosts, flushRuntimeGraph, reportRuntimeError,
-			activateBehaviorsFromTrigger: async (hostNodeId) => {
-				if (!behaviorHostIds.has(hostNodeId) && !behaviorRuntime) return;
-				return (await loadBehaviorRuntime()).activateBehaviorsFromTrigger(hostNodeId);
-			},
-			behaviorHostIdsForAncestors: (element) => behaviorRuntime?.behaviorHostIdsForAncestors(element) ?? pendingBehaviorHostIdsForAncestors(element),
-		});
+				activateBehaviorsFromTrigger: async (hostNodeId) => {
+					if (!behaviorHostIds.has(hostNodeId) && !behaviorRuntime) return;
+					return (await loadBehaviorRuntime()).activateBehaviorsFromTrigger(hostNodeId);
+				},
+				behaviorHostIdsForAncestors: (element) =>
+					behaviorRuntime?.behaviorHostIdsForAncestors(element) ??
+					pendingBehaviorHostIdsForAncestors(element),
+			});
 		for (const eventRecord of input.view.events) {
 			if (eventRecord.eventName === 'visible') continue;
 			const element = elementsByHostId.get(eventRecord.hostNodeId);
@@ -84,21 +86,9 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 		if (branchRuntime.startupArmBehaviorHostIds.length > 0) await flushRuntimeGraph();
 		return branchRuntime;
 	}
-	function viewHasBranchArmBehaviors(view: ResumeRuntimeInput['view']): boolean {
-		return (view.branches ?? []).some((branch) => (branch.armRecords ?? []).some((arm) => (arm.behaviors?.length ?? 0) > 0));
-	}
-	function pendingBehaviorHostIdsForAncestors(element: ResumeDomElement | undefined): string[] {
-		const ids: string[] = [];
-		for (let current = element; current; current = current.parentElement ?? undefined) {
-			for (const hostNodeId of behaviorHostIds) {
-				if (elementsByHostId.get(hostNodeId) === current) ids.push(hostNodeId);
-			}
-		}
-		return ids;
-	}
-	function disposeHost(hostNodeId: string): void {
-		disposedHosts.add(hostNodeId);
-		const element = elementsByHostId.get(hostNodeId);
+		function disposeHost(hostNodeId: string): void {
+			disposedHosts.add(hostNodeId);
+			const element = elementsByHostId.get(hostNodeId);
 		if (element) { events?.eventRecords.delete(element); elementsByHostId.delete(hostNodeId); }
 		elementHandles.deleteHost(hostNodeId); behaviorRuntime?.disposeBehaviorHost(hostNodeId);
 		for (const release of hostSubscriptionReleases.get(hostNodeId) ?? []) release();
@@ -109,38 +99,36 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 		input.root.removeEventListener?.(SHARED_PATCH_EVENT_TYPE, receiveSharedPatch, { capture: true });
 		behaviorRuntime?.disconnect();
 		for (const hostNodeId of Array.from(elementsByHostId.keys())) disposeHost(hostNodeId);
-		for (const release of containerSubscriptionReleases.splice(0)) release();
-	}
-	async function start(): Promise<void> {
-		const events = await getEvents();
-		const rowEvents = (input.view.keyedRepeats ?? []).flatMap((repeat) => repeat.rowEvents);
-		await events.prepareSyncPolicy(input.view.events, rowEvents);
-		if (input.applyDomJournal) storeContainerSubscription(input.graph.subscribeJournal(async (entries) => {
-			await disposeRemovedAsyncRangeHosts(entries);
-			branchRuntime?.disposeRemovedRangeHosts(entries, disposeHost, asyncBoundariesById);
-			await input.applyDomJournal!(entries);
-			await branchRuntime?.materializeFlippedBranchArms(entries, (hostNodeId) => behaviorRuntime!.activateBehaviors(hostNodeId, { flush: false }));
-		}));
-		if ((input.state?.computed ?? []).some((computed) => computed.async === false && typeof (computed as { readonly deriveSymbolId?: unknown }).deriveSymbolId === 'string')) {
-			(await import('./resume-sync-demand.ts')).wireSyncComputedDemandTriggersWithoutLoadingCapability({ graph: input.graph, state: input.state, root: input.root, loadSymbol: input.loadSymbol, elementHandles, storeContainerSubscription });
+			for (const release of containerSubscriptionReleases.splice(0)) release();
 		}
-		if ((input.view.keyedRepeats ?? []).length > 0) {
-			(await import('./resume-keyed-repeats.ts')).wireKeyedRepeats({ graph: input.graph, view: input.view, elementsByHostId, events, storeContainerSubscription });
+		function viewHasBranchArmBehaviors(view: ResumeRuntimeInput['view']): boolean {
+			return (view.branches ?? []).some((branch) => (branch.armRecords ?? []).some((arm) => (arm.behaviors?.length ?? 0) > 0));
 		}
-		if (input.view.asyncBoundaries.length > 0) {
-			(await import('./resume-async-wiring.ts')).wireAsyncBoundariesWithoutLoadingCapability({ asyncBoundariesById, graph: input.graph, root: input.root, loadSymbol: input.loadSymbol, renderBranchHtml: input.renderBranchHtml, elementHandles, storeContainerSubscription });
+		function pendingBehaviorHostIdsForAncestors(element: ResumeDomElement | undefined): string[] {
+			const ids: string[] = [];
+			for (let current = element; current; current = current.parentElement ?? undefined) {
+				for (const hostNodeId of behaviorHostIds) {
+					if (elementsByHostId.get(hostNodeId) === current) ids.push(hostNodeId);
+				}
+			}
+			return ids;
 		}
-		if (input.view.events.some((event) => event.eventName === 'visible')) {
-			const behaviors = await loadBehaviorRuntime(); behaviors.installVisibilityObserver(); behaviors.installRemovalObserver();
+		async function start(): Promise<void> {
+			await (await import('./resume-runtime-start.ts')).startResumeRuntime({
+				runtimeInput: input,
+				prepared,
+				eventTypes,
+				getEvents,
+				loadBehaviorRuntime,
+				loadBranchRuntime,
+				behaviorRuntime: () => behaviorRuntime,
+				branchRuntime: () => branchRuntime,
+				storeContainerSubscription,
+				disposeHost,
+				receiveSharedPatch,
+				sharedPatchEventType: SHARED_PATCH_EVENT_TYPE,
+			});
 		}
-		// Branches wire eagerly when DECLARED (spec 06 gate 2: wiring is bounded by the
-		// records present). Write-demand-triggered branch loading broke flipped-in arm
-		// event wiring and child-prop branch resume twice (T007/T007b); revisit only with
-		// a hardened trigger design. Declared-but-absent capabilities still never load.
-		if ((input.view.branches ?? []).length > 0) await loadBranchRuntime();
-		for (const eventType of eventTypes) input.root.addEventListener?.(eventType, events.dispatch, { capture: true });
-		if ((input.graph.listSharedDefinitions?.() ?? []).length > 0) input.root.addEventListener?.(SHARED_PATCH_EVENT_TYPE, receiveSharedPatch, { capture: true });
-	}
 	return {
 		start,
 		dispatch: async (event: ResumeDomEvent, options?: ResumeDispatchOptions) => (await getEvents()).dispatch(event, options),
@@ -150,23 +138,12 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 		getBranch: (branchId: string) => branchRuntime?.branchesById.get(branchId),
 		disposeHost,
 		dispose,
-	};
-
-	async function disposeRemovedAsyncRangeHosts(entries: ReadonlyArray<DomJournalEntry>): Promise<void> {
-		let locators: typeof import('./resume-locators.ts') | undefined;
-		for (const entry of entries) {
-			if (entry.type !== 'removeRange' || !entry.locator.startsWith('async-boundary:')) continue;
-			const boundary = asyncBoundariesById.get(entry.locator.slice('async-boundary:'.length)); if (!boundary) continue;
-			locators ??= await import('./resume-locators.ts');
-			const removed = locators.elementsBetweenAnchors(input.root, boundary.startAnchor, boundary.endAnchor);
-			for (const id of locators.hostIdsInsideRemovedElements(elementsByHostId, removed)) disposeHost(id);
-		}
+		};
 	}
-}
 
-function connectedElement(root: ResumeDomElement, element: ResumeDomElement | undefined): ResumeDomElement | undefined { return element && containsElement(root, element) ? element : undefined; }
-function containsElement(root: ResumeDomElement, target: ResumeDomElement): boolean {
-	if (root === target) return true;
-	for (const child of root.childNodes ?? []) if (child.nodeType === 1 && containsElement(child as ResumeDomElement, target)) return true;
-	return false;
-}
+	function connectedElement(root: ResumeDomElement, element: ResumeDomElement | undefined): ResumeDomElement | undefined { return element && containsElement(root, element) ? element : undefined; }
+	function containsElement(root: ResumeDomElement, target: ResumeDomElement): boolean {
+		if (root === target) return true;
+		for (const child of root.childNodes ?? []) if (child.nodeType === 1 && containsElement(child as ResumeDomElement, target)) return true;
+		return false;
+	}
