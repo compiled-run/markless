@@ -74,6 +74,39 @@ export function firstSyncPolicyActionCall(
 	return found;
 }
 
+export function extractedSyncPolicyActionCalls(
+	node: AnyNode | undefined,
+	eventParam: string,
+	actions: ReadonlySet<SemanticSyncPolicyAction>,
+	state?: Pick<WalkState, 'graph' | 'source'>,
+): AnyNode[] {
+	if (!node || actions.size === 0) return [];
+
+	const statements = node.type === 'BlockStatement' ? asNodes(node.body) : [node];
+	for (const statement of statements) {
+		if (statement.type !== 'IfStatement') {
+			const expression =
+				statement.type === 'ExpressionStatement'
+					? (statement.expression as AnyNode | undefined)
+					: statement;
+			const action = syncActionCall(expression, eventParam);
+			return action && actions.has(action) && expression ? [expression] : [];
+		}
+
+		const calls = syncActionCallNodes(
+			statement.consequent as AnyNode | undefined,
+			eventParam,
+			actions,
+		);
+		if (calls.length > 0 && state && !extractSyncCondition(statement.test as AnyNode | undefined, eventParam, state)) {
+			continue;
+		}
+		if (calls.length > 0) return calls;
+	}
+
+	return [];
+}
+
 export function firstDetachedSyncPolicyReference(node: AnyNode | undefined): {
 	readonly action: SemanticSyncPolicyAction;
 	readonly alias: string;
@@ -157,6 +190,32 @@ function extractSyncActions(
 	});
 
 	return uniqueBy(actions, (action) => action);
+}
+
+function syncActionCallNodes(
+	node: AnyNode | undefined,
+	eventParam: string,
+	actions: ReadonlySet<SemanticSyncPolicyAction>,
+): AnyNode[] {
+	const calls: AnyNode[] = [];
+
+	walkNode(node, (candidate) => {
+		if (candidate.type !== 'CallExpression') return;
+
+		const callee = candidate.callee as AnyNode | undefined;
+		if (callee?.type !== 'MemberExpression') return;
+		if (getIdentifierName(callee.object as AnyNode | undefined) !== eventParam) return;
+
+		const propertyName = getStaticPropertyName(callee.property as AnyNode | undefined);
+		if (
+			(propertyName === 'preventDefault' || propertyName === 'stopPropagation') &&
+			actions.has(propertyName)
+		) {
+			calls.push(candidate);
+		}
+	});
+
+	return calls;
 }
 
 function syncActionCall(node: AnyNode | undefined, eventParam: string): SemanticSyncPolicyAction | null {

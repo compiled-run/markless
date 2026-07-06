@@ -223,7 +223,7 @@ test('B914 extracts unconditional and aliased onSubmit policies', async () => {
 	const submitModule = compiled.symbolModules.modules.find(
 		(module) => module.symbolId === submitSymbol?.id,
 	);
-	expect(submitModule?.source).toContain('event.preventDefault();');
+	expect(submitModule?.source).not.toContain('event.preventDefault();');
 	expect(submitModule?.source).toContain('graphNodeId: "state:count"');
 });
 

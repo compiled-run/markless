@@ -80,6 +80,7 @@ export type ResumeEventOnlyFromPayloadDocumentInput = {
 	readonly event: EventOnlyResumeDomEvent;
 	readonly element?: EventOnlyResumeDomElement;
 	readonly eventRecord?: EventOnlyResumeRecord;
+	readonly syncPolicyAlreadyApplied?: boolean;
 	readonly loadSymbol: (
 		symbolId: string,
 	) => EventOnlyResumeSymbol | Promise<EventOnlyResumeSymbol>;
@@ -100,6 +101,7 @@ export type EventOnlyResumeContainer = {
 		options?: {
 			readonly element?: EventOnlyResumeDomElement;
 			readonly eventRecord?: EventOnlyResumeRecord;
+			readonly syncPolicyAlreadyApplied?: boolean;
 		},
 	) => Promise<void>;
 	readonly dispose: () => void;
@@ -132,6 +134,7 @@ export async function resumeEventOnlyFromPayloadDocument(
 	await container.dispatch(input.event, {
 		element: input.element,
 		eventRecord: input.eventRecord,
+		syncPolicyAlreadyApplied: input.syncPolicyAlreadyApplied,
 	});
 	return container;
 }
@@ -169,8 +172,7 @@ async function createEventOnlyResumeContainerState(
 				loadSymbol: input.loadSymbol,
 				elementsByHostId,
 				activeBehaviorHosts,
-				element: options.element,
-				eventRecord: options.eventRecord,
+				...options,
 			});
 		},
 		dispose() {
@@ -190,6 +192,7 @@ async function dispatchEvent(input: {
 	readonly activeBehaviorHosts: Set<string>;
 	readonly element?: EventOnlyResumeDomElement;
 	readonly eventRecord?: EventOnlyResumeRecord;
+	readonly syncPolicyAlreadyApplied?: boolean;
 }): Promise<void> {
 	const matched = input.eventRecord
 		? {
@@ -203,7 +206,7 @@ async function dispatchEvent(input: {
 	if (!matched?.element) return;
 
 	try {
-		if (matched.eventRecord.syncPolicy) {
+		if (matched.eventRecord.syncPolicy && !input.syncPolicyAlreadyApplied) {
 			const { runSyncPolicyActions } = await import('./inline/sync-policy-core.ts');
 			runSyncPolicyActions(
 				matched.eventRecord.syncPolicy,
@@ -230,7 +233,14 @@ async function dispatchEvent(input: {
 		await input.graph.flush();
 	}
 
-	if (input.view.behaviors.some((behavior) => !!behavior.symbolId)) {
+	if (
+		hasPendingBehaviorHostForAncestor(
+			matched.element,
+			input.elementsByHostId,
+			input.view.behaviors,
+			input.activeBehaviorHosts,
+		)
+	) {
 		const behaviorRuntime = await import('./event-only-behaviors.ts');
 		await behaviorRuntime.activateBehaviorsFromEventHost({
 			element: matched.element,
@@ -241,6 +251,25 @@ async function dispatchEvent(input: {
 			activeBehaviorHosts: input.activeBehaviorHosts,
 		});
 	}
+}
+
+function hasPendingBehaviorHostForAncestor(
+	element: EventOnlyResumeDomElement,
+	elementsByHostId: ReadonlyMap<string, EventOnlyResumeDomElement>,
+	behaviors: ReadonlyArray<EventOnlyResumeBehaviorRecord>,
+	activeBehaviorHosts: ReadonlySet<string>,
+): boolean {
+	for (
+		let current: EventOnlyResumeDomElement | null | undefined = element;
+		current;
+		current = current.parentElement
+	) {
+		for (const behavior of behaviors) {
+			if (!behavior.symbolId || activeBehaviorHosts.has(behavior.hostNodeId)) continue;
+			if (elementsByHostId.get(behavior.hostNodeId) === current) return true;
+		}
+	}
+	return false;
 }
 
 async function materializeDomLocators(

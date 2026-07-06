@@ -308,6 +308,65 @@ test('event-only resume dispatches lazy event symbols and flushes DOM update sym
 	expect(button.textContent).toBe('1');
 });
 
+test('event-only resume skips sync policy when the inline resumer already applied it', async () => {
+	const button = element('BUTTON');
+	const root = element('DIV', [button]);
+	const state = createProtocolStatePayload({
+		cells: [{ graphNodeId: 'state:locked', name: 'locked', valueKind: 'scalar', value: true }],
+	});
+	const view: ProtocolViewPayload = {
+		version: 1,
+		locators: [
+			{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'div' },
+			{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'button' },
+		],
+		events: [
+			{
+				hostNodeId: 'h1',
+				eventName: 'click',
+				syncPolicy: {
+					when: { type: 'graph-truthy', graphNodeId: 'state:locked', path: [] },
+					actions: ['preventDefault'],
+				},
+				symbolIds: ['symbol:event'],
+			},
+		],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	const scripts = renderPayloadScripts({ state, view });
+	let firstPolicyCalls = 0;
+
+	const container = await resumeEventOnlyFromPayloadDocument({
+		document: payloadDocument(scripts.stateScript, scripts.viewScript),
+		root,
+		event: {
+			type: 'click',
+			target: button,
+			preventDefault() {
+				firstPolicyCalls++;
+			},
+		},
+		syncPolicyAlreadyApplied: true,
+		loadSymbol: () => () => undefined,
+	});
+
+	expect(firstPolicyCalls).toBe(0);
+
+	let delegatedPolicyCalls = 0;
+	await container.dispatch({
+		type: 'click',
+		target: button,
+		preventDefault() {
+			delegatedPolicyCalls++;
+		},
+	});
+
+	expect(delegatedPolicyCalls).toBe(1);
+});
+
 test('event-only resume activates behavior symbols after an explicit trigger', async () => {
 	const button = element('BUTTON');
 	const root = element('DIV', [button]);

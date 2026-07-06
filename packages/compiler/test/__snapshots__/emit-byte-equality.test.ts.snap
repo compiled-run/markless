@@ -4682,7 +4682,7 @@ function marklessSsrEscape(value) { return value.replaceAll("&", "&amp;").replac
     "symbolModules": "symbol:0
 export function symbol_0(context) {
 	const event = context.event;
-	event.preventDefault(); context.graph.update({
+	context.graph.update({
 		graphNodeId: "state:count",
 		path: [],
 		returnValue: "next",
