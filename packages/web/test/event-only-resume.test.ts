@@ -520,7 +520,7 @@ test('event-only scalar lean route falls back for direct SSR container children'
 	expect(output.textContent).toBe('1');
 });
 
-test('event-only scalar lean predicate rejects unreplaced and non-text shapes', () => {
+test('event-only scalar lean predicate accepts structural scalar shape and rejects non-text shapes', () => {
 	const state = createProtocolStatePayload({
 		cells: [{ graphNodeId: 'state:count', name: 'count', valueKind: 'scalar', value: 0 }],
 	});
@@ -548,7 +548,7 @@ test('event-only scalar lean predicate rejects unreplaced and non-text shapes', 
 		view,
 		eventRecord,
 		runtimeDemandMap: scalarRuntimeDemandMap({ eventRecord, domUpdate: textUpdate, replaced: false }),
-	})).toBe(false);
+	})).toBe(true);
 	expect(isScalarLeanResumeShape({
 		state,
 		view: {
@@ -598,7 +598,7 @@ test('event-only scalar lean route falls back to the full event container for be
 	const runtimeDemandMap = scalarRuntimeDemandMap({ eventRecord, domUpdate });
 	const scripts = renderPayloadScripts({ state, view });
 
-	expect(isScalarLeanResumeShape({ state, view, eventRecord, runtimeDemandMap })).toBe(false);
+	expect(isScalarLeanResumeShape({ state, view, eventRecord, runtimeDemandMap })).toBe(true);
 
 	await resumeScalarEventFromPayloadDocument({
 		document: payloadDocument(scripts.stateScript, scripts.viewScript),
