@@ -220,6 +220,7 @@ describe('Vite config integration', () => {
 			'markless-resume-sync-demand',
 			'markless-payload-full',
 			'markless-payload-resume',
+			'markless-inline-payload-document',
 			'markless-payload-document',
 			'markless-payload-graph-construct',
 			'markless-dom-journal',

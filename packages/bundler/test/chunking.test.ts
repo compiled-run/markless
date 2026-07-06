@@ -38,6 +38,7 @@ describe('markless chunking defaults', () => {
 				'markless-runtime-graph-shared',
 				'markless-payload-resume',
 				'markless-payload-graph-construct',
+				'markless-inline-payload-document',
 				'markless-payload-document',
 				'markless-runtime',
 				'markless-symbols',
@@ -76,6 +77,7 @@ describe('markless chunking defaults', () => {
 				'markless-runtime-graph-shared',
 				'markless-payload-resume',
 				'markless-payload-graph-construct',
+				'markless-inline-payload-document',
 				'markless-payload-document',
 				'markless-runtime',
 				'markless-symbols',
@@ -119,6 +121,9 @@ describe('markless chunking defaults', () => {
 				'/repo/packages/web/src/payload-resume-registry.ts',
 			),
 		).toBe(true);
+		expect(
+			firstMatchingGroupName(groups, '/repo/packages/web/src/inline/payload-document.ts'),
+		).toBe('markless-inline-payload-document');
 		expect(groups.get('markless-resume-shared-patch')?.test('/repo/packages/web/src/resume-shared-patch.ts')).toBe(
 			true,
 		);
@@ -180,3 +185,13 @@ describe('markless chunking defaults', () => {
 		);
 	});
 });
+
+function firstMatchingGroupName(
+	groups: ReadonlyMap<string, RegExp | undefined>,
+	id: string,
+): string | undefined {
+	for (const [name, test] of groups) {
+		if (test?.test(id)) return name;
+	}
+	return undefined;
+}
