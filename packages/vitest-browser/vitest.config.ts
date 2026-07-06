@@ -1,6 +1,7 @@
 import { markless } from '@markless/core/vite';
 import { playwright } from 'vite-plus/test/browser-playwright';
 import { defineProject } from 'vitest/config';
+import { executedModulesPlugin } from '../bundler/test-support/executed-modules-plugin.ts';
 import { testSSR } from './src/ssr-plugin.ts';
 
 // Browser test project for @markless/vitest-browser. Runs the CSR + SSR
@@ -8,7 +9,7 @@ import { testSSR } from './src/ssr-plugin.ts';
 // playwright provider. The markless plugin compiles .tsrx fixtures; testSSR
 // rewrites renderSSR(Component) marker calls into the SSR browser command.
 export default defineProject({
-	plugins: [testSSR(), markless()],
+	plugins: [testSSR(), executedModulesPlugin(), markless()],
 	test: {
 		name: 'browser',
 		include: ['browser/**/*.test.ts'],

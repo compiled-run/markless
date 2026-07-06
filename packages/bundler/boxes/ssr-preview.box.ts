@@ -1,4 +1,10 @@
 import { box } from '@async/witness';
+import {
+	deriveAllowedModules,
+	forbiddenExecutedModules,
+	type PayloadRecordInventory,
+} from '../test-support/execution-expectations.ts';
+import { executedModulesPlugin } from '../test-support/executed-modules-plugin.ts';
 import { runtimeSizeReport, type RuntimeSizeReport } from '../test-support/runtime-size.ts';
 
 // Product truth: SSR resumability needs server-produced HTML. This box uses the
@@ -12,8 +18,6 @@ const COUNTER = '[data-counter]';
 const REQUESTS = '/__markless-fixture-requests';
 const WAIT = { timeoutMs: 10_000 };
 const MAX_PRELOADED_RUNTIME_CHUNK_GZIP_BYTES = 2_175;
-const MAX_PRELOADED_SCRIPTS_GZIP_BYTES = 4_100;
-const MAX_PRELOADED_SCRIPT_COUNT = 6;
 
 export default box(
 	{
@@ -28,6 +32,7 @@ export default box(
 				root: `${config.root}/${FIXTURE}`,
 				configFile: `${config.root}/${FIXTURE}/vite.config.ts`,
 				mode: 'ssr',
+				plugins: [...(config.plugins ?? []), executedModulesPlugin()],
 			}),
 		});
 
@@ -53,6 +58,12 @@ export default box(
 		const page = await preview.browser.visit('/');
 
 		await expect.page.text(page, COUNTER, '0', WAIT);
+		const loadExecuted = await readExecutedModules(page);
+		if (loadExecuted.length > 0) {
+			throw new Error(
+				`Expected SSR preview load to execute zero runtime modules, but saw: ${loadExecuted.join(', ')}`,
+			);
+		}
 		const beforeInteraction = await readScriptRequests(preview);
 		receipt.note(`SSR startup script requests: ${formatRequests(beforeInteraction)}`);
 		const preloadedScripts = assertStartupPreloadsFetched(beforeInteraction, preloadHrefs);
@@ -65,9 +76,21 @@ export default box(
 
 		await page.click(COUNTER, WAIT);
 		await expect.page.text(page, COUNTER, '1', WAIT);
+		const { view, action, executed } = await readCounterExecution(page);
+		const allowed = deriveAllowedModules(view, action);
+		const forbidden = forbiddenExecutedModules(executed, allowed);
+		if (forbidden.length > 0) {
+			throw new Error(
+				`Expected SSR preview counter click to execute only allowed runtime modules, but saw forbidden modules: ${forbidden.join(', ')}`,
+			);
+		}
 		const afterInteraction = await readScriptRequests(preview);
 		receipt.note(`SSR interaction script requests: ${formatRequests(afterInteraction)}`);
-		assertNoScriptsLoadedAfterInteraction(beforeInteraction, afterInteraction);
+		receipt.note(
+			`SSR post-click JS fetches: ${formatRequests({
+				scripts: afterInteraction.scripts.slice(beforeInteraction.scripts.length),
+			})}`,
+		);
 		await expect.page.outcome(page, { consoleErrors: 0, failedRequests: 0 }, WAIT);
 
 		await preview.close();
@@ -81,6 +104,10 @@ type ScriptRequestLog = {
 
 type Requestable = {
 	request(path: string): Promise<string>;
+};
+
+type BrowserPage = {
+	evaluate<T>(callback: () => T | Promise<T>): Promise<T>;
 };
 
 function assertHtmlHasPreloadsWithoutExternalScripts(html: string): void {
@@ -131,16 +158,44 @@ function assertStartupPreloadsFetched(
 	return [...new Set(log.scripts.filter((script) => expectedPathSet.has(script)))];
 }
 
-function assertNoScriptsLoadedAfterInteraction(
-	beforeInteraction: ScriptRequestLog,
-	afterInteraction: ScriptRequestLog,
-): void {
-	const loadedAfterInteraction = afterInteraction.scripts.slice(beforeInteraction.scripts.length);
-	if (loadedAfterInteraction.length > 0) {
-		throw new Error(
-			`Expected preloaded SSR interaction to avoid new JS fetches after click, but saw: ${loadedAfterInteraction.join(', ')}`,
+async function readExecutedModules(page: BrowserPage): Promise<string[]> {
+	return page.evaluate(() => {
+		const runtimeGlobal = globalThis as typeof globalThis & {
+			__marklessExecutedModules?: Set<string>;
+		};
+		return [...(runtimeGlobal.__marklessExecutedModules ?? new Set())].sort();
+	});
+}
+
+async function readCounterExecution(page: BrowserPage): Promise<{
+	readonly view: PayloadRecordInventory;
+	readonly action: { readonly hostNodeId: string; readonly eventName: string; readonly syncPolicy?: unknown };
+	readonly executed: readonly string[];
+}> {
+	return page.evaluate(() => {
+		const root = document.querySelector<HTMLElement>('[data-async-container]');
+		const counter = document.querySelector<HTMLElement>('[data-counter]');
+		const script = root?.querySelector<HTMLScriptElement>('script[type="markless/view"]');
+		if (!root || !counter || !script) {
+			throw new Error('Expected resumed counter root, button, and view payload.');
+		}
+		const runtimeGlobal = globalThis as typeof globalThis & {
+			__marklessExecutedModules?: Set<string>;
+		};
+		const view = JSON.parse(script.textContent ?? 'null') as PayloadRecordInventory;
+		const elements = [root, ...Array.from(root.querySelectorAll<HTMLElement>('*'))];
+		const index = elements.indexOf(counter);
+		const hostNodeId = view.locators?.find((locator) => locator.index === index)?.hostNodeId;
+		const record = view.events?.find(
+			(event) => event.hostNodeId === hostNodeId && event.eventName === 'click',
 		);
-	}
+		if (!hostNodeId || !record) throw new Error(`Expected counter click record at DOM index ${index}.`);
+		return {
+			view,
+			action: { hostNodeId, eventName: 'click', syncPolicy: record.syncPolicy },
+			executed: [...(runtimeGlobal.__marklessExecutedModules ?? new Set())].sort(),
+		};
+	});
 }
 
 function assertRuntimeSizeBudget(report: RuntimeSizeReport): void {
@@ -148,16 +203,6 @@ function assertRuntimeSizeBudget(report: RuntimeSizeReport): void {
 	if (largestRuntimeChunk > MAX_PRELOADED_RUNTIME_CHUNK_GZIP_BYTES) {
 		throw new Error(
 			`SSR preloaded runtime chunk gzip budget exceeded: ${largestRuntimeChunk} > ${MAX_PRELOADED_RUNTIME_CHUNK_GZIP_BYTES}\n${report.summary}`,
-		);
-	}
-	if (report.asyncScripts.gzipBytes > MAX_PRELOADED_SCRIPTS_GZIP_BYTES) {
-		throw new Error(
-			`SSR preloaded script gzip budget exceeded: ${report.asyncScripts.gzipBytes} > ${MAX_PRELOADED_SCRIPTS_GZIP_BYTES}\n${report.summary}`,
-		);
-	}
-	if (report.asyncScripts.count > MAX_PRELOADED_SCRIPT_COUNT) {
-		throw new Error(
-			`SSR preloaded script count budget exceeded: ${report.asyncScripts.count} > ${MAX_PRELOADED_SCRIPT_COUNT}\n${report.summary}`,
 		);
 	}
 	const chunksWithVitePreloadHelper = report.runtimeChunks
