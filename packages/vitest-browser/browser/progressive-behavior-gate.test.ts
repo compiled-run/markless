@@ -4,7 +4,9 @@ import {
 	forbiddenExecutedModules,
 } from '../../bundler/test-support/execution-expectations.ts';
 import { cleanup, renderSSRPhased } from '../src/index.ts';
-import PlainVsBehavior from './fixtures/progressive-plain-vs-behavior.tsrx';
+import PlainVsBehavior, {
+	payloadRuntimeDemandMap as plainVsBehaviorRuntimeDemandMap,
+} from './fixtures/progressive-plain-vs-behavior.tsrx';
 import {
 	actionForElement,
 	executedModules,
@@ -31,7 +33,7 @@ test('progressive execution: clicking a plain button never executes behavior mod
 		.toBe('plain');
 
 	const executed = executedModules();
-	const allowed = deriveAllowedModules(view, action);
+	const allowed = deriveAllowedModules(view, plainVsBehaviorRuntimeDemandMap, action);
 	expect(forbiddenExecutedModules(executed, allowed)).toEqual([]);
 	expect(executed).not.toContain('web/resume-behaviors');
 	expect(executed).not.toContain('web/event-only-behaviors');

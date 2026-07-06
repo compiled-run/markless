@@ -4,7 +4,9 @@ import {
 	forbiddenExecutedModules,
 } from '../../bundler/test-support/execution-expectations.ts';
 import { cleanup, renderSSRPhased } from '../src/index.ts';
-import RowMixed from './fixtures/progressive-row-mixed.tsrx';
+import RowMixed, {
+	payloadRuntimeDemandMap as rowMixedRuntimeDemandMap,
+} from './fixtures/progressive-row-mixed.tsrx';
 import {
 	actionForKeyedRepeat,
 	executedModules,
@@ -31,7 +33,7 @@ test('progressive execution: row dispatch allows declared branch wiring without 
 		.toBe('north');
 
 	const executed = executedModules();
-	const allowed = deriveAllowedModules(view, rowAction);
+	const allowed = deriveAllowedModules(view, rowMixedRuntimeDemandMap, rowAction);
 	expect(forbiddenExecutedModules(executed, allowed)).toEqual([]);
 	expect(executed).toContain('web/resume-keyed-repeats');
 	expect(executed).not.toContain('web/resume-async-boundaries');
