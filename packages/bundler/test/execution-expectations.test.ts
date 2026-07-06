@@ -1,37 +1,92 @@
 import { expect, test } from 'vitest';
 import {
+	assertDemandMapMatchesEmittedSymbolImports,
 	deriveAllowedModules,
 	forbiddenExecutedModules,
 } from '../test-support/execution-expectations.ts';
+import { transformTsrxModule } from '../src/transform.ts';
 
-test('full-tier row dispatch allows only the full dispatch spine and touched row capability', () => {
-	const allowed = deriveAllowedModules({
-		keyedRepeats: [{ parentHostNodeId: 'h0', rowEvents: [{ eventName: 'click' }] }],
-		branches: [{ armRecords: [{ events: [{ eventName: 'click' }], domUpdates: [], behaviors: [], elementHandles: [] }] }],
-		asyncBoundaries: [{}],
-	}, { hostNodeId: 'h-row', eventName: 'click', recordKind: 'keyed-repeat-row' });
+test('expectations derive allowed runtime modules from the generated demand map', async () => {
+	const result = await transformTsrxModule({
+		filename: '/workspace/app/Counter.tsrx',
+		source: `
+			import { state } from '@markless/core';
+			export function Counter() @{
+				let count = state(0);
+				<button onClick={() => count++}>{count}</button>
+			}
+		`,
+		executionLog: 'always',
+	});
+	const payload = payloadView(result.virtualModules.find((module) => module.type === 'payload')?.source);
+	const click = payload.events[0];
+	const allowed = deriveAllowedModules(payload, {
+		hostNodeId: click.hostNodeId,
+		eventName: click.eventName,
+		executionLog: true,
+	});
 
-	expect([...allowed]).toEqual(expect.arrayContaining(['core/web/resume', 'web/resume-runtime', 'web/resume-events', 'web/resume-keyed-repeats']));
-	expect(allowed).toContain('web/resume-branches');
-	expect(allowed).not.toContain('web/resume-behaviors');
-	expect(allowed).not.toContain('web/resume-sync-computed');
-	expect(allowed).not.toContain('web/resume-handoff');
-});
-
-test('execution log chunk is classified as observability allowed after logged dispatch', () => {
-	const allowed = deriveAllowedModules({
-		events: [{ hostNodeId: 'h0', eventName: 'click' }],
-	}, { hostNodeId: 'h0', eventName: 'click', executionLog: true });
-
-	expect(allowed).toContain('virtual:markless:dev-log');
-	expect(allowed).toContain('web/dev-log');
+	expect(() =>
+		assertDemandMapMatchesEmittedSymbolImports(result.virtualModules, payload.runtimeDemandMap),
+	).not.toThrow();
+	expect(allowed).toContain('web/fns/write-scalar');
+	expect(allowed).toContain('web/fns/update-text');
+	expect(allowed).toContain('web/event-only-resume');
 	expect(allowed).toContain('web/execution-log-target');
-	expect(forbiddenExecutedModules([
-		'virtual:markless:dev-log',
-		'web/dev-log',
-		'web/execution-log-target',
-	], allowed)).toEqual([]);
-	expect(forbiddenExecutedModules(['web/execution-log-target'], deriveAllowedModules({
-		events: [{ hostNodeId: 'h0', eventName: 'click' }],
-	}, { hostNodeId: 'h0', eventName: 'click' }))).toEqual(['web/execution-log-target']);
+	expect(allowed).not.toContain('web/dom-journal');
 });
+
+test('wrong demand map entries fail expectations and emitted-equals-required', async () => {
+	const result = await transformTsrxModule({
+		filename: '/workspace/app/Counter.tsrx',
+		source: `
+			import { state } from '@markless/core';
+			export function Counter() @{
+				let count = state(0);
+				<button onClick={() => count++}>{count}</button>
+			}
+		`,
+	});
+	const payloadModule = result.virtualModules.find((module) => module.type === 'payload');
+	const payload = payloadView(payloadModule?.source);
+	const click = payload.events[0];
+	const missingFromMap = {
+		...payload.runtimeDemandMap,
+		symbols: payload.runtimeDemandMap.symbols.map((symbol: any) =>
+			symbol.runtimeModuleIds.includes('web/fns/write-scalar')
+				? { ...symbol, runtimeModuleIds: [] }
+				: symbol,
+		),
+		actions: payload.runtimeDemandMap.actions.map((action: any) => ({
+			...action,
+			runtimeModuleIds: action.runtimeModuleIds.filter((id: string) => id !== 'web/fns/write-scalar'),
+		})),
+	};
+	const corruptedPayload = { ...payload, runtimeDemandMap: missingFromMap };
+	const allowed = deriveAllowedModules(corruptedPayload, {
+		hostNodeId: click.hostNodeId,
+		eventName: click.eventName,
+	});
+	const extraInMap = {
+		...payload.runtimeDemandMap,
+		symbols: payload.runtimeDemandMap.symbols.map((symbol: any, index: number) =>
+			index === 0
+				? { ...symbol, runtimeModuleIds: [...symbol.runtimeModuleIds, 'web/fns/not-emitted'] }
+				: symbol,
+		),
+	};
+
+	expect(forbiddenExecutedModules(['web/fns/write-scalar'], allowed)).toEqual(['web/fns/write-scalar']);
+	expect(() =>
+		assertDemandMapMatchesEmittedSymbolImports(result.virtualModules, missingFromMap),
+	).toThrow(/extra=\[web\/fns\/write-scalar\]/);
+	expect(() =>
+		assertDemandMapMatchesEmittedSymbolImports(result.virtualModules, extraInMap),
+	).toThrow(/missing=\[web\/fns\/not-emitted\]/);
+});
+
+function payloadView(source: string | undefined): any {
+	const match = source?.match(/export const view = ([\s\S]*);\s*$/);
+	if (!match) throw new Error('Expected payload virtual module to export view.');
+	return JSON.parse(match[1]);
+}

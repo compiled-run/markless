@@ -57,6 +57,7 @@ export async function transformTsrxModule(
 			exportName: symbolRows[index]!.exportName,
 			virtualModuleId: symbolVirtualModuleId(input.filename, module.symbolId),
 		})),
+		runtimeDemandMap: compiled.runtimeDemandMap,
 	};
 	// Scoped <style> CSS ships through the bundler's CSS pipeline: a virtual
 	// .css module imported by the transformed module, never inline JS.
@@ -69,7 +70,10 @@ export async function transformTsrxModule(
 		{
 			id: payloadId,
 			type: 'payload',
-			source: payloadModule(compiled.payloadScripts),
+			source: payloadModule({
+				...compiled.payloadScripts,
+				view: { ...compiled.payloadScripts.view, runtimeDemandMap: compiled.runtimeDemandMap },
+			}),
 		},
 		{
 			id: resolverId,

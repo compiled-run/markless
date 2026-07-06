@@ -139,6 +139,7 @@ function cloneTransformManifest(manifest: MarklessTransformManifest): MarklessTr
 		payload: { ...manifest.payload },
 		resolver: { ...manifest.resolver },
 		symbols: manifest.symbols.map((symbol) => ({ ...symbol })),
+		runtimeDemandMap: manifest.runtimeDemandMap,
 	};
 }
 

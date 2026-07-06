@@ -76,6 +76,12 @@ export const defaultCompilerPasses: ReadonlyArray<CompilerPassDefinition> = [
 		produces: ['symbolModules'],
 	},
 	{
+		passId: 'runtime-demand-map',
+		description: 'Map emitted symbols and payload records to exact runtime module demands.',
+		consumes: ['symbolResolver', 'symbolModules', 'protocolView'],
+		produces: ['runtimeDemandMap'],
+	},
+	{
 		passId: 'symbol-resolver-module',
 		description: 'Emit the generated symbol resolver module that owns dynamic imports.',
 		consumes: ['symbolResolverModuleInput'],

@@ -1,6 +1,5 @@
 import { afterEach, expect, test } from 'vitest';
 import {
-	MODULE_GROUPS,
 	deriveAllowedModules,
 	forbiddenExecutedModules,
 } from '../../bundler/test-support/execution-expectations.ts';
@@ -34,5 +33,6 @@ test('progressive execution: clicking a plain button never executes behavior mod
 	const executed = executedModules();
 	const allowed = deriveAllowedModules(view, action);
 	expect(forbiddenExecutedModules(executed, allowed)).toEqual([]);
-	expect(executed.some((id) => MODULE_GROUPS.behavior.has(id))).toBe(false);
+	expect(executed).not.toContain('web/resume-behaviors');
+	expect(executed).not.toContain('web/event-only-behaviors');
 });

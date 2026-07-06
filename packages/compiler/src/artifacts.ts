@@ -701,6 +701,35 @@ export type SymbolModulesArtifact = {
 	readonly diagnostics: ReadonlyArray<CaptureAnalysisDiagnostic>;
 };
 
+export type RuntimeDemandMapRecord = {
+	readonly recordId: string;
+	readonly kind: string;
+	readonly hostNodeId?: string;
+	readonly eventName?: string;
+	readonly symbolIds?: ReadonlyArray<string>;
+	readonly runtimeModuleIds: ReadonlyArray<string>;
+};
+
+export type RuntimeDemandMapAction = {
+	readonly hostNodeId: string;
+	readonly eventName: string;
+	readonly recordKind: 'event' | 'keyed-repeat-row';
+	readonly runtimeModuleIds: ReadonlyArray<string>;
+};
+
+export type RuntimeDemandMapArtifact = {
+	readonly passId: 'runtime-demand-map';
+	readonly version: 1;
+	readonly symbols: ReadonlyArray<{
+		readonly symbolId: string;
+		readonly kind: PlannedSymbol['kind'];
+		readonly runtimeModuleIds: ReadonlyArray<string>;
+	}>;
+	readonly payloadRecords: ReadonlyArray<RuntimeDemandMapRecord>;
+	readonly actions: ReadonlyArray<RuntimeDemandMapAction>;
+	readonly unknownRecordModuleIds: ReadonlyArray<string>;
+};
+
 export type SymbolResolverModuleInput = {
 	readonly buildId?: string;
 	readonly resolverId?: string;
@@ -1008,6 +1037,7 @@ export type CompileTsrxModuleResult = {
 	readonly publicRenderPlan: PublicRenderPlanArtifact;
 	readonly publicRenderModule: PublicRenderModuleArtifact;
 	readonly symbolModules: SymbolModulesArtifact;
+	readonly runtimeDemandMap: RuntimeDemandMapArtifact;
 	readonly symbolResolverModule: string;
 	readonly symbolResolverModuleManifest: SymbolResolverModuleManifest;
 };

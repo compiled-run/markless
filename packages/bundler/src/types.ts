@@ -52,6 +52,7 @@ export interface MarklessTransformManifest {
 	payload: MarklessBuildModuleReference;
 	resolver: MarklessBuildModuleReference;
 	symbols: MarklessSymbolManifestEntry[];
+	runtimeDemandMap?: RuntimeDemandMapManifest;
 }
 
 export interface MarklessBuildModuleReference {
@@ -64,6 +65,8 @@ export interface MarklessSymbolManifestEntry extends MarklessBuildModuleReferenc
 	exportName: string;
 	kind: string;
 }
+
+export type RuntimeDemandMapManifest = Omit<import('@markless/compiler').RuntimeDemandMapArtifact, 'passId'>;
 
 export interface MarklessBuildMetadata {
 	version: number;

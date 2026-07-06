@@ -7,6 +7,7 @@ import type {
 	PublicRenderPlanArtifact,
 	PayloadScriptsArtifact,
 	RunnableCompilerPassDefinition,
+	RuntimeDemandMapArtifact,
 	SemanticGraphArtifact,
 	StateLoweringArtifact,
 	SymbolModulesArtifact,
@@ -24,6 +25,7 @@ import { emitPublicRenderModule } from './passes/public-render/module.ts';
 import { planPublicRender } from './passes/public-render/plan.ts';
 import { createProtocolStatePayloadFromArena } from './passes/protocol-state.ts';
 import { createProtocolViewPayload } from './passes/protocol-view.ts';
+import { createRuntimeDemandMap } from './passes/runtime-demand-map.ts';
 import { buildSemanticGraph } from './passes/semantic-graph/index.ts';
 import { createMutableSemanticGraphArtifact } from './passes/semantic-graph/types.ts';
 import { lowerStateAccess } from './passes/state-lowering.ts';
@@ -62,6 +64,7 @@ export async function compileTsrxModule(
 		readonly publicRenderPlan: PublicRenderPlanArtifact;
 		readonly publicRenderModule: PublicRenderModuleArtifact;
 		readonly symbolModules: SymbolModulesArtifact;
+		readonly runtimeDemandMap: RuntimeDemandMapArtifact;
 		readonly symbolResolverModule: string;
 		readonly symbolResolverModuleManifest: SymbolResolverModuleManifest;
 	};
@@ -80,6 +83,7 @@ export async function compileTsrxModule(
 		publicRenderPlan: artifacts.publicRenderPlan,
 		publicRenderModule: artifacts.publicRenderModule,
 		symbolModules: artifacts.symbolModules,
+		runtimeDemandMap: artifacts.runtimeDemandMap,
 		symbolResolverModule: artifacts.symbolResolverModule,
 		symbolResolverModuleManifest: artifacts.symbolResolverModuleManifest,
 	};
@@ -255,6 +259,22 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 							symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
 							captureAnalysis: inputs.captureAnalysis as CaptureAnalysisArtifact,
 							publicRenderPlan: inputs.publicRenderPlan as PublicRenderPlanArtifact,
+						}),
+					};
+				},
+			};
+		}
+
+		if (pass.passId === 'runtime-demand-map') {
+			return {
+				...pass,
+				run({ inputs }) {
+					return {
+						runtimeDemandMap: createRuntimeDemandMap({
+							symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
+							symbolModules: inputs.symbolModules as SymbolModulesArtifact,
+							protocolView:
+								inputs.protocolView as CompileTsrxModuleResult['protocolView'],
 						}),
 					};
 				},
