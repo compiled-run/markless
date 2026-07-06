@@ -339,12 +339,12 @@ async function marklessRenderSsr(props = {}) {
 	};
 }",
     "symbolModules": "symbol:0
+import { marklessUpdateText } from '@markless/web/fns/update-text';
+
 export function symbol_0(context) {
-	return {
-		type: "setText",
-		locator: context.domUpdate?.hostNodeId ?? "h1",
-		value: context.value,
-	};
+	return marklessUpdateText(context, {
+		hostNodeId: "h1",
+	});
 }
 
 
@@ -662,12 +662,12 @@ async function marklessRenderSsr(props = {}) {
 	};
 }",
     "symbolModules": "symbol:0
+import { marklessUpdateText } from '@markless/web/fns/update-text';
+
 export function symbol_0(context) {
-	return {
-		type: "setText",
-		locator: context.domUpdate?.hostNodeId ?? "h0",
-		value: context.value,
-	};
+	return marklessUpdateText(context, {
+		hostNodeId: "h0",
+	});
 }
 ",
     "symbolResolverModule": "export const symbolManifest = 
@@ -1066,22 +1066,26 @@ async function marklessRenderSsr(props = {}) {
 	};
 }",
     "symbolModules": "symbol:0
+import { marklessUpdateText } from '@markless/web/fns/update-text';
+
 export function symbol_0(context) {
-	return {
-		type: "setText",
-		locator: context.domUpdate?.hostNodeId ?? "h1",
-		value: context.value ? "Shown" : "Hidden",
-	};
+	return marklessUpdateText(context, {
+		hostNodeId: "h1",
+		trueValue: "Shown",
+		falseValue: "Hidden",
+	});
 }
 
 
 symbol:1
+import { marklessUpdateText } from '@markless/web/fns/update-text';
+
 export function symbol_1(context) {
-	return {
-		type: "setText",
-		locator: context.domUpdate?.hostNodeId ?? "h2",
-		value: context.value ? "Shown" : "Hidden",
-	};
+	return marklessUpdateText(context, {
+		hostNodeId: "h2",
+		trueValue: "Shown",
+		falseValue: "Hidden",
+	});
 }
 
 
@@ -1315,11 +1319,12 @@ async function marklessRenderSsr(props = {}) {
 	};
 }",
     "symbolModules": "symbol:0
+import { marklessWriteScalar } from '@markless/web/fns/write-scalar';
+
 export function symbol_0(context) {
-	if (context.graph.read("state:count") > 2) return; context.graph.update({
+	if (context.graph.read("state:count") > 2) return; marklessWriteScalar(context, {
 		graphNodeId: "state:count",
 		path: [],
-		returnValue: "next",
 		update(value) {
 			return Number(value) + 1;
 		},
@@ -1328,12 +1333,12 @@ export function symbol_0(context) {
 
 
 symbol:1
+import { marklessUpdateText } from '@markless/web/fns/update-text';
+
 export function symbol_1(context) {
-	return {
-		type: "setText",
-		locator: context.domUpdate?.hostNodeId ?? "h0",
-		value: context.value,
-	};
+	return marklessUpdateText(context, {
+		hostNodeId: "h0",
+	});
 }
 ",
     "symbolResolverModule": "export const symbolManifest = 
@@ -1601,11 +1606,12 @@ async function marklessRenderSsr(props = {}) {
 	};
 }",
     "symbolModules": "symbol:0
+import { marklessWriteScalar } from '@markless/web/fns/write-scalar';
+
 export function symbol_0(context) {
-	return context.graph.update({
+	return marklessWriteScalar(context, {
 		graphNodeId: "state:App.count.createCount.count",
 		path: [],
-		returnValue: "next",
 		update(value) {
 			return Number(value) + 1;
 		},
@@ -1614,12 +1620,12 @@ export function symbol_0(context) {
 
 
 symbol:1
+import { marklessUpdateText } from '@markless/web/fns/update-text';
+
 export function symbol_1(context) {
-	return {
-		type: "setText",
-		locator: context.domUpdate?.hostNodeId ?? "h0",
-		value: context.value,
-	};
+	return marklessUpdateText(context, {
+		hostNodeId: "h0",
+	});
 }
 ",
     "symbolResolverModule": "export const symbolManifest = 
@@ -2218,22 +2224,26 @@ async function marklessRenderSsr(props = {}) {
 	};
 }",
     "symbolModules": "symbol:0
+import { marklessUpdateText } from '@markless/web/fns/update-text';
+
 export function symbol_0(context) {
-	return {
-		type: "setText",
-		locator: context.domUpdate?.hostNodeId ?? "h1",
-		value: context.value ? "Live" : "Idle",
-	};
+	return marklessUpdateText(context, {
+		hostNodeId: "h1",
+		trueValue: "Live",
+		falseValue: "Idle",
+	});
 }
 
 
 symbol:1
+import { marklessUpdateText } from '@markless/web/fns/update-text';
+
 export function symbol_1(context) {
-	return {
-		type: "setText",
-		locator: context.domUpdate?.hostNodeId ?? "h2",
-		value: context.value ? "Live" : "Idle",
-	};
+	return marklessUpdateText(context, {
+		hostNodeId: "h2",
+		trueValue: "Live",
+		falseValue: "Idle",
+	});
 }
 
 
@@ -2676,8 +2686,10 @@ async function marklessRenderSsr(props = {}) {
 	};
 }",
     "symbolModules": "symbol:0
+import { marklessWriteScalar } from '@markless/web/fns/write-scalar';
+
 export function symbol_0(context) {
-	return context.graph.write({
+	return marklessWriteScalar(context, {
 		graphNodeId: "state:chosen",
 		path: [],
 		value: context.locals?.entry?.code,
@@ -3472,22 +3484,26 @@ async function marklessRenderSsr(props = {}) {
 	};
 }",
     "symbolModules": "symbol:0
+import { marklessUpdateText } from '@markless/web/fns/update-text';
+
 export function symbol_0(context) {
-	return {
-		type: "setText",
-		locator: context.domUpdate?.hostNodeId ?? "h1",
-		value: context.value ? "Live" : "Idle",
-	};
+	return marklessUpdateText(context, {
+		hostNodeId: "h1",
+		trueValue: "Live",
+		falseValue: "Idle",
+	});
 }
 
 
 symbol:1
+import { marklessUpdateText } from '@markless/web/fns/update-text';
+
 export function symbol_1(context) {
-	return {
-		type: "setText",
-		locator: context.domUpdate?.hostNodeId ?? "h2",
-		value: context.value ? "Live" : "Idle",
-	};
+	return marklessUpdateText(context, {
+		hostNodeId: "h2",
+		trueValue: "Live",
+		falseValue: "Idle",
+	});
 }
 ",
     "symbolResolverModule": "export const symbolManifest = 
@@ -3954,12 +3970,13 @@ async function marklessRenderSsr(props = {}) {
 	};
 }",
     "symbolModules": "symbol:0
+import { marklessWriteScalar } from '@markless/web/fns/write-scalar';
+
 export function symbol_0(context) {
 	const event = context.event;
-	context.graph.update({
+	marklessWriteScalar(context, {
 		graphNodeId: "state:count",
 		path: [],
-		returnValue: "next",
 		update(value) {
 			return Number(value) + 1;
 		},
@@ -3968,12 +3985,12 @@ export function symbol_0(context) {
 
 
 symbol:1
+import { marklessUpdateText } from '@markless/web/fns/update-text';
+
 export function symbol_1(context) {
-	return {
-		type: "setText",
-		locator: context.domUpdate?.hostNodeId ?? "h0",
-		value: context.value,
-	};
+	return marklessUpdateText(context, {
+		hostNodeId: "h0",
+	});
 }
 ",
     "symbolResolverModule": "export const symbolManifest = 
@@ -4233,12 +4250,12 @@ async function marklessRenderSsr(props = {}) {
 	};
 }",
     "symbolModules": "symbol:0
+import { marklessUpdateText } from '@markless/web/fns/update-text';
+
 export function symbol_0(context) {
-	return {
-		type: "setText",
-		locator: context.domUpdate?.hostNodeId ?? "h0",
-		value: context.value,
-	};
+	return marklessUpdateText(context, {
+		hostNodeId: "h0",
+	});
 }
 
 
