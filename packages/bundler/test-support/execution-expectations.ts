@@ -58,8 +58,16 @@ export const MODULE_GROUPS: Record<ModuleGroup, ReadonlySet<string>> = {
 		'core/web/resume',
 		'web/resume',
 		'web/resume-runtime',
+		// T007e/h/i/j file splits of resume-runtime/payload-full — same plane, new names:
+		'web/resume-runtime-shared',
 		'web/resume-events',
 		'web/payload-full',
+		'web/payload-resume',
+		'web/payload-graph-construct',
+		// Record-derived trigger installer: wiring-time module (installs demand triggers
+		// from record data without importing capability modules) — allowed at first
+		// dispatch when records are declared, like eager branch wiring (spec gate 2).
+		'web/resume-async-wiring',
 	]),
 	'full-resume-core': new Set([
 		'web/resume-locators',
