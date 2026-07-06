@@ -4969,9 +4969,10 @@ test('compileTsrxModule emits handler writes through whole-binding aliases', asy
 		}),
 	]);
 	expect(result.stateLowering.diagnostics).toEqual([]);
-	expect(module?.source).toContain('context.graph.update({');
+	expect(module?.source).toContain("import { marklessWriteScalar } from '@markless/web/fns/write-scalar';");
+	expect(module?.source).toContain('return marklessWriteScalar(context, {');
 	expect(module?.source).toContain('graphNodeId: "state:origin"');
-	expect(module?.source).toContain('path: []');
+	expect(module?.source).not.toContain('path: []');
 });
 
 test('compileTsrxModule emits async computed runner modules without serializing runner source', async () => {

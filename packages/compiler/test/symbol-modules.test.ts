@@ -89,6 +89,92 @@ test('emitSymbolModules emits event, callback, and DOM update modules', () => {
 	expect(artifact.modules[2].source).toContain('value: context.value');
 });
 
+test('emitSymbolModules imports scalar write and text update leaves for scalar click path', () => {
+	const artifact = emitSymbolModules({
+		symbolResolver: {
+			passId: 'symbol-resolver',
+			dynamicImportOwner: 'generated-symbol-resolver',
+			symbols: [
+				{
+					id: 'symbol:click',
+					kind: 'event-handler',
+					hostNodeId: 'h1',
+					eventName: 'click',
+					source: '() => count++',
+					parameters: [],
+					order: 0,
+					writes: [
+						{
+							source: 'count',
+							graphNodeId: 'state:count',
+							path: [],
+							operation: 'update',
+							updateOperator: '++',
+							prefix: false,
+						},
+					],
+				},
+				{
+					id: 'symbol:domUpdate',
+					kind: 'dom-update',
+					hostNodeId: 'h1',
+					source: 'count',
+					graphNodeId: 'state:count',
+					target: { kind: 'text' },
+				},
+			],
+			syncPolicies: [],
+			diagnostics: [],
+		},
+		captureAnalysis: { passId: 'capture-analysis', extractedSymbols: [], diagnostics: [] },
+	});
+
+	expect(artifact.modules[0].source).toContain(
+		"import { marklessWriteScalar } from '@markless/web/fns/write-scalar';",
+	);
+	expect(artifact.modules[0].source).toContain('return marklessWriteScalar(context, {');
+	expect(artifact.modules[1].source).toContain(
+		"import { marklessUpdateText } from '@markless/web/fns/update-text';",
+	);
+	expect(artifact.modules[1].source).toContain('return marklessUpdateText(context, "h1");');
+});
+
+test('emitSymbolModules leaves non-scalar path writes on the existing graph-write path', () => {
+	const artifact = emitSymbolModules({
+		symbolResolver: {
+			passId: 'symbol-resolver',
+			dynamicImportOwner: 'generated-symbol-resolver',
+			symbols: [
+				{
+					id: 'symbol:toggle',
+					kind: 'event-handler',
+					hostNodeId: 'h1',
+					eventName: 'click',
+					source: '() => menu.open = false',
+					parameters: [],
+					order: 0,
+					writes: [
+						{
+							source: 'menu.open',
+							graphNodeId: 'state:menu',
+							path: ['open'],
+							operation: 'assign',
+							valueSource: 'false',
+						},
+					],
+				},
+			],
+			syncPolicies: [],
+			diagnostics: [],
+		},
+		captureAnalysis: { passId: 'capture-analysis', extractedSymbols: [], diagnostics: [] },
+	});
+
+	expect(artifact.modules[0].source).not.toContain('@markless/web/fns/write-scalar');
+	expect(artifact.modules[0].source).toContain('context.graph.write({');
+	expect(artifact.modules[0].source).toContain('path: ["open"]');
+});
+
 test('emitSymbolModules emits conditional text DOM update values', () => {
 	const artifact = emitSymbolModules({
 		symbolResolver: {
@@ -230,10 +316,16 @@ test('emitSymbolModules emits concrete DOM journal entries for each binding targ
 			},
 		});
 
-		expect(artifact.modules[0].source).not.toContain('import ');
+		if (targetCase.id !== 'text') expect(artifact.modules[0].source).not.toContain('import ');
 		expect(artifact.modules[0].source).not.toContain('createDomUpdateEntry');
-		for (const expected of targetCase.expected) {
-			expect(artifact.modules[0].source).toContain(expected);
+		if (targetCase.id === 'text') {
+			expect(artifact.modules[0].source).toContain(
+				"import { marklessUpdateText } from '@markless/web/fns/update-text';",
+			);
+		} else {
+			for (const expected of targetCase.expected) {
+				expect(artifact.modules[0].source).toContain(expected);
+			}
 		}
 	}
 });
@@ -1722,7 +1814,8 @@ test('B908 preserves simple count++ handler semantics as a spliced graph write',
 		writes: [countUpdateWrite()],
 	});
 
-	expect(source).toContain('context.graph.update({');
+	expect(source).toContain("import { marklessWriteScalar } from '@markless/web/fns/write-scalar';");
+	expect(source).toContain('return marklessWriteScalar(context, {');
 	expect(source).toContain('graphNodeId: "state:count"');
 	expect(source).toContain('return Number(value) + 1;');
 	expect(source).not.toContain('count++');
