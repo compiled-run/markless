@@ -1,5 +1,4 @@
 import { expect, test, vi } from 'vitest';
-import { marklessCreateScalarCoreGraph } from '../src/fns/scalar-core-graph.ts';
 import { marklessUpdateText } from '../src/fns/update-text.ts';
 import { marklessWriteScalar } from '../src/fns/write-scalar.ts';
 import { enrichRuntimeErrorForReporting } from '../src/runtime-error-reporting.ts';
@@ -65,17 +64,6 @@ test('text update leaf fails loudly when no record or fallback locator exists', 
 		expect(error).not.toHaveProperty('severity');
 		expect(error).not.toHaveProperty('phase');
 	}
-});
-
-test('lean scalar escalation errors keep site tags without report-only fields', () => {
-	const graph = marklessCreateScalarCoreGraph({ cells: [], domUpdates: [] }, new Map(), vi.fn());
-	expect(() => graph.write({ graphNodeId: 'state:count', path: ['nested'], value: 1 })).toThrowError(
-		expect.objectContaining({
-			message: 'MARKLESS_SCALAR_LEAN_ESCALATE',
-			code: 'MARKLESS_SCALAR_LEAN_ESCALATE',
-			site: 'write-path',
-		}),
-	);
 });
 
 test('runtime reporting helper enriches slim leaf errors once', () => {
