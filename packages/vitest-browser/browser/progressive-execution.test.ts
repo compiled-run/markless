@@ -58,7 +58,7 @@ test('progressive execution: row dispatch does not execute unrelated async, bran
 	const container = screen.container;
 	const view = readViewPayload(container);
 	const rowButton = requireElement<HTMLButtonElement>(container, '.mixed-row button');
-	const rowAction = actionForKeyedRepeat(view, 'click');
+	const rowAction = actionForKeyedRepeat(container, rowButton, 'click');
 
 	rowButton.click();
 	await expect.poll(() => requireElement<HTMLOutputElement>(container, 'output[data-mixed-choice]').textContent)
@@ -123,27 +123,55 @@ function actionForElement(
 	eventName: string,
 ): { hostNodeId: string; eventName: string; syncPolicy?: unknown } {
 	const view = readViewPayload(container);
-	const elements = [container, ...Array.from(container.querySelectorAll<HTMLElement>('*'))];
-	const index = elements.indexOf(element);
-	const hostNodeId = view.locators?.find((locator) => locator.index === index)?.hostNodeId;
-	const record = view.events?.find(
-		(event) => event.hostNodeId === hostNodeId && event.eventName === eventName,
-	);
-	if (!hostNodeId || !record) {
-		throw new Error(`Expected payload event record for ${eventName} at DOM index ${index}.`);
-	}
-	return { hostNodeId, eventName, syncPolicy: record.syncPolicy };
+	const match = findHostNodeIdForTarget(container, view, element, (hostNodeId) => {
+		const record = view.events?.find((event) => event.hostNodeId === hostNodeId && event.eventName === eventName);
+		return record ? { syncPolicy: record.syncPolicy } : undefined;
+	});
+	if (match) return { hostNodeId: match.hostNodeId, eventName, syncPolicy: match.value.syncPolicy };
+	throw new Error(`Expected payload event record for ${eventName} on clicked element or ancestor.`);
 }
 
 function actionForKeyedRepeat(
-	view: PayloadRecordInventory,
+	container: HTMLElement,
+	element: HTMLElement,
 	eventName: string,
 ): { hostNodeId: string; eventName: string; recordKind: 'keyed-repeat-row' } {
-	const repeat = view.keyedRepeats?.find((record) =>
-		record.rowEvents.some((event) => event.eventName === eventName),
+	const view = readViewPayload(container);
+	const match = findHostNodeIdForTarget(container, view, element, (hostNodeId) =>
+		view.keyedRepeats?.find(
+			(record) =>
+				record.parentHostNodeId === hostNodeId &&
+				record.rowEvents.some((event) => event.eventName === eventName),
+		),
 	);
-	if (!repeat) throw new Error(`Expected keyed repeat row event for ${eventName}.`);
-	return { hostNodeId: repeat.parentHostNodeId, eventName, recordKind: 'keyed-repeat-row' };
+	if (match) return { hostNodeId: match.hostNodeId, eventName, recordKind: 'keyed-repeat-row' };
+	throw new Error(`Expected keyed repeat row event for ${eventName} on clicked element or ancestor.`);
+}
+
+function findHostNodeIdForTarget<T>(
+	root: HTMLElement, view: PayloadRecordInventory, element: HTMLElement, matches: (hostNodeId: string) => T | undefined,
+): { hostNodeId: string; value: T } | undefined {
+	const elements: HTMLElement[] = [];
+	const visit = (node: Node): void => {
+		if (node.nodeType === Node.ELEMENT_NODE) elements.push(node as HTMLElement);
+		for (const child of Array.from(node.childNodes)) visit(child);
+	};
+	visit(root);
+	const byHostId = new Map<string, HTMLElement>();
+	// Mirrors packages/web/src/event-only-resume.ts materializeDomLocators/collectElements.
+	for (const locator of view.locators ?? []) {
+		const element = elements[locator.index];
+		if (!element) continue;
+		const tagName = (locator as { readonly tagName?: string }).tagName;
+		if (tagName && tagName !== '*' && element.tagName.toLowerCase() !== tagName.toLowerCase()) continue;
+		byHostId.set(locator.hostNodeId, element);
+	}
+	for (let current: HTMLElement | null = element; current; current = current.parentElement) {
+		for (const [hostNodeId, candidate] of byHostId) {
+			const value = candidate === current ? matches(hostNodeId) : undefined;
+			if (value) return { hostNodeId, value };
+		}
+	}
 }
 
 function requireElement<T extends Element>(container: HTMLElement, selector: string): T {
