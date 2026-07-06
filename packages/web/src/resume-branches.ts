@@ -18,7 +18,7 @@ export function wireBranches(input: any) {
 			return [{ type: 'removeRange', locator: `branch:${branch.id}` }, { type: 'insertRange', locator: `branch:${branch.id}:start`, fragment }] as DomJournalResult;
 		} }));
 	}
-	for (const branch of branchesById.values()) { const arm = currentArmByBranchId.get(branch.id); if (arm !== undefined) startupArmBehaviorHostIds.push(...materializeBranchArmRecords(input, branch, arm)); }
+	for (const branch of branchesById.values()) { const arm = currentArmByBranchId.get(branch.id); if (arm !== undefined && !input.skipStartupBranchIds?.has(branch.id)) startupArmBehaviorHostIds.push(...materializeBranchArmRecords(input, branch, arm)); }
 	async function materializeFlippedBranchArms(entries: ReadonlyArray<DomJournalEntry>, activate: (hostNodeId: string) => Promise<void>): Promise<void> {
 		for (const entry of entries) { if (entry.type !== 'insertRange' || !entry.locator.startsWith('branch:') || !entry.locator.endsWith(':start')) continue;
 			const branchId = entry.locator.slice('branch:'.length, -':start'.length), branch = branchesById.get(branchId), arm = currentArmByBranchId.get(branchId); if (!branch || arm === undefined) continue;

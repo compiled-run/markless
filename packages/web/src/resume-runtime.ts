@@ -1,6 +1,6 @@
 import type { DomJournalEntry, DomJournalResult } from '@markless/runtime';
 import type {
-	ResumeAsyncBoundaryRecord, ResumeBehaviorRecord, ResumeDispatchOptions, ResumeDomElement, ResumeDomEvent, ResumePreparedCore, ResumeRuntime, ResumeRuntimeErrorContext, ResumeRuntimeInput, ResumeSharedPatchDispatcher,
+	ResumeAsyncBoundaryRecord, ResumeBehaviorRecord, ResumeBranchRecord, ResumeDispatchOptions, ResumeDomElement, ResumeDomEvent, ResumePreparedCore, ResumeRuntime, ResumeRuntimeErrorContext, ResumeRuntimeInput, ResumeSharedPatchDispatcher,
 } from './resume-types.ts';
 
 const SHARED_PATCH_EVENT_TYPE = 'async:shared-patch';
@@ -13,7 +13,7 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 	const eventTypes = new Set<string>(), disposedHosts = new Set<string>();
 	const hostSubscriptionReleases = new Map<string, Array<() => void>>(), containerSubscriptionReleases: Array<() => void> = [];
 	let asyncBoundariesById = prepared.asyncBoundariesById;
-	let behaviorRuntime: BehaviorRuntime | undefined, branchRuntime: BranchRuntime | undefined;
+	let behaviorRuntime: BehaviorRuntime | undefined, branchRuntime: BranchRuntime | undefined, syncComputedRuntimeWired = false;
 	const branchesById = new Map<string, {
 		readonly id: string; readonly startAnchor: import('./resume-types.ts').ResumeDomComment;
 		readonly endAnchor: import('./resume-types.ts').ResumeDomComment; readonly symbolId: string;
@@ -22,6 +22,7 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 	}>();
 	let events: EventWiring | undefined, fallbackSharedPatchDispatcher: ResumeSharedPatchDispatcher | undefined;
 	const behaviorHostIds = new Set(input.view.behaviors.map((behavior) => behavior.hostNodeId));
+	const demandBranchArmById = new Map<string, number>();
 
 	const storeHostSubscription = (hostNodeId: string, release: () => void) => {
 		if (typeof release !== 'function') return;
@@ -31,8 +32,9 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 	const storeContainerSubscription = (release: () => void) => { if (typeof release === 'function') containerSubscriptionReleases.push(release); };
 	const flushRuntimeGraph = async () => {
 		await input.graph.flush();
+		const patches = input.graph.takeSharedPatches?.() ?? []; if (patches.length === 0) return;
 		const dispatchSharedPatch = await getSharedPatchDispatcher(); if (!dispatchSharedPatch) return;
-		for (const patch of input.graph.takeSharedPatches()) {
+		for (const patch of patches) {
 			const result = dispatchSharedPatch(patch); if (isPromiseLike(result)) await result;
 		}
 	};
@@ -87,6 +89,18 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 		});
 		return behaviorRuntime;
 	}
+	async function loadBranchRuntime(options: { readonly skipStartupBranchIds?: ReadonlySet<string> } = {}): Promise<BranchRuntime> {
+		if (branchRuntime) return branchRuntime;
+		const eventTypesBefore = new Set(eventTypes), behaviors = await loadBehaviorRuntime();
+		branchRuntime = (await import('./resume-branches.ts')).wireBranches({
+			root: input.root, graph: input.graph, view: input.view, loadSymbol: input.loadSymbol, renderBranchHtml: input.renderBranchHtml, elementsByHostId, disposedHosts, elementHandles, events: await getEvents(), eventTypes, storeContainerSubscription, storeHostSubscription, addBehaviorRecords: behaviors.addBehaviorRecords,
+			skipStartupBranchIds: options.skipStartupBranchIds,
+		});
+		for (const eventType of eventTypes) if (!eventTypesBefore.has(eventType)) input.root.addEventListener?.(eventType, events!.dispatch, { capture: true });
+		for (const hostNodeId of branchRuntime.startupArmBehaviorHostIds) await behaviorRuntime?.activateBehaviors(hostNodeId, { flush: false });
+		if (branchRuntime.startupArmBehaviorHostIds.length > 0) await flushRuntimeGraph();
+		return branchRuntime;
+	}
 	function pendingBehaviorHostIdsForAncestors(element: ResumeDomElement | undefined): string[] {
 		const ids: string[] = [];
 		for (let current = element; current; current = current.parentElement ?? undefined) {
@@ -113,6 +127,30 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 			if (boundary.updateSymbolId) for (const asyncRead of boundary.asyncReads) input.graph.read(asyncRead.graphNodeId, ['status']);
 		}
 	}
+	function wireBranchDemandTriggersWithoutLoadingCapability(): void {
+		const comments = walkComments(input.root);
+		for (const branch of input.view.branches ?? []) { if (!branch.symbolId || !branch.testReads?.length) continue;
+			const startAnchor = comments[branch.startAnchor.index], endAnchor = comments[branch.endAnchor.index]; if (!startAnchor || !endAnchor) continue;
+			const record: ResumeBranchRecord = { id: branch.id, startAnchor, endAnchor, symbolId: branch.symbolId, testReads: branch.testReads, armTests: branch.armTests, armRecords: branch.armRecords };
+			branchesById.set(record.id, record); demandBranchArmById.set(record.id, readBranchArm(record));
+			for (const testRead of record.testReads) storeContainerSubscription(input.graph.subscribe({ id: `branch-demand:${record.id}:${testRead.graphNodeId}:${testRead.path.join('.')}`, graphNodeId: testRead.graphNodeId, path: testRead.path, async run() {
+				if (branchRuntime) return; const newArm = readBranchArm(record); if (newArm === demandBranchArmById.get(record.id)) return;
+				demandBranchArmById.set(record.id, newArm); await loadBranchRuntime({ skipStartupBranchIds: new Set([record.id]) });
+				const update = await (await input.loadSymbol(record.symbolId))({ graph: input.graph, arm: newArm, element: input.root, getElementHandle: elementHandles.get });
+				if (!isResumeBranchUpdate(update)) return; const fragment = input.renderBranchHtml ? input.renderBranchHtml(update.html) : update.html;
+				return [{ type: 'removeRange', locator: `branch:${record.id}` }, { type: 'insertRange', locator: `branch:${record.id}:start`, fragment }] as DomJournalResult;
+			} }));
+		}
+	}
+	function wireSyncComputedDemandTriggersWithoutLoadingCapability(): void {
+		const records = (input.state?.computed ?? []).filter((computed) => computed.async === false && typeof (computed as { readonly deriveSymbolId?: unknown }).deriveSymbolId === 'string') as Array<NonNullable<ResumeRuntimeInput['state']>['computed'][number] & { readonly deriveSymbolId: string }>;
+		for (const computed of records) for (const dependency of computed.dependencies ?? []) storeContainerSubscription(input.graph.subscribe({
+			id: `sync-computed-demand:${computed.graphNodeId}:${dependency.graphNodeId}:${dependency.path.join('.')}`,
+			graphNodeId: dependency.graphNodeId,
+			path: dependency.path,
+			async run() { if (syncComputedRuntimeWired) return; syncComputedRuntimeWired = true; (await import('./resume-sync-computed.ts')).wireSyncComputed({ graph: input.graph, state: input.state, root: input.root, loadSymbol: input.loadSymbol, elementHandles, storeContainerSubscription }); },
+		}));
+	}
 	async function settleAsyncBoundaryRange(boundary: ResumeAsyncBoundaryRecord, snapshot: unknown): Promise<DomJournalResult | void> {
 		const status = (snapshot as { readonly status?: unknown } | null)?.status;
 		if (status !== 'fulfilled' && status !== 'rejected') return;
@@ -121,33 +159,6 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 		if (!isResumeBranchUpdate(update)) return;
 		const fragment = input.renderBranchHtml ? input.renderBranchHtml(update.html) : update.html;
 		return [{ type: 'removeRange', locator: `async-boundary:${boundary.id}` }, { type: 'insertRange', locator: `async-boundary:${boundary.id}:start`, fragment }];
-	}
-	function wireSimpleBranchesWithoutLoadingCapability(): void {
-		const comments = walkComments(input.root), currentArmByBranchId = new Map<string, number>();
-		for (const branch of input.view.branches ?? []) {
-			if (!branch.symbolId || !branch.testReads?.length || hasMeaningfulBranchArmRecords(branch)) continue;
-			const startAnchor = comments[branch.startAnchor.index], endAnchor = comments[branch.endAnchor.index];
-			if (!startAnchor || !endAnchor) continue;
-			const record = { id: branch.id, startAnchor, endAnchor, symbolId: branch.symbolId, testReads: branch.testReads, armTests: branch.armTests };
-			branchesById.set(branch.id, record);
-			let currentArm = readBranchArm(record);
-			currentArmByBranchId.set(branch.id, currentArm);
-			for (const testRead of record.testReads) storeContainerSubscription(input.graph.subscribe({
-				id: `branch-test:${record.id}:${testRead.graphNodeId}:${testRead.path.join('.')}`,
-				graphNodeId: testRead.graphNodeId,
-				path: testRead.path,
-				async run() {
-					const newArm = readBranchArm(record);
-					if (newArm === currentArm) return;
-					const symbol = await input.loadSymbol(record.symbolId);
-					const update = await symbol({ graph: input.graph, arm: newArm, element: input.root, getElementHandle: elementHandles.get });
-					if (!isResumeBranchUpdate(update)) return;
-					currentArm = update.arm; currentArmByBranchId.set(record.id, update.arm);
-					const fragment = input.renderBranchHtml ? input.renderBranchHtml(update.html) : update.html;
-					return [{ type: 'removeRange', locator: `branch:${record.id}` }, { type: 'insertRange', locator: `branch:${record.id}:start`, fragment }] as DomJournalResult;
-				},
-			}));
-		}
 	}
 	function readBranchArm(branch: { readonly testReads: ReadonlyArray<{ readonly graphNodeId: string; readonly path: ReadonlyArray<string> }>; readonly armTests?: ReadonlyArray<unknown> }): number {
 		const read = branch.testReads[0]!, value = input.graph.read(read.graphNodeId, read.path);
@@ -179,16 +190,11 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 		await events.prepareSyncPolicy(input.view.events, rowEvents);
 		if (input.applyDomJournal) storeContainerSubscription(input.graph.subscribeJournal(async (entries) => {
 			await disposeRemovedAsyncRangeHosts(entries);
-			if (entries.some((entry) => entry.type === 'removeRange' && entry.locator.startsWith('branch:'))) {
-				await disposeRemovedSimpleBranchRangeHosts(entries);
-			}
 			branchRuntime?.disposeRemovedRangeHosts(entries, disposeHost, asyncBoundariesById);
 			await input.applyDomJournal!(entries);
 			await branchRuntime?.materializeFlippedBranchArms(entries, (hostNodeId) => behaviorRuntime!.activateBehaviors(hostNodeId, { flush: false }));
 		}));
-		if (input.state && (await import('./resume-sync-computed.ts')).hasSyncComputed(input.state)) {
-			(await import('./resume-sync-computed.ts')).wireSyncComputed({ graph: input.graph, state: input.state, root: input.root, loadSymbol: input.loadSymbol, elementHandles, storeContainerSubscription });
-		}
+		wireSyncComputedDemandTriggersWithoutLoadingCapability();
 		if ((input.view.keyedRepeats ?? []).length > 0) {
 			(await import('./resume-keyed-repeats.ts')).wireKeyedRepeats({ graph: input.graph, view: input.view, elementsByHostId, events, storeContainerSubscription });
 		}
@@ -196,15 +202,9 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 		if (input.view.events.some((event) => event.eventName === 'visible')) {
 			const behaviors = await loadBehaviorRuntime(); behaviors.installVisibilityObserver(); behaviors.installRemovalObserver();
 		}
-		if ((input.view.branches ?? []).some(hasMeaningfulBranchArmRecords)) {
-			const behaviors = await loadBehaviorRuntime();
-			branchRuntime = (await import('./resume-branches.ts')).wireBranches({ root: input.root, graph: input.graph, view: input.view, loadSymbol: input.loadSymbol, renderBranchHtml: input.renderBranchHtml, elementsByHostId, disposedHosts, elementHandles, events, eventTypes, storeContainerSubscription, storeHostSubscription, addBehaviorRecords: behaviors.addBehaviorRecords });
-		}
-		wireSimpleBranchesWithoutLoadingCapability();
+		wireBranchDemandTriggersWithoutLoadingCapability();
 		for (const eventType of eventTypes) input.root.addEventListener?.(eventType, events.dispatch, { capture: true });
 		if ((input.graph.listSharedDefinitions?.() ?? []).length > 0) input.root.addEventListener?.(SHARED_PATCH_EVENT_TYPE, receiveSharedPatch, { capture: true });
-		for (const hostNodeId of branchRuntime?.startupArmBehaviorHostIds ?? []) await behaviorRuntime?.activateBehaviors(hostNodeId, { flush: false });
-		if ((branchRuntime?.startupArmBehaviorHostIds.length ?? 0) > 0) await flushRuntimeGraph();
 	}
 	return {
 		start,
@@ -226,23 +226,6 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 			const removed = locators.elementsBetweenAnchors(input.root, boundary.startAnchor, boundary.endAnchor);
 			for (const id of locators.hostIdsInsideRemovedElements(elementsByHostId, removed)) disposeHost(id);
 		}
-	}
-	async function disposeRemovedSimpleBranchRangeHosts(entries: ReadonlyArray<DomJournalEntry>): Promise<void> {
-		let locators: typeof import('./resume-locators.ts') | undefined;
-		for (const entry of entries) {
-			if (entry.type !== 'removeRange' || !entry.locator.startsWith('branch:')) continue;
-			const branch = branchesById.get(entry.locator.slice('branch:'.length)); if (!branch) continue;
-			locators ??= await import('./resume-locators.ts');
-			const removed = locators.elementsBetweenAnchors(input.root, branch.startAnchor, branch.endAnchor);
-			for (const id of locators.hostIdsInsideRemovedElements(elementsByHostId, removed)) disposeHost(id);
-		}
-	}
-
-	function hasMeaningfulBranchArmRecords(branch: NonNullable<ResumeRuntimeInput['view']['branches']>[number]): boolean {
-		return (branch.armRecords ?? []).some((arm) =>
-			arm.events.length > 0 || arm.domUpdates.length > 0 ||
-			arm.behaviors.length > 0 || arm.elementHandles.length > 0,
-		);
 	}
 	function isResumeBranchUpdate(value: unknown): value is { readonly arm: number; readonly html: string } {
 		const update = value as { readonly arm?: unknown; readonly html?: unknown } | null;
