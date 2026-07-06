@@ -73,6 +73,11 @@ export type SsrRenderResult = {
 	readonly asFragment: () => unknown;
 };
 
+export type SsrPhasedRenderResult = {
+	readonly html: string;
+	readonly mount: (options?: SsrRenderHtmlOptions) => SsrRenderResult;
+};
+
 // Marker rewritten by the testSSR() vitest plugin into the Node-side
 // commands.renderSSR RPC plus renderServerHTML(). Calling it untransformed
 // means the browser project is missing the plugin, so fail loudly.
@@ -82,6 +87,19 @@ export function renderSSR(component: unknown): Promise<SsrRenderResult> {
 		'renderSSR(Component) was not transformed. Add testSSR() from ' +
 			'@markless/vitest-browser/ssr-plugin to the browser test project plugins ' +
 			'(before the markless plugin). v1 supports renderSSR(Component) with a ' +
+			'component imported from a separate .tsrx module and no props.',
+		);
+}
+
+// Marker rewritten by testSSR() into the same Node-side render command as
+// renderSSR(), but leaves client mounting explicit so tests can reset
+// instrumentation between server render and browser load.
+export function renderSSRPhased(component: unknown): Promise<SsrPhasedRenderResult> {
+	void component;
+	throw new Error(
+		'renderSSRPhased(Component) was not transformed. Add testSSR() from ' +
+			'@markless/vitest-browser/ssr-plugin to the browser test project plugins ' +
+			'(before the markless plugin). v1 supports renderSSRPhased(Component) with a ' +
 			'component imported from a separate .tsrx module and no props.',
 	);
 }

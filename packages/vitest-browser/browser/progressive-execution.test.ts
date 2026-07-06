@@ -5,7 +5,12 @@ import {
 	forbiddenExecutedModules,
 	type PayloadRecordInventory,
 } from '../../bundler/test-support/execution-expectations.ts';
-import { cleanup, renderSSR } from '../src/index.ts';
+import {
+	cleanup,
+	renderSSRPhased,
+	type SsrPhasedRenderResult,
+	type SsrRenderResult,
+} from '../src/index.ts';
 import EventOnly from './fixtures/progressive-event-only.tsrx';
 import FullTier from './fixtures/progressive-full-tier.tsrx';
 import PlainVsBehavior from './fixtures/progressive-plain-vs-behavior.tsrx';
@@ -18,23 +23,26 @@ declare global {
 afterEach(() => cleanup());
 
 test('progressive execution: load executes zero runtime modules for full and event-only tiers', async () => {
-	const full = await renderSSR(FullTier);
+	const fullRender = await renderSSRPhased(FullTier);
+	resetExecutedModules();
+	const full = fullRender.mount();
 	await expect.poll(() => full.container.querySelector('[data-async-container]')).not.toBeNull();
 	expect.soft(executedModules()).toEqual([]);
 
 	await cleanup();
-	const eventOnly = await renderSSR(EventOnly);
+	const eventOnlyRender = await renderSSRPhased(EventOnly);
+	resetExecutedModules();
+	const eventOnly = eventOnlyRender.mount();
 	await expect.poll(() => eventOnly.container.querySelector('[data-async-container]')).not.toBeNull();
 	expect.soft(executedModules()).toEqual([]);
 });
 
 test('progressive execution: counter dispatch executes only the event dispatch core path', async () => {
-	const screen = await renderSSR(EventOnly);
+	const screen = await renderProgressiveSSR(renderSSRPhased(EventOnly));
 	const container = screen.container;
 	const button = requireElement<HTMLButtonElement>(container, 'button[data-counter-only]');
 	const view = readViewPayload(container);
 	const action = actionForElement(container, button, 'click');
-	resetExecutedModules();
 
 	button.click();
 	await expect.poll(() => button.textContent).toBe('Count 1');
@@ -46,12 +54,11 @@ test('progressive execution: counter dispatch executes only the event dispatch c
 });
 
 test('progressive execution: row dispatch does not execute unrelated async, branch, or behavior modules', async () => {
-	const screen = await renderSSR(RowMixed);
+	const screen = await renderProgressiveSSR(renderSSRPhased(RowMixed));
 	const container = screen.container;
 	const view = readViewPayload(container);
 	const rowButton = requireElement<HTMLButtonElement>(container, '.mixed-row button');
 	const rowAction = actionForKeyedRepeat(view, 'click');
-	resetExecutedModules();
 
 	rowButton.click();
 	await expect.poll(() => requireElement<HTMLOutputElement>(container, 'output[data-mixed-choice]').textContent)
@@ -67,12 +74,11 @@ test('progressive execution: row dispatch does not execute unrelated async, bran
 });
 
 test('progressive execution: clicking a plain button never executes behavior modules', async () => {
-	const screen = await renderSSR(PlainVsBehavior);
+	const screen = await renderProgressiveSSR(renderSSRPhased(PlainVsBehavior));
 	const container = screen.container;
 	const plain = requireElement<HTMLButtonElement>(container, 'button[data-plain-action]');
 	const view = readViewPayload(container);
 	const action = actionForElement(container, plain, 'click');
-	resetExecutedModules();
 
 	plain.click();
 	await expect.poll(() => requireElement<HTMLOutputElement>(container, 'output[data-plain-label]').textContent)
@@ -85,15 +91,25 @@ test('progressive execution: clicking a plain button never executes behavior mod
 });
 
 test('progressive execution: event-only preventDefault is applied exactly once per dispatch', async () => {
-	const screen = await renderSSR(EventOnly);
+	const screen = await renderProgressiveSSR(renderSSRPhased(EventOnly));
 	const form = requireElement<HTMLFormElement>(screen.container, 'form[data-event-form]');
-	resetExecutedModules();
 
 	const calls = dispatchSubmit(form);
 	await expect.poll(() => requireElement<HTMLButtonElement>(screen.container, 'button[data-submit-count]').textContent)
 		.toContain('1');
 	expect(calls()).toBe(1);
 });
+
+async function renderProgressiveSSR(
+	rendered: Promise<SsrPhasedRenderResult>,
+): Promise<SsrRenderResult> {
+	const phased = await rendered;
+	resetExecutedModules();
+	const screen = phased.mount();
+	await expect.poll(() => screen.container.querySelector('[data-async-container]')).not.toBeNull();
+	resetExecutedModules();
+	return screen;
+}
 
 function readViewPayload(container: HTMLElement): PayloadRecordInventory {
 	const script = container.querySelector<HTMLScriptElement>('script[type="markless/view"]');
