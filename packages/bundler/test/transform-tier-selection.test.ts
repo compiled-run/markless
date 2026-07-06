@@ -47,7 +47,7 @@ test('payload tier selection does not escalate on component edges alone', async 
 
 	const resumeModule = result.virtualModules.find((module) => module.type === 'resume');
 	expect(result.code).not.toContain('resumeEventOnlyFromPayloadDocument');
-	expect(resumeModule?.source).toContain('resumeEventOnlyFromPayloadDocument');
+	expect(resumeModule?.source).toContain('marklessDispatchScalarEvent');
 	expect(result.code).not.toContain('loadFullResume: marklessFullResumeHandoff');
 	expect(result.code).not.toContain("import('@markless/core/web/resume')");
 	expect(result.code).not.toContain(

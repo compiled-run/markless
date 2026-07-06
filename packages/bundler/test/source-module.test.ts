@@ -34,6 +34,8 @@ test('emitSourceModule keeps full resume behind a dynamic handoff', () => {
 	});
 	expect(resumeCode).toContain('export async function resumeContainerEvent');
 	expect(resumeCode).toContain("import('@markless/core/web/resume')");
+	expect(resumeCode).not.toContain('payloadState');
+	expect(resumeCode).not.toContain('payloadView');
 	expect(code).not.toMatch(/^\s*const\s+marklessFullResumeModule\s*=\s*import\(/m);
 	expect(code).not.toContain(
 		"import { resumeFromPayloadDocument } from '@markless/core/web/resume';",
@@ -53,8 +55,10 @@ test('emitSourceModule keeps event-only entries out of the full-runtime graph', 
 	expect(code).not.toContain('resumeEventOnlyFromPayloadDocument');
 	expect(code).not.toContain('export async function resumeContainerEvent');
 	expect(resumeCode).toContain(
-		"const { resumeEventOnlyFromPayloadDocument } = await import('@markless/core/web/event-only-resume');",
+		"const { marklessDispatchScalarEvent } = await import('@markless/web/fns/dispatch-scalar');",
 	);
+	expect(resumeCode).toContain('state: payloadState');
+	expect(resumeCode).toContain('view: payloadView');
 	expect(resumeCode).toContain('export async function resumeContainerEvent');
 	expect(code).not.toContain('loadFullResume: marklessFullResumeHandoff');
 	expect(code).not.toContain("import('@markless/core/web/resume')");

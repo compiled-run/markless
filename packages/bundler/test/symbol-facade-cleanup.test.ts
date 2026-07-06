@@ -143,6 +143,48 @@ describe('generated symbol facade cleanup', () => {
 		expect(bundle['build/symbol-0.js']).toBeDefined();
 	});
 
+	test('keeps import-bearing generated symbol chunks as real symbol chunks', () => {
+		const symbolVirtualId =
+			'\0virtual:markless:symbol:%2Fworkspace%2Fsrc%2Froot.tsrx:symbol%3A0';
+		const bundle = {
+			'build/runtime.js': {
+				type: 'chunk',
+				fileName: 'build/runtime.js',
+				code: 'async function load(id){return import("./symbol-0.js").then((mod)=>mod.symbol_0)}',
+				exports: ['load'],
+				imports: [],
+				dynamicImports: ['build/symbol-0.js'],
+				moduleIds: ['/workspace/src/root.tsrx'],
+			},
+			'build/symbol-0.js': {
+				type: 'chunk',
+				fileName: 'build/symbol-0.js',
+				code: 'import{marklessWriteScalar as w}from"./write-scalar.js";function symbol_0(c){return w(c,"state:count",v=>Number(v)+1)}export{symbol_0};',
+				exports: ['symbol_0'],
+				imports: ['build/write-scalar.js'],
+				dynamicImports: [],
+				moduleIds: [symbolVirtualId],
+				facadeModuleId: symbolVirtualId,
+				isDynamicEntry: true,
+			},
+			'build/write-scalar.js': {
+				type: 'chunk',
+				fileName: 'build/write-scalar.js',
+				code: 'function marklessWriteScalar(){}export{marklessWriteScalar};',
+				exports: ['marklessWriteScalar'],
+				imports: [],
+				dynamicImports: [],
+				moduleIds: ['/workspace/packages/web/src/fns/write-scalar.ts'],
+			},
+		};
+
+		rewriteGeneratedSymbolFacadeImports(bundle);
+
+		expect(bundle['build/runtime.js']?.code).toContain('./symbol-0.js');
+		expect(bundle['build/runtime.js']?.dynamicImports).toEqual(['build/symbol-0.js']);
+		expect(bundle['build/symbol-0.js']).toBeDefined();
+	});
+
 	test('shortens generated symbol chunk init export aliases', () => {
 		const symbolVirtualId =
 			'\0virtual:markless:symbol:%2Fworkspace%2Fsrc%2Froot.tsrx:symbol%3A0';

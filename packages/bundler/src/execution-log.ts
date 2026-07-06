@@ -154,6 +154,8 @@ export function executionLogActivationInjection(mode: MarklessExecutionLogMode |
 
 function runtimeLogId(id: string): string | null {
 	const path = id.startsWith('\0') ? id.slice(1) : id;
+	const virtualIndex = path.indexOf('virtual:markless:');
+	if (virtualIndex >= 0 && !path.endsWith('.css')) return path.slice(virtualIndex);
 	const match = path.match(/[/\\](web|runtime|serializer)[/\\]src[/\\]([^?#]+)\.ts$/);
 	return match ? `${match[1]}:${match[2]!.replace(/[/\\]/g, '/')}` : null;
 }
