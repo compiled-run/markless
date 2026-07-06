@@ -102,7 +102,10 @@ function headLinkTag(injection: GlobalInjections): string {
 	const attributes = Object.entries(injection.attributes ?? {}).map(
 		([name, value]) => `${name}="${value.replaceAll('"', '&quot;')}"`,
 	);
-	return `<${injection.tag} ${attributes.join(' ')}>`;
+	const open = attributes.length > 0 ? `<${injection.tag} ${attributes.join(' ')}>` : `<${injection.tag}>`;
+	return injection.children === undefined
+		? open
+		: `${open}${injection.children}</${injection.tag}>`;
 }
 
 function isHtmlAssetWithSource(output: unknown): output is {

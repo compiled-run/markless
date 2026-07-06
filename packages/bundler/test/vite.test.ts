@@ -77,7 +77,7 @@ describe('Vite adapter structure', () => {
 			'/workspace/app/src/App.tsrx',
 			createViteHookContext('client'),
 		);
-		callGenerateBundle(
+		await callGenerateBundle(
 			plugin,
 			{
 				'index.html': html,
@@ -232,7 +232,9 @@ describe('Vite adapter structure', () => {
 			root: '/workspace/app',
 		});
 
-		expect(callTransformIndexHtml(plugin, '<html></html>')).toBeUndefined();
+		expect(callTransformIndexHtml(plugin, '<html></html>')).toEqual([
+			expect.objectContaining({ tag: 'script', injectTo: 'head' }),
+		]);
 		expect(await callResolveId(plugin, 'virtual:markless-dev-client')).toBeNull();
 		expect(await callLoad(plugin, '\0virtual:markless-dev-client')).toBeNull();
 	});

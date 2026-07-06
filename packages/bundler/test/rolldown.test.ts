@@ -488,7 +488,7 @@ let count = state(0);
 		expect(await callLoad(plugin, `\0${payloadId}`)).toBeNull();
 		const emitFile = vi.fn();
 		const symbolId = `virtual:markless:symbol:${encoded}:${encodeURIComponent('symbol:0')}`;
-		callGenerateBundle(
+		await callGenerateBundle(
 			plugin,
 			{
 				'build/chunk-0.js': {
@@ -547,7 +547,7 @@ let count = state(0);
 			]),
 		);
 
-		callGenerateBundle(plugin, bundle, emitFile);
+		await callGenerateBundle(plugin, bundle, emitFile);
 
 		const graphAsset = emittedAsset(emitFile, MARKLESS_BUNDLE_GRAPH);
 		const graph = JSON.parse(String(graphAsset?.source)) as Array<string | number>;

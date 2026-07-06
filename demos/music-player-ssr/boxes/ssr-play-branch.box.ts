@@ -55,6 +55,7 @@ export default box(
 		await expect.page.text(page, PLAY_ICON, PLAYING_ICON, WAIT);
 		await expect.page.attribute(page, PLAY_TOGGLE, 'class', 'play active', WAIT);
 		await expect.page.attribute(page, '.youtube-frame-host', 'data-command', 'play', WAIT);
+		await waitForLogInteractionAttribute(page, 1, WAIT);
 		const afterClickScripts = await jsBuildRequestPaths(page);
 		const lazyChunks = afterClickScripts.filter((path) => !startupScripts.includes(path));
 		receipt.note(`ssr play-branch post-click lazy JS: ${formatPaths(lazyChunks)}`);
@@ -70,6 +71,7 @@ export default box(
 		await expect.page.text(page, PLAY_ICON, PAUSED_ICON, WAIT);
 		await expect.page.attribute(page, PLAY_TOGGLE, 'class', 'play', WAIT);
 		await expect.page.attribute(page, '.youtube-frame-host', 'data-command', 'pause', WAIT);
+		await waitForLogInteractionAttribute(page, 2, WAIT);
 
 		// Track navigation exercises composed events and dom updates deeper in
 		// the tree (also absorbed from the retired tmp-ssr box).
@@ -136,6 +138,24 @@ async function waitForLogSummaryAttribute(
 		await new Promise((resolve) => setTimeout(resolve, 25));
 	}
 	throw new Error('Expected data-markless-log-summary to mirror the resume summary.');
+}
+
+async function waitForLogInteractionAttribute(
+	page: ContentPage,
+	count: number,
+	options: { readonly timeoutMs: number },
+): Promise<void> {
+	const started = Date.now();
+	const countPattern = new RegExp(`data-markless-log-interactions="${count}"`);
+	const lastPattern = /data-markless-log-last="markless: click \[[^"]+\] · woke \d+ modules · ran warm \d+ modules · \d+(?:\.\d+)? KB"/;
+	while (Date.now() - started < options.timeoutMs) {
+		const html = await page.content();
+		if (countPattern.test(html) && lastPattern.test(html) && !/data-markless-log-last="[^"]*est\./.test(html)) {
+			return;
+		}
+		await new Promise((resolve) => setTimeout(resolve, 25));
+	}
+	throw new Error(`Expected interaction ${count} to mirror a real-KB execution log line.`);
 }
 
 async function jsBuildRequestPaths(page: NetworkRequestPage): Promise<readonly string[]> {

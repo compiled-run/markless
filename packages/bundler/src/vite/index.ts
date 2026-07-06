@@ -10,6 +10,7 @@ import type {
 import type { OutputOptions } from 'rolldown';
 import { joinURL, parsePath } from 'ufo';
 import { createPreloadGraphAdder } from '../build/bundle-graph.ts';
+import { executionLogActivationInjection } from '../execution-log.ts';
 import { outputDefaults } from '../build/chunking.ts';
 import { createMarklessRolldownPlugin } from '../rolldown.ts';
 import {
@@ -145,7 +146,16 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 			hmr.configureServer(server);
 		},
 		transformIndexHtml() {
-			return hmr.transformIndexHtml();
+			const hmrResult = hmr.transformIndexHtml();
+			const injection = executionLogActivationInjection(rolldownOptions.executionLog);
+			if (!injection) return hmrResult;
+			const tag = {
+				tag: injection.tag,
+				injectTo: injection.location,
+				attrs: injection.attributes,
+				children: injection.children,
+			};
+			return Array.isArray(hmrResult) ? [...hmrResult, tag] : [tag];
 		},
 		resolveId: {
 			order: 'pre',

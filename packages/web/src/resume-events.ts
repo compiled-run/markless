@@ -1,4 +1,5 @@
 import type { RuntimeGraph } from '@markless/runtime';
+import { describeMarklessEventTarget } from './execution-log-target.ts';
 import type { ElementHandleRegistry, ResumeDispatchOptions, ResumeDomElement, ResumeDomEvent, ResumeEventRecord, ResumeKeyedRepeatRecord, ResumeKeyedRepeatRowEvent, ResumeRuntimeErrorContext, ResumeRuntimeInput } from './resume-types.ts';
 
 export type ResumeRowEventMatch = { readonly repeat: ResumeKeyedRepeatRecord; readonly parent: ResumeDomElement; readonly rowRoot: ResumeDomElement; readonly rowKey: unknown; readonly rowEvent: ResumeKeyedRepeatRowEvent };
@@ -13,7 +14,10 @@ type ExecutionLogGlobal = typeof globalThis & {
 		readonly before?: ReadonlySet<string>;
 		readonly after?: ReadonlySet<string>;
 		readonly view: ResumeRuntimeInput['view'];
-	}) => void;
+		readonly selector?: string;
+		readonly dispatchModuleId?: string;
+		readonly noMatch?: boolean;
+	}) => void | Promise<void>;
 };
 
 export function createEventWiring(input: {
@@ -40,7 +44,19 @@ export function createEventWiring(input: {
 	async function dispatch(event: ResumeDomEvent, options: ResumeDispatchOptions = {}): Promise<void> {
 		const beforeExecution = marklessExecutionLogSnapshot();
 		const target = event.target; if (!target) return;
-		const matched = findDispatchMatch(target, event.type, eventRecords, rowEventRecords); if (!matched) return;
+		const selector = describeMarklessEventTarget(target);
+		const matched = findDispatchMatch(target, event.type, eventRecords, rowEventRecords); if (!matched) {
+			await marklessLogInteraction({
+				eventName: event.type,
+				eventRecord: null,
+				before: beforeExecution,
+				view: input.view,
+				selector,
+				noMatch: true,
+				dispatchModuleId: 'web:resume-events',
+			});
+			return;
+		}
 		if ('rowMatch' in matched) return dispatchRowEvent(matched.element, matched.rowMatch, event, options);
 		const { element, eventRecord } = matched;
 		if (eventRecord.syncPolicy && !options.syncPolicyAlreadyApplied) runPolicy?.(eventRecord.syncPolicy, input.graph, event);
@@ -58,6 +74,8 @@ export function createEventWiring(input: {
 				eventRecord,
 				before: beforeExecution,
 				view: input.view,
+				selector,
+				dispatchModuleId: 'web:resume-events',
 			});
 		}
 	}
@@ -80,6 +98,8 @@ export function createEventWiring(input: {
 				eventRecord: rowEvent,
 				before: beforeExecution,
 				view: input.view,
+				selector: describeMarklessEventTarget(element),
+				dispatchModuleId: 'web:resume-events',
 			});
 		}
 	}
@@ -96,16 +116,19 @@ async function marklessLogInteraction(input: {
 	readonly eventRecord?: ResumeEventRecord | ResumeKeyedRepeatRowEvent | null;
 	readonly before?: ReadonlySet<string>;
 	readonly view: ResumeRuntimeInput['view'];
+	readonly selector?: string;
+	readonly dispatchModuleId?: string;
+	readonly noMatch?: boolean;
 }): Promise<void> {
 	const global = globalThis as ExecutionLogGlobal;
 	if (!global.__mxLog) return;
 	if (global.__mxLogInteraction) {
-		global.__mxLogInteraction({ ...input, after: new Set(global.__mxLog) });
+		await global.__mxLogInteraction({ ...input, after: new Set(global.__mxLog) });
 		return;
 	}
 	try {
 		const log = await global.__mxLoadLog?.();
-		log?.logMarklessInteraction?.({ ...input, after: new Set(global.__mxLog) });
+		await log?.logMarklessInteraction?.({ ...input, after: new Set(global.__mxLog) });
 	} catch {
 		// Execution logging is observability only; app dispatch must not depend on it.
 	}
