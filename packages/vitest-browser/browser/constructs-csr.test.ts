@@ -30,6 +30,12 @@ function requireElement<T extends Element>(container: HTMLElement, selector: str
 	return element;
 }
 
+function elementOrder(container: HTMLElement): string[] {
+	return Array.from(container.querySelectorAll('*')).map((element) =>
+		element.tagName.toLowerCase(),
+	);
+}
+
 test('CSR: input and click events both drive the same state text binding', async () => {
 	const screen = await render(InputEcho);
 	const container = queryContainer(screen.container);
@@ -247,6 +253,8 @@ test('CSR: static children projection renders inside the wrapping component', as
 	// is deferred; this test flips green when it lands.
 	const screen = await render(ProjectedCard);
 	const container = queryContainer(screen.container);
+
+	expect(elementOrder(container)).toEqual(['main', 'section', 'p', 'h2', 'button', 'output']);
 
 	// Spec 01: children place as an opaque template projection.
 	const projected = container.querySelector('section.card p.projected');
