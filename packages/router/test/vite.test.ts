@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { expect, test } from 'vitest';
 import { nitro } from 'nitro/vite';
 import type { Plugin } from 'vite';
@@ -221,6 +222,18 @@ test('preserves router resume entry exports for preview resume', () => {
 	expect(input[0]).toContain('virtual:markless-router/resume-entry');
 	expect(input.join('\n')).toContain('virtual:markless-router/navigation-entry');
 	expect(clientConfig.build.rolldownOptions.preserveEntrySignatures).toBe('exports-only');
+});
+
+test('router resume entry imports TSRX virtual resume modules instead of page modules', async () => {
+	const source = await readFile(
+		new URL('../src/vite/entries/resume-entry.ts', import.meta.url),
+		'utf8',
+	);
+
+	expect(source).toContain("query: '?markless-resume'");
+	expect(source).toContain('tsrxResumeModuleLoaders');
+	expect(source).not.toContain("import.meta.glob(['/pages/**/*.tsrx', '/pages/**/*.mdx'])");
+	expect(source).not.toContain('pageModule.resumeContainerEvent');
 });
 
 test('scopes router virtual entry modules by resolved Vite root', () => {

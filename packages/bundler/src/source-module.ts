@@ -50,6 +50,11 @@ export function emitSourceModule(input: {
 	readonly environment: MarklessEnvironment;
 	readonly clientOutput: MarklessClientOutput;
 	readonly resumeModuleUrl?: string;
+	readonly headInjections?: ReadonlyArray<{
+		readonly tag: string;
+		readonly attributes?: Record<string, string>;
+		readonly location: 'head' | 'body';
+	}>;
 	readonly needsFullResume?: boolean;
 	readonly publicRenderModuleSource: string;
 	readonly publicRenderRootExportName: string | null;
@@ -87,6 +92,7 @@ export function emitSourceModule(input: {
 			? ''
 			: emitCompiledAppDefault({
 					environment: input.environment,
+					headInjections: input.headInjections,
 					resumeModuleUrl: input.resumeModuleUrl,
 					rootExportName: input.publicRenderRootExportName,
 					csrExportName: input.publicRenderCsrExportName,
@@ -154,6 +160,11 @@ function symbolRouteImportSource(importSource: string): string {
 
 function emitCompiledAppDefault(input: {
 	readonly environment: MarklessEnvironment;
+	readonly headInjections?: ReadonlyArray<{
+		readonly tag: string;
+		readonly attributes?: Record<string, string>;
+		readonly location: 'head' | 'body';
+	}>;
 	readonly resumeModuleUrl?: string;
 	readonly rootExportName: string | null;
 	readonly csrExportName: string | null;
@@ -171,6 +182,10 @@ function emitCompiledAppDefault(input: {
 		input.resumeModuleUrl && input.environment !== 'client'
 			? [`	resumeModuleUrl: ${JSON.stringify(input.resumeModuleUrl)},`]
 			: [];
+	const headInjectionEntry =
+		input.headInjections?.length && input.environment !== 'client'
+			? [`	headInjections: ${JSON.stringify(input.headInjections)},`]
+			: [];
 	const modulePreloadEntry =
 		input.resumeModuleUrl && input.environment === 'server'
 			? [
@@ -180,7 +195,7 @@ function emitCompiledAppDefault(input: {
 	const metadataEntries =
 		input.environment === 'client'
 			? []
-			: [...resumeModuleEntry, ...modulePreloadEntry, '	payloadView,'];
+			: [...headInjectionEntry, ...resumeModuleEntry, ...modulePreloadEntry, '	payloadView,'];
 
 	return [
 		'const marklessCompiledApp = {',

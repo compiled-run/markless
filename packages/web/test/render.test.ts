@@ -1025,9 +1025,9 @@ test('renderToString emits ordered modulepreload links before interactive payloa
 	expect(html.indexOf('rel="modulepreload"')).toBeLessThan(html.indexOf('data-async-resumer'));
 });
 
-test('renderToString uses compiled artifact modulepreloads by default', async () => {
-	const html = await renderToString({
-		modulePreloads: [{ href: '/src/App.tsrx?import', fetchPriority: 'high' }],
+	test('renderToString uses compiled artifact modulepreloads by default', async () => {
+		const html = await renderToString({
+			modulePreloads: [{ href: '/src/App.tsrx?import', fetchPriority: 'high' }],
 		resumeModuleUrl: '/src/App.tsrx?import',
 		renderSsr: () => ({
 			html: '<button type="button">Count 0</button>',
@@ -1038,10 +1038,30 @@ test('renderToString uses compiled artifact modulepreloads by default', async ()
 
 	expect(html).toContain(
 		'<link rel="modulepreload" href="/src/App.tsrx?import" crossorigin="anonymous" fetchpriority="high">',
-	);
-});
+		);
+	});
 
-test('renderToString uses the compiled artifact resume module URL by default', async () => {
+	test('renderToString emits compiled artifact head injections before the container', async () => {
+		const html = await renderToString({
+			headInjections: [
+				{
+					tag: 'script',
+					location: 'head',
+					attributes: { type: 'module', src: '/@vite/client' },
+				},
+			],
+			renderSsr: () => ({
+				html: '<button type="button">Count 0</button>',
+				state: createProtocolStatePayload({ cells: [] }),
+				view: viewWithClick(),
+			}),
+		});
+
+		expect(html).toContain('<script type="module" src="/@vite/client"></script>');
+		expect(html.indexOf('/@vite/client')).toBeLessThan(html.indexOf('<div'));
+	});
+
+	test('renderToString uses the compiled artifact resume module URL by default', async () => {
 	const resumeModuleUrl = createResumeModuleUrl('artifact-default');
 	const html = await renderToString({
 		resumeModuleUrl,

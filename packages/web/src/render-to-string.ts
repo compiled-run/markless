@@ -16,6 +16,7 @@ export type SsrRenderOutput = {
 
 export type SsrRenderArtifact = {
 	readonly renderSsr: (props?: unknown) => SsrRenderOutput;
+	readonly headInjections?: ReadonlyArray<RenderHeadInjection>;
 	readonly modulePreloads?: ReadonlyArray<ModulePreloadInput>;
 	readonly resumeModuleUrl?: string;
 };
@@ -38,6 +39,12 @@ export type ModulePreloadInput =
 			readonly fetchPriority?: 'high' | 'low' | 'auto';
 			readonly crossOrigin?: 'anonymous' | 'use-credentials';
 	  };
+
+export type RenderHeadInjection = {
+	readonly tag: string;
+	readonly attributes?: Record<string, string>;
+	readonly location: 'head' | 'body';
+};
 
 export async function renderToString(
 	component: SsrRenderable,
@@ -69,6 +76,7 @@ export async function renderToString(
 			: '';
 
 	return [
+		renderHeadInjections(artifactHeadInjections(component), options.nonce),
 		renderModulePreloadLinks(modulePreloads, options.nonce),
 		`<div${renderContainerAttributes(options.containerId)}>`,
 		output.html,
@@ -95,6 +103,37 @@ function artifactModulePreloads(
 	component: SsrRenderable,
 ): ReadonlyArray<ModulePreloadInput> | undefined {
 	return typeof component === 'object' ? component.modulePreloads : undefined;
+}
+
+function artifactHeadInjections(
+	component: SsrRenderable,
+): ReadonlyArray<RenderHeadInjection> | undefined {
+	return typeof component === 'object' ? component.headInjections : undefined;
+}
+
+function renderHeadInjections(
+	injections: ReadonlyArray<RenderHeadInjection> | undefined,
+	nonce: string | undefined,
+): string {
+	if (!injections?.length) return '';
+	return injections
+		.filter((injection) => injection.location === 'head')
+		.map((injection) => renderHeadInjection(injection, nonce))
+		.join('');
+}
+
+function renderHeadInjection(injection: RenderHeadInjection, nonce: string | undefined): string {
+	const attributes = { ...injection.attributes };
+	if (nonce && injection.tag === 'script' && !attributes.nonce) {
+		attributes.nonce = nonce;
+	}
+	const renderedAttributes = Object.entries(attributes)
+		.map(([name, value]) => `${name}="${escapeAttribute(value)}"`)
+		.join(' ');
+	const suffix = renderedAttributes ? ` ${renderedAttributes}` : '';
+	return injection.tag === 'link'
+		? `<${injection.tag}${suffix}>`
+		: `<${injection.tag}${suffix}></${injection.tag}>`;
 }
 
 function renderModulePreloadLinks(

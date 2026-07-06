@@ -89,7 +89,7 @@ type MdxPart =
 
 function emitComposedMdxRoute(route: MdxRoute): string {
 	return [
-		`import { resumeEventOnlyFromPayloadDocument } from '@markless/core/runtime/event-only-resume';`,
+			`import { resumeEventOnlyFromPayloadDocument } from '@markless/core/web/event-only-resume';`,
 		`import { composeMdxState, composeMdxView, loadMdxSymbol, renderMdxChild, replaceMdxChild, rootFromMdxHtml } from '@markless/router/vite/runtime/mdx-route';`,
 		...route.imports,
 		'',

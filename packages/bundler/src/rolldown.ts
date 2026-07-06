@@ -52,6 +52,7 @@ type InternalMarklessRolldownOptions = MarklessRolldownOptions & {
 
 const TSRX_SOURCE_FILE = /\.tsrx(?:[?#].*)?$/;
 const MARKLESS_SYMBOL_SOURCE_QUERY_RE = /[?&]markless-symbols(?:[&#]|$)/;
+const MARKLESS_RESUME_SOURCE_QUERY_RE = /[?&]markless-resume(?:[&#]|$)/;
 const SYMBOL_VIRTUAL_ID_RE = /^virtual:markless:symbol:([^:]+):[^:]+$/;
 const RESUME_VIRTUAL_ID_RE = /^virtual:markless:resume:([^:]+)$/;
 const SYMBOL_VIRTUAL_STRING_RE = /(["'`])((?:virtual:markless:symbol:)[^"'`]+)\1/g;
@@ -186,6 +187,10 @@ export function createMarklessRolldownPlugin(input: {
 								internalOptions.publicPath,
 							)
 						: undefined,
+				headInjections:
+					internalOptions.dev === true && currentEnvironment === 'server'
+						? internalOptions.devInjections
+						: undefined,
 			});
 			registerTransformArtifacts({
 				source,
@@ -196,6 +201,10 @@ export function createMarklessRolldownPlugin(input: {
 				dev,
 				environment: currentEnvironment,
 			});
+			if (currentEnvironment === 'client' && isResumeSourceRequest(id)) {
+				const resumeModule = transformed.virtualModules.find((module) => module.type === 'resume');
+				if (resumeModule) return { code: resumeModule.source, map: null };
+			}
 
 			if (currentEnvironment === 'client' && !internalOptions.dev) {
 				for (const module of transformed.virtualModules.filter(
@@ -422,6 +431,10 @@ function isSymbolOnlySourceRequest(id: string): boolean {
 	return MARKLESS_SYMBOL_SOURCE_QUERY_RE.test(id);
 }
 
+function isResumeSourceRequest(id: string): boolean {
+	return MARKLESS_RESUME_SOURCE_QUERY_RE.test(id);
+}
+
 function sourceForSymbolVirtualImporter(importer: string | undefined): string | null {
 	if (!importer) return null;
 
@@ -464,4 +477,4 @@ export { MARKLESS_BUNDLE_GRAPH, MARKLESS_BUILD_PREFIX, outputDefaults } from './
 export { createBuildMetadata } from './build/build-metadata.ts';
 export { convertManifestToBundleGraph, createPreloadGraphAdder } from './build/bundle-graph.ts';
 export { collectHeadLinkInjections } from './build/head-links.ts';
-export { MARKLESS_VIRTUAL_PREFIX, transformTsrxModule } from './transform.ts';
+export { MARKLESS_VIRTUAL_PREFIX, resumeVirtualModuleId, transformTsrxModule } from './transform.ts';

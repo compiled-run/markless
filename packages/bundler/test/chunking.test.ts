@@ -26,6 +26,7 @@ describe('markless chunking defaults', () => {
 				'markless-resume-branches',
 				'markless-resume-repeats',
 				'markless-resume-behaviors',
+				'markless-resume-runtime-start',
 				'markless-resume-runtime-shared',
 				'markless-resume-events',
 				'markless-resume-locators',
@@ -65,6 +66,7 @@ describe('markless chunking defaults', () => {
 				'markless-resume-branches',
 				'markless-resume-repeats',
 				'markless-resume-behaviors',
+				'markless-resume-runtime-start',
 				'markless-resume-runtime-shared',
 				'markless-resume-events',
 				'markless-resume-locators',
@@ -128,6 +130,9 @@ describe('markless chunking defaults', () => {
 			true,
 		);
 		expect(groups.get('markless-resume-runtime-shared')?.test('/repo/packages/web/src/resume-runtime-shared.ts')).toBe(
+			true,
+		);
+		expect(groups.get('markless-resume-runtime-start')?.test('/repo/packages/web/src/resume-runtime-start.ts')).toBe(
 			true,
 		);
 		expect(groups.get('markless-resume-events')?.test('/repo/packages/web/src/resume-events.ts')).toBe(

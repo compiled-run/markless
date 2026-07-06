@@ -105,29 +105,30 @@ export async function transformTsrxModule(
 	const styleImport = styleId ? `import ${JSON.stringify(styleId)};\n` : '';
 	return {
 		code:
-			styleImport +
-			emitSourceModule({
-				filename: input.filename,
-				payloadId,
-				resolverId,
-				environment: input.environment ?? 'lib',
-				clientOutput: input.clientOutput ?? 'full',
-				needsFullResume:
-					(compiled.protocolView.branches?.length ?? 0) > 0 ||
-					(compiled.protocolView.keyedRepeats?.length ?? 0) > 0 ||
-					// Element handles materialize only in the full runtime.
-					compiled.protocolView.elementHandles.length > 0 ||
-					// Async boundary settle/revalidation lives only in the full runtime.
-					compiled.protocolView.asyncBoundaries.length > 0,
-				resumeModuleUrl: input.resumeModuleUrl,
-				publicRenderModuleSource: compiled.publicRenderModule.moduleSource,
-				publicRenderRootExportName: compiled.publicRenderModule.rootExportName,
-				publicCsrModuleSource: compiled.publicRenderModule.csrModuleSource,
-				publicRenderCsrExportName: compiled.publicRenderModule.csrExportName,
-				publicSsrModuleSource: compiled.publicRenderModule.ssrModuleSource,
-				publicRenderSsrExportName: compiled.publicRenderModule.ssrExportName,
-				symbols: symbolRows,
-				symbolRoutes,
+				styleImport +
+				emitSourceModule({
+					filename: input.filename,
+					payloadId,
+					resolverId,
+					environment: input.environment ?? 'lib',
+					clientOutput: input.clientOutput ?? 'full',
+					headInjections: input.headInjections,
+					needsFullResume:
+						(compiled.protocolView.branches?.length ?? 0) > 0 ||
+						(compiled.protocolView.keyedRepeats?.length ?? 0) > 0 ||
+						// Element handles materialize only in the full runtime.
+						compiled.protocolView.elementHandles.length > 0 ||
+						// Async boundary settle/revalidation lives only in the full runtime.
+						compiled.protocolView.asyncBoundaries.length > 0,
+					resumeModuleUrl: input.resumeModuleUrl,
+					publicRenderModuleSource: compiled.publicRenderModule.moduleSource,
+					publicRenderRootExportName: compiled.publicRenderModule.rootExportName,
+					publicCsrModuleSource: compiled.publicRenderModule.csrModuleSource,
+					publicRenderCsrExportName: compiled.publicRenderModule.csrExportName,
+					publicSsrModuleSource: compiled.publicRenderModule.ssrModuleSource,
+					publicRenderSsrExportName: compiled.publicRenderModule.ssrExportName,
+					symbols: symbolRows,
+					symbolRoutes,
 			}),
 		map: null,
 		virtualModules,
