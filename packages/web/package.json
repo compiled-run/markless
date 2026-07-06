@@ -10,6 +10,7 @@
 		"./dom-update": "./src/dom-update.ts",
 		"./event-only-resume": "./src/event-only-resume.ts",
 		"./event-resume": "./src/event-resume.ts",
+		"./fns/*": "./src/fns/*.ts",
 		"./payload": "./src/payload.ts",
 		"./render": "./src/render.ts",
 		"./render-to-string": "./src/render-to-string.ts",

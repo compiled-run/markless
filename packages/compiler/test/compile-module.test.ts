@@ -141,6 +141,11 @@ function countOccurrences(source: string, needle: string): number {
 	return source.split(needle).length - 1;
 }
 
+function helperImports(source: string): string[] {
+	return [...source.matchAll(/^import \{ ([^}]+) \} from '@markless\/web\/fns\/[^']+';/gm)]
+		.flatMap((match) => match[1]!.split(',').map((name) => name.trim()));
+}
+
 const wholeBindingAliasEventSource = `
 import { state } from '@markless/core';
 
@@ -582,25 +587,32 @@ async function importPublicRenderTestModule(
 	},
 ): Promise<Record<string, unknown>> {
 	const globalScope = globalThis as typeof globalThis & {
+		document?: unknown;
 		__marklessPublicRenderTestDocument?: unknown;
 		__marklessPublicRenderTestLoadSymbol?: unknown;
 		__marklessPublicRenderTestChildComponent?: unknown;
 	};
-	const previousDocument = globalScope.__marklessPublicRenderTestDocument;
+	const previousTestDocument = globalScope.__marklessPublicRenderTestDocument;
 	const previousLoadSymbol = globalScope.__marklessPublicRenderTestLoadSymbol;
 	const previousChildComponent = globalScope.__marklessPublicRenderTestChildComponent;
 	if (globals) {
+		globalScope.document = globals.document;
 		globalScope.__marklessPublicRenderTestDocument = globals.document;
 		globalScope.__marklessPublicRenderTestLoadSymbol = globals.loadSymbol;
 		globalScope.__marklessPublicRenderTestChildComponent = globals.childComponent;
 	}
 
 	try {
+		const testSource = source.replace(
+			/from '@markless\/web\/fns\/([^']+)'/g,
+			(_match, helperModule: string) =>
+				`from '${new URL(`../../web/src/fns/${helperModule}.ts`, import.meta.url).href}'`,
+		);
 		return (await import(
-			`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`
+			`data:text/javascript;charset=utf-8,${encodeURIComponent(testSource)}`
 		)) as Record<string, unknown>;
 	} finally {
-		globalScope.__marklessPublicRenderTestDocument = previousDocument;
+		globalScope.__marklessPublicRenderTestDocument = previousTestDocument;
 		globalScope.__marklessPublicRenderTestLoadSymbol = previousLoadSymbol;
 		globalScope.__marklessPublicRenderTestChildComponent = previousChildComponent;
 	}
@@ -820,7 +832,7 @@ test('compileTsrxModule orchestrates source to payload scripts and resolver modu
 	);
 });
 
-test('public render helpers are emitted once when CSR and SSR library modules are combined', async () => {
+test('public render helpers are imported when CSR and SSR library modules are combined', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/card.tsrx',
 		source: libraryComponentSource,
@@ -832,7 +844,56 @@ test('public render helpers are emitted once when CSR and SSR library modules ar
 		result.publicRenderModule.ssrModuleSource,
 	].join('\n');
 
-	expect(countOccurrences(combinedModuleSource, 'function readMarklessPublicPath')).toBe(1);
+	expect(combinedModuleSource).not.toContain('function readMarklessPublicPath');
+	expect(combinedModuleSource).toContain("from '@markless/web/fns/");
+});
+
+test('public render modules import catalog helpers instead of inlining helper bodies', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/App.tsrx',
+		source: `import { state } from '@markless/core';
+
+export function App() @{
+	let count = state(0);
+
+	<><button onClick={() => count++}>{count}</button></>
+}
+`,
+		symbols: [],
+	});
+
+	for (const moduleSource of [
+		result.publicRenderModule.csrModuleSource,
+		result.publicRenderModule.ssrModuleSource,
+	]) {
+		expect(moduleSource).toContain("from '@markless/web/fns/");
+		expect(moduleSource).not.toMatch(/^function markless(?!Render(?:Csr|Ssr)\b)/m);
+		expect(moduleSource).not.toMatch(/^function readMarklessPublicPath\b/m);
+	}
+
+	const csrHelperImports = helperImports(result.publicRenderModule.csrModuleSource);
+	expect(csrHelperImports).toEqual(
+		expect.arrayContaining([
+			'marklessCloneState',
+			'marklessStateValue',
+			'marklessCsrFragmentFromHtml',
+			'marklessCsrText',
+		]),
+	);
+	expect(csrHelperImports).not.toContain('marklessCsrRootFromHtml');
+	expect(csrHelperImports).not.toContain('marklessCsrRepeatRows');
+
+	const ssrHelperImports = helperImports(result.publicRenderModule.ssrModuleSource);
+	expect(ssrHelperImports).toEqual(
+		expect.arrayContaining([
+			'marklessCloneState',
+			'marklessStateValue',
+			'marklessSsrHost',
+			'marklessSsrText',
+		]),
+	);
+	expect(ssrHelperImports).not.toContain('marklessSsrRepeatRows');
+	expect(ssrHelperImports).not.toContain('marklessSsrCallbacks');
 });
 
 test('executed modules deliver object-path state initializer snapshots', async () => {
@@ -3271,7 +3332,8 @@ export function App() @{
 	expect(moduleSource).not.toContain('record.targets');
 	expect(moduleSource).toContain('[[0],"click",["symbol:0"]]');
 	expect(moduleSource).toContain('[[1],"click",["symbol:1"]]');
-	expect(moduleSource).toContain('const element = nodeAtPath(root, path);');
+	expect(moduleSource).toContain('attachMarklessPublicStaticEvents');
+	expect(moduleSource).toContain("from '@markless/web/fns/direct'");
 	expect(moduleSource).toContain('const parent = root.childNodes?.[2];');
 	expect(moduleSource).not.toContain('const parent = elementAtDomOrder(root');
 	expect(moduleSource).not.toContain('function elementAtDomOrder');
@@ -3282,7 +3344,7 @@ export function App() @{
 	expect(moduleSource).not.toContain('readMarklessPublicPath(item, ["title"])');
 	expect(moduleSource).not.toContain('nodeAtPath(record.root');
 	expect(moduleSource).not.toContain('nodeAtPath(row');
-	expect(moduleSource).toContain('function nodeAtPath(root, path)');
+	expect(moduleSource).not.toContain('function nodeAtPath(root, path)');
 	expect(moduleSource).not.toContain('await graph.flush();');
 	expect(moduleSource).toContain('graph.flush();');
 	expect(moduleSource).toContain('function readMarklessPublicRepeat0ClassValues(graph)');
@@ -3327,7 +3389,7 @@ export function App() @{
 	expect(moduleSource).toContain(
 		'patchMarklessPublicRepeat0DirtyRows(state, items, dirtyIndexes, classValue)',
 	);
-	expect(moduleSource).toContain('function replaceMarklessPublicRows(parent, state, keys)');
+	expect(moduleSource).not.toContain('function replaceMarklessPublicRows(parent, state, keys)');
 	expect(moduleSource).toContain('document.createDocumentFragment()');
 	expect(moduleSource).toContain('const newRows = document.createDocumentFragment();');
 	expect(moduleSource).toContain('newRows.appendChild(record.root);');
@@ -3345,9 +3407,9 @@ export function App() @{
 	expect(moduleSource).not.toContain('eventTargets');
 	expect(moduleSource).not.toContain('findMarklessPublicRepeatEventRecord');
 	expect(moduleSource).toMatch(
-		/call\(call\)[\s\S]*delete\(deletion\)[\s\S]*clearMarklessPublicRows/,
+		/call\(call\)[\s\S]*delete\(deletion\)[\s\S]*clearMarklessPublic(?:SingleClass)?Rows/,
 	);
-	expect(moduleSource).toContain(
+	expect(moduleSource).not.toContain(
 		'if (parent.replaceChildren) parent.replaceChildren(); else parent.textContent = "";',
 	);
 	expect(moduleSource).not.toContain(
