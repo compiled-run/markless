@@ -67,7 +67,7 @@ declare global {
 	}
 }
 
-if (import.meta.env.DEV) {
+if (import.meta.env?.DEV) {
 	const { decodePayloadScripts: decodePayloadScriptsDev } = await import(
 		'../../serializer/src/protocol-validation.ts'
 	);
