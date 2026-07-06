@@ -390,7 +390,7 @@ let active = state(true);
 		expect(resolverSource).toContain('if (id === "symbol:0")');
 		const resumeSource = (await callLoad(plugin, `\0${resumeId}`)) as string;
 		expect(resumeSource).toContain('export async function resumeContainerEvent');
-		expect(resumeSource).toContain('resumeEventOnlyFromPayloadDocument');
+		expect(resumeSource).toContain('resumeScalarEventFromPayloadDocument');
 		const symbolIds = ['symbol:0', 'symbol:1'].map(
 			(symbolId) => `virtual:markless:symbol:${encoded}:${encodeURIComponent(symbolId)}`,
 		);
@@ -469,7 +469,7 @@ let count = state(0);
 			`virtual:markless:resume:${encodeURIComponent(filename)}`,
 		);
 		expect(result.code).toContain('export async function resumeContainerEvent');
-		expect(result.code).toContain('resumeEventOnlyFromPayloadDocument');
+		expect(result.code).toContain('resumeScalarEventFromPayloadDocument');
 		expect(result.code).not.toContain('const marklessCompiledApp = {');
 		expect(result.code).not.toContain('renderCsr:');
 	});
@@ -696,7 +696,7 @@ export function App() @{
 	});
 	const plainResume = plain.virtualModules.find((module) => module.type === 'resume');
 	expect(plain.code).not.toContain('resumeEventOnlyFromPayloadDocument');
-	expect(plainResume?.source).toContain('resumeEventOnlyFromPayloadDocument');
+	expect(plainResume?.source).toContain('resumeScalarEventFromPayloadDocument');
 	expect(plain.code).not.toContain(
 		"import { resumeFromPayloadDocument } from '@markless/core/web/resume';",
 	);
