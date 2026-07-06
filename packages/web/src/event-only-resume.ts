@@ -1,114 +1,38 @@
 import type { ProtocolStatePayload, ProtocolViewPayload } from '../../serializer/src/protocol.ts';
-import type { DomJournalResult } from '@markless/runtime';
 import type { EventOnlyResumeGraph } from './event-only-graph.ts';
-
-export type EventOnlyResumeDomNode = {
-	readonly nodeType: number;
-	readonly childNodes?: ArrayLike<EventOnlyResumeDomNode>;
-};
-
-export type EventOnlyResumeDomElement = EventOnlyResumeDomNode & {
-	readonly nodeType: 1;
-	readonly tagName: string;
-	readonly parentElement?: EventOnlyResumeDomElement | null;
-	textContent?: string | null;
-	addEventListener?: (
-		type: string,
-		listener: (event: EventOnlyResumeDomEvent) => Promise<void>,
-		options?: { readonly capture?: boolean },
-	) => void;
-	removeEventListener?: (
-		type: string,
-		listener: (event: EventOnlyResumeDomEvent) => Promise<void>,
-		options?: { readonly capture?: boolean },
-	) => void;
-	setAttribute?: (name: string, value: string) => void;
-	removeAttribute?: (name: string) => void;
-	__marklessEventOnlyGraph?: Map<string, unknown>;
-	__asyncResumeRuntimeStarted?: boolean;
-	readonly [name: string]: unknown;
-};
-
-export type EventOnlyResumeDomEvent = {
-	readonly type: string;
-	readonly target: EventOnlyResumeDomElement | null;
-	readonly preventDefault?: () => void;
-	readonly stopPropagation?: () => void;
-	readonly [key: string]: unknown;
-};
-
-export type EventOnlyResumePayloadScriptElement = {
-	readonly textContent?: string | null;
-	readonly text?: string | null;
-	readonly innerHTML?: string | null;
-};
-
-export type EventOnlyResumePayloadDocument = {
-	readonly querySelector: (selector: string) => EventOnlyResumePayloadScriptElement | null;
-};
-
-export type EventOnlyResumeRecord = ProtocolViewPayload['events'][number];
-export type EventOnlyResumeDomUpdateRecord = ProtocolViewPayload['domUpdates'][number];
-export type EventOnlyResumeBehaviorRecord = ProtocolViewPayload['behaviors'][number];
+import type {
+	CreateEventOnlyResumeContainerInput,
+	EventOnlyResumeBehaviorRecord,
+	EventOnlyResumeContainer,
+	EventOnlyResumeDomElement,
+	EventOnlyResumeDomEvent,
+	EventOnlyResumeDomNode,
+	EventOnlyResumeRecord,
+	EventOnlyResumeSymbol,
+	ResumeEventOnlyFromPayloadDocumentInput,
+} from './event-only-lean/types.ts';
 
 export type { EventOnlyResumeGraph } from './event-only-graph.ts';
-
-export type EventOnlyResumeSymbolContext = {
-	readonly graph: EventOnlyResumeGraph;
-	readonly event?: EventOnlyResumeDomEvent;
-	readonly element: EventOnlyResumeDomElement;
-	readonly getElementHandle: () => undefined;
-	readonly domUpdate?: EventOnlyResumeDomUpdateRecord;
-	readonly locals?: Readonly<Record<string, unknown>>;
-	readonly value?: unknown;
-	readonly behaviorInputs?: ReadonlyArray<unknown>;
-};
-
-export type EventOnlyResumeBehaviorCleanup = () => void;
-
-export type EventOnlyResumeSymbol = (
-	context: EventOnlyResumeSymbolContext,
-) =>
-	| void
-	| DomJournalResult
-	| EventOnlyResumeBehaviorCleanup
-	| Promise<void | DomJournalResult | EventOnlyResumeBehaviorCleanup>;
-
-export type ResumeEventOnlyFromPayloadDocumentInput = {
-	readonly document: EventOnlyResumePayloadDocument;
-	readonly root: EventOnlyResumeDomElement;
-	readonly event: EventOnlyResumeDomEvent;
-	readonly element?: EventOnlyResumeDomElement;
-	readonly eventRecord?: EventOnlyResumeRecord;
-	readonly syncPolicyAlreadyApplied?: boolean;
-	readonly loadSymbol: (
-		symbolId: string,
-	) => EventOnlyResumeSymbol | Promise<EventOnlyResumeSymbol>;
-};
-
-export type CreateEventOnlyResumeContainerInput = {
-	readonly state: ProtocolStatePayload;
-	readonly view: ProtocolViewPayload;
-	readonly root: EventOnlyResumeDomElement;
-	readonly loadSymbol: ResumeEventOnlyFromPayloadDocumentInput['loadSymbol'];
-};
-
-export type EventOnlyResumeContainer = {
-	readonly graph: EventOnlyResumeGraph;
-	readonly view: ProtocolViewPayload;
-	readonly dispatch: (
-		event: EventOnlyResumeDomEvent,
-		options?: {
-			readonly element?: EventOnlyResumeDomElement;
-			readonly eventRecord?: EventOnlyResumeRecord;
-			readonly syncPolicyAlreadyApplied?: boolean;
-		},
-	) => Promise<void>;
-	readonly dispose: () => void;
-};
+export type {
+	CreateEventOnlyResumeContainerInput,
+	EventOnlyResumeBehaviorCleanup,
+	EventOnlyResumeBehaviorRecord,
+	EventOnlyResumeContainer,
+	EventOnlyResumeDomElement,
+	EventOnlyResumeDomEvent,
+	EventOnlyResumeDomNode,
+	EventOnlyResumeDomUpdateRecord,
+	EventOnlyResumePayloadDocument,
+	EventOnlyResumePayloadScriptElement,
+	EventOnlyResumeRecord,
+	EventOnlyResumeSymbol,
+	EventOnlyResumeSymbolContext,
+	ResumeEventOnlyFromPayloadDocumentInput,
+} from './event-only-lean/types.ts';
 
 type EventOnlyResumeContainerState = EventOnlyResumeContainer & {
 	readonly elementsByHostId: ReadonlyMap<string, EventOnlyResumeDomElement>;
+	readonly locatorsByHostId: ReadonlyMap<string, ProtocolViewPayload['locators'][number]>;
 	readonly activeBehaviorHosts: Set<string>;
 };
 
@@ -148,8 +72,18 @@ export function createEventOnlyResumeContainerFromPayloads(
 async function createEventOnlyResumeContainerState(
 	input: CreateEventOnlyResumeContainerInput,
 ): Promise<EventOnlyResumeContainerState> {
-	const elementsByHostId = await materializeDomLocators(input.root, input.view.locators);
+	const elementsByHostId = new Map<string, EventOnlyResumeDomElement>();
+	const locatorsByHostId = new Map(
+		input.view.locators.map((locator) => [locator.hostNodeId, locator]),
+	);
 	const activeBehaviorHosts = new Set<string>();
+	const resolveElementByHostId = (hostNodeId: string) =>
+		materializeHostLocator({
+			root: input.root,
+			locatorsByHostId,
+			elementsByHostId,
+			hostNodeId,
+		});
 	const { createEventOnlyResumeGraph } = await import('./event-only-graph.ts');
 	const graph = await createEventOnlyResumeGraph({
 		state: input.state,
@@ -157,12 +91,14 @@ async function createEventOnlyResumeContainerState(
 		loadSymbol: input.loadSymbol,
 		root: input.root,
 		elementsByHostId,
+		resolveElementByHostId,
 	});
 
 	return {
 		graph,
 		view: input.view,
 		elementsByHostId,
+		locatorsByHostId,
 		activeBehaviorHosts,
 		dispatch(event, options = {}) {
 			return dispatchEvent({
@@ -171,6 +107,8 @@ async function createEventOnlyResumeContainerState(
 				graph,
 				loadSymbol: input.loadSymbol,
 				elementsByHostId,
+				locatorsByHostId,
+				root: input.root,
 				activeBehaviorHosts,
 				...options,
 			});
@@ -188,7 +126,9 @@ async function dispatchEvent(input: {
 	readonly view: ProtocolViewPayload;
 	readonly graph: EventOnlyResumeGraph;
 	readonly loadSymbol: ResumeEventOnlyFromPayloadDocumentInput['loadSymbol'];
-	readonly elementsByHostId: ReadonlyMap<string, EventOnlyResumeDomElement>;
+	readonly elementsByHostId: Map<string, EventOnlyResumeDomElement>;
+	readonly locatorsByHostId: ReadonlyMap<string, ProtocolViewPayload['locators'][number]>;
+	readonly root: EventOnlyResumeDomElement;
 	readonly activeBehaviorHosts: Set<string>;
 	readonly element?: EventOnlyResumeDomElement;
 	readonly eventRecord?: EventOnlyResumeRecord;
@@ -198,48 +138,71 @@ async function dispatchEvent(input: {
 		? {
 				element:
 					input.element ??
-					input.elementsByHostId.get(input.eventRecord.hostNodeId) ??
+					(await materializeHostLocator({
+						root: input.root,
+						locatorsByHostId: input.locatorsByHostId,
+						elementsByHostId: input.elementsByHostId,
+						hostNodeId: input.eventRecord.hostNodeId,
+					})) ??
 					input.event.target,
 				eventRecord: input.eventRecord,
 			}
-		: findEventRecord(input.event.target, input.event.type, input.view, input.elementsByHostId);
+		: await findEventRecord({
+				target: input.event.target,
+				eventName: input.event.type,
+				view: input.view,
+				root: input.root,
+				locatorsByHostId: input.locatorsByHostId,
+				elementsByHostId: input.elementsByHostId,
+			});
 	if (!matched?.element) return;
 
-	try {
-		if (matched.eventRecord.syncPolicy && !input.syncPolicyAlreadyApplied) {
-			const { runSyncPolicyActions } = await import('./inline/sync-policy-core.ts');
-			runSyncPolicyActions(
-				matched.eventRecord.syncPolicy,
-				input.graph,
-				input.event,
-			);
-		}
-		for (const symbolId of matched.eventRecord.symbolIds) {
-			const loadedSymbol = input.loadSymbol(symbolId);
-			const symbol = isPromiseLike(loadedSymbol) ? await loadedSymbol : loadedSymbol;
-			const result = symbol({
-				graph: input.graph,
-				event: input.event,
-				element: matched.element,
-				getElementHandle: noElementHandle,
-			});
-			const journalResult = isPromiseLike(result) ? await result : result;
-			if (typeof journalResult !== 'function') {
-				const { applyDomJournalResult } = await import('./event-only-graph.ts');
-				applyDomJournalResult(journalResult, input.elementsByHostId);
+	let retryWithFullDecode = true;
+	while (true) {
+		try {
+			if (matched.eventRecord.syncPolicy && !input.syncPolicyAlreadyApplied) {
+				const { runSyncPolicyActions } = await import('./inline/sync-policy-core.ts');
+				runSyncPolicyActions(
+					matched.eventRecord.syncPolicy,
+					input.graph,
+					input.event,
+				);
 			}
+			for (const symbolId of matched.eventRecord.symbolIds) {
+				const loadedSymbol = input.loadSymbol(symbolId);
+				const symbol = isPromiseLike(loadedSymbol) ? await loadedSymbol : loadedSymbol;
+				const result = symbol({
+					graph: input.graph,
+					event: input.event,
+					element: matched.element,
+					getElementHandle: noElementHandle,
+				});
+				const journalResult = isPromiseLike(result) ? await result : result;
+				if (typeof journalResult !== 'function') {
+					const { applyDomJournalResult } = await import('./event-only-graph.ts');
+					applyDomJournalResult(journalResult, input.elementsByHostId);
+				}
+			}
+			await input.graph.flush();
+			break;
+		} catch (error) {
+			if (!retryWithFullDecode || !isLeanGraphEscalation(error) || !input.graph.materializeAll) {
+				throw error;
+			}
+			retryWithFullDecode = false;
+			await input.graph.materializeAll();
 		}
-	} finally {
-		await input.graph.flush();
 	}
 
 	if (
-		hasPendingBehaviorHostForAncestor(
-			matched.element,
-			input.elementsByHostId,
-			input.view.behaviors,
-			input.activeBehaviorHosts,
-		)
+		await hasPendingBehaviorHostForAncestor({
+			element: matched.element,
+			root: input.root,
+			locatorsByHostId: input.locatorsByHostId,
+			elementsByHostId: input.elementsByHostId,
+			behaviors: input.view.behaviors,
+			activeBehaviorHosts: input.activeBehaviorHosts,
+		})
 	) {
 		const behaviorRuntime = await import('./event-only-behaviors.ts');
 		await behaviorRuntime.activateBehaviorsFromEventHost({
@@ -253,78 +216,112 @@ async function dispatchEvent(input: {
 	}
 }
 
-function hasPendingBehaviorHostForAncestor(
-	element: EventOnlyResumeDomElement,
-	elementsByHostId: ReadonlyMap<string, EventOnlyResumeDomElement>,
-	behaviors: ReadonlyArray<EventOnlyResumeBehaviorRecord>,
-	activeBehaviorHosts: ReadonlySet<string>,
-): boolean {
+function isLeanGraphEscalation(error: unknown): boolean {
+	return (
+		typeof error === 'object' &&
+		error !== null &&
+		(error as { readonly code?: unknown }).code === 'MARKLESS_EVENT_ONLY_LEAN_ESCALATE'
+	);
+}
+
+async function hasPendingBehaviorHostForAncestor(input: {
+	readonly element: EventOnlyResumeDomElement;
+	readonly root: EventOnlyResumeDomElement;
+	readonly locatorsByHostId: ReadonlyMap<string, ProtocolViewPayload['locators'][number]>;
+	readonly elementsByHostId: Map<string, EventOnlyResumeDomElement>;
+	readonly behaviors: ReadonlyArray<EventOnlyResumeBehaviorRecord>;
+	readonly activeBehaviorHosts: ReadonlySet<string>;
+}): Promise<boolean> {
 	for (
-		let current: EventOnlyResumeDomElement | null | undefined = element;
+		let current: EventOnlyResumeDomElement | null | undefined = input.element;
 		current;
 		current = current.parentElement
 	) {
-		for (const behavior of behaviors) {
-			if (!behavior.symbolId || activeBehaviorHosts.has(behavior.hostNodeId)) continue;
-			if (elementsByHostId.get(behavior.hostNodeId) === current) return true;
+		for (const behavior of input.behaviors) {
+			if (!behavior.symbolId || input.activeBehaviorHosts.has(behavior.hostNodeId)) continue;
+			const element = await materializeHostLocator({
+				root: input.root,
+				locatorsByHostId: input.locatorsByHostId,
+				elementsByHostId: input.elementsByHostId,
+				hostNodeId: behavior.hostNodeId,
+			});
+			if (element === current) return true;
 		}
 	}
 	return false;
 }
 
-async function materializeDomLocators(
-	root: EventOnlyResumeDomElement,
-	locators: ProtocolViewPayload['locators'],
-): Promise<Map<string, EventOnlyResumeDomElement>> {
-	const elements = collectElements(root);
-	const byHostId = new Map<string, EventOnlyResumeDomElement>();
-
-	for (const locator of locators) {
-		const element = elements[locator.index];
-		if (!element) {
-			const { missingElementLocatorError } = await import('./inline/resume-errors.ts');
-			throw missingElementLocatorError(locator);
-		}
-		// '*' marks dynamic-tag hosts whose rendered tag is unknowable at
-		// compile time; skip validation like the full resume runtime does.
-		if (
-			locator.tagName !== '*' &&
-			element.tagName.toLowerCase() !== locator.tagName.toLowerCase()
-		) {
-			const { mismatchedElementLocatorError } = await import('./inline/resume-errors.ts');
-			throw mismatchedElementLocatorError(locator, element.tagName.toLowerCase());
-		}
-		byHostId.set(locator.hostNodeId, element);
+async function materializeHostLocator(input: {
+	readonly root: EventOnlyResumeDomElement;
+	readonly locatorsByHostId: ReadonlyMap<string, ProtocolViewPayload['locators'][number]>;
+	readonly elementsByHostId: Map<string, EventOnlyResumeDomElement>;
+	readonly hostNodeId: string;
+}): Promise<EventOnlyResumeDomElement | undefined> {
+	const cached = input.elementsByHostId.get(input.hostNodeId);
+	if (cached) return cached;
+	const locator = input.locatorsByHostId.get(input.hostNodeId);
+	if (!locator) return undefined;
+	const element = findElementAtDomOrderIndex(input.root, locator.index);
+	if (!element) {
+		const { missingElementLocatorError } = await import('./inline/resume-errors.ts');
+		throw missingElementLocatorError(locator);
 	}
-
-	return byHostId;
+	if (
+		locator.tagName !== '*' &&
+		element.tagName.toLowerCase() !== locator.tagName.toLowerCase()
+	) {
+		const { mismatchedElementLocatorError } = await import('./inline/resume-errors.ts');
+		throw mismatchedElementLocatorError(locator, element.tagName.toLowerCase());
+	}
+	input.elementsByHostId.set(input.hostNodeId, element);
+	return element;
 }
 
-function collectElements(root: EventOnlyResumeDomElement): EventOnlyResumeDomElement[] {
-	const elements: EventOnlyResumeDomElement[] = [];
+function findElementAtDomOrderIndex(
+	root: EventOnlyResumeDomElement,
+	index: number,
+): EventOnlyResumeDomElement | undefined {
+	let currentIndex = 0;
+	let found: EventOnlyResumeDomElement | undefined;
 	const visit = (node: EventOnlyResumeDomNode): void => {
-		if (node.nodeType === 1) elements.push(node as EventOnlyResumeDomElement);
+		if (found) return;
+		if (node.nodeType === 1) {
+			if (currentIndex === index) {
+				found = node as EventOnlyResumeDomElement;
+				return;
+			}
+			currentIndex++;
+		}
 		for (const child of Array.from(node.childNodes ?? [])) visit(child);
 	};
 	visit(root);
-	return elements;
+	return found;
 }
 
-function findEventRecord(
-	target: EventOnlyResumeDomElement | null,
-	eventName: string,
-	view: ProtocolViewPayload,
-	elementsByHostId: ReadonlyMap<string, EventOnlyResumeDomElement>,
-):
+async function findEventRecord(input: {
+	readonly target: EventOnlyResumeDomElement | null;
+	readonly eventName: string;
+	readonly view: ProtocolViewPayload;
+	readonly root: EventOnlyResumeDomElement;
+	readonly locatorsByHostId: ReadonlyMap<string, ProtocolViewPayload['locators'][number]>;
+	readonly elementsByHostId: Map<string, EventOnlyResumeDomElement>;
+}): Promise<
 	| {
 			readonly element: EventOnlyResumeDomElement;
 			readonly eventRecord: EventOnlyResumeRecord;
 	  }
-	| undefined {
-	for (let element = target; element; element = element.parentElement ?? null) {
-		for (const eventRecord of view.events) {
-			if (eventRecord.eventName !== eventName) continue;
-			if (elementsByHostId.get(eventRecord.hostNodeId) === element) {
+	| undefined
+> {
+	for (let element = input.target; element; element = element.parentElement ?? null) {
+		for (const eventRecord of input.view.events) {
+			if (eventRecord.eventName !== input.eventName) continue;
+			const host = await materializeHostLocator({
+				root: input.root,
+				locatorsByHostId: input.locatorsByHostId,
+				elementsByHostId: input.elementsByHostId,
+				hostNodeId: eventRecord.hostNodeId,
+			});
+			if (host === element) {
 				return { element, eventRecord };
 			}
 		}
