@@ -16,12 +16,14 @@ export function App() @{
 	});
 
 	<section class="mixed-board">
-		@for (const card of cards; key card.key) {
-			<div class="mixed-row">
-				<span>{card.caption}</span>
-				<button type="button" data-mixed-row onClick={() => chosen = card.key}>Mark</button>
-			</div>
-		}
+		<section class="mixed-rows">
+			@for (const card of cards; key card.key) {
+				<article data-mixed-row>
+					<h3>{card.caption}</h3>
+					<button type="button" onClick={() => chosen = card.key}>Mark</button>
+				</article>
+			}
+		</section>
 		<div
 			data-mixed-behavior
 			attach={(element) => { element.setAttribute('data-mixed-ready', 'yes'); }}
