@@ -360,7 +360,13 @@ async function observabilityChunkHrefs(chunks: ReadonlyMap<string, string>, prev
 		}
 	}
 	for (const [path, code] of chunks) {
-		if (code.includes('virtual:markless:dev-log') || code.includes('__mxLogInteraction')) {
+		if (
+			code.includes('virtual:markless:dev-log') ||
+			code.includes('__mxLogInteraction') ||
+			// Minified builds preserve the virtual module's export names even when
+			// the specifier string is gone.
+			code.includes('markless_dev_log')
+		) {
 			hrefs.add(`/${path}`);
 		}
 	}
