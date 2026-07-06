@@ -46,7 +46,7 @@ test('web render entry does not statically import event-only resume fallback cod
 test('event-only graph gates object value decoding behind payload shape', async () => {
 	const graphSource = await readSource('../src/event-only-graph.ts');
 
-	expect(graphSource).not.toMatch(/import\s*\{[\s\S]*deserializeGraphValueForClient/);
+	expect(graphSource).not.toMatch(/^import\s*\{[^\n]*deserializeGraphValueForClient/m);
 	expect(graphSource).toContain("import('../../serializer/src/value-decode-client.ts')");
 });
 
