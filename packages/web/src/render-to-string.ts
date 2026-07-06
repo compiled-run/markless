@@ -67,7 +67,7 @@ export async function renderToString(
 	await validateKeyedRepeatPayloadKeys({ state, view });
 	const payloadScripts = hasPayload ? renderPayloadScripts({ state, view }) : undefined;
 	const resumeModuleUrl = options.resumeModuleUrl ?? artifactResumeModuleUrl(component);
-	const executionLog = options.executionLog ?? artifactExecutionLog(component) ?? 'never';
+	const executionLog = options.executionLog ?? artifactExecutionLog(component) ?? 'auto';
 	const browserTriggers = hasBrowserTriggers(view, state);
 	const modulePreloads =
 		options.modulePreloads ?? (browserTriggers ? artifactModulePreloads(component) : undefined);
