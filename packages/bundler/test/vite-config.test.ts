@@ -211,6 +211,7 @@ describe('Vite config integration', () => {
 			'markless-resume-async',
 			'markless-resume-shared-patch',
 			'markless-resume-runtime',
+			'markless-resume-runtime-start',
 			'markless-resume-runtime-shared',
 			'markless-resume-events',
 			'markless-resume-handoff',

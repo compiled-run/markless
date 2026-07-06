@@ -1,6 +1,6 @@
 import type { InputOptions, Plugin } from 'rolldown';
-import { isAbsolute, resolve } from 'pathe';
-import { joinURL, parsePath } from 'ufo';
+import { isAbsolute, relative, resolve } from 'pathe';
+import { joinURL, parsePath, withQuery, withoutLeadingSlash } from 'ufo';
 import { type MarklessBuildMetadataBundle, createBuildMetadata } from './build/build-metadata.ts';
 import { MARKLESS_BUILD_PREFIX, MARKLESS_BUNDLE_GRAPH, outputDefaults } from './build/chunking.ts';
 import { collectModulePreloadInjections, injectHeadLinks } from './build/head-links.ts';
@@ -180,17 +180,21 @@ export function createMarklessRolldownPlugin(input: {
 					(clientSymbolEntrySources.has(source) || isSymbolOnlySourceRequest(id))
 						? 'symbols-only'
 						: undefined,
+				// Dev resume URL points at the SOURCE module (not the virtual resume
+				// module): loading the .tsrx keeps it in the client module graph, which
+				// is what lets Vite's own no-accepting-boundary full-reload fire on
+				// edits (commit e3c5bcc's design). The source client module re-exports
+				// resumeContainerEvent from the virtual resume module in dev only;
+				// production builds keep the split (CSR emits no resume code).
 				resumeModuleUrl:
 					internalOptions.dev === true && currentEnvironment === 'server'
-						? devBrowserVirtualModuleUrl(
-								resumeVirtualModuleId(source),
-								internalOptions.publicPath,
-							)
+						? devBrowserSourceModuleUrl(source, getRoot(), internalOptions.publicPath)
 						: undefined,
 				headInjections:
 					internalOptions.dev === true && currentEnvironment === 'server'
 						? internalOptions.devInjections
 						: undefined,
+				devResumeReexport: internalOptions.dev === true && currentEnvironment === 'client',
 			});
 			registerTransformArtifacts({
 				source,
@@ -390,6 +394,24 @@ function virtualModuleSourceForLoad(
 	return module.source.replace(SYMBOL_VIRTUAL_STRING_RE, (_match, _quote, virtualId) =>
 		JSON.stringify(devBrowserVirtualModuleUrl(virtualId, options.publicPath)),
 	);
+}
+
+function devBrowserSourceModuleUrl(
+	source: string,
+	root: string | undefined,
+	publicPath: ((fileName: string) => string) | undefined,
+) {
+	const relativeSource = root ? relative(root, source) : '';
+	const fileName =
+		root && isRootRelativePath(relativeSource)
+			? relativeSource
+			: joinURL('@fs', withoutLeadingSlash(source));
+	const path = withQuery(fileName, { import: null });
+	return publicPath ? publicPath(path) : joinURL('/', path);
+}
+
+function isRootRelativePath(path: string): boolean {
+	return path !== '' && path !== '..' && !path.startsWith('../') && !isAbsolute(path);
 }
 
 function devBrowserVirtualModuleUrl(

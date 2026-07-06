@@ -113,6 +113,7 @@ export async function transformTsrxModule(
 					environment: input.environment ?? 'lib',
 					clientOutput: input.clientOutput ?? 'full',
 					headInjections: input.headInjections,
+					devResumeReexport: input.devResumeReexport === true,
 					needsFullResume:
 						(compiled.protocolView.branches?.length ?? 0) > 0 ||
 						(compiled.protocolView.keyedRepeats?.length ?? 0) > 0 ||

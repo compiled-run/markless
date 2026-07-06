@@ -254,7 +254,12 @@ describe('Vite adapter structure', () => {
 
 		expect(result.code).toContain('headInjections:');
 		expect(result.code).toContain('"src":"/dev/@vite/client"');
-		expect(result.code).toContain('resumeModuleUrl: "/dev/@id/__x00__virtual:markless:resume:');
+		// Dev resume URL points at the SOURCE module so the .tsrx stays in the client
+		// module graph (vite's no-accepting-boundary full-reload depends on it); the
+		// client source module re-exports resumeContainerEvent from the virtual
+		// resume module in dev only.
+		expect(result.code).toContain('resumeModuleUrl: "/dev/');
+		expect(result.code).toContain('.tsrx?import"');
 	});
 
 	test('serves dev symbol resolver tables with browser-loadable symbol module URLs', async () => {

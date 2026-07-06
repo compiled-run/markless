@@ -56,6 +56,7 @@ export function emitSourceModule(input: {
 		readonly location: 'head' | 'body';
 	}>;
 	readonly needsFullResume?: boolean;
+	readonly devResumeReexport?: boolean;
 	readonly publicRenderModuleSource: string;
 	readonly publicRenderRootExportName: string | null;
 	readonly publicCsrModuleSource: string;
@@ -76,6 +77,13 @@ export function emitSourceModule(input: {
 		routeSymbols ? 'const marklessLoadLocalSymbol = loadSymbol;' : '',
 		symbolsOnly && !routeSymbols ? 'export { loadSymbol };' : '',
 		symbolsOnly ? '' : 'export { payloadView };',
+		// Dev only: re-export the resume entry from the virtual resume module so the
+		// inline resumer can import THIS source module (keeping the .tsrx in the client
+		// module graph — vite's no-accepting-boundary full-reload depends on it).
+		// Production never emits this edge: CSR builds must not reach resume code.
+		input.devResumeReexport && input.environment === 'client' && !symbolsOnly
+			? `export { resumeContainerEvent } from '${resumeVirtualModuleId(input.filename)}';`
+			: '',
 		'',
 		input.environment === 'server' || symbolsOnly ? '' : input.publicRenderModuleSource,
 		input.environment === 'server' || symbolsOnly ? '' : input.publicCsrModuleSource,

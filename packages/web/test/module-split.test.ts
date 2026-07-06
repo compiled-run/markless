@@ -101,10 +101,13 @@ test('resume runtime split points keep capability code in separate modules', asy
 	const sharedPatchSource = await readSource('../src/resume-shared-patch.ts');
 	const syncDemandSource = await readSource('../src/resume-sync-demand.ts');
 
-	expect(runtimeSource).toContain("import('./resume-async-wiring.ts')");
+	// T007j moved startup wiring into resume-runtime-start.ts; the dynamic
+	// boundary lives there now.
+	const runtimeStartSource = await readSource('../src/resume-runtime-start.ts');
+	expect(runtimeStartSource).toContain("import('./resume-async-wiring.ts')");
 	expect(runtimeSource).toContain("import('./resume-runtime-shared.ts')");
 	expect(runtimeSharedSource).toContain("import('./resume-shared-patch.ts')");
-	expect(runtimeSource).toContain("import('./resume-sync-demand.ts')");
+	expect(runtimeStartSource).toContain("import('./resume-sync-demand.ts')");
 	expect(runtimeSource).not.toContain('function wireAsyncBoundariesWithoutLoadingCapability');
 	expect(runtimeSource).not.toContain('function receiveSharedPatch');
 	expect(runtimeSharedSource).toContain('receiveSharedPatch');
