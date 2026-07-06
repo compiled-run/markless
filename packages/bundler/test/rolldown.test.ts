@@ -677,7 +677,7 @@ test('transformTsrxModule emits a scoped style virtual CSS module and imports it
 	expect(result.code).toContain(`import ${JSON.stringify(styleModule!.id)};`);
 });
 
-test('transformTsrxModule escalates branch- and repeat-bearing modules to the full resume runtime', async () => {
+test('transformTsrxModule escalates full-only records but keeps qualifying rows lean', async () => {
 	const plain = await transformTsrxModule({
 		filename: '/workspace/app/src/Plain.tsrx',
 		source: `
@@ -734,6 +734,25 @@ export function App() @{
 	expect(keyed.code).not.toContain(
 		"import { resumeFromPayloadDocument } from '@markless/core/web/resume';",
 	);
+
+	const qualifyingKeyed = await transformTsrxModule({
+		filename: '/workspace/app/src/QualifyingRows.tsrx',
+		source: `
+import { state } from '@markless/core';
+export function App() @{
+	let entries = state([{ code: 'a' }]);
+	let chosen = state('');
+	<main>
+		<section>@for (const entry of entries; key entry.code) {<article><button onClick={() => chosen = entry.code}>Choose</button></article>}</section>
+		<output>{chosen}</output>
+	</main>
+}
+`,
+		environment: 'client',
+	});
+	const qualifyingKeyedResume = qualifyingKeyed.virtualModules.find((module) => module.type === 'resume');
+	expect(qualifyingKeyedResume?.source).toContain('resumeScalarRowEventFromPayloadDocument');
+	expect(qualifyingKeyedResume?.source).not.toContain("import('@markless/core/web/resume')");
 
 	const handles = await transformTsrxModule({
 		filename: '/workspace/app/src/Focus.tsrx',

@@ -8,6 +8,8 @@ import {
 	type LeanActionPlan,
 	type LeanPlan,
 	materializeHostLocator,
+	readLeanComputedEntries,
+	readLeanStateCells,
 	type RuntimeDemandMap,
 	resolveResult,
 	resolveSymbol,
@@ -105,7 +107,7 @@ function scalarRowLeanResumePlan(input: {
 	readonly eventName?: string;
 	readonly actionPlan: LeanActionPlan;
 }): LeanPlan | null {
-	if (input.state.computed.some((computed) => computed.async === false)) return null;
+	if (readLeanComputedEntries(input.state.computed).some((computed) => (computed as { readonly async?: unknown }).async === false)) return null;
 	if ((input.view.elementHandles?.length ?? 0) > 0) return null;
 	if (input.actionPlan.kind !== 'row' || input.actionPlan.version !== 1 || !input.actionPlan.repeatId) return null;
 	const keyedRepeats = (input.view.keyedRepeats ?? []).filter((record) => record.id === input.actionPlan.repeatId);
@@ -122,7 +124,7 @@ function scalarRowLeanResumePlan(input: {
 	]);
 	const fullDecodeCellIds = new Set(input.actionPlan.fullDecodeCells ?? [repeat.collectionGraphNodeId]);
 	const cellIds = new Set([...scalarCellIds, ...fullDecodeCellIds]);
-	const cells = input.state.cells.filter((cell) => cellIds.has(cell.graphNodeId));
+	const cells = readLeanStateCells(input.state.cells, cellIds);
 	if (cells.length !== cellIds.size) return null;
 	if (cells.some((cell) =>
 		scalarCellIds.has(cell.graphNodeId) &&
