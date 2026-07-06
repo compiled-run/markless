@@ -1,13 +1,13 @@
 import type { DomJournalEntry, DomJournalResult } from '@markless/runtime';
 import type {
-	ResumeBehaviorRecord, ResumeDispatchOptions, ResumeDomElement, ResumeDomEvent, ResumePreparedCore, ResumeRuntime, ResumeRuntimeErrorContext, ResumeRuntimeInput,
+	ResumeBehaviorRecord, ResumeDispatchOptions, ResumeDomElement, ResumeDomEvent, ResumePreparedCore, ResumeRuntime, ResumeRuntimeInput,
 } from './resume-types.ts';
 
 const SHARED_PATCH_EVENT_TYPE = 'async:shared-patch';
 type BehaviorRuntime = ReturnType<typeof import('./resume-behaviors.ts')['createBehaviorRuntime']>;
 type BranchRuntime = ReturnType<typeof import('./resume-branches.ts')['wireBranches']>;
 type EventWiring = ReturnType<typeof import('./resume-events.ts')['createEventWiring']>;
-type SharedPatchRuntime = ReturnType<typeof import('./resume-shared-patch.ts')['createResumeSharedPatchRuntime']>;
+type RuntimeShared = ReturnType<typeof import('./resume-runtime-shared.ts')['createResumeRuntimeShared']>;
 
 export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumePreparedCore): ResumeRuntime {
 	const { elementsByHostId, elementHandles } = prepared;
@@ -15,8 +15,15 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 	const hostSubscriptionReleases = new Map<string, Array<() => void>>(), containerSubscriptionReleases: Array<() => void> = [];
 	let asyncBoundariesById = prepared.asyncBoundariesById;
 	let behaviorRuntime: BehaviorRuntime | undefined, branchRuntime: BranchRuntime | undefined;
-	let events: EventWiring | undefined, sharedPatchRuntime: SharedPatchRuntime | undefined;
+	let events: EventWiring | undefined, runtimeShared: RuntimeShared | undefined;
 	const behaviorHostIds = new Set(input.view.behaviors.map((behavior) => behavior.hostNodeId));
+	const getRuntimeShared = async (): Promise<RuntimeShared> =>
+		runtimeShared ??= (await import('./resume-runtime-shared.ts')).createResumeRuntimeShared(input);
+	const flushRuntimeGraph = async () => (await getRuntimeShared()).flushRuntimeGraph();
+	const receiveSharedPatch = async (event: ResumeDomEvent) =>
+		(await getRuntimeShared()).receiveSharedPatch(event);
+	const reportRuntimeError: RuntimeShared['reportRuntimeError'] = async (error, context) =>
+		(await getRuntimeShared()).reportRuntimeError(error, context);
 
 	const storeHostSubscription = (hostNodeId: string, release: () => void) => {
 		if (typeof release !== 'function') return;
@@ -24,28 +31,6 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 		releases.push(release); hostSubscriptionReleases.set(hostNodeId, releases);
 	};
 	const storeContainerSubscription = (release: () => void) => { if (typeof release === 'function') containerSubscriptionReleases.push(release); };
-	const flushRuntimeGraph = async () => {
-		await input.graph.flush();
-		const patches = input.graph.takeSharedPatches?.() ?? []; if (patches.length === 0) return;
-		const dispatchSharedPatch = input.dispatchSharedPatch ?? (await getSharedPatchRuntime()).dispatchSharedPatch; if (!dispatchSharedPatch) return;
-		for (const patch of patches) {
-			const result = dispatchSharedPatch(patch); if (isPromiseLike(result)) await result;
-		}
-	};
-	const reportRuntimeError = async (error: unknown, context: ResumeRuntimeErrorContext) => {
-		if (!input.onError) return;
-		try { const result = input.onError(error, context); if (isPromiseLike(result)) await result; } catch {}
-	};
-	async function getSharedPatchRuntime(): Promise<SharedPatchRuntime> {
-		if (sharedPatchRuntime) return sharedPatchRuntime;
-		const { createResumeSharedPatchRuntime } = await import('./resume-shared-patch.ts');
-		sharedPatchRuntime = createResumeSharedPatchRuntime({ root: input.root, graph: input.graph });
-		return sharedPatchRuntime;
-	}
-	const receiveSharedPatch = async (event: ResumeDomEvent): Promise<void> => {
-		const runtime = await getSharedPatchRuntime();
-		if (await runtime.receiveSharedPatch(event)) await flushRuntimeGraph();
-	};
 	async function getEvents(): Promise<EventWiring> {
 		if (events) return events;
 		const { createEventWiring } = await import('./resume-events.ts');
@@ -184,7 +169,4 @@ function containsElement(root: ResumeDomElement, target: ResumeDomElement): bool
 	if (root === target) return true;
 	for (const child of root.childNodes ?? []) if (child.nodeType === 1 && containsElement(child as ResumeDomElement, target)) return true;
 	return false;
-}
-function isPromiseLike<T>(value: T | PromiseLike<T>): value is PromiseLike<T> {
-	return value !== null && (typeof value === 'object' || typeof value === 'function') && typeof (value as { readonly then?: unknown }).then === 'function';
 }
