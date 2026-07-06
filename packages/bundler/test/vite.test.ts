@@ -429,6 +429,58 @@ export function App() @{
 		});
 		expect(defaultClientSend).not.toHaveBeenCalled();
 	});
+
+	test('server hot updates invalidate the browser resume virtual module', async () => {
+		const plugin = getAsyncPlugin();
+		const send = vi.fn();
+		const filename = '/workspace/app/src/App.tsrx';
+		const resumeId = `\0virtual:markless:resume:${encodeURIComponent(filename)}`;
+		const resumeModule = { id: resumeId };
+		const browser = {
+			hot: { send },
+			moduleGraph: {
+				getModuleById: vi.fn((id: string) => (id === resumeId ? resumeModule : undefined)),
+				invalidateModule: vi.fn(),
+			},
+		};
+		const ssr = {
+			name: 'ssr',
+			config: { consumer: 'server' },
+			moduleGraph: {
+				getModuleById: vi.fn(),
+				invalidateModule: vi.fn(),
+			},
+		};
+
+		callConfigResolved(plugin, { base: '/', command: 'serve', root: '/workspace/app' });
+		callConfigureServer(plugin, {
+			config: { root: '/workspace/app' },
+			environments: { client: browser, ssr },
+		});
+		await callTransform(plugin, source, filename, createViteHookContext('server'));
+
+		await callHotUpdate(
+			plugin,
+			{
+				file: filename,
+				modules: [],
+				timestamp: 789,
+			},
+			{ environment: ssr },
+		);
+
+		expect(browser.moduleGraph.invalidateModule).toHaveBeenCalledWith(
+			resumeModule,
+			expect.anything(),
+			789,
+			true,
+		);
+		expect(send).toHaveBeenCalledWith({
+			type: 'full-reload',
+			path: '/src/App.tsrx',
+			triggeredBy: filename,
+		});
+	});
 });
 
 function getAsyncPlugin() {

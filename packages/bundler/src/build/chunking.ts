@@ -37,6 +37,10 @@ const WEB_RUNTIME_CAPABILITY_GROUPS = [
 	{ name: 'markless-payload-full', test: fileBasenamePattern('payload-full') },
 	{ name: 'markless-payload-resume', test: fileBasenamePattern('payload-resume') },
 	{
+		name: 'markless-inline-payload-document',
+		test: /[/\\]web[/\\]src[/\\]inline[/\\]payload-document\.ts(?:[?#].*)?$/,
+	},
+	{
 		name: 'markless-payload-document',
 		test: fileBasenamePattern('payload-document', 'payload-resume-registry'),
 	},

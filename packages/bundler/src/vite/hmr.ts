@@ -68,19 +68,24 @@ export function createViteHmr(options: ViteHmrOptions) {
 				return undefined;
 			}
 
-			const invalidated = new Set<EnvironmentModuleNode>();
+			const invalidationEnvironments = moduleGraphEnvironments(
+				environment,
+				env === 'server' ? server?.environments?.[options.clientEnvironment] : undefined,
+			);
 			for (const file of files) {
 				for (const candidate of hmrCandidates(file, ctx.file)) {
 					for (const id of options.invalidateGeneratedModules?.(candidate, env) ?? []) {
-						const module = environment.moduleGraph?.getModuleById?.(id);
-						if (!module) continue;
+						for (const targetEnvironment of invalidationEnvironments) {
+							const module = targetEnvironment.moduleGraph?.getModuleById?.(id);
+							if (!module) continue;
 
-						environment.moduleGraph?.invalidateModule?.(
-							module,
-							invalidated,
-							ctx.timestamp,
-							true,
-						);
+							targetEnvironment.moduleGraph?.invalidateModule?.(
+								module,
+								new Set<EnvironmentModuleNode>(),
+								ctx.timestamp,
+								true,
+							);
+						}
 					}
 				}
 			}
@@ -153,6 +158,17 @@ function hmrCandidates(file: string, absoluteFile: string | undefined) {
 	const candidates = new Set<string>([file]);
 	if (absoluteFile) candidates.add(absoluteFile);
 	return candidates;
+}
+
+function moduleGraphEnvironments(
+	environment: DevEnvironment,
+	clientEnvironment: DevEnvironment | undefined,
+) {
+	if (!clientEnvironment || clientEnvironment === environment) {
+		return [environment];
+	}
+
+	return [environment, clientEnvironment];
 }
 
 function firstChangedFile(files: Set<string>) {
