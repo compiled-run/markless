@@ -6,7 +6,7 @@ import {
 	type RuntimePayloadDiagnostic,
 	type RuntimePayloadErrorCode,
 	type RuntimePayloadType,
-} from '../../serializer/src/protocol-validation.ts';
+} from '../../serializer/src/protocol-client.ts';
 import type { SerializedGraphPayload } from '../../serializer/src/value-decode-client.ts';
 import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer/protocol';
 import type { ResumeDomElement, ResumeRuntime, ResumeRuntimeInput } from './resume.ts';
