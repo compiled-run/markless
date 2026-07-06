@@ -3,7 +3,7 @@ import type { DevEnvironment, EnvironmentModuleNode, HotUpdateOptions, ViteDevSe
 import type { MarklessEnvironment } from '../types.ts';
 import { fetchableDevEnvironment, marklessEnvironment } from './environment.ts';
 
-const SOURCE_FILE_EXTENSION = /\.tsrx$/;
+const SOURCE_FILE_EXTENSION = /\.tsrx(?:[?#].*)?$/;
 
 interface ViteHmrOptions {
 	base: string;
