@@ -11,7 +11,16 @@ export function emitPublicCsrRenderModule(
 	input: PublicRenderModuleInput,
 	rootInfo: PublicRenderRoot,
 ): string {
-	if (!input.publicRenderPlan.rootTemplateHtml) return '';
+	// Component-rooted pages have an empty STATIC template (the imported child's
+	// markup lives in its own module), but CSR emission renders components at
+	// runtime through the edge machinery — only bail when there is truly
+	// nothing to render (dashboard-migration need 7).
+	if (
+		!input.publicRenderPlan.rootTemplateHtml &&
+		input.semanticGraph.componentEdges.length === 0
+	) {
+		return '';
+	}
 
 	const references = componentReferences(input.semanticGraph.componentEdges, '__marklessCsrComponent');
 	const valueImports = publicRenderValueImports(

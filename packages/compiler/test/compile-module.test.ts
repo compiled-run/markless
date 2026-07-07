@@ -5196,3 +5196,22 @@ export default function Home() @{
 	]);
 	expect(result.publicRenderModule.ssrModuleSource).toContain('marklessSsrRepeatRows');
 });
+
+test('component-rooted pages emit a CSR render module (route swaps need it)', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/App.tsrx',
+		source: `import { state } from '@markless/core';
+import { Shell } from './shell.tsrx';
+
+export default function Page() @{
+	let n = state(0);
+	<Shell>
+		<button data-n onClick={() => n++}>N {n}</button>
+	</Shell>
+}`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderModule.csrExportName).toBe('marklessRenderCsr');
+	expect(result.publicRenderModule.csrModuleSource).toContain('./shell.tsrx');
+});
