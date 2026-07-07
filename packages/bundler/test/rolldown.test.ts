@@ -4,6 +4,7 @@ import {
 	marklessLib,
 	marklessClient,
 	marklessServer,
+	resumeVirtualModuleId,
 	transformTsrxModule,
 } from '../src/rolldown.ts';
 import {
@@ -96,7 +97,7 @@ describe('TSRX Rolldown plugin structure', () => {
 
 		expect(result.code).not.toContain('export const marklessSource');
 		expect(result.code).toContain(
-			"import { state as payloadState, view as payloadView } from 'virtual:markless:payload:",
+			"import { state as payloadState, view as payloadView, runtimeDemandMap as payloadRuntimeDemandMap } from 'virtual:markless:payload:",
 		);
 		expect(result.code).not.toContain('import { loadSymbol, symbolManifest }');
 		expect(result.code).not.toContain('const marklessSymbolResolverModule');
@@ -107,7 +108,8 @@ describe('TSRX Rolldown plugin structure', () => {
 			"import moduleManifest from 'virtual:markless:module-manifest:",
 		);
 		expect(result.code).toContain('export { payloadView };');
-		expect(result.code).toContain('loadSymbol: loadSymbol,');
+		expect(result.code).toContain('export { payloadRuntimeDemandMap };');
+		expect(result.code).not.toContain('loadSymbol: loadSymbol,');
 		expect(result.code).not.toContain('function marklessResumeLoadSymbol');
 		expect(result.code).toContain('const marklessCompiledApp = {');
 		expect(result.code).toContain('renderCsr: App,');
@@ -118,8 +120,11 @@ describe('TSRX Rolldown plugin structure', () => {
 		);
 		expect(result.code).toContain('export default marklessCompiledApp;');
 		expect(result.code).not.toContain('source: marklessSource');
+		const resumeModule = result.virtualModules.find((module) => module.type === 'resume');
+		expect(resumeModule?.source).toContain('export async function resumeContainerEvent');
+		expect(resumeModule?.source).toContain('await Promise.resolve(loadSymbol("symbol:0"))'); // T015e: specialized dispatcher awaits the symbol directly
 		expect(result.virtualModules.map((item) => item.type)).toEqual(
-			expect.arrayContaining(['payload', 'resolver', 'symbol']),
+			expect.arrayContaining(['payload', 'resolver', 'resume', 'symbol']),
 		);
 		expect(result.manifest.source).toBe('/workspace/app/src/App.tsrx');
 		expect(result.manifest.symbols).toContainEqual(
@@ -158,6 +163,8 @@ describe('TSRX Rolldown plugin structure', () => {
 		});
 
 		expect(result.code).toContain('renderCsr: App,');
+		expect(result.code).not.toContain('resumeEventOnlyFromPayloadDocument');
+		expect(result.code).not.toContain('resumeContainerEvent');
 		expect(result.code).not.toContain('preloadCsrLazySymbols');
 		expect(result.code).not.toContain('bundle-graph.json');
 		expect(result.code).not.toContain('@markless/core/preload');
@@ -202,10 +209,12 @@ let count = state(0);
 			clientOutput: 'symbols-only',
 		});
 
-		expect(result.code).toContain('export async function resumeContainerEvent');
+		const resumeModule = result.virtualModules.find((module) => module.type === 'resume');
+		expect(result.code).not.toContain('export async function resumeContainerEvent');
+		expect(resumeModule?.source).toContain('export async function resumeContainerEvent');
 		expect(result.code).toContain('export { marklessSsrLoadSymbolRoute as loadSymbol };');
 		expect(result.code).toContain('function marklessSsrLoadSymbolRoute(symbolId)');
-		expect(result.code).toContain('loadSymbol: marklessSsrLoadSymbolRoute,');
+		expect(resumeModule?.source).toContain('marklessSsrLoadSymbolRoute'); // composed pages are excluded from specialization (T015g PM); the routed loader wires the full path
 		expect(result.code).not.toContain('function marklessResumeLoadSymbol');
 		expect(result.code).toContain('import("./Child.tsrx?markless-symbols")');
 		expect(result.code).toContain("import('virtual:markless:symbol:");
@@ -230,8 +239,10 @@ let count = state(0);
 			environment: 'client',
 		});
 
-		expect(result.code).toContain('export async function resumeContainerEvent');
-		expect(result.code).toContain('loadSymbol: marklessSsrLoadSymbolRoute,');
+		const resumeModule = result.virtualModules.find((module) => module.type === 'resume');
+		expect(result.code).not.toContain('export async function resumeContainerEvent');
+		expect(resumeModule?.source).toContain('export async function resumeContainerEvent');
+		expect(resumeModule?.source).toContain('marklessSsrLoadSymbolRoute'); // composed pages are excluded from specialization (T015g PM); the routed loader wires the full path
 		expect(result.code).toContain('const marklessLoadLocalSymbol = loadSymbol;');
 		expect(result.code).toContain('function marklessSsrLoadSymbolRoute(symbolId)');
 		expect(result.code).toContain('import("./Child.tsrx?markless-symbols")');
@@ -251,7 +262,7 @@ let count = state(0);
 			code: string;
 		};
 
-		expect(result.code).toContain('export async function resumeContainerEvent');
+		expect(result.code).not.toContain('export async function resumeContainerEvent');
 		expect(result.code).not.toContain('document.createElement');
 		expect(result.code).not.toContain('export default App;');
 	});
@@ -278,7 +289,7 @@ let active = state(true);
 			source,
 		});
 
-		expect(result.code).toContain('export async function resumeContainerEvent');
+		expect(result.code).not.toContain('export async function resumeContainerEvent');
 		expect(result.code).not.toContain('export function render(');
 		expect(result.code).not.toContain('export function renderToString(');
 	});
@@ -359,12 +370,16 @@ let active = state(true);
 		const encoded = encodeURIComponent('/workspace/app/src/App.tsrx');
 		const payloadId = `virtual:markless:payload:${encoded}`;
 		const resolverId = `virtual:markless:resolver:${encoded}`;
+		const resumeId = `virtual:markless:resume:${encoded}`;
 
 		expect(result.code).toContain('virtual:markless:payload:');
 		expect(payloadId).toBeTruthy();
 		expect(resolverId).toBeTruthy();
 		expect(await callResolveId(plugin, payloadId!)).toEqual(
 			expect.objectContaining({ id: `\0${payloadId}` }),
+		);
+		expect(await callResolveId(plugin, resumeId)).toEqual(
+			expect.objectContaining({ id: `\0${resumeId}` }),
 		);
 		const payloadSource = (await callLoad(plugin, `\0${payloadId}`)) as string;
 		expect(payloadSource).toContain('export const state =');
@@ -373,6 +388,10 @@ let active = state(true);
 		expect(payloadSource).not.toContain('export default');
 		const resolverSource = (await callLoad(plugin, `\0${resolverId}`)) as string;
 		expect(resolverSource).toContain('if (id === "symbol:0")');
+		const resumeSource = (await callLoad(plugin, `\0${resumeId}`)) as string;
+		expect(resumeSource).toContain('export async function resumeContainerEvent');
+		expect(resumeSource).toContain('marklessResumeSpecializedScalarEvent');
+		expect(resumeSource).not.toContain('resumeScalarCoreEventFromPayloadDocument');
 		const symbolIds = ['symbol:0', 'symbol:1'].map(
 			(symbolId) => `virtual:markless:symbol:${encoded}:${encodeURIComponent(symbolId)}`,
 		);
@@ -399,6 +418,96 @@ let active = state(true);
 		expect(result).toEqual({ id: '/workspace/app/src/items.ts' });
 	});
 
+	test('base plugin resolves generated inline helper imports from the web package source', async () => {
+		const plugin = marklessClient();
+		const result = await callResolveId(plugin, '@markless/web/inline/sync-policy-core');
+
+		expect(result).toEqual(
+			expect.objectContaining({ id: expect.stringMatching(/packages\/web\/src\/inline\/sync-policy-core\.ts$/) }),
+		);
+	});
+
+	test('base plugin resolves transformed virtual resume symbol routes from the source module', async () => {
+		const plugin = marklessClient();
+		const filename = '/workspace/app/src/ProgressiveFullTier.tsrx';
+		const source = `import { state } from '@markless/core';
+import Child from './progressive-child-panel.tsrx';
+export function App() @{
+let count = state(0);
+<main><button onClick={() => count++}>{count}</button><Child count={count} /></main>
+}`;
+		await callBuildStart(plugin, { cwd: '/workspace/app' });
+		await callTransform(plugin, source, filename);
+
+		const resumeId = `virtual:markless:resume:${encodeURIComponent(filename)}`;
+		const resumeSource = (await callLoad(plugin, `\0${resumeId}`)) as string;
+		const symbolRouteSpecifiers = [
+			...resumeSource.matchAll(/import\("([^"]+\?markless-symbols)"\)/g),
+		].map((match) => match[1]!);
+		const resolve = vi.fn(async () => ({
+			id: '/workspace/app/src/progressive-child-panel.tsrx?markless-symbols',
+		}));
+
+		expect(symbolRouteSpecifiers).toEqual(['./progressive-child-panel.tsrx?markless-symbols']);
+		const result = await callResolveId(
+			plugin,
+			symbolRouteSpecifiers[0]!,
+			`\0${resumeId}`,
+			{ resolve },
+		);
+
+		expect(resolve).toHaveBeenCalledWith(
+			'./progressive-child-panel.tsrx?markless-symbols',
+			filename,
+			{ skipSelf: true },
+		);
+		expect(result).toEqual({
+			id: '/workspace/app/src/progressive-child-panel.tsrx?markless-symbols',
+			});
+	});
+
+	test('client resume source requests serve the generated resume module only', async () => {
+		const plugin = marklessClient();
+		const filename = '/workspace/app/pages/index.tsrx';
+
+		callBuildStart(plugin, { cwd: '/workspace/app' });
+		const result = (await callTransform(plugin, source, `${filename}?markless-resume`)) as {
+			code: string;
+		};
+
+		expect(resumeVirtualModuleId(filename)).toBe(
+			`virtual:markless:resume:${encodeURIComponent(filename)}`,
+		);
+		expect(result.code).toContain('export async function resumeContainerEvent');
+		expect(result.code).toContain('marklessResumeSpecializedScalarEvent');
+		expect(result.code).not.toContain('resumeScalarCoreEventFromPayloadDocument');
+		expect(result.code).not.toContain('const marklessCompiledApp = {');
+		expect(result.code).not.toContain('renderCsr:');
+	});
+
+	test('production client execution logging does not alter hash-bearing modules', async () => {
+		const plugin = marklessClient({ executionLog: 'auto' });
+		const filename = '/workspace/app/src/App.tsrx';
+
+		callBuildStart(plugin, { cwd: '/workspace/app' });
+
+		expect(
+			await callTransform(
+				plugin,
+				'export const runtime = true;',
+				'/workspace/app/packages/web/src/event-only-resume.ts',
+			),
+		).toBeNull();
+
+		await callTransform(plugin, source, filename);
+		const symbolId =
+			`virtual:markless:symbol:${encodeURIComponent(filename)}:${encodeURIComponent('symbol:0')}`;
+		const symbolSource = (await callLoad(plugin, `\0${symbolId}`)) as string;
+
+		expect(symbolSource).not.toContain('__mxLog?.add');
+		expect(symbolSource).toContain('export function symbol_0_');
+	});
+
 	test('buildStart clears stale virtual modules and transform manifests', async () => {
 		const plugin = marklessClient();
 
@@ -414,7 +523,7 @@ let active = state(true);
 		expect(await callLoad(plugin, `\0${payloadId}`)).toBeNull();
 		const emitFile = vi.fn();
 		const symbolId = `virtual:markless:symbol:${encoded}:${encodeURIComponent('symbol:0')}`;
-		callGenerateBundle(
+		await callGenerateBundle(
 			plugin,
 			{
 				'build/chunk-0.js': {
@@ -448,6 +557,7 @@ let active = state(true);
 		const entryVirtualIds = [
 			`virtual:markless:payload:${encoded}`,
 			`virtual:markless:resolver:${encoded}`,
+			`virtual:markless:resume:${encoded}`,
 		];
 		const resolverId = `virtual:markless:resolver:${encoded}`;
 		const resolverSource = (await callLoad(plugin, `\0${resolverId}`)) as string;
@@ -472,7 +582,7 @@ let active = state(true);
 			]),
 		);
 
-		callGenerateBundle(plugin, bundle, emitFile);
+		await callGenerateBundle(plugin, bundle, emitFile);
 
 		const graphAsset = emittedAsset(emitFile, MARKLESS_BUNDLE_GRAPH);
 		const graph = JSON.parse(String(graphAsset?.source)) as Array<string | number>;
@@ -493,6 +603,51 @@ let active = state(true);
 		expect(resolverChunk?.code).toContain('if (id === "symbol:0")');
 		expect(resolverChunk?.code).toContain('import(/* @vite-ignore */ "./chunk-');
 		expect(resolverChunk?.code).not.toContain('virtual:markless:symbol:');
+	});
+
+	test('generateBundle injects every compact graph symbol preload into HTML', async () => {
+		const plugin = marklessClient();
+		const emitFile = vi.fn();
+		const html = { type: 'asset', fileName: 'index.html', source: '<head></head>' };
+		const filename = '/workspace/app/src/App.tsrx';
+		const encoded = encodeURIComponent(filename);
+
+		callBuildStart(plugin, { cwd: '/workspace/app' });
+		await callTransform(plugin, source, filename);
+		const symbolChunks = ['symbol:0', 'symbol:1'].map((symbolId, index) => {
+			const virtualId = `\0virtual:markless:symbol:${encoded}:${encodeURIComponent(symbolId)}`;
+			return [
+				`build/chunk-symbol-${index}.js`,
+				{
+					type: 'chunk',
+					fileName: `build/chunk-symbol-${index}.js`,
+					name: `chunk-symbol-${index}`,
+					code: 'export default {};',
+					exports: ['default'],
+					imports: [],
+					dynamicImports: [],
+					moduleIds: [virtualId],
+					facadeModuleId: virtualId,
+				},
+			] as const;
+		});
+
+		await callGenerateBundle(
+			plugin,
+			{
+				'index.html': html,
+				...Object.fromEntries(symbolChunks),
+			},
+			emitFile,
+		);
+
+		const htmlHrefs = [
+			...html.source.matchAll(/<link\b[^>]*\brel=["']modulepreload["'][^>]*\bhref=["']([^"']+)["']/g),
+		]
+			.map((match) => match[1]!)
+			.sort();
+
+		expect(htmlHrefs).toEqual(['/build/chunk-symbol-0.js', '/build/chunk-symbol-1.js']);
 	});
 });
 
@@ -533,7 +688,7 @@ test('transformTsrxModule emits a scoped style virtual CSS module and imports it
 	expect(result.code).toContain(`import ${JSON.stringify(styleModule!.id)};`);
 });
 
-test('transformTsrxModule escalates branch- and repeat-bearing modules to the full resume runtime', async () => {
+test('transformTsrxModule escalates full-only records but keeps qualifying rows lean', async () => {
 	const plain = await transformTsrxModule({
 		filename: '/workspace/app/src/Plain.tsrx',
 		source: `
@@ -550,8 +705,13 @@ export function App() @{
 `,
 		environment: 'client',
 	});
-	expect(plain.code).toContain('resumeEventOnlyFromPayloadDocument');
-	expect(plain.code).not.toContain('resumeFromPayloadDocument');
+	const plainResume = plain.virtualModules.find((module) => module.type === 'resume');
+	expect(plain.code).not.toContain('resumeEventOnlyFromPayloadDocument');
+	expect(plainResume?.source).toContain('marklessResumeSpecializedScalarEvent');
+	expect(plainResume?.source).not.toContain('resumeScalarCoreEventFromPayloadDocument');
+	expect(plain.code).not.toContain(
+		"import { resumeFromPayloadDocument } from '@markless/core/web/resume';",
+	);
 
 	const keyed = await transformTsrxModule({
 		filename: '/workspace/app/src/Rows.tsrx',
@@ -576,10 +736,35 @@ export function App() @{
 `,
 		environment: 'client',
 	});
-	// Row events need graph subscriptions and locals dispatch: the event-only
-	// runtime silently drops them, so keyed modules take the full runtime.
-	expect(keyed.code).toContain('resumeFromPayloadDocument');
+	// Row events need graph subscriptions and locals dispatch: the resume entry
+	// dynamically hands off to the full runtime.
+	const keyedResume = keyed.virtualModules.find((module) => module.type === 'resume');
 	expect(keyed.code).not.toContain('resumeEventOnlyFromPayloadDocument');
+	expect(keyed.code).not.toContain('resumeFromPayloadDocument');
+	expect(keyedResume?.source).toContain('resumeFromPayloadDocument');
+	expect(keyedResume?.source).toContain("import('@markless/core/web/resume')");
+	expect(keyed.code).not.toContain(
+		"import { resumeFromPayloadDocument } from '@markless/core/web/resume';",
+	);
+
+	const qualifyingKeyed = await transformTsrxModule({
+		filename: '/workspace/app/src/QualifyingRows.tsrx',
+		source: `
+import { state } from '@markless/core';
+export function App() @{
+	let entries = state([{ code: 'a' }]);
+	let chosen = state('');
+	<main>
+		<section>@for (const entry of entries; key entry.code) {<article><button onClick={() => chosen = entry.code}>Choose</button></article>}</section>
+		<output>{chosen}</output>
+	</main>
+}
+`,
+		environment: 'client',
+	});
+	const qualifyingKeyedResume = qualifyingKeyed.virtualModules.find((module) => module.type === 'resume');
+	expect(qualifyingKeyedResume?.source).toContain('resumeScalarRowEventFromPayloadDocument');
+	expect(qualifyingKeyedResume?.source).not.toContain("import('@markless/core/web/resume')");
 
 	const handles = await transformTsrxModule({
 		filename: '/workspace/app/src/Focus.tsrx',
@@ -598,9 +783,15 @@ export function App() @{
 `,
 		environment: 'client',
 	});
-	// Element handles materialize only in the full runtime.
-	expect(handles.code).toContain('resumeFromPayloadDocument');
+	// Element handles materialize only after the dynamic full-runtime handoff.
+	const handlesResume = handles.virtualModules.find((module) => module.type === 'resume');
 	expect(handles.code).not.toContain('resumeEventOnlyFromPayloadDocument');
+	expect(handles.code).not.toContain('resumeFromPayloadDocument');
+	expect(handlesResume?.source).toContain('resumeFromPayloadDocument');
+	expect(handlesResume?.source).toContain("import('@markless/core/web/resume')");
+	expect(handles.code).not.toContain(
+		"import { resumeFromPayloadDocument } from '@markless/core/web/resume';",
+	);
 
 	const boundaries = await transformTsrxModule({
 		filename: '/workspace/app/src/Async.tsrx',
@@ -621,9 +812,15 @@ export function App() @{
 `,
 		environment: 'client',
 	});
-	// Async boundary settle and revalidation live only in the full runtime.
-	expect(boundaries.code).toContain('resumeFromPayloadDocument');
+	// Async boundary settle and revalidation live behind the dynamic full-runtime handoff.
+	const boundariesResume = boundaries.virtualModules.find((module) => module.type === 'resume');
 	expect(boundaries.code).not.toContain('resumeEventOnlyFromPayloadDocument');
+	expect(boundaries.code).not.toContain('resumeFromPayloadDocument');
+	expect(boundariesResume?.source).toContain('resumeFromPayloadDocument');
+	expect(boundariesResume?.source).toContain("import('@markless/core/web/resume')");
+	expect(boundaries.code).not.toContain(
+		"import { resumeFromPayloadDocument } from '@markless/core/web/resume';",
+	);
 
 	const withChild = await transformTsrxModule({
 		filename: '/workspace/app/src/Shell.tsrx',
@@ -642,8 +839,15 @@ export function Shell() @{
 `,
 		environment: 'client',
 	});
-	// Child components may compose branches/boundaries/handles into the served
-	// payload that the parent module cannot see at compile time: escalate.
-	expect(withChild.code).toContain('resumeFromPayloadDocument');
+	// Child components alone are not payload records. The served payload
+	// inventory decides whether the lean tier can handle the page.
+	const withChildResume = withChild.virtualModules.find((module) => module.type === 'resume');
 	expect(withChild.code).not.toContain('resumeEventOnlyFromPayloadDocument');
+	expect(withChildResume?.source).not.toContain('resumeEventOnlyFromPayloadDocument');
+	expect(withChildResume?.source).toContain("import('@markless/core/web/resume')");
+	expect(withChild.code).not.toContain('loadFullResume: marklessFullResumeHandoff');
+	expect(withChild.code).not.toContain("import('@markless/core/web/resume')");
+	expect(withChild.code).not.toContain(
+		"import { resumeFromPayloadDocument } from '@markless/core/web/resume';",
+	);
 });

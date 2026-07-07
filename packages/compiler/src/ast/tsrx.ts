@@ -21,6 +21,7 @@ export function getComponentFunction(
 
 	if (declaration.type === 'FunctionDeclaration') {
 		const name = getIdentifierName(declaration.id as AnyNode | undefined);
+		if ((declaration.body as AnyNode | undefined)?.type !== 'JSXCodeBlock') return null;
 		return name ? { node: declaration, name } : null;
 	}
 

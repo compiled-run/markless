@@ -7,6 +7,7 @@ export type { CompilerDiagnostic, DiagnosticSuggestion, SourceSpan } from './dia
 export type SemanticGraphInput = {
 	readonly filename: string;
 	readonly source: string;
+	readonly importedModuleInterfaces?: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
 };
 
 export type SemanticComponent = {
@@ -66,6 +67,39 @@ export type SemanticGraphBinding = {
 	readonly asyncCapable?: boolean;
 	readonly dependencies?: ReadonlyArray<SemanticGraphDependency>;
 	readonly functionSource?: string;
+};
+
+export type ModuleGraphInterfaceHelperReturn = {
+	readonly kind: 'state' | 'computed';
+	readonly localName: string;
+	readonly declarationKind?: SemanticGraphBinding['declarationKind'];
+	readonly writable: boolean;
+	readonly valueKind?: SemanticGraphBinding['valueKind'];
+	readonly initialValue?: unknown;
+	readonly initializerSource?: string;
+	readonly async?: boolean;
+	readonly asyncCapable?: boolean;
+	readonly functionSource?: string;
+};
+
+export type ModuleGraphInterfaceExport =
+	| {
+			readonly exportName: string;
+			readonly localName: string;
+			readonly kind: 'function';
+			readonly returns: ModuleGraphInterfaceHelperReturn;
+	  }
+	| {
+			readonly exportName: string;
+			readonly localName: string;
+			readonly kind: 'graph-binding';
+			readonly bindingKind: 'state' | 'computed';
+	  };
+
+export type ModuleGraphInterfaceArtifact = {
+	readonly passId: 'module-graph-interface';
+	readonly filename: string;
+	readonly exports: ReadonlyArray<ModuleGraphInterfaceExport>;
 };
 
 export type SemanticSharedScope = 'request' | 'container' | 'page';
@@ -201,17 +235,42 @@ export type SemanticEvent = {
 
 export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 	readonly code:
+		| 'MARKLESS_PARSE_ERROR'
 		| 'MARKLESS_FRAMEWORK_IMPORT_REQUIRED'
+		| 'MARKLESS_FRAMEWORK_API_ALIAS_UNSUPPORTED'
 		| 'MARKLESS_STATE_MODULE_SCOPE'
+		| 'MARKLESS_STATE_CREATION_SITE_UNSTABLE'
+		| 'MARKLESS_STATE_HELPER_RETURN_UNSUPPORTED'
+		| 'MARKLESS_STATE_CROSS_MODULE_IMPORT'
+		| 'MARKLESS_STATE_NESTED_CREATION'
+		| 'MARKLESS_COMPUTED_DEPENDENCY_CYCLE'
 		| 'MARKLESS_ASYNC_POST_AWAIT_READ'
 		| 'MARKLESS_ASYNC_BOUNDARY_REQUIRED'
 		| 'MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED'
 		| 'MARKLESS_STATE_ELEMENT_HANDLE_UNSERIALIZABLE'
+		| 'MARKLESS_STATE_WRITE_IN_TEMPLATE'
+		| 'MARKLESS_STATE_WRITE_IN_COMPUTED'
 		| 'MARKLESS_SHARED_DEFINITION_CYCLE'
+		| 'MARKLESS_SHARED_SCOPE_INVALID'
 		| 'MARKLESS_ELEMENT_HANDLE_REQUIRED'
 		| 'MARKLESS_ELEMENT_HANDLE_DUPLICATE'
+		| 'MARKLESS_ELEMENT_HANDLE_UNBOUND'
+		| 'MARKLESS_ELEMENT_HANDLE_PROP_UNSUPPORTED'
+		| 'MARKLESS_ELEMENT_MODULE_SCOPE'
+		| 'MARKLESS_ELEMENT_HANDLE_RENDER_READ'
 		| 'MARKLESS_ATTACH_HOST_ELEMENT_REQUIRED'
-		| 'MARKLESS_SYNC_POLICY_UNEXTRACTABLE';
+		| 'MARKLESS_EVENT_HANDLER_NOT_A_FUNCTION'
+		| 'MARKLESS_EVENT_SPREAD_UNSUPPORTED' | 'MARKLESS_SPREAD_STATIC_SNAPSHOT'
+		| 'MARKLESS_ATTRIBUTE_OBJECT_VALUE' | 'MARKLESS_ATTRIBUTE_DUPLICATE'
+		| 'MARKLESS_STYLE_OBJECT_UNSUPPORTED'
+		| 'MARKLESS_SYNC_POLICY_UNEXTRACTABLE'
+		| 'MARKLESS_REPEAT_KEY_REQUIRED'
+		| 'MARKLESS_REPEAT_KEY_IS_INDEX'
+		| 'MARKLESS_REPEAT_KEY_UNSTABLE'
+		| 'MARKLESS_SUBMODULE_UNSUPPORTED'
+		| 'MARKLESS_ALLOW_ERROR_UNSUPPRESSIBLE'
+		| 'MARKLESS_ALLOW_REASON_REQUIRED'
+		| 'MARKLESS_ALLOW_STALE';
 	readonly phase: 'semantic-graph' | 'sync-policy';
 	readonly passId: 'tsrx-semantic-graph';
 };
@@ -220,6 +279,8 @@ export type SemanticStateWrite = {
 	readonly target: string;
 	readonly sharedDefinitionId?: string;
 	readonly targetSpan?: SourceSpan;
+	readonly writeScope?: 'component' | 'handler' | 'helper' | 'computed' | 'module';
+	readonly componentName?: string;
 	readonly operation: 'assign' | 'update' | 'call' | 'delete';
 	readonly assignmentOperator?: string;
 	readonly valueSource?: string;
@@ -276,12 +337,15 @@ export type SemanticTemplateRead = {
 	readonly hostNodeId: string;
 	readonly target: SemanticTemplateBindingTarget;
 	readonly asyncBoundaryId?: string;
+	readonly computedGraphNodeId?: string;
 };
 
 export type SemanticElementHandleBinding = {
 	readonly hostNodeId: string;
 	readonly handleName: string;
+	readonly componentName?: string;
 	readonly sourceSpan?: SourceSpan;
+	readonly keyedRepeatScopeIds: ReadonlyArray<string>;
 };
 
 export type SemanticBehavior = {
@@ -296,6 +360,13 @@ export type SemanticLocalBinding = {
 	readonly kind: 'function' | 'class-instance' | 'dom-node' | 'non-serializable-constant';
 	readonly declarationKind?: SemanticGraphBinding['declarationKind'];
 	readonly sourceSpan?: SourceSpan;
+};
+
+export type SemanticLocalDeclaration = {
+	readonly name: string;
+	readonly scope: 'module' | 'component' | 'function';
+	readonly componentName?: string;
+	readonly aliasOf?: string;
 };
 
 export type SemanticSyncPolicyConstant = {
@@ -319,12 +390,14 @@ export type SemanticGraphArtifact = {
 	readonly behaviors: ReadonlyArray<SemanticBehavior>;
 	readonly elementHandleBindings: ReadonlyArray<SemanticElementHandleBinding>;
 	readonly localBindings: ReadonlyArray<SemanticLocalBinding>;
+	readonly localDeclarations: ReadonlyArray<SemanticLocalDeclaration>;
 	readonly aliases: ReadonlyArray<SemanticGraphAlias>;
 	readonly stateReads: ReadonlyArray<SemanticStateRead>;
 	readonly templateReads: ReadonlyArray<SemanticTemplateRead>;
 	readonly stateWrites: ReadonlyArray<SemanticStateWrite>;
 	readonly asyncBoundaries: ReadonlyArray<{ readonly id: string; readonly anchorOrder: number }>;
 	readonly branchSites: ReadonlyArray<SemanticBranchSite>;
+	readonly moduleGraphInterface: ModuleGraphInterfaceArtifact;
 	readonly diagnostics: ReadonlyArray<SemanticGraphDiagnostic>;
 };
 
@@ -340,7 +413,11 @@ export type StateLoweringDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_STATE_OPTIONAL_CHAIN_WRITE'
 		| 'MARKLESS_STATE_REST_ALIAS_EXCLUDED_PATH'
 		| 'MARKLESS_STATE_READ_ONLY_WRITE'
-		| 'MARKLESS_STATE_CONST_REASSIGNMENT';
+		| 'MARKLESS_STATE_CONST_REASSIGNMENT'
+		| 'MARKLESS_STATE_STALE_LOCAL_WRITE'
+		| 'MARKLESS_STATE_MODULE_ESCAPE'
+		| 'MARKLESS_STATE_ELEMENT_HANDLE_UNSERIALIZABLE'
+		| 'MARKLESS_TEMPLATE_EXPRESSION_STATIC';
 	readonly phase: 'state-lowering';
 	readonly passId: 'state-lowering';
 	readonly source: string;
@@ -484,6 +561,7 @@ export type PlannedSymbol =
 			readonly hostNodeId: string;
 			readonly eventName: string;
 			readonly source: string;
+			readonly sourceSpan?: SourceSpan;
 			readonly parameters: ReadonlyArray<string>;
 			readonly moduleImports?: ReadonlyArray<SemanticModuleImport>;
 			readonly order: number;
@@ -494,8 +572,10 @@ export type PlannedSymbol =
 			readonly elementHandleCalls?: ReadonlyArray<{
 				readonly handleName: string;
 				readonly method: string;
+				readonly source: string;
 				readonly argumentSources: ReadonlyArray<string>;
 				readonly offset: number;
+				readonly endOffset: number;
 			}>;
 	  }
 	| {
@@ -504,6 +584,7 @@ export type PlannedSymbol =
 			readonly componentEdgeId: string;
 			readonly propName: string;
 			readonly source: string;
+			readonly sourceSpan?: SourceSpan;
 			readonly moduleImports?: ReadonlyArray<SemanticModuleImport>;
 			readonly reads?: ReadonlyArray<LoweredStateRead>;
 			readonly writes?: ReadonlyArray<LoweredStateWrite>;
@@ -529,6 +610,15 @@ export type PlannedSymbol =
 	| {
 			readonly id: string;
 			readonly kind: 'async-computed-runner';
+			readonly graphNodeId: string;
+			readonly name: string;
+			readonly source: string;
+			readonly dependencies?: ReadonlyArray<SemanticGraphDependency>;
+			readonly moduleImports?: ReadonlyArray<SemanticModuleImport>;
+	  }
+	| {
+			readonly id: string;
+			readonly kind: 'sync-computed-derive';
 			readonly graphNodeId: string;
 			readonly name: string;
 			readonly source: string;
@@ -572,7 +662,10 @@ export type CaptureAnalysisInput = {
 };
 
 export type CaptureAnalysisDiagnostic = CompilerDiagnostic & {
-	readonly code: 'MARKLESS_CAPTURE_UNSUPPORTED_VALUE';
+	readonly code:
+		| 'MARKLESS_CAPTURE_UNSUPPORTED_VALUE'
+		| 'MARKLESS_BEHAVIOR_SYMBOL_EMIT_UNSUPPORTED'
+		| 'MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED';
 	readonly phase: 'capture-analysis';
 	readonly passId: 'capture-analysis';
 	readonly symbolId?: string;
@@ -608,6 +701,53 @@ export type SymbolModulesArtifact = {
 	readonly diagnostics: ReadonlyArray<CaptureAnalysisDiagnostic>;
 };
 
+export type RuntimeDemandMapRecord = {
+	readonly recordId: string;
+	readonly kind: string;
+	readonly hostNodeId?: string;
+	readonly eventName?: string;
+	readonly symbolIds?: ReadonlyArray<string>;
+	readonly runtimeModuleIds: ReadonlyArray<string>;
+};
+
+export type RuntimeDemandMapAction = {
+	readonly hostNodeId: string;
+	readonly eventName: string;
+	readonly recordKind: 'event' | 'keyed-repeat-row';
+	readonly recordKinds: ReadonlyArray<string>;
+	readonly payloadRecordIds: ReadonlyArray<string>;
+	readonly runtimeModuleIds: ReadonlyArray<string>;
+	readonly plan?: RuntimeDemandMapActionPlan;
+};
+
+export type RuntimeDemandMapActionPlan = {
+	readonly version: 1;
+	readonly kind: 'scalar' | 'row';
+	readonly symbolId: string;
+	readonly cell: string;
+	readonly write: { readonly kind: 'assign' | 'update'; readonly value?: unknown; readonly valueKind?: 'undefined'; readonly localPath?: ReadonlyArray<string>; readonly updateOperator?: '++' | '--' };
+	readonly textUpdates: ReadonlyArray<{ readonly hostNodeId: string; readonly graphNodeId: string; readonly symbolId: string; readonly prefix?: string }>;
+	readonly repeatId?: string;
+	readonly fullDecodeCells?: ReadonlyArray<string>;
+};
+
+export type RuntimeDemandMapArtifact = {
+	readonly passId: 'runtime-demand-map';
+	readonly version: 1;
+	readonly recordKinds: ReadonlyArray<{
+		readonly kind: string;
+		readonly replaced: boolean;
+	}>;
+	readonly symbols: ReadonlyArray<{
+		readonly symbolId: string;
+		readonly kind: PlannedSymbol['kind'];
+		readonly runtimeModuleIds: ReadonlyArray<string>;
+	}>;
+	readonly payloadRecords: ReadonlyArray<RuntimeDemandMapRecord>;
+	readonly actions: ReadonlyArray<RuntimeDemandMapAction>;
+	readonly unknownRecordModuleIds: ReadonlyArray<string>;
+};
+
 export type SymbolResolverModuleInput = {
 	readonly buildId?: string;
 	readonly resolverId?: string;
@@ -630,6 +770,7 @@ export type SymbolResolverModuleManifest = readonly [
 export type ProtocolStatePayloadInput = {
 	readonly semanticGraph: SemanticGraphArtifact;
 	readonly payloadArena: PayloadArenaArtifact;
+	readonly symbolResolver?: SymbolResolverPlan;
 };
 
 export type ProtocolViewPayloadInput = {
@@ -767,6 +908,7 @@ export type PublicRenderPlanBranchArms = {
 	// Switch sites: literal case-test values per arm, null for @default.
 	// Absent for if-sites (truthiness selects arm 0/1).
 	readonly armTests?: ReadonlyArray<unknown>;
+	readonly declaredEmptyArms?: ReadonlyArray<number>;
 	// Per arm: hosts addressed by arm-relative raw childNodes paths, so the
 	// runtime can rewire their records after a flip.
 	readonly armHosts?: ReadonlyArray<
@@ -903,6 +1045,7 @@ export type CompilerPassGraph = {
 export type CompileTsrxModuleResult = {
 	readonly passGraph: CompilerPassGraph;
 	readonly semanticGraph: SemanticGraphArtifact;
+	readonly moduleGraphInterface: ModuleGraphInterfaceArtifact;
 	readonly stateLowering: StateLoweringArtifact;
 	readonly payloadArena: PayloadArenaArtifact;
 	readonly symbolResolver: SymbolResolverPlan;
@@ -913,6 +1056,7 @@ export type CompileTsrxModuleResult = {
 	readonly publicRenderPlan: PublicRenderPlanArtifact;
 	readonly publicRenderModule: PublicRenderModuleArtifact;
 	readonly symbolModules: SymbolModulesArtifact;
+	readonly runtimeDemandMap: RuntimeDemandMapArtifact;
 	readonly symbolResolverModule: string;
 	readonly symbolResolverModuleManifest: SymbolResolverModuleManifest;
 };

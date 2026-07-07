@@ -12,6 +12,8 @@ import {
 	resolveGraphPath,
 	semanticAliasMap,
 } from '../artifact-helpers/graph-paths.ts';
+import { getIdentifierName, walkNode, type AnyNode } from '../ast/nodes.ts';
+import { parseJavaScriptModule } from '../js-ast.ts';
 
 export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPlan {
 	const symbols: PlannedSymbol[] = [];
@@ -32,6 +34,7 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 				hostNodeId: event.hostNodeId,
 				eventName: event.eventName,
 				source,
+				sourceSpan,
 				parameters: event.handlerParameters[order] ?? [],
 				...(moduleImports.length > 0 ? { moduleImports } : {}),
 				order,
@@ -58,6 +61,7 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 				componentEdgeId: edge.id,
 				propName: prop.name,
 				source: prop.source,
+				sourceSpan: prop.sourceSpan,
 				...(moduleImports.length > 0 ? { moduleImports } : {}),
 				reads: eventReads(prop.source, input.stateLowering?.reads),
 				writes: eventWrites(prop.source, input.stateLowering?.writes, prop.sourceSpan),
@@ -98,7 +102,7 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 
 		symbols.push({
 			id: `symbol:${nextSymbolId++}`,
-			kind: 'async-computed-runner',
+			kind: computed.async ? 'async-computed-runner' : 'sync-computed-derive',
 			graphNodeId: computed.graphNodeId,
 			name: computed.name,
 			source,
@@ -352,33 +356,93 @@ function findModuleImport(
 
 // Handler statements like box.focus() reference element() handles; they must
 // survive into the emitted symbol (the runtime resolves the handle by name).
-// Matches direct method calls on a known handle name and records the offset
-// so emission can interleave them with lowered writes in authored order.
+// Walks the handler AST so optional calls, nested callbacks, and lookalike
+// string/comment text keep authored source semantics.
 function collectElementHandleCalls(
 	source: string,
 	elementHandles: ReadonlyArray<{ readonly name: string }>,
 ): ReadonlyArray<{
 	readonly handleName: string;
 	readonly method: string;
+	readonly source: string;
 	readonly argumentSources: ReadonlyArray<string>;
 	readonly offset: number;
+	readonly endOffset: number;
 }> {
 	if (elementHandles.length === 0) return [];
 	const names = new Set(elementHandles.map((handle) => handle.name));
 	const calls: Array<{
 		handleName: string;
 		method: string;
+		source: string;
 		argumentSources: string[];
 		offset: number;
+		endOffset: number;
 	}> = [];
-	const callPattern = /(?<![\w$.])([A-Za-z_$][\w$]*)\.([A-Za-z_$][\w$]*)\(([^()]*)\)/g;
-	for (const match of source.matchAll(callPattern)) {
-		const [, handleName, method, argsSource] = match;
-		if (!handleName || !method || !names.has(handleName)) continue;
-		const argumentSources = argsSource!.trim()
-			? argsSource!.split(',').map((argument) => argument.trim())
-			: [];
-		calls.push({ handleName, method, argumentSources, offset: match.index ?? 0 });
+
+	const prefix = 'const __marklessHandler = ';
+	const wrappedSource = `${prefix}${source};`;
+	let ast: AnyNode;
+	try {
+		ast = parseJavaScriptModule(wrappedSource);
+	} catch {
+		return [];
 	}
+
+	walkNode(ast, (node) => {
+		if (node.type !== 'CallExpression') return;
+
+		const callee = unwrapChainExpression(node.callee as AnyNode | undefined);
+		if (callee?.type !== 'MemberExpression') return;
+
+		const handleName = getIdentifierName(
+			unwrapChainExpression(callee.object as AnyNode | undefined),
+		);
+		const method = getStaticMemberPropertyName(callee);
+		if (!handleName || !method || !names.has(handleName)) return;
+		if (typeof node.start !== 'number' || typeof node.end !== 'number') return;
+
+		const offset = node.start - prefix.length;
+		const endOffset = node.end - prefix.length;
+		if (offset < 0 || endOffset <= offset || endOffset > source.length) return;
+
+		const argumentSources = asNodeArray(node.arguments).map((argument) =>
+			wrappedSource.slice(argument.start, argument.end).trim(),
+		);
+		calls.push({
+			handleName,
+			method,
+			source: source.slice(offset, endOffset),
+			argumentSources,
+			offset,
+			endOffset,
+		});
+	});
+
 	return calls;
+}
+
+function unwrapChainExpression(node: AnyNode | undefined): AnyNode | undefined {
+	return node?.type === 'ChainExpression' ? (node.expression as AnyNode | undefined) : node;
+}
+
+function getStaticMemberPropertyName(node: AnyNode): string | null {
+	const property = node.property as AnyNode | undefined;
+	if (typeof property?.name === 'string') return property.name;
+	if (node.computed === true && property?.type === 'Literal' && typeof property.value === 'string') {
+		return property.value;
+	}
+	return null;
+}
+
+function asNodeArray(value: unknown): AnyNode[] {
+	return Array.isArray(value)
+		? value.filter(
+				(item): item is AnyNode =>
+					typeof item === 'object' &&
+					item !== null &&
+					typeof (item as AnyNode).start === 'number' &&
+					typeof (item as AnyNode).end === 'number',
+			)
+		: [];
 }

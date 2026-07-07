@@ -19,6 +19,31 @@ their prerequisites exist:
 - Server functions / RPC story. See "TSRX Submodule Host Boundary (Decision
   Draft)" below for the submodule-shaped slice of this decision.
 - Scoped `<style>` blocks: ACCEPTED 2026-07-02, see `01-tsrx-host-contract.md`.
+- Ingress sources (external world → readonly graph cell): `media()` for
+  `matchMedia`-backed cells and a constrained generic bridge primitive. Until
+  then, the documented recipe is an `attach` behavior writing a `state()`
+  cell.
+- Function-exact runtime emission (accepted direction, researched 2026-07-05):
+  runtime authored as fine-grained functions; compiler emits per-route imports
+  of exactly the functions each route's records/constructs require; bundler
+  packs per-route chunks over a shared core; emitted-equals-required assertions
+  replace runtime capability gating; size walls tighten accordingly. Includes
+  migrating compiler-inlined helper strings in emitted modules to runtime
+  imports. See 06-runtime-resumer.md "Progressive runtime execution".
+- Execution visibility for developers (owner-designed 2026-07-05, build next
+  after the progressive-execution goal): per-interaction collapsed console
+  groups — "click [data-counter] · woke 2 modules (1.4 KB) · 8 untouched" —
+  whose expanded lines show record-level causality ("woke web/event-dispatch
+  <- click matched event record h1"), plus a one-line resume summary ("resumed:
+  0.6 KB executed, 9 modules preloaded (0 executed)"). MUST work on PRODUCTION
+  bundles (owner ruling: dev serves unbundled modules; the question is what the
+  real chunk graph executes): registration ships dormant as
+  `globalThis.__mxLog?.add(id)` (one property read when disabled, ~200-300 B gz
+  total), the logger is a lazy chunk loaded only when enabled. Enablement:
+  local origins (localhost/127.0.0.1/[::1]) auto-on — so `vite preview` logs
+  out of the box — plus `?markless-log` / localStorage flag for deployed
+  sites; build options `executionLog: 'never' | 'always'` strip or force.
+  v2: dev overlay for aggregates. Until built: Chrome Coverage tab.
 - Devtools (graph visualization).
 - Strict no-inline CSP mode for the resumer, including external bootstrap
   emission, hash/nonce automation beyond caller-provided `renderToString`

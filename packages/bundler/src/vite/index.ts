@@ -10,6 +10,7 @@ import type {
 import type { OutputOptions } from 'rolldown';
 import { joinURL, parsePath } from 'ufo';
 import { createPreloadGraphAdder } from '../build/bundle-graph.ts';
+import { executionLogActivationInjection } from '../execution-log.ts';
 import { outputDefaults } from '../build/chunking.ts';
 import { createMarklessRolldownPlugin } from '../rolldown.ts';
 import {
@@ -47,6 +48,7 @@ export interface MarklessViteOptions extends MarklessRolldownOptions {
 
 type MarklessOutputOptions = OutputOptions | OutputOptions[] | undefined;
 type InternalMarklessRolldownOptions = MarklessRolldownOptions & {
+	emitResumeModules?: boolean;
 	publicPath?: (fileName: string) => string;
 };
 type RolldownInputConfig = string | readonly string[] | Record<string, string> | undefined;
@@ -90,7 +92,7 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 		},
 		config(config, env) {
 			command = env.command;
-			configDefaults(config, options);
+			configDefaults(config, options, rolldownOptions);
 		},
 		configResolved(resolvedConfig) {
 			const serve = resolvedConfig.command === 'serve';
@@ -144,7 +146,16 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 			hmr.configureServer(server);
 		},
 		transformIndexHtml() {
-			return hmr.transformIndexHtml();
+			const hmrResult = hmr.transformIndexHtml();
+			const injection = executionLogActivationInjection(rolldownOptions.executionLog);
+			if (!injection) return hmrResult;
+			const tag = {
+				tag: injection.tag,
+				injectTo: injection.location,
+				attrs: injection.attributes,
+				children: injection.children,
+			};
+			return Array.isArray(hmrResult) ? [...hmrResult, tag] : [tag];
 		},
 		resolveId: {
 			order: 'pre',
@@ -235,7 +246,11 @@ function skipDuplicateBuilds(builder: ViteBuilder, names: readonly string[]) {
 	};
 }
 
-function configDefaults(config: UserConfig, options: MarklessViteOptions) {
+function configDefaults(
+	config: UserConfig,
+	options: MarklessViteOptions,
+	internalOptions: InternalMarklessRolldownOptions,
+) {
 	if (config.build?.lib || config.build?.ssr) {
 		return;
 	}
@@ -243,6 +258,7 @@ function configDefaults(config: UserConfig, options: MarklessViteOptions) {
 	const build = (config.build ??= {});
 	const ssrSymbolInput = ssrTsrxInput(config, options);
 	if (ssrSymbolInput) {
+		internalOptions.emitResumeModules = true;
 		const rolldownOptions = (build.rolldownOptions ??= {});
 		rolldownOptions.input = withSsrSymbolInput(
 			rolldownOptions.input as RolldownInputConfig,

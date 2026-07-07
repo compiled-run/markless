@@ -44,7 +44,12 @@ JSX/TSX is explicitly **not** supported.
    container; a tiny inline browser resumer wakes up only the code a user
    actually triggers. In CSR, `render(App, { target })` executes component
    bodies in the browser, creates a live runtime container, and must work without
-   SSR payload scripts or the resumer.
+   SSR payload scripts or the resumer. The runtime itself is progressive:
+   capability modules load only when a page's payload declares their record
+   kinds, and execute only when an action demands them — runtime execution is
+   proportional to what the user does, not to what the page contains or what
+   the framework supports (see 06-runtime-resumer.md "Progressive runtime
+   execution").
 2. **Zero markers.** No `$` suffixes, no `.value`, no `Tracked<T>` boxes, no
    special destructuring syntax, no reactive collection subclasses
    (`RippleArray`-style). The reactive surface is plain values and plain mutation.

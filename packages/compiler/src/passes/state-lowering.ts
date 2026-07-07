@@ -4,6 +4,7 @@ import type {
 	SemanticGraphAlias,
 	SemanticGraphArtifact,
 	SemanticGraphBinding,
+	SemanticLocalDeclaration,
 	SemanticStateWrite,
 	SourceSpan,
 	StateLoweringArtifact,
@@ -24,6 +25,20 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 	const diagnostics: StateLoweringDiagnostic[] = [];
 
 	for (const read of input.semanticGraph.templateReads) {
+		if (read.computedGraphNodeId) {
+			const computed = input.semanticGraph.graphBindings.find(
+				(binding) => binding.id === read.computedGraphNodeId,
+			);
+			for (const dependency of computed?.dependencies ?? []) {
+				reads.push({
+					source: dependency.source,
+					graphNodeId: dependency.graphNodeId,
+					path: dependency.path,
+				});
+			}
+			continue;
+		}
+
 		const lookup = scopedGraphLookup(input, null);
 		const resolved = resolveStateGraphPath(input, read.source, lookup, null);
 		if (!resolved) {
@@ -42,6 +57,22 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 						input.semanticGraph.filename,
 					),
 				);
+				continue;
+			}
+			const staticExpressionReadSource = templateExpressionGraphReadSource(
+				read.source,
+				lookup,
+			);
+			if (staticExpressionReadSource) {
+				diagnostics.push(
+					templateExpressionStaticDiagnostic({
+						source: read.source,
+						readSource: staticExpressionReadSource,
+						sourceSpan: read.sourceSpan,
+						filename: input.semanticGraph.filename,
+					}),
+				);
+				continue;
 			}
 			continue;
 		}
@@ -122,12 +153,34 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 				continue;
 			}
 
+			const moduleTarget = moduleScopeWriteTarget(write, input.semanticGraph);
+			if (moduleTarget) {
+				diagnostics.push(moduleEscapeDiagnostic(write, moduleTarget, input.semanticGraph.filename));
+				continue;
+			}
+
+			const staleLocal = staleLocalWriteTarget(write, input.semanticGraph);
+			if (staleLocal) {
+				diagnostics.push(staleLocalWriteDiagnostic(write, staleLocal, input.semanticGraph.filename));
+				continue;
+			}
+
+			if (isAllowedPlainLocalWrite(write, input.semanticGraph)) continue;
+
 			diagnostics.push(unresolvedWriteDiagnostic(write, input.semanticGraph.filename));
 			continue;
 		}
 
 		if (!resolved.binding.writable) {
 			diagnostics.push(readOnlyWriteDiagnostic(write, resolved.binding));
+			continue;
+		}
+
+		const elementHandleValue = elementHandleWriteValue(write, lookup);
+		if (elementHandleValue) {
+			diagnostics.push(
+				stateElementHandleWriteDiagnostic(write, elementHandleValue, input.semanticGraph.filename),
+			);
 			continue;
 		}
 
@@ -176,6 +229,37 @@ type ResolvedStateGraphPath = {
 	readonly binding: SemanticGraphBinding;
 	readonly path: ReadonlyArray<string>;
 };
+
+function templateExpressionGraphReadSource(
+	source: string,
+	lookup: GraphLookup,
+): string | null {
+	if (!isCompositeTemplateExpression(source)) return null;
+
+	const candidates = [
+		...lookup.bindings.keys(),
+		...lookup.aliases.keys(),
+	].sort((left, right) => right.length - left.length);
+	for (const name of candidates) {
+		if (sourceContainsIdentifier(source, name)) return name;
+	}
+
+	return null;
+}
+
+function isCompositeTemplateExpression(source: string): boolean {
+	return /[?:+\-*/%<>=!&|()[\]{}]/.test(source);
+}
+
+function sourceContainsIdentifier(source: string, identifier: string): boolean {
+	return new RegExp(`(^|[^$0-9A-Z_a-z])${escapeRegExp(identifier)}(?=$|[^$0-9A-Z_a-z])`).test(
+		source,
+	);
+}
+
+function escapeRegExp(value: string): string {
+	return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 function scopedGraphLookup(
 	input: StateLoweringInput,
@@ -238,6 +322,77 @@ function findLast<T>(values: ReadonlyArray<T>, predicate: (value: T) => boolean)
 	return undefined;
 }
 
+function templateExpressionStaticDiagnostic({
+	source,
+	readSource,
+	sourceSpan,
+	filename,
+}: {
+	readonly source: string;
+	readonly readSource: string;
+	readonly sourceSpan?: SourceSpan;
+	readonly filename: string;
+}): StateLoweringDiagnostic {
+	return {
+		code: 'MARKLESS_TEMPLATE_EXPRESSION_STATIC',
+		severity: 'error',
+		phase: 'state-lowering',
+		title: 'This expression reads state but never updates',
+		message: `This text reads \`${readSource}\`, but only plain reads like \`{${readSource}}\` update the page today. The expression renders its initial value and never changes when \`${readSource}\` changes.`,
+		why: 'Each template read compiles to a graph subscription with a DOM-update record; composite expressions are not lowered yet, so no subscription exists to wake this text.',
+		primarySpan: sourceSpan ?? fallbackSpan(filename),
+		passId: 'state-lowering',
+		artifactKeys: ['semanticGraph', 'stateLowering'],
+		statePath: readSource,
+		source,
+		suggestions: [
+			{
+				message:
+					"Hoist the logic into a derived value: `const label = computed(() => a ? 'x' : 'y');` with `<p>{label}</p>`.",
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_TEMPLATE_EXPRESSION_STATIC',
+	};
+}
+
+function elementHandleWriteValue(
+	write: SemanticStateWrite,
+	lookup: GraphLookup,
+): SemanticGraphBinding | null {
+	if (!write.valueSource) return null;
+	const resolved = resolveGraphPath(write.valueSource, lookup.bindings, lookup.aliases);
+	return resolved?.binding.kind === 'element' && resolved.path.length === 0
+		? resolved.binding
+		: null;
+}
+
+function stateElementHandleWriteDiagnostic(
+	write: SemanticStateWrite,
+	handle: SemanticGraphBinding,
+	filename: string,
+): StateLoweringDiagnostic {
+	return {
+		code: 'MARKLESS_STATE_ELEMENT_HANDLE_UNSERIALIZABLE',
+		severity: 'error',
+		phase: 'state-lowering',
+		title: 'element() handles cannot be stored in state',
+		message: `Cannot write element handle "${handle.name}" into state path "${write.target}" because element handles are DOM locators, not serializable graph data.`,
+		why: 'state() writes are serialized into markless/state and replayed without running component bodies. An element() handle resolves through DOM locator metadata and must stay outside serialized graph state.',
+		primarySpan: write.targetSpan ?? fallbackSpan(filename),
+		passId: 'state-lowering',
+		artifactKeys: ['semanticGraph', 'stateLowering'],
+		statePath: write.target,
+		source: write.valueSource ?? write.target,
+		suggestions: [
+			{
+				message:
+					'Keep element handles in element() bindings and bind them with el={handle}. Store serializable ids, flags, or data in state() instead.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_ELEMENT_HANDLE_UNSERIALIZABLE',
+	};
+}
+
 function unresolvedWriteDiagnostic(
 	write: SemanticStateWrite,
 	filename: string,
@@ -247,20 +402,63 @@ function unresolvedWriteDiagnostic(
 		severity: 'error',
 		phase: 'state-lowering',
 		title: 'Cannot resolve graph write target',
-		message: `Cannot write to "${write.target}" because it does not resolve to graph state.`,
-		why: 'Only state() bindings and supported graph paths can be mutated across a resume boundary.',
+		message: `Cannot write to "${write.target}" because the compiler cannot resolve that target.`,
+		why: 'This write is not a known state() graph path, graph alias, declared plain local, or classified module-scope binding.',
 		primarySpan: write.targetSpan ?? fallbackSpan(filename),
 		passId: 'state-lowering',
 		artifactKeys: ['semanticGraph', 'stateLowering'],
 		statePath: write.target,
 		source: write.target,
-		suggestions: [
-			{
-				message:
-					'Write to a state() binding, a path inside object state, or move non-graph mutation into normal local code.',
-			},
-		],
+		suggestions: [{ message: 'Declare the local before writing it, or move UI-changing values into state() so Markless can serialize and resume the update.' }],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_UNRESOLVED_WRITE',
+	};
+}
+
+function staleLocalWriteDiagnostic(
+	write: SemanticStateWrite,
+	local: SemanticLocalDeclaration,
+	filename: string,
+): StateLoweringDiagnostic {
+	const name = local.name;
+	return {
+		code: 'MARKLESS_STATE_STALE_LOCAL_WRITE',
+		severity: 'error',
+		phase: 'state-lowering',
+		title: 'Handler write would leave the template stale',
+		message: `Cannot write to "${write.target}" from a handler because the template reads the component local "${name}" only during initial render.`,
+		why: 'Component bodies run for initial render only. Template reads re-render after events only when they subscribe through state(), so this handler write would leave the UI stale after resume.',
+		primarySpan: write.targetSpan ?? fallbackSpan(filename),
+		passId: 'state-lowering',
+		artifactKeys: ['semanticGraph', 'stateLowering'],
+		statePath: write.target,
+		source: write.target,
+		suggestions: [{ message: `Move "${name}" into state(), then write ${name}++ so Markless can serialize the cell and update subscribed DOM.` }],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_STALE_LOCAL_WRITE',
+	};
+}
+
+function moduleEscapeDiagnostic(
+	write: SemanticStateWrite,
+	target: ModuleWriteTarget,
+	filename: string,
+): StateLoweringDiagnostic {
+	const aliasText = target.aliasName
+		? ` because it aliases module-scope "${target.moduleName}", which would be shared across requests`
+		: ' because it lives at module scope and would be shared across requests';
+	return {
+		code: 'MARKLESS_STATE_MODULE_ESCAPE',
+		severity: 'error',
+		phase: 'state-lowering',
+		title: 'Module-scope storage cannot be written from render or handlers',
+		message: `Cannot write to "${write.target}"${aliasText}.`,
+		why: 'Module-scope storage outlives a single server render. A handler could read or overwrite data from another user because the value is not part of this document payload.',
+		primarySpan: write.targetSpan ?? fallbackSpan(filename),
+		passId: 'state-lowering',
+		artifactKeys: ['semanticGraph', 'stateLowering'],
+		statePath: write.target,
+		source: write.target,
+		suggestions: [{ message: 'Keep per-document values inside state(), or use shared() for named request/container/page dataflow instead of module variables.' }],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_MODULE_ESCAPE',
 	};
 }
 
@@ -473,6 +671,75 @@ function isDynamicGraphPathSource(
 	if (resolveGraphPath(root, bindings, aliases) !== null) return true;
 
 	return graph?.sharedInstances.some((instance) => instance.localName === root) ?? false;
+}
+
+type ModuleWriteTarget = { readonly moduleName: string; readonly aliasName?: string };
+
+function moduleScopeWriteTarget(
+	write: SemanticStateWrite,
+	graph: SemanticGraphArtifact,
+): ModuleWriteTarget | null {
+	const root = graphPathRoot(write.target);
+	if (!root || write.writeScope === 'module') return null;
+
+	const declaration = findLocalDeclaration(root, graph.localDeclarations);
+	if (!declaration) return null;
+	const moduleName =
+		declaration.scope === 'module'
+			? (declaration.aliasOf ?? declaration.name)
+			: moduleAliasDeclarationName(declaration, graph.localDeclarations);
+	if (!moduleName) return null;
+
+	return moduleName === root ? { moduleName } : { moduleName, aliasName: root };
+}
+
+function moduleAliasDeclarationName(
+	declaration: SemanticLocalDeclaration,
+	declarations: ReadonlyArray<SemanticLocalDeclaration>,
+): string | null {
+	if (!declaration.aliasOf) return null;
+	const target = findLocalDeclaration(declaration.aliasOf, declarations);
+	return target?.scope === 'module' ? (target.aliasOf ?? target.name) : null;
+}
+
+function staleLocalWriteTarget(
+	write: SemanticStateWrite,
+	graph: SemanticGraphArtifact,
+): SemanticLocalDeclaration | null {
+	if (write.writeScope !== 'handler') return null;
+	const root = graphPathRoot(write.target);
+	if (!root) return null;
+	const declaration = findLocalDeclaration(root, graph.localDeclarations);
+	return declaration?.scope === 'component' &&
+		declaration.componentName === write.componentName &&
+		graph.templateReads.some((read) => graphPathRoot(read.source) === root)
+		? declaration
+		: null;
+}
+
+function isAllowedPlainLocalWrite(
+	write: SemanticStateWrite,
+	graph: SemanticGraphArtifact,
+): boolean {
+	const root = graphPathRoot(write.target);
+	if (!root) return false;
+	const declaration = findLocalDeclaration(root, graph.localDeclarations);
+	if (!declaration || declaration.aliasOf) return false;
+	if (declaration.scope === 'module') return false;
+	return write.writeScope === 'component'
+		? declaration.scope === 'component' && declaration.componentName === write.componentName
+		: declaration.scope === 'function';
+}
+
+function findLocalDeclaration(
+	name: string,
+	declarations: ReadonlyArray<SemanticLocalDeclaration>,
+): SemanticLocalDeclaration | undefined {
+	for (let index = declarations.length - 1; index >= 0; index--) {
+		const declaration = declarations[index];
+		if (declaration?.name === name) return declaration;
+	}
+	return undefined;
 }
 
 function findRestAliasExcludedPath(

@@ -20,6 +20,13 @@ export function collectAsyncBoundary(
 	state: WalkState,
 	walk: SemanticGraphWalk,
 ): void {
+	if (node.type !== 'JSXTryExpression') {
+		for (const child of childNodes(node)) {
+			walk(child, state);
+		}
+		return;
+	}
+
 	const boundaryId = `boundary:${state.nextBoundaryId++}`;
 	const previousBoundaryId = state.currentAsyncBoundaryId;
 

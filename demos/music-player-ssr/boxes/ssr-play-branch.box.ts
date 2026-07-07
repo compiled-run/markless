@@ -33,6 +33,9 @@ export default box(
 		await expect.html.contains(html, 'aria-label="Play or pause"');
 		await expect.html.contains(html, '<!--markless:branch:');
 		await expect.html.contains(html, 'data-async-resumer');
+		const preloadHrefs = modulePreloadHrefs(html);
+		await assertModulePreloadsServe(preview, preloadHrefs);
+		receipt.note(`ssr play-branch modulepreload hrefs: ${formatPaths(preloadHrefs)}`);
 		// Scope the arm check to the rendered toggle button: the payload scripts
 		// legitimately serialize both arm templates elsewhere in the document.
 		assertRenderedToggleArm(html);
@@ -40,6 +43,7 @@ export default box(
 		// Resume truth: the paused arm comes from the payload, then the click
 		// flips the icon branch to the playing arm.
 		const page = await preview.browser.visit('/');
+		await waitForLogSummaryAttribute(page, WAIT);
 		await expect.page.bodyText(
 			page,
 			{ contains: 'Do I Clench My Fists? (Slowed + Reverb)' },
@@ -54,6 +58,7 @@ export default box(
 		await expect.page.text(page, PLAY_ICON, PLAYING_ICON, WAIT);
 		await expect.page.attribute(page, PLAY_TOGGLE, 'class', 'play active', WAIT);
 		await expect.page.attribute(page, '.youtube-frame-host', 'data-command', 'play', WAIT);
+		await waitForLogInteractionAttribute(page, 1, WAIT);
 		const afterClickScripts = await jsBuildRequestPaths(page);
 		const lazyChunks = afterClickScripts.filter((path) => !startupScripts.includes(path));
 		receipt.note(`ssr play-branch post-click lazy JS: ${formatPaths(lazyChunks)}`);
@@ -69,6 +74,7 @@ export default box(
 		await expect.page.text(page, PLAY_ICON, PAUSED_ICON, WAIT);
 		await expect.page.attribute(page, PLAY_TOGGLE, 'class', 'play', WAIT);
 		await expect.page.attribute(page, '.youtube-frame-host', 'data-command', 'pause', WAIT);
+		await waitForLogInteractionAttribute(page, 2, WAIT);
 
 		// Track navigation exercises composed events and dom updates deeper in
 		// the tree (also absorbed from the retired tmp-ssr box).
@@ -116,9 +122,63 @@ function assertRenderedToggleArm(html: string): void {
 	}
 }
 
+function modulePreloadHrefs(html: string): readonly string[] {
+	return [...html.matchAll(/<link\b(?=[^>]*\brel="modulepreload")[^>]*\bhref="([^"]+)"/g)]
+		.map((match) => match[1]!)
+		.filter((href, index, hrefs) => hrefs.indexOf(href) === index);
+}
+
+async function assertModulePreloadsServe(
+	preview: { request(path: string): Promise<string> },
+	hrefs: readonly string[],
+): Promise<void> {
+	if (hrefs.length === 0) {
+		throw new Error('Expected SSR music player HTML to render modulepreload links.');
+	}
+	for (const href of hrefs) {
+		const path = new URL(href, 'http://markless.local').pathname;
+		await preview.request(path);
+	}
+}
+
 type NetworkRequestPage = {
 	networkRequests(): Promise<ReadonlyArray<{ readonly url: string; readonly method: string }>>;
 };
+
+type ContentPage = {
+	content(): Promise<string>;
+};
+
+async function waitForLogSummaryAttribute(
+	page: ContentPage,
+	options: { readonly timeoutMs: number },
+): Promise<void> {
+	const started = Date.now();
+	while (Date.now() - started < options.timeoutMs) {
+		const html = await page.content();
+		if (/data-markless-log-summary="markless: resumed [^"]*0 executed\)"/.test(html)) return;
+		await new Promise((resolve) => setTimeout(resolve, 25));
+	}
+	throw new Error('Expected data-markless-log-summary to mirror the resume summary.');
+}
+
+async function waitForLogInteractionAttribute(
+	page: ContentPage,
+	count: number,
+	options: { readonly timeoutMs: number },
+): Promise<void> {
+	const started = Date.now();
+	const countPattern = new RegExp(`data-markless-log-interactions="${count}"`);
+	const lastPattern = /data-markless-log-last="markless: click \[[^"]+\] · woke \d+ modules · ran warm \d+ modules · \d+(?:\.\d+)? KB"/;
+	while (Date.now() - started < options.timeoutMs) {
+		const html = await page.content();
+		if (countPattern.test(html) && lastPattern.test(html) && !/data-markless-log-last="[^"]*est\./.test(html)) {
+			return;
+		}
+		await new Promise((resolve) => setTimeout(resolve, 25));
+	}
+	throw new Error(`Expected interaction ${count} to mirror a real-KB execution log line.`);
+}
 
 async function jsBuildRequestPaths(page: NetworkRequestPage): Promise<readonly string[]> {
 	const requests = await page.networkRequests();

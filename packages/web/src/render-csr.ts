@@ -1,9 +1,13 @@
 import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer';
-import type { EventOnlyResumeDomElement, EventOnlyResumeDomEvent } from './event-only-resume.ts';
 import type { DomJournalEntry } from '@markless/runtime';
 import type { RuntimeGraph } from '@markless/runtime';
 import type { CsrRenderContainer, CsrRenderOptions, CsrRenderOutput } from './render.ts';
-import type { ResumeRuntime, ResumeSymbol } from './resume.ts';
+import type { ResumeRuntime, ResumeRuntimeInput, ResumeSymbol } from './resume.ts';
+
+type ExecutionLogGlobal = typeof globalThis & {
+	__mxLog?: Set<string>;
+	__mxLoadLog?: () => Promise<{ readonly logMarklessRenderSummary?: (input?: unknown) => unknown }>;
+};
 
 export async function renderCsrRuntime(input: {
 	readonly output: CsrRenderOutput;
@@ -12,37 +16,10 @@ export async function renderCsrRuntime(input: {
 	const { output, options } = input;
 	const state = output.state ?? emptyStatePayload();
 	const view = output.view ?? emptyViewPayload();
-	const loadSymbol = output.loadSymbol ?? options.loadSymbol ?? missingLoadSymbol;
-
-	if (canUseEventOnlyCsrRuntime(output, state, view)) {
-		const { createEventOnlyResumeContainerFromPayloads } =
-			await import('./event-only-resume.ts');
-		const runtime = await createEventOnlyResumeContainerFromPayloads({
-			root: output.root as EventOnlyResumeDomElement,
-			state,
-			view,
-			loadSymbol: loadSymbol as unknown as Parameters<
-				typeof createEventOnlyResumeContainerFromPayloads
-			>[0]['loadSymbol'],
-		});
-		for (const eventName of new Set(view.events.map((event) => event.eventName))) {
-			output.root.addEventListener?.(
-				eventName,
-				async (event: EventOnlyResumeDomEvent) => {
-					await runtime.dispatch(event);
-				},
-				{ capture: true },
-			);
-		}
-		output.connectRuntime?.({ graph: runtime.graph, runtime });
-
-		return {
-			phase: 'csr',
-			root: output.root,
-			graph: runtime.graph as RuntimeGraph,
-			runtime,
-		};
-	}
+	const loadSymbol = withCsrCallbackSymbols(
+		output.loadSymbol ?? options.loadSymbol ?? missingLoadSymbol,
+		view,
+	);
 
 	const graph =
 		output.graph ??
@@ -53,6 +30,10 @@ export async function renderCsrRuntime(input: {
 			loadSymbol,
 			hasAuthoredState: !!output.state,
 		}));
+	if ((view.keyedRepeats?.length ?? 0) > 0) {
+		const { validateKeyedRepeatGraphKeys } = await import('./repeat-runtime.ts');
+		validateKeyedRepeatGraphKeys(graph, view);
+	}
 	const { createResumeRuntime } = await import('./resume.ts');
 	let runtime: ResumeRuntime;
 	const applyDomJournal =
@@ -61,6 +42,7 @@ export async function renderCsrRuntime(input: {
 	runtime = createResumeRuntime({
 		root: output.root,
 		graph,
+		state,
 		view,
 		loadSymbol,
 		createVisibilityObserver: options.createVisibilityObserver,
@@ -71,6 +53,7 @@ export async function renderCsrRuntime(input: {
 	await runtime.start();
 	output.connectRuntime?.({ graph, runtime });
 	await activateCsrBehaviors(runtime, view);
+	await marklessLogCsrSummary();
 
 	return {
 		phase: 'csr',
@@ -78,6 +61,17 @@ export async function renderCsrRuntime(input: {
 		graph,
 		runtime,
 	};
+}
+
+async function marklessLogCsrSummary(): Promise<void> {
+	const global = globalThis as ExecutionLogGlobal;
+	if (!global.__mxLog) return;
+	try {
+		const log = await global.__mxLoadLog?.();
+		await log?.logMarklessRenderSummary?.();
+	} catch {
+		// Execution logging is observability only; render must not depend on it.
+	}
 }
 
 type CsrDomJournalTarget = {
@@ -132,11 +126,46 @@ async function applyDefaultCsrDomJournal(
 					rangeAnchor[1] === 'branch'
 						? runtime.getBranch(rangeAnchor[2]!)
 						: runtime.getAsyncBoundary(rangeAnchor[2]!);
-				return rangeAnchor[3] === 'end' ? record?.endAnchor : record?.startAnchor;
+				const target = rangeAnchor[3] === 'end' ? record?.endAnchor : record?.startAnchor;
+				if (!target) throw missingCsrJournalTargetError(String(locator));
+				return target;
 			}
 			return runtime.getElement(String(locator));
 		},
 	});
+}
+
+function withCsrCallbackSymbols(
+	loadSymbol: ResumeRuntimeInput['loadSymbol'],
+	view: ProtocolViewPayload,
+): ResumeRuntimeInput['loadSymbol'] {
+	const callbacks = (view as ProtocolViewPayload & {
+		readonly __marklessCsrCallbacks?: Readonly<Record<string, (event: unknown) => unknown>>;
+	}).__marklessCsrCallbacks;
+	if (!callbacks || Object.keys(callbacks).length === 0) return loadSymbol;
+	return (symbolId) => {
+		const callback = callbacks[symbolId];
+		if (!callback) return loadSymbol(symbolId);
+		return async (context) => {
+			const event = context.event as Record<string, unknown> | undefined;
+			if (event) event.__marklessCsrCallbackDispatched = true;
+			const result = callback(context.event);
+			if (isPromiseLike(result)) await result;
+		};
+	};
+}
+
+function missingCsrJournalTargetError(locator: string): Error {
+	const error = new Error(
+		`MARKLESS_CSR_DOM_JOURNAL_TARGET_MISSING: CSR DOM journal could not resolve ${locator}.`,
+	) as Error & Record<string, unknown>;
+	error.name = 'RuntimeResumeError';
+	error.code = 'MARKLESS_CSR_DOM_JOURNAL_TARGET_MISSING';
+	error.phase = 'runtime';
+	error.locator = locator;
+	error.dispatchModuleId = 'web:render-csr';
+	error.docsUrl = 'https://markless.dev/errors/MARKLESS_CSR_DOM_JOURNAL_TARGET_MISSING';
+	return error;
 }
 
 function stringifyDomValue(value: unknown): string {
@@ -183,25 +212,12 @@ function missingLoadSymbol(symbolId: string): ResumeSymbol {
 	throw new Error(`Cannot load async symbol ${symbolId} without a generated symbol resolver.`);
 }
 
-function canUseEventOnlyCsrRuntime(
-	output: CsrRenderOutput,
-	state: ProtocolStatePayload,
-	view: ProtocolViewPayload,
-): boolean {
-	if (output.graph) return false;
-	if ((state.sharedDefinitions?.length ?? 0) > 0) return false;
-	if (state.computed.length > 0) return false;
-	if (view.behaviors.length > 0) return false;
-	if (view.elementHandles.length > 0) return false;
-	if (view.asyncBoundaries.length > 0) return false;
-	// Branch flips need graph subscriptions and range replacement; keyed row
-	// events need locals dispatch. Both require the full resume runtime.
-	if ((view.branches?.length ?? 0) > 0) return false;
-	if ((view.keyedRepeats?.length ?? 0) > 0) return false;
-	if (view.events.some((event) => event.eventName === 'visible' || !!event.syncPolicy)) {
-		return false;
-	}
-	return true;
+function isPromiseLike<T>(value: T | PromiseLike<T>): value is PromiseLike<T> {
+	return (
+		value !== null &&
+		(typeof value === 'object' || typeof value === 'function') &&
+		typeof (value as { readonly then?: unknown }).then === 'function'
+	);
 }
 
 // CSR mounts share the resume graph wiring so async boundary runners load
@@ -214,8 +230,10 @@ async function createFullRuntimeGraph(input: {
 	readonly hasAuthoredState: boolean;
 }): Promise<RuntimeGraph> {
 	if (input.hasAuthoredState) {
-		const { createRuntimeGraphFromResumePayload } = await import('./payload.ts');
-		return createRuntimeGraphFromResumePayload({
+		const { createRuntimeGraphFromResumePayload } = await import(
+			'./payload-graph-construct.ts'
+		);
+		return await createRuntimeGraphFromResumePayload({
 			state: input.state,
 			view: input.view,
 			root: input.root,

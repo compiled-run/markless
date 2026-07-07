@@ -1,5 +1,10 @@
 import { expect, test } from 'vitest';
-import { buildSemanticGraph } from '../src/index.ts';
+import {
+	buildSemanticGraph,
+	createProtocolStatePayloadFromArena,
+	lowerStateAccess,
+	planPayloadArena,
+} from '../src/index.ts';
 
 const source = `
 import { state, computed, element } from '@markless/core';
@@ -329,6 +334,106 @@ test('buildSemanticGraph creates the first production compiler artifact', async 
 	expect(graph.asyncBoundaries).toHaveLength(1);
 });
 
+async function graphAndProtocolState(source: string) {
+	const semanticGraph = await buildSemanticGraph({ filename: 'src/App.tsrx', source });
+	const stateLowering = lowerStateAccess({ semanticGraph });
+	const payloadArena = planPayloadArena({ semanticGraph, stateLowering });
+	return {
+		semanticGraph,
+		protocolState: createProtocolStatePayloadFromArena({ semanticGraph, payloadArena }),
+	};
+}
+
+const unstableCreationCases = [
+	{
+		name: 'computed derives',
+		code: 'MARKLESS_STATE_CREATION_SITE_UNSTABLE',
+		message: 'inside the computed',
+		cell: 'state:tmp',
+		source: `import { state, computed } from '@markless/core'; export function App() @{ const total = computed(() => { const tmp = state(0); return tmp + 1; }); <p>{total}</p> }`,
+	},
+	{
+		name: 'event handlers',
+		code: 'MARKLESS_STATE_CREATION_SITE_UNSTABLE',
+		message: 'inside an event handler',
+		cell: 'state:draft',
+		source: `import { state } from '@markless/core'; export function App() @{ <button onClick={() => { let draft = state(''); draft = 'hello'; }}>New</button> }`,
+	},
+	{
+		name: 'branches',
+		code: 'MARKLESS_STATE_CREATION_SITE_UNSTABLE',
+		message: 'inside a branch',
+		cell: 'state:extra',
+		source: `import { state } from '@markless/core'; export function App() @{ const flag = state(true); if (flag) { const extra = state(0); } <p>{flag}</p> }`,
+	},
+	{
+		name: 'loops',
+		code: 'MARKLESS_STATE_CREATION_SITE_UNSTABLE',
+		message: 'inside a loop',
+		cell: 'state:item',
+		source: `import { state } from '@markless/core'; export function App() @{ for (let i = 0; i < 3; i++) { const item = state(i); } <p>done</p> }`,
+	},
+] as const;
+
+for (const scenario of unstableCreationCases) {
+	test(`buildSemanticGraph rejects state creation inside ${scenario.name} without shipping a cell`, async () => {
+		const { semanticGraph, protocolState } = await graphAndProtocolState(scenario.source);
+
+		expect(semanticGraph.diagnostics).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: scenario.code,
+					message: expect.stringContaining(scenario.message),
+				}),
+			]),
+		);
+		expect(semanticGraph.graphBindings.map((binding) => binding.id)).not.toContain(
+			scenario.cell,
+		);
+		expect(protocolState.cells.map((cell) => cell.graphNodeId)).not.toContain(scenario.cell);
+	});
+}
+
+test('buildSemanticGraph keeps stable component-body and module-scope creation artifacts unchanged', async () => {
+	const { semanticGraph, protocolState } = await graphAndProtocolState(
+		`import { state, computed } from '@markless/core'; const leaked = state(1); export const doubled = computed(() => leaked * 2); export function App() @{ let count = state(0); const label = computed(() => count + 1); <p>{count} {label}</p> }`,
+	);
+
+	expect(semanticGraph.graphBindings).toEqual([
+		expect.objectContaining({ id: 'state:count', name: 'count', kind: 'state' }),
+		expect.objectContaining({ id: 'computed:label', name: 'label', kind: 'computed' }),
+	]);
+	expect(semanticGraph.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+		'MARKLESS_STATE_MODULE_SCOPE',
+		'MARKLESS_STATE_MODULE_SCOPE',
+	]);
+	expect(protocolState.cells.map((cell) => cell.graphNodeId)).toEqual(['state:count']);
+});
+
+test('B905s2 helper-created state records call-site cells and keeps unsupported sites gated', async () => {
+	const [same, two, branch, cross] = await Promise.all([
+		buildSemanticGraph({ filename: 'src/HelperCounter.tsrx', source: `import { state } from '@markless/core'; function counterPair() { const n = state(3); return n; } export function App() @{ const count = counterPair(); <button onClick={() => count++}>{count}</button> }` }),
+		buildSemanticGraph({ filename: 'src/TwoCounters.tsrx', source: `import { state } from '@markless/core'; function counterPair() { const n = state(1); return n; } export function Left() @{ const left = counterPair(); <button onClick={() => left++}>{left}</button> } export function Right() @{ const right = counterPair(); <button onClick={() => right++}>{right}</button> }` }),
+		buildSemanticGraph({ filename: 'src/HelperBranch.tsrx', source: `import { state } from '@markless/core'; function makeToggle() { if (true) { const enabled = state(false); return enabled; } return false; } export function App() @{ const active = makeToggle(); <p>{active}</p> }` }),
+		buildSemanticGraph({ filename: 'src/App.tsrx', source: `import { counterPair } from './helpers.tsrx'; export function App() @{ const count = counterPair(); <button onClick={() => count++}>{count}</button> }` }),
+	]);
+
+	expect(same.diagnostics).toEqual([]);
+	expect(same.graphBindings).toEqual([
+		expect.objectContaining({ id: 'state:App.count.counterPair.n', name: 'App_count_counterPair_n', initialValue: 3 }),
+	]);
+	expect(same.aliases).toEqual([
+		expect.objectContaining({ name: 'count', target: 'App_count_counterPair_n', declarationKind: 'let' }),
+	]);
+	expect(same.stateWrites).toEqual([expect.objectContaining({ target: 'count' })]);
+	expect(two.graphBindings.map((binding) => binding.id)).toEqual([
+		'state:Left.left.counterPair.n',
+		'state:Right.right.counterPair.n',
+	]);
+	expect(branch.diagnostics[0]).toEqual(expect.objectContaining({ code: 'MARKLESS_STATE_CREATION_SITE_UNSTABLE' }));
+	expect(cross.diagnostics[0]).toEqual(expect.objectContaining({ code: 'MARKLESS_STATE_HELPER_RETURN_UNSUPPORTED' }));
+});
+
 test('buildSemanticGraph records component edges from TSRX AST', async () => {
 	const graph = await buildSemanticGraph({
 		filename: 'src/App.tsrx',
@@ -364,6 +469,60 @@ test('buildSemanticGraph records component edges from TSRX AST', async () => {
 		keyedRepeatScopeIds: ['repeat:0'],
 		props: [expect.objectContaining({ name: 'row', source: 'row', kind: 'opaque' })],
 	});
+});
+
+test('B918 records element handle props and accepts same-module prop forwarding', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/ForwardedHandle.tsrx',
+		source: `import { element } from '@markless/core'; function Field(props: { input: unknown }) @{ <input el={props.input} /> } export function App() @{ const field = element<HTMLInputElement>(); <section><Field input={field} /><button onClick={() => field.focus()}>Focus</button></section> }`,
+	});
+
+	expect(graph.diagnostics).toEqual([]);
+	expect(graph.componentEdges[0]).toEqual(
+		expect.objectContaining({
+			parentComponentName: 'App',
+			childComponentName: 'Field',
+			props: [
+				expect.objectContaining({
+					name: 'input',
+					source: 'field',
+					kind: 'graph-reference',
+					graphBindingKind: 'element',
+					graphNodeId: 'element:field',
+					path: [],
+				}),
+			],
+		}),
+	);
+	expect(graph.elementHandleBindings).toEqual([
+		expect.objectContaining({
+			hostNodeId: 'h0',
+			handleName: 'props.input',
+			componentName: 'Field',
+		}),
+	]);
+});
+
+test('B918 records element handle props on imported child edges', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/App.tsrx',
+		source: `import { element } from '@markless/core'; import { Field } from './Field.tsrx'; export function App() @{ const field = element<HTMLInputElement>(); <section><Field input={field} /><button onClick={() => field.focus()}>Focus</button></section> }`,
+	});
+
+	expect(graph.diagnostics).toEqual([]);
+	expect(graph.componentEdges[0]).toEqual(
+		expect.objectContaining({
+			childComponentName: 'Field',
+			importSource: './Field.tsrx',
+			props: [
+				expect.objectContaining({
+					name: 'input',
+					graphBindingKind: 'element',
+					graphNodeId: 'element:field',
+				}),
+			],
+		}),
+	);
 });
 
 test('buildSemanticGraph records keyed repeat structure across alternate host shapes', async () => {
@@ -431,6 +590,105 @@ test('buildSemanticGraph keeps keyed repeats registered when an index clause is 
 			keySource: 'item.key',
 			keyPath: ['key'],
 		},
+	]);
+});
+
+test('buildSemanticGraph diagnoses dynamic repeats that omit a key', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/MissingKey.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let records = state([{ uuid: 'x', title: 'One' }]);
+
+	<ol>
+		@for (const record of records) {
+			<li>{record.title}</li>
+		}
+	</ol>
+}
+`,
+	});
+
+	expect(graph.keyedRepeats).toEqual([]);
+	expect(graph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_REPEAT_KEY_REQUIRED',
+			severity: 'error',
+			phase: 'semantic-graph',
+		}),
+	]);
+});
+
+test('buildSemanticGraph accepts positional repeat keys and warns about slot identity', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/PositionKey.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let records = state([{ uuid: 'x', title: 'One' }]);
+
+	<ol>
+		@for (const record of records; index slot; key slot) {
+			<li>{record.title}</li>
+		}
+	</ol>
+}
+`,
+	});
+	const parent = graph.hostNodes.find((hostNode) => hostNode.tagName === 'ol');
+	const row = graph.hostNodes.find((hostNode) => hostNode.tagName === 'li');
+
+	expect(graph.keyedRepeats).toEqual([
+		{
+			id: 'repeat:0',
+			parentHostNodeId: parent?.id,
+			rowHostNodeId: row?.id,
+			itemName: 'record',
+			indexName: 'slot',
+			collectionSource: 'records',
+			collectionGraphNodeId: 'state:records',
+			collectionPath: [],
+			keySource: 'slot',
+			keyPath: [],
+		},
+	]);
+	expect(graph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_REPEAT_KEY_IS_INDEX',
+			severity: 'warning',
+			phase: 'semantic-graph',
+		}),
+	]);
+});
+
+test('buildSemanticGraph diagnoses repeat keys that are not stable item identity', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/RandomKey.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let records = state([{ uuid: 'x', title: 'One' }]);
+
+	<ol>
+		@for (const record of records; key Math.random()) {
+			<li>{record.title}</li>
+		}
+	</ol>
+}
+`,
+	});
+
+	expect(graph.keyedRepeats).toEqual([]);
+	expect(graph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_REPEAT_KEY_UNSTABLE',
+			severity: 'error',
+			phase: 'semantic-graph',
+		}),
 	]);
 });
 

@@ -78,9 +78,14 @@ describe('package metadata', () => {
 		);
 		expect(web.exports).toMatchObject({
 			'.': './src/index.ts',
+			'./dom-journal': './src/dom-journal.ts',
+			'./dom-update': './src/dom-update.ts',
+			'./event-only-resume': './src/event-only-resume.ts',
+			'./event-resume': './src/event-resume.ts',
+			'./payload': './src/payload.ts',
 			'./render': './src/render.ts',
 			'./render-to-string': './src/render-to-string.ts',
-			'./resume': './src/payload.ts',
+			'./resume': './src/payload-full.ts',
 		});
 	});
 

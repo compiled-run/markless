@@ -4,15 +4,17 @@ import type { Plugin } from 'vite';
 import type { BrowserCommand } from 'vitest/node';
 
 // Node-side vitest plugin for SSR/resume browser tests. It rewrites
-// renderSSR(Component) marker calls in browser test files into a Vitest
-// browser command RPC, and registers the command that renders the compiled
-// TSRX artifact to HTML with @markless/web renderToString on the same Vite
-// dev server that serves the browser's client modules.
+// renderSSR(Component) and renderSSRPhased(Component) marker calls in browser
+// test files into a Vitest browser command RPC, and registers the command that
+// renders the compiled TSRX artifact to HTML with @markless/web
+// renderToString on the same Vite dev server that serves the browser's client
+// modules.
 //
 // v1 limitations (fail loudly instead of half-working):
 // - the component must be imported from a separate `.tsrx` module; local
 //   components declared inside the test file are not supported.
-// - props are not supported: `renderSSR(Component)` only.
+// - props are not supported: `renderSSR(Component)` /
+//   `renderSSRPhased(Component)` only.
 
 const TEST_FILE_ID = /\.[jt]s(?:[?#].*)?$/;
 const TSRX_MODULE = /\.tsrx$/;
@@ -38,7 +40,7 @@ const renderSsrCommand: BrowserCommand<
 				`Available exports: ${Object.keys(moduleExports).join(', ')}`,
 		);
 	}
-	return { html: await renderToString(artifact) };
+	return { html: await renderToString(artifact, { executionLog: 'never' }) };
 };
 
 export function testSSR(): Plugin {
@@ -57,7 +59,7 @@ export function testSSR(): Plugin {
 		transform: {
 			filter: {
 				id: TEST_FILE_ID,
-				code: /renderSSR/,
+				code: /renderSSR(?:Phased)?/,
 			},
 			handler(code, id) {
 				return transformRenderSsrCalls(code, id);
@@ -68,43 +70,45 @@ export function testSSR(): Plugin {
 
 type ImportedName = { readonly source: string; readonly exportName: string };
 
-// Rewrites `renderSSR(Component)` into the browser-command RPC plus a
-// client-side renderServerHTML() of the returned HTML. String-level v1
-// transform: imports and calls are matched textually, and anything outside
-// the supported shape is a loud transform-time error.
+// Rewrites SSR marker helpers into the browser-command RPC plus either a
+// client-side renderServerHTML() call or an explicit mount step for phased
+// measurement. String-level v1 transform: imports and calls are matched
+// textually, and anything outside the supported shape is a loud transform-time
+// error.
 export function transformRenderSsrCalls(
 	code: string,
 	id: string,
 ): { code: string; map: null } | null {
-	const calls = [...code.matchAll(/(?<![.\w$])renderSSR\s*\(([^)]*)\)/g)];
+	const calls = [...code.matchAll(/(?<![.\w$])(renderSSR|renderSSRPhased)\s*\(([^)]*)\)/g)];
 	if (calls.length === 0) return null;
 
-	// Only files that import the renderSSR marker are rewritten. A file that
-	// calls renderSSR without importing it hits the marker module's own
+	// Only files that import an SSR marker are rewritten. A file that
+	// calls a marker without importing it hits the marker module's own
 	// loud runtime error instead.
 	const imports = collectImportedNames(code);
-	const marker = imports.get('renderSSR');
+	const marker = imports.get('renderSSR') ?? imports.get('renderSSRPhased');
 	if (!marker) return null;
 
 	let transformed = code;
 	for (const call of calls) {
-		const argument = call[1]!.trim();
+		const helperName = call[1]!;
+		const argument = call[2]!.trim();
 		if (argument.includes(',')) {
 			throw new Error(
-				`renderSSR(${argument}) in ${id}: props are not supported yet. ` +
-					'v1 supports renderSSR(Component) with no extra arguments.',
+				`${helperName}(${argument}) in ${id}: props are not supported yet. ` +
+					`v1 supports ${helperName}(Component) with no extra arguments.`,
 			);
 		}
 		if (!/^[A-Za-z_$][\w$]*$/.test(argument)) {
 			throw new Error(
-				`renderSSR(${argument}) in ${id}: v1 supports only a component ` +
+				`${helperName}(${argument}) in ${id}: v1 supports only a component ` +
 					'identifier imported from a separate .tsrx module.',
 			);
 		}
 		const component = imports.get(argument);
 		if (!component || !TSRX_MODULE.test(component.source)) {
 			throw new Error(
-				`renderSSR(${argument}) in ${id}: "${argument}" must be imported ` +
+				`${helperName}(${argument}) in ${id}: "${argument}" must be imported ` +
 					'from a separate .tsrx module. Local test-file components are not supported yet.',
 			);
 		}
@@ -113,15 +117,16 @@ export function transformRenderSsrCalls(
 			: component.source;
 		if (!isAbsolute(componentModulePath)) {
 			throw new Error(
-				`renderSSR(${argument}) in ${id}: bare-specifier component modules ` +
+				`${helperName}(${argument}) in ${id}: bare-specifier component modules ` +
 					`("${component.source}") are not supported yet. Use a relative import.`,
 			);
 		}
-		const replacement =
-			'(async () => {' +
-			` const ssr = await __marklessSsrCommands.renderSSR(${JSON.stringify(componentModulePath)}, ${JSON.stringify(component.exportName)});` +
-			' return __marklessRenderServerHTML(ssr.html);' +
-			' })()';
+		const renderCall = ` const ssr = await __marklessSsrCommands.renderSSR(${JSON.stringify(componentModulePath)}, ${JSON.stringify(component.exportName)});`;
+		const returnValue =
+			helperName === 'renderSSRPhased'
+				? ' return { html: ssr.html, mount(options) { return __marklessRenderServerHTML(ssr.html, options); } };'
+				: ' return __marklessRenderServerHTML(ssr.html);';
+		const replacement = '(async () => {' + renderCall + returnValue + ' })()';
 		transformed = transformed.replace(call[0], replacement);
 	}
 

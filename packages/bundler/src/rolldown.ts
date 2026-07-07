@@ -12,7 +12,16 @@ import {
 } from './build/symbol-facade-cleanup.ts';
 import { rewriteGeneratedSymbolTableUrls } from './build/symbol-table.ts';
 import { createMarklessDevGraph } from './dev.ts';
-import { MARKLESS_VIRTUAL_PREFIX, transformTsrxModule } from './transform.ts';
+import {
+	MARKLESS_EXECUTION_LOG_MODULE_ID,
+	MARKLESS_EXECUTION_SIZES,
+	createExecutionSizesAsset,
+	executionLogActivationInjection,
+	executionLogVirtualModuleSource,
+	injectExecutionLogModuleHook,
+	normalizeExecutionLogMode,
+} from './execution-log.ts';
+import { MARKLESS_VIRTUAL_PREFIX, resumeVirtualModuleId, transformTsrxModule } from './transform.ts';
 import type {
 	MarklessEnvironment,
 	MarklessRolldownOptions,
@@ -46,12 +55,15 @@ export type {
 type Environment = MarklessEnvironment | ((context: unknown) => MarklessEnvironment);
 export type MarklessRolldownPlugin = Plugin & { api: MarklessRolldownPluginApi };
 type InternalMarklessRolldownOptions = MarklessRolldownOptions & {
+	emitResumeModules?: boolean;
 	publicPath?: (fileName: string) => string;
 };
 
 const TSRX_SOURCE_FILE = /\.tsrx(?:[?#].*)?$/;
 const MARKLESS_SYMBOL_SOURCE_QUERY_RE = /[?&]markless-symbols(?:[&#]|$)/;
+const MARKLESS_RESUME_SOURCE_QUERY_RE = /[?&]markless-resume(?:[&#]|$)/;
 const SYMBOL_VIRTUAL_ID_RE = /^virtual:markless:symbol:([^:]+):[^:]+$/;
+const RESUME_VIRTUAL_ID_RE = /^virtual:markless:resume:([^:]+)$/;
 const SYMBOL_VIRTUAL_STRING_RE = /(["'`])((?:virtual:markless:symbol:)[^"'`]+)\1/g;
 
 export const marklessClient = (options: MarklessRolldownOptions = {}) =>
@@ -71,6 +83,7 @@ export function createMarklessRolldownPlugin(input: {
 	const transformManifests = new Map<string, MarklessTransformManifest>();
 	const sourceVirtualModules = new Map<string, Set<string>>();
 	const clientSymbolEntrySources = new Set<string>();
+	const executionLogEstimatedSizes = new Map<string, number>();
 	const dev = createMarklessDevGraph();
 	let root = internalOptions.rootDir;
 	const name = pluginName(environment);
@@ -117,6 +130,7 @@ export function createMarklessRolldownPlugin(input: {
 			virtualModules.clear();
 			transformManifests.clear();
 			sourceVirtualModules.clear();
+			executionLogEstimatedSizes.clear();
 			dev.reset();
 
 			const currentRoot = getRoot();
@@ -130,7 +144,31 @@ export function createMarklessRolldownPlugin(input: {
 			return outputDefaults(output, getEnvironment(this));
 		},
 		async resolveId(source, importer) {
+			// Emitted modules import runtime catalog functions as '@markless/web/fns/*'
+			// and conditional inline helpers as '@markless/web/inline/*'.
+			// Apps depend on @markless/core only, so the bundler resolves the catalog
+			// from its own dependency on @markless/web (generated-code-only surface).
+			if (source.startsWith('@markless/web/fns/')) {
+				const resolved = import.meta.resolve(source);
+				if (resolved?.startsWith('file://')) {
+					return { id: decodeURIComponent(resolved.slice('file://'.length)) };
+				}
+			}
+			if (source.startsWith('@markless/web/inline/')) {
+				const resolvedRoot = import.meta.resolve('@markless/web');
+				if (resolvedRoot?.startsWith('file://') && resolvedRoot.endsWith('/index.ts')) {
+					const helperPath = source.slice('@markless/web/'.length);
+					return {
+						id: decodeURIComponent(
+							resolvedRoot.slice('file://'.length, -'index.ts'.length) + `${helperPath}.ts`,
+						),
+					};
+				}
+			}
 			const normalized = normalizeVirtualId(source);
+			if (normalized === MARKLESS_EXECUTION_LOG_MODULE_ID) {
+				return { id: resolveVirtualId(MARKLESS_EXECUTION_LOG_MODULE_ID), moduleSideEffects: true };
+			}
 			if (virtualModules.has(normalized)) {
 				return { id: resolveVirtualId(normalized), moduleSideEffects: true };
 			}
@@ -139,10 +177,26 @@ export function createMarklessRolldownPlugin(input: {
 			if (symbolSource && isRelativeImport(source)) {
 				return await this.resolve(source, symbolSource, { skipSelf: true });
 			}
+			const resumeSource = sourceForResumeVirtualImporter(importer);
+			if (resumeSource && isRelativeImport(source)) {
+				return await this.resolve(source, resumeSource, { skipSelf: true });
+			}
 
 			return null;
 		},
 		load(id) {
+			if (normalizeVirtualId(id) === MARKLESS_EXECUTION_LOG_MODULE_ID) {
+				return executionLogVirtualModuleSource({
+					moduleSizes:
+						internalOptions.dev === true && getEnvironment(this) === 'client'
+							? executionLogEstimatedSizes
+							: undefined,
+					sizesUrl:
+						internalOptions.dev === true
+							? undefined
+							: internalOptions.publicPath?.(MARKLESS_EXECUTION_SIZES) ?? `/${MARKLESS_EXECUTION_SIZES}`,
+				});
+			}
 			const module = virtualModules.get(normalizeVirtualId(id));
 			if (module) {
 				return virtualModuleSourceForLoad(module, {
@@ -156,6 +210,22 @@ export function createMarklessRolldownPlugin(input: {
 			const currentEnvironment = getEnvironment(this);
 			const virtualId = normalizeVirtualId(id);
 			if (!TSRX_SOURCE_FILE.test(id)) {
+				if (
+					currentEnvironment === 'client' &&
+					internalOptions.dev === true &&
+					normalizeExecutionLogMode(internalOptions.executionLog) !== 'never' &&
+					isMarklessRuntimeModule(id)
+				) {
+					executionLogEstimatedSizes.set(executionLogRuntimeModuleId(id), code.length);
+					return {
+						code: injectExecutionLogModuleHook(
+							code,
+							executionLogRuntimeModuleId(id),
+							internalOptions.executionLog,
+						),
+						map: null,
+					};
+				}
 				return null;
 			}
 			if (virtualId.startsWith(MARKLESS_VIRTUAL_PREFIX)) {
@@ -167,16 +237,30 @@ export function createMarklessRolldownPlugin(input: {
 				filename: source,
 				source: code,
 				buildId: internalOptions.buildId,
+				executionLog: normalizeExecutionLogMode(internalOptions.executionLog),
+				executionLogModuleHooks:
+					internalOptions.dev === true && currentEnvironment === 'client',
 				environment: currentEnvironment,
 				clientOutput:
 					currentEnvironment === 'client' &&
 					(clientSymbolEntrySources.has(source) || isSymbolOnlySourceRequest(id))
 						? 'symbols-only'
 						: undefined,
+				// Dev resume URL points at the SOURCE module (not the virtual resume
+				// module): loading the .tsrx keeps it in the client module graph, which
+				// is what lets Vite's own no-accepting-boundary full-reload fire on
+				// edits (commit e3c5bcc's design). The source client module re-exports
+				// resumeContainerEvent from the virtual resume module in dev only;
+				// production builds keep the split (CSR emits no resume code).
 				resumeModuleUrl:
 					internalOptions.dev === true && currentEnvironment === 'server'
 						? devBrowserSourceModuleUrl(source, getRoot(), internalOptions.publicPath)
 						: undefined,
+				headInjections:
+					internalOptions.dev === true && currentEnvironment === 'server'
+						? internalOptions.devInjections
+						: undefined,
+				devResumeReexport: internalOptions.dev === true && currentEnvironment === 'client',
 			});
 			registerTransformArtifacts({
 				source,
@@ -184,13 +268,22 @@ export function createMarklessRolldownPlugin(input: {
 				virtualModules,
 				transformManifests,
 				sourceVirtualModules,
+				executionLogEstimatedSizes,
 				dev,
 				environment: currentEnvironment,
 			});
+			if (currentEnvironment === 'client' && isResumeSourceRequest(id)) {
+				const resumeModule = transformed.virtualModules.find((module) => module.type === 'resume');
+				if (resumeModule) return { code: resumeModule.source, map: null };
+			}
 
 			if (currentEnvironment === 'client' && !internalOptions.dev) {
 				for (const module of transformed.virtualModules.filter(
-					(item) => item.type === 'symbol',
+					(item) =>
+						item.type === 'symbol' ||
+						(item.type === 'resume' &&
+							internalOptions.emitResumeModules === true &&
+							clientSymbolEntrySources.has(source)),
 				)) {
 					this.emitFile({
 						type: 'chunk',
@@ -204,7 +297,7 @@ export function createMarklessRolldownPlugin(input: {
 		},
 		generateBundle: {
 			order: 'post',
-			handler(_, bundle) {
+			async handler(_, bundle) {
 				if (getEnvironment(this) !== 'client') return;
 
 				stripEmptyPreloadWrappersFromChunks(bundle);
@@ -232,19 +325,21 @@ export function createMarklessRolldownPlugin(input: {
 					},
 				);
 
+				const executionLogInjection = executionLogActivationInjection(internalOptions.executionLog);
+				if (executionLogInjection) injectHeadLinks(bundle, [executionLogInjection]);
 				injectHeadLinks(
 					bundle,
-					collectModulePreloadInjections(clientManifest.bundleGraph, {
+					collectModulePreloadInjections(clientManifest, {
 						publicPath: internalOptions.publicPath,
 						entryChunks: Object.values(bundle)
 							.filter(
-								(output): output is { fileName: string } =>
+								(output) =>
 									!!output &&
 									typeof output === 'object' &&
 									(output as { type?: string }).type === 'chunk' &&
 									(output as { isEntry?: boolean }).isEntry === true,
 							)
-							.map((chunk) => stripBuildPrefix(chunk.fileName)),
+							.map((chunk) => stripBuildPrefix((chunk as { fileName: string }).fileName)),
 					}),
 				);
 
@@ -252,6 +347,25 @@ export function createMarklessRolldownPlugin(input: {
 					type: 'asset',
 					fileName: MARKLESS_BUNDLE_GRAPH,
 					source: JSON.stringify(clientManifest.bundleGraph),
+				});
+				this.emitFile(await createExecutionSizesAsset(
+					manifestBundle,
+					clientManifest,
+					stripBuildPrefix,
+				));
+				// The demand map lives in payload-module exports (tree-shaken from built
+				// pages by design); ship it as a build asset so witness boxes and tooling
+				// can derive allowed execution sets against real builds.
+				this.emitFile({
+					type: 'asset',
+					fileName: `${MARKLESS_BUILD_PREFIX}execution-demand.json`,
+					source: JSON.stringify(
+						Object.fromEntries(
+							clientManifest.modules
+								.filter((module) => module.runtimeDemandMap)
+								.map((module) => [module.source, module.runtimeDemandMap]),
+						),
+					),
 				});
 			},
 		},
@@ -323,6 +437,7 @@ function registerTransformArtifacts(input: {
 	virtualModules: Map<string, MarklessVirtualModule>;
 	transformManifests: Map<string, MarklessTransformManifest>;
 	sourceVirtualModules: Map<string, Set<string>>;
+	executionLogEstimatedSizes: Map<string, number>;
 	dev: ReturnType<typeof createMarklessDevGraph>;
 	environment: MarklessEnvironment;
 }) {
@@ -330,6 +445,12 @@ function registerTransformArtifacts(input: {
 	for (const module of input.result.virtualModules) {
 		input.virtualModules.set(module.id, module);
 		ids.add(module.id);
+		if (input.environment === 'client' && module.type === 'symbol' && module.symbolId) {
+			input.executionLogEstimatedSizes.set(
+				module.symbolId.startsWith('symbol:') ? module.symbolId : `symbol:${module.symbolId}`,
+				module.source.length,
+			);
+		}
 	}
 	input.transformManifests.set(input.source, input.result.manifest);
 	input.sourceVirtualModules.set(input.source, ids);
@@ -370,14 +491,6 @@ function virtualModuleSourceForLoad(
 	);
 }
 
-function devBrowserVirtualModuleUrl(
-	virtualId: string,
-	publicPath: ((fileName: string) => string) | undefined,
-) {
-	const path = joinURL('@id', resolveVirtualId(virtualId).replace('\0', '__x00__'));
-	return publicPath ? publicPath(path) : joinURL('/', path);
-}
-
 function devBrowserSourceModuleUrl(
 	source: string,
 	root: string | undefined,
@@ -394,6 +507,14 @@ function devBrowserSourceModuleUrl(
 
 function isRootRelativePath(path: string): boolean {
 	return path !== '' && path !== '..' && !path.startsWith('../') && !isAbsolute(path);
+}
+
+function devBrowserVirtualModuleUrl(
+	virtualId: string,
+	publicPath: ((fileName: string) => string) | undefined,
+) {
+	const path = joinURL('@id', resolveVirtualId(virtualId).replace('\0', '__x00__'));
+	return publicPath ? publicPath(path) : joinURL('/', path);
 }
 
 function clientSymbolEntries(input: unknown, root: string | undefined): string[] {
@@ -427,6 +548,10 @@ function isSymbolOnlySourceRequest(id: string): boolean {
 	return MARKLESS_SYMBOL_SOURCE_QUERY_RE.test(id);
 }
 
+function isResumeSourceRequest(id: string): boolean {
+	return MARKLESS_RESUME_SOURCE_QUERY_RE.test(id);
+}
+
 function sourceForSymbolVirtualImporter(importer: string | undefined): string | null {
 	if (!importer) return null;
 
@@ -434,8 +559,26 @@ function sourceForSymbolVirtualImporter(importer: string | undefined): string | 
 	return match?.[1] ? decodeURIComponent(match[1]) : null;
 }
 
+function sourceForResumeVirtualImporter(importer: string | undefined): string | null {
+	if (!importer) return null;
+
+	const match = normalizeVirtualId(importer).match(RESUME_VIRTUAL_ID_RE);
+	return match?.[1] ? decodeURIComponent(match[1]) : null;
+}
+
 function isRelativeImport(source: string): boolean {
 	return source.startsWith('./') || source.startsWith('../');
+}
+
+function isMarklessRuntimeModule(id: string): boolean {
+	const path = pathname(id);
+	return /[/\\](?:web|runtime|serializer)[/\\]src[/\\].+\.ts$/.test(path);
+}
+
+function executionLogRuntimeModuleId(id: string): string {
+	const path = pathname(id);
+	const match = path.match(/[/\\](web|runtime|serializer)[/\\]src[/\\]([^?#]+)\.ts$/);
+	return match ? `${match[1]}:${match[2].replace(/[/\\]/g, '/')}` : path;
 }
 
 function normalizeVirtualId(id: string) {
@@ -462,4 +605,4 @@ export { MARKLESS_BUNDLE_GRAPH, MARKLESS_BUILD_PREFIX, outputDefaults } from './
 export { createBuildMetadata } from './build/build-metadata.ts';
 export { convertManifestToBundleGraph, createPreloadGraphAdder } from './build/bundle-graph.ts';
 export { collectHeadLinkInjections } from './build/head-links.ts';
-export { MARKLESS_VIRTUAL_PREFIX, transformTsrxModule } from './transform.ts';
+export { MARKLESS_VIRTUAL_PREFIX, resumeVirtualModuleId, transformTsrxModule } from './transform.ts';

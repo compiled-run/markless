@@ -1,4 +1,9 @@
-import { compileTsrxModule, emitSymbolResolverModule } from '@markless/compiler';
+import {
+	compileTsrxModule,
+	emitSymbolResolverModule,
+	type RuntimeDemandMapArtifact,
+} from '@markless/compiler';
+import type { ProtocolViewPayload } from '@markless/serializer';
 import type {
 	MarklessTransformManifest,
 	MarklessVirtualModule,
@@ -7,14 +12,17 @@ import type {
 } from './types.ts';
 import {
 	MARKLESS_VIRTUAL_PREFIX,
+	emitResumeModule,
 	emitSourceModule,
 	payloadModule,
+	resumeVirtualModuleId,
 	rewriteSymbolModuleExport,
 	scopedSymbolExportName,
 	symbolVirtualModuleId,
 } from './source-module.ts';
+import { injectExecutionLogModuleHook } from './execution-log.ts';
 
-export { MARKLESS_VIRTUAL_PREFIX } from './source-module.ts';
+export { MARKLESS_VIRTUAL_PREFIX, resumeVirtualModuleId } from './source-module.ts';
 
 export async function transformTsrxModule(
 	input: TransformTsrxModuleInput,
@@ -22,6 +30,7 @@ export async function transformTsrxModule(
 	const encodedFilename = encodeURIComponent(input.filename);
 	const payloadId = `${MARKLESS_VIRTUAL_PREFIX}payload:${encodedFilename}`;
 	const resolverId = `${MARKLESS_VIRTUAL_PREFIX}resolver:${encodedFilename}`;
+	const resumeId = resumeVirtualModuleId(input.filename);
 	const compiled = await compileTsrxModule({
 		filename: input.filename,
 		source: input.source,
@@ -41,6 +50,8 @@ export async function transformTsrxModule(
 	const symbolRoutes = compiled.semanticGraph.componentEdges.flatMap((edge, index) =>
 		edge.importSource ? [{ prefix: `c${index}:`, importSource: edge.importSource }] : [],
 	);
+	const executionLogModuleHookMode =
+		input.executionLogModuleHooks === false ? 'never' : input.executionLog;
 	const manifest: MarklessTransformManifest = {
 		source: input.filename,
 		payload: { virtualModuleId: payloadId },
@@ -51,6 +62,7 @@ export async function transformTsrxModule(
 			exportName: symbolRows[index]!.exportName,
 			virtualModuleId: symbolVirtualModuleId(input.filename, module.symbolId),
 		})),
+		runtimeDemandMap: compiled.runtimeDemandMap,
 	};
 	// Scoped <style> CSS ships through the bundler's CSS pipeline: a virtual
 	// .css module imported by the transformed module, never inline JS.
@@ -63,12 +75,30 @@ export async function transformTsrxModule(
 		{
 			id: payloadId,
 			type: 'payload',
-			source: payloadModule(compiled.payloadScripts),
+			source: payloadModule({
+				...compiled.payloadScripts,
+				runtimeDemandMap: compiled.runtimeDemandMap,
+			}),
 		},
 		{
 			id: resolverId,
 			type: 'resolver',
 			source: resolverSource,
+		},
+		{
+			id: resumeId,
+			type: 'resume',
+			source: emitResumeModule({
+				payloadId,
+				resolverId,
+				payloadState: compiled.payloadScripts.state,
+				payloadView: containerScopedResumeView(compiled.payloadScripts.view),
+				runtimeDemandMap: compiled.runtimeDemandMap,
+				executionLog: input.executionLog,
+				needsFullResume: needsFullResume(compiled.protocolView, compiled.runtimeDemandMap),
+				symbols: symbolRows,
+				symbolRoutes,
+			}),
 		},
 		...compiled.symbolModules.modules.map(
 			(module, index): MarklessVirtualModule => ({
@@ -76,10 +106,14 @@ export async function transformTsrxModule(
 				type: 'symbol',
 				symbolId: module.symbolId,
 				exportName: symbolRows[index]!.exportName,
-				source: rewriteSymbolModuleExport(
-					module.source,
-					module.exportName,
-					symbolRows[index]!.exportName,
+				source: injectExecutionLogModuleHook(
+					rewriteSymbolModuleExport(
+						module.source,
+						module.exportName,
+						symbolRows[index]!.exportName,
+					),
+					`symbol:${module.symbolId}`,
+					executionLogModuleHookMode,
 				),
 			}),
 		),
@@ -88,35 +122,55 @@ export async function transformTsrxModule(
 	const styleImport = styleId ? `import ${JSON.stringify(styleId)};\n` : '';
 	return {
 		code:
-			styleImport +
-			emitSourceModule({
-				filename: input.filename,
-				payloadId,
-				resolverId,
-				environment: input.environment ?? 'lib',
-				clientOutput: input.clientOutput ?? 'full',
-				needsFullResume:
-					(compiled.protocolView.branches?.length ?? 0) > 0 ||
-					(compiled.protocolView.keyedRepeats?.length ?? 0) > 0 ||
-					// Element handles materialize only in the full runtime.
-					compiled.protocolView.elementHandles.length > 0 ||
-					// Async boundary settle/revalidation lives only in the full runtime.
-					compiled.protocolView.asyncBoundaries.length > 0 ||
-					// Child components may compose branches/boundaries/handles into
-					// the served payload that this module cannot see at compile time.
-					compiled.semanticGraph.componentEdges.length > 0,
-				resumeModuleUrl: input.resumeModuleUrl,
-				publicRenderModuleSource: compiled.publicRenderModule.moduleSource,
-				publicRenderRootExportName: compiled.publicRenderModule.rootExportName,
-				publicCsrModuleSource: compiled.publicRenderModule.csrModuleSource,
-				publicRenderCsrExportName: compiled.publicRenderModule.csrExportName,
-				publicSsrModuleSource: compiled.publicRenderModule.ssrModuleSource,
-				publicRenderSsrExportName: compiled.publicRenderModule.ssrExportName,
-				symbols: symbolRows,
-				symbolRoutes,
+				styleImport +
+				emitSourceModule({
+					filename: input.filename,
+					payloadId,
+					resolverId,
+					environment: input.environment ?? 'lib',
+					clientOutput: input.clientOutput ?? 'full',
+					executionLog: input.executionLog,
+					headInjections: input.headInjections,
+					devResumeReexport: input.devResumeReexport === true,
+					needsFullResume: needsFullResume(compiled.protocolView, compiled.runtimeDemandMap),
+					resumeModuleUrl: input.resumeModuleUrl,
+					publicRenderModuleSource: compiled.publicRenderModule.moduleSource,
+					publicRenderRootExportName: compiled.publicRenderModule.rootExportName,
+					publicCsrModuleSource: compiled.publicRenderModule.csrModuleSource,
+					publicRenderCsrExportName: compiled.publicRenderModule.csrExportName,
+					publicSsrModuleSource: compiled.publicRenderModule.ssrModuleSource,
+					publicRenderSsrExportName: compiled.publicRenderModule.ssrExportName,
+					symbols: symbolRows,
+					symbolRoutes,
 			}),
 		map: null,
 		virtualModules,
 		manifest,
 	};
+}
+
+function containerScopedResumeView(view: ProtocolViewPayload): ProtocolViewPayload {
+	return {
+		...view,
+		// Match the markless/view locator table served by renderToString().
+		locators: (view.locators ?? []).map((locator) => ({
+			...locator,
+			index: locator.index + 1,
+		})),
+	};
+}
+
+function needsFullResume(
+	view: ProtocolViewPayload,
+	runtimeDemandMap: RuntimeDemandMapArtifact,
+): boolean {
+	if ((view.branches?.length ?? 0) > 0) return true;
+	if ((view.elementHandles?.length ?? 0) > 0) return true;
+	if ((view.asyncBoundaries?.length ?? 0) > 0) return true;
+	if ((view.keyedRepeats?.length ?? 0) === 0) return false;
+	return !recordKindReplaced(runtimeDemandMap, 'keyed-repeat');
+}
+
+function recordKindReplaced(runtimeDemandMap: RuntimeDemandMapArtifact, kind: string): boolean {
+	return runtimeDemandMap.recordKinds.some((record) => record.kind === kind && record.replaced === true);
 }

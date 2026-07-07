@@ -23,7 +23,7 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 			valueKind: binding.valueKind ?? 'unknown',
 		}));
 	const computed = input.semanticGraph.graphBindings
-		.filter((binding) => binding.kind === 'computed' && binding.async === true)
+		.filter((binding) => binding.kind === 'computed')
 		.map((binding) => ({
 			graphNodeId: binding.id,
 			name: binding.name,
@@ -71,6 +71,18 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 		},
 	);
 	const viewDomUpdates = input.semanticGraph.templateReads.flatMap((read) => {
+		if (read.computedGraphNodeId) {
+			return [
+				{
+					hostNodeId: read.hostNodeId,
+					source: read.source,
+					graphNodeId: read.computedGraphNodeId,
+					path: [],
+					target: read.target,
+				},
+			];
+		}
+
 		const resolved = resolveGraphPath(read.source, bindings, aliases);
 		if (!resolved) return [];
 
@@ -85,14 +97,16 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 		];
 	});
 	const elementHandles = input.semanticGraph.elementHandleBindings.flatMap((binding) => {
-		const graphBinding = bindings.get(binding.handleName);
+		if (binding.keyedRepeatScopeIds.length > 0) return [];
+
+		const graphBinding = resolveElementHandleBinding(binding, input, bindings, aliases);
 		if (!graphBinding || graphBinding.kind !== 'element') return [];
 
 		return [
 			{
 				hostNodeId: binding.hostNodeId,
 				handleId: graphBinding.id,
-				name: binding.handleName,
+				name: graphBinding.name,
 			},
 		];
 	});
@@ -169,6 +183,37 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 		},
 		diagnostics: input.stateLowering.diagnostics,
 	};
+}
+
+function resolveElementHandleBinding(
+	binding: PayloadArenaInput['semanticGraph']['elementHandleBindings'][number],
+	input: PayloadArenaInput,
+	bindings: ReadonlyMap<string, SemanticGraphBinding>,
+	aliases: ReturnType<typeof semanticAliasMap>,
+): SemanticGraphBinding | undefined {
+	const direct = resolveGraphPath(binding.handleName, bindings, aliases);
+	if (!direct) return undefined;
+	if (direct.binding.kind === 'element' && direct.path.length === 0) return direct.binding;
+	if (direct.binding.kind !== 'prop' || !binding.componentName) return undefined;
+
+	const propName = direct.path[0];
+	if (!propName || direct.path.length !== 1) return undefined;
+
+	const prop = input.semanticGraph.componentEdges
+		.filter((edge) => edge.childComponentName === binding.componentName)
+		.flatMap((edge) => edge.props)
+		.find(
+			(candidate) =>
+				candidate.name === propName &&
+				candidate.kind === 'graph-reference' &&
+				candidate.graphBindingKind === 'element' &&
+				candidate.path.length === 0,
+		);
+	if (!prop) return undefined;
+
+	return input.semanticGraph.graphBindings.find(
+		(graphBinding) => graphBinding.id === prop.graphNodeId,
+	);
 }
 
 function domUpdateTargetKey(

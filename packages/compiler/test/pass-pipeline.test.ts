@@ -31,6 +31,7 @@ test('default compiler passes declare stable artifact boundaries', () => {
 		'capture-analysis',
 		'payload-scripts',
 		'symbol-modules',
+		'runtime-demand-map',
 		'symbol-resolver-module',
 	]);
 
@@ -90,6 +91,12 @@ test('default compiler passes declare stable artifact boundaries', () => {
 				description: expect.stringContaining('symbol module'),
 				consumes: ['symbolResolver', 'captureAnalysis', 'publicRenderPlan'],
 				produces: ['symbolModules'],
+			}),
+			expect.objectContaining({
+				passId: 'runtime-demand-map',
+				description: expect.stringContaining('runtime module demands'),
+				consumes: ['symbolResolver', 'symbolModules', 'publicRenderModule', 'protocolView'],
+				produces: ['runtimeDemandMap'],
 			}),
 		]),
 	);

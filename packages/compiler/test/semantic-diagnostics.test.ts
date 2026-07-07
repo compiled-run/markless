@@ -96,6 +96,35 @@ export function Handles() @{
 }
 `;
 
+const b918HandleGuardsSource = `
+import { state, element } from '@markless/core';
+
+const moduleHandle = element<HTMLInputElement>();
+
+function Field(props: { forwarded: unknown }) @{
+	<input />
+}
+
+export function Handles() @{
+	let input = element<HTMLInputElement>();
+	let unbound = element<HTMLButtonElement>();
+	const saved = state({ current: null });
+	saved.current = input;
+
+	<section>
+		<Field forwarded={input} />
+		<p>{unbound}</p>
+		<p>{input.textContent}</p>
+		@for (const row of state([{ id: 'a' }]); key row.id) {
+			<input el={input} value={row.id} />
+		}
+		<input el={moduleHandle} />
+	</section>
+}
+`;
+
+const templateAsValueSource = `import { state, computed } from '@markless/core'; export function App() @{ const banner = <h1>Hi</h1>; const rows = []; rows.push(<li>One</li>); const view = state(<p>Stored</p>); const card = computed(() => <article>Card</article>); const tiles = [<span>Tile</span>]; <section>{banner}{rows}{view}{card}{tiles}</section> }`;
+
 const componentAttachSource = `
 import { state } from '@markless/core';
 
@@ -132,6 +161,25 @@ export function Form() @{
 }
 `;
 
+const detachedSyncPolicySource = `import { state } from '@markless/core'; export function Link() @{ let count = state(0); <a href="/next" onClick={(event) => { const pd = event.preventDefault; pd(); count++; }}>Next {count}</a> }`;
+const eventExpressionSource = `import { state } from '@markless/core'; export function Counter() @{ let count = state(0); <button onClick={count++}>{count}</button> }`;
+const attributeDisciplineSource = `import { state } from '@markless/core';
+export function App() @{ let count = state(0); const menu = state({ open: false }); const handlers = { onClick: () => count++, onInput: (event) => { count++; } }; <section><input {...handlers} />
+// markless-allow MARKLESS_SPREAD_STATIC_SNAPSHOT: static attribute snapshot is intentional here
+<div {...menu}>Menu</div><div data-menu={menu}>Menu</div><div style={{ color: 'red' }}>Style</div><div id="a" id="b">Duplicate</div><button onclick={() => count++}>Bad case</button><p data-count={count} data-open={menu.open} hidden={false}>Scalars</p></section> }`;
+
+function repeatAllowSource(...sites: readonly string[]): string {
+	return `import { state } from '@markless/core'; export function App() @{ const rows = state([{ id: 'a' }]); <ul>${sites.join('\n')}</ul> }`;
+}
+
+function repeatSite(header: string, allow = ''): string {
+	return `${allow ? `// markless-allow ${allow}\n` : ''}@for (${header}) { <li>{row.id}</li> }`;
+}
+
+async function repeatDiagnostics(...sites: readonly string[]) {
+	return (await buildSemanticGraph({ filename: 'src/Repeat.tsrx', source: repeatAllowSource(...sites) })).diagnostics;
+}
+
 const graphDestructureDefaultSource = `
 import { state } from '@markless/core';
 
@@ -140,6 +188,30 @@ export function Menu() @{
 	const { title: menuTitle = "Untitled" } = menu;
 
 	<p>{menuTitle}</p>
+}
+`;
+
+const templateWriteSource = `
+import { state } from '@markless/core';
+
+export function Counter() @{
+	let count = state(0);
+
+	<p>{count++}</p>
+}
+`;
+
+const computedWriteSource = `
+import { state, computed } from '@markless/core';
+
+export function Counter() @{
+	let count = state(1);
+	const doubled = computed(() => {
+		count++;
+		return count * 2;
+	});
+
+	<p>{doubled}</p>
 }
 `;
 
@@ -212,6 +284,101 @@ test('buildSemanticGraph reports module-scope graph state creation', async () =>
 	]);
 });
 
+test('buildSemanticGraph marks allowed index-key warnings as suppressed with the reason', async () => {
+	const diagnostics = await repeatDiagnostics(
+		repeatSite(
+			'const row of rows; index i; key i',
+			'MARKLESS_REPEAT_KEY_IS_INDEX: static list, order never changes',
+		),
+	);
+
+	expect(diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_REPEAT_KEY_IS_INDEX',
+			severity: 'warning',
+			suppressed: true,
+			suppressionReason: 'static list, order never changes',
+		}),
+	]);
+});
+
+test('buildSemanticGraph keeps markless-allow per site for index-key warnings', async () => {
+	const diagnostics = await repeatDiagnostics(
+		repeatSite(
+			'const row of rows; index i; key i',
+			'MARKLESS_REPEAT_KEY_IS_INDEX: first list is positional',
+		),
+		repeatSite('const row of rows; index slot; key slot'),
+	);
+
+	expect(diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_REPEAT_KEY_IS_INDEX',
+			suppressed: true,
+			suppressionReason: 'first list is positional',
+		}),
+		expect.objectContaining({
+			code: 'MARKLESS_REPEAT_KEY_IS_INDEX',
+			severity: 'warning',
+		}),
+	]);
+	expect(diagnostics[1]).not.toHaveProperty('suppressed');
+});
+
+test('buildSemanticGraph keeps errors unsuppressed and warns about markless-allow error codes', async () => {
+	const diagnostics = await repeatDiagnostics(
+		repeatSite(
+			'const row of rows',
+			'MARKLESS_REPEAT_KEY_REQUIRED: fixture keeps append-only order',
+		),
+	);
+
+	expect(diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_REPEAT_KEY_REQUIRED',
+			severity: 'error',
+		}),
+		expect.objectContaining({
+			code: 'MARKLESS_ALLOW_ERROR_UNSUPPRESSIBLE',
+			severity: 'warning',
+			message: expect.stringContaining('MARKLESS_REPEAT_KEY_REQUIRED'),
+		}),
+	]);
+	expect(diagnostics[0]).not.toHaveProperty('suppressed');
+});
+
+test('buildSemanticGraph warns when markless-allow omits the required reason', async () => {
+	const diagnostics = await repeatDiagnostics(
+		repeatSite('const row of rows; index i; key i', 'MARKLESS_REPEAT_KEY_IS_INDEX'),
+	);
+
+	expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+		'MARKLESS_REPEAT_KEY_IS_INDEX',
+		'MARKLESS_ALLOW_REASON_REQUIRED',
+	]);
+	expect(diagnostics[0]).not.toHaveProperty('suppressed');
+	expect(diagnostics[1]).toEqual(
+		expect.objectContaining({
+			severity: 'warning',
+			message: expect.stringContaining('// markless-allow CODE: reason'),
+		}),
+	);
+});
+
+test('buildSemanticGraph warns when markless-allow is stale for a site', async () => {
+	const diagnostics = await repeatDiagnostics(
+		repeatSite('const row of rows; key row.id', 'MARKLESS_REPEAT_KEY_IS_INDEX: stale'),
+	);
+
+	expect(diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_ALLOW_STALE',
+			severity: 'warning',
+			message: expect.stringContaining('MARKLESS_REPEAT_KEY_IS_INDEX'),
+		}),
+	]);
+});
+
 test('buildSemanticGraph reports shared definition dependency cycles', async () => {
 	const graph = await buildSemanticGraph({
 		filename: 'src/shared-cycle.tsrx',
@@ -235,6 +402,56 @@ test('buildSemanticGraph reports shared definition dependency cycles', async () 
 				end: cycleStart + 'session()'.length,
 			},
 			docsUrl: 'https://markless.dev/errors/MARKLESS_SHARED_DEFINITION_CYCLE',
+		}),
+	]);
+});
+
+test('B919 reports unknown shared scope strings', async () => {
+	const invalidScopeSource = `import { shared } from '@markless/core'; export const session = shared(() => ({}), { scope: 'session' });`;
+	const graph = await buildSemanticGraph({
+		filename: 'src/session.tsrx',
+		source: invalidScopeSource,
+	});
+	const scopeStart = invalidScopeSource.indexOf("'session'");
+
+	expect(graph.sharedDefinitions).toEqual([
+		expect.objectContaining({
+			name: 'session',
+		}),
+	]);
+	expect(graph.sharedDefinitions[0]).not.toHaveProperty('scope');
+	expect(graph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_SHARED_SCOPE_INVALID',
+			message:
+				'Unknown shared() scope "session". Valid scopes are "request", "container", and "page".',
+			primarySpan: {
+				filename: 'src/session.tsrx',
+				start: scopeStart,
+				end: scopeStart + "'session'".length,
+			},
+		}),
+	]);
+});
+
+test('B919 reports non-literal shared scope values', async () => {
+	const dynamicScopeSource = `import { shared } from '@markless/core'; const scope = 'request'; export const session = shared(() => ({}), { scope });`;
+	const graph = await buildSemanticGraph({
+		filename: 'src/session.tsrx',
+		source: dynamicScopeSource,
+	});
+	const scopeStart = dynamicScopeSource.lastIndexOf('scope');
+
+	expect(graph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_SHARED_SCOPE_INVALID',
+			message:
+				'shared() scope must be a string literal. Valid scopes are "request", "container", and "page".',
+			primarySpan: {
+				filename: 'src/session.tsrx',
+				start: scopeStart,
+				end: scopeStart + 'scope'.length,
+			},
 		}),
 	]);
 });
@@ -302,6 +519,151 @@ test('buildSemanticGraph reports missing framework API imports', async () => {
 	]);
 });
 
+test('B915 reports framework API misuse at the semantic graph site', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/FrameworkApiMisuse.tsrx',
+		source: `import { state, computed } from '@markless/core'; export function App() @{ let count = state(1); const nestedState = state(state(5)); const nestedComputed = computed(() => computed(() => count)); const self = computed(() => self ? 1 : 2); const makeState = state; let hidden = makeState(5); <p>{count} {nestedState} {nestedComputed} {self} {hidden}</p> }`,
+	});
+
+	expect(graph.diagnostics).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				code: 'MARKLESS_STATE_NESTED_CREATION',
+				title: 'state() cannot be the initial value of another state()',
+				message:
+					'`state(state(5))` declares graph state whose initial value is another state() call. `nestedState` cannot store graph state as its value.',
+			}),
+			expect.objectContaining({
+				code: 'MARKLESS_STATE_NESTED_CREATION',
+				title: 'A framework API call cannot be a graph value',
+				message:
+					'`computed(() => computed(() => count))` creates a computed whose value would be another computed() call. `nestedComputed` derives a value; it cannot derive graph nodes.',
+			}),
+			expect.objectContaining({
+				code: 'MARKLESS_COMPUTED_DEPENDENCY_CYCLE',
+				title: 'A computed cannot depend on itself',
+				message:
+					'`computed(() => self ? 1 : 2)` reads `self` — the value it is defining. `self` cannot be derived from `self`.',
+			}),
+			expect.objectContaining({
+				code: 'MARKLESS_FRAMEWORK_API_ALIAS_UNSUPPORTED',
+				title: 'Framework APIs cannot be aliased or passed as values',
+				message:
+					'`const makeState = state` copies the framework API `state` into a plain variable. `makeState(5)` would not create graph state — the compiler only rewrites calls made through the imported name.',
+			}),
+		]),
+	);
+	expect(graph.graphBindings.map((binding) => binding.name)).toEqual(['count']);
+});
+
+test('B915 reports local framework API shadowing without import-only guidance', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/ShadowedState.tsrx',
+		source: `function state(value) { return value * 2; } export function App() @{ const x = state(5); <p>{x}</p> }`,
+	});
+
+	expect(graph.graphBindings).toEqual([]);
+	expect(graph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_FRAMEWORK_IMPORT_REQUIRED',
+			message:
+				'`state(5)` calls your local function `state`, but in `.tsrx` files `state` is a compiler-recognized markless API name. Rename the local function, or import the framework API from `@markless/core`.',
+			suggestions: [
+				{
+					message:
+						'Rename the helper (before: `function state(value) { ... }` — after: `function doubleValue(value) { ... }`), or, if graph state was intended, delete the helper and add `import { state } from \'@markless/core\';`.',
+				},
+			],
+		}),
+	]);
+	expect(graph.graphBindings.map((binding) => binding.id)).not.toContain('prop:value');
+});
+
+test('buildSemanticGraph reports state writes inside template expressions', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/TemplateWrite.tsrx',
+		source: templateWriteSource,
+	});
+	const writeStart = templateWriteSource.indexOf('count++');
+
+	expect(graph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_STATE_WRITE_IN_TEMPLATE',
+			severity: 'error',
+			phase: 'semantic-graph',
+			title: 'Cannot write state inside a template expression',
+			message:
+				'`count++` writes to `count` while rendering its value. A template expression is a DOM read; writing `count` there would re-trigger the same DOM update that is rendering it.',
+			why: 'DOM updates are the only effects in the demand-driven graph; a write inside a DOM read creates a self-waking cycle that cannot resume.',
+			primarySpan: {
+				filename: 'src/TemplateWrite.tsrx',
+				start: writeStart,
+				end: writeStart + 'count'.length,
+			},
+			statePath: 'count',
+			source: 'count++',
+			docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_WRITE_IN_TEMPLATE',
+		}),
+	]);
+});
+
+test('buildSemanticGraph reports assignment writes inside branch conditions', async () => {
+	const source = `import { state } from '@markless/core'; export function App() @{ let open = state(false); <section>@if (open = true) { <p>Always?</p> }</section> }`;
+	const graph = await buildSemanticGraph({
+		filename: 'src/BranchAssignment.tsrx',
+		source,
+	});
+	const writeStart = source.indexOf('open = true');
+
+	expect(graph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_STATE_WRITE_IN_TEMPLATE',
+			severity: 'error',
+			phase: 'semantic-graph',
+			title: 'Cannot write state inside a template expression',
+			message:
+				'`@if (open = true)` assigns to `open` while deciding which branch to render. A branch test is a read; writing `open` there would re-trigger the very update that is evaluating it. If you meant a comparison, write `===`.',
+			primarySpan: {
+				filename: 'src/BranchAssignment.tsrx',
+				start: writeStart,
+				end: writeStart + 'open'.length,
+			},
+			statePath: 'open',
+			source: '@if (open = true)',
+			docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_WRITE_IN_TEMPLATE',
+		}),
+	]);
+});
+
+test('buildSemanticGraph reports state writes inside computed derives', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/ComputedWrite.tsrx',
+		source: computedWriteSource,
+	});
+	const writeStart = computedWriteSource.indexOf('count++');
+
+	expect(graph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_STATE_WRITE_IN_COMPUTED',
+			severity: 'error',
+			phase: 'semantic-graph',
+			passId: 'tsrx-semantic-graph',
+			title: 'A computed cannot write graph state',
+			message:
+				'`count++` writes to `count` while deriving a computed value. A computed is a graph read, so writing graph state there would re-trigger the same derivation.',
+			why: 'A computed is a demand-driven read in the graph; the only effects in the system are compiler-generated DOM updates, so a write inside a derive is a self-waking cycle that cannot resume.',
+			primarySpan: {
+				filename: 'src/ComputedWrite.tsrx',
+				start: writeStart,
+				end: writeStart + 'count'.length,
+			},
+			statePath: 'count',
+			source: 'count++',
+			docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_WRITE_IN_COMPUTED',
+		}),
+	]);
+});
+
 test('buildSemanticGraph reports unextractable synchronous event policy', async () => {
 	const graph = await buildSemanticGraph({
 		filename: 'src/Form.tsrx',
@@ -311,7 +673,6 @@ test('buildSemanticGraph reports unextractable synchronous event policy', async 
 
 	expect(graph.events).toEqual([
 		expect.objectContaining({
-			eventName: 'click',
 			hasSyncPolicyCandidate: true,
 			syncPolicy: undefined,
 		}),
@@ -341,6 +702,91 @@ test('buildSemanticGraph reports unextractable synchronous event policy', async 
 			docsUrl: 'https://markless.dev/errors/MARKLESS_SYNC_POLICY_UNEXTRACTABLE',
 		}),
 	]);
+});
+
+test('B914 reports detached sync policy references with the truthful reason', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/Link.tsrx',
+		source: detachedSyncPolicySource,
+	});
+	const detachedStart = detachedSyncPolicySource.indexOf('pd = event.preventDefault');
+
+	expect(graph.events).toEqual([
+		expect.objectContaining({
+			eventName: 'click',
+			hasSyncPolicyCandidate: true,
+			syncPolicy: undefined,
+		}),
+	]);
+	expect(graph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_SYNC_POLICY_UNEXTRACTABLE',
+			phase: 'sync-policy',
+			message:
+				'`pd = event.preventDefault` detaches preventDefault from the event, so the compiler cannot prove when the default action is cancelled for onClick.',
+			why: 'preventDefault() and stopPropagation() must run before lazy handler symbols load; a detached reference hides which action runs and under what condition.',
+			primarySpan: expect.objectContaining({ start: detachedStart }),
+		}),
+	]);
+});
+
+test('B914 reports non-function event prop expressions', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/Counter.tsrx',
+		source: eventExpressionSource,
+	});
+	const expressionStart = eventExpressionSource.indexOf('count++');
+
+	expect(graph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_EVENT_HANDLER_NOT_A_FUNCTION',
+			phase: 'semantic-graph',
+			title: 'Event props need a function',
+			message:
+				'`onClick={count++}` passes the result of `count++`, not a function. The expression would run once while rendering, and the click would receive a number.',
+			why: 'An event prop compiles to a lazy handler symbol that runs on the browser event; only a function or an array of functions can be that handler.',
+			primarySpan: expect.objectContaining({ start: expressionStart }),
+		}),
+	]);
+});
+
+test('B921 reports attribute and spread value discipline diagnostics without flagging scalar attributes', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/AttributeDiscipline.tsrx',
+		source: attributeDisciplineSource,
+	});
+	const byCode = (code: string) => graph.diagnostics.filter((item) => item.code === code);
+
+	expect(byCode('MARKLESS_EVENT_SPREAD_UNSUPPORTED')[0]).toEqual(
+		expect.objectContaining({ severity: 'error', message: expect.stringContaining('onClick') }),
+	);
+	expect(byCode('MARKLESS_SPREAD_STATIC_SNAPSHOT')[0]).toEqual(
+		expect.objectContaining({
+			severity: 'warning',
+			suppressed: true,
+			suppressionReason: 'static attribute snapshot is intentional here',
+		}),
+	);
+	expect(byCode('MARKLESS_ATTRIBUTE_DUPLICATE')[0]).toEqual(
+		expect.objectContaining({ severity: 'error', message: expect.stringContaining('id') }),
+	);
+	expect(byCode('MARKLESS_STYLE_OBJECT_UNSUPPORTED')[0]).toEqual(
+		expect.objectContaining({ severity: 'error', message: expect.stringContaining('style={{ color:') }),
+	);
+	expect(byCode('MARKLESS_ATTRIBUTE_OBJECT_VALUE')).toEqual([
+		expect.objectContaining({ message: expect.stringContaining('data-menu="[object Object]"') }),
+		expect.objectContaining({ message: expect.stringContaining('did you mean `onClick`') }),
+	]);
+	expect(graph.diagnostics).not.toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				message: expect.stringContaining('data-count'),
+			}),
+			expect.objectContaining({
+				message: expect.stringContaining('data-open'),
+			}),
+		]),
+	);
 });
 
 test('buildSemanticGraph reports reactive reads after await in async computed bodies', async () => {
@@ -555,6 +1001,128 @@ test('buildSemanticGraph reports element handles stored in state', async () => {
 			docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_ELEMENT_HANDLE_UNSERIALIZABLE',
 		}),
 	]);
+});
+
+test('B918 reports honest element handle guard diagnostics', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/Handles.tsrx',
+		source: b918HandleGuardsSource,
+	});
+
+	expect(graph.diagnostics.map((diagnostic) => diagnostic.code)).toEqual(
+		expect.arrayContaining([
+		'MARKLESS_ELEMENT_MODULE_SCOPE',
+		'MARKLESS_ELEMENT_HANDLE_UNBOUND',
+		'MARKLESS_ELEMENT_HANDLE_RENDER_READ',
+		'MARKLESS_ELEMENT_HANDLE_DUPLICATE',
+	]),
+	);
+	expect(graph.diagnostics).toEqual(expect.arrayContaining([
+		expect.objectContaining({
+			code: 'MARKLESS_ELEMENT_MODULE_SCOPE',
+			message: expect.stringContaining('moduleHandle'),
+		}),
+		expect.objectContaining({
+			code: 'MARKLESS_ELEMENT_HANDLE_UNBOUND',
+			severity: 'warning',
+			message: expect.stringContaining('unbound'),
+		}),
+		expect.objectContaining({
+			code: 'MARKLESS_ELEMENT_HANDLE_RENDER_READ',
+			message: expect.stringContaining('input.textContent'),
+		}),
+		expect.objectContaining({
+			code: 'MARKLESS_ELEMENT_HANDLE_DUPLICATE',
+			message: expect.stringContaining('inside a keyed repeat'),
+			elementLocator: 'h4',
+		}),
+	]));
+	expect(graph.diagnostics.map((diagnostic) => diagnostic.message).join('\n')).not.toContain(
+		'not an element() handle',
+	);
+
+	const nestedGraph = await buildSemanticGraph({
+		filename: 'src/NestedHandles.tsrx',
+		source: `import { element } from '@markless/core'; function ObjectField(props: { forwarded: unknown }) @{ <input el={props.forwarded.current} /> } function ArrayField(props: { forwarded: unknown }) @{ <input el={props.forwarded[0]} /> } export function App() @{ const input = element<HTMLInputElement>(); <section><ObjectField forwarded={{ current: input }} /><ArrayField forwarded={[input]} /></section> }`,
+	});
+	expect(nestedGraph.diagnostics).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				code: 'MARKLESS_ELEMENT_HANDLE_PROP_UNSUPPORTED',
+				message: expect.stringContaining('props.forwarded.current'),
+			}),
+			expect.objectContaining({
+				code: 'MARKLESS_ELEMENT_HANDLE_PROP_UNSUPPORTED',
+				message: expect.stringContaining('props.forwarded[0]'),
+			}),
+		]),
+	);
+});
+
+test('B918 allows suppressing unbound handle warnings at the read site', async () => {
+	const source = `
+import { element } from '@markless/core';
+
+export function Handles() @{
+	let unbound = element<HTMLButtonElement>();
+
+	<section>
+		// markless-allow MARKLESS_ELEMENT_HANDLE_UNBOUND: read intentionally observes undefined before binding
+		<p>{unbound}</p>
+	</section>
+}
+`;
+	const graph = await buildSemanticGraph({ filename: 'src/Handles.tsrx', source });
+
+	expect(graph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_ELEMENT_HANDLE_UNBOUND',
+			severity: 'warning',
+			suppressed: true,
+			suppressionReason: 'read intentionally observes undefined before binding',
+		}),
+	]);
+});
+
+test('buildSemanticGraph reports templates stored or passed as runtime values', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/TemplateAsValue.tsrx',
+		source: templateAsValueSource,
+	});
+
+	const diagnostics = graph.diagnostics.filter(
+		(diagnostic) => diagnostic.code === 'MARKLESS_TEMPLATE_AS_VALUE',
+	);
+	expect(diagnostics).toHaveLength(5);
+	expect(diagnostics[0]).toEqual(
+		expect.objectContaining({
+			severity: 'error',
+			phase: 'semantic-graph',
+			title: 'A template is not a value',
+			message: expect.stringContaining('banner'),
+			why: expect.stringContaining('no VDOM'),
+			suggestions: [expect.objectContaining({ message: expect.stringContaining('@if/@for') })],
+			docsUrl: 'https://markless.dev/errors/MARKLESS_TEMPLATE_AS_VALUE',
+		}),
+	);
+	expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+		expect.stringContaining('banner'),
+		expect.stringContaining('rows.push(<li>One</li>)'),
+		expect.stringContaining('state(<p>Stored</p>)'),
+		expect.stringContaining('computed(() => <article>Card</article>)'),
+		expect.stringContaining('tiles'),
+	]);
+	expect(graph.hostNodes.map((host) => host.tagName)).toEqual(['section']);
+	expect(graph.graphBindings.map((binding) => binding.id)).not.toContain('state:view');
+	expect(graph.graphBindings.map((binding) => binding.id)).not.toContain('computed:card');
+});
+
+test('buildSemanticGraph keeps legal template structure positions valid', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/LegalTemplateStructure.tsrx',
+		source: `import { state } from '@markless/core'; import { Link } from '@markless/core/router'; export function App() @{ const open = state(true); <main>@if (open) { <h1>Open</h1> } @else { <h1>Closed</h1> }<Link><strong>Projected</strong></Link></main> }`,
+	});
+	expect(graph.diagnostics).toEqual([]);
 });
 
 test('buildSemanticGraph reports attach on components instead of treating it as a host behavior', async () => {

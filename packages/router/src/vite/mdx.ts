@@ -89,7 +89,7 @@ type MdxPart =
 
 function emitComposedMdxRoute(route: MdxRoute): string {
 	return [
-		`import { resumeEventOnlyFromPayloadDocument } from '@markless/core/runtime/event-only-resume';`,
+		`import { resumeFromPayloadDocument } from '@markless/core/web/resume';`,
 		`import { composeMdxState, composeMdxView, loadMdxSymbol, renderMdxChild, replaceMdxChild, rootFromMdxHtml } from '@markless/router/vite/runtime/mdx-route';`,
 		...route.imports,
 		'',
@@ -127,14 +127,13 @@ function emitComposedMdxRoute(route: MdxRoute): string {
 		'export default marklessMdxPage;',
 		'',
 		'export async function resumeContainerEvent(input) {',
-		'  await resumeEventOnlyFromPayloadDocument({',
+		'  input.root.__asyncResumeRuntimeStarted = true;',
+		'  const { runtime } = await resumeFromPayloadDocument({',
 		'    document: input.root,',
 		'    root: input.root,',
-		'    event: input.event,',
-		'    element: input.element,',
-		'    eventRecord: input.eventRecord,',
 		'    loadSymbol: marklessMdxLoadSymbol,',
 		'  });',
+		'  await runtime.dispatch(input.event, { syncPolicyAlreadyApplied: true });',
 		'}',
 		'',
 		'function marklessMdxLoadSymbol(symbolId, children = []) {',

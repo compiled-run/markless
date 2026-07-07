@@ -61,8 +61,16 @@ export async function render(
 ): Promise<CsrRenderContainer> {
 	startCsrPreload(component);
 	const output = typeof component === 'function' ? component() : component.renderCsr();
+	if (output.view && output.state && hasKeyedRepeats(output.view)) {
+		const { validateKeyedRepeatPayloadKeys } = await import('./repeat-runtime.ts');
+		await validateKeyedRepeatPayloadKeys({ state: output.state, view: output.view });
+	}
 
 	if (output.graph && output.runtime) {
+		if (output.view && hasKeyedRepeats(output.view)) {
+			const { validateKeyedRepeatGraphKeys } = await import('./repeat-runtime.ts');
+			validateKeyedRepeatGraphKeys(output.graph, output.view);
+		}
 		mountRoot(options.target, output.root);
 		return {
 			phase: 'csr',
@@ -109,6 +117,10 @@ function offsetElementLocators(view: ProtocolViewPayload, offset: number): Proto
 			index: locator.index + offset,
 		})),
 	};
+}
+
+function hasKeyedRepeats(view: ProtocolViewPayload): boolean {
+	return (view.keyedRepeats?.length ?? 0) > 0;
 }
 
 function startCsrPreload(component: CsrRenderable): void {

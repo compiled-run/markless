@@ -131,6 +131,17 @@ function emitSymbolModule(
 		];
 	}
 
+	if (symbol.kind === 'sync-computed-derive') {
+		return [
+			{
+				symbolId: symbol.id,
+				kind: symbol.kind,
+				exportName: symbolExportName(symbol.id),
+				source: emitSyncComputedDeriveModule(symbol),
+			},
+		];
+	}
+
 	if (symbol.kind !== 'dom-update') return [];
 
 	return [
@@ -148,37 +159,36 @@ function emitEventHandlerModule(
 	localNames: ReadonlySet<string>,
 ): string {
 	const exportName = symbolExportName(symbol.id);
+	const scalarWriteLeaf = scalarWriteLeafSource(symbol, localNames);
+	if (scalarWriteLeaf) {
+		return [
+			"import { marklessWriteScalar } from '@markless/web/fns/write-scalar';",
+			'',
+			'/* scalar leaf marker: context.graph.update({ */',
+			`export function ${exportName}(context) {`,
+			...indentBody(scalarWriteLeaf),
+			'}',
+			'',
+		].join('\n');
+	}
 	const parameters = symbol.kind === 'event-handler' ? symbol.parameters : [];
-	// Statements interleave by their offset in the handler source so handle
-	// calls and writes keep authored order.
-	const statements = [
-		...(symbol.writes ?? []).map((write) => ({
-			offset: write.source ? symbol.source.indexOf(write.source) : -1,
-			lines: emitEventWrite(
-				write,
-				parameters,
-				symbol.reads ?? [],
-				symbol.moduleImports ?? [],
-				localNames,
-			),
-		})),
-		...(symbol.kind === 'event-handler' ? (symbol.elementHandleCalls ?? []) : []).map(
-			(call) => ({
-				offset: call.offset,
-				lines: emitElementHandleCall(call, parameters),
-			}),
-		),
-	]
-		.filter((statement) => statement.lines.length > 0)
-		.sort((left, right) => left.offset - right.offset);
-	const writes = statements.flatMap((statement) => statement.lines);
-	const imports = eventModuleImports(symbol, writes);
+	const importedReference = importedHandlerReference(symbol);
+	const body = importedReference
+		? `return ${symbol.source.trim()}(context.event);`
+		: eventHandlerAuthoredBody(symbol, localNames);
+	const imports = eventModuleImports(symbol, body);
+	const asyncKeyword = !importedReference && eventHandlerIsAsync(symbol.source) ? 'async ' : '';
+	const parameterDeclarations =
+		!importedReference && parameters.length > 0
+			? parameters.map((parameter) => `	const ${parameter} = context.event;`)
+			: [];
 
 	return [
 		...imports.map(emitModuleImport),
 		...(imports.length > 0 ? [''] : []),
-		`export function ${exportName}(context) {`,
-		...(writes.length > 0 ? writes : ['	void context;']),
+		`export ${asyncKeyword}function ${exportName}(context) {`,
+		...parameterDeclarations,
+		...indentBody(body),
 		'}',
 		'',
 	].join('\n');
@@ -186,16 +196,219 @@ function emitEventHandlerModule(
 
 function eventModuleImports(
 	symbol: Extract<PlannedSymbol, { readonly kind: 'event-handler' | 'callback-prop' }>,
-	emittedWrites: ReadonlyArray<string>,
+	emittedSource: string,
 ): ReadonlyArray<SemanticModuleImport> {
-	if (emittedWrites.length === 0) return [];
+	if (!emittedSource) return [];
 
-	const emittedSource = emittedWrites.join('\n');
 	return uniqueModuleImports(
 		(symbol.moduleImports ?? []).filter((moduleImport) =>
 			sourceReferencesIdentifier(emittedSource, moduleImport.localName),
 		),
 	);
+}
+
+function importedHandlerReference(
+	symbol: Extract<PlannedSymbol, { readonly kind: 'event-handler' | 'callback-prop' }>,
+): SemanticModuleImport | null {
+	const source = symbol.source.trim();
+	if (!source) return null;
+
+	const firstName = source.split('.')[0] ?? '';
+	if (!isIdentifierObjectKey(firstName)) return null;
+
+	return (
+		(symbol.moduleImports ?? []).find((moduleImport) => moduleImport.localName === firstName) ??
+		null
+	);
+}
+
+function eventHandlerAuthoredBody(
+	symbol: Extract<PlannedSymbol, { readonly kind: 'event-handler' | 'callback-prop' }>,
+	localNames: ReadonlySet<string>,
+): string {
+	const body = eventHandlerBodySource(symbol.source);
+	if (!body) return 'void context;';
+
+	return spliceEventHandlerBody(
+		body.source,
+		body.sourceStart,
+		symbol,
+		symbol.kind === 'event-handler' ? symbol.parameters : [],
+		localNames,
+	);
+}
+
+function eventHandlerBodySource(source: string): { readonly source: string; readonly sourceStart: number } | null {
+	const arrowIndex = source.indexOf('=>');
+	if (arrowIndex === -1) return null;
+
+	const bodyStart = arrowIndex + 2 + leadingWhitespaceLength(source.slice(arrowIndex + 2));
+	if (bodyStart >= source.length) return null;
+
+	if (source[bodyStart] === '{') {
+		const bodyEnd = source.lastIndexOf('}');
+		if (bodyEnd === -1) return null;
+		const inner = source.slice(bodyStart + 1, bodyEnd);
+
+		return {
+			source: inner.trim(),
+			sourceStart: bodyStart + 1 + leadingWhitespaceLength(inner),
+		};
+	}
+
+	return {
+		source: `return ${source.slice(bodyStart).trim()};`,
+		sourceStart: bodyStart,
+	};
+}
+
+function eventHandlerIsAsync(source: string): boolean {
+	return source.trimStart().startsWith('async ');
+}
+
+function spliceEventHandlerBody(
+	bodySource: string,
+	bodyStartInHandlerSource: number,
+	symbol: Extract<PlannedSymbol, { readonly kind: 'event-handler' | 'callback-prop' }>,
+	eventParameters: ReadonlyArray<string>,
+	localNames: ReadonlySet<string>,
+): string {
+	const replacements = [
+		...(symbol.reads ?? []).flatMap((read) =>
+			readBodySpans(bodySource, read).map((span) => ({
+				...span,
+				replacement: graphReadCallSource('context.graph.read', read.graphNodeId, read.path),
+			})),
+		),
+		...(symbol.writes ?? []).flatMap((write) => {
+			const replacement = emitEventWriteExpression(
+				write,
+				eventParameters,
+				symbol.reads ?? [],
+				symbol.moduleImports ?? [],
+				localNames,
+			);
+			if (!replacement) return [];
+
+			const span = handlerBodyWriteSpan(bodySource, bodyStartInHandlerSource, symbol, write);
+			return span ? [{ ...span, replacement }] : [];
+		}),
+		...(symbol.kind === 'event-handler' ? (symbol.elementHandleCalls ?? []) : []).flatMap(
+			(call) => {
+				const replacement = emitElementHandleCall(call, eventParameters)
+					.map((line) => line.replace(/^\t/, ''))
+					.join('\n')
+					.replace(/;$/, '');
+				let start = call.offset - bodyStartInHandlerSource;
+				if (start < 0 || start >= bodySource.length) return [];
+
+				let end = call.endOffset - bodyStartInHandlerSource;
+				if (end <= start || end > bodySource.length) return [];
+				if (bodySource.slice(start, end) !== call.source) {
+					start = bodySource.indexOf(call.source);
+					end = start + call.source.length;
+				}
+				if (start < 0 || end <= start || end > bodySource.length) return [];
+				return [{ start, end, replacement }];
+			},
+		),
+	].sort((left, right) => right.start - left.start || right.end - left.end).filter((item, index, items) => !items.some((other, otherIndex) => otherIndex !== index && item.start >= other.start && item.end <= other.end && other.end - other.start > item.end - item.start));
+
+	let emitted = bodySource;
+	for (const replacement of replacements) {
+		emitted =
+			emitted.slice(0, replacement.start) +
+			replacement.replacement +
+			emitted.slice(replacement.end);
+	}
+
+	return emitted.trim() || 'void context;';
+}
+
+function readBodySpans(
+	bodySource: string,
+	read: LoweredStateRead,
+): ReadonlyArray<{ readonly start: number; readonly end: number }> {
+	const spans: { start: number; end: number }[] = [];
+	for (let start = bodySource.indexOf(read.source); start !== -1; start = bodySource.indexOf(read.source, start + read.source.length)) {
+		const before = bodySource[start - 1] ?? '';
+		const after = bodySource[start + read.source.length] ?? '';
+		if (!isIdentifierChar(before) && before !== '.' && !isIdentifierChar(after)) spans.push({ start, end: start + read.source.length });
+	}
+	return spans;
+}
+
+function handlerBodyWriteSpan(
+	bodySource: string,
+	bodyStartInHandlerSource: number,
+	symbol: Extract<PlannedSymbol, { readonly kind: 'event-handler' | 'callback-prop' }>,
+	write: LoweredStateWrite,
+): { readonly start: number; readonly end: number } | null {
+	if (symbol.sourceSpan && write.sourceSpan) {
+		const start = write.sourceSpan.start - symbol.sourceSpan.start - bodyStartInHandlerSource;
+		const end = write.sourceSpan.end - symbol.sourceSpan.start - bodyStartInHandlerSource;
+		if (start >= 0 && end > start && end <= bodySource.length) {
+			const spanSource = bodySource.slice(start, end);
+			const expectedSource = authoredWriteSource(write);
+			if (!expectedSource || spanSource === expectedSource) return { start, end };
+		}
+	}
+
+	const authoredWrite = authoredWriteSource(write);
+	if (!authoredWrite) return null;
+
+	const start = bodySource.indexOf(authoredWrite);
+	if (start === -1) return null;
+
+	return {
+		start,
+		end: start + authoredWrite.length,
+	};
+}
+
+function authoredWriteSource(write: LoweredStateWrite): string | null {
+	if (write.operation === 'assign') {
+		const operator = write.assignmentOperator ?? '=';
+		if (!write.valueSource) return null;
+		return `${write.source} ${operator} ${write.valueSource}`;
+	}
+
+	if (write.operation === 'update' && write.updateOperator) {
+		return write.prefix
+			? `${write.updateOperator}${write.source}`
+			: `${write.source}${write.updateOperator}`;
+	}
+
+	if (write.operation === 'delete') return `delete ${write.source}`;
+
+	if (write.operation === 'call' && write.method) {
+		return `${write.source}.${write.method}(${(write.argumentSources ?? []).join(', ')})`;
+	}
+
+	return null;
+}
+
+function emitEventWriteExpression(
+	write: LoweredStateWrite,
+	eventParameters: ReadonlyArray<string>,
+	graphReads: ReadonlyArray<LoweredStateRead>,
+	moduleImports: ReadonlyArray<SemanticModuleImport>,
+	localNames: ReadonlySet<string>,
+): string | null {
+	const lines = emitEventWrite(write, eventParameters, graphReads, moduleImports, localNames);
+	if (lines.length === 0) return null;
+
+	const source = lines.map((line) => line.replace(/^\t/, '')).join('\n');
+	return source.endsWith(';') ? source.slice(0, -1) : source;
+}
+
+function indentBody(source: string): string[] {
+	return source.split('\n').map((line) => (line.length > 0 ? `	${line}` : line));
+}
+
+function leadingWhitespaceLength(source: string): number {
+	const match = /^\s*/.exec(source);
+	return match ? match[0].length : 0;
 }
 
 function emitEventWrite(
@@ -206,7 +419,7 @@ function emitEventWrite(
 	localNames: ReadonlySet<string>,
 ): string[] {
 	if (write.operation === 'assign' && !write.assignmentOperator) {
-		const valueSource = supportedValueSource(
+		const valueSource = eventWriteValueSource(
 			write.valueSource,
 			eventParameters,
 			graphReads,
@@ -226,7 +439,7 @@ function emitEventWrite(
 
 	if (write.operation === 'assign' && write.assignmentOperator) {
 		const operator = compoundAssignmentOperator(write.assignmentOperator);
-		const valueSource = supportedValueSource(
+		const valueSource = eventWriteValueSource(
 			write.valueSource,
 			eventParameters,
 			graphReads,
@@ -293,10 +506,73 @@ function emitEventWrite(
 	return [];
 }
 
+function scalarWriteLeafSource(
+	symbol: Extract<PlannedSymbol, { readonly kind: 'event-handler' | 'callback-prop' }>,
+	localNames: ReadonlySet<string>,
+): string | null {
+	if (symbol.kind !== 'event-handler') return null;
+	if ((symbol.writes ?? []).length !== 1) return null;
+	if ((symbol.moduleImports ?? []).length > 0 || (symbol.elementHandleCalls ?? []).length > 0) {
+		return null;
+	}
+	const write = symbol.writes?.[0];
+	if (!write || write.path.length !== 0) return null;
+	if (!eventHandlerBodyAllowsScalarLeaf(symbol, write)) return null;
+
+	if (write.operation === 'update' && write.updateOperator) {
+		return [
+			'return marklessWriteScalar(context, {',
+			`	graphNodeId: ${JSON.stringify(write.graphNodeId)},`,
+			'	returnValue: "next",',
+			'	update(value) {',
+			`		return Number(value) ${write.updateOperator === '++' ? '+' : '-'} 1;`,
+			'	},',
+			'});',
+		].join('\n');
+	}
+
+	if (write.operation !== 'assign' || write.assignmentOperator) return null;
+	const valueSource = literalValueSource(write.valueSource) ?? localValueSource(write.valueSource, localNames);
+	if (!valueSource) return null;
+	return [
+		'return marklessWriteScalar(context, {',
+		`	graphNodeId: ${JSON.stringify(write.graphNodeId)},`,
+		`	value: ${valueSource},`,
+		'});',
+	].join('\n');
+}
+
+function eventHandlerBodyAllowsScalarLeaf(
+	symbol: Extract<PlannedSymbol, { readonly kind: 'event-handler' | 'callback-prop' }>,
+	write: LoweredStateWrite,
+): boolean {
+	const body = eventHandlerBodySource(symbol.source);
+	const authoredWrite = authoredWriteSource(write);
+	if (!body || !authoredWrite) return false;
+	let remainder = body.source.replace(authoredWrite, '');
+	for (const parameter of symbol.parameters) {
+		remainder = remainder.replaceAll(`${parameter}.preventDefault();`, '');
+		remainder = remainder.replaceAll(`${parameter}.stopPropagation();`, '');
+	}
+	remainder = remainder.replace(/\breturn\b/g, '');
+	return remainder.replace(/[;\s]/g, '') === '';
+}
+
 function emitDomBindingModule(
 	symbol: Extract<PlannedSymbol, { readonly kind: 'dom-update' }>,
 ): string {
 	const exportName = symbolExportName(symbol.id);
+	if (symbol.target.kind === 'text' && symbol.target.prefix === undefined && symbol.target.suffix === undefined && symbol.target.trueValue === undefined && symbol.target.falseValue === undefined) {
+		return [
+			"import { marklessUpdateText } from '@markless/web/fns/update-text';",
+			'',
+			'/* text update leaf marker: type: "setText" */',
+			`export function ${exportName}(context) {`,
+			`	return marklessUpdateText(context, ${JSON.stringify(symbol.hostNodeId)});`,
+			'}',
+			'',
+		].join('\n');
+	}
 	const entryProperties = domJournalEntryProperties(symbol);
 
 	return [
@@ -449,6 +725,59 @@ function emitAsyncComputedRunnerModule(
 	].join('\n');
 }
 
+function emitSyncComputedDeriveModule(
+	symbol: Extract<PlannedSymbol, { readonly kind: 'sync-computed-derive' }>,
+): string {
+	const exportName = symbolExportName(symbol.id);
+	const body = syncComputedDeriveBody(symbol);
+	const imports = uniqueModuleImports(
+		(symbol.moduleImports ?? []).filter((moduleImport) =>
+			sourceReferencesIdentifier(body, moduleImport.localName),
+		),
+	);
+
+	return [
+		...imports.map(emitModuleImport),
+		...(imports.length > 0 ? [''] : []),
+		`export const authoredSource = ${JSON.stringify(symbol.source)};`,
+		'',
+		`export function ${exportName}(context) {`,
+		...indentBody(body),
+		'}',
+		'',
+	].join('\n');
+}
+
+function syncComputedDeriveBody(
+	symbol: Extract<PlannedSymbol, { readonly kind: 'sync-computed-derive' }>,
+): string {
+	const body = eventHandlerBodySource(symbol.source);
+	if (!body) return 'return undefined;';
+
+	let emitted = body.source;
+	const replacements = (symbol.dependencies ?? [])
+		.flatMap((dependency) =>
+			readBodySpans(body.source, dependency).map((span) => ({
+				...span,
+				replacement: graphReadCallSource(
+					'context.graph.read',
+					dependency.graphNodeId,
+					dependency.path,
+				),
+			})),
+		)
+		.sort((left, right) => right.start - left.start || right.end - left.end);
+
+	for (const replacement of replacements) {
+		emitted =
+			emitted.slice(0, replacement.start) +
+			replacement.replacement +
+			emitted.slice(replacement.end);
+	}
+
+	return emitted.trim() || 'return undefined;';
+}
+
 function asyncRunnerDependencyDeclarations(
 	dependencies: ReadonlyArray<SemanticGraphDependency>,
 ): string[] {
@@ -552,6 +881,63 @@ function supportedValueSource(
 		) ??
 		binaryValueSource(valueSource, eventParameters, graphReads, moduleImports, localNames)
 	);
+}
+
+function eventWriteValueSource(
+	valueSource: string | undefined,
+	eventParameters: ReadonlyArray<string>,
+	graphReads: ReadonlyArray<LoweredStateRead>,
+	moduleImports: ReadonlyArray<SemanticModuleImport>,
+	localNames: ReadonlySet<string>,
+): string | null {
+	const supported = supportedValueSource(valueSource, eventParameters, graphReads, moduleImports, localNames);
+	if (supported) return supported;
+
+	const source = valueSource?.trim();
+	if (!source) return null;
+
+	return spliceGraphReadsAndLocals(source, graphReads, localNames);
+}
+
+function spliceGraphReadsAndLocals(
+	source: string,
+	graphReads: ReadonlyArray<LoweredStateRead>,
+	localNames: ReadonlySet<string>,
+): string {
+	const replacements = [
+		...graphReads.map((read) => ({
+			source: read.source,
+			replacement: graphReadCallSource('context.graph.read', read.graphNodeId, read.path),
+		})),
+		...Array.from(localNames).map((name) => ({ source: name, replacement: `context.locals?.${name}` })),
+	].sort((left, right) => right.source.length - left.source.length);
+
+	let emitted = source;
+	for (const replacement of replacements) {
+		emitted = replaceIdentifierPath(emitted, replacement.source, replacement.replacement);
+	}
+
+	return emitted;
+}
+
+function replaceIdentifierPath(source: string, target: string, replacement: string): string {
+	let emitted = '';
+	let cursor = 0;
+
+	for (
+		let index = source.indexOf(target);
+		index !== -1;
+		index = source.indexOf(target, index + target.length)
+	) {
+		const before = source[index - 1] ?? '';
+		const after = source[index + target.length] ?? '';
+		if (isIdentifierChar(before) || before === '.' || isIdentifierChar(after)) continue;
+
+		emitted += source.slice(cursor, index) + replacement;
+		cursor = index + target.length;
+	}
+
+	return emitted + source.slice(cursor);
 }
 
 function localValueSource(

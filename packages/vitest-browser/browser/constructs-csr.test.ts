@@ -30,6 +30,12 @@ function requireElement<T extends Element>(container: HTMLElement, selector: str
 	return element;
 }
 
+function elementOrder(container: HTMLElement): string[] {
+	return Array.from(container.querySelectorAll('*')).map((element) =>
+		element.tagName.toLowerCase(),
+	);
+}
+
 test('CSR: input and click events both drive the same state text binding', async () => {
 	const screen = await render(InputEcho);
 	const container = queryContainer(screen.container);
@@ -236,7 +242,9 @@ test('CSR: fragment root with an @if child flips the branch range', async () => 
 	expect(container.querySelector('p.on')).toBeNull();
 });
 
-test.fails('CSR: static children projection renders inside the wrapping component', async () => {
+// Un-marked from test.fails after T006: the decode-lean dispatch path made CSR static
+// children projection render correctly (SSR twin still deferred to the projection goal).
+test('CSR: static children projection renders inside the wrapping component', async () => {
 	// KNOWN RED (deferred design, T012 Q2): children placement projects raw
 	// HTML correctly since the S5 escape fix, but hosts inside projected
 	// element children keep caller-coordinate locators while rendering inside
@@ -245,6 +253,8 @@ test.fails('CSR: static children projection renders inside the wrapping componen
 	// is deferred; this test flips green when it lands.
 	const screen = await render(ProjectedCard);
 	const container = queryContainer(screen.container);
+
+	expect(elementOrder(container)).toEqual(['main', 'section', 'p', 'h2', 'button', 'output']);
 
 	// Spec 01: children place as an opaque template projection.
 	const projected = container.querySelector('section.card p.projected');

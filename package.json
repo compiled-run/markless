@@ -12,7 +12,8 @@
 		"bench:jsfb:compare": "node scripts/benchmarks/jsfb-baseline.mjs compare",
 		"bench:jsfb:guard": "node scripts/benchmarks/jsfb-baseline.mjs compare",
 		"bench:jsfb:prepare": "node scripts/benchmarks/prepare-jsfb-markless.mjs",
-		"test:compiler": "vp test packages/compiler/test/*.test.ts"
+		"test:compiler": "vp test packages/compiler/test/*.test.ts",
+		"prepare": "git config core.hooksPath .githooks"
 	},
 	"devDependencies": {
 		"@async/witness": "0.7.0",

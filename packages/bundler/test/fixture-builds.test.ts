@@ -4,6 +4,7 @@ import { promisify } from 'node:util';
 import { resolve } from 'pathe';
 import { beforeAll, describe, expect, test } from 'vitest';
 import { runtimeSizeReport } from '../test-support/runtime-size.ts';
+import { assertRuntimeBudget } from './fixture-budget.ts';
 
 const exec = promisify(execFile);
 const root = resolve(import.meta.dirname, '../../..');
@@ -18,8 +19,8 @@ const fixtures = [
 			dist: 'packages/bundler/fixtures/vite-csr/dist',
 			entryHtml: 'packages/bundler/fixtures/vite-csr/dist/index.html',
 			maxRuntimeChunkGzipBytes: 3_100,
-			maxAsyncScriptsGzipBytes: 3_200,
-			maxAsyncScriptCount: 2,
+			// anti-bloat wall — tightened by the runtime-stdlib goal; any increase must be justified
+			maxEmittedRuntimeGzipBytes: 15_500, // anti-bloat wall, measured 15,348; re-baselined 2026-07-06 after resume-time escalation made the fail-closed full-resume chain emit-reachable (emitted != fetched != executed; per-chunk caps unchanged and passing); tighten-only from here; runtime-stdlib goal shrinks the library itself
 			forbidVitePreloadHelper: true,
 		},
 	},
@@ -34,9 +35,10 @@ const fixtures = [
 		symbols: ['symbol:0', 'symbol:1'],
 		runtimeBudget: {
 			dist: 'packages/bundler/fixtures/vite-ssr/dist',
+			entryHtml: 'packages/bundler/fixtures/vite-ssr/dist/index.html',
 			maxRuntimeChunkGzipBytes: 2_175,
-			maxAsyncScriptsGzipBytes: 4_100,
-			maxAsyncScriptCount: 7,
+			// anti-bloat wall — tightened by the runtime-stdlib goal; any increase must be justified
+			maxEmittedRuntimeGzipBytes: 14_550, // anti-bloat wall, measured 14,396; re-baselined 2026-07-06 after resume-time escalation made the fail-closed full-resume chain emit-reachable (emitted != fetched != executed; per-chunk caps unchanged and passing); tighten-only from here; runtime-stdlib goal shrinks the library itself
 			forbidVitePreloadHelper: true,
 		},
 	},
@@ -49,8 +51,8 @@ const fixtures = [
 			dist: 'packages/bundler/fixtures/vite-plus/dist',
 			entryHtml: 'packages/bundler/fixtures/vite-plus/dist/index.html',
 			maxRuntimeChunkGzipBytes: 2_950,
-			maxAsyncScriptsGzipBytes: 3_000,
-			maxAsyncScriptCount: 2,
+			// anti-bloat wall — tightened by the runtime-stdlib goal; any increase must be justified
+			maxEmittedRuntimeGzipBytes: 15_450, // anti-bloat wall, measured 15,272; re-baselined 2026-07-06 after resume-time escalation made the fail-closed full-resume chain emit-reachable (emitted != fetched != executed; per-chunk caps unchanged and passing); tighten-only from here; runtime-stdlib goal shrinks the library itself
 			forbidVitePreloadHelper: true,
 		},
 	},
@@ -91,42 +93,16 @@ describe('fixture builds', () => {
 			}
 
 			if ('runtimeBudget' in fixture) {
-				const scripts =
-					'entryHtml' in fixture.runtimeBudget
-						? await readModuleScripts(resolve(root, fixture.runtimeBudget.entryHtml))
-						: undefined;
-				const report = await runtimeSizeReport({
+				// Owner ruling 2026-07-05: no per-page fetch metric — 'emitted = required'
+				// assertions arrive with the runtime-stdlib goal. The wall guards bloat.
+				const emittedReport = await runtimeSizeReport({
 					dist: resolve(root, fixture.runtimeBudget.dist),
-					scripts,
-					includeStaticImports: !!scripts,
 				});
-				expect(report.runtimeChunks.length, report.summary).toBeGreaterThan(0);
-				expect(report.largestRuntimeChunk?.gzipBytes, report.summary).toBeLessThanOrEqual(
-					fixture.runtimeBudget.maxRuntimeChunkGzipBytes,
-				);
-				expect(report.asyncScripts.gzipBytes, report.summary).toBeLessThanOrEqual(
-					fixture.runtimeBudget.maxAsyncScriptsGzipBytes,
-				);
-				expect(report.asyncScripts.count, report.summary).toBeLessThanOrEqual(
-					fixture.runtimeBudget.maxAsyncScriptCount,
-				);
-				if (fixture.runtimeBudget.forbidVitePreloadHelper) {
-					const chunksWithVitePreloadHelper = report.runtimeChunks
-						.filter((chunk) => chunk.hasVitePreloadHelper)
-						.map((chunk) => chunk.fileName);
-					expect(chunksWithVitePreloadHelper, report.summary).toEqual([]);
-				}
+				assertRuntimeBudget({ budget: fixture.runtimeBudget, emittedReport });
 			}
 		}, 120_000);
 	}
 });
-
-async function readModuleScripts(fileName: string): Promise<string[]> {
-	const html = await readFile(fileName, 'utf8');
-	return [
-		...html.matchAll(/<script\b[^>]*\btype=["']module["'][^>]*\bsrc=["']([^"']+)["']/g),
-	].map((match) => match[1]!);
-}
 
 async function execPnpm(args: string[]) {
 	try {

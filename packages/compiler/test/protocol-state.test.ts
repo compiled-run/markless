@@ -82,3 +82,67 @@ test('createProtocolStatePayloadFromArena serializes shared definition metadata'
 	]);
 	expect(JSON.stringify(state.sharedDefinitions)).not.toContain('sourceSpan');
 });
+
+test('createProtocolStatePayloadFromArena leaves non-literal state initializers render-filled', async () => {
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/init.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	const cfg = { start: 7 };
+	const n = state(cfg.start);
+
+	<output>{n}</output>
+}
+`,
+	});
+	const stateLowering = lowerStateAccess({ semanticGraph });
+	const payloadArena = planPayloadArena({ semanticGraph, stateLowering });
+
+	const state = createProtocolStatePayloadFromArena({
+		semanticGraph,
+		payloadArena,
+	});
+	const cell = state.cells.find((candidate) => candidate.graphNodeId === 'state:n');
+
+	expect(cell).toEqual({
+		graphNodeId: 'state:n',
+		name: 'n',
+		valueKind: 'unknown',
+	});
+	expect(JSON.stringify(cell)).not.toContain('"$type":"undefined"');
+});
+
+test('B910 sync computed cell and dependencies are present in protocol payload', async () => {
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/sync-computed.tsrx',
+		source: `
+import { state, computed } from '@markless/core';
+
+export function App() @{
+	let count = state(2);
+	const doubled = computed(() => count * 2);
+
+	<p>{doubled}</p>
+}
+`,
+	});
+	const stateLowering = lowerStateAccess({ semanticGraph });
+	const payloadArena = planPayloadArena({ semanticGraph, stateLowering });
+
+	const state = createProtocolStatePayloadFromArena({
+		semanticGraph,
+		payloadArena,
+	});
+
+	expect(state.computed).toEqual([
+		{
+			graphNodeId: 'computed:doubled',
+			name: 'doubled',
+			async: false,
+			deriveSymbolId: 'symbol:1',
+			dependencies: [{ graphNodeId: 'state:count', path: [] }],
+		},
+	]);
+});

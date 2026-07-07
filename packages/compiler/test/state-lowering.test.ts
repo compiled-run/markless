@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import type { SemanticGraphArtifact } from '../src/artifacts.ts';
 import { buildSemanticGraph } from '../src/index.ts';
+import { planPayloadArena } from '../src/passes/payload-arena.ts';
 import { lowerStateAccess } from '../src/passes/state-lowering.ts';
 
 const source = `
@@ -55,6 +56,20 @@ export function Counter() @{
 const propReadOnlySource = `
 export function Greeting({ label }: { label: string }) @{
 	<button onClick={() => label = 'Updated'}>{label}</button>
+}
+`;
+
+const elementHandleWriteSource = `
+import { state, element } from '@markless/core';
+
+export function Handles() @{
+	let input = element<HTMLInputElement>();
+	const saved = state({ current: null });
+
+	<>
+		<button onClick={() => saved.current = input}>Save</button>
+		<input el={input} />
+	</>
 }
 `;
 
@@ -148,6 +163,27 @@ export function Header() @{
 	>
 		{currentSession[statusKey]}
 	</button>
+}
+`;
+
+const optionalDeleteSource = `
+import { state } from '@markless/core';
+
+export function Menu() @{
+	const menu = state({ a: 1 });
+
+	<button onClick={() => { delete menu?.a; }}>{menu.a}</button>
+}
+`;
+
+const wholeBindingAliasSource = `
+import { state } from '@markless/core';
+
+export function Counter() @{
+	let origin = state(0);
+	let mirror = origin;
+
+	<button onClick={() => mirror++}>{origin}</button>
 }
 `;
 
@@ -282,6 +318,87 @@ test('lowerStateAccess resolves plain reads and writes to graph operations', asy
 		expect.arrayContaining([expect.objectContaining({ source: 'menuRest.title' })]),
 	);
 
+	expect(lowered.diagnostics).toEqual([]);
+});
+
+test('lowerStateAccess reports optional-chain deletes collected from real source', async () => {
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/OptionalDelete.tsrx',
+		source: optionalDeleteSource,
+	});
+
+	const lowered = lowerStateAccess({ semanticGraph });
+
+	expect(semanticGraph.stateWrites).toEqual([
+		expect.objectContaining({
+			target: 'menu?.a',
+			operation: 'delete',
+			optional: true,
+		}),
+	]);
+	expect(lowered.writes).toEqual([]);
+	expect(lowered.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_STATE_OPTIONAL_CHAIN_WRITE',
+			severity: 'error',
+			phase: 'state-lowering',
+			source: 'menu?.a',
+			statePath: 'menu?.a',
+		}),
+	]);
+});
+
+test('B918 reports element handles written into state', async () => {
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/Handles.tsrx',
+		source: elementHandleWriteSource,
+	});
+
+	const lowered = lowerStateAccess({ semanticGraph });
+
+	expect(lowered.writes).toEqual([]);
+	expect(lowered.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_STATE_ELEMENT_HANDLE_UNSERIALIZABLE',
+			phase: 'state-lowering',
+			message: expect.stringContaining('input'),
+			statePath: 'saved.current',
+		}),
+	]);
+});
+
+test('lowerStateAccess resolves whole-binding aliases to the original graph node', async () => {
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/WholeBindingAlias.tsrx',
+		source: wholeBindingAliasSource,
+	});
+
+	const lowered = lowerStateAccess({ semanticGraph });
+
+	expect(semanticGraph.aliases).toEqual([
+		expect.objectContaining({
+			name: 'mirror',
+			target: 'origin',
+			declarationKind: 'let',
+		}),
+	]);
+	expect(lowered.reads).toEqual(
+		expect.arrayContaining([
+			{
+				source: 'origin',
+				graphNodeId: 'state:origin',
+				path: [],
+			},
+		]),
+	);
+	expect(lowered.writes).toEqual([
+		expect.objectContaining({
+			source: 'mirror',
+			graphNodeId: 'state:origin',
+			path: [],
+			operation: 'update',
+		}),
+	]);
 	expect(lowered.diagnostics).toEqual([]);
 });
 
@@ -869,6 +986,176 @@ test('lowerStateAccess resolves prop reads and reports prop writes as read-only'
 			],
 			docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_READ_ONLY_WRITE',
 		}),
+	]);
+});
+
+test('lowerStateAccess explains unresolved writes without rejecting declared plain locals', async () => {
+	const localWriteSource = `export function Scoreboard() @{ <button onClick={() => missing += 1}>Missing</button> }`;
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/Scoreboard.tsrx',
+		source: localWriteSource,
+	});
+
+	const lowered = lowerStateAccess({ semanticGraph });
+
+	expect(lowered.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_STATE_UNRESOLVED_WRITE',
+			message: 'Cannot write to "missing" because the compiler cannot resolve that target.',
+			why: 'This write is not a known state() graph path, graph alias, declared plain local, or classified module-scope binding.',
+		}),
+	]);
+});
+
+test('B913 allows handler-internal scratch locals', async () => {
+	const scratchSource = `export function Scratch() @{ <button onClick={() => { let next = 1; next += 2; console.log(next); }}>Run</button> }`;
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/Scratch.tsrx',
+		source: scratchSource,
+	});
+
+	const lowered = lowerStateAccess({ semanticGraph });
+
+	expect(lowered.diagnostics).toEqual([]);
+});
+
+test('B913 reports stale UI when a handler writes a component local read by the template', async () => {
+	const staleSource = `export function Counter() @{ let count = 0; <button onClick={() => count++}>{count}</button> }`;
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/StaleLocal.tsrx',
+		source: staleSource,
+	});
+
+	const lowered = lowerStateAccess({ semanticGraph });
+
+	expect(lowered.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_STATE_STALE_LOCAL_WRITE',
+			message:
+				'Cannot write to "count" from a handler because the template reads the component local "count" only during initial render.',
+			why: 'Component bodies run for initial render only. Template reads re-render after events only when they subscribe through state(), so this handler write would leave the UI stale after resume.',
+		}),
+	]);
+});
+
+test('B913 reports module-scope writes and aliases as cross-request escapes', async () => {
+	const moduleEscapeSource = `let counter = 0; const registry = []; export function App() @{ const alias = counter; <button onClick={() => { counter++; alias++; registry.push(counter); }}>Save</button> }`;
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/ModuleEscape.tsrx',
+		source: moduleEscapeSource,
+	});
+
+	const lowered = lowerStateAccess({ semanticGraph });
+
+	expect(lowered.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+		'MARKLESS_STATE_MODULE_ESCAPE',
+		'MARKLESS_STATE_MODULE_ESCAPE',
+		'MARKLESS_STATE_MODULE_ESCAPE',
+	]);
+	expect(lowered.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+		'Cannot write to "counter" because it lives at module scope and would be shared across requests.',
+		'Cannot write to "alias" because it aliases module-scope "counter", which would be shared across requests.',
+		'Cannot write to "registry" because it lives at module scope and would be shared across requests.',
+	]);
+	expect(lowered.diagnostics[0]?.why).toBe(
+		'Module-scope storage outlives a single server render. A handler could read or overwrite data from another user because the value is not part of this document payload.',
+	);
+});
+
+test('B913 keeps whole-binding state aliases lowered to graph writes', async () => {
+	const aliasSource = `import { state } from '@markless/core'; export function App() @{ let origin = state(0); let mirror = origin; <button onClick={() => mirror++}>{origin}</button> }`;
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/StateAlias.tsrx',
+		source: aliasSource,
+	});
+
+	const lowered = lowerStateAccess({ semanticGraph });
+
+	expect(lowered.diagnostics).toEqual([]);
+	expect(lowered.writes).toEqual([
+		expect.objectContaining({
+			source: 'mirror',
+			graphNodeId: 'state:origin',
+			path: [],
+			operation: 'update',
+		}),
+	]);
+});
+
+test('T005 composite ternary template expression lowers all graph reads into one live text site', async () => {
+	const ternarySource = `import { state } from '@markless/core';
+export function App() @{
+	let flag = state(true);
+	const user = state({ pro: false, name: 'Ada' });
+	<p>{flag ? user.name : 'guest'}</p>
+}`;
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/CompositeTernary.tsrx',
+		source: ternarySource,
+	});
+
+	const lowered = lowerStateAccess({ semanticGraph });
+	const payload = planPayloadArena({ semanticGraph, stateLowering: lowered });
+
+	expect(lowered.diagnostics).toEqual([]);
+	expect(lowered.reads).toEqual([
+		expect.objectContaining({ source: 'flag', graphNodeId: 'state:flag', path: [] }),
+		expect.objectContaining({ source: 'user.name', graphNodeId: 'state:user', path: ['name'] }),
+	]);
+	expect(payload.state.computed).toEqual([
+		expect.objectContaining({
+			graphNodeId: 'computed:templateExpression:0',
+			name: 'marklessTemplateExpression0',
+			async: false,
+			functionSource: "() => flag ? user.name : 'guest'",
+			dependencies: [
+				{ source: 'flag', graphNodeId: 'state:flag', path: [] },
+				{ source: 'user.name', graphNodeId: 'state:user', path: ['name'] },
+			],
+		}),
+	]);
+	expect(payload.view.domUpdates).toEqual([
+		expect.objectContaining({
+			hostNodeId: 'h0',
+			source: "flag ? user.name : 'guest'",
+			graphNodeId: 'computed:templateExpression:0',
+			path: [],
+			target: { kind: 'text' },
+		}),
+	]);
+});
+
+test('T005 effectful composite template expressions stay behind the static gate', async () => {
+	const source = `import { state } from '@markless/core';
+function label(value) { return value ? 'on' : 'off'; }
+export function App() @{
+	let flag = state(true);
+	let local = false;
+	<section>
+		<p>{(() => flag ? 'on' : 'off')()}</p>
+		<p>{label(flag)}</p>
+		<p>{local = flag}</p>
+		<p>{flag && local}</p>
+	</section>
+}`;
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/CompositeStaticGate.tsrx',
+		source,
+	});
+
+	const lowered = lowerStateAccess({ semanticGraph });
+
+	expect(lowered.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+		'MARKLESS_TEMPLATE_EXPRESSION_STATIC',
+		'MARKLESS_TEMPLATE_EXPRESSION_STATIC',
+		'MARKLESS_TEMPLATE_EXPRESSION_STATIC',
+		'MARKLESS_TEMPLATE_EXPRESSION_STATIC',
+	]);
+	expect(lowered.diagnostics.map((diagnostic) => diagnostic.source)).toEqual([
+		"(() => flag ? 'on' : 'off')()",
+		'label(flag)',
+		'local = flag',
+		'flag && local',
 	]);
 });
 

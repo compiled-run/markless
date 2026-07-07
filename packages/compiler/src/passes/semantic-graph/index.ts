@@ -1,12 +1,13 @@
 import { parseModule } from '@tsrx/core';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import type { SemanticGraphArtifact, SemanticGraphInput } from '../../artifacts.ts';
+import { applyMarklessAllowDirectives } from '../../diagnostics.ts';
 import {
 	collectAsyncBoundary,
 	collectAsyncBoundaryDiagnostics,
 	propagateAsyncComputedCapability,
 } from './collect-async.ts';
-import { collectImports, collectModuleImports } from './imports.ts';
+import { collectImports, collectModuleImports, getFrameworkApiForCall } from './imports.ts';
 import { collectComponentProps } from './collect-components.ts';
 import { getComponentFunction } from '../../ast/tsrx.ts';
 import {
@@ -30,7 +31,7 @@ import {
 } from './collect-shared.ts';
 import { attachKeyedRepeatRowHost, collectKeyedRepeat } from './collect-repeat.ts';
 import { collectBranchSite } from './collect-branches.ts';
-import { collectVariableDeclaration } from './collect-state.ts';
+import { collectModuleGraphInterface, collectVariableDeclaration } from './collect-state.ts';
 import { createMutableSemanticGraphArtifact, createWalkState, type WalkState } from './types.ts';
 
 export async function buildSemanticGraph(
@@ -46,7 +47,20 @@ export async function buildSemanticGraph(
 		source: input.source,
 		graph,
 		frameworkApiImports,
+		importedModuleInterfaces: input.importedModuleInterfaces,
 	});
+	state.walk = walk;
+	for (const statement of statements) {
+		const declaration =
+			statement.type === 'ExportNamedDeclaration'
+				? ((statement.declaration as AnyNode | undefined) ?? statement)
+				: statement;
+		if (declaration.type !== 'FunctionDeclaration') continue;
+		if (getComponentFunction(statement)) continue;
+		const name = getIdentifierName(declaration.id as AnyNode | undefined);
+		if (name) state.helperFunctions.set(name, declaration);
+	}
+	graph.moduleGraphInterface = collectModuleGraphInterface({ statements, state });
 
 	for (const statement of statements) {
 		collectModuleScopeGraphCreation(statement, state);
@@ -72,7 +86,17 @@ export async function buildSemanticGraph(
 	collectElementHandleDiagnostics(graph);
 	collectAsyncBoundaryDiagnostics(graph);
 
-	return graph;
+	return {
+		...graph,
+		diagnostics: applyMarklessAllowDirectives({
+			source: input.source,
+			filename: input.filename,
+			diagnostics: graph.diagnostics,
+			phase: 'semantic-graph',
+			passId: 'tsrx-semantic-graph',
+			artifactKeys: ['semanticGraph'],
+		}) as SemanticGraphArtifact['diagnostics'],
+	};
 }
 
 function walk(node: AnyNode | null | undefined, state: WalkState): void {
@@ -90,6 +114,13 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 		case 'VariableDeclaration':
 			collectVariableDeclaration(node, state);
 			break;
+		case 'IfStatement':
+			walk(node.test as AnyNode | undefined, state);
+			withCreationSite(state, 'branch', () => {
+				walk(node.consequent as AnyNode | undefined, state);
+				walk(node.alternate as AnyNode | undefined, state);
+			});
+			return;
 		case 'JSXIfExpression':
 			collectBranchSite(node, state);
 			walkBranch(node.consequent as AnyNode | undefined, state);
@@ -119,6 +150,24 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 			if (repeat) state.currentKeyedRepeatScopeIds.pop();
 			attachKeyedRepeatRowHost(node, state, repeatIndex);
 			return;
+		case 'ForStatement':
+			withCreationSite(state, 'loop', () => {
+				for (const child of childNodes(node)) {
+					walk(child, state);
+				}
+			});
+			return;
+		case 'ArrowFunctionExpression':
+		case 'FunctionExpression':
+		case 'FunctionDeclaration':
+			withFunctionSite(state, state.currentHostNodeId ? 'handler' : 'helper', () => {
+				withCreationSite(state, state.currentHostNodeId ? 'handler' : 'helper', () => {
+					for (const child of childNodes(node)) {
+						walk(child, state);
+					}
+				});
+			});
+			return;
 		case 'AssignmentExpression':
 			collectAssignment(node, state);
 			collectExpressionReads(node, state);
@@ -136,6 +185,14 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 			break;
 		case 'CallExpression':
 			collectCollectionCall(node, state);
+			if (getFrameworkApiForCall(node, state.frameworkApiImports) === 'computed') {
+				const [body, ...rest] = asNodes(node.arguments);
+				withFunctionSite(state, 'computed', () => {
+					withCreationSite(state, 'computed', () => walk(body, state));
+				});
+				for (const argument of rest) walk(argument, state);
+				return;
+			}
 			break;
 		case 'TryStatement':
 		case 'JSXTryExpression':
@@ -184,6 +241,28 @@ function walkBranch(node: AnyNode | undefined, state: WalkState): void {
 	if (!node) return;
 	const branchId = `branch:${state.nextBranchId++}`;
 	state.currentBranchScopeIds.push(branchId);
-	walk(node, state);
+	withCreationSite(state, 'branch', () => walk(node, state));
 	state.currentBranchScopeIds.pop();
+}
+
+function withCreationSite(
+	state: WalkState,
+	site: NonNullable<WalkState['currentCreationSite']>,
+	run: () => void,
+): void {
+	const previous = state.currentCreationSite;
+	state.currentCreationSite = previous ?? site;
+	run();
+	state.currentCreationSite = previous;
+}
+
+function withFunctionSite(
+	state: WalkState,
+	site: NonNullable<WalkState['currentFunctionSite']>,
+	run: () => void,
+): void {
+	const previous = state.currentFunctionSite;
+	state.currentFunctionSite = site;
+	run();
+	state.currentFunctionSite = previous;
 }

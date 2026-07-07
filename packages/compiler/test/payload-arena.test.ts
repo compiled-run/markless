@@ -81,6 +81,21 @@ export function App() @{
 }
 `;
 
+const repeatedHandleSource = `
+import { state, element } from '@markless/core';
+
+export function App() @{
+	const rows = state([{ id: 'a' }]);
+	let rowInput = element<HTMLInputElement>();
+
+	<ul>
+		@for (const row of rows; key row.id) {
+			<li><input el={rowInput} value={row.id} /></li>
+		}
+	</ul>
+}
+`;
+
 test('planPayloadArena separates graph state from view wiring metadata', async () => {
 	const semanticGraph = await buildSemanticGraph({
 		filename: 'src/App.tsrx',
@@ -252,6 +267,40 @@ test('planPayloadArena carries keyed repeat metadata into the resumable view pla
 			collectionGraphNodeId: 'state:items',
 			collectionPath: [],
 			keyPath: ['key'],
+		},
+	]);
+});
+
+test('B918 does not emit flat element handle records for repeated hosts', async () => {
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/RepeatedHandles.tsrx',
+		source: repeatedHandleSource,
+	});
+	const stateLowering = lowerStateAccess({ semanticGraph });
+
+	const payload = planPayloadArena({ semanticGraph, stateLowering });
+
+	expect(semanticGraph.diagnostics).toEqual([
+		expect.objectContaining({ code: 'MARKLESS_ELEMENT_HANDLE_DUPLICATE' }),
+	]);
+	expect(payload.view.elementHandles).toEqual([]);
+});
+
+test('B918 plans a prop-forwarded handle on the child host under the parent handle id', async () => {
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/ForwardedHandle.tsrx',
+		source: `import { element } from '@markless/core'; function Field(props: { input: unknown }) @{ <input el={props.input} /> } export function App() @{ const field = element<HTMLInputElement>(); <section><Field input={field} /></section> }`,
+	});
+	const stateLowering = lowerStateAccess({ semanticGraph });
+
+	const payload = planPayloadArena({ semanticGraph, stateLowering });
+
+	expect(semanticGraph.diagnostics).toEqual([]);
+	expect(payload.view.elementHandles).toEqual([
+		{
+			hostNodeId: 'h0',
+			handleId: 'element:field',
+			name: 'field',
 		},
 	]);
 });

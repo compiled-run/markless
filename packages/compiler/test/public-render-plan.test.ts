@@ -6,6 +6,8 @@ import { planSymbolResolver } from '../src/passes/symbol-resolver.ts';
 
 const appSource = (body: string, extra = '') =>
 	`import { state } from '@markless/core';\n${extra}\nexport function App() @{\n${body}\n}\n`;
+const stateAndComputedSource = (body: string) =>
+	`import { state, computed } from '@markless/core';\nexport function App() @{\n${body}\n}\n`;
 const supportedSource = appSource(
 	`let entries = state([]); let chosen = state(null);
 <main><section>@for (const entry of entries; key entry.code) {<article class={chosen === entry.code ? 'picked' : 'plain'}><h2>{entry.title}</h2><button onClick={() => chosen = entry.code}>Choose</button></article>}</section></main>`,
@@ -113,6 +115,71 @@ let actions = state({ runs: 0, clears: 0 });
 	]);
 });
 
+test('planPublicRender reports state created inside a keyed repeat row with row-scope guidance', async () => {
+	const { plan } = await createRenderPlan(
+		'src/RowState.tsrx',
+		appSource(
+			`let rows = state([{ id: 'a', label: 'Alpha' }]); <ul>@for (const row of rows; key row.id) { let selected = state(false); <li>{row.label}</li> }</ul>`,
+		),
+	);
+
+	expect(plan.keyedRepeats).toEqual([]);
+	expect(plan.diagnostics).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				code: 'MARKLESS_STATE_REPEAT_ROW_SCOPE_UNSUPPORTED',
+				title: 'Per-row state in keyed repeats is not supported yet',
+				message: expect.stringContaining('state() creates "selected" inside a keyed @for row'),
+				why: expect.stringContaining('each row would need its own cell keyed by row identity'),
+				suggestions: [
+					expect.objectContaining({
+						message: expect.stringContaining('Lift the state to a collection on the parent'),
+					}),
+				],
+				docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_REPEAT_ROW_SCOPE_UNSUPPORTED',
+			}),
+		]),
+	);
+	expect(plan.diagnostics).not.toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				message: expect.stringContaining('single-row-root-required'),
+			}),
+		]),
+	);
+});
+
+test('planPublicRender reports computed created inside a keyed repeat row with row-scope guidance', async () => {
+	const { plan } = await createRenderPlan(
+		'src/RowComputed.tsrx',
+		stateAndComputedSource(
+			`let rows = state([{ id: 'a', label: 'Alpha' }]); <ul>@for (const row of rows; key row.id) { const label = computed(() => row.label); <li>{row.label}</li> }</ul>`,
+		),
+	);
+
+	expect(plan.keyedRepeats).toEqual([]);
+	expect(plan.diagnostics).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				code: 'MARKLESS_STATE_REPEAT_ROW_SCOPE_UNSUPPORTED',
+				message: expect.stringContaining('computed() creates "label" inside a keyed @for row'),
+				suggestions: [
+					expect.objectContaining({
+						message: expect.stringContaining('one state() holding per-row data keyed by the row key'),
+					}),
+				],
+			}),
+		]),
+	);
+	expect(plan.diagnostics).not.toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				message: expect.stringContaining('single-row-root-required'),
+			}),
+		]),
+	);
+});
+
 test.each([
 	[
 		'rejects fragment row roots with multiple children',
@@ -143,7 +210,15 @@ test.each([
 		),
 		'unsupported-row-binding',
 	],
-])('%s', async (_name, source, reason) => {
+	[
+		'rejects component rows with a component-specific suggestion',
+		`export function Tree({ node }) @{
+<li>{node.name}<ul>@for (const child of node.children; key child.id) { <Tree node={child} /> }</ul></li>
+}`,
+		'unsupported-row-binding',
+		'Rows that render a component',
+	],
+])('%s', async (_name, source, reason, suggestion) => {
 	const { plan } = await createRenderPlan('src/UnsupportedRows.tsrx', source);
 
 	expect(plan.keyedRepeats).toEqual([]);
@@ -154,15 +229,24 @@ test.each([
 			reason,
 		},
 	]);
-	expect(plan.diagnostics).toEqual([
-		expect.objectContaining({
-			code: 'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
-			severity: 'error',
-			phase: 'public-render',
-			passId: 'public-render-plan',
-			message: expect.stringContaining(reason),
-		}),
-	]);
+	expect(plan.diagnostics).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				code: 'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
+				passId: 'public-render-plan',
+				message: expect.stringContaining(reason),
+				...(suggestion
+					? {
+							suggestions: [
+								expect.objectContaining({
+									message: expect.stringContaining(suggestion),
+								}),
+							],
+						}
+					: {}),
+			}),
+		]),
+	);
 });
 
 test.each([
@@ -189,17 +273,19 @@ test.each([
 	async (label, source) => {
 		const { plan } = await createRenderPlan('src/Unsupported.tsrx', source);
 
-		expect(plan.diagnostics).toEqual([
-			expect.objectContaining({
-				code: 'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
-				severity: 'error',
-				phase: 'public-render',
-				passId: 'public-render-plan',
-				title: expect.stringContaining(label),
-				primarySpan: expect.objectContaining({ filename: 'src/Unsupported.tsrx' }),
-				docsUrl: 'https://markless.dev/errors/MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
-			}),
-		]);
+		expect(plan.diagnostics).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
+					severity: 'error',
+					phase: 'public-render',
+					passId: 'public-render-plan',
+					title: expect.stringContaining(label),
+					primarySpan: expect.objectContaining({ filename: 'src/Unsupported.tsrx' }),
+					docsUrl: 'https://markless.dev/errors/MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
+				}),
+			]),
+		);
 	},
 );
 
@@ -231,6 +317,13 @@ test('planPublicRender supports event-bearing arms and gates conditional ones', 
 	expect(eventPlan.branchReactivityGates).toEqual([
 		{ branchSiteId: 'branch-site:0', supported: true },
 	]);
+	expect(eventPlan.branchArms).toEqual([
+		expect.objectContaining({
+			branchSiteId: 'branch-site:0',
+			declaredEmptyArms: [1],
+			arms: [expect.any(Array), []],
+		}),
+	]);
 
 	const { plan: nestedPlan } = await createRenderPlan(
 		'src/NestedBranch.tsrx',
@@ -251,6 +344,48 @@ test('planPublicRender supports event-bearing arms and gates conditional ones', 
 			reason: 'nested-branch-unsupported',
 		}),
 	]);
+});
+
+test.each([
+	[
+		'arm-content-unsupported',
+		appSource(
+			`let open = state(true);
+<section>@if (open) { <Card label="A" /> } @else { <Card label="B" /> }</section>`,
+			`function Card({ label }) @{ <article>{label}</article> }`,
+		),
+	],
+	[
+		'nested-branch-unsupported',
+		appSource(
+			`let open = state(true);
+<section>@if (open) { @if (open) { <p>Nested</p> } } @else { <p>Closed</p> }</section>`,
+		),
+	],
+	[
+		'conditional-branch-unsupported',
+		appSource(
+			`let open = state(true); let entries = state([]);
+<section>@for (const entry of entries; key entry.id) { <article>@if (open) { <p>{entry.name}</p> }</article> }</section>`,
+		),
+	],
+])('B917 planPublicRender reports unsupported branch gate %s', async (reason, source) => {
+	const { plan } = await createRenderPlan('src/BranchUnsupported.tsrx', source);
+	const gates = plan.branchReactivityGates.filter((gate) => !gate.supported);
+
+	expect(gates).toEqual(
+		expect.arrayContaining([expect.objectContaining({ supported: false, reason })]),
+	);
+	expect(plan.diagnostics).toEqual(
+		expect.arrayContaining(
+			gates.map((gate) =>
+				expect.objectContaining({
+					code: 'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
+					message: expect.stringContaining(gate.reason),
+				}),
+			),
+		),
+	);
 });
 
 test('planPublicRender gates a top-level plain-pending async boundary as supported', async () => {
@@ -282,13 +417,15 @@ test('planPublicRender keeps conditional async boundaries gated and diagnosed', 
 			reason: 'conditional-boundary-unsupported',
 		},
 	]);
-	expect(plan.diagnostics).toEqual([
-		expect.objectContaining({
-			code: 'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
-			title: expect.stringContaining('@try'),
-			message: expect.stringContaining('conditional-boundary-unsupported'),
-		}),
-	]);
+	expect(plan.diagnostics).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				code: 'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
+				title: expect.stringContaining('@try'),
+				message: expect.stringContaining('conditional-boundary-unsupported'),
+			}),
+		]),
+	);
 });
 
 test('planPublicRender plans plain host-element fragment roots', async () => {

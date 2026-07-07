@@ -140,7 +140,7 @@ test('runtime decodes async payload scripts into graph state and resume view rec
 		stateScript: scripts.stateScript,
 		viewScript: scripts.viewScript,
 	});
-	const graph = createRuntimeGraphFromStatePayload(decoded.state);
+	const graph = await createRuntimeGraphFromStatePayload(decoded.state);
 	const loadedSymbols: string[] = [];
 	const resume = createResumeRuntime({
 		root,
@@ -154,7 +154,7 @@ test('runtime decodes async payload scripts into graph state and resume view rec
 		},
 	});
 
-	resume.start();
+	await resume.start();
 
 	const keydown: FakeEvent = {
 		type: 'keydown',
@@ -202,7 +202,7 @@ test('runtime decodes async payload scripts from a document-like script lookup',
 	});
 });
 
-test('runtime decodes shared definition metadata from async state payload scripts', () => {
+test('runtime decodes shared definition metadata from async state payload scripts', async () => {
 	const state = createProtocolStatePayload({
 		cells: [
 			{
@@ -257,7 +257,7 @@ test('runtime decodes shared definition metadata from async state payload script
 	};
 	const scripts = renderPayloadScripts({ state, view });
 	const decoded = decodePayloadScripts(scripts);
-	const graph = createRuntimeGraphFromStatePayload(decoded.state);
+	const graph = await createRuntimeGraphFromStatePayload(decoded.state);
 
 	expect(decoded.state.sharedDefinitions).toEqual([
 		{
@@ -354,7 +354,7 @@ test('runtime decodes shared definition metadata from async state payload script
 	expect(graph.takeSharedPatches()).toEqual([]);
 });
 
-test('runtime folds received shared patch records into decoded graph state', () => {
+test('runtime folds received shared patch records into decoded graph state', async () => {
 	const state = createProtocolStatePayload({
 		cells: [
 			{
@@ -404,8 +404,8 @@ test('runtime folds received shared patch records into decoded graph state', () 
 		asyncBoundaries: [],
 	};
 	const decoded = decodePayloadScripts(renderPayloadScripts({ state, view }));
-	const sourceGraph = createRuntimeGraphFromStatePayload(decoded.state);
-	const receiverGraph = createRuntimeGraphFromStatePayload(decoded.state);
+	const sourceGraph = await createRuntimeGraphFromStatePayload(decoded.state);
+	const receiverGraph = await createRuntimeGraphFromStatePayload(decoded.state);
 
 	sourceGraph.writeShared({
 		definitionId: 'shared:src/session.tsrx#session',
@@ -1137,6 +1137,29 @@ test('runtime rejects payload scripts with malformed sync policy records', () =>
 	).toThrow('Invalid markless/view event[0].syncPolicy.when: expected graphNodeId string.');
 });
 
+test('runtime rejects payload scripts with malformed optional view records', () => {
+	const validState =
+		'<script type="markless/state">{"version":1,"cells":[],"computed":[]}</script>';
+
+	expect(() =>
+		decodePayloadScripts({
+			stateScript: validState,
+			viewScript:
+				'<script type="markless/view">{"version":1,"locators":[],"events":[],"domUpdates":[],"behaviors":[],"elementHandles":[],"asyncBoundaries":[],"keyedRepeats":[{"id":"repeat:0","parentHostNodeId":"h0","collectionPath":[],"keyPath":[],"itemName":"row","rowElementCount":1,"rowEvents":[{"hostPath":"0","eventName":"click","symbolIds":[]}]}]}</script>',
+		}),
+	).toThrow(
+		'Invalid markless/view keyedRepeat[0].rowEvents[0]: expected hostPath array.',
+	);
+
+	expect(() =>
+		decodePayloadScripts({
+			stateScript: validState,
+			viewScript:
+				'<script type="markless/view">{"version":1,"locators":[],"events":[],"domUpdates":[],"behaviors":[],"elementHandles":[],"asyncBoundaries":[],"branches":[{"id":"branch:0","startAnchor":{"strategy":"dom-order-comment","index":0},"endAnchor":{"strategy":"dom-order-comment","index":1},"testReads":[{"source":"open","path":[]}]}]}</script>',
+		}),
+	).toThrow('Invalid markless/view branch[0].testReads[0]: expected graphNodeId string.');
+});
+
 test('runtime payload decode errors expose structured payload diagnostics', () => {
 	const validView =
 		'<script type="markless/view">{"version":1,"locators":[],"events":[],"domUpdates":[],"behaviors":[],"elementHandles":[],"asyncBoundaries":[]}</script>';
@@ -1341,6 +1364,64 @@ test('runtime resumes from async payload scripts found in a document-like root',
 	expect(resumed.graph.read('state:menu', ['open'])).toBe(false);
 	expect(resumed.decoded.state).toEqual(state);
 	expect(resumed.decoded.view).toEqual(view);
+});
+
+test('runtime treats a second payload resume for one container as an already-resumed no-op warning', async () => {
+	const button = element('BUTTON');
+	const root = element('SECTION', [button]);
+	const state = createProtocolStatePayload({
+		cells: [
+			{
+				graphNodeId: 'state:count',
+				name: 'count',
+				valueKind: 'scalar',
+				value: 0,
+			},
+		],
+	});
+	const view: ProtocolViewPayload = {
+		version: 1,
+		locators: [
+			{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'section' },
+			{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'button' },
+		],
+		events: [{ hostNodeId: 'h1', eventName: 'click', symbolIds: ['symbol:click'] }],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	const scripts = renderPayloadScripts({ state, view });
+	const first = await resumeFromPayloadDocument({
+		document: payloadDocument(scripts.stateScript, scripts.viewScript),
+		root,
+		loadSymbol: () => () => undefined,
+	});
+
+	expect((root as FakeElement & { __asyncResumeRuntimeStarted?: boolean }).__asyncResumeRuntimeStarted).toBe(
+		true,
+	);
+
+	const second = await resumeFromPayloadDocument({
+		document: payloadDocument(scripts.stateScript, scripts.viewScript),
+		root,
+		loadSymbol: () => {
+			throw new Error('second resume must not wire a new runtime');
+		},
+	});
+
+	expect(second.runtime).toBe(first.runtime);
+	expect(second.graph).toBe(first.graph);
+	expect(root.listeners).toHaveLength(1);
+	expect(second.warnings).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_RESUME_ALREADY_RESUMED',
+			severity: 'warning',
+			phase: 'resume',
+			title: 'This container was already resumed',
+			docsUrl: 'https://markless.dev/errors/MARKLESS_RESUME_ALREADY_RESUMED',
+		}),
+	]);
 });
 
 function captureThrown(run: () => unknown): unknown {

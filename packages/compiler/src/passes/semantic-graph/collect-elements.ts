@@ -1,5 +1,5 @@
-import { isEventAttribute, normalizeEventName } from '@tsrx/core';
-import { asNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
+import { isEventAttribute, normalizeEventName, parseModule } from '@tsrx/core';
+import { asNodes, getIdentifierName, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import {
 	getElementAttributes,
@@ -7,6 +7,7 @@ import {
 	getElementTagName,
 	isHostTagName,
 	isIgnorableJsxTextNode,
+	isSpreadAttribute,
 	staticTextValue,
 	trimmedStaticTextValue,
 	unwrapExpressionContainer,
@@ -15,22 +16,37 @@ import type {
 	SemanticBehavior,
 	SemanticElementHandleBinding,
 	SemanticGraphDiagnostic,
+	SemanticGraphBinding,
+	SemanticGraphDependency,
 	SemanticTemplateBindingTarget,
 	SourceSpan,
 } from '../../artifacts.ts';
-import { graphBindingMap } from '../../artifact-helpers/graph-paths.ts';
+import {
+	graphBindingMap,
+	resolveGraphPath,
+	semanticAliasMap,
+} from '../../artifact-helpers/graph-paths.ts';
 import { collectComponentEdge } from './collect-components.ts';
 import { collectExpressionReads } from './collect-expressions.ts';
 import {
-	extractSyncPolicy,
+	extractSyncPolicyFromHandlers,
+	firstDetachedSyncPolicyReference,
 	firstSyncPolicyActionCall,
 	getHandlerCount,
 	hasSyncEventPolicyCandidate,
 } from './collect-sync-policy.ts';
 import {
 	attachHostElementRequiredDiagnostic,
+	attributeObjectValueDiagnostic,
+	duplicateAttributeDiagnostic,
 	duplicateElementHandleDiagnostic,
 	elementHandleRequiredDiagnostic,
+	elementHandlePropUnsupportedDiagnostic,
+	elementHandleRenderReadDiagnostic,
+	eventSpreadUnsupportedDiagnostic,
+	spreadStaticSnapshotDiagnostic,
+	styleObjectUnsupportedDiagnostic,
+	unboundElementHandleDiagnostic,
 } from './diagnostics.ts';
 import type { MutableSemanticGraphArtifact, SemanticGraphWalk, WalkState } from './types.ts';
 
@@ -51,6 +67,7 @@ export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGr
 		state.currentHostNodeId = hostNodeId;
 	}
 
+	collectDuplicateAttributeDiagnostics(node, state, tagName, isHostElement);
 	for (const attribute of getElementAttributes(node)) {
 		collectAttribute(
 			attribute,
@@ -80,6 +97,7 @@ export function collectTemplateExpression(node: AnyNode, state: WalkState): void
 
 	const expression = node.expression as AnyNode | undefined;
 	if (!expression) return;
+	const composite = collectCompositeTemplateExpression(expression, state);
 
 	state.graph.templateReads.push({
 		hostNodeId: state.currentHostNodeId,
@@ -87,6 +105,7 @@ export function collectTemplateExpression(node: AnyNode, state: WalkState): void
 		sourceSpan: sourceSpan(expression, state.filename),
 		target: state.currentTextTarget ?? { kind: 'text' },
 		asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
+		computedGraphNodeId: composite?.graphNodeId,
 	});
 }
 
@@ -127,6 +146,139 @@ function isStaticTextPart(node: AnyNode): boolean {
 	return node.type === 'JSXText' || node.type === 'Literal';
 }
 
+function collectCompositeTemplateExpression(
+	node: AnyNode,
+	state: WalkState,
+): { readonly graphNodeId: string } | null {
+	if (!isCompositeTemplateExpression(node)) return null;
+
+	const readSources = pureCompositeReadSources(node, state);
+	if (!readSources) return null;
+
+	const bindings = graphBindingMap(state.graph, state.currentSharedDefinitionId);
+	const aliases = semanticAliasMap(state.graph, state.currentSharedDefinitionId);
+	const dependencies: SemanticGraphDependency[] = [];
+	for (const source of readSources) {
+		const resolved = resolveGraphPath(source, bindings, aliases);
+		if (!resolved) return null;
+		if (
+			resolved.binding.kind !== 'state' &&
+			resolved.binding.kind !== 'computed' &&
+			resolved.binding.kind !== 'prop'
+		) {
+			return null;
+		}
+		dependencies.push({ source, graphNodeId: resolved.binding.id, path: resolved.path });
+	}
+	if (dependencies.length === 0) return null;
+
+	const index = state.graph.graphBindings.filter((binding) =>
+		binding.id.startsWith('computed:templateExpression:'),
+	).length;
+	const graphNodeId = `computed:templateExpression:${index}`;
+	state.graph.graphBindings.push({
+		id: graphNodeId,
+		name: `marklessTemplateExpression${index}`,
+		kind: 'computed',
+		writable: false,
+		async: false,
+		asyncCapable: false,
+		functionSource: `() => ${expressionSource(node, state.source)}`,
+		dependencies: uniqueDependencies(dependencies),
+	});
+	return { graphNodeId };
+}
+
+function isCompositeTemplateExpression(node: AnyNode): boolean {
+	return (
+		node.type === 'ConditionalExpression' ||
+		node.type === 'BinaryExpression' ||
+		node.type === 'LogicalExpression' ||
+		node.type === 'TemplateLiteral'
+	);
+}
+
+function pureCompositeReadSources(
+	node: AnyNode | undefined,
+	state: WalkState,
+): ReadonlyArray<string> | null {
+	if (!node) return [];
+	if (node.type === 'ChainExpression') {
+		return pureCompositeReadSources(node.expression as AnyNode | undefined, state);
+	}
+	if (isLiteralExpression(node)) return [];
+	if (node.type === 'Identifier') return [expressionSource(node, state.source)];
+	if (node.type === 'MemberExpression') return memberReadSources(node, state);
+	if (node.type === 'ConditionalExpression') {
+		return joinReadSources([
+			pureCompositeReadSources(node.test as AnyNode | undefined, state),
+			pureCompositeReadSources(node.consequent as AnyNode | undefined, state),
+			pureCompositeReadSources(node.alternate as AnyNode | undefined, state),
+		]);
+	}
+	if (node.type === 'BinaryExpression' || node.type === 'LogicalExpression') {
+		return joinReadSources([
+			pureCompositeReadSources(node.left as AnyNode | undefined, state),
+			pureCompositeReadSources(node.right as AnyNode | undefined, state),
+		]);
+	}
+	if (node.type === 'UnaryExpression') {
+		if (node.operator === 'delete') return null;
+		return pureCompositeReadSources(node.argument as AnyNode | undefined, state);
+	}
+	if (node.type === 'TemplateLiteral') {
+		return joinReadSources(
+			asNodes(node.expressions).map((part) => pureCompositeReadSources(part, state)),
+		);
+	}
+	return null;
+}
+
+function memberReadSources(node: AnyNode, state: WalkState): ReadonlyArray<string> | null {
+	if (node.computed === true && !isLiteralExpression(node.property as AnyNode | undefined)) {
+		return null;
+	}
+	const object = node.object as AnyNode | undefined;
+	if (object?.type === 'CallExpression' || object?.type === 'NewExpression') return null;
+	const source = expressionSource(node, state.source);
+	return source ? [source] : null;
+}
+
+function joinReadSources(
+	parts: ReadonlyArray<ReadonlyArray<string> | null>,
+): ReadonlyArray<string> | null {
+	const joined: string[] = [];
+	for (const part of parts) {
+		if (!part) return null;
+		joined.push(...part);
+	}
+	return [...new Set(joined)];
+}
+
+function isLiteralExpression(node: AnyNode | undefined): boolean {
+	return (
+		node?.type === 'Literal' ||
+		node?.type === 'StringLiteral' ||
+		node?.type === 'NumericLiteral' ||
+		node?.type === 'BooleanLiteral' ||
+		node?.type === 'NullLiteral'
+	);
+}
+
+function uniqueDependencies(
+	dependencies: ReadonlyArray<SemanticGraphDependency>,
+): ReadonlyArray<SemanticGraphDependency> {
+	const seen = new Set<string>();
+	const unique: SemanticGraphDependency[] = [];
+	for (const dependency of dependencies) {
+		const key = `${dependency.graphNodeId}:${dependency.path.join('.')}:${dependency.source}`;
+		if (seen.has(key)) continue;
+		seen.add(key);
+		unique.push(dependency);
+	}
+	return unique;
+}
+
 export function collectConditionalBranchText(node: AnyNode, state: WalkState): void {
 	const test = node.test as AnyNode | undefined;
 	if (!test) return;
@@ -157,12 +309,39 @@ export function collectConditionalBranchText(node: AnyNode, state: WalkState): v
 
 export function collectElementHandleDiagnostics(graph: MutableSemanticGraphArtifact): void {
 	const bindings = graphBindingMap(graph);
+	const aliases = semanticAliasMap(graph);
 	const validElementHandleBindings: SemanticElementHandleBinding[] = [];
+	const moduleElementNames = new Set(
+		graph.diagnostics
+			.filter((diagnostic) => diagnostic.code === 'MARKLESS_ELEMENT_MODULE_SCOPE')
+			.map((diagnostic) => moduleScopeElementName(diagnostic.message))
+			.filter((name): name is string => name !== null),
+	);
 
 	for (const binding of graph.elementHandleBindings) {
-		const graphBinding = bindings.get(binding.handleName);
-		if (!graphBinding || graphBinding.kind !== 'element') {
+		const resolved = resolveGraphPath(binding.handleName, bindings, aliases);
+		const graphBinding = resolved?.binding;
+		if (moduleElementNames.has(binding.handleName)) continue;
+		const forwarded = resolved
+			? resolvePropForwardedElementHandle(binding, resolved, graph)
+			: null;
+		if (forwarded) {
+			validElementHandleBindings.push({
+				...binding,
+				handleName: forwarded.name,
+			});
+			continue;
+		}
+		if (graphBinding?.kind === 'prop') {
+			graph.diagnostics.push(elementHandlePropUnsupportedDiagnostic(binding));
+			continue;
+		}
+		if (!graphBinding || graphBinding.kind !== 'element' || resolved.path.length > 0) {
 			graph.diagnostics.push(elementHandleRequiredDiagnostic(binding, graphBinding));
+			continue;
+		}
+		if (binding.keyedRepeatScopeIds.length > 0) {
+			graph.diagnostics.push(duplicateElementHandleDiagnostic(binding));
 			continue;
 		}
 
@@ -178,6 +357,36 @@ export function collectElementHandleDiagnostics(graph: MutableSemanticGraphArtif
 
 		graph.diagnostics.push(duplicateElementHandleDiagnostic(binding));
 	}
+
+	const boundHandleNames = new Set(validElementHandleBindings.map((binding) => binding.handleName));
+	for (const read of graph.templateReads) {
+		const resolved = resolveGraphPath(read.source, bindings, aliases);
+		if (!resolved || resolved.binding.kind !== 'element') continue;
+		const handleName = resolved.binding.name;
+		if (resolved.path.length > 0) {
+			graph.diagnostics.push(
+				elementHandleRenderReadDiagnostic({
+					handleName,
+					source: read.source,
+					sourceSpan: read.sourceSpan,
+				}),
+			);
+			continue;
+		}
+		if (!boundHandleNames.has(handleName)) {
+			graph.diagnostics.push(
+				unboundElementHandleDiagnostic({
+					handleName,
+					source: read.source,
+					sourceSpan: read.sourceSpan,
+				}),
+			);
+		}
+	}
+}
+
+function moduleScopeElementName(message: string): string | null {
+	return /^Cannot create element handle "([^"]+)"/.exec(message)?.[1] ?? null;
 }
 
 function collectAttribute(
@@ -188,6 +397,11 @@ function collectAttribute(
 	ownerTagName: string | null,
 	isHostElement: boolean,
 ): void {
+	if (isSpreadAttribute(attribute)) {
+		collectSpreadAttribute(attribute, state, walk, hostNodeId);
+		return;
+	}
+
 	const attributeName = getIdentifierName(attribute.name as AnyNode | undefined);
 	if (!attributeName) return;
 
@@ -208,15 +422,26 @@ function collectAttribute(
 	if (!hostNodeId) return;
 
 	if (isEventAttribute(attributeName)) {
-		const handlers = eventHandlerExpressions(expressionValue);
-		const handlerSources = handlers.map((handler) => expressionSource(handler, state.source));
-		const handlerSpans = handlers.map((handler) => sourceSpan(handler, state.filename));
-		const handlerParameters = handlers.map(handlerParameterNames);
-		const syncPolicy = extractSyncPolicy(expressionValue, state);
-		const hasSyncPolicyCandidate = hasSyncEventPolicyCandidate(expressionValue);
+		const invalidHandler = invalidEventHandlerExpression(attributeName, expressionValue, state);
+		if (invalidHandler) {
+			state.graph.diagnostics.push(invalidHandler);
+			collectExpressionReads(expressionValue, state);
+			walk(expressionValue, state);
+			return;
+		}
+
+		const handlers = eventHandlerExpressions(expressionValue, state);
+		const handlerNodes = handlers.map((handler) => handler.node);
+		const handlerSources = handlers.map((handler) => handler.source);
+		const handlerSpans = handlers.map((handler) => handler.span);
+		const handlerParameters = handlerNodes.map(handlerParameterNames);
+		const syncPolicy = extractSyncPolicyFromHandlers(handlerNodes, state);
+		const hasSyncPolicyCandidate =
+			handlerNodes.some((handler) => hasSyncEventPolicyCandidate(handler)) ||
+			handlers.some((handler) => firstDetachedSyncPolicyReference(handler.node));
 		if (hasSyncPolicyCandidate && !syncPolicy) {
 			state.graph.diagnostics.push(
-				unextractableSyncPolicyDiagnostic(attributeName, value, state),
+				unextractableSyncPolicyDiagnostic(attributeName, value, handlerNodes, state),
 			);
 		}
 		state.graph.events.push({
@@ -240,7 +465,7 @@ function collectAttribute(
 			for (const behavior of behaviorExpressions(expressionValue)) {
 				state.graph.behaviors.push({
 					hostNodeId,
-					...behaviorSourceParts(behavior, state.source),
+					...behaviorSourceParts(behavior, state),
 				});
 			}
 			collectExpressionReads(expressionValue, state);
@@ -254,7 +479,9 @@ function collectAttribute(
 			state.graph.elementHandleBindings.push({
 				hostNodeId,
 				handleName: expressionSource(expressionValue, state.source),
+				componentName: state.currentComponentName ?? undefined,
 				sourceSpan: sourceSpan(expressionValue, state.filename),
+				keyedRepeatScopeIds: [...state.currentKeyedRepeatScopeIds],
 			});
 		}
 		return;
@@ -274,6 +501,8 @@ function collectAttribute(
 	}
 
 	if (expressionValue && expressionValue.type !== 'Literal') {
+		const attributeDiagnostic = attributeValueDiagnostic(attributeName, expressionValue, state);
+		if (attributeDiagnostic) state.graph.diagnostics.push(attributeDiagnostic);
 		state.graph.templateReads.push({
 			hostNodeId,
 			source: expressionSource(expressionValue, state.source),
@@ -283,6 +512,147 @@ function collectAttribute(
 		});
 		walk(expressionValue, state);
 	}
+}
+
+function collectDuplicateAttributeDiagnostics(
+	node: AnyNode,
+	state: WalkState,
+	tagName: string | null,
+	isHostElement: boolean,
+): void {
+	if (!isHostElement) return;
+	const seen = new Map<string, AnyNode>();
+	for (const attribute of getElementAttributes(node)) {
+		if (isSpreadAttribute(attribute)) continue;
+		const name = getIdentifierName(attribute.name as AnyNode | undefined);
+		if (!name || isEventAttribute(name) || name === 'attach' || name === 'el') continue;
+		const previous = seen.get(name);
+		if (previous) {
+			state.graph.diagnostics.push(
+				duplicateAttributeDiagnostic({
+					tagName,
+					attributeName: name,
+					duplicate: attribute,
+					filename: state.filename,
+				}),
+			);
+			continue;
+		}
+		seen.set(name, attribute);
+	}
+}
+
+function collectSpreadAttribute(
+	attribute: AnyNode,
+	state: WalkState,
+	walk: SemanticGraphWalk,
+	hostNodeId: string | null,
+): void {
+	const argument = attribute.argument as AnyNode | undefined;
+	if (!argument) return;
+	if (!hostNodeId) {
+		walk(argument, state);
+		return;
+	}
+
+	const spreadSource = expressionSource(argument, state.source);
+	const objectKeys = staticObjectKeys(resolveStaticObjectExpression(argument, state));
+	const eventKeys = objectKeys.filter(isSpreadEventKey);
+	if (eventKeys.length > 0) {
+		state.graph.diagnostics.push(
+			eventSpreadUnsupportedDiagnostic({
+				spreadSource,
+				keys: eventKeys,
+				node: argument,
+				filename: state.filename,
+			}),
+		);
+		walk(argument, state);
+		return;
+	}
+
+	const resolved = resolveGraphPath(spreadSource, graphBindingMap(state.graph), semanticAliasMap(state.graph));
+	if (resolved?.binding.kind === 'state' || resolved?.binding.kind === 'computed') {
+		state.graph.diagnostics.push(
+			spreadStaticSnapshotDiagnostic({
+				spreadSource,
+				node: argument,
+				filename: state.filename,
+			}),
+		);
+	}
+	walk(argument, state);
+}
+
+function attributeValueDiagnostic(
+	attributeName: string,
+	expressionValue: AnyNode,
+	state: WalkState,
+): SemanticGraphDiagnostic | null {
+	const valueSource = expressionSource(expressionValue, state.source);
+	if (isLowercaseEventAttributeName(attributeName) && isFunctionExpressionLike(expressionValue)) {
+		return attributeObjectValueDiagnostic({
+			attributeName,
+			valueSource,
+			node: expressionValue,
+			filename: state.filename,
+			eventSuggestion: eventAttributeSuggestion(attributeName),
+		});
+	}
+
+	const resolved = resolveGraphPath(valueSource, graphBindingMap(state.graph), semanticAliasMap(state.graph));
+	const isObjectValue =
+		expressionValue.type === 'ObjectExpression' ||
+		expressionValue.type === 'ArrayExpression' ||
+		(resolved?.path.length === 0 &&
+			(resolved.binding.valueKind === 'object' || resolved.binding.valueKind === 'array'));
+	if (!isObjectValue) return null;
+	if (attributeName === 'style') {
+		return styleObjectUnsupportedDiagnostic({
+			valueSource,
+			node: expressionValue,
+			filename: state.filename,
+		});
+	}
+	return attributeObjectValueDiagnostic({
+		attributeName,
+		valueSource,
+		node: expressionValue,
+		filename: state.filename,
+	});
+}
+
+function resolvePropForwardedElementHandle(
+	binding: SemanticElementHandleBinding,
+	resolved: {
+		readonly binding: SemanticGraphBinding;
+		readonly path: ReadonlyArray<string>;
+	},
+	graph: MutableSemanticGraphArtifact,
+): { readonly name: string } | null {
+	if (resolved.binding.kind !== 'prop' || !binding.componentName) return null;
+
+	const propName = resolved.path[0];
+	if (!propName || resolved.path.length !== 1) return null;
+
+	const edgeProp = graph.componentEdges
+		.filter((edge) => edge.childComponentName === binding.componentName)
+		.flatMap((edge) => edge.props)
+		.find(
+			(prop) =>
+				prop.name === propName &&
+				prop.kind === 'graph-reference' &&
+				prop.graphBindingKind === 'element' &&
+				prop.path.length === 0,
+		);
+	if (!edgeProp) return null;
+
+	const handle = graph.graphBindings.find(
+		(graphBinding) => graphBinding.id === edgeProp.graphNodeId,
+	);
+	if (!handle || handle.kind !== 'element') return null;
+
+	return { name: handle.name };
 }
 
 function conditionalClassTarget(
@@ -409,82 +779,151 @@ function isDomPropertyBindingName(attributeName: string): boolean {
 	return attributeName === 'value' || attributeName === 'checked' || attributeName === 'selected';
 }
 
-function unextractableSyncPolicyDiagnostic(
-	attributeName: string,
-	value: AnyNode | undefined,
-	state: Pick<WalkState, 'filename'>,
-): SemanticGraphDiagnostic {
-	const actionCall = firstSyncPolicyActionCall(value);
+function resolveStaticObjectExpression(node: AnyNode, state: WalkState): AnyNode | null {
+	if (node.type === 'ObjectExpression') return node;
+	const name = getIdentifierName(node);
+	if (!name) return null;
+	let found: AnyNode | null = null;
+	const ast = parseModule(state.source, state.filename) as unknown as AnyNode;
+	walkNode(ast, (candidate) => {
+		if (found || candidate.type !== 'VariableDeclarator') return;
+		const id = candidate.id as AnyNode | undefined;
+		const init = candidate.init as AnyNode | undefined;
+		if (getIdentifierName(id) === name && init?.type === 'ObjectExpression') found = init;
+	});
+	return found;
+}
+
+function staticObjectKeys(node: AnyNode | null): string[] {
+	if (!node || node.type !== 'ObjectExpression') return [];
+	return asNodes(node.properties).flatMap((property) => {
+		if (property.type !== 'Property') return [];
+		const key = property.key as AnyNode | undefined;
+		const name = getIdentifierName(key);
+		if (name) return [name];
+		if (key?.type === 'Literal' && typeof key.value === 'string') return [key.value];
+		return [];
+	});
+}
+
+function isSpreadEventKey(key: string): boolean {
+	return /^on[A-Z]/.test(key) || key === 'attach' || key === 'el';
+}
+
+function isLowercaseEventAttributeName(attributeName: string): boolean {
+	return /^on[a-z]/.test(attributeName);
+}
+
+function eventAttributeSuggestion(attributeName: string): string {
+	return `on${attributeName.slice(2, 3).toUpperCase()}${attributeName.slice(3)}`;
+}
+
+function isFunctionExpressionLike(node: AnyNode): boolean {
+	return node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression';
+}
+
+function unextractableSyncPolicyDiagnostic(attributeName: string, value: AnyNode | undefined, handlers: ReadonlyArray<AnyNode>, state: Pick<WalkState, 'filename' | 'source'>): SemanticGraphDiagnostic {
+	const detached = firstDetachedSyncPolicyReference({
+		type: 'ArrayExpression',
+		elements: handlers,
+	} as AnyNode);
+	if (detached) {
+		const source = state.source.slice(detached.start, detached.end).trim();
+		return {
+			code: 'MARKLESS_SYNC_POLICY_UNEXTRACTABLE', severity: 'error', phase: 'sync-policy',
+			title: 'Cannot extract synchronous event policy', passId: 'tsrx-semantic-graph',
+			artifactKeys: ['semanticGraph'],
+			message: `\`${source}\` detaches ${detached.action} from the event, so the compiler cannot prove when the default action is cancelled for ${attributeName}.`,
+			why: 'preventDefault() and stopPropagation() must run before lazy handler symbols load; a detached reference hides which action runs and under what condition.',
+			primarySpan: { filename: state.filename, start: detached.start, end: detached.end },
+			suggestions: [{ message: `Call it directly on the event parameter instead of detaching ${detached.action}.` }],
+			docsUrl: 'https://markless.dev/errors/MARKLESS_SYNC_POLICY_UNEXTRACTABLE',
+		};
+	}
+
+	const actionCall =
+		handlers.map((handler) => firstSyncPolicyActionCall(handler)).find(Boolean) ??
+		firstSyncPolicyActionCall(value);
 	const actionLabel = actionCall?.action ?? 'preventDefault/stopPropagation';
 
 	return {
-		code: 'MARKLESS_SYNC_POLICY_UNEXTRACTABLE',
-		severity: 'error',
-		phase: 'sync-policy',
-		title: 'Cannot extract synchronous event policy',
+		code: 'MARKLESS_SYNC_POLICY_UNEXTRACTABLE', severity: 'error', phase: 'sync-policy',
+		title: 'Cannot extract synchronous event policy', passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
 		message: `Cannot extract a synchronous ${actionLabel} policy for ${attributeName} because the guard is not limited to graph state, event fields, props, and constants.`,
 		why: 'preventDefault() and stopPropagation() must run before lazy handler symbols load. The compiler can only emit a synchronous policy when the condition is fully represented in the resumable graph/event data plane.',
 		primarySpan:
 			(actionCall ? sourceSpan(actionCall.node, state.filename) : undefined) ??
 			(value ? sourceSpan(value, state.filename) : undefined) ??
 			fallbackSpan(state.filename),
-		passId: 'tsrx-semantic-graph',
-		artifactKeys: ['semanticGraph'],
-		suggestions: [
-			{
-				message:
-					'Move the browser-critical condition into graph state and simple event-field comparisons, or remove preventDefault()/stopPropagation() from the lazy handler.',
-			},
-		],
+		suggestions: [{ message: 'Move the browser-critical condition into graph state and simple event-field comparisons, or remove preventDefault()/stopPropagation() from the lazy handler.' }],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_SYNC_POLICY_UNEXTRACTABLE',
 	};
 }
 
 function fallbackSpan(filename: string): SourceSpan {
-	return {
-		filename,
-		start: 0,
-		end: 0,
-	};
+	return { filename, start: 0, end: 0 };
 }
+
+type EventHandlerExpression = { readonly node: AnyNode; readonly source: string; readonly span?: SourceSpan };
 
 function behaviorExpressions(node: AnyNode): AnyNode[] {
 	if (node.type === 'ArrayExpression') return asNodes(node.elements);
 	return [node];
 }
 
-function behaviorSourceParts(node: AnyNode, source: string): Omit<SemanticBehavior, 'hostNodeId'> {
-	const behaviorSource = expressionSource(node, source);
+function behaviorSourceParts(
+	node: AnyNode,
+	state: WalkState,
+): Omit<SemanticBehavior, 'hostNodeId'> {
+	const behaviorSource = expressionSource(node, state.source);
 
 	if (node.type !== 'CallExpression') {
 		return {
 			source: behaviorSource,
-			functionSource: behaviorSource,
+			functionSource: localFunctionDeclarationSource(node, state) ?? behaviorSource,
 			inputSources: [],
 		};
 	}
 
 	const callee = node.callee as AnyNode | undefined;
+	const calleeSource = callee ? expressionSource(callee, state.source) : behaviorSource;
 
 	return {
 		source: behaviorSource,
-		functionSource: callee ? expressionSource(callee, source) : behaviorSource,
-		inputSources: asNodes(node.arguments).map((argument) => expressionSource(argument, source)),
+		functionSource: localFunctionDeclarationSource(callee, state) ?? calleeSource,
+		inputSources: asNodes(node.arguments).map((argument) =>
+			expressionSource(argument, state.source),
+		),
 	};
 }
 
-function eventHandlerExpressions(node: AnyNode | undefined): AnyNode[] {
+function localFunctionDeclarationSource(node: AnyNode | undefined, state: WalkState): string | null {
+	const name = getIdentifierName(node);
+	if (!name) return null;
+
+	const declaration = state.helperFunctions.get(name);
+	if (declaration) return expressionSource(declaration, state.source);
+
+	return localFunctionValueSource(name, state)?.source ?? null;
+}
+
+function eventHandlerExpressions(node: AnyNode | undefined, state: WalkState): EventHandlerExpression[] {
 	if (!node) return [];
-	if (node.type === 'ArrayExpression') return asNodes(node.elements);
-	return [node];
+	const expressions = node.type === 'ArrayExpression' ? asNodes(node.elements) : [node];
+
+	return expressions.map((expression) => {
+		const resolved = localFunctionValueSource(getIdentifierName(expression), state);
+		if (!resolved) {
+			return { node: expression, source: expressionSource(expression, state.source), span: sourceSpan(expression, state.filename) };
+		}
+
+		return { node: resolved.node, source: resolved.source, span: resolved.span };
+	});
 }
 
 function handlerParameterNames(node: AnyNode): string[] {
-	if (
-		node.type !== 'ArrowFunctionExpression' &&
-		node.type !== 'FunctionExpression' &&
-		node.type !== 'FunctionDeclaration'
-	) {
+	if (node.type !== 'ArrowFunctionExpression' && node.type !== 'FunctionExpression' && node.type !== 'FunctionDeclaration') {
 		return [];
 	}
 
@@ -492,4 +931,74 @@ function handlerParameterNames(node: AnyNode): string[] {
 		const name = getIdentifierName(parameter);
 		return name ? [name] : [];
 	});
+}
+
+function invalidEventHandlerExpression(attributeName: string, node: AnyNode | undefined, state: WalkState): SemanticGraphDiagnostic | null {
+	const invalid = firstInvalidEventHandlerExpression(node);
+	if (!invalid) return null;
+
+	const source = expressionSource(invalid, state.source);
+	return {
+		code: 'MARKLESS_EVENT_HANDLER_NOT_A_FUNCTION', severity: 'error',
+		phase: 'semantic-graph', title: 'Event props need a function',
+		primarySpan: sourceSpan(invalid, state.filename),
+		passId: 'tsrx-semantic-graph', artifactKeys: ['semanticGraph'],
+		message: `\`${attributeName}={${source}}\` passes the result of \`${source}\`, not a function. The expression would run once while rendering, and the click would receive a number.`,
+		why: 'An event prop compiles to a lazy handler symbol that runs on the browser event; only a function or an array of functions can be that handler.',
+		suggestions: [{ message: `Wrap it in a function, for example ${attributeName}={() => ${source}}.` }],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_EVENT_HANDLER_NOT_A_FUNCTION',
+	};
+}
+
+function firstInvalidEventHandlerExpression(node: AnyNode | undefined): AnyNode | null {
+	if (!node) return null;
+	if (node.type === 'ArrayExpression') {
+		for (const item of asNodes(node.elements)) {
+			const invalid = firstInvalidEventHandlerExpression(item);
+			if (invalid) return invalid;
+		}
+		return null;
+	}
+
+	if (node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression' || node.type === 'FunctionDeclaration') {
+		return null;
+	}
+
+	if (getIdentifierName(node)) return null;
+	if (node.type === 'MemberExpression') return null;
+
+	return node;
+}
+
+function localFunctionValueSource(name: string | null, state: WalkState): { readonly node: AnyNode; readonly source: string; readonly span?: SourceSpan } | null {
+	if (!name) return null;
+	const binding = state.graph.localBindings.find(
+		(item) => item.name === name && item.kind === 'function',
+	);
+	if (!binding?.sourceSpan) return null;
+
+	const node = localFunctionValueNode(name, binding.sourceSpan, state);
+	if (!node) return null;
+
+	return { node, source: expressionSource(node, state.source), span: sourceSpan(node, state.filename) };
+}
+
+function localFunctionValueNode(name: string, nameSpan: SourceSpan, state: WalkState): AnyNode | null {
+	const ast = parseModule(state.source, state.filename) as unknown as AnyNode;
+	let found: AnyNode | null = null;
+
+	walkNode(ast, (node) => {
+		if (found || node.type !== 'VariableDeclarator') return;
+		const id = node.id as AnyNode | undefined;
+		const init = node.init as AnyNode | undefined;
+		if (
+			getIdentifierName(id) === name &&
+			id?.start === nameSpan.start &&
+			(init?.type === 'ArrowFunctionExpression' || init?.type === 'FunctionExpression')
+		) {
+			found = init;
+		}
+	});
+
+	return found;
 }

@@ -1,8 +1,9 @@
 import { asNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
-import { expressionSourceOrFallback } from '../../ast/source.ts';
+import { expressionSource, expressionSourceOrFallback } from '../../ast/source.ts';
 import {
 	moduleScopeGraphCreationDiagnostic,
 	frameworkImportRequiredDiagnostic,
+	moduleScopeElementDiagnostic,
 } from './diagnostics.ts';
 import { evaluateSyncPolicyConstant } from './collect-state.ts';
 import { getFrameworkApiForCall, getCallName, isFrameworkApiName } from './imports.ts';
@@ -19,6 +20,14 @@ export function collectModuleScopeGraphCreation(statement: AnyNode, state: WalkS
 		const callName = getCallName(init);
 		const frameworkApi = getFrameworkApiForCall(init, state.frameworkApiImports);
 		const name = getIdentifierName(id);
+
+		if (name) {
+			state.graph.localDeclarations.push({
+				name,
+				scope: 'module',
+				aliasOf: moduleAliasTarget(init, state),
+			});
+		}
 
 		if (declaration.kind === 'const' && name) {
 			const constant = evaluateSyncPolicyConstant(init);
@@ -39,6 +48,13 @@ export function collectModuleScopeGraphCreation(statement: AnyNode, state: WalkS
 
 		if (frameworkApi === 'shared' && name && init) {
 			collectSharedDefinition({ name, init, state });
+			continue;
+		}
+
+		if (frameworkApi === 'element') {
+			state.graph.diagnostics.push(
+				moduleScopeElementDiagnostic(moduleScopeDeclarationName(id, state.source), init, state.filename),
+			);
 			continue;
 		}
 
@@ -68,4 +84,13 @@ function moduleScopeVariableDeclaration(statement: AnyNode): AnyNode | null {
 
 function moduleScopeDeclarationName(node: AnyNode | undefined, source: string): string {
 	return getIdentifierName(node) ?? expressionSourceOrFallback(node, source, 'graph binding');
+}
+
+function moduleAliasTarget(init: AnyNode | undefined, state: WalkState): string | undefined {
+	if (!init) return undefined;
+	const source = expressionSource(init, state.source);
+	const declaration = state.graph.localDeclarations.find(
+		(candidate) => candidate.scope === 'module' && candidate.name === source,
+	);
+	return declaration?.aliasOf ?? declaration?.name;
 }

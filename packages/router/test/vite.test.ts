@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { expect, test } from 'vitest';
 import { nitro } from 'nitro/vite';
 import type { Plugin } from 'vite';
@@ -223,6 +224,18 @@ test('preserves router resume entry exports for preview resume', () => {
 	expect(clientConfig.build.rolldownOptions.preserveEntrySignatures).toBe('exports-only');
 });
 
+test('router resume entry imports TSRX virtual resume modules instead of page modules', async () => {
+	const source = await readFile(
+		new URL('../src/vite/entries/resume-entry.ts', import.meta.url),
+		'utf8',
+	);
+
+	expect(source).toContain("query: '?markless-resume'");
+	expect(source).toContain('tsrxResumeModuleLoaders');
+	expect(source).not.toContain("import.meta.glob(['/pages/**/*.tsrx', '/pages/**/*.mdx'])");
+	expect(source).not.toContain('pageModule.resumeContainerEvent');
+});
+
 test('scopes router virtual entry modules by resolved Vite root', () => {
 	const routePlugin = flattenPlugins([router()]).find(
 		(plugin) => plugin.name === 'markless-router:routes',
@@ -274,9 +287,10 @@ test('emits exact route modulepreload maps from client build chunks', () => {
 			'build/navigation.js': navigationChunk,
 			'build/resume.js': resumeChunk,
 			'build/docs.js': chunk({
+				code: `import { marklessDecodeScalarCell } from "./scalar-specialized.js"; export const docs = () => import("./docs-symbol.js");`,
 				dynamicImports: ['build/docs-symbol.js'],
 				fileName: 'build/docs.js',
-				imports: ['build/docs-runtime.js', 'build/event-only.js'],
+				imports: ['build/docs-runtime.js', 'build/resume-runtime.js'],
 				moduleIds: ['/project/pages/docs/[...slug].mdx'],
 			}),
 			'build/home.js': chunk({
@@ -285,15 +299,9 @@ test('emits exact route modulepreload maps from client build chunks', () => {
 			}),
 			'build/docs-runtime.js': chunk({ fileName: 'build/docs-runtime.js' }),
 			'build/docs-symbol.js': chunk({ fileName: 'build/docs-symbol.js' }),
-			'build/event-only.js': chunk({
-				dynamicImports: ['build/event-only-behaviors.js'],
-				fileName: 'build/event-only.js',
-			}),
-			'build/event-only-behaviors.js': chunk({
-				fileName: 'build/event-only-behaviors.js',
-			}),
 			'build/navigation-polyfill.js': chunk({ fileName: 'build/navigation-polyfill.js' }),
 			'build/resume-runtime.js': chunk({ fileName: 'build/resume-runtime.js' }),
+			'build/scalar-specialized.js': chunk({ fileName: 'build/scalar-specialized.js' }),
 			'build/shared.js': chunk({ fileName: 'build/shared.js' }),
 		},
 	);
@@ -318,8 +326,8 @@ test('emits exact route modulepreload maps from client build chunks', () => {
 		'/app/build/navigation-polyfill.js',
 		'/app/build/docs.js',
 		'/app/build/docs-runtime.js',
-		'/app/build/event-only.js',
-		'/app/build/event-only-behaviors.js',
+		'/app/build/resume-runtime.js',
+		'/app/build/scalar-specialized.js',
 		'/app/build/docs-symbol.js',
 	]);
 	expect(routePreloads['pages/docs/[...slug].mdx']).not.toContain('/app/build/home.js');
@@ -328,14 +336,57 @@ test('emits exact route modulepreload maps from client build chunks', () => {
 		'/app/build/resume-runtime.js',
 		'/app/build/docs.js',
 		'/app/build/docs-runtime.js',
-		'/app/build/event-only.js',
-		'/app/build/event-only-behaviors.js',
+		'/app/build/scalar-specialized.js',
 		'/app/build/docs-symbol.js',
 	]);
 	expect(ssrPreloads['pages/docs/[...slug].mdx']).not.toContain(
 		'/app/build/navigation-polyfill.js',
 	);
 	expect(ssrPreloads['pages/docs/[...slug].mdx']).not.toContain('/app/build/home.js');
+});
+
+test('includes destination route resume chunks reached from the navigation route table', () => {
+	const plugins = flattenPlugins([router()]);
+	const configPlugin = plugins.find((plugin) => plugin.name === 'markless-router:vite');
+	const routePlugin = plugins.find((plugin) => plugin.name === 'markless-router:routes');
+	const routeLoad = hookHandler(routePlugin?.load) as
+		| ((id: string) => string | undefined)
+		| undefined;
+	const navigationChunk = chunk({
+		code: `const routePreloadsJson = "__MARKLESS_ROUTER_ROUTE_PRELOADS__";
+function loadSymbol(file, symbol) {
+  return file === "pages/docs.tsrx" && symbol === "symbol:0"
+    ? import("./docs-resume.js")
+    : file === "pages/index.tsrx" && symbol === "symbol:0"
+      ? import("./home-resume.js")
+      : undefined;
+}`,
+		dynamicImports: ['build/docs.js', 'build/home.js'],
+		fileName: 'build/navigation.js',
+		moduleIds: ['/repo/packages/router/src/vite/entries/client-entry.ts'],
+	});
+
+	routePlugin?.configResolved?.({ base: '/app/', root: '/project' } as never);
+	configPlugin?.configResolved?.({ base: '/app/', root: '/project' } as never);
+	configPlugin?.generateBundle?.call(
+		{ environment: { config: { consumer: 'client' } } },
+		{},
+		{
+			'build/navigation.js': navigationChunk,
+			'build/docs.js': chunk({ fileName: 'build/docs.js', moduleIds: ['/project/pages/docs.tsrx'] }),
+			'build/docs-resume.js': chunk({ fileName: 'build/docs-resume.js' }),
+			'build/home.js': chunk({ fileName: 'build/home.js', moduleIds: ['/project/pages/index.tsrx'] }),
+			'build/home-resume.js': chunk({ fileName: 'build/home-resume.js' }),
+		},
+	);
+
+	const source = routeLoad?.('\0virtual:markless-router/route-preloads');
+	const routePreloadData = JSON.parse(
+		source?.match(/routePreloadData = routePreloadsJson === .* \? (\{.*\}) :/)?.[1] ?? '{}',
+	) as { readonly navigation?: Record<string, string[]> };
+	const routePreloads = routePreloadData.navigation ?? {};
+	expect(routePreloads['pages/docs.tsrx']).toContain('/app/build/docs-resume.js');
+	expect(routePreloads['pages/docs.tsrx']).not.toContain('/app/build/home-resume.js');
 });
 
 function chunk(overrides: {

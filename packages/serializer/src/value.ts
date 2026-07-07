@@ -115,13 +115,15 @@ export type SerializationResult =
 			readonly diagnostics: ReadonlyArray<SerializationDiagnostic>;
 	  };
 
+export { deserializeGraphValue } from './value-decode.ts';
+
 export function serializeGraphValue(value: unknown): SerializationResult {
 	const diagnostics: SerializationDiagnostic[] = [];
 	const seen = new WeakMap<object, number>();
 	const records: SerializedRecord[] = [];
 
 	const root = encodeSlot(value, [], seen, records, diagnostics);
-	if (diagnostics.length > 0) {
+	if (root === undefined || diagnostics.length > 0) {
 		return {
 			ok: false,
 			diagnostics,
@@ -139,75 +141,13 @@ export function serializeGraphValue(value: unknown): SerializationResult {
 	};
 }
 
-export function deserializeGraphValue(payload: SerializedGraphPayload): unknown {
-	const shells = new Map<number, unknown>();
-
-	for (const record of payload.records) {
-		if (record.type === 'object') shells.set(record.id, {});
-		if (record.type === 'array') shells.set(record.id, []);
-		if (record.type === 'map') shells.set(record.id, new Map());
-		if (record.type === 'set') shells.set(record.id, new Set());
-		if (record.type === 'date') shells.set(record.id, new Date(record.value));
-		if (record.type === 'regexp') {
-			shells.set(record.id, new RegExp(record.source, record.flags));
-		}
-		if (record.type === 'url') shells.set(record.id, new URL(record.value));
-		if (record.type === 'array-buffer') {
-			shells.set(record.id, new Uint8Array(record.bytes).buffer);
-		}
-	}
-
-	for (const record of payload.records) {
-		if (record.type === 'typed-array') {
-			shells.set(record.id, createTypedArray(record, shells));
-		}
-		if (record.type === 'data-view') {
-			shells.set(record.id, createDataView(record, shells));
-		}
-	}
-
-	for (const record of payload.records) {
-		const shell = shells.get(record.id);
-
-		if (record.type === 'object') {
-			const object = shell as Record<string, unknown>;
-			for (const [key, slot] of record.fields) {
-				object[key] = decodeSlot(slot, shells);
-			}
-		}
-
-		if (record.type === 'array') {
-			const array = shell as unknown[];
-			for (const item of record.items) {
-				array.push(decodeSlot(item, shells));
-			}
-		}
-
-		if (record.type === 'map') {
-			const map = shell as Map<unknown, unknown>;
-			for (const [key, value] of record.entries) {
-				map.set(decodeSlot(key, shells), decodeSlot(value, shells));
-			}
-		}
-
-		if (record.type === 'set') {
-			const set = shell as Set<unknown>;
-			for (const value of record.values) {
-				set.add(decodeSlot(value, shells));
-			}
-		}
-	}
-
-	return decodeSlot(payload.root, shells);
-}
-
 function encodeSlot(
 	value: unknown,
 	path: ReadonlyArray<string>,
 	seen: WeakMap<object, number>,
 	records: SerializedRecord[],
 	diagnostics: SerializationDiagnostic[],
-): SerializedSlot | null {
+): SerializedSlot | undefined {
 	if (value === null) return null;
 	if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
 		return value;
@@ -217,12 +157,12 @@ function encodeSlot(
 
 	if (typeof value === 'function' || typeof value === 'symbol') {
 		diagnostics.push(unsupportedDiagnostic(value, path));
-		return null;
+		return undefined;
 	}
 
 	if (!isObject(value)) {
 		diagnostics.push(unsupportedDiagnostic(value, path));
-		return null;
+		return undefined;
 	}
 
 	if (value instanceof Date) {
@@ -346,7 +286,7 @@ function encodeSlot(
 				records,
 				diagnostics,
 			);
-			if (keySlot && valueSlot) {
+			if (keySlot !== undefined && valueSlot !== undefined) {
 				(record.entries as Array<readonly [SerializedSlot, SerializedSlot]>).push([
 					keySlot,
 					valueSlot,
@@ -367,10 +307,15 @@ function encodeSlot(
 		let index = 0;
 		for (const item of value) {
 			const slot = encodeSlot(item, [...path, `set:${index}`], seen, records, diagnostics);
-			if (slot) (record.values as SerializedSlot[]).push(slot);
+			if (slot !== undefined) (record.values as SerializedSlot[]).push(slot);
 			index++;
 		}
 		return { $ref: id };
+	}
+
+	if (!isPlainObject(value)) {
+		diagnostics.push(unsupportedDiagnostic(value, path));
+		return undefined;
 	}
 
 	const record: Extract<SerializedRecord, { readonly type: 'object' }> = {
@@ -382,30 +327,12 @@ function encodeSlot(
 
 	for (const [key, item] of Object.entries(value)) {
 		const slot = encodeSlot(item, [...path, key], seen, records, diagnostics);
-		if (slot) (record.fields as Array<readonly [string, SerializedSlot]>).push([key, slot]);
+		if (slot !== undefined) {
+			(record.fields as Array<readonly [string, SerializedSlot]>).push([key, slot]);
+		}
 	}
 
 	return { $ref: id };
-}
-
-function decodeSlot(slot: SerializedSlot, shells: ReadonlyMap<number, unknown>): unknown {
-	if (
-		slot === null ||
-		typeof slot === 'string' ||
-		typeof slot === 'number' ||
-		typeof slot === 'boolean'
-	) {
-		return slot;
-	}
-
-	if ('$ref' in slot) return shells.get(slot.$ref);
-	if (slot.$type === 'undefined') return undefined;
-	if (slot.$type === 'bigint') return BigInt(slot.value);
-	if (slot.$type === 'date') return new Date(slot.value);
-	if (slot.$type === 'regexp') return new RegExp(slot.source, slot.flags);
-	if (slot.$type === 'url') return new URL(slot.value);
-
-	return undefined;
 }
 
 function typedArrayName(value: object): TypedArrayName | null {
@@ -452,62 +379,13 @@ function typedArrayLength(value: object): number {
 	return (value as ArrayBufferView & { readonly length: number }).length;
 }
 
-function createTypedArray(
-	record: Extract<SerializedRecord, { readonly type: 'typed-array' }>,
-	shells: ReadonlyMap<number, unknown>,
-): unknown {
-	const buffer = decodeSlot(record.buffer, shells);
-	if (!(buffer instanceof ArrayBuffer)) return undefined;
-
-	if (record.arrayType === 'Int8Array') {
-		return new Int8Array(buffer, record.byteOffset, record.length);
-	}
-	if (record.arrayType === 'Uint8Array') {
-		return new Uint8Array(buffer, record.byteOffset, record.length);
-	}
-	if (record.arrayType === 'Uint8ClampedArray') {
-		return new Uint8ClampedArray(buffer, record.byteOffset, record.length);
-	}
-	if (record.arrayType === 'Int16Array') {
-		return new Int16Array(buffer, record.byteOffset, record.length);
-	}
-	if (record.arrayType === 'Uint16Array') {
-		return new Uint16Array(buffer, record.byteOffset, record.length);
-	}
-	if (record.arrayType === 'Int32Array') {
-		return new Int32Array(buffer, record.byteOffset, record.length);
-	}
-	if (record.arrayType === 'Uint32Array') {
-		return new Uint32Array(buffer, record.byteOffset, record.length);
-	}
-	if (record.arrayType === 'Float32Array') {
-		return new Float32Array(buffer, record.byteOffset, record.length);
-	}
-	if (record.arrayType === 'Float64Array') {
-		return new Float64Array(buffer, record.byteOffset, record.length);
-	}
-	if (record.arrayType === 'BigInt64Array') {
-		return new BigInt64Array(buffer, record.byteOffset, record.length);
-	}
-
-	return new BigUint64Array(buffer, record.byteOffset, record.length);
-}
-
-function createDataView(
-	record: Extract<SerializedRecord, { readonly type: 'data-view' }>,
-	shells: ReadonlyMap<number, unknown>,
-): unknown {
-	const buffer = decodeSlot(record.buffer, shells);
-	if (!(buffer instanceof ArrayBuffer)) return undefined;
-
-	return new DataView(buffer, record.byteOffset, record.byteLength);
-}
-
 function unsupportedDiagnostic(
 	value: unknown,
 	path: ReadonlyArray<string>,
 ): SerializationDiagnostic {
-	const valueKind = typeof value;
+	const valueKind = describeUnsupportedValue(value);
+	const formattedPath = formatPath(path);
+	const isClassOrHost = isObject(value) && !isPlainObject(value);
 
 	return {
 		code: 'MARKLESS_SERIALIZE_UNSUPPORTED_VALUE',
@@ -515,14 +393,19 @@ function unsupportedDiagnostic(
 		phase: 'serialization',
 		title: 'Cannot serialize graph state value',
 		path,
-		statePath: formatPath(path),
+		statePath: formattedPath,
 		valueKind,
-		message: `Cannot serialize value at ${formatPath(path)} because ${valueKind} values are not durable graph state.`,
-		why: 'Serialization is for durable graph state. Functions and host/runtime resources cannot be restored during resume.',
+		message: isClassOrHost
+			? `Cannot serialize value at ${formattedPath} because ${valueKind} is a live host/class resource that is not durable graph state and would resume as an empty/plain object.`
+			: `Cannot serialize value at ${formattedPath} because ${valueKind} values are not durable graph state.`,
+		why: isClassOrHost
+			? 'Serialization is for durable graph state. Host and runtime resources cannot be reconstructed from a payload during resume.'
+			: 'Serialization is for durable graph state. Functions and host/runtime resources cannot be restored during resume.',
 		suggestions: [
 			{
-				message:
-					'Move runtime resources into attach={...}, make the value serializable state, or derive it with computed().',
+				message: isClassOrHost
+					? 'Keep live resources in attach={...} behaviors and store serializable connection data such as URLs and status flags in state.'
+					: 'Move runtime resources into attach={...}, make the value serializable state, or derive it with computed().',
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_SERIALIZE_UNSUPPORTED_VALUE',
@@ -537,6 +420,16 @@ function isObject(value: unknown): value is object {
 	return typeof value === 'object' && value !== null;
 }
 
-function isSerializedSlot(value: SerializedSlot | null): value is SerializedSlot {
-	return value !== null;
+function isPlainObject(value: object): boolean {
+	const prototype = Object.getPrototypeOf(value);
+	return prototype === Object.prototype || prototype === null;
+}
+
+function describeUnsupportedValue(value: unknown): string {
+	if (isObject(value)) return value.constructor?.name ?? 'object';
+	return typeof value;
+}
+
+function isSerializedSlot(value: SerializedSlot | undefined): value is SerializedSlot {
+	return value !== undefined;
 }

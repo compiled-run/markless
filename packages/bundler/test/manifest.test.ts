@@ -28,6 +28,8 @@ const transformManifest: MarklessTransformManifest = {
 	],
 };
 
+const stripBuildPrefix = (fileName: string) => fileName.replace(/^build\//, '');
+
 describe('markless build metadata output', () => {
 	test('creates build metadata from bundler output and transform artifacts', () => {
 		const metadata = createBuildMetadata(
@@ -231,7 +233,7 @@ describe('markless build metadata output', () => {
 		const injections = collectModulePreloadInjections(graph);
 
 		expect(injections).toEqual(
-			['/build/shared.js', '/build/press.js', '/build/text.js'].map((href) => ({
+			['/build/shared.js', '/build/branch-runtime.js', '/build/press.js', '/build/text.js'].map((href) => ({
 				tag: 'link',
 				location: 'head',
 				attributes: {
@@ -242,6 +244,107 @@ describe('markless build metadata output', () => {
 				},
 			})),
 		);
+	});
+
+	test('collects metadata-backed modulepreloads for every per-symbol chunk', () => {
+		const metadata = createBuildMetadata(
+			{
+				'build/chunk-play.js': chunk({
+					fileName: 'build/chunk-play.js',
+					name: 'play',
+					code: 'export const symbol_1_play = () => {};',
+					imports: ['build/shared.js'],
+					moduleIds: ['\0virtual:markless:symbol:root:play'],
+					facadeModuleId: '\0virtual:markless:symbol:root:play',
+				}),
+				'build/chunk-write.js': chunk({
+					fileName: 'build/chunk-write.js',
+					name: 'write',
+					code: 'export const symbol_2_write = () => {};',
+					imports: ['build/shared.js'],
+					moduleIds: ['\0virtual:markless:symbol:root:write'],
+					facadeModuleId: '\0virtual:markless:symbol:root:write',
+				}),
+				'build/shared.js': chunk({
+					fileName: 'build/shared.js',
+					name: 'shared',
+					code: 'export const shared = 1;',
+					moduleIds: ['/workspace/app/src/shared.ts'],
+					facadeModuleId: '/workspace/app/src/shared.ts',
+				}),
+			},
+			[
+				{
+					...transformManifest,
+					symbols: [
+						{ symbolId: 'action:play', kind: 'event-handler', exportName: 'symbol_1_play', virtualModuleId: 'virtual:markless:symbol:root:play' },
+						{ symbolId: 'action:write', kind: 'event-handler', exportName: 'symbol_2_write', virtualModuleId: 'virtual:markless:symbol:root:write' },
+					],
+				},
+			],
+			'/workspace/app',
+			{ bundleGraphAsset: MARKLESS_BUNDLE_GRAPH, canonPath: stripBuildPrefix },
+		);
+
+		const hrefs = collectModulePreloadInjections(metadata).map(
+			(injection) => (injection.attributes as { href: string }).href,
+		);
+
+		expect(hrefs).toEqual(['/build/shared.js', '/build/chunk-play.js', '/build/chunk-write.js']);
+	});
+
+	test('encodes compact graph edges from symbol roots to separate canonical chunks', () => {
+		const metadata = createBuildMetadata(
+			{
+				'build/chunk-alpha.js': chunk({
+					fileName: 'build/chunk-alpha.js',
+					name: 'alpha',
+					code: 'export const symbol_0_alpha = () => {};',
+					moduleIds: ['\0virtual:markless:symbol:root:alpha'],
+					facadeModuleId: '\0virtual:markless:symbol:root:alpha',
+				}),
+				'build/chunk-beta.js': chunk({
+					fileName: 'build/chunk-beta.js',
+					name: 'beta',
+					code: 'export const symbol_1_beta = () => {};',
+					moduleIds: ['\0virtual:markless:symbol:root:beta'],
+					facadeModuleId: '\0virtual:markless:symbol:root:beta',
+				}),
+			},
+			[
+				{
+					...transformManifest,
+					symbols: [
+						{
+							symbolId: 'symbol:alpha',
+							kind: 'event-handler',
+							exportName: 'symbol_0_alpha',
+							virtualModuleId: 'virtual:markless:symbol:root:alpha',
+						},
+						{
+							symbolId: 'symbol:beta',
+							kind: 'event-handler',
+							exportName: 'symbol_1_beta',
+							virtualModuleId: 'virtual:markless:symbol:root:beta',
+						},
+					],
+				},
+			],
+			'/workspace/app',
+			{ canonPath: stripBuildPrefix },
+		);
+		for (const module of metadata.modules) {
+			for (const symbol of module.symbols) {
+				delete symbol.fileName;
+			}
+		}
+		const graph = convertManifestToBundleGraph(metadata);
+
+		const hrefs = collectModulePreloadInjections(graph).map(
+			(injection) => (injection.attributes as { href: string }).href,
+		);
+
+		expect(hrefs).toEqual(['/build/chunk-alpha.js', '/build/chunk-beta.js']);
 	});
 
 	test('converts symbol and custom preload entries into the bundle graph', () => {
@@ -302,6 +405,14 @@ function lazySymbolManifest(): MarklessManifest {
 		modules: [
 			{
 				...transformManifest,
+				runtimeDemandMap: {
+					version: 1,
+					recordKinds: [],
+					symbols: [{ symbolId: 'symbol:press', kind: 'event-handler', runtimeModuleIds: ['web/resume-branches'] }],
+					payloadRecords: [],
+					actions: [],
+					unknownRecordModuleIds: [],
+				},
 				symbols: [symbol('press', 'event-handler'), symbol('text', 'dom-update')],
 			},
 		],
@@ -317,6 +428,11 @@ function lazySymbolManifest(): MarklessManifest {
 				total: 1500,
 				imports: ['shared.js'],
 				origins: ['src/root.tsrx'],
+			},
+			'branch-runtime.js': {
+				size: 700,
+				total: 700,
+				origins: ['../packages/web/src/resume-branches.ts'],
 			},
 			'shared.js': { size: 500, total: 500, origins: ['src/shared.ts'] },
 		},

@@ -1,5 +1,5 @@
 import { joinURL } from 'ufo';
-import type { MarklessBundleGraph, GlobalInjections } from '../types.ts';
+import type { MarklessBuildMetadata, MarklessBundleGraph, GlobalInjections } from '../types.ts';
 import { MARKLESS_BUILD_PREFIX } from './chunking.ts';
 import { type ModulePreloadPlanEntry, planModulePreloads } from './preload-plan.ts';
 
@@ -51,7 +51,7 @@ function stylesheetFilesFromViteMetadata(bundle: HeadLinkBundle) {
 }
 
 export function collectModulePreloadInjections(
-	bundleGraph: MarklessBundleGraph | undefined,
+	preloadSource: MarklessBuildMetadata | MarklessBundleGraph | undefined,
 	options: {
 		publicPath?: (fileName: string) => string;
 		// Entry chunk names (bundle-graph normalized). Entries root the plan
@@ -61,12 +61,17 @@ export function collectModulePreloadInjections(
 		entryChunks?: readonly string[];
 	} = {},
 ): GlobalInjections[] {
+	const buildMetadata = isBuildMetadata(preloadSource) ? preloadSource : undefined;
+	const bundleGraph: MarklessBundleGraph | undefined = buildMetadata
+		? buildMetadata.bundleGraph
+		: (preloadSource as MarklessBundleGraph | undefined);
+	const symbolRoots = buildMetadata
+		? symbolRootsFromBuildMetadata(buildMetadata)
+		: (bundleGraph ?? [])
+				.filter((name): name is string => typeof name === 'string' && name.startsWith('symbol:'))
+				.map((name) => ({ name, priority: 'high' as const }));
 	const roots = [
-		...(bundleGraph ?? [])
-			.filter(
-				(name): name is string => typeof name === 'string' && name.startsWith('symbol:'),
-			)
-			.map((name) => ({ name, priority: 'high' as const })),
+		...symbolRoots,
 		...(options.entryChunks ?? []).map((name) => ({
 			name,
 			priority: 'auto' as const,
@@ -81,6 +86,30 @@ export function collectModulePreloadInjections(
 		bundleGraph,
 		roots,
 	}).map(modulePreloadInjection);
+}
+
+function symbolRootsFromBuildMetadata(
+	metadata: MarklessBuildMetadata,
+): Array<{ readonly name: string; readonly priority: 'high' }> {
+	const roots: Array<{ readonly name: string; readonly priority: 'high' }> = [];
+	const seen = new Set<string>();
+	for (const module of metadata.modules) {
+		for (const symbol of module.symbols) {
+			if (!symbol.fileName || seen.has(symbol.symbolId)) continue;
+			seen.add(symbol.symbolId);
+			roots.push({ name: symbol.symbolId, priority: 'high' });
+		}
+	}
+	return roots;
+}
+
+function isBuildMetadata(value: unknown): value is MarklessBuildMetadata {
+	return (
+		!!value &&
+		typeof value === 'object' &&
+		!Array.isArray(value) &&
+		Array.isArray((value as { modules?: unknown }).modules)
+	);
 }
 
 export function injectHeadLinks(
@@ -102,7 +131,10 @@ function headLinkTag(injection: GlobalInjections): string {
 	const attributes = Object.entries(injection.attributes ?? {}).map(
 		([name, value]) => `${name}="${value.replaceAll('"', '&quot;')}"`,
 	);
-	return `<${injection.tag} ${attributes.join(' ')}>`;
+	const open = attributes.length > 0 ? `<${injection.tag} ${attributes.join(' ')}>` : `<${injection.tag}>`;
+	return injection.children === undefined
+		? open
+		: `${open}${injection.children}</${injection.tag}>`;
 }
 
 function isHtmlAssetWithSource(output: unknown): output is {

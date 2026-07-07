@@ -1,5 +1,6 @@
 export type MarklessEnvironment = 'client' | 'server' | 'lib';
 export type MarklessClientOutput = 'full' | 'symbols-only';
+export type MarklessExecutionLogMode = 'auto' | 'never' | 'always';
 
 export interface MarklessDevServer {
 	transformRequest: (url: string, environment: MarklessEnvironment) => Promise<unknown> | unknown;
@@ -9,13 +10,14 @@ export interface MarklessRolldownOptions {
 	dev?: boolean;
 	devInjections?: GlobalInjections[];
 	devServer?: MarklessDevServer;
+	executionLog?: MarklessExecutionLogMode;
 	hmr?: boolean;
 	bundleGraphAdders?: Set<BundleGraphAdder>;
 	rootDir?: string;
 	buildId?: string;
 }
 
-export type MarklessVirtualModuleType = 'payload' | 'resolver' | 'symbol' | 'style';
+export type MarklessVirtualModuleType = 'payload' | 'resolver' | 'resume' | 'symbol' | 'style';
 
 export interface MarklessVirtualModule {
 	id: string;
@@ -28,10 +30,14 @@ export interface MarklessVirtualModule {
 export interface TransformTsrxModuleInput {
 	filename: string;
 	source: string;
+	devResumeReexport?: boolean;
 	buildId?: string;
 	environment?: MarklessEnvironment;
 	clientOutput?: MarklessClientOutput;
 	resumeModuleUrl?: string;
+	headInjections?: GlobalInjections[];
+	executionLog?: MarklessExecutionLogMode;
+	executionLogModuleHooks?: boolean;
 }
 
 export interface TransformTsrxModuleResult {
@@ -46,6 +52,7 @@ export interface MarklessTransformManifest {
 	payload: MarklessBuildModuleReference;
 	resolver: MarklessBuildModuleReference;
 	symbols: MarklessSymbolManifestEntry[];
+	runtimeDemandMap?: RuntimeDemandMapManifest;
 }
 
 export interface MarklessBuildModuleReference {
@@ -58,6 +65,8 @@ export interface MarklessSymbolManifestEntry extends MarklessBuildModuleReferenc
 	exportName: string;
 	kind: string;
 }
+
+export type RuntimeDemandMapManifest = Omit<import('@markless/compiler').RuntimeDemandMapArtifact, 'passId'>;
 
 export interface MarklessBuildMetadata {
 	version: number;
@@ -88,6 +97,7 @@ export type MarklessAsset = {
 export type GlobalInjections = {
 	tag: string;
 	attributes?: Record<string, string>;
+	children?: string;
 	location: 'head' | 'body';
 };
 

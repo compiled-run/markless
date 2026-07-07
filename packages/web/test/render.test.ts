@@ -1,6 +1,12 @@
+import { gzipSync } from 'node:zlib';
 import { ASYNC_PROTOCOL_VERSION, type ProtocolViewPayload } from '@markless/serializer';
 import { createProtocolStatePayload } from '@markless/serializer';
 import { expect, test } from 'vitest';
+import {
+	marklessCsrAttachPropEvent,
+	marklessCsrComposeView,
+	marklessCsrRenderChild,
+} from '../src/fns/csr.ts';
 import { render, renderToString } from '../src/index.ts';
 
 type FakeElement = {
@@ -107,6 +113,21 @@ function viewWithClickDomUpdate(): ProtocolViewPayload {
 	};
 }
 
+function viewWithClickSyncComputedDomUpdate(): ProtocolViewPayload {
+	return {
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'button' }],
+		events: [{ hostNodeId: 'h0', eventName: 'click', symbolIds: ['symbol:click'] }],
+		domUpdates: [{
+			hostNodeId: 'h0', source: 'doubled', graphNodeId: 'computed:doubled',
+			path: [], target: { kind: 'text' }, symbolId: 'symbol:text',
+		}],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+}
+
 function viewWithSyncPolicy(): ProtocolViewPayload {
 	return {
 		version: ASYNC_PROTOCOL_VERSION,
@@ -179,6 +200,35 @@ function staticView(): ProtocolViewPayload {
 	};
 }
 
+function duplicateKeyRepeatView(): ProtocolViewPayload {
+	return {
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'ul' }],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+		keyedRepeats: [{
+			id: 'repeat:0', parentHostNodeId: 'h0', collectionGraphNodeId: 'state:rows',
+			collectionPath: [], keyPath: ['category'], itemName: 'row', rowElementCount: 1,
+			rowEvents: [],
+		}],
+	};
+}
+
+const duplicateRows = [
+	{ category: 'fruit', label: 'apple' },
+	{ category: 'fruit', label: 'pear' },
+	{ category: 'veg', label: 'kale' },
+];
+
+function duplicateRowsState() {
+	return createProtocolStatePayload({
+		cells: [{ graphNodeId: 'state:rows', name: 'rows', valueKind: 'array', value: duplicateRows }],
+	});
+}
+
 test('render creates a CSR container without payload scripts or the inline resumer', async () => {
 	const target = {
 		children: [] as FakeElement[],
@@ -223,6 +273,30 @@ test('render creates a CSR container without payload scripts or the inline resum
 
 	expect(loadedSymbols).toEqual(['symbol:click']);
 	expect(container.graph.read('state:count')).toBe(1);
+});
+
+test('render rejects duplicate runtime keys before mounting CSR output', async () => {
+	const target = { children: [] as FakeElement[], replaceChildren(...children: FakeElement[]) { this.children = children; } };
+
+	await expect(
+		render(
+			() => ({
+				root: element('UL', duplicateRows.map(() => element('LI'))),
+				state: duplicateRowsState(),
+				view: duplicateKeyRepeatView(),
+				loadSymbol: () => () => undefined,
+			}),
+			{ target },
+		),
+	).rejects.toMatchObject({
+		code: 'MARKLESS_REPEAT_KEY_DUPLICATE',
+		message: 'MARKLESS_REPEAT_KEY_DUPLICATE: Duplicate @for key "fruit" from row.category.',
+		phase: 'runtime',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_REPEAT_KEY_DUPLICATE',
+		keyPath: ['category'],
+		collidingValue: 'fruit',
+	});
+	expect(target.children).toEqual([]);
 });
 
 test('render adopts the mount target as container root for fragment-rooted components', async () => {
@@ -365,6 +439,246 @@ test('render flips CSR branch ranges through the full resume runtime', async () 
 	expect(
 		root.childNodes.map((child) => (child.nodeType === 8 ? '#comment' : child.tagName)),
 	).toEqual(['#comment', 'SPAN', '#comment']);
+});
+
+test('render flips a composed child CSR branch from a callback-prop dispatch', async () => {
+	const startAnchor = {
+		nodeType: 8 as const,
+		textContent: 'markless:branch:branch-site:icon',
+	} as unknown as FakeElement;
+	const playIcon = element('SPAN');
+	playIcon.textContent = '▶';
+	const endAnchor = {
+		nodeType: 8 as const,
+		textContent: '/markless:branch:branch-site:icon',
+	} as unknown as FakeElement;
+	const button = element('BUTTON', [startAnchor, playIcon, endAnchor]);
+	const root = element('MAIN', [button]);
+	const target = {
+		children: [] as FakeElement[],
+		replaceChildren(...children: FakeElement[]) {
+			this.children = children;
+		},
+	};
+	const state = createProtocolStatePayload({
+		cells: [{ graphNodeId: 'state:playing', name: 'playing', valueKind: 'scalar', value: false }],
+	});
+	const parentView: ProtocolViewPayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	const childView: ProtocolViewPayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [{ hostNodeId: 'play-button', strategy: 'dom-order', index: 0, tagName: 'button' }],
+		events: [{ hostNodeId: 'play-button', eventName: 'click', symbolIds: ['symbol:child-noop'] }],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+		branches: [
+			{
+				id: 'branch-site:icon',
+				startAnchor: { strategy: 'dom-order-comment', index: 0 },
+				endAnchor: { strategy: 'dom-order-comment', index: 1 },
+				symbolId: 'symbol:icon-branch',
+				testReads: [{ source: 'active', graphNodeId: 'prop:active', path: [] }],
+			},
+		],
+	};
+	let runtimeGraph: { write(input: unknown): void } | undefined;
+	const childOutput = marklessCsrRenderChild(
+		{
+			renderCsr(props?: { readonly onPlayToggle?: (event: FakeEvent) => void }) {
+				marklessCsrAttachPropEvent(button, [], 'click', props?.onPlayToggle);
+				return {
+					root: button,
+					view: childView,
+					propEvents: [{
+						hostNodeId: 'play-button',
+						eventName: 'click',
+						propName: 'onPlayToggle',
+					}],
+				};
+			},
+		},
+		{
+			onPlayToggle() {
+				if (!runtimeGraph) throw new Error('Expected CSR runtime graph to be connected.');
+				runtimeGraph.write({ graphNodeId: 'state:playing', value: true });
+			},
+		},
+	);
+	const view = marklessCsrComposeView(
+		root,
+		parentView,
+		[],
+		[{
+			output: childOutput,
+			hostPrefix: 'c0:',
+			symbolPrefix: 'c0:',
+			graphProps: [{ name: 'active', graphNodeId: 'state:playing', path: [] }],
+		}],
+	) as ProtocolViewPayload;
+	const pauseIcon = element('SPAN');
+	pauseIcon.textContent = '❚❚';
+	const loadedSymbols: string[] = [];
+
+	const container = await render(
+		() => ({
+			root,
+			state,
+			view,
+			connectRuntime(context) {
+				runtimeGraph = context.graph as { write(input: unknown): void };
+			},
+			loadSymbol(symbolId: string) {
+				loadedSymbols.push(symbolId);
+				if (symbolId === 'c0:symbol:child-noop') return () => undefined;
+				return (context: { readonly branchId?: string; readonly composedBranchId?: string }) => {
+					expect(context).toMatchObject({
+						branchId: 'branch-site:icon',
+						composedBranchId: 'c0:branch-site:icon',
+					});
+					return {
+						arm: 0,
+						html: context.branchId === 'branch-site:icon' ? '<span>❚❚</span>' : '',
+					};
+				};
+			},
+		}),
+		{
+			target,
+			renderBranchHtml: (html) => (html ? [pauseIcon as never] : []),
+		},
+	);
+
+	const click = event('click', button);
+	await container.root.listeners[0]!.listener(click);
+
+	expect(button.listeners).toHaveLength(1);
+	await button.listeners[0]!.listener(click);
+	expect(container.graph.read('state:playing')).toBe(true);
+	expect(loadedSymbols).toEqual(['c0:symbol:icon-branch']);
+	expect(button.childNodes.map((child) => child.textContent)).toEqual([
+		'markless:branch:c0:branch-site:icon',
+		'❚❚',
+		'/markless:branch:c0:branch-site:icon',
+	]);
+});
+
+test('render flips the seventh composed child CSR branch independently', async () => {
+	const buttons = Array.from({ length: 6 }, () => element('BUTTON'));
+	const startAnchor = { nodeType: 8 as const, textContent: 'markless:branch:branch-site:0' } as unknown as FakeElement;
+	const shown = element('SPAN');
+	shown.textContent = '▶';
+	const endAnchor = { nodeType: 8 as const, textContent: '/markless:branch:branch-site:0' } as unknown as FakeElement;
+	buttons.push(element('BUTTON', [startAnchor, shown, endAnchor]));
+	const root = element('MAIN', buttons);
+	const state = createProtocolStatePayload({ cells: [{ graphNodeId: 'state:open', name: 'open', valueKind: 'scalar', value: false }] });
+	const childView: ProtocolViewPayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [{ hostNodeId: 'button', strategy: 'dom-order', index: 0, tagName: 'button' }],
+		events: [{ hostNodeId: 'button', eventName: 'click', symbolIds: ['symbol:toggle'] }],
+		domUpdates: [], behaviors: [], elementHandles: [], asyncBoundaries: [],
+		branches: [{ id: 'branch-site:0', startAnchor: { strategy: 'dom-order-comment', index: 0 }, endAnchor: { strategy: 'dom-order-comment', index: 1 }, symbolId: 'symbol:branch', testReads: [{ source: 'open', graphNodeId: 'state:open', path: [] }] }],
+	};
+	const pause = element('SPAN');
+	pause.textContent = '❚❚';
+	(pause as FakeElement & { outerHTML: string }).outerHTML = '<span class="play-icon">❚❚</span>';
+	const armMarkupRecords = [[{ text: '<span class=play-icon>❚❚</span>' }], [{ text: '▶' }]];
+	const loadedSymbols: string[] = [];
+	const renderedBranchHtml: string[] = [];
+	const childLoadSymbol = (index: number) => (symbolId: string) => {
+		loadedSymbols.push(`c${index}:${symbolId}`);
+		if (index === 6 && symbolId === 'symbol:toggle') return ({ graph }) => graph.write({ graphNodeId: 'state:open', value: true });
+		return (context: { readonly arm?: number; readonly branchId?: string; readonly composedBranchId?: string }) => {
+			if (index !== 6 || context.branchId !== 'branch-site:0' || context.composedBranchId !== 'c6:branch-site:0') return { arm: context.arm ?? 0, html: '' };
+			const arm = context.arm ?? 0;
+			return { arm, html: armMarkupRecords[arm] as never };
+		};
+	};
+	const view = marklessCsrComposeView(
+		root,
+		{ version: ASYNC_PROTOCOL_VERSION, locators: [], events: [], domUpdates: [], behaviors: [], elementHandles: [], asyncBoundaries: [] },
+		[],
+		buttons.map((button, index) => ({
+			output: { root: button, view: index === 6 ? childView : { ...childView, branches: [] }, loadSymbol: childLoadSymbol(index) },
+			hostPrefix: `c${index}:`, symbolPrefix: `c${index}:`, graphProps: [],
+		})),
+	) as ProtocolViewPayload;
+
+	const global = globalThis as { document?: unknown };
+	const previousDocument = global.document;
+	expect(buttons[6]!.childNodes.map((child) => child.textContent)).toEqual(['markless:branch:c6:branch-site:0', '▶', '/markless:branch:c6:branch-site:0']);
+	global.document = {
+		createElement(tagName: string) {
+			if (tagName !== 'template') throw new Error(`Unexpected tag ${tagName}`);
+			let childNodes: FakeElement[] = [];
+			return {
+				content: { get childNodes() { return childNodes; } },
+				set innerHTML(value: unknown) {
+					const html = String(value);
+					renderedBranchHtml.push(html);
+					childNodes = html === '<span class=play-icon>❚❚</span>'
+						? [pause]
+						: [{ nodeType: 3, textContent: html } as unknown as FakeElement];
+				},
+			};
+		},
+	};
+	const container = await (async () => {
+		try {
+			return await render(() => ({
+				root,
+				state,
+				view,
+				loadSymbol(symbolId: string) {
+					const index = buttons.findIndex((_, childIndex) => symbolId.startsWith(`c${childIndex}:`));
+					if (index >= 0) return childLoadSymbol(index)(symbolId.slice(`c${index}:`.length));
+					throw new Error(`Unexpected parent symbol ${symbolId}`);
+				},
+			}), { target: { replaceChildren() {} } });
+		} finally {
+			global.document = previousDocument;
+		}
+	})();
+
+	await container.root.listeners[0]!.listener(event('click', buttons[6]!));
+
+	expect(loadedSymbols).toEqual(['c6:symbol:toggle', 'c6:symbol:branch']);
+	expect(renderedBranchHtml).toEqual(['<span class=play-icon>❚❚</span>']);
+	const branchText = buttons[6]!.childNodes.map((child) => child.textContent);
+	expect(branchText).toEqual(['markless:branch:c6:branch-site:0', '❚❚', '/markless:branch:c6:branch-site:0']);
+	expect(branchText).not.toContain('▶');
+	expect(buttons[6]!.childNodes[1]).toMatchObject({
+		tagName: 'SPAN',
+		outerHTML: '<span class="play-icon">❚❚</span>',
+	});
+});
+
+test('render dispatch throws a tagged error when no event record matches', async () => {
+	const button = element('BUTTON');
+	const outside = element('BUTTON');
+	const container = await render(
+		() => ({
+			root: button,
+			state: createProtocolStatePayload({ cells: [] }),
+			view: viewWithClick(),
+			loadSymbol: () => () => undefined,
+		}),
+		{ target: { replaceChildren() {} } },
+	);
+
+	await expect(container.runtime.dispatch(event('click', outside))).rejects.toMatchObject({
+		code: 'MARKLESS_EVENT_DISPATCH_UNMATCHED',
+		phase: 'event',
+		eventName: 'click',
+	});
 });
 
 test('render starts artifact-owned CSR preload work without requiring app code', async () => {
@@ -581,6 +895,61 @@ test('render uses the narrow CSR event path to apply DOM update symbols', async 
 	expect(button.textContent).toBe('1');
 });
 
+test('render wires CSR sync computed dependencies through the full runtime', async () => {
+	const target = {
+		children: [] as FakeElement[],
+		replaceChildren(...children: FakeElement[]) {
+			this.children = children;
+		},
+	};
+	const button = element('BUTTON');
+	button.textContent = '4';
+	const state = {
+		...createProtocolStatePayload({
+			cells: [{ graphNodeId: 'state:count', name: 'count', valueKind: 'scalar', value: 2 }],
+		}),
+		computed: [{
+			graphNodeId: 'computed:doubled', name: 'doubled', async: false,
+			deriveSymbolId: 'symbol:derive',
+			dependencies: [{ graphNodeId: 'state:count', path: [] }],
+		}],
+	};
+	const loadedSymbols: string[] = [];
+
+	const container = await render(
+		() => ({
+			root: button,
+			state: state as never,
+			view: viewWithClickSyncComputedDomUpdate(),
+			loadSymbol(symbolId: string) {
+				loadedSymbols.push(symbolId);
+				if (symbolId === 'symbol:click') {
+					return ({ graph }) =>
+						graph.update({
+							graphNodeId: 'state:count', path: [], returnValue: 'next',
+							update: (value) => Number(value) + 1,
+						});
+				}
+				if (symbolId === 'symbol:derive') {
+					return ({ graph }) => Number(graph.read('state:count')) * 2;
+				}
+				return (context) => ({
+					type: 'setText',
+					locator: context.domUpdate?.hostNodeId ?? 'h0',
+					value: context.value,
+				});
+			},
+		}),
+		{ target },
+	);
+
+	await container.root.listeners[0].listener(event('click', container.root));
+
+	expect(loadedSymbols).toEqual(['symbol:click', 'symbol:derive', 'symbol:text']);
+	expect(container.graph.read('computed:doubled')).toBe(6);
+	expect(button.textContent).toBe('6');
+});
+
 test('render falls back from the event-only path when element handles are present', async () => {
 	const target = {
 		children: [] as FakeElement[],
@@ -628,6 +997,23 @@ test('renderToString emits an SSR container and omits the resumer for static out
 	expect(html).toContain('type="markless/state"');
 	expect(html).toContain('type="markless/view"');
 	expect(html).not.toContain('data-async-resumer');
+});
+
+test('renderToString rejects duplicate runtime keys before serving SSR output', async () => {
+	await expect(
+		renderToString(() => ({
+			html: '<ul><li>apple</li><li>pear</li><li>kale</li></ul>',
+			state: duplicateRowsState(),
+			view: duplicateKeyRepeatView(),
+		})),
+	).rejects.toMatchObject({
+		code: 'MARKLESS_REPEAT_KEY_DUPLICATE',
+		message: 'MARKLESS_REPEAT_KEY_DUPLICATE: Duplicate @for key "fruit" from row.category.',
+		phase: 'runtime',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_REPEAT_KEY_DUPLICATE',
+		keyPath: ['category'],
+		collidingValue: 'fruit',
+	});
 });
 
 test('renderToString keeps fragment sibling roots as direct container children and offsets their locators', async () => {
@@ -884,9 +1270,9 @@ test('renderToString emits ordered modulepreload links before interactive payloa
 	expect(html.indexOf('rel="modulepreload"')).toBeLessThan(html.indexOf('data-async-resumer'));
 });
 
-test('renderToString uses compiled artifact modulepreloads by default', async () => {
-	const html = await renderToString({
-		modulePreloads: [{ href: '/src/App.tsrx?import', fetchPriority: 'high' }],
+	test('renderToString uses compiled artifact modulepreloads by default', async () => {
+		const html = await renderToString({
+			modulePreloads: [{ href: '/src/App.tsrx?import', fetchPriority: 'high' }],
 		resumeModuleUrl: '/src/App.tsrx?import',
 		renderSsr: () => ({
 			html: '<button type="button">Count 0</button>',
@@ -897,10 +1283,30 @@ test('renderToString uses compiled artifact modulepreloads by default', async ()
 
 	expect(html).toContain(
 		'<link rel="modulepreload" href="/src/App.tsrx?import" crossorigin="anonymous" fetchpriority="high">',
-	);
-});
+		);
+	});
 
-test('renderToString uses the compiled artifact resume module URL by default', async () => {
+	test('renderToString emits compiled artifact head injections before the container', async () => {
+		const html = await renderToString({
+			headInjections: [
+				{
+					tag: 'script',
+					location: 'head',
+					attributes: { type: 'module', src: '/@vite/client' },
+				},
+			],
+			renderSsr: () => ({
+				html: '<button type="button">Count 0</button>',
+				state: createProtocolStatePayload({ cells: [] }),
+				view: viewWithClick(),
+			}),
+		});
+
+		expect(html).toContain('<script type="module" src="/@vite/client"></script>');
+		expect(html.indexOf('/@vite/client')).toBeLessThan(html.indexOf('<div'));
+	});
+
+	test('renderToString uses the compiled artifact resume module URL by default', async () => {
 	const resumeModuleUrl = createResumeModuleUrl('artifact-default');
 	const html = await renderToString({
 		resumeModuleUrl,
@@ -922,7 +1328,7 @@ test('renderToString inline event resumer imports the resume module only after i
 			state: createProtocolStatePayload({ cells: [] }),
 			view: viewWithClick(),
 		}),
-		{ resumeModuleUrl },
+		{ executionLog: 'never', resumeModuleUrl },
 	);
 	const view = JSON.parse(extractScriptText(html, 'markless/view')) as ProtocolViewPayload;
 	const resumerSource = extractResumerSource(html);
@@ -998,6 +1404,61 @@ test('renderToString inline event resumer imports the resume module only after i
 	}
 });
 
+test('renderToString execution log activation stays inline and mirrors summary without imports', async () => {
+	const html = await renderToString(
+		() => ({
+			html: '<button type="button">Count 0</button>',
+			state: createProtocolStatePayload({ cells: [] }),
+			view: viewWithClick(),
+		}),
+		{ executionLog: 'always', resumeModuleUrl: '/resume.js' },
+	);
+	const resumerSource = extractResumerSource(html);
+
+	expect(resumerSource).not.toContain('startMarklessExecutionLog');
+	expect(resumerSource).not.toContain('preloadedModuleCount');
+	expect(resumerSource).toContain('globalThis.__mxLog = globalThis.__mxLog || new Set()');
+	expect(resumerSource).toContain('console.log(summary)');
+	expect(resumerSource).toContain("setAttribute('data-markless-log-summary', summary)");
+});
+
+test('renderToString defaults to auto execution log bootstrap for interactive SSR', async () => {
+	const html = await renderToString(
+		() => ({
+			html: '<button type="button">Count 0</button>',
+			state: createProtocolStatePayload({ cells: [] }),
+			view: viewWithClick(),
+		}),
+		{ resumeModuleUrl: '/resume.js' },
+	);
+	const resumerSource = extractResumerSource(html);
+
+	expect(resumerSource).toContain('localhost|127\\.0\\.0\\.1|\\[::1\\]');
+	expect(resumerSource).toContain("new URLSearchParams(l.search).has('markless-log')");
+	expect(resumerSource).toContain("localStorage.getItem('marklessLog') === '1'");
+	expect(resumerSource).toContain('globalThis.__mxLog = globalThis.__mxLog || new Set()');
+	expect(resumerSource).toContain("querySelectorAll('link[rel=modulepreload]')");
+	expect(resumerSource).not.toContain('rel="modulepreload"');
+});
+
+test('renderToString strips execution log bootstrap when executionLog is never', async () => {
+	const html = await renderToString(
+		() => ({
+			html: '<button type="button">Count 0</button>',
+			state: createProtocolStatePayload({ cells: [] }),
+			view: viewWithClick(),
+		}),
+		{ executionLog: 'never', resumeModuleUrl: '/resume.js' },
+	);
+	const resumerSource = extractResumerSource(html);
+
+	expect(resumerSource).not.toContain('__mxLog');
+	expect(resumerSource).not.toContain('markless-log');
+	expect(resumerSource).not.toContain('marklessLog');
+	expect(resumerSource).not.toContain('data-markless-log-summary');
+	expect(resumerSource).not.toContain('querySelectorAll');
+});
+
 test('renderToString inline event resumer steps aside after runtime startup', async () => {
 	const resumeModuleUrl = createResumeRuntimeStartedModuleUrl();
 	const html = await renderToString(
@@ -1006,7 +1467,7 @@ test('renderToString inline event resumer steps aside after runtime startup', as
 			state: createProtocolStatePayload({ cells: [] }),
 			view: viewWithClick(),
 		}),
-		{ resumeModuleUrl },
+		{ executionLog: 'never', resumeModuleUrl },
 	);
 	const view = JSON.parse(extractScriptText(html, 'markless/view')) as ProtocolViewPayload;
 	const resumerSource = extractResumerSource(html);
@@ -1096,7 +1557,7 @@ test('renderToString inline event resumer runs sync policy before importing resu
 			state: createProtocolStatePayload({ cells: [] }),
 			view: viewWithSyncPolicy(),
 		}),
-		{ resumeModuleUrl },
+		{ executionLog: 'never', resumeModuleUrl },
 	);
 	const view = JSON.parse(extractScriptText(html, 'markless/view')) as ProtocolViewPayload;
 	const resumerSource = extractResumerSource(html);
@@ -1208,7 +1669,7 @@ test('renderToString inline event resumer evaluates sync policy before importing
 				],
 			},
 		}),
-		{ resumeModuleUrl },
+		{ executionLog: 'never', resumeModuleUrl },
 	);
 	const view = JSON.parse(extractScriptText(html, 'markless/view')) as ProtocolViewPayload;
 	const resumerSource = extractResumerSource(html);
@@ -1268,7 +1729,7 @@ test('renderToString inline event resumer evaluates sync policy before importing
 		} as FakeEvent);
 
 		expect(globalScope.__asyncResumerSyncPolicyTest).toEqual({
-			order: ['preventDefault', 'stopPropagation', 'import', 'handler:true:true'],
+			order: ['preventDefault', 'stopPropagation', 'import', 'handler:true:true:true'],
 		});
 	} finally {
 		if (previousDocument === undefined) {
@@ -1318,11 +1779,12 @@ test('renderToString inline event resumer reads graph-backed sync policy before 
 				],
 			},
 		}),
-		{ resumeModuleUrl },
+		{ executionLog: 'never', resumeModuleUrl },
 	);
 	const state = extractScriptText(html, 'markless/state');
 	const view = JSON.parse(extractScriptText(html, 'markless/view')) as ProtocolViewPayload;
 	const resumerSource = extractResumerSource(html);
+	expect(resumerSource).toContain('__marklessEventOnlyGraph');
 	const button = element('BUTTON');
 	const root = element('DIV', [button]);
 	const listeners: Array<(event: FakeEvent) => Promise<void>> = [];
@@ -1382,7 +1844,7 @@ test('renderToString inline event resumer reads graph-backed sync policy before 
 		} as FakeEvent);
 
 		expect(globalScope.__asyncResumerSyncPolicyTest).toEqual({
-			order: ['preventDefault', 'import', 'handler:true:false'],
+			order: ['preventDefault', 'import', 'handler:true:false:true'],
 		});
 	} finally {
 		if (previousDocument === undefined) {
@@ -1396,6 +1858,50 @@ test('renderToString inline event resumer reads graph-backed sync policy before 
 			globalScope.__asyncResumerSyncPolicyTest = previousTestState;
 		}
 	}
+});
+
+test('renderToString emits graph sync-policy inline runtime once for repeated payloads', async () => {
+	const inlineRuntimeRegistry = new Set<string>();
+	const renderContainer = () =>
+		renderToString(
+			() => ({
+				html: '<button type="button">Close</button>',
+				state: createProtocolStatePayload({
+					cells: [
+						{
+							graphNodeId: 'state:menu',
+							name: 'menu',
+							valueKind: 'object',
+							value: { open: true },
+						},
+					],
+				}),
+				view: {
+					...viewWithClick(),
+					events: [
+						{
+							hostNodeId: 'h0',
+							eventName: 'click',
+							syncPolicy: {
+								when: {
+									type: 'graph-truthy',
+									graphNodeId: 'state:menu',
+									path: ['open'],
+								},
+								actions: ['preventDefault'],
+							},
+							symbolIds: ['symbol:click'],
+						},
+					],
+				},
+			}),
+			{ executionLog: 'never', resumeModuleUrl: '/async-resume.js', inlineRuntimeRegistry },
+		);
+	const documentHtml = (await Promise.all([renderContainer(), renderContainer(), renderContainer()])).join('');
+	const inlineSources = extractAllResumerSources(documentHtml).join('\n');
+
+	expect(countOccurrences(inlineSources, 'const M = globalThis.__marklessInlineSyncPolicy')).toBe(1);
+	expect(gzipSync(inlineSources).length).toBeLessThan(2000);
 });
 
 test('renderToString inline event resumer reads built-in graph values for sync policy', async () => {
@@ -1432,7 +1938,7 @@ test('renderToString inline event resumer reads built-in graph values for sync p
 				],
 			},
 		}),
-		{ resumeModuleUrl },
+		{ executionLog: 'never', resumeModuleUrl },
 	);
 	const state = extractScriptText(html, 'markless/state');
 	const view = JSON.parse(extractScriptText(html, 'markless/view')) as ProtocolViewPayload;
@@ -1496,7 +2002,7 @@ test('renderToString inline event resumer reads built-in graph values for sync p
 		} as FakeEvent);
 
 		expect(globalScope.__asyncResumerSyncPolicyTest).toEqual({
-			order: ['preventDefault', 'import', 'handler:true:false'],
+			order: ['preventDefault', 'import', 'handler:true:false:true'],
 		});
 	} finally {
 		if (previousDocument === undefined) {
@@ -1523,6 +2029,16 @@ function extractResumerSource(html: string): string {
 	const match = /<script data-async-resumer(?: nonce="[^"]+")?>([\s\S]*?)<\/script>/.exec(html);
 	if (!match) throw new Error('Expected inline resumer script.');
 	return match[1]!;
+}
+
+function extractAllResumerSources(html: string): string[] {
+	return [...html.matchAll(/<script data-async-resumer(?: nonce="[^"]+")?>([\s\S]*?)<\/script>/g)].map(
+		(match) => match[1]!,
+	);
+}
+
+function countOccurrences(source: string, needle: string): number {
+	return source.split(needle).length - 1;
 }
 
 function createResumeModuleUrl(cacheKey = 'default'): string {
@@ -1552,9 +2068,9 @@ function createSyncPolicyResumeModuleUrl(cacheKey = 'default'): string {
 	const source = `
 // ${cacheKey}
 globalThis.__asyncResumerSyncPolicyTest.order.push('import');
-export async function resumeContainerEvent({ event }) {
+export async function resumeContainerEvent({ event, syncPolicyAlreadyApplied }) {
 	globalThis.__asyncResumerSyncPolicyTest.order.push(
-		'handler:' + String(event.defaultPrevented) + ':' + String(event.propagationStopped),
+		'handler:' + String(event.defaultPrevented) + ':' + String(event.propagationStopped) + ':' + String(syncPolicyAlreadyApplied),
 	);
 }
 `;

@@ -89,6 +89,92 @@ test('emitSymbolModules emits event, callback, and DOM update modules', () => {
 	expect(artifact.modules[2].source).toContain('value: context.value');
 });
 
+test('emitSymbolModules imports scalar write and text update leaves for scalar click path', () => {
+	const artifact = emitSymbolModules({
+		symbolResolver: {
+			passId: 'symbol-resolver',
+			dynamicImportOwner: 'generated-symbol-resolver',
+			symbols: [
+				{
+					id: 'symbol:click',
+					kind: 'event-handler',
+					hostNodeId: 'h1',
+					eventName: 'click',
+					source: '() => count++',
+					parameters: [],
+					order: 0,
+					writes: [
+						{
+							source: 'count',
+							graphNodeId: 'state:count',
+							path: [],
+							operation: 'update',
+							updateOperator: '++',
+							prefix: false,
+						},
+					],
+				},
+				{
+					id: 'symbol:domUpdate',
+					kind: 'dom-update',
+					hostNodeId: 'h1',
+					source: 'count',
+					graphNodeId: 'state:count',
+					target: { kind: 'text' },
+				},
+			],
+			syncPolicies: [],
+			diagnostics: [],
+		},
+		captureAnalysis: { passId: 'capture-analysis', extractedSymbols: [], diagnostics: [] },
+	});
+
+	expect(artifact.modules[0].source).toContain(
+		"import { marklessWriteScalar } from '@markless/web/fns/write-scalar';",
+	);
+	expect(artifact.modules[0].source).toContain('return marklessWriteScalar(context, {');
+	expect(artifact.modules[1].source).toContain(
+		"import { marklessUpdateText } from '@markless/web/fns/update-text';",
+	);
+	expect(artifact.modules[1].source).toContain('return marklessUpdateText(context, "h1");');
+});
+
+test('emitSymbolModules leaves non-scalar path writes on the existing graph-write path', () => {
+	const artifact = emitSymbolModules({
+		symbolResolver: {
+			passId: 'symbol-resolver',
+			dynamicImportOwner: 'generated-symbol-resolver',
+			symbols: [
+				{
+					id: 'symbol:toggle',
+					kind: 'event-handler',
+					hostNodeId: 'h1',
+					eventName: 'click',
+					source: '() => menu.open = false',
+					parameters: [],
+					order: 0,
+					writes: [
+						{
+							source: 'menu.open',
+							graphNodeId: 'state:menu',
+							path: ['open'],
+							operation: 'assign',
+							valueSource: 'false',
+						},
+					],
+				},
+			],
+			syncPolicies: [],
+			diagnostics: [],
+		},
+		captureAnalysis: { passId: 'capture-analysis', extractedSymbols: [], diagnostics: [] },
+	});
+
+	expect(artifact.modules[0].source).not.toContain('@markless/web/fns/write-scalar');
+	expect(artifact.modules[0].source).toContain('context.graph.write({');
+	expect(artifact.modules[0].source).toContain('path: ["open"]');
+});
+
 test('emitSymbolModules emits conditional text DOM update values', () => {
 	const artifact = emitSymbolModules({
 		symbolResolver: {
@@ -122,17 +208,10 @@ test('emitSymbolModules emits conditional text DOM update values', () => {
 test('emitSymbolModules emits repeat-local assignment values through context locals', () => {
 	const artifact = emitSelectAssignmentSymbol('entry.code', repeatLocalPublicRenderPlan());
 
-	expect(artifact.modules[0].source).toContain('context.graph.write({');
+	expect(artifact.modules[0].source).toContain("import { marklessWriteScalar } from '@markless/web/fns/write-scalar';");
+	expect(artifact.modules[0].source).toContain('return marklessWriteScalar(context, {');
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:selected"');
-	expect(artifact.modules[0].source).toContain('path: []');
 	expect(artifact.modules[0].source).toContain('value: context.locals?.entry?.code');
-});
-
-test('emitSymbolModules does not treat unproven dotted assignment values as repeat locals', () => {
-	const artifact = emitSelectAssignmentSymbol('external.code');
-
-	expect(artifact.modules[0].source).not.toContain('context.locals');
-	expect(artifact.modules[0].source).not.toContain('context.graph.write');
 });
 
 function emitSelectAssignmentSymbol(valueSource: string, publicRenderPlan?: any) {
@@ -237,10 +316,16 @@ test('emitSymbolModules emits concrete DOM journal entries for each binding targ
 			},
 		});
 
-		expect(artifact.modules[0].source).not.toContain('import ');
+		if (targetCase.id !== 'text') expect(artifact.modules[0].source).not.toContain('import ');
 		expect(artifact.modules[0].source).not.toContain('createDomUpdateEntry');
-		for (const expected of targetCase.expected) {
-			expect(artifact.modules[0].source).toContain(expected);
+		if (targetCase.id === 'text') {
+			expect(artifact.modules[0].source).toContain(
+				"import { marklessUpdateText } from '@markless/web/fns/update-text';",
+			);
+		} else {
+			for (const expected of targetCase.expected) {
+				expect(artifact.modules[0].source).toContain(expected);
+			}
 		}
 	}
 });
@@ -278,6 +363,18 @@ test('emitSymbolModules emits imported behavior modules with deferred input valu
 	});
 
 	expect(artifact.modules).toHaveLength(1);
+	expect(artifact.modules[0].source).toBe(`import { chart } from "./behaviors";
+
+export const authoredSource = "chart(config)";
+export const behaviorFunctionSource = "chart";
+export const behaviorInputSources = ["config"];
+
+export function symbol_chart(context) {
+	const inputs = context.behaviorInputs ?? new Array(1).fill(undefined);
+	const behavior = chart(...inputs);
+	return behavior(context.element);
+}
+`);
 	expect(artifact.modules[0]).toMatchObject({
 		symbolId: 'symbol:chart',
 		kind: 'behavior',
@@ -317,6 +414,16 @@ test('emitSymbolModules emits inline behavior function modules without imports',
 	});
 
 	expect(artifact.modules).toHaveLength(1);
+	expect(artifact.modules[0].source).toBe(`export const authoredSource = "(element) => element.focus()";
+export const behaviorFunctionSource = "(element) => element.focus()";
+export const behaviorInputSources = [];
+
+export function symbol_autofocus(context) {
+	const inputs = [];
+	const behavior = (element) => element.focus();
+	return behavior(context.element);
+}
+`);
 	expect(artifact.modules[0]).toMatchObject({
 		symbolId: 'symbol:autofocus',
 		kind: 'behavior',
@@ -447,6 +554,51 @@ test('emitSymbolModules emits async computed runner modules from planned sources
 	);
 	expect(artifact.modules[0].source).toContain(
 		'return run({ key: context.key, signal: context.signal, read });',
+	);
+});
+
+test('emitSymbolModules emits sync computed derive modules from planned sources', () => {
+	const artifact = emitSymbolModules({
+		symbolResolver: {
+			passId: 'symbol-resolver',
+			dynamicImportOwner: 'generated-symbol-resolver',
+			symbols: [
+				{
+					id: 'symbol:doubledDerive',
+					kind: 'sync-computed-derive',
+					graphNodeId: 'computed:doubled',
+					name: 'doubled',
+					source: '() => count * 2',
+					dependencies: [
+						{
+							source: 'count',
+							graphNodeId: 'state:count',
+							path: [],
+						},
+					],
+				},
+			],
+			syncPolicies: [],
+			diagnostics: [],
+		},
+		captureAnalysis: {
+			passId: 'capture-analysis',
+			extractedSymbols: [],
+			diagnostics: [],
+		},
+	});
+
+	expect(artifact.modules).toHaveLength(1);
+	expect(artifact.modules[0]).toMatchObject({
+		symbolId: 'symbol:doubledDerive',
+		kind: 'sync-computed-derive',
+		exportName: 'symbol_doubledDerive',
+	});
+	expect(artifact.modules[0].source).toContain(
+		'export const authoredSource = "() => count * 2";',
+	);
+	expect(artifact.modules[0].source).toContain(
+		'return context.graph.read("state:count") * 2;',
 	);
 });
 
@@ -1582,7 +1734,224 @@ test('emitSymbolModules re-emits imported helper calls for event handler modules
 	);
 });
 
-test('emitSymbolModules omits event imports that are not referenced by emitted writes', () => {
+test('B908 emits imported handler references as imports plus event calls', () => {
+	const source = emitEventHandlerSource({
+		id: 'symbol:save',
+		source: 'save',
+		moduleImports: [namedImport('save', './api')],
+	});
+
+	expect(source).toContain('import { save } from "./api";');
+	expect(source).toContain('return save(context.event);');
+});
+
+test('B908 emits async handler bodies with await ordering before spliced writes', () => {
+	const source = emitEventHandlerSource({
+		id: 'symbol:asyncSave',
+		eventName: 'submit',
+		source: 'async (event) => { await save(); count++; }',
+		parameters: ['event'],
+		moduleImports: [namedImport('save', './api')],
+		writes: [countUpdateWrite()],
+	});
+
+	expect(source).toContain('export async function symbol_asyncSave(context) {');
+	expect(source).toContain('const event = context.event;');
+	expect(source.indexOf('await save();')).toBeLessThan(source.indexOf('context.graph.update({'));
+});
+
+test('B908 preserves setTimeout deferral while splicing nested writes', () => {
+	const source = emitEventHandlerSource({
+		id: 'symbol:later',
+		source: '() => { setTimeout(() => { count++; }, 50); }',
+		writes: [countUpdateWrite()],
+	});
+
+	expect(source).toContain('setTimeout(() => {');
+	expect(source).toContain('}, 50);');
+	expect(source).toContain('context.graph.update({');
+});
+
+test('B908 preserves guard clauses around spliced handler writes', () => {
+	const source = emitEventHandlerSource({
+		id: 'symbol:guarded',
+		source: '() => { if (enabled) return; count++; }',
+		writes: [countUpdateWrite()],
+	});
+
+	expect(source).toContain('if (enabled) return;');
+	expect(source).toContain('context.graph.update({');
+});
+
+test('B908 reports unsupported captured body locals by name for handler emit', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/UnsupportedCapture.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	const localHelper = () => 1;
+	let count = state(0);
+
+	<button onClick={() => { count = localHelper(); }}>{count}</button>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.captureAnalysis.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED',
+			message: expect.stringContaining('localHelper'),
+		}),
+	]);
+});
+
+test('B908 preserves simple count++ handler semantics as a spliced graph write', () => {
+	const source = emitEventHandlerSource({
+		id: 'symbol:count',
+		source: '() => { count++; }',
+		writes: [countUpdateWrite()],
+	});
+
+	expect(source).toContain("import { marklessWriteScalar } from '@markless/web/fns/write-scalar';");
+	expect(source).toContain('return marklessWriteScalar(context, {');
+	expect(source).toContain('graphNodeId: "state:count"');
+	expect(source).toContain('return Number(value) + 1;');
+	expect(source).not.toContain('count++');
+});
+
+test('B908 Unit B emits authored optional-chain element handle calls', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/OptionalFocusBox.tsrx',
+		source: `
+import { element } from '@markless/core';
+
+export function App() @{
+	const input = element<HTMLInputElement>();
+
+	<>
+		<input el={input} />
+		<button onClick={() => input?.focus()}>Focus</button>
+	</>
+}
+`,
+		symbols: [],
+	});
+
+	const handler = result.symbolModules.modules.find((m) => m.kind === 'event-handler');
+	expect(handler?.source).toContain('context.getElementHandle("input")?.focus();');
+});
+
+test('B908 Unit B collects element handle calls inside nested callbacks', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/DeferredFocusBox.tsrx',
+		source: `
+import { element } from '@markless/core';
+
+export function App() @{
+	const input = element<HTMLInputElement>();
+
+	<>
+		<input el={input} />
+		<button onClick={() => { setTimeout(() => input.focus(), 1); }}>Focus</button>
+	</>
+}
+`,
+		symbols: [],
+	});
+
+	const handler = result.symbolModules.modules.find((m) => m.kind === 'event-handler');
+	expect(handler?.source).toContain('setTimeout(() => context.getElementHandle("input")?.focus(), 1);');
+});
+
+test('B908 Unit B ignores element handle lookalikes inside string literals', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/StringLookalikeFocusBox.tsrx',
+		source: `
+import { element, state } from '@markless/core';
+
+export function App() @{
+	const input = element<HTMLInputElement>();
+	let label = state('');
+
+	<>
+		<input el={input} />
+		<button onClick={() => { label = "input.focus()"; }}>{label}</button>
+	</>
+}
+`,
+		symbols: [],
+	});
+
+	const handler = result.symbolModules.modules.find((m) => m.kind === 'event-handler');
+	expect(handler?.source).toContain('"input.focus()"');
+	expect(handler?.source).not.toContain('getElementHandle');
+});
+
+test('B918 emits parent handler handle calls for same-module prop-forwarded handles', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/ForwardedFocusBox.tsrx',
+		source: `
+import { element } from '@markless/core';
+
+function Field(props: { input: unknown }) @{
+	<input el={props.input} />
+}
+
+export function App() @{
+	const field = element<HTMLInputElement>();
+
+	<section>
+		<Field input={field} />
+		<button onClick={() => field.focus()}>Focus</button>
+	</section>
+}
+`,
+		symbols: [],
+	});
+
+	const handler = result.symbolModules.modules.find((m) => m.kind === 'event-handler');
+	expect(result.semanticGraph.diagnostics).toEqual([]);
+	expect(handler?.source).toContain('context.getElementHandle("field")?.focus();');
+});
+
+function emitEventHandlerSource(symbol: any): string {
+	return emitSymbolModules({
+		symbolResolver: {
+			passId: 'symbol-resolver',
+			dynamicImportOwner: 'generated-symbol-resolver',
+			symbols: [
+				{
+					kind: 'event-handler',
+					hostNodeId: 'h1',
+					eventName: 'click',
+					parameters: [],
+					order: 0,
+					writes: [],
+					...symbol,
+				},
+			],
+			syncPolicies: [],
+			diagnostics: [],
+		},
+		captureAnalysis: {
+			passId: 'capture-analysis',
+			extractedSymbols: [],
+			diagnostics: [],
+		},
+	}).modules[0].source;
+}
+
+function namedImport(localName: string, source: string) {
+	return { localName, importedName: localName, source, kind: 'named' as const };
+}
+
+function countUpdateWrite() {
+	return { source: 'count', graphNodeId: 'state:count', path: [], operation: 'update' as const, updateOperator: '++' as const, prefix: false };
+}
+
+test('emitSymbolModules preserves imports referenced by authored handler bodies', () => {
 	const artifact = emitSymbolModules({
 		symbolResolver: {
 			passId: 'symbol-resolver',
@@ -1631,11 +2000,12 @@ test('emitSymbolModules omits event imports that are not referenced by emitted w
 		kind: 'event-handler',
 		exportName: 'symbol_guarded',
 	});
-	expect(artifact.modules[0].source).not.toContain('import { clamp } from "./math";');
+	expect(artifact.modules[0].source).toContain('import { clamp } from "./math";');
+	expect(artifact.modules[0].source).toContain('if (clamp(total, 10))');
 	expect(artifact.modules[0].source).toContain('value: 1');
 });
 
-test('emitSymbolModules does not emit bare local helper call assignment values', () => {
+test('emitSymbolModules preserves bare local helper call assignment values in authored bodies', () => {
 	const artifact = emitSymbolModules({
 		symbolResolver: {
 			passId: 'symbol-resolver',
@@ -1688,9 +2058,11 @@ test('emitSymbolModules does not emit bare local helper call assignment values',
 		kind: 'event-handler',
 		exportName: 'symbol_localClamp',
 	});
-	expect(artifact.modules[0].source).not.toContain('context.graph.write({');
-	expect(artifact.modules[0].source).not.toContain('value: clamp(');
-	expect(artifact.modules[0].source).toContain('void context;');
+	expect(artifact.modules[0].source).toContain('context.graph.write({');
+	expect(artifact.modules[0].source).toContain(
+		'value: clamp(context.graph.read("state:total"), context.graph.read("state:profile", ["step"]))',
+	);
+	expect(artifact.modules[0].source).not.toContain('void context;');
 });
 
 test('emitSymbolModules re-emits namespace imported helper calls for event handler modules', () => {
@@ -1757,64 +2129,6 @@ test('emitSymbolModules re-emits namespace imported helper calls for event handl
 	expect(artifact.modules[0].source).toContain(
 		'value: math.clamp(context.graph.read("state:total"), context.graph.read("state:profile", ["step"]))',
 	);
-});
-
-test('emitSymbolModules does not emit unimported member helper call assignment values', () => {
-	const artifact = emitSymbolModules({
-		symbolResolver: {
-			passId: 'symbol-resolver',
-			dynamicImportOwner: 'generated-symbol-resolver',
-			symbols: [
-				{
-					id: 'symbol:memberClamp',
-					kind: 'event-handler',
-					hostNodeId: 'h1',
-					eventName: 'click',
-					source: '() => total = helpers.clamp(total, profile.step)',
-					parameters: [],
-					order: 0,
-					writes: [
-						{
-							source: 'total',
-							graphNodeId: 'state:total',
-							path: [],
-							operation: 'assign',
-							valueSource: 'helpers.clamp(total, profile.step)',
-						},
-					],
-					reads: [
-						{
-							source: 'total',
-							graphNodeId: 'state:total',
-							path: [],
-						},
-						{
-							source: 'profile.step',
-							graphNodeId: 'state:profile',
-							path: ['step'],
-						},
-					],
-				},
-			],
-			syncPolicies: [],
-			diagnostics: [],
-		},
-		captureAnalysis: {
-			passId: 'capture-analysis',
-			extractedSymbols: [],
-			diagnostics: [],
-		},
-	});
-
-	expect(artifact.modules).toHaveLength(1);
-	expect(artifact.modules[0]).toMatchObject({
-		symbolId: 'symbol:memberClamp',
-		kind: 'event-handler',
-		exportName: 'symbol_memberClamp',
-	});
-	expect(artifact.modules[0].source).not.toContain('context.graph.write({');
-	expect(artifact.modules[0].source).not.toContain('value: helpers.clamp(');
-	expect(artifact.modules[0].source).toContain('void context;');
 });
 
 test('emitSymbolModules emits logical graph-read assignment values for event handler modules', () => {

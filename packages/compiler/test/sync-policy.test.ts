@@ -1,5 +1,10 @@
 import { expect, test } from 'vitest';
-import { buildSemanticGraph, lowerStateAccess, planPayloadArena } from '../src/index.ts';
+import {
+	buildSemanticGraph,
+	compileTsrxModule,
+	lowerStateAccess,
+	planPayloadArena,
+} from '../src/index.ts';
 
 const source = `
 import { state } from '@markless/core';
@@ -128,6 +133,10 @@ export function Menu() @{
 }
 `;
 
+const unconditionalSubmitSource = `import { state } from '@markless/core'; export function Form() @{ let count = state(0); <form onSubmit={(event) => { event.preventDefault(); count++; }}><button>Save {count}</button></form> }`;
+const aliasedSubmitSource = `import { state } from '@markless/core'; export function Form() @{ let count = state(0); const submit = (event) => { event.preventDefault(); count++; }; <form onSubmit={submit}><button>Save {count}</button></form> }`;
+const constantEqualityGuardSource = `const MODE = 'strict'; export function Menu() @{ <input onKeyDown={(event) => { if (MODE === 'strict') event.preventDefault(); }} /> }`;
+
 test('compiler extracts sync preventDefault policy while keeping writes lazy', async () => {
 	const semanticGraph = await buildSemanticGraph({
 		filename: 'src/Menu.tsrx',
@@ -181,6 +190,43 @@ test('compiler extracts sync preventDefault policy while keeping writes lazy', a
 	]);
 });
 
+test('B914 extracts unconditional and aliased onSubmit policies', async () => {
+	const syncPolicy = {
+		when: { type: 'constant-truthy', value: true },
+		actions: ['preventDefault'],
+	};
+
+	for (const source of [unconditionalSubmitSource, aliasedSubmitSource]) {
+		const semanticGraph = await buildSemanticGraph({ filename: 'src/Form.tsrx', source });
+		const stateLowering = lowerStateAccess({ semanticGraph });
+		const payload = planPayloadArena({ semanticGraph, stateLowering });
+
+		expect(semanticGraph.events[0]).toEqual(expect.objectContaining({
+			eventName: 'submit',
+			handlerSources: ['(event) => { event.preventDefault(); count++; }'],
+			hasSyncPolicyCandidate: true,
+			syncPolicy,
+		}));
+		expect(semanticGraph.diagnostics).toEqual([]);
+		expect(stateLowering.writes[0]).toEqual(expect.objectContaining({ source: 'count', graphNodeId: 'state:count' }));
+		expect(payload.view.events[0]).toEqual(expect.objectContaining({ syncPolicy }));
+	}
+
+	const compiled = await compileTsrxModule({
+		filename: 'src/Form.tsrx',
+		source: unconditionalSubmitSource,
+		symbols: [],
+	});
+	const submitSymbol = compiled.symbolResolver.symbols.find(
+		(symbol) => symbol.kind === 'event-handler' && symbol.eventName === 'submit',
+	);
+	const submitModule = compiled.symbolModules.modules.find(
+		(module) => module.symbolId === submitSymbol?.id,
+	);
+	expect(submitModule?.source).not.toContain('event.preventDefault();');
+	expect(submitModule?.source).toContain('graphNodeId: "state:count"');
+});
+
 test('compiler extracts module-scope serializable constants in sync event policy guards', async () => {
 	const semanticGraph = await buildSemanticGraph({
 		filename: 'src/Menu.tsrx',
@@ -214,6 +260,16 @@ test('compiler extracts module-scope serializable constants in sync event policy
 			syncPolicy,
 		}),
 	]);
+});
+
+test('B914 folds module constant equality in sync event policy guards', async () => {
+	const semanticGraph = await buildSemanticGraph({ filename: 'src/Menu.tsrx', source: constantEqualityGuardSource });
+
+	expect(semanticGraph.events[0]?.syncPolicy).toEqual({
+		when: { type: 'constant-truthy', value: true },
+		actions: ['preventDefault'],
+	});
+	expect(semanticGraph.diagnostics).toEqual([]);
 });
 
 test('compiler preserves sync policy branches for handler arrays', async () => {

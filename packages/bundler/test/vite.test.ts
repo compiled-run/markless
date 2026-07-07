@@ -2,6 +2,7 @@ import { describe, expect, test, vi } from 'vitest';
 import { markless } from '../src/vite/index.ts';
 import {
 	callBuildApp,
+	callBuildStart,
 	callConfig,
 	callConfigResolved,
 	callConfigureServer,
@@ -76,7 +77,7 @@ describe('Vite adapter structure', () => {
 			'/workspace/app/src/App.tsrx',
 			createViteHookContext('client'),
 		);
-		callGenerateBundle(
+		await callGenerateBundle(
 			plugin,
 			{
 				'index.html': html,
@@ -158,6 +159,70 @@ describe('Vite adapter structure', () => {
 		expect(build).toHaveBeenCalledTimes(2);
 	});
 
+	test('does not emit client resume chunks without a configured SSR TSRX root', async () => {
+		const plugin = getAsyncPlugin();
+		const emitFile = vi.fn();
+
+		callConfig(plugin, {}, { command: 'build', mode: 'production' });
+		callConfigResolved(plugin, {
+			base: '/',
+			command: 'build',
+			root: '/workspace/app',
+		});
+		callBuildStart(plugin, { cwd: '/workspace/app', input: { symbols: 'src/App.tsrx' } });
+		await callTransform(
+			plugin,
+			source,
+			'/workspace/app/src/App.tsrx',
+			{ ...createViteHookContext('client'), emitFile },
+		);
+
+		expect(emitFile.mock.calls.map((call) => call[0])).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					id: expect.stringContaining('virtual:markless:symbol:'),
+				}),
+			]),
+		);
+		expect(emitFile.mock.calls.map((call) => call[0].id)).not.toContain(
+			`virtual:markless:resume:${encodeURIComponent('/workspace/app/src/App.tsrx')}`,
+		);
+	});
+
+	test('emits client resume chunks when an SSR TSRX root owns browser resume', async () => {
+		const plugin = getAsyncPlugin();
+		const emitFile = vi.fn();
+		const config = {
+			environments: {
+				ssr: {
+					build: {
+						rolldownOptions: {
+							input: 'src/App.tsrx',
+						},
+					},
+				},
+			},
+		};
+
+		callConfig(plugin, config, { command: 'build', mode: 'production' });
+		callConfigResolved(plugin, {
+			base: '/',
+			command: 'build',
+			root: '/workspace/app',
+		});
+		callBuildStart(plugin, { cwd: '/workspace/app', input: { symbols: 'src/App.tsrx' } });
+		await callTransform(
+			plugin,
+			source,
+			'/workspace/app/src/App.tsrx',
+			{ ...createViteHookContext('client'), emitFile },
+		);
+
+		expect(emitFile.mock.calls.map((call) => call[0].id)).toContain(
+			`virtual:markless:resume:${encodeURIComponent('/workspace/app/src/App.tsrx')}`,
+		);
+	});
+
 	test('does not install a custom dev client for the full reload fallback', async () => {
 		const plugin = getAsyncPlugin();
 
@@ -167,9 +232,36 @@ describe('Vite adapter structure', () => {
 			root: '/workspace/app',
 		});
 
-		expect(callTransformIndexHtml(plugin, '<html></html>')).toBeUndefined();
+		expect(callTransformIndexHtml(plugin, '<html></html>')).toEqual([
+			expect.objectContaining({ tag: 'script', injectTo: 'head' }),
+		]);
 		expect(await callResolveId(plugin, 'virtual:markless-dev-client')).toBeNull();
 		expect(await callLoad(plugin, '\0virtual:markless-dev-client')).toBeNull();
+	});
+
+	test('threads the Vite client tag into dev SSR artifacts', async () => {
+		const plugin = getAsyncPlugin();
+
+		callConfigResolved(plugin, {
+			base: '/dev/',
+			command: 'serve',
+			root: '/workspace/app',
+		});
+		const result = (await callTransform(
+			plugin,
+			source,
+			'/workspace/app/src/App.tsrx',
+			createViteHookContext('server'),
+		)) as { code: string };
+
+		expect(result.code).toContain('headInjections:');
+		expect(result.code).toContain('"src":"/dev/@vite/client"');
+		// Dev resume URL points at the SOURCE module so the .tsrx stays in the client
+		// module graph (vite's no-accepting-boundary full-reload depends on it); the
+		// client source module re-exports resumeContainerEvent from the virtual
+		// resume module in dev only.
+		expect(result.code).toContain('resumeModuleUrl: "/dev/');
+		expect(result.code).toContain('.tsrx?import"');
 	});
 
 	test('serves dev symbol resolver tables with browser-loadable symbol module URLs', async () => {
@@ -363,6 +455,58 @@ export function App() @{
 			triggeredBy: '/workspace/app/src/App.tsrx',
 		});
 		expect(defaultClientSend).not.toHaveBeenCalled();
+	});
+
+	test('server hot updates invalidate the browser resume virtual module', async () => {
+		const plugin = getAsyncPlugin();
+		const send = vi.fn();
+		const filename = '/workspace/app/src/App.tsrx';
+		const resumeId = `\0virtual:markless:resume:${encodeURIComponent(filename)}`;
+		const resumeModule = { id: resumeId };
+		const browser = {
+			hot: { send },
+			moduleGraph: {
+				getModuleById: vi.fn((id: string) => (id === resumeId ? resumeModule : undefined)),
+				invalidateModule: vi.fn(),
+			},
+		};
+		const ssr = {
+			name: 'ssr',
+			config: { consumer: 'server' },
+			moduleGraph: {
+				getModuleById: vi.fn(),
+				invalidateModule: vi.fn(),
+			},
+		};
+
+		callConfigResolved(plugin, { base: '/', command: 'serve', root: '/workspace/app' });
+		callConfigureServer(plugin, {
+			config: { root: '/workspace/app' },
+			environments: { client: browser, ssr },
+		});
+		await callTransform(plugin, source, filename, createViteHookContext('server'));
+
+		await callHotUpdate(
+			plugin,
+			{
+				file: filename,
+				modules: [],
+				timestamp: 789,
+			},
+			{ environment: ssr },
+		);
+
+		expect(browser.moduleGraph.invalidateModule).toHaveBeenCalledWith(
+			resumeModule,
+			expect.anything(),
+			789,
+			true,
+		);
+		expect(send).toHaveBeenCalledWith({
+			type: 'full-reload',
+			path: '/src/App.tsrx',
+			triggeredBy: filename,
+		});
 	});
 });
 

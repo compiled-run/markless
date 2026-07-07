@@ -597,6 +597,11 @@ function routeModulePreloadsFromBundle(input: {
 		}
 		includeChunk(navigationFileNames, chunksByFileName, routeChunk.fileName);
 		includeChunk(navigationFileNames, chunksByFileName, routeChunk.fileName, true);
+		if (input.navigationChunk) {
+			for (const fileName of routeScopedDynamicImports(input.navigationChunk, routeFile)) {
+				includeChunk(navigationFileNames, chunksByFileName, fileName, true);
+			}
+		}
 		navigation[routeFile] = [...navigationFileNames].map((fileName) =>
 			joinURL(input.base, fileName),
 		);
@@ -624,6 +629,10 @@ function includeChunk(
 	for (const imported of chunk.imports) {
 		includeChunk(fileNames, chunksByFileName, imported, includeDynamic, visitedDynamic);
 	}
+	for (const imported of codeStaticImports(chunk)) {
+		if (!chunksByFileName.has(imported)) continue;
+		includeChunk(fileNames, chunksByFileName, imported, includeDynamic, visitedDynamic);
+	}
 	if (!includeDynamic || visitedDynamic.has(fileName)) {
 		return;
 	}
@@ -631,6 +640,61 @@ function includeChunk(
 	for (const imported of chunk.dynamicImports) {
 		includeChunk(fileNames, chunksByFileName, imported, true, visitedDynamic);
 	}
+	for (const imported of codeDynamicImports(chunk)) {
+		if (!chunksByFileName.has(imported)) continue;
+		includeChunk(fileNames, chunksByFileName, imported, true, visitedDynamic);
+	}
+}
+
+function routeScopedDynamicImports(chunk: OutputChunkLike, routeFile: string): string[] {
+	if (!chunk.code) return [];
+	const imports = new Set<string>();
+	const routeLiteralIndex = chunk.code.indexOf(routeFile);
+	if (routeLiteralIndex === -1) return [];
+	const nextRouteLiteralIndex = chunk.code
+		.slice(routeLiteralIndex + routeFile.length)
+		.search(/["'`]pages\/[^"'`]+\.(?:tsrx|mdx)["'`]/);
+	const routeBlockEnd =
+		nextRouteLiteralIndex === -1
+			? chunk.code.length
+			: routeLiteralIndex + routeFile.length + nextRouteLiteralIndex;
+	const routeBlock = chunk.code.slice(routeLiteralIndex, routeBlockEnd);
+	for (const specifier of codeDynamicImportSpecifiers(routeBlock)) {
+		imports.add(normalize(join(dirname(chunk.fileName), specifier)));
+	}
+	return [...imports];
+}
+
+function codeStaticImports(chunk: OutputChunkLike): string[] {
+	return codeImportSpecifiers(
+		chunk,
+		/(?:import\s*(?:[^('"`]*?\bfrom\s*)?|export\s*[^('"`]*?\bfrom\s*)["'](\.\/[^"']+\.js)["']/g,
+	);
+}
+
+function codeDynamicImports(chunk: OutputChunkLike): string[] {
+	return codeDynamicImportSpecifiers(chunk.code ?? '').map((specifier) =>
+		normalize(join(dirname(chunk.fileName), specifier)),
+	);
+}
+
+function codeDynamicImportSpecifiers(code: string): string[] {
+	const imports = new Set<string>();
+	for (const match of code.matchAll(/import\(\s*["'`](\.\/[^"'`]+\.js)["'`]\s*\)/g)) {
+		const specifier = match[1];
+		if (specifier) imports.add(specifier);
+	}
+	return [...imports];
+}
+
+function codeImportSpecifiers(chunk: OutputChunkLike, pattern: RegExp): string[] {
+	if (!chunk.code) return [];
+	const imports = new Set<string>();
+	for (const match of chunk.code.matchAll(pattern)) {
+		const specifier = match[1];
+		if (specifier) imports.add(normalize(join(dirname(chunk.fileName), specifier)));
+	}
+	return [...imports];
 }
 
 function outputChunks(bundle: Record<string, unknown>): OutputChunkLike[] {

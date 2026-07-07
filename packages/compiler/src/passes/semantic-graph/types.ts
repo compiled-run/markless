@@ -8,6 +8,7 @@ import type {
 	SemanticGraphAlias,
 	SemanticGraphBinding,
 	SemanticGraphDiagnostic,
+	ModuleGraphInterfaceArtifact,
 	SemanticModuleImport,
 	SemanticSharedDefinition,
 	SemanticSharedInstance,
@@ -15,6 +16,7 @@ import type {
 	SemanticHostNode,
 	SemanticKeyedRepeat,
 	SemanticLocalBinding,
+	SemanticLocalDeclaration,
 	SemanticStateRead,
 	SemanticStateWrite,
 	SemanticTemplateBindingTarget,
@@ -38,12 +40,14 @@ export type MutableSemanticGraphArtifact = {
 	behaviors: SemanticBehavior[];
 	elementHandleBindings: SemanticElementHandleBinding[];
 	localBindings: SemanticLocalBinding[];
+	localDeclarations: SemanticLocalDeclaration[];
 	aliases: SemanticGraphAlias[];
 	stateReads: SemanticStateRead[];
 	templateReads: SemanticTemplateRead[];
 	stateWrites: SemanticStateWrite[];
 	asyncBoundaries: Array<{ readonly id: string }>;
 	diagnostics: SemanticGraphDiagnostic[];
+	moduleGraphInterface: ModuleGraphInterfaceArtifact;
 };
 
 export type WalkState = {
@@ -51,6 +55,7 @@ export type WalkState = {
 	readonly source: string;
 	readonly graph: MutableSemanticGraphArtifact;
 	readonly frameworkApiImports: ReadonlyMap<string, FrameworkApiName>;
+	readonly importedModuleInterfaces: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
 	readonly hostIds: WeakMap<object, string>;
 	currentComponentName: string | null;
 	currentBranchScopeIds: string[];
@@ -59,6 +64,11 @@ export type WalkState = {
 	currentTextTarget: SemanticTemplateBindingTarget | null;
 	currentAsyncBoundaryId: string | null;
 	currentSharedDefinitionId: string | null;
+	currentCreationSite: 'computed' | 'handler' | 'helper' | 'branch' | 'loop' | null;
+	currentFunctionSite: 'computed' | 'handler' | 'helper' | null;
+	currentHelperCall: HelperStateCallSite | null;
+	helperFunctions: Map<string, AnyNode>;
+	walk: SemanticGraphWalk | null;
 	nextComponentEdgeId: number;
 	nextBranchId: number;
 	nextHostId: number;
@@ -87,12 +97,18 @@ export function createMutableSemanticGraphArtifact(filename: string): MutableSem
 		behaviors: [],
 		elementHandleBindings: [],
 		localBindings: [],
+		localDeclarations: [],
 		aliases: [],
 		stateReads: [],
 		templateReads: [],
 		stateWrites: [],
 		asyncBoundaries: [],
 		branchSites: [],
+		moduleGraphInterface: {
+			passId: 'module-graph-interface',
+			filename,
+			exports: [],
+		},
 		diagnostics: [],
 	};
 }
@@ -102,12 +118,14 @@ export function createWalkState(input: {
 	readonly source: string;
 	readonly graph: MutableSemanticGraphArtifact;
 	readonly frameworkApiImports: ReadonlyMap<string, FrameworkApiName>;
+	readonly importedModuleInterfaces?: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
 }): WalkState {
 	return {
 		filename: input.filename,
 		source: input.source,
 		graph: input.graph,
 		frameworkApiImports: input.frameworkApiImports,
+		importedModuleInterfaces: input.importedModuleInterfaces ?? {},
 		hostIds: new WeakMap<object, string>(),
 		currentComponentName: null,
 		currentBranchScopeIds: [],
@@ -116,6 +134,11 @@ export function createWalkState(input: {
 		currentTextTarget: null,
 		currentAsyncBoundaryId: null,
 		currentSharedDefinitionId: null,
+		currentCreationSite: null,
+		currentFunctionSite: null,
+		currentHelperCall: null,
+		helperFunctions: new Map(),
+		walk: null,
 		nextComponentEdgeId: 0,
 		nextBranchId: 0,
 		nextHostId: 0,
@@ -127,3 +150,9 @@ export function createWalkState(input: {
 }
 
 export type ModuleScopeDeclarationNode = AnyNode;
+
+export type HelperStateCallSite = {
+	readonly componentName: string;
+	readonly localName: string;
+	readonly helperName: string;
+};
