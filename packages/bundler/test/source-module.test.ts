@@ -75,8 +75,9 @@ test('emitResumeModule emits a specialized scalar dispatcher with resolved const
 	expect(resumeCode).toContain('marklessFindElementAtDomOrderIndex(input.root, 3)');
 	expect(resumeCode).toContain('marklessFindElementAtDomOrderIndex(input.root, 5)');
 	expect(resumeCode).not.toContain('?? input.element ?? input.event.target');
-	expect(resumeCode).toContain('payloadState.cells[0]');
-	expect(resumeCode).toContain('marklessDecodeScalarCell(payloadState.cells[0], "state:count", "markless/state cell[0]")');
+	expect(resumeCode).toContain('marklessReadScalarCell(input.root, 0)');
+	expect(resumeCode).toContain('marklessDecodeScalarCell(marklessReadScalarCell(input.root, 0), "state:count", "markless/state cell[0]")');
+	expect(resumeCode).not.toContain('state as payloadState');
 	expect(resumeCode).toContain('graphNodeId === "state:count"');
 	expect(resumeCode).toContain('marklessUpdateText({ domUpdate: { hostNodeId: "host:label" }, value: "Count: " + (state.value == null ? \'\' : String(state.value)) }, "host:label").value');
 	expect(resumeCode).toContain('loadSymbol("symbol:click")');
@@ -90,6 +91,48 @@ test('emitResumeModule emits a specialized scalar dispatcher with resolved const
 	expect(resumeCode).not.toContain('resumeEventOnlyFromPayloadDocument');
 	expect(resumeCode).not.toContain("import('@markless/core/web/resume')");
 	expect(resumeCode).toContain('marklessScalarSpecializedHostMiss');
+});
+
+test('specialized scalar dispatcher routes composed child event symbols', () => {
+	const input = scalarResumeInput();
+	input.symbolRoutes = [{ prefix: 'c0:', importSource: './Child.tsrx' }];
+	input.payloadView.events[0] = {
+		hostNodeId: 'host:button',
+		eventName: 'click',
+		symbolIds: ['c0:symbol:click'],
+	};
+	input.runtimeDemandMap.actions[0].plan.symbolId = 'symbol:click';
+	const resumeCode = emitResumeModule(input);
+
+	expect(resumeCode).toContain('function marklessSsrLoadSymbolRoute(symbolId)');
+	expect(resumeCode).toContain('marklessSsrLoadSymbolRoute("c0:symbol:click")');
+	expect(resumeCode).not.toContain('marklessSsrLoadSymbolRoute("symbol:click")');
+});
+
+test('specialized scalar dispatcher excludes composed child symbols without a route', () => {
+	const input = scalarResumeInput();
+	input.payloadView.events[0] = {
+		hostNodeId: 'host:button',
+		eventName: 'click',
+		symbolIds: ['c0:symbol:click'],
+	};
+	const resumeCode = emitResumeModule(input);
+
+	expect(resumeCode).not.toContain('marklessDecodeScalarCell');
+	expect(resumeCode).not.toContain('async function marklessRunScalar0');
+	expect(resumeCode).toContain("import('@markless/core/web/resume')");
+});
+
+test('specialized scalar dispatcher raises cell validation before fallback-capable work', () => {
+	const resumeCode = emitResumeModule(scalarResumeInput());
+	const decodeIndex = resumeCode.indexOf('marklessDecodeScalarCell(marklessReadScalarCell(input.root, 0), "state:count", "markless/state cell[0]")');
+	const tryIndex = resumeCode.indexOf('\ttry {', resumeCode.indexOf('async function marklessRunScalar0'));
+	const hostMissIndex = resumeCode.indexOf('marklessScalarSpecializedHostMiss(input, "host")');
+
+	expect(decodeIndex).toBeGreaterThan(-1);
+	expect(tryIndex).toBeGreaterThan(-1);
+	expect(hostMissIndex).toBeGreaterThan(tryIndex);
+	expect(decodeIndex).toBeLessThan(tryIndex);
 });
 
 test('specialized scalar dispatcher accepts the real raw event entry shape', () => {

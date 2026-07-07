@@ -141,12 +141,10 @@ export function emitResumeModule(input: {
 	const resumeSymbolLoader = routeSymbols ? 'marklessSsrLoadSymbolRoute' : 'loadSymbol';
 	const scalarSpecializations = scalarDispatcherSpecializations(input);
 	return [
-		scalarSpecializations.length > 0
-			? `import { state as payloadState, runtimeDemandMap as payloadRuntimeDemandMap } from '${input.payloadId}';`
-			: `import { runtimeDemandMap as payloadRuntimeDemandMap } from '${input.payloadId}';`,
+		`import { runtimeDemandMap as payloadRuntimeDemandMap } from '${input.payloadId}';`,
 		scalarSpecializations.length > 0
 			? [
-					"import { marklessDecodeScalarCell, marklessFindElementAtDomOrderIndex, marklessScalarSpecializedError } from '@markless/web/fns/scalar-specialized';",
+					"import { marklessDecodeScalarCell, marklessFindElementAtDomOrderIndex, marklessReadScalarCell, marklessScalarSpecializedError } from '@markless/web/fns/scalar-specialized';",
 					"import { marklessWriteScalar } from '@markless/web/fns/write-scalar';",
 					"import { marklessUpdateText } from '@markless/web/fns/update-text';",
 				].join('\n')
@@ -360,10 +358,11 @@ function scalarDispatcherSpecializations(input: {
 	readonly payloadState?: unknown;
 	readonly payloadView?: unknown;
 	readonly runtimeDemandMap?: unknown;
+	readonly symbolRoutes?: ReadonlyArray<SourceSymbolRoute>;
 }): ReadonlyArray<ScalarSpecialization> {
 	const state = input.payloadState as { readonly cells?: ReadonlyArray<{ readonly graphNodeId?: unknown }> } | undefined;
 	const view = input.payloadView as {
-		readonly events?: ReadonlyArray<{ readonly hostNodeId?: unknown; readonly eventName?: unknown; readonly syncPolicy?: unknown }>;
+		readonly events?: ReadonlyArray<{ readonly hostNodeId?: unknown; readonly eventName?: unknown; readonly symbolIds?: unknown; readonly syncPolicy?: unknown }>;
 		readonly locators?: ReadonlyArray<{ readonly hostNodeId?: unknown; readonly index?: unknown; readonly tagName?: unknown }>;
 	} | undefined;
 	const map = input.runtimeDemandMap as { readonly actions?: ReadonlyArray<any> } | undefined;
@@ -377,6 +376,8 @@ function scalarDispatcherSpecializations(input: {
 		const event = view?.events?.find((candidate) =>
 			candidate?.hostNodeId === action.hostNodeId && candidate?.eventName === action.eventName
 		);
+		const symbolId = scalarActionSymbolId(plan.symbolId, event, input.symbolRoutes ?? []);
+		if (!symbolId) return [];
 		if (cellIndex < 0 || !host || typeof host.index !== 'number') return [];
 		if (event && syncPolicyGraphNodeIds(event.syncPolicy).some((graphNodeId) => graphNodeId !== plan.cell)) return [];
 		const textUpdates = (plan.textUpdates ?? []).flatMap((update: any) => {
@@ -390,7 +391,7 @@ function scalarDispatcherSpecializations(input: {
 			name: `marklessRunScalar${index}`,
 			hostNodeId: action.hostNodeId,
 			eventName: action.eventName,
-			symbolId: plan.symbolId,
+			symbolId,
 			cell: plan.cell,
 			cellIndex,
 			hostIndex: host.index,
@@ -400,6 +401,24 @@ function scalarDispatcherSpecializations(input: {
 			textUpdates,
 		}];
 	});
+}
+
+function scalarActionSymbolId(
+	plannedSymbolId: unknown,
+	event: { readonly symbolIds?: unknown } | undefined,
+	routes: ReadonlyArray<SourceSymbolRoute>,
+): string | null {
+	if (typeof plannedSymbolId !== 'string') return null;
+	const eventSymbolIds = Array.isArray(event?.symbolIds)
+		? event.symbolIds.filter((symbolId): symbolId is string => typeof symbolId === 'string')
+		: [];
+	const routedSymbolId = eventSymbolIds.find((symbolId) =>
+		routes.some((route) => symbolId.startsWith(route.prefix))
+	);
+	if (routedSymbolId) return routedSymbolId;
+	if (eventSymbolIds.some((symbolId) => /^[^:]+:symbol:/.test(symbolId))) return null;
+	if (eventSymbolIds.length > 0 && !eventSymbolIds.includes(plannedSymbolId)) return null;
+	return plannedSymbolId;
 }
 
 function allEventActionsHaveScalarPlan(runtimeDemandMap: unknown): boolean {
@@ -460,8 +479,8 @@ function emitScalarAction(action: ScalarSpecialization, loadSymbolName: string):
 	return [
 		`async function ${action.name}(input) {`,
 		'	let syncPolicyAlreadyApplied = input.syncPolicyAlreadyApplied === true;',
+		`	const state = { value: marklessDecodeScalarCell(marklessReadScalarCell(input.root, ${action.cellIndex}), ${JSON.stringify(action.cell)}, ${JSON.stringify(`markless/state cell[${action.cellIndex}]`)}), dirty: false };`,
 		'	try {',
-		`	const state = { value: marklessDecodeScalarCell(payloadState.cells[${action.cellIndex}], ${JSON.stringify(action.cell)}, ${JSON.stringify(`markless/state cell[${action.cellIndex}]`)}), dirty: false };`,
 		`	const host = marklessFindElementAtDomOrderIndex(input.root, ${action.hostIndex});`,
 		`	if (!host || (${JSON.stringify(action.hostTagName.toLowerCase())} !== "*" && host.tagName.toLowerCase() !== ${JSON.stringify(action.hostTagName.toLowerCase())})) return marklessScalarSpecializedHostMiss(input, "host");`,
 		...action.textUpdates.map((update, index) =>

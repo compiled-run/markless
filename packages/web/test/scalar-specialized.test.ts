@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { marklessDecodeScalarCell } from '../src/fns/scalar-specialized.ts';
+import { marklessDecodeScalarCell, marklessReadScalarCell } from '../src/fns/scalar-specialized.ts';
 
 const dateCell = (value: string) => ({
 	graphNodeId: 'state:created',
@@ -17,5 +17,18 @@ test('specialized scalar payload decoder rejects invalid Date scalar slots', () 
 	expect(() => marklessDecodeScalarCell(dateCell('not-a-date'), 'state:created', 'markless/state cell[0]')).toThrow(expect.objectContaining({
 		code: 'MARKLESS_PAYLOAD_INVALID',
 		site: 'markless/state cell[0]',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_PAYLOAD_INVALID',
+	}));
+});
+
+test('specialized scalar payload decoder rejects malformed live state payload cells', () => {
+	const root = {
+		querySelector: () => ({ textContent: JSON.stringify({ version: 1, cells: 'tampered' }) }),
+	};
+
+	expect(() => marklessDecodeScalarCell(marklessReadScalarCell(root, 0), 'state:created', 'markless/state cell[0]')).toThrow(expect.objectContaining({
+		code: 'MARKLESS_PAYLOAD_INVALID',
+		site: 'markless/state cell[0]',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_PAYLOAD_INVALID',
 	}));
 });
