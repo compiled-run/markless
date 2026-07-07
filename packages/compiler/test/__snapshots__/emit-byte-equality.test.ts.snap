@@ -311,7 +311,7 @@ function marklessRenderCsr(props = {}) {
   "styleScopes": [],
   "diagnostics": []
 }",
-    "ssrModuleSource": "import { marklessSsrRunAsyncComputed, marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrHost, marklessComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+    "ssrModuleSource": "import { marklessSsrRunAsyncComputed, marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrHost, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
 import { marklessSsrText } from '@markless/web/fns/html';
 const marklessSsrPropEvents = [];
@@ -328,7 +328,7 @@ async function marklessRenderSsr(props = {}) {
 	const marklessSsrHostLocators = [];
 	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "main") + "<main>" + "<!--markless:async:boundary:0-->" + (((marklessSsrAsyncSnapshot) => marklessSsrAsyncSnapshot.status === "fulfilled" ? ((details) => marklessSsrHost(marklessSsrHostLocators, "h1", "p") + "<p>" + marklessSsrText(details.title) + "</p>")(marklessSsrAsyncSnapshot.value) : ((marklessSsrAsyncError) => marklessSsrHost(marklessSsrHostLocators, "h2", "p") + "<p>" + "Broken" + "</p>")(marklessSsrAsyncSnapshot.error))(await marklessSsrRunAsyncComputed(marklessSsrAsyncSnapshots, "computed:details", async () => ({ title: query })))) + "<!--/markless:async:boundary:0-->" + "</main>";
 	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren);
-	const marklessSsrState = marklessComposeState(marklessSsrPayloadState, marklessSsrChildren);
+	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
 		state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots),
@@ -632,7 +632,7 @@ function marklessRenderCsr(props = {}) {
   "styleScopes": [],
   "diagnostics": []
 }",
-    "ssrModuleSource": "import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrHost, marklessComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+    "ssrModuleSource": "import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrHost, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
 import { marklessSsrText } from '@markless/web/fns/html';
 const install = (label) => (host) => { host.dataset.label = label; };
@@ -650,7 +650,7 @@ async function marklessRenderSsr(props = {}) {
 	const marklessSsrHostLocators = [];
 	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "section") + "<section>" + marklessSsrText(label) + "</section>";
 	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren);
-	const marklessSsrState = marklessComposeState(marklessSsrPayloadState, marklessSsrChildren);
+	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
 		state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots),
@@ -1037,7 +1037,7 @@ function marklessRenderCsr(props = {}) {
   "styleScopes": [],
   "diagnostics": []
 }",
-    "ssrModuleSource": "import { marklessSsrBranchArm, marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrArmHost, marklessSsrHost, marklessComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+    "ssrModuleSource": "import { marklessSsrBranchArm, marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrArmHost, marklessSsrHost, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
 const marklessSsrPropEvents = [];
 const marklessSsrStateValues = new Map([
@@ -1053,7 +1053,7 @@ async function marklessRenderSsr(props = {}) {
 	const marklessSsrHostLocators = [];
 	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "section") + "<section>" + "<!--markless:branch:branch-site:0-->" + ((open) ? marklessSsrBranchArm(marklessSsrBranches, "branch-site:0", 0) + marklessSsrArmHost(marklessSsrHostLocators) + "<p>" + "Shown" + "</p>" : marklessSsrBranchArm(marklessSsrBranches, "branch-site:0", 1) + marklessSsrArmHost(marklessSsrHostLocators) + "<p>" + "Hidden" + "</p>") + "<!--/markless:branch:branch-site:0-->" + "</section>";
 	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren);
-	const marklessSsrState = marklessComposeState(marklessSsrPayloadState, marklessSsrChildren);
+	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
 		state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots),
@@ -1285,7 +1285,7 @@ function createUnknownSymbolError(id) {
   "styleScopes": [],
   "diagnostics": []
 }",
-    "ssrModuleSource": "import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrHost, marklessComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+    "ssrModuleSource": "import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrHost, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
 import { marklessSsrText } from '@markless/web/fns/html';
 const marklessSsrPropEvents = [];
@@ -1302,7 +1302,7 @@ async function marklessRenderSsr(props = {}) {
 	const marklessSsrHostLocators = [];
 	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "button") + "<button>" + marklessSsrText(count) + "</button>";
 	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren);
-	const marklessSsrState = marklessComposeState(marklessSsrPayloadState, marklessSsrChildren);
+	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
 		state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots),
@@ -1569,7 +1569,7 @@ function marklessRenderCsr(props = {}) {
   "styleScopes": [],
   "diagnostics": []
 }",
-    "ssrModuleSource": "import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrHost, marklessComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+    "ssrModuleSource": "import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrHost, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
 import { marklessCloneState } from '@markless/web/fns/state';
 import { marklessSsrText } from '@markless/web/fns/html';
 function createCount() { const count = state(5); return count; }
@@ -1587,7 +1587,7 @@ async function marklessRenderSsr(props = {}) {
 	const marklessSsrHostLocators = [];
 	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "button") + "<button>" + marklessSsrText(count) + "</button>";
 	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren);
-	const marklessSsrState = marklessComposeState(marklessSsrPayloadState, marklessSsrChildren);
+	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
 		state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots),
@@ -1803,7 +1803,7 @@ function marklessRenderCsr(props = {}) {
   "diagnostics": []
 }",
     "ssrModuleSource": "import __marklessSsrComponent0 from "./ImportedChild.tsrx";
-import { marklessSsrRenderChild, marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrHost, marklessComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+import { marklessSsrRenderChild, marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrHost, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
 const marklessSsrPropEvents = [];
 const marklessSsrStateValues = new Map([
@@ -1819,7 +1819,7 @@ async function marklessRenderSsr(props = {}) {
 	const marklessSsrHostLocators = [];
 	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "main") + "<main>" + (await marklessSsrRenderChild(marklessSsrChildren, __marklessSsrComponent0, { active: active }, { hostPrefix: "c0:", symbolPrefix: "c0:", localIndex: marklessSsrHostLocators.length, graphProps: [{"name":"active","graphNodeId":"state:active","path":[]}] })) + "</main>";
 	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren);
-	const marklessSsrState = marklessComposeState(marklessSsrPayloadState, marklessSsrChildren);
+	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
 		state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots),
@@ -2190,7 +2190,7 @@ function marklessRenderCsr(props = {}) {
   "styleScopes": [],
   "diagnostics": []
 }",
-    "ssrModuleSource": "import { marklessSsrBranchArm, marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrArmHost, marklessSsrHost, marklessComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+    "ssrModuleSource": "import { marklessSsrBranchArm, marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrArmHost, marklessSsrHost, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
 import { marklessCloneState } from '@markless/web/fns/state';
 const marklessSsrPropEvents = [];
 const marklessSsrStateValues = new Map([
@@ -2205,7 +2205,7 @@ async function marklessRenderSsr(props = {}) {
 	const marklessSsrHostLocators = [];
 	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "span") + "<span>" + "<!--markless:branch:branch-site:0-->" + ((active) ? marklessSsrBranchArm(marklessSsrBranches, "branch-site:0", 0) + marklessSsrArmHost(marklessSsrHostLocators) + "<em>" + "Live" + "</em>" : marklessSsrBranchArm(marklessSsrBranches, "branch-site:0", 1) + marklessSsrArmHost(marklessSsrHostLocators) + "<em>" + "Idle" + "</em>") + "<!--/markless:branch:branch-site:0-->" + "</span>";
 	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren);
-	const marklessSsrState = marklessComposeState(marklessSsrPayloadState, marklessSsrChildren);
+	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
 		state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots),
@@ -2643,7 +2643,7 @@ function createUnknownSymbolError(id) {
   "styleScopes": [],
   "diagnostics": []
 }",
-    "ssrModuleSource": "import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrHost, marklessComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+    "ssrModuleSource": "import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrHost, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
 import { marklessSsrText, marklessSsrAttribute } from '@markless/web/fns/html';
 import { marklessSsrRepeatRows } from '@markless/web/fns/repeats';
@@ -2663,7 +2663,7 @@ async function marklessRenderSsr(props = {}) {
 	const marklessSsrHostLocators = [];
 	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "main") + "<main>" + marklessSsrHost(marklessSsrHostLocators, "h1", "section") + "<section>" + marklessSsrRepeatRows(marklessSsrHostLocators, entries, entry => entry.code, "repeat:0", "entry", ["code"], (entry) => "<article" + marklessSsrAttribute("class", chosen === entry.code ? 'picked' : 'plain') + ">" + "<h2>" + marklessSsrText(entry.title) + "</h2>" + "<button>" + "Choose" + "</button>" + "</article>", 3, null) + "</section>" + "</main>";
 	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren);
-	const marklessSsrState = marklessComposeState(marklessSsrPayloadState, marklessSsrChildren);
+	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
 		state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots),
@@ -2840,7 +2840,7 @@ function marklessRenderCsr(props = {}) {
   "styleScopes": [],
   "diagnostics": []
 }",
-    "ssrModuleSource": "import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrHost, marklessComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+    "ssrModuleSource": "import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrHost, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
 import { marklessCloneState } from '@markless/web/fns/state';
 import { marklessSsrText, marklessSsrAttribute } from '@markless/web/fns/html';
 const labels = { title: 'Hello', mode: 'compact' };
@@ -2856,7 +2856,7 @@ async function marklessRenderSsr(props = {}) {
 	const marklessSsrHostLocators = [];
 	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "section") + "<section" + marklessSsrAttribute("data-mode", labels.mode) + ">" + marklessSsrText(labels.title) + "</section>";
 	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren);
-	const marklessSsrState = marklessComposeState(marklessSsrPayloadState, marklessSsrChildren);
+	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
 		state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots),
@@ -3109,7 +3109,7 @@ function marklessRenderCsr(props = {}) {
   "styleScopes": [],
   "diagnostics": []
 }",
-    "ssrModuleSource": "import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrHost, marklessComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+    "ssrModuleSource": "import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrHost, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
 import { marklessSsrText, marklessSsrReadPublicPath } from '@markless/web/fns/html';
 import { marklessSsrRepeatRows } from '@markless/web/fns/repeats';
@@ -3127,7 +3127,7 @@ async function marklessRenderSsr(props = {}) {
 	const marklessSsrHostLocators = [];
 	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "ol") + "<ol>" + marklessSsrRepeatRows(marklessSsrHostLocators, records, record => marklessSsrReadPublicPath(record, []), "repeat:0", "record", [], (record, slot) => "<li>" + marklessSsrText(record.label) + "</li>", 1, null) + "</ol>";
 	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren);
-	const marklessSsrState = marklessComposeState(marklessSsrPayloadState, marklessSsrChildren);
+	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
 		state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots),
@@ -3431,7 +3431,7 @@ function marklessRenderCsr(props = {}) {
   "styleScopes": [],
   "diagnostics": []
 }",
-    "ssrModuleSource": "import { marklessSsrRenderChild, marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrHost, marklessSsrCallbacks, marklessSsrCallbackSymbol, marklessComposeState, marklessViewWithoutAnchors, marklessSsrComposeView } from '@markless/web/fns/ssr';
+    "ssrModuleSource": "import { marklessSsrRenderChild, marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrHost, marklessSsrCallbacks, marklessSsrCallbackSymbol, marklessComposeState as marklessSsrComposeState, marklessViewWithoutAnchors, marklessSsrComposeView } from '@markless/web/fns/ssr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
 const __marklessSsrComponent0 = { renderSsr: marklessRenderSsrBadge };
 async function marklessRenderSsrBadge(props = {}) {
@@ -3444,7 +3444,7 @@ async function marklessRenderSsrBadge(props = {}) {
 	const marklessSsrHostLocators = [];
 	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "span") + "<span>" + ((active) ? marklessSsrHost(marklessSsrHostLocators, "h1", "em") + "<em>" + "Live" + "</em>" : marklessSsrHost(marklessSsrHostLocators, "h2", "em") + "<em>" + "Idle" + "</em>") + "</span>";
 	const marklessSsrComposition = marklessSsrComposeView(html, marklessViewWithoutAnchors(payloadView), marklessSsrHostLocators, marklessSsrChildren);
-	const marklessSsrState = marklessComposeState(marklessSsrPayloadState, marklessSsrChildren);
+	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return { html, state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots), view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) }, elementCount: marklessSsrComposition.elementCount, propEvents: [], externalSymbolIds: marklessSsrComposition.externalSymbolIds };
 }
 const marklessSsrPropEvents = [];
@@ -3461,7 +3461,7 @@ async function marklessRenderSsr(props = {}) {
 	const marklessSsrHostLocators = [];
 	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "main") + "<main>" + (await marklessSsrRenderChild(marklessSsrChildren, __marklessSsrComponent0, { active: active, __marklessSsrCallbacks: marklessSsrCallbacks({ "active": marklessSsrCallbackSymbol(props, ["active"]) }) }, { hostPrefix: "c0:", symbolPrefix: "c0:", localIndex: marklessSsrHostLocators.length, graphProps: [{"name":"active","graphNodeId":"prop:props","path":["active"]}] })) + "</main>";
 	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren);
-	const marklessSsrState = marklessComposeState(marklessSsrPayloadState, marklessSsrChildren);
+	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
 		state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots),
@@ -3646,7 +3646,7 @@ function marklessRenderCsr(props = {}) {
   "styleScopes": [],
   "diagnostics": []
 }",
-    "ssrModuleSource": "import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrHost, marklessComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+    "ssrModuleSource": "import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrHost, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
 import { marklessCloneState } from '@markless/web/fns/state';
 import { marklessSsrSpreadAttributes } from '@markless/web/fns/html';
 const marklessSsrPropEvents = [];
@@ -3662,7 +3662,7 @@ async function marklessRenderSsr(props = {}) {
 	const marklessSsrHostLocators = [];
 	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "section") + "<section" + marklessSsrSpreadAttributes({ ...(meta), title: "Final" }, null) + ">" + "Hi" + "</section>";
 	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren);
-	const marklessSsrState = marklessComposeState(marklessSsrPayloadState, marklessSsrChildren);
+	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
 		state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots),
@@ -3926,7 +3926,7 @@ function marklessRenderCsr(props = {}) {
   "styleScopes": [],
   "diagnostics": []
 }",
-    "ssrModuleSource": "import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrHost, marklessComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+    "ssrModuleSource": "import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrHost, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
 import { marklessSsrText } from '@markless/web/fns/html';
 const marklessSsrPropEvents = [];
@@ -3943,7 +3943,7 @@ async function marklessRenderSsr(props = {}) {
 	const marklessSsrHostLocators = [];
 	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "button") + "<button>" + marklessSsrText(count) + "</button>";
 	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren);
-	const marklessSsrState = marklessComposeState(marklessSsrPayloadState, marklessSsrChildren);
+	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
 		state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots),
@@ -4204,7 +4204,7 @@ function marklessRenderCsr(props = {}) {
   "styleScopes": [],
   "diagnostics": []
 }",
-    "ssrModuleSource": "import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrHost, marklessComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+    "ssrModuleSource": "import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrHost, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
 import { marklessSsrText } from '@markless/web/fns/html';
 const marklessSsrPropEvents = [];
@@ -4222,7 +4222,7 @@ async function marklessRenderSsr(props = {}) {
 	const marklessSsrHostLocators = [];
 	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "output") + "<output>" + marklessSsrText(doubled) + "</output>";
 	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren);
-	const marklessSsrState = marklessComposeState(marklessSsrPayloadState, marklessSsrChildren);
+	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
 		state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots),

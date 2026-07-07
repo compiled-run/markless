@@ -128,7 +128,7 @@ export function emitSameModuleSsrComponents(
 				`const html = ${emitHtmlNode(rootInfo.root, renderContext)};`,
 			]),
 			'	const marklessSsrComposition = marklessSsrComposeView(html, marklessViewWithoutAnchors(payloadView), marklessSsrHostLocators, marklessSsrChildren);',
-			'	const marklessSsrState = marklessComposeState(marklessSsrPayloadState, marklessSsrChildren);',
+			'	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);',
 			'	return { html, state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots), view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) }, elementCount: marklessSsrComposition.elementCount, propEvents: [], externalSymbolIds: marklessSsrComposition.externalSymbolIds };',
 			'}',
 		].filter((line): line is string => line !== null);

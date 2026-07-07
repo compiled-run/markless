@@ -81,7 +81,10 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 	const marklessPlugin = {
 		...basePlugin,
 		name: 'vite-plugin-markless',
-		enforce: 'post',
+		// 'pre': TSRX must compile before Vite builtins parse module code (vite
+		// >=8.1 runs builtin:vite-dynamic-import-vars against raw .tsrx otherwise;
+		// found by the dashboard app on vite-plus 8.1.3).
+		enforce: 'pre',
 		sharedDuringBuild: true,
 		api: {
 			...basePlugin.api,

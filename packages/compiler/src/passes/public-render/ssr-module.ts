@@ -71,7 +71,7 @@ export function emitPublicSsrRenderModule(
 			`const html = ${htmlExpression};`,
 		]),
 		'	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren);',
-		'	const marklessSsrState = marklessComposeState(marklessSsrPayloadState, marklessSsrChildren);',
+		'	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);',
 		'	return {',
 		'		html,',
 		'		state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots),',
@@ -106,7 +106,9 @@ export function emitPublicSsrRenderModule(
 					'marklessSsrHost',
 					'marklessSsrCallbacks',
 					'marklessSsrCallbackSymbol',
-					'marklessComposeState',
+					// Aliased: the CSR module in the same emitted file imports the same
+					// helper name from fns/csr; duplicate import bindings are a JS error.
+					'marklessComposeState as marklessSsrComposeState',
 					'marklessViewWithoutAnchors',
 					'marklessSsrComposeView',
 					'marklessSsrPrefixAnchorHtml',

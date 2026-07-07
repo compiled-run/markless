@@ -21,6 +21,20 @@ import {
 	symbolVirtualModuleId,
 } from './source-module.ts';
 import { injectExecutionLogModuleHook } from './execution-log.ts';
+import { transformSync as oxcTransformSync } from 'rolldown/experimental';
+
+// Authored TS (param annotations, assertions, type aliases) survives compilation
+// into emitted module code, but downstream consumers (Vite builtins, symbol
+// virtual modules) parse it as JS. Strip types at emission — Rolldown-native.
+function stripEmittedTypes(code: string): string {
+	try {
+		return oxcTransformSync('markless-emitted.ts', code).code;
+	} catch {
+		// Never make emission fail on the stripper; downstream diagnostics are
+		// more specific about genuinely-invalid code.
+		return code;
+	}
+}
 
 export { MARKLESS_VIRTUAL_PREFIX, resumeVirtualModuleId } from './source-module.ts';
 
@@ -107,10 +121,12 @@ export async function transformTsrxModule(
 				symbolId: module.symbolId,
 				exportName: symbolRows[index]!.exportName,
 				source: injectExecutionLogModuleHook(
-					rewriteSymbolModuleExport(
-						module.source,
-						module.exportName,
-						symbolRows[index]!.exportName,
+					stripEmittedTypes(
+						rewriteSymbolModuleExport(
+							module.source,
+							module.exportName,
+							symbolRows[index]!.exportName,
+						),
 					),
 					`symbol:${module.symbolId}`,
 					executionLogModuleHookMode,
@@ -123,7 +139,7 @@ export async function transformTsrxModule(
 	return {
 		code:
 				styleImport +
-				emitSourceModule({
+				stripEmittedTypes(emitSourceModule({
 					filename: input.filename,
 					payloadId,
 					resolverId,
@@ -142,7 +158,7 @@ export async function transformTsrxModule(
 					publicRenderSsrExportName: compiled.publicRenderModule.ssrExportName,
 					symbols: symbolRows,
 					symbolRoutes,
-			}),
+			})),
 		map: null,
 		virtualModules,
 		manifest,
