@@ -1,3 +1,4 @@
+import { buildRouteManifestFromFileIds } from '../src/route-manifest.ts';
 import { describe, expect, it } from 'vite-plus/test';
 import {
 	__marklessRouterStartSpaNavigation,
@@ -678,3 +679,57 @@ function deferred<T>() {
 	});
 	return { promise, resolve };
 }
+
+describe('hash mode', () => {
+	it('intercepts hashChange navigation to a matching hash route and renders it', async () => {
+		const document = new EventTarget() as Document;
+		let update: CustomEvent['detail'];
+		document.addEventListener(MARKLESS_ROUTER_ROUTE_EVENT, (event) => {
+			update = (event as CustomEvent).detail;
+		});
+		const context = {
+			mode: 'hash',
+			documentModuleLoader: async () => ({ default: component('document') }),
+			manifest: buildRouteManifestFromFileIds(['pages/index.tsrx', 'pages/r/[repo]/issues.tsrx']),
+			pageModuleLoaders: {
+				'pages/r/[repo]/issues.tsrx': async () => ({ default: component('issues') }),
+			},
+			window: {
+				document,
+				location: { href: 'http://marklessrouter.test/#/' },
+			},
+		};
+		const event = navigateEvent('http://marklessrouter.test/#/r/alpha/issues', {
+			hashChange: true,
+			info: { __marklessRouterLink: true },
+		});
+
+		expect(handleNavigateEvent(event, context as never)).toBe(true);
+		await event.intercepted?.handler();
+		expect(update?.route).toMatchObject({ file: 'pages/r/[repo]/issues.tsrx', params: { repo: 'alpha' } });
+	});
+
+	it('does not intercept hashChange to a non-matching hash', () => {
+		const context = {
+			mode: 'hash',
+			documentModuleLoader: async () => ({}),
+			manifest: buildRouteManifestFromFileIds(['pages/index.tsrx']),
+			pageModuleLoaders: {},
+			window: { document: new EventTarget(), location: { href: 'http://marklessrouter.test/#/' } },
+		};
+		const event = navigateEvent('http://marklessrouter.test/#/nowhere', {
+			hashChange: true,
+			info: { __marklessRouterLink: true },
+		});
+		expect(handleNavigateEvent(event, context as never)).toBe(false);
+	});
+
+	it('path mode default: hashChange stays not intercepted', () => {
+		const context = aboutRouteContext();
+		const event = navigateEvent('http://marklessrouter.test/about#anchor', {
+			hashChange: true,
+			info: { __marklessRouterLink: true },
+		});
+		expect(handleNavigateEvent(event, context as never)).toBe(false);
+	});
+});

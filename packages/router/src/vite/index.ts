@@ -36,8 +36,9 @@ const ROUTE_PRELOADS_ID = 'virtual:markless-router/route-preloads';
 const ROUTE_PRELOADS_PLACEHOLDER = '__MARKLESS_ROUTER_ROUTE_PRELOADS__';
 const SERVER_ENTRY_ID = 'virtual:markless-router/server-entry';
 const ROUTE_HREF_ID = 'virtual:markless-router/route-href';
+const ROUTER_OPTIONS_ID = 'virtual:markless-router/options';
 const PUBLIC_VIRTUAL_MODULE_ID_RE =
-	/^virtual:markless-router\/(?:routes|client-entry|resume-entry|resume-entry-path|navigation-entry|navigation-entry-path|route-preloads|server-entry|route-href)(?:\?.*)?$/;
+	/^virtual:markless-router\/(?:routes|client-entry|resume-entry|resume-entry-path|navigation-entry|navigation-entry-path|route-preloads|server-entry|route-href|options)(?:\?.*)?$/;
 const VITE_PLUGIN_FILE = decodePath(parseURL(import.meta.url).pathname);
 const VIRTUAL_ENTRY_DIR = VITE_PLUGIN_FILE.endsWith('.ts')
 	? join(dirname(VITE_PLUGIN_FILE), 'entries')
@@ -59,6 +60,9 @@ const virtualEntryFiles = {
 } as const;
 
 export interface MarklessRouterOptions {
+	// 'hash' routes by location.hash paths (#/r/x -> route /r/x) for apps whose
+	// URLs live in the fragment; 'path' (default) routes by pathname.
+	mode?: 'path' | 'hash';
 	nitro?: boolean;
 }
 
@@ -70,7 +74,7 @@ export function router(options: MarklessRouterOptions = {}): PluginOption[] {
 			routeTypegenPlugin(),
 			anchorTransformPlugin(),
 			htmlTransformPlugin(),
-			virtualModulesPlugin(),
+			virtualModulesPlugin(undefined, undefined, undefined, options.mode ?? 'path'),
 		];
 	}
 
@@ -86,7 +90,7 @@ export function router(options: MarklessRouterOptions = {}): PluginOption[] {
 		routeTypegenPlugin(),
 		anchorTransformPlugin(),
 		htmlTransformPlugin(),
-		virtualModulesPlugin(resumeEntry, navigationEntry, routePreloads),
+		virtualModulesPlugin(resumeEntry, navigationEntry, routePreloads, options.mode ?? 'path'),
 		nitroPlugins,
 	];
 }
@@ -413,6 +417,7 @@ function virtualModulesPlugin(
 	resumeEntry: ResumeEntryState = resumeEntryState(),
 	navigationEntry: ResumeEntryState = resumeEntryState(),
 	routePreloads: RoutePreloadState = routePreloadState(),
+	routerMode: 'path' | 'hash' = 'path',
 ): Plugin {
 	let root = '';
 
@@ -431,7 +436,8 @@ function virtualModulesPlugin(
 					baseId === SERVER_ENTRY_ID ||
 					baseId === RESUME_ENTRY_PATH_ID ||
 					baseId === NAVIGATION_ENTRY_PATH_ID ||
-					baseId === ROUTE_PRELOADS_ID
+					baseId === ROUTE_PRELOADS_ID ||
+					baseId === ROUTER_OPTIONS_ID
 				) {
 					return `\0${baseId}${rootScopeQuery(root, id)}`;
 				}
@@ -460,6 +466,9 @@ function virtualModulesPlugin(
 			}
 			if (id.startsWith(`\0${ROUTE_PRELOADS_ID}`)) {
 				return routePreloadsSource(routePreloads);
+			}
+			if (id.startsWith(`\0${ROUTER_OPTIONS_ID}`)) {
+				return `export const routerMode = ${JSON.stringify(routerMode)};`;
 			}
 		},
 	};

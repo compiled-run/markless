@@ -34,6 +34,7 @@ export interface MarklessRouterNavigationPolyfillModule {
 export interface StartSpaNavigationOptions {
 	readonly documentModuleLoader?: () => Promise<unknown>;
 	readonly loadPolyfill?: () => Promise<MarklessRouterNavigationPolyfillModule>;
+	readonly mode?: 'path' | 'hash';
 	readonly pageModuleLoaders: Record<string, () => Promise<unknown>>;
 	readonly preloadRouteModule?: (file: string) => unknown;
 	readonly routeFileIds: readonly string[];
@@ -43,9 +44,20 @@ export interface StartSpaNavigationOptions {
 interface NavigationContext {
 	readonly documentModuleLoader?: () => Promise<unknown>;
 	readonly manifest: RouteManifest;
+	// 'hash' routes by location.hash paths (#/r/x -> /r/x) for apps whose URLs
+	// live in the fragment; 'path' (default) routes by pathname.
+	readonly mode?: 'path' | 'hash';
 	readonly pageModuleLoaders: Record<string, () => Promise<unknown>>;
 	readonly preloadRouteModule?: (file: string) => unknown;
 	readonly window: MarklessRouterNavigationWindow;
+}
+
+// The route-table path for a destination URL under the context's routing mode.
+function routePathname(url: URL, context: NavigationContext): string {
+	if (context.mode !== 'hash') return url.pathname;
+	const hash = url.hash.startsWith('#') ? url.hash.slice(1) : url.hash;
+	if (hash === '') return '/';
+	return hash.startsWith('/') ? hash : `/${hash}`;
 }
 
 export async function __marklessRouterStartSpaNavigation(options: StartSpaNavigationOptions) {
@@ -59,6 +71,7 @@ export async function __marklessRouterStartSpaNavigation(options: StartSpaNaviga
 	const context: NavigationContext = {
 		documentModuleLoader: options.documentModuleLoader,
 		manifest: buildRouteManifestFromFileIds(options.routeFileIds),
+		mode: options.mode,
 		pageModuleLoaders: options.pageModuleLoaders,
 		preloadRouteModule: options.preloadRouteModule,
 		window: runtimeWindow,
@@ -73,6 +86,19 @@ export async function __marklessRouterStartSpaNavigation(options: StartSpaNaviga
 	navigation.addEventListener('navigate', (event) => {
 		handleNavigateEvent(event, context);
 	});
+
+	// Hash apps land on /#/some/route while the server rendered the root shell:
+	// swap to the hash's route on boot so deep links work.
+	if (context.mode === 'hash') {
+		const bootUrl = parseSameOriginUrl(
+			runtimeWindow.location.href,
+			runtimeWindow.location.href,
+		);
+		const bootPath = bootUrl ? routePathname(bootUrl, context) : '/';
+		if (bootUrl && bootPath !== '/' && matchRouteManifest(bootPath, context.manifest)) {
+			void renderRoute(bootUrl, context);
+		}
+	}
 }
 
 export async function ensureNavigationRuntime(
@@ -105,12 +131,12 @@ export function handleNavigateEvent(event: NavigateEvent, context: NavigationCon
 	return true;
 }
 
-async function renderRoute(url: URL, context: NavigationContext, signal: AbortSignal) {
-	if (signal.aborted) {
+async function renderRoute(url: URL, context: NavigationContext, signal?: AbortSignal) {
+	if (signal?.aborted) {
 		return;
 	}
 
-	const match = matchRouteManifest(url.pathname, context.manifest);
+	const match = matchRouteManifest(routePathname(url, context), context.manifest);
 	const loadPageModule = match && context.pageModuleLoaders[match.route.file];
 	if (!match || !loadPageModule) {
 		context.window.location.assign(url.href);
@@ -122,7 +148,7 @@ async function renderRoute(url: URL, context: NavigationContext, signal: AbortSi
 		loadPageModule(),
 		context.documentModuleLoader?.(),
 	]);
-	if (signal.aborted) {
+	if (signal?.aborted) {
 		return;
 	}
 
@@ -160,7 +186,7 @@ function handleLinkClick(
 	}
 
 	const url = parseSameOriginUrl(anchor.href, context.window.location.href);
-	const match = url && matchRouteManifest(url.pathname, context.manifest);
+	const match = url && matchRouteManifest(routePathname(url, context), context.manifest);
 	if (!match) {
 		return;
 	}
@@ -189,7 +215,7 @@ function routeUrl(event: NavigateEvent, context: NavigationContext) {
 		!isMarklessRouterNavigation(event) ||
 		event.canIntercept === false ||
 		event.navigationType === 'reload' ||
-		event.hashChange ||
+		(event.hashChange && context.mode !== 'hash') ||
 		event.downloadRequest != null ||
 		event.formData != null
 	) {
@@ -197,7 +223,7 @@ function routeUrl(event: NavigateEvent, context: NavigationContext) {
 	}
 
 	const url = parseSameOriginUrl(event.destination.url, context.window.location.href);
-	return url && matchRouteManifest(url.pathname, context.manifest) ? url : undefined;
+	return url && matchRouteManifest(routePathname(url, context), context.manifest) ? url : undefined;
 }
 
 function isMarklessRouterNavigation(event: NavigateEvent) {
