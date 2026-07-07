@@ -9,8 +9,10 @@ export function enrichRuntimeErrorForReporting(error: unknown, context: ResumeRu
 	reportable.severity ??= 'error';
 	reportable.phase ??= 'runtime';
 	reportable.docsUrl ??= `https://markless.dev/errors/${code}`;
-	reportable.hostNodeId ??= context.hostNodeId;
-	reportable.eventName ??= context.eventName;
+	if ('hostNodeId' in context) reportable.hostNodeId ??= context.hostNodeId;
+	if ('eventName' in context) reportable.eventName ??= context.eventName;
+	const branchId = (context as { readonly branchId?: unknown }).branchId;
+	if (typeof branchId === 'string') reportable.branchId ??= branchId;
 	const graphNodeId = (context as { readonly graphNodeId?: unknown }).graphNodeId;
 	if (typeof graphNodeId === 'string') reportable.graphNodeId ??= graphNodeId;
 	if (context.symbolId) reportable.symbolId ??= context.symbolId;

@@ -539,12 +539,21 @@ test('render flips a composed child CSR branch from a callback-prop dispatch', a
 			loadSymbol(symbolId: string) {
 				loadedSymbols.push(symbolId);
 				if (symbolId === 'c0:symbol:child-noop') return () => undefined;
-				return () => ({ arm: 0, html: '<span>❚❚</span>' });
+				return (context: { readonly branchId?: string; readonly composedBranchId?: string }) => {
+					expect(context).toMatchObject({
+						branchId: 'branch-site:icon',
+						composedBranchId: 'c0:branch-site:icon',
+					});
+					return {
+						arm: 0,
+						html: context.branchId === 'branch-site:icon' ? '<span>❚❚</span>' : '',
+					};
+				};
 			},
 		}),
 		{
 			target,
-			renderBranchHtml: () => [pauseIcon as never],
+			renderBranchHtml: (html) => (html ? [pauseIcon as never] : []),
 		},
 	);
 
