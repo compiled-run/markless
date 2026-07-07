@@ -114,6 +114,10 @@ export type BranchSiteNode = {
 	readonly nested: boolean;
 	containsNested: boolean;
 	readonly conditional: boolean;
+	// Inside an @try/@pending/@catch arm: the arm re-renders on every async
+	// settle, so the branch renders as a plain re-evaluated ternary (no flip
+	// wiring) — dashboard-migration need 8.
+	readonly insideTryArm?: boolean;
 };
 
 // Branch sites gate like async boundaries: reactive flipping needs anchors
@@ -123,25 +127,30 @@ export function collectBranchSiteNodes(root: AnyNode): BranchSiteNode[] {
 	const found: BranchSiteNode[] = [];
 	const branchStack: BranchSiteNode[] = [];
 
-	const visit = (node: AnyNode, conditional: boolean): void => {
+	const visit = (node: AnyNode, conditional: boolean, insideTryArm = false): void => {
 		if (node.type === 'JSXIfExpression' || node.type === 'JSXSwitchExpression') {
 			const entry: BranchSiteNode = {
 				node,
 				nested: branchStack.length > 0,
 				containsNested: false,
 				conditional,
+				insideTryArm,
 			};
 			for (const outer of branchStack) outer.containsNested = true;
 			found.push(entry);
 			branchStack.push(entry);
-			for (const child of childNodes(node)) visit(child, conditional);
+			for (const child of childNodes(node)) visit(child, conditional, insideTryArm);
 			branchStack.pop();
 			return;
 		}
 		const entersControlFlow =
 			node.type === 'JSXForExpression' || node.type === 'JSXTryExpression';
 		for (const child of childNodes(node)) {
-			visit(child, conditional || entersControlFlow);
+			visit(
+				child,
+				conditional || entersControlFlow,
+				insideTryArm || node.type === 'JSXTryExpression',
+			);
 		}
 	};
 

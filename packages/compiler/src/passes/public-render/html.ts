@@ -50,7 +50,7 @@ export function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string 
 				? context.branchReactivityGates?.find((item) => item.branchSiteId === csrSite.id)
 				: undefined;
 			const ternary = `(${testSource} ? ${emitHtmlBranch(node.consequent as AnyNode | undefined, context)} : ${emitHtmlBranch(node.alternate as AnyNode | undefined, context)})`;
-			if (csrSite && csrGate?.supported) {
+			if (csrSite && csrGate?.supported && csrGate.armScoped !== true) {
 				// The CSR-built DOM carries the same anchors, so the same resume
 				// runtime flips the range on the live graph (arm seeds from reads).
 				return joinSsrExpressions([
@@ -99,7 +99,7 @@ export function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string 
 		context.nextAsyncBoundaryIndex = alternateContext.nextAsyncBoundaryIndex;
 		context.nextBranchSiteIndex = alternateContext.nextBranchSiteIndex;
 
-		if (site && gate?.supported) {
+		if (site && gate?.supported && gate.armScoped !== true) {
 			// Anchors always materialize; only the taken arm renders between them.
 			return joinSsrExpressions([
 				JSON.stringify(`<!--markless:branch:${site.id}-->`),

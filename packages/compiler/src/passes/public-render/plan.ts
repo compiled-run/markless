@@ -167,6 +167,13 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 				};
 			}
 			if (found.conditional) {
+				// @if inside an async boundary arm renders as a plain ternary that
+				// re-evaluates whenever the arm re-renders (async settle). No flip
+				// wiring exists or is needed — mark it armScoped so validation and
+				// eligibility treat the page as fully renderable (need 8).
+				if (found.insideTryArm) {
+					return { branchSiteId: site.id, supported: true, armScoped: true };
+				}
 				return {
 					branchSiteId: site.id,
 					supported: false,
@@ -193,7 +200,8 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 	const branchArmsPlans = input.semanticGraph.branchSites.flatMap((site, index) => {
 		const gate = branchReactivityGates[index];
 		const found = branchNodes[index];
-		if (!gate?.supported || !found) return [];
+		// armScoped branches have no anchors/flip wiring: no arm plans.
+		if (!gate?.supported || gate.armScoped === true || !found) return [];
 		const testResolved = resolveGraphPath(site.testSource, bindings, aliases);
 		const arms = branchArms(found.node).map((arm) =>
 			buildBranchArmParts(

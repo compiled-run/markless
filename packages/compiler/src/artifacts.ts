@@ -181,6 +181,9 @@ export type SemanticBranchSite = {
 	readonly armCount: number;
 	readonly testSource: string;
 	readonly anchorOrder: number;
+	// Inside an @try arm: renders as a re-evaluated ternary with no anchors
+	// (need 8) — excluded from the comment-anchor stream and flip records.
+	readonly asyncBoundaryId?: string;
 };
 
 export type SemanticSyncPolicyCondition =
@@ -935,6 +938,9 @@ export type PublicRenderPlanBranchGate =
 	| {
 			readonly branchSiteId: string;
 			readonly supported: true;
+			// In an async arm: renders as a re-evaluated ternary on arm settle;
+			// no flip wiring or anchors (need 8).
+			readonly armScoped?: true;
 	  }
 	| {
 			readonly branchSiteId: string;

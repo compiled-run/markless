@@ -113,7 +113,12 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 	// Unified comment-anchor stream: branch sites and async boundaries share
 	// one document-order allocator (rank derives from collection anchorOrder).
 	const anchorRank = new Map(
-		[...input.semanticGraph.branchSites, ...input.semanticGraph.asyncBoundaries]
+		[
+			// Arm-scoped branch sites render as anchor-less ternaries (need 8);
+			// they must not consume comment-anchor ranks.
+			...input.semanticGraph.branchSites.filter((site) => !site.asyncBoundaryId),
+			...input.semanticGraph.asyncBoundaries,
+		]
 			.sort((left, right) => left.anchorOrder - right.anchorOrder)
 			.map((record, rank) => [record.id, rank] as const),
 	);

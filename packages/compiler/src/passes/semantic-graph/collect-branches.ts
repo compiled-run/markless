@@ -21,6 +21,7 @@ export function collectBranchSite(node: AnyNode, state: WalkState): void {
 			armCount: (node.consequent ? 1 : 0) + (node.alternate ? 1 : 0),
 			testSource: test ? expressionSource(test, state.source) : '',
 			anchorOrder: state.nextAnchorOrder++,
+			...(state.currentAsyncBoundaryId ? { asyncBoundaryId: state.currentAsyncBoundaryId } : {}),
 		});
 		return;
 	}
@@ -38,6 +39,7 @@ export function collectBranchSite(node: AnyNode, state: WalkState): void {
 			armCount: asNodes(node.cases).length,
 			testSource: discriminant ? expressionSource(discriminant, state.source) : '',
 			anchorOrder: state.nextAnchorOrder++,
+			...(state.currentAsyncBoundaryId ? { asyncBoundaryId: state.currentAsyncBoundaryId } : {}),
 		});
 	}
 }
