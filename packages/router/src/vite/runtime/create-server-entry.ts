@@ -273,7 +273,9 @@ function withRenderedRouteMeta(html: string, pathname: string): string {
 	// than this document renders, a swap is coming — flag it before any
 	// deferred script runs so the doomed document's resume stands down
 	// (resuming while the swap rewrites the DOM misaligns locators).
-	const swapFlag = `<script>(function(){var h=location.hash;if(h&&h.indexOf('#/')===0&&h.slice(1)!==${JSON.stringify(pathname)}){window.__marklessRouterSwapPending=true;}})()</script>`;
+	// document.write preserves window: the swapped-in document must CLEAR the
+	// flag its predecessor set, or its own resume stands down too.
+	const swapFlag = `<script>(function(){var h=location.hash;if(h&&h.indexOf('#/')===0&&h.slice(1)!==${JSON.stringify(pathname)}){window.__marklessRouterSwapPending=true;}else{window.__marklessRouterSwapPending=false;}})()</script>`;
 	const headEnd = html.indexOf('</head>');
 	if (headEnd === -1) return html;
 	return `${html.slice(0, headEnd)}${meta}${swapFlag}${html.slice(headEnd)}`;
