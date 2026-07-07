@@ -14,7 +14,8 @@ export function wireBranches(input: any) {
 			const newArm = readBranchArm(input.graph, branch); if (newArm === currentArm) return;
 			const symbol = await input.loadSymbol(branch.symbolId); const update = await symbol({ graph: input.graph, arm: newArm, branchId: branch.sourceId ?? branch.id, composedBranchId: branch.id, element: input.root, getElementHandle: input.elementHandles.get });
 			if (!isResumeBranchUpdate(update)) return; currentArm = update.arm; currentArmByBranchId.set(branch.id, update.arm);
-			const fragment = input.renderBranchHtml ? input.renderBranchHtml(update.html) : update.html;
+			const html = branchHtmlToString(update.html);
+			const fragment = input.renderBranchHtml ? input.renderBranchHtml(html) : html;
 			if (branchFragmentEmpty(fragment) && !branch.declaredEmptyArms?.includes(update.arm)) throw branchArmEmptyError(branch, update.arm);
 			return [{ type: 'removeRange', locator: `branch:${branch.id}` }, { type: 'insertRange', locator: `branch:${branch.id}:start`, fragment }] as DomJournalResult;
 		} }));
@@ -50,7 +51,14 @@ function readBranchArm(graph: RuntimeGraph, branch: ResumeBranchRecord): number 
 	return value ? 0 : 1;
 }
 function isResumeBranchUpdate(value: unknown): value is ResumeBranchUpdate {
-	const update = value as { readonly arm?: unknown; readonly html?: unknown } | null; return typeof update?.arm === 'number' && typeof update?.html === 'string';
+	const update = value as { readonly arm?: unknown; readonly html?: unknown } | null; return typeof update?.arm === 'number' && isBranchHtml(update.html);
+}
+function isBranchHtml(value: unknown): value is ResumeBranchUpdate['html'] {
+	if (typeof value === 'string') return true;
+	return Array.isArray(value) && value.every((record) => typeof record === 'string' || (typeof record === 'object' && record !== null && typeof (record as { readonly text?: unknown }).text === 'string'));
+}
+function branchHtmlToString(html: ResumeBranchUpdate['html']): string {
+	return typeof html === 'string' ? html : html.map((record) => typeof record === 'string' ? record : record.text).join('');
 }
 function materializeBranchLocators(root: ResumeDomElement, branches: NonNullable<ResumeViewRecord['branches']>): ResumeBranchRecord[] {
 	const records: ResumeBranchRecord[] = [], comments = walkComments(root);

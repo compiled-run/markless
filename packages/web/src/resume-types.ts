@@ -25,7 +25,8 @@ export type ResumeKeyedRepeatRecord = NonNullable<ProtocolViewPayload['keyedRepe
 export type ResumeKeyedRepeatRowEvent = ResumeKeyedRepeatRecord['rowEvents'][number];
 export type ResumeBranchArmRecordSet = NonNullable<NonNullable<ProtocolViewPayload['branches']>[number]['armRecords']>[number];
 export type ResumeBranchRecord = { readonly id: string; readonly sourceId?: string; readonly startAnchor: ResumeDomComment; readonly endAnchor: ResumeDomComment; readonly symbolId: string; readonly testReads: NonNullable<NonNullable<ProtocolViewPayload['branches']>[number]['testReads']>; readonly armTests?: ReadonlyArray<unknown>; readonly declaredEmptyArms?: ReadonlyArray<number>; readonly armRecords?: ReadonlyArray<ResumeBranchArmRecordSet> };
-export type ResumeBranchUpdate = { readonly arm: number; readonly html: string };
+export type ResumeBranchHtml = string | ReadonlyArray<string | { readonly text: string }>;
+export type ResumeBranchUpdate = { readonly arm: number; readonly html: ResumeBranchHtml };
 export type ResumeViewRecord = Pick<ProtocolViewPayload, 'locators' | 'events' | 'domUpdates' | 'behaviors' | 'elementHandles' | 'asyncBoundaries' | 'branches' | 'keyedRepeats'>;
 export type ResumeSymbolContext = {
 	readonly graph: RuntimeGraph; readonly read?: RuntimeGraph['read']; readonly key?: unknown; readonly signal?: AbortSignal; readonly event?: ResumeDomEvent; readonly element: ResumeDomElement;

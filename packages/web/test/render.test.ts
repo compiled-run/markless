@@ -575,11 +575,11 @@ test('render flips the seventh composed child CSR branch independently', async (
 	const buttons = Array.from({ length: 6 }, () => element('BUTTON'));
 	const startAnchor = { nodeType: 8 as const, textContent: 'markless:branch:branch-site:0' } as unknown as FakeElement;
 	const shown = element('SPAN');
-	shown.textContent = 'Shown';
+	shown.textContent = '▶';
 	const endAnchor = { nodeType: 8 as const, textContent: '/markless:branch:branch-site:0' } as unknown as FakeElement;
 	buttons.push(element('BUTTON', [startAnchor, shown, endAnchor]));
 	const root = element('MAIN', buttons);
-	const state = createProtocolStatePayload({ cells: [{ graphNodeId: 'state:open', name: 'open', valueKind: 'scalar', value: true }] });
+	const state = createProtocolStatePayload({ cells: [{ graphNodeId: 'state:open', name: 'open', valueKind: 'scalar', value: false }] });
 	const childView: ProtocolViewPayload = {
 		version: ASYNC_PROTOCOL_VERSION,
 		locators: [{ hostNodeId: 'button', strategy: 'dom-order', index: 0, tagName: 'button' }],
@@ -587,16 +587,20 @@ test('render flips the seventh composed child CSR branch independently', async (
 		domUpdates: [], behaviors: [], elementHandles: [], asyncBoundaries: [],
 		branches: [{ id: 'branch-site:0', startAnchor: { strategy: 'dom-order-comment', index: 0 }, endAnchor: { strategy: 'dom-order-comment', index: 1 }, symbolId: 'symbol:branch', testReads: [{ source: 'open', graphNodeId: 'state:open', path: [] }] }],
 	};
-	const hidden = element('SPAN');
-	hidden.textContent = 'Hidden';
+	const pause = element('SPAN');
+	pause.textContent = '❚❚';
+	(pause as FakeElement & { outerHTML: string }).outerHTML = '<span class="play-icon">❚❚</span>';
+	const armMarkupRecords = [[{ text: '<span class=play-icon>❚❚</span>' }], [{ text: '▶' }]];
 	const loadedSymbols: string[] = [];
+	const renderedBranchHtml: string[] = [];
 	const childLoadSymbol = (index: number) => (symbolId: string) => {
 		loadedSymbols.push(`c${index}:${symbolId}`);
-		if (index === 6 && symbolId === 'symbol:toggle') return ({ graph }) => graph.write({ graphNodeId: 'state:open', value: false });
-		return (context: { readonly branchId?: string; readonly composedBranchId?: string }) => ({
-			arm: 1,
-			html: index === 6 && context.branchId === 'branch-site:0' && context.composedBranchId === 'c6:branch-site:0' ? '<span>Hidden</span>' : '',
-		});
+		if (index === 6 && symbolId === 'symbol:toggle') return ({ graph }) => graph.write({ graphNodeId: 'state:open', value: true });
+		return (context: { readonly arm?: number; readonly branchId?: string; readonly composedBranchId?: string }) => {
+			if (index !== 6 || context.branchId !== 'branch-site:0' || context.composedBranchId !== 'c6:branch-site:0') return { arm: context.arm ?? 0, html: '' };
+			const arm = context.arm ?? 0;
+			return { arm, html: armMarkupRecords[arm] as never };
+		};
 	};
 	const view = marklessCsrComposeView(
 		root,
@@ -608,21 +612,53 @@ test('render flips the seventh composed child CSR branch independently', async (
 		})),
 	) as ProtocolViewPayload;
 
-	const container = await render(() => ({
-		root,
-		state,
-		view,
-		loadSymbol(symbolId: string) {
-			const index = buttons.findIndex((_, childIndex) => symbolId.startsWith(`c${childIndex}:`));
-			if (index >= 0) return childLoadSymbol(index)(symbolId.slice(`c${index}:`.length));
-			throw new Error(`Unexpected parent symbol ${symbolId}`);
+	const global = globalThis as { document?: unknown };
+	const previousDocument = global.document;
+	expect(buttons[6]!.childNodes.map((child) => child.textContent)).toEqual(['markless:branch:c6:branch-site:0', '▶', '/markless:branch:c6:branch-site:0']);
+	global.document = {
+		createElement(tagName: string) {
+			if (tagName !== 'template') throw new Error(`Unexpected tag ${tagName}`);
+			let childNodes: FakeElement[] = [];
+			return {
+				content: { get childNodes() { return childNodes; } },
+				set innerHTML(value: unknown) {
+					const html = String(value);
+					renderedBranchHtml.push(html);
+					childNodes = html === '<span class=play-icon>❚❚</span>'
+						? [pause]
+						: [{ nodeType: 3, textContent: html } as unknown as FakeElement];
+				},
+			};
 		},
-	}), { target: { replaceChildren() {} }, renderBranchHtml: (html) => html === '<span>Hidden</span>' ? [hidden as never] : [] });
+	};
+	const container = await (async () => {
+		try {
+			return await render(() => ({
+				root,
+				state,
+				view,
+				loadSymbol(symbolId: string) {
+					const index = buttons.findIndex((_, childIndex) => symbolId.startsWith(`c${childIndex}:`));
+					if (index >= 0) return childLoadSymbol(index)(symbolId.slice(`c${index}:`.length));
+					throw new Error(`Unexpected parent symbol ${symbolId}`);
+				},
+			}), { target: { replaceChildren() {} } });
+		} finally {
+			global.document = previousDocument;
+		}
+	})();
 
 	await container.root.listeners[0]!.listener(event('click', buttons[6]!));
 
 	expect(loadedSymbols).toEqual(['c6:symbol:toggle', 'c6:symbol:branch']);
-	expect(buttons[6]!.childNodes.map((child) => child.textContent)).toEqual(['markless:branch:c6:branch-site:0', 'Hidden', '/markless:branch:c6:branch-site:0']);
+	expect(renderedBranchHtml).toEqual(['<span class=play-icon>❚❚</span>']);
+	const branchText = buttons[6]!.childNodes.map((child) => child.textContent);
+	expect(branchText).toEqual(['markless:branch:c6:branch-site:0', '❚❚', '/markless:branch:c6:branch-site:0']);
+	expect(branchText).not.toContain('▶');
+	expect(buttons[6]!.childNodes[1]).toMatchObject({
+		tagName: 'SPAN',
+		outerHTML: '<span class="play-icon">❚❚</span>',
+	});
 });
 
 test('render dispatch throws a tagged error when no event record matches', async () => {
