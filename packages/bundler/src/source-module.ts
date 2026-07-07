@@ -274,13 +274,14 @@ function emitResumeContainerEvent(
 		'		root: handoff.root,',
 		`		loadSymbol: ${loadSymbolName},`,
 		'	});',
-		'	await runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true });',
+		'	await runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });',
 		'}',
 	].join('\n');
 	const scalarOnlySpecialized = leanMode === 'scalar' && scalarSpecializations.length > 0 && allEventActionsHaveScalarPlan(runtimeDemandMap);
 	const scalarDispatcher = scalarSpecializations.length > 0
 		? emitSpecializedScalarDispatcher(scalarSpecializations, loadSymbolName, scalarOnlySpecialized ? 'fail' : 'full')
 		: emitSpecializedScalarDispatcher([], loadSymbolName, 'full');
+
 	if (needsFullResume) {
 		// Branch flips need graph subscriptions and range replacement: start the
 		// full resume runtime once, mark the container so the inline resumer
@@ -366,6 +367,11 @@ function scalarDispatcherSpecializations(input: {
 		readonly locators?: ReadonlyArray<{ readonly hostNodeId?: unknown; readonly index?: unknown; readonly tagName?: unknown }>;
 	} | undefined;
 	const map = input.runtimeDemandMap as { readonly actions?: ReadonlyArray<any> } | undefined;
+	// Composed pages (child symbol routes) are excluded from specialization until
+	// child-coordinate routing is emitted into the dispatcher: their host/symbol
+	// constants live in caller coordinates and a wrong constant here becomes a
+	// dead click. They fall back to the full path, which handles routing.
+	if ((input.symbolRoutes?.length ?? 0) > 0) return [];
 	const cells = state?.cells ?? [];
 	const locators = view?.locators ?? [];
 	return (map?.actions ?? []).flatMap((action, index) => {

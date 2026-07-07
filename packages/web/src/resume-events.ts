@@ -56,6 +56,10 @@ export function createEventWiring(input: {
 				noMatch: true,
 				dispatchModuleId: 'web:resume-events',
 			});
+			// Broad entry capture (inline resumer / specialized-wrapper fallback)
+			// forwards every captured event; non-markless clicks (e.g. router
+			// links) must pass through silently rather than throw.
+			if (options.ignoreUnmatched === true) return;
 			throw unmatchedDispatchError(event, selector);
 		}
 		if ('rowMatch' in matched) return dispatchRowEvent(matched.element, matched.rowMatch, event, options);

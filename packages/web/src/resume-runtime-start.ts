@@ -71,7 +71,17 @@ export async function startResumeRuntime(input: {
 		behaviors.installRemovalObserver();
 	}
 	if ((runtimeInput.view.branches ?? []).length > 0) await loadBranchRuntime();
-	for (const eventType of eventTypes) runtimeInput.root.addEventListener?.(eventType, events.dispatch, { capture: true });
+	// Container capture listeners see every DOM event of a registered type,
+	// including non-markless ones (router links): unmatched must pass through.
+	const dispatchCaptured = (event: Parameters<typeof events.dispatch>[0]) => events.dispatch(event, { ignoreUnmatched: true });
+	for (const eventType of eventTypes) {
+		runtimeInput.root.addEventListener?.(eventType, dispatchCaptured, { capture: true });
+		// The wrapper has its own identity; pair removal with registration so
+		// dispose drops these listeners too.
+		storeContainerSubscription(() =>
+			runtimeInput.root.removeEventListener?.(eventType, dispatchCaptured, { capture: true }),
+		);
+	}
 	if ((runtimeInput.graph.listSharedDefinitions?.() ?? []).length > 0) {
 		runtimeInput.root.addEventListener?.(sharedPatchEventType, receiveSharedPatch, { capture: true });
 	}

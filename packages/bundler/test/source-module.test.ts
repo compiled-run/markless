@@ -93,20 +93,14 @@ test('emitResumeModule emits a specialized scalar dispatcher with resolved const
 	expect(resumeCode).toContain('marklessScalarSpecializedHostMiss');
 });
 
-test('specialized scalar dispatcher routes composed child event symbols', () => {
+test('composed pages are excluded from scalar specialization (deferred projection design)', () => {
 	const input = scalarResumeInput();
-	input.symbolRoutes = [{ prefix: 'c0:', importSource: './Child.tsrx' }];
-	input.payloadView.events[0] = {
-		hostNodeId: 'host:button',
-		eventName: 'click',
-		symbolIds: ['c0:symbol:click'],
-	};
-	input.runtimeDemandMap.actions[0].plan.symbolId = 'symbol:click';
-	const resumeCode = emitResumeModule(input);
-
-	expect(resumeCode).toContain('function marklessSsrLoadSymbolRoute(symbolId)');
-	expect(resumeCode).toContain('marklessSsrLoadSymbolRoute("c0:symbol:click")');
-	expect(resumeCode).not.toContain('marklessSsrLoadSymbolRoute("symbol:click")');
+	(input as { symbolRoutes: unknown }).symbolRoutes = [{ prefix: 'c0:', importSource: './child.tsrx' }];
+	const resumeCode = emitResumeModule(input as Parameters<typeof emitResumeModule>[0]);
+	// Child-composed hosts keep caller-coordinate locators; until the
+	// projection-metadata design lands, composed pages emit NO specialized
+	// actions (the wrapper falls straight through to the full path).
+	expect(resumeCode).not.toContain('hostNodeId===');
 });
 
 test('specialized scalar dispatcher excludes composed child symbols without a route', () => {
@@ -163,7 +157,7 @@ test('specialized scalar dispatcher carries sync policy state through full fallb
 	expect(resumeCode).toContain('error.syncPolicyAlreadyApplied = syncPolicyAlreadyApplied;');
 	expect(resumeCode).toContain('marklessScalarSpecializedFallback(input, error.site ?? "escalate", error.syncPolicyAlreadyApplied === true)');
 	expect(resumeCode).toContain('await marklessFullResumeHandoff({ ...input, document: input.root, syncPolicyAlreadyApplied });');
-	expect(resumeCode).toContain('await runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true });');
+	expect(resumeCode).toContain('await runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });');
 });
 
 test('specialized scalar dispatcher keeps full fallback for non-scalar event actions', () => {

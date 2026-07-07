@@ -83,12 +83,18 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 			root: input.root, graph: input.graph, view: input.view, loadSymbol: input.loadSymbol, renderBranchHtml: input.renderBranchHtml, elementsByHostId, disposedHosts, elementHandles, events: await getEvents(), eventTypes, storeContainerSubscription, storeHostSubscription, addBehaviorRecords: behaviors?.addBehaviorRecords ?? (() => {}),
 			skipStartupBranchIds: options.skipStartupBranchIds,
 		});
-		for (const eventType of eventTypes) if (!eventTypesBefore.has(eventType)) input.root.addEventListener?.(eventType, events!.dispatch, { capture: true });
+		for (const eventType of eventTypes) if (!eventTypesBefore.has(eventType)) input.root.addEventListener?.(eventType, dispatchCaptured, { capture: true });
 		for (const hostNodeId of branchRuntime.startupArmBehaviorHostIds) await behaviorRuntime?.activateBehaviors(hostNodeId, { flush: false });
 		if (branchRuntime.startupArmBehaviorHostIds.length > 0) await flushRuntimeGraph();
 		return branchRuntime;
 	}
-		function disposeHost(hostNodeId: string, options: { readonly ignoreFutureEvents?: boolean } = {}): void {
+		// Stable-identity capture wrapper: container listeners see every DOM event of
+	// a registered type, including non-markless ones (router links) — unmatched
+	// passes through. Same reference is used for add and remove.
+	function dispatchCaptured(event: ResumeDomEvent): Promise<void> | void {
+		return events?.dispatch(event, { ignoreUnmatched: true });
+	}
+	function disposeHost(hostNodeId: string, options: { readonly ignoreFutureEvents?: boolean } = {}): void {
 			disposedHosts.add(hostNodeId);
 			const element = elementsByHostId.get(hostNodeId);
 		if (element) { if (options.ignoreFutureEvents) ignoredDisposedEventTargets.add(element); events?.eventRecords.delete(element); elementsByHostId.delete(hostNodeId); }
@@ -97,7 +103,7 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 		hostSubscriptionReleases.delete(hostNodeId);
 	}
 	function dispose(): void {
-		for (const eventType of eventTypes) input.root.removeEventListener?.(eventType, events.dispatch, { capture: true });
+		for (const eventType of eventTypes) input.root.removeEventListener?.(eventType, dispatchCaptured, { capture: true });
 		input.root.removeEventListener?.(SHARED_PATCH_EVENT_TYPE, receiveSharedPatch, { capture: true });
 		behaviorRuntime?.disconnect();
 		for (const hostNodeId of Array.from(elementsByHostId.keys())) disposeHost(hostNodeId);
