@@ -133,12 +133,48 @@ export function planKeyedRepeat(input: {
 	};
 }
 
+export type RowAttributeWrite = {
+	readonly name: string;
+	readonly source: string;
+	readonly hostPath: ReadonlyArray<number>;
+};
+
 export type RowPlan = {
 	readonly textWrites: ReadonlyArray<PublicRenderPlanTextWrite>;
 	readonly classWrites: ReadonlyArray<PublicRenderPlanClassWrite>;
 	readonly eventControls: ReadonlyArray<PublicRenderPlanEventControl>;
+	readonly attributeWrites: ReadonlyArray<RowAttributeWrite>;
 	readonly usesIndex: boolean;
 };
+
+// True when the expression's identifier reads are limited to the repeat item
+// (and optional index). Static member property names are not reads.
+function readsOnlyItemScope(
+	node: AnyNode,
+	itemName: string,
+	indexName: string | undefined,
+): boolean {
+	let ok = true;
+	const visit = (candidate: AnyNode | undefined): void => {
+		if (!candidate || !ok) return;
+		if (candidate.type === 'Identifier') {
+			const name = getIdentifierName(candidate);
+			if (name && name !== itemName && name !== indexName) ok = false;
+			return;
+		}
+		if (candidate.type === 'MemberExpression' && candidate.computed !== true) {
+			visit(candidate.object as AnyNode | undefined);
+			return;
+		}
+		if (candidate.type === 'Property' && candidate.computed !== true) {
+			visit(candidate.value as AnyNode | undefined);
+			return;
+		}
+		for (const child of childNodes(candidate)) visit(child);
+	};
+	visit(node);
+	return ok;
+}
 
 export function collectRowPlan(input: {
 	readonly aliases: ReturnType<typeof semanticAliasMap>;
@@ -155,6 +191,7 @@ export function collectRowPlan(input: {
 	const textWrites: PublicRenderPlanTextWrite[] = [];
 	const classWrites: PublicRenderPlanClassWrite[] = [];
 	const eventControls: PublicRenderPlanEventControl[] = [];
+	const attributeWrites: RowAttributeWrite[] = [];
 	let usesIndex = false;
 
 	const visitElement = (node: AnyNode, hostPath: ReadonlyArray<number>): boolean => {
@@ -211,7 +248,21 @@ export function collectRowPlan(input: {
 			}
 
 			if (attributeName === 'attach' || attributeName === 'el') return false;
-			if (expression && expression.type !== 'Literal') return false;
+			if (expression && expression.type !== 'Literal') {
+				// Item-derived dynamic attributes (href={'#/r/' + item.id},
+				// data-testid={...}) are static per row instance: the SSR/CSR row
+				// mappers evaluate them with the item in scope, and client row
+				// rebuilds re-evaluate the same template. Reject expressions that
+				// read anything beyond the item/index (those would need reactive
+				// attribute wiring rows don't have yet).
+				if (!readsOnlyItemScope(expression, input.itemName, input.indexName)) return false;
+				attributeWrites.push({
+					name: attributeName,
+					source: expressionSource(expression, input.source) ?? '',
+					hostPath,
+				});
+				continue;
+			}
 		}
 
 		let childDomIndex = 0;
@@ -267,6 +318,7 @@ export function collectRowPlan(input: {
 		textWrites,
 		classWrites,
 		eventControls,
+		attributeWrites,
 		usesIndex,
 	};
 }

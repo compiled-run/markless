@@ -5150,3 +5150,24 @@ export default function Home() @{
 		collectionGraphNodeId: 'computed:repos',
 	});
 });
+
+test('repeat rows support item-derived dynamic attributes (href/testid class)', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/App.tsrx',
+		source: `import { state } from '@markless/core';
+export default function List() @{
+	let rows = state([{ id: 'a' }]);
+	<main>
+		@for (const r of rows; key r.id) {
+			<a class="row-title" href={'#/r/' + r.id} data-testid={'repo-link-' + r.id}>{r.id}</a>
+		}
+	</main>
+}`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.repeatGates[0]).toMatchObject({ supported: true });
+	// SSR row mapper evaluates the attribute expressions with the item in scope.
+	expect(result.publicRenderModule.ssrModuleSource).toContain("'#/r/' + r.id");
+	expect(result.publicRenderModule.ssrModuleSource).toContain("'repo-link-' + r.id");
+});
