@@ -108,7 +108,7 @@ test('router full-stack fixture separates UI, request, and public artifacts', as
 		kind: 'middleware',
 	});
 	expect(transformRequestFileSource('api/health.ts', healthSource)?.code).toContain(
-		'import { defineHandler as __markless_define_handler__ } from "nitro";',
+		'import { __marklessDefineHandler as __markless_define_handler__ } from "@markless/router";',
 	);
 	expect(transformRequestFileSource('middleware/request.ts', middlewareSource)?.code).toContain(
 		'__marklessCreateHttpContext',

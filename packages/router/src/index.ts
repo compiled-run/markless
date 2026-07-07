@@ -100,6 +100,12 @@ type RuntimeHttpEvent = {
 	readonly url?: URL;
 };
 
+// Consumer api/middleware wrappers import these through @markless/router so
+// 'nitro' resolves from THIS package's dependency graph — consumer apps do not
+// (and must not need to) depend on nitro directly.
+export { defineHandler as __marklessDefineHandler } from 'nitro';
+export { defineCachedHandler as __marklessDefineCachedHandler } from 'nitro/cache';
+
 export function __marklessCreateHttpContext<
 	Params extends object = Readonly<Record<string, string>>,
 	Locals extends object = AppLocals,

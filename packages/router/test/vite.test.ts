@@ -74,7 +74,7 @@ test('transforms top-level API and middleware files through the Vite plugin', ()
 		'/project/api/health.get.ts',
 	);
 
-	expect(result?.code).toContain('defineHandler');
+	expect(result?.code).toContain('__marklessDefineHandler');
 	expect(result?.code).toContain('__marklessCreateHttpContext');
 	expect(
 		transform?.('export default function Page() {}', '/project/pages/index.tsrx'),
@@ -182,7 +182,7 @@ test('preserves user Nitro config while adding Markless request scanning default
 			'export default function health(http) { return { ok: true, url: http.url.href }; }',
 			'/project/api/health.ts',
 		)?.code,
-	).toContain('defineHandler');
+	).toContain('__marklessDefineHandler');
 });
 
 test('throws when users add nitro directly alongside router', () => {

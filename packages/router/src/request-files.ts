@@ -430,8 +430,8 @@ function requestFileWrapperSource(
 ): string {
 	const defineImport =
 		requestFile.kind === 'api' && requestFile.cache
-			? 'import { defineCachedHandler as __markless_define_handler__ } from "nitro/cache";'
-			: 'import { defineHandler as __markless_define_handler__ } from "nitro";';
+			? 'import { __marklessDefineCachedHandler as __markless_define_handler__ } from "@markless/router";'
+			: 'import { __marklessDefineHandler as __markless_define_handler__ } from "@markless/router";';
 	const wrappedHandler = `(event) =>
 	${handlerName}(__markless_create_http_context__(event))`;
 	const wrappedDefault =
