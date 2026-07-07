@@ -77,11 +77,25 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 		});
 		return behaviorRuntime;
 	}
+	// Escalated arm-scoped toggles (T104): re-run the boundary's settle path
+	// with the current snapshot so the whole arm re-renders through commitArm.
+	async function resettleBoundaryArm(boundaryId: string) {
+		const boundary = asyncBoundariesById.get(boundaryId);
+		const read = boundary?.asyncReads[0];
+		if (!boundary?.updateSymbolId || !read) return;
+		const { settleAsyncBoundaryRange } = await import('./resume-async-wiring.ts');
+		return settleAsyncBoundaryRange(
+			{ graph: input.graph, root: input.root, loadSymbol: input.loadSymbol, renderBranchHtml: input.renderBranchHtml, elementHandles, commitArm: commitBoundaryArm },
+			boundary,
+			input.graph.read(read.graphNodeId, []),
+		);
+	}
 	async function loadBranchRuntime(options: { readonly skipStartupBranchIds?: ReadonlySet<string> } = {}): Promise<BranchRuntime> {
 		if (branchRuntime) return branchRuntime;
 		const eventTypesBefore = new Set(eventTypes), behaviors = viewHasBranchArmBehaviors(input.view) ? await loadBehaviorRuntime() : undefined;
 		branchRuntime = (await import('./resume-branches.ts')).wireBranches({
 			root: input.root, graph: input.graph, view: input.view, loadSymbol: input.loadSymbol, renderBranchHtml: input.renderBranchHtml, elementsByHostId, disposedHosts, elementHandles, events: await getEvents(), eventTypes, storeContainerSubscription, storeHostSubscription, addBehaviorRecords: behaviors?.addBehaviorRecords ?? (() => {}),
+			resettleBoundary: resettleBoundaryArm,
 			skipStartupBranchIds: options.skipStartupBranchIds,
 		});
 		for (const eventType of eventTypes) if (!eventTypesBefore.has(eventType)) input.root.addEventListener?.(eventType, dispatchCaptured, { capture: true });
@@ -113,6 +127,13 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 					await behaviors.activateBehaviors(hostNodeId, { flush: false });
 				}
 				: undefined,
+			// Fresh arm-branch anchors: rewire the boundary's flips (T104).
+			registerArmBranches: async (boundaryId, records) => {
+				const branches = await loadBranchRuntime();
+				for (const hostNodeId of branches.registerArmBranches(boundaryId, records as never)) {
+					await behaviorRuntime?.activateBehaviors(hostNodeId, { flush: false });
+				}
+			},
 		})(boundary, update);
 		for (const eventType of eventTypes) {
 			if (!eventTypesBefore.has(eventType)) input.root.addEventListener?.(eventType, dispatchCaptured, { capture: true });

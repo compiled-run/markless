@@ -1,4 +1,5 @@
 import { RuntimeResumeError, mismatchedElementLocatorError, missingElementLocatorError } from './inline/resume-errors.ts';
+import { isArmBranchAnchorComment } from './resume-anchor-census.ts';
 import { expandBoundaryArmRecords } from './resume-arm-records.ts';
 import type { ElementHandleRegistry, ResumeAsyncBoundaryRecord, ResumeDispatchOptions, ResumeDomComment, ResumeDomElement, ResumeDomEvent, ResumeDomNode, ResumeRuntime, ResumeRuntimeInput } from './resume-types.ts';
 
@@ -112,8 +113,9 @@ function walkElements(root: ResumeDomElement): ResumeDomElement[] {
 	return elements;
 }
 function walkComments(root: ResumeDomElement): ResumeDomComment[] {
+	// Arm-branch anchors index in their boundary's own census, never here.
 	const comments: ResumeDomComment[] = [];
-	(function visit(node: ResumeDomNode): void { if (node.nodeType === 8) comments.push(node as ResumeDomComment); for (const child of node.childNodes ?? []) visit(child); })(root);
+	(function visit(node: ResumeDomNode): void { if (node.nodeType === 8 && !isArmBranchAnchorComment(node as ResumeDomComment)) comments.push(node as ResumeDomComment); for (const child of node.childNodes ?? []) visit(child); })(root);
 	return comments;
 }
 function missingCommentAnchorError(id: string, name: 'startAnchor' | 'endAnchor', index: number): RuntimeResumeError {

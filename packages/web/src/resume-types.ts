@@ -32,11 +32,29 @@ export type ResumeBranchUpdate = { readonly arm: number; readonly html: ResumeBr
 // arm). Registration adds the anchor's live element-walk offset, so one set
 // stays valid on initial load and after an arm commit replaces the range.
 export type ResumeArmLocator = { readonly hostNodeId: string; readonly strategy: 'arm-relative'; readonly index: number; readonly tagName: string };
+// An @if/@switch inside a boundary arm (D1 tier 3 in arms). Flip-capable
+// records carry a flip symbol plus an anchor pair indexed in the boundary's
+// OWN arm-branch comment census; escalated records (content needs component
+// execution) omit them and route their test reads through the boundary's arm
+// re-render. Materialization resolves the payload indexes to live comments.
+export type ResumeArmBranchRecord = {
+	readonly id: string;
+	readonly testReads: NonNullable<NonNullable<ProtocolViewPayload['branches']>[number]['testReads']>;
+	readonly symbolId?: string;
+	readonly armTests?: ReadonlyArray<unknown>;
+	readonly declaredEmptyArms?: ReadonlyArray<number>;
+	readonly startAnchor?: { readonly strategy: 'arm-branch-comment'; readonly index: number } | ResumeDomComment;
+	readonly endAnchor?: { readonly strategy: 'arm-branch-comment'; readonly index: number } | ResumeDomComment;
+	readonly armRecords?: ReadonlyArray<ResumeBranchArmRecordSet>;
+	// Present once the record is bound to its live boundary at registration.
+	readonly armBoundaryId?: string;
+};
 export type ResumeArmRecordSet = {
 	readonly locators: ReadonlyArray<ResumeArmLocator>;
 	readonly events: ProtocolViewPayload['events'];
 	readonly behaviors: ProtocolViewPayload['behaviors'];
 	readonly elementHandles: ProtocolViewPayload['elementHandles'];
+	readonly branches?: ReadonlyArray<ResumeArmBranchRecord>;
 };
 export type ResumeAsyncBoundaryPayload = ProtocolViewPayload['asyncBoundaries'][number] & {
 	// A single armized set on SSR-composed pages; CSR-composed pages still

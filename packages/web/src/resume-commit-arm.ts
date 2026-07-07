@@ -5,6 +5,7 @@ import {
 	hostIdsInsideRemovedElements,
 } from './resume-locators.ts';
 import type {
+	ResumeArmBranchRecord,
 	ResumeArmRecordSet,
 	ResumeAsyncBoundaryRecord,
 	ResumeBehaviorRecord,
@@ -73,6 +74,13 @@ export function createArmCommitter(deps: {
 		hostNodeId: string,
 		records: ResumeBehaviorRecord[],
 	) => Promise<void>;
+	// T104: fresh arm content brings fresh arm-branch anchors — the branch
+	// runtime disposes the boundary's previous flip subscriptions and rewires
+	// from these records (escalated records re-dedupe by site id).
+	readonly registerArmBranches?: (
+		boundaryId: string,
+		records: ReadonlyArray<ResumeArmBranchRecord>,
+	) => Promise<void>;
 	readonly documentHost?: CommitDocument;
 }) {
 	return async function commitArm(
@@ -92,6 +100,7 @@ export function createArmCommitter(deps: {
 		const materialized = materializeArmRecords({
 			root: deps.root,
 			startAnchor: boundary.startAnchor,
+			endAnchor: boundary.endAnchor,
 			armRecords: update.armRecords,
 		});
 		for (const [hostNodeId, element] of materialized.elementsByHostId) {
@@ -114,6 +123,9 @@ export function createArmCommitter(deps: {
 				byHost.set(behavior.hostNodeId, records);
 			}
 			for (const [hostNodeId, records] of byHost) await deps.addBehaviors(hostNodeId, records);
+		}
+		if (deps.registerArmBranches && materialized.branches.length > 0) {
+			await deps.registerArmBranches(boundary.id, materialized.branches);
 		}
 		restoreFocusScroll(deps, boundary, captured, materialized.elementsByHostId);
 	};

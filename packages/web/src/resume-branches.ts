@@ -1,4 +1,5 @@
 import type { DomJournalEntry, DomJournalResult, RuntimeGraph } from '@markless/runtime';
+import { isArmBranchAnchorComment } from './resume-anchor-census.ts';
 import type { ResumeBehaviorRecord, ResumeBranchRecord, ResumeBranchUpdate, ResumeDomComment, ResumeDomElement, ResumeDomNode, ResumeViewRecord } from './resume-types.ts';
 
 type ArmDomUpdate = ResumeViewRecord['domUpdates'][number] & { readonly hostPath: ReadonlyArray<number> };
@@ -7,10 +8,13 @@ type ArmHandle = ResumeViewRecord['elementHandles'][number] & { readonly hostPat
 
 export function wireBranches(input: any) {
 	const branchesById = new Map<string, ResumeBranchRecord>(), currentArmByBranchId = new Map<string, number>(), startupArmBehaviorHostIds: string[] = [];
-	for (const branch of materializeBranchLocators(input.root, input.view.branches ?? [])) {
+	// Arm-scoped flip subscriptions dispose and rewire on every arm commit
+	// (the anchors are replaced); escalated records wire once per site.
+	const armFlipReleasesByBoundary = new Map<string, Array<() => void>>(), wiredEscalationIds = new Set<string>();
+	function wireBranchRecord(branch: ResumeBranchRecord & { readonly armBoundaryId?: string }): void {
 		branchesById.set(branch.id, branch); for (const armRecordSet of branch.armRecords ?? []) for (const armEvent of armRecordSet.events) input.eventTypes.add(armEvent.eventName);
 		let currentArm = readBranchArm(input.graph, branch); currentArmByBranchId.set(branch.id, currentArm);
-		for (const testRead of branch.testReads) input.storeContainerSubscription(input.graph.subscribe({ id: `branch-test:${branch.id}:${testRead.graphNodeId}:${testRead.path.join('.')}`, graphNodeId: testRead.graphNodeId, path: testRead.path, async run() {
+		for (const testRead of branch.testReads) { const release = onceRelease(input.graph.subscribe({ id: `branch-test:${branch.id}:${testRead.graphNodeId}:${testRead.path.join('.')}`, graphNodeId: testRead.graphNodeId, path: testRead.path, async run() {
 			const newArm = readBranchArm(input.graph, branch); if (newArm === currentArm) return;
 			const symbol = await input.loadSymbol(branch.symbolId); const update = await symbol({ graph: input.graph, arm: newArm, branchId: branch.sourceId ?? branch.id, composedBranchId: branch.id, element: input.root, getElementHandle: input.elementHandles.get });
 			if (!isResumeBranchUpdate(update)) return; currentArm = update.arm; currentArmByBranchId.set(branch.id, update.arm);
@@ -19,8 +23,37 @@ export function wireBranches(input: any) {
 			if (branchFragmentEmpty(fragment) && !branch.declaredEmptyArms?.includes(update.arm)) throw branchArmEmptyError(branch, update.arm);
 			return [{ type: 'removeRange', locator: `branch:${branch.id}` }, { type: 'insertRange', locator: `branch:${branch.id}:start`, fragment }] as DomJournalResult;
 		} }));
+			if (branch.armBoundaryId) { const releases = armFlipReleasesByBoundary.get(branch.armBoundaryId) ?? []; releases.push(release); armFlipReleasesByBoundary.set(branch.armBoundaryId, releases); }
+			input.storeContainerSubscription(release);
+		}
 	}
+	// Escalated arm-scoped toggles (content needs component execution): the
+	// test read re-renders the whole arm through the boundary's update module.
+	function wireEscalatedRecord(record: { readonly id: string; readonly testReads?: ResumeBranchRecord['testReads']; readonly armBoundaryId?: string }): void {
+		if (!record.armBoundaryId || !record.testReads?.length || wiredEscalationIds.has(record.id)) return;
+		wiredEscalationIds.add(record.id);
+		for (const testRead of record.testReads) input.storeContainerSubscription(input.graph.subscribe({ id: `arm-branch-escalation:${record.id}:${testRead.graphNodeId}:${testRead.path.join('.')}`, graphNodeId: testRead.graphNodeId, path: testRead.path, run: () => input.resettleBoundary?.(record.armBoundaryId) }));
+	}
+	for (const branch of materializeBranchLocators(input.root, input.view.branches ?? [])) wireBranchRecord(branch);
+	for (const record of input.view.branches ?? []) if (record.armBoundaryId && !record.symbolId) wireEscalatedRecord(record);
 	for (const branch of branchesById.values()) { const arm = currentArmByBranchId.get(branch.id); if (arm !== undefined && !input.skipStartupBranchIds?.has(branch.id)) startupArmBehaviorHostIds.push(...materializeBranchArmRecords(input, branch, arm)); }
+	// Re-registration API for commitArm (T103/T104): a fresh arm brings fresh
+	// arm-branch anchors, so previous flip subscriptions release first (no
+	// leaks) and the current arm's in-branch records register like startup.
+	function registerArmBranches(boundaryId: string, records: ReadonlyArray<ResumeBranchRecord & { readonly armBoundaryId?: string }>): string[] {
+		for (const release of armFlipReleasesByBoundary.get(boundaryId) ?? []) release();
+		armFlipReleasesByBoundary.delete(boundaryId);
+		const behaviorHostIds: string[] = [];
+		for (const record of records) {
+			if (!record.testReads?.length) continue;
+			if (!record.symbolId || !isLiveComment(record.startAnchor) || !isLiveComment(record.endAnchor)) { wireEscalatedRecord({ ...record, armBoundaryId: boundaryId }); continue; }
+			const branch = { ...record, armBoundaryId: boundaryId };
+			wireBranchRecord(branch);
+			const arm = currentArmByBranchId.get(branch.id);
+			if (arm !== undefined) behaviorHostIds.push(...materializeBranchArmRecords(input, branch, arm));
+		}
+		return behaviorHostIds;
+	}
 	async function materializeFlippedBranchArms(entries: ReadonlyArray<DomJournalEntry>, activate: (hostNodeId: string) => Promise<void>): Promise<void> {
 		for (const entry of entries) { if (entry.type !== 'insertRange' || !entry.locator.startsWith('branch:') || !entry.locator.endsWith(':start')) continue;
 			const branchId = entry.locator.slice('branch:'.length, -':start'.length), branch = branchesById.get(branchId), arm = currentArmByBranchId.get(branchId); if (!branch || arm === undefined) continue;
@@ -32,7 +65,15 @@ export function wireBranches(input: any) {
 			for (const id of hostIdsInsideRemovedElements(input.elementsByHostId, elementsBetweenAnchors(input.root, range.startAnchor, range.endAnchor))) disposeHost(id);
 		}
 	}
-	return { branchesById, startupArmBehaviorHostIds, materializeFlippedBranchArms, disposeRemovedRangeHosts };
+	return { branchesById, startupArmBehaviorHostIds, materializeFlippedBranchArms, disposeRemovedRangeHosts, registerArmBranches };
+}
+
+function onceRelease(release: () => void): () => void {
+	let released = false;
+	return () => { if (released) return; released = true; if (typeof release === 'function') release(); };
+}
+function isLiveComment(value: unknown): value is ResumeDomComment {
+	return !!value && typeof value === 'object' && (value as { readonly nodeType?: number }).nodeType === 8;
 }
 
 function materializeBranchArmRecords(input: any, branch: ResumeBranchRecord, armIndex: number): string[] {
@@ -60,13 +101,16 @@ function isBranchHtml(value: unknown): value is ResumeBranchUpdate['html'] {
 function branchHtmlToString(html: ResumeBranchUpdate['html']): string {
 	return typeof html === 'string' ? html : html.map((record) => typeof record === 'string' ? record : record.text).join('');
 }
-function materializeBranchLocators(root: ResumeDomElement, branches: NonNullable<ResumeViewRecord['branches']>): ResumeBranchRecord[] {
-	const records: ResumeBranchRecord[] = [], comments = walkComments(root);
+function materializeBranchLocators(root: ResumeDomElement, branches: NonNullable<ResumeViewRecord['branches']>): Array<ResumeBranchRecord & { readonly armBoundaryId?: string }> {
+	const records: Array<ResumeBranchRecord & { readonly armBoundaryId?: string }> = [], comments = walkComments(root);
 	for (const branch of branches) { if (!branch.symbolId || !branch.testReads?.length) continue;
-		const startAnchor = comments[branch.startAnchor.index], endAnchor = comments[branch.endAnchor.index];
+		// Arm-scoped records arrive with LIVE anchors (resolved in the owning
+		// boundary's own arm-branch census by expandBoundaryArmRecords).
+		const live = isLiveComment(branch.startAnchor) && isLiveComment(branch.endAnchor);
+		const startAnchor = live ? branch.startAnchor as unknown as ResumeDomComment : comments[branch.startAnchor.index], endAnchor = live ? branch.endAnchor as unknown as ResumeDomComment : comments[branch.endAnchor.index];
 		if (!startAnchor) throw missingCommentAnchorError(branch.id, 'startAnchor', branch.startAnchor.index);
 		if (!endAnchor) throw missingCommentAnchorError(branch.id, 'endAnchor', branch.endAnchor.index);
-		records.push({ id: branch.id, sourceId: (branch as { readonly sourceId?: string }).sourceId, startAnchor, endAnchor, symbolId: branch.symbolId, testReads: branch.testReads, armTests: branch.armTests, declaredEmptyArms: (branch as { readonly declaredEmptyArms?: ReadonlyArray<number> }).declaredEmptyArms, armRecords: branch.armRecords });
+		records.push({ id: branch.id, sourceId: (branch as { readonly sourceId?: string }).sourceId, startAnchor, endAnchor, symbolId: branch.symbolId, testReads: branch.testReads, armTests: branch.armTests, declaredEmptyArms: (branch as { readonly declaredEmptyArms?: ReadonlyArray<number> }).declaredEmptyArms, armRecords: branch.armRecords, ...((branch as { readonly armBoundaryId?: string }).armBoundaryId ? { armBoundaryId: (branch as { readonly armBoundaryId?: string }).armBoundaryId } : {}) });
 	}
 	return records;
 }
@@ -91,7 +135,8 @@ function containsElement(root: ResumeDomElement, target: ResumeDomElement): bool
 	if (root === target) return true; for (const child of root.childNodes ?? []) if (child.nodeType === 1 && containsElement(child as ResumeDomElement, target)) return true; return false;
 }
 function walkComments(root: ResumeDomElement): ResumeDomComment[] {
-	const comments: ResumeDomComment[] = []; (function visit(node: ResumeDomNode): void { if (node.nodeType === 8) comments.push(node as ResumeDomComment); for (const child of node.childNodes ?? []) visit(child); })(root); return comments;
+	// Arm-branch anchors index in their boundary's own census, never here.
+	const comments: ResumeDomComment[] = []; (function visit(node: ResumeDomNode): void { if (node.nodeType === 8 && !isArmBranchAnchorComment(node as ResumeDomComment)) comments.push(node as ResumeDomComment); for (const child of node.childNodes ?? []) visit(child); })(root); return comments;
 }
 function missingCommentAnchorError(id: string, name: 'startAnchor' | 'endAnchor', index: number): Error {
 	const error = new Error(`Resume locator ${id} ${name} expected a comment at DOM order index ${String(index)}.`) as Error & Record<string, unknown>;

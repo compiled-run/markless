@@ -20,9 +20,12 @@ export function marklessSsrComposeView(html, view, hostLocators, children, async
 export function marklessSsrArmizeBoundaries(html, boundaries, streams, asyncSnapshots) {
 	if (typeof html !== 'string' || boundaries.length === 0) return boundaries;
 	const opensBeforeComment = [];
-	const pattern = /<!--[\s\S]*?-->/g;
+	const pattern = /<!--([\s\S]*?)-->/g;
 	let match;
 	while ((match = pattern.exec(html)) !== null) {
+		// Arm-branch anchors live in their boundary's own census (T104): the
+		// page-level comment census never counts them.
+		if (marklessSsrIsArmBranchAnchor(match[1])) continue;
 		opensBeforeComment.push((html.slice(0, match.index).match(/<[a-zA-Z]/g) ?? []).length);
 	}
 	const snapshotById = new Map((asyncSnapshots ?? []).map((entry) => [entry.graphNodeId, entry.snapshot]));
@@ -55,9 +58,13 @@ export function marklessSsrArmizeBoundaries(html, boundaries, streams, asyncSnap
 			events: [...(planned.events ?? []), ...moved.events],
 			behaviors: [...(planned.behaviors ?? []), ...moved.behaviors],
 			elementHandles: [...(planned.elementHandles ?? []), ...moved.elementHandles],
+			// Arm-scoped branch records (flips + escalations) ride the taken
+			// arm's planned set; resume resolves their anchors arm-locally.
+			branches: planned.branches ?? [],
 		} };
 	});
 }
+export function marklessSsrIsArmBranchAnchor(text) { return typeof text === 'string' && (text.startsWith('markless:arm-branch:') || text.startsWith('/markless:arm-branch:')); }
 // The emitted localIndex (static parent locator count) assumes children render
 // AFTER all parent hosts — false for projecting components (wrappers around the
 // parent's projected content) and for children inside async arms. The final
@@ -90,10 +97,13 @@ export function marklessSsrPrefixBoundaryArmRecords(set, child) {
 		events: (set.events ?? []).map((event) => ({ ...event, hostNodeId: child.hostPrefix + event.hostNodeId, symbolIds: (event.symbolIds ?? []).map((symbolId) => child.externalSymbolIds?.has?.(symbolId) ? symbolId : child.symbolPrefix + symbolId) })),
 		behaviors: (set.behaviors ?? []).map((behavior) => ({ ...behavior, hostNodeId: child.hostPrefix + behavior.hostNodeId, ...(behavior.inputGraphReads ? { inputGraphReads: behavior.inputGraphReads.map((read) => { const mapped = marklessSsrRemapChildGraph(read, child.graphProps); return mapped ? { ...read, graphNodeId: mapped.graphNodeId, path: mapped.path } : read; }) } : {}), ...(behavior.symbolId ? { symbolId: child.symbolPrefix + behavior.symbolId } : {}) })),
 		elementHandles: (set.elementHandles ?? []).map((handle) => ({ ...handle, hostNodeId: child.hostPrefix + handle.hostNodeId })),
+		// Arm-scoped branch records: anchors stay arm-local (resolved by
+		// position, not text); ids/symbols/test reads take the child prefixes.
+		...(set.branches ? { branches: set.branches.map((branch) => ({ ...branch, id: child.hostPrefix + branch.id, testReads: marklessSsrRemapChildReads(branch.testReads, child.graphProps, child.hostPrefix + branch.id), ...(branch.symbolId ? { symbolId: child.symbolPrefix + branch.symbolId } : {}), ...(branch.armRecords ? { armRecords: branch.armRecords.map((arm) => marklessSsrPrefixArmRecord(arm, child)) } : {}) })) } : {}),
 	};
 }
 export function marklessSsrRemapChildGraph(record, graphProps) { if (record.graphNodeId === "prop:props") { const propName = record.path[0]; const binding = graphProps.find((prop) => prop.name === propName); return binding ? { graphNodeId: binding.graphNodeId, path: [...binding.path, ...record.path.slice(1)] } : null; } if (record.graphNodeId.startsWith?.("prop:")) { const propName = record.graphNodeId.slice(5); const binding = graphProps.find((prop) => prop.name === propName); return binding ? { graphNodeId: binding.graphNodeId, path: [...binding.path, ...record.path] } : null; } return { graphNodeId: record.graphNodeId, path: record.path }; }
 export function marklessSsrPrefixAnchorHtml(html, kind, id, prefixedId) { return html.replaceAll(`<!--markless:${kind}:${id}-->`, `<!--markless:${kind}:${prefixedId}-->`).replaceAll(`<!--/markless:${kind}:${id}-->`, `<!--/markless:${kind}:${prefixedId}-->`); }
 export function marklessSsrRemapChildReads(reads, graphProps, recordId) { return (reads ?? []).map((read) => { const mapped = marklessSsrRemapChildGraph(read, graphProps); if (!mapped) throw new Error("MARKLESS_COMPOSED_READ_UNMAPPED: " + recordId); return { ...read, graphNodeId: mapped.graphNodeId, path: mapped.path }; }); }
 export function marklessSsrPrefixArmRecord(arm, child) { return { ...arm, events: (arm.events ?? []).map((event) => ({ ...event, symbolIds: event.symbolIds.map((symbolId) => child.symbolPrefix + symbolId) })), domUpdates: (arm.domUpdates ?? []).map((update) => { const mapped = marklessSsrRemapChildGraph(update, child.graphProps); return mapped ? { ...update, graphNodeId: mapped.graphNodeId, path: mapped.path, ...(update.symbolId ? { symbolId: child.symbolPrefix + update.symbolId } : {}) } : update; }) }; }
-export function marklessSsrResolveAnchorRecords(html, kind, records) { if (records.length === 0) return records; const pattern = /<!--([\s\S]*?)-->/g; const indexByText = new Map(); let match; let index = 0; while ((match = pattern.exec(html)) !== null) { if (!indexByText.has(match[1])) indexByText.set(match[1], index); index++; } return records.map((record) => { const start = indexByText.get(`markless:${kind}:${record.id}`); const end = indexByText.get(`/markless:${kind}:${record.id}`); if (start === undefined || end === undefined) throw new Error(`MARKLESS_COMPOSED_ANCHOR_MISSING: ${kind}:${record.id}`); return { ...record, startAnchor: { ...record.startAnchor, index: start }, endAnchor: { ...record.endAnchor, index: end } }; }); }
+export function marklessSsrResolveAnchorRecords(html, kind, records) { if (records.length === 0) return records; const pattern = /<!--([\s\S]*?)-->/g; const indexByText = new Map(); let match; let index = 0; while ((match = pattern.exec(html)) !== null) { if (marklessSsrIsArmBranchAnchor(match[1])) continue; if (!indexByText.has(match[1])) indexByText.set(match[1], index); index++; } return records.map((record) => { const start = indexByText.get(`markless:${kind}:${record.id}`); const end = indexByText.get(`/markless:${kind}:${record.id}`); if (start === undefined || end === undefined) throw new Error(`MARKLESS_COMPOSED_ANCHOR_MISSING: ${kind}:${record.id}`); return { ...record, startAnchor: { ...record.startAnchor, index: start }, endAnchor: { ...record.endAnchor, index: end } }; }); }
