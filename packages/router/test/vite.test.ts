@@ -287,6 +287,7 @@ test('emits exact route modulepreload maps from client build chunks', () => {
 			'build/navigation.js': navigationChunk,
 			'build/resume.js': resumeChunk,
 			'build/docs.js': chunk({
+				code: `import { marklessDecodeScalarCell } from "./scalar-specialized.js"; export const docs = () => import("./docs-symbol.js");`,
 				dynamicImports: ['build/docs-symbol.js'],
 				fileName: 'build/docs.js',
 				imports: ['build/docs-runtime.js', 'build/resume-runtime.js'],
@@ -300,6 +301,7 @@ test('emits exact route modulepreload maps from client build chunks', () => {
 			'build/docs-symbol.js': chunk({ fileName: 'build/docs-symbol.js' }),
 			'build/navigation-polyfill.js': chunk({ fileName: 'build/navigation-polyfill.js' }),
 			'build/resume-runtime.js': chunk({ fileName: 'build/resume-runtime.js' }),
+			'build/scalar-specialized.js': chunk({ fileName: 'build/scalar-specialized.js' }),
 			'build/shared.js': chunk({ fileName: 'build/shared.js' }),
 		},
 	);
@@ -325,6 +327,7 @@ test('emits exact route modulepreload maps from client build chunks', () => {
 		'/app/build/docs.js',
 		'/app/build/docs-runtime.js',
 		'/app/build/resume-runtime.js',
+		'/app/build/scalar-specialized.js',
 		'/app/build/docs-symbol.js',
 	]);
 	expect(routePreloads['pages/docs/[...slug].mdx']).not.toContain('/app/build/home.js');
@@ -333,6 +336,7 @@ test('emits exact route modulepreload maps from client build chunks', () => {
 		'/app/build/resume-runtime.js',
 		'/app/build/docs.js',
 		'/app/build/docs-runtime.js',
+		'/app/build/scalar-specialized.js',
 		'/app/build/docs-symbol.js',
 	]);
 	expect(ssrPreloads['pages/docs/[...slug].mdx']).not.toContain(
