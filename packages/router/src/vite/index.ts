@@ -609,6 +609,12 @@ function routeModulePreloadsFromBundle(input: {
 		const ssrFileNames = new Set<string>();
 		if (input.resumeChunk) {
 			includeChunk(ssrFileNames, chunksByFileName, input.resumeChunk.fileName);
+			// The resume entry dynamically imports every route's resume module, so
+			// only walk the CURRENT route's resume module (plus its full static and
+			// dynamic closure); other routes' resume modules must stay excluded.
+			for (const fileName of routeScopedDynamicImports(input.resumeChunk, routeFile)) {
+				includeChunk(ssrFileNames, chunksByFileName, fileName, true);
+			}
 		}
 		includeChunk(ssrFileNames, chunksByFileName, routeChunk.fileName, true);
 		ssr[routeFile] = [...ssrFileNames].map((fileName) => joinURL(input.base, fileName));
