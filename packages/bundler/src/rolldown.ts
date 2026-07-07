@@ -579,11 +579,29 @@ function executionLogRuntimeModuleId(id: string): string {
 }
 
 function normalizeVirtualId(id: string) {
-	if (id.startsWith('\0')) {
-		return id.slice(1);
-	}
-
-	return id;
+	const bare = id.startsWith('\0') ? id.slice(1) : id;
+	if (!bare.startsWith(MARKLESS_VIRTUAL_PREFIX)) return bare;
+	// Markless virtual ids embed the encodeURIComponent'd source path and END
+	// in .tsrx, so dev requests arrive mangled twice: Vite's import analysis
+	// appends `?import` as if they were assets, and the /@id middleware
+	// decodeURI()s the path — %2F survives (reserved) but %5B/%5D decode to
+	// raw brackets, so ids for pages like pages/r/[repo] come in
+	// half-decoded. Strip the query and re-canonicalize each colon segment to
+	// the registered encoding, or the first full-resume wake in dev 404s on
+	// its payload/view imports.
+	const queryIndex = bare.indexOf('?');
+	const withoutQuery = queryIndex === -1 ? bare : bare.slice(0, queryIndex);
+	const segments = withoutQuery
+		.slice(MARKLESS_VIRTUAL_PREFIX.length)
+		.split(':')
+		.map((segment) => {
+			try {
+				return encodeURIComponent(decodeURIComponent(segment));
+			} catch {
+				return segment;
+			}
+		});
+	return `${MARKLESS_VIRTUAL_PREFIX}${segments.join(':')}`;
 }
 
 function resolveVirtualId(id: string) {
