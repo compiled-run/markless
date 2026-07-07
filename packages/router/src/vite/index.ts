@@ -597,6 +597,11 @@ function routeModulePreloadsFromBundle(input: {
 		}
 		includeChunk(navigationFileNames, chunksByFileName, routeChunk.fileName);
 		includeChunk(navigationFileNames, chunksByFileName, routeChunk.fileName, true);
+		if (input.navigationChunk) {
+			for (const fileName of routeScopedDynamicImports(input.navigationChunk, routeFile)) {
+				includeChunk(navigationFileNames, chunksByFileName, fileName, true);
+			}
+		}
 		navigation[routeFile] = [...navigationFileNames].map((fileName) =>
 			joinURL(input.base, fileName),
 		);
@@ -641,6 +646,25 @@ function includeChunk(
 	}
 }
 
+function routeScopedDynamicImports(chunk: OutputChunkLike, routeFile: string): string[] {
+	if (!chunk.code) return [];
+	const imports = new Set<string>();
+	const routeLiteralIndex = chunk.code.indexOf(routeFile);
+	if (routeLiteralIndex === -1) return [];
+	const nextRouteLiteralIndex = chunk.code
+		.slice(routeLiteralIndex + routeFile.length)
+		.search(/["'`]pages\/[^"'`]+\.(?:tsrx|mdx)["'`]/);
+	const routeBlockEnd =
+		nextRouteLiteralIndex === -1
+			? chunk.code.length
+			: routeLiteralIndex + routeFile.length + nextRouteLiteralIndex;
+	const routeBlock = chunk.code.slice(routeLiteralIndex, routeBlockEnd);
+	for (const specifier of codeDynamicImportSpecifiers(routeBlock)) {
+		imports.add(normalize(join(dirname(chunk.fileName), specifier)));
+	}
+	return [...imports];
+}
+
 function codeStaticImports(chunk: OutputChunkLike): string[] {
 	return codeImportSpecifiers(
 		chunk,
@@ -649,7 +673,18 @@ function codeStaticImports(chunk: OutputChunkLike): string[] {
 }
 
 function codeDynamicImports(chunk: OutputChunkLike): string[] {
-	return codeImportSpecifiers(chunk, /import\(\s*["'`](\.\/[^"'`]+\.js)["'`]\s*\)/g);
+	return codeDynamicImportSpecifiers(chunk.code ?? '').map((specifier) =>
+		normalize(join(dirname(chunk.fileName), specifier)),
+	);
+}
+
+function codeDynamicImportSpecifiers(code: string): string[] {
+	const imports = new Set<string>();
+	for (const match of code.matchAll(/import\(\s*["'`](\.\/[^"'`]+\.js)["'`]\s*\)/g)) {
+		const specifier = match[1];
+		if (specifier) imports.add(specifier);
+	}
+	return [...imports];
 }
 
 function codeImportSpecifiers(chunk: OutputChunkLike, pattern: RegExp): string[] {
