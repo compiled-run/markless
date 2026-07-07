@@ -30,6 +30,7 @@ export type SsrRenderContext = {
 	// stream (their records rewire via arm-relative host paths) but must
 	// still shift later locator indexes — the repeat-row extras discipline.
 	insideSupportedBranchArm?: boolean;
+	readonly hasChildrenProp?: boolean;
 	readonly styleScopeClass: string | null;
 	readonly source: string;
 };
@@ -52,6 +53,14 @@ export type CsrRenderContext = {
 	readonly asyncBoundaries?: PublicRenderModuleInput['semanticGraph']['asyncBoundaries'];
 	readonly asyncBoundaryGates?: PublicRenderModuleInput['publicRenderPlan']['asyncBoundaryGates'];
 	nextAsyncBoundaryIndex?: number;
+	// Arm-render modules number child components page-aligned (symbol routes
+	// key on the component-edge index); unset keeps the page-module numbering.
+	nextChildIndex?: number;
+	// Arm-render modules tag static in-arm hosts so the emitted module can
+	// derive arm-relative locators from the rendered truth (D3). Mutable:
+	// repeat-row emission unsets it — rows never carry per-instance locators.
+	armHostIdByNode?: ReadonlyMap<AnyNode, string>;
+	readonly hasChildrenProp?: boolean;
 	readonly styleScopeClass?: string | null;
 	readonly source: string;
 };

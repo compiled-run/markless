@@ -378,23 +378,7 @@ class PublicRenderTestElement {
 	}
 
 	querySelector(selector: string): PublicRenderTestElement | undefined {
-		const attribute = selector.match(/^\[([^=]+)="([^"]*)"\]$/);
-		if (!attribute) return undefined;
-		const [, name, value] = attribute;
-		const visit = (node: PublicRenderTestNode): PublicRenderTestElement | undefined => {
-			if (node.nodeType !== 1) return undefined;
-			if (node.getAttribute(name!) === value) return node;
-			for (const child of node.childNodes) {
-				const match = visit(child);
-				if (match) return match;
-			}
-			return undefined;
-		};
-		for (const child of this.childNodes) {
-			const match = visit(child);
-			if (match) return match;
-		}
-		return undefined;
+		return publicRenderTestQuerySelector(this.childNodes, selector);
 	}
 
 	setAttribute(name: string, value: string) {
@@ -404,6 +388,10 @@ class PublicRenderTestElement {
 
 	getAttribute(name: string) {
 		return this.attributes.get(name);
+	}
+
+	removeAttribute(name: string) {
+		this.attributes.delete(name);
 	}
 
 	addEventListener(type: string, listener: PublicRenderTestListener) {
@@ -464,6 +452,10 @@ class PublicRenderTestFragment {
 		return child;
 	}
 
+	querySelector(selector: string): PublicRenderTestElement | undefined {
+		return publicRenderTestQuerySelector(this.childNodes, selector);
+	}
+
 	cloneNode(deep = false) {
 		const clone = new PublicRenderTestFragment();
 		if (deep) clone.replaceChildren(...this.childNodes.map((child) => child.cloneNode(true)));
@@ -486,6 +478,50 @@ class PublicRenderTestTemplate {
 	set innerHTML(html: string) {
 		this.content.replaceChildren(...parsePublicRenderTestHtml(html));
 	}
+
+	// Real templates serialize their content fragment through the innerHTML
+	// getter — the arm-render module relies on that to return html strings.
+	get innerHTML(): string {
+		return this.content.childNodes.map(serializePublicRenderTestNode).join('');
+	}
+}
+
+function publicRenderTestQuerySelector(
+	childNodes: ReadonlyArray<PublicRenderTestNode>,
+	selector: string,
+): PublicRenderTestElement | undefined {
+	const attribute = selector.match(/^\[([^=]+)="([^"]*)"\]$/);
+	if (!attribute) return undefined;
+	const [, name, value] = attribute;
+	const visit = (node: PublicRenderTestNode): PublicRenderTestElement | undefined => {
+		if (node.nodeType !== 1) return undefined;
+		if (node.getAttribute(name!) === value) return node;
+		for (const child of node.childNodes) {
+			const match = visit(child);
+			if (match) return match;
+		}
+		return undefined;
+	};
+	for (const child of childNodes) {
+		const match = visit(child);
+		if (match) return match;
+	}
+	return undefined;
+}
+
+// Round-trips what parsePublicRenderTestHtml understood: entities stay as
+// authored (the parser never decodes them), attributes keep insertion order.
+function serializePublicRenderTestNode(node: PublicRenderTestNode): string {
+	if (node.nodeType === 8) return `<!--${node.textContent}-->`;
+	if (node.nodeType === 3) return node.textContent;
+	if (node.nodeType !== 1) {
+		return node.childNodes.map(serializePublicRenderTestNode).join('');
+	}
+	const attributes = [...node.attributes]
+		.map(([name, value]) => ` ${name}="${value}"`)
+		.join('');
+	const children = node.childNodes.map(serializePublicRenderTestNode).join('');
+	return `<${node.tagName}${attributes}>${children}</${node.tagName}>`;
 }
 
 function publicRenderTestDocument() {
@@ -5195,6 +5231,149 @@ export default function Home() @{
 		expect.objectContaining({ graphNodeId: 'computed:view' }),
 	]);
 	expect(result.publicRenderModule.ssrModuleSource).toContain('marklessSsrRepeatRows');
+});
+
+// D1 tier 4 parity: the arm-render module executes the composed @try content
+// in the browser and must produce the same html SSR served for the same
+// settled snapshot. Normalization note: both sides run through the test DOM's
+// parse/serialize round trip (entities stay as authored, attributes keep
+// insertion order); no other normalization is applied.
+test('arm-render modules render composed @try content byte-equal to SSR for the same snapshot', async () => {
+	const child = await compileTsrxModule({
+		filename: 'src/Shell.tsrx',
+		source: `
+export function Shell({ title }) @{
+	<header class="shell"><h1>{title}</h1></header>
+}
+`,
+		symbols: [],
+	});
+	const page = await compileTsrxModule({
+		filename: 'src/IssuesPage.tsrx',
+		source: `
+import { computed } from '@markless/core';
+import { Shell } from './Shell.tsrx';
+
+export default function Page() @{
+	const view = computed(async () => ({ title: 'Issues', repos: [{ id: 'a' }, { id: 'b' }] }));
+	<main>
+		@try {
+			<>
+				<Shell title={view.title} />
+				<ul class="rows">
+					@for (const r of view.repos; key r.id) { <li class="row">{r.id}</li> }
+				</ul>
+				@if (view.repos.length > 0) { <p class="count">{view.repos.length}</p> }
+				<button class="reload" onClick={() => console.log('reload')}>Reload</button>
+			</>
+		} @pending { <p>Loading</p> } @catch { <p>Broken</p> }
+	</main>
+}
+`,
+		symbols: [],
+	});
+
+	// SSR truth: the real async runner resolves inline and serves the @try arm.
+	const childSsrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(child));
+	const pageSsrModule = await importPublicRenderTestModule(
+		ssrRenderTestModuleSource(page, { replaceChildImport: true }),
+		{ childComponent: { renderSsr: childSsrModule.marklessRenderSsr } },
+	);
+	const ssrOutput = await (
+		pageSsrModule.marklessRenderSsr as () => Promise<{ readonly html: string }>
+	)();
+	const ssrArm = ssrOutput.html.match(
+		/<!--markless:async:[^>]*?-->([\s\S]*?)<!--\/markless:async:[^>]*?-->/,
+	);
+	expect(ssrArm?.[1]).toContain('<h1>Issues</h1>');
+
+	// Client arm render: same snapshot, browser-side component execution.
+	const update = page.symbolModules.modules.find(
+		(module) => module.kind === 'async-boundary-update',
+	);
+	expect(update).toBeDefined();
+	const document = publicRenderTestDocument();
+	const childCsrModule = await importPublicRenderTestModule(csrRenderTestModuleSource(child), {
+		document,
+	});
+	const armModuleSource = update!.source.replace(
+		/import (?:__marklessCsrComponent0|\{ [^}]+ as __marklessCsrComponent0 \}) from [^;]+;/,
+		'const __marklessCsrComponent0 = globalThis.__marklessPublicRenderTestChildComponent;',
+	);
+	const armModule = await importPublicRenderTestModule(armModuleSource, {
+		document,
+		childComponent: { renderCsr: childCsrModule.marklessRenderCsr },
+	});
+	const run = armModule[update!.exportName] as (context: unknown) => {
+		readonly arm: number;
+		readonly html: string;
+		readonly armRecords: {
+			readonly locators: ReadonlyArray<{
+				readonly hostNodeId: string;
+				readonly strategy: string;
+				readonly index: number;
+				readonly tagName: string;
+			}>;
+			readonly events: ReadonlyArray<{
+				readonly hostNodeId: string;
+				readonly eventName: string;
+				readonly symbolIds: ReadonlyArray<string>;
+			}>;
+		};
+	};
+	const snapshot = {
+		status: 'fulfilled',
+		version: 1,
+		key: null,
+		value: { title: 'Issues', repos: [{ id: 'a' }, { id: 'b' }] },
+	};
+	const graph = {
+		read: (graphNodeId: string) => (graphNodeId === 'computed:view' ? snapshot : undefined),
+	};
+	const settled = run({ graph, status: 'fulfilled' });
+
+	expect(settled.arm).toBe(0);
+	expect(settled.html).toBe(ssrArm![1]);
+
+	// armRecords live in the boundary's own coordinate space (D3): index 0 is
+	// the first element after the start anchor — the composed child's root.
+	// Repeat rows carry no locators (the keyed-repeat machinery owns rows).
+	expect(
+		settled.armRecords.locators.map((locator) => [
+			locator.index,
+			locator.tagName,
+			locator.strategy,
+		]),
+	).toEqual([
+		[0, 'header', 'arm-relative'],
+		[1, 'h1', 'arm-relative'],
+		[2, 'ul', 'arm-relative'],
+		[5, 'p', 'arm-relative'],
+		[6, 'button', 'arm-relative'],
+	]);
+	const buttonLocator = settled.armRecords.locators.find(
+		(locator) => locator.tagName === 'button',
+	);
+	expect(settled.armRecords.events).toEqual([
+		expect.objectContaining({
+			hostNodeId: buttonLocator!.hostNodeId,
+			eventName: 'click',
+			symbolIds: [expect.stringMatching(/^symbol:/)],
+		}),
+	]);
+
+	// Rejected snapshots render the @catch arm through the same module.
+	const rejected = run({
+		graph: {
+			read: (graphNodeId: string) =>
+				graphNodeId === 'computed:view'
+					? { status: 'rejected', version: 1, key: null, error: new Error('nope') }
+					: undefined,
+		},
+		status: 'rejected',
+	});
+	expect(rejected.arm).toBe(1);
+	expect(rejected.html).toBe('<p>Broken</p>');
 });
 
 test('component-rooted pages emit a CSR render module (route swaps need it)', async () => {

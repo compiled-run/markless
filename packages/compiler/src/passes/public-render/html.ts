@@ -157,13 +157,19 @@ export function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string 
 			: emitCsrComponent(node, tagName, context);
 	}
 	const hostLocator = context.mode === 'ssr' ? ssrHostLocator(node, tagName, context) : '""';
+	// Arm-render modules tag static in-arm hosts; the module strips the
+	// attribute after deriving arm-relative locators from the rendered truth.
+	const armHostAttribute =
+		context.mode === 'csr' && context.armHostIdByNode?.get(node)
+			? ` data-markless-arm-host="${context.armHostIdByNode.get(node)}"`
+			: '';
 
 	const scopeClass = context.styleScopeClass ?? null;
 
 	if (getElementAttributes(node).some(isSpreadAttribute)) {
 		return joinSsrExpressions([
 			hostLocator,
-			JSON.stringify(`<${tagName}`),
+			JSON.stringify(`<${tagName}${armHostAttribute}`),
 			`${renderHelper(context, 'SpreadAttributes')}({ ${mergedAttributeEntries(node, context.source).join(', ')} }, ${JSON.stringify(scopeClass)})`,
 			JSON.stringify('>'),
 			emitHtmlChildren(node, context),
@@ -171,7 +177,7 @@ export function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string 
 		]);
 	}
 
-	const open = [`<${tagName}`];
+	const open = [`<${tagName}${armHostAttribute}`];
 	const dynamicAttributes: string[] = [];
 	let scopeClassHandled = scopeClass === null;
 	for (const attribute of getElementAttributes(node)) {
@@ -381,7 +387,13 @@ function emitCsrRepeatRows(node: AnyNode, context: CsrRenderContext): string {
 		: [];
 	if (emptyChildren.some((child) => !isPlainHostTemplateNode(child))) return '""';
 
+	// Rows repeat per item, so a single arm-relative locator cannot name them:
+	// row instances never carry the arm-host tag (the keyed-repeat machinery
+	// owns row records) — mirror of the SSR insideRepeatRow discipline.
+	const armHostIdByNode = context.armHostIdByNode;
+	context.armHostIdByNode = undefined;
 	const rowHtml = emitHtmlNode(row, context);
+	context.armHostIdByNode = armHostIdByNode;
 	const rowParams = repeat.indexName
 		? `(${repeat.itemName}, ${repeat.indexName})`
 		: `(${repeat.itemName})`;

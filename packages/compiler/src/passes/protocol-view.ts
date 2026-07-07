@@ -214,9 +214,12 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 }
 
 function boundaryUpdateSymbols(input: ProtocolViewPayloadInput): ReadonlyMap<string, string> {
-	const armsBoundaries = new Set(
-		(input.publicRenderPlan.asyncBoundaryArms ?? []).map((entry) => entry.boundaryId),
-	);
+	// Parts-based (tier 3) and component-executing (tier 4) update modules
+	// share the async-boundary-update wiring: either one settles the range.
+	const armsBoundaries = new Set([
+		...(input.publicRenderPlan.asyncBoundaryArms ?? []).map((entry) => entry.boundaryId),
+		...(input.publicRenderPlan.asyncBoundaryArmRenders ?? []).map((entry) => entry.boundaryId),
+	]);
 	return new Map(
 		input.symbolResolver.symbols.flatMap((symbol) =>
 			symbol.kind === 'async-boundary-update' && armsBoundaries.has(symbol.boundaryId)

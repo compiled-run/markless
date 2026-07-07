@@ -349,7 +349,7 @@ function emptyPublicRenderPlanArtifact(): PublicRenderPlanArtifact {
 		passId: 'public-render-plan', rootTemplateHtml: null, directRenderTemplateHtml: null,
 		staticHostNodeIds: [], staticHostLocators: [], staticEventControls: [], staticTextWrites: [],
 		repeatGates: [], keyedRepeats: [], asyncBoundaryGates: [], branchReactivityGates: [],
-		branchArms: [], asyncBoundaryArms: [], styleScopes: [], diagnostics: [],
+		branchArms: [], asyncBoundaryArms: [], asyncBoundaryArmRenders: [], styleScopes: [], diagnostics: [],
 	};
 }
 

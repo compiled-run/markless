@@ -14,12 +14,14 @@ import {
 } from './diagnostics.ts';
 import { collectStyleScopes } from './style-scopes.ts';
 import { collectAsyncBoundaryNodes } from './async-boundaries.ts';
+import { planAsyncBoundaryArmRenders } from './arm-render-module.ts';
+import { componentPropNames } from './shared.ts';
 import { branchArmSupported, branchArms, buildBranchArmParts, collectArmHosts, collectBranchSiteNodes, scopeClassOf, switchArmTests } from './branch-planning.ts';
 import { assignHostIds, collectHostPaths, collectStaticEventControls, collectStaticHostNodeIds, keyedRepeatNodes } from './host-locators.ts';
 import { collectRowPlan, planKeyedRepeat, supportedRepeatGate } from './repeat-planning.ts';
 import { firstComponentRoot, sameModuleComponentRoots, selectPublicRenderRoot, singleRowRoot, staticHtml, staticShellSupported } from './template.ts';
 import { collectStaticTextWrites } from './text-bindings.ts';
-import { branchRenderDiagnostics, collectChildrenOpacityDiagnostics, collectUndeclaredTemplateReadDiagnostics, collectUnsupportedConstructDiagnostics, componentConditionalRootDiagnostics, componentRootDiagnostics, componentUnsupportedBodyDiagnostics, emptyPlan, repeatRenderDiagnostics } from './validation.ts';
+import { branchRenderDiagnostics, collectChildrenOpacityDiagnostics, collectUndeclaredTemplateReadDiagnostics, collectUnsupportedConstructDiagnostics, componentConditionalRootDiagnostics, componentRootDiagnostics, componentUnsupportedBodyDiagnostics, emptyPlan, repeatRenderDiagnostics, sameModuleChildBoundaryDiagnostics } from './validation.ts';
 import { parseJavaScriptModule } from '../../js-ast.ts';
 import { extractedSyncPolicyActionCalls } from '../semantic-graph/collect-sync-policy.ts';
 import type {
@@ -299,6 +301,23 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 			return { boundaryId: boundary.id, supported: true };
 		});
 
+	// D1 tier 4: boundaries the parts tier bailed on (components, repeats,
+	// @if, fragments in arms) get component-executing arm-render modules.
+	const armRenderPlans = planAsyncBoundaryArmRenders({
+		input,
+		boundaryNodes,
+		asyncBoundaryGates,
+		asyncBoundaryArms,
+		branchReactivityGates,
+		repeatGates,
+		assignedHosts,
+		styleScopeClass: scopeClassOf(styleScopeCollection),
+		rootInfo: {
+			componentName: selectedRoot.componentName,
+			propNames: componentPropNames(selectedRoot.component),
+		},
+	});
+
 	const rootTemplateHtml = staticHtml(root, {
 		componentRoots,
 		componentStack: [selectedRoot.componentName],
@@ -344,9 +363,12 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 		branchReactivityGates,
 		branchArms: branchArmsPlans,
 		asyncBoundaryArms,
+		asyncBoundaryArmRenders: armRenderPlans.armRenders,
 		styleScopes: styleScopeCollection.styleScopes,
 		diagnostics: [
 			...styleScopeCollection.diagnostics,
+			...armRenderPlans.diagnostics,
+			...sameModuleChildBoundaryDiagnostics(ast, selectedRoot.componentName, input.source.filename),
 			...collectUnsupportedConstructDiagnostics(root, input.source.filename),
 			...collectChildrenOpacityDiagnostics(ast, input.source.filename),
 			...repeatRenderDiagnostics({

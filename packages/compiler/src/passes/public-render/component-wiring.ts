@@ -24,7 +24,12 @@ export function emitSsrComponent(node: AnyNode, componentName: string, context: 
 export function emitCsrComponent(node: AnyNode, componentName: string, context: CsrRenderContext): string {
 	const localName = context.componentImports.get(componentName);
 	if (!localName) return '""';
-	const index = context.childReplacements.length;
+	// Arm-render modules number children page-aligned (symbol routes key on
+	// the component-edge index); the page module keeps its own numbering.
+	const index =
+		context.nextChildIndex !== undefined
+			? context.nextChildIndex++
+			: context.childReplacements.length;
 	const edge = context.componentEdges[context.nextComponentEdgeIndex++];
 	const props = componentPropsSource(node, context.source, edge, context.callbackSymbols);
 	const childName = `marklessCsrChild${index}`;

@@ -27,6 +27,30 @@ export function unsupportedRenderConstructDiagnostic(input: {
 	};
 }
 
+// D2/D4: when a settled @try/@catch arm cannot get a browser-side render
+// module, the refusal is loud and speaks the author's words — the content
+// still server-renders, but it cannot update in the browser after settle.
+export function asyncArmRenderUnsupportedDiagnostic(input: {
+	readonly message: string;
+	readonly node: AnyNode;
+	readonly filename: string;
+	readonly suggestion: string;
+}): CompilerDiagnostic {
+	return {
+		code: 'MARKLESS_ASYNC_ARM_RENDER_UNSUPPORTED',
+		severity: 'warning',
+		phase: 'public-render',
+		title: 'The settled @try content cannot render in the browser yet',
+		message: input.message,
+		why: 'The compiler emits a browser-side render module for @try/@catch content so it can update after the data settles. A shape the module cannot render would silently stay frozen, so the compiler reports it instead.',
+		primarySpan: sourceSpan(input.node, input.filename),
+		passId: 'public-render-plan',
+		artifactKeys: ['publicRenderPlan'],
+		suggestions: [{ message: input.suggestion }],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ASYNC_ARM_RENDER_UNSUPPORTED',
+	};
+}
+
 export function repeatRowStateScopeUnsupportedDiagnostic(input: {
 	readonly apiName: 'state' | 'computed';
 	readonly name: string;

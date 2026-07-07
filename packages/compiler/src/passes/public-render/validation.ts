@@ -49,9 +49,48 @@ export function emptyPlan(
 		branchReactivityGates: [],
 		branchArms: [],
 		asyncBoundaryArms: [],
+		asyncBoundaryArmRenders: [],
 		styleScopes: [],
 		diagnostics,
 	};
+}
+
+// Same-module helper components render through emission contexts that plan no
+// boundary anchors: an @try inside one drops its content from the html and
+// its in-arm records never register. Until that emission plans boundaries
+// (arm-commit runtime work), the drop must be loud (D2), in the author's
+// words (D4).
+export function sameModuleChildBoundaryDiagnostics(
+	ast: AnyNode,
+	rootComponentName: string,
+	filename: string,
+) {
+	const diagnostics: ReturnType<typeof unsupportedRenderConstructDiagnostic>[] = [];
+	for (const statement of asNodes(ast.body)) {
+		const component = getComponentFunction(statement);
+		if (!component || component.name === rootComponentName) continue;
+		const boundary = firstBoundaryNode(component.node);
+		if (!boundary) continue;
+		diagnostics.push(
+			unsupportedRenderConstructDiagnostic({
+				label: '@try/@pending/@catch',
+				message: `<${component.name}> contains an @try block, but <${component.name}> is a helper component in the same file as the page. Its @try/@pending/@catch content is dropped from the rendered HTML.`,
+				node: boundary,
+				filename,
+				suggestion: `Move <${component.name}> into its own .tsrx file and import it, or move the @try block into the page component.`,
+			}),
+		);
+	}
+	return diagnostics;
+}
+
+function firstBoundaryNode(node: AnyNode): AnyNode | null {
+	if (node.type === 'JSXTryExpression') return node;
+	for (const child of childNodes(node)) {
+		const found = firstBoundaryNode(child);
+		if (found) return found;
+	}
+	return null;
 }
 
 // Constructs the module emitter cannot render yet must fail loud here; their
