@@ -63,6 +63,8 @@ export type WalkState = {
 	currentHostNodeId: string | null;
 	currentTextTarget: SemanticTemplateBindingTarget | null;
 	currentAsyncBoundaryId: string | null;
+	// Arm index inside the current boundary: 0 = @try, 1 = @pending, 2 = @catch.
+	currentAsyncBoundaryArm: number | null;
 	currentSharedDefinitionId: string | null;
 	currentCreationSite: 'computed' | 'handler' | 'helper' | 'branch' | 'loop' | null;
 	currentFunctionSite: 'computed' | 'handler' | 'helper' | null;
@@ -133,6 +135,7 @@ export function createWalkState(input: {
 		currentHostNodeId: null,
 		currentTextTarget: null,
 		currentAsyncBoundaryId: null,
+		currentAsyncBoundaryArm: null,
 		currentSharedDefinitionId: null,
 		currentCreationSite: null,
 		currentFunctionSite: null,

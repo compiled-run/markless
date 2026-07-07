@@ -159,6 +159,11 @@ export type SemanticGraphDependency = {
 export type SemanticHostNode = {
 	readonly id: string;
 	readonly tagName: string;
+	// Present when the element renders inside an @try/@pending/@catch arm:
+	// the boundary owns the element's coordinates (D3 arm-relative records).
+	// asyncBoundaryArm is the arm index (0 = @try, 1 = @pending, 2 = @catch).
+	readonly asyncBoundaryId?: string;
+	readonly asyncBoundaryArm?: number;
 };
 
 export type SemanticKeyedRepeat = {
@@ -467,6 +472,26 @@ export type PayloadArenaInput = {
 
 export type PayloadArenaDiagnostic = StateLoweringDiagnostic;
 
+// One record set per boundary arm (index 0 = @try, 1 = @pending, 2 = @catch).
+// Locator indexes are ARM-RELATIVE: 0 names the first element after the
+// boundary's start anchor in that arm's rendered content. Resume adds the
+// start anchor's live element-walk offset at materialization time (D3).
+export type PayloadArmRecordSet = {
+	readonly locators: ReadonlyArray<{
+		readonly hostNodeId: string;
+		readonly strategy: 'arm-relative';
+		readonly index: number;
+		readonly tagName: string;
+	}>;
+	readonly events: SemanticGraphArtifact['events'];
+	readonly behaviors: ReadonlyArray<PayloadBehavior>;
+	readonly elementHandles: ReadonlyArray<{
+		readonly hostNodeId: string;
+		readonly handleId: string;
+		readonly name: string;
+	}>;
+};
+
 export type PayloadAsyncBoundary = {
 	readonly id: string;
 	readonly kind: 'async-boundary';
@@ -484,6 +509,7 @@ export type PayloadAsyncBoundary = {
 		readonly graphNodeId: string;
 		readonly path: ReadonlyArray<string>;
 	}>;
+	readonly armRecords: ReadonlyArray<PayloadArmRecordSet>;
 };
 
 export type PayloadBehavior = SemanticBehavior & {
@@ -787,6 +813,25 @@ export type ProtocolViewPayloadInput = {
 	readonly payloadArena: PayloadArenaArtifact;
 	readonly symbolResolver: SymbolResolverPlan;
 	readonly publicRenderPlan: PublicRenderPlanArtifact;
+};
+
+// Wire shape of a boundary arm record set: the payload arena plan with lazy
+// symbol IDs attached. The serializer protocol type gains this field when the
+// streaming work (T107) reopens the protocol contract; until then the view
+// payload stays structurally assignable to ProtocolViewPayload.
+export type ProtocolViewArmRecordSet = {
+	readonly locators: PayloadArmRecordSet['locators'];
+	readonly events: ProtocolViewPayload['events'];
+	readonly behaviors: ProtocolViewPayload['behaviors'];
+	readonly elementHandles: ProtocolViewPayload['elementHandles'];
+};
+
+export type ProtocolViewPayloadWithArmRecords = Omit<ProtocolViewPayload, 'asyncBoundaries'> & {
+	readonly asyncBoundaries: ReadonlyArray<
+		ProtocolViewPayload['asyncBoundaries'][number] & {
+			readonly armRecords?: ReadonlyArray<ProtocolViewArmRecordSet>;
+		}
+	>;
 };
 
 export type PayloadScriptsInput = {

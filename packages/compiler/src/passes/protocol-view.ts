@@ -1,7 +1,13 @@
-import { ASYNC_PROTOCOL_VERSION, type ProtocolViewPayload } from '@markless/serializer';
-import type { ProtocolViewPayloadInput } from '../artifacts.ts';
+import { ASYNC_PROTOCOL_VERSION } from '@markless/serializer';
+import type {
+	ProtocolViewArmRecordSet,
+	ProtocolViewPayloadInput,
+	ProtocolViewPayloadWithArmRecords,
+} from '../artifacts.ts';
 
-export function createProtocolViewPayload(input: ProtocolViewPayloadInput): ProtocolViewPayload {
+export function createProtocolViewPayload(
+	input: ProtocolViewPayloadInput,
+): ProtocolViewPayloadWithArmRecords {
 	const eventSymbols = new Map<string, string[]>();
 	const domUpdateSymbols = new Map<string, string>();
 	const behaviorSymbols = new Map<string, string[]>();
@@ -33,16 +39,18 @@ export function createProtocolViewPayload(input: ProtocolViewPayloadInput): Prot
 		}
 	}
 
+	// Branch-arm hosts and async-boundary-arm hosts leave every flat stream:
+	// their records ride armRecords in the owning range's coordinate space,
+	// since page-absolute locators cannot name elements a flip or an async
+	// settle replaces (D3).
+	const excludedHostIds = new Set([...armHostIds(input), ...boundaryArmHostIds(input)]);
 	return {
 		version: ASYNC_PROTOCOL_VERSION,
-		// Arm hosts ride branch armRecords (single convention for all arms):
-		// they leave every flat stream, since dom-order locators cannot name
-		// elements that a flip replaces.
 		locators: input.payloadArena.view.locators.filter(
-			(locator) => !armHostIds(input).has(locator.hostNodeId),
+			(locator) => !excludedHostIds.has(locator.hostNodeId),
 		),
 		events: input.payloadArena.view.events
-			.filter((event) => !armHostIds(input).has(event.hostNodeId))
+			.filter((event) => !excludedHostIds.has(event.hostNodeId))
 			.map((event) => ({
 				hostNodeId: event.hostNodeId,
 				eventName: event.eventName,
@@ -58,13 +66,13 @@ export function createProtocolViewPayload(input: ProtocolViewPayloadInput): Prot
 				),
 			})),
 		behaviors: input.payloadArena.view.behaviors
-			.filter((behavior) => !armHostIds(input).has(behavior.hostNodeId))
+			.filter((behavior) => !excludedHostIds.has(behavior.hostNodeId))
 			.map((behavior, index) => ({
 				...behavior,
 				symbolId: behaviorSymbols.get(behavior.hostNodeId)?.[index],
 			})),
 		elementHandles: input.payloadArena.view.elementHandles.filter(
-			(handle) => !armHostIds(input).has(handle.hostNodeId),
+			(handle) => !excludedHostIds.has(handle.hostNodeId),
 		),
 		// Only gate-supported boundaries have SSR-emitted anchors; shipping
 		// records for ungated boundaries would make resume throw
@@ -74,8 +82,9 @@ export function createProtocolViewPayload(input: ProtocolViewPayloadInput): Prot
 		// re-indexing allocates over the emitted union in anchorOrder.
 		branches: supportedBranchRecords(input),
 		asyncBoundaries: supportedAsyncBoundaries(input).map(
-			({ kind: _kind, anchorOrder: _order, ...boundary }) => ({
+			({ kind: _kind, anchorOrder: _order, armRecords, ...boundary }) => ({
 				...boundary,
+				armRecords: armRecords.map((set) => wiredArmRecordSet(input, set)),
 				updateSymbolId: boundaryUpdateSymbols(input).get(boundary.id),
 				startAnchor: {
 					...boundary.startAnchor,
@@ -215,6 +224,46 @@ function boundaryUpdateSymbols(input: ProtocolViewPayloadInput): ReadonlyMap<str
 				: [],
 		),
 	);
+}
+
+// Hosts inside a supported boundary's arms: their records nest under the
+// boundary in arm-relative coordinates instead of riding the flat streams.
+function boundaryArmHostIds(input: ProtocolViewPayloadInput): ReadonlySet<string> {
+	return new Set(
+		supportedAsyncBoundaries(input).flatMap((boundary) =>
+			boundary.armRecords.flatMap((set) => set.locators.map((locator) => locator.hostNodeId)),
+		),
+	);
+}
+
+// Attaches lazy symbol IDs to a planned arm record set (the flat-stream
+// wiring, applied inside the boundary's coordinate space).
+function wiredArmRecordSet(
+	input: ProtocolViewPayloadInput,
+	set: ProtocolViewPayloadInput['payloadArena']['view']['asyncBoundaries'][number]['armRecords'][number],
+): ProtocolViewArmRecordSet {
+	const eventSymbols = new Map<string, string[]>();
+	for (const symbol of input.symbolResolver.symbols) {
+		if (symbol.kind !== 'event-handler') continue;
+		const key = `${symbol.hostNodeId}:${symbol.eventName}`;
+		const symbols = eventSymbols.get(key) ?? [];
+		symbols[symbol.order] = symbol.id;
+		eventSymbols.set(key, symbols);
+	}
+	return {
+		locators: set.locators,
+		events: set.events.map((event) => ({
+			hostNodeId: event.hostNodeId,
+			eventName: event.eventName,
+			syncPolicy: event.syncPolicy,
+			symbolIds: eventSymbols.get(`${event.hostNodeId}:${event.eventName}`) ?? [],
+		})),
+		behaviors: set.behaviors.map((behavior, index) => ({
+			...behavior,
+			symbolId: behaviorSymbolsForArms(input).get(behavior.hostNodeId)?.[index],
+		})),
+		elementHandles: set.elementHandles,
+	};
 }
 
 function armHostIds(input: ProtocolViewPayloadInput): ReadonlySet<string> {

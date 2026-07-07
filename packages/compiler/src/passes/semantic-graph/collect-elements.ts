@@ -63,7 +63,16 @@ export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGr
 	if (isHostElement) {
 		hostNodeId = `h${state.nextHostId++}`;
 		state.hostIds.set(node, hostNodeId);
-		state.graph.hostNodes.push({ id: hostNodeId, tagName: tagName ?? '*' });
+		state.graph.hostNodes.push({
+			id: hostNodeId,
+			tagName: tagName ?? '*',
+			...(state.currentAsyncBoundaryId
+				? {
+						asyncBoundaryId: state.currentAsyncBoundaryId,
+						asyncBoundaryArm: state.currentAsyncBoundaryArm ?? 0,
+					}
+				: {}),
+		});
 		state.currentHostNodeId = hostNodeId;
 	}
 

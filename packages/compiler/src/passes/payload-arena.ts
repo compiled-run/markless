@@ -1,6 +1,7 @@
 import type {
 	PayloadArenaArtifact,
 	PayloadArenaInput,
+	PayloadArmRecordSet,
 	PayloadBehavior,
 	PayloadKeyedRepeat,
 	SemanticGraphBinding,
@@ -122,10 +123,39 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 			.sort((left, right) => left.anchorOrder - right.anchorOrder)
 			.map((record, rank) => [record.id, rank] as const),
 	);
+	const behaviors = input.semanticGraph.behaviors.map((behavior) =>
+		payloadBehavior(behavior, bindings, aliases),
+	);
+	// D3: content inside a boundary arm lives in the boundary's own coordinate
+	// space. Each arm's locators index from 0 = first element after the start
+	// anchor in that arm's rendered content; resume adds the anchor's live
+	// element-walk offset. Static indexes are the plain-content plan — the SSR
+	// compose step replaces them with the rendered arm's truth.
+	const boundaryArmRecords = (boundaryId: string): ReadonlyArray<PayloadArmRecordSet> =>
+		[0, 1, 2].map((arm) => {
+			const armHosts = input.semanticGraph.hostNodes.filter(
+				(hostNode) =>
+					hostNode.asyncBoundaryId === boundaryId &&
+					(hostNode.asyncBoundaryArm ?? 0) === arm,
+			);
+			const armHostIds = new Set(armHosts.map((hostNode) => hostNode.id));
+			return {
+				locators: armHosts.map((hostNode, index) => ({
+					hostNodeId: hostNode.id,
+					strategy: 'arm-relative' as const,
+					index,
+					tagName: hostNode.tagName,
+				})),
+				events: input.semanticGraph.events.filter((event) => armHostIds.has(event.hostNodeId)),
+				behaviors: behaviors.filter((behavior) => armHostIds.has(behavior.hostNodeId)),
+				elementHandles: elementHandles.filter((handle) => armHostIds.has(handle.hostNodeId)),
+			};
+		});
 	const asyncBoundaries = input.semanticGraph.asyncBoundaries.map((boundary) => ({
 		id: boundary.id,
 		kind: 'async-boundary' as const,
 		anchorOrder: boundary.anchorOrder,
+		armRecords: boundaryArmRecords(boundary.id),
 		startAnchor: {
 			strategy: 'dom-order-comment' as const,
 			index: (anchorRank.get(boundary.id) ?? 0) * 2,
@@ -175,10 +205,6 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 			(read) => `${read.graphNodeId}:${read.path.join('.')}:${read.source}`,
 		),
 	}));
-	const behaviors = input.semanticGraph.behaviors.map((behavior) =>
-		payloadBehavior(behavior, bindings, aliases),
-	);
-
 	return {
 		passId: 'payload-arena',
 		state: {
