@@ -124,7 +124,7 @@ describe('server entry rendering', () => {
 		expect(html).not.toContain('__marklessRouterStartSpaNavigation');
 	});
 
-	it('emits no destination-route modulepreloads for Links (swaps are server-rendered)', async () => {
+	it('emits exact route modulepreloads for visible Link targets', async () => {
 		const entry = createServerEntry({
 			navigationEntryPath: '/build/navigation.js',
 			resumeEntryPath: '/build/resume.js',
@@ -150,11 +150,35 @@ describe('server entry rendering', () => {
 		const response = await entry.fetch(new Request('http://markless-router.test/'));
 		const html = await response.text();
 
-		// Destination pages arrive as fresh SSR documents that load their own
-		// JS; preloading their chunks here would fetch code that never executes.
-		expect(html).not.toContain('<link rel="modulepreload" href="/build/docs.js"');
-		expect(html).not.toContain('<link rel="modulepreload" href="/build/docs-symbol.js"');
+		// Route swaps are client-side: preloading a visible Link's destination
+		// page chunks avoids a navigation waterfall.
+		expect(html).toContain('<link rel="modulepreload" href="/build/navigation.js"');
+		expect(html).toContain('<link rel="modulepreload" href="/build/docs.js"');
+		expect(html).toContain('<link rel="modulepreload" href="/build/docs-symbol.js"');
 		expect(html).not.toContain('/build/not-found.js');
+	});
+
+	it('emits no document-swap machinery (client-side route swaps)', async () => {
+		const entry = createServerEntry({
+			navigationEntryPath: '/build/navigation.js',
+			resumeEntryPath: '/build/resume.js',
+			documentModuleLoader: undefined,
+			pageModuleLoaders: {
+				'pages/index.tsrx': async () => ({
+					default: page(
+						'<main><a href="/docs/getting-started" data-markless-router-link>Docs</a></main>',
+					),
+				}),
+			},
+			routeFileIds: ['/pages/index.tsrx', '/pages/docs/[...slug].mdx'],
+		});
+
+		const response = await entry.fetch(new Request('http://markless-router.test/'));
+		const html = await response.text();
+
+		expect(html).not.toContain('__marklessRouterSwapPending');
+		expect(html).not.toContain('markless-router-route');
+		expect(html).not.toContain('before-document-swap');
 	});
 
 	it('emits current route modulepreloads in head without requiring a router Link', async () => {

@@ -368,11 +368,7 @@ ${graphConditionSource}
 		d.documentElement?.setAttribute('data-markless-log-summary', summary);
 	}`;
 
-	// __marklessRouterSwapPending: a router bridge that is about to swap this
-	// document sets it synchronously before any deferred work runs — resuming a
-	// document that is being replaced races the swap's DOM (need 12).
 	return `(() => {
-	if (globalThis.__marklessRouterSwapPending) return;
 	const d = document;
 	const s = d.currentScript;
 	const r = s && s.closest('[data-async-container]');
