@@ -145,7 +145,11 @@ export function emitResumeModule(input: {
 			? `import { state as payloadState, runtimeDemandMap as payloadRuntimeDemandMap } from '${input.payloadId}';`
 			: `import { runtimeDemandMap as payloadRuntimeDemandMap } from '${input.payloadId}';`,
 		scalarSpecializations.length > 0
-			? "import { marklessAssertScalarCell, marklessCreateScalarSpecializedState, marklessDecodeScalarSlot, marklessFindElementAtDomOrderIndex, marklessResolve, marklessScalarSlotText, marklessScalarSpecializedAssign, marklessScalarSpecializedHostMiss, marklessScalarSpecializedIncrement, marklessScalarSpecializedShadowGraph, marklessScalarSpecializedTextValue } from '@markless/web/fns/scalar-specialized';"
+			? [
+					"import { marklessDecodeScalarCell, marklessFindElementAtDomOrderIndex, marklessScalarSpecializedError } from '@markless/web/fns/scalar-specialized';",
+					"import { marklessWriteScalar } from '@markless/web/fns/write-scalar';",
+					"import { marklessUpdateText } from '@markless/web/fns/update-text';",
+				].join('\n')
 			: '',
 		'',
 		input.executionLog === 'never' ? '' : emitExecutionLogLoader(),
@@ -294,9 +298,8 @@ function emitResumeContainerEvent(
 			'		root: input.root,',
 			'		event: input.event,',
 			'		element: input.element,',
-			'		eventRecord: input.eventRecord,',
 			'		runtimeDemandMap: payloadRuntimeDemandMap,',
-			'		syncPolicyAlreadyApplied: !!input.eventRecord,',
+			'		syncPolicyAlreadyApplied: false,',
 			`		loadSymbol: ${loadSymbolName},`,
 			'	});',
 		];
@@ -420,19 +423,20 @@ function emitSpecializedScalarDispatcher(actions: ReadonlyArray<ScalarSpecializa
 		'	}',
 		`	return ${fallbackName}(input, "event-match");`,
 		'}',
+		fallback === 'fail'
+			? 'function marklessScalarSpecializedHostMiss(_input, site) { return marklessScalarSpecializedError("MARKLESS_SCALAR_SPECIALIZED_HOST_MISS", site); }'
+			: 'function marklessScalarSpecializedHostMiss(input, site) { return marklessScalarSpecializedFallback(input, site); }',
 		'function marklessScalarSpecializedAction(input) {',
 		...actions.map((action) =>
-			`	if (marklessScalarEventMatches(input, marklessFindElementAtDomOrderIndex(input.root, ${action.hostIndex}, ${JSON.stringify(action.hostTagName)}), ${JSON.stringify(action.eventName)}, ${JSON.stringify(action.hostNodeId)})) return ${action.name};`,
+			`	if (marklessScalarEventMatches(input, marklessFindElementAtDomOrderIndex(input.root, ${action.hostIndex}), ${JSON.stringify(action.hostTagName.toLowerCase())}, ${JSON.stringify(action.eventName)}, ${JSON.stringify(action.hostNodeId)})) return ${action.name};`,
 		),
 		'}',
-		'function marklessScalarEventMatches(input, host, eventName, hostNodeId) {',
+		'function marklessScalarEventMatches(input, host, tagName, eventName, hostNodeId) {',
 		'	const eventTypeMatches = input.event?.type === eventName;',
 		'	if (!eventTypeMatches) return false;',
-		'	if (input.eventRecord) {',
-		'		return input.eventRecord.hostNodeId === hostNodeId && input.eventRecord.eventName === eventName;',
-		'	}',
+		'	if (!host || (tagName !== "*" && host.tagName.toLowerCase() !== tagName)) return false;',
 		'	const eventTarget = input.event?.target;',
-		'	return !!host && (host === eventTarget || (!!eventTarget?.nodeType && typeof host.contains === "function" && host.contains(eventTarget)));',
+		'	return host === eventTarget || (!!eventTarget?.nodeType && typeof host.contains === "function" && host.contains(eventTarget));',
 		'}',
 		...actions.map((action) => emitScalarAction(action, loadSymbolName)),
 		...fallbackBody,
@@ -442,31 +446,37 @@ function emitSpecializedScalarDispatcher(actions: ReadonlyArray<ScalarSpecializa
 function emitScalarAction(action: ScalarSpecialization, loadSymbolName: string): string {
 	return [
 		`async function ${action.name}(input) {`,
-		`	const cell = payloadState.cells[${action.cellIndex}];`,
-		`	marklessAssertScalarCell(cell, ${JSON.stringify(action.cell)}, ${JSON.stringify(`markless/state cell[${action.cellIndex}]`)});`,
-		`	const host = marklessFindElementAtDomOrderIndex(input.root, ${action.hostIndex}, ${JSON.stringify(action.hostTagName)});`,
-		'	if (!host) return marklessScalarSpecializedHostMiss(input, "host");',
+		`	const state = { value: marklessDecodeScalarCell(payloadState.cells[${action.cellIndex}], ${JSON.stringify(action.cell)}, ${JSON.stringify(`markless/state cell[${action.cellIndex}]`)}), dirty: false };`,
+		`	const host = marklessFindElementAtDomOrderIndex(input.root, ${action.hostIndex});`,
+		`	if (!host || (${JSON.stringify(action.hostTagName.toLowerCase())} !== "*" && host.tagName.toLowerCase() !== ${JSON.stringify(action.hostTagName.toLowerCase())})) return marklessScalarSpecializedHostMiss(input, "host");`,
 		...action.textUpdates.map((update, index) =>
-			`	const textTarget${index} = marklessFindElementAtDomOrderIndex(input.root, ${update.index}, ${JSON.stringify(update.tagName)});`,
+			`	const textTarget${index} = marklessFindElementAtDomOrderIndex(input.root, ${update.index});`,
 		),
-		...action.textUpdates.map((_, index) => `	if (!textTarget${index}) return marklessScalarSpecializedHostMiss(input, "text-target");`),
-		`	const state = marklessCreateScalarSpecializedState(${JSON.stringify(action.cell)}, marklessDecodeScalarSlot(cell.value.root));`,
+		...action.textUpdates.map((update, index) => `	if (!textTarget${index} || (${JSON.stringify(update.tagName.toLowerCase())} !== "*" && textTarget${index}.tagName.toLowerCase() !== ${JSON.stringify(update.tagName.toLowerCase())})) return marklessScalarSpecializedHostMiss(input, "text-target");`),
+		'	const graph = {',
+		`		hasCell(graphNodeId) { return graphNodeId === ${JSON.stringify(action.cell)}; },`,
+		`		read(graphNodeId, path = []) { if (graphNodeId !== ${JSON.stringify(action.cell)} || path.length) return marklessScalarSpecializedError("MARKLESS_SCALAR_SPECIALIZED_ESCALATE", "read"); return state.value; },`,
+		`		write(write) { if (write.graphNodeId !== ${JSON.stringify(action.cell)} || (write.path?.length ?? 0)) return marklessScalarSpecializedError("MARKLESS_SCALAR_SPECIALIZED_ESCALATE", "write"); if (!Object.is(state.value, write.value)) { state.value = write.value; state.dirty = true; } },`,
+		`		update(update) { if (update.graphNodeId !== ${JSON.stringify(action.cell)} || (update.path?.length ?? 0)) return marklessScalarSpecializedError("MARKLESS_SCALAR_SPECIALIZED_ESCALATE", "update"); const previous = state.value; const next = update.update(previous); if (!Object.is(previous, next)) { state.value = next; state.dirty = true; } return update.returnValue === "previous" ? previous : update.returnValue === "next" ? next : undefined; },`,
+		'		call() { return marklessScalarSpecializedError("MARKLESS_SCALAR_SPECIALIZED_ESCALATE", "call"); },',
+		'		async flush() {},',
+		'	};',
 		...(action.syncPolicy
 			? [
-					`	const syncPolicy = input.eventRecord?.syncPolicy ?? ${JSON.stringify(action.syncPolicy)};`,
+					`	const syncPolicy = ${JSON.stringify(action.syncPolicy)};`,
 					'	if (syncPolicy && !input.syncPolicyAlreadyApplied) {',
 					"		const { runSyncPolicyActions } = await import('@markless/web/inline/sync-policy-core');",
-					'		runSyncPolicyActions(syncPolicy, state.graph, input.event);',
+					'		runSyncPolicyActions(syncPolicy, graph, input.event);',
 					'	}',
 				]
 			: []),
 		...emitScalarWrite(action),
-		`	const symbol = await marklessResolve(${loadSymbolName}(${JSON.stringify(action.symbolId)}));`,
-		'	await marklessResolve(symbol({ graph: marklessScalarSpecializedShadowGraph(state.graph), event: input.event, element: host, getElementHandle: () => undefined }));',
+		`	const symbol = await Promise.resolve(${loadSymbolName}(${JSON.stringify(action.symbolId)}));`,
+		'	await Promise.resolve(symbol({ graph: { ...graph, write() {}, update(update) { const value = graph.read(update.graphNodeId, update.path ?? []); return update.returnValue === "previous" || update.returnValue === "next" ? value : undefined; } }, event: input.event, element: host, getElementHandle: () => undefined }));',
 		'	if (state.dirty) {',
 		'		state.dirty = false;',
 		...action.textUpdates.map((update, index) =>
-			`		textTarget${index}.textContent = marklessScalarSpecializedTextValue(${JSON.stringify(update.hostNodeId)}, ${JSON.stringify(update.prefix ?? '')} + marklessScalarSlotText(state.value));`,
+			`		textTarget${index}.textContent = marklessUpdateText({ domUpdate: { hostNodeId: ${JSON.stringify(update.hostNodeId)} }, value: ${JSON.stringify(update.prefix ?? '')} + (state.value == null ? '' : String(state.value)) }, ${JSON.stringify(update.hostNodeId)}).value;`,
 		),
 		'	}',
 		'}',
@@ -476,11 +486,20 @@ function emitScalarAction(action: ScalarSpecialization, loadSymbolName: string):
 function emitScalarWrite(action: ScalarSpecialization): string[] {
 	if (action.write.kind === 'update') {
 		return [
-			`	marklessScalarSpecializedIncrement(state.graph, ${JSON.stringify(action.cell)}, ${action.write.updateOperator === '--' ? '-1' : '1'});`,
+			'	marklessWriteScalar({ graph }, {',
+			`		graphNodeId: ${JSON.stringify(action.cell)},`,
+			'		returnValue: "next",',
+			'		update(value) {',
+			`			return Number(value) ${action.write.updateOperator === '--' ? '-' : '+'} 1;`,
+			'		},',
+			'	});',
 		];
 	}
 	return [
-		`	marklessScalarSpecializedAssign(state.graph, ${JSON.stringify(action.cell)}, ${action.write.valueKind === 'undefined' ? 'undefined' : JSON.stringify(action.write.value)});`,
+		'	marklessWriteScalar({ graph }, {',
+		`		graphNodeId: ${JSON.stringify(action.cell)},`,
+		`		value: ${action.write.valueKind === 'undefined' ? 'undefined' : JSON.stringify(action.write.value)},`,
+		'	});',
 	];
 }
 

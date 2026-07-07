@@ -93,14 +93,15 @@ test('alternate-shaped scalar action specializes from locator, cell, event, and 
 		textUpdates: [expect.objectContaining({ prefix: 'Total: ' })],
 	});
 	expect(resumeSource).toContain(
-		`marklessScalarEventMatches(input, marklessFindElementAtDomOrderIndex(input.root, ${eventLocator.index}, "input"), "keydown", ${JSON.stringify(event.hostNodeId)})`,
+		`marklessScalarEventMatches(input, marklessFindElementAtDomOrderIndex(input.root, ${eventLocator.index}), "input", "keydown", ${JSON.stringify(event.hostNodeId)})`,
 	);
 	expect(resumeSource).toContain('input.event?.type === eventName');
-	expect(resumeSource).toContain(`marklessFindElementAtDomOrderIndex(input.root, ${eventLocator.index}, "input")`);
-	expect(resumeSource).toContain(`marklessFindElementAtDomOrderIndex(input.root, ${updateLocator.index}, "output")`);
-	expect(resumeSource).toContain('marklessAssertScalarCell(cell, "state:tally"');
-	expect(resumeSource).toContain('marklessScalarSpecializedTextValue');
+	expect(resumeSource).toContain(`marklessFindElementAtDomOrderIndex(input.root, ${eventLocator.index})`);
+	expect(resumeSource).toContain(`marklessFindElementAtDomOrderIndex(input.root, ${updateLocator.index})`);
+	expect(resumeSource).toContain('marklessDecodeScalarCell(payloadState.cells[0], "state:tally"');
+	expect(resumeSource).toContain('marklessUpdateText');
 	expect(resumeSource).toContain('"Total: " +');
+	expect(resumeSource).not.toContain('input.eventRecord');
 	expect(resumeSource).not.toContain('@markless/web/event-only-lean/scalar-core');
 	expect(resumeSource).not.toContain('payloadRuntimeDemandMap.actions.find');
 	expect(allowed).toContain('web/fns/write-scalar');
@@ -132,9 +133,9 @@ test('wrapped scalar action emits served locator indexes for host and text updat
 	expect(eventLocator).toMatchObject({ tagName: 'button' });
 	expect(updateLocator).toMatchObject({ tagName: 'button' });
 	expect(resumeSource).toContain(
-		`marklessScalarEventMatches(input, marklessFindElementAtDomOrderIndex(input.root, ${eventLocator.index}, "button"), "click", ${JSON.stringify(event.hostNodeId)})`,
+		`marklessScalarEventMatches(input, marklessFindElementAtDomOrderIndex(input.root, ${eventLocator.index}), "button", "click", ${JSON.stringify(event.hostNodeId)})`,
 	);
-	expect(resumeSource).toContain(`marklessFindElementAtDomOrderIndex(input.root, ${updateLocator.index}, "button")`);
+	expect(resumeSource).toContain(`marklessFindElementAtDomOrderIndex(input.root, ${updateLocator.index})`);
 	expect(resumeSource).not.toContain('?? input.element ?? input.event.target');
 });
 
