@@ -390,7 +390,8 @@ let active = state(true);
 		expect(resolverSource).toContain('if (id === "symbol:0")');
 		const resumeSource = (await callLoad(plugin, `\0${resumeId}`)) as string;
 		expect(resumeSource).toContain('export async function resumeContainerEvent');
-		expect(resumeSource).toContain('resumeScalarCoreEventFromPayloadDocument');
+		expect(resumeSource).toContain('marklessResumeSpecializedScalarEvent');
+		expect(resumeSource).not.toContain('resumeScalarCoreEventFromPayloadDocument');
 		const symbolIds = ['symbol:0', 'symbol:1'].map(
 			(symbolId) => `virtual:markless:symbol:${encoded}:${encodeURIComponent(symbolId)}`,
 		);
@@ -415,6 +416,15 @@ let active = state(true);
 
 		expect(resolve).toHaveBeenCalledWith('./items', filename, { skipSelf: true });
 		expect(result).toEqual({ id: '/workspace/app/src/items.ts' });
+	});
+
+	test('base plugin resolves generated inline helper imports from the web package source', async () => {
+		const plugin = marklessClient();
+		const result = await callResolveId(plugin, '@markless/web/inline/sync-policy-core');
+
+		expect(result).toEqual(
+			expect.objectContaining({ id: expect.stringMatching(/packages\/web\/src\/inline\/sync-policy-core\.ts$/) }),
+		);
 	});
 
 	test('base plugin resolves transformed virtual resume symbol routes from the source module', async () => {
@@ -469,7 +479,8 @@ let count = state(0);
 			`virtual:markless:resume:${encodeURIComponent(filename)}`,
 		);
 		expect(result.code).toContain('export async function resumeContainerEvent');
-		expect(result.code).toContain('resumeScalarCoreEventFromPayloadDocument');
+		expect(result.code).toContain('marklessResumeSpecializedScalarEvent');
+		expect(result.code).not.toContain('resumeScalarCoreEventFromPayloadDocument');
 		expect(result.code).not.toContain('const marklessCompiledApp = {');
 		expect(result.code).not.toContain('renderCsr:');
 	});
@@ -696,7 +707,8 @@ export function App() @{
 	});
 	const plainResume = plain.virtualModules.find((module) => module.type === 'resume');
 	expect(plain.code).not.toContain('resumeEventOnlyFromPayloadDocument');
-	expect(plainResume?.source).toContain('resumeScalarCoreEventFromPayloadDocument');
+	expect(plainResume?.source).toContain('marklessResumeSpecializedScalarEvent');
+	expect(plainResume?.source).not.toContain('resumeScalarCoreEventFromPayloadDocument');
 	expect(plain.code).not.toContain(
 		"import { resumeFromPayloadDocument } from '@markless/core/web/resume';",
 	);

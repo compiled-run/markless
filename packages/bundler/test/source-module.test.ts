@@ -63,21 +63,89 @@ test('emitResumeModule routes non-lean event-only entries through the full hando
 	);
 });
 
-test('emitResumeModule routes replaced scalar actions through the scalar resume entry', () => {
+test('emitResumeModule emits a specialized scalar dispatcher with resolved constants', () => {
 	const resumeCode = emitResumeModule({
 		...baseInput,
+		payloadState: {
+			cells: [
+				{
+					graphNodeId: 'state:count',
+					name: 'count',
+					valueKind: 'scalar',
+					value: { version: 1, root: 0, records: [] },
+				},
+			],
+			computed: [],
+		},
+		payloadView: {
+			locators: [
+				{ hostNodeId: 'host:button', index: 3, tagName: 'button' },
+				{ hostNodeId: 'host:label', index: 5, tagName: 'output' },
+			],
+			events: [
+				{
+					hostNodeId: 'host:button',
+					eventName: 'click',
+					symbolIds: ['symbol:click'],
+				},
+			],
+			domUpdates: [
+				{
+					hostNodeId: 'host:label',
+					graphNodeId: 'state:count',
+					symbolId: 'symbol:text',
+					target: { kind: 'text', prefix: 'Count: ' },
+				},
+			],
+		},
 		runtimeDemandMap: {
 			recordKinds: [
 				{ kind: 'event', replaced: true },
 				{ kind: 'dom-update', replaced: true },
 			],
+			actions: [
+				{
+					hostNodeId: 'host:button',
+					eventName: 'click',
+					recordKind: 'event',
+					recordKinds: ['event', 'dom-update'],
+					payloadRecordIds: [],
+					runtimeModuleIds: [],
+					plan: {
+						version: 1,
+						kind: 'scalar',
+						symbolId: 'symbol:click',
+						cell: 'state:count',
+						write: { kind: 'update', updateOperator: '++' },
+						textUpdates: [
+							{
+								hostNodeId: 'host:label',
+								graphNodeId: 'state:count',
+								symbolId: 'symbol:text',
+								prefix: 'Count: ',
+							},
+						],
+					},
+				},
+			],
 		},
 	});
 
-	expect(resumeCode).toContain(
-		"const { resumeScalarCoreEventFromPayloadDocument } = await import('@markless/web/event-only-lean/scalar-core');",
-	);
+	expect(resumeCode).toContain("import { marklessWriteScalar } from '@markless/web/fns/write-scalar';");
+	expect(resumeCode).toContain("import { marklessUpdateText } from '@markless/web/fns/update-text';");
+	expect(resumeCode).toContain('input.eventRecord.hostNodeId === "host:button"');
+	expect(resumeCode).toContain('input.event.type === "click"');
+	expect(resumeCode).toContain('marklessFindElementAtDomOrderIndex(input.root, 3, "button")');
+	expect(resumeCode).toContain('marklessFindElementAtDomOrderIndex(input.root, 5, "output")');
+	expect(resumeCode).toContain('payloadState.cells[0]');
+	expect(resumeCode).toContain('marklessAssertScalarCell(cell, "state:count", "markless/state cell[0]")');
+	expect(resumeCode).toContain('value: "Count: " +');
+	expect(resumeCode).not.toContain('@markless/web/event-only-lean/scalar-core');
+	expect(resumeCode).not.toContain('@markless/web/event-only-lean/lean-shared');
 	expect(resumeCode).not.toContain('@markless/web/event-only-lean/row');
+	expect(resumeCode).not.toContain('@markless/web/inline/sync-policy-core');
+	expect(resumeCode).not.toContain('payloadRuntimeDemandMap.actions.find');
+	expect(resumeCode).not.toContain('payloadView.domUpdates.find');
 	expect(resumeCode).not.toContain('resumeEventOnlyFromPayloadDocument');
 });
 
@@ -112,7 +180,8 @@ test('emitResumeModule branches only for mixed scalar and row lean routes', () =
 	});
 
 	expect(resumeCode).toContain('if (input.eventRecord)');
-	expect(resumeCode).toContain('@markless/web/event-only-lean/scalar-core');
+	expect(resumeCode).toContain('marklessResumeSpecializedScalarEvent(input)');
+	expect(resumeCode).not.toContain('@markless/web/event-only-lean/scalar-core');
 	expect(resumeCode).toContain('@markless/web/event-only-lean/row');
 	expect(resumeCode).not.toContain('resumeEventOnlyFromPayloadDocument');
 });

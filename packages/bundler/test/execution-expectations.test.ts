@@ -31,8 +31,10 @@ test('expectations derive allowed runtime modules from the generated demand map'
 	).not.toThrow();
 	expect(allowed).toContain('web/fns/write-scalar');
 	expect(allowed).toContain('web/fns/update-text');
-	expect(allowed).toContain('web/fns/scalar-core-graph');
-	expect(allowed).toContain('web/event-only-lean/scalar-core');
+	expect(allowed).toContain('web/runtime-error-reporting');
+	expect(allowed).not.toContain('web/fns/scalar-core-graph');
+	expect(allowed).not.toContain('web/event-only-lean/scalar-core');
+	expect(allowed).not.toContain('web/event-only-lean/lean-shared');
 	expect(allowed).not.toContain('web/event-only-lean/row');
 	expect(allowed).toContain('web/execution-log-target');
 	expect(allowed).not.toContain('web/event-only-resume');
@@ -57,6 +59,81 @@ test('generated demand map carries per-kind replacement phase flags', async () =
 		cell: payload.view.domUpdates[0].graphNodeId,
 		symbolId: payload.view.events[0].symbolIds[0],
 	});
+});
+
+test('alternate-shaped scalar action specializes from locator, cell, event, and text artifacts', async () => {
+	const result = await transformTsrxModule({
+		filename: '/workspace/app/Alternate.tsrx',
+		source: `
+			import { state } from '@markless/core';
+			export function Alternate() @{
+				let tally = state(4);
+				<main>
+					<input data-anything="yes" onKeyDown={() => tally++} />
+					<output>Total: {tally}</output>
+				</main>
+			}
+		`,
+	});
+	const payload = payloadView(result.virtualModules.find((module) => module.type === 'payload')?.source);
+	const resumeSource = result.virtualModules.find((module) => module.type === 'resume')?.source ?? '';
+	const event = payload.view.events[0];
+	const update = payload.view.domUpdates[0];
+	const eventLocator = payload.view.locators.find((locator: any) => locator.hostNodeId === event.hostNodeId);
+	const updateLocator = payload.view.locators.find((locator: any) => locator.hostNodeId === update.hostNodeId);
+	const allowed = deriveAllowedModules(payload.view, payload.runtimeDemandMap, {
+		hostNodeId: event.hostNodeId,
+		eventName: event.eventName,
+	});
+
+	expect(event.eventName).toBe('keydown');
+	expect(payload.runtimeDemandMap.actions[0].plan).toMatchObject({
+		kind: 'scalar',
+		cell: 'state:tally',
+		textUpdates: [expect.objectContaining({ prefix: 'Total: ' })],
+	});
+	expect(resumeSource).toContain(`input.eventRecord.hostNodeId === ${JSON.stringify(event.hostNodeId)}`);
+	expect(resumeSource).toContain('input.event.type === "keydown"');
+	expect(resumeSource).toContain(`marklessFindElementAtDomOrderIndex(input.root, ${eventLocator.index}, "input")`);
+	expect(resumeSource).toContain(`marklessFindElementAtDomOrderIndex(input.root, ${updateLocator.index}, "output")`);
+	expect(resumeSource).toContain('marklessAssertScalarCell(cell, "state:tally"');
+	expect(resumeSource).toContain('value: "Total: " +');
+	expect(resumeSource).not.toContain('@markless/web/event-only-lean/scalar-core');
+	expect(resumeSource).not.toContain('payloadRuntimeDemandMap.actions.find');
+	expect(allowed).toContain('web/fns/write-scalar');
+	expect(allowed).toContain('web/fns/update-text');
+	expect(allowed).not.toContain('web/event-only-lean/scalar-core');
+	expect(allowed).not.toContain('web/fns/scalar-core-graph');
+});
+
+test('scalar-looking actions with extra authored work stay on the full dispatch path', async () => {
+	const result = await transformTsrxModule({
+		filename: '/workspace/app/SideEffect.tsrx',
+		source: `
+			import { state } from '@markless/core';
+			export function SideEffect() @{
+				let count = state(0);
+				<button onClick={() => { console.log('clicked'); count++; }}>{count}</button>
+			}
+		`,
+	});
+	const payload = payloadView(result.virtualModules.find((module) => module.type === 'payload')?.source);
+	const resumeSource = result.virtualModules.find((module) => module.type === 'resume')?.source ?? '';
+	const click = payload.view.events[0];
+	const allowed = deriveAllowedModules(payload.view, payload.runtimeDemandMap, {
+		hostNodeId: click.hostNodeId,
+		eventName: click.eventName,
+	});
+
+	expect(payload.runtimeDemandMap.recordKinds).toEqual(
+		['async-boundary', 'behavior', 'branch', 'dom-update', 'element-handle', 'event', 'keyed-repeat']
+			.map((kind) => ({ kind, replaced: false })),
+	);
+	expect(payload.runtimeDemandMap.actions[0].plan).toBeUndefined();
+	expect(resumeSource).not.toContain('marklessRunScalar');
+	expect(resumeSource).not.toContain("import { marklessWriteScalar } from '@markless/web/fns/write-scalar';");
+	expect(allowed).toContain('core/web/resume');
+	expect(allowed).toContain('web/resume-runtime');
 });
 
 test('mixed scalar modules leave replacement phase flags open', async () => {
@@ -197,7 +274,9 @@ test('mixed scalar and row actions keep exact lean modules per action', async ()
 
 	expect(payload.runtimeDemandMap.recordKinds).toContainEqual({ kind: 'event', replaced: true });
 	expect(payload.runtimeDemandMap.recordKinds).toContainEqual({ kind: 'keyed-repeat', replaced: true });
-	expect(counterAllowed).toContain('web/event-only-lean/scalar-core');
+	expect(counterAllowed).not.toContain('web/event-only-lean/scalar-core');
+	expect(counterAllowed).not.toContain('web/event-only-lean/lean-shared');
+	expect(counterAllowed).not.toContain('web/fns/scalar-core-graph');
 	expect(counterAllowed).not.toContain('web/event-only-lean/row');
 	expect(rowAllowed).toContain('web/event-only-lean/row');
 	expect(rowAllowed).not.toContain('web/event-only-lean/scalar-core');
@@ -241,7 +320,9 @@ test('replaced action kinds tighten back to the exact demand set', async () => {
 
 	expect(allowed).toContain('web/fns/write-scalar');
 	expect(allowed).toContain('web/fns/update-text');
-	expect(allowed).toContain('web/fns/scalar-core-graph');
+	expect(allowed).not.toContain('web/fns/scalar-core-graph');
+	expect(allowed).not.toContain('web/event-only-lean/scalar-core');
+	expect(allowed).not.toContain('web/event-only-lean/lean-shared');
 	expect([...allowed].filter((id) => JUDGE_COUNTER_INTERPRETER_CHAIN_SET.has(id))).toEqual([]);
 });
 
