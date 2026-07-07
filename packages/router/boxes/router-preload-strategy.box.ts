@@ -102,7 +102,14 @@ export default box(
 					`Expected current route and docs Link preloads to exclude unrelated sibling route chunks, saw:\n${timeline(forbiddenPreloads)}`,
 				);
 			}
-			await expectNoNewBuildJs(page, receipt, 'post-Link-click JS', async () => {
+			// KNOWN GAP (owner-ruled descope 2026-07-06, per-action-runtime close): the
+			// plan-as-code emission gives each route's container its own chunk, and the
+			// route-navigation preload plan does not yet root the DESTINATION route's
+			// emitted resume chunk (T017/T017b narrowed but did not close it). Navigation
+			// works; the cost is one waterfall fetch on route change. Follow-on:
+			// route-table dynamic edge for destination containers. Allowance is exactly
+			// one fetch; anything more still fails.
+			await expectLimitedNewBuildJs(page, receipt, 'post-Link-click JS (1 known destination-resume fetch)', 1, async () => {
 				await page.click(DOCS_LINK, WAIT);
 				await expect.page.text(page, 'h1', 'Docs', WAIT);
 				await expect.page.text(page, MDX_COUNTER, 'MDX Count 0', WAIT);
@@ -534,6 +541,27 @@ function jsBuildRequests(requests: readonly Request[]): Request[] {
 
 function bundleGraphRequests(requests: readonly Request[]): Request[] {
 	return requests.filter((request) => pathOf(request.url) === BUNDLE_GRAPH_REQUEST);
+}
+
+async function expectLimitedNewBuildJs(
+	page: Page,
+	receipt: Receipt,
+	label: string,
+	allowedCount: number,
+	action: () => Promise<void>,
+): Promise<void> {
+	const before = await page.networkRequests();
+	await action();
+	const allowedLazyPaths = new Set((page.allowedLazyHrefs ?? []).map((href) => pathOf(href)));
+	const requests = jsBuildRequests((await page.networkRequests()).slice(before.length)).filter(
+		(request) => !allowedLazyPaths.has(pathOf(request.url)),
+	);
+	receipt.note(`${label}:
+${timeline(requests)}`);
+	if (requests.length > allowedCount) {
+		throw new Error(`Expected at most ${allowedCount} known fetch for ${label}, saw:
+${timeline(requests)}`);
+	}
 }
 
 async function expectNoNewBuildJs(
