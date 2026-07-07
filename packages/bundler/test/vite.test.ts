@@ -52,7 +52,7 @@ describe('Vite adapter structure', () => {
 		const plugin = getAsyncPlugin();
 
 		expect(plugin.name).toBe('vite-plugin-markless');
-		expect(plugin.enforce).toBe('pre'); // TSRX must compile before vite>=8.1 builtins parse module code
+		expect(plugin.enforce).toBe('post');
 		expect(plugin.sharedDuringBuild).toBe(true);
 		expect(plugin.api?.registerBundleGraphAdder).toEqual(expect.any(Function));
 		expect(plugin.api?.registerPreloadGraphEntries).toEqual(expect.any(Function));
