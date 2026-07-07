@@ -90,7 +90,17 @@ export async function __marklessRouterStartSpaNavigation(options: StartSpaNaviga
 			runtimeWindow.location.href,
 		);
 		const bootHashPath = bootUrl ? hashRoutePath(bootUrl) : undefined;
-		if (bootUrl && bootHashPath && matchRouteManifest(bootHashPath, context.manifest)) {
+		// A swapped-in document keeps the deep-link hash; its rendered-route meta
+		// says what it already shows — re-swapping would race its own resume.
+		const renderedRoute = runtimeWindow.document
+			.querySelector?.('meta[name="markless-router-route"]')
+			?.getAttribute('content');
+		if (
+			bootUrl &&
+			bootHashPath &&
+			bootHashPath !== renderedRoute &&
+			matchRouteManifest(bootHashPath, context.manifest)
+		) {
 			void renderRoute(bootUrl, context);
 		}
 	}

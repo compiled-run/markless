@@ -116,7 +116,10 @@ export function createServerEntry(options: ServerEntryOptions) {
 		const documentModule = options.documentModuleLoader
 			? ((await options.documentModuleLoader()) as DocumentModule)
 			: undefined;
-		const html = await renderDocument(pageOutput, documentModule, pageProps);
+		const html = withRenderedRouteMeta(
+			await renderDocument(pageOutput, documentModule, pageProps),
+			url.pathname,
+		);
 
 		return new Response(html, {
 			status,
@@ -192,15 +195,9 @@ function modulePreloadsForPage(
 	const preloads: ModulePreloadInput[] = [];
 	const seen = new Set<string>();
 	addModulePreloads(preloads, seen, routeSsrModulePreloads?.[file]);
-	if (!routeModulePreloads || !html.includes('data-markless-router-link')) {
-		return preloads.length > 0 ? preloads : undefined;
-	}
-
-	for (const href of routerLinkHrefs(html)) {
-		const url = parseSameOriginUrl(href, baseHref);
-		const match = url && matchRouteManifest(url.pathname, manifest);
-		addModulePreloads(preloads, seen, match && routeModulePreloads[match.route.file]);
-	}
+	// Route swaps are server-rendered: destination pages arrive as fresh SSR
+	// documents that load their own JS, so per-Link destination-route
+	// modulepreloads would fetch chunks that never execute.
 	return preloads.length > 0 ? preloads : undefined;
 }
 
@@ -229,32 +226,6 @@ function splitLeadingModulePreloadLinks(html: string): PageHtml {
 		bodyHtml = bodyHtml.slice(end + 1);
 	}
 	return { bodyHtml, headHtml: links.join('') };
-}
-
-function routerLinkHrefs(html: string): string[] {
-	return [
-		...html.matchAll(
-			/<a\b(?=[^>]*\bdata-markless-router-link(?:[\s=>]|$))(?=[^>]*\bhref="([^"]*)")[^>]*>/g,
-		),
-	].map((match) => unescapeHtmlAttribute(match[1] ?? ''));
-}
-
-function parseSameOriginUrl(href: string, base: string): URL | undefined {
-	try {
-		const current = new URL(base);
-		const url = new URL(href, current);
-		return url.origin === current.origin ? url : undefined;
-	} catch {
-		return undefined;
-	}
-}
-
-function unescapeHtmlAttribute(value: string): string {
-	return value
-		.replaceAll('&quot;', '"')
-		.replaceAll('&gt;', '>')
-		.replaceAll('&lt;', '<')
-		.replaceAll('&amp;', '&');
 }
 
 async function renderDocument(
@@ -291,6 +262,25 @@ async function renderDocument(
 		'</body>',
 		'</html>',
 	].join('');
+}
+
+// The rendered route travels in the document so a '#/' deep-link boot can
+// tell whether the current document ALREADY shows the hash route (a swapped
+// document keeps the hash; re-swapping would race its own resume).
+function withRenderedRouteMeta(html: string, pathname: string): string {
+	const meta = `<meta name="markless-router-route" content="${escapeHtmlAttribute(pathname)}">`;
+	// Synchronous head script: when the deep-link hash names a DIFFERENT route
+	// than this document renders, a swap is coming — flag it before any
+	// deferred script runs so the doomed document's resume stands down
+	// (resuming while the swap rewrites the DOM misaligns locators).
+	const swapFlag = `<script>(function(){var h=location.hash;if(h&&h.indexOf('#/')===0&&h.slice(1)!==${JSON.stringify(pathname)}){window.__marklessRouterSwapPending=true;}})()</script>`;
+	const headEnd = html.indexOf('</head>');
+	if (headEnd === -1) return html;
+	return `${html.slice(0, headEnd)}${meta}${swapFlag}${html.slice(headEnd)}`;
+}
+
+function escapeHtmlAttribute(value: string): string {
+	return value.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;');
 }
 
 async function renderDocumentModule(

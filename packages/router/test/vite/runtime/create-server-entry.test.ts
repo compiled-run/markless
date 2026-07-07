@@ -124,7 +124,7 @@ describe('server entry rendering', () => {
 		expect(html).not.toContain('__marklessRouterStartSpaNavigation');
 	});
 
-	it('emits exact route modulepreloads for visible Link targets', async () => {
+	it('emits no destination-route modulepreloads for Links (swaps are server-rendered)', async () => {
 		const entry = createServerEntry({
 			navigationEntryPath: '/build/navigation.js',
 			resumeEntryPath: '/build/resume.js',
@@ -150,9 +150,10 @@ describe('server entry rendering', () => {
 		const response = await entry.fetch(new Request('http://markless-router.test/'));
 		const html = await response.text();
 
-		expect(html).toContain('<link rel="modulepreload" href="/build/navigation.js"');
-		expect(html).toContain('<link rel="modulepreload" href="/build/docs.js"');
-		expect(html).toContain('<link rel="modulepreload" href="/build/docs-symbol.js"');
+		// Destination pages arrive as fresh SSR documents that load their own
+		// JS; preloading their chunks here would fetch code that never executes.
+		expect(html).not.toContain('<link rel="modulepreload" href="/build/docs.js"');
+		expect(html).not.toContain('<link rel="modulepreload" href="/build/docs-symbol.js"');
 		expect(html).not.toContain('/build/not-found.js');
 	});
 
