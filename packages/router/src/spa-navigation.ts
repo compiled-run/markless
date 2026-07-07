@@ -3,6 +3,7 @@ import {
 	matchRouteManifest,
 	type RouteManifest,
 } from './route-manifest.ts';
+import { dispatchRouteUpdate, type RouteDocumentModule } from './route-state.ts';
 
 const STARTED = '__marklessRouterSpaNavigationStarted';
 const LINK_ATTRIBUTE = 'data-markless-router-link';
@@ -34,6 +35,7 @@ export interface StartSpaNavigationOptions {
 	readonly documentModuleLoader?: () => Promise<unknown>;
 	readonly loadPolyfill?: () => Promise<MarklessRouterNavigationPolyfillModule>;
 	readonly pageModuleLoaders: Record<string, () => Promise<unknown>>;
+	readonly preloadRouteModule?: (file: string) => unknown;
 	readonly routeFileIds: readonly string[];
 	readonly window?: MarklessRouterNavigationWindow;
 }
@@ -42,6 +44,7 @@ interface NavigationContext {
 	readonly documentModuleLoader?: () => Promise<unknown>;
 	readonly manifest: RouteManifest;
 	readonly pageModuleLoaders: Record<string, () => Promise<unknown>>;
+	readonly preloadRouteModule?: (file: string) => unknown;
 	readonly window: MarklessRouterNavigationWindow;
 }
 
@@ -69,6 +72,7 @@ export async function __marklessRouterStartSpaNavigation(options: StartSpaNaviga
 		documentModuleLoader: options.documentModuleLoader,
 		manifest: buildRouteManifestFromFileIds(options.routeFileIds),
 		pageModuleLoaders: options.pageModuleLoaders,
+		preloadRouteModule: options.preloadRouteModule,
 		window: runtimeWindow,
 	};
 	const navigation = await ensureNavigationRuntime(runtimeWindow, options.loadPolyfill);
@@ -90,17 +94,7 @@ export async function __marklessRouterStartSpaNavigation(options: StartSpaNaviga
 			runtimeWindow.location.href,
 		);
 		const bootHashPath = bootUrl ? hashRoutePath(bootUrl) : undefined;
-		// A swapped-in document keeps the deep-link hash; its rendered-route meta
-		// says what it already shows — re-swapping would race its own resume.
-		const renderedRoute = runtimeWindow.document
-			.querySelector?.('meta[name="markless-router-route"]')
-			?.getAttribute('content');
-		if (
-			bootUrl &&
-			bootHashPath &&
-			bootHashPath !== renderedRoute &&
-			matchRouteManifest(bootHashPath, context.manifest)
-		) {
+		if (bootUrl && bootHashPath && matchRouteManifest(bootHashPath, context.manifest)) {
 			void renderRoute(bootUrl, context);
 		}
 	}
@@ -148,35 +142,30 @@ async function renderRoute(url: URL, context: NavigationContext, signal?: AbortS
 		return;
 	}
 
-	// Route swaps are INITIAL renders of the destination page: fetch the
-	// server-rendered document for the route path and resume it — component
-	// bodies execute during initial render, never in the browser (the
-	// no-hydration doctrine applies to navigation too). Hash routes translate
-	// to their pathname for the server, which cannot see fragments.
-	try {
-		const response = await context.window.fetch(
-			`${routePathname(url, context)}${url.search}`,
-			{ headers: { accept: 'text/html' } },
-		);
-		if (signal?.aborted) return;
-		if (!response.ok) {
-			context.window.location.assign(url.href);
-			return;
-		}
-		const html = await response.text();
-		if (signal?.aborted) return;
-		// The JS realm survives document.write: tell live runtimes to tear down
-		// their container listeners before the new document takes over.
-		(context.window as { dispatchEvent?: (event: Event) => void }).dispatchEvent?.(
-			new Event('markless-router:before-document-swap'),
-		);
-		const swapDocument = context.window.document;
-		swapDocument.open();
-		swapDocument.write(html);
-		swapDocument.close();
-	} catch {
-		context.window.location.assign(url.href);
+	// Route swaps render the destination page CLIENT-SIDE: load its page
+	// module, dispatch a route update, and let the route renderer run
+	// renderCsr — async boundaries settle interactively through commitArm.
+	// (No hydration is violated only by re-executing components over existing
+	// server HTML; rendering NEW pages in the browser is the D7 model.)
+	preloadRouteModule(context, match.route.file);
+	const [page, document] = await Promise.all([
+		loadPageModule(),
+		context.documentModuleLoader?.(),
+	]);
+	if (signal?.aborted) {
+		return;
 	}
+
+	dispatchRouteUpdate(context.window.document, {
+		document: document as RouteDocumentModule | undefined,
+		page: page as never,
+		route: {
+			file: match.route.file,
+			params: match.params,
+			status: 200,
+			url: url.href,
+		},
+	});
 }
 
 function handleLinkClick(
@@ -206,6 +195,7 @@ function handleLinkClick(
 		return;
 	}
 
+	preloadRouteModule(context, match.route.file);
 	event.preventDefault();
 	navigation.navigate(url.href, {
 		history: anchor.hasAttribute(REPLACE_ATTRIBUTE) ? 'replace' : 'push',
@@ -214,6 +204,14 @@ function handleLinkClick(
 			scroll: anchor.getAttribute(SCROLL_ATTRIBUTE) === 'manual' ? 'manual' : undefined,
 		},
 	});
+}
+
+function preloadRouteModule(context: NavigationContext, file: string): void {
+	try {
+		context.preloadRouteModule?.(file);
+	} catch {
+		// Route preloads are opportunistic; navigation still imports the route module.
+	}
 }
 
 function routeUrl(event: NavigateEvent, context: NavigationContext) {
