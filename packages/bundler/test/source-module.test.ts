@@ -105,6 +105,9 @@ test('specialized scalar dispatcher accepts the real raw event entry shape', () 
 
 test('specialized scalar dispatcher carries sync policy state through full fallback', () => {
 	const input = scalarResumeInput();
+	// A second, plan-less ACTION keeps the page off scalar-only 'fail' mode so the
+	// dispatcher emits the FULL fallback this test is about.
+	(input.runtimeDemandMap.actions as Array<Record<string, unknown>>).push({ hostNodeId: 'host:other', eventName: 'input', recordKind: 'event', recordKinds: ['event'], payloadRecordIds: [], runtimeModuleIds: [] });
 	(input.payloadView.events[0] as { syncPolicy?: unknown }).syncPolicy = {
 		when: { type: 'graph-truthy', graphNodeId: 'state:count', path: [] },
 		actions: ['preventDefault'],

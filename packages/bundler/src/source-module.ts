@@ -169,6 +169,7 @@ export function emitResumeModule(input: {
 			input.needsFullResume ?? false,
 			leanResumeMode(input.runtimeDemandMap),
 			scalarSpecializations,
+			input.runtimeDemandMap,
 		),
 		'',
 	]
@@ -264,6 +265,7 @@ function emitResumeContainerEvent(
 	needsFullResume: boolean,
 	leanMode: LeanResumeMode,
 	scalarSpecializations: ReadonlyArray<ScalarSpecialization>,
+	runtimeDemandMap: unknown,
 ): string {
 	const fullResumeHandoff = [
 		'async function marklessFullResumeHandoff(handoff) {',
@@ -277,7 +279,7 @@ function emitResumeContainerEvent(
 		'	await runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true });',
 		'}',
 	].join('\n');
-	const scalarOnlySpecialized = leanMode === 'scalar' && scalarSpecializations.length > 0 && allEventActionsHaveScalarPlan(input.runtimeDemandMap);
+	const scalarOnlySpecialized = leanMode === 'scalar' && scalarSpecializations.length > 0 && allEventActionsHaveScalarPlan(runtimeDemandMap);
 	const scalarDispatcher = scalarSpecializations.length > 0
 		? emitSpecializedScalarDispatcher(scalarSpecializations, loadSymbolName, scalarOnlySpecialized ? 'fail' : 'full')
 		: emitSpecializedScalarDispatcher([], loadSymbolName, 'full');
