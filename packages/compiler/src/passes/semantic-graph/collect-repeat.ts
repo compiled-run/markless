@@ -75,6 +75,7 @@ export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | nu
 	state.graph.keyedRepeats.push({
 		id: `repeat:${repeatIndex}`,
 		parentHostNodeId: state.currentHostNodeId,
+		...(state.currentAsyncBoundaryId ? { asyncBoundaryId: state.currentAsyncBoundaryId } : {}),
 		itemName,
 		...(indexName ? { indexName } : {}),
 		collectionSource,

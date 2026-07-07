@@ -5171,3 +5171,28 @@ export default function List() @{
 	expect(result.publicRenderModule.ssrModuleSource).toContain("'#/r/' + r.id");
 	expect(result.publicRenderModule.ssrModuleSource).toContain("'repo-link-' + r.id");
 });
+
+test('repeat inside an async arm registers the boundary read and SSRs rows', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/App.tsrx',
+		source: `import { computed } from '@markless/core';
+export default function Home() @{
+	const view = computed(async () => ({ repos: [{ id: 'a' }, { id: 'b' }] }));
+	<main>
+		@try {
+			<div class="list">
+				@for (const r of view.repos; key r.id) {
+					<a class="row" href={'#/r/' + r.id}>{r.id}</a>
+				}
+			</div>
+		} @pending { <p>Loading</p> } @catch { <p>Broken</p> }
+	</main>
+}`,
+		symbols: [],
+	});
+
+	expect(result.protocolView.asyncBoundaries[0]?.asyncReads).toEqual([
+		expect.objectContaining({ graphNodeId: 'computed:view' }),
+	]);
+	expect(result.publicRenderModule.ssrModuleSource).toContain('marklessSsrRepeatRows');
+});

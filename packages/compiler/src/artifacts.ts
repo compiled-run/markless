@@ -160,6 +160,9 @@ export type SemanticHostNode = {
 export type SemanticKeyedRepeat = {
 	readonly id: string;
 	readonly parentHostNodeId: string;
+	// Present when the repeat renders inside an @try/@pending/@catch arm: the
+	// boundary owns the repeat's async collection read.
+	readonly asyncBoundaryId?: string;
 	readonly rowHostNodeId?: string;
 	readonly itemName: string;
 	readonly indexName?: string;

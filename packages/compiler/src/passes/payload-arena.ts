@@ -130,7 +130,15 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 			index: (anchorRank.get(boundary.id) ?? 0) * 2 + 1,
 		},
 		asyncReads: uniqueBy(
-			input.semanticGraph.templateReads.flatMap((read) => {
+			[
+				...input.semanticGraph.templateReads,
+				// Keyed repeats inside the arm read their collection from the
+				// boundary's async computed — the boundary owns that read too.
+				...input.semanticGraph.keyedRepeats.map((repeat) => ({
+					source: repeat.collectionSource,
+					asyncBoundaryId: repeat.asyncBoundaryId,
+				})),
+			].flatMap((read) => {
 				if (read.asyncBoundaryId !== boundary.id) return [];
 
 				const resolved = resolveGraphPath(read.source, bindings, aliases);
