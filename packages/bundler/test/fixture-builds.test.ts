@@ -20,7 +20,7 @@ const fixtures = [
 			entryHtml: 'packages/bundler/fixtures/vite-csr/dist/index.html',
 			maxRuntimeChunkGzipBytes: 3_100,
 			// anti-bloat wall — tightened by the runtime-stdlib goal; any increase must be justified
-			maxEmittedRuntimeGzipBytes: 15_500, // anti-bloat wall, measured 15,348; re-baselined 2026-07-06 after resume-time escalation made the fail-closed full-resume chain emit-reachable (emitted != fetched != executed; per-chunk caps unchanged and passing); tighten-only from here; runtime-stdlib goal shrinks the library itself
+			maxEmittedRuntimeGzipBytes: 17_125, // anti-bloat wall, measured 17,033; re-baselined 2026-07-07 after tier-4 commitArm became emit-reachable (demand-loaded via dynamic import; per-chunk caps unchanged); tighten-only from here; runtime-stdlib goal shrinks the library itself
 			forbidVitePreloadHelper: true,
 		},
 	},
@@ -52,7 +52,7 @@ const fixtures = [
 			entryHtml: 'packages/bundler/fixtures/vite-plus/dist/index.html',
 			maxRuntimeChunkGzipBytes: 2_950,
 			// anti-bloat wall — tightened by the runtime-stdlib goal; any increase must be justified
-			maxEmittedRuntimeGzipBytes: 15_450, // anti-bloat wall, measured 15,272; re-baselined 2026-07-06 after resume-time escalation made the fail-closed full-resume chain emit-reachable (emitted != fetched != executed; per-chunk caps unchanged and passing); tighten-only from here; runtime-stdlib goal shrinks the library itself
+			maxEmittedRuntimeGzipBytes: 17_100, // anti-bloat wall, measured 17,020; re-baselined 2026-07-07 after tier-4 commitArm became emit-reachable (demand-loaded via dynamic import; per-chunk caps unchanged); tighten-only from here; runtime-stdlib goal shrinks the library itself
 			forbidVitePreloadHelper: true,
 		},
 	},
