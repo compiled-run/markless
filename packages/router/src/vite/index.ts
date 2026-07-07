@@ -624,6 +624,10 @@ function includeChunk(
 	for (const imported of chunk.imports) {
 		includeChunk(fileNames, chunksByFileName, imported, includeDynamic, visitedDynamic);
 	}
+	for (const imported of codeStaticImports(chunk)) {
+		if (!chunksByFileName.has(imported)) continue;
+		includeChunk(fileNames, chunksByFileName, imported, includeDynamic, visitedDynamic);
+	}
 	if (!includeDynamic || visitedDynamic.has(fileName)) {
 		return;
 	}
@@ -631,6 +635,31 @@ function includeChunk(
 	for (const imported of chunk.dynamicImports) {
 		includeChunk(fileNames, chunksByFileName, imported, true, visitedDynamic);
 	}
+	for (const imported of codeDynamicImports(chunk)) {
+		if (!chunksByFileName.has(imported)) continue;
+		includeChunk(fileNames, chunksByFileName, imported, true, visitedDynamic);
+	}
+}
+
+function codeStaticImports(chunk: OutputChunkLike): string[] {
+	return codeImportSpecifiers(
+		chunk,
+		/(?:import\s*(?:[^('"`]*?\bfrom\s*)?|export\s*[^('"`]*?\bfrom\s*)["'](\.\/[^"']+\.js)["']/g,
+	);
+}
+
+function codeDynamicImports(chunk: OutputChunkLike): string[] {
+	return codeImportSpecifiers(chunk, /import\(\s*["'`](\.\/[^"'`]+\.js)["'`]\s*\)/g);
+}
+
+function codeImportSpecifiers(chunk: OutputChunkLike, pattern: RegExp): string[] {
+	if (!chunk.code) return [];
+	const imports = new Set<string>();
+	for (const match of chunk.code.matchAll(pattern)) {
+		const specifier = match[1];
+		if (specifier) imports.add(normalize(join(dirname(chunk.fileName), specifier)));
+	}
+	return [...imports];
 }
 
 function outputChunks(bundle: Record<string, unknown>): OutputChunkLike[] {
