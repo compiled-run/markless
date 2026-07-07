@@ -49,6 +49,7 @@ export async function renderCsrRuntime(input: {
 		createRemovalObserver: options.createRemovalObserver,
 		applyDomJournal,
 		renderBranchHtml: options.renderBranchHtml ?? globalDocumentBranchHtml(),
+		demandAsyncBoundaries: true,
 	});
 	await runtime.start();
 	output.connectRuntime?.({ graph, runtime });

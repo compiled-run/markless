@@ -13,6 +13,10 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 	readonly renderBranchHtml: ResumeRuntimeInput['renderBranchHtml'];
 	readonly elementHandles: ResumePreparedCore['elementHandles'];
 	readonly storeContainerSubscription: (release: () => void) => void;
+	// CSR mounts render @pending with no settled snapshot: the runner must be
+	// demanded at start or the boundary never settles (need 10). SSR-resumed
+	// pages hold snapshots and stay lazy (demanded-execution doctrine).
+	readonly demandOnStart?: boolean;
 }): void {
 	for (const boundary of input.asyncBoundariesById.values()) {
 		for (const asyncRead of boundary.asyncReads) {
@@ -43,7 +47,7 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 				}),
 			);
 		}
-		if (boundary.updateSymbolId) {
+		if (boundary.updateSymbolId || input.demandOnStart === true) {
 			for (const asyncRead of boundary.asyncReads) input.graph.read(asyncRead.graphNodeId, ['status']);
 		}
 	}

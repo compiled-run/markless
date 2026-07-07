@@ -63,6 +63,7 @@ export async function startResumeRuntime(input: {
 		(await import('./resume-async-wiring.ts')).wireAsyncBoundariesWithoutLoadingCapability({
 			asyncBoundariesById: prepared.asyncBoundariesById, graph: runtimeInput.graph, root: runtimeInput.root,
 			loadSymbol: runtimeInput.loadSymbol, renderBranchHtml: runtimeInput.renderBranchHtml, elementHandles: prepared.elementHandles, storeContainerSubscription,
+			demandOnStart: runtimeInput.demandAsyncBoundaries === true,
 		});
 	}
 	if (runtimeInput.view.events.some((event) => event.eventName === 'visible')) {
