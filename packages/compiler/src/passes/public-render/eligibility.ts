@@ -4,9 +4,14 @@ type ProtocolState = PublicRenderModuleInput['protocolState'];
 type ProtocolView = PublicRenderModuleInput['protocolView'];
 
 export function canEmitPublicRenderModule(publicRenderPlan: PublicRenderPlanArtifact): boolean {
+	// Arm-scoped repeats render via in-scope SSR/CSR arm mapping and carry no
+	// top-level planned record by design.
+	const planNeeded = publicRenderPlan.repeatGates.filter(
+		(gate) => !(gate.supported && gate.armScoped === true),
+	);
 	return (
 		(!publicRenderPlan.repeatGates.some((gate) => !gate.supported) &&
-			publicRenderPlan.keyedRepeats.length === publicRenderPlan.repeatGates.length) ||
+			publicRenderPlan.keyedRepeats.length === planNeeded.length) ||
 		publicRenderPlan.repeatGates.length === 0
 	);
 }

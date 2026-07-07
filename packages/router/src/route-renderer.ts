@@ -9,7 +9,9 @@ export function startRouteUpdateRenderer(document: Document = window.document): 
 	state[ROUTE_RENDERER_STARTED] = true;
 
 	document.addEventListener(MARKLESS_ROUTER_ROUTE_EVENT, (event) => {
-		void renderRouteUpdate(document, (event as CustomEvent<RouteUpdate>).detail);
+		renderRouteUpdate(document, (event as CustomEvent<RouteUpdate>).detail).catch((error) => {
+			console.warn('[mx-rru] route update failed', String(error).slice(0, 160));
+		});
 	});
 }
 
@@ -25,6 +27,7 @@ interface ClientPageArtifact {
 
 async function renderRouteUpdate(document: Document, update: RouteUpdate): Promise<void> {
 	const artifact = update.page.default as ClientPageArtifact | undefined;
+	console.warn('[mx-rru] artifact', typeof artifact, 'csr:', typeof artifact?.renderCsr, 'ssr:', typeof artifact?.renderSsr);
 	if (!artifact) return;
 
 	const props = routePageProps(update.route);

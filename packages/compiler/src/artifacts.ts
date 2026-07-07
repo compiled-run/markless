@@ -866,6 +866,9 @@ export type PublicRenderPlanRepeatGate =
 			// direct-DOM runtime stays off because it cannot rewrite index text on
 			// reorder yet.
 			readonly ssrOnly?: true;
+			// The repeat renders inside an async boundary arm: SSR/CSR map it in
+			// scope, so no top-level planned record exists (or is needed).
+			readonly armScoped?: true;
 	  }
 	| {
 			readonly repeatId: string;

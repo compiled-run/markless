@@ -117,7 +117,15 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 		const row = singleRowRoot(repeatNode);
 		const parentLocator = locatorByHostNodeId.get(payloadRepeat.parentHostNodeId);
 		const parentPath = hostPaths.get(payloadRepeat.parentHostNodeId);
-		if (!row || !parentLocator || !parentPath) continue;
+		if (!row || !parentLocator || !parentPath) {
+			// In-arm repeats have no top-level locator by design: the SSR/CSR arm
+			// emission maps them in scope. Mark the gate so eligibility doesn't
+			// demand a planned record that cannot exist.
+			if (semanticRepeat.asyncBoundaryId && gate.supported) {
+				repeatGates[repeatGates.length - 1] = { ...gate, armScoped: true };
+			}
+			continue;
+		}
 
 		const rowPlan = collectRowPlan({
 			aliases,

@@ -138,6 +138,7 @@ async function renderRoute(url: URL, context: NavigationContext, signal?: AbortS
 
 	const match = matchRouteManifest(routePathname(url, context), context.manifest);
 	const loadPageModule = match && context.pageModuleLoaders[match.route.file];
+	console.warn('[mx-rr] match', match?.route.file, 'loader', Boolean(loadPageModule));
 	if (!match || !loadPageModule) {
 		context.window.location.assign(url.href);
 		return;
@@ -152,6 +153,7 @@ async function renderRoute(url: URL, context: NavigationContext, signal?: AbortS
 		return;
 	}
 
+	console.warn('[mx-rr] dispatching route update', match.route.file);
 	dispatchRouteUpdate(context.window.document, {
 		document: document as RouteDocumentModule | undefined,
 		page: page as never,

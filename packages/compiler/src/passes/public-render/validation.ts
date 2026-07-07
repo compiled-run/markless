@@ -172,21 +172,12 @@ export function repeatRenderDiagnostics(input: {
 				}),
 			];
 		}
-		if (input.componentEdgeCount > 0) {
-			return [
-				unsupportedRenderConstructDiagnostic({
-					label: '@for',
-					message:
-						'Keyed repeat rows are skipped in SSR output when the module renders component children, so the list content is dropped.',
-					node,
-					filename: input.filename,
-					suggestion:
-						'Keep the repeat in a component without child components until repeat rows compose with component children.',
-				}),
-			];
-		}
+		// Component-composed pages render repeat rows since the SSR/CSR row
+		// mappers append locators through the same stream child composition
+		// consumes (dashboard-migration need 6; component-wrapped-rows fixture).
 		if (
 			!gate.ssrOnly &&
+			gate.armScoped !== true &&
 			!input.keyedRepeats.some((repeat) => repeat.repeatId === gate.repeatId)
 		) {
 			return [

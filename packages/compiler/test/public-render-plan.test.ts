@@ -466,7 +466,7 @@ test('planPublicRender keeps component-child fragment roots diagnosed with a sco
 	]);
 });
 
-test('planPublicRender reports supported repeat rows skipped by component children', async () => {
+test('planPublicRender does not flag supported repeat rows on component-composed pages (need 6)', async () => {
 	const { plan } = await createRenderPlan(
 		'src/MixedList.tsrx',
 		appSource(
@@ -477,14 +477,9 @@ test('planPublicRender reports supported repeat rows skipped by component childr
 	);
 
 	expect(plan.repeatGates).toEqual([{ repeatId: 'repeat:0', supported: true }]);
-	expect(plan.diagnostics).toEqual([
-		expect.objectContaining({
-			code: 'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
-			severity: 'error',
-			phase: 'public-render',
-			message: expect.stringContaining('component children'),
-		}),
-	]);
+	// Component-composed pages now render repeat rows (dashboard-migration
+	// need 6): no unsupported-construct diagnostic for the @for.
+	expect(plan.diagnostics).toEqual([]);
 });
 
 async function createRenderPlan(filename: string, source: string) {
