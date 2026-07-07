@@ -1,0 +1,241 @@
+import { materializeArmRecords } from './resume-arm-records.ts';
+import {
+	containsElement,
+	elementsBetweenAnchors,
+	hostIdsInsideRemovedElements,
+} from './resume-locators.ts';
+import type {
+	ResumeArmRecordSet,
+	ResumeAsyncBoundaryRecord,
+	ResumeBehaviorRecord,
+	ResumeDomElement,
+	ResumeDomNode,
+	ResumeEventRecord,
+} from './resume-types.ts';
+
+// D1 tier 4: commitArm replaces the DOM range between an async boundary's
+// comment-anchor pair with freshly rendered arm content and re-registers the
+// arm-relative records (D3) against the new DOM. Every consumer of arm
+// rendering — CSR settle, post-mutation re-settle, streaming (T107) — routes
+// through this one primitive. Range replacement is destructive, so the commit
+// captures focus/selection/scroll first and restores what survives.
+
+export type ArmCommitUpdate = {
+	readonly html: string;
+	readonly armRecords: ResumeArmRecordSet;
+};
+
+type CommitParent = {
+	readonly childNodes: ArrayLike<ResumeDomNode>;
+	insertBefore: (node: ResumeDomNode, before: ResumeDomNode | null) => unknown;
+	removeChild: (node: ResumeDomNode) => unknown;
+};
+type CommitAnchor = ResumeDomNode & { readonly parentNode?: CommitParent | null };
+type FocusableElement = ResumeDomElement & {
+	readonly focus?: () => void;
+	readonly getAttribute?: (name: string) => string | null;
+	readonly selectionStart?: number | null;
+	readonly selectionEnd?: number | null;
+	readonly setSelectionRange?: (start: number, end: number) => void;
+};
+type CommitWindow = {
+	readonly scrollX?: number;
+	readonly scrollY?: number;
+	readonly scrollTo?: (x: number, y: number) => void;
+};
+type CommitDocument = {
+	readonly activeElement?: unknown;
+	readonly defaultView?: CommitWindow | null;
+};
+type CapturedFocusScroll = {
+	readonly view?: CommitWindow;
+	readonly scroll?: { readonly x: number; readonly y: number };
+	readonly active?: {
+		readonly hostNodeId?: string;
+		readonly testId?: string;
+		readonly selection?: { readonly start: number; readonly end: number };
+	};
+};
+
+export function createArmCommitter(deps: {
+	readonly root: ResumeDomElement;
+	readonly renderHtml?: (html: string) => ReadonlyArray<ResumeDomNode>;
+	readonly elementsByHostId: Map<string, ResumeDomElement>;
+	readonly disposedHosts: Set<string>;
+	readonly disposeHost: (hostNodeId: string) => void;
+	readonly addEventRecord: (element: ResumeDomElement, record: ResumeEventRecord) => void;
+	readonly registerElementHandle: (
+		hostNodeId: string,
+		handle: { readonly handleId: string; readonly name: string },
+		element: ResumeDomElement,
+	) => void;
+	readonly addBehaviors?: (
+		hostNodeId: string,
+		records: ResumeBehaviorRecord[],
+	) => Promise<void>;
+	readonly documentHost?: CommitDocument;
+}) {
+	return async function commitArm(
+		boundary: ResumeAsyncBoundaryRecord,
+		update: ArmCommitUpdate,
+	): Promise<void> {
+		if (!deps.renderHtml) throw armCommitRendererMissingError(boundary);
+		const fresh = deps.renderHtml(update.html);
+		const outgoing = elementsBetweenAnchors(deps.root, boundary.startAnchor, boundary.endAnchor);
+		const captured = captureFocusScroll(deps, outgoing);
+		for (const hostNodeId of hostIdsInsideRemovedElements(deps.elementsByHostId, outgoing)) {
+			deps.disposeHost(hostNodeId);
+		}
+		replaceAnchorRange(boundary, fresh);
+		// Locator misalignment against the fresh DOM throws loud here (D2): a
+		// commit that cannot prove its census must never half-register records.
+		const materialized = materializeArmRecords({
+			root: deps.root,
+			startAnchor: boundary.startAnchor,
+			armRecords: update.armRecords,
+		});
+		for (const [hostNodeId, element] of materialized.elementsByHostId) {
+			deps.disposedHosts.delete(hostNodeId);
+			deps.elementsByHostId.set(hostNodeId, element);
+		}
+		for (const record of materialized.events) {
+			const element = materialized.elementsByHostId.get(record.hostNodeId);
+			if (element) deps.addEventRecord(element, record);
+		}
+		for (const handle of materialized.elementHandles) {
+			const element = materialized.elementsByHostId.get(handle.hostNodeId);
+			if (element) deps.registerElementHandle(handle.hostNodeId, handle, element);
+		}
+		if (deps.addBehaviors && materialized.behaviors.length > 0) {
+			const byHost = new Map<string, ResumeBehaviorRecord[]>();
+			for (const behavior of materialized.behaviors) {
+				const records = byHost.get(behavior.hostNodeId) ?? [];
+				records.push(behavior);
+				byHost.set(behavior.hostNodeId, records);
+			}
+			for (const [hostNodeId, records] of byHost) await deps.addBehaviors(hostNodeId, records);
+		}
+		restoreFocusScroll(deps, boundary, captured, materialized.elementsByHostId);
+	};
+}
+
+// Both anchors must be live siblings under one parent BEFORE anything is
+// removed: a corrupt census fails clean instead of half-emptying the page.
+function replaceAnchorRange(
+	boundary: ResumeAsyncBoundaryRecord,
+	fresh: ReadonlyArray<ResumeDomNode>,
+): void {
+	const start = boundary.startAnchor as CommitAnchor;
+	const end = boundary.endAnchor as CommitAnchor;
+	const parent = start.parentNode;
+	if (!parent || parent !== end.parentNode) throw armCommitAnchorsError(boundary);
+	const siblings = Array.from(parent.childNodes);
+	const startIndex = siblings.indexOf(start);
+	const endIndex = siblings.indexOf(end);
+	if (startIndex === -1 || endIndex <= startIndex) throw armCommitAnchorsError(boundary);
+	for (const node of siblings.slice(startIndex + 1, endIndex)) parent.removeChild(node);
+	for (const node of fresh) parent.insertBefore(node, end);
+}
+
+function captureFocusScroll(
+	deps: Parameters<typeof createArmCommitter>[0],
+	outgoing: ReadonlySet<ResumeDomElement>,
+): CapturedFocusScroll {
+	const documentHost =
+		deps.documentHost ?? (globalThis as { readonly document?: CommitDocument }).document;
+	const view = documentHost?.defaultView ?? undefined;
+	const scroll =
+		typeof view?.scrollX === 'number' && typeof view.scrollY === 'number'
+			? { x: view.scrollX, y: view.scrollY }
+			: undefined;
+	const active = documentHost?.activeElement as FocusableElement | null | undefined;
+	const insideRange =
+		!!active && [...outgoing].some((element) => containsElement(element, active));
+	if (!insideRange) return { view, scroll };
+	let hostNodeId: string | undefined;
+	for (const [id, element] of deps.elementsByHostId) {
+		if (element === active) {
+			hostNodeId = id;
+			break;
+		}
+	}
+	const testId = active.getAttribute?.('data-testid') ?? undefined;
+	const selection =
+		typeof active.selectionStart === 'number'
+			? {
+					start: active.selectionStart,
+					end: typeof active.selectionEnd === 'number'
+						? active.selectionEnd
+						: active.selectionStart,
+				}
+			: undefined;
+	return { view, scroll, active: { hostNodeId, testId, selection } };
+}
+
+// Focus restores only when an equivalent target survived the commit (same
+// hostNodeId registration or data-testid in the fresh range). Otherwise focus
+// is intentionally left where the browser put it: the replaced content is new
+// by definition and has no prior focus state to preserve.
+function restoreFocusScroll(
+	deps: Parameters<typeof createArmCommitter>[0],
+	boundary: ResumeAsyncBoundaryRecord,
+	captured: CapturedFocusScroll,
+	freshByHostId: ReadonlyMap<string, ResumeDomElement>,
+): void {
+	if (captured.active) {
+		const byHostId = captured.active.hostNodeId
+			? freshByHostId.get(captured.active.hostNodeId)
+			: undefined;
+		const survivor = (byHostId ??
+			findByTestId(deps.root, boundary, captured.active.testId)) as FocusableElement | undefined;
+		if (survivor && typeof survivor.focus === 'function') {
+			survivor.focus();
+			if (captured.active.selection && typeof survivor.setSelectionRange === 'function') {
+				survivor.setSelectionRange(captured.active.selection.start, captured.active.selection.end);
+			}
+		}
+	}
+	if (
+		captured.scroll &&
+		captured.view?.scrollTo &&
+		(captured.view.scrollX !== captured.scroll.x || captured.view.scrollY !== captured.scroll.y)
+	) {
+		captured.view.scrollTo(captured.scroll.x, captured.scroll.y);
+	}
+}
+
+function findByTestId(
+	root: ResumeDomElement,
+	boundary: ResumeAsyncBoundaryRecord,
+	testId: string | undefined,
+): ResumeDomElement | undefined {
+	if (testId === undefined) return undefined;
+	for (const element of elementsBetweenAnchors(root, boundary.startAnchor, boundary.endAnchor)) {
+		if ((element as FocusableElement).getAttribute?.('data-testid') === testId) return element;
+	}
+	return undefined;
+}
+
+function armCommitAnchorsError(boundary: ResumeAsyncBoundaryRecord): Error {
+	const error = new Error(
+		`MARKLESS_ARM_COMMIT_ANCHORS_MISSING: Async boundary ${boundary.id} could not commit its settled @try/@catch content: the boundary's comment anchor pair is no longer intact in the live DOM.`,
+	) as Error & Record<string, unknown>;
+	error.name = 'RuntimeResumeError';
+	error.code = 'MARKLESS_ARM_COMMIT_ANCHORS_MISSING';
+	error.phase = 'runtime';
+	error.boundaryId = boundary.id;
+	error.docsUrl = 'https://markless.dev/errors/MARKLESS_ARM_COMMIT_ANCHORS_MISSING';
+	return error;
+}
+
+function armCommitRendererMissingError(boundary: ResumeAsyncBoundaryRecord): Error {
+	const error = new Error(
+		`MARKLESS_ARM_COMMIT_RENDERER_MISSING: Async boundary ${boundary.id} settled with rendered @try/@catch content, but this host provides no HTML renderer to build DOM nodes from it.`,
+	) as Error & Record<string, unknown>;
+	error.name = 'RuntimeResumeError';
+	error.code = 'MARKLESS_ARM_COMMIT_RENDERER_MISSING';
+	error.phase = 'runtime';
+	error.boundaryId = boundary.id;
+	error.docsUrl = 'https://markless.dev/errors/MARKLESS_ARM_COMMIT_RENDERER_MISSING';
+	return error;
+}

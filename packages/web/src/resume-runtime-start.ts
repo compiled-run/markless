@@ -1,5 +1,6 @@
 import type { DomJournalEntry } from '@markless/runtime';
-import type { ResumePreparedCore, ResumeRuntimeInput } from './resume-types.ts';
+import type { ArmCommitUpdate } from './resume-commit-arm.ts';
+import type { ResumeAsyncBoundaryRecord, ResumePreparedCore, ResumeRuntimeInput } from './resume-types.ts';
 
 type BehaviorRuntime = ReturnType<typeof import('./resume-behaviors.ts')['createBehaviorRuntime']>;
 type BranchRuntime = ReturnType<typeof import('./resume-branches.ts')['wireBranches']>;
@@ -17,6 +18,10 @@ export async function startResumeRuntime(input: {
 	readonly branchRuntime: () => BranchRuntime | undefined;
 	readonly storeContainerSubscription: (release: () => void) => void;
 	readonly disposeHost: (hostNodeId: string) => void;
+	readonly commitArm: (
+		boundary: ResumeAsyncBoundaryRecord,
+		update: ArmCommitUpdate,
+	) => Promise<void>;
 	readonly receiveSharedPatch: RuntimeShared['receiveSharedPatch'];
 	readonly sharedPatchEventType: string;
 }): Promise<void> {
@@ -63,6 +68,7 @@ export async function startResumeRuntime(input: {
 		(await import('./resume-async-wiring.ts')).wireAsyncBoundariesWithoutLoadingCapability({
 			asyncBoundariesById: prepared.asyncBoundariesById, graph: runtimeInput.graph, root: runtimeInput.root,
 			loadSymbol: runtimeInput.loadSymbol, renderBranchHtml: runtimeInput.renderBranchHtml, elementHandles: prepared.elementHandles, storeContainerSubscription,
+			commitArm: input.commitArm,
 			demandOnStart: runtimeInput.demandAsyncBoundaries === true,
 		});
 	}

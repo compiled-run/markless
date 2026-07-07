@@ -1,6 +1,7 @@
 import type { DomJournalResult } from '@markless/runtime';
+import type { ArmCommitUpdate } from './resume-commit-arm.ts';
 import type {
-	ResumeDispatchOptions, ResumeDomElement, ResumeDomEvent, ResumePreparedCore, ResumeRuntime, ResumeRuntimeInput,
+	ResumeAsyncBoundaryRecord, ResumeDispatchOptions, ResumeDomElement, ResumeDomEvent, ResumePreparedCore, ResumeRuntime, ResumeRuntimeInput,
 } from './resume-types.ts';
 
 const SHARED_PATCH_EVENT_TYPE = 'async:shared-patch';
@@ -94,6 +95,29 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 	function dispatchCaptured(event: ResumeDomEvent): Promise<void> | void {
 		return events?.dispatch(event, { ignoreUnmatched: true });
 	}
+	// D1 tier 4: bind the runtime's live capabilities (event wiring, behavior
+	// runtime, dispose paths) to the commitArm primitive, and give any event
+	// type a committed arm introduces its container capture listener.
+	async function commitBoundaryArm(boundary: ResumeAsyncBoundaryRecord, update: ArmCommitUpdate): Promise<void> {
+		const eventWiring = await getEvents();
+		const behaviors = update.armRecords.behaviors.length > 0 ? await loadBehaviorRuntime() : undefined;
+		const eventTypesBefore = new Set(eventTypes);
+		const { createArmCommitter } = await import('./resume-commit-arm.ts');
+		await createArmCommitter({
+			root: input.root, renderHtml: input.renderBranchHtml, elementsByHostId, disposedHosts, disposeHost,
+			addEventRecord: eventWiring.addEventRecord, registerElementHandle: elementHandles.register,
+			addBehaviors: behaviors
+				? async (hostNodeId, records) => {
+					behaviorHostIds.add(hostNodeId);
+					behaviors.addBehaviorRecords(hostNodeId, records);
+					await behaviors.activateBehaviors(hostNodeId, { flush: false });
+				}
+				: undefined,
+		})(boundary, update);
+		for (const eventType of eventTypes) {
+			if (!eventTypesBefore.has(eventType)) input.root.addEventListener?.(eventType, dispatchCaptured, { capture: true });
+		}
+	}
 	function disposeHost(hostNodeId: string, options: { readonly ignoreFutureEvents?: boolean } = {}): void {
 			disposedHosts.add(hostNodeId);
 			const element = elementsByHostId.get(hostNodeId);
@@ -133,6 +157,7 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 				branchRuntime: () => branchRuntime,
 				storeContainerSubscription,
 				disposeHost,
+				commitArm: commitBoundaryArm,
 				receiveSharedPatch,
 				sharedPatchEventType: SHARED_PATCH_EVENT_TYPE,
 			});

@@ -1,4 +1,6 @@
 import type { DomJournalEntry, DomJournalResult } from '@markless/runtime';
+import { boundaryArmRecordSet } from './resume-arm-records.ts';
+import type { ArmCommitUpdate } from './resume-commit-arm.ts';
 import type {
 	ResumeAsyncBoundaryRecord,
 	ResumePreparedCore,
@@ -13,6 +15,12 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 	readonly renderBranchHtml: ResumeRuntimeInput['renderBranchHtml'];
 	readonly elementHandles: ResumePreparedCore['elementHandles'];
 	readonly storeContainerSubscription: (release: () => void) => void;
+	// D1 tier 4: update symbols returning armRecords settle through commitArm
+	// (range replace + record re-registration) instead of the string path.
+	readonly commitArm?: (
+		boundary: ResumeAsyncBoundaryRecord,
+		update: ArmCommitUpdate,
+	) => Promise<void>;
 	// CSR mounts render @pending with no settled snapshot: the runner must be
 	// demanded at start or the boundary never settles (need 10). SSR-resumed
 	// pages hold snapshots and stay lazy (demanded-execution doctrine).
@@ -56,7 +64,7 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 export async function settleAsyncBoundaryRange(
 	input: Pick<
 		Parameters<typeof wireAsyncBoundariesWithoutLoadingCapability>[0],
-		'graph' | 'root' | 'loadSymbol' | 'renderBranchHtml' | 'elementHandles'
+		'graph' | 'root' | 'loadSymbol' | 'renderBranchHtml' | 'elementHandles' | 'commitArm'
 	>,
 	boundary: ResumeAsyncBoundaryRecord,
 	snapshot: unknown,
@@ -72,6 +80,16 @@ export async function settleAsyncBoundaryRange(
 		asyncBoundary: boundary,
 	});
 	if (!isResumeBranchUpdate(update)) return;
+	if (input.commitArm) {
+		const armRecords = boundaryArmRecordSet(
+			(update as { readonly armRecords?: unknown }).armRecords,
+		);
+		if (armRecords) {
+			await input.commitArm(boundary, { html: update.html, armRecords });
+			return;
+		}
+	}
+	// Plain .html updates (cheap parts tier) keep the journal string path.
 	const fragment = input.renderBranchHtml ? input.renderBranchHtml(update.html) : update.html;
 	return [
 		{ type: 'removeRange', locator: `async-boundary:${boundary.id}` },
