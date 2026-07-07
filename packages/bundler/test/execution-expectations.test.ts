@@ -99,7 +99,8 @@ test('alternate-shaped scalar action specializes from locator, cell, event, and 
 	expect(resumeSource).toContain(`marklessFindElementAtDomOrderIndex(input.root, ${eventLocator.index}, "input")`);
 	expect(resumeSource).toContain(`marklessFindElementAtDomOrderIndex(input.root, ${updateLocator.index}, "output")`);
 	expect(resumeSource).toContain('marklessAssertScalarCell(cell, "state:tally"');
-	expect(resumeSource).toContain('value: "Total: " +');
+	expect(resumeSource).toContain('marklessScalarSpecializedTextValue');
+	expect(resumeSource).toContain('"Total: " +');
 	expect(resumeSource).not.toContain('@markless/web/event-only-lean/scalar-core');
 	expect(resumeSource).not.toContain('payloadRuntimeDemandMap.actions.find');
 	expect(allowed).toContain('web/fns/write-scalar');

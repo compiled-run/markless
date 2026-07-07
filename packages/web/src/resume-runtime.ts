@@ -12,6 +12,7 @@ type RuntimeShared = ReturnType<typeof import('./resume-runtime-shared.ts')['cre
 export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumePreparedCore): ResumeRuntime {
 	const { elementsByHostId, elementHandles } = prepared;
 	const eventTypes = new Set<string>(), disposedHosts = new Set<string>();
+	const ignoredDisposedEventTargets = new WeakSet<ResumeDomElement>();
 	const hostSubscriptionReleases = new Map<string, Array<() => void>>(), containerSubscriptionReleases: Array<() => void> = [];
 		const asyncBoundariesById = prepared.asyncBoundariesById;
 	let behaviorRuntime: BehaviorRuntime | undefined, branchRuntime: BranchRuntime | undefined;
@@ -19,6 +20,7 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 	const behaviorHostIds = new Set(input.view.behaviors.map((behavior) => behavior.hostNodeId));
 	const getRuntimeShared = async (): Promise<RuntimeShared> =>
 		runtimeShared ??= (await import('./resume-runtime-shared.ts')).createResumeRuntimeShared(input);
+	const prepareRuntimeShared = async () => { await getRuntimeShared(); };
 	const flushRuntimeGraph = async () => (await getRuntimeShared()).flushRuntimeGraph();
 	const receiveSharedPatch = async (event: ResumeDomEvent) =>
 		(await getRuntimeShared()).receiveSharedPatch(event);
@@ -34,8 +36,8 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 	async function getEvents(): Promise<EventWiring> {
 		if (events) return events;
 		const { createEventWiring } = await import('./resume-events.ts');
-		events = createEventWiring({
-			graph: input.graph, loadSymbol: input.loadSymbol, elementsByHostId, elementHandles, view: input.view, eventTypes, disposedHosts, flushRuntimeGraph, reportRuntimeError,
+			events = createEventWiring({
+			root: input.root, graph: input.graph, loadSymbol: input.loadSymbol, elementsByHostId, elementHandles, view: input.view, eventTypes, disposedHosts, ignoredDisposedEventTargets, prepareRuntimeShared, flushRuntimeGraph, reportRuntimeError,
 				activateBehaviorsFromTrigger: async (hostNodeId) => {
 					if (!behaviorHostIds.has(hostNodeId) && !behaviorRuntime) return;
 					return (await loadBehaviorRuntime()).activateBehaviorsFromTrigger(hostNodeId);
@@ -86,10 +88,10 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 		if (branchRuntime.startupArmBehaviorHostIds.length > 0) await flushRuntimeGraph();
 		return branchRuntime;
 	}
-		function disposeHost(hostNodeId: string): void {
+		function disposeHost(hostNodeId: string, options: { readonly ignoreFutureEvents?: boolean } = {}): void {
 			disposedHosts.add(hostNodeId);
 			const element = elementsByHostId.get(hostNodeId);
-		if (element) { events?.eventRecords.delete(element); elementsByHostId.delete(hostNodeId); }
+		if (element) { if (options.ignoreFutureEvents) ignoredDisposedEventTargets.add(element); events?.eventRecords.delete(element); elementsByHostId.delete(hostNodeId); }
 		elementHandles.deleteHost(hostNodeId); behaviorRuntime?.disposeBehaviorHost(hostNodeId);
 		for (const release of hostSubscriptionReleases.get(hostNodeId) ?? []) release();
 		hostSubscriptionReleases.delete(hostNodeId);
@@ -136,9 +138,9 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 		getElement: (hostNodeId: string) => connectedElement(input.root, elementsByHostId.get(hostNodeId)),
 		getAsyncBoundary: (boundaryId: string) => asyncBoundariesById.get(boundaryId),
 		getBranch: (branchId: string) => branchRuntime?.branchesById.get(branchId),
-		disposeHost,
+		disposeHost: (hostNodeId: string) => disposeHost(hostNodeId, { ignoreFutureEvents: true }),
 		dispose,
-		};
+	};
 	}
 
 	function connectedElement(root: ResumeDomElement, element: ResumeDomElement | undefined): ResumeDomElement | undefined { return element && containsElement(root, element) ? element : undefined; }
