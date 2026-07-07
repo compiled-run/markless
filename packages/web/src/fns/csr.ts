@@ -4,6 +4,36 @@ const MARKLESS_CSR_CALLBACK_PROP = "__marklessCsrCallbackProp";
 const MARKLESS_CSR_CALLBACK_DISPATCHED = "__marklessCsrCallbackDispatched";
 export function marklessCsrRenderChild(component, props) { const callbackProps = {}; const childProps = { ...props }; for (const key of Object.keys(childProps)) { const value = childProps[key]; if (typeof value !== "function") continue; const callback = (...args) => value(...args); Object.defineProperty(callback, MARKLESS_CSR_CALLBACK_PROP, { value: true }); callbackProps[key] = callback; childProps[key] = callback; } const output = component?.renderCsr?.(childProps); return output && Object.keys(callbackProps).length > 0 ? { ...output, callbackProps } : output; }
 export function marklessCsrReplaceChild(root, index, child) { const placeholder = root.querySelector?.(`[data-markless-csr-child="${index}"]`); if (placeholder && child) placeholder.replaceWith(child); else placeholder?.remove?.(); }
+// Component invocation inside a keyed repeat row (CSR mirror of
+// marklessSsrRowChild): rows repeat, so the child contributes markup only and
+// interactive child output refuses loudly instead of dying silently (D2).
+export function marklessCsrRowChild(component, props, componentName) {
+	const output = component?.renderCsr?.(props);
+	if (!output) return "";
+	marklessCsrAssertPresentationalRowChild(output, componentName);
+	const html = output.root?.outerHTML;
+	if (typeof html !== "string") {
+		throw Object.assign(new Error(`MARKLESS_ROW_COMPONENT_INTERACTIVE: <${componentName}> inside a @for row did not produce a serializable root element, so the row cannot render it.`), { code: "MARKLESS_ROW_COMPONENT_INTERACTIVE", componentName });
+	}
+	return html;
+}
+function marklessCsrAssertPresentationalRowChild(output, componentName) {
+	const view = output.view;
+	const state = output.state;
+	const interactive =
+		(view?.events?.length ?? 0) > 0 ||
+		(view?.behaviors?.length ?? 0) > 0 ||
+		(view?.elementHandles?.length ?? 0) > 0 ||
+		(view?.branches?.length ?? 0) > 0 ||
+		(view?.asyncBoundaries?.length ?? 0) > 0 ||
+		(view?.domUpdates ?? []).some((update) => !String(update.graphNodeId).startsWith("prop:")) ||
+		(state?.cells?.length ?? 0) > 0 ||
+		(state?.computed?.length ?? 0) > 0 ||
+		(output.propEvents?.length ?? 0) > 0;
+	if (!interactive) return;
+	const message = `MARKLESS_ROW_COMPONENT_INTERACTIVE: <${componentName}> inside a @for row has its own state, events, or async content, so its interactions cannot resume. Keep components in @for rows presentational (markup from item props, like <Link>), or move the interactive content out of the row.`;
+	throw Object.assign(new Error(message), { code: "MARKLESS_ROW_COMPONENT_INTERACTIVE", severity: "error", phase: "runtime", componentName, docsUrl: "https://markless.dev/errors/MARKLESS_ROW_COMPONENT_INTERACTIVE" });
+}
 export function marklessCsrAttachPropEvent(root, path, eventName, handler) { const element = marklessCsrNodeAtPath(root, path); if (!handler || !element?.addEventListener) return; if (handler[MARKLESS_CSR_CALLBACK_PROP]) { element.addEventListener(eventName, (event) => event?.[MARKLESS_CSR_CALLBACK_DISPATCHED] ? undefined : handler(event)); return; } element.addEventListener(eventName, handler); }
 export function marklessComposeState(state, children) { const childStates = children.map((child) => child.output?.state).filter(Boolean); if (childStates.length === 0) return state; return { ...state, cells: [...(state.cells ?? []), ...childStates.flatMap((childState) => childState.cells ?? [])], computed: [...(state.computed ?? []), ...childStates.flatMap((childState) => childState.computed ?? [])], ...((state.sharedDefinitions || childStates.some((childState) => childState.sharedDefinitions?.length)) ? { sharedDefinitions: [...(state.sharedDefinitions ?? []), ...childStates.flatMap((childState) => childState.sharedDefinitions ?? [])] } : {}) }; }
 export function marklessViewWithoutAnchors(view) { return { ...view, branches: [], asyncBoundaries: [] }; }

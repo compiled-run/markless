@@ -931,6 +931,7 @@ export type PublicRenderPlanUnsupportedReason =
 	| 'repeat-parent-must-contain-only-repeat'
 	| 'nested-repeat-unsupported'
 	| 'unsupported-row-binding'
+	| 'row-component-content-unsupported'
 	| 'repeat-parent-locator-missing';
 
 export type PublicRenderPlanRepeatGate =
@@ -944,6 +945,10 @@ export type PublicRenderPlanRepeatGate =
 			// The repeat renders inside an async boundary arm: SSR/CSR map it in
 			// scope, so no top-level planned record exists (or is needed).
 			readonly armScoped?: true;
+			// Rows invoke components (markup-only, item-scope props): the SSR/CSR
+			// row mappers execute the component per row; the direct-DOM row
+			// template path stays off (a static template cannot hold child output).
+			readonly componentRows?: true;
 	  }
 	| {
 			readonly repeatId: string;

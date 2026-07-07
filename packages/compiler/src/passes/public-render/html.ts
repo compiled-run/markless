@@ -16,7 +16,13 @@ import {
 } from '../../ast/tsrx.ts';
 import type { PublicRenderModuleInput } from '../../artifacts.ts';
 import { itemPathReadSource } from './source-expressions.ts';
-import { emitCsrComponent, emitSsrComponent, objectPropertyName } from './component-wiring.ts';
+import {
+	emitCsrComponent,
+	emitCsrRowComponent,
+	emitSsrComponent,
+	emitSsrRowComponent,
+	objectPropertyName,
+} from './component-wiring.ts';
 import { joinSsrExpressions } from './shared.ts';
 import type { CsrRenderContext, HtmlRenderContext, SsrRenderContext } from './types.ts';
 
@@ -182,8 +188,16 @@ export function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string 
 	const tagName = getElementTagName(node);
 	if (!tagName) return emitDynamicTagHtml(node, context);
 	if (!isHostTagName(tagName)) {
-		return context.mode === 'ssr'
-			? emitSsrComponent(node, tagName, context)
+		// Inside keyed repeat rows components render per row through the
+		// markup-only row-child helper (plan-gated); composed child records
+		// cannot repeat per row.
+		if (context.mode === 'ssr') {
+			return context.insideRepeatRow
+				? emitSsrRowComponent(node, tagName, context)
+				: emitSsrComponent(node, tagName, context);
+		}
+		return context.insideRepeatRow
+			? emitCsrRowComponent(node, tagName, context)
 			: emitCsrComponent(node, tagName, context);
 	}
 	const hostLocator = context.mode === 'ssr' ? ssrHostLocator(node, tagName, context) : '""';
@@ -282,9 +296,10 @@ function emitSsrRepeatRows(node: AnyNode, context: SsrRenderContext): string {
 	// locators through the same marklessSsrHostLocators stream that child
 	// composition consumes, so ordering holds (proven by the
 	// component-wrapped-rows browser fixture — dashboard-migration need 6).
+	const componentRows = gate.componentRows === true;
 
 	const row = singleRepeatRowElement(node);
-	if (!row || !isPlainHostTemplateNode(row)) return '""';
+	if (!row || (!componentRows && !isPlainHostTemplateNode(row))) return '""';
 
 	// The @empty branch renders at most once, so it emits with the normal
 	// context: its locators push only when the branch is actually taken.
@@ -296,6 +311,10 @@ function emitSsrRepeatRows(node: AnyNode, context: SsrRenderContext): string {
 
 	const rowContext: SsrRenderContext = { ...context, insideRepeatRow: true };
 	const rowHtml = emitHtmlNode(row, rowContext);
+	// Row components consume edge/child counters inside the row emission; the
+	// outer context must continue from them so later siblings stay aligned.
+	context.nextComponentEdgeIndex = rowContext.nextComponentEdgeIndex;
+	context.nextChildIndex = rowContext.nextChildIndex;
 	const rowParams = repeat.indexName
 		? `(${repeat.itemName}, ${repeat.indexName})`
 		: `(${repeat.itemName})`;
@@ -303,6 +322,12 @@ function emitSsrRepeatRows(node: AnyNode, context: SsrRenderContext): string {
 		emptyChildren.length > 0
 			? `() => ${joinSsrExpressions(emptyChildren.map((child) => emitHtmlNode(child, context)))}`
 			: 'null';
+	if (componentRows) {
+		// Component-bearing rows render an unknown element count per row, so the
+		// helper counts rendered element opens at runtime instead of trusting a
+		// static per-row count.
+		return `(await marklessSsrComponentRepeatRows(marklessSsrHostLocators, ${repeat.collectionSource}, ${repeat.itemName} => ${itemPathReadSource(repeat.itemName, repeat.keyPath)}, ${JSON.stringify(repeat.id)}, ${JSON.stringify(repeat.itemName)}, ${JSON.stringify(repeat.keyPath)}, async ${rowParams} => ${rowHtml}, ${emptyThunk}))`;
+	}
 	return `marklessSsrRepeatRows(marklessSsrHostLocators, ${repeat.collectionSource}, ${repeat.itemName} => ${itemPathReadSource(repeat.itemName, repeat.keyPath)}, ${JSON.stringify(repeat.id)}, ${JSON.stringify(repeat.itemName)}, ${JSON.stringify(repeat.keyPath)}, ${rowParams} => ${rowHtml}, ${countRowElements(row)}, ${emptyThunk})`;
 }
 
@@ -407,9 +432,10 @@ function emitCsrRepeatRows(node: AnyNode, context: CsrRenderContext): string {
 	if (!repeat) return '""';
 	const gate = context.repeatGates.find((item) => item.repeatId === repeat.id);
 	if (!gate?.supported) return '""';
+	const componentRows = gate.componentRows === true;
 
 	const row = singleRepeatRowElement(node);
-	if (!row || !isPlainHostTemplateNode(row)) return '""';
+	if (!row || (!componentRows && !isPlainHostTemplateNode(row))) return '""';
 
 	const emptyBlock = node.empty as AnyNode | undefined;
 	const emptyChildren = emptyBlock
@@ -421,9 +447,12 @@ function emitCsrRepeatRows(node: AnyNode, context: CsrRenderContext): string {
 	// row instances never carry the arm-host tag (the keyed-repeat machinery
 	// owns row records) — mirror of the SSR insideRepeatRow discipline.
 	const armHostIdByNode = context.armHostIdByNode;
+	const insideRepeatRow = context.insideRepeatRow;
 	context.armHostIdByNode = undefined;
+	context.insideRepeatRow = true;
 	const rowHtml = emitHtmlNode(row, context);
 	context.armHostIdByNode = armHostIdByNode;
+	context.insideRepeatRow = insideRepeatRow;
 	const rowParams = repeat.indexName
 		? `(${repeat.itemName}, ${repeat.indexName})`
 		: `(${repeat.itemName})`;

@@ -1,4 +1,38 @@
 export async function marklessSsrRenderChild(children, component, props, child) { const output = await component?.renderSsr?.(props); if (!output) return ""; let html = output.html ?? ""; for (const branch of output.view?.branches ?? []) html = marklessSsrPrefixAnchorHtml(html, "branch", branch.id, child.hostPrefix + branch.id); for (const boundary of output.view?.asyncBoundaries ?? []) html = marklessSsrPrefixAnchorHtml(html, "async", boundary.id, child.hostPrefix + boundary.id); children.push({ ...child, output: { ...output, html }, callbackProps: props?.__marklessSsrCallbacks ?? {} }); return html; }
+// Component invocation inside a keyed repeat row: rows repeat, so no composed
+// child record can exist — the child contributes MARKUP ONLY. Interactive
+// child output (own state, events, async content) would silently die after
+// resume, so it refuses loudly instead (D2). Prop-keyed dom updates are
+// allowed: prop values are static per row instance.
+export async function marklessSsrRowChild(component, props, componentName) {
+	const output = await component?.renderSsr?.(props);
+	if (!output) return "";
+	marklessAssertPresentationalRowChild(output, componentName);
+	return output.html ?? "";
+}
+export function marklessAssertPresentationalRowChild(output, componentName) {
+	const view = output.view;
+	const state = output.state;
+	const interactive =
+		(view?.events?.length ?? 0) > 0 ||
+		(view?.behaviors?.length ?? 0) > 0 ||
+		(view?.elementHandles?.length ?? 0) > 0 ||
+		(view?.branches?.length ?? 0) > 0 ||
+		(view?.asyncBoundaries?.length ?? 0) > 0 ||
+		(view?.domUpdates ?? []).some((update) => !String(update.graphNodeId).startsWith("prop:")) ||
+		(state?.cells?.length ?? 0) > 0 ||
+		(state?.computed?.length ?? 0) > 0 ||
+		(output.propEvents?.length ?? 0) > 0;
+	if (!interactive) return;
+	const message = `MARKLESS_ROW_COMPONENT_INTERACTIVE: <${componentName}> inside a @for row has its own state, events, or async content, so its interactions cannot resume. Keep components in @for rows presentational (markup from item props, like <Link>), or move the interactive content out of the row.`;
+	const error = new Error(message);
+	error.code = "MARKLESS_ROW_COMPONENT_INTERACTIVE";
+	error.severity = "error";
+	error.phase = "runtime";
+	error.componentName = componentName;
+	error.docsUrl = "https://markless.dev/errors/MARKLESS_ROW_COMPONENT_INTERACTIVE";
+	throw error;
+}
 export function marklessSsrBranchArm(branches, id, takenArm) { branches.push({ id, takenArm }); return ""; }
 export async function marklessSsrRunAsyncComputed(snapshots, graphNodeId, run) { const signal = new AbortController().signal; try { const value = await run({ key: null, signal }); const snapshot = { status: "fulfilled", version: 1, key: null, value }; snapshots.push({ graphNodeId, snapshot }); return snapshot; } catch (error) { const snapshot = { status: "rejected", version: 1, key: null, error }; snapshots.push({ graphNodeId, snapshot }); return snapshot; } }
 export function marklessSsrAttachSnapshots(state, snapshots) { if (snapshots.length === 0) return state; const byId = new Map(snapshots.map((entry) => [entry.graphNodeId, entry.snapshot])); return { ...state, computed: (state.computed ?? []).map((computed) => byId.has(computed.graphNodeId) ? { ...computed, snapshot: byId.get(computed.graphNodeId) } : computed) }; }

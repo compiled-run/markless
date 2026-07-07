@@ -5208,6 +5208,172 @@ export default function List() @{
 	expect(result.publicRenderModule.ssrModuleSource).toContain("'repo-link-' + r.id");
 });
 
+const componentRowsPageSource = `import { state } from '@markless/core';
+import { TagBadge } from './TagBadge.tsrx';
+
+export default function Catalog() @{
+	let picked = state('none');
+	let goods = state([
+		{ sku: 'g1', title: 'First' },
+		{ sku: 'g2', title: 'Second' },
+	]);
+
+	<main>
+		<ul class="goods">
+			@for (const good of goods; key good.sku) {
+				<li data-sku={good.sku} onClick={() => picked = good.sku}><TagBadge title={good.title} /></li>
+			}
+		</ul>
+		<output data-picked>{picked}</output>
+	</main>
+}`;
+
+test('keyed repeat rows render component invocations from item-scope props', async () => {
+	const child = await compileTsrxModule({
+		filename: 'src/TagBadge.tsrx',
+		source: `export function TagBadge({ title }) @{
+	<figure class="tag"><figcaption>{title}</figcaption></figure>
+}`,
+		symbols: [],
+	});
+	const page = await compileTsrxModule({
+		filename: 'src/Catalog.tsrx',
+		source: componentRowsPageSource,
+		symbols: [],
+	});
+
+	const childSsrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(child));
+	const pageSsrModule = await importPublicRenderTestModule(
+		ssrRenderTestModuleSource(page, { replaceChildImport: true }),
+		{ childComponent: { renderSsr: childSsrModule.marklessRenderSsr } },
+	);
+	const output = await (
+		pageSsrModule.marklessRenderSsr as () => Promise<{
+			readonly html: string;
+			readonly view: ProtocolViewPayload;
+		}>
+	)();
+
+	// Each row executed the component with the row's item in scope.
+	expect(output.html).toContain(
+		'<li data-sku="g1"><figure class="tag"><figcaption>First</figcaption></figure></li>',
+	);
+	expect(output.html).toContain(
+		'<li data-sku="g2"><figure class="tag"><figcaption>Second</figcaption></figure></li>',
+	);
+
+	// Row events ship for resume dispatch.
+	const repeat = output.view.keyedRepeats?.[0];
+	expect(repeat?.rowEvents).toEqual([
+		{ hostPath: [], eventName: 'click', symbolIds: [expect.any(String)] },
+	]);
+
+	// Locators stay dom-order exact across component-rendered row elements:
+	// main(0) ul(1) li(2) figure(3) figcaption(4) li(5) figure(6) figcaption(7) output(8).
+	const parentLocator = output.view.locators.find(
+		(locator) => locator.hostNodeId === repeat?.parentHostNodeId,
+	);
+	expect(parentLocator).toMatchObject({ tagName: 'ul', index: 1 });
+	const outputLocator = output.view.locators.find((locator) => locator.tagName === 'output');
+	expect(outputLocator).toMatchObject({ index: 8 });
+	expect(
+		output.view.domUpdates.some(
+			(update) =>
+				update.graphNodeId === 'state:picked' &&
+				update.hostNodeId === outputLocator?.hostNodeId,
+		),
+	).toBe(true);
+});
+
+test('interactive components in repeat rows refuse loudly at row render', async () => {
+	const page = await compileTsrxModule({
+		filename: 'src/Catalog.tsrx',
+		// Variant of componentRowsPageSource: the data-URL module loader caches
+		// identical emitted sources, so this compile must differ byte-wise.
+		source: componentRowsPageSource.replace("state('none')", "state('unset')"),
+		symbols: [],
+	});
+	const interactiveChild = {
+		renderSsr: () => ({
+			html: '<em class="tag">x</em>',
+			view: {
+				locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'em' }],
+				events: [{ hostNodeId: 'h0', eventName: 'click', symbolIds: ['symbol:0'] }],
+				domUpdates: [],
+				behaviors: [],
+				elementHandles: [],
+			},
+		}),
+	};
+
+	const pageSsrModule = await importPublicRenderTestModule(
+		ssrRenderTestModuleSource(page, { replaceChildImport: true }),
+		{ childComponent: interactiveChild },
+	);
+	await expect(
+		(pageSsrModule.marklessRenderSsr as () => Promise<unknown>)(),
+	).rejects.toThrow(
+		'MARKLESS_ROW_COMPONENT_INTERACTIVE: <TagBadge> inside a @for row has its own state, events, or async content, so its interactions cannot resume. Keep components in @for rows presentational (markup from item props, like <Link>), or move the interactive content out of the row.',
+	);
+});
+
+// A page declared AFTER a same-module component must keep ONE host id space:
+// the payload records (events, dom updates, keyed repeats) are keyed by the
+// semantic graph's module-wide host ids, so the page's rendered locators must
+// use the same ids or every hostNodeId-keyed record silently drops during
+// composition (component-wrapped-rows known-red: row events never wired).
+test('same-module component before the page keeps payload records aligned with rendered locators', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Board.tsrx',
+		source: `import { state } from '@markless/core';
+
+function Chip({ text }) @{
+	<aside class="chip"><strong>{text}</strong></aside>
+}
+
+export function Board() @{
+	let tally = state(0);
+	let entries = state([
+		{ slug: 'one', name: 'One' },
+		{ slug: 'two', name: 'Two' },
+	]);
+
+	<section>
+		<Chip text="Pinned" />
+		<p data-tally>Total {tally}</p>
+		<nav>
+			@for (const entry of entries; key entry.slug) {
+				<span data-entry={entry.slug} onClick={() => tally++}>{entry.name}</span>
+			}
+		</nav>
+	</section>
+}`,
+		symbols: [],
+	});
+
+	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	const output = await (
+		ssrModule.marklessRenderSsr as () => Promise<{
+			readonly html: string;
+			readonly view: ProtocolViewPayload;
+		}>
+	)();
+
+	const locatorIds = new Set(output.view.locators.map((locator) => locator.hostNodeId));
+	// The repeat parent (nav) must be locatable, or resume never wires row events.
+	const repeat = output.view.keyedRepeats?.[0];
+	expect(repeat?.rowEvents).toEqual([
+		{ hostPath: [], eventName: 'click', symbolIds: [expect.any(String)] },
+	]);
+	expect(locatorIds.has(repeat!.parentHostNodeId)).toBe(true);
+	// The tally text update must survive composition (same id space as locators).
+	expect(
+		output.view.domUpdates.some(
+			(update) => update.graphNodeId === 'state:tally' && locatorIds.has(update.hostNodeId),
+		),
+	).toBe(true);
+});
+
 test('repeat inside an async arm registers the boundary read and SSRs rows', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/App.tsrx',

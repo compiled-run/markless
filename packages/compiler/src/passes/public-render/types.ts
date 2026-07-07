@@ -60,6 +60,10 @@ export type CsrRenderContext = {
 	// derive arm-relative locators from the rendered truth (D3). Mutable:
 	// repeat-row emission unsets it — rows never carry per-instance locators.
 	armHostIdByNode?: ReadonlyMap<AnyNode, string>;
+	// Inside a keyed repeat row: component invocations render per row through
+	// the markup-only row-child helper instead of the child composition
+	// machinery (rows repeat; composed child records cannot).
+	insideRepeatRow?: boolean;
 	readonly hasChildrenProp?: boolean;
 	readonly styleScopeClass?: string | null;
 	readonly source: string;
@@ -72,4 +76,10 @@ export type PublicRenderRoot = {
 	readonly componentName: string;
 	readonly root: AnyNode;
 	readonly propNames: ReadonlyArray<string>;
+	// The parsed module the root was selected from. Host ids are assigned in
+	// MODULE document order (the semantic graph's id space); emitters that only
+	// walk the page root would renumber from 0 and misalign every
+	// hostNodeId-keyed payload record when a same-module component is declared
+	// before the page.
+	readonly moduleAst?: AnyNode;
 };

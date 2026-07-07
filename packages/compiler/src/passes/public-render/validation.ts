@@ -260,8 +260,11 @@ function repeatUnsupportedSuggestion(
 ): string {
 	const row = singleRowRoot(node);
 	const tagName = row ? getElementTagName(row) : null;
-	if (reason === 'unsupported-row-binding' && tagName && !isHostTagName(tagName)) {
-		return `Rows that render a component (<${tagName} />) are not supported by the render path yet; render host-element rows, or lift the component's markup into the row until component rows ship.`;
+	if (reason === 'row-component-content-unsupported') {
+		if (tagName && !isHostTagName(tagName)) {
+			return `The @for row root is a component (<${tagName} />); the row root anchors row identity, so wrap it in a host element (for example <li><${tagName} /></li>).`;
+		}
+		return 'Components in @for rows render markup only: their props and children may read only the repeat item (and index), they cannot take event props, and row bindings or events must come before the component. Move other reads into the item, or lift the component out of the row.';
 	}
 	return 'Reshape the rows into a single host element with directly readable item bindings.';
 }

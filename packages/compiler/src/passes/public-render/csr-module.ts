@@ -124,6 +124,7 @@ export function emitPublicCsrRenderModule(
 					'marklessCsrFragmentFromHtml',
 					'marklessCsrRootFromHtml',
 					'marklessCsrRenderChild',
+					'marklessCsrRowChild',
 					'marklessCsrReplaceChild',
 					'marklessCsrAttachPropEvent',
 					'marklessComposeState',

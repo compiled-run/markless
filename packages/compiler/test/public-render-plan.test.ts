@@ -215,8 +215,8 @@ test.each([
 		`export function Tree({ node }) @{
 <li>{node.name}<ul>@for (const child of node.children; key child.id) { <Tree node={child} /> }</ul></li>
 }`,
-		'unsupported-row-binding',
-		'Rows that render a component',
+		'row-component-content-unsupported',
+		'The @for row root is a component (<Tree />); the row root anchors row identity, so wrap it in a host element (for example <li><Tree /></li>).',
 	],
 ])('%s', async (_name, source, reason, suggestion) => {
 	const { plan } = await createRenderPlan('src/UnsupportedRows.tsrx', source);
@@ -500,6 +500,107 @@ async function createRenderPlan(filename: string, source: string) {
 
 	return { plan, payloadArena, semanticGraph, stateLowering, symbolResolver };
 }
+
+test('planPublicRender supports component invocations in keyed repeat rows with item-scope props', async () => {
+	const { plan } = await createRenderPlan(
+		'src/Catalog.tsrx',
+		`import { state } from '@markless/core';
+import { TagBadge } from './TagBadge.tsrx';
+
+export default function Catalog() @{
+	let picked = state('none');
+	let goods = state([
+		{ sku: 'g1', title: 'First' },
+		{ sku: 'g2', title: 'Second' },
+	]);
+
+	<main>
+		<ul class="goods">
+			@for (const good of goods; key good.sku) {
+				<li data-sku={good.sku} onClick={() => picked = good.sku}><TagBadge title={good.title} /></li>
+			}
+		</ul>
+		<output data-picked>{picked}</output>
+	</main>
+}`,
+	);
+
+	expect(plan.repeatGates).toEqual([
+		{ repeatId: 'repeat:0', supported: true, componentRows: true },
+	]);
+	const repeat = plan.keyedRepeats[0];
+	expect(repeat?.eventControls).toEqual([
+		expect.objectContaining({ eventName: 'click', hostPath: [] }),
+	]);
+	expect(
+		plan.diagnostics.filter((diagnostic) => diagnostic.message.includes('@for')),
+	).toEqual([]);
+});
+
+test('planPublicRender rejects row components whose props read beyond the item scope', async () => {
+	const { plan } = await createRenderPlan(
+		'src/Catalog.tsrx',
+		`import { state } from '@markless/core';
+import { TagBadge } from './TagBadge.tsrx';
+
+export default function Catalog() @{
+	let picked = state('none');
+	let goods = state([{ sku: 'g1', title: 'First' }]);
+
+	<main>
+		<ul class="goods">
+			@for (const good of goods; key good.sku) {
+				<li data-sku={good.sku}><TagBadge title={picked} /></li>
+			}
+		</ul>
+	</main>
+}`,
+	);
+
+	expect(plan.repeatGates).toEqual([
+		{ repeatId: 'repeat:0', supported: false, reason: 'row-component-content-unsupported' },
+	]);
+	// D4: the refusal explains itself in the author's vocabulary, exact text.
+	expect(plan.diagnostics).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				message:
+					'The @for rows are not compiler-proven (reason: row-component-content-unsupported), so the render module drops the list content.',
+				suggestions: [
+					{
+						message:
+							'Components in @for rows render markup only: their props and children may read only the repeat item (and index), they cannot take event props, and row bindings or events must come before the component. Move other reads into the item, or lift the component out of the row.',
+					},
+				],
+			}),
+		]),
+	);
+});
+
+test('planPublicRender rejects row events positioned after a component in the row', async () => {
+	const { plan } = await createRenderPlan(
+		'src/Catalog.tsrx',
+		`import { state } from '@markless/core';
+import { TagBadge } from './TagBadge.tsrx';
+
+export default function Catalog() @{
+	let picked = state('none');
+	let goods = state([{ sku: 'g1', title: 'First' }]);
+
+	<main>
+		<ul class="goods">
+			@for (const good of goods; key good.sku) {
+				<li><TagBadge title={good.title} /><button onClick={() => picked = good.sku}>Pick</button></li>
+			}
+		</ul>
+	</main>
+}`,
+	);
+
+	expect(plan.repeatGates).toEqual([
+		{ repeatId: 'repeat:0', supported: false, reason: 'row-component-content-unsupported' },
+	]);
+});
 
 test('planPublicRender diagnoses React-style children inspection as opaque', async () => {
 	const { plan } = await createRenderPlan(

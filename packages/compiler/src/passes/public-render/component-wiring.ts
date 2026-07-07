@@ -21,6 +21,37 @@ export function emitSsrComponent(node: AnyNode, componentName: string, context: 
 	return `(await marklessSsrRenderChild(marklessSsrChildren, ${localName}, { ${props.join(', ')} }, { hostPrefix: ${JSON.stringify(placement.hostPrefix)}, symbolPrefix: ${JSON.stringify(placement.symbolPrefix)}, localIndex: marklessSsrHostLocators.length, graphProps: ${JSON.stringify(placement.graphProps)} }))`;
 }
 
+// Component invocation inside a keyed repeat row (SSR): the row mapper
+// executes the component per row with the item in scope and splices the html.
+// No child composition record exists (rows repeat; composed records cannot),
+// so the row-child helper fail-closes on interactive child output. The
+// component edge is still consumed to keep later edges document-aligned.
+export function emitSsrRowComponent(
+	node: AnyNode,
+	componentName: string,
+	context: SsrRenderContext,
+): string {
+	const localName = context.componentImports.get(componentName);
+	if (!localName) return '""';
+	const edge = context.componentEdges[context.nextComponentEdgeIndex++];
+	const props = ssrComponentPropsSource(node, context, edge, context.callbackSymbols);
+	return `(await marklessSsrRowChild(${localName}, { ${props.join(', ')} }, ${JSON.stringify(componentName)}))`;
+}
+
+// CSR mirror of emitSsrRowComponent: renders the child synchronously and
+// splices its markup into the row html string.
+export function emitCsrRowComponent(
+	node: AnyNode,
+	componentName: string,
+	context: CsrRenderContext,
+): string {
+	const localName = context.componentImports.get(componentName);
+	if (!localName) return '""';
+	const edge = context.componentEdges[context.nextComponentEdgeIndex++];
+	const props = componentPropsSource(node, context, edge, context.callbackSymbols);
+	return `marklessCsrRowChild(${localName}, { ${props.join(', ')} }, ${JSON.stringify(componentName)})`;
+}
+
 export function emitCsrComponent(node: AnyNode, componentName: string, context: CsrRenderContext): string {
 	const localName = context.componentImports.get(componentName);
 	if (!localName) return '""';

@@ -93,9 +93,14 @@ export async function createLeanScalarGraph(
 					if (!pending.some((path) => path.graphNodeId === update.graphNodeId)) continue;
 					const element = elementsByHostId.get(update.hostNodeId);
 					if (!element || !update.symbolId) continue;
+					// The record's text target owns the written value shape
+					// (prefix/suffix like "Picks {count}", conditional text): the
+					// full path bakes it into the dom-update symbol, so the lean
+					// flush must apply the same mapping or resumed text drops its
+					// static parts.
 					const result = marklessUpdateText({
 						domUpdate: update,
-						value: graph.read(update.graphNodeId),
+						value: leanTextTargetValue(update.target, graph.read(update.graphNodeId)),
 					}, update.hostNodeId);
 					applyTextJournal(result, elementsByHostId);
 				}
@@ -243,6 +248,23 @@ function findElementAtDomOrderIndex(root: EventOnlyResumeDomElement, index: numb
 	};
 	visit(root);
 	return found;
+}
+
+// Mirror of dom-update.ts textTargetValue, kept local so the lean chunk does
+// not grow a module edge for two string concatenations.
+function leanTextTargetValue(
+	target: ProtocolViewPayload['domUpdates'][number]['target'] | undefined,
+	value: unknown,
+): unknown {
+	if (!target || target.kind !== 'text') return value;
+	const mapped =
+		target.trueValue !== undefined && target.falseValue !== undefined
+			? value
+				? target.trueValue
+				: target.falseValue
+			: value;
+	if (target.prefix === undefined && target.suffix === undefined) return mapped;
+	return `${target.prefix ?? ''}${mapped == null ? '' : String(mapped)}${target.suffix ?? ''}`;
 }
 
 function applyTextJournal(result: Awaited<ReturnType<EventOnlyResumeSymbol>>, elementsByHostId: Map<string, EventOnlyResumeDomElement>): void {

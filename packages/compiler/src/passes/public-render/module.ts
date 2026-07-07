@@ -32,6 +32,7 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 				componentName: rootSelection.componentName,
 				root: rootSelection.root,
 				propNames: componentPropNames(rootSelection.component),
+				moduleAst: ast,
 			}
 		: null;
 	// Fragment roots use the standard CSR module (root = document fragment;

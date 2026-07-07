@@ -25,8 +25,13 @@ export function emitPublicSsrRenderModule(
 		callbackSymbols: callbackSymbolIds(input),
 		nextComponentEdgeIndex: 0,
 		nextChildIndex: 0,
+		// Host ids assign in MODULE document order (the semantic graph's id
+		// space). Walking only the page root would renumber from 0 whenever a
+		// same-module component is declared before the page, silently detaching
+		// every hostNodeId-keyed payload record (events, dom updates, keyed
+		// repeats) from the rendered locators.
 		hostIdByNode: assignSsrHostIds(
-			rootInfo.root,
+			rootInfo.moduleAst ?? rootInfo.root,
 			input.semanticGraph.hostNodes.map((host) => host.id),
 		),
 		keyedRepeats: input.semanticGraph.keyedRepeats,
@@ -98,6 +103,7 @@ export function emitPublicSsrRenderModule(
 				module: 'ssr',
 				names: [
 					'marklessSsrRenderChild',
+					'marklessSsrRowChild',
 					'marklessSsrBranchArm',
 					'marklessSsrRunAsyncComputed',
 					'marklessSsrAttachSnapshots',
@@ -126,7 +132,7 @@ export function emitPublicSsrRenderModule(
 					'marklessSsrSpreadAttributes',
 				],
 			},
-			{ module: 'repeats', names: ['marklessSsrRepeatRows'] },
+			{ module: 'repeats', names: ['marklessSsrRepeatRows', 'marklessSsrComponentRepeatRows'] },
 		]),
 		...moduleScopeLines(input.source.source, input.source.filename),
 		...sameModuleComponents,

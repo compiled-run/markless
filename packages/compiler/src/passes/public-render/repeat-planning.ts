@@ -78,10 +78,20 @@ export function supportedRepeatGate(input: {
 		source: input.source,
 		symbols: input.symbols,
 	});
-	if (!rowPlan) return unsupportedReason('unsupported-row-binding');
+	if (!rowPlan) {
+		// Rows containing component invocations get their own reason so the
+		// diagnostic can explain the component-row rules (D4) instead of the
+		// generic binding guidance.
+		return unsupportedReason(
+			containsComponentTag(row) ? 'row-component-content-unsupported' : 'unsupported-row-binding',
+		);
+	}
 
-	return rowPlan.usesIndex || input.semanticRepeat.keySource === input.semanticRepeat.indexName
-		? { repeatId: input.payloadRepeat.id, supported: true, ssrOnly: true }
+	if (rowPlan.usesIndex || input.semanticRepeat.keySource === input.semanticRepeat.indexName) {
+		return { repeatId: input.payloadRepeat.id, supported: true, ssrOnly: true };
+	}
+	return rowPlan.hasComponents
+		? { repeatId: input.payloadRepeat.id, supported: true, componentRows: true }
 		: { repeatId: input.payloadRepeat.id, supported: true };
 }
 
@@ -147,6 +157,9 @@ export type RowPlan = {
 	readonly eventControls: ReadonlyArray<PublicRenderPlanEventControl>;
 	readonly attributeWrites: ReadonlyArray<RowAttributeWrite>;
 	readonly usesIndex: boolean;
+	// The row invokes components (markup-only, item-scope props). Emitters must
+	// execute the component per row instead of treating the row as plain hosts.
+	readonly hasComponents: boolean;
 };
 
 // True when the expression's identifier reads are limited to the repeat item
@@ -195,12 +208,27 @@ export function collectRowPlan(input: {
 	const eventControls: PublicRenderPlanEventControl[] = [];
 	const attributeWrites: RowAttributeWrite[] = [];
 	let usesIndex = false;
+	// A component renders an unknown number of elements, so row-relative host
+	// paths collected AFTER one (in document order) could not be trusted:
+	// bindings and events must come before any component in the row.
+	let sawComponent = false;
+	let hasComponents = false;
 
 	const visitElement = (node: AnyNode, hostPath: ReadonlyArray<number>): boolean => {
-		// Component rows stay unsupported: their markup renders through the child
-		// module, which row locator/update planning cannot see into.
+		// Component invocations render markup only: props/children limited to the
+		// repeat item (and index) scope, no event/attach/el props. The SSR/CSR
+		// row mappers execute the component per row; anything richer is refused
+		// (the row-child helper also fail-closes on interactive child output).
 		const tagName = getElementTagName(node);
-		if (tagName && !isHostTagName(tagName)) return false;
+		if (tagName && !isHostTagName(tagName)) {
+			if (hostPath.length === 0) return false; // the row root anchors row identity
+			if (!componentRowInvocationSupported(node, input.itemName, input.indexName)) {
+				return false;
+			}
+			sawComponent = true;
+			hasComponents = true;
+			return true;
+		}
 		const hostNodeId = input.assignedHosts.hostIdByNode.get(node);
 
 		for (const attribute of getElementAttributes(node)) {
@@ -209,6 +237,7 @@ export function collectRowPlan(input: {
 
 			const expression = unwrapExpressionContainer(attribute.value as AnyNode | undefined);
 			if (attributeName === 'class' && expression && expression.type !== 'Literal') {
+				if (sawComponent) return false;
 				const binding = classWritePlan({
 					aliases: input.aliases,
 					bindings: input.bindings,
@@ -223,7 +252,7 @@ export function collectRowPlan(input: {
 			}
 
 			if (isEventAttribute(attributeName)) {
-				if (!hostNodeId || !expression) return false;
+				if (!hostNodeId || !expression || sawComponent) return false;
 
 				for (const handler of eventHandlerExpressions(expression)) {
 					const eventName = normalizeEventName(attributeName);
@@ -261,6 +290,7 @@ export function collectRowPlan(input: {
 				// rebuilds re-evaluate the same template. Reject expressions that
 				// read anything beyond the item/index (those would need reactive
 				// attribute wiring rows don't have yet).
+				if (sawComponent) return false;
 				if (!readsOnlyItemScope(expression, input.itemName, input.indexName)) return false;
 				attributeWrites.push({
 					name: attributeName,
@@ -281,7 +311,7 @@ export function collectRowPlan(input: {
 
 			if (child.type === 'JSXExpressionContainer' || child.type === 'TSRXExpression') {
 				const expression = child.expression as AnyNode | undefined;
-				if (!expression) return false;
+				if (!expression || sawComponent) return false;
 
 				const source = expressionSource(expression, input.source);
 				const itemPath = itemPathFromSource(input.itemName, source);
@@ -326,7 +356,80 @@ export function collectRowPlan(input: {
 		eventControls,
 		attributeWrites,
 		usesIndex,
+		hasComponents,
 	};
+}
+
+// True when a component invocation inside a repeat row stays inside the
+// markup-only contract: no event/attach/el props, and every prop or children
+// expression reads only the repeat item (and index). Nested components inside
+// the children stay unsupported (their edges would need per-row child wiring).
+function componentRowInvocationSupported(
+	node: AnyNode,
+	itemName: string,
+	indexName: string | undefined,
+): boolean {
+	for (const attribute of getElementAttributes(node)) {
+		const attributeName = getIdentifierName(attribute.name as AnyNode | undefined);
+		if (!attributeName) return false;
+		if (
+			isEventAttribute(attributeName) ||
+			attributeName === 'attach' ||
+			attributeName === 'el'
+		) {
+			return false;
+		}
+		const expression = unwrapExpressionContainer(attribute.value as AnyNode | undefined);
+		if (
+			expression &&
+			expression.type !== 'Literal' &&
+			!readsOnlyItemScope(expression, itemName, indexName)
+		) {
+			return false;
+		}
+	}
+
+	const childSupported = (child: AnyNode): boolean => {
+		if (isIgnorableTextNode(child) || isStaticTextNode(child)) return true;
+		if (child.type === 'JSXExpressionContainer' || child.type === 'TSRXExpression') {
+			const expression = child.expression as AnyNode | undefined;
+			return !!expression && readsOnlyItemScope(expression, itemName, indexName);
+		}
+		if (child.type === 'Element' || child.type === 'JSXElement') {
+			const tagName = getElementTagName(child);
+			if (!tagName || !isHostTagName(tagName)) return false;
+			for (const attribute of getElementAttributes(child)) {
+				const attributeName = getIdentifierName(attribute.name as AnyNode | undefined);
+				if (!attributeName) return false;
+				if (
+					isEventAttribute(attributeName) ||
+					attributeName === 'attach' ||
+					attributeName === 'el'
+				) {
+					return false;
+				}
+				const expression = unwrapExpressionContainer(attribute.value as AnyNode | undefined);
+				if (
+					expression &&
+					expression.type !== 'Literal' &&
+					!readsOnlyItemScope(expression, itemName, indexName)
+				) {
+					return false;
+				}
+			}
+			return asNodes(child.children).every(childSupported);
+		}
+		return false;
+	};
+	return asNodes(node.children).every(childSupported);
+}
+
+export function containsComponentTag(node: AnyNode): boolean {
+	if (node.type === 'Element' || node.type === 'JSXElement') {
+		const tagName = getElementTagName(node);
+		if (tagName && !isHostTagName(tagName)) return true;
+	}
+	return childNodes(node).some(containsComponentTag);
 }
 
 function classWritePlan(input: {
