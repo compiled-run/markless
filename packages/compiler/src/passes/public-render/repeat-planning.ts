@@ -3,6 +3,8 @@ import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/
 import { expressionSource } from '../../ast/source.ts';
 import {
 	getElementAttributes,
+	getElementTagName,
+	isHostTagName,
 	isIgnorableStaticTextNode as isIgnorableTextNode,
 	isPlainHostTemplateNode,
 	isStaticTextNode,
@@ -195,6 +197,10 @@ export function collectRowPlan(input: {
 	let usesIndex = false;
 
 	const visitElement = (node: AnyNode, hostPath: ReadonlyArray<number>): boolean => {
+		// Component rows stay unsupported: their markup renders through the child
+		// module, which row locator/update planning cannot see into.
+		const tagName = getElementTagName(node);
+		if (tagName && !isHostTagName(tagName)) return false;
 		const hostNodeId = input.assignedHosts.hostIdByNode.get(node);
 
 		for (const attribute of getElementAttributes(node)) {

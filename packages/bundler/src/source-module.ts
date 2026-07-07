@@ -165,7 +165,11 @@ export function emitResumeModule(input: {
 		emitResumeContainerEvent(
 			resumeSymbolLoader,
 			input.needsFullResume ?? false,
-			leanResumeMode(input.runtimeDemandMap),
+			// Composed pages (child symbol routes) take the full path: lean record
+			// matching does not account for runtime child composition (same ruling
+			// as the scalar-specialization exclusion; unmatched events pass through
+			// harmlessly since the ignoreUnmatched contract landed).
+			input.symbolRoutes.length > 0 ? 'none' : leanResumeMode(input.runtimeDemandMap),
 			scalarSpecializations,
 			input.runtimeDemandMap,
 		),

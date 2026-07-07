@@ -236,7 +236,10 @@ function emitSsrRepeatRows(node: AnyNode, context: SsrRenderContext): string {
 	}
 	const gate = context.repeatGates.find((item) => item.repeatId === repeat.id);
 	if (!gate?.supported) return '""';
-	if (context.componentEdges.length > 0) return '""';
+	// Component-composed pages render rows too: the SSR row mapper appends row
+	// locators through the same marklessSsrHostLocators stream that child
+	// composition consumes, so ordering holds (proven by the
+	// component-wrapped-rows browser fixture — dashboard-migration need 6).
 
 	const row = singleRepeatRowElement(node);
 	if (!row || !isPlainHostTemplateNode(row)) return '""';
