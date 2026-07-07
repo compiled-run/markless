@@ -345,6 +345,50 @@ test('emits exact route modulepreload maps from client build chunks', () => {
 	expect(ssrPreloads['pages/docs/[...slug].mdx']).not.toContain('/app/build/home.js');
 });
 
+test('includes destination route resume chunks reached from the navigation route table', () => {
+	const plugins = flattenPlugins([router()]);
+	const configPlugin = plugins.find((plugin) => plugin.name === 'markless-router:vite');
+	const routePlugin = plugins.find((plugin) => plugin.name === 'markless-router:routes');
+	const routeLoad = hookHandler(routePlugin?.load) as
+		| ((id: string) => string | undefined)
+		| undefined;
+	const navigationChunk = chunk({
+		code: `const routePreloadsJson = "__MARKLESS_ROUTER_ROUTE_PRELOADS__";
+function loadSymbol(file, symbol) {
+  return file === "pages/docs.tsrx" && symbol === "symbol:0"
+    ? import("./docs-resume.js")
+    : file === "pages/index.tsrx" && symbol === "symbol:0"
+      ? import("./home-resume.js")
+      : undefined;
+}`,
+		dynamicImports: ['build/docs.js', 'build/home.js'],
+		fileName: 'build/navigation.js',
+		moduleIds: ['/repo/packages/router/src/vite/entries/client-entry.ts'],
+	});
+
+	routePlugin?.configResolved?.({ base: '/app/', root: '/project' } as never);
+	configPlugin?.configResolved?.({ base: '/app/', root: '/project' } as never);
+	configPlugin?.generateBundle?.call(
+		{ environment: { config: { consumer: 'client' } } },
+		{},
+		{
+			'build/navigation.js': navigationChunk,
+			'build/docs.js': chunk({ fileName: 'build/docs.js', moduleIds: ['/project/pages/docs.tsrx'] }),
+			'build/docs-resume.js': chunk({ fileName: 'build/docs-resume.js' }),
+			'build/home.js': chunk({ fileName: 'build/home.js', moduleIds: ['/project/pages/index.tsrx'] }),
+			'build/home-resume.js': chunk({ fileName: 'build/home-resume.js' }),
+		},
+	);
+
+	const source = routeLoad?.('\0virtual:markless-router/route-preloads');
+	const routePreloadData = JSON.parse(
+		source?.match(/routePreloadData = routePreloadsJson === .* \? (\{.*\}) :/)?.[1] ?? '{}',
+	) as { readonly navigation?: Record<string, string[]> };
+	const routePreloads = routePreloadData.navigation ?? {};
+	expect(routePreloads['pages/docs.tsrx']).toContain('/app/build/docs-resume.js');
+	expect(routePreloads['pages/docs.tsrx']).not.toContain('/app/build/home-resume.js');
+});
+
 function chunk(overrides: {
 	readonly code?: string;
 	readonly dynamicImports?: readonly string[];
