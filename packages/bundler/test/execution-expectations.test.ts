@@ -297,7 +297,7 @@ test('wrong demand map entries fail expectations and emitted-equals-required', a
 // T014 tier-collapse receipt: the event-only middle tier was deleted. Mixed
 // unreplaced actions now fall through to the full dispatch core plus shared
 // runtime error reporting.
-const JUDGE_COUNTER_INTERPRETER_CHAIN = ['core/web/resume', 'web/resume', 'web/resume-runtime', 'web/resume-runtime-shared', 'web/resume-runtime-start', 'web/resume-events', 'web/resume-locators', 'web/payload-full', 'web/payload-resume', 'web/payload-graph-construct', 'web/resume-async-wiring', 'web/runtime-error-reporting'] as const;
+const JUDGE_COUNTER_INTERPRETER_CHAIN = ['core/web/resume', 'web/resume', 'web/resume-runtime', 'web/resume-runtime-shared', 'web/resume-runtime-start', 'web/resume-events', 'web/resume-locators', 'web/payload-full', 'web/payload-resume', 'web/payload-graph-construct', 'web/resume-async-wiring'] as const; // runtime-error-reporting removed: shared dispatch infra post tier collapse, not interpreter machinery
 const JUDGE_COUNTER_INTERPRETER_CHAIN_SET = new Set<string>(JUDGE_COUNTER_INTERPRETER_CHAIN);
 
 async function counterPayload(): Promise<{ readonly payload: any }> {

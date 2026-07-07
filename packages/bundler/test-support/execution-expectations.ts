@@ -54,6 +54,21 @@ export function deriveAllowedModules(
 			? runtimeDemandMap.unknownRecordModuleIds
 			: exactActionModules(runtimeDemandMap, action),
 	);
+	// The full tier loads the sync-policy core when ANY record on the page carries a
+	// policy (page-scoped). Exact (replaced) sets stay policy-free for policy-less
+	// actions, so this widening applies only while the action's kind is unreplaced.
+	const kindReplaced = new Map(
+		(runtimeDemandMap.recordKinds ?? []).map((kind) => [kind.kind, kind.replaced]),
+	);
+	const actionKind = action.recordKind === 'keyed-repeat-row' ? 'keyed-repeat' : (action.recordKind ?? 'event');
+	const pageHasSyncPolicy =
+		(payloadRecordInventory.events ?? []).some((event) => (event as { syncPolicy?: unknown }).syncPolicy) ||
+		(payloadRecordInventory.keyedRepeats ?? []).some((repeat) =>
+			((repeat as { rowEvents?: ReadonlyArray<{ syncPolicy?: unknown }> }).rowEvents ?? []).some((event) => event.syncPolicy),
+		);
+	if (pageHasSyncPolicy && kindReplaced.get(actionKind) === false) {
+		allowed.add('web/inline/sync-policy-core');
+	}
 	if (action.executionLog) {
 		for (const id of OBSERVABILITY_MODULES) allowed.add(id);
 	}
