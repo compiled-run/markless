@@ -1,5 +1,5 @@
 import type { InputOptions, Plugin } from 'rolldown';
-import { isAbsolute, relative, resolve } from 'pathe';
+import { isAbsolute, resolve } from 'pathe';
 import { joinURL, parsePath, withQuery, withoutLeadingSlash } from 'ufo';
 import { type MarklessBuildMetadataBundle, createBuildMetadata } from './build/build-metadata.ts';
 import { MARKLESS_BUILD_PREFIX, MARKLESS_BUNDLE_GRAPH, outputDefaults } from './build/chunking.ts';
@@ -491,22 +491,19 @@ function virtualModuleSourceForLoad(
 	);
 }
 
+// Always the /@fs/<absolute> form, even for sources under the Vite root: a
+// root-relative source URL (e.g. /pages/r/[repo]/index.tsrx?import) collides
+// with the app's own route space on framework dev servers (nitro routes it
+// and 404s), which kills the first full-resume wake in dev. Vite serves
+// /@fs URLs for any allowed path and resolves them to the same module-graph
+// entry, so the HMR full-reload contract is unchanged.
 function devBrowserSourceModuleUrl(
 	source: string,
-	root: string | undefined,
+	_root: string | undefined,
 	publicPath: ((fileName: string) => string) | undefined,
 ) {
-	const relativeSource = root ? relative(root, source) : '';
-	const fileName =
-		root && isRootRelativePath(relativeSource)
-			? relativeSource
-			: joinURL('@fs', withoutLeadingSlash(source));
-	const path = withQuery(fileName, { import: null });
+	const path = withQuery(joinURL('@fs', withoutLeadingSlash(source)), { import: null });
 	return publicPath ? publicPath(path) : joinURL('/', path);
-}
-
-function isRootRelativePath(path: string): boolean {
-	return path !== '' && path !== '..' && !path.startsWith('../') && !isAbsolute(path);
 }
 
 function devBrowserVirtualModuleUrl(

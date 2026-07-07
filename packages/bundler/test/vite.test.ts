@@ -259,9 +259,13 @@ describe('Vite adapter structure', () => {
 		// Dev resume URL points at the SOURCE module so the .tsrx stays in the client
 		// module graph (vite's no-accepting-boundary full-reload depends on it); the
 		// client source module re-exports resumeContainerEvent from the virtual
-		// resume module in dev only.
-		expect(result.code).toContain('resumeModuleUrl: "/dev/');
-		expect(result.code).toContain('.tsrx?import"');
+		// resume module in dev only. It must use the /@fs/<absolute> form: a
+		// root-relative source path (e.g. /pages/r/[repo]/index.tsrx) is routed by
+		// framework dev servers (nitro) as an APP ROUTE and 404s, killing the first
+		// full-resume wake in dev (T104 living-proof regression).
+		expect(result.code).toContain(
+			'resumeModuleUrl: "/dev/@fs/workspace/app/src/App.tsrx?import"',
+		);
 	});
 
 	test('serves dev symbol resolver tables with browser-loadable symbol module URLs', async () => {
