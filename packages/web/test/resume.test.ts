@@ -2069,8 +2069,12 @@ test('resume runtime fails loudly when a branch flip resolves an empty arm fragm
 	const end = comment('/markless:branch:branch-site:empty');
 	const button = element('BUTTON');
 	const root = element('SECTION', [button, start, shown, end]);
-	const reportedErrors: unknown[] = [];
 	const graph = createRuntimeGraph({ cells: [{ graphNodeId: 'state:open', value: true }] });
+	const reportedErrors: unknown[] = [];
+	const previousReportError = (globalThis as { reportError?: (error: unknown) => void }).reportError;
+	(globalThis as { reportError?: (error: unknown) => void }).reportError = (error) => {
+		reportedErrors.push(error);
+	};
 	const resume = createResumeRuntime({
 		root,
 		graph,
@@ -2100,24 +2104,26 @@ test('resume runtime fails loudly when a branch flip resolves an empty arm fragm
 		applyDomJournal() {
 			throw new Error('empty fragment must fail before DOM apply');
 		},
-		onError(error) {
-			reportedErrors.push(error);
-		},
 	});
 
-	await resume.start();
-	await expect(root.listeners[0]!.listener(event('click', button, ''))).rejects.toMatchObject({
-		code: 'MARKLESS_BRANCH_ARM_EMPTY',
-		branchId: 'branch-site:empty',
-		arm: 1,
-	});
-	expect(reportedErrors).toEqual([
-		expect.objectContaining({
+	try {
+		await resume.start();
+		await expect(root.listeners[0]!.listener(event('click', button, ''))).rejects.toMatchObject({
 			code: 'MARKLESS_BRANCH_ARM_EMPTY',
 			branchId: 'branch-site:empty',
-			symbolId: 'symbol:empty-branch',
-		}),
-	]);
+			arm: 1,
+		});
+		expect(reportedErrors).toEqual([
+			expect.objectContaining({
+				code: 'MARKLESS_BRANCH_ARM_EMPTY',
+				branchId: 'branch-site:empty',
+				branchSiteId: 'branch-site:empty',
+				symbolId: 'symbol:empty-branch',
+			}),
+		]);
+	} finally {
+		(globalThis as { reportError?: (error: unknown) => void }).reportError = previousReportError;
+	}
 });
 
 test('resume runtime materializes async boundary comment anchors', async () => {
