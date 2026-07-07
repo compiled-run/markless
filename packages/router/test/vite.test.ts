@@ -271,8 +271,13 @@ test('emits exact route modulepreload maps from client build chunks', () => {
 		imports: ['build/shared.js'],
 		moduleIds: ['/repo/packages/router/src/vite/entries/client-entry.ts'],
 	});
+	// Rolldown may split a route's resume container away from its page chunk;
+	// the container is then reachable only through the resume entry's route
+	// map, and the SSR plan must still preload the CURRENT route's container
+	// or the first interaction pays a waterfall fetch on slow networks.
 	const resumeChunk = chunk({
-		dynamicImports: ['build/docs.js', 'build/home.js'],
+		code: `tsrxResumeModuleLoaders = Object.assign({"/pages/docs/[...slug].mdx":()=>import("./docs-resume.js"),"/pages/index.tsrx":()=>import("./home-resume.js")});`,
+		dynamicImports: ['build/docs.js', 'build/home.js', 'build/docs-resume.js', 'build/home-resume.js'],
 		fileName: 'build/resume.js',
 		imports: ['build/resume-runtime.js'],
 		moduleIds: ['/repo/packages/router/src/vite/entries/resume-entry.ts'],
@@ -299,6 +304,8 @@ test('emits exact route modulepreload maps from client build chunks', () => {
 			}),
 			'build/docs-runtime.js': chunk({ fileName: 'build/docs-runtime.js' }),
 			'build/docs-symbol.js': chunk({ fileName: 'build/docs-symbol.js' }),
+			'build/docs-resume.js': chunk({ fileName: 'build/docs-resume.js' }),
+			'build/home-resume.js': chunk({ fileName: 'build/home-resume.js' }),
 			'build/navigation-polyfill.js': chunk({ fileName: 'build/navigation-polyfill.js' }),
 			'build/resume-runtime.js': chunk({ fileName: 'build/resume-runtime.js' }),
 			'build/scalar-specialized.js': chunk({ fileName: 'build/scalar-specialized.js' }),
@@ -334,6 +341,7 @@ test('emits exact route modulepreload maps from client build chunks', () => {
 	expect(ssrPreloads['pages/docs/[...slug].mdx']).toEqual([
 		'/app/build/resume.js',
 		'/app/build/resume-runtime.js',
+		'/app/build/docs-resume.js',
 		'/app/build/docs.js',
 		'/app/build/docs-runtime.js',
 		'/app/build/scalar-specialized.js',
@@ -343,6 +351,11 @@ test('emits exact route modulepreload maps from client build chunks', () => {
 		'/app/build/navigation-polyfill.js',
 	);
 	expect(ssrPreloads['pages/docs/[...slug].mdx']).not.toContain('/app/build/home.js');
+	// The CURRENT route's resume container must be planned even when rolldown
+	// splits it from the page chunk; other routes' containers must not be.
+	expect(ssrPreloads['pages/docs/[...slug].mdx']).not.toContain('/app/build/home-resume.js');
+	expect(ssrPreloads['pages/index.tsrx']).toContain('/app/build/home-resume.js');
+	expect(ssrPreloads['pages/index.tsrx']).not.toContain('/app/build/docs-resume.js');
 });
 
 test('includes destination route resume chunks reached from the navigation route table', () => {

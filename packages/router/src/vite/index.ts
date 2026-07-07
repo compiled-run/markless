@@ -655,6 +655,13 @@ function routeModulePreloadsFromBundle(input: {
 		const ssrFileNames = new Set<string>();
 		if (input.resumeChunk) {
 			includeChunk(ssrFileNames, chunksByFileName, input.resumeChunk.fileName);
+			// The route's own resume container hangs off the resume entry's route
+			// map as a dynamic import. When rolldown splits it away from the page
+			// chunk, missing it here makes the first interaction pay a waterfall
+			// fetch on slow networks (the preload-strategy box catches this).
+			for (const fileName of routeScopedDynamicImports(input.resumeChunk, routeFile)) {
+				includeChunk(ssrFileNames, chunksByFileName, fileName, true);
+			}
 		}
 		includeChunk(ssrFileNames, chunksByFileName, routeChunk.fileName, true);
 		ssr[routeFile] = [...ssrFileNames].map((fileName) => joinURL(input.base, fileName));
@@ -697,9 +704,11 @@ function routeScopedDynamicImports(chunk: OutputChunkLike, routeFile: string): s
 	const imports = new Set<string>();
 	const routeLiteralIndex = chunk.code.indexOf(routeFile);
 	if (routeLiteralIndex === -1) return [];
+	// Route literals appear both as "pages/x.tsrx" (navigation symbol router)
+	// and "/pages/x.tsrx" (resume entry route map keys).
 	const nextRouteLiteralIndex = chunk.code
 		.slice(routeLiteralIndex + routeFile.length)
-		.search(/["'`]pages\/[^"'`]+\.(?:tsrx|mdx)["'`]/);
+		.search(/["'`]\/?pages\/[^"'`]+\.(?:tsrx|mdx)["'`]/);
 	const routeBlockEnd =
 		nextRouteLiteralIndex === -1
 			? chunk.code.length
