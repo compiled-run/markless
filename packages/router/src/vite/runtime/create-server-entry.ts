@@ -151,16 +151,10 @@ async function renderPageModule(
 	const output = await renderSsr(props);
 	if (!output) return { bodyHtml: '', headHtml: '' };
 	const routeScript = output.state || output.view ? renderRouteScript(file) : '';
-	// Structure decides the boot: Link-attributed anchors get the lazy bridge;
-	// '#/' route anchors (or a '#/' deep-link hash at load) boot the navigation
-	// runtime eagerly — hash paths are first-class, no modes.
-	const linkBridge = navigationEntryPath
-		? output.html.includes('href="#/')
-			? renderHashNavigationBootScript(navigationEntryPath)
-			: output.html.includes('data-markless-router-link')
-				? renderLinkBridgeScript(navigationEntryPath)
-				: renderHashDeepLinkBootScript(navigationEntryPath)
-		: '';
+	// ONE lazy bridge, structure-triggered: it imports the navigation runtime
+	// only on Link/'#/' anchor interaction, or at load when a '#/' deep-link
+	// hash is actually present. No eager imports, no modes.
+	const linkBridge = navigationEntryPath ? renderLinkBridgeScript(navigationEntryPath) : '';
 	const routedOutput =
 		routeScript || linkBridge
 			? { ...output, html: `${output.html}${routeScript}${linkBridge}` }
@@ -318,18 +312,6 @@ function renderRouteScript(file: string): string {
 	return `<script type="@markless/core/route">${escapeScriptJson({ file })}</script>`;
 }
 
-// Pages with '#/' route anchors navigate with plain anchors and deep-link via
-// location.hash: the navigation runtime boots eagerly.
-function renderHashNavigationBootScript(navigationEntryPath: string): string {
-	return `<script type="module" data-markless-router-hash-boot>import(${JSON.stringify(navigationEntryPath)});</script>`;
-}
-
-// Pages without '#/' anchors may still be the LANDING shell for a '#/' deep
-// link (the hash never reaches the server): boot only when the hash says so.
-function renderHashDeepLinkBootScript(navigationEntryPath: string): string {
-	return `<script type="module" data-markless-router-hash-boot>if (location.hash.startsWith("#/")) import(${JSON.stringify(navigationEntryPath)});</script>`;
-}
-
 function renderLinkBridgeScript(resumeEntryPath: string): string {
 	return `<script data-markless-router-link-resumer>${escapeInlineScript(`(() => {
 	const d = document;
@@ -352,10 +334,14 @@ function renderLinkBridgeScript(resumeEntryPath: string): string {
 			return null;
 		}
 	};
+	if (location.hash && location.hash.startsWith('#/')) {
+		import(${JSON.stringify(resumeEntryPath)}).catch(() => {});
+	}
 	r.addEventListener('click', async (event) => {
 		if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.altKey || event.ctrlKey || event.shiftKey) return;
 		const anchor = anchorFrom(event);
-		if (!anchor || !anchor.hasAttribute(linkAttr) || anchor.hasAttribute('download')) return;
+		const hashRouteAnchor = anchor && (anchor.getAttribute('href') || '').startsWith('#/');
+		if (!anchor || (!anchor.hasAttribute(linkAttr) && !hashRouteAnchor) || anchor.hasAttribute('download')) return;
 		const target = anchor.getAttribute('target');
 		if (target && target !== '_self') return;
 		if (anchor.relList && anchor.relList.contains('external')) return;
