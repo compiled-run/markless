@@ -292,7 +292,7 @@ export function branchRenderDiagnostics(input: {
 	});
 }
 
-function firstComponentName(node: AnyNode): string | null {
+export function firstComponentName(node: AnyNode): string | null {
 	if (node.type === 'Element' || node.type === 'JSXElement') {
 		const tagName = getElementTagName(node);
 		if (tagName && !isHostTagName(tagName)) return tagName;

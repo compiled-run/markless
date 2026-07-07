@@ -5337,7 +5337,9 @@ export default function Page() @{
 
 	// armRecords live in the boundary's own coordinate space (D3): index 0 is
 	// the first element after the start anchor — the composed child's root.
-	// Repeat rows carry no locators (the keyed-repeat machinery owns rows).
+	// Repeat rows carry no locators (the keyed-repeat machinery owns rows) and
+	// neither does the arm-scoped @if's <p> since T104: flip-owned hosts
+	// re-register through the branch record on every flip.
 	expect(
 		settled.armRecords.locators.map((locator) => [
 			locator.index,
@@ -5348,7 +5350,6 @@ export default function Page() @{
 		[0, 'header', 'arm-relative'],
 		[1, 'h1', 'arm-relative'],
 		[2, 'ul', 'arm-relative'],
-		[5, 'p', 'arm-relative'],
 		[6, 'button', 'arm-relative'],
 	]);
 	const buttonLocator = settled.armRecords.locators.find(

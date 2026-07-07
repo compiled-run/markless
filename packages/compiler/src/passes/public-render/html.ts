@@ -49,7 +49,15 @@ export function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string 
 			const csrGate = csrSite
 				? context.branchReactivityGates?.find((item) => item.branchSiteId === csrSite.id)
 				: undefined;
+			// Arm-scoped flip content is branch-owned: its hosts re-register per
+			// flip through the branch record, so they never carry the arm-host
+			// tag that would claim them for the boundary's own locators.
+			const csrArmFlip =
+				!!csrSite && csrGate?.supported === true && csrGate.armScoped === true && csrGate.armFlip === true;
+			const armHostIdByNode = context.armHostIdByNode;
+			if (csrArmFlip) context.armHostIdByNode = undefined;
 			const ternary = `(${testSource} ? ${emitHtmlBranch(node.consequent as AnyNode | undefined, context)} : ${emitHtmlBranch(node.alternate as AnyNode | undefined, context)})`;
+			if (csrArmFlip) context.armHostIdByNode = armHostIdByNode;
 			if (csrSite && csrGate?.supported && csrGate.armScoped !== true) {
 				// The CSR-built DOM carries the same anchors, so the same resume
 				// runtime flips the range on the live graph (arm seeds from reads).
@@ -57,6 +65,15 @@ export function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string 
 					JSON.stringify(`<!--markless:branch:${csrSite.id}-->`),
 					ternary,
 					JSON.stringify(`<!--/markless:branch:${csrSite.id}-->`),
+				]);
+			}
+			if (csrArmFlip && csrSite) {
+				// Arm-branch anchors live in the owning boundary's own comment
+				// census; the page-level census never counts them.
+				return joinSsrExpressions([
+					JSON.stringify(`<!--markless:arm-branch:${csrSite.id}-->`),
+					ternary,
+					JSON.stringify(`<!--/markless:arm-branch:${csrSite.id}-->`),
 				]);
 			}
 			return ternary;
@@ -74,11 +91,14 @@ export function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string 
 		// locators: their hosts live in the boundary's arm-relative coordinate
 		// space, so the compose step can move only the rendered ternary side's
 		// records into boundary.armRecords (D3 — retires need 15 dead events).
+		// Flip-planned arm-scoped sites (armFlip) are branch-owned instead: the
+		// branch record re-registers their hosts per flip, so they render
+		// locator-free like top-level branch arms.
 		const consequentContext: SsrRenderContext = {
 			...context,
 			insideSupportedBranchArm:
 				context.insideSupportedBranchArm ||
-				(!!gate?.supported && gate.armScoped !== true),
+				(!!gate?.supported && (gate.armScoped !== true || gate.armFlip === true)),
 		};
 		const consequent = emitHtmlBranch(
 			node.consequent as AnyNode | undefined,
@@ -117,6 +137,16 @@ export function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string 
 					alternate,
 				])})`,
 				JSON.stringify(`<!--/markless:branch:${site.id}-->`),
+			]);
+		}
+		if (site && gate?.supported && gate.armScoped === true && gate.armFlip === true) {
+			// D1 tier 3 inside arms: the anchor pair lives in the owning
+			// boundary's own arm-branch census — the page census never sees it,
+			// and the resume runtime seeds the arm from live graph reads.
+			return joinSsrExpressions([
+				JSON.stringify(`<!--markless:arm-branch:${site.id}-->`),
+				`(${testSource} ? ${consequent} : ${alternate})`,
+				JSON.stringify(`<!--/markless:arm-branch:${site.id}-->`),
 			]);
 		}
 		return `(${testSource} ? ${consequent} : ${alternate})`;
@@ -482,19 +512,27 @@ function emitSwitchHtml(node: AnyNode, context: HtmlRenderContext): string {
 	let maxChildIndex = before?.nextChildIndex ?? 0;
 	let maxComponentEdgeIndex = before?.nextComponentEdgeIndex ?? 0;
 
+	const switchArmFlip =
+		!!site && siteGate?.supported === true && siteGate.armScoped === true && siteGate.armFlip === true;
 	const emitCaseBody = (switchCase: AnyNode): string => {
 		const children = asNodes(switchCase.consequent);
 		if (context.mode === 'csr' || !before) {
-			return joinSsrExpressions(children.map((child) => emitHtmlNode(child, context)));
+			// Arm-scoped flip content is branch-owned (see the @if CSR note).
+			const armHostIdByNode = context.armHostIdByNode;
+			if (switchArmFlip) context.armHostIdByNode = undefined;
+			const csrBody = joinSsrExpressions(children.map((child) => emitHtmlNode(child, context)));
+			if (switchArmFlip) context.armHostIdByNode = armHostIdByNode;
+			return csrBody;
 		}
 		const caseContext: SsrRenderContext = {
 			...context,
 			...before,
 			// armScoped @switch cases keep real host locators (see the @if arm
-			// note): the boundary's armRecords own their coordinates.
+			// note): the boundary's armRecords own their coordinates. Flip-planned
+			// cases are branch-owned and render locator-free instead.
 			insideSupportedBranchArm:
 				(context as SsrRenderContext).insideSupportedBranchArm ||
-				(!!siteGate?.supported && siteGate.armScoped !== true),
+				(!!siteGate?.supported && (siteGate.armScoped !== true || siteGate.armFlip === true)),
 		};
 		const body = joinSsrExpressions(children.map((child) => emitHtmlNode(child, caseContext)));
 		maxChildIndex = Math.max(maxChildIndex, caseContext.nextChildIndex);
@@ -524,11 +562,19 @@ function emitSwitchHtml(node: AnyNode, context: HtmlRenderContext): string {
 		expression = `(marklessSwitchValue === (${testedCase.testSource}) ? ${testedCase.body} : ${expression})`;
 	}
 	const chain = `((marklessSwitchValue) => ${expression})(${discriminantSource})`;
-	if (site && siteGate?.supported) {
+	if (site && siteGate?.supported && siteGate.armScoped !== true) {
 		return joinSsrExpressions([
 			JSON.stringify(`<!--markless:branch:${site.id}-->`),
 			chain,
 			JSON.stringify(`<!--/markless:branch:${site.id}-->`),
+		]);
+	}
+	if (site && switchArmFlip) {
+		// Arm-branch anchors: counted only in the owning boundary's own census.
+		return joinSsrExpressions([
+			JSON.stringify(`<!--markless:arm-branch:${site.id}-->`),
+			chain,
+			JSON.stringify(`<!--/markless:arm-branch:${site.id}-->`),
 		]);
 	}
 	return chain;

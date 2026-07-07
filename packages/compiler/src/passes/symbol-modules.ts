@@ -65,16 +65,26 @@ function emitBranchUpdateModule(
 	const selectorHelper = arms.armTests
 		? 'function marklessSelectSwitchArm(value, tests) { for (let index = 0; index < tests.length; index++) { if (tests[index] !== null && value === tests[index]) return index; } return tests.indexOf(null); }'
 		: null;
+	// Arm-scoped flips may carry repeat parts: rows rebuild from a live graph
+	// read of the collection at flip time (still no component execution).
+	const hasRepeatParts = arms.arms.some((arm) => arm.some((part) => 'repeat' in part));
+	const partExpression = hasRepeatParts
+		? 'parts.map((part) => part.text !== undefined ? part.text : part.repeat !== undefined ? marklessBranchRows(part.repeat, context.graph) : marklessBranchText(context.graph.read(part.read.graphNodeId, part.read.path))).join("")'
+		: 'parts.map((part) => part.text !== undefined ? part.text : marklessBranchText(context.graph.read(part.read.graphNodeId, part.read.path))).join("")';
+	const rowsHelper = hasRepeatParts
+		? 'function marklessBranchRows(repeat, graph) { const items = graph.read(repeat.read.graphNodeId, repeat.read.path); if (!Array.isArray(items)) return ""; return items.map((item) => repeat.rowParts.map((row) => row.text !== undefined ? row.text : row.itemPath !== undefined ? marklessBranchText(row.itemPath.reduce((value, key) => value == null ? value : value[key], item)) : marklessBranchText(graph.read(row.read.graphNodeId, row.read.path))).join("")).join(""); }'
+		: null;
 	const source = [
 		`const marklessBranchArms = ${JSON.stringify(arms.arms)};`,
 		...(selectorHelper ? [selectorHelper] : []),
 		`export function ${exportName}(context) {`,
 		`	const arm = context.arm ?? (${armSelector});`,
 		'	const parts = marklessBranchArms[arm] ?? [];',
-		'	const html = parts.map((part) => part.text !== undefined ? part.text : marklessBranchText(context.graph.read(part.read.graphNodeId, part.read.path))).join("");',
+		`	const html = ${partExpression};`,
 		'	return { arm, html };',
 		'}',
 		'function marklessBranchText(value) { return String(value == null ? "" : value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;"); }',
+		...(rowsHelper ? [rowsHelper] : []),
 	].join('\n');
 	return {
 		symbolId: symbol.id,

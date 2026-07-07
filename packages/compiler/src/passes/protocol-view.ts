@@ -1,4 +1,8 @@
 import { ASYNC_PROTOCOL_VERSION } from '@markless/serializer';
+import {
+	armScopedBranchHostIds,
+	armScopedBranchRecords,
+} from '../artifact-helpers/arm-branch-records.ts';
 import type {
 	ProtocolViewArmRecordSet,
 	ProtocolViewPayloadInput,
@@ -84,7 +88,7 @@ export function createProtocolViewPayload(
 		asyncBoundaries: supportedAsyncBoundaries(input).map(
 			({ kind: _kind, anchorOrder: _order, armRecords, ...boundary }) => ({
 				...boundary,
-				armRecords: armRecords.map((set) => wiredArmRecordSet(input, set)),
+				armRecords: armRecords.map((set, arm) => wiredArmRecordSet(input, set, boundary.id, arm)),
 				updateSymbolId: boundaryUpdateSymbols(input).get(boundary.id),
 				startAnchor: {
 					...boundary.startAnchor,
@@ -240,11 +244,16 @@ function boundaryArmHostIds(input: ProtocolViewPayloadInput): ReadonlySet<string
 }
 
 // Attaches lazy symbol IDs to a planned arm record set (the flat-stream
-// wiring, applied inside the boundary's coordinate space).
+// wiring, applied inside the boundary's coordinate space). Hosts owned by an
+// arm-scoped flip site leave the boundary's sets — their records nest under
+// the flip record and re-register on every flip (D1 tier 3 inside arms).
 function wiredArmRecordSet(
 	input: ProtocolViewPayloadInput,
 	set: ProtocolViewPayloadInput['payloadArena']['view']['asyncBoundaries'][number]['armRecords'][number],
+	boundaryId: string,
+	arm: number,
 ): ProtocolViewArmRecordSet {
+	const flipHostIds = armScopedBranchHostIds(input.publicRenderPlan.branchArms, boundaryId);
 	const eventSymbols = new Map<string, string[]>();
 	for (const symbol of input.symbolResolver.symbols) {
 		if (symbol.kind !== 'event-handler') continue;
@@ -253,19 +262,31 @@ function wiredArmRecordSet(
 		symbols[symbol.order] = symbol.id;
 		eventSymbols.set(key, symbols);
 	}
+	const branches = armScopedBranchRecords({
+		publicRenderPlan: input.publicRenderPlan,
+		symbols: input.symbolResolver.symbols,
+		payloadView: input.payloadArena.view,
+		boundaryId,
+		arm,
+	});
 	return {
-		locators: set.locators,
-		events: set.events.map((event) => ({
-			hostNodeId: event.hostNodeId,
-			eventName: event.eventName,
-			syncPolicy: event.syncPolicy,
-			symbolIds: eventSymbols.get(`${event.hostNodeId}:${event.eventName}`) ?? [],
-		})),
-		behaviors: set.behaviors.map((behavior, index) => ({
-			...behavior,
-			symbolId: behaviorSymbolsForArms(input).get(behavior.hostNodeId)?.[index],
-		})),
-		elementHandles: set.elementHandles,
+		locators: set.locators.filter((locator) => !flipHostIds.has(locator.hostNodeId)),
+		events: set.events
+			.filter((event) => !flipHostIds.has(event.hostNodeId))
+			.map((event) => ({
+				hostNodeId: event.hostNodeId,
+				eventName: event.eventName,
+				syncPolicy: event.syncPolicy,
+				symbolIds: eventSymbols.get(`${event.hostNodeId}:${event.eventName}`) ?? [],
+			})),
+		behaviors: set.behaviors
+			.filter((behavior) => !flipHostIds.has(behavior.hostNodeId))
+			.map((behavior, index) => ({
+				...behavior,
+				symbolId: behaviorSymbolsForArms(input).get(behavior.hostNodeId)?.[index],
+			})),
+		elementHandles: set.elementHandles.filter((handle) => !flipHostIds.has(handle.hostNodeId)),
+		...(branches ? { branches } : {}),
 	};
 }
 

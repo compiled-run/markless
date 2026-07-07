@@ -190,9 +190,11 @@ export type SemanticBranchSite = {
 	readonly armCount: number;
 	readonly testSource: string;
 	readonly anchorOrder: number;
-	// Inside an @try arm: renders as a re-evaluated ternary with no anchors
-	// (need 8) — excluded from the comment-anchor stream and flip records.
+	// Inside an @try arm: excluded from the page comment-anchor stream; flip
+	// wiring (if any) lives in the owning boundary's arm coordinate space.
 	readonly asyncBoundaryId?: string;
+	// Arm index inside the owning boundary (0 = @try, 1 = @pending, 2 = @catch).
+	readonly asyncBoundaryArm?: number;
 };
 
 export type SemanticSyncPolicyCondition =
@@ -819,11 +821,32 @@ export type ProtocolViewPayloadInput = {
 // symbol IDs attached. The serializer protocol type gains this field when the
 // streaming work (T107) reopens the protocol contract; until then the view
 // payload stays structurally assignable to ProtocolViewPayload.
+// An arm-scoped @if/@switch record nested under its boundary (D1 tier 3 in
+// arms). Flip-capable sites carry a lazy flip symbol plus an anchor pair in
+// the arm's OWN arm-branch comment census (the page census never counts
+// these). Escalated sites (content needs component execution) omit them: the
+// runtime routes their test reads through the boundary's arm re-render.
+export type ProtocolViewArmBranchRecord = {
+	readonly id: string;
+	readonly testReads: ReadonlyArray<{
+		readonly source: string;
+		readonly graphNodeId: string;
+		readonly path: ReadonlyArray<string>;
+	}>;
+	readonly symbolId?: string;
+	readonly armTests?: ReadonlyArray<unknown>;
+	readonly declaredEmptyArms?: ReadonlyArray<number>;
+	readonly startAnchor?: { readonly strategy: 'arm-branch-comment'; readonly index: number };
+	readonly endAnchor?: { readonly strategy: 'arm-branch-comment'; readonly index: number };
+	readonly armRecords?: NonNullable<ProtocolViewPayload['branches']>[number]['armRecords'];
+};
+
 export type ProtocolViewArmRecordSet = {
 	readonly locators: PayloadArmRecordSet['locators'];
 	readonly events: ProtocolViewPayload['events'];
 	readonly behaviors: ProtocolViewPayload['behaviors'];
 	readonly elementHandles: ProtocolViewPayload['elementHandles'];
+	readonly branches?: ReadonlyArray<ProtocolViewArmBranchRecord>;
 };
 
 export type ProtocolViewPayloadWithArmRecords = Omit<ProtocolViewPayload, 'asyncBoundaries'> & {
@@ -954,6 +977,22 @@ export type PublicRenderPlanBranchArmPart =
 				readonly graphNodeId: string;
 				readonly path: ReadonlyArray<string>;
 			};
+	  }
+	// A keyed @for inside an arm-scoped branch arm: rows rebuild from a live
+	// graph read of the collection at flip time (no keyed diffing — the flip
+	// replaces the whole branch range anyway).
+	| {
+			readonly repeat: {
+				readonly read: {
+					readonly graphNodeId: string;
+					readonly path: ReadonlyArray<string>;
+				};
+				readonly rowParts: ReadonlyArray<
+					| { readonly text: string }
+					| { readonly read: { readonly graphNodeId: string; readonly path: ReadonlyArray<string> } }
+					| { readonly itemPath: ReadonlyArray<string> }
+				>;
+			};
 	  };
 
 export type PublicRenderPlanBranchArms = {
@@ -975,6 +1014,15 @@ export type PublicRenderPlanBranchArms = {
 			readonly hostNodeId: string;
 		}>
 	>;
+	// Arm-scoped sites only (D1 tier 3 inside arms): the owning boundary, the
+	// boundary arm the site renders in, and the site's pair rank in that arm's
+	// own arm-branch comment census (page census never sees these anchors).
+	readonly asyncBoundaryId?: string;
+	readonly asyncBoundaryArm?: number;
+	readonly armAnchorRank?: number;
+	// Every host inside the flip range (including repeat rows armHosts cannot
+	// claim): the boundary's own record sets must not register any of them.
+	readonly ownedHostIds?: ReadonlyArray<string>;
 };
 
 export type PublicRenderPlanAsyncBoundaryArms = {
@@ -1006,6 +1054,10 @@ export type PublicRenderPlanBranchGate =
 			// In an async arm: renders as a re-evaluated ternary on arm settle;
 			// no flip wiring or anchors (need 8).
 			readonly armScoped?: true;
+			// Arm-scoped site with a real flip plan (D1 tier 3 inside arms):
+			// html wraps it in arm-branch anchors and a flip module rebuilds
+			// only the branch's own range.
+			readonly armFlip?: true;
 	  }
 	| {
 			readonly branchSiteId: string;
@@ -1043,6 +1095,13 @@ export type PublicRenderPlanArtifact = {
 	readonly asyncBoundaryGates: ReadonlyArray<PublicRenderPlanAsyncBoundaryGate>;
 	readonly branchReactivityGates: ReadonlyArray<PublicRenderPlanBranchGate>;
 	readonly branchArms: ReadonlyArray<PublicRenderPlanBranchArms>;
+	// Arm-scoped branch sites whose content needs component execution: the
+	// toggle escalates to the boundary's arm re-render (D2 — diagnosed loud).
+	readonly armBranchEscalations?: ReadonlyArray<{
+		readonly branchSiteId: string;
+		readonly asyncBoundaryId: string;
+		readonly asyncBoundaryArm: number;
+	}>;
 	readonly asyncBoundaryArms: ReadonlyArray<PublicRenderPlanAsyncBoundaryArms>;
 	readonly asyncBoundaryArmRenders: ReadonlyArray<PublicRenderPlanAsyncBoundaryArmRender>;
 	readonly styleScopes: ReadonlyArray<{ readonly scopeId: string; readonly cssText: string }>;

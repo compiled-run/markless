@@ -31,7 +31,7 @@ export function emitCsrComponent(node: AnyNode, componentName: string, context: 
 			? context.nextChildIndex++
 			: context.childReplacements.length;
 	const edge = context.componentEdges[context.nextComponentEdgeIndex++];
-	const props = componentPropsSource(node, context.source, edge, context.callbackSymbols);
+	const props = componentPropsSource(node, context, edge, context.callbackSymbols);
 	const childName = `marklessCsrChild${index}`;
 	context.childReplacements.push(
 		`	const ${childName} = marklessCsrRenderChild(${localName}, { ${props.join(', ')} });`,
@@ -43,10 +43,11 @@ export function emitCsrComponent(node: AnyNode, componentName: string, context: 
 
 function componentPropsSource(
 	node: AnyNode,
-	source: string,
+	context: CsrRenderContext,
 	edge: ComponentEdge | undefined,
 	callbackSymbols: ReadonlyMap<string, string>,
 ): string[] {
+	const source = context.source;
 	const props = getElementAttributes(node).flatMap((attribute) => {
 		const name = getIdentifierName(attribute.name as AnyNode | undefined);
 		if (!name) return [];
@@ -56,7 +57,32 @@ function componentPropsSource(
 		}
 		return componentAttributePropSource(attribute, source);
 	});
-	const children = emitHtmlChildren(node, { mode: 'csr', source });
+	// Children render in the PARENT's template space: branch sites and keyed
+	// repeats authored inside them belong to the parent's semantic streams, so
+	// their gates/plans (and index consumption) must flow through — otherwise
+	// an arm-scoped flip site inside projected children loses its anchors.
+	// Component wiring stays absent on purpose: nested components inside
+	// children props are not renderable here today.
+	const childrenContext: CsrRenderContext = {
+		mode: 'csr',
+		source,
+		childReplacements: [],
+		componentEdges: [],
+		componentImports: new Map(),
+		callbackSymbols: new Map(),
+		nextComponentEdgeIndex: 0,
+		branchSites: context.branchSites,
+		branchReactivityGates: context.branchReactivityGates,
+		nextBranchSiteIndex: context.nextBranchSiteIndex,
+		keyedRepeats: context.keyedRepeats,
+		repeatGates: context.repeatGates,
+		nextRepeatIndex: context.nextRepeatIndex,
+		styleScopeClass: context.styleScopeClass,
+		armHostIdByNode: context.armHostIdByNode,
+	};
+	const children = emitHtmlChildren(node, childrenContext);
+	context.nextBranchSiteIndex = childrenContext.nextBranchSiteIndex;
+	context.nextRepeatIndex = childrenContext.nextRepeatIndex;
 	if (children !== '""') {
 		props.push(`children: ${children}`);
 	}

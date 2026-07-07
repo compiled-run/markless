@@ -1,5 +1,9 @@
 import { asNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { isIgnorableJsxTextNode as isIgnorableTextNode } from '../../ast/tsrx.ts';
+import {
+	armScopedBranchHostIds,
+	armScopedBranchRecords,
+} from '../../artifact-helpers/arm-branch-records.ts';
 import type {
 	PayloadArmRecordSet,
 	PlannedSymbol,
@@ -36,6 +40,8 @@ export function planAsyncBoundaryArmRenders(context: {
 	readonly asyncBoundaryGates: PublicRenderPlanArtifact['asyncBoundaryGates'];
 	readonly asyncBoundaryArms: PublicRenderPlanArtifact['asyncBoundaryArms'];
 	readonly branchReactivityGates: PublicRenderPlanArtifact['branchReactivityGates'];
+	readonly branchArms: PublicRenderPlanArtifact['branchArms'];
+	readonly armBranchEscalations: NonNullable<PublicRenderPlanArtifact['armBranchEscalations']>;
 	readonly repeatGates: PublicRenderPlanArtifact['repeatGates'];
 	readonly assignedHosts: AssignedHosts;
 	readonly styleScopeClass: string | null;
@@ -207,7 +213,15 @@ function planOneArmRender(
 	}
 
 	const wiredArmPlans = [0, 2].map((arm) =>
-		wiredArmRecordSet(candidate.payloadBoundary.armRecords[arm], input.symbolResolver.symbols),
+		wiredArmRecordSet(candidate.payloadBoundary.armRecords[arm], input.symbolResolver.symbols, {
+			publicRenderPlan: {
+				branchArms: candidate.branchArms,
+				armBranchEscalations: candidate.armBranchEscalations,
+			},
+			payloadView: input.payloadArena.view,
+			boundaryId: boundarySite.id,
+			arm,
+		}),
 	);
 	const bodyLines = [
 		'	const marklessArmIndex = context.status === "rejected" ? 1 : 0;',
@@ -298,6 +312,7 @@ function armUpdateHelperLines(): string[] {
 		'		events,',
 		'		behaviors,',
 		'		elementHandles,',
+		'		branches: plan.branches ?? [],',
 		'	};',
 		'	return { arm, html: marklessArmSerializeHtml(root), armRecords };',
 		'}',
@@ -313,10 +328,22 @@ function armUpdateHelperLines(): string[] {
 // the flat-stream wiring applied inside the boundary's coordinate space.
 // Locators are omitted: the module derives them from the rendered fragment,
 // which is the only truth once repeats and @if arms shift element positions.
+// Hosts owned by arm-scoped flip sites leave the sets: their records nest
+// under the flip record and re-register per flip (D1 tier 3 inside arms).
 function wiredArmRecordSet(
 	set: PayloadArmRecordSet | undefined,
 	symbols: ReadonlyArray<PlannedSymbol>,
+	armBranches: {
+		readonly publicRenderPlan: Parameters<typeof armScopedBranchRecords>[0]['publicRenderPlan'];
+		readonly payloadView: Parameters<typeof armScopedBranchRecords>[0]['payloadView'];
+		readonly boundaryId: string;
+		readonly arm: number;
+	},
 ) {
+	const flipHostIds = armScopedBranchHostIds(
+		armBranches.publicRenderPlan.branchArms,
+		armBranches.boundaryId,
+	);
 	const eventSymbols = new Map<string, string[]>();
 	const behaviorSymbols = new Map<string, string[]>();
 	for (const symbol of symbols) {
@@ -332,18 +359,32 @@ function wiredArmRecordSet(
 			behaviorSymbols.set(symbol.hostNodeId, ids);
 		}
 	}
+	const branches = armScopedBranchRecords({
+		publicRenderPlan: armBranches.publicRenderPlan,
+		symbols,
+		payloadView: armBranches.payloadView,
+		boundaryId: armBranches.boundaryId,
+		arm: armBranches.arm,
+	});
 	return {
-		events: (set?.events ?? []).map((event) => ({
-			hostNodeId: event.hostNodeId,
-			eventName: event.eventName,
-			syncPolicy: event.syncPolicy,
-			symbolIds: eventSymbols.get(`${event.hostNodeId}:${event.eventName}`) ?? [],
-		})),
-		behaviors: (set?.behaviors ?? []).map((behavior, index) => ({
-			...behavior,
-			symbolId: behaviorSymbols.get(behavior.hostNodeId)?.[index],
-		})),
-		elementHandles: set?.elementHandles ?? [],
+		events: (set?.events ?? [])
+			.filter((event) => !flipHostIds.has(event.hostNodeId))
+			.map((event) => ({
+				hostNodeId: event.hostNodeId,
+				eventName: event.eventName,
+				syncPolicy: event.syncPolicy,
+				symbolIds: eventSymbols.get(`${event.hostNodeId}:${event.eventName}`) ?? [],
+			})),
+		behaviors: (set?.behaviors ?? [])
+			.filter((behavior) => !flipHostIds.has(behavior.hostNodeId))
+			.map((behavior, index) => ({
+				...behavior,
+				symbolId: behaviorSymbols.get(behavior.hostNodeId)?.[index],
+			})),
+		elementHandles: (set?.elementHandles ?? []).filter(
+			(handle) => !flipHostIds.has(handle.hostNodeId),
+		),
+		...(branches ? { branches } : {}),
 	};
 }
 

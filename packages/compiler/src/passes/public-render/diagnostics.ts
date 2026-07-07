@@ -51,6 +51,38 @@ export function asyncArmRenderUnsupportedDiagnostic(input: {
 	};
 }
 
+// D2/D4: a toggle inside @try/@catch content whose branch cannot flip on its
+// own (it needs component execution) still WORKS — the whole @try content
+// re-renders — but the cost is never silent, and the wording stays in the
+// author's vocabulary (never compiler internals).
+export function tryBlockToggleRerenderDiagnostic(input: {
+	readonly branchLabel: '@if' | '@switch';
+	readonly componentName: string | null;
+	readonly node: AnyNode;
+	readonly filename: string;
+}): CompilerDiagnostic {
+	const message = input.componentName
+		? `this ${input.branchLabel} contains <${input.componentName}>, so toggling it re-renders the whole @try block — move the component outside the ${input.branchLabel} to keep the toggle cheap.`
+		: `this ${input.branchLabel} contains content the toggle cannot rebuild on its own, so toggling it re-renders the whole @try block — simplify the ${input.branchLabel} content to plain elements, text, and state reads to keep the toggle cheap.`;
+	return {
+		code: 'MARKLESS_TRY_BLOCK_TOGGLE_RERENDER',
+		severity: 'warning',
+		phase: 'public-render',
+		title: `Toggling this ${input.branchLabel} re-renders the whole @try block`,
+		message,
+		why: 'Content with a component cannot be rebuilt from static parts and value slots, so the toggle falls back to re-rendering the whole @try block. That works, but it re-runs the component and replaces DOM the toggle did not touch.',
+		primarySpan: sourceSpan(input.node, input.filename),
+		passId: 'public-render-plan',
+		artifactKeys: ['publicRenderPlan'],
+		suggestions: [
+			{
+				message: `Move the component outside the ${input.branchLabel}, or keep the ${input.branchLabel} content to plain elements, text, and state reads.`,
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_TRY_BLOCK_TOGGLE_RERENDER',
+	};
+}
+
 export function repeatRowStateScopeUnsupportedDiagnostic(input: {
 	readonly apiName: 'state' | 'computed';
 	readonly name: string;
