@@ -152,9 +152,24 @@ function serializeComputedSnapshot(
 			status: computed.snapshot.status,
 			version: computed.snapshot.version,
 			key,
-			error: serializeProtocolStateField(computed, 'error', computed.snapshot.error),
+			error: serializeProtocolStateField(
+				computed,
+				'error',
+				durableSnapshotError(computed.snapshot.error),
+			),
 		},
 	};
+}
+
+// Rejected async snapshots routinely hold live Error instances (a failed fetch
+// rejects with TypeError). Refusing to serialize them would fail the WHOLE page
+// render over an error the page's @catch arm already handled — keep the durable
+// facts (name/message) and drop the live object.
+function durableSnapshotError(error: unknown): unknown {
+	if (error instanceof Error) {
+		return { $type: 'error', name: error.name, message: error.message };
+	}
+	return error;
 }
 
 function serializeProtocolStateField(

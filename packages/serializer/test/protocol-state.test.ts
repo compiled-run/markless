@@ -86,3 +86,30 @@ function captureThrown(run: () => unknown): unknown {
 
 	throw new Error('Expected callback to throw.');
 }
+
+test('rejected async snapshots serialize a durable error shape instead of failing the render', () => {
+	const payload = createProtocolStatePayload({
+		cells: [],
+		computed: [
+			{
+				graphNodeId: 'computed:model',
+				name: 'model',
+				async: true,
+				dependencies: [],
+				snapshot: {
+					status: 'rejected',
+					version: 1,
+					key: undefined,
+					error: new TypeError('fetch failed'),
+				},
+			},
+		],
+	} as never);
+
+	const snapshot = (payload.computed[0] as { snapshot?: { error?: unknown } }).snapshot;
+	expect(deserializeGraphValue(snapshot?.error as never)).toEqual({
+		$type: 'error',
+		name: 'TypeError',
+		message: 'fetch failed',
+	});
+});
