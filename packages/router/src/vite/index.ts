@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { nitro } from 'nitro/vite';
 import { dirname, isAbsolute, join, normalize, relative } from 'pathe';
 import {
@@ -85,6 +86,7 @@ export function router(options: MarklessRouterOptions = {}): PluginOption[] {
 
 	return [
 		routerConfigPlugin(nitroPlugins, resumeEntry, navigationEntry, routePreloads),
+		devSourceModuleRequestPlugin(),
 		mdxTransformPlugin(),
 		requestFileTransformPlugin(),
 		routeTypegenPlugin(),
@@ -93,6 +95,42 @@ export function router(options: MarklessRouterOptions = {}): PluginOption[] {
 		virtualModulesPlugin(resumeEntry, navigationEntry, routePreloads),
 		nitroPlugins,
 	];
+}
+
+// Dev module requests for authored source files: Vite's glob imports (the
+// resume entry's page-module table) emit ROOT-RELATIVE URLs like
+// `/pages/r/[repo]/index.tsrx?import&markless-resume`. The dev server does
+// not treat the unknown .tsrx/.mdx extension at that shape as a module
+// request, so the request falls through to the nitro route handler and 404s
+// — which kills the FIRST full-resume wake of every dev interaction. The
+// /@fs/<absolute> form is served (and resolves to the same module-graph
+// entry), so rewrite qualifying requests before Vite's own middlewares run.
+function devSourceModuleRequestPlugin(): Plugin {
+	let root = '';
+	return {
+		name: 'markless-router:dev-source-module-requests',
+		apply: 'serve',
+		configResolved(config) {
+			root = config.root;
+		},
+		configureServer(server) {
+			server.middlewares.use((req, _res, next) => {
+				const url = req.url ?? '';
+				const queryIndex = url.indexOf('?');
+				const pathname = queryIndex === -1 ? url : url.slice(0, queryIndex);
+				const query = queryIndex === -1 ? '' : url.slice(queryIndex + 1);
+				if (
+					root !== '' &&
+					/\.(?:tsrx|mdx)$/.test(pathname) &&
+					/(?:^|&)(?:import(?:=|&|$)|markless-)/.test(query) &&
+					existsSync(join(root, decodePath(pathname)))
+				) {
+					req.url = `/@fs${join(root, decodePath(pathname))}?${query}`;
+				}
+				next();
+			});
+		},
+	};
 }
 
 function routerConfigPlugin(
