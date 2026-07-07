@@ -35,6 +35,10 @@ export type SemanticComponentEdge = {
 	readonly id: string;
 	readonly parentComponentName: string;
 	readonly childComponentName: string;
+	// Present when the component renders inside an @try arm: its graph-reference
+	// props are boundary reads (need 10 — the arm may touch the async computed
+	// only through child props).
+	readonly asyncBoundaryId?: string;
 	readonly importSource?: string;
 	readonly importKind?: SemanticModuleImport['kind'];
 	readonly importedName?: string;

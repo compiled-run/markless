@@ -143,6 +143,15 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 					source: repeat.collectionSource,
 					asyncBoundaryId: repeat.asyncBoundaryId,
 				})),
+				// Components inside the arm read the async computed through their
+				// graph-reference props (need 10).
+				...input.semanticGraph.componentEdges.flatMap((edge) =>
+					edge.props.flatMap((prop) =>
+						prop.kind === 'graph-reference'
+							? [{ source: prop.source, asyncBoundaryId: edge.asyncBoundaryId }]
+							: [],
+					),
+				),
 			].flatMap((read) => {
 				if (read.asyncBoundaryId !== boundary.id) return [];
 
