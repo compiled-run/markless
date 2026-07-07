@@ -67,20 +67,20 @@ test('emitResumeModule emits a specialized scalar dispatcher with resolved const
 	const resumeCode = emitResumeModule(scalarResumeInput());
 
 	expect(resumeCode).toContain("from '@markless/web/fns/scalar-specialized';");
-	expect(resumeCode).toContain('marklessScalarEventMatches(input, marklessFindElementAtDomOrderIndex(input.root, 3, "button"), "click", "host:button")');
+	expect(resumeCode).toContain("from '@markless/web/fns/write-scalar';");
+	expect(resumeCode).toContain("from '@markless/web/fns/update-text';");
+	expect(resumeCode).toContain('marklessScalarEventMatches(input, marklessFindElementAtDomOrderIndex(input.root, 3), "button", "click", "host:button")');
 	expect(resumeCode).toContain('const eventTarget = input.event?.target;');
 	expect(resumeCode).toContain('input.event?.type === eventName');
-	expect(resumeCode).toContain('marklessFindElementAtDomOrderIndex(input.root, 3, "button")');
-	expect(resumeCode).toContain('marklessFindElementAtDomOrderIndex(input.root, 5, "output")');
+	expect(resumeCode).toContain('marklessFindElementAtDomOrderIndex(input.root, 3)');
+	expect(resumeCode).toContain('marklessFindElementAtDomOrderIndex(input.root, 5)');
 	expect(resumeCode).not.toContain('?? input.element ?? input.event.target');
 	expect(resumeCode).toContain('payloadState.cells[0]');
-	expect(resumeCode).toContain('marklessAssertScalarCell(cell, "state:count", "markless/state cell[0]")');
-	expect(resumeCode).toContain('marklessCreateScalarSpecializedState("state:count"');
-	expect(resumeCode).toContain('marklessScalarSpecializedTextValue("host:label", "Count: " +');
+	expect(resumeCode).toContain('marklessDecodeScalarCell(payloadState.cells[0], "state:count", "markless/state cell[0]")');
+	expect(resumeCode).toContain('graphNodeId === "state:count"');
+	expect(resumeCode).toContain('marklessUpdateText({ domUpdate: { hostNodeId: "host:label" }, value: "Count: " + (state.value == null ? \'\' : String(state.value)) }, "host:label").value');
 	expect(resumeCode).toContain('loadSymbol("symbol:click")');
 	expect(resumeCode).not.toContain('input.loadSymbol("symbol:click")');
-	expect(resumeCode).not.toContain("from '@markless/web/fns/write-scalar';");
-	expect(resumeCode).not.toContain("from '@markless/web/fns/update-text';");
 	expect(resumeCode).not.toContain('@markless/web/event-only-lean/scalar-core');
 	expect(resumeCode).not.toContain('@markless/web/event-only-lean/lean-shared');
 	expect(resumeCode).not.toContain('@markless/web/event-only-lean/row');
@@ -99,7 +99,8 @@ test('specialized scalar dispatcher accepts the real raw event entry shape', () 
 	expect(resumeCode).toContain('host === eventTarget');
 	expect(resumeCode).toContain('host.contains(eventTarget)');
 	expect(resumeCode).toContain('input.event?.type === eventName');
-	expect(resumeCode).not.toContain('input.eventRecord?.hostNodeId === "host:button"');
+	expect(resumeCode).toContain('host.tagName.toLowerCase() !== tagName');
+	expect(resumeCode).not.toContain('input.eventRecord');
 });
 
 test('emitResumeModule keeps row actions behind the row lean entry', () => {

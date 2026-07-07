@@ -29,8 +29,8 @@ const SCALAR_LEAN_DISPATCH_CORE = [
 	'web/fns/write-scalar',
 	'web/fns/update-text',
 	'web/runtime-error-reporting',
-	// Shared helper body for the emitted specialized dispatchers (hoisted so N
-	// actions share one helper instead of duplicating per action).
+	// Tiny generic helpers for emitted scalar dispatchers: DOM-order lookup,
+	// scalar-cell decode/validation, and fail-closed error creation.
 	'web/fns/scalar-specialized',
 ];
 const ROW_LEAN_DISPATCH_CORE = [

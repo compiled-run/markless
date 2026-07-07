@@ -1,4 +1,6 @@
 import { expect, test, vi } from 'vitest';
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'pathe';
 import { marklessUpdateText } from '../src/fns/update-text.ts';
 import { marklessWriteScalar } from '../src/fns/write-scalar.ts';
 import { enrichRuntimeErrorForReporting } from '../src/runtime-error-reporting.ts';
@@ -89,4 +91,18 @@ test('runtime reporting helper enriches slim leaf errors once', () => {
 		graphNodeId: 'state:count',
 		symbolId: 'symbol:click',
 	});
+});
+
+test('scalar specialized leaf stays limited to generic shared helpers', async () => {
+	const source = await readFile(resolve(import.meta.dirname, '../src/fns/scalar-specialized.ts'), 'utf8');
+
+	expect(source).not.toContain("from './write-scalar.ts'");
+	expect(source).not.toContain("from './update-text.ts'");
+	expect(source).not.toContain('marklessCreateScalarSpecializedState');
+	expect(source).not.toContain('marklessScalarSpecializedIncrement');
+	expect(source).not.toContain('marklessScalarSpecializedAssign');
+	expect(source).not.toContain('marklessScalarSpecializedShadowGraph');
+	expect(source).toContain('marklessFindElementAtDomOrderIndex');
+	expect(source).toContain('marklessDecodeScalarCell');
+	expect(source).toContain('marklessScalarSpecializedError');
 });
