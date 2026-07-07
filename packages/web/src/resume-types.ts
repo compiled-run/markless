@@ -24,18 +24,20 @@ export type ResumeBehaviorRecord = ProtocolViewPayload['behaviors'][number];
 export type ResumeKeyedRepeatRecord = NonNullable<ProtocolViewPayload['keyedRepeats']>[number];
 export type ResumeKeyedRepeatRowEvent = ResumeKeyedRepeatRecord['rowEvents'][number];
 export type ResumeBranchArmRecordSet = NonNullable<NonNullable<ProtocolViewPayload['branches']>[number]['armRecords']>[number];
-export type ResumeBranchRecord = { readonly id: string; readonly startAnchor: ResumeDomComment; readonly endAnchor: ResumeDomComment; readonly symbolId: string; readonly testReads: NonNullable<NonNullable<ProtocolViewPayload['branches']>[number]['testReads']>; readonly armTests?: ReadonlyArray<unknown>; readonly armRecords?: ReadonlyArray<ResumeBranchArmRecordSet> };
+export type ResumeBranchRecord = { readonly id: string; readonly sourceId?: string; readonly startAnchor: ResumeDomComment; readonly endAnchor: ResumeDomComment; readonly symbolId: string; readonly testReads: NonNullable<NonNullable<ProtocolViewPayload['branches']>[number]['testReads']>; readonly armTests?: ReadonlyArray<unknown>; readonly armRecords?: ReadonlyArray<ResumeBranchArmRecordSet> };
 export type ResumeBranchUpdate = { readonly arm: number; readonly html: string };
 export type ResumeViewRecord = Pick<ProtocolViewPayload, 'locators' | 'events' | 'domUpdates' | 'behaviors' | 'elementHandles' | 'asyncBoundaries' | 'branches' | 'keyedRepeats'>;
 export type ResumeSymbolContext = {
 	readonly graph: RuntimeGraph; readonly read?: RuntimeGraph['read']; readonly key?: unknown; readonly signal?: AbortSignal; readonly event?: ResumeDomEvent; readonly element: ResumeDomElement;
-	readonly getElementHandle: (handleIdOrName: string) => ResumeDomElement | undefined; readonly locals?: Readonly<Record<string, unknown>>; readonly arm?: number;
+	readonly getElementHandle: (handleIdOrName: string) => ResumeDomElement | undefined; readonly locals?: Readonly<Record<string, unknown>>; readonly arm?: number; readonly branchId?: string; readonly composedBranchId?: string;
 	readonly behaviorInputs?: ReadonlyArray<unknown>; readonly domUpdate?: ProtocolViewPayload['domUpdates'][number]; readonly value?: unknown;
 	readonly asyncBoundary?: ResumeAsyncBoundaryRecord; readonly asyncRead?: ResumeAsyncBoundaryRead; readonly status?: 'fulfilled' | 'rejected';
 };
 export type ResumeBehaviorCleanup = () => void;
 export type ResumeSymbol = (context: ResumeSymbolContext) => void | DomJournalResult | ResumeBehaviorCleanup | ResumeBranchUpdate | Promise<void | DomJournalResult | ResumeBehaviorCleanup | ResumeBranchUpdate>;
-export type ResumeRuntimeErrorContext = { readonly phase: 'event'; readonly hostNodeId: string; readonly eventName: string; readonly symbolId?: string; readonly event: ResumeDomEvent; readonly element: ResumeDomElement };
+export type ResumeRuntimeErrorContext =
+	| { readonly phase: 'event'; readonly hostNodeId: string; readonly eventName: string; readonly symbolId?: string; readonly event: ResumeDomEvent; readonly element: ResumeDomElement }
+	| { readonly phase: 'runtime'; readonly graphNodeId?: string; readonly branchId?: string; readonly symbolId?: string };
 export type ResumeRuntimeErrorHook = (error: unknown, context: ResumeRuntimeErrorContext) => void | Promise<void>;
 export type ResumeSharedPatchDispatcher = (patch: RuntimeGraphSharedPatch) => void | Promise<void>;
 export type ResumeRuntimeInput = {

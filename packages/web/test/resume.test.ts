@@ -2026,6 +2026,100 @@ test('resume runtime reports lazy event load failures to the app error hook and 
 	expect(flushedWrites).toEqual([[{ graphNodeId: 'state:count', value: 1 }]]);
 });
 
+test('resume runtime reports journal subscriber failures to the app error hook', async () => {
+	const button = element('BUTTON');
+	const root = element('SECTION', [button]);
+	const failure = new Error('journal apply failed');
+	const reportedErrors: unknown[] = [];
+	const graph = createRuntimeGraph({ cells: [{ graphNodeId: 'state:count', value: 0 }] });
+	const resume = createResumeRuntime({
+		root,
+		graph,
+		view: {
+			locators: [
+				{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'section' },
+				{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'button' },
+			],
+			events: [{ hostNodeId: 'h1', eventName: 'click', symbolIds: ['symbol:click'] }],
+			domUpdates: [{ hostNodeId: 'h1', source: 'count', graphNodeId: 'state:count', path: [], symbolId: 'symbol:text' }],
+			behaviors: [],
+			elementHandles: [],
+			asyncBoundaries: [],
+		},
+		loadSymbol(symbolId) {
+			if (symbolId === 'symbol:click') return ({ graph: runtimeGraph }) => runtimeGraph.write({ graphNodeId: 'state:count', value: 1 });
+			return () => ({ type: 'setText', locator: 'h1', value: '1' });
+		},
+		applyDomJournal() {
+			throw failure;
+		},
+		onError(error) {
+			reportedErrors.push(error);
+		},
+	});
+
+	await resume.start();
+	await expect(root.listeners[0]!.listener(event('click', button, ''))).rejects.toBe(failure);
+	expect(reportedErrors).toEqual([failure]);
+});
+
+test('resume runtime fails loudly when a branch flip resolves an empty arm fragment', async () => {
+	const start = comment('markless:branch:branch-site:empty');
+	const shown = element('P');
+	const end = comment('/markless:branch:branch-site:empty');
+	const button = element('BUTTON');
+	const root = element('SECTION', [button, start, shown, end]);
+	const reportedErrors: unknown[] = [];
+	const graph = createRuntimeGraph({ cells: [{ graphNodeId: 'state:open', value: true }] });
+	const resume = createResumeRuntime({
+		root,
+		graph,
+		view: {
+			locators: [
+				{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'section' },
+				{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'button' },
+			],
+			events: [{ hostNodeId: 'h1', eventName: 'click', symbolIds: ['symbol:toggle'] }],
+			domUpdates: [],
+			behaviors: [],
+			elementHandles: [],
+			asyncBoundaries: [],
+			branches: [{
+				id: 'branch-site:empty',
+				startAnchor: { strategy: 'dom-order-comment', index: 0 },
+				endAnchor: { strategy: 'dom-order-comment', index: 1 },
+				symbolId: 'symbol:empty-branch',
+				testReads: [{ source: 'open', graphNodeId: 'state:open', path: [] }],
+			}],
+		},
+		loadSymbol(symbolId) {
+			if (symbolId === 'symbol:toggle') return ({ graph: runtimeGraph }) => runtimeGraph.write({ graphNodeId: 'state:open', value: false });
+			return () => ({ arm: 1, html: '' });
+		},
+		renderBranchHtml: () => [],
+		applyDomJournal() {
+			throw new Error('empty fragment must fail before DOM apply');
+		},
+		onError(error) {
+			reportedErrors.push(error);
+		},
+	});
+
+	await resume.start();
+	await expect(root.listeners[0]!.listener(event('click', button, ''))).rejects.toMatchObject({
+		code: 'MARKLESS_BRANCH_ARM_EMPTY',
+		branchId: 'branch-site:empty',
+		arm: 1,
+	});
+	expect(reportedErrors).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_BRANCH_ARM_EMPTY',
+			branchId: 'branch-site:empty',
+			symbolId: 'symbol:empty-branch',
+		}),
+	]);
+});
+
 test('resume runtime materializes async boundary comment anchors', async () => {
 	const start = comment('async:boundary:0:start');
 	const paragraph = element('P');

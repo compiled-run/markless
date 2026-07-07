@@ -9,7 +9,12 @@ export function createResumeRuntimeShared(input: ResumeRuntimeInput) {
 	let sharedPatchRuntime: SharedPatchRuntime | undefined;
 
 	const flushRuntimeGraph = async () => {
-		await input.graph.flush();
+		try {
+			await input.graph.flush();
+		} catch (error) {
+			await reportRuntimeError(error, { phase: 'runtime' });
+			throw error;
+		}
 		const patches = input.graph.takeSharedPatches?.() ?? [];
 		if (patches.length === 0) return;
 		const dispatchSharedPatch =

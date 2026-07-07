@@ -12,9 +12,10 @@ export function wireBranches(input: any) {
 		let currentArm = readBranchArm(input.graph, branch); currentArmByBranchId.set(branch.id, currentArm);
 		for (const testRead of branch.testReads) input.storeContainerSubscription(input.graph.subscribe({ id: `branch-test:${branch.id}:${testRead.graphNodeId}:${testRead.path.join('.')}`, graphNodeId: testRead.graphNodeId, path: testRead.path, async run() {
 			const newArm = readBranchArm(input.graph, branch); if (newArm === currentArm) return;
-			const symbol = await input.loadSymbol(branch.symbolId); const update = await symbol({ graph: input.graph, arm: newArm, element: input.root, getElementHandle: input.elementHandles.get });
+			const symbol = await input.loadSymbol(branch.symbolId); const update = await symbol({ graph: input.graph, arm: newArm, branchId: branch.sourceId ?? branch.id, composedBranchId: branch.id, element: input.root, getElementHandle: input.elementHandles.get });
 			if (!isResumeBranchUpdate(update)) return; currentArm = update.arm; currentArmByBranchId.set(branch.id, update.arm);
 			const fragment = input.renderBranchHtml ? input.renderBranchHtml(update.html) : update.html;
+			if (branchFragmentEmpty(fragment)) throw branchArmEmptyError(branch, update.arm);
 			return [{ type: 'removeRange', locator: `branch:${branch.id}` }, { type: 'insertRange', locator: `branch:${branch.id}:start`, fragment }] as DomJournalResult;
 		} }));
 	}
@@ -57,7 +58,7 @@ function materializeBranchLocators(root: ResumeDomElement, branches: NonNullable
 		const startAnchor = comments[branch.startAnchor.index], endAnchor = comments[branch.endAnchor.index];
 		if (!startAnchor) throw missingCommentAnchorError(branch.id, 'startAnchor', branch.startAnchor.index);
 		if (!endAnchor) throw missingCommentAnchorError(branch.id, 'endAnchor', branch.endAnchor.index);
-		records.push({ id: branch.id, startAnchor, endAnchor, symbolId: branch.symbolId, testReads: branch.testReads, armTests: branch.armTests, armRecords: branch.armRecords });
+		records.push({ id: branch.id, sourceId: (branch as { readonly sourceId?: string }).sourceId, startAnchor, endAnchor, symbolId: branch.symbolId, testReads: branch.testReads, armTests: branch.armTests, armRecords: branch.armRecords });
 	}
 	return records;
 }
@@ -87,5 +88,15 @@ function walkComments(root: ResumeDomElement): ResumeDomComment[] {
 function missingCommentAnchorError(id: string, name: 'startAnchor' | 'endAnchor', index: number): Error {
 	const error = new Error(`Resume locator ${id} ${name} expected a comment at DOM order index ${String(index)}.`) as Error & Record<string, unknown>;
 	error.name = 'RuntimeResumeError'; error.code = 'MARKLESS_RESUME_LOCATOR_MISSING'; error.docsUrl = 'https://markless.dev/errors/MARKLESS_RESUME_LOCATOR_MISSING';
+	return error;
+}
+function branchFragmentEmpty(fragment: unknown): boolean {
+	if (typeof fragment === 'string') return fragment.length === 0;
+	if (!Array.isArray(fragment)) return false;
+	return fragment.length === 0 || !fragment.some((node) => node && typeof node === 'object' && 'nodeType' in node);
+}
+function branchArmEmptyError(branch: ResumeBranchRecord, arm: number): Error {
+	const error = new Error(`MARKLESS_BRANCH_ARM_EMPTY: Branch ${branch.id} resolved arm ${String(arm)} to an empty fragment.`) as Error & Record<string, unknown>;
+	error.name = 'RuntimeResumeError'; error.code = 'MARKLESS_BRANCH_ARM_EMPTY'; error.phase = 'runtime'; error.branchId = branch.id; error.sourceBranchId = branch.sourceId; error.arm = arm; error.symbolId = branch.symbolId; error.docsUrl = 'https://markless.dev/errors/MARKLESS_BRANCH_ARM_EMPTY';
 	return error;
 }
