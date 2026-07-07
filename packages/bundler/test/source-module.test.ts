@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { emitResumeModule, emitSourceModule } from '../src/source-module.ts';
+import { emitResumeModule, emitSourceModule , rewriteSymbolModuleExport } from '../src/source-module.ts';
 
 const baseInput = {
 	filename: '/workspace/app/src/App.tsrx',
@@ -288,3 +288,13 @@ function scalarResumeInput() {
 		},
 	};
 }
+
+test('rewriteSymbolModuleExport renames async handler exports too', () => {
+	expect(
+		rewriteSymbolModuleExport(
+			'export async function symbol_0(context) {}',
+			'symbol_0',
+			'symbol_0_abc',
+		),
+	).toBe('export async function symbol_0_abc(context) {}');
+});

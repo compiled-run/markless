@@ -34,7 +34,10 @@ export function rewriteSymbolModuleExport(
 	fromExportName: string,
 	toExportName: string,
 ) {
-	return source.replace(`export function ${fromExportName}`, `export function ${toExportName}`);
+	// Handlers with await bodies emit `export async function` — rename both forms.
+	return source
+		.replace(`export function ${fromExportName}`, `export function ${toExportName}`)
+		.replace(`export async function ${fromExportName}`, `export async function ${toExportName}`);
 }
 
 export function payloadModule(payload: {
