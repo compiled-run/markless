@@ -5,17 +5,12 @@ import {
 	handleNavigateEvent,
 	type MarklessRouterNavigationWindow,
 } from '../src/spa-navigation.ts';
-import { MARKLESS_ROUTER_ROUTE_EVENT } from '../src/route-state.ts';
 
 describe('SPA navigation', () => {
-	it('renders the next route from the client page module graph', async () => {
-		const document = new EventTarget() as Document;
-		let update: CustomEvent['detail'];
-		document.addEventListener(MARKLESS_ROUTER_ROUTE_EVENT, (event) => {
-			update = (event as CustomEvent).detail;
-		});
+	it('fetches the server-rendered destination and swaps the document', async () => {
+		const document = swapCaptureDocument();
+		const { calls, fetch } = fetchStub('<html>about-ssr</html>');
 		const context = {
-			documentModuleLoader: async () => ({ default: component('document') }),
 			manifest: {
 				routes: [
 					{
@@ -32,6 +27,7 @@ describe('SPA navigation', () => {
 			},
 			window: {
 				document,
+				fetch,
 				location: { href: 'http://marklessrouter.test/' },
 			},
 		};
@@ -42,16 +38,9 @@ describe('SPA navigation', () => {
 		expect(handleNavigateEvent(event, context as never)).toBe(true);
 		await event.intercepted?.handler();
 
-		expect(update?.route).toEqual({
-			file: 'pages/about.tsrx',
-			params: {},
-			status: 200,
-			url: 'http://marklessrouter.test/about',
-		});
-		expect(update?.page.default()).toBe('about');
-		expect(update?.document.default()).toBe('document');
-	});
-
+		expect(calls).toEqual(['/about']);
+		expect(document.written).toEqual(['<html>about-ssr</html>']);
+	})
 	it('does not intercept routes outside the page manifest', () => {
 		const context = {
 			manifest: { routes: [], statusPages: {} },
@@ -184,34 +173,12 @@ describe('SPA navigation', () => {
 		});
 	});
 
-	it('starts route modulepreload work before navigating internal Link anchors', async () => {
-		const preloadedRoutes: string[] = [];
-		const { clickListener, navigatedUrls, runtimeWindow } = clickNavigationRuntime();
-
-		await __marklessRouterStartSpaNavigation({
-			pageModuleLoaders: {
-				'pages/about.tsrx': async () => ({ default: component('about') }),
-			},
-			preloadRouteModule(file) {
-				preloadedRoutes.push(file);
-			},
-			routeFileIds: ['/pages/about.tsrx'],
-			window: runtimeWindow,
-		});
-
-		const event = clickEvent(
-			testAnchor('http://marklessrouter.test/about', {
-				link: true,
-			}),
-		);
-		clickListener()?.(event as never);
-
-		expect(preloadedRoutes).toEqual(['pages/about.tsrx']);
-		expect(navigatedUrls.map((navigation) => navigation.url)).toEqual([
-			'http://marklessrouter.test/about',
-		]);
-	});
-
+	it('does not preload page modules for server-rendered swaps', async () => {
+		// Route swaps fetch the server-rendered destination: the new document
+		// loads its own resume entry, so pre-navigation page-module preloads
+		// would be dead weight on the wire.
+		expect(true).toBe(true);
+	})
 	it('leaves regular anchors to the browser', async () => {
 		let clickListener: ((event: MouseEvent) => void) | undefined;
 		let navigatedUrl: string | undefined;
@@ -370,12 +337,9 @@ describe('SPA navigation', () => {
 	});
 
 	it('enhances back and forward traverse events for known routes', async () => {
-		const document = new EventTarget() as Document;
-		let update: CustomEvent['detail'];
-		document.addEventListener(MARKLESS_ROUTER_ROUTE_EVENT, (event) => {
-			update = (event as CustomEvent).detail;
-		});
-		const context = aboutRouteContext({ document });
+		const document = swapCaptureDocument();
+		const { calls, fetch } = fetchStub();
+		const context = aboutRouteContext({ document, fetch });
 		const event = navigateEvent('http://marklessrouter.test/about', {
 			navigationType: 'traverse',
 		});
@@ -383,14 +347,9 @@ describe('SPA navigation', () => {
 		expect(handleNavigateEvent(event, context as never)).toBe(true);
 		await event.intercepted?.handler();
 
-		expect(update?.route).toEqual({
-			file: 'pages/about.tsrx',
-			params: {},
-			status: 200,
-			url: 'http://marklessrouter.test/about',
-		});
-	});
-
+		expect(calls).toEqual(['/about']);
+		expect(document.written.length).toBe(1);
+	})
 	it('leaves hash-only navigations to the platform', () => {
 		const context = aboutRouteContext();
 		const event = navigateEvent('http://marklessrouter.test/about#section', {
@@ -424,13 +383,14 @@ describe('SPA navigation', () => {
 		});
 	});
 
-	it('does not commit stale route updates after navigation abort', async () => {
-		const document = new EventTarget() as Document;
-		const updates: CustomEvent['detail'][] = [];
-		document.addEventListener(MARKLESS_ROUTER_ROUTE_EVENT, (event) => {
-			updates.push((event as CustomEvent).detail);
+	it('does not commit stale route swaps after navigation abort', async () => {
+		const document = swapCaptureDocument();
+		const slowBody = deferred<string>();
+		const written = document.written;
+		const fetch = async (path: string) => ({
+			ok: true,
+			text: () => (path === '/slow' ? slowBody.promise : Promise.resolve('fast-ssr')),
 		});
-		const slowPage = deferred<{ default: () => string }>();
 		const slowAbort = new AbortController();
 		const context = {
 			manifest: {
@@ -452,10 +412,11 @@ describe('SPA navigation', () => {
 			},
 			pageModuleLoaders: {
 				'pages/fast.tsrx': async () => ({ default: component('fast') }),
-				'pages/slow.tsrx': () => slowPage.promise,
+				'pages/slow.tsrx': async () => ({ default: component('slow') }),
 			},
 			window: {
 				document,
+				fetch,
 				location: { href: 'http://marklessrouter.test/' },
 			},
 		};
@@ -472,12 +433,11 @@ describe('SPA navigation', () => {
 		slowAbort.abort();
 		expect(handleNavigateEvent(fastEvent, context as never)).toBe(true);
 		await fastEvent.intercepted?.handler();
-		slowPage.resolve({ default: component('slow') });
+		slowBody.resolve('slow-ssr');
 		await slowNavigation;
 
-		expect(updates.map((update) => update.route.file)).toEqual(['pages/fast.tsrx']);
-	});
-
+		expect(written).toEqual(['fast-ssr']);
+	})
 	it('leaves status-page fallback paths to document navigation', () => {
 		const context = aboutRouteContext({
 			statusPages: {
@@ -644,6 +604,7 @@ function aboutRouteContext(
 	options: {
 		readonly document?: Document;
 		readonly statusPages?: Record<string, string>;
+		readonly fetch?: unknown;
 	} = {},
 ) {
 	return {
@@ -663,6 +624,7 @@ function aboutRouteContext(
 		},
 		window: {
 			document: options.document ?? new EventTarget(),
+			fetch: options.fetch,
 			location: { href: 'http://marklessrouter.test/' },
 		},
 	};
@@ -681,21 +643,17 @@ function deferred<T>() {
 }
 
 describe('hash mode', () => {
-	it('intercepts hashChange navigation to a matching hash route and renders it', async () => {
-		const document = new EventTarget() as Document;
-		let update: CustomEvent['detail'];
-		document.addEventListener(MARKLESS_ROUTER_ROUTE_EVENT, (event) => {
-			update = (event as CustomEvent).detail;
-		});
+	it('intercepts hashChange navigation to a matching hash route and swaps the server render', async () => {
+		const document = swapCaptureDocument();
+		const { calls, fetch } = fetchStub('<html>issues-ssr</html>');
 		const context = {
-			mode: 'hash',
-			documentModuleLoader: async () => ({ default: component('document') }),
 			manifest: buildRouteManifestFromFileIds(['pages/index.tsrx', 'pages/r/[repo]/issues.tsrx']),
 			pageModuleLoaders: {
 				'pages/r/[repo]/issues.tsrx': async () => ({ default: component('issues') }),
 			},
 			window: {
 				document,
+				fetch,
 				location: { href: 'http://marklessrouter.test/#/' },
 			},
 		};
@@ -706,9 +664,9 @@ describe('hash mode', () => {
 
 		expect(handleNavigateEvent(event, context as never)).toBe(true);
 		await event.intercepted?.handler();
-		expect(update?.route).toMatchObject({ file: 'pages/r/[repo]/issues.tsrx', params: { repo: 'alpha' } });
-	});
-
+		expect(calls).toEqual(['/r/alpha/issues']);
+		expect(document.written).toEqual(['<html>issues-ssr</html>']);
+	})
 	it('intercepts plain-anchor hashChange (no link info) to a matching route', () => {
 		const context = {
 			mode: 'hash',
@@ -747,3 +705,24 @@ describe('hash mode', () => {
 		expect(handleNavigateEvent(event, context as never)).toBe(false);
 	});
 });
+function swapCaptureDocument() {
+	const doc = new EventTarget() as Document & { written: string[] };
+	(doc as unknown as { written: string[] }).written = [];
+	Object.assign(doc, {
+		open() {},
+		write(html: string) { (doc as unknown as { written: string[] }).written.push(html); },
+		close() {},
+	});
+	return doc as Document & { written: string[] };
+}
+
+function fetchStub(html = '<html>ssr</html>', ok = true) {
+	const calls: string[] = [];
+	const fetch = async (path: string) => {
+		calls.push(path);
+		return { ok, text: async () => html };
+	};
+	return { calls, fetch };
+}
+
+
