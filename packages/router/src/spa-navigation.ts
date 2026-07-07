@@ -34,7 +34,6 @@ export interface MarklessRouterNavigationPolyfillModule {
 export interface StartSpaNavigationOptions {
 	readonly documentModuleLoader?: () => Promise<unknown>;
 	readonly loadPolyfill?: () => Promise<MarklessRouterNavigationPolyfillModule>;
-	readonly mode?: 'path' | 'hash';
 	readonly pageModuleLoaders: Record<string, () => Promise<unknown>>;
 	readonly preloadRouteModule?: (file: string) => unknown;
 	readonly routeFileIds: readonly string[];
@@ -44,20 +43,21 @@ export interface StartSpaNavigationOptions {
 interface NavigationContext {
 	readonly documentModuleLoader?: () => Promise<unknown>;
 	readonly manifest: RouteManifest;
-	// 'hash' routes by location.hash paths (#/r/x -> /r/x) for apps whose URLs
-	// live in the fragment; 'path' (default) routes by pathname.
-	readonly mode?: 'path' | 'hash';
 	readonly pageModuleLoaders: Record<string, () => Promise<unknown>>;
 	readonly preloadRouteModule?: (file: string) => unknown;
 	readonly window: MarklessRouterNavigationWindow;
 }
 
-// The route-table path for a destination URL under the context's routing mode.
-function routePathname(url: URL, context: NavigationContext): string {
-	if (context.mode !== 'hash') return url.pathname;
-	const hash = url.hash.startsWith('#') ? url.hash.slice(1) : url.hash;
-	if (hash === '') return '/';
-	return hash.startsWith('/') ? hash : `/${hash}`;
+// A '#/...' hash is unambiguously a route path (in-page anchors never start
+// with '/'), so hash paths are first-class alongside pathnames — no modes.
+function hashRoutePath(url: URL): string | undefined {
+	return url.hash.startsWith('#/') ? url.hash.slice(1) : undefined;
+}
+
+// Route-table path for a destination URL: a '#/' hash wins (it is the
+// deepest-specified route intent); otherwise the pathname routes.
+function routePathname(url: URL, _context?: NavigationContext): string {
+	return hashRoutePath(url) ?? url.pathname;
 }
 
 export async function __marklessRouterStartSpaNavigation(options: StartSpaNavigationOptions) {
@@ -71,7 +71,6 @@ export async function __marklessRouterStartSpaNavigation(options: StartSpaNaviga
 	const context: NavigationContext = {
 		documentModuleLoader: options.documentModuleLoader,
 		manifest: buildRouteManifestFromFileIds(options.routeFileIds),
-		mode: options.mode,
 		pageModuleLoaders: options.pageModuleLoaders,
 		preloadRouteModule: options.preloadRouteModule,
 		window: runtimeWindow,
@@ -87,15 +86,15 @@ export async function __marklessRouterStartSpaNavigation(options: StartSpaNaviga
 		handleNavigateEvent(event, context);
 	});
 
-	// Hash apps land on /#/some/route while the server rendered the root shell:
-	// swap to the hash's route on boot so deep links work.
-	if (context.mode === 'hash') {
+	// Deep links land on /#/some/route while the server rendered the shell for
+	// the pathname: swap to the hash route on boot.
+	{
 		const bootUrl = parseSameOriginUrl(
 			runtimeWindow.location.href,
 			runtimeWindow.location.href,
 		);
-		const bootPath = bootUrl ? routePathname(bootUrl, context) : '/';
-		if (bootUrl && bootPath !== '/' && matchRouteManifest(bootPath, context.manifest)) {
+		const bootHashPath = bootUrl ? hashRoutePath(bootUrl) : undefined;
+		if (bootUrl && bootHashPath && matchRouteManifest(bootHashPath, context.manifest)) {
 			void renderRoute(bootUrl, context);
 		}
 	}
@@ -213,23 +212,26 @@ function preloadRouteModule(context: NavigationContext, file: string): void {
 }
 
 function routeUrl(event: NavigateEvent, context: NavigationContext) {
-	// In hash mode every same-document hash change toward a matching route is a
-	// route navigation — hash apps navigate with plain anchors, so link info is
-	// not required there.
-	const hashModeNavigation = context.mode === 'hash' && event.hashChange === true;
+	const destination = parseSameOriginUrl(event.destination.url, context.window.location.href);
+	// A hash change toward a '#/...' route path is a route navigation (hash apps
+	// navigate with plain anchors, so link info is not required); any other hash
+	// change is an in-page anchor and stays with the browser.
+	const hashRouteNavigation =
+		event.hashChange === true && !!destination && hashRoutePath(destination) !== undefined;
 	if (
-		(!isMarklessRouterNavigation(event) && !hashModeNavigation) ||
+		(!isMarklessRouterNavigation(event) && !hashRouteNavigation) ||
 		event.canIntercept === false ||
 		event.navigationType === 'reload' ||
-		(event.hashChange && context.mode !== 'hash') ||
+		(event.hashChange && !hashRouteNavigation) ||
 		event.downloadRequest != null ||
 		event.formData != null
 	) {
 		return undefined;
 	}
 
-	const url = parseSameOriginUrl(event.destination.url, context.window.location.href);
-	return url && matchRouteManifest(routePathname(url, context), context.manifest) ? url : undefined;
+	return destination && matchRouteManifest(routePathname(destination), context.manifest)
+		? destination
+		: undefined;
 }
 
 function isMarklessRouterNavigation(event: NavigateEvent) {

@@ -74,7 +74,7 @@ export function router(options: MarklessRouterOptions = {}): PluginOption[] {
 			routeTypegenPlugin(),
 			anchorTransformPlugin(),
 			htmlTransformPlugin(),
-			virtualModulesPlugin(undefined, undefined, undefined, options.mode ?? 'path'),
+			virtualModulesPlugin(),
 		];
 	}
 
@@ -90,7 +90,7 @@ export function router(options: MarklessRouterOptions = {}): PluginOption[] {
 		routeTypegenPlugin(),
 		anchorTransformPlugin(),
 		htmlTransformPlugin(),
-		virtualModulesPlugin(resumeEntry, navigationEntry, routePreloads, options.mode ?? 'path'),
+		virtualModulesPlugin(resumeEntry, navigationEntry, routePreloads),
 		nitroPlugins,
 	];
 }
@@ -417,7 +417,6 @@ function virtualModulesPlugin(
 	resumeEntry: ResumeEntryState = resumeEntryState(),
 	navigationEntry: ResumeEntryState = resumeEntryState(),
 	routePreloads: RoutePreloadState = routePreloadState(),
-	routerMode: 'path' | 'hash' = 'path',
 ): Plugin {
 	let root = '';
 
@@ -451,7 +450,7 @@ function virtualModulesPlugin(
 		},
 		load(id) {
 			if (id.startsWith(`\0${SERVER_ENTRY_ID}`)) {
-				return serverEntrySource(root, routerMode);
+				return serverEntrySource(root);
 			}
 			if (id.startsWith(`\0${RESUME_ENTRY_PATH_ID}`)) {
 				return entryPathSource('resumeEntryPath', resumeEntry, RESUME_ENTRY_ID, root);
@@ -468,7 +467,7 @@ function virtualModulesPlugin(
 				return routePreloadsSource(routePreloads);
 			}
 			if (id.startsWith(`\0${ROUTER_OPTIONS_ID}`)) {
-				return `export const routerMode = ${JSON.stringify(routerMode)};`;
+				return 'export const routerMode = "path"; // retained for compat; hash paths are always first-class';
 			}
 		},
 	};
@@ -486,7 +485,7 @@ function entryPathSource(
 	return `export const ${exportName} = ${JSON.stringify(path)};`;
 }
 
-function serverEntrySource(root: string, mode: 'path' | 'hash' = 'path'): string {
+function serverEntrySource(root: string): string {
 	const query = rootScopeQuery(root);
 	return [
 		`import { createServerEntry } from '@markless/router/vite/runtime/create-server-entry';`,
@@ -503,7 +502,6 @@ function serverEntrySource(root: string, mode: 'path' | 'hash' = 'path'): string
 		`  documentModuleLoader: documentModuleLoaders['/document.tsrx'],`,
 		`  pageModuleLoaders,`,
 		`  routeFileIds,`,
-		`  routerMode: ${JSON.stringify(mode)},`,
 		`});`,
 		`export const fetch = entry.fetch;`,
 		`export default entry;`,

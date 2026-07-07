@@ -6,7 +6,6 @@ import {
 	ensureNavigationRuntime,
 } from '../../spa-navigation.ts';
 import { preloadRouteModule } from 'virtual:markless-router/route-preloads';
-import { routerMode } from 'virtual:markless-router/options';
 
 const routeDiscovery = createRouteDiscovery(
 	import.meta.glob(['/pages/**/*.tsrx', '/pages/**/*.mdx']),
@@ -17,7 +16,6 @@ export const routeFileIds = routeDiscovery.routeFileIds;
 const routeManifest = buildRouteManifestFromFileIds(routeFileIds);
 
 void __marklessRouterStartSpaNavigation({
-	mode: routerMode,
 	pageModuleLoaders: pageModules,
 	preloadRouteModule,
 	routeFileIds,
@@ -39,7 +37,6 @@ export async function navigateMarklessRouterLink(input: {
 	startRouteUpdateRenderer(document);
 	preloadRouteModule(match.route.file);
 	await __marklessRouterStartSpaNavigation({
-		mode: routerMode,
 		pageModuleLoaders: pageModules,
 		preloadRouteModule,
 		routeFileIds,
