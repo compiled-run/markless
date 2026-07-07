@@ -5122,3 +5122,31 @@ export function App() @{
 		'<main><!--markless:async:boundary:0--><p>Broken</p><!--/markless:async:boundary:0--></main>',
 	);
 });
+
+test('computed named after a member it reads is not a dependency cycle', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/App.tsrx',
+		source: `import { computed } from '@markless/core';
+export default function Home() @{
+	const view = computed(async () => ({ repos: [{ id: 'a' }] }));
+	const repos = computed(() => view.repos ?? []);
+	<main>
+		@for (const r of repos; key r.id) {
+			<div class="row">{r.id}</div>
+		}
+	</main>
+}`,
+		symbols: [],
+	});
+
+	expect(result.semanticGraph.diagnostics.map((item) => item.code)).not.toContain(
+		'MARKLESS_COMPUTED_DEPENDENCY_CYCLE',
+	);
+	expect(result.semanticGraph.graphBindings.map((binding) => binding.id)).toContain(
+		'computed:repos',
+	);
+	// The repeat resolves its collection to the computed binding.
+	expect(result.semanticGraph.keyedRepeats[0]).toMatchObject({
+		collectionGraphNodeId: 'computed:repos',
+	});
+});

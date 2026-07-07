@@ -746,6 +746,13 @@ function readsIdentifier(node: AnyNode | undefined, name: string): boolean {
 			visit(candidate.value as AnyNode | undefined);
 			return;
 		}
+		if (candidate.type === 'MemberExpression' && candidate.computed !== true) {
+			// `view.repos` reads `view`, not `repos`: static property names are
+			// not identifier reads (a computed named after a field it projects is
+			// not a self-dependency).
+			visit(candidate.object as AnyNode | undefined);
+			return;
+		}
 
 		for (const child of childNodes(candidate)) visit(child);
 	};
