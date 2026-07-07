@@ -95,6 +95,17 @@ export default {
 				replacement: marklessPackage('packages/core/src/index.ts'),
 			},
 			{
+				// repeat-runtime.ts imports the client decode subpath; without
+				// this alias the catch-all below resolves index.ts +
+				// '/decode-client' (Not a directory).
+				find: '@markless/serializer/decode-client',
+				replacement: marklessPackage('packages/serializer/src/value-decode-client.ts'),
+			},
+			{
+				find: '@markless/serializer/protocol',
+				replacement: marklessPackage('packages/serializer/src/protocol.ts'),
+			},
+			{
 				find: '@markless/serializer',
 				replacement: marklessPackage('packages/serializer/src/index.ts'),
 			},
