@@ -274,10 +274,10 @@ function emitResumeContainerEvent(
 		'		root: handoff.root,',
 		`		loadSymbol: ${loadSymbolName},`,
 		'	});',
-		'	await runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: true });',
+		'	await runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true });',
 		'}',
 	].join('\n');
-	const scalarOnlySpecialized = leanMode === 'scalar' && scalarSpecializations.length > 0;
+	const scalarOnlySpecialized = leanMode === 'scalar' && scalarSpecializations.length > 0 && allEventActionsHaveScalarPlan(input.runtimeDemandMap);
 	const scalarDispatcher = scalarSpecializations.length > 0
 		? emitSpecializedScalarDispatcher(scalarSpecializations, loadSymbolName, scalarOnlySpecialized ? 'fail' : 'full')
 		: emitSpecializedScalarDispatcher([], loadSymbolName, 'full');
@@ -299,7 +299,7 @@ function emitResumeContainerEvent(
 			'		event: input.event,',
 			'		element: input.element,',
 			'		runtimeDemandMap: payloadRuntimeDemandMap,',
-			'		syncPolicyAlreadyApplied: false,',
+			'		syncPolicyAlreadyApplied: input.syncPolicyAlreadyApplied === true,',
 			`		loadSymbol: ${loadSymbolName},`,
 			'	});',
 		];
@@ -400,13 +400,24 @@ function scalarDispatcherSpecializations(input: {
 	});
 }
 
+function allEventActionsHaveScalarPlan(runtimeDemandMap: unknown): boolean {
+	const actions = (runtimeDemandMap as {
+		readonly actions?: ReadonlyArray<{
+			readonly recordKind?: unknown;
+			readonly plan?: { readonly kind?: unknown };
+		}>;
+	} | undefined)?.actions;
+	const eventActions = (actions ?? []).filter((action) => action.recordKind === 'event');
+	return eventActions.length > 0 && eventActions.every((action) => action.plan?.kind === 'scalar');
+}
+
 function emitSpecializedScalarDispatcher(actions: ReadonlyArray<ScalarSpecialization>, loadSymbolName: string, fallback: 'full' | 'fail'): string {
 	const fallbackName = fallback === 'fail' ? 'marklessScalarSpecializedHostMiss' : 'marklessScalarSpecializedFallback';
 	const fallbackBody = fallback === 'full'
 		? [
-				'async function marklessScalarSpecializedFallback(input, site) {',
+				'async function marklessScalarSpecializedFallback(input, site, syncPolicyAlreadyApplied = input.syncPolicyAlreadyApplied === true) {',
 				'	if (import.meta.env?.DEV) console.warn(Object.assign(new Error("MARKLESS_SCALAR_SPECIALIZED_FALLBACK"), { code: "MARKLESS_SCALAR_SPECIALIZED_FALLBACK", site }));',
-				'	await marklessFullResumeHandoff({ ...input, document: input.root });',
+				'	await marklessFullResumeHandoff({ ...input, document: input.root, syncPolicyAlreadyApplied });',
 				'}',
 			]
 		: [];
@@ -417,7 +428,7 @@ function emitSpecializedScalarDispatcher(actions: ReadonlyArray<ScalarSpecializa
 		'		try {',
 		'			return await action(input);',
 		'		} catch (error) {',
-		`			if (error?.code === "MARKLESS_SCALAR_SPECIALIZED_ESCALATE") return ${fallbackName}(input, error.site ?? "escalate");`,
+		`			if (error?.code === "MARKLESS_SCALAR_SPECIALIZED_ESCALATE") return ${fallbackName}(input, error.site ?? "escalate", error.syncPolicyAlreadyApplied === true);`,
 		'			throw error;',
 		'		}',
 		'	}',
@@ -446,6 +457,8 @@ function emitSpecializedScalarDispatcher(actions: ReadonlyArray<ScalarSpecializa
 function emitScalarAction(action: ScalarSpecialization, loadSymbolName: string): string {
 	return [
 		`async function ${action.name}(input) {`,
+		'	let syncPolicyAlreadyApplied = input.syncPolicyAlreadyApplied === true;',
+		'	try {',
 		`	const state = { value: marklessDecodeScalarCell(payloadState.cells[${action.cellIndex}], ${JSON.stringify(action.cell)}, ${JSON.stringify(`markless/state cell[${action.cellIndex}]`)}), dirty: false };`,
 		`	const host = marklessFindElementAtDomOrderIndex(input.root, ${action.hostIndex});`,
 		`	if (!host || (${JSON.stringify(action.hostTagName.toLowerCase())} !== "*" && host.tagName.toLowerCase() !== ${JSON.stringify(action.hostTagName.toLowerCase())})) return marklessScalarSpecializedHostMiss(input, "host");`,
@@ -464,9 +477,10 @@ function emitScalarAction(action: ScalarSpecialization, loadSymbolName: string):
 		...(action.syncPolicy
 			? [
 					`	const syncPolicy = ${JSON.stringify(action.syncPolicy)};`,
-					'	if (syncPolicy && !input.syncPolicyAlreadyApplied) {',
+					'	if (syncPolicy && !syncPolicyAlreadyApplied) {',
 					"		const { runSyncPolicyActions } = await import('@markless/web/inline/sync-policy-core');",
 					'		runSyncPolicyActions(syncPolicy, graph, input.event);',
+					'		syncPolicyAlreadyApplied = true;',
 					'	}',
 				]
 			: []),
@@ -479,7 +493,11 @@ function emitScalarAction(action: ScalarSpecialization, loadSymbolName: string):
 			`		textTarget${index}.textContent = marklessUpdateText({ domUpdate: { hostNodeId: ${JSON.stringify(update.hostNodeId)} }, value: ${JSON.stringify(update.prefix ?? '')} + (state.value == null ? '' : String(state.value)) }, ${JSON.stringify(update.hostNodeId)}).value;`,
 		),
 		'	}',
-		'}',
+		'	} catch (error) {',
+		'		if (error?.code === "MARKLESS_SCALAR_SPECIALIZED_ESCALATE") error.syncPolicyAlreadyApplied = syncPolicyAlreadyApplied;',
+		'		throw error;',
+		'	}',
+	'}',
 	].join('\n');
 }
 

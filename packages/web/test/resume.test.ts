@@ -2126,6 +2126,54 @@ test('resume runtime fails loudly when a branch flip resolves an empty arm fragm
 	}
 });
 
+test('resume runtime allows branch flips to declared empty arms', async () => {
+	const start = comment('markless:branch:branch-site:if');
+	const shown = element('P');
+	const end = comment('/markless:branch:branch-site:if');
+	const button = element('BUTTON');
+	const root = element('SECTION', [button, start, shown, end]);
+	const graph = createRuntimeGraph({ cells: [{ graphNodeId: 'state:open', value: true }] });
+	const journal: DomJournalEntry[] = [];
+	const resume = createResumeRuntime({
+		root,
+		graph,
+		view: {
+			locators: [
+				{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'section' },
+				{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'button' },
+			],
+			events: [{ hostNodeId: 'h1', eventName: 'click', symbolIds: ['symbol:toggle'] }],
+			domUpdates: [],
+			behaviors: [],
+			elementHandles: [],
+			asyncBoundaries: [],
+			branches: [{
+				id: 'branch-site:if',
+				startAnchor: { strategy: 'dom-order-comment', index: 0 },
+				endAnchor: { strategy: 'dom-order-comment', index: 1 },
+				symbolId: 'symbol:if-branch',
+				testReads: [{ source: 'open', graphNodeId: 'state:open', path: [] }],
+				declaredEmptyArms: [1],
+			} as never],
+		},
+		loadSymbol(symbolId) {
+			if (symbolId === 'symbol:toggle') return ({ graph: runtimeGraph }) => runtimeGraph.write({ graphNodeId: 'state:open', value: false });
+			return () => ({ arm: 1, html: '' });
+		},
+		renderBranchHtml: () => [],
+		applyDomJournal(entries) {
+			journal.push(...entries);
+		},
+	});
+
+	await resume.start();
+	await expect(root.listeners[0]!.listener(event('click', button, ''))).resolves.toBeUndefined();
+	expect(journal).toEqual([
+		{ type: 'removeRange', locator: 'branch:branch-site:if' },
+		{ type: 'insertRange', locator: 'branch:branch-site:if:start', fragment: [] },
+	]);
+});
+
 test('resume runtime materializes async boundary comment anchors', async () => {
 	const start = comment('async:boundary:0:start');
 	const paragraph = element('P');

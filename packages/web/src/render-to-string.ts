@@ -327,8 +327,10 @@ ${graphConditionSource}
 		: '';
 	const runSyncPolicy = includeSyncPolicy
 		? `
-					if (record.syncPolicy) ${includeSharedSyncPolicyRuntime ? 'globalThis.__marklessInlineSyncPolicy.y(record.syncPolicy, e, r)' : 'y(record.syncPolicy, e)'};`
+					let sp = false;
+					if (record.syncPolicy) { ${includeSharedSyncPolicyRuntime ? 'globalThis.__marklessInlineSyncPolicy.y(record.syncPolicy, e, r)' : 'y(record.syncPolicy, e)'}; sp = true; }`
 		: '';
+	const syncPolicyResumeInput = includeSyncPolicy ? ', syncPolicyAlreadyApplied: sp' : '';
 	const executionLogPredicate =
 		executionLog === 'always'
 			? 'true'
@@ -384,7 +386,7 @@ ${localSyncPolicySource}
 				if (record) {
 ${runSyncPolicy}
 					const mod = await import(${JSON.stringify(resumeModuleUrl)});
-					await mod.resumeContainerEvent({ root: r, event: e, element: a, eventRecord: record });
+					await mod.resumeContainerEvent({ root: r, event: e, element: a, eventRecord: record${syncPolicyResumeInput} });
 					return;
 				}
 				if (a === r) break;

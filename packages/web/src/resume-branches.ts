@@ -15,7 +15,7 @@ export function wireBranches(input: any) {
 			const symbol = await input.loadSymbol(branch.symbolId); const update = await symbol({ graph: input.graph, arm: newArm, branchId: branch.sourceId ?? branch.id, composedBranchId: branch.id, element: input.root, getElementHandle: input.elementHandles.get });
 			if (!isResumeBranchUpdate(update)) return; currentArm = update.arm; currentArmByBranchId.set(branch.id, update.arm);
 			const fragment = input.renderBranchHtml ? input.renderBranchHtml(update.html) : update.html;
-			if (branchFragmentEmpty(fragment)) throw branchArmEmptyError(branch, update.arm);
+			if (branchFragmentEmpty(fragment) && !branch.declaredEmptyArms?.includes(update.arm)) throw branchArmEmptyError(branch, update.arm);
 			return [{ type: 'removeRange', locator: `branch:${branch.id}` }, { type: 'insertRange', locator: `branch:${branch.id}:start`, fragment }] as DomJournalResult;
 		} }));
 	}
@@ -58,7 +58,7 @@ function materializeBranchLocators(root: ResumeDomElement, branches: NonNullable
 		const startAnchor = comments[branch.startAnchor.index], endAnchor = comments[branch.endAnchor.index];
 		if (!startAnchor) throw missingCommentAnchorError(branch.id, 'startAnchor', branch.startAnchor.index);
 		if (!endAnchor) throw missingCommentAnchorError(branch.id, 'endAnchor', branch.endAnchor.index);
-		records.push({ id: branch.id, sourceId: (branch as { readonly sourceId?: string }).sourceId, startAnchor, endAnchor, symbolId: branch.symbolId, testReads: branch.testReads, armTests: branch.armTests, armRecords: branch.armRecords });
+		records.push({ id: branch.id, sourceId: (branch as { readonly sourceId?: string }).sourceId, startAnchor, endAnchor, symbolId: branch.symbolId, testReads: branch.testReads, armTests: branch.armTests, declaredEmptyArms: (branch as { readonly declaredEmptyArms?: ReadonlyArray<number> }).declaredEmptyArms, armRecords: branch.armRecords });
 	}
 	return records;
 }

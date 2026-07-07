@@ -225,11 +225,11 @@ export function collectArmHosts(
 
 export function branchArms(node: AnyNode): AnyNode[][] {
 	if (node.type === 'JSXIfExpression') {
-		return [node.consequent, node.alternate].flatMap((arm) => {
+		return [node.consequent, node.alternate].map((arm) => {
 			const armNode = arm as AnyNode | undefined;
 			if (!armNode) return [];
 			const children = armNode.type === 'BlockStatement' ? asNodes(armNode.body) : [armNode];
-			return [children.filter((child) => !isIgnorableTextNode(child))];
+			return children.filter((child) => !isIgnorableTextNode(child));
 		});
 	}
 	return asNodes(node.cases).map((switchCase) =>

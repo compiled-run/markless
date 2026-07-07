@@ -1693,7 +1693,7 @@ test('renderToString inline event resumer evaluates sync policy before importing
 		} as FakeEvent);
 
 		expect(globalScope.__asyncResumerSyncPolicyTest).toEqual({
-			order: ['preventDefault', 'stopPropagation', 'import', 'handler:true:true'],
+			order: ['preventDefault', 'stopPropagation', 'import', 'handler:true:true:true'],
 		});
 	} finally {
 		if (previousDocument === undefined) {
@@ -1808,7 +1808,7 @@ test('renderToString inline event resumer reads graph-backed sync policy before 
 		} as FakeEvent);
 
 		expect(globalScope.__asyncResumerSyncPolicyTest).toEqual({
-			order: ['preventDefault', 'import', 'handler:true:false'],
+			order: ['preventDefault', 'import', 'handler:true:false:true'],
 		});
 	} finally {
 		if (previousDocument === undefined) {
@@ -1966,7 +1966,7 @@ test('renderToString inline event resumer reads built-in graph values for sync p
 		} as FakeEvent);
 
 		expect(globalScope.__asyncResumerSyncPolicyTest).toEqual({
-			order: ['preventDefault', 'import', 'handler:true:false'],
+			order: ['preventDefault', 'import', 'handler:true:false:true'],
 		});
 	} finally {
 		if (previousDocument === undefined) {
@@ -2032,9 +2032,9 @@ function createSyncPolicyResumeModuleUrl(cacheKey = 'default'): string {
 	const source = `
 // ${cacheKey}
 globalThis.__asyncResumerSyncPolicyTest.order.push('import');
-export async function resumeContainerEvent({ event }) {
+export async function resumeContainerEvent({ event, syncPolicyAlreadyApplied }) {
 	globalThis.__asyncResumerSyncPolicyTest.order.push(
-		'handler:' + String(event.defaultPrevented) + ':' + String(event.propagationStopped),
+		'handler:' + String(event.defaultPrevented) + ':' + String(event.propagationStopped) + ':' + String(syncPolicyAlreadyApplied),
 	);
 }
 `;

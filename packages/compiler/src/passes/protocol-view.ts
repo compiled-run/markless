@@ -168,6 +168,7 @@ function supportedBranchRecords(input: ProtocolViewPayloadInput) {
 			symbolId: armsBySite.get(site.id) ? branchSymbols.get(site.id)?.id : undefined,
 			testReads: branchSymbols.get(site.id)?.testReads ?? [],
 			armTests: armsBySite.get(site.id)?.armTests,
+			declaredEmptyArms: armsBySite.get(site.id)?.declaredEmptyArms,
 			armRecords: branchArmRecords(input, site.id),
 		}));
 }
