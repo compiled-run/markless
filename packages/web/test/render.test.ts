@@ -2,6 +2,11 @@ import { gzipSync } from 'node:zlib';
 import { ASYNC_PROTOCOL_VERSION, type ProtocolViewPayload } from '@markless/serializer';
 import { createProtocolStatePayload } from '@markless/serializer';
 import { expect, test } from 'vitest';
+import {
+	marklessCsrAttachPropEvent,
+	marklessCsrComposeView,
+	marklessCsrRenderChild,
+} from '../src/fns/csr.ts';
 import { render, renderToString } from '../src/index.ts';
 
 type FakeElement = {
@@ -434,6 +439,147 @@ test('render flips CSR branch ranges through the full resume runtime', async () 
 	expect(
 		root.childNodes.map((child) => (child.nodeType === 8 ? '#comment' : child.tagName)),
 	).toEqual(['#comment', 'SPAN', '#comment']);
+});
+
+test('render flips a composed child CSR branch from a callback-prop dispatch', async () => {
+	const startAnchor = {
+		nodeType: 8 as const,
+		textContent: 'markless:branch:branch-site:icon',
+	} as unknown as FakeElement;
+	const playIcon = element('SPAN');
+	playIcon.textContent = '▶';
+	const endAnchor = {
+		nodeType: 8 as const,
+		textContent: '/markless:branch:branch-site:icon',
+	} as unknown as FakeElement;
+	const button = element('BUTTON', [startAnchor, playIcon, endAnchor]);
+	const root = element('MAIN', [button]);
+	const target = {
+		children: [] as FakeElement[],
+		replaceChildren(...children: FakeElement[]) {
+			this.children = children;
+		},
+	};
+	const state = createProtocolStatePayload({
+		cells: [{ graphNodeId: 'state:playing', name: 'playing', valueKind: 'scalar', value: false }],
+	});
+	const parentView: ProtocolViewPayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	const childView: ProtocolViewPayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [{ hostNodeId: 'play-button', strategy: 'dom-order', index: 0, tagName: 'button' }],
+		events: [{ hostNodeId: 'play-button', eventName: 'click', symbolIds: ['symbol:child-noop'] }],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+		branches: [
+			{
+				id: 'branch-site:icon',
+				startAnchor: { strategy: 'dom-order-comment', index: 0 },
+				endAnchor: { strategy: 'dom-order-comment', index: 1 },
+				symbolId: 'symbol:icon-branch',
+				testReads: [{ source: 'active', graphNodeId: 'prop:active', path: [] }],
+			},
+		],
+	};
+	let runtimeGraph: { write(input: unknown): void } | undefined;
+	const childOutput = marklessCsrRenderChild(
+		{
+			renderCsr(props?: { readonly onPlayToggle?: (event: FakeEvent) => void }) {
+				marklessCsrAttachPropEvent(button, [], 'click', props?.onPlayToggle);
+				return {
+					root: button,
+					view: childView,
+					propEvents: [{
+						hostNodeId: 'play-button',
+						eventName: 'click',
+						propName: 'onPlayToggle',
+					}],
+				};
+			},
+		},
+		{
+			onPlayToggle() {
+				if (!runtimeGraph) throw new Error('Expected CSR runtime graph to be connected.');
+				runtimeGraph.write({ graphNodeId: 'state:playing', value: true });
+			},
+		},
+	);
+	const view = marklessCsrComposeView(
+		root,
+		parentView,
+		[],
+		[{
+			output: childOutput,
+			hostPrefix: 'c0:',
+			symbolPrefix: 'c0:',
+			graphProps: [{ name: 'active', graphNodeId: 'state:playing', path: [] }],
+		}],
+	) as ProtocolViewPayload;
+	const pauseIcon = element('SPAN');
+	pauseIcon.textContent = '❚❚';
+	const loadedSymbols: string[] = [];
+
+	const container = await render(
+		() => ({
+			root,
+			state,
+			view,
+			connectRuntime(context) {
+				runtimeGraph = context.graph as { write(input: unknown): void };
+			},
+			loadSymbol(symbolId: string) {
+				loadedSymbols.push(symbolId);
+				if (symbolId === 'c0:symbol:child-noop') return () => undefined;
+				return () => ({ arm: 0, html: '<span>❚❚</span>' });
+			},
+		}),
+		{
+			target,
+			renderBranchHtml: () => [pauseIcon as never],
+		},
+	);
+
+	const click = event('click', button);
+	await container.root.listeners[0]!.listener(click);
+
+	expect(button.listeners).toHaveLength(1);
+	await button.listeners[0]!.listener(click);
+	expect(container.graph.read('state:playing')).toBe(true);
+	expect(loadedSymbols).toEqual(['c0:symbol:icon-branch']);
+	expect(button.childNodes.map((child) => child.textContent)).toEqual([
+		'markless:branch:c0:branch-site:icon',
+		'❚❚',
+		'/markless:branch:c0:branch-site:icon',
+	]);
+});
+
+test('render dispatch throws a tagged error when no event record matches', async () => {
+	const button = element('BUTTON');
+	const outside = element('BUTTON');
+	const container = await render(
+		() => ({
+			root: button,
+			state: createProtocolStatePayload({ cells: [] }),
+			view: viewWithClick(),
+			loadSymbol: () => () => undefined,
+		}),
+		{ target: { replaceChildren() {} } },
+	);
+
+	await expect(container.runtime.dispatch(event('click', outside))).rejects.toMatchObject({
+		code: 'MARKLESS_EVENT_DISPATCH_UNMATCHED',
+		phase: 'event',
+		eventName: 'click',
+	});
 });
 
 test('render starts artifact-owned CSR preload work without requiring app code', async () => {

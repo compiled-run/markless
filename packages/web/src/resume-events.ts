@@ -43,7 +43,7 @@ export function createEventWiring(input: {
 	}
 	async function dispatch(event: ResumeDomEvent, options: ResumeDispatchOptions = {}): Promise<void> {
 		const beforeExecution = marklessExecutionLogSnapshot();
-		const target = event.target; if (!target) return;
+		const target = event.target; if (!target) throw unmatchedDispatchError(event, undefined);
 		const selector = describeMarklessEventTarget(target);
 		const matched = findDispatchMatch(target, event.type, eventRecords, rowEventRecords); if (!matched) {
 			await marklessLogInteraction({
@@ -55,7 +55,7 @@ export function createEventWiring(input: {
 				noMatch: true,
 				dispatchModuleId: 'web:resume-events',
 			});
-			return;
+			throw unmatchedDispatchError(event, selector);
 		}
 		if ('rowMatch' in matched) return dispatchRowEvent(matched.element, matched.rowMatch, event, options);
 		const { element, eventRecord } = matched;
@@ -142,6 +142,17 @@ function findDispatchMatch(target: ResumeDomElement, eventName: string, eventRec
 		current = current.parentElement;
 	}
 	return null;
+}
+function unmatchedDispatchError(event: ResumeDomEvent, selector: string | undefined): Error {
+	const error = new Error(`MARKLESS_EVENT_DISPATCH_UNMATCHED: No event record matched ${event.type} dispatch${selector ? ` at ${selector}` : ''}.`) as Error & Record<string, unknown>;
+	error.name = 'RuntimeResumeError';
+	error.code = 'MARKLESS_EVENT_DISPATCH_UNMATCHED';
+	error.phase = 'event';
+	error.eventName = event.type;
+	error.selector = selector;
+	error.dispatchModuleId = 'web:resume-events';
+	error.docsUrl = 'https://markless.dev/errors/MARKLESS_EVENT_DISPATCH_UNMATCHED';
+	return error;
 }
 function isPromiseLike<T>(value: T | PromiseLike<T>): value is PromiseLike<T> {
 	return value !== null && (typeof value === 'object' || typeof value === 'function') && typeof (value as { readonly then?: unknown }).then === 'function';
