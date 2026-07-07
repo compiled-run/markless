@@ -92,8 +92,10 @@ test('alternate-shaped scalar action specializes from locator, cell, event, and 
 		cell: 'state:tally',
 		textUpdates: [expect.objectContaining({ prefix: 'Total: ' })],
 	});
-	expect(resumeSource).toContain(`input.eventRecord.hostNodeId === ${JSON.stringify(event.hostNodeId)}`);
-	expect(resumeSource).toContain('input.event.type === "keydown"');
+	expect(resumeSource).toContain(
+		`marklessScalarEventMatches(input, marklessFindElementAtDomOrderIndex(input.root, ${eventLocator.index}, "input"), "keydown", ${JSON.stringify(event.hostNodeId)})`,
+	);
+	expect(resumeSource).toContain('input.event?.type === eventName');
 	expect(resumeSource).toContain(`marklessFindElementAtDomOrderIndex(input.root, ${eventLocator.index}, "input")`);
 	expect(resumeSource).toContain(`marklessFindElementAtDomOrderIndex(input.root, ${updateLocator.index}, "output")`);
 	expect(resumeSource).toContain('marklessAssertScalarCell(cell, "state:tally"');
