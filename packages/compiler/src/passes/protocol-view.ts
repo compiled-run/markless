@@ -117,9 +117,11 @@ function supportedAsyncBoundaries(input: ProtocolViewPayloadInput) {
 }
 
 function supportedBranchIds(input: ProtocolViewPayloadInput): ReadonlySet<string> {
+	// armScoped branches render as anchor-less ternaries re-evaluated on arm
+	// settle (need 8): no flip records, no anchor pairs.
 	return new Set(
 		(input.publicRenderPlan.branchReactivityGates ?? []).flatMap((gate) =>
-			gate.supported ? [gate.branchSiteId] : [],
+			gate.supported && gate.armScoped !== true ? [gate.branchSiteId] : [],
 		),
 	);
 }
