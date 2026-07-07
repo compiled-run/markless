@@ -233,6 +233,7 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 			if (armTests === null) return [];
 		}
 		const armHosts = branchArms(found.node).map((arm) => collectArmHosts(arm, assignedHosts));
+		const declaredEmptyArms = arms.flatMap((arm, armIndex) => arm.length === 0 ? [armIndex] : []);
 		return [
 			{
 				branchSiteId: site.id,
@@ -242,6 +243,7 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 				arms: arms as ReadonlyArray<ReadonlyArray<PublicRenderPlanBranchArmPart>>,
 				armHosts,
 				...(armTests ? { armTests } : {}),
+				...(declaredEmptyArms.length > 0 ? { declaredEmptyArms } : {}),
 			},
 		];
 	});

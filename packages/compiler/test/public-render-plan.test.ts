@@ -317,6 +317,13 @@ test('planPublicRender supports event-bearing arms and gates conditional ones', 
 	expect(eventPlan.branchReactivityGates).toEqual([
 		{ branchSiteId: 'branch-site:0', supported: true },
 	]);
+	expect(eventPlan.branchArms).toEqual([
+		expect.objectContaining({
+			branchSiteId: 'branch-site:0',
+			declaredEmptyArms: [1],
+			arms: [expect.any(Array), []],
+		}),
+	]);
 
 	const { plan: nestedPlan } = await createRenderPlan(
 		'src/NestedBranch.tsrx',

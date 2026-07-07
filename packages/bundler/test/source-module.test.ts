@@ -103,6 +103,42 @@ test('specialized scalar dispatcher accepts the real raw event entry shape', () 
 	expect(resumeCode).not.toContain('input.eventRecord');
 });
 
+test('specialized scalar dispatcher carries sync policy state through full fallback', () => {
+	const input = scalarResumeInput();
+	(input.payloadView.events[0] as { syncPolicy?: unknown }).syncPolicy = {
+		when: { type: 'graph-truthy', graphNodeId: 'state:count', path: [] },
+		actions: ['preventDefault'],
+	};
+	const resumeCode = emitResumeModule(input);
+
+	expect(resumeCode).toContain('let syncPolicyAlreadyApplied = input.syncPolicyAlreadyApplied === true;');
+	expect(resumeCode).toContain('if (syncPolicy && !syncPolicyAlreadyApplied) {');
+	expect(resumeCode).toContain('syncPolicyAlreadyApplied = true;');
+	expect(resumeCode).toContain('error.syncPolicyAlreadyApplied = syncPolicyAlreadyApplied;');
+	expect(resumeCode).toContain('marklessScalarSpecializedFallback(input, error.site ?? "escalate", error.syncPolicyAlreadyApplied === true)');
+	expect(resumeCode).toContain('await marklessFullResumeHandoff({ ...input, document: input.root, syncPolicyAlreadyApplied });');
+	expect(resumeCode).toContain('await runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true });');
+});
+
+test('specialized scalar dispatcher keeps full fallback for non-scalar event actions', () => {
+	const input = scalarResumeInput();
+	(input.payloadView.events as any[]).push({ hostNodeId: 'host:date', eventName: 'click', symbolIds: ['symbol:date'] });
+	(input.payloadView.locators as any[]).push({ hostNodeId: 'host:date', index: 7, tagName: 'button' });
+	(input.runtimeDemandMap.actions as any[]).push({
+		hostNodeId: 'host:date',
+		eventName: 'click',
+		recordKind: 'event',
+		recordKinds: ['event', 'dom-update'],
+		payloadRecordIds: [],
+		runtimeModuleIds: [],
+	});
+	const resumeCode = emitResumeModule(input);
+
+	expect(resumeCode).toContain("import('@markless/core/web/resume')");
+	expect(resumeCode).toContain('function marklessScalarSpecializedHostMiss(input, site) { return marklessScalarSpecializedFallback(input, site); }');
+	expect(resumeCode).toContain('return marklessScalarSpecializedFallback(input, "event-match");');
+});
+
 test('emitResumeModule keeps row actions behind the row lean entry', () => {
 	const resumeCode = emitResumeModule({
 		...baseInput,

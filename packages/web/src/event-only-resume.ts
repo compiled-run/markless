@@ -53,7 +53,7 @@ async function resumeFullEventOnly(
 		root: input.root,
 		loadSymbol: input.loadSymbol,
 	});
-	await runtime.dispatch(input.event, { syncPolicyAlreadyApplied: true });
+	await runtime.dispatch(input.event, { syncPolicyAlreadyApplied: input.syncPolicyAlreadyApplied === true });
 	return undefined as unknown as EventOnlyResumeContainer;
 }
 
