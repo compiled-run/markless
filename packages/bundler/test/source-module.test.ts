@@ -66,8 +66,7 @@ test('emitResumeModule routes non-lean event-only entries through the full hando
 test('emitResumeModule emits a specialized scalar dispatcher with resolved constants', () => {
 	const resumeCode = emitResumeModule(scalarResumeInput());
 
-	expect(resumeCode).toContain("import { marklessWriteScalar } from '@markless/web/fns/write-scalar';");
-	expect(resumeCode).toContain("import { marklessUpdateText } from '@markless/web/fns/update-text';");
+	expect(resumeCode).toContain("from '@markless/web/fns/scalar-specialized';");
 	expect(resumeCode).toContain('marklessScalarEventMatches(input, marklessFindElementAtDomOrderIndex(input.root, 3, "button"), "click", "host:button")');
 	expect(resumeCode).toContain('const eventTarget = input.event?.target;');
 	expect(resumeCode).toContain('input.event?.type === eventName');
@@ -76,9 +75,12 @@ test('emitResumeModule emits a specialized scalar dispatcher with resolved const
 	expect(resumeCode).not.toContain('?? input.element ?? input.event.target');
 	expect(resumeCode).toContain('payloadState.cells[0]');
 	expect(resumeCode).toContain('marklessAssertScalarCell(cell, "state:count", "markless/state cell[0]")');
-	expect(resumeCode).toContain('value: "Count: " +');
+	expect(resumeCode).toContain('marklessCreateScalarSpecializedState("state:count"');
+	expect(resumeCode).toContain('marklessScalarSpecializedTextValue("host:label", "Count: " +');
 	expect(resumeCode).toContain('loadSymbol("symbol:click")');
 	expect(resumeCode).not.toContain('input.loadSymbol("symbol:click")');
+	expect(resumeCode).not.toContain("from '@markless/web/fns/write-scalar';");
+	expect(resumeCode).not.toContain("from '@markless/web/fns/update-text';");
 	expect(resumeCode).not.toContain('@markless/web/event-only-lean/scalar-core');
 	expect(resumeCode).not.toContain('@markless/web/event-only-lean/lean-shared');
 	expect(resumeCode).not.toContain('@markless/web/event-only-lean/row');
@@ -86,6 +88,8 @@ test('emitResumeModule emits a specialized scalar dispatcher with resolved const
 	expect(resumeCode).not.toContain('payloadRuntimeDemandMap.actions.find');
 	expect(resumeCode).not.toContain('payloadView.domUpdates.find');
 	expect(resumeCode).not.toContain('resumeEventOnlyFromPayloadDocument');
+	expect(resumeCode).not.toContain("import('@markless/core/web/resume')");
+	expect(resumeCode).toContain('marklessScalarSpecializedHostMiss');
 });
 
 test('specialized scalar dispatcher accepts the real raw event entry shape', () => {

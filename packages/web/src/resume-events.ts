@@ -1,5 +1,4 @@
 import type { RuntimeGraph } from '@markless/runtime';
-import { describeMarklessEventTarget } from './execution-log-target.ts';
 import type { ElementHandleRegistry, ResumeDispatchOptions, ResumeDomElement, ResumeDomEvent, ResumeEventRecord, ResumeKeyedRepeatRecord, ResumeKeyedRepeatRowEvent, ResumeRuntimeErrorContext, ResumeRuntimeInput } from './resume-types.ts';
 
 export type ResumeRowEventMatch = { readonly repeat: ResumeKeyedRepeatRecord; readonly parent: ResumeDomElement; readonly rowRoot: ResumeDomElement; readonly rowKey: unknown; readonly rowEvent: ResumeKeyedRepeatRowEvent };
@@ -21,9 +20,9 @@ type ExecutionLogGlobal = typeof globalThis & {
 };
 
 export function createEventWiring(input: {
-	readonly graph: RuntimeGraph; readonly loadSymbol: ResumeRuntimeInput['loadSymbol']; readonly elementsByHostId: Map<string, ResumeDomElement>; readonly elementHandles: ElementHandleRegistry;
+	readonly root: ResumeDomElement; readonly graph: RuntimeGraph; readonly loadSymbol: ResumeRuntimeInput['loadSymbol']; readonly elementsByHostId: Map<string, ResumeDomElement>; readonly elementHandles: ElementHandleRegistry;
 	readonly view: ResumeRuntimeInput['view'];
-	readonly eventTypes: Set<string>; readonly disposedHosts: Set<string>; readonly flushRuntimeGraph: () => Promise<void>; readonly reportRuntimeError: (error: unknown, context: ResumeRuntimeErrorContext) => Promise<void>;
+	readonly eventTypes: Set<string>; readonly disposedHosts: Set<string>; readonly ignoredDisposedEventTargets: WeakSet<ResumeDomElement>; readonly prepareRuntimeShared: () => Promise<void>; readonly flushRuntimeGraph: () => Promise<void>; readonly reportRuntimeError: (error: unknown, context: ResumeRuntimeErrorContext) => Promise<void>;
 	readonly activateBehaviorsFromTrigger: (hostNodeId: string) => Promise<void> | undefined; readonly behaviorHostIdsForAncestors: (element: ResumeDomElement | undefined) => string[];
 }) {
 	const eventRecords = new WeakMap<ResumeDomElement, Map<string, ResumeEventRecord>>();
@@ -44,8 +43,10 @@ export function createEventWiring(input: {
 	async function dispatch(event: ResumeDomEvent, options: ResumeDispatchOptions = {}): Promise<void> {
 		const beforeExecution = marklessExecutionLogSnapshot();
 		const target = event.target; if (!target) throw unmatchedDispatchError(event, undefined);
-		const selector = describeMarklessEventTarget(target);
+		const selector = describeResumeEventTarget(target);
+		if (!containsElement(input.root, target) && !ignoredDisposedTarget(input.ignoredDisposedEventTargets, target)) throw unmatchedDispatchError(event, selector);
 		const matched = findDispatchMatch(target, event.type, eventRecords, rowEventRecords); if (!matched) {
+			if (ignoredDisposedTarget(input.ignoredDisposedEventTargets, target)) return;
 			await marklessLogInteraction({
 				eventName: event.type,
 				eventRecord: null,
@@ -62,6 +63,7 @@ export function createEventWiring(input: {
 		if (eventRecord.syncPolicy && !options.syncPolicyAlreadyApplied) runPolicy?.(eventRecord.syncPolicy, input.graph, event);
 		let activeSymbolId: string | undefined;
 		try {
+			await input.prepareRuntimeShared();
 			for (const hostNodeId of input.behaviorHostIdsForAncestors(element)) { const activation = input.activateBehaviorsFromTrigger(hostNodeId); if (activation) await activation; }
 			const activation = input.activateBehaviorsFromTrigger(eventRecord.hostNodeId); if (activation) await activation;
 			for (const symbolId of eventRecord.symbolIds) { activeSymbolId = symbolId; const symbol = await input.loadSymbol(symbolId); const result = symbol({ graph: input.graph, event, element, getElementHandle: input.elementHandles.get }); if (isPromiseLike(result)) await result; }
@@ -86,6 +88,7 @@ export function createEventWiring(input: {
 		if (rowEvent.syncPolicy && !options.syncPolicyAlreadyApplied) runPolicy?.(rowEvent.syncPolicy, input.graph, event);
 		let activeSymbolId: string | undefined;
 		try {
+			await input.prepareRuntimeShared();
 			validateOneRepeat(input.graph, repeat);
 			const locals = { [repeat.itemName]: findRepeatItemByKey(readKeyedRepeatCollection(input.graph, repeat), repeat, rowKey) };
 			for (const symbolId of rowEvent.symbolIds) { activeSymbolId = symbolId; const symbol = await input.loadSymbol(symbolId); const result = symbol({ graph: input.graph, event, element, getElementHandle: input.elementHandles.get, locals }); if (isPromiseLike(result)) await result; }
@@ -98,7 +101,7 @@ export function createEventWiring(input: {
 				eventRecord: rowEvent,
 				before: beforeExecution,
 				view: input.view,
-				selector: describeMarklessEventTarget(element),
+				selector: describeResumeEventTarget(element),
 				dispatchModuleId: 'web:resume-events',
 			});
 		}
@@ -109,6 +112,11 @@ export function createEventWiring(input: {
 function marklessExecutionLogSnapshot(): Set<string> | undefined {
 	const log = (globalThis as ExecutionLogGlobal).__mxLog;
 	return log ? new Set(log) : undefined;
+}
+function describeResumeEventTarget(target: ResumeDomElement): string {
+	const tag = typeof target.tagName === 'string' ? target.tagName.toLowerCase() : 'element';
+	const id = typeof (target as { readonly id?: unknown }).id === 'string' && (target as { readonly id?: string }).id ? `#${(target as { readonly id: string }).id}` : '';
+	return `${tag}${id}`;
 }
 
 async function marklessLogInteraction(input: {
@@ -142,6 +150,14 @@ function findDispatchMatch(target: ResumeDomElement, eventName: string, eventRec
 		current = current.parentElement;
 	}
 	return null;
+}
+function ignoredDisposedTarget(disposedTargets: WeakSet<ResumeDomElement>, target: ResumeDomElement): boolean {
+	return disposedTargets.has(target);
+}
+function containsElement(root: ResumeDomElement, target: ResumeDomElement): boolean {
+	if (root === target) return true;
+	for (const child of root.childNodes ?? []) if (child.nodeType === 1 && containsElement(child as ResumeDomElement, target)) return true;
+	return false;
 }
 function unmatchedDispatchError(event: ResumeDomEvent, selector: string | undefined): Error {
 	const error = new Error(`MARKLESS_EVENT_DISPATCH_UNMATCHED: No event record matched ${event.type} dispatch${selector ? ` at ${selector}` : ''}.`) as Error & Record<string, unknown>;

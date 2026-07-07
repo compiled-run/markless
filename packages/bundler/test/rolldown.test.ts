@@ -122,7 +122,7 @@ describe('TSRX Rolldown plugin structure', () => {
 		expect(result.code).not.toContain('source: marklessSource');
 		const resumeModule = result.virtualModules.find((module) => module.type === 'resume');
 		expect(resumeModule?.source).toContain('export async function resumeContainerEvent');
-		expect(resumeModule?.source).toContain('loadSymbol: loadSymbol,');
+		expect(resumeModule?.source).toContain('marklessResolve(loadSymbol("symbol:0"))');
 		expect(result.virtualModules.map((item) => item.type)).toEqual(
 			expect.arrayContaining(['payload', 'resolver', 'resume', 'symbol']),
 		);
@@ -214,7 +214,7 @@ let count = state(0);
 		expect(resumeModule?.source).toContain('export async function resumeContainerEvent');
 		expect(result.code).toContain('export { marklessSsrLoadSymbolRoute as loadSymbol };');
 		expect(result.code).toContain('function marklessSsrLoadSymbolRoute(symbolId)');
-		expect(resumeModule?.source).toContain('loadSymbol: marklessSsrLoadSymbolRoute,');
+		expect(resumeModule?.source).toContain('marklessResolve(marklessSsrLoadSymbolRoute("symbol:0"))');
 		expect(result.code).not.toContain('function marklessResumeLoadSymbol');
 		expect(result.code).toContain('import("./Child.tsrx?markless-symbols")');
 		expect(result.code).toContain("import('virtual:markless:symbol:");
@@ -242,7 +242,7 @@ let count = state(0);
 		const resumeModule = result.virtualModules.find((module) => module.type === 'resume');
 		expect(result.code).not.toContain('export async function resumeContainerEvent');
 		expect(resumeModule?.source).toContain('export async function resumeContainerEvent');
-		expect(resumeModule?.source).toContain('loadSymbol: marklessSsrLoadSymbolRoute,');
+		expect(resumeModule?.source).toContain('marklessResolve(marklessSsrLoadSymbolRoute("symbol:0"))');
 		expect(result.code).toContain('const marklessLoadLocalSymbol = loadSymbol;');
 		expect(result.code).toContain('function marklessSsrLoadSymbolRoute(symbolId)');
 		expect(result.code).toContain('import("./Child.tsrx?markless-symbols")');

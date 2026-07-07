@@ -18,7 +18,7 @@ describe('markless chunking defaults', () => {
 			entryFileNames: 'build/chunk-[hash].js',
 			chunkFileNames: 'build/chunk-[hash].js',
 			hoistTransitiveImports: false,
-			minifyInternalExports: false,
+			minifyInternalExports: true,
 			strictExecutionOrder: true,
 		});
 		expect(clientOutput.codeSplitting?.groups?.map((group) => group.name)).toEqual(

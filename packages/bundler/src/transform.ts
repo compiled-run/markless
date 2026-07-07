@@ -153,7 +153,7 @@ function containerScopedResumeView(view: ProtocolViewPayload): ProtocolViewPaylo
 	return {
 		...view,
 		// Match the markless/view locator table served by renderToString().
-		locators: view.locators.map((locator) => ({
+		locators: (view.locators ?? []).map((locator) => ({
 			...locator,
 			index: locator.index + 1,
 		})),
@@ -165,8 +165,8 @@ function needsFullResume(
 	runtimeDemandMap: RuntimeDemandMapArtifact,
 ): boolean {
 	if ((view.branches?.length ?? 0) > 0) return true;
-	if (view.elementHandles.length > 0) return true;
-	if (view.asyncBoundaries.length > 0) return true;
+	if ((view.elementHandles?.length ?? 0) > 0) return true;
+	if ((view.asyncBoundaries?.length ?? 0) > 0) return true;
 	if ((view.keyedRepeats?.length ?? 0) === 0) return false;
 	return !recordKindReplaced(runtimeDemandMap, 'keyed-repeat');
 }

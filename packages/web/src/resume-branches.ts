@@ -27,7 +27,7 @@ export function wireBranches(input: any) {
 		}
 	}
 	function disposeRemovedRangeHosts(entries: ReadonlyArray<DomJournalEntry>, disposeHost: (hostNodeId: string) => void, asyncBoundaries: Map<string, { readonly startAnchor: import('./resume-types.ts').ResumeDomComment; readonly endAnchor: import('./resume-types.ts').ResumeDomComment }>): void {
-		for (const entry of entries) { if (entry.type !== 'removeRange') continue; const range = entry.locator.startsWith('branch:') ? branchesById.get(entry.locator.slice('branch:'.length)) : entry.locator.startsWith('async-boundary:') ? asyncBoundaries.get(entry.locator.slice('async-boundary:'.length)) : undefined; if (!range) continue;
+		for (const entry of entries) { if (entry.type !== 'removeRange') continue; const branch = entry.locator.startsWith('branch:') ? branchesById.get(entry.locator.slice('branch:'.length)) : undefined; const range = branch ?? (entry.locator.startsWith('async-boundary:') ? asyncBoundaries.get(entry.locator.slice('async-boundary:'.length)) : undefined); if (!range) continue;
 			for (const id of hostIdsInsideRemovedElements(input.elementsByHostId, elementsBetweenAnchors(input.root, range.startAnchor, range.endAnchor))) disposeHost(id);
 		}
 	}
