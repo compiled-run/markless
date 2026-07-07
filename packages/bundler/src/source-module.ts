@@ -472,7 +472,7 @@ function emitScalarAction(action: ScalarSpecialization, loadSymbolName: string):
 		`async function ${action.name}(input) {`,
 		`	const cell = payloadState.cells[${action.cellIndex}];`,
 		`	marklessAssertScalarCell(cell, ${JSON.stringify(action.cell)}, ${JSON.stringify(`markless/state cell[${action.cellIndex}]`)});`,
-		`	const host = marklessFindElementAtDomOrderIndex(input.root, ${action.hostIndex}, ${JSON.stringify(action.hostTagName)}) ?? input.element ?? input.event.target;`,
+		`	const host = marklessFindElementAtDomOrderIndex(input.root, ${action.hostIndex}, ${JSON.stringify(action.hostTagName)});`,
 		'	if (!host) return marklessScalarSpecializedFallback(input, "host");',
 		...action.textUpdates.map((update, index) =>
 			`	const textTarget${index} = marklessFindElementAtDomOrderIndex(input.root, ${update.index}, ${JSON.stringify(update.tagName)});`,

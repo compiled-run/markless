@@ -73,6 +73,7 @@ test('emitResumeModule emits a specialized scalar dispatcher with resolved const
 	expect(resumeCode).toContain('input.event?.type === eventName');
 	expect(resumeCode).toContain('marklessFindElementAtDomOrderIndex(input.root, 3, "button")');
 	expect(resumeCode).toContain('marklessFindElementAtDomOrderIndex(input.root, 5, "output")');
+	expect(resumeCode).not.toContain('?? input.element ?? input.event.target');
 	expect(resumeCode).toContain('payloadState.cells[0]');
 	expect(resumeCode).toContain('marklessAssertScalarCell(cell, "state:count", "markless/state cell[0]")');
 	expect(resumeCode).toContain('value: "Count: " +');

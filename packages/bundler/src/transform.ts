@@ -92,7 +92,7 @@ export async function transformTsrxModule(
 				payloadId,
 				resolverId,
 				payloadState: compiled.payloadScripts.state,
-				payloadView: compiled.payloadScripts.view,
+				payloadView: containerScopedResumeView(compiled.payloadScripts.view),
 				runtimeDemandMap: compiled.runtimeDemandMap,
 				executionLog: input.executionLog,
 				needsFullResume: needsFullResume(compiled.protocolView, compiled.runtimeDemandMap),
@@ -146,6 +146,17 @@ export async function transformTsrxModule(
 		map: null,
 		virtualModules,
 		manifest,
+	};
+}
+
+function containerScopedResumeView(view: ProtocolViewPayload): ProtocolViewPayload {
+	return {
+		...view,
+		// Match the markless/view locator table served by renderToString().
+		locators: view.locators.map((locator) => ({
+			...locator,
+			index: locator.index + 1,
+		})),
 	};
 }
 

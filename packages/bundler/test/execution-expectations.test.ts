@@ -79,8 +79,8 @@ test('alternate-shaped scalar action specializes from locator, cell, event, and 
 	const resumeSource = result.virtualModules.find((module) => module.type === 'resume')?.source ?? '';
 	const event = payload.view.events[0];
 	const update = payload.view.domUpdates[0];
-	const eventLocator = payload.view.locators.find((locator: any) => locator.hostNodeId === event.hostNodeId);
-	const updateLocator = payload.view.locators.find((locator: any) => locator.hostNodeId === update.hostNodeId);
+	const eventLocator = servedLocator(payload.view.locators.find((locator: any) => locator.hostNodeId === event.hostNodeId));
+	const updateLocator = servedLocator(payload.view.locators.find((locator: any) => locator.hostNodeId === update.hostNodeId));
 	const allowed = deriveAllowedModules(payload.view, payload.runtimeDemandMap, {
 		hostNodeId: event.hostNodeId,
 		eventName: event.eventName,
@@ -106,6 +106,35 @@ test('alternate-shaped scalar action specializes from locator, cell, event, and 
 	expect(allowed).toContain('web/fns/update-text');
 	expect(allowed).not.toContain('web/event-only-lean/scalar-core');
 	expect(allowed).not.toContain('web/fns/scalar-core-graph');
+});
+
+test('wrapped scalar action emits served locator indexes for host and text updates', async () => {
+	const result = await transformTsrxModule({
+		filename: '/workspace/app/Wrapped.tsrx',
+		source: `
+			import { state } from '@markless/core';
+			export function Wrapped() @{
+				let count = state(0);
+				<div className="frame">
+					<button onClick={() => count++}>{count}</button>
+				</div>
+			}
+		`,
+	});
+	const payload = payloadView(result.virtualModules.find((module) => module.type === 'payload')?.source);
+	const resumeSource = result.virtualModules.find((module) => module.type === 'resume')?.source ?? '';
+	const event = payload.view.events[0];
+	const update = payload.view.domUpdates[0];
+	const eventLocator = servedLocator(payload.view.locators.find((locator: any) => locator.hostNodeId === event.hostNodeId));
+	const updateLocator = servedLocator(payload.view.locators.find((locator: any) => locator.hostNodeId === update.hostNodeId));
+
+	expect(eventLocator).toMatchObject({ tagName: 'button' });
+	expect(updateLocator).toMatchObject({ tagName: 'button' });
+	expect(resumeSource).toContain(
+		`marklessScalarEventMatches(input, marklessFindElementAtDomOrderIndex(input.root, ${eventLocator.index}, "button"), "click", ${JSON.stringify(event.hostNodeId)})`,
+	);
+	expect(resumeSource).toContain(`marklessFindElementAtDomOrderIndex(input.root, ${updateLocator.index}, "button")`);
+	expect(resumeSource).not.toContain('?? input.element ?? input.event.target');
 });
 
 test('scalar-looking actions with extra authored work stay on the full dispatch path', async () => {
@@ -414,4 +443,8 @@ function payloadRuntimeDemandMap(source: string | undefined): any {
 	const match = source?.match(/export const runtimeDemandMap = ([\s\S]*?);\nexport const view = /);
 	if (!match) throw new Error('Expected payload virtual module to export runtimeDemandMap.');
 	return JSON.parse(match[1]);
+}
+
+function servedLocator(locator: any): any {
+	return { ...locator, index: locator.index + 1 };
 }
