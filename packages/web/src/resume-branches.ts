@@ -92,11 +92,12 @@ function missingCommentAnchorError(id: string, name: 'startAnchor' | 'endAnchor'
 }
 function branchFragmentEmpty(fragment: unknown): boolean {
 	if (typeof fragment === 'string') return fragment.length === 0;
+	if (fragment && typeof fragment === 'object' && 'childNodes' in fragment) return branchFragmentEmpty(Array.from((fragment as { readonly childNodes?: ArrayLike<unknown> }).childNodes ?? []));
 	if (!Array.isArray(fragment)) return false;
 	return fragment.length === 0 || !fragment.some((node) => node && typeof node === 'object' && 'nodeType' in node);
 }
 function branchArmEmptyError(branch: ResumeBranchRecord, arm: number): Error {
 	const error = new Error(`MARKLESS_BRANCH_ARM_EMPTY: Branch ${branch.id} resolved arm ${String(arm)} to an empty fragment.`) as Error & Record<string, unknown>;
-	error.name = 'RuntimeResumeError'; error.code = 'MARKLESS_BRANCH_ARM_EMPTY'; error.phase = 'runtime'; error.branchId = branch.id; error.sourceBranchId = branch.sourceId; error.arm = arm; error.symbolId = branch.symbolId; error.docsUrl = 'https://markless.dev/errors/MARKLESS_BRANCH_ARM_EMPTY';
+	error.name = 'RuntimeResumeError'; error.code = 'MARKLESS_BRANCH_ARM_EMPTY'; error.phase = 'runtime'; error.branchId = branch.id; error.sourceBranchId = branch.sourceId; error.branchSiteId = branch.sourceId ?? branch.id; error.arm = arm; error.symbolId = branch.symbolId; error.docsUrl = 'https://markless.dev/errors/MARKLESS_BRANCH_ARM_EMPTY';
 	return error;
 }

@@ -30,9 +30,13 @@ export function createResumeRuntimeShared(input: ResumeRuntimeInput) {
 		error: unknown,
 		context: ResumeRuntimeErrorContext,
 	) => {
-		if (!input.onError) return;
+		const reportable = enrichRuntimeErrorForReporting(error, context);
+		if (!input.onError) {
+			reportGlobalRuntimeError(reportable);
+			return;
+		}
 		try {
-			const result = input.onError(enrichRuntimeErrorForReporting(error, context), context);
+			const result = input.onError(reportable, context);
 			if (isPromiseLike(result)) await result;
 		} catch {}
 	};
@@ -53,6 +57,12 @@ export function createResumeRuntimeShared(input: ResumeRuntimeInput) {
 	};
 
 	return { flushRuntimeGraph, receiveSharedPatch, reportRuntimeError };
+}
+
+function reportGlobalRuntimeError(error: unknown): void {
+	const host = globalThis as { readonly reportError?: (error: unknown) => void; readonly dispatchEvent?: (event: Event) => boolean; readonly ErrorEvent?: new (type: string, init: { readonly error: unknown; readonly message: string }) => Event };
+	if (host.reportError) return host.reportError(error);
+	if (host.dispatchEvent && host.ErrorEvent) host.dispatchEvent(new host.ErrorEvent('error', { error, message: error instanceof Error ? error.message : String(error) }));
 }
 
 function isPromiseLike<T>(value: T | PromiseLike<T>): value is PromiseLike<T> {
