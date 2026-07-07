@@ -1,14 +1,23 @@
 import { RuntimeResumeError, mismatchedElementLocatorError, missingElementLocatorError } from './inline/resume-errors.ts';
+import { expandBoundaryArmRecords } from './resume-arm-records.ts';
 import type { ElementHandleRegistry, ResumeAsyncBoundaryRecord, ResumeDispatchOptions, ResumeDomComment, ResumeDomElement, ResumeDomEvent, ResumeDomNode, ResumeRuntime, ResumeRuntimeInput } from './resume-types.ts';
 
 export { RuntimeResumeError, mismatchedElementLocatorError, missingElementLocatorError } from './inline/resume-errors.ts';
 export type { RuntimeResumeDiagnostic, RuntimeResumeErrorCode } from './inline/resume-errors.ts';
 export type * from './resume-types.ts';
 
-export function createResumeRuntime(input: ResumeRuntimeInput): ResumeRuntime {
+export function createResumeRuntime(runtimeInput: ResumeRuntimeInput): ResumeRuntime {
+	const asyncBoundariesById = materializeAsyncBoundaryLocators(runtimeInput.root, runtimeInput.view.asyncBoundaries);
+	// D3: in-arm records register at (start anchor's live element offset +
+	// arm-relative index) and expand into the flat view, so every downstream
+	// wiring path sees them like any other record.
+	const armExpansion = expandBoundaryArmRecords(runtimeInput.root, runtimeInput.view, asyncBoundariesById);
+	const input = armExpansion ? { ...runtimeInput, view: armExpansion.view } : runtimeInput;
 	const elementsByHostId = materializeDomLocators(input.root, input.view.locators);
+	for (const [hostNodeId, element] of armExpansion?.elementsByHostId ?? []) {
+		elementsByHostId.set(hostNodeId, element);
+	}
 	const elementHandles = materializeElementHandles(input.root, elementsByHostId, input.view.elementHandles);
-	const asyncBoundariesById = materializeAsyncBoundaryLocators(input.root, input.view.asyncBoundaries);
 	let runtime: ResumeRuntime | undefined;
 	let starting: Promise<ResumeRuntime> | undefined;
 

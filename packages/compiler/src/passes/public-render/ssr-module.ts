@@ -70,7 +70,7 @@ export function emitPublicSsrRenderModule(
 			'const marklessSsrHostLocators = [];',
 			`const html = ${htmlExpression};`,
 		]),
-		'	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren);',
+		'	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren, marklessSsrAsyncSnapshots);',
 		'	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);',
 		'	return {',
 		'		html,',

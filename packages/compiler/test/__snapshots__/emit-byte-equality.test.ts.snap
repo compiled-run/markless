@@ -373,7 +373,7 @@ async function marklessRenderSsr(props = {}) {
 	const marklessSsrAsyncSnapshots = [];
 	const marklessSsrHostLocators = [];
 	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "main") + "<main>" + "<!--markless:async:boundary:0-->" + (await ((async (marklessSsrAsyncSnapshot) => marklessSsrAsyncSnapshot.status === "fulfilled" ? (async (details) => marklessSsrHost(marklessSsrHostLocators, "h1", "p") + "<p>" + marklessSsrText(details.title) + "</p>")(marklessSsrAsyncSnapshot.value) : (async (marklessSsrAsyncError) => marklessSsrHost(marklessSsrHostLocators, "h2", "p") + "<p>" + "Broken" + "</p>")(marklessSsrAsyncSnapshot.error))(await marklessSsrRunAsyncComputed(marklessSsrAsyncSnapshots, "computed:details", async () => ({ title: query }))))) + "<!--/markless:async:boundary:0-->" + "</main>";
-	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren);
+	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren, marklessSsrAsyncSnapshots);
 	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
@@ -695,7 +695,7 @@ async function marklessRenderSsr(props = {}) {
 	const marklessSsrAsyncSnapshots = [];
 	const marklessSsrHostLocators = [];
 	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "section") + "<section>" + marklessSsrText(label) + "</section>";
-	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren);
+	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren, marklessSsrAsyncSnapshots);
 	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
@@ -1098,7 +1098,7 @@ async function marklessRenderSsr(props = {}) {
 	const marklessSsrAsyncSnapshots = [];
 	const marklessSsrHostLocators = [];
 	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "section") + "<section>" + "<!--markless:branch:branch-site:0-->" + ((open) ? marklessSsrBranchArm(marklessSsrBranches, "branch-site:0", 0) + marklessSsrArmHost(marklessSsrHostLocators) + "<p>" + "Shown" + "</p>" : marklessSsrBranchArm(marklessSsrBranches, "branch-site:0", 1) + marklessSsrArmHost(marklessSsrHostLocators) + "<p>" + "Hidden" + "</p>") + "<!--/markless:branch:branch-site:0-->" + "</section>";
-	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren);
+	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren, marklessSsrAsyncSnapshots);
 	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
@@ -1347,7 +1347,7 @@ async function marklessRenderSsr(props = {}) {
 	const marklessSsrAsyncSnapshots = [];
 	const marklessSsrHostLocators = [];
 	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "button") + "<button>" + marklessSsrText(count) + "</button>";
-	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren);
+	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren, marklessSsrAsyncSnapshots);
 	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
@@ -1632,7 +1632,7 @@ async function marklessRenderSsr(props = {}) {
 	const marklessSsrAsyncSnapshots = [];
 	const marklessSsrHostLocators = [];
 	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "button") + "<button>" + marklessSsrText(count) + "</button>";
-	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren);
+	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren, marklessSsrAsyncSnapshots);
 	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
@@ -1864,7 +1864,7 @@ async function marklessRenderSsr(props = {}) {
 	const marklessSsrAsyncSnapshots = [];
 	const marklessSsrHostLocators = [];
 	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "main") + "<main>" + (await marklessSsrRenderChild(marklessSsrChildren, __marklessSsrComponent0, { active: active }, { hostPrefix: "c0:", symbolPrefix: "c0:", localIndex: marklessSsrHostLocators.length, graphProps: [{"name":"active","graphNodeId":"state:active","path":[]}] })) + "</main>";
-	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren);
+	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren, marklessSsrAsyncSnapshots);
 	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
@@ -2250,7 +2250,7 @@ async function marklessRenderSsr(props = {}) {
 	const marklessSsrAsyncSnapshots = [];
 	const marklessSsrHostLocators = [];
 	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "span") + "<span>" + "<!--markless:branch:branch-site:0-->" + ((active) ? marklessSsrBranchArm(marklessSsrBranches, "branch-site:0", 0) + marklessSsrArmHost(marklessSsrHostLocators) + "<em>" + "Live" + "</em>" : marklessSsrBranchArm(marklessSsrBranches, "branch-site:0", 1) + marklessSsrArmHost(marklessSsrHostLocators) + "<em>" + "Idle" + "</em>") + "<!--/markless:branch:branch-site:0-->" + "</span>";
-	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren);
+	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren, marklessSsrAsyncSnapshots);
 	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
@@ -2708,7 +2708,7 @@ async function marklessRenderSsr(props = {}) {
 	const marklessSsrAsyncSnapshots = [];
 	const marklessSsrHostLocators = [];
 	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "main") + "<main>" + marklessSsrHost(marklessSsrHostLocators, "h1", "section") + "<section>" + marklessSsrRepeatRows(marklessSsrHostLocators, entries, entry => entry.code, "repeat:0", "entry", ["code"], (entry) => "<article" + marklessSsrAttribute("class", chosen === entry.code ? 'picked' : 'plain') + ">" + "<h2>" + marklessSsrText(entry.title) + "</h2>" + "<button>" + "Choose" + "</button>" + "</article>", 3, null) + "</section>" + "</main>";
-	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren);
+	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren, marklessSsrAsyncSnapshots);
 	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
@@ -2901,7 +2901,7 @@ async function marklessRenderSsr(props = {}) {
 	const marklessSsrAsyncSnapshots = [];
 	const marklessSsrHostLocators = [];
 	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "section") + "<section" + marklessSsrAttribute("data-mode", labels.mode) + ">" + marklessSsrText(labels.title) + "</section>";
-	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren);
+	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren, marklessSsrAsyncSnapshots);
 	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
@@ -3172,7 +3172,7 @@ async function marklessRenderSsr(props = {}) {
 	const marklessSsrAsyncSnapshots = [];
 	const marklessSsrHostLocators = [];
 	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "ol") + "<ol>" + marklessSsrRepeatRows(marklessSsrHostLocators, records, record => marklessSsrReadPublicPath(record, []), "repeat:0", "record", [], (record, slot) => "<li>" + marklessSsrText(record.label) + "</li>", 1, null) + "</ol>";
-	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren);
+	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren, marklessSsrAsyncSnapshots);
 	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
@@ -3506,7 +3506,7 @@ async function marklessRenderSsr(props = {}) {
 	const marklessSsrAsyncSnapshots = [];
 	const marklessSsrHostLocators = [];
 	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "main") + "<main>" + (await marklessSsrRenderChild(marklessSsrChildren, __marklessSsrComponent0, { active: active, __marklessSsrCallbacks: marklessSsrCallbacks({ "active": marklessSsrCallbackSymbol(props, ["active"]) }) }, { hostPrefix: "c0:", symbolPrefix: "c0:", localIndex: marklessSsrHostLocators.length, graphProps: [{"name":"active","graphNodeId":"prop:props","path":["active"]}] })) + "</main>";
-	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren);
+	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren, marklessSsrAsyncSnapshots);
 	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
@@ -3707,7 +3707,7 @@ async function marklessRenderSsr(props = {}) {
 	const marklessSsrAsyncSnapshots = [];
 	const marklessSsrHostLocators = [];
 	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "section") + "<section" + marklessSsrSpreadAttributes({ ...(meta), title: "Final" }, null) + ">" + "Hi" + "</section>";
-	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren);
+	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren, marklessSsrAsyncSnapshots);
 	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
@@ -3988,7 +3988,7 @@ async function marklessRenderSsr(props = {}) {
 	const marklessSsrAsyncSnapshots = [];
 	const marklessSsrHostLocators = [];
 	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "button") + "<button>" + marklessSsrText(count) + "</button>";
-	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren);
+	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren, marklessSsrAsyncSnapshots);
 	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
@@ -4267,7 +4267,7 @@ async function marklessRenderSsr(props = {}) {
 	const marklessSsrAsyncSnapshots = [];
 	const marklessSsrHostLocators = [];
 	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "output") + "<output>" + marklessSsrText(doubled) + "</output>";
-	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren);
+	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren, marklessSsrAsyncSnapshots);
 	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,

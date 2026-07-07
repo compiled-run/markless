@@ -70,9 +70,15 @@ export function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string 
 			nextChildIndex: context.nextChildIndex,
 			nextComponentEdgeIndex: context.nextComponentEdgeIndex,
 		};
+		// armScoped @if arms (inside an async boundary arm) keep real host
+		// locators: their hosts live in the boundary's arm-relative coordinate
+		// space, so the compose step can move only the rendered ternary side's
+		// records into boundary.armRecords (D3 — retires need 15 dead events).
 		const consequentContext: SsrRenderContext = {
 			...context,
-			insideSupportedBranchArm: context.insideSupportedBranchArm || !!gate?.supported,
+			insideSupportedBranchArm:
+				context.insideSupportedBranchArm ||
+				(!!gate?.supported && gate.armScoped !== true),
 		};
 		const consequent = emitHtmlBranch(
 			node.consequent as AnyNode | undefined,
@@ -472,8 +478,11 @@ function emitSwitchHtml(node: AnyNode, context: HtmlRenderContext): string {
 		const caseContext: SsrRenderContext = {
 			...context,
 			...before,
+			// armScoped @switch cases keep real host locators (see the @if arm
+			// note): the boundary's armRecords own their coordinates.
 			insideSupportedBranchArm:
-				(context as SsrRenderContext).insideSupportedBranchArm || !!siteGate?.supported,
+				(context as SsrRenderContext).insideSupportedBranchArm ||
+				(!!siteGate?.supported && siteGate.armScoped !== true),
 		};
 		const body = joinSsrExpressions(children.map((child) => emitHtmlNode(child, caseContext)));
 		maxChildIndex = Math.max(maxChildIndex, caseContext.nextChildIndex);

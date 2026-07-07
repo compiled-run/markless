@@ -193,8 +193,22 @@ function hasBrowserTriggers(view: ProtocolViewPayload, state: ProtocolStatePaylo
 		// Branch arm events live on armRecords, not view.events.
 		(view.branches ?? []).some((branch) =>
 			(branch.armRecords ?? []).some((arm) => arm.events.length > 0),
-		)
+		) ||
+		// Async boundary arm events also nest under armRecords (D3).
+		view.asyncBoundaries.some((boundary) => boundaryArmEventNames(boundary).length > 0)
 	);
+}
+
+// In-arm event names from a boundary's armized record set. CSR-composed pages
+// may still carry the compile-time per-arm array, which is not wake-relevant.
+function boundaryArmEventNames(
+	boundary: ProtocolViewPayload['asyncBoundaries'][number],
+): ReadonlyArray<string> {
+	const armRecords = (
+		boundary as { readonly armRecords?: { readonly events?: ReadonlyArray<{ readonly eventName: string }> } }
+	).armRecords;
+	if (!armRecords || Array.isArray(armRecords)) return [];
+	return (armRecords.events ?? []).map((event) => event.eventName);
 }
 
 function containerScopedView(view: ProtocolViewPayload): ProtocolViewPayload {
@@ -380,7 +394,7 @@ ${localSyncPolicySource}
 		const k = e.hostNodeId + '\\n' + e.eventName;
 		m.set(k, e);
 	}
-	const rw = new Set([...(v.keyedRepeats ?? []).flatMap((k) => k.rowEvents.map((e) => e.eventName)), ...(v.branches ?? []).flatMap((k) => (k.armRecords ?? []).flatMap((a) => a.events.map((e) => e.eventName)))]);
+	const rw = new Set([...(v.keyedRepeats ?? []).flatMap((k) => k.rowEvents.map((e) => e.eventName)), ...(v.branches ?? []).flatMap((k) => (k.armRecords ?? []).flatMap((a) => a.events.map((e) => e.eventName))), ...(v.asyncBoundaries ?? []).flatMap((k) => ((k.armRecords && !Array.isArray(k.armRecords) && k.armRecords.events) || []).map((e) => e.eventName))]);
 	for (const t of new Set([...v.events.map((e) => e.eventName), ...rw].filter((e) => e !== 'visible'))) {
 		r.addEventListener(t, async (e) => {
 			if (r.__asyncResumeRuntimeStarted) return;

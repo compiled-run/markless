@@ -27,7 +27,25 @@ export type ResumeBranchArmRecordSet = NonNullable<NonNullable<ProtocolViewPaylo
 export type ResumeBranchRecord = { readonly id: string; readonly sourceId?: string; readonly startAnchor: ResumeDomComment; readonly endAnchor: ResumeDomComment; readonly symbolId: string; readonly testReads: NonNullable<NonNullable<ProtocolViewPayload['branches']>[number]['testReads']>; readonly armTests?: ReadonlyArray<unknown>; readonly declaredEmptyArms?: ReadonlyArray<number>; readonly armRecords?: ReadonlyArray<ResumeBranchArmRecordSet> };
 export type ResumeBranchHtml = string | ReadonlyArray<string | { readonly text: string }>;
 export type ResumeBranchUpdate = { readonly arm: number; readonly html: ResumeBranchHtml };
-export type ResumeViewRecord = Pick<ProtocolViewPayload, 'locators' | 'events' | 'domUpdates' | 'behaviors' | 'elementHandles' | 'asyncBoundaries' | 'branches' | 'keyedRepeats'>;
+// D3: records for content inside an async boundary arm, indexed relative to
+// the boundary's start anchor (0 = first element after it in the rendered
+// arm). Registration adds the anchor's live element-walk offset, so one set
+// stays valid on initial load and after an arm commit replaces the range.
+export type ResumeArmLocator = { readonly hostNodeId: string; readonly strategy: 'arm-relative'; readonly index: number; readonly tagName: string };
+export type ResumeArmRecordSet = {
+	readonly locators: ReadonlyArray<ResumeArmLocator>;
+	readonly events: ProtocolViewPayload['events'];
+	readonly behaviors: ProtocolViewPayload['behaviors'];
+	readonly elementHandles: ProtocolViewPayload['elementHandles'];
+};
+export type ResumeAsyncBoundaryPayload = ProtocolViewPayload['asyncBoundaries'][number] & {
+	// A single armized set on SSR-composed pages; CSR-composed pages still
+	// carry the compile-time per-arm array, which is not registrable yet.
+	readonly armRecords?: ResumeArmRecordSet | ReadonlyArray<unknown>;
+};
+export type ResumeViewRecord = Pick<ProtocolViewPayload, 'locators' | 'events' | 'domUpdates' | 'behaviors' | 'elementHandles' | 'branches' | 'keyedRepeats'> & {
+	readonly asyncBoundaries: ReadonlyArray<ResumeAsyncBoundaryPayload>;
+};
 export type ResumeSymbolContext = {
 	readonly graph: RuntimeGraph; readonly read?: RuntimeGraph['read']; readonly key?: unknown; readonly signal?: AbortSignal; readonly event?: ResumeDomEvent; readonly element: ResumeDomElement;
 	readonly getElementHandle: (handleIdOrName: string) => ResumeDomElement | undefined; readonly locals?: Readonly<Record<string, unknown>>; readonly arm?: number; readonly branchId?: string; readonly composedBranchId?: string;
