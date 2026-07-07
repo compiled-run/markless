@@ -119,7 +119,7 @@ test('wraps API and middleware files for Nitro with Markless HTTP context', () =
 			'export const cache = { maxAge: 60 }; export default function () {}',
 		)?.code,
 	).toContain(
-		'import { __marklessDefineCachedHandler as __markless_define_handler__ } from "@markless/router";',
+		'import { defineCachedHandler as __markless_define_handler__ } from "nitro/cache";',
 	);
 	expect(
 		transformRequestFileSource(
