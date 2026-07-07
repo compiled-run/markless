@@ -3963,3 +3963,33 @@ test('resume runtime activates ancestor behavior hosts on descendant dispatch', 
 	expect(loaded).toContain('symbol:controller');
 	expect(loaded).toContain('symbol:click');
 });
+
+test('CSR direct-value prop cells resolve captured prop reads without an envelope', async () => {
+	// Compiled CSR page modules seed page props as { graphNodeId, directValue }
+	// cells: the value never crossed the HTML boundary, so there is no
+	// serialized envelope to decode (need 14 on the CSR path). Async runner
+	// symbols read them exactly like resumed cells.
+	const root = element('DIV');
+	const state = {
+		version: 1,
+		cells: [{ graphNodeId: 'prop:props', directValue: { params: { repo: 'alpha' } } }],
+		computed: [],
+	};
+	const view = {
+		version: 1,
+		locators: [],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	const graph = await createRuntimeGraphFromResumePayload({
+		state: state as never,
+		view: view as never,
+		root: root as never,
+		loadSymbol: () => () => undefined,
+	});
+
+	expect(graph.read('prop:props', ['params', 'repo'])).toBe('alpha');
+});

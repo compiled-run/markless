@@ -1927,6 +1927,7 @@ const marklessCsrStateValues = new Map([
 function marklessRenderCsr(props = {}) {
 	const { active } = props ?? {};
 	const marklessCsrPayloadState = marklessCloneState(payloadState);
+	marklessCsrPayloadState.cells.push({ graphNodeId: "prop:props", directValue: props ?? {} });
 	const marklessCsrRenderStateValues = new Map(marklessCsrStateValues);
 	const marklessCsrRuntimeState = { graph: null };
 	const marklessCsrChildren = [];

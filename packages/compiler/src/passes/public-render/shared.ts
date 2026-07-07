@@ -37,6 +37,21 @@ export function destructureProps(propNames: ReadonlyArray<string>): string | nul
 	return propNames.length > 0 ? `	const { ${propNames.join(', ')} } = props ?? {};` : null;
 }
 
+// Page props live in the runtime graph under one cell: `prop:props` for a
+// destructured parameter, `prop:<name>` for a whole-object parameter. Lazy
+// symbol modules (async computed runners, event handlers) read captured props
+// through that cell, so CSR mounts must seed it from the render props — during
+// server render the runners run inline with props in closure scope instead.
+export function componentPropCellId(component: AnyNode): string | null {
+	const param = asNodes(component.params)[0];
+	if (!param) return null;
+	if (param.type === 'Identifier') {
+		const name = getIdentifierName(param);
+		return name ? `prop:${name}` : null;
+	}
+	return param.type === 'ObjectPattern' ? 'prop:props' : null;
+}
+
 export function staticHostLocators(input: PublicRenderModuleInput) {
 	return input.publicRenderPlan.staticHostLocators.map((locator) => ({
 		hostNodeId: locator.hostNodeId,

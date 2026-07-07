@@ -3,7 +3,7 @@ import { emitHtmlNode } from './html.ts';
 import { renderBodyLines } from './render-body.ts';
 import { emitCatalogHelperImports, stateRuntimeImports } from './runtime-helpers.ts';
 import { emitSameModuleCsrComponents } from './same-module.ts';
-import { callbackSymbolIds, componentEdgesFor, componentReferences, destructureProps, emitComponentImport, emitValueImport, isFragmentNode, publicRenderValueImports, stateEntries, staticHostLocators, moduleScopeLines } from './shared.ts';
+import { callbackSymbolIds, componentEdgesFor, componentPropCellId, componentReferences, destructureProps, emitComponentImport, emitValueImport, isFragmentNode, publicRenderValueImports, stateEntries, staticHostLocators, moduleScopeLines } from './shared.ts';
 import { collectCsrPropEvents } from './component-wiring.ts';
 import type { CsrRenderContext, PublicRenderRoot } from './types.ts';
 
@@ -48,6 +48,7 @@ export function emitPublicCsrRenderModule(
 		source: input.source.source,
 	};
 	const propEvents = collectCsrPropEvents(rootInfo.root, rootInfo.propNames, input.source.source);
+	const propCellId = componentPropCellId(rootInfo.component);
 	const hostLocators = staticHostLocators(input);
 	const sameModuleComponents = emitSameModuleCsrComponents(input, references, rootInfo.componentName);
 	const body = [
@@ -59,6 +60,12 @@ export function emitPublicCsrRenderModule(
 		'function marklessRenderCsr(props = {}) {',
 		destructureProps(rootInfo.propNames),
 		'	const marklessCsrPayloadState = marklessCloneState(payloadState);',
+		// Lazy symbol modules read captured page props through the prop cell;
+		// the live value never crosses HTML, so it travels as directValue
+		// instead of a serialized envelope (dashboard-migration need 14).
+		propCellId
+			? `	marklessCsrPayloadState.cells.push({ graphNodeId: ${JSON.stringify(propCellId)}, directValue: props ?? {} });`
+			: null,
 		'	const marklessCsrRenderStateValues = new Map(marklessCsrStateValues);',
 		...renderBodyLines(input, rootInfo, 'marklessStateValue', 'marklessCsrRenderStateValues', 'marklessCsrPayloadState', [
 			'const marklessCsrRuntimeState = { graph: null };',
