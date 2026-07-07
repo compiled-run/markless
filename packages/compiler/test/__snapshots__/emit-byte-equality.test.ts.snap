@@ -326,7 +326,7 @@ async function marklessRenderSsr(props = {}) {
 	const marklessSsrBranches = [];
 	const marklessSsrAsyncSnapshots = [];
 	const marklessSsrHostLocators = [];
-	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "main") + "<main>" + "<!--markless:async:boundary:0-->" + (((marklessSsrAsyncSnapshot) => marklessSsrAsyncSnapshot.status === "fulfilled" ? ((details) => marklessSsrHost(marklessSsrHostLocators, "h1", "p") + "<p>" + marklessSsrText(details.title) + "</p>")(marklessSsrAsyncSnapshot.value) : ((marklessSsrAsyncError) => marklessSsrHost(marklessSsrHostLocators, "h2", "p") + "<p>" + "Broken" + "</p>")(marklessSsrAsyncSnapshot.error))(await marklessSsrRunAsyncComputed(marklessSsrAsyncSnapshots, "computed:details", async () => ({ title: query })))) + "<!--/markless:async:boundary:0-->" + "</main>";
+	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "main") + "<main>" + "<!--markless:async:boundary:0-->" + (await ((async (marklessSsrAsyncSnapshot) => marklessSsrAsyncSnapshot.status === "fulfilled" ? (async (details) => marklessSsrHost(marklessSsrHostLocators, "h1", "p") + "<p>" + marklessSsrText(details.title) + "</p>")(marklessSsrAsyncSnapshot.value) : (async (marklessSsrAsyncError) => marklessSsrHost(marklessSsrHostLocators, "h2", "p") + "<p>" + "Broken" + "</p>")(marklessSsrAsyncSnapshot.error))(await marklessSsrRunAsyncComputed(marklessSsrAsyncSnapshots, "computed:details", async () => ({ title: query }))))) + "<!--/markless:async:boundary:0-->" + "</main>";
 	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren);
 	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {

@@ -306,7 +306,7 @@ function emitAsyncBoundaryHtml(node: AnyNode, context: HtmlRenderContext): strin
 			getIdentifierName(handler?.param as AnyNode | undefined) ?? 'marklessSsrAsyncError';
 		return joinSsrExpressions([
 			JSON.stringify(`<!--markless:async:${boundary.id}-->`),
-			`(((marklessSsrAsyncSnapshot) => marklessSsrAsyncSnapshot.status === "fulfilled" ? ((${runner.name}) => ${tryHtml})(marklessSsrAsyncSnapshot.value) : ((${catchParam}) => ${catchHtml})(marklessSsrAsyncSnapshot.error))(await marklessSsrRunAsyncComputed(marklessSsrAsyncSnapshots, ${JSON.stringify(runner.graphNodeId)}, ${runner.source})))`,
+			`(await ((async (marklessSsrAsyncSnapshot) => marklessSsrAsyncSnapshot.status === "fulfilled" ? (async (${runner.name}) => ${tryHtml})(marklessSsrAsyncSnapshot.value) : (async (${catchParam}) => ${catchHtml})(marklessSsrAsyncSnapshot.error))(await marklessSsrRunAsyncComputed(marklessSsrAsyncSnapshots, ${JSON.stringify(runner.graphNodeId)}, ${runner.source}))))`,
 			JSON.stringify(`<!--/markless:async:${boundary.id}-->`),
 		]);
 	}
