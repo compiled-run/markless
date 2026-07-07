@@ -1,6 +1,6 @@
 import { expect, test, vi } from 'vitest';
 import { readFile } from 'node:fs/promises';
-import { resolve } from 'pathe';
+import { resolve } from 'node:path';
 import { marklessUpdateText } from '../src/fns/update-text.ts';
 import { marklessWriteScalar } from '../src/fns/write-scalar.ts';
 import { enrichRuntimeErrorForReporting } from '../src/runtime-error-reporting.ts';
