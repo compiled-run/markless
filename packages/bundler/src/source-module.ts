@@ -277,8 +277,8 @@ function emitResumeContainerEvent(
 		'}',
 	].join('\n');
 	const scalarDispatcher = scalarSpecializations.length > 0
-		? emitSpecializedScalarDispatcher(scalarSpecializations)
-		: emitSpecializedScalarDispatcher([]);
+		? emitSpecializedScalarDispatcher(scalarSpecializations, loadSymbolName)
+		: emitSpecializedScalarDispatcher([], loadSymbolName);
 	if (needsFullResume) {
 		// Branch flips need graph subscriptions and range replacement: start the
 		// full resume runtime once, mark the container so the inline resumer
@@ -323,7 +323,7 @@ function emitResumeContainerEvent(
 			fullResumeHandoff,
 			scalarDispatcher,
 			'export async function resumeContainerEvent(input) {',
-			'	if (input.eventRecord) {',
+			'	if (marklessScalarSpecializedAction(input)) {',
 			'		await marklessResumeSpecializedScalarEvent(input);',
 			'		return;',
 			'	}',
@@ -348,7 +348,7 @@ type ScalarSpecialization = {
 	readonly cellIndex: number;
 	readonly hostIndex: number;
 	readonly hostTagName: string;
-	readonly hasSyncPolicy: boolean;
+	readonly syncPolicy: unknown;
 	readonly write: { readonly kind?: string; readonly value?: unknown; readonly valueKind?: string; readonly updateOperator?: string };
 	readonly textUpdates: ReadonlyArray<{ readonly hostNodeId: string; readonly index: number; readonly tagName: string; readonly prefix?: string }>;
 };
@@ -392,29 +392,42 @@ function scalarDispatcherSpecializations(input: {
 			cellIndex,
 			hostIndex: host.index,
 			hostTagName: String(host.tagName ?? '*'),
-			hasSyncPolicy: !!event?.syncPolicy,
+			syncPolicy: event?.syncPolicy ?? null,
 			write: plan.write,
 			textUpdates,
 		}];
 	});
 }
 
-function emitSpecializedScalarDispatcher(actions: ReadonlyArray<ScalarSpecialization>): string {
+function emitSpecializedScalarDispatcher(actions: ReadonlyArray<ScalarSpecialization>, loadSymbolName: string): string {
 	return [
 		'async function marklessResumeSpecializedScalarEvent(input) {',
-		...actions.flatMap((action) => [
-			`	if (input.eventRecord?.hostNodeId === ${JSON.stringify(action.hostNodeId)} && input.eventRecord.eventName === ${JSON.stringify(action.eventName)} && input.event.type === ${JSON.stringify(action.eventName)}) {`,
-			'		try {',
-			`			return await ${action.name}(input);`,
-			'		} catch (error) {',
-			'			if (error?.code === "MARKLESS_SCALAR_SPECIALIZED_ESCALATE") return marklessScalarSpecializedFallback(input, error.site ?? "escalate");',
-			'			throw error;',
-			'		}',
-			'	}',
-		]),
+		'	const action = marklessScalarSpecializedAction(input);',
+		'	if (action) {',
+		'		try {',
+		'			return await action(input);',
+		'		} catch (error) {',
+		'			if (error?.code === "MARKLESS_SCALAR_SPECIALIZED_ESCALATE") return marklessScalarSpecializedFallback(input, error.site ?? "escalate");',
+		'			throw error;',
+		'		}',
+		'	}',
 		'	return marklessScalarSpecializedFallback(input, "event-match");',
 		'}',
-		...actions.map(emitScalarAction),
+		'function marklessScalarSpecializedAction(input) {',
+		...actions.map((action) =>
+			`	if (marklessScalarEventMatches(input, marklessFindElementAtDomOrderIndex(input.root, ${action.hostIndex}, ${JSON.stringify(action.hostTagName)}), ${JSON.stringify(action.eventName)}, ${JSON.stringify(action.hostNodeId)})) return ${action.name};`,
+		),
+		'}',
+		'function marklessScalarEventMatches(input, host, eventName, hostNodeId) {',
+		'	const eventTypeMatches = input.event?.type === eventName;',
+		'	if (!eventTypeMatches) return false;',
+		'	if (input.eventRecord) {',
+		'		return input.eventRecord.hostNodeId === hostNodeId && input.eventRecord.eventName === eventName;',
+		'	}',
+		'	const eventTarget = input.event?.target;',
+		'	return !!host && (host === eventTarget || (!!eventTarget?.nodeType && typeof host.contains === "function" && host.contains(eventTarget)));',
+		'}',
+		...actions.map((action) => emitScalarAction(action, loadSymbolName)),
 		'async function marklessScalarSpecializedFallback(input, site) {',
 		'	if (import.meta.env?.DEV) console.warn(Object.assign(new Error("MARKLESS_SCALAR_SPECIALIZED_FALLBACK"), { code: "MARKLESS_SCALAR_SPECIALIZED_FALLBACK", site }));',
 		'	await marklessFullResumeHandoff({ ...input, document: input.root });',
@@ -454,12 +467,12 @@ function emitSpecializedScalarDispatcher(actions: ReadonlyArray<ScalarSpecializa
 	].join('\n');
 }
 
-function emitScalarAction(action: ScalarSpecialization): string {
+function emitScalarAction(action: ScalarSpecialization, loadSymbolName: string): string {
 	return [
 		`async function ${action.name}(input) {`,
 		`	const cell = payloadState.cells[${action.cellIndex}];`,
 		`	marklessAssertScalarCell(cell, ${JSON.stringify(action.cell)}, ${JSON.stringify(`markless/state cell[${action.cellIndex}]`)});`,
-		`	const host = input.element ?? marklessFindElementAtDomOrderIndex(input.root, ${action.hostIndex}, ${JSON.stringify(action.hostTagName)}) ?? input.event.target;`,
+		`	const host = marklessFindElementAtDomOrderIndex(input.root, ${action.hostIndex}, ${JSON.stringify(action.hostTagName)}) ?? input.element ?? input.event.target;`,
 		'	if (!host) return marklessScalarSpecializedFallback(input, "host");',
 		...action.textUpdates.map((update, index) =>
 			`	const textTarget${index} = marklessFindElementAtDomOrderIndex(input.root, ${update.index}, ${JSON.stringify(update.tagName)});`,
@@ -480,16 +493,17 @@ function emitScalarAction(action: ScalarSpecialization): string {
 		),
 		'		},',
 		'	};',
-		...(action.hasSyncPolicy
+		...(action.syncPolicy
 			? [
-					'	if (input.eventRecord.syncPolicy && !input.syncPolicyAlreadyApplied) {',
+					`	const syncPolicy = input.eventRecord?.syncPolicy ?? ${JSON.stringify(action.syncPolicy)};`,
+					'	if (syncPolicy && !input.syncPolicyAlreadyApplied) {',
 					"		const { runSyncPolicyActions } = await import('@markless/web/inline/sync-policy-core');",
-					'		runSyncPolicyActions(input.eventRecord.syncPolicy, graph, input.event);',
+					'		runSyncPolicyActions(syncPolicy, graph, input.event);',
 					'	}',
 				]
 			: []),
 		...emitScalarWrite(action),
-		`	const symbol = await resolve(input.loadSymbol(${JSON.stringify(action.symbolId)}));`,
+		`	const symbol = await resolve(${loadSymbolName}(${JSON.stringify(action.symbolId)}));`,
 		'	await resolve(symbol({ graph: { ...graph, write() {}, update(update) { const current = graph.read(update.graphNodeId, update.path ?? []); return update.returnValue === "previous" || update.returnValue === "next" ? current : undefined; } }, event: input.event, element: host, getElementHandle: () => undefined }));',
 		'	await graph.flush();',
 		'}',
