@@ -4,6 +4,9 @@ import { renderToString, type ModulePreloadInput } from '@markless/web/render-to
 
 export interface ServerEntryOptions {
 	readonly navigationEntryPath?: string;
+	// 'hash' apps navigate with plain anchors, so the navigation runtime must
+	// always boot; 'path' (default) boots it only when a rendered Link needs it.
+	readonly routerMode?: 'path' | 'hash';
 	readonly resumeEntryPath?: string;
 	readonly routeModulePreloads?: Record<string, readonly ModulePreloadInput[]>;
 	readonly routeSsrModulePreloads?: Record<string, readonly ModulePreloadInput[]>;
@@ -112,6 +115,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 			options.navigationEntryPath,
 			options.routeModulePreloads,
 			options.routeSsrModulePreloads,
+			options.routerMode,
 		);
 		const documentModule = options.documentModuleLoader
 			? ((await options.documentModuleLoader()) as DocumentModule)
@@ -136,6 +140,7 @@ async function renderPageModule(
 	navigationEntryPath: string | undefined,
 	routeModulePreloads: Record<string, readonly ModulePreloadInput[]> | undefined,
 	routeSsrModulePreloads: Record<string, readonly ModulePreloadInput[]> | undefined,
+	routerMode?: 'path' | 'hash',
 ): Promise<PageHtml> {
 	const baseArtifact = pageModule.default;
 	const renderSsr = baseArtifact?.renderSsr ?? pageModule.marklessRenderSsr;
@@ -151,10 +156,13 @@ async function renderPageModule(
 	const output = await renderSsr(props);
 	if (!output) return { bodyHtml: '', headHtml: '' };
 	const routeScript = output.state || output.view ? renderRouteScript(file) : '';
-	const linkBridge =
-		navigationEntryPath && output.html.includes('data-markless-router-link')
-			? renderLinkBridgeScript(navigationEntryPath)
-			: '';
+	const linkBridge = navigationEntryPath
+		? routerMode === 'hash'
+			? renderHashNavigationBootScript(navigationEntryPath)
+			: output.html.includes('data-markless-router-link')
+				? renderLinkBridgeScript(navigationEntryPath)
+				: ''
+		: '';
 	const routedOutput =
 		routeScript || linkBridge
 			? { ...output, html: `${output.html}${routeScript}${linkBridge}` }
@@ -310,6 +318,12 @@ function insertHeadHtml(documentHtml: string, headHtml: string): string {
 
 function renderRouteScript(file: string): string {
 	return `<script type="@markless/core/route">${escapeScriptJson({ file })}</script>`;
+}
+
+// Hash apps navigate with plain anchors and deep-link via location.hash, so the
+// navigation runtime must boot eagerly rather than on first Link interaction.
+function renderHashNavigationBootScript(navigationEntryPath: string): string {
+	return `<script type="module" data-markless-router-hash-boot>import(${JSON.stringify(navigationEntryPath)});</script>`;
 }
 
 function renderLinkBridgeScript(resumeEntryPath: string): string {

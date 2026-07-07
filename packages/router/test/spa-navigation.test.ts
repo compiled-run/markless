@@ -709,6 +709,20 @@ describe('hash mode', () => {
 		expect(update?.route).toMatchObject({ file: 'pages/r/[repo]/issues.tsrx', params: { repo: 'alpha' } });
 	});
 
+	it('intercepts plain-anchor hashChange (no link info) to a matching route', () => {
+		const context = {
+			mode: 'hash',
+			documentModuleLoader: async () => ({}),
+			manifest: buildRouteManifestFromFileIds(['pages/index.tsrx', 'pages/r/[repo]/issues.tsrx']),
+			pageModuleLoaders: {},
+			window: { document: new EventTarget(), location: { href: 'http://marklessrouter.test/#/' } },
+		};
+		const event = navigateEvent('http://marklessrouter.test/#/r/alpha/issues', {
+			hashChange: true,
+		});
+		expect(handleNavigateEvent(event, context as never)).toBe(true);
+	});
+
 	it('does not intercept hashChange to a non-matching hash', () => {
 		const context = {
 			mode: 'hash',

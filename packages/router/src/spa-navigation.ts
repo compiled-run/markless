@@ -211,8 +211,12 @@ function preloadRouteModule(context: NavigationContext, file: string): void {
 }
 
 function routeUrl(event: NavigateEvent, context: NavigationContext) {
+	// In hash mode every same-document hash change toward a matching route is a
+	// route navigation — hash apps navigate with plain anchors, so link info is
+	// not required there.
+	const hashModeNavigation = context.mode === 'hash' && event.hashChange === true;
 	if (
-		!isMarklessRouterNavigation(event) ||
+		(!isMarklessRouterNavigation(event) && !hashModeNavigation) ||
 		event.canIntercept === false ||
 		event.navigationType === 'reload' ||
 		(event.hashChange && context.mode !== 'hash') ||

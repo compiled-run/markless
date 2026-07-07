@@ -459,7 +459,10 @@ function emitSpecializedScalarDispatcher(actions: ReadonlyArray<ScalarSpecializa
 		'			throw error;',
 		'		}',
 		'	}',
-		`	return ${fallbackName}(input, "event-match");`,
+		// No matching markless record: the event is not ours (router links, page
+		// chrome) — pass through silently on fail-mode pages; full-mode pages
+		// hand off so non-scalar records still dispatch.
+		fallback === 'fail' ? '	return;' : `	return ${fallbackName}(input, "event-match");`,
 		'}',
 		fallback === 'fail'
 			? 'function marklessScalarSpecializedHostMiss(_input, site) { return marklessScalarSpecializedError("MARKLESS_SCALAR_SPECIALIZED_HOST_MISS", site); }'

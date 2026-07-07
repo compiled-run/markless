@@ -451,7 +451,7 @@ function virtualModulesPlugin(
 		},
 		load(id) {
 			if (id.startsWith(`\0${SERVER_ENTRY_ID}`)) {
-				return serverEntrySource(root);
+				return serverEntrySource(root, routerMode);
 			}
 			if (id.startsWith(`\0${RESUME_ENTRY_PATH_ID}`)) {
 				return entryPathSource('resumeEntryPath', resumeEntry, RESUME_ENTRY_ID, root);
@@ -486,7 +486,7 @@ function entryPathSource(
 	return `export const ${exportName} = ${JSON.stringify(path)};`;
 }
 
-function serverEntrySource(root: string): string {
+function serverEntrySource(root: string, mode: 'path' | 'hash' = 'path'): string {
 	const query = rootScopeQuery(root);
 	return [
 		`import { createServerEntry } from '@markless/router/vite/runtime/create-server-entry';`,
@@ -503,6 +503,7 @@ function serverEntrySource(root: string): string {
 		`  documentModuleLoader: documentModuleLoaders['/document.tsrx'],`,
 		`  pageModuleLoaders,`,
 		`  routeFileIds,`,
+		`  routerMode: ${JSON.stringify(mode)},`,
 		`});`,
 		`export const fetch = entry.fetch;`,
 		`export default entry;`,
