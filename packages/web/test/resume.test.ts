@@ -2821,15 +2821,20 @@ test('resume runtime materializes keyed repeat row event hosts from the live col
 	await resume.dispatch(event('click', secondRowButton, ''));
 	expect(loadedSymbols).toEqual(['symbol:row', 'symbol:row']);
 
-	// Elements outside the repeat never match row records.
-	await resume.dispatch(event('click', footer, ''));
+	// Elements outside the repeat fail loudly instead of becoming no-op
+	// dispatches.
+	await expect(resume.dispatch(event('click', footer, ''))).rejects.toMatchObject({
+		code: 'MARKLESS_EVENT_DISPATCH_UNMATCHED',
+		phase: 'event',
+		eventName: 'click',
+	});
 	expect(loadedSymbols).toHaveLength(2);
 
 	// A trailing dom-order locator after the repeat rows still resolves.
 	expect(resume.getElement('h1')).toBe(footer);
 });
 
-test('resume runtime materializes zero keyed repeat rows without throwing', async () => {
+test('resume runtime fails loudly when zero keyed repeat rows leave no matching event host', async () => {
 	const { root, firstRowButton, view, loadedSymbols, loadSymbol } = keyedRepeatFixture({
 		rowEvents: [{ hostPath: [1], eventName: 'click', symbolIds: ['symbol:row'] }],
 	});
@@ -2840,7 +2845,11 @@ test('resume runtime materializes zero keyed repeat rows without throwing', asyn
 	const resume = createResumeRuntime({ root, graph, view, loadSymbol });
 
 	await resume.start();
-	await resume.dispatch(event('click', firstRowButton, ''));
+	await expect(resume.dispatch(event('click', firstRowButton, ''))).rejects.toMatchObject({
+		code: 'MARKLESS_EVENT_DISPATCH_UNMATCHED',
+		phase: 'event',
+		eventName: 'click',
+	});
 	expect(loadedSymbols).toEqual([]);
 });
 
@@ -3536,7 +3545,11 @@ test('resume runtime rewires arm records across branch flips', async () => {
 	graph.write({ graphNodeId: 'state:label', value: 'b' });
 	await graph.flush();
 	expect(loadedSymbols.filter((id) => id === 'symbol:arm-text')).toHaveLength(0);
-	await resume.dispatch(event('click', armButton, ''));
+	await expect(resume.dispatch(event('click', armButton, ''))).rejects.toMatchObject({
+		code: 'MARKLESS_EVENT_DISPATCH_UNMATCHED',
+		phase: 'event',
+		eventName: 'click',
+	});
 	expect(loadedSymbols.filter((id) => id === 'symbol:arm-click')).toHaveLength(0);
 
 	// Flip back to arm 0: its records are live again against the fresh DOM.

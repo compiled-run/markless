@@ -2,7 +2,7 @@ import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serial
 import type { DomJournalEntry } from '@markless/runtime';
 import type { RuntimeGraph } from '@markless/runtime';
 import type { CsrRenderContainer, CsrRenderOptions, CsrRenderOutput } from './render.ts';
-import type { ResumeRuntime, ResumeSymbol } from './resume.ts';
+import type { ResumeRuntime, ResumeRuntimeInput, ResumeSymbol } from './resume.ts';
 
 type ExecutionLogGlobal = typeof globalThis & {
 	__mxLog?: Set<string>;
@@ -16,7 +16,10 @@ export async function renderCsrRuntime(input: {
 	const { output, options } = input;
 	const state = output.state ?? emptyStatePayload();
 	const view = output.view ?? emptyViewPayload();
-	const loadSymbol = output.loadSymbol ?? options.loadSymbol ?? missingLoadSymbol;
+	const loadSymbol = withCsrCallbackSymbols(
+		output.loadSymbol ?? options.loadSymbol ?? missingLoadSymbol,
+		view,
+	);
 
 	const graph =
 		output.graph ??
@@ -123,11 +126,46 @@ async function applyDefaultCsrDomJournal(
 					rangeAnchor[1] === 'branch'
 						? runtime.getBranch(rangeAnchor[2]!)
 						: runtime.getAsyncBoundary(rangeAnchor[2]!);
-				return rangeAnchor[3] === 'end' ? record?.endAnchor : record?.startAnchor;
+				const target = rangeAnchor[3] === 'end' ? record?.endAnchor : record?.startAnchor;
+				if (!target) throw missingCsrJournalTargetError(String(locator));
+				return target;
 			}
 			return runtime.getElement(String(locator));
 		},
 	});
+}
+
+function withCsrCallbackSymbols(
+	loadSymbol: ResumeRuntimeInput['loadSymbol'],
+	view: ProtocolViewPayload,
+): ResumeRuntimeInput['loadSymbol'] {
+	const callbacks = (view as ProtocolViewPayload & {
+		readonly __marklessCsrCallbacks?: Readonly<Record<string, (event: unknown) => unknown>>;
+	}).__marklessCsrCallbacks;
+	if (!callbacks || Object.keys(callbacks).length === 0) return loadSymbol;
+	return (symbolId) => {
+		const callback = callbacks[symbolId];
+		if (!callback) return loadSymbol(symbolId);
+		return async (context) => {
+			const event = context.event as Record<string, unknown> | undefined;
+			if (event) event.__marklessCsrCallbackDispatched = true;
+			const result = callback(context.event);
+			if (isPromiseLike(result)) await result;
+		};
+	};
+}
+
+function missingCsrJournalTargetError(locator: string): Error {
+	const error = new Error(
+		`MARKLESS_CSR_DOM_JOURNAL_TARGET_MISSING: CSR DOM journal could not resolve ${locator}.`,
+	) as Error & Record<string, unknown>;
+	error.name = 'RuntimeResumeError';
+	error.code = 'MARKLESS_CSR_DOM_JOURNAL_TARGET_MISSING';
+	error.phase = 'runtime';
+	error.locator = locator;
+	error.dispatchModuleId = 'web:render-csr';
+	error.docsUrl = 'https://markless.dev/errors/MARKLESS_CSR_DOM_JOURNAL_TARGET_MISSING';
+	return error;
 }
 
 function stringifyDomValue(value: unknown): string {
@@ -172,6 +210,14 @@ function emptyViewPayload(): ProtocolViewPayload {
 
 function missingLoadSymbol(symbolId: string): ResumeSymbol {
 	throw new Error(`Cannot load async symbol ${symbolId} without a generated symbol resolver.`);
+}
+
+function isPromiseLike<T>(value: T | PromiseLike<T>): value is PromiseLike<T> {
+	return (
+		value !== null &&
+		(typeof value === 'object' || typeof value === 'function') &&
+		typeof (value as { readonly then?: unknown }).then === 'function'
+	);
 }
 
 // CSR mounts share the resume graph wiring so async boundary runners load
