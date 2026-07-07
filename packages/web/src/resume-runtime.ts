@@ -1,6 +1,6 @@
 import type { DomJournalResult } from '@markless/runtime';
 import type {
-	ResumeBehaviorRecord, ResumeDispatchOptions, ResumeDomElement, ResumeDomEvent, ResumePreparedCore, ResumeRuntime, ResumeRuntimeInput,
+	ResumeDispatchOptions, ResumeDomElement, ResumeDomEvent, ResumePreparedCore, ResumeRuntime, ResumeRuntimeInput,
 } from './resume-types.ts';
 
 const SHARED_PATCH_EVENT_TYPE = 'async:shared-patch';

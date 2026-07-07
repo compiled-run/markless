@@ -480,7 +480,7 @@ function addTransitiveImports(
 	let changed = true;
 	while (changed) {
 		changed = false;
-		for (const path of [...matches]) {
+		for (const path of matches) {
 			const code = chunks.get(path);
 			if (!code) continue;
 			changed = addStaticImports(matches, code) || changed;

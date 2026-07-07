@@ -4,7 +4,7 @@ import {
 	type EncodedPayloadScripts,
 	type RuntimePayloadType,
 } from '../../serializer/src/protocol-client.ts';
-import type { ResumeDomElement, ResumeRuntimeInput } from './resume.ts';
+import type { ResumeRuntimeInput } from './resume.ts';
 import { getAlreadyResumedPayload } from './payload-resume-registry.ts';
 import {
 	decodePayloadScripts,

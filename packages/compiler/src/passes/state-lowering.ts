@@ -248,7 +248,7 @@ function templateExpressionGraphReadSource(
 }
 
 function isCompositeTemplateExpression(source: string): boolean {
-	return /[?:+\-*\/%<>=!&|()[\]{}]/.test(source);
+	return /[?:+\-*/%<>=!&|()[\]{}]/.test(source);
 }
 
 function sourceContainsIdentifier(source: string, identifier: string): boolean {

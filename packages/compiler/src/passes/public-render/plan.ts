@@ -1,37 +1,16 @@
-import { isEventAttribute, normalizeEventName, parseModule } from '@tsrx/core';
-import { asNodes, childNodes, getIdentifierName, walkNode, type AnyNode } from '../../ast/nodes.ts';
-import { expressionSource } from '../../ast/source.ts';
+import { parseModule } from '@tsrx/core';
+import { asNodes, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import {
-	escapeAttribute,
-	escapeHtml,
-	getComponentFunction,
-	getDynamicTagExpression,
-	getElementAttributes,
-	getElementTagName,
-	isHostTagName,
 	isIgnorableStaticTextNode as isIgnorableTextNode,
 	isPlainHostTemplateNode,
-	isSpreadAttribute,
-	isStaticTextNode,
-	staticTextValue,
-	trimmedStaticTextValue,
-	unwrapExpressionContainer,
-} from '../../ast/tsrx.ts';
+	} from '../../ast/tsrx.ts';
 import {
 	graphBindingMap,
 	resolveGraphPath,
 	semanticAliasMap,
-	splitStaticGraphPath,
 } from '../../artifact-helpers/graph-paths.ts';
 import {
-	childrenOpacityDiagnostic,
-	conditionalComponentRootDiagnostic,
-	noRenderableRootDiagnostic,
-	repeatRowStateScopeUnsupportedDiagnostic,
-	undeclaredTemplateReadDiagnostic,
-	unsupportedRenderBodyDiagnostic,
 	unsupportedRenderConstructDiagnostic,
-	unsupportedRenderRootDiagnostic,
 } from './diagnostics.ts';
 import { collectStyleScopes } from './style-scopes.ts';
 import { collectAsyncBoundaryNodes } from './async-boundaries.ts';
@@ -44,24 +23,15 @@ import { branchRenderDiagnostics, collectChildrenOpacityDiagnostics, collectUnde
 import { parseJavaScriptModule } from '../../js-ast.ts';
 import { extractedSyncPolicyActionCalls } from '../semantic-graph/collect-sync-policy.ts';
 import type {
-	PayloadKeyedRepeat,
 	PlannedSymbol,
 	PublicRenderPlanArtifact,
 	PublicRenderPlanAsyncBoundaryGate,
 	PublicRenderPlanBranchArmPart,
 	PublicRenderPlanBranchGate,
-	PublicRenderPlanClassWrite,
-	PublicRenderPlanEventControl,
 	PublicRenderPlanInput,
 	PublicRenderPlanKeyedRepeat,
 	PublicRenderPlanRepeatGate,
-	PublicRenderPlanStaticEventControl,
-	PublicRenderPlanStaticTextWrite,
-	PublicRenderPlanTextWrite,
-	PublicRenderPlanUnsupportedReason,
 	SemanticGraphArtifact,
-	SemanticGraphBinding,
-	SemanticKeyedRepeat,
 	SemanticSyncPolicy,
 	SemanticSyncPolicyAction,
 } from '../../artifacts.ts';

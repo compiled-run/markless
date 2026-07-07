@@ -56,7 +56,10 @@ function applyKeyedRepeatRowOrder(graph: RuntimeGraph, repeat: ResumeKeyedRepeat
 	const nextRows: ResumeDomElement[] = [];
 	for (const item of readKeyedRepeatCollection(graph, repeat)) { const rowRoot = rowRootsByKey.get(repeatItemKey(item, repeat)); if (!rowRoot) return; nextRows.push(rowRoot); }
 	const mutableParent = parent as ResumeDomElement & { readonly appendChild?: (node: ResumeDomElement) => unknown; readonly insertBefore?: (node: ResumeDomElement, before: unknown) => unknown };
-	for (const rowRoot of nextRows) mutableParent.appendChild ? mutableParent.appendChild(rowRoot) : mutableParent.insertBefore?.(rowRoot, null);
+	for (const rowRoot of nextRows) {
+		if (mutableParent.appendChild) mutableParent.appendChild(rowRoot);
+		else mutableParent.insertBefore?.(rowRoot, null);
+	}
 }
 export function readKeyedRepeatCollection(graph: Pick<RuntimeGraph, 'read'>, repeat: ResumeKeyedRepeatRecord): ReadonlyArray<unknown> {
 	if (!repeat.collectionGraphNodeId) return [];

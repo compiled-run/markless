@@ -137,9 +137,6 @@ export function Badge() @{
 }
 `;
 
-function countOccurrences(source: string, needle: string): number {
-	return source.split(needle).length - 1;
-}
 
 function helperImports(source: string): string[] {
 	return [...source.matchAll(/^import \{ ([^}]+) \} from '@markless\/web\/fns\/[^']+';/gm)]

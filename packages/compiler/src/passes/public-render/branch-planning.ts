@@ -1,11 +1,9 @@
-import { isEventAttribute, normalizeEventName, parseModule } from '@tsrx/core';
+import { isEventAttribute } from '@tsrx/core';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource } from '../../ast/source.ts';
 import {
 	escapeAttribute,
 	escapeHtml,
-	getComponentFunction,
-	getDynamicTagExpression,
 	getElementAttributes,
 	getElementTagName,
 	isHostTagName,
@@ -13,43 +11,15 @@ import {
 	isPlainHostTemplateNode,
 	isSpreadAttribute,
 	isStaticTextNode,
-	staticTextValue,
 	trimmedStaticTextValue,
 	unwrapExpressionContainer,
 } from '../../ast/tsrx.ts';
 import {
-	graphBindingMap,
 	resolveGraphPath,
 	semanticAliasMap,
-	splitStaticGraphPath,
 } from '../../artifact-helpers/graph-paths.ts';
-import {
-	childrenOpacityDiagnostic,
-	conditionalComponentRootDiagnostic,
-	noRenderableRootDiagnostic,
-	repeatRowStateScopeUnsupportedDiagnostic,
-	undeclaredTemplateReadDiagnostic,
-	unsupportedRenderBodyDiagnostic,
-	unsupportedRenderConstructDiagnostic,
-	unsupportedRenderRootDiagnostic,
-} from './diagnostics.ts';
-import { collectStyleScopes } from './style-scopes.ts';
 import type {
-	PayloadKeyedRepeat,
-	PlannedSymbol,
-	PublicRenderPlanArtifact,
-	PublicRenderPlanAsyncBoundaryGate,
 	PublicRenderPlanBranchArmPart,
-	PublicRenderPlanBranchGate,
-	PublicRenderPlanClassWrite,
-	PublicRenderPlanEventControl,
-	PublicRenderPlanInput,
-	PublicRenderPlanKeyedRepeat,
-	PublicRenderPlanRepeatGate,
-	PublicRenderPlanStaticEventControl,
-	PublicRenderPlanStaticTextWrite,
-	PublicRenderPlanTextWrite,
-	PublicRenderPlanUnsupportedReason,
 	SemanticGraphBinding,
 } from '../../artifacts.ts';
 import type { AssignedHosts } from './host-locators.ts';

@@ -7,7 +7,6 @@ import type {
 import {
 	dirtyPathForGraphWrite,
 	findLastSharedReturnProperty,
-	readPath,
 	writePath,
 } from './graph-core.ts';
 

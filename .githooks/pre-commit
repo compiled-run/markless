@@ -1,0 +1,11 @@
+#!/bin/sh
+# Block commits that introduce lint errors or unused imports/vars.
+# Managed via: git config core.hooksPath .githooks (set by pnpm prepare).
+pnpm exec vp lint --deny-warnings 2>/dev/null
+status=$?
+if [ $status -ne 0 ]; then
+	echo ""
+	echo "pre-commit: vp lint failed (unused imports/vars or lint errors)."
+	echo "Fix with: pnpm exec vp lint --fix --fix-suggestions --fix-dangerously"
+	exit $status
+fi

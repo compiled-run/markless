@@ -36,7 +36,8 @@ export function createBehaviorRuntime(input: {
 	function runHostCleanups(hostNodeId: string, kind?: CleanupKind): void {
 		const cleanups = hostCleanups.get(hostNodeId) ?? [], remaining = kind ? cleanups.filter((entry) => entry.kind !== kind) : [];
 		for (const entry of [...cleanups].reverse()) if (!kind || entry.kind === kind) entry.cleanup();
-		remaining.length > 0 ? hostCleanups.set(hostNodeId, remaining) : hostCleanups.delete(hostNodeId);
+		if (remaining.length > 0) hostCleanups.set(hostNodeId, remaining);
+		else hostCleanups.delete(hostNodeId);
 	}
 	function disposeBehaviorHost(hostNodeId: string): void {
 		const visible = visibleElementsByHostId.get(hostNodeId);

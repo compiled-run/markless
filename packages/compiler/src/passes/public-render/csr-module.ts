@@ -3,7 +3,7 @@ import { emitHtmlNode } from './html.ts';
 import { renderBodyLines } from './render-body.ts';
 import { emitCatalogHelperImports, stateRuntimeImports } from './runtime-helpers.ts';
 import { emitSameModuleCsrComponents } from './same-module.ts';
-import { callbackSymbolIds, componentEdgesFor, componentReferences, destructureProps, emitComponentImport, emitValueImport, isFragmentNode, publicRenderValueImports, stateEntries, staticHostLocators, joinSsrExpressions, moduleScopeLines } from './shared.ts';
+import { callbackSymbolIds, componentEdgesFor, componentReferences, destructureProps, emitComponentImport, emitValueImport, isFragmentNode, publicRenderValueImports, stateEntries, staticHostLocators, moduleScopeLines } from './shared.ts';
 import { collectCsrPropEvents } from './component-wiring.ts';
 import type { CsrRenderContext, PublicRenderRoot } from './types.ts';
 

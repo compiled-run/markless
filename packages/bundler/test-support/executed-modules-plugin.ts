@@ -25,7 +25,7 @@ export function executedModulesPlugin(): Plugin {
 }
 
 export function normalizedRuntimeModuleId(id: string): string | null {
-	const clean = id.replace(/\0/g, '').replace(/\\/g, '/').replace(/[?#].*$/, '');
+	const clean = id.replaceAll('\0', '').replace(/\\/g, '/').replace(/[?#].*$/, '');
 	const webIndex = clean.indexOf(WEB_SRC);
 	if (webIndex >= 0) return packageRelativeId('web', clean.slice(webIndex + WEB_SRC.length));
 	const coreIndex = clean.indexOf(CORE_SRC);

@@ -5,7 +5,6 @@ import { isIgnorableJsxTextNode as isIgnorableTextNode } from '../../ast/tsrx.ts
 import type { PublicRenderRoot } from './types.ts';
 
 type GraphBinding = PublicRenderModuleInput['semanticGraph']['graphBindings'][number];
-type ComponentEdge = PublicRenderModuleInput['semanticGraph']['componentEdges'][number];
 const loweredFrameworkCalls = new Set(['computed', 'element', 'handler']);
 export function renderBodyLines(
 	input: PublicRenderModuleInput,
@@ -57,17 +56,6 @@ export function renderBodyLines(
 	return indentLines(lines);
 }
 
-function moduleScopeLines(source: string, filename: string): string[] {
-	const ast = parseModule(source, filename) as unknown as AnyNode;
-	return asNodes(ast.body).flatMap((statement) => {
-		if (statement.type === 'ImportDeclaration' || getComponentFunction(statement)) return [];
-		const declaration = statement.type === 'ExportNamedDeclaration' ? (statement.declaration as AnyNode | undefined) : statement;
-		if (!declaration) return [];
-		if (declaration.type !== 'VariableDeclaration' && declaration.type !== 'FunctionDeclaration' && declaration.type !== 'ClassDeclaration') return [];
-		const sourceText = expressionSource(declaration, source);
-		return sourceText ? [sourceText] : [];
-	});
-}
 
 function computedDeclarationLine(
 	statement: AnyNode,

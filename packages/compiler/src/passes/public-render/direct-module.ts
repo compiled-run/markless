@@ -52,7 +52,7 @@ export function emitDirectPublicRenderModule(input: {
 	const useSingleRepeatClassValue =
 		hasSingleRepeat && input.publicRenderPlan.keyedRepeats[0]?.classWrites.length === 1;
 	const repeatStateName = hasSingleRepeat ? 'repeatState0' : null;
-	const hasStaticEvents = input.publicRenderPlan.staticEventControls.length > 0;
+	
 	const hasStaticTextWrites = input.publicRenderPlan.staticTextWrites.length > 0;
 	const componentFactory = emitComponentFactory(componentName, {
 		repeatSyncCall: publicRepeatSyncCall(

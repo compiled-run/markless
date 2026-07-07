@@ -123,7 +123,7 @@ function hasRuntimeImport(statement: string): boolean {
 	const normalized = statement.replace(/\s+/g, ' ').trim();
 	if (/^(import|export) type\b/.test(normalized)) return false;
 	if (/^import ['"]/.test(normalized)) return true;
-	if (/^import \* as /.test(normalized)) return true;
+	if (normalized.startsWith('import * as ')) return true;
 	if (/^import [^{]/.test(normalized)) return true;
 
 	const bindings = /^(?:import|export) \{(?<bindings>.*)\} from /.exec(normalized)?.groups

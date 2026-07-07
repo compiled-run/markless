@@ -364,7 +364,7 @@ test('event-only scalar lean row route dispatches scalar writes and ignores hand
 		loadSymbol(symbolId) {
 			if (symbolId === 'symbol:row') {
 				return ({ graph, locals }) => {
-					graph.write({ graphNodeId: 'state:chosen', value: (locals?.card as { readonly key: string }).key });
+					graph.write({ graphNodeId: 'state:chosen', value: (locals!.card as { readonly key: string }).key });
 					return { type: 'setText', locator: 'hOutput', value: 'handler-return-ignored' };
 				};
 			}
