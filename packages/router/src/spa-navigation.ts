@@ -165,6 +165,11 @@ async function renderRoute(url: URL, context: NavigationContext, signal?: AbortS
 		}
 		const html = await response.text();
 		if (signal?.aborted) return;
+		// The JS realm survives document.write: tell live runtimes to tear down
+		// their container listeners before the new document takes over.
+		(context.window as { dispatchEvent?: (event: Event) => void }).dispatchEvent?.(
+			new Event('markless-router:before-document-swap'),
+		);
 		const swapDocument = context.window.document;
 		swapDocument.open();
 		swapDocument.write(html);

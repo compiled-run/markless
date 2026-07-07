@@ -5215,3 +5215,35 @@ export default function Page() @{
 	expect(result.publicRenderModule.csrExportName).toBe('marklessRenderCsr');
 	expect(result.publicRenderModule.csrModuleSource).toContain('./shell.tsrx');
 });
+
+test('event-handler symbol modules import every referenced module import (need 13 tail)', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/App.tsrx',
+		source: `import { state, computed } from '@markless/core';
+import { Shell } from './shell.tsrx';
+import { sendJson, currentActor, nextIssueId } from './lib.ts';
+
+export default function Page() @{
+	const model = computed(async () => ({ view: { n: 1 } }));
+	<div class="app">
+		@try {
+			<Shell actors={model.view}>
+				<button data-s onClick={async () => {
+					const title = document.getElementById('new-title').value.trim();
+					if (!title) return;
+					const id = nextIssueId(model.view);
+					await sendJson('POST', '/api/x', { id, title, author: currentActor() });
+					location.hash = '#/done/' + id;
+				}}>Go</button>
+			</Shell>
+		} @pending { <p>L</p> } @catch { <p>B</p> }
+	</div>
+}`,
+		symbols: [],
+	});
+
+	const handler = result.symbolModules.modules.find((module) => module.symbolId === 'symbol:0');
+	expect(handler?.source).toContain('nextIssueId');
+	expect(handler?.source).toContain("import { sendJson }");
+	expect(handler?.source).toContain("import { currentActor }");
+});

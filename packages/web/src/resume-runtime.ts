@@ -136,6 +136,21 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 				receiveSharedPatch,
 				sharedPatchEventType: SHARED_PATCH_EVENT_TYPE,
 			});
+			// document.write swaps replace the DOM but keep the JS realm: this
+			// runtime's container listeners would keep handling the NEXT page's
+			// events with THIS page's symbol resolver. The router announces the
+			// swap; tear down before the new document takes over (need 13 tail).
+			const swapHost = globalThis as {
+				addEventListener?: (type: string, listener: () => void, options?: { once: boolean }) => void;
+				removeEventListener?: (type: string, listener: () => void) => void;
+			};
+			if (swapHost.addEventListener) {
+				const teardown = () => dispose();
+				swapHost.addEventListener('markless-router:before-document-swap', teardown, { once: true });
+				storeContainerSubscription(() =>
+					swapHost.removeEventListener?.('markless-router:before-document-swap', teardown),
+				);
+			}
 		}
 	return {
 		start,
