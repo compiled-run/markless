@@ -144,13 +144,25 @@ export function createMarklessRolldownPlugin(input: {
 			return outputDefaults(output, getEnvironment(this));
 		},
 		async resolveId(source, importer) {
-			// Emitted modules import runtime catalog functions as '@markless/web/fns/*'.
+			// Emitted modules import runtime catalog functions as '@markless/web/fns/*'
+			// and conditional inline helpers as '@markless/web/inline/*'.
 			// Apps depend on @markless/core only, so the bundler resolves the catalog
 			// from its own dependency on @markless/web (generated-code-only surface).
 			if (source.startsWith('@markless/web/fns/')) {
 				const resolved = import.meta.resolve(source);
 				if (resolved?.startsWith('file://')) {
 					return { id: decodeURIComponent(resolved.slice('file://'.length)) };
+				}
+			}
+			if (source.startsWith('@markless/web/inline/')) {
+				const resolvedRoot = import.meta.resolve('@markless/web');
+				if (resolvedRoot?.startsWith('file://') && resolvedRoot.endsWith('/index.ts')) {
+					const helperPath = source.slice('@markless/web/'.length);
+					return {
+						id: decodeURIComponent(
+							resolvedRoot.slice('file://'.length, -'index.ts'.length) + `${helperPath}.ts`,
+						),
+					};
 				}
 			}
 			const normalized = normalizeVirtualId(source);

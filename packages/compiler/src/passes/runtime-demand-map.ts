@@ -26,11 +26,8 @@ const DISPATCH_CORE = [
 	'web/runtime-error-reporting',
 ];
 const SCALAR_LEAN_DISPATCH_CORE = [
-	'web/event-only-lean/scalar-core',
-	'web/fns/scalar-core-graph',
-	// The thin router (post tier collapse) pulls shared lean glue + the error
-	// reporting enrichment on every lean dispatch.
-	'web/event-only-lean/lean-shared',
+	'web/fns/write-scalar',
+	'web/fns/update-text',
 	'web/runtime-error-reporting',
 ];
 const ROW_LEAN_DISPATCH_CORE = [
@@ -144,10 +141,13 @@ function scalarCoreEventKeys(resolver: SymbolResolverPlan, view: ProtocolViewPay
 					return (
 						symbol?.kind === 'event-handler' &&
 						isScalarWriteOnlyEventSymbol(symbol) &&
+						syncPolicyGraphNodeIds(event.syncPolicy).every((graphNodeId) =>
+							graphNodeId === symbol.writes?.[0]?.graphNodeId
+						) &&
 						!writesDemandNonTextRuntime(symbol.writes ?? [], view) &&
 						textDomUpdatesForWrites(symbol.writes ?? [], view).every((update) => {
 							const updateSymbol = update.symbolId ? symbolsById.get(update.symbolId) : undefined;
-							return updateSymbol?.kind === 'dom-update' && isTextUpdateSymbol(updateSymbol);
+							return updateSymbol?.kind === 'dom-update' && isScalarTextUpdateSymbol(updateSymbol);
 						})
 					);
 				})
@@ -184,7 +184,7 @@ function isScalarOnlyKeyedRepeatModule(resolver: SymbolResolverPlan, view: Proto
 		if (domUpdateSymbolIds.length === 0 || domUpdateSymbolIds.some((symbolId) => !symbolId)) return false;
 		if (!domUpdateSymbolIds.every((symbolId) => {
 			const symbol = symbolsById.get(symbolId!);
-			return symbol?.kind === 'dom-update' && isTextUpdateSymbol(symbol);
+			return symbol?.kind === 'dom-update' && isScalarTextUpdateSymbol(symbol);
 		})) return false;
 	}
 	return true;
@@ -198,18 +198,99 @@ function isScalarWriteOnlyEventSymbol(
 	if ((symbol.moduleImports ?? []).length > 0 || (symbol.elementHandleCalls ?? []).length > 0) return false;
 	const write = symbol.writes?.[0];
 	if (!write || write.path.length !== 0) return false;
-	if (write.operation === 'update') return !!write.updateOperator;
+	if (write.operation === 'update') return !!write.updateOperator && eventHandlerBodyAllowsScalarLeaf(symbol, write);
 	if (write.operation !== 'assign' || write.assignmentOperator) return false;
-	return literalValueSource(write.valueSource) !== null || localPathValueSource(write.valueSource, localNames);
+	if (literalValueSource(write.valueSource) === null && !localPathValueSource(write.valueSource, localNames)) {
+		return false;
+	}
+	return eventHandlerBodyAllowsScalarLeaf(symbol, write);
 }
 
-function isTextUpdateSymbol(symbol: Extract<PlannedSymbol, { readonly kind: 'dom-update' }>): boolean {
+function isScalarTextUpdateSymbol(symbol: Extract<PlannedSymbol, { readonly kind: 'dom-update' }>): boolean {
 	const target = symbol.target;
 	return target?.kind === 'text' &&
-		target.prefix === undefined &&
 		target.suffix === undefined &&
 		target.trueValue === undefined &&
 		target.falseValue === undefined;
+}
+
+function syncPolicyGraphNodeIds(policy: unknown): string[] {
+	if (!policy || typeof policy !== 'object') return [];
+	const branches = Array.isArray((policy as { readonly branches?: unknown }).branches)
+		? (policy as { readonly branches: ReadonlyArray<{ readonly when?: unknown }> }).branches
+		: [policy as { readonly when?: unknown }];
+	return [...new Set(branches.flatMap((branch) => conditionGraphNodeIds(branch.when)))].sort();
+}
+
+function conditionGraphNodeIds(condition: unknown): string[] {
+	if (!condition || typeof condition !== 'object') return [];
+	const typed = condition as {
+		readonly type?: unknown;
+		readonly graphNodeId?: unknown;
+		readonly condition?: unknown;
+		readonly conditions?: ReadonlyArray<unknown>;
+	};
+	if (typed.type === 'graph-truthy' && typeof typed.graphNodeId === 'string') return [typed.graphNodeId];
+	if (typed.type === 'not') return conditionGraphNodeIds(typed.condition);
+	if ((typed.type === 'and' || typed.type === 'or') && Array.isArray(typed.conditions)) {
+		return typed.conditions.flatMap(conditionGraphNodeIds);
+	}
+	return [];
+}
+
+function eventHandlerBodyAllowsScalarLeaf(
+	symbol: Extract<PlannedSymbol, { readonly kind: 'event-handler' }>,
+	write: NonNullable<Extract<PlannedSymbol, { readonly kind: 'event-handler' }>['writes']>[number],
+): boolean {
+	const body = eventHandlerBodySource(symbol.source);
+	const authoredWrite = authoredWriteSource(write);
+	if (!body || !authoredWrite) return false;
+	let remainder = body.replace(authoredWrite, '');
+	for (const parameter of symbol.parameters) {
+		remainder = remainder.replaceAll(`${parameter}.preventDefault();`, '');
+		remainder = remainder.replaceAll(`${parameter}.stopPropagation();`, '');
+	}
+	remainder = remainder.replace(/\breturn\b/g, '');
+	return remainder.replace(/[;\s]/g, '') === '';
+}
+
+function eventHandlerBodySource(source: string): string | null {
+	const arrowIndex = source.indexOf('=>');
+	if (arrowIndex === -1) return null;
+
+	const bodyStart = arrowIndex + 2 + leadingWhitespaceLength(source.slice(arrowIndex + 2));
+	if (bodyStart >= source.length) return null;
+
+	if (source[bodyStart] === '{') {
+		const bodyEnd = source.lastIndexOf('}');
+		if (bodyEnd === -1) return null;
+		return source.slice(bodyStart + 1, bodyEnd).trim();
+	}
+
+	return `return ${source.slice(bodyStart).trim()};`;
+}
+
+function authoredWriteSource(
+	write: NonNullable<Extract<PlannedSymbol, { readonly kind: 'event-handler' }>['writes']>[number],
+): string | null {
+	if (write.operation === 'assign') {
+		const operator = write.assignmentOperator ?? '=';
+		if (!write.valueSource) return null;
+		return `${write.source} ${operator} ${write.valueSource}`;
+	}
+
+	if (write.operation === 'update' && write.updateOperator) {
+		return write.prefix
+			? `${write.updateOperator}${write.source}`
+			: `${write.source}${write.updateOperator}`;
+	}
+
+	return null;
+}
+
+function leadingWhitespaceLength(source: string): number {
+	const match = /^\s*/.exec(source);
+	return match ? match[0].length : 0;
 }
 
 function literalValueSource(source: string | undefined): string | null {
@@ -524,7 +605,7 @@ function textUpdatesUseScalarLeafSymbols(
 	const symbolsById = new Map(resolver.symbols.map((symbol) => [symbol.id, symbol]));
 	return textDomUpdatesForWrites(writes, view).every((update) => {
 		const updateSymbol = update.symbolId ? symbolsById.get(update.symbolId) : undefined;
-		return updateSymbol?.kind === 'dom-update' && isTextUpdateSymbol(updateSymbol);
+		return updateSymbol?.kind === 'dom-update' && isScalarTextUpdateSymbol(updateSymbol);
 	});
 }
 

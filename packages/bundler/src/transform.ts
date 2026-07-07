@@ -91,6 +91,8 @@ export async function transformTsrxModule(
 			source: emitResumeModule({
 				payloadId,
 				resolverId,
+				payloadState: compiled.payloadScripts.state,
+				payloadView: compiled.payloadScripts.view,
 				runtimeDemandMap: compiled.runtimeDemandMap,
 				executionLog: input.executionLog,
 				needsFullResume: needsFullResume(compiled.protocolView, compiled.runtimeDemandMap),
