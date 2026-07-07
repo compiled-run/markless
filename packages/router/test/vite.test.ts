@@ -389,6 +389,61 @@ function loadSymbol(file, symbol) {
 	expect(routePreloads['pages/docs.tsrx']).not.toContain('/app/build/home-resume.js');
 });
 
+test('includes the current route resume module closure in ssr modulepreloads', () => {
+	const plugins = flattenPlugins([router()]);
+	const configPlugin = plugins.find((plugin) => plugin.name === 'markless-router:vite');
+	const routePlugin = plugins.find((plugin) => plugin.name === 'markless-router:routes');
+	const routeLoad = hookHandler(routePlugin?.load) as
+		| ((id: string) => string | undefined)
+		| undefined;
+	const resumeChunk = chunk({
+		code: `function loadResumeModule(file) {
+  return file === "pages/docs.tsrx"
+    ? import("./docs-resume.js")
+    : file === "pages/index.tsrx"
+      ? import("./home-resume.js")
+      : undefined;
+}`,
+		dynamicImports: ['build/docs-resume.js', 'build/home-resume.js'],
+		fileName: 'build/resume.js',
+		imports: ['build/resume-runtime.js'],
+		moduleIds: ['/repo/packages/router/src/vite/entries/resume-entry.ts'],
+	});
+
+	routePlugin?.configResolved?.({ base: '/app/', root: '/project' } as never);
+	configPlugin?.configResolved?.({ base: '/app/', root: '/project' } as never);
+	configPlugin?.generateBundle?.call(
+		{ environment: { config: { consumer: 'client' } } },
+		{},
+		{
+			'build/resume.js': resumeChunk,
+			'build/docs.js': chunk({ fileName: 'build/docs.js', moduleIds: ['/project/pages/docs.tsrx'] }),
+			'build/home.js': chunk({ fileName: 'build/home.js', moduleIds: ['/project/pages/index.tsrx'] }),
+			'build/docs-resume.js': chunk({
+				dynamicImports: ['build/docs-click-symbol.js'],
+				fileName: 'build/docs-resume.js',
+				imports: ['build/resume-spine.js'],
+			}),
+			'build/docs-click-symbol.js': chunk({ fileName: 'build/docs-click-symbol.js' }),
+			'build/home-resume.js': chunk({ fileName: 'build/home-resume.js' }),
+			'build/resume-runtime.js': chunk({ fileName: 'build/resume-runtime.js' }),
+			'build/resume-spine.js': chunk({ fileName: 'build/resume-spine.js' }),
+		},
+	);
+
+	const source = routeLoad?.('\0virtual:markless-router/route-preloads');
+	const routePreloadData = JSON.parse(
+		source?.match(/routePreloadData = routePreloadsJson === .* \? (\{.*\}) :/)?.[1] ?? '{}',
+	) as { readonly ssr?: Record<string, string[]> };
+	const ssrPreloads = routePreloadData.ssr ?? {};
+	expect(ssrPreloads['pages/docs.tsrx']).toContain('/app/build/docs-resume.js');
+	expect(ssrPreloads['pages/docs.tsrx']).toContain('/app/build/resume-spine.js');
+	expect(ssrPreloads['pages/docs.tsrx']).toContain('/app/build/docs-click-symbol.js');
+	expect(ssrPreloads['pages/docs.tsrx']).not.toContain('/app/build/home-resume.js');
+	expect(ssrPreloads['pages/index.tsrx']).toContain('/app/build/home-resume.js');
+	expect(ssrPreloads['pages/index.tsrx']).not.toContain('/app/build/docs-resume.js');
+});
+
 function chunk(overrides: {
 	readonly code?: string;
 	readonly dynamicImports?: readonly string[];
