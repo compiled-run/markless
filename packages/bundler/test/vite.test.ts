@@ -52,7 +52,7 @@ describe('Vite adapter structure', () => {
 		const plugin = getAsyncPlugin();
 
 		expect(plugin.name).toBe('vite-plugin-markless');
-		expect(plugin.enforce).toBe('post');
+		expect(plugin.enforce).toBe('pre'); // TSRX must compile before vite>=8.1 builtins parse module code
 		expect(plugin.sharedDuringBuild).toBe(true);
 		expect(plugin.api?.registerBundleGraphAdder).toEqual(expect.any(Function));
 		expect(plugin.api?.registerPreloadGraphEntries).toEqual(expect.any(Function));
@@ -255,7 +255,7 @@ describe('Vite adapter structure', () => {
 		)) as { code: string };
 
 		expect(result.code).toContain('headInjections:');
-		expect(result.code).toContain('"src":"/dev/@vite/client"');
+		expect(result.code).toContain('"src": "/dev/@vite/client"'); // re-print spaces object literals
 		// Dev resume URL points at the SOURCE module so the .tsrx stays in the client
 		// module graph (vite's no-accepting-boundary full-reload depends on it); the
 		// client source module re-exports resumeContainerEvent from the virtual

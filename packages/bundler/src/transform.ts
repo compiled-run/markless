@@ -28,7 +28,11 @@ import { transformSync as oxcTransformSync } from 'rolldown/experimental';
 // virtual modules) parse it as JS. Strip types at emission — Rolldown-native.
 function stripEmittedTypes(code: string): string {
 	try {
-		return oxcTransformSync('markless-emitted.ts', code).code;
+		const out = oxcTransformSync('markless-emitted.ts', code);
+		// transformSync reports failures via `errors` with empty output instead of
+		// throwing (e.g. lib-mode emissions that carry authored TSRX syntax).
+		if (!out.code || (out.errors?.length ?? 0) > 0) return code;
+		return out.code;
 	} catch {
 		// Never make emission fail on the stripper; downstream diagnostics are
 		// more specific about genuinely-invalid code.
