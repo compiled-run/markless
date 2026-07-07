@@ -224,7 +224,16 @@ function ssrHostLocator(node: AnyNode, tagName: string, context: SsrRenderContex
 // behavior) whenever the row shape is not a single all-host-element subtree.
 function emitSsrRepeatRows(node: AnyNode, context: SsrRenderContext): string {
 	const repeat = context.keyedRepeats[context.nextRepeatIndex++];
-	if (!repeat) return '""';
+	if (!repeat) {
+		// No plan exists for this authored @for — today that means it sits inside
+		// an async boundary arm, which repeat planning does not yet traverse
+		// (dashboard-migration ledger need 6). Fail loudly: silently dropping
+		// authored rows cost a full debugging session.
+		throw new Error(
+			'MARKLESS_REPEAT_UNPLANNED: @for inside an @try/@pending/@catch boundary is not supported yet. ' +
+			'Move the repeat outside the async arm or lift the resolved data into page scope.',
+		);
+	}
 	const gate = context.repeatGates.find((item) => item.repeatId === repeat.id);
 	if (!gate?.supported) return '""';
 	if (context.componentEdges.length > 0) return '""';
