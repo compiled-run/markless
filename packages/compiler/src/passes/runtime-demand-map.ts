@@ -29,6 +29,9 @@ const SCALAR_LEAN_DISPATCH_CORE = [
 	'web/fns/write-scalar',
 	'web/fns/update-text',
 	'web/runtime-error-reporting',
+	// Shared helper body for the emitted specialized dispatchers (hoisted so N
+	// actions share one helper instead of duplicating per action).
+	'web/fns/scalar-specialized',
 ];
 const ROW_LEAN_DISPATCH_CORE = [
 	'web/event-only-lean/row',

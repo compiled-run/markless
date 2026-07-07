@@ -97,10 +97,10 @@ export default box(
 		}
 		// T013 consolidated the hot-path leaves into scalar-core (per-module wrapper
 		// tax made separate tiny leaves cost more than one merged module).
-		for (const expected of ['web/event-only-lean/scalar-core']) {
+		for (const expected of ['web/fns/scalar-specialized', 'web/fns/write-scalar']) {
 			if (!executed.includes(expected)) throw new Error(`Expected ${expected}. Saw: ${executed.join(', ')}`);
 		}
-		for (const excluded of ['web/dom-journal', 'web/event-only-graph', 'web/event-only-resume', 'web/event-only-lean/row', 'web/event-only-lean/scalar-resume', 'web/payload', 'web/payload-document']) {
+		for (const excluded of ['web/dom-journal', 'web/event-only-graph', 'web/event-only-resume', 'web/event-only-lean/row', 'web/event-only-lean/scalar-resume', 'web/event-only-lean/scalar-core', 'web/payload', 'web/payload-document']) {
 			if (executed.includes(excluded)) throw new Error(`Unexpected ${excluded}. Saw: ${executed.join(', ')}`);
 		}
 		const instrumentedAfterInteraction = await readScriptRequests(instrumentedPreview);
