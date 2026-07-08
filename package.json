@@ -14,7 +14,7 @@
 		"bench:jsfb:prepare": "node scripts/benchmarks/prepare-jsfb-markless.mjs",
 		"test:compiler": "vp test packages/compiler/test/*.test.ts",
 		"publish": "pnpm --filter '@markless/*' --filter create-markless publish --access public --no-git-checks",
-		"release": "bumpp package.json 'packages/*/package.json' && pnpm build && pnpm run publish && gh release create \"$(git describe --tags --abbrev=0)\" --generate-notes",
+		"release": "node scripts/release/run-release.mjs",
 		"prepare": "git config core.hooksPath .githooks"
 	},
 	"devDependencies": {
