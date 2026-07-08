@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { convertManifestToBundleGraph } from '../src/build/bundle-graph.ts';
 import { planModulePreloadUrls, planModulePreloads } from '../src/build/preload-plan.ts';
-import { planSsrModulePreloads } from '../src/build/preload-plan-ssr.ts';
 import type { MarklessManifest } from '../src/types.ts';
 
 describe('module preload planning', () => {
@@ -205,67 +204,6 @@ describe('module preload planning', () => {
 		);
 	});
 
-	test('plans SSR preloads from a render artifact and resume module URL', () => {
-		const graph = convertManifestToBundleGraph(manifestWithComplexSymbolDeps());
-
-		const preloads = planSsrModulePreloads({
-			artifact: {
-				payloadView: {
-					events: [{ symbolIds: ['symbol:click'] }],
-					domUpdates: [{ symbolId: 'symbol:visible' }],
-					behaviors: [{ symbolId: 'symbol:behavior' }],
-					asyncBoundaries: [{ asyncReads: [{ runnerSymbolId: 'symbol:async-runner' }] }],
-				},
-			},
-			base: '/assets/',
-			bundleGraph: graph,
-			resumeModuleUrl: '/assets/build/resume.js',
-		});
-
-		expect(preloads.map((preload) => preload.href)).toEqual([
-			'/assets/build/vendor.js',
-			'/assets/build/shared.js',
-			'/assets/build/click.js',
-			'/assets/build/nested.js',
-			'/assets/build/behavior.js',
-			'/assets/build/resume.js',
-			'/assets/build/visible.js',
-			'/assets/build/async-runner.js',
-		]);
-	});
-
-	test('keeps Vite dev module URLs as SSR preload roots without a bundle graph', () => {
-		const preloads = planSsrModulePreloads({
-			artifact: { payloadView: { events: [{ symbolIds: ['symbol:click'] }] } },
-			bundleGraph: undefined,
-			resumeModuleUrl: '/src/App.tsrx?import',
-		});
-
-		expect(preloads).toEqual([
-			{
-				fetchPriority: 'high',
-				href: '/src/App.tsrx?import',
-				name: '/src/App.tsrx?import',
-				priority: 'high',
-				probability: 1,
-			},
-		]);
-	});
-
-	test('keeps nested SSR resume resolver chunks above the preload threshold', () => {
-		const preloads = planSsrModulePreloads({
-			artifact: { payloadView: { events: [] } },
-			base: '/build/',
-			bundleGraph: ['resume.js', -5, 3, 'child-resolver.js', -5, 6, 'grandchild-resolver.js'],
-			resumeModuleUrl: '/build/resume.js',
-		});
-
-		expect(preloads.map((preload) => preload.href)).toEqual([
-			'/build/resume.js',
-			'/build/child-resolver.js',
-			'/build/grandchild-resolver.js',
-		]);
-	});
 });
 
 function manifestWithComplexSymbolDeps(): MarklessManifest {

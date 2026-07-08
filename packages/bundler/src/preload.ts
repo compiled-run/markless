@@ -7,7 +7,6 @@ export {
 	type ModulePreloadPriority,
 	type ModulePreloadRoot,
 } from './build/preload-plan.ts';
-export { planSsrModulePreloads, type SsrModulePreloadPlanInput } from './build/preload-plan-ssr.ts';
 export { symbolVirtualModuleSourceFile } from './source-module.ts';
 export {
 	preloadLazySymbolModules,
