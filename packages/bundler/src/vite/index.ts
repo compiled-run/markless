@@ -251,6 +251,17 @@ function configDefaults(
 	options: MarklessViteOptions,
 	internalOptions: InternalMarklessRolldownOptions,
 ) {
+	// Vite builtins (dynamic-import-vars) must never parse raw .tsrx: on
+	// vite >= 8.1 they run before this plugin's transform (found by the
+	// dashboard-migration consumer app on vite-plus 8.1.3).
+	const dynamicImportVars = ((config.build ??= {}).dynamicImportVarsOptions ??= {});
+	const exclude = Array.isArray(dynamicImportVars.exclude)
+		? dynamicImportVars.exclude
+		: dynamicImportVars.exclude
+			? [dynamicImportVars.exclude]
+			: [];
+	dynamicImportVars.exclude = [...exclude, /\.tsrx(?:[?#]|$)/];
+
 	if (config.build?.lib || config.build?.ssr) {
 		return;
 	}

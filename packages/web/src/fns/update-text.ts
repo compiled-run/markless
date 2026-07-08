@@ -5,7 +5,10 @@ type TextUpdateContext = {
 	readonly value?: unknown;
 };
 
-export function marklessUpdateText(context: TextUpdateContext, fallbackHostNodeId: string): {
+export function marklessUpdateText(
+	context: TextUpdateContext,
+	fallbackHostNodeId: string,
+): {
 	readonly type: 'setText';
 	readonly locator: string;
 	readonly value: unknown;

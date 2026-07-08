@@ -1,5 +1,5 @@
 import type { InputOptions, Plugin } from 'rolldown';
-import { isAbsolute, relative, resolve } from 'pathe';
+import { isAbsolute, resolve } from 'pathe';
 import { joinURL, parsePath, withQuery, withoutLeadingSlash } from 'ufo';
 import { type MarklessBuildMetadataBundle, createBuildMetadata } from './build/build-metadata.ts';
 import { MARKLESS_BUILD_PREFIX, MARKLESS_BUNDLE_GRAPH, outputDefaults } from './build/chunking.ts';
@@ -21,7 +21,12 @@ import {
 	injectExecutionLogModuleHook,
 	normalizeExecutionLogMode,
 } from './execution-log.ts';
-import { MARKLESS_VIRTUAL_PREFIX, resumeVirtualModuleId, transformTsrxModule } from './transform.ts';
+import { symbolVirtualModuleSourceFile } from './source-module.ts';
+import {
+	MARKLESS_VIRTUAL_PREFIX,
+	resumeVirtualModuleId,
+	transformTsrxModule,
+} from './transform.ts';
 import type {
 	MarklessEnvironment,
 	MarklessRolldownOptions,
@@ -62,7 +67,6 @@ type InternalMarklessRolldownOptions = MarklessRolldownOptions & {
 const TSRX_SOURCE_FILE = /\.tsrx(?:[?#].*)?$/;
 const MARKLESS_SYMBOL_SOURCE_QUERY_RE = /[?&]markless-symbols(?:[&#]|$)/;
 const MARKLESS_RESUME_SOURCE_QUERY_RE = /[?&]markless-resume(?:[&#]|$)/;
-const SYMBOL_VIRTUAL_ID_RE = /^virtual:markless:symbol:([^:]+):[^:]+$/;
 const RESUME_VIRTUAL_ID_RE = /^virtual:markless:resume:([^:]+)$/;
 const SYMBOL_VIRTUAL_STRING_RE = /(["'`])((?:virtual:markless:symbol:)[^"'`]+)\1/g;
 
@@ -160,14 +164,18 @@ export function createMarklessRolldownPlugin(input: {
 					const helperPath = source.slice('@markless/web/'.length);
 					return {
 						id: decodeURIComponent(
-							resolvedRoot.slice('file://'.length, -'index.ts'.length) + `${helperPath}.ts`,
+							resolvedRoot.slice('file://'.length, -'index.ts'.length) +
+								`${helperPath}.ts`,
 						),
 					};
 				}
 			}
 			const normalized = normalizeVirtualId(source);
 			if (normalized === MARKLESS_EXECUTION_LOG_MODULE_ID) {
-				return { id: resolveVirtualId(MARKLESS_EXECUTION_LOG_MODULE_ID), moduleSideEffects: true };
+				return {
+					id: resolveVirtualId(MARKLESS_EXECUTION_LOG_MODULE_ID),
+					moduleSideEffects: true,
+				};
 			}
 			if (virtualModules.has(normalized)) {
 				return { id: resolveVirtualId(normalized), moduleSideEffects: true };
@@ -194,7 +202,8 @@ export function createMarklessRolldownPlugin(input: {
 					sizesUrl:
 						internalOptions.dev === true
 							? undefined
-							: internalOptions.publicPath?.(MARKLESS_EXECUTION_SIZES) ?? `/${MARKLESS_EXECUTION_SIZES}`,
+							: (internalOptions.publicPath?.(MARKLESS_EXECUTION_SIZES) ??
+								`/${MARKLESS_EXECUTION_SIZES}`),
 				});
 			}
 			const module = virtualModules.get(normalizeVirtualId(id));
@@ -273,7 +282,9 @@ export function createMarklessRolldownPlugin(input: {
 				environment: currentEnvironment,
 			});
 			if (currentEnvironment === 'client' && isResumeSourceRequest(id)) {
-				const resumeModule = transformed.virtualModules.find((module) => module.type === 'resume');
+				const resumeModule = transformed.virtualModules.find(
+					(module) => module.type === 'resume',
+				);
 				if (resumeModule) return { code: resumeModule.source, map: null };
 			}
 
@@ -325,7 +336,9 @@ export function createMarklessRolldownPlugin(input: {
 					},
 				);
 
-				const executionLogInjection = executionLogActivationInjection(internalOptions.executionLog);
+				const executionLogInjection = executionLogActivationInjection(
+					internalOptions.executionLog,
+				);
 				if (executionLogInjection) injectHeadLinks(bundle, [executionLogInjection]);
 				injectHeadLinks(
 					bundle,
@@ -339,7 +352,9 @@ export function createMarklessRolldownPlugin(input: {
 									(output as { type?: string }).type === 'chunk' &&
 									(output as { isEntry?: boolean }).isEntry === true,
 							)
-							.map((chunk) => stripBuildPrefix((chunk as { fileName: string }).fileName)),
+							.map((chunk) =>
+								stripBuildPrefix((chunk as { fileName: string }).fileName),
+							),
 					}),
 				);
 
@@ -348,11 +363,13 @@ export function createMarklessRolldownPlugin(input: {
 					fileName: MARKLESS_BUNDLE_GRAPH,
 					source: JSON.stringify(clientManifest.bundleGraph),
 				});
-				this.emitFile(await createExecutionSizesAsset(
-					manifestBundle,
-					clientManifest,
-					stripBuildPrefix,
-				));
+				this.emitFile(
+					await createExecutionSizesAsset(
+						manifestBundle,
+						clientManifest,
+						stripBuildPrefix,
+					),
+				);
 				// The demand map lives in payload-module exports (tree-shaken from built
 				// pages by design); ship it as a build asset so witness boxes and tooling
 				// can derive allowed execution sets against real builds.
@@ -447,7 +464,9 @@ function registerTransformArtifacts(input: {
 		ids.add(module.id);
 		if (input.environment === 'client' && module.type === 'symbol' && module.symbolId) {
 			input.executionLogEstimatedSizes.set(
-				module.symbolId.startsWith('symbol:') ? module.symbolId : `symbol:${module.symbolId}`,
+				module.symbolId.startsWith('symbol:')
+					? module.symbolId
+					: `symbol:${module.symbolId}`,
 				module.source.length,
 			);
 		}
@@ -491,22 +510,19 @@ function virtualModuleSourceForLoad(
 	);
 }
 
+// Always the /@fs/<absolute> form, even for sources under the Vite root: a
+// root-relative source URL (e.g. /pages/r/[repo]/index.tsrx?import) collides
+// with the app's own route space on framework dev servers (nitro routes it
+// and 404s), which kills the first full-resume wake in dev. Vite serves
+// /@fs URLs for any allowed path and resolves them to the same module-graph
+// entry, so the HMR full-reload contract is unchanged.
 function devBrowserSourceModuleUrl(
 	source: string,
-	root: string | undefined,
+	_root: string | undefined,
 	publicPath: ((fileName: string) => string) | undefined,
 ) {
-	const relativeSource = root ? relative(root, source) : '';
-	const fileName =
-		root && isRootRelativePath(relativeSource)
-			? relativeSource
-			: joinURL('@fs', withoutLeadingSlash(source));
-	const path = withQuery(fileName, { import: null });
+	const path = withQuery(joinURL('@fs', withoutLeadingSlash(source)), { import: null });
 	return publicPath ? publicPath(path) : joinURL('/', path);
-}
-
-function isRootRelativePath(path: string): boolean {
-	return path !== '' && path !== '..' && !path.startsWith('../') && !isAbsolute(path);
 }
 
 function devBrowserVirtualModuleUrl(
@@ -555,8 +571,7 @@ function isResumeSourceRequest(id: string): boolean {
 function sourceForSymbolVirtualImporter(importer: string | undefined): string | null {
 	if (!importer) return null;
 
-	const match = normalizeVirtualId(importer).match(SYMBOL_VIRTUAL_ID_RE);
-	return match?.[1] ? decodeURIComponent(match[1]) : null;
+	return symbolVirtualModuleSourceFile(normalizeVirtualId(importer));
 }
 
 function sourceForResumeVirtualImporter(importer: string | undefined): string | null {
@@ -582,11 +597,29 @@ function executionLogRuntimeModuleId(id: string): string {
 }
 
 function normalizeVirtualId(id: string) {
-	if (id.startsWith('\0')) {
-		return id.slice(1);
-	}
-
-	return id;
+	const bare = id.startsWith('\0') ? id.slice(1) : id;
+	if (!bare.startsWith(MARKLESS_VIRTUAL_PREFIX)) return bare;
+	// Markless virtual ids embed the encodeURIComponent'd source path and END
+	// in .tsrx, so dev requests arrive mangled twice: Vite's import analysis
+	// appends `?import` as if they were assets, and the /@id middleware
+	// decodeURI()s the path — %2F survives (reserved) but %5B/%5D decode to
+	// raw brackets, so ids for pages like pages/r/[repo] come in
+	// half-decoded. Strip the query and re-canonicalize each colon segment to
+	// the registered encoding, or the first full-resume wake in dev 404s on
+	// its payload/view imports.
+	const queryIndex = bare.indexOf('?');
+	const withoutQuery = queryIndex === -1 ? bare : bare.slice(0, queryIndex);
+	const segments = withoutQuery
+		.slice(MARKLESS_VIRTUAL_PREFIX.length)
+		.split(':')
+		.map((segment) => {
+			try {
+				return encodeURIComponent(decodeURIComponent(segment));
+			} catch {
+				return segment;
+			}
+		});
+	return `${MARKLESS_VIRTUAL_PREFIX}${segments.join(':')}`;
 }
 
 function resolveVirtualId(id: string) {
@@ -605,4 +638,8 @@ export { MARKLESS_BUNDLE_GRAPH, MARKLESS_BUILD_PREFIX, outputDefaults } from './
 export { createBuildMetadata } from './build/build-metadata.ts';
 export { convertManifestToBundleGraph, createPreloadGraphAdder } from './build/bundle-graph.ts';
 export { collectHeadLinkInjections } from './build/head-links.ts';
-export { MARKLESS_VIRTUAL_PREFIX, resumeVirtualModuleId, transformTsrxModule } from './transform.ts';
+export {
+	MARKLESS_VIRTUAL_PREFIX,
+	resumeVirtualModuleId,
+	transformTsrxModule,
+} from './transform.ts';

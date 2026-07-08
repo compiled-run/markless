@@ -88,7 +88,7 @@ export function renderSSR(component: unknown): Promise<SsrRenderResult> {
 			'@markless/vitest-browser/ssr-plugin to the browser test project plugins ' +
 			'(before the markless plugin). v1 supports renderSSR(Component) with a ' +
 			'component imported from a separate .tsrx module and no props.',
-		);
+	);
 }
 
 // Marker rewritten by testSSR() into the same Node-side render command as

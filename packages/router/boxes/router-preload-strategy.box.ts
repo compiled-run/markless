@@ -102,14 +102,13 @@ export default box(
 					`Expected current route and docs Link preloads to exclude unrelated sibling route chunks, saw:\n${timeline(forbiddenPreloads)}`,
 				);
 			}
-			// KNOWN GAP (owner-ruled descope 2026-07-06, per-action-runtime close): the
-			// plan-as-code emission gives each route's container its own chunk, and the
-			// route-navigation preload plan does not yet root the DESTINATION route's
-			// emitted resume chunk (T017/T017b narrowed but did not close it). Navigation
-			// works; the cost is one waterfall fetch on route change. Follow-on:
-			// route-table dynamic edge for destination containers. Allowance is exactly
-			// one fetch; anything more still fails.
-			await expectLimitedNewBuildJs(page, receipt, 'post-Link-click JS (1 known destination-resume fetch)', 1, async () => {
+			// Client-side route swaps (D7): the destination page's chunks are part
+			// of the startup preload plan (visible Link targets), so Link
+			// navigation renders client-side with ZERO new JS fetches and no
+			// server document round trip. The former one-fetch destination-resume
+			// allowance (owner-ruled descope 2026-07-06) closed when entry chunks
+			// started rooting preload plans through the dynamic-only edge kind.
+			await expectNoNewBuildJs(page, receipt, 'post-Link-click JS', async () => {
 				await page.click(DOCS_LINK, WAIT);
 				await expect.page.text(page, 'h1', 'Docs', WAIT);
 				await expect.page.text(page, MDX_COUNTER, 'MDX Count 0', WAIT);
@@ -359,10 +358,16 @@ function publicBuildPath(path: string): string | undefined {
 	return index === -1 || !path.endsWith('.js') ? undefined : path.slice(index);
 }
 
-async function observabilityChunkHrefs(chunks: ReadonlyMap<string, string>, preview: Preview): Promise<string[]> {
+async function observabilityChunkHrefs(
+	chunks: ReadonlyMap<string, string>,
+	preview: Preview,
+): Promise<string[]> {
 	const hrefs = new Set<string>();
 	for (const [moduleId, entry] of Object.entries(await executionSizes(preview))) {
-		if (typeof entry?.chunk === 'string' && isObservabilityChunk(chunks, moduleId, entry.chunk)) {
+		if (
+			typeof entry?.chunk === 'string' &&
+			isObservabilityChunk(chunks, moduleId, entry.chunk)
+		) {
 			hrefs.add(`/${entry.chunk}`);
 		}
 	}
@@ -380,15 +385,24 @@ async function observabilityChunkHrefs(chunks: ReadonlyMap<string, string>, prev
 	return [...hrefs].sort();
 }
 
-async function executionSizes(preview: Preview): Promise<Record<string, { readonly chunk?: string }>> {
+async function executionSizes(
+	preview: Preview,
+): Promise<Record<string, { readonly chunk?: string }>> {
 	try {
-		return JSON.parse(await preview.request(EXECUTION_SIZES_REQUEST)) as Record<string, { readonly chunk?: string }>;
+		return JSON.parse(await preview.request(EXECUTION_SIZES_REQUEST)) as Record<
+			string,
+			{ readonly chunk?: string }
+		>;
 	} catch {
 		return {};
 	}
 }
 
-function isObservabilityChunk(chunks: ReadonlyMap<string, string>, moduleId: string, path: string): boolean {
+function isObservabilityChunk(
+	chunks: ReadonlyMap<string, string>,
+	moduleId: string,
+	path: string,
+): boolean {
 	const code = chunks.get(path) ?? '';
 	return (
 		moduleId === 'web:dev-log' ||
@@ -541,27 +555,6 @@ function jsBuildRequests(requests: readonly Request[]): Request[] {
 
 function bundleGraphRequests(requests: readonly Request[]): Request[] {
 	return requests.filter((request) => pathOf(request.url) === BUNDLE_GRAPH_REQUEST);
-}
-
-async function expectLimitedNewBuildJs(
-	page: Page,
-	receipt: Receipt,
-	label: string,
-	allowedCount: number,
-	action: () => Promise<void>,
-): Promise<void> {
-	const before = await page.networkRequests();
-	await action();
-	const allowedLazyPaths = new Set((page.allowedLazyHrefs ?? []).map((href) => pathOf(href)));
-	const requests = jsBuildRequests((await page.networkRequests()).slice(before.length)).filter(
-		(request) => !allowedLazyPaths.has(pathOf(request.url)),
-	);
-	receipt.note(`${label}:
-${timeline(requests)}`);
-	if (requests.length > allowedCount) {
-		throw new Error(`Expected at most ${allowedCount} known fetch for ${label}, saw:
-${timeline(requests)}`);
-	}
 }
 
 async function expectNoNewBuildJs(

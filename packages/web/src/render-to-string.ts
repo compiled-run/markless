@@ -5,7 +5,11 @@ import {
 	type ProtocolStatePayload,
 	type ProtocolViewPayload,
 } from '@markless/serializer';
-import { renderPayloadScripts, serializeRuntimeAsyncSnapshots } from '@markless/serializer';
+import {
+	renderPayloadScripts,
+	serializeRuntimeAsyncSnapshots,
+	serializeRuntimeStateCells,
+} from '@markless/serializer';
 import type { MarklessExecutionLogMode } from './dev-log.ts';
 import { validateKeyedRepeatPayloadKeys } from './repeat-runtime.ts';
 
@@ -30,9 +34,15 @@ export type RenderToStringOptions = {
 	readonly resumeModuleUrl?: string;
 	readonly resumerSource?: string;
 	readonly containerId?: string;
-	readonly modulePreloads?: ReadonlyArray<ModulePreloadInput>;
+	// Static preloads, or a callback resolved against the rendered page html
+	// (streaming hosts compute Link-target preloads from the shell output).
+	readonly modulePreloads?:
+		| ReadonlyArray<ModulePreloadInput>
+		| ((html: string) => ReadonlyArray<ModulePreloadInput> | undefined);
 	readonly inlineRuntimeRegistry?: Set<string>;
 	readonly executionLog?: MarklessExecutionLogMode;
+	// Page props forwarded to the compiled renderSsr (router hosts).
+	readonly props?: unknown;
 };
 
 export type ModulePreloadInput =
@@ -54,13 +64,26 @@ export async function renderToString(
 	component: SsrRenderable,
 	options: RenderToStringOptions = {},
 ): string {
-	const output = await renderSsrOutput(component);
+	const output = await renderSsrOutput(component, options.props, undefined);
+	return assembleSsrContainer(component, output, options);
+}
+
+// Shared container assembly for the blocking (renderToString) and streaming
+// (renderToStream) paths: payload scripts, preload links, head injections,
+// and the inline resumer around the rendered page html.
+export async function assembleSsrContainer(
+	component: SsrRenderable,
+	output: SsrRenderOutput,
+	options: RenderToStringOptions,
+): Promise<string> {
 	const hasPayload = !!output.state || !!output.view;
 	const rawState = output.state ?? emptyStatePayload();
-	// Runtime-attached async snapshots carry raw key/value; the served payload
-	// needs envelope-encoded fields or resume rejects it on first interaction.
+	// Runtime-attached async snapshots and live directValue cells (host-seeded
+	// page props, need 14) carry raw values; the served payload needs
+	// envelope-encoded fields or resume rejects it on first interaction.
 	const state = {
 		...rawState,
+		cells: serializeRuntimeStateCells(rawState.cells ?? []),
 		computed: serializeRuntimeAsyncSnapshots(rawState.computed ?? []),
 	};
 	const view = containerScopedView(output.view ?? emptyViewPayload());
@@ -69,8 +92,12 @@ export async function renderToString(
 	const resumeModuleUrl = options.resumeModuleUrl ?? artifactResumeModuleUrl(component);
 	const executionLog = options.executionLog ?? artifactExecutionLog(component) ?? 'auto';
 	const browserTriggers = hasBrowserTriggers(view, state);
+	const optionPreloads =
+		typeof options.modulePreloads === 'function'
+			? options.modulePreloads(output.html)
+			: options.modulePreloads;
 	const modulePreloads =
-		options.modulePreloads ?? (browserTriggers ? artifactModulePreloads(component) : undefined);
+		optionPreloads ?? (browserTriggers ? artifactModulePreloads(component) : undefined);
 	const resumerScript =
 		hasPayload && browserTriggers
 			? renderInlineResumerScript(
@@ -99,13 +126,28 @@ export async function renderToString(
 		.join('');
 }
 
-async function renderSsrOutput(component: SsrRenderable): Promise<SsrRenderOutput> {
-	if (typeof component === 'function') return component();
-	if (component && typeof component.renderSsr === 'function') return component.renderSsr();
+// The optional render context is the per-request streaming channel: compiled
+// renderSsr threads it into child renders and async runners (T107).
+export async function renderSsrOutput(
+	component: SsrRenderable,
+	props: unknown,
+	renderContext: unknown,
+): Promise<SsrRenderOutput> {
+	if (typeof component === 'function') {
+		return (component as (props?: unknown, renderContext?: unknown) => SsrRenderOutput)(
+			props,
+			renderContext,
+		);
+	}
+	if (component && typeof component.renderSsr === 'function') {
+		return (
+			component.renderSsr as (props?: unknown, renderContext?: unknown) => SsrRenderOutput
+		)(props, renderContext);
+	}
 	throw new TypeError('renderToString(App) requires a compiled TSRX artifact.');
 }
 
-function artifactResumeModuleUrl(component: SsrRenderable): string | undefined {
+export function artifactResumeModuleUrl(component: SsrRenderable): string | undefined {
 	return typeof component === 'object' ? component.resumeModuleUrl : undefined;
 }
 
@@ -193,8 +235,26 @@ function hasBrowserTriggers(view: ProtocolViewPayload, state: ProtocolStatePaylo
 		// Branch arm events live on armRecords, not view.events.
 		(view.branches ?? []).some((branch) =>
 			(branch.armRecords ?? []).some((arm) => arm.events.length > 0),
-		)
+		) ||
+		// Async boundary arm events also nest under armRecords (D3).
+		view.asyncBoundaries.some((boundary) => boundaryArmEventNames(boundary).length > 0)
 	);
+}
+
+// In-arm event names from a boundary's armized record set. CSR-composed pages
+// may still carry the compile-time per-arm array, which is not wake-relevant.
+function boundaryArmEventNames(
+	boundary: ProtocolViewPayload['asyncBoundaries'][number],
+): ReadonlyArray<string> {
+	const armRecords = (
+		boundary as {
+			readonly armRecords?: {
+				readonly events?: ReadonlyArray<{ readonly eventName: string }>;
+			};
+		}
+	).armRecords;
+	if (!armRecords || Array.isArray(armRecords)) return [];
+	return (armRecords.events ?? []).map((event) => event.eventName);
 }
 
 function containerScopedView(view: ProtocolViewPayload): ProtocolViewPayload {
@@ -303,8 +363,9 @@ function defaultInlineResumerSource(
 		if (c.type === 'graph-truthy') return !!globalThis.__marklessInlineSyncPolicy.g(r, c.graphNodeId, c.path);`
 		: `
 		if (c.type === 'graph-truthy') return false;`;
-	const localSyncPolicySource = includeSyncPolicy && !includeSharedSyncPolicyRuntime
-		? `
+	const localSyncPolicySource =
+		includeSyncPolicy && !includeSharedSyncPolicyRuntime
+			? `
 	const q = (c, e) => {
 		if (!c) return false;
 		if (c.type === 'and') return c.conditions.every((x) => q(x, e));
@@ -324,7 +385,7 @@ ${graphConditionSource}
 			}
 		}
 	};`
-		: '';
+			: '';
 	const runSyncPolicy = includeSyncPolicy
 		? `
 					let sp = false;
@@ -376,7 +437,7 @@ ${localSyncPolicySource}
 		const k = e.hostNodeId + '\\n' + e.eventName;
 		m.set(k, e);
 	}
-	const rw = new Set([...(v.keyedRepeats ?? []).flatMap((k) => k.rowEvents.map((e) => e.eventName)), ...(v.branches ?? []).flatMap((k) => (k.armRecords ?? []).flatMap((a) => a.events.map((e) => e.eventName)))]);
+	const rw = new Set([...(v.keyedRepeats ?? []).flatMap((k) => k.rowEvents.map((e) => e.eventName)), ...(v.branches ?? []).flatMap((k) => (k.armRecords ?? []).flatMap((a) => a.events.map((e) => e.eventName))), ...(v.asyncBoundaries ?? []).flatMap((k) => ((k.armRecords && !Array.isArray(k.armRecords) && k.armRecords.events) || []).map((e) => e.eventName))]);
 	for (const t of new Set([...v.events.map((e) => e.eventName), ...rw].filter((e) => e !== 'visible'))) {
 		r.addEventListener(t, async (e) => {
 			if (r.__asyncResumeRuntimeStarted) return;
@@ -396,11 +457,15 @@ ${runSyncPolicy}
 				await mod.resumeContainerEvent({ root: r, event: e, element: e.target, eventRecord: null });
 				return;
 			}
-${executionLog === 'never' ? '' : `			if (globalThis.__mxLog) {
+${
+	executionLog === 'never'
+		? ''
+		: `			if (globalThis.__mxLog) {
 				const mod = await import(${JSON.stringify(resumeModuleUrl)});
 				await mod.resumeContainerEvent({ root: r, event: e, element: e.target, eventRecord: null });
 			}
-`}		}, true);
+`
+}		}, true);
 	}
 })();`;
 }

@@ -97,12 +97,12 @@ describe('TSRX Rolldown plugin structure', () => {
 
 		expect(result.code).not.toContain('export const marklessSource');
 		expect(result.code).toContain(
-			"import { state as payloadState, view as payloadView, runtimeDemandMap as payloadRuntimeDemandMap } from 'virtual:markless:payload:",
+			'import { state as payloadState, view as payloadView, runtimeDemandMap as payloadRuntimeDemandMap } from "virtual:markless:payload:',
 		);
 		expect(result.code).not.toContain('import { loadSymbol, symbolManifest }');
 		expect(result.code).not.toContain('const marklessSymbolResolverModule');
 		expect(result.code).toContain('function loadSymbol(symbolId)');
-		expect(result.code).toContain("import('virtual:markless:symbol:");
+		expect(result.code).toContain('import("virtual:markless:symbol:');
 		expect(result.code).not.toContain('const symbolManifest = [1,');
 		expect(result.code).not.toContain(
 			"import moduleManifest from 'virtual:markless:module-manifest:",
@@ -112,8 +112,8 @@ describe('TSRX Rolldown plugin structure', () => {
 		expect(result.code).not.toContain('loadSymbol: loadSymbol,');
 		expect(result.code).not.toContain('function marklessResumeLoadSymbol');
 		expect(result.code).toContain('const marklessCompiledApp = {');
-		expect(result.code).toContain('renderCsr: App,');
-		expect(result.code).toContain('renderSsr(props) {');
+		expect(result.code).toContain('renderCsr: App');
+		expect(result.code).toContain('renderSsr(props, marklessRenderContext) {');
 		expect(result.code).toContain('const marklessSsrStateValues = new Map');
 		expect(result.code).toContain(
 			'const html = marklessSsrHost(marklessSsrHostLocators, "h0", "button") + "<button>" + marklessSsrText(count) + "</button>";',
@@ -147,7 +147,7 @@ describe('TSRX Rolldown plugin structure', () => {
 			source: defaultRouteSource,
 		});
 
-		expect(result.code).toContain('renderSsr(props) {');
+		expect(result.code).toContain('renderSsr(props, marklessRenderContext) {');
 		expect(result.code).toContain('"<h1>" + "Markless Router" + "</h1>"');
 		expect(result.code).toContain(
 			'import { Link as __marklessSsrComponent0 } from "@markless/core/router";',
@@ -162,7 +162,7 @@ describe('TSRX Rolldown plugin structure', () => {
 			environment: 'client',
 		});
 
-		expect(result.code).toContain('renderCsr: App,');
+		expect(result.code).toContain('renderCsr: App');
 		expect(result.code).not.toContain('resumeEventOnlyFromPayloadDocument');
 		expect(result.code).not.toContain('resumeContainerEvent');
 		expect(result.code).not.toContain('preloadCsrLazySymbols');
@@ -170,7 +170,7 @@ describe('TSRX Rolldown plugin structure', () => {
 		expect(result.code).not.toContain('@markless/core/preload');
 		expect(result.code).not.toContain('preload:');
 		expect(result.code).toContain('export default marklessCompiledApp;');
-		expect(result.code).not.toContain('renderSsr(props) {');
+		expect(result.code).not.toContain('renderSsr(props, marklessRenderContext) {');
 		expect(result.code).not.toContain('state: payloadState');
 	});
 
@@ -217,7 +217,7 @@ let count = state(0);
 		expect(resumeModule?.source).toContain('marklessSsrLoadSymbolRoute'); // composed pages are excluded from specialization (T015g PM); the routed loader wires the full path
 		expect(result.code).not.toContain('function marklessResumeLoadSymbol');
 		expect(result.code).toContain('import("./Child.tsrx?markless-symbols")');
-		expect(result.code).toContain("import('virtual:markless:symbol:");
+		expect(result.code).toContain('import("virtual:markless:symbol:');
 		expect(result.code).not.toContain('document.createElement');
 		expect(result.code).not.toContain('addEventListener');
 		expect(result.code).not.toContain('const marklessCompiledApp = {');
@@ -247,7 +247,7 @@ let count = state(0);
 		expect(result.code).toContain('function marklessSsrLoadSymbolRoute(symbolId)');
 		expect(result.code).toContain('import("./Child.tsrx?markless-symbols")');
 		expect(result.code).toContain('return marklessLoadLocalSymbol(symbolId);');
-		expect(result.code).toContain('renderCsr: marklessRenderCsr,');
+		expect(result.code).toContain('renderCsr: marklessRenderCsr');
 		expect(result.code).toContain('export default marklessCompiledApp;');
 	});
 
@@ -278,9 +278,9 @@ let active = state(true);
 			environment: 'server',
 		});
 
-		expect(result.code).toContain('renderSsr(props) {');
-		expect(result.code).toContain("marklessSsrAttribute(\"class\", active ? 'on' : 'off')");
-		expect(result.code).not.toContain('renderCsr: App,');
+		expect(result.code).toContain('renderSsr(props, marklessRenderContext) {');
+		expect(result.code).toContain('marklessSsrAttribute("class", active ? "on" : "off")');
+		expect(result.code).not.toContain('renderCsr: App');
 	});
 
 	test('transformTsrxModule omits alternate render entry exports', async () => {
@@ -301,7 +301,7 @@ let active = state(true);
 		});
 
 		expect(result.code).toContain('export function App()');
-		expect(result.code).toContain('renderCsr: App,');
+		expect(result.code).toContain('renderCsr: App');
 		expect(result.code).toContain('export default marklessCompiledApp;');
 		expect(result.code).toContain('<main><section></section><footer>Done</footer></main>');
 		expect(result.code).toContain('syncMarklessPublicRepeat0');
@@ -309,12 +309,12 @@ let active = state(true);
 		expect(result.code).toContain('runtime: { async dispatch() {} }');
 		expect(result.code).not.toContain('function createMarklessPublicRuntime');
 		expect(result.code).toContain('attachMarklessPublicStaticEvents');
-		expect(result.code).toContain('const marklessSsrState = marklessComposeState');
+		expect(result.code).toContain('const marklessSsrState = marklessSsrComposeState'); // SSR-side alias (compose-state import dedup)
 		expect(result.code).toContain(
 			'state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots)',
 		);
 		expect(result.code).toContain(
-			'view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) }',
+			'branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches)',
 		);
 		expect(result.code).not.toContain('view: marklessPublicView');
 		expect(result.code).not.toContain('payloadView.locators.filter');
@@ -335,12 +335,12 @@ let active = state(true);
 		});
 
 		expect(result.code).not.toContain(
-			"const marklessSymbolResolverModule = () => import('virtual:markless:resolver:",
+			'const marklessSymbolResolverModule = () => import("virtual:markless:resolver:',
 		);
 		expect(result.code).toContain('function loadSymbol(symbolId)');
 		expect(result.code).toContain('if (symbolId === "symbol:0")');
 		expect(result.code).toContain('if (symbolId === "symbol:7")');
-		expect(result.code).toContain("import('virtual:markless:symbol:");
+		expect(result.code).toContain('import("virtual:markless:symbol:');
 		expect(result.code).toMatch(/readMarklessSourceSymbol\(mod, "symbol_0_[a-z0-9]+"\)/);
 		expect(result.code).toContain('mod.init__virtual_markless_symbol?.();');
 		expect(result.code).not.toContain('name.startsWith("init__virtual_markless_symbol")');
@@ -353,7 +353,7 @@ let active = state(true);
 		});
 
 		expect(result.code).toContain(
-			"const marklessSymbolResolverModule = () => import('virtual:markless:resolver:",
+			'const marklessSymbolResolverModule = () => import("virtual:markless:resolver:',
 		);
 		expect(result.code).toContain(
 			'return marklessSymbolResolverModule().then((mod) => mod.loadSymbol(symbolId));',
@@ -423,7 +423,9 @@ let active = state(true);
 		const result = await callResolveId(plugin, '@markless/web/inline/sync-policy-core');
 
 		expect(result).toEqual(
-			expect.objectContaining({ id: expect.stringMatching(/packages\/web\/src\/inline\/sync-policy-core\.ts$/) }),
+			expect.objectContaining({
+				id: expect.stringMatching(/packages\/web\/src\/inline\/sync-policy-core\.ts$/),
+			}),
 		);
 	});
 
@@ -449,12 +451,9 @@ let count = state(0);
 		}));
 
 		expect(symbolRouteSpecifiers).toEqual(['./progressive-child-panel.tsrx?markless-symbols']);
-		const result = await callResolveId(
-			plugin,
-			symbolRouteSpecifiers[0]!,
-			`\0${resumeId}`,
-			{ resolve },
-		);
+		const result = await callResolveId(plugin, symbolRouteSpecifiers[0]!, `\0${resumeId}`, {
+			resolve,
+		});
 
 		expect(resolve).toHaveBeenCalledWith(
 			'./progressive-child-panel.tsrx?markless-symbols',
@@ -463,7 +462,7 @@ let count = state(0);
 		);
 		expect(result).toEqual({
 			id: '/workspace/app/src/progressive-child-panel.tsrx?markless-symbols',
-			});
+		});
 	});
 
 	test('client resume source requests serve the generated resume module only', async () => {
@@ -500,8 +499,7 @@ let count = state(0);
 		).toBeNull();
 
 		await callTransform(plugin, source, filename);
-		const symbolId =
-			`virtual:markless:symbol:${encodeURIComponent(filename)}:${encodeURIComponent('symbol:0')}`;
+		const symbolId = `virtual:markless:symbol:${encodeURIComponent(filename)}:${encodeURIComponent('symbol:0')}`;
 		const symbolSource = (await callLoad(plugin, `\0${symbolId}`)) as string;
 
 		expect(symbolSource).not.toContain('__mxLog?.add');
@@ -642,7 +640,9 @@ let count = state(0);
 		);
 
 		const htmlHrefs = [
-			...html.source.matchAll(/<link\b[^>]*\brel=["']modulepreload["'][^>]*\bhref=["']([^"']+)["']/g),
+			...html.source.matchAll(
+				/<link\b[^>]*\brel=["']modulepreload["'][^>]*\bhref=["']([^"']+)["']/g,
+			),
 		]
 			.map((match) => match[1]!)
 			.sort();
@@ -762,7 +762,9 @@ export function App() @{
 `,
 		environment: 'client',
 	});
-	const qualifyingKeyedResume = qualifyingKeyed.virtualModules.find((module) => module.type === 'resume');
+	const qualifyingKeyedResume = qualifyingKeyed.virtualModules.find(
+		(module) => module.type === 'resume',
+	);
 	expect(qualifyingKeyedResume?.source).toContain('resumeScalarRowEventFromPayloadDocument');
 	expect(qualifyingKeyedResume?.source).not.toContain("import('@markless/core/web/resume')");
 

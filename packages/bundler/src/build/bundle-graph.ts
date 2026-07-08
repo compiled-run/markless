@@ -109,8 +109,9 @@ function bundleGraphRecords(
 				...(bundle?.imports ?? []),
 				...(module.resolver.fileName ? [module.resolver.fileName] : []),
 			];
-			const runtimeDemandBundles = (runtimeModuleIdsBySymbolId.get(symbol.symbolId) ?? [])
-				.flatMap((id) => runtimeBundles.get(id) ?? []);
+			const runtimeDemandBundles = (
+				runtimeModuleIdsBySymbolId.get(symbol.symbolId) ?? []
+			).flatMap((id) => runtimeBundles.get(id) ?? []);
 			const symbolBundle: BundleGraphRecord = {
 				size: 0,
 				total: 0,
@@ -167,7 +168,9 @@ function appendDynamicImport(bundle: BundleGraphRecord, dependency: string): Bun
 	};
 }
 
-function runtimeBundleNamesByModuleId(manifest: MarklessBuildMetadata): ReadonlyMap<string, string[]> {
+function runtimeBundleNamesByModuleId(
+	manifest: MarklessBuildMetadata,
+): ReadonlyMap<string, string[]> {
 	const entries = new Map<string, string[]>();
 	for (const [bundleName, bundle] of Object.entries(manifest.bundles)) {
 		for (const origin of bundle.origins ?? []) {

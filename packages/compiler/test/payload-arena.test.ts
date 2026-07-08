@@ -223,6 +223,32 @@ test('planPayloadArena separates graph state from view wiring metadata', async (
 			id: 'boundary:0',
 			kind: 'async-boundary',
 			anchorOrder: 0,
+			armRecords: [
+				{
+					locators: [
+						{ hostNodeId: 'h4', strategy: 'arm-relative', index: 0, tagName: 'p' },
+					],
+					events: [],
+					behaviors: [],
+					elementHandles: [],
+				},
+				{
+					locators: [
+						{ hostNodeId: 'h6', strategy: 'arm-relative', index: 0, tagName: 'p' },
+					],
+					events: [],
+					behaviors: [],
+					elementHandles: [],
+				},
+				{
+					locators: [
+						{ hostNodeId: 'h5', strategy: 'arm-relative', index: 0, tagName: 'p' },
+					],
+					events: [],
+					behaviors: [],
+					elementHandles: [],
+				},
+			],
 			startAnchor: {
 				strategy: 'dom-order-comment',
 				index: 0,
@@ -453,6 +479,78 @@ export function App() @{
 			target: {
 				kind: 'text',
 			},
+		},
+	]);
+});
+
+test('planPayloadArena nests in-arm records under their boundary in arm-relative coordinates', async () => {
+	// D3: records for content inside an @try/@pending/@catch arm are the
+	// boundary's own coordinate space (0 = first element after the start
+	// anchor in that arm's rendered content). Static indexes are the
+	// plain-content plan; branch-bearing arms get their rendered truth from
+	// the SSR compose step.
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/ArmRecords.tsrx',
+		source: `
+import { computed, state } from '@markless/core';
+
+export function App() @{
+	let note = state('none');
+	let expanded = state(true);
+	const report = computed(async ({ signal }) => {
+		const response = await fetch('/api/report', { signal });
+		return await response.json();
+	});
+
+	<main>
+		<button onClick={() => note = 'top'}>Top</button>
+		@try {
+			<article attach={panel(report)}>
+				<h2>{report.heading}</h2>
+				@if (expanded) {
+					<button onClick={() => note = 'inner'}>Act</button>
+				} @else {
+					<span>collapsed</span>
+				}
+			</article>
+		} @pending {
+			<p>Loading</p>
+		} @catch (error) {
+			<p>{error.message}</p>
+		}
+	</main>
+}
+`,
+	});
+	const stateLowering = lowerStateAccess({ semanticGraph });
+
+	const payload = planPayloadArena({ semanticGraph, stateLowering });
+
+	expect(payload.view.asyncBoundaries[0]?.armRecords).toEqual([
+		{
+			locators: [
+				{ hostNodeId: 'h2', strategy: 'arm-relative', index: 0, tagName: 'article' },
+				{ hostNodeId: 'h3', strategy: 'arm-relative', index: 1, tagName: 'h2' },
+				{ hostNodeId: 'h4', strategy: 'arm-relative', index: 2, tagName: 'button' },
+				{ hostNodeId: 'h5', strategy: 'arm-relative', index: 3, tagName: 'span' },
+			],
+			events: [expect.objectContaining({ hostNodeId: 'h4', eventName: 'click' })],
+			behaviors: [expect.objectContaining({ hostNodeId: 'h2', functionSource: 'panel' })],
+			elementHandles: [],
+		},
+		{
+			// Host ids follow the collector's walk order (@catch walks before
+			// @pending), so the @pending arm's <p> is h7 here.
+			locators: [{ hostNodeId: 'h7', strategy: 'arm-relative', index: 0, tagName: 'p' }],
+			events: [],
+			behaviors: [],
+			elementHandles: [],
+		},
+		{
+			locators: [{ hostNodeId: 'h6', strategy: 'arm-relative', index: 0, tagName: 'p' }],
+			events: [],
+			behaviors: [],
+			elementHandles: [],
 		},
 	]);
 });

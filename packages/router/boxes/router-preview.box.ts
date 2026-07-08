@@ -37,10 +37,11 @@ export default box(
 			}),
 		});
 		try {
+			const indexHtml = await preview.request('/');
 			const expectedPreloadHrefs = expectedInteractionPreloadHrefs(
 				JSON.parse(await preview.request(BUNDLE_GRAPH_REQUEST)) as MarklessBundleGraph,
+				indexHtml,
 			);
-			const indexHtml = await preview.request('/');
 			await expect.html.contains(indexHtml, '<h1>Markless Router</h1>');
 			await expect.html.contains(indexHtml, 'Button 0');
 			await expect.html.contains(indexHtml, 'data-markless-router-link');
@@ -125,11 +126,27 @@ type NetworkRequestPage = {
 	networkRequests(): Promise<readonly BrowserNetworkRequest[]>;
 };
 
-function expectedInteractionPreloadHrefs(bundleGraph: MarklessBundleGraph): readonly string[] {
+// The bundle graph carries EVERY page's symbols (the fixture grew a second
+// interactive page for the streaming box); the index page only preloads its
+// own plan, so expected hrefs intersect with the modulepreload links the
+// served page actually emitted.
+function expectedInteractionPreloadHrefs(
+	bundleGraph: MarklessBundleGraph,
+	pageHtml: string,
+): readonly string[] {
 	const roots = bundleGraph
 		.filter((item): item is string => typeof item === 'string' && item.startsWith('symbol:'))
 		.map((name) => ({ name, priority: 'high' as const }));
-	return planModulePreloadUrls({ base: '/build/', bundleGraph, roots });
+	const served = new Set(
+		[...pageHtml.matchAll(/rel="modulepreload" href="([^"]+)"/g)].map((match) => match[1]),
+	);
+	const expected = planModulePreloadUrls({ base: '/build/', bundleGraph, roots }).filter((href) =>
+		served.has(href),
+	);
+	if (expected.length === 0) {
+		throw new Error('Index page served no planned symbol modulepreloads to observe.');
+	}
+	return expected;
 }
 
 async function waitForExpectedPreloadRequests(

@@ -38,10 +38,25 @@ export type CompilerDiagnostic = {
 	readonly suppressionReason?: string;
 };
 
-type AllowInput<T extends CompilerDiagnostic = CompilerDiagnostic> = { readonly source: string; readonly filename: string; readonly diagnostics: ReadonlyArray<T>; readonly phase: T['phase']; readonly passId?: string; readonly artifactKeys?: ReadonlyArray<string> };
+type AllowInput<T extends CompilerDiagnostic = CompilerDiagnostic> = {
+	readonly source: string;
+	readonly filename: string;
+	readonly diagnostics: ReadonlyArray<T>;
+	readonly phase: T['phase'];
+	readonly passId?: string;
+	readonly artifactKeys?: ReadonlyArray<string>;
+};
 
-export function applyMarklessAllowDirectives<T extends CompilerDiagnostic>(input: AllowInput<T>): ReadonlyArray<T | CompilerDiagnostic> {
-	const directives: Array<{ index: number; code: string; reason: string | null; line: number; span: SourceSpan }> = [];
+export function applyMarklessAllowDirectives<T extends CompilerDiagnostic>(
+	input: AllowInput<T>,
+): ReadonlyArray<T | CompilerDiagnostic> {
+	const directives: Array<{
+		index: number;
+		code: string;
+		reason: string | null;
+		line: number;
+		span: SourceSpan;
+	}> = [];
 	let offset = 0;
 	input.source.split('\n').forEach((text, line) => {
 		const start = text.indexOf('//');
@@ -57,7 +72,11 @@ export function applyMarklessAllowDirectives<T extends CompilerDiagnostic>(input
 				code: match[1] ?? '',
 				reason: match[2]?.trim() || null,
 				line,
-				span: { filename: input.filename, start: offset + start, end: offset + text.length },
+				span: {
+					filename: input.filename,
+					start: offset + start,
+					end: offset + text.length,
+				},
 			});
 		}
 		offset += text.length + 1;
@@ -90,12 +109,18 @@ export function applyMarklessAllowDirectives<T extends CompilerDiagnostic>(input
 	}
 	for (const directive of directives) {
 		if (used.has(directive.index)) continue;
-		output.push(allowDirectiveDiagnostic(directive.reason ? 'stale' : 'reason', directive, input));
+		output.push(
+			allowDirectiveDiagnostic(directive.reason ? 'stale' : 'reason', directive, input),
+		);
 	}
 	return output;
 }
 
-type AllowDirective = { readonly code: string; readonly reason: string | null; readonly span: SourceSpan };
+type AllowDirective = {
+	readonly code: string;
+	readonly reason: string | null;
+	readonly span: SourceSpan;
+};
 
 function allowDirectiveDiagnostic(
 	kind: 'error' | 'reason' | 'stale',
@@ -104,11 +129,25 @@ function allowDirectiveDiagnostic(
 	errorCode = directive.code,
 ): CompilerDiagnostic {
 	const messages = {
-		error: [`markless-allow named ${directive.code}, but ${errorCode} is an error and must still be fixed.`, 'markless-allow cannot suppress errors'],
-		reason: [`Use \`// markless-allow CODE: reason\`; for this site, write \`// markless-allow ${directive.code}: reason\`.`, 'markless-allow needs a reason'],
-		stale: [`markless-allow named ${directive.code}, but that diagnostic did not fire at this site.`, 'markless-allow did not match this site'],
+		error: [
+			`markless-allow named ${directive.code}, but ${errorCode} is an error and must still be fixed.`,
+			'markless-allow cannot suppress errors',
+		],
+		reason: [
+			`Use \`// markless-allow CODE: reason\`; for this site, write \`// markless-allow ${directive.code}: reason\`.`,
+			'markless-allow needs a reason',
+		],
+		stale: [
+			`markless-allow named ${directive.code}, but that diagnostic did not fire at this site.`,
+			'markless-allow did not match this site',
+		],
 	} as const;
-	const code = kind === 'error' ? 'MARKLESS_ALLOW_ERROR_UNSUPPRESSIBLE' : kind === 'reason' ? 'MARKLESS_ALLOW_REASON_REQUIRED' : 'MARKLESS_ALLOW_STALE';
+	const code =
+		kind === 'error'
+			? 'MARKLESS_ALLOW_ERROR_UNSUPPRESSIBLE'
+			: kind === 'reason'
+				? 'MARKLESS_ALLOW_REASON_REQUIRED'
+				: 'MARKLESS_ALLOW_STALE';
 	return {
 		code,
 		severity: 'warning',
@@ -119,9 +158,18 @@ function allowDirectiveDiagnostic(
 		primarySpan: directive.span,
 		passId: input.passId,
 		artifactKeys: input.artifactKeys,
-		suggestions: [{ message: kind === 'reason' ? '// markless-allow CODE: reason' : 'Fix the diagnostic or remove the markless-allow comment.' }],
+		suggestions: [
+			{
+				message:
+					kind === 'reason'
+						? '// markless-allow CODE: reason'
+						: 'Fix the diagnostic or remove the markless-allow comment.',
+			},
+		],
 		docsUrl: `https://markless.dev/errors/${code}`,
 	};
 }
 
-function lineAt(source: string, offset: number): number { return source.slice(0, offset).split('\n').length - 1; }
+function lineAt(source: string, offset: number): number {
+	return source.slice(0, offset).split('\n').length - 1;
+}

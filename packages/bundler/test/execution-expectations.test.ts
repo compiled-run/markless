@@ -18,7 +18,9 @@ test('expectations derive allowed runtime modules from the generated demand map'
 		`,
 		executionLog: 'always',
 	});
-	const payload = payloadView(result.virtualModules.find((module) => module.type === 'payload')?.source);
+	const payload = payloadView(
+		result.virtualModules.find((module) => module.type === 'payload')?.source,
+	);
 	const click = payload.view.events[0];
 	const allowed = deriveAllowedModules(payload.view, payload.runtimeDemandMap, {
 		hostNodeId: click.hostNodeId,
@@ -46,8 +48,15 @@ test('generated demand map carries per-kind replacement phase flags', async () =
 	const { payload } = await counterPayload();
 
 	expect(payload.runtimeDemandMap.recordKinds).toEqual(
-		['async-boundary', 'behavior', 'branch', 'dom-update', 'element-handle', 'event', 'keyed-repeat']
-			.map((kind) => ({ kind, replaced: kind === 'dom-update' || kind === 'event' })),
+		[
+			'async-boundary',
+			'behavior',
+			'branch',
+			'dom-update',
+			'element-handle',
+			'event',
+			'keyed-repeat',
+		].map((kind) => ({ kind, replaced: kind === 'dom-update' || kind === 'event' })),
 	);
 	expect(payload.runtimeDemandMap.actions[0].payloadRecordIds).toEqual([
 		`dom-update:${payload.view.domUpdates[0].hostNodeId}:${payload.view.domUpdates[0].symbolId}`,
@@ -75,12 +84,19 @@ test('alternate-shaped scalar action specializes from locator, cell, event, and 
 			}
 		`,
 	});
-	const payload = payloadView(result.virtualModules.find((module) => module.type === 'payload')?.source);
-	const resumeSource = result.virtualModules.find((module) => module.type === 'resume')?.source ?? '';
+	const payload = payloadView(
+		result.virtualModules.find((module) => module.type === 'payload')?.source,
+	);
+	const resumeSource =
+		result.virtualModules.find((module) => module.type === 'resume')?.source ?? '';
 	const event = payload.view.events[0];
 	const update = payload.view.domUpdates[0];
-	const eventLocator = servedLocator(payload.view.locators.find((locator: any) => locator.hostNodeId === event.hostNodeId));
-	const updateLocator = servedLocator(payload.view.locators.find((locator: any) => locator.hostNodeId === update.hostNodeId));
+	const eventLocator = servedLocator(
+		payload.view.locators.find((locator: any) => locator.hostNodeId === event.hostNodeId),
+	);
+	const updateLocator = servedLocator(
+		payload.view.locators.find((locator: any) => locator.hostNodeId === update.hostNodeId),
+	);
 	const allowed = deriveAllowedModules(payload.view, payload.runtimeDemandMap, {
 		hostNodeId: event.hostNodeId,
 		eventName: event.eventName,
@@ -96,9 +112,15 @@ test('alternate-shaped scalar action specializes from locator, cell, event, and 
 		`marklessScalarEventMatches(input, marklessFindElementAtDomOrderIndex(input.root, ${eventLocator.index}), "input", "keydown", ${JSON.stringify(event.hostNodeId)})`,
 	);
 	expect(resumeSource).toContain('input.event?.type === eventName');
-	expect(resumeSource).toContain(`marklessFindElementAtDomOrderIndex(input.root, ${eventLocator.index})`);
-	expect(resumeSource).toContain(`marklessFindElementAtDomOrderIndex(input.root, ${updateLocator.index})`);
-	expect(resumeSource).toContain('marklessDecodeScalarCell(marklessReadScalarCell(input.root, 0), "state:tally"');
+	expect(resumeSource).toContain(
+		`marklessFindElementAtDomOrderIndex(input.root, ${eventLocator.index})`,
+	);
+	expect(resumeSource).toContain(
+		`marklessFindElementAtDomOrderIndex(input.root, ${updateLocator.index})`,
+	);
+	expect(resumeSource).toContain(
+		'marklessDecodeScalarCell(marklessReadScalarCell(input.root, 0), "state:tally"',
+	);
 	expect(resumeSource).toContain('marklessUpdateText');
 	expect(resumeSource).toContain('"Total: " +');
 	expect(resumeSource).not.toContain('input.eventRecord');
@@ -123,19 +145,28 @@ test('wrapped scalar action emits served locator indexes for host and text updat
 			}
 		`,
 	});
-	const payload = payloadView(result.virtualModules.find((module) => module.type === 'payload')?.source);
-	const resumeSource = result.virtualModules.find((module) => module.type === 'resume')?.source ?? '';
+	const payload = payloadView(
+		result.virtualModules.find((module) => module.type === 'payload')?.source,
+	);
+	const resumeSource =
+		result.virtualModules.find((module) => module.type === 'resume')?.source ?? '';
 	const event = payload.view.events[0];
 	const update = payload.view.domUpdates[0];
-	const eventLocator = servedLocator(payload.view.locators.find((locator: any) => locator.hostNodeId === event.hostNodeId));
-	const updateLocator = servedLocator(payload.view.locators.find((locator: any) => locator.hostNodeId === update.hostNodeId));
+	const eventLocator = servedLocator(
+		payload.view.locators.find((locator: any) => locator.hostNodeId === event.hostNodeId),
+	);
+	const updateLocator = servedLocator(
+		payload.view.locators.find((locator: any) => locator.hostNodeId === update.hostNodeId),
+	);
 
 	expect(eventLocator).toMatchObject({ tagName: 'button' });
 	expect(updateLocator).toMatchObject({ tagName: 'button' });
 	expect(resumeSource).toContain(
 		`marklessScalarEventMatches(input, marklessFindElementAtDomOrderIndex(input.root, ${eventLocator.index}), "button", "click", ${JSON.stringify(event.hostNodeId)})`,
 	);
-	expect(resumeSource).toContain(`marklessFindElementAtDomOrderIndex(input.root, ${updateLocator.index})`);
+	expect(resumeSource).toContain(
+		`marklessFindElementAtDomOrderIndex(input.root, ${updateLocator.index})`,
+	);
 	expect(resumeSource).not.toContain('?? input.element ?? input.event.target');
 });
 
@@ -150,8 +181,11 @@ test('scalar-looking actions with extra authored work stay on the full dispatch 
 			}
 		`,
 	});
-	const payload = payloadView(result.virtualModules.find((module) => module.type === 'payload')?.source);
-	const resumeSource = result.virtualModules.find((module) => module.type === 'resume')?.source ?? '';
+	const payload = payloadView(
+		result.virtualModules.find((module) => module.type === 'payload')?.source,
+	);
+	const resumeSource =
+		result.virtualModules.find((module) => module.type === 'resume')?.source ?? '';
 	const click = payload.view.events[0];
 	const allowed = deriveAllowedModules(payload.view, payload.runtimeDemandMap, {
 		hostNodeId: click.hostNodeId,
@@ -159,12 +193,21 @@ test('scalar-looking actions with extra authored work stay on the full dispatch 
 	});
 
 	expect(payload.runtimeDemandMap.recordKinds).toEqual(
-		['async-boundary', 'behavior', 'branch', 'dom-update', 'element-handle', 'event', 'keyed-repeat']
-			.map((kind) => ({ kind, replaced: false })),
+		[
+			'async-boundary',
+			'behavior',
+			'branch',
+			'dom-update',
+			'element-handle',
+			'event',
+			'keyed-repeat',
+		].map((kind) => ({ kind, replaced: false })),
 	);
 	expect(payload.runtimeDemandMap.actions[0].plan).toBeUndefined();
 	expect(resumeSource).not.toContain('marklessRunScalar');
-	expect(resumeSource).not.toContain("import { marklessWriteScalar } from '@markless/web/fns/write-scalar';");
+	expect(resumeSource).not.toContain(
+		"import { marklessWriteScalar } from '@markless/web/fns/write-scalar';",
+	);
 	expect(allowed).toContain('core/web/resume');
 	expect(allowed).toContain('web/resume-runtime');
 });
@@ -180,11 +223,20 @@ test('mixed scalar modules leave replacement phase flags open', async () => {
 			}
 		`,
 	});
-	const payload = payloadView(result.virtualModules.find((module) => module.type === 'payload')?.source);
+	const payload = payloadView(
+		result.virtualModules.find((module) => module.type === 'payload')?.source,
+	);
 
 	expect(payload.runtimeDemandMap.recordKinds).toEqual(
-		['async-boundary', 'behavior', 'branch', 'dom-update', 'element-handle', 'event', 'keyed-repeat']
-			.map((kind) => ({ kind, replaced: false })),
+		[
+			'async-boundary',
+			'behavior',
+			'branch',
+			'dom-update',
+			'element-handle',
+			'event',
+			'keyed-repeat',
+		].map((kind) => ({ kind, replaced: false })),
 	);
 });
 
@@ -233,8 +285,9 @@ test('mixed action kinds allow the structurally derived interpreter chain', asyn
 		eventName: click.eventName,
 	});
 
-	expect([...allowed].filter((id) => JUDGE_COUNTER_INTERPRETER_CHAIN_SET.has(id)).sort())
-		.toEqual([...JUDGE_COUNTER_INTERPRETER_CHAIN].sort());
+	expect([...allowed].filter((id) => JUDGE_COUNTER_INTERPRETER_CHAIN_SET.has(id)).sort()).toEqual(
+		[...JUDGE_COUNTER_INTERPRETER_CHAIN].sort(),
+	);
 	expect(allowed).not.toContain('web/fns/csr');
 	expect(allowed).not.toContain('web/fns/html');
 	expect(allowed).not.toContain('web/fns/state');
@@ -254,7 +307,9 @@ test('keyed repeat row actions allow render-module catalog helper imports', asyn
 			}
 		`,
 	});
-	const payload = payloadView(result.virtualModules.find((module) => module.type === 'payload')?.source);
+	const payload = payloadView(
+		result.virtualModules.find((module) => module.type === 'payload')?.source,
+	);
 	const repeat = payload.view.keyedRepeats[0];
 	const rowClick = repeat.rowEvents[0];
 	const allowed = deriveAllowedModules(payload.view, payload.runtimeDemandMap, {
@@ -263,15 +318,29 @@ test('keyed repeat row actions allow render-module catalog helper imports', asyn
 		recordKind: 'keyed-repeat-row',
 	});
 
-	expect(payload.runtimeDemandMap.recordKinds).toContainEqual({ kind: 'keyed-repeat', replaced: true });
-	expect(payload.runtimeDemandMap.recordKinds).toContainEqual({ kind: 'dom-update', replaced: true });
+	expect(payload.runtimeDemandMap.recordKinds).toContainEqual({
+		kind: 'keyed-repeat',
+		replaced: true,
+	});
+	expect(payload.runtimeDemandMap.recordKinds).toContainEqual({
+		kind: 'dom-update',
+		replaced: true,
+	});
 	expect(allowed).toContain('web/event-only-lean/row');
 	expect(allowed).toContain('web/event-only-lean/lean-shared');
 	expect(allowed).not.toContain('web/event-only-lean/scalar-core');
 	expect(allowed).toContain('web/resume-keyed-repeats');
 	expect([...allowed].filter((id) => JUDGE_COUNTER_INTERPRETER_CHAIN_SET.has(id))).toEqual([]);
-	expect(payload.runtimeDemandMap.actions.find((action: any) => action.recordKind === 'keyed-repeat-row')?.plan)
-		.toMatchObject({ version: 1, kind: 'row', cell: payload.view.domUpdates[0].graphNodeId, repeatId: repeat.id });
+	expect(
+		payload.runtimeDemandMap.actions.find(
+			(action: any) => action.recordKind === 'keyed-repeat-row',
+		)?.plan,
+	).toMatchObject({
+		version: 1,
+		kind: 'row',
+		cell: payload.view.domUpdates[0].graphNodeId,
+		repeatId: repeat.id,
+	});
 });
 
 test('mixed scalar and row actions keep exact lean modules per action', async () => {
@@ -291,7 +360,9 @@ test('mixed scalar and row actions keep exact lean modules per action', async ()
 			}
 		`,
 	});
-	const payload = payloadView(result.virtualModules.find((module) => module.type === 'payload')?.source);
+	const payload = payloadView(
+		result.virtualModules.find((module) => module.type === 'payload')?.source,
+	);
 	const counterClick = payload.view.events[0];
 	const repeat = payload.view.keyedRepeats[0];
 	const rowClick = repeat.rowEvents[0];
@@ -306,7 +377,10 @@ test('mixed scalar and row actions keep exact lean modules per action', async ()
 	});
 
 	expect(payload.runtimeDemandMap.recordKinds).toContainEqual({ kind: 'event', replaced: true });
-	expect(payload.runtimeDemandMap.recordKinds).toContainEqual({ kind: 'keyed-repeat', replaced: true });
+	expect(payload.runtimeDemandMap.recordKinds).toContainEqual({
+		kind: 'keyed-repeat',
+		replaced: true,
+	});
 	expect(counterAllowed).not.toContain('web/event-only-lean/scalar-core');
 	expect(counterAllowed).not.toContain('web/event-only-lean/lean-shared');
 	expect(counterAllowed).not.toContain('web/fns/scalar-core-graph');
@@ -327,10 +401,18 @@ test('keyed repeat row actions with non-text subscribers stay unreplaced', async
 			}
 		`,
 	});
-	const payload = payloadView(result.virtualModules.find((module) => module.type === 'payload')?.source);
+	const payload = payloadView(
+		result.virtualModules.find((module) => module.type === 'payload')?.source,
+	);
 
-	expect(payload.runtimeDemandMap.recordKinds).toContainEqual({ kind: 'keyed-repeat', replaced: false });
-	expect(payload.runtimeDemandMap.recordKinds).toContainEqual({ kind: 'dom-update', replaced: false });
+	expect(payload.runtimeDemandMap.recordKinds).toContainEqual({
+		kind: 'keyed-repeat',
+		replaced: false,
+	});
+	expect(payload.runtimeDemandMap.recordKinds).toContainEqual({
+		kind: 'dom-update',
+		replaced: false,
+	});
 });
 
 test('replaced action kinds tighten back to the exact demand set', async () => {
@@ -382,7 +464,9 @@ test('wrong demand map entries fail expectations and emitted-equals-required', a
 		),
 		actions: payload.runtimeDemandMap.actions.map((action: any) => ({
 			...action,
-			runtimeModuleIds: action.runtimeModuleIds.filter((id: string) => id !== 'web/fns/write-scalar'),
+			runtimeModuleIds: action.runtimeModuleIds.filter(
+				(id: string) => id !== 'web/fns/write-scalar',
+			),
 		})),
 	};
 	const corruptedPayload = { ...payload, runtimeDemandMap: missingFromMap };
@@ -394,12 +478,17 @@ test('wrong demand map entries fail expectations and emitted-equals-required', a
 		...payload.runtimeDemandMap,
 		symbols: payload.runtimeDemandMap.symbols.map((symbol: any, index: number) =>
 			index === 0
-				? { ...symbol, runtimeModuleIds: [...symbol.runtimeModuleIds, 'web/fns/not-emitted'] }
+				? {
+						...symbol,
+						runtimeModuleIds: [...symbol.runtimeModuleIds, 'web/fns/not-emitted'],
+					}
 				: symbol,
 		),
 	};
 
-	expect(forbiddenExecutedModules(['web/fns/write-scalar'], allowed)).toEqual(['web/fns/write-scalar']);
+	expect(forbiddenExecutedModules(['web/fns/write-scalar'], allowed)).toEqual([
+		'web/fns/write-scalar',
+	]);
 	expect(() =>
 		assertDemandMapMatchesEmittedSymbolImports(result.virtualModules, missingFromMap),
 	).toThrow(/extra=\[web\/fns\/write-scalar\]/);
@@ -411,7 +500,19 @@ test('wrong demand map entries fail expectations and emitted-equals-required', a
 // T014 tier-collapse receipt: the event-only middle tier was deleted. Mixed
 // unreplaced actions now fall through to the full dispatch core plus shared
 // runtime error reporting.
-const JUDGE_COUNTER_INTERPRETER_CHAIN = ['core/web/resume', 'web/resume', 'web/resume-runtime', 'web/resume-runtime-shared', 'web/resume-runtime-start', 'web/resume-events', 'web/resume-locators', 'web/payload-full', 'web/payload-resume', 'web/payload-graph-construct', 'web/resume-async-wiring'] as const; // runtime-error-reporting removed: shared dispatch infra post tier collapse, not interpreter machinery
+const JUDGE_COUNTER_INTERPRETER_CHAIN = [
+	'core/web/resume',
+	'web/resume',
+	'web/resume-runtime',
+	'web/resume-runtime-shared',
+	'web/resume-runtime-start',
+	'web/resume-events',
+	'web/resume-locators',
+	'web/payload-full',
+	'web/payload-resume',
+	'web/payload-graph-construct',
+	'web/resume-async-wiring',
+] as const; // runtime-error-reporting removed: shared dispatch infra post tier collapse, not interpreter machinery
 const JUDGE_COUNTER_INTERPRETER_CHAIN_SET = new Set<string>(JUDGE_COUNTER_INTERPRETER_CHAIN);
 
 async function counterPayload(): Promise<{ readonly payload: any }> {
@@ -425,7 +526,11 @@ async function counterPayload(): Promise<{ readonly payload: any }> {
 			}
 		`,
 	});
-	return { payload: payloadView(result.virtualModules.find((module) => module.type === 'payload')?.source) };
+	return {
+		payload: payloadView(
+			result.virtualModules.find((module) => module.type === 'payload')?.source,
+		),
+	};
 }
 
 function payloadView(source: string | undefined): any {
@@ -442,7 +547,9 @@ function payloadViewOnly(source: string | undefined): any {
 }
 
 function payloadRuntimeDemandMap(source: string | undefined): any {
-	const match = source?.match(/export const runtimeDemandMap = ([\s\S]*?);\nexport const view = /);
+	const match = source?.match(
+		/export const runtimeDemandMap = ([\s\S]*?);\nexport const view = /,
+	);
 	if (!match) throw new Error('Expected payload virtual module to export runtimeDemandMap.');
 	return JSON.parse(match[1]);
 }

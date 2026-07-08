@@ -155,13 +155,17 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 
 			const moduleTarget = moduleScopeWriteTarget(write, input.semanticGraph);
 			if (moduleTarget) {
-				diagnostics.push(moduleEscapeDiagnostic(write, moduleTarget, input.semanticGraph.filename));
+				diagnostics.push(
+					moduleEscapeDiagnostic(write, moduleTarget, input.semanticGraph.filename),
+				);
 				continue;
 			}
 
 			const staleLocal = staleLocalWriteTarget(write, input.semanticGraph);
 			if (staleLocal) {
-				diagnostics.push(staleLocalWriteDiagnostic(write, staleLocal, input.semanticGraph.filename));
+				diagnostics.push(
+					staleLocalWriteDiagnostic(write, staleLocal, input.semanticGraph.filename),
+				);
 				continue;
 			}
 
@@ -179,7 +183,11 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 		const elementHandleValue = elementHandleWriteValue(write, lookup);
 		if (elementHandleValue) {
 			diagnostics.push(
-				stateElementHandleWriteDiagnostic(write, elementHandleValue, input.semanticGraph.filename),
+				stateElementHandleWriteDiagnostic(
+					write,
+					elementHandleValue,
+					input.semanticGraph.filename,
+				),
 			);
 			continue;
 		}
@@ -230,16 +238,12 @@ type ResolvedStateGraphPath = {
 	readonly path: ReadonlyArray<string>;
 };
 
-function templateExpressionGraphReadSource(
-	source: string,
-	lookup: GraphLookup,
-): string | null {
+function templateExpressionGraphReadSource(source: string, lookup: GraphLookup): string | null {
 	if (!isCompositeTemplateExpression(source)) return null;
 
-	const candidates = [
-		...lookup.bindings.keys(),
-		...lookup.aliases.keys(),
-	].sort((left, right) => right.length - left.length);
+	const candidates = [...lookup.bindings.keys(), ...lookup.aliases.keys()].sort(
+		(left, right) => right.length - left.length,
+	);
 	for (const name of candidates) {
 		if (sourceContainsIdentifier(source, name)) return name;
 	}
@@ -409,7 +413,12 @@ function unresolvedWriteDiagnostic(
 		artifactKeys: ['semanticGraph', 'stateLowering'],
 		statePath: write.target,
 		source: write.target,
-		suggestions: [{ message: 'Declare the local before writing it, or move UI-changing values into state() so Markless can serialize and resume the update.' }],
+		suggestions: [
+			{
+				message:
+					'Declare the local before writing it, or move UI-changing values into state() so Markless can serialize and resume the update.',
+			},
+		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_UNRESOLVED_WRITE',
 	};
 }
@@ -432,7 +441,11 @@ function staleLocalWriteDiagnostic(
 		artifactKeys: ['semanticGraph', 'stateLowering'],
 		statePath: write.target,
 		source: write.target,
-		suggestions: [{ message: `Move "${name}" into state(), then write ${name}++ so Markless can serialize the cell and update subscribed DOM.` }],
+		suggestions: [
+			{
+				message: `Move "${name}" into state(), then write ${name}++ so Markless can serialize the cell and update subscribed DOM.`,
+			},
+		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_STALE_LOCAL_WRITE',
 	};
 }
@@ -457,7 +470,12 @@ function moduleEscapeDiagnostic(
 		artifactKeys: ['semanticGraph', 'stateLowering'],
 		statePath: write.target,
 		source: write.target,
-		suggestions: [{ message: 'Keep per-document values inside state(), or use shared() for named request/container/page dataflow instead of module variables.' }],
+		suggestions: [
+			{
+				message:
+					'Keep per-document values inside state(), or use shared() for named request/container/page dataflow instead of module variables.',
+			},
+		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_MODULE_ESCAPE',
 	};
 }

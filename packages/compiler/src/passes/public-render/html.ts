@@ -16,7 +16,14 @@ import {
 } from '../../ast/tsrx.ts';
 import type { PublicRenderModuleInput } from '../../artifacts.ts';
 import { itemPathReadSource } from './source-expressions.ts';
-import { emitCsrComponent, emitSsrComponent, objectPropertyName } from './component-wiring.ts';
+import {
+	emitCsrComponent,
+	emitCsrProjectedComponent,
+	emitCsrRowComponent,
+	emitSsrComponent,
+	emitSsrRowComponent,
+	objectPropertyName,
+} from './component-wiring.ts';
 import { joinSsrExpressions } from './shared.ts';
 import type { CsrRenderContext, HtmlRenderContext, SsrRenderContext } from './types.ts';
 
@@ -49,14 +56,44 @@ export function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string 
 			const csrGate = csrSite
 				? context.branchReactivityGates?.find((item) => item.branchSiteId === csrSite.id)
 				: undefined;
-			const ternary = `(${testSource} ? ${emitHtmlBranch(node.consequent as AnyNode | undefined, context)} : ${emitHtmlBranch(node.alternate as AnyNode | undefined, context)})`;
-			if (csrSite && csrGate?.supported) {
+			// Arm-scoped flip content is branch-owned: its hosts re-register per
+			// flip through the branch record, so they never carry the arm-host
+			// tag that would claim them for the boundary's own locators.
+			const csrArmFlip =
+				!!csrSite &&
+				csrGate?.supported === true &&
+				csrGate.armScoped === true &&
+				csrGate.armFlip === true;
+			const armHostIdByNode = context.armHostIdByNode;
+			if (csrArmFlip) context.armHostIdByNode = undefined;
+			// Child-component renders inside an arm are gated by the arm test:
+			// only the HTML lives in the ternary, so without the gate a component
+			// in the falsy arm would still execute (D2 — its props read absent
+			// data, e.g. `@if (info) { <Badge label={info.owner.name} /> }`).
+			const consequentStart = csrChildReplacementCount(context);
+			const consequentHtml = emitHtmlBranch(node.consequent as AnyNode | undefined, context);
+			gateCsrChildReplacements(context, consequentStart, testSource);
+			const alternateStart = csrChildReplacementCount(context);
+			const alternateHtml = emitHtmlBranch(node.alternate as AnyNode | undefined, context);
+			gateCsrChildReplacements(context, alternateStart, `!${testSource}`);
+			const ternary = `(${testSource} ? ${consequentHtml} : ${alternateHtml})`;
+			if (csrArmFlip) context.armHostIdByNode = armHostIdByNode;
+			if (csrSite && csrGate?.supported && csrGate.armScoped !== true) {
 				// The CSR-built DOM carries the same anchors, so the same resume
 				// runtime flips the range on the live graph (arm seeds from reads).
 				return joinSsrExpressions([
 					JSON.stringify(`<!--markless:branch:${csrSite.id}-->`),
 					ternary,
 					JSON.stringify(`<!--/markless:branch:${csrSite.id}-->`),
+				]);
+			}
+			if (csrArmFlip && csrSite) {
+				// Arm-branch anchors live in the owning boundary's own comment
+				// census; the page-level census never counts them.
+				return joinSsrExpressions([
+					JSON.stringify(`<!--markless:arm-branch:${csrSite.id}-->`),
+					ternary,
+					JSON.stringify(`<!--/markless:arm-branch:${csrSite.id}-->`),
 				]);
 			}
 			return ternary;
@@ -70,9 +107,18 @@ export function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string 
 			nextChildIndex: context.nextChildIndex,
 			nextComponentEdgeIndex: context.nextComponentEdgeIndex,
 		};
+		// armScoped @if arms (inside an async boundary arm) keep real host
+		// locators: their hosts live in the boundary's arm-relative coordinate
+		// space, so the compose step can move only the rendered ternary side's
+		// records into boundary.armRecords (D3 — retires need 15 dead events).
+		// Flip-planned arm-scoped sites (armFlip) are branch-owned instead: the
+		// branch record re-registers their hosts per flip, so they render
+		// locator-free like top-level branch arms.
 		const consequentContext: SsrRenderContext = {
 			...context,
-			insideSupportedBranchArm: context.insideSupportedBranchArm || !!gate?.supported,
+			insideSupportedBranchArm:
+				context.insideSupportedBranchArm ||
+				(!!gate?.supported && (gate.armScoped !== true || gate.armFlip === true)),
 		};
 		const consequent = emitHtmlBranch(
 			node.consequent as AnyNode | undefined,
@@ -99,7 +145,7 @@ export function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string 
 		context.nextAsyncBoundaryIndex = alternateContext.nextAsyncBoundaryIndex;
 		context.nextBranchSiteIndex = alternateContext.nextBranchSiteIndex;
 
-		if (site && gate?.supported) {
+		if (site && gate?.supported && gate.armScoped !== true) {
 			// Anchors always materialize; only the taken arm renders between them.
 			return joinSsrExpressions([
 				JSON.stringify(`<!--markless:branch:${site.id}-->`),
@@ -111,6 +157,16 @@ export function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string 
 					alternate,
 				])})`,
 				JSON.stringify(`<!--/markless:branch:${site.id}-->`),
+			]);
+		}
+		if (site && gate?.supported && gate.armScoped === true && gate.armFlip === true) {
+			// D1 tier 3 inside arms: the anchor pair lives in the owning
+			// boundary's own arm-branch census — the page census never sees it,
+			// and the resume runtime seeds the arm from live graph reads.
+			return joinSsrExpressions([
+				JSON.stringify(`<!--markless:arm-branch:${site.id}-->`),
+				`(${testSource} ? ${consequent} : ${alternate})`,
+				JSON.stringify(`<!--/markless:arm-branch:${site.id}-->`),
 			]);
 		}
 		return `(${testSource} ? ${consequent} : ${alternate})`;
@@ -146,18 +202,32 @@ export function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string 
 	const tagName = getElementTagName(node);
 	if (!tagName) return emitDynamicTagHtml(node, context);
 	if (!isHostTagName(tagName)) {
-		return context.mode === 'ssr'
-			? emitSsrComponent(node, tagName, context)
-			: emitCsrComponent(node, tagName, context);
+		// Inside keyed repeat rows components render per row through the
+		// markup-only row-child helper (plan-gated); composed child records
+		// cannot repeat per row.
+		if (context.mode === 'ssr') {
+			return context.insideRepeatRow
+				? emitSsrRowComponent(node, tagName, context)
+				: emitSsrComponent(node, tagName, context);
+		}
+		if (context.insideRepeatRow) return emitCsrRowComponent(node, tagName, context);
+		if (context.childrenMarkupOnly) return emitCsrProjectedComponent(node, tagName, context);
+		return emitCsrComponent(node, tagName, context);
 	}
 	const hostLocator = context.mode === 'ssr' ? ssrHostLocator(node, tagName, context) : '""';
+	// Arm-render modules tag static in-arm hosts; the module strips the
+	// attribute after deriving arm-relative locators from the rendered truth.
+	const armHostAttribute =
+		context.mode === 'csr' && context.armHostIdByNode?.get(node)
+			? ` data-markless-arm-host="${context.armHostIdByNode.get(node)}"`
+			: '';
 
 	const scopeClass = context.styleScopeClass ?? null;
 
 	if (getElementAttributes(node).some(isSpreadAttribute)) {
 		return joinSsrExpressions([
 			hostLocator,
-			JSON.stringify(`<${tagName}`),
+			JSON.stringify(`<${tagName}${armHostAttribute}`),
 			`${renderHelper(context, 'SpreadAttributes')}({ ${mergedAttributeEntries(node, context.source).join(', ')} }, ${JSON.stringify(scopeClass)})`,
 			JSON.stringify('>'),
 			emitHtmlChildren(node, context),
@@ -165,7 +235,7 @@ export function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string 
 		]);
 	}
 
-	const open = [`<${tagName}`];
+	const open = [`<${tagName}${armHostAttribute}`];
 	const dynamicAttributes: string[] = [];
 	let scopeClassHandled = scopeClass === null;
 	for (const attribute of getElementAttributes(node)) {
@@ -224,13 +294,26 @@ function ssrHostLocator(node: AnyNode, tagName: string, context: SsrRenderContex
 // behavior) whenever the row shape is not a single all-host-element subtree.
 function emitSsrRepeatRows(node: AnyNode, context: SsrRenderContext): string {
 	const repeat = context.keyedRepeats[context.nextRepeatIndex++];
-	if (!repeat) return '""';
+	if (!repeat) {
+		// No plan exists for this authored @for — today that means it sits inside
+		// an async boundary arm, which repeat planning does not yet traverse
+		// (dashboard-migration ledger need 6). Fail loudly: silently dropping
+		// authored rows cost a full debugging session.
+		throw new Error(
+			'MARKLESS_REPEAT_UNPLANNED: @for inside an @try/@pending/@catch boundary is not supported yet. ' +
+				'Move the repeat outside the async arm or lift the resolved data into page scope.',
+		);
+	}
 	const gate = context.repeatGates.find((item) => item.repeatId === repeat.id);
 	if (!gate?.supported) return '""';
-	if (context.componentEdges.length > 0) return '""';
+	// Component-composed pages render rows too: the SSR row mapper appends row
+	// locators through the same marklessSsrHostLocators stream that child
+	// composition consumes, so ordering holds (proven by the
+	// component-wrapped-rows browser fixture — dashboard-migration need 6).
+	const componentRows = gate.componentRows === true;
 
 	const row = singleRepeatRowElement(node);
-	if (!row || !isPlainHostTemplateNode(row)) return '""';
+	if (!row || (!componentRows && !isPlainHostTemplateNode(row))) return '""';
 
 	// The @empty branch renders at most once, so it emits with the normal
 	// context: its locators push only when the branch is actually taken.
@@ -242,6 +325,10 @@ function emitSsrRepeatRows(node: AnyNode, context: SsrRenderContext): string {
 
 	const rowContext: SsrRenderContext = { ...context, insideRepeatRow: true };
 	const rowHtml = emitHtmlNode(row, rowContext);
+	// Row components consume edge/child counters inside the row emission; the
+	// outer context must continue from them so later siblings stay aligned.
+	context.nextComponentEdgeIndex = rowContext.nextComponentEdgeIndex;
+	context.nextChildIndex = rowContext.nextChildIndex;
 	const rowParams = repeat.indexName
 		? `(${repeat.itemName}, ${repeat.indexName})`
 		: `(${repeat.itemName})`;
@@ -249,6 +336,12 @@ function emitSsrRepeatRows(node: AnyNode, context: SsrRenderContext): string {
 		emptyChildren.length > 0
 			? `() => ${joinSsrExpressions(emptyChildren.map((child) => emitHtmlNode(child, context)))}`
 			: 'null';
+	if (componentRows) {
+		// Component-bearing rows render an unknown element count per row, so the
+		// helper counts rendered element opens at runtime instead of trusting a
+		// static per-row count.
+		return `(await marklessSsrComponentRepeatRows(marklessSsrHostLocators, ${repeat.collectionSource}, ${repeat.itemName} => ${itemPathReadSource(repeat.itemName, repeat.keyPath)}, ${JSON.stringify(repeat.id)}, ${JSON.stringify(repeat.itemName)}, ${JSON.stringify(repeat.keyPath)}, async ${rowParams} => ${rowHtml}, ${emptyThunk}))`;
+	}
 	return `marklessSsrRepeatRows(marklessSsrHostLocators, ${repeat.collectionSource}, ${repeat.itemName} => ${itemPathReadSource(repeat.itemName, repeat.keyPath)}, ${JSON.stringify(repeat.id)}, ${JSON.stringify(repeat.itemName)}, ${JSON.stringify(repeat.keyPath)}, ${rowParams} => ${rowHtml}, ${countRowElements(row)}, ${emptyThunk})`;
 }
 
@@ -292,9 +385,16 @@ function emitAsyncBoundaryHtml(node: AnyNode, context: HtmlRenderContext): strin
 		);
 		const catchParam =
 			getIdentifierName(handler?.param as AnyNode | undefined) ?? 'marklessSsrAsyncError';
+		// Three-way on snapshot status: a streaming render context (T107) makes
+		// the runner return a pending snapshot instead of awaiting, so the
+		// @pending arm must render — never the @catch arm with an undefined
+		// error. Blocking mode only ever sees fulfilled/rejected here. The
+		// trailing literal declares whether the author wrote a @pending arm:
+		// its presence IS the streaming opt-in; without one the boundary holds
+		// the stream (the helper awaits).
 		return joinSsrExpressions([
 			JSON.stringify(`<!--markless:async:${boundary.id}-->`),
-			`(((marklessSsrAsyncSnapshot) => marklessSsrAsyncSnapshot.status === "fulfilled" ? ((${runner.name}) => ${tryHtml})(marklessSsrAsyncSnapshot.value) : ((${catchParam}) => ${catchHtml})(marklessSsrAsyncSnapshot.error))(await marklessSsrRunAsyncComputed(marklessSsrAsyncSnapshots, ${JSON.stringify(runner.graphNodeId)}, ${runner.source})))`,
+			`(await ((async (marklessSsrAsyncSnapshot) => marklessSsrAsyncSnapshot.status === "fulfilled" ? (async (${runner.name}) => ${tryHtml})(marklessSsrAsyncSnapshot.value) : marklessSsrAsyncSnapshot.status === "rejected" ? (async (${catchParam}) => ${catchHtml})(marklessSsrAsyncSnapshot.error) : (async () => ${pendingHtml})())(await marklessSsrRunAsyncComputed(marklessSsrAsyncSnapshots, ${JSON.stringify(runner.graphNodeId)}, ${runner.source}, marklessSsrRenderContext, ${String(node.pending != null)}))))`,
 			JSON.stringify(`<!--/markless:async:${boundary.id}-->`),
 		]);
 	}
@@ -353,9 +453,10 @@ function emitCsrRepeatRows(node: AnyNode, context: CsrRenderContext): string {
 	if (!repeat) return '""';
 	const gate = context.repeatGates.find((item) => item.repeatId === repeat.id);
 	if (!gate?.supported) return '""';
+	const componentRows = gate.componentRows === true;
 
 	const row = singleRepeatRowElement(node);
-	if (!row || !isPlainHostTemplateNode(row)) return '""';
+	if (!row || (!componentRows && !isPlainHostTemplateNode(row))) return '""';
 
 	const emptyBlock = node.empty as AnyNode | undefined;
 	const emptyChildren = emptyBlock
@@ -363,7 +464,16 @@ function emitCsrRepeatRows(node: AnyNode, context: CsrRenderContext): string {
 		: [];
 	if (emptyChildren.some((child) => !isPlainHostTemplateNode(child))) return '""';
 
+	// Rows repeat per item, so a single arm-relative locator cannot name them:
+	// row instances never carry the arm-host tag (the keyed-repeat machinery
+	// owns row records) — mirror of the SSR insideRepeatRow discipline.
+	const armHostIdByNode = context.armHostIdByNode;
+	const insideRepeatRow = context.insideRepeatRow;
+	context.armHostIdByNode = undefined;
+	context.insideRepeatRow = true;
 	const rowHtml = emitHtmlNode(row, context);
+	context.armHostIdByNode = armHostIdByNode;
+	context.insideRepeatRow = insideRepeatRow;
 	const rowParams = repeat.indexName
 		? `(${repeat.itemName}, ${repeat.indexName})`
 		: `(${repeat.itemName})`;
@@ -452,16 +562,53 @@ function emitSwitchHtml(node: AnyNode, context: HtmlRenderContext): string {
 	let maxChildIndex = before?.nextChildIndex ?? 0;
 	let maxComponentEdgeIndex = before?.nextComponentEdgeIndex ?? 0;
 
+	const switchArmFlip =
+		!!site &&
+		siteGate?.supported === true &&
+		siteGate.armScoped === true &&
+		siteGate.armFlip === true;
+	// Case gates for CSR child-component renders (see the @if CSR note): each
+	// tested case gates on discriminant equality; @default gates on none of the
+	// tested cases matching.
+	const caseTestSources = asNodes(node.cases).flatMap((switchCase) => {
+		const test = switchCase.test as AnyNode | undefined;
+		return test ? [expressionSource(test, context.source)] : [];
+	});
+	const caseGateSource = (testSource: string | undefined): string =>
+		testSource === undefined
+			? caseTestSources.length === 0
+				? 'true'
+				: `!(${caseTestSources.map((candidate) => `(${discriminantSource}) === (${candidate})`).join(' || ')})`
+			: `(${discriminantSource}) === (${testSource})`;
 	const emitCaseBody = (switchCase: AnyNode): string => {
 		const children = asNodes(switchCase.consequent);
 		if (context.mode === 'csr' || !before) {
-			return joinSsrExpressions(children.map((child) => emitHtmlNode(child, context)));
+			// Arm-scoped flip content is branch-owned (see the @if CSR note).
+			const armHostIdByNode = context.armHostIdByNode;
+			if (switchArmFlip) context.armHostIdByNode = undefined;
+			const caseStart = csrChildReplacementCount(context);
+			const csrBody = joinSsrExpressions(
+				children.map((child) => emitHtmlNode(child, context)),
+			);
+			const test = switchCase.test as AnyNode | undefined;
+			gateCsrChildReplacements(
+				context,
+				caseStart,
+				caseGateSource(test ? expressionSource(test, context.source) : undefined),
+			);
+			if (switchArmFlip) context.armHostIdByNode = armHostIdByNode;
+			return csrBody;
 		}
 		const caseContext: SsrRenderContext = {
 			...context,
 			...before,
+			// armScoped @switch cases keep real host locators (see the @if arm
+			// note): the boundary's armRecords own their coordinates. Flip-planned
+			// cases are branch-owned and render locator-free instead.
 			insideSupportedBranchArm:
-				(context as SsrRenderContext).insideSupportedBranchArm || !!siteGate?.supported,
+				(context as SsrRenderContext).insideSupportedBranchArm ||
+				(!!siteGate?.supported &&
+					(siteGate.armScoped !== true || siteGate.armFlip === true)),
 		};
 		const body = joinSsrExpressions(children.map((child) => emitHtmlNode(child, caseContext)));
 		maxChildIndex = Math.max(maxChildIndex, caseContext.nextChildIndex);
@@ -491,14 +638,42 @@ function emitSwitchHtml(node: AnyNode, context: HtmlRenderContext): string {
 		expression = `(marklessSwitchValue === (${testedCase.testSource}) ? ${testedCase.body} : ${expression})`;
 	}
 	const chain = `((marklessSwitchValue) => ${expression})(${discriminantSource})`;
-	if (site && siteGate?.supported) {
+	if (site && siteGate?.supported && siteGate.armScoped !== true) {
 		return joinSsrExpressions([
 			JSON.stringify(`<!--markless:branch:${site.id}-->`),
 			chain,
 			JSON.stringify(`<!--/markless:branch:${site.id}-->`),
 		]);
 	}
+	if (site && switchArmFlip) {
+		// Arm-branch anchors: counted only in the owning boundary's own census.
+		return joinSsrExpressions([
+			JSON.stringify(`<!--markless:arm-branch:${site.id}-->`),
+			chain,
+			JSON.stringify(`<!--/markless:arm-branch:${site.id}-->`),
+		]);
+	}
 	return chain;
+}
+
+// CSR branch arms interpolate their HTML inside a ternary, but component
+// child renders emit OUT-OF-BAND statements (render + placeholder replace +
+// registration). Those statements must run only when the owning arm rendered:
+// a component in a falsy arm reading absent data must never execute (D2).
+function csrChildReplacementCount(context: HtmlRenderContext): number {
+	return context.mode === 'csr' ? context.childReplacements.length : 0;
+}
+
+function gateCsrChildReplacements(
+	context: HtmlRenderContext,
+	start: number,
+	testSource: string,
+): void {
+	if (context.mode !== 'csr' || testSource === 'true') return;
+	const replacements = context.childReplacements;
+	if (replacements.length === start) return;
+	const gated = replacements.splice(start).map((line) => `\t${line}`);
+	replacements.push(`	if (${testSource}) {`, ...gated, '	}');
 }
 
 function emitHtmlBranch(node: AnyNode | undefined, context: HtmlRenderContext): string {

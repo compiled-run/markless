@@ -83,14 +83,23 @@ function baseState(value: unknown): asserts value is ProtocolStatePayload {
 }
 function baseView(value: unknown): asserts value is ProtocolViewPayload {
 	const payload = root(value, 'markless/view');
-	for (const key of ['locators', 'events', 'domUpdates', 'behaviors', 'elementHandles', 'asyncBoundaries'] as const) arr(payload, key, 'markless/view');
+	for (const key of [
+		'locators',
+		'events',
+		'domUpdates',
+		'behaviors',
+		'elementHandles',
+		'asyncBoundaries',
+	] as const)
+		arr(payload, key, 'markless/view');
 	for (const [index, locator] of payload.locators.entries()) {
 		const context = `markless/view locator[${index}]`;
 		const record = obj(locator, context);
 		str(record, 'hostNodeId', context);
 		str(record, 'tagName', context);
 		if (record.strategy !== 'dom-order') invalid(context, 'expected strategy "dom-order".');
-		if (!Number.isInteger(record.index) || Number(record.index) < 0) invalid(context, 'expected index non-negative integer.');
+		if (!Number.isInteger(record.index) || Number(record.index) < 0)
+			invalid(context, 'expected index non-negative integer.');
 	}
 	for (const [index, event] of payload.events.entries()) {
 		const context = `markless/view event[${index}]`;
@@ -102,7 +111,8 @@ function baseView(value: unknown): asserts value is ProtocolViewPayload {
 }
 function root(value: unknown, type: RuntimePayloadType): Record<string, unknown> {
 	const record = obj(value, type);
-	if (!('version' in record)) throw payloadInvalidError(type, `Invalid ${type} payload: expected version.`);
+	if (!('version' in record))
+		throw payloadInvalidError(type, `Invalid ${type} payload: expected version.`);
 	return record;
 }
 function obj(value: unknown, context: string): Record<string, unknown> {
@@ -140,13 +150,18 @@ function version(actualVersion: unknown, type: RuntimePayloadType): void {
 	});
 }
 function invalid(context: string, reason: string): never {
-	throw payloadInvalidError(context.startsWith('markless/view') ? 'markless/view' : 'markless/state', `Invalid ${context}: ${reason}`);
+	throw payloadInvalidError(
+		context.startsWith('markless/view') ? 'markless/view' : 'markless/state',
+		`Invalid ${context}: ${reason}`,
+	);
 }
 export function payloadInvalidError(
 	type: RuntimePayloadType,
 	message: string,
 	why = `${type} did not match the required resume payload shape.`,
-	suggestions: ReadonlyArray<{ readonly message: string }> = [{ message: `Emit a valid ${type} payload script.` }],
+	suggestions: ReadonlyArray<{ readonly message: string }> = [
+		{ message: `Emit a valid ${type} payload script.` },
+	],
 ): RuntimePayloadError {
 	return new RuntimePayloadError({
 		code: 'MARKLESS_PAYLOAD_INVALID',

@@ -29,7 +29,8 @@ test('progressive execution: qualifying row dispatch stays on the lean keyed-rep
 	const rowAction = actionForKeyedRepeat(container, rowButton, 'click');
 
 	rowButton.click();
-	await expect.poll(() => requireElement<HTMLOutputElement>(container, 'output[data-choice]').textContent)
+	await expect
+		.poll(() => requireElement<HTMLOutputElement>(container, 'output[data-choice]').textContent)
 		.toBe('north');
 
 	const executed = executedModules();

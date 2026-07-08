@@ -1,12 +1,23 @@
 import { isEventAttribute, normalizeEventName } from '@tsrx/core';
 import { asNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource } from '../../ast/source.ts';
-import { getElementAttributes, getElementTagName, isHostTagName, isIgnorableJsxTextNode as isIgnorableTextNode, isSpreadAttribute, unwrapExpressionContainer } from '../../ast/tsrx.ts';
+import {
+	getElementAttributes,
+	getElementTagName,
+	isHostTagName,
+	isIgnorableJsxTextNode as isIgnorableTextNode,
+	isSpreadAttribute,
+	unwrapExpressionContainer,
+} from '../../ast/tsrx.ts';
 import { emitHtmlChildren } from './html.ts';
 import { objectPropertyName } from './shared.ts';
 import type { ComponentEdge, CsrRenderContext, SsrRenderContext } from './types.ts';
 
-export function emitSsrComponent(node: AnyNode, componentName: string, context: SsrRenderContext): string {
+export function emitSsrComponent(
+	node: AnyNode,
+	componentName: string,
+	context: SsrRenderContext,
+): string {
 	const localName = context.componentImports.get(componentName);
 	if (!localName) return '""';
 	const edge = context.componentEdges[context.nextComponentEdgeIndex++];
@@ -18,15 +29,73 @@ export function emitSsrComponent(node: AnyNode, componentName: string, context: 
 		graphProps: graphReferenceProps(edge),
 	};
 
-	return `(await marklessSsrRenderChild(marklessSsrChildren, ${localName}, { ${props.join(', ')} }, { hostPrefix: ${JSON.stringify(placement.hostPrefix)}, symbolPrefix: ${JSON.stringify(placement.symbolPrefix)}, localIndex: marklessSsrHostLocators.length, graphProps: ${JSON.stringify(placement.graphProps)} }))`;
+	return `(await marklessSsrRenderChild(marklessSsrChildren, ${localName}, { ${props.join(', ')} }, { hostPrefix: ${JSON.stringify(placement.hostPrefix)}, symbolPrefix: ${JSON.stringify(placement.symbolPrefix)}, localIndex: marklessSsrHostLocators.length, graphProps: ${JSON.stringify(placement.graphProps)} }, marklessSsrRenderContext))`;
 }
 
-export function emitCsrComponent(node: AnyNode, componentName: string, context: CsrRenderContext): string {
+// Component invocation inside a keyed repeat row (SSR): the row mapper
+// executes the component per row with the item in scope and splices the html.
+// No child composition record exists (rows repeat; composed records cannot),
+// so the row-child helper fail-closes on interactive child output. The
+// component edge is still consumed to keep later edges document-aligned.
+export function emitSsrRowComponent(
+	node: AnyNode,
+	componentName: string,
+	context: SsrRenderContext,
+): string {
 	const localName = context.componentImports.get(componentName);
 	if (!localName) return '""';
-	const index = context.childReplacements.length;
 	const edge = context.componentEdges[context.nextComponentEdgeIndex++];
-	const props = componentPropsSource(node, context.source, edge, context.callbackSymbols);
+	const props = ssrComponentPropsSource(node, context, edge, context.callbackSymbols);
+	return `(await marklessSsrRowChild(${localName}, { ${props.join(', ')} }, ${JSON.stringify(componentName)}))`;
+}
+
+// CSR mirror of emitSsrRowComponent: renders the child synchronously and
+// splices its markup into the row html string.
+export function emitCsrRowComponent(
+	node: AnyNode,
+	componentName: string,
+	context: CsrRenderContext,
+): string {
+	const localName = context.componentImports.get(componentName);
+	if (!localName) return '""';
+	const edge = context.componentEdges[context.nextComponentEdgeIndex++];
+	const props = componentPropsSource(node, context, edge, context.callbackSymbols);
+	return `marklessCsrRowChild(${localName}, { ${props.join(', ')} }, ${JSON.stringify(componentName)})`;
+}
+
+// Component invocation projected through another component's children prop
+// (CSR string emission): placeholder replacement cannot reach projected
+// content, so the child renders markup-only via a synchronous splice — SSR
+// already composes these children, and silently dropping them lost router
+// <Link> anchors on client-side route swaps. Interactive child output refuses
+// loudly at render (the projected-child helper fail-closes).
+export function emitCsrProjectedComponent(
+	node: AnyNode,
+	componentName: string,
+	context: CsrRenderContext,
+): string {
+	const localName = context.componentImports.get(componentName);
+	if (!localName) return '""';
+	const edge = context.componentEdges[context.nextComponentEdgeIndex++];
+	const props = componentPropsSource(node, context, edge, context.callbackSymbols);
+	return `marklessCsrProjectedChild(${localName}, { ${props.join(', ')} }, ${JSON.stringify(componentName)})`;
+}
+
+export function emitCsrComponent(
+	node: AnyNode,
+	componentName: string,
+	context: CsrRenderContext,
+): string {
+	const localName = context.componentImports.get(componentName);
+	if (!localName) return '""';
+	// Arm-render modules number children page-aligned (symbol routes key on
+	// the component-edge index); the page module keeps its own numbering.
+	const index =
+		context.nextChildIndex !== undefined
+			? context.nextChildIndex++
+			: context.childReplacements.length;
+	const edge = context.componentEdges[context.nextComponentEdgeIndex++];
+	const props = componentPropsSource(node, context, edge, context.callbackSymbols);
 	const childName = `marklessCsrChild${index}`;
 	context.childReplacements.push(
 		`	const ${childName} = marklessCsrRenderChild(${localName}, { ${props.join(', ')} });`,
@@ -38,10 +107,11 @@ export function emitCsrComponent(node: AnyNode, componentName: string, context: 
 
 function componentPropsSource(
 	node: AnyNode,
-	source: string,
+	context: CsrRenderContext,
 	edge: ComponentEdge | undefined,
 	callbackSymbols: ReadonlyMap<string, string>,
 ): string[] {
+	const source = context.source;
 	const props = getElementAttributes(node).flatMap((attribute) => {
 		const name = getIdentifierName(attribute.name as AnyNode | undefined);
 		if (!name) return [];
@@ -51,7 +121,35 @@ function componentPropsSource(
 		}
 		return componentAttributePropSource(attribute, source);
 	});
-	const children = emitHtmlChildren(node, { mode: 'csr', source });
+	// Children render in the PARENT's template space: branch sites and keyed
+	// repeats authored inside them belong to the parent's semantic streams, so
+	// their gates/plans (and index consumption) must flow through — otherwise
+	// an arm-scoped flip site inside projected children loses its anchors.
+	// Component invocations inside projected children render markup-only
+	// through the projected-child/row-child splice (childReplacements cannot
+	// reach placeholders that live inside another child's rendered output).
+	const childrenContext: CsrRenderContext = {
+		mode: 'csr',
+		source,
+		childReplacements: [],
+		componentEdges: context.componentEdges,
+		componentImports: context.componentImports,
+		callbackSymbols: context.callbackSymbols,
+		nextComponentEdgeIndex: context.nextComponentEdgeIndex,
+		childrenMarkupOnly: true,
+		branchSites: context.branchSites,
+		branchReactivityGates: context.branchReactivityGates,
+		nextBranchSiteIndex: context.nextBranchSiteIndex,
+		keyedRepeats: context.keyedRepeats,
+		repeatGates: context.repeatGates,
+		nextRepeatIndex: context.nextRepeatIndex,
+		styleScopeClass: context.styleScopeClass,
+		armHostIdByNode: context.armHostIdByNode,
+	};
+	const children = emitHtmlChildren(node, childrenContext);
+	context.nextComponentEdgeIndex = childrenContext.nextComponentEdgeIndex;
+	context.nextBranchSiteIndex = childrenContext.nextBranchSiteIndex;
+	context.nextRepeatIndex = childrenContext.nextRepeatIndex;
 	if (children !== '""') {
 		props.push(`children: ${children}`);
 	}
@@ -198,4 +296,3 @@ export function collectCsrPropEvents(
 	return events;
 }
 export { objectPropertyName } from './shared.ts';
-

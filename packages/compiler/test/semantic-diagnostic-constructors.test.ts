@@ -64,7 +64,9 @@ test('helper return gate wording describes only residual unsupported helper shap
 			code: 'MARKLESS_STATE_HELPER_RETURN_UNSUPPORTED',
 			title: 'Helper-created state return shape is not supported',
 			message: expect.stringContaining('cannot connect this helper return shape'),
-			why: expect.stringContaining('same-module direct helper returns and compiled imported helpers'),
+			why: expect.stringContaining(
+				'same-module direct helper returns and compiled imported helpers',
+			),
 		}),
 	);
 	expect(diagnostic.message).not.toContain('helper-created state is coming');

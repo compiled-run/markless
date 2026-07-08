@@ -35,7 +35,7 @@ test('web render entry does not statically import event-only resume fallback cod
 	expect(renderSource).not.toMatch(/import\(\s*['"]\.\/event-only-resume\.ts['"]\s*\)/);
 	expect(renderSource).not.toMatch(/import\(\s*['"]\.\/resume\.ts['"]\s*\)/);
 	expect(renderSource).not.toMatch(/import\(\s*['"]\.\/payload\.ts['"]\s*\)/);
-	expect(renderCsrSource).toContain("import(\n\t\t\t'./payload-graph-construct.ts'");
+	expect(renderCsrSource).toMatch(/import\(\s*['"]\.\/payload-graph-construct\.ts['"]\s*\)/);
 	expect(renderCsrSource).not.toContain("import('./payload-full.ts')");
 });
 
@@ -44,10 +44,12 @@ test('full resume avoids the server value decoder in browser chunks', async () =
 	const graphSource = await readSource('../src/payload-graph-construct.ts');
 	const repeatSource = await readSource('../src/repeat-runtime.ts');
 
-	expect(payloadSource).toContain("import('./payload-graph-construct.ts')");
+	// T115: static edge — the demand map co-demands graph construction with
+	// payload-full on every tier that loads it; chunk groups keep them split.
+	expect(payloadSource).toContain("from './payload-graph-construct.ts'");
 	expect(payloadSource).not.toContain("import('../../serializer/src/value-decode-client.ts')");
 	expect(graphSource).toContain("import('../../serializer/src/value-decode-client.ts')");
-	expect(repeatSource).toContain("@markless/serializer/decode-client");
+	expect(repeatSource).toContain('@markless/serializer/decode-client');
 	expect(payloadSource).not.toContain("@markless/serializer/decode'");
 	expect(repeatSource).not.toContain("@markless/serializer/decode'");
 });
@@ -66,17 +68,17 @@ test('payload-full keeps heavy resume dependencies behind dynamic gates', async 
 		'./inline/payload-document.ts',
 		'./resume.ts',
 	]) {
-		expect(runtimeImports).not.toContainEqual(
-			expect.stringContaining(`from '${specifier}'`),
-		);
+		expect(runtimeImports).not.toContainEqual(expect.stringContaining(`from '${specifier}'`));
 	}
 });
 
-test('payload graph construction is isolated behind a payload-full dynamic import', async () => {
+test('payload graph construction stays isolated in its own module', async () => {
 	const payloadSource = await readSource('../src/payload-full.ts');
 	const graphSource = await readSource('../src/payload-graph-construct.ts');
 
-	expect(payloadSource).toContain("import('./payload-graph-construct.ts')");
+	// T115: graph construction is a static re-export (always co-demanded), but
+	// its implementation and the runtime graph import stay out of payload-full.
+	expect(payloadSource).toContain("from './payload-graph-construct.ts'");
 	expect(payloadSource).not.toContain("from '@markless/runtime'");
 	expect(payloadSource).not.toContain('asyncRunnerSymbolsByGraphNode');
 	expect(graphSource).toContain('createRuntimeGraphFromResumePayload');
@@ -100,7 +102,9 @@ test('resume runtime split points keep capability code in separate modules', asy
 	expect(runtimeSource).not.toContain('function wireAsyncBoundariesWithoutLoadingCapability');
 	expect(runtimeSource).not.toContain('function receiveSharedPatch');
 	expect(runtimeSharedSource).toContain('receiveSharedPatch');
-	expect(runtimeSource).not.toContain('function wireSyncComputedDemandTriggersWithoutLoadingCapability');
+	expect(runtimeSource).not.toContain(
+		'function wireSyncComputedDemandTriggersWithoutLoadingCapability',
+	);
 	expect(asyncWiringSource).toContain('settleAsyncBoundaryRange');
 	expect(sharedPatchSource).toContain('receiveSharedPatch');
 	expect(syncDemandSource).toContain('wireSyncComputedDemandTriggersWithoutLoadingCapability');

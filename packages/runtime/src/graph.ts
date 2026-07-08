@@ -23,11 +23,7 @@ import {
 	markDirtyComputedDependencies,
 	readComputedNode,
 } from './graph-computed.ts';
-import {
-	appendJournalResult,
-	scheduleMicrotask,
-	type DirtyPath,
-} from './graph-scheduler.ts';
+import { appendJournalResult, scheduleMicrotask, type DirtyPath } from './graph-scheduler.ts';
 import { createSharedGraphPlane } from './graph-shared.ts';
 
 export type RuntimeGraphCell = {
@@ -57,6 +53,10 @@ export type RuntimeGraphAsyncSnapshot =
 			readonly status: 'pending';
 			readonly version: number;
 			readonly key: unknown;
+			// A re-run carries the prior settled value so event-time reads keep
+			// answering with it until the new snapshot commits (spec D8: "the
+			// prior value is always addressable"; Solid 2 `latest` semantics).
+			readonly value?: unknown;
 	  }
 	| {
 			readonly status: 'fulfilled';
@@ -227,7 +227,9 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 
 		const asyncComputed = asyncComputedNodes.get(graphNodeId);
 		if (asyncComputed) {
-			return readAsyncComputedNode(asyncComputed, path, () => demandAsyncComputed(asyncComputed));
+			return readAsyncComputedNode(asyncComputed, path, () =>
+				demandAsyncComputed(asyncComputed),
+			);
 		}
 
 		return readPath(cells.get(graphNodeId), path);

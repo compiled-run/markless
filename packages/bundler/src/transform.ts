@@ -22,6 +22,38 @@ import {
 } from './source-module.ts';
 import { injectExecutionLogModuleHook } from './execution-log.ts';
 
+// Authored TS (param annotations, assertions, type aliases) survives compilation
+// into emitted module code, but downstream consumers (Vite builtins, symbol
+// virtual modules) parse it as JS. Strip types at emission — Rolldown-native.
+// Loaded lazily: rolldown/experimental binds native code that must never enter
+// the browser module graph (dev client imports this file's module scope).
+let oxcTransformSyncPromise:
+	| Promise<typeof import('rolldown/experimental').transformSync | undefined>
+	| undefined;
+function loadOxcTransformSync() {
+	oxcTransformSyncPromise ??= import('rolldown/experimental').then(
+		(mod) => mod.transformSync,
+		() => undefined,
+	);
+	return oxcTransformSyncPromise;
+}
+
+async function stripEmittedTypes(code: string): Promise<string> {
+	const oxcTransformSync = await loadOxcTransformSync();
+	if (!oxcTransformSync) return code;
+	try {
+		const out = oxcTransformSync('markless-emitted.ts', code);
+		// transformSync reports failures via `errors` with empty output instead of
+		// throwing (e.g. lib-mode emissions that carry authored TSRX syntax).
+		if (!out.code || (out.errors?.length ?? 0) > 0) return code;
+		return out.code;
+	} catch {
+		// Never make emission fail on the stripper; downstream diagnostics are
+		// more specific about genuinely-invalid code.
+		return code;
+	}
+}
+
 export { MARKLESS_VIRTUAL_PREFIX, resumeVirtualModuleId } from './source-module.ts';
 
 export async function transformTsrxModule(
@@ -100,29 +132,34 @@ export async function transformTsrxModule(
 				symbolRoutes,
 			}),
 		},
-		...compiled.symbolModules.modules.map(
-			(module, index): MarklessVirtualModule => ({
-				id: symbolVirtualModuleId(input.filename, module.symbolId),
-				type: 'symbol',
-				symbolId: module.symbolId,
-				exportName: symbolRows[index]!.exportName,
-				source: injectExecutionLogModuleHook(
-					rewriteSymbolModuleExport(
-						module.source,
-						module.exportName,
-						symbolRows[index]!.exportName,
+		...(await Promise.all(
+			compiled.symbolModules.modules.map(
+				async (module, index): Promise<MarklessVirtualModule> => ({
+					id: symbolVirtualModuleId(input.filename, module.symbolId),
+					type: 'symbol',
+					symbolId: module.symbolId,
+					exportName: symbolRows[index]!.exportName,
+					source: injectExecutionLogModuleHook(
+						await stripEmittedTypes(
+							rewriteSymbolModuleExport(
+								module.source,
+								module.exportName,
+								symbolRows[index]!.exportName,
+							),
+						),
+						`symbol:${module.symbolId}`,
+						executionLogModuleHookMode,
 					),
-					`symbol:${module.symbolId}`,
-					executionLogModuleHookMode,
-				),
-			}),
-		),
+				}),
+			),
+		)),
 	];
 
 	const styleImport = styleId ? `import ${JSON.stringify(styleId)};\n` : '';
 	return {
 		code:
-				styleImport +
+			styleImport +
+			(await stripEmittedTypes(
 				emitSourceModule({
 					filename: input.filename,
 					payloadId,
@@ -132,7 +169,10 @@ export async function transformTsrxModule(
 					executionLog: input.executionLog,
 					headInjections: input.headInjections,
 					devResumeReexport: input.devResumeReexport === true,
-					needsFullResume: needsFullResume(compiled.protocolView, compiled.runtimeDemandMap),
+					needsFullResume: needsFullResume(
+						compiled.protocolView,
+						compiled.runtimeDemandMap,
+					),
 					resumeModuleUrl: input.resumeModuleUrl,
 					publicRenderModuleSource: compiled.publicRenderModule.moduleSource,
 					publicRenderRootExportName: compiled.publicRenderModule.rootExportName,
@@ -142,7 +182,8 @@ export async function transformTsrxModule(
 					publicRenderSsrExportName: compiled.publicRenderModule.ssrExportName,
 					symbols: symbolRows,
 					symbolRoutes,
-			}),
+				}),
+			)),
 		map: null,
 		virtualModules,
 		manifest,
@@ -172,5 +213,7 @@ function needsFullResume(
 }
 
 function recordKindReplaced(runtimeDemandMap: RuntimeDemandMapArtifact, kind: string): boolean {
-	return runtimeDemandMap.recordKinds.some((record) => record.kind === kind && record.replaced === true);
+	return runtimeDemandMap.recordKinds.some(
+		(record) => record.kind === kind && record.replaced === true,
+	);
 }

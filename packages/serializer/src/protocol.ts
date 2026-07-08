@@ -46,6 +46,11 @@ export type ProtocolStatePayload = {
 		readonly name: string;
 		readonly valueKind: 'scalar' | 'object' | 'array' | 'unknown';
 		readonly value?: unknown;
+		// Live-value channel (need 14): CSR mounts seed cells (page props) whose
+		// value never crosses HTML, so it travels as-is instead of a serialized
+		// envelope. Hosts serving a payload script must envelope-encode these via
+		// serializeRuntimeStateCells first — payload decoding rejects the field.
+		readonly directValue?: unknown;
 	}>;
 	readonly computed: ReadonlyArray<{
 		readonly graphNodeId: string;
@@ -102,6 +107,39 @@ export type ProtocolStatePayload = {
 			  }
 		>;
 	}>;
+};
+
+// D3 arm-relative coordinates: records inside an async boundary arm index
+// from the boundary's start anchor (locator index 0 names the first element
+// after it), so arms stay closed, movable, replaceable, streamable units.
+// Arm-scoped branch records resolve their anchors in the arm's own
+// arm-branch comment census; escalated records carry no anchors.
+export type ProtocolArmBranchRecord = {
+	readonly id: string;
+	readonly testReads: ReadonlyArray<{
+		readonly source: string;
+		readonly graphNodeId: string;
+		readonly path: ReadonlyArray<string>;
+	}>;
+	readonly symbolId?: string;
+	readonly armTests?: ReadonlyArray<unknown>;
+	readonly declaredEmptyArms?: ReadonlyArray<number>;
+	readonly startAnchor?: { readonly strategy: 'arm-branch-comment'; readonly index: number };
+	readonly endAnchor?: { readonly strategy: 'arm-branch-comment'; readonly index: number };
+	readonly armRecords?: NonNullable<ProtocolViewPayload['branches']>[number]['armRecords'];
+};
+
+export type ProtocolArmRecordSet = {
+	readonly locators: ReadonlyArray<{
+		readonly hostNodeId: string;
+		readonly strategy: 'arm-relative';
+		readonly index: number;
+		readonly tagName: string;
+	}>;
+	readonly events: ProtocolViewPayload['events'];
+	readonly behaviors: ProtocolViewPayload['behaviors'];
+	readonly elementHandles: ProtocolViewPayload['elementHandles'];
+	readonly branches?: ReadonlyArray<ProtocolArmBranchRecord>;
 };
 
 export type ProtocolViewPayload = {
@@ -209,6 +247,11 @@ export type ProtocolViewPayload = {
 	readonly asyncBoundaries: ReadonlyArray<{
 		readonly id: string;
 		readonly updateSymbolId?: string;
+		// A single set is the armized truth for the arm the render actually
+		// served (SSR compose / arm-render modules); an array is the compiler's
+		// per-arm plan (index 0 = @try, 1 = @pending, 2 = @catch), which is not
+		// positionally trustworthy after composition and is never registrable.
+		readonly armRecords?: ProtocolArmRecordSet | ReadonlyArray<ProtocolArmRecordSet>;
 		readonly startAnchor: {
 			readonly strategy: 'dom-order-comment';
 			readonly index: number;

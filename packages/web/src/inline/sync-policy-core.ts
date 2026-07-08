@@ -1,4 +1,8 @@
-import type { ProtocolSyncPolicy, ProtocolSyncPolicyBranch, ProtocolSyncPolicyCondition } from '../../../serializer/src/protocol.ts';
+import type {
+	ProtocolSyncPolicy,
+	ProtocolSyncPolicyBranch,
+	ProtocolSyncPolicyCondition,
+} from '../../../serializer/src/protocol.ts';
 
 export type SyncPolicyGraph = {
 	read(graphNodeId: string, path?: ReadonlyArray<string>): unknown;

@@ -20,7 +20,7 @@ const fixtures = [
 			entryHtml: 'packages/bundler/fixtures/vite-csr/dist/index.html',
 			maxRuntimeChunkGzipBytes: 3_100,
 			// anti-bloat wall — tightened by the runtime-stdlib goal; any increase must be justified
-			maxEmittedRuntimeGzipBytes: 15_500, // anti-bloat wall, measured 15,348; re-baselined 2026-07-06 after resume-time escalation made the fail-closed full-resume chain emit-reachable (emitted != fetched != executed; per-chunk caps unchanged and passing); tighten-only from here; runtime-stdlib goal shrinks the library itself
+			maxEmittedRuntimeGzipBytes: 18_050, // anti-bloat wall, measured 17,962; re-baselined 2026-07-07 after tier-3 arm-branch flips became emit-reachable (demand-loaded; per-chunk caps + event-only budget unchanged); tighten-only from here; runtime-stdlib goal shrinks the library itself. consolidation debt: runtime-stdlib goal owns shrinking; two same-day re-baselines (commitArm, arm flips) — next expansion needs library shrink first.
 			forbidVitePreloadHelper: true,
 		},
 	},
@@ -52,7 +52,7 @@ const fixtures = [
 			entryHtml: 'packages/bundler/fixtures/vite-plus/dist/index.html',
 			maxRuntimeChunkGzipBytes: 2_950,
 			// anti-bloat wall — tightened by the runtime-stdlib goal; any increase must be justified
-			maxEmittedRuntimeGzipBytes: 15_450, // anti-bloat wall, measured 15,272; re-baselined 2026-07-06 after resume-time escalation made the fail-closed full-resume chain emit-reachable (emitted != fetched != executed; per-chunk caps unchanged and passing); tighten-only from here; runtime-stdlib goal shrinks the library itself
+			maxEmittedRuntimeGzipBytes: 18_025, // anti-bloat wall, measured 17,926; re-baselined 2026-07-07 after tier-3 arm-branch flips became emit-reachable (demand-loaded; per-chunk caps + event-only budget unchanged); tighten-only from here; runtime-stdlib goal shrinks the library itself. consolidation debt: runtime-stdlib goal owns shrinking; two same-day re-baselines (commitArm, arm flips) — next expansion needs library shrink first.
 			forbidVitePreloadHelper: true,
 		},
 	},

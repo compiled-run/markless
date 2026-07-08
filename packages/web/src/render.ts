@@ -35,6 +35,14 @@ export type CsrRenderOptions = {
 	readonly createRemovalObserver?: ResumeRuntimeInput['createRemovalObserver'];
 	readonly applyDomJournal?: ResumeRuntimeInput['applyDomJournal'];
 	readonly renderBranchHtml?: ResumeRuntimeInput['renderBranchHtml'];
+	// D8 navigation transitions: runs after the page is fully live (runtime
+	// started, boundary runners demanded) but BEFORE it is mounted into the
+	// target — the router holds the outgoing page here until the destination
+	// settles or the deadline passes. Returning false cancels the mount (the
+	// navigation was superseded).
+	readonly beforeMount?: (
+		container: CsrRenderContainer,
+	) => Promise<boolean | void> | boolean | void;
 };
 
 type CompilerProvidedCsrRuntime = {
@@ -71,13 +79,17 @@ export async function render(
 			const { validateKeyedRepeatGraphKeys } = await import('./repeat-runtime.ts');
 			validateKeyedRepeatGraphKeys(output.graph, output.view);
 		}
-		mountRoot(options.target, output.root);
-		return {
+		const container: CsrRenderContainer = {
 			phase: 'csr',
 			root: output.root,
 			graph: output.graph,
 			runtime: output.runtime,
 		};
+		if ((await options.beforeMount?.(container)) === false) {
+			return disposeCancelledMount(container);
+		}
+		mountRoot(options.target, output.root);
+		return container;
 	}
 
 	// Fragment-rooted components: DOM expands the fragment on mount, so the
@@ -86,6 +98,28 @@ export async function render(
 	// indexes shift +1 because the root element joins the dom-order walk —
 	// the same discipline containerScopedView applies for SSR containers.
 	if ((output.root as { readonly nodeType?: number }).nodeType === 11) {
+		// A held route swap cannot mount into the visible target first: the
+		// fragment expands into a layout-transparent holder that stays the
+		// container root, and the holder itself mounts when the hold commits.
+		const holder = options.beforeMount ? createFragmentHolder(options.target) : undefined;
+		if (holder) {
+			mountRoot(holder as RenderTarget, output.root);
+			const container = await import('./render-csr.ts').then((runtime) =>
+				runtime.renderCsrRuntime({
+					output: {
+						...output,
+						root: holder,
+						view: output.view ? offsetElementLocators(output.view, 1) : output.view,
+					},
+					options,
+				}),
+			);
+			if ((await options.beforeMount!(container)) === false) {
+				return disposeCancelledMount(container);
+			}
+			mountRoot(options.target, holder);
+			return container;
+		}
 		mountRoot(options.target, output.root);
 		return await import('./render-csr.ts').then((runtime) =>
 			runtime.renderCsrRuntime({
@@ -105,8 +139,37 @@ export async function render(
 			options,
 		}),
 	);
+	if ((await options.beforeMount?.(container)) === false) {
+		return disposeCancelledMount(container);
+	}
 	mountRoot(options.target, output.root);
 	return container;
+}
+
+// A superseded navigation never mounts; release the held page's runtime
+// wiring so the abandoned island holds no live subscriptions or observers.
+function disposeCancelledMount(container: CsrRenderContainer): CsrRenderContainer {
+	(container.runtime as { readonly dispose?: () => void }).dispose?.();
+	return container;
+}
+
+// The holder wraps a fragment-rooted page for a held route swap. It stays in
+// the page as the container root, so it must be layout-transparent
+// (display: contents) — the page's own top-level elements keep their layout.
+function createFragmentHolder(target: RenderTarget): ResumeDomElement | undefined {
+	const documentHost =
+		(target as { readonly ownerDocument?: unknown }).ownerDocument ??
+		(globalThis as { readonly document?: unknown }).document;
+	const createElement = (
+		documentHost as { readonly createElement?: (tagName: string) => unknown } | undefined
+	)?.createElement;
+	if (typeof createElement !== 'function') return undefined;
+	const holder = createElement.call(documentHost, 'div') as ResumeDomElement & {
+		readonly setAttribute?: (name: string, value: string) => void;
+	};
+	holder.setAttribute?.('style', 'display: contents');
+	holder.setAttribute?.('data-markless-route-holder', '');
+	return holder;
 }
 
 function offsetElementLocators(view: ProtocolViewPayload, offset: number): ProtocolViewPayload {

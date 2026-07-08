@@ -1,5 +1,6 @@
 import type {
 	GeneratedSymbolModule,
+	PublicRenderPlanAsyncBoundaryArmRender,
 	PublicRenderPlanAsyncBoundaryArms,
 	PublicRenderPlanBranchArms,
 	LoweredStateRead,
@@ -21,6 +22,12 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 	const boundaryArmsById = new Map(
 		(input.publicRenderPlan?.asyncBoundaryArms ?? []).map((entry) => [entry.boundaryId, entry]),
 	);
+	const boundaryArmRendersById = new Map(
+		(input.publicRenderPlan?.asyncBoundaryArmRenders ?? []).map((entry) => [
+			entry.boundaryId,
+			entry,
+		]),
+	);
 
 	return {
 		passId: 'symbol-modules',
@@ -31,7 +38,9 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 			}
 			if (symbol.kind === 'async-boundary-update') {
 				const arms = boundaryArmsById.get(symbol.boundaryId);
-				return arms ? [emitAsyncBoundaryUpdateModule(symbol, arms)] : [];
+				if (arms) return [emitAsyncBoundaryUpdateModule(symbol, arms)];
+				const armRender = boundaryArmRendersById.get(symbol.boundaryId);
+				return armRender ? [emitAsyncBoundaryArmRenderModule(symbol, armRender)] : [];
 			}
 			return emitSymbolModule(symbol, localNamesBySymbol.get(symbol.id) ?? emptyLocalNames);
 		}),
@@ -56,16 +65,26 @@ function emitBranchUpdateModule(
 	const selectorHelper = arms.armTests
 		? 'function marklessSelectSwitchArm(value, tests) { for (let index = 0; index < tests.length; index++) { if (tests[index] !== null && value === tests[index]) return index; } return tests.indexOf(null); }'
 		: null;
+	// Arm-scoped flips may carry repeat parts: rows rebuild from a live graph
+	// read of the collection at flip time (still no component execution).
+	const hasRepeatParts = arms.arms.some((arm) => arm.some((part) => 'repeat' in part));
+	const partExpression = hasRepeatParts
+		? 'parts.map((part) => part.text !== undefined ? part.text : part.repeat !== undefined ? marklessBranchRows(part.repeat, context.graph) : marklessBranchText(context.graph.read(part.read.graphNodeId, part.read.path))).join("")'
+		: 'parts.map((part) => part.text !== undefined ? part.text : marklessBranchText(context.graph.read(part.read.graphNodeId, part.read.path))).join("")';
+	const rowsHelper = hasRepeatParts
+		? 'function marklessBranchRows(repeat, graph) { const items = graph.read(repeat.read.graphNodeId, repeat.read.path); if (!Array.isArray(items)) return ""; return items.map((item) => repeat.rowParts.map((row) => row.text !== undefined ? row.text : row.itemPath !== undefined ? marklessBranchText(row.itemPath.reduce((value, key) => value == null ? value : value[key], item)) : marklessBranchText(graph.read(row.read.graphNodeId, row.read.path))).join("")).join(""); }'
+		: null;
 	const source = [
 		`const marklessBranchArms = ${JSON.stringify(arms.arms)};`,
 		...(selectorHelper ? [selectorHelper] : []),
 		`export function ${exportName}(context) {`,
 		`	const arm = context.arm ?? (${armSelector});`,
 		'	const parts = marklessBranchArms[arm] ?? [];',
-		'	const html = parts.map((part) => part.text !== undefined ? part.text : marklessBranchText(context.graph.read(part.read.graphNodeId, part.read.path))).join("");',
+		`	const html = ${partExpression};`,
 		'	return { arm, html };',
 		'}',
 		'function marklessBranchText(value) { return String(value == null ? "" : value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;"); }',
+		...(rowsHelper ? [rowsHelper] : []),
 	].join('\n');
 	return {
 		symbolId: symbol.id,
@@ -238,7 +257,9 @@ function eventHandlerAuthoredBody(
 	);
 }
 
-function eventHandlerBodySource(source: string): { readonly source: string; readonly sourceStart: number } | null {
+function eventHandlerBodySource(
+	source: string,
+): { readonly source: string; readonly sourceStart: number } | null {
 	const arrowIndex = source.indexOf('=>');
 	if (arrowIndex === -1) return null;
 
@@ -312,7 +333,18 @@ function spliceEventHandlerBody(
 				return [{ start, end, replacement }];
 			},
 		),
-	].sort((left, right) => right.start - left.start || right.end - left.end).filter((item, index, items) => !items.some((other, otherIndex) => otherIndex !== index && item.start >= other.start && item.end <= other.end && other.end - other.start > item.end - item.start));
+	]
+		.sort((left, right) => right.start - left.start || right.end - left.end)
+		.filter(
+			(item, index, items) =>
+				!items.some(
+					(other, otherIndex) =>
+						otherIndex !== index &&
+						item.start >= other.start &&
+						item.end <= other.end &&
+						other.end - other.start > item.end - item.start,
+				),
+		);
 
 	let emitted = bodySource;
 	for (const replacement of replacements) {
@@ -330,10 +362,15 @@ function readBodySpans(
 	read: LoweredStateRead,
 ): ReadonlyArray<{ readonly start: number; readonly end: number }> {
 	const spans: { start: number; end: number }[] = [];
-	for (let start = bodySource.indexOf(read.source); start !== -1; start = bodySource.indexOf(read.source, start + read.source.length)) {
+	for (
+		let start = bodySource.indexOf(read.source);
+		start !== -1;
+		start = bodySource.indexOf(read.source, start + read.source.length)
+	) {
 		const before = bodySource[start - 1] ?? '';
 		const after = bodySource[start + read.source.length] ?? '';
-		if (!isIdentifierChar(before) && before !== '.' && !isIdentifierChar(after)) spans.push({ start, end: start + read.source.length });
+		if (!isIdentifierChar(before) && before !== '.' && !isIdentifierChar(after))
+			spans.push({ start, end: start + read.source.length });
 	}
 	return spans;
 }
@@ -532,7 +569,8 @@ function scalarWriteLeafSource(
 	}
 
 	if (write.operation !== 'assign' || write.assignmentOperator) return null;
-	const valueSource = literalValueSource(write.valueSource) ?? localValueSource(write.valueSource, localNames);
+	const valueSource =
+		literalValueSource(write.valueSource) ?? localValueSource(write.valueSource, localNames);
 	if (!valueSource) return null;
 	return [
 		'return marklessWriteScalar(context, {',
@@ -562,7 +600,13 @@ function emitDomBindingModule(
 	symbol: Extract<PlannedSymbol, { readonly kind: 'dom-update' }>,
 ): string {
 	const exportName = symbolExportName(symbol.id);
-	if (symbol.target.kind === 'text' && symbol.target.prefix === undefined && symbol.target.suffix === undefined && symbol.target.trueValue === undefined && symbol.target.falseValue === undefined) {
+	if (
+		symbol.target.kind === 'text' &&
+		symbol.target.prefix === undefined &&
+		symbol.target.suffix === undefined &&
+		symbol.target.trueValue === undefined &&
+		symbol.target.falseValue === undefined
+	) {
 		return [
 			"import { marklessUpdateText } from '@markless/web/fns/update-text';",
 			'',
@@ -890,7 +934,13 @@ function eventWriteValueSource(
 	moduleImports: ReadonlyArray<SemanticModuleImport>,
 	localNames: ReadonlySet<string>,
 ): string | null {
-	const supported = supportedValueSource(valueSource, eventParameters, graphReads, moduleImports, localNames);
+	const supported = supportedValueSource(
+		valueSource,
+		eventParameters,
+		graphReads,
+		moduleImports,
+		localNames,
+	);
 	if (supported) return supported;
 
 	const source = valueSource?.trim();
@@ -909,7 +959,10 @@ function spliceGraphReadsAndLocals(
 			source: read.source,
 			replacement: graphReadCallSource('context.graph.read', read.graphNodeId, read.path),
 		})),
-		...Array.from(localNames).map((name) => ({ source: name, replacement: `context.locals?.${name}` })),
+		...Array.from(localNames).map((name) => ({
+			source: name,
+			replacement: `context.locals?.${name}`,
+		})),
 	].sort((left, right) => right.source.length - left.source.length);
 
 	let emitted = source;
@@ -2056,6 +2109,25 @@ function emitAsyncBoundaryUpdateModule(
 		'	return { arm, html };',
 		'}',
 		'function marklessBoundaryText(value) { return String(value == null ? "" : value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;"); }',
+	].join('\n');
+	return { symbolId: symbol.id, kind: symbol.kind, exportName, source };
+}
+
+// Tier-4 arm renderer (D1): the public-render plan owns the emission pieces
+// (component imports, planned records, render body); this pass only names the
+// export the generated resolver dispatches to. Same callable contract as the
+// parts-based module, extended with arm-relative armRecords in the return.
+function emitAsyncBoundaryArmRenderModule(
+	symbol: Extract<PlannedSymbol, { kind: 'async-boundary-update' }>,
+	armRender: PublicRenderPlanAsyncBoundaryArmRender,
+): GeneratedSymbolModule {
+	const exportName = symbolExportName(symbol.id);
+	const source = [
+		...armRender.imports,
+		...armRender.moduleLines,
+		`export function ${exportName}(context) {`,
+		...armRender.bodyLines,
+		'}',
 	].join('\n');
 	return { symbolId: symbol.id, kind: symbol.kind, exportName, source };
 }

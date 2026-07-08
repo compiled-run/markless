@@ -10,14 +10,16 @@ export function createResumeSharedPatchRuntime(input: {
 		if (fallbackSharedPatchDispatcher || !input.root.dispatchEvent) {
 			return fallbackSharedPatchDispatcher;
 		}
-		fallbackSharedPatchDispatcher = (await import('./resume-handoff.ts')).defaultSharedPatchDispatcher(
-			input.root,
-		);
+		fallbackSharedPatchDispatcher = (
+			await import('./resume-handoff.ts')
+		).defaultSharedPatchDispatcher(input.root);
 		return fallbackSharedPatchDispatcher;
 	}
 
 	return {
-		async dispatchSharedPatch(patch: Parameters<NonNullable<ResumeRuntimeInput['dispatchSharedPatch']>>[0]) {
+		async dispatchSharedPatch(
+			patch: Parameters<NonNullable<ResumeRuntimeInput['dispatchSharedPatch']>>[0],
+		) {
 			const dispatchSharedPatch = await getSharedPatchDispatcher();
 			return dispatchSharedPatch?.(patch);
 		},

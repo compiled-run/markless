@@ -3,7 +3,20 @@ import { emitHtmlNode, collectSsrAsyncRunners } from './html.ts';
 import { renderBodyLines } from './render-body.ts';
 import { emitCatalogHelperImports, stateRuntimeImports } from './runtime-helpers.ts';
 import { emitSameModuleSsrComponents } from './same-module.ts';
-import { assignSsrHostIds, callbackSymbolIds, componentEdgesFor, componentReferences, destructureProps, emitComponentImport, emitValueImport, isComponentRoot, publicRenderValueImports, stateEntries, staticHostLocators, moduleScopeLines } from './shared.ts';
+import {
+	assignSsrHostIds,
+	callbackSymbolIds,
+	componentEdgesFor,
+	componentReferences,
+	destructureProps,
+	emitComponentImport,
+	emitValueImport,
+	isComponentRoot,
+	publicRenderValueImports,
+	stateEntries,
+	staticHostLocators,
+	moduleScopeLines,
+} from './shared.ts';
 import { collectSsrPropEvents } from './component-wiring.ts';
 import type { PublicRenderRoot, SsrRenderContext } from './types.ts';
 
@@ -13,7 +26,10 @@ export function emitPublicSsrRenderModule(
 ): string {
 	if (!input.publicRenderPlan.rootTemplateHtml && !isComponentRoot(rootInfo.root)) return '';
 
-	const references = componentReferences(input.semanticGraph.componentEdges, '__marklessSsrComponent');
+	const references = componentReferences(
+		input.semanticGraph.componentEdges,
+		'__marklessSsrComponent',
+	);
 	const valueImports = publicRenderValueImports(
 		input.semanticGraph.moduleImports,
 		input.semanticGraph.componentEdges,
@@ -25,8 +41,13 @@ export function emitPublicSsrRenderModule(
 		callbackSymbols: callbackSymbolIds(input),
 		nextComponentEdgeIndex: 0,
 		nextChildIndex: 0,
+		// Host ids assign in MODULE document order (the semantic graph's id
+		// space). Walking only the page root would renumber from 0 whenever a
+		// same-module component is declared before the page, silently detaching
+		// every hostNodeId-keyed payload record (events, dom updates, keyed
+		// repeats) from the rendered locators.
 		hostIdByNode: assignSsrHostIds(
-			rootInfo.root,
+			rootInfo.moduleAst ?? rootInfo.root,
 			input.semanticGraph.hostNodes.map((host) => host.id),
 		),
 		keyedRepeats: input.semanticGraph.keyedRepeats,
@@ -52,26 +73,40 @@ export function emitPublicSsrRenderModule(
 		hostLocators,
 	);
 	const htmlExpression = emitHtmlNode(rootInfo.root, renderContext);
-	const sameModuleComponents = emitSameModuleSsrComponents(input, references, rootInfo.componentName);
+	const sameModuleComponents = emitSameModuleSsrComponents(
+		input,
+		references,
+		rootInfo.componentName,
+	);
 	const body = [
 		'',
 		`const marklessSsrPropEvents = ${JSON.stringify(propEvents)};`,
 		'const marklessSsrStateValues = new Map([',
 		stateEntries(input).join(',\n'),
 		']);',
-		'async function marklessRenderSsr(props = {}) {',
+		// The optional render context is the per-request streaming channel
+		// (T107): renderToStream threads it through child renders and async
+		// runners. Omitted = exact blocking behavior.
+		'async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {',
 		destructureProps(rootInfo.propNames),
 		'	const marklessSsrPayloadState = marklessCloneState(payloadState);',
 		'	const marklessSsrRenderStateValues = new Map(marklessSsrStateValues);',
-		...renderBodyLines(input, rootInfo, 'marklessStateValue', 'marklessSsrRenderStateValues', 'marklessSsrPayloadState', [
-			'const marklessSsrChildren = [];',
-			'const marklessSsrBranches = [];',
-			'const marklessSsrAsyncSnapshots = [];',
-			'const marklessSsrHostLocators = [];',
-			`const html = ${htmlExpression};`,
-		]),
-		'	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren);',
-		'	const marklessSsrState = marklessComposeState(marklessSsrPayloadState, marklessSsrChildren);',
+		...renderBodyLines(
+			input,
+			rootInfo,
+			'marklessStateValue',
+			'marklessSsrRenderStateValues',
+			'marklessSsrPayloadState',
+			[
+				'const marklessSsrChildren = [];',
+				'const marklessSsrBranches = [];',
+				'const marklessSsrAsyncSnapshots = [];',
+				'const marklessSsrHostLocators = [];',
+				`const html = ${htmlExpression};`,
+			],
+		),
+		'	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren, marklessSsrAsyncSnapshots);',
+		'	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);',
 		'	return {',
 		'		html,',
 		'		state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots),',
@@ -98,6 +133,7 @@ export function emitPublicSsrRenderModule(
 				module: 'ssr',
 				names: [
 					'marklessSsrRenderChild',
+					'marklessSsrRowChild',
 					'marklessSsrBranchArm',
 					'marklessSsrRunAsyncComputed',
 					'marklessSsrAttachSnapshots',
@@ -106,7 +142,9 @@ export function emitPublicSsrRenderModule(
 					'marklessSsrHost',
 					'marklessSsrCallbacks',
 					'marklessSsrCallbackSymbol',
-					'marklessComposeState',
+					// Aliased: the CSR module in the same emitted file imports the same
+					// helper name from fns/csr; duplicate import bindings are a JS error.
+					'marklessComposeState as marklessSsrComposeState',
 					'marklessViewWithoutAnchors',
 					'marklessSsrComposeView',
 					'marklessSsrPrefixAnchorHtml',
@@ -124,7 +162,10 @@ export function emitPublicSsrRenderModule(
 					'marklessSsrSpreadAttributes',
 				],
 			},
-			{ module: 'repeats', names: ['marklessSsrRepeatRows'] },
+			{
+				module: 'repeats',
+				names: ['marklessSsrRepeatRows', 'marklessSsrComponentRepeatRows'],
+			},
 		]),
 		...moduleScopeLines(input.source.source, input.source.filename),
 		...sameModuleComponents,

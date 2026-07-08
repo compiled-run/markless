@@ -30,7 +30,12 @@ import type {
 	PublicRenderPlanUnsupportedReason,
 } from '../../artifacts.ts';
 import type { BranchSiteNode } from './branch-planning.ts';
-import { singleRowRoot, firstComponentRoot, supportedFragmentRoot, unsupportedFragmentChildKind } from './template.ts';
+import {
+	singleRowRoot,
+	firstComponentRoot,
+	supportedFragmentRoot,
+	unsupportedFragmentChildKind,
+} from './template.ts';
 
 export function emptyPlan(
 	diagnostics: ReadonlyArray<PublicRenderPlanArtifact['diagnostics'][number]> = [],
@@ -49,9 +54,48 @@ export function emptyPlan(
 		branchReactivityGates: [],
 		branchArms: [],
 		asyncBoundaryArms: [],
+		asyncBoundaryArmRenders: [],
 		styleScopes: [],
 		diagnostics,
 	};
+}
+
+// Same-module helper components render through emission contexts that plan no
+// boundary anchors: an @try inside one drops its content from the html and
+// its in-arm records never register. Until that emission plans boundaries
+// (arm-commit runtime work), the drop must be loud (D2), in the author's
+// words (D4).
+export function sameModuleChildBoundaryDiagnostics(
+	ast: AnyNode,
+	rootComponentName: string,
+	filename: string,
+) {
+	const diagnostics: ReturnType<typeof unsupportedRenderConstructDiagnostic>[] = [];
+	for (const statement of asNodes(ast.body)) {
+		const component = getComponentFunction(statement);
+		if (!component || component.name === rootComponentName) continue;
+		const boundary = firstBoundaryNode(component.node);
+		if (!boundary) continue;
+		diagnostics.push(
+			unsupportedRenderConstructDiagnostic({
+				label: '@try/@pending/@catch',
+				message: `<${component.name}> contains an @try block, but <${component.name}> is a helper component in the same file as the page. Its @try/@pending/@catch content is dropped from the rendered HTML.`,
+				node: boundary,
+				filename,
+				suggestion: `Move <${component.name}> into its own .tsrx file and import it, or move the @try block into the page component.`,
+			}),
+		);
+	}
+	return diagnostics;
+}
+
+function firstBoundaryNode(node: AnyNode): AnyNode | null {
+	if (node.type === 'JSXTryExpression') return node;
+	for (const child of childNodes(node)) {
+		const found = firstBoundaryNode(child);
+		if (found) return found;
+	}
+	return null;
 }
 
 // Constructs the module emitter cannot render yet must fail loud here; their
@@ -172,21 +216,12 @@ export function repeatRenderDiagnostics(input: {
 				}),
 			];
 		}
-		if (input.componentEdgeCount > 0) {
-			return [
-				unsupportedRenderConstructDiagnostic({
-					label: '@for',
-					message:
-						'Keyed repeat rows are skipped in SSR output when the module renders component children, so the list content is dropped.',
-					node,
-					filename: input.filename,
-					suggestion:
-						'Keep the repeat in a component without child components until repeat rows compose with component children.',
-				}),
-			];
-		}
+		// Component-composed pages render repeat rows since the SSR/CSR row
+		// mappers append locators through the same stream child composition
+		// consumes (dashboard-migration need 6; component-wrapped-rows fixture).
 		if (
 			!gate.ssrOnly &&
+			gate.armScoped !== true &&
 			!input.keyedRepeats.some((repeat) => repeat.repeatId === gate.repeatId)
 		) {
 			return [
@@ -205,9 +240,11 @@ export function repeatRenderDiagnostics(input: {
 	});
 }
 
-function repeatRowStateCreation(
-	node: AnyNode,
-): { readonly apiName: 'state' | 'computed'; readonly name: string; readonly node: AnyNode } | null {
+function repeatRowStateCreation(node: AnyNode): {
+	readonly apiName: 'state' | 'computed';
+	readonly name: string;
+	readonly node: AnyNode;
+} | null {
 	for (const child of asNodes((node.body as AnyNode | undefined)?.body)) {
 		if (isIgnorableTextNode(child)) continue;
 		if (child.type !== 'VariableDeclaration') continue;
@@ -230,8 +267,11 @@ function repeatUnsupportedSuggestion(
 ): string {
 	const row = singleRowRoot(node);
 	const tagName = row ? getElementTagName(row) : null;
-	if (reason === 'unsupported-row-binding' && tagName && !isHostTagName(tagName)) {
-		return `Rows that render a component (<${tagName} />) are not supported by the render path yet; render host-element rows, or lift the component's markup into the row until component rows ship.`;
+	if (reason === 'row-component-content-unsupported') {
+		if (tagName && !isHostTagName(tagName)) {
+			return `The @for row root is a component (<${tagName} />); the row root anchors row identity, so wrap it in a host element (for example <li><${tagName} /></li>).`;
+		}
+		return 'Components in @for rows render markup only: their props and children may read only the repeat item (and index), they cannot take event props, and row events must come before the component. Move other reads into the item, or lift the component out of the row.';
 	}
 	return 'Reshape the rows into a single host element with directly readable item bindings.';
 }
@@ -246,7 +286,9 @@ export function branchRenderDiagnostics(input: {
 		if (gate.supported || !found) return [];
 		const label = found.node.type === 'JSXSwitchExpression' ? '@switch' : '@if';
 		const componentName = firstComponentName(found.node);
-		const componentDetail = componentName ? ` contain a component (<${componentName} />), and` : '';
+		const componentDetail = componentName
+			? ` contain a component (<${componentName} />), and`
+			: '';
 		const suggestion = componentName
 			? 'Move the condition inside the component, or put host elements in the arms until component arms are supported.'
 			: 'Move the branch out of nested control flow, or keep branch arms to host elements, text, and graph-resolvable expressions.';
@@ -262,7 +304,7 @@ export function branchRenderDiagnostics(input: {
 	});
 }
 
-function firstComponentName(node: AnyNode): string | null {
+export function firstComponentName(node: AnyNode): string | null {
 	if (node.type === 'Element' || node.type === 'JSXElement') {
 		const tagName = getElementTagName(node);
 		if (tagName && !isHostTagName(tagName)) return tagName;
@@ -323,14 +365,23 @@ export function componentConditionalRootDiagnostics(ast: AnyNode, filename: stri
 		if (!body) continue;
 
 		const returns = templateReturnStatements(body);
-		if (returns.length > 1) return [conditionalComponentRootDiagnostic({
-			node: returns[1]!, filename, componentName: componentFunction.name,
-		})];
+		if (returns.length > 1)
+			return [
+				conditionalComponentRootDiagnostic({
+					node: returns[1]!,
+					filename,
+					componentName: componentFunction.name,
+				}),
+			];
 	}
 	return [];
 }
 
-export function componentUnsupportedBodyDiagnostics(ast: AnyNode, filename: string, source: string) {
+export function componentUnsupportedBodyDiagnostics(
+	ast: AnyNode,
+	filename: string,
+	source: string,
+) {
 	for (const statement of asNodes(ast.body)) {
 		const componentFunction = getComponentFunction(statement);
 		const body = componentFunction?.node.body as AnyNode | undefined;
@@ -342,10 +393,15 @@ export function componentUnsupportedBodyDiagnostics(ast: AnyNode, filename: stri
 			if (bodyStatement === root || returnArgument(bodyStatement) === root) continue;
 			const message = unsupportedBodyStatementMessage(bodyStatement, source);
 			if (!message) continue;
-			return [unsupportedRenderBodyDiagnostic({
-				node: bodyStatement, filename, message,
-				suggestion: 'Split framework declarations into their own statements so the render module can preserve body order.',
-			})];
+			return [
+				unsupportedRenderBodyDiagnostic({
+					node: bodyStatement,
+					filename,
+					message,
+					suggestion:
+						'Split framework declarations into their own statements so the render module can preserve body order.',
+				}),
+			];
 		}
 	}
 	return [];
@@ -360,20 +416,41 @@ export function collectUndeclaredTemplateReadDiagnostics(input: {
 	readonly root: AnyNode;
 	readonly source: string;
 }) {
-	const scope = new Set([...knownRenderGlobals, ...input.moduleImports, ...input.repeatLocals, ...declarations(asNodes(input.ast.body).filter((statement) => !getComponentFunction(statement))), ...componentPropNames(input.component), ...declarations(childNodes(input.component.body as AnyNode | undefined)), ...catchNames(input.root)]);
+	const scope = new Set([
+		...knownRenderGlobals,
+		...input.moduleImports,
+		...input.repeatLocals,
+		...declarations(
+			asNodes(input.ast.body).filter((statement) => !getComponentFunction(statement)),
+		),
+		...componentPropNames(input.component),
+		...declarations(childNodes(input.component.body as AnyNode | undefined)),
+		...catchNames(input.root),
+	]);
 	for (const read of emittedTemplateReads(input.root, input.source)) {
-		const name = [...identifiersFromSource(read.source)].find((identifier) => !scope.has(identifier));
+		const name = [...identifiersFromSource(read.source)].find(
+			(identifier) => !scope.has(identifier),
+		);
 		if (!name) continue;
-		return [undeclaredTemplateReadDiagnostic({ name, node: read.node, filename: input.filename })];
+		return [
+			undeclaredTemplateReadDiagnostic({ name, node: read.node, filename: input.filename }),
+		];
 	}
 	return [];
 }
 
 function declarations(nodes: ReadonlyArray<AnyNode>): string[] {
 	return nodes.flatMap((node) => {
-		node = node.type === 'ExportNamedDeclaration' ? (node.declaration as AnyNode | undefined) ?? node : node;
-		if (node.type === 'VariableDeclaration') return asNodes(node.declarations).flatMap((declaration) => bindingNames(declaration.id as AnyNode | undefined));
-		if (node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration') return bindingNames(node.id as AnyNode | undefined);
+		node =
+			node.type === 'ExportNamedDeclaration'
+				? ((node.declaration as AnyNode | undefined) ?? node)
+				: node;
+		if (node.type === 'VariableDeclaration')
+			return asNodes(node.declarations).flatMap((declaration) =>
+				bindingNames(declaration.id as AnyNode | undefined),
+			);
+		if (node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration')
+			return bindingNames(node.id as AnyNode | undefined);
 		return [];
 	});
 }
@@ -388,7 +465,8 @@ function catchNames(root: AnyNode): string[] {
 	const names: string[] = [];
 	const visit = (node: AnyNode | null | undefined): void => {
 		if (!node || typeof node !== 'object') return;
-		if (node.type === 'CatchClause') names.push(...bindingNames(node.param as AnyNode | undefined));
+		if (node.type === 'CatchClause')
+			names.push(...bindingNames(node.param as AnyNode | undefined));
 		for (const child of childNodes(node)) visit(child);
 	};
 	visit(root);
@@ -403,12 +481,17 @@ function componentPropNames(component: AnyNode): string[] {
 	return param.type === 'ObjectPattern'
 		? asNodes(param.properties).flatMap((property) => {
 				const prop = property as AnyNode;
-				return bindingNames((prop.value as AnyNode | undefined) ?? (prop.key as AnyNode | undefined));
+				return bindingNames(
+					(prop.value as AnyNode | undefined) ?? (prop.key as AnyNode | undefined),
+				);
 			})
 		: [];
 }
 
-function emittedTemplateReads(root: AnyNode, fileSource: string): Array<{ readonly source: string; readonly node: AnyNode }> {
+function emittedTemplateReads(
+	root: AnyNode,
+	fileSource: string,
+): Array<{ readonly source: string; readonly node: AnyNode }> {
 	const reads: Array<{ readonly source: string; readonly node: AnyNode }> = [];
 	const add = (node: AnyNode | undefined) => {
 		if (!node) return;
@@ -417,12 +500,16 @@ function emittedTemplateReads(root: AnyNode, fileSource: string): Array<{ readon
 	};
 	const visitTemplate = (node: AnyNode | null | undefined): void => {
 		if (!node || typeof node !== 'object') return;
-			if (node.type === 'JSXExpressionContainer' || node.type === 'TSRXExpression') { add(node.expression as AnyNode | undefined); return; }
-			if (node.type === 'JSXIfExpression') add(node.test as AnyNode | undefined);
-			if (node.type === 'JSXSwitchExpression') {
-				add(node.discriminant as AnyNode | undefined);
-				for (const switchCase of asNodes(node.cases)) add(switchCase.test as AnyNode | undefined);
-			}
+		if (node.type === 'JSXExpressionContainer' || node.type === 'TSRXExpression') {
+			add(node.expression as AnyNode | undefined);
+			return;
+		}
+		if (node.type === 'JSXIfExpression') add(node.test as AnyNode | undefined);
+		if (node.type === 'JSXSwitchExpression') {
+			add(node.discriminant as AnyNode | undefined);
+			for (const switchCase of asNodes(node.cases))
+				add(switchCase.test as AnyNode | undefined);
+		}
 		if (node.type === 'JSXForExpression') {
 			add(node.collection as AnyNode | undefined);
 			add(node.key as AnyNode | undefined);
@@ -430,8 +517,17 @@ function emittedTemplateReads(root: AnyNode, fileSource: string): Array<{ readon
 		add(getDynamicTagExpression(node) ?? undefined);
 		for (const attribute of getElementAttributes(node)) {
 			const attributeName = getIdentifierName(attribute.name as AnyNode | undefined) ?? '';
-			if (isEventAttribute(attributeName) || attributeName === 'attach' || attributeName === 'el') continue;
-			add(isSpreadAttribute(attribute) ? attribute.argument as AnyNode | undefined : unwrapExpressionContainer(attribute.value as AnyNode | undefined));
+			if (
+				isEventAttribute(attributeName) ||
+				attributeName === 'attach' ||
+				attributeName === 'el'
+			)
+				continue;
+			add(
+				isSpreadAttribute(attribute)
+					? (attribute.argument as AnyNode | undefined)
+					: unwrapExpressionContainer(attribute.value as AnyNode | undefined),
+			);
 		}
 		for (const child of childNodes(node)) visitTemplate(child);
 	};
@@ -453,10 +549,15 @@ function identifiersFromSource(source: string): Set<string> {
 	return names;
 }
 
-const knownRenderGlobals = new Set('Array Boolean Date Infinity Intl JSON Map Math NaN Number Object RegExp Set String false null true URL URLSearchParams undefined'.split(' '));
+const knownRenderGlobals = new Set(
+	'Array Boolean Date Infinity Intl JSON Map Math NaN Number Object RegExp Set String false null true URL URLSearchParams undefined'.split(
+		' ',
+	),
+);
 
 function unsupportedBodyStatementMessage(statement: AnyNode, source: string): string | null {
-	const declarations = statement.type === 'VariableDeclaration' ? asNodes(statement.declarations) : [];
+	const declarations =
+		statement.type === 'VariableDeclaration' ? asNodes(statement.declarations) : [];
 	const frameworkDeclarations = declarations.filter((declaration) =>
 		loweredFrameworkCalls.has(frameworkCallName(declaration.init as AnyNode | undefined)),
 	);
@@ -475,11 +576,15 @@ function unsupportedBodyStatementMessage(statement: AnyNode, source: string): st
 const loweredFrameworkCalls = new Set(['state', 'computed', 'element', 'handler']);
 
 function frameworkCallName(node: AnyNode | null | undefined): string {
-	return node?.type === 'CallExpression' ? (getIdentifierName(node.callee as AnyNode | undefined) ?? '') : '';
+	return node?.type === 'CallExpression'
+		? (getIdentifierName(node.callee as AnyNode | undefined) ?? '')
+		: '';
 }
 
 function returnArgument(statement: AnyNode): AnyNode | undefined {
-	return statement.type === 'ReturnStatement' ? (statement.argument as AnyNode | undefined) : undefined;
+	return statement.type === 'ReturnStatement'
+		? (statement.argument as AnyNode | undefined)
+		: undefined;
 }
 
 function templateReturnStatements(node: AnyNode): AnyNode[] {
@@ -487,7 +592,10 @@ function templateReturnStatements(node: AnyNode): AnyNode[] {
 	const visit = (child: AnyNode | null | undefined): void => {
 		if (!child || typeof child !== 'object') return;
 		if (isFunctionNode(child) && child !== node) return;
-		if (child.type === 'ReturnStatement' && isTemplateRoot(child.argument as AnyNode | undefined)) {
+		if (
+			child.type === 'ReturnStatement' &&
+			isTemplateRoot(child.argument as AnyNode | undefined)
+		) {
 			returns.push(child);
 			return;
 		}

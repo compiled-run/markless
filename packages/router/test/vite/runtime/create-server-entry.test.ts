@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vite-plus/test';
+import { marklessSsrAttachSnapshots, marklessSsrRunAsyncComputed } from '@markless/web/fns/ssr';
 import { createServerEntry } from '../../../src/vite/runtime/create-server-entry.ts';
 
 describe('server entry rendering', () => {
@@ -96,6 +97,81 @@ describe('server entry rendering', () => {
 		expect(html).not.toContain('src="/@id/virtual:markless-router/resume-entry"');
 	});
 
+	it('serializes page props into the payload prop cell (need 14, SSR side)', async () => {
+		const entry = createServerEntry({
+			resumeEntryPath: '/@id/virtual:markless-router/resume-entry',
+			documentModuleLoader: undefined,
+			pageModuleLoaders: {
+				'pages/r/[id].tsrx': async () => ({
+					default: page('<main><button>Count 0</button></main>', {
+						state: { version: 1, cells: [], computed: [] },
+						view: {
+							version: 1,
+							locators: [
+								{
+									hostNodeId: 'h0',
+									index: 0,
+									strategy: 'dom-order',
+									tagName: 'main',
+								},
+								{
+									hostNodeId: 'h1',
+									index: 1,
+									strategy: 'dom-order',
+									tagName: 'button',
+								},
+							],
+							events: [
+								{ eventName: 'click', hostNodeId: 'h1', symbolIds: ['symbol:0'] },
+							],
+							domUpdates: [],
+							behaviors: [],
+							elementHandles: [],
+							asyncBoundaries: [],
+						},
+					}),
+				}),
+			},
+			routeFileIds: ['/pages/r/[id].tsrx'],
+		});
+
+		const response = await entry.fetch(new Request('http://markless-router.test/r/alpha'));
+		const html = await response.text();
+		const stateJson = html.slice(
+			html.indexOf('<script type="markless/state">') +
+				'<script type="markless/state">'.length,
+		);
+		const state = JSON.parse(stateJson.slice(0, stateJson.indexOf('</script>'))) as {
+			readonly cells: ReadonlyArray<Record<string, unknown>>;
+		};
+		const propCell = state.cells.find((cell) => cell.graphNodeId === 'prop:props');
+
+		// Symbol modules and re-running props+state computeds on resumed pages
+		// read page props through the graph's prop cell; the served value must
+		// be envelope-encoded, never a live directValue.
+		expect(propCell).toMatchObject({ name: 'props', valueKind: 'object' });
+		expect(propCell).not.toHaveProperty('directValue');
+		const encodedValue = JSON.stringify(propCell?.value);
+		expect(encodedValue).toContain('"alpha"');
+		expect(encodedValue).toContain('/r/alpha');
+	});
+
+	it('adds no prop cell to pages without a resumability payload', async () => {
+		const entry = createServerEntry({
+			documentModuleLoader: undefined,
+			pageModuleLoaders: {
+				'pages/index.tsrx': async () => ({ default: page('<main>Home</main>') }),
+			},
+			routeFileIds: ['/pages/index.tsrx'],
+		});
+
+		const response = await entry.fetch(new Request('http://markless-router.test/'));
+		const html = await response.text();
+
+		expect(html).not.toContain('prop:props');
+		expect(html).not.toContain('<script type="markless/state">');
+	});
+
 	it('emits a lazy Link navigation bridge without waking a client entry', async () => {
 		const entry = createServerEntry({
 			navigationEntryPath: '/@id/virtual:markless-router/navigation-entry',
@@ -124,6 +200,33 @@ describe('server entry rendering', () => {
 		expect(html).not.toContain('__marklessRouterStartSpaNavigation');
 	});
 
+	it('bridge click handling covers only Link-attributed anchors (T106: apps use Link everywhere)', async () => {
+		const entry = createServerEntry({
+			navigationEntryPath: '/@id/virtual:markless-router/navigation-entry',
+			resumeEntryPath: '/@id/virtual:markless-router/resume-entry',
+			documentModuleLoader: undefined,
+			pageModuleLoaders: {
+				'pages/index.tsrx': async () => ({
+					default: page(
+						'<main><a href="#/r/alpha" data-markless-router-link>Alpha</a></main>',
+					),
+				}),
+			},
+			routeFileIds: ['/pages/index.tsrx'],
+		});
+
+		const response = await entry.fetch(new Request('http://markless-router.test/'));
+		const html = await response.text();
+
+		// Plain hash anchors are no longer special-cased by the click handler:
+		// SPA navigation belongs to <Link> (data-markless-router-link) only.
+		expect(html).not.toContain('hashRouteAnchor');
+		expect(html).toContain('hasAttribute(linkAttr)');
+		// The load-time '#/' deep-link check is about LANDING on a hash route,
+		// not clicking — it stays.
+		expect(html).toContain("location.hash.startsWith('#/')");
+	});
+
 	it('emits exact route modulepreloads for visible Link targets', async () => {
 		const entry = createServerEntry({
 			navigationEntryPath: '/build/navigation.js',
@@ -150,10 +253,35 @@ describe('server entry rendering', () => {
 		const response = await entry.fetch(new Request('http://markless-router.test/'));
 		const html = await response.text();
 
+		// Route swaps are client-side: preloading a visible Link's destination
+		// page chunks avoids a navigation waterfall.
 		expect(html).toContain('<link rel="modulepreload" href="/build/navigation.js"');
 		expect(html).toContain('<link rel="modulepreload" href="/build/docs.js"');
 		expect(html).toContain('<link rel="modulepreload" href="/build/docs-symbol.js"');
 		expect(html).not.toContain('/build/not-found.js');
+	});
+
+	it('emits no document-swap machinery (client-side route swaps)', async () => {
+		const entry = createServerEntry({
+			navigationEntryPath: '/build/navigation.js',
+			resumeEntryPath: '/build/resume.js',
+			documentModuleLoader: undefined,
+			pageModuleLoaders: {
+				'pages/index.tsrx': async () => ({
+					default: page(
+						'<main><a href="/docs/getting-started" data-markless-router-link>Docs</a></main>',
+					),
+				}),
+			},
+			routeFileIds: ['/pages/index.tsrx', '/pages/docs/[...slug].mdx'],
+		});
+
+		const response = await entry.fetch(new Request('http://markless-router.test/'));
+		const html = await response.text();
+
+		expect(html).not.toContain('__marklessRouterSwapPending');
+		expect(html).not.toContain('markless-router-route');
+		expect(html).not.toContain('before-document-swap');
 	});
 
 	it('emits current route modulepreloads in head without requiring a router Link', async () => {
@@ -307,6 +435,143 @@ describe('server entry rendering', () => {
 		expect(html).toContain(
 			'Page module must export an Markless compiled artifact: pages/index.tsrx',
 		);
+	});
+});
+
+// A compiled-module-shaped page whose @try boundary demands a delayed async
+// computed, threading the render context like emitted code does (alternate-
+// shaped: a tide chart, not a dashboard).
+function tidePage(delayMs: number) {
+	return {
+		resumeModuleUrl: '/build/tide-resume.js',
+		async renderSsr(_props?: unknown, renderContext?: unknown) {
+			const snapshots: unknown[] = [];
+			const snapshot = (await marklessSsrRunAsyncComputed(
+				snapshots as never,
+				'computed:tides',
+				async () => {
+					await new Promise((resolve) => setTimeout(resolve, delayMs));
+					return { crest: 'High tide 14:02' };
+				},
+				renderContext,
+				true,
+			)) as { readonly status: string; readonly value?: { readonly crest: string } };
+			const arm =
+				snapshot.status === 'fulfilled'
+					? `<article data-crest>${snapshot.value!.crest}</article>`
+					: '<p data-surveying>Reading the buoys</p>';
+			return {
+				html: `<main><!--markless:async:tide:0-->${arm}<!--/markless:async:tide:0--></main>`,
+				state: marklessSsrAttachSnapshots(
+					{
+						version: 1,
+						cells: [],
+						computed: [{ graphNodeId: 'computed:tides', name: 'tides', async: true }],
+					} as never,
+					snapshots as never,
+				),
+				view: {
+					version: 1,
+					locators: [
+						{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'main' },
+					],
+					events: [],
+					domUpdates: [],
+					behaviors: [],
+					elementHandles: [],
+					asyncBoundaries: [
+						{
+							id: 'tide:0',
+							startAnchor: { strategy: 'dom-order-comment', index: 0 },
+							endAnchor: { strategy: 'dom-order-comment', index: 1 },
+							asyncReads: [
+								{
+									source: 'tides',
+									graphNodeId: 'computed:tides',
+									path: [],
+									runnerSymbolId: 'symbol:tide-run',
+								},
+							],
+							armRecords: {
+								locators: [],
+								events: [],
+								behaviors: [],
+								elementHandles: [],
+							},
+						},
+					],
+				},
+			};
+		},
+	};
+}
+
+async function readChunks(response: Response): Promise<{ chunks: string[]; text: string }> {
+	const reader = response.body!.getReader();
+	const decoder = new TextDecoder();
+	const chunks: string[] = [];
+	for (;;) {
+		const { done, value } = await reader.read();
+		if (done) break;
+		chunks.push(decoder.decode(value, { stream: true }));
+	}
+	return { chunks, text: chunks.join('') };
+}
+
+describe('server entry streaming (default)', () => {
+	const entryOptions = (render?: 'streaming' | 'blocking', delayMs = 40) => ({
+		...(render ? { render } : {}),
+		resumeEntryPath: '/build/tide-resume.js',
+		documentModuleLoader: undefined,
+		pageModuleLoaders: {
+			'pages/index.tsrx': async () => ({ default: tidePage(delayMs) }),
+		},
+		routeFileIds: ['/pages/index.tsrx'],
+	});
+
+	it('streams by default: pending shell first, settled template appended on the SAME response', async () => {
+		const entry = createServerEntry(entryOptions());
+		const response = await entry.fetch(new Request('http://markless-router.test/'));
+		const { chunks, text } = await readChunks(response);
+
+		expect(response.status).toBe(200);
+		expect(chunks.length).toBeGreaterThanOrEqual(2);
+		// Shell flushed with the pending arm; settled content arrives later.
+		expect(chunks[0]).toContain('data-surveying');
+		expect(chunks[0]).not.toContain('High tide 14:02');
+		expect(text).toContain(
+			'<template m:arm="tide:0"><article data-crest>High tide 14:02</article></template>',
+		);
+		expect(text).toContain('<script type="markless/arm" data-boundary="tide:0">');
+		expect(text).toContain(
+			'<script type="markless/state-patch" data-graph-node="computed:tides">',
+		);
+		expect(text).toContain('__mArm("tide:0")');
+		// The document closes AFTER the streamed settle.
+		expect(text.indexOf('__mArm("tide:0")')).toBeLessThan(text.indexOf('</body></html>'));
+	});
+
+	it('renders inline with zero streaming artifacts when data beats the first-flush deadline', async () => {
+		const entry = createServerEntry(entryOptions(undefined, 0));
+		const response = await entry.fetch(new Request('http://markless-router.test/'));
+		const { text } = await readChunks(response);
+
+		expect(text).toContain('High tide 14:02');
+		expect(text).not.toContain('data-surveying');
+		expect(text).not.toContain('m:arm');
+		expect(text).not.toContain('state-patch');
+		expect(text).not.toContain('__mArm');
+	});
+
+	it('render: "blocking" opts out — the whole document awaits the settle', async () => {
+		const entry = createServerEntry(entryOptions('blocking'));
+		const response = await entry.fetch(new Request('http://markless-router.test/'));
+		const text = await response.text();
+
+		expect(text).toContain('High tide 14:02');
+		expect(text).not.toContain('data-surveying');
+		expect(text).not.toContain('m:arm');
+		expect(text).not.toContain('__mArm');
 	});
 });
 

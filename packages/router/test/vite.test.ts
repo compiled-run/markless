@@ -271,8 +271,18 @@ test('emits exact route modulepreload maps from client build chunks', () => {
 		imports: ['build/shared.js'],
 		moduleIds: ['/repo/packages/router/src/vite/entries/client-entry.ts'],
 	});
+	// Rolldown may split a route's resume container away from its page chunk;
+	// the container is then reachable only through the resume entry's route
+	// map, and the SSR plan must still preload the CURRENT route's container
+	// or the first interaction pays a waterfall fetch on slow networks.
 	const resumeChunk = chunk({
-		dynamicImports: ['build/docs.js', 'build/home.js'],
+		code: `tsrxResumeModuleLoaders = Object.assign({"/pages/docs/[...slug].mdx":()=>import("./docs-resume.js"),"/pages/index.tsrx":()=>import("./home-resume.js")});`,
+		dynamicImports: [
+			'build/docs.js',
+			'build/home.js',
+			'build/docs-resume.js',
+			'build/home-resume.js',
+		],
 		fileName: 'build/resume.js',
 		imports: ['build/resume-runtime.js'],
 		moduleIds: ['/repo/packages/router/src/vite/entries/resume-entry.ts'],
@@ -299,6 +309,8 @@ test('emits exact route modulepreload maps from client build chunks', () => {
 			}),
 			'build/docs-runtime.js': chunk({ fileName: 'build/docs-runtime.js' }),
 			'build/docs-symbol.js': chunk({ fileName: 'build/docs-symbol.js' }),
+			'build/docs-resume.js': chunk({ fileName: 'build/docs-resume.js' }),
+			'build/home-resume.js': chunk({ fileName: 'build/home-resume.js' }),
 			'build/navigation-polyfill.js': chunk({ fileName: 'build/navigation-polyfill.js' }),
 			'build/resume-runtime.js': chunk({ fileName: 'build/resume-runtime.js' }),
 			'build/scalar-specialized.js': chunk({ fileName: 'build/scalar-specialized.js' }),
@@ -334,6 +346,7 @@ test('emits exact route modulepreload maps from client build chunks', () => {
 	expect(ssrPreloads['pages/docs/[...slug].mdx']).toEqual([
 		'/app/build/resume.js',
 		'/app/build/resume-runtime.js',
+		'/app/build/docs-resume.js',
 		'/app/build/docs.js',
 		'/app/build/docs-runtime.js',
 		'/app/build/scalar-specialized.js',
@@ -343,6 +356,11 @@ test('emits exact route modulepreload maps from client build chunks', () => {
 		'/app/build/navigation-polyfill.js',
 	);
 	expect(ssrPreloads['pages/docs/[...slug].mdx']).not.toContain('/app/build/home.js');
+	// The CURRENT route's resume container must be planned even when rolldown
+	// splits it from the page chunk; other routes' containers must not be.
+	expect(ssrPreloads['pages/docs/[...slug].mdx']).not.toContain('/app/build/home-resume.js');
+	expect(ssrPreloads['pages/index.tsrx']).toContain('/app/build/home-resume.js');
+	expect(ssrPreloads['pages/index.tsrx']).not.toContain('/app/build/docs-resume.js');
 });
 
 test('includes destination route resume chunks reached from the navigation route table', () => {
@@ -373,9 +391,15 @@ function loadSymbol(file, symbol) {
 		{},
 		{
 			'build/navigation.js': navigationChunk,
-			'build/docs.js': chunk({ fileName: 'build/docs.js', moduleIds: ['/project/pages/docs.tsrx'] }),
+			'build/docs.js': chunk({
+				fileName: 'build/docs.js',
+				moduleIds: ['/project/pages/docs.tsrx'],
+			}),
 			'build/docs-resume.js': chunk({ fileName: 'build/docs-resume.js' }),
-			'build/home.js': chunk({ fileName: 'build/home.js', moduleIds: ['/project/pages/index.tsrx'] }),
+			'build/home.js': chunk({
+				fileName: 'build/home.js',
+				moduleIds: ['/project/pages/index.tsrx'],
+			}),
 			'build/home-resume.js': chunk({ fileName: 'build/home-resume.js' }),
 		},
 	);
@@ -417,8 +441,14 @@ test('includes the current route resume module closure in ssr modulepreloads', (
 		{},
 		{
 			'build/resume.js': resumeChunk,
-			'build/docs.js': chunk({ fileName: 'build/docs.js', moduleIds: ['/project/pages/docs.tsrx'] }),
-			'build/home.js': chunk({ fileName: 'build/home.js', moduleIds: ['/project/pages/index.tsrx'] }),
+			'build/docs.js': chunk({
+				fileName: 'build/docs.js',
+				moduleIds: ['/project/pages/docs.tsrx'],
+			}),
+			'build/home.js': chunk({
+				fileName: 'build/home.js',
+				moduleIds: ['/project/pages/index.tsrx'],
+			}),
 			'build/docs-resume.js': chunk({
 				dynamicImports: ['build/docs-click-symbol.js'],
 				fileName: 'build/docs-resume.js',
@@ -442,6 +472,110 @@ test('includes the current route resume module closure in ssr modulepreloads', (
 	expect(ssrPreloads['pages/docs.tsrx']).not.toContain('/app/build/home-resume.js');
 	expect(ssrPreloads['pages/index.tsrx']).toContain('/app/build/home-resume.js');
 	expect(ssrPreloads['pages/index.tsrx']).not.toContain('/app/build/docs-resume.js');
+});
+
+test('includes route-scoped symbol-module chunks in ssr and navigation modulepreloads', () => {
+	const plugins = flattenPlugins([router()]);
+	const configPlugin = plugins.find((plugin) => plugin.name === 'markless-router:vite');
+	const routePlugin = plugins.find((plugin) => plugin.name === 'markless-router:routes');
+	const routeLoad = hookHandler(routePlugin?.load) as
+		| ((id: string) => string | undefined)
+		| undefined;
+	// Symbol-module chunks are demanded through the symbol resolver's computed
+	// import table (`import(/* @vite-ignore */ moduleUrls[row[0]])`), so the
+	// bundle has NO literal import edge reaching them. Their virtual module id
+	// embeds the source file they serve — that filename is the route-scoping key.
+	const symbolModuleId = (sourceFile: string, symbolId: string) =>
+		`virtual:markless:symbol:${encodeURIComponent(sourceFile)}:${encodeURIComponent(symbolId)}`;
+	const navigationChunk = chunk({
+		code: `const routePreloadsJson = "__MARKLESS_ROUTER_ROUTE_PRELOADS__";`,
+		dynamicImports: ['build/gallery.js', 'build/journal.js'],
+		fileName: 'build/navigation.js',
+		moduleIds: ['/repo/packages/router/src/vite/entries/client-entry.ts'],
+	});
+
+	routePlugin?.configResolved?.({ base: '/app/', root: '/project' } as never);
+	configPlugin?.configResolved?.({ base: '/app/', root: '/project' } as never);
+	configPlugin?.generateBundle?.call(
+		{ environment: { config: { consumer: 'client' } } },
+		{},
+		{
+			'build/navigation.js': navigationChunk,
+			'build/gallery.js': chunk({
+				fileName: 'build/gallery.js',
+				moduleIds: [
+					'/project/pages/gallery.tsrx',
+					'/project/src/components/light-table.tsrx?markless-symbols',
+				],
+			}),
+			'build/journal.js': chunk({
+				fileName: 'build/journal.js',
+				moduleIds: ['/project/pages/journal.tsrx'],
+			}),
+			// An event-handler symbol of the gallery page (resolved ids carry \0).
+			'build/gallery-tap-symbol.js': chunk({
+				fileName: 'build/gallery-tap-symbol.js',
+				moduleIds: [`\0${symbolModuleId('/project/pages/gallery.tsrx', 'symbol:0')}`],
+			}),
+			// An attach-behavior symbol whose static import must ride along.
+			'build/gallery-lens-symbol.js': chunk({
+				fileName: 'build/gallery-lens-symbol.js',
+				imports: ['build/lens-runtime.js'],
+				moduleIds: [`\0${symbolModuleId('/project/pages/gallery.tsrx', 'symbol:1')}`],
+			}),
+			// A symbol of a non-page component in the gallery route's closure.
+			'build/light-table-symbol.js': chunk({
+				fileName: 'build/light-table-symbol.js',
+				moduleIds: [
+					symbolModuleId('/project/src/components/light-table.tsrx', 'symbol:0'),
+				],
+			}),
+			'build/journal-save-symbol.js': chunk({
+				fileName: 'build/journal-save-symbol.js',
+				moduleIds: [symbolModuleId('/project/pages/journal.tsrx', 'symbol:0')],
+			}),
+			'build/lens-runtime.js': chunk({ fileName: 'build/lens-runtime.js' }),
+		},
+	);
+
+	const source = routeLoad?.('\0virtual:markless-router/route-preloads');
+	const routePreloadData = JSON.parse(
+		source?.match(/routePreloadData = routePreloadsJson === .* \? (\{.*\}) :/)?.[1] ?? '{}',
+	) as {
+		readonly navigation?: Record<string, string[]>;
+		readonly ssr?: Record<string, string[]>;
+	};
+	for (const [label, preloads] of [
+		['navigation', routePreloadData.navigation ?? {}],
+		['ssr', routePreloadData.ssr ?? {}],
+	] as const) {
+		expect(preloads['pages/gallery.tsrx'], label).toContain(
+			'/app/build/gallery-tap-symbol.js',
+		);
+		expect(preloads['pages/gallery.tsrx'], label).toContain(
+			'/app/build/gallery-lens-symbol.js',
+		);
+		expect(preloads['pages/gallery.tsrx'], label).toContain('/app/build/lens-runtime.js');
+		expect(preloads['pages/gallery.tsrx'], label).toContain(
+			'/app/build/light-table-symbol.js',
+		);
+		// Cross-route exclusion: the other route's symbol chunks never preload.
+		expect(preloads['pages/gallery.tsrx'], label).not.toContain(
+			'/app/build/journal-save-symbol.js',
+		);
+		expect(preloads['pages/journal.tsrx'], label).toContain(
+			'/app/build/journal-save-symbol.js',
+		);
+		expect(preloads['pages/journal.tsrx'], label).not.toContain(
+			'/app/build/gallery-tap-symbol.js',
+		);
+		expect(preloads['pages/journal.tsrx'], label).not.toContain(
+			'/app/build/gallery-lens-symbol.js',
+		);
+		expect(preloads['pages/journal.tsrx'], label).not.toContain(
+			'/app/build/light-table-symbol.js',
+		);
+	}
 });
 
 function chunk(overrides: {

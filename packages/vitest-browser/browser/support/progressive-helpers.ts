@@ -16,7 +16,9 @@ export async function renderProgressiveSSR(
 	const phased = await rendered;
 	resetExecutedModules();
 	const screen = phased.mount();
-	await expect.poll(() => screen.container.querySelector('[data-async-container]')).not.toBeNull();
+	await expect
+		.poll(() => screen.container.querySelector('[data-async-container]'))
+		.not.toBeNull();
 	resetExecutedModules();
 	return screen;
 }
@@ -34,7 +36,9 @@ export function actionForElement(
 ): RuntimeDispatchAction {
 	const view = readViewPayload(container);
 	const match = findHostNodeIdForTarget(container, view, element, (hostNodeId) => {
-		const record = view.events?.find((event) => event.hostNodeId === hostNodeId && event.eventName === eventName);
+		const record = view.events?.find(
+			(event) => event.hostNodeId === hostNodeId && event.eventName === eventName,
+		);
 		return record ? { syncPolicy: record.syncPolicy } : undefined;
 	});
 	if (match) {
@@ -44,7 +48,9 @@ export function actionForElement(
 			syncPolicy: match.value.syncPolicy,
 		});
 	}
-	throw new Error(`Expected payload event record for ${eventName} on clicked element or ancestor.`);
+	throw new Error(
+		`Expected payload event record for ${eventName} on clicked element or ancestor.`,
+	);
 }
 
 export function actionForKeyedRepeat(
@@ -67,7 +73,9 @@ export function actionForKeyedRepeat(
 			recordKind: 'keyed-repeat-row',
 		});
 	}
-	throw new Error(`Expected keyed repeat row event for ${eventName} on clicked element or ancestor.`);
+	throw new Error(
+		`Expected keyed repeat row event for ${eventName} on clicked element or ancestor.`,
+	);
 }
 
 function withExecutionLog(action: RuntimeDispatchAction): RuntimeDispatchAction {
@@ -93,7 +101,8 @@ function findHostNodeIdForTarget<T>(
 		const element = elements[locator.index];
 		if (!element) continue;
 		const tagName = (locator as { readonly tagName?: string }).tagName;
-		if (tagName && tagName !== '*' && element.tagName.toLowerCase() !== tagName.toLowerCase()) continue;
+		if (tagName && tagName !== '*' && element.tagName.toLowerCase() !== tagName.toLowerCase())
+			continue;
 		byHostId.set(locator.hostNodeId, element);
 	}
 	for (let current: HTMLElement | null = element; current; current = current.parentElement) {

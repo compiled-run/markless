@@ -1,10 +1,20 @@
-import type { DomJournalEntry } from '@markless/runtime';
-import type { ResumePreparedCore, ResumeRuntimeInput } from './resume-types.ts';
+import type { DomJournalEntry, DomJournalResult } from '@markless/runtime';
+import type { AsyncBoundarySettleTracker } from './resume-async-wiring.ts';
+import type { ArmCommitUpdate } from './resume-commit-arm.ts';
+import type {
+	ResumeAsyncBoundaryRecord,
+	ResumePreparedCore,
+	ResumeRuntimeInput,
+} from './resume-types.ts';
 
-type BehaviorRuntime = ReturnType<typeof import('./resume-behaviors.ts')['createBehaviorRuntime']>;
-type BranchRuntime = ReturnType<typeof import('./resume-branches.ts')['wireBranches']>;
-type EventWiring = ReturnType<typeof import('./resume-events.ts')['createEventWiring']>;
-type RuntimeShared = ReturnType<typeof import('./resume-runtime-shared.ts')['createResumeRuntimeShared']>;
+type BehaviorRuntime = ReturnType<
+	(typeof import('./resume-behaviors.ts'))['createBehaviorRuntime']
+>;
+type BranchRuntime = ReturnType<(typeof import('./resume-branches.ts'))['wireBranches']>;
+type EventWiring = ReturnType<(typeof import('./resume-events.ts'))['createEventWiring']>;
+type RuntimeShared = ReturnType<
+	(typeof import('./resume-runtime-shared.ts'))['createResumeRuntimeShared']
+>;
 
 export async function startResumeRuntime(input: {
 	readonly runtimeInput: ResumeRuntimeInput;
@@ -17,9 +27,19 @@ export async function startResumeRuntime(input: {
 	readonly branchRuntime: () => BranchRuntime | undefined;
 	readonly storeContainerSubscription: (release: () => void) => void;
 	readonly disposeHost: (hostNodeId: string) => void;
+	readonly commitArm: (
+		boundary: ResumeAsyncBoundaryRecord,
+		update: ArmCommitUpdate,
+	) => Promise<void>;
+	// Receives the branch-runtime hooks built here (escalated-flip re-settle +
+	// pending-flip hold) before any branch runtime loads.
+	readonly connectBranchWiring: (wiring: {
+		readonly resettleBoundary: (boundaryId: string) => Promise<DomJournalResult | void>;
+		readonly holdPendingFlip: (graphNodeId: string) => boolean;
+	}) => void;
 	readonly receiveSharedPatch: RuntimeShared['receiveSharedPatch'];
 	readonly sharedPatchEventType: string;
-}): Promise<void> {
+}): Promise<AsyncBoundarySettleTracker | undefined> {
 	const {
 		runtimeInput,
 		prepared,
@@ -36,35 +56,116 @@ export async function startResumeRuntime(input: {
 	const rowEvents = (runtimeInput.view.keyedRepeats ?? []).flatMap((repeat) => repeat.rowEvents);
 	await events.prepareSyncPolicy(runtimeInput.view.events, rowEvents);
 	if (runtimeInput.applyDomJournal) {
-		storeContainerSubscription(runtimeInput.graph.subscribeJournal(async (entries) => {
-			await disposeRemovedAsyncRangeHosts(runtimeInput, prepared, entries, disposeHost);
-			input.branchRuntime()?.disposeRemovedRangeHosts(entries, disposeHost, prepared.asyncBoundariesById);
-			await runtimeInput.applyDomJournal!(entries);
-			await input.branchRuntime()?.materializeFlippedBranchArms(entries, (hostNodeId) =>
-				input.behaviorRuntime()!.activateBehaviors(hostNodeId, { flush: false }),
-			);
-		}));
+		storeContainerSubscription(
+			runtimeInput.graph.subscribeJournal(async (entries) => {
+				await disposeRemovedAsyncRangeHosts(runtimeInput, prepared, entries, disposeHost);
+				input
+					.branchRuntime()
+					?.disposeRemovedRangeHosts(entries, disposeHost, prepared.asyncBoundariesById);
+				await runtimeInput.applyDomJournal!(entries);
+				await input
+					.branchRuntime()
+					?.materializeFlippedBranchArms(entries, (hostNodeId) =>
+						input.behaviorRuntime()!.activateBehaviors(hostNodeId, { flush: false }),
+					);
+			}),
+		);
 	}
-	if ((runtimeInput.state?.computed ?? []).some((computed) =>
-		computed.async === false &&
-		typeof (computed as { readonly deriveSymbolId?: unknown }).deriveSymbolId === 'string'
-	)) {
-		(await import('./resume-sync-demand.ts')).wireSyncComputedDemandTriggersWithoutLoadingCapability({
-			graph: runtimeInput.graph, state: runtimeInput.state, root: runtimeInput.root, loadSymbol: runtimeInput.loadSymbol,
-			elementHandles: prepared.elementHandles, storeContainerSubscription,
+	if (
+		(runtimeInput.state?.computed ?? []).some(
+			(computed) =>
+				computed.async === false &&
+				typeof (computed as { readonly deriveSymbolId?: unknown }).deriveSymbolId ===
+					'string',
+		)
+	) {
+		(
+			await import('./resume-sync-demand.ts')
+		).wireSyncComputedDemandTriggersWithoutLoadingCapability({
+			graph: runtimeInput.graph,
+			state: runtimeInput.state,
+			root: runtimeInput.root,
+			loadSymbol: runtimeInput.loadSymbol,
+			elementHandles: prepared.elementHandles,
+			storeContainerSubscription,
 		});
 	}
 	if ((runtimeInput.view.keyedRepeats ?? []).length > 0) {
 		(await import('./resume-keyed-repeats.ts')).wireKeyedRepeats({
-			graph: runtimeInput.graph, view: runtimeInput.view, elementsByHostId: prepared.elementsByHostId, events, storeContainerSubscription,
+			graph: runtimeInput.graph,
+			view: runtimeInput.view,
+			elementsByHostId: prepared.elementsByHostId,
+			events,
+			storeContainerSubscription,
 		});
 	}
+	let settleTracker: AsyncBoundarySettleTracker | undefined;
 	if (runtimeInput.view.asyncBoundaries.length > 0) {
-		(await import('./resume-async-wiring.ts')).wireAsyncBoundariesWithoutLoadingCapability({
-			asyncBoundariesById: prepared.asyncBoundariesById, graph: runtimeInput.graph, root: runtimeInput.root,
-			loadSymbol: runtimeInput.loadSymbol, renderBranchHtml: runtimeInput.renderBranchHtml, elementHandles: prepared.elementHandles, storeContainerSubscription,
+		const asyncWiring = await import('./resume-async-wiring.ts');
+		// D8: settled-content tracking (deadline-gated pending, the navigation-
+		// transition settle promise, pending minimum duration).
+		settleTracker = asyncWiring.createAsyncBoundarySettleTracker({
+			boundaries: prepared.asyncBoundariesById.values(),
+			state: runtimeInput.state,
+		});
+		// T119/T120: deadline-gated @pending on re-settles (captures the mounted
+		// @pending arms before the runners are demanded below).
+		const { wireResettleHold } = await import('./resume-resettle-hold.ts');
+		const onAsyncSnapshot = wireResettleHold({
+			tracker: settleTracker,
+			boundaries: prepared.asyncBoundariesById.values(),
+			readStatus: (graphNodeId) => runtimeInput.graph.read(graphNodeId, ['status']),
+			commitArm: input.commitArm,
+			hasHtmlRenderer: !!runtimeInput.renderBranchHtml,
+		});
+		asyncWiring.wireAsyncBoundariesWithoutLoadingCapability({
+			asyncBoundariesById: prepared.asyncBoundariesById,
+			graph: runtimeInput.graph,
+			root: runtimeInput.root,
+			loadSymbol: runtimeInput.loadSymbol,
+			renderBranchHtml: runtimeInput.renderBranchHtml,
+			elementHandles: prepared.elementHandles,
+			storeContainerSubscription,
+			commitArm: input.commitArm,
+			demandOnStart: runtimeInput.demandAsyncBoundaries === true,
+			settleTracker,
+			onAsyncSnapshot,
 		});
 	}
+	// Branch-runtime hooks live here with the settle machinery they depend on;
+	// the runtime core only carries their connection point.
+	input.connectBranchWiring({
+		// Escalated arm-scoped toggles (T104): re-run the boundary's settle path
+		// with the current snapshot so the whole arm re-renders through commitArm.
+		resettleBoundary: async (boundaryId): Promise<DomJournalResult | void> => {
+			const boundary = prepared.asyncBoundariesById.get(boundaryId);
+			const read = boundary?.asyncReads[0];
+			if (!boundary?.updateSymbolId || !read) return;
+			const { settleAsyncBoundaryRange } = await import('./resume-async-wiring.ts');
+			return settleAsyncBoundaryRange(
+				{
+					graph: runtimeInput.graph,
+					root: runtimeInput.root,
+					loadSymbol: runtimeInput.loadSymbol,
+					renderBranchHtml: runtimeInput.renderBranchHtml,
+					elementHandles: prepared.elementHandles,
+					commitArm: input.commitArm,
+					settleTracker,
+				},
+				boundary,
+				runtimeInput.graph.read(read.graphNodeId, []),
+			);
+		},
+		// Spec D8: a branch flip whose deciding test read goes THROUGH an async
+		// computed that is re-running holds its prior arm — the pending snapshot
+		// has no value, so the test would evaluate lies; the boundary's settle
+		// re-commit renders the truthful arm.
+		holdPendingFlip: (graphNodeId) =>
+			runtimeInput.graph.read(graphNodeId, ['status']) === 'pending' &&
+			[...prepared.asyncBoundariesById.values()].some((boundary) =>
+				boundary.asyncReads.some((read) => read.graphNodeId === graphNodeId),
+			),
+	});
 	if (runtimeInput.view.events.some((event) => event.eventName === 'visible')) {
 		const behaviors = await loadBehaviorRuntime();
 		behaviors.installVisibilityObserver();
@@ -73,7 +174,8 @@ export async function startResumeRuntime(input: {
 	if ((runtimeInput.view.branches ?? []).length > 0) await loadBranchRuntime();
 	// Container capture listeners see every DOM event of a registered type,
 	// including non-markless ones (router links): unmatched must pass through.
-	const dispatchCaptured = (event: Parameters<typeof events.dispatch>[0]) => events.dispatch(event, { ignoreUnmatched: true });
+	const dispatchCaptured = (event: Parameters<typeof events.dispatch>[0]) =>
+		events.dispatch(event, { ignoreUnmatched: true });
 	for (const eventType of eventTypes) {
 		runtimeInput.root.addEventListener?.(eventType, dispatchCaptured, { capture: true });
 		// The wrapper has its own identity; pair removal with registration so
@@ -83,8 +185,11 @@ export async function startResumeRuntime(input: {
 		);
 	}
 	if ((runtimeInput.graph.listSharedDefinitions?.() ?? []).length > 0) {
-		runtimeInput.root.addEventListener?.(sharedPatchEventType, receiveSharedPatch, { capture: true });
+		runtimeInput.root.addEventListener?.(sharedPatchEventType, receiveSharedPatch, {
+			capture: true,
+		});
 	}
+	return settleTracker;
 }
 
 async function disposeRemovedAsyncRangeHosts(
@@ -96,10 +201,17 @@ async function disposeRemovedAsyncRangeHosts(
 	let locators: typeof import('./resume-locators.ts') | undefined;
 	for (const entry of entries) {
 		if (entry.type !== 'removeRange' || !entry.locator.startsWith('async-boundary:')) continue;
-		const boundary = prepared.asyncBoundariesById.get(entry.locator.slice('async-boundary:'.length));
+		const boundary = prepared.asyncBoundariesById.get(
+			entry.locator.slice('async-boundary:'.length),
+		);
 		if (!boundary) continue;
 		locators ??= await import('./resume-locators.ts');
-		const removed = locators.elementsBetweenAnchors(input.root, boundary.startAnchor, boundary.endAnchor);
-		for (const id of locators.hostIdsInsideRemovedElements(prepared.elementsByHostId, removed)) disposeHost(id);
+		const removed = locators.elementsBetweenAnchors(
+			input.root,
+			boundary.startAnchor,
+			boundary.endAnchor,
+		);
+		for (const id of locators.hostIdsInsideRemovedElements(prepared.elementsByHostId, removed))
+			disposeHost(id);
 	}
 }

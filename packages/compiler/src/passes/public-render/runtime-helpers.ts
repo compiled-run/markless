@@ -16,7 +16,9 @@ export function emitCatalogHelperImports(
 }
 
 function referencesIdentifier(source: string, name: string): boolean {
-	return new RegExp(`\\b${name}\\b`).test(source);
+	// Aliased entries ('imported as local') are used under the LOCAL name.
+	const local = name.includes(' as ') ? name.split(' as ')[1]! : name;
+	return new RegExp(`\\b${local}\\b`).test(source);
 }
 
 export const stateRuntimeImports = {

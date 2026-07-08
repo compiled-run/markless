@@ -3,6 +3,8 @@ import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/
 import { expressionSource } from '../../ast/source.ts';
 import {
 	getElementAttributes,
+	getElementTagName,
+	isHostTagName,
 	isIgnorableStaticTextNode as isIgnorableTextNode,
 	isPlainHostTemplateNode,
 	isStaticTextNode,
@@ -76,10 +78,29 @@ export function supportedRepeatGate(input: {
 		source: input.source,
 		symbols: input.symbols,
 	});
-	if (!rowPlan) return unsupportedReason('unsupported-row-binding');
+	if (!rowPlan) {
+		// Rows containing component invocations get their own reason so the
+		// diagnostic can explain the component-row rules (D4) instead of the
+		// generic binding guidance.
+		return unsupportedReason(
+			containsComponentTag(row)
+				? 'row-component-content-unsupported'
+				: 'unsupported-row-binding',
+		);
+	}
 
-	return rowPlan.usesIndex || input.semanticRepeat.keySource === input.semanticRepeat.indexName
-		? { repeatId: input.payloadRepeat.id, supported: true, ssrOnly: true }
+	if (rowPlan.usesIndex || input.semanticRepeat.keySource === input.semanticRepeat.indexName) {
+		return rowPlan.hasComponents
+			? {
+					repeatId: input.payloadRepeat.id,
+					supported: true,
+					ssrOnly: true,
+					componentRows: true,
+				}
+			: { repeatId: input.payloadRepeat.id, supported: true, ssrOnly: true };
+	}
+	return rowPlan.hasComponents
+		? { repeatId: input.payloadRepeat.id, supported: true, componentRows: true }
 		: { repeatId: input.payloadRepeat.id, supported: true };
 }
 
@@ -133,12 +154,48 @@ export function planKeyedRepeat(input: {
 	};
 }
 
+export type RowAttributeWrite = {
+	readonly name: string;
+	readonly source: string;
+	readonly hostPath: ReadonlyArray<number>;
+};
+
 export type RowPlan = {
 	readonly textWrites: ReadonlyArray<PublicRenderPlanTextWrite>;
 	readonly classWrites: ReadonlyArray<PublicRenderPlanClassWrite>;
 	readonly eventControls: ReadonlyArray<PublicRenderPlanEventControl>;
+	readonly attributeWrites: ReadonlyArray<RowAttributeWrite>;
 	readonly usesIndex: boolean;
+	// The row invokes components (markup-only, item-scope props). Emitters must
+	// execute the component per row instead of treating the row as plain hosts.
+	readonly hasComponents: boolean;
 };
+
+// True when the expression's identifier reads are limited to the repeat item,
+// the optional index, and the page's props (render-constant per instance).
+// Static member property names are not reads.
+function readsOnlyItemScope(node: AnyNode, isRowStaticRead: (name: string) => boolean): boolean {
+	let ok = true;
+	const visit = (candidate: AnyNode | undefined): void => {
+		if (!candidate || !ok) return;
+		if (candidate.type === 'Identifier') {
+			const name = getIdentifierName(candidate);
+			if (name && !isRowStaticRead(name)) ok = false;
+			return;
+		}
+		if (candidate.type === 'MemberExpression' && candidate.computed !== true) {
+			visit(candidate.object as AnyNode | undefined);
+			return;
+		}
+		if (candidate.type === 'Property' && candidate.computed !== true) {
+			visit(candidate.value as AnyNode | undefined);
+			return;
+		}
+		for (const child of childNodes(candidate)) visit(child);
+	};
+	visit(node);
+	return ok;
+}
 
 export function collectRowPlan(input: {
 	readonly aliases: ReturnType<typeof semanticAliasMap>;
@@ -155,9 +212,41 @@ export function collectRowPlan(input: {
 	const textWrites: PublicRenderPlanTextWrite[] = [];
 	const classWrites: PublicRenderPlanClassWrite[] = [];
 	const eventControls: PublicRenderPlanEventControl[] = [];
+	const attributeWrites: RowAttributeWrite[] = [];
+	// Row-static reads: the item, the index, and the page's props (aliases like
+	// a destructured \`params\` resolve through the graph). Props are constant
+	// for the page render (route params in row hrefs), and pages with props
+	// never take the direct-DOM row path, so no reactive wiring is owed.
+	const isRowStaticRead = (name: string): boolean => {
+		if (name === input.itemName || name === input.indexName) return true;
+		const resolved = resolveGraphPath(name, input.bindings, input.aliases);
+		return resolved?.binding.kind === 'prop';
+	};
 	let usesIndex = false;
+	// A component renders an unknown number of elements, so row-relative host
+	// paths AFTER one (in document order) cannot be trusted at runtime. Row
+	// EVENTS resolve their host path against the live row DOM, so they must
+	// come before any component. Text/class/attribute writes only feed the
+	// direct-DOM row path, which component rows never use (component edges
+	// exclude the direct module), so they stay plannable anywhere in the row.
+	let sawComponent = false;
+	let hasComponents = false;
 
 	const visitElement = (node: AnyNode, hostPath: ReadonlyArray<number>): boolean => {
+		// Component invocations render markup only: props/children limited to the
+		// repeat item (and index) scope, no event/attach/el props. The SSR/CSR
+		// row mappers execute the component per row; anything richer is refused
+		// (the row-child helper also fail-closes on interactive child output).
+		const tagName = getElementTagName(node);
+		if (tagName && !isHostTagName(tagName)) {
+			if (hostPath.length === 0) return false; // the row root anchors row identity
+			if (!componentRowInvocationSupported(node, isRowStaticRead)) {
+				return false;
+			}
+			sawComponent = true;
+			hasComponents = true;
+			return true;
+		}
 		const hostNodeId = input.assignedHosts.hostIdByNode.get(node);
 
 		for (const attribute of getElementAttributes(node)) {
@@ -180,7 +269,7 @@ export function collectRowPlan(input: {
 			}
 
 			if (isEventAttribute(attributeName)) {
-				if (!hostNodeId || !expression) return false;
+				if (!hostNodeId || !expression || sawComponent) return false;
 
 				for (const handler of eventHandlerExpressions(expression)) {
 					const eventName = normalizeEventName(attributeName);
@@ -211,7 +300,21 @@ export function collectRowPlan(input: {
 			}
 
 			if (attributeName === 'attach' || attributeName === 'el') return false;
-			if (expression && expression.type !== 'Literal') return false;
+			if (expression && expression.type !== 'Literal') {
+				// Item-derived dynamic attributes (href={'#/r/' + item.id},
+				// data-testid={...}) are static per row instance: the SSR/CSR row
+				// mappers evaluate them with the item in scope, and client row
+				// rebuilds re-evaluate the same template. Reject expressions that
+				// read anything beyond the item/index (those would need reactive
+				// attribute wiring rows don't have yet).
+				if (!readsOnlyItemScope(expression, isRowStaticRead)) return false;
+				attributeWrites.push({
+					name: attributeName,
+					source: expressionSource(expression, input.source) ?? '',
+					hostPath,
+				});
+				continue;
+			}
 		}
 
 		let childDomIndex = 0;
@@ -267,8 +370,83 @@ export function collectRowPlan(input: {
 		textWrites,
 		classWrites,
 		eventControls,
+		attributeWrites,
 		usesIndex,
+		hasComponents,
 	};
+}
+
+// True when a component invocation inside a repeat row stays inside the
+// markup-only contract: no event/attach/el props, and every prop or children
+// expression reads only the repeat item (and index). Nested components inside
+// the children stay unsupported (their edges would need per-row child wiring).
+function componentRowInvocationSupported(
+	node: AnyNode,
+	isRowStaticRead: (name: string) => boolean,
+): boolean {
+	for (const attribute of getElementAttributes(node)) {
+		const attributeName = getIdentifierName(attribute.name as AnyNode | undefined);
+		if (!attributeName) return false;
+		if (
+			isEventAttribute(attributeName) ||
+			attributeName === 'attach' ||
+			attributeName === 'el'
+		) {
+			return false;
+		}
+		const expression = unwrapExpressionContainer(attribute.value as AnyNode | undefined);
+		if (
+			expression &&
+			expression.type !== 'Literal' &&
+			!readsOnlyItemScope(expression, isRowStaticRead)
+		) {
+			return false;
+		}
+	}
+
+	const childSupported = (child: AnyNode): boolean => {
+		if (isIgnorableTextNode(child) || isStaticTextNode(child)) return true;
+		if (child.type === 'JSXExpressionContainer' || child.type === 'TSRXExpression') {
+			const expression = child.expression as AnyNode | undefined;
+			return !!expression && readsOnlyItemScope(expression, isRowStaticRead);
+		}
+		if (child.type === 'Element' || child.type === 'JSXElement') {
+			const tagName = getElementTagName(child);
+			if (!tagName || !isHostTagName(tagName)) return false;
+			for (const attribute of getElementAttributes(child)) {
+				const attributeName = getIdentifierName(attribute.name as AnyNode | undefined);
+				if (!attributeName) return false;
+				if (
+					isEventAttribute(attributeName) ||
+					attributeName === 'attach' ||
+					attributeName === 'el'
+				) {
+					return false;
+				}
+				const expression = unwrapExpressionContainer(
+					attribute.value as AnyNode | undefined,
+				);
+				if (
+					expression &&
+					expression.type !== 'Literal' &&
+					!readsOnlyItemScope(expression, isRowStaticRead)
+				) {
+					return false;
+				}
+			}
+			return asNodes(child.children).every(childSupported);
+		}
+		return false;
+	};
+	return asNodes(node.children).every(childSupported);
+}
+
+export function containsComponentTag(node: AnyNode): boolean {
+	if (node.type === 'Element' || node.type === 'JSXElement') {
+		const tagName = getElementTagName(node);
+		if (tagName && !isHostTagName(tagName)) return true;
+	}
+	return childNodes(node).some(containsComponentTag);
 }
 
 function classWritePlan(input: {

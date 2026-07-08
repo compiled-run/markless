@@ -1,3 +1,4 @@
+import { buildRouteManifestFromFileIds } from '../src/route-manifest.ts';
 import { describe, expect, it } from 'vite-plus/test';
 import {
 	__marklessRouterStartSpaNavigation,
@@ -678,3 +679,159 @@ function deferred<T>() {
 	});
 	return { promise, resolve };
 }
+
+describe('hash mode', () => {
+	it('intercepts hashChange navigation to a matching hash route and renders it', async () => {
+		const document = new EventTarget() as Document;
+		let update: CustomEvent['detail'];
+		document.addEventListener(MARKLESS_ROUTER_ROUTE_EVENT, (event) => {
+			update = (event as CustomEvent).detail;
+		});
+		const context = {
+			mode: 'hash',
+			documentModuleLoader: async () => ({ default: component('document') }),
+			manifest: buildRouteManifestFromFileIds([
+				'pages/index.tsrx',
+				'pages/r/[repo]/issues.tsrx',
+			]),
+			pageModuleLoaders: {
+				'pages/r/[repo]/issues.tsrx': async () => ({ default: component('issues') }),
+			},
+			window: {
+				document,
+				location: { href: 'http://marklessrouter.test/#/' },
+			},
+		};
+		const event = navigateEvent('http://marklessrouter.test/#/r/alpha/issues', {
+			hashChange: true,
+			info: { __marklessRouterLink: true },
+		});
+
+		expect(handleNavigateEvent(event, context as never)).toBe(true);
+		await event.intercepted?.handler();
+		expect(update?.route).toMatchObject({
+			file: 'pages/r/[repo]/issues.tsrx',
+			params: { repo: 'alpha' },
+		});
+	});
+
+	it('renders a hash deep link client-side on boot without fetching the route path', async () => {
+		// Landing on /#/r/x serves the '/' shell: boot must dispatch a client
+		// route update for the hash route — never a server document round trip.
+		const document = new EventTarget() as Document;
+		let update: CustomEvent['detail'];
+		document.addEventListener(MARKLESS_ROUTER_ROUTE_EVENT, (event) => {
+			update = (event as CustomEvent).detail;
+		});
+		const fetchedPaths: string[] = [];
+		const runtimeWindow = {
+			addEventListener() {},
+			document,
+			fetch: async (path: string) => {
+				fetchedPaths.push(path);
+				return { ok: true, text: async () => '<html>ssr</html>' };
+			},
+			location: { href: 'http://marklessrouter.test/#/r/alpha/issues' },
+			navigation: {
+				addEventListener() {},
+				navigate() {},
+			},
+		} as unknown as MarklessRouterNavigationWindow;
+
+		await __marklessRouterStartSpaNavigation({
+			pageModuleLoaders: {
+				'pages/r/[repo]/issues.tsrx': async () => ({ default: component('issues') }),
+			},
+			routeFileIds: ['/pages/index.tsrx', '/pages/r/[repo]/issues.tsrx'],
+			window: runtimeWindow,
+		});
+		await new Promise((resolve) => setTimeout(resolve, 0));
+
+		expect(fetchedPaths).toEqual([]);
+		expect(update?.route).toMatchObject({
+			file: 'pages/r/[repo]/issues.tsrx',
+			params: { repo: 'alpha' },
+		});
+		expect(update?.page.default()).toBe('issues');
+	});
+
+	it('intercepts plain-anchor hashChange (no link info) to a matching route', () => {
+		const context = {
+			mode: 'hash',
+			documentModuleLoader: async () => ({}),
+			manifest: buildRouteManifestFromFileIds([
+				'pages/index.tsrx',
+				'pages/r/[repo]/issues.tsrx',
+			]),
+			pageModuleLoaders: {},
+			window: {
+				document: new EventTarget(),
+				location: { href: 'http://marklessrouter.test/#/' },
+			},
+		};
+		const event = navigateEvent('http://marklessrouter.test/#/r/alpha/issues', {
+			hashChange: true,
+		});
+		expect(handleNavigateEvent(event, context as never)).toBe(true);
+	});
+
+	it('does not intercept hashChange to a non-matching hash', () => {
+		const context = {
+			mode: 'hash',
+			documentModuleLoader: async () => ({}),
+			manifest: buildRouteManifestFromFileIds(['pages/index.tsrx']),
+			pageModuleLoaders: {},
+			window: {
+				document: new EventTarget(),
+				location: { href: 'http://marklessrouter.test/#/' },
+			},
+		};
+		const event = navigateEvent('http://marklessrouter.test/#/nowhere', {
+			hashChange: true,
+			info: { __marklessRouterLink: true },
+		});
+		expect(handleNavigateEvent(event, context as never)).toBe(false);
+	});
+
+	// T110 part C: a '#/...' navigation that matches no route cannot fall back
+	// to a server document load (location.assign on a hash URL is a no-op), so
+	// silence here is a dead nav. Dev mode must say so loudly.
+	it('emits a loud dev diagnostic when a hash navigation matches no route', () => {
+		const errors: unknown[][] = [];
+		const originalError = console.error;
+		console.error = (...args: unknown[]) => {
+			errors.push(args);
+		};
+		try {
+			const context = {
+				documentModuleLoader: async () => ({}),
+				manifest: buildRouteManifestFromFileIds(['pages/index.tsrx']),
+				pageModuleLoaders: {},
+				window: {
+					document: new EventTarget(),
+					location: { href: 'http://marklessrouter.test/#/' },
+				},
+			};
+			const event = navigateEvent('http://marklessrouter.test/#/nowhere', {
+				hashChange: true,
+				info: { __marklessRouterLink: true },
+			});
+			expect(handleNavigateEvent(event, context as never)).toBe(false);
+		} finally {
+			console.error = originalError;
+		}
+
+		const flattened = errors.flat().map(String).join('\n');
+		expect(flattened).toContain('MARKLESS_ROUTER_UNKNOWN_HASH_ROUTE');
+		expect(flattened).toContain('#/nowhere');
+	});
+
+	it('path mode default: hashChange stays not intercepted', () => {
+		const context = aboutRouteContext();
+		const event = navigateEvent('http://marklessrouter.test/about#anchor', {
+			hashChange: true,
+			info: { __marklessRouterLink: true },
+		});
+		expect(handleNavigateEvent(event, context as never)).toBe(false);
+	});
+});

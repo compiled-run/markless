@@ -4,7 +4,16 @@ import type { AnyNode } from '../../ast/nodes.ts';
 import { firstComponentRoot } from './plan.ts';
 import { emitHtmlNode } from './html.ts';
 import { renderBodyLines } from './render-body.ts';
-import { callbackSymbolIds, componentEdgesFor, componentPropNames, destructureProps, isFragmentNode, sameModuleComponentMap, assignSsrHostIds, type ComponentReference } from './shared.ts';
+import {
+	callbackSymbolIds,
+	componentEdgesFor,
+	componentPropNames,
+	destructureProps,
+	isFragmentNode,
+	sameModuleComponentMap,
+	assignSsrHostIds,
+	type ComponentReference,
+} from './shared.ts';
 import type { CsrRenderContext, SsrRenderContext } from './types.ts';
 
 export function emitSameModuleCsrComponents(
@@ -53,11 +62,18 @@ export function emitSameModuleCsrComponents(
 			destructureProps(rootInfo.propNames),
 			'	const marklessCsrPayloadState = { ...marklessCloneState(payloadState), cells: [], computed: [] };',
 			'	const marklessCsrRenderStateValues = new Map(marklessCsrStateValues);',
-			...renderBodyLines(input, rootInfo, 'marklessStateValue', 'marklessCsrRenderStateValues', 'marklessCsrPayloadState', [
-				'const marklessCsrRuntimeState = { graph: null };',
-				'const marklessCsrChildren = [];',
-				`const root = ${isFragmentNode(rootInfo.root) ? 'marklessCsrFragmentFromHtml' : 'marklessCsrRootFromHtml'}(${emitHtmlNode(rootInfo.root, renderContext)});`,
-			]),
+			...renderBodyLines(
+				input,
+				rootInfo,
+				'marklessStateValue',
+				'marklessCsrRenderStateValues',
+				'marklessCsrPayloadState',
+				[
+					'const marklessCsrRuntimeState = { graph: null };',
+					'const marklessCsrChildren = [];',
+					`const root = ${isFragmentNode(rootInfo.root) ? 'marklessCsrFragmentFromHtml' : 'marklessCsrRootFromHtml'}(${emitHtmlNode(rootInfo.root, renderContext)});`,
+				],
+			),
 			...renderContext.childReplacements,
 			'	const marklessCsrView = marklessCsrComposeView(root, marklessViewWithoutAnchors(payloadView), [], marklessCsrChildren);',
 			'	const marklessCsrState = marklessComposeState(marklessCsrPayloadState, marklessCsrChildren);',
@@ -116,19 +132,26 @@ export function emitSameModuleSsrComponents(
 		const functionName = `marklessRenderSsr${reference.componentName}`;
 		return [
 			`const ${reference.localName} = { renderSsr: ${functionName} };`,
-			`async function ${functionName}(props = {}) {`,
+			`async function ${functionName}(props = {}, marklessSsrRenderContext) {`,
 			destructureProps(rootInfo.propNames),
 			'	const marklessSsrPayloadState = { ...marklessCloneState(payloadState), cells: [], computed: [] };',
 			'	const marklessSsrRenderStateValues = new Map(marklessSsrStateValues);',
-			...renderBodyLines(input, rootInfo, 'marklessStateValue', 'marklessSsrRenderStateValues', 'marklessSsrPayloadState', [
-				'const marklessSsrChildren = [];',
-				'const marklessSsrBranches = [];',
-				'const marklessSsrAsyncSnapshots = [];',
-				'const marklessSsrHostLocators = [];',
-				`const html = ${emitHtmlNode(rootInfo.root, renderContext)};`,
-			]),
+			...renderBodyLines(
+				input,
+				rootInfo,
+				'marklessStateValue',
+				'marklessSsrRenderStateValues',
+				'marklessSsrPayloadState',
+				[
+					'const marklessSsrChildren = [];',
+					'const marklessSsrBranches = [];',
+					'const marklessSsrAsyncSnapshots = [];',
+					'const marklessSsrHostLocators = [];',
+					`const html = ${emitHtmlNode(rootInfo.root, renderContext)};`,
+				],
+			),
 			'	const marklessSsrComposition = marklessSsrComposeView(html, marklessViewWithoutAnchors(payloadView), marklessSsrHostLocators, marklessSsrChildren);',
-			'	const marklessSsrState = marklessComposeState(marklessSsrPayloadState, marklessSsrChildren);',
+			'	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);',
 			'	return { html, state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots), view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) }, elementCount: marklessSsrComposition.elementCount, propEvents: [], externalSymbolIds: marklessSsrComposition.externalSymbolIds };',
 			'}',
 		].filter((line): line is string => line !== null);

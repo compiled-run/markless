@@ -91,7 +91,8 @@ test('compileTsrxModule emitted artifacts stay byte-equal across public-render p
 		const importedModuleInterfaces: Record<string, ModuleGraphInterfaceArtifact> = {};
 		for (const imported of fixture.imports ?? []) {
 			const result = await compileFixture(imported, {});
-			importedModuleInterfaces[`./${imported.filename.split('/').at(-1)}`] = result.moduleGraphInterface;
+			importedModuleInterfaces[`./${imported.filename.split('/').at(-1)}`] =
+				result.moduleGraphInterface;
 			snapshots[imported.name] = emittedSnapshot(result);
 		}
 

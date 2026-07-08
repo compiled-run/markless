@@ -503,7 +503,9 @@ function sharedScopeFromOptions(
 			state.graph.diagnostics.push(
 				invalidSharedScopeDiagnostic({
 					valueSource: value ? expressionSource(value, state.source) : undefined,
-					valueSpan: value ? sourceSpan(value, state.filename) : sourceSpan(property, state.filename),
+					valueSpan: value
+						? sourceSpan(value, state.filename)
+						: sourceSpan(property, state.filename),
 				}),
 			);
 			return undefined;

@@ -3,7 +3,12 @@ import { deserializeGraphValue, type SerializedGraphPayload } from '@markless/se
 import type { PublicRenderModuleInput, SemanticModuleImport } from '../../artifacts.ts';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource } from '../../ast/source.ts';
-import { getComponentFunction, getDynamicTagExpression, getElementTagName, isHostTagName } from '../../ast/tsrx.ts';
+import {
+	getComponentFunction,
+	getDynamicTagExpression,
+	getElementTagName,
+	isHostTagName,
+} from '../../ast/tsrx.ts';
 import type { ComponentEdge } from './types.ts';
 
 export function isComponentRoot(root: AnyNode): boolean {
@@ -25,9 +30,17 @@ export function moduleScopeLines(source: string, filename: string): string[] {
 	const ast = parseModule(source, filename) as unknown as AnyNode;
 	return asNodes(ast.body).flatMap((statement) => {
 		if (statement.type === 'ImportDeclaration' || getComponentFunction(statement)) return [];
-		const declaration = statement.type === 'ExportNamedDeclaration' ? (statement.declaration as AnyNode | undefined) : statement;
+		const declaration =
+			statement.type === 'ExportNamedDeclaration'
+				? (statement.declaration as AnyNode | undefined)
+				: statement;
 		if (!declaration) return [];
-		if (declaration.type !== 'VariableDeclaration' && declaration.type !== 'FunctionDeclaration' && declaration.type !== 'ClassDeclaration') return [];
+		if (
+			declaration.type !== 'VariableDeclaration' &&
+			declaration.type !== 'FunctionDeclaration' &&
+			declaration.type !== 'ClassDeclaration'
+		)
+			return [];
 		const sourceText = expressionSource(declaration, source);
 		return sourceText ? [sourceText] : [];
 	});
@@ -35,6 +48,21 @@ export function moduleScopeLines(source: string, filename: string): string[] {
 
 export function destructureProps(propNames: ReadonlyArray<string>): string | null {
 	return propNames.length > 0 ? `	const { ${propNames.join(', ')} } = props ?? {};` : null;
+}
+
+// Page props live in the runtime graph under one cell: `prop:props` for a
+// destructured parameter, `prop:<name>` for a whole-object parameter. Lazy
+// symbol modules (async computed runners, event handlers) read captured props
+// through that cell, so CSR mounts must seed it from the render props — during
+// server render the runners run inline with props in closure scope instead.
+export function componentPropCellId(component: AnyNode): string | null {
+	const param = asNodes(component.params)[0];
+	if (!param) return null;
+	if (param.type === 'Identifier') {
+		const name = getIdentifierName(param);
+		return name ? `prop:${name}` : null;
+	}
+	return param.type === 'ObjectPattern' ? 'prop:props' : null;
 }
 
 export function staticHostLocators(input: PublicRenderModuleInput) {
@@ -73,7 +101,9 @@ export function componentReferences(
 	return references;
 }
 
-export function emitComponentImport(imported: ComponentReference & { readonly importSource: string }): string {
+export function emitComponentImport(
+	imported: ComponentReference & { readonly importSource: string },
+): string {
 	if (imported.importKind === 'named' && !isTsrxComponentImport(imported.importSource)) {
 		return `import { ${imported.importedName ?? imported.componentName} as ${imported.localName} } from ${JSON.stringify(imported.importSource)};`;
 	}

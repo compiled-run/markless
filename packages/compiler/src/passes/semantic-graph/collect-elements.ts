@@ -63,7 +63,16 @@ export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGr
 	if (isHostElement) {
 		hostNodeId = `h${state.nextHostId++}`;
 		state.hostIds.set(node, hostNodeId);
-		state.graph.hostNodes.push({ id: hostNodeId, tagName: tagName ?? '*' });
+		state.graph.hostNodes.push({
+			id: hostNodeId,
+			tagName: tagName ?? '*',
+			...(state.currentAsyncBoundaryId
+				? {
+						asyncBoundaryId: state.currentAsyncBoundaryId,
+						asyncBoundaryArm: state.currentAsyncBoundaryArm ?? 0,
+					}
+				: {}),
+		});
 		state.currentHostNodeId = hostNodeId;
 	}
 
@@ -358,7 +367,9 @@ export function collectElementHandleDiagnostics(graph: MutableSemanticGraphArtif
 		graph.diagnostics.push(duplicateElementHandleDiagnostic(binding));
 	}
 
-	const boundHandleNames = new Set(validElementHandleBindings.map((binding) => binding.handleName));
+	const boundHandleNames = new Set(
+		validElementHandleBindings.map((binding) => binding.handleName),
+	);
 	for (const read of graph.templateReads) {
 		const resolved = resolveGraphPath(read.source, bindings, aliases);
 		if (!resolved || resolved.binding.kind !== 'element') continue;
@@ -571,7 +582,11 @@ function collectSpreadAttribute(
 		return;
 	}
 
-	const resolved = resolveGraphPath(spreadSource, graphBindingMap(state.graph), semanticAliasMap(state.graph));
+	const resolved = resolveGraphPath(
+		spreadSource,
+		graphBindingMap(state.graph),
+		semanticAliasMap(state.graph),
+	);
 	if (resolved?.binding.kind === 'state' || resolved?.binding.kind === 'computed') {
 		state.graph.diagnostics.push(
 			spreadStaticSnapshotDiagnostic({
@@ -600,7 +615,11 @@ function attributeValueDiagnostic(
 		});
 	}
 
-	const resolved = resolveGraphPath(valueSource, graphBindingMap(state.graph), semanticAliasMap(state.graph));
+	const resolved = resolveGraphPath(
+		valueSource,
+		graphBindingMap(state.graph),
+		semanticAliasMap(state.graph),
+	);
 	const isObjectValue =
 		expressionValue.type === 'ObjectExpression' ||
 		expressionValue.type === 'ArrayExpression' ||
@@ -822,7 +841,12 @@ function isFunctionExpressionLike(node: AnyNode): boolean {
 	return node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression';
 }
 
-function unextractableSyncPolicyDiagnostic(attributeName: string, value: AnyNode | undefined, handlers: ReadonlyArray<AnyNode>, state: Pick<WalkState, 'filename' | 'source'>): SemanticGraphDiagnostic {
+function unextractableSyncPolicyDiagnostic(
+	attributeName: string,
+	value: AnyNode | undefined,
+	handlers: ReadonlyArray<AnyNode>,
+	state: Pick<WalkState, 'filename' | 'source'>,
+): SemanticGraphDiagnostic {
 	const detached = firstDetachedSyncPolicyReference({
 		type: 'ArrayExpression',
 		elements: handlers,
@@ -830,13 +854,20 @@ function unextractableSyncPolicyDiagnostic(attributeName: string, value: AnyNode
 	if (detached) {
 		const source = state.source.slice(detached.start, detached.end).trim();
 		return {
-			code: 'MARKLESS_SYNC_POLICY_UNEXTRACTABLE', severity: 'error', phase: 'sync-policy',
-			title: 'Cannot extract synchronous event policy', passId: 'tsrx-semantic-graph',
+			code: 'MARKLESS_SYNC_POLICY_UNEXTRACTABLE',
+			severity: 'error',
+			phase: 'sync-policy',
+			title: 'Cannot extract synchronous event policy',
+			passId: 'tsrx-semantic-graph',
 			artifactKeys: ['semanticGraph'],
 			message: `\`${source}\` detaches ${detached.action} from the event, so the compiler cannot prove when the default action is cancelled for ${attributeName}.`,
 			why: 'preventDefault() and stopPropagation() must run before lazy handler symbols load; a detached reference hides which action runs and under what condition.',
 			primarySpan: { filename: state.filename, start: detached.start, end: detached.end },
-			suggestions: [{ message: `Call it directly on the event parameter instead of detaching ${detached.action}.` }],
+			suggestions: [
+				{
+					message: `Call it directly on the event parameter instead of detaching ${detached.action}.`,
+				},
+			],
 			docsUrl: 'https://markless.dev/errors/MARKLESS_SYNC_POLICY_UNEXTRACTABLE',
 		};
 	}
@@ -847,8 +878,11 @@ function unextractableSyncPolicyDiagnostic(attributeName: string, value: AnyNode
 	const actionLabel = actionCall?.action ?? 'preventDefault/stopPropagation';
 
 	return {
-		code: 'MARKLESS_SYNC_POLICY_UNEXTRACTABLE', severity: 'error', phase: 'sync-policy',
-		title: 'Cannot extract synchronous event policy', passId: 'tsrx-semantic-graph',
+		code: 'MARKLESS_SYNC_POLICY_UNEXTRACTABLE',
+		severity: 'error',
+		phase: 'sync-policy',
+		title: 'Cannot extract synchronous event policy',
+		passId: 'tsrx-semantic-graph',
 		artifactKeys: ['semanticGraph'],
 		message: `Cannot extract a synchronous ${actionLabel} policy for ${attributeName} because the guard is not limited to graph state, event fields, props, and constants.`,
 		why: 'preventDefault() and stopPropagation() must run before lazy handler symbols load. The compiler can only emit a synchronous policy when the condition is fully represented in the resumable graph/event data plane.',
@@ -856,7 +890,12 @@ function unextractableSyncPolicyDiagnostic(attributeName: string, value: AnyNode
 			(actionCall ? sourceSpan(actionCall.node, state.filename) : undefined) ??
 			(value ? sourceSpan(value, state.filename) : undefined) ??
 			fallbackSpan(state.filename),
-		suggestions: [{ message: 'Move the browser-critical condition into graph state and simple event-field comparisons, or remove preventDefault()/stopPropagation() from the lazy handler.' }],
+		suggestions: [
+			{
+				message:
+					'Move the browser-critical condition into graph state and simple event-field comparisons, or remove preventDefault()/stopPropagation() from the lazy handler.',
+			},
+		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_SYNC_POLICY_UNEXTRACTABLE',
 	};
 }
@@ -865,7 +904,11 @@ function fallbackSpan(filename: string): SourceSpan {
 	return { filename, start: 0, end: 0 };
 }
 
-type EventHandlerExpression = { readonly node: AnyNode; readonly source: string; readonly span?: SourceSpan };
+type EventHandlerExpression = {
+	readonly node: AnyNode;
+	readonly source: string;
+	readonly span?: SourceSpan;
+};
 
 function behaviorExpressions(node: AnyNode): AnyNode[] {
 	if (node.type === 'ArrayExpression') return asNodes(node.elements);
@@ -898,7 +941,10 @@ function behaviorSourceParts(
 	};
 }
 
-function localFunctionDeclarationSource(node: AnyNode | undefined, state: WalkState): string | null {
+function localFunctionDeclarationSource(
+	node: AnyNode | undefined,
+	state: WalkState,
+): string | null {
 	const name = getIdentifierName(node);
 	if (!name) return null;
 
@@ -908,14 +954,21 @@ function localFunctionDeclarationSource(node: AnyNode | undefined, state: WalkSt
 	return localFunctionValueSource(name, state)?.source ?? null;
 }
 
-function eventHandlerExpressions(node: AnyNode | undefined, state: WalkState): EventHandlerExpression[] {
+function eventHandlerExpressions(
+	node: AnyNode | undefined,
+	state: WalkState,
+): EventHandlerExpression[] {
 	if (!node) return [];
 	const expressions = node.type === 'ArrayExpression' ? asNodes(node.elements) : [node];
 
 	return expressions.map((expression) => {
 		const resolved = localFunctionValueSource(getIdentifierName(expression), state);
 		if (!resolved) {
-			return { node: expression, source: expressionSource(expression, state.source), span: sourceSpan(expression, state.filename) };
+			return {
+				node: expression,
+				source: expressionSource(expression, state.source),
+				span: sourceSpan(expression, state.filename),
+			};
 		}
 
 		return { node: resolved.node, source: resolved.source, span: resolved.span };
@@ -923,7 +976,11 @@ function eventHandlerExpressions(node: AnyNode | undefined, state: WalkState): E
 }
 
 function handlerParameterNames(node: AnyNode): string[] {
-	if (node.type !== 'ArrowFunctionExpression' && node.type !== 'FunctionExpression' && node.type !== 'FunctionDeclaration') {
+	if (
+		node.type !== 'ArrowFunctionExpression' &&
+		node.type !== 'FunctionExpression' &&
+		node.type !== 'FunctionDeclaration'
+	) {
 		return [];
 	}
 
@@ -933,19 +990,28 @@ function handlerParameterNames(node: AnyNode): string[] {
 	});
 }
 
-function invalidEventHandlerExpression(attributeName: string, node: AnyNode | undefined, state: WalkState): SemanticGraphDiagnostic | null {
+function invalidEventHandlerExpression(
+	attributeName: string,
+	node: AnyNode | undefined,
+	state: WalkState,
+): SemanticGraphDiagnostic | null {
 	const invalid = firstInvalidEventHandlerExpression(node);
 	if (!invalid) return null;
 
 	const source = expressionSource(invalid, state.source);
 	return {
-		code: 'MARKLESS_EVENT_HANDLER_NOT_A_FUNCTION', severity: 'error',
-		phase: 'semantic-graph', title: 'Event props need a function',
+		code: 'MARKLESS_EVENT_HANDLER_NOT_A_FUNCTION',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: 'Event props need a function',
 		primarySpan: sourceSpan(invalid, state.filename),
-		passId: 'tsrx-semantic-graph', artifactKeys: ['semanticGraph'],
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
 		message: `\`${attributeName}={${source}}\` passes the result of \`${source}\`, not a function. The expression would run once while rendering, and the click would receive a number.`,
 		why: 'An event prop compiles to a lazy handler symbol that runs on the browser event; only a function or an array of functions can be that handler.',
-		suggestions: [{ message: `Wrap it in a function, for example ${attributeName}={() => ${source}}.` }],
+		suggestions: [
+			{ message: `Wrap it in a function, for example ${attributeName}={() => ${source}}.` },
+		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_EVENT_HANDLER_NOT_A_FUNCTION',
 	};
 }
@@ -960,7 +1026,11 @@ function firstInvalidEventHandlerExpression(node: AnyNode | undefined): AnyNode 
 		return null;
 	}
 
-	if (node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression' || node.type === 'FunctionDeclaration') {
+	if (
+		node.type === 'ArrowFunctionExpression' ||
+		node.type === 'FunctionExpression' ||
+		node.type === 'FunctionDeclaration'
+	) {
 		return null;
 	}
 
@@ -970,7 +1040,10 @@ function firstInvalidEventHandlerExpression(node: AnyNode | undefined): AnyNode 
 	return node;
 }
 
-function localFunctionValueSource(name: string | null, state: WalkState): { readonly node: AnyNode; readonly source: string; readonly span?: SourceSpan } | null {
+function localFunctionValueSource(
+	name: string | null,
+	state: WalkState,
+): { readonly node: AnyNode; readonly source: string; readonly span?: SourceSpan } | null {
 	if (!name) return null;
 	const binding = state.graph.localBindings.find(
 		(item) => item.name === name && item.kind === 'function',
@@ -980,10 +1053,18 @@ function localFunctionValueSource(name: string | null, state: WalkState): { read
 	const node = localFunctionValueNode(name, binding.sourceSpan, state);
 	if (!node) return null;
 
-	return { node, source: expressionSource(node, state.source), span: sourceSpan(node, state.filename) };
+	return {
+		node,
+		source: expressionSource(node, state.source),
+		span: sourceSpan(node, state.filename),
+	};
 }
 
-function localFunctionValueNode(name: string, nameSpan: SourceSpan, state: WalkState): AnyNode | null {
+function localFunctionValueNode(
+	name: string,
+	nameSpan: SourceSpan,
+	state: WalkState,
+): AnyNode | null {
 	const ast = parseModule(state.source, state.filename) as unknown as AnyNode;
 	let found: AnyNode | null = null;
 

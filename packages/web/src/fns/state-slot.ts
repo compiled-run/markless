@@ -1,8 +1,15 @@
 export function marklessSerializeSlot(value, records, seen) {
-	if (value === null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
+	if (
+		value === null ||
+		typeof value === 'string' ||
+		typeof value === 'number' ||
+		typeof value === 'boolean'
+	)
+		return value;
 	if (value === undefined) return { $type: 'undefined' };
 	if (typeof value === 'bigint') return { $type: 'bigint', value: String(value) };
-	if (typeof value === 'function' || typeof value === 'symbol') throw new Error('MARKLESS_SERIALIZE_UNSUPPORTED_VALUE');
+	if (typeof value === 'function' || typeof value === 'symbol')
+		throw new Error('MARKLESS_SERIALIZE_UNSUPPORTED_VALUE');
 	if (seen.has(value)) return { $ref: seen.get(value) };
 	const id = records.length;
 	seen.set(value, id);
@@ -25,9 +32,11 @@ export function marklessSerializeSlot(value, records, seen) {
 		return { $ref: id };
 	}
 	const prototype = Object.getPrototypeOf(value);
-	if (prototype !== Object.prototype && prototype !== null) throw new Error('MARKLESS_SERIALIZE_UNSUPPORTED_VALUE');
+	if (prototype !== Object.prototype && prototype !== null)
+		throw new Error('MARKLESS_SERIALIZE_UNSUPPORTED_VALUE');
 	const record = { id, type: 'object', fields: [] };
 	records.push(record);
-	for (const key of Object.keys(value)) record.fields.push([key, marklessSerializeSlot(value[key], records, seen)]);
+	for (const key of Object.keys(value))
+		record.fields.push([key, marklessSerializeSlot(value[key], records, seen)]);
 	return { $ref: id };
 }

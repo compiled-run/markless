@@ -118,10 +118,16 @@ function viewWithClickSyncComputedDomUpdate(): ProtocolViewPayload {
 		version: ASYNC_PROTOCOL_VERSION,
 		locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'button' }],
 		events: [{ hostNodeId: 'h0', eventName: 'click', symbolIds: ['symbol:click'] }],
-		domUpdates: [{
-			hostNodeId: 'h0', source: 'doubled', graphNodeId: 'computed:doubled',
-			path: [], target: { kind: 'text' }, symbolId: 'symbol:text',
-		}],
+		domUpdates: [
+			{
+				hostNodeId: 'h0',
+				source: 'doubled',
+				graphNodeId: 'computed:doubled',
+				path: [],
+				target: { kind: 'text' },
+				symbolId: 'symbol:text',
+			},
+		],
 		behaviors: [],
 		elementHandles: [],
 		asyncBoundaries: [],
@@ -209,11 +215,18 @@ function duplicateKeyRepeatView(): ProtocolViewPayload {
 		behaviors: [],
 		elementHandles: [],
 		asyncBoundaries: [],
-		keyedRepeats: [{
-			id: 'repeat:0', parentHostNodeId: 'h0', collectionGraphNodeId: 'state:rows',
-			collectionPath: [], keyPath: ['category'], itemName: 'row', rowElementCount: 1,
-			rowEvents: [],
-		}],
+		keyedRepeats: [
+			{
+				id: 'repeat:0',
+				parentHostNodeId: 'h0',
+				collectionGraphNodeId: 'state:rows',
+				collectionPath: [],
+				keyPath: ['category'],
+				itemName: 'row',
+				rowElementCount: 1,
+				rowEvents: [],
+			},
+		],
 	};
 }
 
@@ -225,7 +238,9 @@ const duplicateRows = [
 
 function duplicateRowsState() {
 	return createProtocolStatePayload({
-		cells: [{ graphNodeId: 'state:rows', name: 'rows', valueKind: 'array', value: duplicateRows }],
+		cells: [
+			{ graphNodeId: 'state:rows', name: 'rows', valueKind: 'array', value: duplicateRows },
+		],
 	});
 }
 
@@ -276,12 +291,20 @@ test('render creates a CSR container without payload scripts or the inline resum
 });
 
 test('render rejects duplicate runtime keys before mounting CSR output', async () => {
-	const target = { children: [] as FakeElement[], replaceChildren(...children: FakeElement[]) { this.children = children; } };
+	const target = {
+		children: [] as FakeElement[],
+		replaceChildren(...children: FakeElement[]) {
+			this.children = children;
+		},
+	};
 
 	await expect(
 		render(
 			() => ({
-				root: element('UL', duplicateRows.map(() => element('LI'))),
+				root: element(
+					'UL',
+					duplicateRows.map(() => element('LI')),
+				),
 				state: duplicateRowsState(),
 				view: duplicateKeyRepeatView(),
 				loadSymbol: () => () => undefined,
@@ -461,7 +484,9 @@ test('render flips a composed child CSR branch from a callback-prop dispatch', a
 		},
 	};
 	const state = createProtocolStatePayload({
-		cells: [{ graphNodeId: 'state:playing', name: 'playing', valueKind: 'scalar', value: false }],
+		cells: [
+			{ graphNodeId: 'state:playing', name: 'playing', valueKind: 'scalar', value: false },
+		],
 	});
 	const parentView: ProtocolViewPayload = {
 		version: ASYNC_PROTOCOL_VERSION,
@@ -474,8 +499,12 @@ test('render flips a composed child CSR branch from a callback-prop dispatch', a
 	};
 	const childView: ProtocolViewPayload = {
 		version: ASYNC_PROTOCOL_VERSION,
-		locators: [{ hostNodeId: 'play-button', strategy: 'dom-order', index: 0, tagName: 'button' }],
-		events: [{ hostNodeId: 'play-button', eventName: 'click', symbolIds: ['symbol:child-noop'] }],
+		locators: [
+			{ hostNodeId: 'play-button', strategy: 'dom-order', index: 0, tagName: 'button' },
+		],
+		events: [
+			{ hostNodeId: 'play-button', eventName: 'click', symbolIds: ['symbol:child-noop'] },
+		],
 		domUpdates: [],
 		behaviors: [],
 		elementHandles: [],
@@ -498,11 +527,13 @@ test('render flips a composed child CSR branch from a callback-prop dispatch', a
 				return {
 					root: button,
 					view: childView,
-					propEvents: [{
-						hostNodeId: 'play-button',
-						eventName: 'click',
-						propName: 'onPlayToggle',
-					}],
+					propEvents: [
+						{
+							hostNodeId: 'play-button',
+							eventName: 'click',
+							propName: 'onPlayToggle',
+						},
+					],
 				};
 			},
 		},
@@ -517,12 +548,14 @@ test('render flips a composed child CSR branch from a callback-prop dispatch', a
 		root,
 		parentView,
 		[],
-		[{
-			output: childOutput,
-			hostPrefix: 'c0:',
-			symbolPrefix: 'c0:',
-			graphProps: [{ name: 'active', graphNodeId: 'state:playing', path: [] }],
-		}],
+		[
+			{
+				output: childOutput,
+				hostPrefix: 'c0:',
+				symbolPrefix: 'c0:',
+				graphProps: [{ name: 'active', graphNodeId: 'state:playing', path: [] }],
+			},
+		],
 	) as ProtocolViewPayload;
 	const pauseIcon = element('SPAN');
 	pauseIcon.textContent = '❚❚';
@@ -539,7 +572,10 @@ test('render flips a composed child CSR branch from a callback-prop dispatch', a
 			loadSymbol(symbolId: string) {
 				loadedSymbols.push(symbolId);
 				if (symbolId === 'c0:symbol:child-noop') return () => undefined;
-				return (context: { readonly branchId?: string; readonly composedBranchId?: string }) => {
+				return (context: {
+					readonly branchId?: string;
+					readonly composedBranchId?: string;
+				}) => {
 					expect(context).toMatchObject({
 						branchId: 'branch-site:icon',
 						composedBranchId: 'c0:branch-site:icon',
@@ -573,19 +609,38 @@ test('render flips a composed child CSR branch from a callback-prop dispatch', a
 
 test('render flips the seventh composed child CSR branch independently', async () => {
 	const buttons = Array.from({ length: 6 }, () => element('BUTTON'));
-	const startAnchor = { nodeType: 8 as const, textContent: 'markless:branch:branch-site:0' } as unknown as FakeElement;
+	const startAnchor = {
+		nodeType: 8 as const,
+		textContent: 'markless:branch:branch-site:0',
+	} as unknown as FakeElement;
 	const shown = element('SPAN');
 	shown.textContent = '▶';
-	const endAnchor = { nodeType: 8 as const, textContent: '/markless:branch:branch-site:0' } as unknown as FakeElement;
+	const endAnchor = {
+		nodeType: 8 as const,
+		textContent: '/markless:branch:branch-site:0',
+	} as unknown as FakeElement;
 	buttons.push(element('BUTTON', [startAnchor, shown, endAnchor]));
 	const root = element('MAIN', buttons);
-	const state = createProtocolStatePayload({ cells: [{ graphNodeId: 'state:open', name: 'open', valueKind: 'scalar', value: false }] });
+	const state = createProtocolStatePayload({
+		cells: [{ graphNodeId: 'state:open', name: 'open', valueKind: 'scalar', value: false }],
+	});
 	const childView: ProtocolViewPayload = {
 		version: ASYNC_PROTOCOL_VERSION,
 		locators: [{ hostNodeId: 'button', strategy: 'dom-order', index: 0, tagName: 'button' }],
 		events: [{ hostNodeId: 'button', eventName: 'click', symbolIds: ['symbol:toggle'] }],
-		domUpdates: [], behaviors: [], elementHandles: [], asyncBoundaries: [],
-		branches: [{ id: 'branch-site:0', startAnchor: { strategy: 'dom-order-comment', index: 0 }, endAnchor: { strategy: 'dom-order-comment', index: 1 }, symbolId: 'symbol:branch', testReads: [{ source: 'open', graphNodeId: 'state:open', path: [] }] }],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+		branches: [
+			{
+				id: 'branch-site:0',
+				startAnchor: { strategy: 'dom-order-comment', index: 0 },
+				endAnchor: { strategy: 'dom-order-comment', index: 1 },
+				symbolId: 'symbol:branch',
+				testReads: [{ source: 'open', graphNodeId: 'state:open', path: [] }],
+			},
+		],
 	};
 	const pause = element('SPAN');
 	pause.textContent = '❚❚';
@@ -595,54 +650,93 @@ test('render flips the seventh composed child CSR branch independently', async (
 	const renderedBranchHtml: string[] = [];
 	const childLoadSymbol = (index: number) => (symbolId: string) => {
 		loadedSymbols.push(`c${index}:${symbolId}`);
-		if (index === 6 && symbolId === 'symbol:toggle') return ({ graph }) => graph.write({ graphNodeId: 'state:open', value: true });
-		return (context: { readonly arm?: number; readonly branchId?: string; readonly composedBranchId?: string }) => {
-			if (index !== 6 || context.branchId !== 'branch-site:0' || context.composedBranchId !== 'c6:branch-site:0') return { arm: context.arm ?? 0, html: '' };
+		if (index === 6 && symbolId === 'symbol:toggle')
+			return ({ graph }) => graph.write({ graphNodeId: 'state:open', value: true });
+		return (context: {
+			readonly arm?: number;
+			readonly branchId?: string;
+			readonly composedBranchId?: string;
+		}) => {
+			if (
+				index !== 6 ||
+				context.branchId !== 'branch-site:0' ||
+				context.composedBranchId !== 'c6:branch-site:0'
+			)
+				return { arm: context.arm ?? 0, html: '' };
 			const arm = context.arm ?? 0;
 			return { arm, html: armMarkupRecords[arm] as never };
 		};
 	};
 	const view = marklessCsrComposeView(
 		root,
-		{ version: ASYNC_PROTOCOL_VERSION, locators: [], events: [], domUpdates: [], behaviors: [], elementHandles: [], asyncBoundaries: [] },
+		{
+			version: ASYNC_PROTOCOL_VERSION,
+			locators: [],
+			events: [],
+			domUpdates: [],
+			behaviors: [],
+			elementHandles: [],
+			asyncBoundaries: [],
+		},
 		[],
 		buttons.map((button, index) => ({
-			output: { root: button, view: index === 6 ? childView : { ...childView, branches: [] }, loadSymbol: childLoadSymbol(index) },
-			hostPrefix: `c${index}:`, symbolPrefix: `c${index}:`, graphProps: [],
+			output: {
+				root: button,
+				view: index === 6 ? childView : { ...childView, branches: [] },
+				loadSymbol: childLoadSymbol(index),
+			},
+			hostPrefix: `c${index}:`,
+			symbolPrefix: `c${index}:`,
+			graphProps: [],
 		})),
 	) as ProtocolViewPayload;
 
 	const global = globalThis as { document?: unknown };
 	const previousDocument = global.document;
-	expect(buttons[6]!.childNodes.map((child) => child.textContent)).toEqual(['markless:branch:c6:branch-site:0', '▶', '/markless:branch:c6:branch-site:0']);
+	expect(buttons[6]!.childNodes.map((child) => child.textContent)).toEqual([
+		'markless:branch:c6:branch-site:0',
+		'▶',
+		'/markless:branch:c6:branch-site:0',
+	]);
 	global.document = {
 		createElement(tagName: string) {
 			if (tagName !== 'template') throw new Error(`Unexpected tag ${tagName}`);
 			let childNodes: FakeElement[] = [];
 			return {
-				content: { get childNodes() { return childNodes; } },
+				content: {
+					get childNodes() {
+						return childNodes;
+					},
+				},
 				set innerHTML(value: unknown) {
 					const html = String(value);
 					renderedBranchHtml.push(html);
-					childNodes = html === '<span class=play-icon>❚❚</span>'
-						? [pause]
-						: [{ nodeType: 3, textContent: html } as unknown as FakeElement];
+					childNodes =
+						html === '<span class=play-icon>❚❚</span>'
+							? [pause]
+							: [{ nodeType: 3, textContent: html } as unknown as FakeElement];
 				},
 			};
 		},
 	};
 	const container = await (async () => {
 		try {
-			return await render(() => ({
-				root,
-				state,
-				view,
-				loadSymbol(symbolId: string) {
-					const index = buttons.findIndex((_, childIndex) => symbolId.startsWith(`c${childIndex}:`));
-					if (index >= 0) return childLoadSymbol(index)(symbolId.slice(`c${index}:`.length));
-					throw new Error(`Unexpected parent symbol ${symbolId}`);
-				},
-			}), { target: { replaceChildren() {} } });
+			return await render(
+				() => ({
+					root,
+					state,
+					view,
+					loadSymbol(symbolId: string) {
+						const index = buttons.findIndex((_, childIndex) =>
+							symbolId.startsWith(`c${childIndex}:`),
+						);
+						if (index >= 0)
+							return childLoadSymbol(index)(symbolId.slice(`c${index}:`.length));
+						throw new Error(`Unexpected parent symbol ${symbolId}`);
+					},
+				}),
+				{ target: { replaceChildren() {} } },
+			);
 		} finally {
 			global.document = previousDocument;
 		}
@@ -653,7 +747,11 @@ test('render flips the seventh composed child CSR branch independently', async (
 	expect(loadedSymbols).toEqual(['c6:symbol:toggle', 'c6:symbol:branch']);
 	expect(renderedBranchHtml).toEqual(['<span class=play-icon>❚❚</span>']);
 	const branchText = buttons[6]!.childNodes.map((child) => child.textContent);
-	expect(branchText).toEqual(['markless:branch:c6:branch-site:0', '❚❚', '/markless:branch:c6:branch-site:0']);
+	expect(branchText).toEqual([
+		'markless:branch:c6:branch-site:0',
+		'❚❚',
+		'/markless:branch:c6:branch-site:0',
+	]);
 	expect(branchText).not.toContain('▶');
 	expect(buttons[6]!.childNodes[1]).toMatchObject({
 		tagName: 'SPAN',
@@ -908,11 +1006,15 @@ test('render wires CSR sync computed dependencies through the full runtime', asy
 		...createProtocolStatePayload({
 			cells: [{ graphNodeId: 'state:count', name: 'count', valueKind: 'scalar', value: 2 }],
 		}),
-		computed: [{
-			graphNodeId: 'computed:doubled', name: 'doubled', async: false,
-			deriveSymbolId: 'symbol:derive',
-			dependencies: [{ graphNodeId: 'state:count', path: [] }],
-		}],
+		computed: [
+			{
+				graphNodeId: 'computed:doubled',
+				name: 'doubled',
+				async: false,
+				deriveSymbolId: 'symbol:derive',
+				dependencies: [{ graphNodeId: 'state:count', path: [] }],
+			},
+		],
 	};
 	const loadedSymbols: string[] = [];
 
@@ -926,7 +1028,9 @@ test('render wires CSR sync computed dependencies through the full runtime', asy
 				if (symbolId === 'symbol:click') {
 					return ({ graph }) =>
 						graph.update({
-							graphNodeId: 'state:count', path: [], returnValue: 'next',
+							graphNodeId: 'state:count',
+							path: [],
+							returnValue: 'next',
 							update: (value) => Number(value) + 1,
 						});
 				}
@@ -997,6 +1101,32 @@ test('renderToString emits an SSR container and omits the resumer for static out
 	expect(html).toContain('type="markless/state"');
 	expect(html).toContain('type="markless/view"');
 	expect(html).not.toContain('data-async-resumer');
+});
+
+// Live directValue cells (page props seeded by the host, need 14) must be
+// envelope-encoded before the payload script is served — resume validation
+// rejects a leaked directValue on first interaction.
+test('renderToString envelope-encodes live directValue state cells before serving', async () => {
+	const html = await renderToString(() => ({
+		html: '<button>Go</button>',
+		state: {
+			version: ASYNC_PROTOCOL_VERSION,
+			cells: [
+				{
+					graphNodeId: 'prop:props',
+					name: 'props',
+					valueKind: 'object' as const,
+					directValue: { params: { owner: 'ada' }, status: 200 },
+				},
+			],
+			computed: [],
+		},
+		view: staticView(),
+	}));
+
+	expect(html).toContain('"graphNodeId":"prop:props"');
+	expect(html).not.toContain('directValue');
+	expect(html).toContain('"records"');
 });
 
 test('renderToString rejects duplicate runtime keys before serving SSR output', async () => {
@@ -1270,9 +1400,9 @@ test('renderToString emits ordered modulepreload links before interactive payloa
 	expect(html.indexOf('rel="modulepreload"')).toBeLessThan(html.indexOf('data-async-resumer'));
 });
 
-	test('renderToString uses compiled artifact modulepreloads by default', async () => {
-		const html = await renderToString({
-			modulePreloads: [{ href: '/src/App.tsrx?import', fetchPriority: 'high' }],
+test('renderToString uses compiled artifact modulepreloads by default', async () => {
+	const html = await renderToString({
+		modulePreloads: [{ href: '/src/App.tsrx?import', fetchPriority: 'high' }],
 		resumeModuleUrl: '/src/App.tsrx?import',
 		renderSsr: () => ({
 			html: '<button type="button">Count 0</button>',
@@ -1283,30 +1413,30 @@ test('renderToString emits ordered modulepreload links before interactive payloa
 
 	expect(html).toContain(
 		'<link rel="modulepreload" href="/src/App.tsrx?import" crossorigin="anonymous" fetchpriority="high">',
-		);
+	);
+});
+
+test('renderToString emits compiled artifact head injections before the container', async () => {
+	const html = await renderToString({
+		headInjections: [
+			{
+				tag: 'script',
+				location: 'head',
+				attributes: { type: 'module', src: '/@vite/client' },
+			},
+		],
+		renderSsr: () => ({
+			html: '<button type="button">Count 0</button>',
+			state: createProtocolStatePayload({ cells: [] }),
+			view: viewWithClick(),
+		}),
 	});
 
-	test('renderToString emits compiled artifact head injections before the container', async () => {
-		const html = await renderToString({
-			headInjections: [
-				{
-					tag: 'script',
-					location: 'head',
-					attributes: { type: 'module', src: '/@vite/client' },
-				},
-			],
-			renderSsr: () => ({
-				html: '<button type="button">Count 0</button>',
-				state: createProtocolStatePayload({ cells: [] }),
-				view: viewWithClick(),
-			}),
-		});
+	expect(html).toContain('<script type="module" src="/@vite/client"></script>');
+	expect(html.indexOf('/@vite/client')).toBeLessThan(html.indexOf('<div'));
+});
 
-		expect(html).toContain('<script type="module" src="/@vite/client"></script>');
-		expect(html.indexOf('/@vite/client')).toBeLessThan(html.indexOf('<div'));
-	});
-
-	test('renderToString uses the compiled artifact resume module URL by default', async () => {
+test('renderToString uses the compiled artifact resume module URL by default', async () => {
 	const resumeModuleUrl = createResumeModuleUrl('artifact-default');
 	const html = await renderToString({
 		resumeModuleUrl,
@@ -1897,10 +2027,14 @@ test('renderToString emits graph sync-policy inline runtime once for repeated pa
 			}),
 			{ executionLog: 'never', resumeModuleUrl: '/async-resume.js', inlineRuntimeRegistry },
 		);
-	const documentHtml = (await Promise.all([renderContainer(), renderContainer(), renderContainer()])).join('');
+	const documentHtml = (
+		await Promise.all([renderContainer(), renderContainer(), renderContainer()])
+	).join('');
 	const inlineSources = extractAllResumerSources(documentHtml).join('\n');
 
-	expect(countOccurrences(inlineSources, 'const M = globalThis.__marklessInlineSyncPolicy')).toBe(1);
+	expect(countOccurrences(inlineSources, 'const M = globalThis.__marklessInlineSyncPolicy')).toBe(
+		1,
+	);
 	expect(gzipSync(inlineSources).length).toBeLessThan(2000);
 });
 
@@ -2032,9 +2166,9 @@ function extractResumerSource(html: string): string {
 }
 
 function extractAllResumerSources(html: string): string[] {
-	return [...html.matchAll(/<script data-async-resumer(?: nonce="[^"]+")?>([\s\S]*?)<\/script>/g)].map(
-		(match) => match[1]!,
-	);
+	return [
+		...html.matchAll(/<script data-async-resumer(?: nonce="[^"]+")?>([\s\S]*?)<\/script>/g),
+	].map((match) => match[1]!);
 }
 
 function countOccurrences(source: string, needle: string): number {

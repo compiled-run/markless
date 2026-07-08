@@ -69,7 +69,9 @@ export default box(
 			);
 		}
 		const instrumentedBeforeInteraction = await readScriptRequests(instrumentedPreview);
-		receipt.note(`SSR instrumented startup script requests: ${formatRequests(instrumentedBeforeInteraction)}`);
+		receipt.note(
+			`SSR instrumented startup script requests: ${formatRequests(instrumentedBeforeInteraction)}`,
+		);
 		assertStartupPreloadsFetched(instrumentedBeforeInteraction, preloadHrefs);
 
 		await page.click(COUNTER, WAIT);
@@ -98,16 +100,31 @@ export default box(
 		// T013 consolidated the hot-path leaves into scalar-core (per-module wrapper
 		// tax made separate tiny leaves cost more than one merged module).
 		for (const expected of ['web/fns/scalar-specialized', 'web/fns/write-scalar']) {
-			if (!executed.includes(expected)) throw new Error(`Expected ${expected}. Saw: ${executed.join(', ')}`);
+			if (!executed.includes(expected))
+				throw new Error(`Expected ${expected}. Saw: ${executed.join(', ')}`);
 		}
-		for (const excluded of ['web/dom-journal', 'web/event-only-graph', 'web/event-only-resume', 'web/event-only-lean/row', 'web/event-only-lean/scalar-resume', 'web/event-only-lean/scalar-core', 'web/payload', 'web/payload-document']) {
-			if (executed.includes(excluded)) throw new Error(`Unexpected ${excluded}. Saw: ${executed.join(', ')}`);
+		for (const excluded of [
+			'web/dom-journal',
+			'web/event-only-graph',
+			'web/event-only-resume',
+			'web/event-only-lean/row',
+			'web/event-only-lean/scalar-resume',
+			'web/event-only-lean/scalar-core',
+			'web/payload',
+			'web/payload-document',
+		]) {
+			if (executed.includes(excluded))
+				throw new Error(`Unexpected ${excluded}. Saw: ${executed.join(', ')}`);
 		}
 		const instrumentedAfterInteraction = await readScriptRequests(instrumentedPreview);
-		receipt.note(`SSR instrumented interaction script requests: ${formatRequests(instrumentedAfterInteraction)}`);
+		receipt.note(
+			`SSR instrumented interaction script requests: ${formatRequests(instrumentedAfterInteraction)}`,
+		);
 		receipt.note(
 			`SSR instrumented post-click JS fetches: ${formatRequests({
-				scripts: instrumentedAfterInteraction.scripts.slice(instrumentedBeforeInteraction.scripts.length),
+				scripts: instrumentedAfterInteraction.scripts.slice(
+					instrumentedBeforeInteraction.scripts.length,
+				),
 			})}`,
 		);
 		await expect.page.outcome(page, { consoleErrors: 0, failedRequests: 0 }, WAIT);
@@ -139,8 +156,13 @@ export default box(
 		await expect.page.text(shippedPage, COUNTER, '0', WAIT);
 		assertNoExecutionMirror(await shippedPage.content());
 		const shippedBeforeInteraction = await readScriptRequests(shippedPreview);
-		receipt.note(`SSR shipped startup script requests: ${formatRequests(shippedBeforeInteraction)}`);
-		const shippedPreloadedScripts = assertStartupPreloadsFetched(shippedBeforeInteraction, shippedPreloadHrefs);
+		receipt.note(
+			`SSR shipped startup script requests: ${formatRequests(shippedBeforeInteraction)}`,
+		);
+		const shippedPreloadedScripts = assertStartupPreloadsFetched(
+			shippedBeforeInteraction,
+			shippedPreloadHrefs,
+		);
 		const shippedPreloadedRuntimeSize = await runtimeSizeReport({
 			dist: DIST,
 			scripts: shippedPreloadedScripts,
@@ -151,19 +173,34 @@ export default box(
 		await shippedPage.click(COUNTER, WAIT);
 		await expect.page.text(shippedPage, COUNTER, '1', WAIT);
 		assertNoExecutionMirror(await shippedPage.content());
-		const executionSizes = JSON.parse(await shippedPreview.request('/build/execution-sizes.json')) as ExecutionSizeMap;
-		const counterClickGzip = await executedGzipReportWithClosure(executed, executionSizes, (path) =>
-			shippedPreview.request(path),
+		const executionSizes = JSON.parse(
+			await shippedPreview.request('/build/execution-sizes.json'),
+		) as ExecutionSizeMap;
+		const counterClickGzip = await executedGzipReportWithClosure(
+			executed,
+			executionSizes,
+			(path) => shippedPreview.request(path),
 		);
-		receipt.note(`SSR shipped counter click executed gzip: before=${PREVIOUS_COUNTER_CLICK_EXECUTED_GZIP_BYTES} after=${counterClickGzip.gzipBytes} budget=${MAX_COUNTER_CLICK_EXECUTED_GZIP_BYTES}\n${counterClickGzip.summary}`);
-		if (counterClickGzip.missing.length > 0 || counterClickGzip.gzipBytes > MAX_COUNTER_CLICK_EXECUTED_GZIP_BYTES) {
-			throw new Error(`SSR counter click executed gzip budget failed. total=${counterClickGzip.gzipBytes} missing=[${counterClickGzip.missing.join(', ')}]\n${counterClickGzip.summary}`);
+		receipt.note(
+			`SSR shipped counter click executed gzip: before=${PREVIOUS_COUNTER_CLICK_EXECUTED_GZIP_BYTES} after=${counterClickGzip.gzipBytes} budget=${MAX_COUNTER_CLICK_EXECUTED_GZIP_BYTES}\n${counterClickGzip.summary}`,
+		);
+		if (
+			counterClickGzip.missing.length > 0 ||
+			counterClickGzip.gzipBytes > MAX_COUNTER_CLICK_EXECUTED_GZIP_BYTES
+		) {
+			throw new Error(
+				`SSR counter click executed gzip budget failed. total=${counterClickGzip.gzipBytes} missing=[${counterClickGzip.missing.join(', ')}]\n${counterClickGzip.summary}`,
+			);
 		}
 		const shippedAfterInteraction = await readScriptRequests(shippedPreview);
-		receipt.note(`SSR shipped interaction script requests: ${formatRequests(shippedAfterInteraction)}`);
+		receipt.note(
+			`SSR shipped interaction script requests: ${formatRequests(shippedAfterInteraction)}`,
+		);
 		receipt.note(
 			`SSR shipped post-click JS fetches: ${formatRequests({
-				scripts: shippedAfterInteraction.scripts.slice(shippedBeforeInteraction.scripts.length),
+				scripts: shippedAfterInteraction.scripts.slice(
+					shippedBeforeInteraction.scripts.length,
+				),
 			})}`,
 		);
 		const firstInteractionSize = await runtimeSizeReport({
@@ -203,7 +240,8 @@ function assertHtmlHasPreloadsWithoutExternalScripts(html: string): void {
 }
 
 function assertNoExecutionMirror(html: string): void {
-	if (html.includes('data-markless-executed')) throw new Error('Expected shipped SSR output to omit the test execution DOM mirror.');
+	if (html.includes('data-markless-executed'))
+		throw new Error('Expected shipped SSR output to omit the test execution DOM mirror.');
 }
 
 function modulePreloadHrefs(html: string): readonly string[] {
@@ -245,12 +283,6 @@ function assertStartupPreloadsFetched(
 	return [...new Set(log.scripts.filter((script) => expectedPathSet.has(script)))];
 }
 
-
-
-
-
-
-
 function assertRuntimeSizeBudget(report: RuntimeSizeReport): void {
 	const largestRuntimeChunk = report.largestRuntimeChunk?.gzipBytes ?? 0;
 	if (largestRuntimeChunk > MAX_PRELOADED_RUNTIME_CHUNK_GZIP_BYTES) {
@@ -277,14 +309,23 @@ async function executedGzipReportWithClosure(
 	// Anonymous shared chunks execute too but carry no stable markless id, so their
 	// instrumented-build names cannot map across builds. Charge them honestly by
 	// expanding the SHIPPED static import closure of the counted chunks.
-	const seen = new Set(base.summary.split('\n').map((row) => row.split(' ')[1]).filter(Boolean));
+	const seen = new Set(
+		base.summary
+			.split('\n')
+			.map((row) => row.split(' ')[1])
+			.filter(Boolean),
+	);
 	const queue = [...seen];
 	let closureGzip = 0;
 	const closureRows: string[] = [];
 	while (queue.length > 0) {
 		const chunk = queue.pop()!;
 		let code = '';
-		try { code = await request(`/build/${chunk}`); } catch { continue; }
+		try {
+			code = await request(`/build/${chunk}`);
+		} catch {
+			continue;
+		}
 		for (const match of code.matchAll(/from\s*["'`]\.\/([^"'`]+)["'`]/g)) {
 			const dep = match[1];
 			if (seen.has(dep)) continue;
@@ -295,7 +336,9 @@ async function executedGzipReportWithClosure(
 				const gz = gzipSync(Buffer.from(depCode)).length;
 				closureGzip += gz;
 				closureRows.push(`(shared) ${dep} gzip=${gz}`);
-			} catch { /* asset not servable; skip */ }
+			} catch {
+				/* asset not servable; skip */
+			}
 		}
 	}
 	return {
@@ -305,12 +348,18 @@ async function executedGzipReportWithClosure(
 	};
 }
 
-function executedGzipReport(executed: readonly string[], sizes: ExecutionSizeMap): {
+function executedGzipReport(
+	executed: readonly string[],
+	sizes: ExecutionSizeMap,
+): {
 	readonly gzipBytes: number;
 	readonly missing: readonly string[];
 	readonly summary: string;
 } {
-	const counted = new Map<string, { readonly id: string; readonly entry: ExecutionSizeMap[string] }>();
+	const counted = new Map<
+		string,
+		{ readonly id: string; readonly entry: ExecutionSizeMap[string] }
+	>();
 	const missing: string[] = [];
 	for (const id of executed) {
 		if (isMeasurementOnlyExecution(id)) continue;
@@ -325,11 +374,16 @@ function executedGzipReport(executed: readonly string[], sizes: ExecutionSizeMap
 	return {
 		gzipBytes: rows.reduce((total, row) => total + row.entry.gzip, 0),
 		missing,
-		summary: rows.map((row) => `${row.id} ${row.entry.chunk} gzip=${row.entry.gzip}`).join('\n'),
+		summary: rows
+			.map((row) => `${row.id} ${row.entry.chunk} gzip=${row.entry.gzip}`)
+			.join('\n'),
 	};
 }
 
-function executionSizeFor(id: string, sizes: ExecutionSizeMap): ExecutionSizeMap[string] | undefined {
+function executionSizeFor(
+	id: string,
+	sizes: ExecutionSizeMap,
+): ExecutionSizeMap[string] | undefined {
 	const normalizedIds = [
 		id,
 		id.replace(/^(runtime|serializer|web)\//, '$1:'),
@@ -374,7 +428,14 @@ function counterClickAction(view: PayloadRecordInventory): {
 } {
 	const clicks = (view.events ?? []).filter((event) => event.eventName === 'click');
 	if (clicks.length !== 1) {
-		throw new Error(`Expected exactly one click event record in the preview fixture, saw ${clicks.length}.`);
+		throw new Error(
+			`Expected exactly one click event record in the preview fixture, saw ${clicks.length}.`,
+		);
 	}
-	return { hostNodeId: clicks[0].hostNodeId, eventName: 'click', syncPolicy: clicks[0].syncPolicy, executionLog: true };
+	return {
+		hostNodeId: clicks[0].hostNodeId,
+		eventName: 'click',
+		syncPolicy: clicks[0].syncPolicy,
+		executionLog: true,
+	};
 }

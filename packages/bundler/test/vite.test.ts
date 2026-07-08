@@ -170,12 +170,10 @@ describe('Vite adapter structure', () => {
 			root: '/workspace/app',
 		});
 		callBuildStart(plugin, { cwd: '/workspace/app', input: { symbols: 'src/App.tsrx' } });
-		await callTransform(
-			plugin,
-			source,
-			'/workspace/app/src/App.tsrx',
-			{ ...createViteHookContext('client'), emitFile },
-		);
+		await callTransform(plugin, source, '/workspace/app/src/App.tsrx', {
+			...createViteHookContext('client'),
+			emitFile,
+		});
 
 		expect(emitFile.mock.calls.map((call) => call[0])).toEqual(
 			expect.arrayContaining([
@@ -211,12 +209,10 @@ describe('Vite adapter structure', () => {
 			root: '/workspace/app',
 		});
 		callBuildStart(plugin, { cwd: '/workspace/app', input: { symbols: 'src/App.tsrx' } });
-		await callTransform(
-			plugin,
-			source,
-			'/workspace/app/src/App.tsrx',
-			{ ...createViteHookContext('client'), emitFile },
-		);
+		await callTransform(plugin, source, '/workspace/app/src/App.tsrx', {
+			...createViteHookContext('client'),
+			emitFile,
+		});
 
 		expect(emitFile.mock.calls.map((call) => call[0].id)).toContain(
 			`virtual:markless:resume:${encodeURIComponent('/workspace/app/src/App.tsrx')}`,
@@ -255,13 +251,64 @@ describe('Vite adapter structure', () => {
 		)) as { code: string };
 
 		expect(result.code).toContain('headInjections:');
-		expect(result.code).toContain('"src":"/dev/@vite/client"');
+		expect(result.code).toContain('"src": "/dev/@vite/client"'); // re-print spaces object literals
 		// Dev resume URL points at the SOURCE module so the .tsrx stays in the client
 		// module graph (vite's no-accepting-boundary full-reload depends on it); the
 		// client source module re-exports resumeContainerEvent from the virtual
-		// resume module in dev only.
-		expect(result.code).toContain('resumeModuleUrl: "/dev/');
-		expect(result.code).toContain('.tsrx?import"');
+		// resume module in dev only. It must use the /@fs/<absolute> form: a
+		// root-relative source path (e.g. /pages/r/[repo]/index.tsrx) is routed by
+		// framework dev servers (nitro) as an APP ROUTE and 404s, killing the first
+		// full-resume wake in dev (T104 living-proof regression).
+		expect(result.code).toContain(
+			'resumeModuleUrl: "/dev/@fs/workspace/app/src/App.tsrx?import"',
+		);
+	});
+
+	test('resolves and loads virtual module ids carrying the ?import suffix Vite adds to .tsrx-shaped imports', async () => {
+		// The dev resume module imports `virtual:markless:payload:<file>` — an id
+		// that ENDS in .tsrx, so Vite's import analysis treats it like an asset
+		// and appends `?import`. Lookups must strip the query or the first
+		// full-resume wake 404s on its payload/view imports (T104 dev proof).
+		const plugin = getAsyncPlugin();
+		const filename = '/workspace/app/src/App.tsrx';
+		callConfigResolved(plugin, {
+			base: '/dev/',
+			command: 'serve',
+			root: '/workspace/app',
+		});
+		await callTransform(plugin, source, filename, createViteHookContext('client'));
+
+		const canonicalId = `\0virtual:markless:payload:${encodeURIComponent(filename)}`;
+		const resolved = await callResolveId(plugin, `${canonicalId}?import`);
+		expect(resolved).toMatchObject({ id: canonicalId });
+
+		const loaded = await callLoad(plugin, `${canonicalId}?import`);
+		expect(loaded).toContain('export const state');
+		expect(loaded).toContain('"graphNodeId": "state:count"');
+	});
+
+	test('resolves virtual ids after the /@id middleware decodeURI damage (bracketed route dirs)', async () => {
+		// Vite decodeURI()s /@id request paths: %2F stays (reserved) but %5B/%5D
+		// decode to raw brackets — so ids for pages like pages/r/[repo] come in
+		// half-decoded and must still match the registered encodeURIComponent
+		// form (the dashboard branch-menu dev regression).
+		const plugin = getAsyncPlugin();
+		const filename = '/workspace/app/pages/r/[repo]/Menu.tsrx';
+		callConfigResolved(plugin, {
+			base: '/dev/',
+			command: 'serve',
+			root: '/workspace/app',
+		});
+		await callTransform(plugin, source, filename, createViteHookContext('client'));
+
+		const canonicalId = `\0virtual:markless:payload:${encodeURIComponent(filename)}`;
+		const damagedId = decodeURI(`${canonicalId}?import`);
+		expect(damagedId).toContain('[repo]');
+
+		const resolved = await callResolveId(plugin, damagedId);
+		expect(resolved).toMatchObject({ id: canonicalId });
+		const loaded = await callLoad(plugin, damagedId);
+		expect(loaded).toContain('export const state');
 	});
 
 	test('serves dev symbol resolver tables with browser-loadable symbol module URLs', async () => {

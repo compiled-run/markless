@@ -2,8 +2,17 @@ export type MarklessExecutionLogMode = 'auto' | 'never' | 'always';
 export { describeMarklessEventTarget } from './execution-log-target.ts';
 export type MarklessExecutionLogLocation = { readonly origin: string; readonly search: string };
 export type MarklessExecutionLogStorage = { readonly getItem: (key: string) => string | null };
-export type MarklessExecutionEventRecord = { readonly hostNodeId: string; readonly symbolIds?: ReadonlyArray<string> };
-export type MarklessExecutionView = { readonly behaviors?: ReadonlyArray<{ readonly hostNodeId: string; readonly symbolId?: string }>; readonly domUpdates?: ReadonlyArray<{ readonly hostNodeId: string; readonly symbolId?: string }> };
+export type MarklessExecutionEventRecord = {
+	readonly hostNodeId: string;
+	readonly symbolIds?: ReadonlyArray<string>;
+};
+export type MarklessExecutionView = {
+	readonly behaviors?: ReadonlyArray<{ readonly hostNodeId: string; readonly symbolId?: string }>;
+	readonly domUpdates?: ReadonlyArray<{
+		readonly hostNodeId: string;
+		readonly symbolId?: string;
+	}>;
+};
 export type MarklessExecutionModuleSize = {
 	readonly raw: number;
 	readonly gzip?: number;
@@ -19,7 +28,11 @@ export function shouldActivateMarklessExecutionLog(input: {
 }): boolean {
 	if (input.mode === 'always') return true;
 	if (input.mode === 'never') return false;
-	if (isLocalOrigin(input.location.origin) || new URLSearchParams(input.location.search).has('markless-log')) return true;
+	if (
+		isLocalOrigin(input.location.origin) ||
+		new URLSearchParams(input.location.search).has('markless-log')
+	)
+		return true;
 	try {
 		return input.localStorage?.getItem('marklessLog') === '1';
 	} catch {
@@ -49,13 +62,22 @@ export function describeMarklessExecutionCauses(input: {
 	const cause = input.eventRecord
 		? `${input.eventName} matched event record ${input.eventRecord.hostNodeId}`
 		: `${input.eventName} matched runtime records`;
-	const rows = woken.map((moduleId) => `woke ${moduleId}${moduleKbSuffix(moduleId, input.moduleSizes)} <- ${cause}`);
+	const rows = woken.map(
+		(moduleId) => `woke ${moduleId}${moduleKbSuffix(moduleId, input.moduleSizes)} <- ${cause}`,
+	);
 	if (input.eventRecord) {
 		for (const moduleId of warmModuleIds(input.dispatchModuleId, input.eventRecord.symbolIds)) {
-			rows.push(`ran warm ${moduleId}${moduleKbSuffix(moduleId, input.moduleSizes)} <- ${cause}`);
+			rows.push(
+				`ran warm ${moduleId}${moduleKbSuffix(moduleId, input.moduleSizes)} <- ${cause}`,
+			);
 		}
 	}
-	if (input.eventRecord && !(input.view?.behaviors ?? []).some((behavior) => behavior.hostNodeId === input.eventRecord?.hostNodeId)) {
+	if (
+		input.eventRecord &&
+		!(input.view?.behaviors ?? []).some(
+			(behavior) => behavior.hostNodeId === input.eventRecord?.hostNodeId,
+		)
+	) {
 		rows.push('skip behavior — no matching record touched');
 	}
 	return rows;
@@ -76,7 +98,8 @@ function formatExecutedSize(
 	modules: ReadonlyArray<string>,
 	moduleSizes: MarklessExecutionModuleSizes | undefined,
 ): string {
-	if (!moduleSizes) return modules.length === 1 ? '1 module executed' : `${modules.length} modules executed`;
+	if (!moduleSizes)
+		return modules.length === 1 ? '1 module executed' : `${modules.length} modules executed`;
 	return formatMarklessExecutedSize(modules, moduleSizes);
 }
 
@@ -85,17 +108,30 @@ function formatExecutedKb(
 	moduleSizes: MarklessExecutionModuleSizes | undefined,
 ): string {
 	if (!moduleSizes) return modules.length === 1 ? '1 module' : `${modules.length} modules`;
-	const sizes = modules.map((moduleId) => moduleSizes.get(moduleId)).filter((size): size is MarklessExecutionModuleSize => !!size);
+	const sizes = modules
+		.map((moduleId) => moduleSizes.get(moduleId))
+		.filter((size): size is MarklessExecutionModuleSize => !!size);
 	const estimated = [...moduleSizes.values()].some((size) => size.estimated);
-	const total = sizes.reduce((sum, size) => sum + (size.estimated ? size.raw : size.gzip ?? size.raw), 0);
+	const total = sizes.reduce(
+		(sum, size) => sum + (size.estimated ? size.raw : (size.gzip ?? size.raw)),
+		0,
+	);
 	return `${(total / 1024).toFixed(1)} KB${estimated ? ' est.' : ''}`;
 }
 
-function moduleKbSuffix(moduleId: string, moduleSizes: MarklessExecutionModuleSizes | undefined): string {
+function moduleKbSuffix(
+	moduleId: string,
+	moduleSizes: MarklessExecutionModuleSizes | undefined,
+): string {
 	if (!moduleSizes) return '';
 	return ` (${formatExecutedKb([moduleId], moduleSizes)})`;
 }
 
-function warmModuleIds(dispatchModuleId: string | undefined, symbolIds: ReadonlyArray<string> | undefined): string[] {
-	return [...new Set([dispatchModuleId, ...(symbolIds ?? [])].filter((id): id is string => !!id))];
+function warmModuleIds(
+	dispatchModuleId: string | undefined,
+	symbolIds: ReadonlyArray<string> | undefined,
+): string[] {
+	return [
+		...new Set([dispatchModuleId, ...(symbolIds ?? [])].filter((id): id is string => !!id)),
+	];
 }

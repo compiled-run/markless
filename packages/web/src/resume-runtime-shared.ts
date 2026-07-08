@@ -1,9 +1,15 @@
-import type { ResumeDomEvent, ResumeRuntimeErrorContext, ResumeRuntimeInput } from './resume-types.ts';
+import type {
+	ResumeDomEvent,
+	ResumeRuntimeErrorContext,
+	ResumeRuntimeInput,
+} from './resume-types.ts';
 import { enrichRuntimeErrorForReporting } from './runtime-error-reporting.ts';
 
 export const SHARED_PATCH_EVENT_TYPE = 'async:shared-patch';
 
-type SharedPatchRuntime = ReturnType<typeof import('./resume-shared-patch.ts')['createResumeSharedPatchRuntime']>;
+type SharedPatchRuntime = ReturnType<
+	(typeof import('./resume-shared-patch.ts'))['createResumeSharedPatchRuntime']
+>;
 
 export function createResumeRuntimeShared(input: ResumeRuntimeInput) {
 	let sharedPatchRuntime: SharedPatchRuntime | undefined;
@@ -26,10 +32,7 @@ export function createResumeRuntimeShared(input: ResumeRuntimeInput) {
 		}
 	};
 
-	const reportRuntimeError = async (
-		error: unknown,
-		context: ResumeRuntimeErrorContext,
-	) => {
+	const reportRuntimeError = async (error: unknown, context: ResumeRuntimeErrorContext) => {
 		const reportable = enrichRuntimeErrorForReporting(error, context);
 		if (!input.onError) {
 			reportGlobalRuntimeError(reportable);
@@ -60,9 +63,22 @@ export function createResumeRuntimeShared(input: ResumeRuntimeInput) {
 }
 
 function reportGlobalRuntimeError(error: unknown): void {
-	const host = globalThis as { readonly reportError?: (error: unknown) => void; readonly dispatchEvent?: (event: Event) => boolean; readonly ErrorEvent?: new (type: string, init: { readonly error: unknown; readonly message: string }) => Event };
+	const host = globalThis as {
+		readonly reportError?: (error: unknown) => void;
+		readonly dispatchEvent?: (event: Event) => boolean;
+		readonly ErrorEvent?: new (
+			type: string,
+			init: { readonly error: unknown; readonly message: string },
+		) => Event;
+	};
 	if (host.reportError) return host.reportError(error);
-	if (host.dispatchEvent && host.ErrorEvent) host.dispatchEvent(new host.ErrorEvent('error', { error, message: error instanceof Error ? error.message : String(error) }));
+	if (host.dispatchEvent && host.ErrorEvent)
+		host.dispatchEvent(
+			new host.ErrorEvent('error', {
+				error,
+				message: error instanceof Error ? error.message : String(error),
+			}),
+		);
 }
 
 function isPromiseLike<T>(value: T | PromiseLike<T>): value is PromiseLike<T> {

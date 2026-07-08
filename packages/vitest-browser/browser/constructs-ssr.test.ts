@@ -1,6 +1,7 @@
 import { afterEach, expect, test, onTestFinished } from 'vitest';
 import { cleanup, renderSSR } from '../src/index.ts';
 import ArmEvents from './fixtures/arm-events.tsrx';
+import ArmTryEvents from './fixtures/arm-try-events.tsrx';
 import AsyncDetails from './fixtures/async-details.tsrx';
 import AttachBehavior from './fixtures/attach-behavior.tsrx';
 import DynamicTag from './fixtures/dynamic-tag.tsrx';
@@ -167,6 +168,27 @@ test('SSR: async computed serves the resolved arm and revalidates on a write', a
 	await expect.poll(() => container.querySelector('p.done')?.textContent).toBe('Hello Grace');
 });
 
+test('SSR: buttons inside @try fire on direct load (arm-relative records, D3)', async () => {
+	// The dead-events-inside-arms bug class: in-arm records must resolve
+	// relative to the boundary start anchor, so the SSR-taken @try arm's
+	// button dispatches through its own event record on the first click.
+	const screen = await renderSSR(ArmTryEvents);
+	const container = screen.container;
+	const saved = requireElement<HTMLOutputElement>(container, 'output[data-saved]');
+
+	expect(container.querySelector('p.done')?.textContent).toBe('Q3 report');
+	expect(saved.textContent).toBe('none');
+
+	requireElement<HTMLButtonElement>(container, 'button[data-save]').click();
+	await expect.poll(() => saved.textContent).toBe('saved:Q3 report');
+
+	// Need 15's banked repro shape: a host inside an arm-scoped @if arm.
+	// Its event record must resolve through the boundary's arm records, not a
+	// page-absolute locator that assumes both @if arms rendered.
+	requireElement<HTMLButtonElement>(container, 'button[data-share]').click();
+	await expect.poll(() => saved.textContent).toBe('shared:Q3 report');
+});
+
 test('SSR: dynamic tag <{expr}> renders the computed element', async () => {
 	const screen = await renderSSR(DynamicTag);
 	const container = screen.container;
@@ -238,16 +260,11 @@ test('SSR: fragment root with an @if child flips the branch range', async () => 
 	expect(container.querySelector('p.on')).toBeNull();
 });
 
-// Un-marked from test.fails after T007: payload-declared tier selection fixed SSR
-// static children projection (CSR twin un-marked at T006).
-// KNOWN RED — restored to its original status (born red for the deferred
-// projection-metadata design, T012 Q2). It passed incidentally 2026-07-01..06 via
-// the event-only middle tier's lenient path; the tier collapse (T014) plus
-// specialized-dispatch exclusion of composed pages (T015g) removed the accident:
-// projected child hosts keep caller-coordinate locators that the strict full-tier
-// walk correctly rejects (locator h1 expects <p> at 2, composed DOM has <section>).
-// Flips green when the projection-metadata design lands (specs/framework, deferred).
-test.fails('SSR: static children projection renders inside the wrapping component', async () => {
+// GREEN as of dashboard-migration need 13 (2026-07-07): marklessSsrComposeView
+// derives child positions from the final html (element opens before the child's
+// rendered subtree), so projected child hosts get true dom-order locators — the
+// caller-coordinate misindex this test ledgered is fixed.
+test('SSR: static children projection renders inside the wrapping component', async () => {
 	// The deferred misindex also surfaces as an ASYNC RuntimeResumeError after
 	// the resumer script runs; contain it so the ledgered failure stays the
 	// assertion below rather than an unhandled rejection failing the run.

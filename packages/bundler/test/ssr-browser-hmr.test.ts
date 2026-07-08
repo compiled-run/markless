@@ -9,7 +9,9 @@ import { fixtureSsrHost } from '../fixtures/vite-ssr/src/dev-server.ts';
 const root = resolve(import.meta.dirname, '../../..');
 const cleanupRoots: string[] = [];
 afterEach(async () => {
-	await Promise.all(cleanupRoots.splice(0).map((path) => rm(path, { force: true, recursive: true })));
+	await Promise.all(
+		cleanupRoots.splice(0).map((path) => rm(path, { force: true, recursive: true })),
+	);
 });
 
 describe('SSR browser HMR', () => {
@@ -34,7 +36,11 @@ describe('SSR browser HMR', () => {
 			const send = vi.spyOn(server.environments.client.hot, 'send');
 			await requestHtml(server);
 
-			await editFile(server, fixture.entry, fixture.source.replace('count++', 'count = count + 1'));
+			await editFile(
+				server,
+				fixture.entry,
+				fixture.source.replace('count++', 'count = count + 1'),
+			);
 			const firstReloads = await waitForFullReloadCountAbove(send, 0);
 
 			await requestHtml(server);
@@ -101,7 +107,10 @@ function marklessSourceAliases() {
 			find: '@markless/serializer/decode-client',
 			replacement: repo('packages/serializer/src/value-decode-client.ts'),
 		},
-		{ find: '@markless/bundler/rolldown', replacement: repo('packages/bundler/src/rolldown.ts') },
+		{
+			find: '@markless/bundler/rolldown',
+			replacement: repo('packages/bundler/src/rolldown.ts'),
+		},
 		{ find: '@markless/bundler/preload', replacement: repo('packages/bundler/src/preload.ts') },
 		{ find: '@markless/bundler/vite', replacement: repo('packages/bundler/src/vite/index.ts') },
 		...(['core', 'web', 'runtime', 'serializer'] as const).flatMap((name) => [

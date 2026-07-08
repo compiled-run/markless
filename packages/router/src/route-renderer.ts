@@ -1,12 +1,16 @@
 import { render } from '@markless/web/render';
-import { MARKLESS_ROUTER_ROUTE_EVENT, routePageProps, type RouteUpdate } from './route-state.ts';
-
-const ROUTE_RENDERER_STARTED = '__marklessRouterRouteRendererStarted';
+import { holdNavigationSwapUntilSettled, type NavigationHoldRuntime } from './navigation-hold.ts';
+import {
+	MARKLESS_ROUTER_RENDERER_STARTED,
+	MARKLESS_ROUTER_ROUTE_EVENT,
+	routePageProps,
+	type RouteUpdate,
+} from './route-state.ts';
 
 export function startRouteUpdateRenderer(document: Document = window.document): void {
 	const state = document as unknown as Record<string, unknown>;
-	if (state[ROUTE_RENDERER_STARTED]) return;
-	state[ROUTE_RENDERER_STARTED] = true;
+	if (state[MARKLESS_ROUTER_RENDERER_STARTED]) return;
+	state[MARKLESS_ROUTER_RENDERER_STARTED] = true;
 
 	document.addEventListener(MARKLESS_ROUTER_ROUTE_EVENT, (event) => {
 		void renderRouteUpdate(document, (event as CustomEvent<RouteUpdate>).detail);
@@ -24,21 +28,37 @@ interface ClientPageArtifact {
 }
 
 async function renderRouteUpdate(document: Document, update: RouteUpdate): Promise<void> {
-	const artifact = update.page.default as ClientPageArtifact | undefined;
-	if (!artifact) return;
+	try {
+		const artifact = update.page.default as ClientPageArtifact | undefined;
+		if (!artifact || update.signal?.aborted) return;
 
-	const props = routePageProps(update.route);
-	if (typeof artifact.renderCsr === 'function') {
-		await render(
-			{
-				renderCsr: () => artifact.renderCsr?.(props),
-			} as never,
-			{ target: document.body },
-		);
-		return;
-	}
+		const props = routePageProps(update.route);
+		if (typeof artifact.renderCsr === 'function') {
+			// D8 navigation transition: the destination renders fully live but
+			// unmounted (its boundary runners already run); the outgoing page
+			// stays interactive in the document until the hold commits.
+			await render(
+				{
+					renderCsr: () => artifact.renderCsr?.(props),
+				} as never,
+				{
+					target: document.body,
+					// The D8 hold/deadline/min-duration state machine lives in
+					// navigation-hold.ts (pure, fake-clock property-tested).
+					beforeMount: (container) =>
+						holdNavigationSwapUntilSettled({
+							runtime: container.runtime as NavigationHoldRuntime,
+							signal: update.signal,
+						}),
+				},
+			);
+			return;
+		}
 
-	if (typeof artifact.renderSsr === 'function') {
-		document.body.innerHTML = (await artifact.renderSsr(props)).html;
+		if (typeof artifact.renderSsr === 'function') {
+			document.body.innerHTML = (await artifact.renderSsr(props)).html;
+		}
+	} finally {
+		update.onRendered?.();
 	}
 }

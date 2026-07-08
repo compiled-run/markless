@@ -30,6 +30,7 @@ export type SsrRenderContext = {
 	// stream (their records rewire via arm-relative host paths) but must
 	// still shift later locator indexes — the repeat-row extras discipline.
 	insideSupportedBranchArm?: boolean;
+	readonly hasChildrenProp?: boolean;
 	readonly styleScopeClass: string | null;
 	readonly source: string;
 };
@@ -52,6 +53,22 @@ export type CsrRenderContext = {
 	readonly asyncBoundaries?: PublicRenderModuleInput['semanticGraph']['asyncBoundaries'];
 	readonly asyncBoundaryGates?: PublicRenderModuleInput['publicRenderPlan']['asyncBoundaryGates'];
 	nextAsyncBoundaryIndex?: number;
+	// Arm-render modules number child components page-aligned (symbol routes
+	// key on the component-edge index); unset keeps the page-module numbering.
+	nextChildIndex?: number;
+	// Arm-render modules tag static in-arm hosts so the emitted module can
+	// derive arm-relative locators from the rendered truth (D3). Mutable:
+	// repeat-row emission unsets it — rows never carry per-instance locators.
+	armHostIdByNode?: ReadonlyMap<AnyNode, string>;
+	// Inside a keyed repeat row: component invocations render per row through
+	// the markup-only row-child helper instead of the child composition
+	// machinery (rows repeat; composed child records cannot).
+	insideRepeatRow?: boolean;
+	// Inside another component's children prop (CSR string emission): child
+	// replacement machinery cannot reach projected placeholders, so component
+	// invocations render through the markup-only projected-child splice.
+	childrenMarkupOnly?: boolean;
+	readonly hasChildrenProp?: boolean;
 	readonly styleScopeClass?: string | null;
 	readonly source: string;
 };
@@ -63,4 +80,10 @@ export type PublicRenderRoot = {
 	readonly componentName: string;
 	readonly root: AnyNode;
 	readonly propNames: ReadonlyArray<string>;
+	// The parsed module the root was selected from. Host ids are assigned in
+	// MODULE document order (the semantic graph's id space); emitters that only
+	// walk the page root would renumber from 0 and misalign every
+	// hostNodeId-keyed payload record when a same-module component is declared
+	// before the page.
+	readonly moduleAst?: AnyNode;
 };

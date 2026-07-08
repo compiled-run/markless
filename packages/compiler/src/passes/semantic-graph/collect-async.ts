@@ -29,15 +29,24 @@ export function collectAsyncBoundary(
 
 	const boundaryId = `boundary:${state.nextBoundaryId++}`;
 	const previousBoundaryId = state.currentAsyncBoundaryId;
+	const previousArm = state.currentAsyncBoundaryArm;
+	// Arm index inside this boundary: 0 = @try, 1 = @pending, 2 = @catch.
+	const armByNode = new Map<unknown, number>([
+		[node.block, 0],
+		[node.pending, 1],
+		[node.handler, 2],
+	]);
 
 	state.graph.asyncBoundaries.push({ id: boundaryId, anchorOrder: state.nextAnchorOrder++ });
 	state.currentAsyncBoundaryId = boundaryId;
 
 	for (const child of childNodes(node)) {
+		state.currentAsyncBoundaryArm = armByNode.get(child) ?? previousArm;
 		walk(child, state);
 	}
 
 	state.currentAsyncBoundaryId = previousBoundaryId;
+	state.currentAsyncBoundaryArm = previousArm;
 }
 
 export function propagateAsyncComputedCapability(graph: MutableSemanticGraphArtifact): void {

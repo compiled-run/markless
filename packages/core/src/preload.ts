@@ -1,7 +1,6 @@
 export {
 	planModulePreloadUrls,
 	planModulePreloads,
-	planSsrModulePreloads,
 	preloadLazySymbolModules,
 	type AppendedModulePreloads,
 	type LazySymbolPreloadView,
@@ -11,6 +10,5 @@ export {
 	type ModulePreloadPriority,
 	type ModulePreloadRoot,
 	type PreloadLazySymbolModulesInput,
-	type SsrModulePreloadPlanInput,
 	type MarklessBundleGraph,
 } from '@markless/bundler/preload';

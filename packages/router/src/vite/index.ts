@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { nitro } from 'nitro/vite';
 import { dirname, isAbsolute, join, normalize, relative } from 'pathe';
 import {
@@ -18,6 +19,9 @@ import {
 	stringifyQuery,
 	withoutLeadingSlash,
 } from 'ufo';
+// Build-time-only dependency: the bundler owns the symbol virtual module id
+// shape (single source of truth); browser entries must never reach this file.
+import { symbolVirtualModuleSourceFile } from '@markless/bundler/preload';
 import { transformRequestFileSource } from '../request-files.ts';
 import { anchorTransformPlugin } from './anchor-transform.ts';
 import { htmlTransformPlugin } from './html-transform.ts';
@@ -36,8 +40,9 @@ const ROUTE_PRELOADS_ID = 'virtual:markless-router/route-preloads';
 const ROUTE_PRELOADS_PLACEHOLDER = '__MARKLESS_ROUTER_ROUTE_PRELOADS__';
 const SERVER_ENTRY_ID = 'virtual:markless-router/server-entry';
 const ROUTE_HREF_ID = 'virtual:markless-router/route-href';
+const ROUTER_OPTIONS_ID = 'virtual:markless-router/options';
 const PUBLIC_VIRTUAL_MODULE_ID_RE =
-	/^virtual:markless-router\/(?:routes|client-entry|resume-entry|resume-entry-path|navigation-entry|navigation-entry-path|route-preloads|server-entry|route-href)(?:\?.*)?$/;
+	/^virtual:markless-router\/(?:routes|client-entry|resume-entry|resume-entry-path|navigation-entry|navigation-entry-path|route-preloads|server-entry|route-href|options)(?:\?.*)?$/;
 const VITE_PLUGIN_FILE = decodePath(parseURL(import.meta.url).pathname);
 const VIRTUAL_ENTRY_DIR = VITE_PLUGIN_FILE.endsWith('.ts')
 	? join(dirname(VITE_PLUGIN_FILE), 'entries')
@@ -59,6 +64,9 @@ const virtualEntryFiles = {
 } as const;
 
 export interface MarklessRouterOptions {
+	// 'hash' routes by location.hash paths (#/r/x -> route /r/x) for apps whose
+	// URLs live in the fragment; 'path' (default) routes by pathname.
+	mode?: 'path' | 'hash';
 	nitro?: boolean;
 }
 
@@ -81,6 +89,7 @@ export function router(options: MarklessRouterOptions = {}): PluginOption[] {
 
 	return [
 		routerConfigPlugin(nitroPlugins, resumeEntry, navigationEntry, routePreloads),
+		devSourceModuleRequestPlugin(),
 		mdxTransformPlugin(),
 		requestFileTransformPlugin(),
 		routeTypegenPlugin(),
@@ -89,6 +98,42 @@ export function router(options: MarklessRouterOptions = {}): PluginOption[] {
 		virtualModulesPlugin(resumeEntry, navigationEntry, routePreloads),
 		nitroPlugins,
 	];
+}
+
+// Dev module requests for authored source files: Vite's glob imports (the
+// resume entry's page-module table) emit ROOT-RELATIVE URLs like
+// `/pages/r/[repo]/index.tsrx?import&markless-resume`. The dev server does
+// not treat the unknown .tsrx/.mdx extension at that shape as a module
+// request, so the request falls through to the nitro route handler and 404s
+// — which kills the FIRST full-resume wake of every dev interaction. The
+// /@fs/<absolute> form is served (and resolves to the same module-graph
+// entry), so rewrite qualifying requests before Vite's own middlewares run.
+function devSourceModuleRequestPlugin(): Plugin {
+	let root = '';
+	return {
+		name: 'markless-router:dev-source-module-requests',
+		apply: 'serve',
+		configResolved(config) {
+			root = config.root;
+		},
+		configureServer(server) {
+			server.middlewares.use((req, _res, next) => {
+				const url = req.url ?? '';
+				const queryIndex = url.indexOf('?');
+				const pathname = queryIndex === -1 ? url : url.slice(0, queryIndex);
+				const query = queryIndex === -1 ? '' : url.slice(queryIndex + 1);
+				if (
+					root !== '' &&
+					/\.(?:tsrx|mdx)$/.test(pathname) &&
+					/(?:^|&)(?:import(?:=|&|$)|markless-)/.test(query) &&
+					existsSync(join(root, decodePath(pathname)))
+				) {
+					req.url = `/@fs${join(root, decodePath(pathname))}?${query}`;
+				}
+				next();
+			});
+		},
+	};
 }
 
 function routerConfigPlugin(
@@ -431,7 +476,8 @@ function virtualModulesPlugin(
 					baseId === SERVER_ENTRY_ID ||
 					baseId === RESUME_ENTRY_PATH_ID ||
 					baseId === NAVIGATION_ENTRY_PATH_ID ||
-					baseId === ROUTE_PRELOADS_ID
+					baseId === ROUTE_PRELOADS_ID ||
+					baseId === ROUTER_OPTIONS_ID
 				) {
 					return `\0${baseId}${rootScopeQuery(root, id)}`;
 				}
@@ -460,6 +506,9 @@ function virtualModulesPlugin(
 			}
 			if (id.startsWith(`\0${ROUTE_PRELOADS_ID}`)) {
 				return routePreloadsSource(routePreloads);
+			}
+			if (id.startsWith(`\0${ROUTER_OPTIONS_ID}`)) {
+				return 'export const routerMode = "path"; // retained for compat; hash paths are always first-class';
 			}
 		},
 	};
@@ -583,6 +632,7 @@ function routeModulePreloadsFromBundle(input: {
 		routeChunkFileNames.add(chunk.fileName);
 	}
 
+	const symbolChunks = symbolChunksBySourceFile(chunks);
 	const navigation: Record<string, readonly string[]> = {};
 	const ssr: Record<string, readonly string[]> = {};
 	for (const [routeFile, routeChunk] of routeChunks) {
@@ -602,9 +652,6 @@ function routeModulePreloadsFromBundle(input: {
 				includeChunk(navigationFileNames, chunksByFileName, fileName, true);
 			}
 		}
-		navigation[routeFile] = [...navigationFileNames].map((fileName) =>
-			joinURL(input.base, fileName),
-		);
 
 		const ssrFileNames = new Set<string>();
 		if (input.resumeChunk) {
@@ -612,14 +659,83 @@ function routeModulePreloadsFromBundle(input: {
 			// The resume entry dynamically imports every route's resume module, so
 			// only walk the CURRENT route's resume module (plus its full static and
 			// dynamic closure); other routes' resume modules must stay excluded.
+			// Missing this walk makes the first interaction pay a serial waterfall
+			// fetch on slow networks (the preload-strategy box catches this).
 			for (const fileName of routeScopedDynamicImports(input.resumeChunk, routeFile)) {
 				includeChunk(ssrFileNames, chunksByFileName, fileName, true);
 			}
 		}
 		includeChunk(ssrFileNames, chunksByFileName, routeChunk.fileName, true);
+
+		// Symbol modules (event handlers, attach behaviors, async runs) are
+		// demanded through the symbol resolver's computed import table, so the
+		// bundle records NO import edge reaching their chunks — the walks above
+		// can never find them and the first interaction fetches them cold. Their
+		// virtual module id bakes in the source file they serve: a symbol chunk
+		// preloads for this route iff that source file is already in the route's
+		// planned chunk closure (cross-route exclusion falls out of the key).
+		// Both maps get the same symbol set so SSR landings and SPA navigations
+		// warm identical bytes; execution stays lazy — this preloads bytes only.
+		const routeSourceFiles = sourceFilesForChunks(
+			new Set([...navigationFileNames, ...ssrFileNames]),
+			chunksByFileName,
+		);
+		for (const [sourceFile, symbolFileNames] of symbolChunks) {
+			if (!routeSourceFiles.has(sourceFile)) continue;
+			for (const fileName of symbolFileNames) {
+				includeChunk(navigationFileNames, chunksByFileName, fileName, true);
+				includeChunk(ssrFileNames, chunksByFileName, fileName, true);
+			}
+		}
+
+		navigation[routeFile] = [...navigationFileNames].map((fileName) =>
+			joinURL(input.base, fileName),
+		);
 		ssr[routeFile] = [...ssrFileNames].map((fileName) => joinURL(input.base, fileName));
 	}
 	return { navigation, ssr };
+}
+
+// Maps each authored source file to the chunks holding its compiled symbol
+// modules, read from the `virtual:markless:symbol:<sourceFile>:<id>` module
+// ids (the bundler owns that id shape — see @markless/bundler/preload).
+function symbolChunksBySourceFile(
+	chunks: readonly OutputChunkLike[],
+): Map<string, readonly string[]> {
+	const bySourceFile = new Map<string, string[]>();
+	for (const chunk of chunks) {
+		for (const moduleId of chunk.moduleIds ?? []) {
+			const sourceFile = symbolVirtualModuleSourceFile(moduleId);
+			if (!sourceFile) continue;
+			const key = sourceModulePathname(sourceFile);
+			const fileNames = bySourceFile.get(key) ?? [];
+			if (!fileNames.includes(chunk.fileName)) fileNames.push(chunk.fileName);
+			bySourceFile.set(key, fileNames);
+		}
+	}
+	return bySourceFile;
+}
+
+function sourceFilesForChunks(
+	fileNames: ReadonlySet<string>,
+	chunksByFileName: ReadonlyMap<string, OutputChunkLike>,
+): Set<string> {
+	const sourceFiles = new Set<string>();
+	for (const fileName of fileNames) {
+		for (const moduleId of chunksByFileName.get(fileName)?.moduleIds ?? []) {
+			if (moduleId.startsWith('\0')) continue;
+			const pathname = sourceModulePathname(moduleId);
+			if (/\.(?:tsrx|mdx)$/.test(pathname)) sourceFiles.add(pathname);
+		}
+	}
+	return sourceFiles;
+}
+
+// Source modules appear both bare and with request queries (?markless-symbols,
+// ?markless-resume); symbol virtual ids bake in the bare path. Compare both on
+// the same decoded, query-free pathname.
+function sourceModulePathname(moduleId: string): string {
+	return decodePath(parseURL(moduleId).pathname);
 }
 
 function includeChunk(
@@ -657,9 +773,11 @@ function routeScopedDynamicImports(chunk: OutputChunkLike, routeFile: string): s
 	const imports = new Set<string>();
 	const routeLiteralIndex = chunk.code.indexOf(routeFile);
 	if (routeLiteralIndex === -1) return [];
+	// Route literals appear both as "pages/x.tsrx" (navigation symbol router)
+	// and "/pages/x.tsrx" (resume entry route map keys).
 	const nextRouteLiteralIndex = chunk.code
 		.slice(routeLiteralIndex + routeFile.length)
-		.search(/["'`]pages\/[^"'`]+\.(?:tsrx|mdx)["'`]/);
+		.search(/["'`]\/?pages\/[^"'`]+\.(?:tsrx|mdx)["'`]/);
 	const routeBlockEnd =
 		nextRouteLiteralIndex === -1
 			? chunk.code.length

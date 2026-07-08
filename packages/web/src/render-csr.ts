@@ -6,7 +6,9 @@ import type { ResumeRuntime, ResumeRuntimeInput, ResumeSymbol } from './resume.t
 
 type ExecutionLogGlobal = typeof globalThis & {
 	__mxLog?: Set<string>;
-	__mxLoadLog?: () => Promise<{ readonly logMarklessRenderSummary?: (input?: unknown) => unknown }>;
+	__mxLoadLog?: () => Promise<{
+		readonly logMarklessRenderSummary?: (input?: unknown) => unknown;
+	}>;
 };
 
 export async function renderCsrRuntime(input: {
@@ -49,6 +51,7 @@ export async function renderCsrRuntime(input: {
 		createRemovalObserver: options.createRemovalObserver,
 		applyDomJournal,
 		renderBranchHtml: options.renderBranchHtml ?? globalDocumentBranchHtml(),
+		demandAsyncBoundaries: true,
 	});
 	await runtime.start();
 	output.connectRuntime?.({ graph, runtime });
@@ -139,9 +142,11 @@ function withCsrCallbackSymbols(
 	loadSymbol: ResumeRuntimeInput['loadSymbol'],
 	view: ProtocolViewPayload,
 ): ResumeRuntimeInput['loadSymbol'] {
-	const callbacks = (view as ProtocolViewPayload & {
-		readonly __marklessCsrCallbacks?: Readonly<Record<string, (event: unknown) => unknown>>;
-	}).__marklessCsrCallbacks;
+	const callbacks = (
+		view as ProtocolViewPayload & {
+			readonly __marklessCsrCallbacks?: Readonly<Record<string, (event: unknown) => unknown>>;
+		}
+	).__marklessCsrCallbacks;
 	if (!callbacks || Object.keys(callbacks).length === 0) return loadSymbol;
 	return (symbolId) => {
 		const callback = callbacks[symbolId];
@@ -230,9 +235,8 @@ async function createFullRuntimeGraph(input: {
 	readonly hasAuthoredState: boolean;
 }): Promise<RuntimeGraph> {
 	if (input.hasAuthoredState) {
-		const { createRuntimeGraphFromResumePayload } = await import(
-			'./payload-graph-construct.ts'
-		);
+		const { createRuntimeGraphFromResumePayload } =
+			await import('./payload-graph-construct.ts');
 		return await createRuntimeGraphFromResumePayload({
 			state: input.state,
 			view: input.view,

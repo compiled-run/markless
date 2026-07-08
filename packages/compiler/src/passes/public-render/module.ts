@@ -17,10 +17,20 @@ export type { PublicRenderRoot } from './types.ts';
 // the component shape can run through this specialized path.
 export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRenderModuleArtifact {
 	const ast = parseModule(input.source.source, input.source.filename) as unknown as AnyNode;
-	if (input.semanticGraph.diagnostics.some((item) => item.code === 'MARKLESS_EVENT_SPREAD_UNSUPPORTED')) {
+	if (
+		input.semanticGraph.diagnostics.some(
+			(item) => item.code === 'MARKLESS_EVENT_SPREAD_UNSUPPORTED',
+		)
+	) {
 		return {
-			passId: 'public-render-module', moduleSource: '', rootExportName: null, csrModuleSource: '',
-			csrExportName: null, ssrModuleSource: '', ssrExportName: null, diagnostics: input.publicRenderPlan.diagnostics,
+			passId: 'public-render-module',
+			moduleSource: '',
+			rootExportName: null,
+			csrModuleSource: '',
+			csrExportName: null,
+			ssrModuleSource: '',
+			ssrExportName: null,
+			diagnostics: input.publicRenderPlan.diagnostics,
 		};
 	}
 	const rootSelection = selectPublicRenderRoot(ast);
@@ -32,6 +42,7 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 				componentName: rootSelection.componentName,
 				root: rootSelection.root,
 				propNames: componentPropNames(rootSelection.component),
+				moduleAst: ast,
 			}
 		: null;
 	// Fragment roots use the standard CSR module (root = document fragment;

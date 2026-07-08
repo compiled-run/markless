@@ -63,6 +63,7 @@ export function collectComponentEdge(
 		id: `component-edge:${state.nextComponentEdgeId++}`,
 		parentComponentName: state.currentComponentName,
 		childComponentName,
+		...(state.currentAsyncBoundaryId ? { asyncBoundaryId: state.currentAsyncBoundaryId } : {}),
 		...componentImportSource(childComponentName, state),
 		sourceSpan: sourceSpan(node, state.filename),
 		props,

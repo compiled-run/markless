@@ -22,7 +22,8 @@ export async function compileTsrxModulesWithInterfaces(
 		});
 
 		results.push(result);
-		importedModuleInterfaces[module.importSource ?? module.filename] = result.moduleGraphInterface;
+		importedModuleInterfaces[module.importSource ?? module.filename] =
+			result.moduleGraphInterface;
 	}
 
 	return results;

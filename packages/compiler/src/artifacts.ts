@@ -35,6 +35,10 @@ export type SemanticComponentEdge = {
 	readonly id: string;
 	readonly parentComponentName: string;
 	readonly childComponentName: string;
+	// Present when the component renders inside an @try arm: its graph-reference
+	// props are boundary reads (need 10 — the arm may touch the async computed
+	// only through child props).
+	readonly asyncBoundaryId?: string;
 	readonly importSource?: string;
 	readonly importKind?: SemanticModuleImport['kind'];
 	readonly importedName?: string;
@@ -155,11 +159,19 @@ export type SemanticGraphDependency = {
 export type SemanticHostNode = {
 	readonly id: string;
 	readonly tagName: string;
+	// Present when the element renders inside an @try/@pending/@catch arm:
+	// the boundary owns the element's coordinates (D3 arm-relative records).
+	// asyncBoundaryArm is the arm index (0 = @try, 1 = @pending, 2 = @catch).
+	readonly asyncBoundaryId?: string;
+	readonly asyncBoundaryArm?: number;
 };
 
 export type SemanticKeyedRepeat = {
 	readonly id: string;
 	readonly parentHostNodeId: string;
+	// Present when the repeat renders inside an @try/@pending/@catch arm: the
+	// boundary owns the repeat's async collection read.
+	readonly asyncBoundaryId?: string;
 	readonly rowHostNodeId?: string;
 	readonly itemName: string;
 	readonly indexName?: string;
@@ -178,6 +190,11 @@ export type SemanticBranchSite = {
 	readonly armCount: number;
 	readonly testSource: string;
 	readonly anchorOrder: number;
+	// Inside an @try arm: excluded from the page comment-anchor stream; flip
+	// wiring (if any) lives in the owning boundary's arm coordinate space.
+	readonly asyncBoundaryId?: string;
+	// Arm index inside the owning boundary (0 = @try, 1 = @pending, 2 = @catch).
+	readonly asyncBoundaryArm?: number;
 };
 
 export type SemanticSyncPolicyCondition =
@@ -260,8 +277,10 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_ELEMENT_HANDLE_RENDER_READ'
 		| 'MARKLESS_ATTACH_HOST_ELEMENT_REQUIRED'
 		| 'MARKLESS_EVENT_HANDLER_NOT_A_FUNCTION'
-		| 'MARKLESS_EVENT_SPREAD_UNSUPPORTED' | 'MARKLESS_SPREAD_STATIC_SNAPSHOT'
-		| 'MARKLESS_ATTRIBUTE_OBJECT_VALUE' | 'MARKLESS_ATTRIBUTE_DUPLICATE'
+		| 'MARKLESS_EVENT_SPREAD_UNSUPPORTED'
+		| 'MARKLESS_SPREAD_STATIC_SNAPSHOT'
+		| 'MARKLESS_ATTRIBUTE_OBJECT_VALUE'
+		| 'MARKLESS_ATTRIBUTE_DUPLICATE'
 		| 'MARKLESS_STYLE_OBJECT_UNSUPPORTED'
 		| 'MARKLESS_SYNC_POLICY_UNEXTRACTABLE'
 		| 'MARKLESS_REPEAT_KEY_REQUIRED'
@@ -457,6 +476,26 @@ export type PayloadArenaInput = {
 
 export type PayloadArenaDiagnostic = StateLoweringDiagnostic;
 
+// One record set per boundary arm (index 0 = @try, 1 = @pending, 2 = @catch).
+// Locator indexes are ARM-RELATIVE: 0 names the first element after the
+// boundary's start anchor in that arm's rendered content. Resume adds the
+// start anchor's live element-walk offset at materialization time (D3).
+export type PayloadArmRecordSet = {
+	readonly locators: ReadonlyArray<{
+		readonly hostNodeId: string;
+		readonly strategy: 'arm-relative';
+		readonly index: number;
+		readonly tagName: string;
+	}>;
+	readonly events: SemanticGraphArtifact['events'];
+	readonly behaviors: ReadonlyArray<PayloadBehavior>;
+	readonly elementHandles: ReadonlyArray<{
+		readonly hostNodeId: string;
+		readonly handleId: string;
+		readonly name: string;
+	}>;
+};
+
 export type PayloadAsyncBoundary = {
 	readonly id: string;
 	readonly kind: 'async-boundary';
@@ -474,6 +513,7 @@ export type PayloadAsyncBoundary = {
 		readonly graphNodeId: string;
 		readonly path: ReadonlyArray<string>;
 	}>;
+	readonly armRecords: ReadonlyArray<PayloadArmRecordSet>;
 };
 
 export type PayloadBehavior = SemanticBehavior & {
@@ -725,8 +765,19 @@ export type RuntimeDemandMapActionPlan = {
 	readonly kind: 'scalar' | 'row';
 	readonly symbolId: string;
 	readonly cell: string;
-	readonly write: { readonly kind: 'assign' | 'update'; readonly value?: unknown; readonly valueKind?: 'undefined'; readonly localPath?: ReadonlyArray<string>; readonly updateOperator?: '++' | '--' };
-	readonly textUpdates: ReadonlyArray<{ readonly hostNodeId: string; readonly graphNodeId: string; readonly symbolId: string; readonly prefix?: string }>;
+	readonly write: {
+		readonly kind: 'assign' | 'update';
+		readonly value?: unknown;
+		readonly valueKind?: 'undefined';
+		readonly localPath?: ReadonlyArray<string>;
+		readonly updateOperator?: '++' | '--';
+	};
+	readonly textUpdates: ReadonlyArray<{
+		readonly hostNodeId: string;
+		readonly graphNodeId: string;
+		readonly symbolId: string;
+		readonly prefix?: string;
+	}>;
 	readonly repeatId?: string;
 	readonly fullDecodeCells?: ReadonlyArray<string>;
 };
@@ -777,6 +828,46 @@ export type ProtocolViewPayloadInput = {
 	readonly payloadArena: PayloadArenaArtifact;
 	readonly symbolResolver: SymbolResolverPlan;
 	readonly publicRenderPlan: PublicRenderPlanArtifact;
+};
+
+// Wire shape of a boundary arm record set: the payload arena plan with lazy
+// symbol IDs attached. The serializer protocol type gains this field when the
+// streaming work (T107) reopens the protocol contract; until then the view
+// payload stays structurally assignable to ProtocolViewPayload.
+// An arm-scoped @if/@switch record nested under its boundary (D1 tier 3 in
+// arms). Flip-capable sites carry a lazy flip symbol plus an anchor pair in
+// the arm's OWN arm-branch comment census (the page census never counts
+// these). Escalated sites (content needs component execution) omit them: the
+// runtime routes their test reads through the boundary's arm re-render.
+export type ProtocolViewArmBranchRecord = {
+	readonly id: string;
+	readonly testReads: ReadonlyArray<{
+		readonly source: string;
+		readonly graphNodeId: string;
+		readonly path: ReadonlyArray<string>;
+	}>;
+	readonly symbolId?: string;
+	readonly armTests?: ReadonlyArray<unknown>;
+	readonly declaredEmptyArms?: ReadonlyArray<number>;
+	readonly startAnchor?: { readonly strategy: 'arm-branch-comment'; readonly index: number };
+	readonly endAnchor?: { readonly strategy: 'arm-branch-comment'; readonly index: number };
+	readonly armRecords?: NonNullable<ProtocolViewPayload['branches']>[number]['armRecords'];
+};
+
+export type ProtocolViewArmRecordSet = {
+	readonly locators: PayloadArmRecordSet['locators'];
+	readonly events: ProtocolViewPayload['events'];
+	readonly behaviors: ProtocolViewPayload['behaviors'];
+	readonly elementHandles: ProtocolViewPayload['elementHandles'];
+	readonly branches?: ReadonlyArray<ProtocolViewArmBranchRecord>;
+};
+
+export type ProtocolViewPayloadWithArmRecords = Omit<ProtocolViewPayload, 'asyncBoundaries'> & {
+	readonly asyncBoundaries: ReadonlyArray<
+		ProtocolViewPayload['asyncBoundaries'][number] & {
+			readonly armRecords?: ReadonlyArray<ProtocolViewArmRecordSet>;
+		}
+	>;
 };
 
 export type PayloadScriptsInput = {
@@ -853,6 +944,7 @@ export type PublicRenderPlanUnsupportedReason =
 	| 'repeat-parent-must-contain-only-repeat'
 	| 'nested-repeat-unsupported'
 	| 'unsupported-row-binding'
+	| 'row-component-content-unsupported'
 	| 'repeat-parent-locator-missing';
 
 export type PublicRenderPlanRepeatGate =
@@ -863,6 +955,13 @@ export type PublicRenderPlanRepeatGate =
 			// direct-DOM runtime stays off because it cannot rewrite index text on
 			// reorder yet.
 			readonly ssrOnly?: true;
+			// The repeat renders inside an async boundary arm: SSR/CSR map it in
+			// scope, so no top-level planned record exists (or is needed).
+			readonly armScoped?: true;
+			// Rows invoke components (markup-only, item-scope props): the SSR/CSR
+			// row mappers execute the component per row; the direct-DOM row
+			// template path stays off (a static template cannot hold child output).
+			readonly componentRows?: true;
 	  }
 	| {
 			readonly repeatId: string;
@@ -896,6 +995,27 @@ export type PublicRenderPlanBranchArmPart =
 				readonly graphNodeId: string;
 				readonly path: ReadonlyArray<string>;
 			};
+	  }
+	// A keyed @for inside an arm-scoped branch arm: rows rebuild from a live
+	// graph read of the collection at flip time (no keyed diffing — the flip
+	// replaces the whole branch range anyway).
+	| {
+			readonly repeat: {
+				readonly read: {
+					readonly graphNodeId: string;
+					readonly path: ReadonlyArray<string>;
+				};
+				readonly rowParts: ReadonlyArray<
+					| { readonly text: string }
+					| {
+							readonly read: {
+								readonly graphNodeId: string;
+								readonly path: ReadonlyArray<string>;
+							};
+					  }
+					| { readonly itemPath: ReadonlyArray<string> }
+				>;
+			};
 	  };
 
 export type PublicRenderPlanBranchArms = {
@@ -917,6 +1037,15 @@ export type PublicRenderPlanBranchArms = {
 			readonly hostNodeId: string;
 		}>
 	>;
+	// Arm-scoped sites only (D1 tier 3 inside arms): the owning boundary, the
+	// boundary arm the site renders in, and the site's pair rank in that arm's
+	// own arm-branch comment census (page census never sees these anchors).
+	readonly asyncBoundaryId?: string;
+	readonly asyncBoundaryArm?: number;
+	readonly armAnchorRank?: number;
+	// Every host inside the flip range (including repeat rows armHosts cannot
+	// claim): the boundary's own record sets must not register any of them.
+	readonly ownedHostIds?: ReadonlyArray<string>;
 };
 
 export type PublicRenderPlanAsyncBoundaryArms = {
@@ -925,10 +1054,33 @@ export type PublicRenderPlanAsyncBoundaryArms = {
 	readonly arms: ReadonlyArray<ReadonlyArray<PublicRenderPlanBranchArmPart>>;
 };
 
+// D1 tier 4: a per-boundary lazy module that MAY execute components — used
+// when the parts tier cannot rebuild the arm (components, repeats, @if,
+// fragments). The plan owns the emission pieces; symbol-modules only wraps
+// them in the exported update function.
+export type PublicRenderPlanAsyncBoundaryArmRender = {
+	readonly boundaryId: string;
+	// Module-scope import statements (child components, helper catalog, value
+	// imports referenced by the arm content).
+	readonly imports: ReadonlyArray<string>;
+	// Module-scope statements (planned record constants, helpers, authored
+	// module-scope declarations the arm references).
+	readonly moduleLines: ReadonlyArray<string>;
+	// Statements for the exported `(context) => { ... }` update function.
+	readonly bodyLines: ReadonlyArray<string>;
+};
+
 export type PublicRenderPlanBranchGate =
 	| {
 			readonly branchSiteId: string;
 			readonly supported: true;
+			// In an async arm: renders as a re-evaluated ternary on arm settle;
+			// no flip wiring or anchors (need 8).
+			readonly armScoped?: true;
+			// Arm-scoped site with a real flip plan (D1 tier 3 inside arms):
+			// html wraps it in arm-branch anchors and a flip module rebuilds
+			// only the branch's own range.
+			readonly armFlip?: true;
 	  }
 	| {
 			readonly branchSiteId: string;
@@ -966,7 +1118,15 @@ export type PublicRenderPlanArtifact = {
 	readonly asyncBoundaryGates: ReadonlyArray<PublicRenderPlanAsyncBoundaryGate>;
 	readonly branchReactivityGates: ReadonlyArray<PublicRenderPlanBranchGate>;
 	readonly branchArms: ReadonlyArray<PublicRenderPlanBranchArms>;
+	// Arm-scoped branch sites whose content needs component execution: the
+	// toggle escalates to the boundary's arm re-render (D2 — diagnosed loud).
+	readonly armBranchEscalations?: ReadonlyArray<{
+		readonly branchSiteId: string;
+		readonly asyncBoundaryId: string;
+		readonly asyncBoundaryArm: number;
+	}>;
 	readonly asyncBoundaryArms: ReadonlyArray<PublicRenderPlanAsyncBoundaryArms>;
+	readonly asyncBoundaryArmRenders: ReadonlyArray<PublicRenderPlanAsyncBoundaryArmRender>;
 	readonly styleScopes: ReadonlyArray<{ readonly scopeId: string; readonly cssText: string }>;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
 };

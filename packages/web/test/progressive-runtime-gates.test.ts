@@ -28,7 +28,10 @@ afterEach(() => {
 });
 
 test('full resume row dispatch wires declared branches but not unrelated async or behavior capabilities', async () => {
-	let asyncBoundaryImports = 0, behaviorImports = 0, branchImports = 0, handoffImports = 0;
+	let asyncBoundaryImports = 0,
+		behaviorImports = 0,
+		branchImports = 0,
+		handoffImports = 0;
 	vi.doMock('../src/resume-async-boundaries.ts', () => {
 		asyncBoundaryImports++;
 		return { wireAsyncBoundaries: vi.fn(() => new Map()) };
@@ -159,7 +162,9 @@ test('branch records wire eagerly once and source writes still apply the current
 });
 
 test('row collection writes do not import unrelated async or behavior capabilities', async () => {
-	let asyncBoundaryImports = 0, behaviorImports = 0, branchImports = 0;
+	let asyncBoundaryImports = 0,
+		behaviorImports = 0,
+		branchImports = 0;
 	vi.doMock('../src/resume-async-boundaries.ts', () => {
 		asyncBoundaryImports++;
 		return { wireAsyncBoundaries: vi.fn(() => new Map()) };
@@ -203,16 +208,18 @@ test('row collection writes do not import unrelated async or behavior capabiliti
 		view: {
 			...branchCapabilityView(),
 			locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 1, tagName: 'tbody' }],
-			keyedRepeats: [{
-				id: 'repeat:0',
-				parentHostNodeId: 'h0',
-				collectionGraphNodeId: 'state:rows',
-				collectionPath: [],
-				keyPath: ['id'],
-				itemName: 'row',
-				rowElementCount: 1,
-				rowEvents: [],
-			}],
+			keyedRepeats: [
+				{
+					id: 'repeat:0',
+					parentHostNodeId: 'h0',
+					collectionGraphNodeId: 'state:rows',
+					collectionPath: [],
+					keyPath: ['id'],
+					itemName: 'row',
+					rowElementCount: 1,
+					rowEvents: [],
+				},
+			],
 		},
 		loadSymbol: () => () => undefined,
 	});
@@ -238,34 +245,47 @@ function progressiveMixedView(): ResumeViewRecord {
 		domUpdates: [],
 		behaviors: [{ hostNodeId: 'h1', symbolId: 'symbol:behavior', inputSources: [] }],
 		elementHandles: [],
-		asyncBoundaries: [{
-			id: 'async:0',
-			updateSymbolId: 'symbol:async-update',
-			startAnchor: { strategy: 'dom-order-comment', index: 0 },
-			endAnchor: { strategy: 'dom-order-comment', index: 1 },
-			asyncReads: [{ source: 'flag', graphNodeId: 'state:flag', path: [], runnerSymbolId: 'symbol:async-run' }],
-		}],
-		branches: [{
-			id: 'branch:0',
-			symbolId: 'symbol:branch',
-			startAnchor: { strategy: 'dom-order-comment', index: 2 },
-			endAnchor: { strategy: 'dom-order-comment', index: 3 },
-			testReads: [{ graphNodeId: 'state:flag', path: [] }],
-			armRecords: [
-				{ events: [], domUpdates: [], behaviors: [], elementHandles: [] },
-				{ events: [], domUpdates: [], behaviors: [], elementHandles: [] },
-			],
-		}],
-		keyedRepeats: [{
-			id: 'repeat:0',
-			parentHostNodeId: 'h0',
-			collectionGraphNodeId: 'state:rows',
-			collectionPath: [],
-			keyPath: ['id'],
-			itemName: 'row',
-			rowElementCount: 2,
-			rowEvents: [{ hostPath: [0], eventName: 'click', symbolIds: ['symbol:row'] }],
-		}],
+		asyncBoundaries: [
+			{
+				id: 'async:0',
+				updateSymbolId: 'symbol:async-update',
+				startAnchor: { strategy: 'dom-order-comment', index: 0 },
+				endAnchor: { strategy: 'dom-order-comment', index: 1 },
+				asyncReads: [
+					{
+						source: 'flag',
+						graphNodeId: 'state:flag',
+						path: [],
+						runnerSymbolId: 'symbol:async-run',
+					},
+				],
+			},
+		],
+		branches: [
+			{
+				id: 'branch:0',
+				symbolId: 'symbol:branch',
+				startAnchor: { strategy: 'dom-order-comment', index: 2 },
+				endAnchor: { strategy: 'dom-order-comment', index: 3 },
+				testReads: [{ graphNodeId: 'state:flag', path: [] }],
+				armRecords: [
+					{ events: [], domUpdates: [], behaviors: [], elementHandles: [] },
+					{ events: [], domUpdates: [], behaviors: [], elementHandles: [] },
+				],
+			},
+		],
+		keyedRepeats: [
+			{
+				id: 'repeat:0',
+				parentHostNodeId: 'h0',
+				collectionGraphNodeId: 'state:rows',
+				collectionPath: [],
+				keyPath: ['id'],
+				itemName: 'row',
+				rowElementCount: 2,
+				rowEvents: [{ hostPath: [0], eventName: 'click', symbolIds: ['symbol:row'] }],
+			},
+		],
 	};
 }
 
@@ -277,17 +297,24 @@ function branchCapabilityView(): ResumeViewRecord {
 		behaviors: [],
 		elementHandles: [],
 		asyncBoundaries: [],
-		branches: [{
-			id: 'site:0',
-			symbolId: 'symbol:branch',
-			startAnchor: { strategy: 'dom-order-comment', index: 0 },
-			endAnchor: { strategy: 'dom-order-comment', index: 1 },
-			testReads: [{ graphNodeId: 'state:flag', path: [] }],
-			armRecords: [
-				{ events: [{ hostPath: [0], eventName: 'click', symbolIds: ['symbol:arm'] }], domUpdates: [], behaviors: [], elementHandles: [] },
-				{ events: [], domUpdates: [], behaviors: [], elementHandles: [] },
-			],
-		}],
+		branches: [
+			{
+				id: 'site:0',
+				symbolId: 'symbol:branch',
+				startAnchor: { strategy: 'dom-order-comment', index: 0 },
+				endAnchor: { strategy: 'dom-order-comment', index: 1 },
+				testReads: [{ graphNodeId: 'state:flag', path: [] }],
+				armRecords: [
+					{
+						events: [{ hostPath: [0], eventName: 'click', symbolIds: ['symbol:arm'] }],
+						domUpdates: [],
+						behaviors: [],
+						elementHandles: [],
+					},
+					{ events: [], domUpdates: [], behaviors: [], elementHandles: [] },
+				],
+			},
+		],
 		keyedRepeats: [],
 	};
 }

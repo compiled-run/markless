@@ -27,12 +27,16 @@ export function injectExecutionLogModuleHook(
 	return `globalThis.__mxLog?.add(${JSON.stringify(moduleId)});\n${source}`;
 }
 
-export function executionLogVirtualModuleSource(options: {
-	readonly moduleSizes?: ReadonlyMap<string, number>;
-	readonly sizesUrl?: string;
-} = {}): string {
+export function executionLogVirtualModuleSource(
+	options: {
+		readonly moduleSizes?: ReadonlyMap<string, number>;
+		readonly sizesUrl?: string;
+	} = {},
+): string {
 	const moduleSizes = options.moduleSizes
-		? Object.fromEntries([...options.moduleSizes].map(([id, raw]) => [id, { raw, estimated: true }]))
+		? Object.fromEntries(
+				[...options.moduleSizes].map(([id, raw]) => [id, { raw, estimated: true }]),
+			)
 		: null;
 	return `
 globalThis.__mxLog?.add(${JSON.stringify(MARKLESS_EXECUTION_LOG_MODULE_ID)});
@@ -139,7 +143,9 @@ export async function createExecutionSizesAsset(
 	};
 }
 
-export function executionLogActivationInjection(mode: MarklessExecutionLogMode | undefined): GlobalInjections | null {
+export function executionLogActivationInjection(
+	mode: MarklessExecutionLogMode | undefined,
+): GlobalInjections | null {
 	if (normalizeExecutionLogMode(mode) === 'never') return null;
 	const predicate =
 		mode === 'always'

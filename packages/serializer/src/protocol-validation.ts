@@ -155,6 +155,15 @@ export function assertProtocolStateCellPayload(
 	assertStringField(cell, 'name', context);
 	assertStateValueKind(cell, context);
 	if ('value' in cell) assertSerializedGraphPayload(cell.value, `${context}.value`);
+	// directValue is the live-value channel (CSR mounts): it must never be
+	// served. A payload script still carrying one is a host bug — hosts must
+	// envelope-encode through serializeRuntimeStateCells before emitting.
+	if ('directValue' in cell) {
+		throw invalidPayloadShapeError(
+			contextPayloadType(context),
+			`Invalid ${context}: live directValue cells must be serialized before serving.`,
+		);
+	}
 }
 
 export function assertProtocolViewPayload(
@@ -443,10 +452,7 @@ function assertOptionalBranches(record: Record<string, unknown>): void {
 	}
 }
 
-function assertOptionalBranchArmRecords(
-	record: Record<string, unknown>,
-	context: string,
-): void {
+function assertOptionalBranchArmRecords(record: Record<string, unknown>, context: string): void {
 	if (record.armRecords === undefined) return;
 	if (!Array.isArray(record.armRecords)) {
 		throw invalidPayloadShapeError(

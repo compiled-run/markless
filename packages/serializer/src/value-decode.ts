@@ -11,9 +11,11 @@ export function deserializeGraphValue(payload: SerializedGraphPayload): unknown 
 		if (record.type === 'map') shells.set(record.id, new Map());
 		if (record.type === 'set') shells.set(record.id, new Set());
 		if (record.type === 'date') shells.set(record.id, new Date(record.value));
-		if (record.type === 'regexp') shells.set(record.id, new RegExp(record.source, record.flags));
+		if (record.type === 'regexp')
+			shells.set(record.id, new RegExp(record.source, record.flags));
 		if (record.type === 'url') shells.set(record.id, new URL(record.value));
-		if (record.type === 'array-buffer') shells.set(record.id, new Uint8Array(record.bytes).buffer);
+		if (record.type === 'array-buffer')
+			shells.set(record.id, new Uint8Array(record.bytes).buffer);
 	}
 
 	for (const record of payload.records) {

@@ -304,7 +304,9 @@ function sourceInput(value: unknown): CompileTsrxModuleInput {
 function isExternalParserSyntaxError(error: unknown): error is SyntaxError {
 	return (
 		error instanceof SyntaxError ||
-		(typeof error === 'object' && error !== null && (error as { readonly name?: unknown }).name === 'SyntaxError')
+		(typeof error === 'object' &&
+			error !== null &&
+			(error as { readonly name?: unknown }).name === 'SyntaxError')
 	);
 }
 
@@ -323,7 +325,12 @@ function parseErrorDiagnostic(
 		primarySpan: parserErrorSpan(error, source),
 		passId: 'tsrx-semantic-graph',
 		artifactKeys: ['semanticGraph'],
-		suggestions: [{ message: 'Check the TSRX syntax rules at https://tsrx.dev/specification and rewrite this source into supported TSRX syntax.' }],
+		suggestions: [
+			{
+				message:
+					'Check the TSRX syntax rules at https://tsrx.dev/specification and rewrite this source into supported TSRX syntax.',
+			},
+		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_PARSE_ERROR',
 	};
 }
@@ -346,17 +353,34 @@ function hasExternalParseDiagnostic(semanticGraph: SemanticGraphArtifact): boole
 
 function emptyPublicRenderPlanArtifact(): PublicRenderPlanArtifact {
 	return {
-		passId: 'public-render-plan', rootTemplateHtml: null, directRenderTemplateHtml: null,
-		staticHostNodeIds: [], staticHostLocators: [], staticEventControls: [], staticTextWrites: [],
-		repeatGates: [], keyedRepeats: [], asyncBoundaryGates: [], branchReactivityGates: [],
-		branchArms: [], asyncBoundaryArms: [], styleScopes: [], diagnostics: [],
+		passId: 'public-render-plan',
+		rootTemplateHtml: null,
+		directRenderTemplateHtml: null,
+		staticHostNodeIds: [],
+		staticHostLocators: [],
+		staticEventControls: [],
+		staticTextWrites: [],
+		repeatGates: [],
+		keyedRepeats: [],
+		asyncBoundaryGates: [],
+		branchReactivityGates: [],
+		branchArms: [],
+		asyncBoundaryArms: [],
+		asyncBoundaryArmRenders: [],
+		styleScopes: [],
+		diagnostics: [],
 	};
 }
 
 function emptyPublicRenderModuleArtifact(): PublicRenderModuleArtifact {
 	return {
-		passId: 'public-render-module', moduleSource: '', rootExportName: null,
-		csrModuleSource: '', csrExportName: null, ssrModuleSource: '', ssrExportName: null,
+		passId: 'public-render-module',
+		moduleSource: '',
+		rootExportName: null,
+		csrModuleSource: '',
+		csrExportName: null,
+		ssrModuleSource: '',
+		ssrExportName: null,
 		diagnostics: [],
 	};
 }

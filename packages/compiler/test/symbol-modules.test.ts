@@ -208,7 +208,9 @@ test('emitSymbolModules emits conditional text DOM update values', () => {
 test('emitSymbolModules emits repeat-local assignment values through context locals', () => {
 	const artifact = emitSelectAssignmentSymbol('entry.code', repeatLocalPublicRenderPlan());
 
-	expect(artifact.modules[0].source).toContain("import { marklessWriteScalar } from '@markless/web/fns/write-scalar';");
+	expect(artifact.modules[0].source).toContain(
+		"import { marklessWriteScalar } from '@markless/web/fns/write-scalar';",
+	);
 	expect(artifact.modules[0].source).toContain('return marklessWriteScalar(context, {');
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:selected"');
 	expect(artifact.modules[0].source).toContain('value: context.locals?.entry?.code');
@@ -414,7 +416,8 @@ test('emitSymbolModules emits inline behavior function modules without imports',
 	});
 
 	expect(artifact.modules).toHaveLength(1);
-	expect(artifact.modules[0].source).toBe(`export const authoredSource = "(element) => element.focus()";
+	expect(artifact.modules[0].source)
+		.toBe(`export const authoredSource = "(element) => element.focus()";
 export const behaviorFunctionSource = "(element) => element.focus()";
 export const behaviorInputSources = [];
 
@@ -597,9 +600,7 @@ test('emitSymbolModules emits sync computed derive modules from planned sources'
 	expect(artifact.modules[0].source).toContain(
 		'export const authoredSource = "() => count * 2";',
 	);
-	expect(artifact.modules[0].source).toContain(
-		'return context.graph.read("state:count") * 2;',
-	);
+	expect(artifact.modules[0].source).toContain('return context.graph.read("state:count") * 2;');
 });
 
 test('emitSymbolModules emits static delete writes for event handler modules', () => {
@@ -1814,7 +1815,9 @@ test('B908 preserves simple count++ handler semantics as a spliced graph write',
 		writes: [countUpdateWrite()],
 	});
 
-	expect(source).toContain("import { marklessWriteScalar } from '@markless/web/fns/write-scalar';");
+	expect(source).toContain(
+		"import { marklessWriteScalar } from '@markless/web/fns/write-scalar';",
+	);
 	expect(source).toContain('return marklessWriteScalar(context, {');
 	expect(source).toContain('graphNodeId: "state:count"');
 	expect(source).toContain('return Number(value) + 1;');
@@ -1862,7 +1865,9 @@ export function App() @{
 	});
 
 	const handler = result.symbolModules.modules.find((m) => m.kind === 'event-handler');
-	expect(handler?.source).toContain('setTimeout(() => context.getElementHandle("input")?.focus(), 1);');
+	expect(handler?.source).toContain(
+		'setTimeout(() => context.getElementHandle("input")?.focus(), 1);',
+	);
 });
 
 test('B908 Unit B ignores element handle lookalikes inside string literals', async () => {
@@ -1948,7 +1953,14 @@ function namedImport(localName: string, source: string) {
 }
 
 function countUpdateWrite() {
-	return { source: 'count', graphNodeId: 'state:count', path: [], operation: 'update' as const, updateOperator: '++' as const, prefix: false };
+	return {
+		source: 'count',
+		graphNodeId: 'state:count',
+		path: [],
+		operation: 'update' as const,
+		updateOperator: '++' as const,
+		prefix: false,
+	};
 }
 
 test('emitSymbolModules preserves imports referenced by authored handler bodies', () => {
@@ -2630,6 +2642,215 @@ export function App() @{
 		html: '<p>Result: markless</p>',
 	});
 	expect(run({ graph, status: 'rejected' })).toEqual({ arm: 1, html: '<p>Broken</p>' });
+});
+
+// D1 tier 4: arms the cheap parts tier cannot rebuild (components, repeats,
+// @if) get a component-executing arm-render module instead of no module.
+test('composed @try arms (component + repeat + @if) emit an arm-render module that executes components', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/IssuesPage.tsrx',
+		source: `
+import { computed } from '@markless/core';
+import { Shell } from './shell.tsrx';
+
+export default function Page() @{
+	const view = computed(async () => ({ title: 'Issues', repos: [{ id: 'a' }] }));
+	<main>
+		@try {
+			<>
+				<Shell title={view.title} />
+				<ul class="rows">
+					@for (const r of view.repos; key r.id) { <li class="row">{r.id}</li> }
+				</ul>
+				@if (view.repos.length > 0) { <p class="count">{view.repos.length}</p> }
+			</>
+		} @pending { <p>Loading</p> } @catch { <p>Broken</p> }
+	</main>
+}
+`,
+		symbols: [],
+	});
+
+	const update = result.symbolModules.modules.find(
+		(module) => module.kind === 'async-boundary-update',
+	);
+	expect(update).toBeDefined();
+	// The runtime reaches the module through the boundary record.
+	expect(result.protocolView.asyncBoundaries[0]).toEqual(
+		expect.objectContaining({ updateSymbolId: update!.symbolId }),
+	);
+	// Component execution is real: the module imports the child component and
+	// renders it through the CSR child machinery (initial render in the
+	// browser — the unified model allows it; this is not hydration).
+	expect(update!.source).toContain('from "./shell.tsrx"');
+	expect(update!.source).toContain('marklessCsrRenderChild');
+	// The callable contract returns the arm html plus arm-relative records
+	// (0 = first element after the boundary's start comment).
+	expect(update!.source).toContain('armRecords');
+	expect(update!.source).toContain('"arm-relative"');
+});
+
+test('plain-content @try arms keep the cheap parts-based update module (no component machinery)', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/AsyncPlain.tsrx',
+		source: `
+import { computed } from '@markless/core';
+
+export function App() @{
+	const details = computed(async () => ({ title: 'ok' }));
+	<main>
+		@try { <p>{details.title}</p> } @pending { <p>Loading</p> } @catch { <p>Broken</p> }
+	</main>
+}
+`,
+		symbols: [],
+	});
+
+	const update = result.symbolModules.modules.find(
+		(module) => module.kind === 'async-boundary-update',
+	);
+	expect(update).toBeDefined();
+	// Tier discipline: the smallest provable tier stays selected.
+	expect(update!.source).toContain('marklessBoundaryArms');
+	expect(update!.source).not.toContain('marklessCsrRenderChild');
+});
+
+// D4: when the arm-render tier cannot support a shape, the diagnostic speaks
+// the author's words — never "arm", "tier", "boundary", or "anchor".
+test('same-module components inside @try diagnose in author vocabulary and emit no update module', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/SameModuleArm.tsrx',
+		source: `
+import { computed } from '@markless/core';
+
+export default function Page() @{
+	const view = computed(async () => ({ label: 'live' }));
+	<main>
+		@try { <StatusBadge label={view.label} /> } @pending { <p>Loading</p> } @catch { <p>Broken</p> }
+	</main>
+}
+
+export function StatusBadge({ label }) @{
+	<em class="badge">{label}</em>
+}
+`,
+		symbols: [],
+	});
+
+	expect(
+		result.symbolModules.modules.find((module) => module.kind === 'async-boundary-update'),
+	).toBeUndefined();
+	const diagnostic = result.publicRenderPlan.diagnostics.find(
+		(candidate) => candidate.code === 'MARKLESS_ASYNC_ARM_RENDER_UNSUPPORTED',
+	);
+	expect(diagnostic?.message).toBe(
+		'This @try block renders <StatusBadge>, which is defined in the same file. Rendering the settled @try content in the browser needs components imported from their own module.',
+	);
+	expect(diagnostic?.suggestions?.[0]?.message).toBe(
+		'Move <StatusBadge> into its own .tsrx file and import it.',
+	);
+});
+
+test('function props on components inside @try diagnose in author vocabulary and emit no update module', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/CallbackArm.tsrx',
+		source: `
+import { computed, state } from '@markless/core';
+import { Shell } from './shell.tsrx';
+
+export default function Page() @{
+	let picked = state('');
+	const view = computed(async () => ({ title: 'Issues' }));
+	<main>
+		@try { <Shell title={view.title} onPick={(id) => picked = id} /> } @pending { <p>Loading</p> } @catch { <p>Broken</p> }
+	</main>
+}
+`,
+		symbols: [],
+	});
+
+	expect(
+		result.symbolModules.modules.find((module) => module.kind === 'async-boundary-update'),
+	).toBeUndefined();
+	const diagnostic = result.publicRenderPlan.diagnostics.find(
+		(candidate) => candidate.code === 'MARKLESS_ASYNC_ARM_RENDER_UNSUPPORTED',
+	);
+	expect(diagnostic?.message).toBe(
+		'This @try block passes a function prop to <Shell>. Function props inside @try/@catch content cannot be wired up again when the settled content renders in the browser yet.',
+	);
+	expect(diagnostic?.suggestions?.[0]?.message).toBe(
+		'Handle the event inside <Shell> itself, or lift the change into shared state both components read.',
+	);
+});
+
+// Carried forward from the arm-relative records package: a same-module helper
+// component CONTAINING @try renders with no boundary anchors — today its @try
+// content is dropped from the html entirely and its in-arm events never fire.
+// The render fix needs the same-module emission to plan boundaries (runtime
+// half lives in @markless/web); until then the drop must be loud, not silent.
+test('same-module helper components containing @try diagnose the dropped content in author vocabulary', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Widgets.tsrx',
+		source: `
+import { computed, state } from '@markless/core';
+
+export default function Page() @{
+	<main>
+		<Widget />
+	</main>
+}
+
+export function Widget() @{
+	let n = state(0);
+	const data = computed(async () => ({ label: 'live' }));
+	<section>
+		@try { <button class="bump" onClick={() => n++}>{data.label}</button> } @pending { <p>Loading</p> } @catch { <p>Broken</p> }
+	</section>
+}
+`,
+		symbols: [],
+	});
+
+	const diagnostic = result.publicRenderPlan.diagnostics.find(
+		(candidate) => candidate.code === 'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
+	);
+	expect(diagnostic?.message).toBe(
+		'<Widget> contains an @try block, but <Widget> is a helper component in the same file as the page. Its @try/@pending/@catch content is dropped from the rendered HTML.',
+	);
+	expect(diagnostic?.suggestions?.[0]?.message).toBe(
+		'Move <Widget> into its own .tsrx file and import it, or move the @try block into the page component.',
+	);
+});
+
+test('@try content reading component props diagnoses in author vocabulary and emits no update module', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/PropArm.tsrx',
+		source: `
+import { computed } from '@markless/core';
+import { Shell } from './shell.tsrx';
+
+export default function Page({ owner }) @{
+	const view = computed(async () => ({ title: 'Issues' }));
+	<main>
+		@try { <><Shell title={view.title} /> <p class="owner">{owner}</p></> } @pending { <p>Loading</p> } @catch { <p>Broken</p> }
+	</main>
+}
+`,
+		symbols: [],
+	});
+
+	expect(
+		result.symbolModules.modules.find((module) => module.kind === 'async-boundary-update'),
+	).toBeUndefined();
+	const diagnostic = result.publicRenderPlan.diagnostics.find(
+		(candidate) => candidate.code === 'MARKLESS_ASYNC_ARM_RENDER_UNSUPPORTED',
+	);
+	expect(diagnostic?.message).toBe(
+		'This @try block reads "owner" from the component props. Rendering the settled @try content in the browser cannot reach component props yet.',
+	);
+	expect(diagnostic?.suggestions?.[0]?.message).toBe(
+		'Lift "owner" into state() or computed() so the settled content reads it from the graph.',
+	);
 });
 
 test('branch-update modules defer to the runtime-computed arm when provided', async () => {

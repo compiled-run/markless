@@ -422,10 +422,9 @@ async function main() {
 		// stdout is reserved for the JSON report; route the table to stderr.
 		new console.Console(process.stderr).table(rows);
 		const ssrGap =
-			report.modes['ssr-preview'].stats.median_ms - report.modes['csr-preview'].stats.median_ms;
-		console.error(
-			`SSR - CSR median gap (preview): ${Math.round(ssrGap * 10) / 10}ms`,
-		);
+			report.modes['ssr-preview'].stats.median_ms -
+			report.modes['csr-preview'].stats.median_ms;
+		console.error(`SSR - CSR median gap (preview): ${Math.round(ssrGap * 10) / 10}ms`);
 		console.error('post-click resources (SSR preview, last iteration):');
 		for (const resource of report.modes['ssr-preview'].postClickResources) {
 			console.error(

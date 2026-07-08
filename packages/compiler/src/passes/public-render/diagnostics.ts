@@ -27,6 +27,62 @@ export function unsupportedRenderConstructDiagnostic(input: {
 	};
 }
 
+// D2/D4: when a settled @try/@catch arm cannot get a browser-side render
+// module, the refusal is loud and speaks the author's words — the content
+// still server-renders, but it cannot update in the browser after settle.
+export function asyncArmRenderUnsupportedDiagnostic(input: {
+	readonly message: string;
+	readonly node: AnyNode;
+	readonly filename: string;
+	readonly suggestion: string;
+}): CompilerDiagnostic {
+	return {
+		code: 'MARKLESS_ASYNC_ARM_RENDER_UNSUPPORTED',
+		severity: 'warning',
+		phase: 'public-render',
+		title: 'The settled @try content cannot render in the browser yet',
+		message: input.message,
+		why: 'The compiler emits a browser-side render module for @try/@catch content so it can update after the data settles. A shape the module cannot render would silently stay frozen, so the compiler reports it instead.',
+		primarySpan: sourceSpan(input.node, input.filename),
+		passId: 'public-render-plan',
+		artifactKeys: ['publicRenderPlan'],
+		suggestions: [{ message: input.suggestion }],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ASYNC_ARM_RENDER_UNSUPPORTED',
+	};
+}
+
+// D2/D4: a toggle inside @try/@catch content whose branch cannot flip on its
+// own (it needs component execution) still WORKS — the whole @try content
+// re-renders — but the cost is never silent, and the wording stays in the
+// author's vocabulary (never compiler internals).
+export function tryBlockToggleRerenderDiagnostic(input: {
+	readonly branchLabel: '@if' | '@switch';
+	readonly componentName: string | null;
+	readonly node: AnyNode;
+	readonly filename: string;
+}): CompilerDiagnostic {
+	const message = input.componentName
+		? `this ${input.branchLabel} contains <${input.componentName}>, so toggling it re-renders the whole @try block — move the component outside the ${input.branchLabel} to keep the toggle cheap.`
+		: `this ${input.branchLabel} contains content the toggle cannot rebuild on its own, so toggling it re-renders the whole @try block — simplify the ${input.branchLabel} content to plain elements, text, and state reads to keep the toggle cheap.`;
+	return {
+		code: 'MARKLESS_TRY_BLOCK_TOGGLE_RERENDER',
+		severity: 'warning',
+		phase: 'public-render',
+		title: `Toggling this ${input.branchLabel} re-renders the whole @try block`,
+		message,
+		why: 'Content with a component cannot be rebuilt from static parts and value slots, so the toggle falls back to re-rendering the whole @try block. That works, but it re-runs the component and replaces DOM the toggle did not touch.',
+		primarySpan: sourceSpan(input.node, input.filename),
+		passId: 'public-render-plan',
+		artifactKeys: ['publicRenderPlan'],
+		suggestions: [
+			{
+				message: `Move the component outside the ${input.branchLabel}, or keep the ${input.branchLabel} content to plain elements, text, and state reads.`,
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_TRY_BLOCK_TOGGLE_RERENDER',
+	};
+}
+
 export function repeatRowStateScopeUnsupportedDiagnostic(input: {
 	readonly apiName: 'state' | 'computed';
 	readonly name: string;
@@ -123,7 +179,12 @@ export function noRenderableRootDiagnostic(input: {
 	};
 }
 
-export function unsupportedRenderBodyDiagnostic(input: { readonly node: AnyNode; readonly filename: string; readonly message: string; readonly suggestion: string; }): CompilerDiagnostic {
+export function unsupportedRenderBodyDiagnostic(input: {
+	readonly node: AnyNode;
+	readonly filename: string;
+	readonly message: string;
+	readonly suggestion: string;
+}): CompilerDiagnostic {
 	return {
 		code: 'MARKLESS_RENDER_BODY_UNSUPPORTED',
 		severity: 'error',
@@ -139,7 +200,11 @@ export function unsupportedRenderBodyDiagnostic(input: { readonly node: AnyNode;
 	};
 }
 
-export function undeclaredTemplateReadDiagnostic(input: { readonly name: string; readonly node: AnyNode; readonly filename: string; }): CompilerDiagnostic {
+export function undeclaredTemplateReadDiagnostic(input: {
+	readonly name: string;
+	readonly node: AnyNode;
+	readonly filename: string;
+}): CompilerDiagnostic {
 	const message = `${input.name} would throw ReferenceError when the render module runs because no prop, body declaration, module declaration, or import with that name is in scope.`;
 	return {
 		code: 'MARKLESS_TEMPLATE_READ_UNDECLARED',
@@ -151,12 +216,20 @@ export function undeclaredTemplateReadDiagnostic(input: { readonly name: string;
 		primarySpan: sourceSpan(input.node, input.filename),
 		passId: 'public-render-plan',
 		artifactKeys: ['publicRenderPlan'],
-		suggestions: [{ message: `Declare ${input.name} in the component body, pass it as a prop, import it, or hoist it to a module-scope declaration before reading it in the template.` }],
+		suggestions: [
+			{
+				message: `Declare ${input.name} in the component body, pass it as a prop, import it, or hoist it to a module-scope declaration before reading it in the template.`,
+			},
+		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_TEMPLATE_READ_UNDECLARED',
 	};
 }
 
-export function conditionalComponentRootDiagnostic(input: { readonly node: AnyNode; readonly filename: string; readonly componentName: string; }): CompilerDiagnostic {
+export function conditionalComponentRootDiagnostic(input: {
+	readonly node: AnyNode;
+	readonly filename: string;
+	readonly componentName: string;
+}): CompilerDiagnostic {
 	return {
 		code: 'MARKLESS_COMPONENT_ROOT_CONDITIONAL',
 		severity: 'error',
@@ -167,7 +240,12 @@ export function conditionalComponentRootDiagnostic(input: { readonly node: AnyNo
 		primarySpan: sourceSpan(input.node, input.filename),
 		passId: 'public-render-plan',
 		artifactKeys: ['publicRenderPlan'],
-		suggestions: [{ message: 'Use a single root with @if/@else inside it, or return null before the one root for a guard clause.' }],
+		suggestions: [
+			{
+				message:
+					'Use a single root with @if/@else inside it, or return null before the one root for a guard clause.',
+			},
+		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_COMPONENT_ROOT_CONDITIONAL',
 	};
 }

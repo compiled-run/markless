@@ -1,4 +1,7 @@
-import type { ResumeRuntime } from './resume.ts';
+// Static edge: full-tier resume always constructs the browser resume runtime;
+// the demand map co-demands web/resume with web/payload-resume on every tier
+// that loads this module. The chunk groups keep resume core in its own chunk.
+import { createResumeRuntime, type ResumeRuntime } from './resume.ts';
 import {
 	createRuntimeGraphFromResumePayload,
 	decodePayloadScripts,
@@ -7,13 +10,38 @@ import {
 } from './payload-full.ts';
 import { getAlreadyResumedPayload, setResumedPayload } from './payload-resume-registry.ts';
 
+// Streamed settles (T107) leave records + snapshot patches in the document.
+// Only pages that actually streamed pay for the adoption module: the check
+// is one selector; the overlay chunk loads on demand.
+async function adoptStreamedPatchesIfPresent(
+	decoded: ReturnType<typeof decodePayloadScripts>,
+	root: ResumePayloadScriptsInput['root'],
+): Promise<ReturnType<typeof decodePayloadScripts>> {
+	const documentHost = (
+		root as {
+			readonly ownerDocument?: { readonly querySelector?: (selector: string) => unknown };
+		}
+	).ownerDocument;
+	if (
+		!documentHost?.querySelector?.(
+			'script[type="markless/arm"],script[type="markless/state-patch"]',
+		)
+	) {
+		return decoded;
+	}
+	const { adoptStreamedArmPatches } = await import('./resume-stream-patches.ts');
+	return adoptStreamedArmPatches(decoded, root);
+}
+
 export async function resumeFromPayloadScriptsImpl(
 	input: ResumePayloadScriptsInput,
 ): Promise<ResumePayloadScriptsResult> {
 	const resumed = getAlreadyResumedPayload(input.root);
 	if (resumed) return resumed;
 
-	const decoded = decodePayloadScripts(input);
+	// Streamed settles left records + snapshot patches in the document; adopt
+	// them before graph construction so the settled DOM resumes interactive.
+	const decoded = await adoptStreamedPatchesIfPresent(decodePayloadScripts(input), input.root);
 	const graph = await createRuntimeGraphFromResumePayload({
 		state: decoded.state,
 		view: decoded.view,
@@ -41,7 +69,6 @@ export async function resumeFromPayloadScriptsImpl(
 				},
 			});
 		});
-	const { createResumeRuntime } = await import('./resume.ts');
 	runtime = createResumeRuntime({
 		root: input.root,
 		graph,

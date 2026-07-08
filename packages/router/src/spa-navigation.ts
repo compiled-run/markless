@@ -3,7 +3,12 @@ import {
 	matchRouteManifest,
 	type RouteManifest,
 } from './route-manifest.ts';
-import { dispatchRouteUpdate, type RouteDocumentModule } from './route-state.ts';
+import {
+	MARKLESS_ROUTER_RENDERER_STARTED,
+	dispatchRouteUpdate,
+	type RouteDocumentModule,
+	type RouteUpdate,
+} from './route-state.ts';
 
 const STARTED = '__marklessRouterSpaNavigationStarted';
 const LINK_ATTRIBUTE = 'data-markless-router-link';
@@ -48,6 +53,18 @@ interface NavigationContext {
 	readonly window: MarklessRouterNavigationWindow;
 }
 
+// A '#/...' hash is unambiguously a route path (in-page anchors never start
+// with '/'), so hash paths are first-class alongside pathnames — no modes.
+function hashRoutePath(url: URL): string | undefined {
+	return url.hash.startsWith('#/') ? url.hash.slice(1) : undefined;
+}
+
+// Route-table path for a destination URL: a '#/' hash wins (it is the
+// deepest-specified route intent); otherwise the pathname routes.
+function routePathname(url: URL, _context?: NavigationContext): string {
+	return hashRoutePath(url) ?? url.pathname;
+}
+
 export async function __marklessRouterStartSpaNavigation(options: StartSpaNavigationOptions) {
 	const runtimeWindow = options.window ?? browserWindow();
 	const state = runtimeWindow as unknown as Record<string, unknown>;
@@ -73,6 +90,19 @@ export async function __marklessRouterStartSpaNavigation(options: StartSpaNaviga
 	navigation.addEventListener('navigate', (event) => {
 		handleNavigateEvent(event, context);
 	});
+
+	// Deep links land on /#/some/route while the server rendered the shell for
+	// the pathname: swap to the hash route on boot.
+	{
+		const bootUrl = parseSameOriginUrl(
+			runtimeWindow.location.href,
+			runtimeWindow.location.href,
+		);
+		const bootHashPath = bootUrl ? hashRoutePath(bootUrl) : undefined;
+		if (bootUrl && bootHashPath && matchRouteManifest(bootHashPath, context.manifest)) {
+			void renderRoute(bootUrl, context);
+		}
+	}
 }
 
 export async function ensureNavigationRuntime(
@@ -105,28 +135,34 @@ export function handleNavigateEvent(event: NavigateEvent, context: NavigationCon
 	return true;
 }
 
-async function renderRoute(url: URL, context: NavigationContext, signal: AbortSignal) {
-	if (signal.aborted) {
+async function renderRoute(url: URL, context: NavigationContext, signal?: AbortSignal) {
+	if (signal?.aborted) {
 		return;
 	}
 
-	const match = matchRouteManifest(url.pathname, context.manifest);
+	const match = matchRouteManifest(routePathname(url, context), context.manifest);
 	const loadPageModule = match && context.pageModuleLoaders[match.route.file];
 	if (!match || !loadPageModule) {
+		if (hashRoutePath(url) !== undefined) warnUnknownHashRoute(url);
 		context.window.location.assign(url.href);
 		return;
 	}
 
+	// Route swaps render the destination page CLIENT-SIDE: load its page
+	// module, dispatch a route update, and let the route renderer run
+	// renderCsr — async boundaries settle interactively through commitArm.
+	// (No hydration is violated only by re-executing components over existing
+	// server HTML; rendering NEW pages in the browser is the D7 model.)
 	preloadRouteModule(context, match.route.file);
 	const [page, document] = await Promise.all([
 		loadPageModule(),
 		context.documentModuleLoader?.(),
 	]);
-	if (signal.aborted) {
+	if (signal?.aborted) {
 		return;
 	}
 
-	dispatchRouteUpdate(context.window.document, {
+	const update: RouteUpdate = {
 		document: document as RouteDocumentModule | undefined,
 		page: page as never,
 		route: {
@@ -135,7 +171,37 @@ async function renderRoute(url: URL, context: NavigationContext, signal: AbortSi
 			status: 200,
 			url: url.href,
 		},
+		signal,
+	};
+
+	// D8 navigation transitions: the renderer holds the outgoing page until
+	// the destination settles or the deadline passes, so the navigation's
+	// intercept handler must finish at the real swap commit (after-transition
+	// focus/scroll then applies to the committed page). Awaiting is safe only
+	// when a renderer is actually listening on this document.
+	const rendererStarted =
+		(context.window.document as unknown as Record<string, unknown>)[
+			MARKLESS_ROUTER_RENDERER_STARTED
+		] === true;
+	if (!rendererStarted) {
+		dispatchRouteUpdate(context.window.document, update);
+		return;
+	}
+	await new Promise<void>((resolve) => {
+		dispatchRouteUpdate(context.window.document, { ...update, onRendered: resolve });
 	});
+}
+
+// A '#/...' URL cannot fall back to a server document load (assigning a hash
+// URL never leaves the page), so a hash navigation that matches no route is a
+// DEAD navigation. Say so loudly in dev instead of silently doing nothing.
+function warnUnknownHashRoute(url: URL): void {
+	if (!import.meta.env?.DEV) return;
+	console.error(
+		`MARKLESS_ROUTER_UNKNOWN_HASH_ROUTE: Navigation to "${url.hash}" matched no route file. ` +
+			'Hash URLs cannot fall back to a server document load, so this navigation does nothing. ' +
+			`Add a page for "${url.hash.slice(1)}" or fix the link href.`,
+	);
 }
 
 function handleLinkClick(
@@ -160,7 +226,7 @@ function handleLinkClick(
 	}
 
 	const url = parseSameOriginUrl(anchor.href, context.window.location.href);
-	const match = url && matchRouteManifest(url.pathname, context.manifest);
+	const match = url && matchRouteManifest(routePathname(url, context), context.manifest);
 	if (!match) {
 		return;
 	}
@@ -185,19 +251,31 @@ function preloadRouteModule(context: NavigationContext, file: string): void {
 }
 
 function routeUrl(event: NavigateEvent, context: NavigationContext) {
+	const destination = parseSameOriginUrl(event.destination.url, context.window.location.href);
+	// A hash change toward a '#/...' route path is a route navigation (hash apps
+	// navigate with plain anchors, so link info is not required); any other hash
+	// change is an in-page anchor and stays with the browser.
+	const hashRouteNavigation =
+		event.hashChange === true && !!destination && hashRoutePath(destination) !== undefined;
 	if (
-		!isMarklessRouterNavigation(event) ||
+		(!isMarklessRouterNavigation(event) && !hashRouteNavigation) ||
 		event.canIntercept === false ||
 		event.navigationType === 'reload' ||
-		event.hashChange ||
+		(event.hashChange && !hashRouteNavigation) ||
 		event.downloadRequest != null ||
 		event.formData != null
 	) {
 		return undefined;
 	}
 
-	const url = parseSameOriginUrl(event.destination.url, context.window.location.href);
-	return url && matchRouteManifest(url.pathname, context.manifest) ? url : undefined;
+	const matched =
+		destination && matchRouteManifest(routePathname(destination), context.manifest)
+			? destination
+			: undefined;
+	// The browser default for an unmatched hash change is a scroll no-op:
+	// without this diagnostic an unknown '#/...' route is a silent dead nav.
+	if (!matched && hashRouteNavigation && destination) warnUnknownHashRoute(destination);
+	return matched;
 }
 
 function isMarklessRouterNavigation(event: NavigateEvent) {

@@ -3,23 +3,59 @@ import { asNodes, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import {
 	isIgnorableStaticTextNode as isIgnorableTextNode,
 	isPlainHostTemplateNode,
-	} from '../../ast/tsrx.ts';
+} from '../../ast/tsrx.ts';
 import {
 	graphBindingMap,
 	resolveGraphPath,
 	semanticAliasMap,
 } from '../../artifact-helpers/graph-paths.ts';
 import {
+	tryBlockToggleRerenderDiagnostic,
 	unsupportedRenderConstructDiagnostic,
 } from './diagnostics.ts';
 import { collectStyleScopes } from './style-scopes.ts';
 import { collectAsyncBoundaryNodes } from './async-boundaries.ts';
-import { branchArmSupported, branchArms, buildBranchArmParts, collectArmHosts, collectBranchSiteNodes, scopeClassOf, switchArmTests } from './branch-planning.ts';
-import { assignHostIds, collectHostPaths, collectStaticEventControls, collectStaticHostNodeIds, keyedRepeatNodes } from './host-locators.ts';
+import { planAsyncBoundaryArmRenders } from './arm-render-module.ts';
+import { componentPropNames } from './shared.ts';
+import {
+	branchArmSupported,
+	branchArms,
+	buildBranchArmParts,
+	collectArmHosts,
+	collectBranchSiteNodes,
+	scopeClassOf,
+	switchArmTests,
+} from './branch-planning.ts';
+import {
+	assignHostIds,
+	collectHostPaths,
+	collectStaticEventControls,
+	collectStaticHostNodeIds,
+	keyedRepeatNodes,
+} from './host-locators.ts';
 import { collectRowPlan, planKeyedRepeat, supportedRepeatGate } from './repeat-planning.ts';
-import { firstComponentRoot, sameModuleComponentRoots, selectPublicRenderRoot, singleRowRoot, staticHtml, staticShellSupported } from './template.ts';
+import {
+	firstComponentRoot,
+	sameModuleComponentRoots,
+	selectPublicRenderRoot,
+	singleRowRoot,
+	staticHtml,
+	staticShellSupported,
+} from './template.ts';
 import { collectStaticTextWrites } from './text-bindings.ts';
-import { branchRenderDiagnostics, collectChildrenOpacityDiagnostics, collectUndeclaredTemplateReadDiagnostics, collectUnsupportedConstructDiagnostics, componentConditionalRootDiagnostics, componentRootDiagnostics, componentUnsupportedBodyDiagnostics, emptyPlan, repeatRenderDiagnostics } from './validation.ts';
+import {
+	branchRenderDiagnostics,
+	collectChildrenOpacityDiagnostics,
+	collectUndeclaredTemplateReadDiagnostics,
+	collectUnsupportedConstructDiagnostics,
+	componentConditionalRootDiagnostics,
+	componentRootDiagnostics,
+	componentUnsupportedBodyDiagnostics,
+	emptyPlan,
+	firstComponentName,
+	repeatRenderDiagnostics,
+	sameModuleChildBoundaryDiagnostics,
+} from './validation.ts';
 import { parseJavaScriptModule } from '../../js-ast.ts';
 import { extractedSyncPolicyActionCalls } from '../semantic-graph/collect-sync-policy.ts';
 import type {
@@ -40,9 +76,16 @@ import type {
 // decides what direct DOM work is compiler-proven instead of emitting code itself.
 export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlanArtifact {
 	const ast = parseModule(input.source.source, input.source.filename) as unknown as AnyNode;
-	const conditionalRootDiagnostics = componentConditionalRootDiagnostics(ast, input.source.filename);
+	const conditionalRootDiagnostics = componentConditionalRootDiagnostics(
+		ast,
+		input.source.filename,
+	);
 	if (conditionalRootDiagnostics.length > 0) return emptyPlan(conditionalRootDiagnostics);
-	const unsupportedBodyDiagnostics = componentUnsupportedBodyDiagnostics(ast, input.source.filename, input.source.source);
+	const unsupportedBodyDiagnostics = componentUnsupportedBodyDiagnostics(
+		ast,
+		input.source.filename,
+		input.source.source,
+	);
 	if (unsupportedBodyDiagnostics.length > 0) return emptyPlan(unsupportedBodyDiagnostics);
 
 	const selectedRoot = selectPublicRenderRoot(ast);
@@ -56,7 +99,9 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 		ast,
 		component: selectedRoot.component,
 		filename: input.source.filename,
-		moduleImports: input.semanticGraph.moduleImports.map((moduleImport) => moduleImport.localName),
+		moduleImports: input.semanticGraph.moduleImports.map(
+			(moduleImport) => moduleImport.localName,
+		),
 		repeatLocals: input.semanticGraph.keyedRepeats.flatMap((repeat) =>
 			repeat.indexName ? [repeat.itemName, repeat.indexName] : [repeat.itemName],
 		),
@@ -117,7 +162,15 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 		const row = singleRowRoot(repeatNode);
 		const parentLocator = locatorByHostNodeId.get(payloadRepeat.parentHostNodeId);
 		const parentPath = hostPaths.get(payloadRepeat.parentHostNodeId);
-		if (!row || !parentLocator || !parentPath) continue;
+		if (!row || !parentLocator || !parentPath) {
+			// In-arm repeats have no top-level locator by design: the SSR/CSR arm
+			// emission maps them in scope. Mark the gate so eligibility doesn't
+			// demand a planned record that cannot exist.
+			if (semanticRepeat.asyncBoundaryId && gate.supported) {
+				repeatGates[repeatGates.length - 1] = { ...gate, armScoped: true };
+			}
+			continue;
+		}
 
 		const rowPlan = collectRowPlan({
 			aliases,
@@ -148,6 +201,37 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 
 	const styleScopeCollection = collectStyleScopes(root, input.source.filename);
 	const branchNodes = collectBranchSiteNodes(root);
+	// Repeat nodes inside arm-scoped branch arms: the flip plan rebuilds their
+	// rows from a live graph read (no component execution, D1 tier 3).
+	const repeatInfoByNode = new Map(
+		input.semanticGraph.keyedRepeats.flatMap((repeat, index) => {
+			const node = repeatNodes[index];
+			return node
+				? [
+						[
+							node,
+							{
+								itemName: repeat.itemName,
+								collectionSource: repeat.collectionSource,
+							},
+						] as const,
+					]
+				: [];
+		}),
+	);
+	const armFlipPlansBySite = new Map<
+		string,
+		{
+			readonly arms: ReadonlyArray<ReadonlyArray<PublicRenderPlanBranchArmPart>>;
+			readonly armTests: unknown[] | null;
+		}
+	>();
+	const armBranchEscalations: Array<{
+		readonly branchSiteId: string;
+		readonly asyncBoundaryId: string;
+		readonly asyncBoundaryArm: number;
+	}> = [];
+	const armEscalationDiagnostics: ReturnType<typeof tryBlockToggleRerenderDiagnostic>[] = [];
 	const branchReactivityGates: PublicRenderPlanBranchGate[] = input.semanticGraph.branchSites.map(
 		(site, index) => {
 			const found = branchNodes[index];
@@ -159,6 +243,60 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 				};
 			}
 			if (found.conditional) {
+				// Inside an async boundary arm the branch always renders as a
+				// ternary; T104 adds real flip wiring (armFlip) when the content is
+				// parts-buildable, and escalates LOUDLY (D2) to the boundary's arm
+				// re-render when it needs component execution. Sites inside @for
+				// rows or without a graph-resolvable test keep the plain
+				// re-evaluated ternary (need 8).
+				if (found.insideTryArm) {
+					const testResolved = resolveGraphPath(site.testSource, bindings, aliases);
+					if (found.insideRepeat || !site.asyncBoundaryId || !testResolved) {
+						return { branchSiteId: site.id, supported: true, armScoped: true };
+					}
+					const armTests = site.kind === 'switch' ? switchArmTests(found.node) : null;
+					const arms =
+						site.kind === 'switch' && armTests === null
+							? null
+							: branchArms(found.node).map((arm) =>
+									buildBranchArmParts(
+										arm,
+										bindings,
+										aliases,
+										input.source.source,
+										scopeClassOf(styleScopeCollection),
+										{ repeats: repeatInfoByNode },
+									),
+								);
+					if (arms && arms.every((arm) => arm !== null)) {
+						armFlipPlansBySite.set(site.id, {
+							arms: arms as ReadonlyArray<
+								ReadonlyArray<PublicRenderPlanBranchArmPart>
+							>,
+							armTests,
+						});
+						return {
+							branchSiteId: site.id,
+							supported: true,
+							armScoped: true,
+							armFlip: true,
+						};
+					}
+					armBranchEscalations.push({
+						branchSiteId: site.id,
+						asyncBoundaryId: site.asyncBoundaryId,
+						asyncBoundaryArm: site.asyncBoundaryArm ?? 0,
+					});
+					armEscalationDiagnostics.push(
+						tryBlockToggleRerenderDiagnostic({
+							branchLabel: site.kind === 'switch' ? '@switch' : '@if',
+							componentName: firstComponentName(found.node),
+							node: found.node,
+							filename: input.source.filename,
+						}),
+					);
+					return { branchSiteId: site.id, supported: true, armScoped: true };
+				}
 				return {
 					branchSiteId: site.id,
 					supported: false,
@@ -182,10 +320,47 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 		},
 	);
 
+	const armAnchorRankCounters = new Map<string, number>();
 	const branchArmsPlans = input.semanticGraph.branchSites.flatMap((site, index) => {
 		const gate = branchReactivityGates[index];
 		const found = branchNodes[index];
 		if (!gate?.supported || !found) return [];
+		// Arm-scoped sites: only flip-planned ones get arm plans, in the owning
+		// boundary's arm coordinate space (escalated/plain ternaries have none).
+		if (gate.armScoped === true) {
+			const flipPlan = gate.armFlip === true ? armFlipPlansBySite.get(site.id) : undefined;
+			if (!flipPlan || !site.asyncBoundaryId) return [];
+			const testResolved = resolveGraphPath(site.testSource, bindings, aliases);
+			const rankKey = `${site.asyncBoundaryId}:${String(site.asyncBoundaryArm ?? 0)}`;
+			const armAnchorRank = armAnchorRankCounters.get(rankKey) ?? 0;
+			armAnchorRankCounters.set(rankKey, armAnchorRank + 1);
+			const declaredEmptyArms = flipPlan.arms.flatMap((arm, armIndex) =>
+				arm.length === 0 ? [armIndex] : [],
+			);
+			const ownedHostIds: string[] = [];
+			walkNode(found.node, (hostNode) => {
+				const hostNodeId = assignedHosts.hostIdByNode.get(hostNode);
+				if (hostNodeId) ownedHostIds.push(hostNodeId);
+			});
+			return [
+				{
+					branchSiteId: site.id,
+					testRead: testResolved
+						? { graphNodeId: testResolved.binding.id, path: testResolved.path }
+						: null,
+					arms: flipPlan.arms,
+					armHosts: branchArms(found.node).map((arm) =>
+						collectArmHosts(arm, assignedHosts),
+					),
+					...(flipPlan.armTests ? { armTests: flipPlan.armTests } : {}),
+					...(declaredEmptyArms.length > 0 ? { declaredEmptyArms } : {}),
+					asyncBoundaryId: site.asyncBoundaryId,
+					asyncBoundaryArm: site.asyncBoundaryArm ?? 0,
+					armAnchorRank,
+					ownedHostIds,
+				},
+			];
+		}
 		const testResolved = resolveGraphPath(site.testSource, bindings, aliases);
 		const arms = branchArms(found.node).map((arm) =>
 			buildBranchArmParts(
@@ -203,7 +378,9 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 			if (armTests === null) return [];
 		}
 		const armHosts = branchArms(found.node).map((arm) => collectArmHosts(arm, assignedHosts));
-		const declaredEmptyArms = arms.flatMap((arm, armIndex) => arm.length === 0 ? [armIndex] : []);
+		const declaredEmptyArms = arms.flatMap((arm, armIndex) =>
+			arm.length === 0 ? [armIndex] : [],
+		);
 		return [
 			{
 				branchSiteId: site.id,
@@ -283,6 +460,25 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 			return { boundaryId: boundary.id, supported: true };
 		});
 
+	// D1 tier 4: boundaries the parts tier bailed on (components, repeats,
+	// @if, fragments in arms) get component-executing arm-render modules.
+	const armRenderPlans = planAsyncBoundaryArmRenders({
+		input,
+		boundaryNodes,
+		asyncBoundaryGates,
+		asyncBoundaryArms,
+		branchReactivityGates,
+		branchArms: branchArmsPlans,
+		armBranchEscalations,
+		repeatGates,
+		assignedHosts,
+		styleScopeClass: scopeClassOf(styleScopeCollection),
+		rootInfo: {
+			componentName: selectedRoot.componentName,
+			propNames: componentPropNames(selectedRoot.component),
+		},
+	});
+
 	const rootTemplateHtml = staticHtml(root, {
 		componentRoots,
 		componentStack: [selectedRoot.componentName],
@@ -327,10 +523,19 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 		asyncBoundaryGates,
 		branchReactivityGates,
 		branchArms: branchArmsPlans,
+		...(armBranchEscalations.length > 0 ? { armBranchEscalations } : {}),
 		asyncBoundaryArms,
+		asyncBoundaryArmRenders: armRenderPlans.armRenders,
 		styleScopes: styleScopeCollection.styleScopes,
 		diagnostics: [
 			...styleScopeCollection.diagnostics,
+			...armEscalationDiagnostics,
+			...armRenderPlans.diagnostics,
+			...sameModuleChildBoundaryDiagnostics(
+				ast,
+				selectedRoot.componentName,
+				input.source.filename,
+			),
 			...collectUnsupportedConstructDiagnostics(root, input.source.filename),
 			...collectChildrenOpacityDiagnostics(ast, input.source.filename),
 			...repeatRenderDiagnostics({
@@ -380,12 +585,12 @@ function stripExtractedSyncPolicyCalls(
 			) {
 				continue;
 			}
-				const stripped = stripSyncPolicyCallsFromHandlerSource(
-					symbol.source,
-					symbol.parameters[0] ?? 'event',
-					actions,
-					semanticGraph,
-				);
+			const stripped = stripSyncPolicyCallsFromHandlerSource(
+				symbol.source,
+				symbol.parameters[0] ?? 'event',
+				actions,
+				semanticGraph,
+			);
 			if (stripped !== symbol.source) {
 				(symbol as { source: string }).source = stripped;
 			}
@@ -432,15 +637,19 @@ function stripSyncPolicyCallsFromHandlerSource(
 		graph: semanticGraph as never,
 		source: wrappedSource,
 	})
-		.flatMap((node) => removableCallSpan(source, (node.start ?? 0) - prefix.length, (node.end ?? 0) - prefix.length))
+		.flatMap((node) =>
+			removableCallSpan(
+				source,
+				(node.start ?? 0) - prefix.length,
+				(node.end ?? 0) - prefix.length,
+			),
+		)
 		.sort((left, right) => right.start - left.start);
 	if (replacements.length === 0) return source;
 
 	let stripped = source;
 	for (const replacement of replacements) {
-		stripped =
-			stripped.slice(0, replacement.start) +
-			stripped.slice(replacement.end);
+		stripped = stripped.slice(0, replacement.start) + stripped.slice(replacement.end);
 	}
 	return stripped;
 }

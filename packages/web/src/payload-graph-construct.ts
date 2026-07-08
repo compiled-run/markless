@@ -44,13 +44,22 @@ export async function createRuntimeGraphFromResumePayload(
 
 async function decodeStateCells(payload: ProtocolStatePayload) {
 	return Promise.all(
-		payload.cells.map(async (cell) => ({
-			graphNodeId: cell.graphNodeId,
-			value:
-				cell.value === undefined
-					? undefined
-					: await deserializeGraphValue(cell.value as SerializedGraphPayload),
-		})),
+		payload.cells.map(async (cell) => {
+			// CSR-mounted pages seed prop cells with live values that never
+			// crossed the HTML boundary — there is no serialized envelope to
+			// decode, the value is used as-is (dashboard-migration need 14).
+			const directValue = (cell as { readonly directValue?: unknown }).directValue;
+			if (directValue !== undefined) {
+				return { graphNodeId: cell.graphNodeId, value: directValue };
+			}
+			return {
+				graphNodeId: cell.graphNodeId,
+				value:
+					cell.value === undefined
+						? undefined
+						: await deserializeGraphValue(cell.value as SerializedGraphPayload),
+			};
+		}),
 	);
 }
 

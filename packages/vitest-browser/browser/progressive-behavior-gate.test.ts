@@ -29,7 +29,12 @@ test('progressive execution: clicking a plain button never executes behavior mod
 	const action = actionForElement(container, plain, 'click');
 
 	plain.click();
-	await expect.poll(() => requireElement<HTMLOutputElement>(container, 'output[data-plain-label]').textContent)
+	await expect
+		.poll(
+			() =>
+				requireElement<HTMLOutputElement>(container, 'output[data-plain-label]')
+					.textContent,
+		)
 		.toBe('plain');
 
 	const executed = executedModules();

@@ -1,5 +1,12 @@
-import type { ProtocolStatePayload, ProtocolViewPayload } from '../../../serializer/src/protocol.ts';
-import type { EventOnlyResumeContainer, EventOnlyResumeRecord, ResumeEventOnlyFromPayloadDocumentInput } from './types.ts';
+import type {
+	ProtocolStatePayload,
+	ProtocolViewPayload,
+} from '../../../serializer/src/protocol.ts';
+import type {
+	EventOnlyResumeContainer,
+	EventOnlyResumeRecord,
+	ResumeEventOnlyFromPayloadDocumentInput,
+} from './types.ts';
 import { isScalarCoreLeanResumeShape } from './scalar-core.ts';
 import { isScalarRowLeanResumeShape } from './row.ts';
 
