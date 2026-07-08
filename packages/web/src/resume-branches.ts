@@ -110,7 +110,9 @@ function materializeBranchLocators(root: ResumeDomElement, branches: NonNullable
 		const startAnchor = live ? branch.startAnchor as unknown as ResumeDomComment : comments[branch.startAnchor.index], endAnchor = live ? branch.endAnchor as unknown as ResumeDomComment : comments[branch.endAnchor.index];
 		if (!startAnchor) throw missingCommentAnchorError(branch.id, 'startAnchor', branch.startAnchor.index);
 		if (!endAnchor) throw missingCommentAnchorError(branch.id, 'endAnchor', branch.endAnchor.index);
-		records.push({ id: branch.id, sourceId: (branch as { readonly sourceId?: string }).sourceId, startAnchor, endAnchor, symbolId: branch.symbolId, testReads: branch.testReads, armTests: branch.armTests, declaredEmptyArms: (branch as { readonly declaredEmptyArms?: ReadonlyArray<number> }).declaredEmptyArms, armRecords: branch.armRecords, ...((branch as { readonly armBoundaryId?: string }).armBoundaryId ? { armBoundaryId: (branch as { readonly armBoundaryId?: string }).armBoundaryId } : {}) });
+		// The protocol record carries exactly the branch-record fields; only the
+		// index anchors are replaced with their live comments.
+		records.push({ ...branch, startAnchor, endAnchor } as ResumeBranchRecord & { readonly armBoundaryId?: string });
 	}
 	return records;
 }
@@ -139,8 +141,15 @@ function walkComments(root: ResumeDomElement): ResumeDomComment[] {
 	const comments: ResumeDomComment[] = []; (function visit(node: ResumeDomNode): void { if (node.nodeType === 8 && !isArmBranchAnchorComment(node as ResumeDomComment)) comments.push(node as ResumeDomComment); for (const child of node.childNodes ?? []) visit(child); })(root); return comments;
 }
 function missingCommentAnchorError(id: string, name: 'startAnchor' | 'endAnchor', index: number): Error {
-	const error = new Error(`Resume locator ${id} ${name} expected a comment at DOM order index ${String(index)}.`) as Error & Record<string, unknown>;
-	error.name = 'RuntimeResumeError'; error.code = 'MARKLESS_RESUME_LOCATOR_MISSING'; error.docsUrl = 'https://markless.dev/errors/MARKLESS_RESUME_LOCATOR_MISSING';
+	return branchRuntimeError(`Resume locator ${id} ${name} expected a comment at DOM order index ${String(index)}.`, 'MARKLESS_RESUME_LOCATOR_MISSING', {});
+}
+// Shared diagnostic shape (message text stays authored per site; docsUrl
+// always mirrors the code).
+function branchRuntimeError(message: string, code: string, fields: Record<string, unknown>): Error {
+	const error = new Error(message) as Error & Record<string, unknown>;
+	error.name = 'RuntimeResumeError'; error.code = code;
+	Object.assign(error, fields);
+	error.docsUrl = `https://markless.dev/errors/${code}`;
 	return error;
 }
 function branchFragmentEmpty(fragment: unknown): boolean {
@@ -150,7 +159,7 @@ function branchFragmentEmpty(fragment: unknown): boolean {
 	return fragment.length === 0 || !fragment.some((node) => node && typeof node === 'object' && 'nodeType' in node);
 }
 function branchArmEmptyError(branch: ResumeBranchRecord, arm: number): Error {
-	const error = new Error(`MARKLESS_BRANCH_ARM_EMPTY: Branch ${branch.id} resolved arm ${String(arm)} to an empty fragment.`) as Error & Record<string, unknown>;
-	error.name = 'RuntimeResumeError'; error.code = 'MARKLESS_BRANCH_ARM_EMPTY'; error.phase = 'runtime'; error.branchId = branch.id; error.sourceBranchId = branch.sourceId; error.branchSiteId = branch.sourceId ?? branch.id; error.arm = arm; error.symbolId = branch.symbolId; error.docsUrl = 'https://markless.dev/errors/MARKLESS_BRANCH_ARM_EMPTY';
-	return error;
+	return branchRuntimeError(`MARKLESS_BRANCH_ARM_EMPTY: Branch ${branch.id} resolved arm ${String(arm)} to an empty fragment.`, 'MARKLESS_BRANCH_ARM_EMPTY', {
+		phase: 'runtime', branchId: branch.id, sourceBranchId: branch.sourceId, branchSiteId: branch.sourceId ?? branch.id, arm, symbolId: branch.symbolId,
+	});
 }

@@ -228,26 +228,30 @@ function findByTestId(
 	return undefined;
 }
 
-function armCommitAnchorsError(boundary: ResumeAsyncBoundaryRecord): Error {
-	const error = new Error(
-		`MARKLESS_ARM_COMMIT_ANCHORS_MISSING: Async boundary ${boundary.id} could not commit its settled @try/@catch content: the boundary's comment anchor pair is no longer intact in the live DOM.`,
-	) as Error & Record<string, unknown>;
+// One factory for both commit refusals: identical diagnostic shape, message
+// text unchanged (code-prefixed, author vocabulary per D2/D4).
+function armCommitError(code: string, boundary: ResumeAsyncBoundaryRecord, detail: string): Error {
+	const error = new Error(`${code}: Async boundary ${boundary.id} ${detail}`) as Error & Record<string, unknown>;
 	error.name = 'RuntimeResumeError';
-	error.code = 'MARKLESS_ARM_COMMIT_ANCHORS_MISSING';
+	error.code = code;
 	error.phase = 'runtime';
 	error.boundaryId = boundary.id;
-	error.docsUrl = 'https://markless.dev/errors/MARKLESS_ARM_COMMIT_ANCHORS_MISSING';
+	error.docsUrl = `https://markless.dev/errors/${code}`;
 	return error;
 }
 
+function armCommitAnchorsError(boundary: ResumeAsyncBoundaryRecord): Error {
+	return armCommitError(
+		'MARKLESS_ARM_COMMIT_ANCHORS_MISSING',
+		boundary,
+		"could not commit its settled @try/@catch content: the boundary's comment anchor pair is no longer intact in the live DOM.",
+	);
+}
+
 function armCommitRendererMissingError(boundary: ResumeAsyncBoundaryRecord): Error {
-	const error = new Error(
-		`MARKLESS_ARM_COMMIT_RENDERER_MISSING: Async boundary ${boundary.id} settled with rendered @try/@catch content, but this host provides no HTML renderer to build DOM nodes from it.`,
-	) as Error & Record<string, unknown>;
-	error.name = 'RuntimeResumeError';
-	error.code = 'MARKLESS_ARM_COMMIT_RENDERER_MISSING';
-	error.phase = 'runtime';
-	error.boundaryId = boundary.id;
-	error.docsUrl = 'https://markless.dev/errors/MARKLESS_ARM_COMMIT_RENDERER_MISSING';
-	return error;
+	return armCommitError(
+		'MARKLESS_ARM_COMMIT_RENDERER_MISSING',
+		boundary,
+		'settled with rendered @try/@catch content, but this host provides no HTML renderer to build DOM nodes from it.',
+	);
 }
