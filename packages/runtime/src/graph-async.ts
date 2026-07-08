@@ -43,12 +43,11 @@ export function readAsyncComputedNode(
 	demand: () => void,
 ): unknown {
 	demand();
-	const [head, ...rest] = path;
+	const head = path[0];
 	if (head === undefined || ASYNC_SNAPSHOT_META_KEYS.has(head)) {
 		return readPath(node.snapshot, path);
 	}
-	const snapshot = node.snapshot as { readonly value?: unknown };
-	return readPath(snapshot.value, [head, ...rest]);
+	return readPath((node.snapshot as { readonly value?: unknown }).value, path);
 }
 
 export function demandAsyncComputed(input: {
@@ -57,14 +56,10 @@ export function demandAsyncComputed(input: {
 	readonly markDirtyPath: (graphNodeId: string, path: ReadonlyArray<string>) => void;
 	readonly scheduleFlush: () => void;
 }): void {
-	if (input.node.pendingSnapshotNeedsRunner) {
-		input.node.pendingSnapshotNeedsRunner = false;
-		input.node.demanded = true;
-		startAsyncComputed({ ...input, key: input.node.key(input.readGraph) });
-		return;
-	}
-
-	if (input.node.snapshot.status !== 'idle') return;
+	// A payload-planned pending snapshot still needs its runner started on
+	// first demand; otherwise only idle computeds start (startAsyncComputed
+	// clears the needs-runner flag itself).
+	if (!input.node.pendingSnapshotNeedsRunner && input.node.snapshot.status !== 'idle') return;
 
 	input.node.demanded = true;
 	startAsyncComputed({ ...input, key: input.node.key(input.readGraph) });
@@ -99,27 +94,35 @@ function startAsyncComputed(input: {
 	input.node.controller = controller;
 	input.node.keyValue = input.key;
 	input.node.version = version;
-	input.node.snapshot = { status: 'pending', version, key: input.key };
+	// A re-run keeps the prior settled value addressable while pending (spec
+	// D8 / Solid 2 `latest`): reads through the computed answer with it until
+	// the new snapshot commits. Consecutive re-runs carry it forward; a first
+	// run or a rejected prior carries undefined (reads answer undefined). The
+	// literal reads the prior snapshot before the assignment replaces it.
+	input.node.snapshot = {
+		status: 'pending',
+		version,
+		key: input.key,
+		value: (input.node.snapshot as { readonly value?: unknown }).value,
+	};
 
-	const commitFulfilled = (value: unknown): void => {
+	const commit = (snapshot: RuntimeGraphAsyncSnapshot): void => {
 		if (input.node.version !== version || controller.signal.aborted) return;
 
-		input.node.snapshot = { status: 'fulfilled', version, key: input.key, value };
+		input.node.snapshot = snapshot;
 		input.markDirtyPath(input.node.graphNodeId, []);
 		input.scheduleFlush();
 	};
-	const commitRejected = (error: unknown): void => {
-		if (input.node.version !== version || controller.signal.aborted) return;
-
-		input.node.snapshot = { status: 'rejected', version, key: input.key, error };
-		input.markDirtyPath(input.node.graphNodeId, []);
-		input.scheduleFlush();
-	};
+	const commitRejected = (error: unknown): void =>
+		commit({ status: 'rejected', version, key: input.key, error });
 
 	try {
 		Promise.resolve(
 			input.node.run({ key: input.key, signal: controller.signal, read: input.readGraph }),
-		).then(commitFulfilled, commitRejected);
+		).then(
+			(value) => commit({ status: 'fulfilled', version, key: input.key, value }),
+			commitRejected,
+		);
 	} catch (error) {
 		commitRejected(error);
 	}

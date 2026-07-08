@@ -57,6 +57,10 @@ export type RuntimeGraphAsyncSnapshot =
 			readonly status: 'pending';
 			readonly version: number;
 			readonly key: unknown;
+			// A re-run carries the prior settled value so event-time reads keep
+			// answering with it until the new snapshot commits (spec D8: "the
+			// prior value is always addressable"; Solid 2 `latest` semantics).
+			readonly value?: unknown;
 	  }
 	| {
 			readonly status: 'fulfilled';
