@@ -517,7 +517,7 @@ export default function Catalog() @{
 	<main>
 		<ul class="goods">
 			@for (const good of goods; key good.sku) {
-				<li data-sku={good.sku} onClick={() => picked = good.sku}><TagBadge title={good.title} /></li>
+				<li data-sku={good.sku} onClick={() => picked = good.sku}><TagBadge title={good.title} /><span class="meta">{good.title}</span></li>
 			}
 		</ul>
 		<output data-picked>{picked}</output>
@@ -525,6 +525,9 @@ export default function Catalog() @{
 }`,
 	);
 
+	// Item text bindings AFTER the component stay plannable: they render per
+	// row through the SSR/CSR mappers, and their positional write plans only
+	// feed the direct-DOM row path, which component rows never use.
 	expect(plan.repeatGates).toEqual([
 		{ repeatId: 'repeat:0', supported: true, componentRows: true },
 	]);
@@ -535,6 +538,33 @@ export default function Catalog() @{
 	expect(
 		plan.diagnostics.filter((diagnostic) => diagnostic.message.includes('@for')),
 	).toEqual([]);
+});
+
+test('planPublicRender allows row reads rooted at page props (render-constant)', async () => {
+	// Mirror of the dashboard issues list: row hrefs combine a route param
+	// (page prop, constant per render) with item fields. Pages with props never
+	// use the direct-DOM row machinery, so prop reads are safe row bindings.
+	const { plan } = await createRenderPlan(
+		'src/IssueList.tsrx',
+		`import { computed } from '@markless/core';
+import { TagBadge } from './TagBadge.tsrx';
+
+export default function IssueList({ params }) @{
+	const model = computed(async () => ({ rows: [{ id: 'i1', title: 'First' }] }));
+
+	<main>
+		<section class="rows">
+			@for (const row of model.rows; key row.id) {
+				<article data-href={'#/r/' + params.repo + '/issues/' + row.id}><TagBadge title={params.repo} /><span>{row.title}</span></article>
+			}
+		</section>
+	</main>
+}`,
+	);
+
+	expect(plan.repeatGates).toEqual([
+		expect.objectContaining({ repeatId: 'repeat:0', supported: true, componentRows: true }),
+	]);
 });
 
 test('planPublicRender rejects row components whose props read beyond the item scope', async () => {
@@ -569,7 +599,7 @@ export default function Catalog() @{
 				suggestions: [
 					{
 						message:
-							'Components in @for rows render markup only: their props and children may read only the repeat item (and index), they cannot take event props, and row bindings or events must come before the component. Move other reads into the item, or lift the component out of the row.',
+							'Components in @for rows render markup only: their props and children may read only the repeat item (and index), they cannot take event props, and row events must come before the component. Move other reads into the item, or lift the component out of the row.',
 					},
 				],
 			}),

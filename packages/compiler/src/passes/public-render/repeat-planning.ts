@@ -88,7 +88,9 @@ export function supportedRepeatGate(input: {
 	}
 
 	if (rowPlan.usesIndex || input.semanticRepeat.keySource === input.semanticRepeat.indexName) {
-		return { repeatId: input.payloadRepeat.id, supported: true, ssrOnly: true };
+		return rowPlan.hasComponents
+			? { repeatId: input.payloadRepeat.id, supported: true, ssrOnly: true, componentRows: true }
+			: { repeatId: input.payloadRepeat.id, supported: true, ssrOnly: true };
 	}
 	return rowPlan.hasComponents
 		? { repeatId: input.payloadRepeat.id, supported: true, componentRows: true }
@@ -162,19 +164,16 @@ export type RowPlan = {
 	readonly hasComponents: boolean;
 };
 
-// True when the expression's identifier reads are limited to the repeat item
-// (and optional index). Static member property names are not reads.
-function readsOnlyItemScope(
-	node: AnyNode,
-	itemName: string,
-	indexName: string | undefined,
-): boolean {
+// True when the expression's identifier reads are limited to the repeat item,
+// the optional index, and the page's props (render-constant per instance).
+// Static member property names are not reads.
+function readsOnlyItemScope(node: AnyNode, isRowStaticRead: (name: string) => boolean): boolean {
 	let ok = true;
 	const visit = (candidate: AnyNode | undefined): void => {
 		if (!candidate || !ok) return;
 		if (candidate.type === 'Identifier') {
 			const name = getIdentifierName(candidate);
-			if (name && name !== itemName && name !== indexName) ok = false;
+			if (name && !isRowStaticRead(name)) ok = false;
 			return;
 		}
 		if (candidate.type === 'MemberExpression' && candidate.computed !== true) {
@@ -207,10 +206,22 @@ export function collectRowPlan(input: {
 	const classWrites: PublicRenderPlanClassWrite[] = [];
 	const eventControls: PublicRenderPlanEventControl[] = [];
 	const attributeWrites: RowAttributeWrite[] = [];
+	// Row-static reads: the item, the index, and the page's props (aliases like
+	// a destructured \`params\` resolve through the graph). Props are constant
+	// for the page render (route params in row hrefs), and pages with props
+	// never take the direct-DOM row path, so no reactive wiring is owed.
+	const isRowStaticRead = (name: string): boolean => {
+		if (name === input.itemName || name === input.indexName) return true;
+		const resolved = resolveGraphPath(name, input.bindings, input.aliases);
+		return resolved?.binding.kind === 'prop';
+	};
 	let usesIndex = false;
 	// A component renders an unknown number of elements, so row-relative host
-	// paths collected AFTER one (in document order) could not be trusted:
-	// bindings and events must come before any component in the row.
+	// paths AFTER one (in document order) cannot be trusted at runtime. Row
+	// EVENTS resolve their host path against the live row DOM, so they must
+	// come before any component. Text/class/attribute writes only feed the
+	// direct-DOM row path, which component rows never use (component edges
+	// exclude the direct module), so they stay plannable anywhere in the row.
 	let sawComponent = false;
 	let hasComponents = false;
 
@@ -222,7 +233,7 @@ export function collectRowPlan(input: {
 		const tagName = getElementTagName(node);
 		if (tagName && !isHostTagName(tagName)) {
 			if (hostPath.length === 0) return false; // the row root anchors row identity
-			if (!componentRowInvocationSupported(node, input.itemName, input.indexName)) {
+			if (!componentRowInvocationSupported(node, isRowStaticRead)) {
 				return false;
 			}
 			sawComponent = true;
@@ -237,7 +248,6 @@ export function collectRowPlan(input: {
 
 			const expression = unwrapExpressionContainer(attribute.value as AnyNode | undefined);
 			if (attributeName === 'class' && expression && expression.type !== 'Literal') {
-				if (sawComponent) return false;
 				const binding = classWritePlan({
 					aliases: input.aliases,
 					bindings: input.bindings,
@@ -290,8 +300,7 @@ export function collectRowPlan(input: {
 				// rebuilds re-evaluate the same template. Reject expressions that
 				// read anything beyond the item/index (those would need reactive
 				// attribute wiring rows don't have yet).
-				if (sawComponent) return false;
-				if (!readsOnlyItemScope(expression, input.itemName, input.indexName)) return false;
+				if (!readsOnlyItemScope(expression, isRowStaticRead)) return false;
 				attributeWrites.push({
 					name: attributeName,
 					source: expressionSource(expression, input.source) ?? '',
@@ -311,7 +320,7 @@ export function collectRowPlan(input: {
 
 			if (child.type === 'JSXExpressionContainer' || child.type === 'TSRXExpression') {
 				const expression = child.expression as AnyNode | undefined;
-				if (!expression || sawComponent) return false;
+				if (!expression) return false;
 
 				const source = expressionSource(expression, input.source);
 				const itemPath = itemPathFromSource(input.itemName, source);
@@ -366,8 +375,7 @@ export function collectRowPlan(input: {
 // the children stay unsupported (their edges would need per-row child wiring).
 function componentRowInvocationSupported(
 	node: AnyNode,
-	itemName: string,
-	indexName: string | undefined,
+	isRowStaticRead: (name: string) => boolean,
 ): boolean {
 	for (const attribute of getElementAttributes(node)) {
 		const attributeName = getIdentifierName(attribute.name as AnyNode | undefined);
@@ -383,7 +391,7 @@ function componentRowInvocationSupported(
 		if (
 			expression &&
 			expression.type !== 'Literal' &&
-			!readsOnlyItemScope(expression, itemName, indexName)
+			!readsOnlyItemScope(expression, isRowStaticRead)
 		) {
 			return false;
 		}
@@ -393,7 +401,7 @@ function componentRowInvocationSupported(
 		if (isIgnorableTextNode(child) || isStaticTextNode(child)) return true;
 		if (child.type === 'JSXExpressionContainer' || child.type === 'TSRXExpression') {
 			const expression = child.expression as AnyNode | undefined;
-			return !!expression && readsOnlyItemScope(expression, itemName, indexName);
+			return !!expression && readsOnlyItemScope(expression, isRowStaticRead);
 		}
 		if (child.type === 'Element' || child.type === 'JSXElement') {
 			const tagName = getElementTagName(child);
@@ -412,7 +420,7 @@ function componentRowInvocationSupported(
 				if (
 					expression &&
 					expression.type !== 'Literal' &&
-					!readsOnlyItemScope(expression, itemName, indexName)
+					!readsOnlyItemScope(expression, isRowStaticRead)
 				) {
 					return false;
 				}

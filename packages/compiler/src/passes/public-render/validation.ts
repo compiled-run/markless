@@ -264,7 +264,7 @@ function repeatUnsupportedSuggestion(
 		if (tagName && !isHostTagName(tagName)) {
 			return `The @for row root is a component (<${tagName} />); the row root anchors row identity, so wrap it in a host element (for example <li><${tagName} /></li>).`;
 		}
-		return 'Components in @for rows render markup only: their props and children may read only the repeat item (and index), they cannot take event props, and row bindings or events must come before the component. Move other reads into the item, or lift the component out of the row.';
+		return 'Components in @for rows render markup only: their props and children may read only the repeat item (and index), they cannot take event props, and row events must come before the component. Move other reads into the item, or lift the component out of the row.';
 	}
 	return 'Reshape the rows into a single host element with directly readable item bindings.';
 }

@@ -5317,6 +5317,58 @@ test('interactive components in repeat rows refuse loudly at row render', async 
 	);
 });
 
+// Viewless children (router <Link>-style: renderSsr returns { html } only)
+// still render real elements. Composition must count them, or every host
+// locator after the child points one element short in the final DOM.
+test('viewless child components (Link-style) offset later host locators', async () => {
+	const page = await compileTsrxModule({
+		filename: 'src/Nav.tsrx',
+		source: `import { state } from '@markless/core';
+import { Jump } from './Jump.tsrx';
+
+export default function Nav() @{
+	let taps = state(0);
+
+	<nav>
+		<Jump target="home"><span class="counter">{taps}</span></Jump>
+		<button onClick={() => taps++}>{taps}</button>
+	</nav>
+}`,
+		symbols: [],
+	});
+	// Link-shaped stub: markup only, children html interpolated, no view.
+	const jump = {
+		renderSsr: (props: { readonly children?: unknown }) => ({
+			html: `<a data-jump>${props.children == null ? '' : String(props.children)}</a>`,
+		}),
+	};
+	const pageSsrModule = await importPublicRenderTestModule(
+		ssrRenderTestModuleSource(page, { replaceChildImport: true }),
+		{ childComponent: jump },
+	);
+	const output = await (
+		pageSsrModule.marklessRenderSsr as () => Promise<{
+			readonly html: string;
+			readonly view: ProtocolViewPayload;
+		}>
+	)();
+
+	expect(output.html).toBe(
+		'<nav><a data-jump><span class="counter">0</span></a><button>0</button></nav>',
+	);
+	// DOM order: nav(0) a(1) span(2) button(3). The span is a page-owned host
+	// projected through the child's children prop; the anchor belongs to the
+	// viewless child and must still shift both following locators.
+	const spanLocator = output.view.locators.find((locator) => locator.tagName === 'span');
+	const buttonLocator = output.view.locators.find((locator) => locator.tagName === 'button');
+	expect(spanLocator).toMatchObject({ index: 2 });
+	expect(buttonLocator).toMatchObject({ index: 3 });
+	// The click record survives composition wired to the button's host id.
+	expect(
+		output.view.events.some((event) => event.hostNodeId === buttonLocator?.hostNodeId),
+	).toBe(true);
+});
+
 // A page declared AFTER a same-module component must keep ONE host id space:
 // the payload records (events, dom updates, keyed repeats) are keyed by the
 // semantic graph's module-wide host ids, so the page's rendered locators must

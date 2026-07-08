@@ -342,8 +342,7 @@ function renderLinkBridgeScript(resumeEntryPath: string): string {
 	r.addEventListener('click', async (event) => {
 		if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.altKey || event.ctrlKey || event.shiftKey) return;
 		const anchor = anchorFrom(event);
-		const hashRouteAnchor = anchor && (anchor.getAttribute('href') || '').startsWith('#/');
-		if (!anchor || (!anchor.hasAttribute(linkAttr) && !hashRouteAnchor) || anchor.hasAttribute('download')) return;
+		if (!anchor || !anchor.hasAttribute(linkAttr) || anchor.hasAttribute('download')) return;
 		const target = anchor.getAttribute('target');
 		if (target && target !== '_self') return;
 		if (anchor.relList && anchor.relList.contains('external')) return;

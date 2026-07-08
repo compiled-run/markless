@@ -124,6 +124,33 @@ describe('server entry rendering', () => {
 		expect(html).not.toContain('__marklessRouterStartSpaNavigation');
 	});
 
+	it('bridge click handling covers only Link-attributed anchors (T106: apps use Link everywhere)', async () => {
+		const entry = createServerEntry({
+			navigationEntryPath: '/@id/virtual:markless-router/navigation-entry',
+			resumeEntryPath: '/@id/virtual:markless-router/resume-entry',
+			documentModuleLoader: undefined,
+			pageModuleLoaders: {
+				'pages/index.tsrx': async () => ({
+					default: page(
+						'<main><a href="#/r/alpha" data-markless-router-link>Alpha</a></main>',
+					),
+				}),
+			},
+			routeFileIds: ['/pages/index.tsrx'],
+		});
+
+		const response = await entry.fetch(new Request('http://markless-router.test/'));
+		const html = await response.text();
+
+		// Plain hash anchors are no longer special-cased by the click handler:
+		// SPA navigation belongs to <Link> (data-markless-router-link) only.
+		expect(html).not.toContain('hashRouteAnchor');
+		expect(html).toContain('hasAttribute(linkAttr)');
+		// The load-time '#/' deep-link check is about LANDING on a hash route,
+		// not clicking — it stays.
+		expect(html).toContain("location.hash.startsWith('#/')");
+	});
+
 	it('emits exact route modulepreloads for visible Link targets', async () => {
 		const entry = createServerEntry({
 			navigationEntryPath: '/build/navigation.js',
