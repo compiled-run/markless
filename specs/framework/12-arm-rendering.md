@@ -59,20 +59,35 @@ events-in-arm misalignment and in-arm compose offset arithmetic.
 speak the author's words: "@try block", "@pending content", "this @if
 contains <Shell>". Every diagnostic fixture asserts its message text.
 
-## D5. Streaming mechanism (from Qwik OOOS, minus the VDOM tax)
+## D5. Streaming mechanism
 
-Keep: settled content streams as inert `<template>` + a tiny inline executor
-that commits it. Delete (possible because graph state addresses cells by id,
-not position): vnode grafting, cross-segment ref tables, reveal dance
-(display toggling), result-parent/placeholder indirection, backpatch maps,
-serialization ordering locks.
+The server flushes the document with each still-pending boundary showing its
+@pending arm between its existing comment anchors, and keeps the response
+open. When a boundary settles, the server appends to the same stream:
 
-Shape: server flushes pending arms in place and keeps the response open; a
-settling boundary appends
-`<template m:arm="boundary:N">html</template>` +
-`<script type="markless/arm">arm records</script>` +
-`<script>__mArm("boundary:N")</script>` — the executor routes through the
-same `commitArm` primitive the client tiers use.
+    <template m:arm="boundary:N">settled arm html</template>
+    <script type="markless/arm">arm records (arm-relative)</script>
+    <script>__mArm("boundary:N")</script>
+
+The template parses inert (the browser builds its DOM without rendering it);
+the once-installed executor moves that content into the boundary's anchor
+range — the same `commitArm` operation the client tiers use — and the records
+register against the fresh DOM. The pending arm is genuinely replaced, not
+hidden and kept.
+
+A streamed commit is one fragment move plus record registration, nothing
+else. Because graph state addresses cells by id rather than DOM position,
+there is no framework-side tree that moved DOM must be reconciled into, no
+node-reference tables spanning stream segments, and no placeholder
+indirection — the anchor pair is the only address a boundary has, and it is
+already in the document.
+
+Provenance: the inert-template-plus-executor wire pattern is validated in
+production by Qwik's out-of-order streaming (researched from source, see the
+arm-rendering goal notes). The simplifications above relative to that
+reference exist because a virtual-tree framework must graft streamed content
+into its bookkeeping; Markless has no such tree, so the work disappears
+rather than being optimized.
 
 ## D6. Sequencing and defaults (amended 2026-07-07, owner ruling)
 
