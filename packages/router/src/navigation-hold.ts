@@ -6,10 +6,10 @@
 // and only a destination still pending at the deadline swaps showing its
 // @pending arms — which then stay visible at least the pending minimum
 // (holdPendingSettleCommits raises the settle tracker's commit floor).
-import {
-	MARKLESS_NAV_PENDING_MIN_MS,
-	MARKLESS_NAV_SETTLE_DEADLINE_MS,
-} from './navigation-timing.ts';
+// The settle-vs-deadline race itself is the SHARED pending-timing machine
+// (@markless/web pending-timing.ts) that also gates re-settle @pending (T120).
+import { settleOrPendingDeadline } from '@markless/web';
+import { MARKLESS_NAV_PENDING_MIN_MS } from './navigation-timing.ts';
 
 // Injectable timer so tests control virtual time; production uses setTimeout.
 export type NavigationHoldClock = {
@@ -32,25 +32,12 @@ export async function holdNavigationSwapUntilSettled(input: {
 	readonly signal?: AbortSignal;
 	readonly clock?: NavigationHoldClock;
 }): Promise<boolean | void> {
-	const wait = input.clock?.wait ?? waitMs;
 	const settled = input.runtime.whenAsyncBoundariesSettled?.();
 	if (settled) {
-		const outcome = await Promise.race([
-			// A settle failure fails loudly in the page's own flush; for the
-			// hold it only means "commit the swap now".
-			settled.then(
-				() => 'settled' as const,
-				() => 'settled' as const,
-			),
-			wait(MARKLESS_NAV_SETTLE_DEADLINE_MS).then(() => 'deadline' as const),
-		]);
+		const outcome = await settleOrPendingDeadline(settled, input.clock?.wait);
 		if (outcome === 'deadline') {
 			await input.runtime.holdPendingSettleCommits?.(MARKLESS_NAV_PENDING_MIN_MS);
 		}
 	}
 	if (input.signal?.aborted) return false;
-}
-
-function waitMs(durationMs: number): Promise<void> {
-	return new Promise((resolve) => setTimeout(resolve, durationMs));
 }

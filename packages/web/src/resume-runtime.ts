@@ -18,8 +18,8 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 	const hostSubscriptionReleases = new Map<string, Array<() => void>>(), containerSubscriptionReleases: Array<() => void> = [];
 		const asyncBoundariesById = prepared.asyncBoundariesById;
 	// D8 settled-content tracker: created by the demand-loaded start wiring
-	// when the page has async boundaries (first-appearance-only pending +
-	// navigation transition settle promise + pending minimum duration).
+	// when the page has async boundaries (deadline-gated pending, navigation
+	// transition settle promise, pending minimum duration — T119/T120).
 	let settleTracker: AsyncBoundarySettleTracker | undefined;
 	let behaviorRuntime: BehaviorRuntime | undefined, branchRuntime: BranchRuntime | undefined;
 	let events: EventWiring | undefined, runtimeShared: RuntimeShared | undefined;
@@ -82,35 +82,21 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 		});
 		return behaviorRuntime;
 	}
-	// Escalated arm-scoped toggles (T104): re-run the boundary's settle path
-	// with the current snapshot so the whole arm re-renders through commitArm.
-	async function resettleBoundaryArm(boundaryId: string) {
-		const boundary = asyncBoundariesById.get(boundaryId);
-		const read = boundary?.asyncReads[0];
-		if (!boundary?.updateSymbolId || !read) return;
-		const { settleAsyncBoundaryRange } = await import('./resume-async-wiring.ts');
-		return settleAsyncBoundaryRange(
-			{ graph: input.graph, root: input.root, loadSymbol: input.loadSymbol, renderBranchHtml: input.renderBranchHtml, elementHandles, commitArm: commitBoundaryArm, settleTracker },
-			boundary,
-			input.graph.read(read.graphNodeId, []),
-		);
-	}
-	// Spec D8: a branch flip whose deciding test read goes THROUGH an async
-	// computed that is re-running holds its prior arm — the pending snapshot
-	// has no value, so the test would evaluate lies; the boundary's settle
-	// re-commit renders the truthful arm. Lives here (single copy) so the
-	// duplicated branch-runtime chunk only carries the call site.
-	const holdPendingFlip = (graphNodeId: string) =>
-		input.graph.read(graphNodeId, ['status']) === 'pending' &&
-		[...asyncBoundariesById.values()].some((boundary) =>
-			boundary.asyncReads.some((read) => read.graphNodeId === graphNodeId));
+	// The escalated-flip re-settle path and the pending-flip hold are built by
+	// the demand-loaded start wiring (resume-runtime-start.ts, where the
+	// settle tracker and re-settle hold live) and connected here before any
+	// branch runtime loads.
+	let branchWiring: {
+		readonly resettleBoundary: (boundaryId: string) => Promise<DomJournalResult | void>;
+		readonly holdPendingFlip: (graphNodeId: string) => boolean;
+	} | undefined;
 	async function loadBranchRuntime(options: { readonly skipStartupBranchIds?: ReadonlySet<string> } = {}): Promise<BranchRuntime> {
 		if (branchRuntime) return branchRuntime;
 		const eventTypesBefore = new Set(eventTypes), behaviors = viewHasBranchArmBehaviors(input.view) ? await loadBehaviorRuntime() : undefined;
 		branchRuntime = (await import('./resume-branches.ts')).wireBranches({
 			root: input.root, graph: input.graph, view: input.view, loadSymbol: input.loadSymbol, renderBranchHtml: input.renderBranchHtml, elementsByHostId, disposedHosts, elementHandles, events: await getEvents(), eventTypes, storeContainerSubscription, storeHostSubscription, addBehaviorRecords: behaviors?.addBehaviorRecords ?? (() => {}),
-			resettleBoundary: resettleBoundaryArm,
-			holdPendingFlip,
+			resettleBoundary: branchWiring?.resettleBoundary,
+			holdPendingFlip: branchWiring?.holdPendingFlip,
 			skipStartupBranchIds: options.skipStartupBranchIds,
 		});
 		for (const eventType of eventTypes) if (!eventTypesBefore.has(eventType)) input.root.addEventListener?.(eventType, dispatchCaptured, { capture: true });
@@ -194,6 +180,9 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 				storeContainerSubscription,
 				disposeHost,
 				commitArm: commitBoundaryArm,
+				connectBranchWiring: (wiring) => {
+					branchWiring = wiring;
+				},
 				receiveSharedPatch,
 				sharedPatchEventType: SHARED_PATCH_EVENT_TYPE,
 			});

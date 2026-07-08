@@ -8,15 +8,20 @@ import type {
 	ResumeRuntimeInput,
 } from './resume-types.ts';
 
-// Spec D8 (12-arm-rendering): pending UI is for FIRST APPEARANCES only, and a
-// route swap may hold a fully-live but unmounted page until its boundaries
-// settle. This tracker is the settle path's single source for both facts:
+// Spec D8 + T119 ruling (12-arm-rendering): pending UI is DEADLINE-GATED
+// everywhere — first appearances render @pending structurally, navigations
+// hold the outgoing page, and RE-settles hold the prior settled content until
+// the client deadline (resume-resettle-hold.ts), then commit the boundary's
+// @pending arm with a minimum visible duration. This tracker is the settle
+// path's synchronous bookkeeping core:
 // - which boundaries currently render SETTLED content, so a re-run of their
 //   async computed keeps the prior snapshot instead of flashing @pending
 // - a promise that resolves once every tracked boundary settled (the router
 //   races it against the navigation deadline before committing a swap)
-// - a commit floor: once pending UI became visible at a deadline swap, settle
-//   commits wait out the remaining minimum-visibility window (no blink).
+// - a commit floor: once pending UI became visible (deadline swap OR deadline
+//   re-settle), settle commits wait out the minimum-visibility window. The
+//   re-settle hold raises the floor BEFORE its pending-arm commit, so a
+//   racing settle commit always waits it out — one ordering mechanism.
 export type AsyncBoundarySettleTracker = {
 	readonly hasSettledContent: (boundaryId: string) => boolean;
 	readonly markSettled: (boundaryId: string) => void;
@@ -106,8 +111,12 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 	// demanded at start or the boundary never settles (need 10). SSR-resumed
 	// pages hold snapshots and stay lazy (demanded-execution doctrine).
 	readonly demandOnStart?: boolean;
-	// D8 first-appearance-only pending + navigation transitions (T110).
+	// D8 settled-content tracking + navigation transitions (T110) + the
+	// commit floor the re-settle hold raises (T120).
 	readonly settleTracker?: AsyncBoundarySettleTracker;
+	// T120: the re-settle hold (resume-resettle-hold.ts) observes every
+	// snapshot of an update-symbol boundary to deadline-gate @pending.
+	readonly onAsyncSnapshot?: (boundary: ResumeAsyncBoundaryRecord, snapshot: unknown) => void;
 }): void {
 	for (const boundary of input.asyncBoundariesById.values()) {
 		for (const asyncRead of boundary.asyncReads) {
@@ -142,6 +151,9 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 								},
 							] as DomJournalEntry[];
 						}
+						// T120: report the snapshot to the re-settle hold (deadline-
+						// gated @pending), then settle through the shared path.
+						input.onAsyncSnapshot?.(boundary, snapshot);
 						return settleAsyncBoundaryRange(input, boundary, snapshot);
 					},
 				}),
@@ -169,9 +181,11 @@ export async function settleAsyncBoundaryRange(
 ): Promise<DomJournalResult | void> {
 	const status = (snapshot as { readonly status?: unknown } | null)?.status;
 	if (status !== 'fulfilled' && status !== 'rejected') return;
-	// D8 minimum pending visibility: a deadline route swap that showed the
-	// @pending arm holds the settle commit until the pending UI was visible
-	// for the minimum duration (no blink between deadline and settle).
+	// D8 minimum pending visibility: once the @pending arm was shown (deadline
+	// route swap or deadline re-settle), the settle commit waits until the
+	// pending UI was visible for the minimum duration (no blink). The re-settle
+	// hold raises the floor BEFORE its pending commit, so this wait also
+	// orders settle commits behind an in-flight pending-arm commit.
 	if ((await input.settleTracker?.waitOutCommitHold()) === true) {
 		const read = boundary.asyncReads[0];
 		// A newer run superseded this settle while it waited; its own settle

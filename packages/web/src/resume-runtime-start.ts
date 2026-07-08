@@ -1,4 +1,4 @@
-import type { DomJournalEntry } from '@markless/runtime';
+import type { DomJournalEntry, DomJournalResult } from '@markless/runtime';
 import type { AsyncBoundarySettleTracker } from './resume-async-wiring.ts';
 import type { ArmCommitUpdate } from './resume-commit-arm.ts';
 import type { ResumeAsyncBoundaryRecord, ResumePreparedCore, ResumeRuntimeInput } from './resume-types.ts';
@@ -23,6 +23,12 @@ export async function startResumeRuntime(input: {
 		boundary: ResumeAsyncBoundaryRecord,
 		update: ArmCommitUpdate,
 	) => Promise<void>;
+	// Receives the branch-runtime hooks built here (escalated-flip re-settle +
+	// pending-flip hold) before any branch runtime loads.
+	readonly connectBranchWiring: (wiring: {
+		readonly resettleBoundary: (boundaryId: string) => Promise<DomJournalResult | void>;
+		readonly holdPendingFlip: (graphNodeId: string) => boolean;
+	}) => void;
 	readonly receiveSharedPatch: RuntimeShared['receiveSharedPatch'];
 	readonly sharedPatchEventType: string;
 }): Promise<AsyncBoundarySettleTracker | undefined> {
@@ -68,11 +74,21 @@ export async function startResumeRuntime(input: {
 	let settleTracker: AsyncBoundarySettleTracker | undefined;
 	if (runtimeInput.view.asyncBoundaries.length > 0) {
 		const asyncWiring = await import('./resume-async-wiring.ts');
-		// D8: settled-content tracking (first-appearance-only pending, the
-		// navigation-transition settle promise, pending minimum duration).
+		// D8: settled-content tracking (deadline-gated pending, the navigation-
+		// transition settle promise, pending minimum duration).
 		settleTracker = asyncWiring.createAsyncBoundarySettleTracker({
 			boundaries: prepared.asyncBoundariesById.values(),
 			state: runtimeInput.state,
+		});
+		// T119/T120: deadline-gated @pending on re-settles (captures the mounted
+		// @pending arms before the runners are demanded below).
+		const { wireResettleHold } = await import('./resume-resettle-hold.ts');
+		const onAsyncSnapshot = wireResettleHold({
+			tracker: settleTracker,
+			boundaries: prepared.asyncBoundariesById.values(),
+			readStatus: (graphNodeId) => runtimeInput.graph.read(graphNodeId, ['status']),
+			commitArm: input.commitArm,
+			hasHtmlRenderer: !!runtimeInput.renderBranchHtml,
 		});
 		asyncWiring.wireAsyncBoundariesWithoutLoadingCapability({
 			asyncBoundariesById: prepared.asyncBoundariesById, graph: runtimeInput.graph, root: runtimeInput.root,
@@ -80,8 +96,38 @@ export async function startResumeRuntime(input: {
 			commitArm: input.commitArm,
 			demandOnStart: runtimeInput.demandAsyncBoundaries === true,
 			settleTracker,
+			onAsyncSnapshot,
 		});
 	}
+	// Branch-runtime hooks live here with the settle machinery they depend on;
+	// the runtime core only carries their connection point.
+	input.connectBranchWiring({
+		// Escalated arm-scoped toggles (T104): re-run the boundary's settle path
+		// with the current snapshot so the whole arm re-renders through commitArm.
+		resettleBoundary: async (boundaryId): Promise<DomJournalResult | void> => {
+			const boundary = prepared.asyncBoundariesById.get(boundaryId);
+			const read = boundary?.asyncReads[0];
+			if (!boundary?.updateSymbolId || !read) return;
+			const { settleAsyncBoundaryRange } = await import('./resume-async-wiring.ts');
+			return settleAsyncBoundaryRange(
+				{
+					graph: runtimeInput.graph, root: runtimeInput.root, loadSymbol: runtimeInput.loadSymbol,
+					renderBranchHtml: runtimeInput.renderBranchHtml, elementHandles: prepared.elementHandles,
+					commitArm: input.commitArm, settleTracker,
+				},
+				boundary,
+				runtimeInput.graph.read(read.graphNodeId, []),
+			);
+		},
+		// Spec D8: a branch flip whose deciding test read goes THROUGH an async
+		// computed that is re-running holds its prior arm — the pending snapshot
+		// has no value, so the test would evaluate lies; the boundary's settle
+		// re-commit renders the truthful arm.
+		holdPendingFlip: (graphNodeId) =>
+			runtimeInput.graph.read(graphNodeId, ['status']) === 'pending' &&
+			[...prepared.asyncBoundariesById.values()].some((boundary) =>
+				boundary.asyncReads.some((read) => read.graphNodeId === graphNodeId)),
+	});
 	if (runtimeInput.view.events.some((event) => event.eventName === 'visible')) {
 		const behaviors = await loadBehaviorRuntime();
 		behaviors.installVisibilityObserver();

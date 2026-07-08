@@ -135,6 +135,9 @@ function rowEventHost(rowRoot: ResumeDomElement, hostPath: ReadonlyArray<number>
 	let current: ResumeDomNode | undefined = rowRoot; for (const index of hostPath) { current = current.childNodes?.[index]; if (!current) return; }
 	return current.nodeType === 1 ? current as ResumeDomElement : undefined;
 }
+// Local copies of the resume-locators DOM-walk helpers: importing that module
+// here regroups it (plus the resume-errors chunk) into this wall-counted
+// chunk, which costs more than the duplication saves (T120 measurement).
 function elementsBetweenAnchors(root: ResumeDomElement, startAnchor: ResumeDomComment, endAnchor: ResumeDomComment): Set<ResumeDomElement> {
 	const inside = new Set<ResumeDomElement>(); let within = false; function visit(node: ResumeDomNode): void { if (node === startAnchor) { within = true; return; } if (node === endAnchor) { within = false; return; } if (within && node.nodeType === 1) inside.add(node as ResumeDomElement); for (const child of node.childNodes ?? []) visit(child); } visit(root); return inside;
 }

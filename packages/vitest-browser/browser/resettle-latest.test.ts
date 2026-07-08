@@ -2,10 +2,11 @@ import { afterEach, expect, test } from 'vitest';
 import { cleanup, render } from '../src/index.ts';
 import ArmCommitRefresh from './fixtures/arm-commit-refresh.tsrx';
 
-// T110 / spec D8 part B: pending is for FIRST APPEARANCES only. When a
-// settled boundary re-settles (a mutation re-runs its async computed), the
-// arm keeps rendering the prior settled snapshot until the new one commits —
-// the @pending arm must never reappear and the range must never go blank.
+// T119/T120 / spec D8: re-settle pending is DEADLINE-GATED. This refresh is
+// FAST (well under the ~250ms client deadline), so the arm keeps rendering
+// the prior settled snapshot until the new one commits — the @pending arm
+// must never reappear and the range must never go blank (frame-proven; the
+// slow past-deadline case lives in resettle-deadline.test.ts).
 afterEach(() => cleanup());
 
 test('re-settle keeps the prior settled content visible: no pending frame, no blank frame', async () => {
