@@ -3,7 +3,12 @@ import {
 	matchRouteManifest,
 	type RouteManifest,
 } from './route-manifest.ts';
-import { dispatchRouteUpdate, type RouteDocumentModule } from './route-state.ts';
+import {
+	MARKLESS_ROUTER_RENDERER_STARTED,
+	dispatchRouteUpdate,
+	type RouteDocumentModule,
+	type RouteUpdate,
+} from './route-state.ts';
 
 const STARTED = '__marklessRouterSpaNavigationStarted';
 const LINK_ATTRIBUTE = 'data-markless-router-link';
@@ -138,6 +143,7 @@ async function renderRoute(url: URL, context: NavigationContext, signal?: AbortS
 	const match = matchRouteManifest(routePathname(url, context), context.manifest);
 	const loadPageModule = match && context.pageModuleLoaders[match.route.file];
 	if (!match || !loadPageModule) {
+		if (hashRoutePath(url) !== undefined) warnUnknownHashRoute(url);
 		context.window.location.assign(url.href);
 		return;
 	}
@@ -156,7 +162,7 @@ async function renderRoute(url: URL, context: NavigationContext, signal?: AbortS
 		return;
 	}
 
-	dispatchRouteUpdate(context.window.document, {
+	const update: RouteUpdate = {
 		document: document as RouteDocumentModule | undefined,
 		page: page as never,
 		route: {
@@ -165,7 +171,37 @@ async function renderRoute(url: URL, context: NavigationContext, signal?: AbortS
 			status: 200,
 			url: url.href,
 		},
+		signal,
+	};
+
+	// D8 navigation transitions: the renderer holds the outgoing page until
+	// the destination settles or the deadline passes, so the navigation's
+	// intercept handler must finish at the real swap commit (after-transition
+	// focus/scroll then applies to the committed page). Awaiting is safe only
+	// when a renderer is actually listening on this document.
+	const rendererStarted =
+		(context.window.document as unknown as Record<string, unknown>)[
+			MARKLESS_ROUTER_RENDERER_STARTED
+		] === true;
+	if (!rendererStarted) {
+		dispatchRouteUpdate(context.window.document, update);
+		return;
+	}
+	await new Promise<void>((resolve) => {
+		dispatchRouteUpdate(context.window.document, { ...update, onRendered: resolve });
 	});
+}
+
+// A '#/...' URL cannot fall back to a server document load (assigning a hash
+// URL never leaves the page), so a hash navigation that matches no route is a
+// DEAD navigation. Say so loudly in dev instead of silently doing nothing.
+function warnUnknownHashRoute(url: URL): void {
+	if (!import.meta.env?.DEV) return;
+	console.error(
+		`MARKLESS_ROUTER_UNKNOWN_HASH_ROUTE: Navigation to "${url.hash}" matched no route file. ` +
+			'Hash URLs cannot fall back to a server document load, so this navigation does nothing. ' +
+			`Add a page for "${url.hash.slice(1)}" or fix the link href.`,
+	);
 }
 
 function handleLinkClick(
@@ -232,9 +268,14 @@ function routeUrl(event: NavigateEvent, context: NavigationContext) {
 		return undefined;
 	}
 
-	return destination && matchRouteManifest(routePathname(destination), context.manifest)
-		? destination
-		: undefined;
+	const matched =
+		destination && matchRouteManifest(routePathname(destination), context.manifest)
+			? destination
+			: undefined;
+	// The browser default for an unmatched hash change is a scroll no-op:
+	// without this diagnostic an unknown '#/...' route is a silent dead nav.
+	if (!matched && hashRouteNavigation && destination) warnUnknownHashRoute(destination);
+	return matched;
 }
 
 function isMarklessRouterNavigation(event: NavigateEvent) {

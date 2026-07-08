@@ -793,6 +793,39 @@ describe('hash mode', () => {
 		expect(handleNavigateEvent(event, context as never)).toBe(false);
 	});
 
+	// T110 part C: a '#/...' navigation that matches no route cannot fall back
+	// to a server document load (location.assign on a hash URL is a no-op), so
+	// silence here is a dead nav. Dev mode must say so loudly.
+	it('emits a loud dev diagnostic when a hash navigation matches no route', () => {
+		const errors: unknown[][] = [];
+		const originalError = console.error;
+		console.error = (...args: unknown[]) => {
+			errors.push(args);
+		};
+		try {
+			const context = {
+				documentModuleLoader: async () => ({}),
+				manifest: buildRouteManifestFromFileIds(['pages/index.tsrx']),
+				pageModuleLoaders: {},
+				window: {
+					document: new EventTarget(),
+					location: { href: 'http://marklessrouter.test/#/' },
+				},
+			};
+			const event = navigateEvent('http://marklessrouter.test/#/nowhere', {
+				hashChange: true,
+				info: { __marklessRouterLink: true },
+			});
+			expect(handleNavigateEvent(event, context as never)).toBe(false);
+		} finally {
+			console.error = originalError;
+		}
+
+		const flattened = errors.flat().map(String).join('\n');
+		expect(flattened).toContain('MARKLESS_ROUTER_UNKNOWN_HASH_ROUTE');
+		expect(flattened).toContain('#/nowhere');
+	});
+
 	it('path mode default: hashChange stays not intercepted', () => {
 		const context = aboutRouteContext();
 		const event = navigateEvent('http://marklessrouter.test/about#anchor', {

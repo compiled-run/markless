@@ -27,6 +27,7 @@ export type {
 	RequestFileParseResult,
 	RequestFileTransformResult,
 } from './request-files.ts';
+export { startRouteUpdateRenderer } from './route-renderer.ts';
 export { MARKLESS_ROUTER_ROUTE_EVENT, dispatchRouteUpdate, routePageProps } from './route-state.ts';
 export type {
 	RouteDocumentModule,
