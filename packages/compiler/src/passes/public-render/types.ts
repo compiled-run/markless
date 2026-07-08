@@ -64,6 +64,10 @@ export type CsrRenderContext = {
 	// the markup-only row-child helper instead of the child composition
 	// machinery (rows repeat; composed child records cannot).
 	insideRepeatRow?: boolean;
+	// Inside another component's children prop (CSR string emission): child
+	// replacement machinery cannot reach projected placeholders, so component
+	// invocations render through the markup-only projected-child splice.
+	childrenMarkupOnly?: boolean;
 	readonly hasChildrenProp?: boolean;
 	readonly styleScopeClass?: string | null;
 	readonly source: string;

@@ -18,6 +18,7 @@ import type { PublicRenderModuleInput } from '../../artifacts.ts';
 import { itemPathReadSource } from './source-expressions.ts';
 import {
 	emitCsrComponent,
+	emitCsrProjectedComponent,
 	emitCsrRowComponent,
 	emitSsrComponent,
 	emitSsrRowComponent,
@@ -196,9 +197,9 @@ export function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string 
 				? emitSsrRowComponent(node, tagName, context)
 				: emitSsrComponent(node, tagName, context);
 		}
-		return context.insideRepeatRow
-			? emitCsrRowComponent(node, tagName, context)
-			: emitCsrComponent(node, tagName, context);
+		if (context.insideRepeatRow) return emitCsrRowComponent(node, tagName, context);
+		if (context.childrenMarkupOnly) return emitCsrProjectedComponent(node, tagName, context);
+		return emitCsrComponent(node, tagName, context);
 	}
 	const hostLocator = context.mode === 'ssr' ? ssrHostLocator(node, tagName, context) : '""';
 	// Arm-render modules tag static in-arm hosts; the module strips the

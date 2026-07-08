@@ -265,6 +265,7 @@ function planOneArmRender(
 					'marklessCsrFragmentFromHtml',
 					'marklessCsrRenderChild',
 					'marklessCsrRowChild',
+					'marklessCsrProjectedChild',
 					'marklessCsrReplaceChild',
 					'marklessCsrCollectElements',
 					'marklessCsrAppendChildView',

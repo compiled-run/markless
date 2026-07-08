@@ -52,6 +52,24 @@ export function emitCsrRowComponent(
 	return `marklessCsrRowChild(${localName}, { ${props.join(', ')} }, ${JSON.stringify(componentName)})`;
 }
 
+// Component invocation projected through another component's children prop
+// (CSR string emission): placeholder replacement cannot reach projected
+// content, so the child renders markup-only via a synchronous splice — SSR
+// already composes these children, and silently dropping them lost router
+// <Link> anchors on client-side route swaps. Interactive child output refuses
+// loudly at render (the projected-child helper fail-closes).
+export function emitCsrProjectedComponent(
+	node: AnyNode,
+	componentName: string,
+	context: CsrRenderContext,
+): string {
+	const localName = context.componentImports.get(componentName);
+	if (!localName) return '""';
+	const edge = context.componentEdges[context.nextComponentEdgeIndex++];
+	const props = componentPropsSource(node, context, edge, context.callbackSymbols);
+	return `marklessCsrProjectedChild(${localName}, { ${props.join(', ')} }, ${JSON.stringify(componentName)})`;
+}
+
 export function emitCsrComponent(node: AnyNode, componentName: string, context: CsrRenderContext): string {
 	const localName = context.componentImports.get(componentName);
 	if (!localName) return '""';
@@ -92,16 +110,18 @@ function componentPropsSource(
 	// repeats authored inside them belong to the parent's semantic streams, so
 	// their gates/plans (and index consumption) must flow through — otherwise
 	// an arm-scoped flip site inside projected children loses its anchors.
-	// Component wiring stays absent on purpose: nested components inside
-	// children props are not renderable here today.
+	// Component invocations inside projected children render markup-only
+	// through the projected-child/row-child splice (childReplacements cannot
+	// reach placeholders that live inside another child's rendered output).
 	const childrenContext: CsrRenderContext = {
 		mode: 'csr',
 		source,
 		childReplacements: [],
-		componentEdges: [],
-		componentImports: new Map(),
-		callbackSymbols: new Map(),
-		nextComponentEdgeIndex: 0,
+		componentEdges: context.componentEdges,
+		componentImports: context.componentImports,
+		callbackSymbols: context.callbackSymbols,
+		nextComponentEdgeIndex: context.nextComponentEdgeIndex,
+		childrenMarkupOnly: true,
 		branchSites: context.branchSites,
 		branchReactivityGates: context.branchReactivityGates,
 		nextBranchSiteIndex: context.nextBranchSiteIndex,
@@ -112,6 +132,7 @@ function componentPropsSource(
 		armHostIdByNode: context.armHostIdByNode,
 	};
 	const children = emitHtmlChildren(node, childrenContext);
+	context.nextComponentEdgeIndex = childrenContext.nextComponentEdgeIndex;
 	context.nextBranchSiteIndex = childrenContext.nextBranchSiteIndex;
 	context.nextRepeatIndex = childrenContext.nextRepeatIndex;
 	if (children !== '""') {

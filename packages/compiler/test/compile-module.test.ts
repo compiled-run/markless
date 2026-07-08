@@ -5317,6 +5317,48 @@ test('interactive components in repeat rows refuse loudly at row render', async 
 	);
 });
 
+// Components PROJECTED through another component's children prop must render
+// in CSR string emission too (the page CSR module and tier-4 arm-render
+// modules): SSR already composes them, and a silent CSR drop loses router
+// <Link> anchors on every client-side route swap (dashboard issues list).
+// They render markup-only through the projected-child splice; interactive
+// child output refuses loudly at render.
+test('CSR children projection renders component invocations markup-only (static and in rows)', async () => {
+	const page = await compileTsrxModule({
+		filename: 'src/Board.tsrx',
+		source: `import { computed } from '@markless/core';
+import { Panel } from './Panel.tsrx';
+import { Jump } from './Jump.tsrx';
+
+export default function Board() @{
+	const model = computed(async () => ({ zone: 'z1', rows: [{ id: 'i1', title: 'First' }] }));
+
+	<div class="board-root">
+		@try {
+			<Panel actors={model.rows}>
+				<Jump target={model.zone}>All</Jump>
+				<section class="rows">
+					@for (const row of model.rows; key row.id) {
+						<article data-row={row.id}><Jump target={row.id}>{row.title}</Jump></article>
+					}
+				</section>
+			</Panel>
+		} @pending { <p>Loading</p> } @catch { <p>Broken</p> }
+	</div>
+}`,
+		symbols: [],
+	});
+
+	const update = page.symbolModules.modules.find(
+		(module) => module.kind === 'async-boundary-update',
+	);
+	expect(update).toBeDefined();
+	// The projected static component renders through the markup-only splice…
+	expect(update!.source).toContain('marklessCsrProjectedChild');
+	// …and the in-row component through the row-child splice.
+	expect(update!.source).toContain('marklessCsrRowChild');
+});
+
 // Viewless children (router <Link>-style: renderSsr returns { html } only)
 // still render real elements. Composition must count them, or every host
 // locator after the child points one element short in the final DOM.

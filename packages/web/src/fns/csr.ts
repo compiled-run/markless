@@ -17,7 +17,28 @@ export function marklessCsrRowChild(component, props, componentName) {
 	}
 	return html;
 }
+// Component invocation projected through another component's children prop
+// (CSR string emission): renders markup only, mirrors marklessCsrRowChild.
+export function marklessCsrProjectedChild(component, props, componentName) {
+	const output = component?.renderCsr?.(props);
+	if (!output) return "";
+	marklessCsrAssertPresentationalChild(output, componentName, {
+		code: "MARKLESS_PROJECTED_COMPONENT_INTERACTIVE",
+		message: `MARKLESS_PROJECTED_COMPONENT_INTERACTIVE: <${componentName}> is projected through another component's children and renders markup only, but it has its own state, events, or async content, so its interactions cannot resume. Keep projected components presentational (like <Link>), or move them out of the children content.`,
+	});
+	const html = output.root?.outerHTML;
+	if (typeof html !== "string") {
+		throw Object.assign(new Error(`MARKLESS_PROJECTED_COMPONENT_INTERACTIVE: <${componentName}> projected through another component's children did not produce a serializable root element.`), { code: "MARKLESS_PROJECTED_COMPONENT_INTERACTIVE", componentName });
+	}
+	return html;
+}
 function marklessCsrAssertPresentationalRowChild(output, componentName) {
+	marklessCsrAssertPresentationalChild(output, componentName, {
+		code: "MARKLESS_ROW_COMPONENT_INTERACTIVE",
+		message: `MARKLESS_ROW_COMPONENT_INTERACTIVE: <${componentName}> inside a @for row has its own state, events, or async content, so its interactions cannot resume. Keep components in @for rows presentational (markup from item props, like <Link>), or move the interactive content out of the row.`,
+	});
+}
+function marklessCsrAssertPresentationalChild(output, componentName, diagnostic) {
 	const view = output.view;
 	const state = output.state;
 	const interactive =
@@ -31,8 +52,7 @@ function marklessCsrAssertPresentationalRowChild(output, componentName) {
 		(state?.computed?.length ?? 0) > 0 ||
 		(output.propEvents?.length ?? 0) > 0;
 	if (!interactive) return;
-	const message = `MARKLESS_ROW_COMPONENT_INTERACTIVE: <${componentName}> inside a @for row has its own state, events, or async content, so its interactions cannot resume. Keep components in @for rows presentational (markup from item props, like <Link>), or move the interactive content out of the row.`;
-	throw Object.assign(new Error(message), { code: "MARKLESS_ROW_COMPONENT_INTERACTIVE", severity: "error", phase: "runtime", componentName, docsUrl: "https://markless.dev/errors/MARKLESS_ROW_COMPONENT_INTERACTIVE" });
+	throw Object.assign(new Error(diagnostic.message), { code: diagnostic.code, severity: "error", phase: "runtime", componentName, docsUrl: `https://markless.dev/errors/${diagnostic.code}` });
 }
 export function marklessCsrAttachPropEvent(root, path, eventName, handler) { const element = marklessCsrNodeAtPath(root, path); if (!handler || !element?.addEventListener) return; if (handler[MARKLESS_CSR_CALLBACK_PROP]) { element.addEventListener(eventName, (event) => event?.[MARKLESS_CSR_CALLBACK_DISPATCHED] ? undefined : handler(event)); return; } element.addEventListener(eventName, handler); }
 export function marklessComposeState(state, children) { const childStates = children.map((child) => child.output?.state).filter(Boolean); if (childStates.length === 0) return state; return { ...state, cells: [...(state.cells ?? []), ...childStates.flatMap((childState) => childState.cells ?? [])], computed: [...(state.computed ?? []), ...childStates.flatMap((childState) => childState.computed ?? [])], ...((state.sharedDefinitions || childStates.some((childState) => childState.sharedDefinitions?.length)) ? { sharedDefinitions: [...(state.sharedDefinitions ?? []), ...childStates.flatMap((childState) => childState.sharedDefinitions ?? [])] } : {}) }; }
