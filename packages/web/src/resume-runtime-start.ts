@@ -1,4 +1,5 @@
 import type { DomJournalEntry } from '@markless/runtime';
+import type { AsyncBoundarySettleTracker } from './resume-async-wiring.ts';
 import type { ArmCommitUpdate } from './resume-commit-arm.ts';
 import type { ResumeAsyncBoundaryRecord, ResumePreparedCore, ResumeRuntimeInput } from './resume-types.ts';
 
@@ -24,7 +25,7 @@ export async function startResumeRuntime(input: {
 	) => Promise<void>;
 	readonly receiveSharedPatch: RuntimeShared['receiveSharedPatch'];
 	readonly sharedPatchEventType: string;
-}): Promise<void> {
+}): Promise<AsyncBoundarySettleTracker | undefined> {
 	const {
 		runtimeInput,
 		prepared,
@@ -64,12 +65,21 @@ export async function startResumeRuntime(input: {
 			graph: runtimeInput.graph, view: runtimeInput.view, elementsByHostId: prepared.elementsByHostId, events, storeContainerSubscription,
 		});
 	}
+	let settleTracker: AsyncBoundarySettleTracker | undefined;
 	if (runtimeInput.view.asyncBoundaries.length > 0) {
-		(await import('./resume-async-wiring.ts')).wireAsyncBoundariesWithoutLoadingCapability({
+		const asyncWiring = await import('./resume-async-wiring.ts');
+		// D8: settled-content tracking (first-appearance-only pending, the
+		// navigation-transition settle promise, pending minimum duration).
+		settleTracker = asyncWiring.createAsyncBoundarySettleTracker({
+			boundaries: prepared.asyncBoundariesById.values(),
+			state: runtimeInput.state,
+		});
+		asyncWiring.wireAsyncBoundariesWithoutLoadingCapability({
 			asyncBoundariesById: prepared.asyncBoundariesById, graph: runtimeInput.graph, root: runtimeInput.root,
 			loadSymbol: runtimeInput.loadSymbol, renderBranchHtml: runtimeInput.renderBranchHtml, elementHandles: prepared.elementHandles, storeContainerSubscription,
 			commitArm: input.commitArm,
 			demandOnStart: runtimeInput.demandAsyncBoundaries === true,
+			settleTracker,
 		});
 	}
 	if (runtimeInput.view.events.some((event) => event.eventName === 'visible')) {
@@ -92,6 +102,7 @@ export async function startResumeRuntime(input: {
 	if ((runtimeInput.graph.listSharedDefinitions?.() ?? []).length > 0) {
 		runtimeInput.root.addEventListener?.(sharedPatchEventType, receiveSharedPatch, { capture: true });
 	}
+	return settleTracker;
 }
 
 async function disposeRemovedAsyncRangeHosts(

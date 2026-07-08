@@ -1,4 +1,5 @@
 import type { DomJournalEntry, DomJournalResult } from '@markless/runtime';
+import type { ProtocolStatePayload } from '@markless/serializer';
 import { boundaryArmRecordSet } from './resume-arm-records.ts';
 import type { ArmCommitUpdate } from './resume-commit-arm.ts';
 import type {
@@ -6,6 +7,72 @@ import type {
 	ResumePreparedCore,
 	ResumeRuntimeInput,
 } from './resume-types.ts';
+
+// Spec D8 (12-arm-rendering): pending UI is for FIRST APPEARANCES only, and a
+// route swap may hold a fully-live but unmounted page until its boundaries
+// settle. This tracker is the settle path's single source for both facts:
+// - which boundaries currently render SETTLED content, so a re-run of their
+//   async computed keeps the prior snapshot instead of flashing @pending
+// - a promise that resolves once every tracked boundary settled (the router
+//   races it against the navigation deadline before committing a swap)
+// - a commit floor: once pending UI became visible at a deadline swap, settle
+//   commits wait out the remaining minimum-visibility window (no blink).
+export type AsyncBoundarySettleTracker = {
+	readonly hasSettledContent: (boundaryId: string) => boolean;
+	readonly markSettled: (boundaryId: string) => void;
+	readonly whenAllSettled: () => Promise<void>;
+	readonly holdSettleCommitsFor: (minVisibleMs: number) => void;
+	readonly remainingCommitHoldMs: () => number;
+};
+
+export function createAsyncBoundarySettleTracker(input: {
+	readonly boundaries: Iterable<ResumeAsyncBoundaryRecord>;
+	readonly state?: ProtocolStatePayload;
+}): AsyncBoundarySettleTracker {
+	// SSR-resumed pages arrive with settled snapshots in the state payload;
+	// their boundaries already show settled content before any runner re-runs.
+	const settledGraphNodeIds = new Set<string>();
+	for (const computed of input.state?.computed ?? []) {
+		const status = computed.snapshot?.status;
+		if (status === 'fulfilled' || status === 'rejected') {
+			settledGraphNodeIds.add(computed.graphNodeId);
+		}
+	}
+	const settledById = new Map<string, boolean>();
+	for (const boundary of input.boundaries) {
+		settledById.set(
+			boundary.id,
+			boundary.asyncReads.length > 0 &&
+				boundary.asyncReads.every((read) => settledGraphNodeIds.has(read.graphNodeId)),
+		);
+	}
+	let commitFloor = 0;
+	let allSettled: { readonly promise: Promise<void>; readonly resolve: () => void } | undefined;
+	const isAllSettled = () => [...settledById.values()].every(Boolean);
+	return {
+		hasSettledContent: (boundaryId) => settledById.get(boundaryId) === true,
+		markSettled(boundaryId) {
+			if (settledById.get(boundaryId) !== false) return;
+			settledById.set(boundaryId, true);
+			if (allSettled && isAllSettled()) allSettled.resolve();
+		},
+		whenAllSettled() {
+			if (isAllSettled()) return Promise.resolve();
+			if (!allSettled) {
+				let resolve!: () => void;
+				const promise = new Promise<void>((resolvePromise) => {
+					resolve = resolvePromise;
+				});
+				allSettled = { promise, resolve };
+			}
+			return allSettled.promise;
+		},
+		holdSettleCommitsFor(minVisibleMs) {
+			commitFloor = Math.max(commitFloor, Date.now() + minVisibleMs);
+		},
+		remainingCommitHoldMs: () => Math.max(0, commitFloor - Date.now()),
+	};
+}
 
 export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 	readonly asyncBoundariesById: ReadonlyMap<string, ResumeAsyncBoundaryRecord>;
@@ -25,6 +92,8 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 	// demanded at start or the boundary never settles (need 10). SSR-resumed
 	// pages hold snapshots and stay lazy (demanded-execution doctrine).
 	readonly demandOnStart?: boolean;
+	// D8 first-appearance-only pending + navigation transitions (T110).
+	readonly settleTracker?: AsyncBoundarySettleTracker;
 }): void {
 	for (const boundary of input.asyncBoundariesById.values()) {
 		for (const asyncRead of boundary.asyncReads) {
@@ -35,6 +104,15 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 					path: [],
 					run(snapshot) {
 						if (!boundary.updateSymbolId) {
+							const status = (snapshot as { readonly status?: unknown } | null)?.status;
+							const settled = status === 'fulfilled' || status === 'rejected';
+							// D8: once the range shows settled content, a re-run
+							// keeps rendering the prior snapshot — the structural
+							// pending journal never replaces visible content.
+							if (!settled && input.settleTracker?.hasSettledContent(boundary.id)) {
+								return;
+							}
+							if (settled) input.settleTracker?.markSettled(boundary.id);
 							return [
 								{ type: 'removeRange', locator: `async-boundary:${boundary.id}` },
 								{
@@ -64,13 +142,30 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 export async function settleAsyncBoundaryRange(
 	input: Pick<
 		Parameters<typeof wireAsyncBoundariesWithoutLoadingCapability>[0],
-		'graph' | 'root' | 'loadSymbol' | 'renderBranchHtml' | 'elementHandles' | 'commitArm'
+		| 'graph'
+		| 'root'
+		| 'loadSymbol'
+		| 'renderBranchHtml'
+		| 'elementHandles'
+		| 'commitArm'
+		| 'settleTracker'
 	>,
 	boundary: ResumeAsyncBoundaryRecord,
 	snapshot: unknown,
 ): Promise<DomJournalResult | void> {
 	const status = (snapshot as { readonly status?: unknown } | null)?.status;
 	if (status !== 'fulfilled' && status !== 'rejected') return;
+	// D8 minimum pending visibility: a deadline route swap that showed the
+	// @pending arm holds the settle commit until the pending UI was visible
+	// for the minimum duration (no blink between deadline and settle).
+	const holdMs = input.settleTracker?.remainingCommitHoldMs() ?? 0;
+	if (holdMs > 0) {
+		await new Promise((resolve) => setTimeout(resolve, holdMs));
+		const read = boundary.asyncReads[0];
+		// A newer run superseded this settle while it waited; its own settle
+		// subscription commits the fresher snapshot.
+		if (read && input.graph.read(read.graphNodeId, ['status']) !== status) return;
+	}
 	const symbol = await input.loadSymbol(boundary.updateSymbolId!);
 	const update = await symbol({
 		graph: input.graph,
@@ -86,11 +181,13 @@ export async function settleAsyncBoundaryRange(
 		);
 		if (armRecords) {
 			await input.commitArm(boundary, { html: update.html, armRecords });
+			input.settleTracker?.markSettled(boundary.id);
 			return;
 		}
 	}
 	// Plain .html updates (cheap parts tier) keep the journal string path.
 	const fragment = input.renderBranchHtml ? input.renderBranchHtml(update.html) : update.html;
+	input.settleTracker?.markSettled(boundary.id);
 	return [
 		{ type: 'removeRange', locator: `async-boundary:${boundary.id}` },
 		{ type: 'insertRange', locator: `async-boundary:${boundary.id}:start`, fragment },

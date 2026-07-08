@@ -84,6 +84,10 @@ export type ResumeRuntimeInput = {
 	readonly dispatchSharedPatch?: ResumeSharedPatchDispatcher; readonly onError?: ResumeRuntimeErrorHook;
 };
 export type ResumeDispatchOptions = { readonly syncPolicyAlreadyApplied?: boolean; readonly ignoreUnmatched?: boolean };
-export type ResumeRuntime = { readonly start: () => Promise<void>; readonly dispatch: (event: ResumeDomEvent, options?: ResumeDispatchOptions) => Promise<void>; readonly activateBehaviors: (hostNodeId: string) => Promise<void>; readonly getElement: (hostNodeId: string) => ResumeDomElement | undefined; readonly getAsyncBoundary: (boundaryId: string) => ResumeAsyncBoundaryRecord | undefined; readonly getBranch: (branchId: string) => ResumeBranchRecord | undefined; readonly disposeHost: (hostNodeId: string) => void; readonly dispose: () => void };
+// whenAsyncBoundariesSettled/holdPendingSettleCommits: D8 navigation
+// transitions — a route swap holds the outgoing page until the destination's
+// boundaries settle (or the deadline passes; pending then stays a minimum
+// duration). Optional: event-only containers never carry async boundaries.
+export type ResumeRuntime = { readonly start: () => Promise<void>; readonly dispatch: (event: ResumeDomEvent, options?: ResumeDispatchOptions) => Promise<void>; readonly activateBehaviors: (hostNodeId: string) => Promise<void>; readonly getElement: (hostNodeId: string) => ResumeDomElement | undefined; readonly getAsyncBoundary: (boundaryId: string) => ResumeAsyncBoundaryRecord | undefined; readonly getBranch: (branchId: string) => ResumeBranchRecord | undefined; readonly disposeHost: (hostNodeId: string) => void; readonly dispose: () => void; readonly whenAsyncBoundariesSettled?: () => Promise<void>; readonly holdPendingSettleCommits?: (minVisibleMs: number) => Promise<void> | void };
 export type ElementHandleRegistry = { readonly get: (handleIdOrName: string) => ResumeDomElement | undefined; readonly register: (hostNodeId: string, handle: { readonly handleId: string; readonly name: string }, element: ResumeDomElement) => void; readonly deleteHost: (hostNodeId: string) => void };
 export type ResumePreparedCore = { readonly elementsByHostId: Map<string, ResumeDomElement>; readonly elementHandles: ElementHandleRegistry; readonly asyncBoundariesById: Map<string, ResumeAsyncBoundaryRecord> };

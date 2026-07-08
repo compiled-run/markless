@@ -2436,6 +2436,100 @@ test('resume runtime emits structural async boundary journal entries without sym
 	]);
 });
 
+// Spec D8: pending is for FIRST APPEARANCES only. Once a boundary has settled
+// content in its range, a re-run of its async computed (mutation refresh) must
+// NOT re-emit the structural pending journal — the prior settled snapshot
+// stays rendered until the new one commits.
+test('re-settle skips the structural pending journal once the boundary has settled content', async () => {
+	const results = [deferred<{ readonly title: string }>(), deferred<{ readonly title: string }>()];
+	let runCount = 0;
+	const start = comment('async:boundary:0:start');
+	const paragraph = element('P');
+	const end = comment('async:boundary:0:end');
+	const root = element('SECTION', [start, paragraph, end]);
+	const journalBatches: ReadonlyArray<DomJournalEntry>[] = [];
+	const graph = createRuntimeGraph({
+		cells: [{ graphNodeId: 'state:userId', value: 'a' }],
+		asyncComputed: [
+			{
+				graphNodeId: 'computed:details',
+				dependencies: [{ graphNodeId: 'state:userId', path: [] }],
+				key: (read) => read('state:userId'),
+				run() {
+					return results[runCount++]!.promise;
+				},
+			},
+		],
+	});
+
+	const resume = createResumeRuntime({
+		root,
+		graph,
+		view: {
+			locators: [
+				{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'section' },
+				{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'p' },
+			],
+			events: [],
+			domUpdates: [],
+			behaviors: [],
+			elementHandles: [],
+			asyncBoundaries: [
+				{
+					id: 'boundary:0',
+					startAnchor: { strategy: 'dom-order-comment', index: 0 },
+					endAnchor: { strategy: 'dom-order-comment', index: 1 },
+					asyncReads: [
+						{
+							source: 'details',
+							graphNodeId: 'computed:details',
+							path: ['title'],
+							runnerSymbolId: 'symbol:details-runner',
+						},
+					],
+				},
+			],
+		},
+		loadSymbol() {
+			return () => undefined;
+		},
+		applyDomJournal(entries) {
+			journalBatches.push([...entries]);
+		},
+	});
+
+	await resume.start();
+
+	// First appearance: pending renders, then the settle commits.
+	graph.read('computed:details');
+	await graph.flush();
+	results[0]!.resolve({ title: 'Alice' });
+	await drainMicrotasks();
+	await graph.flush();
+	expect(journalBatches).toHaveLength(2);
+	expect(snapshotStatuses(journalBatches)).toEqual(['pending', 'fulfilled']);
+
+	// Re-settle: the dependency write re-runs the computed. The pending
+	// snapshot must NOT reach the DOM journal — only the new settle does.
+	graph.write({ graphNodeId: 'state:userId', value: 'b' });
+	await graph.flush();
+	results[1]!.resolve({ title: 'Beatrix' });
+	await drainMicrotasks();
+	await graph.flush();
+
+	expect(snapshotStatuses(journalBatches)).toEqual(['pending', 'fulfilled', 'fulfilled']);
+
+	function snapshotStatuses(batches: ReadonlyArray<ReadonlyArray<DomJournalEntry>>): string[] {
+		return batches.flatMap((batch) =>
+			batch.flatMap((entry) =>
+				entry.type === 'insertRange'
+					? [String((entry.fragment as { readonly snapshot?: { readonly status?: unknown } }).snapshot?.status)]
+					: [],
+			),
+		);
+	}
+});
+
 test('resume runtime does not treat async runner symbols as DOM update symbols', async () => {
 	const result = deferred<string>();
 	const start = comment('async:boundary:0:start');

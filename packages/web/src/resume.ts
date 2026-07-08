@@ -58,6 +58,8 @@ export function createResumeRuntime(runtimeInput: ResumeRuntimeInput): ResumeRun
 		dispose() {
 			runtime?.dispose(); elementsByHostId.clear();
 		},
+		whenAsyncBoundariesSettled: async () => (await loadRuntime()).whenAsyncBoundariesSettled?.(),
+		holdPendingSettleCommits: async (ms: number) => (await loadRuntime()).holdPendingSettleCommits?.(ms),
 	};
 }
 

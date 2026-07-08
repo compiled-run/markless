@@ -1,4 +1,5 @@
 import type { DomJournalResult } from '@markless/runtime';
+import type { AsyncBoundarySettleTracker } from './resume-async-wiring.ts';
 import type { ArmCommitUpdate } from './resume-commit-arm.ts';
 import type {
 	ResumeAsyncBoundaryRecord, ResumeDispatchOptions, ResumeDomElement, ResumeDomEvent, ResumePreparedCore, ResumeRuntime, ResumeRuntimeInput,
@@ -16,6 +17,10 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 	const ignoredDisposedEventTargets = new WeakSet<ResumeDomElement>();
 	const hostSubscriptionReleases = new Map<string, Array<() => void>>(), containerSubscriptionReleases: Array<() => void> = [];
 		const asyncBoundariesById = prepared.asyncBoundariesById;
+	// D8 settled-content tracker: created by the demand-loaded start wiring
+	// when the page has async boundaries (first-appearance-only pending +
+	// navigation transition settle promise + pending minimum duration).
+	let settleTracker: AsyncBoundarySettleTracker | undefined;
 	let behaviorRuntime: BehaviorRuntime | undefined, branchRuntime: BranchRuntime | undefined;
 	let events: EventWiring | undefined, runtimeShared: RuntimeShared | undefined;
 	const behaviorHostIds = new Set(input.view.behaviors.map((behavior) => behavior.hostNodeId));
@@ -85,7 +90,7 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 		if (!boundary?.updateSymbolId || !read) return;
 		const { settleAsyncBoundaryRange } = await import('./resume-async-wiring.ts');
 		return settleAsyncBoundaryRange(
-			{ graph: input.graph, root: input.root, loadSymbol: input.loadSymbol, renderBranchHtml: input.renderBranchHtml, elementHandles, commitArm: commitBoundaryArm },
+			{ graph: input.graph, root: input.root, loadSymbol: input.loadSymbol, renderBranchHtml: input.renderBranchHtml, elementHandles, commitArm: commitBoundaryArm, settleTracker },
 			boundary,
 			input.graph.read(read.graphNodeId, []),
 		);
@@ -167,7 +172,7 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 			return ids;
 		}
 		async function start(): Promise<void> {
-			await (await import('./resume-runtime-start.ts')).startResumeRuntime({
+			settleTracker = await (await import('./resume-runtime-start.ts')).startResumeRuntime({
 				runtimeInput: input,
 				prepared,
 				eventTypes,
@@ -187,6 +192,16 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 		start,
 		dispatch: async (event: ResumeDomEvent, options?: ResumeDispatchOptions) => (await getEvents()).dispatch(event, options),
 		activateBehaviors: async (hostNodeId: string) => (await loadBehaviorRuntime()).activateBehaviors(hostNodeId),
+		// D8 navigation transitions: settled means every boundary committed its
+		// content AND the flush that carried it fully applied.
+		whenAsyncBoundariesSettled: async () => {
+			if (!settleTracker) return;
+			await settleTracker.whenAllSettled();
+			await input.graph.flush();
+		},
+		holdPendingSettleCommits: (minVisibleMs: number) => {
+			settleTracker?.holdSettleCommitsFor(minVisibleMs);
+		},
 		getElement: (hostNodeId: string) => connectedElement(input.root, elementsByHostId.get(hostNodeId)),
 		getAsyncBoundary: (boundaryId: string) => asyncBoundariesById.get(boundaryId),
 		getBranch: (branchId: string) => branchRuntime?.branchesById.get(branchId),
