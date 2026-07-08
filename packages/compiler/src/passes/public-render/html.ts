@@ -63,7 +63,17 @@ export function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string 
 				!!csrSite && csrGate?.supported === true && csrGate.armScoped === true && csrGate.armFlip === true;
 			const armHostIdByNode = context.armHostIdByNode;
 			if (csrArmFlip) context.armHostIdByNode = undefined;
-			const ternary = `(${testSource} ? ${emitHtmlBranch(node.consequent as AnyNode | undefined, context)} : ${emitHtmlBranch(node.alternate as AnyNode | undefined, context)})`;
+			// Child-component renders inside an arm are gated by the arm test:
+			// only the HTML lives in the ternary, so without the gate a component
+			// in the falsy arm would still execute (D2 — its props read absent
+			// data, e.g. `@if (info) { <Badge label={info.owner.name} /> }`).
+			const consequentStart = csrChildReplacementCount(context);
+			const consequentHtml = emitHtmlBranch(node.consequent as AnyNode | undefined, context);
+			gateCsrChildReplacements(context, consequentStart, testSource);
+			const alternateStart = csrChildReplacementCount(context);
+			const alternateHtml = emitHtmlBranch(node.alternate as AnyNode | undefined, context);
+			gateCsrChildReplacements(context, alternateStart, `!${testSource}`);
+			const ternary = `(${testSource} ? ${consequentHtml} : ${alternateHtml})`;
 			if (csrArmFlip) context.armHostIdByNode = armHostIdByNode;
 			if (csrSite && csrGate?.supported && csrGate.armScoped !== true) {
 				// The CSR-built DOM carries the same anchors, so the same resume
@@ -551,13 +561,33 @@ function emitSwitchHtml(node: AnyNode, context: HtmlRenderContext): string {
 
 	const switchArmFlip =
 		!!site && siteGate?.supported === true && siteGate.armScoped === true && siteGate.armFlip === true;
+	// Case gates for CSR child-component renders (see the @if CSR note): each
+	// tested case gates on discriminant equality; @default gates on none of the
+	// tested cases matching.
+	const caseTestSources = asNodes(node.cases).flatMap((switchCase) => {
+		const test = switchCase.test as AnyNode | undefined;
+		return test ? [expressionSource(test, context.source)] : [];
+	});
+	const caseGateSource = (testSource: string | undefined): string =>
+		testSource === undefined
+			? caseTestSources.length === 0
+				? 'true'
+				: `!(${caseTestSources.map((candidate) => `(${discriminantSource}) === (${candidate})`).join(' || ')})`
+			: `(${discriminantSource}) === (${testSource})`;
 	const emitCaseBody = (switchCase: AnyNode): string => {
 		const children = asNodes(switchCase.consequent);
 		if (context.mode === 'csr' || !before) {
 			// Arm-scoped flip content is branch-owned (see the @if CSR note).
 			const armHostIdByNode = context.armHostIdByNode;
 			if (switchArmFlip) context.armHostIdByNode = undefined;
+			const caseStart = csrChildReplacementCount(context);
 			const csrBody = joinSsrExpressions(children.map((child) => emitHtmlNode(child, context)));
+			const test = switchCase.test as AnyNode | undefined;
+			gateCsrChildReplacements(
+				context,
+				caseStart,
+				caseGateSource(test ? expressionSource(test, context.source) : undefined),
+			);
 			if (switchArmFlip) context.armHostIdByNode = armHostIdByNode;
 			return csrBody;
 		}
@@ -615,6 +645,26 @@ function emitSwitchHtml(node: AnyNode, context: HtmlRenderContext): string {
 		]);
 	}
 	return chain;
+}
+
+// CSR branch arms interpolate their HTML inside a ternary, but component
+// child renders emit OUT-OF-BAND statements (render + placeholder replace +
+// registration). Those statements must run only when the owning arm rendered:
+// a component in a falsy arm reading absent data must never execute (D2).
+function csrChildReplacementCount(context: HtmlRenderContext): number {
+	return context.mode === 'csr' ? context.childReplacements.length : 0;
+}
+
+function gateCsrChildReplacements(
+	context: HtmlRenderContext,
+	start: number,
+	testSource: string,
+): void {
+	if (context.mode !== 'csr' || testSource === 'true') return;
+	const replacements = context.childReplacements;
+	if (replacements.length === start) return;
+	const gated = replacements.splice(start).map((line) => `\t${line}`);
+	replacements.push(`	if (${testSource}) {`, ...gated, '	}');
 }
 
 function emitHtmlBranch(node: AnyNode | undefined, context: HtmlRenderContext): string {
