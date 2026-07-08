@@ -1,4 +1,4 @@
-export async function marklessSsrRenderChild(children, component, props, child) { const output = await component?.renderSsr?.(props); if (!output) return ""; let html = output.html ?? ""; for (const branch of output.view?.branches ?? []) html = marklessSsrPrefixAnchorHtml(html, "branch", branch.id, child.hostPrefix + branch.id); for (const boundary of output.view?.asyncBoundaries ?? []) html = marklessSsrPrefixAnchorHtml(html, "async", boundary.id, child.hostPrefix + boundary.id); const entry = { ...child, output: { ...output, html }, callbackProps: props?.__marklessSsrCallbacks ?? {} };
+export async function marklessSsrRenderChild(children, component, props, child, renderContext) { const output = await component?.renderSsr?.(props, renderContext); if (!output) return ""; let html = output.html ?? ""; for (const branch of output.view?.branches ?? []) html = marklessSsrPrefixAnchorHtml(html, "branch", branch.id, child.hostPrefix + branch.id); for (const boundary of output.view?.asyncBoundaries ?? []) html = marklessSsrPrefixAnchorHtml(html, "async", boundary.id, child.hostPrefix + boundary.id); const entry = { ...child, output: { ...output, html }, callbackProps: props?.__marklessSsrCallbacks ?? {} };
 	// Viewless children (router <Link>-style: renderSsr returns { html } only)
 	// still render real elements that later dom-order locators must skip.
 	// Their own element count is the rendered html minus the caller's projected
@@ -44,7 +44,29 @@ export function marklessAssertPresentationalRowChild(output, componentName) {
 	throw error;
 }
 export function marklessSsrBranchArm(branches, id, takenArm) { branches.push({ id, takenArm }); return ""; }
-export async function marklessSsrRunAsyncComputed(snapshots, graphNodeId, run) { const signal = new AbortController().signal; try { const value = await run({ key: null, signal }); const snapshot = { status: "fulfilled", version: 1, key: null, value }; snapshots.push({ graphNodeId, snapshot }); return snapshot; } catch (error) { const snapshot = { status: "rejected", version: 1, key: null, error }; snapshots.push({ graphNodeId, snapshot }); return snapshot; } }
+export async function marklessSsrRunAsyncComputed(snapshots, graphNodeId, run, renderContext) {
+	// Streaming mode (T107): the render context carries a per-request runner
+	// registry. run() executes ONCE per graph node across streaming passes; an
+	// unsettled runner returns a pending snapshot (the compiled boundary lambda
+	// renders the @pending arm), and re-render passes reuse the in-flight
+	// promise so the settled arm renders without re-running the runner.
+	const streamingRuns = renderContext?.streaming?.runs;
+	if (streamingRuns) {
+		let entry = streamingRuns.get(graphNodeId);
+		if (!entry) {
+			entry = { promise: marklessSsrSettleAsyncComputed(run) };
+			entry.promise.then((settledSnapshot) => { entry.settled = settledSnapshot; });
+			streamingRuns.set(graphNodeId, entry);
+		}
+		const snapshot = entry.settled ?? { status: "pending", version: 1, key: null };
+		snapshots.push({ graphNodeId, snapshot });
+		return snapshot;
+	}
+	const snapshot = await marklessSsrSettleAsyncComputed(run);
+	snapshots.push({ graphNodeId, snapshot });
+	return snapshot;
+}
+async function marklessSsrSettleAsyncComputed(run) { const signal = new AbortController().signal; try { const value = await run({ key: null, signal }); return { status: "fulfilled", version: 1, key: null, value }; } catch (error) { return { status: "rejected", version: 1, key: null, error }; } }
 export function marklessSsrAttachSnapshots(state, snapshots) { if (snapshots.length === 0) return state; const byId = new Map(snapshots.map((entry) => [entry.graphNodeId, entry.snapshot])); return { ...state, computed: (state.computed ?? []).map((computed) => byId.has(computed.graphNodeId) ? { ...computed, snapshot: byId.get(computed.graphNodeId) } : computed) }; }
 export function marklessSsrMergeBranches(payloadBranches, runtimeBranches) { const takenById = new Map(runtimeBranches.map((branch) => [branch.id, branch.takenArm])); return (payloadBranches ?? []).map((branch) => takenById.has(branch.id) ? { ...branch, takenArm: takenById.get(branch.id) } : branch); }
 export function marklessSsrArmHost(hostLocators) { hostLocators.marklessSsrExtraElements = (hostLocators.marklessSsrExtraElements ?? 0) + 1; return ""; }

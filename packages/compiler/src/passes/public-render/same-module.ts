@@ -116,7 +116,7 @@ export function emitSameModuleSsrComponents(
 		const functionName = `marklessRenderSsr${reference.componentName}`;
 		return [
 			`const ${reference.localName} = { renderSsr: ${functionName} };`,
-			`async function ${functionName}(props = {}) {`,
+			`async function ${functionName}(props = {}, marklessSsrRenderContext) {`,
 			destructureProps(rootInfo.propNames),
 			'	const marklessSsrPayloadState = { ...marklessCloneState(payloadState), cells: [], computed: [] };',
 			'	const marklessSsrRenderStateValues = new Map(marklessSsrStateValues);',

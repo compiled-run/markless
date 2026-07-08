@@ -2588,6 +2588,77 @@ export function App() @{
 	);
 });
 
+// D5/D6 streaming (T107): a render context with a streaming runner registry
+// makes unsettled boundaries render their @pending arm NOW (never the @catch
+// arm with an undefined error); a later pass with the same context renders
+// the settled @try arm from the one shared run() execution. No context means
+// exact blocking behavior.
+test('T107 streaming render context renders @pending first and the settled @try arm on re-render', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/SlowPanel.tsrx',
+		source: `
+import { computed, state } from '@markless/core';
+
+export function App() @{
+	let topic = state('otters');
+	const facts = computed(async () => ({ headline: 'Fact about ' + topic }));
+
+	<section>
+		@try { <article><h2>{facts.headline}</h2><button onClick={() => topic = 'owls'}>Next</button></article> }
+		@pending { <p>Gathering facts</p> }
+		@catch { <p>No facts today</p> }
+	</section>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.diagnostics).toEqual([]);
+	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	const renderSsr = ssrModule.marklessRenderSsr as (
+		props?: unknown,
+		renderContext?: unknown,
+	) => Promise<{
+		readonly html: string;
+		readonly state: ProtocolStatePayload;
+		readonly view: {
+			readonly asyncBoundaries: ReadonlyArray<{
+				readonly armRecords?: unknown;
+			}>;
+		};
+	}>;
+	const runs = new Map<string, { readonly promise: Promise<unknown> }>();
+	const streamingContext = { streaming: { runs } };
+
+	const shell = await renderSsr(undefined, streamingContext);
+	expect(shell.html).toContain('<p>Gathering facts</p>');
+	expect(shell.html).not.toContain('Fact about');
+	expect(shell.html).not.toContain('No facts today');
+	expect(
+		shell.state.computed.find((computed) => computed.graphNodeId === 'computed:facts')?.snapshot,
+	).toMatchObject({ status: 'pending' });
+
+	await runs.get('computed:facts')?.promise;
+	const settledPass = await renderSsr(undefined, streamingContext);
+	expect(settledPass.html).toContain('Fact about otters');
+	expect(settledPass.html).not.toContain('Gathering facts');
+	const armRecords = settledPass.view.asyncBoundaries[0]?.armRecords as {
+		readonly events: ReadonlyArray<{ readonly eventName: string }>;
+	};
+	expect(Array.isArray(armRecords)).toBe(false);
+	expect(armRecords.events).toEqual(
+		expect.arrayContaining([expect.objectContaining({ eventName: 'click' })]),
+	);
+
+	// No render context: exact blocking behavior (await inline, settled arm).
+	const blocking = await renderSsr();
+	expect(blocking.html).toContain('Fact about otters');
+	expect(
+		blocking.state.computed.find((computed) => computed.graphNodeId === 'computed:facts')
+			?.snapshot,
+	).toMatchObject({ status: 'fulfilled' });
+});
+
 test('compileTsrxModule renders the matching @switch case in SSR html', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/SwitchCard.tsrx',

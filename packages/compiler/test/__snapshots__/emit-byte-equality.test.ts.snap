@@ -365,7 +365,7 @@ const marklessSsrPropEvents = [];
 const marklessSsrStateValues = new Map([
 	["state:query", "Ada"]
 ]);
-async function marklessRenderSsr(props = {}) {
+async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 	const marklessSsrPayloadState = marklessCloneState(payloadState);
 	const marklessSsrRenderStateValues = new Map(marklessSsrStateValues);
 	let query = marklessStateValue(marklessSsrRenderStateValues, marklessSsrPayloadState, "state:query");
@@ -373,7 +373,7 @@ async function marklessRenderSsr(props = {}) {
 	const marklessSsrBranches = [];
 	const marklessSsrAsyncSnapshots = [];
 	const marklessSsrHostLocators = [];
-	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "main") + "<main>" + "<!--markless:async:boundary:0-->" + (await ((async (marklessSsrAsyncSnapshot) => marklessSsrAsyncSnapshot.status === "fulfilled" ? (async (details) => marklessSsrHost(marklessSsrHostLocators, "h1", "p") + "<p>" + marklessSsrText(details.title) + "</p>")(marklessSsrAsyncSnapshot.value) : (async (marklessSsrAsyncError) => marklessSsrHost(marklessSsrHostLocators, "h2", "p") + "<p>" + "Broken" + "</p>")(marklessSsrAsyncSnapshot.error))(await marklessSsrRunAsyncComputed(marklessSsrAsyncSnapshots, "computed:details", async () => ({ title: query }))))) + "<!--/markless:async:boundary:0-->" + "</main>";
+	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "main") + "<main>" + "<!--markless:async:boundary:0-->" + (await ((async (marklessSsrAsyncSnapshot) => marklessSsrAsyncSnapshot.status === "fulfilled" ? (async (details) => marklessSsrHost(marklessSsrHostLocators, "h1", "p") + "<p>" + marklessSsrText(details.title) + "</p>")(marklessSsrAsyncSnapshot.value) : marklessSsrAsyncSnapshot.status === "rejected" ? (async (marklessSsrAsyncError) => marklessSsrHost(marklessSsrHostLocators, "h2", "p") + "<p>" + "Broken" + "</p>")(marklessSsrAsyncSnapshot.error) : (async () => marklessSsrHost(marklessSsrHostLocators, "h3", "p") + "<p>" + "Loading" + "</p>")())(await marklessSsrRunAsyncComputed(marklessSsrAsyncSnapshots, "computed:details", async () => ({ title: query }), marklessSsrRenderContext)))) + "<!--/markless:async:boundary:0-->" + "</main>";
 	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren, marklessSsrAsyncSnapshots);
 	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
@@ -688,7 +688,7 @@ const marklessSsrPropEvents = [];
 const marklessSsrStateValues = new Map([
 	["state:label", "ready"]
 ]);
-async function marklessRenderSsr(props = {}) {
+async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 	const marklessSsrPayloadState = marklessCloneState(payloadState);
 	const marklessSsrRenderStateValues = new Map(marklessSsrStateValues);
 	let label = marklessStateValue(marklessSsrRenderStateValues, marklessSsrPayloadState, "state:label");
@@ -1092,7 +1092,7 @@ const marklessSsrPropEvents = [];
 const marklessSsrStateValues = new Map([
 	["state:open", true]
 ]);
-async function marklessRenderSsr(props = {}) {
+async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 	const marklessSsrPayloadState = marklessCloneState(payloadState);
 	const marklessSsrRenderStateValues = new Map(marklessSsrStateValues);
 	let open = marklessStateValue(marklessSsrRenderStateValues, marklessSsrPayloadState, "state:open");
@@ -1342,7 +1342,7 @@ const marklessSsrPropEvents = [];
 const marklessSsrStateValues = new Map([
 	["state:count", 0]
 ]);
-async function marklessRenderSsr(props = {}) {
+async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 	const marklessSsrPayloadState = marklessCloneState(payloadState);
 	const marklessSsrRenderStateValues = new Map(marklessSsrStateValues);
 	let count = marklessStateValue(marklessSsrRenderStateValues, marklessSsrPayloadState, "state:count");
@@ -1628,7 +1628,7 @@ const marklessSsrPropEvents = [];
 const marklessSsrStateValues = new Map([
 	["state:App.count.createCount.count", 5]
 ]);
-async function marklessRenderSsr(props = {}) {
+async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 	const marklessSsrPayloadState = marklessCloneState(payloadState);
 	const marklessSsrRenderStateValues = new Map(marklessSsrStateValues);
 	const count = createCount();
@@ -1861,7 +1861,7 @@ const marklessSsrPropEvents = [];
 const marklessSsrStateValues = new Map([
 	["state:active", true]
 ]);
-async function marklessRenderSsr(props = {}) {
+async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 	const marklessSsrPayloadState = marklessCloneState(payloadState);
 	const marklessSsrRenderStateValues = new Map(marklessSsrStateValues);
 	let active = marklessStateValue(marklessSsrRenderStateValues, marklessSsrPayloadState, "state:active");
@@ -1869,7 +1869,7 @@ async function marklessRenderSsr(props = {}) {
 	const marklessSsrBranches = [];
 	const marklessSsrAsyncSnapshots = [];
 	const marklessSsrHostLocators = [];
-	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "main") + "<main>" + (await marklessSsrRenderChild(marklessSsrChildren, __marklessSsrComponent0, { active: active }, { hostPrefix: "c0:", symbolPrefix: "c0:", localIndex: marklessSsrHostLocators.length, graphProps: [{"name":"active","graphNodeId":"state:active","path":[]}] })) + "</main>";
+	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "main") + "<main>" + (await marklessSsrRenderChild(marklessSsrChildren, __marklessSsrComponent0, { active: active }, { hostPrefix: "c0:", symbolPrefix: "c0:", localIndex: marklessSsrHostLocators.length, graphProps: [{"name":"active","graphNodeId":"state:active","path":[]}] }, marklessSsrRenderContext)) + "</main>";
 	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren, marklessSsrAsyncSnapshots);
 	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
@@ -2249,7 +2249,7 @@ import { marklessCloneState } from '@markless/web/fns/state';
 const marklessSsrPropEvents = [];
 const marklessSsrStateValues = new Map([
 ]);
-async function marklessRenderSsr(props = {}) {
+async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 	const { active } = props ?? {};
 	const marklessSsrPayloadState = marklessCloneState(payloadState);
 	const marklessSsrRenderStateValues = new Map(marklessSsrStateValues);
@@ -2707,7 +2707,7 @@ const marklessSsrStateValues = new Map([
 	["state:entries", [{"code":"a","title":"Alpha"}]],
 	["state:chosen", "a"]
 ]);
-async function marklessRenderSsr(props = {}) {
+async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 	const marklessSsrPayloadState = marklessCloneState(payloadState);
 	const marklessSsrRenderStateValues = new Map(marklessSsrStateValues);
 	let entries = marklessStateValue(marklessSsrRenderStateValues, marklessSsrPayloadState, "state:entries");
@@ -2903,7 +2903,7 @@ const labels = { title: 'Hello', mode: 'compact' };
 const marklessSsrPropEvents = [];
 const marklessSsrStateValues = new Map([
 ]);
-async function marklessRenderSsr(props = {}) {
+async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 	const marklessSsrPayloadState = marklessCloneState(payloadState);
 	const marklessSsrRenderStateValues = new Map(marklessSsrStateValues);
 	const marklessSsrChildren = [];
@@ -3174,7 +3174,7 @@ const marklessSsrPropEvents = [];
 const marklessSsrStateValues = new Map([
 	["state:records", [{"label":"Zero"}]]
 ]);
-async function marklessRenderSsr(props = {}) {
+async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 	const marklessSsrPayloadState = marklessCloneState(payloadState);
 	const marklessSsrRenderStateValues = new Map(marklessSsrStateValues);
 	let records = marklessStateValue(marklessSsrRenderStateValues, marklessSsrPayloadState, "state:records");
@@ -3492,7 +3492,7 @@ function marklessRenderCsr(props = {}) {
     "ssrModuleSource": "import { marklessSsrRenderChild, marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrHost, marklessSsrCallbacks, marklessSsrCallbackSymbol, marklessComposeState as marklessSsrComposeState, marklessViewWithoutAnchors, marklessSsrComposeView } from '@markless/web/fns/ssr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
 const __marklessSsrComponent0 = { renderSsr: marklessRenderSsrBadge };
-async function marklessRenderSsrBadge(props = {}) {
+async function marklessRenderSsrBadge(props = {}, marklessSsrRenderContext) {
 	const { active } = props ?? {};
 	const marklessSsrPayloadState = { ...marklessCloneState(payloadState), cells: [], computed: [] };
 	const marklessSsrRenderStateValues = new Map(marklessSsrStateValues);
@@ -3509,7 +3509,7 @@ const marklessSsrPropEvents = [];
 const marklessSsrStateValues = new Map([
 	["state:active", true]
 ]);
-async function marklessRenderSsr(props = {}) {
+async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 	const marklessSsrPayloadState = marklessCloneState(payloadState);
 	const marklessSsrRenderStateValues = new Map(marklessSsrStateValues);
 	let active = marklessStateValue(marklessSsrRenderStateValues, marklessSsrPayloadState, "state:active");
@@ -3517,7 +3517,7 @@ async function marklessRenderSsr(props = {}) {
 	const marklessSsrBranches = [];
 	const marklessSsrAsyncSnapshots = [];
 	const marklessSsrHostLocators = [];
-	const html = marklessSsrHost(marklessSsrHostLocators, "h3", "main") + "<main>" + (await marklessSsrRenderChild(marklessSsrChildren, __marklessSsrComponent0, { active: active, __marklessSsrCallbacks: marklessSsrCallbacks({ "active": marklessSsrCallbackSymbol(props, ["active"]) }) }, { hostPrefix: "c0:", symbolPrefix: "c0:", localIndex: marklessSsrHostLocators.length, graphProps: [{"name":"active","graphNodeId":"prop:props","path":["active"]}] })) + "</main>";
+	const html = marklessSsrHost(marklessSsrHostLocators, "h3", "main") + "<main>" + (await marklessSsrRenderChild(marklessSsrChildren, __marklessSsrComponent0, { active: active, __marklessSsrCallbacks: marklessSsrCallbacks({ "active": marklessSsrCallbackSymbol(props, ["active"]) }) }, { hostPrefix: "c0:", symbolPrefix: "c0:", localIndex: marklessSsrHostLocators.length, graphProps: [{"name":"active","graphNodeId":"prop:props","path":["active"]}] }, marklessSsrRenderContext)) + "</main>";
 	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren, marklessSsrAsyncSnapshots);
 	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
@@ -3711,7 +3711,7 @@ import { marklessSsrSpreadAttributes } from '@markless/web/fns/html';
 const marklessSsrPropEvents = [];
 const marklessSsrStateValues = new Map([
 ]);
-async function marklessRenderSsr(props = {}) {
+async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 	const marklessSsrPayloadState = marklessCloneState(payloadState);
 	const marklessSsrRenderStateValues = new Map(marklessSsrStateValues);
 	const meta = { 'data-kind': 'card', title: 'Draft' };
@@ -3993,7 +3993,7 @@ const marklessSsrPropEvents = [];
 const marklessSsrStateValues = new Map([
 	["state:count", 0]
 ]);
-async function marklessRenderSsr(props = {}) {
+async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 	const marklessSsrPayloadState = marklessCloneState(payloadState);
 	const marklessSsrRenderStateValues = new Map(marklessSsrStateValues);
 	let count = marklessStateValue(marklessSsrRenderStateValues, marklessSsrPayloadState, "state:count");
@@ -4272,7 +4272,7 @@ const marklessSsrPropEvents = [];
 const marklessSsrStateValues = new Map([
 	["state:count", 2]
 ]);
-async function marklessRenderSsr(props = {}) {
+async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 	const marklessSsrPayloadState = marklessCloneState(payloadState);
 	const marklessSsrRenderStateValues = new Map(marklessSsrStateValues);
 	let count = marklessStateValue(marklessSsrRenderStateValues, marklessSsrPayloadState, "state:count");

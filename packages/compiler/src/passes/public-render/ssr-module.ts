@@ -64,7 +64,10 @@ export function emitPublicSsrRenderModule(
 		'const marklessSsrStateValues = new Map([',
 		stateEntries(input).join(',\n'),
 		']);',
-		'async function marklessRenderSsr(props = {}) {',
+		// The optional render context is the per-request streaming channel
+		// (T107): renderToStream threads it through child renders and async
+		// runners. Omitted = exact blocking behavior.
+		'async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {',
 		destructureProps(rootInfo.propNames),
 		'	const marklessSsrPayloadState = marklessCloneState(payloadState);',
 		'	const marklessSsrRenderStateValues = new Map(marklessSsrStateValues);',
