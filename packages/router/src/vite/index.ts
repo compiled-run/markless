@@ -655,9 +655,10 @@ function routeModulePreloadsFromBundle(input: {
 		const ssrFileNames = new Set<string>();
 		if (input.resumeChunk) {
 			includeChunk(ssrFileNames, chunksByFileName, input.resumeChunk.fileName);
-			// The route's own resume container hangs off the resume entry's route
-			// map as a dynamic import. When rolldown splits it away from the page
-			// chunk, missing it here makes the first interaction pay a waterfall
+			// The resume entry dynamically imports every route's resume module, so
+			// only walk the CURRENT route's resume module (plus its full static and
+			// dynamic closure); other routes' resume modules must stay excluded.
+			// Missing this walk makes the first interaction pay a serial waterfall
 			// fetch on slow networks (the preload-strategy box catches this).
 			for (const fileName of routeScopedDynamicImports(input.resumeChunk, routeFile)) {
 				includeChunk(ssrFileNames, chunksByFileName, fileName, true);
