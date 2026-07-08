@@ -17,8 +17,31 @@ export type SourceSymbolRoute = {
 	readonly importSource: string;
 };
 
+const SYMBOL_VIRTUAL_PREFIX = `${MARKLESS_VIRTUAL_PREFIX}symbol:`;
+
 export function symbolVirtualModuleId(filename: string, symbolId: string) {
-	return `${MARKLESS_VIRTUAL_PREFIX}symbol:${encodeURIComponent(filename)}:${encodeURIComponent(symbolId)}`;
+	return `${SYMBOL_VIRTUAL_PREFIX}${encodeURIComponent(filename)}:${encodeURIComponent(symbolId)}`;
+}
+
+// Single source of truth for reading a symbol virtual module id back. Build
+// tooling (the bundler's resolve hooks, the router's route preload planning)
+// recovers the source file a symbol module serves from the id; symbol chunks
+// are otherwise invisible in the bundle graph because the symbol resolver
+// demands them through a computed import table, not literal import edges.
+// Returns the decoded source filename, or null when the id is not a symbol
+// virtual module id. Accepts rolldown-resolved ids (leading `\0`).
+export function symbolVirtualModuleSourceFile(moduleId: string): string | null {
+	const bare = moduleId.startsWith('\0') ? moduleId.slice(1) : moduleId;
+	if (!bare.startsWith(SYMBOL_VIRTUAL_PREFIX)) return null;
+	const encoded = bare.slice(SYMBOL_VIRTUAL_PREFIX.length);
+	const separator = encoded.indexOf(':');
+	if (separator <= 0 || separator === encoded.length - 1) return null;
+	if (encoded.includes(':', separator + 1)) return null;
+	try {
+		return decodeURIComponent(encoded.slice(0, separator));
+	} catch {
+		return null;
+	}
 }
 
 export function resumeVirtualModuleId(filename: string) {

@@ -21,6 +21,7 @@ import {
 	injectExecutionLogModuleHook,
 	normalizeExecutionLogMode,
 } from './execution-log.ts';
+import { symbolVirtualModuleSourceFile } from './source-module.ts';
 import {
 	MARKLESS_VIRTUAL_PREFIX,
 	resumeVirtualModuleId,
@@ -66,7 +67,6 @@ type InternalMarklessRolldownOptions = MarklessRolldownOptions & {
 const TSRX_SOURCE_FILE = /\.tsrx(?:[?#].*)?$/;
 const MARKLESS_SYMBOL_SOURCE_QUERY_RE = /[?&]markless-symbols(?:[&#]|$)/;
 const MARKLESS_RESUME_SOURCE_QUERY_RE = /[?&]markless-resume(?:[&#]|$)/;
-const SYMBOL_VIRTUAL_ID_RE = /^virtual:markless:symbol:([^:]+):[^:]+$/;
 const RESUME_VIRTUAL_ID_RE = /^virtual:markless:resume:([^:]+)$/;
 const SYMBOL_VIRTUAL_STRING_RE = /(["'`])((?:virtual:markless:symbol:)[^"'`]+)\1/g;
 
@@ -571,8 +571,7 @@ function isResumeSourceRequest(id: string): boolean {
 function sourceForSymbolVirtualImporter(importer: string | undefined): string | null {
 	if (!importer) return null;
 
-	const match = normalizeVirtualId(importer).match(SYMBOL_VIRTUAL_ID_RE);
-	return match?.[1] ? decodeURIComponent(match[1]) : null;
+	return symbolVirtualModuleSourceFile(normalizeVirtualId(importer));
 }
 
 function sourceForResumeVirtualImporter(importer: string | undefined): string | null {

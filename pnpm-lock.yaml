@@ -361,6 +361,9 @@ importers:
 
   packages/router:
     dependencies:
+      '@markless/bundler':
+        specifier: workspace:*
+        version: link:../bundler
       '@markless/web':
         specifier: workspace:*
         version: link:../web

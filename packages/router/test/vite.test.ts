@@ -474,6 +474,110 @@ test('includes the current route resume module closure in ssr modulepreloads', (
 	expect(ssrPreloads['pages/index.tsrx']).not.toContain('/app/build/docs-resume.js');
 });
 
+test('includes route-scoped symbol-module chunks in ssr and navigation modulepreloads', () => {
+	const plugins = flattenPlugins([router()]);
+	const configPlugin = plugins.find((plugin) => plugin.name === 'markless-router:vite');
+	const routePlugin = plugins.find((plugin) => plugin.name === 'markless-router:routes');
+	const routeLoad = hookHandler(routePlugin?.load) as
+		| ((id: string) => string | undefined)
+		| undefined;
+	// Symbol-module chunks are demanded through the symbol resolver's computed
+	// import table (`import(/* @vite-ignore */ moduleUrls[row[0]])`), so the
+	// bundle has NO literal import edge reaching them. Their virtual module id
+	// embeds the source file they serve — that filename is the route-scoping key.
+	const symbolModuleId = (sourceFile: string, symbolId: string) =>
+		`virtual:markless:symbol:${encodeURIComponent(sourceFile)}:${encodeURIComponent(symbolId)}`;
+	const navigationChunk = chunk({
+		code: `const routePreloadsJson = "__MARKLESS_ROUTER_ROUTE_PRELOADS__";`,
+		dynamicImports: ['build/gallery.js', 'build/journal.js'],
+		fileName: 'build/navigation.js',
+		moduleIds: ['/repo/packages/router/src/vite/entries/client-entry.ts'],
+	});
+
+	routePlugin?.configResolved?.({ base: '/app/', root: '/project' } as never);
+	configPlugin?.configResolved?.({ base: '/app/', root: '/project' } as never);
+	configPlugin?.generateBundle?.call(
+		{ environment: { config: { consumer: 'client' } } },
+		{},
+		{
+			'build/navigation.js': navigationChunk,
+			'build/gallery.js': chunk({
+				fileName: 'build/gallery.js',
+				moduleIds: [
+					'/project/pages/gallery.tsrx',
+					'/project/src/components/light-table.tsrx?markless-symbols',
+				],
+			}),
+			'build/journal.js': chunk({
+				fileName: 'build/journal.js',
+				moduleIds: ['/project/pages/journal.tsrx'],
+			}),
+			// An event-handler symbol of the gallery page (resolved ids carry \0).
+			'build/gallery-tap-symbol.js': chunk({
+				fileName: 'build/gallery-tap-symbol.js',
+				moduleIds: [`\0${symbolModuleId('/project/pages/gallery.tsrx', 'symbol:0')}`],
+			}),
+			// An attach-behavior symbol whose static import must ride along.
+			'build/gallery-lens-symbol.js': chunk({
+				fileName: 'build/gallery-lens-symbol.js',
+				imports: ['build/lens-runtime.js'],
+				moduleIds: [`\0${symbolModuleId('/project/pages/gallery.tsrx', 'symbol:1')}`],
+			}),
+			// A symbol of a non-page component in the gallery route's closure.
+			'build/light-table-symbol.js': chunk({
+				fileName: 'build/light-table-symbol.js',
+				moduleIds: [
+					symbolModuleId('/project/src/components/light-table.tsrx', 'symbol:0'),
+				],
+			}),
+			'build/journal-save-symbol.js': chunk({
+				fileName: 'build/journal-save-symbol.js',
+				moduleIds: [symbolModuleId('/project/pages/journal.tsrx', 'symbol:0')],
+			}),
+			'build/lens-runtime.js': chunk({ fileName: 'build/lens-runtime.js' }),
+		},
+	);
+
+	const source = routeLoad?.('\0virtual:markless-router/route-preloads');
+	const routePreloadData = JSON.parse(
+		source?.match(/routePreloadData = routePreloadsJson === .* \? (\{.*\}) :/)?.[1] ?? '{}',
+	) as {
+		readonly navigation?: Record<string, string[]>;
+		readonly ssr?: Record<string, string[]>;
+	};
+	for (const [label, preloads] of [
+		['navigation', routePreloadData.navigation ?? {}],
+		['ssr', routePreloadData.ssr ?? {}],
+	] as const) {
+		expect(preloads['pages/gallery.tsrx'], label).toContain(
+			'/app/build/gallery-tap-symbol.js',
+		);
+		expect(preloads['pages/gallery.tsrx'], label).toContain(
+			'/app/build/gallery-lens-symbol.js',
+		);
+		expect(preloads['pages/gallery.tsrx'], label).toContain('/app/build/lens-runtime.js');
+		expect(preloads['pages/gallery.tsrx'], label).toContain(
+			'/app/build/light-table-symbol.js',
+		);
+		// Cross-route exclusion: the other route's symbol chunks never preload.
+		expect(preloads['pages/gallery.tsrx'], label).not.toContain(
+			'/app/build/journal-save-symbol.js',
+		);
+		expect(preloads['pages/journal.tsrx'], label).toContain(
+			'/app/build/journal-save-symbol.js',
+		);
+		expect(preloads['pages/journal.tsrx'], label).not.toContain(
+			'/app/build/gallery-tap-symbol.js',
+		);
+		expect(preloads['pages/journal.tsrx'], label).not.toContain(
+			'/app/build/gallery-lens-symbol.js',
+		);
+		expect(preloads['pages/journal.tsrx'], label).not.toContain(
+			'/app/build/light-table-symbol.js',
+		);
+	}
+});
+
 function chunk(overrides: {
 	readonly code?: string;
 	readonly dynamicImports?: readonly string[];

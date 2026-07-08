@@ -19,6 +19,9 @@ import {
 	stringifyQuery,
 	withoutLeadingSlash,
 } from 'ufo';
+// Build-time-only dependency: the bundler owns the symbol virtual module id
+// shape (single source of truth); browser entries must never reach this file.
+import { symbolVirtualModuleSourceFile } from '@markless/bundler/preload';
 import { transformRequestFileSource } from '../request-files.ts';
 import { anchorTransformPlugin } from './anchor-transform.ts';
 import { htmlTransformPlugin } from './html-transform.ts';
@@ -629,6 +632,7 @@ function routeModulePreloadsFromBundle(input: {
 		routeChunkFileNames.add(chunk.fileName);
 	}
 
+	const symbolChunks = symbolChunksBySourceFile(chunks);
 	const navigation: Record<string, readonly string[]> = {};
 	const ssr: Record<string, readonly string[]> = {};
 	for (const [routeFile, routeChunk] of routeChunks) {
@@ -648,9 +652,6 @@ function routeModulePreloadsFromBundle(input: {
 				includeChunk(navigationFileNames, chunksByFileName, fileName, true);
 			}
 		}
-		navigation[routeFile] = [...navigationFileNames].map((fileName) =>
-			joinURL(input.base, fileName),
-		);
 
 		const ssrFileNames = new Set<string>();
 		if (input.resumeChunk) {
@@ -665,9 +666,76 @@ function routeModulePreloadsFromBundle(input: {
 			}
 		}
 		includeChunk(ssrFileNames, chunksByFileName, routeChunk.fileName, true);
+
+		// Symbol modules (event handlers, attach behaviors, async runs) are
+		// demanded through the symbol resolver's computed import table, so the
+		// bundle records NO import edge reaching their chunks — the walks above
+		// can never find them and the first interaction fetches them cold. Their
+		// virtual module id bakes in the source file they serve: a symbol chunk
+		// preloads for this route iff that source file is already in the route's
+		// planned chunk closure (cross-route exclusion falls out of the key).
+		// Both maps get the same symbol set so SSR landings and SPA navigations
+		// warm identical bytes; execution stays lazy — this preloads bytes only.
+		const routeSourceFiles = sourceFilesForChunks(
+			new Set([...navigationFileNames, ...ssrFileNames]),
+			chunksByFileName,
+		);
+		for (const [sourceFile, symbolFileNames] of symbolChunks) {
+			if (!routeSourceFiles.has(sourceFile)) continue;
+			for (const fileName of symbolFileNames) {
+				includeChunk(navigationFileNames, chunksByFileName, fileName, true);
+				includeChunk(ssrFileNames, chunksByFileName, fileName, true);
+			}
+		}
+
+		navigation[routeFile] = [...navigationFileNames].map((fileName) =>
+			joinURL(input.base, fileName),
+		);
 		ssr[routeFile] = [...ssrFileNames].map((fileName) => joinURL(input.base, fileName));
 	}
 	return { navigation, ssr };
+}
+
+// Maps each authored source file to the chunks holding its compiled symbol
+// modules, read from the `virtual:markless:symbol:<sourceFile>:<id>` module
+// ids (the bundler owns that id shape — see @markless/bundler/preload).
+function symbolChunksBySourceFile(
+	chunks: readonly OutputChunkLike[],
+): Map<string, readonly string[]> {
+	const bySourceFile = new Map<string, string[]>();
+	for (const chunk of chunks) {
+		for (const moduleId of chunk.moduleIds ?? []) {
+			const sourceFile = symbolVirtualModuleSourceFile(moduleId);
+			if (!sourceFile) continue;
+			const key = sourceModulePathname(sourceFile);
+			const fileNames = bySourceFile.get(key) ?? [];
+			if (!fileNames.includes(chunk.fileName)) fileNames.push(chunk.fileName);
+			bySourceFile.set(key, fileNames);
+		}
+	}
+	return bySourceFile;
+}
+
+function sourceFilesForChunks(
+	fileNames: ReadonlySet<string>,
+	chunksByFileName: ReadonlyMap<string, OutputChunkLike>,
+): Set<string> {
+	const sourceFiles = new Set<string>();
+	for (const fileName of fileNames) {
+		for (const moduleId of chunksByFileName.get(fileName)?.moduleIds ?? []) {
+			if (moduleId.startsWith('\0')) continue;
+			const pathname = sourceModulePathname(moduleId);
+			if (/\.(?:tsrx|mdx)$/.test(pathname)) sourceFiles.add(pathname);
+		}
+	}
+	return sourceFiles;
+}
+
+// Source modules appear both bare and with request queries (?markless-symbols,
+// ?markless-resume); symbol virtual ids bake in the bare path. Compare both on
+// the same decoded, query-free pathname.
+function sourceModulePathname(moduleId: string): string {
+	return decodePath(parseURL(moduleId).pathname);
 }
 
 function includeChunk(

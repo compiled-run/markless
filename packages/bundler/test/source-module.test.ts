@@ -3,6 +3,8 @@ import {
 	emitResumeModule,
 	emitSourceModule,
 	rewriteSymbolModuleExport,
+	symbolVirtualModuleId,
+	symbolVirtualModuleSourceFile,
 } from '../src/source-module.ts';
 
 const baseInput = {
@@ -349,4 +351,23 @@ test('rewriteSymbolModuleExport renames async handler exports too', () => {
 			'symbol_0_abc',
 		),
 	).toBe('export async function symbol_0_abc(context) {}');
+});
+
+test('symbolVirtualModuleSourceFile reads back the source file symbolVirtualModuleId baked in', () => {
+	const filename = '/workspace/app/pages/r/[repo]/index.tsrx';
+	const id = symbolVirtualModuleId(filename, 'symbol:4');
+	expect(symbolVirtualModuleSourceFile(id)).toBe(filename);
+	// Rolldown-resolved module ids (chunk.moduleIds) carry a leading \0.
+	expect(symbolVirtualModuleSourceFile(`\0${id}`)).toBe(filename);
+});
+
+test('symbolVirtualModuleSourceFile rejects non-symbol and malformed virtual ids', () => {
+	expect(symbolVirtualModuleSourceFile('/workspace/app/pages/index.tsrx')).toBeNull();
+	expect(
+		symbolVirtualModuleSourceFile('virtual:markless:resume:%2Fapp%2Fpages%2Findex.tsrx'),
+	).toBeNull();
+	expect(symbolVirtualModuleSourceFile('virtual:markless:symbol:no-symbol-id')).toBeNull();
+	expect(
+		symbolVirtualModuleSourceFile('virtual:markless:symbol:%2Fapp.tsrx:symbol:extra'),
+	).toBeNull();
 });

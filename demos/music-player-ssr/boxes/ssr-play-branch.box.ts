@@ -5,11 +5,30 @@ import { box } from '@async/witness';
 // flip the Player's `@if (isPlaying)` icon branch on click — then flip it
 // back. The branch condition is a parent-graph prop crossing a child-component
 // edge, the exact shape of the demo regression.
+//
+// Zero-cold-click probe (preload-integrity goal, owner doctrine): "Chunks in
+// the network tab from execution means it was not preloaded correctly,
+// period." The play click must fetch ZERO `/build/*.js` chunks — every
+// route-scoped chunk (including the symbol resolver's computed-import-table
+// targets) is head-preloaded, so bytes are warm before the first interaction
+// while execution stays lazy (resume summary still reports 0 executed).
+// The probe matcher is `/build/*.js` only: `/build/execution-sizes.json` is
+// the dev execution log auto-activating on localhost origins (PM ruling: dev
+// tooling, local-origin-gated at packages/web/src/dev-log.ts) and YouTube
+// embed traffic is out of scope. This probe lives in THIS box because witness
+// currently supports one nitro preview per run: a second in-process preview
+// reuses the first (closed) server entry module and 404s.
 const PLAY_TOGGLE = '[aria-label="Play or pause"]';
 const PLAY_ICON = '.play .play-icon';
 const PAUSED_ICON = '▶';
 const PLAYING_ICON = '❚❚';
 const WAIT = { timeoutMs: 10_000 };
+// Head-size sanity: 64 links before resolver-aware preload (5 cold post-click
+// chunks); the route symbol closure adds ~22. Past 2x the old baseline means
+// the plan stopped being route-scoped (the named misfire is preloading EVERY
+// symbol module globally, breaking cross-route exclusion).
+const MIN_HEAD_LINKS = 65;
+const MAX_HEAD_LINKS = 128;
 
 export default box(
 	{
@@ -35,7 +54,13 @@ export default box(
 		await expect.html.contains(html, 'data-async-resumer');
 		const preloadHrefs = modulePreloadHrefs(html);
 		await assertModulePreloadsServe(preview, preloadHrefs);
-		receipt.note(`ssr play-branch modulepreload hrefs: ${formatPaths(preloadHrefs)}`);
+		receipt.note(`ssr play-branch modulepreload hrefs (${preloadHrefs.length}): ${formatPaths(preloadHrefs)}`);
+		if (preloadHrefs.length < MIN_HEAD_LINKS || preloadHrefs.length > MAX_HEAD_LINKS) {
+			throw new Error(
+				`Expected the route-scoped head preload map to stay in the sane band ` +
+					`[${MIN_HEAD_LINKS}, ${MAX_HEAD_LINKS}], saw ${preloadHrefs.length} links.`,
+			);
+		}
 		// Scope the arm check to the rendered toggle button: the payload scripts
 		// legitimately serialize both arm templates elsewhere in the document.
 		assertRenderedToggleArm(html);
@@ -51,7 +76,7 @@ export default box(
 		);
 		await expect.page.text(page, PLAY_ICON, PAUSED_ICON, WAIT);
 		await expect.page.attribute(page, PLAY_TOGGLE, 'class', 'play', WAIT);
-		const startupScripts = await jsBuildRequestPaths(page);
+		const startupScripts = await waitForQuietBuildJs(page);
 		receipt.note(`ssr play-branch startup JS: ${formatPaths(startupScripts)}`);
 
 		await page.click(PLAY_TOGGLE, WAIT);
@@ -59,9 +84,15 @@ export default box(
 		await expect.page.attribute(page, PLAY_TOGGLE, 'class', 'play active', WAIT);
 		await expect.page.attribute(page, '.youtube-frame-host', 'data-command', 'play', WAIT);
 		await waitForLogInteractionAttribute(page, 1, WAIT);
-		const afterClickScripts = await jsBuildRequestPaths(page);
+		const afterClickScripts = await waitForQuietBuildJs(page);
 		const lazyChunks = afterClickScripts.filter((path) => !startupScripts.includes(path));
-		receipt.note(`ssr play-branch post-click lazy JS: ${formatPaths(lazyChunks)}`);
+		receipt.note(`ssr play-branch post-click /build JS request diff: ${formatPaths(lazyChunks)}`);
+		if (lazyChunks.length > 0) {
+			throw new Error(
+				`Expected the first interaction to fetch ZERO framework chunks ` +
+					`(bytes head-preloaded, execution lazy), saw cold fetches: ${formatPaths(lazyChunks)}`,
+			);
+		}
 
 		// Command-state depth (absorbed from the retired tmp-ssr box): the
 		// App-root attach controller activated on the first interaction and
@@ -191,6 +222,26 @@ async function jsBuildRequestPaths(page: NetworkRequestPage): Promise<readonly s
 		.filter((request) => request.method === 'GET')
 		.map((request) => new URL(request.url).pathname)
 		.filter((pathname) => pathname.startsWith('/build/') && pathname.endsWith('.js'));
+}
+
+// Poll until no NEW /build/*.js request lands for a quiet window, so preload
+// fetches finish before the snapshot (networkidle scoped to framework JS).
+async function waitForQuietBuildJs(page: NetworkRequestPage): Promise<readonly string[]> {
+	const quietMs = 500;
+	const started = Date.now();
+	let paths = await jsBuildRequestPaths(page);
+	let quietSince = Date.now();
+	while (Date.now() - started < WAIT.timeoutMs) {
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		const latest = await jsBuildRequestPaths(page);
+		if (latest.length !== paths.length) {
+			paths = latest;
+			quietSince = Date.now();
+		} else if (Date.now() - quietSince >= quietMs) {
+			return paths;
+		}
+	}
+	return paths;
 }
 
 function formatPaths(paths: readonly string[]): string {
