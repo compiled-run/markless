@@ -76,11 +76,9 @@ register against the fresh DOM. The pending arm is genuinely replaced, not
 hidden and kept.
 
 A streamed commit is one fragment move plus record registration, nothing
-else. Because graph state addresses cells by id rather than DOM position,
-there is no framework-side tree that moved DOM must be reconciled into, no
-node-reference tables spanning stream segments, and no placeholder
-indirection — the anchor pair is the only address a boundary has, and it is
-already in the document.
+else. The anchor pair is the only address a boundary has, and it is already
+in the document; graph cells are addressed by id, records by anchor plus
+arm-relative index. Settled content is therefore live the moment it lands.
 
 Markless has no runtime representation of the document. The DOM is the only
 tree; the runtime holds graph state (cells addressed by id) and record
