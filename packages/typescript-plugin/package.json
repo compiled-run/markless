@@ -13,7 +13,7 @@
 		"./language": "./src/language.ts"
 	},
 	"scripts": {
-		"build:cjs": "vp pack src/index.ts --format cjs --out-dir dist --clean --no-dts --no-report"
+		"build:cjs": "vp pack src/index.ts --no-config --format cjs --out-dir dist --clean --no-dts --no-report"
 	},
 	"dependencies": {
 		"@markless/compiler": "workspace:*",

@@ -1,65 +1,208 @@
+import { readFileSync, readdirSync } from 'node:fs';
+import { resolve as pathResolve } from 'node:path';
 import { defineConfig } from 'vite-plus';
+import type { PackUserConfig } from 'vite-plus/pack';
+
+// Per-package pack configs (QDS buildOrder shape): each package builds from
+// its own directory into its own ./dist so publishConfig.exports can target
+// dist files that live inside the published package.
+
+type PackageManifest = {
+	dependencies?: Record<string, string>;
+	peerDependencies?: Record<string, string>;
+	devDependencies?: Record<string, string>;
+};
+
+const rootDir = import.meta.dirname;
+const packageDir = (packageName: string) => pathResolve(rootDir, 'packages', packageName);
+
+const readPackageManifest = (packageName: string): PackageManifest =>
+	JSON.parse(
+		readFileSync(pathResolve(packageDir(packageName), 'package.json'), 'utf-8'),
+	) as PackageManifest;
+
+const nodeBuiltinImportPattern = /^node:.*$/;
+
+const escapeForRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// Matches the package itself and any subpath import of it (e.g. `vite` and
+// `vite/module-runner`), so dependencies stay external instead of being
+// bundled as private copies.
+const packageImportPattern = (packageName: string) =>
+	new RegExp(`^${escapeForRegExp(packageName)}(/.*)?$`);
+
+const dependencyImportPatterns = (dependencies: Record<string, string> = {}) =>
+	Object.keys(dependencies).map(packageImportPattern);
+
+// QDS externalPackageImports: read the package's own manifest so every
+// declared dependency (including @markless/* workspace deps) is externalized.
+const externalPackageImports = (
+	packageName: string,
+	options?: { devDependencies?: boolean },
+) => {
+	const manifest = readPackageManifest(packageName);
+	return [
+		nodeBuiltinImportPattern,
+		...dependencyImportPatterns(manifest.dependencies),
+		...dependencyImportPatterns(manifest.peerDependencies),
+		...(options?.devDependencies
+			? dependencyImportPatterns(manifest.devDependencies)
+			: []),
+	];
+};
+
+const buildToolImportPatterns = ['rolldown', 'vite', 'vitest'].map(packageImportPattern);
+
+const marklessPack = (options: {
+	packageName: string;
+	entry: Record<string, string>;
+	platform?: 'neutral' | 'node';
+	devDependencies?: boolean;
+}): PackUserConfig => ({
+	name: `@markless/${options.packageName}`,
+	cwd: packageDir(options.packageName),
+	entry: options.entry,
+	format: ['esm'],
+	outDir: './dist',
+	platform: options.platform ?? 'neutral',
+	// ESM-only output: keep plain .js/.d.ts extensions even for the node
+	// platform (cli) so publishConfig.exports stays uniform across packages.
+	fixedExtension: false,
+	dts: true,
+	clean: true,
+	deps: {
+		neverBundle: [
+			...buildToolImportPatterns,
+			...externalPackageImports(options.packageName, {
+				devDependencies: options.devDependencies,
+			}),
+		],
+		onlyBundle: false,
+	},
+});
+
+// `./fns/*` is a glob export; enumerate the real modules so every published
+// subpath has its own dist entry.
+const webFnsEntries = Object.fromEntries(
+	readdirSync(pathResolve(packageDir('web'), 'src/fns'))
+		.filter((file) => file.endsWith('.ts'))
+		.map((file) => [`fns/${file.slice(0, -'.ts'.length)}`, `./src/fns/${file}`]),
+);
+
+const buildOrder: PackUserConfig[] = [
+	marklessPack({
+		packageName: 'serializer',
+		entry: {
+			index: './src/index.ts',
+			decode: './src/value-decode.ts',
+			'decode-client': './src/value-decode-client.ts',
+			protocol: './src/protocol.ts',
+			'protocol-validation': './src/protocol-validation.ts',
+		},
+	}),
+	marklessPack({
+		packageName: 'compiler',
+		entry: {
+			index: './src/index.ts',
+			'type-service': './src/type-service.ts',
+		},
+	}),
+	marklessPack({
+		packageName: 'runtime',
+		entry: {
+			index: './src/index.ts',
+			graph: './src/graph.ts',
+		},
+	}),
+	marklessPack({
+		packageName: 'web',
+		entry: {
+			index: './src/index.ts',
+			'dom-journal': './src/dom-journal.ts',
+			'dom-update': './src/dom-update.ts',
+			'event-only-resume': './src/event-only-resume.ts',
+			'event-only-lean/row': './src/event-only-lean/row.ts',
+			'event-only-lean/scalar-core': './src/event-only-lean/scalar-core.ts',
+			'event-only-lean/scalar-resume': './src/event-only-lean/scalar-resume.ts',
+			'event-resume': './src/event-resume.ts',
+			payload: './src/payload.ts',
+			render: './src/render.ts',
+			'render-to-stream': './src/render-to-stream.ts',
+			'render-to-string': './src/render-to-string.ts',
+			resume: './src/payload-full.ts',
+			...webFnsEntries,
+		},
+	}),
+	marklessPack({
+		packageName: 'bundler',
+		entry: {
+			preload: './src/preload.ts',
+			rolldown: './src/rolldown.ts',
+			vite: './src/vite/index.ts',
+		},
+	}),
+	marklessPack({
+		packageName: 'router',
+		entry: {
+			index: './src/index.ts',
+			vite: './src/vite/index.ts',
+			'vite/runtime/create-route-discovery': './src/vite/runtime/create-route-discovery.ts',
+			'vite/runtime/mdx-route': './src/vite/runtime/mdx-route.ts',
+			'vite/runtime/create-server-entry': './src/vite/runtime/create-server-entry.ts',
+			'vite/route-href': './src/vite/entries/route-href.ts',
+			'typescript-plugin': './src/typescript-plugin/index.ts',
+		},
+	}),
+	marklessPack({
+		packageName: 'core',
+		entry: {
+			index: './src/index.ts',
+			preload: './src/preload.ts',
+			rolldown: './src/rolldown.ts',
+			runtime: './src/runtime.ts',
+			'runtime/dom-journal': './src/runtime/dom-journal.ts',
+			'runtime/dom-update': './src/runtime/dom-update.ts',
+			'runtime/event-only-resume': './src/runtime/event-only-resume.ts',
+			'runtime/event-resume': './src/runtime/event-resume.ts',
+			'runtime/render': './src/runtime/render.ts',
+			'runtime/render-to-string': './src/runtime/render-to-string.ts',
+			'runtime/resume': './src/runtime/resume.ts',
+			router: './src/router.ts',
+			'router/vite': './src/router/vite.ts',
+			web: './src/web.ts',
+			'web/dom-journal': './src/web/dom-journal.ts',
+			'web/dom-update': './src/web/dom-update.ts',
+			'web/event-only-resume': './src/web/event-only-resume.ts',
+			'web/event-resume': './src/web/event-resume.ts',
+			'web/render': './src/web/render.ts',
+			'web/render-to-string': './src/web/render-to-string.ts',
+			'web/resume': './src/web/resume.ts',
+			vite: './src/vite.ts',
+		},
+	}),
+	marklessPack({
+		packageName: 'cli',
+		platform: 'node',
+		entry: {
+			index: './src/index.ts',
+			node: './src/node.ts',
+		},
+	}),
+	marklessPack({
+		packageName: 'vitest-browser',
+		devDependencies: true,
+		entry: {
+			index: './src/index.ts',
+			vitest: './src/vitest.ts',
+		},
+	}),
+];
 
 export default defineConfig({
 	staged: {
 		'*': 'vp check --fix',
 	},
-	pack: {
-		deps: {
-			neverBundle: ['rolldown', 'vite', 'vitest', 'vitest/browser'],
-		},
-		entry: {
-			'serializer/index': './packages/serializer/src/index.ts',
-			'compiler/index': './packages/compiler/src/index.ts',
-			'runtime/index': './packages/runtime/src/index.ts',
-			'runtime/graph': './packages/runtime/src/graph.ts',
-			'web/dom-journal': './packages/web/src/dom-journal.ts',
-			'web/dom-update': './packages/web/src/dom-update.ts',
-			'web/event-only-resume': './packages/web/src/event-only-resume.ts',
-			'web/event-resume': './packages/web/src/event-resume.ts',
-			'web/index': './packages/web/src/index.ts',
-			'web/render': './packages/web/src/render.ts',
-			'web/render-to-string': './packages/web/src/render-to-string.ts',
-			'web/resume': './packages/web/src/payload.ts',
-			'bundler/rolldown': './packages/bundler/src/rolldown.ts',
-			'bundler/vite': './packages/bundler/src/vite/index.ts',
-			'router/index': './packages/router/src/index.ts',
-			'router/vite': './packages/router/src/vite/index.ts',
-			'router/vite/route-href': './packages/router/src/vite/entries/route-href.ts',
-			'router/vite/runtime/create-route-discovery':
-				'./packages/router/src/vite/runtime/create-route-discovery.ts',
-			'router/vite/runtime/create-server-entry':
-				'./packages/router/src/vite/runtime/create-server-entry.ts',
-			'router/typescript-plugin': './packages/router/src/typescript-plugin/index.ts',
-			'cli/index': './packages/cli/src/index.ts',
-			'core/index': './packages/core/src/index.ts',
-			'core/rolldown': './packages/core/src/rolldown.ts',
-			'core/runtime': './packages/core/src/runtime.ts',
-			'core/runtime/dom-journal': './packages/core/src/runtime/dom-journal.ts',
-			'core/runtime/dom-update': './packages/core/src/runtime/dom-update.ts',
-			'core/runtime/event-only-resume': './packages/core/src/runtime/event-only-resume.ts',
-			'core/runtime/event-resume': './packages/core/src/runtime/event-resume.ts',
-			'core/runtime/render': './packages/core/src/runtime/render.ts',
-			'core/runtime/render-to-string': './packages/core/src/runtime/render-to-string.ts',
-			'core/runtime/resume': './packages/core/src/runtime/resume.ts',
-			'core/router': './packages/core/src/router.ts',
-			'core/router/vite': './packages/core/src/router/vite.ts',
-			'core/web': './packages/core/src/web.ts',
-			'core/web/dom-journal': './packages/core/src/web/dom-journal.ts',
-			'core/web/dom-update': './packages/core/src/web/dom-update.ts',
-			'core/web/event-only-resume': './packages/core/src/web/event-only-resume.ts',
-			'core/web/event-resume': './packages/core/src/web/event-resume.ts',
-			'core/web/render': './packages/core/src/web/render.ts',
-			'core/web/render-to-string': './packages/core/src/web/render-to-string.ts',
-			'core/web/resume': './packages/core/src/web/resume.ts',
-			'core/vite': './packages/core/src/vite.ts',
-			'vitest-browser/index': './packages/vitest-browser/src/index.ts',
-			'vitest-browser/vitest': './packages/vitest-browser/src/vitest.ts',
-		},
-		format: ['esm'],
-		dts: true,
-		clean: true,
-	},
+	pack: buildOrder,
 	test: {
 		projects: [
 			{

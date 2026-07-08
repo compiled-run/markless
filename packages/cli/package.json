@@ -1,14 +1,30 @@
 {
-	"name": "@markless/cli",
-	"version": "0.0.0",
-	"private": true,
+	"name": "create-markless",
+	"version": "0.1.0",
 	"description": "Create Markless apps.",
 	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/markless-dev/markless.git",
+		"directory": "packages/cli"
+	},
+	"publishConfig": {
+		"access": "public",
+		"exports": {
+			".": {
+				"types": "./dist/index.d.ts",
+				"default": "./dist/index.js"
+			}
+		},
+		"bin": {
+			"create-markless": "./dist/node.js"
+		}
+	},
 	"bin": {
 		"create-markless": "./src/node.ts"
 	},
 	"files": [
-		"src",
+		"dist",
 		"templates"
 	],
 	"type": "module",
@@ -19,5 +35,8 @@
 		"@clack/prompts": "^1.6.0",
 		"pathe": "catalog:",
 		"ufo": "catalog:"
+	},
+	"scripts": {
+		"prepublishOnly": "node ../../scripts/release/verify-publish-ready.mjs"
 	}
 }

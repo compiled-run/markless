@@ -1,7 +1,106 @@
 {
 	"name": "@markless/core",
-	"version": "0.0.0",
-	"private": true,
+	"version": "0.1.0",
+	"description": "Markless core authoring APIs: resumable TSRX apps with no hydration and no VDOM.",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/markless-dev/markless.git",
+		"directory": "packages/core"
+	},
+	"publishConfig": {
+		"access": "public",
+		"exports": {
+			".": {
+				"types": "./dist/index.d.ts",
+				"default": "./dist/index.js"
+			},
+			"./preload": {
+				"types": "./dist/preload.d.ts",
+				"default": "./dist/preload.js"
+			},
+			"./rolldown": {
+				"types": "./dist/rolldown.d.ts",
+				"default": "./dist/rolldown.js"
+			},
+			"./runtime": {
+				"types": "./dist/runtime.d.ts",
+				"default": "./dist/runtime.js"
+			},
+			"./runtime/dom-journal": {
+				"types": "./dist/runtime/dom-journal.d.ts",
+				"default": "./dist/runtime/dom-journal.js"
+			},
+			"./runtime/dom-update": {
+				"types": "./dist/runtime/dom-update.d.ts",
+				"default": "./dist/runtime/dom-update.js"
+			},
+			"./runtime/event-only-resume": {
+				"types": "./dist/runtime/event-only-resume.d.ts",
+				"default": "./dist/runtime/event-only-resume.js"
+			},
+			"./runtime/event-resume": {
+				"types": "./dist/runtime/event-resume.d.ts",
+				"default": "./dist/runtime/event-resume.js"
+			},
+			"./runtime/render": {
+				"types": "./dist/runtime/render.d.ts",
+				"default": "./dist/runtime/render.js"
+			},
+			"./runtime/render-to-string": {
+				"types": "./dist/runtime/render-to-string.d.ts",
+				"default": "./dist/runtime/render-to-string.js"
+			},
+			"./runtime/resume": {
+				"types": "./dist/runtime/resume.d.ts",
+				"default": "./dist/runtime/resume.js"
+			},
+			"./router": {
+				"types": "./dist/router.d.ts",
+				"default": "./dist/router.js"
+			},
+			"./router/vite": {
+				"types": "./dist/router/vite.d.ts",
+				"default": "./dist/router/vite.js"
+			},
+			"./web": {
+				"types": "./dist/web.d.ts",
+				"default": "./dist/web.js"
+			},
+			"./web/dom-journal": {
+				"types": "./dist/web/dom-journal.d.ts",
+				"default": "./dist/web/dom-journal.js"
+			},
+			"./web/dom-update": {
+				"types": "./dist/web/dom-update.d.ts",
+				"default": "./dist/web/dom-update.js"
+			},
+			"./web/event-only-resume": {
+				"types": "./dist/web/event-only-resume.d.ts",
+				"default": "./dist/web/event-only-resume.js"
+			},
+			"./web/event-resume": {
+				"types": "./dist/web/event-resume.d.ts",
+				"default": "./dist/web/event-resume.js"
+			},
+			"./web/render": {
+				"types": "./dist/web/render.d.ts",
+				"default": "./dist/web/render.js"
+			},
+			"./web/render-to-string": {
+				"types": "./dist/web/render-to-string.d.ts",
+				"default": "./dist/web/render-to-string.js"
+			},
+			"./web/resume": {
+				"types": "./dist/web/resume.d.ts",
+				"default": "./dist/web/resume.js"
+			},
+			"./vite": {
+				"types": "./dist/vite.d.ts",
+				"default": "./dist/vite.js"
+			}
+		}
+	},
 	"type": "module",
 	"sideEffects": false,
 	"exports": {
@@ -32,5 +131,11 @@
 		"@markless/bundler": "workspace:*",
 		"@markless/router": "workspace:*",
 		"@markless/web": "workspace:*"
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"prepublishOnly": "node ../../scripts/release/verify-publish-ready.mjs"
 	}
 }

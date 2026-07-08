@@ -51,7 +51,7 @@ test('keeps supported project choices and package shape visible', async () => {
 	};
 
 	expect(packageJson).toMatchObject({
-		name: '@markless/cli',
+		name: 'create-markless',
 	});
 	expect(packageJson.bin).toEqual({
 		'create-markless': './src/node.ts',
@@ -66,7 +66,9 @@ test('keeps supported project choices and package shape visible', async () => {
 	await expect(access(new URL('../src/cli.ts', import.meta.url))).rejects.toThrow();
 
 	const viteConfig = await readFile(new URL('../../../vite.config.ts', import.meta.url), 'utf-8');
-	expect(viteConfig).toContain("'cli/index': './packages/cli/src/index.ts'");
+	// Per-package pack config (release restructure): the cli package builds its
+	// own dist with an index entry; the old root-level 'cli/index' entry is gone.
+	expect(viteConfig).toMatch(/packageName: 'cli'[\s\S]*?index: '\.\/src\/index\.ts'/);
 	expect(viteConfig).not.toContain("'cli/cli'");
 });
 

@@ -1,7 +1,74 @@
 {
 	"name": "@markless/web",
-	"version": "0.0.0",
-	"private": true,
+	"version": "0.1.0",
+	"description": "Markless unified render/resume runtime for the web.",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/markless-dev/markless.git",
+		"directory": "packages/web"
+	},
+	"publishConfig": {
+		"access": "public",
+		"exports": {
+			".": {
+				"types": "./dist/index.d.ts",
+				"default": "./dist/index.js"
+			},
+			"./dom-journal": {
+				"types": "./dist/dom-journal.d.ts",
+				"default": "./dist/dom-journal.js"
+			},
+			"./dom-update": {
+				"types": "./dist/dom-update.d.ts",
+				"default": "./dist/dom-update.js"
+			},
+			"./event-only-resume": {
+				"types": "./dist/event-only-resume.d.ts",
+				"default": "./dist/event-only-resume.js"
+			},
+			"./event-only-lean/row": {
+				"types": "./dist/event-only-lean/row.d.ts",
+				"default": "./dist/event-only-lean/row.js"
+			},
+			"./event-only-lean/scalar-core": {
+				"types": "./dist/event-only-lean/scalar-core.d.ts",
+				"default": "./dist/event-only-lean/scalar-core.js"
+			},
+			"./event-only-lean/scalar-resume": {
+				"types": "./dist/event-only-lean/scalar-resume.d.ts",
+				"default": "./dist/event-only-lean/scalar-resume.js"
+			},
+			"./event-resume": {
+				"types": "./dist/event-resume.d.ts",
+				"default": "./dist/event-resume.js"
+			},
+			"./fns/*": {
+				"types": "./dist/fns/*.d.ts",
+				"default": "./dist/fns/*.js"
+			},
+			"./payload": {
+				"types": "./dist/payload.d.ts",
+				"default": "./dist/payload.js"
+			},
+			"./render": {
+				"types": "./dist/render.d.ts",
+				"default": "./dist/render.js"
+			},
+			"./render-to-stream": {
+				"types": "./dist/render-to-stream.d.ts",
+				"default": "./dist/render-to-stream.js"
+			},
+			"./render-to-string": {
+				"types": "./dist/render-to-string.d.ts",
+				"default": "./dist/render-to-string.js"
+			},
+			"./resume": {
+				"types": "./dist/resume.d.ts",
+				"default": "./dist/resume.js"
+			}
+		}
+	},
 	"type": "module",
 	"sideEffects": false,
 	"exports": {
@@ -23,5 +90,11 @@
 	"dependencies": {
 		"@markless/runtime": "workspace:*",
 		"@markless/serializer": "workspace:*"
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"prepublishOnly": "node ../../scripts/release/verify-publish-ready.mjs"
 	}
 }

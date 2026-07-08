@@ -196,14 +196,14 @@ describe('package metadata', () => {
 		);
 	});
 
-	test('router package publishes source files without local fixtures or boxes', async () => {
+	test('router package publishes built dist without local fixtures or boxes', async () => {
 		const router = JSON.parse(
 			await readFile(resolve(root, 'packages/router/package.json'), 'utf8'),
 		) as {
 			readonly files?: readonly string[];
 		};
 
-		expect(router.files).toEqual(['src']);
+		expect(router.files).toEqual(['dist']);
 	});
 
 	test('JSFB fixture aliases Markless subpath imports before the package root', async () => {

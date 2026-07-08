@@ -13,13 +13,16 @@
 		"bench:jsfb:guard": "node scripts/benchmarks/jsfb-baseline.mjs compare",
 		"bench:jsfb:prepare": "node scripts/benchmarks/prepare-jsfb-markless.mjs",
 		"test:compiler": "vp test packages/compiler/test/*.test.ts",
+		"publish": "pnpm --filter '@markless/*' --filter create-markless publish --access public --no-git-checks",
+		"release": "bumpp -r && pnpm build && pnpm run publish && gh release create \"$(git describe --tags --abbrev=0)\" --generate-notes",
 		"prepare": "git config core.hooksPath .githooks"
 	},
 	"devDependencies": {
 		"@async/witness": "0.7.0",
-		"@markless/cli": "workspace:*",
+		"create-markless": "workspace:*",
 		"@markless/typescript-plugin": "workspace:*",
 		"@types/node": "24.12.2",
+		"bumpp": "^10.4.1",
 		"rolldown": "1.0.3",
 		"typescript": "5.9.3",
 		"vite": "8.0.16",
