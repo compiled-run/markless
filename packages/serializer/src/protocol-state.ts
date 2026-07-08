@@ -104,6 +104,29 @@ export function createProtocolStatePayload(input: ProtocolStatePayloadInput): Pr
 	};
 }
 
+// Live-value cells (directValue, need 14) hold values that never crossed
+// HTML. Before a payload is SERVED, those values must become envelope-encoded
+// `value` fields — payload decoding rejects a leaked directValue. Cells that
+// are already encoded pass through untouched.
+export function serializeRuntimeStateCells(
+	cells: ProtocolStatePayload['cells'],
+): ProtocolStatePayload['cells'] {
+	return cells.map((cell) => {
+		if (cell.directValue === undefined) return cell;
+		const durable = {
+			graphNodeId: cell.graphNodeId,
+			name: cell.name ?? '',
+			valueKind: cell.valueKind ?? ('unknown' as const),
+			value: cell.directValue,
+		};
+		const result = serializeGraphValue(cell.directValue);
+		if (!result.ok) {
+			throw protocolStateSerializationError(durable, result.diagnostics[0]);
+		}
+		return { ...durable, value: result.payload };
+	});
+}
+
 // Render paths attach raw snapshots at runtime (SSR awaits async work, then
 // records the settled result); the served payload needs envelope-encoded
 // key/value fields, so hosts re-encode through this before emitting scripts.
