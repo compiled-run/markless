@@ -16,6 +16,7 @@
 		"./fns/*": "./src/fns/*.ts",
 		"./payload": "./src/payload.ts",
 		"./render": "./src/render.ts",
+		"./render-to-stream": "./src/render-to-stream.ts",
 		"./render-to-string": "./src/render-to-string.ts",
 		"./resume": "./src/payload-full.ts"
 	},

@@ -6,6 +6,7 @@ import {
 	type ResumePayloadScriptsResult,
 } from './payload-full.ts';
 import { getAlreadyResumedPayload, setResumedPayload } from './payload-resume-registry.ts';
+import { adoptStreamedArmPatches } from './resume-stream-patches.ts';
 
 export async function resumeFromPayloadScriptsImpl(
 	input: ResumePayloadScriptsInput,
@@ -13,7 +14,9 @@ export async function resumeFromPayloadScriptsImpl(
 	const resumed = getAlreadyResumedPayload(input.root);
 	if (resumed) return resumed;
 
-	const decoded = decodePayloadScripts(input);
+	// Streamed settles left records + snapshot patches in the document; adopt
+	// them before graph construction so the settled DOM resumes interactive.
+	const decoded = adoptStreamedArmPatches(decodePayloadScripts(input), input.root);
 	const graph = await createRuntimeGraphFromResumePayload({
 		state: decoded.state,
 		view: decoded.view,

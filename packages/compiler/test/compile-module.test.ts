@@ -2659,6 +2659,47 @@ export function App() @{
 	).toMatchObject({ status: 'fulfilled' });
 });
 
+// Grammar finding (verified empirically 2026-07-07; TSRX MCP unavailable in
+// the T107 session): @try + @catch WITHOUT @pending parses and keeps a
+// supported boundary gate, so the hold-the-stream branch is reachable. The
+// authored @pending arm is the structural streaming opt-in; without one the
+// boundary holds the stream — the server awaits it even under streaming.
+test('T107 a @try without @pending holds the stream (settled arm in the shell)', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/HeldPanel.tsrx',
+		source: `
+import { computed, state } from '@markless/core';
+
+export function App() @{
+	let topic = state('otters');
+	const facts = computed(async () => ({ headline: 'Fact about ' + topic }));
+
+	<section>
+		@try { <h2>{facts.headline}</h2> }
+		@catch { <p>No facts today</p> }
+	</section>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.diagnostics).toEqual([]);
+	expect(result.publicRenderPlan.asyncBoundaryGates).toEqual([
+		{ boundaryId: 'boundary:0', supported: true },
+	]);
+	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	const renderSsr = ssrModule.marklessRenderSsr as (
+		props?: unknown,
+		renderContext?: unknown,
+	) => Promise<{ readonly html: string; readonly state: ProtocolStatePayload }>;
+
+	const shell = await renderSsr(undefined, { streaming: { runs: new Map() } });
+	expect(shell.html).toContain('Fact about otters');
+	expect(
+		shell.state.computed.find((computed) => computed.graphNodeId === 'computed:facts')?.snapshot,
+	).toMatchObject({ status: 'fulfilled' });
+});
+
 test('compileTsrxModule renders the matching @switch case in SSR html', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/SwitchCard.tsrx',

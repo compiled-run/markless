@@ -34,9 +34,15 @@ export type RenderToStringOptions = {
 	readonly resumeModuleUrl?: string;
 	readonly resumerSource?: string;
 	readonly containerId?: string;
-	readonly modulePreloads?: ReadonlyArray<ModulePreloadInput>;
+	// Static preloads, or a callback resolved against the rendered page html
+	// (streaming hosts compute Link-target preloads from the shell output).
+	readonly modulePreloads?:
+		| ReadonlyArray<ModulePreloadInput>
+		| ((html: string) => ReadonlyArray<ModulePreloadInput> | undefined);
 	readonly inlineRuntimeRegistry?: Set<string>;
 	readonly executionLog?: MarklessExecutionLogMode;
+	// Page props forwarded to the compiled renderSsr (router hosts).
+	readonly props?: unknown;
 };
 
 export type ModulePreloadInput =
@@ -58,7 +64,18 @@ export async function renderToString(
 	component: SsrRenderable,
 	options: RenderToStringOptions = {},
 ): string {
-	const output = await renderSsrOutput(component);
+	const output = await renderSsrOutput(component, options.props, undefined);
+	return assembleSsrContainer(component, output, options);
+}
+
+// Shared container assembly for the blocking (renderToString) and streaming
+// (renderToStream) paths: payload scripts, preload links, head injections,
+// and the inline resumer around the rendered page html.
+export async function assembleSsrContainer(
+	component: SsrRenderable,
+	output: SsrRenderOutput,
+	options: RenderToStringOptions,
+): Promise<string> {
 	const hasPayload = !!output.state || !!output.view;
 	const rawState = output.state ?? emptyStatePayload();
 	// Runtime-attached async snapshots and live directValue cells (host-seeded
@@ -75,8 +92,12 @@ export async function renderToString(
 	const resumeModuleUrl = options.resumeModuleUrl ?? artifactResumeModuleUrl(component);
 	const executionLog = options.executionLog ?? artifactExecutionLog(component) ?? 'auto';
 	const browserTriggers = hasBrowserTriggers(view, state);
+	const optionPreloads =
+		typeof options.modulePreloads === 'function'
+			? options.modulePreloads(output.html)
+			: options.modulePreloads;
 	const modulePreloads =
-		options.modulePreloads ?? (browserTriggers ? artifactModulePreloads(component) : undefined);
+		optionPreloads ?? (browserTriggers ? artifactModulePreloads(component) : undefined);
 	const resumerScript =
 		hasPayload && browserTriggers
 			? renderInlineResumerScript(
@@ -105,13 +126,28 @@ export async function renderToString(
 		.join('');
 }
 
-async function renderSsrOutput(component: SsrRenderable): Promise<SsrRenderOutput> {
-	if (typeof component === 'function') return component();
-	if (component && typeof component.renderSsr === 'function') return component.renderSsr();
+// The optional render context is the per-request streaming channel: compiled
+// renderSsr threads it into child renders and async runners (T107).
+export async function renderSsrOutput(
+	component: SsrRenderable,
+	props: unknown,
+	renderContext: unknown,
+): Promise<SsrRenderOutput> {
+	if (typeof component === 'function') {
+		return (component as (props?: unknown, renderContext?: unknown) => SsrRenderOutput)(
+			props,
+			renderContext,
+		);
+	}
+	if (component && typeof component.renderSsr === 'function') {
+		return (
+			component.renderSsr as (props?: unknown, renderContext?: unknown) => SsrRenderOutput
+		)(props, renderContext);
+	}
 	throw new TypeError('renderToString(App) requires a compiled TSRX artifact.');
 }
 
-function artifactResumeModuleUrl(component: SsrRenderable): string | undefined {
+export function artifactResumeModuleUrl(component: SsrRenderable): string | undefined {
 	return typeof component === 'object' ? component.resumeModuleUrl : undefined;
 }
 

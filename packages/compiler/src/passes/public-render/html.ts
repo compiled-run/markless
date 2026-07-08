@@ -375,10 +375,13 @@ function emitAsyncBoundaryHtml(node: AnyNode, context: HtmlRenderContext): strin
 		// Three-way on snapshot status: a streaming render context (T107) makes
 		// the runner return a pending snapshot instead of awaiting, so the
 		// @pending arm must render — never the @catch arm with an undefined
-		// error. Blocking mode only ever sees fulfilled/rejected here.
+		// error. Blocking mode only ever sees fulfilled/rejected here. The
+		// trailing literal declares whether the author wrote a @pending arm:
+		// its presence IS the streaming opt-in; without one the boundary holds
+		// the stream (the helper awaits).
 		return joinSsrExpressions([
 			JSON.stringify(`<!--markless:async:${boundary.id}-->`),
-			`(await ((async (marklessSsrAsyncSnapshot) => marklessSsrAsyncSnapshot.status === "fulfilled" ? (async (${runner.name}) => ${tryHtml})(marklessSsrAsyncSnapshot.value) : marklessSsrAsyncSnapshot.status === "rejected" ? (async (${catchParam}) => ${catchHtml})(marklessSsrAsyncSnapshot.error) : (async () => ${pendingHtml})())(await marklessSsrRunAsyncComputed(marklessSsrAsyncSnapshots, ${JSON.stringify(runner.graphNodeId)}, ${runner.source}, marklessSsrRenderContext))))`,
+			`(await ((async (marklessSsrAsyncSnapshot) => marklessSsrAsyncSnapshot.status === "fulfilled" ? (async (${runner.name}) => ${tryHtml})(marklessSsrAsyncSnapshot.value) : marklessSsrAsyncSnapshot.status === "rejected" ? (async (${catchParam}) => ${catchHtml})(marklessSsrAsyncSnapshot.error) : (async () => ${pendingHtml})())(await marklessSsrRunAsyncComputed(marklessSsrAsyncSnapshots, ${JSON.stringify(runner.graphNodeId)}, ${runner.source}, marklessSsrRenderContext, ${String(node.pending != null)}))))`,
 			JSON.stringify(`<!--/markless:async:${boundary.id}-->`),
 		]);
 	}

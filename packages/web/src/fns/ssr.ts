@@ -44,19 +44,25 @@ export function marklessAssertPresentationalRowChild(output, componentName) {
 	throw error;
 }
 export function marklessSsrBranchArm(branches, id, takenArm) { branches.push({ id, takenArm }); return ""; }
-export async function marklessSsrRunAsyncComputed(snapshots, graphNodeId, run, renderContext) {
-	// Streaming mode (T107): the render context carries a per-request runner
-	// registry. run() executes ONCE per graph node across streaming passes; an
-	// unsettled runner returns a pending snapshot (the compiled boundary lambda
-	// renders the @pending arm), and re-render passes reuse the in-flight
-	// promise so the settled arm renders without re-running the runner.
-	const streamingRuns = renderContext?.streaming?.runs;
-	if (streamingRuns) {
-		let entry = streamingRuns.get(graphNodeId);
+export async function marklessSsrRunAsyncComputed(snapshots, graphNodeId, run, renderContext, hasPendingArm) {
+	// Streaming mode (T107, owner-ratified three-layer semantics): the render
+	// context carries a per-request runner registry. run() executes ONCE per
+	// graph node across streaming passes; re-render passes reuse the in-flight
+	// promise. Boundary tier: an authored @pending arm IS the streaming opt-in
+	// (hasPendingArm) — a @try without @pending HOLDS the stream (awaits).
+	// Per-request tier: runners get until the shared first-flush deadline to
+	// settle inline; only still-pending boundaries stream.
+	const streaming = renderContext?.streaming;
+	if (streaming?.runs) {
+		let entry = streaming.runs.get(graphNodeId);
 		if (!entry) {
 			entry = { promise: marklessSsrSettleAsyncComputed(run) };
 			entry.promise.then((settledSnapshot) => { entry.settled = settledSnapshot; });
-			streamingRuns.set(graphNodeId, entry);
+			streaming.runs.set(graphNodeId, entry);
+		}
+		if (!entry.settled) {
+			if (hasPendingArm !== true) await entry.promise;
+			else if (streaming.deadline) await Promise.race([entry.promise, streaming.deadline]);
 		}
 		const snapshot = entry.settled ?? { status: "pending", version: 1, key: null };
 		snapshots.push({ graphNodeId, snapshot });
