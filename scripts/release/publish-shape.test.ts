@@ -39,6 +39,7 @@ type PackageManifest = {
 	readonly bin?: Record<string, string>;
 	readonly scripts?: Record<string, string>;
 	readonly dependencies?: Record<string, string>;
+	readonly peerDependencies?: Record<string, string>;
 	readonly publishConfig?: {
 		readonly access?: string;
 		readonly exports?: Record<string, ExportTarget>;
@@ -261,6 +262,59 @@ describe.skipIf(!packedDistExists)('packed dist output (run `vp pack` first)', (
 			'dist/vite.js must resolve published entries under src/vite/entries',
 		).toBe(true);
 	});
+
+	// T006 dependency-classification guard. vp pack externalizes exactly the
+	// declared dependencies/peerDependencies, so a dependency that no SHIPPED
+	// file (dist output plus any extra `files` directories shipped as source,
+	// e.g. the router's app-context vite entries) ever imports is dead weight
+	// every consumer installs for nothing — move it to devDependencies.
+	// Codegen strings inside shipped files can over-count reachability; that
+	// direction only keeps a dependency, never drops one, so the guard stays
+	// conservative. The reverse direction (imports with no declared dependency)
+	// is covered by the tarball-consumer smokes and the closure guards.
+	const shippedModuleExtensions = ['.js', '.cjs', '.mjs', '.ts'];
+	function shippedModuleFiles(packageDir: string, files: readonly string[]): string[] {
+		const collected: string[] = [];
+		for (const entry of files) {
+			// cli templates are the SCAFFOLDED app's code (its own manifest deps),
+			// not part of the cli package's module graph.
+			if (entry === 'templates') continue;
+			const directory = resolve(packageDir, entry);
+			if (!existsSync(directory)) continue;
+			for (const dirent of readdirSync(directory, { withFileTypes: true, recursive: true })) {
+				if (!dirent.isFile()) continue;
+				if (!shippedModuleExtensions.some((extension) => dirent.name.endsWith(extension))) {
+					continue;
+				}
+				collected.push(resolve(dirent.parentPath, dirent.name));
+			}
+		}
+		return collected;
+	}
+
+	for (const packageName of releasePackages) {
+		test(`@markless/${packageName} declares no dependency its shipped files never import`, () => {
+			const manifest = readManifest(packageName);
+			const declared = Object.keys({
+				...manifest.dependencies,
+				...manifest.peerDependencies,
+			});
+			if (declared.length === 0) return;
+			const packageDir = resolve(repoRoot, 'packages', packageName);
+			const specifiers = shippedModuleFiles(packageDir, manifest.files ?? []).flatMap((file) =>
+				staticImportSpecifiers(readFileSync(file, 'utf8')),
+			);
+			for (const dependency of declared) {
+				expect(
+					specifiers.some(
+						(specifier) =>
+							specifier === dependency || specifier.startsWith(`${dependency}/`),
+					),
+					`${packageName} declares ${dependency} but no shipped file imports it — dead weight for consumers (move it to devDependencies)`,
+				).toBe(true);
+			}
+		});
+	}
 
 	test('@markless/core packed root entry stays node-free and bundler-free', () => {
 		const manifest = readManifest('core');
