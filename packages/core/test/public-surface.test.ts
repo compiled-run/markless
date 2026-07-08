@@ -7,10 +7,11 @@ import {
 	renderToString,
 	resumeFromPayloadDocument,
 	resumeFromPayloadScripts,
-	marklessClient,
 	shared,
 	state,
 } from '../src/index.ts';
+import * as rootSurface from '../src/index.ts';
+import { marklessClient } from '../src/rolldown.ts';
 import { Link } from '../src/router.ts';
 import { router } from '../src/router/vite.ts';
 import { applyDomJournalEntries as narrowApplyDomJournalEntries } from '../src/runtime/dom-journal.ts';
@@ -48,6 +49,14 @@ test('main package exposes the curated author and build surface', () => {
 	expect(typeof router).toBe('function');
 });
 
+test('build plugins stay off the root entry (subpaths ./vite and ./rolldown only)', () => {
+	// Owner doctrine: the root import of @markless/core is a browser entry.
+	// Build tooling (rolldown/vite plugins) must never be resolvable from it.
+	expect('marklessClient' in rootSurface).toBe(false);
+	expect('marklessLib' in rootSurface).toBe(false);
+	expect('marklessServer' in rootSurface).toBe(false);
+});
+
 test('root and grouped runtime entries use internal package boundaries deliberately', async () => {
 	const staleScope = '@markless' + 'js/';
 	const [indexSource, runtimeSource] = await Promise.all([
@@ -61,7 +70,8 @@ test('root and grouped runtime entries use internal package boundaries deliberat
 	expect(indexSource).toContain("from './render.ts'");
 	expect(indexSource).toContain("from '@markless/web/render-to-string'");
 	expect(indexSource).toContain("from '@markless/web/resume'");
-	expect(indexSource).toContain("from '@markless/bundler/rolldown'");
+	expect(indexSource).not.toContain('@markless/bundler');
+	expect(indexSource).not.toContain('rolldown');
 	expect(runtimeSource).toContain("from '@markless/web/render'");
 	expect(runtimeSource).toContain("from '@markless/web/render-to-string'");
 	expect(runtimeSource).toContain("from '@markless/web/resume'");
