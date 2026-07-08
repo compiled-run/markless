@@ -19,6 +19,22 @@
 //                the data wells settle. Ordering-based (the 300ms throttle
 //                guarantees pre-settle frames), no absolute-time assertions.
 //
+//   total-cls  Whole-page refresh stability (goal shell-decomposition T004).
+//            Throttled (/api/view +300ms) chromium refresh of home ('/#/') and
+//            a deep link ('/#/r/<repo>/issues') gated on REAL layout-shift
+//            (PerformanceObserver, buffered) plus the replacement-jank the CLS
+//            metric cannot see (wholesale element swaps score 0):
+//            (a) total layout-shift score within budget on both refreshes;
+//            (b) home refresh performs ZERO body swaps — the SSR'd document IS
+//                the '/' route, so the router must resume it, never re-render
+//                it (the identity boot swap was the measured whole-page jump);
+//            (c) a deep-link refresh performs exactly ONE body swap, shows
+//                ZERO pending-arm frames at/after the swap, and the destination
+//                content regions never change geometry after the swap (the D8
+//                boot-swap hold commits settled content, not @pending arms).
+//            The +300ms throttle exceeds the 250ms navigation deadline, so the
+//            pre-fix deadline path is deterministically exercised.
+//
 //   journey  Unthrottled navigation journey home -> repo code -> issues:
 //            frame sampler asserts ZERO pending-arm ("Loading…"/.empty-state)
 //            frames (D8 intact) and a stable header box across swaps; then the
@@ -33,7 +49,7 @@
 // Invocation (markless repo root; requires a built dashboard:
 // `pnpm --dir ../design-system-manager/markless-dashboard build`):
 //
-//   node scripts/test-utils/shell-chrome-oracle.ts [--phase cls|journey|specs]
+//   node scripts/test-utils/shell-chrome-oracle.ts [--phase cls|total-cls|journey|specs]
 //
 // Env: DSM_ROOT (../design-system-manager), THROTTLE_DELAY_MS (300),
 //      PREVIEW_PORT (4961), BACKEND_PORT (4962), PROXY_PORT (4963),
@@ -440,6 +456,138 @@ async function phaseCls() {
 	}
 }
 
+// --- total-cls phase -------------------------------------------------------------
+
+// Real layout-shift score budget. Measured 0.0000 on every mode of this app
+// (T004): wholesale element replacement scores zero, which is exactly why the
+// structural swap/pending/geometry gates below exist alongside the score.
+const totalClsScoreBudget = 0.02;
+
+// Layout-shift observer + body-swap counter. A body "swap" is a child-list
+// mutation removing a rendered element (streamed <script>/<template>
+// bookkeeping nodes are not content) — the signature of a route boot swap
+// replacing the SSR'd document root.
+const totalClsInit = `(() => {
+	window.__totalCls = { score: 0, shifts: 0, bodySwaps: [] };
+	new PerformanceObserver((list) => {
+		for (const entry of list.getEntries()) {
+			if (entry.hadRecentInput) continue;
+			window.__totalCls.score += entry.value;
+			window.__totalCls.shifts++;
+		}
+	}).observe({ type: 'layout-shift', buffered: true });
+	const isRenderedElement = (node) =>
+		node.nodeType === 1 && node.tagName !== 'SCRIPT' && node.tagName !== 'TEMPLATE';
+	const watchBody = () => {
+		if (!document.body) return false;
+		new MutationObserver((records) => {
+			for (const record of records) {
+				if ([...record.removedNodes].some(isRenderedElement)) {
+					window.__totalCls.bodySwaps.push(Math.round(performance.now()));
+				}
+			}
+		}).observe(document.body, { childList: true });
+		return true;
+	};
+	if (!watchBody()) {
+		new MutationObserver((_, observer) => {
+			if (watchBody()) observer.disconnect();
+		}).observe(document.documentElement ?? document, { childList: true, subtree: true });
+	}
+})();`;
+
+function boxKey(box: FrameSample['boxes'][string] | undefined): string {
+	return box ? `${box.x},${box.y},${box.w},${box.h}` : 'absent';
+}
+
+async function phaseTotalCls() {
+	const base = `http://127.0.0.1:${previewPort}`;
+	const { chromium } = await loadPlaywright();
+	const browser = await chromium.launch({ headless: true });
+	const contentRegions = ['#repo-context', '.underline-nav', 'main#app'];
+	try {
+		// pages[0] = home identity refresh; pages[1] = repo deep-link refresh.
+		for (const page of [pages[0]!, pages[1]!]) {
+			const label = `total-cls:${page.label}`;
+			const context = await browser.newContext();
+			const tab = await context.newPage();
+			await tab.addInitScript(samplerInit);
+			await tab.addInitScript(totalClsInit);
+			await tab.goto(`${base}${page.hash}`, { waitUntil: 'commit' });
+			try {
+				await tab.waitForFunction(
+					() => {
+						const select = document.querySelector('#actor-select') as HTMLSelectElement | null;
+						return !!select && select.options.length > 0;
+					},
+					{ timeout: 20_000 },
+				);
+				await tab.waitForSelector(page.contentReady, { timeout: 20_000 });
+			} catch (error) {
+				gate(false, `${label}: settle wait failed (${(error as Error).message.split('\n')[0]})`);
+			}
+			await tab.waitForTimeout(600);
+			const totals = (await tab.evaluate('window.__totalCls')) as {
+				score: number;
+				shifts: number;
+				bodySwaps: number[];
+			};
+			const samples = (await tab.evaluate('window.__chromeSamples')) as FrameSample[];
+			console.log(
+				`${label}: layout-shift score=${totals.score.toFixed(4)} (${totals.shifts} entries); ` +
+					`body swaps=${totals.bodySwaps.length}${totals.bodySwaps.length ? ` @${totals.bodySwaps.join(',@')}ms` : ''}`,
+			);
+			gate(
+				totals.score <= totalClsScoreBudget,
+				`${label}: layout-shift score ${totals.score.toFixed(4)} > budget ${totalClsScoreBudget}`,
+			);
+			if (page.mountSelector === null) {
+				// Home: the SSR'd document IS the '/' route. Resume owns it — the
+				// router must never replace the streamed document with a client
+				// re-render (the measured identity boot swap).
+				gate(
+					totals.bodySwaps.length === 0,
+					`${label}: ${totals.bodySwaps.length} body swap(s) on an identity refresh (SSR'd route re-rendered client-side)`,
+				);
+			} else {
+				// Deep link: the server rendered '/', so exactly one swap to the
+				// hash route is expected — but it must commit SETTLED content
+				// (D8 boot-swap hold), never @pending arms, and the destination
+				// regions must land at final geometry.
+				gate(
+					totals.bodySwaps.length === 1,
+					`${label}: expected exactly 1 boot swap, saw ${totals.bodySwaps.length}`,
+				);
+				const swapAt = totals.bodySwaps[0] ?? 0;
+				const postSwap = samples.filter((sample) => sample.t >= swapAt && sample.hasContent);
+				const pendingAfterSwap = postSwap.filter((sample) => sample.pendingArm);
+				gate(
+					pendingAfterSwap.length === 0,
+					`${label}: ${pendingAfterSwap.length} pending-arm frame(s) at/after the boot swap (deadline committed fallback over the live document)`,
+				);
+				for (const selector of contentRegions) {
+					const boxes = postSwap
+						.filter((sample) => sample.boxes[selector])
+						.map((sample) => ({ t: sample.t, key: boxKey(sample.boxes[selector]) }));
+					const distinct = [...new Set(boxes.map((box) => box.key))];
+					if (boxes.length > 0) {
+						console.log(
+							`${label} ${selector}: ${distinct.length} post-swap geometry state(s): ${distinct.join(' -> ')}`,
+						);
+					}
+					gate(
+						distinct.length <= 1,
+						`${label}: ${selector} changed geometry ${distinct.length - 1}x after the boot swap (content committed unsettled)`,
+					);
+				}
+			}
+			await context.close();
+		}
+	} finally {
+		await browser.close();
+	}
+}
+
 async function phaseJourney() {
 	const base = `http://127.0.0.1:${previewPort}`;
 	const { chromium } = await loadPlaywright();
@@ -551,7 +699,7 @@ try {
 	proxyHandle = await startLatencyProxy({
 		listenPort: proxyPort,
 		upstreamOrigin: `http://127.0.0.1:${backendPort}`,
-		delayMs: phase === 'cls' ? delayMs : 0,
+		delayMs: phase === 'cls' || phase === 'total-cls' ? delayMs : 0,
 		delayPathPrefixes: ['/api/view'],
 	});
 
@@ -571,9 +719,10 @@ try {
 	);
 
 	if (phase === 'cls') await phaseCls();
+	else if (phase === 'total-cls') await phaseTotalCls();
 	else if (phase === 'journey') await phaseJourney();
 	else if (phase === 'specs') await phaseSpecs();
-	else fail(`unknown --phase ${phase} (cls|journey|specs)`);
+	else fail(`unknown --phase ${phase} (cls|total-cls|journey|specs)`);
 
 	if (failures.length > 0) {
 		fail(`${failures.length} gate(s) failed:\n  - ${failures.join('\n  - ')}`);

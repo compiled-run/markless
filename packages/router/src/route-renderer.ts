@@ -49,6 +49,7 @@ async function renderRouteUpdate(document: Document, update: RouteUpdate): Promi
 						holdNavigationSwapUntilSettled({
 							runtime: container.runtime as NavigationHoldRuntime,
 							signal: update.signal,
+							bootSwap: update.bootSwap,
 						}),
 				},
 			);

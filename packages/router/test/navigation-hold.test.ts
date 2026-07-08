@@ -35,6 +35,8 @@ type NavigationCase = {
 	readonly holdRegisteredFirst?: boolean;
 	/** whenAsyncBoundariesSettled rejects after settling (flush failure). */
 	readonly settleRejects?: boolean;
+	/** Deep-link boot swap: the SSR'd document stays live past the deadline. */
+	readonly bootSwap?: boolean;
 };
 
 type NavigationRun = {
@@ -101,6 +103,7 @@ async function runNavigation(navigationCase: NavigationCase): Promise<Navigation
 			runtime,
 			signal: controller.signal,
 			clock,
+			bootSwap: navigationCase.bootSwap,
 		}).then((result) => {
 			swapResult = result;
 			swapAt = clock.now();
@@ -288,6 +291,57 @@ describe('D8 navigation hold state machine (fake clock)', () => {
 			expectUniversalInvariants(run, navigationCase);
 			expectSettledFirstModel(run, navigationCase);
 		}
+	});
+});
+
+// T004 (shell-decomposition): a hash deep link boots on the SSR'd '/' shell —
+// real, live UI nobody navigated away from. The click-feedback purpose of the
+// deadline does not exist at boot, so a deadline expiry must NOT replace the
+// visible document with @pending fallback (D8 prime rule: nothing visible is
+// ever replaced by fallback UI). The boot swap keeps holding until the
+// destination settles; pending UI never shows and the min-visible floor never
+// engages. Same machine, one branch — no second timing vocabulary.
+describe('D8 boot swap hold (deep-link refresh, fake clock)', () => {
+	it('slow settle past the deadline: no pending UI, swap commits at settle', async () => {
+		for (const settleAt of [251, 400, 600]) {
+			const navigationCase = { settleTimesMs: [settleAt], bootSwap: true };
+			const run = await runNavigation(navigationCase);
+			expectUniversalInvariants(run, navigationCase);
+			expect(run.pendingShownAt, `settle@${settleAt}`).toBeUndefined();
+			expect(run.swapAt, `settle@${settleAt}`).toBe(settleAt);
+			expect(run.commits[0]!.at, `settle@${settleAt}`).toBe(settleAt);
+		}
+	});
+
+	it('fast settle inside the deadline behaves exactly like a navigation', async () => {
+		const navigationCase = { settleTimesMs: [100], bootSwap: true };
+		const run = await runNavigation(navigationCase);
+		expectUniversalInvariants(run, navigationCase);
+		expect(run.pendingShownAt).toBeUndefined();
+		expect(run.swapAt).toBe(100);
+	});
+
+	it('multiple boundaries straddling the deadline: one swap at the last settle', async () => {
+		const navigationCase = { settleTimesMs: [50, 240, 460], bootSwap: true };
+		const run = await runNavigation(navigationCase);
+		expectUniversalInvariants(run, navigationCase);
+		expect(run.pendingShownAt).toBeUndefined();
+		expect(run.swapAt).toBe(460);
+	});
+
+	it('a settle failure past the deadline still commits (fails loudly in its own flush)', async () => {
+		const navigationCase = { settleTimesMs: [400], settleRejects: true, bootSwap: true };
+		const run = await runNavigation(navigationCase);
+		expectUniversalInvariants(run, navigationCase);
+		expect(run.pendingShownAt).toBeUndefined();
+		expect(run.swapAt).toBe(400);
+	});
+
+	it('a superseding navigation during the extended hold cancels the boot mount', async () => {
+		const navigationCase = { settleTimesMs: [500], abortAtMs: 301, bootSwap: true };
+		const run = await runNavigation(navigationCase);
+		expectUniversalInvariants(run, navigationCase);
+		expect(run.swapResult).toBe(false);
 	});
 });
 

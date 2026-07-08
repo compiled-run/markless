@@ -334,6 +334,55 @@ test('a streamed commit arriving just after first paint waits out the pending mi
 	}
 });
 
+// T004 (shell-decomposition): a hash deep-link boot swap replaces the SSR'd
+// document with a CLIENT-rendered page whose boundary ids collide with the
+// outgoing document's (both pages number their boundaries `x:0, x:1, ...`).
+// A late streamed settle template belongs to the SSR'd container document
+// ONLY — it must never commit into same-id anchors of a client-rendered page
+// (measured on the dashboard: the home repo list injected itself into the
+// deep-linked issues page after the boot swap). Client-rendered roots carry
+// no data-async-container, so the executor fails closed on a missing
+// container root: template removed, foreign content untouched.
+test('a late streamed template never commits into a client-rendered page with colliding boundary ids', async () => {
+	const stream = await renderToStream(beaconArtifact(30) as never, {});
+	expect(stream.pendingArmCount).toBe(1);
+
+	const host = document.createElement('div');
+	document.body.appendChild(host);
+	const tail = document.createElement('div');
+	document.body.appendChild(tail);
+	try {
+		host.innerHTML = stream.shell;
+		// Collect the settle chunks WITHOUT executing them yet: the late
+		// template is still in flight while the router boot-swaps the page.
+		const lateChunks: string[] = [];
+		for await (const chunk of stream.appends()) lateChunks.push(chunk);
+
+		// Boot swap: the SSR'd document root is replaced wholesale by a
+		// client-rendered page (no data-async-container) that owns a boundary
+		// with the SAME id in its own coordinate space.
+		host.innerHTML =
+			'<main><!--markless:async:beacon:0-->' +
+			'<p data-relay>Relay departures loaded</p>' +
+			'<!--/markless:async:beacon:0--></main>';
+
+		tail.insertAdjacentHTML('beforeend', lateChunks.join(''));
+		runInlineScripts(tail);
+		// The executor's reveal consumes the template either way (commit or
+		// fail-closed no-op); polling its consumption avoids racing the flush.
+		await expect
+			.poll(() => document.querySelector('template[m\\:arm]'), { timeout: 5_000 })
+			.toBeNull();
+
+		expect(host.querySelector('[data-relay]')?.textContent).toBe('Relay departures loaded');
+		expect(host.querySelector('[data-signal]')).toBeNull();
+	} finally {
+		tail.remove();
+		host.remove();
+		delete (globalThis as { __mArm?: unknown }).__mArm;
+	}
+});
+
 test('__mArm commits a later-flushed template into the anchor range without the runtime', async () => {
 	const stream = await renderToStream(beaconArtifact(30) as never, {});
 	expect(stream.pendingArmCount).toBe(1);

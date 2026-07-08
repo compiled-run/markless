@@ -99,8 +99,20 @@ export async function __marklessRouterStartSpaNavigation(options: StartSpaNaviga
 			runtimeWindow.location.href,
 		);
 		const bootHashPath = bootUrl ? hashRoutePath(bootUrl) : undefined;
-		if (bootUrl && bootHashPath && matchRouteManifest(bootHashPath, context.manifest)) {
-			void renderRoute(bootUrl, context);
+		// When the hash path IS the document path+search ('/#/' refresh serves
+		// '/'), the SSR'd document already rendered exactly this route: resume
+		// owns it. A client re-render would replace settled streamed content
+		// with a fresh @pending render and re-fetch every boundary — the
+		// measured whole-page jump on home refresh (T004).
+		const alreadyServerRendered =
+			!!bootUrl && bootHashPath === `${bootUrl.pathname}${bootUrl.search}`;
+		if (
+			bootUrl &&
+			bootHashPath &&
+			!alreadyServerRendered &&
+			matchRouteManifest(bootHashPath, context.manifest)
+		) {
+			void renderRoute(bootUrl, context, undefined, { bootSwap: true });
 		}
 	}
 }
@@ -135,7 +147,12 @@ export function handleNavigateEvent(event: NavigateEvent, context: NavigationCon
 	return true;
 }
 
-async function renderRoute(url: URL, context: NavigationContext, signal?: AbortSignal) {
+async function renderRoute(
+	url: URL,
+	context: NavigationContext,
+	signal?: AbortSignal,
+	options?: { readonly bootSwap?: boolean },
+) {
 	if (signal?.aborted) {
 		return;
 	}
@@ -163,6 +180,7 @@ async function renderRoute(url: URL, context: NavigationContext, signal?: AbortS
 	}
 
 	const update: RouteUpdate = {
+		bootSwap: options?.bootSwap,
 		document: document as RouteDocumentModule | undefined,
 		page: page as never,
 		route: {

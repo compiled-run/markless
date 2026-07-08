@@ -22,6 +22,10 @@ export interface RouteDocumentModule {
 }
 
 export interface RouteUpdate {
+	// True for the hash deep-link swap at boot: the outgoing document is live
+	// SSR'd UI nobody clicked away from, so the D8 hold never commits @pending
+	// fallback over it — it holds until the destination settles (T004).
+	readonly bootSwap?: boolean;
 	readonly document?: RouteDocumentModule;
 	readonly page: RoutePageModule;
 	readonly route: RouteState;

@@ -258,6 +258,13 @@ function renderArmAppend(
 // mirroring the inline resumer's record-less fallback. If the resume runtime
 // already started, the client settle path owns the boundary: no-op.
 //
+// Anchors found OUTSIDE a [data-async-container] root are not this stream's
+// anchors: every SSR/streamed shell wraps the page in that container, while a
+// router boot swap replaces it with a CLIENT-rendered page whose page-scoped
+// boundary ids collide with the outgoing document's. A late template must
+// fail closed there (T004: the home repo list injected itself into a
+// deep-linked page after the boot swap), never range-replace foreign content.
+//
 // Reveal trains (T113, G1/C3/G2): commits queue and reveal in trains —
 // before the document's first paint they flush in the pre-paint frame (the
 // pending arm never became visible, so the settled content simply appears:
@@ -301,7 +308,7 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 	}
 	if (!s || !e || s.parentNode !== e.parentNode) throw new Error('MARKLESS_STREAM_ARM_ANCHORS_MISSING: ' + id);
 	const root = s.parentElement && s.parentElement.closest && s.parentElement.closest('[data-async-container]');
-	if (root && root.__asyncResumeRuntimeStarted) { tpl.remove(); return; }
+	if (!root || root.__asyncResumeRuntimeStarted) { tpl.remove(); return; }
 	while (s.nextSibling && s.nextSibling !== e) s.parentNode.removeChild(s.nextSibling);
 	s.parentNode.insertBefore(tpl.content, e);
 	tpl.remove();${wake}

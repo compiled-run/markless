@@ -27,16 +27,29 @@ export type NavigationHoldRuntime = {
 // deadline passes (D8: nothing visible is ever replaced by fallback UI).
 // A superseded navigation (aborted signal) cancels the mount entirely by
 // resolving false.
+//
+// bootSwap (T004): a hash deep link boots on the SSR'd shell — real, live UI
+// with no click awaiting feedback, which is the only reason the deadline may
+// commit @pending fallback. A boot swap that misses the deadline therefore
+// keeps holding until the destination settles: the visible document is never
+// replaced by fallback UI, and the pending min-visible floor never engages.
 export async function holdNavigationSwapUntilSettled(input: {
 	readonly runtime: NavigationHoldRuntime;
 	readonly signal?: AbortSignal;
 	readonly clock?: NavigationHoldClock;
+	readonly bootSwap?: boolean;
 }): Promise<boolean | void> {
 	const settled = input.runtime.whenAsyncBoundariesSettled?.();
 	if (settled) {
 		const outcome = await settleOrPendingDeadline(settled, input.clock?.wait);
 		if (outcome === 'deadline') {
-			await input.runtime.holdPendingSettleCommits?.(MARKLESS_NAV_PENDING_MIN_MS);
+			if (input.bootSwap) {
+				// Settle failures commit the swap and fail loudly in their own
+				// flush, exactly like the pre-deadline race path.
+				await settled.catch(() => {});
+			} else {
+				await input.runtime.holdPendingSettleCommits?.(MARKLESS_NAV_PENDING_MIN_MS);
+			}
 		}
 	}
 	if (input.signal?.aborted) return false;

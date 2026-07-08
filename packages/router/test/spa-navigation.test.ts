@@ -753,6 +753,42 @@ describe('hash mode', () => {
 			params: { repo: 'alpha' },
 		});
 		expect(update?.page.default()).toBe('issues');
+		// T004 (shell-decomposition): the route renderer needs to know this swap
+		// replaces a live SSR'd document at boot, not a clicked navigation.
+		expect(update?.bootSwap).toBe(true);
+	});
+
+	it('skips the boot swap when the hash route is the route the server already rendered', async () => {
+		// Refreshing '/#/' serves the '/' document — the SSR'd page IS the
+		// destination. Re-rendering it client-side replaces settled streamed
+		// content with a fresh pending render (the measured whole-page jump on
+		// home refresh, T004) and double-fetches every boundary. Resume owns the
+		// document; no route update may be dispatched.
+		const document = new EventTarget() as Document;
+		const updates: unknown[] = [];
+		document.addEventListener(MARKLESS_ROUTER_ROUTE_EVENT, (event) => {
+			updates.push((event as CustomEvent).detail);
+		});
+		const runtimeWindow = {
+			addEventListener() {},
+			document,
+			location: { href: 'http://marklessrouter.test/#/' },
+			navigation: {
+				addEventListener() {},
+				navigate() {},
+			},
+		} as unknown as MarklessRouterNavigationWindow;
+
+		await __marklessRouterStartSpaNavigation({
+			pageModuleLoaders: {
+				'pages/index.tsrx': async () => ({ default: component('home') }),
+			},
+			routeFileIds: ['/pages/index.tsrx', '/pages/r/[repo]/issues.tsrx'],
+			window: runtimeWindow,
+		});
+		await new Promise((resolve) => setTimeout(resolve, 0));
+
+		expect(updates).toEqual([]);
 	});
 
 	it('intercepts plain-anchor hashChange (no link info) to a matching route', () => {
