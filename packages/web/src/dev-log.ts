@@ -62,13 +62,16 @@ export function describeMarklessExecutionCauses(input: {
 	const cause = input.eventRecord
 		? `${input.eventName} matched event record ${input.eventRecord.hostNodeId}`
 		: `${input.eventName} matched runtime records`;
+	const label = (moduleId: string) =>
+		formatMarklessModuleId(canonicalModuleId(moduleId, input.moduleSizes));
 	const rows = woken.map(
-		(moduleId) => `woke ${moduleId}${moduleKbSuffix(moduleId, input.moduleSizes)} <- ${cause}`,
+		(moduleId) =>
+			`woke ${label(moduleId)}${moduleKbSuffix(moduleId, input.moduleSizes)} <- ${cause}`,
 	);
 	if (input.eventRecord) {
 		for (const moduleId of warmModuleIds(input.dispatchModuleId, input.eventRecord.symbolIds)) {
 			rows.push(
-				`ran warm ${moduleId}${moduleKbSuffix(moduleId, input.moduleSizes)} <- ${cause}`,
+				`ran warm ${label(moduleId)}${moduleKbSuffix(moduleId, input.moduleSizes)} <- ${cause}`,
 			);
 		}
 	}
@@ -90,6 +93,45 @@ export function formatMarklessExecutedSize(
 	return `${formatExecutedKb(modules, moduleSizes)} executed`;
 }
 
+// Short display form for console rows: qualified symbol execution-log ids
+// (the symbol virtual module id — see @markless/bundler source-module.ts, the
+// id shape's single source of truth) render as "symbol:N (Source.tsrx)".
+export function formatMarklessModuleId(moduleId: string): string {
+	const parts = symbolModuleIdParts(moduleId);
+	if (!parts) return moduleId;
+	const sourceName = parts.source.split('/').pop() || parts.source;
+	return `${parts.symbolId} (${sourceName})`;
+}
+
+function symbolModuleIdParts(
+	moduleId: string,
+): { readonly source: string; readonly symbolId: string } | null {
+	const match = /^virtual:markless:symbol:([^:]+):([^:]+)$/.exec(moduleId);
+	if (!match) return null;
+	try {
+		return { source: decodeURIComponent(match[1]!), symbolId: decodeURIComponent(match[2]!) };
+	} catch {
+		return null;
+	}
+}
+
+// Size maps key symbols by qualified id, but payload event records carry the
+// module-local id ("symbol:N", possibly behind "c<i>:" child-route prefixes).
+// Join those to a qualified entry only when exactly one source module matches;
+// an ambiguous id must read as unknown rather than joining a wrong size.
+function canonicalModuleId(
+	moduleId: string,
+	moduleSizes: MarklessExecutionModuleSizes | undefined,
+): string {
+	if (!moduleSizes || moduleSizes.has(moduleId)) return moduleId;
+	const localId = moduleId.replace(/^(?:c\d+:)+/, '');
+	if (!localId.startsWith('symbol:')) return moduleId;
+	const matches = [...moduleSizes.keys()].filter(
+		(key) => symbolModuleIdParts(key)?.symbolId === localId,
+	);
+	return matches.length === 1 ? matches[0]! : moduleId;
+}
+
 function isLocalOrigin(origin: string): boolean {
 	return /^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::|$)/.test(origin);
 }
@@ -108,7 +150,7 @@ function formatExecutedKb(
 	moduleSizes: MarklessExecutionModuleSizes | undefined,
 ): string {
 	if (!moduleSizes) return modules.length === 1 ? '1 module' : `${modules.length} modules`;
-	const sizes = modules
+	const sizes = [...new Set(modules.map((moduleId) => canonicalModuleId(moduleId, moduleSizes)))]
 		.map((moduleId) => moduleSizes.get(moduleId))
 		.filter((size): size is MarklessExecutionModuleSize => !!size);
 	const estimated = [...moduleSizes.values()].some((size) => size.estimated);

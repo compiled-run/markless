@@ -27,16 +27,49 @@ export function injectExecutionLogModuleHook(
 	return `globalThis.__mxLog?.add(${JSON.stringify(moduleId)});\n${source}`;
 }
 
+const EXECUTION_LOG_HOOK_LINE = /^globalThis\.__mxLog\?\.add\("(?:[^"\\]|\\.)*"\);\n/;
+
+// The transform pass injects per-source-module symbol log ids ("symbol:N")
+// that collide across source files. The plugin re-keys the hook to the symbol
+// virtual module id (which embeds the source filename) so the executed id is
+// exactly the size-map join key. No-op when the source carries no hook
+// (production symbol modules).
+export function requalifyExecutionLogModuleHook(source: string, moduleId: string): string {
+	if (!EXECUTION_LOG_HOOK_LINE.test(source)) return source;
+	return source.replace(
+		EXECUTION_LOG_HOOK_LINE,
+		`globalThis.__mxLog?.add(${JSON.stringify(moduleId)});\n`,
+	);
+}
+
 export function executionLogVirtualModuleSource(
 	options: {
 		readonly moduleSizes?: ReadonlyMap<string, number>;
 		readonly sizesUrl?: string;
 	} = {},
 ): string {
+	if (!options.moduleSizes) return executionLogVirtualModuleSourceWithOwnSize(options, null);
+	// The module logs its own execution, so the dev estimate join must cover it
+	// too: measure the emitted source and embed that size (build sizes come
+	// from the emitted execution-sizes asset instead).
+	return executionLogVirtualModuleSourceWithOwnSize(
+		options,
+		executionLogVirtualModuleSourceWithOwnSize(options, 0).length,
+	);
+}
+
+function executionLogVirtualModuleSourceWithOwnSize(
+	options: {
+		readonly moduleSizes?: ReadonlyMap<string, number>;
+		readonly sizesUrl?: string;
+	},
+	ownRawSize: number | null,
+): string {
 	const moduleSizes = options.moduleSizes
-		? Object.fromEntries(
-				[...options.moduleSizes].map(([id, raw]) => [id, { raw, estimated: true }]),
-			)
+		? Object.fromEntries([
+				...[...options.moduleSizes].map(([id, raw]) => [id, { raw, estimated: true }]),
+				[MARKLESS_EXECUTION_LOG_MODULE_ID, { raw: ownRawSize ?? 0, estimated: true }],
+			])
 		: null;
 	return `
 globalThis.__mxLog?.add(${JSON.stringify(MARKLESS_EXECUTION_LOG_MODULE_ID)});
@@ -53,9 +86,18 @@ async function loadModuleSizes(input) {
 	marklessSizesPromise ||= fetch(marklessSizesUrl).then((response) => response.ok ? response.json() : undefined).then(normalizeSizes).catch(() => undefined);
 	return marklessSizesPromise;
 }
+function symbolParts(id) { const match = /^virtual:markless:symbol:([^:]+):([^:]+)$/.exec(id); if (!match) return null; try { return { source: decodeURIComponent(match[1]), symbolId: decodeURIComponent(match[2]) }; } catch { return null; } }
+function canonicalId(id, sizes) {
+	if (!sizes || sizes.has(id)) return id;
+	const local = id.replace(/^(?:c\\d+:)+/, '');
+	if (!local.startsWith('symbol:')) return id;
+	const matches = [...sizes.keys()].filter((key) => { const parts = symbolParts(key); return !!parts && parts.symbolId === local; });
+	return matches.length === 1 ? matches[0] : id;
+}
+function displayId(id) { const parts = symbolParts(id); return parts ? parts.symbolId + ' (' + (parts.source.split('/').pop() || parts.source) + ')' : id; }
 function kb(items, sizes) {
 	if (!sizes) return items.length === 1 ? '1 module' : items.length + ' modules';
-	const records = items.map((id) => sizes.get(id)).filter(Boolean); const est = [...sizes.values()].some((record) => record.estimated); let total = 0;
+	const records = [...new Set(items.map((id) => canonicalId(id, sizes)))].map((id) => sizes.get(id)).filter(Boolean); const est = [...sizes.values()].some((record) => record.estimated); let total = 0;
 	for (const record of records) total += record.estimated ? record.raw : (record.gzip || record.raw || 0);
 	return (total / 1024).toFixed(1) + ' KB' + (est ? ' est.' : '');
 }
@@ -64,8 +106,9 @@ function warmIds(event) { return [...new Set([event.dispatchModuleId, ...((event
 function causeRows(input) {
 	const before = input.before || new Set(); const after = input.after || new Set(); const woken = [...after].filter((id) => !before.has(id)); const record = input.eventRecord;
 	const cause = record ? input.eventName + ' matched event record ' + record.hostNodeId : input.eventName + ' matched runtime records';
-	const rows = woken.map((id) => 'woke ' + id + (input.moduleSizes ? ' (' + kb([id], input.moduleSizes) + ')' : '') + ' <- ' + cause);
-	if (record) for (const id of warmIds(input)) rows.push('ran warm ' + id + (input.moduleSizes ? ' (' + kb([id], input.moduleSizes) + ')' : '') + ' <- ' + cause);
+	const label = (id) => displayId(canonicalId(id, input.moduleSizes));
+	const rows = woken.map((id) => 'woke ' + label(id) + (input.moduleSizes ? ' (' + kb([id], input.moduleSizes) + ')' : '') + ' <- ' + cause);
+	if (record) for (const id of warmIds(input)) rows.push('ran warm ' + label(id) + (input.moduleSizes ? ' (' + kb([id], input.moduleSizes) + ')' : '') + ' <- ' + cause);
 	if (record && !(input.view?.behaviors || []).some((b) => b.hostNodeId === record.hostNodeId)) rows.push('skip behavior — no matching record touched');
 	return rows;
 }
@@ -115,7 +158,10 @@ export async function createExecutionSizesAsset(
 		for (const symbol of module.symbols) {
 			if (!symbol.fileName) continue;
 			const chunk = symbolLogIdsByChunk.get(symbol.fileName) ?? [];
-			chunk.push(symbolLogId(symbol.symbolId));
+			// Key symbols by their virtual module id (it embeds the source
+			// filename): same-numbered symbols from two source files must not
+			// overwrite each other in this flat map.
+			chunk.push(stripResolvedIdMarker(symbol.virtualModuleId));
 			symbolLogIdsByChunk.set(symbol.fileName, chunk);
 		}
 	}
@@ -124,7 +170,7 @@ export async function createExecutionSizesAsset(
 		if (item.type !== 'chunk') continue;
 		const chunk = canonPath(item.fileName);
 		const logIds = new Set<string>([
-			...item.moduleIds.flatMap((id) => runtimeLogId(id) ?? []),
+			...item.moduleIds.flatMap((id) => chunkModuleLogId(id) ?? []),
 			...(symbolLogIdsByChunk.get(chunk) ?? []),
 		]);
 		if (logIds.size === 0) continue;
@@ -158,14 +204,19 @@ export function executionLogActivationInjection(
 	};
 }
 
-function runtimeLogId(id: string): string | null {
-	const path = id.startsWith('\0') ? id.slice(1) : id;
+// Every id the execution-log hook can add to __mxLog must resolve here, or
+// the console reports "0.0 KB" for real executions: runtime package modules
+// (dev hook ids reused as build keys) and the dev-log module itself, which
+// self-registers when it loads.
+function chunkModuleLogId(id: string): string | null {
+	const path = stripResolvedIdMarker(id);
+	if (path === MARKLESS_EXECUTION_LOG_MODULE_ID) return path;
 	const match = path.match(/[/\\](web|runtime|serializer)[/\\]src[/\\]([^?#]+)\.ts$/);
 	return match ? `${match[1]}:${match[2]!.replace(/[/\\]/g, '/')}` : null;
 }
 
-function symbolLogId(id: string): string {
-	return id.startsWith('symbol:') ? id : `symbol:${id}`;
+function stripResolvedIdMarker(id: string): string {
+	return id.startsWith('\0') ? id.slice(1) : id;
 }
 
 async function gzipByteLength(code: string): Promise<number> {
