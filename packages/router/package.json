@@ -42,7 +42,8 @@
 		}
 	},
 	"files": [
-		"dist"
+		"dist",
+		"src/vite/entries"
 	],
 	"type": "module",
 	"sideEffects": false,

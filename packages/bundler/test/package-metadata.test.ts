@@ -203,7 +203,11 @@ describe('package metadata', () => {
 			readonly files?: readonly string[];
 		};
 
-		expect(router.files).toEqual(['dist']);
+		// src/vite/entries rides along deliberately: the vite plugin serves those
+		// files as app-context virtual entries compiled by the CONSUMER app, so
+		// they must ship as source (scripts/release/publish-shape.test.ts owns
+		// the entry-shape assertions). Fixtures, boxes, and tests stay out.
+		expect(router.files).toEqual(['dist', 'src/vite/entries']);
 	});
 
 	test('JSFB fixture aliases Markless subpath imports before the package root', async () => {

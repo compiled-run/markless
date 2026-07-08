@@ -28,6 +28,13 @@ export type {
 	RequestFileTransformResult,
 } from './request-files.ts';
 export { startRouteUpdateRenderer } from './route-renderer.ts';
+// Consumed by the published vite-plugin client entry (src/vite/entries/
+// client-entry.ts), which can only reach this module through the package's
+// root export once installed from npm.
+export {
+	__marklessRouterStartSpaNavigation,
+	ensureNavigationRuntime,
+} from './spa-navigation.ts';
 export { MARKLESS_ROUTER_ROUTE_EVENT, dispatchRouteUpdate, routePageProps } from './route-state.ts';
 export type {
 	RouteDocumentModule,

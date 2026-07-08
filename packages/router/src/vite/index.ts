@@ -44,9 +44,12 @@ const ROUTER_OPTIONS_ID = 'virtual:markless-router/options';
 const PUBLIC_VIRTUAL_MODULE_ID_RE =
 	/^virtual:markless-router\/(?:routes|client-entry|resume-entry|resume-entry-path|navigation-entry|navigation-entry-path|route-preloads|server-entry|route-href|options)(?:\?.*)?$/;
 const VITE_PLUGIN_FILE = decodePath(parseURL(import.meta.url).pathname);
+// The app-context entry files ship as SOURCE at src/vite/entries (see the
+// `files` field): running from src, they sit next to this file; running from
+// the published dist/vite.js, they sit under <package-root>/src/vite/entries.
 const VIRTUAL_ENTRY_DIR = VITE_PLUGIN_FILE.endsWith('.ts')
 	? join(dirname(VITE_PLUGIN_FILE), 'entries')
-	: join(dirname(dirname(VITE_PLUGIN_FILE)), 'entries');
+	: join(dirname(dirname(VITE_PLUGIN_FILE)), 'src/vite/entries');
 const DEFAULT_WATCH_IGNORES = [
 	'**/.nitro/**',
 	'**/.output/**',
