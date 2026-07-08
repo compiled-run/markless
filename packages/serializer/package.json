@@ -1,7 +1,38 @@
 {
 	"name": "@markless/serializer",
-	"version": "0.0.0",
-	"private": true,
+	"version": "0.1.0",
+	"description": "Markless serialization tiers and resumability payload protocol.",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/markless-dev/markless.git",
+		"directory": "packages/serializer"
+	},
+	"publishConfig": {
+		"access": "public",
+		"exports": {
+			".": {
+				"types": "./dist/index.d.ts",
+				"default": "./dist/index.js"
+			},
+			"./decode": {
+				"types": "./dist/decode.d.ts",
+				"default": "./dist/decode.js"
+			},
+			"./decode-client": {
+				"types": "./dist/decode-client.d.ts",
+				"default": "./dist/decode-client.js"
+			},
+			"./protocol": {
+				"types": "./dist/protocol.d.ts",
+				"default": "./dist/protocol.js"
+			},
+			"./protocol-validation": {
+				"types": "./dist/protocol-validation.d.ts",
+				"default": "./dist/protocol-validation.js"
+			}
+		}
+	},
 	"type": "module",
 	"sideEffects": false,
 	"exports": {
@@ -10,5 +41,11 @@
 		"./decode-client": "./src/value-decode-client.ts",
 		"./protocol": "./src/protocol.ts",
 		"./protocol-validation": "./src/protocol-validation.ts"
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"prepublishOnly": "node ../../scripts/release/verify-publish-ready.mjs"
 	}
 }

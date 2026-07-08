@@ -1,9 +1,48 @@
 {
 	"name": "@markless/router",
-	"version": "0.0.0",
-	"private": true,
+	"version": "0.1.0",
+	"description": "Markless router: client-side navigation with SSR streaming and build-time preload maps.",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/markless-dev/markless.git",
+		"directory": "packages/router"
+	},
+	"publishConfig": {
+		"access": "public",
+		"exports": {
+			".": {
+				"types": "./dist/index.d.ts",
+				"default": "./dist/index.js"
+			},
+			"./vite": {
+				"types": "./dist/vite.d.ts",
+				"default": "./dist/vite.js"
+			},
+			"./vite/runtime/create-route-discovery": {
+				"types": "./dist/vite/runtime/create-route-discovery.d.ts",
+				"default": "./dist/vite/runtime/create-route-discovery.js"
+			},
+			"./vite/runtime/mdx-route": {
+				"types": "./dist/vite/runtime/mdx-route.d.ts",
+				"default": "./dist/vite/runtime/mdx-route.js"
+			},
+			"./vite/runtime/create-server-entry": {
+				"types": "./dist/vite/runtime/create-server-entry.d.ts",
+				"default": "./dist/vite/runtime/create-server-entry.js"
+			},
+			"./vite/route-href": {
+				"types": "./dist/vite/route-href.d.ts",
+				"default": "./dist/vite/route-href.js"
+			},
+			"./typescript-plugin": {
+				"types": "./dist/typescript-plugin.d.ts",
+				"default": "./dist/typescript-plugin.js"
+			}
+		}
+	},
 	"files": [
-		"src"
+		"dist"
 	],
 	"type": "module",
 	"sideEffects": false,
@@ -17,7 +56,8 @@
 		"./typescript-plugin": "./src/typescript-plugin/index.ts"
 	},
 	"scripts": {
-		"test:boxes": "witness run"
+		"test:boxes": "witness run",
+		"prepublishOnly": "node ../../scripts/release/verify-publish-ready.mjs"
 	},
 	"dependencies": {
 		"@markless/bundler": "workspace:*",

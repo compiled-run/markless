@@ -506,6 +506,24 @@ let count = state(0);
 		expect(symbolSource).toContain('export function symbol_0_');
 	});
 
+	test('dev client symbol modules log and size the same qualified execution id', async () => {
+		const plugin = marklessClient({ dev: true, executionLog: 'auto' });
+		const filename = '/workspace/app/src/App.tsrx';
+
+		callBuildStart(plugin, { cwd: '/workspace/app' });
+		await callTransform(plugin, source, filename);
+		const symbolId = `virtual:markless:symbol:${encodeURIComponent(filename)}:${encodeURIComponent('symbol:0')}`;
+		const symbolSource = (await callLoad(plugin, `\0${symbolId}`)) as string;
+		const logSource = (await callLoad(plugin, '\0virtual:markless:dev-log')) as string;
+
+		// The executed id the hook adds must be the size-map key: qualified by
+		// the source module so symbol:0 from two files cannot collide.
+		expect(symbolSource).toContain(`globalThis.__mxLog?.add(${JSON.stringify(symbolId)});`);
+		expect(symbolSource).not.toContain('__mxLog?.add("symbol:');
+		expect(logSource).toContain(JSON.stringify(symbolId));
+		expect(logSource).not.toContain('"symbol:symbol:0"');
+	});
+
 	test('buildStart clears stale virtual modules and transform manifests', async () => {
 		const plugin = marklessClient();
 

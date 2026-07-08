@@ -20,6 +20,7 @@ import {
 	executionLogVirtualModuleSource,
 	injectExecutionLogModuleHook,
 	normalizeExecutionLogMode,
+	requalifyExecutionLogModuleHook,
 } from './execution-log.ts';
 import { symbolVirtualModuleSourceFile } from './source-module.ts';
 import {
@@ -460,15 +461,17 @@ function registerTransformArtifacts(input: {
 }) {
 	const ids = new Set<string>();
 	for (const module of input.result.virtualModules) {
-		input.virtualModules.set(module.id, module);
+		const isClientSymbol = input.environment === 'client' && module.type === 'symbol';
+		// The symbol virtual module id embeds the source filename, so it is the
+		// collision-free execution-log id: re-key the injected hook (dev builds)
+		// and the size estimate to that same id so the join always resolves.
+		const stored = isClientSymbol
+			? { ...module, source: requalifyExecutionLogModuleHook(module.source, module.id) }
+			: module;
+		input.virtualModules.set(module.id, stored);
 		ids.add(module.id);
-		if (input.environment === 'client' && module.type === 'symbol' && module.symbolId) {
-			input.executionLogEstimatedSizes.set(
-				module.symbolId.startsWith('symbol:')
-					? module.symbolId
-					: `symbol:${module.symbolId}`,
-				module.source.length,
-			);
+		if (isClientSymbol) {
+			input.executionLogEstimatedSizes.set(module.id, stored.source.length);
 		}
 	}
 	input.transformManifests.set(input.source, input.result.manifest);

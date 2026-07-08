@@ -3,9 +3,58 @@ import {
 	describeMarklessEventTarget,
 	describeMarklessExecutionCauses,
 	formatMarklessExecutedSize,
+	formatMarklessModuleId,
 	formatMarklessResumeSummary,
 	shouldActivateMarklessExecutionLog,
 } from '../src/dev-log.ts';
+
+const APP_SYMBOL_ID = `virtual:markless:symbol:${encodeURIComponent('/workspace/src/App.tsrx')}:${encodeURIComponent('symbol:0')}`;
+const LIBRARY_SYMBOL_ID = `virtual:markless:symbol:${encodeURIComponent('/workspace/src/Library.tsrx')}:${encodeURIComponent('symbol:0')}`;
+
+test('module display names shorten qualified symbol ids to author-readable form', () => {
+	expect(
+		formatMarklessModuleId(
+			`virtual:markless:symbol:${encodeURIComponent('/src/components/Player.tsrx')}:${encodeURIComponent('symbol:2')}`,
+		),
+	).toBe('symbol:2 (Player.tsrx)');
+	expect(formatMarklessModuleId('web:resume-events')).toBe('web:resume-events');
+});
+
+test('executed sizes join local and route-prefixed symbol ids to a unique qualified entry', () => {
+	const sizes = new Map([[APP_SYMBOL_ID, { raw: 1024, estimated: true }]]);
+
+	expect(formatMarklessExecutedSize(['symbol:0'], sizes)).toBe('1.0 KB est. executed');
+	expect(formatMarklessExecutedSize(['c0:symbol:0'], sizes)).toBe('1.0 KB est. executed');
+	// Two spellings of the same module count once.
+	expect(formatMarklessExecutedSize(['symbol:0', APP_SYMBOL_ID], sizes)).toBe(
+		'1.0 KB est. executed',
+	);
+});
+
+test('ambiguous local symbol ids refuse to guess a size', () => {
+	const sizes = new Map([
+		[APP_SYMBOL_ID, { raw: 1024, estimated: true }],
+		[LIBRARY_SYMBOL_ID, { raw: 4096, estimated: true }],
+	]);
+
+	expect(formatMarklessExecutedSize(['symbol:0'], sizes)).toBe('0.0 KB est. executed');
+});
+
+test('cause rows display qualified woken symbol ids in short form with sizes', () => {
+	const rows = describeMarklessExecutionCauses({
+		eventName: 'click',
+		eventRecord: { hostNodeId: 'h1', symbolIds: ['symbol:0'] },
+		before: new Set<string>(),
+		after: new Set([APP_SYMBOL_ID]),
+		moduleSizes: new Map([[APP_SYMBOL_ID, { raw: 1024, gzip: 512, chunk: 'chunk-app.js' }]]),
+		view: { behaviors: [{ hostNodeId: 'h1' }] },
+	});
+
+	expect(rows).toEqual([
+		'woke symbol:0 (App.tsrx) (0.5 KB) <- click matched event record h1',
+		'ran warm symbol:0 (App.tsrx) (0.5 KB) <- click matched event record h1',
+	]);
+});
 
 test('activation predicate enables local origins, query flag, storage flag, and always mode', () => {
 	const activeLocations = [
