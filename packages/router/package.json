@@ -1,6 +1,6 @@
 {
 	"name": "@markless/router",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"description": "Markless router: client-side navigation with SSR streaming and build-time preload maps.",
 	"license": "MIT",
 	"repository": {

@@ -1,6 +1,6 @@
 {
 	"name": "@markless/web",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"description": "Markless unified render/resume runtime for the web.",
 	"license": "MIT",
 	"repository": {
