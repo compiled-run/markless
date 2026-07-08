@@ -84,6 +84,46 @@ test('adoptStreamedArmPatches is identity without streamed scripts or a document
 	expect(adoptStreamedArmPatches(decoded, {} as never)).toBe(decoded);
 });
 
+// Reveal trains (T113): a streamed template can still be QUEUED (present in
+// the document, not yet committed) when the runtime wakes mid-train. Its
+// boundary still shows the @pending arm, so adopting the settled records or
+// snapshot would register settled truth against pending DOM. The runtime
+// skips both — the pending snapshot re-demands the computed and the client
+// settle path owns the boundary; the queued commit no-ops at flush.
+test('adoptStreamedArmPatches skips boundaries whose streamed template is still uncommitted', () => {
+	const settledRecords = {
+		locators: [{ hostNodeId: 'h3', strategy: 'arm-relative', index: 2, tagName: 'button' }],
+		events: [{ hostNodeId: 'h3', eventName: 'click', symbolIds: ['symbol:relay-tap'] }],
+		behaviors: [],
+		elementHandles: [],
+	};
+	const root = fakeRoot({
+		'template[m\\:arm]': [fakeScript({ 'm:arm': 'boundary:0' }, '')],
+		'script[type="markless/arm"][data-boundary]': [
+			fakeScript({ 'data-boundary': 'boundary:0' }, JSON.stringify(settledRecords)),
+		],
+		'script[type="markless/state-patch"][data-graph-node]': [
+			fakeScript(
+				{ 'data-graph-node': 'computed:report' },
+				JSON.stringify({
+					graphNodeId: 'computed:report',
+					snapshot: { status: 'fulfilled', version: 1, key: null, value: { root: 7, records: [] } },
+				}),
+			),
+		],
+	});
+
+	const adopted = adoptStreamedArmPatches(decoded, root as never);
+
+	expect(adopted.state.computed[0]?.snapshot).toMatchObject({ status: 'pending' });
+	expect(adopted.view.asyncBoundaries[0]?.armRecords).toEqual({
+		locators: [],
+		events: [],
+		behaviors: [],
+		elementHandles: [],
+	});
+});
+
 test('adoptStreamedArmPatches ignores patches for other containers payloads', () => {
 	const root = fakeRoot({
 		'script[type="markless/arm"][data-boundary]': [

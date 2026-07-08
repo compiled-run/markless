@@ -11,6 +11,14 @@ export const MARKLESS_PENDING_SETTLE_DEADLINE_MS = 250;
 // smeijer/spin-delay 500/200, React suspenseConfig busyDelay/busyMinDuration).
 export const MARKLESS_PENDING_MIN_VISIBLE_MS = 200;
 
+// Streamed range commits reveal in trains: after a reveal, the next train
+// leaves no earlier than one cadence later, so multi-boundary settles under
+// real latency spread batch into calm reveals instead of dribbling one
+// range-replace per arrival (prior art: React fizz FALLBACK_THROTTLE_MS=300,
+// $RB batch revealed at lastRevealTime+300). Value-slot commits are
+// layout-safe and never ride trains (C3 tier knowledge).
+export const MARKLESS_REVEAL_TRAIN_CADENCE_MS = 300;
+
 // Injectable timer so tests control virtual time; production uses setTimeout.
 export type PendingTimingClock = {
 	readonly wait: (durationMs: number) => Promise<void>;

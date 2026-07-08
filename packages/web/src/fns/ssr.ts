@@ -60,6 +60,15 @@ export async function marklessSsrRunAsyncComputed(snapshots, graphNodeId, run, r
 			entry.promise.then((settledSnapshot) => { entry.settled = settledSnapshot; });
 			streaming.runs.set(graphNodeId, entry);
 		}
+		// Discovery pass (C1 parallel runner starts): the first streaming pass
+		// only STARTS runners — it never awaits one and never consumes the
+		// first-flush deadline, so every boundary's runner is in flight before
+		// the real render pass races any of them against the shared deadline.
+		if (streaming.prestart) {
+			const snapshot = entry.settled ?? { status: "pending", version: 1, key: null };
+			snapshots.push({ graphNodeId, snapshot });
+			return snapshot;
+		}
 		if (!entry.settled) {
 			if (hasPendingArm !== true) await entry.promise;
 			else if (streaming.deadline) await Promise.race([entry.promise, streaming.deadline]);

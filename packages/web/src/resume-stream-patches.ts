@@ -10,6 +10,10 @@ import type { DecodedPayloadScripts } from '../../serializer/src/protocol-client
 //   (arm-relative, D3), never the pending arm the shell payload shipped.
 // Patches for ids outside this container's payload are ignored (another
 // container owns them). A malformed patch script throws — never half-adopt.
+// A template still present in the document is a commit the reveal train has
+// QUEUED but not flushed: its boundary still shows @pending, so neither its
+// records nor its snapshot may be adopted — the runtime re-demands the
+// computed and owns the boundary (the queued commit no-ops at flush).
 
 type StreamPatchScript = {
 	readonly getAttribute: (name: string) => string | null;
@@ -32,17 +36,29 @@ export function adoptStreamedArmPatches(
 	const patchScripts = [...query('script[type="markless/state-patch"][data-graph-node]')];
 	if (armScripts.length === 0 && patchScripts.length === 0) return decoded;
 
+	const uncommittedBoundaryIds = new Set(
+		[...query('template[m\\:arm]')].map((template) => template.getAttribute('m:arm')),
+	);
+	const uncommittedGraphNodeIds = new Set(
+		decoded.view.asyncBoundaries
+			.filter((boundary) => uncommittedBoundaryIds.has(boundary.id))
+			.flatMap((boundary) => boundary.asyncReads.map((read) => read.graphNodeId)),
+	);
 	const armRecordsByBoundary = new Map(
-		armScripts.map((script) => [
-			script.getAttribute('data-boundary'),
-			JSON.parse(script.textContent ?? 'null') as unknown,
-		]),
+		armScripts
+			.filter((script) => !uncommittedBoundaryIds.has(script.getAttribute('data-boundary')))
+			.map((script) => [
+				script.getAttribute('data-boundary'),
+				JSON.parse(script.textContent ?? 'null') as unknown,
+			]),
 	);
 	const patchByGraphNode = new Map(
-		patchScripts.map((script) => [
-			script.getAttribute('data-graph-node'),
-			JSON.parse(script.textContent ?? 'null') as { readonly snapshot?: unknown } | null,
-		]),
+		patchScripts
+			.filter((script) => !uncommittedGraphNodeIds.has(script.getAttribute('data-graph-node') ?? ''))
+			.map((script) => [
+				script.getAttribute('data-graph-node'),
+				JSON.parse(script.textContent ?? 'null') as { readonly snapshot?: unknown } | null,
+			]),
 	);
 
 	return {

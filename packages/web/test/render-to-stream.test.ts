@@ -89,6 +89,181 @@ async function collect(appends: AsyncGenerator<string>): Promise<string[]> {
 	return chunks;
 }
 
+// Multi-boundary compiled-module-shaped artifact (alternate-shaped: orchard
+// sensor rows, not a dashboard). Sensors declare their own latency, whether
+// they authored a @pending arm (the streaming opt-in), and compiler-known
+// read-set edges (state payload `dependencies`) onto other sensors.
+type OrchardSensor = {
+	readonly key: string;
+	readonly delayMs: number;
+	readonly label: string;
+	readonly hasPendingArm?: boolean;
+	readonly dependsOn?: ReadonlyArray<string>;
+};
+
+function orchardArtifact(
+	sensors: ReadonlyArray<OrchardSensor>,
+	options: { readonly settleWaveLagMs?: number } = {},
+) {
+	let renderPass = 0;
+	return {
+		async renderSsr(_props?: unknown, renderContext?: unknown) {
+			renderPass += 1;
+			const snapshots: unknown[] = [];
+			const arms: string[] = [];
+			for (const [index, sensor] of sensors.entries()) {
+				const snapshot = (await marklessSsrRunAsyncComputed(
+					snapshots as never,
+					`computed:${sensor.key}`,
+					async () => {
+						await new Promise((resolve) => setTimeout(resolve, sensor.delayMs));
+						return { label: sensor.label };
+					},
+					renderContext,
+					sensor.hasPendingArm !== false,
+				)) as { readonly status: string; readonly value?: { readonly label: string } };
+				const arm =
+					snapshot.status === 'fulfilled'
+						? `<p data-sensor="${sensor.key}">${snapshot.value!.label}</p>`
+						: snapshot.status === 'rejected'
+							? `<p data-fault="${sensor.key}">sensor offline</p>`
+							: `<p data-calibrating="${sensor.key}">calibrating</p>`;
+				arms.push(
+					`<!--markless:async:orchard:${index}-->${arm}<!--/markless:async:orchard:${index}-->`,
+				);
+			}
+			// Simulates a slow settle-wave re-render pass (composition work after
+			// the runs), so settles can race the pass — the request-versioning
+			// window. Only settle waves lag (pass 3+): the discovery and shell
+			// passes stay fast so the wave timing is deterministic.
+			if (options.settleWaveLagMs && renderPass >= 3) {
+				await new Promise((resolve) => setTimeout(resolve, options.settleWaveLagMs));
+			}
+			return {
+				html: `<main>${arms.join('')}</main>`,
+				state: marklessSsrAttachSnapshots(
+					{
+						version: ASYNC_PROTOCOL_VERSION,
+						cells: [],
+						computed: sensors.map((sensor) => ({
+							graphNodeId: `computed:${sensor.key}`,
+							name: sensor.key,
+							async: true,
+							...(sensor.dependsOn
+								? {
+										dependencies: sensor.dependsOn.map((dependency) => ({
+											graphNodeId: `computed:${dependency}`,
+											path: [],
+										})),
+									}
+								: {}),
+						})),
+					} as never,
+					snapshots as never,
+				),
+				view: {
+					version: ASYNC_PROTOCOL_VERSION,
+					locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'main' }],
+					events: [],
+					domUpdates: [],
+					behaviors: [],
+					elementHandles: [],
+					asyncBoundaries: sensors.map((sensor, index) => ({
+						id: `orchard:${index}`,
+						startAnchor: { strategy: 'dom-order-comment', index: index * 2 },
+						endAnchor: { strategy: 'dom-order-comment', index: index * 2 + 1 },
+						asyncReads: [
+							{
+								source: sensor.key,
+								graphNodeId: `computed:${sensor.key}`,
+								path: [],
+								runnerSymbolId: `symbol:${sensor.key}-run`,
+							},
+						],
+						armRecords: { locators: [], events: [], behaviors: [], elementHandles: [] },
+					})),
+				},
+			} as never;
+		},
+	};
+}
+
+// C1 parallel runner starts (T113): every boundary runner starts at request
+// start, so a slow early boundary cannot consume the shared first-flush
+// deadline on behalf of a fast later one.
+test('a slow early boundary does not make a later deadline-beating boundary stream', async () => {
+	const stream = await renderToStream(
+		orchardArtifact([
+			{ key: 'frost', delayMs: 60, label: 'Frost risk low' },
+			{ key: 'soil', delayMs: 5, label: 'Soil moisture 42%' },
+		]) as never,
+		{},
+	);
+
+	// The fast sensor beat the deadline because its runner started at request
+	// start — it renders inline with zero streaming artifacts.
+	expect(stream.pendingArmCount).toBe(1);
+	expect(stream.shell).toContain('Soil moisture 42%');
+	expect(stream.shell).not.toContain('data-calibrating="soil"');
+	expect(stream.shell).toContain('data-calibrating="frost"');
+
+	const chunks = await collect(stream.appends());
+	const appended = chunks.join('');
+	expect(appended).toContain('<template m:arm="orchard:0">');
+	expect(appended).not.toContain('<template m:arm="orchard:1">');
+});
+
+// S1 request-versioning audit (T113): a settle that lands WHILE a re-render
+// pass is in flight must not stream that pass's output for its boundary —
+// the pass rendered the boundary's @pending arm and a pending snapshot. The
+// settled truth for a wave is the wave's own render output (Ripple's
+// versioned-request pattern: completions are checked against the version
+// they rendered under), so the late settle streams in the next wave.
+test('a settle racing the re-render pass streams its own settled wave, never the pending output', async () => {
+	const stream = await renderToStream(
+		orchardArtifact(
+			[
+				{ key: 'canopy', delayMs: 30, label: 'Canopy shade 60%' },
+				{ key: 'irrigation', delayMs: 50, label: 'Irrigation line clear' },
+			],
+			{ settleWaveLagMs: 40 },
+		) as never,
+		{},
+	);
+	expect(stream.pendingArmCount).toBe(2);
+
+	const chunks = await collect(stream.appends());
+	const appended = chunks.join('');
+	// Every streamed template carries settled content — never a pending arm
+	// captured by a render pass the settle raced.
+	expect(appended).toContain('Canopy shade 60%');
+	expect(appended).toContain('Irrigation line clear');
+	const templates = appended.match(/<template m:arm="[^"]*">.*?<\/template>/g) ?? [];
+	expect(templates).toHaveLength(2);
+	for (const template of templates) expect(template).not.toContain('data-calibrating');
+	const patches = appended.match(/<script type="markless\/state-patch"[^>]*>.*?<\/script>/g) ?? [];
+	expect(patches).toHaveLength(2);
+	for (const patch of patches) expect(patch).toContain('"status":"fulfilled"');
+});
+
+test('hold-the-stream boundaries resolve their runners in parallel, not sequentially', async () => {
+	const startedAt = Date.now();
+	const stream = await renderToStream(
+		orchardArtifact([
+			{ key: 'north', delayMs: 80, label: 'North rows green', hasPendingArm: false },
+			{ key: 'south', delayMs: 80, label: 'South rows green', hasPendingArm: false },
+		]) as never,
+		{},
+	);
+	const elapsed = Date.now() - startedAt;
+
+	expect(stream.pendingArmCount).toBe(0);
+	expect(stream.shell).toContain('North rows green');
+	expect(stream.shell).toContain('South rows green');
+	// Sequential starts would need >= 160ms; parallel starts finish in ~80ms.
+	expect(elapsed).toBeLessThan(150);
+});
+
 test('renderToStream flushes the pending shell and appends the settled arm out of order', async () => {
 	const stream = await renderToStream(relayArtifact({ delayMs: 40 }) as never, {});
 
@@ -175,6 +350,46 @@ test('two interleaved streaming renders with different props/latencies stay isol
 		expect(chunk).toContain('data-graph-node="computed:report"');
 		expect(chunk).toContain('"status":"fulfilled"');
 	}
+});
+
+// G1/C3 reveal choreography (T113): the compiler-known read-set edges in the
+// state payload become boundary-to-boundary reveal dependencies. Streamed
+// commit invocations carry the streamed boundaries the committing boundary
+// depends on, so the client executor reveals dependency-ordered trains
+// instead of blind arrival order.
+test('streamed commit invocations carry compiler-known dependency edges onto streamed boundaries', async () => {
+	const stream = await renderToStream(
+		orchardArtifact([
+			{ key: 'weather', delayMs: 25, label: 'Weather feed live' },
+			{ key: 'advice', delayMs: 25, label: 'Prune after the frost', dependsOn: ['weather'] },
+		]) as never,
+		{},
+	);
+	expect(stream.pendingArmCount).toBe(2);
+
+	const appended = (await collect(stream.appends())).join('');
+	// The dependency-free boundary commits with no reveal dependencies; the
+	// dependent one names the streamed boundary its read set points at.
+	expect(appended).toContain('__mArm("orchard:0")');
+	expect(appended).toContain('__mArm("orchard:1",["orchard:0"])');
+});
+
+test('dependency edges onto inline-settled boundaries are not reveal dependencies', async () => {
+	const stream = await renderToStream(
+		orchardArtifact([
+			{ key: 'weather', delayMs: 0, label: 'Weather feed live' },
+			{ key: 'advice', delayMs: 30, label: 'Prune after the frost', dependsOn: ['weather'] },
+		]) as never,
+		{},
+	);
+	// The dependency settled inline with the shell — it is already visible,
+	// so the streamed boundary must not wait for a commit that never comes.
+	expect(stream.pendingArmCount).toBe(1);
+	expect(stream.shell).toContain('Weather feed live');
+
+	const appended = (await collect(stream.appends())).join('');
+	expect(appended).toContain('__mArm("orchard:1")');
+	expect(appended).not.toContain('__mArm("orchard:1",');
 });
 
 test('renderToStream streams the settled @catch arm with the durable error shape', async () => {
