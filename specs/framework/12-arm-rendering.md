@@ -2,7 +2,7 @@
 
 Status: DRAFT (ratified design, implementation in progress — docs/goals/arm-rendering)
 Ratified with owner: 2026-07-07. Source discussion: dashboard-migration goal,
-15-need ledger; Qwik OOOS research (local ../qwik source read).
+15-need ledger. Working research notes: docs/goals/arm-rendering/notes/.
 
 ## Motivation
 
@@ -82,12 +82,11 @@ node-reference tables spanning stream segments, and no placeholder
 indirection — the anchor pair is the only address a boundary has, and it is
 already in the document.
 
-Provenance: the inert-template-plus-executor wire pattern is validated in
-production by Qwik's out-of-order streaming (researched from source, see the
-arm-rendering goal notes). The simplifications above relative to that
-reference exist because a virtual-tree framework must graft streamed content
-into its bookkeeping; Markless has no such tree, so the work disappears
-rather than being optimized.
+Markless has no runtime representation of the document. The DOM is the only
+tree; the runtime holds graph state (cells addressed by id) and record
+registrations (addressed by anchor and arm-relative index). Streamed content
+therefore needs no integration step beyond the fragment move and record
+registration above.
 
 ## D6. Sequencing and defaults (amended 2026-07-07, owner ruling)
 
