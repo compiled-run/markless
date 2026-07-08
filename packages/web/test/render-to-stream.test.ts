@@ -428,3 +428,133 @@ test('renderToStream streams the settled @catch arm with the durable error shape
 	expect(chunks[0]).toContain('relay unreachable');
 	expect(chunks[0]).not.toContain('"stack"');
 });
+
+// Composed child-owned boundaries: a page composing a child that owns its
+// own @try streams the child boundary under its INSTANCE-PREFIXED id
+// (c0:boundary:0 — the composed boundary identity), with the armized record
+// set already in the composed id space. The shape below is what the SSR
+// compose step emits for a page-owned boundary beside a composed child.
+function composedGroveArtifact() {
+	return {
+		async renderSsr(_props?: unknown, renderContext?: unknown) {
+			const snapshots: unknown[] = [];
+			const arm = async (graphNodeId: string, delayMs: number, label: string) => {
+				const snapshot = (await marklessSsrRunAsyncComputed(
+					snapshots as never,
+					graphNodeId,
+					async () => {
+						await new Promise((resolve) => setTimeout(resolve, delayMs));
+						return { label };
+					},
+					renderContext,
+					true,
+				)) as { readonly status: string; readonly value?: { readonly label: string } };
+				return snapshot.status === 'fulfilled'
+					? `<p data-settled>${snapshot.value!.label}</p>`
+					: '<p data-waiting>waiting</p>';
+			};
+			const pageArm = await arm('computed:forecast', 5, 'Clear skies');
+			const childArm = await arm('computed:crop', 40, 'Rhubarb ready');
+			return {
+				html:
+					'<main><header data-chrome>Grove</header>' +
+					`<!--markless:async:boundary:0-->${pageArm}<!--/markless:async:boundary:0-->` +
+					`<!--markless:async:c0:boundary:0-->${childArm}<!--/markless:async:c0:boundary:0--></main>`,
+				state: marklessSsrAttachSnapshots(
+					{
+						version: ASYNC_PROTOCOL_VERSION,
+						cells: [],
+						computed: [
+							{ graphNodeId: 'computed:forecast', name: 'forecast', async: true },
+							{ graphNodeId: 'computed:crop', name: 'crop', async: true },
+						],
+					} as never,
+					snapshots as never,
+				),
+				view: {
+					version: ASYNC_PROTOCOL_VERSION,
+					locators: [
+						{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'main' },
+						{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'header' },
+					],
+					events: [],
+					domUpdates: [],
+					behaviors: [],
+					elementHandles: [],
+					asyncBoundaries: [
+						{
+							id: 'boundary:0',
+							startAnchor: { strategy: 'dom-order-comment', index: 0 },
+							endAnchor: { strategy: 'dom-order-comment', index: 1 },
+							asyncReads: [
+								{
+									source: 'forecast',
+									graphNodeId: 'computed:forecast',
+									path: [],
+									runnerSymbolId: 'symbol:forecast-run',
+								},
+							],
+							armRecords: { locators: [], events: [], behaviors: [], elementHandles: [] },
+						},
+						{
+							id: 'c0:boundary:0',
+							updateSymbolId: 'c0:symbol:crop-update',
+							startAnchor: { strategy: 'dom-order-comment', index: 2 },
+							endAnchor: { strategy: 'dom-order-comment', index: 3 },
+							asyncReads: [
+								{
+									source: 'crop',
+									graphNodeId: 'computed:crop',
+									path: [],
+									runnerSymbolId: 'c0:symbol:crop-run',
+								},
+							],
+							// The child's armized set arrives prefixed from compose.
+							armRecords: {
+								locators: [
+									{
+										hostNodeId: 'c0:h2',
+										strategy: 'arm-relative',
+										index: 0,
+										tagName: 'p',
+									},
+								],
+								events: [
+									{
+										hostNodeId: 'c0:h2',
+										eventName: 'click',
+										symbolIds: ['c0:symbol:pick'],
+									},
+								],
+								behaviors: [],
+								elementHandles: [],
+							},
+						},
+					],
+				},
+			} as never;
+		},
+	};
+}
+
+test('a composed child-owned boundary streams under its instance-prefixed id with the prefixed armized set', async () => {
+	const stream = await renderToStream(composedGroveArtifact() as never, {});
+
+	// Static chrome and both pending arms are in the FIRST flush; the fast
+	// page boundary beat the deadline and settled inline.
+	expect(stream.shell).toContain('data-chrome');
+	expect(stream.shell).toContain('Clear skies');
+	expect(stream.shell).toContain('markless:async:c0:boundary:0');
+	expect(stream.shell).not.toContain('m:arm');
+
+	// The child boundary streams keyed by the COMPOSED id everywhere: the
+	// inert template, the arm-record script, and the reveal-train call.
+	const appended = (await collect(stream.appends())).join('');
+	expect(appended).toContain('<template m:arm="c0:boundary:0"><p data-settled>Rhubarb ready</p></template>');
+	expect(appended).toContain('<script type="markless/arm" data-boundary="c0:boundary:0">');
+	expect(appended).toContain('__mArm("c0:boundary:0")');
+	// The streamed record set keeps the composed id space (prefixed host and
+	// symbol ids) so adopt-time registration matches the payload records.
+	expect(appended).toContain('"hostNodeId":"c0:h2"');
+	expect(appended).toContain('"c0:symbol:pick"');
+});

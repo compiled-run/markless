@@ -133,8 +133,8 @@ export type ResumeArmRecordSet = {
 	readonly branches?: ReadonlyArray<ResumeArmBranchRecord>;
 };
 export type ResumeAsyncBoundaryPayload = ProtocolViewPayload['asyncBoundaries'][number] & {
-	// A single armized set on SSR-composed pages; CSR-composed pages still
-	// carry the compile-time per-arm array, which is not registrable yet.
+	// A single armized set (SSR and CSR compose both armize live arms); a
+	// compile-time per-arm array is a stale payload and is never registrable.
 	readonly armRecords?: ResumeArmRecordSet | ReadonlyArray<unknown>;
 };
 export type ResumeViewRecord = Pick<

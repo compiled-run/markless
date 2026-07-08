@@ -171,6 +171,7 @@ export function marklessSsrCallbackSymbol(props, path) {
 export function marklessComposeState(state, children) {
 	const childStates = children.map((child) => child.output?.state).filter(Boolean);
 	if (childStates.length === 0) return state;
+	marklessAssertComposableStateNames(state, childStates);
 	return {
 		...state,
 		cells: [
@@ -191,6 +192,45 @@ export function marklessComposeState(state, children) {
 				}
 			: {}),
 	};
+}
+// Graph node ids are NAME-based per module and compose merges child state
+// into ONE page graph unprefixed: same-named state()/computed() in a page
+// and a composed component would silently share one value (and one streaming
+// runner). Refuse loudly (D2) until graph ids are instance-scoped; shared
+// definitions keep their cross-module ids on purpose.
+export function marklessAssertComposableStateNames(state, childStates) {
+	const seen = new Set(
+		[...(state.cells ?? []), ...(state.computed ?? [])].map((node) => node.graphNodeId),
+	);
+	for (const childState of childStates) {
+		for (const node of [...(childState.cells ?? []), ...(childState.computed ?? [])]) {
+			const id = node.graphNodeId;
+			// Only author-renamable state()/computed() names are diagnosable.
+			// Shared definitions and props compose by design; compiler-synthesized
+			// names (computed:templateExpression:0) carry extra ':' segments and
+			// repeat in ~every module — their sharing is the ledgered
+			// instance-scoped-graph-ids follow-on, not an author collision.
+			if (
+				id.startsWith('shared:') ||
+				id.startsWith('prop:') ||
+				id.slice(id.indexOf(':') + 1).includes(':')
+			)
+				continue;
+			if (seen.has(id)) {
+				throw Object.assign(
+					new Error(
+						`MARKLESS_COMPOSED_STATE_COLLISION: Two components on this page both declare state() or computed() named "${id.slice(id.indexOf(':') + 1)}". Composed components share one state graph, so they would read and write the same value. Rename one of them.`,
+					),
+					{
+						code: 'MARKLESS_COMPOSED_STATE_COLLISION',
+						graphNodeId: id,
+						docsUrl: 'https://markless.dev/errors/MARKLESS_COMPOSED_STATE_COLLISION',
+					},
+				);
+			}
+			seen.add(id);
+		}
+	}
 }
 export function marklessViewWithoutAnchors(view) {
 	return { ...view, branches: [], asyncBoundaries: [] };

@@ -3,6 +3,7 @@ import type { ProtocolStatePayload } from '@markless/serializer';
 import { boundaryArmRecordSet } from './resume-arm-records.ts';
 import type { ArmCommitUpdate } from './resume-commit-arm.ts';
 import type {
+	ResumeArmRecordSet,
 	ResumeAsyncBoundaryRecord,
 	ResumePreparedCore,
 	ResumeRuntimeInput,
@@ -39,6 +40,11 @@ export type SettleTrackerClock = {
 	readonly wait?: (durationMs: number) => Promise<void>;
 };
 
+// An async snapshot only commits once its runner settled either way.
+function isSettledStatus(status: unknown): boolean {
+	return status === 'fulfilled' || status === 'rejected';
+}
+
 export function createAsyncBoundarySettleTracker(input: {
 	readonly boundaries: Iterable<ResumeAsyncBoundaryRecord>;
 	readonly state?: ProtocolStatePayload;
@@ -49,8 +55,7 @@ export function createAsyncBoundarySettleTracker(input: {
 	// their boundaries already show settled content before any runner re-runs.
 	const settledGraphNodeIds = new Set<string>();
 	for (const computed of input.state?.computed ?? []) {
-		const status = computed.snapshot?.status;
-		if (status === 'fulfilled' || status === 'rejected') {
+		if (isSettledStatus(computed.snapshot?.status)) {
 			settledGraphNodeIds.add(computed.graphNodeId);
 		}
 	}
@@ -127,9 +132,9 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 					path: [],
 					run(snapshot) {
 						if (!boundary.updateSymbolId) {
-							const status = (snapshot as { readonly status?: unknown } | null)
-								?.status;
-							const settled = status === 'fulfilled' || status === 'rejected';
+							const settled = isSettledStatus(
+								(snapshot as { readonly status?: unknown } | null)?.status,
+							);
 							// D8: once the range shows settled content, a re-run
 							// keeps rendering the prior snapshot — the structural
 							// pending journal never replaces visible content.
@@ -137,20 +142,13 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 								return;
 							}
 							if (settled) input.settleTracker?.markSettled(boundary.id);
-							return [
-								{ type: 'removeRange', locator: `async-boundary:${boundary.id}` },
-								{
-									type: 'insertRange',
-									locator: `async-boundary:${boundary.id}:start`,
-									fragment: {
-										type: 'async-boundary-snapshot',
-										boundaryId: boundary.id,
-										graphNodeId: asyncRead.graphNodeId,
-										path: asyncRead.path,
-										snapshot,
-									},
-								},
-							] as DomJournalEntry[];
+							return boundaryRangeJournal(boundary.id, {
+								type: 'async-boundary-snapshot',
+								boundaryId: boundary.id,
+								graphNodeId: asyncRead.graphNodeId,
+								path: asyncRead.path,
+								snapshot,
+							});
 						}
 						// T120: report the snapshot to the re-settle hold (deadline-
 						// gated @pending), then settle through the shared path.
@@ -182,7 +180,7 @@ export async function settleAsyncBoundaryRange(
 	snapshot: unknown,
 ): Promise<DomJournalResult | void> {
 	const status = (snapshot as { readonly status?: unknown } | null)?.status;
-	if (status !== 'fulfilled' && status !== 'rejected') return;
+	if (!isSettledStatus(status)) return;
 	// D8 minimum pending visibility: once the @pending arm was shown (deadline
 	// route swap or deadline re-settle), the settle commit waits until the
 	// pending UI was visible for the minimum duration (no blink). The re-settle
@@ -208,7 +206,10 @@ export async function settleAsyncBoundaryRange(
 			(update as { readonly armRecords?: unknown }).armRecords,
 		);
 		if (armRecords) {
-			await input.commitArm(boundary, { html: update.html, armRecords });
+			await input.commitArm(boundary, {
+				html: update.html,
+				armRecords: composedBoundaryArmRecords(boundary.id, armRecords),
+			});
 			input.settleTracker?.markSettled(boundary.id);
 			return;
 		}
@@ -216,10 +217,69 @@ export async function settleAsyncBoundaryRange(
 	// Plain .html updates (cheap parts tier) keep the journal string path.
 	const fragment = input.renderBranchHtml ? input.renderBranchHtml(update.html) : update.html;
 	input.settleTracker?.markSettled(boundary.id);
+	return boundaryRangeJournal(boundary.id, fragment);
+}
+
+// The settle commit shape shared by the snapshot and html paths: replace the
+// boundary's anchor range with the settled fragment.
+function boundaryRangeJournal(boundaryId: string, fragment: unknown): DomJournalEntry[] {
 	return [
-		{ type: 'removeRange', locator: `async-boundary:${boundary.id}` },
-		{ type: 'insertRange', locator: `async-boundary:${boundary.id}:start`, fragment },
-	];
+		{ type: 'removeRange', locator: `async-boundary:${boundaryId}` },
+		{ type: 'insertRange', locator: `async-boundary:${boundaryId}:start`, fragment },
+	] as DomJournalEntry[];
+}
+
+// Composed child-owned boundaries load their update symbol through the
+// instance prefix riding boundary.id (c0:boundary:1 → prefix "c0:"). The
+// arm-render module mints records in the child module's own id space, so
+// committed host, symbol, and arm-branch ids take the same prefix before
+// registration — host ids join the page-wide host map and symbol ids resolve
+// through the same prefix routes the update symbol itself resolved through.
+// Graph node ids stay untouched: composed pages share one name-based graph.
+function composedBoundaryArmRecords(
+	boundaryId: string,
+	set: ResumeArmRecordSet,
+): ResumeArmRecordSet {
+	const prefix = boundaryId.slice(0, boundaryId.lastIndexOf('boundary:'));
+	if (!prefix) return set;
+	const prefixHost = <T extends { readonly hostNodeId: string }>(record: T): T => ({
+		...record,
+		hostNodeId: prefix + record.hostNodeId,
+	});
+	return {
+		locators: set.locators.map(prefixHost),
+		events: set.events.map((event) => ({
+			...prefixHost(event),
+			symbolIds: event.symbolIds.map((symbolId) => prefix + symbolId),
+		})),
+		behaviors: set.behaviors.map((behavior) => ({
+			...prefixHost(behavior),
+			...(behavior.symbolId ? { symbolId: prefix + behavior.symbolId } : {}),
+		})),
+		elementHandles: set.elementHandles.map(prefixHost),
+		...(set.branches
+			? {
+					branches: set.branches.map((branch) => ({
+						...branch,
+						id: prefix + branch.id,
+						...(branch.symbolId ? { symbolId: prefix + branch.symbolId } : {}),
+						...(branch.armRecords
+							? {
+									armRecords: branch.armRecords.map((arm) => ({
+										...arm,
+										events: (arm.events ?? []).map((event) => ({
+											...event,
+											symbolIds: (event.symbolIds ?? []).map(
+												(symbolId) => prefix + symbolId,
+											),
+										})),
+									})),
+								}
+							: {}),
+					})),
+				}
+			: {}),
+	};
 }
 
 function isResumeBranchUpdate(

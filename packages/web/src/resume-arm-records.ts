@@ -1,4 +1,5 @@
 import {
+	RuntimeResumeError,
 	mismatchedElementLocatorError,
 	missingElementLocatorError,
 } from './inline/resume-errors.ts';
@@ -17,8 +18,10 @@ import type {
 // anchor plus the LIVE element-walk offset added at materialization time, for
 // both the initial SSR load and re-registration after commitArm.
 
-// Narrow unknown armRecords payloads to the registrable single-set shape; the
-// CSR-composed per-arm array is not positionally trustworthy, so it stays out.
+// Narrow unknown armRecords payloads to the registrable single-set shape.
+// SSR and CSR compose both armize live arms into single sets now; a compiler
+// per-arm ARRAY reaching resume is a stale/foreign payload whose static
+// indexes earned no positional trust, so it stays fail-closed (D2).
 export function boundaryArmRecordSet(value: unknown): ResumeArmRecordSet | null {
 	if (!value || Array.isArray(value)) return null;
 	const set = value as ResumeArmRecordSet;
@@ -50,15 +53,13 @@ export function materializeArmRecords(input: ArmMaterializeInput) {
 			byHostId.set(locator.hostNodeId, element);
 		}
 	}
+	// Records whose host did not render in this arm are skipped.
+	const rendered = (record: { readonly hostNodeId: string }) => byHostId.has(record.hostNodeId);
 	return {
 		elementsByHostId: byHostId,
-		events: input.armRecords.events.filter((event) => byHostId.has(event.hostNodeId)),
-		behaviors: input.armRecords.behaviors.filter((behavior) =>
-			byHostId.has(behavior.hostNodeId),
-		),
-		elementHandles: input.armRecords.elementHandles.filter((handle) =>
-			byHostId.has(handle.hostNodeId),
-		),
+		events: input.armRecords.events.filter(rendered),
+		behaviors: input.armRecords.behaviors.filter(rendered),
+		elementHandles: input.armRecords.elementHandles.filter(rendered),
 		branches: materializeArmBranchRecords(input),
 	};
 }
@@ -112,13 +113,11 @@ function armBranchCommentCensus(
 }
 
 function missingArmBranchAnchorError(id: string, index: number): Error {
-	const error = new Error(
-		`MARKLESS_RESUME_LOCATOR_MISSING: Arm-scoped branch ${id} expected an arm-branch comment anchor at arm-local index ${String(index)}.`,
-	) as Error & Record<string, unknown>;
-	error.name = 'RuntimeResumeError';
-	error.code = 'MARKLESS_RESUME_LOCATOR_MISSING';
-	error.docsUrl = 'https://markless.dev/errors/MARKLESS_RESUME_LOCATOR_MISSING';
-	return error;
+	return new RuntimeResumeError({
+		code: 'MARKLESS_RESUME_LOCATOR_MISSING',
+		message: `Arm-scoped branch ${id} expected an arm-branch comment anchor at arm-local index ${String(index)}.`,
+		docsUrl: 'https://markless.dev/errors/MARKLESS_RESUME_LOCATOR_MISSING',
+	});
 }
 
 // Expands every boundary's armized record set into flat runtime records so

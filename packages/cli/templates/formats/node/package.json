@@ -11,8 +11,8 @@
 		"test": "vp test"
 	},
 	"dependencies": {
-		"@markless/core": "workspace:*",
-		"@markless/router": "workspace:*",
+		"@markless/core": "{{marklessVersion}}",
+		"@markless/router": "{{marklessVersion}}",
 		"nitro": "3.0.260429-beta",
 		"vite-plus": "0.1.20"
 	},

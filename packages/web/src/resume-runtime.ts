@@ -318,6 +318,9 @@ export function createResumeRuntime(
 	};
 }
 
+// Local copies of the resume-locators helpers: importing that module here
+// regroups the wall-counted chunk graph, which costs more than the
+// duplication saves (T120 measurement; re-confirmed on this tree).
 function connectedElement(
 	root: ResumeDomElement,
 	element: ResumeDomElement | undefined,
