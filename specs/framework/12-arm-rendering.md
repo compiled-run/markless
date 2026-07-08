@@ -116,3 +116,17 @@ settle via commitArm. The document.write/server-HTML-swap navigation
 meta, before-document-swap teardown — are deleted when tier 4 lands. The Link
 component owns SPA navigation; plain-anchor hash special-casing is removed
 once component-in-row lands and apps can use Link everywhere.
+
+## D8. Pending is for first appearances only (ratified 2026-07-08, owner)
+
+Nothing visible is ever replaced by fallback UI. @pending renders only when a
+boundary has no prior settled content. Re-settles (mutation refreshes,
+recomputes) render from the prior snapshot until the new one commits —
+snapshots are versioned with status, so the prior value is always addressable.
+Client navigation is a transition: the outgoing page stays live until the
+destination settles or the navigation deadline passes; once pending UI shows,
+it stays a minimum duration. Constants live in one documented module. Reveal
+choreography is tier-aware: value-slot commits are layout-safe and commit
+immediately; range commits join dependency-ordered reveal trains. All timing
+behavior is structural or latency-decided — never per-block configuration.
+TSRX syntax is unchanged.
