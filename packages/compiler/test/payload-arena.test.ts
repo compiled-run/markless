@@ -534,28 +534,20 @@ export function App() @{
 				{ hostNodeId: 'h4', strategy: 'arm-relative', index: 2, tagName: 'button' },
 				{ hostNodeId: 'h5', strategy: 'arm-relative', index: 3, tagName: 'span' },
 			],
-			events: [
-				expect.objectContaining({ hostNodeId: 'h4', eventName: 'click' }),
-			],
-			behaviors: [
-				expect.objectContaining({ hostNodeId: 'h2', functionSource: 'panel' }),
-			],
+			events: [expect.objectContaining({ hostNodeId: 'h4', eventName: 'click' })],
+			behaviors: [expect.objectContaining({ hostNodeId: 'h2', functionSource: 'panel' })],
 			elementHandles: [],
 		},
 		{
 			// Host ids follow the collector's walk order (@catch walks before
 			// @pending), so the @pending arm's <p> is h7 here.
-			locators: [
-				{ hostNodeId: 'h7', strategy: 'arm-relative', index: 0, tagName: 'p' },
-			],
+			locators: [{ hostNodeId: 'h7', strategy: 'arm-relative', index: 0, tagName: 'p' }],
 			events: [],
 			behaviors: [],
 			elementHandles: [],
 		},
 		{
-			locators: [
-				{ hostNodeId: 'h6', strategy: 'arm-relative', index: 0, tagName: 'p' },
-			],
+			locators: [{ hostNodeId: 'h6', strategy: 'arm-relative', index: 0, tagName: 'p' }],
 			events: [],
 			behaviors: [],
 			elementHandles: [],

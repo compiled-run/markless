@@ -170,12 +170,10 @@ describe('Vite adapter structure', () => {
 			root: '/workspace/app',
 		});
 		callBuildStart(plugin, { cwd: '/workspace/app', input: { symbols: 'src/App.tsrx' } });
-		await callTransform(
-			plugin,
-			source,
-			'/workspace/app/src/App.tsrx',
-			{ ...createViteHookContext('client'), emitFile },
-		);
+		await callTransform(plugin, source, '/workspace/app/src/App.tsrx', {
+			...createViteHookContext('client'),
+			emitFile,
+		});
 
 		expect(emitFile.mock.calls.map((call) => call[0])).toEqual(
 			expect.arrayContaining([
@@ -211,12 +209,10 @@ describe('Vite adapter structure', () => {
 			root: '/workspace/app',
 		});
 		callBuildStart(plugin, { cwd: '/workspace/app', input: { symbols: 'src/App.tsrx' } });
-		await callTransform(
-			plugin,
-			source,
-			'/workspace/app/src/App.tsrx',
-			{ ...createViteHookContext('client'), emitFile },
-		);
+		await callTransform(plugin, source, '/workspace/app/src/App.tsrx', {
+			...createViteHookContext('client'),
+			emitFile,
+		});
 
 		expect(emitFile.mock.calls.map((call) => call[0].id)).toContain(
 			`virtual:markless:resume:${encodeURIComponent('/workspace/app/src/App.tsrx')}`,

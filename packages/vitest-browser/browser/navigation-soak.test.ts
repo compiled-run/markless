@@ -34,11 +34,15 @@ test(
 			for (const target of [routeDocument, routeWindow] as const) {
 				const originalAdd = target.addEventListener.bind(target);
 				const originalRemove = target.removeEventListener.bind(target);
-				(target as EventTarget).addEventListener = ((...args: Parameters<EventTarget['addEventListener']>) => {
+				(target as EventTarget).addEventListener = ((
+					...args: Parameters<EventTarget['addEventListener']>
+				) => {
 					netListeners++;
 					return originalAdd(...args);
 				}) as EventTarget['addEventListener'];
-				(target as EventTarget).removeEventListener = ((...args: Parameters<EventTarget['removeEventListener']>) => {
+				(target as EventTarget).removeEventListener = ((
+					...args: Parameters<EventTarget['removeEventListener']>
+				) => {
 					netListeners--;
 					return originalRemove(...args);
 				}) as EventTarget['removeEventListener'];
@@ -57,7 +61,12 @@ test(
 			const navigate = (page: unknown, pathname: string) =>
 				dispatchRouteUpdate(routeDocument, {
 					page: { default: page },
-					route: { file: `pages${pathname}.tsrx`, params: {}, status: 200, url: `http://localhost${pathname}` },
+					route: {
+						file: `pages${pathname}.tsrx`,
+						params: {},
+						status: 200,
+						url: `http://localhost${pathname}`,
+					},
 				});
 
 			navigate(AlphaPage, '/alpha');
@@ -82,8 +91,12 @@ test(
 			// Flat, not merely sub-linear: swaps must not add ANY lasting
 			// document/window listeners or body nodes once warmed.
 			expect(netListeners - listenerBaseline, 'document/window listener growth').toBe(0);
-			expect(routeDocument.body.querySelectorAll('*').length, 'element count').toBe(nodeBaseline);
-			expect(routeDocument.body.childNodes.length, 'body child count').toBe(bodyChildBaseline);
+			expect(routeDocument.body.querySelectorAll('*').length, 'element count').toBe(
+				nodeBaseline,
+			);
+			expect(routeDocument.body.childNodes.length, 'body child count').toBe(
+				bodyChildBaseline,
+			);
 		} finally {
 			iframe.remove();
 		}

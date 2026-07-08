@@ -40,7 +40,9 @@ export type CsrRenderOptions = {
 	// target — the router holds the outgoing page here until the destination
 	// settles or the deadline passes. Returning false cancels the mount (the
 	// navigation was superseded).
-	readonly beforeMount?: (container: CsrRenderContainer) => Promise<boolean | void> | boolean | void;
+	readonly beforeMount?: (
+		container: CsrRenderContainer,
+	) => Promise<boolean | void> | boolean | void;
 };
 
 type CompilerProvidedCsrRuntime = {

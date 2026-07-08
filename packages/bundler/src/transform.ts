@@ -132,32 +132,35 @@ export async function transformTsrxModule(
 				symbolRoutes,
 			}),
 		},
-		...(await Promise.all(compiled.symbolModules.modules.map(
-			async (module, index): Promise<MarklessVirtualModule> => ({
-				id: symbolVirtualModuleId(input.filename, module.symbolId),
-				type: 'symbol',
-				symbolId: module.symbolId,
-				exportName: symbolRows[index]!.exportName,
-				source: injectExecutionLogModuleHook(
-					await stripEmittedTypes(
-						rewriteSymbolModuleExport(
-							module.source,
-							module.exportName,
-							symbolRows[index]!.exportName,
+		...(await Promise.all(
+			compiled.symbolModules.modules.map(
+				async (module, index): Promise<MarklessVirtualModule> => ({
+					id: symbolVirtualModuleId(input.filename, module.symbolId),
+					type: 'symbol',
+					symbolId: module.symbolId,
+					exportName: symbolRows[index]!.exportName,
+					source: injectExecutionLogModuleHook(
+						await stripEmittedTypes(
+							rewriteSymbolModuleExport(
+								module.source,
+								module.exportName,
+								symbolRows[index]!.exportName,
+							),
 						),
+						`symbol:${module.symbolId}`,
+						executionLogModuleHookMode,
 					),
-					`symbol:${module.symbolId}`,
-					executionLogModuleHookMode,
-				),
-			}),
-		))),
+				}),
+			),
+		)),
 	];
 
 	const styleImport = styleId ? `import ${JSON.stringify(styleId)};\n` : '';
 	return {
 		code:
-				styleImport +
-				(await stripEmittedTypes(emitSourceModule({
+			styleImport +
+			(await stripEmittedTypes(
+				emitSourceModule({
 					filename: input.filename,
 					payloadId,
 					resolverId,
@@ -166,7 +169,10 @@ export async function transformTsrxModule(
 					executionLog: input.executionLog,
 					headInjections: input.headInjections,
 					devResumeReexport: input.devResumeReexport === true,
-					needsFullResume: needsFullResume(compiled.protocolView, compiled.runtimeDemandMap),
+					needsFullResume: needsFullResume(
+						compiled.protocolView,
+						compiled.runtimeDemandMap,
+					),
 					resumeModuleUrl: input.resumeModuleUrl,
 					publicRenderModuleSource: compiled.publicRenderModule.moduleSource,
 					publicRenderRootExportName: compiled.publicRenderModule.rootExportName,
@@ -176,7 +182,8 @@ export async function transformTsrxModule(
 					publicRenderSsrExportName: compiled.publicRenderModule.ssrExportName,
 					symbols: symbolRows,
 					symbolRoutes,
-			}))),
+				}),
+			)),
 		map: null,
 		virtualModules,
 		manifest,
@@ -206,5 +213,7 @@ function needsFullResume(
 }
 
 function recordKindReplaced(runtimeDemandMap: RuntimeDemandMapArtifact, kind: string): boolean {
-	return runtimeDemandMap.recordKinds.some((record) => record.kind === kind && record.replaced === true);
+	return runtimeDemandMap.recordKinds.some(
+		(record) => record.kind === kind && record.replaced === true,
+	);
 }

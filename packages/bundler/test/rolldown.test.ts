@@ -423,7 +423,9 @@ let active = state(true);
 		const result = await callResolveId(plugin, '@markless/web/inline/sync-policy-core');
 
 		expect(result).toEqual(
-			expect.objectContaining({ id: expect.stringMatching(/packages\/web\/src\/inline\/sync-policy-core\.ts$/) }),
+			expect.objectContaining({
+				id: expect.stringMatching(/packages\/web\/src\/inline\/sync-policy-core\.ts$/),
+			}),
 		);
 	});
 
@@ -449,12 +451,9 @@ let count = state(0);
 		}));
 
 		expect(symbolRouteSpecifiers).toEqual(['./progressive-child-panel.tsrx?markless-symbols']);
-		const result = await callResolveId(
-			plugin,
-			symbolRouteSpecifiers[0]!,
-			`\0${resumeId}`,
-			{ resolve },
-		);
+		const result = await callResolveId(plugin, symbolRouteSpecifiers[0]!, `\0${resumeId}`, {
+			resolve,
+		});
 
 		expect(resolve).toHaveBeenCalledWith(
 			'./progressive-child-panel.tsrx?markless-symbols',
@@ -463,7 +462,7 @@ let count = state(0);
 		);
 		expect(result).toEqual({
 			id: '/workspace/app/src/progressive-child-panel.tsrx?markless-symbols',
-			});
+		});
 	});
 
 	test('client resume source requests serve the generated resume module only', async () => {
@@ -500,8 +499,7 @@ let count = state(0);
 		).toBeNull();
 
 		await callTransform(plugin, source, filename);
-		const symbolId =
-			`virtual:markless:symbol:${encodeURIComponent(filename)}:${encodeURIComponent('symbol:0')}`;
+		const symbolId = `virtual:markless:symbol:${encodeURIComponent(filename)}:${encodeURIComponent('symbol:0')}`;
 		const symbolSource = (await callLoad(plugin, `\0${symbolId}`)) as string;
 
 		expect(symbolSource).not.toContain('__mxLog?.add');
@@ -642,7 +640,9 @@ let count = state(0);
 		);
 
 		const htmlHrefs = [
-			...html.source.matchAll(/<link\b[^>]*\brel=["']modulepreload["'][^>]*\bhref=["']([^"']+)["']/g),
+			...html.source.matchAll(
+				/<link\b[^>]*\brel=["']modulepreload["'][^>]*\bhref=["']([^"']+)["']/g,
+			),
 		]
 			.map((match) => match[1]!)
 			.sort();
@@ -762,7 +762,9 @@ export function App() @{
 `,
 		environment: 'client',
 	});
-	const qualifyingKeyedResume = qualifyingKeyed.virtualModules.find((module) => module.type === 'resume');
+	const qualifyingKeyedResume = qualifyingKeyed.virtualModules.find(
+		(module) => module.type === 'resume',
+	);
 	expect(qualifyingKeyedResume?.source).toContain('resumeScalarRowEventFromPayloadDocument');
 	expect(qualifyingKeyedResume?.source).not.toContain("import('@markless/core/web/resume')");
 

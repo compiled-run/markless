@@ -277,7 +277,12 @@ test('emits exact route modulepreload maps from client build chunks', () => {
 	// or the first interaction pays a waterfall fetch on slow networks.
 	const resumeChunk = chunk({
 		code: `tsrxResumeModuleLoaders = Object.assign({"/pages/docs/[...slug].mdx":()=>import("./docs-resume.js"),"/pages/index.tsrx":()=>import("./home-resume.js")});`,
-		dynamicImports: ['build/docs.js', 'build/home.js', 'build/docs-resume.js', 'build/home-resume.js'],
+		dynamicImports: [
+			'build/docs.js',
+			'build/home.js',
+			'build/docs-resume.js',
+			'build/home-resume.js',
+		],
 		fileName: 'build/resume.js',
 		imports: ['build/resume-runtime.js'],
 		moduleIds: ['/repo/packages/router/src/vite/entries/resume-entry.ts'],
@@ -386,9 +391,15 @@ function loadSymbol(file, symbol) {
 		{},
 		{
 			'build/navigation.js': navigationChunk,
-			'build/docs.js': chunk({ fileName: 'build/docs.js', moduleIds: ['/project/pages/docs.tsrx'] }),
+			'build/docs.js': chunk({
+				fileName: 'build/docs.js',
+				moduleIds: ['/project/pages/docs.tsrx'],
+			}),
 			'build/docs-resume.js': chunk({ fileName: 'build/docs-resume.js' }),
-			'build/home.js': chunk({ fileName: 'build/home.js', moduleIds: ['/project/pages/index.tsrx'] }),
+			'build/home.js': chunk({
+				fileName: 'build/home.js',
+				moduleIds: ['/project/pages/index.tsrx'],
+			}),
 			'build/home-resume.js': chunk({ fileName: 'build/home-resume.js' }),
 		},
 	);
@@ -430,8 +441,14 @@ test('includes the current route resume module closure in ssr modulepreloads', (
 		{},
 		{
 			'build/resume.js': resumeChunk,
-			'build/docs.js': chunk({ fileName: 'build/docs.js', moduleIds: ['/project/pages/docs.tsrx'] }),
-			'build/home.js': chunk({ fileName: 'build/home.js', moduleIds: ['/project/pages/index.tsrx'] }),
+			'build/docs.js': chunk({
+				fileName: 'build/docs.js',
+				moduleIds: ['/project/pages/docs.tsrx'],
+			}),
+			'build/home.js': chunk({
+				fileName: 'build/home.js',
+				moduleIds: ['/project/pages/index.tsrx'],
+			}),
 			'build/docs-resume.js': chunk({
 				dynamicImports: ['build/docs-click-symbol.js'],
 				fileName: 'build/docs-resume.js',

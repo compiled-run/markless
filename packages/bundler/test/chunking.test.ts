@@ -9,9 +9,12 @@ type MarklessOutputOptions = {
 
 describe('markless chunking defaults', () => {
 	test('uses explicit output defaults for each environment', () => {
-		const clientOutput = outputDefaults({
-			dir: 'dist/client',
-		}, 'client') as MarklessOutputOptions;
+		const clientOutput = outputDefaults(
+			{
+				dir: 'dist/client',
+			},
+			'client',
+		) as MarklessOutputOptions;
 
 		expect(clientOutput).toMatchObject({
 			dir: 'dist/client',
@@ -69,9 +72,12 @@ describe('markless chunking defaults', () => {
 
 	test('appends user code splitting groups after framework groups', () => {
 		const userGroup = { name: 'vendor', test: /vendor/ };
-		const output = outputDefaults({
-			codeSplitting: { groups: [userGroup] },
-		}, 'client') as MarklessOutputOptions;
+		const output = outputDefaults(
+			{
+				codeSplitting: { groups: [userGroup] },
+			},
+			'client',
+		) as MarklessOutputOptions;
 
 		expect(output.codeSplitting?.groups?.map((group) => group.name)).toEqual(
 			expect.arrayContaining([
@@ -120,9 +126,9 @@ describe('markless chunking defaults', () => {
 		);
 
 		expect(groups.has('markless-symbols')).toBe(false);
-		expect(firstMatchingGroupName(groups, 'virtual:markless:symbol:/src/root.tsrx:symbol:0')).toBe(
-			undefined,
-		);
+		expect(
+			firstMatchingGroupName(groups, 'virtual:markless:symbol:/src/root.tsrx:symbol:0'),
+		).toBe(undefined);
 	});
 
 	test('maps split resume capability files to bounded runtime groups', () => {
@@ -131,63 +137,83 @@ describe('markless chunking defaults', () => {
 			output.codeSplitting?.groups?.map((group) => [group.name, group.test]) ?? [],
 		);
 
-		expect(groups.get('markless-resume-async')?.test('/repo/packages/web/src/resume-async-wiring.ts')).toBe(
-			true,
-		);
+		expect(
+			groups
+				.get('markless-resume-async')
+				?.test('/repo/packages/web/src/resume-async-wiring.ts'),
+		).toBe(true);
 		// The web fns leaves intentionally stay ungrouped: force-merging them
 		// defeated one-function-per-chunk execution and raised shipped bytes.
-		expect(firstMatchingGroupName(groups, '/repo/packages/web/src/fns/csr.ts')).toBe(
-			undefined,
-		);
-		expect(groups.get('markless-resume-branches')?.test('/repo/packages/core/src/web/resume-branches.ts')).toBe(
-			true,
-		);
-		expect(groups.get('markless-resume-repeats')?.test('/repo/packages/web/src/resume-keyed-repeats.ts')).toBe(
-			true,
-		);
-		expect(groups.get('markless-resume-behaviors')?.test('/repo/packages/core/src/web/resume-behaviors.ts')).toBe(
-			true,
-		);
+		expect(firstMatchingGroupName(groups, '/repo/packages/web/src/fns/csr.ts')).toBe(undefined);
+		expect(
+			groups
+				.get('markless-resume-branches')
+				?.test('/repo/packages/core/src/web/resume-branches.ts'),
+		).toBe(true);
+		expect(
+			groups
+				.get('markless-resume-repeats')
+				?.test('/repo/packages/web/src/resume-keyed-repeats.ts'),
+		).toBe(true);
+		expect(
+			groups
+				.get('markless-resume-behaviors')
+				?.test('/repo/packages/core/src/web/resume-behaviors.ts'),
+		).toBe(true);
 		expect(
 			groups.get('markless-payload-resume')?.test('/repo/packages/web/src/payload-resume.ts'),
 		).toBe(true);
 		expect(
-			groups.get('markless-payload-graph-construct')?.test(
-				'/repo/packages/web/src/payload-graph-construct.ts',
-			),
+			groups
+				.get('markless-payload-graph-construct')
+				?.test('/repo/packages/web/src/payload-graph-construct.ts'),
 		).toBe(true);
-		expect(groups.get('markless-payload-document')?.test('/repo/packages/web/src/payload-document.ts')).toBe(
-			true,
-		);
 		expect(
-			groups.get('markless-payload-document')?.test(
-				'/repo/packages/web/src/payload-resume-registry.ts',
-			),
+			groups
+				.get('markless-payload-document')
+				?.test('/repo/packages/web/src/payload-document.ts'),
+		).toBe(true);
+		expect(
+			groups
+				.get('markless-payload-document')
+				?.test('/repo/packages/web/src/payload-resume-registry.ts'),
 		).toBe(true);
 		expect(
 			firstMatchingGroupName(groups, '/repo/packages/web/src/inline/payload-document.ts'),
 		).toBe('markless-inline-payload-document');
-		expect(groups.get('markless-resume-shared-patch')?.test('/repo/packages/web/src/resume-shared-patch.ts')).toBe(
-			true,
-		);
-		expect(groups.get('markless-resume-runtime-shared')?.test('/repo/packages/web/src/resume-runtime-shared.ts')).toBe(
-			true,
-		);
-		expect(groups.get('markless-resume-runtime-start')?.test('/repo/packages/web/src/resume-runtime-start.ts')).toBe(
-			true,
-		);
-		expect(groups.get('markless-resume-events')?.test('/repo/packages/web/src/resume-events.ts')).toBe(
-			true,
-		);
-		expect(groups.get('markless-resume-locators')?.test('/repo/packages/web/src/resume-locators.ts')).toBe(
-			true,
-		);
-		expect(groups.get('markless-resume-errors')?.test('/repo/packages/web/src/inline/resume-errors.ts')).toBe(
-			true,
-		);
-		expect(groups.get('markless-resume-sync-demand')?.test('/repo/packages/web/src/resume-sync-demand.ts')).toBe(
-			true,
-		);
+		expect(
+			groups
+				.get('markless-resume-shared-patch')
+				?.test('/repo/packages/web/src/resume-shared-patch.ts'),
+		).toBe(true);
+		expect(
+			groups
+				.get('markless-resume-runtime-shared')
+				?.test('/repo/packages/web/src/resume-runtime-shared.ts'),
+		).toBe(true);
+		expect(
+			groups
+				.get('markless-resume-runtime-start')
+				?.test('/repo/packages/web/src/resume-runtime-start.ts'),
+		).toBe(true);
+		expect(
+			groups.get('markless-resume-events')?.test('/repo/packages/web/src/resume-events.ts'),
+		).toBe(true);
+		expect(
+			groups
+				.get('markless-resume-locators')
+				?.test('/repo/packages/web/src/resume-locators.ts'),
+		).toBe(true);
+		expect(
+			groups
+				.get('markless-resume-errors')
+				?.test('/repo/packages/web/src/inline/resume-errors.ts'),
+		).toBe(true);
+		expect(
+			groups
+				.get('markless-resume-sync-demand')
+				?.test('/repo/packages/web/src/resume-sync-demand.ts'),
+		).toBe(true);
 	});
 
 	test('maps runtime graph planes to separate bounded groups', () => {
@@ -196,30 +222,36 @@ describe('markless chunking defaults', () => {
 			output.codeSplitting?.groups?.map((group) => [group.name, group.test]) ?? [],
 		);
 
-		expect(groups.get('markless-runtime-graph-core')?.test('/repo/packages/runtime/src/graph-core.ts')).toBe(
-			true,
-		);
 		expect(
-			groups.get('markless-runtime-graph-collections')?.test(
-				'/repo/packages/runtime/src/graph-collections.ts',
-			),
+			groups
+				.get('markless-runtime-graph-core')
+				?.test('/repo/packages/runtime/src/graph-core.ts'),
 		).toBe(true);
 		expect(
-			groups.get('markless-runtime-graph-computed')?.test(
-				'/repo/packages/runtime/src/graph-computed.ts',
-			),
+			groups
+				.get('markless-runtime-graph-collections')
+				?.test('/repo/packages/runtime/src/graph-collections.ts'),
 		).toBe(true);
-		expect(groups.get('markless-runtime-graph-async')?.test('/repo/packages/runtime/src/graph-async.ts')).toBe(
-			true,
-		);
 		expect(
-			groups.get('markless-runtime-graph-scheduler')?.test(
-				'/repo/packages/runtime/src/graph-scheduler.ts',
-			),
+			groups
+				.get('markless-runtime-graph-computed')
+				?.test('/repo/packages/runtime/src/graph-computed.ts'),
 		).toBe(true);
-		expect(groups.get('markless-runtime-graph-shared')?.test('/repo/packages/runtime/src/graph-shared.ts')).toBe(
-			true,
-		);
+		expect(
+			groups
+				.get('markless-runtime-graph-async')
+				?.test('/repo/packages/runtime/src/graph-async.ts'),
+		).toBe(true);
+		expect(
+			groups
+				.get('markless-runtime-graph-scheduler')
+				?.test('/repo/packages/runtime/src/graph-scheduler.ts'),
+		).toBe(true);
+		expect(
+			groups
+				.get('markless-runtime-graph-shared')
+				?.test('/repo/packages/runtime/src/graph-shared.ts'),
+		).toBe(true);
 		expect(groups.get('markless-graph')?.test('/repo/packages/runtime/src/graph-core.ts')).toBe(
 			false,
 		);

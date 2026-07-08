@@ -51,12 +51,17 @@ export async function validateKeyedRepeatPayloadKeys(input: {
 	readonly view: Pick<ProtocolViewPayload, 'keyedRepeats'>;
 }): Promise<void> {
 	const entries = await Promise.all(
-		input.state.cells.map(async (cell) => [
-			cell.graphNodeId,
-			cell.value === undefined
-				? undefined
-				: await deserializeGraphValueForClient(cell.value as SerializedGraphPayload),
-		] as const),
+		input.state.cells.map(
+			async (cell) =>
+				[
+					cell.graphNodeId,
+					cell.value === undefined
+						? undefined
+						: await deserializeGraphValueForClient(
+								cell.value as SerializedGraphPayload,
+							),
+				] as const,
+		),
 	);
 	const cells = new Map(entries);
 	validateKeyedRepeatGraphKeys(
@@ -80,10 +85,7 @@ export function readKeyedRepeatCollection(
 	return Array.from((value ?? []) as Iterable<unknown>);
 }
 
-export function repeatItemKey(
-	item: unknown,
-	repeat: RuntimeKeyedRepeatRecord,
-): unknown {
+export function repeatItemKey(item: unknown, repeat: RuntimeKeyedRepeatRecord): unknown {
 	return readPath(item, repeat.keyPath);
 }
 

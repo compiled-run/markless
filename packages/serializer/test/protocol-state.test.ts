@@ -106,7 +106,11 @@ test('serializeRuntimeStateCells envelope-encodes live directValue cells for ser
 	expect(cells[0]).toBe(encoded);
 	const propCell = cells[1]!;
 	expect('directValue' in propCell).toBe(false);
-	expect(propCell).toMatchObject({ graphNodeId: 'prop:props', name: 'props', valueKind: 'object' });
+	expect(propCell).toMatchObject({
+		graphNodeId: 'prop:props',
+		name: 'props',
+		valueKind: 'object',
+	});
 	expect(deserializeGraphValue(propCell.value as never)).toEqual({
 		params: { owner: 'ada' },
 		status: 200,

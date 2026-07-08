@@ -1,4 +1,7 @@
-import { mismatchedElementLocatorError, missingElementLocatorError } from './inline/resume-errors.ts';
+import {
+	mismatchedElementLocatorError,
+	missingElementLocatorError,
+} from './inline/resume-errors.ts';
 import { isArmBranchAnchorComment } from './resume-anchor-census.ts';
 import type {
 	ResumeArmBranchRecord,
@@ -50,8 +53,12 @@ export function materializeArmRecords(input: ArmMaterializeInput) {
 	return {
 		elementsByHostId: byHostId,
 		events: input.armRecords.events.filter((event) => byHostId.has(event.hostNodeId)),
-		behaviors: input.armRecords.behaviors.filter((behavior) => byHostId.has(behavior.hostNodeId)),
-		elementHandles: input.armRecords.elementHandles.filter((handle) => byHostId.has(handle.hostNodeId)),
+		behaviors: input.armRecords.behaviors.filter((behavior) =>
+			byHostId.has(behavior.hostNodeId),
+		),
+		elementHandles: input.armRecords.elementHandles.filter((handle) =>
+			byHostId.has(handle.hostNodeId),
+		),
 		branches: materializeArmBranchRecords(input),
 	};
 }
@@ -59,7 +66,9 @@ export function materializeArmRecords(input: ArmMaterializeInput) {
 // Resolves each flip record's anchor pair by position in the arm-local census.
 // A missing anchor is a corrupt census — fail loud (D2), never register half a
 // flip. Escalated records (no anchors) pass through untouched.
-function materializeArmBranchRecords(input: ArmMaterializeInput): ReadonlyArray<ResumeArmBranchRecord> {
+function materializeArmBranchRecords(
+	input: ArmMaterializeInput,
+): ReadonlyArray<ResumeArmBranchRecord> {
 	const records = input.armRecords.branches ?? [];
 	if (records.length === 0) return [];
 	const census = records.some((record) => record.startAnchor)
@@ -118,12 +127,22 @@ export function expandBoundaryArmRecords(
 	root: ResumeDomElement,
 	view: ResumeViewRecord,
 	boundariesById: ReadonlyMap<string, ResumeAsyncBoundaryRecord>,
-): { readonly view: ResumeViewRecord; readonly elementsByHostId: Map<string, ResumeDomElement> } | null {
+): {
+	readonly view: ResumeViewRecord;
+	readonly elementsByHostId: Map<string, ResumeDomElement>;
+} | null {
 	const registrable = view.asyncBoundaries.flatMap((boundary) => {
 		const armRecords = boundaryArmRecordSet(boundary.armRecords);
 		const live = boundariesById.get(boundary.id);
 		return armRecords && live
-			? [{ armRecords, boundaryId: boundary.id, startAnchor: live.startAnchor, endAnchor: live.endAnchor }]
+			? [
+					{
+						armRecords,
+						boundaryId: boundary.id,
+						startAnchor: live.startAnchor,
+						endAnchor: live.endAnchor,
+					},
+				]
 			: [];
 	});
 	if (registrable.length === 0) return null;
@@ -150,7 +169,13 @@ export function expandBoundaryArmRecords(
 		);
 	}
 	return {
-		view: { ...view, events, behaviors, elementHandles, ...(branches.length > 0 ? { branches } : {}) },
+		view: {
+			...view,
+			events,
+			behaviors,
+			elementHandles,
+			...(branches.length > 0 ? { branches } : {}),
+		},
 		elementsByHostId,
 	};
 }

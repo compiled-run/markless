@@ -129,11 +129,17 @@ test('planPublicRender reports state created inside a keyed repeat row with row-
 			expect.objectContaining({
 				code: 'MARKLESS_STATE_REPEAT_ROW_SCOPE_UNSUPPORTED',
 				title: 'Per-row state in keyed repeats is not supported yet',
-				message: expect.stringContaining('state() creates "selected" inside a keyed @for row'),
-				why: expect.stringContaining('each row would need its own cell keyed by row identity'),
+				message: expect.stringContaining(
+					'state() creates "selected" inside a keyed @for row',
+				),
+				why: expect.stringContaining(
+					'each row would need its own cell keyed by row identity',
+				),
 				suggestions: [
 					expect.objectContaining({
-						message: expect.stringContaining('Lift the state to a collection on the parent'),
+						message: expect.stringContaining(
+							'Lift the state to a collection on the parent',
+						),
 					}),
 				],
 				docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_REPEAT_ROW_SCOPE_UNSUPPORTED',
@@ -162,10 +168,14 @@ test('planPublicRender reports computed created inside a keyed repeat row with r
 		expect.arrayContaining([
 			expect.objectContaining({
 				code: 'MARKLESS_STATE_REPEAT_ROW_SCOPE_UNSUPPORTED',
-				message: expect.stringContaining('computed() creates "label" inside a keyed @for row'),
+				message: expect.stringContaining(
+					'computed() creates "label" inside a keyed @for row',
+				),
 				suggestions: [
 					expect.objectContaining({
-						message: expect.stringContaining('one state() holding per-row data keyed by the row key'),
+						message: expect.stringContaining(
+							'one state() holding per-row data keyed by the row key',
+						),
 					}),
 				],
 			}),
@@ -282,7 +292,8 @@ test.each([
 					passId: 'public-render-plan',
 					title: expect.stringContaining(label),
 					primarySpan: expect.objectContaining({ filename: 'src/Unsupported.tsrx' }),
-					docsUrl: 'https://markless.dev/errors/MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
+					docsUrl:
+						'https://markless.dev/errors/MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
 				}),
 			]),
 		);
@@ -535,9 +546,9 @@ export default function Catalog() @{
 	expect(repeat?.eventControls).toEqual([
 		expect.objectContaining({ eventName: 'click', hostPath: [] }),
 	]);
-	expect(
-		plan.diagnostics.filter((diagnostic) => diagnostic.message.includes('@for')),
-	).toEqual([]);
+	expect(plan.diagnostics.filter((diagnostic) => diagnostic.message.includes('@for'))).toEqual(
+		[],
+	);
 });
 
 test('planPublicRender allows row reads rooted at page props (render-constant)', async () => {

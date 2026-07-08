@@ -11,7 +11,8 @@ describe('marklessSsrComposeView with projecting children', () => {
 	it('offsets parent in-projection event hosts by the child wrapper count', () => {
 		// Final DOM: <div app-root> <div shell> <header/> <main> <button/> </main> </div> </div>
 		// Walk:      0 app-root    1 shell     2 header   3 main  4 button
-		const childHtml = '<div class="shell"><header></header><main><button data-h="h2"></button></main></div>';
+		const childHtml =
+			'<div class="shell"><header></header><main><button data-h="h2"></button></main></div>';
 		const html = `<div class="app-root">${childHtml}</div>`;
 		// Parent-only walk (component invisible): app-root=0, button=1.
 		const hostLocators = [
@@ -49,7 +50,12 @@ describe('marklessSsrComposeView with projecting children', () => {
 		];
 
 		const composed = marklessSsrComposeView(html, view, hostLocators, children);
-		const byId = new Map(composed.view.locators.map((l: { hostNodeId: string; index: number }) => [l.hostNodeId, l.index]));
+		const byId = new Map(
+			composed.view.locators.map((l: { hostNodeId: string; index: number }) => [
+				l.hostNodeId,
+				l.index,
+			]),
+		);
 
 		// Child wrappers occupy walk indexes 1..3; the projected button lands at 4.
 		expect(byId.get('c0:s1')).toBe(1);

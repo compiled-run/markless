@@ -15,10 +15,9 @@ test('a slow re-settle shows the @pending arm only past the deadline, then settl
 	const container = screen.container as HTMLElement;
 
 	// First appearance settles (structural @pending is legitimate here).
-	await expect.poll(
-		() => container.querySelector('em[data-badge]')?.textContent,
-		{ timeout: 5_000 },
-	).toBe('Report alpha');
+	await expect
+		.poll(() => container.querySelector('em[data-badge]')?.textContent, { timeout: 5_000 })
+		.toBe('Report alpha');
 
 	// Record every DOM state transition (with timestamps) during the refresh.
 	const samples: { html: string; at: number }[] = [];
@@ -37,16 +36,18 @@ test('a slow re-settle shows the @pending arm only past the deadline, then settl
 	const clickedAt = performance.now();
 	refresh.click();
 
-	await expect.poll(
-		() => container.querySelector('em[data-badge]')?.textContent,
-		{ timeout: 5_000 },
-	).toBe('Report beta');
+	await expect
+		.poll(() => container.querySelector('em[data-badge]')?.textContent, { timeout: 5_000 })
+		.toBe('Report beta');
 	observer.disconnect();
 
 	const pendingIndex = samples.findIndex((sample) => sample.html.includes('class="pending"'));
 	// The deadline passed while the refresh was still pending: the @pending
 	// arm MUST have been committed.
-	expect(pendingIndex, 'expected the @pending arm to appear past the deadline').toBeGreaterThanOrEqual(0);
+	expect(
+		pendingIndex,
+		'expected the @pending arm to appear past the deadline',
+	).toBeGreaterThanOrEqual(0);
 
 	// …but never before the deadline: timers only fire late, so the pending
 	// frame appears no earlier than (deadline - scheduling margin).
@@ -57,7 +58,9 @@ test('a slow re-settle shows the @pending arm only past the deadline, then settl
 		// range, no premature arm swap.
 		if (index < pendingIndex) expect(sample.html).toContain('Report alpha');
 		// Never a blank boundary: either a settled report or the pending arm.
-		expect(/Report |class="pending"/.test(sample.html), `blank frame at ${String(index)}`).toBe(true);
+		expect(/Report |class="pending"/.test(sample.html), `blank frame at ${String(index)}`).toBe(
+			true,
+		);
 	}
 
 	// Min-duration lower bound: once shown, pending stays visible at least

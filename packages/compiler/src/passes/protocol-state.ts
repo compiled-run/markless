@@ -1,14 +1,12 @@
 import { createProtocolStatePayload } from '@markless/serializer';
 import type { ProtocolStatePayload } from '@markless/serializer';
-import type {
-	ProtocolStatePayloadInput,
-	SemanticSharedReturnProperty,
-} from '../artifacts.ts';
+import type { ProtocolStatePayloadInput, SemanticSharedReturnProperty } from '../artifacts.ts';
 import { planSymbolResolver } from './symbol-resolver.ts';
 
-type StateBindingWithInitializer = ProtocolStatePayloadInput['semanticGraph']['graphBindings'][number] & {
-	readonly initialValueKnown?: boolean;
-};
+type StateBindingWithInitializer =
+	ProtocolStatePayloadInput['semanticGraph']['graphBindings'][number] & {
+		readonly initialValueKnown?: boolean;
+	};
 
 export function createProtocolStatePayloadFromArena(
 	input: ProtocolStatePayloadInput,
@@ -80,9 +78,7 @@ export function createProtocolStatePayloadFromArena(
 	};
 }
 
-function syncDeriveSymbolIds(
-	input: ProtocolStatePayloadInput,
-): ReadonlyMap<string, string> {
+function syncDeriveSymbolIds(input: ProtocolStatePayloadInput): ReadonlyMap<string, string> {
 	const symbolResolver =
 		input.symbolResolver ??
 		planSymbolResolver({

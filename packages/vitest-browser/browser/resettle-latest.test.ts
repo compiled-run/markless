@@ -14,9 +14,9 @@ test('re-settle keeps the prior settled content visible: no pending frame, no bl
 	const container = screen.container as HTMLElement;
 
 	// First appearance: @pending is legitimate here (no prior settled content).
-	await expect.poll(() => container.querySelector('em[data-badge]')?.textContent).toBe(
-		'Report alpha',
-	);
+	await expect
+		.poll(() => container.querySelector('em[data-badge]')?.textContent)
+		.toBe('Report alpha');
 
 	// Record every DOM state transition during the refresh.
 	const samples: string[] = [];
@@ -32,9 +32,9 @@ test('re-settle keeps the prior settled content visible: no pending frame, no bl
 	if (!refresh) throw new Error('Expected the refresh button in the rendered DOM.');
 	refresh.click();
 
-	await expect.poll(() => container.querySelector('em[data-badge]')?.textContent).toBe(
-		'Report beta',
-	);
+	await expect
+		.poll(() => container.querySelector('em[data-badge]')?.textContent)
+		.toBe('Report beta');
 	observer.disconnect();
 
 	for (const sample of samples) {

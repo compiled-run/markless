@@ -32,8 +32,10 @@ type ScalarWriteInput =
 	  };
 
 export function marklessWriteScalar(context: ScalarWriteContext, input: ScalarWriteInput): unknown {
-	if (!context.graph) throw marklessScalarLeafError('MARKLESS_SCALAR_WRITE_GRAPH_MISSING', 'write-graph');
-	if ((input.path?.length ?? 0) !== 0) throw marklessScalarLeafError('MARKLESS_SCALAR_WRITE_SHAPE', 'write-path');
+	if (!context.graph)
+		throw marklessScalarLeafError('MARKLESS_SCALAR_WRITE_GRAPH_MISSING', 'write-graph');
+	if ((input.path?.length ?? 0) !== 0)
+		throw marklessScalarLeafError('MARKLESS_SCALAR_WRITE_SHAPE', 'write-path');
 	if (context.graph.hasCell?.(input.graphNodeId) === false) {
 		throw marklessScalarLeafError('MARKLESS_SCALAR_WRITE_CELL_MISSING', 'write-cell');
 	}

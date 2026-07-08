@@ -25,7 +25,11 @@ export default box(
 		await expect.build.environment(build, 'client');
 		await expect.build.environment(build, 'ssr');
 		await expect.artifact.text(build, SERVER_ARTIFACT, {
-			contains: ['data-counter', 'renderSsr(props, marklessRenderContext)', 'payloadView: view'],
+			contains: [
+				'data-counter',
+				'renderSsr(props, marklessRenderContext)',
+				'payloadView: view',
+			],
 		});
 
 		await receipt.capture('ssr server artifact rendered payload shell');

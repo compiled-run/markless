@@ -23,11 +23,7 @@ import {
 	markDirtyComputedDependencies,
 	readComputedNode,
 } from './graph-computed.ts';
-import {
-	appendJournalResult,
-	scheduleMicrotask,
-	type DirtyPath,
-} from './graph-scheduler.ts';
+import { appendJournalResult, scheduleMicrotask, type DirtyPath } from './graph-scheduler.ts';
 import { createSharedGraphPlane } from './graph-shared.ts';
 
 export type RuntimeGraphCell = {
@@ -231,7 +227,9 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 
 		const asyncComputed = asyncComputedNodes.get(graphNodeId);
 		if (asyncComputed) {
-			return readAsyncComputedNode(asyncComputed, path, () => demandAsyncComputed(asyncComputed));
+			return readAsyncComputedNode(asyncComputed, path, () =>
+				demandAsyncComputed(asyncComputed),
+			);
 		}
 
 		return readPath(cells.get(graphNodeId), path);

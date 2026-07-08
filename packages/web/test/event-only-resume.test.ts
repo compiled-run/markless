@@ -2,7 +2,10 @@ import type { ProtocolViewPayload } from '@markless/serializer';
 import { expect, test, vi } from 'vitest';
 import { createProtocolStatePayload, renderPayloadScripts } from '../../serializer/src/index.ts';
 import { resumeEventOnlyFromPayloadDocument } from '../src/event-only-resume.ts';
-import { isScalarLeanResumeShape, resumeScalarEventFromPayloadDocument } from '../src/event-only-lean/scalar-resume.ts';
+import {
+	isScalarLeanResumeShape,
+	resumeScalarEventFromPayloadDocument,
+} from '../src/event-only-lean/scalar-resume.ts';
 
 type FakeElement = {
 	nodeType: 1;
@@ -67,59 +70,102 @@ function scalarRuntimeDemandMap(input: {
 }): unknown {
 	const replaced = input.replaced ?? true;
 	return {
-		recordKinds: ['async-boundary', 'behavior', 'branch', 'dom-update', 'element-handle', 'event', 'keyed-repeat']
-			.map((kind) => ({
-				kind,
-				replaced: replaced && (kind === 'event' || kind === 'dom-update'),
-			})),
-		actions: [{
-			hostNodeId: input.eventRecord.hostNodeId,
-			eventName: input.eventRecord.eventName,
-			recordKind: 'event',
-			recordKinds: ['event', 'dom-update'],
-			payloadRecordIds: [
-				`event:${input.eventRecord.hostNodeId}:${input.eventRecord.eventName}`,
-				`dom-update:${input.domUpdate.hostNodeId}:${input.domUpdate.symbolId ?? ''}`,
-			],
-			plan: {
-				version: 1, kind: 'scalar', symbolId: input.eventRecord.symbolIds[0], cell: input.domUpdate.graphNodeId,
-				write: { kind: 'assign', value: 1 },
-				textUpdates: [{ hostNodeId: input.domUpdate.hostNodeId, graphNodeId: input.domUpdate.graphNodeId, symbolId: input.domUpdate.symbolId }],
+		recordKinds: [
+			'async-boundary',
+			'behavior',
+			'branch',
+			'dom-update',
+			'element-handle',
+			'event',
+			'keyed-repeat',
+		].map((kind) => ({
+			kind,
+			replaced: replaced && (kind === 'event' || kind === 'dom-update'),
+		})),
+		actions: [
+			{
+				hostNodeId: input.eventRecord.hostNodeId,
+				eventName: input.eventRecord.eventName,
+				recordKind: 'event',
+				recordKinds: ['event', 'dom-update'],
+				payloadRecordIds: [
+					`event:${input.eventRecord.hostNodeId}:${input.eventRecord.eventName}`,
+					`dom-update:${input.domUpdate.hostNodeId}:${input.domUpdate.symbolId ?? ''}`,
+				],
+				plan: {
+					version: 1,
+					kind: 'scalar',
+					symbolId: input.eventRecord.symbolIds[0],
+					cell: input.domUpdate.graphNodeId,
+					write: { kind: 'assign', value: 1 },
+					textUpdates: [
+						{
+							hostNodeId: input.domUpdate.hostNodeId,
+							graphNodeId: input.domUpdate.graphNodeId,
+							symbolId: input.domUpdate.symbolId,
+						},
+					],
+				},
 			},
-		}],
+		],
 	};
 }
 
 function rowRuntimeDemandMap(input: {
 	readonly repeat: NonNullable<ProtocolViewPayload['keyedRepeats']>[number];
-	readonly rowEvent: NonNullable<ProtocolViewPayload['keyedRepeats']>[number]['rowEvents'][number];
+	readonly rowEvent: NonNullable<
+		ProtocolViewPayload['keyedRepeats']
+	>[number]['rowEvents'][number];
 	readonly domUpdate: ProtocolViewPayload['domUpdates'][number];
 	readonly replaced?: boolean;
 }): unknown {
 	const replaced = input.replaced ?? true;
 	return {
-		recordKinds: ['async-boundary', 'behavior', 'branch', 'dom-update', 'element-handle', 'event', 'keyed-repeat']
-			.map((kind) => ({
-				kind,
-				replaced: replaced && (kind === 'dom-update' || kind === 'keyed-repeat'),
-			})),
-		actions: [{
-			hostNodeId: input.repeat.parentHostNodeId,
-			eventName: input.rowEvent.eventName,
-			recordKind: 'keyed-repeat-row',
-			recordKinds: ['dom-update', 'keyed-repeat'],
-			payloadRecordIds: [
-				`dom-update:${input.domUpdate.hostNodeId}:${input.domUpdate.symbolId ?? ''}`,
-				`keyed-repeat:${input.repeat.id}`,
-			],
-			plan: {
-				version: 1, kind: 'row', symbolId: input.rowEvent.symbolIds[0], cell: input.domUpdate.graphNodeId,
-				write: { kind: 'assign', localPath: [input.repeat.itemName, ...(input.repeat.keyPath ?? [])] },
-				textUpdates: [{ hostNodeId: input.domUpdate.hostNodeId, graphNodeId: input.domUpdate.graphNodeId, symbolId: input.domUpdate.symbolId }],
-				repeatId: input.repeat.id,
-				fullDecodeCells: input.repeat.collectionGraphNodeId ? [input.repeat.collectionGraphNodeId] : [],
+		recordKinds: [
+			'async-boundary',
+			'behavior',
+			'branch',
+			'dom-update',
+			'element-handle',
+			'event',
+			'keyed-repeat',
+		].map((kind) => ({
+			kind,
+			replaced: replaced && (kind === 'dom-update' || kind === 'keyed-repeat'),
+		})),
+		actions: [
+			{
+				hostNodeId: input.repeat.parentHostNodeId,
+				eventName: input.rowEvent.eventName,
+				recordKind: 'keyed-repeat-row',
+				recordKinds: ['dom-update', 'keyed-repeat'],
+				payloadRecordIds: [
+					`dom-update:${input.domUpdate.hostNodeId}:${input.domUpdate.symbolId ?? ''}`,
+					`keyed-repeat:${input.repeat.id}`,
+				],
+				plan: {
+					version: 1,
+					kind: 'row',
+					symbolId: input.rowEvent.symbolIds[0],
+					cell: input.domUpdate.graphNodeId,
+					write: {
+						kind: 'assign',
+						localPath: [input.repeat.itemName, ...(input.repeat.keyPath ?? [])],
+					},
+					textUpdates: [
+						{
+							hostNodeId: input.domUpdate.hostNodeId,
+							graphNodeId: input.domUpdate.graphNodeId,
+							symbolId: input.domUpdate.symbolId,
+						},
+					],
+					repeatId: input.repeat.id,
+					fullDecodeCells: input.repeat.collectionGraphNodeId
+						? [input.repeat.collectionGraphNodeId]
+						: [],
+				},
 			},
-		}],
+		],
 	};
 }
 
@@ -130,7 +176,14 @@ test('event-only scalar lean route rejects a tampered consumed cell slot', async
 		cells: [{ graphNodeId: 'state:count', name: 'count', valueKind: 'scalar', value: 0 }],
 	});
 	const eventRecord = { hostNodeId: 'hButton', eventName: 'click', symbolIds: ['symbol:event'] };
-	const domUpdate = { hostNodeId: 'hOutput', source: 'count', graphNodeId: 'state:count', path: [], target: { kind: 'text' as const }, symbolId: 'symbol:text' };
+	const domUpdate = {
+		hostNodeId: 'hOutput',
+		source: 'count',
+		graphNodeId: 'state:count',
+		path: [],
+		target: { kind: 'text' as const },
+		symbolId: 'symbol:text',
+	};
 	const view: ProtocolViewPayload = {
 		version: 1,
 		locators: [
@@ -144,7 +197,9 @@ test('event-only scalar lean route rejects a tampered consumed cell slot', async
 		asyncBoundaries: [],
 	};
 	const runtimeDemandMap = scalarRuntimeDemandMap({ eventRecord, domUpdate }) as {
-		actions: Array<{ plan: { write: { kind: string; updateOperator?: string }; textUpdates: unknown[] } }>;
+		actions: Array<{
+			plan: { write: { kind: string; updateOperator?: string }; textUpdates: unknown[] };
+		}>;
 	};
 	runtimeDemandMap.actions[0]!.plan.write = { kind: 'update', updateOperator: '++' };
 	const tamperedCell = {
@@ -223,7 +278,9 @@ test('event-only scalar lean route keeps only the dispatched record and text sub
 		domUpdate: view.domUpdates[0],
 	});
 
-	expect(isScalarLeanResumeShape({ state, view, eventRecord: view.events[0], runtimeDemandMap })).toBe(true);
+	expect(
+		isScalarLeanResumeShape({ state, view, eventRecord: view.events[0], runtimeDemandMap }),
+	).toBe(true);
 
 	const result = await resumeScalarEventFromPayloadDocument({
 		document: payloadDocument(scripts.stateScript, scripts.viewScript),
@@ -233,12 +290,13 @@ test('event-only scalar lean route keeps only the dispatched record and text sub
 		runtimeDemandMap,
 		loadSymbol(symbolId) {
 			if (symbolId === 'symbol:event') {
-				return ({ graph }) => graph.update({
-					graphNodeId: 'state:count',
-					update(value) {
-						return Number(value) + 1;
-					},
-				});
+				return ({ graph }) =>
+					graph.update({
+						graphNodeId: 'state:count',
+						update(value) {
+							return Number(value) + 1;
+						},
+					});
 			}
 			return ({ value }) => ({ type: 'setText', locator: 'h2', value });
 		},
@@ -276,13 +334,15 @@ test('event-only scalar lean route falls back to the full event container for be
 		],
 		events: [eventRecord],
 		domUpdates: [domUpdate],
-		behaviors: [{
-			hostNodeId: 'h0',
-			source: 'installController',
-			functionSource: 'installController',
-			inputSources: [],
-			symbolId: 'symbol:behavior',
-		}],
+		behaviors: [
+			{
+				hostNodeId: 'h0',
+				source: 'installController',
+				functionSource: 'installController',
+				inputSources: [],
+				symbolId: 'symbol:behavior',
+			},
+		],
 		elementHandles: [],
 		asyncBoundaries: [],
 	};
@@ -316,7 +376,12 @@ test('event-only scalar lean row route dispatches scalar writes and ignores hand
 	const state = createProtocolStatePayload({
 		cells: [
 			{ graphNodeId: 'state:chosen', name: 'chosen', valueKind: 'scalar', value: 'none' },
-			{ graphNodeId: 'state:cards', name: 'cards', valueKind: 'array', value: [{ key: 'north' }] },
+			{
+				graphNodeId: 'state:cards',
+				name: 'cards',
+				valueKind: 'array',
+				value: [{ key: 'north' }],
+			},
 		],
 	});
 	const domUpdate = {
@@ -351,10 +416,16 @@ test('event-only scalar lean row route dispatches scalar writes and ignores hand
 		branches: [],
 		asyncBoundaries: [],
 	};
-	const runtimeDemandMap = rowRuntimeDemandMap({ repeat, rowEvent: repeat.rowEvents[0], domUpdate });
+	const runtimeDemandMap = rowRuntimeDemandMap({
+		repeat,
+		rowEvent: repeat.rowEvents[0],
+		domUpdate,
+	});
 	const scripts = renderPayloadScripts({ state, view });
 
-	expect(isScalarLeanResumeShape({ state, view, eventName: 'click', runtimeDemandMap })).toBe(true);
+	expect(isScalarLeanResumeShape({ state, view, eventName: 'click', runtimeDemandMap })).toBe(
+		true,
+	);
 
 	await resumeScalarEventFromPayloadDocument({
 		document: payloadDocument(scripts.stateScript, scripts.viewScript),
@@ -364,7 +435,10 @@ test('event-only scalar lean row route dispatches scalar writes and ignores hand
 		loadSymbol(symbolId) {
 			if (symbolId === 'symbol:row') {
 				return ({ graph, locals }) => {
-					graph.write({ graphNodeId: 'state:chosen', value: (locals!.card as { readonly key: string }).key });
+					graph.write({
+						graphNodeId: 'state:chosen',
+						value: (locals!.card as { readonly key: string }).key,
+					});
 					return { type: 'setText', locator: 'hOutput', value: 'handler-return-ignored' };
 				};
 			}
@@ -382,7 +456,12 @@ test('event-only scalar lean row fallback creates the full event path cold', asy
 	const state = createProtocolStatePayload({
 		cells: [
 			{ graphNodeId: 'state:chosen', name: 'chosen', valueKind: 'scalar', value: 'none' },
-			{ graphNodeId: 'state:cards', name: 'cards', valueKind: 'array', value: [{ key: 'north' }] },
+			{
+				graphNodeId: 'state:cards',
+				name: 'cards',
+				valueKind: 'array',
+				value: [{ key: 'north' }],
+			},
 		],
 	});
 	const domUpdate = {
@@ -417,23 +496,36 @@ test('event-only scalar lean row fallback creates the full event path cold', asy
 	const scripts = renderPayloadScripts({ state, view });
 	let coldFullFallback = false;
 
-	expect(isScalarLeanResumeShape({
-		state,
-		view,
-		eventName: 'click',
-		runtimeDemandMap: rowRuntimeDemandMap({ repeat, rowEvent: repeat.rowEvents[0], domUpdate }),
-	})).toBe(false);
+	expect(
+		isScalarLeanResumeShape({
+			state,
+			view,
+			eventName: 'click',
+			runtimeDemandMap: rowRuntimeDemandMap({
+				repeat,
+				rowEvent: repeat.rowEvents[0],
+				domUpdate,
+			}),
+		}),
+	).toBe(false);
 
 	await resumeScalarEventFromPayloadDocument({
 		document: payloadDocument(scripts.stateScript, scripts.viewScript),
 		root,
 		event: { type: 'click', target: button },
-		runtimeDemandMap: rowRuntimeDemandMap({ repeat, rowEvent: repeat.rowEvents[0], domUpdate, replaced: false }),
+		runtimeDemandMap: rowRuntimeDemandMap({
+			repeat,
+			rowEvent: repeat.rowEvents[0],
+			domUpdate,
+			replaced: false,
+		}),
 		loadSymbol: () => () => undefined,
 		loadFullResume() {
 			coldFullFallback = true;
 		},
-	} as Parameters<typeof resumeScalarEventFromPayloadDocument>[0] & { readonly loadFullResume: () => void });
+	} as Parameters<typeof resumeScalarEventFromPayloadDocument>[0] & {
+		readonly loadFullResume: () => void;
+	});
 
 	expect(coldFullFallback).toBe(true);
 });
@@ -441,13 +533,15 @@ test('event-only scalar lean row fallback creates the full event path cold', asy
 test('event-only resume routes non-lean served view records to the full runtime', async () => {
 	for (const extra of [
 		{
-			branches: [{
-				id: 'branch-site:0',
-				startAnchor: { strategy: 'dom-order-comment', index: 0 },
-				endAnchor: { strategy: 'dom-order-comment', index: 1 },
-				symbolId: 'symbol:branch',
-				testReads: [],
-			}],
+			branches: [
+				{
+					id: 'branch-site:0',
+					startAnchor: { strategy: 'dom-order-comment', index: 0 },
+					endAnchor: { strategy: 'dom-order-comment', index: 1 },
+					symbolId: 'symbol:branch',
+					testReads: [],
+				},
+			],
 		},
 		{ futureRecords: [{ id: 'future:0' }] },
 	]) {
@@ -466,7 +560,9 @@ test('event-only resume routes non-lean served view records to the full runtime'
 			elementHandles: [],
 			asyncBoundaries: [],
 			...extra,
-		} as ProtocolViewPayload & { readonly futureRecords?: ReadonlyArray<{ readonly id: string }> };
+		} as ProtocolViewPayload & {
+			readonly futureRecords?: ReadonlyArray<{ readonly id: string }>;
+		};
 		const scripts = renderPayloadScripts({ state, view });
 		const document = payloadDocument(scripts.stateScript, scripts.viewScript);
 		const fullResume = vi.fn(async () => undefined);
@@ -482,7 +578,9 @@ test('event-only resume routes non-lean served view records to the full runtime'
 			readonly loadFullResume: typeof fullResume;
 		});
 
-		expect(fullResume).toHaveBeenCalledWith(expect.objectContaining({ document, root, loadSymbol }));
+		expect(fullResume).toHaveBeenCalledWith(
+			expect.objectContaining({ document, root, loadSymbol }),
+		);
 		expect(loadSymbol).not.toHaveBeenCalled();
 	}
 });

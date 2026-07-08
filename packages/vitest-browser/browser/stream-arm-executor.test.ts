@@ -1,9 +1,6 @@
 import { expect, test } from 'vitest';
 import { renderToStream } from '@markless/web/render-to-stream';
-import {
-	marklessSsrAttachSnapshots,
-	marklessSsrRunAsyncComputed,
-} from '@markless/web/fns/ssr';
+import { marklessSsrAttachSnapshots, marklessSsrRunAsyncComputed } from '@markless/web/fns/ssr';
 
 // T107 streaming, show half of the show-then-adopt split: the __mArm inline
 // executor commits a later-flushed inert <template m:arm> into the
@@ -41,7 +38,9 @@ function beaconArtifact(delayMs: number) {
 				),
 				view: {
 					version: 1,
-					locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'section' }],
+					locators: [
+						{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'section' },
+					],
 					events: [],
 					domUpdates: [],
 					behaviors: [],
@@ -54,7 +53,12 @@ function beaconArtifact(delayMs: number) {
 							asyncReads: [
 								{ source: 'signal', graphNodeId: 'computed:signal', path: [] },
 							],
-							armRecords: { locators: [], events: [], behaviors: [], elementHandles: [] },
+							armRecords: {
+								locators: [],
+								events: [],
+								behaviors: [],
+								elementHandles: [],
+							},
 						},
 					],
 				},
@@ -312,7 +316,9 @@ test('a streamed commit arriving just after first paint waits out the pending mi
 			runInlineScripts(tail);
 		}
 		await expect
-			.poll(() => host.querySelector('[data-tide="salinity"]')?.textContent, { timeout: 5_000 })
+			.poll(() => host.querySelector('[data-tide="salinity"]')?.textContent, {
+				timeout: 5_000,
+			})
 			.toBe('Salinity 34 PSU');
 		// The template arrived ~60ms after the simulated paint, but the reveal
 		// held until the pending arm had been visible the minimum duration

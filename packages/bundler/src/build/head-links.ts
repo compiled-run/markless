@@ -68,7 +68,10 @@ export function collectModulePreloadInjections(
 	const symbolRoots = buildMetadata
 		? symbolRootsFromBuildMetadata(buildMetadata)
 		: (bundleGraph ?? [])
-				.filter((name): name is string => typeof name === 'string' && name.startsWith('symbol:'))
+				.filter(
+					(name): name is string =>
+						typeof name === 'string' && name.startsWith('symbol:'),
+				)
 				.map((name) => ({ name, priority: 'high' as const }));
 	const roots = [
 		...symbolRoots,
@@ -131,7 +134,8 @@ function headLinkTag(injection: GlobalInjections): string {
 	const attributes = Object.entries(injection.attributes ?? {}).map(
 		([name, value]) => `${name}="${value.replaceAll('"', '&quot;')}"`,
 	);
-	const open = attributes.length > 0 ? `<${injection.tag} ${attributes.join(' ')}>` : `<${injection.tag}>`;
+	const open =
+		attributes.length > 0 ? `<${injection.tag} ${attributes.join(' ')}>` : `<${injection.tag}>`;
 	return injection.children === undefined
 		? open
 		: `${open}${injection.children}</${injection.tag}>`;

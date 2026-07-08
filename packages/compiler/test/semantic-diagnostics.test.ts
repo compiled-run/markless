@@ -177,7 +177,12 @@ function repeatSite(header: string, allow = ''): string {
 }
 
 async function repeatDiagnostics(...sites: readonly string[]) {
-	return (await buildSemanticGraph({ filename: 'src/Repeat.tsrx', source: repeatAllowSource(...sites) })).diagnostics;
+	return (
+		await buildSemanticGraph({
+			filename: 'src/Repeat.tsrx',
+			source: repeatAllowSource(...sites),
+		})
+	).diagnostics;
 }
 
 const graphDestructureDefaultSource = `
@@ -571,7 +576,7 @@ test('B915 reports local framework API shadowing without import-only guidance', 
 			suggestions: [
 				{
 					message:
-						'Rename the helper (before: `function state(value) { ... }` — after: `function doubleValue(value) { ... }`), or, if graph state was intended, delete the helper and add `import { state } from \'@markless/core\';`.',
+						"Rename the helper (before: `function state(value) { ... }` — after: `function doubleValue(value) { ... }`), or, if graph state was intended, delete the helper and add `import { state } from '@markless/core';`.",
 				},
 			],
 		}),
@@ -771,10 +776,15 @@ test('B921 reports attribute and spread value discipline diagnostics without fla
 		expect.objectContaining({ severity: 'error', message: expect.stringContaining('id') }),
 	);
 	expect(byCode('MARKLESS_STYLE_OBJECT_UNSUPPORTED')[0]).toEqual(
-		expect.objectContaining({ severity: 'error', message: expect.stringContaining('style={{ color:') }),
+		expect.objectContaining({
+			severity: 'error',
+			message: expect.stringContaining('style={{ color:'),
+		}),
 	);
 	expect(byCode('MARKLESS_ATTRIBUTE_OBJECT_VALUE')).toEqual([
-		expect.objectContaining({ message: expect.stringContaining('data-menu="[object Object]"') }),
+		expect.objectContaining({
+			message: expect.stringContaining('data-menu="[object Object]"'),
+		}),
 		expect.objectContaining({ message: expect.stringContaining('did you mean `onClick`') }),
 	]);
 	expect(graph.diagnostics).not.toEqual(
@@ -1011,32 +1021,34 @@ test('B918 reports honest element handle guard diagnostics', async () => {
 
 	expect(graph.diagnostics.map((diagnostic) => diagnostic.code)).toEqual(
 		expect.arrayContaining([
-		'MARKLESS_ELEMENT_MODULE_SCOPE',
-		'MARKLESS_ELEMENT_HANDLE_UNBOUND',
-		'MARKLESS_ELEMENT_HANDLE_RENDER_READ',
-		'MARKLESS_ELEMENT_HANDLE_DUPLICATE',
-	]),
+			'MARKLESS_ELEMENT_MODULE_SCOPE',
+			'MARKLESS_ELEMENT_HANDLE_UNBOUND',
+			'MARKLESS_ELEMENT_HANDLE_RENDER_READ',
+			'MARKLESS_ELEMENT_HANDLE_DUPLICATE',
+		]),
 	);
-	expect(graph.diagnostics).toEqual(expect.arrayContaining([
-		expect.objectContaining({
-			code: 'MARKLESS_ELEMENT_MODULE_SCOPE',
-			message: expect.stringContaining('moduleHandle'),
-		}),
-		expect.objectContaining({
-			code: 'MARKLESS_ELEMENT_HANDLE_UNBOUND',
-			severity: 'warning',
-			message: expect.stringContaining('unbound'),
-		}),
-		expect.objectContaining({
-			code: 'MARKLESS_ELEMENT_HANDLE_RENDER_READ',
-			message: expect.stringContaining('input.textContent'),
-		}),
-		expect.objectContaining({
-			code: 'MARKLESS_ELEMENT_HANDLE_DUPLICATE',
-			message: expect.stringContaining('inside a keyed repeat'),
-			elementLocator: 'h4',
-		}),
-	]));
+	expect(graph.diagnostics).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				code: 'MARKLESS_ELEMENT_MODULE_SCOPE',
+				message: expect.stringContaining('moduleHandle'),
+			}),
+			expect.objectContaining({
+				code: 'MARKLESS_ELEMENT_HANDLE_UNBOUND',
+				severity: 'warning',
+				message: expect.stringContaining('unbound'),
+			}),
+			expect.objectContaining({
+				code: 'MARKLESS_ELEMENT_HANDLE_RENDER_READ',
+				message: expect.stringContaining('input.textContent'),
+			}),
+			expect.objectContaining({
+				code: 'MARKLESS_ELEMENT_HANDLE_DUPLICATE',
+				message: expect.stringContaining('inside a keyed repeat'),
+				elementLocator: 'h4',
+			}),
+		]),
+	);
 	expect(graph.diagnostics.map((diagnostic) => diagnostic.message).join('\n')).not.toContain(
 		'not an element() handle',
 	);
@@ -1101,7 +1113,9 @@ test('buildSemanticGraph reports templates stored or passed as runtime values', 
 			title: 'A template is not a value',
 			message: expect.stringContaining('banner'),
 			why: expect.stringContaining('no VDOM'),
-			suggestions: [expect.objectContaining({ message: expect.stringContaining('@if/@for') })],
+			suggestions: [
+				expect.objectContaining({ message: expect.stringContaining('@if/@for') }),
+			],
 			docsUrl: 'https://markless.dev/errors/MARKLESS_TEMPLATE_AS_VALUE',
 		}),
 	);

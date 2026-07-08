@@ -21,7 +21,11 @@ import {
 	injectExecutionLogModuleHook,
 	normalizeExecutionLogMode,
 } from './execution-log.ts';
-import { MARKLESS_VIRTUAL_PREFIX, resumeVirtualModuleId, transformTsrxModule } from './transform.ts';
+import {
+	MARKLESS_VIRTUAL_PREFIX,
+	resumeVirtualModuleId,
+	transformTsrxModule,
+} from './transform.ts';
 import type {
 	MarklessEnvironment,
 	MarklessRolldownOptions,
@@ -160,14 +164,18 @@ export function createMarklessRolldownPlugin(input: {
 					const helperPath = source.slice('@markless/web/'.length);
 					return {
 						id: decodeURIComponent(
-							resolvedRoot.slice('file://'.length, -'index.ts'.length) + `${helperPath}.ts`,
+							resolvedRoot.slice('file://'.length, -'index.ts'.length) +
+								`${helperPath}.ts`,
 						),
 					};
 				}
 			}
 			const normalized = normalizeVirtualId(source);
 			if (normalized === MARKLESS_EXECUTION_LOG_MODULE_ID) {
-				return { id: resolveVirtualId(MARKLESS_EXECUTION_LOG_MODULE_ID), moduleSideEffects: true };
+				return {
+					id: resolveVirtualId(MARKLESS_EXECUTION_LOG_MODULE_ID),
+					moduleSideEffects: true,
+				};
 			}
 			if (virtualModules.has(normalized)) {
 				return { id: resolveVirtualId(normalized), moduleSideEffects: true };
@@ -194,7 +202,8 @@ export function createMarklessRolldownPlugin(input: {
 					sizesUrl:
 						internalOptions.dev === true
 							? undefined
-							: internalOptions.publicPath?.(MARKLESS_EXECUTION_SIZES) ?? `/${MARKLESS_EXECUTION_SIZES}`,
+							: (internalOptions.publicPath?.(MARKLESS_EXECUTION_SIZES) ??
+								`/${MARKLESS_EXECUTION_SIZES}`),
 				});
 			}
 			const module = virtualModules.get(normalizeVirtualId(id));
@@ -273,7 +282,9 @@ export function createMarklessRolldownPlugin(input: {
 				environment: currentEnvironment,
 			});
 			if (currentEnvironment === 'client' && isResumeSourceRequest(id)) {
-				const resumeModule = transformed.virtualModules.find((module) => module.type === 'resume');
+				const resumeModule = transformed.virtualModules.find(
+					(module) => module.type === 'resume',
+				);
 				if (resumeModule) return { code: resumeModule.source, map: null };
 			}
 
@@ -325,7 +336,9 @@ export function createMarklessRolldownPlugin(input: {
 					},
 				);
 
-				const executionLogInjection = executionLogActivationInjection(internalOptions.executionLog);
+				const executionLogInjection = executionLogActivationInjection(
+					internalOptions.executionLog,
+				);
 				if (executionLogInjection) injectHeadLinks(bundle, [executionLogInjection]);
 				injectHeadLinks(
 					bundle,
@@ -339,7 +352,9 @@ export function createMarklessRolldownPlugin(input: {
 									(output as { type?: string }).type === 'chunk' &&
 									(output as { isEntry?: boolean }).isEntry === true,
 							)
-							.map((chunk) => stripBuildPrefix((chunk as { fileName: string }).fileName)),
+							.map((chunk) =>
+								stripBuildPrefix((chunk as { fileName: string }).fileName),
+							),
 					}),
 				);
 
@@ -348,11 +363,13 @@ export function createMarklessRolldownPlugin(input: {
 					fileName: MARKLESS_BUNDLE_GRAPH,
 					source: JSON.stringify(clientManifest.bundleGraph),
 				});
-				this.emitFile(await createExecutionSizesAsset(
-					manifestBundle,
-					clientManifest,
-					stripBuildPrefix,
-				));
+				this.emitFile(
+					await createExecutionSizesAsset(
+						manifestBundle,
+						clientManifest,
+						stripBuildPrefix,
+					),
+				);
 				// The demand map lives in payload-module exports (tree-shaken from built
 				// pages by design); ship it as a build asset so witness boxes and tooling
 				// can derive allowed execution sets against real builds.
@@ -447,7 +464,9 @@ function registerTransformArtifacts(input: {
 		ids.add(module.id);
 		if (input.environment === 'client' && module.type === 'symbol' && module.symbolId) {
 			input.executionLogEstimatedSizes.set(
-				module.symbolId.startsWith('symbol:') ? module.symbolId : `symbol:${module.symbolId}`,
+				module.symbolId.startsWith('symbol:')
+					? module.symbolId
+					: `symbol:${module.symbolId}`,
 				module.source.length,
 			);
 		}
@@ -620,4 +639,8 @@ export { MARKLESS_BUNDLE_GRAPH, MARKLESS_BUILD_PREFIX, outputDefaults } from './
 export { createBuildMetadata } from './build/build-metadata.ts';
 export { convertManifestToBundleGraph, createPreloadGraphAdder } from './build/bundle-graph.ts';
 export { collectHeadLinkInjections } from './build/head-links.ts';
-export { MARKLESS_VIRTUAL_PREFIX, resumeVirtualModuleId, transformTsrxModule } from './transform.ts';
+export {
+	MARKLESS_VIRTUAL_PREFIX,
+	resumeVirtualModuleId,
+	transformTsrxModule,
+} from './transform.ts';

@@ -98,7 +98,11 @@ export function extractedSyncPolicyActionCalls(
 			eventParam,
 			actions,
 		);
-		if (calls.length > 0 && state && !extractSyncCondition(statement.test as AnyNode | undefined, eventParam, state)) {
+		if (
+			calls.length > 0 &&
+			state &&
+			!extractSyncCondition(statement.test as AnyNode | undefined, eventParam, state)
+		) {
 			continue;
 		}
 		if (calls.length > 0) return calls;
@@ -113,7 +117,12 @@ export function firstDetachedSyncPolicyReference(node: AnyNode | undefined): {
 	readonly start: number;
 	readonly end: number;
 } | null {
-	let detached: { action: SemanticSyncPolicyAction; alias: string; start: number; end: number } | null = null;
+	let detached: {
+		action: SemanticSyncPolicyAction;
+		alias: string;
+		start: number;
+		end: number;
+	} | null = null;
 
 	walkNode(node, (candidate) => {
 		if (detached || candidate.type !== 'VariableDeclarator') return;
@@ -125,7 +134,12 @@ export function firstDetachedSyncPolicyReference(node: AnyNode | undefined): {
 		if (action !== 'preventDefault' && action !== 'stopPropagation') return;
 		if (!callsIdentifier(node, alias)) return;
 
-		detached = { action, alias, start: candidate.start ?? init.start ?? 0, end: candidate.end ?? init.end ?? 0 };
+		detached = {
+			action,
+			alias,
+			start: candidate.start ?? init.start ?? 0,
+			end: candidate.end ?? init.end ?? 0,
+		};
 	});
 
 	return detached;
@@ -218,7 +232,10 @@ function syncActionCallNodes(
 	return calls;
 }
 
-function syncActionCall(node: AnyNode | undefined, eventParam: string): SemanticSyncPolicyAction | null {
+function syncActionCall(
+	node: AnyNode | undefined,
+	eventParam: string,
+): SemanticSyncPolicyAction | null {
 	if (node?.type !== 'CallExpression') return null;
 
 	const callee = node.callee as AnyNode | undefined;
@@ -317,7 +334,10 @@ function extractSyncCondition(
 	};
 }
 
-function syncPolicyStaticValue(node: AnyNode | undefined, constants: ReadonlyArray<{ readonly name: string; readonly value: unknown }>): { readonly ok: true; readonly value: unknown } | { readonly ok: false } {
+function syncPolicyStaticValue(
+	node: AnyNode | undefined,
+	constants: ReadonlyArray<{ readonly name: string; readonly value: unknown }>,
+): { readonly ok: true; readonly value: unknown } | { readonly ok: false } {
 	const literal = literalValue(node);
 	if (literal.ok) return literal;
 	if (!node) return { ok: false };

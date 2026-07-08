@@ -3,7 +3,9 @@ import { deserializeGraphValue, serializeGraphValue } from '../src/index.ts';
 
 class AppToken {
 	constructor(readonly label: string) {}
-	display(): string { return this.label; }
+	display(): string {
+		return this.label;
+	}
 }
 
 class RuntimeHandle {

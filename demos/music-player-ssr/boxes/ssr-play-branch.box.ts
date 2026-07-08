@@ -169,10 +169,15 @@ async function waitForLogInteractionAttribute(
 ): Promise<void> {
 	const started = Date.now();
 	const countPattern = new RegExp(`data-markless-log-interactions="${count}"`);
-	const lastPattern = /data-markless-log-last="markless: click \[[^"]+\] · woke \d+ modules · ran warm \d+ modules · \d+(?:\.\d+)? KB"/;
+	const lastPattern =
+		/data-markless-log-last="markless: click \[[^"]+\] · woke \d+ modules · ran warm \d+ modules · \d+(?:\.\d+)? KB"/;
 	while (Date.now() - started < options.timeoutMs) {
 		const html = await page.content();
-		if (countPattern.test(html) && lastPattern.test(html) && !/data-markless-log-last="[^"]*est\./.test(html)) {
+		if (
+			countPattern.test(html) &&
+			lastPattern.test(html) &&
+			!/data-markless-log-last="[^"]*est\./.test(html)
+		) {
 			return;
 		}
 		await new Promise((resolve) => setTimeout(resolve, 25));

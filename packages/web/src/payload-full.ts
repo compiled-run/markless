@@ -27,13 +27,15 @@ export {
 type DevProtocolValidationModule = typeof import('../../serializer/src/protocol-validation.ts');
 type RuntimeGraph = import('@markless/runtime').RuntimeGraph;
 
-export type ResumePayloadScriptsInput = EncodedPayloadScripts & Pick<
-	ResumeRuntimeInput,
-	| 'loadSymbol'
-	| 'createVisibilityObserver'
-	| 'createRemovalObserver'
-	| 'applyDomJournal'
-	| 'renderBranchHtml'> & { readonly root: ResumeDomElement };
+export type ResumePayloadScriptsInput = EncodedPayloadScripts &
+	Pick<
+		ResumeRuntimeInput,
+		| 'loadSymbol'
+		| 'createVisibilityObserver'
+		| 'createRemovalObserver'
+		| 'applyDomJournal'
+		| 'renderBranchHtml'
+	> & { readonly root: ResumeDomElement };
 
 export type ResumePayloadScriptsResult = {
 	readonly decoded: DecodedPayloadScripts;
@@ -51,9 +53,8 @@ declare global {
 }
 
 if (import.meta.env?.DEV) {
-	const { decodePayloadScripts: decodePayloadScriptsDev } = await import(
-		'../../serializer/src/protocol-validation.ts'
-	);
+	const { decodePayloadScripts: decodePayloadScriptsDev } =
+		await import('../../serializer/src/protocol-validation.ts');
 	devPayloadValidator = decodePayloadScriptsDev;
 }
 

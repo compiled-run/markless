@@ -74,7 +74,8 @@ function collectBranchConditionAssignments(
 			);
 		}
 	}
-	for (const child of childNodes(node)) collectBranchConditionAssignments(child, branchSource, state);
+	for (const child of childNodes(node))
+		collectBranchConditionAssignments(child, branchSource, state);
 }
 
 function assignmentTarget(

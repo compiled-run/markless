@@ -277,8 +277,10 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_ELEMENT_HANDLE_RENDER_READ'
 		| 'MARKLESS_ATTACH_HOST_ELEMENT_REQUIRED'
 		| 'MARKLESS_EVENT_HANDLER_NOT_A_FUNCTION'
-		| 'MARKLESS_EVENT_SPREAD_UNSUPPORTED' | 'MARKLESS_SPREAD_STATIC_SNAPSHOT'
-		| 'MARKLESS_ATTRIBUTE_OBJECT_VALUE' | 'MARKLESS_ATTRIBUTE_DUPLICATE'
+		| 'MARKLESS_EVENT_SPREAD_UNSUPPORTED'
+		| 'MARKLESS_SPREAD_STATIC_SNAPSHOT'
+		| 'MARKLESS_ATTRIBUTE_OBJECT_VALUE'
+		| 'MARKLESS_ATTRIBUTE_DUPLICATE'
 		| 'MARKLESS_STYLE_OBJECT_UNSUPPORTED'
 		| 'MARKLESS_SYNC_POLICY_UNEXTRACTABLE'
 		| 'MARKLESS_REPEAT_KEY_REQUIRED'
@@ -763,8 +765,19 @@ export type RuntimeDemandMapActionPlan = {
 	readonly kind: 'scalar' | 'row';
 	readonly symbolId: string;
 	readonly cell: string;
-	readonly write: { readonly kind: 'assign' | 'update'; readonly value?: unknown; readonly valueKind?: 'undefined'; readonly localPath?: ReadonlyArray<string>; readonly updateOperator?: '++' | '--' };
-	readonly textUpdates: ReadonlyArray<{ readonly hostNodeId: string; readonly graphNodeId: string; readonly symbolId: string; readonly prefix?: string }>;
+	readonly write: {
+		readonly kind: 'assign' | 'update';
+		readonly value?: unknown;
+		readonly valueKind?: 'undefined';
+		readonly localPath?: ReadonlyArray<string>;
+		readonly updateOperator?: '++' | '--';
+	};
+	readonly textUpdates: ReadonlyArray<{
+		readonly hostNodeId: string;
+		readonly graphNodeId: string;
+		readonly symbolId: string;
+		readonly prefix?: string;
+	}>;
 	readonly repeatId?: string;
 	readonly fullDecodeCells?: ReadonlyArray<string>;
 };
@@ -994,7 +1007,12 @@ export type PublicRenderPlanBranchArmPart =
 				};
 				readonly rowParts: ReadonlyArray<
 					| { readonly text: string }
-					| { readonly read: { readonly graphNodeId: string; readonly path: ReadonlyArray<string> } }
+					| {
+							readonly read: {
+								readonly graphNodeId: string;
+								readonly path: ReadonlyArray<string>;
+							};
+					  }
 					| { readonly itemPath: ReadonlyArray<string> }
 				>;
 			};

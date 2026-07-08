@@ -25,12 +25,21 @@ test('client mount settles when an optional-prop component sits in the falsy @if
 	startRouteUpdateRenderer(routeDocument);
 
 	const pageErrors: unknown[] = [];
-	iframe.contentWindow?.addEventListener('error', (event) => pageErrors.push(event.error ?? event.message));
-	iframe.contentWindow?.addEventListener('unhandledrejection', (event) => pageErrors.push(event.reason));
+	iframe.contentWindow?.addEventListener('error', (event) =>
+		pageErrors.push(event.error ?? event.message),
+	);
+	iframe.contentWindow?.addEventListener('unhandledrejection', (event) =>
+		pageErrors.push(event.reason),
+	);
 
 	dispatchRouteUpdate(routeDocument, {
 		page: { default: OptionalContextPage },
-		route: { file: 'pages/optional-context-page.tsrx', params: {}, status: 200, url: 'http://localhost/context' },
+		route: {
+			file: 'pages/optional-context-page.tsrx',
+			params: {},
+			status: 200,
+			url: 'http://localhost/context',
+		},
 	});
 
 	// The settled arm must commit: rows render, the @else context row shows,
@@ -41,7 +50,9 @@ test('client mount settles when an optional-prop component sits in the falsy @if
 		await new Promise((resolve) => setTimeout(resolve, 16));
 	}
 	expect(routeDocument.querySelectorAll('[data-optional-row]')).toHaveLength(2);
-	expect(routeDocument.querySelector('[data-optional-anonymous]')?.textContent).toBe('no context');
+	expect(routeDocument.querySelector('[data-optional-anonymous]')?.textContent).toBe(
+		'no context',
+	);
 	expect(routeDocument.querySelector('[data-optional-owner]')).toBeNull();
 	expect(routeDocument.querySelector('[data-optional-pending]')).toBeNull();
 	expect(pageErrors).toEqual([]);

@@ -3,7 +3,20 @@ import { emitHtmlNode } from './html.ts';
 import { renderBodyLines } from './render-body.ts';
 import { emitCatalogHelperImports, stateRuntimeImports } from './runtime-helpers.ts';
 import { emitSameModuleCsrComponents } from './same-module.ts';
-import { callbackSymbolIds, componentEdgesFor, componentPropCellId, componentReferences, destructureProps, emitComponentImport, emitValueImport, isFragmentNode, publicRenderValueImports, stateEntries, staticHostLocators, moduleScopeLines } from './shared.ts';
+import {
+	callbackSymbolIds,
+	componentEdgesFor,
+	componentPropCellId,
+	componentReferences,
+	destructureProps,
+	emitComponentImport,
+	emitValueImport,
+	isFragmentNode,
+	publicRenderValueImports,
+	stateEntries,
+	staticHostLocators,
+	moduleScopeLines,
+} from './shared.ts';
 import { collectCsrPropEvents } from './component-wiring.ts';
 import type { CsrRenderContext, PublicRenderRoot } from './types.ts';
 
@@ -22,7 +35,10 @@ export function emitPublicCsrRenderModule(
 		return '';
 	}
 
-	const references = componentReferences(input.semanticGraph.componentEdges, '__marklessCsrComponent');
+	const references = componentReferences(
+		input.semanticGraph.componentEdges,
+		'__marklessCsrComponent',
+	);
 	const valueImports = publicRenderValueImports(
 		input.semanticGraph.moduleImports,
 		input.semanticGraph.componentEdges,
@@ -50,7 +66,11 @@ export function emitPublicCsrRenderModule(
 	const propEvents = collectCsrPropEvents(rootInfo.root, rootInfo.propNames, input.source.source);
 	const propCellId = componentPropCellId(rootInfo.component);
 	const hostLocators = staticHostLocators(input);
-	const sameModuleComponents = emitSameModuleCsrComponents(input, references, rootInfo.componentName);
+	const sameModuleComponents = emitSameModuleCsrComponents(
+		input,
+		references,
+		rootInfo.componentName,
+	);
 	const body = [
 		'',
 		`const marklessCsrHostLocators = ${JSON.stringify(hostLocators)};`,
@@ -67,11 +87,18 @@ export function emitPublicCsrRenderModule(
 			? `	marklessCsrPayloadState.cells.push({ graphNodeId: ${JSON.stringify(propCellId)}, directValue: props ?? {} });`
 			: null,
 		'	const marklessCsrRenderStateValues = new Map(marklessCsrStateValues);',
-		...renderBodyLines(input, rootInfo, 'marklessStateValue', 'marklessCsrRenderStateValues', 'marklessCsrPayloadState', [
-			'const marklessCsrRuntimeState = { graph: null };',
-			'const marklessCsrChildren = [];',
-			`const root = ${isFragmentNode(rootInfo.root) ? 'marklessCsrFragmentFromHtml' : 'marklessCsrRootFromHtml'}(${emitHtmlNode(rootInfo.root, renderContext)});`,
-		]),
+		...renderBodyLines(
+			input,
+			rootInfo,
+			'marklessStateValue',
+			'marklessCsrRenderStateValues',
+			'marklessCsrPayloadState',
+			[
+				'const marklessCsrRuntimeState = { graph: null };',
+				'const marklessCsrChildren = [];',
+				`const root = ${isFragmentNode(rootInfo.root) ? 'marklessCsrFragmentFromHtml' : 'marklessCsrRootFromHtml'}(${emitHtmlNode(rootInfo.root, renderContext)});`,
+			],
+		),
 		...renderContext.childReplacements,
 		...propEvents.map(
 			(event) =>

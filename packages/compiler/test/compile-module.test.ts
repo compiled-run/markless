@@ -137,10 +137,10 @@ export function Badge() @{
 }
 `;
 
-
 function helperImports(source: string): string[] {
-	return [...source.matchAll(/^import \{ ([^}]+) \} from '@markless\/web\/fns\/[^']+';/gm)]
-		.flatMap((match) => match[1]!.split(',').map((name) => name.trim()));
+	return [
+		...source.matchAll(/^import \{ ([^}]+) \} from '@markless\/web\/fns\/[^']+';/gm),
+	].flatMap((match) => match[1]!.split(',').map((name) => name.trim()));
 }
 
 const wholeBindingAliasEventSource = `
@@ -206,9 +206,7 @@ export function App() @{
 	expect(result.semanticGraph.diagnostics[0]?.message).toContain(
 		'Dynamic element names must be an identifier, member expression, static string, or runtime expression; calls, spreads, string concatenation, string interpolation, and static null, undefined, boolean, number, object, and array literals are not valid tag names.',
 	);
-	expect(result.semanticGraph.diagnostics[0]?.why).toContain(
-		'phase parse (external @tsrx/core)',
-	);
+	expect(result.semanticGraph.diagnostics[0]?.why).toContain('phase parse (external @tsrx/core)');
 	expect(result.semanticGraph.diagnostics[0]?.suggestions[0]?.message).toContain(
 		'https://tsrx.dev/specification',
 	);
@@ -236,8 +234,12 @@ test('compileTsrxModule keeps valid source output byte-identical', async () => {
 		symbols: [],
 	});
 
-	expect(again.publicRenderModule.ssrModuleSource).toBe(result.publicRenderModule.ssrModuleSource);
-	expect(again.publicRenderModule.csrModuleSource).toBe(result.publicRenderModule.csrModuleSource);
+	expect(again.publicRenderModule.ssrModuleSource).toBe(
+		result.publicRenderModule.ssrModuleSource,
+	);
+	expect(again.publicRenderModule.csrModuleSource).toBe(
+		result.publicRenderModule.csrModuleSource,
+	);
 	expect(again.symbolResolverModule).toBe(result.symbolResolverModule);
 	expect(result.semanticGraph.diagnostics).toEqual([]);
 });
@@ -517,9 +519,7 @@ function serializePublicRenderTestNode(node: PublicRenderTestNode): string {
 	if (node.nodeType !== 1) {
 		return node.childNodes.map(serializePublicRenderTestNode).join('');
 	}
-	const attributes = [...node.attributes]
-		.map(([name, value]) => ` ${name}="${value}"`)
-		.join('');
+	const attributes = [...node.attributes].map(([name, value]) => ` ${name}="${value}"`).join('');
 	const children = node.childNodes.map(serializePublicRenderTestNode).join('');
 	return `<${node.tagName}${attributes}>${children}</${node.tagName}>`;
 }
@@ -527,21 +527,31 @@ function serializePublicRenderTestNode(node: PublicRenderTestNode): string {
 function publicRenderTestDocument() {
 	return {
 		createElement: (tagName: string) =>
-			tagName === 'template' ? new PublicRenderTestTemplate() : new PublicRenderTestElement(tagName),
+			tagName === 'template'
+				? new PublicRenderTestTemplate()
+				: new PublicRenderTestElement(tagName),
 		createDocumentFragment: () => new PublicRenderTestFragment(),
 	};
 }
 
-async function renderTestCsr(result: Awaited<ReturnType<typeof compileTsrxModule>>, props?: unknown) {
+async function renderTestCsr(
+	result: Awaited<ReturnType<typeof compileTsrxModule>>,
+	props?: unknown,
+) {
 	const module = await importPublicRenderTestModule(csrRenderTestModuleSource(result), {
 		document: publicRenderTestDocument(),
 	});
 	return (module.marklessRenderCsr as (props?: unknown) => unknown)(props);
 }
 
-async function renderTestSsr(result: Awaited<ReturnType<typeof compileTsrxModule>>, props?: unknown) {
+async function renderTestSsr(
+	result: Awaited<ReturnType<typeof compileTsrxModule>>,
+	props?: unknown,
+) {
 	const module = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
-	return (module.marklessRenderSsr as (props?: unknown) => Promise<{ readonly html: string }>)(props);
+	return (module.marklessRenderSsr as (props?: unknown) => Promise<{ readonly html: string }>)(
+		props,
+	);
 }
 
 function payloadStateCellValue(state: ProtocolStatePayload, graphNodeId: string): unknown {
@@ -551,10 +561,7 @@ function payloadStateCellValue(state: ProtocolStatePayload, graphNodeId: string)
 	return deserializeGraphValue(cell!.value!);
 }
 
-async function expectRuntimeInitializerSnapshot(
-	body: string,
-	expected: number,
-): Promise<void> {
+async function expectRuntimeInitializerSnapshot(body: string, expected: number): Promise<void> {
 	const result = await compileTsrxModule({
 		filename: 'src/StateInit.tsrx',
 		source: `import { state } from '@markless/core';
@@ -1023,7 +1030,9 @@ test('B910 regressions keep async computed and plain state binding artifacts sta
 			symbolId: 'symbol:0',
 		},
 	]);
-	expect(plainResult.publicRenderModule.ssrModuleSource).toContain('<p>" + marklessSsrText(count) + "</p>');
+	expect(plainResult.publicRenderModule.ssrModuleSource).toContain(
+		'<p>" + marklessSsrText(count) + "</p>',
+	);
 });
 
 test('literal state initializers keep their exact protocol payload artifact', async () => {
@@ -1173,7 +1182,7 @@ export function App({ kind = 'demo' }) @{
 	});
 	const log = vi.spyOn(console, 'log').mockImplementation(() => {});
 	try {
-		const csrOutput = await renderTestCsr(result, { kind: 'demo' }) as {
+		const csrOutput = (await renderTestCsr(result, { kind: 'demo' })) as {
 			readonly root: PublicRenderTestElement;
 		};
 		expect(csrOutput.root.textContent).toBe('7');
@@ -1223,7 +1232,7 @@ export function App({ suffix = 'tail' }) @{
 		ssrSource.indexOf("const label = segments.join('-');"),
 	);
 
-	const csrOutput = await renderTestCsr(result, { suffix: 'tail' }) as {
+	const csrOutput = (await renderTestCsr(result, { suffix: 'tail' })) as {
 		readonly root: PublicRenderTestElement;
 	};
 	expect(csrOutput.root.textContent).toBe('head-tail');
@@ -1239,7 +1248,13 @@ test('compileTsrxModule diagnoses undeclared template reads before public render
 		symbols: [],
 	});
 	expect(result.publicRenderPlan.diagnostics).toEqual([
-		expect.objectContaining({ code: 'MARKLESS_TEMPLATE_READ_UNDECLARED', severity: 'error', phase: 'public-render', message: expect.stringContaining('missingLabel'), docsUrl: 'https://markless.dev/errors/MARKLESS_TEMPLATE_READ_UNDECLARED' }),
+		expect.objectContaining({
+			code: 'MARKLESS_TEMPLATE_READ_UNDECLARED',
+			severity: 'error',
+			phase: 'public-render',
+			message: expect.stringContaining('missingLabel'),
+			docsUrl: 'https://markless.dev/errors/MARKLESS_TEMPLATE_READ_UNDECLARED',
+		}),
 	]);
 	expect(result.publicRenderModule.csrModuleSource).toBe('');
 	expect(result.publicRenderModule.ssrModuleSource).toBe('');
@@ -1278,7 +1293,10 @@ test('compileTsrxModule renders plain body local template reads in CSR and SSR m
 		symbols: [],
 	});
 	expect(result.publicRenderPlan.diagnostics).toEqual([]);
-	expect(((await renderTestCsr(result)) as { readonly root: PublicRenderTestElement }).root.textContent).toBe('render-once');
+	expect(
+		((await renderTestCsr(result)) as { readonly root: PublicRenderTestElement }).root
+			.textContent,
+	).toBe('render-once');
 	expect((await renderTestSsr(result)).html).toBe('<main>render-once</main>');
 });
 
@@ -1290,7 +1308,10 @@ test('B913 compileTsrxModule renders component-body accumulator locals in CSR an
 	});
 	expect(result.semanticGraph.diagnostics).toEqual([]);
 	expect(result.stateLowering.diagnostics).toEqual([]);
-	expect(((await renderTestCsr(result)) as { readonly root: PublicRenderTestElement }).root.textContent).toBe('6');
+	expect(
+		((await renderTestCsr(result)) as { readonly root: PublicRenderTestElement }).root
+			.textContent,
+	).toBe('6');
 	expect((await renderTestSsr(result)).html).toBe('<main>6</main>');
 });
 
@@ -1301,7 +1322,10 @@ test('compileTsrxModule renders module-scope const template reads in CSR and SSR
 		symbols: [],
 	});
 	expect(result.publicRenderPlan.diagnostics).toEqual([]);
-	expect(((await renderTestCsr(result)) as { readonly root: PublicRenderTestElement }).root.textContent).toBe('Module title');
+	expect(
+		((await renderTestCsr(result)) as { readonly root: PublicRenderTestElement }).root
+			.textContent,
+	).toBe('Module title');
 	expect((await renderTestSsr(result)).html).toBe('<main>Module title</main>');
 });
 
@@ -1312,8 +1336,16 @@ test('compileTsrxModule renders prop template reads in CSR and SSR modules', asy
 		symbols: [],
 	});
 	expect(result.publicRenderPlan.diagnostics).toEqual([]);
-	expect(((await renderTestCsr(result, { label: 'prop value' })) as { readonly root: PublicRenderTestElement }).root.textContent).toBe('prop value');
-	expect((await renderTestSsr(result, { label: 'prop value' })).html).toBe('<main>prop value</main>');
+	expect(
+		(
+			(await renderTestCsr(result, { label: 'prop value' })) as {
+				readonly root: PublicRenderTestElement;
+			}
+		).root.textContent,
+	).toBe('prop value');
+	expect((await renderTestSsr(result, { label: 'prop value' })).html).toBe(
+		'<main>prop value</main>',
+	);
 });
 
 test('T005 compileTsrxModule renders pure composite template expressions in CSR and SSR modules', async () => {
@@ -1385,7 +1417,7 @@ export function App({ hidden = false }) @{
 		symbols: [],
 	});
 	expect(await renderTestCsr(result, { hidden: true })).toBeNull();
-	const visible = await renderTestCsr(result, { hidden: false }) as {
+	const visible = (await renderTestCsr(result, { hidden: false })) as {
 		readonly root: PublicRenderTestElement;
 	};
 	expect(visible.root.textContent).toBe('Visible');
@@ -1593,7 +1625,9 @@ export function App() @{ const label = state('Menu'); const count = state(3); co
 	const output = await (ssrModule.marklessRenderSsr as () => { readonly html: string })();
 
 	expect(result.semanticGraph.diagnostics).toEqual([]);
-	expect(output.html).toBe('<section data-label="Menu" data-count="3" data-open="true">Hi</section>');
+	expect(output.html).toBe(
+		'<section data-label="Menu" data-count="3" data-open="true">Hi</section>',
+	);
 });
 
 test('B921 rejects spread handler bags before render modules interpolate undeclared spread sources', async () => {
@@ -1610,7 +1644,9 @@ export function App() @{ let count = state(0); const handlers = { onClick: () =>
 			severity: 'error',
 		}),
 	]);
-	expect(result.publicRenderModule.ssrModuleSource + result.publicRenderModule.csrModuleSource).not.toContain('...(handlers)');
+	expect(
+		result.publicRenderModule.ssrModuleSource + result.publicRenderModule.csrModuleSource,
+	).not.toContain('...(handlers)');
 });
 
 test('compileTsrxModule renders the @empty branch in the direct render module', async () => {
@@ -1922,7 +1958,9 @@ export function App() @{
 	});
 
 	expect(result.semanticGraph.diagnostics).toEqual([]);
-	expect(result.publicRenderPlan.repeatGates).toEqual([{ repeatId: 'repeat:0', supported: true }]);
+	expect(result.publicRenderPlan.repeatGates).toEqual([
+		{ repeatId: 'repeat:0', supported: true },
+	]);
 	const ssrOutput = await renderTestSsr(result);
 
 	expect(ssrOutput.html).toBe('<section><p>One</p><p>Two</p></section>');
@@ -2635,7 +2673,8 @@ export function App() @{
 	expect(shell.html).not.toContain('Fact about');
 	expect(shell.html).not.toContain('No facts today');
 	expect(
-		shell.state.computed.find((computed) => computed.graphNodeId === 'computed:facts')?.snapshot,
+		shell.state.computed.find((computed) => computed.graphNodeId === 'computed:facts')
+			?.snapshot,
 	).toMatchObject({ status: 'pending' });
 
 	await runs.get('computed:facts')?.promise;
@@ -2696,7 +2735,8 @@ export function App() @{
 	const shell = await renderSsr(undefined, { streaming: { runs: new Map() } });
 	expect(shell.html).toContain('Fact about otters');
 	expect(
-		shell.state.computed.find((computed) => computed.graphNodeId === 'computed:facts')?.snapshot,
+		shell.state.computed.find((computed) => computed.graphNodeId === 'computed:facts')
+			?.snapshot,
 	).toMatchObject({ status: 'fulfilled' });
 });
 
@@ -4347,10 +4387,17 @@ test('B905s2 compile output renders and updates same-module helper-created state
 	expect(incrementModule?.source).toContain('graphNodeId: "state:App.count.counterPair.n"');
 
 	const incrementExports = await importPublicRenderTestModule(incrementModule!.source);
-	const document = { createElement: (tagName: string) => tagName === 'template' ? new PublicRenderTestTemplate() : new PublicRenderTestElement(tagName) };
+	const document = {
+		createElement: (tagName: string) =>
+			tagName === 'template'
+				? new PublicRenderTestTemplate()
+				: new PublicRenderTestElement(tagName),
+	};
 	const csrSource = `const document = globalThis.__marklessPublicRenderTestDocument; const loadSymbol = () => undefined; const payloadState = ${JSON.stringify(result.protocolState)}; const payloadView = ${JSON.stringify(result.protocolView)}; const state = (value) => value;\n${result.publicRenderModule.csrModuleSource}\nexport { marklessRenderCsr };`;
 	const csrModule = await importPublicRenderTestModule(csrSource, { document });
-	const rendered = (csrModule.marklessRenderCsr as () => unknown)() as { readonly root: PublicRenderTestElement };
+	const rendered = (csrModule.marklessRenderCsr as () => unknown)() as {
+		readonly root: PublicRenderTestElement;
+	};
 	const button = elementsByTag(rendered.root, 'button')[0]!;
 	let value = 5;
 	const handler = incrementExports[incrementModule!.exportName] as (context: any) => unknown;
@@ -5120,7 +5167,9 @@ test('compileTsrxModule emits handler writes through whole-binding aliases', asy
 		}),
 	]);
 	expect(result.stateLowering.diagnostics).toEqual([]);
-	expect(module?.source).toContain("import { marklessWriteScalar } from '@markless/web/fns/write-scalar';");
+	expect(module?.source).toContain(
+		"import { marklessWriteScalar } from '@markless/web/fns/write-scalar';",
+	);
 	expect(module?.source).toContain('return marklessWriteScalar(context, {');
 	expect(module?.source).toContain('graphNodeId: "state:origin"');
 	expect(module?.source).not.toContain('path: []');
@@ -5208,7 +5257,9 @@ export function App() @{
 	]);
 
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
-	const output = await (ssrModule.marklessRenderSsr as () => Promise<{ readonly html: string }>)();
+	const output = await (
+		ssrModule.marklessRenderSsr as () => Promise<{ readonly html: string }>
+	)();
 
 	expect(output.html).toBe(
 		'<main><!--markless:async:boundary:0--><p>Ada</p><!--/markless:async:boundary:0--></main>',
@@ -5238,7 +5289,9 @@ export function App() @{
 		symbols: [],
 	});
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
-	const output = await (ssrModule.marklessRenderSsr as () => Promise<{ readonly html: string }>)();
+	const output = await (
+		ssrModule.marklessRenderSsr as () => Promise<{ readonly html: string }>
+	)();
 
 	expect(output.html).toBe(
 		'<main><!--markless:async:boundary:0--><p>Fallback value</p><!--/markless:async:boundary:0--></main>',
@@ -5264,7 +5317,9 @@ export function App() @{
 		symbols: [],
 	});
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
-	const output = await (ssrModule.marklessRenderSsr as () => Promise<{ readonly html: string }>)();
+	const output = await (
+		ssrModule.marklessRenderSsr as () => Promise<{ readonly html: string }>
+	)();
 
 	expect(output.html).toBe(
 		'<main><!--markless:async:boundary:0--><p>Broken</p><!--/markless:async:boundary:0--></main>',
@@ -5422,9 +5477,7 @@ test('interactive components in repeat rows refuse loudly at row render', async 
 		ssrRenderTestModuleSource(page, { replaceChildImport: true }),
 		{ childComponent: interactiveChild },
 	);
-	await expect(
-		(pageSsrModule.marklessRenderSsr as () => Promise<unknown>)(),
-	).rejects.toThrow(
+	await expect((pageSsrModule.marklessRenderSsr as () => Promise<unknown>)()).rejects.toThrow(
 		'MARKLESS_ROW_COMPONENT_INTERACTIVE: <TagBadge> inside a @for row has its own state, events, or async content, so its interactions cannot resume. Keep components in @for rows presentational (markup from item props, like <Link>), or move the interactive content out of the row.',
 	);
 });
@@ -5518,9 +5571,9 @@ export default function Nav() @{
 	expect(spanLocator).toMatchObject({ index: 2 });
 	expect(buttonLocator).toMatchObject({ index: 3 });
 	// The click record survives composition wired to the button's host id.
-	expect(
-		output.view.events.some((event) => event.hostNodeId === buttonLocator?.hostNodeId),
-	).toBe(true);
+	expect(output.view.events.some((event) => event.hostNodeId === buttonLocator?.hostNodeId)).toBe(
+		true,
+	);
 });
 
 // A page declared AFTER a same-module component must keep ONE host id space:
@@ -5796,6 +5849,6 @@ export default function Page() @{
 
 	const handler = result.symbolModules.modules.find((module) => module.symbolId === 'symbol:0');
 	expect(handler?.source).toContain('nextIssueId');
-	expect(handler?.source).toContain("import { sendJson }");
-	expect(handler?.source).toContain("import { currentActor }");
+	expect(handler?.source).toContain('import { sendJson }');
+	expect(handler?.source).toContain('import { currentActor }');
 });

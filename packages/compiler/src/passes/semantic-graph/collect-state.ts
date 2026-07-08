@@ -195,7 +195,12 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 			}
 			const templateValue = findTemplateValue(initial);
 			if (templateValue) {
-				reportTemplateAsValue(state, templateValue, expressionSource(init, state.source), name);
+				reportTemplateAsValue(
+					state,
+					templateValue,
+					expressionSource(init, state.source),
+					name,
+				);
 				markTemplateValueHandled(templateValue);
 				continue;
 			}
@@ -233,7 +238,13 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 
 		if (frameworkApi === 'computed') {
 			if (state.currentCreationSite) {
-				reportUnstableCreationSite(name, 'computed', init, state.currentCreationSite, state);
+				reportUnstableCreationSite(
+					name,
+					'computed',
+					init,
+					state.currentCreationSite,
+					state,
+				);
 				continue;
 			}
 			const body = firstArgument(init);
@@ -264,7 +275,12 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 			}
 			const templateValue = findComputedTemplateValue(body);
 			if (templateValue) {
-				reportTemplateAsValue(state, templateValue, expressionSource(init, state.source), name);
+				reportTemplateAsValue(
+					state,
+					templateValue,
+					expressionSource(init, state.source),
+					name,
+				);
 				markTemplateValueHandled(templateValue);
 				continue;
 			}
@@ -314,7 +330,8 @@ export function collectModuleGraphInterface(input: {
 				const localName = getIdentifierName(declarator.id as AnyNode | undefined);
 				const init = declarator.init as AnyNode | undefined;
 				const frameworkApi = getFrameworkApiForCall(init, input.state.frameworkApiImports);
-				if (!localName || (frameworkApi !== 'state' && frameworkApi !== 'computed')) continue;
+				if (!localName || (frameworkApi !== 'state' && frameworkApi !== 'computed'))
+					continue;
 				exportedHelpers.push({
 					exportName: localName,
 					localName,
@@ -413,7 +430,9 @@ function directHelperGraphReturn(
 				writable: false,
 				async: bodyArgument?.async === true,
 				asyncCapable: bodyArgument?.async === true,
-				functionSource: bodyArgument ? expressionSource(bodyArgument, state.source) : undefined,
+				functionSource: bodyArgument
+					? expressionSource(bodyArgument, state.source)
+					: undefined,
 			};
 		}
 	}
@@ -575,7 +594,10 @@ function collectImportedHelperBindingForCall(
 function graphBindingFromInterfaceReturn(
 	helperReturn: ModuleGraphInterfaceHelperReturn,
 	state: WalkState,
-): SemanticGraphBinding & { readonly initialValueKnown?: boolean; readonly initializerSource?: string } {
+): SemanticGraphBinding & {
+	readonly initialValueKnown?: boolean;
+	readonly initializerSource?: string;
+} {
 	return {
 		id: graphBindingId(helperReturn.kind, helperReturn.localName, state),
 		name: graphBindingName(helperReturn.localName, state),
@@ -622,10 +644,7 @@ function collectHelperBindingForCall(
 	return target;
 }
 
-function helperReturnTarget(
-	body: AnyNode | undefined,
-	state: WalkState,
-): string | null {
+function helperReturnTarget(body: AnyNode | undefined, state: WalkState): string | null {
 	const returned = findReturnArgument(body);
 	if (!returned || !state.currentHelperCall) return null;
 
@@ -651,10 +670,7 @@ function crossModuleHelperSource(helperName: string, state: WalkState): string |
 	return moduleImportForHelper(helperName, state)?.source ?? null;
 }
 
-function moduleImportForHelper(
-	helperName: string,
-	state: WalkState,
-): SemanticModuleImport | null {
+function moduleImportForHelper(helperName: string, state: WalkState): SemanticModuleImport | null {
 	const imported = state.graph.moduleImports.find(
 		(moduleImport) =>
 			moduleImport.localName === helperName &&
@@ -694,10 +710,7 @@ function localDeclarationScope(state: WalkState): 'component' | 'function' {
 	return state.currentFunctionSite ? 'function' : 'component';
 }
 
-function frameworkApiValueReference(
-	node: AnyNode,
-	state: WalkState,
-): FrameworkApiName | null {
+function frameworkApiValueReference(node: AnyNode, state: WalkState): FrameworkApiName | null {
 	const name = getIdentifierName(node);
 	return name ? (state.frameworkApiImports.get(name) ?? null) : null;
 }

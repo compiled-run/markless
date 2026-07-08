@@ -3,7 +3,7 @@ import { asNodes, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import {
 	isIgnorableStaticTextNode as isIgnorableTextNode,
 	isPlainHostTemplateNode,
-	} from '../../ast/tsrx.ts';
+} from '../../ast/tsrx.ts';
 import {
 	graphBindingMap,
 	resolveGraphPath,
@@ -17,12 +17,45 @@ import { collectStyleScopes } from './style-scopes.ts';
 import { collectAsyncBoundaryNodes } from './async-boundaries.ts';
 import { planAsyncBoundaryArmRenders } from './arm-render-module.ts';
 import { componentPropNames } from './shared.ts';
-import { branchArmSupported, branchArms, buildBranchArmParts, collectArmHosts, collectBranchSiteNodes, scopeClassOf, switchArmTests } from './branch-planning.ts';
-import { assignHostIds, collectHostPaths, collectStaticEventControls, collectStaticHostNodeIds, keyedRepeatNodes } from './host-locators.ts';
+import {
+	branchArmSupported,
+	branchArms,
+	buildBranchArmParts,
+	collectArmHosts,
+	collectBranchSiteNodes,
+	scopeClassOf,
+	switchArmTests,
+} from './branch-planning.ts';
+import {
+	assignHostIds,
+	collectHostPaths,
+	collectStaticEventControls,
+	collectStaticHostNodeIds,
+	keyedRepeatNodes,
+} from './host-locators.ts';
 import { collectRowPlan, planKeyedRepeat, supportedRepeatGate } from './repeat-planning.ts';
-import { firstComponentRoot, sameModuleComponentRoots, selectPublicRenderRoot, singleRowRoot, staticHtml, staticShellSupported } from './template.ts';
+import {
+	firstComponentRoot,
+	sameModuleComponentRoots,
+	selectPublicRenderRoot,
+	singleRowRoot,
+	staticHtml,
+	staticShellSupported,
+} from './template.ts';
 import { collectStaticTextWrites } from './text-bindings.ts';
-import { branchRenderDiagnostics, collectChildrenOpacityDiagnostics, collectUndeclaredTemplateReadDiagnostics, collectUnsupportedConstructDiagnostics, componentConditionalRootDiagnostics, componentRootDiagnostics, componentUnsupportedBodyDiagnostics, emptyPlan, firstComponentName, repeatRenderDiagnostics, sameModuleChildBoundaryDiagnostics } from './validation.ts';
+import {
+	branchRenderDiagnostics,
+	collectChildrenOpacityDiagnostics,
+	collectUndeclaredTemplateReadDiagnostics,
+	collectUnsupportedConstructDiagnostics,
+	componentConditionalRootDiagnostics,
+	componentRootDiagnostics,
+	componentUnsupportedBodyDiagnostics,
+	emptyPlan,
+	firstComponentName,
+	repeatRenderDiagnostics,
+	sameModuleChildBoundaryDiagnostics,
+} from './validation.ts';
 import { parseJavaScriptModule } from '../../js-ast.ts';
 import { extractedSyncPolicyActionCalls } from '../semantic-graph/collect-sync-policy.ts';
 import type {
@@ -43,9 +76,16 @@ import type {
 // decides what direct DOM work is compiler-proven instead of emitting code itself.
 export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlanArtifact {
 	const ast = parseModule(input.source.source, input.source.filename) as unknown as AnyNode;
-	const conditionalRootDiagnostics = componentConditionalRootDiagnostics(ast, input.source.filename);
+	const conditionalRootDiagnostics = componentConditionalRootDiagnostics(
+		ast,
+		input.source.filename,
+	);
 	if (conditionalRootDiagnostics.length > 0) return emptyPlan(conditionalRootDiagnostics);
-	const unsupportedBodyDiagnostics = componentUnsupportedBodyDiagnostics(ast, input.source.filename, input.source.source);
+	const unsupportedBodyDiagnostics = componentUnsupportedBodyDiagnostics(
+		ast,
+		input.source.filename,
+		input.source.source,
+	);
 	if (unsupportedBodyDiagnostics.length > 0) return emptyPlan(unsupportedBodyDiagnostics);
 
 	const selectedRoot = selectPublicRenderRoot(ast);
@@ -59,7 +99,9 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 		ast,
 		component: selectedRoot.component,
 		filename: input.source.filename,
-		moduleImports: input.semanticGraph.moduleImports.map((moduleImport) => moduleImport.localName),
+		moduleImports: input.semanticGraph.moduleImports.map(
+			(moduleImport) => moduleImport.localName,
+		),
 		repeatLocals: input.semanticGraph.keyedRepeats.flatMap((repeat) =>
 			repeat.indexName ? [repeat.itemName, repeat.indexName] : [repeat.itemName],
 		),
@@ -165,7 +207,15 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 		input.semanticGraph.keyedRepeats.flatMap((repeat, index) => {
 			const node = repeatNodes[index];
 			return node
-				? [[node, { itemName: repeat.itemName, collectionSource: repeat.collectionSource }] as const]
+				? [
+						[
+							node,
+							{
+								itemName: repeat.itemName,
+								collectionSource: repeat.collectionSource,
+							},
+						] as const,
+					]
 				: [];
 		}),
 	);
@@ -220,10 +270,17 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 								);
 					if (arms && arms.every((arm) => arm !== null)) {
 						armFlipPlansBySite.set(site.id, {
-							arms: arms as ReadonlyArray<ReadonlyArray<PublicRenderPlanBranchArmPart>>,
+							arms: arms as ReadonlyArray<
+								ReadonlyArray<PublicRenderPlanBranchArmPart>
+							>,
 							armTests,
 						});
-						return { branchSiteId: site.id, supported: true, armScoped: true, armFlip: true };
+						return {
+							branchSiteId: site.id,
+							supported: true,
+							armScoped: true,
+							armFlip: true,
+						};
 					}
 					armBranchEscalations.push({
 						branchSiteId: site.id,
@@ -292,7 +349,9 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 						? { graphNodeId: testResolved.binding.id, path: testResolved.path }
 						: null,
 					arms: flipPlan.arms,
-					armHosts: branchArms(found.node).map((arm) => collectArmHosts(arm, assignedHosts)),
+					armHosts: branchArms(found.node).map((arm) =>
+						collectArmHosts(arm, assignedHosts),
+					),
 					...(flipPlan.armTests ? { armTests: flipPlan.armTests } : {}),
 					...(declaredEmptyArms.length > 0 ? { declaredEmptyArms } : {}),
 					asyncBoundaryId: site.asyncBoundaryId,
@@ -319,7 +378,9 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 			if (armTests === null) return [];
 		}
 		const armHosts = branchArms(found.node).map((arm) => collectArmHosts(arm, assignedHosts));
-		const declaredEmptyArms = arms.flatMap((arm, armIndex) => arm.length === 0 ? [armIndex] : []);
+		const declaredEmptyArms = arms.flatMap((arm, armIndex) =>
+			arm.length === 0 ? [armIndex] : [],
+		);
 		return [
 			{
 				branchSiteId: site.id,
@@ -470,7 +531,11 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 			...styleScopeCollection.diagnostics,
 			...armEscalationDiagnostics,
 			...armRenderPlans.diagnostics,
-			...sameModuleChildBoundaryDiagnostics(ast, selectedRoot.componentName, input.source.filename),
+			...sameModuleChildBoundaryDiagnostics(
+				ast,
+				selectedRoot.componentName,
+				input.source.filename,
+			),
 			...collectUnsupportedConstructDiagnostics(root, input.source.filename),
 			...collectChildrenOpacityDiagnostics(ast, input.source.filename),
 			...repeatRenderDiagnostics({
@@ -520,12 +585,12 @@ function stripExtractedSyncPolicyCalls(
 			) {
 				continue;
 			}
-				const stripped = stripSyncPolicyCallsFromHandlerSource(
-					symbol.source,
-					symbol.parameters[0] ?? 'event',
-					actions,
-					semanticGraph,
-				);
+			const stripped = stripSyncPolicyCallsFromHandlerSource(
+				symbol.source,
+				symbol.parameters[0] ?? 'event',
+				actions,
+				semanticGraph,
+			);
 			if (stripped !== symbol.source) {
 				(symbol as { source: string }).source = stripped;
 			}
@@ -572,15 +637,19 @@ function stripSyncPolicyCallsFromHandlerSource(
 		graph: semanticGraph as never,
 		source: wrappedSource,
 	})
-		.flatMap((node) => removableCallSpan(source, (node.start ?? 0) - prefix.length, (node.end ?? 0) - prefix.length))
+		.flatMap((node) =>
+			removableCallSpan(
+				source,
+				(node.start ?? 0) - prefix.length,
+				(node.end ?? 0) - prefix.length,
+			),
+		)
 		.sort((left, right) => right.start - left.start);
 	if (replacements.length === 0) return source;
 
 	let stripped = source;
 	for (const replacement of replacements) {
-		stripped =
-			stripped.slice(0, replacement.start) +
-			stripped.slice(replacement.end);
+		stripped = stripped.slice(0, replacement.start) + stripped.slice(replacement.end);
 	}
 	return stripped;
 }

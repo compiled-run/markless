@@ -95,7 +95,10 @@ export async function renderToStream(
 	if (runs.size > 0) {
 		// Fast pages settle before the deadline and never stream; slow pages
 		// hit the deadline with every runner already in flight.
-		await Promise.race([Promise.all([...runs.values()].map((entry) => entry.promise)), deadline]);
+		await Promise.race([
+			Promise.all([...runs.values()].map((entry) => entry.promise)),
+			deadline,
+		]);
 		output = await renderSsrOutput(component, options.props, renderContext);
 	}
 	const shell = await assembleSsrContainer(component, output, options);
@@ -132,12 +135,17 @@ function pendingStreamArms(
 	// Reveal dependencies (G1/C3): the computed's compiler-known read set,
 	// restricted to OTHER streamed boundaries. Inline-settled dependencies
 	// are already visible — never a reveal gate.
-	const streamedBoundaryByGraphNode = new Map(arms.map((arm) => [arm.graphNodeId, arm.boundaryId]));
+	const streamedBoundaryByGraphNode = new Map(
+		arms.map((arm) => [arm.graphNodeId, arm.boundaryId]),
+	);
 	const dependenciesByGraphNode = new Map(
 		(output.state?.computed ?? []).map((computed) => [
 			computed.graphNodeId,
-			(computed as { readonly dependencies?: ReadonlyArray<{ readonly graphNodeId: string }> })
-				.dependencies ?? [],
+			(
+				computed as {
+					readonly dependencies?: ReadonlyArray<{ readonly graphNodeId: string }>;
+				}
+			).dependencies ?? [],
 		]),
 	);
 	for (const arm of arms) {
@@ -184,7 +192,9 @@ async function* streamArmAppends(input: {
 			(output.state?.computed ?? []).flatMap((computed) => {
 				const status = (computed as { readonly snapshot?: { readonly status?: string } })
 					.snapshot?.status;
-				return status === 'fulfilled' || status === 'rejected' ? [computed.graphNodeId] : [];
+				return status === 'fulfilled' || status === 'rejected'
+					? [computed.graphNodeId]
+					: [];
 			}),
 		);
 		const parts: string[] = [];
@@ -202,7 +212,11 @@ async function* streamArmAppends(input: {
 	}
 }
 
-function renderArmAppend(output: SsrRenderOutput, arm: PendingArm, nonce: string | undefined): string {
+function renderArmAppend(
+	output: SsrRenderOutput,
+	arm: PendingArm,
+	nonce: string | undefined,
+): string {
 	const startAnchor = `<!--markless:async:${arm.boundaryId}-->`;
 	const endAnchor = `<!--/markless:async:${arm.boundaryId}-->`;
 	const html = output.html;

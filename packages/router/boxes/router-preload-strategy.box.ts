@@ -358,10 +358,16 @@ function publicBuildPath(path: string): string | undefined {
 	return index === -1 || !path.endsWith('.js') ? undefined : path.slice(index);
 }
 
-async function observabilityChunkHrefs(chunks: ReadonlyMap<string, string>, preview: Preview): Promise<string[]> {
+async function observabilityChunkHrefs(
+	chunks: ReadonlyMap<string, string>,
+	preview: Preview,
+): Promise<string[]> {
 	const hrefs = new Set<string>();
 	for (const [moduleId, entry] of Object.entries(await executionSizes(preview))) {
-		if (typeof entry?.chunk === 'string' && isObservabilityChunk(chunks, moduleId, entry.chunk)) {
+		if (
+			typeof entry?.chunk === 'string' &&
+			isObservabilityChunk(chunks, moduleId, entry.chunk)
+		) {
 			hrefs.add(`/${entry.chunk}`);
 		}
 	}
@@ -379,15 +385,24 @@ async function observabilityChunkHrefs(chunks: ReadonlyMap<string, string>, prev
 	return [...hrefs].sort();
 }
 
-async function executionSizes(preview: Preview): Promise<Record<string, { readonly chunk?: string }>> {
+async function executionSizes(
+	preview: Preview,
+): Promise<Record<string, { readonly chunk?: string }>> {
 	try {
-		return JSON.parse(await preview.request(EXECUTION_SIZES_REQUEST)) as Record<string, { readonly chunk?: string }>;
+		return JSON.parse(await preview.request(EXECUTION_SIZES_REQUEST)) as Record<
+			string,
+			{ readonly chunk?: string }
+		>;
 	} catch {
 		return {};
 	}
 }
 
-function isObservabilityChunk(chunks: ReadonlyMap<string, string>, moduleId: string, path: string): boolean {
+function isObservabilityChunk(
+	chunks: ReadonlyMap<string, string>,
+	moduleId: string,
+	path: string,
+): boolean {
 	const code = chunks.get(path) ?? '';
 	return (
 		moduleId === 'web:dev-log' ||

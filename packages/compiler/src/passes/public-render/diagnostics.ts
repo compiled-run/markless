@@ -179,7 +179,12 @@ export function noRenderableRootDiagnostic(input: {
 	};
 }
 
-export function unsupportedRenderBodyDiagnostic(input: { readonly node: AnyNode; readonly filename: string; readonly message: string; readonly suggestion: string; }): CompilerDiagnostic {
+export function unsupportedRenderBodyDiagnostic(input: {
+	readonly node: AnyNode;
+	readonly filename: string;
+	readonly message: string;
+	readonly suggestion: string;
+}): CompilerDiagnostic {
 	return {
 		code: 'MARKLESS_RENDER_BODY_UNSUPPORTED',
 		severity: 'error',
@@ -195,7 +200,11 @@ export function unsupportedRenderBodyDiagnostic(input: { readonly node: AnyNode;
 	};
 }
 
-export function undeclaredTemplateReadDiagnostic(input: { readonly name: string; readonly node: AnyNode; readonly filename: string; }): CompilerDiagnostic {
+export function undeclaredTemplateReadDiagnostic(input: {
+	readonly name: string;
+	readonly node: AnyNode;
+	readonly filename: string;
+}): CompilerDiagnostic {
 	const message = `${input.name} would throw ReferenceError when the render module runs because no prop, body declaration, module declaration, or import with that name is in scope.`;
 	return {
 		code: 'MARKLESS_TEMPLATE_READ_UNDECLARED',
@@ -207,12 +216,20 @@ export function undeclaredTemplateReadDiagnostic(input: { readonly name: string;
 		primarySpan: sourceSpan(input.node, input.filename),
 		passId: 'public-render-plan',
 		artifactKeys: ['publicRenderPlan'],
-		suggestions: [{ message: `Declare ${input.name} in the component body, pass it as a prop, import it, or hoist it to a module-scope declaration before reading it in the template.` }],
+		suggestions: [
+			{
+				message: `Declare ${input.name} in the component body, pass it as a prop, import it, or hoist it to a module-scope declaration before reading it in the template.`,
+			},
+		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_TEMPLATE_READ_UNDECLARED',
 	};
 }
 
-export function conditionalComponentRootDiagnostic(input: { readonly node: AnyNode; readonly filename: string; readonly componentName: string; }): CompilerDiagnostic {
+export function conditionalComponentRootDiagnostic(input: {
+	readonly node: AnyNode;
+	readonly filename: string;
+	readonly componentName: string;
+}): CompilerDiagnostic {
 	return {
 		code: 'MARKLESS_COMPONENT_ROOT_CONDITIONAL',
 		severity: 'error',
@@ -223,7 +240,12 @@ export function conditionalComponentRootDiagnostic(input: { readonly node: AnyNo
 		primarySpan: sourceSpan(input.node, input.filename),
 		passId: 'public-render-plan',
 		artifactKeys: ['publicRenderPlan'],
-		suggestions: [{ message: 'Use a single root with @if/@else inside it, or return null before the one root for a guard clause.' }],
+		suggestions: [
+			{
+				message:
+					'Use a single root with @if/@else inside it, or return null before the one root for a guard clause.',
+			},
+		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_COMPONENT_ROOT_CONDITIONAL',
 	};
 }

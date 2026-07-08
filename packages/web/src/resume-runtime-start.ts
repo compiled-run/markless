@@ -1,12 +1,20 @@
 import type { DomJournalEntry, DomJournalResult } from '@markless/runtime';
 import type { AsyncBoundarySettleTracker } from './resume-async-wiring.ts';
 import type { ArmCommitUpdate } from './resume-commit-arm.ts';
-import type { ResumeAsyncBoundaryRecord, ResumePreparedCore, ResumeRuntimeInput } from './resume-types.ts';
+import type {
+	ResumeAsyncBoundaryRecord,
+	ResumePreparedCore,
+	ResumeRuntimeInput,
+} from './resume-types.ts';
 
-type BehaviorRuntime = ReturnType<typeof import('./resume-behaviors.ts')['createBehaviorRuntime']>;
-type BranchRuntime = ReturnType<typeof import('./resume-branches.ts')['wireBranches']>;
-type EventWiring = ReturnType<typeof import('./resume-events.ts')['createEventWiring']>;
-type RuntimeShared = ReturnType<typeof import('./resume-runtime-shared.ts')['createResumeRuntimeShared']>;
+type BehaviorRuntime = ReturnType<
+	(typeof import('./resume-behaviors.ts'))['createBehaviorRuntime']
+>;
+type BranchRuntime = ReturnType<(typeof import('./resume-branches.ts'))['wireBranches']>;
+type EventWiring = ReturnType<(typeof import('./resume-events.ts'))['createEventWiring']>;
+type RuntimeShared = ReturnType<
+	(typeof import('./resume-runtime-shared.ts'))['createResumeRuntimeShared']
+>;
 
 export async function startResumeRuntime(input: {
 	readonly runtimeInput: ResumeRuntimeInput;
@@ -48,27 +56,47 @@ export async function startResumeRuntime(input: {
 	const rowEvents = (runtimeInput.view.keyedRepeats ?? []).flatMap((repeat) => repeat.rowEvents);
 	await events.prepareSyncPolicy(runtimeInput.view.events, rowEvents);
 	if (runtimeInput.applyDomJournal) {
-		storeContainerSubscription(runtimeInput.graph.subscribeJournal(async (entries) => {
-			await disposeRemovedAsyncRangeHosts(runtimeInput, prepared, entries, disposeHost);
-			input.branchRuntime()?.disposeRemovedRangeHosts(entries, disposeHost, prepared.asyncBoundariesById);
-			await runtimeInput.applyDomJournal!(entries);
-			await input.branchRuntime()?.materializeFlippedBranchArms(entries, (hostNodeId) =>
-				input.behaviorRuntime()!.activateBehaviors(hostNodeId, { flush: false }),
-			);
-		}));
+		storeContainerSubscription(
+			runtimeInput.graph.subscribeJournal(async (entries) => {
+				await disposeRemovedAsyncRangeHosts(runtimeInput, prepared, entries, disposeHost);
+				input
+					.branchRuntime()
+					?.disposeRemovedRangeHosts(entries, disposeHost, prepared.asyncBoundariesById);
+				await runtimeInput.applyDomJournal!(entries);
+				await input
+					.branchRuntime()
+					?.materializeFlippedBranchArms(entries, (hostNodeId) =>
+						input.behaviorRuntime()!.activateBehaviors(hostNodeId, { flush: false }),
+					);
+			}),
+		);
 	}
-	if ((runtimeInput.state?.computed ?? []).some((computed) =>
-		computed.async === false &&
-		typeof (computed as { readonly deriveSymbolId?: unknown }).deriveSymbolId === 'string'
-	)) {
-		(await import('./resume-sync-demand.ts')).wireSyncComputedDemandTriggersWithoutLoadingCapability({
-			graph: runtimeInput.graph, state: runtimeInput.state, root: runtimeInput.root, loadSymbol: runtimeInput.loadSymbol,
-			elementHandles: prepared.elementHandles, storeContainerSubscription,
+	if (
+		(runtimeInput.state?.computed ?? []).some(
+			(computed) =>
+				computed.async === false &&
+				typeof (computed as { readonly deriveSymbolId?: unknown }).deriveSymbolId ===
+					'string',
+		)
+	) {
+		(
+			await import('./resume-sync-demand.ts')
+		).wireSyncComputedDemandTriggersWithoutLoadingCapability({
+			graph: runtimeInput.graph,
+			state: runtimeInput.state,
+			root: runtimeInput.root,
+			loadSymbol: runtimeInput.loadSymbol,
+			elementHandles: prepared.elementHandles,
+			storeContainerSubscription,
 		});
 	}
 	if ((runtimeInput.view.keyedRepeats ?? []).length > 0) {
 		(await import('./resume-keyed-repeats.ts')).wireKeyedRepeats({
-			graph: runtimeInput.graph, view: runtimeInput.view, elementsByHostId: prepared.elementsByHostId, events, storeContainerSubscription,
+			graph: runtimeInput.graph,
+			view: runtimeInput.view,
+			elementsByHostId: prepared.elementsByHostId,
+			events,
+			storeContainerSubscription,
 		});
 	}
 	let settleTracker: AsyncBoundarySettleTracker | undefined;
@@ -91,8 +119,13 @@ export async function startResumeRuntime(input: {
 			hasHtmlRenderer: !!runtimeInput.renderBranchHtml,
 		});
 		asyncWiring.wireAsyncBoundariesWithoutLoadingCapability({
-			asyncBoundariesById: prepared.asyncBoundariesById, graph: runtimeInput.graph, root: runtimeInput.root,
-			loadSymbol: runtimeInput.loadSymbol, renderBranchHtml: runtimeInput.renderBranchHtml, elementHandles: prepared.elementHandles, storeContainerSubscription,
+			asyncBoundariesById: prepared.asyncBoundariesById,
+			graph: runtimeInput.graph,
+			root: runtimeInput.root,
+			loadSymbol: runtimeInput.loadSymbol,
+			renderBranchHtml: runtimeInput.renderBranchHtml,
+			elementHandles: prepared.elementHandles,
+			storeContainerSubscription,
 			commitArm: input.commitArm,
 			demandOnStart: runtimeInput.demandAsyncBoundaries === true,
 			settleTracker,
@@ -111,9 +144,13 @@ export async function startResumeRuntime(input: {
 			const { settleAsyncBoundaryRange } = await import('./resume-async-wiring.ts');
 			return settleAsyncBoundaryRange(
 				{
-					graph: runtimeInput.graph, root: runtimeInput.root, loadSymbol: runtimeInput.loadSymbol,
-					renderBranchHtml: runtimeInput.renderBranchHtml, elementHandles: prepared.elementHandles,
-					commitArm: input.commitArm, settleTracker,
+					graph: runtimeInput.graph,
+					root: runtimeInput.root,
+					loadSymbol: runtimeInput.loadSymbol,
+					renderBranchHtml: runtimeInput.renderBranchHtml,
+					elementHandles: prepared.elementHandles,
+					commitArm: input.commitArm,
+					settleTracker,
 				},
 				boundary,
 				runtimeInput.graph.read(read.graphNodeId, []),
@@ -126,7 +163,8 @@ export async function startResumeRuntime(input: {
 		holdPendingFlip: (graphNodeId) =>
 			runtimeInput.graph.read(graphNodeId, ['status']) === 'pending' &&
 			[...prepared.asyncBoundariesById.values()].some((boundary) =>
-				boundary.asyncReads.some((read) => read.graphNodeId === graphNodeId)),
+				boundary.asyncReads.some((read) => read.graphNodeId === graphNodeId),
+			),
 	});
 	if (runtimeInput.view.events.some((event) => event.eventName === 'visible')) {
 		const behaviors = await loadBehaviorRuntime();
@@ -136,7 +174,8 @@ export async function startResumeRuntime(input: {
 	if ((runtimeInput.view.branches ?? []).length > 0) await loadBranchRuntime();
 	// Container capture listeners see every DOM event of a registered type,
 	// including non-markless ones (router links): unmatched must pass through.
-	const dispatchCaptured = (event: Parameters<typeof events.dispatch>[0]) => events.dispatch(event, { ignoreUnmatched: true });
+	const dispatchCaptured = (event: Parameters<typeof events.dispatch>[0]) =>
+		events.dispatch(event, { ignoreUnmatched: true });
 	for (const eventType of eventTypes) {
 		runtimeInput.root.addEventListener?.(eventType, dispatchCaptured, { capture: true });
 		// The wrapper has its own identity; pair removal with registration so
@@ -146,7 +185,9 @@ export async function startResumeRuntime(input: {
 		);
 	}
 	if ((runtimeInput.graph.listSharedDefinitions?.() ?? []).length > 0) {
-		runtimeInput.root.addEventListener?.(sharedPatchEventType, receiveSharedPatch, { capture: true });
+		runtimeInput.root.addEventListener?.(sharedPatchEventType, receiveSharedPatch, {
+			capture: true,
+		});
 	}
 	return settleTracker;
 }
@@ -160,10 +201,17 @@ async function disposeRemovedAsyncRangeHosts(
 	let locators: typeof import('./resume-locators.ts') | undefined;
 	for (const entry of entries) {
 		if (entry.type !== 'removeRange' || !entry.locator.startsWith('async-boundary:')) continue;
-		const boundary = prepared.asyncBoundariesById.get(entry.locator.slice('async-boundary:'.length));
+		const boundary = prepared.asyncBoundariesById.get(
+			entry.locator.slice('async-boundary:'.length),
+		);
 		if (!boundary) continue;
 		locators ??= await import('./resume-locators.ts');
-		const removed = locators.elementsBetweenAnchors(input.root, boundary.startAnchor, boundary.endAnchor);
-		for (const id of locators.hostIdsInsideRemovedElements(prepared.elementsByHostId, removed)) disposeHost(id);
+		const removed = locators.elementsBetweenAnchors(
+			input.root,
+			boundary.startAnchor,
+			boundary.endAnchor,
+		);
+		for (const id of locators.hostIdsInsideRemovedElements(prepared.elementsByHostId, removed))
+			disposeHost(id);
 	}
 }

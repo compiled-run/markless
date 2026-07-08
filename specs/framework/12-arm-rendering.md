@@ -18,13 +18,13 @@ detour (document.write swaps) taken to avoid client arm rendering.
 The compiler always selects the SMALLEST update tier it can statically prove.
 Range replacement is the last resort, never the default.
 
-| Tier | Mechanism | Component execution | Used for |
-|---|---|---|---|
-| 1 | value slots (text/attribute graph subscriptions) | no | most state changes |
-| 2 | keyed row ops | no | repeat mutations |
-| 3 | branch range flips (static parts + slots) | no | @if/@switch, incl. inside arms |
-| 4 | arm commit (`commitArm`) | YES | transitions: mount, async settle, error |
-| 5 | route swap | YES | tier 4 at page scale |
+| Tier | Mechanism                                        | Component execution | Used for                                |
+| ---- | ------------------------------------------------ | ------------------- | --------------------------------------- |
+| 1    | value slots (text/attribute graph subscriptions) | no                  | most state changes                      |
+| 2    | keyed row ops                                    | no                  | repeat mutations                        |
+| 3    | branch range flips (static parts + slots)        | no                  | @if/@switch, incl. inside arms          |
+| 4    | arm commit (`commitArm`)                         | YES                 | transitions: mount, async settle, error |
+| 5    | route swap                                       | YES                 | tier 4 at page scale                    |
 
 Steady-state interactions run at the vanilla-JS floor (the tiers ARE the
 textContent/replaceChildren calls a hand-writer would make, selected at
@@ -100,6 +100,7 @@ templates commit on parse — early paint is lost, correctness never.
 
 Three-layer opt-in semantics (no configuration creep — structure and timing
 decide):
+
 1. Entry: streaming default; `render: 'blocking'`-style option opts out.
 2. Boundary: an authored @pending arm IS the boundary's streaming declaration
    (it is the waiting UI). A @try without @pending (if the grammar permits one)
@@ -117,8 +118,9 @@ meta, before-document-swap teardown — are deleted when tier 4 lands. The Link
 component owns SPA navigation; plain-anchor hash special-casing is removed
 once component-in-row lands and apps can use Link everywhere.
 
-## D8. Deadline-gated pending (ratified 2026-07-08, owner; supersedes the
-## same-day "first appearances only" wording)
+## D8. Deadline-gated pending (ratified 2026-07-08, owner)
+
+Supersedes the same-day "first appearances only" wording.
 
 `@try` / `@pending` / `@catch` is the ONLY async status vocabulary. There is
 no property-style status surface: no `navigation.pending`, no `model.pending`,

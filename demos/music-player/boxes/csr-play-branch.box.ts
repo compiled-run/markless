@@ -76,7 +76,13 @@ async function waitForLogSummaryAttribute(
 	page: ContentPage,
 	options: { readonly timeoutMs: number },
 ): Promise<void> {
-	await waitForLogMirror(page, options, /data-markless-log-summary="markless: rendered — \d+ modules? executed \(\d+(?:\.\d+)? KB\)"/, /data-markless-log-summary="[^"]*est\./, 'Expected data-markless-log-summary to mirror the CSR render summary.');
+	await waitForLogMirror(
+		page,
+		options,
+		/data-markless-log-summary="markless: rendered — \d+ modules? executed \(\d+(?:\.\d+)? KB\)"/,
+		/data-markless-log-summary="[^"]*est\./,
+		'Expected data-markless-log-summary to mirror the CSR render summary.',
+	);
 }
 
 async function waitForLogInteractionAttribute(
@@ -84,7 +90,14 @@ async function waitForLogInteractionAttribute(
 	count: number,
 	options: { readonly timeoutMs: number },
 ): Promise<void> {
-	await waitForLogMirror(page, options, /data-markless-log-last="markless: click \[[^"]+\] · woke \d+ modules · ran warm \d+ modules · \d+(?:\.\d+)? KB"/, /data-markless-log-last="[^"]*est\./, `Expected interaction ${count} to mirror a real-KB execution log line.`, new RegExp(`data-markless-log-interactions="${count}"`));
+	await waitForLogMirror(
+		page,
+		options,
+		/data-markless-log-last="markless: click \[[^"]+\] · woke \d+ modules · ran warm \d+ modules · \d+(?:\.\d+)? KB"/,
+		/data-markless-log-last="[^"]*est\./,
+		`Expected interaction ${count} to mirror a real-KB execution log line.`,
+		new RegExp(`data-markless-log-interactions="${count}"`),
+	);
 }
 
 async function waitForLogMirror(
@@ -98,7 +111,12 @@ async function waitForLogMirror(
 	const started = Date.now();
 	while (Date.now() - started < options.timeoutMs) {
 		const html = await page.content();
-		if ((!extraPattern || extraPattern.test(html)) && pattern.test(html) && !estPattern.test(html)) return;
+		if (
+			(!extraPattern || extraPattern.test(html)) &&
+			pattern.test(html) &&
+			!estPattern.test(html)
+		)
+			return;
 		await new Promise((resolve) => setTimeout(resolve, 25));
 	}
 	throw new Error(message);

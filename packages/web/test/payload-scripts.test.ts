@@ -1147,9 +1147,7 @@ test('runtime rejects payload scripts with malformed optional view records', () 
 			viewScript:
 				'<script type="markless/view">{"version":1,"locators":[],"events":[],"domUpdates":[],"behaviors":[],"elementHandles":[],"asyncBoundaries":[],"keyedRepeats":[{"id":"repeat:0","parentHostNodeId":"h0","collectionPath":[],"keyPath":[],"itemName":"row","rowElementCount":1,"rowEvents":[{"hostPath":"0","eventName":"click","symbolIds":[]}]}]}</script>',
 		}),
-	).toThrow(
-		'Invalid markless/view keyedRepeat[0].rowEvents[0]: expected hostPath array.',
-	);
+	).toThrow('Invalid markless/view keyedRepeat[0].rowEvents[0]: expected hostPath array.');
 
 	expect(() =>
 		decodePayloadScripts({
@@ -1398,9 +1396,10 @@ test('runtime treats a second payload resume for one container as an already-res
 		loadSymbol: () => () => undefined,
 	});
 
-	expect((root as FakeElement & { __asyncResumeRuntimeStarted?: boolean }).__asyncResumeRuntimeStarted).toBe(
-		true,
-	);
+	expect(
+		(root as FakeElement & { __asyncResumeRuntimeStarted?: boolean })
+			.__asyncResumeRuntimeStarted,
+	).toBe(true);
 
 	const second = await resumeFromPayloadDocument({
 		document: payloadDocument(scripts.stateScript, scripts.viewScript),

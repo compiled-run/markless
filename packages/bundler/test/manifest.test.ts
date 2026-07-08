@@ -233,7 +233,12 @@ describe('markless build metadata output', () => {
 		const injections = collectModulePreloadInjections(graph);
 
 		expect(injections).toEqual(
-			['/build/shared.js', '/build/branch-runtime.js', '/build/press.js', '/build/text.js'].map((href) => ({
+			[
+				'/build/shared.js',
+				'/build/branch-runtime.js',
+				'/build/press.js',
+				'/build/text.js',
+			].map((href) => ({
 				tag: 'link',
 				location: 'head',
 				attributes: {
@@ -277,8 +282,18 @@ describe('markless build metadata output', () => {
 				{
 					...transformManifest,
 					symbols: [
-						{ symbolId: 'action:play', kind: 'event-handler', exportName: 'symbol_1_play', virtualModuleId: 'virtual:markless:symbol:root:play' },
-						{ symbolId: 'action:write', kind: 'event-handler', exportName: 'symbol_2_write', virtualModuleId: 'virtual:markless:symbol:root:write' },
+						{
+							symbolId: 'action:play',
+							kind: 'event-handler',
+							exportName: 'symbol_1_play',
+							virtualModuleId: 'virtual:markless:symbol:root:play',
+						},
+						{
+							symbolId: 'action:write',
+							kind: 'event-handler',
+							exportName: 'symbol_2_write',
+							virtualModuleId: 'virtual:markless:symbol:root:write',
+						},
 					],
 				},
 			],
@@ -290,7 +305,11 @@ describe('markless build metadata output', () => {
 			(injection) => (injection.attributes as { href: string }).href,
 		);
 
-		expect(hrefs).toEqual(['/build/shared.js', '/build/chunk-play.js', '/build/chunk-write.js']);
+		expect(hrefs).toEqual([
+			'/build/shared.js',
+			'/build/chunk-play.js',
+			'/build/chunk-write.js',
+		]);
 	});
 
 	test('encodes compact graph edges from symbol roots to separate canonical chunks', () => {
@@ -408,7 +427,13 @@ function lazySymbolManifest(): MarklessManifest {
 				runtimeDemandMap: {
 					version: 1,
 					recordKinds: [],
-					symbols: [{ symbolId: 'symbol:press', kind: 'event-handler', runtimeModuleIds: ['web/resume-branches'] }],
+					symbols: [
+						{
+							symbolId: 'symbol:press',
+							kind: 'event-handler',
+							runtimeModuleIds: ['web/resume-branches'],
+						},
+					],
 					payloadRecords: [],
 					actions: [],
 					unknownRecordModuleIds: [],

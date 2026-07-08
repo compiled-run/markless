@@ -6,9 +6,7 @@ import { marklessWriteScalar } from '../src/fns/write-scalar.ts';
 import { enrichRuntimeErrorForReporting } from '../src/runtime-error-reporting.ts';
 
 test('scalar write leaf fails loudly when no graph is available', () => {
-	expect(() =>
-		marklessWriteScalar({}, { graphNodeId: 'state:count', value: 1 }),
-	).toThrowError(
+	expect(() => marklessWriteScalar({}, { graphNodeId: 'state:count', value: 1 })).toThrowError(
 		expect.objectContaining({
 			message: 'MARKLESS_SCALAR_WRITE_GRAPH_MISSING',
 			code: 'MARKLESS_SCALAR_WRITE_GRAPH_MISSING',
@@ -19,30 +17,38 @@ test('scalar write leaf fails loudly when no graph is available', () => {
 
 test('scalar write leaf rejects non-scalar path writes', () => {
 	expect(() =>
-		marklessWriteScalar({
-			graph: {
-				read: vi.fn(),
-				write: vi.fn(),
-				update: vi.fn(),
+		marklessWriteScalar(
+			{
+				graph: {
+					read: vi.fn(),
+					write: vi.fn(),
+					update: vi.fn(),
+				},
 			},
-		}, { graphNodeId: 'state:count', path: ['nested'], value: 1 }),
-	).toThrowError(expect.objectContaining({
-		message: 'MARKLESS_SCALAR_WRITE_SHAPE',
-		code: 'MARKLESS_SCALAR_WRITE_SHAPE',
-		site: 'write-path',
-	}));
+			{ graphNodeId: 'state:count', path: ['nested'], value: 1 },
+		),
+	).toThrowError(
+		expect.objectContaining({
+			message: 'MARKLESS_SCALAR_WRITE_SHAPE',
+			code: 'MARKLESS_SCALAR_WRITE_SHAPE',
+			site: 'write-path',
+		}),
+	);
 });
 
 test('scalar write leaf fails loudly when the graph reports a missing cell', () => {
 	expect(() =>
-		marklessWriteScalar({
-			graph: {
-				hasCell: () => false,
-				read: vi.fn(),
-				write: vi.fn(),
-				update: vi.fn(),
+		marklessWriteScalar(
+			{
+				graph: {
+					hasCell: () => false,
+					read: vi.fn(),
+					write: vi.fn(),
+					update: vi.fn(),
+				},
 			},
-		}, { graphNodeId: 'state:missing', value: 1 }),
+			{ graphNodeId: 'state:missing', value: 1 },
+		),
 	).toThrowError(
 		expect.objectContaining({
 			message: 'MARKLESS_SCALAR_WRITE_CELL_MISSING',
@@ -94,7 +100,10 @@ test('runtime reporting helper enriches slim leaf errors once', () => {
 });
 
 test('scalar specialized leaf stays limited to generic shared helpers', async () => {
-	const source = await readFile(resolve(import.meta.dirname, '../src/fns/scalar-specialized.ts'), 'utf8');
+	const source = await readFile(
+		resolve(import.meta.dirname, '../src/fns/scalar-specialized.ts'),
+		'utf8',
+	);
 
 	expect(source).not.toContain("from './write-scalar.ts'");
 	expect(source).not.toContain("from './update-text.ts'");

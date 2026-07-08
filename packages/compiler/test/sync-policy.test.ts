@@ -201,14 +201,18 @@ test('B914 extracts unconditional and aliased onSubmit policies', async () => {
 		const stateLowering = lowerStateAccess({ semanticGraph });
 		const payload = planPayloadArena({ semanticGraph, stateLowering });
 
-		expect(semanticGraph.events[0]).toEqual(expect.objectContaining({
-			eventName: 'submit',
-			handlerSources: ['(event) => { event.preventDefault(); count++; }'],
-			hasSyncPolicyCandidate: true,
-			syncPolicy,
-		}));
+		expect(semanticGraph.events[0]).toEqual(
+			expect.objectContaining({
+				eventName: 'submit',
+				handlerSources: ['(event) => { event.preventDefault(); count++; }'],
+				hasSyncPolicyCandidate: true,
+				syncPolicy,
+			}),
+		);
 		expect(semanticGraph.diagnostics).toEqual([]);
-		expect(stateLowering.writes[0]).toEqual(expect.objectContaining({ source: 'count', graphNodeId: 'state:count' }));
+		expect(stateLowering.writes[0]).toEqual(
+			expect.objectContaining({ source: 'count', graphNodeId: 'state:count' }),
+		);
 		expect(payload.view.events[0]).toEqual(expect.objectContaining({ syncPolicy }));
 	}
 
@@ -263,7 +267,10 @@ test('compiler extracts module-scope serializable constants in sync event policy
 });
 
 test('B914 folds module constant equality in sync event policy guards', async () => {
-	const semanticGraph = await buildSemanticGraph({ filename: 'src/Menu.tsrx', source: constantEqualityGuardSource });
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/Menu.tsrx',
+		source: constantEqualityGuardSource,
+	});
 
 	expect(semanticGraph.events[0]?.syncPolicy).toEqual({
 		when: { type: 'constant-truthy', value: true },

@@ -25,9 +25,9 @@ test('CSR: a composed @try arm settles and its button fires after the commit', a
 	// CSR mounts paint @pending first; the runner is demanded at start.
 	expect(container.querySelector('p.pending')?.textContent).toBe('Loading');
 
-	await expect.poll(() => container.querySelector('em[data-badge]')?.textContent).toBe(
-		'Q3 report',
-	);
+	await expect
+		.poll(() => container.querySelector('em[data-badge]')?.textContent)
+		.toBe('Q3 report');
 	expect(container.querySelector('p.pending')).toBeNull();
 
 	// The dead-events class this task fixes: the settled arm's button must
@@ -42,9 +42,9 @@ test('CSR: a settled arm re-commits on computed re-run and stays interactive; ou
 	const screen = await render(ArmCommitRefresh);
 	const container = queryContainer(screen.container);
 
-	await expect.poll(() => container.querySelector('em[data-badge]')?.textContent).toBe(
-		'Report alpha',
-	);
+	await expect
+		.poll(() => container.querySelector('em[data-badge]')?.textContent)
+		.toBe('Report alpha');
 
 	// Focus + type into an input OUTSIDE the boundary before the re-commit.
 	const note = requireElement<HTMLInputElement>(container, 'input[data-note]');
@@ -55,9 +55,9 @@ test('CSR: a settled arm re-commits on computed re-run and stays interactive; ou
 	// Write to the state the async computed reads: the runner re-runs and the
 	// settle re-commits the composed arm through the arm-render module.
 	requireElement<HTMLButtonElement>(container, 'button[data-refresh]').click();
-	await expect.poll(() => container.querySelector('em[data-badge]')?.textContent).toBe(
-		'Report beta',
-	);
+	await expect
+		.poll(() => container.querySelector('em[data-badge]')?.textContent)
+		.toBe('Report beta');
 
 	// The re-committed arm's button still fires (fresh registration)…
 	requireElement<HTMLButtonElement>(container, 'button[data-pick]').click();

@@ -1,5 +1,9 @@
 import { expect, test } from 'vitest';
-import { emitResumeModule, emitSourceModule , rewriteSymbolModuleExport } from '../src/source-module.ts';
+import {
+	emitResumeModule,
+	emitSourceModule,
+	rewriteSymbolModuleExport,
+} from '../src/source-module.ts';
 
 const baseInput = {
 	filename: '/workspace/app/src/App.tsrx',
@@ -69,17 +73,23 @@ test('emitResumeModule emits a specialized scalar dispatcher with resolved const
 	expect(resumeCode).toContain("from '@markless/web/fns/scalar-specialized';");
 	expect(resumeCode).toContain("from '@markless/web/fns/write-scalar';");
 	expect(resumeCode).toContain("from '@markless/web/fns/update-text';");
-	expect(resumeCode).toContain('marklessScalarEventMatches(input, marklessFindElementAtDomOrderIndex(input.root, 3), "button", "click", "host:button")');
+	expect(resumeCode).toContain(
+		'marklessScalarEventMatches(input, marklessFindElementAtDomOrderIndex(input.root, 3), "button", "click", "host:button")',
+	);
 	expect(resumeCode).toContain('const eventTarget = input.event?.target;');
 	expect(resumeCode).toContain('input.event?.type === eventName');
 	expect(resumeCode).toContain('marklessFindElementAtDomOrderIndex(input.root, 3)');
 	expect(resumeCode).toContain('marklessFindElementAtDomOrderIndex(input.root, 5)');
 	expect(resumeCode).not.toContain('?? input.element ?? input.event.target');
 	expect(resumeCode).toContain('marklessReadScalarCell(input.root, 0)');
-	expect(resumeCode).toContain('marklessDecodeScalarCell(marklessReadScalarCell(input.root, 0), "state:count", "markless/state cell[0]")');
+	expect(resumeCode).toContain(
+		'marklessDecodeScalarCell(marklessReadScalarCell(input.root, 0), "state:count", "markless/state cell[0]")',
+	);
 	expect(resumeCode).not.toContain('state as payloadState');
 	expect(resumeCode).toContain('graphNodeId === "state:count"');
-	expect(resumeCode).toContain('marklessUpdateText({ domUpdate: { hostNodeId: "host:label" }, value: "Count: " + (state.value == null ? \'\' : String(state.value)) }, "host:label").value');
+	expect(resumeCode).toContain(
+		'marklessUpdateText({ domUpdate: { hostNodeId: "host:label" }, value: "Count: " + (state.value == null ? \'\' : String(state.value)) }, "host:label").value',
+	);
 	expect(resumeCode).toContain('loadSymbol("symbol:click")');
 	expect(resumeCode).not.toContain('input.loadSymbol("symbol:click")');
 	expect(resumeCode).not.toContain('@markless/web/event-only-lean/scalar-core');
@@ -95,7 +105,9 @@ test('emitResumeModule emits a specialized scalar dispatcher with resolved const
 
 test('composed pages are excluded from scalar specialization (deferred projection design)', () => {
 	const input = scalarResumeInput();
-	(input as { symbolRoutes: unknown }).symbolRoutes = [{ prefix: 'c0:', importSource: './child.tsrx' }];
+	(input as { symbolRoutes: unknown }).symbolRoutes = [
+		{ prefix: 'c0:', importSource: './child.tsrx' },
+	];
 	const resumeCode = emitResumeModule(input as Parameters<typeof emitResumeModule>[0]);
 	// Child-composed hosts keep caller-coordinate locators; until the
 	// projection-metadata design lands, composed pages emit NO specialized
@@ -119,8 +131,13 @@ test('specialized scalar dispatcher excludes composed child symbols without a ro
 
 test('specialized scalar dispatcher raises cell validation before fallback-capable work', () => {
 	const resumeCode = emitResumeModule(scalarResumeInput());
-	const decodeIndex = resumeCode.indexOf('marklessDecodeScalarCell(marklessReadScalarCell(input.root, 0), "state:count", "markless/state cell[0]")');
-	const tryIndex = resumeCode.indexOf('\ttry {', resumeCode.indexOf('async function marklessRunScalar0'));
+	const decodeIndex = resumeCode.indexOf(
+		'marklessDecodeScalarCell(marklessReadScalarCell(input.root, 0), "state:count", "markless/state cell[0]")',
+	);
+	const tryIndex = resumeCode.indexOf(
+		'\ttry {',
+		resumeCode.indexOf('async function marklessRunScalar0'),
+	);
 	const hostMissIndex = resumeCode.indexOf('marklessScalarSpecializedHostMiss(input, "host")');
 
 	expect(decodeIndex).toBeGreaterThan(-1);
@@ -144,26 +161,49 @@ test('specialized scalar dispatcher carries sync policy state through full fallb
 	const input = scalarResumeInput();
 	// A second, plan-less ACTION keeps the page off scalar-only 'fail' mode so the
 	// dispatcher emits the FULL fallback this test is about.
-	(input.runtimeDemandMap.actions as Array<Record<string, unknown>>).push({ hostNodeId: 'host:other', eventName: 'input', recordKind: 'event', recordKinds: ['event'], payloadRecordIds: [], runtimeModuleIds: [] });
+	(input.runtimeDemandMap.actions as Array<Record<string, unknown>>).push({
+		hostNodeId: 'host:other',
+		eventName: 'input',
+		recordKind: 'event',
+		recordKinds: ['event'],
+		payloadRecordIds: [],
+		runtimeModuleIds: [],
+	});
 	(input.payloadView.events[0] as { syncPolicy?: unknown }).syncPolicy = {
 		when: { type: 'graph-truthy', graphNodeId: 'state:count', path: [] },
 		actions: ['preventDefault'],
 	};
 	const resumeCode = emitResumeModule(input);
 
-	expect(resumeCode).toContain('let syncPolicyAlreadyApplied = input.syncPolicyAlreadyApplied === true;');
+	expect(resumeCode).toContain(
+		'let syncPolicyAlreadyApplied = input.syncPolicyAlreadyApplied === true;',
+	);
 	expect(resumeCode).toContain('if (syncPolicy && !syncPolicyAlreadyApplied) {');
 	expect(resumeCode).toContain('syncPolicyAlreadyApplied = true;');
 	expect(resumeCode).toContain('error.syncPolicyAlreadyApplied = syncPolicyAlreadyApplied;');
-	expect(resumeCode).toContain('marklessScalarSpecializedFallback(input, error.site ?? "escalate", error.syncPolicyAlreadyApplied === true)');
-	expect(resumeCode).toContain('await marklessFullResumeHandoff({ ...input, document: input.root, syncPolicyAlreadyApplied });');
-	expect(resumeCode).toContain('await runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });');
+	expect(resumeCode).toContain(
+		'marklessScalarSpecializedFallback(input, error.site ?? "escalate", error.syncPolicyAlreadyApplied === true)',
+	);
+	expect(resumeCode).toContain(
+		'await marklessFullResumeHandoff({ ...input, document: input.root, syncPolicyAlreadyApplied });',
+	);
+	expect(resumeCode).toContain(
+		'await runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });',
+	);
 });
 
 test('specialized scalar dispatcher keeps full fallback for non-scalar event actions', () => {
 	const input = scalarResumeInput();
-	(input.payloadView.events as any[]).push({ hostNodeId: 'host:date', eventName: 'click', symbolIds: ['symbol:date'] });
-	(input.payloadView.locators as any[]).push({ hostNodeId: 'host:date', index: 7, tagName: 'button' });
+	(input.payloadView.events as any[]).push({
+		hostNodeId: 'host:date',
+		eventName: 'click',
+		symbolIds: ['symbol:date'],
+	});
+	(input.payloadView.locators as any[]).push({
+		hostNodeId: 'host:date',
+		index: 7,
+		tagName: 'button',
+	});
 	(input.runtimeDemandMap.actions as any[]).push({
 		hostNodeId: 'host:date',
 		eventName: 'click',
@@ -175,7 +215,9 @@ test('specialized scalar dispatcher keeps full fallback for non-scalar event act
 	const resumeCode = emitResumeModule(input);
 
 	expect(resumeCode).toContain("import('@markless/core/web/resume')");
-	expect(resumeCode).toContain('function marklessScalarSpecializedHostMiss(input, site) { return marklessScalarSpecializedFallback(input, site); }');
+	expect(resumeCode).toContain(
+		'function marklessScalarSpecializedHostMiss(input, site) { return marklessScalarSpecializedFallback(input, site); }',
+	);
 	expect(resumeCode).toContain('return marklessScalarSpecializedFallback(input, "event-match");');
 });
 
@@ -238,12 +280,14 @@ function scalarResumeInput() {
 	return {
 		...baseInput,
 		payloadState: {
-			cells: [{
-				graphNodeId: 'state:count',
-				name: 'count',
-				valueKind: 'scalar',
-				value: { version: 1, root: 0, records: [] },
-			}],
+			cells: [
+				{
+					graphNodeId: 'state:count',
+					name: 'count',
+					valueKind: 'scalar',
+					value: { version: 1, root: 0, records: [] },
+				},
+			],
 			computed: [],
 		},
 		payloadView: {
@@ -251,40 +295,48 @@ function scalarResumeInput() {
 				{ hostNodeId: 'host:button', index: 3, tagName: 'button' },
 				{ hostNodeId: 'host:label', index: 5, tagName: 'output' },
 			],
-			events: [{ hostNodeId: 'host:button', eventName: 'click', symbolIds: ['symbol:click'] }],
-			domUpdates: [{
-				hostNodeId: 'host:label',
-				graphNodeId: 'state:count',
-				symbolId: 'symbol:text',
-				target: { kind: 'text', prefix: 'Count: ' },
-			}],
+			events: [
+				{ hostNodeId: 'host:button', eventName: 'click', symbolIds: ['symbol:click'] },
+			],
+			domUpdates: [
+				{
+					hostNodeId: 'host:label',
+					graphNodeId: 'state:count',
+					symbolId: 'symbol:text',
+					target: { kind: 'text', prefix: 'Count: ' },
+				},
+			],
 		},
 		runtimeDemandMap: {
 			recordKinds: [
 				{ kind: 'event', replaced: true },
 				{ kind: 'dom-update', replaced: true },
 			],
-			actions: [{
-				hostNodeId: 'host:button',
-				eventName: 'click',
-				recordKind: 'event',
-				recordKinds: ['event', 'dom-update'],
-				payloadRecordIds: [],
-				runtimeModuleIds: [],
-				plan: {
-					version: 1,
-					kind: 'scalar',
-					symbolId: 'symbol:click',
-					cell: 'state:count',
-					write: { kind: 'update', updateOperator: '++' },
-					textUpdates: [{
-						hostNodeId: 'host:label',
-						graphNodeId: 'state:count',
-						symbolId: 'symbol:text',
-						prefix: 'Count: ',
-					}],
+			actions: [
+				{
+					hostNodeId: 'host:button',
+					eventName: 'click',
+					recordKind: 'event',
+					recordKinds: ['event', 'dom-update'],
+					payloadRecordIds: [],
+					runtimeModuleIds: [],
+					plan: {
+						version: 1,
+						kind: 'scalar',
+						symbolId: 'symbol:click',
+						cell: 'state:count',
+						write: { kind: 'update', updateOperator: '++' },
+						textUpdates: [
+							{
+								hostNodeId: 'host:label',
+								graphNodeId: 'state:count',
+								symbolId: 'symbol:text',
+								prefix: 'Count: ',
+							},
+						],
+					},
 				},
-			}],
+			],
 		},
 	};
 }

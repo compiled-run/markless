@@ -44,9 +44,15 @@ export function renderBodyLines(
 			stateValuesName,
 			statePayloadName,
 		);
-		if (stateLine) { lines.push(stateLine); continue; }
+		if (stateLine) {
+			lines.push(stateLine);
+			continue;
+		}
 		const computedLine = computedDeclarationLine(statement, computedBindings);
-		if (computedLine) { lines.push(computedLine); continue; }
+		if (computedLine) {
+			lines.push(computedLine);
+			continue;
+		}
 		if (isLoweredFrameworkDeclaration(statement)) continue;
 
 		const source = expressionSource(statement, input.source.source);
@@ -55,7 +61,6 @@ export function renderBodyLines(
 	if (!emittedRoot) lines.push(...rootLines);
 	return indentLines(lines);
 }
-
 
 function computedDeclarationLine(
 	statement: AnyNode,
@@ -94,15 +99,24 @@ function stateDeclarationLine(
 	const name = getIdentifierName(declaration.id as AnyNode | undefined);
 	const binding = name ? stateBindings.get(name) : undefined;
 	if (!binding || !isFrameworkCall(declaration.init as AnyNode | undefined, 'state')) return null;
-	const initializerSource = (binding as GraphBinding & { readonly initializerSource?: string }).initializerSource;
-	const args = [stateValuesName, statePayloadName, JSON.stringify(binding.id), initializerSource].filter(
-		(arg): arg is string => arg !== undefined,
-	);
+	const initializerSource = (binding as GraphBinding & { readonly initializerSource?: string })
+		.initializerSource;
+	const args = [
+		stateValuesName,
+		statePayloadName,
+		JSON.stringify(binding.id),
+		initializerSource,
+	].filter((arg): arg is string => arg !== undefined);
 	return `let ${binding.name} = ${stateValueFunctionName}(${args.join(', ')});`;
 }
 
 function isStateDeclaration(statement: AnyNode): boolean {
-	return statement.type === 'VariableDeclaration' && asNodes(statement.declarations).some((declaration) => isFrameworkCall(declaration.init as AnyNode | undefined, 'state'));
+	return (
+		statement.type === 'VariableDeclaration' &&
+		asNodes(statement.declarations).some((declaration) =>
+			isFrameworkCall(declaration.init as AnyNode | undefined, 'state'),
+		)
+	);
 }
 
 function isLoweredFrameworkDeclaration(statement: AnyNode): boolean {
@@ -118,18 +132,26 @@ function isFrameworkCall(node: AnyNode | null | undefined, name: string): boolea
 }
 
 function frameworkCallName(node: AnyNode | null | undefined): string | null {
-	return node?.type === 'CallExpression' ? getIdentifierName(node.callee as AnyNode | undefined) : null;
+	return node?.type === 'CallExpression'
+		? getIdentifierName(node.callee as AnyNode | undefined)
+		: null;
 }
 
 function returnArgument(statement: AnyNode): AnyNode | undefined {
-	return statement.type === 'ReturnStatement' ? (statement.argument as AnyNode | undefined) : undefined;
+	return statement.type === 'ReturnStatement'
+		? (statement.argument as AnyNode | undefined)
+		: undefined;
 }
 
 function indentLines(lines: ReadonlyArray<string>): string[] {
 	return lines.flatMap((line) => line.split('\n').map((part) => `	${part}`));
 }
 
-export function hasExecutableBodyStatements(component: AnyNode, root: AnyNode, source: string): boolean {
+export function hasExecutableBodyStatements(
+	component: AnyNode,
+	root: AnyNode,
+	source: string,
+): boolean {
 	const body = component.body as AnyNode | undefined;
 	if (!body) return false;
 	for (const statement of childNodes(body)) {

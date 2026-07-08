@@ -139,7 +139,9 @@ function expectUniversalInvariants(run: NavigationRun, navigationCase: Navigatio
 			// out the full minimum-visibility window. Never in between (blink).
 			const immediate = settleAt <= run.pendingShownAt && commit.at === settleAt;
 			const heldToFloor = commit.at === Math.max(settleAt, run.pendingShownAt + PENDING_MIN);
-			expect(immediate || heldToFloor, `${label} commit ${commit.id}@${commit.at}`).toBe(true);
+			expect(immediate || heldToFloor, `${label} commit ${commit.id}@${commit.at}`).toBe(
+				true,
+			);
 		}
 	}
 	if (run.pendingShownAt !== undefined) {

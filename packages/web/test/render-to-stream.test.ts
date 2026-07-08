@@ -20,7 +20,9 @@ function relayArtifact(input: { readonly delayMs: number; readonly fail?: boolea
 					await new Promise((resolve) => setTimeout(resolve, input.delayMs));
 					if (input.fail) throw new TypeError('relay unreachable');
 					return {
-						headline: (props as { headline?: string } | undefined)?.headline ?? 'Relay report ready',
+						headline:
+							(props as { headline?: string } | undefined)?.headline ??
+							'Relay report ready',
 					};
 				},
 				renderContext,
@@ -36,10 +38,26 @@ function relayArtifact(input: { readonly delayMs: number; readonly fail?: boolea
 				snapshot.status === 'fulfilled'
 					? {
 							locators: [
-								{ hostNodeId: 'h2', strategy: 'arm-relative', index: 0, tagName: 'article' },
-								{ hostNodeId: 'h3', strategy: 'arm-relative', index: 2, tagName: 'button' },
+								{
+									hostNodeId: 'h2',
+									strategy: 'arm-relative',
+									index: 0,
+									tagName: 'article',
+								},
+								{
+									hostNodeId: 'h3',
+									strategy: 'arm-relative',
+									index: 2,
+									tagName: 'button',
+								},
 							],
-							events: [{ hostNodeId: 'h3', eventName: 'click', symbolIds: ['symbol:relay-tap'] }],
+							events: [
+								{
+									hostNodeId: 'h3',
+									eventName: 'click',
+									symbolIds: ['symbol:relay-tap'],
+								},
+							],
 							behaviors: [],
 							elementHandles: [],
 						}
@@ -56,7 +74,9 @@ function relayArtifact(input: { readonly delayMs: number; readonly fail?: boolea
 				),
 				view: {
 					version: ASYNC_PROTOCOL_VERSION,
-					locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'main' }],
+					locators: [
+						{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'main' },
+					],
 					events: [],
 					domUpdates: [],
 					behaviors: [],
@@ -163,7 +183,9 @@ function orchardArtifact(
 				),
 				view: {
 					version: ASYNC_PROTOCOL_VERSION,
-					locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'main' }],
+					locators: [
+						{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'main' },
+					],
 					events: [],
 					domUpdates: [],
 					behaviors: [],
@@ -241,7 +263,8 @@ test('a settle racing the re-render pass streams its own settled wave, never the
 	const templates = appended.match(/<template m:arm="[^"]*">.*?<\/template>/g) ?? [];
 	expect(templates).toHaveLength(2);
 	for (const template of templates) expect(template).not.toContain('data-calibrating');
-	const patches = appended.match(/<script type="markless\/state-patch"[^>]*>.*?<\/script>/g) ?? [];
+	const patches =
+		appended.match(/<script type="markless\/state-patch"[^>]*>.*?<\/script>/g) ?? [];
 	expect(patches).toHaveLength(2);
 	for (const patch of patches) expect(patch).toContain('"status":"fulfilled"');
 });
@@ -283,7 +306,9 @@ test('renderToStream flushes the pending shell and appends the settled arm out o
 	expect(chunk).toContain('<h2>Relay report ready</h2>');
 	expect(chunk).toContain('<script type="markless/arm" data-boundary="boundary:0">');
 	expect(chunk).toContain('"eventName":"click"');
-	expect(chunk).toContain('<script type="markless/state-patch" data-graph-node="computed:report">');
+	expect(chunk).toContain(
+		'<script type="markless/state-patch" data-graph-node="computed:report">',
+	);
 	expect(chunk).toContain('"status":"fulfilled"');
 	// Snapshot values are envelope-encoded like every served payload field.
 	expect(chunk).toContain('"records"');

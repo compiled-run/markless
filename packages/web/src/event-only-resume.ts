@@ -25,15 +25,13 @@ export async function resumeEventOnlyFromPayloadDocument(
 ): Promise<EventOnlyResumeContainer> {
 	const mode = leanResumeMode(input.runtimeDemandMap);
 	if (mode === 'scalar' || (mode === 'mixed' && input.eventRecord)) {
-		const { resumeScalarCoreEventFromPayloadDocument } = await import(
-			'./event-only-lean/scalar-core.ts'
-		);
+		const { resumeScalarCoreEventFromPayloadDocument } =
+			await import('./event-only-lean/scalar-core.ts');
 		return resumeScalarCoreEventFromPayloadDocument(input);
 	}
 	if (mode === 'row' || mode === 'mixed') {
-		const { resumeScalarRowEventFromPayloadDocument } = await import(
-			'./event-only-lean/row.ts'
-		);
+		const { resumeScalarRowEventFromPayloadDocument } =
+			await import('./event-only-lean/row.ts');
 		return resumeScalarRowEventFromPayloadDocument(input);
 	}
 	return resumeFullEventOnly(input);
@@ -53,16 +51,25 @@ async function resumeFullEventOnly(
 		root: input.root,
 		loadSymbol: input.loadSymbol,
 	});
-	await runtime.dispatch(input.event, { syncPolicyAlreadyApplied: input.syncPolicyAlreadyApplied === true });
+	await runtime.dispatch(input.event, {
+		syncPolicyAlreadyApplied: input.syncPolicyAlreadyApplied === true,
+	});
 	return undefined as unknown as EventOnlyResumeContainer;
 }
 
 type LeanResumeMode = 'none' | 'scalar' | 'row' | 'mixed';
 
 function leanResumeMode(runtimeDemandMap: unknown): LeanResumeMode {
-	const recordKinds = (runtimeDemandMap as {
-		readonly recordKinds?: ReadonlyArray<{ readonly kind: string; readonly replaced: boolean }>;
-	} | undefined)?.recordKinds;
+	const recordKinds = (
+		runtimeDemandMap as
+			| {
+					readonly recordKinds?: ReadonlyArray<{
+						readonly kind: string;
+						readonly replaced: boolean;
+					}>;
+			  }
+			| undefined
+	)?.recordKinds;
 	if (!recordKinds) return 'none';
 	const replaced = new Map(recordKinds.map((record) => [record.kind, record.replaced]));
 	const scalar = replaced.get('event') === true && replaced.get('dom-update') === true;

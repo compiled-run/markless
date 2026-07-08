@@ -251,17 +251,13 @@ export function App() @{
 		{
 			// Host ids follow the collector's walk order (@catch walks before
 			// @pending), so the @pending arm's <p> is h5 here.
-			locators: [
-				{ hostNodeId: 'h5', strategy: 'arm-relative', index: 0, tagName: 'p' },
-			],
+			locators: [{ hostNodeId: 'h5', strategy: 'arm-relative', index: 0, tagName: 'p' }],
 			events: [],
 			behaviors: [],
 			elementHandles: [],
 		},
 		{
-			locators: [
-				{ hostNodeId: 'h4', strategy: 'arm-relative', index: 0, tagName: 'p' },
-			],
+			locators: [{ hostNodeId: 'h4', strategy: 'arm-relative', index: 0, tagName: 'p' }],
 			events: [],
 			behaviors: [],
 			elementHandles: [],

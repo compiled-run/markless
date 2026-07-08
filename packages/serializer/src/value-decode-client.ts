@@ -79,7 +79,8 @@ function decodeSlot(
 		typeof slot === 'string' ||
 		typeof slot === 'number' ||
 		typeof slot === 'boolean'
-	) return slot;
+	)
+		return slot;
 	if ('$ref' in slot) return shells.get(slot.$ref);
 	if (slot.$type === 'undefined') return undefined;
 	if (slot.$type === 'bigint') return BigInt(slot.value);
@@ -96,7 +97,8 @@ function payloadNeedsExtendedDecoders(payload: SerializedGraphPayload): boolean 
 			record.type === 'array-buffer' ||
 			record.type === 'typed-array' ||
 			record.type === 'data-view'
-		) return true;
+		)
+			return true;
 		if (record.type === 'object') {
 			return record.fields.some(([, slot]) => slotNeedsExtendedDecoder(slot));
 		}

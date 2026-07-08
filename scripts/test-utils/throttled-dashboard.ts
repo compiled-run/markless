@@ -204,15 +204,23 @@ try {
 	// seeded root via DSM global-setup), then run the immutable oracles
 	// against the throttled preview.
 	await stopChild(backend);
-	await waitFor(`port ${backendPort} to free`, async () => !(await portInUse(backendPort)), 10_000);
+	await waitFor(
+		`port ${backendPort} to free`,
+		async () => !(await portInUse(backendPort)),
+		10_000,
+	);
 
-	const playwright = spawnChild('npx', ['playwright', 'test', 'e2e/smoke.spec.ts', 'e2e/issues.spec.ts'], {
-		cwd: dsmRoot,
-		env: {
-			DSM_E2E_PORT: String(backendPort),
-			DSM_E2E_TARGET_URL: `http://127.0.0.1:${previewPort}`,
+	const playwright = spawnChild(
+		'npx',
+		['playwright', 'test', 'e2e/smoke.spec.ts', 'e2e/issues.spec.ts'],
+		{
+			cwd: dsmRoot,
+			env: {
+				DSM_E2E_PORT: String(backendPort),
+				DSM_E2E_TARGET_URL: `http://127.0.0.1:${previewPort}`,
+			},
 		},
-	});
+	);
 	const exitCode = await new Promise<number>((resolveExit) =>
 		playwright.once('exit', (code) => resolveExit(code ?? 1)),
 	);

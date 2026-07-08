@@ -66,7 +66,10 @@ export interface MarklessSymbolManifestEntry extends MarklessBuildModuleReferenc
 	kind: string;
 }
 
-export type RuntimeDemandMapManifest = Omit<import('@markless/compiler').RuntimeDemandMapArtifact, 'passId'>;
+export type RuntimeDemandMapManifest = Omit<
+	import('@markless/compiler').RuntimeDemandMapArtifact,
+	'passId'
+>;
 
 export interface MarklessBuildMetadata {
 	version: number;

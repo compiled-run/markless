@@ -41,7 +41,11 @@ export function createFakeClock(): FakeClock {
 			let next: { at: number; seq: number; resolve: () => void } | undefined;
 			for (const waiter of waiters) {
 				if (waiter.at > timeMs) continue;
-				if (!next || waiter.at < next.at || (waiter.at === next.at && waiter.seq < next.seq)) {
+				if (
+					!next ||
+					waiter.at < next.at ||
+					(waiter.at === next.at && waiter.seq < next.seq)
+				) {
 					next = waiter;
 				}
 			}

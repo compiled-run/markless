@@ -2,10 +2,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { renderToString, type SsrRenderable } from '@markless/core';
-import {
-	planModulePreloads,
-	type ModulePreloadRoot,
-} from '../../../src/build/preload-plan.ts';
+import { planModulePreloads, type ModulePreloadRoot } from '../../../src/build/preload-plan.ts';
 import type { MarklessBundleGraph } from '../../../src/types.ts';
 import {
 	createFetchableDevEnvironment,

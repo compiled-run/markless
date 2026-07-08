@@ -2,7 +2,10 @@ export * from './dom-journal.ts';
 export * from './dom-update.ts';
 export * from './event-only-resume.ts';
 export * from './event-resume.ts';
-export { decodePayloadScriptsFromDocument, readPayloadScriptsFromDocument } from './payload-document.ts';
+export {
+	decodePayloadScriptsFromDocument,
+	readPayloadScriptsFromDocument,
+} from './payload-document.ts';
 export * from './payload-full.ts';
 export * from './pending-timing.ts';
 export * from './render.ts';

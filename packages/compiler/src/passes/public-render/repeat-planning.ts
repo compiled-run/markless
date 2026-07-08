@@ -83,13 +83,20 @@ export function supportedRepeatGate(input: {
 		// diagnostic can explain the component-row rules (D4) instead of the
 		// generic binding guidance.
 		return unsupportedReason(
-			containsComponentTag(row) ? 'row-component-content-unsupported' : 'unsupported-row-binding',
+			containsComponentTag(row)
+				? 'row-component-content-unsupported'
+				: 'unsupported-row-binding',
 		);
 	}
 
 	if (rowPlan.usesIndex || input.semanticRepeat.keySource === input.semanticRepeat.indexName) {
 		return rowPlan.hasComponents
-			? { repeatId: input.payloadRepeat.id, supported: true, ssrOnly: true, componentRows: true }
+			? {
+					repeatId: input.payloadRepeat.id,
+					supported: true,
+					ssrOnly: true,
+					componentRows: true,
+				}
 			: { repeatId: input.payloadRepeat.id, supported: true, ssrOnly: true };
 	}
 	return rowPlan.hasComponents
@@ -416,7 +423,9 @@ function componentRowInvocationSupported(
 				) {
 					return false;
 				}
-				const expression = unwrapExpressionContainer(attribute.value as AnyNode | undefined);
+				const expression = unwrapExpressionContainer(
+					attribute.value as AnyNode | undefined,
+				);
 				if (
 					expression &&
 					expression.type !== 'Literal' &&

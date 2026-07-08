@@ -1,5 +1,12 @@
-import type { ProtocolStatePayload, ProtocolSyncPolicyCondition, ProtocolViewPayload } from '../../../serializer/src/protocol.ts';
-import type { SerializedGraphPayload, SerializedSlot } from '../../../serializer/src/value-decode-client.ts';
+import type {
+	ProtocolStatePayload,
+	ProtocolSyncPolicyCondition,
+	ProtocolViewPayload,
+} from '../../../serializer/src/protocol.ts';
+import type {
+	SerializedGraphPayload,
+	SerializedSlot,
+} from '../../../serializer/src/value-decode-client.ts';
 import type {
 	EventOnlyResumeContainer,
 	EventOnlyResumeDomElement,
@@ -28,8 +35,19 @@ export type LeanActionPlan = {
 	readonly kind: 'scalar' | 'row';
 	readonly symbolId: string;
 	readonly cell: string;
-	readonly write: { readonly kind: 'assign' | 'update'; readonly value?: unknown; readonly valueKind?: 'undefined'; readonly localPath?: ReadonlyArray<string>; readonly updateOperator?: '++' | '--' };
-	readonly textUpdates: ReadonlyArray<{ readonly hostNodeId: string; readonly graphNodeId: string; readonly symbolId: string; readonly prefix?: string }>;
+	readonly write: {
+		readonly kind: 'assign' | 'update';
+		readonly value?: unknown;
+		readonly valueKind?: 'undefined';
+		readonly localPath?: ReadonlyArray<string>;
+		readonly updateOperator?: '++' | '--';
+	};
+	readonly textUpdates: ReadonlyArray<{
+		readonly hostNodeId: string;
+		readonly graphNodeId: string;
+		readonly symbolId: string;
+		readonly prefix?: string;
+	}>;
 	readonly repeatId?: string;
 	readonly fullDecodeCells?: ReadonlyArray<string>;
 };
@@ -81,7 +99,11 @@ export async function createLeanScalarGraph(
 				cells.set(update.graphNodeId, next);
 				dirty.push({ graphNodeId: update.graphNodeId });
 			}
-			return update.returnValue === 'previous' ? previous : update.returnValue === 'next' ? next : undefined;
+			return update.returnValue === 'previous'
+				? previous
+				: update.returnValue === 'next'
+					? next
+					: undefined;
 		},
 		call() {
 			return leanEscalation('graph-call');
@@ -98,10 +120,16 @@ export async function createLeanScalarGraph(
 					// full path bakes it into the dom-update symbol, so the lean
 					// flush must apply the same mapping or resumed text drops its
 					// static parts.
-					const result = marklessUpdateText({
-						domUpdate: update,
-						value: leanTextTargetValue(update.target, graph.read(update.graphNodeId)),
-					}, update.hostNodeId);
+					const result = marklessUpdateText(
+						{
+							domUpdate: update,
+							value: leanTextTargetValue(
+								update.target,
+								graph.read(update.graphNodeId),
+							),
+						},
+						update.hostNodeId,
+					);
 					applyTextJournal(result, elementsByHostId);
 				}
 			}
@@ -121,19 +149,30 @@ export function materializeHostLocator(
 	const locator = locators.find((candidate) => candidate.hostNodeId === hostNodeId);
 	if (!locator) return undefined;
 	const element = findElementAtDomOrderIndex(root, locator.index);
-	if (!element || (locator.tagName !== '*' && element.tagName.toLowerCase() !== locator.tagName.toLowerCase())) return undefined;
+	if (
+		!element ||
+		(locator.tagName !== '*' && element.tagName.toLowerCase() !== locator.tagName.toLowerCase())
+	)
+		return undefined;
 	elementsByHostId.set(hostNodeId, element);
 	return element;
 }
 
-export function syncPolicyGraphNodeIds(policy: EventOnlyResumeRecord['syncPolicy']): ReadonlyArray<string> {
+export function syncPolicyGraphNodeIds(
+	policy: EventOnlyResumeRecord['syncPolicy'],
+): ReadonlyArray<string> {
 	if (!policy) return [];
 	const branches = 'branches' in policy ? policy.branches : [policy];
 	return uniqueStrings(branches.flatMap((branch) => conditionGraphNodeIds(branch.when)));
 }
 
 export function cellValueNeedsFullDecode(value: unknown): boolean {
-	return Boolean(value && typeof value === 'object' && Array.isArray((value as { readonly records?: unknown }).records) && (value as { readonly records: ReadonlyArray<unknown> }).records.length > 0);
+	return Boolean(
+		value &&
+		typeof value === 'object' &&
+		Array.isArray((value as { readonly records?: unknown }).records) &&
+		(value as { readonly records: ReadonlyArray<unknown> }).records.length > 0,
+	);
 }
 
 export function readLeanStateCells(
@@ -145,9 +184,10 @@ export function readLeanStateCells(
 	}
 	const matchingCells: ProtocolStatePayload['cells'][number][] = [];
 	for (const [index, cell] of cells.entries()) {
-		const graphNodeId = cell && typeof cell === 'object'
-			? (cell as { readonly graphNodeId?: unknown }).graphNodeId
-			: undefined;
+		const graphNodeId =
+			cell && typeof cell === 'object'
+				? (cell as { readonly graphNodeId?: unknown }).graphNodeId
+				: undefined;
 		if (typeof graphNodeId !== 'string' || !cellIds.has(graphNodeId)) continue;
 		assertLeanStateCellPayload(cell, `markless/state cell[${index}]`);
 		matchingCells.push(cell);
@@ -162,8 +202,11 @@ export function readLeanComputedEntries(computed: unknown): ReadonlyArray<unknow
 	return computed;
 }
 
-export async function resumeFullEventOnly(input: ResumeEventOnlyFromPayloadDocumentInput): Promise<EventOnlyResumeContainer> {
-	if (import.meta.env?.DEV) console.warn('markless: lean resume fell back to full event container');
+export async function resumeFullEventOnly(
+	input: ResumeEventOnlyFromPayloadDocumentInput,
+): Promise<EventOnlyResumeContainer> {
+	if (import.meta.env?.DEV)
+		console.warn('markless: lean resume fell back to full event container');
 	if (input.loadFullResume) {
 		await input.loadFullResume(input);
 		return undefined as unknown as EventOnlyResumeContainer;
@@ -175,15 +218,21 @@ export async function resumeFullEventOnly(input: ResumeEventOnlyFromPayloadDocum
 		root: input.root,
 		loadSymbol: input.loadSymbol,
 	});
-	await runtime.dispatch(input.event, { syncPolicyAlreadyApplied: input.syncPolicyAlreadyApplied === true });
+	await runtime.dispatch(input.event, {
+		syncPolicyAlreadyApplied: input.syncPolicyAlreadyApplied === true,
+	});
 	return undefined as unknown as EventOnlyResumeContainer;
 }
 
-export async function resolveSymbol(value: EventOnlyResumeSymbol | Promise<EventOnlyResumeSymbol>): Promise<EventOnlyResumeSymbol> {
+export async function resolveSymbol(
+	value: EventOnlyResumeSymbol | Promise<EventOnlyResumeSymbol>,
+): Promise<EventOnlyResumeSymbol> {
 	return isPromiseLike(value) ? await value : value;
 }
 
-export async function resolveResult(value: ReturnType<EventOnlyResumeSymbol>): Promise<Awaited<ReturnType<EventOnlyResumeSymbol>>> {
+export async function resolveResult(
+	value: ReturnType<EventOnlyResumeSymbol>,
+): Promise<Awaited<ReturnType<EventOnlyResumeSymbol>>> {
 	return isPromiseLike(value) ? await value : value;
 }
 
@@ -197,28 +246,42 @@ export function executeLeanActionPlanWrite(
 	locals: Record<string, unknown> = {},
 ): void {
 	if (plan.write.kind === 'update') {
-		marklessWriteScalar({ graph }, {
-			graphNodeId: plan.cell,
-			returnValue: 'next',
-			update(value) {
-				return Number(value) + (plan.write.updateOperator === '--' ? -1 : 1);
+		marklessWriteScalar(
+			{ graph },
+			{
+				graphNodeId: plan.cell,
+				returnValue: 'next',
+				update(value) {
+					return Number(value) + (plan.write.updateOperator === '--' ? -1 : 1);
+				},
 			},
-		});
+		);
 		return;
 	}
-	marklessWriteScalar({ graph }, {
-		graphNodeId: plan.cell,
-		value: plan.write.localPath ? readPath(locals, plan.write.localPath) : plan.write.valueKind === 'undefined' ? undefined : plan.write.value,
-	});
+	marklessWriteScalar(
+		{ graph },
+		{
+			graphNodeId: plan.cell,
+			value: plan.write.localPath
+				? readPath(locals, plan.write.localPath)
+				: plan.write.valueKind === 'undefined'
+					? undefined
+					: plan.write.value,
+		},
+	);
 }
 
-export function shadowLeanActionPlanGraph(graph: EventOnlyResumeContainer['graph']): EventOnlyResumeContainer['graph'] {
+export function shadowLeanActionPlanGraph(
+	graph: EventOnlyResumeContainer['graph'],
+): EventOnlyResumeContainer['graph'] {
 	return {
 		...graph,
 		write() {},
 		update(update) {
 			const value = graph.read(update.graphNodeId, update.path ?? []);
-			return update.returnValue === 'previous' || update.returnValue === 'next' ? value : undefined;
+			return update.returnValue === 'previous' || update.returnValue === 'next'
+				? value
+				: undefined;
 		},
 	};
 }
@@ -232,7 +295,10 @@ function readPath(value: unknown, path: ReadonlyArray<string>): unknown {
 	return cursor;
 }
 
-function findElementAtDomOrderIndex(root: EventOnlyResumeDomElement, index: number): EventOnlyResumeDomElement | undefined {
+function findElementAtDomOrderIndex(
+	root: EventOnlyResumeDomElement,
+	index: number,
+): EventOnlyResumeDomElement | undefined {
 	let currentIndex = 0;
 	let found: EventOnlyResumeDomElement | undefined;
 	const visit = (node: EventOnlyResumeDomNode): void => {
@@ -267,7 +333,10 @@ function leanTextTargetValue(
 	return `${target.prefix ?? ''}${mapped == null ? '' : String(mapped)}${target.suffix ?? ''}`;
 }
 
-function applyTextJournal(result: Awaited<ReturnType<EventOnlyResumeSymbol>>, elementsByHostId: Map<string, EventOnlyResumeDomElement>): void {
+function applyTextJournal(
+	result: Awaited<ReturnType<EventOnlyResumeSymbol>>,
+	elementsByHostId: Map<string, EventOnlyResumeDomElement>,
+): void {
 	if (!result || typeof result === 'function') return;
 	const entries = Array.isArray(result) ? result : [result];
 	for (const entry of entries) {
@@ -279,13 +348,20 @@ function applyTextJournal(result: Awaited<ReturnType<EventOnlyResumeSymbol>>, el
 
 function conditionGraphNodeIds(condition: ProtocolSyncPolicyCondition): ReadonlyArray<string> {
 	if (condition.type === 'graph-truthy') return [condition.graphNodeId];
-	if (condition.type === 'and' || condition.type === 'or') return uniqueStrings(condition.conditions.flatMap(conditionGraphNodeIds));
+	if (condition.type === 'and' || condition.type === 'or')
+		return uniqueStrings(condition.conditions.flatMap(conditionGraphNodeIds));
 	if (condition.type === 'not') return conditionGraphNodeIds(condition.condition);
 	return [];
 }
 
 function decodeScalarSlot(slot: SerializedSlot | undefined): unknown {
-	if (slot === null || typeof slot === 'string' || typeof slot === 'number' || typeof slot === 'boolean') return slot;
+	if (
+		slot === null ||
+		typeof slot === 'string' ||
+		typeof slot === 'number' ||
+		typeof slot === 'boolean'
+	)
+		return slot;
 	if (slot?.$type === 'undefined') return undefined;
 	if (slot?.$type === 'bigint') return BigInt(slot.value);
 	if (slot?.$type === 'date') return new Date(slot.value);
@@ -294,7 +370,8 @@ function decodeScalarSlot(slot: SerializedSlot | undefined): unknown {
 
 async function decodeFullCell(payload: SerializedGraphPayload): Promise<unknown> {
 	if (payload.records.length === 0) return decodeScalarSlot(payload.root);
-	const { deserializeGraphValueForClient } = await import('../../../serializer/src/value-decode-client.ts');
+	const { deserializeGraphValueForClient } =
+		await import('../../../serializer/src/value-decode-client.ts');
 	return deserializeGraphValueForClient(payload);
 }
 
@@ -315,23 +392,47 @@ function leanPayloadShapeError(message: string): Error {
 		why: 'The markless/state payload did not match the resumability protocol shape required by this runtime.',
 		payloadType: 'markless/state',
 		payloadScript: 'script[type="markless/state"]',
-		suggestions: [{ message: 'Regenerate the markless/state payload with the matching markless compiler/runtime version.' }],
+		suggestions: [
+			{
+				message:
+					'Regenerate the markless/state payload with the matching markless compiler/runtime version.',
+			},
+		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_PAYLOAD_INVALID',
 	});
 }
 
-function assertLeanStateCellPayload(cell: unknown, context: string): asserts cell is ProtocolStatePayload['cells'][number] {
-	if (!cell || typeof cell !== 'object') throw leanPayloadShapeError(`Invalid ${context}: expected object.`);
-	const record = cell as { readonly graphNodeId?: unknown; readonly name?: unknown; readonly valueKind?: unknown; readonly value?: unknown };
-	if (typeof record.graphNodeId !== 'string') throw leanPayloadShapeError(`Invalid ${context}: expected graphNodeId string.`);
-	if (typeof record.name !== 'string') throw leanPayloadShapeError(`Invalid ${context}: expected name string.`);
-	if (!['scalar', 'object', 'array', 'unknown'].includes(record.valueKind as string)) throw leanPayloadShapeError(`Invalid ${context}: expected supported valueKind.`);
-	if (!record.value || typeof record.value !== 'object') throw leanPayloadShapeError(`Invalid ${context}.value: expected value payload.`);
+function assertLeanStateCellPayload(
+	cell: unknown,
+	context: string,
+): asserts cell is ProtocolStatePayload['cells'][number] {
+	if (!cell || typeof cell !== 'object')
+		throw leanPayloadShapeError(`Invalid ${context}: expected object.`);
+	const record = cell as {
+		readonly graphNodeId?: unknown;
+		readonly name?: unknown;
+		readonly valueKind?: unknown;
+		readonly value?: unknown;
+	};
+	if (typeof record.graphNodeId !== 'string')
+		throw leanPayloadShapeError(`Invalid ${context}: expected graphNodeId string.`);
+	if (typeof record.name !== 'string')
+		throw leanPayloadShapeError(`Invalid ${context}: expected name string.`);
+	if (!['scalar', 'object', 'array', 'unknown'].includes(record.valueKind as string))
+		throw leanPayloadShapeError(`Invalid ${context}: expected supported valueKind.`);
+	if (!record.value || typeof record.value !== 'object')
+		throw leanPayloadShapeError(`Invalid ${context}.value: expected value payload.`);
 	const value = record.value as { readonly version?: unknown; readonly records?: unknown };
-	if (value.version !== 1) throw leanPayloadShapeError(`Invalid ${context}.value: expected version 1.`);
-	if (!Array.isArray(value.records)) throw leanPayloadShapeError(`Invalid ${context}.value: expected records array.`);
+	if (value.version !== 1)
+		throw leanPayloadShapeError(`Invalid ${context}.value: expected version 1.`);
+	if (!Array.isArray(value.records))
+		throw leanPayloadShapeError(`Invalid ${context}.value: expected records array.`);
 }
 
 function isPromiseLike<T>(value: T | Promise<T>): value is Promise<T> {
-	return value !== null && (typeof value === 'object' || typeof value === 'function') && typeof (value as { readonly then?: unknown }).then === 'function';
+	return (
+		value !== null &&
+		(typeof value === 'object' || typeof value === 'function') &&
+		typeof (value as { readonly then?: unknown }).then === 'function'
+	);
 }

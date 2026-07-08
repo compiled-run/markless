@@ -127,7 +127,8 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 					path: [],
 					run(snapshot) {
 						if (!boundary.updateSymbolId) {
-							const status = (snapshot as { readonly status?: unknown } | null)?.status;
+							const status = (snapshot as { readonly status?: unknown } | null)
+								?.status;
 							const settled = status === 'fulfilled' || status === 'rejected';
 							// D8: once the range shows settled content, a re-run
 							// keeps rendering the prior snapshot — the structural
@@ -160,7 +161,8 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 			);
 		}
 		if (boundary.updateSymbolId || input.demandOnStart === true) {
-			for (const asyncRead of boundary.asyncReads) input.graph.read(asyncRead.graphNodeId, ['status']);
+			for (const asyncRead of boundary.asyncReads)
+				input.graph.read(asyncRead.graphNodeId, ['status']);
 		}
 	}
 }
@@ -220,7 +222,9 @@ export async function settleAsyncBoundaryRange(
 	];
 }
 
-function isResumeBranchUpdate(value: unknown): value is { readonly arm: number; readonly html: string } {
+function isResumeBranchUpdate(
+	value: unknown,
+): value is { readonly arm: number; readonly html: string } {
 	const update = value as { readonly arm?: unknown; readonly html?: unknown } | null;
 	return typeof update?.arm === 'number' && typeof update?.html === 'string';
 }

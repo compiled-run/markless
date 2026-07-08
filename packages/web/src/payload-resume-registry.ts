@@ -44,7 +44,9 @@ function alreadyResumedWarning(): ResumeAlreadyResumedWarning {
 		title: 'This container was already resumed',
 		message: 'resumeFromPayloadDocument was called again on an already live container.',
 		why: 'Resume attaches graph and event wiring once per payload container.',
-		suggestions: [{ message: 'Resume each served container once, or dispose before resuming again.' }],
+		suggestions: [
+			{ message: 'Resume each served container once, or dispose before resuming again.' },
+		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_RESUME_ALREADY_RESUMED',
 	};
 }

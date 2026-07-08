@@ -257,7 +257,9 @@ function eventHandlerAuthoredBody(
 	);
 }
 
-function eventHandlerBodySource(source: string): { readonly source: string; readonly sourceStart: number } | null {
+function eventHandlerBodySource(
+	source: string,
+): { readonly source: string; readonly sourceStart: number } | null {
 	const arrowIndex = source.indexOf('=>');
 	if (arrowIndex === -1) return null;
 
@@ -331,7 +333,18 @@ function spliceEventHandlerBody(
 				return [{ start, end, replacement }];
 			},
 		),
-	].sort((left, right) => right.start - left.start || right.end - left.end).filter((item, index, items) => !items.some((other, otherIndex) => otherIndex !== index && item.start >= other.start && item.end <= other.end && other.end - other.start > item.end - item.start));
+	]
+		.sort((left, right) => right.start - left.start || right.end - left.end)
+		.filter(
+			(item, index, items) =>
+				!items.some(
+					(other, otherIndex) =>
+						otherIndex !== index &&
+						item.start >= other.start &&
+						item.end <= other.end &&
+						other.end - other.start > item.end - item.start,
+				),
+		);
 
 	let emitted = bodySource;
 	for (const replacement of replacements) {
@@ -349,10 +362,15 @@ function readBodySpans(
 	read: LoweredStateRead,
 ): ReadonlyArray<{ readonly start: number; readonly end: number }> {
 	const spans: { start: number; end: number }[] = [];
-	for (let start = bodySource.indexOf(read.source); start !== -1; start = bodySource.indexOf(read.source, start + read.source.length)) {
+	for (
+		let start = bodySource.indexOf(read.source);
+		start !== -1;
+		start = bodySource.indexOf(read.source, start + read.source.length)
+	) {
 		const before = bodySource[start - 1] ?? '';
 		const after = bodySource[start + read.source.length] ?? '';
-		if (!isIdentifierChar(before) && before !== '.' && !isIdentifierChar(after)) spans.push({ start, end: start + read.source.length });
+		if (!isIdentifierChar(before) && before !== '.' && !isIdentifierChar(after))
+			spans.push({ start, end: start + read.source.length });
 	}
 	return spans;
 }
@@ -551,7 +569,8 @@ function scalarWriteLeafSource(
 	}
 
 	if (write.operation !== 'assign' || write.assignmentOperator) return null;
-	const valueSource = literalValueSource(write.valueSource) ?? localValueSource(write.valueSource, localNames);
+	const valueSource =
+		literalValueSource(write.valueSource) ?? localValueSource(write.valueSource, localNames);
 	if (!valueSource) return null;
 	return [
 		'return marklessWriteScalar(context, {',
@@ -581,7 +600,13 @@ function emitDomBindingModule(
 	symbol: Extract<PlannedSymbol, { readonly kind: 'dom-update' }>,
 ): string {
 	const exportName = symbolExportName(symbol.id);
-	if (symbol.target.kind === 'text' && symbol.target.prefix === undefined && symbol.target.suffix === undefined && symbol.target.trueValue === undefined && symbol.target.falseValue === undefined) {
+	if (
+		symbol.target.kind === 'text' &&
+		symbol.target.prefix === undefined &&
+		symbol.target.suffix === undefined &&
+		symbol.target.trueValue === undefined &&
+		symbol.target.falseValue === undefined
+	) {
 		return [
 			"import { marklessUpdateText } from '@markless/web/fns/update-text';",
 			'',
@@ -909,7 +934,13 @@ function eventWriteValueSource(
 	moduleImports: ReadonlyArray<SemanticModuleImport>,
 	localNames: ReadonlySet<string>,
 ): string | null {
-	const supported = supportedValueSource(valueSource, eventParameters, graphReads, moduleImports, localNames);
+	const supported = supportedValueSource(
+		valueSource,
+		eventParameters,
+		graphReads,
+		moduleImports,
+		localNames,
+	);
 	if (supported) return supported;
 
 	const source = valueSource?.trim();
@@ -928,7 +959,10 @@ function spliceGraphReadsAndLocals(
 			source: read.source,
 			replacement: graphReadCallSource('context.graph.read', read.graphNodeId, read.path),
 		})),
-		...Array.from(localNames).map((name) => ({ source: name, replacement: `context.locals?.${name}` })),
+		...Array.from(localNames).map((name) => ({
+			source: name,
+			replacement: `context.locals?.${name}`,
+		})),
 	].sort((left, right) => right.source.length - left.source.length);
 
 	let emitted = source;

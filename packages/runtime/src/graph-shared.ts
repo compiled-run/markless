@@ -4,11 +4,7 @@ import type {
 	RuntimeGraphSharedPatch,
 	RuntimeGraphSharedWrite,
 } from './graph.ts';
-import {
-	dirtyPathForGraphWrite,
-	findLastSharedReturnProperty,
-	writePath,
-} from './graph-core.ts';
+import { dirtyPathForGraphWrite, findLastSharedReturnProperty, writePath } from './graph-core.ts';
 
 type RuntimeSharedDefinition = NonNullable<ProtocolStatePayload['sharedDefinitions']>[number];
 
@@ -96,7 +92,10 @@ export function createSharedGraphPlane(input: {
 
 		for (const resolved of resolvedPatches) {
 			const current = input.cells.get(resolved.graphNodeId);
-			input.cells.set(resolved.graphNodeId, writePath(current, resolved.graphPath, resolved.value));
+			input.cells.set(
+				resolved.graphNodeId,
+				writePath(current, resolved.graphPath, resolved.value),
+			);
 			input.markDirtyPath(
 				resolved.graphNodeId,
 				dirtyPathForGraphWrite(current, resolved.graphPath),

@@ -70,10 +70,7 @@ export function createArmCommitter(deps: {
 		handle: { readonly handleId: string; readonly name: string },
 		element: ResumeDomElement,
 	) => void;
-	readonly addBehaviors?: (
-		hostNodeId: string,
-		records: ResumeBehaviorRecord[],
-	) => Promise<void>;
+	readonly addBehaviors?: (hostNodeId: string, records: ResumeBehaviorRecord[]) => Promise<void>;
 	// T104: fresh arm content brings fresh arm-branch anchors — the branch
 	// runtime disposes the boundary's previous flip subscriptions and rewires
 	// from these records (escalated records re-dedupe by site id).
@@ -89,7 +86,11 @@ export function createArmCommitter(deps: {
 	): Promise<void> {
 		if (!deps.renderHtml) throw armCommitRendererMissingError(boundary);
 		const fresh = deps.renderHtml(update.html);
-		const outgoing = elementsBetweenAnchors(deps.root, boundary.startAnchor, boundary.endAnchor);
+		const outgoing = elementsBetweenAnchors(
+			deps.root,
+			boundary.startAnchor,
+			boundary.endAnchor,
+		);
 		const captured = captureFocusScroll(deps, outgoing);
 		for (const hostNodeId of hostIdsInsideRemovedElements(deps.elementsByHostId, outgoing)) {
 			deps.disposeHost(hostNodeId);
@@ -122,7 +123,8 @@ export function createArmCommitter(deps: {
 				records.push(behavior);
 				byHost.set(behavior.hostNodeId, records);
 			}
-			for (const [hostNodeId, records] of byHost) await deps.addBehaviors(hostNodeId, records);
+			for (const [hostNodeId, records] of byHost)
+				await deps.addBehaviors(hostNodeId, records);
 		}
 		if (deps.registerArmBranches && materialized.branches.length > 0) {
 			await deps.registerArmBranches(boundary.id, materialized.branches);
@@ -176,9 +178,10 @@ function captureFocusScroll(
 		typeof active.selectionStart === 'number'
 			? {
 					start: active.selectionStart,
-					end: typeof active.selectionEnd === 'number'
-						? active.selectionEnd
-						: active.selectionStart,
+					end:
+						typeof active.selectionEnd === 'number'
+							? active.selectionEnd
+							: active.selectionStart,
 				}
 			: undefined;
 	return { view, scroll, active: { hostNodeId, testId, selection } };
@@ -198,12 +201,16 @@ function restoreFocusScroll(
 		const byHostId = captured.active.hostNodeId
 			? freshByHostId.get(captured.active.hostNodeId)
 			: undefined;
-		const survivor = (byHostId ??
-			findByTestId(deps.root, boundary, captured.active.testId)) as FocusableElement | undefined;
+		const survivor = (byHostId ?? findByTestId(deps.root, boundary, captured.active.testId)) as
+			| FocusableElement
+			| undefined;
 		if (survivor && typeof survivor.focus === 'function') {
 			survivor.focus();
 			if (captured.active.selection && typeof survivor.setSelectionRange === 'function') {
-				survivor.setSelectionRange(captured.active.selection.start, captured.active.selection.end);
+				survivor.setSelectionRange(
+					captured.active.selection.start,
+					captured.active.selection.end,
+				);
 			}
 		}
 	}
@@ -231,7 +238,8 @@ function findByTestId(
 // One factory for both commit refusals: identical diagnostic shape, message
 // text unchanged (code-prefixed, author vocabulary per D2/D4).
 function armCommitError(code: string, boundary: ResumeAsyncBoundaryRecord, detail: string): Error {
-	const error = new Error(`${code}: Async boundary ${boundary.id} ${detail}`) as Error & Record<string, unknown>;
+	const error = new Error(`${code}: Async boundary ${boundary.id} ${detail}`) as Error &
+		Record<string, unknown>;
 	error.name = 'RuntimeResumeError';
 	error.code = code;
 	error.phase = 'runtime';

@@ -146,9 +146,13 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 					index,
 					tagName: hostNode.tagName,
 				})),
-				events: input.semanticGraph.events.filter((event) => armHostIds.has(event.hostNodeId)),
+				events: input.semanticGraph.events.filter((event) =>
+					armHostIds.has(event.hostNodeId),
+				),
 				behaviors: behaviors.filter((behavior) => armHostIds.has(behavior.hostNodeId)),
-				elementHandles: elementHandles.filter((handle) => armHostIds.has(handle.hostNodeId)),
+				elementHandles: elementHandles.filter((handle) =>
+					armHostIds.has(handle.hostNodeId),
+				),
 			};
 		});
 	const asyncBoundaries = input.semanticGraph.asyncBoundaries.map((boundary) => ({

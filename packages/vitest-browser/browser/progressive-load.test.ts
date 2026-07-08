@@ -21,6 +21,8 @@ test('progressive execution: load executes zero runtime modules for full and eve
 	const eventOnlyRender = await renderSSRPhased(EventOnly);
 	resetExecutedModules();
 	const eventOnly = eventOnlyRender.mount();
-	await expect.poll(() => eventOnly.container.querySelector('[data-async-container]')).not.toBeNull();
+	await expect
+		.poll(() => eventOnly.container.querySelector('[data-async-container]'))
+		.not.toBeNull();
 	expect.soft(executedModules()).toEqual([]);
 });

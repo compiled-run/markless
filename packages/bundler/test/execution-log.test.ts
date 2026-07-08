@@ -27,7 +27,10 @@ test('execution size asset maps runtime and symbol log ids to raw and gzip chunk
 	const asset = await createExecutionSizesAsset(
 		{
 			'build/chunk-play.js': {
-				type: 'chunk', fileName: 'build/chunk-play.js', name: 'chunk-play', code,
+				type: 'chunk',
+				fileName: 'build/chunk-play.js',
+				name: 'chunk-play',
+				code,
 				exports: ['play'],
 				imports: [],
 				dynamicImports: [],
@@ -47,8 +50,12 @@ test('execution size asset maps runtime and symbol log ids to raw and gzip chunk
 					resolver: { virtualModuleId: 'virtual:markless:resolver' },
 					symbols: [
 						{
-							symbolId: 'play', kind: 'event', exportName: 'play',
-							virtualModuleId: 'virtual:markless:symbol:%2Fworkspace%2Fsrc%2FApp.tsrx:play', fileName: 'chunk-play.js',
+							symbolId: 'play',
+							kind: 'event',
+							exportName: 'play',
+							virtualModuleId:
+								'virtual:markless:symbol:%2Fworkspace%2Fsrc%2FApp.tsrx:play',
+							fileName: 'chunk-play.js',
 						},
 					],
 				},
@@ -57,7 +64,10 @@ test('execution size asset maps runtime and symbol log ids to raw and gzip chunk
 		},
 		(fileName) => fileName.replace(/^build\//, ''),
 	);
-	const sizes = JSON.parse(String(asset.source)) as Record<string, { raw: number; gzip: number; chunk: string }>;
+	const sizes = JSON.parse(String(asset.source)) as Record<
+		string,
+		{ raw: number; gzip: number; chunk: string }
+	>;
 
 	expect(asset.fileName).toBe('build/execution-sizes.json');
 	expect(sizes['web:event-only-resume']).toMatchObject({

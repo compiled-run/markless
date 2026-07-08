@@ -48,11 +48,11 @@ This page is static markdown.
 		);
 		expect(code).toContain('renderSsr(props = {})');
 		expect(code).toContain('renderCsr(props = {})');
-			expect(code).toContain('preload()');
-			expect(code).toContain('InteractiveCounter.preload?.()');
-			expect(code).toContain('resumeContainerEvent(input)');
-			expect(code).toContain(`'@markless/core/web/resume'`);
-			expect(code).toContain(`'@markless/router/vite/runtime/mdx-route'`);
+		expect(code).toContain('preload()');
+		expect(code).toContain('InteractiveCounter.preload?.()');
+		expect(code).toContain('resumeContainerEvent(input)');
+		expect(code).toContain(`'@markless/core/web/resume'`);
+		expect(code).toContain(`'@markless/router/vite/runtime/mdx-route'`);
 		expect(code).toContain(`../../components/InteractiveCounter.tsrx?markless-symbols`);
 		expect(code).toContain('renderMdxChild(marklessMdxChildren, InteractiveCounter');
 		expect(code).toContain('<h1>Body</h1>');

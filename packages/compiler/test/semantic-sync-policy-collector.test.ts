@@ -135,7 +135,9 @@ test('sync-policy collector extracts bare unconditional action policy', () => {
 	const graph = createMutableSemanticGraphArtifact('src/App.tsrx');
 
 	expect(hasSyncEventPolicyCandidate(handler)).toBe(true);
-	expect(extractSyncPolicy(handler, { graph, source: '(event) => { event.preventDefault(); }' })).toEqual({
+	expect(
+		extractSyncPolicy(handler, { graph, source: '(event) => { event.preventDefault(); }' }),
+	).toEqual({
 		when: { type: 'constant-truthy', value: true },
 		actions: ['preventDefault'],
 	});

@@ -452,10 +452,7 @@ function assertOptionalBranches(record: Record<string, unknown>): void {
 	}
 }
 
-function assertOptionalBranchArmRecords(
-	record: Record<string, unknown>,
-	context: string,
-): void {
+function assertOptionalBranchArmRecords(record: Record<string, unknown>, context: string): void {
 	if (record.armRecords === undefined) return;
 	if (!Array.isArray(record.armRecords)) {
 		throw invalidPayloadShapeError(

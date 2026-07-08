@@ -59,7 +59,10 @@ test('async boundary armRecords round-trip payload scripts in both protocol shap
 				id: 'async:1',
 				startAnchor: { strategy: 'dom-order-comment', index: 2 },
 				endAnchor: { strategy: 'dom-order-comment', index: 3 },
-				armRecords: [armized, { locators: [], events: [], behaviors: [], elementHandles: [] }],
+				armRecords: [
+					armized,
+					{ locators: [], events: [], behaviors: [], elementHandles: [] },
+				],
 			},
 		],
 	};
@@ -81,7 +84,12 @@ test('served state payloads reject live directValue cells', () => {
 	const state = {
 		version: ASYNC_PROTOCOL_VERSION,
 		cells: [
-			{ graphNodeId: 'prop:props', name: 'props', valueKind: 'object', directValue: { a: 1 } },
+			{
+				graphNodeId: 'prop:props',
+				name: 'props',
+				valueKind: 'object',
+				directValue: { a: 1 },
+			},
 		],
 		computed: [],
 	};

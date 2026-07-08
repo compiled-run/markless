@@ -30,7 +30,12 @@ import type {
 	PublicRenderPlanUnsupportedReason,
 } from '../../artifacts.ts';
 import type { BranchSiteNode } from './branch-planning.ts';
-import { singleRowRoot, firstComponentRoot, supportedFragmentRoot, unsupportedFragmentChildKind } from './template.ts';
+import {
+	singleRowRoot,
+	firstComponentRoot,
+	supportedFragmentRoot,
+	unsupportedFragmentChildKind,
+} from './template.ts';
 
 export function emptyPlan(
 	diagnostics: ReadonlyArray<PublicRenderPlanArtifact['diagnostics'][number]> = [],
@@ -235,9 +240,11 @@ export function repeatRenderDiagnostics(input: {
 	});
 }
 
-function repeatRowStateCreation(
-	node: AnyNode,
-): { readonly apiName: 'state' | 'computed'; readonly name: string; readonly node: AnyNode } | null {
+function repeatRowStateCreation(node: AnyNode): {
+	readonly apiName: 'state' | 'computed';
+	readonly name: string;
+	readonly node: AnyNode;
+} | null {
 	for (const child of asNodes((node.body as AnyNode | undefined)?.body)) {
 		if (isIgnorableTextNode(child)) continue;
 		if (child.type !== 'VariableDeclaration') continue;
@@ -279,7 +286,9 @@ export function branchRenderDiagnostics(input: {
 		if (gate.supported || !found) return [];
 		const label = found.node.type === 'JSXSwitchExpression' ? '@switch' : '@if';
 		const componentName = firstComponentName(found.node);
-		const componentDetail = componentName ? ` contain a component (<${componentName} />), and` : '';
+		const componentDetail = componentName
+			? ` contain a component (<${componentName} />), and`
+			: '';
 		const suggestion = componentName
 			? 'Move the condition inside the component, or put host elements in the arms until component arms are supported.'
 			: 'Move the branch out of nested control flow, or keep branch arms to host elements, text, and graph-resolvable expressions.';
@@ -356,14 +365,23 @@ export function componentConditionalRootDiagnostics(ast: AnyNode, filename: stri
 		if (!body) continue;
 
 		const returns = templateReturnStatements(body);
-		if (returns.length > 1) return [conditionalComponentRootDiagnostic({
-			node: returns[1]!, filename, componentName: componentFunction.name,
-		})];
+		if (returns.length > 1)
+			return [
+				conditionalComponentRootDiagnostic({
+					node: returns[1]!,
+					filename,
+					componentName: componentFunction.name,
+				}),
+			];
 	}
 	return [];
 }
 
-export function componentUnsupportedBodyDiagnostics(ast: AnyNode, filename: string, source: string) {
+export function componentUnsupportedBodyDiagnostics(
+	ast: AnyNode,
+	filename: string,
+	source: string,
+) {
 	for (const statement of asNodes(ast.body)) {
 		const componentFunction = getComponentFunction(statement);
 		const body = componentFunction?.node.body as AnyNode | undefined;
@@ -375,10 +393,15 @@ export function componentUnsupportedBodyDiagnostics(ast: AnyNode, filename: stri
 			if (bodyStatement === root || returnArgument(bodyStatement) === root) continue;
 			const message = unsupportedBodyStatementMessage(bodyStatement, source);
 			if (!message) continue;
-			return [unsupportedRenderBodyDiagnostic({
-				node: bodyStatement, filename, message,
-				suggestion: 'Split framework declarations into their own statements so the render module can preserve body order.',
-			})];
+			return [
+				unsupportedRenderBodyDiagnostic({
+					node: bodyStatement,
+					filename,
+					message,
+					suggestion:
+						'Split framework declarations into their own statements so the render module can preserve body order.',
+				}),
+			];
 		}
 	}
 	return [];
@@ -393,20 +416,41 @@ export function collectUndeclaredTemplateReadDiagnostics(input: {
 	readonly root: AnyNode;
 	readonly source: string;
 }) {
-	const scope = new Set([...knownRenderGlobals, ...input.moduleImports, ...input.repeatLocals, ...declarations(asNodes(input.ast.body).filter((statement) => !getComponentFunction(statement))), ...componentPropNames(input.component), ...declarations(childNodes(input.component.body as AnyNode | undefined)), ...catchNames(input.root)]);
+	const scope = new Set([
+		...knownRenderGlobals,
+		...input.moduleImports,
+		...input.repeatLocals,
+		...declarations(
+			asNodes(input.ast.body).filter((statement) => !getComponentFunction(statement)),
+		),
+		...componentPropNames(input.component),
+		...declarations(childNodes(input.component.body as AnyNode | undefined)),
+		...catchNames(input.root),
+	]);
 	for (const read of emittedTemplateReads(input.root, input.source)) {
-		const name = [...identifiersFromSource(read.source)].find((identifier) => !scope.has(identifier));
+		const name = [...identifiersFromSource(read.source)].find(
+			(identifier) => !scope.has(identifier),
+		);
 		if (!name) continue;
-		return [undeclaredTemplateReadDiagnostic({ name, node: read.node, filename: input.filename })];
+		return [
+			undeclaredTemplateReadDiagnostic({ name, node: read.node, filename: input.filename }),
+		];
 	}
 	return [];
 }
 
 function declarations(nodes: ReadonlyArray<AnyNode>): string[] {
 	return nodes.flatMap((node) => {
-		node = node.type === 'ExportNamedDeclaration' ? (node.declaration as AnyNode | undefined) ?? node : node;
-		if (node.type === 'VariableDeclaration') return asNodes(node.declarations).flatMap((declaration) => bindingNames(declaration.id as AnyNode | undefined));
-		if (node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration') return bindingNames(node.id as AnyNode | undefined);
+		node =
+			node.type === 'ExportNamedDeclaration'
+				? ((node.declaration as AnyNode | undefined) ?? node)
+				: node;
+		if (node.type === 'VariableDeclaration')
+			return asNodes(node.declarations).flatMap((declaration) =>
+				bindingNames(declaration.id as AnyNode | undefined),
+			);
+		if (node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration')
+			return bindingNames(node.id as AnyNode | undefined);
 		return [];
 	});
 }
@@ -421,7 +465,8 @@ function catchNames(root: AnyNode): string[] {
 	const names: string[] = [];
 	const visit = (node: AnyNode | null | undefined): void => {
 		if (!node || typeof node !== 'object') return;
-		if (node.type === 'CatchClause') names.push(...bindingNames(node.param as AnyNode | undefined));
+		if (node.type === 'CatchClause')
+			names.push(...bindingNames(node.param as AnyNode | undefined));
 		for (const child of childNodes(node)) visit(child);
 	};
 	visit(root);
@@ -436,12 +481,17 @@ function componentPropNames(component: AnyNode): string[] {
 	return param.type === 'ObjectPattern'
 		? asNodes(param.properties).flatMap((property) => {
 				const prop = property as AnyNode;
-				return bindingNames((prop.value as AnyNode | undefined) ?? (prop.key as AnyNode | undefined));
+				return bindingNames(
+					(prop.value as AnyNode | undefined) ?? (prop.key as AnyNode | undefined),
+				);
 			})
 		: [];
 }
 
-function emittedTemplateReads(root: AnyNode, fileSource: string): Array<{ readonly source: string; readonly node: AnyNode }> {
+function emittedTemplateReads(
+	root: AnyNode,
+	fileSource: string,
+): Array<{ readonly source: string; readonly node: AnyNode }> {
 	const reads: Array<{ readonly source: string; readonly node: AnyNode }> = [];
 	const add = (node: AnyNode | undefined) => {
 		if (!node) return;
@@ -450,12 +500,16 @@ function emittedTemplateReads(root: AnyNode, fileSource: string): Array<{ readon
 	};
 	const visitTemplate = (node: AnyNode | null | undefined): void => {
 		if (!node || typeof node !== 'object') return;
-			if (node.type === 'JSXExpressionContainer' || node.type === 'TSRXExpression') { add(node.expression as AnyNode | undefined); return; }
-			if (node.type === 'JSXIfExpression') add(node.test as AnyNode | undefined);
-			if (node.type === 'JSXSwitchExpression') {
-				add(node.discriminant as AnyNode | undefined);
-				for (const switchCase of asNodes(node.cases)) add(switchCase.test as AnyNode | undefined);
-			}
+		if (node.type === 'JSXExpressionContainer' || node.type === 'TSRXExpression') {
+			add(node.expression as AnyNode | undefined);
+			return;
+		}
+		if (node.type === 'JSXIfExpression') add(node.test as AnyNode | undefined);
+		if (node.type === 'JSXSwitchExpression') {
+			add(node.discriminant as AnyNode | undefined);
+			for (const switchCase of asNodes(node.cases))
+				add(switchCase.test as AnyNode | undefined);
+		}
 		if (node.type === 'JSXForExpression') {
 			add(node.collection as AnyNode | undefined);
 			add(node.key as AnyNode | undefined);
@@ -463,8 +517,17 @@ function emittedTemplateReads(root: AnyNode, fileSource: string): Array<{ readon
 		add(getDynamicTagExpression(node) ?? undefined);
 		for (const attribute of getElementAttributes(node)) {
 			const attributeName = getIdentifierName(attribute.name as AnyNode | undefined) ?? '';
-			if (isEventAttribute(attributeName) || attributeName === 'attach' || attributeName === 'el') continue;
-			add(isSpreadAttribute(attribute) ? attribute.argument as AnyNode | undefined : unwrapExpressionContainer(attribute.value as AnyNode | undefined));
+			if (
+				isEventAttribute(attributeName) ||
+				attributeName === 'attach' ||
+				attributeName === 'el'
+			)
+				continue;
+			add(
+				isSpreadAttribute(attribute)
+					? (attribute.argument as AnyNode | undefined)
+					: unwrapExpressionContainer(attribute.value as AnyNode | undefined),
+			);
 		}
 		for (const child of childNodes(node)) visitTemplate(child);
 	};
@@ -486,10 +549,15 @@ function identifiersFromSource(source: string): Set<string> {
 	return names;
 }
 
-const knownRenderGlobals = new Set('Array Boolean Date Infinity Intl JSON Map Math NaN Number Object RegExp Set String false null true URL URLSearchParams undefined'.split(' '));
+const knownRenderGlobals = new Set(
+	'Array Boolean Date Infinity Intl JSON Map Math NaN Number Object RegExp Set String false null true URL URLSearchParams undefined'.split(
+		' ',
+	),
+);
 
 function unsupportedBodyStatementMessage(statement: AnyNode, source: string): string | null {
-	const declarations = statement.type === 'VariableDeclaration' ? asNodes(statement.declarations) : [];
+	const declarations =
+		statement.type === 'VariableDeclaration' ? asNodes(statement.declarations) : [];
 	const frameworkDeclarations = declarations.filter((declaration) =>
 		loweredFrameworkCalls.has(frameworkCallName(declaration.init as AnyNode | undefined)),
 	);
@@ -508,11 +576,15 @@ function unsupportedBodyStatementMessage(statement: AnyNode, source: string): st
 const loweredFrameworkCalls = new Set(['state', 'computed', 'element', 'handler']);
 
 function frameworkCallName(node: AnyNode | null | undefined): string {
-	return node?.type === 'CallExpression' ? (getIdentifierName(node.callee as AnyNode | undefined) ?? '') : '';
+	return node?.type === 'CallExpression'
+		? (getIdentifierName(node.callee as AnyNode | undefined) ?? '')
+		: '';
 }
 
 function returnArgument(statement: AnyNode): AnyNode | undefined {
-	return statement.type === 'ReturnStatement' ? (statement.argument as AnyNode | undefined) : undefined;
+	return statement.type === 'ReturnStatement'
+		? (statement.argument as AnyNode | undefined)
+		: undefined;
 }
 
 function templateReturnStatements(node: AnyNode): AnyNode[] {
@@ -520,7 +592,10 @@ function templateReturnStatements(node: AnyNode): AnyNode[] {
 	const visit = (child: AnyNode | null | undefined): void => {
 		if (!child || typeof child !== 'object') return;
 		if (isFunctionNode(child) && child !== node) return;
-		if (child.type === 'ReturnStatement' && isTemplateRoot(child.argument as AnyNode | undefined)) {
+		if (
+			child.type === 'ReturnStatement' &&
+			isTemplateRoot(child.argument as AnyNode | undefined)
+		) {
 			returns.push(child);
 			return;
 		}

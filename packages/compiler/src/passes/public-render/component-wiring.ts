@@ -1,12 +1,23 @@
 import { isEventAttribute, normalizeEventName } from '@tsrx/core';
 import { asNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource } from '../../ast/source.ts';
-import { getElementAttributes, getElementTagName, isHostTagName, isIgnorableJsxTextNode as isIgnorableTextNode, isSpreadAttribute, unwrapExpressionContainer } from '../../ast/tsrx.ts';
+import {
+	getElementAttributes,
+	getElementTagName,
+	isHostTagName,
+	isIgnorableJsxTextNode as isIgnorableTextNode,
+	isSpreadAttribute,
+	unwrapExpressionContainer,
+} from '../../ast/tsrx.ts';
 import { emitHtmlChildren } from './html.ts';
 import { objectPropertyName } from './shared.ts';
 import type { ComponentEdge, CsrRenderContext, SsrRenderContext } from './types.ts';
 
-export function emitSsrComponent(node: AnyNode, componentName: string, context: SsrRenderContext): string {
+export function emitSsrComponent(
+	node: AnyNode,
+	componentName: string,
+	context: SsrRenderContext,
+): string {
 	const localName = context.componentImports.get(componentName);
 	if (!localName) return '""';
 	const edge = context.componentEdges[context.nextComponentEdgeIndex++];
@@ -70,7 +81,11 @@ export function emitCsrProjectedComponent(
 	return `marklessCsrProjectedChild(${localName}, { ${props.join(', ')} }, ${JSON.stringify(componentName)})`;
 }
 
-export function emitCsrComponent(node: AnyNode, componentName: string, context: CsrRenderContext): string {
+export function emitCsrComponent(
+	node: AnyNode,
+	componentName: string,
+	context: CsrRenderContext,
+): string {
 	const localName = context.componentImports.get(componentName);
 	if (!localName) return '""';
 	// Arm-render modules number children page-aligned (symbol routes key on
@@ -281,4 +296,3 @@ export function collectCsrPropEvents(
 	return events;
 }
 export { objectPropertyName } from './shared.ts';
-

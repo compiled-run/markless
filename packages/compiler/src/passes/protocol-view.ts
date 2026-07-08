@@ -88,7 +88,9 @@ export function createProtocolViewPayload(
 		asyncBoundaries: supportedAsyncBoundaries(input).map(
 			({ kind: _kind, anchorOrder: _order, armRecords, ...boundary }) => ({
 				...boundary,
-				armRecords: armRecords.map((set, arm) => wiredArmRecordSet(input, set, boundary.id, arm)),
+				armRecords: armRecords.map((set, arm) =>
+					wiredArmRecordSet(input, set, boundary.id, arm),
+				),
 				updateSymbolId: boundaryUpdateSymbols(input).get(boundary.id),
 				startAnchor: {
 					...boundary.startAnchor,

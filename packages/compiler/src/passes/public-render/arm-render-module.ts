@@ -67,11 +67,19 @@ export function planAsyncBoundaryArmRenders(context: {
 		);
 		const read = payloadBoundary?.asyncReads[0];
 		const runner = input.symbolResolver.symbols.find(
-			(symbol) => symbol.kind === 'async-computed-runner' && symbol.graphNodeId === read?.graphNodeId,
+			(symbol) =>
+				symbol.kind === 'async-computed-runner' && symbol.graphNodeId === read?.graphNodeId,
 		);
 		if (!payloadBoundary || !read || !runner || runner.kind !== 'async-computed-runner') return;
 
-		const plan = planOneArmRender({ ...context, boundarySite, found, payloadBoundary, read, runner });
+		const plan = planOneArmRender({
+			...context,
+			boundarySite,
+			found,
+			payloadBoundary,
+			read,
+			runner,
+		});
 		if ('diagnostic' in plan) {
 			diagnostics.push(plan.diagnostic);
 			return;
@@ -92,7 +100,9 @@ type ArmRenderCandidate = Parameters<typeof planAsyncBoundaryArmRenders>[0] & {
 
 function planOneArmRender(
 	candidate: ArmRenderCandidate,
-): { readonly armRender: PublicRenderPlanAsyncBoundaryArmRender } | { readonly diagnostic: CompilerDiagnostic } {
+):
+	| { readonly armRender: PublicRenderPlanAsyncBoundaryArmRender }
+	| { readonly diagnostic: CompilerDiagnostic } {
 	const { input, boundarySite, found } = candidate;
 	const filename = input.source.filename;
 	const boundaryEdges = input.semanticGraph.componentEdges.filter(
@@ -165,9 +175,12 @@ function planOneArmRender(
 	const tryChildren = armChildren((found.node.block as AnyNode | undefined)?.body);
 	const handler = found.node.handler as AnyNode | undefined;
 	const catchChildren = armChildren((handler?.body as AnyNode | undefined)?.body);
-	const catchParam = getIdentifierName(handler?.param as AnyNode | undefined) ?? 'marklessArmError';
+	const catchParam =
+		getIdentifierName(handler?.param as AnyNode | undefined) ?? 'marklessArmError';
 
-	const tryHtml = joinSsrExpressions(tryChildren.map((child) => emitHtmlNode(child, renderContext)));
+	const tryHtml = joinSsrExpressions(
+		tryChildren.map((child) => emitHtmlNode(child, renderContext)),
+	);
 	const tryReplacementCount = renderContext.childReplacements.length;
 	const catchHtml = joinSsrExpressions(
 		catchChildren.map((child) => emitHtmlNode(child, renderContext)),
@@ -200,7 +213,9 @@ function planOneArmRender(
 			binding.name !== catchParam &&
 			referencesIdentifier(emittedBody, binding.name),
 	);
-	const reserved = graphLocals.find((binding) => binding.name === 'context' || binding.name === 'root');
+	const reserved = graphLocals.find(
+		(binding) => binding.name === 'context' || binding.name === 'root',
+	);
 	if (reserved) {
 		return {
 			diagnostic: asyncArmRenderUnsupportedDiagnostic({
@@ -234,7 +249,9 @@ function planOneArmRender(
 		'	const marklessArmRoot = marklessArmIndex === 0',
 		`		? ((${candidate.runner.name}) => {`,
 		`			const root = marklessCsrFragmentFromHtml(${tryHtml});`,
-		...renderContext.childReplacements.slice(0, tryReplacementCount).map((line) => `\t\t${line}`),
+		...renderContext.childReplacements
+			.slice(0, tryReplacementCount)
+			.map((line) => `\t\t${line}`),
 		'			return root;',
 		'		})(marklessArmSnapshot.value)',
 		`		: ((${catchParam}) => {`,

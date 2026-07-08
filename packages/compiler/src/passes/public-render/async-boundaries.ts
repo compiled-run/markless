@@ -38,4 +38,3 @@ export function collectAsyncBoundaryNodes(root: AnyNode): AsyncBoundaryNode[] {
 	visit(root, false);
 	return found;
 }
-

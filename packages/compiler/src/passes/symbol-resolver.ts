@@ -429,7 +429,11 @@ function unwrapChainExpression(node: AnyNode | undefined): AnyNode | undefined {
 function getStaticMemberPropertyName(node: AnyNode): string | null {
 	const property = node.property as AnyNode | undefined;
 	if (typeof property?.name === 'string') return property.name;
-	if (node.computed === true && property?.type === 'Literal' && typeof property.value === 'string') {
+	if (
+		node.computed === true &&
+		property?.type === 'Literal' &&
+		typeof property.value === 'string'
+	) {
 		return property.value;
 	}
 	return null;

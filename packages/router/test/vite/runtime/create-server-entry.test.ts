@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vite-plus/test';
-import {
-	marklessSsrAttachSnapshots,
-	marklessSsrRunAsyncComputed,
-} from '@markless/web/fns/ssr';
+import { marklessSsrAttachSnapshots, marklessSsrRunAsyncComputed } from '@markless/web/fns/ssr';
 import { createServerEntry } from '../../../src/vite/runtime/create-server-entry.ts';
 
 describe('server entry rendering', () => {
@@ -111,10 +108,22 @@ describe('server entry rendering', () => {
 						view: {
 							version: 1,
 							locators: [
-								{ hostNodeId: 'h0', index: 0, strategy: 'dom-order', tagName: 'main' },
-								{ hostNodeId: 'h1', index: 1, strategy: 'dom-order', tagName: 'button' },
+								{
+									hostNodeId: 'h0',
+									index: 0,
+									strategy: 'dom-order',
+									tagName: 'main',
+								},
+								{
+									hostNodeId: 'h1',
+									index: 1,
+									strategy: 'dom-order',
+									tagName: 'button',
+								},
 							],
-							events: [{ eventName: 'click', hostNodeId: 'h1', symbolIds: ['symbol:0'] }],
+							events: [
+								{ eventName: 'click', hostNodeId: 'h1', symbolIds: ['symbol:0'] },
+							],
 							domUpdates: [],
 							behaviors: [],
 							elementHandles: [],
@@ -129,7 +138,8 @@ describe('server entry rendering', () => {
 		const response = await entry.fetch(new Request('http://markless-router.test/r/alpha'));
 		const html = await response.text();
 		const stateJson = html.slice(
-			html.indexOf('<script type="markless/state">') + '<script type="markless/state">'.length,
+			html.indexOf('<script type="markless/state">') +
+				'<script type="markless/state">'.length,
 		);
 		const state = JSON.parse(stateJson.slice(0, stateJson.indexOf('</script>'))) as {
 			readonly cells: ReadonlyArray<Record<string, unknown>>;
@@ -462,7 +472,9 @@ function tidePage(delayMs: number) {
 				),
 				view: {
 					version: 1,
-					locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'main' }],
+					locators: [
+						{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'main' },
+					],
 					events: [],
 					domUpdates: [],
 					behaviors: [],
@@ -480,7 +492,12 @@ function tidePage(delayMs: number) {
 									runnerSymbolId: 'symbol:tide-run',
 								},
 							],
-							armRecords: { locators: [], events: [], behaviors: [], elementHandles: [] },
+							armRecords: {
+								locators: [],
+								events: [],
+								behaviors: [],
+								elementHandles: [],
+							},
 						},
 					],
 				},
@@ -522,9 +539,13 @@ describe('server entry streaming (default)', () => {
 		// Shell flushed with the pending arm; settled content arrives later.
 		expect(chunks[0]).toContain('data-surveying');
 		expect(chunks[0]).not.toContain('High tide 14:02');
-		expect(text).toContain('<template m:arm="tide:0"><article data-crest>High tide 14:02</article></template>');
+		expect(text).toContain(
+			'<template m:arm="tide:0"><article data-crest>High tide 14:02</article></template>',
+		);
 		expect(text).toContain('<script type="markless/arm" data-boundary="tide:0">');
-		expect(text).toContain('<script type="markless/state-patch" data-graph-node="computed:tides">');
+		expect(text).toContain(
+			'<script type="markless/state-patch" data-graph-node="computed:tides">',
+		);
 		expect(text).toContain('__mArm("tide:0")');
 		// The document closes AFTER the streamed settle.
 		expect(text.indexOf('__mArm("tide:0")')).toBeLessThan(text.indexOf('</body></html>'));

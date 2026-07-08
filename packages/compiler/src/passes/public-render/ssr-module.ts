@@ -3,7 +3,20 @@ import { emitHtmlNode, collectSsrAsyncRunners } from './html.ts';
 import { renderBodyLines } from './render-body.ts';
 import { emitCatalogHelperImports, stateRuntimeImports } from './runtime-helpers.ts';
 import { emitSameModuleSsrComponents } from './same-module.ts';
-import { assignSsrHostIds, callbackSymbolIds, componentEdgesFor, componentReferences, destructureProps, emitComponentImport, emitValueImport, isComponentRoot, publicRenderValueImports, stateEntries, staticHostLocators, moduleScopeLines } from './shared.ts';
+import {
+	assignSsrHostIds,
+	callbackSymbolIds,
+	componentEdgesFor,
+	componentReferences,
+	destructureProps,
+	emitComponentImport,
+	emitValueImport,
+	isComponentRoot,
+	publicRenderValueImports,
+	stateEntries,
+	staticHostLocators,
+	moduleScopeLines,
+} from './shared.ts';
 import { collectSsrPropEvents } from './component-wiring.ts';
 import type { PublicRenderRoot, SsrRenderContext } from './types.ts';
 
@@ -13,7 +26,10 @@ export function emitPublicSsrRenderModule(
 ): string {
 	if (!input.publicRenderPlan.rootTemplateHtml && !isComponentRoot(rootInfo.root)) return '';
 
-	const references = componentReferences(input.semanticGraph.componentEdges, '__marklessSsrComponent');
+	const references = componentReferences(
+		input.semanticGraph.componentEdges,
+		'__marklessSsrComponent',
+	);
 	const valueImports = publicRenderValueImports(
 		input.semanticGraph.moduleImports,
 		input.semanticGraph.componentEdges,
@@ -57,7 +73,11 @@ export function emitPublicSsrRenderModule(
 		hostLocators,
 	);
 	const htmlExpression = emitHtmlNode(rootInfo.root, renderContext);
-	const sameModuleComponents = emitSameModuleSsrComponents(input, references, rootInfo.componentName);
+	const sameModuleComponents = emitSameModuleSsrComponents(
+		input,
+		references,
+		rootInfo.componentName,
+	);
 	const body = [
 		'',
 		`const marklessSsrPropEvents = ${JSON.stringify(propEvents)};`,
@@ -71,13 +91,20 @@ export function emitPublicSsrRenderModule(
 		destructureProps(rootInfo.propNames),
 		'	const marklessSsrPayloadState = marklessCloneState(payloadState);',
 		'	const marklessSsrRenderStateValues = new Map(marklessSsrStateValues);',
-		...renderBodyLines(input, rootInfo, 'marklessStateValue', 'marklessSsrRenderStateValues', 'marklessSsrPayloadState', [
-			'const marklessSsrChildren = [];',
-			'const marklessSsrBranches = [];',
-			'const marklessSsrAsyncSnapshots = [];',
-			'const marklessSsrHostLocators = [];',
-			`const html = ${htmlExpression};`,
-		]),
+		...renderBodyLines(
+			input,
+			rootInfo,
+			'marklessStateValue',
+			'marklessSsrRenderStateValues',
+			'marklessSsrPayloadState',
+			[
+				'const marklessSsrChildren = [];',
+				'const marklessSsrBranches = [];',
+				'const marklessSsrAsyncSnapshots = [];',
+				'const marklessSsrHostLocators = [];',
+				`const html = ${htmlExpression};`,
+			],
+		),
 		'	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren, marklessSsrAsyncSnapshots);',
 		'	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);',
 		'	return {',
@@ -135,7 +162,10 @@ export function emitPublicSsrRenderModule(
 					'marklessSsrSpreadAttributes',
 				],
 			},
-			{ module: 'repeats', names: ['marklessSsrRepeatRows', 'marklessSsrComponentRepeatRows'] },
+			{
+				module: 'repeats',
+				names: ['marklessSsrRepeatRows', 'marklessSsrComponentRepeatRows'],
+			},
 		]),
 		...moduleScopeLines(input.source.source, input.source.filename),
 		...sameModuleComponents,

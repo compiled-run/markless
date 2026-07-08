@@ -14,14 +14,8 @@ import {
 	trimmedStaticTextValue,
 	unwrapExpressionContainer,
 } from '../../ast/tsrx.ts';
-import {
-	resolveGraphPath,
-	semanticAliasMap,
-} from '../../artifact-helpers/graph-paths.ts';
-import type {
-	PublicRenderPlanBranchArmPart,
-	SemanticGraphBinding,
-} from '../../artifacts.ts';
+import { resolveGraphPath, semanticAliasMap } from '../../artifact-helpers/graph-paths.ts';
+import type { PublicRenderPlanBranchArmPart, SemanticGraphBinding } from '../../artifacts.ts';
 import type { AssignedHosts } from './host-locators.ts';
 
 export function scopeClassOf(collection: {
@@ -43,7 +37,10 @@ export function buildBranchArmParts(
 	source: string,
 	scopeClass: string | null,
 	options?: {
-		readonly repeats?: ReadonlyMap<AnyNode, { readonly itemName: string; readonly collectionSource: string }>;
+		readonly repeats?: ReadonlyMap<
+			AnyNode,
+			{ readonly itemName: string; readonly collectionSource: string }
+		>;
 	},
 ): ReadonlyArray<PublicRenderPlanBranchArmPart> | null {
 	const parts: PublicRenderPlanBranchArmPart[] = [];
@@ -153,11 +150,17 @@ function buildRepeatPart(
 	},
 ): Extract<PublicRenderPlanBranchArmPart, { repeat: unknown }> | null {
 	const collection = resolveGraphPath(repeat.collectionSource, context.bindings, context.aliases);
-	if (!collection || (collection.binding.kind !== 'state' && collection.binding.kind !== 'computed')) {
+	if (
+		!collection ||
+		(collection.binding.kind !== 'state' && collection.binding.kind !== 'computed')
+	) {
 		return null;
 	}
 
-	type RowPart = Extract<PublicRenderPlanBranchArmPart, { repeat: unknown }>['repeat']['rowParts'][number];
+	type RowPart = Extract<
+		PublicRenderPlanBranchArmPart,
+		{ repeat: unknown }
+	>['repeat']['rowParts'][number];
 	const rowParts: RowPart[] = [];
 	const pushRowText = (text: string): void => {
 		const last = rowParts[rowParts.length - 1];
@@ -248,7 +251,12 @@ export function collectBranchSiteNodes(root: AnyNode): BranchSiteNode[] {
 	const found: BranchSiteNode[] = [];
 	const branchStack: BranchSiteNode[] = [];
 
-	const visit = (node: AnyNode, conditional: boolean, insideTryArm = false, insideRepeat = false): void => {
+	const visit = (
+		node: AnyNode,
+		conditional: boolean,
+		insideTryArm = false,
+		insideRepeat = false,
+	): void => {
 		if (node.type === 'JSXIfExpression' || node.type === 'JSXSwitchExpression') {
 			const entry: BranchSiteNode = {
 				node,
@@ -261,7 +269,8 @@ export function collectBranchSiteNodes(root: AnyNode): BranchSiteNode[] {
 			for (const outer of branchStack) outer.containsNested = true;
 			found.push(entry);
 			branchStack.push(entry);
-			for (const child of childNodes(node)) visit(child, conditional, insideTryArm, insideRepeat);
+			for (const child of childNodes(node))
+				visit(child, conditional, insideTryArm, insideRepeat);
 			branchStack.pop();
 			return;
 		}

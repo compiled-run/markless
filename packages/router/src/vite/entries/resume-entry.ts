@@ -6,7 +6,7 @@ const tsrxResumeModuleLoaders = import.meta.glob('/pages/**/*.tsrx', {
 export async function resumeContainerEvent(input: {
 	readonly root: ParentNode;
 	readonly [key: string]: unknown;
-	}) {
+}) {
 	const file = routeFileFromRoot(input.root);
 	const loadRouteResumeModule = file && routeResumeModuleLoader(file);
 	const routeResumeModule = loadRouteResumeModule ? await loadRouteResumeModule() : undefined;

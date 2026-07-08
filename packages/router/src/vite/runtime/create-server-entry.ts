@@ -24,10 +24,7 @@ interface RenderOutput {
 	readonly view?: unknown;
 }
 
-type SsrRender = (
-	props?: unknown,
-	renderContext?: unknown,
-) => RenderOutput | Promise<RenderOutput>;
+type SsrRender = (props?: unknown, renderContext?: unknown) => RenderOutput | Promise<RenderOutput>;
 
 interface SsrArtifact {
 	readonly renderSsr?: SsrRender;
@@ -152,7 +149,10 @@ export function createServerEntry(options: ServerEntryOptions) {
 				await renderToString(pageArtifact as never, renderOptions),
 			);
 			const shell = await renderDocumentShell(documentModule, pageProps, pageHtml.headHtml);
-			return new Response(fillDocumentChildren(shell, pageHtml.bodyHtml), { status, headers });
+			return new Response(fillDocumentChildren(shell, pageHtml.bodyHtml), {
+				status,
+				headers,
+			});
 		}
 
 		// Streaming default (owner ruling 2026-07-07): out-of-order streaming is
@@ -163,13 +163,14 @@ export function createServerEntry(options: ServerEntryOptions) {
 		const pageHtml = splitLeadingModulePreloadLinks(stream.shell);
 		const shell = await renderDocumentShell(documentModule, pageProps, pageHtml.headHtml);
 		if (stream.pendingArmCount === 0) {
-			return new Response(fillDocumentChildren(shell, pageHtml.bodyHtml), { status, headers });
+			return new Response(fillDocumentChildren(shell, pageHtml.bodyHtml), {
+				status,
+				headers,
+			});
 		}
 		const placeholderAt = shell.indexOf(DOCUMENT_CHILDREN_PLACEHOLDER);
 		const prefix =
-			placeholderAt === -1
-				? shell
-				: shell.slice(0, placeholderAt) + pageHtml.bodyHtml;
+			placeholderAt === -1 ? shell : shell.slice(0, placeholderAt) + pageHtml.bodyHtml;
 		const suffix =
 			placeholderAt === -1
 				? ''

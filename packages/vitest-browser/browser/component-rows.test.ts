@@ -13,15 +13,10 @@ test('SSR: component-in-row rows render child markup and dispatch row events acr
 	const rows = Array.from(container.querySelectorAll('[data-card]'));
 	expect(rows.map((row) => row.getAttribute('data-card'))).toEqual(['north', 'south']);
 	// Each row executed the component with its own item in scope.
-	expect(rows.map((row) => row.querySelector('em.tag')?.textContent)).toEqual([
-		'North',
-		'South',
-	]);
+	expect(rows.map((row) => row.querySelector('em.tag')?.textContent)).toEqual(['North', 'South']);
 
 	(rows[1] as HTMLElement).click();
-	await expect
-		.poll(() => container.querySelector('[data-chosen]')?.textContent)
-		.toBe('south');
+	await expect.poll(() => container.querySelector('[data-chosen]')?.textContent).toBe('south');
 
 	(container.querySelector('[data-flip]') as HTMLElement).click();
 	await expect
@@ -35,8 +30,6 @@ test('SSR: component-in-row rows render child markup and dispatch row events acr
 	// The moved row still resolves its own item locals on dispatch.
 	const movedNorth = container.querySelector('[data-card="north"]') as HTMLElement;
 	movedNorth.click();
-	await expect
-		.poll(() => container.querySelector('[data-chosen]')?.textContent)
-		.toBe('north');
+	await expect.poll(() => container.querySelector('[data-chosen]')?.textContent).toBe('north');
 	await cleanup();
 });

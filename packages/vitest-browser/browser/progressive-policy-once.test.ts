@@ -18,7 +18,12 @@ test('progressive execution: event-only preventDefault is applied exactly once p
 	const form = requireElement<HTMLFormElement>(screen.container, 'form[data-event-form]');
 
 	const calls = dispatchSubmit(form);
-	await expect.poll(() => requireElement<HTMLButtonElement>(screen.container, 'button[data-submit-count]').textContent)
+	await expect
+		.poll(
+			() =>
+				requireElement<HTMLButtonElement>(screen.container, 'button[data-submit-count]')
+					.textContent,
+		)
 		.toContain('1');
 	expect(calls()).toBe(1);
 });

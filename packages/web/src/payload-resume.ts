@@ -17,8 +17,16 @@ async function adoptStreamedPatchesIfPresent(
 	decoded: ReturnType<typeof decodePayloadScripts>,
 	root: ResumePayloadScriptsInput['root'],
 ): Promise<ReturnType<typeof decodePayloadScripts>> {
-	const documentHost = (root as { readonly ownerDocument?: { readonly querySelector?: (selector: string) => unknown } }).ownerDocument;
-	if (!documentHost?.querySelector?.('script[type="markless/arm"],script[type="markless/state-patch"]')) {
+	const documentHost = (
+		root as {
+			readonly ownerDocument?: { readonly querySelector?: (selector: string) => unknown };
+		}
+	).ownerDocument;
+	if (
+		!documentHost?.querySelector?.(
+			'script[type="markless/arm"],script[type="markless/state-patch"]',
+		)
+	) {
 		return decoded;
 	}
 	const { adoptStreamedArmPatches } = await import('./resume-stream-patches.ts');

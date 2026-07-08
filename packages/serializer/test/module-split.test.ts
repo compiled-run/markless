@@ -34,7 +34,7 @@ test('client value decoder keeps rare value records behind an async boundary', a
 	});
 	expect(rare.ok).toBe(true);
 	if (!rare.ok) return;
-	const decoded = await deserializeGraphValueForClient(rare.payload) as {
+	const decoded = (await deserializeGraphValueForClient(rare.payload)) as {
 		readonly pattern: RegExp;
 		readonly link: URL;
 		readonly bytes: Uint8Array;

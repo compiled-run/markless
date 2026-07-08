@@ -118,13 +118,19 @@ function syncComputedPayloads() {
 	return {
 		state: {
 			...createProtocolStatePayload({
-				cells: [{ graphNodeId: 'state:count', name: 'count', valueKind: 'scalar', value: 2 }],
+				cells: [
+					{ graphNodeId: 'state:count', name: 'count', valueKind: 'scalar', value: 2 },
+				],
 			}),
-			computed: [{
-				graphNodeId: 'computed:doubled', name: 'doubled', async: false,
-				deriveSymbolId: 'symbol:derive',
-				dependencies: [{ graphNodeId: 'state:count', path: [] }],
-			}],
+			computed: [
+				{
+					graphNodeId: 'computed:doubled',
+					name: 'doubled',
+					async: false,
+					deriveSymbolId: 'symbol:derive',
+					dependencies: [{ graphNodeId: 'state:count', path: [] }],
+				},
+			],
 		},
 		view: {
 			version: 1,
@@ -133,10 +139,16 @@ function syncComputedPayloads() {
 				{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'output' },
 			],
 			events: [],
-			domUpdates: [{
-				hostNodeId: 'h1', source: 'doubled', graphNodeId: 'computed:doubled',
-				path: [], target: { kind: 'text' }, symbolId: 'symbol:text',
-			}],
+			domUpdates: [
+				{
+					hostNodeId: 'h1',
+					source: 'doubled',
+					graphNodeId: 'computed:doubled',
+					path: [],
+					target: { kind: 'text' },
+					symbolId: 'symbol:text',
+				},
+			],
 			behaviors: [],
 			elementHandles: [],
 			asyncBoundaries: [],
@@ -2041,13 +2053,23 @@ test('resume runtime reports journal subscriber failures to the app error hook',
 				{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'button' },
 			],
 			events: [{ hostNodeId: 'h1', eventName: 'click', symbolIds: ['symbol:click'] }],
-			domUpdates: [{ hostNodeId: 'h1', source: 'count', graphNodeId: 'state:count', path: [], symbolId: 'symbol:text' }],
+			domUpdates: [
+				{
+					hostNodeId: 'h1',
+					source: 'count',
+					graphNodeId: 'state:count',
+					path: [],
+					symbolId: 'symbol:text',
+				},
+			],
 			behaviors: [],
 			elementHandles: [],
 			asyncBoundaries: [],
 		},
 		loadSymbol(symbolId) {
-			if (symbolId === 'symbol:click') return ({ graph: runtimeGraph }) => runtimeGraph.write({ graphNodeId: 'state:count', value: 1 });
+			if (symbolId === 'symbol:click')
+				return ({ graph: runtimeGraph }) =>
+					runtimeGraph.write({ graphNodeId: 'state:count', value: 1 });
 			return () => ({ type: 'setText', locator: 'h1', value: '1' });
 		},
 		applyDomJournal() {
@@ -2071,7 +2093,8 @@ test('resume runtime fails loudly when a branch flip resolves an empty arm fragm
 	const root = element('SECTION', [button, start, shown, end]);
 	const graph = createRuntimeGraph({ cells: [{ graphNodeId: 'state:open', value: true }] });
 	const reportedErrors: unknown[] = [];
-	const previousReportError = (globalThis as { reportError?: (error: unknown) => void }).reportError;
+	const previousReportError = (globalThis as { reportError?: (error: unknown) => void })
+		.reportError;
 	(globalThis as { reportError?: (error: unknown) => void }).reportError = (error) => {
 		reportedErrors.push(error);
 	};
@@ -2088,16 +2111,20 @@ test('resume runtime fails loudly when a branch flip resolves an empty arm fragm
 			behaviors: [],
 			elementHandles: [],
 			asyncBoundaries: [],
-			branches: [{
-				id: 'branch-site:empty',
-				startAnchor: { strategy: 'dom-order-comment', index: 0 },
-				endAnchor: { strategy: 'dom-order-comment', index: 1 },
-				symbolId: 'symbol:empty-branch',
-				testReads: [{ source: 'open', graphNodeId: 'state:open', path: [] }],
-			}],
+			branches: [
+				{
+					id: 'branch-site:empty',
+					startAnchor: { strategy: 'dom-order-comment', index: 0 },
+					endAnchor: { strategy: 'dom-order-comment', index: 1 },
+					symbolId: 'symbol:empty-branch',
+					testReads: [{ source: 'open', graphNodeId: 'state:open', path: [] }],
+				},
+			],
 		},
 		loadSymbol(symbolId) {
-			if (symbolId === 'symbol:toggle') return ({ graph: runtimeGraph }) => runtimeGraph.write({ graphNodeId: 'state:open', value: false });
+			if (symbolId === 'symbol:toggle')
+				return ({ graph: runtimeGraph }) =>
+					runtimeGraph.write({ graphNodeId: 'state:open', value: false });
 			return () => ({ arm: 1, html: '' });
 		},
 		renderBranchHtml: () => [],
@@ -2108,11 +2135,13 @@ test('resume runtime fails loudly when a branch flip resolves an empty arm fragm
 
 	try {
 		await resume.start();
-		await expect(root.listeners[0]!.listener(event('click', button, ''))).rejects.toMatchObject({
-			code: 'MARKLESS_BRANCH_ARM_EMPTY',
-			branchId: 'branch-site:empty',
-			arm: 1,
-		});
+		await expect(root.listeners[0]!.listener(event('click', button, ''))).rejects.toMatchObject(
+			{
+				code: 'MARKLESS_BRANCH_ARM_EMPTY',
+				branchId: 'branch-site:empty',
+				arm: 1,
+			},
+		);
 		expect(reportedErrors).toEqual([
 			expect.objectContaining({
 				code: 'MARKLESS_BRANCH_ARM_EMPTY',
@@ -2122,7 +2151,8 @@ test('resume runtime fails loudly when a branch flip resolves an empty arm fragm
 			}),
 		]);
 	} finally {
-		(globalThis as { reportError?: (error: unknown) => void }).reportError = previousReportError;
+		(globalThis as { reportError?: (error: unknown) => void }).reportError =
+			previousReportError;
 	}
 });
 
@@ -2147,17 +2177,21 @@ test('resume runtime allows branch flips to declared empty arms', async () => {
 			behaviors: [],
 			elementHandles: [],
 			asyncBoundaries: [],
-			branches: [{
-				id: 'branch-site:if',
-				startAnchor: { strategy: 'dom-order-comment', index: 0 },
-				endAnchor: { strategy: 'dom-order-comment', index: 1 },
-				symbolId: 'symbol:if-branch',
-				testReads: [{ source: 'open', graphNodeId: 'state:open', path: [] }],
-				declaredEmptyArms: [1],
-			} as never],
+			branches: [
+				{
+					id: 'branch-site:if',
+					startAnchor: { strategy: 'dom-order-comment', index: 0 },
+					endAnchor: { strategy: 'dom-order-comment', index: 1 },
+					symbolId: 'symbol:if-branch',
+					testReads: [{ source: 'open', graphNodeId: 'state:open', path: [] }],
+					declaredEmptyArms: [1],
+				} as never,
+			],
 		},
 		loadSymbol(symbolId) {
-			if (symbolId === 'symbol:toggle') return ({ graph: runtimeGraph }) => runtimeGraph.write({ graphNodeId: 'state:open', value: false });
+			if (symbolId === 'symbol:toggle')
+				return ({ graph: runtimeGraph }) =>
+					runtimeGraph.write({ graphNodeId: 'state:open', value: false });
 			return () => ({ arm: 1, html: '' });
 		},
 		renderBranchHtml: () => [],
@@ -2441,7 +2475,10 @@ test('resume runtime emits structural async boundary journal entries without sym
 // NOT re-emit the structural pending journal — the prior settled snapshot
 // stays rendered until the new one commits.
 test('re-settle skips the structural pending journal once the boundary has settled content', async () => {
-	const results = [deferred<{ readonly title: string }>(), deferred<{ readonly title: string }>()];
+	const results = [
+		deferred<{ readonly title: string }>(),
+		deferred<{ readonly title: string }>(),
+	];
 	let runCount = 0;
 	const start = comment('async:boundary:0:start');
 	const paragraph = element('P');
@@ -2523,7 +2560,15 @@ test('re-settle skips the structural pending journal once the boundary has settl
 		return batches.flatMap((batch) =>
 			batch.flatMap((entry) =>
 				entry.type === 'insertRange'
-					? [String((entry.fragment as { readonly snapshot?: { readonly status?: unknown } }).snapshot?.status)]
+					? [
+							String(
+								(
+									entry.fragment as {
+										readonly snapshot?: { readonly status?: unknown };
+									}
+								).snapshot?.status,
+							),
+						]
 					: [],
 			),
 		);
@@ -3176,7 +3221,11 @@ test('resume runtime wakes keyed repeats on collection writes', async () => {
 	const firstRow = element('TR');
 	const secondRow = element('TR');
 	const thirdRow = element('TR');
-	const tbody = rangeElement('TBODY', [firstRow, secondRow, thirdRow]) as FakeRangeParentElement & {
+	const tbody = rangeElement('TBODY', [
+		firstRow,
+		secondRow,
+		thirdRow,
+	]) as FakeRangeParentElement & {
 		appendChild(node: FakeNode): FakeNode;
 	};
 	tbody.appendChild = (node) => tbody.insertBefore(node, null);

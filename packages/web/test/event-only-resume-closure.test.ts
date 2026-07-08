@@ -16,15 +16,23 @@ const resumeOnDemandEntries = [
 	join(repoRoot, 'packages/web/src/resume-keyed-repeats.ts'),
 	join(repoRoot, 'packages/web/src/resume-sync-computed.ts'),
 ] as const;
-// 4,800 gzip bytes * the observed ~3.7 raw:minified+gzip ratio leaves a
-// 17,760 byte raw-source proxy budget for the full progressive runtime closure.
-const sourceByteLimit = 17760;
+// 4,800 gzip bytes * the observed ~3.85 raw:minified+gzip ratio leaves an
+// 18,480 byte raw-source proxy budget for the full progressive runtime closure.
+// Ratio re-observed 2026-07-08 after the repo-wide canonical format (wraps +
+// trailing commas grew raw source only — largest closure measured 18,266; the
+// authoritative gzip walls in bundler/test/fixture-builds.test.ts were
+// unchanged and passing, same method).
+const sourceByteLimit = 18480;
 
 const forbiddenClosureFiles = [
-	'packages/web/src/resume.ts', 'packages/web/src/render.ts',
-	'packages/web/src/render-csr.ts', 'packages/web/src/render-to-string.ts',
-	'packages/web/src/payload.ts', 'packages/web/src/repeat-runtime.ts',
-	'packages/serializer/src/index.ts', 'packages/serializer/src/payload-scripts.ts',
+	'packages/web/src/resume.ts',
+	'packages/web/src/render.ts',
+	'packages/web/src/render-csr.ts',
+	'packages/web/src/render-to-string.ts',
+	'packages/web/src/payload.ts',
+	'packages/web/src/repeat-runtime.ts',
+	'packages/serializer/src/index.ts',
+	'packages/serializer/src/payload-scripts.ts',
 ] as const;
 
 const forbiddenResumeSerializerFiles = [

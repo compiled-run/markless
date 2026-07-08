@@ -67,7 +67,12 @@ test('adoptStreamedArmPatches overlays streamed snapshots and arm records before
 				{ 'data-graph-node': 'computed:report' },
 				JSON.stringify({
 					graphNodeId: 'computed:report',
-					snapshot: { status: 'fulfilled', version: 1, key: null, value: { root: 7, records: [] } },
+					snapshot: {
+						status: 'fulfilled',
+						version: 1,
+						key: null,
+						value: { root: 7, records: [] },
+					},
 				}),
 			),
 		],
@@ -107,7 +112,12 @@ test('adoptStreamedArmPatches skips boundaries whose streamed template is still 
 				{ 'data-graph-node': 'computed:report' },
 				JSON.stringify({
 					graphNodeId: 'computed:report',
-					snapshot: { status: 'fulfilled', version: 1, key: null, value: { root: 7, records: [] } },
+					snapshot: {
+						status: 'fulfilled',
+						version: 1,
+						key: null,
+						value: { root: 7, records: [] },
+					},
 				}),
 			),
 		],
@@ -132,7 +142,10 @@ test('adoptStreamedArmPatches ignores patches for other containers payloads', ()
 		'script[type="markless/state-patch"][data-graph-node]': [
 			fakeScript(
 				{ 'data-graph-node': 'computed:unknown' },
-				JSON.stringify({ graphNodeId: 'computed:unknown', snapshot: { status: 'fulfilled' } }),
+				JSON.stringify({
+					graphNodeId: 'computed:unknown',
+					snapshot: { status: 'fulfilled' },
+				}),
 			),
 		],
 	});

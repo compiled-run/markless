@@ -1,9 +1,6 @@
 import { createServer } from 'node:http';
 import { box } from '@async/witness';
-import {
-	marklessSsrAttachSnapshots,
-	marklessSsrRunAsyncComputed,
-} from '@markless/web/fns/ssr';
+import { marklessSsrAttachSnapshots, marklessSsrRunAsyncComputed } from '@markless/web/fns/ssr';
 import { renderToStream } from '@markless/web/render-to-stream';
 
 // T107 out-of-order streaming proof (D5/D6): the harbor fixture's forecast
@@ -80,11 +77,16 @@ export default box(
 			await expect.html.contains(text, 'data-markless-stream-executor');
 			await expect.html.contains(text, '<template m:arm="');
 			await expect.html.contains(text, '<script type="markless/arm" data-boundary="');
-			await expect.html.contains(text, '<script type="markless/state-patch" data-graph-node="');
+			await expect.html.contains(
+				text,
+				'<script type="markless/state-patch" data-graph-node="',
+			);
 			await expect.html.contains(text, '__mArm(');
 			await expect.html.contains(text, 'data-async-resumer');
 			if (text.indexOf('data-harbor-waiting') > text.indexOf('<template m:arm=')) {
-				throw new Error('Pending arm bytes must precede the settled template in the stream.');
+				throw new Error(
+					'Pending arm bytes must precede the settled template in the stream.',
+				);
 			}
 
 			// (2) Real browser: the settled arm committed between the boundary's
@@ -132,7 +134,9 @@ export default box(
 				if (bufferedDom.includes('data-harbor-waiting')) {
 					throw new Error('Buffered streamed document must still show settled content.');
 				}
-				receipt.note('buffered single-write copy rendered settled content (executor commits on parse)');
+				receipt.note(
+					'buffered single-write copy rendered settled content (executor commits on parse)',
+				);
 			} finally {
 				buffered.close();
 			}
@@ -170,10 +174,17 @@ export default box(
 				);
 
 				const revealPage = await preview.browser.visit(`${reveal.url}/reveal`);
-				await expect.page.text(revealPage, '[data-content="reef"]', 'Reef window 14:10', WAIT);
+				await expect.page.text(
+					revealPage,
+					'[data-content="reef"]',
+					'Reef window 14:10',
+					WAIT,
+				);
 				const revealDom = await revealPage.content();
 				if (revealDom.includes('data-waiting') || /<template[^>]*m:arm/.test(revealDom)) {
-					throw new Error('All streamed arms must be committed and their templates consumed.');
+					throw new Error(
+						'All streamed arms must be committed and their templates consumed.',
+					);
 				}
 				const commits = parseCommitMarks(revealDom);
 				const fcp = parseFcpMark(revealDom);
@@ -212,7 +223,9 @@ export default box(
 		} finally {
 			await preview.close();
 		}
-		await receipt.capture('router streaming settled a slow boundary out of order on one response');
+		await receipt.capture(
+			'router streaming settled a slow boundary out of order on one response',
+		);
 	},
 );
 
@@ -362,7 +375,9 @@ function revealTrainArtifact() {
 				),
 				view: {
 					version: 1,
-					locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'section' }],
+					locators: [
+						{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'section' },
+					],
 					events: [],
 					domUpdates: [],
 					behaviors: [],

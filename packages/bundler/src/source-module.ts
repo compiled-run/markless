@@ -37,7 +37,10 @@ export function rewriteSymbolModuleExport(
 	// Handlers with await bodies emit `export async function` — rename both forms.
 	return source
 		.replace(`export function ${fromExportName}`, `export function ${toExportName}`)
-		.replace(`export async function ${fromExportName}`, `export async function ${toExportName}`);
+		.replace(
+			`export async function ${fromExportName}`,
+			`export async function ${toExportName}`,
+		);
 }
 
 export function payloadModule(payload: {
@@ -86,7 +89,9 @@ export function emitSourceModule(input: {
 			: `import { state as payloadState, view as payloadView, runtimeDemandMap as payloadRuntimeDemandMap } from '${input.payloadId}';`,
 		'',
 		emitLoadSymbol(input),
-		input.environment === 'client' && input.executionLog !== 'never' ? emitExecutionLogLoader() : '',
+		input.environment === 'client' && input.executionLog !== 'never'
+			? emitExecutionLogLoader()
+			: '',
 		routeSymbols ? 'const marklessLoadLocalSymbol = loadSymbol;' : '',
 		symbolsOnly && !routeSymbols ? 'export { loadSymbol };' : '',
 		symbolsOnly ? '' : 'export { payloadView };',
@@ -290,10 +295,18 @@ function emitResumeContainerEvent(
 		'	await runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });',
 		'}',
 	].join('\n');
-	const scalarOnlySpecialized = leanMode === 'scalar' && scalarSpecializations.length > 0 && allEventActionsHaveScalarPlan(runtimeDemandMap);
-	const scalarDispatcher = scalarSpecializations.length > 0
-		? emitSpecializedScalarDispatcher(scalarSpecializations, loadSymbolName, scalarOnlySpecialized ? 'fail' : 'full')
-		: emitSpecializedScalarDispatcher([], loadSymbolName, 'full');
+	const scalarOnlySpecialized =
+		leanMode === 'scalar' &&
+		scalarSpecializations.length > 0 &&
+		allEventActionsHaveScalarPlan(runtimeDemandMap);
+	const scalarDispatcher =
+		scalarSpecializations.length > 0
+			? emitSpecializedScalarDispatcher(
+					scalarSpecializations,
+					loadSymbolName,
+					scalarOnlySpecialized ? 'fail' : 'full',
+				)
+			: emitSpecializedScalarDispatcher([], loadSymbolName, 'full');
 
 	if (needsFullResume) {
 		// Branch flips need graph subscriptions and range replacement: start the
@@ -364,8 +377,18 @@ type ScalarSpecialization = {
 	readonly hostIndex: number;
 	readonly hostTagName: string;
 	readonly syncPolicy: unknown;
-	readonly write: { readonly kind?: string; readonly value?: unknown; readonly valueKind?: string; readonly updateOperator?: string };
-	readonly textUpdates: ReadonlyArray<{ readonly hostNodeId: string; readonly index: number; readonly tagName: string; readonly prefix?: string }>;
+	readonly write: {
+		readonly kind?: string;
+		readonly value?: unknown;
+		readonly valueKind?: string;
+		readonly updateOperator?: string;
+	};
+	readonly textUpdates: ReadonlyArray<{
+		readonly hostNodeId: string;
+		readonly index: number;
+		readonly tagName: string;
+		readonly prefix?: string;
+	}>;
 };
 
 function scalarDispatcherSpecializations(input: {
@@ -374,11 +397,24 @@ function scalarDispatcherSpecializations(input: {
 	readonly runtimeDemandMap?: unknown;
 	readonly symbolRoutes?: ReadonlyArray<SourceSymbolRoute>;
 }): ReadonlyArray<ScalarSpecialization> {
-	const state = input.payloadState as { readonly cells?: ReadonlyArray<{ readonly graphNodeId?: unknown }> } | undefined;
-	const view = input.payloadView as {
-		readonly events?: ReadonlyArray<{ readonly hostNodeId?: unknown; readonly eventName?: unknown; readonly symbolIds?: unknown; readonly syncPolicy?: unknown }>;
-		readonly locators?: ReadonlyArray<{ readonly hostNodeId?: unknown; readonly index?: unknown; readonly tagName?: unknown }>;
-	} | undefined;
+	const state = input.payloadState as
+		| { readonly cells?: ReadonlyArray<{ readonly graphNodeId?: unknown }> }
+		| undefined;
+	const view = input.payloadView as
+		| {
+				readonly events?: ReadonlyArray<{
+					readonly hostNodeId?: unknown;
+					readonly eventName?: unknown;
+					readonly symbolIds?: unknown;
+					readonly syncPolicy?: unknown;
+				}>;
+				readonly locators?: ReadonlyArray<{
+					readonly hostNodeId?: unknown;
+					readonly index?: unknown;
+					readonly tagName?: unknown;
+				}>;
+		  }
+		| undefined;
 	const map = input.runtimeDemandMap as { readonly actions?: ReadonlyArray<any> } | undefined;
 	// Composed pages (child symbol routes) are excluded from specialization until
 	// child-coordinate routing is emitted into the dispatcher: their host/symbol
@@ -389,36 +425,56 @@ function scalarDispatcherSpecializations(input: {
 	const locators = view?.locators ?? [];
 	return (map?.actions ?? []).flatMap((action, index) => {
 		const plan = action?.plan;
-		if (action?.recordKind !== 'event' || plan?.version !== 1 || plan?.kind !== 'scalar') return [];
+		if (action?.recordKind !== 'event' || plan?.version !== 1 || plan?.kind !== 'scalar')
+			return [];
 		const cellIndex = cells.findIndex((cell) => cell?.graphNodeId === plan.cell);
 		const host = locators.find((locator) => locator?.hostNodeId === action.hostNodeId);
-		const event = view?.events?.find((candidate) =>
-			candidate?.hostNodeId === action.hostNodeId && candidate?.eventName === action.eventName
+		const event = view?.events?.find(
+			(candidate) =>
+				candidate?.hostNodeId === action.hostNodeId &&
+				candidate?.eventName === action.eventName,
 		);
 		const symbolId = scalarActionSymbolId(plan.symbolId, event, input.symbolRoutes ?? []);
 		if (!symbolId) return [];
 		if (cellIndex < 0 || !host || typeof host.index !== 'number') return [];
-		if (event && syncPolicyGraphNodeIds(event.syncPolicy).some((graphNodeId) => graphNodeId !== plan.cell)) return [];
+		if (
+			event &&
+			syncPolicyGraphNodeIds(event.syncPolicy).some(
+				(graphNodeId) => graphNodeId !== plan.cell,
+			)
+		)
+			return [];
 		const textUpdates = (plan.textUpdates ?? []).flatMap((update: any) => {
-			const locator = locators.find((candidate) => candidate?.hostNodeId === update.hostNodeId);
+			const locator = locators.find(
+				(candidate) => candidate?.hostNodeId === update.hostNodeId,
+			);
 			return locator && typeof locator.index === 'number'
-				? [{ hostNodeId: update.hostNodeId, index: locator.index, tagName: String(locator.tagName ?? '*'), ...(update.prefix ? { prefix: update.prefix } : {}) }]
+				? [
+						{
+							hostNodeId: update.hostNodeId,
+							index: locator.index,
+							tagName: String(locator.tagName ?? '*'),
+							...(update.prefix ? { prefix: update.prefix } : {}),
+						},
+					]
 				: [];
 		});
 		if (textUpdates.length !== (plan.textUpdates ?? []).length) return [];
-		return [{
-			name: `marklessRunScalar${index}`,
-			hostNodeId: action.hostNodeId,
-			eventName: action.eventName,
-			symbolId,
-			cell: plan.cell,
-			cellIndex,
-			hostIndex: host.index,
-			hostTagName: String(host.tagName ?? '*'),
-			syncPolicy: event?.syncPolicy ?? null,
-			write: plan.write,
-			textUpdates,
-		}];
+		return [
+			{
+				name: `marklessRunScalar${index}`,
+				hostNodeId: action.hostNodeId,
+				eventName: action.eventName,
+				symbolId,
+				cell: plan.cell,
+				cellIndex,
+				hostIndex: host.index,
+				hostTagName: String(host.tagName ?? '*'),
+				syncPolicy: event?.syncPolicy ?? null,
+				write: plan.write,
+				textUpdates,
+			},
+		];
 	});
 }
 
@@ -432,7 +488,7 @@ function scalarActionSymbolId(
 		? event.symbolIds.filter((symbolId): symbolId is string => typeof symbolId === 'string')
 		: [];
 	const routedSymbolId = eventSymbolIds.find((symbolId) =>
-		routes.some((route) => symbolId.startsWith(route.prefix))
+		routes.some((route) => symbolId.startsWith(route.prefix)),
 	);
 	if (routedSymbolId) return routedSymbolId;
 	if (eventSymbolIds.some((symbolId) => /^[^:]+:symbol:/.test(symbolId))) return null;
@@ -441,26 +497,40 @@ function scalarActionSymbolId(
 }
 
 function allEventActionsHaveScalarPlan(runtimeDemandMap: unknown): boolean {
-	const actions = (runtimeDemandMap as {
-		readonly actions?: ReadonlyArray<{
-			readonly recordKind?: unknown;
-			readonly plan?: { readonly kind?: unknown };
-		}>;
-	} | undefined)?.actions;
+	const actions = (
+		runtimeDemandMap as
+			| {
+					readonly actions?: ReadonlyArray<{
+						readonly recordKind?: unknown;
+						readonly plan?: { readonly kind?: unknown };
+					}>;
+			  }
+			| undefined
+	)?.actions;
 	const eventActions = (actions ?? []).filter((action) => action.recordKind === 'event');
-	return eventActions.length > 0 && eventActions.every((action) => action.plan?.kind === 'scalar');
+	return (
+		eventActions.length > 0 && eventActions.every((action) => action.plan?.kind === 'scalar')
+	);
 }
 
-function emitSpecializedScalarDispatcher(actions: ReadonlyArray<ScalarSpecialization>, loadSymbolName: string, fallback: 'full' | 'fail'): string {
-	const fallbackName = fallback === 'fail' ? 'marklessScalarSpecializedHostMiss' : 'marklessScalarSpecializedFallback';
-	const fallbackBody = fallback === 'full'
-		? [
-				'async function marklessScalarSpecializedFallback(input, site, syncPolicyAlreadyApplied = input.syncPolicyAlreadyApplied === true) {',
-				'	if (import.meta.env?.DEV) console.warn(Object.assign(new Error("MARKLESS_SCALAR_SPECIALIZED_FALLBACK"), { code: "MARKLESS_SCALAR_SPECIALIZED_FALLBACK", site }));',
-				'	await marklessFullResumeHandoff({ ...input, document: input.root, syncPolicyAlreadyApplied });',
-				'}',
-			]
-		: [];
+function emitSpecializedScalarDispatcher(
+	actions: ReadonlyArray<ScalarSpecialization>,
+	loadSymbolName: string,
+	fallback: 'full' | 'fail',
+): string {
+	const fallbackName =
+		fallback === 'fail'
+			? 'marklessScalarSpecializedHostMiss'
+			: 'marklessScalarSpecializedFallback';
+	const fallbackBody =
+		fallback === 'full'
+			? [
+					'async function marklessScalarSpecializedFallback(input, site, syncPolicyAlreadyApplied = input.syncPolicyAlreadyApplied === true) {',
+					'	if (import.meta.env?.DEV) console.warn(Object.assign(new Error("MARKLESS_SCALAR_SPECIALIZED_FALLBACK"), { code: "MARKLESS_SCALAR_SPECIALIZED_FALLBACK", site }));',
+					'	await marklessFullResumeHandoff({ ...input, document: input.root, syncPolicyAlreadyApplied });',
+					'}',
+				]
+			: [];
 	return [
 		'async function marklessResumeSpecializedScalarEvent(input) {',
 		'	const action = marklessScalarSpecializedAction(input);',
@@ -481,8 +551,9 @@ function emitSpecializedScalarDispatcher(actions: ReadonlyArray<ScalarSpecializa
 			? 'function marklessScalarSpecializedHostMiss(_input, site) { return marklessScalarSpecializedError("MARKLESS_SCALAR_SPECIALIZED_HOST_MISS", site); }'
 			: 'function marklessScalarSpecializedHostMiss(input, site) { return marklessScalarSpecializedFallback(input, site); }',
 		'function marklessScalarSpecializedAction(input) {',
-		...actions.map((action) =>
-			`	if (marklessScalarEventMatches(input, marklessFindElementAtDomOrderIndex(input.root, ${action.hostIndex}), ${JSON.stringify(action.hostTagName.toLowerCase())}, ${JSON.stringify(action.eventName)}, ${JSON.stringify(action.hostNodeId)})) return ${action.name};`,
+		...actions.map(
+			(action) =>
+				`	if (marklessScalarEventMatches(input, marklessFindElementAtDomOrderIndex(input.root, ${action.hostIndex}), ${JSON.stringify(action.hostTagName.toLowerCase())}, ${JSON.stringify(action.eventName)}, ${JSON.stringify(action.hostNodeId)})) return ${action.name};`,
 		),
 		'}',
 		'function marklessScalarEventMatches(input, host, tagName, eventName, hostNodeId) {',
@@ -505,10 +576,14 @@ function emitScalarAction(action: ScalarSpecialization, loadSymbolName: string):
 		'	try {',
 		`	const host = marklessFindElementAtDomOrderIndex(input.root, ${action.hostIndex});`,
 		`	if (!host || (${JSON.stringify(action.hostTagName.toLowerCase())} !== "*" && host.tagName.toLowerCase() !== ${JSON.stringify(action.hostTagName.toLowerCase())})) return marklessScalarSpecializedHostMiss(input, "host");`,
-		...action.textUpdates.map((update, index) =>
-			`	const textTarget${index} = marklessFindElementAtDomOrderIndex(input.root, ${update.index});`,
+		...action.textUpdates.map(
+			(update, index) =>
+				`	const textTarget${index} = marklessFindElementAtDomOrderIndex(input.root, ${update.index});`,
 		),
-		...action.textUpdates.map((update, index) => `	if (!textTarget${index} || (${JSON.stringify(update.tagName.toLowerCase())} !== "*" && textTarget${index}.tagName.toLowerCase() !== ${JSON.stringify(update.tagName.toLowerCase())})) return marklessScalarSpecializedHostMiss(input, "text-target");`),
+		...action.textUpdates.map(
+			(update, index) =>
+				`	if (!textTarget${index} || (${JSON.stringify(update.tagName.toLowerCase())} !== "*" && textTarget${index}.tagName.toLowerCase() !== ${JSON.stringify(update.tagName.toLowerCase())})) return marklessScalarSpecializedHostMiss(input, "text-target");`,
+		),
 		'	const graph = {',
 		`		hasCell(graphNodeId) { return graphNodeId === ${JSON.stringify(action.cell)}; },`,
 		`		read(graphNodeId, path = []) { if (graphNodeId !== ${JSON.stringify(action.cell)} || path.length) return marklessScalarSpecializedError("MARKLESS_SCALAR_SPECIALIZED_ESCALATE", "read"); return state.value; },`,
@@ -532,15 +607,16 @@ function emitScalarAction(action: ScalarSpecialization, loadSymbolName: string):
 		'	await Promise.resolve(symbol({ graph: { ...graph, write() {}, update(update) { const value = graph.read(update.graphNodeId, update.path ?? []); return update.returnValue === "previous" || update.returnValue === "next" ? value : undefined; } }, event: input.event, element: host, getElementHandle: () => undefined }));',
 		'	if (state.dirty) {',
 		'		state.dirty = false;',
-		...action.textUpdates.map((update, index) =>
-			`		textTarget${index}.textContent = marklessUpdateText({ domUpdate: { hostNodeId: ${JSON.stringify(update.hostNodeId)} }, value: ${JSON.stringify(update.prefix ?? '')} + (state.value == null ? '' : String(state.value)) }, ${JSON.stringify(update.hostNodeId)}).value;`,
+		...action.textUpdates.map(
+			(update, index) =>
+				`		textTarget${index}.textContent = marklessUpdateText({ domUpdate: { hostNodeId: ${JSON.stringify(update.hostNodeId)} }, value: ${JSON.stringify(update.prefix ?? '')} + (state.value == null ? '' : String(state.value)) }, ${JSON.stringify(update.hostNodeId)}).value;`,
 		),
 		'	}',
 		'	} catch (error) {',
 		'		if (error?.code === "MARKLESS_SCALAR_SPECIALIZED_ESCALATE") error.syncPolicyAlreadyApplied = syncPolicyAlreadyApplied;',
 		'		throw error;',
 		'	}',
-	'}',
+		'}',
 	].join('\n');
 }
 
@@ -580,7 +656,8 @@ function conditionGraphNodeIds(condition: unknown): string[] {
 		readonly condition?: unknown;
 		readonly conditions?: ReadonlyArray<unknown>;
 	};
-	if (typed.type === 'graph-truthy' && typeof typed.graphNodeId === 'string') return [typed.graphNodeId];
+	if (typed.type === 'graph-truthy' && typeof typed.graphNodeId === 'string')
+		return [typed.graphNodeId];
 	if (typed.type === 'not') return conditionGraphNodeIds(typed.condition);
 	if ((typed.type === 'and' || typed.type === 'or') && Array.isArray(typed.conditions)) {
 		return typed.conditions.flatMap(conditionGraphNodeIds);
@@ -591,7 +668,14 @@ function conditionGraphNodeIds(condition: unknown): string[] {
 type LeanResumeMode = 'none' | 'scalar' | 'row' | 'mixed';
 
 function leanResumeMode(runtimeDemandMap: unknown): LeanResumeMode {
-	const recordKinds = (runtimeDemandMap as { readonly recordKinds?: ReadonlyArray<{ readonly kind: string; readonly replaced: boolean }> })?.recordKinds;
+	const recordKinds = (
+		runtimeDemandMap as {
+			readonly recordKinds?: ReadonlyArray<{
+				readonly kind: string;
+				readonly replaced: boolean;
+			}>;
+		}
+	)?.recordKinds;
 	if (!recordKinds) return 'none';
 	const replaced = new Map(recordKinds.map((record) => [record.kind, record.replaced]));
 	const scalar = replaced.get('event') === true && replaced.get('dom-update') === true;

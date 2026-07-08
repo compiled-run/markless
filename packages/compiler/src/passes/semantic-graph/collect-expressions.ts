@@ -75,13 +75,20 @@ export function collectCollectionCall(node: AnyNode, state: WalkState): void {
 		argumentSources: asNodes(node.arguments).map((argument) =>
 			expressionSource(argument, state.source),
 		),
-		optional: node.optional === true || callee.optional === true || isChainExpression(node.callee),
+		optional:
+			node.optional === true || callee.optional === true || isChainExpression(node.callee),
 	});
 }
 
 const templateValueTypes = new Set([
-	'Element', 'JSXElement', 'Fragment', 'JSXFragment',
-	'JSXIfExpression', 'JSXForExpression', 'JSXSwitchExpression', 'JSXTryExpression',
+	'Element',
+	'JSXElement',
+	'Fragment',
+	'JSXFragment',
+	'JSXIfExpression',
+	'JSXForExpression',
+	'JSXSwitchExpression',
+	'JSXTryExpression',
 ]);
 
 export function findTemplateValue(node: AnyNode | undefined): AnyNode | null {
@@ -240,9 +247,10 @@ function sharedScope(state: WalkState): { readonly sharedDefinitionId?: string }
 		: {};
 }
 
-function writeScope(
-	state: WalkState,
-): { readonly writeScope: 'component' | 'handler' | 'helper' | 'computed' | 'module'; readonly componentName?: string } {
+function writeScope(state: WalkState): {
+	readonly writeScope: 'component' | 'handler' | 'helper' | 'computed' | 'module';
+	readonly componentName?: string;
+} {
 	if (state.currentFunctionSite) {
 		return {
 			writeScope: state.currentFunctionSite,

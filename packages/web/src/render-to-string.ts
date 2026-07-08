@@ -247,7 +247,11 @@ function boundaryArmEventNames(
 	boundary: ProtocolViewPayload['asyncBoundaries'][number],
 ): ReadonlyArray<string> {
 	const armRecords = (
-		boundary as { readonly armRecords?: { readonly events?: ReadonlyArray<{ readonly eventName: string }> } }
+		boundary as {
+			readonly armRecords?: {
+				readonly events?: ReadonlyArray<{ readonly eventName: string }>;
+			};
+		}
 	).armRecords;
 	if (!armRecords || Array.isArray(armRecords)) return [];
 	return (armRecords.events ?? []).map((event) => event.eventName);
@@ -359,8 +363,9 @@ function defaultInlineResumerSource(
 		if (c.type === 'graph-truthy') return !!globalThis.__marklessInlineSyncPolicy.g(r, c.graphNodeId, c.path);`
 		: `
 		if (c.type === 'graph-truthy') return false;`;
-	const localSyncPolicySource = includeSyncPolicy && !includeSharedSyncPolicyRuntime
-		? `
+	const localSyncPolicySource =
+		includeSyncPolicy && !includeSharedSyncPolicyRuntime
+			? `
 	const q = (c, e) => {
 		if (!c) return false;
 		if (c.type === 'and') return c.conditions.every((x) => q(x, e));
@@ -380,7 +385,7 @@ ${graphConditionSource}
 			}
 		}
 	};`
-		: '';
+			: '';
 	const runSyncPolicy = includeSyncPolicy
 		? `
 					let sp = false;
@@ -452,11 +457,15 @@ ${runSyncPolicy}
 				await mod.resumeContainerEvent({ root: r, event: e, element: e.target, eventRecord: null });
 				return;
 			}
-${executionLog === 'never' ? '' : `			if (globalThis.__mxLog) {
+${
+	executionLog === 'never'
+		? ''
+		: `			if (globalThis.__mxLog) {
 				const mod = await import(${JSON.stringify(resumeModuleUrl)});
 				await mod.resumeContainerEvent({ root: r, event: e, element: e.target, eventRecord: null });
 			}
-`}		}, true);
+`
+}		}, true);
 	}
 })();`;
 }

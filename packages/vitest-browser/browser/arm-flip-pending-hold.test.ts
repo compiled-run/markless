@@ -47,8 +47,12 @@ test('a branch reading through a pending async re-run holds its prior arm until 
 		// settle commit that carries target-1. A frame showing target-0 with
 		// the Idle pill is a flip that ran on the pending snapshot.
 		if (sample.includes('target-0')) {
-			expect(sample, 'flip committed during the pending window').toContain('data-tracking-pill');
-			expect(sample, 'flip committed during the pending window').not.toContain('data-idle-pill');
+			expect(sample, 'flip committed during the pending window').toContain(
+				'data-tracking-pill',
+			);
+			expect(sample, 'flip committed during the pending window').not.toContain(
+				'data-idle-pill',
+			);
 		}
 		// D8 part B still holds at the arm level: no pending arm, no blank range.
 		expect(sample).not.toContain('data-booting');

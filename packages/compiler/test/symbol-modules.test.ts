@@ -208,7 +208,9 @@ test('emitSymbolModules emits conditional text DOM update values', () => {
 test('emitSymbolModules emits repeat-local assignment values through context locals', () => {
 	const artifact = emitSelectAssignmentSymbol('entry.code', repeatLocalPublicRenderPlan());
 
-	expect(artifact.modules[0].source).toContain("import { marklessWriteScalar } from '@markless/web/fns/write-scalar';");
+	expect(artifact.modules[0].source).toContain(
+		"import { marklessWriteScalar } from '@markless/web/fns/write-scalar';",
+	);
 	expect(artifact.modules[0].source).toContain('return marklessWriteScalar(context, {');
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:selected"');
 	expect(artifact.modules[0].source).toContain('value: context.locals?.entry?.code');
@@ -414,7 +416,8 @@ test('emitSymbolModules emits inline behavior function modules without imports',
 	});
 
 	expect(artifact.modules).toHaveLength(1);
-	expect(artifact.modules[0].source).toBe(`export const authoredSource = "(element) => element.focus()";
+	expect(artifact.modules[0].source)
+		.toBe(`export const authoredSource = "(element) => element.focus()";
 export const behaviorFunctionSource = "(element) => element.focus()";
 export const behaviorInputSources = [];
 
@@ -597,9 +600,7 @@ test('emitSymbolModules emits sync computed derive modules from planned sources'
 	expect(artifact.modules[0].source).toContain(
 		'export const authoredSource = "() => count * 2";',
 	);
-	expect(artifact.modules[0].source).toContain(
-		'return context.graph.read("state:count") * 2;',
-	);
+	expect(artifact.modules[0].source).toContain('return context.graph.read("state:count") * 2;');
 });
 
 test('emitSymbolModules emits static delete writes for event handler modules', () => {
@@ -1814,7 +1815,9 @@ test('B908 preserves simple count++ handler semantics as a spliced graph write',
 		writes: [countUpdateWrite()],
 	});
 
-	expect(source).toContain("import { marklessWriteScalar } from '@markless/web/fns/write-scalar';");
+	expect(source).toContain(
+		"import { marklessWriteScalar } from '@markless/web/fns/write-scalar';",
+	);
 	expect(source).toContain('return marklessWriteScalar(context, {');
 	expect(source).toContain('graphNodeId: "state:count"');
 	expect(source).toContain('return Number(value) + 1;');
@@ -1862,7 +1865,9 @@ export function App() @{
 	});
 
 	const handler = result.symbolModules.modules.find((m) => m.kind === 'event-handler');
-	expect(handler?.source).toContain('setTimeout(() => context.getElementHandle("input")?.focus(), 1);');
+	expect(handler?.source).toContain(
+		'setTimeout(() => context.getElementHandle("input")?.focus(), 1);',
+	);
 });
 
 test('B908 Unit B ignores element handle lookalikes inside string literals', async () => {
@@ -1948,7 +1953,14 @@ function namedImport(localName: string, source: string) {
 }
 
 function countUpdateWrite() {
-	return { source: 'count', graphNodeId: 'state:count', path: [], operation: 'update' as const, updateOperator: '++' as const, prefix: false };
+	return {
+		source: 'count',
+		graphNodeId: 'state:count',
+		path: [],
+		operation: 'update' as const,
+		updateOperator: '++' as const,
+		prefix: false,
+	};
 }
 
 test('emitSymbolModules preserves imports referenced by authored handler bodies', () => {

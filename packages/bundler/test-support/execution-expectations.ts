@@ -10,7 +10,10 @@ export type PayloadRecordInventory = {
 	readonly domUpdates?: ReadonlyArray<{ readonly hostNodeId: string }>;
 	readonly keyedRepeats?: ReadonlyArray<{
 		readonly parentHostNodeId: string;
-		readonly rowEvents: ReadonlyArray<{ readonly eventName: string; readonly syncPolicy?: unknown }>;
+		readonly rowEvents: ReadonlyArray<{
+			readonly eventName: string;
+			readonly syncPolicy?: unknown;
+		}>;
 	}>;
 	readonly branches?: ReadonlyArray<unknown>;
 	readonly asyncBoundaries?: ReadonlyArray<unknown>;
@@ -60,11 +63,16 @@ export function deriveAllowedModules(
 	const kindReplaced = new Map(
 		(runtimeDemandMap.recordKinds ?? []).map((kind) => [kind.kind, kind.replaced]),
 	);
-	const actionKind = action.recordKind === 'keyed-repeat-row' ? 'keyed-repeat' : (action.recordKind ?? 'event');
+	const actionKind =
+		action.recordKind === 'keyed-repeat-row' ? 'keyed-repeat' : (action.recordKind ?? 'event');
 	const pageHasSyncPolicy =
-		(payloadRecordInventory.events ?? []).some((event) => (event as { syncPolicy?: unknown }).syncPolicy) ||
+		(payloadRecordInventory.events ?? []).some(
+			(event) => (event as { syncPolicy?: unknown }).syncPolicy,
+		) ||
 		(payloadRecordInventory.keyedRepeats ?? []).some((repeat) =>
-			((repeat as { rowEvents?: ReadonlyArray<{ syncPolicy?: unknown }> }).rowEvents ?? []).some((event) => event.syncPolicy),
+			(
+				(repeat as { rowEvents?: ReadonlyArray<{ syncPolicy?: unknown }> }).rowEvents ?? []
+			).some((event) => event.syncPolicy),
 		);
 	if (pageHasSyncPolicy && kindReplaced.get(actionKind) === false) {
 		allowed.add('web/inline/sync-policy-core');
@@ -80,7 +88,12 @@ export function forbiddenExecutedModules(
 	allowed: ReadonlySet<string>,
 ): string[] {
 	return [...executed]
-		.filter((id) => !isAllowedDispatchCoreVirtual(id) && isMarklessRuntimeModule(id) && !allowed.has(id))
+		.filter(
+			(id) =>
+				!isAllowedDispatchCoreVirtual(id) &&
+				isMarklessRuntimeModule(id) &&
+				!allowed.has(id),
+		)
 		.sort();
 }
 
@@ -138,13 +151,19 @@ function interpreterModulesForUnreplacedKinds(
 	kinds: ReadonlyArray<string>,
 ): ReadonlyArray<string> {
 	const phases = new Map(
-		((map as { readonly recordKinds?: ReadonlyArray<{ readonly kind: string; readonly replaced: boolean }> })
-			.recordKinds ?? []).map((kind) => [kind.kind, kind.replaced]),
+		(
+			(
+				map as {
+					readonly recordKinds?: ReadonlyArray<{
+						readonly kind: string;
+						readonly replaced: boolean;
+					}>;
+				}
+			).recordKinds ?? []
+		).map((kind) => [kind.kind, kind.replaced]),
 	);
 	return unique(
-		kinds.flatMap((kind) =>
-			phases.get(kind) === false ? interpreterChainForKind(kind) : [],
-		),
+		kinds.flatMap((kind) => (phases.get(kind) === false ? interpreterChainForKind(kind) : [])),
 	);
 }
 
@@ -203,6 +222,18 @@ function unique(values: ReadonlyArray<string | undefined>): string[] {
 const INTERPRETER_CHAIN_EXCLUDED_MODULES = new Set(['web/dom-journal']);
 const RUNTIME_IMPORT_EDGES: Record<string, ReadonlyArray<string>> = {
 	'core/web/resume': ['web/resume'],
-	'web/resume': ['web/resume-runtime', 'web/resume-locators', 'web/payload-full', 'web/payload-resume', 'web/payload-graph-construct', 'web/resume-async-wiring', 'web/runtime-error-reporting'],
-	'web/resume-runtime': ['web/resume-events', 'web/resume-runtime-shared', 'web/resume-runtime-start'],
+	'web/resume': [
+		'web/resume-runtime',
+		'web/resume-locators',
+		'web/payload-full',
+		'web/payload-resume',
+		'web/payload-graph-construct',
+		'web/resume-async-wiring',
+		'web/runtime-error-reporting',
+	],
+	'web/resume-runtime': [
+		'web/resume-events',
+		'web/resume-runtime-shared',
+		'web/resume-runtime-start',
+	],
 };

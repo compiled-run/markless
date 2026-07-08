@@ -60,7 +60,10 @@ export function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string 
 			// flip through the branch record, so they never carry the arm-host
 			// tag that would claim them for the boundary's own locators.
 			const csrArmFlip =
-				!!csrSite && csrGate?.supported === true && csrGate.armScoped === true && csrGate.armFlip === true;
+				!!csrSite &&
+				csrGate?.supported === true &&
+				csrGate.armScoped === true &&
+				csrGate.armFlip === true;
 			const armHostIdByNode = context.armHostIdByNode;
 			if (csrArmFlip) context.armHostIdByNode = undefined;
 			// Child-component renders inside an arm are gated by the arm test:
@@ -298,7 +301,7 @@ function emitSsrRepeatRows(node: AnyNode, context: SsrRenderContext): string {
 		// authored rows cost a full debugging session.
 		throw new Error(
 			'MARKLESS_REPEAT_UNPLANNED: @for inside an @try/@pending/@catch boundary is not supported yet. ' +
-			'Move the repeat outside the async arm or lift the resolved data into page scope.',
+				'Move the repeat outside the async arm or lift the resolved data into page scope.',
 		);
 	}
 	const gate = context.repeatGates.find((item) => item.repeatId === repeat.id);
@@ -560,7 +563,10 @@ function emitSwitchHtml(node: AnyNode, context: HtmlRenderContext): string {
 	let maxComponentEdgeIndex = before?.nextComponentEdgeIndex ?? 0;
 
 	const switchArmFlip =
-		!!site && siteGate?.supported === true && siteGate.armScoped === true && siteGate.armFlip === true;
+		!!site &&
+		siteGate?.supported === true &&
+		siteGate.armScoped === true &&
+		siteGate.armFlip === true;
 	// Case gates for CSR child-component renders (see the @if CSR note): each
 	// tested case gates on discriminant equality; @default gates on none of the
 	// tested cases matching.
@@ -581,7 +587,9 @@ function emitSwitchHtml(node: AnyNode, context: HtmlRenderContext): string {
 			const armHostIdByNode = context.armHostIdByNode;
 			if (switchArmFlip) context.armHostIdByNode = undefined;
 			const caseStart = csrChildReplacementCount(context);
-			const csrBody = joinSsrExpressions(children.map((child) => emitHtmlNode(child, context)));
+			const csrBody = joinSsrExpressions(
+				children.map((child) => emitHtmlNode(child, context)),
+			);
 			const test = switchCase.test as AnyNode | undefined;
 			gateCsrChildReplacements(
 				context,
@@ -599,7 +607,8 @@ function emitSwitchHtml(node: AnyNode, context: HtmlRenderContext): string {
 			// cases are branch-owned and render locator-free instead.
 			insideSupportedBranchArm:
 				(context as SsrRenderContext).insideSupportedBranchArm ||
-				(!!siteGate?.supported && (siteGate.armScoped !== true || siteGate.armFlip === true)),
+				(!!siteGate?.supported &&
+					(siteGate.armScoped !== true || siteGate.armFlip === true)),
 		};
 		const body = joinSsrExpressions(children.map((child) => emitHtmlNode(child, caseContext)));
 		maxChildIndex = Math.max(maxChildIndex, caseContext.nextChildIndex);

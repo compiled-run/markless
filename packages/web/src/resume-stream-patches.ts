@@ -54,7 +54,10 @@ export function adoptStreamedArmPatches(
 	);
 	const patchByGraphNode = new Map(
 		patchScripts
-			.filter((script) => !uncommittedGraphNodeIds.has(script.getAttribute('data-graph-node') ?? ''))
+			.filter(
+				(script) =>
+					!uncommittedGraphNodeIds.has(script.getAttribute('data-graph-node') ?? ''),
+			)
 			.map((script) => [
 				script.getAttribute('data-graph-node'),
 				JSON.parse(script.textContent ?? 'null') as { readonly snapshot?: unknown } | null,

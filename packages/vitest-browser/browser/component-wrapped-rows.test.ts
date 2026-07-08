@@ -11,6 +11,8 @@ test('SSR: component-wrapped page renders repeat rows and dispatches row events'
 	expect(rows[0]?.getAttribute('data-row-id')).toBe('row-alpha');
 
 	(rows[1] as HTMLElement).click();
-	await expect.poll(() => screen.container.querySelector('[data-picks]')?.textContent).toBe('Picks 1');
+	await expect
+		.poll(() => screen.container.querySelector('[data-picks]')?.textContent)
+		.toBe('Picks 1');
 	await cleanup();
 });

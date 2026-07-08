@@ -53,7 +53,11 @@ export function collectModuleScopeGraphCreation(statement: AnyNode, state: WalkS
 
 		if (frameworkApi === 'element') {
 			state.graph.diagnostics.push(
-				moduleScopeElementDiagnostic(moduleScopeDeclarationName(id, state.source), init, state.filename),
+				moduleScopeElementDiagnostic(
+					moduleScopeDeclarationName(id, state.source),
+					init,
+					state.filename,
+				),
 			);
 			continue;
 		}

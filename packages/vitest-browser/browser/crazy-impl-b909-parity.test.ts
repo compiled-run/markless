@@ -28,10 +28,12 @@ test('B909: tampered event-only payload reports MARKLESS_PAYLOAD_INVALID, not Na
 		const rejections = rejectionLog();
 		state.textContent = JSON.stringify({ version: 1, cells: 'tampered' });
 		button.click();
-		await expect.poll(() => rejections[0]).toMatchObject({
-			code: 'MARKLESS_PAYLOAD_INVALID',
-			docsUrl: 'https://markless.dev/errors/MARKLESS_PAYLOAD_INVALID',
-		});
+		await expect
+			.poll(() => rejections[0])
+			.toMatchObject({
+				code: 'MARKLESS_PAYLOAD_INVALID',
+				docsUrl: 'https://markless.dev/errors/MARKLESS_PAYLOAD_INVALID',
+			});
 		expect(button.textContent).toBe('0');
 		rejections.stop();
 		await cleanup();
@@ -51,7 +53,11 @@ test('B909: second full resume is a guarded no-op warning (3/3)', async () => {
 	for (let run = 0; run < 3; run++) {
 		const { container } = await renderSSR(B909Fixture);
 		const root = required<HTMLElement>(container, '[data-async-container]');
-		await resumeFromPayloadDocument({ document: root, root, loadSymbol: () => () => undefined });
+		await resumeFromPayloadDocument({
+			document: root,
+			root,
+			loadSymbol: () => () => undefined,
+		});
 		const second = await resumeFromPayloadDocument({
 			document: root,
 			root,

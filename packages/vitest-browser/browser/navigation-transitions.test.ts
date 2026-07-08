@@ -49,7 +49,8 @@ function createRouteDocument(): Document {
 
 function sampleBody(routeDocument: Document): Sampler {
 	const samples: BodySample[] = [];
-	const record = () => samples.push({ at: performance.now(), html: routeDocument.body.innerHTML });
+	const record = () =>
+		samples.push({ at: performance.now(), html: routeDocument.body.innerHTML });
 	const observer = new MutationObserver(record);
 	observer.observe(routeDocument.body, {
 		attributes: true,
@@ -70,7 +71,12 @@ function navigateTo(routeDocument: Document, page: unknown, pathname: string): n
 	const at = performance.now();
 	dispatchRouteUpdate(routeDocument, {
 		page: { default: page },
-		route: { file: `pages${pathname}.tsrx`, params: {}, status: 200, url: `http://localhost${pathname}` },
+		route: {
+			file: `pages${pathname}.tsrx`,
+			params: {},
+			status: 200,
+			url: `http://localhost${pathname}`,
+		},
 	});
 	return at;
 }
@@ -97,7 +103,12 @@ test('fast route swap: no pending frame, one swap, outgoing page stays interacti
 	const routeDocument = createRouteDocument();
 
 	navigateTo(routeDocument, AlphaPage, '/alpha');
-	await waitForBody(routeDocument, (html) => html.includes('data-nav-settled="alpha"'), 3000, 'alpha settle');
+	await waitForBody(
+		routeDocument,
+		(html) => html.includes('data-nav-settled="alpha"'),
+		3000,
+		'alpha settle',
+	);
 
 	const sampler = sampleBody(routeDocument);
 	navigateTo(routeDocument, BetaPage, '/beta');
@@ -107,7 +118,12 @@ test('fast route swap: no pending frame, one swap, outgoing page stays interacti
 	if (!tap) throw new Error('Expected the alpha tap button in the live DOM.');
 	tap.click();
 
-	await waitForBody(routeDocument, (html) => html.includes('data-nav-settled="beta"'), 3000, 'beta settle');
+	await waitForBody(
+		routeDocument,
+		(html) => html.includes('data-nav-settled="beta"'),
+		3000,
+		'beta settle',
+	);
 	sampler.stop();
 
 	// D8: the destination's @pending arm never exists in the live document.
@@ -133,7 +149,12 @@ test('slow destination: pending appears only after the deadline and stays the mi
 	const routeDocument = createRouteDocument();
 
 	navigateTo(routeDocument, AlphaPage, '/alpha');
-	await waitForBody(routeDocument, (html) => html.includes('data-nav-settled="alpha"'), 3000, 'alpha settle');
+	await waitForBody(
+		routeDocument,
+		(html) => html.includes('data-nav-settled="alpha"'),
+		3000,
+		'alpha settle',
+	);
 
 	const sampler = sampleBody(routeDocument);
 	navigateTo(routeDocument, SlowPage, '/slow');
@@ -143,7 +164,12 @@ test('slow destination: pending appears only after the deadline and stays the mi
 	if (!tap) throw new Error('Expected the alpha tap button in the live DOM.');
 	tap.click();
 
-	await waitForBody(routeDocument, (html) => html.includes('data-nav-settled="slow"'), 5000, 'slow settle');
+	await waitForBody(
+		routeDocument,
+		(html) => html.includes('data-nav-settled="slow"'),
+		5000,
+		'slow settle',
+	);
 	sampler.stop();
 
 	const pending = firstSampleWith(sampler.samples, 'data-nav-pending="slow"');

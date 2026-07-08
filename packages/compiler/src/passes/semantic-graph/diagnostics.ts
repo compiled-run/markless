@@ -179,7 +179,8 @@ export function moduleScopeElementDiagnostic(
 		message: `Cannot create element handle "${name}" at module scope.`,
 		why: 'Element handles are per-render DOM locators. A module-scope handle would be shared across requests and cannot point at one document-owned host element.',
 		span: init ? sourceSpan(init, filename) : fallbackSpan(filename),
-		suggestion: 'Move element() creation into the component that owns the host element and bind it with el={handle}.',
+		suggestion:
+			'Move element() creation into the component that owns the host element and bind it with el={handle}.',
 		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_MODULE_SCOPE',
 	});
 }
@@ -243,7 +244,8 @@ export function crossModuleHelperStateReturnUnsupportedDiagnostic(input: {
 		title: 'Imported helper-created state needs module analysis',
 		message: `Cannot call imported helper "${input.helperName}" from "${input.sourceModule}" as component state because graph analysis is not available for that module.`,
 		why: 'Per-module compilation can connect helper-created state only when the imported module was compiled with a module graph interface that describes exported helper graph semantics.',
-		suggestion: 'Compile the helper module with interface output and pass that interface to this module compile, or declare the state in this component body for now.',
+		suggestion:
+			'Compile the helper module with interface output and pass that interface to this module compile, or declare the state in this component body for now.',
 		span: sourceSpan(input.init, input.filename),
 	});
 }
@@ -276,7 +278,8 @@ export function unsupportedHelperStateReturnDiagnostic(input: {
 		title: 'Helper-created state return shape is not supported yet',
 		message: `Cannot connect helper "${input.helperName}" return value "${input.source}" to graph state. This slice supports returning one state() or computed() binding directly.`,
 		why: 'Object-return and more complex helper return shapes need additional return-path alias artifacts before reads, writes, and payload cells can stay unambiguous.',
-		suggestion: 'Return the graph binding directly from the same-module helper, or declare the state in the component body for now.',
+		suggestion:
+			'Return the graph binding directly from the same-module helper, or declare the state in the component body for now.',
 		span: sourceSpan(input.init, input.filename),
 	});
 }
@@ -559,9 +562,7 @@ export function invalidSharedScopeDiagnostic(input: {
 }): SemanticGraphDiagnostic {
 	const valid = '"request", "container", and "page"';
 	const literal = input.valueSource?.startsWith("'") || input.valueSource?.startsWith('"');
-	const valueText = literal
-		? `"${input.valueSource?.slice(1, -1)}"`
-		: input.valueSource;
+	const valueText = literal ? `"${input.valueSource?.slice(1, -1)}"` : input.valueSource;
 	return semanticGraphDiagnostic({
 		code: 'MARKLESS_SHARED_SCOPE_INVALID',
 		title: 'shared() scope must be valid',
@@ -655,7 +656,8 @@ export function elementHandleRenderReadDiagnostic(input: {
 		message: `Cannot render "${input.source}" because "${input.handleName}" is an element() handle, not serializable graph state.`,
 		why: 'During initial render the browser DOM element does not exist, and browser resume does not rerun component bodies. Element handles are available to lazy event or behavior code after resume locates the host node.',
 		span: input.sourceSpan,
-		suggestion: 'Read DOM properties inside an event handler or attach behavior, and render serializable state() or computed() data instead.',
+		suggestion:
+			'Read DOM properties inside an event handler or attach behavior, and render serializable state() or computed() data instead.',
 		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_RENDER_READ',
 	});
 }
@@ -800,42 +802,53 @@ export function attachHostElementRequiredDiagnostic(
 
 type AttributeDisciplineNode = { readonly node: AnyNode; readonly filename: string };
 
-export function eventSpreadUnsupportedDiagnostic(input: AttributeDisciplineNode & {
-	readonly spreadSource: string;
-	readonly keys: ReadonlyArray<string>;
-}): SemanticGraphDiagnostic {
+export function eventSpreadUnsupportedDiagnostic(
+	input: AttributeDisciplineNode & {
+		readonly spreadSource: string;
+		readonly keys: ReadonlyArray<string>;
+	},
+): SemanticGraphDiagnostic {
 	const listed = input.keys.map((key) => `\`${key}\``).join(', ');
 	return attributeDisciplineDiagnostic(input.node, input.filename, {
-		code: 'MARKLESS_EVENT_SPREAD_UNSUPPORTED', severity: 'error',
+		code: 'MARKLESS_EVENT_SPREAD_UNSUPPORTED',
+		severity: 'error',
 		title: 'Event handlers cannot be spread onto an element',
 		message: `{...${input.spreadSource}} spreads ${listed} onto an element. Events compile to static view records, so handlers inside a spread would be discarded.`,
 		why: 'The compiler owns event discovery so the browser can resume without scanning markup; a runtime spread hides which events exist from the compiler.',
-		suggestion: 'Write event props directly, for example <input onClick={handlers.onClick} onInput={handlers.onInput} />, and keep spreads for plain static attributes.',
+		suggestion:
+			'Write event props directly, for example <input onClick={handlers.onClick} onInput={handlers.onInput} />, and keep spreads for plain static attributes.',
 	});
 }
 
-export function spreadStaticSnapshotDiagnostic(input: AttributeDisciplineNode & {
-	readonly spreadSource: string;
-}): SemanticGraphDiagnostic {
+export function spreadStaticSnapshotDiagnostic(
+	input: AttributeDisciplineNode & {
+		readonly spreadSource: string;
+	},
+): SemanticGraphDiagnostic {
 	return attributeDisciplineDiagnostic(input.node, input.filename, {
-		code: 'MARKLESS_SPREAD_STATIC_SNAPSHOT', severity: 'warning',
+		code: 'MARKLESS_SPREAD_STATIC_SNAPSHOT',
+		severity: 'warning',
 		title: 'Spread attributes render once',
 		message: `{...${input.spreadSource}} copies attributes during initial render. When ${input.spreadSource} changes later, these attributes do not update.`,
 		why: 'The compiler plans DOM-update records for graph-backed attributes it can see; a spread hides which attributes exist, so no update records are planned for it.',
-		suggestion: 'Bind attributes that change individually, such as <div id={menu.id} data-open={menu.open} />, and keep the spread only for initial attributes.',
+		suggestion:
+			'Bind attributes that change individually, such as <div id={menu.id} data-open={menu.open} />, and keep the spread only for initial attributes.',
 	});
 }
 
-export function attributeObjectValueDiagnostic(input: AttributeDisciplineNode & {
-	readonly attributeName: string;
-	readonly valueSource: string;
-	readonly eventSuggestion?: string;
-}): SemanticGraphDiagnostic {
+export function attributeObjectValueDiagnostic(
+	input: AttributeDisciplineNode & {
+		readonly attributeName: string;
+		readonly valueSource: string;
+		readonly eventSuggestion?: string;
+	},
+): SemanticGraphDiagnostic {
 	const eventText = input.eventSuggestion
 		? ` If this was meant to be an event, did you mean \`${input.eventSuggestion}\`?`
 		: '';
 	return attributeDisciplineDiagnostic(input.node, input.filename, {
-		code: 'MARKLESS_ATTRIBUTE_OBJECT_VALUE', severity: 'warning',
+		code: 'MARKLESS_ATTRIBUTE_OBJECT_VALUE',
+		severity: 'warning',
 		title: input.eventSuggestion
 			? 'Lowercase on* attributes are plain HTML attributes'
 			: 'This attribute renders "[object Object]"',
@@ -857,7 +870,8 @@ export function duplicateAttributeDiagnostic(input: {
 }): SemanticGraphDiagnostic {
 	const tag = input.tagName ? `<${input.tagName}>` : 'this element';
 	return attributeDisciplineDiagnostic(input.duplicate, input.filename, {
-		code: 'MARKLESS_ATTRIBUTE_DUPLICATE', severity: 'error',
+		code: 'MARKLESS_ATTRIBUTE_DUPLICATE',
+		severity: 'error',
 		title: 'Duplicate attribute on one element',
 		message: `\`${input.attributeName}\` appears twice on ${tag}. Only one can win, and render paths can disagree about which value is used.`,
 		why: 'Duplicate attributes ship invalid HTML and make the element depend on parser and update semantics instead of one authored value.',
@@ -865,15 +879,19 @@ export function duplicateAttributeDiagnostic(input: {
 	});
 }
 
-export function styleObjectUnsupportedDiagnostic(input: AttributeDisciplineNode & {
-	readonly valueSource: string;
-}): SemanticGraphDiagnostic {
+export function styleObjectUnsupportedDiagnostic(
+	input: AttributeDisciplineNode & {
+		readonly valueSource: string;
+	},
+): SemanticGraphDiagnostic {
 	return attributeDisciplineDiagnostic(input.node, input.filename, {
-		code: 'MARKLESS_STYLE_OBJECT_UNSUPPORTED', severity: 'error',
+		code: 'MARKLESS_STYLE_OBJECT_UNSUPPORTED',
+		severity: 'error',
 		title: 'Object style bindings are not supported yet',
 		message: `style={${input.valueSource}} passes an object to style. This compiler slice would render "[object Object]" instead of CSS text.`,
 		why: 'The current public render artifact supports text style attributes, but not object-style lowering into CSS declarations and update records.',
-		suggestion: 'Use a CSS string for now, or bind class names until object-style lowering is implemented.',
+		suggestion:
+			'Use a CSS string for now, or bind class names until object-style lowering is implemented.',
 	});
 }
 
@@ -890,10 +908,15 @@ function attributeDisciplineDiagnostic(
 	},
 ): SemanticGraphDiagnostic {
 	return {
-		code: input.code, severity: input.severity, phase: 'semantic-graph',
-		title: input.title, message: input.message, why: input.why,
+		code: input.code,
+		severity: input.severity,
+		phase: 'semantic-graph',
+		title: input.title,
+		message: input.message,
+		why: input.why,
 		primarySpan: sourceSpan(node, filename),
-		passId: 'tsrx-semantic-graph', artifactKeys: ['semanticGraph'],
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
 		suggestions: [{ message: input.suggestion }],
 		docsUrl: `https://markless.dev/errors/${input.code}`,
 	};

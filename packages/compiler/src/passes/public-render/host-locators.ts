@@ -13,7 +13,7 @@ import type {
 	PlannedSymbol,
 	PublicRenderPlanInput,
 	PublicRenderPlanStaticEventControl,
-	} from '../../artifacts.ts';
+} from '../../artifacts.ts';
 
 export type AssignedHosts = {
 	readonly hostIdByNode: ReadonlyMap<AnyNode, string>;
@@ -231,4 +231,3 @@ export function keyedRepeatNodes(root: AnyNode): AnyNode[] {
 	visit(root);
 	return repeats;
 }
-

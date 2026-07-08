@@ -4,15 +4,9 @@ import {
 	isIgnorableStaticTextNode as isIgnorableTextNode,
 	isStaticTextNode,
 	staticTextValue,
-	} from '../../ast/tsrx.ts';
-import {
-	resolveGraphPath,
-	semanticAliasMap,
-} from '../../artifact-helpers/graph-paths.ts';
-import type {
-	PublicRenderPlanStaticTextWrite,
-	SemanticGraphBinding,
-} from '../../artifacts.ts';
+} from '../../ast/tsrx.ts';
+import { resolveGraphPath, semanticAliasMap } from '../../artifact-helpers/graph-paths.ts';
+import type { PublicRenderPlanStaticTextWrite, SemanticGraphBinding } from '../../artifacts.ts';
 
 export function collectStaticTextWrites(input: {
 	readonly aliases: ReturnType<typeof semanticAliasMap>;
@@ -102,4 +96,3 @@ function staticTextWriteTarget(
 		...(suffix ? { suffix } : {}),
 	};
 }
-
