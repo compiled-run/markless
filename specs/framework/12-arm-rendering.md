@@ -74,11 +74,27 @@ settling boundary appends
 `<script>__mArm("boundary:N")</script>` — the executor routes through the
 same `commitArm` primitive the client tiers use.
 
-## D6. Sequencing
+## D6. Sequencing and defaults (amended 2026-07-07, owner ruling)
 
 Client-side primitive first (tiers 3-4, commitArm); streaming after it proves
 out. Streaming additionally requires incremental snapshot serialization.
 Ordering groups (parallel/sequential/reverse) are a deferred nicety.
+
+STREAMING IS THE DEFAULT SSR POSTURE. Blocking the whole page on every async
+boundary defeats @try's purpose; the router server entry streams by default and
+blocking render is the explicit opt-out. Safe because streaming degrades
+gracefully: a buffering proxy delivers one complete document whose inert
+templates commit on parse — early paint is lost, correctness never.
+
+Three-layer opt-in semantics (no configuration creep — structure and timing
+decide):
+1. Entry: streaming default; `render: 'blocking'`-style option opts out.
+2. Boundary: an authored @pending arm IS the boundary's streaming declaration
+   (it is the waiting UI). A @try without @pending (if the grammar permits one)
+   HOLDS the stream — the structural deferStream equivalent.
+3. Per-request: a first-flush deadline renders fast-settling boundaries inline
+   (no pending flash, no template bytes); only boundaries still pending at
+   flush time stream out of order. Latency decides, not configuration.
 
 ## D7. Navigation
 
