@@ -1,4 +1,5 @@
 import type { PublicRenderModuleInput } from '../../artifacts.ts';
+import type { AnyNode } from '../../ast/nodes.ts';
 import { emitHtmlNode } from './html.ts';
 import { renderBodyLines } from './render-body.ts';
 import { emitCatalogHelperImports, stateRuntimeImports } from './runtime-helpers.ts';
@@ -18,7 +19,34 @@ import {
 	moduleScopeLines,
 } from './shared.ts';
 import { collectCsrPropEvents } from './component-wiring.ts';
+import { assignHostIds } from './host-locators.ts';
 import type { CsrRenderContext, PublicRenderRoot } from './types.ts';
+
+// CSR mounts render each supported boundary's @pending arm inside the root
+// template, but the compile-time per-arm record arrays are not positionally
+// trustworthy once composition adds elements the static walk never counted.
+// Tagging in-arm hosts with data-markless-arm-host lets the CSR compose step
+// armize the live arm from rendered truth — the same earned-trust mechanism
+// the tier-4 arm-render modules use. Hosts outside boundary arms resolve
+// through static host paths and stay untagged.
+function inArmHostIdByNode(
+	input: PublicRenderModuleInput,
+	rootInfo: PublicRenderRoot,
+): ReadonlyMap<AnyNode, string> | undefined {
+	const inArmHostIds = new Set(
+		input.semanticGraph.hostNodes.flatMap((hostNode) =>
+			hostNode.asyncBoundaryId ? [hostNode.id] : [],
+		),
+	);
+	if (inArmHostIds.size === 0 || !rootInfo.moduleAst) return undefined;
+	const assignedHosts = assignHostIds(
+		rootInfo.moduleAst,
+		input.semanticGraph.hostNodes.map((hostNode) => hostNode.id),
+	);
+	return new Map(
+		[...assignedHosts.hostIdByNode].filter(([, hostNodeId]) => inArmHostIds.has(hostNodeId)),
+	);
+}
 
 export function emitPublicCsrRenderModule(
 	input: PublicRenderModuleInput,
@@ -62,6 +90,7 @@ export function emitPublicCsrRenderModule(
 		hasChildrenProp: rootInfo.propNames.includes('children'),
 		styleScopeClass: input.publicRenderPlan.styleScopes[0]?.scopeId ?? null,
 		source: input.source.source,
+		armHostIdByNode: inArmHostIdByNode(input, rootInfo),
 	};
 	const propEvents = collectCsrPropEvents(rootInfo.root, rootInfo.propNames, input.source.source);
 	const propCellId = componentPropCellId(rootInfo.component);

@@ -69,16 +69,19 @@ export async function render(
 ): Promise<CsrRenderContainer> {
 	startCsrPreload(component);
 	const output = typeof component === 'function' ? component() : component.renderCsr();
-	if (output.view && output.state && hasKeyedRepeats(output.view)) {
-		const { validateKeyedRepeatPayloadKeys } = await import('./repeat-runtime.ts');
-		await validateKeyedRepeatPayloadKeys({ state: output.state, view: output.view });
+	const startCsrRuntime = async (runtimeOutput: CsrRenderOutput) =>
+		(await import('./render-csr.ts')).renderCsrRuntime({ output: runtimeOutput, options });
+	if (output.view && hasKeyedRepeats(output.view)) {
+		const repeats = await import('./repeat-runtime.ts');
+		if (output.state) {
+			await repeats.validateKeyedRepeatPayloadKeys({ state: output.state, view: output.view });
+		}
+		if (output.graph && output.runtime) {
+			repeats.validateKeyedRepeatGraphKeys(output.graph, output.view);
+		}
 	}
 
 	if (output.graph && output.runtime) {
-		if (output.view && hasKeyedRepeats(output.view)) {
-			const { validateKeyedRepeatGraphKeys } = await import('./repeat-runtime.ts');
-			validateKeyedRepeatGraphKeys(output.graph, output.view);
-		}
 		const container: CsrRenderContainer = {
 			phase: 'csr',
 			root: output.root,
@@ -98,22 +101,18 @@ export async function render(
 	// indexes shift +1 because the root element joins the dom-order walk —
 	// the same discipline containerScopedView applies for SSR containers.
 	if ((output.root as { readonly nodeType?: number }).nodeType === 11) {
+		const fragmentView = output.view ? offsetElementLocators(output.view, 1) : output.view;
 		// A held route swap cannot mount into the visible target first: the
 		// fragment expands into a layout-transparent holder that stays the
 		// container root, and the holder itself mounts when the hold commits.
 		const holder = options.beforeMount ? createFragmentHolder(options.target) : undefined;
 		if (holder) {
 			mountRoot(holder as RenderTarget, output.root);
-			const container = await import('./render-csr.ts').then((runtime) =>
-				runtime.renderCsrRuntime({
-					output: {
-						...output,
-						root: holder,
-						view: output.view ? offsetElementLocators(output.view, 1) : output.view,
-					},
-					options,
-				}),
-			);
+			const container = await startCsrRuntime({
+				...output,
+				root: holder,
+				view: fragmentView,
+			});
 			if ((await options.beforeMount!(container)) === false) {
 				return disposeCancelledMount(container);
 			}
@@ -121,24 +120,14 @@ export async function render(
 			return container;
 		}
 		mountRoot(options.target, output.root);
-		return await import('./render-csr.ts').then((runtime) =>
-			runtime.renderCsrRuntime({
-				output: {
-					...output,
-					root: options.target as unknown as ResumeDomElement,
-					view: output.view ? offsetElementLocators(output.view, 1) : output.view,
-				},
-				options,
-			}),
-		);
+		return await startCsrRuntime({
+			...output,
+			root: options.target as unknown as ResumeDomElement,
+			view: fragmentView,
+		});
 	}
 
-	const container = await import('./render-csr.ts').then((runtime) =>
-		runtime.renderCsrRuntime({
-			output,
-			options,
-		}),
-	);
+	const container = await startCsrRuntime(output);
 	if ((await options.beforeMount?.(container)) === false) {
 		return disposeCancelledMount(container);
 	}

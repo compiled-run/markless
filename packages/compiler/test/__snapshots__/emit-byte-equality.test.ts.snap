@@ -15,7 +15,7 @@ function marklessRenderCsr(props = {}) {
 	let query = marklessStateValue(marklessCsrRenderStateValues, marklessCsrPayloadState, "state:query");
 	const marklessCsrRuntimeState = { graph: null };
 	const marklessCsrChildren = [];
-	const root = marklessCsrRootFromHtml("<main>" + "<!--markless:async:boundary:0-->" + "<p>" + "Loading" + "</p>" + "<!--/markless:async:boundary:0-->" + "</main>");
+	const root = marklessCsrRootFromHtml("<main>" + "<!--markless:async:boundary:0-->" + "<p data-markless-arm-host=\\"h3\\">" + "Loading" + "</p>" + "<!--/markless:async:boundary:0-->" + "</main>");
 	const marklessCsrView = marklessCsrComposeView(root, payloadView, marklessCsrHostLocators, marklessCsrChildren);
 	const marklessCsrState = marklessComposeState(marklessCsrPayloadState, marklessCsrChildren);
 	return {

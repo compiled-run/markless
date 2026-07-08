@@ -292,6 +292,9 @@ function ignoredDisposedTarget(
 ): boolean {
 	return disposedTargets.has(target);
 }
+// Local copy of the resume-locators containsElement: importing that module
+// here regroups the wall-counted chunk graph, which costs more than the
+// duplication saves (T120 measurement; re-confirmed on this tree).
 function containsElement(root: ResumeDomElement, target: ResumeDomElement): boolean {
 	if (root === target) return true;
 	for (const child of root.childNodes ?? [])
