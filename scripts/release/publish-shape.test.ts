@@ -9,6 +9,13 @@ import { describe, expect, test } from 'vitest';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
+// bumpp keeps every release package's version in lockstep with the workspace
+// root — assert against that, never a literal (a literal goes stale on the
+// first release after it is written).
+const workspaceVersion = (
+	JSON.parse(readFileSync(resolve(repoRoot, 'package.json'), 'utf8')) as { version: string }
+).version;
+
 const releasePackages = [
 	'core',
 	'web',
@@ -95,7 +102,7 @@ describe('publish manifest shape', () => {
 		test(`@markless/${packageName} carries publishable fields`, () => {
 			const manifest = readManifest(packageName);
 			expect(manifest.private, `${packageName} must not be private`).toBeUndefined();
-			expect(manifest.version, `${packageName} version`).toBe('0.1.0');
+			expect(manifest.version, `${packageName} version`).toBe(workspaceVersion);
 			expect(manifest.license, `${packageName} license`).toBe('MIT');
 			expect(manifest.publishConfig?.access, `${packageName} access`).toBe('public');
 			expect(manifest.files, `${packageName} files field`).toContain('dist');
