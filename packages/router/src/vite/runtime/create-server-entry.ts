@@ -155,9 +155,10 @@ async function renderPageModule(
 	// only on Link/'#/' anchor interaction, or at load when a '#/' deep-link
 	// hash is actually present. No eager imports, no modes.
 	const linkBridge = navigationEntryPath ? renderLinkBridgeScript(navigationEntryPath) : '';
+	const stateWithProps = withPagePropsCell(output.state, props);
 	const routedOutput =
-		routeScript || linkBridge
-			? { ...output, html: `${output.html}${routeScript}${linkBridge}` }
+		routeScript || linkBridge || stateWithProps !== output.state
+			? { ...output, state: stateWithProps, html: `${output.html}${routeScript}${linkBridge}` }
 			: output;
 	const modulePreloads = modulePreloadsForPage(
 		file,
@@ -179,6 +180,27 @@ async function renderPageModule(
 	});
 
 	return splitLeadingModulePreloadLinks(rendered);
+}
+
+// Symbol modules and props+state computeds re-running on a resumed page read
+// page props through the graph's `prop:props` cell (need 14, SSR side). The
+// live props ride the payload as a directValue cell; renderToString
+// envelope-encodes it before the payload script is served. Pages that already
+// seeded the cell, and pages without a resumability payload, are untouched.
+function withPagePropsCell(state: unknown, props: PageComponentProps): unknown {
+	if (!state || typeof state !== 'object') return state;
+	const cells = (state as { readonly cells?: ReadonlyArray<{ readonly graphNodeId?: unknown }> })
+		.cells;
+	if (!Array.isArray(cells) || cells.some((cell) => cell?.graphNodeId === 'prop:props')) {
+		return state;
+	}
+	return {
+		...state,
+		cells: [
+			...cells,
+			{ graphNodeId: 'prop:props', name: 'props', valueKind: 'object', directValue: props },
+		],
+	};
 }
 
 function modulePreloadsForPage(

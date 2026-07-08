@@ -999,6 +999,32 @@ test('renderToString emits an SSR container and omits the resumer for static out
 	expect(html).not.toContain('data-async-resumer');
 });
 
+// Live directValue cells (page props seeded by the host, need 14) must be
+// envelope-encoded before the payload script is served — resume validation
+// rejects a leaked directValue on first interaction.
+test('renderToString envelope-encodes live directValue state cells before serving', async () => {
+	const html = await renderToString(() => ({
+		html: '<button>Go</button>',
+		state: {
+			version: ASYNC_PROTOCOL_VERSION,
+			cells: [
+				{
+					graphNodeId: 'prop:props',
+					name: 'props',
+					valueKind: 'object' as const,
+					directValue: { params: { owner: 'ada' }, status: 200 },
+				},
+			],
+			computed: [],
+		},
+		view: staticView(),
+	}));
+
+	expect(html).toContain('"graphNodeId":"prop:props"');
+	expect(html).not.toContain('directValue');
+	expect(html).toContain('"records"');
+});
+
 test('renderToString rejects duplicate runtime keys before serving SSR output', async () => {
 	await expect(
 		renderToString(() => ({

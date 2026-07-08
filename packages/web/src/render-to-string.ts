@@ -5,7 +5,11 @@ import {
 	type ProtocolStatePayload,
 	type ProtocolViewPayload,
 } from '@markless/serializer';
-import { renderPayloadScripts, serializeRuntimeAsyncSnapshots } from '@markless/serializer';
+import {
+	renderPayloadScripts,
+	serializeRuntimeAsyncSnapshots,
+	serializeRuntimeStateCells,
+} from '@markless/serializer';
 import type { MarklessExecutionLogMode } from './dev-log.ts';
 import { validateKeyedRepeatPayloadKeys } from './repeat-runtime.ts';
 
@@ -57,10 +61,12 @@ export async function renderToString(
 	const output = await renderSsrOutput(component);
 	const hasPayload = !!output.state || !!output.view;
 	const rawState = output.state ?? emptyStatePayload();
-	// Runtime-attached async snapshots carry raw key/value; the served payload
-	// needs envelope-encoded fields or resume rejects it on first interaction.
+	// Runtime-attached async snapshots and live directValue cells (host-seeded
+	// page props, need 14) carry raw values; the served payload needs
+	// envelope-encoded fields or resume rejects it on first interaction.
 	const state = {
 		...rawState,
+		cells: serializeRuntimeStateCells(rawState.cells ?? []),
 		computed: serializeRuntimeAsyncSnapshots(rawState.computed ?? []),
 	};
 	const view = containerScopedView(output.view ?? emptyViewPayload());

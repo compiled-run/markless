@@ -96,6 +96,68 @@ describe('server entry rendering', () => {
 		expect(html).not.toContain('src="/@id/virtual:markless-router/resume-entry"');
 	});
 
+	it('serializes page props into the payload prop cell (need 14, SSR side)', async () => {
+		const entry = createServerEntry({
+			resumeEntryPath: '/@id/virtual:markless-router/resume-entry',
+			documentModuleLoader: undefined,
+			pageModuleLoaders: {
+				'pages/r/[id].tsrx': async () => ({
+					default: page('<main><button>Count 0</button></main>', {
+						state: { version: 1, cells: [], computed: [] },
+						view: {
+							version: 1,
+							locators: [
+								{ hostNodeId: 'h0', index: 0, strategy: 'dom-order', tagName: 'main' },
+								{ hostNodeId: 'h1', index: 1, strategy: 'dom-order', tagName: 'button' },
+							],
+							events: [{ eventName: 'click', hostNodeId: 'h1', symbolIds: ['symbol:0'] }],
+							domUpdates: [],
+							behaviors: [],
+							elementHandles: [],
+							asyncBoundaries: [],
+						},
+					}),
+				}),
+			},
+			routeFileIds: ['/pages/r/[id].tsrx'],
+		});
+
+		const response = await entry.fetch(new Request('http://markless-router.test/r/alpha'));
+		const html = await response.text();
+		const stateJson = html.slice(
+			html.indexOf('<script type="markless/state">') + '<script type="markless/state">'.length,
+		);
+		const state = JSON.parse(stateJson.slice(0, stateJson.indexOf('</script>'))) as {
+			readonly cells: ReadonlyArray<Record<string, unknown>>;
+		};
+		const propCell = state.cells.find((cell) => cell.graphNodeId === 'prop:props');
+
+		// Symbol modules and re-running props+state computeds on resumed pages
+		// read page props through the graph's prop cell; the served value must
+		// be envelope-encoded, never a live directValue.
+		expect(propCell).toMatchObject({ name: 'props', valueKind: 'object' });
+		expect(propCell).not.toHaveProperty('directValue');
+		const encodedValue = JSON.stringify(propCell?.value);
+		expect(encodedValue).toContain('"alpha"');
+		expect(encodedValue).toContain('/r/alpha');
+	});
+
+	it('adds no prop cell to pages without a resumability payload', async () => {
+		const entry = createServerEntry({
+			documentModuleLoader: undefined,
+			pageModuleLoaders: {
+				'pages/index.tsrx': async () => ({ default: page('<main>Home</main>') }),
+			},
+			routeFileIds: ['/pages/index.tsrx'],
+		});
+
+		const response = await entry.fetch(new Request('http://markless-router.test/'));
+		const html = await response.text();
+
+		expect(html).not.toContain('prop:props');
+		expect(html).not.toContain('<script type="markless/state">');
+	});
+
 	it('emits a lazy Link navigation bridge without waking a client entry', async () => {
 		const entry = createServerEntry({
 			navigationEntryPath: '/@id/virtual:markless-router/navigation-entry',
