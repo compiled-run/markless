@@ -6,7 +6,21 @@ import {
 	type ResumePayloadScriptsResult,
 } from './payload-full.ts';
 import { getAlreadyResumedPayload, setResumedPayload } from './payload-resume-registry.ts';
-import { adoptStreamedArmPatches } from './resume-stream-patches.ts';
+
+// Streamed settles (T107) leave records + snapshot patches in the document.
+// Only pages that actually streamed pay for the adoption module: the check
+// is one selector; the overlay chunk loads on demand.
+async function adoptStreamedPatchesIfPresent(
+	decoded: ReturnType<typeof decodePayloadScripts>,
+	root: ResumePayloadScriptsInput['root'],
+): Promise<ReturnType<typeof decodePayloadScripts>> {
+	const documentHost = (root as { readonly ownerDocument?: { readonly querySelector?: (selector: string) => unknown } }).ownerDocument;
+	if (!documentHost?.querySelector?.('script[type="markless/arm"],script[type="markless/state-patch"]')) {
+		return decoded;
+	}
+	const { adoptStreamedArmPatches } = await import('./resume-stream-patches.ts');
+	return adoptStreamedArmPatches(decoded, root);
+}
 
 export async function resumeFromPayloadScriptsImpl(
 	input: ResumePayloadScriptsInput,
@@ -16,7 +30,7 @@ export async function resumeFromPayloadScriptsImpl(
 
 	// Streamed settles left records + snapshot patches in the document; adopt
 	// them before graph construction so the settled DOM resumes interactive.
-	const decoded = adoptStreamedArmPatches(decodePayloadScripts(input), input.root);
+	const decoded = await adoptStreamedPatchesIfPresent(decodePayloadScripts(input), input.root);
 	const graph = await createRuntimeGraphFromResumePayload({
 		state: decoded.state,
 		view: decoded.view,
