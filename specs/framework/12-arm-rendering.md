@@ -117,16 +117,34 @@ meta, before-document-swap teardown — are deleted when tier 4 lands. The Link
 component owns SPA navigation; plain-anchor hash special-casing is removed
 once component-in-row lands and apps can use Link everywhere.
 
-## D8. Pending is for first appearances only (ratified 2026-07-08, owner)
+## D8. Deadline-gated pending (ratified 2026-07-08, owner; supersedes the
+## same-day "first appearances only" wording)
 
-Nothing visible is ever replaced by fallback UI. @pending renders only when a
-boundary has no prior settled content. Re-settles (mutation refreshes,
-recomputes) render from the prior snapshot until the new one commits —
-snapshots are versioned with status, so the prior value is always addressable.
-Client navigation is a transition: the outgoing page stays live until the
-destination settles or the navigation deadline passes; once pending UI shows,
-it stays a minimum duration. Constants live in one documented module. Reveal
-choreography is tier-aware: value-slot commits are layout-safe and commit
-immediately; range commits join dependency-ordered reveal trains. All timing
-behavior is structural or latency-decided — never per-block configuration.
-TSRX syntax is unchanged.
+`@try` / `@pending` / `@catch` is the ONLY async status vocabulary. There is
+no property-style status surface: no `navigation.pending`, no `model.pending`,
+no compiler lowering of status reads in templates (rejected by owner
+2026-07-08). Anything an author wants to show about async progress is
+expressed structurally in an arm.
+
+@pending shows only when the wait is genuinely long, under one uniform rule
+across all three cases:
+
+- First load: the server's first-flush deadline renders fast-settling
+  boundaries inline; only genuinely slow boundaries flush @pending and stream.
+- Navigation: the outgoing page stays live and interactive until the
+  destination settles or the client deadline passes; past the deadline the
+  destination's @pending shows.
+- Re-settle (mutation refresh, recompute): the boundary holds its prior
+  settled snapshot (snapshots are versioned with status, so the prior value is
+  always addressable); past the client deadline the boundary's @pending arm
+  commits, so a genuinely slow refresh shows honest waiting UI instead of
+  stale content indefinitely.
+
+Fast paths never show pending — testable as a frame-sampled invariant. Once
+pending UI shows, it stays a minimum duration (no blink). Deadline and
+min-duration constants live in one documented module; the timing state machine
+is pure and property-tested under a fake clock. Reveal choreography is
+tier-aware: value-slot commits are layout-safe and commit immediately; range
+commits join dependency-ordered reveal trains. All timing behavior is
+structural or latency-decided — never per-block configuration. TSRX syntax is
+unchanged.
