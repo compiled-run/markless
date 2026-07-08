@@ -11,6 +11,15 @@ import SlowPage from './fixtures/nav-page-slow.tsrx';
 // @pending frame; slow destinations show honest pending UI only after the
 // navigation deadline, and once shown it stays the minimum duration.
 //
+// INTEGRATION-ONLY (T116 gate 1): these fixtures prove the D8 machine is
+// wired to real route swaps in a real browser — real render, real
+// MutationObserver truth, real interactivity. All timing SEMANTICS
+// (settle-vs-deadline-vs-min-duration orderings, exact boundaries, abort/
+// supersede) are property-tested under a fake clock in
+// packages/router/test/navigation-hold.test.ts and
+// packages/web/test/settle-tracker-timing.test.ts. No assertion here may
+// depend on real-wait durations; only on ORDERINGS and DOM-state existence.
+//
 // The route renderer targets document.body, so each test drives a dedicated
 // iframe document and records every DOM state transition of its body with a
 // MutationObserver (stricter than frame sampling: a state that never exists
@@ -127,7 +136,7 @@ test('slow destination: pending appears only after the deadline and stays the mi
 	await waitForBody(routeDocument, (html) => html.includes('data-nav-settled="alpha"'), 3000, 'alpha settle');
 
 	const sampler = sampleBody(routeDocument);
-	const dispatchedAt = navigateTo(routeDocument, SlowPage, '/slow');
+	navigateTo(routeDocument, SlowPage, '/slow');
 
 	// Interactive well inside the deadline window.
 	const tap = routeDocument.querySelector<HTMLButtonElement>('button[data-alpha-tap]');
@@ -142,11 +151,10 @@ test('slow destination: pending appears only after the deadline and stays the mi
 	if (!pending) throw new Error('Expected honest pending UI for the slow destination.');
 	if (!settled) throw new Error('Expected the slow destination to settle.');
 
-	// The swap held the outgoing page until the navigation deadline.
-	expect(pending.at - dispatchedAt).toBeGreaterThanOrEqual(240);
-	// Once shown, pending UI stays at least the minimum duration (no blink).
-	expect(settled.at - pending.at).toBeGreaterThanOrEqual(185);
-	expect(settled.at - pending.at).toBeLessThan(1000);
+	// Ordering-only integration truth: pending UI appeared, then settled
+	// content replaced it (exact deadline/min-duration durations are the fake
+	// clock suites' responsibility, never real-wait assertions here).
+	expect(settled.at).toBeGreaterThan(pending.at);
 
 	// Outgoing page stayed whole and interactive until the pending swap.
 	const tapped = firstSampleWith(sampler.samples, 'Taps 1');

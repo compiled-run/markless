@@ -22,13 +22,24 @@ export type AsyncBoundarySettleTracker = {
 	readonly markSettled: (boundaryId: string) => void;
 	readonly whenAllSettled: () => Promise<void>;
 	readonly holdSettleCommitsFor: (minVisibleMs: number) => void;
-	readonly remainingCommitHoldMs: () => number;
+	// Waits out the active commit floor; resolves true iff it actually waited
+	// (callers then re-check for a superseding newer run before committing).
+	readonly waitOutCommitHold: () => Promise<boolean>;
+};
+
+// Injectable so the D8 hold/min-duration semantics are property-tested under
+// a fake clock; production defaults to Date.now/setTimeout.
+export type SettleTrackerClock = {
+	readonly now?: () => number;
+	readonly wait?: (durationMs: number) => Promise<void>;
 };
 
 export function createAsyncBoundarySettleTracker(input: {
 	readonly boundaries: Iterable<ResumeAsyncBoundaryRecord>;
 	readonly state?: ProtocolStatePayload;
+	readonly clock?: SettleTrackerClock;
 }): AsyncBoundarySettleTracker {
+	const now = input.clock?.now ?? Date.now;
 	// SSR-resumed pages arrive with settled snapshots in the state payload;
 	// their boundaries already show settled content before any runner re-runs.
 	const settledGraphNodeIds = new Set<string>();
@@ -47,30 +58,33 @@ export function createAsyncBoundarySettleTracker(input: {
 		);
 	}
 	let commitFloor = 0;
-	let allSettled: { readonly promise: Promise<void>; readonly resolve: () => void } | undefined;
+	let allSettled: Promise<void> | undefined;
+	let resolveAllSettled = () => {};
 	const isAllSettled = () => [...settledById.values()].every(Boolean);
 	return {
 		hasSettledContent: (boundaryId) => settledById.get(boundaryId) === true,
 		markSettled(boundaryId) {
 			if (settledById.get(boundaryId) !== false) return;
 			settledById.set(boundaryId, true);
-			if (allSettled && isAllSettled()) allSettled.resolve();
+			if (isAllSettled()) resolveAllSettled();
 		},
 		whenAllSettled() {
 			if (isAllSettled()) return Promise.resolve();
-			if (!allSettled) {
-				let resolve!: () => void;
-				const promise = new Promise<void>((resolvePromise) => {
-					resolve = resolvePromise;
-				});
-				allSettled = { promise, resolve };
-			}
-			return allSettled.promise;
+			allSettled ??= new Promise((resolve) => {
+				resolveAllSettled = resolve;
+			});
+			return allSettled;
 		},
 		holdSettleCommitsFor(minVisibleMs) {
-			commitFloor = Math.max(commitFloor, Date.now() + minVisibleMs);
+			commitFloor = Math.max(commitFloor, now() + minVisibleMs);
 		},
-		remainingCommitHoldMs: () => Math.max(0, commitFloor - Date.now()),
+		async waitOutCommitHold() {
+			const holdMs = commitFloor - now();
+			if (holdMs <= 0) return false;
+			await (input.clock?.wait?.(holdMs) ??
+				new Promise((resolve) => setTimeout(resolve, holdMs)));
+			return true;
+		},
 	};
 }
 
@@ -158,9 +172,7 @@ export async function settleAsyncBoundaryRange(
 	// D8 minimum pending visibility: a deadline route swap that showed the
 	// @pending arm holds the settle commit until the pending UI was visible
 	// for the minimum duration (no blink between deadline and settle).
-	const holdMs = input.settleTracker?.remainingCommitHoldMs() ?? 0;
-	if (holdMs > 0) {
-		await new Promise((resolve) => setTimeout(resolve, holdMs));
+	if ((await input.settleTracker?.waitOutCommitHold()) === true) {
 		const read = boundary.asyncReads[0];
 		// A newer run superseded this settle while it waited; its own settle
 		// subscription commits the fresher snapshot.

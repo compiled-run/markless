@@ -15,6 +15,12 @@ export function wireBranches(input: any) {
 		branchesById.set(branch.id, branch); for (const armRecordSet of branch.armRecords ?? []) for (const armEvent of armRecordSet.events) input.eventTypes.add(armEvent.eventName);
 		let currentArm = readBranchArm(input.graph, branch); currentArmByBranchId.set(branch.id, currentArm);
 		for (const testRead of branch.testReads) { const release = onceRelease(input.graph.subscribe({ id: `branch-test:${branch.id}:${testRead.graphNodeId}:${testRead.path.join('.')}`, graphNodeId: testRead.graphNodeId, path: testRead.path, async run() {
+			// Spec D8: pending is for FIRST APPEARANCES only — including flips.
+			// While the deciding read's async computed is re-running the flip
+			// holds its prior arm (see resume-runtime.ts holdPendingFlip). The
+			// compiler emits at most one test read per branch (symbol-resolver),
+			// so this subscription's read IS the arm decider readBranchArm uses.
+			if (input.holdPendingFlip?.(testRead.graphNodeId)) return;
 			const newArm = readBranchArm(input.graph, branch); if (newArm === currentArm) return;
 			const symbol = await input.loadSymbol(branch.symbolId); const update = await symbol({ graph: input.graph, arm: newArm, branchId: branch.sourceId ?? branch.id, composedBranchId: branch.id, element: input.root, getElementHandle: input.elementHandles.get });
 			if (!isResumeBranchUpdate(update)) return; currentArm = update.arm; currentArmByBranchId.set(branch.id, update.arm);
@@ -32,6 +38,8 @@ export function wireBranches(input: any) {
 	function wireEscalatedRecord(record: { readonly id: string; readonly testReads?: ResumeBranchRecord['testReads']; readonly armBoundaryId?: string }): void {
 		if (!record.armBoundaryId || !record.testReads?.length || wiredEscalationIds.has(record.id)) return;
 		wiredEscalationIds.add(record.id);
+		// Pending re-runs need no hold here: resettleBoundary routes through
+		// settleAsyncBoundaryRange, which ignores non-settled snapshots.
 		for (const testRead of record.testReads) input.storeContainerSubscription(input.graph.subscribe({ id: `arm-branch-escalation:${record.id}:${testRead.graphNodeId}:${testRead.path.join('.')}`, graphNodeId: testRead.graphNodeId, path: testRead.path, run: () => input.resettleBoundary?.(record.armBoundaryId) }));
 	}
 	for (const branch of materializeBranchLocators(input.root, input.view.branches ?? [])) wireBranchRecord(branch);

@@ -11,7 +11,7 @@ import { renderToStream } from '../src/render-to-stream.ts';
 function relayArtifact(input: { readonly delayMs: number; readonly fail?: boolean }) {
 	return {
 		resumeModuleUrl: '/build/relay-resume.js',
-		async renderSsr(_props?: unknown, renderContext?: unknown) {
+		async renderSsr(props?: unknown, renderContext?: unknown) {
 			const snapshots: unknown[] = [];
 			const snapshot = (await marklessSsrRunAsyncComputed(
 				snapshots as never,
@@ -19,7 +19,9 @@ function relayArtifact(input: { readonly delayMs: number; readonly fail?: boolea
 				async () => {
 					await new Promise((resolve) => setTimeout(resolve, input.delayMs));
 					if (input.fail) throw new TypeError('relay unreachable');
-					return { headline: 'Relay report ready' };
+					return {
+						headline: (props as { headline?: string } | undefined)?.headline ?? 'Relay report ready',
+					};
 				},
 				renderContext,
 				true,
@@ -126,6 +128,53 @@ test('renderToStream renders inline when the runner beats the first-flush deadli
 	expect(stream.shell).not.toContain('state-patch');
 	expect(stream.shell).not.toContain('__mArm');
 	expect(await collect(stream.appends())).toHaveLength(0);
+});
+
+// T116 best-effort 4: the render-context threading exists exactly so that
+// two overlapping streamed responses cannot bleed values, boundary chunks, or
+// snapshot patches into each other — even when they share graph node ids.
+test('two interleaved streaming renders with different props/latencies stay isolated', async () => {
+	const [slowStream, fastStream] = await Promise.all([
+		renderToStream(relayArtifact({ delayMs: 60 }) as never, {
+			props: { headline: 'Alpha uplink ready' },
+		}),
+		renderToStream(relayArtifact({ delayMs: 15 }) as never, {
+			props: { headline: 'Beta uplink ready' },
+		}),
+	]);
+	// Both missed the first-flush deadline: pending shells, streaming route.
+	expect(slowStream.pendingArmCount).toBe(1);
+	expect(fastStream.pendingArmCount).toBe(1);
+	expect(slowStream.shell).not.toContain('uplink ready');
+	expect(fastStream.shell).not.toContain('uplink ready');
+
+	const settleOrder: string[] = [];
+	const [slowChunks, fastChunks] = await Promise.all([
+		collect(slowStream.appends()).then((chunks) => {
+			settleOrder.push('slow');
+			return chunks;
+		}),
+		collect(fastStream.appends()).then((chunks) => {
+			settleOrder.push('fast');
+			return chunks;
+		}),
+	]);
+	// The faster render finished first: the two streams genuinely overlapped.
+	expect(settleOrder).toEqual(['fast', 'slow']);
+
+	// Each response carries exactly its own settled arm and snapshot patch,
+	// despite both renders using the same boundary and graph node ids.
+	expect(slowChunks).toHaveLength(1);
+	expect(fastChunks).toHaveLength(1);
+	expect(slowChunks[0]).toContain('Alpha uplink ready');
+	expect(slowChunks[0]).not.toContain('Beta');
+	expect(fastChunks[0]).toContain('Beta uplink ready');
+	expect(fastChunks[0]).not.toContain('Alpha');
+	for (const chunk of [slowChunks[0]!, fastChunks[0]!]) {
+		expect(chunk).toContain('<template m:arm="boundary:0">');
+		expect(chunk).toContain('data-graph-node="computed:report"');
+		expect(chunk).toContain('"status":"fulfilled"');
+	}
 });
 
 test('renderToStream streams the settled @catch arm with the durable error shape', async () => {

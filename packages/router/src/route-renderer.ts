@@ -1,8 +1,5 @@
 import { render } from '@markless/web/render';
-import {
-	MARKLESS_NAV_PENDING_MIN_MS,
-	MARKLESS_NAV_SETTLE_DEADLINE_MS,
-} from './navigation-timing.ts';
+import { holdNavigationSwapUntilSettled, type NavigationHoldRuntime } from './navigation-hold.ts';
 import {
 	MARKLESS_ROUTER_RENDERER_STARTED,
 	MARKLESS_ROUTER_ROUTE_EVENT,
@@ -30,13 +27,6 @@ interface ClientPageArtifact {
 	) => { readonly html: string } | Promise<{ readonly html: string }>;
 }
 
-// The settle-transition surface a rendered page's runtime may expose
-// (@markless/web ResumeRuntime); pages without async boundaries mount as-is.
-interface TransitionRuntime {
-	readonly whenAsyncBoundariesSettled?: () => Promise<void>;
-	readonly holdPendingSettleCommits?: (minVisibleMs: number) => Promise<void> | void;
-}
-
 async function renderRouteUpdate(document: Document, update: RouteUpdate): Promise<void> {
 	try {
 		const artifact = update.page.default as ClientPageArtifact | undefined;
@@ -53,8 +43,13 @@ async function renderRouteUpdate(document: Document, update: RouteUpdate): Promi
 				} as never,
 				{
 					target: document.body,
+					// The D8 hold/deadline/min-duration state machine lives in
+					// navigation-hold.ts (pure, fake-clock property-tested).
 					beforeMount: (container) =>
-						holdRouteSwapUntilSettled(container.runtime as TransitionRuntime, update.signal),
+						holdNavigationSwapUntilSettled({
+							runtime: container.runtime as NavigationHoldRuntime,
+							signal: update.signal,
+						}),
 				},
 			);
 			return;
@@ -66,35 +61,4 @@ async function renderRouteUpdate(document: Document, update: RouteUpdate): Promi
 	} finally {
 		update.onRendered?.();
 	}
-}
-
-// Hold the swap until the destination's boundaries settle or the navigation
-// deadline passes (spec D8: nothing visible is ever replaced by fallback UI).
-// Past the deadline the swap shows honest @pending — which then stays visible
-// at least the pending minimum before its settle commits. A superseded
-// navigation cancels the mount entirely.
-async function holdRouteSwapUntilSettled(
-	runtime: TransitionRuntime,
-	signal: AbortSignal | undefined,
-): Promise<boolean | void> {
-	const settled = runtime.whenAsyncBoundariesSettled?.();
-	if (settled) {
-		const outcome = await Promise.race([
-			// A settle failure fails loudly in the page's own flush; for the
-			// hold it only means "commit the swap now".
-			settled.then(
-				() => 'settled' as const,
-				() => 'settled' as const,
-			),
-			waitMs(MARKLESS_NAV_SETTLE_DEADLINE_MS).then(() => 'deadline' as const),
-		]);
-		if (outcome === 'deadline') {
-			await runtime.holdPendingSettleCommits?.(MARKLESS_NAV_PENDING_MIN_MS);
-		}
-	}
-	if (signal?.aborted) return false;
-}
-
-function waitMs(durationMs: number): Promise<void> {
-	return new Promise((resolve) => setTimeout(resolve, durationMs));
 }

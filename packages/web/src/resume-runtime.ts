@@ -95,12 +95,22 @@ export function createResumeRuntime(input: ResumeRuntimeInput, prepared: ResumeP
 			input.graph.read(read.graphNodeId, []),
 		);
 	}
+	// Spec D8: a branch flip whose deciding test read goes THROUGH an async
+	// computed that is re-running holds its prior arm — the pending snapshot
+	// has no value, so the test would evaluate lies; the boundary's settle
+	// re-commit renders the truthful arm. Lives here (single copy) so the
+	// duplicated branch-runtime chunk only carries the call site.
+	const holdPendingFlip = (graphNodeId: string) =>
+		input.graph.read(graphNodeId, ['status']) === 'pending' &&
+		[...asyncBoundariesById.values()].some((boundary) =>
+			boundary.asyncReads.some((read) => read.graphNodeId === graphNodeId));
 	async function loadBranchRuntime(options: { readonly skipStartupBranchIds?: ReadonlySet<string> } = {}): Promise<BranchRuntime> {
 		if (branchRuntime) return branchRuntime;
 		const eventTypesBefore = new Set(eventTypes), behaviors = viewHasBranchArmBehaviors(input.view) ? await loadBehaviorRuntime() : undefined;
 		branchRuntime = (await import('./resume-branches.ts')).wireBranches({
 			root: input.root, graph: input.graph, view: input.view, loadSymbol: input.loadSymbol, renderBranchHtml: input.renderBranchHtml, elementsByHostId, disposedHosts, elementHandles, events: await getEvents(), eventTypes, storeContainerSubscription, storeHostSubscription, addBehaviorRecords: behaviors?.addBehaviorRecords ?? (() => {}),
 			resettleBoundary: resettleBoundaryArm,
+			holdPendingFlip,
 			skipStartupBranchIds: options.skipStartupBranchIds,
 		});
 		for (const eventType of eventTypes) if (!eventTypesBefore.has(eventType)) input.root.addEventListener?.(eventType, dispatchCaptured, { capture: true });
