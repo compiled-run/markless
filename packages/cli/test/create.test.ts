@@ -285,8 +285,8 @@ test('generates Deno format imports with Nitro available', async () => {
 
 	expect(denoJson.nodeModulesDir).toBe('auto');
 	expect(denoJson.imports).toMatchObject({
-		'@markless/core': 'npm:@markless/core',
-		'@markless/router': 'npm:@markless/router',
+		'@markless/core': expect.stringMatching(/^npm:@markless\/core@\^/),
+		'@markless/router': expect.stringMatching(/^npm:@markless\/router@\^/),
 		nitro: 'npm:nitro@3.0.260429-beta',
 	});
 });
@@ -316,6 +316,54 @@ test('generates docs with MDX routes and component layouts only', async () => {
 	await expect(exists(join(appRoot, 'collections'))).resolves.toBe(false);
 	await expect(exists(join(appRoot, 'pages/api'))).resolves.toBe(false);
 	await expect(exists(join(appRoot, 'nitro.config.ts'))).resolves.toBe(false);
+});
+
+test('scaffolded manifests pin @markless deps to the publishing cli version, never workspace links', async () => {
+	const cliManifest = JSON.parse(
+		await readFile(new URL('../package.json', import.meta.url), 'utf-8'),
+	) as { version: string };
+	expect(cliManifest.version).toMatch(/^\d+\.\d+\.\d+/);
+	const expectedRange = `^${cliManifest.version}`;
+
+	await Promise.all(
+		(['node', 'bun'] as const).map(async (format) => {
+			const root = await makeWorkspace();
+			const program = new CreateProgram();
+
+			await program.run(
+				[`${format}-pin-app`, '--format', format, '--no-install', '--no-git'],
+				runtime(root),
+			);
+
+			const appManifest = JSON.parse(
+				await readFile(join(root, `${format}-pin-app/package.json`), 'utf-8'),
+			) as { dependencies: Record<string, string>; devDependencies: Record<string, string> };
+
+			expect(appManifest.dependencies['@markless/core']).toBe(expectedRange);
+			expect(appManifest.dependencies['@markless/router']).toBe(expectedRange);
+			for (const [name, range] of [
+				...Object.entries(appManifest.dependencies),
+				...Object.entries(appManifest.devDependencies),
+			]) {
+				expect(range, `${format} dep ${name}`).not.toContain('workspace:');
+				expect(range, `${format} dep ${name}`).not.toContain('catalog:');
+				expect(range, `${format} dep ${name}`).not.toContain('link:');
+				expect(range, `${format} dep ${name}`).not.toContain('file:');
+			}
+		}),
+	);
+
+	const denoRoot = await makeWorkspace();
+	await new CreateProgram().run(
+		['deno-pin-app', '--format', 'deno', '--no-install', '--no-git'],
+		runtime(denoRoot),
+	);
+	const denoJson = JSON.parse(
+		await readFile(join(denoRoot, 'deno-pin-app/deno.json'), 'utf-8'),
+	) as { imports: Record<string, string> };
+
+	expect(denoJson.imports['@markless/core']).toBe(`npm:@markless/core@${expectedRange}`);
+	expect(denoJson.imports['@markless/router']).toBe(`npm:@markless/router@${expectedRange}`);
 });
 
 test('rejects --yes without a positional target', async () => {

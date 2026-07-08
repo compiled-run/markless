@@ -9,8 +9,8 @@
 	},
 	"nodeModulesDir": "auto",
 	"imports": {
-		"@markless/core": "npm:@markless/core",
-		"@markless/router": "npm:@markless/router",
+		"@markless/core": "npm:@markless/core@{{marklessVersion}}",
+		"@markless/router": "npm:@markless/router@{{marklessVersion}}",
 		"nitro": "npm:nitro@3.0.260429-beta"
 	}
 }

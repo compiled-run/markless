@@ -515,9 +515,27 @@ async function starterFiles(options: CreateOptions, fs: ProgramFileSystem): Prom
 	).flat();
 
 	return renderTemplateFiles(files, {
+		marklessVersion: await marklessVersionRange(fs),
 		packageManager: options.packageManager,
 		packageName: packageName(options.target),
 	});
+}
+
+const CLI_MANIFEST_URL = new URL('../package.json', import.meta.url);
+
+// Reads create-markless's own package.json version so scaffolded apps depend
+// on the matching published @markless/* release (`^<version>`), never the
+// monorepo-only `workspace:*` links the templates would otherwise emit.
+// Versions bump in lockstep across the release set, so the cli's own version
+// always names a real published range.
+async function marklessVersionRange(fs: ProgramFileSystem): Promise<string> {
+	const manifest = JSON.parse(await fs.readFile(CLI_MANIFEST_URL)) as { version?: unknown };
+
+	if (typeof manifest.version !== 'string' || manifest.version.length === 0) {
+		throw new Error('create-markless package.json is missing a version.');
+	}
+
+	return `^${manifest.version}`;
 }
 
 function starterTemplateDirectories(starter: Starter): URL[] {
