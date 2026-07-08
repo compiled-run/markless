@@ -224,9 +224,15 @@ function emitCompiledAppDefault(input: {
 		(input.rootExportName || input.csrExportName) && input.environment !== 'server'
 			? [`	renderCsr: ${input.rootExportName ?? input.csrExportName},`]
 			: [];
+	// The optional render context is the per-request streaming channel (T107):
+	// dropping it here would silently force every page back to blocking SSR.
 	const renderSsrEntry =
 		input.ssrExportName && input.environment !== 'client'
-			? ['	renderSsr(props) {', `		return ${input.ssrExportName}(props);`, '	},']
+			? [
+					'	renderSsr(props, marklessRenderContext) {',
+					`		return ${input.ssrExportName}(props, marklessRenderContext);`,
+					'	},',
+				]
 			: [];
 	const resumeModuleEntry =
 		input.resumeModuleUrl && input.environment !== 'client'

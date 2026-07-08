@@ -113,7 +113,7 @@ describe('TSRX Rolldown plugin structure', () => {
 		expect(result.code).not.toContain('function marklessResumeLoadSymbol');
 		expect(result.code).toContain('const marklessCompiledApp = {');
 		expect(result.code).toContain('renderCsr: App');
-		expect(result.code).toContain('renderSsr(props) {');
+		expect(result.code).toContain('renderSsr(props, marklessRenderContext) {');
 		expect(result.code).toContain('const marklessSsrStateValues = new Map');
 		expect(result.code).toContain(
 			'const html = marklessSsrHost(marklessSsrHostLocators, "h0", "button") + "<button>" + marklessSsrText(count) + "</button>";',
@@ -147,7 +147,7 @@ describe('TSRX Rolldown plugin structure', () => {
 			source: defaultRouteSource,
 		});
 
-		expect(result.code).toContain('renderSsr(props) {');
+		expect(result.code).toContain('renderSsr(props, marklessRenderContext) {');
 		expect(result.code).toContain('"<h1>" + "Markless Router" + "</h1>"');
 		expect(result.code).toContain(
 			'import { Link as __marklessSsrComponent0 } from "@markless/core/router";',
@@ -170,7 +170,7 @@ describe('TSRX Rolldown plugin structure', () => {
 		expect(result.code).not.toContain('@markless/core/preload');
 		expect(result.code).not.toContain('preload:');
 		expect(result.code).toContain('export default marklessCompiledApp;');
-		expect(result.code).not.toContain('renderSsr(props) {');
+		expect(result.code).not.toContain('renderSsr(props, marklessRenderContext) {');
 		expect(result.code).not.toContain('state: payloadState');
 	});
 
@@ -278,7 +278,7 @@ let active = state(true);
 			environment: 'server',
 		});
 
-		expect(result.code).toContain('renderSsr(props) {');
+		expect(result.code).toContain('renderSsr(props, marklessRenderContext) {');
 		expect(result.code).toContain('marklessSsrAttribute("class", active ? "on" : "off")');
 		expect(result.code).not.toContain('renderCsr: App');
 	});
