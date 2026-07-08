@@ -94,6 +94,28 @@ function verifyPackage(packageDir) {
 		}
 	}
 
+	// App-context vite-plugin entries (router): served as source .ts compiled in
+	// the CONSUMER app's module graph. When a package carries them, the tarball
+	// must ship the directory and no entry may import relatively (a ../.. path
+	// escapes the shipped directory into unpublished src/ — the 0.1.0 defect).
+	const appEntriesDir = resolve(packageDir, 'src/vite/entries');
+	if (existsSync(appEntriesDir)) {
+		if (!manifest.files?.includes('src/vite/entries')) {
+			failures.push(`${label}: files must ship "src/vite/entries" (vite-plugin app entries)`);
+		}
+		for (const fileName of readdirSync(appEntriesDir)) {
+			if (!fileName.endsWith('.ts')) continue;
+			const code = readFileSync(resolve(appEntriesDir, fileName), 'utf8');
+			for (const match of code.matchAll(/(?:from\s*|^import\s*|\bimport\()\s*['"]([^'"]+)['"]/gm)) {
+				if (match[1]?.startsWith('.')) {
+					failures.push(
+						`${label}: src/vite/entries/${fileName} imports '${match[1]}' relatively — unresolvable from the published tarball`,
+					);
+				}
+			}
+		}
+	}
+
 	for (const [binName, binPath] of Object.entries(manifest.publishConfig?.bin ?? {})) {
 		if (!existsSync(resolve(packageDir, binPath))) {
 			failures.push(`${label}: bin ${binName} -> ${binPath} missing on disk (run vp pack)`);

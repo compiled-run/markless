@@ -144,6 +144,59 @@ describe('publish manifest shape', () => {
 		});
 	}
 
+	// The router vite plugin serves these files as APP-CONTEXT virtual entries:
+	// the consumer app's vite compiles them so import.meta.glob('/pages/**')
+	// resolves against the app root. They must ship as source .ts inside the
+	// tarball, and every import they carry must survive leaving the monorepo
+	// (package specifiers that resolve through publishConfig.exports — never
+	// ../.. paths into unshipped src/). The full proof is the router-app
+	// tarball-consumer build in the release runbook; this is the cheap static
+	// form that runs on every test pass.
+	describe('router vite-plugin app-context entries survive publishing', () => {
+		const routerDir = resolve(repoRoot, 'packages', 'router');
+		const entriesDir = resolve(routerDir, 'src/vite/entries');
+		const pluginSource = readFileSync(resolve(routerDir, 'src/vite/index.ts'), 'utf8');
+		const requestedEntryFiles = [
+			...new Set(
+				[...(pluginSource.match(/virtualEntryFiles = \{[^}]*\}/)?.[0] ?? '').matchAll(
+					/'([\w-]+\.ts)'/g,
+				)].map((match) => match[1]),
+			),
+		];
+
+		test('the entries directory ships in the tarball and holds every requested entry', () => {
+			expect(readManifest('router').files).toContain('src/vite/entries');
+			// Sanity floor: the extraction regex must keep finding the plugin's map.
+			expect(requestedEntryFiles.length).toBeGreaterThanOrEqual(5);
+			for (const fileName of requestedEntryFiles) {
+				expect(
+					existsSync(resolve(entriesDir, fileName ?? '')),
+					`router entry ${fileName} missing from src/vite/entries`,
+				).toBe(true);
+			}
+		});
+
+		test('entry imports are package or virtual specifiers that resolve when published', () => {
+			for (const fileName of readdirSync(entriesDir)) {
+				if (!fileName.endsWith('.ts')) continue;
+				const code = readFileSync(resolve(entriesDir, fileName), 'utf8');
+				for (const specifier of staticImportSpecifiers(code)) {
+					expect(
+						specifier.startsWith('.'),
+						`entries/${fileName} imports '${specifier}' relatively — unresolvable outside the monorepo`,
+					).toBe(false);
+					if (!specifier.startsWith('@markless/')) continue;
+					const [, packageName, ...rest] = specifier.split('/');
+					const subpath = rest.length === 0 ? '.' : `./${rest.join('/')}`;
+					expect(
+						readManifest(packageName ?? '').publishConfig?.exports?.[subpath],
+						`entries/${fileName} imports '${specifier}' but @markless/${packageName} publishes no ${subpath} export`,
+					).toBeDefined();
+				}
+			}
+		});
+	});
+
 	test('create-markless bin is rewritten to a dist file and ships templates', () => {
 		const manifest = readManifest('cli');
 		const publishedBin = manifest.publishConfig?.bin?.['create-markless'];
@@ -190,6 +243,16 @@ describe.skipIf(!packedDistExists)('packed dist output (run `vp pack` first)', (
 		const absolute = resolve(repoRoot, 'packages', 'cli', binPath ?? '');
 		expect(existsSync(absolute), `cli bin ${binPath} missing from dist`).toBe(true);
 		expect(readFileSync(absolute, 'utf8').startsWith('#!')).toBe(true);
+	});
+
+	test('@markless/router packed vite plugin resolves entries where the tarball ships them', () => {
+		// dist/vite.js resolves the app-context entries relative to the package
+		// root; the literal must point at the shipped src/vite/entries directory.
+		const code = readFileSync(resolve(repoRoot, 'packages', 'router', 'dist/vite.js'), 'utf8');
+		expect(
+			code.includes('src/vite/entries'),
+			'dist/vite.js must resolve published entries under src/vite/entries',
+		).toBe(true);
 	});
 
 	test('@markless/core packed root entry stays node-free and bundler-free', () => {

@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { readFile, rm } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { resolve } from 'pathe';
-import { beforeAll, describe, expect, test } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import { runtimeSizeReport } from '../test-support/runtime-size.ts';
 import { assertRuntimeBudget } from './fixture-budget.ts';
 
@@ -65,10 +65,11 @@ const fixtures = [
 ] as const;
 
 describe('fixture builds', () => {
-	beforeAll(async () => {
-		await execPnpm(['build']);
-	}, 120_000);
-
+	// No root `pnpm build` here: fixtures resolve @markless deps through the dev
+	// exports maps (src .ts), so package dists are not inputs to these builds.
+	// Repacking the workspace from inside the suite wiped every packages/*/dist
+	// (pack `clean: true`) in parallel with tests that read dist output
+	// (scripts/release/publish-shape.test.ts), making the full run flaky.
 	for (const fixture of fixtures) {
 		test(`${fixture.filter} builds from a clean output directory`, async () => {
 			await Promise.all(

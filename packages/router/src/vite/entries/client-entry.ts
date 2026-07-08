@@ -1,10 +1,14 @@
+// Package specifiers only: this file ships as source in the tarball and is
+// compiled in the CONSUMER app's module graph (so import.meta.glob resolves
+// against the app root) — relative paths into src/ would escape the package.
 import { createRouteDiscovery } from '@markless/router/vite/runtime/create-route-discovery';
-import { buildRouteManifestFromFileIds, matchRouteManifest } from '../../route-manifest.ts';
-import { startRouteUpdateRenderer } from '../../route-renderer.ts';
 import {
 	__marklessRouterStartSpaNavigation,
+	buildRouteManifestFromFileIds,
 	ensureNavigationRuntime,
-} from '../../spa-navigation.ts';
+	matchRouteManifest,
+	startRouteUpdateRenderer,
+} from '@markless/router';
 import { preloadRouteModule } from 'virtual:markless-router/route-preloads';
 
 const routeDiscovery = createRouteDiscovery(
