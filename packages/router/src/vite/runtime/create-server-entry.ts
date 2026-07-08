@@ -1,6 +1,7 @@
 import type { PageProps } from '../../index.ts';
 import { buildRouteManifestFromFileIds, matchRouteManifest } from '../../route-manifest.ts';
 import { renderToString, type ModulePreloadInput } from '@markless/web/render-to-string';
+import { renderToStream } from '@markless/web/render-to-stream';
 
 export interface ServerEntryOptions {
 	readonly navigationEntryPath?: string;
@@ -10,6 +11,11 @@ export interface ServerEntryOptions {
 	readonly documentModuleLoader: (() => Promise<unknown>) | undefined;
 	readonly pageModuleLoaders: Record<string, () => Promise<unknown>>;
 	readonly routeFileIds: readonly string[];
+	// Out-of-order streaming IS the default (owner ruling 2026-07-07): pages
+	// flush with @pending arms in place and settled arms append on the same
+	// open response. 'blocking' opts a host out — the document awaits every
+	// boundary before the first byte (the pre-T107 behavior).
+	readonly render?: 'streaming' | 'blocking';
 }
 
 interface RenderOutput {
@@ -18,7 +24,10 @@ interface RenderOutput {
 	readonly view?: unknown;
 }
 
-type SsrRender = (props?: unknown) => RenderOutput | Promise<RenderOutput>;
+type SsrRender = (
+	props?: unknown,
+	renderContext?: unknown,
+) => RenderOutput | Promise<RenderOutput>;
 
 interface SsrArtifact {
 	readonly renderSsr?: SsrRender;
@@ -103,83 +112,127 @@ export function createServerEntry(options: ServerEntryOptions) {
 			},
 			status,
 		};
-		const pageOutput = await renderPageModule(
-			pageModule,
-			pageProps,
-			file,
-			manifest,
-			options.resumeEntryPath,
-			options.navigationEntryPath,
-			options.routeModulePreloads,
-			options.routeSsrModulePreloads,
-		);
 		const documentModule = options.documentModuleLoader
 			? ((await options.documentModuleLoader()) as DocumentModule)
 			: undefined;
-		const html = await renderDocument(pageOutput, documentModule, pageProps);
+		const headers = { 'content-type': 'text/html;charset=utf-8' };
 
-		return new Response(html, {
-			status,
-			headers: { 'content-type': 'text/html;charset=utf-8' },
+		const baseArtifact = pageModule.default;
+		const renderSsr = baseArtifact?.renderSsr ?? pageModule.marklessRenderSsr;
+		if (!renderSsr) {
+			const shell = await renderDocumentShell(documentModule, pageProps, '');
+			const message = `Page module must export an Markless compiled artifact: ${escapeHtml(file)}`;
+			return new Response(fillDocumentChildren(shell, message), { status, headers });
+		}
+		const pageArtifact = routedPageArtifact(
+			renderSsr,
+			baseArtifact,
+			pageProps,
+			file,
+			options.navigationEntryPath,
+		);
+		const renderOptions = {
+			props: pageProps,
+			resumeModuleUrl: options.resumeEntryPath ?? baseArtifact?.resumeModuleUrl,
+			// Preloads read Link targets from the rendered shell html.
+			modulePreloads: (html: string) =>
+				modulePreloadsForPage(
+					file,
+					html,
+					pageProps.url.href,
+					manifest,
+					options.routeModulePreloads,
+					options.routeSsrModulePreloads,
+				),
+		};
+
+		// Blocking opt-out: the pre-T107 whole-page await.
+		if (options.render === 'blocking') {
+			const pageHtml = splitLeadingModulePreloadLinks(
+				await renderToString(pageArtifact as never, renderOptions),
+			);
+			const shell = await renderDocumentShell(documentModule, pageProps, pageHtml.headHtml);
+			return new Response(fillDocumentChildren(shell, pageHtml.bodyHtml), { status, headers });
+		}
+
+		// Streaming default (owner ruling 2026-07-07): out-of-order streaming is
+		// the point of @try — boundaries whose data beats the first-flush
+		// deadline render inline; the rest flush @pending and settle on the
+		// same open response.
+		const stream = await renderToStream(pageArtifact as never, renderOptions);
+		const pageHtml = splitLeadingModulePreloadLinks(stream.shell);
+		const shell = await renderDocumentShell(documentModule, pageProps, pageHtml.headHtml);
+		if (stream.pendingArmCount === 0) {
+			return new Response(fillDocumentChildren(shell, pageHtml.bodyHtml), { status, headers });
+		}
+		const placeholderAt = shell.indexOf(DOCUMENT_CHILDREN_PLACEHOLDER);
+		const prefix =
+			placeholderAt === -1
+				? shell
+				: shell.slice(0, placeholderAt) + pageHtml.bodyHtml;
+		const suffix =
+			placeholderAt === -1
+				? ''
+				: shell.slice(placeholderAt + DOCUMENT_CHILDREN_PLACEHOLDER.length);
+		const encoder = new TextEncoder();
+		const body = new ReadableStream<Uint8Array>({
+			async start(controller) {
+				controller.enqueue(encoder.encode(prefix));
+				try {
+					for await (const chunk of stream.appends()) {
+						controller.enqueue(encoder.encode(chunk));
+					}
+				} catch (error) {
+					// Headers already flushed: fail the stream loudly instead of
+					// serving a document that silently never settles.
+					console.error('[markless-router] streaming settle failed:', error);
+					controller.error(error);
+					return;
+				}
+				controller.enqueue(encoder.encode(suffix));
+				controller.close();
+			},
 		});
+		return new Response(body, { status, headers });
 	}
 
 	return { fetch };
 }
 
-async function renderPageModule(
-	pageModule: PageModule,
-	props: PageComponentProps,
+// Wraps the compiled page renderSsr with the route script, the lazy Link
+// bridge, and the serialized page-prop cell, FORWARDING the render context
+// so streaming reaches the page's async boundaries (T107).
+function routedPageArtifact(
+	renderSsr: SsrRender,
+	baseArtifact: SsrArtifact | undefined,
+	pageProps: PageComponentProps,
 	file: string,
-	manifest: ReturnType<typeof buildRouteManifestFromFileIds>,
-	resumeEntryPath: string | undefined,
 	navigationEntryPath: string | undefined,
-	routeModulePreloads: Record<string, readonly ModulePreloadInput[]> | undefined,
-	routeSsrModulePreloads: Record<string, readonly ModulePreloadInput[]> | undefined,
-): Promise<PageHtml> {
-	const baseArtifact = pageModule.default;
-	const renderSsr = baseArtifact?.renderSsr ?? pageModule.marklessRenderSsr;
-	if (!renderSsr) {
-		return {
-			bodyHtml: `Page module must export an Markless compiled artifact: ${escapeHtml(file)}`,
-			headHtml: '',
-		};
-	}
-
-	// Compiled marklessRenderSsr is async (initial render awaits demanded
-	// async work); interpolating the un-awaited Promise served 500s.
-	const output = await renderSsr(props);
-	if (!output) return { bodyHtml: '', headHtml: '' };
-	const routeScript = output.state || output.view ? renderRouteScript(file) : '';
-	// ONE lazy bridge, structure-triggered: it imports the navigation runtime
-	// only on Link/'#/' anchor interaction, or at load when a '#/' deep-link
-	// hash is actually present. No eager imports, no modes.
-	const linkBridge = navigationEntryPath ? renderLinkBridgeScript(navigationEntryPath) : '';
-	const stateWithProps = withPagePropsCell(output.state, props);
-	const routedOutput =
-		routeScript || linkBridge || stateWithProps !== output.state
-			? { ...output, state: stateWithProps, html: `${output.html}${routeScript}${linkBridge}` }
-			: output;
-	const modulePreloads = modulePreloadsForPage(
-		file,
-		output.html,
-		props.url.href,
-		manifest,
-		routeModulePreloads,
-		routeSsrModulePreloads,
-	);
-	const pageArtifact: SsrArtifact = {
+) {
+	return {
 		resumeModuleUrl: baseArtifact?.resumeModuleUrl,
-		renderSsr() {
-			return routedOutput;
+		async renderSsr(renderProps?: unknown, renderContext?: unknown): Promise<RenderOutput> {
+			// Compiled marklessRenderSsr is async (initial render awaits demanded
+			// async work); interpolating the un-awaited Promise served 500s.
+			const output = await renderSsr(renderProps ?? pageProps, renderContext);
+			if (!output) return { html: '' };
+			const routeScript = output.state || output.view ? renderRouteScript(file) : '';
+			// ONE lazy bridge, structure-triggered: it imports the navigation
+			// runtime only on Link/'#/' anchor interaction, or at load when a
+			// '#/' deep-link hash is actually present. No eager imports, no modes.
+			const linkBridge = navigationEntryPath
+				? renderLinkBridgeScript(navigationEntryPath)
+				: '';
+			const stateWithProps = withPagePropsCell(output.state, pageProps);
+			return routeScript || linkBridge || stateWithProps !== output.state
+				? {
+						...output,
+						state: stateWithProps,
+						html: `${output.html}${routeScript}${linkBridge}`,
+					}
+				: output;
 		},
 	};
-	const rendered = await renderToString(pageArtifact as never, {
-		modulePreloads,
-		resumeModuleUrl: resumeEntryPath ?? baseArtifact?.resumeModuleUrl,
-	});
-
-	return splitLeadingModulePreloadLinks(rendered);
 }
 
 // Symbol modules and props+state computeds re-running on a resumed page read
@@ -281,23 +334,24 @@ function splitLeadingModulePreloadLinks(html: string): PageHtml {
 	return { bodyHtml, headHtml: links.join('') };
 }
 
-async function renderDocument(
-	pageHtml: PageHtml,
+// The document with the children placeholder INTACT: blocking responses fill
+// it in one piece; streaming responses split at it so everything after the
+// page (and the closing tags) flushes only when the last boundary settled.
+async function renderDocumentShell(
 	documentModule: DocumentModule | undefined,
 	pageProps: PageComponentProps,
+	headHtml: string,
 ): Promise<string> {
 	const attributes = htmlAttributes(documentModule, pageProps);
-	const children = pageHtml.bodyHtml;
 	const documentHtml = await renderDocumentModule(documentModule, {
 		...pageProps,
 		children: DOCUMENT_CHILDREN_PLACEHOLDER,
 	});
 	if (documentHtml !== undefined) {
-		const resolvedDocumentHtml = documentHtml.replace(DOCUMENT_CHILDREN_PLACEHOLDER, children);
 		return [
 			'<!doctype html>',
 			`<html${renderAttributes(attributes)}>`,
-			insertHeadHtml(resolvedDocumentHtml, pageHtml.headHtml),
+			insertHeadHtml(documentHtml, headHtml),
 			'</html>',
 		].join('');
 	}
@@ -308,13 +362,25 @@ async function renderDocument(
 		'<head>',
 		'<meta charset="utf-8">',
 		'<meta name="viewport" content="width=device-width, initial-scale=1">',
-		pageHtml.headHtml,
+		headHtml,
 		'</head>',
 		'<body>',
-		children,
+		DOCUMENT_CHILDREN_PLACEHOLDER,
 		'</body>',
 		'</html>',
 	].join('');
+}
+
+// indexOf/slice instead of String.replace: page html routinely contains '$'
+// sequences that replace() would interpret as substitution patterns.
+function fillDocumentChildren(documentShell: string, children: string): string {
+	const at = documentShell.indexOf(DOCUMENT_CHILDREN_PLACEHOLDER);
+	if (at === -1) return documentShell;
+	return (
+		documentShell.slice(0, at) +
+		children +
+		documentShell.slice(at + DOCUMENT_CHILDREN_PLACEHOLDER.length)
+	);
 }
 
 async function renderDocumentModule(
