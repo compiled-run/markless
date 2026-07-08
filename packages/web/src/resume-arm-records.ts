@@ -10,37 +10,29 @@ import type {
 	ResumeViewRecord,
 } from './resume-types.ts';
 
-// D3 arm-relative registration: an arm record set indexes from its boundary's
-// start anchor. This module adds the anchor's LIVE element-walk offset at
-// materialization time, so the same API serves the initial SSR load and the
-// re-registration after an arm's DOM range is replaced (commitArm, T103).
+// D3 arm-relative registration: arm records index from their boundary's start
+// anchor plus the LIVE element-walk offset added at materialization time, for
+// both the initial SSR load and re-registration after commitArm.
 
-// Narrow unknown armRecords payloads to the registrable single-set shape.
-// CSR-composed pages still ship the compile-time per-arm array — that plan is
-// not positionally trustworthy, so it is deliberately not registrable here.
+// Narrow unknown armRecords payloads to the registrable single-set shape; the
+// CSR-composed per-arm array is not positionally trustworthy, so it stays out.
 export function boundaryArmRecordSet(value: unknown): ResumeArmRecordSet | null {
 	if (!value || Array.isArray(value)) return null;
 	const set = value as ResumeArmRecordSet;
 	return Array.isArray(set.locators) ? set : null;
 }
 
-// Registers one arm record set against the live DOM. Locators resolve to
-// elements at (anchor offset + arm-relative index); records whose host did
-// not render in this arm (the untaken side of an in-arm ternary) are skipped.
-// Arm-scoped branch records resolve their anchor pairs in the arm's own
-// arm-branch comment census (bounded by the boundary's end anchor).
-export function materializeArmRecords(input: {
+type ArmMaterializeInput = {
 	readonly root: ResumeDomElement;
 	readonly startAnchor: ResumeDomComment;
 	readonly endAnchor?: ResumeDomComment;
 	readonly armRecords: ResumeArmRecordSet;
-}): {
-	readonly elementsByHostId: Map<string, ResumeDomElement>;
-	readonly events: ResumeArmRecordSet['events'];
-	readonly behaviors: ResumeArmRecordSet['behaviors'];
-	readonly elementHandles: ResumeArmRecordSet['elementHandles'];
-	readonly branches: ReadonlyArray<ResumeArmBranchRecord>;
-} {
+};
+
+// Registers one arm record set against the live DOM at (anchor offset +
+// arm-relative index); records whose host did not render in this arm are
+// skipped; arm-scoped branches resolve anchors in the arm's own census.
+export function materializeArmRecords(input: ArmMaterializeInput) {
 	const byHostId = new Map<string, ResumeDomElement>();
 	if (input.armRecords.locators.length > 0) {
 		const { elements, offset } = elementsAndAnchorOffset(input.root, input.startAnchor);
@@ -64,16 +56,10 @@ export function materializeArmRecords(input: {
 	};
 }
 
-// Resolves each flip record's anchor pair to live comments by position in the
-// arm-local arm-branch census. A missing anchor is a corrupt census — fail
-// loud (D2), never register half a flip. Escalated records (no anchors) pass
-// through untouched.
-function materializeArmBranchRecords(input: {
-	readonly root: ResumeDomElement;
-	readonly startAnchor: ResumeDomComment;
-	readonly endAnchor?: ResumeDomComment;
-	readonly armRecords: ResumeArmRecordSet;
-}): ReadonlyArray<ResumeArmBranchRecord> {
+// Resolves each flip record's anchor pair by position in the arm-local census.
+// A missing anchor is a corrupt census — fail loud (D2), never register half a
+// flip. Escalated records (no anchors) pass through untouched.
+function materializeArmBranchRecords(input: ArmMaterializeInput): ReadonlyArray<ResumeArmBranchRecord> {
 	const records = input.armRecords.branches ?? [];
 	if (records.length === 0) return [];
 	const census = records.some((record) => record.startAnchor)
@@ -155,8 +141,7 @@ export function expandBoundaryArmRecords(
 		events.push(...materialized.events);
 		behaviors.push(...materialized.behaviors);
 		elementHandles.push(...materialized.elementHandles);
-		// Arm-scoped branch records join the branch stream with LIVE anchors and
-		// their owning boundary id; the branch runtime wires flips/escalations.
+		// Arm-scoped branches join the stream with LIVE anchors + boundary id.
 		branches.push(
 			...(materialized.branches.map((record) => ({
 				...record,
@@ -171,8 +156,7 @@ export function expandBoundaryArmRecords(
 }
 
 // Pre-order element walk (root included, matching dom-order locators) that
-// also reports how many elements precede the anchor comment in document
-// order — the arm's element-walk offset.
+// also reports how many elements precede the anchor — the arm's offset.
 function elementsAndAnchorOffset(
 	root: ResumeDomElement,
 	anchor: ResumeDomComment,
@@ -184,7 +168,6 @@ function elementsAndAnchorOffset(
 		if (node.nodeType === 1) elements.push(node as ResumeDomElement);
 		for (const child of node.childNodes ?? []) visit(child);
 	})(root);
-	// A missing anchor cannot happen when the caller found it by census; the
-	// past-the-end offset makes any locator lookup fail loud, not silently.
+	// Missing anchor: past-the-end offset makes locator lookups fail loud.
 	return { elements, offset: offset === -1 ? elements.length : offset };
 }
