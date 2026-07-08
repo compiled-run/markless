@@ -8,7 +8,6 @@ import {
 	type RuntimePayloadType,
 } from '../../serializer/src/protocol-client.ts';
 import type { ResumeDomElement, ResumeRuntime, ResumeRuntimeInput } from './resume.ts';
-import type { ResumePayloadGraphInput } from './payload-graph-construct.ts';
 import {
 	deleteResumedPayload,
 	type ResumeAlreadyResumedWarning,
@@ -80,19 +79,13 @@ function normalizeRuntimePayloadError(error: unknown): Error {
 	return error instanceof Error ? error : new Error(String(error));
 }
 
-export async function createRuntimeGraphFromStatePayload(
-	payload: ResumePayloadGraphInput['state'],
-): Promise<RuntimeGraph> {
-	const graph = await import('./payload-graph-construct.ts');
-	return graph.createRuntimeGraphFromStatePayload(payload);
-}
-
-export async function createRuntimeGraphFromResumePayload(
-	input: ResumePayloadGraphInput,
-): Promise<RuntimeGraph> {
-	const graph = await import('./payload-graph-construct.ts');
-	return graph.createRuntimeGraphFromResumePayload(input);
-}
+// Static edge: the demand map co-demands graph construction with payload-full
+// on every tier that loads it (DISPATCH_CORE and FULL_TIER); the bundler chunk
+// groups keep payload-graph-construct in its own capability chunk.
+export {
+	createRuntimeGraphFromResumePayload,
+	createRuntimeGraphFromStatePayload,
+} from './payload-graph-construct.ts';
 
 export async function resumeFromPayloadScripts(
 	input: ResumePayloadScriptsInput,

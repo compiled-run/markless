@@ -1,4 +1,7 @@
-import type { ResumeRuntime } from './resume.ts';
+// Static edge: full-tier resume always constructs the browser resume runtime;
+// the demand map co-demands web/resume with web/payload-resume on every tier
+// that loads this module. The chunk groups keep resume core in its own chunk.
+import { createResumeRuntime, type ResumeRuntime } from './resume.ts';
 import {
 	createRuntimeGraphFromResumePayload,
 	decodePayloadScripts,
@@ -58,7 +61,6 @@ export async function resumeFromPayloadScriptsImpl(
 				},
 			});
 		});
-	const { createResumeRuntime } = await import('./resume.ts');
 	runtime = createResumeRuntime({
 		root: input.root,
 		graph,
