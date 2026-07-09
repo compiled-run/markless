@@ -97,11 +97,14 @@ function canonicalId(id, sizes) {
 function displayId(id) { const parts = symbolParts(id); return parts ? parts.symbolId + ' (' + (parts.source.split('/').pop() || parts.source) + ')' : id; }
 function kb(items, sizes) {
 	if (!sizes) return items.length === 1 ? '1 module' : items.length + ' modules';
-	const records = [...new Set(items.map((id) => canonicalId(id, sizes)))].map((id) => sizes.get(id)).filter(Boolean); const est = [...sizes.values()].some((record) => record.estimated); let total = 0;
-	for (const record of records) total += record.estimated ? record.raw : (record.gzip || record.raw || 0);
-	return (total / 1024).toFixed(1) + ' KB' + (est ? ' est.' : '');
+	const records = uniqueSizeRecords(items, sizes, false); const toolingRecords = uniqueSizeRecords(items, sizes, true); const est = [...sizes.values()].some((record) => record.estimated);
+	const total = sizeTotal(records); const toolingTotal = sizeTotal(toolingRecords); const tooling = toolingTotal > 0 ? ' (tooling ' + (toolingTotal / 1024).toFixed(1) + ' KB' + (est ? ' est.' : '') + ')' : '';
+	return (total / 1024).toFixed(1) + ' KB' + (est ? ' est.' : '') + tooling;
 }
+function uniqueSizeRecords(items, sizes, tooling) { const seen = new Set(); const records = []; for (const id of new Set(items.map((item) => canonicalId(item, sizes)))) { const isTooling = id === ${JSON.stringify(MARKLESS_EXECUTION_LOG_MODULE_ID)}; if (isTooling !== tooling) continue; const record = sizes.get(id); if (!record) continue; const key = record.chunk || id; if (seen.has(key)) continue; seen.add(key); records.push(record); } return records; }
+function sizeTotal(records) { let total = 0; for (const record of records) total += record.estimated ? record.raw : (record.gzip || record.raw || 0); return total; }
 function bytesText(items, sizes) { return !sizes ? (items.length === 1 ? '1 module executed' : items.length + ' modules executed') : kb(items, sizes) + ' executed'; }
+function appModuleCount(items) { return items.filter((id) => id !== ${JSON.stringify(MARKLESS_EXECUTION_LOG_MODULE_ID)}).length; }
 function warmIds(event) { return [...new Set([event.dispatchModuleId, ...((event.eventRecord && event.eventRecord.symbolIds) || [])].filter(Boolean))]; }
 function causeRows(input) {
 	const before = input.before || new Set(); const after = input.after || new Set(); const woken = [...after].filter((id) => !before.has(id)); const record = input.eventRecord;
@@ -120,9 +123,9 @@ function mirror(text) {
 export async function installMarklessExecutionLog(input = {}) {
 	const log = globalThis.__mxLog; if (!log || log.__marklessInstalled) return;
 	log.__marklessInstalled = true;
-	const moduleSizes = await loadModuleSizes(input); const preloaded = input.preloadedModuleCount || document.querySelectorAll('link[rel="modulepreload"]').length; const current = modules(log);
+	const moduleSizes = await loadModuleSizes(input); await quiet(); const preloaded = input.preloadedModuleCount || document.querySelectorAll('link[rel="modulepreload"]').length; const current = modules(log);
 	if (input.printResumeSummary !== false) {
-		const summary = 'markless: resumed — ' + bytesText(current, moduleSizes) + ', ' + preloaded + ' modules preloaded (' + current.length + ' executed)';
+		const summary = 'markless: resumed — ' + bytesText(current, moduleSizes) + ', ' + preloaded + ' modules preloaded (' + appModuleCount(current) + ' executed)';
 		console.log(summary); document.documentElement?.setAttribute('data-markless-log-summary', summary);
 	}
 	globalThis.__mxLogInteraction = (event) => {
@@ -144,6 +147,7 @@ export async function logMarklessRenderSummary(input = {}) {
 	const summary = 'markless: rendered — ' + current.length + ' ' + (current.length === 1 ? 'module' : 'modules') + ' executed (' + kb(current, moduleSizes) + ')';
 	console.log(summary); document.documentElement?.setAttribute('data-markless-log-summary', summary);
 }
+function quiet() { return new Promise((resolve) => setTimeout(resolve, 0)); }
 `;
 }
 

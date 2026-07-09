@@ -20,6 +20,7 @@ export type MarklessExecutionModuleSize = {
 	readonly estimated?: boolean;
 };
 export type MarklessExecutionModuleSizes = ReadonlyMap<string, MarklessExecutionModuleSize>;
+const MARKLESS_EXECUTION_LOG_MODULE_ID = 'virtual:markless:dev-log';
 
 export function shouldActivateMarklessExecutionLog(input: {
 	readonly mode: MarklessExecutionLogMode;
@@ -45,7 +46,9 @@ export function formatMarklessResumeSummary(input: {
 	readonly preloadedModuleCount: number;
 	readonly moduleSizes?: MarklessExecutionModuleSizes;
 }): string {
-	const executed = input.executedModules.length;
+	const executed = input.executedModules.filter(
+		(moduleId) => moduleId !== MARKLESS_EXECUTION_LOG_MODULE_ID,
+	).length;
 	return `markless: resumed — ${formatExecutedSize(input.executedModules, input.moduleSizes)}, ${input.preloadedModuleCount} modules preloaded (${executed} executed)`;
 }
 
@@ -150,15 +153,16 @@ function formatExecutedKb(
 	moduleSizes: MarklessExecutionModuleSizes | undefined,
 ): string {
 	if (!moduleSizes) return modules.length === 1 ? '1 module' : `${modules.length} modules`;
-	const sizes = [...new Set(modules.map((moduleId) => canonicalModuleId(moduleId, moduleSizes)))]
-		.map((moduleId) => moduleSizes.get(moduleId))
-		.filter((size): size is MarklessExecutionModuleSize => !!size);
+	const sizes = uniqueSizeRecords(modules, moduleSizes, false);
+	const toolingSizes = uniqueSizeRecords(modules, moduleSizes, true);
 	const estimated = [...moduleSizes.values()].some((size) => size.estimated);
-	const total = sizes.reduce(
-		(sum, size) => sum + (size.estimated ? size.raw : (size.gzip ?? size.raw)),
-		0,
-	);
-	return `${(total / 1024).toFixed(1)} KB${estimated ? ' est.' : ''}`;
+	const total = sizeTotal(sizes);
+	const toolingTotal = sizeTotal(toolingSizes);
+	const tooling =
+		toolingTotal > 0
+			? ` (tooling ${(toolingTotal / 1024).toFixed(1)} KB${estimated ? ' est.' : ''})`
+			: '';
+	return `${(total / 1024).toFixed(1)} KB${estimated ? ' est.' : ''}${tooling}`;
 }
 
 function moduleKbSuffix(
@@ -176,4 +180,28 @@ function warmModuleIds(
 	return [
 		...new Set([dispatchModuleId, ...(symbolIds ?? [])].filter((id): id is string => !!id)),
 	];
+}
+
+function uniqueSizeRecords(
+	modules: ReadonlyArray<string>,
+	moduleSizes: MarklessExecutionModuleSizes,
+	tooling: boolean,
+): MarklessExecutionModuleSize[] {
+	const seen = new Set<string>();
+	const records: MarklessExecutionModuleSize[] = [];
+	for (const moduleId of new Set(modules.map((id) => canonicalModuleId(id, moduleSizes)))) {
+		const isTooling = moduleId === MARKLESS_EXECUTION_LOG_MODULE_ID;
+		if (isTooling !== tooling) continue;
+		const size = moduleSizes.get(moduleId);
+		if (!size) continue;
+		const key = size.chunk ?? moduleId;
+		if (seen.has(key)) continue;
+		seen.add(key);
+		records.push(size);
+	}
+	return records;
+}
+
+function sizeTotal(sizes: ReadonlyArray<MarklessExecutionModuleSize>): number {
+	return sizes.reduce((sum, size) => sum + (size.estimated ? size.raw : (size.gzip ?? size.raw)), 0);
 }

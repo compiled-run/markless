@@ -222,11 +222,12 @@ export function createMarklessRolldownPlugin(input: {
 			if (!TSRX_SOURCE_FILE.test(id)) {
 				if (
 					currentEnvironment === 'client' &&
-					internalOptions.dev === true &&
 					normalizeExecutionLogMode(internalOptions.executionLog) !== 'never' &&
 					isMarklessRuntimeModule(id)
 				) {
-					executionLogEstimatedSizes.set(executionLogRuntimeModuleId(id), code.length);
+					if (internalOptions.dev === true) {
+						executionLogEstimatedSizes.set(executionLogRuntimeModuleId(id), code.length);
+					}
 					return {
 						code: injectExecutionLogModuleHook(
 							code,

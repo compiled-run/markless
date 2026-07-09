@@ -29,6 +29,7 @@ const WAIT = { timeoutMs: 10_000 };
 // symbol module globally, breaking cross-route exclusion).
 const MIN_HEAD_LINKS = 65;
 const MAX_HEAD_LINKS = 128;
+const MAX_INTERACTION_APP_GZIP_KB = 2.0;
 
 export default box(
 	{
@@ -84,6 +85,7 @@ export default box(
 		await expect.page.attribute(page, PLAY_TOGGLE, 'class', 'play active', WAIT);
 		await expect.page.attribute(page, '.youtube-frame-host', 'data-command', 'play', WAIT);
 		await waitForLogInteractionAttribute(page, 1, WAIT);
+		await assertInteractionAppBytes(page, MAX_INTERACTION_APP_GZIP_KB, WAIT);
 		const afterClickScripts = await waitForQuietBuildJs(page);
 		const lazyChunks = afterClickScripts.filter((path) => !startupScripts.includes(path));
 		receipt.note(`ssr play-branch post-click /build JS request diff: ${formatPaths(lazyChunks)}`);
@@ -201,7 +203,7 @@ async function waitForLogInteractionAttribute(
 	const started = Date.now();
 	const countPattern = new RegExp(`data-markless-log-interactions="${count}"`);
 	const lastPattern =
-		/data-markless-log-last="markless: click \[[^"]+\] · woke \d+ modules · ran warm \d+ modules · \d+(?:\.\d+)? KB"/;
+		/data-markless-log-last="markless: click \[[^"]+\] · woke \d+ modules · ran warm \d+ modules · \d+(?:\.\d+)? KB(?: \(tooling \d+(?:\.\d+)? KB\))?"/;
 	while (Date.now() - started < options.timeoutMs) {
 		const html = await page.content();
 		if (
@@ -214,6 +216,31 @@ async function waitForLogInteractionAttribute(
 		await new Promise((resolve) => setTimeout(resolve, 25));
 	}
 	throw new Error(`Expected interaction ${count} to mirror a real-KB execution log line.`);
+}
+
+async function assertInteractionAppBytes(
+	page: ContentPage,
+	maxKb: number,
+	options: { readonly timeoutMs: number },
+): Promise<void> {
+	const started = Date.now();
+	while (Date.now() - started < options.timeoutMs) {
+		const html = await page.content();
+		const match = /data-markless-log-last="markless: click \[[^"]+\] · woke \d+ modules · ran warm \d+ modules · (\d+(?:\.\d+)?) KB/.exec(
+			html,
+		);
+		if (match?.[1]) {
+			const appKb = Number(match[1]);
+			if (appKb > maxKb) {
+				throw new Error(
+					`Expected first interaction app execution <= ${maxKb.toFixed(1)}KB gzip, saw ${appKb.toFixed(1)}KB.`,
+				);
+			}
+			return;
+		}
+		await new Promise((resolve) => setTimeout(resolve, 25));
+	}
+	throw new Error('Expected interaction execution byte summary for budget check.');
 }
 
 async function jsBuildRequestPaths(page: NetworkRequestPage): Promise<readonly string[]> {

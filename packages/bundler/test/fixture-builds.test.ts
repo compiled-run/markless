@@ -4,7 +4,7 @@ import { promisify } from 'node:util';
 import { resolve } from 'pathe';
 import { describe, expect, test } from 'vitest';
 import { runtimeSizeReport } from '../test-support/runtime-size.ts';
-import { assertRuntimeBudget } from './fixture-budget.ts';
+import { assertRuntimeBudget, pageFetchScriptsFromHtml } from './fixture-budget.ts';
 
 const exec = promisify(execFile);
 const root = resolve(import.meta.dirname, '../../..');
@@ -99,7 +99,17 @@ describe('fixture builds', () => {
 				const emittedReport = await runtimeSizeReport({
 					dist: resolve(root, fixture.runtimeBudget.dist),
 				});
-				assertRuntimeBudget({ budget: fixture.runtimeBudget, emittedReport });
+				// The demand filter's honesty guard needs the page fetch set:
+				// wall-excluded chunks must never ship.
+				const indexHtml = await readFile(
+					resolve(root, fixture.runtimeBudget.dist, 'index.html'),
+					'utf8',
+				).catch(() => undefined);
+				assertRuntimeBudget({
+					budget: fixture.runtimeBudget,
+					emittedReport,
+					pageFetchScripts: indexHtml ? pageFetchScriptsFromHtml(indexHtml) : undefined,
+				});
 			}
 		}, 120_000);
 	}

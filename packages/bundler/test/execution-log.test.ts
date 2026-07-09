@@ -231,8 +231,45 @@ test('rendered summary sizes every executed id the module hook can inject', asyn
 		MARKLESS_EXECUTION_LOG_MODULE_ID,
 	]);
 	expect(logged).toHaveLength(1);
-	expect(logged[0]).toMatch(/^markless: rendered — 1 module executed \(\d+\.\d KB est\.\)$/);
-	expect(logged[0]).not.toContain('(0.0 KB');
+	expect(logged[0]).toMatch(
+		/^markless: rendered — 1 module executed \(0\.0 KB est\. \(tooling \d+\.\d KB est\.\)\)$/,
+	);
+});
+
+test('resume summary waits for quiet before reading executed modules', async () => {
+	stubExecutionLogDom();
+	(globalThis as ExecutionLogGlobal).__mxLog = new Set();
+	const logged: string[] = [];
+	vi.spyOn(console, 'log').mockImplementation((line: unknown) => logged.push(String(line)));
+
+	const mod = await importExecutionLogModule(
+		executionLogVirtualModuleSource({ moduleSizes: new Map([['web:payload-resume', 1024]]) }),
+	);
+	setTimeout(() => (globalThis as ExecutionLogGlobal).__mxLog!.add('web:payload-resume'), 0);
+	await mod.installMarklessExecutionLog({ preloadedModuleCount: 0 });
+
+	// App bytes lead the line; the dev logger's self-measurement is split
+	// into the tooling parenthetical (owner-facing honesty).
+	expect(logged[0]).toContain('1.0 KB est. (tooling 6.6 KB est.) executed');
+	expect(logged[0]).toContain('(1 executed)');
+});
+
+test('rendered summary counts each chunk once across multiple executed ids', async () => {
+	stubExecutionLogDom();
+	(globalThis as ExecutionLogGlobal).__mxLog = new Set(['web:resume-events', 'web:resume-runtime']);
+	const logged: string[] = [];
+	vi.spyOn(console, 'log').mockImplementation((line: unknown) => logged.push(String(line)));
+
+	const mod = await importExecutionLogModule(executionLogVirtualModuleSource());
+	await mod.logMarklessRenderSummary({
+		moduleSizes: {
+			'web:resume-events': { raw: 4096, gzip: 1024, chunk: 'runtime.js' },
+			'web:resume-runtime': { raw: 4096, gzip: 1024, chunk: 'runtime.js' },
+			[MARKLESS_EXECUTION_LOG_MODULE_ID]: { raw: 4096, gzip: 1536, chunk: 'dev-log.js' },
+		},
+	});
+
+	expect(logged[0]).toContain('(1.0 KB (tooling ');
 });
 
 test('interaction rows resolve qualified symbol ids and display them short', async () => {

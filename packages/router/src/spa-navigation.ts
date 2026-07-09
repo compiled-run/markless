@@ -84,14 +84,20 @@ export async function __marklessRouterStartSpaNavigation(options: StartSpaNaviga
 		preloadRouteModule: options.preloadRouteModule,
 		window: runtimeWindow,
 	};
-	const navigation = await ensureNavigationRuntime(runtimeWindow, options.loadPolyfill);
+	const navigation = runtimeWindow.navigation;
 
 	runtimeWindow.addEventListener(
 		'click',
-		(event) => handleLinkClick(event, context, navigation),
+		(event) => {
+			handleLinkClick(
+				event,
+				context,
+				navigation ?? (() => ensureNavigationRuntime(runtimeWindow, options.loadPolyfill)),
+			);
+		},
 		true,
 	);
-	navigation.addEventListener('navigate', (event) => {
+	navigation?.addEventListener('navigate', (event) => {
 		handleNavigateEvent(event, context);
 	});
 
@@ -262,7 +268,9 @@ function warnUnknownHashRoute(url: URL): void {
 function handleLinkClick(
 	event: MouseEvent,
 	context: NavigationContext,
-	navigation: MarklessRouterNavigationRuntime,
+	navigation:
+		| MarklessRouterNavigationRuntime
+		| (() => Promise<MarklessRouterNavigationRuntime>),
 ) {
 	if (
 		event.defaultPrevented ||
@@ -288,13 +296,16 @@ function handleLinkClick(
 
 	preloadRouteModule(context, match.route.file);
 	event.preventDefault();
-	navigation.navigate(url.href, {
-		history: anchor.hasAttribute(REPLACE_ATTRIBUTE) ? 'replace' : 'push',
-		info: {
-			[LINK_INFO]: true,
-			scroll: anchor.getAttribute(SCROLL_ATTRIBUTE) === 'manual' ? 'manual' : undefined,
-		},
-	});
+	const navigate = (runtime: MarklessRouterNavigationRuntime) =>
+		runtime.navigate(url.href, {
+			history: anchor.hasAttribute(REPLACE_ATTRIBUTE) ? 'replace' : 'push',
+			info: {
+				[LINK_INFO]: true,
+				scroll: anchor.getAttribute(SCROLL_ATTRIBUTE) === 'manual' ? 'manual' : undefined,
+			},
+		});
+	if (typeof navigation === 'function') void navigation().then(navigate);
+	else navigate(navigation);
 }
 
 function preloadRouteModule(context: NavigationContext, file: string): void {

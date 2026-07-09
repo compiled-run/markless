@@ -484,19 +484,21 @@ let count = state(0);
 		expect(result.code).not.toContain('renderCsr:');
 	});
 
-	test('production client execution logging does not alter hash-bearing modules', async () => {
+	test('production client execution logging covers runtime modules without touching symbols', async () => {
 		const plugin = marklessClient({ executionLog: 'auto' });
 		const filename = '/workspace/app/src/App.tsrx';
 
 		callBuildStart(plugin, { cwd: '/workspace/app' });
 
 		expect(
-			await callTransform(
-				plugin,
-				'export const runtime = true;',
-				'/workspace/app/packages/web/src/event-only-resume.ts',
-			),
-		).toBeNull();
+			(
+				(await callTransform(
+					plugin,
+					'export const runtime = true;',
+					'/workspace/app/packages/web/src/event-only-resume.ts',
+				)) as { code: string }
+			).code,
+		).toContain('globalThis.__mxLog?.add("web:event-only-resume");');
 
 		await callTransform(plugin, source, filename);
 		const symbolId = `virtual:markless:symbol:${encodeURIComponent(filename)}:${encodeURIComponent('symbol:0')}`;

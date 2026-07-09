@@ -844,6 +844,38 @@ describe('hash mode', () => {
 		expect(updates).toEqual([]);
 	});
 
+	it('skips identity hash boot before demanding the navigation polyfill', async () => {
+		const document = new EventTarget() as Document;
+		const loaded: string[] = [];
+		const runtimeWindow = {
+			addEventListener() {},
+			document,
+			location: { href: 'http://marklessrouter.test/#/' },
+		} as unknown as MarklessRouterNavigationWindow;
+
+		await __marklessRouterStartSpaNavigation({
+			loadPolyfill: async () => {
+				loaded.push('polyfill');
+				return {
+					applyPolyfill() {
+						return { addEventListener() {}, navigate() {} };
+					},
+				};
+			},
+			pageModuleLoaders: {
+				'pages/index.tsrx': async () => {
+					loaded.push('page');
+					return { default: component('home') };
+				},
+			},
+			routeFileIds: ['/pages/index.tsrx'],
+			window: runtimeWindow,
+		});
+		await new Promise((resolve) => setTimeout(resolve, 0));
+
+		expect(loaded).toEqual([]);
+	});
+
 	it('intercepts plain-anchor hashChange (no link info) to a matching route', () => {
 		const context = {
 			mode: 'hash',

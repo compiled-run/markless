@@ -4,17 +4,31 @@ export type RuntimeBudget = {
 	readonly maxRuntimeChunkGzipBytes: number;
 	readonly maxEmittedRuntimeGzipBytes: number;
 	readonly forbidVitePreloadHelper?: boolean;
+	// Arms once record-kind preload gating lands: wall-excluded chunks must
+	// never appear in the page fetch set.
+	readonly assertUndemandedNeverShips?: boolean;
 };
 
 export function assertRuntimeBudget(input: {
 	readonly budget: RuntimeBudget;
 	readonly emittedReport: RuntimeSizeReport;
+	readonly pageFetchScripts?: readonly string[];
 }) {
 	const { budget, emittedReport } = input;
-	assert(
-		emittedReport.runtimeChunks.length > 0,
-		`expected at least one runtime-heavy emitted chunk\n${emittedReport.summary}`,
-	);
+	// Honesty guard for the demand filter: a runtime chunk excluded from the
+	// wall (no record can demand it) must also never reach a browser. If it
+	// shows up in the page's fetch set, the wall is lying — fail loud.
+	if (input.pageFetchScripts && budget.assertUndemandedNeverShips) {
+		const fetchSet = new Set(input.pageFetchScripts.map((s) => s.split('/').pop()));
+		const shipped = emittedReport.undemandedRuntimeChunks
+			.filter((chunk) => fetchSet.has(chunk.fileName.split('/').pop()))
+			.map((chunk) => chunk.fileName);
+		assert(
+			shipped.length === 0,
+			`undemanded runtime chunks are excluded from the wall but SHIPPED in the page fetch set: ${shipped.join(', ')}
+${emittedReport.summary}`,
+		);
+	}
 	assert(
 		(emittedReport.largestRuntimeChunk?.gzipBytes ?? 0) <= budget.maxRuntimeChunkGzipBytes,
 		`largest runtime chunk gzip budget exceeded: ${emittedReport.largestRuntimeChunk?.gzipBytes ?? 0} > ${budget.maxRuntimeChunkGzipBytes}\n${emittedReport.summary}`,

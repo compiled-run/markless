@@ -42,6 +42,9 @@ test('expectations derive allowed runtime modules from the generated demand map'
 	expect(allowed).not.toContain('web/event-only-resume');
 	expect(allowed).not.toContain('web/event-only-graph');
 	expect(allowed).not.toContain('web/dom-journal');
+	expect(allowed).not.toContain('web/resume-branches');
+	expect(allowed).not.toContain('web/resume-async-boundaries');
+	expect(allowed).not.toContain('web/resume-async-wiring');
 });
 
 test('generated demand map carries per-kind replacement phase flags', async () => {
@@ -511,7 +514,6 @@ const JUDGE_COUNTER_INTERPRETER_CHAIN = [
 	'web/payload-full',
 	'web/payload-resume',
 	'web/payload-graph-construct',
-	'web/resume-async-wiring',
 ] as const; // runtime-error-reporting removed: shared dispatch infra post tier collapse, not interpreter machinery
 const JUDGE_COUNTER_INTERPRETER_CHAIN_SET = new Set<string>(JUDGE_COUNTER_INTERPRETER_CHAIN);
 

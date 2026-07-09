@@ -11,6 +11,12 @@ type Manifest = {
 	readonly bundles?: Record<string, ManifestBundle>;
 };
 
+type ExecutionDemandMap = {
+	readonly symbols?: ReadonlyArray<{ readonly runtimeModuleIds?: readonly string[] }>;
+	readonly payloadRecords?: ReadonlyArray<{ readonly runtimeModuleIds?: readonly string[] }>;
+	readonly actions?: ReadonlyArray<{ readonly runtimeModuleIds?: readonly string[] }>;
+};
+
 export type RuntimeSizeReportInput = {
 	readonly dist: string;
 	readonly manifest?: string;
@@ -28,6 +34,7 @@ export type RuntimeScriptSize = {
 
 export type RuntimeSizeReport = {
 	readonly runtimeChunks: readonly RuntimeScriptSize[];
+	readonly undemandedRuntimeChunks: readonly RuntimeScriptSize[];
 	readonly largestRuntimeChunk: RuntimeScriptSize | undefined;
 	readonly asyncScripts: {
 		readonly count: number;
@@ -62,6 +69,7 @@ export async function runtimeSizeReport(input: RuntimeSizeReportInput): Promise<
 		? (JSON.parse(await readFile(input.manifest, 'utf8')) as Manifest)
 		: undefined;
 	const bundles = manifest?.bundles ?? {};
+	const demandedRuntimeChunks = await demandRuntimeChunks(input.dist);
 	const roots = input.scripts?.map(normalizeScriptFileName).filter(isJavaScriptFile);
 	const fileNames = roots
 		? input.includeStaticImports
@@ -86,7 +94,15 @@ export async function runtimeSizeReport(input: RuntimeSizeReportInput): Promise<
 			} satisfies RuntimeScriptSize & { readonly isRuntimeChunk: boolean };
 		}),
 	);
+	// The wall counts EVERY emitted runtime chunk. The demand map may one day
+	// exclude never-demandable families — but only once the preload plan is
+	// gated the same way, or the wall would stop counting bytes that still
+	// ship (the honesty guard below caught exactly that). Until then the
+	// demand set only powers the undemanded-vs-fetch-set assertion.
 	const runtimeChunks = scripts.filter((script) => script.isRuntimeChunk);
+	const undemandedRuntimeChunks = demandedRuntimeChunks
+		? runtimeChunks.filter((script) => !demandedRuntimeChunks.has(script.fileName))
+		: [];
 	const largestRuntimeChunk = runtimeChunks.reduce<RuntimeScriptSize | undefined>(
 		(largest, script) => {
 			if (!largest || script.gzipBytes > largest.gzipBytes) {
@@ -107,6 +123,7 @@ export async function runtimeSizeReport(input: RuntimeSizeReportInput): Promise<
 
 	return {
 		runtimeChunks,
+		undemandedRuntimeChunks,
 		largestRuntimeChunk,
 		asyncScripts,
 		summary: formatRuntimeSizeSummary({
@@ -120,6 +137,49 @@ export async function runtimeSizeReport(input: RuntimeSizeReportInput): Promise<
 			runtimeChunks,
 		}),
 	};
+}
+
+async function demandRuntimeChunks(dist: string): Promise<ReadonlySet<string> | undefined> {
+	const [sizes, demand] = await Promise.all([
+		readJsonFile<Record<string, { readonly chunk?: string }>>(
+			resolve(dist, 'build', 'execution-sizes.json'),
+		),
+		readJsonFile<Record<string, ExecutionDemandMap>>(resolve(dist, 'build', 'execution-demand.json')),
+	]);
+	if (!sizes || !demand) return undefined;
+	const runtimeModuleIds = new Set<string>();
+	for (const map of Object.values(demand)) {
+		for (const record of [
+			...(map.symbols ?? []),
+			...(map.payloadRecords ?? []),
+			...(map.actions ?? []),
+		]) {
+			for (const id of record.runtimeModuleIds ?? []) runtimeModuleIds.add(id);
+		}
+	}
+	const chunks = new Set<string>();
+	const missingSizeIds: string[] = [];
+	for (const id of runtimeModuleIds) {
+		const chunk = (sizes[id] ?? sizes[id.replace('/', ':')])?.chunk;
+		if (chunk) {
+			chunks.add(normalizeScriptFileName(chunk));
+		} else {
+			missingSizeIds.push(id);
+		}
+	}
+	// A demanded id with no sizes entry was tree-shaken out of the emit
+	// entirely: zero bytes, nothing loadable — the demand map lists what a
+	// record COULD need, the build proves what exists. Only a fully missing
+	// sizes asset (handled above) indicates broken instrumentation.
+	return chunks;
+}
+
+async function readJsonFile<T>(fileName: string): Promise<T | undefined> {
+	try {
+		return JSON.parse(await readFile(fileName, 'utf8')) as T;
+	} catch {
+		return undefined;
+	}
 }
 
 async function collectStaticScriptClosure(

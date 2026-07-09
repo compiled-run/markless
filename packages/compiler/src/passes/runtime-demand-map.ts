@@ -20,7 +20,6 @@ const DISPATCH_CORE = [
 	'web/payload-full',
 	'web/payload-resume',
 	'web/payload-graph-construct',
-	'web/resume-async-wiring',
 	// Error enrichment is dispatch infrastructure (T012): loaded by the shared
 	// runtime on any dispatch path, not a capability.
 	'web/runtime-error-reporting',
@@ -38,7 +37,7 @@ const SYNC_POLICY = ['web/inline/sync-policy-core'];
 const DOM_UPDATE: string[] = [];
 const KEYED_REPEAT = ['web/repeat-runtime', 'web/resume-keyed-repeats'];
 const BRANCH = ['web/resume-branches'];
-const ASYNC_BOUNDARY = ['web/resume-async-boundaries'];
+const ASYNC_BOUNDARY = ['web/resume-async-boundaries', 'web/resume-async-wiring'];
 const BEHAVIOR = ['web/resume-behaviors'];
 const FULL_RESUME_CORE = ['web/resume-locators'];
 const FULL_TIER = [
@@ -51,7 +50,6 @@ const FULL_TIER = [
 	'web/payload-full',
 	'web/payload-resume',
 	'web/payload-graph-construct',
-	'web/resume-async-wiring',
 ];
 const RECORD_KINDS = [
 	'async-boundary',

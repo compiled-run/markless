@@ -41,6 +41,12 @@
 //            preload doctrine probe — actor-select change + tab navigation must
 //            trigger ZERO new /build/*.js fetches (cold-fetch check).
 //
+//   exec-budget  Executed-byte budget probe:
+//            path-URL load must execute 0 app/framework modules after the quiet
+//            resume summary; identity hash boot ('/#/') must stay <=1.0KB gzip
+//            app bytes; deep-link hash boot is recorded as structural (not gated)
+//            until the owner decides whether path URLs replace hash deep links.
+//
 //   specs    The immutable playwright suite (all seven specs) against the
 //            patched serve copy, repeated SPECS_REPEAT (2) times. Playwright's
 //            own webServer owns the backend port (fresh seeded root via the
@@ -76,6 +82,7 @@ const previewPort = Number(process.env.PREVIEW_PORT ?? '4961');
 const backendPort = Number(process.env.BACKEND_PORT ?? '4962');
 const proxyPort = Number(process.env.PROXY_PORT ?? '4963');
 const specsRepeat = Number(process.env.SPECS_REPEAT ?? '2');
+const identityHashBootBudgetKb = 1.0;
 
 const repoId = 'alpha-project-a';
 // A hash URL's server document is always '/', so a cold refresh of a repo hash
@@ -682,6 +689,79 @@ async function phaseSpecs() {
 	}
 }
 
+async function phaseExecBudget() {
+	const base = `http://127.0.0.1:${previewPort}`;
+	const { chromium } = await loadPlaywright();
+	const browser = await chromium.launch({ headless: true });
+	try {
+		const pathLoad = await measureExecutedBytes(browser, `${base}/`);
+		console.log(`exec-budget[path /]: ${formatExecutionMeasure(pathLoad)}`);
+		gate(
+			pathLoad.executedModules === 0 && pathLoad.appKb === 0,
+			`exec-budget path URL executed ${pathLoad.executedModules} module(s), ${pathLoad.appKb.toFixed(1)}KB app bytes (expected 0)`,
+		);
+
+		const identity = await measureExecutedBytes(browser, `${base}/#/`);
+		console.log(`exec-budget[identity /#/]: ${formatExecutionMeasure(identity)}`);
+		gate(
+			identity.appKb <= identityHashBootBudgetKb,
+			`exec-budget identity hash boot executed ${identity.appKb.toFixed(1)}KB app bytes > ${identityHashBootBudgetKb.toFixed(1)}KB`,
+		);
+
+		const deepLink = await measureExecutedBytes(browser, `${base}/#/r/${repoId}/issues`);
+		console.log(
+			`exec-budget[deep-link /#/r/${repoId}/issues]: ${formatExecutionMeasure(deepLink)} (structural hash CSR render cost; recorded, not gated)`,
+		);
+	} finally {
+		await browser.close();
+	}
+}
+
+type ExecutionMeasure = {
+	readonly appKb: number;
+	readonly executedModules: number;
+	readonly rawSummary: string;
+	readonly toolingKb: number;
+};
+
+async function measureExecutedBytes(
+	browser: { newContext(): Promise<any> },
+	url: string,
+): Promise<ExecutionMeasure> {
+	const context = await browser.newContext();
+	const tab = await context.newPage();
+	try {
+		await tab.goto(url, { waitUntil: 'commit' });
+		await tab.waitForFunction(
+			() => !!document.documentElement?.getAttribute('data-markless-log-summary'),
+			{ timeout: 20_000 },
+		);
+		await tab.waitForTimeout(250);
+		const rawSummary = (await tab.evaluate(
+			() => document.documentElement?.getAttribute('data-markless-log-summary') ?? '',
+		)) as string;
+		const appMatch = /markless: resumed — (\d+(?:\.\d+)?) KB(?: est\.)?/.exec(rawSummary);
+		const moduleMatch = /\((\d+) executed\)/.exec(rawSummary);
+		const toolingMatch = /\(tooling (\d+(?:\.\d+)?) KB/.exec(rawSummary);
+		return {
+			appKb: appMatch?.[1]
+				? Number(appMatch[1])
+				: rawSummary.includes('0 modules executed')
+					? 0
+					: Number.POSITIVE_INFINITY,
+			executedModules: moduleMatch?.[1] ? Number(moduleMatch[1]) : 0,
+			rawSummary,
+			toolingKb: toolingMatch?.[1] ? Number(toolingMatch[1]) : 0,
+		};
+	} finally {
+		await context.close();
+	}
+}
+
+function formatExecutionMeasure(measure: ExecutionMeasure): string {
+	return `${measure.appKb.toFixed(1)}KB app gzip, ${measure.toolingKb.toFixed(1)}KB tooling, ${measure.executedModules} modules; ${measure.rawSummary}`;
+}
+
 // --- main ----------------------------------------------------------------------
 
 try {
@@ -721,8 +801,9 @@ try {
 	if (phase === 'cls') await phaseCls();
 	else if (phase === 'total-cls') await phaseTotalCls();
 	else if (phase === 'journey') await phaseJourney();
+	else if (phase === 'exec-budget') await phaseExecBudget();
 	else if (phase === 'specs') await phaseSpecs();
-	else fail(`unknown --phase ${phase} (cls|total-cls|journey|specs)`);
+	else fail(`unknown --phase ${phase} (cls|total-cls|journey|exec-budget|specs)`);
 
 	if (failures.length > 0) {
 		fail(`${failures.length} gate(s) failed:\n  - ${failures.join('\n  - ')}`);

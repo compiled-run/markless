@@ -31,6 +31,40 @@ test('executed sizes join local and route-prefixed symbol ids to a unique qualif
 	);
 });
 
+test('executed sizes count one chunk once across multiple executed ids', () => {
+	const sizes = new Map([
+		['web:resume-events', { raw: 4096, gzip: 1024, chunk: 'runtime.js' }],
+		['web:resume-runtime', { raw: 4096, gzip: 1024, chunk: 'runtime.js' }],
+	]);
+
+	expect(formatMarklessExecutedSize(['web:resume-events', 'web:resume-runtime'], sizes)).toBe(
+		'1.0 KB executed',
+	);
+});
+
+test('dev logger self cost is split from app execution bytes', () => {
+	const sizes = new Map([
+		['web:resume-events', { raw: 4096, gzip: 1024, chunk: 'runtime.js' }],
+		['virtual:markless:dev-log', { raw: 4096, gzip: 1536, chunk: 'dev-log.js' }],
+	]);
+
+	expect(formatMarklessExecutedSize(['virtual:markless:dev-log', 'web:resume-events'], sizes)).toBe(
+		'1.0 KB (tooling 1.5 KB) executed',
+	);
+});
+
+test('resume summary excludes dev logger self from owner executed count', () => {
+	expect(
+		formatMarklessResumeSummary({
+			executedModules: ['virtual:markless:dev-log'],
+			preloadedModuleCount: 4,
+			moduleSizes: new Map([
+				['virtual:markless:dev-log', { raw: 4096, gzip: 1536, chunk: 'dev-log.js' }],
+			]),
+		}),
+	).toBe('markless: resumed — 0.0 KB (tooling 1.5 KB) executed, 4 modules preloaded (0 executed)');
+});
+
 test('ambiguous local symbol ids refuse to guess a size', () => {
 	const sizes = new Map([
 		[APP_SYMBOL_ID, { raw: 1024, estimated: true }],
