@@ -408,7 +408,8 @@ export function marklessSsrAppendChildView(context) {
 	const childView = context.child.view;
 	const propEvents = context.child.output?.propEvents ?? [];
 	const callbackProps = context.child.callbackProps ?? {};
-	for (const locator of childView.locators)
+	const childLocators = marklessSsrRenderedChildLocators(context.child, childView.locators);
+	for (const locator of childLocators)
 		context.locators.push({
 			...locator,
 			hostNodeId: context.child.hostPrefix + locator.hostNodeId,
@@ -516,6 +517,76 @@ export function marklessSsrAppendChildView(context) {
 					}
 				: {}),
 		});
+}
+export function marklessSsrRenderedChildLocators(child, locators) {
+	if (!Array.isArray(locators) || locators.length === 0) return locators;
+	const renderedElementCount = child.hostCount ?? child.output?.elementCount;
+	if (typeof renderedElementCount !== 'number') return locators;
+	const maxLocatorIndex = locators.reduce(
+		(max, locator) => Math.max(max, Number(locator.index) || 0),
+		0,
+	);
+	if (maxLocatorIndex >= renderedElementCount - 1) return locators;
+
+	const renderedIndexes = marklessSsrRenderedLocatorIndexes(child.output?.html, locators);
+	return renderedIndexes ?? locators;
+}
+// Some compiled child artifacts report rendered repeat extents before their
+// flat locators have been shifted. Compose may use the served child HTML's
+// element census only when the locator/tag sequence has one possible mapping;
+// ambiguous streams fall through so resume keeps throwing its loud mismatch.
+export function marklessSsrRenderedLocatorIndexes(html, locators) {
+	const tags = marklessSsrElementOpenTags(html);
+	if (tags.length === 0) return null;
+	const sorted = locators
+		.map((locator, order) => ({ locator, order }))
+		.sort((left, right) => left.locator.index - right.locator.index || left.order - right.order);
+	if (sorted.some((item) => item.locator.tagName === undefined || item.locator.tagName === '*'))
+		return null;
+	const matches = marklessSsrUniqueLocatorTagMatch(
+		tags,
+		sorted.map((item) => String(item.locator.tagName).toLowerCase()),
+	);
+	if (!matches) return null;
+	const nextIndexes = new Map(sorted.map((item, index) => [item.order, matches[index]]));
+	return locators.map((locator, order) => ({ ...locator, index: nextIndexes.get(order) }));
+}
+export function marklessSsrUniqueLocatorTagMatch(tags, expectedTags) {
+	if (expectedTags.length > tags.length) return null;
+	const earliest = [];
+	let cursor = 0;
+	for (const expected of expectedTags) {
+		const index = tags.findIndex((tag, tagIndex) => tagIndex >= cursor && tag === expected);
+		if (index === -1) return null;
+		earliest.push(index);
+		cursor = index + 1;
+	}
+	const latest = [];
+	cursor = tags.length - 1;
+	for (let expectedIndex = expectedTags.length - 1; expectedIndex >= 0; expectedIndex--) {
+		const expected = expectedTags[expectedIndex];
+		let found = -1;
+		for (let tagIndex = cursor; tagIndex >= 0; tagIndex--) {
+			if (tags[tagIndex] !== expected) continue;
+			found = tagIndex;
+			break;
+		}
+		if (found === -1) return null;
+		latest[expectedIndex] = found;
+		cursor = found - 1;
+	}
+	return earliest.every((index, expectedIndex) => index === latest[expectedIndex])
+		? earliest
+		: null;
+}
+export function marklessSsrElementOpenTags(html) {
+	const tags = [];
+	const pattern = /<([a-zA-Z][a-zA-Z0-9:-]*)\b/g;
+	let match;
+	while ((match = pattern.exec(String(html ?? ''))) !== null) {
+		tags.push(match[1].toLowerCase());
+	}
+	return tags;
 }
 // A child boundary's armized record set keeps its arm-relative coordinates
 // through composition (the anchor is located live at resume); only host ids,

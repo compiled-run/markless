@@ -129,6 +129,78 @@ test('protocol view nests the arm-scoped flip record under the boundary in an ar
 	expect(drawerHostIds).toEqual(['div', 'button']);
 });
 
+test('dashboard-shaped chrome plus page branch arms keep the same page-owned records', async () => {
+	const { payloadArena, symbolResolver, plan } = await planFixture(
+		'src/WorkspaceRoute.tsrx',
+		`
+import { computed, state } from '@markless/core';
+import { WorkspaceFrame } from './workspace-frame.tsrx';
+import { NavPills } from './nav-pills.tsrx';
+
+export function App({ params }) @{
+	let pickerOpen = state(false);
+	const model = computed(async ({ signal }) => {
+		const response = await fetch('/api/workspace/' + params.workspace, { signal });
+		return await response.json();
+	});
+
+	<main>
+		<WorkspaceFrame />
+		<NavPills params={params} tab="files" />
+		@try {
+			<section>
+				<div class="toolbar">
+					<button type="button" data-picker onClick={() => pickerOpen = !pickerOpen}>
+						{model.currentRef}
+					</button>
+					@if (pickerOpen) {
+						<div class="picker">
+							@for (const ref of model.refs; key ref.name) {
+								<a href={ref.href}>{ref.name}</a>
+							}
+						</div>
+					}
+				</div>
+				@if (model.hasSummary) {
+					<article>{model.summary}</article>
+				}
+			</section>
+		} @pending {
+			<p>Loading workspace</p>
+		} @catch {
+			<p>Workspace unavailable</p>
+		}
+	</main>
+}
+`,
+	);
+	const view = createProtocolViewPayload({
+		payloadArena,
+		symbolResolver,
+		publicRenderPlan: plan,
+	});
+
+	expect(view.branches ?? []).toEqual([]);
+	const boundary = view.asyncBoundaries[0];
+	expect(boundary?.startAnchor).toEqual({ strategy: 'dom-order-comment', index: 0 });
+	expect(boundary?.endAnchor).toEqual({ strategy: 'dom-order-comment', index: 1 });
+	expect(boundary?.armRecords?.[0]?.events).toEqual([
+		expect.objectContaining({ eventName: 'click' }),
+	]);
+	expect(boundary?.armRecords?.[0]?.branches).toEqual([
+		expect.objectContaining({
+			id: 'branch-site:1',
+			startAnchor: { strategy: 'arm-branch-comment', index: 0 },
+			endAnchor: { strategy: 'arm-branch-comment', index: 1 },
+		}),
+		expect.objectContaining({
+			id: 'branch-site:0',
+			testReads: [expect.objectContaining({ graphNodeId: 'state:pickerOpen' })],
+		}),
+	]);
+	expect(boundary?.armRecords?.[0]?.branches?.[1]).not.toHaveProperty('startAnchor');
+});
+
 test('the arm-scoped flip module rebuilds the range from parts + repeat rows, no component execution', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/DrawerMenu.tsrx',

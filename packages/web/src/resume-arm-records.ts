@@ -36,8 +36,8 @@ type ArmMaterializeInput = {
 };
 
 // Registers one arm record set against the live DOM at (anchor offset +
-// arm-relative index); records whose host did not render in this arm are
-// skipped; arm-scoped branches resolve anchors in the arm's own census.
+// arm-relative index). Non-event records without a rendered host are skipped;
+// events stay so the caller reports the dead handler (D2, never silent).
 export function materializeArmRecords(input: ArmMaterializeInput) {
 	const byHostId = new Map<string, ResumeDomElement>();
 	if (input.armRecords.locators.length > 0) {
@@ -57,7 +57,7 @@ export function materializeArmRecords(input: ArmMaterializeInput) {
 	const rendered = (record: { readonly hostNodeId: string }) => byHostId.has(record.hostNodeId);
 	return {
 		elementsByHostId: byHostId,
-		events: input.armRecords.events.filter(rendered),
+		events: input.armRecords.events,
 		behaviors: input.armRecords.behaviors.filter(rendered),
 		elementHandles: input.armRecords.elementHandles.filter(rendered),
 		branches: materializeArmBranchRecords(input),
@@ -75,12 +75,14 @@ function materializeArmBranchRecords(
 	const census = records.some((record) => record.startAnchor)
 		? armBranchCommentCensus(input.root, input.startAnchor, input.endAnchor)
 		: [];
-	return records.map((record) => {
+	return records.flatMap((record) => {
 		if (!record.startAnchor || !record.endAnchor) return record;
 		const startIndex = (record.startAnchor as { readonly index: number }).index;
 		const endIndex = (record.endAnchor as { readonly index: number }).index;
 		const startAnchor = census[startIndex];
 		const endAnchor = census[endIndex];
+		// Nested branch in an inactive parent arm: no anchors until it renders.
+		if (!startAnchor && !endAnchor) return [];
 		if (!startAnchor || !endAnchor) throw missingArmBranchAnchorError(record.id, startIndex);
 		return { ...record, startAnchor, endAnchor };
 	});

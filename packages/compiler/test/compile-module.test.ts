@@ -3367,6 +3367,32 @@ function Card({ value }) @{
 	);
 });
 
+test('same-module child event locator emission compiles from protocol view records', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/SameModuleButton.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+function ActionButton() @{
+	let taps = state(0);
+	<button type="button" data-action onClick={() => taps++}>{taps}</button>
+}
+
+export function App() @{
+	<main><ActionButton /></main>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderModule.csrModuleSource).toContain(
+		'function marklessRenderCsrActionButton',
+	);
+	expect(result.publicRenderModule.csrModuleSource).toContain(
+		'{"hostNodeId":"h0","tagName":"button","hostPath":[]}',
+	);
+});
+
 test('compileTsrxModule accepts the main authoring import', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/MainImport.tsrx',

@@ -235,7 +235,7 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 	const branchReactivityGates: PublicRenderPlanBranchGate[] = input.semanticGraph.branchSites.map(
 		(site, index) => {
 			const found = branchNodes[index];
-			if (!found || found.nested || found.containsNested) {
+			if (!found || ((found.nested || found.containsNested) && !found.insideTryArm)) {
 				return {
 					branchSiteId: site.id,
 					supported: false,

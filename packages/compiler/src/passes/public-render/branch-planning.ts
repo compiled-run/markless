@@ -314,7 +314,34 @@ export function collectArmHosts(
 	assignedHosts: AssignedHosts,
 ): ReadonlyArray<{ readonly hostPath: ReadonlyArray<number>; readonly hostNodeId: string }> {
 	const hosts: Array<{ hostPath: ReadonlyArray<number>; hostNodeId: string }> = [];
+	const visitArm = (nodes: ReadonlyArray<AnyNode>, basePath: ReadonlyArray<number>): void => {
+		const parentPath = basePath.slice(0, -1);
+		const baseIndex = basePath[basePath.length - 1] ?? 0;
+		let index = 0;
+		for (const node of nodes) {
+			if (isIgnorableTextNode(node)) continue;
+			visit(node, [...parentPath, baseIndex + index]);
+			index++;
+		}
+	};
 	const visit = (node: AnyNode, path: ReadonlyArray<number>): void => {
+		if (node.type === 'JSXIfExpression' || node.type === 'JSXSwitchExpression') {
+			for (const nestedArm of branchArms(node)) visitArm(nestedArm, path);
+			return;
+		}
+		if (
+			node.type === 'BlockStatement' ||
+			node.type === 'Fragment' ||
+			node.type === 'JSXFragment'
+		) {
+			visitArm(asNodes(node.body ?? node.children), path);
+			return;
+		}
+		if (node.type === 'ExpressionStatement') {
+			const expression = node.expression as AnyNode | undefined;
+			if (expression) visit(expression, path);
+			return;
+		}
 		if (node.type !== 'Element' && node.type !== 'JSXElement') return;
 		const hostNodeId = assignedHosts.hostIdByNode.get(node);
 		if (hostNodeId) hosts.push({ hostPath: path, hostNodeId });

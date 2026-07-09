@@ -88,7 +88,16 @@ export function createResumeRuntime(
 		for (const eventRecord of input.view.events) {
 			if (eventRecord.eventName === 'visible') continue;
 			const element = elementsByHostId.get(eventRecord.hostNodeId);
-			if (element) events.addEventRecord(element, eventRecord);
+			if (element) {
+				events.addEventRecord(element, eventRecord);
+				continue;
+			}
+			await reportRuntimeError(missingEventHostError(eventRecord), {
+				phase: 'runtime',
+				hostNodeId: eventRecord.hostNodeId,
+				eventName: eventRecord.eventName,
+				symbolId: eventRecord.symbolIds[0],
+			});
 		}
 		return events;
 	}
@@ -170,6 +179,13 @@ export function createResumeRuntime(
 			storeContainerSubscription,
 			storeHostSubscription,
 			addBehaviorRecords: behaviors?.addBehaviorRecords ?? (() => {}),
+			reportEventBindError: (record) =>
+				reportRuntimeError(missingEventHostError(record), {
+					phase: 'runtime',
+					hostNodeId: record.hostNodeId,
+					eventName: record.eventName,
+					symbolId: record.symbolIds[0],
+				}),
 			resettleBoundary: branchWiring?.resettleBoundary,
 			holdPendingFlip: branchWiring?.holdPendingFlip,
 			skipStartupBranchIds: options.skipStartupBranchIds,
@@ -208,6 +224,13 @@ export function createResumeRuntime(
 			disposeHost,
 			addEventRecord: eventWiring.addEventRecord,
 			registerElementHandle: elementHandles.register,
+			reportEventBindError: (record) =>
+				reportRuntimeError(missingEventHostError(record), {
+					phase: 'runtime',
+					hostNodeId: record.hostNodeId,
+					eventName: record.eventName,
+					symbolId: record.symbolIds[0],
+				}),
 			addBehaviors: behaviors
 				? async (hostNodeId, records) => {
 						behaviorHostIds.add(hostNodeId);
@@ -317,6 +340,26 @@ export function createResumeRuntime(
 		disposeHost: (hostNodeId: string) => disposeHost(hostNodeId, { ignoreFutureEvents: true }),
 		dispose,
 	};
+}
+
+function missingEventHostError(record: {
+	readonly hostNodeId: string;
+	readonly eventName: string;
+	readonly symbolIds?: ReadonlyArray<string>;
+}): Error {
+	const propName = `on${record.eventName[0]?.toUpperCase() ?? ''}${record.eventName.slice(1)}`;
+	const symbolId = record.symbolIds?.[0];
+	const error = new Error(
+		`MARKLESS_EVENT_HOST_MISSING: Could not wire ${propName} handler${symbolId ? ` ${symbolId}` : ''} because host ${record.hostNodeId} was not found in the rendered content.`,
+	) as Error & Record<string, unknown>;
+	error.name = 'RuntimeResumeError';
+	error.code = 'MARKLESS_EVENT_HOST_MISSING';
+	error.phase = 'runtime';
+	error.hostNodeId = record.hostNodeId;
+	error.eventName = record.eventName;
+	error.symbolId = symbolId;
+	error.docsUrl = 'https://markless.dev/errors/MARKLESS_EVENT_HOST_MISSING';
+	return error;
 }
 
 // Local copies of the resume-locators helpers: importing that module here

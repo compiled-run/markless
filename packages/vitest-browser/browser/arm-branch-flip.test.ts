@@ -1,7 +1,8 @@
 import { afterEach, expect, test } from 'vitest';
-import { cleanup, renderSSR } from '../src/index.ts';
+import { cleanup, render, renderSSR } from '../src/index.ts';
 import ArmBranchEscalate from './fixtures/arm-branch-escalate.tsrx';
 import ArmBranchFlip from './fixtures/arm-branch-flip.tsrx';
+import NestedSwitchEvents from './fixtures/arm-nested-switch-events.tsrx';
 import { resetPanelRenders } from './fixtures/panel-render-probe.ts';
 
 // T104: @if/@switch INSIDE async boundary arms get real flip machinery (D1
@@ -96,4 +97,24 @@ test('SSR: an @if containing a component still toggles via the whole-arm re-rend
 
 	requireElement<HTMLButtonElement>(container, 'button[data-details-toggle]').click();
 	await expect.poll(() => container.querySelector('[data-badge]')).toBeNull();
+});
+
+test('CSR: nested @switch handlers inside a settled @try arm stay wired after opening the panel', async () => {
+	const screen = await render(NestedSwitchEvents);
+	const container = screen.container as HTMLElement;
+
+	await expect.poll(() => container.querySelector('button[data-open]')?.textContent).toBe('Moorings');
+
+	requireElement<HTMLButtonElement>(container, 'button[data-open]').click();
+	await expect.poll(() => container.querySelector('[data-mooring-panel]')).not.toBeNull();
+	expect(container.querySelector('[data-berths]')).not.toBeNull();
+
+	requireElement<HTMLButtonElement>(container, 'button[data-tab-docks]').click();
+	await expect.poll(() => container.querySelector('[data-docks]')).not.toBeNull();
+
+	requireElement<HTMLButtonElement>(container, 'button[data-dock-row]').click();
+	await expect.poll(() => container.querySelector('[data-picked]')?.textContent).toBe('dock');
+
+	requireElement<HTMLButtonElement>(container, 'button[data-close]').click();
+	await expect.poll(() => container.querySelector('[data-mooring-panel]')).toBeNull();
 });

@@ -6,10 +6,7 @@ import EffectOnlyPage from './fixtures/scoped-effect-only.tsrx';
 
 afterEach(cleanup);
 
-// PINNED KNOWN GAP (map 9j): a pure-state composed child's events never
-// wire on CSR — no boundary, no crash, handler simply dead. Flip to test()
-// when the composed/nested event-wiring slice lands.
-test.fails('KNOWN GAP: pure-state composed child events wire on CSR', async () => {
+test('pure-state composed child events wire on CSR', async () => {
 	const screen = await render(NoCrashPage);
 	const button = screen.container.querySelector('[data-safe-sibling]') as HTMLButtonElement;
 	expect(button).not.toBeNull();

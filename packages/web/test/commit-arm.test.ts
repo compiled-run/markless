@@ -197,6 +197,34 @@ test('commitArm fails loud without an HTML renderer for the settled content', as
 	});
 });
 
+test('commitArm reports event records whose host is absent from the committed arm', async () => {
+	const { root, start, end } = fixture();
+	const reported: unknown[] = [];
+	const commitArm = createArmCommitter({
+		root: asElement(root),
+		renderHtml: () => [],
+		elementsByHostId: new Map(),
+		disposedHosts: new Set(),
+		disposeHost: () => {},
+		addEventRecord: () => {},
+		registerElementHandle: () => {},
+		reportEventBindError: (record) => void reported.push(record),
+	});
+
+	await commitArm(boundaryFor(start, end), {
+		html: '',
+		armRecords: emptyArmRecords({
+			events: [
+				{ hostNodeId: 'h-missing', eventName: 'click', symbolIds: ['symbol:openPanel'] },
+			],
+		}),
+	});
+
+	expect(reported).toEqual([
+		{ hostNodeId: 'h-missing', eventName: 'click', symbolIds: ['symbol:openPanel'] },
+	]);
+});
+
 test('commitArm restores focus and selection onto the surviving hostNodeId', async () => {
 	const { root, start, end, oldSection } = fixture();
 	const oldInput = element('input');

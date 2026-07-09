@@ -242,6 +242,12 @@ function materializeBranchArmRecords(
 				syncPolicy: armEvent.syncPolicy,
 				symbolIds: armEvent.symbolIds,
 			});
+		else
+			input.reportEventBindError?.({
+				hostNodeId: `branch:${branch.id}:arm:${String(armIndex)}:${armEvent.hostPath.join('.')}`,
+				eventName: armEvent.eventName,
+				symbolIds: armEvent.symbolIds,
+			});
 	}
 	for (const update of set.domUpdates as ReadonlyArray<ArmDomUpdate>) {
 		if (!update.symbolId) continue;

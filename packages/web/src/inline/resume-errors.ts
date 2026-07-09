@@ -2,7 +2,8 @@ import type { ProtocolViewPayload } from '../../../serializer/src/protocol.ts';
 
 export type RuntimeResumeErrorCode =
 	| 'MARKLESS_RESUME_LOCATOR_MISSING'
-	| 'MARKLESS_RESUME_LOCATOR_MISMATCH';
+	| 'MARKLESS_RESUME_LOCATOR_MISMATCH'
+	| 'MARKLESS_EVENT_HOST_MISSING';
 export type RuntimeResumeDiagnostic = {
 	readonly code: RuntimeResumeErrorCode;
 	readonly message: string;

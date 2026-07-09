@@ -14,6 +14,10 @@ import {
 	assignSsrHostIds,
 	type ComponentReference,
 } from './shared.ts';
+import {
+	assignHostIds as assignPublicHostIds,
+	collectHostPaths,
+} from './host-locators.ts';
 import type { CsrRenderContext, SsrRenderContext } from './types.ts';
 
 export function emitSameModuleCsrComponents(
@@ -24,6 +28,10 @@ export function emitSameModuleCsrComponents(
 	const ast = parseModule(input.source.source, input.source.filename) as unknown as AnyNode;
 	const componentMap = sameModuleComponentMap(ast);
 	const referenceMap = new Map(references.map((item) => [item.componentName, item.localName]));
+	const assignedHosts = assignPublicHostIds(
+		ast,
+		input.semanticGraph.hostNodes.map((host) => host.id),
+	);
 	return references.flatMap((reference) => {
 		if (reference.importSource || reference.componentName === rootComponentName) return [];
 		const component = componentMap.get(reference.componentName);
@@ -55,6 +63,13 @@ export function emitSameModuleCsrComponents(
 			styleScopeClass: input.publicRenderPlan.styleScopes[0]?.scopeId ?? null,
 			source: input.source.source,
 		};
+		const hostPaths = collectHostPaths(root, assignedHosts);
+		const hostLocators = input.protocolView.locators.flatMap((locator) => {
+			const hostPath = hostPaths.get(locator.hostNodeId);
+			return hostPath
+				? [{ hostNodeId: locator.hostNodeId, tagName: locator.tagName, hostPath }]
+				: [];
+		});
 		const functionName = `marklessRenderCsr${reference.componentName}`;
 		return [
 			`const ${reference.localName} = { renderCsr: ${functionName} };`,
@@ -76,7 +91,7 @@ export function emitSameModuleCsrComponents(
 				'marklessCsrRuntimeState.graph',
 			),
 			...renderContext.childReplacements,
-			'	const marklessCsrView = marklessCsrComposeView(root, marklessViewWithoutAnchors(payloadView), [], marklessCsrChildren);',
+			`	const marklessCsrView = marklessCsrComposeView(root, marklessViewWithoutAnchors(payloadView), ${JSON.stringify(hostLocators)}, marklessCsrChildren);`,
 			'	const marklessCsrState = marklessComposeState(marklessCsrPayloadState, marklessCsrChildren);',
 			'	return { root, state: marklessCsrState, view: marklessCsrView, loadSymbol, connectRuntime(context) { marklessCsrRuntimeState.graph = context.graph; for (const child of marklessCsrChildren) child.output?.connectRuntime?.(context); } };',
 			'}',

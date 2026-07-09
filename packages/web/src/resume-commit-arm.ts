@@ -65,6 +65,7 @@ export function createArmCommitter(deps: {
 	readonly disposedHosts: Set<string>;
 	readonly disposeHost: (hostNodeId: string) => void;
 	readonly addEventRecord: (element: ResumeDomElement, record: ResumeEventRecord) => void;
+	readonly reportEventBindError?: (record: ResumeEventRecord) => void | Promise<void>;
 	readonly registerElementHandle: (
 		hostNodeId: string,
 		handle: { readonly handleId: string; readonly name: string },
@@ -110,7 +111,11 @@ export function createArmCommitter(deps: {
 		}
 		for (const record of materialized.events) {
 			const element = materialized.elementsByHostId.get(record.hostNodeId);
-			if (element) deps.addEventRecord(element, record);
+			if (element) {
+				deps.addEventRecord(element, record);
+				continue;
+			}
+			await deps.reportEventBindError?.(record);
 		}
 		for (const handle of materialized.elementHandles) {
 			const element = materialized.elementsByHostId.get(handle.hostNodeId);
