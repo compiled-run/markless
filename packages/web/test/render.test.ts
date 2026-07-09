@@ -3,6 +3,7 @@ import { ASYNC_PROTOCOL_VERSION, type ProtocolViewPayload } from '@markless/seri
 import { createProtocolStatePayload } from '@markless/serializer';
 import { expect, test } from 'vitest';
 import {
+	marklessCsrResolveAnchorRecords,
 	marklessCsrAttachPropEvent,
 	marklessCsrComposeView,
 	marklessCsrRenderChild,
@@ -2315,4 +2316,31 @@ test('render starts pending CSR async boundary runners and settles the range', a
 	expect(
 		root.childNodes.map((child) => (child.nodeType === 8 ? '#comment' : child.tagName)),
 	).toEqual(['#comment', 'SPAN', '#comment']);
+});
+
+test('anchor records nested in unrendered arms are deferred, not fatal', () => {
+	// A boundary/branch nested inside an arm that has not rendered yet has NO
+	// anchors in the live DOM — mirroring the nested-branch rule, it must be
+	// skipped until the parent arm commit registers it (never a page-killing
+	// throw). One-sided anchors stay fatal (genuinely corrupt markup).
+	const comment = (text: string) => ({ nodeType: 8, textContent: text, childNodes: [] });
+	const root = {
+		nodeType: 1,
+		childNodes: [comment('markless:async:boundary:0'), comment('/markless:async:boundary:0')],
+	};
+	const records = [
+		{ id: 'boundary:0', startAnchor: { index: 0 }, endAnchor: { index: 0 } },
+		{ id: 'boundary:1', startAnchor: { index: 0 }, endAnchor: { index: 0 } },
+	];
+	const resolved = marklessCsrResolveAnchorRecords(root as never, 'async', records as never);
+	expect(resolved.map((record: { id: string }) => record.id)).toEqual(['boundary:0']);
+
+	const oneSided = [{ id: 'boundary:2', startAnchor: { index: 0 }, endAnchor: { index: 0 } }];
+	const rootOneSided = {
+		nodeType: 1,
+		childNodes: [comment('markless:async:boundary:2')],
+	};
+	expect(() =>
+		marklessCsrResolveAnchorRecords(rootOneSided as never, 'async', oneSided as never),
+	).toThrow(/MARKLESS_COMPOSED_ANCHOR_MISSING/);
 });

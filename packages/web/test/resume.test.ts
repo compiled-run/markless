@@ -3146,13 +3146,28 @@ test('resume runtime ignoreUnmatched passes plain content but reports markless-o
 	await resume.start();
 
 	await resume.dispatch(event('click', routerLink, ''), { ignoreUnmatched: true });
-	await expect(
-		resume.dispatch(event('click', marklessButton, ''), { ignoreUnmatched: true }),
-	).rejects.toMatchObject({
-		code: 'MARKLESS_EVENT_DISPATCH_UNMATCHED',
-		phase: 'event',
-		eventName: 'click',
-	});
+	// Suspicious-unmatched REPORTS (once) and resolves — a thrown click is an
+	// unhandled rejection on user interaction, the exact class this rail kills.
+	const reported: unknown[] = [];
+	const previousReportError = (globalThis as { reportError?: (error: unknown) => void })
+		.reportError;
+	(globalThis as { reportError?: (error: unknown) => void }).reportError = (error) => {
+		reported.push(error);
+	};
+	try {
+		await expect(
+			resume.dispatch(event('click', marklessButton, ''), { ignoreUnmatched: true }),
+		).resolves.toBeUndefined();
+		expect(reported).toEqual([
+			expect.objectContaining({ code: 'MARKLESS_EVENT_DISPATCH_UNMATCHED' }),
+		]);
+		// Deduped: the same target shape reports once, not per click.
+		await resume.dispatch(event('click', marklessButton, ''), { ignoreUnmatched: true });
+		expect(reported).toHaveLength(1);
+	} finally {
+		(globalThis as { reportError?: (error: unknown) => void }).reportError =
+			previousReportError;
+	}
 });
 
 test('resume runtime fails loudly when zero keyed repeat rows leave no matching event host', async () => {

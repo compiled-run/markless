@@ -712,15 +712,21 @@ export function marklessSsrResolveAnchorRecords(html, kind, records) {
 		if (!indexByText.has(match[1])) indexByText.set(match[1], index);
 		index++;
 	}
-	return records.map((record) => {
+	return records.flatMap((record) => {
 		const start = indexByText.get(`markless:${kind}:${record.id}`);
 		const end = indexByText.get(`/markless:${kind}:${record.id}`);
+		// BOTH anchors absent: the record is nested inside an arm that has not
+		// rendered yet (same rule as nested branches) — defer it to the parent
+		// arm's commit instead of killing the whole component render.
+		if (start === undefined && end === undefined) return [];
 		if (start === undefined || end === undefined)
 			throw new Error(`MARKLESS_COMPOSED_ANCHOR_MISSING: ${kind}:${record.id}`);
-		return {
-			...record,
-			startAnchor: { ...record.startAnchor, index: start },
-			endAnchor: { ...record.endAnchor, index: end },
-		};
+		return [
+			{
+				...record,
+				startAnchor: { ...record.startAnchor, index: start },
+				endAnchor: { ...record.endAnchor, index: end },
+			},
+		];
 	});
 }

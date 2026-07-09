@@ -122,13 +122,28 @@ export function createEventWiring(input: {
 				dispatchModuleId: 'web:resume-events',
 			});
 			// Broad entry capture (inline resumer / specialized-wrapper fallback)
-			// forwards every captured event; non-markless clicks (e.g. router
-			// links) must pass through silently rather than throw.
-			if (
-				options.ignoreUnmatched === true &&
-				!isMarklessOwnedUnmatchedTarget(input, target)
-			)
+			// forwards every captured event; non-markless clicks must pass
+			// through silently. When the target IS markless-authored AND looks
+			// interactive, an unmatched dispatch is a silent-loss suspect — but
+			// the diagnostic REPORTS (once per target shape) instead of
+			// throwing: an unhandled rejection on a user click is itself the
+			// defect class this rail exists to kill. Anchors are excluded —
+			// router links are dispatch-unmatched BY DESIGN (the bridge owns
+			// them at its own capture listener).
+			if (options.ignoreUnmatched === true) {
+				if (
+					isInteractiveUnmatchedTarget(target) &&
+					isMarklessOwnedUnmatchedTarget(input, target) &&
+					!reportedUnmatchedDispatches.has(`${event.type}:${selector ?? ''}`)
+				) {
+					reportedUnmatchedDispatches.add(`${event.type}:${selector ?? ''}`);
+					await input.reportRuntimeError(unmatchedDispatchError(event, selector), {
+						phase: 'event',
+						eventName: event.type,
+					} as never);
+				}
 				return;
+			}
 			throw unmatchedDispatchError(event, selector);
 		}
 		if ('rowMatch' in matched)
@@ -302,6 +317,20 @@ function ignoredDisposedTarget(
 ): boolean {
 	return disposedTargets.has(target);
 }
+const reportedUnmatchedDispatches = new Set<string>();
+
+// Anchors navigate (router-owned); only genuinely interactive controls make
+// an unmatched dispatch suspicious.
+function isInteractiveUnmatchedTarget(target: ResumeDomElement): boolean {
+	const tagName = String(target.tagName ?? '').toUpperCase();
+	if (tagName === 'A') return false;
+	if (['BUTTON', 'INPUT', 'SELECT', 'TEXTAREA'].includes(tagName)) return true;
+	const getAttribute = (
+		target as { readonly getAttribute?: (name: string) => string | null }
+	).getAttribute;
+	return getAttribute ? getAttribute.call(target, 'role') === 'button' : false;
+}
+
 function isMarklessOwnedUnmatchedTarget(
 	input: {
 		readonly root: ResumeDomElement;
