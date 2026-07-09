@@ -5887,3 +5887,35 @@ export default function Page() @{
 	expect(handler?.source).toContain('import { sendJson }');
 	expect(handler?.source).toContain('import { currentActor }');
 });
+
+test('boundary asyncReads resolve sync-over-async template reads to the underlying async computed', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/FreightBoard.tsrx',
+		source: `
+import { computed } from '@markless/core';
+
+export function FreightBoard() @{
+	const manifest = computed(async ({ signal }) => loadManifest(signal));
+	const headline = computed(() => manifest.entries.length + ' entries');
+
+	<section>
+		@try {
+			<p>{headline}</p>
+		} @pending {
+			<p>loading</p>
+		} @catch {
+			<p>failed</p>
+		}
+	</section>
+}
+`,
+		symbols: [],
+	});
+
+	const boundary = result.payloadArena.view.asyncBoundaries[0];
+	expect(boundary).toBeDefined();
+	// The boundary must wait on the ASYNC runner (manifest), not the sync
+	// derive (headline) — a sync computed has no runner, so tracking it makes
+	// the boundary pend forever with zero diagnostics.
+	expect(boundary!.asyncReads.map((read) => read.graphNodeId)).toEqual(['computed:manifest']);
+});

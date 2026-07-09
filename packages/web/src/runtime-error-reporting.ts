@@ -53,15 +53,8 @@ export function createRegionRenderError(input: RegionRenderErrorInput): Reportab
 export function reportGlobalRuntimeError(error: unknown): void {
 	const host = globalThis as {
 		readonly reportError?: (error: unknown) => void;
-		readonly dispatchEvent?: (event: Event) => boolean;
-		readonly ErrorEvent?: new (type: string, init: { error: unknown; message: string }) => Event;
 		readonly console?: { readonly error?: (...args: unknown[]) => void };
 	};
 	if (host.reportError) return host.reportError(error);
-	if (host.dispatchEvent && host.ErrorEvent) {
-		const message = error instanceof Error ? error.message : String(error);
-		host.dispatchEvent(new host.ErrorEvent('error', { error, message }));
-		return;
-	}
 	host.console?.error?.(error);
 }

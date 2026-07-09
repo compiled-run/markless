@@ -10,13 +10,24 @@ export function attachMarklessPublicStaticEvents(root, graph, loadSymbolForEvent
 		const element = nodeAtPath(root, path);
 		if (!element?.addEventListener) continue;
 		element.addEventListener(eventName, async (event) => {
-			for (const symbolId of symbolIds) {
-				const loaded = loadSymbolForEvent(symbolId);
-				const symbol = isMarklessPublicThenable(loaded) ? await loaded : loaded;
-				const value = symbol({ graph, event, element, getElementHandle: () => undefined });
-				if (isMarklessPublicThenable(value)) await value;
+			try {
+				for (const symbolId of symbolIds) {
+					const loaded = loadSymbolForEvent(symbolId);
+					const symbol = isMarklessPublicThenable(loaded) ? await loaded : loaded;
+					const value = symbol({ graph, event, element, getElementHandle: () => undefined });
+					if (isMarklessPublicThenable(value)) await value;
+				}
+			} catch (error) {
+				// Scoped errors: one throwing handler contains to this dispatch,
+				// reported loudly; the flush still runs for committed writes.
+				// Inline minimal report — this module rides the lean byte budget.
+				const reportable = error instanceof Error ? error : new Error(String(error));
+				reportable.code ??= 'MARKLESS_RUNTIME_ERROR';
+				reportable.eventName ??= eventName;
+				(globalThis.reportError ?? console.error)(reportable);
+			} finally {
+				graph.flush();
 			}
-			graph.flush();
 		});
 	}
 }

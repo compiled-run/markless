@@ -366,6 +366,18 @@ async function dispatchEvent(input: {
 				input.elementsByHostId,
 			);
 		}
+	} catch (error) {
+		// Scoped errors: one throwing handler is contained to this dispatch —
+		// reported loudly, never an unhandled rejection, and the flush below
+		// still runs so committed writes from earlier symbols reach the DOM.
+		// Inline minimal report — this module rides the lean byte budget.
+		const reportable = (
+			error instanceof Error ? error : new Error(String(error))
+		) as Error & Record<string, unknown>;
+		reportable.code ??= 'MARKLESS_RUNTIME_ERROR';
+		reportable.hostNodeId ??= matched.eventRecord.hostNodeId;
+		reportable.eventName ??= input.event.type;
+		(globalThis.reportError ?? console.error)(reportable);
 	} finally {
 		await input.graph.flush();
 	}

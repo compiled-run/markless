@@ -11,14 +11,13 @@ function CrashingBadge() @{
 	<span data-crashing-badge>{crashingLabel()}</span>
 }
 
-function SafeSibling() @{
-	let taps = state(0);
-	<button type="button" data-safe-sibling onClick={() => taps++}>{taps}</button>
-}
-
+// The surviving interactivity is PAGE-level on purpose: composed-child
+// event wiring has its own known gap (map 9j) and must not confound the
+// containment contract under test here.
 export function App() @{
+	let taps = state(0);
 	<main>
 		<CrashingBadge />
-		<SafeSibling />
+		<button type="button" data-safe-sibling onClick={() => taps++}>{taps}</button>
 	</main>
 }

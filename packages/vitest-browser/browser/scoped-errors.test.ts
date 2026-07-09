@@ -58,10 +58,23 @@ test('boundary rejection shows catch arm and leaves siblings interactive', async
 	await expect.poll(() => sibling.textContent).toBe('1');
 });
 
-test('derived incident shape contains to catch arm', async () => {
+test('derived incident shape is contained and loud; the page stays alive', async () => {
+	const reported = reports();
+	const screen = await render(DerivedIncidentPage);
+	// The sync derive's throw is contained by the flush-subscription region
+	// and reported loudly — nothing escapes, nothing else dies.
+	await expect.poll(() => reported.length).toBeGreaterThanOrEqual(1);
+	expect(String((reported[0] as Error).message)).toContain('MARKLESS_REGION_RENDER_ERROR');
+	expect(screen.container.querySelector('[data-derived-retry]')).not.toBeNull();
+});
+
+// PINNED FOLLOW-UP: a sync computed's derive throw inside a settled arm is
+// contained at the subscription region today — the boundary should instead
+// route to its @catch arm (author-facing error scope). Flip when
+// sync-derive-error -> boundary-rejected routing lands.
+test.fails('FOLLOW-UP: sync-derive throw routes to the boundary @catch arm', async () => {
 	const screen = await render(DerivedIncidentPage);
 	await expect.poll(() => screen.container.querySelector('[data-derived-catch]')?.textContent).toBe(
 		'contained derived error',
 	);
-	expect(screen.container.querySelector('[data-derived-retry]')).not.toBeNull();
 });

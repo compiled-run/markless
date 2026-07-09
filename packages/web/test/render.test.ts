@@ -411,7 +411,8 @@ test('CSR child render failures report a contained component-region diagnostic',
 			{},
 			'StatusBadge',
 		);
-		expect(child).toBeUndefined();
+		// The contained marker keeps the child's slot element (locator shape).
+		expect(child).toEqual({ contained: true });
 		expect(reported).toEqual([
 			expect.objectContaining({
 				code: 'MARKLESS_REGION_RENDER_ERROR',

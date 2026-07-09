@@ -1723,7 +1723,7 @@ function marklessRenderCsr(props = {}) {
 	const marklessCsrChildren = [];
 	const root = marklessCsrRootFromHtml("<main>" + "<span data-markless-csr-child=\\"0\\"></span>" + "</main>");
 	const marklessCsrChild0 = marklessCsrRenderChild(__marklessCsrComponent0, { active: active }, "Child");
-	marklessCsrReplaceChild(root, 0, marklessCsrChild0?.root);
+	marklessCsrReplaceChild(root, 0, marklessCsrChild0?.root, marklessCsrChild0);
 	marklessCsrChildren.push({ hostPrefix: "c0:", symbolPrefix: "c0:", output: marklessCsrChild0, graphProps: [{"name":"active","graphNodeId":"state:active","path":[]}] });
 	const marklessCsrView = marklessCsrComposeView(root, payloadView, marklessCsrHostLocators, marklessCsrChildren);
 	const marklessCsrState = marklessComposeState(marklessCsrPayloadState, marklessCsrChildren);
@@ -3258,7 +3258,7 @@ function marklessRenderCsr(props = {}) {
 	const marklessCsrChildren = [];
 	const root = marklessCsrRootFromHtml("<main>" + "<span data-markless-csr-child=\\"0\\"></span>" + "</main>");
 	const marklessCsrChild0 = marklessCsrRenderChild(__marklessCsrComponent0, { active: active }, "Badge");
-	marklessCsrReplaceChild(root, 0, marklessCsrChild0?.root);
+	marklessCsrReplaceChild(root, 0, marklessCsrChild0?.root, marklessCsrChild0);
 	marklessCsrChildren.push({ hostPrefix: "c0:", symbolPrefix: "c0:", output: marklessCsrChild0, graphProps: [{"name":"active","graphNodeId":"prop:props","path":["active"]}] });
 	const marklessCsrView = marklessCsrComposeView(root, payloadView, marklessCsrHostLocators, marklessCsrChildren);
 	const marklessCsrState = marklessComposeState(marklessCsrPayloadState, marklessCsrChildren);

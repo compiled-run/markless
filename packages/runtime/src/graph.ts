@@ -422,18 +422,22 @@ function createRuntimeGraphRegionError(
 	error: unknown,
 	subscription: RuntimeGraphSubscription,
 ): Error & Record<string, unknown> {
+	const code = 'MARKLESS_REGION_RENDER_ERROR';
 	const original = error instanceof Error ? error.message : String(error);
-	const message = `MARKLESS_REGION_RENDER_ERROR: subscription "${subscription.id}" for graph node "${subscription.graphNodeId}" failed while rendering: ${original}`;
-	return Object.assign(new Error(message), {
-		code: 'MARKLESS_REGION_RENDER_ERROR',
-		severity: 'error',
-		phase: 'runtime',
-		message,
-		graphNodeId: subscription.graphNodeId,
-		subscriptionId: subscription.id,
-		docsUrl: 'https://markless.dev/errors/MARKLESS_REGION_RENDER_ERROR',
-		cause: error,
-	});
+	return Object.assign(
+		new Error(
+			`${code}: subscription "${subscription.id}" for graph node "${subscription.graphNodeId}" failed while rendering: ${original}`,
+		),
+		{
+			code,
+			severity: 'error',
+			phase: 'runtime',
+			graphNodeId: subscription.graphNodeId,
+			subscriptionId: subscription.id,
+			docsUrl: `https://markless.dev/errors/${code}`,
+			cause: error,
+		},
+	);
 }
 
 function reportGlobalRuntimeError(error: unknown): void {

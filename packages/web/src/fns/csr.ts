@@ -36,14 +36,25 @@ export function marklessCsrRenderChild(component, props, componentName = 'unknow
 				originalError: error,
 			}),
 		);
-		return undefined;
+		// The contained region must keep its slot: a TSRX component renders
+		// exactly one root node, and page locators are compile-time DOM-order
+		// plans — dropping the element would shift every later locator and
+		// silently kill sibling interactivity. The existing slot placeholder
+		// element is kept (no document access — runtime-agnostic).
+		return { contained: true };
 	}
 	return output && Object.keys(callbackProps).length > 0 ? { ...output, callbackProps } : output;
 }
-export function marklessCsrReplaceChild(root, index, child) {
+export function marklessCsrReplaceChild(root, index, child, output) {
 	const placeholder = root.querySelector?.(`[data-markless-csr-child="${index}"]`);
-	if (placeholder && child) placeholder.replaceWith(child);
-	else placeholder?.remove?.();
+	if (!placeholder) return;
+	if (output?.contained) {
+		placeholder.hidden = true;
+		placeholder.setAttribute?.('data-markless-region-error', '');
+		return;
+	}
+	if (child) placeholder.replaceWith(child);
+	else placeholder.remove?.();
 }
 // Component invocation inside a keyed repeat row (CSR mirror of
 // marklessSsrRowChild): rows repeat, so the child contributes markup only and

@@ -99,7 +99,7 @@ export function emitCsrComponent(
 	const childName = `marklessCsrChild${index}`;
 	context.childReplacements.push(
 		`	const ${childName} = marklessCsrRenderChild(${localName}, { ${props.join(', ')} }, ${JSON.stringify(componentName)});`,
-		`	marklessCsrReplaceChild(root, ${index}, ${childName}?.root);`,
+		`	marklessCsrReplaceChild(root, ${index}, ${childName}?.root, ${childName});`,
 		`	marklessCsrChildren.push({ hostPrefix: ${JSON.stringify(`c${index}:`)}, symbolPrefix: ${JSON.stringify(`c${index}:`)}, output: ${childName}, graphProps: ${JSON.stringify(graphReferenceProps(edge))} });`,
 	);
 	return JSON.stringify(`<span data-markless-csr-child="${index}"></span>`);

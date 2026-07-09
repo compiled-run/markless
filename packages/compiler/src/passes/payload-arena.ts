@@ -197,6 +197,18 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 				) {
 					return [];
 				}
+				// A SYNC computed over async data has no runner of its own — the
+				// boundary must wait on the transitive ASYNC computed(s) it reads,
+				// or it pends forever. The sync derive re-evaluates at arm render.
+				if (resolved.binding.async !== true) {
+					return asyncRunnerDependencies(resolved.binding, bindings).map(
+						(dependency) => ({
+							source: read.source,
+							graphNodeId: dependency.id,
+							path: [],
+						}),
+					);
+				}
 
 				return [
 					{
@@ -426,4 +438,30 @@ function literalStringValue(source: string): BehaviorInputValue | undefined {
 	}
 
 	return undefined;
+}
+
+// Transitive async runners behind a sync computed: walk its dependency
+// metadata until the computeds that actually own async runners are found.
+// What callers do with the result: subscribe the boundary to THESE nodes —
+// they are the only ones that ever produce settle snapshots.
+function asyncRunnerDependencies(
+	binding: SemanticGraphBinding,
+	bindings: ReadonlyMap<string, SemanticGraphBinding>,
+	visited: Set<string> = new Set(),
+): SemanticGraphBinding[] {
+	if (visited.has(binding.id)) return [];
+	visited.add(binding.id);
+	const runners: SemanticGraphBinding[] = [];
+	for (const dependency of binding.dependencies ?? []) {
+		const target = [...bindings.values()].find(
+			(candidate) => candidate.id === dependency.graphNodeId,
+		);
+		if (!target || target.kind !== 'computed') continue;
+		if (target.async === true) {
+			runners.push(target);
+			continue;
+		}
+		runners.push(...asyncRunnerDependencies(target, bindings, visited));
+	}
+	return runners;
 }
