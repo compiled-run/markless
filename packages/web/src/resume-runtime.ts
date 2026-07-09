@@ -61,6 +61,29 @@ export function createResumeRuntime(
 	const storeContainerSubscription = (release: () => void) => {
 		if (typeof release === 'function') containerSubscriptionReleases.push(release);
 	};
+	// Range replacements recreate nested boundaries' anchor comments — live
+	// records must repoint at the fresh pair (else ANCHORS_MISSING per settle).
+	function rebindBoundaryAnchors(fresh: ReadonlyArray<ResumeDomNode>): void {
+		const byText = new Map<string, ResumeDomNode>();
+		const visit = (node: ResumeDomNode): void => {
+			const text =
+				node.nodeType === 8
+					? ((node as { textContent?: string | null }).textContent ??
+						(node as { data?: string | null }).data ??
+						'')
+					: '';
+			if (text.includes('markless:async:') && !byText.has(text)) byText.set(text, node);
+			for (const child of Array.from(node.childNodes ?? [])) visit(child);
+		};
+		for (const node of fresh) visit(node);
+		for (const boundary of prepared.asyncBoundariesById.values()) {
+			const start = byText.get(`markless:async:${boundary.id}`);
+			const end = byText.get(`/markless:async:${boundary.id}`);
+			if (start && end)
+				Object.assign(boundary, { startAnchor: start, endAnchor: end });
+		}
+	}
+
 	async function getEvents(): Promise<EventWiring> {
 		if (events) return events;
 		const { createEventWiring } = await import('./resume-events.ts');
@@ -167,6 +190,7 @@ export function createResumeRuntime(
 				? await loadBehaviorRuntime()
 				: undefined;
 		branchRuntime = (await import('./resume-branches.ts')).wireBranches({
+			rebindBoundaryAnchors,
 			root: input.root,
 			graph: input.graph,
 			view: input.view,
@@ -227,35 +251,7 @@ export function createResumeRuntime(
 			disposeHost,
 			addEventRecord: eventWiring.addEventRecord,
 			registerElementHandle: elementHandles.register,
-			// A parent commit replaces nested boundaries' anchor comments —
-			// rebind live records to the fresh pair or their next settle
-			// throws ANCHORS_MISSING on every cycle (2026-07-09 incident).
-			rebindBoundaryAnchors: (fresh) => {
-				const commentsByText = new Map<string, ResumeDomNode>();
-				const visit = (node: ResumeDomNode): void => {
-					if (node.nodeType === 8) {
-						const text =
-							(node as { textContent?: string | null; data?: string | null })
-								.textContent ??
-							(node as { data?: string | null }).data ??
-							'';
-						if (text.includes('markless:async:') && !commentsByText.has(text)) {
-							commentsByText.set(text, node);
-						}
-					}
-					for (const child of Array.from(node.childNodes ?? [])) visit(child);
-				};
-				for (const node of fresh) visit(node);
-				if (commentsByText.size === 0) return;
-				for (const boundary of prepared.asyncBoundariesById.values()) {
-					const start = commentsByText.get(`markless:async:${boundary.id}`);
-					const end = commentsByText.get(`/markless:async:${boundary.id}`);
-					if (start && end) {
-						(boundary as { startAnchor: ResumeDomNode }).startAnchor = start;
-						(boundary as { endAnchor: ResumeDomNode }).endAnchor = end;
-					}
-				}
-			},
+			rebindBoundaryAnchors,
 			reportEventBindError: (record) =>
 				reportRuntimeError(missingEventHostError(record), {
 					phase: 'runtime',

@@ -79,9 +79,8 @@ export function createArmCommitter(deps: {
 		boundaryId: string,
 		records: ReadonlyArray<ResumeArmBranchRecord>,
 	) => void | Promise<void>;
-	// Nested boundaries' anchor comments live inside this range: the commit
-	// replaces them, so the runtime must rebind its live records to the fresh
-	// comment pair or every later nested settle throws ANCHORS_MISSING.
+	// Commits replace nested boundaries' anchor comments — the runtime rebinder
+	// repoints live records at the fresh pair (else ANCHORS_MISSING per settle).
 	readonly rebindBoundaryAnchors?: (fresh: ReadonlyArray<ResumeDomNode>) => void;
 	readonly documentHost?: CommitDocument;
 }) {

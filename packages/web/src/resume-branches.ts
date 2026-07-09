@@ -41,11 +41,8 @@ export function wireBranches(input: any) {
 					graphNodeId: testRead.graphNodeId,
 					path: testRead.path,
 					async run() {
-						// Spec D8: pending is for FIRST APPEARANCES only — including flips.
-						// While the deciding read's async computed is re-running the flip
-						// holds its prior arm (see resume-runtime.ts holdPendingFlip). The
-						// compiler emits at most one test read per branch (symbol-resolver),
-						// so this subscription's read IS the arm decider readBranchArm uses.
+						// D8: pending is first-appearance only — a re-running decider holds
+						// the prior arm (holdPendingFlip); this read IS the arm decider.
 						if (input.holdPendingFlip?.(testRead.graphNodeId)) return;
 						const newArm = readBranchArm(input.graph, branch);
 						if (newArm === currentArm) return;
@@ -70,6 +67,8 @@ export function wireBranches(input: any) {
 							!branch.declaredEmptyArms?.includes(update.arm)
 						)
 							throw branchArmEmptyError(branch, update.arm);
+						// Flips recreate nested boundary anchors — rebind live records.
+						if (Array.isArray(fragment)) input.rebindBoundaryAnchors?.(fragment);
 						return [
 							{ type: 'removeRange', locator: `branch:${branch.id}` },
 							{ type: 'insertRange', locator: `branch:${branch.id}:start`, fragment },

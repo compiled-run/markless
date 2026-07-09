@@ -49,7 +49,7 @@ test('event-only resume keeps its static source import closure lean', () => {
 	for (const forbidden of forbiddenClosureFiles) {
 		expect(relativeClosure).not.toContain(forbidden);
 	}
-	expect(closure.sourceBytes).toBeLessThanOrEqual(sourceByteLimit);
+	expect(closure.sourceBytes, entry).toBeLessThanOrEqual(sourceByteLimit);
 });
 
 test('payload resume keeps its static source import closure lean', () => {
@@ -58,7 +58,7 @@ test('payload resume keeps its static source import closure lean', () => {
 
 	expect(relativeClosure).not.toContain('packages/serializer/src/protocol-validation.ts');
 	expect(relativeClosure).not.toContain('packages/serializer/src/value.ts');
-	expect(closure.sourceBytes).toBeLessThanOrEqual(sourceByteLimit);
+	expect(closure.sourceBytes, entry).toBeLessThanOrEqual(sourceByteLimit);
 });
 
 test('render-csr keeps full resume apply helpers out of its static import closure', () => {
@@ -87,7 +87,7 @@ test.each([
 test('resume core and on-demand runtime modules keep static source closures lean', () => {
 	for (const entry of [resumeEntry, resumeRuntimeEntry, ...resumeOnDemandEntries]) {
 		const closure = collectStaticImportClosure(entry);
-		expect(closure.sourceBytes).toBeLessThanOrEqual(sourceByteLimit);
+		expect(closure.sourceBytes, entry).toBeLessThanOrEqual(sourceByteLimit);
 	}
 });
 
