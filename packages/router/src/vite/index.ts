@@ -558,7 +558,10 @@ function rootScopeQuery(root: string, id = ''): string {
 		...parseQuery(parsed.search),
 		'markless-router-root': root || '.',
 	});
-	return query ? `?${query}` : '';
+	// `lang.ts` last: Rolldown's module-type detection reads the query tail,
+	// and a bare `.ts?<query>` from a linked package otherwise fails with
+	// "Failed to detect the lang" (vite convention, cf. SFC-style plugins).
+	return query ? `?${query}&lang.ts` : '';
 }
 
 function routePreloadsSource(state: RoutePreloadState): string {
