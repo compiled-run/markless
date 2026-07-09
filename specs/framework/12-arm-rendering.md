@@ -150,3 +150,62 @@ tier-aware: value-slot commits are layout-safe and commit immediately; range
 commits join dependency-ordered reveal trains. All timing behavior is
 structural or latency-decided — never per-block configuration. TSRX syntax is
 unchanged.
+
+## D9. Scoped errors: a broken region never breaks the app (ratified 2026-07-08, owner)
+
+Owner ruling: "The ref picker should not be breaking the entire app... we
+definitely need scoped errors which only affect the exact place it errored."
+No new authoring API — the containment hierarchy reuses the existing
+vocabulary (validated against Svelte 5's `<svelte:boundary>` and Ripple's
+native template `try/catch`; markless's `@try/@catch` already IS the error
+boundary syntax those designs converge on).
+
+Containment scopes, nearest first:
+
+1. **Boundary scope.** A throw while rendering, settling, or committing a
+   boundary's arm resolves that boundary as REJECTED: the `@catch` arm
+   commits through the same rail async rejections ride. Settle bookkeeping
+   always completes — a throwing arm must never leave `whenAllSettled` (and
+   therefore navigation/boot holds) waiting forever. Sibling boundaries and
+   the rest of the page render, resume, and stay interactive.
+2. **Component slot scope.** A component render throw outside any boundary
+   contains to that component's slot. The slot KEEPS one placeholder element:
+   locator plans are compile-time DOM-order truth, so a dropped element would
+   silently shift every later locator (observed: dead sibling buttons). The
+   placeholder is inert, hidden, and marked `data-markless-region-error`.
+3. **Page scope.** A route render/module-load failure completes the
+   navigation with a contained error region instead of stranding the previous
+   document silently. In dev, a demand-loaded error card overlays the region;
+   in prod the region renders empty. The card module must never ride the
+   startup closure.
+
+Handler dispatch: a throwing event handler is contained to that dispatch on
+EVERY dispatch path (full resume, lean event resume, direct-mode static
+events). The error reports exactly once; it never surfaces as an unhandled
+rejection; the graph flush still runs so writes committed before the throw
+reach the DOM; other handlers and other interactions stay live.
+
+Flush isolation: one throwing subscription must not abort the flush wave or
+drop other subscriptions' dirty paths. Each failure is contained per
+subscription and reported.
+
+Streaming: one arm's render throw during the settle wave marks that boundary
+rejected and keeps streaming the remaining boundaries.
+
+Loud per D2: every containment site reports a `MARKLESS_REGION_RENDER_ERROR`
+(see 07-diagnostics.md) carrying the region kind and name in author
+vocabulary with the original error as `cause`, through the runtime error
+hook when the host provides one and `globalThis.reportError` otherwise.
+Containment without a loud artifact is a defect, not a feature.
+
+Boundary wiring correctness (the incident's second half): a boundary whose
+template reads a SYNC computed that derives from async data must wait on the
+transitive ASYNC computed(s) — the sync derive has no runner, so tracking it
+directly pends forever with no diagnostic. `asyncReads` resolve through sync
+computeds to the async runners; the sync derive re-evaluates at arm render.
+
+Known follow-ups (pinned as `test.fails` fixtures, not yet contract): a sync
+computed's derive throw inside a settled arm currently contains at the
+subscription region — it should route to the owning boundary's `@catch` arm;
+error arms may want an app-level retry affordance (plain JavaScript, not a
+framework API).

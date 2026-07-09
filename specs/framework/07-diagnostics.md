@@ -111,3 +111,24 @@ version/hash mismatch details.
 Runtime production errors may minimize human text, but they still preserve the
 stable code, docs URL, and structured metadata for the app-level error hook.
 Symbol load failures retry once, then surface through that hook.
+
+## MARKLESS_REGION_RENDER_ERROR (runtime containment)
+
+Every scoped-error containment site (see 12-arm-rendering.md D9) reports this
+shape through the runtime error hook, falling back to
+`globalThis.reportError`, falling back to `console.error`:
+
+```
+MARKLESS_REGION_RENDER_ERROR: <region kind> "<region name>" failed while rendering: <original message>
+```
+
+Enriched fields: `code`, `severity: 'error'`, `phase`, region identifiers
+(`boundaryId` / `regionName` / `regionKind`, plus `hostNodeId`, `eventName`,
+`graphNodeId`, `symbolId`, `subscriptionId` where the site knows them),
+`docsUrl`, and the original error as `cause`. Errors that already carry a
+`code` keep it (a contained `MARKLESS_BRANCH_ARM_EMPTY` stays addressable as
+its own diagnostic inside `cause`). Handler-dispatch containment defaults the
+code to `MARKLESS_RUNTIME_ERROR`.
+
+Tests assert the message text and the enriched fields, not console output
+formatting. A containment site with no reported artifact is a D2 violation.
