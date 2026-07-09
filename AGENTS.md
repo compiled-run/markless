@@ -60,6 +60,20 @@ is the Codex-facing always-on guidance for building the TSRX resumable framework
   similar compiler jargon in source names unless the spec section and diagnostic
   already use that exact term for users.
 
+## Hard Rules
+
+- **Framework tests alone never justify a landing.** A framework change
+  merges only after the real consuming app's battery passes against it.
+- **Third strike, revert.** If fixing a fix requires a third fix, revert to
+  the last green state and redesign. Never commit onto a red suite.
+- **Destructive git needs a status check.** Before `reset --hard`,
+  `checkout -- .`, or stashing, read `git status` and treat entries you did
+  not create as someone else's live work: preserve them or stop and ask.
+- **Comments state constraints, not conversation.** A comment exists only
+  for an invariant the code cannot express, after a better name failed. No
+  dates, task IDs, incident references, rulings, or attributions — history
+  belongs in commit messages and receipts. Default to zero comments.
+
 ## Implementation Guardrails
 
 Every implementation goal must follow these hard requirements. If the active
