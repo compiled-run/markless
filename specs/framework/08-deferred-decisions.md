@@ -10,8 +10,12 @@ their prerequisites exist:
 - Keeping imperative third-party state in sync after `onVisible` init (the
   `chart.update` problem), plus possible `onVisible` variants (idle trigger,
   `onHidden`).
-- Async caching policy beyond "current dependency key", stale-while-revalidate
-  UI, manual refresh/invalidation APIs, and prefetch policy.
+- Async caching policy beyond "current dependency key" and prefetch policy.
+  Stale-while-revalidate on refresh is now specified (not implemented) in
+  [13-resume-cache.md](./13-resume-cache.md); manual
+  refresh/invalidation stays deferred there as `revalidate(computed)`
+  (void-returning, no status reads), with the bump-a-state alias idiom as the
+  documented interim.
 - Writable `computed()` (optimistic state).
 - Streaming SSR / out-of-order async boundary patching. The expected direction
   is documented below, but it remains out of scope for the first implementation

@@ -114,10 +114,15 @@ if (capture('git', ['status', '--porcelain', '--', ...MANIFEST_PATHSPECS]).stdou
 		fail(`PUBLISHED ${version} but the release commit failed — finish manually (add/commit/tag ${tag}/push).`);
 }
 if (capture('git', ['rev-parse', '-q', '--verify', `refs/tags/${tag}`]).status !== 0) {
-	if (run('git', ['tag', tag]) !== 0) fail(`PUBLISHED ${version} but tagging failed — tag ${tag} manually.`);
+	// Annotated, not lightweight: --follow-tags only pushes annotated tags.
+	if (run('git', ['tag', '-a', tag, '-m', `chore: release ${tag}`]) !== 0)
+		fail(`PUBLISHED ${version} but tagging failed — tag ${tag} manually.`);
 }
 if (run('git', ['push', '--follow-tags']) !== 0)
 	fail(`PUBLISHED ${version} but push failed — push --follow-tags manually.`);
+// Belt and braces: pre-existing lightweight tags are not covered by --follow-tags.
+if (run('git', ['push', 'origin', tag]) !== 0)
+	fail(`PUBLISHED ${version} but pushing tag ${tag} failed — push it manually.`);
 if (capture('gh', ['release', 'view', tag]).status !== 0) {
 	if (run('gh', ['release', 'create', tag, '--generate-notes']) !== 0)
 		fail(`published + tagged ${tag}, but gh release create failed — run it manually.`);

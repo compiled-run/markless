@@ -86,3 +86,7 @@ VDOM.
 - [11-platform-organization.md](./framework/11-platform-organization.md) —
   web, mobile, desktop package boundaries, platform-owned adapters, and deferred
   `@markless/core/ui`.
+- [13-resume-cache.md](./framework/13-resume-cache.md) — resume cache:
+  refresh-stable boundaries via persisted settled snapshots, allowlist config,
+  boot demand set, and stale-while-revalidate swap semantics (specified, not
+  implemented).
