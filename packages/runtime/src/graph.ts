@@ -123,6 +123,7 @@ export type RuntimeGraphInput = {
 	readonly computed?: ReadonlyArray<RuntimeGraphComputed>;
 	readonly asyncComputed?: ReadonlyArray<RuntimeGraphAsyncComputed>;
 	readonly sharedDefinitions?: ProtocolStatePayload['sharedDefinitions'];
+	readonly reportError?: (error: unknown) => void | Promise<void>;
 };
 
 export type RuntimeGraphWrite = {
@@ -252,7 +253,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 
 		flushScheduled = true;
 		scheduleMicrotask(() => {
-			void flush();
+			void flush().catch((error) => reportRuntimeGraphError(error));
 		});
 	};
 
@@ -299,10 +300,16 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 						if (!dirty || ranSubscriptions.has(subscription.id)) continue;
 
 						ranSubscriptions.add(subscription.id);
-						const entries = await subscription.run(
-							readGraph(subscription.graphNodeId, subscriptionPath),
-						);
-						appendJournalResult(journal, entries);
+						try {
+							const entries = await subscription.run(
+								readGraph(subscription.graphNodeId, subscriptionPath),
+							);
+							appendJournalResult(journal, entries);
+						} catch (error) {
+							await reportRuntimeGraphError(
+								createRuntimeGraphRegionError(error, subscription),
+							);
+						}
 					}
 				}
 			} finally {
@@ -400,4 +407,49 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			return journal.splice(0);
 		},
 	};
+
+	async function reportRuntimeGraphError(error: unknown): Promise<void> {
+		try {
+			const result = input.reportError?.(error);
+			if (isPromiseLike(result)) await result;
+			if (input.reportError) return;
+		} catch {}
+		reportGlobalRuntimeError(error);
+	}
+}
+
+function createRuntimeGraphRegionError(
+	error: unknown,
+	subscription: RuntimeGraphSubscription,
+): Error & Record<string, unknown> {
+	const original = error instanceof Error ? error.message : String(error);
+	const message = `MARKLESS_REGION_RENDER_ERROR: subscription "${subscription.id}" for graph node "${subscription.graphNodeId}" failed while rendering: ${original}`;
+	return Object.assign(new Error(message), {
+		code: 'MARKLESS_REGION_RENDER_ERROR',
+		severity: 'error',
+		phase: 'runtime',
+		message,
+		graphNodeId: subscription.graphNodeId,
+		subscriptionId: subscription.id,
+		docsUrl: 'https://markless.dev/errors/MARKLESS_REGION_RENDER_ERROR',
+		cause: error,
+	});
+}
+
+function reportGlobalRuntimeError(error: unknown): void {
+	const host = globalThis as {
+		readonly reportError?: (error: unknown) => void;
+		readonly console?: { readonly error?: (...args: unknown[]) => void };
+	};
+	if (host.reportError) return host.reportError(error);
+	host.console?.error?.(error);
+}
+
+function isPromiseLike<T>(value: T | PromiseLike<T> | undefined): value is PromiseLike<T> {
+	return (
+		value !== undefined &&
+		value !== null &&
+		(typeof value === 'object' || typeof value === 'function') &&
+		typeof (value as { readonly then?: unknown }).then === 'function'
+	);
 }

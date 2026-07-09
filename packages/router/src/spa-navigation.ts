@@ -1,4 +1,8 @@
 import {
+	createRegionRenderError,
+	reportGlobalRuntimeError,
+} from '@markless/web/runtime-error-reporting';
+import {
 	buildRouteManifestFromFileIds,
 	matchRouteManifest,
 	type RouteManifest,
@@ -112,7 +116,9 @@ export async function __marklessRouterStartSpaNavigation(options: StartSpaNaviga
 			!alreadyServerRendered &&
 			matchRouteManifest(bootHashPath, context.manifest)
 		) {
-			void renderRoute(bootUrl, context, undefined, { bootSwap: true });
+			void renderRoute(bootUrl, context, undefined, { bootSwap: true }).catch((error) => {
+				void reportRouteNavigationError(error, bootUrl, context);
+			});
 		}
 	}
 }
@@ -142,7 +148,10 @@ export function handleNavigateEvent(event: NavigateEvent, context: NavigationCon
 	event.intercept({
 		focusReset: 'after-transition',
 		scroll: navigationScroll(event),
-		handler: () => renderRoute(url, context, event.signal),
+		handler: () =>
+			renderRoute(url, context, event.signal).catch((error) =>
+				reportRouteNavigationError(error, url, context),
+			),
 	});
 	return true;
 }
@@ -208,6 +217,34 @@ async function renderRoute(
 	await new Promise<void>((resolve) => {
 		dispatchRouteUpdate(context.window.document, { ...update, onRendered: resolve });
 	});
+}
+
+async function reportRouteNavigationError(
+	error: unknown,
+	url: URL,
+	context: NavigationContext,
+): Promise<void> {
+	const routePath = routePathname(url, context);
+	const regionName = matchRouteManifest(routePath, context.manifest)?.route.file ?? routePath;
+	const diagnostic = createRegionRenderError({
+		regionKind: 'route',
+		regionName,
+		originalError: error,
+	});
+	reportGlobalRuntimeError(diagnostic);
+	const body = context.window.document.body;
+	if (!body?.replaceChildren) return;
+	body.replaceChildren((await routeErrorRoot(context.window.document, diagnostic)) as Node);
+}
+
+async function routeErrorRoot(document: Document, error: unknown): Promise<unknown> {
+	if (import.meta.env?.DEV && typeof document.createElement === 'function') {
+		try {
+			const { createRouteErrorCard } = await import('./route-error-card.ts');
+			return createRouteErrorCard(document, error);
+		} catch {}
+	}
+	return document.createComment?.('MARKLESS_REGION_RENDER_ERROR') ?? '';
 }
 
 // A '#/...' URL cannot fall back to a server document load (assigning a hash

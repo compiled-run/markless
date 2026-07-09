@@ -153,7 +153,6 @@ export function createEventWiring(input: {
 				event,
 				element,
 			});
-			throw error;
 		} finally {
 			await input.flushRuntimeGraph();
 			await marklessLogInteraction({
@@ -210,7 +209,6 @@ export function createEventWiring(input: {
 				event,
 				element,
 			});
-			throw error;
 		} finally {
 			await input.flushRuntimeGraph();
 			await marklessLogInteraction({

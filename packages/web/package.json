@@ -63,6 +63,10 @@
 				"types": "./dist/render-to-string.d.ts",
 				"default": "./dist/render-to-string.js"
 			},
+			"./runtime-error-reporting": {
+				"types": "./dist/runtime-error-reporting.d.ts",
+				"default": "./dist/runtime-error-reporting.js"
+			},
 			"./resume": {
 				"types": "./dist/resume.d.ts",
 				"default": "./dist/resume.js"
@@ -85,6 +89,7 @@
 		"./render": "./src/render.ts",
 		"./render-to-stream": "./src/render-to-stream.ts",
 		"./render-to-string": "./src/render-to-string.ts",
+		"./runtime-error-reporting": "./src/runtime-error-reporting.ts",
 		"./resume": "./src/payload-full.ts"
 	},
 	"dependencies": {

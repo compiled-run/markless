@@ -1,3 +1,5 @@
+import { createRegionRenderError, reportGlobalRuntimeError } from '../runtime-error-reporting.ts';
+
 export function marklessCsrFragmentFromHtml(html) {
 	const template = document.createElement('template');
 	template.innerHTML = html;
@@ -12,7 +14,7 @@ export function marklessCsrRootFromHtml(html) {
 }
 const MARKLESS_CSR_CALLBACK_PROP = '__marklessCsrCallbackProp';
 const MARKLESS_CSR_CALLBACK_DISPATCHED = '__marklessCsrCallbackDispatched';
-export function marklessCsrRenderChild(component, props) {
+export function marklessCsrRenderChild(component, props, componentName = 'unknown component') {
 	const callbackProps = {};
 	const childProps = { ...props };
 	for (const key of Object.keys(childProps)) {
@@ -23,7 +25,19 @@ export function marklessCsrRenderChild(component, props) {
 		callbackProps[key] = callback;
 		childProps[key] = callback;
 	}
-	const output = component?.renderCsr?.(childProps);
+	let output;
+	try {
+		output = component?.renderCsr?.(childProps);
+	} catch (error) {
+		reportGlobalRuntimeError(
+			createRegionRenderError({
+				regionKind: 'component',
+				regionName: componentName,
+				originalError: error,
+			}),
+		);
+		return undefined;
+	}
 	return output && Object.keys(callbackProps).length > 0 ? { ...output, callbackProps } : output;
 }
 export function marklessCsrReplaceChild(root, index, child) {

@@ -394,6 +394,38 @@ test('render adopts the mount target as container root for fragment-rooted compo
 	expect(container.graph.read('state:count')).toBe(1);
 });
 
+test('CSR child render failures report a contained component-region diagnostic', () => {
+	const reported: unknown[] = [];
+	const previousReportError = (globalThis as { reportError?: (error: unknown) => void })
+		.reportError;
+	(globalThis as { reportError?: (error: unknown) => void }).reportError = (error) => {
+		reported.push(error);
+	};
+	try {
+		const child = marklessCsrRenderChild(
+			{
+				renderCsr() {
+					throw new Error('badge render crashed');
+				},
+			},
+			{},
+			'StatusBadge',
+		);
+		expect(child).toBeUndefined();
+		expect(reported).toEqual([
+			expect.objectContaining({
+				code: 'MARKLESS_REGION_RENDER_ERROR',
+				regionKind: 'component',
+				regionName: 'StatusBadge',
+				message:
+					'MARKLESS_REGION_RENDER_ERROR: component "StatusBadge" failed while rendering: badge render crashed',
+			}),
+		]);
+	} finally {
+		(globalThis as { reportError?: (error: unknown) => void }).reportError = previousReportError;
+	}
+});
+
 test('render flips CSR branch ranges through the full resume runtime', async () => {
 	const startAnchor = {
 		nodeType: 8 as const,

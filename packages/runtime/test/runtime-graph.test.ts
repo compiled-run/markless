@@ -1734,3 +1734,48 @@ test('graph subscribe returns an unsubscribe that stops the subscription firing'
 	await (graph as { flush?: () => Promise<void> }).flush?.();
 	expect(fired).toEqual(['fired']);
 });
+
+test('graph flush contains subscription render failures and keeps flushing siblings', async () => {
+	const reported: unknown[] = [];
+	const journaled: unknown[] = [];
+	const failure = new Error('status badge render exploded');
+	const graph = createRuntimeGraph({
+		cells: [{ graphNodeId: 'state:status', value: 'ready' }],
+		reportError(error) {
+			reported.push(error);
+		},
+	} as never);
+	graph.subscribe({
+		id: 'dom-update:status-badge',
+		graphNodeId: 'state:status',
+		path: [],
+		run() {
+			throw failure;
+		},
+	});
+	graph.subscribe({
+		id: 'dom-update:status-copy',
+		graphNodeId: 'state:status',
+		path: [],
+		run(value) {
+			return { type: 'setText', locator: 'status-copy', value };
+		},
+	});
+	graph.subscribeJournal((entries) => {
+		journaled.push(...entries);
+	});
+
+	graph.write({ graphNodeId: 'state:status', value: 'blocked' });
+	await graph.flush();
+
+	expect(journaled).toEqual([{ type: 'setText', locator: 'status-copy', value: 'blocked' }]);
+	expect(reported).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_REGION_RENDER_ERROR',
+			graphNodeId: 'state:status',
+			subscriptionId: 'dom-update:status-badge',
+			message:
+				'MARKLESS_REGION_RENDER_ERROR: subscription "dom-update:status-badge" for graph node "state:status" failed while rendering: status badge render exploded',
+		}),
+	]);
+});

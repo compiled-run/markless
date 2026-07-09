@@ -758,6 +758,59 @@ describe('hash mode', () => {
 		expect(update?.bootSwap).toBe(true);
 	});
 
+	it('reports boot hash route load failures without an unhandled rejection', async () => {
+		const reported: unknown[] = [];
+		const previousReportError = (globalThis as { reportError?: (error: unknown) => void })
+			.reportError;
+		(globalThis as { reportError?: (error: unknown) => void }).reportError = (error) => {
+			reported.push(error);
+		};
+		let mounted: unknown;
+		const runtimeWindow = {
+			addEventListener() {},
+			document: Object.assign(new EventTarget(), {
+				body: {
+					replaceChildren(root: unknown) {
+						mounted = root;
+					},
+				},
+				createComment(text: string) {
+					return { nodeType: 8, textContent: text };
+				},
+			}),
+			location: { href: 'http://marklessrouter.test/#/broken' },
+			navigation: {
+				addEventListener() {},
+				navigate() {},
+			},
+		} as unknown as MarklessRouterNavigationWindow;
+		try {
+			await __marklessRouterStartSpaNavigation({
+				pageModuleLoaders: {
+					'pages/broken.tsrx': async () => {
+						throw new Error('broken page module load');
+					},
+				},
+				routeFileIds: ['/pages/broken.tsrx'],
+				window: runtimeWindow,
+			});
+			await new Promise((resolve) => setTimeout(resolve, 0));
+		} finally {
+			(globalThis as { reportError?: (error: unknown) => void }).reportError =
+				previousReportError;
+		}
+
+		expect(mounted).toEqual({ nodeType: 8, textContent: 'MARKLESS_REGION_RENDER_ERROR' });
+		expect(reported).toEqual([
+			expect.objectContaining({
+				code: 'MARKLESS_REGION_RENDER_ERROR',
+				regionName: 'pages/broken.tsrx',
+				message:
+					'MARKLESS_REGION_RENDER_ERROR: route "pages/broken.tsrx" failed while rendering: broken page module load',
+			}),
+		]);
+	});
+
 	it('skips the boot swap when the hash route is the route the server already rendered', async () => {
 		// Refreshing '/#/' serves the '/' document — the SSR'd page IS the
 		// destination. Re-rendering it client-side replaces settled streamed

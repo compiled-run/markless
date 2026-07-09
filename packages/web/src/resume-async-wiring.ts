@@ -6,8 +6,14 @@ import type {
 	ResumeArmRecordSet,
 	ResumeAsyncBoundaryRecord,
 	ResumePreparedCore,
+	ResumeRuntimeErrorHook,
 	ResumeRuntimeInput,
 } from './resume-types.ts';
+import {
+	createRegionRenderError,
+	enrichRuntimeErrorForReporting,
+	reportGlobalRuntimeError,
+} from './runtime-error-reporting.ts';
 
 // Spec D8 + T119 ruling (12-arm-rendering): pending UI is DEADLINE-GATED
 // everywhere — first appearances render @pending structurally, navigations
@@ -122,6 +128,7 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 	// T120: the re-settle hold (resume-resettle-hold.ts) observes every
 	// snapshot of an update-symbol boundary to deadline-gate @pending.
 	readonly onAsyncSnapshot?: (boundary: ResumeAsyncBoundaryRecord, snapshot: unknown) => void;
+	readonly reportRuntimeError?: ResumeRuntimeErrorHook;
 }): void {
 	for (const boundary of input.asyncBoundariesById.values()) {
 		for (const asyncRead of boundary.asyncReads) {
@@ -175,6 +182,7 @@ export async function settleAsyncBoundaryRange(
 		| 'elementHandles'
 		| 'commitArm'
 		| 'settleTracker'
+		| 'reportRuntimeError'
 	>,
 	boundary: ResumeAsyncBoundaryRecord,
 	snapshot: unknown,
@@ -192,25 +200,66 @@ export async function settleAsyncBoundaryRange(
 		// subscription commits the fresher snapshot.
 		if (read && input.graph.read(read.graphNodeId, ['status']) !== status) return;
 	}
-	const symbol = await input.loadSymbol(boundary.updateSymbolId!);
-	const update = await symbol({
-		graph: input.graph,
-		status,
-		element: input.root,
-		getElementHandle: input.elementHandles.get,
-		asyncBoundary: boundary,
-	});
-	if (!isResumeBranchUpdate(update)) return;
+	let update;
+	let containedRenderFailure = false;
+	try {
+		update = await renderBoundaryUpdate(input, boundary, status);
+	} catch (error) {
+		containedRenderFailure = true;
+		await reportBoundaryRenderError(input, boundary, error);
+		try {
+			update = await renderBoundaryUpdate(input, boundary, 'rejected');
+		} catch (fallbackError) {
+			await reportBoundaryRenderError(input, boundary, fallbackError);
+			input.settleTracker?.markSettled(boundary.id);
+			return boundaryRangeJournal(boundary.id, containedBoundaryComment(boundary.id));
+		}
+	}
+	if (!isResumeBranchUpdate(update)) {
+		if (containedRenderFailure) input.settleTracker?.markSettled(boundary.id);
+		return;
+	}
 	if (input.commitArm) {
 		const armRecords = boundaryArmRecordSet(
 			(update as { readonly armRecords?: unknown }).armRecords,
 		);
 		if (armRecords) {
-			await input.commitArm(boundary, {
-				html: update.html,
-				armRecords: composedBoundaryArmRecords(boundary.id, armRecords),
-			});
-			input.settleTracker?.markSettled(boundary.id);
+			try {
+				await input.commitArm(boundary, {
+					html: update.html,
+					armRecords: composedBoundaryArmRecords(boundary.id, armRecords),
+				});
+			} catch (error) {
+				await reportBoundaryRenderError(input, boundary, error);
+				try {
+					const fallback = await renderBoundaryUpdate(input, boundary, 'rejected');
+					if (isResumeBranchUpdate(fallback)) {
+						const fallbackRecords = boundaryArmRecordSet(
+							(fallback as { readonly armRecords?: unknown }).armRecords,
+						);
+						if (fallbackRecords) {
+							try {
+								await input.commitArm(boundary, {
+									html: fallback.html,
+									armRecords: composedBoundaryArmRecords(boundary.id, fallbackRecords),
+								});
+								return;
+							} catch (fallbackError) {
+								await reportBoundaryRenderError(input, boundary, fallbackError);
+							}
+						}
+						const fragment = input.renderBranchHtml
+							? input.renderBranchHtml(fallback.html)
+							: fallback.html;
+						return boundaryRangeJournal(boundary.id, fragment);
+					}
+				} catch (fallbackError) {
+					await reportBoundaryRenderError(input, boundary, fallbackError);
+				}
+				return boundaryRangeJournal(boundary.id, containedBoundaryComment(boundary.id));
+			} finally {
+				input.settleTracker?.markSettled(boundary.id);
+			}
 			return;
 		}
 	}
@@ -218,6 +267,54 @@ export async function settleAsyncBoundaryRange(
 	const fragment = input.renderBranchHtml ? input.renderBranchHtml(update.html) : update.html;
 	input.settleTracker?.markSettled(boundary.id);
 	return boundaryRangeJournal(boundary.id, fragment);
+}
+
+async function renderBoundaryUpdate(
+	input: Pick<
+		Parameters<typeof wireAsyncBoundariesWithoutLoadingCapability>[0],
+		'graph' | 'root' | 'loadSymbol' | 'elementHandles'
+	>,
+	boundary: ResumeAsyncBoundaryRecord,
+	status: 'fulfilled' | 'rejected',
+): Promise<unknown> {
+	const symbol = await input.loadSymbol(boundary.updateSymbolId!);
+	return await symbol({
+		graph: input.graph,
+		status,
+		element: input.root,
+		getElementHandle: input.elementHandles.get,
+		asyncBoundary: boundary,
+	});
+}
+
+async function reportBoundaryRenderError(
+	input: Pick<Parameters<typeof wireAsyncBoundariesWithoutLoadingCapability>[0], 'reportRuntimeError'>,
+	boundary: ResumeAsyncBoundaryRecord,
+	error: unknown,
+): Promise<void> {
+	const context = {
+		phase: 'runtime' as const,
+		boundaryId: boundary.id,
+		graphNodeId: boundary.asyncReads[0]?.graphNodeId,
+		symbolId: boundary.updateSymbolId,
+	};
+	const diagnostic = enrichRuntimeErrorForReporting(
+		createRegionRenderError({
+			regionKind: 'async boundary',
+			regionName: boundary.id,
+			originalError: error,
+		}),
+		context,
+	);
+	if (input.reportRuntimeError) {
+		await input.reportRuntimeError(diagnostic, context);
+		return;
+	}
+	reportGlobalRuntimeError(diagnostic);
+}
+
+function containedBoundaryComment(boundaryId: string): string {
+	return `<!--MARKLESS_REGION_RENDER_ERROR:${boundaryId}-->`;
 }
 
 // The settle commit shape shared by the snapshot and html paths: replace the

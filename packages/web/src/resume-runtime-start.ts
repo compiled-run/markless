@@ -31,6 +31,7 @@ export async function startResumeRuntime(input: {
 		boundary: ResumeAsyncBoundaryRecord,
 		update: ArmCommitUpdate,
 	) => Promise<void>;
+	readonly reportRuntimeError: RuntimeShared['reportRuntimeError'];
 	// Receives the branch-runtime hooks built here (escalated-flip re-settle +
 	// pending-flip hold) before any branch runtime loads.
 	readonly connectBranchWiring: (wiring: {
@@ -130,6 +131,7 @@ export async function startResumeRuntime(input: {
 			demandOnStart: runtimeInput.demandAsyncBoundaries === true,
 			settleTracker,
 			onAsyncSnapshot,
+			reportRuntimeError: input.reportRuntimeError,
 		});
 	}
 	// Branch-runtime hooks live here with the settle machinery they depend on;
@@ -151,6 +153,7 @@ export async function startResumeRuntime(input: {
 					elementHandles: prepared.elementHandles,
 					commitArm: input.commitArm,
 					settleTracker,
+					reportRuntimeError: input.reportRuntimeError,
 				},
 				boundary,
 				runtimeInput.graph.read(read.graphNodeId, []),

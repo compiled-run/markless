@@ -377,6 +377,46 @@ test('two interleaved streaming renders with different props/latencies stay isol
 	}
 });
 
+test('a throwing settled arm reports loudly without killing later stream appends', async () => {
+	const reported: unknown[] = [];
+	const stream = await renderToStream(
+		{
+			async renderSsr(_props?: unknown, renderContext?: unknown) {
+				const output = await orchardArtifact([
+					{ key: 'mist', delayMs: 30, label: 'Mist collectors full' },
+					{ key: 'ridge', delayMs: 70, label: 'Ridge lights ready' },
+				]).renderSsr(_props, renderContext);
+				const mist = output.state.computed.find(
+					(computed: { readonly graphNodeId: string }) =>
+						computed.graphNodeId === 'computed:mist',
+				) as { readonly snapshot?: { readonly status?: string } };
+				if (mist?.snapshot?.status === 'fulfilled') {
+					throw new Error('mist arm render crashed');
+				}
+				return output;
+			},
+		} as never,
+		{
+			onError(error) {
+				reported.push(error);
+			},
+		},
+	);
+
+	const chunks = await collect(stream.appends());
+	const appended = chunks.join('');
+	expect(appended).toContain('MARKLESS_REGION_RENDER_ERROR:orchard:0');
+	expect(appended).toContain('Ridge lights ready');
+	expect(reported).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_REGION_RENDER_ERROR',
+			regionName: 'orchard:0',
+			message:
+				'MARKLESS_REGION_RENDER_ERROR: async boundary "orchard:0" failed while rendering: mist arm render crashed',
+		}),
+	]);
+});
+
 // G1/C3 reveal choreography (T113): the compiler-known read-set edges in the
 // state payload become boundary-to-boundary reveal dependencies. Streamed
 // commit invocations carry the streamed boundaries the committing boundary

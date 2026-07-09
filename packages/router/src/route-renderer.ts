@@ -1,4 +1,8 @@
 import { render } from '@markless/web/render';
+import {
+	createRegionRenderError,
+	reportGlobalRuntimeError,
+} from '@markless/web/runtime-error-reporting';
 import { holdNavigationSwapUntilSettled, type NavigationHoldRuntime } from './navigation-hold.ts';
 import {
 	MARKLESS_ROUTER_RENDERER_STARTED,
@@ -59,7 +63,25 @@ async function renderRouteUpdate(document: Document, update: RouteUpdate): Promi
 		if (typeof artifact.renderSsr === 'function') {
 			document.body.innerHTML = (await artifact.renderSsr(props)).html;
 		}
+	} catch (error) {
+		const diagnostic = createRegionRenderError({
+			regionKind: 'route',
+			regionName: update.route.file,
+			originalError: error,
+		});
+		reportGlobalRuntimeError(diagnostic);
+		document.body.replaceChildren((await routeErrorRoot(document, diagnostic)) as Node);
 	} finally {
 		update.onRendered?.();
 	}
+}
+
+async function routeErrorRoot(document: Document, error: unknown): Promise<unknown> {
+	if (import.meta.env?.DEV && typeof document.createElement === 'function') {
+		try {
+			const { createRouteErrorCard } = await import('./route-error-card.ts');
+			return createRouteErrorCard(document, error);
+		} catch {}
+	}
+	return document.createComment?.('MARKLESS_REGION_RENDER_ERROR') ?? '';
 }

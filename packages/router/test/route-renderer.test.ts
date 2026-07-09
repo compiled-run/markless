@@ -104,4 +104,58 @@ describe('route update renderer', () => {
 		expect(mounted).toBe('destination-root');
 		expect(pendingHolds).toBe(0);
 	});
+
+	it('contains route CSR render failures and reports a loud diagnostic', async () => {
+		let mounted: unknown;
+		const reported: unknown[] = [];
+		const previousReportError = (globalThis as { reportError?: (error: unknown) => void })
+			.reportError;
+		(globalThis as { reportError?: (error: unknown) => void }).reportError = (error) => {
+			reported.push(error);
+		};
+		const document = Object.assign(new EventTarget(), {
+			body: {
+				replaceChildren(root: unknown) {
+					mounted = root;
+				},
+			},
+			createComment(text: string) {
+				return { nodeType: 8, textContent: text };
+			},
+		}) as Document;
+		try {
+			startRouteUpdateRenderer(document);
+			dispatchRouteUpdate(document, {
+				page: {
+					default: {
+						renderCsr() {
+							throw new Error('inventory route crashed');
+						},
+					},
+				},
+				route: {
+					file: 'pages/inventory.tsrx',
+					params: {},
+					status: 200,
+					url: 'http://markless.test/inventory',
+				},
+			});
+			await Promise.resolve();
+			await Promise.resolve();
+		} finally {
+			(globalThis as { reportError?: (error: unknown) => void }).reportError =
+				previousReportError;
+		}
+
+		expect(mounted).toEqual({ nodeType: 8, textContent: 'MARKLESS_REGION_RENDER_ERROR' });
+		expect(reported).toEqual([
+			expect.objectContaining({
+				code: 'MARKLESS_REGION_RENDER_ERROR',
+				regionKind: 'route',
+				regionName: 'pages/inventory.tsrx',
+				message:
+					'MARKLESS_REGION_RENDER_ERROR: route "pages/inventory.tsrx" failed while rendering: inventory route crashed',
+			}),
+		]);
+	});
 });

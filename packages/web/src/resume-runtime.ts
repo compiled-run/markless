@@ -286,6 +286,7 @@ export function createResumeRuntime(
 			storeContainerSubscription,
 			disposeHost,
 			commitArm: commitBoundaryArm,
+			reportRuntimeError,
 			connectBranchWiring: (wiring) => {
 				branchWiring = wiring;
 			},

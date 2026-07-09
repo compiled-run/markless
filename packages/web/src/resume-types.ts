@@ -190,6 +190,7 @@ export type ResumeRuntimeErrorContext =
 			readonly phase: 'runtime';
 			readonly graphNodeId?: string;
 			readonly branchId?: string;
+			readonly boundaryId?: string;
 			readonly symbolId?: string;
 	  };
 export type ResumeRuntimeErrorHook = (

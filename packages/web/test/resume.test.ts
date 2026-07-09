@@ -1821,13 +1821,14 @@ test('resume runtime unobserves visible hosts disposed before first intersection
 	expect(loadedSymbols).toEqual([]);
 });
 
-test('resume runtime dispatches handler arrays in order and flushes committed writes on error', async () => {
+test('resume runtime dispatches handler arrays in order and reports committed handler errors once', async () => {
 	const button = element('BUTTON');
 	const root = element('SECTION', [button]);
 	const writes: RuntimeGraphWrite[] = [];
 	const flushedWrites: RuntimeGraphWrite[][] = [];
 	const loadedSymbols: string[] = [];
 	const ignoredReturns: unknown[] = [];
+	const reportedErrors: unknown[] = [];
 	const failure = new Error('second handler failed');
 	const graph: RuntimeGraph = {
 		read() {
@@ -1911,17 +1912,21 @@ test('resume runtime dispatches handler arrays in order and flushes committed wr
 				});
 			};
 		},
+		onError(error) {
+			reportedErrors.push(error);
+		},
 	});
 
 	await resume.start();
 	flushedWrites.splice(0);
 
-	await expect(root.listeners[0].listener(event('click', button, ''))).rejects.toBe(failure);
+	await expect(root.listeners[0].listener(event('click', button, ''))).resolves.toBeUndefined();
 
 	expect(loadedSymbols).toEqual(['symbol:first', 'symbol:second']);
 	expect(writes).toEqual([{ graphNodeId: 'state:count', value: 1 }]);
 	expect(flushedWrites).toEqual([[{ graphNodeId: 'state:count', value: 1 }]]);
 	expect(ignoredReturns).toHaveLength(1);
+	expect(reportedErrors).toEqual([failure]);
 });
 
 test('resume runtime reports lazy event load failures to the app error hook and flushes committed writes', async () => {
@@ -2020,7 +2025,7 @@ test('resume runtime reports lazy event load failures to the app error hook and 
 	flushedWrites.splice(0);
 
 	const click = event('click', button, '');
-	await expect(root.listeners[0].listener(click)).rejects.toBe(failure);
+	await expect(root.listeners[0].listener(click)).resolves.toBeUndefined();
 
 	expect(reportedErrors).toEqual([failure]);
 	expect(reportedContexts).toEqual([
@@ -2135,19 +2140,22 @@ test('resume runtime fails loudly when a branch flip resolves an empty arm fragm
 
 	try {
 		await resume.start();
-		await expect(root.listeners[0]!.listener(event('click', button, ''))).rejects.toMatchObject(
-			{
-				code: 'MARKLESS_BRANCH_ARM_EMPTY',
-				branchId: 'branch-site:empty',
-				arm: 1,
-			},
-		);
+		// Scoped-errors contract: handler dispatch reports the loud artifact
+		// exactly once and RESOLVES — a contained failure never becomes an
+		// unhandled rejection that can escape the region.
+		await expect(
+			root.listeners[0]!.listener(event('click', button, '')),
+		).resolves.toBeUndefined();
+		// The flush-subscription region contains the failure: the reported
+		// artifact is the region wrapper, with the author-facing branch error
+		// preserved as its cause.
 		expect(reportedErrors).toEqual([
 			expect.objectContaining({
-				code: 'MARKLESS_BRANCH_ARM_EMPTY',
-				branchId: 'branch-site:empty',
-				branchSiteId: 'branch-site:empty',
-				symbolId: 'symbol:empty-branch',
+				code: 'MARKLESS_REGION_RENDER_ERROR',
+				cause: expect.objectContaining({
+					code: 'MARKLESS_BRANCH_ARM_EMPTY',
+					branchId: 'branch-site:empty',
+				}),
 			}),
 		]);
 	} finally {

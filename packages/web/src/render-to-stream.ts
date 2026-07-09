@@ -11,6 +11,7 @@ import {
 	type SsrRenderable,
 	type SsrRenderOutput,
 } from './render-to-string.ts';
+import { createRegionRenderError, reportGlobalRuntimeError } from './runtime-error-reporting.ts';
 
 // D5/D6 out-of-order streaming (T107, owner-ratified three-layer semantics):
 // the shell flushes with @pending arms in place of unsettled boundaries and
@@ -34,7 +35,9 @@ import {
 // ruling 2026-07-07). One shared timer bounds the whole first flush.
 export const MARKLESS_STREAM_FIRST_FLUSH_DEADLINE_MS = 10;
 
-export type RenderToStreamOptions = RenderToStringOptions;
+export type RenderToStreamOptions = RenderToStringOptions & {
+	readonly onError?: (error: unknown) => void | Promise<void>;
+};
 
 export type MarklessSsrStream = {
 	// The complete container shell (pending arms in place). Hosts flush this
@@ -178,11 +181,29 @@ async function* streamArmAppends(input: {
 		// per-request registry (no run() re-execution), so the pass renders the
 		// settled arm html + armized records for every boundary that just
 		// settled; still-pending boundaries render @pending again and wait.
-		const output = await renderSsrOutput(
-			input.component,
-			input.options.props,
-			input.renderContext,
-		);
+		let output: SsrRenderOutput;
+		try {
+			output = await renderSsrOutput(
+				input.component,
+				input.options.props,
+				input.renderContext,
+			);
+		} catch (error) {
+			const parts: string[] = [];
+			for (const arm of remaining.values()) {
+				if (!arm.entry.settled) continue;
+				remaining.delete(arm.graphNodeId);
+				await reportStreamArmError(input.options, arm, error);
+				arm.entry.settled = { status: 'rejected' };
+				if (!executorEmitted) {
+					parts.push(armExecutorScript(input.resumeModuleUrl, input.options.nonce));
+					executorEmitted = true;
+				}
+				parts.push(renderContainedArmAppend(arm, input.options.nonce));
+			}
+			if (parts.length > 0) yield parts.join('');
+			continue;
+		}
 		// The wave's own render output is the settled truth (request-versioning
 		// discipline, Ripple prior art): a runner that settles WHILE this pass
 		// renders was captured by it as @pending, so it streams in the NEXT
@@ -210,6 +231,28 @@ async function* streamArmAppends(input: {
 		}
 		if (parts.length > 0) yield parts.join('');
 	}
+}
+
+async function reportStreamArmError(
+	options: RenderToStreamOptions,
+	arm: PendingArm,
+	error: unknown,
+): Promise<void> {
+	const diagnostic = createRegionRenderError({
+		regionKind: 'async boundary',
+		regionName: arm.boundaryId,
+		originalError: error,
+	});
+	if (options.onError) return options.onError(diagnostic);
+	reportGlobalRuntimeError(diagnostic);
+}
+
+function renderContainedArmAppend(arm: PendingArm, nonce: string | undefined): string {
+	const nonceAttribute = nonce ? ` nonce="${escapeAttribute(nonce)}"` : '';
+	const id = escapeAttribute(arm.boundaryId);
+	const armRecords =
+		'{"locators":[],"events":[],"behaviors":[],"elementHandles":[]}';
+	return `<template m:arm="${id}"><!--MARKLESS_REGION_RENDER_ERROR:${id}--></template><script type="markless/arm" data-boundary="${id}"${nonceAttribute}>${armRecords}</script><script${nonceAttribute}>__mArm(${escapeScriptJson(JSON.stringify(arm.boundaryId))})</script>`;
 }
 
 function renderArmAppend(

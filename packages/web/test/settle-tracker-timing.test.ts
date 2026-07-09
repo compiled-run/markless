@@ -181,6 +181,108 @@ test('no active floor: the settle commits immediately without registering a wait
 	expect(clock.pendingWaits()).toBe(0);
 });
 
+test('settle render failures report loudly and reroute through the rejected arm', async () => {
+	const tracker = createAsyncBoundarySettleTracker({
+		boundaries: [boundaryRecord('faulty', 'symbol:update')],
+	});
+	const reported: unknown[] = [];
+	const committed: unknown[] = [];
+	const failure = new Error('derived panel crashed');
+	const entries = await settleAsyncBoundaryRange(
+		{
+			graph: { read: () => 'fulfilled', flush: async () => {} } as never,
+			root: {} as never,
+			loadSymbol: async () =>
+				((context: { readonly status: string }) => {
+					if (context.status === 'fulfilled') throw failure;
+					return { arm: 1, html: '<p data-catch>contained</p>' };
+				}) as never,
+			renderBranchHtml: undefined,
+			elementHandles: { get: () => undefined } as never,
+			settleTracker: tracker,
+			reportRuntimeError(error) {
+				reported.push(error);
+			},
+		},
+		boundaryRecord('faulty', 'symbol:update'),
+		{ status: 'fulfilled' },
+	);
+	if (entries) committed.push(...(entries as unknown[]));
+
+	expect(committed).toEqual([
+		{ type: 'removeRange', locator: 'async-boundary:faulty' },
+		{
+			type: 'insertRange',
+			locator: 'async-boundary:faulty:start',
+			fragment: '<p data-catch>contained</p>',
+		},
+	]);
+	expect(tracker.hasSettledContent('faulty')).toBe(true);
+	expect(reported).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_REGION_RENDER_ERROR',
+			boundaryId: 'faulty',
+			message:
+				'MARKLESS_REGION_RENDER_ERROR: async boundary "faulty" failed while rendering: derived panel crashed',
+		}),
+	]);
+});
+
+test('settle commit failures report loudly and commit the rejected arm', async () => {
+	const tracker = createAsyncBoundarySettleTracker({
+		boundaries: [boundaryRecord('faulty-commit', 'symbol:update')],
+	});
+	const reported: unknown[] = [];
+	const committed: unknown[] = [];
+	const failure = new Error('arm commit crashed');
+	let commitAttempts = 0;
+	const entries = await settleAsyncBoundaryRange(
+		{
+			graph: { read: () => 'fulfilled', flush: async () => {} } as never,
+			root: {} as never,
+			loadSymbol: async () =>
+				((context: { readonly status: string }) => ({
+					arm: context.status === 'rejected' ? 1 : 0,
+					html:
+						context.status === 'rejected'
+							? '<p data-catch>contained</p>'
+							: '<p data-try>ready</p>',
+					armRecords: { locators: [], events: [], behaviors: [], elementHandles: [] },
+				})) as never,
+			renderBranchHtml: undefined,
+			elementHandles: { get: () => undefined } as never,
+			settleTracker: tracker,
+			async commitArm(_boundary, update) {
+				commitAttempts += 1;
+				if (commitAttempts === 1) throw failure;
+				committed.push(update);
+			},
+			reportRuntimeError(error) {
+				reported.push(error);
+			},
+		},
+		boundaryRecord('faulty-commit', 'symbol:update'),
+		{ status: 'fulfilled' },
+	);
+
+	expect(entries).toBeUndefined();
+	expect(committed).toEqual([
+		{
+			html: '<p data-catch>contained</p>',
+			armRecords: { locators: [], events: [], behaviors: [], elementHandles: [] },
+		},
+	]);
+	expect(tracker.hasSettledContent('faulty-commit')).toBe(true);
+	expect(reported).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_REGION_RENDER_ERROR',
+			boundaryId: 'faulty-commit',
+			message:
+				'MARKLESS_REGION_RENDER_ERROR: async boundary "faulty-commit" failed while rendering: arm commit crashed',
+		}),
+	]);
+});
+
 // D8 part B at the wiring level: once a boundary shows settled content, a
 // re-run's structural @pending journal is suppressed (mutations racing a
 // navigation never flash), and every subscription is accounted for.

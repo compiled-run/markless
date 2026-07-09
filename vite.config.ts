@@ -130,6 +130,7 @@ const buildOrder: PackUserConfig[] = [
 			'render-to-stream': './src/render-to-stream.ts',
 			'render-to-string': './src/render-to-string.ts',
 			resume: './src/payload-full.ts',
+			'runtime-error-reporting': './src/runtime-error-reporting.ts',
 			...webFnsEntries,
 		},
 	}),
