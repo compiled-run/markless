@@ -69,6 +69,7 @@ export function createResumeRuntime(
 			graph: input.graph,
 			loadSymbol: input.loadSymbol,
 			elementsByHostId,
+			asyncBoundariesById,
 			elementHandles,
 			view: input.view,
 			eventTypes,
@@ -214,6 +215,8 @@ export function createResumeRuntime(
 		const eventWiring = await getEvents();
 		const behaviors =
 			update.armRecords.behaviors.length > 0 ? await loadBehaviorRuntime() : undefined;
+		const branches =
+			(update.armRecords.branches?.length ?? 0) > 0 ? await loadBranchRuntime() : undefined;
 		const eventTypesBefore = new Set(eventTypes);
 		const { createArmCommitter } = await import('./resume-commit-arm.ts');
 		await createArmCommitter({
@@ -240,8 +243,7 @@ export function createResumeRuntime(
 				: undefined,
 			// Fresh arm-branch anchors: rewire the boundary's flips (T104).
 			registerArmBranches: async (boundaryId, records) => {
-				const branches = await loadBranchRuntime();
-				for (const hostNodeId of branches.registerArmBranches(
+				for (const hostNodeId of branches!.registerArmBranches(
 					boundaryId,
 					records as never,
 				)) {

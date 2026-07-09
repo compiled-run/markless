@@ -3129,6 +3129,32 @@ test('resume runtime materializes keyed repeat row event hosts from the live col
 	expect(resume.getElement('h1')).toBe(footer);
 });
 
+test('resume runtime ignoreUnmatched passes plain content but reports markless-owned hosts', async () => {
+	const marklessButton = element('BUTTON');
+	const routerLink = element('A');
+	const root = element('MAIN', [marklessButton, routerLink]);
+	const resume = createResumeRuntime({
+		root,
+		graph: createRuntimeGraph({ cells: [] }),
+		view: {
+			locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 1, tagName: 'button' }],
+			events: [], domUpdates: [], behaviors: [], elementHandles: [], asyncBoundaries: [],
+		},
+		loadSymbol: () => () => undefined,
+	});
+
+	await resume.start();
+
+	await resume.dispatch(event('click', routerLink, ''), { ignoreUnmatched: true });
+	await expect(
+		resume.dispatch(event('click', marklessButton, ''), { ignoreUnmatched: true }),
+	).rejects.toMatchObject({
+		code: 'MARKLESS_EVENT_DISPATCH_UNMATCHED',
+		phase: 'event',
+		eventName: 'click',
+	});
+});
+
 test('resume runtime fails loudly when zero keyed repeat rows leave no matching event host', async () => {
 	const { root, firstRowButton, view, loadedSymbols, loadSymbol } = keyedRepeatFixture({
 		rowEvents: [{ hostPath: [1], eventName: 'click', symbolIds: ['symbol:row'] }],

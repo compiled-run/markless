@@ -2,14 +2,21 @@ import type { RuntimeGraph } from '@markless/runtime';
 import type {
 	ElementHandleRegistry,
 	ResumeDispatchOptions,
+	ResumeDomComment,
 	ResumeDomElement,
 	ResumeDomEvent,
+	ResumeDomNode,
 	ResumeEventRecord,
 	ResumeKeyedRepeatRecord,
 	ResumeKeyedRepeatRowEvent,
 	ResumeRuntimeErrorContext,
 	ResumeRuntimeInput,
 } from './resume-types.ts';
+
+type AsyncBoundaryRange = {
+	readonly startAnchor: ResumeDomComment;
+	readonly endAnchor: ResumeDomComment;
+};
 
 export type ResumeRowEventMatch = {
 	readonly repeat: ResumeKeyedRepeatRecord;
@@ -40,6 +47,7 @@ export function createEventWiring(input: {
 	readonly graph: RuntimeGraph;
 	readonly loadSymbol: ResumeRuntimeInput['loadSymbol'];
 	readonly elementsByHostId: Map<string, ResumeDomElement>;
+	readonly asyncBoundariesById: ReadonlyMap<string, AsyncBoundaryRange>;
 	readonly elementHandles: ElementHandleRegistry;
 	readonly view: ResumeRuntimeInput['view'];
 	readonly eventTypes: Set<string>;
@@ -116,7 +124,11 @@ export function createEventWiring(input: {
 			// Broad entry capture (inline resumer / specialized-wrapper fallback)
 			// forwards every captured event; non-markless clicks (e.g. router
 			// links) must pass through silently rather than throw.
-			if (options.ignoreUnmatched === true) return;
+			if (
+				options.ignoreUnmatched === true &&
+				!isMarklessOwnedUnmatchedTarget(input, target)
+			)
+				return;
 			throw unmatchedDispatchError(event, selector);
 		}
 		if ('rowMatch' in matched)
@@ -289,6 +301,50 @@ function ignoredDisposedTarget(
 	target: ResumeDomElement,
 ): boolean {
 	return disposedTargets.has(target);
+}
+function isMarklessOwnedUnmatchedTarget(
+	input: {
+		readonly root: ResumeDomElement;
+		readonly elementsByHostId: Map<string, ResumeDomElement>;
+		readonly asyncBoundariesById: ReadonlyMap<string, AsyncBoundaryRange>;
+	},
+	target: ResumeDomElement,
+): boolean {
+	for (
+		let current: ResumeDomElement | null | undefined = target;
+		current;
+		current = current.parentElement
+	) {
+		const getAttribute = (
+			current as { readonly getAttribute?: (name: string) => string | null }
+		).getAttribute;
+		if (getAttribute && getAttribute.call(current, 'data-markless-arm-host') !== null) return true;
+		for (const element of input.elementsByHostId.values()) if (element === current) return true;
+		if (current === input.root) break;
+	}
+	for (const boundary of input.asyncBoundariesById.values()) {
+		let within = false;
+		let found = false;
+		const visit = (node: ResumeDomNode): void => {
+			if (found) return;
+			if (node === boundary.startAnchor) {
+				within = true;
+				return;
+			}
+			if (node === boundary.endAnchor) {
+				within = false;
+				return;
+			}
+			if (within && node.nodeType === 1 && containsElement(node as ResumeDomElement, target)) {
+				found = true;
+				return;
+			}
+			for (const child of node.childNodes ?? []) visit(child);
+		};
+		visit(input.root);
+		if (found) return true;
+	}
+	return false;
 }
 // Local copy of the resume-locators containsElement: importing that module
 // here regroups the wall-counted chunk graph, which costs more than the

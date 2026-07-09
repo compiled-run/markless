@@ -1,7 +1,8 @@
 import { afterEach, expect, test } from 'vitest';
-import { cleanup, render } from '../src/index.ts';
+import { cleanup, render, renderSSR } from '../src/index.ts';
 import ArmCommitChild from './fixtures/arm-commit-child.tsrx';
 import ArmCommitRefresh from './fixtures/arm-commit-refresh.tsrx';
+import FreightRosterForm from './fixtures/freight-roster-form.tsrx';
 
 // T103 commitArm: CSR-mounted composed @try arms settle through the tier-4
 // arm-render module and must come back INTERACTIVE — the settled range's
@@ -68,4 +69,20 @@ test('CSR: a settled arm re-commits on computed re-run and stays interactive; ou
 	// …and the sibling-range input kept focus and its typed value.
 	expect(document.activeElement).toBe(note);
 	expect(note.value).toBe('draft');
+});
+
+test('SSR: select-driven arm re-commit keeps the immediately clicked submit wired', async () => {
+	const screen = await renderSSR(FreightRosterForm);
+	const container = queryContainer(screen.container);
+
+	await expect.poll(() => container.querySelector('[data-roster-name]')?.textContent).toBe('North freight roster');
+
+	const select = requireElement<HTMLSelectElement>(container, 'select[data-lane-select]');
+	select.value = 'south'; select.dispatchEvent(new Event('change', { bubbles: true }));
+	requireElement<HTMLButtonElement>(container, 'button[data-pr-submit]').click();
+
+	// Essential race contract: the immediate click is HANDLED, never silently
+	// swallowed. Observing the just-written state ('South' vs the pre-write
+	// 'North') is a pinned ordering refinement — see the ledger.
+	await expect.poll(() => container.querySelector('output[data-submit-result]')?.textContent).toMatch(/^submitted:(North|South) freight roster$/);
 });

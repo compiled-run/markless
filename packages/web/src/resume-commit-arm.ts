@@ -78,7 +78,7 @@ export function createArmCommitter(deps: {
 	readonly registerArmBranches?: (
 		boundaryId: string,
 		records: ReadonlyArray<ResumeArmBranchRecord>,
-	) => Promise<void>;
+	) => void | Promise<void>;
 	readonly documentHost?: CommitDocument;
 }) {
 	return async function commitArm(
@@ -109,18 +109,24 @@ export function createArmCommitter(deps: {
 			deps.disposedHosts.delete(hostNodeId);
 			deps.elementsByHostId.set(hostNodeId, element);
 		}
+		const eventBindErrors: ResumeEventRecord[] = [];
 		for (const record of materialized.events) {
 			const element = materialized.elementsByHostId.get(record.hostNodeId);
 			if (element) {
 				deps.addEventRecord(element, record);
 				continue;
 			}
-			await deps.reportEventBindError?.(record);
+			eventBindErrors.push(record);
 		}
 		for (const handle of materialized.elementHandles) {
 			const element = materialized.elementsByHostId.get(handle.hostNodeId);
 			if (element) deps.registerElementHandle(handle.hostNodeId, handle, element);
 		}
+		const armBranchRegistration =
+			deps.registerArmBranches && materialized.branches.length > 0
+				? deps.registerArmBranches(boundary.id, materialized.branches)
+				: undefined;
+		for (const record of eventBindErrors) await deps.reportEventBindError?.(record);
 		if (deps.addBehaviors && materialized.behaviors.length > 0) {
 			const byHost = new Map<string, ResumeBehaviorRecord[]>();
 			for (const behavior of materialized.behaviors) {
@@ -131,9 +137,7 @@ export function createArmCommitter(deps: {
 			for (const [hostNodeId, records] of byHost)
 				await deps.addBehaviors(hostNodeId, records);
 		}
-		if (deps.registerArmBranches && materialized.branches.length > 0) {
-			await deps.registerArmBranches(boundary.id, materialized.branches);
-		}
+		await armBranchRegistration;
 		restoreFocusScroll(deps, boundary, captured, materialized.elementsByHostId);
 	};
 }

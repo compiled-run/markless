@@ -152,6 +152,49 @@ test('commitArm replaces exactly the anchor range and disposes before re-registe
 	expect(disposedHosts.has('h-new')).toBe(false);
 });
 
+test('commitArm has no post-swap await before fresh event records are dispatchable', async () => {
+	const { root, start, end, outside } = fixture();
+	const newButton = element('button');
+	const newSection = element('section', [newButton]);
+	const eventRecords = new WeakMap<ResumeDomElement, Map<string, string[]>>();
+	let loadedSymbols = 0;
+
+	const commitArm = createArmCommitter({
+		root: asElement(root),
+		renderHtml: () => [asElement(newSection) as ResumeDomNode],
+		elementsByHostId: new Map(),
+		disposedHosts: new Set(),
+		disposeHost: () => {},
+		addEventRecord(element, record) {
+			const byName = eventRecords.get(element) ?? new Map<string, string[]>();
+			byName.set(record.eventName, [...record.symbolIds]);
+			eventRecords.set(element, byName);
+		},
+		registerElementHandle: () => {},
+		reportEventBindError() {
+			expect(root.childNodes).toEqual([outside, start, newSection, end]);
+			const symbols = eventRecords.get(asElement(newButton))?.get('click');
+			if (!symbols) throw new Error('fresh button was not dispatchable after arm swap');
+			loadedSymbols += symbols.length;
+		},
+	});
+
+	await commitArm(boundaryFor(start, end), {
+		html: '<section><button></button></section>',
+		armRecords: emptyArmRecords({
+			locators: [
+				{ hostNodeId: 'h-new', strategy: 'arm-relative', index: 1, tagName: 'button' },
+			],
+			events: [
+				{ hostNodeId: 'h-missing', eventName: 'click', symbolIds: ['sym:missing'] },
+				{ hostNodeId: 'h-new', eventName: 'click', symbolIds: ['sym:click'] },
+			],
+		}),
+	});
+
+	expect(loadedSymbols).toBe(1);
+});
+
 test('commitArm fails loud when the anchor pair is not intact in the live DOM', async () => {
 	const { root, start, oldSection } = fixture();
 	// The end anchor lives in a DIFFERENT parent: the census is corrupt.
