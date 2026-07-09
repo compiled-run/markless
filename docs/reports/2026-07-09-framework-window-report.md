@@ -72,6 +72,43 @@ Three owner reports started it, each real:
    received one (path URLs) plus a cleaner architecture they never asked
    to see this week.
 
+## Owner ruling on PR #15 — and the deeper cut (added 2026-07-09)
+
+The owner's diagnosis, accepted after review: **PR #15's refresh fixes were
+themselves a root cause of the window.** Each was verified in isolation
+(red-first, property-tested, oracle-gated) — but in composition they
+deepened coupling in the navigation/settle subsystem that then churned for
+24 hours: the boot-hold introduced an unbounded wait whose hang-forever
+edge drove the containment urgency; the identity-skip decided too late and
+spawned the T006 boot-trim; the hijack guard added the
+`data-async-container` coupling that surfaced in the wall forensics.
+"Verified in isolation" and "destabilizing in composition" were both true.
+
+Disposition: PR #15 **closed unmerged** (comment links here). The stable
+base was cut deeper, to the released `0.1.1` state (`99a8885`) plus only
+the 4-line router `lang.ts` build shim, this report, and spec 13. The app
+was pair-reverted to its pre-migration state. The restored pair is
+gate-green with the console guard active (stable, two consecutive runs).
+
+The line held at `99a8885` after a deliberate audit of everything earlier:
+the pre-window/pre-PR-15 framework is released on npm, judge-audited per
+tranche, and field-tested by a full day of real app use — its defects are
+known and pinned, not latent. Nothing earlier meets the bar for reverting.
+
+## The rebuild base (GPT-5.6 workers)
+
+- Framework: `app-stable` = `99a8885` + build shim + docs. App:
+  `feat/markless-dashboard` @ the pair-reverted, gate-green state.
+- Every window diff preserved: branches (`scoped-errors-t003-wip`, crew
+  branches for picker/dark-mode/PR-tabs) + patches in the session job dir.
+- Verification the window lacked, active from commit one: the
+  deterministic gate (`pnpm gate:app`, stale-preview guard, `--specs`
+  bisection, build hashes) and the console guard (any pageerror or
+  console.error fails the spec).
+- Reland order stands as below, with one amendment from the ruling: the
+  refresh fixes are re-derived LAST, on top of a settled containment
+  design, not first — their receipts are the spec, not the patch.
+
 ## What the revert keeps and loses
 
 **Keeps (not in the revert):** the app's path-URL migration (gate-green),
