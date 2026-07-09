@@ -13,6 +13,7 @@ export function renderBodyLines(
 	stateValuesName: string,
 	statePayloadName: string,
 	rootLines: ReadonlyArray<string>,
+	graphReadSource?: string,
 ): string[] {
 	const body = rootInfo.component.body as AnyNode | undefined;
 	if (!body) return indentLines(rootLines);
@@ -48,7 +49,12 @@ export function renderBodyLines(
 			lines.push(stateLine);
 			continue;
 		}
-		const computedLine = computedDeclarationLine(statement, computedBindings);
+		const computedLine = computedDeclarationLine(
+			statement,
+			computedBindings,
+			input.semanticGraph.graphBindings,
+			graphReadSource,
+		);
 		if (computedLine) {
 			lines.push(computedLine);
 			continue;
@@ -65,6 +71,8 @@ export function renderBodyLines(
 function computedDeclarationLine(
 	statement: AnyNode,
 	computedBindings: ReadonlyMap<string, GraphBinding>,
+	graphBindings: ReadonlyArray<GraphBinding>,
+	graphReadSource: string | undefined,
 ): string | null {
 	if (statement.type !== 'VariableDeclaration') return null;
 	const declarations = asNodes(statement.declarations);
@@ -82,7 +90,51 @@ function computedDeclarationLine(
 	}
 
 	const declarationKind = binding.declarationKind ?? 'const';
-	return `${declarationKind} ${binding.name} = (${binding.functionSource})();`;
+	const functionSource = graphReadSource
+		? rewriteAsyncComputedDependencies(binding.functionSource, binding, graphBindings, graphReadSource)
+		: binding.functionSource;
+	const valueSource =
+		functionSource === binding.functionSource
+			? `(${functionSource})()`
+			: `${graphReadSource} ? (${functionSource})() : undefined`;
+	return `${declarationKind} ${binding.name} = ${valueSource};`;
+}
+
+function rewriteAsyncComputedDependencies(
+	functionSource: string,
+	binding: GraphBinding,
+	graphBindings: ReadonlyArray<GraphBinding>,
+	graphReadSource: string,
+): string {
+	const asyncComputedIds = new Set(
+		graphBindings.flatMap((candidate) =>
+			candidate.kind === 'computed' && candidate.async === true ? [candidate.id] : [],
+		),
+	);
+	const replacements = (binding.dependencies ?? [])
+		.filter((dependency) => asyncComputedIds.has(dependency.graphNodeId))
+		.map((dependency) => ({
+			source: dependency.source,
+			replacement: graphReadCallSource(graphReadSource, dependency.graphNodeId, dependency.path),
+		}))
+		.sort((left, right) => right.source.length - left.source.length);
+
+	let emitted = functionSource;
+	for (const replacement of replacements) {
+		emitted = emitted.replaceAll(replacement.source, replacement.replacement);
+	}
+	return emitted;
+}
+
+function graphReadCallSource(
+	graphReadSource: string,
+	graphNodeId: string,
+	path: readonly string[],
+): string {
+	const read = path.length === 0
+		? `${graphReadSource}.read(${JSON.stringify(graphNodeId)})`
+		: `${graphReadSource}.read(${JSON.stringify(graphNodeId)}, ${JSON.stringify(path)})`;
+	return `(${read})`;
 }
 
 function stateDeclarationLine(

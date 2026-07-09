@@ -294,8 +294,18 @@ function spliceEventHandlerBody(
 	eventParameters: ReadonlyArray<string>,
 	localNames: ReadonlySet<string>,
 ): string {
+	// A state alias declared inside this handler (`const submitted = searchTerm;`)
+	// materializes as a real local: its declaration initializer lowers to a graph
+	// read, so later reads THROUGH the alias must stay plain JavaScript — lowering
+	// them again would re-read the graph (stale vs the captured local) and corrupt
+	// the emitted write value.
+	const declaredLocals = bodyDeclaredLocalNames(bodySource);
+	const liveReads = (symbol.reads ?? []).filter((read) => {
+		const leading = /^[A-Za-z_$][\w$]*/.exec(read.source)?.[0];
+		return leading === undefined || !declaredLocals.has(leading);
+	});
 	const replacements = [
-		...(symbol.reads ?? []).flatMap((read) =>
+		...liveReads.flatMap((read) =>
 			readBodySpans(bodySource, read).map((span) => ({
 				...span,
 				replacement: graphReadCallSource('context.graph.read', read.graphNodeId, read.path),
@@ -305,7 +315,7 @@ function spliceEventHandlerBody(
 			const replacement = emitEventWriteExpression(
 				write,
 				eventParameters,
-				symbol.reads ?? [],
+				liveReads,
 				symbol.moduleImports ?? [],
 				localNames,
 			);
@@ -369,10 +379,34 @@ function readBodySpans(
 	) {
 		const before = bodySource[start - 1] ?? '';
 		const after = bodySource[start + read.source.length] ?? '';
-		if (!isIdentifierChar(before) && before !== '.' && !isIdentifierChar(after))
+		if (
+			!isIdentifierChar(before) &&
+			before !== '.' &&
+			!isIdentifierChar(after) &&
+			!isVariableDeclaratorBinding(bodySource, start, read.source)
+		) {
 			spans.push({ start, end: start + read.source.length });
+		}
 	}
 	return spans;
+}
+
+function isVariableDeclaratorBinding(source: string, start: number, name: string): boolean {
+	const before = source.slice(0, start);
+	const after = source.slice(start + name.length);
+	return /(?:^|[;\n]\s*)(?:const|let|var)\s+$/.test(before) && /^\s*=/.test(after);
+}
+
+// Names declared as plain locals inside a handler body. Reads that resolve
+// through these (state aliases) must not be lowered to graph reads — the
+// declaration already captured the value into a real local.
+function bodyDeclaredLocalNames(bodySource: string): ReadonlySet<string> {
+	const names = new Set<string>();
+	for (const match of bodySource.matchAll(/(?:^|[;\n{]\s*)(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=/g)) {
+		const name = match[1];
+		if (name !== undefined) names.add(name);
+	}
+	return names;
 }
 
 function handlerBodyWriteSpan(

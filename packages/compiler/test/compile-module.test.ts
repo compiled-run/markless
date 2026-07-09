@@ -1035,6 +1035,41 @@ test('B910 regressions keep async computed and plain state binding artifacts sta
 	);
 });
 
+test('CSR inline sync computed reads async computed dependencies through the graph', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Catalog.tsrx',
+		source: `import { computed } from '@markless/core';
+
+export function Catalog() @{
+	const catalog = computed(async () => ({ products: [{ sku: 'tea', active: true }] }));
+	const activeProducts = computed(() => catalog.products.filter((product) => product.active));
+
+	<section>
+		@try {
+			<ul>
+				@for (const product of activeProducts; key product.sku) {
+					<li>{product.sku}</li>
+				}
+			</ul>
+		} @pending { <p>Loading</p> } @catch { <p>Broken</p> }
+	</section>
+}`,
+		symbols: [],
+	});
+
+	const csrModule = result.publicRenderModule.csrModuleSource;
+	expect(csrModule).toContain('marklessCsrRuntimeState.graph.read("computed:catalog", ["products"])');
+	expect(csrModule).not.toContain('catalog.products.filter');
+	expect(csrModule).not.toContain('catch { return undefined; }');
+
+	const csrOutput = (await renderTestCsr(result)) as { readonly root: PublicRenderTestElement };
+	// The test renderer serializes boundary anchor markers into textContent;
+	// the assertion cares that the arm rendered PENDING (not a crash, not the
+	// settled arm) — anchors are incidental.
+	expect(csrOutput.root.textContent).toContain('Loading');
+	expect(csrOutput.root.textContent).not.toContain('undefined');
+});
+
 test('literal state initializers keep their exact protocol payload artifact', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/LiteralStateInit.tsrx',

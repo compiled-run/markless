@@ -62,6 +62,7 @@ export function emitSameModuleCsrComponents(
 			destructureProps(rootInfo.propNames),
 			'	const marklessCsrPayloadState = { ...marklessCloneState(payloadState), cells: [], computed: [] };',
 			'	const marklessCsrRenderStateValues = new Map(marklessCsrStateValues);',
+			'	const marklessCsrRuntimeState = { graph: null };',
 			...renderBodyLines(
 				input,
 				rootInfo,
@@ -69,10 +70,10 @@ export function emitSameModuleCsrComponents(
 				'marklessCsrRenderStateValues',
 				'marklessCsrPayloadState',
 				[
-					'const marklessCsrRuntimeState = { graph: null };',
 					'const marklessCsrChildren = [];',
 					`const root = ${isFragmentNode(rootInfo.root) ? 'marklessCsrFragmentFromHtml' : 'marklessCsrRootFromHtml'}(${emitHtmlNode(rootInfo.root, renderContext)});`,
 				],
+				'marklessCsrRuntimeState.graph',
 			),
 			...renderContext.childReplacements,
 			'	const marklessCsrView = marklessCsrComposeView(root, marklessViewWithoutAnchors(payloadView), [], marklessCsrChildren);',

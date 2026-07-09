@@ -116,6 +116,7 @@ export function emitPublicCsrRenderModule(
 			? `	marklessCsrPayloadState.cells.push({ graphNodeId: ${JSON.stringify(propCellId)}, directValue: props ?? {} });`
 			: null,
 		'	const marklessCsrRenderStateValues = new Map(marklessCsrStateValues);',
+		'	const marklessCsrRuntimeState = { graph: null };',
 		...renderBodyLines(
 			input,
 			rootInfo,
@@ -123,10 +124,10 @@ export function emitPublicCsrRenderModule(
 			'marklessCsrRenderStateValues',
 			'marklessCsrPayloadState',
 			[
-				'const marklessCsrRuntimeState = { graph: null };',
 				'const marklessCsrChildren = [];',
 				`const root = ${isFragmentNode(rootInfo.root) ? 'marklessCsrFragmentFromHtml' : 'marklessCsrRootFromHtml'}(${emitHtmlNode(rootInfo.root, renderContext)});`,
 			],
+			'marklessCsrRuntimeState.graph',
 		),
 		...renderContext.childReplacements,
 		...propEvents.map(

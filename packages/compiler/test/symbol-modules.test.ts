@@ -2597,6 +2597,48 @@ export function App() @{
 	expect(statusWrite).toBeGreaterThan(focusCall);
 });
 
+test('event symbol modules lower bare state alias initializers to graph reads', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/SearchBox.tsrx',
+		source: `
+	import { state } from '@markless/core';
+
+	export function SearchBox() @{
+		let searchTerm = state('tea');
+
+		<form onSubmit={(event) => {
+			event.preventDefault();
+			const submitted = searchTerm;
+			searchTerm = submitted.trim();
+		}}>
+			<input value={searchTerm} />
+		</form>
+	}
+	`,
+		symbols: [],
+	});
+
+	const handler = result.symbolModules.modules.find((module) => module.kind === 'event-handler');
+	expect(handler).toBeDefined();
+	expect(handler!.source).toContain('const submitted = context.graph.read("state:searchTerm");');
+	expect(handler!.source).not.toContain('const submitted = ;');
+
+	const imported = (await import(
+		`data:text/javascript;charset=utf-8,${encodeURIComponent(handler!.source)}`
+	)) as Record<string, (context: unknown) => unknown>;
+	const graph = {
+		value: '  chai  ',
+		read() {
+			return this.value;
+		},
+		write(input: { readonly value: string }) {
+			this.value = input.value;
+		},
+	};
+	imported[handler!.exportName]!({ graph, event: { preventDefault() {} } });
+	expect(graph.value).toBe('chai');
+});
+
 test('emitSymbolModules emits async-boundary-update modules rendering settled arms', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/AsyncFlip.tsrx',
