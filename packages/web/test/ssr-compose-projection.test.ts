@@ -80,6 +80,71 @@ describe('marklessSsrComposeView with projecting children', () => {
 		expect(byId.get('h1')).toBe(0);
 	});
 
+	// PINNED RED (sibling-shift bug): blocks the branch picker + dark mode
+	// relanding. Crew investigation: marklessSsrComposeView sibling offsets use
+	// compiled hostCount; the rendered extent must flow in — but naive rendered
+	// counts double-count NESTED composed children (their own entries offset
+	// too). The fix needs the projection model: rendered extent MINUS nested
+	// child extents already accounted.
+	it.fails('sibling children after a dynamic-option child keep their locators (rendered extent offsets)', () => {
+		// First child: rendered options exceed its compiled locator count (the
+		// compiled plan knows 1 select locator; the render emitted 3 options).
+		const shellHtml =
+			'<select data-actors><option>one</option><option>two</option><option>three</option></select>';
+		// Second child: an interactive button whose locator must still resolve.
+		const panelHtml = '<div data-panel><button data-go></button></div>';
+		const html = `<header data-chrome>${shellHtml}${panelHtml}</header>`;
+		const hostLocators = [{ hostNodeId: 'hChrome', strategy: 'dom-order', index: 0, tagName: 'header' }];
+		const view = { locators: hostLocators, events: [], domUpdates: [], behaviors: [], elementHandles: [] };
+		const children = [
+			{
+				hostPrefix: 'c0:',
+				symbolPrefix: 'c0:',
+				localIndex: 1,
+				graphProps: [],
+				output: {
+					html: shellHtml,
+					view: {
+						locators: [{ hostNodeId: 'hSel', strategy: 'dom-order', index: 0, tagName: 'select' }],
+						events: [],
+						domUpdates: [],
+						behaviors: [],
+						elementHandles: [],
+					},
+				},
+			},
+			{
+				hostPrefix: 'c1:',
+				symbolPrefix: 'c1:',
+				localIndex: 1,
+				graphProps: [],
+				output: {
+					html: panelHtml,
+					view: {
+						locators: [
+							{ hostNodeId: 'hPanel', strategy: 'dom-order', index: 0, tagName: 'div' },
+							{ hostNodeId: 'hGo', strategy: 'dom-order', index: 1, tagName: 'button' },
+						],
+						events: [{ hostNodeId: 'hGo', eventName: 'click', symbolIds: ['symbol:go'] }],
+						domUpdates: [],
+						behaviors: [],
+						elementHandles: [],
+					},
+				},
+			},
+		];
+		const root = element('HEADER', [
+			element('SELECT', [element('OPTION'), element('OPTION'), element('OPTION')]),
+			element('DIV', [element('BUTTON')]),
+		]);
+		const composed = marklessSsrComposeView(html, view, hostLocators, children);
+		const resolved = materializeDomLocators(wrapRoot(root), composed.locators);
+		// The c1 panel/button locators must land on the real elements despite
+		// the preceding child's extra rendered option extent.
+		expect(resolved.get('c1:hGo')?.tagName).toBe('BUTTON');
+		expect(resolved.get('c1:hPanel')?.tagName).toBe('DIV');
+	});
+
 	it('resolves a composed child button after rendered select options', () => {
 		const childHtml =
 			'<select data-cargo><option value="van">Van</option><option value="rail">Rail</option><option value="air">Air</option></select><div data-note></div><button data-send></button>';
