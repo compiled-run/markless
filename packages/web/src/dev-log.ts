@@ -22,6 +22,49 @@ export type MarklessExecutionModuleSize = {
 export type MarklessExecutionModuleSizes = ReadonlyMap<string, MarklessExecutionModuleSize>;
 const MARKLESS_EXECUTION_LOG_MODULE_ID = 'virtual:markless:dev-log';
 
+export function reportMarklessDevLogViolation(error: unknown): void { if (import.meta.env?.DEV) postMarklessDevViolation(error); }
+
+export function postMarklessDevViolation(error: unknown): void {
+	if (!globalThis.fetch) return;
+	void globalThis.fetch('/__markless/violations', {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify(marklessDevViolationFromError(error)),
+	}).catch(() => {});
+}
+
+export function marklessDevViolationFromError(error: unknown) {
+	const reportable = error instanceof Error
+		? (error as Error & Record<string, unknown>)
+		: Object.assign(new Error(String(error)), { code: 'MARKLESS_RUNTIME_ERROR' });
+	const cause = reportable.cause;
+	return compactFields({
+		ts: Date.now(),
+		code: typeof reportable.code === 'string' ? reportable.code : 'MARKLESS_RUNTIME_ERROR',
+		message: reportable.message,
+		regionKind: stringField(reportable.regionKind),
+		regionName: stringField(reportable.regionName),
+		hostNodeId: stringField(reportable.hostNodeId),
+		eventName: stringField(reportable.eventName),
+		cause: cause instanceof Error
+			? compactFields({
+					name: cause.name,
+					message: cause.message,
+					code: stringField((cause as Error & Record<string, unknown>).code),
+				})
+			: cause,
+	});
+}
+
+function stringField(value: unknown): string | undefined {
+	return typeof value === 'string' ? value : undefined;
+}
+
+function compactFields<T extends Record<string, unknown>>(value: T): T {
+	for (const key of Object.keys(value)) if (value[key] === undefined) delete value[key];
+	return value;
+}
+
 export function shouldActivateMarklessExecutionLog(input: {
 	readonly mode: MarklessExecutionLogMode;
 	readonly location: MarklessExecutionLogLocation;

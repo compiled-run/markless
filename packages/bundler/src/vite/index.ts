@@ -21,6 +21,7 @@ import {
 	type MarklessRolldownOptions,
 } from '../types.ts';
 import { createDevTags } from './dev-tags.ts';
+import { createDevViolationsMiddleware } from './dev-violations.ts';
 import {
 	isServerViteEnvironment,
 	marklessEnvironment,
@@ -77,6 +78,7 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 		api: { invalidateGeneratedModules: typeof hmrOptions.invalidateGeneratedModules };
 	};
 	const hmr = createViteHmr(hmrOptions);
+	const devViolations = createDevViolationsMiddleware();
 
 	const marklessPlugin = {
 		...basePlugin,
@@ -143,6 +145,9 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 				transformRequest: (url, environment) =>
 					transformMarklessRequest(server, url, environment, options),
 			};
+			// Test doubles model only the slice of ViteDevServer they exercise;
+			// the violations sink is dev-browser plumbing, not HMR-structural.
+			server.middlewares?.use?.(devViolations.middleware);
 			hmr.configureServer(server);
 		},
 		transformIndexHtml() {

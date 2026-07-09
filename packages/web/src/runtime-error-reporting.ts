@@ -51,6 +51,11 @@ export function createRegionRenderError(input: RegionRenderErrorInput): Reportab
 }
 
 export function reportGlobalRuntimeError(error: unknown): void {
+	if (import.meta.env?.DEV) {
+		void import('./dev-log.ts').then(({ postMarklessDevViolation }) =>
+			postMarklessDevViolation(error),
+		);
+	}
 	const host = globalThis as {
 		readonly reportError?: (error: unknown) => void;
 		readonly console?: { readonly error?: (...args: unknown[]) => void };
