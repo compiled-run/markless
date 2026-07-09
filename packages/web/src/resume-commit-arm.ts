@@ -79,6 +79,10 @@ export function createArmCommitter(deps: {
 		boundaryId: string,
 		records: ReadonlyArray<ResumeArmBranchRecord>,
 	) => void | Promise<void>;
+	// Nested boundaries' anchor comments live inside this range: the commit
+	// replaces them, so the runtime must rebind its live records to the fresh
+	// comment pair or every later nested settle throws ANCHORS_MISSING.
+	readonly rebindBoundaryAnchors?: (fresh: ReadonlyArray<ResumeDomNode>) => void;
 	readonly documentHost?: CommitDocument;
 }) {
 	return async function commitArm(
@@ -97,6 +101,7 @@ export function createArmCommitter(deps: {
 			deps.disposeHost(hostNodeId);
 		}
 		replaceAnchorRange(boundary, fresh);
+		deps.rebindBoundaryAnchors?.(fresh);
 		// Locator misalignment against the fresh DOM throws loud here (D2): a
 		// commit that cannot prove its census must never half-register records.
 		const materialized = materializeArmRecords({

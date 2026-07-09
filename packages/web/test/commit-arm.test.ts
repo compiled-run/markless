@@ -342,3 +342,69 @@ test('commitArm restores the document scroll position when the commit moved it',
 
 	expect(scrollCalls).toEqual([[0, 120]]);
 });
+
+test('parent commits rebind nested boundary anchor pairs from the fresh content', async () => {
+	// A nested boundary's anchor comments live INSIDE the parent's range: the
+	// parent's commit replaces them with fresh nodes. Without rebinding, every
+	// later settle of the nested boundary throws ANCHORS_MISSING (observed
+	// 33x/page on 2026-07-09). The committer must hand fresh nodes to the
+	// rebinder so live records point at the new comment pair.
+	const nestedStart = comment('markless:async:c9:boundary:1');
+	const nestedEnd = comment('/markless:async:c9:boundary:1');
+	const parentStart = comment('markless:async:c9:boundary:0');
+	const parentEnd = comment('/markless:async:c9:boundary:0');
+	const root = element('DIV', [parentStart, nestedStart, nestedEnd, parentEnd]);
+	const nestedRecord = {
+		id: 'c9:boundary:1',
+		startAnchor: nestedStart,
+		endAnchor: nestedEnd,
+		asyncReads: [],
+		armRecords: [],
+	};
+	const rebound: string[] = [];
+	const commit = createArmCommitter({
+		root,
+		renderHtml: () => {
+			const freshStart = comment('markless:async:c9:boundary:1');
+			const freshEnd = comment('/markless:async:c9:boundary:1');
+			return [freshStart, element('P'), freshEnd];
+		},
+		elementsByHostId: new Map(),
+		disposedHosts: new Set(),
+		disposeHost: () => {},
+		addEventRecord: () => {},
+		registerElementHandle: () => {},
+		rebindBoundaryAnchors: (fresh) => {
+			rebound.push(`rebind:${fresh.length}`);
+			// Runtime-owned rebinder: match fresh comment pairs to live records.
+			const flat: { textContent?: string | null }[] = [];
+			const visit = (node: { textContent?: string | null; childNodes?: ArrayLike<unknown> }) => {
+				flat.push(node);
+				for (const child of Array.from(node.childNodes ?? [])) visit(child as never);
+			};
+			for (const node of fresh) visit(node as never);
+			const text = (n: { textContent?: string | null; data?: string | null }) => n.textContent ?? (n as { data?: string }).data;
+			const freshStart = flat.find((n) => text(n) === 'markless:async:c9:boundary:1');
+			const freshEnd = flat.find((n) => text(n) === '/markless:async:c9:boundary:1');
+			if (freshStart && freshEnd) {
+				(nestedRecord as { startAnchor: unknown }).startAnchor = freshStart;
+				(nestedRecord as { endAnchor: unknown }).endAnchor = freshEnd;
+			}
+		},
+	});
+	await commit(
+		{
+			id: 'c9:boundary:0',
+			startAnchor: parentStart,
+			endAnchor: parentEnd,
+			asyncReads: [],
+			armRecords: [],
+		} as never,
+		{ arm: 0, html: 'fresh', armRecords: { locators: [], events: [], behaviors: [], elementHandles: [] } } as never,
+	);
+	expect(rebound).toEqual(['rebind:3']);
+	expect((nestedRecord.startAnchor as { data?: string }).data).toBe(
+		'markless:async:c9:boundary:1',
+	);
+	expect(nestedRecord.startAnchor).not.toBe(nestedStart);
+});

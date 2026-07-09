@@ -227,6 +227,35 @@ export function createResumeRuntime(
 			disposeHost,
 			addEventRecord: eventWiring.addEventRecord,
 			registerElementHandle: elementHandles.register,
+			// A parent commit replaces nested boundaries' anchor comments —
+			// rebind live records to the fresh pair or their next settle
+			// throws ANCHORS_MISSING on every cycle (2026-07-09 incident).
+			rebindBoundaryAnchors: (fresh) => {
+				const commentsByText = new Map<string, ResumeDomNode>();
+				const visit = (node: ResumeDomNode): void => {
+					if (node.nodeType === 8) {
+						const text =
+							(node as { textContent?: string | null; data?: string | null })
+								.textContent ??
+							(node as { data?: string | null }).data ??
+							'';
+						if (text.includes('markless:async:') && !commentsByText.has(text)) {
+							commentsByText.set(text, node);
+						}
+					}
+					for (const child of Array.from(node.childNodes ?? [])) visit(child);
+				};
+				for (const node of fresh) visit(node);
+				if (commentsByText.size === 0) return;
+				for (const boundary of prepared.asyncBoundariesById.values()) {
+					const start = commentsByText.get(`markless:async:${boundary.id}`);
+					const end = commentsByText.get(`/markless:async:${boundary.id}`);
+					if (start && end) {
+						(boundary as { startAnchor: ResumeDomNode }).startAnchor = start;
+						(boundary as { endAnchor: ResumeDomNode }).endAnchor = end;
+					}
+				}
+			},
 			reportEventBindError: (record) =>
 				reportRuntimeError(missingEventHostError(record), {
 					phase: 'runtime',
