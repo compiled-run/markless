@@ -91,11 +91,17 @@ function staticImportSpecifiers(code: string): string[] {
 }
 
 describe('publish manifest shape', () => {
+	// every release package must share the core package's version; the number
+	// itself is owned by the release process, not this test
+	const releaseVersion = readManifest('core').version;
+	test('release version is a concrete semver', () => {
+		expect(releaseVersion).toMatch(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/);
+	});
 	for (const packageName of releasePackages) {
 		test(`@markless/${packageName} carries publishable fields`, () => {
 			const manifest = readManifest(packageName);
 			expect(manifest.private, `${packageName} must not be private`).toBeUndefined();
-			expect(manifest.version, `${packageName} version`).toBe('0.1.0');
+			expect(manifest.version, `${packageName} version`).toBe(releaseVersion);
 			expect(manifest.license, `${packageName} license`).toBe('MIT');
 			expect(manifest.publishConfig?.access, `${packageName} access`).toBe('public');
 			expect(manifest.files, `${packageName} files field`).toContain('dist');
