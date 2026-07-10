@@ -1,7 +1,3 @@
-
-
-<!-- Source: .ruler/AGENTS.md -->
-
 # Agent Guidance
 
 Agent rules, skills, and MCP config for this repo are generated from `.ruler/` by [Ruler](https://github.com/intellectronica/ruler). Edit sources in `.ruler/` and run `pnpm rules` to sync; never edit generated files directly.
@@ -14,12 +10,3 @@ Read-only scout/critique packets may declare `Workflow guidance: none`.
 For direct interactive user requests, read `.ruler/skills/markless-implementation/implementation.md` (the base) plus the matching overlay (`compiler.md`, `bundler.md`, `performance.md`, `release.md`), or `.ruler/skills/markless-spec-maintenance/spec.md` for specs.
 The progress ledger is CLI-managed: use `pnpm state append|status|tail|project`.
 Never read `specs/state-archive.md` or bulk history; use the CLI.
-
-
-
-<!-- Source: .ruler/claude.md -->
-
-# Claude Notes
-
-Use the `markless-implementation` skill for implementation work and `markless-spec-maintenance` for spec work; their folders carry the full workflow doctrine.
-Command policy is enforced mechanically in `.claude/settings.json`.

@@ -1,0 +1,31 @@
+# .ruler/ is the single source for agent rules, skills, and MCP servers.
+# `pnpm rules` (ruler apply) generates AGENTS.md, CLAUDE.md, skill copies,
+# and MCP configs, and gitignores everything generated except the two
+# top-level files, which stay committed so any agent opening the repo
+# discovers this setup immediately.
+default_agents = ["claude", "codex"]
+
+[gitignore]
+enabled = true
+
+[skills]
+enabled = true
+
+[mcp]
+enabled = true
+merge_strategy = "merge"
+
+[mcp_servers.grep]
+url = "https://mcp.grep.app"
+
+[mcp_servers.chrome-devtools]
+command = "npx"
+args = ["-y", "chrome-devtools-mcp@latest"]
+
+[agents.claude]
+enabled = true
+output_path = "CLAUDE.md"
+
+[agents.codex]
+enabled = true
+output_path = "AGENTS.md"

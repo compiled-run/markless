@@ -26,3 +26,17 @@ docs/goals/
 packages/vitest-browser/.vitest-attachments/
 packages/vitest-browser/browser/__screenshots__/
 .fable-codex/
+
+
+# START Ruler Generated Files
+/.claude/skills
+/.codex/config.toml
+/.codex/config.toml.bak
+/.codex/skills
+/.mcp.json
+/.mcp.json.bak
+/AGENTS.md
+/AGENTS.md.bak
+/CLAUDE.md
+/CLAUDE.md.bak
+# END Ruler Generated Files

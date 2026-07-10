@@ -16,6 +16,7 @@
 		"publish": "pnpm --filter '@markless/*' --filter create-markless publish --access public --no-git-checks",
 		"release": "node scripts/release/run-release.mjs",
 		"state": "node scripts/state-ledger.mjs",
+		"rules": "npx -y @intellectronica/ruler apply",
 		"prepare": "git config core.hooksPath .githooks"
 	},
 	"devDependencies": {
