@@ -11,6 +11,30 @@ concurrency:
     cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+    agent-files:
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10.33.2
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+
+            - name: Verify committed agent files match .ruler/ sources
+              run: |
+                  pnpm dlx @intellectronica/ruler apply
+                  DRIFT="$(git status --porcelain -- AGENTS.md CLAUDE.md .claude/skills .codex/skills .mcp.json .codex/config.toml)"
+                  if [ -n "$DRIFT" ]; then
+                      echo "::error::Committed agent files are out of sync with .ruler/. Run 'pnpm rules' and commit the result."
+                      git status --porcelain -- AGENTS.md CLAUDE.md .claude/skills .codex/skills .mcp.json .codex/config.toml
+                      exit 1
+                  fi
+
     test:
         runs-on: ubuntu-latest
         timeout-minutes: 30

@@ -123,3 +123,11 @@ Read these first when changing the repo:
 - [CONTRIBUTING.md](./CONTRIBUTING.md) for the package map and workflow.
 - [AGENTS.md](./AGENTS.md) for project rules.
 - [specs/framework-design.md](./specs/framework-design.md) for the spec index.
+
+## Agent Guidance
+
+AI agent rules, skills, and MCP config are sourced from [`.ruler/`](.ruler/) and
+generated with [Ruler](https://github.com/intellectronica/ruler) via `pnpm rules`.
+`AGENTS.md`, `CLAUDE.md`, and the per-agent skill copies are generated files —
+edit `.ruler/` instead and rerun `pnpm rules`. CI and the pre-commit hook fail
+when generated files drift from their sources.

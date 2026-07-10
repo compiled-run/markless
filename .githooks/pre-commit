@@ -9,3 +9,18 @@ if [ $status -ne 0 ]; then
 	echo "Fix with: pnpm exec vp lint --fix --fix-suggestions --fix-dangerously"
 	exit $status
 fi
+
+# Keep generated agent files in sync with .ruler/ sources.
+if git diff --cached --name-only | grep -q '^\.ruler/'; then
+	if command -v pnpm >/dev/null 2>&1 && pnpm rules >/dev/null 2>&1; then
+		DRIFT="$(git diff --name-only -- AGENTS.md CLAUDE.md .claude/skills .codex/skills .mcp.json .codex/config.toml)"
+		if [ -n "$DRIFT" ]; then
+			echo ""
+			echo "pre-commit: .ruler/ changed but generated agent files are stale."
+			echo "Run: pnpm rules  and stage the regenerated files."
+			exit 1
+		fi
+	else
+		echo "pre-commit: warning: could not run 'pnpm rules' to verify agent files (offline?); skipping drift check."
+	fi
+fi

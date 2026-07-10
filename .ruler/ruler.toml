@@ -1,12 +1,12 @@
 # .ruler/ is the single source for agent rules, skills, and MCP servers.
 # `pnpm rules` (ruler apply) generates AGENTS.md, CLAUDE.md, skill copies,
-# and MCP configs, and gitignores everything generated except the two
-# top-level files, which stay committed so any agent opening the repo
-# discovers this setup immediately.
+# and MCP configs. Generated files are COMMITTED (per ruler's team guidance)
+# so fresh clones and crew worktrees have guidance immediately; CI and the
+# pre-commit hook fail on drift between .ruler/ sources and generated files.
 default_agents = ["claude", "codex"]
 
 [gitignore]
-enabled = true
+enabled = false
 
 [skills]
 enabled = true
