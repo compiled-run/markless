@@ -431,7 +431,13 @@ export function __marklessDebugRegisterRouter(
 ): void {
 	if (root)
 		safely(() => (moduleRoots.get(root) ?? controlsFor(root, 'ssr-resume')).router(source));
-	else safely(() => latestControls?.router(source));
+	else
+		safely(() => {
+			const inlineControls = (globalThis as Record<PropertyKey, unknown>)[
+				Symbol.for('markless.debug.channel.v1.bootstrap')
+			] as Pick<RootControls, 'router'> | undefined;
+			(latestControls ?? inlineControls)?.router(source);
+		});
 }
 export function __marklessDebugSetBoundaries(
 	root: Element,
@@ -444,4 +450,7 @@ export function __marklessDebugResetForTest(): void {
 	moduleRoots = new WeakMap();
 	latestControls = undefined;
 	delete global.__MARKLESS_DEBUG__;
+	delete (global as Record<PropertyKey, unknown>)[
+		Symbol.for('markless.debug.channel.v1.bootstrap')
+	];
 }

@@ -405,20 +405,26 @@ function renderRouteScript(file: string): string {
 }
 
 function renderLinkBridgeScript(resumeEntryPath: string): string {
-	const debugSource =
+	const debugBootstrap =
 		typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
-			? JSON.stringify(__marklessDebugBootstrapSource())
+			? `<script data-markless-router-debug-bootstrap>${escapeInlineScript(`(() => {
+	const d = document;
+	const s = d.currentScript;
+	const r = s && s.closest('[data-async-container]');
+	if (!r) return;
+	try { globalThis[Symbol.for('markless.debug.channel.v1.bootstrap')] = ${__marklessDebugBootstrapSource()}(r, 'ssr-inline', false); } catch {}
+})();`)}</script>`
 			: '';
 	const debugRegistration =
 		typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
 			? `
 	try {
-		const bootstrap = Function('return (' + ${debugSource} + ')')();
-		const md = typeof bootstrap === 'function' ? bootstrap(r, 'ssr-inline', false) : undefined;
+		const key = Symbol.for('markless.debug.channel.v1.bootstrap');
+		const md = globalThis[key];
 		if (md) { md.router('ssr-link-bridge'); md.activate(); }
 	} catch {}`
 			: '';
-	return `<script data-markless-router-link-resumer>${escapeInlineScript(`(() => {
+	return `${debugBootstrap}<script data-markless-router-link-resumer>${escapeInlineScript(`(() => {
 	const d = document;
 	const s = d.currentScript;
 	const r = s && s.closest('[data-async-container]');

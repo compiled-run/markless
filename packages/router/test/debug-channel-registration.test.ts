@@ -120,6 +120,10 @@ describe('router debug registration', () => {
 
 		const response = await entry.fetch(new Request('http://router.test/'));
 		const html = await response.text();
+		const debugBootstrap = requiredScriptContent(
+			html,
+			/<script data-markless-router-debug-bootstrap>([\s\S]*?)<\/script>/,
+		);
 		const source = requiredScriptContent(html, /<script data-markless-router-link-resumer>([\s\S]*?)<\/script>/);
 		const root: any = {
 			isConnected: true,
@@ -144,6 +148,7 @@ describe('router debug registration', () => {
 			assign() {},
 		};
 		try {
+			new Function(debugBootstrap)();
 			new Function(source)();
 		} finally {
 			(globalThis as any).document = previousDocument;
@@ -152,6 +157,71 @@ describe('router debug registration', () => {
 		expect(debugChannel()?.explainInteraction(link as never, 'click')).toMatchObject({
 			kind: 'router-delegation',
 			source: 'ssr-link-bridge',
+		});
+	});
+
+	test('built bridge records after registration without runtime source compilation', async () => {
+		const entry = createServerEntry({
+			navigationEntryPath: '/build/navigation.js',
+			pageModuleLoaders: {
+				'pages/index.tsrx': async () => ({
+					default: {
+						renderSsr: async () => ({
+							html: '<a data-markless-router-link href="/about">About</a>',
+						}),
+					},
+				}),
+			},
+			routeFileIds: ['pages/index.tsrx'],
+		});
+		const html = await (await entry.fetch(new Request('http://router.test/'))).text();
+		const source = requiredScriptContent(
+			html,
+			/<script data-markless-router-link-resumer>([\s\S]*?)<\/script>/,
+		);
+		const debugBootstrap = requiredScriptContent(
+			html,
+			/<script data-markless-router-debug-bootstrap>([\s\S]*?)<\/script>/,
+		);
+		const root: any = {
+			isConnected: true,
+			listeners: new Map(),
+			contains(value: unknown) {
+				return value === this || (value as any).parentElement === this;
+			},
+			addEventListener(name: string, listener: unknown) {
+				this.listeners.set(name, listener);
+			},
+		};
+		const link = anchor(root, {
+			href: 'http://router.test/about',
+			'data-markless-router-link': '',
+		});
+		const previousDocument = (globalThis as any).document;
+		(globalThis as any).document = { currentScript: { closest: () => root } };
+		(globalThis as any).location = {
+			href: 'http://router.test/',
+			origin: 'http://router.test',
+			hash: '',
+		};
+		try {
+			new Function(debugBootstrap)();
+			new Function('Function', source)(() => {
+				throw new EvalError('unsafe-eval blocked');
+			});
+		} finally {
+			(globalThis as any).document = previousDocument;
+		}
+
+		expect(root.listeners.has('click')).toBe(true);
+		expect(debugChannel()?.explainInteraction(link as never, 'click')).toMatchObject({
+			kind: 'router-delegation',
+			source: 'ssr-link-bridge',
+		});
+		debugChannelModule.__marklessDebugRegisterRouter(undefined, 'navigation-event');
+		expect(debugChannel()?.explainInteraction(link as never, 'navigate')).toMatchObject({
+			kind: 'router-delegation',
+			source: 'navigation-event',
 		});
 	});
 
