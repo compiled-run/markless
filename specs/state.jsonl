@@ -1,0 +1,1 @@
+{"ts":"2026-07-10T00:00:00.000Z","goal":"state-ledger-cutover","unit":null,"status":"done","summary":"Cut over implementation state tracking to the append-only JSONL ledger.","refs":["specs/state-archive.md"]}

@@ -15,6 +15,7 @@
 		"test:compiler": "vp test packages/compiler/test/*.test.ts",
 		"publish": "pnpm --filter '@markless/*' --filter create-markless publish --access public --no-git-checks",
 		"release": "node scripts/release/run-release.mjs",
+		"state": "node scripts/state-ledger.mjs",
 		"prepare": "git config core.hooksPath .githooks"
 	},
 	"devDependencies": {
