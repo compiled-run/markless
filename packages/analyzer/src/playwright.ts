@@ -13,6 +13,7 @@ import { executedJavaScriptBytes, type V8CoverageEntry } from './coverage.ts';
 import { evaluateBoundaries, evaluateCandidate, type BoundarySnapshot } from './invariants.ts';
 import {
 	evaluatePreloadIntegrity,
+	type PreloadActionKind,
 	type PreloadIntegrityEvaluation,
 	type PreloadRequestObservation,
 } from './preload-integrity.ts';
@@ -423,6 +424,7 @@ export async function measurePageWindow(input: {
 	route: MatrixRoute;
 	fixtureUrlId: string;
 	actionId: string;
+	actionKind?: PreloadActionKind;
 	origin: string;
 	knownDocumentPaths: readonly string[];
 	run: () => Promise<void>;
@@ -467,6 +469,7 @@ export async function measurePageWindow(input: {
 	} catch (error) {
 		errors.push(error instanceof Error ? error.message : String(error));
 	}
+	const destinationSettledAfterRequestCount = requestLedger.snapshot().length;
 	await requestLedger.closeAndObserveLeaks();
 	const coverage = await input.page.coverage.stopJSCoverage();
 	consoleLedger.assertAndClear();
@@ -474,6 +477,14 @@ export async function measurePageWindow(input: {
 	const declaredAfter = await collectDeclaredModulePreloads(input.page);
 	const preloadIntegrity = evaluatePreloadIntegrity({
 		baseUrl: input.page.url(),
+		actionKind: input.actionKind,
+		...(input.actionKind === 'navigation'
+			? {
+					expectedDestination: {
+						settledAfterRequestCount: destinationSettledAfterRequestCount,
+					},
+				}
+			: {}),
 		declaredPreloads: [...new Set([...declaredBefore, ...declaredAfter])],
 		observedRequests: [...loadedBefore, ...requestLedger.preloadObservations(input.actionId)],
 	});

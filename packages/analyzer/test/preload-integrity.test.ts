@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { evaluatePreloadIntegrity } from '../src/preload-integrity.ts';
 
 describe('MLA-S1 preload integrity', () => {
-	test('passes when an action module was declared and loaded during bootstrap', () => {
+	test('passes when a declared action module was loaded before the interaction', () => {
 		const evaluation = evaluatePreloadIntegrity({
 			baseUrl: 'https://app.test/dashboard/',
 			declaredPreloads: ['/build/editor.js'],
@@ -10,12 +10,6 @@ describe('MLA-S1 preload integrity', () => {
 				{
 					phase: 'bootstrap',
 					url: 'https://app.test/build/editor.js',
-					resourceType: 'script',
-				},
-				{
-					phase: 'action',
-					actionId: 'open-editor',
-					url: '/build/editor.js',
 					resourceType: 'script',
 				},
 			],
@@ -32,6 +26,7 @@ describe('MLA-S1 preload integrity', () => {
 	test('fails an undeclared cold module request with its action', () => {
 		const evaluation = evaluatePreloadIntegrity({
 			baseUrl: 'https://app.test/',
+			actionKind: 'interaction',
 			declaredPreloads: [],
 			observedRequests: [
 				{
@@ -47,6 +42,46 @@ describe('MLA-S1 preload integrity', () => {
 		expect(evaluation.invariant.details).toEqual([
 			'save-settings: module fetched during action without prior preload load: https://app.test/build/save.js',
 		]);
+	});
+
+	test('reports navigation destination loads without failing preload integrity', () => {
+		const evaluation = evaluatePreloadIntegrity({
+			baseUrl: 'https://app.test/',
+			actionKind: 'navigation',
+			expectedDestination: { settledAfterRequestCount: 2 },
+			declaredPreloads: [],
+			observedRequests: [
+				{ phase: 'action', actionId: 'open-alpha', url: '/build/alpha.js' },
+				{ phase: 'action', actionId: 'open-alpha', url: '/build/alpha-closure.js' },
+			],
+		});
+
+		expect(evaluation.invariant.status).toBe('pass');
+		expect(evaluation.navigationLoads).toEqual({
+			count: 2,
+			urls: ['https://app.test/build/alpha.js', 'https://app.test/build/alpha-closure.js'],
+		});
+	});
+
+	test('fails a navigation module load after the destination settled', () => {
+		const evaluation = evaluatePreloadIntegrity({
+			baseUrl: 'https://app.test/',
+			actionKind: 'navigation',
+			expectedDestination: { settledAfterRequestCount: 1 },
+			declaredPreloads: [],
+			observedRequests: [
+				{ phase: 'action', actionId: 'open-alpha', url: '/build/alpha.js' },
+				{ phase: 'action', actionId: 'open-alpha', url: '/build/late.js' },
+			],
+		});
+
+		expect(evaluation.invariant.details).toEqual([
+			'open-alpha: module fetched after navigation destination settled: https://app.test/build/late.js',
+		]);
+		expect(evaluation.navigationLoads).toEqual({
+			count: 1,
+			urls: ['https://app.test/build/alpha.js'],
+		});
 	});
 
 	test('fails a declared module that was not loaded before the action', () => {
@@ -83,6 +118,8 @@ describe('MLA-S1 preload integrity', () => {
 	test('normalizes absolute, root-relative, build-relative, and fragment URLs', () => {
 		const evaluation = evaluatePreloadIntegrity({
 			baseUrl: 'https://app.test/app/index.html',
+			actionKind: 'navigation',
+			expectedDestination: { settledAfterRequestCount: 1 },
 			declaredPreloads: ['../build/chunk.js#declaration'],
 			observedRequests: [
 				{
