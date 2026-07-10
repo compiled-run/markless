@@ -87,13 +87,13 @@ export async function __marklessRouterStartSpaNavigation(options: StartSpaNaviga
 		(event) => handleLinkClick(event, context, navigation),
 		true,
 	);
+	navigation.addEventListener('navigate', (event) => {
+		handleNavigateEvent(event, context);
+	});
 	if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
 		await import('../../web/src/debug-channel.ts')
 			.then((debug) => debug.__marklessDebugRegisterRouter(undefined, 'spa-click-listener'))
 			.catch(() => {});
-	navigation.addEventListener('navigate', (event) => {
-		handleNavigateEvent(event, context);
-	});
 	if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
 		await import('../../web/src/debug-channel.ts')
 			.then((debug) => debug.__marklessDebugRegisterRouter(undefined, 'navigation-event'))

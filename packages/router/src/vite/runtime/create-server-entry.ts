@@ -407,12 +407,16 @@ function renderRouteScript(file: string): string {
 function renderLinkBridgeScript(resumeEntryPath: string): string {
 	const debugSource =
 		typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
-			? `let md; try { md = ${__marklessDebugBootstrapSource()}(r, 'ssr-inline', false); } catch {}`
+			? JSON.stringify(__marklessDebugBootstrapSource())
 			: '';
 	const debugRegistration =
 		typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
 			? `
-	if (md) try { md.router('ssr-link-bridge'); md.activate(); } catch {}`
+	try {
+		const bootstrap = Function('return (' + ${debugSource} + ')')();
+		const md = typeof bootstrap === 'function' ? bootstrap(r, 'ssr-inline', false) : undefined;
+		if (md) { md.router('ssr-link-bridge'); md.activate(); }
+	} catch {}`
 			: '';
 	return `<script data-markless-router-link-resumer>${escapeInlineScript(`(() => {
 	const d = document;
@@ -420,7 +424,6 @@ function renderLinkBridgeScript(resumeEntryPath: string): string {
 	const r = s && s.closest('[data-async-container]');
 	if (!r || r.__marklessRouterLinkResumerStarted) return;
 	r.__marklessRouterLinkResumerStarted = true;
-	${debugSource}
 	const linkAttr = 'data-markless-router-link';
 	const replaceAttr = 'data-markless-router-replace';
 	const scrollAttr = 'data-markless-router-scroll';

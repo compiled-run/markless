@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import * as debugChannelModule from '../../web/src/debug-channel.ts';
 import {
 	__marklessDebugResetForTest,
 	__marklessDebugStartContainer,
@@ -47,6 +48,8 @@ beforeEach(() => {
 	(globalThis as Record<string, unknown>).location = { href: 'http://router.test/' };
 	__marklessDebugResetForTest();
 });
+
+afterEach(() => vi.restoreAllMocks());
 
 describe('router debug registration', () => {
 	test('SPA listeners explain marked eligible anchors and reject native or external links', async () => {
@@ -151,4 +154,47 @@ describe('router debug registration', () => {
 			source: 'ssr-link-bridge',
 		});
 	});
+
+	test.each(['undefined', 'function (this is not valid JavaScript)'])(
+		'SSR link bridge still registers when generated debug bootstrap is %s',
+		async (bootstrapSource) => {
+			vi.spyOn(debugChannelModule, '__marklessDebugBootstrapSource').mockReturnValue(
+				bootstrapSource,
+			);
+			const entry = createServerEntry({
+				navigationEntryPath: '/navigation.js',
+				pageModuleLoaders: {
+					'pages/index.tsrx': async () => ({
+						default: {
+							renderSsr: async () => ({
+								html: '<a data-markless-router-link href="/about">About</a>',
+							}),
+						},
+					}),
+				},
+				routeFileIds: ['pages/index.tsrx'],
+			});
+			const response = await entry.fetch(new Request('http://router.test/'));
+			const source = requiredScriptContent(
+				await response.text(),
+				/<script data-markless-router-link-resumer>([\s\S]*?)<\/script>/,
+			);
+			const root = {
+				listeners: new Map<string, unknown>(),
+				addEventListener(name: string, listener: unknown) {
+					this.listeners.set(name, listener);
+				},
+			};
+			const previousDocument = (globalThis as { document?: unknown }).document;
+			(globalThis as { document?: unknown }).document = {
+				currentScript: { closest: () => root },
+			};
+			try {
+				expect(() => new Function(source)()).not.toThrow();
+			} finally {
+				(globalThis as { document?: unknown }).document = previousDocument;
+			}
+			expect(root.listeners.has('click')).toBe(true);
+		},
+	);
 });
