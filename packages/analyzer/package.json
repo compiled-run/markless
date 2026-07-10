@@ -36,6 +36,9 @@
 		"prepublishOnly": "node ../../scripts/release/verify-publish-ready.mjs"
 	},
 	"dependencies": {
+		"@markless/router": "workspace:*",
+		"@markless/serializer": "workspace:*",
+		"@markless/web": "workspace:*",
 		"ufo": "catalog:"
 	},
 	"devDependencies": {

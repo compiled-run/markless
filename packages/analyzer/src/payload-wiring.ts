@@ -1,3 +1,9 @@
+import { MARKLESS_ARM_SCRIPT_TYPE, MARKLESS_VIEW_SCRIPT_TYPE } from '@markless/serializer';
+import {
+	MARKLESS_DEBUG_INTERACTION_KIND_DIRECT_CSR, MARKLESS_DEBUG_INTERACTION_KIND_NONE,
+	MARKLESS_DEBUG_INTERACTION_KIND_ROUTER_DELEGATION, MARKLESS_DEBUG_SOURCE_CALLBACK_PROP,
+	MARKLESS_DEBUG_SOURCE_STREAMED_ARM,
+} from '@markless/web';
 import type { AnalyzerCanonicalInvariantResult } from './contracts.ts';
 
 export interface PayloadEventClaim {
@@ -5,7 +11,7 @@ export interface PayloadEventClaim {
 	readonly hostNodeId: string;
 	readonly eventName: string;
 	readonly symbolIds: readonly string[];
-	readonly source: 'view' | 'streamed-arm';
+	readonly source: 'view' | typeof MARKLESS_DEBUG_SOURCE_STREAMED_ARM;
 	readonly boundaryId?: string;
 }
 
@@ -30,22 +36,25 @@ export function parsePayloadEventClaims(input: {
 }): PayloadEventClaim[] {
 	const claims: PayloadEventClaim[] = [];
 	if (input.viewScript) {
-		const view = parseObject(input.viewScript, 'markless/view');
+		const view = parseObject(input.viewScript, MARKLESS_VIEW_SCRIPT_TYPE);
 		claims.push(...readRecordSet(view, input.containerId, 'view'));
-		const boundaries = optionalArray(view.asyncBoundaries, 'markless/view.asyncBoundaries');
+		const boundaries = optionalArray(
+			view.asyncBoundaries,
+			`${MARKLESS_VIEW_SCRIPT_TYPE}.asyncBoundaries`,
+		);
 		for (const [index, value] of boundaries.entries()) {
-			const boundary = asObject(value, `markless/view.asyncBoundaries[${index}]`);
+			const boundary = asObject(value, `${MARKLESS_VIEW_SCRIPT_TYPE}.asyncBoundaries[${index}]`);
 			// Arrays are compiler plans, not the served/registrable arm shape.
 			if (boundary.armRecords && !Array.isArray(boundary.armRecords)) {
 				const boundaryId = readString(
 					boundary.id,
-					`markless/view.asyncBoundaries[${index}].id`,
+					`${MARKLESS_VIEW_SCRIPT_TYPE}.asyncBoundaries[${index}].id`,
 				);
 				claims.push(
 					...readRecordSet(
 						asObject(
 							boundary.armRecords,
-							`markless/view.asyncBoundaries[${index}].armRecords`,
+							`${MARKLESS_VIEW_SCRIPT_TYPE}.asyncBoundaries[${index}].armRecords`,
 						),
 						input.containerId,
 						'view',
@@ -58,9 +67,9 @@ export function parsePayloadEventClaims(input: {
 	for (const arm of input.armScripts ?? []) {
 		claims.push(
 			...readRecordSet(
-				parseObject(arm.content, `markless/arm[${arm.boundaryId}]`),
+				parseObject(arm.content, `${MARKLESS_ARM_SCRIPT_TYPE}[${arm.boundaryId}]`),
 				input.containerId,
-				'streamed-arm',
+				MARKLESS_DEBUG_SOURCE_STREAMED_ARM,
 				arm.boundaryId,
 			),
 		);
@@ -74,12 +83,16 @@ export function reconcilePayloadWiring(
 ): PayloadWiringEvaluation {
 	const key = (value: { containerId: string; hostNodeId?: string; eventName: string }) =>
 		`${value.containerId}\n${value.hostNodeId ?? ''}\n${value.eventName}`;
-	const confirmed = new Set(registrations.filter((entry) => entry.kind !== 'none').map(key));
+	const confirmed = new Set(
+		registrations
+			.filter((entry) => entry.kind !== MARKLESS_DEBUG_INTERACTION_KIND_NONE)
+			.map(key),
+	);
 	const claimed = new Set(claims.map(key));
 	const missing = claims.filter((claim) => !confirmed.has(key(claim)));
 	const runtimeOnly = registrations.filter(
 		(registration) =>
-			registration.kind !== 'none' &&
+			registration.kind !== MARKLESS_DEBUG_INTERACTION_KIND_NONE &&
 			!claimed.has(key(registration)) &&
 			!runtimeGenerated(registration),
 	);
@@ -104,10 +117,10 @@ export function reconcilePayloadWiring(
 
 function runtimeGenerated(registration: ChannelEventRegistration): boolean {
 	return (
-		registration.kind === 'direct-csr' ||
-		registration.kind === 'callback-prop' ||
-		registration.kind === 'router-delegation' ||
-		registration.source === 'callback-prop'
+		registration.kind === MARKLESS_DEBUG_INTERACTION_KIND_DIRECT_CSR ||
+		registration.kind === MARKLESS_DEBUG_SOURCE_CALLBACK_PROP ||
+		registration.kind === MARKLESS_DEBUG_INTERACTION_KIND_ROUTER_DELEGATION ||
+		registration.source === MARKLESS_DEBUG_SOURCE_CALLBACK_PROP
 	);
 }
 

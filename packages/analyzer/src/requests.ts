@@ -2,6 +2,7 @@ import type { AnalyzerRequestRecord } from './contracts.ts';
 
 export interface RequestClassificationInput {
 	readonly pageOrigin: string;
+	readonly servingPrefix: string;
 	readonly knownDocumentPaths: readonly string[];
 	readonly declaredApi: readonly { readonly method: string; readonly path: string }[];
 	readonly phase: 'bootstrap' | 'action';
@@ -33,7 +34,7 @@ export function classifyRequest(
 		sameOrigin &&
 		successful &&
 		(input.method === 'GET' || input.method === 'HEAD') &&
-		(target.pathname.startsWith('/build/') || input.phase === 'bootstrap')
+		(target.pathname.startsWith(input.servingPrefix) || input.phase === 'bootstrap')
 	)
 		return 'asset';
 	if (

@@ -1,3 +1,8 @@
+import {
+	MARKLESS_DEBUG_INTERACTION_KIND_DIRECT_CSR, MARKLESS_DEBUG_INTERACTION_KIND_INLINE_RESUMER,
+	MARKLESS_DEBUG_INTERACTION_KIND_NONE, MARKLESS_DEBUG_INTERACTION_KIND_RESUME_RECORD,
+	MARKLESS_DEBUG_INTERACTION_KIND_ROUTER_DELEGATION, MARKLESS_DEBUG_INTERACTION_KIND_ROW_RECORD,
+} from '@markless/web';
 import type {
 	MatrixAction,
 	MatrixApiContract,
@@ -124,11 +129,11 @@ function action(value: unknown, path: string): MatrixAction {
 	oneOf(
 		item.expectedInteraction,
 		[
-			'inline-resumer',
-			'resume-record',
-			'row-record',
-			'direct-csr',
-			'router-delegation',
+			MARKLESS_DEBUG_INTERACTION_KIND_INLINE_RESUMER,
+			MARKLESS_DEBUG_INTERACTION_KIND_RESUME_RECORD,
+			MARKLESS_DEBUG_INTERACTION_KIND_ROW_RECORD,
+			MARKLESS_DEBUG_INTERACTION_KIND_DIRECT_CSR,
+			MARKLESS_DEBUG_INTERACTION_KIND_ROUTER_DELEGATION,
 			'native',
 		],
 		`${path}.expectedInteraction`,
@@ -141,7 +146,7 @@ function action(value: unknown, path: string): MatrixAction {
 	strings(item.expectedRejectedBoundaryIds, `${path}.expectedRejectedBoundaryIds`);
 	const reset = record(item.reset, `${path}.reset`);
 	exactKeys(reset, `${path}.reset`, ['mode'], ['reason']);
-	oneOf(reset.mode, ['none', 'fresh-fixture'], `${path}.reset.mode`);
+	oneOf(reset.mode, [MARKLESS_DEBUG_INTERACTION_KIND_NONE, 'fresh-fixture'], `${path}.reset.mode`);
 	if (reset.reason !== undefined && typeof reset.reason !== 'string')
 		fail(`${path}.reset.reason`, 'must be string');
 	if (

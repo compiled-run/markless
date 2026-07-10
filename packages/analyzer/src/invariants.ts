@@ -1,3 +1,7 @@
+import {
+	MARKLESS_DEBUG_INTERACTION_KIND_NONE,
+	MARKLESS_DEBUG_INTERACTION_KIND_ROUTER_DELEGATION,
+} from '@markless/web';
 import type {
 	AnalyzerCandidateActionReport,
 	AnalyzerInvariantResult,
@@ -89,13 +93,17 @@ export function evaluateCandidate(candidate: SemanticCandidate): AnalyzerInvaria
 			? ['click']
 			: candidate.expectedEvents;
 	for (const eventName of requiredEvents) {
-		const kind = candidate.explanations[eventName]?.kind ?? 'none';
-		if (candidate.classification === 'markless-link' && kind !== 'router-delegation')
+		const kind =
+			candidate.explanations[eventName]?.kind ?? MARKLESS_DEBUG_INTERACTION_KIND_NONE;
+		if (
+			candidate.classification === 'markless-link' &&
+			kind !== MARKLESS_DEBUG_INTERACTION_KIND_ROUTER_DELEGATION
+		)
 			return fail(
 				'BQA-I4-WIRING-MISSING',
-				`${eventName} requires router-delegation; received ${kind}`,
+				`${eventName} requires ${MARKLESS_DEBUG_INTERACTION_KIND_ROUTER_DELEGATION}; received ${kind}`,
 			);
-		if (kind === 'none')
+		if (kind === MARKLESS_DEBUG_INTERACTION_KIND_NONE)
 			return fail('BQA-I4-WIRING-MISSING', `${eventName} has no framework registration`);
 	}
 	return [];

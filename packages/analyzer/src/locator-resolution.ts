@@ -1,3 +1,8 @@
+import {
+	MARKLESS_ARM_BRANCH_ANCHOR_PREFIX,
+	MARKLESS_ARM_BRANCH_END_ANCHOR_PREFIX,
+} from '@markless/serializer';
+import { MARKLESS_DEBUG_SOURCE_STREAMED_ARM } from '@markless/web';
 import type { AnalyzerCanonicalInvariantResult } from './contracts.ts';
 
 export type LocatorKind =
@@ -56,7 +61,7 @@ export function locatorPlansFromView(view: Record<string, any>): {
 	if (list(view.keyedRepeats).length)
 		skipped.push({ kind: 'keyed-row', reason: 'served view payload omits live collection cardinality needed to expand one raw child-node path per row' });
 	if (list(view.asyncBoundaries).some((boundary) => boundary.armRecords))
-		skipped.push({ kind: 'streamed-arm', reason: 'arm-relative locators require the live boundary-local re-anchoring census' });
+		skipped.push({ kind: MARKLESS_DEBUG_SOURCE_STREAMED_ARM, reason: 'arm-relative locators require the live boundary-local re-anchoring census' });
 	if (list(view.branches).some((branch) => list(branch.armRecords).length))
 		skipped.push({ kind: 'branch-arm', reason: 'branch arm host paths require the currently selected graph arm' });
 	return { plans, skipped };
@@ -124,7 +129,11 @@ function elementWalk<Node>(root: Node, adapter: WalkableDomAdapter<Node>): Node[
 function commentWalk<Node>(root: Node, adapter: WalkableDomAdapter<Node>): Node[] {
 	return walk(root, adapter).filter((node) => {
 		const data = adapter.commentData?.(node) ?? '';
-		return adapter.nodeType(node) === 8 && !/^\/?markless:arm-branch:/.test(data);
+		return (
+			adapter.nodeType(node) === 8 &&
+			!data.startsWith(MARKLESS_ARM_BRANCH_ANCHOR_PREFIX) &&
+			!data.startsWith(MARKLESS_ARM_BRANCH_END_ANCHOR_PREFIX)
+		);
 	});
 }
 function walk<Node>(root: Node, adapter: WalkableDomAdapter<Node>): Node[] {

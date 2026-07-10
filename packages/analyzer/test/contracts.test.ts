@@ -229,6 +229,7 @@ describe('analyzer contracts', () => {
 	test('classifies bootstrap, action, document, and declared API requests', () => {
 		const base = {
 			pageOrigin: 'https://app.test',
+			servingPrefix: '/assets/',
 			knownDocumentPaths: ['/'],
 			declaredApi: [{ method: 'GET', path: '/api/items?limit=1' }],
 			method: 'GET',
@@ -240,6 +241,14 @@ describe('analyzer contracts', () => {
 				phase: 'bootstrap',
 				url: 'https://app.test/styles.css',
 				resourceType: 'stylesheet',
+			}),
+		).toBe('asset');
+		expect(
+			classifyRequest({
+				...base,
+				phase: 'action',
+				url: 'https://app.test/assets/action.js',
+				resourceType: 'script',
 			}),
 		).toBe('asset');
 		expect(

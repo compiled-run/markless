@@ -26,6 +26,7 @@ describe('Playwright adapter', () => {
 		const page = new EventEmitter();
 		const ledger = new RequestLedger(page as never, {
 			pageOrigin: 'https://app.test',
+			servingPrefix: '/assets/',
 			knownDocumentPaths: [],
 			declaredApi: [],
 			phase: 'action',
@@ -57,9 +58,10 @@ describe('Playwright adapter', () => {
 	});
 
 	test('collects served HTML and build chunks from the page', async () => {
-		const artifacts = [{ path: '/index.html', content: '<main />' }, { path: '/build/a.js', content: 'export{}' }];
+		const artifacts = [{ path: '/index.html', content: '<main />' }, { path: '/assets/a.js', content: 'export{}' }];
 		const page = { evaluate: vi.fn(async () => artifacts) };
-		expect(await collectServedBuildArtifacts(page as never)).toEqual(artifacts);
+		expect(await collectServedBuildArtifacts(page as never, '/assets/')).toEqual(artifacts);
+		expect(page.evaluate).toHaveBeenCalledWith(expect.any(Function), '/assets/');
 	});
 
 	test('adapts a serialized page Document to the locator core', async () => {
@@ -93,7 +95,7 @@ describe('Playwright adapter', () => {
 			explanations: { click: { kind: 'resume-record' } },
 		}] as never);
 
-		expect(page.evaluate.mock.calls[0]?.[1]).toEqual([
+		expect(page.evaluate.mock.calls[0]?.[1].candidateEvents).toEqual([
 			{ documentIndex: 4, eventName: 'click' },
 		]);
 		expect(evaluation.invariant.status).toBe('fail');

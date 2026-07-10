@@ -1,3 +1,9 @@
+import type {
+	MARKLESS_DEBUG_INTERACTION_KIND_DIRECT_CSR, MARKLESS_DEBUG_INTERACTION_KIND_INLINE_RESUMER,
+	MARKLESS_DEBUG_INTERACTION_KIND_NONE, MARKLESS_DEBUG_INTERACTION_KIND_RESUME_RECORD,
+	MARKLESS_DEBUG_INTERACTION_KIND_ROUTER_DELEGATION, MARKLESS_DEBUG_INTERACTION_KIND_ROW_RECORD,
+} from '@markless/web';
+
 /** @deprecated Use AnalyzerInvariantId; BQA IDs remain accepted aliases. */
 export type BrowserQaInvariantId =
 	| 'BQA-I1-CONSOLE'
@@ -135,17 +141,20 @@ export interface MatrixAction {
 	/** Action performs a route navigation (any mechanism); MLA-S1 expects destination module loads. */
 	readonly navigates?: boolean;
 	readonly expectedInteraction:
-		| 'inline-resumer'
-		| 'resume-record'
-		| 'row-record'
-		| 'direct-csr'
-		| 'router-delegation'
+		| typeof MARKLESS_DEBUG_INTERACTION_KIND_INLINE_RESUMER
+		| typeof MARKLESS_DEBUG_INTERACTION_KIND_RESUME_RECORD
+		| typeof MARKLESS_DEBUG_INTERACTION_KIND_ROW_RECORD
+		| typeof MARKLESS_DEBUG_INTERACTION_KIND_DIRECT_CSR
+		| typeof MARKLESS_DEBUG_INTERACTION_KIND_ROUTER_DELEGATION
 		| 'native';
 	readonly apiContractIds: readonly string[];
 	readonly setupActionIds?: readonly string[];
 	readonly pendingPolicy: PendingPolicy;
 	readonly expectedRejectedBoundaryIds: readonly string[];
-	readonly reset: { readonly mode: 'none' | 'fresh-fixture'; readonly reason?: string };
+	readonly reset: {
+		readonly mode: typeof MARKLESS_DEBUG_INTERACTION_KIND_NONE | 'fresh-fixture';
+		readonly reason?: string;
+	};
 }
 
 export interface MatrixRoute {

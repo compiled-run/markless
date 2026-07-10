@@ -1,6 +1,23 @@
 declare const __MARKLESS_DEBUG_ENABLED__: boolean;
 
 export const MARKLESS_DEBUG_CHANNEL_SYMBOL_KEY = 'markless.debug.channel.v1.bootstrap';
+export const MARKLESS_DEBUG_GLOBAL_PROPERTY = '__MARKLESS_DEBUG__';
+export const MARKLESS_DEBUG_COMPILE_FLAG = '__MARKLESS_DEBUG_ENABLED__';
+export const MARKLESS_DEBUG_CHANNEL_VERSION = 1;
+export const MARKLESS_DEBUG_DIAGNOSTIC_PREFIX = 'MARKLESS_DEBUG_';
+export const MARKLESS_DEBUG_INTERACTION_KIND_INLINE_RESUMER = 'inline-resumer';
+export const MARKLESS_DEBUG_INTERACTION_KIND_RESUME_RECORD = 'resume-record';
+export const MARKLESS_DEBUG_INTERACTION_KIND_ROW_RECORD = 'row-record';
+export const MARKLESS_DEBUG_INTERACTION_KIND_DIRECT_CSR = 'direct-csr';
+export const MARKLESS_DEBUG_INTERACTION_KIND_ROUTER_DELEGATION = 'router-delegation';
+export const MARKLESS_DEBUG_INTERACTION_KIND_NONE = 'none';
+export const MARKLESS_DEBUG_SOURCE_SSR_INLINE = 'ssr-inline';
+export const MARKLESS_DEBUG_SOURCE_STREAMED_ARM = 'streamed-arm';
+export const MARKLESS_DEBUG_SOURCE_STATIC_EVENT = 'static-event';
+export const MARKLESS_DEBUG_SOURCE_CALLBACK_PROP = 'callback-prop';
+export const MARKLESS_DEBUG_SOURCE_SSR_LINK_BRIDGE = 'ssr-link-bridge';
+export const MARKLESS_DEBUG_SOURCE_SPA_CLICK_LISTENER = 'spa-click-listener';
+export const MARKLESS_DEBUG_SOURCE_NAVIGATION_EVENT = 'navigation-event';
 
 export type MarklessDebugContainerId = string;
 export type MarklessDebugRootKey = string;
@@ -36,30 +53,30 @@ interface MarklessDebugInteractionBase {
 	readonly eventName: string;
 }
 export interface MarklessDebugInlineResumerInteraction extends MarklessDebugInteractionBase {
-	readonly kind: 'inline-resumer';
-	readonly source: 'ssr-inline' | 'streamed-arm';
+	readonly kind: typeof MARKLESS_DEBUG_INTERACTION_KIND_INLINE_RESUMER;
+	readonly source: typeof MARKLESS_DEBUG_SOURCE_SSR_INLINE | typeof MARKLESS_DEBUG_SOURCE_STREAMED_ARM;
 	readonly hostNodeId?: string;
 }
 export interface MarklessDebugResumeRecordInteraction extends MarklessDebugInteractionBase {
-	readonly kind: 'resume-record';
+	readonly kind: typeof MARKLESS_DEBUG_INTERACTION_KIND_RESUME_RECORD;
 	readonly hostNodeId: string;
 	readonly symbolIds: readonly string[];
 }
 export interface MarklessDebugRowRecordInteraction extends MarklessDebugInteractionBase {
-	readonly kind: 'row-record';
+	readonly kind: typeof MARKLESS_DEBUG_INTERACTION_KIND_ROW_RECORD;
 	readonly repeatId: string;
 	readonly symbolIds: readonly string[];
 }
 export interface MarklessDebugDirectCsrInteraction extends MarklessDebugInteractionBase {
-	readonly kind: 'direct-csr';
-	readonly source: 'static-event' | 'callback-prop';
+	readonly kind: typeof MARKLESS_DEBUG_INTERACTION_KIND_DIRECT_CSR;
+	readonly source: typeof MARKLESS_DEBUG_SOURCE_STATIC_EVENT | typeof MARKLESS_DEBUG_SOURCE_CALLBACK_PROP;
 }
 export interface MarklessDebugRouterDelegationInteraction extends MarklessDebugInteractionBase {
-	readonly kind: 'router-delegation';
-	readonly source: 'ssr-link-bridge' | 'spa-click-listener' | 'navigation-event';
+	readonly kind: typeof MARKLESS_DEBUG_INTERACTION_KIND_ROUTER_DELEGATION;
+	readonly source: typeof MARKLESS_DEBUG_SOURCE_SSR_LINK_BRIDGE | typeof MARKLESS_DEBUG_SOURCE_SPA_CLICK_LISTENER | typeof MARKLESS_DEBUG_SOURCE_NAVIGATION_EVENT;
 }
 export interface MarklessDebugNoInteraction {
-	readonly kind: 'none';
+	readonly kind: typeof MARKLESS_DEBUG_INTERACTION_KIND_NONE;
 	readonly eventName: string;
 	readonly reason:
 		| 'outside-known-container'
@@ -95,7 +112,7 @@ export interface MarklessDebugViolation {
 	readonly details?: Readonly<Record<string, MarklessDebugJson>>;
 }
 export interface MarklessDebugChannelV1 {
-	readonly version: 1;
+	readonly version: typeof MARKLESS_DEBUG_CHANNEL_VERSION;
 	readonly containers: readonly MarklessDebugContainerSnapshot[];
 	readonly violations: readonly MarklessDebugViolation[];
 	readonly violationCapacity: 100;
@@ -453,10 +470,10 @@ export function __marklessDebugSetBoundaries(
 	safely(() => moduleRoots.get(root)?.boundaries(boundaries));
 }
 export function __marklessDebugResetForTest(): void {
-	const global = globalThis as typeof globalThis & { __MARKLESS_DEBUG__?: unknown };
+	const global = globalThis as typeof globalThis & Record<string, unknown>;
 	moduleRoots = new WeakMap();
 	latestControls = undefined;
-	delete global.__MARKLESS_DEBUG__;
+	delete global[MARKLESS_DEBUG_GLOBAL_PROPERTY];
 	delete (global as Record<PropertyKey, unknown>)[
 		Symbol.for(MARKLESS_DEBUG_CHANNEL_SYMBOL_KEY)
 	];

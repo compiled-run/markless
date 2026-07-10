@@ -1,4 +1,17 @@
 import type { ConsoleMessage, Page, Request, Response } from 'playwright';
+import { MARKLESS_ROUTER_LINK_ATTRIBUTE } from '@markless/router';
+import {
+	MARKLESS_ARM_SCRIPT_TYPE,
+	MARKLESS_ASYNC_ANCHOR_PREFIX,
+	MARKLESS_ASYNC_CONTAINER_ATTRIBUTE,
+	MARKLESS_BOUNDARY_ATTRIBUTE,
+	MARKLESS_VIEW_SCRIPT_TYPE,
+} from '@markless/serializer';
+import {
+	MARKLESS_DEBUG_CHANNEL_VERSION,
+	MARKLESS_DEBUG_GLOBAL_PROPERTY,
+	MARKLESS_DEBUG_INTERACTION_KIND_NONE,
+} from '@markless/web';
 import type {
 	AnalyzerCandidateActionReport,
 	AnalyzerKnownAuditItem,
@@ -31,38 +44,39 @@ import {
 import { classifyRequest, type RequestClassificationInput } from './requests.ts';
 import type { AnalyzerTextArtifact } from './strip-guarantee.ts';
 
-export async function collectServedBuildArtifacts(page: Page): Promise<AnalyzerTextArtifact[]> {
-	return page.evaluate(async () => {
+export async function collectServedBuildArtifacts(page: Page, servingPrefix: string): Promise<AnalyzerTextArtifact[]> {
+	return page.evaluate(async (servingPrefix) => {
 		const current = new URL(location.href);
 		const urls = [
 			current.href,
 			...performance.getEntriesByType('resource').map((entry) => entry.name),
 		].filter((url, index, all) => {
 			const parsed = new URL(url, current);
-			return all.indexOf(url) === index && (url === current.href || /\/build\/.*\.[cm]?js$/.test(parsed.pathname));
+			return all.indexOf(url) === index && (url === current.href || (parsed.pathname.startsWith(servingPrefix) && /\.[cm]?js$/.test(parsed.pathname)));
 		});
 		return Promise.all(urls.map(async (url) => {
 			const response = await fetch(url);
 			return { path: new URL(url, current).pathname, content: await response.text() };
 		}));
-	});
+	}, servingPrefix);
 }
 
 type SerializedDomNode = { readonly nodeType: number; readonly tagName?: string; readonly data?: string; readonly childNodes: readonly SerializedDomNode[] };
 export async function collectLocatorResolution(page: Page): Promise<LocatorResolutionEvaluation> {
-	const containers = await page.evaluate(() => {
+	const containers = await page.evaluate((protocol) => {
 		const serialize = (node: Node): SerializedDomNode => ({
 			nodeType: node.nodeType,
 			...(node instanceof Element ? { tagName: node.tagName } : {}),
 			...(node.nodeType === Node.COMMENT_NODE ? { data: node.nodeValue ?? '' } : {}),
 			childNodes: [...node.childNodes].map(serialize),
 		});
-		return [...document.querySelectorAll<Element>('[data-async-container]')].map((root, index) => {
-			const view = [...root.querySelectorAll<HTMLScriptElement>('script[type="markless/view"]')]
-				.find((script) => script.closest('[data-async-container]') === root);
+		const containerSelector = `[${protocol.asyncContainerAttribute}]`;
+		return [...document.querySelectorAll<Element>(containerSelector)].map((root, index) => {
+			const view = [...root.querySelectorAll<HTMLScriptElement>(`script[type="${protocol.viewScriptType}"]`)]
+				.find((script) => script.closest(containerSelector) === root);
 			return { containerId: `document-container:${index}`, root: serialize(root), view: JSON.parse(view?.textContent ?? '{}') };
 		});
-	});
+	}, { asyncContainerAttribute: MARKLESS_ASYNC_CONTAINER_ATTRIBUTE, viewScriptType: MARKLESS_VIEW_SCRIPT_TYPE });
 	const details: string[] = [], covered = new Set<any>(), skipped: Array<{ kind: string; reason: string }> = [];
 	const adapter = { childNodes: (node: SerializedDomNode) => node.childNodes, nodeType: (node: SerializedDomNode) => node.nodeType, tagName: (node: SerializedDomNode) => node.tagName, commentData: (node: SerializedDomNode) => node.data };
 	for (const container of containers) {
@@ -212,7 +226,7 @@ export class RequestLedger {
 }
 
 export interface MarklessDebugChannelV1Subset {
-	readonly version: 1;
+	readonly version: typeof MARKLESS_DEBUG_CHANNEL_VERSION;
 	readonly containers: readonly { readonly boundaries: readonly BoundarySnapshot[] }[];
 	explainInteraction(
 		element: Element,
@@ -231,28 +245,30 @@ export async function collectPayloadWiring(
 			eventName,
 		})),
 	);
-	const containers = await page.evaluate((candidateEvents) => {
+	const containers = await page.evaluate((input) => {
+		const { candidateEvents, protocol } = input;
 		const channel = (
-			window as typeof window & { __MARKLESS_DEBUG__?: MarklessDebugChannelV1Subset }
-		).__MARKLESS_DEBUG__;
-		if (!channel || channel.version !== 1)
+			window as typeof window & Record<string, MarklessDebugChannelV1Subset | undefined>
+		)[protocol.debugGlobalProperty];
+		if (!channel || channel.version !== protocol.debugChannelVersion)
 			throw new Error(
-				`Analyzer requires Markless debug channel version 1; received ${channel?.version ?? 'missing'}`,
+				`Analyzer requires Markless debug channel version ${protocol.debugChannelVersion}; received ${channel?.version ?? 'missing'}`,
 			);
-		const containers = [...document.querySelectorAll<Element>('[data-async-container]')].map(
+		const containerSelector = `[${protocol.asyncContainerAttribute}]`;
+		const containers = [...document.querySelectorAll<Element>(containerSelector)].map(
 			(root, containerIndex) => {
 				const containerId = `document-container:${containerIndex}`;
 				const owned = <T extends Element>(selector: string) =>
 					[...root.querySelectorAll<T>(selector)].filter(
-						(element) => element.closest('[data-async-container]') === root,
+						(element) => element.closest(containerSelector) === root,
 					);
-				const viewElement = owned<HTMLScriptElement>('script[type="markless/view"]')[0];
+				const viewElement = owned<HTMLScriptElement>(`script[type="${protocol.viewScriptType}"]`)[0];
 				const armElements = owned<HTMLScriptElement>(
-					'script[type="markless/arm"][data-boundary]',
+					`script[type="${protocol.armScriptType}"][${protocol.boundaryAttribute}]`,
 				);
 				const viewScript = viewElement?.textContent ?? null;
 				const armScripts = armElements.map((script) => ({
-					boundaryId: script.getAttribute('data-boundary') ?? '',
+					boundaryId: script.getAttribute(protocol.boundaryAttribute) ?? '',
 					content: script.textContent ?? '',
 				}));
 				const elements: Element[] = [root];
@@ -284,7 +300,7 @@ export async function collectPayloadWiring(
 					while ((current = all.nextNode())) {
 						if (
 							current.nodeType === Node.COMMENT_NODE &&
-							current.nodeValue === `markless:async:${boundaryId}`
+							current.nodeValue === `${protocol.asyncAnchorPrefix}${boundaryId}`
 						)
 							return count + 1;
 						if (current.nodeType === Node.ELEMENT_NODE) count++;
@@ -303,15 +319,15 @@ export async function collectPayloadWiring(
 				return { containerId, viewScript, armScripts, registrations };
 			},
 		);
-		const roots = [...document.querySelectorAll<Element>('[data-async-container]')];
+		const roots = [...document.querySelectorAll<Element>(containerSelector)];
 		const elements = [...document.querySelectorAll<Element>('*')];
 		const candidateRegistrations = candidateEvents.flatMap(({ documentIndex, eventName }) => {
 			const element = elements[documentIndex];
-			const root = element?.closest<Element>('[data-async-container]');
+			const root = element?.closest<Element>(containerSelector);
 			const containerIndex = root ? roots.indexOf(root) : -1;
 			if (!element || containerIndex < 0) return [];
 			const explanation = channel.explainInteraction(element, eventName);
-			if (explanation.kind === 'none') return [];
+			if (explanation.kind === protocol.noneInteractionKind) return [];
 			return [
 				{
 					containerId: `document-container:${containerIndex}`,
@@ -323,7 +339,15 @@ export async function collectPayloadWiring(
 			];
 		});
 		return { containers, candidateRegistrations };
-	}, candidateEvents);
+	}, {
+		candidateEvents,
+		protocol: {
+			armScriptType: MARKLESS_ARM_SCRIPT_TYPE, asyncAnchorPrefix: MARKLESS_ASYNC_ANCHOR_PREFIX,
+			asyncContainerAttribute: MARKLESS_ASYNC_CONTAINER_ATTRIBUTE, boundaryAttribute: MARKLESS_BOUNDARY_ATTRIBUTE,
+			debugChannelVersion: MARKLESS_DEBUG_CHANNEL_VERSION, debugGlobalProperty: MARKLESS_DEBUG_GLOBAL_PROPERTY,
+			noneInteractionKind: MARKLESS_DEBUG_INTERACTION_KIND_NONE, viewScriptType: MARKLESS_VIEW_SCRIPT_TYPE,
+		},
+	});
 	const { containers: payloadContainers, candidateRegistrations } = containers;
 	const claims = payloadContainers.flatMap(parsePayloadEventClaims);
 	return reconcilePayloadWiring(claims, [
@@ -357,11 +381,11 @@ export async function inventoryCandidates(
 	const raw = await page.locator('*').evaluateAll(
 		(elements, input) => {
 			const channel = (
-				window as typeof window & { __MARKLESS_DEBUG__?: MarklessDebugChannelV1Subset }
-			).__MARKLESS_DEBUG__;
-			if (!channel || channel.version !== 1)
+				window as typeof window & Record<string, MarklessDebugChannelV1Subset | undefined>
+			)[input.debugGlobalProperty];
+			if (!channel || channel.version !== input.debugChannelVersion)
 				throw new Error(
-					`Analyzer requires Markless debug channel version 1; received ${channel?.version ?? 'missing'}`,
+					`Analyzer requires Markless debug channel version ${input.debugChannelVersion}; received ${channel?.version ?? 'missing'}`,
 				);
 			const expected = new Map(
 				input.expectations.map((item) => [item.documentIndex, item.eventNames]),
@@ -372,7 +396,7 @@ export async function inventoryCandidates(
 				const tagName = element.tagName.toLowerCase();
 				const style = getComputedStyle(html);
 				const hidden =
-					style.display === 'none' ||
+					style.display === input.noneInteractionKind ||
 					style.visibility === 'hidden' ||
 					html.hidden ||
 					html.closest('[hidden],[inert]') !== null ||
@@ -400,7 +424,7 @@ export async function inventoryCandidates(
 						const href = html.getAttribute('href') ?? '';
 						if (!href) throw new Error('empty');
 						new URL(href, location.href);
-						classification = html.hasAttribute('data-markless-router-link')
+						classification = html.hasAttribute(input.routerLinkAttribute)
 							? 'markless-link'
 							: 'native-anchor';
 					} catch {
@@ -423,9 +447,13 @@ export async function inventoryCandidates(
 					[...requiredEvents].map((eventName) => {
 						let kind = channel.explainInteraction(element, eventName).kind;
 						let ancestor = element.parentElement;
-						while (kind === 'none' && ancestor && ancestor !== document.body) {
+						while (
+							kind === input.noneInteractionKind &&
+							ancestor &&
+							ancestor !== document.body
+						) {
 							const above = channel.explainInteraction(ancestor, eventName).kind;
-							if (above !== 'none') kind = `delegated:${above}`;
+							if (above !== input.noneInteractionKind) kind = `delegated:${above}`;
 							ancestor = ancestor.parentElement;
 						}
 						return [eventName, { kind }];
@@ -456,7 +484,15 @@ export async function inventoryCandidates(
 				};
 			});
 		},
-		{ expectations, knownAudits, widgetRoles: POLICY_WIDGET_ROLES },
+		{
+			debugChannelVersion: MARKLESS_DEBUG_CHANNEL_VERSION,
+			debugGlobalProperty: MARKLESS_DEBUG_GLOBAL_PROPERTY,
+			expectations,
+			knownAudits,
+			noneInteractionKind: MARKLESS_DEBUG_INTERACTION_KIND_NONE,
+			routerLinkAttribute: MARKLESS_ROUTER_LINK_ATTRIBUTE,
+			widgetRoles: POLICY_WIDGET_ROLES,
+		},
 	);
 	return raw.map((candidate) => ({ ...candidate, violations: evaluateCandidate(candidate) }));
 }
@@ -521,18 +557,18 @@ export async function waitForBoundaryLiveness(
 	pollMs = 50,
 ): Promise<ReturnType<typeof evaluateBoundaries>['results']> {
 	while (true) {
-		const snapshot = await page.evaluate(() => {
+		const snapshot = await page.evaluate((protocol) => {
 			const channel = (
-				window as typeof window & { __MARKLESS_DEBUG__?: MarklessDebugChannelV1Subset }
-			).__MARKLESS_DEBUG__;
+				window as typeof window & Record<string, MarklessDebugChannelV1Subset | undefined>
+			)[protocol.debugGlobalProperty];
 			return {
 				version: channel?.version,
 				boundaries: channel?.containers.flatMap((entry) => entry.boundaries) ?? [],
 			};
-		});
-		if (snapshot.version !== 1)
+		}, { debugGlobalProperty: MARKLESS_DEBUG_GLOBAL_PROPERTY });
+		if (snapshot.version !== MARKLESS_DEBUG_CHANNEL_VERSION)
 			throw new Error(
-				`Analyzer requires Markless debug channel version 1; received ${snapshot.version ?? 'missing'}`,
+				`Analyzer requires Markless debug channel version ${MARKLESS_DEBUG_CHANNEL_VERSION}; received ${snapshot.version ?? 'missing'}`,
 			);
 		const evaluation = evaluateBoundaries(
 			snapshot.boundaries,
@@ -597,6 +633,7 @@ export async function measurePageWindow(input: {
 	actionId: string;
 	actionKind?: PreloadActionKind;
 	origin: string;
+	servingPrefix: string;
 	knownDocumentPaths: readonly string[];
 	run: () => Promise<void>;
 	declaredApi: readonly Pick<MatrixApiContract, 'method' | 'path'>[];
@@ -614,6 +651,7 @@ export async function measurePageWindow(input: {
 	const consoleLedger = new ConsoleLedger(input.page);
 	const requestLedger = new RequestLedger(input.page, {
 		pageOrigin: input.origin,
+		servingPrefix: input.servingPrefix,
 		knownDocumentPaths: input.knownDocumentPaths,
 		declaredApi: input.declaredApi,
 		phase: input.actionId === 'bootstrap' ? 'bootstrap' : 'action',

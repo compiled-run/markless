@@ -112,6 +112,15 @@ importers:
 
   packages/analyzer:
     dependencies:
+      '@markless/router':
+        specifier: workspace:*
+        version: link:../router
+      '@markless/serializer':
+        specifier: workspace:*
+        version: link:../serializer
+      '@markless/web':
+        specifier: workspace:*
+        version: link:../web
       ufo:
         specifier: 'catalog:'
         version: 1.6.4

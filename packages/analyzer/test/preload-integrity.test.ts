@@ -5,11 +5,11 @@ describe('MLA-S1 preload integrity', () => {
 	test('passes when a declared action module was loaded before the interaction', () => {
 		const evaluation = evaluatePreloadIntegrity({
 			baseUrl: 'https://app.test/dashboard/',
-			declaredPreloads: ['/build/editor.js'],
+			declaredPreloads: ['/assets/editor.js'],
 			observedRequests: [
 				{
 					phase: 'bootstrap',
-					url: 'https://app.test/build/editor.js',
+					url: 'https://app.test/assets/editor.js',
 					resourceType: 'script',
 				},
 			],
@@ -26,16 +26,16 @@ describe('MLA-S1 preload integrity', () => {
 	test('fails a bootstrap module load that was not declared up front', () => {
 		const evaluation = evaluatePreloadIntegrity({
 			baseUrl: 'https://app.test/',
-			declaredPreloads: ['/build/declared.js'],
+			declaredPreloads: ['/assets/declared.js'],
 			observedRequests: [
-				{ phase: 'bootstrap', url: '/build/undeclared.js', resourceType: 'script' },
+				{ phase: 'bootstrap', url: '/assets/undeclared.js', resourceType: 'script' },
 			],
 		});
 
 		expect(evaluation.invariant).toMatchObject({
 			status: 'fail',
 			details: [
-				'undeclared module loaded before interaction: https://app.test/build/undeclared.js',
+				'undeclared module loaded before interaction: https://app.test/assets/undeclared.js',
 			],
 		});
 	});
@@ -49,7 +49,7 @@ describe('MLA-S1 preload integrity', () => {
 				{
 					phase: 'action',
 					actionId: 'save-settings',
-					url: 'https://app.test/build/save.js',
+					url: 'https://app.test/assets/save.js',
 					resourceType: 'script',
 				},
 			],
@@ -57,7 +57,7 @@ describe('MLA-S1 preload integrity', () => {
 
 		expect(evaluation.invariant.status).toBe('fail');
 		expect(evaluation.invariant.details).toEqual([
-			'save-settings: module fetched during action without prior preload load: https://app.test/build/save.js',
+			'save-settings: module fetched during action without prior preload load: https://app.test/assets/save.js',
 		]);
 	});
 
@@ -68,15 +68,15 @@ describe('MLA-S1 preload integrity', () => {
 			expectedDestination: { settledAfterRequestCount: 2 },
 			declaredPreloads: [],
 			observedRequests: [
-				{ phase: 'action', actionId: 'open-alpha', url: '/build/alpha.js' },
-				{ phase: 'action', actionId: 'open-alpha', url: '/build/alpha-closure.js' },
+				{ phase: 'action', actionId: 'open-alpha', url: '/assets/alpha.js' },
+				{ phase: 'action', actionId: 'open-alpha', url: '/assets/alpha-closure.js' },
 			],
 		});
 
 		expect(evaluation.invariant.status).toBe('pass');
 		expect(evaluation.navigationLoads).toEqual({
 			count: 2,
-			urls: ['https://app.test/build/alpha.js', 'https://app.test/build/alpha-closure.js'],
+			urls: ['https://app.test/assets/alpha.js', 'https://app.test/assets/alpha-closure.js'],
 		});
 	});
 
@@ -87,29 +87,29 @@ describe('MLA-S1 preload integrity', () => {
 			expectedDestination: { settledAfterRequestCount: 1 },
 			declaredPreloads: [],
 			observedRequests: [
-				{ phase: 'action', actionId: 'open-alpha', url: '/build/alpha.js' },
-				{ phase: 'action', actionId: 'open-alpha', url: '/build/late.js' },
+				{ phase: 'action', actionId: 'open-alpha', url: '/assets/alpha.js' },
+				{ phase: 'action', actionId: 'open-alpha', url: '/assets/late.js' },
 			],
 		});
 
 		expect(evaluation.invariant.details).toEqual([
-			'open-alpha: module fetched after navigation destination settled: https://app.test/build/late.js',
+			'open-alpha: module fetched after navigation destination settled: https://app.test/assets/late.js',
 		]);
 		expect(evaluation.navigationLoads).toEqual({
 			count: 1,
-			urls: ['https://app.test/build/alpha.js'],
+			urls: ['https://app.test/assets/alpha.js'],
 		});
 	});
 
 	test('fails a declared module that was not loaded before the action', () => {
 		const evaluation = evaluatePreloadIntegrity({
 			baseUrl: 'https://app.test/',
-			declaredPreloads: ['/build/lazy.js'],
+			declaredPreloads: ['/assets/lazy.js'],
 			observedRequests: [
 				{
 					phase: 'action',
 					actionId: 'expand-lazy-panel',
-					url: '/build/lazy.js',
+					url: '/assets/lazy.js',
 					resourceType: 'script',
 				},
 			],
@@ -122,13 +122,13 @@ describe('MLA-S1 preload integrity', () => {
 	test('reports declared but never loaded preloads as waste warnings', () => {
 		const evaluation = evaluatePreloadIntegrity({
 			baseUrl: 'https://app.test/',
-			declaredPreloads: ['/build/unused.js'],
+			declaredPreloads: ['/assets/unused.js'],
 			observedRequests: [],
 		});
 
 		expect(evaluation.invariant.status).toBe('pass');
 		expect(evaluation.warnings).toEqual([
-			'declared modulepreload was never loaded: https://app.test/build/unused.js',
+			'declared modulepreload was never loaded: https://app.test/assets/unused.js',
 		]);
 	});
 
@@ -137,17 +137,17 @@ describe('MLA-S1 preload integrity', () => {
 			baseUrl: 'https://app.test/app/index.html',
 			actionKind: 'navigation',
 			expectedDestination: { settledAfterRequestCount: 1 },
-			declaredPreloads: ['../build/chunk.js#declaration'],
+			declaredPreloads: ['../assets/chunk.js#declaration'],
 			observedRequests: [
 				{
 					phase: 'navigation',
-					url: 'https://app.test/build/chunk.js',
+					url: 'https://app.test/assets/chunk.js',
 					resourceType: 'script',
 				},
 				{
 					phase: 'action',
 					actionId: 'navigate',
-					url: '/build/chunk.js',
+					url: '/assets/chunk.js',
 					resourceType: 'script',
 				},
 			],
