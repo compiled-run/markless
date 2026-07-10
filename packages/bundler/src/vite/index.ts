@@ -43,6 +43,7 @@ export type {
 
 export interface MarklessViteOptions extends MarklessRolldownOptions {
 	clientEnvironment?: string;
+	debug?: boolean;
 	serverEnvironment?: string;
 }
 
@@ -92,6 +93,19 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 		},
 		config(config, env) {
 			command = env.command;
+			const debugEnabled = env.command === 'serve' || options.debug === true;
+			const debugDefine = JSON.stringify(debugEnabled);
+			const consumerDebugDefine = config.define?.__MARKLESS_DEBUG_ENABLED__;
+			if (
+				consumerDebugDefine !== undefined &&
+				consumerDebugDefine !== debugDefine &&
+				consumerDebugDefine !== debugEnabled
+			) {
+				throw new Error(
+					'MARKLESS_DEBUG_DEFINE_CONFLICT: __MARKLESS_DEBUG_ENABLED__ is controlled by markless(). Remove the consumer definition or set markless({ debug: true }).',
+				);
+			}
+			config.define = { ...config.define, __MARKLESS_DEBUG_ENABLED__: debugDefine };
 			configDefaults(config, options, rolldownOptions);
 		},
 		configResolved(resolvedConfig) {

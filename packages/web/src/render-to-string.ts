@@ -11,6 +11,7 @@ import {
 	serializeRuntimeStateCells,
 } from '@markless/serializer';
 import type { MarklessExecutionLogMode } from './dev-log.ts';
+import { __marklessDebugBootstrapSource } from './debug-channel.ts';
 import { validateKeyedRepeatPayloadKeys } from './repeat-runtime.ts';
 
 export type SsrRenderOutput = {
@@ -414,6 +415,24 @@ ${graphConditionSource}
 		console.log(summary);
 		d.documentElement?.setAttribute('data-markless-log-summary', summary);
 	}`;
+	const debugSource =
+		typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
+			? `let md; try { md = ${__marklessDebugBootstrapSource()}(r, 'ssr-inline', false); } catch {}`
+			: '';
+	const debugRegistrationSource =
+		typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
+			? `
+		for (const candidate of v.events) {
+			if (candidate.eventName !== t || candidate.eventName === 'visible') continue;
+			const locator = v.locators.find((item) => item.hostNodeId === candidate.hostNodeId);
+			const element = locator && n[locator.index];
+				if (element && md) try { md.record(element, t, { kind: 'inline-resumer', source: 'ssr-inline', hostNodeId: candidate.hostNodeId }); } catch {}
+		}`
+			: '';
+	const debugActivateSource =
+		typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
+			? '\n\tif (md) try { md.activate(); } catch {}'
+			: '';
 
 	return `(() => {
 	const d = document;
@@ -430,6 +449,7 @@ ${executionLogSource}
 	while ((x = w.nextNode())) n.push(x);
 	const h = new Map(v.locators.map((l) => [l.index, l.hostNodeId]));
 	const m = new Map();
+${debugSource}
 ${sharedSyncPolicySource}
 ${localSyncPolicySource}
 	for (const e of v.events) {
@@ -465,8 +485,9 @@ ${
 				await mod.resumeContainerEvent({ root: r, event: e, element: e.target, eventRecord: null });
 			}
 `
-}		}, true);
+}		}, true);${debugRegistrationSource}
 	}
+${debugActivateSource}
 })();`;
 }
 

@@ -44,7 +44,10 @@ export function marklessCsrRowChild(component, props, componentName) {
 			new Error(
 				`MARKLESS_ROW_COMPONENT_INTERACTIVE: <${componentName}> inside a @for row did not produce a serializable root element, so the row cannot render it.`,
 			),
-			{ code: 'MARKLESS_ROW_COMPONENT_INTERACTIVE', componentName },
+			{
+				code: 'MARKLESS_ROW_COMPONENT_INTERACTIVE',
+				componentName,
+			},
 		);
 	}
 	return html;
@@ -64,7 +67,10 @@ export function marklessCsrProjectedChild(component, props, componentName) {
 			new Error(
 				`MARKLESS_PROJECTED_COMPONENT_INTERACTIVE: <${componentName}> projected through another component's children did not produce a serializable root element.`,
 			),
-			{ code: 'MARKLESS_PROJECTED_COMPONENT_INTERACTIVE', componentName },
+			{
+				code: 'MARKLESS_PROJECTED_COMPONENT_INTERACTIVE',
+				componentName,
+			},
 		);
 	}
 	return html;
@@ -106,9 +112,31 @@ export function marklessCsrAttachPropEvent(root, path, eventName, handler) {
 		element.addEventListener(eventName, (event) =>
 			event?.[MARKLESS_CSR_CALLBACK_DISPATCHED] ? undefined : handler(event),
 		);
+		if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__) {
+			return marklessCsrDebugEvent(root, element, eventName);
+		}
 		return;
 	}
 	element.addEventListener(eventName, handler);
+	if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__) {
+		return marklessCsrDebugEvent(root, element, eventName);
+	}
+}
+function marklessCsrDebugEvent(root, element, eventName) {
+	const rootRef = new WeakRef(root),
+		elementRef = new WeakRef(element);
+	return import('../debug-channel.ts')
+		.then((debug) => {
+			const liveRoot = rootRef.deref(),
+				liveElement = elementRef.deref();
+			if (!liveRoot || !liveElement) return;
+			debug.__marklessDebugStartContainer(liveRoot, 'csr');
+			debug.__marklessDebugRecordInteraction(liveRoot, liveElement, eventName, {
+				kind: 'direct-csr',
+				source: 'callback-prop',
+			});
+		})
+		.catch(() => {});
 }
 export function marklessComposeState(state, children) {
 	const childStates = children.map((child) => child.output?.state).filter(Boolean);
@@ -370,7 +398,10 @@ export function marklessCsrAppendChildView(context) {
 // symbol ids, and behavior graph reads take the child prefixes/remaps
 // (CSR twin of marklessSsrPrefixBoundaryArmRecords).
 export function marklessCsrPrefixBoundaryArmRecords(set, child) {
-	const prefixHost = (record) => ({ ...record, hostNodeId: child.hostPrefix + record.hostNodeId });
+	const prefixHost = (record) => ({
+		...record,
+		hostNodeId: child.hostPrefix + record.hostNodeId,
+	});
 	return {
 		locators: (set.locators ?? []).map(prefixHost),
 		events: (set.events ?? []).map((event) => ({
@@ -448,7 +479,11 @@ export function marklessCsrArmizeBoundaries(root, boundaries, streams, indexByEl
 		for (let i = streams.locators.length - 1; i >= 0; i--) {
 			const locator = streams.locators[i];
 			if (locator.index < start || locator.index >= end) continue;
-			armLocators.push({ ...locator, strategy: 'arm-relative', index: locator.index - start });
+			armLocators.push({
+				...locator,
+				strategy: 'arm-relative',
+				index: locator.index - start,
+			});
 			streams.locators.splice(i, 1);
 		}
 		armLocators.sort((a, b) => a.index - b.index);

@@ -209,6 +209,15 @@ export async function resumeFullEventOnly(
 		console.warn('markless: lean resume fell back to full event container');
 	if (input.loadFullResume) {
 		await input.loadFullResume(input);
+		if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
+			await import('../debug-channel.ts')
+				.then((debug) =>
+					debug.__marklessDebugStartContainer(
+						input.root as unknown as Element,
+						'ssr-resume',
+					),
+				)
+				.catch(() => {});
 		return undefined as unknown as EventOnlyResumeContainer;
 	}
 	input.root.__asyncResumeRuntimeStarted = true;

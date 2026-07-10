@@ -63,19 +63,21 @@ describe('fixture framework boundaries', () => {
 		}
 	});
 
-	test('SSR fixture host renders the compiled TSRX artifact directly', async () => {
+	test('SSR fixture host delegates rendering to its additive server entry', async () => {
 		const host = await readFixture('vite-ssr/src/dev-server.ts');
+		const server = await readFixture('vite-ssr/src/server.ts');
 
-		expect(host).toContain('import { renderToString');
-		expect(host).toContain("runner.import('/src/root.tsrx')");
-		expect(host).toContain('renderToString(entry.default');
+		expect(host).toContain('options.devRenderEntry');
+		expect(host).toContain('options.builtRenderEntry');
+		expect(server).toContain("import App from './root.tsrx'");
+		expect(server).toContain('renderToString(App, options)');
 		expect(host).not.toContain('entry-client');
 		expect(host).not.toContain('entry-server');
 		expect(host).not.toContain('renderServerShell');
 		expect(host).not.toContain('render-shell');
 	});
 
-	test('SSR fixture config keeps framework compilation out of app config', async () => {
+	test('SSR fixture config owns an additive server-render environment', async () => {
 		const config = await readFixture('vite-ssr/vite.config.ts');
 
 		expect(config).not.toContain('node:fs');
@@ -83,8 +85,8 @@ describe('fixture framework boundaries', () => {
 		expect(config).not.toContain('ssrLoadModule');
 		expect(config).not.toContain('transformIndexHtml');
 		expect(config).not.toContain('renderServerShell');
-		expect(config).not.toContain('consumer:');
-		expect(config).not.toContain('outDir:');
+		expect(config).toContain("consumer: 'server'");
+		expect(config).toContain("outDir: 'dist/server-render'");
 		expect(config).not.toContain('entryFileNames:');
 		expect(config).toContain("input: 'index.html'");
 		expect(config).not.toContain("symbols: 'src/root.tsrx'");

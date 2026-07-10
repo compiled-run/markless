@@ -27,6 +27,15 @@ type SsrEntry = {
 			}>;
 		};
 	};
+	render?(options?: {
+		readonly resumeModuleUrl?: string;
+		readonly modulePreloads?: ReturnType<typeof planModulePreloads>;
+	}): Promise<string>;
+};
+
+type FixtureSsrHostOptions = {
+	readonly devRenderEntry?: string;
+	readonly builtRenderEntry?: string;
 };
 
 type DevRequest = {
@@ -46,7 +55,7 @@ const REQUEST_LOG_PATH = '/__markless-fixture-requests';
 
 // Fixture-only SSR host. Real apps should provide this from a runtime adapter
 // or meta-framework; the markless bundler only needs SSR artifacts.
-export function fixtureSsrHost(): Plugin {
+export function fixtureSsrHost(options: FixtureSsrHostOptions = {}): Plugin {
 	return {
 		name: 'fixture:markless-ssr-host',
 		config() {
@@ -61,7 +70,11 @@ export function fixtureSsrHost(): Plugin {
 									transport: createServerHotChannel(),
 									handleRequest(request) {
 										runner ??= createServerModuleRunner(environment);
-										return renderDevRequest(runner, request);
+										return renderDevRequest(
+											runner,
+											request,
+											options.devRenderEntry,
+										);
 									},
 								});
 								const close = environment.close.bind(environment);
@@ -114,6 +127,7 @@ export function fixtureSsrHost(): Plugin {
 					const response = await renderPreviewRequest(
 						server.config.root,
 						server.config.build.outDir,
+						options.builtRenderEntry,
 					);
 					await sendResponse(outgoingResponse as DevResponse, response);
 				} catch (error) {
@@ -144,23 +158,24 @@ function createScriptRequestLog() {
 	};
 }
 
-async function renderDevRequest(runner: SsrRunner, request: Request) {
+async function renderDevRequest(runner: SsrRunner, request: Request, renderEntry?: string) {
 	const url = new URL(request.url);
 	if (!isHtmlRoute(url.pathname)) {
 		return new Response('Not found', { status: 404 });
 	}
 
-	const entry = (await runner.import('/src/root.tsrx')) as SsrEntry;
-	return new Response(await renderToString(entry.default), {
+	const entry = (await runner.import(renderEntry ?? '/src/root.tsrx')) as SsrEntry;
+	const html = renderEntry ? await entry.render!(undefined) : await renderToString(entry.default);
+	return new Response(html, {
 		headers: { 'Content-Type': 'text/html;charset=utf-8' },
 	});
 }
 
-async function renderPreviewRequest(root: string, outDir: string) {
+async function renderPreviewRequest(root: string, outDir: string, renderEntry?: string) {
 	const dist = resolve(root, outDir);
 	const resumeModuleUrl = await readClientResumeModuleUrl(dist);
 	const entry = (await import(
-		`${pathToFileURL(resolve(dist, 'server/root.js')).href}?preview=${Date.now()}`
+		`${pathToFileURL(resolve(dist, renderEntry ?? 'server/root.js')).href}?preview=${Date.now()}`
 	)) as SsrEntry;
 	const modulePreloads = planModulePreloads({
 		base: '/build/',
@@ -171,7 +186,11 @@ async function renderPreviewRequest(root: string, outDir: string) {
 		],
 	});
 
-	return new Response(await renderToString(entry.default, { resumeModuleUrl, modulePreloads }), {
+	const renderOptions = { resumeModuleUrl, modulePreloads };
+	const html = renderEntry
+		? await entry.render!(renderOptions)
+		: await renderToString(entry.default, renderOptions);
+	return new Response(html, {
 		headers: { 'Content-Type': 'text/html;charset=utf-8' },
 	});
 }
