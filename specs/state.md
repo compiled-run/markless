@@ -13,3 +13,6 @@ Legacy entries are preserved in [specs/state-archive.md](./state-archive.md).
 ## Recent Events
 
 - 2026-07-10T00:00:00.000Z state-ledger-cutover done Cut over implementation state tracking to the append-only JSONL ledger.
+- 2026-07-10T01:52:03.088Z workflow-context-optimization/U1 done AGENTS.md 18.3KB->850B; six per-workflow guidance files; CLAUDE.md/skills to pointers
+- 2026-07-10T01:52:03.228Z workflow-context-optimization/U2 done state ledger CLI live: append-only specs/state.jsonl, archive frozen, generated projection
+- 2026-07-10T01:52:03.370Z workflow-context-optimization/U3 done fable-codex: orchestrator 8.9KB->2.4KB, crew maxRetries 0 default, verify ledger events

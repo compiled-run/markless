@@ -1,1 +1,4 @@
 {"ts":"2026-07-10T00:00:00.000Z","goal":"state-ledger-cutover","unit":null,"status":"done","summary":"Cut over implementation state tracking to the append-only JSONL ledger.","refs":["specs/state-archive.md"]}
+{"ts":"2026-07-10T01:52:03.088Z","goal":"workflow-context-optimization","unit":"U1","status":"done","summary":"AGENTS.md 18.3KB->850B; six per-workflow guidance files; CLAUDE.md/skills to pointers","refs":[]}
+{"ts":"2026-07-10T01:52:03.228Z","goal":"workflow-context-optimization","unit":"U2","status":"done","summary":"state ledger CLI live: append-only specs/state.jsonl, archive frozen, generated projection","refs":[]}
+{"ts":"2026-07-10T01:52:03.370Z","goal":"workflow-context-optimization","unit":"U3","status":"done","summary":"fable-codex: orchestrator 8.9KB->2.4KB, crew maxRetries 0 default, verify ledger events","refs":[]}
