@@ -1,5 +1,7 @@
 declare const __MARKLESS_DEBUG_ENABLED__: boolean;
 
+export const MARKLESS_DEBUG_CHANNEL_SYMBOL_KEY = 'markless.debug.channel.v1.bootstrap';
+
 export type MarklessDebugContainerId = string;
 export type MarklessDebugRootKey = string;
 export type MarklessDebugElementKey = string;
@@ -439,7 +441,7 @@ export function __marklessDebugRegisterRouter(
 				Symbol.for('markless.debug.channel.v1.router-sources')
 			] ??= new Set()) as Set<MarklessDebugRouterDelegationInteraction['source']>).add(source);
 			const inlineControls = (globalThis as Record<PropertyKey, unknown>)[
-				Symbol.for('markless.debug.channel.v1.bootstrap')
+				Symbol.for(MARKLESS_DEBUG_CHANNEL_SYMBOL_KEY)
 			] as Pick<RootControls, 'router'> | undefined;
 			(latestControls ?? inlineControls)?.router(source);
 		});
@@ -456,7 +458,7 @@ export function __marklessDebugResetForTest(): void {
 	latestControls = undefined;
 	delete global.__MARKLESS_DEBUG__;
 	delete (global as Record<PropertyKey, unknown>)[
-		Symbol.for('markless.debug.channel.v1.bootstrap')
+		Symbol.for(MARKLESS_DEBUG_CHANNEL_SYMBOL_KEY)
 	];
 	delete (global as Record<PropertyKey, unknown>)[
 		Symbol.for('markless.debug.channel.v1.router-sources')

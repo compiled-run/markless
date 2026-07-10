@@ -9,9 +9,9 @@ import {
 	type RouteDocumentModule,
 	type RouteUpdate,
 } from './route-state.ts';
+import { MARKLESS_ROUTER_LINK_ATTRIBUTE } from './protocol-constants.ts';
 
 const STARTED = '__marklessRouterSpaNavigationStarted';
-const LINK_ATTRIBUTE = 'data-markless-router-link';
 const REPLACE_ATTRIBUTE = 'data-markless-router-replace';
 const SCROLL_ATTRIBUTE = 'data-markless-router-scroll';
 const LINK_INFO = '__marklessRouterLink';
@@ -229,7 +229,11 @@ function handleLinkClick(
 	}
 
 	const anchor = sourceAnchor(event);
-	if (!anchor || !anchor.hasAttribute(LINK_ATTRIBUTE) || !isEligibleLink(anchor)) {
+	if (
+		!anchor ||
+		!anchor.hasAttribute(MARKLESS_ROUTER_LINK_ATTRIBUTE) ||
+		!isEligibleLink(anchor)
+	) {
 		return;
 	}
 

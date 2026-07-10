@@ -377,6 +377,9 @@ importers:
       '@markless/bundler':
         specifier: workspace:*
         version: link:../bundler
+      '@markless/serializer':
+        specifier: workspace:*
+        version: link:../serializer
       '@markless/web':
         specifier: workspace:*
         version: link:../web

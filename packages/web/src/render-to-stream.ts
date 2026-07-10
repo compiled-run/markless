@@ -1,4 +1,11 @@
-import { serializeRuntimeAsyncSnapshots } from '@markless/serializer';
+import {
+	MARKLESS_ARM_SCRIPT_TYPE,
+	MARKLESS_ASYNC_ANCHOR_PREFIX,
+	MARKLESS_ASYNC_CONTAINER_ATTRIBUTE,
+	MARKLESS_ASYNC_END_ANCHOR_PREFIX,
+	MARKLESS_BOUNDARY_ATTRIBUTE,
+	serializeRuntimeAsyncSnapshots,
+} from '@markless/serializer';
 import {
 	MARKLESS_PENDING_MIN_VISIBLE_MS,
 	MARKLESS_REVEAL_TRAIN_CADENCE_MS,
@@ -218,8 +225,8 @@ function renderArmAppend(
 	arm: PendingArm,
 	nonce: string | undefined,
 ): string {
-	const startAnchor = `<!--markless:async:${arm.boundaryId}-->`;
-	const endAnchor = `<!--/markless:async:${arm.boundaryId}-->`;
+	const startAnchor = `<!--${MARKLESS_ASYNC_ANCHOR_PREFIX}${arm.boundaryId}-->`;
+	const endAnchor = `<!--${MARKLESS_ASYNC_END_ANCHOR_PREFIX}${arm.boundaryId}-->`;
 	const html = output.html;
 	const start = html.indexOf(startAnchor);
 	const end = html.indexOf(endAnchor);
@@ -247,7 +254,7 @@ function renderArmAppend(
 
 	return (
 		`<template m:arm="${escapeAttribute(arm.boundaryId)}">${armHtml}</template>` +
-		`<script type="markless/arm" data-boundary="${escapeAttribute(arm.boundaryId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(armRecords))}</script>` +
+		`<script type="${MARKLESS_ARM_SCRIPT_TYPE}" ${MARKLESS_BOUNDARY_ATTRIBUTE}="${escapeAttribute(arm.boundaryId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(armRecords))}</script>` +
 		`<script type="markless/state-patch" data-graph-node="${escapeAttribute(arm.graphNodeId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(patch))}</script>` +
 		`<script${nonceAttribute}>__mArm(${escapeScriptJson(revealArguments)})</script>`
 	);
@@ -294,8 +301,8 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 	const debugActivate = debugEnabled ? 'if (md) try { md.activate(); } catch {}' : '';
 	const wake = resumeModuleUrl
 		? `
-		const rec = d.querySelector('script[type="markless/arm"][data-boundary="' + id + '"]');
-		const r = s.parentElement && s.parentElement.closest && s.parentElement.closest('[data-async-container]');
+		const rec = d.querySelector('script[type="${MARKLESS_ARM_SCRIPT_TYPE}"][${MARKLESS_BOUNDARY_ATTRIBUTE}="' + id + '"]');
+		const r = s.parentElement && s.parentElement.closest && s.parentElement.closest('[${MARKLESS_ASYNC_CONTAINER_ATTRIBUTE}]');
 		if (!rec || !r) return;
 			const records = JSON.parse(rec.textContent || 'null') || {};
 			const names = new Set((records.events || []).map((x) => x.eventName));
@@ -322,11 +329,11 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 	const w = d.createTreeWalker(d.body, 128);
 	let s, e, n;
 	while ((n = w.nextNode())) {
-		if (n.data === 'markless:async:' + id) s = n;
-		else if (n.data === '/markless:async:' + id) { e = n; break; }
+		if (n.data === '${MARKLESS_ASYNC_ANCHOR_PREFIX}' + id) s = n;
+		else if (n.data === '${MARKLESS_ASYNC_END_ANCHOR_PREFIX}' + id) { e = n; break; }
 	}
 	if (!s || !e || s.parentNode !== e.parentNode) throw new Error('MARKLESS_STREAM_ARM_ANCHORS_MISSING: ' + id);
-	const root = s.parentElement && s.parentElement.closest && s.parentElement.closest('[data-async-container]');
+	const root = s.parentElement && s.parentElement.closest && s.parentElement.closest('[${MARKLESS_ASYNC_CONTAINER_ATTRIBUTE}]');
 	if (root && root.__asyncResumeRuntimeStarted) { tpl.remove(); return; }
 	while (s.nextSibling && s.nextSibling !== e) s.parentNode.removeChild(s.nextSibling);
 	s.parentNode.insertBefore(tpl.content, e);
