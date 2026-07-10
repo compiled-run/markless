@@ -1,6 +1,12 @@
 import { EventEmitter } from 'node:events';
 import { describe, expect, test, vi } from 'vitest';
-import { ConsoleLedger, RequestLedger, performMatrixAction } from '../src/playwright.ts';
+import {
+	collectLocatorResolution,
+	collectServedBuildArtifacts,
+	ConsoleLedger,
+	RequestLedger,
+	performMatrixAction,
+} from '../src/playwright.ts';
 
 describe('Playwright adapter', () => {
 	test('captures console and page errors through a page event surface', () => {
@@ -47,5 +53,24 @@ describe('Playwright adapter', () => {
 		);
 		expect(page.getByTestId).toHaveBeenCalledWith('primary-control');
 		expect(click).toHaveBeenCalledOnce();
+	});
+
+	test('collects served HTML and build chunks from the page', async () => {
+		const artifacts = [{ path: '/index.html', content: '<main />' }, { path: '/build/a.js', content: 'export{}' }];
+		const page = { evaluate: vi.fn(async () => artifacts) };
+		expect(await collectServedBuildArtifacts(page as never)).toEqual(artifacts);
+	});
+
+	test('adapts a serialized page Document to the locator core', async () => {
+		const page = {
+			evaluate: vi.fn(async () => [{
+				containerId: 'document-container:0',
+				root: { nodeType: 1, tagName: 'MAIN', childNodes: [] },
+				view: { locators: [{ hostNodeId: 'root', strategy: 'dom-order', index: 0, tagName: 'main' }], events: [], domUpdates: [], behaviors: [], elementHandles: [], keyedRepeats: [], branches: [], asyncBoundaries: [] },
+			}]),
+		};
+		const result = await collectLocatorResolution(page as never);
+		expect(result.invariant.status).toBe('pass');
+		expect(result.coverage.covered).toEqual(['dom-order-path']);
 	});
 });

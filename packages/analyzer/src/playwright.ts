@@ -12,6 +12,11 @@ import type {
 import { executedJavaScriptBytes, type V8CoverageEntry } from './coverage.ts';
 import { evaluateBoundaries, evaluateCandidate, type BoundarySnapshot } from './invariants.ts';
 import {
+	evaluateLocatorResolution,
+	locatorPlansFromView,
+	type LocatorResolutionEvaluation,
+} from './locator-resolution.ts';
+import {
 	evaluatePreloadIntegrity,
 	type PreloadActionKind,
 	type PreloadIntegrityEvaluation,
@@ -24,6 +29,51 @@ import {
 	type PayloadWiringEvaluation,
 } from './payload-wiring.ts';
 import { classifyRequest, type RequestClassificationInput } from './requests.ts';
+import type { AnalyzerTextArtifact } from './strip-guarantee.ts';
+
+export async function collectServedBuildArtifacts(page: Page): Promise<AnalyzerTextArtifact[]> {
+	return page.evaluate(async () => {
+		const current = new URL(location.href);
+		const urls = [
+			current.href,
+			...performance.getEntriesByType('resource').map((entry) => entry.name),
+		].filter((url, index, all) => {
+			const parsed = new URL(url, current);
+			return all.indexOf(url) === index && (url === current.href || /\/build\/.*\.[cm]?js$/.test(parsed.pathname));
+		});
+		return Promise.all(urls.map(async (url) => {
+			const response = await fetch(url);
+			return { path: new URL(url, current).pathname, content: await response.text() };
+		}));
+	});
+}
+
+type SerializedDomNode = { readonly nodeType: number; readonly tagName?: string; readonly data?: string; readonly childNodes: readonly SerializedDomNode[] };
+export async function collectLocatorResolution(page: Page): Promise<LocatorResolutionEvaluation> {
+	const containers = await page.evaluate(() => {
+		const serialize = (node: Node): SerializedDomNode => ({
+			nodeType: node.nodeType,
+			...(node instanceof Element ? { tagName: node.tagName } : {}),
+			...(node.nodeType === Node.COMMENT_NODE ? { data: node.nodeValue ?? '' } : {}),
+			childNodes: [...node.childNodes].map(serialize),
+		});
+		return [...document.querySelectorAll<Element>('[data-async-container]')].map((root, index) => {
+			const view = [...root.querySelectorAll<HTMLScriptElement>('script[type="markless/view"]')]
+				.find((script) => script.closest('[data-async-container]') === root);
+			return { containerId: `document-container:${index}`, root: serialize(root), view: JSON.parse(view?.textContent ?? '{}') };
+		});
+	});
+	const details: string[] = [], covered = new Set<any>(), skipped: Array<{ kind: string; reason: string }> = [];
+	const adapter = { childNodes: (node: SerializedDomNode) => node.childNodes, nodeType: (node: SerializedDomNode) => node.nodeType, tagName: (node: SerializedDomNode) => node.tagName, commentData: (node: SerializedDomNode) => node.data };
+	for (const container of containers) {
+		const parsed = locatorPlansFromView(container.view);
+		const result = evaluateLocatorResolution(parsed.plans, [container.root], adapter, parsed.skipped);
+		details.push(...result.invariant.details.map((detail) => `${container.containerId}: ${detail}`));
+		for (const kind of result.coverage.covered) covered.add(kind);
+		skipped.push(...result.coverage.skipped.map((entry) => ({ ...entry, reason: `${container.containerId}: ${entry.reason}` })));
+	}
+	return { invariant: { id: 'MLA-S3-LOCATOR-RESOLUTION', status: details.length ? 'fail' : 'pass', details }, coverage: { covered: [...covered].sort(), skipped } };
+}
 
 export interface ConsoleLedgerEntry {
 	readonly source: 'console.error' | 'pageerror';
