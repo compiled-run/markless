@@ -3,7 +3,7 @@ import { defineConfig } from 'vite';
 import { markless } from '../../../core/src/vite.ts';
 import { fixtureSsrHost } from './src/dev-server.ts';
 
-export default defineConfig(({ command }) => ({
+export default defineConfig(({ command, mode }) => ({
 	build:
 		command === 'build'
 			? {
@@ -21,6 +21,21 @@ export default defineConfig(({ command }) => ({
 				},
 			},
 		},
+		ssrRender: {
+			consumer: 'server',
+			build: {
+				outDir: 'dist/server-render',
+				rolldownOptions: {
+					input: fileURLToPath(new URL('./src/server.ts', import.meta.url)),
+				},
+			},
+		},
 	},
-	plugins: [markless(), fixtureSsrHost()],
+	plugins: [
+		markless({ debug: mode === 'debug-channel' }),
+		fixtureSsrHost({
+			devRenderEntry: '/src/server.ts',
+			builtRenderEntry: 'server-render/server.js',
+		}),
+	],
 }));

@@ -6,6 +6,7 @@ export function isMarklessPublicThenable(value) {
 	);
 }
 export function attachMarklessPublicStaticEvents(root, graph, loadSymbolForEvent, staticEvents) {
+	let debugRegistrations;
 	for (const [path, eventName, symbolIds] of staticEvents) {
 		const element = nodeAtPath(root, path);
 		if (!element?.addEventListener) continue;
@@ -18,7 +19,28 @@ export function attachMarklessPublicStaticEvents(root, graph, loadSymbolForEvent
 			}
 			graph.flush();
 		});
+		if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__) {
+			const rootRef = new WeakRef(root),
+				elementRef = new WeakRef(element);
+			(debugRegistrations ??= []).push(
+				import('../debug-channel.ts')
+					.then((debug) => {
+						const liveRoot = rootRef.deref(),
+							liveElement = elementRef.deref();
+						if (!liveRoot || !liveElement) return;
+						debug.__marklessDebugStartContainer(liveRoot, 'csr');
+						debug.__marklessDebugRecordInteraction(liveRoot, liveElement, eventName, {
+							kind: 'direct-csr',
+							source: 'static-event',
+						});
+					})
+					.catch(() => {}),
+			);
+		}
 	}
+	return typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
+		? Promise.all(debugRegistrations ?? [])
+		: undefined;
 }
 export function nodeAtPath(root, path) {
 	let node = root;

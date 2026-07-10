@@ -8,7 +8,9 @@
       "command": "npx",
       "args": [
         "-y",
-        "chrome-devtools-mcp@latest"
+        "chrome-devtools-mcp@1.5.0",
+        "--headless",
+        "--isolated"
       ],
       "type": "stdio"
     }

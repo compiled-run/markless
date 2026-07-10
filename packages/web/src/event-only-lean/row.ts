@@ -91,6 +91,12 @@ export async function resumeScalarRowEventFromPayloadDocument(
 		));
 	}
 	await graph.flush();
+	if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
+		await import('../debug-channel.ts')
+			.then((debug) =>
+				debug.__marklessDebugStartContainer(input.root as unknown as Element, 'ssr-lean'),
+			)
+			.catch(() => {});
 	return {
 		graph,
 		view: {
@@ -109,6 +115,12 @@ export async function resumeScalarRowEventFromPayloadDocument(
 		},
 		dispose() {
 			delete input.root.__marklessEventOnlyGraph;
+			if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
+				void import('../debug-channel.ts')
+					.then((debug) =>
+						debug.__marklessDebugDisposeContainer(input.root as unknown as Element),
+					)
+					.catch(() => {});
 		},
 	};
 }

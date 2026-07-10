@@ -16,6 +16,16 @@ export async function renderCsrRuntime(input: {
 	readonly options: CsrRenderOptions;
 }): Promise<CsrRenderContainer> {
 	const { output, options } = input;
+	if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
+		void import('./debug-channel.ts')
+			.then((debug) =>
+				debug.__marklessDebugStartContainer(
+					output.root as unknown as Element,
+					'csr',
+					false,
+				),
+			)
+			.catch(() => {});
 	const state = output.state ?? emptyStatePayload();
 	const view = output.view ?? emptyViewPayload();
 	const loadSymbol = withCsrCallbackSymbols(

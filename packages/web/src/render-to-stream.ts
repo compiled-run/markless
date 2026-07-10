@@ -11,6 +11,7 @@ import {
 	type SsrRenderable,
 	type SsrRenderOutput,
 } from './render-to-string.ts';
+import { __marklessDebugBootstrapSource } from './debug-channel.ts';
 
 // D5/D6 out-of-order streaming (T107, owner-ratified three-layer semantics):
 // the shell flushes with @pending arms in place of unsettled boundaries and
@@ -270,19 +271,44 @@ function renderArmAppend(
 // failure fails loudly in its own task and neither wedges the train nor
 // holds dependents hostage — boundaries stay independent (D2).
 function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | undefined): string {
+	const debugEnabled =
+		typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__;
+	const debugSetup = debugEnabled
+		? `let md; try { md = ${__marklessDebugBootstrapSource()}(r, 'ssr-inline', false); } catch {}
+		const nodes = [r];
+		const walk = d.createTreeWalker(r, 129);
+		let offset = -1, node;
+		while ((node = walk.nextNode())) {
+			if (node === s) offset = nodes.length;
+			if (node.nodeType === 1) nodes.push(node);
+		}`
+		: '';
+	const debugRegistration = debugEnabled
+		? `if (md) for (const event of records.events || []) {
+			if (event.eventName !== t) continue;
+			const locator = (records.locators || []).find((item) => item.hostNodeId === event.hostNodeId);
+			const element = locator && nodes[offset + locator.index];
+			if (element) try { md.record(element, t, { kind: 'inline-resumer', source: 'streamed-arm', hostNodeId: event.hostNodeId }); } catch {}
+		}`
+		: '';
+	const debugActivate = debugEnabled ? 'if (md) try { md.activate(); } catch {}' : '';
 	const wake = resumeModuleUrl
 		? `
 		const rec = d.querySelector('script[type="markless/arm"][data-boundary="' + id + '"]');
 		const r = s.parentElement && s.parentElement.closest && s.parentElement.closest('[data-async-container]');
 		if (!rec || !r) return;
-		const names = new Set((JSON.parse(rec.textContent || 'null')?.events || []).map((x) => x.eventName));
-		for (const t of names) {
+			const records = JSON.parse(rec.textContent || 'null') || {};
+			const names = new Set((records.events || []).map((x) => x.eventName));
+			${debugSetup}
+			for (const t of names) {
 			r.addEventListener(t, async (e) => {
 				if (r.__asyncResumeRuntimeStarted) return;
 				const mod = await import(${JSON.stringify(resumeModuleUrl)});
 				await mod.resumeContainerEvent({ root: r, event: e, element: e.target, eventRecord: null });
 			}, true);
-		}`
+				${debugRegistration}
+			}
+			${debugActivate}`
 		: '';
 	const source = `globalThis.__mArm ||= (() => {
 	const d = document;

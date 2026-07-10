@@ -17,6 +17,8 @@ For direct interactive user requests, read `.ruler/skills/markless-implementatio
 The progress ledger is CLI-managed: use `pnpm state append|status|tail|project`.
 Never read `specs/state-archive.md` or bulk history; use the CLI.
 
+Production package folders: `packages/analyzer`, `packages/bundler`, `packages/cli`, `packages/compiler`, `packages/core`, `packages/router`, `packages/runtime`, `packages/serializer`, `packages/typescript-plugin`, `packages/vitest-browser`, and `packages/web`.
+
 
 
 <!-- Source: .ruler/claude.md -->

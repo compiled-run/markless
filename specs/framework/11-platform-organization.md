@@ -44,6 +44,10 @@ platform-specific code grows, split by ownership rather than public API ambition
 - `packages/core` remains the curated public package. It may re-export stable
   platform entry points after they are proven, but internal platform packages are
   not public API by default.
+- `packages/analyzer` owns host-agnostic browser QA contracts and evaluation,
+  with Playwright-specific collection and crawl helpers isolated behind its
+  `playwright` export path. App-owned matrices, policies, budgets, baselines, and
+  gate wiring remain outside the package.
 
 The preferred future production platform packages are:
 

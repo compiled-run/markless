@@ -56,6 +56,11 @@ export function createEventWiring(input: {
 }) {
 	const eventRecords = new WeakMap<ResumeDomElement, Map<string, ResumeEventRecord>>();
 	const rowEventRecords: ResumeRowEventRecords = new WeakMap();
+	let debugRegistrations: Set<Promise<unknown>> | undefined;
+	const trackDebug = (pending: Promise<unknown>) => {
+		(debugRegistrations ??= new Set()).add(pending);
+		void pending.finally(() => debugRegistrations?.delete(pending));
+	};
 	let runPolicy:
 		| undefined
 		| ((
@@ -71,6 +76,19 @@ export function createEventWiring(input: {
 		}
 		byName.set(record.eventName, record);
 		input.eventTypes.add(record.eventName);
+		if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
+			trackDebug(
+				recordDebugInteraction(
+					input.root as unknown as Element,
+					element as unknown as Element,
+					record.eventName,
+					{
+						kind: 'resume-record',
+						hostNodeId: record.hostNodeId,
+						symbolIds: record.symbolIds,
+					},
+				),
+			);
 	};
 	const addRowEvent = (host: ResumeDomElement, match: ResumeRowEventMatch) => {
 		let byName = rowEventRecords.get(host);
@@ -80,6 +98,19 @@ export function createEventWiring(input: {
 		}
 		byName.set(match.rowEvent.eventName, match);
 		input.eventTypes.add(match.rowEvent.eventName);
+		if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
+			trackDebug(
+				recordDebugInteraction(
+					input.root as unknown as Element,
+					host as unknown as Element,
+					match.rowEvent.eventName,
+					{
+						kind: 'row-record',
+						repeatId: match.repeat.id,
+						symbolIds: match.rowEvent.symbolIds,
+					},
+				),
+			);
 	};
 	async function prepareSyncPolicy(
 		viewEvents: ReadonlyArray<ResumeEventRecord>,
@@ -229,8 +260,24 @@ export function createEventWiring(input: {
 		addEventRecord,
 		addRowEvent,
 		prepareSyncPolicy,
+		...(typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
+			? { whenDebugRegistered: () => Promise.all(debugRegistrations ?? []) }
+			: {}),
 		dispatch,
 	};
+}
+
+function recordDebugInteraction(root: Element, element: Element, eventName: string, record: any) {
+	const rootRef = new WeakRef(root),
+		elementRef = new WeakRef(element);
+	return import('./debug-channel.ts')
+		.then((debug) => {
+			const liveRoot = rootRef.deref(),
+				liveElement = elementRef.deref();
+			if (liveRoot && liveElement)
+				debug.__marklessDebugRecordInteraction(liveRoot, liveElement, eventName, record);
+		})
+		.catch(() => {});
 }
 
 function marklessExecutionLogSnapshot(): Set<string> | undefined {

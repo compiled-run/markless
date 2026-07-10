@@ -1,6 +1,5 @@
 [mcp_servers.grep]
 url = "https://mcp.grep.app"
-type = "remote"
 
 [mcp_servers.chrome-devtools]
 command = "npx"
@@ -10,4 +9,3 @@ args = [
   "--headless",
   "--isolated"
 ]
-type = "stdio"

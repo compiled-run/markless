@@ -2,6 +2,7 @@ import type { PageProps } from '../../index.ts';
 import { buildRouteManifestFromFileIds, matchRouteManifest } from '../../route-manifest.ts';
 import { renderToString, type ModulePreloadInput } from '@markless/web/render-to-string';
 import { renderToStream } from '@markless/web/render-to-stream';
+import { __marklessDebugBootstrapSource } from '../../../../web/src/debug-channel.ts';
 
 export interface ServerEntryOptions {
 	readonly navigationEntryPath?: string;
@@ -404,7 +405,26 @@ function renderRouteScript(file: string): string {
 }
 
 function renderLinkBridgeScript(resumeEntryPath: string): string {
-	return `<script data-markless-router-link-resumer>${escapeInlineScript(`(() => {
+	const debugBootstrap =
+		typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
+			? `<script data-markless-router-debug-bootstrap>${escapeInlineScript(`(() => {
+	const d = document;
+	const s = d.currentScript;
+	const r = s && s.closest('[data-async-container]');
+	if (!r) return;
+	try { globalThis[Symbol.for('markless.debug.channel.v1.bootstrap')] = ${__marklessDebugBootstrapSource()}(r, 'ssr-inline', false); } catch {}
+})();`)}</script>`
+			: '';
+	const debugRegistration =
+		typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
+			? `
+	try {
+		const key = Symbol.for('markless.debug.channel.v1.bootstrap');
+		const md = globalThis[key];
+		if (md) { md.router('ssr-link-bridge'); md.activate(); }
+	} catch {}`
+			: '';
+	return `${debugBootstrap}<script data-markless-router-link-resumer>${escapeInlineScript(`(() => {
 	const d = document;
 	const s = d.currentScript;
 	const r = s && s.closest('[data-async-container]');
@@ -454,7 +474,7 @@ function renderLinkBridgeScript(resumeEntryPath: string): string {
 			setTimeout(() => { throw error; });
 			location.assign(url.href);
 		}
-	}, true);
+	}, true);${debugRegistration}
 })();`)}</script>`;
 }
 

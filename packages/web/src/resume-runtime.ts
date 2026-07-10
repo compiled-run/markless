@@ -26,6 +26,22 @@ export function createResumeRuntime(
 	prepared: ResumePreparedCore,
 ): ResumeRuntime {
 	const { elementsByHostId, elementHandles } = prepared;
+	let disposed = false,
+		debugModule: typeof import('./debug-channel.ts') | undefined;
+	const debugRoot =
+		typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
+			? new WeakRef(input.root as unknown as Element)
+			: undefined;
+	const debugReady = debugRoot
+		? import('./debug-channel.ts')
+				.then((debug) => {
+					debugModule = debug;
+					const root = debugRoot.deref();
+					if (!disposed && root)
+						debug.__marklessDebugStartContainer(root, 'ssr-resume', false);
+				})
+				.catch(() => {})
+		: undefined;
 	const eventTypes = new Set<string>(),
 		disposedHosts = new Set<string>();
 	const ignoredDisposedEventTargets = new WeakSet<ResumeDomElement>();
@@ -59,7 +75,14 @@ export function createResumeRuntime(
 		hostSubscriptionReleases.set(hostNodeId, releases);
 	};
 	const storeContainerSubscription = (release: () => void) => {
-		if (typeof release === 'function') containerSubscriptionReleases.push(release);
+		if (typeof release !== 'function') return;
+		if (
+			typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' &&
+			__MARKLESS_DEBUG_ENABLED__ &&
+			disposed
+		)
+			release();
+		else containerSubscriptionReleases.push(release);
 	};
 	async function getEvents(): Promise<EventWiring> {
 		if (events) return events;
@@ -89,6 +112,16 @@ export function createResumeRuntime(
 			if (eventRecord.eventName === 'visible') continue;
 			const element = elementsByHostId.get(eventRecord.hostNodeId);
 			if (element) events.addEventRecord(element, eventRecord);
+			else if (
+				typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' &&
+				__MARKLESS_DEBUG_ENABLED__
+			)
+				void debugReady?.then(() =>
+					debugModule?.__marklessDebugRecordViolation({
+						code: 'MARKLESS_DEBUG_EVENT_HOST_MISSING',
+						message: `Debug registration skipped missing event host ${eventRecord.hostNodeId}.`,
+					}),
+				);
 		}
 		return events;
 	}
@@ -240,6 +273,14 @@ export function createResumeRuntime(
 		if (element) {
 			if (options.ignoreFutureEvents) ignoredDisposedEventTargets.add(element);
 			events?.eventRecords.delete(element);
+			if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__) {
+				const root = debugRoot?.deref();
+				if (root && debugModule)
+					debugModule.__marklessDebugInvalidateElement(
+						root,
+						element as unknown as Element,
+					);
+			}
 			elementsByHostId.delete(hostNodeId);
 		}
 		elementHandles.deleteHost(hostNodeId);
@@ -248,6 +289,10 @@ export function createResumeRuntime(
 		hostSubscriptionReleases.delete(hostNodeId);
 	}
 	function dispose(): void {
+		if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__) {
+			if (disposed) return;
+			disposed = true;
+		}
 		for (const eventType of eventTypes)
 			input.root.removeEventListener?.(eventType, dispatchCaptured, { capture: true });
 		input.root.removeEventListener?.(SHARED_PATCH_EVENT_TYPE, receiveSharedPatch, {
@@ -256,6 +301,15 @@ export function createResumeRuntime(
 		behaviorRuntime?.disconnect();
 		for (const hostNodeId of Array.from(elementsByHostId.keys())) disposeHost(hostNodeId);
 		for (const release of containerSubscriptionReleases.splice(0)) release();
+		if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__) {
+			const root = debugRoot?.deref();
+			if (root && debugModule) debugModule.__marklessDebugDisposeContainer(root);
+			else
+				void debugReady?.then(() => {
+					const lateRoot = debugRoot?.deref();
+					if (lateRoot) debugModule?.__marklessDebugDisposeContainer(lateRoot);
+				});
+		}
 	}
 	function viewHasBranchArmBehaviors(view: ResumeRuntimeInput['view']): boolean {
 		return (view.branches ?? []).some((branch) =>
@@ -292,6 +346,90 @@ export function createResumeRuntime(
 			receiveSharedPatch,
 			sharedPatchEventType: SHARED_PATCH_EVENT_TYPE,
 		});
+		if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__) {
+			if (disposed) return;
+			await debugReady;
+			await events?.whenDebugRegistered?.();
+			if (disposed) return;
+			const root = debugRoot?.deref();
+			if (!root || !debugModule) return;
+			debugModule.__marklessDebugActivateContainer(root);
+			debugModule.__marklessDebugSetBoundaries(root, debugBoundarySnapshots());
+			for (const boundary of asyncBoundariesById.values()) {
+				for (const read of boundary.asyncReads) {
+					storeContainerSubscription(
+						input.graph.subscribe({
+							id: `debug-boundary:${boundary.id}:${read.graphNodeId}`,
+							graphNodeId: read.graphNodeId,
+							path: [],
+							run() {
+								debugModule?.__marklessDebugSetBoundaries(
+									root,
+									debugBoundarySnapshots(),
+								);
+							},
+						}),
+					);
+				}
+			}
+		}
+	}
+	const pendingRuns = new Map<string, { readonly version: number; readonly since: number }>();
+	function debugBoundarySnapshots(): import('./debug-channel.ts').MarklessDebugBoundarySnapshot[] {
+		return [...asyncBoundariesById.values()].flatMap((boundary) =>
+			boundary.asyncReads.map((read, readIndex) => {
+				let snapshot: { readonly status?: unknown; readonly version?: unknown } | undefined;
+				try {
+					snapshot = input.graph.peekAsyncSnapshot(read.graphNodeId) as typeof snapshot;
+					if (!snapshot) throw new Error('missing async snapshot');
+				} catch {
+					return {
+						boundaryId: boundary.id,
+						readIndex,
+						graphNodeId: read.graphNodeId,
+						status: 'missing' as const,
+						runVersion: null,
+						pendingSince: null,
+						hasSettledContent: settleTracker?.hasSettledContent(boundary.id) === true,
+						missingReason: 'graph-read-missing' as const,
+					};
+				}
+				const status = snapshot?.status;
+				const version = snapshot?.version;
+				if (
+					(status !== 'pending' && status !== 'fulfilled' && status !== 'rejected') ||
+					typeof version !== 'number'
+				) {
+					return {
+						boundaryId: boundary.id,
+						readIndex,
+						graphNodeId: read.graphNodeId,
+						status: 'missing' as const,
+						runVersion: null,
+						pendingSince: null,
+						hasSettledContent: settleTracker?.hasSettledContent(boundary.id) === true,
+						missingReason: 'snapshot-invalid' as const,
+					};
+				}
+				const key = `${boundary.id}:${readIndex}`;
+				if (status === 'pending' && pendingRuns.get(key)?.version !== version)
+					pendingRuns.set(key, { version, since: Date.now() });
+				if (status !== 'pending') pendingRuns.delete(key);
+				return {
+					boundaryId: boundary.id,
+					readIndex,
+					graphNodeId: read.graphNodeId,
+					status,
+					runVersion: version,
+					pendingSince:
+						status === 'pending' ? (pendingRuns.get(key)?.since ?? null) : null,
+					hasSettledContent:
+						status === 'fulfilled' ||
+						status === 'rejected' ||
+						settleTracker?.hasSettledContent(boundary.id) === true,
+				};
+			}),
+		);
 	}
 	return {
 		start,
