@@ -11,7 +11,69 @@ import type {
 } from './contracts.ts';
 import { executedJavaScriptBytes, type V8CoverageEntry } from './coverage.ts';
 import { evaluateBoundaries, evaluateCandidate, type BoundarySnapshot } from './invariants.ts';
+import {
+	evaluateLocatorResolution,
+	locatorPlansFromView,
+	type LocatorResolutionEvaluation,
+} from './locator-resolution.ts';
+import {
+	evaluatePreloadIntegrity,
+	type PreloadActionKind,
+	type PreloadIntegrityEvaluation,
+	type PreloadRequestObservation,
+} from './preload-integrity.ts';
+import {
+	parsePayloadEventClaims,
+	reconcilePayloadWiring,
+	type ChannelEventRegistration,
+	type PayloadWiringEvaluation,
+} from './payload-wiring.ts';
 import { classifyRequest, type RequestClassificationInput } from './requests.ts';
+import type { AnalyzerTextArtifact } from './strip-guarantee.ts';
+
+export async function collectServedBuildArtifacts(page: Page): Promise<AnalyzerTextArtifact[]> {
+	return page.evaluate(async () => {
+		const current = new URL(location.href);
+		const urls = [
+			current.href,
+			...performance.getEntriesByType('resource').map((entry) => entry.name),
+		].filter((url, index, all) => {
+			const parsed = new URL(url, current);
+			return all.indexOf(url) === index && (url === current.href || /\/build\/.*\.[cm]?js$/.test(parsed.pathname));
+		});
+		return Promise.all(urls.map(async (url) => {
+			const response = await fetch(url);
+			return { path: new URL(url, current).pathname, content: await response.text() };
+		}));
+	});
+}
+
+type SerializedDomNode = { readonly nodeType: number; readonly tagName?: string; readonly data?: string; readonly childNodes: readonly SerializedDomNode[] };
+export async function collectLocatorResolution(page: Page): Promise<LocatorResolutionEvaluation> {
+	const containers = await page.evaluate(() => {
+		const serialize = (node: Node): SerializedDomNode => ({
+			nodeType: node.nodeType,
+			...(node instanceof Element ? { tagName: node.tagName } : {}),
+			...(node.nodeType === Node.COMMENT_NODE ? { data: node.nodeValue ?? '' } : {}),
+			childNodes: [...node.childNodes].map(serialize),
+		});
+		return [...document.querySelectorAll<Element>('[data-async-container]')].map((root, index) => {
+			const view = [...root.querySelectorAll<HTMLScriptElement>('script[type="markless/view"]')]
+				.find((script) => script.closest('[data-async-container]') === root);
+			return { containerId: `document-container:${index}`, root: serialize(root), view: JSON.parse(view?.textContent ?? '{}') };
+		});
+	});
+	const details: string[] = [], covered = new Set<any>(), skipped: Array<{ kind: string; reason: string }> = [];
+	const adapter = { childNodes: (node: SerializedDomNode) => node.childNodes, nodeType: (node: SerializedDomNode) => node.nodeType, tagName: (node: SerializedDomNode) => node.tagName, commentData: (node: SerializedDomNode) => node.data };
+	for (const container of containers) {
+		const parsed = locatorPlansFromView(container.view);
+		const result = evaluateLocatorResolution(parsed.plans, [container.root], adapter, parsed.skipped);
+		details.push(...result.invariant.details.map((detail) => `${container.containerId}: ${detail}`));
+		for (const kind of result.coverage.covered) covered.add(kind);
+		skipped.push(...result.coverage.skipped.map((entry) => ({ ...entry, reason: `${container.containerId}: ${entry.reason}` })));
+	}
+	return { invariant: { id: 'MLA-S3-LOCATOR-RESOLUTION', status: details.length ? 'fail' : 'pass', details }, coverage: { covered: [...covered].sort(), skipped } };
+}
 
 export interface ConsoleLedgerEntry {
 	readonly source: 'console.error' | 'pageerror';
@@ -133,6 +195,14 @@ export class RequestLedger {
 			this.#records.map(({ request: _request, ...record }) => Object.freeze({ ...record })),
 		);
 	}
+	preloadObservations(actionId?: string): readonly PreloadRequestObservation[] {
+		return this.snapshot().map((request) => ({
+			phase: this.input.phase,
+			...(this.input.phase === 'action' ? { actionId } : {}),
+			url: request.url,
+			resourceType: request.resourceType,
+		}));
+	}
 	detach() {
 		this.page.off('request', this.#onRequest);
 		this.page.off('response', this.#onResponse);
@@ -144,7 +214,91 @@ export class RequestLedger {
 export interface MarklessDebugChannelV1Subset {
 	readonly version: 1;
 	readonly containers: readonly { readonly boundaries: readonly BoundarySnapshot[] }[];
-	explainInteraction(element: Element, eventName: string): { readonly kind: string };
+	explainInteraction(
+		element: Element,
+		eventName: string,
+	): { readonly kind: string; readonly source?: string };
+}
+
+export async function collectPayloadWiring(page: Page): Promise<PayloadWiringEvaluation> {
+	const containers = await page.evaluate(() => {
+		const channel = (
+			window as typeof window & { __MARKLESS_DEBUG__?: MarklessDebugChannelV1Subset }
+		).__MARKLESS_DEBUG__;
+		if (!channel || channel.version !== 1)
+			throw new Error(
+				`Analyzer requires Markless debug channel version 1; received ${channel?.version ?? 'missing'}`,
+			);
+		return [...document.querySelectorAll<Element>('[data-async-container]')].map(
+			(root, containerIndex) => {
+				const containerId = `document-container:${containerIndex}`;
+				const owned = <T extends Element>(selector: string) =>
+					[...root.querySelectorAll<T>(selector)].filter(
+						(element) => element.closest('[data-async-container]') === root,
+					);
+				const viewElement = owned<HTMLScriptElement>('script[type="markless/view"]')[0];
+				const armElements = owned<HTMLScriptElement>(
+					'script[type="markless/arm"][data-boundary]',
+				);
+				const viewScript = viewElement?.textContent ?? null;
+				const armScripts = armElements.map((script) => ({
+					boundaryId: script.getAttribute('data-boundary') ?? '',
+					content: script.textContent ?? '',
+				}));
+				const elements: Element[] = [root];
+				const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+				let node: Node | null;
+				while ((node = walker.nextNode())) elements.push(node as Element);
+				const registrations: ChannelEventRegistration[] = [];
+				const inspect = (recordSet: any, offset = 0) => {
+					for (const event of recordSet?.events ?? []) {
+						const locator = (recordSet?.locators ?? []).find(
+							(candidate: any) => candidate.hostNodeId === event.hostNodeId,
+						);
+						const element = locator && elements[offset + locator.index];
+						if (!element) continue;
+						const explanation = channel.explainInteraction(element, event.eventName);
+						registrations.push({
+							containerId,
+							hostNodeId: event.hostNodeId,
+							eventName: event.eventName,
+							kind: explanation.kind,
+							...(explanation.source ? { source: explanation.source } : {}),
+						});
+					}
+				};
+				const armOffset = (boundaryId: string) => {
+					const all = document.createTreeWalker(root, NodeFilter.SHOW_ALL);
+					let count = 0,
+						current: Node | null;
+					while ((current = all.nextNode())) {
+						if (
+							current.nodeType === Node.COMMENT_NODE &&
+							current.nodeValue === `markless:async:${boundaryId}`
+						)
+							return count + 1;
+						if (current.nodeType === Node.ELEMENT_NODE) count++;
+					}
+					return elements.length;
+				};
+				if (viewScript) {
+					const view = JSON.parse(viewScript);
+					inspect(view);
+					for (const boundary of view.asyncBoundaries ?? [])
+						if (boundary.armRecords && !Array.isArray(boundary.armRecords))
+							inspect(boundary.armRecords, armOffset(boundary.id));
+				}
+				for (const arm of armScripts)
+					inspect(JSON.parse(arm.content), armOffset(arm.boundaryId));
+				return { containerId, viewScript, armScripts, registrations };
+			},
+		);
+	});
+	const claims = containers.flatMap(parsePayloadEventClaims);
+	return reconcilePayloadWiring(
+		claims,
+		containers.flatMap((entry) => entry.registrations),
+	);
 }
 
 export interface CandidateExpectation {
@@ -380,13 +534,37 @@ export async function collectExecutedJavaScriptBytes(
 export interface MeasuredWindowResult {
 	readonly report: Omit<AnalyzerCandidateActionReport, 'invariants' | 'knownAudit'>;
 	readonly boundaryResults: Awaited<ReturnType<typeof waitForBoundaryLiveness>>;
+	readonly preloadIntegrity: PreloadIntegrityEvaluation;
 	readonly errors: readonly string[];
 }
+
+export async function collectDeclaredModulePreloads(page: Page): Promise<readonly string[]> {
+	return page.evaluate(() =>
+		[...document.querySelectorAll<HTMLLinkElement>('link[rel="modulepreload"]')]
+			.map((link) => link.href || link.getAttribute('href') || '')
+			.filter(Boolean),
+	);
+}
+
+async function collectPriorModuleLoads(page: Page): Promise<readonly PreloadRequestObservation[]> {
+	return page.evaluate(() =>
+		performance.getEntriesByType('resource').map((entry) => ({
+			phase: 'navigation' as const,
+			url: entry.name,
+			resourceType:
+				'initiatorType' in entry && entry.initiatorType === 'script'
+					? 'script'
+					: 'resource',
+		})),
+	);
+}
+
 export async function measurePageWindow(input: {
 	page: Page;
 	route: MatrixRoute;
 	fixtureUrlId: string;
 	actionId: string;
+	actionKind?: PreloadActionKind;
 	origin: string;
 	knownDocumentPaths: readonly string[];
 	run: () => Promise<void>;
@@ -399,6 +577,9 @@ export async function measurePageWindow(input: {
 	const startedAt = new Date().toISOString();
 	const started = performance.now();
 	const errors: string[] = [];
+	const declaredBefore = await collectDeclaredModulePreloads(input.page);
+	const loadedBefore =
+		input.actionId === 'bootstrap' ? [] : await collectPriorModuleLoads(input.page);
 	const consoleLedger = new ConsoleLedger(input.page);
 	const requestLedger = new RequestLedger(input.page, {
 		pageOrigin: input.origin,
@@ -428,15 +609,31 @@ export async function measurePageWindow(input: {
 	} catch (error) {
 		errors.push(error instanceof Error ? error.message : String(error));
 	}
+	const destinationSettledAfterRequestCount = requestLedger.snapshot().length;
 	await requestLedger.closeAndObserveLeaks();
 	const coverage = await input.page.coverage.stopJSCoverage();
 	consoleLedger.assertAndClear();
 	const requests = requestLedger.snapshot();
+	const declaredAfter = await collectDeclaredModulePreloads(input.page);
+	const preloadIntegrity = evaluatePreloadIntegrity({
+		baseUrl: input.page.url(),
+		actionKind: input.actionKind,
+		...(input.actionKind === 'navigation'
+			? {
+					expectedDestination: {
+						settledAfterRequestCount: destinationSettledAfterRequestCount,
+					},
+				}
+			: {}),
+		declaredPreloads: [...new Set([...declaredBefore, ...declaredAfter])],
+		observedRequests: [...loadedBefore, ...requestLedger.preloadObservations(input.actionId)],
+	});
 	consoleLedger.detach();
 	requestLedger.detach();
 	return {
 		errors,
 		boundaryResults,
+		preloadIntegrity,
 		report: {
 			routeFile: input.route.routeFile,
 			fixtureUrlId: input.fixtureUrlId,

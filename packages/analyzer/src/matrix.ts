@@ -101,7 +101,7 @@ function action(value: unknown, path: string): MatrixAction {
 			'expectedRejectedBoundaryIds',
 			'reset',
 		],
-		['value', 'setupActionIds'],
+		['value', 'setupActionIds', 'navigates'],
 	);
 	stringValue(item.id, `${path}.id`, idPattern);
 	stringValue(item.fixtureUrlId, `${path}.fixtureUrlId`);
@@ -133,6 +133,8 @@ function action(value: unknown, path: string): MatrixAction {
 		],
 		`${path}.expectedInteraction`,
 	);
+	if (item.navigates !== undefined && typeof item.navigates !== 'boolean')
+		fail(`${path}.navigates`, 'must be boolean');
 	strings(item.apiContractIds, `${path}.apiContractIds`);
 	if (item.setupActionIds !== undefined) strings(item.setupActionIds, `${path}.setupActionIds`);
 	pending(item.pendingPolicy, `${path}.pendingPolicy`);

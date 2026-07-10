@@ -1,31 +1,22 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { box } from '@async/witness';
+import { DEBUG_CHANNEL_SENTINELS } from '../../analyzer/src/strip-guarantee.ts';
 import {
 	buildFixture,
 	debugChannelReporter,
 	expectedDebugResult,
 	previewFixture,
 } from './debug-channel-positive.box.ts';
+import { appendWitnessVerdict } from './witness-verdict.ts';
 
 const FIXTURES = ['fixtures/vite-csr', 'fixtures/vite-ssr'] as const;
-const SENTINELS = [
-	'__MARKLESS_DEBUG__',
-	'__MARKLESS_DEBUG_ENABLED__',
-	'markless.debug.channel.v1.bootstrap',
-	'inline-resumer',
-	'streamed-arm',
-	'resume-record',
-	'row-record',
-	'direct-csr',
-	'callback-prop',
-	'router-delegation',
-	'MARKLESS_DEBUG_',
-];
-
+const BOX = {
+	name: 'debug channel: unflagged client and SSR output strips all instrumentation',
+	tags: ['debug-channel', 'build', 'preview'],
+};
 export default box(
 	{
-		name: 'debug channel: unflagged client and SSR output strips all instrumentation',
-		tags: ['debug-channel', 'build', 'preview'],
+		...BOX,
 		modes: ['build', 'preview'],
 	},
 	async ({ pipeline, expect, receipt }) => {
@@ -90,6 +81,11 @@ export default box(
 			`Observed ${moduleRows.length} debug helper module metadata rows; all stripped.`,
 		);
 		await receipt.capture('unflagged CSR and SSR debug channel strip proof');
+		await appendWitnessVerdict({
+			...BOX,
+			passed: true,
+			receiptPath: '.witness/receipts/debug-channel-strip.json',
+		});
 	},
 );
 
@@ -111,6 +107,6 @@ function outputModuleObserver(rows: Array<{ id: string; renderedLength: number }
 }
 
 function assertNoSentinels(source: string, label: string): void {
-	const found = SENTINELS.filter((sentinel) => source.includes(sentinel));
+	const found = DEBUG_CHANNEL_SENTINELS.filter((sentinel) => source.includes(sentinel));
 	if (found.length > 0) throw new Error(`${label} retained debug sentinels: ${found.join(', ')}`);
 }

@@ -1,4 +1,5 @@
-export type AnalyzerInvariantId =
+/** @deprecated Use AnalyzerInvariantId; BQA IDs remain accepted aliases. */
+export type BrowserQaInvariantId =
 	| 'BQA-I1-CONSOLE'
 	| 'BQA-I2-NETWORK'
 	| 'BQA-I3-BOUNDARY-MISSING'
@@ -9,15 +10,38 @@ export type AnalyzerInvariantId =
 	| 'BQA-I5-BOOTSTRAP-BUDGET'
 	| 'BQA-I5-ACTION-BUDGET';
 
+export type AnalyzerCanonicalInvariantId =
+	| 'MLA-I1-CONSOLE'
+	| 'MLA-I2-NETWORK'
+	| 'MLA-I3-BOUNDARY-MISSING'
+	| 'MLA-I3-PENDING-TIMEOUT'
+	| 'MLA-I3-REJECTED'
+	| 'MLA-I4-WIRING-MISSING'
+	| 'MLA-I4-UNCLASSIFIED'
+	| 'MLA-I5-BOOTSTRAP-BUDGET'
+	| 'MLA-I5-ACTION-BUDGET'
+	| 'MLA-S1-PRELOAD-INTEGRITY'
+	| 'MLA-S2-PAYLOAD-WIRING'
+	| 'MLA-S3-LOCATOR-RESOLUTION'
+	| 'MLA-S4-STRIP-GUARANTEE'
+	| `MLA-EXT-${string}`;
+
+/** Canonical MLA IDs plus the BQA aliases accepted from existing emitters. */
+export type AnalyzerInvariantId = AnalyzerCanonicalInvariantId | BrowserQaInvariantId;
+
 export interface AnalyzerInvariantResult {
 	readonly id: AnalyzerInvariantId;
 	readonly status: 'pass' | 'fail' | 'not-run';
 	readonly details: readonly string[];
 }
 
+export interface AnalyzerCanonicalInvariantResult extends AnalyzerInvariantResult {
+	readonly id: AnalyzerCanonicalInvariantId;
+}
+
 export interface AnalyzerKnownAuditResult {
 	readonly id: string;
-	readonly invariantId: 'BQA-I4-WIRING-MISSING' | 'BQA-I4-UNCLASSIFIED';
+	readonly invariantId: Extract<AnalyzerInvariantId, `${string}-I4-${string}`>;
 	readonly details: readonly string[];
 }
 
@@ -47,6 +71,25 @@ export interface AnalyzerReportV1 {
 	readonly build: { debugEnabled: boolean; marklessSha: string; artifactHash: string };
 	readonly actions: readonly AnalyzerActionReport[];
 	readonly passed: boolean;
+}
+
+export interface AnalyzerVerdictReportV2 {
+	readonly version: 2;
+	readonly source: string;
+	readonly lane: string;
+	readonly results: readonly AnalyzerCanonicalInvariantResult[];
+	readonly passed: boolean;
+	readonly metadata?: Readonly<Record<string, unknown>>;
+}
+
+export type AnalyzerVerdictReport = AnalyzerVerdictReportV2;
+
+export interface CreateVerdictReportInput {
+	readonly source: string;
+	readonly lane: string;
+	readonly results?: readonly AnalyzerInvariantResult[];
+	readonly passed?: boolean;
+	readonly metadata?: Readonly<Record<string, unknown>>;
 }
 
 export interface AnalyzerFaultReceiptV1 {
@@ -87,6 +130,8 @@ export interface MatrixAction {
 	readonly operation: 'click' | 'fill' | 'select' | 'press';
 	readonly value?: string;
 	readonly expectedEventTypes: readonly string[];
+	/** Action performs a route navigation (any mechanism); MLA-S1 expects destination module loads. */
+	readonly navigates?: boolean;
 	readonly expectedInteraction:
 		| 'inline-resumer'
 		| 'resume-record'
@@ -150,3 +195,22 @@ export interface AnalyzerKnownAuditItem {
 	readonly description: string;
 	readonly status: 'known-unwired';
 }
+
+/** @deprecated Use the Analyzer* names. */
+export type BrowserQaInvariantResult = AnalyzerInvariantResult;
+/** @deprecated Use the Analyzer* names. */
+export type BrowserQaKnownAuditResult = AnalyzerKnownAuditResult;
+/** @deprecated Use the Analyzer* names. */
+export type BrowserQaRequestRecord = AnalyzerRequestRecord;
+/** @deprecated Use the Analyzer* names. */
+export type BrowserQaActionReport = AnalyzerActionReport;
+/** @deprecated Use the Analyzer* names. */
+export type BrowserQaReportV1 = AnalyzerReportV1;
+/** @deprecated Use the Analyzer* names. */
+export type BrowserQaFaultReceiptV1 = AnalyzerFaultReceiptV1;
+/** @deprecated Use the Analyzer* names. */
+export type BrowserQaCandidateActionReport = AnalyzerCandidateActionReport;
+/** @deprecated Use the Analyzer* names. */
+export type BrowserQaCandidateInventoryReport = AnalyzerCandidateInventoryReport;
+/** @deprecated Use the Analyzer* names. */
+export type BrowserQaKnownAuditItem = AnalyzerKnownAuditItem;

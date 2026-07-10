@@ -1,0 +1,106 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://markless.dev/schemas/analyzer-verdict-report-v2.json",
+	"title": "Markless analyzer verdict report",
+	"oneOf": [{ "$ref": "#/$defs/v2" }, { "$ref": "#/$defs/v1" }],
+	"$defs": {
+		"status": { "enum": ["pass", "fail", "not-run"] },
+		"canonicalId": {
+			"oneOf": [
+				{
+					"enum": [
+						"MLA-I1-CONSOLE",
+						"MLA-I2-NETWORK",
+						"MLA-I3-BOUNDARY-MISSING",
+						"MLA-I3-PENDING-TIMEOUT",
+						"MLA-I3-REJECTED",
+						"MLA-I4-WIRING-MISSING",
+						"MLA-I4-UNCLASSIFIED",
+						"MLA-I5-BOOTSTRAP-BUDGET",
+						"MLA-I5-ACTION-BUDGET"
+					]
+				},
+				{
+					"enum": [
+						"MLA-S1-PRELOAD-INTEGRITY",
+						"MLA-S2-PAYLOAD-WIRING",
+						"MLA-S3-LOCATOR-RESOLUTION",
+						"MLA-S4-STRIP-GUARANTEE"
+					]
+				},
+				{ "type": "string", "pattern": "^MLA-EXT-[A-Z0-9]+(?:-[A-Z0-9]+)*$" }
+			]
+		},
+		"compatibleId": {
+			"oneOf": [
+				{ "$ref": "#/$defs/canonicalId" },
+				{
+					"enum": [
+						"BQA-I1-CONSOLE",
+						"BQA-I2-NETWORK",
+						"BQA-I3-BOUNDARY-MISSING",
+						"BQA-I3-PENDING-TIMEOUT",
+						"BQA-I3-REJECTED",
+						"BQA-I4-WIRING-MISSING",
+						"BQA-I4-UNCLASSIFIED",
+						"BQA-I5-BOOTSTRAP-BUDGET",
+						"BQA-I5-ACTION-BUDGET"
+					]
+				}
+			]
+		},
+		"canonicalResult": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["id", "status", "details"],
+			"properties": {
+				"id": { "$ref": "#/$defs/canonicalId" },
+				"status": { "$ref": "#/$defs/status" },
+				"details": { "type": "array", "items": { "type": "string" } }
+			}
+		},
+		"compatibleResult": {
+			"type": "object",
+			"required": ["id", "status", "details"],
+			"properties": {
+				"id": { "$ref": "#/$defs/compatibleId" },
+				"status": { "$ref": "#/$defs/status" },
+				"details": { "type": "array", "items": { "type": "string" } }
+			}
+		},
+		"v2": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["version", "source", "lane", "results", "passed"],
+			"properties": {
+				"version": { "const": 2 },
+				"source": { "type": "string", "minLength": 1 },
+				"lane": { "type": "string", "minLength": 1 },
+				"results": { "type": "array", "items": { "$ref": "#/$defs/canonicalResult" } },
+				"passed": { "type": "boolean" },
+				"metadata": { "type": "object" }
+			}
+		},
+		"v1": {
+			"type": "object",
+			"required": ["version", "actions", "passed"],
+			"properties": {
+				"version": { "const": 1 },
+				"actions": {
+					"type": "array",
+					"items": {
+						"type": "object",
+						"required": ["invariants"],
+						"properties": {
+							"invariants": {
+								"type": "array",
+								"items": { "$ref": "#/$defs/compatibleResult" }
+							}
+						}
+					}
+				},
+				"passed": { "type": "boolean" }
+			}
+		}
+	}
+}

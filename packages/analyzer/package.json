@@ -10,7 +10,8 @@
 	},
 	"files": [
 		"dist",
-		"route-action-matrix.schema.json"
+		"route-action-matrix.schema.json",
+		"verdict-report.schema.json"
 	],
 	"type": "module",
 	"sideEffects": false,
@@ -33,6 +34,9 @@
 	},
 	"scripts": {
 		"prepublishOnly": "node ../../scripts/release/verify-publish-ready.mjs"
+	},
+	"dependencies": {
+		"ufo": "catalog:"
 	},
 	"devDependencies": {
 		"playwright": "1.58.2"
