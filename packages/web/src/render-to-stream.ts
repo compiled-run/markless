@@ -4,6 +4,7 @@ import {
 	MARKLESS_ASYNC_CONTAINER_ATTRIBUTE,
 	MARKLESS_ASYNC_END_ANCHOR_PREFIX,
 	MARKLESS_BOUNDARY_ATTRIBUTE,
+	MARKLESS_STATE_PATCH_SCRIPT_TYPE,
 	serializeRuntimeAsyncSnapshots,
 } from '@markless/serializer';
 import {
@@ -255,7 +256,7 @@ function renderArmAppend(
 	return (
 		`<template m:arm="${escapeAttribute(arm.boundaryId)}">${armHtml}</template>` +
 		`<script type="${MARKLESS_ARM_SCRIPT_TYPE}" ${MARKLESS_BOUNDARY_ATTRIBUTE}="${escapeAttribute(arm.boundaryId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(armRecords))}</script>` +
-		`<script type="markless/state-patch" data-graph-node="${escapeAttribute(arm.graphNodeId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(patch))}</script>` +
+		`<script type="${MARKLESS_STATE_PATCH_SCRIPT_TYPE}" data-graph-node="${escapeAttribute(arm.graphNodeId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(patch))}</script>` +
 		`<script${nonceAttribute}>__mArm(${escapeScriptJson(revealArguments)})</script>`
 	);
 }

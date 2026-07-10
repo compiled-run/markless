@@ -1,4 +1,8 @@
 import type { DecodedPayloadScripts } from '../../serializer/src/protocol-client.ts';
+import {
+	MARKLESS_ARM_SCRIPT_TYPE,
+	MARKLESS_STATE_PATCH_SCRIPT_TYPE,
+} from '../../serializer/src/protocol-constants.ts';
 
 // Show-then-adopt, adopt half (T107 streaming): the __mArm executor already
 // swapped settled arm content into the boundary's anchor range pre-runtime;
@@ -32,8 +36,10 @@ export function adoptStreamedArmPatches(
 ): DecodedPayloadScripts {
 	const query = root.ownerDocument?.querySelectorAll?.bind(root.ownerDocument);
 	if (!query) return decoded;
-	const armScripts = [...query('script[type="markless/arm"][data-boundary]')];
-	const patchScripts = [...query('script[type="markless/state-patch"][data-graph-node]')];
+	const armScripts = [...query(`script[type="${MARKLESS_ARM_SCRIPT_TYPE}"][data-boundary]`)];
+	const patchScripts = [
+		...query(`script[type="${MARKLESS_STATE_PATCH_SCRIPT_TYPE}"][data-graph-node]`),
+	];
 	if (armScripts.length === 0 && patchScripts.length === 0) return decoded;
 
 	const uncommittedBoundaryIds = new Set(

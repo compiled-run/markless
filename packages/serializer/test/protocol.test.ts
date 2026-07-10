@@ -2,6 +2,7 @@ import { expect, test } from 'vitest';
 import {
 	ASYNC_PROTOCOL_VERSION,
 	decodePayloadScripts,
+	MARKLESS_STATE_PATCH_SCRIPT_TYPE,
 	renderPayloadScripts,
 	type ProtocolArmRecordSet,
 	type ProtocolStatePayload,
@@ -27,6 +28,10 @@ test('protocol payloads share the current async protocol version', () => {
 	expect(ASYNC_PROTOCOL_VERSION).toBe(1);
 	expect(state.version).toBe(1);
 	expect(view.version).toBe(1);
+});
+
+test('streamed state patches use the owned protocol script type', () => {
+	expect(MARKLESS_STATE_PATCH_SCRIPT_TYPE).toBe('markless/state-patch');
 });
 
 // D3 graduation (T101/T107): async boundary arm records are first-class
