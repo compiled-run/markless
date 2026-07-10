@@ -8,6 +8,7 @@
 Agent rules, skills, and MCP config for this repo are generated from `.ruler/` by [Ruler](https://github.com/intellectronica/ruler). Edit sources in `.ruler/` and run `pnpm rules` to sync; never edit generated files directly.
 
 A change known to affect a consuming application must pass that application's checks before it lands; the framework's own suite passing is not sufficient evidence.
+Protocol and config facts are imported from their owning package, never restated as literals.
 The task packet or active goal card defines scope. Stay inside its named files and preserve unrelated work.
 If a required decision is missing from the packet, return blocked; do not improvise.
 Crew and GoalBuddy artifact-writing packets/cards must declare `Workflow guidance: <one or more .ruler/skills/*/<file>.md paths>`.
