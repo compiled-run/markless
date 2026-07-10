@@ -2,6 +2,7 @@ import { EventEmitter } from 'node:events';
 import { describe, expect, test, vi } from 'vitest';
 import {
 	collectLocatorResolution,
+	collectPayloadWiring,
 	collectServedBuildArtifacts,
 	ConsoleLedger,
 	RequestLedger,
@@ -72,5 +73,29 @@ describe('Playwright adapter', () => {
 		const result = await collectLocatorResolution(page as never);
 		expect(result.invariant.status).toBe('pass');
 		expect(result.coverage.covered).toEqual(['dom-order-path']);
+	});
+
+	test('censuses candidate registrations independently of payload claims', async () => {
+		const page = {
+			evaluate: vi.fn(async (_fn, candidateEvents) => ({
+				containers: [],
+				candidateRegistrations: [{
+					containerId: 'document-container:0',
+					hostNodeId: 'button:extra',
+					eventName: 'click',
+					kind: 'resume-record',
+				}],
+				candidateEvents,
+			})),
+		};
+		const evaluation = await collectPayloadWiring(page as never, [{
+			documentIndex: 4,
+			explanations: { click: { kind: 'resume-record' } },
+		}] as never);
+
+		expect(page.evaluate.mock.calls[0]?.[1]).toEqual([
+			{ documentIndex: 4, eventName: 'click' },
+		]);
+		expect(evaluation.invariant.status).toBe('fail');
 	});
 });

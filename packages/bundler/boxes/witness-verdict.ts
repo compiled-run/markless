@@ -1,4 +1,5 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import type { BoxRunFn } from '@async/witness';
 import {
 	appendInvariantResult,
 	createVerdictReport,
@@ -14,6 +15,28 @@ export function appendWitnessVerdict(outcome: WitnessBoxOutcome): Promise<void> 
 	const write = pendingWrite.then(() => writeWitnessVerdict(outcome));
 	pendingWrite = write.catch(() => undefined);
 	return write;
+}
+
+type WitnessBox = Omit<WitnessBoxOutcome, 'passed' | 'details'>;
+
+export function runBoxWithVerdict(
+	box: WitnessBox,
+	fn: BoxRunFn,
+	emit: (outcome: WitnessBoxOutcome) => Promise<void> = appendWitnessVerdict,
+): BoxRunFn {
+	return async (context) => {
+		try {
+			await fn(context);
+			await emit({ ...box, passed: true });
+		} catch (error) {
+			await emit({
+				...box,
+				passed: false,
+				details: [error instanceof Error ? error.message : String(error)],
+			});
+			throw error;
+		}
+	};
 }
 
 async function writeWitnessVerdict(outcome: WitnessBoxOutcome): Promise<void> {

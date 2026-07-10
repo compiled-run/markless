@@ -7,19 +7,20 @@ import {
 	expectedDebugResult,
 	previewFixture,
 } from './debug-channel-positive.box.ts';
-import { appendWitnessVerdict } from './witness-verdict.ts';
+import { runBoxWithVerdict } from './witness-verdict.ts';
 
 const FIXTURES = ['fixtures/vite-csr', 'fixtures/vite-ssr'] as const;
 const BOX = {
 	name: 'debug channel: unflagged client and SSR output strips all instrumentation',
 	tags: ['debug-channel', 'build', 'preview'],
+	receiptPath: '.witness/receipts/debug-channel-strip.json',
 };
 export default box(
 	{
 		...BOX,
 		modes: ['build', 'preview'],
 	},
-	async ({ pipeline, expect, receipt }) => {
+	runBoxWithVerdict(BOX, async ({ pipeline, expect, receipt }) => {
 		const moduleRows: Array<{ id: string; renderedLength: number }> = [];
 		const results: Record<string, unknown> = {};
 		for (const fixture of FIXTURES) {
@@ -81,12 +82,7 @@ export default box(
 			`Observed ${moduleRows.length} debug helper module metadata rows; all stripped.`,
 		);
 		await receipt.capture('unflagged CSR and SSR debug channel strip proof');
-		await appendWitnessVerdict({
-			...BOX,
-			passed: true,
-			receiptPath: '.witness/receipts/debug-channel-strip.json',
-		});
-	},
+	}),
 );
 
 function outputModuleObserver(rows: Array<{ id: string; renderedLength: number }>) {

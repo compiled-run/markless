@@ -23,6 +23,23 @@ describe('MLA-S1 preload integrity', () => {
 		expect(evaluation.warnings).toEqual([]);
 	});
 
+	test('fails a bootstrap module load that was not declared up front', () => {
+		const evaluation = evaluatePreloadIntegrity({
+			baseUrl: 'https://app.test/',
+			declaredPreloads: ['/build/declared.js'],
+			observedRequests: [
+				{ phase: 'bootstrap', url: '/build/undeclared.js', resourceType: 'script' },
+			],
+		});
+
+		expect(evaluation.invariant).toMatchObject({
+			status: 'fail',
+			details: [
+				'undeclared module loaded before interaction: https://app.test/build/undeclared.js',
+			],
+		});
+	});
+
 	test('fails an undeclared cold module request with its action', () => {
 		const evaluation = evaluatePreloadIntegrity({
 			baseUrl: 'https://app.test/',

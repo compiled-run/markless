@@ -88,6 +88,25 @@ describe('analyzer contracts', () => {
 		).toThrow(/\$report\.results\[0\]\.id/);
 	});
 
+	test('preserves warnings and rejects a contradictory passed verdict', () => {
+		const report = createVerdictReport({
+			source: 'browser-qa',
+			lane: 'preload',
+			warnings: ['declared modulepreload was never loaded: /unused.js'],
+		});
+		expect(report.warnings).toEqual(['declared modulepreload was never loaded: /unused.js']);
+		expect(() =>
+			validateVerdictReport({
+				version: 2,
+				source: 'browser-qa',
+				lane: 'preload',
+				results: [{ id: 'MLA-S1-PRELOAD-INTEGRITY', status: 'fail', details: [] }],
+				passed: true,
+				warnings: [],
+			}),
+		).toThrow(/passed.*must agree/i);
+	});
+
 	test('reads v1 browser reports and normalizes nested BQA results', () => {
 		const report = readVerdictReport({
 			version: 1,

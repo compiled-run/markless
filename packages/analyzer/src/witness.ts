@@ -5,6 +5,7 @@ export interface WitnessBoxOutcome {
 	readonly tags: readonly string[];
 	readonly passed: boolean;
 	readonly receiptPath: string;
+	readonly details?: readonly string[];
 }
 
 export function createWitnessVerdict(outcome: WitnessBoxOutcome): AnalyzerInvariantResult {
@@ -15,6 +16,7 @@ export function createWitnessVerdict(outcome: WitnessBoxOutcome): AnalyzerInvari
 			`box: ${outcome.name}`,
 			`tags: ${outcome.tags.join(', ')}`,
 			`receipt: ${outcome.receiptPath}`,
+			...(outcome.details ?? []),
 		],
 	};
 }

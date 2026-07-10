@@ -60,6 +60,19 @@ describe('MLA-S2 payload wiring', () => {
 		expect(evaluation.runtimeOnly).toEqual([]);
 	});
 
+	test('fails an unexplained runtime-only registration', () => {
+		const evaluation = reconcilePayloadWiring([], [registration()]);
+
+		expect(evaluation.invariant).toEqual({
+			id: 'MLA-S2-PAYLOAD-WIRING',
+			status: 'fail',
+			details: [
+				'shell: runtime registered click on button:save without a payload claim (resume-record)',
+			],
+		});
+		expect(evaluation.runtimeOnly).toEqual([registration()]);
+	});
+
 	test('merges streamed arm claims with initial view claims', () => {
 		const claims = parsePayloadEventClaims({
 			containerId: 'shell',

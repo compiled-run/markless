@@ -220,8 +220,18 @@ export interface MarklessDebugChannelV1Subset {
 	): { readonly kind: string; readonly source?: string };
 }
 
-export async function collectPayloadWiring(page: Page): Promise<PayloadWiringEvaluation> {
-	const containers = await page.evaluate(() => {
+export async function collectPayloadWiring(
+	page: Page,
+	candidateInventory?: readonly CandidateRecord[],
+): Promise<PayloadWiringEvaluation> {
+	const candidates = candidateInventory ?? (await inventoryCandidates(page));
+	const candidateEvents = candidates.flatMap((candidate) =>
+		Object.keys(candidate.explanations).map((eventName) => ({
+			documentIndex: candidate.documentIndex,
+			eventName,
+		})),
+	);
+	const containers = await page.evaluate((candidateEvents) => {
 		const channel = (
 			window as typeof window & { __MARKLESS_DEBUG__?: MarklessDebugChannelV1Subset }
 		).__MARKLESS_DEBUG__;
@@ -229,7 +239,7 @@ export async function collectPayloadWiring(page: Page): Promise<PayloadWiringEva
 			throw new Error(
 				`Analyzer requires Markless debug channel version 1; received ${channel?.version ?? 'missing'}`,
 			);
-		return [...document.querySelectorAll<Element>('[data-async-container]')].map(
+		const containers = [...document.querySelectorAll<Element>('[data-async-container]')].map(
 			(root, containerIndex) => {
 				const containerId = `document-container:${containerIndex}`;
 				const owned = <T extends Element>(selector: string) =>
@@ -293,12 +303,33 @@ export async function collectPayloadWiring(page: Page): Promise<PayloadWiringEva
 				return { containerId, viewScript, armScripts, registrations };
 			},
 		);
-	});
-	const claims = containers.flatMap(parsePayloadEventClaims);
-	return reconcilePayloadWiring(
-		claims,
-		containers.flatMap((entry) => entry.registrations),
-	);
+		const roots = [...document.querySelectorAll<Element>('[data-async-container]')];
+		const elements = [...document.querySelectorAll<Element>('*')];
+		const candidateRegistrations = candidateEvents.flatMap(({ documentIndex, eventName }) => {
+			const element = elements[documentIndex];
+			const root = element?.closest<Element>('[data-async-container]');
+			const containerIndex = root ? roots.indexOf(root) : -1;
+			if (!element || containerIndex < 0) return [];
+			const explanation = channel.explainInteraction(element, eventName);
+			if (explanation.kind === 'none') return [];
+			return [
+				{
+					containerId: `document-container:${containerIndex}`,
+					hostNodeId: 'hostNodeId' in explanation ? explanation.hostNodeId : undefined,
+					eventName,
+					kind: explanation.kind,
+					...('source' in explanation ? { source: explanation.source } : {}),
+				},
+			];
+		});
+		return { containers, candidateRegistrations };
+	}, candidateEvents);
+	const { containers: payloadContainers, candidateRegistrations } = containers;
+	const claims = payloadContainers.flatMap(parsePayloadEventClaims);
+	return reconcilePayloadWiring(claims, [
+		...payloadContainers.flatMap((entry) => entry.registrations),
+		...candidateRegistrations,
+	]);
 }
 
 export interface CandidateExpectation {

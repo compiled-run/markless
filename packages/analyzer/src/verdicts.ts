@@ -75,7 +75,15 @@ function readResult(value: unknown, path: string): AnalyzerCanonicalInvariantRes
 
 export function validateVerdictReport(value: unknown): AnalyzerVerdictReportV2 {
 	const input = record(value, '$report');
-	const allowed = new Set(['version', 'source', 'lane', 'results', 'passed', 'metadata']);
+	const allowed = new Set([
+		'version',
+		'source',
+		'lane',
+		'results',
+		'passed',
+		'warnings',
+		'metadata',
+	]);
 	for (const key of Object.keys(input))
 		if (!allowed.has(key)) fail(`$report.${key}`, 'is not allowed');
 	if (input.version !== 2) fail('$report.version', 'must equal 2');
@@ -83,15 +91,26 @@ export function validateVerdictReport(value: unknown): AnalyzerVerdictReportV2 {
 	const lane = nonempty(input.lane, '$report.lane');
 	if (!Array.isArray(input.results)) fail('$report.results', 'must be an array');
 	if (typeof input.passed !== 'boolean') fail('$report.passed', 'must be a boolean');
+	if (
+		input.warnings !== undefined &&
+		(!Array.isArray(input.warnings) ||
+			input.warnings.some((warning) => typeof warning !== 'string'))
+	)
+		fail('$report.warnings', 'must be an array of strings');
 	if (input.metadata !== undefined) record(input.metadata, '$report.metadata');
+	const warnings = input.warnings as readonly string[] | undefined;
+	const results = input.results.map((result, index) =>
+		readResult(result, `$report.results[${index}]`),
+	);
+	if (input.passed !== results.every((result) => result.status !== 'fail'))
+		fail('$report.passed', 'must agree with result statuses');
 	return {
 		version: 2,
 		source,
 		lane,
-		results: input.results.map((result, index) =>
-			readResult(result, `$report.results[${index}]`),
-		),
+		results,
 		passed: input.passed,
+		...(warnings === undefined ? {} : { warnings: [...warnings] }),
 		...(input.metadata === undefined
 			? {}
 			: { metadata: input.metadata as Readonly<Record<string, unknown>> }),
@@ -108,6 +127,7 @@ export function createVerdictReport(input: CreateVerdictReportInput): AnalyzerVe
 		lane: input.lane,
 		results,
 		passed: input.passed ?? results.every((result) => result.status !== 'fail'),
+		...(input.warnings === undefined ? {} : { warnings: input.warnings }),
 		...(input.metadata === undefined ? {} : { metadata: input.metadata }),
 	});
 }

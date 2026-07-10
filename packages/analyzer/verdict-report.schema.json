@@ -78,6 +78,7 @@
 				"lane": { "type": "string", "minLength": 1 },
 				"results": { "type": "array", "items": { "$ref": "#/$defs/canonicalResult" } },
 				"passed": { "type": "boolean" },
+				"warnings": { "type": "array", "items": { "type": "string" } },
 				"metadata": { "type": "object" }
 			}
 		},

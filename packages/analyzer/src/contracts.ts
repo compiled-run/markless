@@ -79,6 +79,7 @@ export interface AnalyzerVerdictReportV2 {
 	readonly lane: string;
 	readonly results: readonly AnalyzerCanonicalInvariantResult[];
 	readonly passed: boolean;
+	readonly warnings?: readonly string[];
 	readonly metadata?: Readonly<Record<string, unknown>>;
 }
 
@@ -89,6 +90,7 @@ export interface CreateVerdictReportInput {
 	readonly lane: string;
 	readonly results?: readonly AnalyzerInvariantResult[];
 	readonly passed?: boolean;
+	readonly warnings?: readonly string[];
 	readonly metadata?: Readonly<Record<string, unknown>>;
 }
 

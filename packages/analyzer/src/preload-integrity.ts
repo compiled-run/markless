@@ -59,10 +59,17 @@ export function evaluatePreloadIntegrity(input: PreloadIntegrityInput): PreloadI
 	const failures = isNavigation
 		? actionModuleLoads.filter(({ requestIndex }) => requestIndex > settledAfter)
 		: actionModuleLoads;
+	const undeclaredLoads = input.observedRequests
+		.filter((request) => request.phase !== 'action' && isModuleRequest(request))
+		.map((request) => normalize(request.url))
+		.filter((url) => !declared.has(url));
 	const details = failures.map(({ request, url }) =>
 		isNavigation
 			? `${request.actionId ?? 'unknown-action'}: module fetched after navigation destination settled: ${url}`
 			: `${request.actionId ?? 'unknown-action'}: module fetched during action without prior preload load: ${url}`,
+	);
+	details.push(
+		...undeclaredLoads.map((url) => `undeclared module loaded before interaction: ${url}`),
 	);
 	const warnings = [...declared]
 		.filter((url) => !loadedAtAnyPhase.has(url))

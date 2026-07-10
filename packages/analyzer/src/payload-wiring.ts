@@ -19,7 +19,7 @@ export interface ChannelEventRegistration {
 
 export interface PayloadWiringEvaluation {
 	readonly invariant: AnalyzerCanonicalInvariantResult;
-	/** Unclaimed registrations are visibility findings, not MLA-S2 failures. */
+	/** Non-exempt registrations without payload claims. */
 	readonly runtimeOnly: readonly ChannelEventRegistration[];
 }
 
@@ -86,11 +86,17 @@ export function reconcilePayloadWiring(
 	return {
 		invariant: {
 			id: 'MLA-S2-PAYLOAD-WIRING',
-			status: missing.length ? 'fail' : 'pass',
-			details: missing.map(
-				(claim) =>
-					`${claim.containerId}: payload claims ${claim.eventName} on ${claim.hostNodeId} but the runtime channel did not confirm it`,
-			),
+			status: missing.length || runtimeOnly.length ? 'fail' : 'pass',
+			details: [
+				...missing.map(
+					(claim) =>
+						`${claim.containerId}: payload claims ${claim.eventName} on ${claim.hostNodeId} but the runtime channel did not confirm it`,
+				),
+				...runtimeOnly.map(
+					(entry) =>
+						`${entry.containerId}: runtime registered ${entry.eventName} on ${entry.hostNodeId ?? 'unknown-host'} without a payload claim (${entry.kind})`,
+				),
+			],
 		},
 		runtimeOnly,
 	};
