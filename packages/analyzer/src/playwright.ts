@@ -17,6 +17,12 @@ import {
 	type PreloadIntegrityEvaluation,
 	type PreloadRequestObservation,
 } from './preload-integrity.ts';
+import {
+	parsePayloadEventClaims,
+	reconcilePayloadWiring,
+	type ChannelEventRegistration,
+	type PayloadWiringEvaluation,
+} from './payload-wiring.ts';
 import { classifyRequest, type RequestClassificationInput } from './requests.ts';
 
 export interface ConsoleLedgerEntry {
@@ -158,7 +164,91 @@ export class RequestLedger {
 export interface MarklessDebugChannelV1Subset {
 	readonly version: 1;
 	readonly containers: readonly { readonly boundaries: readonly BoundarySnapshot[] }[];
-	explainInteraction(element: Element, eventName: string): { readonly kind: string };
+	explainInteraction(
+		element: Element,
+		eventName: string,
+	): { readonly kind: string; readonly source?: string };
+}
+
+export async function collectPayloadWiring(page: Page): Promise<PayloadWiringEvaluation> {
+	const containers = await page.evaluate(() => {
+		const channel = (
+			window as typeof window & { __MARKLESS_DEBUG__?: MarklessDebugChannelV1Subset }
+		).__MARKLESS_DEBUG__;
+		if (!channel || channel.version !== 1)
+			throw new Error(
+				`Analyzer requires Markless debug channel version 1; received ${channel?.version ?? 'missing'}`,
+			);
+		return [...document.querySelectorAll<Element>('[data-async-container]')].map(
+			(root, containerIndex) => {
+				const containerId = `document-container:${containerIndex}`;
+				const owned = <T extends Element>(selector: string) =>
+					[...root.querySelectorAll<T>(selector)].filter(
+						(element) => element.closest('[data-async-container]') === root,
+					);
+				const viewElement = owned<HTMLScriptElement>('script[type="markless/view"]')[0];
+				const armElements = owned<HTMLScriptElement>(
+					'script[type="markless/arm"][data-boundary]',
+				);
+				const viewScript = viewElement?.textContent ?? null;
+				const armScripts = armElements.map((script) => ({
+					boundaryId: script.getAttribute('data-boundary') ?? '',
+					content: script.textContent ?? '',
+				}));
+				const elements: Element[] = [root];
+				const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+				let node: Node | null;
+				while ((node = walker.nextNode())) elements.push(node as Element);
+				const registrations: ChannelEventRegistration[] = [];
+				const inspect = (recordSet: any, offset = 0) => {
+					for (const event of recordSet?.events ?? []) {
+						const locator = (recordSet?.locators ?? []).find(
+							(candidate: any) => candidate.hostNodeId === event.hostNodeId,
+						);
+						const element = locator && elements[offset + locator.index];
+						if (!element) continue;
+						const explanation = channel.explainInteraction(element, event.eventName);
+						registrations.push({
+							containerId,
+							hostNodeId: event.hostNodeId,
+							eventName: event.eventName,
+							kind: explanation.kind,
+							...(explanation.source ? { source: explanation.source } : {}),
+						});
+					}
+				};
+				const armOffset = (boundaryId: string) => {
+					const all = document.createTreeWalker(root, NodeFilter.SHOW_ALL);
+					let count = 0,
+						current: Node | null;
+					while ((current = all.nextNode())) {
+						if (
+							current.nodeType === Node.COMMENT_NODE &&
+							current.nodeValue === `markless:async:${boundaryId}`
+						)
+							return count + 1;
+						if (current.nodeType === Node.ELEMENT_NODE) count++;
+					}
+					return elements.length;
+				};
+				if (viewScript) {
+					const view = JSON.parse(viewScript);
+					inspect(view);
+					for (const boundary of view.asyncBoundaries ?? [])
+						if (boundary.armRecords && !Array.isArray(boundary.armRecords))
+							inspect(boundary.armRecords, armOffset(boundary.id));
+				}
+				for (const arm of armScripts)
+					inspect(JSON.parse(arm.content), armOffset(arm.boundaryId));
+				return { containerId, viewScript, armScripts, registrations };
+			},
+		);
+	});
+	const claims = containers.flatMap(parsePayloadEventClaims);
+	return reconcilePayloadWiring(
+		claims,
+		containers.flatMap((entry) => entry.registrations),
+	);
 }
 
 export interface CandidateExpectation {
