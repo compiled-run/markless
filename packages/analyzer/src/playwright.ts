@@ -11,6 +11,11 @@ import type {
 } from './contracts.ts';
 import { executedJavaScriptBytes, type V8CoverageEntry } from './coverage.ts';
 import { evaluateBoundaries, evaluateCandidate, type BoundarySnapshot } from './invariants.ts';
+import {
+	evaluatePreloadIntegrity,
+	type PreloadIntegrityEvaluation,
+	type PreloadRequestObservation,
+} from './preload-integrity.ts';
 import { classifyRequest, type RequestClassificationInput } from './requests.ts';
 
 export interface ConsoleLedgerEntry {
@@ -132,6 +137,14 @@ export class RequestLedger {
 		return Object.freeze(
 			this.#records.map(({ request: _request, ...record }) => Object.freeze({ ...record })),
 		);
+	}
+	preloadObservations(actionId?: string): readonly PreloadRequestObservation[] {
+		return this.snapshot().map((request) => ({
+			phase: this.input.phase,
+			...(this.input.phase === 'action' ? { actionId } : {}),
+			url: request.url,
+			resourceType: request.resourceType,
+		}));
 	}
 	detach() {
 		this.page.off('request', this.#onRequest);
@@ -380,8 +393,31 @@ export async function collectExecutedJavaScriptBytes(
 export interface MeasuredWindowResult {
 	readonly report: Omit<AnalyzerCandidateActionReport, 'invariants' | 'knownAudit'>;
 	readonly boundaryResults: Awaited<ReturnType<typeof waitForBoundaryLiveness>>;
+	readonly preloadIntegrity: PreloadIntegrityEvaluation;
 	readonly errors: readonly string[];
 }
+
+export async function collectDeclaredModulePreloads(page: Page): Promise<readonly string[]> {
+	return page.evaluate(() =>
+		[...document.querySelectorAll<HTMLLinkElement>('link[rel="modulepreload"]')]
+			.map((link) => link.href || link.getAttribute('href') || '')
+			.filter(Boolean),
+	);
+}
+
+async function collectPriorModuleLoads(page: Page): Promise<readonly PreloadRequestObservation[]> {
+	return page.evaluate(() =>
+		performance.getEntriesByType('resource').map((entry) => ({
+			phase: 'navigation' as const,
+			url: entry.name,
+			resourceType:
+				'initiatorType' in entry && entry.initiatorType === 'script'
+					? 'script'
+					: 'resource',
+		})),
+	);
+}
+
 export async function measurePageWindow(input: {
 	page: Page;
 	route: MatrixRoute;
@@ -399,6 +435,9 @@ export async function measurePageWindow(input: {
 	const startedAt = new Date().toISOString();
 	const started = performance.now();
 	const errors: string[] = [];
+	const declaredBefore = await collectDeclaredModulePreloads(input.page);
+	const loadedBefore =
+		input.actionId === 'bootstrap' ? [] : await collectPriorModuleLoads(input.page);
 	const consoleLedger = new ConsoleLedger(input.page);
 	const requestLedger = new RequestLedger(input.page, {
 		pageOrigin: input.origin,
@@ -432,11 +471,18 @@ export async function measurePageWindow(input: {
 	const coverage = await input.page.coverage.stopJSCoverage();
 	consoleLedger.assertAndClear();
 	const requests = requestLedger.snapshot();
+	const declaredAfter = await collectDeclaredModulePreloads(input.page);
+	const preloadIntegrity = evaluatePreloadIntegrity({
+		baseUrl: input.page.url(),
+		declaredPreloads: [...new Set([...declaredBefore, ...declaredAfter])],
+		observedRequests: [...loadedBefore, ...requestLedger.preloadObservations(input.actionId)],
+	});
 	consoleLedger.detach();
 	requestLedger.detach();
 	return {
 		errors,
 		boundaryResults,
+		preloadIntegrity,
 		report: {
 			routeFile: input.route.routeFile,
 			fixtureUrlId: input.fixtureUrlId,
