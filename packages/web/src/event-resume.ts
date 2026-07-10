@@ -1,4 +1,9 @@
-import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer';
+import {
+	MARKLESS_STATE_SCRIPT_TYPE,
+	MARKLESS_VIEW_SCRIPT_TYPE,
+	type ProtocolStatePayload,
+	type ProtocolViewPayload,
+} from '@markless/serializer';
 import type {
 	DomJournalEntry,
 	DomJournalResult,
@@ -121,8 +126,8 @@ export async function resumeEventFromPayloadDocument(
 ): Promise<EventResumeContainer> {
 	let container = containers.get(input.root);
 	if (!container) {
-		const state = readPayloadJson<ProtocolStatePayload>(input.document, 'markless/state');
-		const view = readPayloadJson<ProtocolViewPayload>(input.document, 'markless/view');
+		const state = readPayloadJson<ProtocolStatePayload>(input.document, MARKLESS_STATE_SCRIPT_TYPE);
+		const view = readPayloadJson<ProtocolViewPayload>(input.document, MARKLESS_VIEW_SCRIPT_TYPE);
 		container = createEventResumeContainerState({
 			state,
 			view,

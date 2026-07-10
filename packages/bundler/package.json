@@ -11,6 +11,10 @@
 	"publishConfig": {
 		"access": "public",
 		"exports": {
+			"./constants": {
+				"types": "./dist/build/constants.d.ts",
+				"default": "./dist/build/constants.js"
+			},
 			"./preload": {
 				"types": "./dist/preload.d.ts",
 				"default": "./dist/preload.js"

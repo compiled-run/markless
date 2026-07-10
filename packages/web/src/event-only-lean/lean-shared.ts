@@ -3,6 +3,7 @@ import type {
 	ProtocolSyncPolicyCondition,
 	ProtocolViewPayload,
 } from '../../../serializer/src/protocol.ts';
+import { MARKLESS_STATE_SCRIPT_TYPE } from '../../../serializer/src/protocol-constants.ts';
 import type {
 	SerializedGraphPayload,
 	SerializedSlot,
@@ -180,7 +181,7 @@ export function readLeanStateCells(
 	cellIds: ReadonlySet<string>,
 ): ProtocolStatePayload['cells'] {
 	if (!Array.isArray(cells)) {
-		throw leanPayloadShapeError('Invalid markless/state payload: expected cells array.');
+		throw leanPayloadShapeError(`Invalid ${MARKLESS_STATE_SCRIPT_TYPE} payload: expected cells array.`);
 	}
 	const matchingCells: ProtocolStatePayload['cells'][number][] = [];
 	for (const [index, cell] of cells.entries()) {
@@ -189,7 +190,7 @@ export function readLeanStateCells(
 				? (cell as { readonly graphNodeId?: unknown }).graphNodeId
 				: undefined;
 		if (typeof graphNodeId !== 'string' || !cellIds.has(graphNodeId)) continue;
-		assertLeanStateCellPayload(cell, `markless/state cell[${index}]`);
+		assertLeanStateCellPayload(cell, `${MARKLESS_STATE_SCRIPT_TYPE} cell[${index}]`);
 		matchingCells.push(cell);
 	}
 	return matchingCells;
@@ -197,7 +198,7 @@ export function readLeanStateCells(
 
 export function readLeanComputedEntries(computed: unknown): ReadonlyArray<unknown> {
 	if (!Array.isArray(computed)) {
-		throw leanPayloadShapeError('Invalid markless/state payload: expected computed array.');
+		throw leanPayloadShapeError(`Invalid ${MARKLESS_STATE_SCRIPT_TYPE} payload: expected computed array.`);
 	}
 	return computed;
 }
@@ -398,13 +399,13 @@ function leanPayloadShapeError(message: string): Error {
 		phase: 'payload',
 		title: 'Invalid resumability payload',
 		message,
-		why: 'The markless/state payload did not match the resumability protocol shape required by this runtime.',
-		payloadType: 'markless/state',
-		payloadScript: 'script[type="markless/state"]',
+		why: `The ${MARKLESS_STATE_SCRIPT_TYPE} payload did not match the resumability protocol shape required by this runtime.`,
+		payloadType: MARKLESS_STATE_SCRIPT_TYPE,
+		payloadScript: `script[type="${MARKLESS_STATE_SCRIPT_TYPE}"]`,
 		suggestions: [
 			{
 				message:
-					'Regenerate the markless/state payload with the matching markless compiler/runtime version.',
+					`Regenerate the ${MARKLESS_STATE_SCRIPT_TYPE} payload with the matching markless compiler/runtime version.`,
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_PAYLOAD_INVALID',

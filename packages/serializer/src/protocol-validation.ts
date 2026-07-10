@@ -3,6 +3,10 @@ import {
 	type ProtocolStatePayload,
 	type ProtocolViewPayload,
 } from './protocol.ts';
+import {
+	MARKLESS_STATE_SCRIPT_TYPE,
+	MARKLESS_VIEW_SCRIPT_TYPE,
+} from './protocol-constants.ts';
 
 export type EncodedPayloadScripts = {
 	readonly stateScript: string;
@@ -14,7 +18,9 @@ export type DecodedPayloadScripts = {
 	readonly view: ProtocolViewPayload;
 };
 
-export type RuntimePayloadType = 'markless/state' | 'markless/view';
+export type RuntimePayloadType =
+	| typeof MARKLESS_STATE_SCRIPT_TYPE
+	| typeof MARKLESS_VIEW_SCRIPT_TYPE;
 
 export type RuntimePayloadErrorCode =
 	| 'MARKLESS_PAYLOAD_INVALID'
@@ -66,13 +72,13 @@ export class RuntimePayloadError extends Error implements RuntimePayloadDiagnost
 }
 
 export function decodePayloadScripts(input: EncodedPayloadScripts): DecodedPayloadScripts {
-	const state = parseDataScript(input.stateScript, 'markless/state') as ProtocolStatePayload;
-	const view = parseDataScript(input.viewScript, 'markless/view') as ProtocolViewPayload;
+	const state = parseDataScript(input.stateScript, MARKLESS_STATE_SCRIPT_TYPE) as ProtocolStatePayload;
+	const view = parseDataScript(input.viewScript, MARKLESS_VIEW_SCRIPT_TYPE) as ProtocolViewPayload;
 
 	assertProtocolStatePayload(state);
 	assertProtocolViewPayload(view);
-	assertProtocolVersion(state.version, 'markless/state');
-	assertProtocolVersion(view.version, 'markless/view');
+	assertProtocolVersion(state.version, MARKLESS_STATE_SCRIPT_TYPE);
+	assertProtocolVersion(view.version, MARKLESS_VIEW_SCRIPT_TYPE);
 
 	return { state, view };
 }
@@ -115,26 +121,26 @@ export function assertProtocolStatePayload(
 ): asserts payload is ProtocolStatePayload {
 	if (!isRecord(payload)) {
 		throw invalidPayloadShapeError(
-			'markless/state',
-			'Invalid markless/state payload: expected object.',
+			MARKLESS_STATE_SCRIPT_TYPE,
+			`Invalid ${MARKLESS_STATE_SCRIPT_TYPE} payload: expected object.`,
 		);
 	}
 	if (!('version' in payload)) {
 		throw invalidPayloadShapeError(
-			'markless/state',
-			'Invalid markless/state payload: expected version.',
+			MARKLESS_STATE_SCRIPT_TYPE,
+			`Invalid ${MARKLESS_STATE_SCRIPT_TYPE} payload: expected version.`,
 		);
 	}
-	const cells = requiredPayloadArrayField(payload, 'cells', 'markless/state');
+	const cells = requiredPayloadArrayField(payload, 'cells', MARKLESS_STATE_SCRIPT_TYPE);
 
 	for (const [index, cell] of cells.entries()) {
-		assertProtocolStateCellPayload(cell, `markless/state cell[${index}]`);
+		assertProtocolStateCellPayload(cell, `${MARKLESS_STATE_SCRIPT_TYPE} cell[${index}]`);
 	}
 
-	const computedEntries = requiredPayloadArrayField(payload, 'computed', 'markless/state');
+	const computedEntries = requiredPayloadArrayField(payload, 'computed', MARKLESS_STATE_SCRIPT_TYPE);
 
 	for (const [index, computed] of computedEntries.entries()) {
-		const context = `markless/state computed[${index}]`;
+		const context = `${MARKLESS_STATE_SCRIPT_TYPE} computed[${index}]`;
 		assertRecordShape(computed, context);
 		assertStringField(computed, 'graphNodeId', context);
 		assertStringField(computed, 'name', context);
@@ -171,26 +177,26 @@ export function assertProtocolViewPayload(
 ): asserts payload is ProtocolViewPayload {
 	if (!isRecord(payload)) {
 		throw invalidPayloadShapeError(
-			'markless/view',
-			'Invalid markless/view payload: expected object.',
+			MARKLESS_VIEW_SCRIPT_TYPE,
+			`Invalid ${MARKLESS_VIEW_SCRIPT_TYPE} payload: expected object.`,
 		);
 	}
 	if (!('version' in payload)) {
 		throw invalidPayloadShapeError(
-			'markless/view',
-			'Invalid markless/view payload: expected version.',
+			MARKLESS_VIEW_SCRIPT_TYPE,
+			`Invalid ${MARKLESS_VIEW_SCRIPT_TYPE} payload: expected version.`,
 		);
 	}
 
-	const locators = requiredPayloadArrayField(payload, 'locators', 'markless/view');
-	const events = requiredPayloadArrayField(payload, 'events', 'markless/view');
-	const domUpdates = requiredPayloadArrayField(payload, 'domUpdates', 'markless/view');
-	const behaviors = requiredPayloadArrayField(payload, 'behaviors', 'markless/view');
-	const elementHandles = requiredPayloadArrayField(payload, 'elementHandles', 'markless/view');
-	const asyncBoundaries = requiredPayloadArrayField(payload, 'asyncBoundaries', 'markless/view');
+	const locators = requiredPayloadArrayField(payload, 'locators', MARKLESS_VIEW_SCRIPT_TYPE);
+	const events = requiredPayloadArrayField(payload, 'events', MARKLESS_VIEW_SCRIPT_TYPE);
+	const domUpdates = requiredPayloadArrayField(payload, 'domUpdates', MARKLESS_VIEW_SCRIPT_TYPE);
+	const behaviors = requiredPayloadArrayField(payload, 'behaviors', MARKLESS_VIEW_SCRIPT_TYPE);
+	const elementHandles = requiredPayloadArrayField(payload, 'elementHandles', MARKLESS_VIEW_SCRIPT_TYPE);
+	const asyncBoundaries = requiredPayloadArrayField(payload, 'asyncBoundaries', MARKLESS_VIEW_SCRIPT_TYPE);
 
 	for (const [index, locator] of locators.entries()) {
-		const context = `markless/view locator[${index}]`;
+		const context = `${MARKLESS_VIEW_SCRIPT_TYPE} locator[${index}]`;
 		assertRecordShape(locator, context);
 		assertStringField(locator, 'hostNodeId', context);
 		assertLiteralField(locator, 'strategy', 'dom-order', context);
@@ -199,7 +205,7 @@ export function assertProtocolViewPayload(
 	}
 
 	for (const [index, event] of events.entries()) {
-		const context = `markless/view event[${index}]`;
+		const context = `${MARKLESS_VIEW_SCRIPT_TYPE} event[${index}]`;
 		assertRecordShape(event, context);
 		assertStringField(event, 'hostNodeId', context);
 		assertStringField(event, 'eventName', context);
@@ -210,7 +216,7 @@ export function assertProtocolViewPayload(
 	}
 
 	for (const [index, domUpdate] of domUpdates.entries()) {
-		const context = `markless/view domUpdate[${index}]`;
+		const context = `${MARKLESS_VIEW_SCRIPT_TYPE} domUpdate[${index}]`;
 		assertRecordShape(domUpdate, context);
 		assertStringField(domUpdate, 'hostNodeId', context);
 		assertStringField(domUpdate, 'source', context);
@@ -221,7 +227,7 @@ export function assertProtocolViewPayload(
 	}
 
 	for (const [index, behavior] of behaviors.entries()) {
-		const context = `markless/view behavior[${index}]`;
+		const context = `${MARKLESS_VIEW_SCRIPT_TYPE} behavior[${index}]`;
 		assertRecordShape(behavior, context);
 		assertStringField(behavior, 'hostNodeId', context);
 		assertStringField(behavior, 'source', context);
@@ -233,7 +239,7 @@ export function assertProtocolViewPayload(
 	}
 
 	for (const [index, handle] of elementHandles.entries()) {
-		const context = `markless/view elementHandle[${index}]`;
+		const context = `${MARKLESS_VIEW_SCRIPT_TYPE} elementHandle[${index}]`;
 		assertRecordShape(handle, context);
 		assertStringField(handle, 'hostNodeId', context);
 		assertStringField(handle, 'handleId', context);
@@ -241,7 +247,7 @@ export function assertProtocolViewPayload(
 	}
 
 	for (const [index, boundary] of asyncBoundaries.entries()) {
-		const context = `markless/view asyncBoundary[${index}]`;
+		const context = `${MARKLESS_VIEW_SCRIPT_TYPE} asyncBoundary[${index}]`;
 		assertRecordShape(boundary, context);
 		assertStringField(boundary, 'id', context);
 		assertCommentAnchor(boundary.startAnchor, `${context}.startAnchor`);
@@ -406,13 +412,13 @@ function assertOptionalKeyedRepeats(record: Record<string, unknown>): void {
 	if (record.keyedRepeats === undefined) return;
 	if (!Array.isArray(record.keyedRepeats)) {
 		throw invalidPayloadShapeError(
-			'markless/view',
-			'Invalid markless/view payload: expected keyedRepeats array.',
+			MARKLESS_VIEW_SCRIPT_TYPE,
+			`Invalid ${MARKLESS_VIEW_SCRIPT_TYPE} payload: expected keyedRepeats array.`,
 		);
 	}
 
 	for (const [index, repeat] of record.keyedRepeats.entries()) {
-		const context = `markless/view keyedRepeat[${index}]`;
+		const context = `${MARKLESS_VIEW_SCRIPT_TYPE} keyedRepeat[${index}]`;
 		assertRecordShape(repeat, context);
 		assertStringField(repeat, 'id', context);
 		assertStringField(repeat, 'parentHostNodeId', context);
@@ -429,13 +435,13 @@ function assertOptionalBranches(record: Record<string, unknown>): void {
 	if (record.branches === undefined) return;
 	if (!Array.isArray(record.branches)) {
 		throw invalidPayloadShapeError(
-			'markless/view',
-			'Invalid markless/view payload: expected branches array.',
+			MARKLESS_VIEW_SCRIPT_TYPE,
+			`Invalid ${MARKLESS_VIEW_SCRIPT_TYPE} payload: expected branches array.`,
 		);
 	}
 
 	for (const [index, branch] of record.branches.entries()) {
-		const context = `markless/view branch[${index}]`;
+		const context = `${MARKLESS_VIEW_SCRIPT_TYPE} branch[${index}]`;
 		assertRecordShape(branch, context);
 		assertStringField(branch, 'id', context);
 		assertCommentAnchor(branch.startAnchor, `${context}.startAnchor`);
@@ -560,13 +566,13 @@ function assertOptionalSharedDefinitions(record: Record<string, unknown>): void 
 	if (record.sharedDefinitions === undefined) return;
 	if (!Array.isArray(record.sharedDefinitions)) {
 		throw invalidPayloadShapeError(
-			'markless/state',
-			'Invalid markless/state payload: expected sharedDefinitions array.',
+			MARKLESS_STATE_SCRIPT_TYPE,
+			`Invalid ${MARKLESS_STATE_SCRIPT_TYPE} payload: expected sharedDefinitions array.`,
 		);
 	}
 
 	for (const [index, definition] of record.sharedDefinitions.entries()) {
-		const context = `markless/state sharedDefinitions[${index}]`;
+		const context = `${MARKLESS_STATE_SCRIPT_TYPE} sharedDefinitions[${index}]`;
 		assertRecordShape(definition, context);
 		assertStringField(definition, 'id', context);
 		assertStringField(definition, 'name', context);
@@ -1379,7 +1385,7 @@ function protocolVersionMismatchError(
 }
 
 function contextPayloadType(context: string): RuntimePayloadType {
-	return context.startsWith('markless/state') ? 'markless/state' : 'markless/view';
+	return context.startsWith(MARKLESS_STATE_SCRIPT_TYPE) ? MARKLESS_STATE_SCRIPT_TYPE : MARKLESS_VIEW_SCRIPT_TYPE;
 }
 
 export function payloadScriptSelector(type: RuntimePayloadType): string {

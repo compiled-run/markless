@@ -2,6 +2,10 @@ import type {
 	ProtocolStatePayload,
 	ProtocolViewPayload,
 } from '../../../serializer/src/protocol.ts';
+import {
+	MARKLESS_STATE_SCRIPT_TYPE,
+	MARKLESS_VIEW_SCRIPT_TYPE,
+} from '../../../serializer/src/protocol-constants.ts';
 import type {
 	EventOnlyResumeContainer,
 	EventOnlyResumeDomElement,
@@ -30,8 +34,8 @@ export async function resumeScalarRowEventFromPayloadDocument(
 ): Promise<EventOnlyResumeContainer> {
 	const action = rowAction(input.event.type, input.runtimeDemandMap);
 	if (!action?.plan) return resumeFullEventOnly(input);
-	const state = readPayloadScript(input.document, 'markless/state') as ProtocolStatePayload;
-	const view = readPayloadScript(input.document, 'markless/view') as ProtocolViewPayload;
+	const state = readPayloadScript(input.document, MARKLESS_STATE_SCRIPT_TYPE) as ProtocolStatePayload;
+	const view = readPayloadScript(input.document, MARKLESS_VIEW_SCRIPT_TYPE) as ProtocolViewPayload;
 	const plan = scalarRowLeanResumePlan({
 		state,
 		view,
@@ -236,7 +240,7 @@ function planDomUpdates(
 
 function readPayloadScript(
 	document: ResumeEventOnlyFromPayloadDocumentInput['document'],
-	type: 'markless/state' | 'markless/view',
+	type: typeof MARKLESS_STATE_SCRIPT_TYPE | typeof MARKLESS_VIEW_SCRIPT_TYPE,
 ) {
 	const element = document.querySelector(`script[type="${type}"]`);
 	const text = element?.textContent ?? element?.text ?? element?.innerHTML;
