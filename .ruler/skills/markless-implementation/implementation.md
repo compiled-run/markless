@@ -22,6 +22,8 @@ This is the base guidance for every write packet. Read the applicable workflow o
 
 ## Tests and verification
 
+Everything is test-driven.
+
 - For behavior changes and bug fixes, first add or update the closest focused test and run the narrowest command that fails for the expected reason. Then implement the smallest change, rerun the focused test, refactor, and broaden verification only for shared behavior.
 - If a change is spec-only, formatting-only, generated metadata, or genuinely cannot be tested first, state why in the final report.
 - Assert observable behavior or artifact contracts rather than incidental implementation details. Prefer focused artifacts and diagnostics to giant snapshots unless final emit is the behavior under test.
