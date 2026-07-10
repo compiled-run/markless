@@ -1,0 +1,48 @@
+{
+	"name": "@markless/analyzer",
+	"version": "0.1.1",
+	"description": "Portable browser QA analysis contracts with an optional Playwright driver.",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/markless-dev/markless.git",
+		"directory": "packages/analyzer"
+	},
+	"files": [
+		"dist",
+		"route-action-matrix.schema.json"
+	],
+	"type": "module",
+	"sideEffects": false,
+	"exports": {
+		".": "./src/index.ts",
+		"./playwright": "./src/playwright.ts"
+	},
+	"publishConfig": {
+		"access": "public",
+		"exports": {
+			".": {
+				"types": "./dist/index.d.ts",
+				"default": "./dist/index.js"
+			},
+			"./playwright": {
+				"types": "./dist/playwright.d.ts",
+				"default": "./dist/playwright.js"
+			}
+		}
+	},
+	"scripts": {
+		"prepublishOnly": "node ../../scripts/release/verify-publish-ready.mjs"
+	},
+	"devDependencies": {
+		"playwright": "1.58.2"
+	},
+	"peerDependencies": {
+		"playwright": ">=1.58.0"
+	},
+	"peerDependenciesMeta": {
+		"playwright": {
+			"optional": true
+		}
+	}
+}

@@ -91,6 +91,13 @@ const webFnsEntries = Object.fromEntries(
 
 const buildOrder: PackUserConfig[] = [
 	marklessPack({
+		packageName: 'analyzer',
+		entry: {
+			index: './src/index.ts',
+			playwright: './src/playwright.ts',
+		},
+	}),
+	marklessPack({
 		packageName: 'serializer',
 		entry: {
 			index: './src/index.ts',

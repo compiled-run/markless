@@ -1,0 +1,11 @@
+[mcp_servers.grep]
+url = "https://mcp.grep.app"
+
+[mcp_servers.chrome-devtools]
+command = "npx"
+args = [
+  "-y",
+  "chrome-devtools-mcp@1.5.0",
+  "--headless",
+  "--isolated"
+]

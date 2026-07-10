@@ -1,0 +1,28 @@
+# .ruler/ is the single source for agent rules, skills, and MCP servers.
+# Run `pnpm rules` after editing this directory.
+default_agents = ["claude", "codex"]
+
+[gitignore]
+enabled = false
+
+[skills]
+enabled = true
+
+[mcp]
+enabled = true
+merge_strategy = "merge"
+
+[mcp_servers.grep]
+url = "https://mcp.grep.app"
+
+[mcp_servers.chrome-devtools]
+command = "npx"
+args = ["-y", "chrome-devtools-mcp@1.5.0", "--headless", "--isolated"]
+
+[agents.claude]
+enabled = true
+output_path = "CLAUDE.md"
+
+[agents.codex]
+enabled = true
+output_path = "AGENTS.md"
