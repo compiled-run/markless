@@ -28,6 +28,7 @@
 	"type": "module",
 	"sideEffects": false,
 	"exports": {
+		"./constants": "./src/build/constants.ts",
 		"./preload": "./src/preload.ts",
 		"./rolldown": "./src/rolldown.ts",
 		"./vite": "./src/vite/index.ts"

@@ -1,9 +1,8 @@
 import type { CodeSplittingOptions, OutputOptions } from 'rolldown';
 import type { MarklessEnvironment } from '../types.ts';
+import { MARKLESS_BUILD_PREFIX } from './constants.ts';
 
-export const MARKLESS_BUILD_DIR = 'build';
-export const MARKLESS_BUILD_PREFIX = `${MARKLESS_BUILD_DIR}/`;
-export const MARKLESS_BUNDLE_GRAPH = `${MARKLESS_BUILD_PREFIX}bundle-graph.json`;
+export { MARKLESS_BUILD_DIR, MARKLESS_BUILD_PREFIX, MARKLESS_BUNDLE_GRAPH } from './constants.ts';
 
 // Progressive runtime execution (specs/framework/06-runtime-resumer.md): each web
 // runtime capability chunks separately so an action never executes untouched

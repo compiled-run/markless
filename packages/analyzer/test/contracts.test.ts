@@ -277,6 +277,20 @@ describe('analyzer contracts', () => {
 		).toBe('declared-api');
 	});
 
+	test('rejects a relative servingPrefix before classifying requests', () => {
+		expect(() => classifyRequest({
+			pageOrigin: 'https://app.test',
+			servingPrefix: 'assets/',
+			knownDocumentPaths: [],
+			declaredApi: [],
+			phase: 'action',
+			method: 'GET',
+			url: 'https://app.test/assets/action.js',
+			resourceType: 'script',
+			status: 200,
+		})).toThrow('servingPrefix must start with "/"; received "assets/"');
+	});
+
 	test('validates matrix references and exact route file equality', () => {
 		const action = {
 			id: 'open',

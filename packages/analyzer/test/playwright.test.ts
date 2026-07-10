@@ -64,6 +64,17 @@ describe('Playwright adapter', () => {
 		expect(page.evaluate).toHaveBeenCalledWith(expect.any(Function), '/assets/');
 	});
 
+	test('rejects a relative servingPrefix before entering the page', async () => {
+		const page = { evaluate: vi.fn() };
+		await expect(collectServedBuildArtifacts(page as never, 'assets/'))
+			.rejects.toThrow('servingPrefix must start with "/"; received "assets/"');
+		expect(page.evaluate).not.toHaveBeenCalled();
+		expect(() => new RequestLedger(page as never, {
+			pageOrigin: 'https://app.test', servingPrefix: 'assets/', knownDocumentPaths: [],
+			declaredApi: [], phase: 'action',
+		})).toThrow('servingPrefix must start with "/"; received "assets/"');
+	});
+
 	test('adapts a serialized page Document to the locator core', async () => {
 		const page = {
 			evaluate: vi.fn(async () => [{

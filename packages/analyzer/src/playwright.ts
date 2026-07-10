@@ -41,10 +41,11 @@ import {
 	type ChannelEventRegistration,
 	type PayloadWiringEvaluation,
 } from './payload-wiring.ts';
-import { classifyRequest, type RequestClassificationInput } from './requests.ts';
+import { assertServingPrefix, classifyRequest, type RequestClassificationInput } from './requests.ts';
 import type { AnalyzerTextArtifact } from './strip-guarantee.ts';
 
 export async function collectServedBuildArtifacts(page: Page, servingPrefix: string): Promise<AnalyzerTextArtifact[]> {
+	assertServingPrefix(servingPrefix);
 	return page.evaluate(async (servingPrefix) => {
 		const current = new URL(location.href);
 		const urls = [
@@ -148,6 +149,7 @@ export class RequestLedger {
 		readonly page: Page,
 		readonly input: RequestLedgerInput,
 	) {
+		assertServingPrefix(input.servingPrefix);
 		page.on('request', this.#onRequest);
 		page.on('response', this.#onResponse);
 		page.on('requestfinished', this.#onRequestFinished);
@@ -642,6 +644,7 @@ export async function measurePageWindow(input: {
 	rootSelector?: string;
 	knownAudits?: readonly AnalyzerKnownAuditItem[];
 }): Promise<MeasuredWindowResult> {
+	assertServingPrefix(input.servingPrefix);
 	const startedAt = new Date().toISOString();
 	const started = performance.now();
 	const errors: string[] = [];

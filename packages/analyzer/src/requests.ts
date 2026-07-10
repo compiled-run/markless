@@ -12,9 +12,15 @@ export interface RequestClassificationInput {
 	readonly status: number | null;
 }
 
+export function assertServingPrefix(servingPrefix: string): void {
+	if (!servingPrefix.startsWith('/'))
+		throw new Error(`servingPrefix must start with "/"; received ${JSON.stringify(servingPrefix)}`);
+}
+
 export function classifyRequest(
 	input: RequestClassificationInput,
 ): AnalyzerRequestRecord['classification'] {
+	assertServingPrefix(input.servingPrefix);
 	let target: URL;
 	try {
 		target = new URL(input.url);
