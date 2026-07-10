@@ -130,6 +130,8 @@ export interface MatrixAction {
 	readonly operation: 'click' | 'fill' | 'select' | 'press';
 	readonly value?: string;
 	readonly expectedEventTypes: readonly string[];
+	/** Action performs a route navigation (any mechanism); MLA-S1 expects destination module loads. */
+	readonly navigates?: boolean;
 	readonly expectedInteraction:
 		| 'inline-resumer'
 		| 'resume-record'

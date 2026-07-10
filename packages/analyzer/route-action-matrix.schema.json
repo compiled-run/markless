@@ -1,208 +1,426 @@
 {
-	"$schema": "https://json-schema.org/draft/2020-12/schema",
-	"$id": "https://markless.dev/schemas/analyzer-route-actions-v1.json",
-	"title": "Markless analyzer route/action matrix",
-	"type": "object",
-	"additionalProperties": false,
-	"required": ["schemaVersion", "routes"],
-	"properties": {
-		"schemaVersion": { "const": 1 },
-		"routes": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/route" } }
-	},
-	"$defs": {
-		"route": {
-			"type": "object",
-			"additionalProperties": false,
-			"required": [
-				"routeFile",
-				"fixtureUrls",
-				"apiContracts",
-				"actions",
-				"bootstrapPendingPolicy",
-				"bootstrapExpectedRejectedBoundaryIds",
-				"resetRequirements"
-			],
-			"properties": {
-				"routeFile": { "type": "string", "pattern": "^pages/.+\\.(tsrx|mdx)$" },
-				"fixtureUrls": {
-					"type": "array",
-					"minItems": 1,
-					"items": { "$ref": "#/$defs/fixtureUrl" }
-				},
-				"apiContracts": { "type": "array", "items": { "$ref": "#/$defs/apiContract" } },
-				"actions": { "type": "array", "items": { "$ref": "#/$defs/action" } },
-				"bootstrapPendingPolicy": { "$ref": "#/$defs/pendingPolicy" },
-				"bootstrapExpectedRejectedBoundaryIds": {
-					"type": "array",
-					"uniqueItems": true,
-					"items": { "type": "string", "minLength": 1 }
-				},
-				"resetRequirements": { "$ref": "#/$defs/resetRequirements" },
-				"ownerNotes": { "type": "array", "items": { "type": "string", "minLength": 1 } }
-			}
-		},
-		"fixtureUrl": {
-			"type": "object",
-			"additionalProperties": false,
-			"required": ["id", "url"],
-			"properties": {
-				"id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
-				"url": { "type": "string", "pattern": "^(?:/#/.*|/)$" }
-			}
-		},
-		"apiContract": {
-			"type": "object",
-			"additionalProperties": false,
-			"required": ["id", "phase", "method", "path"],
-			"properties": {
-				"id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
-				"phase": { "enum": ["bootstrap", "action"] },
-				"actionId": { "type": "string" },
-				"method": { "enum": ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"] },
-				"path": { "type": "string", "pattern": "^/" },
-				"required": { "type": "boolean", "default": true }
-			},
-			"allOf": [
-				{
-					"if": { "properties": { "phase": { "const": "action" } } },
-					"then": { "required": ["actionId"] }
-				}
-			]
-		},
-		"locator": {
-			"type": "object",
-			"additionalProperties": false,
-			"required": ["kind", "value"],
-			"properties": {
-				"kind": { "enum": ["testId", "role", "css"] },
-				"value": { "type": "string", "minLength": 1 },
-				"name": { "type": "string" }
-			}
-		},
-		"pendingPolicy": {
-			"oneOf": [
-				{
-					"type": "object",
-					"additionalProperties": false,
-					"required": ["allow"],
-					"properties": { "allow": { "const": false } }
-				},
-				{
-					"type": "object",
-					"additionalProperties": false,
-					"required": ["allow", "boundaryIds", "maxAgeMs", "reason"],
-					"properties": {
-						"allow": { "const": true },
-						"boundaryIds": {
-							"type": "array",
-							"minItems": 1,
-							"uniqueItems": true,
-							"items": { "type": "string", "minLength": 1 }
-						},
-						"maxAgeMs": { "type": "integer", "minimum": 1, "maximum": 5000 },
-						"reason": { "type": "string", "minLength": 1 }
-					}
-				}
-			]
-		},
-		"actionReset": {
-			"type": "object",
-			"additionalProperties": false,
-			"required": ["mode"],
-			"properties": {
-				"mode": { "enum": ["none", "fresh-fixture"] },
-				"reason": { "type": "string" }
-			}
-		},
-		"action": {
-			"type": "object",
-			"additionalProperties": false,
-			"required": [
-				"id",
-				"fixtureUrlId",
-				"safety",
-				"defaultCrawl",
-				"locator",
-				"operation",
-				"expectedEventTypes",
-				"expectedInteraction",
-				"apiContractIds",
-				"pendingPolicy",
-				"expectedRejectedBoundaryIds",
-				"reset"
-			],
-			"properties": {
-				"id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
-				"fixtureUrlId": { "type": "string" },
-				"safety": { "enum": ["safe", "mutating"] },
-				"defaultCrawl": { "type": "boolean" },
-				"locator": { "$ref": "#/$defs/locator" },
-				"operation": { "enum": ["click", "fill", "select", "press"] },
-				"value": { "type": "string" },
-				"expectedEventTypes": {
-					"type": "array",
-					"minItems": 1,
-					"uniqueItems": true,
-					"items": { "type": "string", "minLength": 1 }
-				},
-				"expectedInteraction": {
-					"enum": [
-						"inline-resumer",
-						"resume-record",
-						"row-record",
-						"direct-csr",
-						"router-delegation",
-						"native"
-					]
-				},
-				"apiContractIds": {
-					"type": "array",
-					"uniqueItems": true,
-					"items": { "type": "string" }
-				},
-				"setupActionIds": {
-					"type": "array",
-					"uniqueItems": true,
-					"items": { "type": "string", "minLength": 1 }
-				},
-				"pendingPolicy": { "$ref": "#/$defs/pendingPolicy" },
-				"expectedRejectedBoundaryIds": {
-					"type": "array",
-					"uniqueItems": true,
-					"items": { "type": "string", "minLength": 1 }
-				},
-				"reset": { "$ref": "#/$defs/actionReset" }
-			},
-			"allOf": [
-				{
-					"if": { "properties": { "safety": { "const": "mutating" } } },
-					"then": {
-						"properties": {
-							"defaultCrawl": { "const": false },
-							"reset": {
-								"required": ["reason"],
-								"properties": { "mode": { "const": "fresh-fixture" } }
-							}
-						}
-					}
-				},
-				{
-					"if": {
-						"properties": { "operation": { "enum": ["fill", "select", "press"] } }
-					},
-					"then": { "required": ["value"] }
-				}
-			]
-		},
-		"resetRequirements": {
-			"type": "object",
-			"additionalProperties": false,
-			"required": ["beforeRoute", "beforeEachAction", "afterMutatingAction"],
-			"properties": {
-				"beforeRoute": { "enum": ["fresh-fixture", "reuse-read-only-fixture"] },
-				"beforeEachAction": { "enum": ["fresh-browser-context", "fresh-fixture"] },
-				"afterMutatingAction": { "const": "discard-fixture" }
-			}
-		}
-	}
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "https://markless.dev/schemas/analyzer-route-actions-v1.json",
+ "title": "Markless analyzer route/action matrix",
+ "type": "object",
+ "additionalProperties": false,
+ "required": [
+  "schemaVersion",
+  "routes"
+ ],
+ "properties": {
+  "schemaVersion": {
+   "const": 1
+  },
+  "routes": {
+   "type": "array",
+   "minItems": 1,
+   "items": {
+    "$ref": "#/$defs/route"
+   }
+  }
+ },
+ "$defs": {
+  "route": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "routeFile",
+    "fixtureUrls",
+    "apiContracts",
+    "actions",
+    "bootstrapPendingPolicy",
+    "bootstrapExpectedRejectedBoundaryIds",
+    "resetRequirements"
+   ],
+   "properties": {
+    "routeFile": {
+     "type": "string",
+     "pattern": "^pages/.+\\.(tsrx|mdx)$"
+    },
+    "fixtureUrls": {
+     "type": "array",
+     "minItems": 1,
+     "items": {
+      "$ref": "#/$defs/fixtureUrl"
+     }
+    },
+    "apiContracts": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/apiContract"
+     }
+    },
+    "actions": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/action"
+     }
+    },
+    "bootstrapPendingPolicy": {
+     "$ref": "#/$defs/pendingPolicy"
+    },
+    "bootstrapExpectedRejectedBoundaryIds": {
+     "type": "array",
+     "uniqueItems": true,
+     "items": {
+      "type": "string",
+      "minLength": 1
+     }
+    },
+    "resetRequirements": {
+     "$ref": "#/$defs/resetRequirements"
+    },
+    "ownerNotes": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     }
+    }
+   }
+  },
+  "fixtureUrl": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "id",
+    "url"
+   ],
+   "properties": {
+    "id": {
+     "type": "string",
+     "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "url": {
+     "type": "string",
+     "pattern": "^(?:/#/.*|/)$"
+    }
+   }
+  },
+  "apiContract": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "id",
+    "phase",
+    "method",
+    "path"
+   ],
+   "properties": {
+    "id": {
+     "type": "string",
+     "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "phase": {
+     "enum": [
+      "bootstrap",
+      "action"
+     ]
+    },
+    "actionId": {
+     "type": "string"
+    },
+    "method": {
+     "enum": [
+      "GET",
+      "HEAD",
+      "POST",
+      "PUT",
+      "PATCH",
+      "DELETE"
+     ]
+    },
+    "path": {
+     "type": "string",
+     "pattern": "^/"
+    },
+    "required": {
+     "type": "boolean",
+     "default": true
+    }
+   },
+   "allOf": [
+    {
+     "if": {
+      "properties": {
+       "phase": {
+        "const": "action"
+       }
+      }
+     },
+     "then": {
+      "required": [
+       "actionId"
+      ]
+     }
+    }
+   ]
+  },
+  "locator": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "kind",
+    "value"
+   ],
+   "properties": {
+    "kind": {
+     "enum": [
+      "testId",
+      "role",
+      "css"
+     ]
+    },
+    "value": {
+     "type": "string",
+     "minLength": 1
+    },
+    "name": {
+     "type": "string"
+    }
+   }
+  },
+  "pendingPolicy": {
+   "oneOf": [
+    {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "allow"
+     ],
+     "properties": {
+      "allow": {
+       "const": false
+      }
+     }
+    },
+    {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "allow",
+      "boundaryIds",
+      "maxAgeMs",
+      "reason"
+     ],
+     "properties": {
+      "allow": {
+       "const": true
+      },
+      "boundaryIds": {
+       "type": "array",
+       "minItems": 1,
+       "uniqueItems": true,
+       "items": {
+        "type": "string",
+        "minLength": 1
+       }
+      },
+      "maxAgeMs": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 5000
+      },
+      "reason": {
+       "type": "string",
+       "minLength": 1
+      }
+     }
+    }
+   ]
+  },
+  "actionReset": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "mode"
+   ],
+   "properties": {
+    "mode": {
+     "enum": [
+      "none",
+      "fresh-fixture"
+     ]
+    },
+    "reason": {
+     "type": "string"
+    }
+   }
+  },
+  "action": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "id",
+    "fixtureUrlId",
+    "safety",
+    "defaultCrawl",
+    "locator",
+    "operation",
+    "expectedEventTypes",
+    "expectedInteraction",
+    "apiContractIds",
+    "pendingPolicy",
+    "expectedRejectedBoundaryIds",
+    "reset"
+   ],
+   "properties": {
+    "id": {
+     "type": "string",
+     "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "fixtureUrlId": {
+     "type": "string"
+    },
+    "safety": {
+     "enum": [
+      "safe",
+      "mutating"
+     ]
+    },
+    "defaultCrawl": {
+     "type": "boolean"
+    },
+    "locator": {
+     "$ref": "#/$defs/locator"
+    },
+    "operation": {
+     "enum": [
+      "click",
+      "fill",
+      "select",
+      "press"
+     ]
+    },
+    "value": {
+     "type": "string"
+    },
+    "expectedEventTypes": {
+     "type": "array",
+     "minItems": 1,
+     "uniqueItems": true,
+     "items": {
+      "type": "string",
+      "minLength": 1
+     }
+    },
+    "expectedInteraction": {
+     "enum": [
+      "inline-resumer",
+      "resume-record",
+      "row-record",
+      "direct-csr",
+      "router-delegation",
+      "native"
+     ]
+    },
+    "apiContractIds": {
+     "type": "array",
+     "uniqueItems": true,
+     "items": {
+      "type": "string"
+     }
+    },
+    "setupActionIds": {
+     "type": "array",
+     "uniqueItems": true,
+     "items": {
+      "type": "string",
+      "minLength": 1
+     }
+    },
+    "pendingPolicy": {
+     "$ref": "#/$defs/pendingPolicy"
+    },
+    "expectedRejectedBoundaryIds": {
+     "type": "array",
+     "uniqueItems": true,
+     "items": {
+      "type": "string",
+      "minLength": 1
+     }
+    },
+    "reset": {
+     "$ref": "#/$defs/actionReset"
+    },
+    "navigates": {
+     "type": "boolean",
+     "description": "Action performs a route navigation (any mechanism); destination module loads are expected for MLA-S1."
+    }
+   },
+   "allOf": [
+    {
+     "if": {
+      "properties": {
+       "safety": {
+        "const": "mutating"
+       }
+      }
+     },
+     "then": {
+      "properties": {
+       "defaultCrawl": {
+        "const": false
+       },
+       "reset": {
+        "required": [
+         "reason"
+        ],
+        "properties": {
+         "mode": {
+          "const": "fresh-fixture"
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "if": {
+      "properties": {
+       "operation": {
+        "enum": [
+         "fill",
+         "select",
+         "press"
+        ]
+       }
+      }
+     },
+     "then": {
+      "required": [
+       "value"
+      ]
+     }
+    }
+   ]
+  },
+  "resetRequirements": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "beforeRoute",
+    "beforeEachAction",
+    "afterMutatingAction"
+   ],
+   "properties": {
+    "beforeRoute": {
+     "enum": [
+      "fresh-fixture",
+      "reuse-read-only-fixture"
+     ]
+    },
+    "beforeEachAction": {
+     "enum": [
+      "fresh-browser-context",
+      "fresh-fixture"
+     ]
+    },
+    "afterMutatingAction": {
+     "const": "discard-fixture"
+    }
+   }
+  }
+ }
 }
