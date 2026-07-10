@@ -1,13 +1,17 @@
 import { box, type BuildHandle, type PipelineApi } from '@async/witness';
 import type { Plugin } from 'vite';
+import { appendWitnessVerdict } from './witness-verdict.ts';
 
 const FIXTURES = ['fixtures/vite-csr', 'fixtures/vite-ssr'] as const;
 const WAIT = { timeoutMs: 10_000 };
+const BOX = {
+	name: 'debug channel: flagged CSR and SSR interaction paths are visible',
+	tags: ['debug-channel', 'build', 'preview', 'browser'],
+};
 
 export default box(
 	{
-		name: 'debug channel: flagged CSR and SSR interaction paths are visible',
-		tags: ['debug-channel', 'build', 'preview', 'browser'],
+		...BOX,
 		modes: ['build', 'preview'],
 	},
 	async ({ pipeline, expect, receipt }) => {
@@ -24,6 +28,11 @@ export default box(
 			await preview.close();
 		}
 		await receipt.capture('flagged debug channel proof');
+		await appendWitnessVerdict({
+			...BOX,
+			passed: true,
+			receiptPath: '.witness/receipts/<run>/receipt.json',
+		});
 	},
 );
 

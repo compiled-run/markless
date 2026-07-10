@@ -12,6 +12,7 @@ import {
 	executedJavaScriptBytes,
 	mergeCoverageRanges,
 	createVerdictReport,
+	createWitnessVerdict,
 	normalizeInvariantId,
 	readVerdictReport,
 	validateVerdictReport,
@@ -46,6 +47,33 @@ describe('analyzer contracts', () => {
 		expect(readVerdictReport(JSON.parse(JSON.stringify(appended)))).toEqual(appended);
 		expect(appended.passed).toBe(false);
 		expect(initial.results).toHaveLength(1);
+	});
+
+	test('shapes a witness box outcome as an external MLA verdict', () => {
+		expect(
+			createWitnessVerdict({
+				name: 'debug channel: flagged paths are visible',
+				tags: ['debug-channel', 'build'],
+				passed: true,
+				receiptPath: '.witness/receipts/debug-channel-positive.json',
+			}),
+		).toEqual({
+			id: 'MLA-EXT-WITNESS',
+			status: 'pass',
+			details: [
+				'box: debug channel: flagged paths are visible',
+				'tags: debug-channel, build',
+				'receipt: .witness/receipts/debug-channel-positive.json',
+			],
+		});
+		expect(
+			createWitnessVerdict({
+				name: 'failed box',
+				tags: [],
+				passed: false,
+				receiptPath: 'receipt.json',
+			}),
+		).toMatchObject({ status: 'fail' });
 	});
 
 	test('rejects malformed unified reports with a schema path', () => {

@@ -8,3 +8,4 @@ export * from './preload-integrity.ts';
 export * from './requests.ts';
 export * from './strip-guarantee.ts';
 export * from './verdicts.ts';
+export * from './witness.ts';
