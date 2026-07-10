@@ -103,6 +103,32 @@ describe('router debug registration', () => {
 		});
 	});
 
+	test('lazy SPA startup records delegation for a later active CSR container', async () => {
+		const runtimeWindow = {
+			document: new EventTarget(),
+			location: { href: 'http://router.test/' },
+			addEventListener() {},
+			navigation: { addEventListener() {}, navigate() {} },
+		} as unknown as MarklessRouterNavigationWindow;
+		await __marklessRouterStartSpaNavigation({
+			pageModuleLoaders: {}, routeFileIds: [], window: runtimeWindow,
+		});
+		const root = {
+			isConnected: true,
+			contains(value: unknown) {
+				return value === this || (value as { parentElement?: unknown }).parentElement === this;
+			},
+		};
+		const link = anchor(root, {
+			href: 'http://router.test/lazy', 'data-markless-router-link': '',
+		});
+		__marklessDebugStartContainer(root as never, 'csr');
+		expect(debugChannel()?.explainInteraction(link as never, 'click')).toMatchObject({
+			kind: 'router-delegation',
+			source: 'spa-click-listener',
+		});
+	});
+
 	test('SSR output executes its initial-link bridge registration', async () => {
 		const entry = createServerEntry({
 			navigationEntryPath: '/navigation.js',
@@ -155,6 +181,20 @@ describe('router debug registration', () => {
 		}
 		expect(root.listeners.has('click')).toBe(true);
 		expect(debugChannel()?.explainInteraction(link as never, 'click')).toMatchObject({
+			kind: 'router-delegation',
+			source: 'ssr-link-bridge',
+		});
+		const csrRoot = {
+			isConnected: true,
+			contains(value: unknown) {
+				return value === this || (value as { parentElement?: unknown }).parentElement === this;
+			},
+		};
+		const csrLink = anchor(csrRoot, {
+			href: 'http://router.test/csr', 'data-markless-router-link': '',
+		});
+		__marklessDebugStartContainer(csrRoot as never, 'csr');
+		expect(debugChannel()?.explainInteraction(csrLink as never, 'click')).toMatchObject({
 			kind: 'router-delegation',
 			source: 'ssr-link-bridge',
 		});

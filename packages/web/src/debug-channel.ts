@@ -154,7 +154,9 @@ function installDebugChannelLayer(
 	const events = new WeakMap<Element, Map<string, MarklessDebugInteractionExplanation>>();
 	const keys = new WeakMap<Element, string>();
 	const invalidated = new WeakSet<Element>();
-	const routerSources = new Set<MarklessDebugRouterDelegationInteraction['source']>();
+	const routerSources = ((global as Record<PropertyKey, unknown>)[
+		Symbol.for('markless.debug.channel.v1.router-sources')
+	] ??= new Set()) as Set<MarklessDebugRouterDelegationInteraction['source']>;
 	const ownViolations: MarklessDebugViolation[] = [];
 	let phase = initialPhase;
 	let lifecycle: MarklessDebugContainerLifecycle = initiallyActive ? 'active' : 'registered';
@@ -219,9 +221,6 @@ function installDebugChannelLayer(
 			}
 		}
 		if (element.isConnected === false) return none(element, eventName, 'element-disconnected');
-		const interaction = events.get(element)?.get(eventName);
-		if (interaction) return freeze({ ...interaction });
-		if (invalidated.has(element)) return none(element, eventName, 'not-registered');
 		if (eligibleAnchor(element)) {
 			const source =
 				eventName === 'navigate' && routerSources.has('navigation-event')
@@ -240,6 +239,9 @@ function installDebugChannelLayer(
 					eventName,
 				});
 		}
+		const interaction = events.get(element)?.get(eventName);
+		if (interaction) return freeze({ ...interaction });
+		if (invalidated.has(element)) return none(element, eventName, 'not-registered');
 		try {
 			const prior = previous?.explainInteraction(element, eventName);
 			if (prior && prior.kind !== 'none') return prior;
@@ -433,6 +435,9 @@ export function __marklessDebugRegisterRouter(
 		safely(() => (moduleRoots.get(root) ?? controlsFor(root, 'ssr-resume')).router(source));
 	else
 		safely(() => {
+			(((globalThis as Record<PropertyKey, unknown>)[
+				Symbol.for('markless.debug.channel.v1.router-sources')
+			] ??= new Set()) as Set<MarklessDebugRouterDelegationInteraction['source']>).add(source);
 			const inlineControls = (globalThis as Record<PropertyKey, unknown>)[
 				Symbol.for('markless.debug.channel.v1.bootstrap')
 			] as Pick<RootControls, 'router'> | undefined;
@@ -452,5 +457,8 @@ export function __marklessDebugResetForTest(): void {
 	delete global.__MARKLESS_DEBUG__;
 	delete (global as Record<PropertyKey, unknown>)[
 		Symbol.for('markless.debug.channel.v1.bootstrap')
+	];
+	delete (global as Record<PropertyKey, unknown>)[
+		Symbol.for('markless.debug.channel.v1.router-sources')
 	];
 }

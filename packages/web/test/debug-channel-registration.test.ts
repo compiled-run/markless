@@ -1,7 +1,13 @@
 import { createRuntimeGraph } from '@markless/runtime';
 import { beforeEach, describe, expect, test } from 'vitest';
 import { createProtocolStatePayload, renderPayloadScripts } from '../../serializer/src/index.ts';
-import { __marklessDebugRecordViolation, __marklessDebugResetForTest, __marklessDebugStartContainer } from '../src/debug-channel.ts';
+import {
+	__marklessDebugRecordViolation,
+	__marklessDebugInvalidateElement,
+	__marklessDebugRegisterRouter,
+	__marklessDebugResetForTest,
+	__marklessDebugStartContainer,
+} from '../src/debug-channel.ts';
 import type { MarklessDebugChannelV1 } from '../src/debug-channel.ts';
 import { resumeScalarCoreEventFromPayloadDocument } from '../src/event-only-lean/scalar-core.ts';
 import { resumeScalarRowEventFromPayloadDocument } from '../src/event-only-lean/row.ts';
@@ -53,6 +59,27 @@ function payloadDocument(state: any, view: any) {
 beforeEach(() => { (globalThis as any).__MARKLESS_DEBUG_ENABLED__ = true; __marklessDebugResetForTest(); });
 
 describe('debug registration mirrors successful framework wiring', () => {
+	test('explains a marked eligible anchor in an active CSR container from SPA delegation', () => {
+		const root = element('MAIN');
+		const link = {
+			...element('A'),
+			parentElement: root,
+			href: 'http://localhost/about',
+			hasAttribute: (name: string) => name === 'data-markless-router-link',
+			getAttribute: () => null,
+			relList: { contains: () => false },
+			closest: (selector: string) => (selector === 'a[href]' ? link : null),
+		};
+		root.childNodes.push(link);
+		__marklessDebugStartContainer(root as never, 'csr');
+		__marklessDebugRegisterRouter(undefined, 'spa-click-listener');
+		__marklessDebugInvalidateElement(root as never, link as never);
+		expect(channel()?.explainInteraction(link as never, 'click')).toMatchObject({
+			kind: 'router-delegation',
+			source: 'spa-click-listener',
+		});
+	});
+
 	test('executes inline registration and an absent-locator full-resume handoff', async () => {
 		const button = element('BUTTON'), root = element('MAIN', [button]);
 		executeInline(await inlineHtml(), root, [button]);
