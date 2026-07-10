@@ -1,5 +1,27 @@
 {
 	"permissions": {
+		"allow": [
+			"Bash(pnpm exec vp test *)",
+			"Bash(pnpm vp test *)",
+			"Bash(pnpm exec vp check *)",
+			"Bash(pnpm vp check *)",
+			"Bash(pnpm exec vp lint *)",
+			"Bash(pnpm vp lint *)",
+			"Bash(pnpm test)",
+			"Bash(pnpm test *)",
+			"Bash(pnpm check)",
+			"Bash(pnpm check *)",
+			"Bash(pnpm state status)",
+			"Bash(pnpm state status *)",
+			"Bash(pnpm state tail)",
+			"Bash(pnpm state tail *)",
+			"Bash(pnpm state project)",
+			"Bash(pnpm state project *)",
+			"Bash(npm whoami)",
+			"Bash(npm view *)",
+			"Bash(gh search *)",
+			"mcp__grep__searchGitHub"
+		],
 		"ask": [
 			"Bash(pnpm add:*)",
 			"Bash(pnpm install:*)",
