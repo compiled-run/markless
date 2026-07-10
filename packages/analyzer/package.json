@@ -10,7 +10,8 @@
 	},
 	"files": [
 		"dist",
-		"route-action-matrix.schema.json"
+		"route-action-matrix.schema.json",
+		"verdict-report.schema.json"
 	],
 	"type": "module",
 	"sideEffects": false,

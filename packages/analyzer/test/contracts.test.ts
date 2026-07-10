@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
 	assertMatrixFileSetEquality,
+	appendInvariantResult,
 	candidateInvariantReport,
 	classifyAnchorWithoutHref,
 	classifyRequest,
@@ -10,10 +11,86 @@ import {
 	evaluateCandidate,
 	executedJavaScriptBytes,
 	mergeCoverageRanges,
+	createVerdictReport,
+	normalizeInvariantId,
+	readVerdictReport,
+	validateVerdictReport,
 	validateMatrixDocument,
 } from '../src/index.ts';
 
 describe('analyzer contracts', () => {
+	test('normalizes legacy browser invariant aliases into the MLA namespace', () => {
+		expect(normalizeInvariantId('BQA-I4-WIRING-MISSING')).toBe('MLA-I4-WIRING-MISSING');
+		expect(normalizeInvariantId('MLA-S2-PAYLOAD-WIRING')).toBe('MLA-S2-PAYLOAD-WIRING');
+		expect(normalizeInvariantId('MLA-EXT-SURFACE-WITNESS')).toBe('MLA-EXT-SURFACE-WITNESS');
+	});
+
+	test('validates, appends, and JSON-round-trips unified verdict reports', () => {
+		const initial = createVerdictReport({
+			source: 'surface-witness',
+			lane: 'preload',
+			results: [{ id: 'BQA-I1-CONSOLE', status: 'pass', details: [] }],
+		});
+		expect(initial).toEqual({
+			version: 2,
+			source: 'surface-witness',
+			lane: 'preload',
+			results: [{ id: 'MLA-I1-CONSOLE', status: 'pass', details: [] }],
+			passed: true,
+		});
+		const appended = appendInvariantResult(initial, {
+			id: 'MLA-S1-PRELOAD-INTEGRITY',
+			status: 'fail',
+			details: ['missing preload'],
+		});
+		expect(readVerdictReport(JSON.parse(JSON.stringify(appended)))).toEqual(appended);
+		expect(appended.passed).toBe(false);
+		expect(initial.results).toHaveLength(1);
+	});
+
+	test('rejects malformed unified reports with a schema path', () => {
+		expect(() =>
+			validateVerdictReport({
+				version: 2,
+				source: 'pass-tests',
+				lane: 'payload',
+				results: [{ id: 'MLA-EXT-', status: 'pass', details: [] }],
+				passed: true,
+			}),
+		).toThrow(/\$report\.results\[0\]\.id/);
+	});
+
+	test('reads v1 browser reports and normalizes nested BQA results', () => {
+		const report = readVerdictReport({
+			version: 1,
+			build: { debugEnabled: true, marklessSha: 'abc', artifactHash: 'def' },
+			actions: [
+				{
+					routeFile: 'pages/index.tsrx',
+					fixtureUrlId: 'home',
+					actionId: 'bootstrap',
+					startedAt: '2026-07-10T00:00:00.000Z',
+					durationMs: 1,
+					console: [],
+					requests: [],
+					executedBytes: 10,
+					invariants: [
+						{ id: 'BQA-I2-NETWORK', status: 'fail', details: ['unexpected request'] },
+					],
+					knownAudit: [],
+				},
+			],
+			passed: false,
+		});
+		expect(report).toMatchObject({
+			version: 2,
+			source: 'browser-qa',
+			lane: 'browser-invariants',
+			results: [{ id: 'MLA-I2-NETWORK', status: 'fail' }],
+			passed: false,
+		});
+	});
+
 	test('evaluates boundary liveness and expected rejection policy', () => {
 		const pending = {
 			boundaryId: 'profile-read',
