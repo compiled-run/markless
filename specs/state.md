@@ -19,3 +19,4 @@ Legacy entries are preserved in [specs/state-archive.md](./state-archive.md).
 - 2026-07-10T01:59:30.695Z workflow-context-optimization done goal complete: first-call tokens -26.4%, guardrails preserved, effort/retry policy live in both repos
 - 2026-07-10T02:29:01.448Z workflow-context-optimization/ruler done ruler adopted: .ruler single source (rules+4 skills+MCP grep/chrome-devtools); generated AGENTS.md/CLAUDE.md tracked; doctrine as skill resources; pnpm rules
 - 2026-07-10T02:46:53.238Z workflow-context-optimization/ruler done ruler distribution hardened: generated files committed (clone/worktree-ready), pre-commit + CI agent-files drift checks, README section
+- 2026-07-10T02:59:38.233Z workflow-context-optimization/parallelism done parallel dispatch policy added to orchestrator (evidence: 1.5-1.8x for balanced 2-wide batches, 0 rate-limit events, worktree deps are the real hazard)
