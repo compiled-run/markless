@@ -17,3 +17,4 @@ Legacy entries are preserved in [specs/state-archive.md](./state-archive.md).
 - 2026-07-10T01:52:03.228Z workflow-context-optimization/U2 done state ledger CLI live: append-only specs/state.jsonl, archive frozen, generated projection
 - 2026-07-10T01:52:03.370Z workflow-context-optimization/U3 done fable-codex: orchestrator 8.9KB->2.4KB, crew maxRetries 0 default, verify ledger events
 - 2026-07-10T01:59:30.695Z workflow-context-optimization done goal complete: first-call tokens -26.4%, guardrails preserved, effort/retry policy live in both repos
+- 2026-07-10T02:29:01.448Z workflow-context-optimization/ruler done ruler adopted: .ruler single source (rules+4 skills+MCP grep/chrome-devtools); generated AGENTS.md/CLAUDE.md tracked; doctrine as skill resources; pnpm rules

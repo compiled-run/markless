@@ -3,3 +3,4 @@
 {"ts":"2026-07-10T01:52:03.228Z","goal":"workflow-context-optimization","unit":"U2","status":"done","summary":"state ledger CLI live: append-only specs/state.jsonl, archive frozen, generated projection","refs":[]}
 {"ts":"2026-07-10T01:52:03.370Z","goal":"workflow-context-optimization","unit":"U3","status":"done","summary":"fable-codex: orchestrator 8.9KB->2.4KB, crew maxRetries 0 default, verify ledger events","refs":[]}
 {"ts":"2026-07-10T01:59:30.695Z","goal":"workflow-context-optimization","unit":null,"status":"done","summary":"goal complete: first-call tokens -26.4%, guardrails preserved, effort/retry policy live in both repos","refs":[]}
+{"ts":"2026-07-10T02:29:01.448Z","goal":"workflow-context-optimization","unit":"ruler","status":"done","summary":"ruler adopted: .ruler single source (rules+4 skills+MCP grep/chrome-devtools); generated AGENTS.md/CLAUDE.md tracked; doctrine as skill resources; pnpm rules","refs":[]}
