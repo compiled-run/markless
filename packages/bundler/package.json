@@ -11,6 +11,10 @@
 	"publishConfig": {
 		"access": "public",
 		"exports": {
+			"./constants": {
+				"types": "./dist/build/constants.d.ts",
+				"default": "./dist/build/constants.js"
+			},
 			"./preload": {
 				"types": "./dist/preload.d.ts",
 				"default": "./dist/preload.js"
@@ -28,6 +32,7 @@
 	"type": "module",
 	"sideEffects": false,
 	"exports": {
+		"./constants": "./src/build/constants.ts",
 		"./preload": "./src/preload.ts",
 		"./rolldown": "./src/rolldown.ts",
 		"./vite": "./src/vite/index.ts"

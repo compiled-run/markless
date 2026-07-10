@@ -1,5 +1,6 @@
 export * from './dom-journal.ts';
 export * from './dom-update.ts';
+export * from './debug-channel.ts';
 export * from './event-only-resume.ts';
 export * from './event-resume.ts';
 export {

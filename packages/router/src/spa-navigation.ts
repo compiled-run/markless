@@ -9,9 +9,9 @@ import {
 	type RouteDocumentModule,
 	type RouteUpdate,
 } from './route-state.ts';
+import { MARKLESS_ROUTER_LINK_ATTRIBUTE } from './protocol-constants.ts';
 
 const STARTED = '__marklessRouterSpaNavigationStarted';
-const LINK_ATTRIBUTE = 'data-markless-router-link';
 const REPLACE_ATTRIBUTE = 'data-markless-router-replace';
 const SCROLL_ATTRIBUTE = 'data-markless-router-scroll';
 const LINK_INFO = '__marklessRouterLink';
@@ -90,6 +90,14 @@ export async function __marklessRouterStartSpaNavigation(options: StartSpaNaviga
 	navigation.addEventListener('navigate', (event) => {
 		handleNavigateEvent(event, context);
 	});
+	if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
+		await import('../../web/src/debug-channel.ts')
+			.then((debug) => debug.__marklessDebugRegisterRouter(undefined, 'spa-click-listener'))
+			.catch(() => {});
+	if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
+		await import('../../web/src/debug-channel.ts')
+			.then((debug) => debug.__marklessDebugRegisterRouter(undefined, 'navigation-event'))
+			.catch(() => {});
 
 	// Deep links land on /#/some/route while the server rendered the shell for
 	// the pathname: swap to the hash route on boot.
@@ -221,7 +229,11 @@ function handleLinkClick(
 	}
 
 	const anchor = sourceAnchor(event);
-	if (!anchor || !anchor.hasAttribute(LINK_ATTRIBUTE) || !isEligibleLink(anchor)) {
+	if (
+		!anchor ||
+		!anchor.hasAttribute(MARKLESS_ROUTER_LINK_ATTRIBUTE) ||
+		!isEligibleLink(anchor)
+	) {
 		return;
 	}
 

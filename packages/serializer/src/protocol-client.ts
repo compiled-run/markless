@@ -1,11 +1,17 @@
 import type { ProtocolStatePayload, ProtocolViewPayload } from './protocol.ts';
+import type {
+	MARKLESS_STATE_SCRIPT_TYPE,
+	MARKLESS_VIEW_SCRIPT_TYPE,
+} from './protocol-constants.ts';
 const ASYNC_PROTOCOL_VERSION = 1;
 export type EncodedPayloadScripts = { readonly stateScript: string; readonly viewScript: string };
 export type DecodedPayloadScripts = {
 	readonly state: ProtocolStatePayload;
 	readonly view: ProtocolViewPayload;
 };
-export type RuntimePayloadType = 'markless/state' | 'markless/view';
+export type RuntimePayloadType =
+	| typeof MARKLESS_STATE_SCRIPT_TYPE
+	| typeof MARKLESS_VIEW_SCRIPT_TYPE;
 export type RuntimePayloadErrorCode =
 	| 'MARKLESS_PAYLOAD_INVALID'
 	| 'MARKLESS_PROTOCOL_VERSION_MISMATCH';
@@ -69,6 +75,8 @@ function parse(script: string, type: RuntimePayloadType): unknown {
 		throw payloadInvalidError(type, `Invalid ${type} payload JSON.`);
 	}
 }
+// No runtime reference to the protocol constants folds byte-neutrally in this module;
+// permanent gzip walls require raw literals. Keep exemptions tethered by the serializer test.
 function baseState(value: unknown): asserts value is ProtocolStatePayload {
 	const payload = root(value, 'markless/state');
 	arr(payload, 'cells', 'markless/state');

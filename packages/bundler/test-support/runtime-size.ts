@@ -159,7 +159,12 @@ async function readEmittedScript(dist: string, fileName: string): Promise<Uint8A
 async function collectClientScripts(dist: string): Promise<string[]> {
 	const files = await listFiles(dist);
 	return files
-		.filter((fileName) => isJavaScriptFile(fileName) && !fileName.startsWith('server/'))
+		.filter(
+			(fileName) =>
+				isJavaScriptFile(fileName) &&
+				!fileName.startsWith('server/') &&
+				!fileName.startsWith('server-render/'),
+		)
 		.map(normalizeScriptFileName)
 		.sort();
 }

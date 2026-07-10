@@ -28,6 +28,11 @@ export type {
 	RequestFileTransformResult,
 } from './request-files.ts';
 export { startRouteUpdateRenderer } from './route-renderer.ts';
+export {
+	MARKLESS_ROUTER_LINK_ATTRIBUTE,
+	MARKLESS_ROUTER_LINK_DATASET_PROPERTY,
+} from './protocol-constants.ts';
+import { MARKLESS_ROUTER_LINK_ATTRIBUTE } from './protocol-constants.ts';
 // Consumed by the published vite-plugin client entry (src/vite/entries/
 // client-entry.ts), which can only reach this module through the package's
 // root export once installed from npm.
@@ -169,7 +174,7 @@ function linkAnchorAttributes(props: LinkProps): Array<readonly [string, string]
 	}
 
 	attributes.set('href', typeof props.href === 'string' ? props.href : '#');
-	attributes.set('data-markless-router-link', '');
+	attributes.set(MARKLESS_ROUTER_LINK_ATTRIBUTE, '');
 	if (props.replace) attributes.set('data-markless-router-replace', '');
 	if (props.scroll === false) attributes.set('data-markless-router-scroll', 'manual');
 	return [...attributes];

@@ -1,8 +1,10 @@
 import { expect, test } from 'vitest';
 import {
 	createProtocolStatePayload,
-	renderPayloadScripts,
 	deserializeGraphValue,
+	MARKLESS_STATE_SCRIPT_TYPE,
+	MARKLESS_VIEW_SCRIPT_TYPE,
+	renderPayloadScripts,
 } from '../src/index.ts';
 import type { ProtocolViewPayload } from '@markless/serializer';
 
@@ -37,9 +39,11 @@ test('renderPayloadScripts emits canonical markless/state and markless/view data
 
 	const scripts = renderPayloadScripts({ state, view });
 
-	expect(scripts.stateScript).toMatch(/^<script type="markless\/state">/);
+	expect(scripts.stateScript).toMatch(
+		new RegExp(`^<script type="${MARKLESS_STATE_SCRIPT_TYPE}">`),
+	);
 	expect(scripts.stateScript).toMatch(/<\/script>$/);
-	expect(scripts.viewScript).toMatch(/^<script type="markless\/view">/);
+	expect(scripts.viewScript).toMatch(new RegExp(`^<script type="${MARKLESS_VIEW_SCRIPT_TYPE}">`));
 	expect(scripts.viewScript).toMatch(/<\/script>$/);
 	expect(scripts.state.cells[0].value).toBeDefined();
 

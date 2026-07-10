@@ -6,6 +6,10 @@ import {
 	type EncodedPayloadScripts,
 	type RuntimePayloadType,
 } from '../../../serializer/src/protocol-client.ts';
+import {
+	MARKLESS_STATE_SCRIPT_TYPE,
+	MARKLESS_VIEW_SCRIPT_TYPE,
+} from '../../../serializer/src/protocol-constants.ts';
 
 export type PayloadScriptElement = {
 	readonly textContent?: string | null;
@@ -21,8 +25,8 @@ export function readPayloadScriptsFromDocument(
 	document: PayloadScriptDocument,
 ): EncodedPayloadScripts {
 	return {
-		stateScript: readPayloadScriptFromDocument(document, 'markless/state'),
-		viewScript: readPayloadScriptFromDocument(document, 'markless/view'),
+		stateScript: readPayloadScriptFromDocument(document, MARKLESS_STATE_SCRIPT_TYPE),
+		viewScript: readPayloadScriptFromDocument(document, MARKLESS_VIEW_SCRIPT_TYPE),
 	};
 }
 

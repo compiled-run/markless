@@ -1,5 +1,8 @@
 import {
 	ASYNC_PROTOCOL_VERSION,
+	MARKLESS_ASYNC_CONTAINER_ATTRIBUTE,
+	MARKLESS_STATE_SCRIPT_TYPE,
+	MARKLESS_VIEW_SCRIPT_TYPE,
 	type ProtocolSyncPolicy,
 	type ProtocolSyncPolicyCondition,
 	type ProtocolStatePayload,
@@ -11,6 +14,7 @@ import {
 	serializeRuntimeStateCells,
 } from '@markless/serializer';
 import type { MarklessExecutionLogMode } from './dev-log.ts';
+import { __marklessDebugBootstrapSource } from './debug-channel.ts';
 import { validateKeyedRepeatPayloadKeys } from './repeat-runtime.ts';
 
 export type SsrRenderOutput = {
@@ -269,8 +273,8 @@ function containerScopedView(view: ProtocolViewPayload): ProtocolViewPayload {
 
 function renderContainerAttributes(containerId: string | undefined): string {
 	return containerId
-		? ` data-async-container="${escapeAttribute(containerId)}"`
-		: ' data-async-container';
+		? ` ${MARKLESS_ASYNC_CONTAINER_ATTRIBUTE}="${escapeAttribute(containerId)}"`
+		: ` ${MARKLESS_ASYNC_CONTAINER_ATTRIBUTE}`;
 }
 
 function renderInlineResumerScript(source: string, nonce: string | undefined): string {
@@ -353,7 +357,7 @@ function defaultInlineResumerSource(
 		? `
 	const M = globalThis.__marklessInlineSyncPolicy || (globalThis.__marklessInlineSyncPolicy = {});
 	M.d ||= (s, r) => { if (s === null || typeof s !== 'object') return s; if ('$ref' in s) { const x = r.get(s.$ref); if (!x) return undefined; if (x.type === 'object') { const o = {}; for (const [k, v] of x.fields || []) o[k] = M.d(v, r); return o; } if (x.type === 'array') return (x.items || []).map((v) => M.d(v, r)); if (x.type === 'map') return new Map((x.entries || []).map(([k, v]) => [M.d(k, r), M.d(v, r)])); if (x.type === 'set') return new Set((x.values || []).map((v) => M.d(v, r))); if (x.type === 'date') return new Date(x.value); if (x.type === 'regexp') return new RegExp(x.source, x.flags); if (x.type === 'url') return new URL(x.value); if (x.type === 'array-buffer') return new Uint8Array(x.bytes || []).buffer; if (x.type === 'typed-array') { const C = globalThis[x.arrayType]; const b = M.d(x.buffer, r); return C && b instanceof ArrayBuffer ? new C(b, x.byteOffset, x.length) : undefined; } if (x.type === 'data-view') { const b = M.d(x.buffer, r); return b instanceof ArrayBuffer ? new DataView(b, x.byteOffset, x.byteLength) : undefined; } return undefined; } if (s.$type === 'undefined') return undefined; if (s.$type === 'bigint') return BigInt(s.value); if (s.$type === 'date') return new Date(s.value); if (s.$type === 'regexp') return new RegExp(s.source, s.flags); if (s.$type === 'url') return new URL(s.value); return s.value; };
-	M.i ||= (r) => { const s0 = r.querySelector('script[type="markless/state"]'); const g = r.__marklessEventOnlyGraph || new Map(); r.__marklessEventOnlyGraph = g; if (s0 && !r.__marklessEventOnlyGraphInitialized) { const s1 = JSON.parse(s0.textContent || 'null'); for (const c of s1.cells || []) { if (!c.value) continue; const r0 = new Map((c.value.records || []).map((r) => [r.id, r])); g.set(c.graphNodeId, M.d(c.value.root, r0)); } r.__marklessEventOnlyGraphInitialized = true; } return g; };
+	M.i ||= (r) => { const s0 = r.querySelector('script[type="${MARKLESS_STATE_SCRIPT_TYPE}"]'); const g = r.__marklessEventOnlyGraph || new Map(); r.__marklessEventOnlyGraph = g; if (s0 && !r.__marklessEventOnlyGraphInitialized) { const s1 = JSON.parse(s0.textContent || 'null'); for (const c of s1.cells || []) { if (!c.value) continue; const r0 = new Map((c.value.records || []).map((r) => [r.id, r])); g.set(c.graphNodeId, M.d(c.value.root, r0)); } r.__marklessEventOnlyGraphInitialized = true; } return g; };
 	M.g ||= (r, id, path) => { const g = M.i(r); let value = g.get(id); for (const key of path || []) value = value == null ? undefined : value[key]; return value; };
 	M.q ||= (c, e, r) => { if (!c) return false; if (c.type === 'and') return c.conditions.every((x) => M.q(x, e, r)); if (c.type === 'or') return c.conditions.some((x) => M.q(x, e, r)); if (c.type === 'not') return !M.q(c.condition, e, r); if (c.type === 'graph-truthy') return !!M.g(r, c.graphNodeId, c.path); if (c.type === 'constant-truthy') return !!c.value; if (c.type === 'event-equals') return e[c.field] === c.value; return false; };
 	M.y ||= (p, e, r) => { for (const b of p.branches || [p]) { if (!M.q(b.when, e, r)) continue; for (const a of b.actions) { if (a === 'preventDefault') e.preventDefault && e.preventDefault(); if (a === 'stopPropagation') e.stopPropagation && e.stopPropagation(); } } };`
@@ -414,14 +418,32 @@ ${graphConditionSource}
 		console.log(summary);
 		d.documentElement?.setAttribute('data-markless-log-summary', summary);
 	}`;
+	const debugSource =
+		typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
+			? `let md; try { md = ${__marklessDebugBootstrapSource()}(r, 'ssr-inline', false); } catch {}`
+			: '';
+	const debugRegistrationSource =
+		typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
+			? `
+		for (const candidate of v.events) {
+			if (candidate.eventName !== t || candidate.eventName === 'visible') continue;
+			const locator = v.locators.find((item) => item.hostNodeId === candidate.hostNodeId);
+			const element = locator && n[locator.index];
+				if (element && md) try { md.record(element, t, { kind: 'inline-resumer', source: 'ssr-inline', hostNodeId: candidate.hostNodeId }); } catch {}
+		}`
+			: '';
+	const debugActivateSource =
+		typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
+			? '\n\tif (md) try { md.activate(); } catch {}'
+			: '';
 
 	return `(() => {
 	const d = document;
 	const s = d.currentScript;
-	const r = s && s.closest('[data-async-container]');
+	const r = s && s.closest('[${MARKLESS_ASYNC_CONTAINER_ATTRIBUTE}]');
 	if (!r) return;
 ${executionLogSource}
-	const p = r.querySelector('script[type="markless/view"]');
+	const p = r.querySelector('script[type="${MARKLESS_VIEW_SCRIPT_TYPE}"]');
 	if (!p) return;
 	const v = JSON.parse(p.textContent || 'null');
 	const w = d.createTreeWalker(r, 1);
@@ -430,6 +452,7 @@ ${executionLogSource}
 	while ((x = w.nextNode())) n.push(x);
 	const h = new Map(v.locators.map((l) => [l.index, l.hostNodeId]));
 	const m = new Map();
+${debugSource}
 ${sharedSyncPolicySource}
 ${localSyncPolicySource}
 	for (const e of v.events) {
@@ -465,8 +488,9 @@ ${
 				await mod.resumeContainerEvent({ root: r, event: e, element: e.target, eventRecord: null });
 			}
 `
-}		}, true);
+}		}, true);${debugRegistrationSource}
 	}
+${debugActivateSource}
 })();`;
 }
 

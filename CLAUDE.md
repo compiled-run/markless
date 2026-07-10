@@ -1,23 +1,18 @@
-# Markless — Claude Code Guidance
 
-@AGENTS.md
 
-The imported `AGENTS.md` is the authoritative always-on project guidance. The
-notes below only map its Codex-specific references onto Claude Code.
+<!-- Source: .ruler/AGENTS.md -->
 
-## Claude Code Mapping
+# Agent Guidance
 
-- Project skills live under `.claude/skills/` (mirrored from `.codex/skills/`).
-  Where `AGENTS.md` says `$markless-implementation` or `$markless-spec-maintenance`,
-  use the Skill tool: `markless-implementation` for implementation work,
-  `markless-spec-maintenance` for spec edits, and `review-with-engineer-lenses`
-  for reviewing API/docs/DX changes.
-- Where skills say `apply_patch`, use the Edit/Write tools.
-- The `.codex/rules/*.rules` command policies are ported to
-  `.claude/settings.json` permissions: standalone esbuild/terser/Rollup/SWC/
-  webpack/Babel commands are denied (Rolldown/Vite only), and dependency
-  add/install/update commands prompt for review (build tooling stays
-  Rolldown/Vite; core packages stay runtime-agnostic — prefer `pathe`/`ufo`
-  and host adapters).
-- GoalBuddy flows referenced in `AGENTS.md` map to the `goalbuddy` skill and
-  `/goal` in Claude Code.
+Agent rules, skills, and MCP config for this repo are generated from `.ruler/` by [Ruler](https://github.com/intellectronica/ruler). Edit sources in `.ruler/` and run `pnpm rules` to sync; never edit generated files directly.
+
+The task packet or active goal card defines scope. Stay inside its named files and preserve unrelated work.
+If a required decision is missing from the packet, return blocked; do not improvise.
+Crew and GoalBuddy artifact-writing packets/cards must declare `Workflow guidance: <one or more .ruler/skills/*/<file>.md paths>`.
+If that declaration is missing, or says `Workflow guidance: none` for a write task, stop before editing and return blocked.
+Read-only scout/critique packets may declare `Workflow guidance: none`.
+For direct interactive user requests, read `.ruler/skills/markless-implementation/implementation.md` (the base) plus the matching overlay (`compiler.md`, `bundler.md`, `performance.md`, `release.md`), or `.ruler/skills/markless-spec-maintenance/spec.md` for specs.
+The progress ledger is CLI-managed: use `pnpm state append|status|tail|project`.
+Never read `specs/state-archive.md` or bulk history; use the CLI.
+
+Production package folders: `packages/analyzer`, `packages/bundler`, `packages/cli`, `packages/compiler`, `packages/core`, `packages/router`, `packages/runtime`, `packages/serializer`, `packages/typescript-plugin`, `packages/vitest-browser`, and `packages/web`.

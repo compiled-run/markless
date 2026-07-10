@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import { MARKLESS_BUILD_DIR, MARKLESS_BUILD_PREFIX, MARKLESS_BUNDLE_GRAPH } from '@markless/bundler/constants';
 import { outputDefaults } from '../src/build/chunking.ts';
 
 type MarklessOutputOptions = {
@@ -8,6 +9,11 @@ type MarklessOutputOptions = {
 };
 
 describe('markless chunking defaults', () => {
+	test('exposes side-effect-free build location constants', () => {
+		expect([MARKLESS_BUILD_DIR, MARKLESS_BUILD_PREFIX, MARKLESS_BUNDLE_GRAPH])
+			.toEqual(['build', 'build/', 'build/bundle-graph.json']);
+	});
+
 	test('uses explicit output defaults for each environment', () => {
 		const clientOutput = outputDefaults(
 			{

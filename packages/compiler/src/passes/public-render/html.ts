@@ -1,4 +1,10 @@
 import { isEventAttribute } from '@tsrx/core';
+import {
+	MARKLESS_ARM_BRANCH_ANCHOR_PREFIX,
+	MARKLESS_ARM_BRANCH_END_ANCHOR_PREFIX,
+	MARKLESS_ASYNC_ANCHOR_PREFIX,
+	MARKLESS_ASYNC_END_ANCHOR_PREFIX,
+} from '@markless/serializer';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource } from '../../ast/source.ts';
 import {
@@ -91,9 +97,9 @@ export function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string 
 				// Arm-branch anchors live in the owning boundary's own comment
 				// census; the page-level census never counts them.
 				return joinSsrExpressions([
-					JSON.stringify(`<!--markless:arm-branch:${csrSite.id}-->`),
+					JSON.stringify(`<!--${MARKLESS_ARM_BRANCH_ANCHOR_PREFIX}${csrSite.id}-->`),
 					ternary,
-					JSON.stringify(`<!--/markless:arm-branch:${csrSite.id}-->`),
+					JSON.stringify(`<!--${MARKLESS_ARM_BRANCH_END_ANCHOR_PREFIX}${csrSite.id}-->`),
 				]);
 			}
 			return ternary;
@@ -164,9 +170,9 @@ export function emitHtmlNode(node: AnyNode, context: HtmlRenderContext): string 
 			// boundary's own arm-branch census — the page census never sees it,
 			// and the resume runtime seeds the arm from live graph reads.
 			return joinSsrExpressions([
-				JSON.stringify(`<!--markless:arm-branch:${site.id}-->`),
+				JSON.stringify(`<!--${MARKLESS_ARM_BRANCH_ANCHOR_PREFIX}${site.id}-->`),
 				`(${testSource} ? ${consequent} : ${alternate})`,
-				JSON.stringify(`<!--/markless:arm-branch:${site.id}-->`),
+				JSON.stringify(`<!--${MARKLESS_ARM_BRANCH_END_ANCHOR_PREFIX}${site.id}-->`),
 			]);
 		}
 		return `(${testSource} ? ${consequent} : ${alternate})`;
@@ -393,15 +399,15 @@ function emitAsyncBoundaryHtml(node: AnyNode, context: HtmlRenderContext): strin
 		// its presence IS the streaming opt-in; without one the boundary holds
 		// the stream (the helper awaits).
 		return joinSsrExpressions([
-			JSON.stringify(`<!--markless:async:${boundary.id}-->`),
+			JSON.stringify(`<!--${MARKLESS_ASYNC_ANCHOR_PREFIX}${boundary.id}-->`),
 			`(await ((async (marklessSsrAsyncSnapshot) => marklessSsrAsyncSnapshot.status === "fulfilled" ? (async (${runner.name}) => ${tryHtml})(marklessSsrAsyncSnapshot.value) : marklessSsrAsyncSnapshot.status === "rejected" ? (async (${catchParam}) => ${catchHtml})(marklessSsrAsyncSnapshot.error) : (async () => ${pendingHtml})())(await marklessSsrRunAsyncComputed(marklessSsrAsyncSnapshots, ${JSON.stringify(runner.graphNodeId)}, ${runner.source}, marklessSsrRenderContext, ${String(node.pending != null)}))))`,
-			JSON.stringify(`<!--/markless:async:${boundary.id}-->`),
+			JSON.stringify(`<!--${MARKLESS_ASYNC_END_ANCHOR_PREFIX}${boundary.id}-->`),
 		]);
 	}
 	return joinSsrExpressions([
-		JSON.stringify(`<!--markless:async:${boundary.id}-->`),
+		JSON.stringify(`<!--${MARKLESS_ASYNC_ANCHOR_PREFIX}${boundary.id}-->`),
 		pendingHtml,
-		JSON.stringify(`<!--/markless:async:${boundary.id}-->`),
+		JSON.stringify(`<!--${MARKLESS_ASYNC_END_ANCHOR_PREFIX}${boundary.id}-->`),
 	]);
 }
 
@@ -648,9 +654,9 @@ function emitSwitchHtml(node: AnyNode, context: HtmlRenderContext): string {
 	if (site && switchArmFlip) {
 		// Arm-branch anchors: counted only in the owning boundary's own census.
 		return joinSsrExpressions([
-			JSON.stringify(`<!--markless:arm-branch:${site.id}-->`),
+			JSON.stringify(`<!--${MARKLESS_ARM_BRANCH_ANCHOR_PREFIX}${site.id}-->`),
 			chain,
-			JSON.stringify(`<!--/markless:arm-branch:${site.id}-->`),
+			JSON.stringify(`<!--${MARKLESS_ARM_BRANCH_END_ANCHOR_PREFIX}${site.id}-->`),
 		]);
 	}
 	return chain;

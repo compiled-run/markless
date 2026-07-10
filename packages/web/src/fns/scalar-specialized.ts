@@ -1,3 +1,5 @@
+import { MARKLESS_STATE_SCRIPT_TYPE } from '../../../serializer/src/protocol-constants.ts';
+
 const e = (c, s) => {
 	throw Object.assign(
 		Error(c),
@@ -15,7 +17,7 @@ export const marklessFindElementAtDomOrderIndex = (r, i) => {
 };
 export const marklessReadScalarCell = (r, i) => {
 	try {
-		return JSON.parse(r.querySelector('script[type="markless/state"]')?.textContent || 'null')
+		return JSON.parse(r.querySelector(`script[type="${MARKLESS_STATE_SCRIPT_TYPE}"]`)?.textContent || 'null')
 			?.cells?.[i];
 	} catch {}
 };

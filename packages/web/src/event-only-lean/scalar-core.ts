@@ -7,6 +7,10 @@ import type {
 import type { LeanActionPlan, LeanPlan, RuntimeDemandMap } from './lean-shared.ts';
 import { resumeFullEventOnly } from './lean-shared.ts';
 import type { ProtocolSyncPolicyCondition } from '../../../serializer/src/protocol.ts';
+import {
+	MARKLESS_STATE_SCRIPT_TYPE,
+	MARKLESS_VIEW_SCRIPT_TYPE,
+} from '../../../serializer/src/protocol-constants.ts';
 
 export async function resumeScalarCoreEventFromPayloadDocument(
 	input: ResumeEventOnlyFromPayloadDocumentInput,
@@ -47,6 +51,12 @@ export async function resumeScalarCoreEventFromPayloadDocument(
 		));
 	}
 	await graph.flush();
+	if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
+		await import('../debug-channel.ts')
+			.then((debug) =>
+				debug.__marklessDebugStartContainer(input.root as unknown as Element, 'ssr-lean'),
+			)
+			.catch(() => {});
 	return {
 		graph,
 		view: {
@@ -65,6 +75,12 @@ export async function resumeScalarCoreEventFromPayloadDocument(
 		},
 		dispose() {
 			delete input.root.__marklessEventOnlyGraph;
+			if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
+				void import('../debug-channel.ts')
+					.then((debug) =>
+						debug.__marklessDebugDisposeContainer(input.root as unknown as Element),
+					)
+					.catch(() => {});
 		},
 	};
 }
@@ -119,8 +135,8 @@ function readScalarCorePlanFromDocument(
 	graphNodeIds: ReadonlyArray<string>,
 ): LeanPlan | null {
 	return readScalarCorePlan({
-		state: readPayloadScript(input.document, 'markless/state'),
-		view: readPayloadScript(input.document, 'markless/view'),
+		state: readPayloadScript(input.document, MARKLESS_STATE_SCRIPT_TYPE),
+		view: readPayloadScript(input.document, MARKLESS_VIEW_SCRIPT_TYPE),
 		eventRecord: input.eventRecord,
 		plan: actionPlan,
 		graphNodeIds,
@@ -170,7 +186,7 @@ function readScalarCorePlan(input: {
 
 function readPayloadScript(
 	document: ResumeEventOnlyFromPayloadDocumentInput['document'],
-	type: 'markless/state' | 'markless/view',
+	type: typeof MARKLESS_STATE_SCRIPT_TYPE | typeof MARKLESS_VIEW_SCRIPT_TYPE,
 ) {
 	const element = document.querySelector(`script[type="${type}"]`);
 	const text = element?.textContent ?? element?.text ?? element?.innerHTML;
@@ -186,8 +202,8 @@ function readPayloadScript(
 function readComputedEntries(computed: unknown): ReadonlyArray<unknown> {
 	if (!Array.isArray(computed))
 		throw payloadInvalid(
-			'Invalid markless/state payload: expected computed array.',
-			'markless/state.computed',
+			`Invalid ${MARKLESS_STATE_SCRIPT_TYPE} payload: expected computed array.`,
+			`${MARKLESS_STATE_SCRIPT_TYPE}.computed`,
 		);
 	return computed;
 }
@@ -195,8 +211,8 @@ function readComputedEntries(computed: unknown): ReadonlyArray<unknown> {
 function readScalarStateCells(cells: unknown, cellIds: ReadonlySet<string>): LeanPlan['cells'] {
 	if (!Array.isArray(cells))
 		throw payloadInvalid(
-			'Invalid markless/state payload: expected cells array.',
-			'markless/state.cells',
+			`Invalid ${MARKLESS_STATE_SCRIPT_TYPE} payload: expected cells array.`,
+			`${MARKLESS_STATE_SCRIPT_TYPE}.cells`,
 		);
 	const matches: LeanPlan['cells'][number][] = [];
 	for (const [index, cell] of cells.entries()) {
@@ -209,10 +225,10 @@ function readScalarStateCells(cells: unknown, cellIds: ReadonlySet<string>): Lea
 		if (typeof record.graphNodeId !== 'string' || !cellIds.has(record.graphNodeId)) continue;
 		if (record.valueKind !== 'scalar')
 			throw payloadInvalid(
-				`Invalid markless/state cell[${index}]: expected scalar valueKind.`,
-				`markless/state cell[${index}].valueKind`,
+				`Invalid ${MARKLESS_STATE_SCRIPT_TYPE} cell[${index}]: expected scalar valueKind.`,
+				`${MARKLESS_STATE_SCRIPT_TYPE} cell[${index}].valueKind`,
 			);
-		assertScalarValuePayload(record.value, `markless/state cell[${index}].value`);
+		assertScalarValuePayload(record.value, `${MARKLESS_STATE_SCRIPT_TYPE} cell[${index}].value`);
 		matches.push(cell as LeanPlan['cells'][number]);
 	}
 	return matches;
@@ -438,13 +454,13 @@ function payloadInvalid(message: string, site: string): Error {
 		phase: 'payload',
 		title: 'Invalid resumability payload',
 		message,
-		why: 'The markless/state payload did not match the resumability protocol shape required by this runtime.',
-		payloadType: 'markless/state',
-		payloadScript: 'script[type="markless/state"]',
+		why: `The ${MARKLESS_STATE_SCRIPT_TYPE} payload did not match the resumability protocol shape required by this runtime.`,
+		payloadType: MARKLESS_STATE_SCRIPT_TYPE,
+		payloadScript: `script[type="${MARKLESS_STATE_SCRIPT_TYPE}"]`,
 		suggestions: [
 			{
 				message:
-					'Regenerate the markless/state payload with the matching markless compiler/runtime version.',
+					`Regenerate the ${MARKLESS_STATE_SCRIPT_TYPE} payload with the matching markless compiler/runtime version.`,
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_PAYLOAD_INVALID',

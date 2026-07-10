@@ -2,6 +2,12 @@ import type { PageProps } from '../../index.ts';
 import { buildRouteManifestFromFileIds, matchRouteManifest } from '../../route-manifest.ts';
 import { renderToString, type ModulePreloadInput } from '@markless/web/render-to-string';
 import { renderToStream } from '@markless/web/render-to-stream';
+import { MARKLESS_ASYNC_CONTAINER_ATTRIBUTE } from '@markless/serializer';
+import {
+	__marklessDebugBootstrapSource,
+	MARKLESS_DEBUG_CHANNEL_SYMBOL_KEY,
+} from '../../../../web/src/debug-channel.ts';
+import { MARKLESS_ROUTER_LINK_ATTRIBUTE } from '../../protocol-constants.ts';
 
 export interface ServerEntryOptions {
 	readonly navigationEntryPath?: string;
@@ -270,7 +276,7 @@ function modulePreloadsForPage(
 	addModulePreloads(preloads, seen, routeSsrModulePreloads?.[file]);
 	// Route swaps are client-side: preload the destination page chunks for
 	// every visible Link so navigation avoids a module-fetch waterfall.
-	if (!routeModulePreloads || !html.includes('data-markless-router-link')) {
+	if (!routeModulePreloads || !html.includes(MARKLESS_ROUTER_LINK_ATTRIBUTE)) {
 		return preloads.length > 0 ? preloads : undefined;
 	}
 
@@ -285,7 +291,10 @@ function modulePreloadsForPage(
 function routerLinkHrefs(html: string): string[] {
 	return [
 		...html.matchAll(
-			/<a\b(?=[^>]*\bdata-markless-router-link(?:[\s=>]|$))(?=[^>]*\bhref="([^"]*)")[^>]*>/g,
+			new RegExp(
+				`<a\\b(?=[^>]*\\b${MARKLESS_ROUTER_LINK_ATTRIBUTE}(?:[\\s=>]|$))(?=[^>]*\\bhref="([^"]*)")[^>]*>`,
+				'g',
+			),
 		),
 	].map((match) => unescapeHtmlAttribute(match[1] ?? ''));
 }
@@ -404,13 +413,32 @@ function renderRouteScript(file: string): string {
 }
 
 function renderLinkBridgeScript(resumeEntryPath: string): string {
-	return `<script data-markless-router-link-resumer>${escapeInlineScript(`(() => {
+	const debugBootstrap =
+		typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
+			? `<script data-markless-router-debug-bootstrap>${escapeInlineScript(`(() => {
 	const d = document;
 	const s = d.currentScript;
-	const r = s && s.closest('[data-async-container]');
+	const r = s && s.closest('[${MARKLESS_ASYNC_CONTAINER_ATTRIBUTE}]');
+	if (!r) return;
+	try { globalThis[Symbol.for(${JSON.stringify(MARKLESS_DEBUG_CHANNEL_SYMBOL_KEY)})] = ${__marklessDebugBootstrapSource()}(r, 'ssr-inline', false); } catch {}
+})();`)}</script>`
+			: '';
+	const debugRegistration =
+		typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
+			? `
+	try {
+		const key = Symbol.for(${JSON.stringify(MARKLESS_DEBUG_CHANNEL_SYMBOL_KEY)});
+		const md = globalThis[key];
+		if (md) { md.router('ssr-link-bridge'); md.activate(); }
+	} catch {}`
+			: '';
+	return `${debugBootstrap}<script data-markless-router-link-resumer>${escapeInlineScript(`(() => {
+	const d = document;
+	const s = d.currentScript;
+	const r = s && s.closest('[${MARKLESS_ASYNC_CONTAINER_ATTRIBUTE}]');
 	if (!r || r.__marklessRouterLinkResumerStarted) return;
 	r.__marklessRouterLinkResumerStarted = true;
-	const linkAttr = 'data-markless-router-link';
+	const linkAttr = ${JSON.stringify(MARKLESS_ROUTER_LINK_ATTRIBUTE)};
 	const replaceAttr = 'data-markless-router-replace';
 	const scrollAttr = 'data-markless-router-scroll';
 	const anchorFrom = (event) => {
@@ -454,7 +482,7 @@ function renderLinkBridgeScript(resumeEntryPath: string): string {
 			setTimeout(() => { throw error; });
 			location.assign(url.href);
 		}
-	}, true);
+	}, true);${debugRegistration}
 })();`)}</script>`;
 }
 

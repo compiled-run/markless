@@ -1,4 +1,12 @@
-import { serializeRuntimeAsyncSnapshots } from '@markless/serializer';
+import {
+	MARKLESS_ARM_SCRIPT_TYPE,
+	MARKLESS_ASYNC_ANCHOR_PREFIX,
+	MARKLESS_ASYNC_CONTAINER_ATTRIBUTE,
+	MARKLESS_ASYNC_END_ANCHOR_PREFIX,
+	MARKLESS_BOUNDARY_ATTRIBUTE,
+	MARKLESS_STATE_PATCH_SCRIPT_TYPE,
+	serializeRuntimeAsyncSnapshots,
+} from '@markless/serializer';
 import {
 	MARKLESS_PENDING_MIN_VISIBLE_MS,
 	MARKLESS_REVEAL_TRAIN_CADENCE_MS,
@@ -11,6 +19,7 @@ import {
 	type SsrRenderable,
 	type SsrRenderOutput,
 } from './render-to-string.ts';
+import { __marklessDebugBootstrapSource } from './debug-channel.ts';
 
 // D5/D6 out-of-order streaming (T107, owner-ratified three-layer semantics):
 // the shell flushes with @pending arms in place of unsettled boundaries and
@@ -217,8 +226,8 @@ function renderArmAppend(
 	arm: PendingArm,
 	nonce: string | undefined,
 ): string {
-	const startAnchor = `<!--markless:async:${arm.boundaryId}-->`;
-	const endAnchor = `<!--/markless:async:${arm.boundaryId}-->`;
+	const startAnchor = `<!--${MARKLESS_ASYNC_ANCHOR_PREFIX}${arm.boundaryId}-->`;
+	const endAnchor = `<!--${MARKLESS_ASYNC_END_ANCHOR_PREFIX}${arm.boundaryId}-->`;
 	const html = output.html;
 	const start = html.indexOf(startAnchor);
 	const end = html.indexOf(endAnchor);
@@ -246,8 +255,8 @@ function renderArmAppend(
 
 	return (
 		`<template m:arm="${escapeAttribute(arm.boundaryId)}">${armHtml}</template>` +
-		`<script type="markless/arm" data-boundary="${escapeAttribute(arm.boundaryId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(armRecords))}</script>` +
-		`<script type="markless/state-patch" data-graph-node="${escapeAttribute(arm.graphNodeId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(patch))}</script>` +
+		`<script type="${MARKLESS_ARM_SCRIPT_TYPE}" ${MARKLESS_BOUNDARY_ATTRIBUTE}="${escapeAttribute(arm.boundaryId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(armRecords))}</script>` +
+		`<script type="${MARKLESS_STATE_PATCH_SCRIPT_TYPE}" data-graph-node="${escapeAttribute(arm.graphNodeId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(patch))}</script>` +
 		`<script${nonceAttribute}>__mArm(${escapeScriptJson(revealArguments)})</script>`
 	);
 }
@@ -270,19 +279,44 @@ function renderArmAppend(
 // failure fails loudly in its own task and neither wedges the train nor
 // holds dependents hostage — boundaries stay independent (D2).
 function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | undefined): string {
+	const debugEnabled =
+		typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__;
+	const debugSetup = debugEnabled
+		? `let md; try { md = ${__marklessDebugBootstrapSource()}(r, 'ssr-inline', false); } catch {}
+		const nodes = [r];
+		const walk = d.createTreeWalker(r, 129);
+		let offset = -1, node;
+		while ((node = walk.nextNode())) {
+			if (node === s) offset = nodes.length;
+			if (node.nodeType === 1) nodes.push(node);
+		}`
+		: '';
+	const debugRegistration = debugEnabled
+		? `if (md) for (const event of records.events || []) {
+			if (event.eventName !== t) continue;
+			const locator = (records.locators || []).find((item) => item.hostNodeId === event.hostNodeId);
+			const element = locator && nodes[offset + locator.index];
+			if (element) try { md.record(element, t, { kind: 'inline-resumer', source: 'streamed-arm', hostNodeId: event.hostNodeId }); } catch {}
+		}`
+		: '';
+	const debugActivate = debugEnabled ? 'if (md) try { md.activate(); } catch {}' : '';
 	const wake = resumeModuleUrl
 		? `
-		const rec = d.querySelector('script[type="markless/arm"][data-boundary="' + id + '"]');
-		const r = s.parentElement && s.parentElement.closest && s.parentElement.closest('[data-async-container]');
+		const rec = d.querySelector('script[type="${MARKLESS_ARM_SCRIPT_TYPE}"][${MARKLESS_BOUNDARY_ATTRIBUTE}="' + id + '"]');
+		const r = s.parentElement && s.parentElement.closest && s.parentElement.closest('[${MARKLESS_ASYNC_CONTAINER_ATTRIBUTE}]');
 		if (!rec || !r) return;
-		const names = new Set((JSON.parse(rec.textContent || 'null')?.events || []).map((x) => x.eventName));
-		for (const t of names) {
+			const records = JSON.parse(rec.textContent || 'null') || {};
+			const names = new Set((records.events || []).map((x) => x.eventName));
+			${debugSetup}
+			for (const t of names) {
 			r.addEventListener(t, async (e) => {
 				if (r.__asyncResumeRuntimeStarted) return;
 				const mod = await import(${JSON.stringify(resumeModuleUrl)});
 				await mod.resumeContainerEvent({ root: r, event: e, element: e.target, eventRecord: null });
 			}, true);
-		}`
+				${debugRegistration}
+			}
+			${debugActivate}`
 		: '';
 	const source = `globalThis.__mArm ||= (() => {
 	const d = document;
@@ -296,11 +330,11 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 	const w = d.createTreeWalker(d.body, 128);
 	let s, e, n;
 	while ((n = w.nextNode())) {
-		if (n.data === 'markless:async:' + id) s = n;
-		else if (n.data === '/markless:async:' + id) { e = n; break; }
+		if (n.data === '${MARKLESS_ASYNC_ANCHOR_PREFIX}' + id) s = n;
+		else if (n.data === '${MARKLESS_ASYNC_END_ANCHOR_PREFIX}' + id) { e = n; break; }
 	}
 	if (!s || !e || s.parentNode !== e.parentNode) throw new Error('MARKLESS_STREAM_ARM_ANCHORS_MISSING: ' + id);
-	const root = s.parentElement && s.parentElement.closest && s.parentElement.closest('[data-async-container]');
+	const root = s.parentElement && s.parentElement.closest && s.parentElement.closest('[${MARKLESS_ASYNC_CONTAINER_ATTRIBUTE}]');
 	if (root && root.__asyncResumeRuntimeStarted) { tpl.remove(); return; }
 	while (s.nextSibling && s.nextSibling !== e) s.parentNode.removeChild(s.nextSibling);
 	s.parentNode.insertBefore(tpl.content, e);

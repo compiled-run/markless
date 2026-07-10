@@ -26,6 +26,8 @@ import {
 import { appendJournalResult, scheduleMicrotask, type DirtyPath } from './graph-scheduler.ts';
 import { createSharedGraphPlane } from './graph-shared.ts';
 
+declare const __MARKLESS_DEBUG_ENABLED__: boolean;
+
 export type RuntimeGraphCell = {
 	readonly graphNodeId: string;
 	readonly value: unknown;
@@ -179,6 +181,7 @@ export type RuntimeGraphSubscription = {
 
 export type RuntimeGraph = {
 	readonly read: (graphNodeId: string, path?: ReadonlyArray<string>) => unknown;
+	readonly peekAsyncSnapshot: (graphNodeId: string) => RuntimeGraphAsyncSnapshot | undefined;
 	readonly readShared: (
 		definitionId: string,
 		propertyName: string,
@@ -330,6 +333,12 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 
 	return {
 		read: readGraph,
+		...(typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
+			? {
+					peekAsyncSnapshot: (graphNodeId: string) =>
+						asyncComputedNodes.get(graphNodeId)?.snapshot,
+				}
+			: {}),
 		readShared: sharedGraph.readShared,
 		writeShared: sharedGraph.writeShared,
 		getSharedDefinition: sharedGraph.getSharedDefinition,
@@ -399,5 +408,5 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		takeJournal() {
 			return journal.splice(0);
 		},
-	};
+	} as RuntimeGraph;
 }

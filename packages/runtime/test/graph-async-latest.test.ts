@@ -85,3 +85,23 @@ test('first run has no prior value: pending reads stay undefined', async () => {
 	expect(graph.read('computed:issueModel', ['status'])).toBe('pending');
 	expect(graph.read('computed:issueModel', ['label'])).toBeUndefined();
 });
+
+test('peeking an async snapshot never demands its runner or schedules subscription work', async () => {
+	(globalThis as any).__MARKLESS_DEBUG_ENABLED__ = true;
+	let runs = 0,
+		subscriptions = 0;
+	const graph = graphWithAsyncComputed(() => {
+		runs++;
+		return 'unexpected';
+	});
+	graph.subscribe({
+		id: 'async:observer',
+		graphNodeId: 'computed:issueModel',
+		run: () => void subscriptions++,
+	});
+
+	expect(graph.peekAsyncSnapshot('computed:issueModel')).toEqual({ status: 'idle', version: 0 });
+	await graph.flush();
+	expect({ runs, subscriptions }).toEqual({ runs: 0, subscriptions: 0 });
+	delete (globalThis as any).__MARKLESS_DEBUG_ENABLED__;
+});

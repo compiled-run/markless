@@ -1,0 +1,14 @@
+# Agent Guidance
+
+Agent rules, skills, and MCP config for this repo are generated from `.ruler/` by [Ruler](https://github.com/intellectronica/ruler). Edit sources in `.ruler/` and run `pnpm rules` to sync; never edit generated files directly.
+
+The task packet or active goal card defines scope. Stay inside its named files and preserve unrelated work.
+If a required decision is missing from the packet, return blocked; do not improvise.
+Crew and GoalBuddy artifact-writing packets/cards must declare `Workflow guidance: <one or more .ruler/skills/*/<file>.md paths>`.
+If that declaration is missing, or says `Workflow guidance: none` for a write task, stop before editing and return blocked.
+Read-only scout/critique packets may declare `Workflow guidance: none`.
+For direct interactive user requests, read `.ruler/skills/markless-implementation/implementation.md` (the base) plus the matching overlay (`compiler.md`, `bundler.md`, `performance.md`, `release.md`), or `.ruler/skills/markless-spec-maintenance/spec.md` for specs.
+The progress ledger is CLI-managed: use `pnpm state append|status|tail|project`.
+Never read `specs/state-archive.md` or bulk history; use the CLI.
+
+Production package folders: `packages/analyzer`, `packages/bundler`, `packages/cli`, `packages/compiler`, `packages/core`, `packages/router`, `packages/runtime`, `packages/serializer`, `packages/typescript-plugin`, `packages/vitest-browser`, and `packages/web`.
