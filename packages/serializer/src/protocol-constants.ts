@@ -1,6 +1,7 @@
 export const MARKLESS_STATE_SCRIPT_TYPE = 'markless/state';
 export const MARKLESS_VIEW_SCRIPT_TYPE = 'markless/view';
 export const MARKLESS_ARM_SCRIPT_TYPE = 'markless/arm';
+export const MARKLESS_STATE_PATCH_SCRIPT_TYPE = 'markless/state-patch';
 
 export const MARKLESS_ASYNC_CONTAINER_ATTRIBUTE = 'data-async-container';
 export const MARKLESS_BOUNDARY_ATTRIBUTE = 'data-boundary';
