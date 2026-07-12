@@ -10,6 +10,34 @@ import {
 } from './helpers.ts';
 
 describe('Vite config integration', () => {
+	test('defaults production builds to a stripped execution log', () => {
+		const plugin = getMarklessPlugin();
+		callConfig(plugin, {}, { command: 'build' });
+
+		expect(callTransformIndexHtml(plugin)).toBeUndefined();
+	});
+
+	test('keeps automatic execution logging for the dev server', () => {
+		const plugin = getMarklessPlugin();
+		callConfig(plugin, {}, { command: 'serve' });
+
+		expect(callTransformIndexHtml(plugin)).toEqual([
+			expect.objectContaining({ tag: 'script' }),
+		]);
+	});
+
+	test.each(['auto', 'always'] as const)(
+		'preserves explicit production executionLog %s',
+		(executionLog) => {
+			const plugin = getPlugin(markless({ executionLog }), 'vite-plugin-markless');
+			callConfig(plugin, {}, { command: 'build' });
+
+			expect(callTransformIndexHtml(plugin)).toEqual([
+				expect.objectContaining({ tag: 'script' }),
+			]);
+		},
+	);
+
 	test('shares plugin state across app build environments', () => {
 		expect(getMarklessPlugin().sharedDuringBuild).toBe(true);
 	});
@@ -257,6 +285,13 @@ describe('Vite config integration', () => {
 		});
 	});
 });
+
+function callTransformIndexHtml(plugin: ReturnType<typeof getMarklessPlugin>) {
+	if (typeof plugin.transformIndexHtml !== 'function') {
+		throw new Error('Expected a transformIndexHtml hook.');
+	}
+	return plugin.transformIndexHtml.call({} as never, '<html></html>', {} as never);
+}
 
 function getMarklessPlugin(options: Parameters<typeof markless>[0] = {}) {
 	return getPlugin(markless(options), 'vite-plugin-markless') as ReturnType<

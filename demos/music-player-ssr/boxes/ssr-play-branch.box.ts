@@ -38,7 +38,11 @@ export default box(
 	},
 	async ({ pipeline, expect, receipt }) => {
 		const build = await pipeline.build({
-			config: (config) => ({ ...config, mode: 'ssr' }),
+			config: (config) => ({
+				...config,
+				configFile: 'boxes/vite.config.ts',
+				mode: 'ssr',
+			}),
 		});
 		const preview = await pipeline.preview(build);
 

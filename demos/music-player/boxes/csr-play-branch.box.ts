@@ -18,7 +18,9 @@ export default box(
 		modes: ['build', 'preview'],
 	},
 	async ({ pipeline, expect, receipt }) => {
-		const build = await pipeline.build();
+		const build = await pipeline.build({
+			config: (config) => ({ ...config, configFile: 'boxes/vite.config.ts' }),
+		});
 		const preview = await pipeline.preview(build);
 
 		// Mount truth: the app renders paused — the @else arm shows the play

@@ -32,7 +32,10 @@ export default defineConfig(({ command, mode }) => ({
 		},
 	},
 	plugins: [
-		markless({ debug: mode === 'debug-channel' }),
+		markless({
+			debug: mode === 'debug-channel',
+			executionLog: mode === 'ssr' ? 'auto' : undefined,
+		}),
 		fixtureSsrHost({
 			devRenderEntry: '/src/server.ts',
 			builtRenderEntry: 'server-render/server.js',

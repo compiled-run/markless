@@ -93,6 +93,8 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 		},
 		config(config, env) {
 			command = env.command;
+			rolldownOptions.executionLog =
+				options.executionLog ?? (env.command === 'serve' ? 'auto' : 'never');
 			const debugEnabled = env.command === 'serve' || options.debug === true;
 			const debugDefine = JSON.stringify(debugEnabled);
 			const consumerDebugDefine = config.define?.__MARKLESS_DEBUG_ENABLED__;

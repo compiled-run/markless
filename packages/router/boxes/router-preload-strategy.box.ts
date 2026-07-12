@@ -58,6 +58,7 @@ export default box(
 				...config,
 				root: `${config.root}/${FIXTURE}`,
 				configFile: `${config.root}/${FIXTURE}/vite.config.ts`,
+				mode: 'execution-measurement',
 			}),
 		});
 		const preview = await pipeline.preview(build, {
