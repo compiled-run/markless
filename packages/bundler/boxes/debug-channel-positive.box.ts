@@ -1,6 +1,10 @@
 import { box, type BuildHandle, type PipelineApi } from '@async/witness';
 import type { Plugin } from 'vite';
-import { appendWitnessVerdict } from './witness-verdict.ts';
+import {
+	appendWitnessVerdict,
+	invalidateBundlerAnalyzerReceipt,
+	writeBundlerAnalyzerReceipt,
+} from './witness-verdict.ts';
 
 const FIXTURES = ['fixtures/vite-csr', 'fixtures/vite-ssr'] as const;
 const WAIT = { timeoutMs: 10_000 };
@@ -15,6 +19,7 @@ export default box(
 		modes: ['build', 'preview'],
 	},
 	async ({ pipeline, expect, receipt }) => {
+		await invalidateBundlerAnalyzerReceipt('debug-channel-positive');
 		for (const fixture of FIXTURES) {
 			const flagged = await buildFixture(pipeline, fixture, true);
 			const preview = await previewFixture(pipeline, flagged, fixture, true);
@@ -32,6 +37,11 @@ export default box(
 			...BOX,
 			passed: true,
 			receiptPath: '.witness/receipts/<run>/receipt.json',
+		});
+		await writeBundlerAnalyzerReceipt({
+			name: 'debug-channel-positive',
+			identity: { matrix: 'bundler-debug-channel-positive-v1' },
+			results: [{ id: 'MLA-EXT-WITNESS', status: 'pass', details: [] }],
 		});
 	},
 );

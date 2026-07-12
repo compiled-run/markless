@@ -8,6 +8,16 @@
 		"url": "git+https://github.com/markless-dev/markless.git",
 		"directory": "packages/bundler"
 	},
+	"files": [
+		"dist"
+	],
+	"type": "module",
+	"sideEffects": false,
+	"exports": {
+		"./preload": "./src/preload.ts",
+		"./rolldown": "./src/rolldown.ts",
+		"./vite": "./src/vite/index.ts"
+	},
 	"publishConfig": {
 		"access": "public",
 		"exports": {
@@ -25,13 +35,6 @@
 			}
 		}
 	},
-	"type": "module",
-	"sideEffects": false,
-	"exports": {
-		"./preload": "./src/preload.ts",
-		"./rolldown": "./src/rolldown.ts",
-		"./vite": "./src/vite/index.ts"
-	},
 	"scripts": {
 		"test:boxes": "witness run",
 		"prepublishOnly": "node ../../scripts/release/verify-publish-ready.mjs"
@@ -42,6 +45,9 @@
 		"@thi.ng/dgraph": "catalog:",
 		"pathe": "catalog:",
 		"ufo": "catalog:"
+	},
+	"devDependencies": {
+		"@markless/analyzer": "workspace:*"
 	},
 	"peerDependencies": {
 		"rolldown": "1.0.3",
@@ -54,8 +60,5 @@
 		"vite": {
 			"optional": true
 		}
-	},
-	"files": [
-		"dist"
-	]
+	}
 }

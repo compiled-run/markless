@@ -1,6 +1,11 @@
 import { box } from '@async/witness';
 import { planModulePreloadUrls } from '../src/build/preload-plan.ts';
 import type { MarklessBundleGraph } from '../src/types.ts';
+import { evaluatePreloaderEvidence, measureAndRefuseI5, measureI5WithV8 } from './analyzer-gate.ts';
+import {
+	invalidateBundlerAnalyzerReceipt,
+	writeBundlerAnalyzerReceipt,
+} from './witness-verdict.ts';
 
 const FIXTURE = 'fixtures/vite-csr-preloader';
 const COUNTER = '[data-counter]';
@@ -22,6 +27,7 @@ export default box(
 		modes: ['build', 'preview'],
 	},
 	async ({ pipeline, expect, receipt }) => {
+		await invalidateBundlerAnalyzerReceipt('csr-preloader');
 		const build = await pipeline.build({
 			config: (config) => ({
 				...config,
@@ -63,8 +69,25 @@ export default box(
 
 		await page.clearNetworkEmulation();
 		await expect.page.outcome(page, { consoleErrors: 0, failedRequests: 0 }, WAIT);
+		if (process.env.MARKLESS_ANALYZER_MEASURE_I5 === '1') {
+			await measureAndRefuseI5('vite-csr-preloader', () =>
+				measureI5WithV8(page.url, COUNTER),
+			);
+		}
+		const analyzerResults = evaluatePreloaderEvidence({
+			fixture: 'vite-csr-preloader',
+			pageUrl: page.url,
+			declaredPreloads: expectedPreloadHrefs,
+			actionStartIndex: beforeClick.length,
+			requests: afterClick,
+		});
 		await preview.close();
 		await receipt.capture('csr preload low network startup overlap and interaction');
+		await writeBundlerAnalyzerReceipt({
+			name: 'csr-preloader',
+			identity: { fixture: 'vite-csr-preloader' },
+			results: analyzerResults,
+		});
 	},
 );
 

@@ -1,4 +1,9 @@
 import { box } from '@async/witness';
+import { evaluatePreloaderEvidence, measureAndRefuseI5, measureI5WithV8 } from './analyzer-gate.ts';
+import {
+	invalidateBundlerAnalyzerReceipt,
+	writeBundlerAnalyzerReceipt,
+} from './witness-verdict.ts';
 
 const FIXTURE = 'fixtures/vite-ssr-preloader';
 const COUNTER = '[data-counter]';
@@ -19,6 +24,7 @@ export default box(
 		modes: ['build', 'preview'],
 	},
 	async ({ pipeline, expect, receipt }) => {
+		await invalidateBundlerAnalyzerReceipt('ssr-preloader');
 		const build = await pipeline.build({
 			config: (config) => ({
 				...config,
@@ -58,8 +64,25 @@ export default box(
 
 		await page.clearNetworkEmulation();
 		await expect.page.outcome(page, { consoleErrors: 0, failedRequests: 0 }, WAIT);
+		if (process.env.MARKLESS_ANALYZER_MEASURE_I5 === '1') {
+			await measureAndRefuseI5('vite-ssr-preloader', () =>
+				measureI5WithV8(page.url, COUNTER),
+			);
+		}
+		const analyzerResults = evaluatePreloaderEvidence({
+			fixture: 'vite-ssr-preloader',
+			pageUrl: page.url,
+			declaredPreloads: expectedPreloadHrefs,
+			actionStartIndex: beforeClick.length,
+			requests: afterClick,
+		});
 		await preview.close();
 		await receipt.capture('ssr preload low network startup and interaction');
+		await writeBundlerAnalyzerReceipt({
+			name: 'ssr-preloader',
+			identity: { fixture: 'vite-ssr-preloader' },
+			results: analyzerResults,
+		});
 	},
 );
 

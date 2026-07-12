@@ -1,4 +1,8 @@
 import { box } from '@async/witness';
+import {
+	invalidateBundlerAnalyzerReceipt,
+	writeBundlerAnalyzerReceipt,
+} from './witness-verdict.ts';
 
 const FIXTURE = 'fixtures/vite-ssr-preloader';
 const COUNTER = '[data-counter]';
@@ -19,6 +23,10 @@ export default box(
 		modes: ['build', 'preview'],
 	},
 	async ({ pipeline, expect, receipt }) => {
+		await invalidateBundlerAnalyzerReceipt('ssr-preload-waterfall');
+		if (process.env.MARKLESS_ANALYZER_FORCE_WITNESS_FAILURE === '1') {
+			throw new Error('MLA-EXT-WITNESS forced box failure');
+		}
 		const build = await pipeline.build({
 			config: (config) => ({
 				...config,
@@ -50,6 +58,11 @@ export default box(
 		await expect.page.outcome(page, { consoleErrors: 0, failedRequests: 0 }, WAIT);
 		await preview.close();
 		await receipt.capture('ssr preload module request overlap under throttling');
+		await writeBundlerAnalyzerReceipt({
+			name: 'ssr-preload-waterfall',
+			identity: { matrix: 'bundler-ssr-preload-waterfall-v1' },
+			results: [{ id: 'MLA-EXT-WITNESS', status: 'pass', details: [] }],
+		});
 	},
 );
 

@@ -67,10 +67,14 @@ jobs:
             - name: Run unit and integration tests
               run: pnpm exec vp test
 
-            - name: Prove analyzer consumer contracts and validate receipts
-              run: |
-                  pnpm receipts:generate
-                  pnpm receipts:check
+            - name: Generate analyzer unit-contract receipts
+              run: pnpm receipts:generate
+
+            - name: Run bundler pipeline boxes
+              run: pnpm --dir packages/bundler test:boxes
+
+            - name: Validate required analyzer consumer receipts
+              run: pnpm receipts:check
 
             - name: Upload analyzer contract receipts
               if: always()
@@ -79,9 +83,6 @@ jobs:
                   name: analyzer-contract-receipts
                   path: packages/*/.witness/receipts/*.json
                   if-no-files-found: error
-
-            - name: Run bundler pipeline boxes
-              run: pnpm --dir packages/bundler test:boxes
 
             - name: Run router pipeline boxes
               run: pnpm --dir packages/router test:boxes

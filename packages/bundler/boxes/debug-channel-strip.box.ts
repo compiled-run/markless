@@ -1,13 +1,18 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { box } from '@async/witness';
-import { DEBUG_CHANNEL_SENTINELS } from '../../analyzer/src/strip-guarantee.ts';
+import type { AnalyzerCanonicalInvariantResult } from '@markless/analyzer';
+import { evaluateBundlerStrip } from './analyzer-gate.ts';
 import {
 	buildFixture,
 	debugChannelReporter,
 	expectedDebugResult,
 	previewFixture,
 } from './debug-channel-positive.box.ts';
-import { appendWitnessVerdict } from './witness-verdict.ts';
+import {
+	appendWitnessVerdict,
+	invalidateBundlerAnalyzerReceipt,
+	writeBundlerAnalyzerReceipt,
+} from './witness-verdict.ts';
 
 const FIXTURES = ['fixtures/vite-csr', 'fixtures/vite-ssr'] as const;
 const BOX = {
@@ -20,8 +25,10 @@ export default box(
 		modes: ['build', 'preview'],
 	},
 	async ({ pipeline, expect, receipt }) => {
+		await invalidateBundlerAnalyzerReceipt('debug-channel');
 		const moduleRows: Array<{ id: string; renderedLength: number }> = [];
 		const results: Record<string, unknown> = {};
+		const analyzerResults: AnalyzerCanonicalInvariantResult[] = [];
 		for (const fixture of FIXTURES) {
 			const build = await pipeline.build({
 				config: (config) => ({
@@ -35,10 +42,20 @@ export default box(
 					],
 				}),
 			});
+			const unflaggedArtifacts = [];
 			for (const artifact of build.artifacts) {
 				if (!/\.(?:html|[cm]?js)$/.test(artifact.path)) continue;
-				assertNoSentinels((await build.artifact(artifact.path)).text, artifact.path);
+				unflaggedArtifacts.push({
+					path: artifact.path,
+					content: (await build.artifact(artifact.path)).text,
+				});
 			}
+			const stripResult = evaluateBundlerStrip({
+				debugEnabled: false,
+				artifacts: unflaggedArtifacts,
+			});
+			if (stripResult.status === 'fail') throw new Error(stripResult.details.join('\n'));
+			analyzerResults.push(stripResult);
 			const preview = await previewFixture(pipeline, build, fixture, false);
 			const html = await preview.request('/');
 			assertNoSentinels(html, `${fixture} preview HTML`);
@@ -49,6 +66,21 @@ export default box(
 			await preview.close();
 
 			const flagged = await buildFixture(pipeline, fixture, true);
+			const flaggedArtifacts = await Promise.all(
+				flagged.artifacts
+					.filter((artifact) => /\.(?:html|[cm]?js)$/.test(artifact.path))
+					.map(async (artifact) => ({
+						path: artifact.path,
+						content: (await flagged.artifact(artifact.path)).text,
+					})),
+			);
+			const positiveResult = evaluateBundlerStrip({
+				debugEnabled: true,
+				artifacts: flaggedArtifacts,
+			});
+			if (positiveResult.status === 'fail')
+				throw new Error(positiveResult.details.join('\n'));
+			analyzerResults.push(positiveResult);
 			const flaggedPreview = await previewFixture(pipeline, flagged, fixture, true);
 			const flaggedPage = await flaggedPreview.browser.visit('/');
 			const positive = expectedDebugResult(fixture);
@@ -86,6 +118,11 @@ export default box(
 			passed: true,
 			receiptPath: '.witness/receipts/debug-channel-strip.json',
 		});
+		await writeBundlerAnalyzerReceipt({
+			name: 'debug-channel',
+			identity: { matrix: 'bundler-debug-channel-v1' },
+			results: [...analyzerResults, { id: 'MLA-EXT-WITNESS', status: 'pass', details: [] }],
+		});
 	},
 );
 
@@ -107,6 +144,9 @@ function outputModuleObserver(rows: Array<{ id: string; renderedLength: number }
 }
 
 function assertNoSentinels(source: string, label: string): void {
-	const found = DEBUG_CHANNEL_SENTINELS.filter((sentinel) => source.includes(sentinel));
-	if (found.length > 0) throw new Error(`${label} retained debug sentinels: ${found.join(', ')}`);
+	const result = evaluateBundlerStrip({
+		debugEnabled: false,
+		artifacts: [{ path: label, content: source }],
+	});
+	if (result.status === 'fail') throw new Error(result.details.join('\n'));
 }
