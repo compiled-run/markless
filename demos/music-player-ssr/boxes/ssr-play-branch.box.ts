@@ -29,6 +29,11 @@ const WAIT = { timeoutMs: 10_000 };
 // symbol module globally, breaking cross-route exclusion).
 const MIN_HEAD_LINKS = 65;
 const MAX_HEAD_LINKS = 128;
+// Permanent execution walls: owner ratification 2026-07-12, T006.
+const LOAD_APP_BYTES = 0;
+const LOAD_INSTRUMENT_BYTES = 0;
+const FIRST_PLAY_APP_BYTES_MAX = 1_850;
+const FIRST_PLAY_INSTRUMENT_BYTES_MAX = 2_400;
 
 export default box(
 	{
@@ -90,6 +95,11 @@ export default box(
 		await expect.page.attribute(page, PLAY_TOGGLE, 'class', 'play active', WAIT);
 		await expect.page.attribute(page, '.youtube-frame-host', 'data-command', 'play', WAIT);
 		const expectedAppBytes = await expectedFirstPlayAppBytes(preview);
+		if (expectedAppBytes > FIRST_PLAY_APP_BYTES_MAX) {
+			throw new Error(
+				`Expected first-Play app bytes derived from execution-sizes.json to stay <= ${FIRST_PLAY_APP_BYTES_MAX}, got ${expectedAppBytes}.`,
+			);
+		}
 		await waitForLogInteractionAttribute(page, 1, expectedAppBytes, WAIT);
 		const afterClickScripts = await waitForQuietBuildJs(page);
 		const lazyChunks = afterClickScripts.filter((path) => !startupScripts.includes(path));
@@ -193,6 +203,8 @@ async function waitForLogSummaryAttribute(
 	page: ContentPage,
 	options: { readonly timeoutMs: number },
 ): Promise<void> {
+	// Exact zero is the permanent load gate (owner ratification 2026-07-12, T006):
+	// any positive app or instrument execution during resume is a regression.
 	const started = Date.now();
 	while (Date.now() - started < options.timeoutMs) {
 		const html = await page.content();
@@ -200,8 +212,10 @@ async function waitForLogSummaryAttribute(
 			/data-markless-log-summary="markless: resumed — 0\.0 KB app executed, \d+ modules preloaded \(0 app executed\) · 0\.0 KB instrument"/.test(
 				html,
 			) &&
-			/data-markless-log-app-bytes="0"/.test(html) &&
-			/data-markless-log-instrument-bytes="0"/.test(html) &&
+			new RegExp(`data-markless-log-app-bytes="${LOAD_APP_BYTES}"`).test(html) &&
+			new RegExp(`data-markless-log-instrument-bytes="${LOAD_INSTRUMENT_BYTES}"`).test(
+				html,
+			) &&
 			!/data-markless-log-summary="[^"]*· 3\.1 KB"/.test(html)
 		)
 			return;
@@ -271,6 +285,15 @@ async function waitForLogInteractionAttribute(
 			appBytesPattern.test(html) &&
 			!/data-markless-log-last="[^"]*est\./.test(html)
 		) {
+			const instrumentBytes = Number(exactInstrument);
+			if (
+				!Number.isInteger(instrumentBytes) ||
+				instrumentBytes > FIRST_PLAY_INSTRUMENT_BYTES_MAX
+			) {
+				throw new Error(
+					`Expected first-Play instrument bytes to be an integer <= ${FIRST_PLAY_INSTRUMENT_BYTES_MAX}, got ${exactInstrument}.`,
+				);
+			}
 			return;
 		}
 		await new Promise((resolve) => setTimeout(resolve, 25));
