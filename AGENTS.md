@@ -15,10 +15,15 @@ Crew and GoalBuddy artifact-writing packets/cards must declare `Workflow guidanc
 If that declaration is missing, or says `Workflow guidance: none` for a write task, stop before editing and return blocked.
 Read-only scout/critique packets may declare `Workflow guidance: none`.
 For direct interactive user requests, read `.ruler/skills/markless-implementation/implementation.md` (the base) plus the matching overlay (`compiler.md`, `bundler.md`, `performance.md`, `release.md`), or `.ruler/skills/markless-spec-maintenance/spec.md` for specs.
+Merging or pushing to main, pushing any shared branch, or closing a goal requires an explicit owner directive for that specific change set. A prior directive does not carry forward to new commits, follow-up fixes, or "finishing" work. When in doubt, prepare the commit locally and ask.
 The progress ledger is CLI-managed: use `pnpm state append|status|tail|project`.
 Never read `specs/state-archive.md` or bulk history; use the CLI.
 
 Production package folders: `packages/analyzer`, `packages/bundler`, `packages/cli`, `packages/compiler`, `packages/core`, `packages/router`, `packages/runtime`, `packages/serializer`, `packages/typescript-plugin`, `packages/vitest-browser`, and `packages/web`.
+
+Write user-facing explanations in clear, concise language without reducing technical precision. Prefer concrete wording over unexplained jargon. Use established domain terminology when it is the most precise choice, and briefly define it when the intended audience may not know it. Preserve material evidence, constraints, tradeoffs, caveats, and uncertainty. Do not rewrite code, identifiers, commands, quoted text, or prescribed formats merely to satisfy this style rule.
+
+When asking the owner to decide something (goal menus, batched decision lists, question prompts), each decision must be readable on its own without opening the notes file: one plain sentence saying what is being decided, one saying what the recommendation is and why, and one saying what changes if adopted. Never chain multiple decisions into a single semicolon-packed paragraph, and never use bare codes (A1, D2) without the plain-language meaning beside them. Depth belongs in the linked note; the menu itself is a summary a reader new to the goal could act on.
 
 
 
