@@ -1,8 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import {
-	DEBUG_CHANNEL_SENTINELS,
-	evaluateDebugChannelStrip,
-} from '../src/strip-guarantee.ts';
+import { DEBUG_CHANNEL_SENTINELS, evaluateDebugChannelStrip } from '../src/strip-guarantee.ts';
 
 describe('MLA-S4 strip guarantee', () => {
 	test('passes when an unflagged artifact set contains no sentinel', () => {
@@ -20,9 +17,7 @@ describe('MLA-S4 strip guarantee', () => {
 	test('fails an unflagged artifact and names its retained sentinel', () => {
 		const result = evaluateDebugChannelStrip({
 			debugEnabled: false,
-			artifacts: [
-				{ path: 'build/chunk-debug.js', content: DEBUG_CHANNEL_SENTINELS[2] },
-			],
+			artifacts: [{ path: 'build/chunk-debug.js', content: DEBUG_CHANNEL_SENTINELS[2] }],
 		});
 
 		expect(result.status).toBe('fail');
@@ -35,9 +30,7 @@ describe('MLA-S4 strip guarantee', () => {
 		expect(
 			evaluateDebugChannelStrip({
 				debugEnabled: true,
-				artifacts: [
-					{ path: 'index.html', content: 'markless.debug.channel.v1.bootstrap' },
-				],
+				artifacts: [{ path: 'index.html', content: 'markless.debug.channel.v1.bootstrap' }],
 			}).status,
 		).toBe('pass');
 		expect(

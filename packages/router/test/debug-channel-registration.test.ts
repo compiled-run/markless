@@ -13,10 +13,10 @@ import type { MarklessDebugChannelV1 } from '../../web/src/debug-channel.ts';
 
 function requiredScriptContent(text: string, pattern: RegExp): string {
 	const match = text.match(pattern);
-	if (!match || match[1] === undefined) throw new Error('expected script content matching ' + String(pattern));
+	if (!match || match[1] === undefined)
+		throw new Error('expected script content matching ' + String(pattern));
 	return match[1];
 }
-
 
 const debugChannel = () =>
 	(globalThis as typeof globalThis & { __MARKLESS_DEBUG__?: MarklessDebugChannelV1 })
@@ -111,16 +111,21 @@ describe('router debug registration', () => {
 			navigation: { addEventListener() {}, navigate() {} },
 		} as unknown as MarklessRouterNavigationWindow;
 		await __marklessRouterStartSpaNavigation({
-			pageModuleLoaders: {}, routeFileIds: [], window: runtimeWindow,
+			pageModuleLoaders: {},
+			routeFileIds: [],
+			window: runtimeWindow,
 		});
 		const root = {
 			isConnected: true,
 			contains(value: unknown) {
-				return value === this || (value as { parentElement?: unknown }).parentElement === this;
+				return (
+					value === this || (value as { parentElement?: unknown }).parentElement === this
+				);
 			},
 		};
 		const link = anchor(root, {
-			href: 'http://router.test/lazy', 'data-markless-router-link': '',
+			href: 'http://router.test/lazy',
+			'data-markless-router-link': '',
 		});
 		__marklessDebugStartContainer(root as never, 'csr');
 		expect(debugChannel()?.explainInteraction(link as never, 'click')).toMatchObject({
@@ -150,7 +155,10 @@ describe('router debug registration', () => {
 			html,
 			/<script data-markless-router-debug-bootstrap>([\s\S]*?)<\/script>/,
 		);
-		const source = requiredScriptContent(html, /<script data-markless-router-link-resumer>([\s\S]*?)<\/script>/);
+		const source = requiredScriptContent(
+			html,
+			/<script data-markless-router-link-resumer>([\s\S]*?)<\/script>/,
+		);
 		const root: any = {
 			isConnected: true,
 			listeners: new Map(),
@@ -187,11 +195,14 @@ describe('router debug registration', () => {
 		const csrRoot = {
 			isConnected: true,
 			contains(value: unknown) {
-				return value === this || (value as { parentElement?: unknown }).parentElement === this;
+				return (
+					value === this || (value as { parentElement?: unknown }).parentElement === this
+				);
 			},
 		};
 		const csrLink = anchor(csrRoot, {
-			href: 'http://router.test/csr', 'data-markless-router-link': '',
+			href: 'http://router.test/csr',
+			'data-markless-router-link': '',
 		});
 		__marklessDebugStartContainer(csrRoot as never, 'csr');
 		expect(debugChannel()?.explainInteraction(csrLink as never, 'click')).toMatchObject({

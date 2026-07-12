@@ -28,6 +28,7 @@ packages/vitest-browser/browser/__screenshots__/
 .fable-codex/
 
 # ruler apply backups
+*.bak
 AGENTS.md.bak
 CLAUDE.md.bak
 .mcp.json.bak

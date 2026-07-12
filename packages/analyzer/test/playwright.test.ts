@@ -56,18 +56,39 @@ describe('Playwright adapter', () => {
 	});
 
 	test('collects served HTML and build chunks from the page', async () => {
-		const artifacts = [{ path: '/index.html', content: '<main />' }, { path: '/build/a.js', content: 'export{}' }];
+		const artifacts = [
+			{ path: '/index.html', content: '<main />' },
+			{ path: '/build/a.js', content: 'export{}' },
+		];
 		const page = { evaluate: vi.fn(async () => artifacts) };
 		expect(await collectServedBuildArtifacts(page as never)).toEqual(artifacts);
 	});
 
 	test('adapts a serialized page Document to the locator core', async () => {
 		const page = {
-			evaluate: vi.fn(async () => [{
-				containerId: 'document-container:0',
-				root: { nodeType: 1, tagName: 'MAIN', childNodes: [] },
-				view: { locators: [{ hostNodeId: 'root', strategy: 'dom-order', index: 0, tagName: 'main' }], events: [], domUpdates: [], behaviors: [], elementHandles: [], keyedRepeats: [], branches: [], asyncBoundaries: [] },
-			}]),
+			evaluate: vi.fn(async () => [
+				{
+					containerId: 'document-container:0',
+					root: { nodeType: 1, tagName: 'MAIN', childNodes: [] },
+					view: {
+						locators: [
+							{
+								hostNodeId: 'root',
+								strategy: 'dom-order',
+								index: 0,
+								tagName: 'main',
+							},
+						],
+						events: [],
+						domUpdates: [],
+						behaviors: [],
+						elementHandles: [],
+						keyedRepeats: [],
+						branches: [],
+						asyncBoundaries: [],
+					},
+				},
+			]),
 		};
 		const result = await collectLocatorResolution(page as never);
 		expect(result.invariant.status).toBe('pass');

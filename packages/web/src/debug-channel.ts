@@ -435,9 +435,11 @@ export function __marklessDebugRegisterRouter(
 		safely(() => (moduleRoots.get(root) ?? controlsFor(root, 'ssr-resume')).router(source));
 	else
 		safely(() => {
-			(((globalThis as Record<PropertyKey, unknown>)[
-				Symbol.for('markless.debug.channel.v1.router-sources')
-			] ??= new Set()) as Set<MarklessDebugRouterDelegationInteraction['source']>).add(source);
+			(
+				((globalThis as Record<PropertyKey, unknown>)[
+					Symbol.for('markless.debug.channel.v1.router-sources')
+				] ??= new Set()) as Set<MarklessDebugRouterDelegationInteraction['source']>
+			).add(source);
 			const inlineControls = (globalThis as Record<PropertyKey, unknown>)[
 				Symbol.for('markless.debug.channel.v1.bootstrap')
 			] as Pick<RootControls, 'router'> | undefined;
