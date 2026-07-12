@@ -86,6 +86,7 @@ export async function transformTsrxModule(
 		input.executionLogModuleHooks === false ? 'never' : input.executionLog;
 	const manifest: MarklessTransformManifest = {
 		source: input.filename,
+		symbolRoutes,
 		payload: { virtualModuleId: payloadId },
 		resolver: { virtualModuleId: resolverId },
 		symbols: compiled.symbolModules.modules.map((module, index) => ({

@@ -49,6 +49,7 @@ export interface TransformTsrxModuleResult {
 
 export interface MarklessTransformManifest {
 	source: string;
+	symbolRoutes?: ReadonlyArray<{ readonly prefix: string; readonly importSource: string }>;
 	payload: MarklessBuildModuleReference;
 	resolver: MarklessBuildModuleReference;
 	symbols: MarklessSymbolManifestEntry[];

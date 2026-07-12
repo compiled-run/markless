@@ -85,7 +85,8 @@ export default box(
 		await expect.page.text(page, PLAY_ICON, PLAYING_ICON, WAIT);
 		await expect.page.attribute(page, PLAY_TOGGLE, 'class', 'play active', WAIT);
 		await expect.page.attribute(page, '.youtube-frame-host', 'data-command', 'play', WAIT);
-		await waitForLogInteractionAttribute(page, 1, WAIT);
+		const expectedAppBytes = await expectedFirstPlayAppBytes(preview);
+		await waitForLogInteractionAttribute(page, 1, expectedAppBytes, WAIT);
 		const afterClickScripts = await waitForQuietBuildJs(page);
 		const lazyChunks = afterClickScripts.filter((path) => !startupScripts.includes(path));
 		receipt.note(
@@ -109,7 +110,7 @@ export default box(
 		await expect.page.text(page, PLAY_ICON, PAUSED_ICON, WAIT);
 		await expect.page.attribute(page, PLAY_TOGGLE, 'class', 'play', WAIT);
 		await expect.page.attribute(page, '.youtube-frame-host', 'data-command', 'pause', WAIT);
-		await waitForLogInteractionAttribute(page, 2, WAIT);
+		await waitForLogInteractionAttribute(page, 2, expectedAppBytes, WAIT);
 
 		// Track navigation exercises composed events and dom updates deeper in
 		// the tree (also absorbed from the retired tmp-ssr box).
@@ -205,33 +206,65 @@ async function waitForLogSummaryAttribute(
 	throw new Error('Expected data-markless-log-summary to mirror the resume summary.');
 }
 
+// The first-Play app cost is derived from the served size map (resume-events +
+// the Player click symbol) rather than pinned as a literal: the assertion then
+// proves the accounting arithmetic end to end and survives byte drift, while a
+// composition change (a new module waking) still fails the woke/warm counts and
+// the derived sum.
+async function expectedFirstPlayAppBytes(preview: {
+	request(path: string): Promise<string>;
+}): Promise<number> {
+	const sizes = JSON.parse(await preview.request('/build/execution-sizes.json')) as Record<
+		string,
+		{ readonly gzip?: number; readonly instrument?: true }
+	>;
+	const playerSymbolKey = Object.keys(sizes).find(
+		(key) =>
+			key.startsWith('virtual:markless:symbol:') &&
+			decodeURIComponent(key).includes('/components/Player.tsrx') &&
+			decodeURIComponent(key).endsWith(':symbol:3'),
+	);
+	const resumeEvents = sizes['web:resume-events']?.gzip;
+	const playerSymbol = playerSymbolKey ? sizes[playerSymbolKey]?.gzip : undefined;
+	if (!resumeEvents || !playerSymbol) {
+		throw new Error(
+			`Expected size-map entries for web:resume-events and Player symbol:3, got ${resumeEvents} and ${playerSymbol}.`,
+		);
+	}
+	return resumeEvents + playerSymbol;
+}
+
 async function waitForLogInteractionAttribute(
 	page: ContentPage,
 	count: number,
+	expectedAppBytes: number,
 	options: { readonly timeoutMs: number },
 ): Promise<void> {
-	// Honest-unknown is the CURRENT contract because the click symbol is unmapped; the
-	// qualified-symbol attribution tranche must flip this to numeric app bytes + present mirrors.
-	// See docs/goals/runtime-management/notes/T005A-instrument-truth-spec.md.
 	const started = Date.now();
 	const countPattern = new RegExp(`data-markless-log-interactions="${count}"`);
-	const lastPattern =
-		/data-markless-log-last="markless: click \[[^"]+\] · woke \d+ modules · ran warm \d+ modules · \d+ app modules \(bytes unknown; \d+ unmapped\) · \d+(?:\.\d+)? KB instrument"/;
+	const expectedAppClause = (expectedAppBytes / 1024).toFixed(1);
+	const lastPattern = new RegExp(
+		`data-markless-log-last="markless: click \\[[^"]+\\] · woke \\d+ modules · ran warm \\d+ modules · ${expectedAppClause.replace('.', '\\.')} KB app · (\\d+(?:\\.\\d+)?) KB instrument"`,
+	);
 	const rejectedFixtures = [
 		'data-markless-log-last="markless: click [button.play] · woke 1 modules · ran warm 2 modules · 3.1 KB"',
-		'data-markless-log-last="markless: click [button.play] · woke 1 modules · ran warm 2 modules · 1.8 KB app · 1.5 KB instrument"',
+		'data-markless-log-last="markless: click [button.play] · woke 1 modules · ran warm 2 modules · 2 app modules (bytes unknown; 1 unmapped) · 1.9 KB instrument"',
 	];
 	for (const fixture of rejectedFixtures) {
 		if (lastPattern.test(fixture))
 			throw new Error(`Execution-log matcher accepted a rejected format: ${fixture}`);
 	}
+	const appBytesPattern = new RegExp(`data-markless-log-app-bytes="${expectedAppBytes}"`);
 	while (Date.now() - started < options.timeoutMs) {
 		const html = await page.content();
+		const readableInstrument = lastPattern.exec(html)?.[1];
+		const exactInstrument = /data-markless-log-instrument-bytes="(\d+)"/.exec(html)?.[1];
 		if (
 			countPattern.test(html) &&
-			lastPattern.test(html) &&
-			!/data-markless-log-app-bytes=/.test(html) &&
-			!/data-markless-log-instrument-bytes=/.test(html) &&
+			readableInstrument !== undefined &&
+			exactInstrument !== undefined &&
+			(Number(exactInstrument) / 1024).toFixed(1) === readableInstrument &&
+			appBytesPattern.test(html) &&
 			!/data-markless-log-last="[^"]*est\./.test(html)
 		) {
 			return;
@@ -239,7 +272,7 @@ async function waitForLogInteractionAttribute(
 		await new Promise((resolve) => setTimeout(resolve, 25));
 	}
 	throw new Error(
-		`Expected interaction ${count} to mirror an honest-unknown execution log line.`,
+		`Expected interaction ${count} to mirror app-bytes=${expectedAppBytes} derived from the size map.`,
 	);
 }
 

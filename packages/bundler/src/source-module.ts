@@ -23,6 +23,10 @@ export function symbolVirtualModuleId(filename: string, symbolId: string) {
 	return `${SYMBOL_VIRTUAL_PREFIX}${encodeURIComponent(filename)}:${encodeURIComponent(symbolId)}`;
 }
 
+export function encodedSymbolSource(filename: string): string {
+	return encodeURIComponent(filename);
+}
+
 // Single source of truth for reading a symbol virtual module id back. Build
 // tooling (the bundler's resolve hooks, the router's route preload planning)
 // recovers the source file a symbol module serves from the id; symbol chunks

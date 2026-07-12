@@ -92,9 +92,8 @@ async function waitForLogInteractionAttribute(
 	count: number,
 	options: { readonly timeoutMs: number },
 ): Promise<void> {
-	// Honest-unknown is the CURRENT contract because the click symbol is unmapped; the
-	// qualified-symbol attribution tranche must flip this to numeric app bytes + present mirrors.
-	// See docs/goals/runtime-management/notes/T005A-instrument-truth-spec.md.
+	// Ruling 9 accepts honest-unknown here: CSR substitutes csr-callback ids, which
+	// intentionally do not guess source ownership in the pull-attribution design.
 	const lastPattern =
 		/data-markless-log-last="markless: click \[[^"]+\] · woke \d+ modules · ran warm \d+ modules · \d+ app modules \(bytes unknown; \d+ unmapped\) · \d+(?:\.\d+)? KB instrument"/;
 	const rejectedFixtures = [

@@ -94,6 +94,9 @@ describe('fixture builds', () => {
 			}
 
 			if ('runtimeBudget' in fixture) {
+				await expectNoAppChunkStaticallyImportsInstrumentChunk(
+					resolve(root, fixture.runtimeBudget.dist),
+				);
 				// Owner ruling 2026-07-05: no per-page fetch metric — 'emitted = required'
 				// assertions arrive with the runtime-stdlib goal. The wall guards bloat.
 				const emittedReport = await runtimeSizeReport({
@@ -112,4 +115,40 @@ async function execPnpm(args: string[]) {
 		const next = error as Error & { stdout?: string; stderr?: string };
 		throw new Error([next.message, next.stdout, next.stderr].filter(Boolean).join('\n'));
 	}
+}
+
+type ExecutionSizeEntry = {
+	readonly chunk?: string;
+	readonly instrument?: boolean;
+};
+
+async function expectNoAppChunkStaticallyImportsInstrumentChunk(dist: string): Promise<void> {
+	const sizes = JSON.parse(
+		await readFile(resolve(dist, 'build/execution-sizes.json'), 'utf8'),
+	) as Record<string, ExecutionSizeEntry>;
+	const instrumentChunks = new Set(
+		Object.values(sizes)
+			.filter((entry) => entry.instrument && entry.chunk)
+			.map((entry) => entry.chunk!),
+	);
+	const appChunks = new Set(
+		Object.values(sizes)
+			.filter((entry) => !entry.instrument && entry.chunk)
+			.map((entry) => entry.chunk!),
+	);
+	const forbiddenEdges: string[] = [];
+	for (const importer of appChunks) {
+		const source = await readFile(resolve(dist, 'build', importer), 'utf8');
+		for (const match of source.matchAll(
+			/\bimport(?:(?:\s+|[{\w*])[\s\S]*?\bfrom\s*)?["']\.\/([^"']+\.js)["']/g,
+		)) {
+			const imported = match[1]!;
+			if (instrumentChunks.has(imported)) forbiddenEdges.push(`${importer} -> ${imported}`);
+		}
+	}
+
+	expect(
+		forbiddenEdges,
+		'app chunks must not statically import execution-instrument chunks',
+	).toEqual([]);
 }

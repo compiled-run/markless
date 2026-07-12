@@ -6,6 +6,8 @@ import { MARKLESS_BUILD_PREFIX } from './build/chunking.ts';
 export const MARKLESS_EXECUTION_LOG_MODULE_ID = 'virtual:markless:dev-log';
 export const MARKLESS_EXECUTION_SIZES = `${MARKLESS_BUILD_PREFIX}execution-sizes.json`;
 
+export type ExecutionAttributionTables = Readonly<Record<string, Readonly<Record<string, string>>>>;
+
 export type ExecutionSizeEntry = {
 	readonly raw: number;
 	readonly gzip: number;
@@ -80,17 +82,21 @@ globalThis.__mxLog?.add(${JSON.stringify(MARKLESS_EXECUTION_LOG_MODULE_ID)});
 const marklessDefaultModuleSizes = ${JSON.stringify(moduleSizes)};
 const marklessSizesUrl = ${JSON.stringify(options.sizesUrl ?? null)};
 let marklessSizesPromise;
+let marklessAttribution;
+let marklessInstallPromise;
 function modules(log) { return log ? [...log] : []; }
 function sizeRecord(input) { return !input ? undefined : typeof input === 'number' ? { raw: input, estimated: true } : input; }
-function normalizeSizes(input) { if (!input) return undefined; const map = new Map(); for (const id of Object.keys(input)) map.set(id, sizeRecord(input[id])); return map; }
+function normalizeSizes(input) { if (!input) return undefined; const map = new Map(); for (const id of Object.keys(input)) if (id !== 'attribution') map.set(id, sizeRecord(input[id])); return map; }
 async function loadModuleSizes(input) {
 	if (input.moduleSizes) return normalizeSizes(input.moduleSizes);
 	if (marklessDefaultModuleSizes) return normalizeSizes(marklessDefaultModuleSizes);
 	if (!marklessSizesUrl) return undefined;
-	marklessSizesPromise ||= fetch(marklessSizesUrl).then((response) => response.ok ? response.json() : undefined).then(normalizeSizes).catch(() => undefined);
+	marklessSizesPromise ||= fetch(marklessSizesUrl).then((response) => response.ok ? response.json() : undefined).then((payload) => { marklessAttribution = payload && payload.attribution; return normalizeSizes(payload); }).catch(() => undefined);
 	return marklessSizesPromise;
 }
 function symbolParts(id) { const match = /^virtual:markless:symbol:([^:]+):([^:]+)$/.exec(id); if (!match) return null; try { return { source: decodeURIComponent(match[1]), symbolId: decodeURIComponent(match[2]) }; } catch { return null; } }
+function routeFile() { const text = document.querySelector?.('script[type="@markless/core/route"]')?.textContent; if (!text) return null; try { const value = JSON.parse(text).file; return typeof value === 'string' ? value : null; } catch { return null; } }
+function qualifySymbolIds(ids, hostNodeId, sizes, tables) { const route = routeFile(); if (!route || route.includes('..') || route.includes('\\\\')) return ids; const canonical = route.replace(/^\\/+/, ''); const scopes = tables && Object.prototype.hasOwnProperty.call(tables, canonical) ? tables[canonical] : undefined; if (!scopes) return ids; const host = /^((?:c\\d+:)*)[^:]+$/.exec(hostNodeId); const hostScope = host && host[1]; return ids.map((id) => { const own = /^((?:c\\d+:)+)(.*)$/.exec(id); const scope = own ? own[1] : hostScope; if (scope === null || !Object.prototype.hasOwnProperty.call(scopes, scope)) return id; const local = own ? own[2] : id; if (!local.startsWith('symbol:')) return id; const matches = [...(sizes?.keys() || [])].filter((key) => { const match = /^virtual:markless:symbol:([^:]+):([^:]+)$/.exec(key); if (!match || match[1] !== scopes[scope]) return false; try { return decodeURIComponent(match[2]) === local; } catch { return false; } }); return matches.length === 1 ? matches[0] : id; }); }
 function canonicalId(id, sizes) {
 	if (!sizes || sizes.has(id)) return id;
 	const local = id.replace(/^(?:c\\d+:)+/, '');
@@ -125,15 +131,19 @@ function mirror(text, a) {
 }
 function mirrorBytes(root, a) { if (a.appBytes === null || a.instrumentBytes === null) { root.removeAttribute('data-markless-log-app-bytes'); root.removeAttribute('data-markless-log-instrument-bytes'); return; } root.setAttribute('data-markless-log-app-bytes', String(a.appBytes)); root.setAttribute('data-markless-log-instrument-bytes', String(a.instrumentBytes)); }
 export async function installMarklessExecutionLog(input = {}) {
-	const log = globalThis.__mxLog; if (!log || log.__marklessInstalled) return;
-	log.__marklessInstalled = true;
+	const log = globalThis.__mxLog; if (!log || globalThis.__mxLogInteraction) return;
+	if (marklessInstallPromise) return marklessInstallPromise;
+	marklessInstallPromise = (async () => {
 	const moduleSizes = await loadModuleSizes(input); const preloaded = input.preloadedModuleCount || document.querySelectorAll('link[rel="modulepreload"]').length; const current = modules(log);
 	if (input.printResumeSummary !== false) {
 		const a = accounting(current, moduleSizes); const summary = 'markless: resumed — ' + category(a, 'app') + ' executed, ' + preloaded + ' modules preloaded (' + a.appModules + ' app executed) · ' + category(a, 'instrument');
 		console.log(summary); const root = document.documentElement; if (root) { root.setAttribute('data-markless-log-summary', summary); mirrorBytes(root, a); }
 	}
 	globalThis.__mxLogInteraction = (event) => {
-		const after = modules(log); const before = event.before || new Set(); const woken = after.filter((id) => !before.has(id)); const warm = warmIds(event);
+		const capturedAfter = modules(event.after || log);
+		const symbolIds = qualifySymbolIds((event.eventRecord && event.eventRecord.symbolIds) || [], event.eventRecord && event.eventRecord.hostNodeId, moduleSizes, marklessAttribution);
+		if (event.eventRecord) event = { ...event, eventRecord: { ...event.eventRecord, symbolIds } };
+		const after = capturedAfter; const before = event.before || new Set(); if (log.has(${JSON.stringify(MARKLESS_EXECUTION_LOG_MODULE_ID)}) && !after.includes(${JSON.stringify(MARKLESS_EXECUTION_LOG_MODULE_ID)})) after.push(${JSON.stringify(MARKLESS_EXECUTION_LOG_MODULE_ID)}); const woken = after.filter((id) => !before.has(id)); const warm = warmIds(event);
 		if (event.noMatch) {
 			const a = accounting([], moduleSizes); const line = 'markless: ' + event.eventName + ' [' + (event.selector || 'event target') + '] — no event record matched · 0.0 KB app · 0.0 KB instrument';
 			console.info(line); mirror(line, a); return;
@@ -143,6 +153,9 @@ export async function installMarklessExecutionLog(input = {}) {
 		for (const row of causeRows({ ...event, after: new Set(after), moduleSizes })) console.log(row);
 		console.groupEnd(); mirror(header, a);
 	};
+	log.__marklessInstalled = true;
+	})();
+	return marklessInstallPromise;
 }
 export async function logMarklessInteraction(event) { await installMarklessExecutionLog({ printResumeSummary: false }); globalThis.__mxLogInteraction?.(event); }
 export async function logMarklessRenderSummary(input = {}) {
@@ -158,6 +171,7 @@ export async function createExecutionSizesAsset(
 	bundle: MarklessBuildMetadataBundle,
 	metadata: MarklessBuildMetadata,
 	canonPath: (fileName: string) => string = (fileName) => fileName,
+	attribution?: ExecutionAttributionTables,
 ) {
 	const entries: Record<string, ExecutionSizeEntry> = {};
 	const symbolLogIdsByChunk = new Map<string, string[]>();
@@ -202,7 +216,12 @@ export async function createExecutionSizesAsset(
 	return {
 		type: 'asset' as const,
 		fileName: MARKLESS_EXECUTION_SIZES,
-		source: JSON.stringify(sortRecord(entries)),
+		source: JSON.stringify({
+			...sortRecord(entries),
+			...(attribution && Object.keys(attribution).length > 0
+				? { attribution: sortNestedRecord(attribution) }
+				: {}),
+		}),
 	};
 }
 
@@ -257,5 +276,13 @@ async function gzipByteLength(code: string): Promise<number> {
 function sortRecord<T>(record: Record<string, T>): Record<string, T> {
 	const next: Record<string, T> = {};
 	for (const key of Object.keys(record).sort()) next[key] = record[key]!;
+	return next;
+}
+
+function sortNestedRecord(
+	record: ExecutionAttributionTables,
+): Record<string, Record<string, string>> {
+	const next: Record<string, Record<string, string>> = {};
+	for (const key of Object.keys(record).sort()) next[key] = sortRecord({ ...record[key] });
 	return next;
 }

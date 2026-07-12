@@ -560,6 +560,55 @@ let count = state(0);
 		expect(JSON.parse(String(graph?.source))).not.toContain('symbol:0');
 	});
 
+	test('attribution tables render from the complete multi-route nested manifest graph', async () => {
+		const plugin = marklessClient({ executionLog: 'always', rootDir: '/workspace/app' });
+		const emitFile = vi.fn();
+		callBuildStart(plugin, { cwd: '/workspace/app' });
+		const component = (name: string, child?: string) =>
+			`${
+				child ? `import Child from ${JSON.stringify(child)};` : ''
+			}\nexport default function ${name}() @{ <section>${child ? '<Child />' : name}</section> }`;
+		await callTransform(
+			plugin,
+			component('RouteA', '../components/Branch.tsrx'),
+			'/workspace/app/pages/a.tsrx',
+		);
+		await callTransform(
+			plugin,
+			component('RouteB', '../components/Other.tsrx'),
+			'/workspace/app/pages/b.tsrx',
+		);
+		await callTransform(
+			plugin,
+			component('Branch', './Leaf.tsrx'),
+			'/workspace/app/components/Branch.tsrx',
+		);
+		await callTransform(plugin, component('Leaf'), '/workspace/app/components/Leaf.tsrx');
+		await callTransform(plugin, component('Other'), '/workspace/app/components/Other.tsrx');
+		await callGenerateBundle(plugin, {}, emitFile);
+		const sizes = emittedAsset(emitFile, 'build/execution-sizes.json');
+		const payload = JSON.parse(String(sizes?.source)) as {
+			attribution: Record<string, Record<string, string>>;
+		};
+		expect(Object.keys(payload.attribution)).toEqual(['pages/a.tsrx', 'pages/b.tsrx']);
+		expect(payload.attribution['pages/a.tsrx']).toHaveProperty('c0:c0:');
+		expect(JSON.stringify(payload.attribution)).not.toContain('virtual:markless:');
+	});
+
+	test('execution-log never mode emits no attribution section or size entries', async () => {
+		const plugin = marklessClient({ executionLog: 'never', rootDir: '/workspace/app' });
+		const emitFile = vi.fn();
+		callBuildStart(plugin, { cwd: '/workspace/app' });
+		await callTransform(
+			plugin,
+			'export default function App() @{ <button>Play</button> }',
+			'/workspace/app/pages/app.tsrx',
+		);
+		await callGenerateBundle(plugin, {}, emitFile);
+		const sizes = emittedAsset(emitFile, 'build/execution-sizes.json');
+		expect(JSON.parse(String(sizes?.source))).toEqual({});
+	});
+
 	test('generateBundle emits the bundle graph from build output', async () => {
 		const plugin = marklessClient();
 		const emitFile = vi.fn();

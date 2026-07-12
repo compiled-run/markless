@@ -1,5 +1,5 @@
 import type { InputOptions, Plugin } from 'rolldown';
-import { isAbsolute, resolve } from 'pathe';
+import { dirname, isAbsolute, resolve } from 'pathe';
 import { joinURL, parsePath, withQuery, withoutLeadingSlash } from 'ufo';
 import { type MarklessBuildMetadataBundle, createBuildMetadata } from './build/build-metadata.ts';
 import { MARKLESS_BUILD_PREFIX, MARKLESS_BUNDLE_GRAPH, outputDefaults } from './build/chunking.ts';
@@ -22,7 +22,7 @@ import {
 	normalizeExecutionLogMode,
 	requalifyExecutionLogModuleHook,
 } from './execution-log.ts';
-import { symbolVirtualModuleSourceFile } from './source-module.ts';
+import { encodedSymbolSource, symbolVirtualModuleSourceFile } from './source-module.ts';
 import {
 	MARKLESS_VIRTUAL_PREFIX,
 	resumeVirtualModuleId,
@@ -369,6 +369,9 @@ export function createMarklessRolldownPlugin(input: {
 						manifestBundle,
 						clientManifest,
 						stripBuildPrefix,
+						executionLogInjection
+							? executionAttributionTables(transformManifests, getRoot())
+							: undefined,
 					),
 				);
 				// The demand map lives in payload-module exports (tree-shaken from built
@@ -390,6 +393,58 @@ export function createMarklessRolldownPlugin(input: {
 	} satisfies Plugin & { api: MarklessRolldownPluginApi };
 
 	return plugin;
+}
+
+function executionAttributionRoots(
+	manifests: ReadonlyMap<string, MarklessTransformManifest>,
+): string[] {
+	const children = new Set<string>();
+	for (const manifest of manifests.values()) {
+		for (const route of manifest.symbolRoutes ?? []) {
+			children.add(resolve(dirname(manifest.source), route.importSource.split('?')[0]!));
+		}
+	}
+	return [...manifests.keys()].filter((source) => !children.has(source));
+}
+
+function executionAttributionTables(
+	manifests: ReadonlyMap<string, MarklessTransformManifest>,
+	root: string | undefined,
+): Record<string, Record<string, string>> {
+	return Object.fromEntries(
+		executionAttributionRoots(manifests)
+			.sort()
+			.map((source) => [
+				executionAttributionRouteKey(source, root),
+				flattenExecutionAttributionScopes(source, manifests),
+			]),
+	);
+}
+
+function executionAttributionRouteKey(source: string, root: string | undefined): string {
+	const prefix = root ? `${root.replace(/[/\\]+$/, '')}/` : '';
+	return (prefix && source.startsWith(prefix) ? source.slice(prefix.length) : source).replace(
+		/^[/\\]+/,
+		'',
+	);
+}
+
+function flattenExecutionAttributionScopes(
+	root: string,
+	manifests: ReadonlyMap<string, MarklessTransformManifest>,
+): Record<string, string> {
+	const scopes: Record<string, string> = {};
+	const visit = (source: string, scope: string, seen: ReadonlySet<string>) => {
+		if (seen.has(source)) return;
+		scopes[scope] = encodedSymbolSource(source);
+		const manifest = manifests.get(source);
+		for (const route of manifest?.symbolRoutes ?? []) {
+			const child = resolve(dirname(source), route.importSource.split('?')[0]!);
+			visit(child, scope + route.prefix, new Set([...seen, source]));
+		}
+	};
+	visit(root, '', new Set());
+	return scopes;
 }
 
 function bundleWithoutRemovedChunks(

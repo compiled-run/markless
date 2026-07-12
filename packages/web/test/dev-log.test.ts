@@ -81,6 +81,128 @@ test('cause rows display qualified woken symbol ids in short form with sizes', (
 	]);
 });
 
+test('cause rows accept pull-attributed warm ids while unknown ids stay unchanged', () => {
+	const sizes = new Map([[APP_SYMBOL_ID, { raw: 1024, gzip: 512 }]]);
+	expect(
+		describeMarklessExecutionCauses({
+			eventName: 'click',
+			eventRecord: { hostNodeId: 'h1', symbolIds: ['c1:symbol:0'] },
+			before: new Set(),
+			after: new Set(),
+			moduleSizes: sizes,
+			attribution: { 'pages/a.tsrx': { 'c1:': encodeURIComponent('/src/App.tsrx') } },
+			routeFile: 'pages/a.tsrx',
+			view: { behaviors: [{ hostNodeId: 'h1' }] },
+		}),
+	).toEqual(['ran warm symbol:0 (App.tsrx) (0.5 KB) <- click matched event record h1']);
+});
+
+test('pull attribution resolves root, sibling, and nested scopes by exact route', () => {
+	const root = APP_SYMBOL_ID;
+	const sibling = `virtual:markless:symbol:${encodeURIComponent('/workspace/src/Sibling.tsrx')}:${encodeURIComponent('symbol:0')}`;
+	const leaf = `virtual:markless:symbol:${encodeURIComponent('/workspace/src/Leaf.tsrx')}:${encodeURIComponent('symbol:0')}`;
+	const rows = describeMarklessExecutionCauses({
+		eventName: 'click',
+		eventRecord: {
+			hostNodeId: 'h1',
+			symbolIds: ['symbol:0', 'c0:symbol:0', 'c1:c0:symbol:0', 'c9:symbol:0'],
+		},
+		before: new Set(),
+		after: new Set(),
+		moduleSizes: new Map([root, sibling, leaf].map((id) => [id, { raw: 100 }])),
+		attribution: {
+			'pages/a.tsrx': {
+				'': encodeURIComponent('/workspace/src/App.tsrx'),
+				'c0:': encodeURIComponent('/workspace/src/Sibling.tsrx'),
+				'c1:c0:': encodeURIComponent('/workspace/src/Leaf.tsrx'),
+			},
+		},
+		routeFile: '/pages/a.tsrx',
+		view: { behaviors: [{ hostNodeId: 'h1' }] },
+	});
+
+	expect(rows.map((row) => row.split(' <- ')[0])).toEqual([
+		'ran warm symbol:0 (App.tsrx) (0.1 KB)',
+		'ran warm symbol:0 (Sibling.tsrx) (0.1 KB)',
+		'ran warm symbol:0 (Leaf.tsrx) (0.1 KB)',
+		'ran warm c9:symbol:0 (bytes unknown)',
+	]);
+});
+
+test('pull attribution inherits unprefixed symbol scope from the event host', () => {
+	const source = (name: string) => encodeURIComponent(`/workspace/src/${name}.tsrx`);
+	const symbol = (name: string, id: string) =>
+		`virtual:markless:symbol:${source(name)}:${encodeURIComponent(id)}`;
+	const ids = [
+		symbol('Root', 'symbol:1'),
+		symbol('Root', 'symbol:3'),
+		symbol('Player', 'symbol:3'),
+		symbol('Self', 'symbol:4'),
+		symbol('Leaf', 'symbol:5'),
+	];
+	const base = {
+		eventName: 'click',
+		before: new Set<string>(),
+		after: new Set<string>(),
+		moduleSizes: new Map(ids.map((id, index) => [id, { raw: 100 + index }])),
+		attribution: {
+			'pages/a.tsrx': {
+				'': source('Root'),
+				'c2:': source('Player'),
+				'c7:': source('Self'),
+				'c1:c0:': source('Leaf'),
+			},
+		},
+		routeFile: 'pages/a.tsrx',
+	};
+	const warmRow = (hostNodeId: string, symbolId: string) =>
+		describeMarklessExecutionCauses({
+			...base,
+			eventRecord: { hostNodeId, symbolIds: [symbolId] },
+		})[0];
+
+	expect(warmRow('c2:h9', 'symbol:3')).toContain('symbol:3 (Player.tsrx)');
+	expect(warmRow('c2:h9', 'c7:symbol:4')).toContain('symbol:4 (Self.tsrx)');
+	expect(warmRow('h1', 'symbol:1')).toContain('symbol:1 (Root.tsrx)');
+	expect(warmRow('c1:c0:h2', 'symbol:5')).toContain('symbol:5 (Leaf.tsrx)');
+	expect(warmRow('c9:h2', 'symbol:3')).toContain('symbol:3 (bytes unknown)');
+});
+
+test('cause rows retain original ids for missing routes and unknown sources', () => {
+	const input = {
+		eventName: 'click',
+		eventRecord: { hostNodeId: 'h1', symbolIds: ['symbol:0', 'symbol:1'] },
+		before: new Set<string>(),
+		after: new Set<string>(),
+		view: { behaviors: [{ hostNodeId: 'h1' }] },
+	};
+	expect(
+		describeMarklessExecutionCauses({
+			...input,
+			moduleSizes: new Map([[APP_SYMBOL_ID, { raw: 1024 }]]),
+			attribution: { 'pages/a.tsrx': { '': encodeURIComponent('/src/App.tsrx') } },
+			routeFile: '../pages/a.tsrx',
+		}),
+	).toEqual([
+		'ran warm symbol:0 (App.tsrx) (1.0 KB) <- click matched event record h1',
+		'ran warm symbol:1 (bytes unknown) <- click matched event record h1',
+	]);
+	expect(
+		describeMarklessExecutionCauses({
+			...input,
+			moduleSizes: new Map([
+				[APP_SYMBOL_ID, { raw: 1024 }],
+				[LIBRARY_SYMBOL_ID, { raw: 2048 }],
+			]),
+			attribution: { 'pages/a.tsrx': { '': encodeURIComponent('/src/Unknown.tsrx') } },
+			routeFile: 'pages/a.tsrx',
+		}),
+	).toEqual([
+		'ran warm symbol:0 (bytes unknown) <- click matched event record h1',
+		'ran warm symbol:1 (bytes unknown) <- click matched event record h1',
+	]);
+});
+
 test('cause rows mark instrument modules after their size', () => {
 	const rows = describeMarklessExecutionCauses({
 		eventName: 'click',

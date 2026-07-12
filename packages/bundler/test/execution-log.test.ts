@@ -77,13 +77,25 @@ test('execution size asset maps runtime and symbol log ids to raw and gzip chunk
 			bundles: {},
 		},
 		(fileName) => fileName.replace(/^build\//, ''),
+		{
+			'pages/app.tsrx': {
+				'': encodeURIComponent('/workspace/src/App.tsrx'),
+				'c0:': encodeURIComponent('/workspace/src/Child.tsrx'),
+			},
+		},
 	);
 	const sizes = JSON.parse(String(asset.source)) as Record<
 		string,
 		{ raw: number; gzip: number; chunk: string }
-	>;
+	> & { attribution: Record<string, Record<string, string>> };
 
 	expect(asset.fileName).toBe('build/execution-sizes.json');
+	expect(sizes.attribution).toEqual({
+		'pages/app.tsrx': {
+			'': encodeURIComponent('/workspace/src/App.tsrx'),
+			'c0:': encodeURIComponent('/workspace/src/Child.tsrx'),
+		},
+	});
 	expect(sizes['web:event-only-resume']).toMatchObject({
 		raw: code.length,
 		chunk: 'chunk-play.js',
@@ -127,6 +139,7 @@ test('execution size asset covers the dev-log module id that logs itself', async
 		chunk: 'chunk-log.js',
 		instrument: true,
 	});
+	expect(sizes).not.toHaveProperty('attribution');
 });
 
 test('execution size asset rejects a dev-log chunk shared with app log ids', async () => {
@@ -244,7 +257,7 @@ async function importExecutionLogModule(source: string) {
 	};
 }
 
-function stubExecutionLogDom() {
+function stubExecutionLogDom(routeFile?: string) {
 	const attributes = new Map<string, string>();
 	vi.stubGlobal('document', {
 		documentElement: {
@@ -252,6 +265,8 @@ function stubExecutionLogDom() {
 			setAttribute: (name: string, value: string) => attributes.set(name, value),
 			removeAttribute: (name: string) => attributes.delete(name),
 		},
+		querySelector: () =>
+			routeFile === undefined ? null : { textContent: JSON.stringify({ file: routeFile }) },
 		querySelectorAll: () => [],
 	});
 	return attributes;
@@ -315,6 +330,167 @@ test('interaction rows resolve qualified symbol ids and display them short', asy
 	expect(attributes.get('data-markless-log-instrument-bytes')).toBe('0');
 });
 
+test('pull attribution resolves both first-call lazy and direct installed-hook paths', async () => {
+	const attributes = stubExecutionLogDom('pages/player.tsrx');
+	const appSymbol = `virtual:markless:symbol:${encodeURIComponent('/workspace/src/Player.tsrx')}:${encodeURIComponent('symbol:3')}`;
+	vi.stubGlobal(
+		'fetch',
+		vi.fn(async () => ({
+			ok: true,
+			json: async () => ({
+				'web:resume-events': { raw: 1646, gzip: 1646, chunk: 'resume.js' },
+				[appSymbol]: { raw: 182, gzip: 184, chunk: 'player.js' },
+				attribution: {
+					'pages/player.tsrx': {
+						'c1:c0:': encodeURIComponent('/workspace/src/Player.tsrx'),
+					},
+				},
+			}),
+		})),
+	);
+	const loggerSource = executionLogVirtualModuleSource({ sizesUrl: '/execution-sizes.json' });
+	const event = {
+		eventName: 'click',
+		selector: 'button.play',
+		eventRecord: { hostNodeId: 'player', symbolIds: ['c1:c0:symbol:3'] },
+		dispatchModuleId: 'web:resume-events',
+		before: new Set<string>([MARKLESS_EXECUTION_LOG_MODULE_ID]),
+		view: { behaviors: [{ hostNodeId: 'player' }] },
+	};
+	vi.spyOn(console, 'groupCollapsed').mockImplementation(() => {});
+	vi.spyOn(console, 'groupEnd').mockImplementation(() => {});
+	vi.spyOn(console, 'log').mockImplementation(() => {});
+
+	(globalThis as ExecutionLogGlobal).__mxLog = new Set();
+	let mod = await importExecutionLogModule(loggerSource);
+	await mod.logMarklessInteraction(event);
+	expect(attributes.get('data-markless-log-app-bytes')).toBe('1830');
+
+	(globalThis as ExecutionLogGlobal).__mxLog = new Set();
+	mod = await importExecutionLogModule(loggerSource);
+	await mod.installMarklessExecutionLog({ printResumeSummary: false });
+	await (globalThis as ExecutionLogGlobal).__mxLogInteraction!(event);
+	expect(attributes.get('data-markless-log-app-bytes')).toBe('1830');
+});
+
+test('generated logger inherits unprefixed symbol scope from the event host', async () => {
+	const attributes = stubExecutionLogDom('pages/player.tsrx');
+	const source = (name: string) => encodeURIComponent(`/workspace/src/${name}.tsrx`);
+	const symbol = (name: string, id: string) =>
+		`virtual:markless:symbol:${source(name)}:${encodeURIComponent(id)}`;
+	const entries = [
+		[symbol('Root', 'symbol:1'), 101],
+		[symbol('Root', 'symbol:3'), 103],
+		[symbol('Player', 'symbol:3'), 184],
+		[symbol('Self', 'symbol:4'), 104],
+		[symbol('Leaf', 'symbol:5'), 105],
+	] as const;
+	vi.stubGlobal(
+		'fetch',
+		vi.fn(async () => ({
+			ok: true,
+			json: async () => ({
+				...Object.fromEntries(entries.map(([id, gzip]) => [id, { raw: gzip, gzip }])),
+				attribution: {
+					'pages/player.tsrx': {
+						'': source('Root'),
+						'c2:': source('Player'),
+						'c7:': source('Self'),
+						'c1:c0:': source('Leaf'),
+					},
+				},
+			}),
+		})),
+	);
+	vi.spyOn(console, 'groupCollapsed').mockImplementation(() => {});
+	vi.spyOn(console, 'groupEnd').mockImplementation(() => {});
+	vi.spyOn(console, 'log').mockImplementation(() => {});
+	(globalThis as ExecutionLogGlobal).__mxLog = new Set();
+	const mod = await importExecutionLogModule(
+		executionLogVirtualModuleSource({ sizesUrl: '/execution-sizes.json' }),
+	);
+	await mod.installMarklessExecutionLog({ printResumeSummary: false });
+	const run = (hostNodeId: string, symbolId: string) => {
+		(globalThis as ExecutionLogGlobal).__mxLogInteraction!({
+			eventName: 'click',
+			eventRecord: { hostNodeId, symbolIds: [symbolId] },
+			before: new Set([MARKLESS_EXECUTION_LOG_MODULE_ID]),
+		});
+		return attributes.get('data-markless-log-app-bytes');
+	};
+
+	expect(run('c2:h9', 'symbol:3')).toBe('184');
+	expect(run('c2:h9', 'c7:symbol:4')).toBe('104');
+	expect(run('h1', 'symbol:1')).toBe('101');
+	expect(run('c1:c0:h2', 'symbol:5')).toBe('105');
+	expect(run('c9:h2', 'symbol:3')).toBeUndefined();
+});
+
+test('interaction accounting stays bounded by each caller snapshot', async () => {
+	const attributes = stubExecutionLogDom();
+	const loggerSource = executionLogVirtualModuleSource({
+		moduleSizes: new Map([
+			['app:first', 100],
+			['app:second', 200],
+		]),
+	});
+	const headers: string[] = [];
+	vi.spyOn(console, 'groupCollapsed').mockImplementation((line: unknown) =>
+		headers.push(String(line)),
+	);
+	vi.spyOn(console, 'groupEnd').mockImplementation(() => {});
+	vi.spyOn(console, 'log').mockImplementation(() => {});
+	(globalThis as ExecutionLogGlobal).__mxLog = new Set(['app:first']);
+	const mod = await importExecutionLogModule(loggerSource);
+	const firstAfter = new Set((globalThis as ExecutionLogGlobal).__mxLog);
+	const first = mod.logMarklessInteraction({
+		eventName: 'click',
+		selector: 'first',
+		before: new Set(),
+		after: firstAfter,
+	});
+	(globalThis as ExecutionLogGlobal).__mxLog!.add('app:second');
+	const second = mod.logMarklessInteraction({
+		eventName: 'click',
+		selector: 'second',
+		before: new Set(),
+		after: new Set((globalThis as ExecutionLogGlobal).__mxLog),
+	});
+	await Promise.all([first, second]);
+
+	expect(headers[0]).toContain('[first]');
+	expect(headers[0]).toContain('· 0.1 KB est. app');
+	expect(headers[1]).toContain('[second]');
+	expect(headers[1]).toContain('· 0.3 KB est. app');
+	expect(attributes.get('data-markless-log-interactions')).toBe('2');
+});
+
+test('concurrent first interactions share installation and both reach the hook', async () => {
+	const attributes = stubExecutionLogDom();
+	let release!: () => void;
+	vi.stubGlobal(
+		'fetch',
+		vi.fn(
+			() =>
+				new Promise(
+					(resolve) => (release = () => resolve({ ok: true, json: async () => ({}) })),
+				),
+		),
+	);
+	(globalThis as ExecutionLogGlobal).__mxLog = new Set();
+	vi.spyOn(console, 'groupCollapsed').mockImplementation(() => {});
+	vi.spyOn(console, 'groupEnd').mockImplementation(() => {});
+	const mod = await importExecutionLogModule(
+		executionLogVirtualModuleSource({ sizesUrl: '/execution-sizes.json' }),
+	);
+	const first = mod.logMarklessInteraction({ eventName: 'click', selector: 'first' });
+	const second = mod.logMarklessInteraction({ eventName: 'click', selector: 'second' });
+	release();
+	await Promise.all([first, second]);
+
+	expect(attributes.get('data-markless-log-interactions')).toBe('2');
+});
+
 test('generated logger accounts an instrument-only interaction', async () => {
 	const attributes = stubExecutionLogDom();
 	(globalThis as ExecutionLogGlobal).__mxLog = new Set();
@@ -337,7 +513,7 @@ test('generated logger accounts an instrument-only interaction', async () => {
 			},
 		},
 	});
-	(globalThis as ExecutionLogGlobal).__mxLogInteraction!({
+	await (globalThis as ExecutionLogGlobal).__mxLogInteraction!({
 		eventName: 'click',
 		selector: 'button',
 		before: new Set<string>(),
@@ -371,7 +547,7 @@ test('generated logger partitions mixed app and instrument interaction accountin
 			},
 		},
 	});
-	(globalThis as ExecutionLogGlobal).__mxLogInteraction!({
+	await (globalThis as ExecutionLogGlobal).__mxLogInteraction!({
 		eventName: 'click',
 		selector: 'button',
 		before: new Set<string>(),
@@ -397,7 +573,7 @@ test('generated logger treats old unmarked object size maps as app entries', asy
 		printResumeSummary: false,
 		moduleSizes: { 'app:legacy': { raw: 3072, gzip: 768, chunk: 'legacy.js' } },
 	});
-	(globalThis as ExecutionLogGlobal).__mxLogInteraction!({
+	await (globalThis as ExecutionLogGlobal).__mxLogInteraction!({
 		eventName: 'click',
 		selector: 'button',
 		before: new Set<string>([MARKLESS_EXECUTION_LOG_MODULE_ID]),
@@ -428,7 +604,7 @@ test('generated logger uses emitted gzip bytes for both accounting partitions', 
 			},
 		},
 	});
-	(globalThis as ExecutionLogGlobal).__mxLogInteraction!({
+	await (globalThis as ExecutionLogGlobal).__mxLogInteraction!({
 		eventName: 'click',
 		selector: 'button',
 		before: new Set<string>(),

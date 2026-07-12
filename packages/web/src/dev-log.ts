@@ -21,6 +21,9 @@ export type MarklessExecutionModuleSize = {
 	readonly instrument?: true;
 };
 export type MarklessExecutionModuleSizes = ReadonlyMap<string, MarklessExecutionModuleSize>;
+export type MarklessExecutionAttribution = Readonly<
+	Record<string, Readonly<Record<string, string>>>
+>;
 export type MarklessExecutionAccounting = {
 	readonly appBytes: number | null;
 	readonly instrumentBytes: number | null;
@@ -66,6 +69,8 @@ export function describeMarklessExecutionCauses(input: {
 	readonly view?: MarklessExecutionView;
 	readonly dispatchModuleId?: string;
 	readonly moduleSizes?: MarklessExecutionModuleSizes;
+	readonly attribution?: MarklessExecutionAttribution;
+	readonly routeFile?: string;
 }): string[] {
 	const woken = [...input.after].filter((moduleId) => !input.before.has(moduleId));
 	const cause = input.eventRecord
@@ -78,7 +83,16 @@ export function describeMarklessExecutionCauses(input: {
 			`woke ${label(moduleId)}${moduleKbSuffix(moduleId, input.moduleSizes)} <- ${cause}`,
 	);
 	if (input.eventRecord) {
-		for (const moduleId of warmModuleIds(input.dispatchModuleId, input.eventRecord.symbolIds)) {
+		for (const moduleId of warmModuleIds(
+			input.dispatchModuleId,
+			qualifiedSymbolIds(
+				input.eventRecord.symbolIds ?? [],
+				input.eventRecord.hostNodeId,
+				input.moduleSizes,
+				input.attribution,
+				input.routeFile,
+			),
+		)) {
 			rows.push(
 				`ran warm ${label(moduleId)}${moduleKbSuffix(moduleId, input.moduleSizes)} <- ${cause}`,
 			);
@@ -93,6 +107,48 @@ export function describeMarklessExecutionCauses(input: {
 		rows.push('skip behavior — no matching record touched');
 	}
 	return rows;
+}
+
+function qualifiedSymbolIds(
+	ids: ReadonlyArray<string>,
+	hostNodeId: string,
+	moduleSizes: MarklessExecutionModuleSizes | undefined,
+	attribution: MarklessExecutionAttribution | undefined,
+	routeFile: string | undefined,
+): ReadonlyArray<string> {
+	if (
+		!moduleSizes ||
+		!attribution ||
+		!routeFile ||
+		routeFile.includes('..') ||
+		routeFile.includes('\\')
+	)
+		return ids;
+	const canonicalRoute = routeFile.replace(/^\/+/, '');
+	const scopes = Object.prototype.hasOwnProperty.call(attribution, canonicalRoute)
+		? attribution[canonicalRoute]
+		: undefined;
+	if (!scopes) return ids;
+	const hostMatch = /^((?:c\d+:)*)[^:]+$/.exec(hostNodeId);
+	const hostScope = hostMatch?.[1];
+	return ids.map((id) => {
+		const ownScope = /^((?:c\d+:)+)(.*)$/.exec(id);
+		const scope = ownScope?.[1] ?? hostScope;
+		if (scope === undefined || !Object.prototype.hasOwnProperty.call(scopes, scope)) return id;
+		const localId = ownScope?.[2] ?? id;
+		if (!localId.startsWith('symbol:')) return id;
+		const encodedSource = scopes[scope];
+		const matches = [...moduleSizes.keys()].filter((key) => {
+			const match = /^virtual:markless:symbol:([^:]+):([^:]+)$/.exec(key);
+			if (!match || match[1] !== encodedSource) return false;
+			try {
+				return decodeURIComponent(match[2]!) === localId;
+			} catch {
+				return false;
+			}
+		});
+		return matches.length === 1 ? matches[0]! : id;
+	});
 }
 
 export function formatMarklessExecutedSize(
