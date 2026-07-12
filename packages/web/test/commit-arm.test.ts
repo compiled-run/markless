@@ -112,22 +112,27 @@ test('commitArm replaces exactly the anchor range and disposes before re-registe
 	]);
 	const disposedHosts = new Set<string>(['h-new']);
 
-	const commitArm = createArmCommitter({
-		root: asElement(root),
-		renderHtml: () => [asElement(newSection) as ResumeDomNode],
-		elementsByHostId,
-		disposedHosts,
-		disposeHost(hostNodeId) {
-			order.push(`dispose:${hostNodeId}`);
-			elementsByHostId.delete(hostNodeId);
+	const commitArm = createArmCommitter(
+		{
+			root: asElement(root),
+			renderHtml: () => [asElement(newSection) as ResumeDomNode],
+			elementsByHostId,
+			disposedHosts,
+			disposeHost(hostNodeId) {
+				order.push(`dispose:${hostNodeId}`);
+				elementsByHostId.delete(hostNodeId);
+			},
+			addEventRecord(_, record) {
+				order.push(`event:${record.hostNodeId}`);
+			},
+			registerElementHandle(hostNodeId) {
+				order.push(`handle:${hostNodeId}`);
+			},
 		},
-		addEventRecord(_, record) {
-			order.push(`event:${record.hostNodeId}`);
+		(eventType) => {
+			order.push(`install:${eventType}`);
 		},
-		registerElementHandle(hostNodeId) {
-			order.push(`handle:${hostNodeId}`);
-		},
-	});
+	);
 
 	await commitArm(boundaryFor(start, end), {
 		html: '<section><button></button></section>',
@@ -143,7 +148,7 @@ test('commitArm replaces exactly the anchor range and disposes before re-registe
 	// The range between the anchors was replaced; siblings and anchors stayed.
 	expect(root.childNodes).toEqual([outside, start, newSection, end]);
 	// Outgoing hosts inside the range disposed BEFORE the fresh registration.
-	expect(order).toEqual(['dispose:h-old', 'event:h-new', 'handle:h-new']);
+	expect(order).toEqual(['install:click', 'dispose:h-old', 'event:h-new', 'handle:h-new']);
 	expect(elementsByHostId.get('h-new')).toBe(asElement(newButton));
 	expect(elementsByHostId.has('h-old')).toBe(false);
 	// Hosts outside the range are untouched.
@@ -158,15 +163,18 @@ test('commitArm fails loud when the anchor pair is not intact in the live DOM', 
 	const strandedEnd = comment('async-boundary:b0:end');
 	element('div', [strandedEnd]);
 
-	const commitArm = createArmCommitter({
-		root: asElement(root),
-		renderHtml: () => [],
-		elementsByHostId: new Map(),
-		disposedHosts: new Set(),
-		disposeHost: () => {},
-		addEventRecord: () => {},
-		registerElementHandle: () => {},
-	});
+	const commitArm = createArmCommitter(
+		{
+			root: asElement(root),
+			renderHtml: () => [],
+			elementsByHostId: new Map(),
+			disposedHosts: new Set(),
+			disposeHost: () => {},
+			addEventRecord: () => {},
+			registerElementHandle: () => {},
+		},
+		() => {},
+	);
 
 	await expect(
 		commitArm(boundaryFor(start, strandedEnd), { html: '', armRecords: emptyArmRecords() }),
@@ -180,14 +188,17 @@ test('commitArm fails loud when the anchor pair is not intact in the live DOM', 
 
 test('commitArm fails loud without an HTML renderer for the settled content', async () => {
 	const { root, start, end } = fixture();
-	const commitArm = createArmCommitter({
-		root: asElement(root),
-		elementsByHostId: new Map(),
-		disposedHosts: new Set(),
-		disposeHost: () => {},
-		addEventRecord: () => {},
-		registerElementHandle: () => {},
-	});
+	const commitArm = createArmCommitter(
+		{
+			root: asElement(root),
+			elementsByHostId: new Map(),
+			disposedHosts: new Set(),
+			disposeHost: () => {},
+			addEventRecord: () => {},
+			registerElementHandle: () => {},
+		},
+		() => {},
+	);
 
 	await expect(
 		commitArm(boundaryFor(start, end), { html: '<p></p>', armRecords: emptyArmRecords() }),
@@ -211,16 +222,19 @@ test('commitArm restores focus and selection onto the surviving hostNodeId', asy
 	};
 	const newSection = element('section', [newInput]);
 
-	const commitArm = createArmCommitter({
-		root: asElement(root),
-		renderHtml: () => [asElement(newSection) as ResumeDomNode],
-		elementsByHostId: new Map([['h-field', asElement(oldInput)]]),
-		disposedHosts: new Set(),
-		disposeHost: () => {},
-		addEventRecord: () => {},
-		registerElementHandle: () => {},
-		documentHost: { activeElement: oldInput },
-	});
+	const commitArm = createArmCommitter(
+		{
+			root: asElement(root),
+			renderHtml: () => [asElement(newSection) as ResumeDomNode],
+			elementsByHostId: new Map([['h-field', asElement(oldInput)]]),
+			disposedHosts: new Set(),
+			disposeHost: () => {},
+			addEventRecord: () => {},
+			registerElementHandle: () => {},
+			documentHost: { activeElement: oldInput },
+		},
+		() => {},
+	);
 
 	await commitArm(boundaryFor(start, end), {
 		html: '<section><input></section>',
@@ -253,16 +267,19 @@ test('commitArm restores the document scroll position when the commit moved it',
 		return originalRemoveChild(child);
 	};
 
-	const commitArm = createArmCommitter({
-		root: asElement(root),
-		renderHtml: () => [asElement(element('p')) as ResumeDomNode],
-		elementsByHostId: new Map(),
-		disposedHosts: new Set(),
-		disposeHost: () => {},
-		addEventRecord: () => {},
-		registerElementHandle: () => {},
-		documentHost: { activeElement: null, defaultView: view },
-	});
+	const commitArm = createArmCommitter(
+		{
+			root: asElement(root),
+			renderHtml: () => [asElement(element('p')) as ResumeDomNode],
+			elementsByHostId: new Map(),
+			disposedHosts: new Set(),
+			disposeHost: () => {},
+			addEventRecord: () => {},
+			registerElementHandle: () => {},
+			documentHost: { activeElement: null, defaultView: view },
+		},
+		() => {},
+	);
 
 	await commitArm(boundaryFor(start, end), {
 		html: '<p></p>',

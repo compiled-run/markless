@@ -18,27 +18,20 @@ test('a branch reading through a pending async re-run holds its prior arm until 
 	const screen = await render(TelescopePanel);
 	const container = screen.container as HTMLElement;
 
-	// First appearance settles: cycle 0 => Tracking + target-0.
-	await expect.poll(() => container.querySelector('[data-target]')?.textContent).toBe('target-0');
+	// Click at the first browser-observable instant of the target-0 commit.
+	// The observer callback runs synchronously before commit wiring may await.
+	await waitForTargetCommit(container, 'target-0', undefined, () => {
+		const cycle = container.querySelector<HTMLButtonElement>('button[data-cycle]');
+		if (!cycle) throw new Error('Expected the cycle button in the rendered DOM.');
+		cycle.click();
+	});
 	expect(container.querySelector('[data-tracking-pill]')).not.toBeNull();
 
-	// Record every DOM state during the mutation re-settle.
 	const samples: string[] = [];
-	const observer = new MutationObserver(() => samples.push(container.innerHTML));
-	observer.observe(container, {
-		attributes: true,
-		characterData: true,
-		childList: true,
-		subtree: true,
-	});
-
-	const cycle = container.querySelector<HTMLButtonElement>('button[data-cycle]');
-	if (!cycle) throw new Error('Expected the cycle button in the rendered DOM.');
-	cycle.click();
+	const settled = waitForTargetCommit(container, 'target-1', samples);
 
 	// Cycle 1 settles: Idle + target-1 (the flip itself is legitimate AT settle).
-	await expect.poll(() => container.querySelector('[data-target]')?.textContent).toBe('target-1');
-	observer.disconnect();
+	await settled;
 	expect(container.querySelector('[data-idle-pill]')).not.toBeNull();
 	expect(container.querySelector('[data-tracking-pill]')).toBeNull();
 
@@ -59,3 +52,32 @@ test('a branch reading through a pending async re-run holds its prior arm until 
 		expect(sample).toMatch(/target-\d/);
 	}
 });
+
+function waitForTargetCommit(
+	container: HTMLElement,
+	target: string,
+	samples?: string[],
+	onCommit?: () => void,
+): Promise<void> {
+	if (container.querySelector('[data-target]')?.textContent === target) {
+		onCommit?.();
+		return Promise.resolve();
+	}
+
+	return new Promise((resolve) => {
+		const observer = new MutationObserver(() => {
+			const html = container.innerHTML;
+			samples?.push(html);
+			if (container.querySelector('[data-target]')?.textContent !== target) return;
+			observer.disconnect();
+			onCommit?.();
+			resolve();
+		});
+		observer.observe(container, {
+			attributes: true,
+			characterData: true,
+			childList: true,
+			subtree: true,
+		});
+	});
+}

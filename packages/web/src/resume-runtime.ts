@@ -173,14 +173,12 @@ export function createResumeRuntime(
 	}
 	// The escalated-flip re-settle path and the pending-flip hold are built by
 	// the demand-loaded start wiring (resume-runtime-start.ts, where the
-	// settle tracker and re-settle hold live) and connected here before any
-	// branch runtime loads.
-	let branchWiring:
-		| {
-				readonly resettleBoundary: (boundaryId: string) => Promise<DomJournalResult | void>;
-				readonly holdPendingFlip: (graphNodeId: string) => boolean;
-		  }
-		| undefined;
+	// settle tracker and re-settle hold live). Keep the object passed to an
+	// early-loaded branch runtime so start wiring can add the hooks in place.
+	const branchWiring: {
+		resettleBoundary?: (boundaryId: string) => Promise<DomJournalResult | void>;
+		holdPendingFlip?: (graphNodeId: string) => boolean;
+	} = {};
 	async function loadBranchRuntime(
 		options: { readonly skipStartupBranchIds?: ReadonlySet<string> } = {},
 	): Promise<BranchRuntime> {
@@ -189,24 +187,24 @@ export function createResumeRuntime(
 			behaviors = viewHasBranchArmBehaviors(input.view)
 				? await loadBehaviorRuntime()
 				: undefined;
-		branchRuntime = (await import('./resume-branches.ts')).wireBranches({
-			root: input.root,
-			graph: input.graph,
-			view: input.view,
-			loadSymbol: input.loadSymbol,
-			renderBranchHtml: input.renderBranchHtml,
-			elementsByHostId,
-			disposedHosts,
-			elementHandles,
-			events: await getEvents(),
-			eventTypes,
-			storeContainerSubscription,
-			storeHostSubscription,
-			addBehaviorRecords: behaviors?.addBehaviorRecords ?? (() => {}),
-			resettleBoundary: branchWiring?.resettleBoundary,
-			holdPendingFlip: branchWiring?.holdPendingFlip,
-			skipStartupBranchIds: options.skipStartupBranchIds,
-		});
+		branchRuntime = (await import('./resume-branches.ts')).wireBranches(
+			Object.assign(branchWiring, {
+				root: input.root,
+				graph: input.graph,
+				view: input.view,
+				loadSymbol: input.loadSymbol,
+				renderBranchHtml: input.renderBranchHtml,
+				elementsByHostId,
+				disposedHosts,
+				elementHandles,
+				events: await getEvents(),
+				eventTypes,
+				storeContainerSubscription,
+				storeHostSubscription,
+				addBehaviorRecords: behaviors?.addBehaviorRecords ?? (() => {}),
+				skipStartupBranchIds: options.skipStartupBranchIds,
+			}),
+		);
 		for (const eventType of eventTypes)
 			if (!eventTypesBefore.has(eventType))
 				input.root.addEventListener?.(eventType, dispatchCaptured, { capture: true });
@@ -215,9 +213,8 @@ export function createResumeRuntime(
 		if (branchRuntime.startupArmBehaviorHostIds.length > 0) await flushRuntimeGraph();
 		return branchRuntime;
 	}
-	// Stable-identity capture wrapper: container listeners see every DOM event of
-	// a registered type, including non-markless ones (router links) — unmatched
-	// passes through. Same reference is used for add and remove.
+	// Stable wrapper: container listeners see every registered event type,
+	// including non-markless ones; unmatched events pass through.
 	function dispatchCaptured(event: ResumeDomEvent): Promise<void> | void {
 		return events?.dispatch(event, { ignoreUnmatched: true });
 	}
@@ -231,38 +228,40 @@ export function createResumeRuntime(
 		const eventWiring = await getEvents();
 		const behaviors =
 			update.armRecords.behaviors.length > 0 ? await loadBehaviorRuntime() : undefined;
-		const eventTypesBefore = new Set(eventTypes);
 		const { createArmCommitter } = await import('./resume-commit-arm.ts');
-		await createArmCommitter({
-			root: input.root,
-			renderHtml: input.renderBranchHtml,
-			elementsByHostId,
-			disposedHosts,
-			disposeHost,
-			addEventRecord: eventWiring.addEventRecord,
-			registerElementHandle: elementHandles.register,
-			addBehaviors: behaviors
-				? async (hostNodeId, records) => {
-						behaviorHostIds.add(hostNodeId);
-						behaviors.addBehaviorRecords(hostNodeId, records);
-						await behaviors.activateBehaviors(hostNodeId, { flush: false });
+		await createArmCommitter(
+			{
+				root: input.root,
+				renderHtml: input.renderBranchHtml,
+				elementsByHostId,
+				disposedHosts,
+				disposeHost,
+				addEventRecord: eventWiring.addEventRecord,
+				registerElementHandle: elementHandles.register,
+				addBehaviors: behaviors
+					? async (hostNodeId, records) => {
+							behaviorHostIds.add(hostNodeId);
+							behaviors.addBehaviorRecords(hostNodeId, records);
+							await behaviors.activateBehaviors(hostNodeId, { flush: false });
+						}
+					: undefined,
+				// Fresh arm-branch anchors: rewire the boundary's flips (T104).
+				registerArmBranches: async (boundaryId, records) => {
+					const branches = await loadBranchRuntime();
+					for (const hostNodeId of branches.registerArmBranches(
+						boundaryId,
+						records as never,
+					)) {
+						await behaviorRuntime?.activateBehaviors(hostNodeId, { flush: false });
 					}
-				: undefined,
-			// Fresh arm-branch anchors: rewire the boundary's flips (T104).
-			registerArmBranches: async (boundaryId, records) => {
-				const branches = await loadBranchRuntime();
-				for (const hostNodeId of branches.registerArmBranches(
-					boundaryId,
-					records as never,
-				)) {
-					await behaviorRuntime?.activateBehaviors(hostNodeId, { flush: false });
-				}
+				},
 			},
-		})(boundary, update);
-		for (const eventType of eventTypes) {
-			if (!eventTypesBefore.has(eventType))
+			(eventType) => {
+				if (eventTypes.has(eventType)) return;
+				eventTypes.add(eventType);
 				input.root.addEventListener?.(eventType, dispatchCaptured, { capture: true });
-		}
+			},
+		)(boundary, update);
 	}
 	function disposeHost(
 		hostNodeId: string,
@@ -341,7 +340,7 @@ export function createResumeRuntime(
 			disposeHost,
 			commitArm: commitBoundaryArm,
 			connectBranchWiring: (wiring) => {
-				branchWiring = wiring;
+				Object.assign(branchWiring, wiring);
 			},
 			receiveSharedPatch,
 			sharedPatchEventType: SHARED_PATCH_EVENT_TYPE,

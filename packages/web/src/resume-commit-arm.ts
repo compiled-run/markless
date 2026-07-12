@@ -58,28 +58,34 @@ type CapturedFocusScroll = {
 	};
 };
 
-export function createArmCommitter(deps: {
-	readonly root: ResumeDomElement;
-	readonly renderHtml?: (html: string) => ReadonlyArray<ResumeDomNode>;
-	readonly elementsByHostId: Map<string, ResumeDomElement>;
-	readonly disposedHosts: Set<string>;
-	readonly disposeHost: (hostNodeId: string) => void;
-	readonly addEventRecord: (element: ResumeDomElement, record: ResumeEventRecord) => void;
-	readonly registerElementHandle: (
-		hostNodeId: string,
-		handle: { readonly handleId: string; readonly name: string },
-		element: ResumeDomElement,
-	) => void;
-	readonly addBehaviors?: (hostNodeId: string, records: ResumeBehaviorRecord[]) => Promise<void>;
-	// T104: fresh arm content brings fresh arm-branch anchors — the branch
-	// runtime disposes the boundary's previous flip subscriptions and rewires
-	// from these records (escalated records re-dedupe by site id).
-	readonly registerArmBranches?: (
-		boundaryId: string,
-		records: ReadonlyArray<ResumeArmBranchRecord>,
-	) => Promise<void>;
-	readonly documentHost?: CommitDocument;
-}) {
+export function createArmCommitter(
+	deps: {
+		readonly root: ResumeDomElement;
+		readonly renderHtml?: (html: string) => ReadonlyArray<ResumeDomNode>;
+		readonly elementsByHostId: Map<string, ResumeDomElement>;
+		readonly disposedHosts: Set<string>;
+		readonly disposeHost: (hostNodeId: string) => void;
+		readonly addEventRecord: (element: ResumeDomElement, record: ResumeEventRecord) => void;
+		readonly registerElementHandle: (
+			hostNodeId: string,
+			handle: { readonly handleId: string; readonly name: string },
+			element: ResumeDomElement,
+		) => void;
+		readonly addBehaviors?: (
+			hostNodeId: string,
+			records: ResumeBehaviorRecord[],
+		) => Promise<void>;
+		// T104: fresh arm content brings fresh arm-branch anchors — the branch
+		// runtime disposes the boundary's previous flip subscriptions and rewires
+		// from these records (escalated records re-dedupe by site id).
+		readonly registerArmBranches?: (
+			boundaryId: string,
+			records: ReadonlyArray<ResumeArmBranchRecord>,
+		) => Promise<void>;
+		readonly documentHost?: CommitDocument;
+	},
+	installEventType: (eventType: string) => void,
+) {
 	return async function commitArm(
 		boundary: ResumeAsyncBoundaryRecord,
 		update: ArmCommitUpdate,
@@ -92,6 +98,11 @@ export function createArmCommitter(deps: {
 			boundary.endAnchor,
 		);
 		const captured = captureFocusScroll(deps, outgoing);
+		// Install delegation before replacement exposes fresh interactive DOM.
+		for (const event of update.armRecords.events) installEventType(event.eventName);
+		for (const branch of update.armRecords.branches ?? [])
+			for (const arm of branch.armRecords ?? [])
+				for (const event of arm.events) installEventType(event.eventName);
 		for (const hostNodeId of hostIdsInsideRemovedElements(deps.elementsByHostId, outgoing)) {
 			deps.disposeHost(hostNodeId);
 		}

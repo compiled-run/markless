@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { createRuntimeGraph } from '@markless/runtime';
 import { createProtocolStatePayload } from '@markless/serializer';
 import {
@@ -238,6 +238,76 @@ test('resume runtime selects switch arms by case tests when seeding and flipping
 	const entries = (await subscriptions[0]!.run()) as unknown[];
 	expect(loaded).toEqual(['symbol:flip']);
 	expect(entries).toHaveLength(2);
+});
+
+test('resume runtime preserves a branch flip dispatched before branch wiring connects', async () => {
+	const graph = createRuntimeGraph({
+		cells: [{ graphNodeId: 'state:open', value: false }],
+	});
+	const applied: DomJournalEntry[] = [];
+	vi.doMock('../src/resume-runtime-start.ts', () => ({
+		startResumeRuntime: async (input: {
+			readonly loadBranchRuntime: () => Promise<unknown>;
+			readonly connectBranchWiring: (wiring: {
+				readonly resettleBoundary: () => Promise<void>;
+				readonly holdPendingFlip: () => boolean;
+			}) => void;
+		}) => {
+			graph.subscribeJournal((entries) => applied.push(...entries));
+			await input.loadBranchRuntime();
+			graph.write({ graphNodeId: 'state:open', value: true });
+			await graph.flush();
+			input.connectBranchWiring({
+				resettleBoundary: async () => {},
+				holdPendingFlip: () => false,
+			});
+			return undefined;
+		},
+	}));
+	try {
+		const { createResumeRuntime: createIsolatedResumeRuntime } =
+			await import('../src/index.ts?pre-connect-branch-flip');
+		const start = comment('markless:branch:branch-site:pre-connect');
+		const shown = element('P');
+		const end = comment('/markless:branch:branch-site:pre-connect');
+		const runtime = createIsolatedResumeRuntime({
+			root: rangeElement('MAIN', [start, shown, end]),
+			graph,
+			view: {
+				locators: [],
+				events: [],
+				domUpdates: [],
+				behaviors: [],
+				elementHandles: [],
+				asyncBoundaries: [],
+				branches: [
+					{
+						id: 'branch-site:pre-connect',
+						startAnchor: { strategy: 'dom-order-comment', index: 0 },
+						endAnchor: { strategy: 'dom-order-comment', index: 1 },
+						testReads: [{ graphNodeId: 'state:open', path: [] }],
+						tests: [{ kind: 'truthy' }],
+						symbolId: 'symbol:pre-connect-flip',
+					},
+				],
+			},
+			loadSymbol: () => () => ({ arm: 0, html: '<p>open</p>' }),
+			applyDomJournal: (entries) => applied.push(...entries),
+		});
+
+		await runtime.start();
+		expect(applied).toEqual([
+			{ type: 'removeRange', locator: 'branch:branch-site:pre-connect' },
+			{
+				type: 'insertRange',
+				locator: 'branch:branch-site:pre-connect:start',
+				fragment: '<p>open</p>',
+			},
+		]);
+	} finally {
+		vi.doUnmock('../src/resume-runtime-start.ts');
+		vi.resetModules();
+	}
 });
 
 test('resume runtime skips tagName validation for wildcard locators', () => {
@@ -3522,6 +3592,95 @@ test('resume runtime starts unsettled async boundary runners at creation and set
 			fragment: [fragmentNode],
 		},
 	]);
+});
+
+test('resume runtime installs settled arm event listeners before exposing range replacement', async () => {
+	const start = comment('markless:async:boundary:0');
+	const pending = element('P');
+	const end = comment('/markless:async:boundary:0');
+	const root = rangeElement('SECTION', [start, pending, end]);
+	const replacement = element('BUTTON');
+	const result = deferred<{ title: string }>();
+	const loadedSymbols: string[] = [];
+	const listenerTypesAtRemoval: string[][] = [];
+	const removeChild = root.removeChild;
+	root.removeChild = (node) => {
+		listenerTypesAtRemoval.push(root.listeners.map(({ type }) => type));
+		return removeChild(node);
+	};
+	const graph = createRuntimeGraph({
+		cells: [{ graphNodeId: 'state:userId', value: 'ada' }],
+		asyncComputed: [
+			{
+				graphNodeId: 'computed:details',
+				dependencies: [{ graphNodeId: 'state:userId', path: [] }],
+				key: (read) => read('state:userId'),
+				run: () => result.promise,
+			},
+		],
+	});
+	const resume = createResumeRuntime({
+		root,
+		graph,
+		view: updatableBoundaryView(),
+		loadSymbol(symbolId) {
+			loadedSymbols.push(symbolId);
+			return () => ({
+				arm: 0,
+				html: '<button></button>',
+				armRecords: {
+					locators: [
+						{
+							hostNodeId: 'h-arm',
+							strategy: 'arm-relative',
+							index: 0,
+							tagName: 'button',
+						},
+					],
+					events: [
+						{
+							hostNodeId: 'h-arm',
+							eventName: 'pointerdown',
+							symbolIds: ['symbol:arm-pointerdown'],
+						},
+					],
+					behaviors: [],
+					elementHandles: [],
+					branches: [
+						{
+							id: 'branch:inside-arm',
+							testReads: [],
+							armRecords: [
+								{
+									events: [
+										{
+											hostPath: [0],
+											eventName: 'keydown',
+											symbolIds: ['symbol:nested-keydown'],
+										},
+									],
+									domUpdates: [],
+									behaviors: [],
+									elementHandles: [],
+								},
+							],
+						},
+					],
+				},
+			});
+		},
+		renderBranchHtml: () => [replacement],
+	});
+
+	await resume.start();
+	expect(loadedSymbols).toEqual([]);
+	result.resolve({ title: 'User ada' });
+	await drainMicrotasks();
+	await graph.flush();
+
+	expect(listenerTypesAtRemoval[0]).toEqual(expect.arrayContaining(['pointerdown', 'keydown']));
+	// Installing delegation enumerates record metadata only; handlers stay lazy.
+	expect(loadedSymbols).toEqual(['symbol:boundary-update']);
 });
 
 // One async boundary whose settled arms rebuild through an update symbol.

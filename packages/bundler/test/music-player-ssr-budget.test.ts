@@ -13,7 +13,8 @@ const clientBuild = resolve(demo, '.output/public/build');
 // Production `executionLog: never` measurement: 62,464 B across 76 distinct
 // size-map chunks; 62,500 B is the permanent shipped wall (owner ratification
 // 2026-07-12, T006), leaving 36 B / 0.06% headroom. Tighten only.
-const MAX_SHIPPED_JS_GZIP_BYTES = 62_500;
+// 62,500 -> 62,520 (owner receipt 2026-07-12): lost-click window fix, measured 62,514.
+const MAX_SHIPPED_JS_GZIP_BYTES = 62_520;
 
 test('music-player-ssr production build stays within its shipped JS budget', async () => {
 	await rm(resolve(demo, '.output'), { force: true, recursive: true });
