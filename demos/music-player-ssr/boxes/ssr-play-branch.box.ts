@@ -130,6 +130,11 @@ export default box(
 		// the tree (also absorbed from the retired tmp-ssr box).
 		await page.click('[aria-label="Next track"]', WAIT);
 		await expect.page.bodyText(page, { contains: 'Empty Crown' }, WAIT);
+		// Next-track app-execution wall (owner ratification 2026-07-12, T006:
+		// candidate 1,860 B activated after a fresh-page Next capture
+		// reconfirmed 1,838 B exactly; warm and fresh Next report the same
+		// app bytes, so the mirror ceiling guards both).
+		await waitForAppBytesCeiling(page, 1_860, WAIT);
 		// Paused next-track cues the new video (playing next-track loads it);
 		// the video id change proves the composed dom updates flowed.
 		await expect.page.attribute(page, '.youtube-frame-host', 'data-command', 'cue', WAIT);
@@ -333,4 +338,25 @@ async function waitForQuietBuildJs(page: NetworkRequestPage): Promise<readonly s
 
 function formatPaths(paths: readonly string[]): string {
 	return paths.length === 0 ? '(none)' : paths.join(', ');
+}
+
+async function waitForAppBytesCeiling(
+	page: ContentPage,
+	ceilingBytes: number,
+	options: { readonly timeoutMs: number },
+): Promise<void> {
+	const started = Date.now();
+	let lastSeen: string | null = null;
+	while (Date.now() - started < options.timeoutMs) {
+		const html = await page.content();
+		const raw = /data-markless-log-app-bytes="(\d+)"/.exec(html)?.[1];
+		if (raw !== undefined) {
+			lastSeen = raw;
+			if (Number(raw) <= ceilingBytes) return;
+		}
+		await new Promise((resolve) => setTimeout(resolve, 25));
+	}
+	throw new Error(
+		`Expected app-bytes mirror within the ${ceilingBytes} B wall, saw ${lastSeen ?? '(absent)'}.`,
+	);
 }
