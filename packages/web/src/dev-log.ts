@@ -18,8 +18,17 @@ export type MarklessExecutionModuleSize = {
 	readonly gzip?: number;
 	readonly chunk?: string;
 	readonly estimated?: boolean;
+	readonly instrument?: true;
 };
 export type MarklessExecutionModuleSizes = ReadonlyMap<string, MarklessExecutionModuleSize>;
+export type MarklessExecutionAccounting = {
+	readonly appBytes: number | null;
+	readonly instrumentBytes: number | null;
+	readonly appModules: number;
+	readonly instrumentModules: number;
+	readonly estimated: { readonly app: boolean; readonly instrument: boolean };
+	readonly unmappedIds: ReadonlyArray<string>;
+};
 
 export function shouldActivateMarklessExecutionLog(input: {
 	readonly mode: MarklessExecutionLogMode;
@@ -45,8 +54,8 @@ export function formatMarklessResumeSummary(input: {
 	readonly preloadedModuleCount: number;
 	readonly moduleSizes?: MarklessExecutionModuleSizes;
 }): string {
-	const executed = input.executedModules.length;
-	return `markless: resumed — ${formatExecutedSize(input.executedModules, input.moduleSizes)}, ${input.preloadedModuleCount} modules preloaded (${executed} executed)`;
+	const accounting = accountMarklessExecution(input.executedModules, input.moduleSizes);
+	return `markless: resumed — ${formatCategory(accounting, 'app')} executed, ${input.preloadedModuleCount} modules preloaded (${accounting.appModules} app executed) · ${formatCategory(accounting, 'instrument')}`;
 }
 
 export function describeMarklessExecutionCauses(input: {
@@ -90,7 +99,58 @@ export function formatMarklessExecutedSize(
 	modules: ReadonlyArray<string>,
 	moduleSizes?: MarklessExecutionModuleSizes,
 ): string {
-	return `${formatExecutedKb(modules, moduleSizes)} executed`;
+	const accounting = accountMarklessExecution(modules, moduleSizes);
+	return `${formatCategory(accounting, 'app')} executed · ${formatCategory(accounting, 'instrument')}`;
+}
+
+export function accountMarklessExecution(
+	modules: ReadonlyArray<string>,
+	moduleSizes?: MarklessExecutionModuleSizes,
+): MarklessExecutionAccounting {
+	const canonicalIds = [...new Set(modules.map((id) => canonicalModuleId(id, moduleSizes)))];
+	if (!moduleSizes) {
+		return {
+			appBytes: canonicalIds.length === 0 ? 0 : null,
+			instrumentBytes: 0,
+			appModules: canonicalIds.length,
+			instrumentModules: 0,
+			estimated: { app: false, instrument: false },
+			unmappedIds: [],
+		};
+	}
+	let appBytes = 0;
+	let instrumentBytes = 0;
+	let appModules = 0;
+	let instrumentModules = 0;
+	let appEstimated = false;
+	let instrumentEstimated = false;
+	const unmappedIds: string[] = [];
+	for (const id of canonicalIds) {
+		const size = moduleSizes.get(id);
+		if (!size) {
+			unmappedIds.push(id);
+			appModules++;
+			continue;
+		}
+		const bytes = size.estimated ? size.raw : (size.gzip ?? size.raw);
+		if (size.instrument) {
+			instrumentModules++;
+			instrumentBytes += bytes;
+			instrumentEstimated ||= !!size.estimated;
+		} else {
+			appModules++;
+			appBytes += bytes;
+			appEstimated ||= !!size.estimated;
+		}
+	}
+	return {
+		appBytes: unmappedIds.length ? null : appBytes,
+		instrumentBytes,
+		appModules,
+		instrumentModules,
+		estimated: { app: appEstimated, instrument: instrumentEstimated },
+		unmappedIds,
+	};
 }
 
 // Short display form for console rows: qualified symbol execution-log ids
@@ -136,13 +196,19 @@ function isLocalOrigin(origin: string): boolean {
 	return /^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::|$)/.test(origin);
 }
 
-function formatExecutedSize(
-	modules: ReadonlyArray<string>,
-	moduleSizes: MarklessExecutionModuleSizes | undefined,
+function formatCategory(
+	accounting: MarklessExecutionAccounting,
+	category: 'app' | 'instrument',
 ): string {
-	if (!moduleSizes)
-		return modules.length === 1 ? '1 module executed' : `${modules.length} modules executed`;
-	return formatMarklessExecutedSize(modules, moduleSizes);
+	const bytes = category === 'app' ? accounting.appBytes : accounting.instrumentBytes;
+	const modules = category === 'app' ? accounting.appModules : accounting.instrumentModules;
+	if (bytes === null) {
+		const count = `${modules} ${category} module${modules === 1 ? '' : 's'}`;
+		return category === 'app' && accounting.unmappedIds.length
+			? `${count} (bytes unknown; ${accounting.unmappedIds.length} unmapped)`
+			: count;
+	}
+	return `${(bytes / 1024).toFixed(1)} KB${accounting.estimated[category] ? ' est.' : ''} ${category}`;
 }
 
 function formatExecutedKb(
@@ -150,14 +216,10 @@ function formatExecutedKb(
 	moduleSizes: MarklessExecutionModuleSizes | undefined,
 ): string {
 	if (!moduleSizes) return modules.length === 1 ? '1 module' : `${modules.length} modules`;
-	const sizes = [...new Set(modules.map((moduleId) => canonicalModuleId(moduleId, moduleSizes)))]
-		.map((moduleId) => moduleSizes.get(moduleId))
-		.filter((size): size is MarklessExecutionModuleSize => !!size);
-	const estimated = [...moduleSizes.values()].some((size) => size.estimated);
-	const total = sizes.reduce(
-		(sum, size) => sum + (size.estimated ? size.raw : (size.gzip ?? size.raw)),
-		0,
-	);
+	const accounting = accountMarklessExecution(modules, moduleSizes);
+	if (accounting.unmappedIds.length) return 'bytes unknown';
+	const total = (accounting.appBytes ?? 0) + (accounting.instrumentBytes ?? 0);
+	const estimated = accounting.estimated.app || accounting.estimated.instrument;
 	return `${(total / 1024).toFixed(1)} KB${estimated ? ' est.' : ''}`;
 }
 
@@ -166,7 +228,9 @@ function moduleKbSuffix(
 	moduleSizes: MarklessExecutionModuleSizes | undefined,
 ): string {
 	if (!moduleSizes) return '';
-	return ` (${formatExecutedKb([moduleId], moduleSizes)})`;
+	const canonicalId = canonicalModuleId(moduleId, moduleSizes);
+	const instrument = moduleSizes.get(canonicalId)?.instrument ? ' instrument' : '';
+	return ` (${formatExecutedKb([moduleId], moduleSizes)}${instrument})`;
 }
 
 function warmModuleIds(

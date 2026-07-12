@@ -1550,6 +1550,9 @@ test('renderToString execution log activation stays inline and mirrors summary w
 	expect(resumerSource).toContain('globalThis.__mxLog = globalThis.__mxLog || new Set()');
 	expect(resumerSource).toContain('console.log(summary)');
 	expect(resumerSource).toContain("setAttribute('data-markless-log-summary', summary)");
+	expect(resumerSource).toContain("setAttribute('data-markless-log-app-bytes', '0')");
+	expect(resumerSource).toContain("setAttribute('data-markless-log-instrument-bytes', '0')");
+	expect(resumerSource).toContain("removeAttribute('data-markless-log-app-bytes')");
 });
 
 test('renderToString defaults to auto execution log bootstrap for interactive SSR', async () => {

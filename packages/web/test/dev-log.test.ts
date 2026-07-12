@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import {
+	accountMarklessExecution,
 	describeMarklessEventTarget,
 	describeMarklessExecutionCauses,
 	formatMarklessExecutedSize,
@@ -23,11 +24,15 @@ test('module display names shorten qualified symbol ids to author-readable form'
 test('executed sizes join local and route-prefixed symbol ids to a unique qualified entry', () => {
 	const sizes = new Map([[APP_SYMBOL_ID, { raw: 1024, estimated: true }]]);
 
-	expect(formatMarklessExecutedSize(['symbol:0'], sizes)).toBe('1.0 KB est. executed');
-	expect(formatMarklessExecutedSize(['c0:symbol:0'], sizes)).toBe('1.0 KB est. executed');
+	expect(formatMarklessExecutedSize(['symbol:0'], sizes)).toBe(
+		'1.0 KB est. app executed · 0.0 KB instrument',
+	);
+	expect(formatMarklessExecutedSize(['c0:symbol:0'], sizes)).toBe(
+		'1.0 KB est. app executed · 0.0 KB instrument',
+	);
 	// Two spellings of the same module count once.
 	expect(formatMarklessExecutedSize(['symbol:0', APP_SYMBOL_ID], sizes)).toBe(
-		'1.0 KB est. executed',
+		'1.0 KB est. app executed · 0.0 KB instrument',
 	);
 });
 
@@ -37,7 +42,27 @@ test('ambiguous local symbol ids refuse to guess a size', () => {
 		[LIBRARY_SYMBOL_ID, { raw: 4096, estimated: true }],
 	]);
 
-	expect(formatMarklessExecutedSize(['symbol:0'], sizes)).toBe('0.0 KB est. executed');
+	expect(formatMarklessExecutedSize(['symbol:0'], sizes)).toBe(
+		'1 app module (bytes unknown; 1 unmapped) executed · 0.0 KB instrument',
+	);
+});
+
+test('accounting partitions, deduplicates, and reports unmapped ids honestly', () => {
+	const accounting = accountMarklessExecution(
+		['app', 'app', 'instrument', 'missing'],
+		new Map([
+			['app', { raw: 4096, gzip: 1024, chunk: 'shared.js' }],
+			['instrument', { raw: 2048, estimated: true, instrument: true }],
+		]),
+	);
+	expect(accounting).toEqual({
+		appBytes: null,
+		instrumentBytes: 2048,
+		appModules: 2,
+		instrumentModules: 1,
+		estimated: { app: false, instrument: true },
+		unmappedIds: ['missing'],
+	});
 });
 
 test('cause rows display qualified woken symbol ids in short form with sizes', () => {
@@ -53,6 +78,24 @@ test('cause rows display qualified woken symbol ids in short form with sizes', (
 	expect(rows).toEqual([
 		'woke symbol:0 (App.tsrx) (0.5 KB) <- click matched event record h1',
 		'ran warm symbol:0 (App.tsrx) (0.5 KB) <- click matched event record h1',
+	]);
+});
+
+test('cause rows mark instrument modules after their size', () => {
+	const rows = describeMarklessExecutionCauses({
+		eventName: 'click',
+		before: new Set<string>(),
+		after: new Set(['virtual:markless:dev-log']),
+		moduleSizes: new Map([
+			[
+				'virtual:markless:dev-log',
+				{ raw: 2048, gzip: 1024, chunk: 'chunk-log.js', instrument: true },
+			],
+		]),
+	});
+
+	expect(rows).toEqual([
+		'woke virtual:markless:dev-log (1.0 KB instrument) <- click matched runtime records',
 	]);
 });
 
@@ -97,13 +140,17 @@ test('resume summary uses byte estimates when provided and counts otherwise', ()
 				['symbol:play', { raw: 1536, estimated: true }],
 			]),
 		}),
-	).toBe('markless: resumed — 2.0 KB est. executed, 4 modules preloaded (2 executed)');
+	).toBe(
+		'markless: resumed — 2.0 KB est. app executed, 4 modules preloaded (2 app executed) · 0.0 KB instrument',
+	);
 	expect(
 		formatMarklessResumeSummary({
 			executedModules: ['runtime:event'],
 			preloadedModuleCount: 2,
 		}),
-	).toBe('markless: resumed — 1 module executed, 2 modules preloaded (1 executed)');
+	).toBe(
+		'markless: resumed — 1 app module executed, 2 modules preloaded (1 app executed) · 0.0 KB instrument',
+	);
 });
 
 test('executed size labels estimates and real gzip bytes distinctly', () => {
@@ -112,19 +159,19 @@ test('executed size labels estimates and real gzip bytes distinctly', () => {
 			['web:event-only-resume'],
 			new Map([['web:event-only-resume', { raw: 2048, estimated: true }]]),
 		),
-	).toBe('2.0 KB est. executed');
+	).toBe('2.0 KB est. app executed · 0.0 KB instrument');
 	expect(
 		formatMarklessExecutedSize(
 			['web:missing'],
 			new Map([['web:event-only-resume', { raw: 2048, estimated: true }]]),
 		),
-	).toBe('0.0 KB est. executed');
+	).toBe('1 app module (bytes unknown; 1 unmapped) executed · 0.0 KB instrument');
 	expect(
 		formatMarklessExecutedSize(
 			['web:event-only-resume'],
 			new Map([['web:event-only-resume', { raw: 4096, gzip: 1024, chunk: 'chunk-a.js' }]]),
 		),
-	).toBe('1.0 KB executed');
+	).toBe('1.0 KB app executed · 0.0 KB instrument');
 });
 
 test('selector derivation names tag, id, classes, and stable data attributes', () => {

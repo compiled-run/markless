@@ -410,10 +410,15 @@ ${graphConditionSource}
 		const log = globalThis.__mxLog = globalThis.__mxLog || new Set();
 		const executed = [...log];
 		const preloaded = d.querySelectorAll('link[rel=modulepreload]').length;
-		const bytes = executed.length === 1 ? '1 module executed' : executed.length + ' modules executed';
-		const summary = 'markless: resumed — ' + bytes + ', ' + preloaded + ' modules preloaded (' + executed.length + ' executed)';
+		const app = executed.length === 0 ? '0.0 KB app' : executed.length + ' app module' + (executed.length === 1 ? '' : 's');
+		const summary = 'markless: resumed — ' + app + ' executed, ' + preloaded + ' modules preloaded (' + executed.length + ' app executed) · 0.0 KB instrument';
 		console.log(summary);
-		d.documentElement?.setAttribute('data-markless-log-summary', summary);
+		const root = d.documentElement;
+		if (root) {
+			root.setAttribute('data-markless-log-summary', summary);
+			if (executed.length === 0) { root.setAttribute('data-markless-log-app-bytes', '0'); root.setAttribute('data-markless-log-instrument-bytes', '0'); }
+			else { root.removeAttribute('data-markless-log-app-bytes'); root.removeAttribute('data-markless-log-instrument-bytes'); }
+		}
 	}`;
 	const debugSource =
 		typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__

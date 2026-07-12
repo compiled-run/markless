@@ -54,7 +54,9 @@ export default box(
 		await expect.html.contains(html, 'data-async-resumer');
 		const preloadHrefs = modulePreloadHrefs(html);
 		await assertModulePreloadsServe(preview, preloadHrefs);
-		receipt.note(`ssr play-branch modulepreload hrefs (${preloadHrefs.length}): ${formatPaths(preloadHrefs)}`);
+		receipt.note(
+			`ssr play-branch modulepreload hrefs (${preloadHrefs.length}): ${formatPaths(preloadHrefs)}`,
+		);
 		if (preloadHrefs.length < MIN_HEAD_LINKS || preloadHrefs.length > MAX_HEAD_LINKS) {
 			throw new Error(
 				`Expected the route-scoped head preload map to stay in the sane band ` +
@@ -86,7 +88,9 @@ export default box(
 		await waitForLogInteractionAttribute(page, 1, WAIT);
 		const afterClickScripts = await waitForQuietBuildJs(page);
 		const lazyChunks = afterClickScripts.filter((path) => !startupScripts.includes(path));
-		receipt.note(`ssr play-branch post-click /build JS request diff: ${formatPaths(lazyChunks)}`);
+		receipt.note(
+			`ssr play-branch post-click /build JS request diff: ${formatPaths(lazyChunks)}`,
+		);
 		if (lazyChunks.length > 0) {
 			throw new Error(
 				`Expected the first interaction to fetch ZERO framework chunks ` +
@@ -187,7 +191,15 @@ async function waitForLogSummaryAttribute(
 	const started = Date.now();
 	while (Date.now() - started < options.timeoutMs) {
 		const html = await page.content();
-		if (/data-markless-log-summary="markless: resumed [^"]*0 executed\)"/.test(html)) return;
+		if (
+			/data-markless-log-summary="markless: resumed — 0\.0 KB app executed, \d+ modules preloaded \(0 app executed\) · 0\.0 KB instrument"/.test(
+				html,
+			) &&
+			/data-markless-log-app-bytes="0"/.test(html) &&
+			/data-markless-log-instrument-bytes="0"/.test(html) &&
+			!/data-markless-log-summary="[^"]*· 3\.1 KB"/.test(html)
+		)
+			return;
 		await new Promise((resolve) => setTimeout(resolve, 25));
 	}
 	throw new Error('Expected data-markless-log-summary to mirror the resume summary.');
@@ -198,22 +210,37 @@ async function waitForLogInteractionAttribute(
 	count: number,
 	options: { readonly timeoutMs: number },
 ): Promise<void> {
+	// Honest-unknown is the CURRENT contract because the click symbol is unmapped; the
+	// qualified-symbol attribution tranche must flip this to numeric app bytes + present mirrors.
+	// See docs/goals/runtime-management/notes/T005A-instrument-truth-spec.md.
 	const started = Date.now();
 	const countPattern = new RegExp(`data-markless-log-interactions="${count}"`);
 	const lastPattern =
-		/data-markless-log-last="markless: click \[[^"]+\] · woke \d+ modules · ran warm \d+ modules · \d+(?:\.\d+)? KB"/;
+		/data-markless-log-last="markless: click \[[^"]+\] · woke \d+ modules · ran warm \d+ modules · \d+ app modules \(bytes unknown; \d+ unmapped\) · \d+(?:\.\d+)? KB instrument"/;
+	const rejectedFixtures = [
+		'data-markless-log-last="markless: click [button.play] · woke 1 modules · ran warm 2 modules · 3.1 KB"',
+		'data-markless-log-last="markless: click [button.play] · woke 1 modules · ran warm 2 modules · 1.8 KB app · 1.5 KB instrument"',
+	];
+	for (const fixture of rejectedFixtures) {
+		if (lastPattern.test(fixture))
+			throw new Error(`Execution-log matcher accepted a rejected format: ${fixture}`);
+	}
 	while (Date.now() - started < options.timeoutMs) {
 		const html = await page.content();
 		if (
 			countPattern.test(html) &&
 			lastPattern.test(html) &&
+			!/data-markless-log-app-bytes=/.test(html) &&
+			!/data-markless-log-instrument-bytes=/.test(html) &&
 			!/data-markless-log-last="[^"]*est\./.test(html)
 		) {
 			return;
 		}
 		await new Promise((resolve) => setTimeout(resolve, 25));
 	}
-	throw new Error(`Expected interaction ${count} to mirror a real-KB execution log line.`);
+	throw new Error(
+		`Expected interaction ${count} to mirror an honest-unknown execution log line.`,
+	);
 }
 
 async function jsBuildRequestPaths(page: NetworkRequestPage): Promise<readonly string[]> {

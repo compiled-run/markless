@@ -10,6 +10,7 @@ export type ExecutionSizeEntry = {
 	readonly raw: number;
 	readonly gzip: number;
 	readonly chunk: string;
+	readonly instrument?: true;
 };
 
 export function normalizeExecutionLogMode(
@@ -68,7 +69,10 @@ function executionLogVirtualModuleSourceWithOwnSize(
 	const moduleSizes = options.moduleSizes
 		? Object.fromEntries([
 				...[...options.moduleSizes].map(([id, raw]) => [id, { raw, estimated: true }]),
-				[MARKLESS_EXECUTION_LOG_MODULE_ID, { raw: ownRawSize ?? 0, estimated: true }],
+				[
+					MARKLESS_EXECUTION_LOG_MODULE_ID,
+					{ raw: ownRawSize ?? 0, estimated: true, instrument: true },
+				],
 			])
 		: null;
 	return `
@@ -95,54 +99,57 @@ function canonicalId(id, sizes) {
 	return matches.length === 1 ? matches[0] : id;
 }
 function displayId(id) { const parts = symbolParts(id); return parts ? parts.symbolId + ' (' + (parts.source.split('/').pop() || parts.source) + ')' : id; }
-function kb(items, sizes) {
-	if (!sizes) return items.length === 1 ? '1 module' : items.length + ' modules';
-	const records = [...new Set(items.map((id) => canonicalId(id, sizes)))].map((id) => sizes.get(id)).filter(Boolean); const est = [...sizes.values()].some((record) => record.estimated); let total = 0;
-	for (const record of records) total += record.estimated ? record.raw : (record.gzip || record.raw || 0);
-	return (total / 1024).toFixed(1) + ' KB' + (est ? ' est.' : '');
+function accounting(items, sizes) {
+	const ids = [...new Set(items.map((id) => canonicalId(id, sizes)))];
+	if (!sizes) return { appBytes: ids.length ? null : 0, instrumentBytes: 0, appModules: ids.length, instrumentModules: 0, estimated: { app: false, instrument: false }, unmappedIds: [] };
+	let appBytes = 0, instrumentBytes = 0, appModules = 0, instrumentModules = 0, appEstimated = false, instrumentEstimated = false; const unmappedIds = [];
+	for (const id of ids) { const record = sizes.get(id); if (!record) { appModules++; unmappedIds.push(id); continue; } const bytes = record.estimated ? record.raw : (record.gzip ?? record.raw); if (record.instrument) { instrumentModules++; instrumentBytes += bytes; instrumentEstimated ||= !!record.estimated; } else { appModules++; appBytes += bytes; appEstimated ||= !!record.estimated; } }
+	return { appBytes: unmappedIds.length ? null : appBytes, instrumentBytes, appModules, instrumentModules, estimated: { app: appEstimated, instrument: instrumentEstimated }, unmappedIds };
 }
-function bytesText(items, sizes) { return !sizes ? (items.length === 1 ? '1 module executed' : items.length + ' modules executed') : kb(items, sizes) + ' executed'; }
+function category(a, name) { const bytes = name === 'app' ? a.appBytes : a.instrumentBytes; const count = name === 'app' ? a.appModules : a.instrumentModules; if (bytes === null) return count + ' ' + name + ' module' + (count === 1 ? '' : 's') + (name === 'app' && a.unmappedIds.length ? ' (bytes unknown; ' + a.unmappedIds.length + ' unmapped)' : ''); return (bytes / 1024).toFixed(1) + ' KB' + (a.estimated[name] ? ' est.' : '') + ' ' + name; }
+function rowKb(items, sizes) { const a = accounting(items, sizes); if (a.unmappedIds.length) return 'bytes unknown'; const total = (a.appBytes || 0) + (a.instrumentBytes || 0); return (total / 1024).toFixed(1) + ' KB' + (a.estimated.app || a.estimated.instrument ? ' est.' : ''); }
 function warmIds(event) { return [...new Set([event.dispatchModuleId, ...((event.eventRecord && event.eventRecord.symbolIds) || [])].filter(Boolean))]; }
 function causeRows(input) {
 	const before = input.before || new Set(); const after = input.after || new Set(); const woken = [...after].filter((id) => !before.has(id)); const record = input.eventRecord;
 	const cause = record ? input.eventName + ' matched event record ' + record.hostNodeId : input.eventName + ' matched runtime records';
 	const label = (id) => displayId(canonicalId(id, input.moduleSizes));
-	const rows = woken.map((id) => 'woke ' + label(id) + (input.moduleSizes ? ' (' + kb([id], input.moduleSizes) + ')' : '') + ' <- ' + cause);
-	if (record) for (const id of warmIds(input)) rows.push('ran warm ' + label(id) + (input.moduleSizes ? ' (' + kb([id], input.moduleSizes) + ')' : '') + ' <- ' + cause);
+	const rows = woken.map((id) => 'woke ' + label(id) + (input.moduleSizes ? ' (' + rowKb([id], input.moduleSizes) + (input.moduleSizes.get(canonicalId(id, input.moduleSizes))?.instrument ? ' instrument' : '') + ')' : '') + ' <- ' + cause);
+	if (record) for (const id of warmIds(input)) rows.push('ran warm ' + label(id) + (input.moduleSizes ? ' (' + rowKb([id], input.moduleSizes) + (input.moduleSizes.get(canonicalId(id, input.moduleSizes))?.instrument ? ' instrument' : '') + ')' : '') + ' <- ' + cause);
 	if (record && !(input.view?.behaviors || []).some((b) => b.hostNodeId === record.hostNodeId)) rows.push('skip behavior — no matching record touched');
 	return rows;
 }
-function mirror(text) {
+function mirror(text, a) {
 	const root = document.documentElement; if (!root) return;
 	const count = Number(root.getAttribute('data-markless-log-interactions') || '0') + 1;
-	root.setAttribute('data-markless-log-interactions', String(count)); root.setAttribute('data-markless-log-last', text);
+	root.setAttribute('data-markless-log-interactions', String(count)); root.setAttribute('data-markless-log-last', text); mirrorBytes(root, a);
 }
+function mirrorBytes(root, a) { if (a.appBytes === null || a.instrumentBytes === null) { root.removeAttribute('data-markless-log-app-bytes'); root.removeAttribute('data-markless-log-instrument-bytes'); return; } root.setAttribute('data-markless-log-app-bytes', String(a.appBytes)); root.setAttribute('data-markless-log-instrument-bytes', String(a.instrumentBytes)); }
 export async function installMarklessExecutionLog(input = {}) {
 	const log = globalThis.__mxLog; if (!log || log.__marklessInstalled) return;
 	log.__marklessInstalled = true;
 	const moduleSizes = await loadModuleSizes(input); const preloaded = input.preloadedModuleCount || document.querySelectorAll('link[rel="modulepreload"]').length; const current = modules(log);
 	if (input.printResumeSummary !== false) {
-		const summary = 'markless: resumed — ' + bytesText(current, moduleSizes) + ', ' + preloaded + ' modules preloaded (' + current.length + ' executed)';
-		console.log(summary); document.documentElement?.setAttribute('data-markless-log-summary', summary);
+		const a = accounting(current, moduleSizes); const summary = 'markless: resumed — ' + category(a, 'app') + ' executed, ' + preloaded + ' modules preloaded (' + a.appModules + ' app executed) · ' + category(a, 'instrument');
+		console.log(summary); const root = document.documentElement; if (root) { root.setAttribute('data-markless-log-summary', summary); mirrorBytes(root, a); }
 	}
 	globalThis.__mxLogInteraction = (event) => {
 		const after = modules(log); const before = event.before || new Set(); const woken = after.filter((id) => !before.has(id)); const warm = warmIds(event);
 		if (event.noMatch) {
-			const line = 'markless: ' + event.eventName + ' [' + (event.selector || 'event target') + '] — no event record matched (0.0 KB)';
-			console.info(line); mirror(line); return;
+			const a = accounting([], moduleSizes); const line = 'markless: ' + event.eventName + ' [' + (event.selector || 'event target') + '] — no event record matched · 0.0 KB app · 0.0 KB instrument';
+			console.info(line); mirror(line, a); return;
 		}
-		const header = 'markless: ' + event.eventName + ' [' + (event.selector || 'event target') + '] · woke ' + woken.length + ' modules · ran warm ' + warm.length + ' modules · ' + kb([...new Set([...woken, ...warm])], moduleSizes);
+		const a = accounting([...woken, ...warm], moduleSizes); const header = 'markless: ' + event.eventName + ' [' + (event.selector || 'event target') + '] · woke ' + woken.length + ' modules · ran warm ' + warm.length + ' modules · ' + category(a, 'app') + ' · ' + category(a, 'instrument');
 		console.groupCollapsed(header);
 		for (const row of causeRows({ ...event, after: new Set(after), moduleSizes })) console.log(row);
-		console.groupEnd(); mirror(header);
+		console.groupEnd(); mirror(header, a);
 	};
 }
 export async function logMarklessInteraction(event) { await installMarklessExecutionLog({ printResumeSummary: false }); globalThis.__mxLogInteraction?.(event); }
 export async function logMarklessRenderSummary(input = {}) {
 	const log = globalThis.__mxLog; if (!log) return;
-	const moduleSizes = await loadModuleSizes(input); const current = modules(log);
-	const summary = 'markless: rendered — ' + current.length + ' ' + (current.length === 1 ? 'module' : 'modules') + ' executed (' + kb(current, moduleSizes) + ')';
-	console.log(summary); document.documentElement?.setAttribute('data-markless-log-summary', summary);
+	const moduleSizes = await loadModuleSizes(input); const current = modules(log); const a = accounting(current, moduleSizes);
+	const summary = 'markless: rendered — ' + a.appModules + ' app module' + (a.appModules === 1 ? '' : 's') + ' executed (' + category(a, 'app') + ') · ' + a.instrumentModules + ' instrument module' + (a.instrumentModules === 1 ? '' : 's') + ' executed (' + category(a, 'instrument').replace(/ instrument$/, '') + ')';
+	console.log(summary); const root = document.documentElement; if (root) { root.setAttribute('data-markless-log-summary', summary); mirrorBytes(root, a); }
 }
 `;
 }
@@ -174,12 +181,22 @@ export async function createExecutionSizesAsset(
 			...(symbolLogIdsByChunk.get(chunk) ?? []),
 		]);
 		if (logIds.size === 0) continue;
+		if (logIds.has(MARKLESS_EXECUTION_LOG_MODULE_ID) && logIds.size > 1) {
+			const cohabitingIds = [...logIds]
+				.filter((id) => id !== MARKLESS_EXECUTION_LOG_MODULE_ID)
+				.sort();
+			throw new Error(
+				`Markless execution sizes require an isolated dev-log chunk; chunk "${chunk}" also contains logged module ids: ${cohabitingIds.join(', ')}.`,
+			);
+		}
 		const size = {
 			raw: item.code.length,
 			gzip: await gzipByteLength(item.code),
 			chunk,
 		};
-		for (const id of logIds) entries[id] = size;
+		for (const id of logIds)
+			entries[id] =
+				id === MARKLESS_EXECUTION_LOG_MODULE_ID ? { ...size, instrument: true } : size;
 	}
 
 	return {

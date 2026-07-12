@@ -79,9 +79,11 @@ async function waitForLogSummaryAttribute(
 	await waitForLogMirror(
 		page,
 		options,
-		/data-markless-log-summary="markless: rendered — \d+ modules? executed \(\d+(?:\.\d+)? KB\)"/,
+		/data-markless-log-summary="markless: rendered — \d+ app modules? executed \(\d+(?:\.\d+)? KB app\) · \d+ instrument modules? executed \(\d+(?:\.\d+)? KB\)"/,
 		/data-markless-log-summary="[^"]*est\./,
 		'Expected data-markless-log-summary to mirror the CSR render summary.',
+		undefined,
+		[/data-markless-log-app-bytes="\d+"/, /data-markless-log-instrument-bytes="\d+"/],
 	);
 }
 
@@ -90,13 +92,35 @@ async function waitForLogInteractionAttribute(
 	count: number,
 	options: { readonly timeoutMs: number },
 ): Promise<void> {
-	await waitForLogMirror(
-		page,
-		options,
-		/data-markless-log-last="markless: click \[[^"]+\] · woke \d+ modules · ran warm \d+ modules · \d+(?:\.\d+)? KB"/,
-		/data-markless-log-last="[^"]*est\./,
-		`Expected interaction ${count} to mirror a real-KB execution log line.`,
-		new RegExp(`data-markless-log-interactions="${count}"`),
+	// Honest-unknown is the CURRENT contract because the click symbol is unmapped; the
+	// qualified-symbol attribution tranche must flip this to numeric app bytes + present mirrors.
+	// See docs/goals/runtime-management/notes/T005A-instrument-truth-spec.md.
+	const lastPattern =
+		/data-markless-log-last="markless: click \[[^"]+\] · woke \d+ modules · ran warm \d+ modules · \d+ app modules \(bytes unknown; \d+ unmapped\) · \d+(?:\.\d+)? KB instrument"/;
+	const rejectedFixtures = [
+		'data-markless-log-last="markless: click [button.play] · woke 1 modules · ran warm 2 modules · 3.1 KB"',
+		'data-markless-log-last="markless: click [button.play] · woke 1 modules · ran warm 2 modules · 1.8 KB app · 1.5 KB instrument"',
+	];
+	for (const fixture of rejectedFixtures) {
+		if (lastPattern.test(fixture))
+			throw new Error(`Execution-log matcher accepted a rejected format: ${fixture}`);
+	}
+	const started = Date.now();
+	const countPattern = new RegExp(`data-markless-log-interactions="${count}"`);
+	while (Date.now() - started < options.timeoutMs) {
+		const html = await page.content();
+		if (
+			countPattern.test(html) &&
+			lastPattern.test(html) &&
+			!/data-markless-log-app-bytes=/.test(html) &&
+			!/data-markless-log-instrument-bytes=/.test(html) &&
+			!/data-markless-log-last="[^"]*est\./.test(html)
+		)
+			return;
+		await new Promise((resolve) => setTimeout(resolve, 25));
+	}
+	throw new Error(
+		`Expected interaction ${count} to mirror an honest-unknown execution log line.`,
 	);
 }
 
@@ -107,14 +131,21 @@ async function waitForLogMirror(
 	estPattern: RegExp,
 	message: string,
 	extraPattern?: RegExp,
+	structuredPatterns: readonly RegExp[] = [],
 ): Promise<void> {
+	const oldTotalFixture =
+		'data-markless-log-last="markless: click [button.play] · woke 1 modules · ran warm 2 modules · 3.1 KB"';
+	if (pattern.test(oldTotalFixture))
+		throw new Error('Execution-log matcher accepted the old single-total format.');
 	const started = Date.now();
 	while (Date.now() - started < options.timeoutMs) {
 		const html = await page.content();
 		if (
 			(!extraPattern || extraPattern.test(html)) &&
+			structuredPatterns.every((structured) => structured.test(html)) &&
 			pattern.test(html) &&
-			!estPattern.test(html)
+			!estPattern.test(html) &&
+			!/data-markless-log-(?:summary|last)="[^"]*· 3\.1 KB"/.test(html)
 		)
 			return;
 		await new Promise((resolve) => setTimeout(resolve, 25));
