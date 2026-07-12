@@ -33,7 +33,10 @@ const MAX_HEAD_LINKS = 128;
 const LOAD_APP_BYTES = 0;
 const LOAD_INSTRUMENT_BYTES = 0;
 const FIRST_PLAY_APP_BYTES_MAX = 1_850;
-const FIRST_PLAY_INSTRUMENT_BYTES_MAX = 2_400;
+// 2,400 -> 2,520 (owner receipt 2026-07-12): the wiring repair relocated
+// ~111 B of accounting from the app chunk into the lazy logger - app bytes
+// unchanged, never-mode byte-identical; instrument growth stays visible.
+const FIRST_PLAY_INSTRUMENT_BYTES_MAX = 2_520;
 
 export default box(
 	{

@@ -156,7 +156,7 @@ test('specialized scalar dispatcher accepts the real raw event entry shape', () 
 	expect(resumeCode).toContain('host.contains(eventTarget)');
 	expect(resumeCode).toContain('input.event?.type === eventName');
 	expect(resumeCode).toContain('host.tagName.toLowerCase() !== tagName');
-	expect(resumeCode).not.toContain('input.eventRecord');
+	expect(resumeCode).not.toContain('input.eventRecord?.eventName');
 });
 
 test('specialized scalar dispatcher carries sync policy state through full fallback', () => {
@@ -261,12 +261,36 @@ test('emitResumeModule branches only for mixed scalar and row lean routes', () =
 });
 
 test('emitResumeModule emits the execution log loader only when logging is enabled', () => {
-	expect(emitResumeModule({ ...baseInput, executionLog: 'auto' })).toContain(
+	const enabled = emitResumeModule({ ...scalarResumeInput(), executionLog: 'auto' });
+	const disabled = emitResumeModule({ ...scalarResumeInput(), executionLog: 'never' });
+	expect(enabled).toContain(
 		'globalThis.__mxLoadLog ||= () => import("virtual:markless:dev-log");',
 	);
-	expect(emitResumeModule({ ...baseInput, executionLog: 'never' })).not.toContain(
-		'virtual:markless:dev-log',
-	);
+	expect(enabled).toContain('logMarklessSpecializedInteraction(input, marklessLogBefore)');
+	expect(enabled).not.toContain('input.eventRecord');
+	expect(disabled).not.toContain('virtual:markless:dev-log');
+	expect(disabled).not.toContain('logMarklessSpecializedInteraction');
+});
+
+test('emitSourceModule wraps direct render summaries only in logging builds', () => {
+	const publicRenderModuleSource = 'export function Fixture() { return { root: {} }; }';
+	const enabled = emitSourceModule({
+		...baseInput,
+		executionLog: 'auto',
+		publicRenderModuleSource,
+		publicRenderRootExportName: 'Fixture',
+	});
+	const disabled = emitSourceModule({
+		...baseInput,
+		executionLog: 'never',
+		publicRenderModuleSource,
+		publicRenderRootExportName: 'Fixture',
+	});
+
+	expect(enabled).toContain('logMarklessRenderSummary()');
+	expect(enabled).toContain('export function Fixture()');
+	expect(disabled).toContain(publicRenderModuleSource);
+	expect(disabled).not.toContain('logMarklessRenderSummary()');
 });
 
 test('emitSourceModule emits the CSR execution log loader only when logging is enabled', () => {

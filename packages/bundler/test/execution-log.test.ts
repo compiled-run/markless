@@ -253,6 +253,7 @@ async function importExecutionLogModule(source: string) {
 	)) as {
 		installMarklessExecutionLog: (input?: unknown) => Promise<void>;
 		logMarklessInteraction: (event: unknown) => Promise<void>;
+		logMarklessSpecializedInteraction: (input: unknown, before: Set<string>) => Promise<void>;
 		logMarklessRenderSummary: (input?: unknown) => Promise<void>;
 	};
 }
@@ -556,6 +557,25 @@ test('generated logger partitions mixed app and instrument interaction accountin
 	expect(headers[0]).toMatch(/· 1\.0 KB app · 0\.5 KB instrument$/);
 	expect(attributes.get('data-markless-log-app-bytes')).toBe('1024');
 	expect(attributes.get('data-markless-log-instrument-bytes')).toBe('512');
+});
+
+test('generated logger formats specialized interaction snapshots in the lazy bridge', async () => {
+	const attributes = stubExecutionLogDom();
+	(globalThis as ExecutionLogGlobal).__mxLog = new Set(['app:action']);
+	vi.spyOn(console, 'groupCollapsed').mockImplementation(() => {});
+	vi.spyOn(console, 'groupEnd').mockImplementation(() => {});
+	vi.spyOn(console, 'log').mockImplementation(() => {});
+
+	const mod = await importExecutionLogModule(executionLogVirtualModuleSource());
+	await mod.logMarklessSpecializedInteraction(
+		{
+			event: { type: 'keydown', target: { id: 'field', tagName: 'INPUT' } },
+			eventRecord: { hostNodeId: 'host:field', symbolIds: [] },
+		},
+		new Set<string>(),
+	);
+
+	expect(attributes.get('data-markless-log-last')).toContain('keydown [input#field]');
 });
 
 test('generated logger treats old unmarked object size maps as app entries', async () => {

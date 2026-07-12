@@ -158,6 +158,11 @@ export async function installMarklessExecutionLog(input = {}) {
 	return marklessInstallPromise;
 }
 export async function logMarklessInteraction(event) { await installMarklessExecutionLog({ printResumeSummary: false }); globalThis.__mxLogInteraction?.(event); }
+export async function logMarklessSpecializedInteraction(input, before) {
+	const target = input.element ?? input.event?.target;
+	const tag = typeof target?.tagName === 'string' ? target.tagName.toLowerCase() : 'element';
+	await logMarklessInteraction({ eventName: input.event?.type ?? 'event', eventRecord: input.eventRecord, before, selector: tag + (target?.id ? '#' + target.id : ''), after: new Set(globalThis.__mxLog) });
+}
 export async function logMarklessRenderSummary(input = {}) {
 	const log = globalThis.__mxLog; if (!log) return;
 	const moduleSizes = await loadModuleSizes(input); const current = modules(log); const a = accounting(current, moduleSizes);

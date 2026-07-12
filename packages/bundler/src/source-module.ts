@@ -83,6 +83,24 @@ export function payloadModule(payload: {
 	].join('\n');
 }
 
+function emitPublicRenderModule(
+	source: string,
+	input: { readonly executionLogEnabled: boolean; readonly rootExportName: string | null },
+): string {
+	if (!input.executionLogEnabled || !input.rootExportName) return source;
+	const declaration = `export function ${input.rootExportName}()`;
+	if (!source.includes(declaration)) return source;
+	const implementationName = `marklessRender${input.rootExportName}`;
+	return [
+		source.replace(declaration, `function ${implementationName}()`),
+		`export function ${input.rootExportName}() {`,
+		`\tconst output = ${implementationName}();`,
+		'\tglobalThis.__mxLoadLog().then(log => log.logMarklessRenderSummary());',
+		'\treturn output;',
+		'}',
+	].join('\n');
+}
+
 export function emitSourceModule(input: {
 	readonly filename: string;
 	readonly payloadId: string;
@@ -133,7 +151,12 @@ export function emitSourceModule(input: {
 			? `export { resumeContainerEvent } from '${resumeVirtualModuleId(input.filename)}';`
 			: '',
 		'',
-		input.environment === 'server' || symbolsOnly ? '' : input.publicRenderModuleSource,
+		input.environment === 'server' || symbolsOnly
+			? ''
+			: emitPublicRenderModule(input.publicRenderModuleSource, {
+					executionLogEnabled: input.executionLog !== 'never',
+					rootExportName: input.publicRenderRootExportName,
+				}),
 		input.environment === 'server' || symbolsOnly ? '' : input.publicCsrModuleSource,
 		input.environment === 'client' ? '' : input.publicSsrModuleSource,
 		routeSymbols
@@ -207,6 +230,7 @@ export function emitResumeModule(input: {
 			input.symbolRoutes.length > 0 ? 'none' : leanResumeMode(input.runtimeDemandMap),
 			scalarSpecializations,
 			input.runtimeDemandMap,
+			input.executionLog !== 'never',
 		),
 		'',
 	]
@@ -309,6 +333,7 @@ function emitResumeContainerEvent(
 	leanMode: LeanResumeMode,
 	scalarSpecializations: ReadonlyArray<ScalarSpecialization>,
 	runtimeDemandMap: unknown,
+	executionLogEnabled: boolean,
 ): string {
 	const fullResumeHandoff = [
 		'async function marklessFullResumeHandoff(handoff) {',
@@ -367,7 +392,13 @@ function emitResumeContainerEvent(
 				scalarOnlySpecialized ? '' : fullResumeHandoff,
 				scalarDispatcher,
 				'export async function resumeContainerEvent(input) {',
+				executionLogEnabled
+					? '	const marklessLogBefore = globalThis.__mxLog && new Set(globalThis.__mxLog);'
+					: '',
 				'	await marklessResumeSpecializedScalarEvent(input);',
+				executionLogEnabled
+					? '	if (marklessLogBefore) globalThis.__mxLoadLog().then(log => log.logMarklessSpecializedInteraction(input, marklessLogBefore));'
+					: '',
 				'}',
 			].join('\n');
 		}
