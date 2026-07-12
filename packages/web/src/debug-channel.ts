@@ -398,6 +398,9 @@ function safely<T>(run: () => T): T | undefined {
 export function __marklessDebugBootstrapSource(): string {
 	return `((root,phase,active)=>{const controls=(${installDebugChannelLayer.toString()})(root,phase,active);return Object.freeze({record:(element,eventName,input)=>controls.record(element,eventName,input),router:(source)=>controls.router(source),activate:()=>controls.activate()})})`;
 }
+export function __marklessDebugChannelForTest(): MarklessDebugChannelV1 | undefined {
+	return globalThis.__MARKLESS_DEBUG__;
+}
 export function __marklessDebugStartContainer(
 	root: Element,
 	phase: MarklessDebugContainerPhase,

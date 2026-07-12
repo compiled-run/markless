@@ -67,6 +67,19 @@ jobs:
             - name: Run unit and integration tests
               run: pnpm exec vp test
 
+            - name: Prove analyzer consumer contracts and validate receipts
+              run: |
+                  pnpm receipts:generate
+                  pnpm receipts:check
+
+            - name: Upload analyzer contract receipts
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: analyzer-contract-receipts
+                  path: packages/*/.witness/receipts/*.json
+                  if-no-files-found: error
+
             - name: Run bundler pipeline boxes
               run: pnpm --dir packages/bundler test:boxes
 

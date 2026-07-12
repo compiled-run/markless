@@ -1,5 +1,6 @@
 export * from './contracts.ts';
 export * from './coverage.ts';
+export * from './debug-channel-contract.ts';
 export * from './invariants.ts';
 export * from './locator-resolution.ts';
 export * from './matrix.ts';

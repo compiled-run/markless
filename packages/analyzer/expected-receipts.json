@@ -1,3 +1,11 @@
 {
-	"entries": []
+	"entries": [
+		{
+			"receiptPath": "packages/web/.witness/receipts/analyzer-debug-channel-contract.json",
+			"consumer": "@markless/web",
+			"fixture": "real-emitted-debug-channel-v1",
+			"commitSha": "git:HEAD",
+			"buildArtifactHash": "sha256:packages/web/src/debug-channel.ts"
+		}
+	]
 }

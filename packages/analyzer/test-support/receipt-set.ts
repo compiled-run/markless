@@ -1,5 +1,8 @@
+import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { isAbsolute, resolve, sep } from 'node:path';
+import { promisify } from 'node:util';
 import { validateVerdictReport } from '../src/verdicts.ts';
 
 interface ExpectedReceipt {
@@ -13,6 +16,22 @@ interface ExpectedReceipt {
 
 interface ExpectedReceiptManifest {
 	readonly entries: readonly ExpectedReceipt[];
+}
+
+const execFileAsync = promisify(execFile);
+
+export async function resolveReceiptIdentityValue(value: string, root: string): Promise<string> {
+	if (value === 'git:HEAD') {
+		const { stdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], { cwd: root });
+		return stdout.trim();
+	}
+	if (value.startsWith('sha256:')) {
+		const path = value.slice('sha256:'.length);
+		return createHash('sha256')
+			.update(await readFile(receiptFile(root, path)))
+			.digest('hex');
+	}
+	return value;
 }
 
 const nonempty = (value: unknown, name: string): string => {
@@ -110,11 +129,16 @@ export async function checkReceiptSet(
 		if (report.results.some((result) => result.status !== 'pass'))
 			throw new Error(`Required receipt ${entry.receiptPath} contains a non-pass result`);
 		const metadata = report.metadata;
-		for (const field of ['consumer', 'commitSha', 'buildArtifactHash'] as const)
-			if (metadata?.[field] !== entry[field])
+		for (const field of ['consumer', 'commitSha', 'buildArtifactHash'] as const) {
+			const expected =
+				field === 'commitSha' || field === 'buildArtifactHash'
+					? await resolveReceiptIdentityValue(entry[field], receiptRoot)
+					: entry[field];
+			if (metadata?.[field] !== expected)
 				throw new Error(
 					`Required receipt ${entry.receiptPath} metadata ${field} does not match the manifest`,
 				);
+		}
 		const identityField = entry.fixture === undefined ? 'matrix' : 'fixture';
 		if (metadata?.[identityField] !== entry[identityField])
 			throw new Error(

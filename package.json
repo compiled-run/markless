@@ -13,6 +13,7 @@
 		"bench:jsfb:guard": "node scripts/benchmarks/jsfb-baseline.mjs compare",
 		"bench:jsfb:prepare": "node scripts/benchmarks/prepare-jsfb-markless.mjs",
 		"receipts:check": "node packages/analyzer/test-support/check-receipts.ts packages/analyzer/expected-receipts.json .",
+		"receipts:generate": "vitest run --config packages/web/vitest.analyzer-debug-channel-contract.config.ts && vitest run packages/web/test/analyzer-debug-channel-contract.test.ts packages/analyzer/test/receipt-set.test.ts packages/web/test/debug-channel-registration.test.ts",
 		"test:compiler": "vp test packages/compiler/test/*.test.ts",
 		"publish": "pnpm --filter '@markless/*' --filter create-markless publish --access public --no-git-checks",
 		"release": "node scripts/release/run-release.mjs",

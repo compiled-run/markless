@@ -531,6 +531,10 @@ importers:
       '@markless/serializer':
         specifier: workspace:*
         version: link:../serializer
+    devDependencies:
+      '@markless/analyzer':
+        specifier: workspace:*
+        version: link:../analyzer
 
 packages:
 

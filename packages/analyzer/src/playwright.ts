@@ -1,4 +1,5 @@
 import type { ConsoleMessage, Page, Request, Response } from 'playwright';
+import type { AnalyzerRequiredDebugChannel } from './debug-channel-contract.ts';
 import type {
 	AnalyzerCandidateActionReport,
 	AnalyzerKnownAuditItem,
@@ -10,7 +11,7 @@ import type {
 	PendingPolicy,
 } from './contracts.ts';
 import { executedJavaScriptBytes, type V8CoverageEntry } from './coverage.ts';
-import { evaluateBoundaries, evaluateCandidate, type BoundarySnapshot } from './invariants.ts';
+import { evaluateBoundaries, evaluateCandidate } from './invariants.ts';
 import {
 	evaluateLocatorResolution,
 	locatorPlansFromView,
@@ -254,19 +255,10 @@ export class RequestLedger {
 	}
 }
 
-export interface MarklessDebugChannelV1Subset {
-	readonly version: 1;
-	readonly containers: readonly { readonly boundaries: readonly BoundarySnapshot[] }[];
-	explainInteraction(
-		element: Element,
-		eventName: string,
-	): { readonly kind: string; readonly source?: string };
-}
-
 export async function collectPayloadWiring(page: Page): Promise<PayloadWiringEvaluation> {
 	const containers = await page.evaluate(() => {
 		const channel = (
-			window as typeof window & { __MARKLESS_DEBUG__?: MarklessDebugChannelV1Subset }
+			window as typeof window & { __MARKLESS_DEBUG__?: AnalyzerRequiredDebugChannel<Element> }
 		).__MARKLESS_DEBUG__;
 		if (!channel || channel.version !== 1)
 			throw new Error(
@@ -369,7 +361,9 @@ export async function inventoryCandidates(
 	const raw = await page.locator('*').evaluateAll(
 		(elements, input) => {
 			const channel = (
-				window as typeof window & { __MARKLESS_DEBUG__?: MarklessDebugChannelV1Subset }
+				window as typeof window & {
+					__MARKLESS_DEBUG__?: AnalyzerRequiredDebugChannel<Element>;
+				}
 			).__MARKLESS_DEBUG__;
 			if (!channel || channel.version !== 1)
 				throw new Error(
@@ -535,7 +529,9 @@ export async function waitForBoundaryLiveness(
 	while (true) {
 		const snapshot = await page.evaluate(() => {
 			const channel = (
-				window as typeof window & { __MARKLESS_DEBUG__?: MarklessDebugChannelV1Subset }
+				window as typeof window & {
+					__MARKLESS_DEBUG__?: AnalyzerRequiredDebugChannel<Element>;
+				}
 			).__MARKLESS_DEBUG__;
 			return {
 				version: channel?.version,

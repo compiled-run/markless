@@ -1,0 +1,5 @@
+{
+	"extends": "../../../tsconfig.json",
+	"exclude": [],
+	"include": ["analyzer-debug-channel-contract.test-d.ts"]
+}

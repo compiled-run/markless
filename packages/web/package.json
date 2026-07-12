@@ -8,6 +8,27 @@
 		"url": "git+https://github.com/markless-dev/markless.git",
 		"directory": "packages/web"
 	},
+	"files": [
+		"dist"
+	],
+	"type": "module",
+	"sideEffects": false,
+	"exports": {
+		".": "./src/index.ts",
+		"./dom-journal": "./src/dom-journal.ts",
+		"./dom-update": "./src/dom-update.ts",
+		"./event-only-resume": "./src/event-only-resume.ts",
+		"./event-only-lean/row": "./src/event-only-lean/row.ts",
+		"./event-only-lean/scalar-core": "./src/event-only-lean/scalar-core.ts",
+		"./event-only-lean/scalar-resume": "./src/event-only-lean/scalar-resume.ts",
+		"./event-resume": "./src/event-resume.ts",
+		"./fns/*": "./src/fns/*.ts",
+		"./payload": "./src/payload.ts",
+		"./render": "./src/render.ts",
+		"./render-to-stream": "./src/render-to-stream.ts",
+		"./render-to-string": "./src/render-to-string.ts",
+		"./resume": "./src/payload-full.ts"
+	},
 	"publishConfig": {
 		"access": "public",
 		"exports": {
@@ -69,32 +90,14 @@
 			}
 		}
 	},
-	"type": "module",
-	"sideEffects": false,
-	"exports": {
-		".": "./src/index.ts",
-		"./dom-journal": "./src/dom-journal.ts",
-		"./dom-update": "./src/dom-update.ts",
-		"./event-only-resume": "./src/event-only-resume.ts",
-		"./event-only-lean/row": "./src/event-only-lean/row.ts",
-		"./event-only-lean/scalar-core": "./src/event-only-lean/scalar-core.ts",
-		"./event-only-lean/scalar-resume": "./src/event-only-lean/scalar-resume.ts",
-		"./event-resume": "./src/event-resume.ts",
-		"./fns/*": "./src/fns/*.ts",
-		"./payload": "./src/payload.ts",
-		"./render": "./src/render.ts",
-		"./render-to-stream": "./src/render-to-stream.ts",
-		"./render-to-string": "./src/render-to-string.ts",
-		"./resume": "./src/payload-full.ts"
+	"scripts": {
+		"prepublishOnly": "node ../../scripts/release/verify-publish-ready.mjs"
 	},
 	"dependencies": {
 		"@markless/runtime": "workspace:*",
 		"@markless/serializer": "workspace:*"
 	},
-	"files": [
-		"dist"
-	],
-	"scripts": {
-		"prepublishOnly": "node ../../scripts/release/verify-publish-ready.mjs"
+	"devDependencies": {
+		"@markless/analyzer": "workspace:*"
 	}
 }
