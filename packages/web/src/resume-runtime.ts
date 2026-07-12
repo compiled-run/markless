@@ -380,7 +380,7 @@ export function createResumeRuntime(
 			boundary.asyncReads.map((read, readIndex) => {
 				let snapshot: { readonly status?: unknown; readonly version?: unknown } | undefined;
 				try {
-					snapshot = input.graph.peekAsyncSnapshot(read.graphNodeId) as typeof snapshot;
+					snapshot = input.graph.peekAsyncSnapshot?.(read.graphNodeId);
 					if (!snapshot) throw new Error('missing async snapshot');
 				} catch {
 					return {

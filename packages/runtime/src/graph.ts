@@ -181,7 +181,8 @@ export type RuntimeGraphSubscription = {
 
 export type RuntimeGraph = {
 	readonly read: (graphNodeId: string, path?: ReadonlyArray<string>) => unknown;
-	readonly peekAsyncSnapshot: (graphNodeId: string) => RuntimeGraphAsyncSnapshot | undefined;
+	/** Available only in debug-enabled builds (`__MARKLESS_DEBUG_ENABLED__`). */
+	readonly peekAsyncSnapshot?: (graphNodeId: string) => RuntimeGraphAsyncSnapshot | undefined;
 	readonly readShared: (
 		definitionId: string,
 		propertyName: string,
@@ -408,5 +409,5 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		takeJournal() {
 			return journal.splice(0);
 		},
-	} as RuntimeGraph;
+	};
 }

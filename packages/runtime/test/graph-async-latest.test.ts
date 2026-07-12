@@ -86,7 +86,7 @@ test('first run has no prior value: pending reads stay undefined', async () => {
 	expect(graph.read('computed:issueModel', ['label'])).toBeUndefined();
 });
 
-test('peeking an async snapshot never demands its runner or schedules subscription work', async () => {
+test('debug-enabled graph exposes async snapshots without demanding its runner', async () => {
 	(globalThis as any).__MARKLESS_DEBUG_ENABLED__ = true;
 	let runs = 0,
 		subscriptions = 0;
@@ -100,8 +100,20 @@ test('peeking an async snapshot never demands its runner or schedules subscripti
 		run: () => void subscriptions++,
 	});
 
-	expect(graph.peekAsyncSnapshot('computed:issueModel')).toEqual({ status: 'idle', version: 0 });
+	expect('peekAsyncSnapshot' in graph).toBe(true);
+	expect(graph.peekAsyncSnapshot?.('computed:issueModel')).toEqual({ status: 'idle', version: 0 });
 	await graph.flush();
 	expect({ runs, subscriptions }).toEqual({ runs: 0, subscriptions: 0 });
+	delete (globalThis as any).__MARKLESS_DEBUG_ENABLED__;
+});
+
+test('debug-disabled graph omits the async snapshot member', () => {
+	for (const debugEnabled of [undefined, false]) {
+		if (debugEnabled === undefined) delete (globalThis as any).__MARKLESS_DEBUG_ENABLED__;
+		else (globalThis as any).__MARKLESS_DEBUG_ENABLED__ = debugEnabled;
+
+		const graph = graphWithAsyncComputed(() => 'unexpected');
+		expect('peekAsyncSnapshot' in graph).toBe(false);
+	}
 	delete (globalThis as any).__MARKLESS_DEBUG_ENABLED__;
 });
