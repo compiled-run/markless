@@ -412,7 +412,10 @@ function isObservabilityChunk(
 }
 
 function isRouterNavigationChunk(code: string): boolean {
-	return code.includes('navigateMarklessRouterLink') || code.includes('__marklessRouterLink');
+	// The shared navigation runtime also contains the __marklessRouterLink
+	// protocol key. Only the exported entry function identifies the chunk that
+	// owns the route-import map; bundle iteration order is platform-dependent.
+	return code.includes('navigateMarklessRouterLink');
 }
 
 function isDocsRouteChunk(code: string): boolean {
