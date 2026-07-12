@@ -17,7 +17,9 @@ const MAX_SHIPPED_JS_GZIP_BYTES = 62_500;
 
 test('music-player-ssr production build stays within its shipped JS budget', async () => {
 	await rm(resolve(demo, '.output'), { force: true, recursive: true });
-	await execPnpm(['--dir', demo, 'build']);
+	// Consumer posture: the wall measures the 'never' build even though the
+	// demo's default build keeps the lab instrument (owner rulings 2026-07-12).
+	await execPnpm(['--dir', demo, 'build'], { MARKLESS_CONSUMER_BUILD: '1' });
 
 	const sizes = JSON.parse(
 		await readFile(resolve(clientBuild, 'execution-sizes.json'), 'utf8'),
@@ -47,9 +49,9 @@ test('music-player-ssr production build stays within its shipped JS budget', asy
 	).toBeLessThanOrEqual(MAX_SHIPPED_JS_GZIP_BYTES);
 }, 120_000);
 
-async function execPnpm(args: string[]): Promise<void> {
+async function execPnpm(args: string[], env: Record<string, string> = {}): Promise<void> {
 	try {
-		await exec('pnpm', args, { cwd: root });
+		await exec('pnpm', args, { cwd: root, env: { ...process.env, ...env } });
 	} catch (error) {
 		const next = error as Error & { stdout?: string; stderr?: string };
 		throw new Error([next.message, next.stdout, next.stderr].filter(Boolean).join('\n'));

@@ -128,7 +128,7 @@ describe('package metadata', () => {
 		expect(manifest.dependencies).not.toHaveProperty('@markless/router');
 		expect(manifest.scripts).not.toHaveProperty('smoke:ssr');
 		expect(config).not.toContain('@markless/router');
-		expect(config).toContain('plugins: [markless()]');
+		expect(config).toContain('plugins: [markless({ executionLog })]');
 		await expect(access(resolve(root, 'demos/music-player/index.html'))).resolves.toBe(
 			undefined,
 		);
@@ -159,7 +159,7 @@ describe('package metadata', () => {
 		expect(manifest.dependencies).toHaveProperty('@markless/router');
 		expect(manifest.scripts).not.toHaveProperty('smoke:ssr');
 		expect(config).toContain("import { router } from '@markless/router/vite';");
-		expect(config).toContain('plugins: [markless(), router()]');
+		expect(config).toContain('plugins: [markless({ executionLog }), router()]');
 		expect(config).not.toContain('musicPlayerSsrHost');
 		await expect(access(resolve(root, 'demos/music-player-ssr/document.tsrx'))).resolves.toBe(
 			undefined,
