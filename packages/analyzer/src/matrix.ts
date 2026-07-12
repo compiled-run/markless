@@ -8,6 +8,9 @@ import type {
 
 const idPattern = /^[a-z0-9][a-z0-9-]*$/;
 const routePattern = /^pages\/.+\.(?:tsrx|mdx)$/;
+// Fixture URLs are origin-free router paths. Hash-router fixtures remain
+// supported, while history-router consumers may name ordinary root paths.
+const fixtureUrlPattern = /^\/(?!\/)(?!\.\.(?:\/|$))(?!.*\/\.\.(?:\/|$))(?:#\/.*|[^#]*)$/;
 const methods = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'];
 const fail = (path: string, message: string): never => {
 	throw new Error(`Route/action matrix schema violation at ${path}: ${message}`);
@@ -181,7 +184,7 @@ function route(value: unknown, path: string): MatrixRoute {
 		const fixture = record(entry, `${path}.fixtureUrls[${index}]`);
 		exactKeys(fixture, `${path}.fixtureUrls[${index}]`, ['id', 'url']);
 		stringValue(fixture.id, `${path}.fixtureUrls[${index}].id`, idPattern);
-		stringValue(fixture.url, `${path}.fixtureUrls[${index}].url`, /^(?:\/#\/.*|\/$)/);
+		stringValue(fixture.url, `${path}.fixtureUrls[${index}].url`, fixtureUrlPattern);
 		return fixture as { id: string; url: string };
 	});
 	const contracts = array(item.apiContracts, `${path}.apiContracts`).map((entry, index) =>

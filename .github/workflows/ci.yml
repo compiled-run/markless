@@ -73,6 +73,9 @@ jobs:
             - name: Run bundler pipeline boxes
               run: pnpm --dir packages/bundler test:boxes
 
+            - name: Run router pipeline boxes
+              run: pnpm --dir packages/router test:boxes
+
             - name: Validate required analyzer consumer receipts
               run: pnpm receipts:check
 
@@ -83,9 +86,6 @@ jobs:
                   name: analyzer-contract-receipts
                   path: packages/*/.witness/receipts/*.json
                   if-no-files-found: error
-
-            - name: Run router pipeline boxes
-              run: pnpm --dir packages/router test:boxes
 
             - name: Run music-player demo boxes
               run: pnpm --dir demos/music-player test:boxes

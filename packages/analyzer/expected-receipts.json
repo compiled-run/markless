@@ -27,6 +27,13 @@
 			"matrix": "bundler-debug-channel-positive-v1",
 			"commitSha": "git:HEAD",
 			"buildArtifactHash": "sha256:packages/bundler/boxes/analyzer/policy.ts"
+		},
+		{
+			"receiptPath": "packages/router/.witness/receipts/analyzer-route-actions.json",
+			"consumer": "@markless/router",
+			"matrix": "router-route-actions-v1",
+			"commitSha": "git:HEAD",
+			"buildArtifactHash": "sha256:packages/router/boxes/analyzer/policy.ts"
 		}
 	]
 }

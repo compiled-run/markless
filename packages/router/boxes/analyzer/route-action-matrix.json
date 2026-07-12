@@ -1,0 +1,218 @@
+{
+	"schemaVersion": 1,
+	"routes": [
+		{
+			"routeFile": "pages/404.tsrx",
+			"fixtureUrls": [{ "id": "missing", "url": "/missing" }],
+			"apiContracts": [],
+			"actions": [],
+			"bootstrapPendingPolicy": { "allow": false },
+			"bootstrapExpectedRejectedBoundaryIds": [],
+			"resetRequirements": {
+				"beforeRoute": "reuse-read-only-fixture",
+				"beforeEachAction": "fresh-browser-context",
+				"afterMutatingAction": "discard-fixture"
+			}
+		},
+		{
+			"routeFile": "pages/docs/[...slug].mdx",
+			"fixtureUrls": [{ "id": "getting-started", "url": "/docs/getting-started" }],
+			"apiContracts": [],
+			"actions": [
+				{
+					"id": "mdx-counter",
+					"fixtureUrlId": "getting-started",
+					"safety": "safe",
+					"defaultCrawl": true,
+					"locator": { "kind": "css", "value": "[data-mdx-counter]" },
+					"operation": "click",
+					"expectedEventTypes": ["click"],
+					"expectedInteraction": "inline-resumer",
+					"apiContractIds": [],
+					"pendingPolicy": { "allow": false },
+					"expectedRejectedBoundaryIds": [],
+					"reset": { "mode": "none" },
+					"navigates": false
+				},
+				{
+					"id": "mdx-input",
+					"fixtureUrlId": "getting-started",
+					"safety": "safe",
+					"defaultCrawl": true,
+					"locator": { "kind": "css", "value": "[data-mdx-input]" },
+					"operation": "click",
+					"expectedEventTypes": ["click"],
+					"expectedInteraction": "inline-resumer",
+					"apiContractIds": [],
+					"pendingPolicy": { "allow": false },
+					"expectedRejectedBoundaryIds": [],
+					"reset": { "mode": "none" },
+					"navigates": false
+				},
+				{
+					"id": "mdx-boost",
+					"fixtureUrlId": "getting-started",
+					"safety": "safe",
+					"defaultCrawl": true,
+					"locator": { "kind": "css", "value": "[data-mdx-boost]" },
+					"operation": "click",
+					"expectedEventTypes": ["click"],
+					"expectedInteraction": "inline-resumer",
+					"apiContractIds": [],
+					"pendingPolicy": { "allow": false },
+					"expectedRejectedBoundaryIds": [],
+					"reset": { "mode": "none" },
+					"navigates": false
+				},
+				{
+					"id": "router-home",
+					"fixtureUrlId": "getting-started",
+					"safety": "safe",
+					"defaultCrawl": true,
+					"locator": { "kind": "css", "value": "[data-router-home]" },
+					"operation": "click",
+					"expectedEventTypes": ["click"],
+					"expectedInteraction": "router-delegation",
+					"apiContractIds": [],
+					"pendingPolicy": { "allow": false },
+					"expectedRejectedBoundaryIds": [],
+					"reset": { "mode": "none" },
+					"navigates": true
+				},
+				{
+					"id": "router-back",
+					"fixtureUrlId": "getting-started",
+					"safety": "safe",
+					"defaultCrawl": true,
+					"locator": { "kind": "css", "value": "[data-router-back]" },
+					"operation": "click",
+					"expectedEventTypes": ["click"],
+					"expectedInteraction": "router-delegation",
+					"apiContractIds": [],
+					"pendingPolicy": { "allow": false },
+					"expectedRejectedBoundaryIds": [],
+					"reset": { "mode": "none" },
+					"navigates": true
+				}
+			],
+			"bootstrapPendingPolicy": { "allow": false },
+			"bootstrapExpectedRejectedBoundaryIds": [],
+			"resetRequirements": {
+				"beforeRoute": "reuse-read-only-fixture",
+				"beforeEachAction": "fresh-browser-context",
+				"afterMutatingAction": "discard-fixture"
+			},
+			"ownerNotes": [
+				"m0 runtime attribution IDs for the MDX route are intentionally unknown until runtime-management measurement; executed-byte gating is deferred and must not infer them.",
+				"router-home and router-back remain distinct because they are distinct DOM interactions even though both navigate to the same destination."
+			]
+		},
+		{
+			"routeFile": "pages/harbor.tsrx",
+			"fixtureUrls": [{ "id": "harbor", "url": "/harbor" }],
+			"apiContracts": [],
+			"actions": [
+				{
+					"id": "harbor-log",
+					"fixtureUrlId": "harbor",
+					"safety": "safe",
+					"defaultCrawl": true,
+					"locator": { "kind": "css", "value": "[data-harbor-log]" },
+					"operation": "click",
+					"expectedEventTypes": ["click"],
+					"expectedInteraction": "inline-resumer",
+					"apiContractIds": [],
+					"pendingPolicy": { "allow": false },
+					"expectedRejectedBoundaryIds": [],
+					"reset": { "mode": "none" },
+					"navigates": false
+				}
+			],
+			"bootstrapPendingPolicy": { "allow": false },
+			"bootstrapExpectedRejectedBoundaryIds": [],
+			"resetRequirements": {
+				"beforeRoute": "fresh-fixture",
+				"beforeEachAction": "fresh-browser-context",
+				"afterMutatingAction": "discard-fixture"
+			},
+			"ownerNotes": [
+				"Analyzer settlement begins only after the existing streaming box observes the 300ms forecast boundary commit; no pending-boundary ID or allowance is inferred.",
+				"The catch arm exists, but no rejected boundary is declared without an observed normal-path rejection."
+			]
+		},
+		{
+			"routeFile": "pages/index.tsrx",
+			"fixtureUrls": [{ "id": "home", "url": "/" }],
+			"apiContracts": [],
+			"actions": [
+				{
+					"id": "home-counter",
+					"fixtureUrlId": "home",
+					"safety": "safe",
+					"defaultCrawl": true,
+					"locator": { "kind": "css", "value": "[data-home-counter]" },
+					"operation": "click",
+					"expectedEventTypes": ["click"],
+					"expectedInteraction": "inline-resumer",
+					"apiContractIds": [],
+					"pendingPolicy": { "allow": false },
+					"expectedRejectedBoundaryIds": [],
+					"reset": { "mode": "none" },
+					"navigates": false
+				},
+				{
+					"id": "home-input",
+					"fixtureUrlId": "home",
+					"safety": "safe",
+					"defaultCrawl": true,
+					"locator": { "kind": "css", "value": "[data-home-input]" },
+					"operation": "click",
+					"expectedEventTypes": ["click"],
+					"expectedInteraction": "inline-resumer",
+					"apiContractIds": [],
+					"pendingPolicy": { "allow": false },
+					"expectedRejectedBoundaryIds": [],
+					"reset": { "mode": "none" },
+					"navigates": false
+				},
+				{
+					"id": "home-boost",
+					"fixtureUrlId": "home",
+					"safety": "safe",
+					"defaultCrawl": true,
+					"locator": { "kind": "css", "value": "[data-home-boost]" },
+					"operation": "click",
+					"expectedEventTypes": ["click"],
+					"expectedInteraction": "inline-resumer",
+					"apiContractIds": [],
+					"pendingPolicy": { "allow": false },
+					"expectedRejectedBoundaryIds": [],
+					"reset": { "mode": "none" },
+					"navigates": false
+				},
+				{
+					"id": "docs-link",
+					"fixtureUrlId": "home",
+					"safety": "safe",
+					"defaultCrawl": true,
+					"locator": { "kind": "role", "value": "link", "name": "Docs" },
+					"operation": "click",
+					"expectedEventTypes": ["click"],
+					"expectedInteraction": "router-delegation",
+					"apiContractIds": [],
+					"pendingPolicy": { "allow": false },
+					"expectedRejectedBoundaryIds": [],
+					"reset": { "mode": "none" },
+					"navigates": true
+				}
+			],
+			"bootstrapPendingPolicy": { "allow": false },
+			"bootstrapExpectedRejectedBoundaryIds": [],
+			"resetRequirements": {
+				"beforeRoute": "reuse-read-only-fixture",
+				"beforeEachAction": "fresh-browser-context",
+				"afterMutatingAction": "discard-fixture"
+			}
+		}
+	]
+}

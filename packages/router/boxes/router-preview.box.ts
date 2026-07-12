@@ -1,6 +1,9 @@
 import { box } from '@async/witness';
 import { planModulePreloadUrls } from '../../bundler/src/build/preload-plan.ts';
 import type { MarklessBundleGraph } from '../../bundler/src/types.ts';
+import { evaluateRouterPreloadWindow, evaluateRouterRequests } from './analyzer-gate.ts';
+import { routerAnalyzerPolicy } from './analyzer/policy.ts';
+import { invalidateRouterAnalyzerReceipt, writeRouterAnalyzerReceipt } from './analyzer-receipt.ts';
 
 const FIXTURE = 'fixtures/router';
 const NITRO_BUILD_DIR = 'node_modules/.nitro-router-preview';
@@ -19,6 +22,8 @@ export default box(
 		modes: ['build', 'preview'],
 	},
 	async ({ pipeline, expect, receipt }) => {
+		await invalidateRouterAnalyzerReceipt();
+		let analyzerResults: Parameters<typeof writeRouterAnalyzerReceipt>[0] | undefined;
 		const build = await pipeline.build({
 			config: (config) => ({
 				...config,
@@ -60,13 +65,31 @@ export default box(
 			await expect.page.attribute(page, DOCS_LINK, 'href', '/docs/getting-started', WAIT);
 			const preloaded = await waitForExpectedPreloadRequests(page, expectedPreloadHrefs, 0);
 			receipt.note(`router target interaction modulepreloads: ${formatRequests(preloaded)}`);
+			const beforeNavigation = (await page.networkRequests()).length;
 			await page.click(DOCS_LINK, WAIT);
 			await expect.page.text(page, 'h1', 'Docs', WAIT);
 			await expect.page.text(page, MDX_COUNTER, 'MDX Count 0', WAIT);
+			// The settlement count is captured the moment the destination proves
+			// settled; any module request observed after it (through the MDX
+			// interaction below) is post-settlement and must fail MLA-S1.
+			const settledAfterRequestCount =
+				(await page.networkRequests()).length - beforeNavigation;
 			const beforeMdxCounter = await page.networkRequests();
 			await page.click(MDX_COUNTER, WAIT);
 			await expect.page.text(page, MDX_COUNTER, 'MDX Count 1', WAIT);
 			const afterMdxCounter = await page.networkRequests();
+			const preload = evaluateRouterPreloadWindow({
+				baseUrl: page.url,
+				actionKind: 'navigation',
+				expectedDestination: { settledAfterRequestCount },
+				declaredPreloads: expectedPreloadHrefs,
+				observedRequests: afterMdxCounter.slice(beforeNavigation).map((request) => ({
+					phase: 'action' as const,
+					actionId: 'docs-link',
+					url: request.url,
+					resourceType: request.resourceType,
+				})),
+			}).invariant;
 			const postClickJs = jsBuildRequests(afterMdxCounter.slice(beforeMdxCounter.length));
 			if (postClickJs.length > 0) {
 				throw new Error(
@@ -96,6 +119,20 @@ export default box(
 				{ consoleErrors: 0, failedRequests: 0, navigations: 2 },
 				WAIT,
 			);
+			const requests = await page.networkRequests();
+			const network = evaluateRouterRequests({
+				pageOrigin: new URL(page.url).origin,
+				rules: routerAnalyzerPolicy.network.router,
+				requests,
+			});
+			for (const result of [preload, network]) {
+				if (result.status === 'fail') throw new Error(result.details.join('\n'));
+			}
+			analyzerResults = [
+				preload,
+				network,
+				{ id: 'MLA-EXT-WITNESS', status: 'pass', details: [] },
+			];
 			receipt.note('vite preview served SSR HTML and SPA-navigated router fixture routes');
 		} finally {
 			await preview.close();
@@ -103,6 +140,8 @@ export default box(
 		await receipt.capture(
 			'router vite preview SPA-navigated built fixture counters without startup module',
 		);
+		if (!analyzerResults) throw new Error('Router analyzer results were not produced.');
+		await writeRouterAnalyzerReceipt(analyzerResults);
 	},
 );
 
@@ -120,6 +159,9 @@ function isolatedNitroOutput() {
 type BrowserNetworkRequest = {
 	readonly method: string;
 	readonly url: string;
+	readonly resourceType?: string | null;
+	readonly status: number | null;
+	readonly failedReason?: string | null;
 };
 
 type NetworkRequestPage = {

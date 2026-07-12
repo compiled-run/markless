@@ -279,6 +279,29 @@ describe('analyzer contracts', () => {
 		};
 		const valid = { schemaVersion: 1, routes: [route] };
 		expect(validateMatrixDocument(valid)).toEqual(valid);
+		for (const url of ['/', '/#/', '/missing', '/docs/getting-started']) {
+			expect(
+				validateMatrixDocument({
+					...valid,
+					routes: [{ ...route, fixtureUrls: [{ id: 'home', url }] }],
+				}),
+			).toBeTruthy();
+		}
+		for (const url of [
+			'https://fixture.test/docs',
+			'http://fixture.test/docs',
+			'//fixture.test/docs',
+			'/../secret',
+			'/docs/../secret',
+			'/#/docs/../secret',
+		]) {
+			expect(() =>
+				validateMatrixDocument({
+					...valid,
+					routes: [{ ...route, fixtureUrls: [{ id: 'home', url }] }],
+				}),
+			).toThrow(/fixtureUrls.*url/i);
+		}
 		expect(() =>
 			validateMatrixDocument({
 				...valid,
