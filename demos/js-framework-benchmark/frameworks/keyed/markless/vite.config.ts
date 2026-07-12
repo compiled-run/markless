@@ -30,7 +30,8 @@ const { markless } = await import(
 export default {
 	root: benchmarkRoot,
 	base: './',
-	plugins: [markless()],
+	// Benchmarks measure the instrument-free production build (owner ruling 2026-07-12).
+	plugins: [markless({ executionLog: 'never' })],
 	build: {
 		emptyOutDir: true,
 		modulePreload: false,
