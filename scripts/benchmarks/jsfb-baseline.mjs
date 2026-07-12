@@ -227,6 +227,7 @@ export function compareBenchmarkResults(baseline, currentResults) {
 	const failures = [];
 	const warnings = [];
 	const cpuBenchmarkRegressions = [];
+	const clearCpuBenchmarkRegressions = [];
 
 	const currentCpu = [];
 	const baselineCpu = [];
@@ -238,10 +239,8 @@ export function compareBenchmarkResults(baseline, currentResults) {
 		currentCpu.push(current);
 		baselineCpu.push(previous);
 		const ratio = current / previous;
-		// Above the clear threshold the row is outside same-runner noise, so it
-		// fails on its own even when the geomean stays inside its gate.
 		if (ratio > (thresholds.cpuBenchmarkClearRegressionRatio ?? 1.25)) {
-			failures.push(
+			clearCpuBenchmarkRegressions.push(
 				`${key} clearly regressed from ${previous} to ${current} (${formatRatio(ratio)} of baseline).`,
 			);
 		} else if (ratio > (thresholds.cpuBenchmarkRegressionRatio ?? 1.07)) {
@@ -268,6 +267,17 @@ export function compareBenchmarkResults(baseline, currentResults) {
 	}
 	if (cpuGeomeanWithinThreshold) warnings.push(...cpuBenchmarkRegressions);
 	else failures.push(...cpuBenchmarkRegressions);
+
+	// A single whole-run JSFB sample can be bimodal on a shared runner even
+	// though JSFB reports the median of its internal iterations. Require a
+	// second independent signal before making a clear row regression fatal.
+	if (!cpuGeomeanWithinThreshold || clearCpuBenchmarkRegressions.length >= 2) {
+		failures.push(...clearCpuBenchmarkRegressions);
+	} else if (clearCpuBenchmarkRegressions.length === 1) {
+		warnings.push(
+			`${clearCpuBenchmarkRegressions[0].slice(0, -1)}, but is not corroborated by the CPU geomean or another clear row; re-measure before landing.`,
+		);
+	}
 
 	for (const key of sizeBenchmarks) {
 		const current = requiredResult(currentResults, key, failures);

@@ -331,7 +331,7 @@ describe('js-framework-benchmark baseline guard', () => {
 		]);
 	});
 
-	test('fails a clear single-benchmark regression even when the geomean stays inside its threshold', async () => {
+	test('warns for one uncorroborated clear CPU regression with a flat geomean', async () => {
 		const { compareBenchmarkResults } = await loadBenchmarkGuard();
 		const baseline = {
 			thresholds: {
@@ -369,15 +369,14 @@ describe('js-framework-benchmark baseline guard', () => {
 			},
 		};
 
-		// One benchmark clearly regresses (+28%) while the other eight are
-		// flat, so the geomean only moves ~+2.8% — inside the 1.03 gate.
-		// Runner noise tops out well below +25%, so it must fail, not warn.
+		// Reproduces the hosted-runner evidence: one row is 130.4% of baseline
+		// while the other eight keep the geomean inside the unchanged 1.03 gate.
 		const result = compareBenchmarkResults(baseline, {
 			'01_run1k': 94.8,
 			'02_replace1k': 106.9,
 			'03_update10th1k': 57.2,
 			'04_select1k': 22.4,
-			'05_swap1k': 77.6,
+			'05_swap1k': 79.0224,
 			'06_remove-one-1k': 41.3,
 			'07_create10k': 1421.6,
 			'08_create1k-after1k': 82.1,
@@ -385,9 +384,94 @@ describe('js-framework-benchmark baseline guard', () => {
 		});
 
 		expect(result.currentCpuGeomean / result.baselineCpuGeomean).toBeLessThan(1.03);
+		expect(result.ok).toBe(true);
+		expect(result.failures).toEqual([]);
+		expect(result.warnings).toEqual([
+			expect.stringContaining(
+				'05_swap1k clearly regressed from 60.6 to 79.0224 (130.4% of baseline), but is not corroborated',
+			),
+		]);
+
+		const otherRound = compareBenchmarkResults(baseline, {
+			'01_run1k': 94.8,
+			'02_replace1k': 106.9,
+			'03_update10th1k': 57.2,
+			'04_select1k': 22.4,
+			'05_swap1k': 45,
+			'06_remove-one-1k': 41.3,
+			'07_create10k': 1940.3138,
+			'08_create1k-after1k': 82.1,
+			'09_clear1k': 24.2,
+		});
+
+		expect(otherRound.currentCpuGeomean / otherRound.baselineCpuGeomean).toBeLessThan(1.03);
+		expect(otherRound.ok).toBe(true);
+		expect(otherRound.failures).toEqual([]);
+		expect(otherRound.warnings).toEqual([
+			expect.stringContaining(
+				'07_create10k clearly regressed from 1425.8 to 1940.3138 (136.1% of baseline), but is not corroborated',
+			),
+		]);
+	});
+
+	test('fails when two CPU rows clearly regress despite a flat geomean', async () => {
+		const { compareBenchmarkResults } = await loadBenchmarkGuard();
+		const baseline = {
+			thresholds: {
+				cpuGeomeanRegressionRatio: 1.03,
+				cpuBenchmarkRegressionRatio: 1.07,
+				cpuBenchmarkClearRegressionRatio: 1.25,
+			},
+			benchmarks: { cpu: ['05_swap1k', '07_create10k', '09_clear1k'] },
+			frameworks: {
+				markless: { results: { '05_swap1k': 100, '07_create10k': 100, '09_clear1k': 100 } },
+			},
+		};
+
+		const result = compareBenchmarkResults(baseline, {
+			'05_swap1k': 130.4,
+			'07_create10k': 136.1,
+			'09_clear1k': 55,
+		});
+
+		expect(result.currentCpuGeomean / result.baselineCpuGeomean).toBeLessThan(1.03);
 		expect(result.ok).toBe(false);
 		expect(result.failures).toEqual([
-			expect.stringContaining('05_swap1k clearly regressed from 60.6 to 77.6'),
+			expect.stringContaining('05_swap1k clearly regressed'),
+			expect.stringContaining('07_create10k clearly regressed'),
 		]);
+	});
+
+	test('keeps geomean and size regressions hard failures with one clear CPU row', async () => {
+		const { compareBenchmarkResults } = await loadBenchmarkGuard();
+		const baseline = {
+			thresholds: {
+				cpuGeomeanRegressionRatio: 1.03,
+				cpuBenchmarkRegressionRatio: 1.07,
+				cpuBenchmarkClearRegressionRatio: 1.25,
+				rawSizeRegressionKb: 0.5,
+			},
+			benchmarks: { cpu: ['05_swap1k', '07_create10k'], size: ['41_size-uncompressed'] },
+			frameworks: {
+				markless: {
+					results: { '05_swap1k': 100, '07_create10k': 100, '41_size-uncompressed': 10 },
+				},
+			},
+		};
+
+		const result = compareBenchmarkResults(baseline, {
+			'05_swap1k': 130,
+			'07_create10k': 100,
+			'41_size-uncompressed': 10.6,
+		});
+
+		expect(result.ok).toBe(false);
+		expect(result.failures).toEqual(
+			expect.arrayContaining([
+				expect.stringContaining('CPU geomean regressed'),
+				expect.stringContaining('05_swap1k clearly regressed'),
+				expect.stringContaining('raw size regressed'),
+			]),
+		);
 	});
 });
