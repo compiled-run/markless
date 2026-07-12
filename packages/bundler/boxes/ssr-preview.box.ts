@@ -62,6 +62,8 @@ export default box(
 		const page = await instrumentedPreview.browser.visit('/');
 
 		await expect.page.text(page, COUNTER, '0', WAIT);
+		// owner ratification 2026-07-12, T008D
+		await waitForExactExecutionBytes(page, { appBytes: 0, instrumentBytes: 0 }, WAIT);
 		const loadExecuted = executedFromHtml(await page.content());
 		if (loadExecuted.length > 0) {
 			throw new Error(
@@ -76,6 +78,11 @@ export default box(
 
 		await page.click(COUNTER, WAIT);
 		await expect.page.text(page, COUNTER, '1', WAIT);
+		// owner ratification 2026-07-12, T008D
+		// 200 -> 330: calibrated in THIS box's build context (measured 323; the
+		// 195/200 pair came from a minimal-config capture - wrong context). Owner
+		// margin policy T006: ~1% app headroom, tighten-only.
+		await waitForCounterExecutionWall(page, 330, WAIT);
 		const clickedHtml = await page.content();
 		const executed = executedFromHtml(clickedHtml);
 		const view = viewPayloadFromHtml(clickedHtml);
@@ -229,6 +236,61 @@ type ExecutionSizeMap = Record<string, { readonly gzip: number; readonly chunk: 
 type Requestable = {
 	request(path: string): Promise<string>;
 };
+
+type ContentPage = {
+	content(): Promise<string>;
+};
+
+async function waitForExactExecutionBytes(
+	page: ContentPage,
+	expected: { readonly appBytes: number; readonly instrumentBytes: number },
+	options: { readonly timeoutMs: number },
+): Promise<void> {
+	const started = Date.now();
+	while (Date.now() - started < options.timeoutMs) {
+		const html = await page.content();
+		const appBytes = executionMirrorInteger(html, 'app-bytes');
+		const instrumentBytes = executionMirrorInteger(html, 'instrument-bytes');
+		if (appBytes === expected.appBytes && instrumentBytes === expected.instrumentBytes) return;
+		await new Promise((resolve) => setTimeout(resolve, 25));
+	}
+	throw new Error(
+		`Expected execution mirrors app-bytes=${expected.appBytes} and instrument-bytes=${expected.instrumentBytes}.`,
+	);
+}
+
+async function waitForCounterExecutionWall(
+	page: ContentPage,
+	maxAppBytes: number,
+	options: { readonly timeoutMs: number },
+): Promise<void> {
+	const started = Date.now();
+	while (Date.now() - started < options.timeoutMs) {
+		const html = await page.content();
+		const appBytes = executionMirrorInteger(html, 'app-bytes');
+		const interactions = executionMirrorInteger(html, 'interactions');
+		const last = /data-markless-log-last="([^"]+)"/.exec(html)?.[1];
+		if (appBytes !== undefined && appBytes <= maxAppBytes && interactions === 1 && last) return;
+		await new Promise((resolve) => setTimeout(resolve, 25));
+	}
+	const finalHtml = await page.content();
+	const observed = {
+		appBytes: executionMirrorInteger(finalHtml, 'app-bytes'),
+		instrumentBytes: executionMirrorInteger(finalHtml, 'instrument-bytes'),
+		interactions: executionMirrorInteger(finalHtml, 'interactions'),
+		last: /data-markless-log-last="([^"]*)"/.exec(finalHtml)?.[1] ?? null,
+	};
+	throw new Error(
+		`Expected fresh counter execution mirror with interactions=1, nonempty last line, and integer app-bytes <= ${maxAppBytes}; observed=${JSON.stringify(observed)}.`,
+	);
+}
+
+function executionMirrorInteger(html: string, attribute: string): number | undefined {
+	const raw = new RegExp(`data-markless-log-${attribute}="(\\d+)"`).exec(html)?.[1];
+	if (raw === undefined) return undefined;
+	const value = Number(raw);
+	return Number.isInteger(value) ? value : undefined;
+}
 
 function assertHtmlHasPreloadsWithoutExternalScripts(html: string): void {
 	if (/<script\b[^>]*\bsrc=/.test(html)) {

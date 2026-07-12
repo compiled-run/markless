@@ -29,6 +29,27 @@ export default box(
 		modes: ['build', 'preview'],
 	},
 	async ({ pipeline, expect, receipt }) => {
+		const instrumentedBuild = await pipeline.build({
+			config: (config) => ({
+				...config,
+				root: `${config.root}/${FIXTURE}`,
+				configFile: `${config.root}/boxes/vite-csr.instrumented.config.ts`,
+			}),
+		});
+		await expect.build.environment(instrumentedBuild, 'client');
+		const instrumentedPreview = await pipeline.preview(instrumentedBuild, {
+			config: (config) => ({
+				...config,
+				configFile: `${config.root}/boxes/vite-csr.instrumented.config.ts`,
+			}),
+		});
+		const instrumentedPage = await instrumentedPreview.browser.visit('/');
+		await expect.page.text(instrumentedPage, COUNTER, '0', WAIT);
+		// owner ratification 2026-07-12, T008D
+		await waitForLoadAppBytes(instrumentedPage, WAIT);
+		// Owner-deferred: CSR counter dispatch is not yet wired to the execution logger.
+		await instrumentedPreview.close();
+
 		const build = await pipeline.build({
 			config: (config) => ({
 				...config,
@@ -122,6 +143,23 @@ type BrowserNetworkRequest = {
 type NetworkRequestPage = {
 	networkRequests(): Promise<BrowserNetworkRequest[]>;
 };
+
+type ContentPage = {
+	content(): Promise<string>;
+};
+
+async function waitForLoadAppBytes(
+	page: ContentPage,
+	options: { readonly timeoutMs: number },
+): Promise<void> {
+	const started = Date.now();
+	while (Date.now() - started < options.timeoutMs) {
+		const raw = /data-markless-log-app-bytes="(\d+)"/.exec(await page.content())?.[1];
+		if (raw !== undefined && Number.isInteger(Number(raw)) && Number(raw) === 0) return;
+		await sleep(25);
+	}
+	throw new Error('Expected integer load app-bytes mirror to equal 0 exactly.');
+}
 
 type RuntimeSizeBudget = {
 	readonly label: string;

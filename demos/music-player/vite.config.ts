@@ -2,5 +2,7 @@ import { markless } from '@markless/core/vite';
 import { defineConfig } from 'vite-plus';
 
 export default defineConfig({
-	plugins: [markless()],
+	// Demos are the framework lab: keep the localhost-gated execution log in
+	// preview builds (production consumer apps default to 'never').
+	plugins: [markless({ executionLog: 'auto' })],
 });
