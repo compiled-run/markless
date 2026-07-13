@@ -12,16 +12,24 @@ pnpm --dir demos/octane-bench bench -- ssr-throughput
 
 Add `--smoke` for a cheap one-second-per-case verification, or `--record` to write `baselines/local/ssr-throughput.json` after a green run. The normal protocol uses a 10-second sample window per case, a warmup of at least three renders and about 10% of that window, a 200,000-sample cap, and up to 5,000 memory-phase renders without forced garbage collection.
 
-## Lane status: signal-favoring (PARKED RED)
+## Lane status: signal-favoring (PARKED RED at write-path symbol delegation; mount fixed)
 
-The signal-favoring lane is implemented and node-tested. Its captured 100-level mount failure
-asked the empty root resolver for child-owned `symbol:21`; composed child sync-computed derive
-symbols are now prefixed through the owning child route in both CSR and SSR state composition.
-The lane remains parked until the PM confirms that routing fix with the full browser mount gate.
-The previously documented build failure for a single 211-symbol module was the same packed
-resolver-table defect as framework finding 8 and is fixed. The topology is not shrunk because
-that would fake comparability; `node demos/octane-bench/bench.mjs signal-favoring` is the
-confirmation step.
+Four of the five framework walls behind this lane are fixed: the packed symbol-array build
+ceiling (also the 211-symbol single-module case), composed child computed derive-symbol routing
+(mount's `Unknown async symbol symbol:21`), module-scope helper capture (the generated fixture
+now imports its evaluation counter - module-scope function declarations are not captured into
+extracted derive-symbol chunks), and prop-carried computed propagation (a write now re-derives
+computeds fed through component props; previously only the owning component's computed re-ran).
+The 100-level chain MOUNTS and evaluates (mount, equal-write, and unmount gates green), and
+write-path symbol routes are now canonical: one composition prefix per imported module boundary.
+
+The lane remains parked on the last wall: the root symbol resolver does not DELEGATE prefixed
+routes (`c0:symbol:20`) on the demand-loaded write path, so the dom-update/derive symbols a
+write demands never load and recomputations produce no DOM writes; mount-path resolution goes
+through per-child output loaders and works at full depth. That delegation is a framework design
+seam, out of bounded-card scope. The topology is not shrunk because that would fake
+comparability. The lane's write gates (`node demos/octane-bench/bench.mjs signal-favoring`)
+are the fix's proof.
 
 ## Lane status: async-waterfall (PARKED RED at the runtime gate; build ceiling fixed)
 
