@@ -1,7 +1,12 @@
 import { box } from '@async/witness';
 import { planModulePreloadUrls } from '../src/build/preload-plan.ts';
 import type { MarklessBundleGraph } from '../src/types.ts';
-import { evaluatePreloaderEvidence, measureAndRefuseI5, measureI5WithV8 } from './analyzer-gate.ts';
+import {
+	evaluatePreloaderEvidence,
+	measureAndRefuseI5,
+	measureI5WithV8,
+	requirePassingAnalyzerResults,
+} from './analyzer-gate.ts';
 import {
 	invalidateBundlerAnalyzerReceipt,
 	writeBundlerAnalyzerReceipt,
@@ -81,6 +86,8 @@ export default box(
 			actionStartIndex: beforeClick.length,
 			requests: afterClick,
 		});
+		// Merge-blocking: a failed analyzer result fails the box (never advisory).
+		requirePassingAnalyzerResults(analyzerResults);
 		await preview.close();
 		await receipt.capture('csr preload low network startup overlap and interaction');
 		await writeBundlerAnalyzerReceipt({

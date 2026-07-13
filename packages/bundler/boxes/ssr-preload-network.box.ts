@@ -1,5 +1,10 @@
 import { box } from '@async/witness';
-import { evaluatePreloaderEvidence, measureAndRefuseI5, measureI5WithV8 } from './analyzer-gate.ts';
+import {
+	evaluatePreloaderEvidence,
+	measureAndRefuseI5,
+	measureI5WithV8,
+	requirePassingAnalyzerResults,
+} from './analyzer-gate.ts';
 import {
 	invalidateBundlerAnalyzerReceipt,
 	writeBundlerAnalyzerReceipt,
@@ -76,6 +81,8 @@ export default box(
 			actionStartIndex: beforeClick.length,
 			requests: afterClick,
 		});
+		// Merge-blocking: a failed analyzer result fails the box (never advisory).
+		requirePassingAnalyzerResults(analyzerResults);
 		await preview.close();
 		await receipt.capture('ssr preload low network startup and interaction');
 		await writeBundlerAnalyzerReceipt({

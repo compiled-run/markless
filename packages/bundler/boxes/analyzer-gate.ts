@@ -183,6 +183,18 @@ export function evaluateBundlerPreloadWindow(
 	return evaluatePreloadIntegrity(input);
 }
 
+export function requirePassingAnalyzerResults(
+	results: readonly AnalyzerCanonicalInvariantResult[],
+): void {
+	const failed = results.filter((result) => result.status !== 'pass');
+	if (failed.length === 0) return;
+	throw new Error(
+		failed
+			.map((result) => `${result.id}: ${result.details.join('; ') || result.status}`)
+			.join('\n'),
+	);
+}
+
 export function evaluatePreloaderEvidence(input: {
 	readonly fixture: 'vite-csr-preloader' | 'vite-ssr-preloader';
 	readonly pageUrl: string;

@@ -11,6 +11,31 @@ import {
 
 afterEach(() => __marklessDebugResetForTest());
 
+test('a missing debug channel fails the analyzer contract', () => {
+	expect(checkAnalyzerDebugChannelContract(undefined)).toEqual({
+		id: 'MLA-EXT-DEBUG-CHANNEL-CONTRACT',
+		status: 'fail',
+		details: [
+			'MLA-EXT-DEBUG-CHANNEL-CONTRACT: expected debug channel version 1; received missing',
+		],
+	});
+});
+
+test('a version-mismatched real channel fails the analyzer contract', () => {
+	const root = {
+		isConnected: true,
+		contains(candidate: unknown) {
+			return candidate === this;
+		},
+	};
+	const install = new Function(`return ${__marklessDebugBootstrapSource()}`)();
+	install(root, 'csr', true);
+	const emitted = __marklessDebugChannelForTest() as { version: number };
+	const mismatched = { ...emitted, version: 2 };
+	expect(checkAnalyzerDebugChannelContract(mismatched).status).toBe('fail');
+	expect(checkAnalyzerDebugChannelContract(mismatched).details[0]).toContain('received 2');
+});
+
 test('the real emitted debug channel satisfies the analyzer contract', async () => {
 	const root = {
 		isConnected: true,

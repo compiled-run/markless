@@ -9,6 +9,7 @@ import {
 	measureAndRefuseI5,
 	refuseAfterI5Measurement,
 	proveBudgetRedAtMeasuredBytesMinusOne,
+	requirePassingAnalyzerResults,
 	requireRatifiedBudget,
 } from '../boxes/analyzer-gate.ts';
 import { bundlerAnalyzerPolicy } from '../boxes/analyzer/policy.ts';
@@ -54,6 +55,24 @@ describe('bundler analyzer adoption gate fault controls', () => {
 		for (const rules of Object.values(bundlerAnalyzerPolicy.network)) {
 			expect(rules.every((rule) => rule.origin === 'fixture')).toBe(true);
 		}
+	});
+
+	test('the live preload boxes are merge-blocking: any non-pass result throws', () => {
+		expect(() =>
+			requirePassingAnalyzerResults([
+				{ id: 'MLA-S1-PRELOAD-INTEGRITY', status: 'pass', details: [] },
+				{
+					id: 'MLA-I2-NETWORK',
+					status: 'fail',
+					details: ['undeclared request: GET https://tracker.test/pixel'],
+				},
+			]),
+		).toThrow(/MLA-I2-NETWORK: undeclared request/);
+		expect(() =>
+			requirePassingAnalyzerResults([
+				{ id: 'MLA-EXT-WITNESS', status: 'pass', details: [] },
+			]),
+		).not.toThrow();
 	});
 
 	test('S1 fails for a module fetched after destination settlement', () => {

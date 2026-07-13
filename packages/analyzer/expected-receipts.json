@@ -15,6 +15,20 @@
 			"buildArtifactHash": "sha256:packages/bundler/boxes/analyzer/policy.ts"
 		},
 		{
+			"receiptPath": "packages/bundler/.witness/receipts/analyzer-csr-preloader.json",
+			"consumer": "@markless/bundler",
+			"fixture": "vite-csr-preloader",
+			"commitSha": "git:HEAD",
+			"buildArtifactHash": "sha256:packages/bundler/boxes/analyzer/policy.ts"
+		},
+		{
+			"receiptPath": "packages/bundler/.witness/receipts/analyzer-ssr-preloader.json",
+			"consumer": "@markless/bundler",
+			"fixture": "vite-ssr-preloader",
+			"commitSha": "git:HEAD",
+			"buildArtifactHash": "sha256:packages/bundler/boxes/analyzer/policy.ts"
+		},
+		{
 			"receiptPath": "packages/bundler/.witness/receipts/analyzer-debug-channel.json",
 			"consumer": "@markless/bundler",
 			"matrix": "bundler-debug-channel-v1",
