@@ -105,7 +105,7 @@ export async function marklessSsrRunAsyncComputed(
 	if (streaming?.runs) {
 		let entry = streaming.runs.get(graphNodeId);
 		if (!entry) {
-			entry = { promise: marklessSsrSettleAsyncComputed(run) };
+			entry = { promise: marklessSsrSettleAsyncComputed(run, snapshots) };
 			entry.promise.then((settledSnapshot) => {
 				entry.settled = settledSnapshot;
 			});
@@ -128,14 +128,21 @@ export async function marklessSsrRunAsyncComputed(
 		snapshots.push({ graphNodeId, snapshot });
 		return snapshot;
 	}
-	const snapshot = await marklessSsrSettleAsyncComputed(run);
+	const snapshot = await marklessSsrSettleAsyncComputed(run, snapshots);
 	snapshots.push({ graphNodeId, snapshot });
 	return snapshot;
 }
-async function marklessSsrSettleAsyncComputed(run) {
+async function marklessSsrSettleAsyncComputed(run, snapshots) {
 	const signal = new AbortController().signal;
 	try {
-		const value = await run({ key: null, signal });
+		const read = (graphNodeId, path = []) => {
+			let value;
+			for (const entry of snapshots)
+				if (entry.graphNodeId === graphNodeId) value = entry.snapshot;
+			for (const segment of path) value = value?.[segment];
+			return value;
+		};
+		const value = await run({ key: null, signal, read });
 		return { status: 'fulfilled', version: 1, key: null, value };
 	} catch (error) {
 		return { status: 'rejected', version: 1, key: null, error };

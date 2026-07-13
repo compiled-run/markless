@@ -14,7 +14,11 @@ import {
 	trimmedStaticTextValue,
 	unwrapExpressionContainer,
 } from '../../ast/tsrx.ts';
-import { resolveGraphPath, semanticAliasMap } from '../../artifact-helpers/graph-paths.ts';
+import {
+	resolveGraphPath,
+	runtimeGraphReadPath,
+	semanticAliasMap,
+} from '../../artifact-helpers/graph-paths.ts';
 import type { PublicRenderPlanBranchArmPart, SemanticGraphBinding } from '../../artifacts.ts';
 import type { AssignedHosts } from './host-locators.ts';
 
@@ -96,7 +100,12 @@ export function buildBranchArmParts(
 			if (!graph || (graph.binding.kind !== 'state' && graph.binding.kind !== 'computed')) {
 				return false;
 			}
-			parts.push({ read: { graphNodeId: graph.binding.id, path: graph.path } });
+			parts.push({
+				read: {
+					graphNodeId: graph.binding.id,
+					path: runtimeGraphReadPath(graph.binding, graph.path),
+				},
+			});
 			return true;
 		}
 		if (node.type === 'JSXForExpression' && options?.repeats?.has(node)) {
@@ -195,7 +204,12 @@ function buildRepeatPart(
 			if (!graph || (graph.binding.kind !== 'state' && graph.binding.kind !== 'computed')) {
 				return false;
 			}
-			rowParts.push({ read: { graphNodeId: graph.binding.id, path: graph.path } });
+			rowParts.push({
+				read: {
+					graphNodeId: graph.binding.id,
+					path: runtimeGraphReadPath(graph.binding, graph.path),
+				},
+			});
 			return true;
 		}
 		if (rowNode.type !== 'Element' && rowNode.type !== 'JSXElement') return false;

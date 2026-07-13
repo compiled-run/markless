@@ -4,6 +4,8 @@ import type {
 	SemanticGraphBinding,
 } from '../artifacts.ts';
 
+const asyncSnapshotKeys = new Set(['status', 'version', 'key', 'error', 'value']);
+
 export function resolveGraphPath(
 	source: string,
 	bindings: ReadonlyMap<string, SemanticGraphBinding>,
@@ -25,6 +27,34 @@ export function graphBindingMap(
 	}
 
 	return bindings;
+}
+
+// Authored members on an async computed read through its resolved value. The
+// runtime reserves snapshot metadata at the graph root, so a colliding member
+// needs an explicit `value` hop to keep `result.value` distinct from the raw
+// snapshot's own value field.
+export function runtimeGraphReadPath(
+	binding: SemanticGraphBinding,
+	path: ReadonlyArray<string>,
+): ReadonlyArray<string> {
+	return binding.kind === 'computed' &&
+		binding.asyncCapable === true &&
+		path[0] !== undefined &&
+		asyncSnapshotKeys.has(path[0])
+		? ['value', ...path]
+		: path;
+}
+
+// A computed runner needs the upstream resolved object before its authored
+// member access runs; reading the snapshot root would make `upstream.member`
+// inspect metadata instead.
+export function runtimeGraphDependencyPath(
+	binding: SemanticGraphBinding,
+	path: ReadonlyArray<string>,
+): ReadonlyArray<string> {
+	return binding.kind === 'computed' && binding.asyncCapable === true
+		? ['value', ...path]
+		: path;
 }
 
 export function semanticAliasMap(

@@ -707,6 +707,10 @@ function products(...items: ReadonlyArray<readonly [sku: string, name: string]>)
 	}));
 }
 
+async function drainPublicRenderMicrotasks(): Promise<void> {
+	for (let index = 0; index < 8; index++) await Promise.resolve();
+}
+
 function elementsByTag(root: PublicRenderTestElement, tagName: string): PublicRenderTestElement[] {
 	const matches: PublicRenderTestElement[] = [];
 	const visit = (node: PublicRenderTestElement | PublicRenderTestText) => {
@@ -2981,6 +2985,127 @@ export function App() @{
 			}),
 		}),
 	]);
+});
+
+test('compileTsrxModule settles async-computed dependencies through two SSR boundaries', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/SsrAsyncChain.tsrx',
+		source: `
+import { computed, state } from '@markless/core';
+
+export function App() @{
+	let version = state(0);
+	const first = computed(async () => ({ revision: version, label: 'first:' + version }));
+	const second = computed(async () => ({ label: 'second:' + first.revision }));
+
+	<main>
+		@try { <p>{first.label}</p> } @pending { <p>Loading first</p> } @catch { <p>Broken first</p> }
+		@try { <p>{second.label}</p> } @pending { <p>Loading second</p> } @catch { <p>Broken second</p> }
+	</main>
+}
+`,
+		symbols: [],
+	});
+
+	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	const output = await (
+		ssrModule.marklessRenderSsr as () => Promise<{
+			readonly html: string;
+			readonly state: ProtocolStatePayload;
+		}>
+	)();
+
+	expect(output.html).toContain('<p>first:0</p>');
+	expect(output.html).toContain('<p>second:0</p>');
+	expect(output.html).not.toContain('Loading');
+	expect(output.html).not.toContain('Broken');
+	expect(output.state.computed.map((computed) => computed.snapshot?.status)).toEqual([
+		'fulfilled',
+		'fulfilled',
+	]);
+});
+
+test('compileTsrxModule CSR settles a two-level async chain without interaction', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/CsrAsyncChain.tsrx',
+		source: `
+import { computed, state } from '@markless/core';
+
+export function App() @{
+	let version = state(0);
+	const first = computed(async () => ({ revision: version, value: 'first:' + version }));
+	const second = computed(async () => ({ value: 'second:' + first.revision }));
+
+	<main>
+		@try { <p>{first.value}</p> } @pending { <p>Loading first</p> } @catch { <p>Broken first</p> }
+		@try { <p>{second.value}</p> } @pending { <p>Loading second</p> } @catch { <p>Broken second</p> }
+	</main>
+}
+`,
+		symbols: [],
+	});
+	const symbolModules = new Map(
+		result.symbolModules.modules.map((module) => [module.symbolId, module]),
+	);
+	const symbolExports = new Map<string, Record<string, unknown>>();
+	for (const module of result.symbolModules.modules) {
+		symbolExports.set(module.symbolId, await importPublicRenderTestModule(module.source));
+	}
+	const loadedSymbols: string[] = [];
+	const loadSymbol = (symbolId: string) => {
+		loadedSymbols.push(symbolId);
+		const module = symbolModules.get(symbolId);
+		if (!module) throw new Error(`Unexpected async symbol ${symbolId}`);
+		return symbolExports.get(symbolId)?.[module.exportName];
+	};
+	const document = publicRenderTestDocument();
+	const csrModule = await importPublicRenderTestModule(csrRenderTestModuleSource(result), {
+		document,
+		loadSymbol,
+	});
+	const output = (csrModule.marklessRenderCsr as () => {
+		readonly root: PublicRenderTestElement;
+	})();
+	const applied: Array<{ readonly type: string; readonly fragment?: unknown }> = [];
+	const container = await render(() => output as never, {
+		target: new PublicRenderTestElement('target') as never,
+		renderBranchHtml: (html) => html as never,
+		applyDomJournal: (entries) => applied.push(...entries),
+	});
+	await drainPublicRenderMicrotasks();
+	await container.graph.flush();
+	await drainPublicRenderMicrotasks();
+
+	expect(loadedSymbols).toEqual(
+		expect.arrayContaining(
+			result.symbolModules.modules
+				.filter(
+					(module) =>
+						module.kind === 'async-computed-runner' ||
+						module.kind === 'async-boundary-update',
+				)
+				.map((module) => module.symbolId),
+		),
+	);
+	const initialFragments = applied.flatMap((entry) =>
+		entry.type === 'insertRange' ? [String(entry.fragment)] : [],
+	);
+	expect(initialFragments).toContain('<p>first:0</p>');
+	expect(initialFragments).toContain('<p>second:0</p>');
+
+	applied.length = 0;
+	container.graph.write({ graphNodeId: 'state:version', value: 1 });
+	await container.graph.flush();
+	await drainPublicRenderMicrotasks();
+	await container.graph.flush();
+	await drainPublicRenderMicrotasks();
+
+	const updatedFragments = applied.flatMap((entry) =>
+		entry.type === 'insertRange' ? [String(entry.fragment)] : [],
+	);
+	expect(updatedFragments).toContain('<p>first:1</p>');
+	expect(updatedFragments).toContain('<p>second:1</p>');
+	expect(updatedFragments.join('')).not.toContain('[object Object]');
 });
 
 test('compileTsrxModule emits async boundary anchors and @pending in the CSR string path', async () => {

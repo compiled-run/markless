@@ -6,14 +6,22 @@ import type {
 	PayloadKeyedRepeat,
 	SemanticGraphBinding,
 } from '../artifacts.ts';
-import { resolveGraphPath, semanticAliasMap, uniqueBy } from '../artifact-helpers/graph-paths.ts';
+import {
+	resolveGraphPath,
+	runtimeGraphDependencyPath,
+	runtimeGraphReadPath,
+	semanticAliasMap,
+	uniqueBy,
+} from '../artifact-helpers/graph-paths.ts';
 
 export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact {
 	const bindings = new Map<string, SemanticGraphBinding>();
+	const bindingsById = new Map<string, SemanticGraphBinding>();
 	const aliases = semanticAliasMap(input.semanticGraph);
 
 	for (const binding of input.semanticGraph.graphBindings) {
 		bindings.set(binding.name, binding);
+		bindingsById.set(binding.id, binding);
 	}
 
 	const cells = input.semanticGraph.graphBindings
@@ -30,7 +38,12 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 			name: binding.name,
 			async: binding.async === true,
 			functionSource: binding.functionSource,
-			dependencies: binding.dependencies,
+			dependencies: binding.dependencies?.map((dependency) => {
+				const target = bindingsById.get(dependency.graphNodeId);
+				return target
+					? { ...dependency, path: runtimeGraphDependencyPath(target, dependency.path) }
+					: dependency;
+			}),
 		}));
 	const sharedDefinitions = input.semanticGraph.sharedDefinitions.map((definition) => {
 		const graphNodeIds = input.semanticGraph.graphBindings
@@ -92,7 +105,7 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 				hostNodeId: read.hostNodeId,
 				source: read.source,
 				graphNodeId: resolved.binding.id,
-				path: resolved.path,
+				path: runtimeGraphReadPath(resolved.binding, resolved.path),
 				target: read.target,
 			},
 		];
@@ -202,7 +215,7 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 					{
 						source: read.source,
 						graphNodeId: resolved.binding.id,
-						path: resolved.path,
+						path: runtimeGraphReadPath(resolved.binding, resolved.path),
 					},
 				];
 			}),
@@ -321,7 +334,7 @@ function behaviorInputGraphReads(
 				inputIndex,
 				source: inputSource,
 				graphNodeId: resolved.binding.id,
-				path: resolved.path,
+				path: runtimeGraphReadPath(resolved.binding, resolved.path),
 			},
 		];
 	});

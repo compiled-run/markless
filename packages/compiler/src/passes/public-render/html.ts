@@ -406,17 +406,31 @@ function emitAsyncBoundaryHtml(node: AnyNode, context: HtmlRenderContext): strin
 }
 
 // The runner's authored async function, keyed by the boundary that demands
-// it. SSR awaits it inline; state locals put its free reads in scope.
+// it. SSR awaits it inline; resolved upstream async locals are restored from
+// snapshots because their component-body declarations are compiler-lowered.
 export function collectSsrAsyncRunners(
 	input: PublicRenderModuleInput,
 ): ReadonlyMap<
 	string,
 	{ readonly graphNodeId: string; readonly name: string; readonly source: string }
 > {
+	const asyncGraphNodeIds = new Set(
+		input.symbolResolver.symbols.flatMap((symbol) =>
+			symbol.kind === 'async-computed-runner' ? [symbol.graphNodeId] : [],
+		),
+	);
 	const runnersByGraphNode = new Map(
 		input.symbolResolver.symbols.flatMap((symbol) =>
 			symbol.kind === 'async-computed-runner'
-				? [[symbol.graphNodeId, { name: symbol.name, source: symbol.source }] as const]
+				? [
+						[
+							symbol.graphNodeId,
+							{
+								name: symbol.name,
+								source: ssrAsyncRunnerSource(symbol, asyncGraphNodeIds),
+							},
+						] as const,
+					]
 				: [],
 		),
 	);
@@ -432,6 +446,31 @@ export function collectSsrAsyncRunners(
 		}
 	}
 	return byBoundary;
+}
+
+function ssrAsyncRunnerSource(
+	symbol: Extract<
+		PublicRenderModuleInput['symbolResolver']['symbols'][number],
+		{ readonly kind: 'async-computed-runner' }
+	>,
+	asyncGraphNodeIds: ReadonlySet<string>,
+): string {
+	const declarations: string[] = [];
+	const names = new Set<string>();
+	for (const dependency of symbol.dependencies ?? []) {
+		if (!asyncGraphNodeIds.has(dependency.graphNodeId)) continue;
+		const sourcePath = dependency.source.split('.');
+		const name = sourcePath[0];
+		if (!name || names.has(name) || sourcePath.some((part) => !/^[$A-Z_a-z][$\w]*$/.test(part)))
+			continue;
+		names.add(name);
+		const path = dependency.path.slice(0, dependency.path.length - sourcePath.length + 1);
+		declarations.push(
+			`const ${name}=read(${JSON.stringify(dependency.graphNodeId)},${JSON.stringify(path)});`,
+		);
+	}
+	if (declarations.length === 0) return symbol.source;
+	return `({key,signal,read})=>{${declarations.join('')}const run=${symbol.source};return run({key,signal,read})}`;
 }
 
 function countDescendantBoundaries(node: AnyNode): number {

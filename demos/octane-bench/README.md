@@ -37,24 +37,18 @@ waits now fail LOUDLY where count-only gates once passed. The topology is not sh
 that would fake comparability. The lane's write gates
 (`node demos/octane-bench/bench.mjs signal-favoring`) are the fix's proof.
 
-## Lane status: async-waterfall (PARKED RED at the runtime gate; build ceiling fixed)
+## Lane status: async-waterfall (GREEN)
 
-The former BUILD ceiling is fixed: OXC packed dense resolver URL arrays into a comma-joined
-`"a,b,c".split(",")` string and the bundler's symbol-table rewrite did not recognize that
-representation; it now recovers every generated symbol row from it (genuinely missing IDs still
-fail closed). The focused 8-by-8, 8-by-9, 16-by-1, and 10-by-10 build matrix passes, including
-all 31 resolver rows for ten by ten; the separate 211-symbol single-module build failure is
-cured by the same fix, and `--build-only` is green and restored to the default `build` script.
-
-The lane remains PARKED RED at runtime (framework finding 11, found by the first full PM
-browser run): chained async computeds - level N reading through level N-1 - do not propagate on
-initial load (the server settles only level 0 and boundaries 1 through 9 render no arm at all;
-the resumed client also idles at level 0), and when a root-state dispatch does settle the chain
-client-side, read-through text bindings render the raw resolved object instead of the projected
-member. Nested async boundary markup remains separately rejected as
-`nested-boundary-unsupported`, so the ten levels are flat siblings backed by a true ten-node
-async dependency chain; the topology is not shrunk because that would fake comparability. The
-full lane command (`node bench.mjs async-waterfall`) is the runtime fix's proof.
+Both former ceilings are fixed. Build: OXC packed dense resolver URL arrays into a comma-joined
+`"a,b,c".split(",")` string the symbol-table rewrite did not recognize; it now recovers every
+row from that representation (missing IDs still fail closed), with a bundle-shape test matrix
+and a route-termination integrity gate behind it. Runtime (framework finding 11): emitted async
+dependencies and materialized-arm reads addressed snapshot metadata instead of the resolved
+value, and SSR removed upstream async locals without reconstructing them from settled
+snapshots - fixed across the payload-arena and public-render passes; blocking `renderToString`
+settles all demanded boundaries and streaming stays deadline-gated. The full protocol passes:
+ten chained async levels settle server-side to `L9:v0`, resume plus one real dispatch drives
+`L9:v1` under MLA-S1/MLA-I2, and the waterfall factor lands near the ten-level serial floor.
 
 ## Lane status: effectful-list (PARKED RED, no lane directory)
 
