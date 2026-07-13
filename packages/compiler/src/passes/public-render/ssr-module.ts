@@ -11,8 +11,10 @@ import {
 	destructureProps,
 	emitComponentImport,
 	emitValueImport,
+	hasPropDependentComputed,
 	isComponentRoot,
 	publicRenderValueImports,
+	sameModuleGraphProps,
 	stateEntries,
 	staticHostLocators,
 	moduleScopeLines,
@@ -72,6 +74,9 @@ export function emitPublicSsrRenderModule(
 		input.source.source,
 		hostLocators,
 	);
+	const remapsGraphProps = hasPropDependentComputed(input);
+	const internalGraphProps = sameModuleGraphProps(input);
+	const remapsInternalGraphProps = remapsGraphProps && internalGraphProps.length > 0;
 	const htmlExpression = emitHtmlNode(rootInfo.root, renderContext);
 	const sameModuleComponents = emitSameModuleSsrComponents(
 		input,
@@ -107,14 +112,21 @@ export function emitPublicSsrRenderModule(
 		),
 		'	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren, marklessSsrAsyncSnapshots);',
 		'	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);',
-		'	return {',
+		remapsInternalGraphProps ? '	const marklessSsrOutput = {' : '	return {',
 		'		html,',
 		'		state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots),',
 		'		view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) },',
 		'		elementCount: marklessSsrComposition.elementCount,',
+		...(remapsGraphProps
+			? ['		m(graphProps) { marklessSsrRemapGraphOutput(this, graphProps); },']
+			: []),
 		'		propEvents: marklessSsrPropEvents,',
 		'		externalSymbolIds: marklessSsrComposition.externalSymbolIds,',
 		'	};',
+		remapsInternalGraphProps
+			? `	marklessSsrRemapGraphOutput(marklessSsrOutput, ${JSON.stringify(internalGraphProps)});`
+			: null,
+		remapsInternalGraphProps ? '	return marklessSsrOutput;' : null,
 		'}',
 		'',
 	];
@@ -145,6 +157,7 @@ export function emitPublicSsrRenderModule(
 					// Aliased: the CSR module in the same emitted file imports the same
 					// helper name from fns/csr; duplicate import bindings are a JS error.
 					'marklessComposeState as marklessSsrComposeState',
+					'marklessSsrRemapGraphOutput',
 					'marklessViewWithoutAnchors',
 					'marklessSsrComposeView',
 					'marklessSsrPrefixAnchorHtml',

@@ -9,6 +9,7 @@ import {
 	componentEdgesFor,
 	componentPropNames,
 	destructureProps,
+	hasPropDependentComputed,
 	isFragmentNode,
 	sameModuleComponentMap,
 	assignSsrHostIds,
@@ -21,6 +22,7 @@ export function emitSameModuleCsrComponents(
 	references: ReadonlyArray<ComponentReference>,
 	rootComponentName: string,
 ): string[] {
+	const remapsGraphProps = hasPropDependentComputed(input);
 	const ast = parseModule(input.source.source, input.source.filename) as unknown as AnyNode;
 	const componentMap = sameModuleComponentMap(ast);
 	const referenceMap = new Map(references.map((item) => [item.componentName, item.localName]));
@@ -77,7 +79,7 @@ export function emitSameModuleCsrComponents(
 			...renderContext.childReplacements,
 			'	const marklessCsrView = marklessCsrComposeView(root, marklessViewWithoutAnchors(payloadView), [], marklessCsrChildren);',
 			'	const marklessCsrState = marklessComposeState(marklessCsrPayloadState, marklessCsrChildren);',
-			'	return { root, state: marklessCsrState, view: marklessCsrView, loadSymbol, connectRuntime(context) { marklessCsrRuntimeState.graph = context.graph; for (const child of marklessCsrChildren) child.output?.connectRuntime?.(context); } };',
+			`	return { root, state: marklessCsrState, view: marklessCsrView, loadSymbol${remapsGraphProps ? ', m(graphProps) { marklessCsrRemapGraphOutput(this, graphProps); }' : ''}, connectRuntime(context) { marklessCsrRuntimeState.graph = context.graph; for (const child of marklessCsrChildren) child.output?.connectRuntime?.(context); } };`,
 			'}',
 		].filter((line): line is string => line !== null);
 	});
@@ -88,6 +90,7 @@ export function emitSameModuleSsrComponents(
 	references: ReadonlyArray<ComponentReference>,
 	rootComponentName: string,
 ): string[] {
+	const remapsGraphProps = hasPropDependentComputed(input);
 	const ast = parseModule(input.source.source, input.source.filename) as unknown as AnyNode;
 	const componentMap = sameModuleComponentMap(ast);
 	const referenceMap = new Map(references.map((item) => [item.componentName, item.localName]));
@@ -152,7 +155,7 @@ export function emitSameModuleSsrComponents(
 			),
 			'	const marklessSsrComposition = marklessSsrComposeView(html, marklessViewWithoutAnchors(payloadView), marklessSsrHostLocators, marklessSsrChildren);',
 			'	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);',
-			'	return { html, state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots), view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) }, elementCount: marklessSsrComposition.elementCount, propEvents: [], externalSymbolIds: marklessSsrComposition.externalSymbolIds };',
+			`	return { html, state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots), view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) }, elementCount: marklessSsrComposition.elementCount, propEvents: [], externalSymbolIds: marklessSsrComposition.externalSymbolIds${remapsGraphProps ? ', m(graphProps) { marklessSsrRemapGraphOutput(this, graphProps); }' : ''} };`,
 			'}',
 		].filter((line): line is string => line !== null);
 	});

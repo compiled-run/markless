@@ -12,8 +12,10 @@ import {
 	destructureProps,
 	emitComponentImport,
 	emitValueImport,
+	hasPropDependentComputed,
 	isFragmentNode,
 	publicRenderValueImports,
+	sameModuleGraphProps,
 	stateEntries,
 	staticHostLocators,
 	moduleScopeLines,
@@ -93,6 +95,9 @@ export function emitPublicCsrRenderModule(
 		armHostIdByNode: inArmHostIdByNode(input, rootInfo),
 	};
 	const propEvents = collectCsrPropEvents(rootInfo.root, rootInfo.propNames, input.source.source);
+	const remapsGraphProps = hasPropDependentComputed(input);
+	const internalGraphProps = sameModuleGraphProps(input);
+	const remapsInternalGraphProps = remapsGraphProps && internalGraphProps.length > 0;
 	const propCellId = componentPropCellId(rootInfo.component);
 	const hostLocators = staticHostLocators(input);
 	const sameModuleComponents = emitSameModuleCsrComponents(
@@ -135,13 +140,20 @@ export function emitPublicCsrRenderModule(
 		),
 		'	const marklessCsrView = marklessCsrComposeView(root, payloadView, marklessCsrHostLocators, marklessCsrChildren);',
 		'	const marklessCsrState = marklessComposeState(marklessCsrPayloadState, marklessCsrChildren);',
-		'	return {',
+		remapsInternalGraphProps ? '	const marklessCsrOutput = {' : '	return {',
 		'		root,',
 		'		state: marklessCsrState,',
 		'		view: marklessCsrView,',
 		'		loadSymbol: marklessCsrLoadSymbol,',
+		...(remapsGraphProps
+			? ['		m(graphProps) { marklessCsrRemapGraphOutput(this, graphProps); },']
+			: []),
 		'		connectRuntime(context) { marklessCsrRuntimeState.graph = context.graph; for (const child of marklessCsrChildren) child.output?.connectRuntime?.(context); },',
 		'	};',
+		remapsInternalGraphProps
+			? `	marklessCsrRemapGraphOutput(marklessCsrOutput, ${JSON.stringify(internalGraphProps)});`
+			: null,
+		remapsInternalGraphProps ? '	return marklessCsrOutput;' : null,
 		'	function marklessCsrCallback(symbolId) {',
 		'		return async function marklessCsrCallbackHandler(event) {',
 		'			const graph = marklessCsrRuntimeState.graph;',
@@ -185,6 +197,7 @@ export function emitPublicCsrRenderModule(
 					'marklessCsrReplaceChild',
 					'marklessCsrAttachPropEvent',
 					'marklessComposeState',
+					'marklessCsrRemapGraphOutput',
 					'marklessViewWithoutAnchors',
 					'marklessCsrComposeView',
 					'marklessCsrIsThenable',

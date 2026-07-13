@@ -1,3 +1,17 @@
+import {
+	marklessAssertComposableStateNames,
+	marklessComposeState,
+	marklessCsrRemapChildGraph,
+	marklessCsrRemapGraphOutput,
+} from './csr.ts';
+
+export {
+	marklessAssertComposableStateNames,
+	marklessComposeState,
+};
+export const marklessSsrRemapChildGraph = marklessCsrRemapChildGraph;
+export const marklessSsrRemapGraphOutput = marklessCsrRemapGraphOutput;
+
 export async function marklessSsrRenderChild(children, component, props, child, renderContext) {
 	const output = await component?.renderSsr?.(props, renderContext);
 	if (!output) return '';
@@ -167,77 +181,6 @@ export function marklessSsrCallbackSymbol(props, path) {
 	let value = props?.__marklessSsrCallbacks;
 	for (const key of path) value = value?.[key];
 	return typeof value === 'string' ? value : undefined;
-}
-export function marklessComposeState(state, children) {
-	const childStates = children.map((child) => child.output?.state).filter(Boolean);
-	if (childStates.length === 0) return state;
-	marklessAssertComposableStateNames(state, childStates);
-	return {
-		...state,
-		cells: [
-			...(state.cells ?? []),
-			...childStates.flatMap((childState) => childState.cells ?? []),
-		],
-		computed: [
-			...(state.computed ?? []),
-			...children.flatMap((child) =>
-				(child.output?.state?.computed ?? []).map((computed) => ({
-					...computed,
-					...(computed.deriveSymbolId
-						? { deriveSymbolId: child.symbolPrefix + computed.deriveSymbolId }
-						: {}),
-				})),
-			),
-		],
-		...(state.sharedDefinitions ||
-		childStates.some((childState) => childState.sharedDefinitions?.length)
-			? {
-					sharedDefinitions: [
-						...(state.sharedDefinitions ?? []),
-						...childStates.flatMap((childState) => childState.sharedDefinitions ?? []),
-					],
-				}
-			: {}),
-	};
-}
-// Graph node ids are NAME-based per module and compose merges child state
-// into ONE page graph unprefixed: same-named state()/computed() in a page
-// and a composed component would silently share one value (and one streaming
-// runner). Refuse loudly (D2) until graph ids are instance-scoped; shared
-// definitions keep their cross-module ids on purpose.
-export function marklessAssertComposableStateNames(state, childStates) {
-	const seen = new Set(
-		[...(state.cells ?? []), ...(state.computed ?? [])].map((node) => node.graphNodeId),
-	);
-	for (const childState of childStates) {
-		for (const node of [...(childState.cells ?? []), ...(childState.computed ?? [])]) {
-			const id = node.graphNodeId;
-			// Only author-renamable state()/computed() names are diagnosable.
-			// Shared definitions and props compose by design; compiler-synthesized
-			// names (computed:templateExpression:0) carry extra ':' segments and
-			// repeat in ~every module — their sharing is the ledgered
-			// instance-scoped-graph-ids follow-on, not an author collision.
-			if (
-				id.startsWith('shared:') ||
-				id.startsWith('prop:') ||
-				id.slice(id.indexOf(':') + 1).includes(':')
-			)
-				continue;
-			if (seen.has(id)) {
-				throw Object.assign(
-					new Error(
-						`MARKLESS_COMPOSED_STATE_COLLISION: Two components on this page both declare state() or computed() named "${id.slice(id.indexOf(':') + 1)}". Composed components share one state graph, so they would read and write the same value. Rename one of them.`,
-					),
-					{
-						code: 'MARKLESS_COMPOSED_STATE_COLLISION',
-						graphNodeId: id,
-						docsUrl: 'https://markless.dev/errors/MARKLESS_COMPOSED_STATE_COLLISION',
-					},
-				);
-			}
-			seen.add(id);
-		}
-	}
 }
 export function marklessViewWithoutAnchors(view) {
 	return { ...view, branches: [], asyncBoundaries: [] };
@@ -585,23 +528,6 @@ export function marklessSsrPrefixBoundaryArmRecords(set, child) {
 				}
 			: {}),
 	};
-}
-export function marklessSsrRemapChildGraph(record, graphProps) {
-	if (record.graphNodeId === 'prop:props') {
-		const propName = record.path[0];
-		const binding = graphProps.find((prop) => prop.name === propName);
-		return binding
-			? { graphNodeId: binding.graphNodeId, path: [...binding.path, ...record.path.slice(1)] }
-			: null;
-	}
-	if (record.graphNodeId.startsWith?.('prop:')) {
-		const propName = record.graphNodeId.slice(5);
-		const binding = graphProps.find((prop) => prop.name === propName);
-		return binding
-			? { graphNodeId: binding.graphNodeId, path: [...binding.path, ...record.path] }
-			: null;
-	}
-	return { graphNodeId: record.graphNodeId, path: record.path };
 }
 export function marklessSsrPrefixAnchorHtml(html, kind, id, prefixedId) {
 	return html

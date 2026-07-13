@@ -140,8 +140,12 @@ function marklessCsrDebugEvent(root, element, eventName) {
 }
 export function marklessComposeState(state, children) {
 	const childStates = children.map((child) => child.output?.state).filter(Boolean);
-	if (childStates.length === 0) return state;
+	if (!childStates.length) return state;
 	marklessAssertComposableStateNames(state, childStates);
+	const sharedDefinitions = [
+		...(state.sharedDefinitions ?? []),
+		...childStates.flatMap((childState) => childState.sharedDefinitions ?? []),
+	];
 	return {
 		...state,
 		cells: [
@@ -151,24 +155,52 @@ export function marklessComposeState(state, children) {
 		computed: [
 			...(state.computed ?? []),
 			...children.flatMap((child) =>
-				(child.output?.state?.computed ?? []).map((computed) => ({
-					...computed,
-					...(computed.deriveSymbolId
-						? { deriveSymbolId: child.symbolPrefix + computed.deriveSymbolId }
-						: {}),
-				})),
+				(
+					// Private compiled-output hook (`m` = map graph props). Its compact
+					// key keeps the shipped size wall while the exported helper stays clear.
+					child.output?.m?.(child.graphProps),
+					(child.output?.state?.computed ?? []).map((computed) => ({
+						...computed,
+						...(computed.deriveSymbolId
+							? { deriveSymbolId: child.symbolPrefix + computed.deriveSymbolId }
+							: {}),
+					}))
+				),
 			),
 		],
-		...(state.sharedDefinitions ||
-		childStates.some((childState) => childState.sharedDefinitions?.length)
-			? {
-					sharedDefinitions: [
-						...(state.sharedDefinitions ?? []),
-						...childStates.flatMap((childState) => childState.sharedDefinitions ?? []),
-					],
-				}
-			: {}),
+		...(sharedDefinitions.length ? { sharedDefinitions } : {}),
 	};
+}
+export function marklessCsrRemapGraphOutput(output, graphProps) {
+	output.state.computed = output.state.computed.map((computed) => ({
+		...computed,
+		...(computed.dependencies && {
+			dependencies: computed.dependencies.map(
+				(dependency) => marklessCsrRemapChildGraph(dependency, graphProps) ?? dependency,
+			),
+		}),
+	}));
+	const loadSymbol = output.loadSymbol;
+	if (!loadSymbol || !graphProps?.length) return;
+	output.loadSymbol = (symbolId) =>
+		Promise.resolve(loadSymbol(symbolId)).then((symbol) => (context) =>
+			symbol({
+				...context,
+				graph: {
+					...context.graph,
+					read(graphNodeId, path = []) {
+						const mapped = marklessCsrRemapChildGraph(
+							{ graphNodeId, path },
+							graphProps,
+						);
+						return context.graph.read(
+							mapped?.graphNodeId ?? graphNodeId,
+							mapped?.path ?? path,
+						);
+					},
+				},
+			}),
+		);
 }
 // Graph node ids are NAME-based per module and compose merges child state
 // into ONE page graph unprefixed: same-named state()/computed() in a page
@@ -570,21 +602,17 @@ function marklessCsrTagMatches(element, tagName) {
 	return tagName === '*' || element?.tagName?.toLowerCase?.() === String(tagName).toLowerCase();
 }
 export function marklessCsrRemapChildGraph(record, graphProps) {
-	if (record.graphNodeId === 'prop:props') {
-		const propName = record.path[0];
-		const binding = graphProps.find((prop) => prop.name === propName);
-		return binding
-			? { graphNodeId: binding.graphNodeId, path: [...binding.path, ...record.path.slice(1)] }
-			: null;
-	}
-	if (record.graphNodeId.startsWith?.('prop:')) {
-		const propName = record.graphNodeId.slice(5);
-		const binding = graphProps.find((prop) => prop.name === propName);
-		return binding
-			? { graphNodeId: binding.graphNodeId, path: [...binding.path, ...record.path] }
-			: null;
-	}
-	return { graphNodeId: record.graphNodeId, path: record.path };
+	const whole = record.graphNodeId === 'prop:props';
+	if (!whole && !record.graphNodeId.startsWith('prop:')) return record;
+	const binding = graphProps.find(
+		(prop) => prop.name === (whole ? record.path[0] : record.graphNodeId.slice(5)),
+	);
+	return binding
+		? {
+				graphNodeId: binding.graphNodeId,
+				path: [...binding.path, ...record.path.slice(+whole)],
+			}
+		: null;
 }
 export function marklessCsrRemapChildReads(reads, graphProps, recordId) {
 	return (reads ?? []).map((read) => {

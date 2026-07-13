@@ -1,13 +1,25 @@
 import { createProtocolStatePayload, type ProtocolStatePayload } from '@markless/serializer';
 import { expect, test } from 'vitest';
-import { marklessComposeState as composeCsrState } from '../src/fns/csr.ts';
-import { marklessComposeState as composeSsrState } from '../src/fns/ssr.ts';
+import {
+	marklessComposeState as composeCsrState,
+	marklessCsrRemapGraphOutput,
+} from '../src/fns/csr.ts';
+import {
+	marklessComposeState as composeSsrState,
+} from '../src/fns/ssr.ts';
 import { render } from '../src/render.ts';
 
 type ComposedChild = {
 	readonly symbolPrefix: string;
+	readonly graphProps: ReadonlyArray<{
+		readonly name: string;
+		readonly graphNodeId: string;
+		readonly path: ReadonlyArray<string>;
+	}>;
 	readonly output: {
-		readonly state: ProtocolStatePayload;
+		state: ProtocolStatePayload;
+		loadSymbol?: (symbolId: string) => (context: never) => unknown;
+		m?: (graphProps: ComposedChild['graphProps']) => void;
 	};
 };
 
@@ -54,8 +66,44 @@ function computedState(input: {
 	} as ProtocolStatePayload;
 }
 
-function child(state: ProtocolStatePayload, symbolPrefix: string): ComposedChild {
-	return { symbolPrefix, output: { state } };
+function propComputedState(input: {
+	readonly propName: string;
+	readonly computedId: string;
+	readonly deriveSymbolId: string;
+	readonly initialValue?: number;
+}): ProtocolStatePayload {
+	return {
+		...createProtocolStatePayload({
+			cells: [
+				{
+					graphNodeId: 'prop:props',
+					name: 'props',
+					valueKind: 'object',
+					value: { [input.propName]: input.initialValue ?? 0 },
+				},
+			],
+		}),
+		computed: [
+			{
+				graphNodeId: input.computedId,
+				name: input.computedId.slice(input.computedId.indexOf(':') + 1),
+				async: false,
+				deriveSymbolId: input.deriveSymbolId,
+				dependencies: [{ graphNodeId: 'prop:props', path: [input.propName] }],
+			},
+		],
+	} as ProtocolStatePayload;
+}
+
+function child(
+	state: ProtocolStatePayload,
+	symbolPrefix: string,
+	graphProps: ComposedChild['graphProps'] = [],
+	loadSymbol?: ComposedChild['output']['loadSymbol'],
+): ComposedChild {
+	const output: ComposedChild['output'] = { state, loadSymbol };
+	output.m = (props) => marklessCsrRemapGraphOutput(output, props);
+	return { symbolPrefix, graphProps, output };
 }
 
 async function mountAndWrite(input: {
@@ -118,6 +166,212 @@ test('composed CSR sync computed resolves its derive symbol through the child-pr
 	expect(rootLoaderCalls).toEqual(['c0:symbol:21']);
 	expect(childLoaderCalls).toEqual(['symbol:21']);
 	expect(container.graph.read('computed:childOutput')).toBe(8);
+});
+
+test('compiled same-module CSR re-derives a child computed fed by a parent computed prop', async () => {
+	const parentState = computedState({
+		cellId: 'state:owner',
+		computedId: 'computed:parentValue',
+		deriveSymbolId: 'symbol:parent',
+		initialValue: 0,
+	});
+	const childState = propComputedState({
+		propName: 'input',
+		computedId: 'computed:childValue',
+		deriveSymbolId: 'symbol:child',
+	});
+	const state = {
+		...parentState,
+		cells: [...parentState.cells, ...childState.cells],
+		computed: [...parentState.computed, ...childState.computed],
+	} as ProtocolStatePayload;
+	const evaluations = { parent: 1, child: 1 };
+	const loadedSymbols: string[] = [];
+	const compiledOutput = {
+		state,
+		loadSymbol(symbolId: string) {
+			loadedSymbols.push(symbolId);
+			if (symbolId === 'symbol:parent') {
+				return ({ graph }) => {
+					evaluations.parent++;
+					return Number(graph.read('state:owner'));
+				};
+			}
+			if (symbolId === 'symbol:child') {
+				return ({ graph }) => {
+					evaluations.child++;
+					return Number(graph.read('prop:props', ['input']));
+				};
+			}
+			if (symbolId === 'symbol:text') {
+				return (context) => ({
+					type: 'setText' as const,
+					locator: context.domUpdate.hostNodeId,
+					value: context.value,
+				});
+			}
+			throw new Error(`Unknown symbol ${symbolId}`);
+		},
+	};
+	marklessCsrRemapGraphOutput(compiledOutput, [
+		{ name: 'input', graphNodeId: 'computed:parentValue', path: [] },
+	]);
+	const output = {
+		nodeType: 1 as const,
+		tagName: 'OUTPUT',
+		childNodes: [],
+		textContent: '0',
+		addEventListener() {},
+	};
+	const view = {
+		...emptyView,
+		locators: [{ hostNodeId: 'child-output', strategy: 'dom-order', index: 0, tagName: 'output' }],
+		domUpdates: [
+			{
+				hostNodeId: 'child-output',
+				source: 'childValue',
+				graphNodeId: 'computed:childValue',
+				path: [],
+				target: { kind: 'text' },
+				symbolId: 'symbol:text',
+			},
+		],
+	} as const;
+	const container = await render(
+		() => ({
+			root: output as never,
+			state: compiledOutput.state,
+			view: view as never,
+			loadSymbol: compiledOutput.loadSymbol as never,
+		}),
+		{ target: { replaceChildren() {} } },
+	);
+
+	expect(evaluations).toEqual({ parent: 1, child: 1 });
+	expect(loadedSymbols).toEqual([]);
+	container.graph.write({ graphNodeId: 'state:owner', value: 1 });
+	await container.graph.flush();
+
+	expect(evaluations).toEqual({ parent: 2, child: 2 });
+	expect(container.graph.read('computed:childValue')).toBe(1);
+	expect(output.textContent).toBe('1');
+	expect(loadedSymbols).toEqual(['symbol:parent', 'symbol:child', 'symbol:text']);
+});
+
+test('composed CSR re-derives a child computed fed directly by parent state', async () => {
+	const childEvaluations = { count: 1 };
+	const childRecord = child(
+		propComputedState({
+			propName: 'amount',
+			computedId: 'computed:stateChildValue',
+			deriveSymbolId: 'symbol:state-child',
+		}),
+		'c0:',
+		[{ name: 'amount', graphNodeId: 'state:source', path: [] }],
+		((symbolId: string) => {
+			if (symbolId !== 'symbol:state-child') throw new Error(`Unknown child symbol ${symbolId}`);
+			return ({ graph }) => {
+				childEvaluations.count++;
+				return Number(graph.read('prop:props', ['amount']));
+			};
+		}) as never,
+	);
+	const state = composeCsrState(
+		createProtocolStatePayload({
+			cells: [
+				{ graphNodeId: 'state:source', name: 'source', valueKind: 'scalar', value: 0 },
+			],
+		}),
+		[childRecord],
+	);
+	const container = await mountAndWrite({
+		state,
+		cellId: 'state:source',
+		value: 4,
+		loadSymbol(symbolId) {
+			if (!symbolId.startsWith('c0:')) throw new Error(`Unknown root symbol ${symbolId}`);
+			return childRecord.output.loadSymbol!(symbolId.slice(3)) as never;
+		},
+	});
+
+	expect(childEvaluations.count).toBe(2);
+	expect(container.graph.read('computed:stateChildValue')).toBe(4);
+});
+
+test('nested composed CSR propagates a parent computed prop through a two-hop computed chain', async () => {
+	const evaluations = { parent: 1, child: 1, grandchild: 1 };
+	const grandchildRecord = child(
+		propComputedState({
+			propName: 'leafInput',
+			computedId: 'computed:grandchildValue',
+			deriveSymbolId: 'symbol:grandchild',
+		}),
+		'c1:',
+		[{ name: 'leafInput', graphNodeId: 'computed:childValue', path: [] }],
+		((symbolId: string) => {
+			if (symbolId !== 'symbol:grandchild') {
+				throw new Error(`Unknown grandchild symbol ${symbolId}`);
+			}
+			return ({ graph }) => {
+				evaluations.grandchild++;
+				return Number(graph.read('prop:props', ['leafInput'])) + 1;
+			};
+		}) as never,
+	);
+	const middleState = composeCsrState(
+		propComputedState({
+			propName: 'childInput',
+			computedId: 'computed:childValue',
+			deriveSymbolId: 'symbol:child',
+		}),
+		[grandchildRecord],
+	);
+	const middleRecord = child(
+		middleState,
+		'c0:',
+		[{ name: 'childInput', graphNodeId: 'computed:parentValue', path: [] }],
+		((symbolId: string) => {
+			if (symbolId === 'symbol:child') {
+				return ({ graph }) => {
+					evaluations.child++;
+					return Number(graph.read('prop:props', ['childInput'])) + 1;
+				};
+			}
+			if (symbolId.startsWith('c1:')) {
+				return grandchildRecord.output.loadSymbol!(symbolId.slice(3)) as never;
+			}
+			throw new Error(`Unknown middle symbol ${symbolId}`);
+		}) as never,
+	);
+	const state = composeCsrState(
+		computedState({
+			cellId: 'state:owner',
+			computedId: 'computed:parentValue',
+			deriveSymbolId: 'symbol:parent',
+			initialValue: 0,
+		}),
+		[middleRecord],
+	);
+	const container = await mountAndWrite({
+		state,
+		cellId: 'state:owner',
+		value: 1,
+		loadSymbol(symbolId) {
+			if (symbolId === 'symbol:parent') {
+				return ({ graph }) => {
+					evaluations.parent++;
+					return Number(graph.read('state:owner'));
+				};
+			}
+			if (symbolId.startsWith('c0:')) {
+				return middleRecord.output.loadSymbol!(symbolId.slice(3)) as never;
+			}
+			throw new Error(`Unknown root symbol ${symbolId}`);
+		},
+	});
+
+	expect(evaluations).toEqual({ parent: 2, child: 2, grandchild: 2 });
+	expect(container.graph.read('computed:grandchildValue')).toBe(3);
 });
 
 test('nested composed CSR sync computed accumulates each child route prefix exactly once', async () => {

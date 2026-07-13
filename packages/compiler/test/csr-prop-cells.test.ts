@@ -70,3 +70,56 @@ test('pages without props emit no prop cell seeding', async () => {
 		'marklessCsrPayloadState.cells.push',
 	);
 });
+
+test('prop-dependent computeds emit the composed graph remap hook in CSR and SSR', async () => {
+	const result = await compileTsrxModule({
+		filename: 'pages/computed-prop-chain.tsrx',
+		source: `import { computed, state } from '@markless/core';
+
+function Child({ input }) @{
+	const childValue = computed(() => input + 1);
+	<output>{childValue}</output>
+}
+
+export default function Page() @{
+	let owner = state(0);
+	const parentValue = computed(() => owner);
+	<main><Child input={parentValue} /></main>
+}`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderModule.csrModuleSource).toContain(
+		'm(graphProps) { marklessCsrRemapGraphOutput(this, graphProps); }',
+	);
+	expect(result.publicRenderModule.csrModuleSource).toContain(
+		'marklessCsrRemapGraphOutput(marklessCsrOutput, [{"name":"input","graphNodeId":"computed:parentValue","path":[]}]);',
+	);
+	expect(result.publicRenderModule.ssrModuleSource).toContain(
+		'm(graphProps) { marklessSsrRemapGraphOutput(this, graphProps); }',
+	);
+	expect(result.publicRenderModule.ssrModuleSource).toContain(
+		'marklessSsrRemapGraphOutput(marklessSsrOutput, [{"name":"input","graphNodeId":"computed:parentValue","path":[]}]);',
+	);
+});
+
+test('components without prop-dependent computeds do not import the graph remapper', async () => {
+	const result = await compileTsrxModule({
+		filename: 'pages/presentational-child.tsrx',
+		source: `function Child({ input }) @{
+	<output>{input}</output>
+}
+
+export default function Page({ input }) @{
+	<main><Child input={input} /></main>
+}`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderModule.csrModuleSource).not.toContain(
+		'marklessCsrRemapGraphOutput',
+	);
+	expect(result.publicRenderModule.ssrModuleSource).not.toContain(
+		'marklessSsrRemapGraphOutput',
+	);
+});

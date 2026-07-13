@@ -65,6 +65,24 @@ export function componentPropCellId(component: AnyNode): string | null {
 	return param.type === 'ObjectPattern' ? 'prop:props' : null;
 }
 
+export function hasPropDependentComputed(input: PublicRenderModuleInput): boolean {
+	return input.protocolState.computed.some((computed) =>
+		computed.dependencies?.some((dependency) => dependency.graphNodeId.startsWith('prop:')),
+	);
+}
+
+export function sameModuleGraphProps(input: PublicRenderModuleInput) {
+	return input.semanticGraph.componentEdges
+		.filter((edge) => !edge.importSource)
+		.flatMap((edge) =>
+			edge.props.flatMap((prop) =>
+				prop.kind === 'graph-reference'
+					? [{ name: prop.name, graphNodeId: prop.graphNodeId, path: prop.path }]
+					: [],
+			),
+		);
+}
+
 export function staticHostLocators(input: PublicRenderModuleInput) {
 	return input.publicRenderPlan.staticHostLocators.map((locator) => ({
 		hostNodeId: locator.hostNodeId,
