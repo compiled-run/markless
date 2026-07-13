@@ -9,6 +9,8 @@ import { assertResult, writeBaseline, writeResult } from './lib/results.mjs';
 import { runSsrThroughput } from './lanes/ssr-throughput/run.mjs';
 import { runStreamingSsr } from './lanes/streaming-ssr/run.mjs';
 import { runNews } from './lanes/news/run.mjs';
+import { checkGeneratedFixture } from './lanes/signal-favoring/gen.mjs';
+import { runSignalFavoring } from './lanes/signal-favoring/run.mjs';
 
 process.env.NODE_ENV = 'production';
 
@@ -20,39 +22,49 @@ const laneDefinitions = {
 	'ssr-throughput': { run: runSsrThroughput, protocol: ssrThroughputProtocol },
 	'streaming-ssr': { run: runStreamingSsr, protocol: streamingSsrProtocol },
 	news: { run: runNews, protocol: newsProtocol },
+	'signal-favoring': { run: runSignalFavoring, protocol: signalFavoringProtocol },
 };
 const laneDefinition = laneDefinitions[lane];
 
 if (!laneDefinition) {
 	console.error(
-		'usage: node bench.mjs <ssr-throughput|streaming-ssr|news> [--smoke] [--record] [--build-only] [--ssr-only]',
+		'usage: node bench.mjs <ssr-throughput|streaming-ssr|news|signal-favoring> [--smoke] [--record] [--build-only] [--ssr-only] [--gen-check]',
 	);
 	process.exit(2);
+}
+
+if (lane === 'signal-favoring' && flags.has('--gen-check')) {
+	const summary = checkGeneratedFixture();
+	console.log(`signal-favoring generator check passed: ${summary.levels} levels, ${summary.owners.length} owners`);
+	process.exit(0);
 }
 
 const fixtureRoot = path.join(root, 'lanes', lane, 'fixture');
 await buildFixture(fixtureRoot);
 if (flags.has('--build-only')) {
-	console.log(`built ${lane} production SSR fixture`);
+	console.log(`built ${lane} production fixture`);
 	process.exit(0);
 }
 
 const smoke = flags.has('--smoke');
 const protocol = laneDefinition.protocol(smoke);
 const environment = collectEnvironment();
-const entryPath = path.join(
-	fixtureRoot,
-	'dist',
-	...(lane === 'news' ? ['server', 'entry-server.js'] : ['entry-server.js']),
-);
-const fixture = await import(`${pathToFileURL(entryPath).href}?built=${Date.now()}`);
+let fixture;
+if (lane !== 'signal-favoring') {
+	const entryPath = path.join(
+		fixtureRoot,
+		'dist',
+		...(lane === 'news' ? ['server', 'entry-server.js'] : ['entry-server.js']),
+	);
+	fixture = await import(`${pathToFileURL(entryPath).href}?built=${Date.now()}`);
+}
 const outcome = await laneDefinition.run({
-	fixture,
+	...(fixture ? { fixture } : {}),
 	protocol,
 	environment,
 	ssrOnly: flags.has('--ssr-only'),
-	clientDirectory: path.join(fixtureRoot, 'dist', 'client'),
-	receiptPath: path.join(root, 'dist', 'results', 'news-analyzer-verdict.json'),
+	clientDirectory: path.join(fixtureRoot, 'dist', ...(lane === 'signal-favoring' ? [] : ['client'])),
+	receiptPath: path.join(root, 'dist', 'results', `${lane}-analyzer-verdict.json`),
 });
 assertResult(outcome.result);
 
@@ -75,6 +87,11 @@ if (flags.has('--record')) {
 process.exitCode = outcome.exitCode;
 
 async function buildFixture(fixtureDirectory) {
+	if (lane === 'signal-favoring') {
+		console.error('building signal-favoring production client fixture…');
+		execFileSync('pnpm', ['exec', 'vp', 'build'], { cwd: fixtureDirectory, stdio: 'inherit' });
+		return;
+	}
 	if (lane === 'news') {
 		console.error('building news production client and SSR fixtures…');
 		const builder = await createBuilder({
@@ -137,6 +154,24 @@ function streamingSsrProtocol(smoke) {
 	};
 }
 
+function signalFavoringProtocol(smoke) {
+	return {
+		mode: smoke ? 'smoke' : 'full',
+		timedSeconds: 0,
+		warmupMinimumRenders: 5,
+		warmupSeconds: 0,
+		maxSamples: smoke ? 1 : 20,
+		memoryMaxRenders: 0,
+		forcedGc: false,
+		browserForcedGc: true,
+		operationWarmups: 5,
+		operationSamples: smoke ? 1 : 20,
+		writeRepetitions: 50,
+		sweepRepetitions: 25,
+		sampleYieldMs: 5,
+	};
+}
+
 function collectEnvironment() {
 	return {
 		os: `${os.platform()} ${os.release()}`,
@@ -170,6 +205,15 @@ function printSummary(result, resultPath) {
 			console.log(`preloaded client: ${benchmarkCase.metrics.preloaded_client_bytes} bytes`);
 			console.log(`startup executed: ${benchmarkCase.metrics.startup_executed_bytes ?? 'unavailable'} bytes`);
 		}
+	} else if (result.lane === 'signal-favoring') {
+		console.log('operation                 p50 ms    p95 ms   computeds   DOM nodes   batches');
+		for (const benchmarkCase of result.cases) {
+			const evidence = benchmarkCase.metrics.counterEvidence.actual;
+			console.log(
+				`${benchmarkCase.name.padEnd(25)} ${benchmarkCase.timing.p50Ms.toFixed(3).padStart(8)} ${benchmarkCase.timing.p95Ms.toFixed(3).padStart(9)} ${String(evidence.recomputations).padStart(11)} ${String(evidence.domMutations).padStart(11)} ${String(evidence.mutationBatches).padStart(9)}`,
+			);
+		}
+		console.log('browser GC is requested before timed samples; timed propagation windows allow zero requests');
 	} else if (result.lane === 'streaming-ssr') {
 		console.log('scenario       shell p50 ms   total p50 ms   chunks   total bytes   renders/sec');
 		for (const benchmarkCase of result.cases) {

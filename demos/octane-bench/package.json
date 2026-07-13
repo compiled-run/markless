@@ -5,7 +5,7 @@
 	"type": "module",
 	"scripts": {
 		"check": "vp check",
-		"build": "node bench.mjs news --build-only",
+		"build": "node bench.mjs news --build-only && node bench.mjs signal-favoring --build-only",
 		"bench": "node bench.mjs",
 		"test": "node --test lanes/*/run.test.mjs"
 	},
