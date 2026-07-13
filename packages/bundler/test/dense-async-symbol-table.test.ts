@@ -2,12 +2,12 @@ import { resolve } from 'pathe';
 import { describe, expect, test } from 'vitest';
 import { build as viteBuild, type Plugin } from 'vite';
 import { rewriteGeneratedSymbolFacadeImports } from '../src/build/symbol-facade-cleanup.ts';
-import { rewriteGeneratedSymbolTableUrls } from '../src/build/symbol-table.ts';
-import { marklessClient, transformTsrxModule } from '../src/rolldown.ts';
 import {
-	denseAsyncSource,
-	type DenseAsyncShape,
-} from './fixtures/dense-async.ts';
+	rewriteGeneratedSymbolTableUrls,
+	verifyGeneratedSymbolTableRoutes,
+} from '../src/build/symbol-table.ts';
+import { marklessClient, transformTsrxModule } from '../src/rolldown.ts';
+import { denseAsyncSource, type DenseAsyncShape } from './fixtures/dense-async.ts';
 
 const root = resolve(import.meta.dirname, '..');
 const symbolPrefix = 'virtual:markless:symbol:';
@@ -30,13 +30,15 @@ describe('dense async generated symbol tables', () => {
 			expect(
 				result.manifestSymbolIds.map((id) => symbolFiles.get(id)),
 				result.bundleShape,
-			).toEqual(
-				result.manifestSymbolIds.map(() => expect.stringMatching(/\.js$/)),
-			);
+			).toEqual(result.manifestSymbolIds.map(() => expect.stringMatching(/\.js$/)));
 			expect(result.tableRewrite.unresolved, result.bundleShape).toEqual([]);
 			expect(result.tableRewrite.rewritten, result.bundleShape).toBe(
 				result.manifestSymbolIds.length,
 			);
+			expect(
+				verifyGeneratedSymbolTableRoutes(result.bundle, [result.manifest]),
+				result.bundleShape,
+			).toEqual({ verified: result.manifestSymbolIds.length, errors: [] });
 		},
 	);
 
@@ -67,11 +69,45 @@ describe('dense async generated symbol tables', () => {
 			unresolved: [missingId],
 		});
 	});
+
+	test('rejects a resolver row that terminates in another symbol chunk', async () => {
+		const result = await buildDenseAsyncShape({ computeds: 8, boundaries: 8 });
+		const bundle = cloneBundle(result.bundle);
+		const resolver = generatedChunks(bundle).find((chunk) =>
+			chunk.moduleIds
+				.map(normalizeVirtualId)
+				.includes(result.manifest.resolver.virtualModuleId),
+		);
+		if (!resolver) throw new Error('dense async build emitted no resolver chunk');
+
+		const tableStart = resolver.code.indexOf('[1,');
+		expect(tableStart).toBeGreaterThan(-1);
+		const tableSource = resolver.code.slice(tableStart);
+		const routeSpecifiers = [...tableSource.matchAll(/(["'`])(\.\/[^"'`]+\.js)\1/g)].map(
+			(match) => match[2]!,
+		);
+		expect(routeSpecifiers.length).toBeGreaterThan(1);
+		resolver.code =
+			resolver.code.slice(0, tableStart) +
+			tableSource.replace(routeSpecifiers[0]!, routeSpecifiers[1]!);
+
+		expect(verifyGeneratedSymbolTableRoutes(bundle, [result.manifest])).toEqual({
+			verified: result.manifestSymbolIds.length - 1,
+			errors: [
+				{
+					symbolId: 'symbol:0',
+					claimedChunk: expect.stringMatching(/\.js$/),
+					reason: expect.stringContaining('does not contain its generated symbol module'),
+				},
+			],
+		});
+	});
 });
 
 type DenseAsyncBuild = {
 	readonly bundle: Record<string, unknown>;
 	readonly bundleShape: string;
+	readonly manifest: Awaited<ReturnType<typeof transformTsrxModule>>['manifest'];
 	readonly manifestSymbolIds: readonly string[];
 	readonly rawBundle: Record<string, unknown>;
 	readonly resolverCode: string;
@@ -156,7 +192,15 @@ async function captureDenseAsyncBuild(shape: DenseAsyncShape): Promise<DenseAsyn
 	)?.code;
 	if (!resolverCode) throw new Error(`dense async ${name} build emitted no symbol resolver`);
 
-	return { bundle, bundleShape, manifestSymbolIds, rawBundle, resolverCode, tableRewrite };
+	return {
+		bundle,
+		bundleShape,
+		manifest: transformed.manifest,
+		manifestSymbolIds,
+		rawBundle,
+		resolverCode,
+		tableRewrite,
+	};
 }
 
 type CapturedChunk = {

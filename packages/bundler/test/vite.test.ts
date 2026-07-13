@@ -1,4 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
+import { transformTsrxModule } from '../src/rolldown.ts';
 import { markless } from '../src/vite/index.ts';
 import {
 	callBuildApp,
@@ -61,9 +62,12 @@ describe('Vite adapter structure', () => {
 
 	test('applies the Vite base to head links injected into built HTML', async () => {
 		const plugin = getAsyncPlugin();
-		const encoded = encodeURIComponent('/workspace/app/src/App.tsrx');
-		const symbolId = (name: string) =>
-			`\0virtual:markless:symbol:${encoded}:${encodeURIComponent(name)}`;
+		const filename = '/workspace/app/src/App.tsrx';
+		const transformed = await transformTsrxModule({
+			filename,
+			source,
+			environment: 'client',
+		});
 		const html = { type: 'asset', fileName: 'index.html', source: '<head></head>' };
 
 		callConfigResolved(plugin, {
@@ -71,29 +75,42 @@ describe('Vite adapter structure', () => {
 			command: 'build',
 			root: '/workspace/app',
 		});
-		await callTransform(
+		const sourceChunk = (await callTransform(
 			plugin,
 			source,
-			'/workspace/app/src/App.tsrx',
+			filename,
 			createViteHookContext('client'),
-		);
+		)) as { code: string };
 		await callGenerateBundle(
 			plugin,
 			{
 				'index.html': html,
+				'build/app.js': {
+					type: 'chunk',
+					fileName: 'build/app.js',
+					name: 'app',
+					code: sourceChunk.code,
+					exports: [],
+					imports: [],
+					dynamicImports: transformed.manifest.symbols.map(
+						(_, index) => `build/chunk-${index}.js`,
+					),
+					moduleIds: [filename],
+					facadeModuleId: filename,
+				},
 				...Object.fromEntries(
-					['symbol:0', 'symbol:1'].map((name, index) => [
+					transformed.manifest.symbols.map((symbol, index) => [
 						`build/chunk-${index}.js`,
 						{
 							type: 'chunk',
 							fileName: `build/chunk-${index}.js`,
 							name: `chunk-${index}`,
-							code: 'export default {};',
-							exports: ['default'],
+							code: `export function ${symbol.exportName}() {}`,
+							exports: [symbol.exportName],
 							imports: [],
 							dynamicImports: [],
-							moduleIds: [symbolId(name)],
-							facadeModuleId: symbolId(name),
+							moduleIds: [`\0${symbol.virtualModuleId}`],
+							facadeModuleId: `\0${symbol.virtualModuleId}`,
 						},
 					]),
 				),

@@ -626,25 +626,51 @@ let count = state(0);
 		];
 		const resolverId = `virtual:markless:resolver:${encoded}`;
 		const resolverSource = (await callLoad(plugin, `\0${resolverId}`)) as string;
-		const symbolVirtualIds = ['symbol:0', 'symbol:1'].map(
-			(symbolId) => `virtual:markless:symbol:${encoded}:${encodeURIComponent(symbolId)}`,
+		const transformed = await transformTsrxModule({
+			filename: '/workspace/app/src/App.tsrx',
+			source,
+			environment: 'client',
+		});
+		const symbolVirtualIds = transformed.manifest.symbols.map(
+			(symbol) => symbol.virtualModuleId,
 		);
 		const virtualIds = [...entryVirtualIds, ...symbolVirtualIds].map((id) => `\0${id}`);
 		const bundle = Object.fromEntries(
-			virtualIds.map((id, index) => [
-				`build/chunk-${index}.js`,
-				{
-					type: 'chunk',
-					fileName: `build/chunk-${index}.js`,
-					name: `chunk-${index}`,
-					code: id === `\0${resolverId}` ? resolverSource : 'export default {};',
-					exports: ['default'],
-					imports: [],
-					dynamicImports: [],
-					moduleIds: [id],
-					facadeModuleId: id,
-				},
-			]),
+			virtualIds.map((id, index) => {
+				const symbol = transformed.manifest.symbols.find(
+					(entry) => `\0${entry.virtualModuleId}` === id,
+				);
+				return [
+					`build/chunk-${index}.js`,
+					{
+						type: 'chunk',
+						fileName: `build/chunk-${index}.js`,
+						name: `chunk-${index}`,
+						code:
+							id === `\0${resolverId}`
+								? resolverSource
+								: symbol
+									? `export function ${symbol.exportName}() {}`
+									: 'export default {};',
+						exports:
+							id === `\0${resolverId}`
+								? ['loadSymbol']
+								: symbol
+									? [symbol.exportName]
+									: ['default'],
+						imports: [],
+						dynamicImports:
+							id === `\0${resolverId}`
+								? symbolVirtualIds.map(
+										(_, symbolIndex) =>
+											`build/chunk-${entryVirtualIds.length + symbolIndex}.js`,
+									)
+								: [],
+						moduleIds: [id],
+						facadeModuleId: id,
+					},
+				] as const;
+			}),
 		);
 
 		await callGenerateBundle(plugin, bundle, emitFile);
@@ -699,6 +725,67 @@ let count = state(0);
 		);
 	});
 
+	test('generateBundle hard-errors when a symbol row claims another emitted chunk', async () => {
+		const plugin = marklessClient();
+		const filename = '/workspace/app/src/App.tsrx';
+		const encoded = encodeURIComponent(filename);
+		const resolverId = `virtual:markless:resolver:${encoded}`;
+		const largeSource = manyButtonSource(9);
+		const transformed = await transformTsrxModule({
+			filename,
+			source: largeSource,
+			environment: 'client',
+		});
+
+		callBuildStart(plugin, { cwd: '/workspace/app' });
+		await callTransform(plugin, largeSource, filename);
+		const resolverSource = (await callLoad(plugin, `\0${resolverId}`)) as string;
+		const [first, second] = transformed.manifest.symbols;
+		if (!first || !second) throw new Error('test source requires two compiler symbols');
+		const misroutedResolverSource = resolverSource.replace(
+			first.virtualModuleId,
+			second.virtualModuleId,
+		);
+		const symbolChunks = transformed.manifest.symbols.map((symbol, index) => {
+			const virtualId = `\0${symbol.virtualModuleId}`;
+			return [
+				`build/symbol-${index}.js`,
+				{
+					type: 'chunk',
+					fileName: `build/symbol-${index}.js`,
+					name: `symbol-${index}`,
+					code: `export function ${symbol.exportName}() {}`,
+					exports: [symbol.exportName],
+					imports: [],
+					dynamicImports: [],
+					moduleIds: [virtualId],
+					facadeModuleId: virtualId,
+				},
+			] as const;
+		});
+
+		await expect(
+			callGenerateBundle(plugin, {
+				'build/resolver.js': {
+					type: 'chunk',
+					fileName: 'build/resolver.js',
+					name: 'resolver',
+					code: misroutedResolverSource,
+					exports: ['loadSymbol', 'symbolManifest'],
+					imports: [],
+					dynamicImports: symbolChunks.map(([fileName]) => fileName),
+					moduleIds: [`\0${resolverId}`],
+					facadeModuleId: `\0${resolverId}`,
+				},
+				...Object.fromEntries(symbolChunks),
+			}),
+		).rejects.toThrow(
+			new RegExp(
+				`Markless symbol resolver table integrity check failed:[\\s\\S]*${first.symbolId} -> build/symbol-1\\.js: claimed chunk does not contain its generated symbol module`,
+			),
+		);
+	});
+
 	test('generateBundle injects every compact graph symbol preload into HTML', async () => {
 		const plugin = marklessClient();
 		const emitFile = vi.fn();
@@ -708,16 +795,19 @@ let count = state(0);
 
 		callBuildStart(plugin, { cwd: '/workspace/app' });
 		await callTransform(plugin, source, filename);
-		const symbolChunks = ['symbol:0', 'symbol:1'].map((symbolId, index) => {
-			const virtualId = `\0virtual:markless:symbol:${encoded}:${encodeURIComponent(symbolId)}`;
+		const transformed = await transformTsrxModule({ filename, source, environment: 'client' });
+		const resolverId = `virtual:markless:resolver:${encoded}`;
+		const resolverSource = (await callLoad(plugin, `\0${resolverId}`)) as string;
+		const symbolChunks = transformed.manifest.symbols.map((symbol, index) => {
+			const virtualId = `\0${symbol.virtualModuleId}`;
 			return [
 				`build/chunk-symbol-${index}.js`,
 				{
 					type: 'chunk',
 					fileName: `build/chunk-symbol-${index}.js`,
 					name: `chunk-symbol-${index}`,
-					code: 'export default {};',
-					exports: ['default'],
+					code: `export function ${symbol.exportName}() {}`,
+					exports: [symbol.exportName],
 					imports: [],
 					dynamicImports: [],
 					moduleIds: [virtualId],
@@ -730,6 +820,17 @@ let count = state(0);
 			plugin,
 			{
 				'index.html': html,
+				'build/resolver.js': {
+					type: 'chunk',
+					fileName: 'build/resolver.js',
+					name: 'resolver',
+					code: resolverSource,
+					exports: ['loadSymbol'],
+					imports: [],
+					dynamicImports: symbolChunks.map(([fileName]) => fileName),
+					moduleIds: [`\0${resolverId}`],
+					facadeModuleId: `\0${resolverId}`,
+				},
 				...Object.fromEntries(symbolChunks),
 			},
 			emitFile,
@@ -743,7 +844,11 @@ let count = state(0);
 			.map((match) => match[1]!)
 			.sort();
 
-		expect(htmlHrefs).toEqual(['/build/chunk-symbol-0.js', '/build/chunk-symbol-1.js']);
+		expect(htmlHrefs).toEqual([
+			'/build/chunk-symbol-0.js',
+			'/build/chunk-symbol-1.js',
+			'/build/resolver.js',
+		]);
 	});
 });
 

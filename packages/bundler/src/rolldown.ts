@@ -10,7 +10,10 @@ import {
 	rewriteGeneratedSymbolFacadeImports,
 	rewriteGeneratedSymbolInitExports,
 } from './build/symbol-facade-cleanup.ts';
-import { rewriteGeneratedSymbolTableUrls } from './build/symbol-table.ts';
+import {
+	rewriteGeneratedSymbolTableUrls,
+	verifyGeneratedSymbolTableRoutes,
+} from './build/symbol-table.ts';
 import { createMarklessDevGraph } from './dev.ts';
 import {
 	MARKLESS_EXECUTION_LOG_MODULE_ID,
@@ -321,6 +324,20 @@ export function createMarklessRolldownPlugin(input: {
 				if (tableRewrite.unresolved.length > 0) {
 					this.error(
 						`Markless symbol resolver table contains unresolved generated symbol chunks: ${tableRewrite.unresolved.join(', ')}`,
+					);
+				}
+				const tableIntegrity = verifyGeneratedSymbolTableRoutes(
+					manifestBundle,
+					transformManifests.values(),
+				);
+				if (tableIntegrity.errors.length > 0) {
+					this.error(
+						`Markless symbol resolver table integrity check failed:\n${tableIntegrity.errors
+							.map(
+								(error) =>
+									`- ${error.symbolId} -> ${error.claimedChunk}: ${error.reason}`,
+							)
+							.join('\n')}`,
 					);
 				}
 
