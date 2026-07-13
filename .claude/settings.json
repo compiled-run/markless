@@ -20,7 +20,22 @@
 			"Bash(npm whoami)",
 			"Bash(npm view *)",
 			"Bash(gh search *)",
-			"mcp__grep__searchGitHub"
+			"mcp__grep__searchGitHub",
+			"Bash(pnpm exec vp test)",
+			"Bash(pnpm exec vp check)",
+			"Bash(pnpm exec vp lint)",
+			"Bash(pnpm lint)",
+			"Bash(pnpm lint *)",
+			"Bash(pnpm exec witness run *)",
+			"Bash(pnpm --dir * test:boxes)",
+			"Bash(node /Users/jacksm5pro/.claude/skills/goalbuddy/scripts/check-goal-state.mjs)",
+			"Bash(node /Users/jacksm5pro/.claude/skills/goalbuddy/scripts/check-goal-state.mjs *)",
+			"Bash(node /Users/jacksm5pro/.claude/skills/goalbuddy/scripts/check-update.mjs)",
+			"Bash(node /Users/jacksm5pro/.claude/skills/goalbuddy/scripts/check-update.mjs *)",
+			"mcp__chrome-devtools__take_screenshot",
+			"Bash(pnpm exec vitest run *)",
+			"Bash(pnpm receipts:check)",
+			"Bash(pnpm receipts:check *)"
 		],
 		"ask": [
 			"Bash(pnpm add:*)",
