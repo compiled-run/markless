@@ -205,7 +205,7 @@ async function collectEvidence(page, operation) {
 		await window.__signalFavoringBench.unmount();
 		window.__signalFavoringBench.resetEvaluationCounters();
 	});
-	return await page.evaluate(async (name) => {
+	return await page.evaluate(async ({ name, expectedRecomputations }) => {
 		const api = window.__signalFavoringBench;
 		const root = document.querySelector('#app');
 		if (!root) throw new Error('signal-favoring root is missing');
@@ -224,10 +224,27 @@ async function collectEvidence(page, operation) {
 			}
 		});
 		observer.observe(root, { childList: true, characterData: true, subtree: true });
-		if (name === 'mount') await api.mount();
-		else {
+		// Dispatched clicks commit on a later task than graph.flush(), so
+		// every phase waits on its observable effect: mount on the deepest
+		// output existing, writes on the fixture-owned evaluation counters
+		// reaching the expected total, zero-work cases on a quiet window.
+		const recomputationSum = () => api.readEvaluationCounters().reduce((sum, count) => sum + count, 0);
+		const until = async (predicate, label) => {
+			for (let attempt = 0; attempt < 1_000; attempt++) {
+				if (predicate()) return;
+				await new Promise((resolve) => setTimeout(resolve, 5));
+			}
+			throw new Error(`signal-favoring evidence wait timed out: ${label}`);
+		};
+		const quiet = () => new Promise((resolve) => setTimeout(resolve, 40));
+		if (name === 'mount') {
 			await api.mount();
-			await new Promise((resolve) => setTimeout(resolve, 0));
+			await until(() => document.querySelector("[data-value='100']")?.textContent !== '', 'mount deepest output');
+			await quiet();
+		} else {
+			await api.mount();
+			await until(() => document.querySelector("[data-value='100']")?.textContent !== '', 'mount deepest output');
+			await quiet();
 			domMutations = 0;
 			mutationBatches = 0;
 			api.resetEvaluationCounters();
@@ -240,12 +257,14 @@ async function collectEvidence(page, operation) {
 			else if (name === 'equal-write') await api.equalWrite();
 			else if (name === 'unmount') await api.unmount();
 			else throw new Error(`unknown evidence operation ${name}`);
+			if (name === 'unmount') await until(() => root.querySelector('#signal-chain') === null || root.childElementCount === 0, 'unmount teardown');
+			else if (expectedRecomputations > 0) await until(() => recomputationSum() >= expectedRecomputations, `${name} recomputations`);
+			await quiet();
 		}
-		await new Promise((resolve) => setTimeout(resolve, 0));
 		observer.disconnect();
-		const recomputations = api.readEvaluationCounters().reduce((sum, count) => sum + count, 0);
+		const recomputations = recomputationSum();
 		return { recomputations, domMutations, mutationBatches };
-	}, operation);
+	}, { name: operation, expectedRecomputations: EXPECTED_EVIDENCE[operation]?.recomputations ?? 0 });
 }
 
 async function measureOperation({ browser, origin, observations, operation, protocol }) {

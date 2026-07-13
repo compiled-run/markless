@@ -1,7 +1,6 @@
 import { computed, state } from '@markless/core';
+import { counted } from './counted.ts';
 import C91 from './chain-91-100.tsrx';
-
-function counted(level, value) { globalThis.__signalEvaluationCounts[level]++; return value; }
 
 function C90({ input90 }) @{
 	const value90 = computed(() => counted(90, input90));

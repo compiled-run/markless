@@ -150,7 +150,16 @@ export function marklessComposeState(state, children) {
 		],
 		computed: [
 			...(state.computed ?? []),
-			...childStates.flatMap((childState) => childState.computed ?? []),
+			...children.flatMap((child) =>
+				(child.output?.state?.computed ?? []).map((computed) =>
+					typeof computed.deriveSymbolId === 'string'
+						? {
+								...computed,
+								deriveSymbolId: child.symbolPrefix + computed.deriveSymbolId,
+							}
+						: computed,
+				),
+			),
 		],
 		...(state.sharedDefinitions ||
 		childStates.some((childState) => childState.sharedDefinitions?.length)

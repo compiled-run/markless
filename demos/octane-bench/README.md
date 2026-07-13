@@ -14,13 +14,14 @@ Add `--smoke` for a cheap one-second-per-case verification, or `--record` to wri
 
 ## Lane status: signal-favoring (PARKED RED)
 
-The signal-favoring lane is implemented and node-tested but currently fails at mount with
-`Unknown async symbol` at octane's mandated 100-level topology: markless's production symbol
-pipeline breaks at runtime (90 levels mount; 100 do not). The previously documented build
-failure for a single 211-symbol module was the same packed resolver-table defect as framework
-finding 8 and is fixed; the remaining mount failure is separate PM work. The topology is not
-shrunk because that would fake comparability. The lane turns green when its mount ceiling is
-fixed; its mount gate is that fix's proof.
+The signal-favoring lane is implemented and node-tested. Its captured 100-level mount failure
+asked the empty root resolver for child-owned `symbol:21`; composed child sync-computed derive
+symbols are now prefixed through the owning child route in both CSR and SSR state composition.
+The lane remains parked until the PM confirms that routing fix with the full browser mount gate.
+The previously documented build failure for a single 211-symbol module was the same packed
+resolver-table defect as framework finding 8 and is fixed. The topology is not shrunk because
+that would fake comparability; `node demos/octane-bench/bench.mjs signal-favoring` is the
+confirmation step.
 
 ## Lane status: async-waterfall (PARKED RED at the runtime gate; build ceiling fixed)
 

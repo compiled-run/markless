@@ -36,11 +36,17 @@ export function generateFixtureFiles(options = {}) {
 	const model = createFixtureModel(options);
 	const files = new Map();
 	files.set('app.tsrx', `import C1 from './chain-1-10.tsrx';\n\nexport default function App() @{ <main id='signal-chain'><C1 /></main> }\n`);
+	// The evaluation counter is an IMPORTED helper: module-scope function
+	// declarations referenced from computed bodies are not captured into the
+	// extracted derive-symbol chunks (runtime ReferenceError at mount), while
+	// imported helpers travel through the module graph (compiler T130).
+	files.set('counted.ts', `export function counted(level: number, value: number): number { globalThis.__signalEvaluationCounts[level]++; return value; }\n`);
 	for (let start = 1; start <= LEVEL_COUNT; start += 10) {
 		const end = start + 9;
 		let source = `import { computed, state } from '@markless/core';\n`;
+		source += `import { counted } from './counted.ts';\n`;
 		if (end < LEVEL_COUNT) source += `import C${end + 1} from './chain-${end + 1}-${end + 10}.tsrx';\n`;
-		source += `\nfunction counted(level, value) { globalThis.__signalEvaluationCounts[level]++; return value; }\n\n`;
+		source += `\n`;
 		for (let level = end; level >= start; level--) {
 			const node = model[level - 1];
 			const parameter = level === 1 ? '' : `{ input${level} }`;
