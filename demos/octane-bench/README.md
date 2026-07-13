@@ -31,3 +31,25 @@ pnpm --dir demos/octane-bench bench -- streaming-ssr
 The `streaming-ssr` lane builds a production Node-loadable SSR fixture and measures `renderToStream` for ten TSRX async cards. The deterministic `staggered` scenario resolves cards at 5 ms intervals through 50 ms and reports shell/first-nonempty-chunk latency plus total completion latency. The `all-fast` scenario resolves every card after about 1 ms and additionally reports renders per second. Full runs use five warmups and 30 timed renders per scenario; `--smoke` uses one warmup and three timed renders.
 
 Markless has a mandated, non-configurable 10 ms first-flush deadline. Boundaries that resolve before that deadline render inline in the shell. As a result, `all-fast` typically completes in a single flush. Chunk count and total bytes are recorded as framework-specific metadata exactly as emitted; they are not normalized and should not be compared as equivalent framing work across frameworks. The timing results describe Markless's production behavior and do not by themselves establish cross-framework comparability.
+
+## Production news
+
+Run the node-verifiable production build and warm SSR phase with:
+
+```sh
+pnpm --dir demos/octane-bench bench -- news --ssr-only
+```
+
+Run the complete lane on a host with Chromium available with:
+
+```sh
+pnpm --dir demos/octane-bench bench -- news
+```
+
+The lane reuses `ssr-throughput`'s deterministic 50-article corpus and ports the production dual-build, five-warmup/twenty-sample warm SSR phase, static HTTP splice, fresh-browser-context sampling, article-count check, DOM-adoption check, and theme-toggle interaction from Octane's `benchmarks/news/gen.mjs`, `run.mjs`, and `octane-tsrx` target. Both client and server outputs are production Vite builds.
+
+The client timing is honestly named `resume_first_dispatch_ms`: it starts immediately before the deterministic theme-toggle dispatch and ends when the expected DOM mutation commits, including Markless resume and the first dispatched action. It is a Markless-specific resume measurement and is not presented as equivalent to another framework's eager client-startup measurement. A JavaScript request initiated after dispatch fails the sample.
+
+Each full result also records server HTML bytes, transferred bytes for the document's declared modulepreloaded JavaScript, and startup-executed bytes when the Chromium V8 coverage driver supplies them. MLA-S1 receives only `action` observations. MLA-I2 allows exactly the document, the document's modulepreloaded JavaScript, and its linked CSS; an undeclared request fails closed. The full run writes `dist/results/news-analyzer-verdict.json` through `@markless/analyzer`'s verdict contract.
+
+`playwright` is a declared development dependency. If dependencies have not been refreshed since this lane was added, the benchmark owner must run `pnpm install` and ensure Chromium is installed before the full command. Use `--record` only after the complete lane passes to write the local baseline.

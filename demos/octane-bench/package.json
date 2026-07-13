@@ -5,7 +5,7 @@
 	"type": "module",
 	"scripts": {
 		"check": "vp check",
-		"build": "node bench.mjs ssr-throughput --build-only",
+		"build": "node bench.mjs news --build-only",
 		"bench": "node bench.mjs",
 		"test": "node --test lanes/*/run.test.mjs"
 	},
@@ -14,7 +14,9 @@
 	},
 	"devDependencies": {
 		"@markless/analyzer": "workspace:*",
+		"@markless/bundler": "workspace:*",
 		"@markless/web": "workspace:*",
+		"playwright": "1.58.2",
 		"rolldown": "1.0.3",
 		"typescript": "5.9.3",
 		"vite": "8.0.16",

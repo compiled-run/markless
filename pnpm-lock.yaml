@@ -125,9 +125,15 @@ importers:
       '@markless/analyzer':
         specifier: workspace:*
         version: link:../../packages/analyzer
+      '@markless/bundler':
+        specifier: workspace:*
+        version: link:../../packages/bundler
       '@markless/web':
         specifier: workspace:*
         version: link:../../packages/web
+      playwright:
+        specifier: 1.58.2
+        version: 1.58.2
       rolldown:
         specifier: 1.0.3
         version: 1.0.3

@@ -1,0 +1,76 @@
+{
+	"schemaVersion": 1,
+	"kind": "markless-benchmark-result",
+	"lane": "news",
+	"status": "passed",
+	"recordedAt": "2026-07-13T14:19:58.371Z",
+	"protocol": {
+		"mode": "full",
+		"timedSeconds": 0,
+		"warmupMinimumRenders": 5,
+		"warmupSeconds": 0,
+		"maxSamples": 20,
+		"memoryMaxRenders": 0,
+		"forcedGc": false,
+		"ssrWarmups": 5,
+		"ssrSamples": 20,
+		"clientWarmups": 5,
+		"clientSamples": 20
+	},
+	"environment": {
+		"os": "darwin 25.5.0",
+		"arch": "arm64",
+		"cpuModel": "Apple M5 Pro",
+		"nodeVersion": "v24.15.0",
+		"pnpmVersion": "10.33.2",
+		"gitSha": "1c6cff9009dffe0adfc2bb1f9aef99bf9343522f",
+		"dirtyTree": true
+	},
+	"cases": [
+		{
+			"name": "production-news-50",
+			"gates": {
+				"passed": true,
+				"checks": [
+					"server rendered exactly 50 article cards",
+					"server rendered the theme toggle",
+					"exactly 50 article cards remained after resume",
+					"theme toggle committed the expected DOM mutation",
+					"server article nodes were adopted without replacement",
+					"no JavaScript request started after dispatch",
+					"exact declared request set passed MLA-I2"
+				]
+			},
+			"bodyBytes": 84410,
+			"timing": {
+				"samples": 20,
+				"minMs": 0.12133399999993344,
+				"p50Ms": 0.16525000000001455,
+				"p95Ms": 0.23195899999996072,
+				"p99Ms": 0.8611250000000155,
+				"meanMs": 0.2074271999999837,
+				"opsPerSec": 4820.968513290824
+			},
+			"memory": {
+				"label": "allocator-growth-observation",
+				"renders": 0,
+				"rssGrowthBytes": 0,
+				"heapGrowthBytes": 0,
+				"forcedGc": false
+			},
+			"metrics": {
+				"resume_first_dispatch_ms": {
+					"samples": 20,
+					"minMs": 2.3999998569488525,
+					"p50Ms": 2.5999999046325684,
+					"p95Ms": 2.700000047683716,
+					"p99Ms": 2.700000047683716,
+					"meanMs": 2.5950000047683717,
+					"opsPerSec": 385.3564540125153
+				},
+				"preloaded_client_bytes": 86291,
+				"startup_executed_bytes": 969
+			}
+		}
+	]
+}

@@ -18,6 +18,7 @@ export function createFailedResult({ lane, protocol, environment, failure, cases
 }
 
 export function assertResult(value) {
+	assertNoForbiddenMetricNames(value);
 	assertObject(value, 'result');
 	assertEqual(value.schemaVersion, RESULT_SCHEMA_VERSION, 'result.schemaVersion');
 	assertEqual(value.kind, 'markless-benchmark-result', 'result.kind');
@@ -37,6 +38,16 @@ export function assertResult(value) {
 		throw new TypeError('passed result cannot contain a failed correctness gate');
 	}
 	return value;
+}
+
+function assertNoForbiddenMetricNames(value, path = 'result') {
+	if (!value || typeof value !== 'object') return;
+	for (const [key, child] of Object.entries(value)) {
+		if (key.toLowerCase().includes(['hyd', 'rate'].join(''))) {
+			throw new TypeError(`${path}.${key} uses a forbidden metric name; use resume_first_dispatch_ms`);
+		}
+		assertNoForbiddenMetricNames(child, `${path}.${key}`);
+	}
 }
 
 export function assertBaseline(value, expectedLane) {
