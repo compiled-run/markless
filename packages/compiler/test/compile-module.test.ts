@@ -3526,6 +3526,12 @@ export function App() @{
 	expect(moduleSource).not.toContain('const parent = elementAtDomOrder(root');
 	expect(moduleSource).not.toContain('function elementAtDomOrder');
 	expect(moduleSource).toContain('const textTarget0 = record.text0;');
+	expect(moduleSource).toContain(
+		'const nextTextValue0 = stringifyMarklessPublicValue(item.title);',
+	);
+	expect(moduleSource).toContain(
+		'if (textTarget0 && textTarget0.nodeValue !== nextTextValue0) textTarget0.nodeValue = nextTextValue0;',
+	);
 	expect(moduleSource).toContain('item.code');
 	expect(moduleSource).toContain('item.title');
 	expect(moduleSource).not.toContain('readMarklessPublicPath(item, ["code"])');
@@ -3576,6 +3582,12 @@ export function App() @{
 	expect(moduleSource).toContain('const dirtyIndexes = graph.dirtyIndexes?.("state:entries");');
 	expect(moduleSource).toContain(
 		'patchMarklessPublicRepeat0DirtyRows(state, items, dirtyIndexes, classValue)',
+	);
+	expect(moduleSource).toMatch(
+		/function patchMarklessPublicRepeat0DirtyRows[\s\S]*?writeMarklessPublicRepeat0Row\(record, item, classValue\);[\s\S]*?return true;/,
+	);
+	expect(moduleSource).toMatch(
+		/else if \(record\.item !== item\) \{[\s\S]*?writeMarklessPublicRepeat0Row\(record, item, classValue\);[\s\S]*?\} else \{/,
 	);
 	expect(moduleSource).not.toContain('function replaceMarklessPublicRows(parent, state, keys)');
 	expect(moduleSource).toContain('document.createDocumentFragment()');

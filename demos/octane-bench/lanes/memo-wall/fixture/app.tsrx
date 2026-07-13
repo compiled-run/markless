@@ -7,7 +7,9 @@ import { bumpTheme, changeMiddle, makeRows, type WallRow } from './data.ts';
 // keyed-row expressions all silently drop or empty output. Walls start empty
 // and fill via handlers (fill dispatch = the measured wall-mount operation);
 // the fan-out travels IN row data (theme field) because single-source
-// cross-state fan-out into rows is blocked on finding 5c.
+// cross-state fan-out into rows is blocked on finding 5c. Cells bind only
+// plain precomputed row fields (inner/leaf) because expression bindings in
+// keyed rows silently break (finding 10).
 export function App() @{
 	let rowsA = state<WallRow[]>([]);
 	let rowsB = state<WallRow[]>([]);
@@ -29,8 +31,8 @@ export function App() @{
 			@for (row of rowsA; key row.id) {
 				<tr class="item">
 					<td class="row" data-value>{row.value}</td>
-					<td class="inner" data-value>{row.value + 1}</td>
-					<td class="leaf" data-value>{row.value + row.theme}</td>
+					<td class="inner" data-value>{row.inner}</td>
+					<td class="leaf" data-value>{row.leaf}</td>
 				</tr>
 			}
 		</tbody></table>
@@ -38,8 +40,8 @@ export function App() @{
 			@for (row of rowsB; key row.id) {
 				<tr class="item">
 					<td class="row" data-value>{row.value}</td>
-					<td class="inner" data-value>{row.value + 1}</td>
-					<td class="leaf" data-value>{row.value + row.theme}</td>
+					<td class="inner" data-value>{row.inner}</td>
+					<td class="leaf" data-value>{row.leaf}</td>
 				</tr>
 			}
 		</tbody></table>

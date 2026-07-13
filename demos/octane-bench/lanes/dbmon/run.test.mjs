@@ -10,6 +10,27 @@ test('wrong dbmon row count is a red proof', () => {
 	assert.match(gate.failures.join('; '), /rows 999, expected 1000/);
 });
 
+test('redundant writes fail the dbmon tick gates: writes must equal changed cells', () => {
+	const full = evaluateDbmonEvidence('full-tick', { rows: 1_000, cells: 7_000, textMutations: 7_000, changedCells: 5_968, survivingRows: 1_000, requests: 0 });
+	const partial = evaluateDbmonEvidence('partial-tick', { rows: 1_000, cells: 7_000, textMutations: 700, changedCells: 596, survivingRows: 1_000, requests: 0 });
+	assert.equal(full.passed, false);
+	assert.match(full.failures.join('; '), /7000 text mutations but 5968 cells changed/);
+	assert.equal(partial.passed, false);
+	assert.match(partial.failures.join('; '), /700 text mutations but 596 cells changed/);
+});
+
+test('a broken row writer fails the dbmon tick band even when writes equal changes', () => {
+	const gate = evaluateDbmonEvidence('full-tick', { rows: 1_000, cells: 7_000, textMutations: 0, changedCells: 0, survivingRows: 1_000, requests: 0 });
+	assert.equal(gate.passed, false);
+	assert.match(gate.failures.join('; '), /changed 0 cells, expected 5500\.\.6000/);
+});
+
+test('the documented tick change counts come from the seeded corpus itself', () => {
+	const stringifyFields = (row) => [String(row.name), String(row.count), String(row.query0), String(row.query1), String(row.query2), String(row.query3), String(row.query4)];
+	const changedBetween = (before, after) => before.flatMap((row, index) => stringifyFields(row).map((text, field) => text !== stringifyFields(after[index])[field])).filter(Boolean).length;
+	assert.equal(changedBetween(makeData(0, 1), makeData(0, 2)), 5_968);
+});
+
 test('dbmon schema requires all operations', () => assert.throws(() => validateDbmonResultSchema({ cases: [] }), /six operation/));
 
 test('dbmon analyzer rejects timed requests', () => {

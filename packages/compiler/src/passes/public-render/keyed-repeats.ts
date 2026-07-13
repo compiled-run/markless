@@ -192,7 +192,8 @@ function emitRepeatWriteFunction(repeat: KeyedRepeatPlan, index: number) {
 	const classParameter = useSingleClassValue ? 'classValue' : 'classValues';
 	const textWrites = repeat.textWrites.flatMap((write, writeIndex) => [
 		`	const textTarget${writeIndex} = record.text${writeIndex};`,
-		`	if (textTarget${writeIndex}) textTarget${writeIndex}.nodeValue = stringifyMarklessPublicValue(${itemPathReadSource('item', write.itemPath)});`,
+		`	const nextTextValue${writeIndex} = stringifyMarklessPublicValue(${itemPathReadSource('item', write.itemPath)});`,
+		`	if (textTarget${writeIndex} && textTarget${writeIndex}.nodeValue !== nextTextValue${writeIndex}) textTarget${writeIndex}.nodeValue = nextTextValue${writeIndex};`,
 	]);
 	const classWrites = repeat.classWrites.flatMap((write, writeIndex) => [
 		`	const classTarget${writeIndex} = record.class${writeIndex};`,

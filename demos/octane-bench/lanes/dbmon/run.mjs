@@ -7,10 +7,16 @@ import { createSignalFavoringServer as createStaticServer } from '../signal-favo
 import { evaluateDbmonAnalyzerPolicy } from './analyzer-policy.mjs';
 
 const OPERATIONS = ['mount', 'full-tick', 'partial-tick', 'all-new-key-remount', 'sort-reorder', 'unmount'];
+// Per-field suppression means tick write counts are data-dependent (the
+// seeded corpus repeats the odd value across frames), so tick gates require
+// textMutations === changedCells (exact-work equality: no redundant write,
+// no missed write reaches the DOM diff) inside a sanity band that proves the
+// workload is real. With the current corpus the full tick changes 5,968
+// cells and the partial tick 596; the stable dbname column must never move.
 const EXPECTED = {
 	mount: { rows: 1_000, cells: 7_000 },
-	'full-tick': { rows: 1_000, cells: 7_000, textMutations: 7_000 },
-	'partial-tick': { rows: 1_000, cells: 7_000, textMutations: 700 },
+	'full-tick': { rows: 1_000, cells: 7_000, changedCellsMin: 5_500, changedCellsMax: 6_000 },
+	'partial-tick': { rows: 1_000, cells: 7_000, changedCellsMin: 550, changedCellsMax: 600 },
 	'all-new-key-remount': { rows: 1_000, cells: 7_000 },
 	'sort-reorder': { rows: 1_000, cells: 7_000 },
 	unmount: { rows: 0, cells: 0 },
@@ -43,7 +49,12 @@ export async function runDbmon({ protocol, environment, clientDirectory, receipt
 export function evaluateDbmonEvidence(operation, actual) {
 	const expected = EXPECTED[operation];
 	if (!expected) throw new TypeError(`unknown dbmon operation ${operation}`);
-	const failures = Object.entries(expected).flatMap(([field, value]) => actual[field] === value ? [] : [`${operation} ${field} ${String(actual[field])}, expected ${value}`]);
+	const fixedFields = Object.entries(expected).filter(([field]) => !field.startsWith('changedCells'));
+	const failures = fixedFields.flatMap(([field, value]) => actual[field] === value ? [] : [`${operation} ${field} ${String(actual[field])}, expected ${value}`]);
+	if (expected.changedCellsMin !== undefined) {
+		if (actual.textMutations !== actual.changedCells) failures.push(`${operation} committed ${String(actual.textMutations)} text mutations but ${String(actual.changedCells)} cells changed value - writes must equal real changes`);
+		if (!(actual.changedCells >= expected.changedCellsMin && actual.changedCells <= expected.changedCellsMax)) failures.push(`${operation} changed ${String(actual.changedCells)} cells, expected ${expected.changedCellsMin}..${expected.changedCellsMax}`);
+	}
 	if (actual.requests !== 0) failures.push(`${operation} requests ${actual.requests}, expected 0`);
 	if (operation === 'full-tick' && actual.survivingRows !== 1_000) failures.push('full-tick did not reuse all 1,000 keyed rows');
 	if (operation === 'partial-tick' && actual.survivingRows !== 1_000) failures.push('partial-tick did not reuse all 1,000 keyed rows');
@@ -54,7 +65,7 @@ export function evaluateDbmonEvidence(operation, actual) {
 		failures,
 		checks: failures.length === 0 ? [
 			`${operation} rendered ${expected.rows} rows and ${expected.cells} cells`,
-			...(expected.textMutations === undefined ? [] : [`${operation} committed exactly ${expected.textMutations} text mutations`]),
+			...(expected.changedCellsMin === undefined ? [] : [`${operation} committed exactly ${String(actual.changedCells)} text mutations, one per changed cell`]),
 			`${operation} preserved the required keyed identity and issued zero requests`,
 		] : failures,
 		evidence: { expected: { ...expected, requests: 0 }, actual: { ...actual } },
@@ -144,19 +155,32 @@ async function semanticGates(bench) {
 		await quiet();
 		const mountedRows = rows();
 		const mount = snapshot();
-		const observe = async (action, expectedMutations) => {
+		// Per-field suppression makes the honest write count data-dependent:
+		// a write must happen exactly when a cell's stringified value changed
+		// (the seeded corpus occasionally repeats a value across frames). So
+		// the gate snapshots every cell, diffs after commit, and requires
+		// observed mutations === changed cells. A same-value write cannot
+		// appear in the diff but is counted by the observer, so any
+		// redundant write fails the equality. commitFloor only detects the
+		// commit batch; exactness comes from the diff.
+		const cellTexts = () => [...document.querySelectorAll('.dbmon tbody td')].map((cell) => cell.textContent);
+		const observe = async (action, commitFloor) => {
+			const beforeTexts = cellTexts();
 			const before = counters.text;
 			await api.invoke(action);
-			await settled(() => counters.text >= before + expectedMutations);
+			await settled(() => counters.text >= before + commitFloor);
 			await quiet();
-			return counters.text - before;
+			const afterTexts = cellTexts();
+			let changedCells = 0;
+			for (let index = 0; index < afterTexts.length; index++) if (afterTexts[index] !== beforeTexts[index]) changedCells++;
+			return { textMutations: counters.text - before, changedCells };
 		};
-		const fullMutations = await observe('tick', 7_000);
+		const fullObserved = await observe('tick', 4_000);
 		const fullRows = rows();
-		const full = snapshot(fullRows.filter((row) => mountedRows.includes(row)).length, fullMutations);
+		const full = { ...snapshot(fullRows.filter((row) => mountedRows.includes(row)).length, fullObserved.textMutations), changedCells: fullObserved.changedCells };
 		const partialBefore = rows();
-		const partialMutations = await observe('tick-partial', 700);
-		const partial = snapshot(rows().filter((row) => partialBefore.includes(row)).length, partialMutations);
+		const partialObserved = await observe('tick-partial', 400);
+		const partial = { ...snapshot(rows().filter((row) => partialBefore.includes(row)).length, partialObserved.textMutations), changedCells: partialObserved.changedCells };
 		const remountBefore = rows();
 		await api.invoke('remount');
 		await settled(() => rows().length === 1_000 && firstName() === 'cluster-1000');
@@ -227,7 +251,10 @@ async function measureOperation(browser, origin, observations, operation, protoc
 					await window.__dbmonBench.unmount();
 					await settled(() => rows().length === 0);
 				} else if (name === 'full-tick' || name === 'partial-tick') {
-					const expected = counters.text + (name === 'full-tick' ? 7_000 : 700);
+					// Commit-detection floor only: the commit lands as one batch, so
+				// any threshold below the real count stops the clock at the same
+				// observer callback; exact write counts are gated in semanticGates.
+				const expected = counters.text + (name === 'full-tick' ? 4_000 : 400);
 					await window.__dbmonBench.invoke(name === 'full-tick' ? 'tick' : 'tick-partial');
 					await settled(() => counters.text >= expected);
 				} else if (name === 'all-new-key-remount') {

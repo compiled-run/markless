@@ -26,14 +26,14 @@ test('an equal parent write producing DOM work fails the zero-work gate', () => 
 	assert.match(gate.failures.join('; '), /domMutations 3, expected 0/);
 });
 
-test('a theme fan-out with missing row updates fails exact evidence', () => {
+test('a theme fan-out with redundant stable-field writes fails exact evidence', () => {
 	const gate = evaluateMemoWallEvidence('theme-fanout-A', {
 		...ZERO,
-		domMutations: 1_000,
+		domMutations: 3_000,
 		mutationBatches: 1,
 	});
 	assert.equal(gate.passed, false);
-	assert.match(gate.failures.join('; '), /domMutations 1000, expected 3000/);
+	assert.match(gate.failures.join('; '), /domMutations 3000, expected 1000/);
 });
 
 test('memo-wall result schema rejects missing counter evidence', () => {

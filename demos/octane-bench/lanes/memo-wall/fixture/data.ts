@@ -1,12 +1,22 @@
 export const ROW_COUNT = 1_000;
 export const MIDDLE_INDEX = ROW_COUNT >> 1;
 
+// inner/leaf are precomputed display fields: expression bindings inside
+// keyed rows compile to broken member paths (framework finding 10 - cells
+// render empty and updates read undefined), so every bound cell must be a
+// plain row-field read and all derivation happens here.
 export type WallRow = {
 	id: number;
 	label: string;
 	value: number;
 	theme: number;
+	inner: number;
+	leaf: number;
 };
+
+function derived(row: Omit<WallRow, 'inner' | 'leaf'>): WallRow {
+	return { ...row, inner: row.value + 1, leaf: row.value + row.theme };
+}
 
 const WORDS = [
 	'alpha',
@@ -39,21 +49,23 @@ function mulberry32(seed: number): () => number {
 
 export function makeRows(): WallRow[] {
 	const random = mulberry32(0x51ab);
-	return Array.from({ length: ROW_COUNT }, (_, index) => ({
-		id: index + 1,
-		label: `${WORDS[(random() * WORDS.length) | 0]} ${WORDS[(random() * WORDS.length) | 0]} ${index + 1}`,
-		value: (random() * 10_000) | 0,
-		theme: 0,
-	}));
+	return Array.from({ length: ROW_COUNT }, (_, index) =>
+		derived({
+			id: index + 1,
+			label: `${WORDS[(random() * WORDS.length) | 0]} ${WORDS[(random() * WORDS.length) | 0]} ${index + 1}`,
+			value: (random() * 10_000) | 0,
+			theme: 0,
+		}),
+	);
 }
 
 export function changeMiddle(rows: WallRow[]): WallRow[] {
 	const next = rows.slice();
 	const row = next[MIDDLE_INDEX];
-	next[MIDDLE_INDEX] = { ...row, value: row.value + 1 };
+	next[MIDDLE_INDEX] = derived({ ...row, value: row.value + 1 });
 	return next;
 }
 
 export function bumpTheme(rows: WallRow[]): WallRow[] {
-	return rows.map((row) => ({ ...row, theme: row.theme + 1 }));
+	return rows.map((row) => derived({ ...row, theme: row.theme + 1 }));
 }

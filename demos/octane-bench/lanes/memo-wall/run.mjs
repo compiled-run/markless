@@ -27,11 +27,9 @@ const EXPECTED_EVIDENCE = {
 	'parent-rerender-equal-B': { ...ZERO },
 	'one-change-A': { ...ZERO, domMutations: 3, mutationBatches: 1 },
 	'one-change-B': { ...ZERO, domMutations: 3, mutationBatches: 1 },
-	// A changed row object rewrites ALL of its bound cell texts (3 per row):
-	// markless does not suppress identical-value writes per field. Documented
-	// as score-improvement hypothesis #2 (3,000 -> 1,000 would be the win).
-	'theme-fanout-A': { ...ZERO, domMutations: 3_000, mutationBatches: 1 },
-	'theme-fanout-B': { ...ZERO, domMutations: 3_000, mutationBatches: 1 },
+	// Only the changed theme text is written for each changed row object.
+	'theme-fanout-A': { ...ZERO, domMutations: 1_000, mutationBatches: 1 },
+	'theme-fanout-B': { ...ZERO, domMutations: 1_000, mutationBatches: 1 },
 };
 
 export async function runMemoWall({ protocol, environment, clientDirectory, receiptPath }) {
@@ -263,11 +261,32 @@ async function collectEvidence(page, operation) {
 			}
 			throw new Error('memo-wall walls did not commit 1,000 rows each');
 		};
+		// Content-consistency gate: every cell binds a precomputed row field
+		// (finding 10 bans expressions), so the DOM itself must satisfy
+		// inner === value + 1 and leaf === value + themeBumps for every
+		// sampled row. This catches silently empty or stale cells that
+		// mutation counts alone cannot see.
+		const assertWallContent = (wallId, themeBumps) => {
+			const rows = [...document.querySelectorAll(`#${wallId} .item`)];
+			for (const index of [0, 1, 499, 500, 998, 999]) {
+				const row = rows[index];
+				const value = Number(row.querySelector('.row')?.textContent);
+				const inner = Number(row.querySelector('.inner')?.textContent);
+				const leaf = Number(row.querySelector('.leaf')?.textContent);
+				if (!Number.isFinite(value) || inner !== value + 1 || leaf !== value + themeBumps) {
+					throw new Error(
+						`memo-wall ${wallId} row ${index} content inconsistent: value=${value} inner=${inner} leaf=${leaf} themeBumps=${themeBumps}`,
+					);
+				}
+			}
+		};
 		if (name === 'mount') {
 			await api.mount();
 			await api.invoke('fill-a');
 			await api.invoke('fill-b');
 			await wallsCommitted();
+			assertWallContent('wall-a', 0);
+			assertWallContent('wall-b', 0);
 		} else {
 			await api.mount();
 			await api.invoke('fill-a');
@@ -278,6 +297,10 @@ async function collectEvidence(page, operation) {
 			mutationBatches = 0;
 			await api.invoke(actionFor(name));
 			await new Promise((resolve) => setTimeout(resolve, 20));
+			const bumpsA = name === 'theme-fanout-A' ? 1 : 0;
+			const bumpsB = name === 'theme-fanout-B' ? 1 : 0;
+			assertWallContent('wall-a', bumpsA);
+			assertWallContent('wall-b', bumpsB);
 		}
 		await new Promise((resolve) => setTimeout(resolve, 0));
 		observer.disconnect();
