@@ -3,7 +3,7 @@
 	"kind": "markless-benchmark-result",
 	"lane": "todomvc",
 	"status": "passed",
-	"recordedAt": "2026-07-13T16:47:50.887Z",
+	"recordedAt": "2026-07-13T17:25:48.309Z",
 	"protocol": {
 		"mode": "full",
 		"timedSeconds": 0,
@@ -23,8 +23,8 @@
 		"cpuModel": "Apple M5 Pro",
 		"nodeVersion": "v24.15.0",
 		"pnpmVersion": "10.33.2",
-		"gitSha": "397c3ecbf30a3cc0e36b95b5a0e056d3a3873a2e",
-		"dirtyTree": true
+		"gitSha": "f6e7164ee6fff2c53ef8d40786968fa1cdcc5a50",
+		"dirtyTree": false
 	},
 	"cases": [
 		{
@@ -40,12 +40,12 @@
 			"bodyBytes": 0,
 			"timing": {
 				"samples": 8,
-				"minMs": 1.5,
-				"p50Ms": 1.8999998569488525,
+				"minMs": 1.4000000953674316,
+				"p50Ms": 1.7999999523162842,
 				"p95Ms": 2.0999999046325684,
 				"p99Ms": 2.0999999046325684,
-				"meanMs": 1.8499999940395355,
-				"opsPerSec": 540.5405422820934
+				"meanMs": 1.8250000178813934,
+				"opsPerSec": 547.945200110672
 			},
 			"memory": {
 				"label": "allocator-growth-observation",
@@ -82,12 +82,12 @@
 			"bodyBytes": 0,
 			"timing": {
 				"samples": 8,
-				"minMs": 0.10000014305114746,
-				"p50Ms": 0.19999980926513672,
-				"p95Ms": 0.2999999523162842,
-				"p99Ms": 0.2999999523162842,
-				"meanMs": 0.19999995827674866,
-				"opsPerSec": 5000.001043081501
+				"minMs": 0.09999990463256836,
+				"p50Ms": 0.10000014305114746,
+				"p95Ms": 0.20000004768371582,
+				"p99Ms": 0.20000004768371582,
+				"meanMs": 0.15000000596046448,
+				"opsPerSec": 6666.666401757145
 			},
 			"memory": {
 				"label": "allocator-growth-observation",
@@ -124,12 +124,12 @@
 			"bodyBytes": 0,
 			"timing": {
 				"samples": 8,
-				"minMs": 0,
-				"p50Ms": 0.09999990463256836,
+				"minMs": 0.09999990463256836,
+				"p50Ms": 0.10000014305114746,
 				"p95Ms": 0.2999999523162842,
 				"p99Ms": 0.2999999523162842,
-				"meanMs": 0.11249995231628418,
-				"opsPerSec": 8888.892656492724
+				"meanMs": 0.16249999403953552,
+				"opsPerSec": 6153.846379567894
 			},
 			"memory": {
 				"label": "allocator-growth-observation",
@@ -167,11 +167,11 @@
 			"timing": {
 				"samples": 8,
 				"minMs": 0.7999999523162842,
-				"p50Ms": 0.9000000953674316,
-				"p95Ms": 1,
-				"p99Ms": 1,
-				"meanMs": 0.9000000357627869,
-				"opsPerSec": 1111.1110669595241
+				"p50Ms": 0.7999999523162842,
+				"p95Ms": 0.9000000953674316,
+				"p99Ms": 0.9000000953674316,
+				"meanMs": 0.8375000059604645,
+				"opsPerSec": 1194.029842248391
 			},
 			"memory": {
 				"label": "allocator-growth-observation",
@@ -208,12 +208,12 @@
 			"bodyBytes": 0,
 			"timing": {
 				"samples": 8,
-				"minMs": 0.9000000953674316,
+				"minMs": 1,
 				"p50Ms": 1,
-				"p95Ms": 1,
-				"p99Ms": 1,
-				"meanMs": 0.9750000238418579,
-				"opsPerSec": 1025.6410005608338
+				"p95Ms": 1.2000000476837158,
+				"p99Ms": 1.2000000476837158,
+				"meanMs": 1.050000011920929,
+				"opsPerSec": 952.3809415683186
 			},
 			"memory": {
 				"label": "allocator-growth-observation",
@@ -250,12 +250,12 @@
 			"bodyBytes": 0,
 			"timing": {
 				"samples": 8,
-				"minMs": 0.7000000476837158,
+				"minMs": 0.6999998092651367,
 				"p50Ms": 0.7999999523162842,
-				"p95Ms": 0.8000001907348633,
-				"p99Ms": 0.8000001907348633,
-				"meanMs": 0.7875000536441803,
-				"opsPerSec": 1269.841183340204
+				"p95Ms": 0.8999998569488525,
+				"p99Ms": 0.8999998569488525,
+				"meanMs": 0.7999999523162842,
+				"opsPerSec": 1250.0000745058105
 			},
 			"memory": {
 				"label": "allocator-growth-observation",
@@ -294,12 +294,12 @@
 			"bodyBytes": 0,
 			"timing": {
 				"samples": 8,
-				"minMs": 0.39999985694885254,
+				"minMs": 0.5,
 				"p50Ms": 0.5,
 				"p95Ms": 0.5999999046325684,
 				"p99Ms": 0.5999999046325684,
-				"meanMs": 0.5124999582767487,
-				"opsPerSec": 1951.2196710463
+				"meanMs": 0.5249999761581421,
+				"opsPerSec": 1904.7619912629805
 			},
 			"memory": {
 				"label": "allocator-growth-observation",
@@ -336,12 +336,12 @@
 			"bodyBytes": 0,
 			"timing": {
 				"samples": 8,
-				"minMs": 1.2000000476837158,
+				"minMs": 1.2999999523162842,
 				"p50Ms": 1.4000000953674316,
-				"p95Ms": 1.5,
-				"p99Ms": 1.5,
-				"meanMs": 1.412500023841858,
-				"opsPerSec": 707.9645898200416
+				"p95Ms": 1.5999999046325684,
+				"p99Ms": 1.5999999046325684,
+				"meanMs": 1.4374999701976776,
+				"opsPerSec": 695.6521883353397
 			},
 			"memory": {
 				"label": "allocator-growth-observation",
@@ -380,10 +380,10 @@
 				"samples": 8,
 				"minMs": 0,
 				"p50Ms": 0,
-				"p95Ms": 0.09999990463256836,
-				"p99Ms": 0.09999990463256836,
-				"meanMs": 0.02499997615814209,
-				"opsPerSec": 40000.038147009036
+				"p95Ms": 0,
+				"p99Ms": 0,
+				"meanMs": 0,
+				"opsPerSec": null
 			},
 			"memory": {
 				"label": "allocator-growth-observation",

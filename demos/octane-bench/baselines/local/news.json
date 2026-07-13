@@ -3,7 +3,7 @@
 	"kind": "markless-benchmark-result",
 	"lane": "news",
 	"status": "passed",
-	"recordedAt": "2026-07-13T14:19:58.371Z",
+	"recordedAt": "2026-07-13T17:25:29.248Z",
 	"protocol": {
 		"mode": "full",
 		"timedSeconds": 0,
@@ -23,8 +23,8 @@
 		"cpuModel": "Apple M5 Pro",
 		"nodeVersion": "v24.15.0",
 		"pnpmVersion": "10.33.2",
-		"gitSha": "1c6cff9009dffe0adfc2bb1f9aef99bf9343522f",
-		"dirtyTree": true
+		"gitSha": "f6e7164ee6fff2c53ef8d40786968fa1cdcc5a50",
+		"dirtyTree": false
 	},
 	"cases": [
 		{
@@ -44,12 +44,12 @@
 			"bodyBytes": 84410,
 			"timing": {
 				"samples": 20,
-				"minMs": 0.12133399999993344,
-				"p50Ms": 0.16525000000001455,
-				"p95Ms": 0.23195899999996072,
-				"p99Ms": 0.8611250000000155,
-				"meanMs": 0.2074271999999837,
-				"opsPerSec": 4820.968513290824
+				"minMs": 0.11537500000002865,
+				"p50Ms": 0.15358400000002348,
+				"p95Ms": 0.24954199999996263,
+				"p99Ms": 0.8972090000000321,
+				"meanMs": 0.20581044999999562,
+				"opsPerSec": 4858.839772227412
 			},
 			"memory": {
 				"label": "allocator-growth-observation",
@@ -61,12 +61,12 @@
 			"metrics": {
 				"resume_first_dispatch_ms": {
 					"samples": 20,
-					"minMs": 2.3999998569488525,
-					"p50Ms": 2.5999999046325684,
-					"p95Ms": 2.700000047683716,
-					"p99Ms": 2.700000047683716,
-					"meanMs": 2.5950000047683717,
-					"opsPerSec": 385.3564540125153
+					"minMs": 2.5,
+					"p50Ms": 2.6999998092651367,
+					"p95Ms": 2.9000000953674316,
+					"p99Ms": 2.9000000953674316,
+					"meanMs": 2.675000011920929,
+					"opsPerSec": 373.8317740349824
 				},
 				"preloaded_client_bytes": 86291,
 				"startup_executed_bytes": 969

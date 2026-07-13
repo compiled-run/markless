@@ -3,7 +3,7 @@
 	"kind": "markless-benchmark-result",
 	"lane": "bundle-size",
 	"status": "passed",
-	"recordedAt": "2026-07-13T16:48:07.763Z",
+	"recordedAt": "2026-07-13T17:25:53.980Z",
 	"protocol": {
 		"mode": "full",
 		"timedSeconds": 0,
@@ -19,8 +19,8 @@
 		"cpuModel": "Apple M5 Pro",
 		"nodeVersion": "v24.15.0",
 		"pnpmVersion": "10.33.2",
-		"gitSha": "397c3ecbf30a3cc0e36b95b5a0e056d3a3873a2e",
-		"dirtyTree": true
+		"gitSha": "f6e7164ee6fff2c53ef8d40786968fa1cdcc5a50",
+		"dirtyTree": false
 	},
 	"cases": [
 		{
