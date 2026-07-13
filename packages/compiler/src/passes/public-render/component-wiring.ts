@@ -25,7 +25,7 @@ export function emitSsrComponent(
 	const props = ssrComponentPropsSource(node, context, edge, context.callbackSymbols);
 	const placement = {
 		hostPrefix: `c${childIndex}:`,
-		symbolPrefix: `c${childIndex}:`,
+		symbolPrefix: edge?.importSource ? `c${childIndex}:` : '',
 		graphProps: graphReferenceProps(edge),
 	};
 
@@ -100,7 +100,7 @@ export function emitCsrComponent(
 	context.childReplacements.push(
 		`	const ${childName} = marklessCsrRenderChild(${localName}, { ${props.join(', ')} });`,
 		`	marklessCsrReplaceChild(root, ${index}, ${childName}?.root);`,
-		`	marklessCsrChildren.push({ hostPrefix: ${JSON.stringify(`c${index}:`)}, symbolPrefix: ${JSON.stringify(`c${index}:`)}, output: ${childName}, graphProps: ${JSON.stringify(graphReferenceProps(edge))} });`,
+		`	marklessCsrChildren.push({ hostPrefix: ${JSON.stringify(`c${index}:`)}, symbolPrefix: ${JSON.stringify(edge?.importSource ? `c${index}:` : '')}, output: ${childName}, graphProps: ${JSON.stringify(graphReferenceProps(edge))} });`,
 	);
 	return JSON.stringify(`<span data-markless-csr-child="${index}"></span>`);
 }

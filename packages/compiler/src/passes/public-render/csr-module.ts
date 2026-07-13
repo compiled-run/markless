@@ -15,7 +15,7 @@ import {
 	hasPropDependentComputed,
 	isFragmentNode,
 	publicRenderValueImports,
-	sameModuleGraphProps,
+	composedGraphProps,
 	stateEntries,
 	staticHostLocators,
 	moduleScopeLines,
@@ -96,7 +96,7 @@ export function emitPublicCsrRenderModule(
 	};
 	const propEvents = collectCsrPropEvents(rootInfo.root, rootInfo.propNames, input.source.source);
 	const remapsGraphProps = hasPropDependentComputed(input);
-	const internalGraphProps = sameModuleGraphProps(input);
+	const internalGraphProps = composedGraphProps(input);
 	const remapsInternalGraphProps = remapsGraphProps && internalGraphProps.length > 0;
 	const propCellId = componentPropCellId(rootInfo.component);
 	const hostLocators = staticHostLocators(input);

@@ -71,9 +71,8 @@ export function hasPropDependentComputed(input: PublicRenderModuleInput): boolea
 	);
 }
 
-export function sameModuleGraphProps(input: PublicRenderModuleInput) {
+export function composedGraphProps(input: PublicRenderModuleInput) {
 	return input.semanticGraph.componentEdges
-		.filter((edge) => !edge.importSource)
 		.flatMap((edge) =>
 			edge.props.flatMap((prop) =>
 				prop.kind === 'graph-reference'

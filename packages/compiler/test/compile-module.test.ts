@@ -2,6 +2,7 @@ import { expect, test, vi } from 'vitest';
 import { compileTsrxModule } from '../src/index.ts';
 import { deserializeGraphValue, renderPayloadScripts } from '../../serializer/src/index.ts';
 import { resumeFromPayloadScripts } from '../../web/src/payload.ts';
+import { render } from '../../web/src/render.ts';
 import type { ProtocolStatePayload, ProtocolViewPayload } from '../../serializer/src/index.ts';
 
 const source = `
@@ -3330,6 +3331,129 @@ function Card({ value }) @{
 	expect(ssrOutput.html).toBe(
 		'<main><article class="card"><strong>7</strong></article><button>+</button></main>',
 	);
+});
+
+test('deep same-module CSR preserves one imported-child route for computed and DOM writes', async () => {
+	const child = await compileTsrxModule({
+		filename: 'src/Leaf.tsrx',
+		source: `
+import { computed } from '@markless/core';
+
+export default function Leaf({ leafInput }) @{
+	const leafValue = computed(() => leafInput + 1);
+	<output>{leafValue}</output>
+}
+`,
+		symbols: [],
+	});
+	const parent = await compileTsrxModule({
+		filename: 'src/DeepSameModuleComputed.tsrx',
+		source: `
+import { computed, state } from '@markless/core';
+import Leaf from './Leaf.tsrx';
+
+function Deep({ deepInput }) @{
+	const deepValue = computed(() => deepInput + 1);
+	<div><Leaf leafInput={deepValue} /></div>
+}
+
+function Middle({ middleInput }) @{
+	const middleValue = computed(() => middleInput + 1);
+	<section><Deep deepInput={middleValue} /></section>
+}
+
+export function App() @{
+	let owner = state(0);
+	const rootValue = computed(() => owner + 1);
+	<main><Middle middleInput={rootValue} /></main>
+}
+`,
+		symbols: [],
+	});
+	const parentComputedBySymbolId = new Map(
+		parent.protocolState.computed.flatMap((computed) =>
+			computed.deriveSymbolId ? [[computed.deriveSymbolId, computed] as const] : [],
+		),
+	);
+	const childComputedBySymbolId = new Map(
+		child.protocolState.computed.flatMap((computed) =>
+			computed.deriveSymbolId ? [[computed.deriveSymbolId, computed] as const] : [],
+		),
+	);
+	const childDomUpdateIds = new Set(
+		child.protocolView.domUpdates.flatMap((update) =>
+			update.symbolId ? [update.symbolId] : [],
+		),
+	);
+	const childLoaderCalls: string[] = [];
+	const childLoadSymbol = (symbolId: string) => {
+		childLoaderCalls.push(symbolId);
+		const computed = childComputedBySymbolId.get(symbolId);
+		if (computed) {
+			return ({ graph }: { readonly graph: PublicRenderTestGraph }) => {
+				const dependency = computed.dependencies![0]!;
+				return Number(graph.read(dependency.graphNodeId, dependency.path)) + 1;
+			};
+		}
+		if (childDomUpdateIds.has(symbolId)) {
+			return (context: { readonly domUpdate: { readonly hostNodeId: string }; readonly value: unknown }) => ({
+				type: 'setText' as const,
+				locator: context.domUpdate.hostNodeId,
+				value: context.value,
+			});
+		}
+		throw new Error(`Unknown child async symbol ${symbolId}`);
+	};
+	const document = publicRenderTestDocument();
+	const childModule = await importPublicRenderTestModule(csrRenderTestModuleSource(child), {
+		document,
+		loadSymbol: childLoadSymbol,
+	});
+	const parentLoaderCalls: string[] = [];
+	const parentLoadSymbol = (requestedId: string) => {
+		parentLoaderCalls.push(requestedId);
+		const parentComputed = parentComputedBySymbolId.get(requestedId);
+		if (parentComputed) {
+			return ({ graph }: { readonly graph: PublicRenderTestGraph }) => {
+				const dependency = parentComputed.dependencies![0]!;
+				return Number(graph.read(dependency.graphNodeId, dependency.path)) + 1;
+			};
+		}
+		const childId = requestedId.slice(requestedId.lastIndexOf(':symbol:') + 1);
+		if (childComputedBySymbolId.has(childId) || childDomUpdateIds.has(childId)) {
+			return childLoadSymbol(childId);
+		}
+		throw new Error(`Unknown async symbol ${requestedId}`);
+	};
+	const parentModule = await importPublicRenderTestModule(
+		csrRenderTestModuleSource(parent, { replaceChildImport: true }),
+		{
+			document,
+			loadSymbol: parentLoadSymbol,
+			childComponent: { renderCsr: childModule.marklessRenderCsr },
+		},
+	);
+	const output = (parentModule.marklessRenderCsr as () => {
+		readonly root: PublicRenderTestElement;
+		readonly state: ProtocolStatePayload;
+		readonly view: ProtocolViewPayload;
+		readonly loadSymbol: typeof parentLoadSymbol;
+	})();
+	const container = await render(() => output as never, {
+		target: new PublicRenderTestElement('target') as never,
+	});
+
+	container.graph.write({ graphNodeId: 'state:owner', value: 1 });
+	await container.graph.flush();
+
+	const childDeriveId = child.protocolState.computed[0]!.deriveSymbolId!;
+	const childDomUpdateId = child.protocolView.domUpdates[0]!.symbolId!;
+	expect(parentLoaderCalls.filter((symbolId) => symbolId.startsWith('c'))).toEqual([
+		`c0:${childDeriveId}`,
+		`c0:${childDomUpdateId}`,
+	]);
+	expect(childLoaderCalls).toEqual([childDeriveId, childDomUpdateId]);
+	expect(output.root.textContent).toBe('5');
 });
 
 test('compileTsrxModule accepts the main authoring import', async () => {

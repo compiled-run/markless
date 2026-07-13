@@ -400,6 +400,68 @@ test('nested composed CSR sync computed accumulates each child route prefix exac
 	expect(container.graph.read('computed:leafOutput')).toBe(6);
 });
 
+test('three same-module hops preserve one imported-child route for derive and DOM symbols', async () => {
+	const leafState = computedState({
+		cellId: 'state:routedLeafInput',
+		computedId: 'computed:routedLeafOutput',
+		deriveSymbolId: 'symbol:leaf-derive',
+	});
+	const importedState = composeCsrState(emptyState(), [child(leafState, 'c0:')]);
+	const deepState = composeCsrState(emptyState(), [child(importedState, '')]);
+	const middleState = composeCsrState(emptyState(), [child(deepState, '')]);
+	const state = composeCsrState(emptyState(), [child(middleState, '')]);
+	const output = {
+		nodeType: 1 as const,
+		tagName: 'OUTPUT',
+		childNodes: [],
+		textContent: '1',
+		addEventListener() {},
+	};
+	const view = {
+		...emptyView,
+		locators: [{ hostNodeId: 'routed-leaf', strategy: 'dom-order', index: 0, tagName: 'output' }],
+		domUpdates: [
+			{
+				hostNodeId: 'routed-leaf',
+				source: 'routedLeafOutput',
+				graphNodeId: 'computed:routedLeafOutput',
+				path: [],
+				target: { kind: 'text' },
+				symbolId: 'c0:symbol:leaf-dom',
+			},
+		],
+	} as const;
+	const loaderCalls: string[] = [];
+	const container = await render(
+		() => ({
+			root: output as never,
+			state,
+			view: view as never,
+			loadSymbol(symbolId: string) {
+				loaderCalls.push(symbolId);
+				if (symbolId === 'c0:symbol:leaf-derive') {
+					return ({ graph }) => Number(graph.read('state:routedLeafInput')) + 1;
+				}
+				if (symbolId === 'c0:symbol:leaf-dom') {
+					return (context) => ({
+						type: 'setText' as const,
+						locator: context.domUpdate.hostNodeId,
+						value: context.value,
+					});
+				}
+				throw new Error(`Unknown async symbol ${symbolId}`);
+			},
+		}),
+		{ target: { replaceChildren() {} } },
+	);
+
+	container.graph.write({ graphNodeId: 'state:routedLeafInput', value: 6 });
+	await container.graph.flush();
+
+	expect(loaderCalls).toEqual(['c0:symbol:leaf-derive', 'c0:symbol:leaf-dom']);
+	expect(output.textContent).toBe('7');
+});
+
 test('composed SSR sync computed preserves its child-owned symbol route for resume', async () => {
 	const state = composeSsrState(emptyState(), [
 		child(

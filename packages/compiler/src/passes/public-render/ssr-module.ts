@@ -14,7 +14,7 @@ import {
 	hasPropDependentComputed,
 	isComponentRoot,
 	publicRenderValueImports,
-	sameModuleGraphProps,
+	composedGraphProps,
 	stateEntries,
 	staticHostLocators,
 	moduleScopeLines,
@@ -75,7 +75,7 @@ export function emitPublicSsrRenderModule(
 		hostLocators,
 	);
 	const remapsGraphProps = hasPropDependentComputed(input);
-	const internalGraphProps = sameModuleGraphProps(input);
+	const internalGraphProps = composedGraphProps(input);
 	const remapsInternalGraphProps = remapsGraphProps && internalGraphProps.length > 0;
 	const htmlExpression = emitHtmlNode(rootInfo.root, renderContext);
 	const sameModuleComponents = emitSameModuleSsrComponents(

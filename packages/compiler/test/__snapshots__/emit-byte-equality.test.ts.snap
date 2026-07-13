@@ -3259,7 +3259,7 @@ function marklessRenderCsr(props = {}) {
 	const root = marklessCsrRootFromHtml("<main>" + "<span data-markless-csr-child=\\"0\\"></span>" + "</main>");
 	const marklessCsrChild0 = marklessCsrRenderChild(__marklessCsrComponent0, { active: active });
 	marklessCsrReplaceChild(root, 0, marklessCsrChild0?.root);
-	marklessCsrChildren.push({ hostPrefix: "c0:", symbolPrefix: "c0:", output: marklessCsrChild0, graphProps: [{"name":"active","graphNodeId":"prop:props","path":["active"]}] });
+	marklessCsrChildren.push({ hostPrefix: "c0:", symbolPrefix: "", output: marklessCsrChild0, graphProps: [{"name":"active","graphNodeId":"prop:props","path":["active"]}] });
 	const marklessCsrView = marklessCsrComposeView(root, payloadView, marklessCsrHostLocators, marklessCsrChildren);
 	const marklessCsrState = marklessComposeState(marklessCsrPayloadState, marklessCsrChildren);
 	return {
@@ -3517,7 +3517,7 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 	const marklessSsrBranches = [];
 	const marklessSsrAsyncSnapshots = [];
 	const marklessSsrHostLocators = [];
-	const html = marklessSsrHost(marklessSsrHostLocators, "h3", "main") + "<main>" + (await marklessSsrRenderChild(marklessSsrChildren, __marklessSsrComponent0, { active: active, __marklessSsrCallbacks: marklessSsrCallbacks({ "active": marklessSsrCallbackSymbol(props, ["active"]) }) }, { hostPrefix: "c0:", symbolPrefix: "c0:", localIndex: marklessSsrHostLocators.length, graphProps: [{"name":"active","graphNodeId":"prop:props","path":["active"]}] }, marklessSsrRenderContext)) + "</main>";
+	const html = marklessSsrHost(marklessSsrHostLocators, "h3", "main") + "<main>" + (await marklessSsrRenderChild(marklessSsrChildren, __marklessSsrComponent0, { active: active, __marklessSsrCallbacks: marklessSsrCallbacks({ "active": marklessSsrCallbackSymbol(props, ["active"]) }) }, { hostPrefix: "c0:", symbolPrefix: "", localIndex: marklessSsrHostLocators.length, graphProps: [{"name":"active","graphNodeId":"prop:props","path":["active"]}] }, marklessSsrRenderContext)) + "</main>";
 	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren, marklessSsrAsyncSnapshots);
 	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
