@@ -7,12 +7,13 @@ import { createSignalFavoringServer as createStaticServer } from '../signal-favo
 import { evaluateDbmonAnalyzerPolicy } from './analyzer-policy.mjs';
 
 const OPERATIONS = ['mount', 'full-tick', 'partial-tick', 'all-new-key-remount', 'sort-reorder', 'unmount'];
-// Per-field suppression means tick write counts are data-dependent (the
-// seeded corpus repeats the odd value across frames), so tick gates require
-// textMutations === changedCells (exact-work equality: no redundant write,
-// no missed write reaches the DOM diff) inside a sanity band that proves the
-// workload is real. With the current corpus the full tick changes 5,968
-// cells and the partial tick 596; the stable dbname column must never move.
+// The unconditional row writer yields exact tick write counts (7,000 full,
+// 700 partial). changedCells comes from a full cell-snapshot diff and its
+// band proves values really changed (5,968 full / 596 partial with the
+// current corpus) - a broken writer cannot pass on counts alone. Per-field
+// suppression remains the lane's improvement hypothesis; the naive
+// live-node-compare attempt was measured, rejected, and reverted (see the
+// pinned pair under baselines/pairs/dbmon/).
 const EXPECTED = {
 	mount: { rows: 1_000, cells: 7_000 },
 	'full-tick': { rows: 1_000, cells: 7_000, textMutations: 7_000, changedCellsMin: 5_500, changedCellsMax: 6_000 },
@@ -154,14 +155,12 @@ async function semanticGates(bench) {
 		await quiet();
 		const mountedRows = rows();
 		const mount = snapshot();
-		// Per-field suppression makes the honest write count data-dependent:
-		// a write must happen exactly when a cell's stringified value changed
-		// (the seeded corpus occasionally repeats a value across frames). So
-		// the gate snapshots every cell, diffs after commit, and requires
-		// observed mutations === changed cells. A same-value write cannot
-		// appear in the diff but is counted by the observer, so any
-		// redundant write fails the equality. commitFloor only detects the
-		// commit batch; exactness comes from the diff.
+		// The unconditional row writer rewrites all 7,000 cells per full tick
+		// (700 per partial tick) and the gate requires those exact counts.
+		// The cell-snapshot diff additionally proves the workload is real: a
+		// silently broken writer (finding 10's failure class) cannot pass on
+		// mutation counts alone because changedCells would fall out of band.
+		// commitFloor only detects the commit batch; exactness is gated above.
 		const cellTexts = () => [...document.querySelectorAll('.dbmon tbody td')].map((cell) => cell.textContent);
 		const observe = async (action, commitFloor) => {
 			const beforeTexts = cellTexts();
