@@ -11,6 +11,7 @@ import { runStreamingSsr } from './lanes/streaming-ssr/run.mjs';
 import { runNews } from './lanes/news/run.mjs';
 import { checkGeneratedFixture } from './lanes/signal-favoring/gen.mjs';
 import { runSignalFavoring } from './lanes/signal-favoring/run.mjs';
+import { runMemoWall } from './lanes/memo-wall/run.mjs';
 
 process.env.NODE_ENV = 'production';
 
@@ -23,19 +24,22 @@ const laneDefinitions = {
 	'streaming-ssr': { run: runStreamingSsr, protocol: streamingSsrProtocol },
 	news: { run: runNews, protocol: newsProtocol },
 	'signal-favoring': { run: runSignalFavoring, protocol: signalFavoringProtocol },
+	'memo-wall': { run: runMemoWall, protocol: memoWallProtocol },
 };
 const laneDefinition = laneDefinitions[lane];
 
 if (!laneDefinition) {
 	console.error(
-		'usage: node bench.mjs <ssr-throughput|streaming-ssr|news|signal-favoring> [--smoke] [--record] [--build-only] [--ssr-only] [--gen-check]',
+		'usage: node bench.mjs <ssr-throughput|streaming-ssr|news|signal-favoring|memo-wall> [--smoke] [--record] [--build-only] [--ssr-only] [--gen-check]',
 	);
 	process.exit(2);
 }
 
 if (lane === 'signal-favoring' && flags.has('--gen-check')) {
 	const summary = checkGeneratedFixture();
-	console.log(`signal-favoring generator check passed: ${summary.levels} levels, ${summary.owners.length} owners`);
+	console.log(
+		`signal-favoring generator check passed: ${summary.levels} levels, ${summary.owners.length} owners`,
+	);
 	process.exit(0);
 }
 
@@ -50,7 +54,7 @@ const smoke = flags.has('--smoke');
 const protocol = laneDefinition.protocol(smoke);
 const environment = collectEnvironment();
 let fixture;
-if (lane !== 'signal-favoring') {
+if (lane !== 'signal-favoring' && lane !== 'memo-wall') {
 	const entryPath = path.join(
 		fixtureRoot,
 		'dist',
@@ -63,7 +67,11 @@ const outcome = await laneDefinition.run({
 	protocol,
 	environment,
 	ssrOnly: flags.has('--ssr-only'),
-	clientDirectory: path.join(fixtureRoot, 'dist', ...(lane === 'signal-favoring' ? [] : ['client'])),
+	clientDirectory: path.join(
+		fixtureRoot,
+		'dist',
+		...(lane === 'signal-favoring' || lane === 'memo-wall' ? [] : ['client']),
+	),
 	receiptPath: path.join(root, 'dist', 'results', `${lane}-analyzer-verdict.json`),
 });
 assertResult(outcome.result);
@@ -87,8 +95,8 @@ if (flags.has('--record')) {
 process.exitCode = outcome.exitCode;
 
 async function buildFixture(fixtureDirectory) {
-	if (lane === 'signal-favoring') {
-		console.error('building signal-favoring production client fixture…');
+	if (lane === 'signal-favoring' || lane === 'memo-wall') {
+		console.error(`building ${lane} production client fixture…`);
 		execFileSync('pnpm', ['exec', 'vp', 'build'], { cwd: fixtureDirectory, stdio: 'inherit' });
 		return;
 	}
@@ -172,6 +180,25 @@ function signalFavoringProtocol(smoke) {
 	};
 }
 
+function memoWallProtocol(smoke) {
+	return {
+		mode: smoke ? 'smoke' : 'full',
+		timedSeconds: 0,
+		warmupMinimumRenders: 5,
+		warmupSeconds: 0,
+		maxSamples: smoke ? 1 : 20,
+		memoryMaxRenders: 0,
+		forcedGc: false,
+		browserForcedGc: true,
+		operationWarmups: 5,
+		operationSamples: smoke ? 1 : 20,
+		equalWriteRepetitions: 10,
+		oneChangeRepetitions: 10,
+		sharedFanoutRepetitions: 5,
+		sampleYieldMs: 5,
+	};
+}
+
 function collectEnvironment() {
 	return {
 		os: `${os.platform()} ${os.release()}`,
@@ -198,12 +225,18 @@ function printSummary(result, resultPath) {
 		console.log(`correctness gate failed: ${result.failure}`);
 	} else if (result.lane === 'news') {
 		const benchmarkCase = result.cases[0];
-		console.log(`warm SSR p50: ${benchmarkCase.timing.p50Ms.toFixed(3)} ms (${benchmarkCase.timing.samples} samples)`);
+		console.log(
+			`warm SSR p50: ${benchmarkCase.timing.p50Ms.toFixed(3)} ms (${benchmarkCase.timing.samples} samples)`,
+		);
 		console.log(`HTML: ${benchmarkCase.bodyBytes} bytes`);
 		if (benchmarkCase.metrics) {
-			console.log(`resume + first dispatch p50: ${benchmarkCase.metrics.resume_first_dispatch_ms.p50Ms.toFixed(3)} ms`);
+			console.log(
+				`resume + first dispatch p50: ${benchmarkCase.metrics.resume_first_dispatch_ms.p50Ms.toFixed(3)} ms`,
+			);
 			console.log(`preloaded client: ${benchmarkCase.metrics.preloaded_client_bytes} bytes`);
-			console.log(`startup executed: ${benchmarkCase.metrics.startup_executed_bytes ?? 'unavailable'} bytes`);
+			console.log(
+				`startup executed: ${benchmarkCase.metrics.startup_executed_bytes ?? 'unavailable'} bytes`,
+			);
 		}
 	} else if (result.lane === 'signal-favoring') {
 		console.log('operation                 p50 ms    p95 ms   computeds   DOM nodes   batches');
@@ -213,9 +246,30 @@ function printSummary(result, resultPath) {
 				`${benchmarkCase.name.padEnd(25)} ${benchmarkCase.timing.p50Ms.toFixed(3).padStart(8)} ${benchmarkCase.timing.p95Ms.toFixed(3).padStart(9)} ${String(evidence.recomputations).padStart(11)} ${String(evidence.domMutations).padStart(11)} ${String(evidence.mutationBatches).padStart(9)}`,
 			);
 		}
-		console.log('browser GC is requested before timed samples; timed propagation windows allow zero requests');
+		console.log(
+			'browser GC is requested before timed samples; timed propagation windows allow zero requests',
+		);
+	} else if (result.lane === 'memo-wall') {
+		console.log(
+			'operation                      p50 ms    p95 ms   evaluations   DOM nodes   batches',
+		);
+		for (const benchmarkCase of result.cases) {
+			const evidence = benchmarkCase.metrics.counterEvidence.actual;
+			const evaluations = ['rowA', 'innerA', 'leafA', 'rowB', 'innerB', 'leafB'].reduce(
+				(sum, field) => sum + evidence[field],
+				0,
+			);
+			console.log(
+				`${benchmarkCase.name.padEnd(30)} ${benchmarkCase.timing.p50Ms.toFixed(3).padStart(8)} ${benchmarkCase.timing.p95Ms.toFixed(3).padStart(9)} ${String(evaluations).padStart(13)} ${String(evidence.domMutations).padStart(11)} ${String(evidence.mutationBatches).padStart(9)}`,
+			);
+		}
+		console.log(
+			'browser GC is requested before timed samples; timed memo-wall windows allow zero requests',
+		);
 	} else if (result.lane === 'streaming-ssr') {
-		console.log('scenario       shell p50 ms   total p50 ms   chunks   total bytes   renders/sec');
+		console.log(
+			'scenario       shell p50 ms   total p50 ms   chunks   total bytes   renders/sec',
+		);
 		for (const benchmarkCase of result.cases) {
 			const rendersPerSec = benchmarkCase.metadata.rendersPerSec;
 			console.log(
@@ -224,7 +278,9 @@ function printSummary(result, resultPath) {
 		}
 		console.log('chunk count and total bytes are unnormalized framework-specific metadata');
 	} else {
-		console.log('case                 ops/sec    p50 ms    p95 ms    p99 ms    min ms   body bytes   rss growth   heap growth');
+		console.log(
+			'case                 ops/sec    p50 ms    p95 ms    p99 ms    min ms   body bytes   rss growth   heap growth',
+		);
 		for (const benchmarkCase of result.cases) {
 			const timing = benchmarkCase.timing;
 			console.log(

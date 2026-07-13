@@ -85,3 +85,25 @@ pnpm --dir demos/octane-bench bench -- signal-favoring --record
 This lane ports Octane's generated 100-component signal-favoring chain, five warmups, twenty timed samples, inner repetitions, short sample yields, browser-GC request, shallow/middle/deep writes, forward per-write flush, one-flush forward and reverse sweeps, mount, and teardown. Ordinary TSRX `state()` owners appear at levels 1, 11, 21, through 91. Every level derives one `computed()` from its predecessor, and fixture-owned wrappers count those evaluations. MutationObserver records the reactive DOM nodes affected and the number of observer batches.
 
 Correctness gates require exact computed and DOM work: shallow, middle, and deep writes affect 100, 50, and 10 levels; a per-write sweep performs 550 evaluations and ten mutation batches; either one-flush sweep performs 100 evaluations in one mutation batch; and an equal write performs no work. The production client uses `@markless/web`'s `render` export. Its static server allows only the document and production build assets, primes lazy render imports before timing, and fails MLA-I2 if any request enters a measured propagation window. The receipt contains MLA-I2-NETWORK and MLA-EXT-SIGNAL-GATES; MLA-S1 does not apply because this CSR lane is not a resume or preload oracle.
+
+## Memo wall
+
+Build the production CSR fixture with:
+
+```sh
+pnpm --dir demos/octane-bench bench -- memo-wall --build-only
+```
+
+The benchmark owner runs the complete Playwright phase and records a local baseline with:
+
+```sh
+pnpm --dir demos/octane-bench bench -- memo-wall --record
+```
+
+This lane ports Octane memo-wall's two deterministic 1,000-row branches with mount, equal-parent-write, one-row-change, and fan-out operations. The walls are inline keyed `@for` tables (the JSFB-proven authoring shape) that start empty and fill via dispatched clicks — the fill dispatch is the measured wall-mount operation. Exact-work evidence is MutationObserver text-mutation counts with truthful expectations: equal writes prove ZERO work, a one-row change proves exactly 3 cell writes, and the fan-out (a theme field travelling in row data) proves 3,000 writes — markless rewrites every bound cell of a changed row object, so per-field identical-value suppression (3,000 → 1,000) is a named score-improvement hypothesis.
+
+Two honesty notes. First, `shared()` (the context-translation the plan mandated) has no compiled-TSRX support yet, and single-source cross-state fan-out into keyed rows renders empty — both are parked framework findings; the row-data fan-out here is explicitly NOT context semantics. Second, several constructs silently drop or empty compiled output (call-expression `state()` initializers, module-scope calls / template literals / non-row state references inside row expressions); this fixture documents the proven shape and the goal notes carry the full forensics.
+
+Full runs use five warmups, twenty timed samples, ten inner repetitions for equal and one-row writes, five repetitions for shared fan-out, a five-millisecond yield, and browser garbage collection before each sample. Fixture-owned counters and MutationObserver tallies gate every timing. Equal writes require zero computed evaluations and zero DOM mutations; one-row writes require exactly one targeted Row→Inner→Leaf chain and three DOM text mutations; each `shared()` write requires exactly 1,000 targeted leaf evaluations and DOM mutations with zero work in the other branch. A failed count produces a failed result and nonzero exit.
+
+The production client reuses the signal-favoring static preview server, declares the document and every production build asset, and permits zero requests during timed windows. Its verdict receipt contains MLA-I2-NETWORK and MLA-EXT-MEMO-GATES. MLA-S1 does not apply because this is a CSR propagation lane rather than a resume oracle.

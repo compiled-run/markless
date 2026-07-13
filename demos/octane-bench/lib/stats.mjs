@@ -22,6 +22,8 @@ export function summarizeSamples(samples) {
 		p95Ms: nearestRank(sorted, 0.95),
 		p99Ms: nearestRank(sorted, 0.99),
 		meanMs,
-		opsPerSec: meanMs === 0 ? Number.POSITIVE_INFINITY : 1000 / meanMs,
+		// Sub-timer-resolution operations have no honest ops/sec; report null
+		// rather than infinity (the timing distribution still carries the truth).
+		opsPerSec: meanMs === 0 ? null : 1000 / meanMs,
 	};
 }

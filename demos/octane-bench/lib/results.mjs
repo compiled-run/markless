@@ -134,9 +134,10 @@ function assertCase(benchmarkCase, index) {
 
 function assertTiming(timing, label) {
 	assertObject(timing, label);
-	for (const field of ['samples', 'minMs', 'p50Ms', 'p95Ms', 'p99Ms', 'meanMs', 'opsPerSec']) {
+	for (const field of ['samples', 'minMs', 'p50Ms', 'p95Ms', 'p99Ms', 'meanMs']) {
 		assertFiniteNumber(timing[field], `${label}.${field}`);
 	}
+	if (timing.opsPerSec !== null) assertFiniteNumber(timing.opsPerSec, `${label}.opsPerSec`);
 }
 
 function assertMemory(memory, label) {
