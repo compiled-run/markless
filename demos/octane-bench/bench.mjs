@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build } from 'vite';
 import { assertResult, writeBaseline, writeResult } from './lib/results.mjs';
 import { runSsrThroughput } from './lanes/ssr-throughput/run.mjs';
+import { runStreamingSsr } from './lanes/streaming-ssr/run.mjs';
 
 process.env.NODE_ENV = 'production';
 
@@ -14,9 +15,16 @@ const root = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
 const flags = new Set(args.filter((argument) => argument.startsWith('--')));
 const lane = args.find((argument) => !argument.startsWith('--'));
+const laneDefinitions = {
+	'ssr-throughput': { run: runSsrThroughput, protocol: ssrThroughputProtocol },
+	'streaming-ssr': { run: runStreamingSsr, protocol: streamingSsrProtocol },
+};
+const laneDefinition = laneDefinitions[lane];
 
-if (!lane || lane !== 'ssr-throughput') {
-	console.error('usage: node bench.mjs ssr-throughput [--smoke] [--record] [--build-only]');
+if (!laneDefinition) {
+	console.error(
+		'usage: node bench.mjs <ssr-throughput|streaming-ssr> [--smoke] [--record] [--build-only]',
+	);
 	process.exit(2);
 }
 
@@ -28,19 +36,11 @@ if (flags.has('--build-only')) {
 }
 
 const smoke = flags.has('--smoke');
-const protocol = {
-	mode: smoke ? 'smoke' : 'full',
-	timedSeconds: smoke ? 1 : 10,
-	warmupMinimumRenders: 3,
-	warmupSeconds: smoke ? 0.1 : 1,
-	maxSamples: 200_000,
-	memoryMaxRenders: smoke ? 100 : 5_000,
-	forcedGc: false,
-};
+const protocol = laneDefinition.protocol(smoke);
 const environment = collectEnvironment();
 const entryPath = path.join(fixtureRoot, 'dist', 'entry-server.js');
 const fixture = await import(`${pathToFileURL(entryPath).href}?built=${Date.now()}`);
-const outcome = await runSsrThroughput({ fixture, protocol, environment });
+const outcome = await laneDefinition.run({ fixture, protocol, environment });
 assertResult(outcome.result);
 
 const resultPath = process.env.BENCH_JSON
@@ -71,6 +71,32 @@ async function buildFixture(fixtureDirectory) {
 	});
 }
 
+function ssrThroughputProtocol(smoke) {
+	return {
+		mode: smoke ? 'smoke' : 'full',
+		timedSeconds: smoke ? 1 : 10,
+		warmupMinimumRenders: 3,
+		warmupSeconds: smoke ? 0.1 : 1,
+		maxSamples: 200_000,
+		memoryMaxRenders: smoke ? 100 : 5_000,
+		forcedGc: false,
+	};
+}
+
+function streamingSsrProtocol(smoke) {
+	return {
+		mode: smoke ? 'smoke' : 'full',
+		timedSeconds: 0,
+		warmupMinimumRenders: smoke ? 1 : 5,
+		warmupSeconds: 0,
+		maxSamples: smoke ? 3 : 30,
+		memoryMaxRenders: 0,
+		forcedGc: false,
+		warmupRenders: smoke ? 1 : 5,
+		timedRenders: smoke ? 3 : 30,
+	};
+}
+
 function collectEnvironment() {
 	return {
 		os: `${os.platform()} ${os.release()}`,
@@ -95,6 +121,15 @@ function printSummary(result, resultPath) {
 	console.log(`\n${result.lane} — ${result.status} (${result.protocol.mode})`);
 	if (result.status === 'failed') {
 		console.log(`correctness gate failed: ${result.failure}`);
+	} else if (result.lane === 'streaming-ssr') {
+		console.log('scenario       shell p50 ms   total p50 ms   chunks   total bytes   renders/sec');
+		for (const benchmarkCase of result.cases) {
+			const rendersPerSec = benchmarkCase.metadata.rendersPerSec;
+			console.log(
+				`${benchmarkCase.name.padEnd(14)} ${benchmarkCase.shellTiming.p50Ms.toFixed(3).padStart(12)} ${benchmarkCase.timing.p50Ms.toFixed(3).padStart(14)} ${String(benchmarkCase.metadata.chunkCount).padStart(8)} ${String(benchmarkCase.metadata.totalBytes).padStart(13)} ${rendersPerSec === undefined ? '—'.padStart(13) : rendersPerSec.toFixed(1).padStart(13)}`,
+			);
+		}
+		console.log('chunk count and total bytes are unnormalized framework-specific metadata');
 	} else {
 		console.log('case                 ops/sec    p50 ms    p95 ms    p99 ms    min ms   body bytes   rss growth   heap growth');
 		for (const benchmarkCase of result.cases) {

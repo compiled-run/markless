@@ -7,7 +7,7 @@
 		"check": "vp check",
 		"build": "node bench.mjs ssr-throughput --build-only",
 		"bench": "node bench.mjs",
-		"test": "node --test lanes/ssr-throughput/run.test.mjs"
+		"test": "node --test lanes/*/run.test.mjs"
 	},
 	"dependencies": {
 		"@markless/core": "workspace:*"

@@ -1,0 +1,114 @@
+{
+	"schemaVersion": 1,
+	"kind": "markless-benchmark-result",
+	"lane": "streaming-ssr",
+	"status": "passed",
+	"recordedAt": "2026-07-13T05:25:14.711Z",
+	"protocol": {
+		"mode": "full",
+		"timedSeconds": 0,
+		"warmupMinimumRenders": 5,
+		"warmupSeconds": 0,
+		"maxSamples": 30,
+		"memoryMaxRenders": 0,
+		"forcedGc": false,
+		"warmupRenders": 5,
+		"timedRenders": 30
+	},
+	"environment": {
+		"os": "darwin 25.5.0",
+		"arch": "arm64",
+		"cpuModel": "Apple M5 Pro",
+		"nodeVersion": "v24.15.0",
+		"pnpmVersion": "10.33.2",
+		"gitSha": "13c28cbf28ff92f4a62786792b826e09266c608c",
+		"dirtyTree": true
+	},
+	"cases": [
+		{
+			"name": "staggered",
+			"gates": {
+				"passed": true,
+				"checks": [
+					"shell was exposed as the first non-empty chunk",
+					"all ten cards were present exactly once at completion",
+					"every card pending at shell time had a skeleton placeholder",
+					"slowest card arrived after the shell",
+					"staggered completion took at least 40 ms"
+				]
+			},
+			"bodyBytes": 41531,
+			"timing": {
+				"samples": 30,
+				"minMs": 50.62358300000005,
+				"p50Ms": 51.34887500000002,
+				"p95Ms": 52.08674999999994,
+				"p99Ms": 52.29141600000003,
+				"meanMs": 51.420349966666684,
+				"opsPerSec": 19.44755336453858
+			},
+			"shellTiming": {
+				"samples": 30,
+				"minMs": 10.72287499999993,
+				"p50Ms": 11.811500000000024,
+				"p95Ms": 12.370708000000036,
+				"p99Ms": 12.67037500000015,
+				"meanMs": 11.591693133333328,
+				"opsPerSec": 86.26867434269614
+			},
+			"metadata": {
+				"chunkCount": 10,
+				"totalBytes": 41531
+			},
+			"memory": {
+				"label": "allocator-growth-observation",
+				"renders": 30,
+				"rssGrowthBytes": 819200,
+				"heapGrowthBytes": -5442912,
+				"forcedGc": false
+			}
+		},
+		{
+			"name": "all-fast",
+			"gates": {
+				"passed": true,
+				"checks": [
+					"shell was exposed as the first non-empty chunk",
+					"all ten cards were present exactly once at completion",
+					"every card pending at shell time had a skeleton placeholder"
+				]
+			},
+			"bodyBytes": 37663,
+			"timing": {
+				"samples": 30,
+				"minMs": 0.5478339999999662,
+				"p50Ms": 1.9239999999999782,
+				"p95Ms": 2.3463339999998425,
+				"p99Ms": 2.3801250000001346,
+				"meanMs": 1.8074499999999867,
+				"opsPerSec": 553.2656505020926
+			},
+			"shellTiming": {
+				"samples": 30,
+				"minMs": 0.49816699999973935,
+				"p50Ms": 1.8687919999997575,
+				"p95Ms": 2.296624999999949,
+				"p99Ms": 2.3025000000002365,
+				"meanMs": 1.7489986999999625,
+				"opsPerSec": 571.7557137120922
+			},
+			"metadata": {
+				"chunkCount": 1,
+				"totalBytes": 37663,
+				"rendersPerSec": 553.2656505020926
+			},
+			"memory": {
+				"label": "allocator-growth-observation",
+				"renders": 30,
+				"rssGrowthBytes": 163840,
+				"heapGrowthBytes": -4678120,
+				"forcedGc": false
+			}
+		}
+	]
+}
