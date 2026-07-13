@@ -15,6 +15,10 @@ export type SymbolTableUrlRewriteResult = {
 };
 
 const SYMBOL_VIRTUAL_PREFIX = `${MARKLESS_VIRTUAL_PREFIX}symbol:`;
+// OXC packs sufficiently long string arrays as "a,b,c".split(","). Recover
+// that emitted representation before resolving each compiler-owned URL.
+const PACKED_SYMBOL_VIRTUAL_LIST_RE =
+	/(["'`])((?:virtual:markless:symbol:)[^"'`]+)\1\.split\(\s*(["'`]),\3\s*\)/g;
 const SYMBOL_VIRTUAL_STRING_RE = /(["'`])((?:virtual:markless:symbol:)[^"'`]+)\1/g;
 const SYMBOL_MANIFEST_TUPLE_RE =
 	/(\[1,(?:null|["'`][^"'`]*["'`]),(?:null|["'`][^"'`]*["'`]),)(\[[^\]]*\]),(\[[^\]]*\]),(\{[^}]*\})(\])/g;
@@ -79,16 +83,41 @@ function rewriteSymbolVirtualStrings(
 	let rewritten = 0;
 	const unresolved = new Set<string>();
 	const code = compactSymbolManifestTables(
-		chunk.code.replace(SYMBOL_VIRTUAL_STRING_RE, (match, _quote: string, virtualId: string) => {
-			const fileName = symbolFiles.get(virtualId);
-			if (!fileName) {
-				unresolved.add(virtualId);
-				return match;
-			}
+		chunk.code
+			.replace(
+				PACKED_SYMBOL_VIRTUAL_LIST_RE,
+				(match, _quote: string, packedVirtualIds: string) => {
+					const virtualIds = packedVirtualIds.split(',');
+					if (
+						virtualIds.length < 2 ||
+						virtualIds.some((id) => !id.startsWith(SYMBOL_VIRTUAL_PREFIX))
+					) {
+						return match;
+					}
 
-			rewritten++;
-			return JSON.stringify(relativeChunkSpecifier(chunk.fileName, fileName));
-		}),
+					return JSON.stringify(
+						virtualIds.map((virtualId) => {
+							const fileName = symbolFiles.get(virtualId);
+							if (!fileName) return virtualId;
+							rewritten++;
+							return relativeChunkSpecifier(chunk.fileName, fileName);
+						}),
+					);
+				},
+			)
+			.replace(
+				SYMBOL_VIRTUAL_STRING_RE,
+				(match, _quote: string, virtualId: string) => {
+					const fileName = symbolFiles.get(virtualId);
+					if (!fileName) {
+						unresolved.add(virtualId);
+						return match;
+					}
+
+					rewritten++;
+					return JSON.stringify(relativeChunkSpecifier(chunk.fileName, fileName));
+				},
+			),
 	);
 
 	return { code, rewritten, unresolved: [...unresolved] };

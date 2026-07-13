@@ -16,21 +16,23 @@ Add `--smoke` for a cheap one-second-per-case verification, or `--record` to wri
 
 The signal-favoring lane is implemented and node-tested but currently fails at mount with
 `Unknown async symbol` at octane's mandated 100-level topology: markless's production symbol
-pipeline breaks near ~200 compiled symbols (90 levels mount; 100 do not; a single 211-symbol
-module also fails at build). The topology is not shrunk because that would fake comparability.
-The lane turns green when the framework ceiling is fixed; its mount gate is that fix's proof.
+pipeline breaks at runtime (90 levels mount; 100 do not). The previously documented build
+failure for a single 211-symbol module was the same packed resolver-table defect as framework
+finding 8 and is fixed; the remaining mount failure is separate PM work. The topology is not
+shrunk because that would fake comparability. The lane turns green when its mount ceiling is
+fixed; its mount gate is that fix's proof.
 
-## Lane status: async-waterfall (PARKED RED)
+## Lane status: async-waterfall (UNPARKED FOR BUILD)
 
-The async-waterfall lane is implemented and node-tested, but `node bench.mjs async-waterfall
---build-only` fails at octane's mandated ten-level topology: a component whose async computed
-count and async boundary count are BOTH eight or more (with at least one side at nine or more)
-emits unresolved generated symbol chunks at build. Eight computeds with eight boundaries build;
-eight with nine do not; sixteen computeds with one boundary do. Nested async boundary markup is
-separately rejected as `nested-boundary-unsupported`, so the ten levels are flat siblings backed
-by a true ten-node async dependency chain. The topology is not shrunk because that would fake
-comparability. The lane is excluded from this package's default `build` script while parked; it
-turns green when the ceiling is fixed, and its `--build-only` command is that fix's proof.
+The async-waterfall lane is implemented, node-tested, and green for `node bench.mjs
+async-waterfall --build-only` at octane's mandated ten-level topology. Framework finding 8 is
+fixed: OXC packed dense resolver URL arrays into a comma-joined string, and the bundler now
+recovers every generated symbol row from that representation. The focused 8-by-8, 8-by-9,
+16-by-1, and 10-by-10 build matrix passes, including all 31 resolver rows for ten by ten. Nested
+async boundary markup remains separately rejected as `nested-boundary-unsupported`, so the ten
+levels are flat siblings backed by a true ten-node async dependency chain. The lane is restored
+to this package's default `build` script. Browser measurement and the first performance baseline
+remain PM work and are not part of this build-only unpark.
 
 ## Lane status: effectful-list (PARKED RED, no lane directory)
 

@@ -670,6 +670,35 @@ let count = state(0);
 		expect(resolverChunk?.code).not.toContain('virtual:markless:symbol:');
 	});
 
+	test('generateBundle hard-errors when a compiler symbol chunk is genuinely missing', async () => {
+		const plugin = marklessClient();
+		const filename = '/workspace/app/src/App.tsrx';
+		const encoded = encodeURIComponent(filename);
+		const resolverId = `virtual:markless:resolver:${encoded}`;
+
+		callBuildStart(plugin, { cwd: '/workspace/app' });
+		await callTransform(plugin, source, filename);
+		const resolverSource = (await callLoad(plugin, `\0${resolverId}`)) as string;
+
+		await expect(
+			callGenerateBundle(plugin, {
+				'build/resolver.js': {
+					type: 'chunk',
+					fileName: 'build/resolver.js',
+					name: 'resolver',
+					code: resolverSource,
+					exports: ['loadSymbol', 'symbolManifest'],
+					imports: [],
+					dynamicImports: [],
+					moduleIds: [`\0${resolverId}`],
+					facadeModuleId: `\0${resolverId}`,
+				},
+			}),
+		).rejects.toThrow(
+			'Markless symbol resolver table contains unresolved generated symbol chunks:',
+		);
+	});
+
 	test('generateBundle injects every compact graph symbol preload into HTML', async () => {
 		const plugin = marklessClient();
 		const emitFile = vi.fn();
