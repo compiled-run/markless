@@ -79,7 +79,7 @@ export function emitSameModuleCsrComponents(
 			...renderContext.childReplacements,
 			'	const marklessCsrView = marklessCsrComposeView(root, marklessViewWithoutAnchors(payloadView), [], marklessCsrChildren);',
 			'	const marklessCsrState = marklessComposeState(marklessCsrPayloadState, marklessCsrChildren);',
-			`	return { root, state: marklessCsrState, view: marklessCsrView, loadSymbol${remapsGraphProps ? ', m(graphProps) { marklessCsrRemapGraphOutput(this, graphProps); }' : ''}, connectRuntime(context) { marklessCsrRuntimeState.graph = context.graph; for (const child of marklessCsrChildren) child.output?.connectRuntime?.(context); } };`,
+			`	return { root, state: marklessCsrState, view: marklessCsrView, loadSymbol: (symbolId) => marklessCsrLoadChildSymbol(marklessCsrChildren, loadSymbol, symbolId)${remapsGraphProps ? ', m(graphProps) { marklessCsrRemapGraphOutput(this, graphProps); }' : ''}, connectRuntime(context) { marklessCsrRuntimeState.graph = context.graph; for (const child of marklessCsrChildren) child.output?.connectRuntime?.(context); } };`,
 			'}',
 		].filter((line): line is string => line !== null);
 	});

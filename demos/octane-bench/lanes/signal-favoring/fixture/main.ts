@@ -34,17 +34,53 @@ function click(selector: string): void {
 	button.click();
 }
 
+// Every owner write flows into the deepest output (value100 sums all owner
+// contributions), so waiting for its text to reach an expected value is an
+// event-driven commit barrier that also verifies content. graph.flush() is
+// not a commit barrier for dispatched clicks, and a click dispatched while
+// a prior propagation is in flight is dropped, so sequential sweeps MUST
+// wait out each commit (that is also octane's sequential-sweep semantics).
+function deepestText(): string {
+	const node = target.querySelector("[data-value='100']");
+	if (!node) throw new Error('signal-favoring deepest output is missing');
+	return node.textContent ?? '';
+}
+
+function untilDeepest(expected: string, timeoutMs = 15_000): Promise<void> {
+	return new Promise((resolve, reject) => {
+		if (deepestText() === expected) {
+			resolve();
+			return;
+		}
+		const timer = setTimeout(() => {
+			observer.disconnect();
+			reject(new Error(`signal-favoring deepest output never reached ${expected} (at ${deepestText()})`));
+		}, timeoutMs);
+		const observer = new MutationObserver(() => {
+			if (deepestText() !== expected) return;
+			clearTimeout(timer);
+			observer.disconnect();
+			resolve();
+		});
+		observer.observe(target, { characterData: true, childList: true, subtree: true });
+	});
+}
+
 async function write(level: number): Promise<void> {
+	const expected = String(Number(deepestText()) + 1);
 	click(`[data-owner="${level}"]`);
-	await flush();
+	await untilDeepest(expected);
 }
 
 async function sweep(levels: readonly number[], flushEach: boolean): Promise<void> {
-	for (const level of levels) {
-		click(`[data-owner="${level}"]`);
-		if (flushEach) await flush();
+	if (flushEach) {
+		for (const level of levels) await write(level);
+		return;
 	}
-	if (!flushEach) await flush();
+	const expected = String(Number(deepestText()) + levels.length);
+	for (const level of levels) click(`[data-owner="${level}"]`);
+	await flush();
+	await untilDeepest(expected);
 }
 
 const api = {

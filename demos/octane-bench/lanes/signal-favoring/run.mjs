@@ -230,7 +230,10 @@ async function collectEvidence(page, operation) {
 		// reaching the expected total, zero-work cases on a quiet window.
 		const recomputationSum = () => api.readEvaluationCounters().reduce((sum, count) => sum + count, 0);
 		const until = async (predicate, label) => {
-			for (let attempt = 0; attempt < 1_000; attempt++) {
+			// Sweeps drive ten sequential deep writes (550 recomputations) and a
+			// fresh context demand-loads symbol chunks on first use, so the
+			// evidence wait is generous; exactness is still gated on the counts.
+			for (let attempt = 0; attempt < 6_000; attempt++) {
 				if (predicate()) return;
 				await new Promise((resolve) => setTimeout(resolve, 5));
 			}

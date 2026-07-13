@@ -3333,7 +3333,7 @@ function Card({ value }) @{
 	);
 });
 
-test('deep same-module CSR preserves one imported-child route for computed and DOM writes', async () => {
+test('deep same-module CSR delegates an imported-child route for computed and DOM writes', async () => {
 	const child = await compileTsrxModule({
 		filename: 'src/Leaf.tsrx',
 		source: `
@@ -3419,10 +3419,6 @@ export function App() @{
 				return Number(graph.read(dependency.graphNodeId, dependency.path)) + 1;
 			};
 		}
-		const childId = requestedId.slice(requestedId.lastIndexOf(':symbol:') + 1);
-		if (childComputedBySymbolId.has(childId) || childDomUpdateIds.has(childId)) {
-			return childLoadSymbol(childId);
-		}
 		throw new Error(`Unknown async symbol ${requestedId}`);
 	};
 	const parentModule = await importPublicRenderTestModule(
@@ -3448,10 +3444,8 @@ export function App() @{
 
 	const childDeriveId = child.protocolState.computed[0]!.deriveSymbolId!;
 	const childDomUpdateId = child.protocolView.domUpdates[0]!.symbolId!;
-	expect(parentLoaderCalls.filter((symbolId) => symbolId.startsWith('c'))).toEqual([
-		`c0:${childDeriveId}`,
-		`c0:${childDomUpdateId}`,
-	]);
+	expect(parentLoaderCalls).toHaveLength(parentComputedBySymbolId.size);
+	expect(new Set(parentLoaderCalls)).toEqual(new Set(parentComputedBySymbolId.keys()));
 	expect(childLoaderCalls).toEqual([childDeriveId, childDomUpdateId]);
 	expect(output.root.textContent).toBe('5');
 });

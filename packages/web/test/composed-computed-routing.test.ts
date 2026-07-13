@@ -2,6 +2,7 @@ import { createProtocolStatePayload, type ProtocolStatePayload } from '@markless
 import { expect, test } from 'vitest';
 import {
 	marklessComposeState as composeCsrState,
+	marklessCsrLoadChildSymbol,
 	marklessCsrRemapGraphOutput,
 } from '../src/fns/csr.ts';
 import {
@@ -460,6 +461,120 @@ test('three same-module hops preserve one imported-child route for derive and DO
 
 	expect(loaderCalls).toEqual(['c0:symbol:leaf-derive', 'c0:symbol:leaf-dom']);
 	expect(output.textContent).toBe('7');
+});
+
+test('demand-loaded writes delegate composed routes through same-module outputs', async () => {
+	const childLoaderCalls: string[] = [];
+	const rootLoaderCalls: string[] = [];
+	const loadRootSymbol = (id: string) => {
+		rootLoaderCalls.push(id);
+		if (id === 'symbol:root') {
+			return ({ graph }) => Number(graph.read('state:rootDemandInput')) * 10;
+		}
+		throw new Error(`Unknown async symbol ${id}`);
+	};
+	const importedChild = child(
+		computedState({
+			cellId: 'state:demandInput',
+			computedId: 'computed:demandOutput',
+			deriveSymbolId: 'symbol:derive',
+		}),
+		'c0:',
+		[],
+		((symbolId: string) => {
+			childLoaderCalls.push(symbolId);
+			if (symbolId === 'symbol:derive') {
+				return ({ graph }) => Number(graph.read('state:demandInput')) + 1;
+			}
+			if (symbolId === 'symbol:dom') {
+				return (context) => ({
+					type: 'setText' as const,
+					locator: context.domUpdate.hostNodeId,
+					value: context.value,
+				});
+			}
+			throw new Error(`Unknown child async symbol ${symbolId}`);
+		}) as never,
+	);
+	const deepestChildren = [importedChild];
+	const deepest = child(
+		composeCsrState(emptyState(), deepestChildren),
+		'',
+		[],
+		((symbolId: string) =>
+			marklessCsrLoadChildSymbol(
+				deepestChildren,
+				loadRootSymbol,
+				symbolId,
+			)) as never,
+	);
+	const middleChildren = [deepest];
+	const middle = child(
+		composeCsrState(emptyState(), middleChildren),
+		'',
+		[],
+		((symbolId: string) =>
+			marklessCsrLoadChildSymbol(
+				middleChildren,
+				loadRootSymbol,
+				symbolId,
+			)) as never,
+	);
+	const rootState = computedState({
+		cellId: 'state:rootDemandInput',
+		computedId: 'computed:rootDemandOutput',
+		deriveSymbolId: 'symbol:root',
+	});
+	const state = composeCsrState(rootState, [middle]);
+	const output = {
+		nodeType: 1 as const,
+		tagName: 'OUTPUT',
+		childNodes: [],
+		textContent: '1',
+		addEventListener() {},
+	};
+	const view = {
+		...emptyView,
+		locators: [{ hostNodeId: 'demand-leaf', strategy: 'dom-order', index: 0, tagName: 'output' }],
+		domUpdates: [
+			{
+				hostNodeId: 'demand-leaf',
+				source: 'demandOutput',
+				graphNodeId: 'computed:demandOutput',
+				path: [],
+				target: { kind: 'text' },
+				symbolId: 'c0:symbol:dom',
+			},
+		],
+	} as const;
+	const container = await render(
+		() => ({
+			root: output as never,
+			state,
+			view: view as never,
+			loadSymbol(symbolId: string) {
+				return marklessCsrLoadChildSymbol(
+					[middle],
+					loadRootSymbol,
+					symbolId,
+				);
+			},
+		}),
+		{ target: { replaceChildren() {} } },
+	);
+
+	expect(childLoaderCalls).toEqual([]);
+	expect(rootLoaderCalls).toEqual([]);
+	container.graph.write({ graphNodeId: 'state:demandInput', value: 6 });
+	await container.graph.flush();
+
+	expect(childLoaderCalls).toEqual(['symbol:derive', 'symbol:dom']);
+	expect(rootLoaderCalls).toEqual([]);
+	expect(output.textContent).toBe('7');
+
+	container.graph.write({ graphNodeId: 'state:rootDemandInput', value: 3 });
+	await container.graph.flush();
+	expect(rootLoaderCalls).toEqual(['symbol:root']);
 });
 
 test('composed SSR sync computed preserves its child-owned symbol route for resume', async () => {

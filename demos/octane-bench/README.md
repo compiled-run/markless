@@ -23,13 +23,19 @@ computeds fed through component props; previously only the owning component's co
 The 100-level chain MOUNTS and evaluates (mount, equal-write, and unmount gates green), and
 write-path symbol routes are now canonical: one composition prefix per imported module boundary.
 
-The lane remains parked on the last wall: the root symbol resolver does not DELEGATE prefixed
-routes (`c0:symbol:20`) on the demand-loaded write path, so the dom-update/derive symbols a
-write demands never load and recomputations produce no DOM writes; mount-path resolution goes
-through per-child output loaders and works at full depth. That delegation is a framework design
-seam, out of bounded-card scope. The topology is not shrunk because that would fake
-comparability. The lane's write gates (`node demos/octane-bench/bench.mjs signal-favoring`)
-are the fix's proof.
+Write-path delegation through child loaders is also fixed and node-proven (one prefix per
+imported module boundary, delegated like mount-path child loaders), and on the build where
+that landed the shallow/middle/deep write gates PASSED end to end. The lane remains parked on
+the decisive wall: write-path symbol routing at depth is BUILD-SHAPE SENSITIVE with a silent
+failure mode - after an unrelated rebuild the same click propagates only one level, with no
+error and no unresolved-symbol throw, because the post-build symbol-table rewrite (regex over
+minified chunk code) silently misses some chunk-graph shapes. Robust resolution is an
+architectural change (structured resolver tables instead of code rewriting). Separately, a
+click dispatched while a prior propagation is in flight is dropped, so the fixture's sweeps
+are content-bound per write (also octane's sequential-sweep semantics); the deepest-value
+waits now fail LOUDLY where count-only gates once passed. The topology is not shrunk because
+that would fake comparability. The lane's write gates
+(`node demos/octane-bench/bench.mjs signal-favoring`) are the fix's proof.
 
 ## Lane status: async-waterfall (PARKED RED at the runtime gate; build ceiling fixed)
 

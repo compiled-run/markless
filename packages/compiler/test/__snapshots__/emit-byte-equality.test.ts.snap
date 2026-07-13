@@ -3,7 +3,7 @@
 exports[`compileTsrxModule emitted artifacts stay byte-equal across public-render plan splits 1`] = `
 {
   "async-boundary": {
-    "csrModuleSource": "import { marklessCsrRootFromHtml, marklessComposeState, marklessCsrComposeView, marklessCsrIsThenable } from '@markless/web/fns/csr';
+    "csrModuleSource": "import { marklessCsrRootFromHtml, marklessComposeState, marklessCsrLoadChildSymbol, marklessCsrComposeView, marklessCsrIsThenable } from '@markless/web/fns/csr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
 const marklessCsrHostLocators = [{"hostNodeId":"h0","tagName":"main","hostPath":[]}];
 const marklessCsrStateValues = new Map([
@@ -15,6 +15,7 @@ function marklessRenderCsr(props = {}) {
 	let query = marklessStateValue(marklessCsrRenderStateValues, marklessCsrPayloadState, "state:query");
 	const marklessCsrRuntimeState = { graph: null };
 	const marklessCsrChildren = [];
+	const marklessCsrLoadSymbol = (symbolId) => marklessCsrLoadChildSymbol(marklessCsrChildren, loadSymbol, symbolId);
 	const root = marklessCsrRootFromHtml("<main>" + "<!--markless:async:boundary:0-->" + "<p data-markless-arm-host=\\"h3\\">" + "Loading" + "</p>" + "<!--/markless:async:boundary:0-->" + "</main>");
 	const marklessCsrView = marklessCsrComposeView(root, payloadView, marklessCsrHostLocators, marklessCsrChildren);
 	const marklessCsrState = marklessComposeState(marklessCsrPayloadState, marklessCsrChildren);
@@ -35,14 +36,6 @@ function marklessRenderCsr(props = {}) {
 			if (marklessCsrIsThenable(result)) await result;
 			await graph.flush?.();
 		};
-	}
-	function marklessCsrLoadSymbol(symbolId) {
-		for (const child of marklessCsrChildren) {
-			if (symbolId.startsWith(child.symbolPrefix) && child.output?.loadSymbol) {
-				return child.output.loadSymbol(symbolId.slice(child.symbolPrefix.length));
-			}
-		}
-		return loadSymbol(symbolId);
 	}
 }",
     "payloadScripts": "{
@@ -451,7 +444,7 @@ function createUnknownSymbolError(id) {
 ",
   },
   "behavior-and-element-handle": {
-    "csrModuleSource": "import { marklessCsrRootFromHtml, marklessComposeState, marklessCsrComposeView, marklessCsrIsThenable } from '@markless/web/fns/csr';
+    "csrModuleSource": "import { marklessCsrRootFromHtml, marklessComposeState, marklessCsrLoadChildSymbol, marklessCsrComposeView, marklessCsrIsThenable } from '@markless/web/fns/csr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
 import { marklessCsrText } from '@markless/web/fns/html';
 const install = (label) => (host) => { host.dataset.label = label; };
@@ -465,6 +458,7 @@ function marklessRenderCsr(props = {}) {
 	let label = marklessStateValue(marklessCsrRenderStateValues, marklessCsrPayloadState, "state:label");
 	const marklessCsrRuntimeState = { graph: null };
 	const marklessCsrChildren = [];
+	const marklessCsrLoadSymbol = (symbolId) => marklessCsrLoadChildSymbol(marklessCsrChildren, loadSymbol, symbolId);
 	const root = marklessCsrRootFromHtml("<section>" + marklessCsrText(label) + "</section>");
 	const marklessCsrView = marklessCsrComposeView(root, payloadView, marklessCsrHostLocators, marklessCsrChildren);
 	const marklessCsrState = marklessComposeState(marklessCsrPayloadState, marklessCsrChildren);
@@ -485,14 +479,6 @@ function marklessRenderCsr(props = {}) {
 			if (marklessCsrIsThenable(result)) await result;
 			await graph.flush?.();
 		};
-	}
-	function marklessCsrLoadSymbol(symbolId) {
-		for (const child of marklessCsrChildren) {
-			if (symbolId.startsWith(child.symbolPrefix) && child.output?.loadSymbol) {
-				return child.output.loadSymbol(symbolId.slice(child.symbolPrefix.length));
-			}
-		}
-		return loadSymbol(symbolId);
 	}
 }",
     "payloadScripts": "{
@@ -753,7 +739,7 @@ function createUnknownSymbolError(id) {
 ",
   },
   "branches": {
-    "csrModuleSource": "import { marklessCsrRootFromHtml, marklessComposeState, marklessCsrComposeView, marklessCsrIsThenable } from '@markless/web/fns/csr';
+    "csrModuleSource": "import { marklessCsrRootFromHtml, marklessComposeState, marklessCsrLoadChildSymbol, marklessCsrComposeView, marklessCsrIsThenable } from '@markless/web/fns/csr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
 const marklessCsrHostLocators = [{"hostNodeId":"h0","tagName":"section","hostPath":[]},{"hostNodeId":"h1","tagName":"p","hostPath":[0]},{"hostNodeId":"h2","tagName":"p","hostPath":[0]}];
 const marklessCsrStateValues = new Map([
@@ -765,6 +751,7 @@ function marklessRenderCsr(props = {}) {
 	let open = marklessStateValue(marklessCsrRenderStateValues, marklessCsrPayloadState, "state:open");
 	const marklessCsrRuntimeState = { graph: null };
 	const marklessCsrChildren = [];
+	const marklessCsrLoadSymbol = (symbolId) => marklessCsrLoadChildSymbol(marklessCsrChildren, loadSymbol, symbolId);
 	const root = marklessCsrRootFromHtml("<section>" + "<!--markless:branch:branch-site:0-->" + ((open) ? "<p>" + "Shown" + "</p>" : "<p>" + "Hidden" + "</p>") + "<!--/markless:branch:branch-site:0-->" + "</section>");
 	const marklessCsrView = marklessCsrComposeView(root, payloadView, marklessCsrHostLocators, marklessCsrChildren);
 	const marklessCsrState = marklessComposeState(marklessCsrPayloadState, marklessCsrChildren);
@@ -785,14 +772,6 @@ function marklessRenderCsr(props = {}) {
 			if (marklessCsrIsThenable(result)) await result;
 			await graph.flush?.();
 		};
-	}
-	function marklessCsrLoadSymbol(symbolId) {
-		for (const child of marklessCsrChildren) {
-			if (symbolId.startsWith(child.symbolPrefix) && child.output?.loadSymbol) {
-				return child.output.loadSymbol(symbolId.slice(child.symbolPrefix.length));
-			}
-		}
-		return loadSymbol(symbolId);
 	}
 }",
     "payloadScripts": "{
@@ -1420,7 +1399,7 @@ function createUnknownSymbolError(id) {
 ",
   },
   "helper-created-state": {
-    "csrModuleSource": "import { marklessCsrRootFromHtml, marklessComposeState, marklessCsrComposeView, marklessCsrIsThenable } from '@markless/web/fns/csr';
+    "csrModuleSource": "import { marklessCsrRootFromHtml, marklessComposeState, marklessCsrLoadChildSymbol, marklessCsrComposeView, marklessCsrIsThenable } from '@markless/web/fns/csr';
 import { marklessCloneState } from '@markless/web/fns/state';
 import { marklessCsrText } from '@markless/web/fns/html';
 function createCount() { const count = state(5); return count; }
@@ -1434,6 +1413,7 @@ function marklessRenderCsr(props = {}) {
 	const count = createCount();
 	const marklessCsrRuntimeState = { graph: null };
 	const marklessCsrChildren = [];
+	const marklessCsrLoadSymbol = (symbolId) => marklessCsrLoadChildSymbol(marklessCsrChildren, loadSymbol, symbolId);
 	const root = marklessCsrRootFromHtml("<button>" + marklessCsrText(count) + "</button>");
 	const marklessCsrView = marklessCsrComposeView(root, payloadView, marklessCsrHostLocators, marklessCsrChildren);
 	const marklessCsrState = marklessComposeState(marklessCsrPayloadState, marklessCsrChildren);
@@ -1454,14 +1434,6 @@ function marklessRenderCsr(props = {}) {
 			if (marklessCsrIsThenable(result)) await result;
 			await graph.flush?.();
 		};
-	}
-	function marklessCsrLoadSymbol(symbolId) {
-		for (const child of marklessCsrChildren) {
-			if (symbolId.startsWith(child.symbolPrefix) && child.output?.loadSymbol) {
-				return child.output.loadSymbol(symbolId.slice(child.symbolPrefix.length));
-			}
-		}
-		return loadSymbol(symbolId);
 	}
 }",
     "payloadScripts": "{
@@ -1709,7 +1681,7 @@ function createUnknownSymbolError(id) {
   },
   "imported-child": {
     "csrModuleSource": "import __marklessCsrComponent0 from "./ImportedChild.tsrx";
-import { marklessCsrRootFromHtml, marklessCsrRenderChild, marklessCsrReplaceChild, marklessComposeState, marklessCsrComposeView, marklessCsrIsThenable } from '@markless/web/fns/csr';
+import { marklessCsrRootFromHtml, marklessCsrRenderChild, marklessCsrReplaceChild, marklessComposeState, marklessCsrLoadChildSymbol, marklessCsrComposeView, marklessCsrIsThenable } from '@markless/web/fns/csr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
 const marklessCsrHostLocators = [{"hostNodeId":"h0","tagName":"main","hostPath":[]}];
 const marklessCsrStateValues = new Map([
@@ -1721,6 +1693,7 @@ function marklessRenderCsr(props = {}) {
 	let active = marklessStateValue(marklessCsrRenderStateValues, marklessCsrPayloadState, "state:active");
 	const marklessCsrRuntimeState = { graph: null };
 	const marklessCsrChildren = [];
+	const marklessCsrLoadSymbol = (symbolId) => marklessCsrLoadChildSymbol(marklessCsrChildren, loadSymbol, symbolId);
 	const root = marklessCsrRootFromHtml("<main>" + "<span data-markless-csr-child=\\"0\\"></span>" + "</main>");
 	const marklessCsrChild0 = marklessCsrRenderChild(__marklessCsrComponent0, { active: active });
 	marklessCsrReplaceChild(root, 0, marklessCsrChild0?.root);
@@ -1744,14 +1717,6 @@ function marklessRenderCsr(props = {}) {
 			if (marklessCsrIsThenable(result)) await result;
 			await graph.flush?.();
 		};
-	}
-	function marklessCsrLoadSymbol(symbolId) {
-		for (const child of marklessCsrChildren) {
-			if (symbolId.startsWith(child.symbolPrefix) && child.output?.loadSymbol) {
-				return child.output.loadSymbol(symbolId.slice(child.symbolPrefix.length));
-			}
-		}
-		return loadSymbol(symbolId);
 	}
 }",
     "payloadScripts": "{
@@ -1919,7 +1884,7 @@ function createUnknownSymbolError(id) {
 ",
   },
   "imported-child-dependency": {
-    "csrModuleSource": "import { marklessCsrRootFromHtml, marklessComposeState, marklessCsrComposeView, marklessCsrIsThenable } from '@markless/web/fns/csr';
+    "csrModuleSource": "import { marklessCsrRootFromHtml, marklessComposeState, marklessCsrLoadChildSymbol, marklessCsrComposeView, marklessCsrIsThenable } from '@markless/web/fns/csr';
 import { marklessCloneState } from '@markless/web/fns/state';
 const marklessCsrHostLocators = [{"hostNodeId":"h0","tagName":"span","hostPath":[]},{"hostNodeId":"h1","tagName":"em","hostPath":[0]},{"hostNodeId":"h2","tagName":"em","hostPath":[0]}];
 const marklessCsrStateValues = new Map([
@@ -1931,6 +1896,7 @@ function marklessRenderCsr(props = {}) {
 	const marklessCsrRenderStateValues = new Map(marklessCsrStateValues);
 	const marklessCsrRuntimeState = { graph: null };
 	const marklessCsrChildren = [];
+	const marklessCsrLoadSymbol = (symbolId) => marklessCsrLoadChildSymbol(marklessCsrChildren, loadSymbol, symbolId);
 	const root = marklessCsrRootFromHtml("<span>" + "<!--markless:branch:branch-site:0-->" + ((active) ? "<em>" + "Live" + "</em>" : "<em>" + "Idle" + "</em>") + "<!--/markless:branch:branch-site:0-->" + "</span>");
 	const marklessCsrView = marklessCsrComposeView(root, payloadView, marklessCsrHostLocators, marklessCsrChildren);
 	const marklessCsrState = marklessComposeState(marklessCsrPayloadState, marklessCsrChildren);
@@ -1951,14 +1917,6 @@ function marklessRenderCsr(props = {}) {
 			if (marklessCsrIsThenable(result)) await result;
 			await graph.flush?.();
 		};
-	}
-	function marklessCsrLoadSymbol(symbolId) {
-		for (const child of marklessCsrChildren) {
-			if (symbolId.startsWith(child.symbolPrefix) && child.output?.loadSymbol) {
-				return child.output.loadSymbol(symbolId.slice(child.symbolPrefix.length));
-			}
-		}
-		return loadSymbol(symbolId);
 	}
 }",
     "payloadScripts": "{
@@ -2776,7 +2734,7 @@ function createUnknownSymbolError(id) {
 ",
   },
   "module-scope-constants": {
-    "csrModuleSource": "import { marklessCsrRootFromHtml, marklessComposeState, marklessCsrComposeView, marklessCsrIsThenable } from '@markless/web/fns/csr';
+    "csrModuleSource": "import { marklessCsrRootFromHtml, marklessComposeState, marklessCsrLoadChildSymbol, marklessCsrComposeView, marklessCsrIsThenable } from '@markless/web/fns/csr';
 import { marklessCloneState } from '@markless/web/fns/state';
 import { marklessCsrText, marklessCsrAttribute } from '@markless/web/fns/html';
 const labels = { title: 'Hello', mode: 'compact' };
@@ -2788,6 +2746,7 @@ function marklessRenderCsr(props = {}) {
 	const marklessCsrRenderStateValues = new Map(marklessCsrStateValues);
 	const marklessCsrRuntimeState = { graph: null };
 	const marklessCsrChildren = [];
+	const marklessCsrLoadSymbol = (symbolId) => marklessCsrLoadChildSymbol(marklessCsrChildren, loadSymbol, symbolId);
 	const root = marklessCsrRootFromHtml("<section" + marklessCsrAttribute("data-mode", labels.mode) + ">" + marklessCsrText(labels.title) + "</section>");
 	const marklessCsrView = marklessCsrComposeView(root, payloadView, marklessCsrHostLocators, marklessCsrChildren);
 	const marklessCsrState = marklessComposeState(marklessCsrPayloadState, marklessCsrChildren);
@@ -2808,14 +2767,6 @@ function marklessRenderCsr(props = {}) {
 			if (marklessCsrIsThenable(result)) await result;
 			await graph.flush?.();
 		};
-	}
-	function marklessCsrLoadSymbol(symbolId) {
-		for (const child of marklessCsrChildren) {
-			if (symbolId.startsWith(child.symbolPrefix) && child.output?.loadSymbol) {
-				return child.output.loadSymbol(symbolId.slice(child.symbolPrefix.length));
-			}
-		}
-		return loadSymbol(symbolId);
 	}
 }",
     "payloadScripts": "{
@@ -2960,7 +2911,7 @@ function createUnknownSymbolError(id) {
 ",
   },
   "positional-keyed-repeat": {
-    "csrModuleSource": "import { marklessCsrRootFromHtml, marklessComposeState, marklessCsrComposeView, marklessCsrIsThenable } from '@markless/web/fns/csr';
+    "csrModuleSource": "import { marklessCsrRootFromHtml, marklessComposeState, marklessCsrLoadChildSymbol, marklessCsrComposeView, marklessCsrIsThenable } from '@markless/web/fns/csr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
 import { marklessCsrText, readMarklessPublicPath } from '@markless/web/fns/html';
 import { marklessCsrRepeatRows } from '@markless/web/fns/repeats';
@@ -2974,6 +2925,7 @@ function marklessRenderCsr(props = {}) {
 	let records = marklessStateValue(marklessCsrRenderStateValues, marklessCsrPayloadState, "state:records");
 	const marklessCsrRuntimeState = { graph: null };
 	const marklessCsrChildren = [];
+	const marklessCsrLoadSymbol = (symbolId) => marklessCsrLoadChildSymbol(marklessCsrChildren, loadSymbol, symbolId);
 	const root = marklessCsrRootFromHtml("<ol>" + marklessCsrRepeatRows(records, record => readMarklessPublicPath(record, []), "repeat:0", "record", [], (record, slot) => "<li>" + marklessCsrText(record.label) + "</li>", null) + "</ol>");
 	const marklessCsrView = marklessCsrComposeView(root, payloadView, marklessCsrHostLocators, marklessCsrChildren);
 	const marklessCsrState = marklessComposeState(marklessCsrPayloadState, marklessCsrChildren);
@@ -2994,14 +2946,6 @@ function marklessRenderCsr(props = {}) {
 			if (marklessCsrIsThenable(result)) await result;
 			await graph.flush?.();
 		};
-	}
-	function marklessCsrLoadSymbol(symbolId) {
-		for (const child of marklessCsrChildren) {
-			if (symbolId.startsWith(child.symbolPrefix) && child.output?.loadSymbol) {
-				return child.output.loadSymbol(symbolId.slice(child.symbolPrefix.length));
-			}
-		}
-		return loadSymbol(symbolId);
 	}
 }",
     "payloadScripts": "{
@@ -3232,7 +3176,7 @@ function createUnknownSymbolError(id) {
 ",
   },
   "same-module-child": {
-    "csrModuleSource": "import { marklessCsrRootFromHtml, marklessCsrRenderChild, marklessCsrReplaceChild, marklessComposeState, marklessViewWithoutAnchors, marklessCsrComposeView, marklessCsrIsThenable } from '@markless/web/fns/csr';
+    "csrModuleSource": "import { marklessCsrRootFromHtml, marklessCsrRenderChild, marklessCsrReplaceChild, marklessComposeState, marklessCsrLoadChildSymbol, marklessViewWithoutAnchors, marklessCsrComposeView, marklessCsrIsThenable } from '@markless/web/fns/csr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
 const __marklessCsrComponent0 = { renderCsr: marklessRenderCsrBadge };
 function marklessRenderCsrBadge(props = {}) {
@@ -3244,7 +3188,7 @@ function marklessRenderCsrBadge(props = {}) {
 	const root = marklessCsrRootFromHtml("<span>" + ((active) ? "<em>" + "Live" + "</em>" : "<em>" + "Idle" + "</em>") + "</span>");
 	const marklessCsrView = marklessCsrComposeView(root, marklessViewWithoutAnchors(payloadView), [], marklessCsrChildren);
 	const marklessCsrState = marklessComposeState(marklessCsrPayloadState, marklessCsrChildren);
-	return { root, state: marklessCsrState, view: marklessCsrView, loadSymbol, connectRuntime(context) { marklessCsrRuntimeState.graph = context.graph; for (const child of marklessCsrChildren) child.output?.connectRuntime?.(context); } };
+	return { root, state: marklessCsrState, view: marklessCsrView, loadSymbol: (symbolId) => marklessCsrLoadChildSymbol(marklessCsrChildren, loadSymbol, symbolId), connectRuntime(context) { marklessCsrRuntimeState.graph = context.graph; for (const child of marklessCsrChildren) child.output?.connectRuntime?.(context); } };
 }
 const marklessCsrHostLocators = [{"hostNodeId":"h3","tagName":"main","hostPath":[]}];
 const marklessCsrStateValues = new Map([
@@ -3256,6 +3200,7 @@ function marklessRenderCsr(props = {}) {
 	let active = marklessStateValue(marklessCsrRenderStateValues, marklessCsrPayloadState, "state:active");
 	const marklessCsrRuntimeState = { graph: null };
 	const marklessCsrChildren = [];
+	const marklessCsrLoadSymbol = (symbolId) => marklessCsrLoadChildSymbol(marklessCsrChildren, loadSymbol, symbolId);
 	const root = marklessCsrRootFromHtml("<main>" + "<span data-markless-csr-child=\\"0\\"></span>" + "</main>");
 	const marklessCsrChild0 = marklessCsrRenderChild(__marklessCsrComponent0, { active: active });
 	marklessCsrReplaceChild(root, 0, marklessCsrChild0?.root);
@@ -3279,14 +3224,6 @@ function marklessRenderCsr(props = {}) {
 			if (marklessCsrIsThenable(result)) await result;
 			await graph.flush?.();
 		};
-	}
-	function marklessCsrLoadSymbol(symbolId) {
-		for (const child of marklessCsrChildren) {
-			if (symbolId.startsWith(child.symbolPrefix) && child.output?.loadSymbol) {
-				return child.output.loadSymbol(symbolId.slice(child.symbolPrefix.length));
-			}
-		}
-		return loadSymbol(symbolId);
 	}
 }",
     "payloadScripts": "{
@@ -3585,7 +3522,7 @@ function createUnknownSymbolError(id) {
 ",
   },
   "spread-attributes": {
-    "csrModuleSource": "import { marklessCsrRootFromHtml, marklessComposeState, marklessCsrComposeView, marklessCsrIsThenable } from '@markless/web/fns/csr';
+    "csrModuleSource": "import { marklessCsrRootFromHtml, marklessComposeState, marklessCsrLoadChildSymbol, marklessCsrComposeView, marklessCsrIsThenable } from '@markless/web/fns/csr';
 import { marklessCloneState } from '@markless/web/fns/state';
 import { marklessCsrSpreadAttributes } from '@markless/web/fns/html';
 const marklessCsrHostLocators = [{"hostNodeId":"h0","tagName":"section","hostPath":[]}];
@@ -3597,6 +3534,7 @@ function marklessRenderCsr(props = {}) {
 	const meta = { 'data-kind': 'card', title: 'Draft' };
 	const marklessCsrRuntimeState = { graph: null };
 	const marklessCsrChildren = [];
+	const marklessCsrLoadSymbol = (symbolId) => marklessCsrLoadChildSymbol(marklessCsrChildren, loadSymbol, symbolId);
 	const root = marklessCsrRootFromHtml("<section" + marklessCsrSpreadAttributes({ ...(meta), title: "Final" }, null) + ">" + "Hi" + "</section>");
 	const marklessCsrView = marklessCsrComposeView(root, payloadView, marklessCsrHostLocators, marklessCsrChildren);
 	const marklessCsrState = marklessComposeState(marklessCsrPayloadState, marklessCsrChildren);
@@ -3617,14 +3555,6 @@ function marklessRenderCsr(props = {}) {
 			if (marklessCsrIsThenable(result)) await result;
 			await graph.flush?.();
 		};
-	}
-	function marklessCsrLoadSymbol(symbolId) {
-		for (const child of marklessCsrChildren) {
-			if (symbolId.startsWith(child.symbolPrefix) && child.output?.loadSymbol) {
-				return child.output.loadSymbol(symbolId.slice(child.symbolPrefix.length));
-			}
-		}
-		return loadSymbol(symbolId);
 	}
 }",
     "payloadScripts": "{
@@ -3769,7 +3699,7 @@ function createUnknownSymbolError(id) {
 ",
   },
   "state-and-handlers": {
-    "csrModuleSource": "import { marklessCsrRootFromHtml, marklessComposeState, marklessCsrComposeView, marklessCsrIsThenable } from '@markless/web/fns/csr';
+    "csrModuleSource": "import { marklessCsrRootFromHtml, marklessComposeState, marklessCsrLoadChildSymbol, marklessCsrComposeView, marklessCsrIsThenable } from '@markless/web/fns/csr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
 import { marklessCsrText } from '@markless/web/fns/html';
 const marklessCsrHostLocators = [{"hostNodeId":"h0","tagName":"button","hostPath":[]}];
@@ -3782,6 +3712,7 @@ function marklessRenderCsr(props = {}) {
 	let count = marklessStateValue(marklessCsrRenderStateValues, marklessCsrPayloadState, "state:count");
 	const marklessCsrRuntimeState = { graph: null };
 	const marklessCsrChildren = [];
+	const marklessCsrLoadSymbol = (symbolId) => marklessCsrLoadChildSymbol(marklessCsrChildren, loadSymbol, symbolId);
 	const root = marklessCsrRootFromHtml("<button>" + marklessCsrText(count) + "</button>");
 	const marklessCsrView = marklessCsrComposeView(root, payloadView, marklessCsrHostLocators, marklessCsrChildren);
 	const marklessCsrState = marklessComposeState(marklessCsrPayloadState, marklessCsrChildren);
@@ -3802,14 +3733,6 @@ function marklessRenderCsr(props = {}) {
 			if (marklessCsrIsThenable(result)) await result;
 			await graph.flush?.();
 		};
-	}
-	function marklessCsrLoadSymbol(symbolId) {
-		for (const child of marklessCsrChildren) {
-			if (symbolId.startsWith(child.symbolPrefix) && child.output?.loadSymbol) {
-				return child.output.loadSymbol(symbolId.slice(child.symbolPrefix.length));
-			}
-		}
-		return loadSymbol(symbolId);
 	}
 }",
     "payloadScripts": "{
@@ -4073,7 +3996,7 @@ function createUnknownSymbolError(id) {
 ",
   },
   "sync-computed": {
-    "csrModuleSource": "import { marklessCsrRootFromHtml, marklessComposeState, marklessCsrComposeView, marklessCsrIsThenable } from '@markless/web/fns/csr';
+    "csrModuleSource": "import { marklessCsrRootFromHtml, marklessComposeState, marklessCsrLoadChildSymbol, marklessCsrComposeView, marklessCsrIsThenable } from '@markless/web/fns/csr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
 import { marklessCsrText } from '@markless/web/fns/html';
 const marklessCsrHostLocators = [{"hostNodeId":"h0","tagName":"output","hostPath":[]}];
@@ -4087,6 +4010,7 @@ function marklessRenderCsr(props = {}) {
 	const doubled = (() => count * 2)();
 	const marklessCsrRuntimeState = { graph: null };
 	const marklessCsrChildren = [];
+	const marklessCsrLoadSymbol = (symbolId) => marklessCsrLoadChildSymbol(marklessCsrChildren, loadSymbol, symbolId);
 	const root = marklessCsrRootFromHtml("<output>" + marklessCsrText(doubled) + "</output>");
 	const marklessCsrView = marklessCsrComposeView(root, payloadView, marklessCsrHostLocators, marklessCsrChildren);
 	const marklessCsrState = marklessComposeState(marklessCsrPayloadState, marklessCsrChildren);
@@ -4107,14 +4031,6 @@ function marklessRenderCsr(props = {}) {
 			if (marklessCsrIsThenable(result)) await result;
 			await graph.flush?.();
 		};
-	}
-	function marklessCsrLoadSymbol(symbolId) {
-		for (const child of marklessCsrChildren) {
-			if (symbolId.startsWith(child.symbolPrefix) && child.output?.loadSymbol) {
-				return child.output.loadSymbol(symbolId.slice(child.symbolPrefix.length));
-			}
-		}
-		return loadSymbol(symbolId);
 	}
 }",
     "payloadScripts": "{

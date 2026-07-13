@@ -171,6 +171,12 @@ export function marklessComposeState(state, children) {
 		...(sharedDefinitions.length ? { sharedDefinitions } : {}),
 	};
 }
+export function marklessCsrLoadChildSymbol(children, loadSymbol, symbolId) {
+	for (const child of children)
+		if (symbolId.startsWith(child.symbolPrefix) && child.output?.loadSymbol)
+			return child.output.loadSymbol(symbolId.slice(child.symbolPrefix.length));
+	return loadSymbol(symbolId);
+}
 export function marklessCsrRemapGraphOutput(output, graphProps) {
 	output.state.computed = output.state.computed.map((computed) => ({
 		...computed,
