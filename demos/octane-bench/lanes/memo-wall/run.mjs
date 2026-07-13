@@ -27,7 +27,8 @@ const EXPECTED_EVIDENCE = {
 	'parent-rerender-equal-B': { ...ZERO },
 	'one-change-A': { ...ZERO, domMutations: 3, mutationBatches: 1 },
 	'one-change-B': { ...ZERO, domMutations: 3, mutationBatches: 1 },
-	// Only the changed theme text is written for each changed row object.
+	// The unconditional row writer rewrites all three bound texts for each
+	// changed row object (1,000 changed leaf values + 2,000 identical rewrites).
 	'theme-fanout-A': { ...ZERO, domMutations: 3_000, mutationBatches: 1 },
 	'theme-fanout-B': { ...ZERO, domMutations: 3_000, mutationBatches: 1 },
 };

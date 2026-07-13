@@ -15,21 +15,22 @@ const jsfbRoot = path.join(
 	'demos/js-framework-benchmark/frameworks/keyed/markless',
 );
 const byteFields = ['raw', 'gzip', 'brotli'];
+export const bundleSizeDefinitions = [
+	{
+		name: 'js-framework-benchmark',
+		root: jsfbRoot,
+		appRoot: path.join(jsfbRoot, 'src'),
+		configFile: path.join(jsfbRoot, 'vite.config.ts'),
+	},
+	{ name: 'todomvc', root: path.resolve(laneRoot, '../todomvc/fixture') },
+	{ name: 'chat-stream', root: path.resolve(laneRoot, '../chat-stream/fixture') },
+];
 
 export async function runBundleSize({ protocol, environment }) {
 	try {
-		const definitions = [
-			{
-				name: 'js-framework-benchmark',
-				root: jsfbRoot,
-				appRoot: path.join(jsfbRoot, 'src'),
-				configFile: path.join(jsfbRoot, 'vite.config.ts'),
-			},
-			{ name: 'todomvc', root: path.resolve(laneRoot, '../todomvc/fixture') },
-			{ name: 'chat-stream', root: path.resolve(laneRoot, '../chat-stream/fixture') },
-		];
 		const cases = [];
-		for (const definition of definitions) cases.push(await buildAndMeasure(definition));
+		for (const definition of bundleSizeDefinitions)
+			cases.push(await buildAndMeasure(definition));
 		const result = passedResult({ protocol, environment, cases });
 		validateBundleSizeResult(result);
 		return { result, exitCode: 0 };
@@ -102,10 +103,7 @@ async function buildAndMeasure(definition) {
 				target: 'es2022',
 				rollupOptions: {
 					output: {
-						codeSplitting: {
-							includeDependenciesRecursively: false,
-							groups: [{ name: 'framework', test: isFrameworkModule }],
-						},
+						codeSplitting: createBundleSizeCodeSplitting(),
 					},
 				},
 			},
@@ -148,6 +146,13 @@ async function buildAndMeasure(definition) {
 	addBytes(total, buckets.application);
 	addBytes(total, buckets.framework);
 	return sizeCase(definition.name, { total, ...buckets }, files);
+}
+
+export function createBundleSizeCodeSplitting() {
+	return {
+		includeDependenciesRecursively: false,
+		groups: [{ name: 'framework', test: isFrameworkModule }],
+	};
 }
 
 function isApplicationModule(id, appRoot) {

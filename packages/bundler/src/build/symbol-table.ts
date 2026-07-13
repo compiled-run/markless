@@ -78,7 +78,11 @@ export function verifyGeneratedSymbolTableRoutes(
 
 	for (const manifest of manifests) {
 		if (manifest.symbols.length === 0) continue;
-		const resolverChunk = findChunkForVirtualId(chunks, manifest.resolver.virtualModuleId);
+		const resolverChunk = findResolverRouteChunk(
+			chunks,
+			manifest.resolver.virtualModuleId,
+			manifest.symbols,
+		);
 		const routeChunk = resolverChunk ?? findChunkForVirtualId(chunks, manifest.source);
 		if (!routeChunk) {
 			for (const symbol of manifest.symbols) {
@@ -139,9 +143,22 @@ function collectGeneratedSymbolFiles(
 	chunks: ReadonlyMap<string, GeneratedChunk>,
 ): Map<string, string> {
 	const symbolFiles = new Map<string, string>();
+	// A retained emitted entry facade is the module the runtime can import: its
+	// public exports can differ from the internal aliases on the chunk that also
+	// lists the virtual module in moduleIds. Facade cleanup copies the facade ID
+	// to its surviving target, so moduleIds remain the fallback when no facade
+	// survives.
 	for (const chunk of chunks.values()) {
-		for (const id of virtualIds(chunk)) {
-			if (id.startsWith(SYMBOL_VIRTUAL_PREFIX)) {
+		const facadeId = chunk.facadeModuleId
+			? normalizeVirtualId(chunk.facadeModuleId)
+			: undefined;
+		if (facadeId?.startsWith(SYMBOL_VIRTUAL_PREFIX)) {
+			symbolFiles.set(facadeId, chunk.fileName);
+		}
+	}
+	for (const chunk of chunks.values()) {
+		for (const id of chunk.moduleIds.map(normalizeVirtualId)) {
+			if (id.startsWith(SYMBOL_VIRTUAL_PREFIX) && !symbolFiles.has(id)) {
 				symbolFiles.set(id, chunk.fileName);
 			}
 		}
@@ -235,13 +252,30 @@ function verifyDirectRoute(
 			reason: `claimed chunk does not export ${symbol.exportName}`,
 		};
 	}
-	if (!dynamicRouteReachesChunk(chunks, routeChunk, target.fileName)) {
+	if (
+		!dynamicRouteReachesChunk(chunks, routeChunk, target.fileName) &&
+		!rewrittenSpecifierRoutesTo(routeChunk, target.fileName)
+	) {
 		return {
 			claimedChunk: target.fileName,
 			reason: `source chunk ${routeChunk.fileName} has no emitted dynamic route to the claimed chunk`,
 		};
 	}
 	return { claimedChunk: target.fileName };
+}
+
+// Rolldown's dynamicImports metadata cannot see routes this plugin itself
+// creates: the resolver-table rewrite replaces virtual specifiers with final
+// chunk URLs AFTER bundling, and facade cleanup removes the chunks that
+// carried the metadata edges. The rewritten string in the route chunk's code
+// - in exactly the form relativeChunkSpecifier emitted - IS the route.
+function rewrittenSpecifierRoutesTo(routeChunk: GeneratedChunk, targetFileName: string): boolean {
+	const specifier = relativeChunkSpecifier(routeChunk.fileName, targetFileName);
+	return (
+		routeChunk.code.includes(JSON.stringify(specifier)) ||
+		routeChunk.code.includes(`'${specifier}'`) ||
+		routeChunk.code.includes(`\`${specifier}\``)
+	);
 }
 
 function dynamicRouteReachesChunk(
@@ -311,7 +345,31 @@ function findChunkForVirtualId(
 	virtualId: string,
 ): GeneratedChunk | undefined {
 	const normalized = normalizeVirtualId(virtualId);
-	return [...chunks.values()].find((chunk) => virtualIds(chunk).includes(normalized));
+	return (
+		[...chunks.values()].find(
+			(chunk) =>
+				!!chunk.facadeModuleId && normalizeVirtualId(chunk.facadeModuleId) === normalized,
+		) ??
+		[...chunks.values()].find((chunk) =>
+			chunk.moduleIds.map(normalizeVirtualId).includes(normalized),
+		)
+	);
+}
+
+function findResolverRouteChunk(
+	chunks: ReadonlyMap<string, GeneratedChunk>,
+	virtualId: string,
+	symbols: readonly MarklessSymbolManifestEntry[],
+): GeneratedChunk | undefined {
+	const normalized = normalizeVirtualId(virtualId);
+	const candidates = [...chunks.values()].filter((chunk) =>
+		virtualIds(chunk).includes(normalized),
+	);
+	return (
+		candidates.find((chunk) => !!findSymbolTable(chunk.code, symbols)) ??
+		candidates.find((chunk) => chunk.moduleIds.map(normalizeVirtualId).includes(normalized)) ??
+		candidates[0]
+	);
 }
 
 function resolveChunkSpecifier(importerFileName: string, specifier: string): string {
