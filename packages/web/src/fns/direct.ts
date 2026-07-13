@@ -106,8 +106,11 @@ export function replaceMarklessPublicRows(parent, state, keys) {
 }
 export function pruneMarklessPublicRows(state, keys) {
 	const retainedKeys = new Set(keys);
-	for (const key of Array.from(state.rows.keys()))
-		if (!retainedKeys.has(key)) state.rows.delete(key);
+	for (const [key, record] of state.rows)
+		if (!retainedKeys.has(key)) {
+			record.c?.();
+			state.rows.delete(key);
+		}
 }
 export function assertUniqueMarklessPublicRepeatKey(seenKeys, repeatId, itemName, keyPath, key) {
 	if (seenKeys.has(key))
@@ -165,6 +168,7 @@ export function removeMarklessPublicMissingKey(parent, state, nextKeys) {
 	if (!record) return false;
 	if (record.root.remove) record.root.remove();
 	else parent.removeChild?.(record.root);
+	record.c?.();
 	state.rows.delete(missingKey);
 	return true;
 }

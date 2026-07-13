@@ -46,6 +46,7 @@ import {
 	eventSpreadUnsupportedDiagnostic,
 	spreadStaticSnapshotDiagnostic,
 	styleObjectUnsupportedDiagnostic,
+	unsupportedRowElementHandleDiagnostic,
 	unboundElementHandleDiagnostic,
 } from './diagnostics.ts';
 import type { MutableSemanticGraphArtifact, SemanticGraphWalk, WalkState } from './types.ts';
@@ -327,10 +328,31 @@ export function collectElementHandleDiagnostics(graph: MutableSemanticGraphArtif
 			.filter((name): name is string => name !== null),
 	);
 
-	for (const binding of graph.elementHandleBindings) {
+	for (const [bindingIndex, binding] of graph.elementHandleBindings.entries()) {
 		const resolved = resolveGraphPath(binding.handleName, bindings, aliases);
 		const graphBinding = resolved?.binding;
 		if (moduleElementNames.has(binding.handleName)) continue;
+		if (binding.keyedRepeatScopeIds.length > 0) {
+			const repeatId = binding.keyedRepeatScopeIds[0];
+			const repeat = graph.keyedRepeats.find((candidate) => candidate.id === repeatId);
+			if (
+				binding.keyedRepeatScopeIds.length === 1 &&
+				repeat &&
+				/^[A-Za-z_$][\w$]*$/.test(binding.handleName) &&
+				graphBinding?.kind === 'element' &&
+				resolved?.path.length === 0
+			) {
+				const rowOwned = {
+					...binding,
+					rowOwner: { repeatId, keyPath: repeat.keyPath },
+				};
+				graph.elementHandleBindings[bindingIndex] = rowOwned;
+				validElementHandleBindings.push(rowOwned);
+				continue;
+			}
+			graph.diagnostics.push(unsupportedRowElementHandleDiagnostic(binding));
+			continue;
+		}
 		const forwarded = resolved
 			? resolvePropForwardedElementHandle(binding, resolved, graph)
 			: null;
@@ -349,11 +371,6 @@ export function collectElementHandleDiagnostics(graph: MutableSemanticGraphArtif
 			graph.diagnostics.push(elementHandleRequiredDiagnostic(binding, graphBinding));
 			continue;
 		}
-		if (binding.keyedRepeatScopeIds.length > 0) {
-			graph.diagnostics.push(duplicateElementHandleDiagnostic(binding));
-			continue;
-		}
-
 		validElementHandleBindings.push(binding);
 	}
 
@@ -477,6 +494,9 @@ function collectAttribute(
 				state.graph.behaviors.push({
 					hostNodeId,
 					...behaviorSourceParts(behavior, state),
+					...(state.currentKeyedRepeatScopeIds.length > 0
+						? { keyedRepeatScopeIds: [...state.currentKeyedRepeatScopeIds] }
+						: {}),
 				});
 			}
 			collectExpressionReads(expressionValue, state);

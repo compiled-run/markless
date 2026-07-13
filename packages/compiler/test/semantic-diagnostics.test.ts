@@ -1024,7 +1024,6 @@ test('B918 reports honest element handle guard diagnostics', async () => {
 			'MARKLESS_ELEMENT_MODULE_SCOPE',
 			'MARKLESS_ELEMENT_HANDLE_UNBOUND',
 			'MARKLESS_ELEMENT_HANDLE_RENDER_READ',
-			'MARKLESS_ELEMENT_HANDLE_DUPLICATE',
 		]),
 	);
 	expect(graph.diagnostics).toEqual(
@@ -1041,11 +1040,6 @@ test('B918 reports honest element handle guard diagnostics', async () => {
 			expect.objectContaining({
 				code: 'MARKLESS_ELEMENT_HANDLE_RENDER_READ',
 				message: expect.stringContaining('input.textContent'),
-			}),
-			expect.objectContaining({
-				code: 'MARKLESS_ELEMENT_HANDLE_DUPLICATE',
-				message: expect.stringContaining('inside a keyed repeat'),
-				elementLocator: 'h4',
 			}),
 		]),
 	);
@@ -1201,6 +1195,45 @@ test('buildSemanticGraph reports graph destructuring defaults as unsupported ali
 			statePath: 'menu.title',
 			source: 'menuTitle = "Untitled"',
 			docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED',
+		}),
+	]);
+});
+
+test('keyed rows classify a direct element handle identifier as repeat-owned', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/RowHandles.tsrx',
+		source: `import { element, state } from '@markless/core';
+export function App() @{
+	const rows = state([{ id: 'a' }]);
+	const row = element<HTMLTableRowElement>();
+	<table><tbody>@for (const item of rows; key item.id) { <tr el={row}><td>{item.id}</td></tr> }</tbody></table>
+}`,
+	});
+
+	expect(graph.diagnostics).toEqual([]);
+	expect(graph.elementHandleBindings).toEqual([
+		expect.objectContaining({
+			handleName: 'row',
+			rowOwner: { repeatId: 'repeat:0', keyPath: ['id'] },
+		}),
+	]);
+});
+
+test('keyed rows reject non-identifier element handle bindings with a named diagnostic', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/UnsupportedRowHandle.tsrx',
+		source: `import { element, state } from '@markless/core';
+export function App() @{
+	const rows = state([{ id: 'a' }]);
+	const row = { current: element<HTMLTableRowElement>() };
+	<table><tbody>@for (const item of rows; key item.id) { <tr el={row.current}><td>{item.id}</td></tr> }</tbody></table>
+}`,
+	});
+
+	expect(graph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_ROW_ELEMENT_HANDLE_UNSUPPORTED',
+			message: expect.stringContaining('el={row.current}'),
 		}),
 	]);
 });

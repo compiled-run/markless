@@ -6113,3 +6113,136 @@ export default function Page() @{
 	expect(handler?.source).toContain('import { sendJson }');
 	expect(handler?.source).toContain('import { currentActor }');
 });
+
+test('compiled CSR keyed row behaviors attach once per key and clean removed records once', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/EffectfulRows.tsrx',
+		source: `import { element, state } from '@markless/core';
+import { installRow } from './row-behavior.ts';
+export function App() @{
+	let rows = state([{ id: 'a', label: 'Alpha' }, { id: 'b', label: 'Beta' }, { id: 'c', label: 'Gamma' }, { id: 'd', label: 'Delta' }]);
+	const row = element<HTMLTableRowElement>();
+	<main>
+		<button onClick={() => rows = [{ id: 'a', label: 'Alpha next' }, { id: 'b', label: 'Beta next' }, { id: 'c', label: 'Gamma next' }, { id: 'd', label: 'Delta next' }]}>Reuse</button>
+		<button onClick={() => rows = [{ id: 'd', label: 'Delta next' }, { id: 'c', label: 'Gamma next' }, { id: 'b', label: 'Beta next' }, { id: 'a', label: 'Alpha next' }]}>Reorder</button>
+		<button onClick={() => rows = [{ id: 'd', label: 'Delta next' }, { id: 'a', label: 'Alpha next' }]}>Remove</button>
+		<button onClick={() => rows = []}>Clear</button>
+		<button onClick={() => rows = [{ id: 'a', label: 'Alpha fresh' }, { id: 'b', label: 'Beta fresh' }, { id: 'c', label: 'Gamma fresh' }, { id: 'd', label: 'Delta fresh' }]}>Remount</button>
+		<table><tbody>@for (const item of rows; key item.id) {
+			<tr el={row} attach={installRow(item.id)}><td>{item.label}</td></tr>
+		}</tbody></table>
+	</main>
+}`,
+		symbols: [],
+	});
+
+	expect(result.semanticGraph.diagnostics).toEqual([]);
+	expect(result.publicRenderPlan.repeatGates).toEqual([
+		expect.objectContaining({ repeatId: 'repeat:0', supported: true }),
+	]);
+	expect(result.publicRenderModule.rootExportName).toBe('App');
+	expect(result.publicRenderModule.moduleSource).toContain('cleanupMarklessPublicRepeat0Record');
+	expect(result.publicRenderModule.moduleSource).toContain('attachMarklessPublicRepeat0Behaviors');
+	expect(result.protocolView.behaviors).toEqual([]);
+	expect(result.protocolView.keyedRepeats?.[0]).not.toHaveProperty('rowBehaviors');
+
+	const hostsByKey = new Map<string, PublicRenderTestElement>();
+	const cleanupCounts = new Map<string, number>();
+	let attachments = 0;
+	const behaviorSymbol = result.symbolResolver.symbols.find(
+		(symbol) => symbol.kind === 'behavior',
+	);
+	const eventSymbols = result.symbolResolver.symbols.filter(
+		(symbol) => symbol.kind === 'event-handler',
+	);
+	const eventRows = [
+		[
+			{ id: 'a', label: 'Alpha next' },
+			{ id: 'b', label: 'Beta next' },
+			{ id: 'c', label: 'Gamma next' },
+			{ id: 'd', label: 'Delta next' },
+		],
+		[
+			{ id: 'd', label: 'Delta next' },
+			{ id: 'c', label: 'Gamma next' },
+			{ id: 'b', label: 'Beta next' },
+			{ id: 'a', label: 'Alpha next' },
+		],
+		[
+			{ id: 'd', label: 'Delta next' },
+			{ id: 'a', label: 'Alpha next' },
+		],
+		[],
+		[
+			{ id: 'a', label: 'Alpha fresh' },
+			{ id: 'b', label: 'Beta fresh' },
+			{ id: 'c', label: 'Gamma fresh' },
+			{ id: 'd', label: 'Delta fresh' },
+		],
+	] as const;
+	const loadSymbol = (symbolId: string) => {
+		if (symbolId === behaviorSymbol?.id) {
+			return ({ element, behaviorInputs }: { readonly element: PublicRenderTestElement; readonly behaviorInputs: [string] }) => {
+				const key = behaviorInputs[0];
+				attachments++;
+				hostsByKey.set(key, element);
+				return () => {
+					cleanupCounts.set(key, (cleanupCounts.get(key) ?? 0) + 1);
+					hostsByKey.delete(key);
+				};
+			};
+		}
+		const eventIndex = eventSymbols.findIndex((candidate) => candidate.id === symbolId);
+		if (eventIndex < 0) throw new Error(`Unexpected symbol ${symbolId}`);
+		return ({ graph }: { readonly graph: PublicRenderTestGraph }) =>
+			graph.write({ graphNodeId: 'state:rows', value: eventRows[eventIndex] });
+	};
+	const publicModule = await importPublicRenderTestModule(
+		[
+			'const document = globalThis.__marklessPublicRenderTestDocument;',
+			'const loadSymbol = globalThis.__marklessPublicRenderTestLoadSymbol;',
+			result.publicRenderModule.moduleSource,
+		].join('\n'),
+		{ document: publicRenderTestDocument(), loadSymbol },
+	);
+	const rendered = publicModule.App() as { readonly root: PublicRenderTestElement };
+	await drainPublicRenderMicrotasks();
+	const buttons = elementsByTag(rendered.root, 'button');
+	const mountedHosts = new Map(hostsByKey);
+
+	expect(attachments).toBe(4);
+	expect(new Set(hostsByKey.values()).size).toBe(4);
+	await buttons[0]!.dispatch('click');
+	await drainPublicRenderMicrotasks();
+	expect(attachments).toBe(4);
+	expect(cleanupCounts.size).toBe(0);
+	expect(hostsByKey).toEqual(mountedHosts);
+
+	await buttons[1]!.dispatch('click');
+	await drainPublicRenderMicrotasks();
+	expect(attachments).toBe(4);
+	expect(cleanupCounts.size).toBe(0);
+	const reorderedRows = elementsByTag(rendered.root, 'tr');
+	expect(reorderedRows).toHaveLength(4);
+	expect(reorderedRows[0]).toBe(mountedHosts.get('d'));
+	expect(reorderedRows[1]).toBe(mountedHosts.get('c'));
+	expect(reorderedRows[2]).toBe(mountedHosts.get('b'));
+	expect(reorderedRows[3]).toBe(mountedHosts.get('a'));
+
+	await buttons[2]!.dispatch('click');
+	await drainPublicRenderMicrotasks();
+	expect(Object.fromEntries(cleanupCounts)).toEqual({ b: 1, c: 1 });
+	expect(hostsByKey.get('a')).toBe(mountedHosts.get('a'));
+	expect(hostsByKey.get('d')).toBe(mountedHosts.get('d'));
+
+	await buttons[3]!.dispatch('click');
+	await drainPublicRenderMicrotasks();
+	expect(Object.fromEntries(cleanupCounts)).toEqual({ a: 1, b: 1, c: 1, d: 1 });
+
+	await buttons[4]!.dispatch('click');
+	await drainPublicRenderMicrotasks();
+	expect(attachments).toBe(8);
+	expect(Object.fromEntries(cleanupCounts)).toEqual({ a: 1, b: 1, c: 1, d: 1 });
+	for (const key of ['a', 'b', 'c', 'd'])
+		expect(hostsByKey.get(key)).not.toBe(mountedHosts.get(key));
+});

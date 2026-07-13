@@ -297,7 +297,7 @@ test('planPayloadArena carries keyed repeat metadata into the resumable view pla
 	]);
 });
 
-test('B918 does not emit flat element handle records for repeated hosts', async () => {
+test('B918 places a repeated direct element handle on its keyed row record', async () => {
 	const semanticGraph = await buildSemanticGraph({
 		filename: 'src/RepeatedHandles.tsrx',
 		source: repeatedHandleSource,
@@ -306,10 +306,48 @@ test('B918 does not emit flat element handle records for repeated hosts', async 
 
 	const payload = planPayloadArena({ semanticGraph, stateLowering });
 
-	expect(semanticGraph.diagnostics).toEqual([
-		expect.objectContaining({ code: 'MARKLESS_ELEMENT_HANDLE_DUPLICATE' }),
-	]);
+	expect(semanticGraph.diagnostics).toEqual([]);
 	expect(payload.view.elementHandles).toEqual([]);
+	expect(payload.view.keyedRepeats[0]?.rowElementHandles).toEqual([
+		expect.objectContaining({ handleId: 'element:rowInput', name: 'rowInput' }),
+	]);
+});
+
+test('planPayloadArena places keyed row handles and behaviors on the repeat record', async () => {
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/EffectfulRows.tsrx',
+		source: `import { element, state } from '@markless/core';
+import { installRow } from './row-behavior.ts';
+export function App() @{
+	const rows = state([{ id: 'a', label: 'Alpha' }]);
+	const row = element<HTMLTableRowElement>();
+	<table><tbody>@for (const item of rows; key item.id) {
+		<tr el={row} attach={installRow(item.id)}><td>{item.label}</td></tr>
+	}</tbody></table>
+}`,
+	});
+	const payload = planPayloadArena({
+		semanticGraph,
+		stateLowering: lowerStateAccess({ semanticGraph }),
+	});
+
+	expect(semanticGraph.diagnostics).toEqual([]);
+	expect(payload.view.elementHandles).toEqual([]);
+	expect(payload.view.behaviors).toEqual([]);
+	expect(payload.view.keyedRepeats).toEqual([
+		expect.objectContaining({
+			rowElementHandles: [
+				expect.objectContaining({ handleId: 'element:row', name: 'row' }),
+			],
+			rowBehaviors: [
+				expect.objectContaining({
+					source: 'installRow(item.id)',
+					functionSource: 'installRow',
+					inputSources: ['item.id'],
+				}),
+			],
+		}),
+	]);
 });
 
 test('B918 plans a prop-forwarded handle on the child host under the parent handle id', async () => {

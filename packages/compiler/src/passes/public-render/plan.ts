@@ -178,6 +178,7 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 			bindings,
 			itemName: semanticRepeat.itemName,
 			keyPath: payloadRepeat.keyPath,
+			payloadRepeat,
 			repeatId: payloadRepeat.id,
 			row,
 			source: input.source.source,

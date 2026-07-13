@@ -271,6 +271,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_SHARED_SCOPE_INVALID'
 		| 'MARKLESS_ELEMENT_HANDLE_REQUIRED'
 		| 'MARKLESS_ELEMENT_HANDLE_DUPLICATE'
+		| 'MARKLESS_ROW_ELEMENT_HANDLE_UNSUPPORTED'
 		| 'MARKLESS_ELEMENT_HANDLE_UNBOUND'
 		| 'MARKLESS_ELEMENT_HANDLE_PROP_UNSUPPORTED'
 		| 'MARKLESS_ELEMENT_MODULE_SCOPE'
@@ -365,6 +366,10 @@ export type SemanticElementHandleBinding = {
 	readonly componentName?: string;
 	readonly sourceSpan?: SourceSpan;
 	readonly keyedRepeatScopeIds: ReadonlyArray<string>;
+	readonly rowOwner?: {
+		readonly repeatId: string;
+		readonly keyPath: ReadonlyArray<string>;
+	};
 };
 
 export type SemanticBehavior = {
@@ -372,6 +377,7 @@ export type SemanticBehavior = {
 	readonly source: string;
 	readonly functionSource: string;
 	readonly inputSources: ReadonlyArray<string>;
+	readonly keyedRepeatScopeIds?: ReadonlyArray<string>;
 };
 
 export type SemanticLocalBinding = {
@@ -533,6 +539,12 @@ export type PayloadKeyedRepeat = {
 	readonly collectionGraphNodeId: string;
 	readonly collectionPath: ReadonlyArray<string>;
 	readonly keyPath: ReadonlyArray<string>;
+	readonly rowElementHandles?: ReadonlyArray<{
+		readonly hostNodeId: string;
+		readonly handleId: string;
+		readonly name: string;
+	}>;
+	readonly rowBehaviors?: ReadonlyArray<PayloadBehavior>;
 };
 
 export type PayloadArenaArtifact = {
@@ -986,6 +998,16 @@ export type PublicRenderPlanKeyedRepeat = {
 	readonly textWrites: ReadonlyArray<PublicRenderPlanTextWrite>;
 	readonly classWrites: ReadonlyArray<PublicRenderPlanClassWrite>;
 	readonly eventControls: ReadonlyArray<PublicRenderPlanEventControl>;
+	readonly rowElementHandles?: ReadonlyArray<{
+		readonly hostPath: ReadonlyArray<number>;
+		readonly handleId: string;
+		readonly name: string;
+	}>;
+	readonly rowBehaviors?: ReadonlyArray<{
+		readonly hostPath: ReadonlyArray<number>;
+		readonly symbolId: string;
+		readonly inputPaths: ReadonlyArray<ReadonlyArray<string>>;
+	}>;
 };
 
 export type PublicRenderPlanBranchArmPart =

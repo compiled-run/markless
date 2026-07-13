@@ -73,6 +73,7 @@ export function supportedRepeatGate(input: {
 		indexName: input.semanticRepeat.indexName,
 		itemName: input.semanticRepeat.itemName,
 		keyPath: input.payloadRepeat.keyPath,
+		payloadRepeat: input.payloadRepeat,
 		repeatId: input.payloadRepeat.id,
 		row,
 		source: input.source,
@@ -151,6 +152,12 @@ export function planKeyedRepeat(input: {
 		textWrites: input.rowPlan.textWrites,
 		classWrites: input.rowPlan.classWrites,
 		eventControls: input.rowPlan.eventControls,
+		...(input.rowPlan.rowElementHandles.length > 0
+			? { rowElementHandles: input.rowPlan.rowElementHandles }
+			: {}),
+		...(input.rowPlan.rowBehaviors.length > 0
+			? { rowBehaviors: input.rowPlan.rowBehaviors }
+			: {}),
 	};
 }
 
@@ -165,6 +172,8 @@ export type RowPlan = {
 	readonly classWrites: ReadonlyArray<PublicRenderPlanClassWrite>;
 	readonly eventControls: ReadonlyArray<PublicRenderPlanEventControl>;
 	readonly attributeWrites: ReadonlyArray<RowAttributeWrite>;
+	readonly rowElementHandles: NonNullable<PublicRenderPlanKeyedRepeat['rowElementHandles']>;
+	readonly rowBehaviors: NonNullable<PublicRenderPlanKeyedRepeat['rowBehaviors']>;
 	readonly usesIndex: boolean;
 	// The row invokes components (markup-only, item-scope props). Emitters must
 	// execute the component per row instead of treating the row as plain hosts.
@@ -204,6 +213,7 @@ export function collectRowPlan(input: {
 	readonly indexName?: string;
 	readonly itemName: string;
 	readonly keyPath: ReadonlyArray<string>;
+	readonly payloadRepeat: PayloadKeyedRepeat;
 	readonly repeatId: string;
 	readonly row: AnyNode;
 	readonly source: string;
@@ -213,6 +223,12 @@ export function collectRowPlan(input: {
 	const classWrites: PublicRenderPlanClassWrite[] = [];
 	const eventControls: PublicRenderPlanEventControl[] = [];
 	const attributeWrites: RowAttributeWrite[] = [];
+	const rowElementHandles: Array<
+		NonNullable<PublicRenderPlanKeyedRepeat['rowElementHandles']>[number]
+	> = [];
+	const rowBehaviors: Array<
+		NonNullable<PublicRenderPlanKeyedRepeat['rowBehaviors']>[number]
+	> = [];
 	// Row-static reads: the item, the index, and the page's props (aliases like
 	// a destructured \`params\` resolve through the graph). Props are constant
 	// for the page render (route params in row hrefs), and pages with props
@@ -299,7 +315,47 @@ export function collectRowPlan(input: {
 				continue;
 			}
 
-			if (attributeName === 'attach' || attributeName === 'el') return false;
+			if (attributeName === 'el') {
+				if (!hostNodeId) return false;
+				const handles = (input.payloadRepeat.rowElementHandles ?? []).filter(
+					(handle) => handle.hostNodeId === hostNodeId,
+				);
+				if (handles.length === 0) return false;
+				rowElementHandles.push(
+					...handles.map((handle) => ({
+						hostPath,
+						handleId: handle.handleId,
+						name: handle.name,
+					})),
+				);
+				continue;
+			}
+
+			if (attributeName === 'attach') {
+				if (!hostNodeId) return false;
+				const behaviors = (input.payloadRepeat.rowBehaviors ?? []).filter(
+					(behavior) => behavior.hostNodeId === hostNodeId,
+				);
+				if (behaviors.length === 0) return false;
+				for (const behavior of behaviors) {
+					const symbol = input.symbols.find(
+						(candidate) =>
+							candidate.kind === 'behavior' &&
+							candidate.hostNodeId === hostNodeId &&
+							candidate.source === behavior.source,
+					);
+					const inputPaths = behavior.inputSources.map((source) =>
+						rowInputPath(input.itemName, source),
+					);
+					if (!symbol || inputPaths.some((path) => path === null)) return false;
+					rowBehaviors.push({
+						hostPath,
+						symbolId: symbol.id,
+						inputPaths: inputPaths as ReadonlyArray<ReadonlyArray<string>>,
+					});
+				}
+				continue;
+			}
 			if (expression && expression.type !== 'Literal') {
 				// Item-derived dynamic attributes (href={'#/r/' + item.id},
 				// data-testid={...}) are static per row instance: the SSR/CSR row
@@ -371,6 +427,8 @@ export function collectRowPlan(input: {
 		classWrites,
 		eventControls,
 		attributeWrites,
+		rowElementHandles,
+		rowBehaviors,
 		usesIndex,
 		hasComponents,
 	};
@@ -527,6 +585,11 @@ function itemPathFromSource(itemName: string, source: string): ReadonlyArray<str
 	if (segments[0] !== itemName || segments.length === 1) return null;
 
 	return segments.slice(1);
+}
+
+function rowInputPath(itemName: string, source: string): ReadonlyArray<string> | null {
+	const segments = splitStaticGraphPath(source);
+	return segments[0] === itemName ? segments.slice(1) : null;
 }
 
 export function parentContainsOnlyRepeat(parent: AnyNode, repeat: AnyNode): boolean {

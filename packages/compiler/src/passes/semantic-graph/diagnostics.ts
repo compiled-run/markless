@@ -691,6 +691,30 @@ export function duplicateElementHandleDiagnostic(
 	};
 }
 
+export function unsupportedRowElementHandleDiagnostic(
+	binding: SemanticElementHandleBinding,
+): SemanticGraphDiagnostic {
+	return {
+		code: 'MARKLESS_ROW_ELEMENT_HANDLE_UNSUPPORTED',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: 'Keyed row element handles must be direct identifiers',
+		message: `Cannot bind el={${binding.handleName}} inside a keyed repeat. Stage-one row ownership supports only a direct element() handle identifier such as el={row}.`,
+		why: 'The keyed row record owns one host slot per authored handle and repeat key. Member paths, forwarded props, and nested repeat scopes do not identify one compiler-proven row-owned slot.',
+		primarySpan: binding.sourceSpan,
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		elementLocator: binding.hostNodeId,
+		suggestions: [
+			{
+				message:
+					'Declare one component-local handle with const row = element(), then bind that identifier directly as el={row} on the keyed row host.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ROW_ELEMENT_HANDLE_UNSUPPORTED',
+	};
+}
+
 export function repeatKeyRequiredDiagnostic(input: {
 	readonly node: AnyNode;
 	readonly itemName: string;

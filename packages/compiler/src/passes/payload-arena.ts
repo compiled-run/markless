@@ -68,9 +68,30 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 		index,
 		tagName: hostNode.tagName,
 	}));
+	const behaviors = input.semanticGraph.behaviors.map((behavior) =>
+		payloadBehavior(behavior, bindings, aliases),
+	);
 	const keyedRepeats = input.semanticGraph.keyedRepeats.flatMap(
 		(repeat): PayloadKeyedRepeat[] => {
 			if (!repeat.collectionGraphNodeId) return [];
+
+			const rowElementHandles = input.semanticGraph.elementHandleBindings.flatMap(
+				(binding) => {
+					if (binding.rowOwner?.repeatId !== repeat.id) return [];
+					const graphBinding = resolveElementHandleBinding(binding, input, bindings, aliases);
+					if (!graphBinding || graphBinding.kind !== 'element') return [];
+					return [
+						{
+							hostNodeId: binding.hostNodeId,
+							handleId: graphBinding.id,
+							name: graphBinding.name,
+						},
+					];
+				},
+			);
+			const rowBehaviors = behaviors.filter((behavior) =>
+				behavior.keyedRepeatScopeIds?.includes(repeat.id),
+			);
 
 			return [
 				{
@@ -80,6 +101,8 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 					collectionGraphNodeId: repeat.collectionGraphNodeId,
 					collectionPath: repeat.collectionPath,
 					keyPath: repeat.keyPath,
+					...(rowElementHandles.length > 0 ? { rowElementHandles } : {}),
+					...(rowBehaviors.length > 0 ? { rowBehaviors } : {}),
 				},
 			];
 		},
@@ -111,7 +134,7 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 		];
 	});
 	const elementHandles = input.semanticGraph.elementHandleBindings.flatMap((binding) => {
-		if (binding.keyedRepeatScopeIds.length > 0) return [];
+		if (binding.rowOwner || binding.keyedRepeatScopeIds.length > 0) return [];
 
 		const graphBinding = resolveElementHandleBinding(binding, input, bindings, aliases);
 		if (!graphBinding || graphBinding.kind !== 'element') return [];
@@ -136,9 +159,6 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 			.sort((left, right) => left.anchorOrder - right.anchorOrder)
 			.map((record, rank) => [record.id, rank] as const),
 	);
-	const behaviors = input.semanticGraph.behaviors.map((behavior) =>
-		payloadBehavior(behavior, bindings, aliases),
-	);
 	// D3: content inside a boundary arm lives in the boundary's own coordinate
 	// space. Each arm's locators index from 0 = first element after the start
 	// anchor in that arm's rendered content; resume adds the anchor's live
@@ -162,7 +182,11 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 				events: input.semanticGraph.events.filter((event) =>
 					armHostIds.has(event.hostNodeId),
 				),
-				behaviors: behaviors.filter((behavior) => armHostIds.has(behavior.hostNodeId)),
+				behaviors: behaviors.filter(
+					(behavior) =>
+						(behavior.keyedRepeatScopeIds?.length ?? 0) === 0 &&
+						armHostIds.has(behavior.hostNodeId),
+				),
 				elementHandles: elementHandles.filter((handle) =>
 					armHostIds.has(handle.hostNodeId),
 				),
@@ -238,7 +262,9 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 				(domUpdate) =>
 					`${domUpdate.hostNodeId}:${domUpdateTargetKey(domUpdate.target)}:${domUpdate.graphNodeId}:${domUpdate.path.join('.')}`,
 			),
-			behaviors,
+			behaviors: behaviors.filter(
+				(behavior) => (behavior.keyedRepeatScopeIds?.length ?? 0) === 0,
+			),
 			elementHandles,
 			asyncBoundaries,
 			branchSites: input.semanticGraph.branchSites.map((site) => ({

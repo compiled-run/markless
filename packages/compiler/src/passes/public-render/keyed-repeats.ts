@@ -42,6 +42,7 @@ export function emitRepeatFunctions(
 		emitRepeatPatchFunction(repeat, index),
 		emitRepeatWriteFunction(repeat, index),
 		emitRepeatEventFunction(repeat, index),
+		emitRepeatBehaviorFunction(repeat, index),
 	]);
 }
 
@@ -77,12 +78,16 @@ function emitRepeatSyncFunction(
 	options: { readonly hasSingleRepeat: boolean },
 ) {
 	const useSingleClassValue = repeat.classWrites.length === 1;
+	const hasRowBehaviors = (repeat.rowBehaviors?.length ?? 0) > 0;
 	const classValueName = useSingleClassValue ? 'classValue' : 'classValues';
 	const classStateName = useSingleClassValue ? 'classValue' : 'classValues';
 	const attachEventsCall =
-		repeat.eventControls.length > 0
+		(repeat.eventControls.length > 0
 			? `\n\t\t\tattachMarklessPublicRepeat${index}Events(record);`
-			: '';
+			: '') +
+		(hasRowBehaviors
+			? `\n\t\t\tattachMarklessPublicRepeat${index}Behaviors(record, item, graph, loadSymbolForRepeat);`
+			: '');
 	const delegateEventsCall =
 		repeat.eventControls.length > 0
 			? `\n\tdelegateMarklessPublicRepeat${index}Events(parent, graph, loadSymbolForRepeat);`
@@ -91,9 +96,11 @@ function emitRepeatSyncFunction(
 	const stateDeclaration = options.hasSingleRepeat
 		? ''
 		: `\n\tconst state = repeatState(root, ${index});`;
-	const clearRowsFunction = useSingleClassValue
-		? 'clearMarklessPublicSingleClassRows'
-		: 'clearMarklessPublicRows';
+	const clearRowsFunction = hasRowBehaviors
+		? `clearMarklessPublicRepeat${index}Rows`
+		: useSingleClassValue
+			? 'clearMarklessPublicSingleClassRows'
+			: 'clearMarklessPublicRows';
 
 	return [
 		`function syncMarklessPublicRepeat${index}(root, graph, loadSymbolForRepeat${stateParameter}) {\n\tconst parent = ${domNodePathExpression('root', repeat.parentPath)};\n\tif (!parent?.replaceChildren) return;${stateDeclaration}${delegateEventsCall}\n\tconst collectionDirty = graph.isDirty?.(${JSON.stringify(repeat.collectionGraphNodeId)}) ?? true;\n\tconst classDirty = ${classDirtyExpression(repeat)};\n\tif (!collectionDirty && state.keys.length > 0) {\n\t\tif (classDirty) {\n\t\t\tconst ${classValueName} = readMarklessPublicRepeat${index}ClassValues(graph);\n\t\t\tupdateMarklessPublicRepeat${index}Classes(state, ${classValueName});\n\t\t\tstate.${classStateName} = ${classValueName};\n\t\t}\n\t\treturn;\n\t}\n\tconst itemsValue = ${graphReadExpression(repeat.collectionGraphNodeId, repeat.collectionPath)};\n\tconst items = Array.isArray(itemsValue) ? itemsValue : Array.from(itemsValue ?? []);\n\tif (items.length === 0) { ${clearRowsFunction}(parent, state); renderMarklessPublicRepeat${index}Empty(parent); return; }\n\tconst ${classValueName} = readMarklessPublicRepeat${index}ClassValues(graph);\n\tconst hadRows = state.keys.length > 0;\n\tconst dirtyIndexes = graph.dirtyIndexes?.(${JSON.stringify(repeat.collectionGraphNodeId)});\n\tif (hadRows && dirtyIndexes && dirtyIndexes.length < items.length && patchMarklessPublicRepeat${index}DirtyRows(state, items, dirtyIndexes, ${classValueName})) {\n\t\tif (classDirty) updateMarklessPublicRepeat${index}Classes(state, ${classValueName});\n\t\tstate.${classStateName} = ${classValueName};\n\t\treturn;\n\t}\n\tlet canAppend = hadRows && state.keys.length < items.length;\n\tlet reusedRows = 0;\n\tconst newRows = document.createDocumentFragment();\n\tconst nextKeys = [];`,
@@ -175,6 +182,15 @@ function emitRepeatRecordFunction(repeat: KeyedRepeatPlan, index: number) {
 			(eventControl, eventIndex) =>
 				`\t\tevent${eventIndex}: ${domNodePathExpression('row', eventControl.hostPath)},`,
 		),
+		...(repeat.rowElementHandles ?? []).map(
+			(handle, handleIndex) =>
+				`\t\thandle${handleIndex}: ${domNodePathExpression('row', handle.hostPath)},`,
+		),
+		...(repeat.rowBehaviors ?? []).map(
+			(behavior, behaviorIndex) =>
+				`\t\tbehavior${behaviorIndex}: ${domNodePathExpression('row', behavior.hostPath)},`,
+		),
+		...((repeat.rowBehaviors?.length ?? 0) > 0 ? ['\t\tremoved: false,'] : []),
 	];
 
 	return [
@@ -326,6 +342,54 @@ function emitRepeatEventFunction(repeat: KeyedRepeatPlan, index: number) {
 		'',
 		`function attachMarklessPublicRepeat${index}Events(record) {`,
 		...eventMarkers,
+		'}',
+		'',
+	].join('\n');
+}
+
+function emitRepeatBehaviorFunction(repeat: KeyedRepeatPlan, index: number) {
+	const behaviors = repeat.rowBehaviors ?? [];
+	if (behaviors.length === 0) return '';
+	const handleChecks = (repeat.rowElementHandles ?? []).map(
+		(handle, handleIndex) =>
+			`id === ${JSON.stringify(handle.handleId)} || id === ${JSON.stringify(handle.name)} ? record.handle${handleIndex} :`,
+	);
+	const getElementHandle = `(id) => ${handleChecks.join(' ')} undefined`;
+	const activations = [
+		`\trecord.c ??= () => cleanupMarklessPublicRepeat${index}Record(record);`,
+		'\tawait 0;',
+		'\tif (record.removed) return;',
+		...behaviors.flatMap((behavior, behaviorIndex) => [
+			`\tconst loaded${behaviorIndex} = loadSymbolForRepeat(${JSON.stringify(behavior.symbolId)});`,
+			`\tconst symbol${behaviorIndex} = isMarklessPublicThenable(loaded${behaviorIndex}) ? await loaded${behaviorIndex} : loaded${behaviorIndex};`,
+			'\tif (record.removed) return;',
+			`\tconst cleanup${behaviorIndex} = await symbol${behaviorIndex}({ graph, element: record.behavior${behaviorIndex}, getElementHandle: ${getElementHandle}, behaviorInputs: [${behavior.inputPaths.map((path) => itemPathReadSource('item', path)).join(', ')}] });`,
+			`\tif (typeof cleanup${behaviorIndex} === "function") { if (record.removed) cleanup${behaviorIndex}(); else (record.cleanups ??= []).push(cleanup${behaviorIndex}); }`,
+		]),
+	];
+	const classReset =
+		repeat.classWrites.length === 1
+			? '\tstate.classValue = undefined;'
+			: '\tstate.classValues = [];';
+
+	return [
+		`async function attachMarklessPublicRepeat${index}Behaviors(record, item, graph, loadSymbolForRepeat) {`,
+		...activations,
+		'}',
+		'',
+		`function cleanupMarklessPublicRepeat${index}Record(record) {`,
+		'\tif (record.removed) return;',
+		'\trecord.removed = true;',
+		'\tfor (const cleanup of [...(record.cleanups ?? [])].reverse()) cleanup();',
+		'\trecord.cleanups = [];',
+		'}',
+		'',
+		`function clearMarklessPublicRepeat${index}Rows(parent, state) {`,
+		'\tif (parent.replaceChildren) parent.replaceChildren(); else parent.textContent = "";',
+		`\tfor (const record of state.rows.values()) cleanupMarklessPublicRepeat${index}Record(record);`,
+		'\tstate.rows.clear();',
+		'\tstate.keys = [];',
+		classReset,
 		'}',
 		'',
 	].join('\n');

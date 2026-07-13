@@ -80,7 +80,10 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 		});
 	}
 
-	input.payloadArena.view.behaviors.forEach((behavior, order) => {
+	[
+		...input.payloadArena.view.behaviors,
+		...input.payloadArena.view.keyedRepeats.flatMap((repeat) => repeat.rowBehaviors ?? []),
+	].forEach((behavior, order) => {
 		symbols.push({
 			id: `symbol:${nextSymbolId++}`,
 			kind: 'behavior',
