@@ -1,4 +1,11 @@
 import { box } from '@async/witness';
+import {
+	evaluateMusicSsrPreloadWindow,
+	evaluateMusicSsrRequests,
+	invalidateMusicSsrReceipt,
+	writeMusicSsrReceipt,
+} from './analyzer/analyzer-gate.ts';
+import { musicSsrAnalyzerPolicy } from './analyzer/policy.ts';
 
 // Product truth: the SSR demo must serve the player page (no internal server
 // error) with branch comment anchors in the html, resume in the browser, and
@@ -45,6 +52,7 @@ export default box(
 		modes: ['build', 'preview'],
 	},
 	async ({ pipeline, expect, receipt }) => {
+		await invalidateMusicSsrReceipt();
 		const build = await pipeline.build({
 			config: (config) => ({
 				...config,
@@ -91,6 +99,7 @@ export default box(
 		await expect.page.text(page, PLAY_ICON, PAUSED_ICON, WAIT);
 		await expect.page.attribute(page, PLAY_TOGGLE, 'class', 'play', WAIT);
 		const startupScripts = await waitForQuietBuildJs(page);
+		const actionStartIndex = (await page.networkRequests()).length;
 		receipt.note(`ssr play-branch startup JS: ${formatPaths(startupScripts)}`);
 
 		await page.click(PLAY_TOGGLE, WAIT);
@@ -148,10 +157,39 @@ export default box(
 			'm_qlgFQs7E4',
 			WAIT,
 		);
-
 		await expect.page.outcome(page, { consoleErrors: 0, failedRequests: 0 }, WAIT);
+		const requests = await page.networkRequests();
+		const fixtureOrigin = new URL(page.url).origin;
+		const analyzerResults = [
+			evaluateMusicSsrPreloadWindow({
+				baseUrl: page.url,
+				actionKind: 'interaction',
+				declaredPreloads: preloadHrefs,
+				// S1 governs the fixture's own build modules; declared third-party
+				// player internals are I2's jurisdiction (network rules below).
+				observedRequests: requests
+					.map((request, index) => ({
+						phase: index < actionStartIndex ? ('bootstrap' as const) : ('action' as const),
+						...(index < actionStartIndex ? {} : { actionId: 'play-pause-or-next' }),
+						url: request.url,
+					}))
+					.filter((observation) => new URL(observation.url).origin === fixtureOrigin),
+			}).invariant,
+			evaluateMusicSsrRequests({
+				pageOrigin: new URL(page.url).origin,
+				rules: musicSsrAnalyzerPolicy.network,
+				requests,
+			}),
+			{ id: 'MLA-I1-CONSOLE' as const, status: 'pass' as const, details: [] },
+			{ id: 'MLA-EXT-WITNESS' as const, status: 'pass' as const, details: [] },
+		];
+		for (const result of analyzerResults) {
+			if (result.status === 'fail') throw new Error(result.details.join('\n'));
+		}
+
 		await preview.close();
 		await receipt.capture('music-player ssr served the page and round-tripped the icon branch');
+		await writeMusicSsrReceipt(analyzerResults);
 	},
 );
 
@@ -200,7 +238,14 @@ async function assertModulePreloadsServe(
 }
 
 type NetworkRequestPage = {
-	networkRequests(): Promise<ReadonlyArray<{ readonly url: string; readonly method: string }>>;
+	networkRequests(): Promise<
+		ReadonlyArray<{
+			readonly url: string;
+			readonly method: string;
+			readonly status: number | null;
+			readonly failedReason: string | null;
+		}>
+	>;
 };
 
 type ContentPage = {

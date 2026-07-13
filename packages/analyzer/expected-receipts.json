@@ -34,6 +34,20 @@
 			"matrix": "router-route-actions-v1",
 			"commitSha": "git:HEAD",
 			"buildArtifactHash": "sha256:packages/router/boxes/analyzer/policy.ts"
+		},
+		{
+			"receiptPath": "demos/music-player/.witness/receipts/analyzer-csr.json",
+			"consumer": "markless-music-player",
+			"matrix": "music-player-csr-surfaces-v1",
+			"commitSha": "git:HEAD",
+			"buildArtifactHash": "sha256:demos/music-player/boxes/analyzer/policy.ts"
+		},
+		{
+			"receiptPath": "demos/music-player-ssr/.witness/receipts/analyzer-ssr.json",
+			"consumer": "markless-music-player-ssr",
+			"matrix": "music-player-ssr-route-actions-v1",
+			"commitSha": "git:HEAD",
+			"buildArtifactHash": "sha256:demos/music-player-ssr/boxes/analyzer/policy.ts"
 		}
 	]
 }

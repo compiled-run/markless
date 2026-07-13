@@ -1,0 +1,30 @@
+{
+	"schemaVersion": 1,
+	"kind": "fixture-surface-matrix",
+	"fixtures": [
+		{
+			"fixture": "csr-command-state",
+			"interactions": ["play", "next-track"],
+			"surfaces": [
+				"MLA-S1-PRELOAD-INTEGRITY",
+				"MLA-I1-CONSOLE",
+				"MLA-I2-NETWORK",
+				"MLA-I5-BOOTSTRAP-BUDGET",
+				"MLA-I5-ACTION-BUDGET",
+				"MLA-EXT-WITNESS"
+			]
+		},
+		{
+			"fixture": "csr-play-branch",
+			"interactions": ["play", "pause"],
+			"surfaces": [
+				"MLA-S1-PRELOAD-INTEGRITY",
+				"MLA-I1-CONSOLE",
+				"MLA-I2-NETWORK",
+				"MLA-I5-BOOTSTRAP-BUDGET",
+				"MLA-I5-ACTION-BUDGET",
+				"MLA-EXT-WITNESS"
+			]
+		}
+	]
+}

@@ -75,6 +75,9 @@ importers:
         specifier: workspace:*
         version: link:../../packages/core
     devDependencies:
+      '@markless/analyzer':
+        specifier: workspace:*
+        version: link:../../packages/analyzer
       rolldown:
         specifier: 1.0.3
         version: 1.0.3
@@ -97,6 +100,9 @@ importers:
         specifier: workspace:*
         version: link:../../packages/router
     devDependencies:
+      '@markless/analyzer':
+        specifier: workspace:*
+        version: link:../../packages/analyzer
       rolldown:
         specifier: 1.0.3
         version: 1.0.3

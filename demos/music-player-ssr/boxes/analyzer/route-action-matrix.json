@@ -1,0 +1,67 @@
+{
+	"schemaVersion": 1,
+	"routes": [
+		{
+			"routeFile": "pages/index.tsrx",
+			"fixtureUrls": [{ "id": "player", "url": "/" }],
+			"apiContracts": [],
+			"actions": [
+				{
+					"id": "play",
+					"fixtureUrlId": "player",
+					"safety": "safe",
+					"defaultCrawl": true,
+					"locator": { "kind": "css", "value": "[aria-label=\"Play or pause\"]" },
+					"operation": "click",
+					"expectedEventTypes": ["click"],
+					"expectedInteraction": "inline-resumer",
+					"apiContractIds": [],
+					"pendingPolicy": { "allow": false },
+					"expectedRejectedBoundaryIds": [],
+					"reset": { "mode": "none" },
+					"navigates": false
+				},
+				{
+					"id": "pause",
+					"fixtureUrlId": "player",
+					"safety": "safe",
+					"defaultCrawl": true,
+					"locator": { "kind": "css", "value": "[aria-label=\"Play or pause\"]" },
+					"operation": "click",
+					"expectedEventTypes": ["click"],
+					"expectedInteraction": "inline-resumer",
+					"apiContractIds": [],
+					"pendingPolicy": { "allow": false },
+					"expectedRejectedBoundaryIds": [],
+					"reset": { "mode": "none" },
+					"navigates": false
+				},
+				{
+					"id": "next-track",
+					"fixtureUrlId": "player",
+					"safety": "safe",
+					"defaultCrawl": true,
+					"locator": { "kind": "css", "value": "[aria-label=\"Next track\"]" },
+					"operation": "click",
+					"expectedEventTypes": ["click"],
+					"expectedInteraction": "inline-resumer",
+					"apiContractIds": [],
+					"pendingPolicy": { "allow": false },
+					"expectedRejectedBoundaryIds": [],
+					"reset": { "mode": "none" },
+					"navigates": false
+				}
+			],
+			"bootstrapPendingPolicy": { "allow": false },
+			"bootstrapExpectedRejectedBoundaryIds": [],
+			"resetRequirements": {
+				"beforeRoute": "fresh-fixture",
+				"beforeEachAction": "fresh-browser-context",
+				"afterMutatingAction": "discard-fixture"
+			},
+			"ownerNotes": [
+				"Play and Next retain separate V8 measurement windows; neither execution-log gzip wall is an analyzer I5 ceiling."
+			]
+		}
+	]
+}

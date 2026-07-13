@@ -9,6 +9,7 @@
 		"build": "vp build",
 		"preview": "vp preview",
 		"test": "vp test",
+		"test:analyzer": "vitest run boxes/analyzer-gate.test.ts",
 		"test:boxes": "witness run"
 	},
 	"dependencies": {
@@ -16,6 +17,7 @@
 		"@markless/router": "workspace:*"
 	},
 	"devDependencies": {
+		"@markless/analyzer": "workspace:*",
 		"rolldown": "1.0.3",
 		"typescript": "5.9.3",
 		"vite": "8.0.16",

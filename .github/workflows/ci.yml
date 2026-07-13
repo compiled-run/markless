@@ -76,6 +76,18 @@ jobs:
             - name: Run router pipeline boxes
               run: pnpm --dir packages/router test:boxes
 
+            - name: Run music-player demo analyzer gate tests
+              run: pnpm --dir demos/music-player test:analyzer
+
+            - name: Run music-player demo boxes
+              run: pnpm --dir demos/music-player test:boxes
+
+            - name: Run music-player-ssr demo analyzer gate tests
+              run: pnpm --dir demos/music-player-ssr test:analyzer
+
+            - name: Run music-player-ssr demo boxes
+              run: pnpm --dir demos/music-player-ssr test:boxes
+
             - name: Validate required analyzer consumer receipts
               run: pnpm receipts:check
 
@@ -84,14 +96,10 @@ jobs:
               uses: actions/upload-artifact@v4
               with:
                   name: analyzer-contract-receipts
-                  path: packages/*/.witness/receipts/*.json
+                  path: |
+                      packages/*/.witness/receipts/*.json
+                      demos/*/.witness/receipts/*.json
                   if-no-files-found: error
-
-            - name: Run music-player demo boxes
-              run: pnpm --dir demos/music-player test:boxes
-
-            - name: Run music-player-ssr demo boxes
-              run: pnpm --dir demos/music-player-ssr test:boxes
 
     changes:
         runs-on: ubuntu-latest

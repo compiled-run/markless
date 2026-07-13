@@ -1,4 +1,11 @@
 import { box } from '@async/witness';
+import {
+	evaluateMusicCsrPreloadWindow,
+	evaluateMusicCsrRequests,
+	invalidateMusicCsrReceipt,
+	writeMusicCsrReceipt,
+} from './analyzer/analyzer-gate.ts';
+import { musicCsrAnalyzerPolicy } from './analyzer/policy.ts';
 
 const WAIT = { timeoutMs: 10_000 };
 
@@ -9,6 +16,7 @@ export default box(
 		modes: ['build', 'preview'],
 	},
 	async ({ pipeline, expect, receipt }) => {
+		await invalidateMusicCsrReceipt();
 		const build = await pipeline.build();
 		const preview = await pipeline.preview(build);
 		const html = await preview.request('/');
@@ -51,6 +59,7 @@ export default box(
 		await expect.page.attribute(page, '.track', 'data-color-end', '#a57c5b', WAIT);
 
 		const startupPaths = new Set(startupModules.map((request) => pathOf(request.url)));
+		const actionStartIndex = (await page.networkRequests()).length;
 		await page.trackEvents('click');
 		await page.click('[aria-label="Play or pause"]', WAIT);
 		await expect.page.outcome(page, { events: { click: { atLeast: 1 } } }, WAIT);
@@ -76,9 +85,39 @@ export default box(
 		await expect.page.attribute(page, '.track', 'data-color-start', '#4b3f72', WAIT);
 		await expect.page.attribute(page, '.track', 'data-color-end', '#d79f6f', WAIT);
 		assertNoNewBuildJs(await page.networkRequests(), startupPaths, 'next-track interaction');
+		await expect.page.outcome(page, { consoleErrors: 0, failedRequests: 0 }, WAIT);
+		const requests = await page.networkRequests();
+		const fixtureOrigin = new URL(page.url).origin;
+		const analyzerResults = [
+			evaluateMusicCsrPreloadWindow({
+				baseUrl: page.url,
+				actionKind: 'interaction',
+				declaredPreloads: preloadHrefs,
+				// S1 governs the fixture's own build modules; declared third-party
+				// player internals are I2's jurisdiction (network rules below).
+				observedRequests: requests
+					.map((request, index) => ({
+						phase: index < actionStartIndex ? ('bootstrap' as const) : ('action' as const),
+						...(index < actionStartIndex ? {} : { actionId: 'play-or-next-track' }),
+						url: request.url,
+					}))
+					.filter((observation) => new URL(observation.url).origin === fixtureOrigin),
+			}).invariant,
+			evaluateMusicCsrRequests({
+				pageOrigin: new URL(page.url).origin,
+				rules: musicCsrAnalyzerPolicy.network,
+				requests,
+			}),
+			{ id: 'MLA-I1-CONSOLE' as const, status: 'pass' as const, details: [] },
+			{ id: 'MLA-EXT-WITNESS' as const, status: 'pass' as const, details: [] },
+		];
+		for (const result of analyzerResults) {
+			if (result.status === 'fail') throw new Error(result.details.join('\n'));
+		}
 
 		await preview.close();
 		await receipt.capture('music-player csr preview youtube command state');
+		await writeMusicCsrReceipt(analyzerResults);
 	},
 );
 
