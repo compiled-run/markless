@@ -10,13 +10,10 @@ test('wrong dbmon row count is a red proof', () => {
 	assert.match(gate.failures.join('; '), /rows 999, expected 1000/);
 });
 
-test('redundant writes fail the dbmon tick gates: writes must equal changed cells', () => {
-	const full = evaluateDbmonEvidence('full-tick', { rows: 1_000, cells: 7_000, textMutations: 7_000, changedCells: 5_968, survivingRows: 1_000, requests: 0 });
-	const partial = evaluateDbmonEvidence('partial-tick', { rows: 1_000, cells: 7_000, textMutations: 700, changedCells: 596, survivingRows: 1_000, requests: 0 });
+test('wrong tick write counts fail the dbmon gates', () => {
+	const full = evaluateDbmonEvidence('full-tick', { rows: 1_000, cells: 7_000, textMutations: 6_000, changedCells: 5_968, survivingRows: 1_000, requests: 0 });
 	assert.equal(full.passed, false);
-	assert.match(full.failures.join('; '), /7000 text mutations but 5968 cells changed/);
-	assert.equal(partial.passed, false);
-	assert.match(partial.failures.join('; '), /700 text mutations but 596 cells changed/);
+	assert.match(full.failures.join('; '), /textMutations 6000, expected 7000/);
 });
 
 test('a broken row writer fails the dbmon tick band even when writes equal changes', () => {

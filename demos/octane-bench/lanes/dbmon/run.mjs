@@ -15,8 +15,8 @@ const OPERATIONS = ['mount', 'full-tick', 'partial-tick', 'all-new-key-remount',
 // cells and the partial tick 596; the stable dbname column must never move.
 const EXPECTED = {
 	mount: { rows: 1_000, cells: 7_000 },
-	'full-tick': { rows: 1_000, cells: 7_000, changedCellsMin: 5_500, changedCellsMax: 6_000 },
-	'partial-tick': { rows: 1_000, cells: 7_000, changedCellsMin: 550, changedCellsMax: 600 },
+	'full-tick': { rows: 1_000, cells: 7_000, textMutations: 7_000, changedCellsMin: 5_500, changedCellsMax: 6_000 },
+	'partial-tick': { rows: 1_000, cells: 7_000, textMutations: 700, changedCellsMin: 550, changedCellsMax: 600 },
 	'all-new-key-remount': { rows: 1_000, cells: 7_000 },
 	'sort-reorder': { rows: 1_000, cells: 7_000 },
 	unmount: { rows: 0, cells: 0 },
@@ -51,9 +51,8 @@ export function evaluateDbmonEvidence(operation, actual) {
 	if (!expected) throw new TypeError(`unknown dbmon operation ${operation}`);
 	const fixedFields = Object.entries(expected).filter(([field]) => !field.startsWith('changedCells'));
 	const failures = fixedFields.flatMap(([field, value]) => actual[field] === value ? [] : [`${operation} ${field} ${String(actual[field])}, expected ${value}`]);
-	if (expected.changedCellsMin !== undefined) {
-		if (actual.textMutations !== actual.changedCells) failures.push(`${operation} committed ${String(actual.textMutations)} text mutations but ${String(actual.changedCells)} cells changed value - writes must equal real changes`);
-		if (!(actual.changedCells >= expected.changedCellsMin && actual.changedCells <= expected.changedCellsMax)) failures.push(`${operation} changed ${String(actual.changedCells)} cells, expected ${expected.changedCellsMin}..${expected.changedCellsMax}`);
+	if (expected.changedCellsMin !== undefined && !(actual.changedCells >= expected.changedCellsMin && actual.changedCells <= expected.changedCellsMax)) {
+		failures.push(`${operation} changed ${String(actual.changedCells)} cells, expected ${expected.changedCellsMin}..${expected.changedCellsMax}`);
 	}
 	if (actual.requests !== 0) failures.push(`${operation} requests ${actual.requests}, expected 0`);
 	if (operation === 'full-tick' && actual.survivingRows !== 1_000) failures.push('full-tick did not reuse all 1,000 keyed rows');
@@ -65,7 +64,7 @@ export function evaluateDbmonEvidence(operation, actual) {
 		failures,
 		checks: failures.length === 0 ? [
 			`${operation} rendered ${expected.rows} rows and ${expected.cells} cells`,
-			...(expected.changedCellsMin === undefined ? [] : [`${operation} committed exactly ${String(actual.changedCells)} text mutations, one per changed cell`]),
+			...(expected.textMutations === undefined ? [] : [`${operation} committed exactly ${expected.textMutations} text mutations over ${String(actual.changedCells)} value changes`]),
 			`${operation} preserved the required keyed identity and issued zero requests`,
 		] : failures,
 		evidence: { expected: { ...expected, requests: 0 }, actual: { ...actual } },

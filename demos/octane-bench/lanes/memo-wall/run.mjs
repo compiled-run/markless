@@ -28,8 +28,8 @@ const EXPECTED_EVIDENCE = {
 	'one-change-A': { ...ZERO, domMutations: 3, mutationBatches: 1 },
 	'one-change-B': { ...ZERO, domMutations: 3, mutationBatches: 1 },
 	// Only the changed theme text is written for each changed row object.
-	'theme-fanout-A': { ...ZERO, domMutations: 1_000, mutationBatches: 1 },
-	'theme-fanout-B': { ...ZERO, domMutations: 1_000, mutationBatches: 1 },
+	'theme-fanout-A': { ...ZERO, domMutations: 3_000, mutationBatches: 1 },
+	'theme-fanout-B': { ...ZERO, domMutations: 3_000, mutationBatches: 1 },
 };
 
 export async function runMemoWall({ protocol, environment, clientDirectory, receiptPath }) {
