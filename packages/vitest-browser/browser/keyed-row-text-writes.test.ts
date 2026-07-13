@@ -9,7 +9,7 @@ afterEach(() => cleanup());
 // whose value did not change. A per-field identical-value suppression card
 // was implemented and REVERTED 2026-07-13: the naive live-nodeValue compare
 // regressed dbmon full-tick +17.4% p50 (7,000 node reads to save 32 writes;
-// pinned pair baselines/pairs/dbmon in demos/octane-bench). A future card
+// pinned pair baselines/pairs/dbmon in demos/benchmarks). A future card
 // (e.g. raw prior-item field comparison, which also skips the stringify)
 // flips the first assertion from 3 to 1.
 

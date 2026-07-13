@@ -1,0 +1,16 @@
+{
+	"name": "chat-stream",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"dependencies": {
+		"@markless/core": "workspace:*"
+	},
+	"devDependencies": {
+		"@markless/analyzer": "workspace:*",
+		"@markless/bundler": "workspace:*",
+		"playwright": "1.58.2",
+		"vite-plus": "0.1.20"
+	},
+	"packageManager": "pnpm@10.33.2"
+}

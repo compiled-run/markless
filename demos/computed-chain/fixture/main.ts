@@ -1,0 +1,117 @@
+import { render } from '@markless/web';
+import type { CsrRenderContainer } from '@markless/web';
+import App from './app.tsrx';
+
+const ownerLevels = [1, 11, 21, 31, 41, 51, 61, 71, 81, 91] as const;
+const target = document.querySelector('#app');
+if (!target) throw new Error('computed-chain fixture requires #app');
+
+let container: CsrRenderContainer | undefined;
+const evaluationCounts = new Uint32Array(101);
+globalThis.__chainEvaluationCounts = evaluationCounts;
+
+function resetEvaluationCounters(): void {
+	evaluationCounts.fill(0);
+}
+
+function readEvaluationCounters(): number[] {
+	return Array.from(evaluationCounts);
+}
+
+async function mount(): Promise<void> {
+	if (container) throw new Error('computed-chain fixture is already mounted');
+	container = await render(App, { target });
+}
+
+async function flush(): Promise<void> {
+	if (!container) throw new Error('computed-chain fixture is not mounted');
+	await container.graph.flush();
+}
+
+function click(selector: string): void {
+	const button = target.querySelector<HTMLButtonElement>(selector);
+	if (!button) throw new Error(`computed-chain action is missing: ${selector}`);
+	button.click();
+}
+
+// Every owner write flows into the deepest output (value100 sums all owner
+// contributions), so waiting for its text to reach an expected value is an
+// event-driven commit barrier that also verifies content. graph.flush() is
+// not a commit barrier for dispatched clicks, and a click dispatched while
+// a prior propagation is in flight is dropped, so sequential sweeps MUST
+// wait out each commit to preserve sequential-sweep semantics.
+function deepestText(): string {
+	const node = target.querySelector("[data-value='100']");
+	if (!node) throw new Error('computed-chain deepest output is missing');
+	return node.textContent ?? '';
+}
+
+function untilDeepest(expected: string, timeoutMs = 15_000): Promise<void> {
+	return new Promise((resolve, reject) => {
+		if (deepestText() === expected) {
+			resolve();
+			return;
+		}
+		const timer = setTimeout(() => {
+			observer.disconnect();
+			const sample = [1, 2, 50, 99, 100].map((l) => `${l}:${target.querySelector(`[data-value='${l}']`)?.textContent}`).join(' ');
+			reject(new Error(`computed-chain deepest output never reached ${expected} (cells ${sample}; evals ${globalThis.__chainEvaluationCounts.reduce((a, b) => a + b, 0)})`));
+		}, timeoutMs);
+		const observer = new MutationObserver(() => {
+			if (deepestText() !== expected) return;
+			clearTimeout(timer);
+			observer.disconnect();
+			resolve();
+		});
+		observer.observe(target, { characterData: true, childList: true, subtree: true });
+	});
+}
+
+async function write(level: number): Promise<void> {
+	const expected = String(Number(deepestText()) + 1);
+	click(`[data-owner="${level}"]`);
+	await untilDeepest(expected);
+}
+
+async function sweep(levels: readonly number[], flushEach: boolean): Promise<void> {
+	if (flushEach) {
+		for (const level of levels) await write(level);
+		return;
+	}
+	// Batched sweeps click ONE root button whose handler writes all ten
+	// owners in a single dispatch. Ten separate rapid clicks do NOT coalesce across events
+	// (measured: they propagate sequentially like the spaced sweep).
+	const direction = levels[0] > levels[levels.length - 1] ? 'reverse' : 'forward';
+	const expected = String(Number(deepestText()) + levels.length);
+	click(`[data-batch="${direction}"]`);
+	await untilDeepest(expected);
+}
+
+const api = {
+	mount,
+	async unmount() {
+		if (!container) return;
+		(container.runtime as { dispose?: () => void }).dispose?.();
+		target.replaceChildren();
+		container = undefined;
+	},
+	async write(level: number) { await write(level); },
+	async equalWrite() { click('[data-equal="1"]'); await flush(); },
+	async forwardSweep() { await sweep(ownerLevels, true); },
+	async batchedForwardSweep() { await sweep(ownerLevels, false); },
+	async reverseSweep() { await sweep([...ownerLevels].reverse(), false); },
+	resetEvaluationCounters,
+	readEvaluationCounters,
+	ownerLevels: [...ownerLevels],
+};
+
+declare global {
+	interface Window {
+		__computedChainBench: typeof api;
+		__ready: boolean;
+	}
+	var __chainEvaluationCounts: Uint32Array;
+}
+
+window.__computedChainBench = api;
+window.__ready = true;

@@ -1,0 +1,14 @@
+{
+	"name": "ssr-throughput",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"dependencies": {
+		"@markless/core": "workspace:*",
+		"@markless/web": "workspace:*"
+	},
+	"devDependencies": {
+		"vite": "8.0.16"
+	},
+	"packageManager": "pnpm@10.33.2"
+}

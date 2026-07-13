@@ -11,6 +11,7 @@ import {
 	evaluateCandidate,
 	executedJavaScriptBytes,
 	mergeCoverageRanges,
+	createBenchmarkVerdictReport,
 	createVerdictReport,
 	createWitnessVerdict,
 	normalizeInvariantId,
@@ -47,6 +48,31 @@ describe('analyzer contracts', () => {
 		expect(readVerdictReport(JSON.parse(JSON.stringify(appended)))).toEqual(appended);
 		expect(appended.passed).toBe(false);
 		expect(initial.results).toHaveLength(1);
+	});
+
+	test('creates benchmark verdict reports with benchmark terminology', () => {
+		const report = createBenchmarkVerdictReport({
+			source: 'computed-chain',
+			benchmark: 'browser-update',
+			results: [{ id: 'BQA-I1-CONSOLE', status: 'pass', details: [] }],
+			metadata: { durationMs: 12 },
+		});
+
+		expect(report).toEqual({
+			version: 2,
+			source: 'computed-chain',
+			benchmark: 'browser-update',
+			results: [{ id: 'MLA-I1-CONSOLE', status: 'pass', details: [] }],
+			passed: true,
+			metadata: { durationMs: 12 },
+		});
+		expect(JSON.stringify(report)).not.toContain('lane');
+	});
+
+	test('reports benchmark input errors with benchmark terminology', () => {
+		expect(() =>
+			createBenchmarkVerdictReport({ source: 'computed-chain', benchmark: '' }),
+		).toThrow(/\$report\.benchmark/);
 	});
 
 	test('shapes a witness box outcome as an external MLA verdict', () => {

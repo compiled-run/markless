@@ -84,9 +84,26 @@ export interface AnalyzerVerdictReportV2 {
 
 export type AnalyzerVerdictReport = AnalyzerVerdictReportV2;
 
+export interface AnalyzerBenchmarkVerdictReportV2 {
+	readonly version: 2;
+	readonly source: string;
+	readonly benchmark: string;
+	readonly results: readonly AnalyzerCanonicalInvariantResult[];
+	readonly passed: boolean;
+	readonly metadata?: Readonly<Record<string, unknown>>;
+}
+
 export interface CreateVerdictReportInput {
 	readonly source: string;
 	readonly lane: string;
+	readonly results?: readonly AnalyzerInvariantResult[];
+	readonly passed?: boolean;
+	readonly metadata?: Readonly<Record<string, unknown>>;
+}
+
+export interface CreateBenchmarkVerdictReportInput {
+	readonly source: string;
+	readonly benchmark: string;
 	readonly results?: readonly AnalyzerInvariantResult[];
 	readonly passed?: boolean;
 	readonly metadata?: Readonly<Record<string, unknown>>;

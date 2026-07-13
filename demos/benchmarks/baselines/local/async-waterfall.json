@@ -1,0 +1,87 @@
+{
+	"schemaVersion": 1,
+	"kind": "markless-benchmark-result",
+	"benchmark": "async-waterfall",
+	"status": "passed",
+	"recordedAt": "2026-07-13T21:02:26.674Z",
+	"protocol": {
+		"mode": "full",
+		"timedSeconds": 0,
+		"warmupMinimumRenders": 0,
+		"warmupSeconds": 0,
+		"maxSamples": 10,
+		"memoryMaxRenders": 0,
+		"forcedGc": false,
+		"clientWarmups": 0,
+		"clientSamples": 10,
+		"levels": 10,
+		"delayMsPerLevel": 16
+	},
+	"environment": {
+		"os": "darwin 25.5.0",
+		"arch": "arm64",
+		"cpuModel": "Apple M5 Pro",
+		"nodeVersion": "v24.15.0",
+		"pnpmVersion": "10.33.2",
+		"gitSha": "bc9b7c2eb3b6f1953726f4acfad4ddfa981aa37d",
+		"dirtyTree": false
+	},
+	"cases": [
+		{
+			"name": "ten-level-async-waterfall",
+			"gates": {
+				"passed": true,
+				"checks": [
+					"server rendered exactly 10 async boundaries",
+					"server settled the deepest boundary to L9:v0",
+					"server rendered the root-state update button",
+					"each sample used a fresh SSR document and page-local async graph",
+					"first and second clicks each committed L9 at the expected version",
+					"first-dispatch action windows fetched no JavaScript",
+					"exact declared request set passed MLA-I2"
+				]
+			},
+			"bodyBytes": 13667,
+			"timing": {
+				"samples": 10,
+				"minMs": 174,
+				"p50Ms": 177.70000004768372,
+				"p95Ms": 180.10000014305115,
+				"p99Ms": 180.10000014305115,
+				"meanMs": 177.52000005245208,
+				"opsPerSec": 5.633168092071477
+			},
+			"memory": {
+				"label": "allocator-growth-observation",
+				"renders": 0,
+				"rssGrowthBytes": 0,
+				"heapGrowthBytes": 0,
+				"forcedGc": false
+			},
+			"metrics": {
+				"ssr_resume_first_dispatch_ms": {
+					"samples": 10,
+					"minMs": 174,
+					"p50Ms": 177.70000004768372,
+					"p95Ms": 180.10000014305115,
+					"p99Ms": 180.10000014305115,
+					"meanMs": 177.52000005245208,
+					"opsPerSec": 5.633168092071477
+				},
+				"update_deepest_boundary_ms": {
+					"samples": 10,
+					"minMs": 173.39999985694885,
+					"p50Ms": 175,
+					"p95Ms": 176.20000004768372,
+					"p99Ms": 176.20000004768372,
+					"meanMs": 175.11000003814698,
+					"opsPerSec": 5.710696132614666
+				},
+				"waterfall_factor": 1.1095000003278255,
+				"levels": 10,
+				"delay_ms_per_level": 16,
+				"serial_floor_ms": 160
+			}
+		}
+	]
+}

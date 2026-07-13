@@ -1,0 +1,393 @@
+{
+	"schemaVersion": 1,
+	"kind": "markless-benchmark-result",
+	"benchmark": "computed-chain",
+	"status": "passed",
+	"recordedAt": "2026-07-13T21:37:21.688Z",
+	"protocol": {
+		"mode": "full",
+		"timedSeconds": 0,
+		"warmupMinimumRenders": 5,
+		"warmupSeconds": 0,
+		"maxSamples": 20,
+		"memoryMaxRenders": 0,
+		"forcedGc": false,
+		"browserForcedGc": true,
+		"operationWarmups": 5,
+		"operationSamples": 20,
+		"writeRepetitions": 50,
+		"sweepRepetitions": 25,
+		"sampleYieldMs": 5
+	},
+	"environment": {
+		"os": "darwin 25.5.0",
+		"arch": "arm64",
+		"cpuModel": "Apple M5 Pro",
+		"nodeVersion": "v24.15.0",
+		"pnpmVersion": "10.33.2",
+		"gitSha": "e441f34625d2553e048279f09a9eda4b249ec707",
+		"dirtyTree": false
+	},
+	"cases": [
+		{
+			"name": "mount",
+			"gates": {
+				"passed": true,
+				"checks": [
+					"mount recomputed exactly 100 fixture computeds",
+					"mount mutated exactly 100 reactive DOM nodes in 1 observer batch(es)",
+					"mount issued zero requests"
+				]
+			},
+			"bodyBytes": 0,
+			"timing": {
+				"samples": 20,
+				"minMs": 12.599999904632568,
+				"p50Ms": 12.899999856948853,
+				"p95Ms": 14,
+				"p99Ms": 14,
+				"meanMs": 13.060000002384186,
+				"opsPerSec": 76.56967839337241
+			},
+			"memory": {
+				"label": "allocator-growth-observation",
+				"renders": 0,
+				"rssGrowthBytes": 0,
+				"heapGrowthBytes": 0,
+				"forcedGc": false
+			},
+			"metrics": {
+				"counterEvidence": {
+					"expected": {
+						"recomputations": 100,
+						"domMutations": 100,
+						"mutationBatches": 1,
+						"requests": 0
+					},
+					"actual": {
+						"recomputations": 100,
+						"domMutations": 100,
+						"mutationBatches": 1,
+						"requests": 0
+					}
+				},
+				"innerRepetitions": 1
+			}
+		},
+		{
+			"name": "shallow-write",
+			"gates": {
+				"passed": true,
+				"checks": [
+					"shallow-write recomputed exactly 100 fixture computeds",
+					"shallow-write mutated exactly 100 reactive DOM nodes in 1 observer batch(es)",
+					"shallow-write issued zero requests"
+				]
+			},
+			"bodyBytes": 0,
+			"timing": {
+				"samples": 20,
+				"minMs": 5.12,
+				"p50Ms": 5.372000002861023,
+				"p95Ms": 6.108000001907349,
+				"p99Ms": 6.147999997138977,
+				"meanMs": 5.511300001144408,
+				"opsPerSec": 181.44539397099638
+			},
+			"memory": {
+				"label": "allocator-growth-observation",
+				"renders": 0,
+				"rssGrowthBytes": 0,
+				"heapGrowthBytes": 0,
+				"forcedGc": false
+			},
+			"metrics": {
+				"counterEvidence": {
+					"expected": {
+						"recomputations": 100,
+						"domMutations": 100,
+						"mutationBatches": 1,
+						"requests": 0
+					},
+					"actual": {
+						"recomputations": 100,
+						"domMutations": 100,
+						"mutationBatches": 1,
+						"requests": 0
+					}
+				},
+				"innerRepetitions": 50
+			}
+		},
+		{
+			"name": "middle-write",
+			"gates": {
+				"passed": true,
+				"checks": [
+					"middle-write recomputed exactly 50 fixture computeds",
+					"middle-write mutated exactly 50 reactive DOM nodes in 1 observer batch(es)",
+					"middle-write issued zero requests"
+				]
+			},
+			"bodyBytes": 0,
+			"timing": {
+				"samples": 20,
+				"minMs": 3.107999997138977,
+				"p50Ms": 3.2859999990463256,
+				"p95Ms": 3.346000003814697,
+				"p99Ms": 3.352000002861023,
+				"meanMs": 3.277399999856948,
+				"opsPerSec": 305.1199121387832
+			},
+			"memory": {
+				"label": "allocator-growth-observation",
+				"renders": 0,
+				"rssGrowthBytes": 0,
+				"heapGrowthBytes": 0,
+				"forcedGc": false
+			},
+			"metrics": {
+				"counterEvidence": {
+					"expected": {
+						"recomputations": 50,
+						"domMutations": 50,
+						"mutationBatches": 1,
+						"requests": 0
+					},
+					"actual": {
+						"recomputations": 50,
+						"domMutations": 50,
+						"mutationBatches": 1,
+						"requests": 0
+					}
+				},
+				"innerRepetitions": 50
+			}
+		},
+		{
+			"name": "deep-write",
+			"gates": {
+				"passed": true,
+				"checks": [
+					"deep-write recomputed exactly 10 fixture computeds",
+					"deep-write mutated exactly 10 reactive DOM nodes in 1 observer batch(es)",
+					"deep-write issued zero requests"
+				]
+			},
+			"bodyBytes": 0,
+			"timing": {
+				"samples": 20,
+				"minMs": 0.7120000028610229,
+				"p50Ms": 0.73,
+				"p95Ms": 0.7640000009536743,
+				"p99Ms": 0.7819999980926514,
+				"meanMs": 0.7350000000000001,
+				"opsPerSec": 1360.5442176870747
+			},
+			"memory": {
+				"label": "allocator-growth-observation",
+				"renders": 0,
+				"rssGrowthBytes": 0,
+				"heapGrowthBytes": 0,
+				"forcedGc": false
+			},
+			"metrics": {
+				"counterEvidence": {
+					"expected": {
+						"recomputations": 10,
+						"domMutations": 10,
+						"mutationBatches": 1,
+						"requests": 0
+					},
+					"actual": {
+						"recomputations": 10,
+						"domMutations": 10,
+						"mutationBatches": 1,
+						"requests": 0
+					}
+				},
+				"innerRepetitions": 50
+			}
+		},
+		{
+			"name": "forward-sweep",
+			"gates": {
+				"passed": true,
+				"checks": [
+					"forward-sweep recomputed exactly 550 fixture computeds",
+					"forward-sweep mutated exactly 550 reactive DOM nodes in 10 observer batch(es)",
+					"forward-sweep issued zero requests"
+				]
+			},
+			"bodyBytes": 0,
+			"timing": {
+				"samples": 20,
+				"minMs": 32.98,
+				"p50Ms": 34.48,
+				"p95Ms": 35.96800000190735,
+				"p99Ms": 35.96800000190735,
+				"meanMs": 34.516000000476836,
+				"opsPerSec": 28.972070923229374
+			},
+			"memory": {
+				"label": "allocator-growth-observation",
+				"renders": 0,
+				"rssGrowthBytes": 0,
+				"heapGrowthBytes": 0,
+				"forcedGc": false
+			},
+			"metrics": {
+				"counterEvidence": {
+					"expected": {
+						"recomputations": 550,
+						"domMutations": 550,
+						"mutationBatches": 10,
+						"requests": 0
+					},
+					"actual": {
+						"recomputations": 550,
+						"domMutations": 550,
+						"mutationBatches": 10,
+						"requests": 0
+					}
+				},
+				"innerRepetitions": 25
+			}
+		},
+		{
+			"name": "batched-forward-sweep",
+			"gates": {
+				"passed": true,
+				"checks": [
+					"batched-forward-sweep recomputed exactly 550 fixture computeds",
+					"batched-forward-sweep mutated exactly 100 reactive DOM nodes in 1 observer batch(es)",
+					"batched-forward-sweep issued zero requests"
+				]
+			},
+			"bodyBytes": 0,
+			"timing": {
+				"samples": 20,
+				"minMs": 29.66,
+				"p50Ms": 31.327999992370607,
+				"p95Ms": 32.51199999809265,
+				"p99Ms": 32.54400000572205,
+				"meanMs": 31.366600000381474,
+				"opsPerSec": 31.881045442854443
+			},
+			"memory": {
+				"label": "allocator-growth-observation",
+				"renders": 0,
+				"rssGrowthBytes": 0,
+				"heapGrowthBytes": 0,
+				"forcedGc": false
+			},
+			"metrics": {
+				"counterEvidence": {
+					"expected": {
+						"recomputations": 550,
+						"domMutations": 100,
+						"mutationBatches": 1,
+						"requests": 0
+					},
+					"actual": {
+						"recomputations": 550,
+						"domMutations": 100,
+						"mutationBatches": 1,
+						"requests": 0
+					}
+				},
+				"innerRepetitions": 25
+			}
+		},
+		{
+			"name": "reverse-sweep",
+			"gates": {
+				"passed": true,
+				"checks": [
+					"reverse-sweep recomputed exactly 550 fixture computeds",
+					"reverse-sweep mutated exactly 100 reactive DOM nodes in 1 observer batch(es)",
+					"reverse-sweep issued zero requests"
+				]
+			},
+			"bodyBytes": 0,
+			"timing": {
+				"samples": 20,
+				"minMs": 30,
+				"p50Ms": 30.44,
+				"p95Ms": 32.38800000190735,
+				"p99Ms": 33.62,
+				"meanMs": 30.89439999914169,
+				"opsPerSec": 32.36832565214997
+			},
+			"memory": {
+				"label": "allocator-growth-observation",
+				"renders": 0,
+				"rssGrowthBytes": 0,
+				"heapGrowthBytes": 0,
+				"forcedGc": false
+			},
+			"metrics": {
+				"counterEvidence": {
+					"expected": {
+						"recomputations": 550,
+						"domMutations": 100,
+						"mutationBatches": 1,
+						"requests": 0
+					},
+					"actual": {
+						"recomputations": 550,
+						"domMutations": 100,
+						"mutationBatches": 1,
+						"requests": 0
+					}
+				},
+				"innerRepetitions": 25
+			}
+		},
+		{
+			"name": "unmount",
+			"gates": {
+				"passed": true,
+				"checks": [
+					"unmount recomputed exactly 0 fixture computeds",
+					"unmount mutated exactly 100 reactive DOM nodes in 1 observer batch(es)",
+					"unmount issued zero requests"
+				]
+			},
+			"bodyBytes": 0,
+			"timing": {
+				"samples": 20,
+				"minMs": 0,
+				"p50Ms": 0.09999990463256836,
+				"p95Ms": 0.10000014305114746,
+				"p99Ms": 0.10000014305114746,
+				"meanMs": 0.07499997615814209,
+				"opsPerSec": 13333.337571887198
+			},
+			"memory": {
+				"label": "allocator-growth-observation",
+				"renders": 0,
+				"rssGrowthBytes": 0,
+				"heapGrowthBytes": 0,
+				"forcedGc": false
+			},
+			"metrics": {
+				"counterEvidence": {
+					"expected": {
+						"recomputations": 0,
+						"domMutations": 100,
+						"mutationBatches": 1,
+						"requests": 0
+					},
+					"actual": {
+						"recomputations": 0,
+						"domMutations": 100,
+						"mutationBatches": 1,
+						"requests": 0
+					}
+				},
+				"innerRepetitions": 1
+			}
+		}
+	]
+}

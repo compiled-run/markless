@@ -1,0 +1,1067 @@
+{
+	"schemaVersion": 1,
+	"kind": "markless-benchmark-pair",
+	"benchmark": "ssr-throughput",
+	"claim": "Omitting inert payload scripts from static SSR output (no browser triggers -> no resumer -> data scripts unconsumable) halves static response bytes and raises throughput.",
+	"card": "T006 improvement plan, card 1 (internal goal notes)",
+	"baseSha": "f6e7164ee6fff2c53ef8d40786968fa1cdcc5a50",
+	"candidateSha": "b4eb46f6db1613d99821c5d20ddacb5a3d08a4e1",
+	"cleanTreeAsserted": true,
+	"environmentIdenticalAsserted": true,
+	"protocolIdenticalAsserted": true,
+	"noiseThresholdPercent": 5.0,
+	"method": "three alternating full runs per side via clean checkouts on quiet hardware; medians compared; byte counts deterministic and identical across runs per side",
+	"verdict": {
+		"kept": true,
+		"reason": "news-50 +45.4%, news-500 +46.9%, escape-heavy +28.5% ops/s all clear the declared 5% threshold; guard cases parallel-async (-1.1%) and nested-waterfall (-0.4%) are within threshold with byte-identical bodies; full suite, news, and streaming-ssr benchmarks green at candidate."
+	},
+	"deltas": {
+		"news-50": {
+			"opsPerSecBaseRuns": [
+				11437.191717879197,
+				11126.095260178132,
+				11063.729802594133
+			],
+			"opsPerSecCandidateRuns": [
+				16174.484994792147,
+				16059.269522261337,
+				16217.14264719332
+			],
+			"opsPerSecBaseMedian": 11126.095260178132,
+			"opsPerSecCandidateMedian": 16174.484994792147,
+			"opsPerSecDeltaPercent": 45.37431701383068,
+			"bodyBytesBase": 80446,
+			"bodyBytesCandidate": 39572,
+			"clearsThreshold": true,
+			"regressesBeyondThreshold": false
+		},
+		"news-500": {
+			"opsPerSecBaseRuns": [
+				1037.8945229268147,
+				1013.6475524367031,
+				1011.9630114960447
+			],
+			"opsPerSecCandidateRuns": [
+				1479.3040072020328,
+				1489.536486196244,
+				1492.0008969735818
+			],
+			"opsPerSecBaseMedian": 1013.6475524367031,
+			"opsPerSecCandidateMedian": 1489.536486196244,
+			"opsPerSecDeltaPercent": 46.94816582110354,
+			"bodyBytesBase": 806564,
+			"bodyBytesCandidate": 399080,
+			"clearsThreshold": true,
+			"regressesBeyondThreshold": false
+		},
+		"parallel-async": {
+			"opsPerSecBaseRuns": [
+				88524.5488752254,
+				89003.20745664513,
+				87522.33629101448
+			],
+			"opsPerSecCandidateRuns": [
+				87515.91593986643,
+				89302.37320489612,
+				87419.34433949176
+			],
+			"opsPerSecBaseMedian": 88524.5488752254,
+			"opsPerSecCandidateMedian": 87515.91593986643,
+			"opsPerSecDeltaPercent": -1.13938218062046,
+			"bodyBytesBase": 4349,
+			"bodyBytesCandidate": 4349,
+			"clearsThreshold": false,
+			"regressesBeyondThreshold": false
+		},
+		"nested-waterfall": {
+			"opsPerSecBaseRuns": [
+				265329.4120898857,
+				265046.1908654835,
+				257002.35656079042
+			],
+			"opsPerSecCandidateRuns": [
+				263894.3032485591,
+				266497.5370254237,
+				261346.94506949667
+			],
+			"opsPerSecBaseMedian": 265046.1908654835,
+			"opsPerSecCandidateMedian": 263894.3032485591,
+			"opsPerSecDeltaPercent": -0.4345988196106416,
+			"bodyBytesBase": 1454,
+			"bodyBytesCandidate": 1454,
+			"clearsThreshold": false,
+			"regressesBeyondThreshold": false
+		},
+		"escape-heavy": {
+			"opsPerSecBaseRuns": [
+				114.84088066110213,
+				114.16482024764068,
+				113.28147004017941
+			],
+			"opsPerSecCandidateRuns": [
+				146.7068277113869,
+				147.94637686529384,
+				143.127923110908
+			],
+			"opsPerSecBaseMedian": 114.16482024764068,
+			"opsPerSecCandidateMedian": 146.7068277113869,
+			"opsPerSecDeltaPercent": 28.504409145617455,
+			"bodyBytesBase": 2184075,
+			"bodyBytesCandidate": 897842,
+			"clearsThreshold": true,
+			"regressesBeyondThreshold": false
+		}
+	},
+	"baseRuns": [
+		{
+			"schemaVersion": 1,
+			"kind": "markless-benchmark-result",
+			"benchmark": "ssr-throughput",
+			"status": "passed",
+			"recordedAt": "2026-07-13T17:33:07.195Z",
+			"protocol": {
+				"mode": "full",
+				"timedSeconds": 10,
+				"warmupMinimumRenders": 3,
+				"warmupSeconds": 1,
+				"maxSamples": 200000,
+				"memoryMaxRenders": 5000,
+				"forcedGc": false
+			},
+			"environment": {
+				"os": "darwin 25.5.0",
+				"arch": "arm64",
+				"cpuModel": "Apple M5 Pro",
+				"nodeVersion": "v24.15.0",
+				"pnpmVersion": "10.33.2",
+				"gitSha": "f6e7164ee6fff2c53ef8d40786968fa1cdcc5a50",
+				"dirtyTree": false
+			},
+			"cases": [
+				{
+					"name": "news-50",
+					"gates": {
+						"passed": true,
+						"checks": [
+							"rendered exactly 50 articles"
+						]
+					},
+					"bodyBytes": 80446,
+					"timing": {
+						"samples": 114305,
+						"minMs": 0.08104099999991377,
+						"p50Ms": 0.08554099999992104,
+						"p95Ms": 0.09533300000020972,
+						"p99Ms": 0.11662500000056752,
+						"meanMs": 0.08743405065395113,
+						"opsPerSec": 11437.191717879197
+					},
+					"memory": {
+						"label": "allocator-growth-observation",
+						"renders": 5000,
+						"rssGrowthBytes": 16384,
+						"heapGrowthBytes": 2814200,
+						"forcedGc": false
+					}
+				},
+				{
+					"name": "news-500",
+					"gates": {
+						"passed": true,
+						"checks": [
+							"rendered exactly 500 articles"
+						]
+					},
+					"bodyBytes": 806564,
+					"timing": {
+						"samples": 10379,
+						"minMs": 0.8587920000009035,
+						"p50Ms": 0.9259579999998095,
+						"p95Ms": 0.9864579999994021,
+						"p99Ms": 2.4231670000008307,
+						"meanMs": 0.9634890423932926,
+						"opsPerSec": 1037.8945229268147
+					},
+					"memory": {
+						"label": "allocator-growth-observation",
+						"renders": 5000,
+						"rssGrowthBytes": 10698752,
+						"heapGrowthBytes": 36451432,
+						"forcedGc": false
+					}
+				},
+				{
+					"name": "parallel-async",
+					"gates": {
+						"passed": true,
+						"checks": [
+							"async content settled: parallel first 11, parallel second 23, parallel third 37, parallel fourth 41"
+						]
+					},
+					"bodyBytes": 4349,
+					"timing": {
+						"samples": 200000,
+						"minMs": 0.010125000000698492,
+						"p50Ms": 0.01112499999726424,
+						"p95Ms": 0.011999999998806743,
+						"p99Ms": 0.015875000000960426,
+						"meanMs": 0.011296301564998557,
+						"opsPerSec": 88524.5488752254
+					},
+					"memory": {
+						"label": "allocator-growth-observation",
+						"renders": 5000,
+						"rssGrowthBytes": 0,
+						"heapGrowthBytes": -14096600,
+						"forcedGc": false
+					}
+				},
+				{
+					"name": "nested-waterfall",
+					"gates": {
+						"passed": true,
+						"checks": [
+							"async content settled: level 4 = 404"
+						]
+					},
+					"bodyBytes": 1454,
+					"timing": {
+						"samples": 200000,
+						"minMs": 0.0032910000008996576,
+						"p50Ms": 0.0037079999965499155,
+						"p95Ms": 0.00408400000014808,
+						"p99Ms": 0.004750000000058208,
+						"meanMs": 0.00376889992000295,
+						"opsPerSec": 265329.4120898857
+					},
+					"memory": {
+						"label": "allocator-growth-observation",
+						"renders": 5000,
+						"rssGrowthBytes": 0,
+						"heapGrowthBytes": -20243768,
+						"forcedGc": false
+					}
+				},
+				{
+					"name": "escape-heavy",
+					"gates": {
+						"passed": true,
+						"checks": [
+							"rendered exactly 10000 escape rows",
+							"escaped sentinel present and raw sentinel absent"
+						]
+					},
+					"bodyBytes": 2184075,
+					"timing": {
+						"samples": 1149,
+						"minMs": 7.9375,
+						"p50Ms": 8.580249999999069,
+						"p95Ms": 9.524166999995941,
+						"p99Ms": 10.09954199999629,
+						"meanMs": 8.707700552654426,
+						"opsPerSec": 114.84088066110213
+					},
+					"memory": {
+						"label": "allocator-growth-observation",
+						"renders": 5000,
+						"rssGrowthBytes": -31047680,
+						"heapGrowthBytes": 13085272,
+						"forcedGc": false
+					}
+				}
+			]
+		},
+		{
+			"schemaVersion": 1,
+			"kind": "markless-benchmark-result",
+			"benchmark": "ssr-throughput",
+			"status": "passed",
+			"recordedAt": "2026-07-13T17:35:50.557Z",
+			"protocol": {
+				"mode": "full",
+				"timedSeconds": 10,
+				"warmupMinimumRenders": 3,
+				"warmupSeconds": 1,
+				"maxSamples": 200000,
+				"memoryMaxRenders": 5000,
+				"forcedGc": false
+			},
+			"environment": {
+				"os": "darwin 25.5.0",
+				"arch": "arm64",
+				"cpuModel": "Apple M5 Pro",
+				"nodeVersion": "v24.15.0",
+				"pnpmVersion": "10.33.2",
+				"gitSha": "f6e7164ee6fff2c53ef8d40786968fa1cdcc5a50",
+				"dirtyTree": false
+			},
+			"cases": [
+				{
+					"name": "news-50",
+					"gates": {
+						"passed": true,
+						"checks": [
+							"rendered exactly 50 articles"
+						]
+					},
+					"bodyBytes": 80446,
+					"timing": {
+						"samples": 111199,
+						"minMs": 0.08095800000000963,
+						"p50Ms": 0.08845900000051188,
+						"p95Ms": 0.09804200000053243,
+						"p99Ms": 0.11883399999896938,
+						"meanMs": 0.08987879185064515,
+						"opsPerSec": 11126.095260178132
+					},
+					"memory": {
+						"label": "allocator-growth-observation",
+						"renders": 5000,
+						"rssGrowthBytes": 32768,
+						"heapGrowthBytes": 2823088,
+						"forcedGc": false
+					}
+				},
+				{
+					"name": "news-500",
+					"gates": {
+						"passed": true,
+						"checks": [
+							"rendered exactly 500 articles"
+						]
+					},
+					"bodyBytes": 806564,
+					"timing": {
+						"samples": 10136,
+						"minMs": 0.8618750000023283,
+						"p50Ms": 0.9510000000009313,
+						"p95Ms": 1.0017920000009326,
+						"p99Ms": 2.4801250000018626,
+						"meanMs": 0.9865361955406533,
+						"opsPerSec": 1013.6475524367031
+					},
+					"memory": {
+						"label": "allocator-growth-observation",
+						"renders": 5000,
+						"rssGrowthBytes": 25395200,
+						"heapGrowthBytes": 51169768,
+						"forcedGc": false
+					}
+				},
+				{
+					"name": "parallel-async",
+					"gates": {
+						"passed": true,
+						"checks": [
+							"async content settled: parallel first 11, parallel second 23, parallel third 37, parallel fourth 41"
+						]
+					},
+					"bodyBytes": 4349,
+					"timing": {
+						"samples": 200000,
+						"minMs": 0.00999999999839929,
+						"p50Ms": 0.011042000001907581,
+						"p95Ms": 0.011792000001150882,
+						"p99Ms": 0.016791999998531537,
+						"meanMs": 0.011235550140000468,
+						"opsPerSec": 89003.20745664513
+					},
+					"memory": {
+						"label": "allocator-growth-observation",
+						"renders": 5000,
+						"rssGrowthBytes": 0,
+						"heapGrowthBytes": -14094688,
+						"forcedGc": false
+					}
+				},
+				{
+					"name": "nested-waterfall",
+					"gates": {
+						"passed": true,
+						"checks": [
+							"async content settled: level 4 = 404"
+						]
+					},
+					"bodyBytes": 1454,
+					"timing": {
+						"samples": 200000,
+						"minMs": 0.003290999997261679,
+						"p50Ms": 0.0036670000008598436,
+						"p95Ms": 0.0040829999998095445,
+						"p99Ms": 0.004666999997425592,
+						"meanMs": 0.00377292726499707,
+						"opsPerSec": 265046.1908654835
+					},
+					"memory": {
+						"label": "allocator-growth-observation",
+						"renders": 5000,
+						"rssGrowthBytes": 0,
+						"heapGrowthBytes": -20241168,
+						"forcedGc": false
+					}
+				},
+				{
+					"name": "escape-heavy",
+					"gates": {
+						"passed": true,
+						"checks": [
+							"rendered exactly 10000 escape rows",
+							"escaped sentinel present and raw sentinel absent"
+						]
+					},
+					"bodyBytes": 2184075,
+					"timing": {
+						"samples": 1142,
+						"minMs": 7.98895800000173,
+						"p50Ms": 8.59008399999584,
+						"p95Ms": 9.699500000002445,
+						"p99Ms": 12.438416999997571,
+						"meanMs": 8.759265751313317,
+						"opsPerSec": 114.16482024764068
+					},
+					"memory": {
+						"label": "allocator-growth-observation",
+						"renders": 5000,
+						"rssGrowthBytes": 128892928,
+						"heapGrowthBytes": 105153552,
+						"forcedGc": false
+					}
+				}
+			]
+		},
+		{
+			"schemaVersion": 1,
+			"kind": "markless-benchmark-result",
+			"benchmark": "ssr-throughput",
+			"status": "passed",
+			"recordedAt": "2026-07-13T17:38:35.148Z",
+			"protocol": {
+				"mode": "full",
+				"timedSeconds": 10,
+				"warmupMinimumRenders": 3,
+				"warmupSeconds": 1,
+				"maxSamples": 200000,
+				"memoryMaxRenders": 5000,
+				"forcedGc": false
+			},
+			"environment": {
+				"os": "darwin 25.5.0",
+				"arch": "arm64",
+				"cpuModel": "Apple M5 Pro",
+				"nodeVersion": "v24.15.0",
+				"pnpmVersion": "10.33.2",
+				"gitSha": "f6e7164ee6fff2c53ef8d40786968fa1cdcc5a50",
+				"dirtyTree": false
+			},
+			"cases": [
+				{
+					"name": "news-50",
+					"gates": {
+						"passed": true,
+						"checks": [
+							"rendered exactly 50 articles"
+						]
+					},
+					"bodyBytes": 80446,
+					"timing": {
+						"samples": 110575,
+						"minMs": 0.08083299999998417,
+						"p50Ms": 0.0885839999991731,
+						"p95Ms": 0.09887499999967986,
+						"p99Ms": 0.1216669999998885,
+						"meanMs": 0.09038543220438447,
+						"opsPerSec": 11063.729802594133
+					},
+					"memory": {
+						"label": "allocator-growth-observation",
+						"renders": 5000,
+						"rssGrowthBytes": 0,
+						"heapGrowthBytes": 2823088,
+						"forcedGc": false
+					}
+				},
+				{
+					"name": "news-500",
+					"gates": {
+						"passed": true,
+						"checks": [
+							"rendered exactly 500 articles"
+						]
+					},
+					"bodyBytes": 806564,
+					"timing": {
+						"samples": 10119,
+						"minMs": 0.8641250000000582,
+						"p50Ms": 0.9518750000024738,
+						"p95Ms": 1.0167079999991984,
+						"p99Ms": 2.4110839999993914,
+						"meanMs": 0.9881784103172317,
+						"opsPerSec": 1011.9630114960447
+					},
+					"memory": {
+						"label": "allocator-growth-observation",
+						"renders": 5000,
+						"rssGrowthBytes": -40239104,
+						"heapGrowthBytes": -80052000,
+						"forcedGc": false
+					}
+				},
+				{
+					"name": "parallel-async",
+					"gates": {
+						"passed": true,
+						"checks": [
+							"async content settled: parallel first 11, parallel second 23, parallel third 37, parallel fourth 41"
+						]
+					},
+					"bodyBytes": 4349,
+					"timing": {
+						"samples": 200000,
+						"minMs": 0.009958999999071239,
+						"p50Ms": 0.011125000000902219,
+						"p95Ms": 0.012209000000439119,
+						"p99Ms": 0.017790999998396728,
+						"meanMs": 0.011425654779997749,
+						"opsPerSec": 87522.33629101448
+					},
+					"memory": {
+						"label": "allocator-growth-observation",
+						"renders": 5000,
+						"rssGrowthBytes": 0,
+						"heapGrowthBytes": -14093384,
+						"forcedGc": false
+					}
+				},
+				{
+					"name": "nested-waterfall",
+					"gates": {
+						"passed": true,
+						"checks": [
+							"async content settled: level 4 = 404"
+						]
+					},
+					"bodyBytes": 1454,
+					"timing": {
+						"samples": 200000,
+						"minMs": 0.0032909999936237,
+						"p50Ms": 0.0037080000001878943,
+						"p95Ms": 0.00429200000144192,
+						"p99Ms": 0.0052500000019790605,
+						"meanMs": 0.0038910149050071594,
+						"opsPerSec": 257002.35656079042
+					},
+					"memory": {
+						"label": "allocator-growth-observation",
+						"renders": 5000,
+						"rssGrowthBytes": 0,
+						"heapGrowthBytes": 46856064,
+						"forcedGc": false
+					}
+				},
+				{
+					"name": "escape-heavy",
+					"gates": {
+						"passed": true,
+						"checks": [
+							"rendered exactly 10000 escape rows",
+							"escaped sentinel present and raw sentinel absent"
+						]
+					},
+					"bodyBytes": 2184075,
+					"timing": {
+						"samples": 1133,
+						"minMs": 7.997000000003027,
+						"p50Ms": 8.699249999997846,
+						"p95Ms": 9.78845800000272,
+						"p99Ms": 10.902041999994253,
+						"meanMs": 8.827569060017613,
+						"opsPerSec": 113.28147004017941
+					},
+					"memory": {
+						"label": "allocator-growth-observation",
+						"renders": 5000,
+						"rssGrowthBytes": 128090112,
+						"heapGrowthBytes": 101150808,
+						"forcedGc": false
+					}
+				}
+			]
+		}
+	],
+	"candidateRuns": [
+		{
+			"schemaVersion": 1,
+			"kind": "markless-benchmark-result",
+			"benchmark": "ssr-throughput",
+			"status": "passed",
+			"recordedAt": "2026-07-13T17:34:23.500Z",
+			"protocol": {
+				"mode": "full",
+				"timedSeconds": 10,
+				"warmupMinimumRenders": 3,
+				"warmupSeconds": 1,
+				"maxSamples": 200000,
+				"memoryMaxRenders": 5000,
+				"forcedGc": false
+			},
+			"environment": {
+				"os": "darwin 25.5.0",
+				"arch": "arm64",
+				"cpuModel": "Apple M5 Pro",
+				"nodeVersion": "v24.15.0",
+				"pnpmVersion": "10.33.2",
+				"gitSha": "b4eb46f6db1613d99821c5d20ddacb5a3d08a4e1",
+				"dirtyTree": false
+			},
+			"cases": [
+				{
+					"name": "news-50",
+					"gates": {
+						"passed": true,
+						"checks": [
+							"rendered exactly 50 articles"
+						]
+					},
+					"bodyBytes": 39572,
+					"timing": {
+						"samples": 161632,
+						"minMs": 0.05537499999991269,
+						"p50Ms": 0.06095899999854737,
+						"p95Ms": 0.06670800000028976,
+						"p99Ms": 0.08241699999962293,
+						"meanMs": 0.06182577067040957,
+						"opsPerSec": 16174.484994792147
+					},
+					"memory": {
+						"label": "allocator-growth-observation",
+						"renders": 5000,
+						"rssGrowthBytes": 32768,
+						"heapGrowthBytes": 35664240,
+						"forcedGc": false
+					}
+				},
+				{
+					"name": "news-500",
+					"gates": {
+						"passed": true,
+						"checks": [
+							"rendered exactly 500 articles"
+						]
+					},
+					"bodyBytes": 399080,
+					"timing": {
+						"samples": 14792,
+						"minMs": 0.5877920000002632,
+						"p50Ms": 0.6500410000007832,
+						"p95Ms": 0.7059160000026168,
+						"p99Ms": 1.5669579999994312,
+						"meanMs": 0.6759935720659662,
+						"opsPerSec": 1479.3040072020328
+					},
+					"memory": {
+						"label": "allocator-growth-observation",
+						"renders": 5000,
+						"rssGrowthBytes": -13910016,
+						"heapGrowthBytes": 11990760,
+						"forcedGc": false
+					}
+				},
+				{
+					"name": "parallel-async",
+					"gates": {
+						"passed": true,
+						"checks": [
+							"async content settled: parallel first 11, parallel second 23, parallel third 37, parallel fourth 41"
+						]
+					},
+					"bodyBytes": 4349,
+					"timing": {
+						"samples": 200000,
+						"minMs": 0.010041999998065876,
+						"p50Ms": 0.011209000000235392,
+						"p95Ms": 0.011957999999140156,
+						"p99Ms": 0.01654199999757111,
+						"meanMs": 0.011426492989996423,
+						"opsPerSec": 87515.91593986643
+					},
+					"memory": {
+						"label": "allocator-growth-observation",
+						"renders": 5000,
+						"rssGrowthBytes": 0,
+						"heapGrowthBytes": -14091160,
+						"forcedGc": false
+					}
+				},
+				{
+					"name": "nested-waterfall",
+					"gates": {
+						"passed": true,
+						"checks": [
+							"async content settled: level 4 = 404"
+						]
+					},
+					"bodyBytes": 1454,
+					"timing": {
+						"samples": 200000,
+						"minMs": 0.003250000001571607,
+						"p50Ms": 0.0037080000001878943,
+						"p95Ms": 0.0040829999998095445,
+						"p99Ms": 0.004625000001396984,
+						"meanMs": 0.0037893959350009574,
+						"opsPerSec": 263894.3032485591
+					},
+					"memory": {
+						"label": "allocator-growth-observation",
+						"renders": 5000,
+						"rssGrowthBytes": 0,
+						"heapGrowthBytes": -20243480,
+						"forcedGc": false
+					}
+				},
+				{
+					"name": "escape-heavy",
+					"gates": {
+						"passed": true,
+						"checks": [
+							"rendered exactly 10000 escape rows",
+							"escaped sentinel present and raw sentinel absent"
+						]
+					},
+					"bodyBytes": 897842,
+					"timing": {
+						"samples": 1468,
+						"minMs": 6.1159999999945285,
+						"p50Ms": 6.684667000001355,
+						"p95Ms": 7.5552499999976135,
+						"p99Ms": 8.476999999998952,
+						"meanMs": 6.816315338555871,
+						"opsPerSec": 146.7068277113869
+					},
+					"memory": {
+						"label": "allocator-growth-observation",
+						"renders": 5000,
+						"rssGrowthBytes": 180224,
+						"heapGrowthBytes": 103072,
+						"forcedGc": false
+					}
+				}
+			]
+		},
+		{
+			"schemaVersion": 1,
+			"kind": "markless-benchmark-result",
+			"benchmark": "ssr-throughput",
+			"status": "passed",
+			"recordedAt": "2026-07-13T17:37:07.217Z",
+			"protocol": {
+				"mode": "full",
+				"timedSeconds": 10,
+				"warmupMinimumRenders": 3,
+				"warmupSeconds": 1,
+				"maxSamples": 200000,
+				"memoryMaxRenders": 5000,
+				"forcedGc": false
+			},
+			"environment": {
+				"os": "darwin 25.5.0",
+				"arch": "arm64",
+				"cpuModel": "Apple M5 Pro",
+				"nodeVersion": "v24.15.0",
+				"pnpmVersion": "10.33.2",
+				"gitSha": "b4eb46f6db1613d99821c5d20ddacb5a3d08a4e1",
+				"dirtyTree": false
+			},
+			"cases": [
+				{
+					"name": "news-50",
+					"gates": {
+						"passed": true,
+						"checks": [
+							"rendered exactly 50 articles"
+						]
+					},
+					"bodyBytes": 39572,
+					"timing": {
+						"samples": 160481,
+						"minMs": 0.05591699999990851,
+						"p50Ms": 0.06145800000012969,
+						"p95Ms": 0.06720899999891117,
+						"p99Ms": 0.08304200000020501,
+						"meanMs": 0.062269332899220695,
+						"opsPerSec": 16059.269522261337
+					},
+					"memory": {
+						"label": "allocator-growth-observation",
+						"renders": 5000,
+						"rssGrowthBytes": 32768,
+						"heapGrowthBytes": 35592696,
+						"forcedGc": false
+					}
+				},
+				{
+					"name": "news-500",
+					"gates": {
+						"passed": true,
+						"checks": [
+							"rendered exactly 500 articles"
+						]
+					},
+					"bodyBytes": 399080,
+					"timing": {
+						"samples": 14895,
+						"minMs": 0.5889160000006086,
+						"p50Ms": 0.648457999999664,
+						"p95Ms": 0.6919999999990978,
+						"p99Ms": 1.5669170000001031,
+						"meanMs": 0.6713497851627998,
+						"opsPerSec": 1489.536486196244
+					},
+					"memory": {
+						"label": "allocator-growth-observation",
+						"renders": 5000,
+						"rssGrowthBytes": -17334272,
+						"heapGrowthBytes": 8231272,
+						"forcedGc": false
+					}
+				},
+				{
+					"name": "parallel-async",
+					"gates": {
+						"passed": true,
+						"checks": [
+							"async content settled: parallel first 11, parallel second 23, parallel third 37, parallel fourth 41"
+						]
+					},
+					"bodyBytes": 4349,
+					"timing": {
+						"samples": 200000,
+						"minMs": 0.009833000000071479,
+						"p50Ms": 0.010999999998603016,
+						"p95Ms": 0.011791000000812346,
+						"p99Ms": 0.016625000000203727,
+						"meanMs": 0.011197910695000137,
+						"opsPerSec": 89302.37320489612
+					},
+					"memory": {
+						"label": "allocator-growth-observation",
+						"renders": 5000,
+						"rssGrowthBytes": 0,
+						"heapGrowthBytes": -14094016,
+						"forcedGc": false
+					}
+				},
+				{
+					"name": "nested-waterfall",
+					"gates": {
+						"passed": true,
+						"checks": [
+							"async content settled: level 4 = 404"
+						]
+					},
+					"bodyBytes": 1454,
+					"timing": {
+						"samples": 200000,
+						"minMs": 0.003249999997933628,
+						"p50Ms": 0.0036670000008598436,
+						"p95Ms": 0.004042000000481494,
+						"p99Ms": 0.004625000001396984,
+						"meanMs": 0.003752379894995429,
+						"opsPerSec": 266497.5370254237
+					},
+					"memory": {
+						"label": "allocator-growth-observation",
+						"renders": 5000,
+						"rssGrowthBytes": 0,
+						"heapGrowthBytes": 46854872,
+						"forcedGc": false
+					}
+				},
+				{
+					"name": "escape-heavy",
+					"gates": {
+						"passed": true,
+						"checks": [
+							"rendered exactly 10000 escape rows",
+							"escaped sentinel present and raw sentinel absent"
+						]
+					},
+					"bodyBytes": 897842,
+					"timing": {
+						"samples": 1480,
+						"minMs": 6.087542000001122,
+						"p50Ms": 6.616708999998082,
+						"p95Ms": 7.454749999997148,
+						"p99Ms": 8.06562500000291,
+						"meanMs": 6.75920574189192,
+						"opsPerSec": 147.94637686529384
+					},
+					"memory": {
+						"label": "allocator-growth-observation",
+						"renders": 5000,
+						"rssGrowthBytes": -17006592,
+						"heapGrowthBytes": 6552904,
+						"forcedGc": false
+					}
+				}
+			]
+		},
+		{
+			"schemaVersion": 1,
+			"kind": "markless-benchmark-result",
+			"benchmark": "ssr-throughput",
+			"status": "passed",
+			"recordedAt": "2026-07-13T17:39:52.196Z",
+			"protocol": {
+				"mode": "full",
+				"timedSeconds": 10,
+				"warmupMinimumRenders": 3,
+				"warmupSeconds": 1,
+				"maxSamples": 200000,
+				"memoryMaxRenders": 5000,
+				"forcedGc": false
+			},
+			"environment": {
+				"os": "darwin 25.5.0",
+				"arch": "arm64",
+				"cpuModel": "Apple M5 Pro",
+				"nodeVersion": "v24.15.0",
+				"pnpmVersion": "10.33.2",
+				"gitSha": "b4eb46f6db1613d99821c5d20ddacb5a3d08a4e1",
+				"dirtyTree": false
+			},
+			"cases": [
+				{
+					"name": "news-50",
+					"gates": {
+						"passed": true,
+						"checks": [
+							"rendered exactly 50 articles"
+						]
+					},
+					"bodyBytes": 39572,
+					"timing": {
+						"samples": 162057,
+						"minMs": 0.05562499999996362,
+						"p50Ms": 0.06070799999997689,
+						"p95Ms": 0.06700000000091677,
+						"p99Ms": 0.08229199999914272,
+						"meanMs": 0.061663143856792106,
+						"opsPerSec": 16217.14264719332
+					},
+					"memory": {
+						"label": "allocator-growth-observation",
+						"renders": 5000,
+						"rssGrowthBytes": 32768,
+						"heapGrowthBytes": 35664240,
+						"forcedGc": false
+					}
+				},
+				{
+					"name": "news-500",
+					"gates": {
+						"passed": true,
+						"checks": [
+							"rendered exactly 500 articles"
+						]
+					},
+					"bodyBytes": 399080,
+					"timing": {
+						"samples": 14921,
+						"minMs": 0.5853750000023865,
+						"p50Ms": 0.6483339999995223,
+						"p95Ms": 0.6896249999990687,
+						"p99Ms": 1.5516669999997248,
+						"meanMs": 0.6702408839220065,
+						"opsPerSec": 1492.0008969735818
+					},
+					"memory": {
+						"label": "allocator-growth-observation",
+						"renders": 5000,
+						"rssGrowthBytes": -13910016,
+						"heapGrowthBytes": 11599440,
+						"forcedGc": false
+					}
+				},
+				{
+					"name": "parallel-async",
+					"gates": {
+						"passed": true,
+						"checks": [
+							"async content settled: parallel first 11, parallel second 23, parallel third 37, parallel fourth 41"
+						]
+					},
+					"bodyBytes": 4349,
+					"timing": {
+						"samples": 200000,
+						"minMs": 0.010041000001365319,
+						"p50Ms": 0.011207999999896856,
+						"p95Ms": 0.01204199999847333,
+						"p99Ms": 0.017832999998063315,
+						"meanMs": 0.011439115765001789,
+						"opsPerSec": 87419.34433949176
+					},
+					"memory": {
+						"label": "allocator-growth-observation",
+						"renders": 5000,
+						"rssGrowthBytes": 0,
+						"heapGrowthBytes": -14093376,
+						"forcedGc": false
+					}
+				},
+				{
+					"name": "nested-waterfall",
+					"gates": {
+						"passed": true,
+						"checks": [
+							"async content settled: level 4 = 404"
+						]
+					},
+					"bodyBytes": 1454,
+					"timing": {
+						"samples": 200000,
+						"minMs": 0.003249999997933628,
+						"p50Ms": 0.0036670000008598436,
+						"p95Ms": 0.004249999998137355,
+						"p99Ms": 0.0048749999987194315,
+						"meanMs": 0.0038263313150038265,
+						"opsPerSec": 261346.94506949667
+					},
+					"memory": {
+						"label": "allocator-growth-observation",
+						"renders": 5000,
+						"rssGrowthBytes": 0,
+						"heapGrowthBytes": -20247264,
+						"forcedGc": false
+					}
+				},
+				{
+					"name": "escape-heavy",
+					"gates": {
+						"passed": true,
+						"checks": [
+							"rendered exactly 10000 escape rows",
+							"escaped sentinel present and raw sentinel absent"
+						]
+					},
+					"bodyBytes": 897842,
+					"timing": {
+						"samples": 1432,
+						"minMs": 6.239250000005995,
+						"p50Ms": 6.8706249999959255,
+						"p95Ms": 7.706207999995968,
+						"p99Ms": 8.264290999999503,
+						"meanMs": 6.986756869413334,
+						"opsPerSec": 143.127923110908
+					},
+					"memory": {
+						"label": "allocator-growth-observation",
+						"renders": 5000,
+						"rssGrowthBytes": 13697024,
+						"heapGrowthBytes": 13357560,
+						"forcedGc": false
+					}
+				}
+			]
+		}
+	]
+}

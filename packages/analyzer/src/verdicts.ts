@@ -1,9 +1,11 @@
 import type {
 	AnalyzerCanonicalInvariantId,
 	AnalyzerCanonicalInvariantResult,
+	AnalyzerBenchmarkVerdictReportV2,
 	AnalyzerInvariantId,
 	AnalyzerInvariantResult,
 	AnalyzerVerdictReportV2,
+	CreateBenchmarkVerdictReportInput,
 	CreateVerdictReportInput,
 } from './contracts.ts';
 
@@ -110,6 +112,24 @@ export function createVerdictReport(input: CreateVerdictReportInput): AnalyzerVe
 		passed: input.passed ?? results.every((result) => result.status !== 'fail'),
 		...(input.metadata === undefined ? {} : { metadata: input.metadata }),
 	});
+}
+
+export function createBenchmarkVerdictReport(
+	input: CreateBenchmarkVerdictReportInput,
+): AnalyzerBenchmarkVerdictReportV2 {
+	const benchmark = nonempty(input.benchmark, '$report.benchmark');
+	const report = createVerdictReport({
+		...input,
+		lane: benchmark,
+	});
+	return {
+		version: report.version,
+		source: report.source,
+		benchmark,
+		results: report.results,
+		passed: report.passed,
+		...(report.metadata === undefined ? {} : { metadata: report.metadata }),
+	};
 }
 
 export function appendInvariantResult(

@@ -13,10 +13,10 @@ import { markless } from '../src/vite/index.ts';
 import {
 	bundleSizeDefinitions,
 	createBundleSizeCodeSplitting,
-} from '../../../demos/octane-bench/lanes/bundle-size/run.mjs';
+} from '../../../demos/bundle-size/run.mjs';
 
 const fixtureRoot = bundleSizeDefinitions.find((definition) => definition.name === 'todomvc')?.root;
-if (!fixtureRoot) throw new Error('bundle-size lane has no todomvc definition');
+if (!fixtureRoot) throw new Error('bundle-size benchmark has no todomvc definition');
 let pendingBuild: ReturnType<typeof captureBundleSizeTodoMvcBuild> | undefined;
 
 describe('bundle-size generated symbol tables', () => {

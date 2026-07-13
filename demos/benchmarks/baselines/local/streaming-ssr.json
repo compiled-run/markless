@@ -1,0 +1,114 @@
+{
+	"schemaVersion": 1,
+	"kind": "markless-benchmark-result",
+	"benchmark": "streaming-ssr",
+	"status": "passed",
+	"recordedAt": "2026-07-13T17:25:13.502Z",
+	"protocol": {
+		"mode": "full",
+		"timedSeconds": 0,
+		"warmupMinimumRenders": 5,
+		"warmupSeconds": 0,
+		"maxSamples": 30,
+		"memoryMaxRenders": 0,
+		"forcedGc": false,
+		"warmupRenders": 5,
+		"timedRenders": 30
+	},
+	"environment": {
+		"os": "darwin 25.5.0",
+		"arch": "arm64",
+		"cpuModel": "Apple M5 Pro",
+		"nodeVersion": "v24.15.0",
+		"pnpmVersion": "10.33.2",
+		"gitSha": "f6e7164ee6fff2c53ef8d40786968fa1cdcc5a50",
+		"dirtyTree": false
+	},
+	"cases": [
+		{
+			"name": "staggered",
+			"gates": {
+				"passed": true,
+				"checks": [
+					"shell was exposed as the first non-empty chunk",
+					"all ten cards were present exactly once at completion",
+					"every card pending at shell time had a skeleton placeholder",
+					"slowest card arrived after the shell",
+					"staggered completion took at least 40 ms"
+				]
+			},
+			"bodyBytes": 41531,
+			"timing": {
+				"samples": 30,
+				"minMs": 50.113165999999865,
+				"p50Ms": 50.93854099999999,
+				"p95Ms": 51.60529199999996,
+				"p99Ms": 51.67970800000012,
+				"meanMs": 50.94060136666669,
+				"opsPerSec": 19.630706610667467
+			},
+			"shellTiming": {
+				"samples": 30,
+				"minMs": 10.219167000000198,
+				"p50Ms": 10.608540999999832,
+				"p95Ms": 11.73416700000007,
+				"p99Ms": 11.809583999999973,
+				"meanMs": 10.892119566666656,
+				"opsPerSec": 91.80949528504236
+			},
+			"metadata": {
+				"chunkCount": 10,
+				"totalBytes": 41531
+			},
+			"memory": {
+				"label": "allocator-growth-observation",
+				"renders": 30,
+				"rssGrowthBytes": 1130496,
+				"heapGrowthBytes": -4996664,
+				"forcedGc": false
+			}
+		},
+		{
+			"name": "all-fast",
+			"gates": {
+				"passed": true,
+				"checks": [
+					"shell was exposed as the first non-empty chunk",
+					"all ten cards were present exactly once at completion",
+					"every card pending at shell time had a skeleton placeholder"
+				]
+			},
+			"bodyBytes": 37663,
+			"timing": {
+				"samples": 30,
+				"minMs": 0.4804169999997612,
+				"p50Ms": 1.602292000000034,
+				"p95Ms": 1.8984999999997854,
+				"p99Ms": 1.9572089999996933,
+				"meanMs": 1.5986041999999694,
+				"opsPerSec": 625.5457104391563
+			},
+			"shellTiming": {
+				"samples": 30,
+				"minMs": 0.4456669999999576,
+				"p50Ms": 1.5671250000000327,
+				"p95Ms": 1.8624999999997272,
+				"p99Ms": 1.9194589999997334,
+				"meanMs": 1.5618667000000186,
+				"opsPerSec": 640.2595048604263
+			},
+			"metadata": {
+				"chunkCount": 1,
+				"totalBytes": 37663,
+				"rendersPerSec": 625.5457104391563
+			},
+			"memory": {
+				"label": "allocator-growth-observation",
+				"renders": 30,
+				"rssGrowthBytes": 163840,
+				"heapGrowthBytes": -4291968,
+				"forcedGc": false
+			}
+		}
+	]
+}

@@ -1,0 +1,26 @@
+{
+	"name": "benchmarks",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"check": "vp check",
+		"build": "node bench.mjs news --build-only && node bench.mjs async-waterfall --build-only && node bench.mjs computed-chain --build-only && node bench.mjs memo-wall --build-only && node bench.mjs dbmon --build-only && node bench.mjs todomvc --build-only && node bench.mjs chat-stream --build-only",
+		"bench": "node bench.mjs",
+		"test": "node --test ../*/run.test.mjs"
+	},
+	"dependencies": {
+		"@markless/core": "workspace:*"
+	},
+	"devDependencies": {
+		"@markless/analyzer": "workspace:*",
+		"@markless/bundler": "workspace:*",
+		"@markless/web": "workspace:*",
+		"playwright": "1.58.2",
+		"rolldown": "1.0.3",
+		"typescript": "5.9.3",
+		"vite": "8.0.16",
+		"vite-plus": "0.1.20"
+	},
+	"packageManager": "pnpm@10.33.2"
+}

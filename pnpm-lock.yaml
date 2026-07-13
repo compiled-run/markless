@@ -69,6 +69,160 @@ importers:
         specifier: 4.1.5
         version: 4.1.5(@types/node@24.12.2)(vite@8.0.16(@types/node@24.12.2)(jiti@2.7.0)(yaml@2.9.0))
 
+  demos/async-waterfall:
+    dependencies:
+      '@markless/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@markless/web':
+        specifier: workspace:*
+        version: link:../../packages/web
+    devDependencies:
+      '@markless/analyzer':
+        specifier: workspace:*
+        version: link:../../packages/analyzer
+      '@markless/bundler':
+        specifier: workspace:*
+        version: link:../../packages/bundler
+      playwright:
+        specifier: 1.58.2
+        version: 1.58.2
+      vite:
+        specifier: 8.0.16
+        version: 8.0.16(@types/node@24.12.2)(jiti@2.7.0)(yaml@2.9.0)
+
+  demos/benchmarks:
+    dependencies:
+      '@markless/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+    devDependencies:
+      '@markless/analyzer':
+        specifier: workspace:*
+        version: link:../../packages/analyzer
+      '@markless/bundler':
+        specifier: workspace:*
+        version: link:../../packages/bundler
+      '@markless/web':
+        specifier: workspace:*
+        version: link:../../packages/web
+      playwright:
+        specifier: 1.58.2
+        version: 1.58.2
+      rolldown:
+        specifier: 1.0.3
+        version: 1.0.3
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vite:
+        specifier: 8.0.16
+        version: 8.0.16(@types/node@24.12.2)(jiti@2.7.0)(yaml@2.9.0)
+      vite-plus:
+        specifier: 0.1.20
+        version: 0.1.20(@types/node@24.12.2)(jiti@2.7.0)(typescript@5.9.3)(vite@8.0.16(@types/node@24.12.2)(jiti@2.7.0)(yaml@2.9.0))(yaml@2.9.0)
+
+  demos/bundle-size:
+    devDependencies:
+      '@markless/bundler':
+        specifier: workspace:*
+        version: link:../../packages/bundler
+      vite:
+        specifier: 8.0.16
+        version: 8.0.16(@types/node@24.12.2)(jiti@2.7.0)(yaml@2.9.0)
+
+  demos/chat-stream:
+    dependencies:
+      '@markless/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+    devDependencies:
+      '@markless/analyzer':
+        specifier: workspace:*
+        version: link:../../packages/analyzer
+      '@markless/bundler':
+        specifier: workspace:*
+        version: link:../../packages/bundler
+      playwright:
+        specifier: 1.58.2
+        version: 1.58.2
+      vite-plus:
+        specifier: 0.1.20
+        version: 0.1.20(@types/node@24.12.2)(jiti@2.7.0)(typescript@5.9.3)(vite@8.0.16(@types/node@24.12.2)(jiti@2.7.0)(yaml@2.9.0))(yaml@2.9.0)
+
+  demos/codegen-size:
+    dependencies:
+      '@markless/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+    devDependencies:
+      vite:
+        specifier: 8.0.16
+        version: 8.0.16(@types/node@24.12.2)(jiti@2.7.0)(yaml@2.9.0)
+
+  demos/computed-chain:
+    dependencies:
+      '@markless/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@markless/web':
+        specifier: workspace:*
+        version: link:../../packages/web
+    devDependencies:
+      '@markless/analyzer':
+        specifier: workspace:*
+        version: link:../../packages/analyzer
+      playwright:
+        specifier: 1.58.2
+        version: 1.58.2
+      vite-plus:
+        specifier: 0.1.20
+        version: 0.1.20(@types/node@24.12.2)(jiti@2.7.0)(typescript@5.9.3)(vite@8.0.16(@types/node@24.12.2)(jiti@2.7.0)(yaml@2.9.0))(yaml@2.9.0)
+
+  demos/dbmon:
+    dependencies:
+      '@markless/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@markless/web':
+        specifier: workspace:*
+        version: link:../../packages/web
+    devDependencies:
+      '@markless/analyzer':
+        specifier: workspace:*
+        version: link:../../packages/analyzer
+      '@markless/bundler':
+        specifier: workspace:*
+        version: link:../../packages/bundler
+      playwright:
+        specifier: 1.58.2
+        version: 1.58.2
+      vite-plus:
+        specifier: 0.1.20
+        version: 0.1.20(@types/node@24.12.2)(jiti@2.7.0)(typescript@5.9.3)(vite@8.0.16(@types/node@24.12.2)(jiti@2.7.0)(yaml@2.9.0))(yaml@2.9.0)
+
+  demos/memo-wall:
+    dependencies:
+      '@markless/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@markless/web':
+        specifier: workspace:*
+        version: link:../../packages/web
+    devDependencies:
+      '@markless/analyzer':
+        specifier: workspace:*
+        version: link:../../packages/analyzer
+      '@markless/bundler':
+        specifier: workspace:*
+        version: link:../../packages/bundler
+      playwright:
+        specifier: 1.58.2
+        version: 1.58.2
+      vite-plus:
+        specifier: 0.1.20
+        version: 0.1.20(@types/node@24.12.2)(jiti@2.7.0)(typescript@5.9.3)(vite@8.0.16(@types/node@24.12.2)(jiti@2.7.0)(yaml@2.9.0))(yaml@2.9.0)
+
   demos/music-player:
     dependencies:
       '@markless/core':
@@ -116,7 +270,55 @@ importers:
         specifier: 0.1.20
         version: 0.1.20(@types/node@24.12.2)(jiti@2.7.0)(typescript@5.9.3)(vite@8.0.16(@types/node@24.12.2)(jiti@2.7.0)(yaml@2.9.0))(yaml@2.9.0)
 
-  demos/octane-bench:
+  demos/news:
+    dependencies:
+      '@markless/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@markless/web':
+        specifier: workspace:*
+        version: link:../../packages/web
+    devDependencies:
+      '@markless/analyzer':
+        specifier: workspace:*
+        version: link:../../packages/analyzer
+      '@markless/bundler':
+        specifier: workspace:*
+        version: link:../../packages/bundler
+      playwright:
+        specifier: 1.58.2
+        version: 1.58.2
+      vite:
+        specifier: 8.0.16
+        version: 8.0.16(@types/node@24.12.2)(jiti@2.7.0)(yaml@2.9.0)
+
+  demos/ssr-throughput:
+    dependencies:
+      '@markless/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@markless/web':
+        specifier: workspace:*
+        version: link:../../packages/web
+    devDependencies:
+      vite:
+        specifier: 8.0.16
+        version: 8.0.16(@types/node@24.12.2)(jiti@2.7.0)(yaml@2.9.0)
+
+  demos/streaming-ssr:
+    dependencies:
+      '@markless/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@markless/web':
+        specifier: workspace:*
+        version: link:../../packages/web
+    devDependencies:
+      vite:
+        specifier: 8.0.16
+        version: 8.0.16(@types/node@24.12.2)(jiti@2.7.0)(yaml@2.9.0)
+
+  demos/todomvc:
     dependencies:
       '@markless/core':
         specifier: workspace:*
@@ -128,21 +330,9 @@ importers:
       '@markless/bundler':
         specifier: workspace:*
         version: link:../../packages/bundler
-      '@markless/web':
-        specifier: workspace:*
-        version: link:../../packages/web
       playwright:
         specifier: 1.58.2
         version: 1.58.2
-      rolldown:
-        specifier: 1.0.3
-        version: 1.0.3
-      typescript:
-        specifier: 5.9.3
-        version: 5.9.3
-      vite:
-        specifier: 8.0.16
-        version: 8.0.16(@types/node@24.12.2)(jiti@2.7.0)(yaml@2.9.0)
       vite-plus:
         specifier: 0.1.20
         version: 0.1.20(@types/node@24.12.2)(jiti@2.7.0)(typescript@5.9.3)(vite@8.0.16(@types/node@24.12.2)(jiti@2.7.0)(yaml@2.9.0))(yaml@2.9.0)
