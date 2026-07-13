@@ -20,6 +20,29 @@ pipeline breaks near ~200 compiled symbols (90 levels mount; 100 do not; a singl
 module also fails at build). The topology is not shrunk because that would fake comparability.
 The lane turns green when the framework ceiling is fixed; its mount gate is that fix's proof.
 
+## Lane status: async-waterfall (PARKED RED)
+
+The async-waterfall lane is implemented and node-tested, but `node bench.mjs async-waterfall
+--build-only` fails at octane's mandated ten-level topology: a component whose async computed
+count and async boundary count are BOTH eight or more (with at least one side at nine or more)
+emits unresolved generated symbol chunks at build. Eight computeds with eight boundaries build;
+eight with nine do not; sixteen computeds with one boundary do. Nested async boundary markup is
+separately rejected as `nested-boundary-unsupported`, so the ten levels are flat siblings backed
+by a true ten-node async dependency chain. The topology is not shrunk because that would fake
+comparability. The lane is excluded from this package's default `build` script while parked; it
+turns green when the ceiling is fixed, and its `--build-only` command is that fix's proof.
+
+## Lane status: effectful-list (PARKED RED, no lane directory)
+
+The effectful-list adaptation translates octane's per-row effect/ref pairs to per-row
+`element()` handles plus `attach` behaviors, and the compiled keyed `@for` pipeline rejects that
+row shape outright: `MARKLESS_ELEMENT_HANDLE_DUPLICATE`, repeat gate `supported: false` with
+reason `unsupported-row-binding`, `MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT`, and an SSR
+output whose table body is empty. Implementing the lane today would silently omit every row and
+all lifecycle records, so no lane directory exists. The lane starts when keyed rows support
+element handles and attach records; the minimal repro is a keyed row of the form
+`<tr el={row} attach={(host) => { return () => {}; }}>`.
+
 ## Measurement policy
 
 Absolute latency baselines are machine-profiled observations. Compare a local baseline only with a run on the same OS, CPU, architecture, Node and pnpm versions, and protocol. CI never compares developer-machine milliseconds.
@@ -61,6 +84,26 @@ The client timing is honestly named `resume_first_dispatch_ms`: it starts immedi
 Each full result also records server HTML bytes, transferred bytes for the document's declared modulepreloaded JavaScript, and startup-executed bytes when the Chromium V8 coverage driver supplies them. MLA-S1 receives only `action` observations. MLA-I2 allows exactly the document, the document's modulepreloaded JavaScript, and its linked CSS; an undeclared request fails closed. The full run writes `dist/results/news-analyzer-verdict.json` through `@markless/analyzer`'s verdict contract.
 
 `playwright` is a declared development dependency. If dependencies have not been refreshed since this lane was added, the benchmark owner must run `pnpm install` and ensure Chromium is installed before the full command. Use `--record` only after the complete lane passes to write the local baseline.
+
+## Async waterfall
+
+Build the production SSR-and-resume fixture without launching a browser:
+
+```sh
+pnpm --dir demos/octane-bench bench -- async-waterfall --build-only
+```
+
+The benchmark owner runs the complete Playwright phase on quiet hardware with:
+
+```sh
+pnpm --dir demos/octane-bench bench -- async-waterfall
+```
+
+This lane renders ten nested TSRX async boundaries backed by a true dependency chain of ten `computed(async ...)` nodes. Each node waits for a fixed 16 ms simulated delay. The full protocol collects ten independent cold samples with no ordered warmup population: every sample opens a fresh page served from a fresh SSR render and page-local async graph, dispatches one real root-state click, and waits through a MutationObserver predicate until the deepest boundary commits `L9:v1`. That same page then contributes one second-click update sample ending at `L9:v2`.
+
+The cold metric is named `ssr_resume_first_dispatch_ms`; it includes resume, the first dispatched action, the ten dependent async settlements, and the deepest observable DOM commit. The lane also reports `update_deepest_boundary_ms` and a waterfall factor against the ten-level serial floor of 160 ms. It does not claim equivalence with another framework's client-startup measurement.
+
+The production server passes the built resume-entry chunk to `renderToString`, emits the complete bundle-graph preload plan, and declares the document, module entry script, every modulepreloaded script, and linked CSS for MLA-I2. Any code request in a first-dispatch action window fails MLA-S1. Exact boundary count, deepest values at versions zero through two, absence of failed arms, and both network policies must pass before the lane writes `dist/results/async-waterfall-analyzer-verdict.json`. No baseline is recorded by the implementation workflow.
 
 ## Signal-favoring propagation
 

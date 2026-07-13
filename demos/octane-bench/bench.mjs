@@ -9,6 +9,7 @@ import { assertResult, writeBaseline, writeResult } from './lib/results.mjs';
 import { runSsrThroughput } from './lanes/ssr-throughput/run.mjs';
 import { runStreamingSsr } from './lanes/streaming-ssr/run.mjs';
 import { runNews } from './lanes/news/run.mjs';
+import { runAsyncWaterfall } from './lanes/async-waterfall/run.mjs';
 import { checkGeneratedFixture } from './lanes/signal-favoring/gen.mjs';
 import { runSignalFavoring } from './lanes/signal-favoring/run.mjs';
 import { runMemoWall } from './lanes/memo-wall/run.mjs';
@@ -28,6 +29,7 @@ const laneDefinitions = {
 	'ssr-throughput': { run: runSsrThroughput, protocol: ssrThroughputProtocol },
 	'streaming-ssr': { run: runStreamingSsr, protocol: streamingSsrProtocol },
 	news: { run: runNews, protocol: newsProtocol },
+	'async-waterfall': { run: runAsyncWaterfall, protocol: asyncWaterfallProtocol },
 	'signal-favoring': { run: runSignalFavoring, protocol: signalFavoringProtocol },
 	'memo-wall': { run: runMemoWall, protocol: memoWallProtocol },
 	dbmon: { run: runDbmon, protocol: dbmonProtocol },
@@ -40,7 +42,7 @@ const laneDefinition = laneDefinitions[lane];
 
 if (!laneDefinition) {
 	console.error(
-		'usage: node bench.mjs <ssr-throughput|streaming-ssr|news|signal-favoring|memo-wall|dbmon|todomvc|chat-stream|bundle-size|codegen-size> [--smoke] [--record] [--build-only] [--ssr-only] [--gen-check]',
+		'usage: node bench.mjs <ssr-throughput|streaming-ssr|news|async-waterfall|signal-favoring|memo-wall|dbmon|todomvc|chat-stream|bundle-size|codegen-size> [--smoke] [--record] [--build-only] [--ssr-only] [--gen-check]',
 	);
 	process.exit(2);
 }
@@ -72,7 +74,7 @@ if (!nodeOnlySizeLane && !csrBrowserLane) {
 	const entryPath = path.join(
 		fixtureRoot,
 		'dist',
-		...(lane === 'news' ? ['server', 'entry-server.js'] : ['entry-server.js']),
+		...(['news', 'async-waterfall'].includes(lane) ? ['server', 'entry-server.js'] : ['entry-server.js']),
 	);
 	fixture = await import(`${pathToFileURL(entryPath).href}?built=${Date.now()}`);
 }
@@ -114,8 +116,8 @@ async function buildFixture(fixtureDirectory) {
 		execFileSync('pnpm', ['exec', 'vp', 'build'], { cwd: fixtureDirectory, stdio: 'inherit' });
 		return;
 	}
-	if (lane === 'news') {
-		console.error('building news production client and SSR fixtures…');
+	if (lane === 'news' || lane === 'async-waterfall') {
+		console.error(`building ${lane} production client and SSR fixtures…`);
 		const builder = await createBuilder({
 			root: fixtureDirectory,
 			configFile: path.join(fixtureDirectory, 'vite.config.mjs'),
@@ -147,6 +149,22 @@ function newsProtocol(smoke) {
 		ssrSamples: 20,
 		clientWarmups: 5,
 		clientSamples: smoke ? 1 : 20,
+	};
+}
+
+function asyncWaterfallProtocol(smoke) {
+	return {
+		mode: smoke ? 'smoke' : 'full',
+		timedSeconds: 0,
+		warmupMinimumRenders: 0,
+		warmupSeconds: 0,
+		maxSamples: smoke ? 1 : 10,
+		memoryMaxRenders: 0,
+		forcedGc: false,
+		clientWarmups: 0,
+		clientSamples: smoke ? 1 : 10,
+		levels: 10,
+		delayMsPerLevel: 16,
 	};
 }
 
@@ -282,6 +300,11 @@ function printSummary(result, resultPath) {
 				`startup executed: ${benchmarkCase.metrics.startup_executed_bytes ?? 'unavailable'} bytes`,
 			);
 		}
+	} else if (result.lane === 'async-waterfall') {
+		const metrics = result.cases[0].metrics;
+		console.log(`SSR + resume + first dispatch p50: ${metrics.ssr_resume_first_dispatch_ms.p50Ms.toFixed(3)} ms`);
+		console.log(`root-state update p50: ${metrics.update_deepest_boundary_ms.p50Ms.toFixed(3)} ms`);
+		console.log(`waterfall factor against ${metrics.serial_floor_ms} ms floor: ${metrics.waterfall_factor.toFixed(2)}x`);
 	} else if (result.lane === 'signal-favoring') {
 		console.log('operation                 p50 ms    p95 ms   computeds   DOM nodes   batches');
 		for (const benchmarkCase of result.cases) {
