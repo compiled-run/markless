@@ -3,7 +3,7 @@
 	"kind": "markless-benchmark-result",
 	"lane": "ssr-throughput",
 	"status": "passed",
-	"recordedAt": "2026-07-13T17:25:11.213Z",
+	"recordedAt": "2026-07-13T17:39:52.196Z",
 	"protocol": {
 		"mode": "full",
 		"timedSeconds": 10,
@@ -19,7 +19,7 @@
 		"cpuModel": "Apple M5 Pro",
 		"nodeVersion": "v24.15.0",
 		"pnpmVersion": "10.33.2",
-		"gitSha": "f6e7164ee6fff2c53ef8d40786968fa1cdcc5a50",
+		"gitSha": "b4eb46f6db1613d99821c5d20ddacb5a3d08a4e1",
 		"dirtyTree": false
 	},
 	"cases": [
@@ -31,21 +31,21 @@
 					"rendered exactly 50 articles"
 				]
 			},
-			"bodyBytes": 80446,
+			"bodyBytes": 39572,
 			"timing": {
-				"samples": 113082,
-				"minMs": 0.08237499999995634,
-				"p50Ms": 0.0851249999996071,
-				"p95Ms": 0.09858400000030088,
-				"p99Ms": 0.12175000000024738,
-				"meanMs": 0.0883818653631865,
-				"opsPerSec": 11314.538292337602
+				"samples": 162057,
+				"minMs": 0.05562499999996362,
+				"p50Ms": 0.06070799999997689,
+				"p95Ms": 0.06700000000091677,
+				"p99Ms": 0.08229199999914272,
+				"meanMs": 0.061663143856792106,
+				"opsPerSec": 16217.14264719332
 			},
 			"memory": {
 				"label": "allocator-growth-observation",
 				"renders": 5000,
-				"rssGrowthBytes": 16384,
-				"heapGrowthBytes": 3162944,
+				"rssGrowthBytes": 32768,
+				"heapGrowthBytes": 35664240,
 				"forcedGc": false
 			}
 		},
@@ -57,21 +57,21 @@
 					"rendered exactly 500 articles"
 				]
 			},
-			"bodyBytes": 806564,
+			"bodyBytes": 399080,
 			"timing": {
-				"samples": 10147,
-				"minMs": 0.8714589999981399,
-				"p50Ms": 0.9431249999997817,
-				"p95Ms": 1.0281670000003942,
-				"p99Ms": 2.476666999998997,
-				"meanMs": 0.9854922325810489,
-				"opsPerSec": 1014.7213412133697
+				"samples": 14921,
+				"minMs": 0.5853750000023865,
+				"p50Ms": 0.6483339999995223,
+				"p95Ms": 0.6896249999990687,
+				"p99Ms": 1.5516669999997248,
+				"meanMs": 0.6702408839220065,
+				"opsPerSec": 1492.0008969735818
 			},
 			"memory": {
 				"label": "allocator-growth-observation",
 				"renders": 5000,
-				"rssGrowthBytes": 26214400,
-				"heapGrowthBytes": 52218712,
+				"rssGrowthBytes": -13910016,
+				"heapGrowthBytes": 11599440,
 				"forcedGc": false
 			}
 		},
@@ -86,18 +86,18 @@
 			"bodyBytes": 4349,
 			"timing": {
 				"samples": 200000,
-				"minMs": 0.009957999998732703,
-				"p50Ms": 0.010708000001613982,
-				"p95Ms": 0.01166699999885168,
-				"p99Ms": 0.015791000001627253,
-				"meanMs": 0.010973208859996267,
-				"opsPerSec": 91131.04587351673
+				"minMs": 0.010041000001365319,
+				"p50Ms": 0.011207999999896856,
+				"p95Ms": 0.01204199999847333,
+				"p99Ms": 0.017832999998063315,
+				"meanMs": 0.011439115765001789,
+				"opsPerSec": 87419.34433949176
 			},
 			"memory": {
 				"label": "allocator-growth-observation",
 				"renders": 5000,
 				"rssGrowthBytes": 0,
-				"heapGrowthBytes": 53004184,
+				"heapGrowthBytes": -14093376,
 				"forcedGc": false
 			}
 		},
@@ -112,18 +112,18 @@
 			"bodyBytes": 1454,
 			"timing": {
 				"samples": 200000,
-				"minMs": 0.0032080000019050203,
-				"p50Ms": 0.0035420000021986198,
-				"p95Ms": 0.003958000001148321,
-				"p99Ms": 0.004625000001396984,
-				"meanMs": 0.0036386067400006688,
-				"opsPerSec": 274830.469862708
+				"minMs": 0.003249999997933628,
+				"p50Ms": 0.0036670000008598436,
+				"p95Ms": 0.004249999998137355,
+				"p99Ms": 0.0048749999987194315,
+				"meanMs": 0.0038263313150038265,
+				"opsPerSec": 261346.94506949667
 			},
 			"memory": {
 				"label": "allocator-growth-observation",
 				"renders": 5000,
 				"rssGrowthBytes": 0,
-				"heapGrowthBytes": -20244048,
+				"heapGrowthBytes": -20247264,
 				"forcedGc": false
 			}
 		},
@@ -136,21 +136,21 @@
 					"escaped sentinel present and raw sentinel absent"
 				]
 			},
-			"bodyBytes": 2184075,
+			"bodyBytes": 897842,
 			"timing": {
-				"samples": 1179,
-				"minMs": 7.860082999999577,
-				"p50Ms": 8.377166999998735,
-				"p95Ms": 9.047791999997571,
-				"p99Ms": 10.249166000001424,
-				"meanMs": 8.486173037319652,
-				"opsPerSec": 117.8387472895378
+				"samples": 1432,
+				"minMs": 6.239250000005995,
+				"p50Ms": 6.8706249999959255,
+				"p95Ms": 7.706207999995968,
+				"p99Ms": 8.264290999999503,
+				"meanMs": 6.986756869413334,
+				"opsPerSec": 143.127923110908
 			},
 			"memory": {
 				"label": "allocator-growth-observation",
 				"renders": 5000,
-				"rssGrowthBytes": -46858240,
-				"heapGrowthBytes": -69335920,
+				"rssGrowthBytes": 13697024,
+				"heapGrowthBytes": 13357560,
 				"forcedGc": false
 			}
 		}
