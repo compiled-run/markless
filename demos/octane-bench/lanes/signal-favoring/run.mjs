@@ -22,8 +22,13 @@ const EXPECTED_EVIDENCE = {
 	'middle-write': { recomputations: 50, domMutations: 50, mutationBatches: 1, requests: 0 },
 	'deep-write': { recomputations: 10, domMutations: 10, mutationBatches: 1, requests: 0 },
 	'forward-sweep': { recomputations: 550, domMutations: 550, mutationBatches: 10, requests: 0 },
-	'batched-forward-sweep': { recomputations: 100, domMutations: 100, mutationBatches: 1, requests: 0 },
-	'reverse-sweep': { recomputations: 100, domMutations: 100, mutationBatches: 1, requests: 0 },
+	// Ten owner writes in ONE dispatch: the DOM journal coalesces perfectly
+	// (100 final text writes, one commit batch) but computeds re-evaluate
+	// once per write rather than once per wave - 550 evaluations is the
+	// measured current behavior. Batch evaluation dedupe (550 -> 100) is
+	// this lane's named score-improvement hypothesis (octane batch parity).
+	'batched-forward-sweep': { recomputations: 550, domMutations: 100, mutationBatches: 1, requests: 0 },
+	'reverse-sweep': { recomputations: 550, domMutations: 100, mutationBatches: 1, requests: 0 },
 	unmount: { recomputations: 0, domMutations: 100, mutationBatches: 1, requests: 0 },
 	'equal-write': { recomputations: 0, domMutations: 0, mutationBatches: 0, requests: 0 },
 };

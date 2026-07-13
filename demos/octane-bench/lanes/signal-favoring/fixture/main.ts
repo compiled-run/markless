@@ -54,7 +54,8 @@ function untilDeepest(expected: string, timeoutMs = 15_000): Promise<void> {
 		}
 		const timer = setTimeout(() => {
 			observer.disconnect();
-			reject(new Error(`signal-favoring deepest output never reached ${expected} (at ${deepestText()})`));
+			const sample = [1, 2, 50, 99, 100].map((l) => `${l}:${target.querySelector(`[data-value='${l}']`)?.textContent}`).join(' ');
+			reject(new Error(`signal-favoring deepest output never reached ${expected} (cells ${sample}; evals ${globalThis.__signalEvaluationCounts.reduce((a, b) => a + b, 0)})`));
 		}, timeoutMs);
 		const observer = new MutationObserver(() => {
 			if (deepestText() !== expected) return;
@@ -77,9 +78,13 @@ async function sweep(levels: readonly number[], flushEach: boolean): Promise<voi
 		for (const level of levels) await write(level);
 		return;
 	}
+	// Batched sweeps click ONE root button whose handler writes all ten
+	// owners in a single dispatch - markless's equivalent of octane's
+	// batch(). Ten separate rapid clicks do NOT coalesce across events
+	// (measured: they propagate sequentially like the spaced sweep).
+	const direction = levels[0] > levels[levels.length - 1] ? 'reverse' : 'forward';
 	const expected = String(Number(deepestText()) + levels.length);
-	for (const level of levels) click(`[data-owner="${level}"]`);
-	await flush();
+	click(`[data-batch="${direction}"]`);
 	await untilDeepest(expected);
 }
 

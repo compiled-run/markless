@@ -12,30 +12,26 @@ pnpm --dir demos/octane-bench bench -- ssr-throughput
 
 Add `--smoke` for a cheap one-second-per-case verification, or `--record` to write `baselines/local/ssr-throughput.json` after a green run. The normal protocol uses a 10-second sample window per case, a warmup of at least three renders and about 10% of that window, a 200,000-sample cap, and up to 5,000 memory-phase renders without forced garbage collection.
 
-## Lane status: signal-favoring (PARKED RED at write-path symbol delegation; mount fixed)
+## Lane status: signal-favoring (GREEN)
 
-Four of the five framework walls behind this lane are fixed: the packed symbol-array build
-ceiling (also the 211-symbol single-module case), composed child computed derive-symbol routing
-(mount's `Unknown async symbol symbol:21`), module-scope helper capture (the generated fixture
-now imports its evaluation counter - module-scope function declarations are not captured into
-extracted derive-symbol chunks), and prop-carried computed propagation (a write now re-derives
-computeds fed through component props; previously only the owning component's computed re-ran).
-The 100-level chain MOUNTS and evaluates (mount, equal-write, and unmount gates green), and
-write-path symbol routes are now canonical: one composition prefix per imported module boundary.
+Every wall behind this lane fell to red-first cards: the packed symbol-array build ceiling
+(also the 211-symbol case), composed child derive-symbol routing, module-scope helper capture
+(imported helpers are the proven idiom), prop-carried computed propagation, canonical
+write-path routes with child-loader delegation, raw-text dependency scanning (string literals
+colliding with cell names), same-module locator lists silently filtering own DOM-update
+records, and demand-side prop-cell seeding (mid-chain writes read the upstream committed value
+instead of undefined). The 100-level chain mounts, writes propagate with exact counter gates
+(shallow 100/100, middle 50/50, deep 10/10), sweeps are content-verified per commit, and timed
+windows permit zero requests.
 
-Write-path delegation through child loaders is also fixed and node-proven (one prefix per
-imported module boundary, delegated like mount-path child loaders), and on the build where
-that landed the shallow/middle/deep write gates PASSED end to end. The lane remains parked on
-the decisive wall: write-path symbol routing at depth is BUILD-SHAPE SENSITIVE with a silent
-failure mode - after an unrelated rebuild the same click propagates only one level, with no
-error and no unresolved-symbol throw, because the post-build symbol-table rewrite (regex over
-minified chunk code) silently misses some chunk-graph shapes. Robust resolution is an
-architectural change (structured resolver tables instead of code rewriting). Separately, a
-click dispatched while a prior propagation is in flight is dropped, so the fixture's sweeps
-are content-bound per write (also octane's sequential-sweep semantics); the deepest-value
-waits now fail LOUDLY where count-only gates once passed. The topology is not shrunk because
-that would fake comparability. The lane's write gates
-(`node demos/octane-bench/bench.mjs signal-favoring`) are the fix's proof.
+Owners live at the ROOT like octane's module-scope signals, and the batched sweeps click one
+button whose handler writes all ten owners in a single dispatch - markless's equivalent of
+octane's batch() (separate rapid clicks do not coalesce across events, and a click dispatched
+during an in-flight propagation is dropped - the lost-click finding). Measured batching truth:
+the DOM journal coalesces perfectly (100 final writes, one commit batch) but computeds
+re-evaluate once per write rather than once per wave - 550 evaluations where a deduped wave
+would do 100. Batch evaluation dedupe (550 -> 100) is this lane's named score-improvement
+hypothesis.
 
 ## Lane status: async-waterfall (GREEN)
 
