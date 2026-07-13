@@ -99,6 +99,11 @@ jobs:
                   path: |
                       packages/*/.witness/receipts/*.json
                       demos/*/.witness/receipts/*.json
+                  # .witness is a dot-directory; upload-artifact v4.4+ skips
+                  # hidden paths unless told otherwise (receipts:check reads
+                  # the same files and passes, so silence here means missed
+                  # evidence, not missing receipts).
+                  include-hidden-files: true
                   if-no-files-found: error
 
     changes:
