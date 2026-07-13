@@ -3,7 +3,7 @@
 	"kind": "markless-benchmark-result",
 	"lane": "bundle-size",
 	"status": "passed",
-	"recordedAt": "2026-07-13T17:25:53.980Z",
+	"recordedAt": "2026-07-13T21:59:31.572Z",
 	"protocol": {
 		"mode": "full",
 		"timedSeconds": 0,
@@ -19,7 +19,7 @@
 		"cpuModel": "Apple M5 Pro",
 		"nodeVersion": "v24.15.0",
 		"pnpmVersion": "10.33.2",
-		"gitSha": "f6e7164ee6fff2c53ef8d40786968fa1cdcc5a50",
+		"gitSha": "75b065416d8e72757527b8f1010e21c3b660f54e",
 		"dirtyTree": false
 	},
 	"cases": [
@@ -651,7 +651,7 @@
 					"application and framework buckets non-empty"
 				]
 			},
-			"bodyBytes": 98577,
+			"bodyBytes": 98776,
 			"timing": {
 				"samples": 1,
 				"minMs": 0,
@@ -672,9 +672,9 @@
 				"samples": 1,
 				"bytes": {
 					"total": {
-						"raw": 98577,
-						"gzip": 41118,
-						"brotli": 36641
+						"raw": 98776,
+						"gzip": 41240,
+						"brotli": 36764
 					},
 					"application": {
 						"raw": 7496,
@@ -682,9 +682,9 @@
 						"brotli": 2525
 					},
 					"framework": {
-						"raw": 91081,
-						"gzip": 38252,
-						"brotli": 34116
+						"raw": 91280,
+						"gzip": 38374,
+						"brotli": 34239
 					}
 				},
 				"files": [
@@ -791,9 +791,9 @@
 							"<repo>/packages/web/src/resume-stream-patches.ts",
 							"<repo>/packages/web/src/runtime-error-reporting.ts"
 						],
-						"raw": 24403,
-						"gzip": 7701,
-						"brotli": 6839
+						"raw": 24602,
+						"gzip": 7823,
+						"brotli": 6962
 					},
 					{
 						"file": "build/chunk-BLoMwjSB.js",

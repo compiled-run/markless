@@ -3,7 +3,7 @@
 	"kind": "markless-benchmark-result",
 	"lane": "codegen-size",
 	"status": "passed",
-	"recordedAt": "2026-07-13T17:25:54.324Z",
+	"recordedAt": "2026-07-13T21:59:31.892Z",
 	"protocol": {
 		"mode": "full",
 		"timedSeconds": 0,
@@ -19,7 +19,7 @@
 		"cpuModel": "Apple M5 Pro",
 		"nodeVersion": "v24.15.0",
 		"pnpmVersion": "10.33.2",
-		"gitSha": "f6e7164ee6fff2c53ef8d40786968fa1cdcc5a50",
+		"gitSha": "75b065416d8e72757527b8f1010e21c3b660f54e",
 		"dirtyTree": false
 	},
 	"cases": [
@@ -32,7 +32,7 @@
 					"compiler diagnostics empty"
 				]
 			},
-			"bodyBytes": 42973,
+			"bodyBytes": 41657,
 			"timing": {
 				"samples": 1,
 				"minMs": 0,
@@ -57,7 +57,7 @@
 						"gzip": 2917
 					},
 					"compiled": {
-						"raw": 42973,
+						"raw": 41657,
 						"minified": 8852,
 						"gzip": 4634
 					}
@@ -142,7 +142,7 @@
 							"gzip": 149
 						},
 						"compiled": {
-							"raw": 3404,
+							"raw": 3393,
 							"minified": 93,
 							"gzip": 66
 						}
@@ -168,7 +168,7 @@
 							"gzip": 186
 						},
 						"compiled": {
-							"raw": 2361,
+							"raw": 2216,
 							"minified": 124,
 							"gzip": 94
 						}
@@ -181,7 +181,7 @@
 							"gzip": 272
 						},
 						"compiled": {
-							"raw": 2816,
+							"raw": 2671,
 							"minified": 149,
 							"gzip": 113
 						}
@@ -194,7 +194,7 @@
 							"gzip": 222
 						},
 						"compiled": {
-							"raw": 2039,
+							"raw": 1894,
 							"minified": 62,
 							"gzip": 60
 						}
@@ -207,7 +207,7 @@
 							"gzip": 189
 						},
 						"compiled": {
-							"raw": 2448,
+							"raw": 2303,
 							"minified": 122,
 							"gzip": 92
 						}
@@ -220,7 +220,7 @@
 							"gzip": 207
 						},
 						"compiled": {
-							"raw": 2390,
+							"raw": 2245,
 							"minified": 128,
 							"gzip": 96
 						}
@@ -233,7 +233,7 @@
 							"gzip": 196
 						},
 						"compiled": {
-							"raw": 2321,
+							"raw": 2176,
 							"minified": 91,
 							"gzip": 86
 						}
@@ -246,7 +246,7 @@
 							"gzip": 172
 						},
 						"compiled": {
-							"raw": 2316,
+							"raw": 2171,
 							"minified": 95,
 							"gzip": 90
 						}
@@ -259,7 +259,7 @@
 							"gzip": 191
 						},
 						"compiled": {
-							"raw": 2338,
+							"raw": 2193,
 							"minified": 153,
 							"gzip": 122
 						}
@@ -298,7 +298,7 @@
 							"gzip": 214
 						},
 						"compiled": {
-							"raw": 2668,
+							"raw": 2523,
 							"minified": 163,
 							"gzip": 118
 						}
@@ -315,7 +315,7 @@
 					"compiler diagnostics empty"
 				]
 			},
-			"bodyBytes": 30286,
+			"bodyBytes": 30283,
 			"timing": {
 				"samples": 1,
 				"minMs": 0,
@@ -340,7 +340,7 @@
 						"gzip": 2917
 					},
 					"compiled": {
-						"raw": 30286,
+						"raw": 30283,
 						"minified": 1807,
 						"gzip": 1361
 					}
@@ -425,7 +425,7 @@
 							"gzip": 149
 						},
 						"compiled": {
-							"raw": 3095,
+							"raw": 3092,
 							"minified": 93,
 							"gzip": 65
 						}
