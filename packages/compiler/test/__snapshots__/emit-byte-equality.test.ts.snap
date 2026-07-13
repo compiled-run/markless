@@ -3186,7 +3186,7 @@ function marklessRenderCsrBadge(props = {}) {
 	const marklessCsrRuntimeState = { graph: null };
 	const marklessCsrChildren = [];
 	const root = marklessCsrRootFromHtml("<span>" + ((active) ? "<em>" + "Live" + "</em>" : "<em>" + "Idle" + "</em>") + "</span>");
-	const marklessCsrView = marklessCsrComposeView(root, marklessViewWithoutAnchors(payloadView), [], marklessCsrChildren);
+	const marklessCsrView = marklessCsrComposeView(root, marklessViewWithoutAnchors(payloadView), [{"hostNodeId":"h0","tagName":"span","hostPath":[]},{"hostNodeId":"h1","tagName":"em","hostPath":[0]},{"hostNodeId":"h2","tagName":"em","hostPath":[0]}], marklessCsrChildren);
 	const marklessCsrState = marklessComposeState(marklessCsrPayloadState, marklessCsrChildren);
 	return { root, state: marklessCsrState, view: marklessCsrView, loadSymbol: (symbolId) => marklessCsrLoadChildSymbol(marklessCsrChildren, loadSymbol, symbolId), connectRuntime(context) { marklessCsrRuntimeState.graph = context.graph; for (const child of marklessCsrChildren) child.output?.connectRuntime?.(context); } };
 }

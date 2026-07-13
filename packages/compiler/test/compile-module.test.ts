@@ -3479,12 +3479,12 @@ import Leaf from './Leaf.tsrx';
 
 function Deep({ deepInput }) @{
 	const deepValue = computed(() => deepInput + 1);
-	<div><Leaf leafInput={deepValue} /></div>
+	<div><output>{deepValue}</output><Leaf leafInput={deepValue} /></div>
 }
 
 function Middle({ middleInput }) @{
 	const middleValue = computed(() => middleInput + 1);
-	<section><Deep deepInput={middleValue} /></section>
+	<section><output>{middleValue}</output><Deep deepInput={middleValue} /></section>
 }
 
 export function App() @{
@@ -3498,6 +3498,11 @@ export function App() @{
 	const parentComputedBySymbolId = new Map(
 		parent.protocolState.computed.flatMap((computed) =>
 			computed.deriveSymbolId ? [[computed.deriveSymbolId, computed] as const] : [],
+		),
+	);
+	const parentDomUpdateIds = new Set(
+		parent.protocolView.domUpdates.flatMap((update) =>
+			update.symbolId ? [update.symbolId] : [],
 		),
 	);
 	const childComputedBySymbolId = new Map(
@@ -3544,6 +3549,13 @@ export function App() @{
 				return Number(graph.read(dependency.graphNodeId, dependency.path)) + 1;
 			};
 		}
+		if (parentDomUpdateIds.has(requestedId)) {
+			return (context: { readonly domUpdate: { readonly hostNodeId: string }; readonly value: unknown }) => ({
+				type: 'setText' as const,
+				locator: context.domUpdate.hostNodeId,
+				value: context.value,
+			});
+		}
 		throw new Error(`Unknown async symbol ${requestedId}`);
 	};
 	const parentModule = await importPublicRenderTestModule(
@@ -3569,10 +3581,16 @@ export function App() @{
 
 	const childDeriveId = child.protocolState.computed[0]!.deriveSymbolId!;
 	const childDomUpdateId = child.protocolView.domUpdates[0]!.symbolId!;
-	expect(parentLoaderCalls).toHaveLength(parentComputedBySymbolId.size);
-	expect(new Set(parentLoaderCalls)).toEqual(new Set(parentComputedBySymbolId.keys()));
+	expect(new Set(parentLoaderCalls)).toEqual(
+		new Set([...parentComputedBySymbolId.keys(), ...parentDomUpdateIds]),
+	);
 	expect(childLoaderCalls).toEqual([childDeriveId, childDomUpdateId]);
-	expect(output.root.textContent).toBe('5');
+	expect(elementsByTag(output.root, 'output').map((element) => element.textContent)).toEqual([
+		'3',
+		'4',
+		'5',
+	]);
+	expect(output.root.textContent).toBe('345');
 });
 
 test('compileTsrxModule accepts the main authoring import', async () => {

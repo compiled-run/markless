@@ -3,6 +3,7 @@ import type { PublicRenderModuleInput } from '../../artifacts.ts';
 import type { AnyNode } from '../../ast/nodes.ts';
 import { firstComponentRoot } from './plan.ts';
 import { emitHtmlNode } from './html.ts';
+import { collectHostPaths } from './host-locators.ts';
 import { renderBodyLines } from './render-body.ts';
 import {
 	callbackSymbolIds,
@@ -26,6 +27,10 @@ export function emitSameModuleCsrComponents(
 	const ast = parseModule(input.source.source, input.source.filename) as unknown as AnyNode;
 	const componentMap = sameModuleComponentMap(ast);
 	const referenceMap = new Map(references.map((item) => [item.componentName, item.localName]));
+	const hostIdByNode = assignSsrHostIds(
+		ast,
+		input.semanticGraph.hostNodes.map((host) => host.id),
+	);
 	return references.flatMap((reference) => {
 		if (reference.importSource || reference.componentName === rootComponentName) return [];
 		const component = componentMap.get(reference.componentName);
@@ -58,6 +63,13 @@ export function emitSameModuleCsrComponents(
 			source: input.source.source,
 		};
 		const functionName = `marklessRenderCsr${reference.componentName}`;
+		const hostPaths = collectHostPaths(root, { hostIdByNode, nodeByHostId: new Map() });
+		const hostLocators = input.protocolView.locators.flatMap((locator) => {
+			const hostPath = hostPaths.get(locator.hostNodeId);
+			return hostPath
+				? [{ hostNodeId: locator.hostNodeId, tagName: locator.tagName, hostPath }]
+				: [];
+		});
 		return [
 			`const ${reference.localName} = { renderCsr: ${functionName} };`,
 			`function ${functionName}(props = {}) {`,
@@ -77,7 +89,7 @@ export function emitSameModuleCsrComponents(
 				],
 			),
 			...renderContext.childReplacements,
-			'	const marklessCsrView = marklessCsrComposeView(root, marklessViewWithoutAnchors(payloadView), [], marklessCsrChildren);',
+			`	const marklessCsrView = marklessCsrComposeView(root, marklessViewWithoutAnchors(payloadView), ${JSON.stringify(hostLocators)}, marklessCsrChildren);`,
 			'	const marklessCsrState = marklessComposeState(marklessCsrPayloadState, marklessCsrChildren);',
 			`	return { root, state: marklessCsrState, view: marklessCsrView, loadSymbol: (symbolId) => marklessCsrLoadChildSymbol(marklessCsrChildren, loadSymbol, symbolId)${remapsGraphProps ? ', m(graphProps) { marklessCsrRemapGraphOutput(this, graphProps); }' : ''}, connectRuntime(context) { marklessCsrRuntimeState.graph = context.graph; for (const child of marklessCsrChildren) child.output?.connectRuntime?.(context); } };`,
 			'}',

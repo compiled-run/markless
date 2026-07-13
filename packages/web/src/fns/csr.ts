@@ -142,6 +142,7 @@ export function marklessComposeState(state, children) {
 	const childStates = children.map((child) => child.output?.state).filter(Boolean);
 	if (!childStates.length) return state;
 	marklessAssertComposableStateNames(state, childStates);
+	for (const child of children) child.output?.m?.(child.graphProps);
 	const sharedDefinitions = [
 		...(state.sharedDefinitions ?? []),
 		...childStates.flatMap((childState) => childState.sharedDefinitions ?? []),
@@ -155,17 +156,12 @@ export function marklessComposeState(state, children) {
 		computed: [
 			...(state.computed ?? []),
 			...children.flatMap((child) =>
-				(
-					// Private compiled-output hook (`m` = map graph props). Its compact
-					// key keeps the shipped size wall while the exported helper stays clear.
-					child.output?.m?.(child.graphProps),
-					(child.output?.state?.computed ?? []).map((computed) => ({
-						...computed,
-						...(computed.deriveSymbolId
-							? { deriveSymbolId: child.symbolPrefix + computed.deriveSymbolId }
-							: {}),
-					}))
-				),
+				(child.output?.state?.computed ?? []).map((computed) => ({
+					...computed,
+					...(computed.deriveSymbolId
+						? { deriveSymbolId: child.symbolPrefix + computed.deriveSymbolId }
+						: {}),
+				})),
 			),
 		],
 		...(sharedDefinitions.length ? { sharedDefinitions } : {}),
@@ -178,6 +174,17 @@ export function marklessCsrLoadChildSymbol(children, loadSymbol, symbolId) {
 	return loadSymbol(symbolId);
 }
 export function marklessCsrRemapGraphOutput(output, graphProps) {
+	// A composed CSR prop is the source node's committed mount value. Seed that
+	// node before the page graph is built so a downstream-first write can read it.
+	const props = output.state.cells.find((cell) => cell.graphNodeId.startsWith('prop:'))
+		?.directValue;
+	if (props)
+		for (const prop of graphProps ?? [])
+			if (!prop.path.length && props[prop.name] !== undefined)
+				output.state.cells.push({
+					graphNodeId: prop.graphNodeId,
+					directValue: props[prop.name],
+				});
 	output.state.computed = output.state.computed.map((computed) => ({
 		...computed,
 		...(computed.dependencies && {
@@ -221,11 +228,13 @@ export function marklessAssertComposableStateNames(state, childStates) {
 		for (const node of [...(childState.cells ?? []), ...(childState.computed ?? [])]) {
 			const id = node.graphNodeId;
 			// Only author-renamable state()/computed() names are diagnosable.
+			// Live directValue cells seed mapped prop sources and are not declarations.
 			// Shared definitions and props compose by design; compiler-synthesized
 			// names (computed:templateExpression:0) carry extra ':' segments and
 			// repeat in ~every module — their sharing is the ledgered
 			// instance-scoped-graph-ids follow-on, not an author collision.
 			if (
+				node.directValue !== undefined ||
 				id.startsWith('shared:') ||
 				id.startsWith('prop:') ||
 				id.slice(id.indexOf(':') + 1).includes(':')
