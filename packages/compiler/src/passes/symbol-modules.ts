@@ -12,6 +12,8 @@ import type {
 	SymbolModulesArtifact,
 	SymbolModulesInput,
 } from '../artifacts.ts';
+import { walkNode, type AnyNode } from '../ast/nodes.ts';
+import { parseJavaScriptModule } from '../js-ast.ts';
 
 export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtifact {
 	const localNamesBySymbol = publicRenderLocalNamesBySymbol(input.publicRenderPlan);
@@ -361,18 +363,35 @@ function readBodySpans(
 	bodySource: string,
 	read: LoweredStateRead,
 ): ReadonlyArray<{ readonly start: number; readonly end: number }> {
-	const spans: { start: number; end: number }[] = [];
-	for (
-		let start = bodySource.indexOf(read.source);
-		start !== -1;
-		start = bodySource.indexOf(read.source, start + read.source.length)
-	) {
-		const before = bodySource[start - 1] ?? '';
-		const after = bodySource[start + read.source.length] ?? '';
-		if (!isIdentifierChar(before) && before !== '.' && !isIdentifierChar(after))
-			spans.push({ start, end: start + read.source.length });
+	const prefix = 'async function* __marklessBody() {\n';
+	const source = `${prefix}${bodySource}\n}`;
+	let ast: AnyNode;
+	try {
+		ast = parseJavaScriptModule(source);
+	} catch {
+		return [];
 	}
-	return spans;
+
+	const spans = new Map<number, { readonly start: number; readonly end: number }>();
+	walkNode(ast, (node) => {
+		if (!isGraphReadExpression(node)) return;
+		if (typeof node.start !== 'number' || typeof node.end !== 'number') return;
+		if (source.slice(node.start, node.end) !== read.source) return;
+
+		const start = node.start - prefix.length;
+		const end = node.end - prefix.length;
+		if (start < 0 || end > bodySource.length) return;
+		spans.set(start, { start, end });
+	});
+	return [...spans.values()];
+}
+
+function isGraphReadExpression(node: AnyNode): boolean {
+	return (
+		node.type === 'Identifier' ||
+		node.type === 'MemberExpression' ||
+		node.type === 'ChainExpression'
+	);
 }
 
 function handlerBodyWriteSpan(

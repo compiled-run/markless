@@ -603,6 +603,43 @@ test('emitSymbolModules emits sync computed derive modules from planned sources'
 	expect(artifact.modules[0].source).toContain('return context.graph.read("state:count") * 2;');
 });
 
+test('emitSymbolModules keeps dependency-like string values literal in sync computed derives', () => {
+	const artifact = emitSymbolModules({
+		symbolResolver: {
+			passId: 'symbol-resolver',
+			dynamicImportOwner: 'generated-symbol-resolver',
+			symbols: [
+				{
+					id: 'symbol:statusDerive',
+					kind: 'sync-computed-derive',
+					graphNodeId: 'computed:status',
+					name: 'status',
+					source:
+						"() => alpha === 'alpha' || alpha === 'alpha-applied' || alpha === 'alphaapplied'",
+					dependencies: [
+						{
+							source: 'alpha',
+							graphNodeId: 'state:alpha',
+							path: [],
+						},
+					],
+				},
+			],
+			syncPolicies: [],
+			diagnostics: [],
+		},
+		captureAnalysis: {
+			passId: 'capture-analysis',
+			extractedSymbols: [],
+			diagnostics: [],
+		},
+	});
+
+	expect(artifact.modules[0].source).toContain(
+		"return context.graph.read(\"state:alpha\") === 'alpha' || context.graph.read(\"state:alpha\") === 'alpha-applied' || context.graph.read(\"state:alpha\") === 'alphaapplied';",
+	);
+});
+
 test('emitSymbolModules emits static delete writes for event handler modules', () => {
 	const artifact = emitSymbolModules({
 		symbolResolver: {
