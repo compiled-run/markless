@@ -116,6 +116,31 @@ importers:
         specifier: 0.1.20
         version: 0.1.20(@types/node@24.12.2)(jiti@2.7.0)(typescript@5.9.3)(vite@8.0.16(@types/node@24.12.2)(jiti@2.7.0)(yaml@2.9.0))(yaml@2.9.0)
 
+  demos/octane-bench:
+    dependencies:
+      '@markless/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+    devDependencies:
+      '@markless/analyzer':
+        specifier: workspace:*
+        version: link:../../packages/analyzer
+      '@markless/web':
+        specifier: workspace:*
+        version: link:../../packages/web
+      rolldown:
+        specifier: 1.0.3
+        version: 1.0.3
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vite:
+        specifier: 8.0.16
+        version: 8.0.16(@types/node@24.12.2)(jiti@2.7.0)(yaml@2.9.0)
+      vite-plus:
+        specifier: 0.1.20
+        version: 0.1.20(@types/node@24.12.2)(jiti@2.7.0)(typescript@5.9.3)(vite@8.0.16(@types/node@24.12.2)(jiti@2.7.0)(yaml@2.9.0))(yaml@2.9.0)
+
   packages/analyzer:
     dependencies:
       ufo:

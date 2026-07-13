@@ -1,0 +1,158 @@
+{
+	"schemaVersion": 1,
+	"kind": "markless-benchmark-result",
+	"lane": "ssr-throughput",
+	"status": "passed",
+	"recordedAt": "2026-07-13T05:14:26.676Z",
+	"protocol": {
+		"mode": "full",
+		"timedSeconds": 10,
+		"warmupMinimumRenders": 3,
+		"warmupSeconds": 1,
+		"maxSamples": 200000,
+		"memoryMaxRenders": 5000,
+		"forcedGc": false
+	},
+	"environment": {
+		"os": "darwin 25.5.0",
+		"arch": "arm64",
+		"cpuModel": "Apple M5 Pro",
+		"nodeVersion": "v24.15.0",
+		"pnpmVersion": "10.33.2",
+		"gitSha": "7c61da1fd85bc4a00919ed26c669068b2c1a8c74",
+		"dirtyTree": true
+	},
+	"cases": [
+		{
+			"name": "news-50",
+			"gates": {
+				"passed": true,
+				"checks": [
+					"rendered exactly 50 articles"
+				]
+			},
+			"bodyBytes": 80446,
+			"timing": {
+				"samples": 116601,
+				"minMs": 0.08112499999970169,
+				"p50Ms": 0.0840410000000702,
+				"p95Ms": 0.09412499999962165,
+				"p99Ms": 0.11045899999999165,
+				"meanMs": 0.08571511153420501,
+				"opsPerSec": 11666.55426448282
+			},
+			"memory": {
+				"label": "allocator-growth-observation",
+				"renders": 5000,
+				"rssGrowthBytes": 32768,
+				"heapGrowthBytes": 2797712,
+				"forcedGc": false
+			}
+		},
+		{
+			"name": "news-500",
+			"gates": {
+				"passed": true,
+				"checks": [
+					"rendered exactly 500 articles"
+				]
+			},
+			"bodyBytes": 806564,
+			"timing": {
+				"samples": 10686,
+				"minMs": 0.8546249999999418,
+				"p50Ms": 0.8992089999992459,
+				"p95Ms": 0.9524999999994179,
+				"p99Ms": 2.254165999998804,
+				"meanMs": 0.9359462728804132,
+				"opsPerSec": 1068.4373975040883
+			},
+			"memory": {
+				"label": "allocator-growth-observation",
+				"renders": 5000,
+				"rssGrowthBytes": 26214400,
+				"heapGrowthBytes": 52561680,
+				"forcedGc": false
+			}
+		},
+		{
+			"name": "parallel-async",
+			"gates": {
+				"passed": true,
+				"checks": [
+					"async content settled: parallel first 11, parallel second 23, parallel third 37, parallel fourth 41"
+				]
+			},
+			"bodyBytes": 4349,
+			"timing": {
+				"samples": 200000,
+				"minMs": 0.01004099999772734,
+				"p50Ms": 0.010750000001280569,
+				"p95Ms": 0.011500000000523869,
+				"p99Ms": 0.014333999999507796,
+				"meanMs": 0.010970277130000669,
+				"opsPerSec": 91155.40000947443
+			},
+			"memory": {
+				"label": "allocator-growth-observation",
+				"renders": 5000,
+				"rssGrowthBytes": 0,
+				"heapGrowthBytes": -14093272,
+				"forcedGc": false
+			}
+		},
+		{
+			"name": "nested-waterfall",
+			"gates": {
+				"passed": true,
+				"checks": [
+					"async content settled: level 4 = 404"
+				]
+			},
+			"bodyBytes": 1454,
+			"timing": {
+				"samples": 200000,
+				"minMs": 0.0032910000008996576,
+				"p50Ms": 0.003541999998560641,
+				"p95Ms": 0.004124999999476131,
+				"p99Ms": 0.005166999999346444,
+				"meanMs": 0.004110247464997592,
+				"opsPerSec": 243294.35356773244
+			},
+			"memory": {
+				"label": "allocator-growth-observation",
+				"renders": 5000,
+				"rssGrowthBytes": 0,
+				"heapGrowthBytes": 1400528,
+				"forcedGc": false
+			}
+		},
+		{
+			"name": "escape-heavy",
+			"gates": {
+				"passed": true,
+				"checks": [
+					"rendered exactly 10000 escape rows",
+					"escaped sentinel present and raw sentinel absent"
+				]
+			},
+			"bodyBytes": 2184075,
+			"timing": {
+				"samples": 1245,
+				"minMs": 7.488333000001148,
+				"p50Ms": 7.891417000006186,
+				"p95Ms": 8.67595799999981,
+				"p99Ms": 9.346791000003577,
+				"meanMs": 8.03421379357429,
+				"opsPerSec": 124.46768603541435
+			},
+			"memory": {
+				"label": "allocator-growth-observation",
+				"renders": 5000,
+				"rssGrowthBytes": -63291392,
+				"heapGrowthBytes": -85691024,
+				"forcedGc": false
+			}
+		}
+	]
+}
