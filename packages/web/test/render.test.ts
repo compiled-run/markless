@@ -1089,18 +1089,92 @@ test('renderToString emits an SSR container and omits the resumer for static out
 	const html = await renderToString(() => {
 		componentBodyRuns++;
 		return {
-			html: '<p>Static</p>',
-			state: createProtocolStatePayload({ cells: [] }),
-			view: staticView(),
+			html: '<main><p>Static news</p></main>',
+			state: createProtocolStatePayload({
+				cells: [
+					{
+						graphNodeId: 'state:article',
+						name: 'article',
+						valueKind: 'object',
+						value: { title: 'Static news' },
+					},
+				],
+			}),
+			view: {
+				...staticView(),
+				locators: [
+					{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'main' },
+				],
+				domUpdates: [
+					{
+						hostNodeId: 'h0',
+						source: 'article',
+						graphNodeId: 'state:article',
+						path: ['title'],
+						target: { kind: 'text' },
+						symbolId: 'symbol:static-text',
+					},
+				],
+			},
 		};
 	});
 
 	expect(componentBodyRuns).toBe(1);
-	expect(html).toContain('data-async-container');
-	expect(html).toContain('<p>Static</p>');
+	expect(html).toBe(
+		'<div data-async-container><main><p>Static news</p></main></div>',
+	);
+	expect(html).not.toContain('type="markless/state"');
+	expect(html).not.toContain('type="markless/view"');
+	expect(html).not.toContain('data-async-resumer');
+});
+
+test.each([
+	{
+		name: 'an element event',
+		state: createProtocolStatePayload({ cells: [] }),
+		view: viewWithClick(),
+	},
+	{
+		name: 'a keyed-row event',
+		state: createProtocolStatePayload({ cells: [] }),
+		view: {
+			...duplicateKeyRepeatView(),
+			keyedRepeats: duplicateKeyRepeatView().keyedRepeats?.map((repeat) => ({
+				...repeat,
+				rowEvents: [{ hostPath: [0], eventName: 'click', symbolIds: ['symbol:row-click'] }],
+			})),
+		},
+	},
+	{
+		name: 'a sync computed derive symbol',
+		state: {
+			...createProtocolStatePayload({ cells: [] }),
+			computed: [
+				{
+					graphNodeId: 'computed:greeting',
+					name: 'greeting',
+					async: false,
+					deriveSymbolId: 'symbol:derive-greeting',
+					dependencies: [],
+				},
+			],
+		},
+		view: staticView(),
+	},
+	{
+		name: 'an async boundary',
+		state: createProtocolStatePayload({ cells: [] }),
+		view: viewWithAsyncBoundary(),
+	},
+])('renderToString keeps payload scripts and the resumer for $name', async ({ state, view }) => {
+	const html = await renderToString(
+		() => ({ html: '<button type="button">Resume</button>', state, view }),
+		{ resumeModuleUrl: '/async-resume.js' },
+	);
+
 	expect(html).toContain('type="markless/state"');
 	expect(html).toContain('type="markless/view"');
-	expect(html).not.toContain('data-async-resumer');
+	expect(html).toContain('data-async-resumer');
 });
 
 // Live directValue cells (page props seeded by the host, need 14) must be
@@ -1121,7 +1195,7 @@ test('renderToString envelope-encodes live directValue state cells before servin
 			],
 			computed: [],
 		},
-		view: staticView(),
+		view: viewWithClick(),
 	}));
 
 	expect(html).toContain('"graphNodeId":"prop:props"');
@@ -1129,7 +1203,7 @@ test('renderToString envelope-encodes live directValue state cells before servin
 	expect(html).toContain('"records"');
 });
 
-test('renderToString rejects duplicate runtime keys before serving SSR output', async () => {
+test('renderToString rejects duplicate runtime keys on the static output path', async () => {
 	await expect(
 		renderToString(() => ({
 			html: '<ul><li>apple</li><li>pear</li><li>kale</li></ul>',

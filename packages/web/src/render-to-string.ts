@@ -89,10 +89,11 @@ export async function assembleSsrContainer(
 	};
 	const view = containerScopedView(output.view ?? emptyViewPayload());
 	await validateKeyedRepeatPayloadKeys({ state, view });
-	const payloadScripts = hasPayload ? renderPayloadScripts({ state, view }) : undefined;
+	const browserTriggers = hasBrowserTriggers(view, state);
+	const payloadScripts =
+		hasPayload && browserTriggers ? renderPayloadScripts({ state, view }) : undefined;
 	const resumeModuleUrl = options.resumeModuleUrl ?? artifactResumeModuleUrl(component);
 	const executionLog = options.executionLog ?? artifactExecutionLog(component) ?? 'auto';
-	const browserTriggers = hasBrowserTriggers(view, state);
 	const optionPreloads =
 		typeof options.modulePreloads === 'function'
 			? options.modulePreloads(output.html)
