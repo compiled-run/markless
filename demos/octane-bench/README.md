@@ -22,17 +22,24 @@ finding 8 and is fixed; the remaining mount failure is separate PM work. The top
 shrunk because that would fake comparability. The lane turns green when its mount ceiling is
 fixed; its mount gate is that fix's proof.
 
-## Lane status: async-waterfall (UNPARKED FOR BUILD)
+## Lane status: async-waterfall (PARKED RED at the runtime gate; build ceiling fixed)
 
-The async-waterfall lane is implemented, node-tested, and green for `node bench.mjs
-async-waterfall --build-only` at octane's mandated ten-level topology. Framework finding 8 is
-fixed: OXC packed dense resolver URL arrays into a comma-joined string, and the bundler now
-recovers every generated symbol row from that representation. The focused 8-by-8, 8-by-9,
-16-by-1, and 10-by-10 build matrix passes, including all 31 resolver rows for ten by ten. Nested
-async boundary markup remains separately rejected as `nested-boundary-unsupported`, so the ten
-levels are flat siblings backed by a true ten-node async dependency chain. The lane is restored
-to this package's default `build` script. Browser measurement and the first performance baseline
-remain PM work and are not part of this build-only unpark.
+The former BUILD ceiling is fixed: OXC packed dense resolver URL arrays into a comma-joined
+`"a,b,c".split(",")` string and the bundler's symbol-table rewrite did not recognize that
+representation; it now recovers every generated symbol row from it (genuinely missing IDs still
+fail closed). The focused 8-by-8, 8-by-9, 16-by-1, and 10-by-10 build matrix passes, including
+all 31 resolver rows for ten by ten; the separate 211-symbol single-module build failure is
+cured by the same fix, and `--build-only` is green and restored to the default `build` script.
+
+The lane remains PARKED RED at runtime (framework finding 11, found by the first full PM
+browser run): chained async computeds - level N reading through level N-1 - do not propagate on
+initial load (the server settles only level 0 and boundaries 1 through 9 render no arm at all;
+the resumed client also idles at level 0), and when a root-state dispatch does settle the chain
+client-side, read-through text bindings render the raw resolved object instead of the projected
+member. Nested async boundary markup remains separately rejected as
+`nested-boundary-unsupported`, so the ten levels are flat siblings backed by a true ten-node
+async dependency chain; the topology is not shrunk because that would fake comparability. The
+full lane command (`node bench.mjs async-waterfall`) is the runtime fix's proof.
 
 ## Lane status: effectful-list (PARKED RED, no lane directory)
 
