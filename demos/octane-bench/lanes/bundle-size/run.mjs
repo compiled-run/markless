@@ -25,8 +25,8 @@ export async function runBundleSize({ protocol, environment }) {
 				appRoot: path.join(jsfbRoot, 'src'),
 				configFile: path.join(jsfbRoot, 'vite.config.ts'),
 			},
-			{ name: 'todomvc', root: path.join(laneRoot, 'todomvc') },
-			{ name: 'chat-stream', root: path.join(laneRoot, 'chat-stream') },
+			{ name: 'todomvc', root: path.resolve(laneRoot, '../todomvc/fixture') },
+			{ name: 'chat-stream', root: path.resolve(laneRoot, '../chat-stream/fixture') },
 		];
 		const cases = [];
 		for (const definition of definitions) cases.push(await buildAndMeasure(definition));

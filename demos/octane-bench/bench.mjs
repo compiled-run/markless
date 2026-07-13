@@ -12,6 +12,9 @@ import { runNews } from './lanes/news/run.mjs';
 import { checkGeneratedFixture } from './lanes/signal-favoring/gen.mjs';
 import { runSignalFavoring } from './lanes/signal-favoring/run.mjs';
 import { runMemoWall } from './lanes/memo-wall/run.mjs';
+import { runDbmon } from './lanes/dbmon/run.mjs';
+import { runTodoMvc } from './lanes/todomvc/run.mjs';
+import { runChatStream } from './lanes/chat-stream/run.mjs';
 import { runBundleSize } from './lanes/bundle-size/run.mjs';
 import { runCodegenSize } from './lanes/codegen-size/run.mjs';
 
@@ -27,6 +30,9 @@ const laneDefinitions = {
 	news: { run: runNews, protocol: newsProtocol },
 	'signal-favoring': { run: runSignalFavoring, protocol: signalFavoringProtocol },
 	'memo-wall': { run: runMemoWall, protocol: memoWallProtocol },
+	dbmon: { run: runDbmon, protocol: dbmonProtocol },
+	todomvc: { run: runTodoMvc, protocol: interactionProtocol },
+	'chat-stream': { run: runChatStream, protocol: interactionProtocol },
 	'bundle-size': { run: runBundleSize, protocol: sizeProtocol },
 	'codegen-size': { run: runCodegenSize, protocol: sizeProtocol },
 };
@@ -34,7 +40,7 @@ const laneDefinition = laneDefinitions[lane];
 
 if (!laneDefinition) {
 	console.error(
-		'usage: node bench.mjs <ssr-throughput|streaming-ssr|news|signal-favoring|memo-wall|bundle-size|codegen-size> [--smoke] [--record] [--build-only] [--ssr-only] [--gen-check]',
+		'usage: node bench.mjs <ssr-throughput|streaming-ssr|news|signal-favoring|memo-wall|dbmon|todomvc|chat-stream|bundle-size|codegen-size> [--smoke] [--record] [--build-only] [--ssr-only] [--gen-check]',
 	);
 	process.exit(2);
 }
@@ -61,7 +67,8 @@ const smoke = flags.has('--smoke');
 const protocol = laneDefinition.protocol(smoke);
 const environment = collectEnvironment();
 let fixture;
-if (!nodeOnlySizeLane && lane !== 'signal-favoring' && lane !== 'memo-wall') {
+const csrBrowserLane = ['signal-favoring', 'memo-wall', 'dbmon', 'todomvc', 'chat-stream'].includes(lane);
+if (!nodeOnlySizeLane && !csrBrowserLane) {
 	const entryPath = path.join(
 		fixtureRoot,
 		'dist',
@@ -77,7 +84,7 @@ const outcome = await laneDefinition.run({
 	clientDirectory: path.join(
 		fixtureRoot,
 		'dist',
-		...(lane === 'signal-favoring' || lane === 'memo-wall' ? [] : ['client']),
+		...(csrBrowserLane ? [] : ['client']),
 	),
 	receiptPath: path.join(root, 'dist', 'results', `${lane}-analyzer-verdict.json`),
 });
@@ -102,7 +109,7 @@ if (flags.has('--record')) {
 process.exitCode = outcome.exitCode;
 
 async function buildFixture(fixtureDirectory) {
-	if (lane === 'signal-favoring' || lane === 'memo-wall') {
+	if (['signal-favoring', 'memo-wall', 'dbmon', 'todomvc', 'chat-stream'].includes(lane)) {
 		console.error(`building ${lane} production client fixture…`);
 		execFileSync('pnpm', ['exec', 'vp', 'build'], { cwd: fixtureDirectory, stdio: 'inherit' });
 		return;
@@ -206,6 +213,24 @@ function memoWallProtocol(smoke) {
 	};
 }
 
+function dbmonProtocol(smoke) {
+	return {
+		mode: smoke ? 'smoke' : 'full', timedSeconds: 0, warmupMinimumRenders: 10,
+		warmupSeconds: 0, maxSamples: smoke ? 1 : 30, memoryMaxRenders: 0,
+		forcedGc: false, browserForcedGc: true, operationWarmups: smoke ? 1 : 10,
+		operationSamples: smoke ? 1 : 30, sampleYieldMs: 5,
+	};
+}
+
+function interactionProtocol(smoke) {
+	return {
+		mode: smoke ? 'smoke' : 'full', timedSeconds: 0, warmupMinimumRenders: 1,
+		warmupSeconds: 0, maxSamples: smoke ? 1 : 8, memoryMaxRenders: 0,
+		forcedGc: false, browserForcedGc: true, operationWarmups: 1,
+		operationSamples: smoke ? 1 : 8, sampleYieldMs: 40,
+	};
+}
+
 function sizeProtocol(smoke) {
 	return {
 		mode: smoke ? 'smoke' : 'full',
@@ -285,6 +310,12 @@ function printSummary(result, resultPath) {
 		console.log(
 			'browser GC is requested before timed samples; timed memo-wall windows allow zero requests',
 		);
+	} else if (['dbmon', 'todomvc', 'chat-stream'].includes(result.lane)) {
+		console.log('operation                      p50 ms    p95 ms   samples');
+		for (const benchmarkCase of result.cases) {
+			console.log(`${benchmarkCase.name.padEnd(30)} ${benchmarkCase.timing.p50Ms.toFixed(3).padStart(8)} ${benchmarkCase.timing.p95Ms.toFixed(3).padStart(9)} ${String(benchmarkCase.timing.samples).padStart(9)}`);
+		}
+		console.log(`timed ${result.lane} windows allow zero requests`);
 	} else if (result.lane === 'bundle-size') {
 		console.log('fixture                       total gzip   app gzip   framework gzip');
 		for (const benchmarkCase of result.cases) {

@@ -1,0 +1,414 @@
+{
+	"schemaVersion": 1,
+	"kind": "markless-benchmark-result",
+	"lane": "todomvc",
+	"status": "passed",
+	"recordedAt": "2026-07-13T16:47:50.887Z",
+	"protocol": {
+		"mode": "full",
+		"timedSeconds": 0,
+		"warmupMinimumRenders": 1,
+		"warmupSeconds": 0,
+		"maxSamples": 8,
+		"memoryMaxRenders": 0,
+		"forcedGc": false,
+		"browserForcedGc": true,
+		"operationWarmups": 1,
+		"operationSamples": 8,
+		"sampleYieldMs": 40
+	},
+	"environment": {
+		"os": "darwin 25.5.0",
+		"arch": "arm64",
+		"cpuModel": "Apple M5 Pro",
+		"nodeVersion": "v24.15.0",
+		"pnpmVersion": "10.33.2",
+		"gitSha": "397c3ecbf30a3cc0e36b95b5a0e056d3a3873a2e",
+		"dirtyTree": true
+	},
+	"cases": [
+		{
+			"name": "add-100",
+			"gates": {
+				"passed": true,
+				"checks": [
+					"add-100 DOM matched 100 todos and 0 completed",
+					"add-100 committed after real input, keyboard, dblclick, or click events",
+					"add-100 issued zero requests"
+				]
+			},
+			"bodyBytes": 0,
+			"timing": {
+				"samples": 8,
+				"minMs": 1.5,
+				"p50Ms": 1.8999998569488525,
+				"p95Ms": 2.0999999046325684,
+				"p99Ms": 2.0999999046325684,
+				"meanMs": 1.8499999940395355,
+				"opsPerSec": 540.5405422820934
+			},
+			"memory": {
+				"label": "allocator-growth-observation",
+				"renders": 0,
+				"rssGrowthBytes": 0,
+				"heapGrowthBytes": 0,
+				"forcedGc": false
+			},
+			"metrics": {
+				"domEvidence": {
+					"expected": {
+						"rows": 100,
+						"completed": 0,
+						"requests": 0
+					},
+					"actual": {
+						"rows": 100,
+						"completed": 0,
+						"requests": 0
+					}
+				}
+			}
+		},
+		{
+			"name": "toggle-all-on",
+			"gates": {
+				"passed": true,
+				"checks": [
+					"toggle-all-on DOM matched 100 todos and 100 completed",
+					"toggle-all-on committed after real input, keyboard, dblclick, or click events",
+					"toggle-all-on issued zero requests"
+				]
+			},
+			"bodyBytes": 0,
+			"timing": {
+				"samples": 8,
+				"minMs": 0.10000014305114746,
+				"p50Ms": 0.19999980926513672,
+				"p95Ms": 0.2999999523162842,
+				"p99Ms": 0.2999999523162842,
+				"meanMs": 0.19999995827674866,
+				"opsPerSec": 5000.001043081501
+			},
+			"memory": {
+				"label": "allocator-growth-observation",
+				"renders": 0,
+				"rssGrowthBytes": 0,
+				"heapGrowthBytes": 0,
+				"forcedGc": false
+			},
+			"metrics": {
+				"domEvidence": {
+					"expected": {
+						"rows": 100,
+						"completed": 100,
+						"requests": 0
+					},
+					"actual": {
+						"rows": 100,
+						"completed": 100,
+						"requests": 0
+					}
+				}
+			}
+		},
+		{
+			"name": "toggle-all-off",
+			"gates": {
+				"passed": true,
+				"checks": [
+					"toggle-all-off DOM matched 100 todos and 0 completed",
+					"toggle-all-off committed after real input, keyboard, dblclick, or click events",
+					"toggle-all-off issued zero requests"
+				]
+			},
+			"bodyBytes": 0,
+			"timing": {
+				"samples": 8,
+				"minMs": 0,
+				"p50Ms": 0.09999990463256836,
+				"p95Ms": 0.2999999523162842,
+				"p99Ms": 0.2999999523162842,
+				"meanMs": 0.11249995231628418,
+				"opsPerSec": 8888.892656492724
+			},
+			"memory": {
+				"label": "allocator-growth-observation",
+				"renders": 0,
+				"rssGrowthBytes": 0,
+				"heapGrowthBytes": 0,
+				"forcedGc": false
+			},
+			"metrics": {
+				"domEvidence": {
+					"expected": {
+						"rows": 100,
+						"completed": 0,
+						"requests": 0
+					},
+					"actual": {
+						"rows": 100,
+						"completed": 0,
+						"requests": 0
+					}
+				}
+			}
+		},
+		{
+			"name": "complete-25",
+			"gates": {
+				"passed": true,
+				"checks": [
+					"complete-25 DOM matched 100 todos and 25 completed",
+					"complete-25 committed after real input, keyboard, dblclick, or click events",
+					"complete-25 issued zero requests"
+				]
+			},
+			"bodyBytes": 0,
+			"timing": {
+				"samples": 8,
+				"minMs": 0.7999999523162842,
+				"p50Ms": 0.9000000953674316,
+				"p95Ms": 1,
+				"p99Ms": 1,
+				"meanMs": 0.9000000357627869,
+				"opsPerSec": 1111.1110669595241
+			},
+			"memory": {
+				"label": "allocator-growth-observation",
+				"renders": 0,
+				"rssGrowthBytes": 0,
+				"heapGrowthBytes": 0,
+				"forcedGc": false
+			},
+			"metrics": {
+				"domEvidence": {
+					"expected": {
+						"rows": 100,
+						"completed": 25,
+						"requests": 0
+					},
+					"actual": {
+						"rows": 100,
+						"completed": 25,
+						"requests": 0
+					}
+				}
+			}
+		},
+		{
+			"name": "filter-cycle",
+			"gates": {
+				"passed": true,
+				"checks": [
+					"filter-cycle DOM matched 100 todos and 25 completed",
+					"filter-cycle committed after real input, keyboard, dblclick, or click events",
+					"filter-cycle issued zero requests"
+				]
+			},
+			"bodyBytes": 0,
+			"timing": {
+				"samples": 8,
+				"minMs": 0.9000000953674316,
+				"p50Ms": 1,
+				"p95Ms": 1,
+				"p99Ms": 1,
+				"meanMs": 0.9750000238418579,
+				"opsPerSec": 1025.6410005608338
+			},
+			"memory": {
+				"label": "allocator-growth-observation",
+				"renders": 0,
+				"rssGrowthBytes": 0,
+				"heapGrowthBytes": 0,
+				"forcedGc": false
+			},
+			"metrics": {
+				"domEvidence": {
+					"expected": {
+						"rows": 100,
+						"completed": 25,
+						"requests": 0
+					},
+					"actual": {
+						"rows": 100,
+						"completed": 25,
+						"requests": 0
+					}
+				}
+			}
+		},
+		{
+			"name": "edit-10",
+			"gates": {
+				"passed": true,
+				"checks": [
+					"edit-10 DOM matched 100 todos and 0 completed",
+					"edit-10 committed after real input, keyboard, dblclick, or click events",
+					"edit-10 issued zero requests"
+				]
+			},
+			"bodyBytes": 0,
+			"timing": {
+				"samples": 8,
+				"minMs": 0.7000000476837158,
+				"p50Ms": 0.7999999523162842,
+				"p95Ms": 0.8000001907348633,
+				"p99Ms": 0.8000001907348633,
+				"meanMs": 0.7875000536441803,
+				"opsPerSec": 1269.841183340204
+			},
+			"memory": {
+				"label": "allocator-growth-observation",
+				"renders": 0,
+				"rssGrowthBytes": 0,
+				"heapGrowthBytes": 0,
+				"forcedGc": false
+			},
+			"metrics": {
+				"domEvidence": {
+					"expected": {
+						"rows": 100,
+						"completed": 0,
+						"edited": 10,
+						"requests": 0
+					},
+					"actual": {
+						"rows": 100,
+						"completed": 0,
+						"edited": 10,
+						"requests": 0
+					}
+				}
+			}
+		},
+		{
+			"name": "clear-completed",
+			"gates": {
+				"passed": true,
+				"checks": [
+					"clear-completed DOM matched 75 todos and 0 completed",
+					"clear-completed committed after real input, keyboard, dblclick, or click events",
+					"clear-completed issued zero requests"
+				]
+			},
+			"bodyBytes": 0,
+			"timing": {
+				"samples": 8,
+				"minMs": 0.39999985694885254,
+				"p50Ms": 0.5,
+				"p95Ms": 0.5999999046325684,
+				"p99Ms": 0.5999999046325684,
+				"meanMs": 0.5124999582767487,
+				"opsPerSec": 1951.2196710463
+			},
+			"memory": {
+				"label": "allocator-growth-observation",
+				"renders": 0,
+				"rssGrowthBytes": 0,
+				"heapGrowthBytes": 0,
+				"forcedGc": false
+			},
+			"metrics": {
+				"domEvidence": {
+					"expected": {
+						"rows": 75,
+						"completed": 0,
+						"requests": 0
+					},
+					"actual": {
+						"rows": 75,
+						"completed": 0,
+						"requests": 0
+					}
+				}
+			}
+		},
+		{
+			"name": "destroy-25",
+			"gates": {
+				"passed": true,
+				"checks": [
+					"destroy-25 DOM matched 75 todos and 0 completed",
+					"destroy-25 committed after real input, keyboard, dblclick, or click events",
+					"destroy-25 issued zero requests"
+				]
+			},
+			"bodyBytes": 0,
+			"timing": {
+				"samples": 8,
+				"minMs": 1.2000000476837158,
+				"p50Ms": 1.4000000953674316,
+				"p95Ms": 1.5,
+				"p99Ms": 1.5,
+				"meanMs": 1.412500023841858,
+				"opsPerSec": 707.9645898200416
+			},
+			"memory": {
+				"label": "allocator-growth-observation",
+				"renders": 0,
+				"rssGrowthBytes": 0,
+				"heapGrowthBytes": 0,
+				"forcedGc": false
+			},
+			"metrics": {
+				"domEvidence": {
+					"expected": {
+						"rows": 75,
+						"completed": 0,
+						"requests": 0
+					},
+					"actual": {
+						"rows": 75,
+						"completed": 0,
+						"requests": 0
+					}
+				}
+			}
+		},
+		{
+			"name": "dom-comment-count",
+			"gates": {
+				"passed": true,
+				"checks": [
+					"dom-comment-count DOM matched 100 todos and 0 completed",
+					"dom-comment-count committed after real input, keyboard, dblclick, or click events",
+					"dom-comment-count issued zero requests"
+				]
+			},
+			"bodyBytes": 0,
+			"timing": {
+				"samples": 8,
+				"minMs": 0,
+				"p50Ms": 0,
+				"p95Ms": 0.09999990463256836,
+				"p99Ms": 0.09999990463256836,
+				"meanMs": 0.02499997615814209,
+				"opsPerSec": 40000.038147009036
+			},
+			"memory": {
+				"label": "allocator-growth-observation",
+				"renders": 0,
+				"rssGrowthBytes": 0,
+				"heapGrowthBytes": 0,
+				"forcedGc": false
+			},
+			"metrics": {
+				"domEvidence": {
+					"expected": {
+						"rows": 100,
+						"completed": 0,
+						"commentsStable": true,
+						"requests": 0
+					},
+					"actual": {
+						"rows": 100,
+						"completed": 0,
+						"requests": 0,
+						"commentsStable": true
+					}
+				},
+				"commentCount": 0
+			}
+		}
+	]
+}

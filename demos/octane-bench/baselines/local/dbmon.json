@@ -1,0 +1,290 @@
+{
+	"schemaVersion": 1,
+	"kind": "markless-benchmark-result",
+	"lane": "dbmon",
+	"status": "passed",
+	"recordedAt": "2026-07-13T16:47:36.321Z",
+	"protocol": {
+		"mode": "full",
+		"timedSeconds": 0,
+		"warmupMinimumRenders": 10,
+		"warmupSeconds": 0,
+		"maxSamples": 30,
+		"memoryMaxRenders": 0,
+		"forcedGc": false,
+		"browserForcedGc": true,
+		"operationWarmups": 10,
+		"operationSamples": 30,
+		"sampleYieldMs": 5
+	},
+	"environment": {
+		"os": "darwin 25.5.0",
+		"arch": "arm64",
+		"cpuModel": "Apple M5 Pro",
+		"nodeVersion": "v24.15.0",
+		"pnpmVersion": "10.33.2",
+		"gitSha": "397c3ecbf30a3cc0e36b95b5a0e056d3a3873a2e",
+		"dirtyTree": true
+	},
+	"cases": [
+		{
+			"name": "mount",
+			"gates": {
+				"passed": true,
+				"checks": [
+					"mount rendered 1000 rows and 7000 cells",
+					"mount preserved the required keyed identity and issued zero requests"
+				]
+			},
+			"bodyBytes": 0,
+			"timing": {
+				"samples": 30,
+				"minMs": 4.6000001430511475,
+				"p50Ms": 5,
+				"p95Ms": 8.699999809265137,
+				"p99Ms": 9.299999952316284,
+				"meanMs": 5.643333307902018,
+				"opsPerSec": 177.20023706552305
+			},
+			"memory": {
+				"label": "allocator-growth-observation",
+				"renders": 0,
+				"rssGrowthBytes": 0,
+				"heapGrowthBytes": 0,
+				"forcedGc": false
+			},
+			"metrics": {
+				"semanticEvidence": {
+					"expected": {
+						"rows": 1000,
+						"cells": 7000,
+						"requests": 0
+					},
+					"actual": {
+						"rows": 1000,
+						"cells": 7000,
+						"survivingRows": 0,
+						"requests": 0
+					}
+				}
+			}
+		},
+		{
+			"name": "full-tick",
+			"gates": {
+				"passed": true,
+				"checks": [
+					"full-tick rendered 1000 rows and 7000 cells",
+					"full-tick committed exactly 7000 text mutations",
+					"full-tick preserved the required keyed identity and issued zero requests"
+				]
+			},
+			"bodyBytes": 0,
+			"timing": {
+				"samples": 30,
+				"minMs": 2,
+				"p50Ms": 2.299999952316284,
+				"p95Ms": 2.5,
+				"p99Ms": 2.5999999046325684,
+				"meanMs": 2.2866666475931803,
+				"opsPerSec": 437.3177879043039
+			},
+			"memory": {
+				"label": "allocator-growth-observation",
+				"renders": 0,
+				"rssGrowthBytes": 0,
+				"heapGrowthBytes": 0,
+				"forcedGc": false
+			},
+			"metrics": {
+				"semanticEvidence": {
+					"expected": {
+						"rows": 1000,
+						"cells": 7000,
+						"textMutations": 7000,
+						"requests": 0
+					},
+					"actual": {
+						"rows": 1000,
+						"cells": 7000,
+						"survivingRows": 1000,
+						"textMutations": 7000,
+						"requests": 0
+					}
+				}
+			}
+		},
+		{
+			"name": "partial-tick",
+			"gates": {
+				"passed": true,
+				"checks": [
+					"partial-tick rendered 1000 rows and 7000 cells",
+					"partial-tick committed exactly 700 text mutations",
+					"partial-tick preserved the required keyed identity and issued zero requests"
+				]
+			},
+			"bodyBytes": 0,
+			"timing": {
+				"samples": 30,
+				"minMs": 0.8999998569488525,
+				"p50Ms": 1.1000001430511475,
+				"p95Ms": 1.3000001907348633,
+				"p99Ms": 1.3999998569488525,
+				"meanMs": 1.1166666666666667,
+				"opsPerSec": 895.5223880597015
+			},
+			"memory": {
+				"label": "allocator-growth-observation",
+				"renders": 0,
+				"rssGrowthBytes": 0,
+				"heapGrowthBytes": 0,
+				"forcedGc": false
+			},
+			"metrics": {
+				"semanticEvidence": {
+					"expected": {
+						"rows": 1000,
+						"cells": 7000,
+						"textMutations": 700,
+						"requests": 0
+					},
+					"actual": {
+						"rows": 1000,
+						"cells": 7000,
+						"survivingRows": 1000,
+						"textMutations": 700,
+						"requests": 0
+					}
+				}
+			}
+		},
+		{
+			"name": "all-new-key-remount",
+			"gates": {
+				"passed": true,
+				"checks": [
+					"all-new-key-remount rendered 1000 rows and 7000 cells",
+					"all-new-key-remount preserved the required keyed identity and issued zero requests"
+				]
+			},
+			"bodyBytes": 0,
+			"timing": {
+				"samples": 30,
+				"minMs": 5.099999904632568,
+				"p50Ms": 5.400000095367432,
+				"p95Ms": 5.700000047683716,
+				"p99Ms": 6.299999952316284,
+				"meanMs": 5.433333325386047,
+				"opsPerSec": 184.0490800238081
+			},
+			"memory": {
+				"label": "allocator-growth-observation",
+				"renders": 0,
+				"rssGrowthBytes": 0,
+				"heapGrowthBytes": 0,
+				"forcedGc": false
+			},
+			"metrics": {
+				"semanticEvidence": {
+					"expected": {
+						"rows": 1000,
+						"cells": 7000,
+						"requests": 0
+					},
+					"actual": {
+						"rows": 1000,
+						"cells": 7000,
+						"survivingRows": 0,
+						"requests": 0
+					}
+				}
+			}
+		},
+		{
+			"name": "sort-reorder",
+			"gates": {
+				"passed": true,
+				"checks": [
+					"sort-reorder rendered 1000 rows and 7000 cells",
+					"sort-reorder preserved the required keyed identity and issued zero requests"
+				]
+			},
+			"bodyBytes": 0,
+			"timing": {
+				"samples": 30,
+				"minMs": 3.200000047683716,
+				"p50Ms": 3.5,
+				"p95Ms": 4.799999952316284,
+				"p99Ms": 5.1000001430511475,
+				"meanMs": 3.6266666889190673,
+				"opsPerSec": 275.7352924257981
+			},
+			"memory": {
+				"label": "allocator-growth-observation",
+				"renders": 0,
+				"rssGrowthBytes": 0,
+				"heapGrowthBytes": 0,
+				"forcedGc": false
+			},
+			"metrics": {
+				"semanticEvidence": {
+					"expected": {
+						"rows": 1000,
+						"cells": 7000,
+						"requests": 0
+					},
+					"actual": {
+						"rows": 1000,
+						"cells": 7000,
+						"survivingRows": 1000,
+						"orderChanged": true,
+						"requests": 0
+					}
+				}
+			}
+		},
+		{
+			"name": "unmount",
+			"gates": {
+				"passed": true,
+				"checks": [
+					"unmount rendered 0 rows and 0 cells",
+					"unmount preserved the required keyed identity and issued zero requests"
+				]
+			},
+			"bodyBytes": 0,
+			"timing": {
+				"samples": 30,
+				"minMs": 0.19999980926513672,
+				"p50Ms": 0.3000001907348633,
+				"p95Ms": 1.7999999523162842,
+				"p99Ms": 1.7999999523162842,
+				"meanMs": 0.8233333587646484,
+				"opsPerSec": 1214.574861269349
+			},
+			"memory": {
+				"label": "allocator-growth-observation",
+				"renders": 0,
+				"rssGrowthBytes": 0,
+				"heapGrowthBytes": 0,
+				"forcedGc": false
+			},
+			"metrics": {
+				"semanticEvidence": {
+					"expected": {
+						"rows": 0,
+						"cells": 0,
+						"requests": 0
+					},
+					"actual": {
+						"rows": 0,
+						"cells": 0,
+						"survivingRows": 0,
+						"requests": 0
+					}
+				}
+			}
+		}
+	]
+}

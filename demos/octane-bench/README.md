@@ -108,6 +108,62 @@ Full runs use five warmups, twenty timed samples, ten inner repetitions for equa
 
 The production client reuses the signal-favoring static preview server, declares the document and every production build asset, and permits zero requests during timed windows. Its verdict receipt contains MLA-I2-NETWORK and MLA-EXT-MEMO-GATES. MLA-S1 does not apply because this is a CSR propagation lane rather than a resume oracle.
 
+## Dbmon
+
+Build the production CSR fixture with:
+
+```sh
+pnpm --dir demos/octane-bench bench -- dbmon --build-only
+```
+
+The benchmark owner runs the complete Playwright phase and records a local baseline with:
+
+```sh
+pnpm --dir demos/octane-bench bench -- dbmon --record
+```
+
+This lane ports Octane dbmon's deterministic seeded generator and six operations: dispatched empty-to-1,000-row mount, full tick, 100-row partial tick, all-new-key remount, keyed reorder, and teardown. Each row has seven bound text cells. An untimed semantic pass verifies row and cell counts, keyed node reuse for surviving keys, replacement for new keys, changed sort order, and an empty root after teardown. Full runs use ten warmups, 30 samples, browser garbage collection, and a five-millisecond yield. Because delegated compiled-CSR handlers run on a later task than the dispatching click and `graph.flush()` resolves before the DOM journal applies, every timed window waits on the operation's observable DOM effect (mutation-count thresholds for ticks, first-row identity for remounts, row order for sorts) before the clock stops.
+
+MutationObserver evidence uses the current compiler-proven behavior: replacing a row object rewrites every one of its seven bound texts, including the stable database name. The exact gates are therefore 7,000 full-tick text mutations and 700 partial-tick text mutations. Suppressing identical per-field writes would reduce those counts to 6,000 and 600 and is the lane's score-improvement hypothesis. Dynamic threshold classes from Octane's fixture are not rendered because dynamic keyed-row attributes are outside the currently proven Markless row shape; the deterministic count and elapsed values still churn in all six non-name cells.
+
+The production client reuses the static build server, declares the document and all emitted assets, and permits zero requests during every timed window. The verdict receipt contains MLA-I2-NETWORK and MLA-EXT-DBMON-GATES; MLA-S1 does not apply to this CSR lane.
+
+## TodoMVC
+
+Build the production CSR fixture with:
+
+```sh
+pnpm --dir demos/octane-bench bench -- todomvc --build-only
+```
+
+The benchmark owner runs the complete Playwright phase and records a local baseline with:
+
+```sh
+pnpm --dir demos/octane-bench bench -- todomvc --record
+```
+
+This lane reuses the TodoMVC source measured by bundle-size and ports Octane's add-100, toggle-all on and off, complete-25, filter cycle, edit-10, clear-completed, destroy-25, and DOM-comment operations. Every preparation and measured change goes through the fixture's actual keydown, dblclick, or click handler; the harness has no state mutation hook. Preparation is untimed, one complete operation pass warms the fixture, and full runs collect eight samples per operation. Delegated compiled-CSR handlers run on a later task than the dispatching script and `graph.flush()` resolves before the DOM journal applies, so the harness waits on each interaction's observable DOM effect (row count, completed count, label text) through a MutationObserver hook before the clock stops; timing therefore ends at the committed DOM state a user would see, and the DOM is checked after every sample.
+
+Visibility, completion, and editing travel in row data. The keyed row uses static attributes plus row-only text bindings because dynamic keyed-row attributes and nested row branches are not compiler-proven yet. This changes the evidence selectors but not the scripted todo state transitions. The comment count is sampled eight times and must remain stable. The production client permits zero timed-window requests, and its verdict receipt contains MLA-I2-NETWORK and MLA-EXT-TODOMVC-GATES.
+
+## Chat stream
+
+Build the production CSR fixture with:
+
+```sh
+pnpm --dir demos/octane-bench bench -- chat-stream --build-only
+```
+
+The benchmark owner runs the complete Playwright phase and records a local baseline with:
+
+```sh
+pnpm --dir demos/octane-bench bench -- chat-stream --record
+```
+
+This lane reuses the chat-stream source measured by bundle-size. A fixed Mulberry32 seed creates a ten-message conversation, a 200-message history, and repeatable 240-to-432-token replies without `Math.random`. The harness sends four replies in eight-token batches, sends the same workload in 64-token batches, appends two replies to the long history, switches between conversations five round trips, and counts DOM comments. One full pass warms every operation and full runs collect eight DOM-verified samples per operation.
+
+The fixture exposes `window.__pump(k)`, `window.__reset()`, and the `window.__benchSettled(predicate)` commit-wait used by the harness. The hooks dispatch hidden fixture controls and wait for each dispatch's observable DOM effect (message count, streaming markers, the pump button's remaining-tokens attribute) instead of trusting `graph.flush()`, which resolves before the DOM journal applies; there are no fixture timers or direct state writes from the harness. The composer prompt and pump-size fields are uncontrolled inputs read directly by their click handlers, because a keyed-repeat component drops its export silently when any non-row state is bound outside the loop (see the framework findings note). Message bodies are precomputed row fields rather than nested segment rows, keeping keyed expressions within the proven row-only shape. Every stream gate requires a zero token remainder and no streaming message. The comment count must remain stable, timed windows permit zero requests, and the verdict receipt contains MLA-I2-NETWORK and MLA-EXT-CHAT-GATES.
+
 ## Bundle size
 
 Run the deterministic Node-only production builds with:
@@ -116,7 +172,7 @@ Run the deterministic Node-only production builds with:
 pnpm --dir demos/octane-bench bench -- bundle-size
 ```
 
-The lane builds three Markless applications once each: the existing keyed JS framework benchmark source, a minimal TodoMVC fixture intended for reuse by a future TodoMVC lane, and a deterministic transcript fixture intended for reuse by a future chat-stream lane. The latter two start their keyed collections with literal empty arrays and populate them only from event handlers. This preserves the compiler-proven keyed-row shape documented by memo-wall.
+The lane builds three Markless applications once each: the existing keyed JS framework benchmark source, the TodoMVC lane fixture, and the chat-stream lane fixture. The latter two start their keyed collections with literal empty arrays and populate them only from dispatched handlers. Bundle-size and the browser lanes therefore measure the same source files rather than forked copies. This preserves the compiler-proven keyed-row shape documented by memo-wall.
 
 Every build uses the production Markless Vite plugin, an ES2022 target, and one normalized Oxc minification pass. Oxc is the repository's Vite/Rolldown-native equivalent of Octane's normalized one-pass esbuild setting; the lane does not introduce esbuild alongside the repository toolchain. Only emitted JavaScript is measured. Raw, best-level gzip, and maximum-quality brotli bytes are reported for the total, application modules, and framework/runtime modules. Compression is applied independently to each emitted JavaScript file and then summed.
 
