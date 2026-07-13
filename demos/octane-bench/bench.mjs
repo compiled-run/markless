@@ -12,6 +12,8 @@ import { runNews } from './lanes/news/run.mjs';
 import { checkGeneratedFixture } from './lanes/signal-favoring/gen.mjs';
 import { runSignalFavoring } from './lanes/signal-favoring/run.mjs';
 import { runMemoWall } from './lanes/memo-wall/run.mjs';
+import { runBundleSize } from './lanes/bundle-size/run.mjs';
+import { runCodegenSize } from './lanes/codegen-size/run.mjs';
 
 process.env.NODE_ENV = 'production';
 
@@ -25,12 +27,14 @@ const laneDefinitions = {
 	news: { run: runNews, protocol: newsProtocol },
 	'signal-favoring': { run: runSignalFavoring, protocol: signalFavoringProtocol },
 	'memo-wall': { run: runMemoWall, protocol: memoWallProtocol },
+	'bundle-size': { run: runBundleSize, protocol: sizeProtocol },
+	'codegen-size': { run: runCodegenSize, protocol: sizeProtocol },
 };
 const laneDefinition = laneDefinitions[lane];
 
 if (!laneDefinition) {
 	console.error(
-		'usage: node bench.mjs <ssr-throughput|streaming-ssr|news|signal-favoring|memo-wall> [--smoke] [--record] [--build-only] [--ssr-only] [--gen-check]',
+		'usage: node bench.mjs <ssr-throughput|streaming-ssr|news|signal-favoring|memo-wall|bundle-size|codegen-size> [--smoke] [--record] [--build-only] [--ssr-only] [--gen-check]',
 	);
 	process.exit(2);
 }
@@ -44,17 +48,20 @@ if (lane === 'signal-favoring' && flags.has('--gen-check')) {
 }
 
 const fixtureRoot = path.join(root, 'lanes', lane, 'fixture');
-await buildFixture(fixtureRoot);
-if (flags.has('--build-only')) {
-	console.log(`built ${lane} production fixture`);
-	process.exit(0);
+const nodeOnlySizeLane = lane === 'bundle-size' || lane === 'codegen-size';
+if (!nodeOnlySizeLane) {
+	await buildFixture(fixtureRoot);
+	if (flags.has('--build-only')) {
+		console.log(`built ${lane} production fixture`);
+		process.exit(0);
+	}
 }
 
 const smoke = flags.has('--smoke');
 const protocol = laneDefinition.protocol(smoke);
 const environment = collectEnvironment();
 let fixture;
-if (lane !== 'signal-favoring' && lane !== 'memo-wall') {
+if (!nodeOnlySizeLane && lane !== 'signal-favoring' && lane !== 'memo-wall') {
 	const entryPath = path.join(
 		fixtureRoot,
 		'dist',
@@ -199,6 +206,18 @@ function memoWallProtocol(smoke) {
 	};
 }
 
+function sizeProtocol(smoke) {
+	return {
+		mode: smoke ? 'smoke' : 'full',
+		timedSeconds: 0,
+		warmupMinimumRenders: 0,
+		warmupSeconds: 0,
+		maxSamples: 1,
+		memoryMaxRenders: 0,
+		forcedGc: false,
+	};
+}
+
 function collectEnvironment() {
 	return {
 		os: `${os.platform()} ${os.release()}`,
@@ -266,6 +285,22 @@ function printSummary(result, resultPath) {
 		console.log(
 			'browser GC is requested before timed samples; timed memo-wall windows allow zero requests',
 		);
+	} else if (result.lane === 'bundle-size') {
+		console.log('fixture                       total gzip   app gzip   framework gzip');
+		for (const benchmarkCase of result.cases) {
+			const bytes = benchmarkCase.metrics.bytes;
+			console.log(
+				`${benchmarkCase.name.padEnd(29)} ${String(bytes.total.gzip).padStart(10)} ${String(bytes.application.gzip).padStart(10)} ${String(bytes.framework.gzip).padStart(16)}`,
+			);
+		}
+	} else if (result.lane === 'codegen-size') {
+		console.log('mode       source gzip   compiled raw   compiled min   compiled gzip');
+		for (const benchmarkCase of result.cases) {
+			const bytes = benchmarkCase.metrics.bytes;
+			console.log(
+				`${benchmarkCase.name.padEnd(10)} ${String(bytes.source.gzip).padStart(11)} ${String(bytes.compiled.raw).padStart(14)} ${String(bytes.compiled.minified).padStart(14)} ${String(bytes.compiled.gzip).padStart(15)}`,
+			);
+		}
 	} else if (result.lane === 'streaming-ssr') {
 		console.log(
 			'scenario       shell p50 ms   total p50 ms   chunks   total bytes   renders/sec',

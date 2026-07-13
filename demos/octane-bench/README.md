@@ -107,3 +107,31 @@ Two honesty notes. First, `shared()` (the context-translation the plan mandated)
 Full runs use five warmups, twenty timed samples, ten inner repetitions for equal and one-row writes, five repetitions for shared fan-out, a five-millisecond yield, and browser garbage collection before each sample. Fixture-owned counters and MutationObserver tallies gate every timing. Equal writes require zero computed evaluations and zero DOM mutations; one-row writes require exactly one targeted Row→Inner→Leaf chain and three DOM text mutations; each `shared()` write requires exactly 1,000 targeted leaf evaluations and DOM mutations with zero work in the other branch. A failed count produces a failed result and nonzero exit.
 
 The production client reuses the signal-favoring static preview server, declares the document and every production build asset, and permits zero requests during timed windows. Its verdict receipt contains MLA-I2-NETWORK and MLA-EXT-MEMO-GATES. MLA-S1 does not apply because this is a CSR propagation lane rather than a resume oracle.
+
+## Bundle size
+
+Run the deterministic Node-only production builds with:
+
+```sh
+pnpm --dir demos/octane-bench bench -- bundle-size
+```
+
+The lane builds three Markless applications once each: the existing keyed JS framework benchmark source, a minimal TodoMVC fixture intended for reuse by a future TodoMVC lane, and a deterministic transcript fixture intended for reuse by a future chat-stream lane. The latter two start their keyed collections with literal empty arrays and populate them only from event handlers. This preserves the compiler-proven keyed-row shape documented by memo-wall.
+
+Every build uses the production Markless Vite plugin, an ES2022 target, and one normalized Oxc minification pass. Oxc is the repository's Vite/Rolldown-native equivalent of Octane's normalized one-pass esbuild setting; the lane does not introduce esbuild alongside the repository toolchain. Only emitted JavaScript is measured. Raw, best-level gzip, and maximum-quality brotli bytes are reported for the total, application modules, and framework/runtime modules. Compression is applied independently to each emitted JavaScript file and then summed.
+
+Attribution comes from Rolldown's module provenance for each emitted chunk. Modules under each fixture's application source root count as application code. Markless package modules, dependencies, and all virtual modules count as framework code. The production `bundle-graph.json` must also exist and be non-empty. Non-recursive code-splitting keeps application dependencies imported by lazy symbols in the application bucket. A mixed-provenance chunk or an empty application/framework bucket fails the lane instead of producing a score.
+
+These are Markless production-build measurements, not claims that byte buckets or application behavior are cross-framework equivalent.
+
+## Codegen size
+
+Run the deterministic compiler corpus with:
+
+```sh
+pnpm --dir demos/octane-bench bench -- codegen-size
+```
+
+The lane owns a fixed 14-file TSRX corpus covering events, component composition, keyed flow, dynamic classes, forms, async boundaries, `state()` and `computed()`, element handles, conditional and switch flow, spread attributes, nested markup, capture events, and multiple state writes. It calls the compiler package's main programmatic export once per file and measures both official render outputs: the direct client module when available (otherwise the compiler's CSR module) and the SSR module.
+
+For every file and each mode, the result records source raw/gzip bytes and compiled raw/minified/gzip bytes. Compiled gzip is taken after one Oxc minification pass. Aggregate values are sums of those per-file values. Every corpus filename and SHA-256 hash is embedded in both mode results; changing any file starts a new baseline series, and a hash mismatch fails validation. The lane reports code generation size only and makes no cross-language expansion-ratio comparability claim.

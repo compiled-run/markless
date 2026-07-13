@@ -1,0 +1,1783 @@
+{
+	"schemaVersion": 1,
+	"kind": "markless-benchmark-result",
+	"lane": "bundle-size",
+	"status": "passed",
+	"recordedAt": "2026-07-13T15:47:10.531Z",
+	"protocol": {
+		"mode": "full",
+		"timedSeconds": 0,
+		"warmupMinimumRenders": 0,
+		"warmupSeconds": 0,
+		"maxSamples": 1,
+		"memoryMaxRenders": 0,
+		"forcedGc": false
+	},
+	"environment": {
+		"os": "darwin 25.5.0",
+		"arch": "arm64",
+		"cpuModel": "Apple M5 Pro",
+		"nodeVersion": "v24.15.0",
+		"pnpmVersion": "10.33.2",
+		"gitSha": "ca69df9523d3f0dd673f5532ba8704ff7d52462f",
+		"dirtyTree": true
+	},
+	"cases": [
+		{
+			"name": "js-framework-benchmark",
+			"gates": {
+				"passed": true,
+				"checks": [
+					"bundle graph present",
+					"application and framework buckets non-empty"
+				]
+			},
+			"bodyBytes": 85634,
+			"timing": {
+				"samples": 1,
+				"minMs": 0,
+				"p50Ms": 0,
+				"p95Ms": 0,
+				"p99Ms": 0,
+				"meanMs": 0,
+				"opsPerSec": null
+			},
+			"memory": {
+				"label": "allocator-growth-observation",
+				"renders": 0,
+				"rssGrowthBytes": 0,
+				"heapGrowthBytes": 0,
+				"forcedGc": false
+			},
+			"metrics": {
+				"samples": 1,
+				"bytes": {
+					"total": {
+						"raw": 85634,
+						"gzip": 36503,
+						"brotli": 32762
+					},
+					"application": {
+						"raw": 7600,
+						"gzip": 2992,
+						"brotli": 2660
+					},
+					"framework": {
+						"raw": 78034,
+						"gzip": 33511,
+						"brotli": 30102
+					}
+				},
+				"files": [
+					{
+						"file": "build/chunk-B0qWYodz.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 85,
+						"gzip": 97,
+						"brotli": 84
+					},
+					{
+						"file": "build/chunk-B0W4rsW72.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/resume.ts"
+						],
+						"raw": 1945,
+						"gzip": 939,
+						"brotli": 848
+					},
+					{
+						"file": "build/chunk-B7M7Uzi7.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 190,
+						"gzip": 159,
+						"brotli": 128
+					},
+					{
+						"file": "build/chunk-BcONQa1Q2.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/resume-runtime-shared.ts"
+						],
+						"raw": 1210,
+						"gzip": 595,
+						"brotli": 534
+					},
+					{
+						"file": "build/chunk-BehR2pkY2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 115,
+						"gzip": 127,
+						"brotli": 119
+					},
+					{
+						"file": "build/chunk-BFOsxdyA2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 79,
+						"gzip": 94,
+						"brotli": 83
+					},
+					{
+						"file": "build/chunk-BKTqLI03.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/runtime/src/graph.ts",
+							"<repo>/packages/runtime/src/index.ts"
+						],
+						"raw": 2640,
+						"gzip": 1130,
+						"brotli": 1040
+					},
+					{
+						"file": "build/chunk-BMfgdug7.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 86,
+						"gzip": 98,
+						"brotli": 85
+					},
+					{
+						"file": "build/chunk-BOglAY9o.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/runtime/src/graph-scheduler.ts"
+						],
+						"raw": 285,
+						"gzip": 206,
+						"brotli": 185
+					},
+					{
+						"file": "build/chunk-BQwTIe5b2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 80,
+						"gzip": 92,
+						"brotli": 84
+					},
+					{
+						"file": "build/chunk-BSmfu8WF.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/runtime/src/graph-async.ts"
+						],
+						"raw": 1529,
+						"gzip": 693,
+						"brotli": 637
+					},
+					{
+						"file": "build/chunk-Btma_K7Q.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/runtime/src/graph-core.ts"
+						],
+						"raw": 1143,
+						"gzip": 555,
+						"brotli": 506
+					},
+					{
+						"file": "build/chunk-Bu37zt1B.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/payload-graph-construct.ts"
+						],
+						"raw": 1753,
+						"gzip": 814,
+						"brotli": 745
+					},
+					{
+						"file": "build/chunk-BUtFIVKf2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 80,
+						"gzip": 92,
+						"brotli": 84
+					},
+					{
+						"file": "build/chunk-BX-f7Rso.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/dom-journal.ts"
+						],
+						"raw": 2039,
+						"gzip": 807,
+						"brotli": 716
+					},
+					{
+						"file": "build/chunk-BxBETWbe.js",
+						"bucket": "framework",
+						"modules": [
+							"\u0000rolldown/runtime.js"
+						],
+						"raw": 50,
+						"gzip": 67,
+						"brotli": 54
+					},
+					{
+						"file": "build/chunk-BZ4Dde9A.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 82,
+						"gzip": 97,
+						"brotli": 73
+					},
+					{
+						"file": "build/chunk-C_LSHtDt.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/runtime/src/graph-computed.ts"
+						],
+						"raw": 1111,
+						"gzip": 448,
+						"brotli": 404
+					},
+					{
+						"file": "build/chunk-C3__27AF.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 81,
+						"gzip": 93,
+						"brotli": 83
+					},
+					{
+						"file": "build/chunk-C6JZOPvu2.js",
+						"bucket": "application",
+						"modules": [
+							"<repo>/demos/js-framework-benchmark/frameworks/keyed/markless/src/data.ts"
+						],
+						"raw": 947,
+						"gzip": 566,
+						"brotli": 519
+					},
+					{
+						"file": "build/chunk-CC0xAYb3.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 130,
+						"gzip": 127,
+						"brotli": 107
+					},
+					{
+						"file": "build/chunk-CeNTnHBJ.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/resume-handoff.ts"
+						],
+						"raw": 711,
+						"gzip": 423,
+						"brotli": 367
+					},
+					{
+						"file": "build/chunk-CFbAWRzb.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 236,
+						"gzip": 171,
+						"brotli": 144
+					},
+					{
+						"file": "build/chunk-CHiJG8UR2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 108,
+						"gzip": 110,
+						"brotli": 99
+					},
+					{
+						"file": "build/chunk-CIlsefk8.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/resume-locators.ts"
+						],
+						"raw": 1243,
+						"gzip": 587,
+						"brotli": 529
+					},
+					{
+						"file": "build/chunk-cPTv-DUn.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/resume-events.ts"
+						],
+						"raw": 4085,
+						"gzip": 1622,
+						"brotli": 1464
+					},
+					{
+						"file": "build/chunk-CrVg9EL82.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/resume-shared-patch.ts"
+						],
+						"raw": 673,
+						"gzip": 329,
+						"brotli": 283
+					},
+					{
+						"file": "build/chunk-CtWfVVEU2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 80,
+						"gzip": 92,
+						"brotli": 84
+					},
+					{
+						"file": "build/chunk-CVEdMTvb2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 80,
+						"gzip": 92,
+						"brotli": 84
+					},
+					{
+						"file": "build/chunk-CWCk73G6.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/resume-behaviors.ts"
+						],
+						"raw": 4008,
+						"gzip": 1622,
+						"brotli": 1508
+					},
+					{
+						"file": "build/chunk-CXAQV_OL.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/resume-branches.ts"
+						],
+						"raw": 6483,
+						"gzip": 2462,
+						"brotli": 2259
+					},
+					{
+						"file": "build/chunk-CZ-AXNuP2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 91,
+						"gzip": 106,
+						"brotli": 95
+					},
+					{
+						"file": "build/chunk-D1a6cAp2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 78,
+						"gzip": 93,
+						"brotli": 82
+					},
+					{
+						"file": "build/chunk-D2Nsafzh.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/repeat-runtime.ts",
+							"<repo>/packages/web/src/resume-keyed-repeats.ts"
+						],
+						"raw": 3326,
+						"gzip": 1329,
+						"brotli": 1168
+					},
+					{
+						"file": "build/chunk-D3WDOqqg.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/runtime/src/graph-shared.ts"
+						],
+						"raw": 1606,
+						"gzip": 744,
+						"brotli": 688
+					},
+					{
+						"file": "build/chunk-d6KRd4gB2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 80,
+						"gzip": 95,
+						"brotli": 84
+					},
+					{
+						"file": "build/chunk-D7_Hj3672.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/resume-runtime-start.ts"
+						],
+						"raw": 3694,
+						"gzip": 1420,
+						"brotli": 1272
+					},
+					{
+						"file": "build/chunk-DCzug9JL2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 171,
+						"gzip": 150,
+						"brotli": 123
+					},
+					{
+						"file": "build/chunk-DDzvjs5i2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 80,
+						"gzip": 92,
+						"brotli": 84
+					},
+					{
+						"file": "build/chunk-DEJwrBr_.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 77,
+						"gzip": 92,
+						"brotli": 79
+					},
+					{
+						"file": "build/chunk-DI_hy6pL.js",
+						"bucket": "application",
+						"modules": [
+							"<repo>/demos/js-framework-benchmark/frameworks/keyed/markless/index.html",
+							"<repo>/demos/js-framework-benchmark/frameworks/keyed/markless/src/main.ts",
+							"<repo>/demos/js-framework-benchmark/frameworks/keyed/markless/src/root.tsrx"
+						],
+						"raw": 6653,
+						"gzip": 2426,
+						"brotli": 2141
+					},
+					{
+						"file": "build/chunk-DjDDk54_2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 75,
+						"gzip": 90,
+						"brotli": 78
+					},
+					{
+						"file": "build/chunk-DQfJZuy4.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/resume-async-wiring.ts"
+						],
+						"raw": 2895,
+						"gzip": 1252,
+						"brotli": 1128
+					},
+					{
+						"file": "build/chunk-DQpc-uap2.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/resume-sync-demand.ts"
+						],
+						"raw": 781,
+						"gzip": 449,
+						"brotli": 393
+					},
+					{
+						"file": "build/chunk-Drse5l72.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 72,
+						"gzip": 87,
+						"brotli": 72
+					},
+					{
+						"file": "build/chunk-DrZX8T2p2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 80,
+						"gzip": 92,
+						"brotli": 84
+					},
+					{
+						"file": "build/chunk-DsnlnPqW.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/inline/resume-errors.ts"
+						],
+						"raw": 756,
+						"gzip": 386,
+						"brotli": 325
+					},
+					{
+						"file": "build/chunk-DTcrnajc2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 81,
+						"gzip": 93,
+						"brotli": 85
+					},
+					{
+						"file": "build/chunk-DulkSE0f2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 77,
+						"gzip": 92,
+						"brotli": 81
+					},
+					{
+						"file": "build/chunk-DyR9-0RA.js",
+						"bucket": "framework",
+						"modules": [
+							"\u0000virtual:markless:symbol:<repo>%2Fdemos%2Fjs-framework-benchmark%2Fframeworks%2Fkeyed%2Fmarkless%2Fsrc%2Froot.tsrx:symbol%3A0",
+							"\u0000virtual:markless:symbol:<repo>%2Fdemos%2Fjs-framework-benchmark%2Fframeworks%2Fkeyed%2Fmarkless%2Fsrc%2Froot.tsrx:symbol%3A1",
+							"\u0000virtual:markless:symbol:<repo>%2Fdemos%2Fjs-framework-benchmark%2Fframeworks%2Fkeyed%2Fmarkless%2Fsrc%2Froot.tsrx:symbol%3A2",
+							"\u0000virtual:markless:symbol:<repo>%2Fdemos%2Fjs-framework-benchmark%2Fframeworks%2Fkeyed%2Fmarkless%2Fsrc%2Froot.tsrx:symbol%3A3",
+							"\u0000virtual:markless:symbol:<repo>%2Fdemos%2Fjs-framework-benchmark%2Fframeworks%2Fkeyed%2Fmarkless%2Fsrc%2Froot.tsrx:symbol%3A4",
+							"\u0000virtual:markless:symbol:<repo>%2Fdemos%2Fjs-framework-benchmark%2Fframeworks%2Fkeyed%2Fmarkless%2Fsrc%2Froot.tsrx:symbol%3A5",
+							"\u0000virtual:markless:symbol:<repo>%2Fdemos%2Fjs-framework-benchmark%2Fframeworks%2Fkeyed%2Fmarkless%2Fsrc%2Froot.tsrx:symbol%3A6",
+							"\u0000virtual:markless:symbol:<repo>%2Fdemos%2Fjs-framework-benchmark%2Fframeworks%2Fkeyed%2Fmarkless%2Fsrc%2Froot.tsrx:symbol%3A7",
+							"\u0000vite/preload-helper.js",
+							"<repo>/packages/web/src/fns/direct.ts",
+							"<repo>/packages/web/src/fns/write-scalar.ts",
+							"<repo>/packages/web/src/inline/sync-policy-core.ts",
+							"<repo>/packages/web/src/pending-timing.ts",
+							"<repo>/packages/web/src/render-csr.ts",
+							"<repo>/packages/web/src/render.ts",
+							"<repo>/packages/web/src/resume-anchor-census.ts",
+							"<repo>/packages/web/src/resume-arm-records.ts",
+							"<repo>/packages/web/src/resume-commit-arm.ts",
+							"<repo>/packages/web/src/resume-resettle-hold.ts",
+							"<repo>/packages/web/src/runtime-error-reporting.ts"
+						],
+						"raw": 19637,
+						"gzip": 6947,
+						"brotli": 6206
+					},
+					{
+						"file": "build/chunk-DYs2YFUI.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/serializer/src/value-decode-client.ts",
+							"<repo>/packages/serializer/src/value-decode-extensions.ts"
+						],
+						"raw": 2667,
+						"gzip": 964,
+						"brotli": 878
+					},
+					{
+						"file": "build/chunk-QBxYL6_Y2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 86,
+						"gzip": 101,
+						"brotli": 89
+					},
+					{
+						"file": "build/chunk-rYVCBcgT.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 81,
+						"gzip": 96,
+						"brotli": 71
+					},
+					{
+						"file": "build/chunk-uCfCGB8n2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 80,
+						"gzip": 92,
+						"brotli": 84
+					},
+					{
+						"file": "build/chunk-UDrXBmrH.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 83,
+						"gzip": 95,
+						"brotli": 86
+					},
+					{
+						"file": "build/chunk-v1QlC9Q3.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 95,
+						"gzip": 110,
+						"brotli": 98
+					},
+					{
+						"file": "build/chunk-Vvq1qz5J2.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/resume-sync-computed.ts"
+						],
+						"raw": 683,
+						"gzip": 404,
+						"brotli": 367
+					},
+					{
+						"file": "build/chunk-wFUEAYqU.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 253,
+						"gzip": 181,
+						"brotli": 145
+					},
+					{
+						"file": "build/chunk-wG5EaP_d2.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/resume-runtime.ts"
+						],
+						"raw": 5561,
+						"gzip": 2012,
+						"brotli": 1841
+					},
+					{
+						"file": "build/chunk-XuCD11F8.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 95,
+						"gzip": 107,
+						"brotli": 91
+					},
+					{
+						"file": "build/chunk-XwXw5R2G.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/runtime/src/graph-collections.ts"
+						],
+						"raw": 2273,
+						"gzip": 900,
+						"brotli": 805
+					}
+				]
+			}
+		},
+		{
+			"name": "todomvc",
+			"gates": {
+				"passed": true,
+				"checks": [
+					"bundle graph present",
+					"application and framework buckets non-empty"
+				]
+			},
+			"bodyBytes": 80555,
+			"timing": {
+				"samples": 1,
+				"minMs": 0,
+				"p50Ms": 0,
+				"p95Ms": 0,
+				"p99Ms": 0,
+				"meanMs": 0,
+				"opsPerSec": null
+			},
+			"memory": {
+				"label": "allocator-growth-observation",
+				"renders": 0,
+				"rssGrowthBytes": 0,
+				"heapGrowthBytes": 0,
+				"forcedGc": false
+			},
+			"metrics": {
+				"samples": 1,
+				"bytes": {
+					"total": {
+						"raw": 80555,
+						"gzip": 34746,
+						"brotli": 31152
+					},
+					"application": {
+						"raw": 4373,
+						"gzip": 2042,
+						"brotli": 1796
+					},
+					"framework": {
+						"raw": 76182,
+						"gzip": 32704,
+						"brotli": 29356
+					}
+				},
+				"files": [
+					{
+						"file": "build/chunk-6HmlOJva.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/resume-events.ts"
+						],
+						"raw": 4085,
+						"gzip": 1623,
+						"brotli": 1468
+					},
+					{
+						"file": "build/chunk-A3ix253i2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 75,
+						"gzip": 90,
+						"brotli": 78
+					},
+					{
+						"file": "build/chunk-B0EssJxv.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/resume-async-wiring.ts"
+						],
+						"raw": 2895,
+						"gzip": 1252,
+						"brotli": 1125
+					},
+					{
+						"file": "build/chunk-BapFw3Y0.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/payload-graph-construct.ts"
+						],
+						"raw": 1753,
+						"gzip": 813,
+						"brotli": 749
+					},
+					{
+						"file": "build/chunk-BBlHfDbS2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 79,
+						"gzip": 94,
+						"brotli": 83
+					},
+					{
+						"file": "build/chunk-BE8C1kYk2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 115,
+						"gzip": 129,
+						"brotli": 96
+					},
+					{
+						"file": "build/chunk-BF-nL0Xh.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 236,
+						"gzip": 171,
+						"brotli": 150
+					},
+					{
+						"file": "build/chunk-BfrNDBaZ2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 80,
+						"gzip": 92,
+						"brotli": 84
+					},
+					{
+						"file": "build/chunk-BgqYk6TO2.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/resume.ts"
+						],
+						"raw": 1945,
+						"gzip": 936,
+						"brotli": 844
+					},
+					{
+						"file": "build/chunk-BIMjStmk.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/repeat-runtime.ts",
+							"<repo>/packages/web/src/resume-keyed-repeats.ts"
+						],
+						"raw": 3326,
+						"gzip": 1330,
+						"brotli": 1168
+					},
+					{
+						"file": "build/chunk-BKTqLI03.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/runtime/src/graph.ts",
+							"<repo>/packages/runtime/src/index.ts"
+						],
+						"raw": 2640,
+						"gzip": 1130,
+						"brotli": 1040
+					},
+					{
+						"file": "build/chunk-BMfgdug7.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 86,
+						"gzip": 98,
+						"brotli": 85
+					},
+					{
+						"file": "build/chunk-BmjgIIMc2.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/resume-sync-demand.ts"
+						],
+						"raw": 781,
+						"gzip": 448,
+						"brotli": 392
+					},
+					{
+						"file": "build/chunk-BOglAY9o.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/runtime/src/graph-scheduler.ts"
+						],
+						"raw": 285,
+						"gzip": 206,
+						"brotli": 185
+					},
+					{
+						"file": "build/chunk-BqQBn5cK2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 91,
+						"gzip": 106,
+						"brotli": 93
+					},
+					{
+						"file": "build/chunk-BSmfu8WF.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/runtime/src/graph-async.ts"
+						],
+						"raw": 1529,
+						"gzip": 693,
+						"brotli": 637
+					},
+					{
+						"file": "build/chunk-Btma_K7Q.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/runtime/src/graph-core.ts"
+						],
+						"raw": 1143,
+						"gzip": 555,
+						"brotli": 506
+					},
+					{
+						"file": "build/chunk-BX-f7Rso.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/dom-journal.ts"
+						],
+						"raw": 2039,
+						"gzip": 807,
+						"brotli": 716
+					},
+					{
+						"file": "build/chunk-BxBETWbe.js",
+						"bucket": "framework",
+						"modules": [
+							"\u0000rolldown/runtime.js"
+						],
+						"raw": 50,
+						"gzip": 67,
+						"brotli": 54
+					},
+					{
+						"file": "build/chunk-BZ4Dde9A.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 82,
+						"gzip": 97,
+						"brotli": 73
+					},
+					{
+						"file": "build/chunk-BZnZMXxz2.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/resume-runtime-shared.ts"
+						],
+						"raw": 1210,
+						"gzip": 592,
+						"brotli": 529
+					},
+					{
+						"file": "build/chunk-C_LSHtDt.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/runtime/src/graph-computed.ts"
+						],
+						"raw": 1111,
+						"gzip": 448,
+						"brotli": 404
+					},
+					{
+						"file": "build/chunk-C1KGX53n.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 95,
+						"gzip": 107,
+						"brotli": 91
+					},
+					{
+						"file": "build/chunk-C427Qkux.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 95,
+						"gzip": 110,
+						"brotli": 99
+					},
+					{
+						"file": "build/chunk-C7-4UU-l2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 80,
+						"gzip": 92,
+						"brotli": 84
+					},
+					{
+						"file": "build/chunk-C9B030Dv.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/resume-branches.ts"
+						],
+						"raw": 6483,
+						"gzip": 2462,
+						"brotli": 2260
+					},
+					{
+						"file": "build/chunk-CadWg0gK.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 190,
+						"gzip": 156,
+						"brotli": 128
+					},
+					{
+						"file": "build/chunk-CC0xAYb3.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 130,
+						"gzip": 127,
+						"brotli": 107
+					},
+					{
+						"file": "build/chunk-CeNTnHBJ.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/resume-handoff.ts"
+						],
+						"raw": 711,
+						"gzip": 423,
+						"brotli": 367
+					},
+					{
+						"file": "build/chunk-CIlsefk8.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/resume-locators.ts"
+						],
+						"raw": 1243,
+						"gzip": 587,
+						"brotli": 529
+					},
+					{
+						"file": "build/chunk-CJ4gUUJL2.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/resume-runtime.ts"
+						],
+						"raw": 5561,
+						"gzip": 2009,
+						"brotli": 1834
+					},
+					{
+						"file": "build/chunk-Cn__H1ZT.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 81,
+						"gzip": 93,
+						"brotli": 83
+					},
+					{
+						"file": "build/chunk-Cql5Apln.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 83,
+						"gzip": 95,
+						"brotli": 84
+					},
+					{
+						"file": "build/chunk-CWCk73G6.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/resume-behaviors.ts"
+						],
+						"raw": 4008,
+						"gzip": 1622,
+						"brotli": 1508
+					},
+					{
+						"file": "build/chunk-D1a6cAp2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 78,
+						"gzip": 93,
+						"brotli": 82
+					},
+					{
+						"file": "build/chunk-D3WDOqqg.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/runtime/src/graph-shared.ts"
+						],
+						"raw": 1606,
+						"gzip": 744,
+						"brotli": 688
+					},
+					{
+						"file": "build/chunk-DAElR1iL2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 80,
+						"gzip": 95,
+						"brotli": 84
+					},
+					{
+						"file": "build/chunk-DdfVP7_N2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 81,
+						"gzip": 93,
+						"brotli": 85
+					},
+					{
+						"file": "build/chunk-DDY4yiht.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 85,
+						"gzip": 97,
+						"brotli": 82
+					},
+					{
+						"file": "build/chunk-DQRbAkBs2.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/resume-shared-patch.ts"
+						],
+						"raw": 673,
+						"gzip": 330,
+						"brotli": 283
+					},
+					{
+						"file": "build/chunk-DsnlnPqW.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/inline/resume-errors.ts"
+						],
+						"raw": 756,
+						"gzip": 386,
+						"brotli": 325
+					},
+					{
+						"file": "build/chunk-Dt1MUOev2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 86,
+						"gzip": 101,
+						"brotli": 89
+					},
+					{
+						"file": "build/chunk-DTCmme8k.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 72,
+						"gzip": 87,
+						"brotli": 70
+					},
+					{
+						"file": "build/chunk-DulkSE0f2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 77,
+						"gzip": 92,
+						"brotli": 81
+					},
+					{
+						"file": "build/chunk-DV10xSkF.js",
+						"bucket": "framework",
+						"modules": [
+							"\u0000virtual:markless:symbol:<repo>%2Fdemos%2Foctane-bench%2Flanes%2Fbundle-size%2Ftodomvc%2Fapp.tsrx:symbol%3A0",
+							"\u0000virtual:markless:symbol:<repo>%2Fdemos%2Foctane-bench%2Flanes%2Fbundle-size%2Ftodomvc%2Fapp.tsrx:symbol%3A1",
+							"\u0000virtual:markless:symbol:<repo>%2Fdemos%2Foctane-bench%2Flanes%2Fbundle-size%2Ftodomvc%2Fapp.tsrx:symbol%3A2",
+							"\u0000vite/preload-helper.js",
+							"<repo>/packages/web/src/fns/direct.ts",
+							"<repo>/packages/web/src/inline/sync-policy-core.ts",
+							"<repo>/packages/web/src/pending-timing.ts",
+							"<repo>/packages/web/src/render-csr.ts",
+							"<repo>/packages/web/src/render.ts",
+							"<repo>/packages/web/src/resume-anchor-census.ts",
+							"<repo>/packages/web/src/resume-arm-records.ts",
+							"<repo>/packages/web/src/resume-commit-arm.ts",
+							"<repo>/packages/web/src/resume-resettle-hold.ts",
+							"<repo>/packages/web/src/runtime-error-reporting.ts"
+						],
+						"raw": 18185,
+						"gzip": 6606,
+						"brotli": 5913
+					},
+					{
+						"file": "build/chunk-DYxFy_6H.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/serializer/src/value-decode-client.ts",
+							"<repo>/packages/serializer/src/value-decode-extensions.ts"
+						],
+						"raw": 2667,
+						"gzip": 964,
+						"brotli": 881
+					},
+					{
+						"file": "build/chunk-I3xVOL722.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 171,
+						"gzip": 149,
+						"brotli": 127
+					},
+					{
+						"file": "build/chunk-lDS2Tqi8.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 81,
+						"gzip": 96,
+						"brotli": 71
+					},
+					{
+						"file": "build/chunk-pyU_00jj.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 77,
+						"gzip": 92,
+						"brotli": 71
+					},
+					{
+						"file": "build/chunk-rC_DMi8k2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 108,
+						"gzip": 110,
+						"brotli": 99
+					},
+					{
+						"file": "build/chunk-Vvq1qz5J2.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/resume-sync-computed.ts"
+						],
+						"raw": 683,
+						"gzip": 404,
+						"brotli": 367
+					},
+					{
+						"file": "build/chunk-wFUEAYqU.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 253,
+						"gzip": 181,
+						"brotli": 145
+					},
+					{
+						"file": "build/chunk-XwXw5R2G.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/runtime/src/graph-collections.ts"
+						],
+						"raw": 2273,
+						"gzip": 900,
+						"brotli": 805
+					},
+					{
+						"file": "build/chunk-yFezeS3l.js",
+						"bucket": "application",
+						"modules": [
+							"<repo>/demos/octane-bench/lanes/bundle-size/todomvc/app.tsrx",
+							"<repo>/demos/octane-bench/lanes/bundle-size/todomvc/index.html",
+							"<repo>/demos/octane-bench/lanes/bundle-size/todomvc/main.ts"
+						],
+						"raw": 4041,
+						"gzip": 1810,
+						"brotli": 1599
+					},
+					{
+						"file": "build/chunk-ZhQXBNSF2.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/resume-runtime-start.ts"
+						],
+						"raw": 3694,
+						"gzip": 1424,
+						"brotli": 1275
+					},
+					{
+						"file": "build/chunk-zmhihAbM2.js",
+						"bucket": "application",
+						"modules": [
+							"<repo>/demos/octane-bench/lanes/bundle-size/todomvc/data.ts"
+						],
+						"raw": 332,
+						"gzip": 232,
+						"brotli": 197
+					}
+				]
+			}
+		},
+		{
+			"name": "chat-stream",
+			"gates": {
+				"passed": true,
+				"checks": [
+					"bundle graph present",
+					"application and framework buckets non-empty"
+				]
+			},
+			"bodyBytes": 80178,
+			"timing": {
+				"samples": 1,
+				"minMs": 0,
+				"p50Ms": 0,
+				"p95Ms": 0,
+				"p99Ms": 0,
+				"meanMs": 0,
+				"opsPerSec": null
+			},
+			"memory": {
+				"label": "allocator-growth-observation",
+				"renders": 0,
+				"rssGrowthBytes": 0,
+				"heapGrowthBytes": 0,
+				"forcedGc": false
+			},
+			"metrics": {
+				"samples": 1,
+				"bytes": {
+					"total": {
+						"raw": 80178,
+						"gzip": 34621,
+						"brotli": 31089
+					},
+					"application": {
+						"raw": 4212,
+						"gzip": 2029,
+						"brotli": 1775
+					},
+					"framework": {
+						"raw": 75966,
+						"gzip": 32592,
+						"brotli": 29314
+					}
+				},
+				"files": [
+					{
+						"file": "build/chunk-5VSMbITf2.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/resume-runtime-start.ts"
+						],
+						"raw": 3694,
+						"gzip": 1422,
+						"brotli": 1269
+					},
+					{
+						"file": "build/chunk-B6e0DkEe2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 171,
+						"gzip": 152,
+						"brotli": 121
+					},
+					{
+						"file": "build/chunk-BaRAsEVh2.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/resume-shared-patch.ts"
+						],
+						"raw": 673,
+						"gzip": 330,
+						"brotli": 282
+					},
+					{
+						"file": "build/chunk-BC-Bdor-2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 80,
+						"gzip": 92,
+						"brotli": 84
+					},
+					{
+						"file": "build/chunk-BHnqbHiS2.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/resume.ts"
+						],
+						"raw": 1945,
+						"gzip": 937,
+						"brotli": 844
+					},
+					{
+						"file": "build/chunk-BjVIJ70D.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/payload-graph-construct.ts"
+						],
+						"raw": 1753,
+						"gzip": 815,
+						"brotli": 753
+					},
+					{
+						"file": "build/chunk-BKTqLI03.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/runtime/src/graph.ts",
+							"<repo>/packages/runtime/src/index.ts"
+						],
+						"raw": 2640,
+						"gzip": 1130,
+						"brotli": 1040
+					},
+					{
+						"file": "build/chunk-BMfgdug7.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 86,
+						"gzip": 98,
+						"brotli": 85
+					},
+					{
+						"file": "build/chunk-BMtvkuIh.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/resume-branches.ts"
+						],
+						"raw": 6483,
+						"gzip": 2458,
+						"brotli": 2256
+					},
+					{
+						"file": "build/chunk-BnlLGw3O.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/serializer/src/value-decode-client.ts",
+							"<repo>/packages/serializer/src/value-decode-extensions.ts"
+						],
+						"raw": 2667,
+						"gzip": 965,
+						"brotli": 877
+					},
+					{
+						"file": "build/chunk-BOglAY9o.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/runtime/src/graph-scheduler.ts"
+						],
+						"raw": 285,
+						"gzip": 206,
+						"brotli": 185
+					},
+					{
+						"file": "build/chunk-BPW9eZmd2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 79,
+						"gzip": 94,
+						"brotli": 83
+					},
+					{
+						"file": "build/chunk-BSmfu8WF.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/runtime/src/graph-async.ts"
+						],
+						"raw": 1529,
+						"gzip": 693,
+						"brotli": 637
+					},
+					{
+						"file": "build/chunk-Btma_K7Q.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/runtime/src/graph-core.ts"
+						],
+						"raw": 1143,
+						"gzip": 555,
+						"brotli": 506
+					},
+					{
+						"file": "build/chunk-BtUNrRZL2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 86,
+						"gzip": 101,
+						"brotli": 90
+					},
+					{
+						"file": "build/chunk-BwSHfKTa2.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/resume-sync-demand.ts"
+						],
+						"raw": 781,
+						"gzip": 449,
+						"brotli": 399
+					},
+					{
+						"file": "build/chunk-BX-f7Rso.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/dom-journal.ts"
+						],
+						"raw": 2039,
+						"gzip": 807,
+						"brotli": 716
+					},
+					{
+						"file": "build/chunk-BxBETWbe.js",
+						"bucket": "framework",
+						"modules": [
+							"\u0000rolldown/runtime.js"
+						],
+						"raw": 50,
+						"gzip": 67,
+						"brotli": 54
+					},
+					{
+						"file": "build/chunk-BxX81trp.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 95,
+						"gzip": 107,
+						"brotli": 91
+					},
+					{
+						"file": "build/chunk-BZ4Dde9A.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 82,
+						"gzip": 97,
+						"brotli": 73
+					},
+					{
+						"file": "build/chunk-C_fZTjQq.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 72,
+						"gzip": 87,
+						"brotli": 70
+					},
+					{
+						"file": "build/chunk-C_LSHtDt.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/runtime/src/graph-computed.ts"
+						],
+						"raw": 1111,
+						"gzip": 448,
+						"brotli": 404
+					},
+					{
+						"file": "build/chunk-C3IAdbY3.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 83,
+						"gzip": 95,
+						"brotli": 87
+					},
+					{
+						"file": "build/chunk-C7Buxb3D.js",
+						"bucket": "application",
+						"modules": [
+							"<repo>/demos/octane-bench/lanes/bundle-size/chat-stream/app.tsrx",
+							"<repo>/demos/octane-bench/lanes/bundle-size/chat-stream/index.html",
+							"<repo>/demos/octane-bench/lanes/bundle-size/chat-stream/main.ts"
+						],
+						"raw": 3892,
+						"gzip": 1798,
+						"brotli": 1581
+					},
+					{
+						"file": "build/chunk-CC0xAYb3.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 130,
+						"gzip": 127,
+						"brotli": 107
+					},
+					{
+						"file": "build/chunk-CeNTnHBJ.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/resume-handoff.ts"
+						],
+						"raw": 711,
+						"gzip": 423,
+						"brotli": 367
+					},
+					{
+						"file": "build/chunk-CHGPSeXq.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/resume-events.ts"
+						],
+						"raw": 4085,
+						"gzip": 1612,
+						"brotli": 1468
+					},
+					{
+						"file": "build/chunk-CIlsefk8.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/resume-locators.ts"
+						],
+						"raw": 1243,
+						"gzip": 587,
+						"brotli": 529
+					},
+					{
+						"file": "build/chunk-Ciw1l1iq2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 75,
+						"gzip": 90,
+						"brotli": 79
+					},
+					{
+						"file": "build/chunk-CKwdCqYK.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 95,
+						"gzip": 110,
+						"brotli": 99
+					},
+					{
+						"file": "build/chunk-COCzChCT.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 190,
+						"gzip": 157,
+						"brotli": 127
+					},
+					{
+						"file": "build/chunk-Cp0LrsP92.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 115,
+						"gzip": 129,
+						"brotli": 116
+					},
+					{
+						"file": "build/chunk-CsPC9-N-.js",
+						"bucket": "framework",
+						"modules": [
+							"\u0000virtual:markless:symbol:<repo>%2Fdemos%2Foctane-bench%2Flanes%2Fbundle-size%2Fchat-stream%2Fapp.tsrx:symbol%3A0",
+							"\u0000virtual:markless:symbol:<repo>%2Fdemos%2Foctane-bench%2Flanes%2Fbundle-size%2Fchat-stream%2Fapp.tsrx:symbol%3A1",
+							"\u0000vite/preload-helper.js",
+							"<repo>/packages/web/src/fns/direct.ts",
+							"<repo>/packages/web/src/inline/sync-policy-core.ts",
+							"<repo>/packages/web/src/pending-timing.ts",
+							"<repo>/packages/web/src/render-csr.ts",
+							"<repo>/packages/web/src/render.ts",
+							"<repo>/packages/web/src/resume-anchor-census.ts",
+							"<repo>/packages/web/src/resume-arm-records.ts",
+							"<repo>/packages/web/src/resume-commit-arm.ts",
+							"<repo>/packages/web/src/resume-resettle-hold.ts",
+							"<repo>/packages/web/src/runtime-error-reporting.ts"
+						],
+						"raw": 18049,
+						"gzip": 6581,
+						"brotli": 5905
+					},
+					{
+						"file": "build/chunk-CUeNO-tv.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 236,
+						"gzip": 174,
+						"brotli": 154
+					},
+					{
+						"file": "build/chunk-CWCk73G6.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/resume-behaviors.ts"
+						],
+						"raw": 4008,
+						"gzip": 1622,
+						"brotli": 1508
+					},
+					{
+						"file": "build/chunk-D1a6cAp2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 78,
+						"gzip": 93,
+						"brotli": 82
+					},
+					{
+						"file": "build/chunk-D3WDOqqg.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/runtime/src/graph-shared.ts"
+						],
+						"raw": 1606,
+						"gzip": 744,
+						"brotli": 688
+					},
+					{
+						"file": "build/chunk-DngGN_1m2.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/resume-runtime.ts"
+						],
+						"raw": 5561,
+						"gzip": 2011,
+						"brotli": 1839
+					},
+					{
+						"file": "build/chunk-DRRJR16t.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 77,
+						"gzip": 92,
+						"brotli": 77
+					},
+					{
+						"file": "build/chunk-DsnlnPqW.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/inline/resume-errors.ts"
+						],
+						"raw": 756,
+						"gzip": 386,
+						"brotli": 325
+					},
+					{
+						"file": "build/chunk-DulkSE0f2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 77,
+						"gzip": 92,
+						"brotli": 81
+					},
+					{
+						"file": "build/chunk-DVN1cTv82.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 108,
+						"gzip": 110,
+						"brotli": 91
+					},
+					{
+						"file": "build/chunk-DvSmMSzt2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 80,
+						"gzip": 95,
+						"brotli": 84
+					},
+					{
+						"file": "build/chunk-DztrvMAh2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 91,
+						"gzip": 106,
+						"brotli": 95
+					},
+					{
+						"file": "build/chunk-Eic8G4fn.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/resume-async-wiring.ts"
+						],
+						"raw": 2895,
+						"gzip": 1263,
+						"brotli": 1138
+					},
+					{
+						"file": "build/chunk-el_2emGN.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 81,
+						"gzip": 93,
+						"brotli": 85
+					},
+					{
+						"file": "build/chunk-fOTFbFuY2.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/resume-runtime-shared.ts"
+						],
+						"raw": 1210,
+						"gzip": 592,
+						"brotli": 536
+					},
+					{
+						"file": "build/chunk-jDtykfON2.js",
+						"bucket": "application",
+						"modules": [
+							"<repo>/demos/octane-bench/lanes/bundle-size/chat-stream/data.ts"
+						],
+						"raw": 320,
+						"gzip": 231,
+						"brotli": 194
+					},
+					{
+						"file": "build/chunk-JPJaCcUa.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 85,
+						"gzip": 97,
+						"brotli": 89
+					},
+					{
+						"file": "build/chunk-RkPAIswo2.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 81,
+						"gzip": 93,
+						"brotli": 85
+					},
+					{
+						"file": "build/chunk-T5Xqc0-C.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/repeat-runtime.ts",
+							"<repo>/packages/web/src/resume-keyed-repeats.ts"
+						],
+						"raw": 3326,
+						"gzip": 1327,
+						"brotli": 1166
+					},
+					{
+						"file": "build/chunk-Vvq1qz5J2.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/web/src/resume-sync-computed.ts"
+						],
+						"raw": 683,
+						"gzip": 404,
+						"brotli": 367
+					},
+					{
+						"file": "build/chunk-wFUEAYqU.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 253,
+						"gzip": 181,
+						"brotli": 145
+					},
+					{
+						"file": "build/chunk-Xr5faoIR.js",
+						"bucket": "framework",
+						"modules": [],
+						"raw": 81,
+						"gzip": 96,
+						"brotli": 71
+					},
+					{
+						"file": "build/chunk-XwXw5R2G.js",
+						"bucket": "framework",
+						"modules": [
+							"<repo>/packages/runtime/src/graph-collections.ts"
+						],
+						"raw": 2273,
+						"gzip": 900,
+						"brotli": 805
+					}
+				]
+			}
+		}
+	]
+}
