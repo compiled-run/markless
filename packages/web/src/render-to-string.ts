@@ -191,7 +191,13 @@ function renderHeadInjection(injection: RenderHeadInjection, nonce: string | und
 	const suffix = renderedAttributes ? ` ${renderedAttributes}` : '';
 	return injection.tag === 'link'
 		? `<${injection.tag}${suffix}>`
-		: `<${injection.tag}${suffix}>${escapeInlineScript(injection.children ?? '')}</${injection.tag}>`;
+		: `<${injection.tag}${suffix}>${escapeInlineHeadContent(injection.children ?? '', injection.tag)}</${injection.tag}>`;
+}
+
+function escapeInlineHeadContent(value: string, tag: string): string {
+	return tag.toLowerCase() === 'style'
+		? value.replace(/<\/style/gi, '<\\/style')
+		: escapeInlineScript(value);
 }
 
 function renderModulePreloadLinks(

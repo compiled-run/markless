@@ -1,4 +1,5 @@
 import { box } from '@async/witness';
+import { MARKLESS_SCOPED_STYLE_ATTRIBUTE } from '@markless/bundler/preload';
 
 const FIXTURE = 'fixtures/router-app';
 const NITRO_BUILD_DIR = 'node_modules/.nitro-router-app-preview';
@@ -33,8 +34,19 @@ export default box(
 
 		try {
 			const html = await preview.request('/');
-			await expect.html.contains(html, 'rel="stylesheet"');
-			if (html.includes('<script type="module"')) {
+			const headEnd = html.indexOf('</head>');
+			const head = headEnd === -1 ? '' : html.slice(0, headEnd);
+			const hasBuiltStylesheet = /<link rel=["']stylesheet["'] href=["'][^"']+\.css/.test(
+				head,
+			);
+			const hasScopedFallback = new RegExp(
+				`<style\\b[^>]*\\b${MARKLESS_SCOPED_STYLE_ATTRIBUTE}=(?:""|'')[^>]*>[\\s\\S]*?button\\.mk-[a-z0-9]+\\s*\\{[^}]*background\\s*:\\s*red`,
+				'i',
+			).test(head);
+			if (!hasBuiltStylesheet && !hasScopedFallback) {
+				throw new Error('Router preview did not deliver built or fallback scoped CSS.');
+			}
+			if (/<script\b[^>]*\btype\s*=\s*["']module["']/i.test(html)) {
 				throw new Error(
 					'Router preview must deliver scoped CSS without eager page JavaScript.',
 				);
@@ -55,6 +67,8 @@ export default box(
 				{ 'background-color': 'rgb(239, 239, 239)' },
 				WAIT,
 			);
+			await page.click(COUNTER, WAIT);
+			await expect.page.text(page, COUNTER, 'Count 1', WAIT);
 			await expect.page.outcome(page, { consoleErrors: 0, failedRequests: 0 }, WAIT);
 			await receipt.capture('built router delivered scoped TSRX CSS at first paint');
 		} finally {

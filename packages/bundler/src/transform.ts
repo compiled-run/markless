@@ -156,7 +156,21 @@ export async function transformTsrxModule(
 		)),
 	];
 
-	const styleImport = styleId ? `import ${JSON.stringify(styleId)};\n` : '';
+	// Production server adapters import processed CSS text for a no-JS first-paint
+	// fallback. The browser build keeps the normal side-effect CSS import so the
+	// CSS pipeline still owns CSR extraction and route-level deduplication.
+	const styleCssTextImport =
+		styleId && input.environment === 'server' && input.styleModuleCssTextImport
+			? input.styleModuleCssTextImport(styleId)
+			: undefined;
+	const styleCssTextReference = styleCssTextImport
+		? uniqueGeneratedIdentifier(input.source, 'marklessScopedStyleCss')
+		: undefined;
+	const styleImport = styleId
+		? styleCssTextImport && styleCssTextReference
+			? `import ${styleCssTextReference} from ${JSON.stringify(styleCssTextImport)};\n`
+			: `import ${JSON.stringify(styleId)};\n`
+		: '';
 	const headInjections = [
 		...(input.headInjections ?? []),
 		...(styleId && input.styleModuleUrl
@@ -181,6 +195,7 @@ export async function transformTsrxModule(
 					clientOutput: input.clientOutput ?? 'full',
 					executionLog: input.executionLog,
 					headInjections: headInjections.length > 0 ? headInjections : undefined,
+					scopedStyleCssTextReference: styleCssTextReference,
 					devResumeReexport: input.devResumeReexport === true,
 					needsFullResume: needsFullResume(
 						compiled.protocolView,
@@ -229,4 +244,11 @@ function recordKindReplaced(runtimeDemandMap: RuntimeDemandMapArtifact, kind: st
 	return runtimeDemandMap.recordKinds.some(
 		(record) => record.kind === kind && record.replaced === true,
 	);
+}
+
+function uniqueGeneratedIdentifier(source: string, base: string): string {
+	let identifier = base;
+	let suffix = 0;
+	while (source.includes(identifier)) identifier = `${base}_${++suffix}`;
+	return identifier;
 }

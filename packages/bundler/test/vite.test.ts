@@ -1,5 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
 import { transformTsrxModule } from '../src/rolldown.ts';
+import { MARKLESS_SCOPED_STYLE_ATTRIBUTE } from '../src/preload.ts';
 import { markless } from '../src/vite/index.ts';
 import {
 	callBuildApp,
@@ -292,6 +293,7 @@ describe('Vite adapter structure', () => {
 		expect(result.code).toMatch(
 			/"href": "\/dev\/@id\/__x00__virtual:markless:style:.*\.css\?direct"/,
 		);
+		expect(result.code).not.toContain(MARKLESS_SCOPED_STYLE_ATTRIBUTE);
 
 		const styleId = `\0virtual:markless:style:${encodeURIComponent('/workspace/app/src/App.tsrx')}.css`;
 		const resolvedStyle = await callResolveId(plugin, `${styleId}?direct`);
@@ -308,6 +310,35 @@ describe('Vite adapter structure', () => {
 		expect(result.code).toContain(
 			'resumeModuleUrl: "/dev/@fs/workspace/app/src/App.tsrx?import"',
 		);
+	});
+
+	test('imports pipeline-processed scoped CSS into production SSR artifacts', async () => {
+		const plugin = getAsyncPlugin();
+		const filename = '/workspace/app/src/App.tsrx';
+
+		callConfigResolved(plugin, {
+			base: '/build/',
+			command: 'build',
+			root: '/workspace/app',
+		});
+		const result = (await callTransform(
+			plugin,
+			styledSource,
+			filename,
+			createViteHookContext('server'),
+		)) as { code: string };
+
+		expect(result.code).toContain(
+			`from "virtual:markless:style:${encodeURIComponent(filename)}.css?inline"`,
+		);
+		expect(result.code).toContain(MARKLESS_SCOPED_STYLE_ATTRIBUTE);
+		expect(result.code).toContain('children: marklessScopedStyleCss');
+		expect(result.code).not.toContain('?direct');
+
+		const styleId = `\0virtual:markless:style:${encodeURIComponent(filename)}.css`;
+		expect(await callResolveId(plugin, `${styleId}?inline`)).toMatchObject({
+			id: `${styleId}?inline`,
+		});
 	});
 
 	test('resolves and loads virtual module ids carrying the ?import suffix Vite adds to .tsrx-shaped imports', async () => {

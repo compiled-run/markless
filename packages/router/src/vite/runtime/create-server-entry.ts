@@ -1,5 +1,6 @@
 import type { PageProps } from '../../index.ts';
 import { buildRouteManifestFromFileIds, matchRouteManifest } from '../../route-manifest.ts';
+import { MARKLESS_SCOPED_STYLE_ATTRIBUTE } from '@markless/bundler/preload';
 import {
 	renderToString,
 	type ModulePreloadInput,
@@ -219,8 +220,14 @@ function routedPageArtifact(
 	navigationEntryPath: string | undefined,
 	stylesheetHrefs: readonly string[] | undefined,
 ) {
+	// Built route CSS includes transitive component styles and wins when the
+	// client build supplied it. The marked, pipeline-processed page fallback is
+	// retained only when that cross-environment map is unavailable.
+	const hasBuiltStylesheets = (stylesheetHrefs?.length ?? 0) > 0;
 	const headInjections = [
-		...(baseArtifact?.headInjections ?? []),
+		...(baseArtifact?.headInjections ?? []).filter(
+			(injection) => !hasBuiltStylesheets || !isScopedStyleFallback(injection),
+		),
 		...(stylesheetHrefs ?? []).map(
 			(href): RenderHeadInjection => ({
 				tag: 'link',
@@ -254,6 +261,13 @@ function routedPageArtifact(
 				: output;
 		},
 	};
+}
+
+function isScopedStyleFallback(injection: RenderHeadInjection): boolean {
+	return (
+		injection.tag === 'style' &&
+		injection.attributes?.[MARKLESS_SCOPED_STYLE_ATTRIBUTE] !== undefined
+	);
 }
 
 // Symbol modules and props+state computeds re-running on a resumed page read

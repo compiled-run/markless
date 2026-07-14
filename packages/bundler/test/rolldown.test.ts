@@ -889,6 +889,52 @@ test('transformTsrxModule emits a scoped style virtual CSS module and imports it
 	expect(result.code).toContain(`import ${JSON.stringify(styleModule!.id)};`);
 });
 
+test('transformTsrxModule embeds scoped CSS in the production server artifact', async () => {
+	const cssTextImport = (virtualModuleId: string) => `${virtualModuleId}?inline`;
+	const result = await transformTsrxModule({
+		filename: 'src/StyledCard.tsrx',
+		source: styledSource,
+		buildId: 'test-build',
+		environment: 'server',
+		styleModuleCssTextImport: cssTextImport,
+	});
+	const styleModule = result.virtualModules.find((module) => module.type === 'style');
+
+	expect(styleModule).toBeDefined();
+	expect(result.code).toContain(`from ${JSON.stringify(cssTextImport(styleModule!.id))}`);
+	expect(result.code).toContain('headInjections:');
+	expect(result.code).toContain('"data-markless-scoped-style": ""');
+	expect(result.code).toContain('children: marklessScopedStyleCss');
+	expect(result.code).not.toContain(JSON.stringify(styleModule!.source));
+
+	const client = await transformTsrxModule({
+		filename: 'src/StyledCard.tsrx',
+		source: styledSource,
+		buildId: 'test-build',
+		environment: 'client',
+		styleModuleCssTextImport: cssTextImport,
+	});
+	expect(client.code).toContain(`import ${JSON.stringify(styleModule!.id)};`);
+	expect(client.code).not.toContain('?inline');
+	expect(client.code).not.toContain('data-markless-scoped-style');
+});
+
+test('transformTsrxModule avoids authored bindings for the server CSS import', async () => {
+	const result = await transformTsrxModule({
+		filename: 'src/StyledCard.tsrx',
+		source: styledSource.replace(
+			"import { state } from '@markless/core';",
+			"import { state } from '@markless/core';\nconst marklessScopedStyleCss = 'author';",
+		),
+		environment: 'server',
+		styleModuleCssTextImport: (virtualModuleId) => `${virtualModuleId}?inline`,
+	});
+
+	expect(result.code).toContain('import marklessScopedStyleCss_1 from');
+	expect(result.code).toContain('const marklessScopedStyleCss = "author"');
+	expect(result.code).toContain('children: marklessScopedStyleCss_1');
+});
+
 test('transformTsrxModule escalates full-only records but keeps qualifying rows lean', async () => {
 	const plain = await transformTsrxModule({
 		filename: '/workspace/app/src/Plain.tsrx',

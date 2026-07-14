@@ -1510,6 +1510,22 @@ test('renderToString emits compiled artifact head injections before the containe
 	expect(html.indexOf('/@vite/client')).toBeLessThan(html.indexOf('<div'));
 });
 
+test('renderToString escapes closing style tags in compiled head injections', async () => {
+	const html = await renderToString({
+		headInjections: [
+			{
+				tag: 'style',
+				location: 'head',
+				children: '.card { --closing-tag: "</style>"; }',
+			},
+		],
+		renderSsr: () => ({ html: '<main class="card">Card</main>' }),
+	});
+
+	expect(html).toContain('<style>.card { --closing-tag: "<\\/style>"; }</style>');
+	expect(html).not.toContain('--closing-tag: "</style>"');
+});
+
 test('renderToString uses the compiled artifact resume module URL by default', async () => {
 	const resumeModuleUrl = createResumeModuleUrl('artifact-default');
 	const html = await renderToString({

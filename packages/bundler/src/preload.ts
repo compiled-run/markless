@@ -14,4 +14,4 @@ export {
 	type LazySymbolPreloadView,
 	type PreloadLazySymbolModulesInput,
 } from './build/module-preload-dom.ts';
-export type { MarklessBundleGraph } from './types.ts';
+export { MARKLESS_SCOPED_STYLE_ATTRIBUTE, type MarklessBundleGraph } from './types.ts';

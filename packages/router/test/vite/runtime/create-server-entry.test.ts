@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vite-plus/test';
+import { MARKLESS_SCOPED_STYLE_ATTRIBUTE } from '@markless/bundler/preload';
 import { marklessSsrAttachSnapshots, marklessSsrRunAsyncComputed } from '@markless/web/fns/ssr';
 import { createServerEntry } from '../../../src/vite/runtime/create-server-entry.ts';
 
@@ -39,6 +40,12 @@ describe('server entry rendering', () => {
 					default: page('<main class="mk-page">Home</main>', {
 						headInjections: [
 							{
+								tag: 'style',
+								location: 'head',
+								attributes: { [MARKLESS_SCOPED_STYLE_ATTRIBUTE]: '' },
+								children: '.mk-page { color: red; }',
+							},
+							{
 								tag: 'link',
 								location: 'head',
 								attributes: {
@@ -65,7 +72,38 @@ describe('server entry rendering', () => {
 			'<link rel="stylesheet" href="/@id/virtual:markless:style:page.css?direct">',
 		);
 		expect(head).toContain('<link rel="stylesheet" href="/assets/page.css">');
+		expect(head).not.toContain(MARKLESS_SCOPED_STYLE_ATTRIBUTE);
+		expect(head).not.toContain('.mk-page { color: red; }');
 		expect(body).not.toContain('rel="stylesheet"');
+	});
+
+	it('keeps compiled scoped CSS when the built route stylesheet map is unavailable', async () => {
+		const entry = createServerEntry({
+			documentModuleLoader: undefined,
+			pageModuleLoaders: {
+				'pages/index.tsrx': async () => ({
+					default: page('<main class="mk-page">Home</main>', {
+						headInjections: [
+							{
+								tag: 'style',
+								location: 'head',
+								attributes: { [MARKLESS_SCOPED_STYLE_ATTRIBUTE]: '' },
+								children: '.mk-page { color: red; }',
+							},
+						],
+					}),
+				}),
+			},
+			routeFileIds: ['/pages/index.tsrx'],
+		});
+
+		const response = await entry.fetch(new Request('http://markless-router.test/'));
+		const html = await response.text();
+		const head = html.slice(0, html.indexOf('</head>'));
+
+		expect(head).toContain(
+			`<style ${MARKLESS_SCOPED_STYLE_ATTRIBUTE}="">.mk-page { color: red; }</style>`,
+		);
 	});
 
 	it('emits resumability payloads without waking a client entry on page load', async () => {

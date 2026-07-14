@@ -51,6 +51,7 @@ type MarklessOutputOptions = OutputOptions | OutputOptions[] | undefined;
 type InternalMarklessRolldownOptions = MarklessRolldownOptions & {
 	emitResumeModules?: boolean;
 	publicPath?: (fileName: string) => string;
+	styleModuleCssTextImport?: (virtualModuleId: string) => string;
 };
 type RolldownInputConfig = string | readonly string[] | Record<string, string> | undefined;
 const MARKLESS_SKIP_DUPLICATE_BUILDS = Symbol('markless-skip-duplicate-builds');
@@ -62,6 +63,8 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 	const transformedTsrxSources = new Map<string, string>();
 	const rolldownOptions: InternalMarklessRolldownOptions = { ...options };
 	rolldownOptions.bundleGraphAdders = bundleGraphAdders;
+	// `virtual:` is an opaque module id, not a URL scheme for ufo to normalize.
+	rolldownOptions.styleModuleCssTextImport = (virtualModuleId) => `${virtualModuleId}?inline`;
 	const hmrOptions = {
 		base: '/',
 		clientEnvironment: viteEnvironmentName('client', options),
