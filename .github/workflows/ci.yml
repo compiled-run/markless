@@ -255,8 +255,10 @@ jobs:
                     side="$1"; bench="$2"; repo_root="$3"; results_dir="$4"; traces_dir="$5"
                     rm -rf webdriver-ts/results webdriver-ts/traces
                     MARKLESS_REPO_ROOT="$repo_root" node --input-type=module -e "import { rebuildFrameworks } from './cli/rebuild-build-single.js'; if (!rebuildFrameworks(['keyed/markless'], true)) process.exit(1);"
+                    CHROME_BIN="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium-browser || echo /usr/bin/google-chrome)"
                     MARKLESS_REPO_ROOT="$repo_root" npm run bench -- \
                       --headless \
+                      --chromeBinary "$CHROME_BIN" \
                       --framework keyed/markless \
                       --count "$MARKLESS_JSFB_CI_COUNT" \
                       --benchmark "$bench" \
