@@ -1,6 +1,10 @@
 import type { PageProps } from '../../index.ts';
 import { buildRouteManifestFromFileIds, matchRouteManifest } from '../../route-manifest.ts';
-import { renderToString, type ModulePreloadInput } from '@markless/web/render-to-string';
+import {
+	renderToString,
+	type ModulePreloadInput,
+	type RenderHeadInjection,
+} from '@markless/web/render-to-string';
 import { renderToStream } from '@markless/web/render-to-stream';
 import { __marklessDebugBootstrapSource } from '../../../../web/src/debug-channel.ts';
 
@@ -9,6 +13,7 @@ export interface ServerEntryOptions {
 	readonly resumeEntryPath?: string;
 	readonly routeModulePreloads?: Record<string, readonly ModulePreloadInput[]>;
 	readonly routeSsrModulePreloads?: Record<string, readonly ModulePreloadInput[]>;
+	readonly routeStylesheets?: Record<string, readonly string[]>;
 	readonly documentModuleLoader: (() => Promise<unknown>) | undefined;
 	readonly pageModuleLoaders: Record<string, () => Promise<unknown>>;
 	readonly routeFileIds: readonly string[];
@@ -30,6 +35,7 @@ type SsrRender = (props?: unknown, renderContext?: unknown) => RenderOutput | Pr
 interface SsrArtifact {
 	readonly renderSsr?: SsrRender;
 	readonly resumeModuleUrl?: string;
+	readonly headInjections?: ReadonlyArray<RenderHeadInjection>;
 }
 
 interface PageModule {
@@ -128,6 +134,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 			pageProps,
 			file,
 			options.navigationEntryPath,
+			options.routeStylesheets?.[file],
 		);
 		const renderOptions = {
 			props: pageProps,
@@ -146,7 +153,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 
 		// Blocking opt-out: the pre-T107 whole-page await.
 		if (options.render === 'blocking') {
-			const pageHtml = splitLeadingModulePreloadLinks(
+			const pageHtml = splitLeadingHeadHtml(
 				await renderToString(pageArtifact as never, renderOptions),
 			);
 			const shell = await renderDocumentShell(documentModule, pageProps, pageHtml.headHtml);
@@ -161,7 +168,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 		// deadline render inline; the rest flush @pending and settle on the
 		// same open response.
 		const stream = await renderToStream(pageArtifact as never, renderOptions);
-		const pageHtml = splitLeadingModulePreloadLinks(stream.shell);
+		const pageHtml = splitLeadingHeadHtml(stream.shell);
 		const shell = await renderDocumentShell(documentModule, pageProps, pageHtml.headHtml);
 		if (stream.pendingArmCount === 0) {
 			return new Response(fillDocumentChildren(shell, pageHtml.bodyHtml), {
@@ -210,9 +217,21 @@ function routedPageArtifact(
 	pageProps: PageComponentProps,
 	file: string,
 	navigationEntryPath: string | undefined,
+	stylesheetHrefs: readonly string[] | undefined,
 ) {
+	const headInjections = [
+		...(baseArtifact?.headInjections ?? []),
+		...(stylesheetHrefs ?? []).map(
+			(href): RenderHeadInjection => ({
+				tag: 'link',
+				location: 'head',
+				attributes: { rel: 'stylesheet', href },
+			}),
+		),
+	];
 	return {
 		resumeModuleUrl: baseArtifact?.resumeModuleUrl,
+		...(headInjections.length > 0 ? { headInjections } : {}),
 		async renderSsr(renderProps?: unknown, renderContext?: unknown): Promise<RenderOutput> {
 			// Compiled marklessRenderSsr is async (initial render awaits demanded
 			// async work); interpolating the un-awaited Promise served 500s.
@@ -322,18 +341,13 @@ function addModulePreloads(
 	}
 }
 
-function splitLeadingModulePreloadLinks(html: string): PageHtml {
-	let bodyHtml = html;
-	const links: string[] = [];
-	while (bodyHtml.startsWith('<link ')) {
-		const end = bodyHtml.indexOf('>');
-		if (end === -1) break;
-		const link = bodyHtml.slice(0, end + 1);
-		if (!link.includes('rel="modulepreload"')) break;
-		links.push(link);
-		bodyHtml = bodyHtml.slice(end + 1);
-	}
-	return { bodyHtml, headHtml: links.join('') };
+function splitLeadingHeadHtml(html: string): PageHtml {
+	const containerStart = html.indexOf('<div data-async-container');
+	if (containerStart <= 0) return { bodyHtml: html, headHtml: '' };
+	return {
+		bodyHtml: html.slice(containerStart),
+		headHtml: html.slice(0, containerStart),
+	};
 }
 
 // The document with the children placeholder INTACT: blocking responses fill

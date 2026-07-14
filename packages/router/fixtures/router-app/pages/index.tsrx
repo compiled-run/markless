@@ -8,5 +8,11 @@ export default function Home() @{
 		<h1>Markless Router App</h1>
 		<button onClick={() => count++}>Count {count}</button>
 		<Link href="/">Home</Link>
+
+		<style>
+			button {
+				background: red;
+			}
+		</style>
 	</main>
 }

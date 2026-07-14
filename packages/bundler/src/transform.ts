@@ -157,6 +157,18 @@ export async function transformTsrxModule(
 	];
 
 	const styleImport = styleId ? `import ${JSON.stringify(styleId)};\n` : '';
+	const headInjections = [
+		...(input.headInjections ?? []),
+		...(styleId && input.styleModuleUrl
+			? [
+					{
+						tag: 'link',
+						location: 'head' as const,
+						attributes: { rel: 'stylesheet', href: input.styleModuleUrl(styleId) },
+					},
+				]
+			: []),
+	];
 	return {
 		code:
 			styleImport +
@@ -168,7 +180,7 @@ export async function transformTsrxModule(
 					environment: input.environment ?? 'lib',
 					clientOutput: input.clientOutput ?? 'full',
 					executionLog: input.executionLog,
-					headInjections: input.headInjections,
+					headInjections: headInjections.length > 0 ? headInjections : undefined,
 					devResumeReexport: input.devResumeReexport === true,
 					needsFullResume: needsFullResume(
 						compiled.protocolView,

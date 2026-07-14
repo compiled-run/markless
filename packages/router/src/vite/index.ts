@@ -413,6 +413,7 @@ interface RoutePreloadState {
 interface RoutePreloadMaps {
 	readonly navigation: Record<string, readonly string[]>;
 	readonly ssr: Record<string, readonly string[]>;
+	readonly styles: Record<string, readonly string[]>;
 }
 
 function resumeEntryState(): ResumeEntryState {
@@ -420,7 +421,7 @@ function resumeEntryState(): ResumeEntryState {
 }
 
 function routePreloadState(): RoutePreloadState {
-	return { base: '/', root: '.', routes: { navigation: {}, ssr: {} } };
+	return { base: '/', root: '.', routes: { navigation: {}, ssr: {}, styles: {} } };
 }
 
 function routerClientInput(input: InputOption | undefined, root: string): InputOption | undefined {
@@ -535,7 +536,7 @@ function serverEntrySource(root: string): string {
 		`import { createServerEntry } from '@markless/router/vite/runtime/create-server-entry';`,
 		`import { resumeEntryPath } from '${RESUME_ENTRY_PATH_ID}${query}';`,
 		`import { navigationEntryPath } from '${NAVIGATION_ENTRY_PATH_ID}${query}';`,
-		`import { routeModulePreloads, routeSsrModulePreloads } from '${ROUTE_PRELOADS_ID}${query}';`,
+		`import { routeModulePreloads, routeSsrModulePreloads, routeStylesheets } from '${ROUTE_PRELOADS_ID}${query}';`,
 		`import { pageModuleLoaders, routeFileIds } from '${ROUTE_DISCOVERY_ID}${query}';`,
 		`const documentModuleLoaders = import.meta.glob(['/document.tsrx']);`,
 		`const entry = createServerEntry({`,
@@ -543,6 +544,7 @@ function serverEntrySource(root: string): string {
 		`  navigationEntryPath,`,
 		`  routeModulePreloads,`,
 		`  routeSsrModulePreloads,`,
+		`  routeStylesheets,`,
 		`  documentModuleLoader: documentModuleLoaders['/document.tsrx'],`,
 		`  pageModuleLoaders,`,
 		`  routeFileIds,`,
@@ -570,6 +572,7 @@ function routePreloadsSource(state: RoutePreloadState): string {
 		`const routePreloadData = routePreloadsJson === ${JSON.stringify(ROUTE_PRELOADS_PLACEHOLDER)} ? ${JSON.stringify(state.routes)} : JSON.parse(routePreloadsJson);`,
 		`export const routeModulePreloads = routePreloadData.navigation ?? {};`,
 		`export const routeSsrModulePreloads = routePreloadData.ssr ?? {};`,
+		`export const routeStylesheets = routePreloadData.styles ?? {};`,
 		`export function preloadRouteModule(file, document = globalThis.document) {`,
 		`  const hrefs = routeModulePreloads[file];`,
 		`  if (!hrefs?.length || !document?.head) return [];`,
@@ -618,6 +621,9 @@ interface OutputChunkLike {
 	readonly fileName: string;
 	readonly imports: readonly string[];
 	readonly moduleIds?: readonly string[];
+	readonly viteMetadata?: {
+		readonly importedCss?: ReadonlySet<string> | readonly string[];
+	};
 }
 
 function routeModulePreloadsFromBundle(input: {
@@ -641,6 +647,7 @@ function routeModulePreloadsFromBundle(input: {
 	const symbolChunks = symbolChunksBySourceFile(chunks);
 	const navigation: Record<string, readonly string[]> = {};
 	const ssr: Record<string, readonly string[]> = {};
+	const styles: Record<string, readonly string[]> = {};
 	for (const [routeFile, routeChunk] of routeChunks) {
 		const navigationFileNames = new Set<string>();
 		if (input.navigationChunk) {
@@ -698,8 +705,31 @@ function routeModulePreloadsFromBundle(input: {
 			joinURL(input.base, fileName),
 		);
 		ssr[routeFile] = [...ssrFileNames].map((fileName) => joinURL(input.base, fileName));
+		styles[routeFile] = routeStylesheetsForChunk(routeChunk, chunksByFileName, input.base);
 	}
-	return { navigation, ssr };
+	return { navigation, ssr, styles };
+}
+
+function routeStylesheetsForChunk(
+	routeChunk: OutputChunkLike,
+	chunksByFileName: ReadonlyMap<string, OutputChunkLike>,
+	base: string,
+): readonly string[] {
+	const styles = new Set<string>();
+	const visited = new Set<string>();
+	const visit = (chunk: OutputChunkLike): void => {
+		if (visited.has(chunk.fileName)) return;
+		visited.add(chunk.fileName);
+		for (const imported of [...chunk.imports, ...codeStaticImports(chunk)]) {
+			const dependency = chunksByFileName.get(imported);
+			if (dependency) visit(dependency);
+		}
+		for (const stylesheet of chunk.viteMetadata?.importedCss ?? []) {
+			styles.add(joinURL(base, stylesheet));
+		}
+	};
+	visit(routeChunk);
+	return [...styles];
 }
 
 // Maps each authored source file to the chunks holding its compiled symbol

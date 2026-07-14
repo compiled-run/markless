@@ -31,6 +31,43 @@ describe('server entry rendering', () => {
 		expect(html).toContain('<main>Home</main>');
 	});
 
+	it('places compiled and built route stylesheets in the document head', async () => {
+		const entry = createServerEntry({
+			documentModuleLoader: undefined,
+			pageModuleLoaders: {
+				'pages/index.tsrx': async () => ({
+					default: page('<main class="mk-page">Home</main>', {
+						headInjections: [
+							{
+								tag: 'link',
+								location: 'head',
+								attributes: {
+									rel: 'stylesheet',
+									href: '/@id/virtual:markless:style:page.css?direct',
+								},
+							},
+						],
+					}),
+				}),
+			},
+			routeFileIds: ['/pages/index.tsrx'],
+			routeStylesheets: {
+				'pages/index.tsrx': ['/assets/page.css'],
+			},
+		});
+
+		const response = await entry.fetch(new Request('http://markless-router.test/'));
+		const html = await response.text();
+		const head = html.slice(0, html.indexOf('</head>'));
+		const body = html.slice(html.indexOf('<body>'));
+
+		expect(head).toContain(
+			'<link rel="stylesheet" href="/@id/virtual:markless:style:page.css?direct">',
+		);
+		expect(head).toContain('<link rel="stylesheet" href="/assets/page.css">');
+		expect(body).not.toContain('rel="stylesheet"');
+	});
+
 	it('emits resumability payloads without waking a client entry on page load', async () => {
 		const entry = createServerEntry({
 			resumeEntryPath: '/@id/virtual:markless-router/resume-entry',
@@ -578,12 +615,18 @@ describe('server entry streaming (default)', () => {
 function page(
 	html: string,
 	payload: {
+		readonly headInjections?: readonly {
+			readonly tag: string;
+			readonly location: 'head' | 'body';
+			readonly attributes?: Record<string, string>;
+		}[];
 		readonly modulePreloads?: readonly { readonly href: string }[];
 		readonly state?: unknown;
 		readonly view?: unknown;
 	} = {},
 ) {
 	return {
+		headInjections: payload.headInjections,
 		modulePreloads: payload.modulePreloads,
 		renderSsr() {
 			return { html, ...payload };

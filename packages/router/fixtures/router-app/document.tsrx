@@ -7,6 +7,9 @@ export default function Document({ children }: { readonly children?: unknown }) 
 			<meta name="viewport" content="width=device-width, initial-scale=1" />
 			<title>Markless Router App</title>
 		</head>
-		<body>{children}</body>
+		<body>
+			{children}
+			<button data-unscoped-button>Outside page scope</button>
+		</body>
 	</Html>
 }

@@ -4,6 +4,7 @@ import { navigationEntryPath } from 'virtual:markless-router/navigation-entry-pa
 import {
 	routeModulePreloads,
 	routeSsrModulePreloads,
+	routeStylesheets,
 } from 'virtual:markless-router/route-preloads';
 import { pageModuleLoaders, routeFileIds } from 'virtual:markless-router/routes';
 
@@ -13,6 +14,7 @@ const entry = createServerEntry({
 	navigationEntryPath,
 	routeModulePreloads,
 	routeSsrModulePreloads,
+	routeStylesheets,
 	documentModuleLoader: documentModuleLoaders['/document.tsrx'],
 	pageModuleLoaders,
 	routeFileIds,

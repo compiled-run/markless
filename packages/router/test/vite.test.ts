@@ -257,7 +257,7 @@ test('scopes router virtual entry modules by resolved Vite root', () => {
 	expect(first).not.toBe(second);
 });
 
-test('emits exact route modulepreload maps from client build chunks', () => {
+test('emits exact route modulepreload and stylesheet maps from client build chunks', () => {
 	const plugins = flattenPlugins([router()]);
 	const configPlugin = plugins.find((plugin) => plugin.name === 'markless-router:vite');
 	const routePlugin = plugins.find((plugin) => plugin.name === 'markless-router:routes');
@@ -302,19 +302,27 @@ test('emits exact route modulepreload maps from client build chunks', () => {
 				fileName: 'build/docs.js',
 				imports: ['build/docs-runtime.js', 'build/resume-runtime.js'],
 				moduleIds: ['/project/pages/docs/[...slug].mdx'],
+				viteMetadata: { importedCss: new Set(['assets/docs.css', 'assets/shared.css']) },
 			}),
 			'build/home.js': chunk({
 				fileName: 'build/home.js',
 				moduleIds: ['/project/pages/index.tsrx'],
+				viteMetadata: { importedCss: ['assets/home.css', 'assets/shared.css'] },
 			}),
-			'build/docs-runtime.js': chunk({ fileName: 'build/docs-runtime.js' }),
+			'build/docs-runtime.js': chunk({
+				fileName: 'build/docs-runtime.js',
+				viteMetadata: { importedCss: ['assets/docs-runtime.css'] },
+			}),
 			'build/docs-symbol.js': chunk({ fileName: 'build/docs-symbol.js' }),
 			'build/docs-resume.js': chunk({ fileName: 'build/docs-resume.js' }),
 			'build/home-resume.js': chunk({ fileName: 'build/home-resume.js' }),
 			'build/navigation-polyfill.js': chunk({ fileName: 'build/navigation-polyfill.js' }),
 			'build/resume-runtime.js': chunk({ fileName: 'build/resume-runtime.js' }),
 			'build/scalar-specialized.js': chunk({ fileName: 'build/scalar-specialized.js' }),
-			'build/shared.js': chunk({ fileName: 'build/shared.js' }),
+			'build/shared.js': chunk({
+				fileName: 'build/shared.js',
+				viteMetadata: { importedCss: ['assets/shell.css'] },
+			}),
 		},
 	);
 
@@ -324,11 +332,14 @@ test('emits exact route modulepreload maps from client build chunks', () => {
 	) as {
 		readonly navigation?: Record<string, string[]>;
 		readonly ssr?: Record<string, string[]>;
+		readonly styles?: Record<string, string[]>;
 	};
 	const routePreloads = routePreloadData.navigation ?? {};
 	const ssrPreloads = routePreloadData.ssr ?? {};
+	const stylesheets = routePreloadData.styles ?? {};
 
 	expect(source).toContain('"pages/docs/[...slug].mdx"');
+	expect(source).toContain('routeStylesheets');
 	expect(navigationChunk.code).toContain('pages/docs/[...slug].mdx');
 	expect(navigationChunk.code.match(/__MARKLESS_ROUTER_ROUTE_PRELOADS__/g)).toHaveLength(1);
 	expect(navigationChunk.code).toContain('JSON.parse(routePreloadsJson)');
@@ -361,6 +372,15 @@ test('emits exact route modulepreload maps from client build chunks', () => {
 	expect(ssrPreloads['pages/docs/[...slug].mdx']).not.toContain('/app/build/home-resume.js');
 	expect(ssrPreloads['pages/index.tsrx']).toContain('/app/build/home-resume.js');
 	expect(ssrPreloads['pages/index.tsrx']).not.toContain('/app/build/docs-resume.js');
+	expect(stylesheets['pages/docs/[...slug].mdx']).toEqual([
+		'/app/assets/docs-runtime.css',
+		'/app/assets/docs.css',
+		'/app/assets/shared.css',
+	]);
+	expect(stylesheets['pages/index.tsrx']).toEqual([
+		'/app/assets/home.css',
+		'/app/assets/shared.css',
+	]);
 });
 
 test('includes destination route resume chunks reached from the navigation route table', () => {
@@ -584,6 +604,9 @@ function chunk(overrides: {
 	readonly fileName: string;
 	readonly imports?: readonly string[];
 	readonly moduleIds?: readonly string[];
+	readonly viteMetadata?: {
+		readonly importedCss?: ReadonlySet<string> | readonly string[];
+	};
 }) {
 	return {
 		code: overrides.code,
@@ -593,5 +616,6 @@ function chunk(overrides: {
 		fileName: overrides.fileName,
 		imports: [...(overrides.imports ?? [])],
 		moduleIds: [...(overrides.moduleIds ?? [])],
+		viteMetadata: overrides.viteMetadata,
 	};
 }
