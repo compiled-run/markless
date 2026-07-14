@@ -155,6 +155,7 @@ function classifyConstructContext(
 ): readonly string[] {
 	const replacements = [
 		placeholderName,
+		`{${placeholderName}}`,
 		`@case ${placeholderName}: {}`,
 		`@pending {} ${placeholderName};`,
 	];
@@ -181,6 +182,22 @@ function classifyPlaceholder(location: AstLocation): readonly string[] | undefin
 	const { node, ancestors } = location;
 	const parent = ancestors.at(-1);
 	if (!parent) return [];
+
+	if (parent.type === 'JSXExpressionContainer' && parent.expression === node) {
+		const childrenParent = ancestors.at(-2);
+		if (
+			(childrenParent?.type !== 'JSXElement' && childrenParent?.type !== 'JSXFragment') ||
+			!Array.isArray(childrenParent.children)
+		) {
+			return [];
+		}
+		const childIndex = childrenParent.children.indexOf(parent);
+		if (childIndex < 0) return [];
+		const previous = childrenParent.children[childIndex - 1] as AstNode | undefined;
+		if (previous?.type === 'JSXIfExpression') return [...baseConstructs, '@else'];
+		if (previous?.type === 'JSXForExpression') return [...baseConstructs, '@empty'];
+		return baseConstructs;
+	}
 
 	if (ancestors.some((ancestor) => ancestor.type === 'JSXSwitchExpression')) {
 		return ancestors.some((ancestor) => ancestor.type === 'SwitchCase')
