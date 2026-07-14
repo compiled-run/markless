@@ -514,11 +514,14 @@ async function starterFiles(options: CreateOptions, fs: ProgramFileSystem): Prom
 		await Promise.all(directories.map((directory) => readTemplateDirectory(directory, fs)))
 	).flat();
 
-	return renderTemplateFiles(files, {
+	const renderedFiles = renderTemplateFiles(files, {
 		marklessVersion: await marklessVersionRange(fs),
 		packageManager: options.packageManager,
 		packageName: packageName(options.target),
 	});
+	const agents = renderedFiles.find((file) => file.path === 'AGENTS.md');
+
+	return agents ? [...renderedFiles, { path: 'CLAUDE.md', contents: agents.contents }] : renderedFiles;
 }
 
 const CLI_MANIFEST_URL = new URL('../package.json', import.meta.url);

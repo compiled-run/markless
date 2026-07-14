@@ -110,7 +110,7 @@ Ignore generated and local-output folders while scanning:
 - `dist/`
 - `.witness/`
 - `packages/bundler/.witness/`
-- `docs/goals/`
+- `goals/`
 
 The `poc/` tree contains executable proof fixtures and earlier proof packages.
 Use it as design evidence and regression material, not as the production package

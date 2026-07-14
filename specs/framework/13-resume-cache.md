@@ -2,7 +2,7 @@
 
 Status: SPECIFIED, NOT IMPLEMENTED (POC-validated 2026-07-08 — goal
 `snapshot-resume-poc`, commit `196da51` on branch `snapshot-resume-poc`;
-measured matrix: `docs/goals/snapshot-resume-poc/notes/comparison.md`;
+measured matrix: `goals/snapshot-resume-poc/notes/comparison.md`;
 adversarially reviewed 2026-07-09 via two cross-model critique lanes +
 owner talk-out — the boot contract, failure table, and observability
 sections below reflect that adjudication).

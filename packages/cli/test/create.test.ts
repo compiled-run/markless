@@ -1,5 +1,7 @@
+import { execFile } from 'node:child_process';
 import { access, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { promisify } from 'node:util';
 import { join } from 'pathe';
 import { afterEach, expect, test } from 'vitest';
 import {
@@ -10,6 +12,7 @@ import {
 } from '../src/index.ts';
 
 const cleanupRoots: string[] = [];
+const execFileAsync = promisify(execFile);
 
 afterEach(async () => {
 	await Promise.all(
@@ -217,6 +220,7 @@ test('creates a minimal Markless Router app with TSRX pages and Nitro-backed dep
 		build: 'vp build',
 		check: 'vp check',
 		dev: 'vp dev',
+		doctor: 'node scripts/markless-doctor.mjs',
 		preview: 'vp preview',
 		test: 'vp test',
 	});
@@ -227,9 +231,17 @@ test('creates a minimal Markless Router app with TSRX pages and Nitro-backed dep
 		'vite-plus': expect.any(String),
 	});
 	expect(packageJson.devDependencies).toMatchObject({
+		'@markless/analyzer': expect.any(String),
 		typescript: expect.any(String),
 		vite: expect.any(String),
 	});
+	const agents = await readFile(join(appRoot, 'AGENTS.md'));
+	const claude = await readFile(join(appRoot, 'CLAUDE.md'));
+	expect(claude).toEqual(agents);
+	await expect(
+		readFile(join(appRoot, '.claude/skills/markless-debugging/SKILL.md'), 'utf-8'),
+	).resolves.toBeTruthy();
+	await expect(readFile(join(appRoot, 'scripts/markless-doctor.mjs'), 'utf-8')).resolves.toBeTruthy();
 	await expect(exists(join(appRoot, 'pages/index.tsrx'))).resolves.toBe(true);
 	await expect(exists(join(appRoot, 'public'))).resolves.toBe(true);
 	await expect(exists(join(appRoot, 'nitro.config.ts'))).resolves.toBe(false);
@@ -245,6 +257,23 @@ test('creates a minimal Markless Router app with TSRX pages and Nitro-backed dep
 	expect(viteConfig).not.toContain('nitro()');
 	await expect(readFile(join(appRoot, 'tsconfig.json'), 'utf-8')).resolves.not.toContain('tsx');
 	await expect(exists(join(appRoot, 'pages/index.tsx'))).resolves.toBe(false);
+});
+
+test('packs the agent discovery templates, including the dot-directory skill', async () => {
+	const cache = await makeWorkspace();
+	const cliRoot = new URL('..', import.meta.url);
+	const { stdout } = await execFileAsync('npm', ['pack', '--dry-run', '--json'], {
+		cwd: cliRoot,
+		env: { ...process.env, npm_config_cache: cache },
+	});
+	const [{ files }] = JSON.parse(stdout) as Array<{ files: Array<{ path: string }> }>;
+	const packedPaths = files.map((file) => file.path);
+
+	expect(packedPaths).toContain('templates/common/AGENTS.md');
+	expect(packedPaths).toContain(
+		'templates/common/.claude/skills/markless-debugging/SKILL.md',
+	);
+	expect(packedPaths).toContain('templates/common/scripts/markless-doctor.mjs');
 });
 
 test('generates app and full-stack status pages under pages', async () => {
@@ -341,6 +370,7 @@ test('scaffolded manifests pin @markless deps to the publishing cli version, nev
 
 			expect(appManifest.dependencies['@markless/core']).toBe(expectedRange);
 			expect(appManifest.dependencies['@markless/router']).toBe(expectedRange);
+			expect(appManifest.devDependencies['@markless/analyzer']).toBe(expectedRange);
 			for (const [name, range] of [
 				...Object.entries(appManifest.dependencies),
 				...Object.entries(appManifest.devDependencies),

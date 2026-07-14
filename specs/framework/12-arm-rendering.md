@@ -1,8 +1,8 @@
 # 12. Arm Rendering: Update Escalation Ladder, Arm-Relative Coordinates, Out-of-Order Streaming
 
-Status: DRAFT (ratified design, implementation in progress — docs/goals/arm-rendering)
+Status: DRAFT (ratified design, implementation in progress — goals/arm-rendering)
 Ratified with owner: 2026-07-07. Source discussion: dashboard-migration goal,
-15-need ledger. Working research notes: docs/goals/arm-rendering/notes/.
+15-need ledger. Working research notes: goals/arm-rendering/notes/.
 
 ## Motivation
 
