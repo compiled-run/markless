@@ -35,16 +35,25 @@ export async function createRuntimeGraphFromResumePayload(
 	let graph!: RuntimeGraph;
 	const asyncComputed = await asyncComputedFromPayload(input, () => graph);
 	graph = createRuntimeGraph({
-		cells: await decodeStateCells(input.state),
+		cells: await decodeStateCells(input.state, input.root.__marklessEventOnlyGraph),
 		sharedDefinitions: input.state.sharedDefinitions,
 		asyncComputed,
 	});
 	return graph;
 }
 
-async function decodeStateCells(payload: ProtocolStatePayload) {
+async function decodeStateCells(
+	payload: ProtocolStatePayload,
+	eventOnlyValues?: ReadonlyMap<string, unknown>,
+) {
 	return Promise.all(
 		payload.cells.map(async (cell) => {
+			if (eventOnlyValues?.has(cell.graphNodeId)) {
+				return {
+					graphNodeId: cell.graphNodeId,
+					value: eventOnlyValues.get(cell.graphNodeId),
+				};
+			}
 			// CSR-mounted pages seed prop cells with live values that never
 			// crossed the HTML boundary — there is no serialized envelope to
 			// decode, the value is used as-is (dashboard-migration need 14).

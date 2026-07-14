@@ -92,9 +92,59 @@ describe('server entry rendering', () => {
 			html.indexOf('<script type="markless/state">'),
 		);
 		expect(html).not.toContain('/pages/index.tsrx?import');
-		expect(html).toContain('import("/@id/virtual:markless-router/resume-entry")');
+		expect(html).toContain(
+			'data-markless-resume-module="/@id/virtual:markless-router/resume-entry"',
+		);
+		expect(html).toContain('import(/* @vite-ignore */ url)');
 		expect(html).not.toContain('<script type="module"');
 		expect(html).not.toContain('src="/@id/virtual:markless-router/resume-entry"');
+	});
+
+	it('forwards the compiled inline resumer through the routed page artifact', async () => {
+		const compiledEventSource = 'globalThis.__routedCompiledResumer = true;';
+		const artifact = page('<main><button>Count 0</button></main>', {
+			state: { version: 1, cells: [], computed: [] },
+			view: {
+				version: 1,
+				locators: [
+					{ hostNodeId: 'h0', index: 0, strategy: 'dom-order', tagName: 'main' },
+					{ hostNodeId: 'h1', index: 1, strategy: 'dom-order', tagName: 'button' },
+				],
+				events: [{ eventName: 'click', hostNodeId: 'h1', symbolIds: ['symbol:0'] }],
+				domUpdates: [],
+				behaviors: [],
+				elementHandles: [],
+				asyncBoundaries: [],
+			},
+		});
+		const entry = createServerEntry({
+			resumeEntryPath: '/build/page-resume.js',
+			documentModuleLoader: undefined,
+			pageModuleLoaders: {
+				'pages/index.tsrx': async () => ({
+					default: {
+						...artifact,
+						inlineResumerSources: {
+							debug: false,
+							executionLog: 'never',
+							event: compiledEventSource,
+							syncPolicy: 'globalThis.__routedCompiledSyncResumer = true;',
+							graphSyncPolicyOwner: 'globalThis.__routedCompiledGraphOwner = true;',
+							graphSyncPolicyConsumer:
+								'globalThis.__routedCompiledGraphConsumer = true;',
+						},
+					},
+				}),
+			},
+			routeFileIds: ['/pages/index.tsrx'],
+		});
+
+		const response = await entry.fetch(new Request('http://markless-router.test/'));
+		const html = await response.text();
+
+		expect(html).toContain(compiledEventSource);
+		expect(html).not.toContain('__MARKLESS_INLINE_');
+		expect(html).not.toContain('runInlineResumer');
 	});
 
 	it('serializes page props into the payload prop cell (need 14, SSR side)', async () => {

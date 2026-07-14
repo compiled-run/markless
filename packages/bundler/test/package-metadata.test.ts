@@ -60,6 +60,12 @@ describe('package metadata', () => {
 			readonly name?: string;
 			readonly dependencies?: Record<string, string>;
 			readonly exports?: Record<string, string>;
+			readonly publishConfig?: {
+				readonly exports?: Record<
+					string,
+					{ readonly types?: string; readonly default?: string }
+				>;
+			};
 		};
 
 		expect(web.name).toBe('@markless/web');
@@ -82,10 +88,15 @@ describe('package metadata', () => {
 			'./dom-update': './src/dom-update.ts',
 			'./event-only-resume': './src/event-only-resume.ts',
 			'./event-resume': './src/event-resume.ts',
+			'./inline/resumer': './src/inline/resumer.ts',
 			'./payload': './src/payload.ts',
 			'./render': './src/render.ts',
 			'./render-to-string': './src/render-to-string.ts',
 			'./resume': './src/payload-full.ts',
+		});
+		expect(web.publishConfig?.exports?.['./inline/resumer']).toEqual({
+			types: './dist/inline/resumer.d.ts',
+			default: './dist/inline/resumer.js',
 		});
 	});
 

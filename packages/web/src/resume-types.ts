@@ -21,6 +21,7 @@ export type ResumeDomElement = ResumeDomNode & {
 		options?: { readonly capture?: boolean },
 	) => void;
 	readonly dispatchEvent?: (event: ResumeSharedPatchEvent) => boolean;
+	__marklessEventOnlyGraph?: Map<string, unknown>;
 };
 export type ResumeDomComment = ResumeDomNode & { readonly nodeType: 8; readonly data?: string };
 export type ResumeDomEvent = {

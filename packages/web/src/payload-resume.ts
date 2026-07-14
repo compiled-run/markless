@@ -48,6 +48,7 @@ export async function resumeFromPayloadScriptsImpl(
 		root: input.root,
 		loadSymbol: input.loadSymbol,
 	});
+	delete input.root.__marklessEventOnlyGraph;
 	let runtime: ResumeRuntime | undefined;
 	const applyDomJournal =
 		input.applyDomJournal ??

@@ -1,4 +1,3 @@
-import { gzipSync } from 'node:zlib';
 import { ASYNC_PROTOCOL_VERSION, type ProtocolViewPayload } from '@markless/serializer';
 import { createProtocolStatePayload } from '@markless/serializer';
 import { expect, test } from 'vitest';
@@ -1102,9 +1101,7 @@ test('renderToString emits an SSR container and omits the resumer for static out
 			}),
 			view: {
 				...staticView(),
-				locators: [
-					{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'main' },
-				],
+				locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'main' }],
 				domUpdates: [
 					{
 						hostNodeId: 'h0',
@@ -1120,9 +1117,7 @@ test('renderToString emits an SSR container and omits the resumer for static out
 	});
 
 	expect(componentBodyRuns).toBe(1);
-	expect(html).toBe(
-		'<div data-async-container><main><p>Static news</p></main></div>',
-	);
+	expect(html).toBe('<div data-async-container><main><p>Static news</p></main></div>');
 	expect(html).not.toContain('type="markless/state"');
 	expect(html).not.toContain('type="markless/view"');
 	expect(html).not.toContain('data-async-resumer');
@@ -1524,6 +1519,27 @@ test('renderToString uses the compiled artifact resume module URL by default', a
 	expect(extractResumerSource(html)).toContain(JSON.stringify(resumeModuleUrl));
 });
 
+test('renderToString uses the compiled resumer mode when logging metadata is omitted', async () => {
+	const html = await renderToString({
+		resumeModuleUrl: '/build/resume.js',
+		inlineResumerSources: {
+			debug: false,
+			executionLog: 'never',
+			event: 'globalThis.__compiledEventResumer = true;',
+			syncPolicy: 'globalThis.__compiledSyncResumer = true;',
+			graphSyncPolicyOwner: 'globalThis.__compiledGraphOwner = true;',
+			graphSyncPolicyConsumer: 'globalThis.__compiledGraphConsumer = true;',
+		},
+		renderSsr: () => ({
+			html: '<button type="button">Count 0</button>',
+			state: createProtocolStatePayload({ cells: [] }),
+			view: viewWithClick(),
+		}),
+	});
+
+	expect(extractResumerSource(html)).toBe('globalThis.__compiledEventResumer = true;');
+});
+
 test('renderToString inline event resumer imports the resume module only after interaction', async () => {
 	const resumeModuleUrl = createResumeModuleUrl();
 	const html = await renderToString(
@@ -1536,8 +1552,6 @@ test('renderToString inline event resumer imports the resume module only after i
 	);
 	const view = JSON.parse(extractScriptText(html, 'markless/view')) as ProtocolViewPayload;
 	const resumerSource = extractResumerSource(html);
-	expect(resumerSource).not.toContain('preventDefault');
-	expect(resumerSource).not.toContain('stopPropagation');
 	const button = element('BUTTON');
 	const root = element('DIV', [button]);
 	const listeners: Array<(event: FakeEvent) => Promise<void>> = [];
@@ -1621,12 +1635,13 @@ test('renderToString execution log activation stays inline and mirrors summary w
 
 	expect(resumerSource).not.toContain('startMarklessExecutionLog');
 	expect(resumerSource).not.toContain('preloadedModuleCount');
-	expect(resumerSource).toContain('globalThis.__mxLog = globalThis.__mxLog || new Set()');
+	expect(resumerSource).toContain('const __MARKLESS_INLINE_EXECUTION_LOG__="always";');
+	expect(resumerSource).toContain('globalScope.__mxLog ||= new Set()');
 	expect(resumerSource).toContain('console.log(summary)');
-	expect(resumerSource).toContain("setAttribute('data-markless-log-summary', summary)");
-	expect(resumerSource).toContain("setAttribute('data-markless-log-app-bytes', '0')");
-	expect(resumerSource).toContain("setAttribute('data-markless-log-instrument-bytes', '0')");
-	expect(resumerSource).toContain("removeAttribute('data-markless-log-app-bytes')");
+	expect(resumerSource).toContain('setAttribute("data-markless-log-summary", summary)');
+	expect(resumerSource).toContain('setAttribute("data-markless-log-app-bytes", "0")');
+	expect(resumerSource).toContain('setAttribute("data-markless-log-instrument-bytes", "0")');
+	expect(resumerSource).toContain('removeAttribute("data-markless-log-app-bytes")');
 });
 
 test('renderToString defaults to auto execution log bootstrap for interactive SSR', async () => {
@@ -1640,15 +1655,18 @@ test('renderToString defaults to auto execution log bootstrap for interactive SS
 	);
 	const resumerSource = extractResumerSource(html);
 
+	expect(resumerSource).toContain('const __MARKLESS_INLINE_EXECUTION_LOG__="auto";');
 	expect(resumerSource).toContain('localhost|127\\.0\\.0\\.1|\\[::1\\]');
-	expect(resumerSource).toContain("new URLSearchParams(l.search).has('markless-log')");
-	expect(resumerSource).toContain("localStorage.getItem('marklessLog') === '1'");
-	expect(resumerSource).toContain('globalThis.__mxLog = globalThis.__mxLog || new Set()');
-	expect(resumerSource).toContain("querySelectorAll('link[rel=modulepreload]')");
+	expect(resumerSource).toContain(
+		'new URLSearchParams(currentLocation.search).has("markless-log")',
+	);
+	expect(resumerSource).toContain('localStorage.getItem("marklessLog") === "1"');
+	expect(resumerSource).toContain('globalScope.__mxLog ||= new Set()');
+	expect(resumerSource).toContain('querySelectorAll("link[rel=modulepreload]")');
 	expect(resumerSource).not.toContain('rel="modulepreload"');
 });
 
-test('renderToString strips execution log bootstrap when executionLog is never', async () => {
+test('renderToString marks the typed fallback for execution-log removal when disabled', async () => {
 	const html = await renderToString(
 		() => ({
 			html: '<button type="button">Count 0</button>',
@@ -1659,11 +1677,7 @@ test('renderToString strips execution log bootstrap when executionLog is never',
 	);
 	const resumerSource = extractResumerSource(html);
 
-	expect(resumerSource).not.toContain('__mxLog');
-	expect(resumerSource).not.toContain('markless-log');
-	expect(resumerSource).not.toContain('marklessLog');
-	expect(resumerSource).not.toContain('data-markless-log-summary');
-	expect(resumerSource).not.toContain('querySelectorAll');
+	expect(resumerSource).toContain('const __MARKLESS_INLINE_EXECUTION_LOG__="never";');
 });
 
 test('renderToString inline event resumer steps aside after runtime startup', async () => {
@@ -1739,7 +1753,7 @@ test('renderToString inline event resumer steps aside after runtime startup', as
 	}
 });
 
-test('renderToString event-only inline resumer omits sync-policy feature code', async () => {
+test('renderToString marks the typed event-only fallback for sync-policy removal', async () => {
 	const html = await renderToString(
 		() => ({
 			html: '<button type="button">Count 0</button>',
@@ -1750,10 +1764,8 @@ test('renderToString event-only inline resumer omits sync-policy feature code', 
 	);
 	const resumerSource = extractResumerSource(html);
 
-	expect(resumerSource).not.toContain('preventDefault');
-	expect(resumerSource).not.toContain('stopPropagation');
-	expect(resumerSource).not.toContain('constant-truthy');
-	expect(resumerSource).not.toContain('event-equals');
+	expect(resumerSource).toContain('const __MARKLESS_INLINE_SYNC_POLICY__=false;');
+	expect(resumerSource).toContain('const __MARKLESS_INLINE_GRAPH_SYNC_POLICY__=false;');
 });
 
 test('renderToString inline event resumer runs sync policy before importing resume module', async () => {
@@ -2109,10 +2121,12 @@ test('renderToString emits graph sync-policy inline runtime once for repeated pa
 	).join('');
 	const inlineSources = extractAllResumerSources(documentHtml).join('\n');
 
-	expect(countOccurrences(inlineSources, 'const M = globalThis.__marklessInlineSyncPolicy')).toBe(
-		1,
-	);
-	expect(gzipSync(inlineSources).length).toBeLessThan(2000);
+	expect(
+		inlineSources.match(/const __MARKLESS_INLINE_SHARED_GRAPH_POLICY__=true;/g),
+	).toHaveLength(1);
+	expect(
+		inlineSources.match(/const __MARKLESS_INLINE_SHARED_GRAPH_POLICY__=false;/g),
+	).toHaveLength(2);
 });
 
 test('renderToString inline event resumer reads built-in graph values for sync policy', async () => {
@@ -2237,19 +2251,15 @@ function extractScriptText(html: string, type: 'markless/state' | 'markless/view
 }
 
 function extractResumerSource(html: string): string {
-	const match = /<script data-async-resumer(?: nonce="[^"]+")?>([\s\S]*?)<\/script>/.exec(html);
+	const match = /<script data-async-resumer\b[^>]*>([\s\S]*?)<\/script>/.exec(html);
 	if (!match) throw new Error('Expected inline resumer script.');
 	return match[1]!;
 }
 
 function extractAllResumerSources(html: string): string[] {
-	return [
-		...html.matchAll(/<script data-async-resumer(?: nonce="[^"]+")?>([\s\S]*?)<\/script>/g),
-	].map((match) => match[1]!);
-}
-
-function countOccurrences(source: string, needle: string): number {
-	return source.split(needle).length - 1;
+	return [...html.matchAll(/<script data-async-resumer\b[^>]*>([\s\S]*?)<\/script>/g)].map(
+		(match) => match[1]!,
+	);
 }
 
 function createResumeModuleUrl(cacheKey = 'default'): string {

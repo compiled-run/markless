@@ -276,13 +276,16 @@ test('event-only scalar lean route keeps only the dispatched record and text sub
 	const runtimeDemandMap = scalarRuntimeDemandMap({
 		eventRecord: view.events[0],
 		domUpdate: view.domUpdates[0],
-	});
+	}) as {
+		actions: Array<{ plan: { write: { kind: string; updateOperator?: string } } }>;
+	};
+	runtimeDemandMap.actions[0]!.plan.write = { kind: 'update', updateOperator: '++' };
 
 	expect(
 		isScalarLeanResumeShape({ state, view, eventRecord: view.events[0], runtimeDemandMap }),
 	).toBe(true);
 
-	const result = await resumeScalarEventFromPayloadDocument({
+	const input = {
 		document: payloadDocument(scripts.stateScript, scripts.viewScript),
 		root,
 		event: { type: 'click', target: button },
@@ -300,13 +303,15 @@ test('event-only scalar lean route keeps only the dispatched record and text sub
 			}
 			return ({ value }) => ({ type: 'setText', locator: 'h2', value });
 		},
-	});
+	};
+	const first = await resumeScalarEventFromPayloadDocument(input);
+	const second = await resumeScalarEventFromPayloadDocument(input);
 
-	expect(result.view.events).toEqual([view.events[0]]);
-	expect(result.view.domUpdates).toEqual([view.domUpdates[0]]);
-	expect(result.view.locators.map((locator) => locator.hostNodeId)).toEqual(['h1', 'h2']);
-	expect(result.graph.read('state:count')).toBe(1);
-	expect(output.textContent).toBe('1');
+	expect(first.view.events).toEqual([view.events[0]]);
+	expect(first.view.domUpdates).toEqual([view.domUpdates[0]]);
+	expect(first.view.locators.map((locator) => locator.hostNodeId)).toEqual(['h1', 'h2']);
+	expect(second.graph.read('state:count')).toBe(2);
+	expect(output.textContent).toBe('2');
 });
 
 test('event-only scalar lean route falls back to the full event container for behavior records', async () => {

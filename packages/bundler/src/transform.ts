@@ -21,6 +21,7 @@ import {
 	symbolVirtualModuleId,
 } from './source-module.ts';
 import { injectExecutionLogModuleHook } from './execution-log.ts';
+import { compileInlineResumerSources } from './inline-resumer.ts';
 
 // Authored TS (param annotations, assertions, type aliases) survives compilation
 // into emitted module code, but downstream consumers (Vite builtins, symbol
@@ -157,6 +158,13 @@ export async function transformTsrxModule(
 	];
 
 	const styleImport = styleId ? `import ${JSON.stringify(styleId)};\n` : '';
+	const inlineResumerSources =
+		(input.environment ?? 'lib') === 'client'
+			? undefined
+			: await compileInlineResumerSources({
+					debug: input.inlineResumerDebug === true,
+					executionLog: input.executionLog ?? 'never',
+				});
 	return {
 		code:
 			styleImport +
@@ -169,6 +177,7 @@ export async function transformTsrxModule(
 					clientOutput: input.clientOutput ?? 'full',
 					executionLog: input.executionLog,
 					headInjections: input.headInjections,
+					inlineResumerSources,
 					devResumeReexport: input.devResumeReexport === true,
 					needsFullResume: needsFullResume(
 						compiled.protocolView,

@@ -65,6 +65,7 @@ type Environment = MarklessEnvironment | ((context: unknown) => MarklessEnvironm
 export type MarklessRolldownPlugin = Plugin & { api: MarklessRolldownPluginApi };
 type InternalMarklessRolldownOptions = MarklessRolldownOptions & {
 	emitResumeModules?: boolean;
+	inlineResumerDebug?: boolean;
 	publicPath?: (fileName: string) => string;
 };
 
@@ -253,6 +254,7 @@ export function createMarklessRolldownPlugin(input: {
 				executionLog: normalizeExecutionLogMode(internalOptions.executionLog),
 				executionLogModuleHooks:
 					internalOptions.dev === true && currentEnvironment === 'client',
+				inlineResumerDebug: internalOptions.inlineResumerDebug === true,
 				environment: currentEnvironment,
 				clientOutput:
 					currentEnvironment === 'client' &&

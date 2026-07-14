@@ -19,7 +19,7 @@ export async function resumeScalarCoreEventFromPayloadDocument(
 	if (!plan) return resumeFullEventOnly(input);
 
 	const elementsByHostId = new Map<string, EventOnlyResumeDomElement>();
-	const graph = createScalarCoreGraph(plan, elementsByHostId);
+	const graph = createScalarCoreGraph(plan, elementsByHostId, input.root);
 	const element =
 		input.element ??
 		locateHost(input.root, plan.locators, elementsByHostId, plan.eventRecord.hostNodeId) ??
@@ -277,13 +277,17 @@ function validateScalarSlot(slot: unknown, context: string): void {
 function createScalarCoreGraph(
 	plan: LeanPlan,
 	elementsByHostId: Map<string, EventOnlyResumeDomElement>,
+	root: EventOnlyResumeDomElement,
 ): EventOnlyResumeContainer['graph'] {
-	const values = new Map(
-		plan.cells.map((cell) => [
-			cell.graphNodeId,
-			decodeScalarSlot((cell.value as { readonly root?: unknown }).root),
-		]),
-	);
+	const values = (root.__marklessEventOnlyGraph ||= new Map());
+	for (const cell of plan.cells) {
+		if (!values.has(cell.graphNodeId)) {
+			values.set(
+				cell.graphNodeId,
+				decodeScalarSlot((cell.value as { readonly root?: unknown }).root),
+			);
+		}
+	}
 	const dirty: string[] = [];
 	const graph: EventOnlyResumeContainer['graph'] = {
 		read(graphNodeId) {
