@@ -1,0 +1,4 @@
+{
+	"recommendations": ["markless-dev.markless-tsrx"],
+	"unwantedRecommendations": ["ripple-ts.ripple-ts-vscode-plugin"]
+}

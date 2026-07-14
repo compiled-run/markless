@@ -1,10 +1,12 @@
 {
 	"name": "@markless/typescript-plugin",
 	"version": "0.1.1",
-	"private": true,
 	"type": "module",
 	"sideEffects": false,
 	"main": "./dist/index.cjs",
+	"files": [
+		"dist"
+	],
 	"exports": {
 		".": {
 			"import": "./src/index.ts",
@@ -12,8 +14,22 @@
 		},
 		"./language": "./src/language.ts"
 	},
+	"publishConfig": {
+		"access": "public",
+		"exports": {
+			".": {
+				"require": "./dist/index.cjs",
+				"default": "./dist/index.cjs"
+			},
+			"./language": {
+				"require": "./dist/language.cjs",
+				"default": "./dist/language.cjs"
+			}
+		}
+	},
 	"scripts": {
-		"build:cjs": "vp pack src/index.ts --no-config --format cjs --platform node --out-dir dist --clean --no-dts --no-report",
+		"build:cjs": "vp pack src/index.ts src/language.ts --no-config --format cjs --platform node --out-dir dist --clean --no-dts --no-report",
+		"prepublishOnly": "pnpm run build:cjs && node ../../scripts/release/verify-publish-ready.mjs",
 		"test:completion-matrix": "pnpm run build:cjs && pnpm --dir ../router run build:cjs && pnpm -w exec vp test packages/typescript-plugin/test/completion-matrix.test.ts"
 	},
 	"dependencies": {

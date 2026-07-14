@@ -215,6 +215,9 @@ test('creates a minimal Markless Router app with TSRX pages and Nitro-backed dep
 	const vscodeSettings = JSON.parse(
 		await readFile(join(appRoot, '.vscode/settings.json'), 'utf-8'),
 	) as unknown;
+	const vscodeExtensions = JSON.parse(
+		await readFile(join(appRoot, '.vscode/extensions.json'), 'utf-8'),
+	) as unknown;
 	const zedSettings = await readFile(join(appRoot, '.zed/settings.json'), 'utf-8');
 	const zedSettingsTemplate = await readFile(
 		new URL('../templates/common/.zed/settings.json', import.meta.url),
@@ -235,6 +238,7 @@ test('creates a minimal Markless Router app with TSRX pages and Nitro-backed dep
 		'vite-plus': expect.any(String),
 	});
 	expect(packageJson.devDependencies).toMatchObject({
+		'@markless/typescript-plugin': expect.any(String),
 		typescript: expect.any(String),
 		vite: expect.any(String),
 	});
@@ -242,6 +246,10 @@ test('creates a minimal Markless Router app with TSRX pages and Nitro-backed dep
 		'files.associations': {
 			'*.tsrx': 'markless-tsrx',
 		},
+	});
+	expect(vscodeExtensions).toEqual({
+		recommendations: ['markless-dev.markless-tsrx'],
+		unwantedRecommendations: ['ripple-ts.ripple-ts-vscode-plugin'],
 	});
 	expect(zedSettings).toBe(zedSettingsTemplate);
 	await expect(exists(join(appRoot, 'pages/index.tsrx'))).resolves.toBe(true);
@@ -355,6 +363,9 @@ test('scaffolded manifests pin @markless deps to the publishing cli version, nev
 
 			expect(appManifest.dependencies['@markless/core']).toBe(expectedRange);
 			expect(appManifest.dependencies['@markless/router']).toBe(expectedRange);
+			expect(appManifest.devDependencies['@markless/typescript-plugin']).toBe(
+				expectedRange,
+			);
 			for (const [name, range] of [
 				...Object.entries(appManifest.dependencies),
 				...Object.entries(appManifest.devDependencies),
