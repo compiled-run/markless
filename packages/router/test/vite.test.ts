@@ -49,6 +49,7 @@ test('shares route preload state across client and server build environments', (
 	const routePlugin = plugins.find((plugin) => plugin.name === 'markless-router:routes');
 
 	expect(configPlugin?.sharedDuringBuild).toBe(true);
+	expect(configPlugin?.generateBundle).toMatchObject({ order: 'post' });
 	expect(routePlugin?.sharedDuringBuild).toBe(true);
 });
 
@@ -302,7 +303,7 @@ test('emits exact route modulepreload and stylesheet maps from client build chun
 
 	routePlugin?.configResolved?.({ base: '/app/', root: '/project' } as never);
 	configPlugin?.configResolved?.({ base: '/app/', root: '/project' } as never);
-	configPlugin?.generateBundle?.call(
+	hookHandler(configPlugin?.generateBundle)?.call(
 		{ environment: { config: { consumer: 'client' } } },
 		{},
 		{
@@ -437,7 +438,7 @@ function loadSymbol(file, symbol) {
 
 	routePlugin?.configResolved?.({ base: '/app/', root: '/project' } as never);
 	configPlugin?.configResolved?.({ base: '/app/', root: '/project' } as never);
-	configPlugin?.generateBundle?.call(
+	hookHandler(configPlugin?.generateBundle)?.call(
 		{ environment: { config: { consumer: 'client' } } },
 		{},
 		{
@@ -487,7 +488,7 @@ test('includes the current route resume module closure in ssr modulepreloads', (
 
 	routePlugin?.configResolved?.({ base: '/app/', root: '/project' } as never);
 	configPlugin?.configResolved?.({ base: '/app/', root: '/project' } as never);
-	configPlugin?.generateBundle?.call(
+	hookHandler(configPlugin?.generateBundle)?.call(
 		{ environment: { config: { consumer: 'client' } } },
 		{},
 		{
@@ -547,7 +548,7 @@ test('includes route-scoped symbol-module chunks in ssr and navigation modulepre
 
 	routePlugin?.configResolved?.({ base: '/app/', root: '/project' } as never);
 	configPlugin?.configResolved?.({ base: '/app/', root: '/project' } as never);
-	configPlugin?.generateBundle?.call(
+	hookHandler(configPlugin?.generateBundle)?.call(
 		{ environment: { config: { consumer: 'client' } } },
 		{},
 		{

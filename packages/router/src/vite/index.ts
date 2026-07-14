@@ -181,32 +181,37 @@ function routerConfigPlugin(
 		configEnvironment(_name, config) {
 			configureRouteInputs(config);
 		},
-		generateBundle(_options, bundle) {
-			if (this.environment?.config.consumer !== 'client') {
-				return;
-			}
+		generateBundle: {
+			// Vite finalizes and propagates importedCss in vite:css-post.
+			order: 'post',
+			handler(_options, bundle) {
+				if (this.environment?.config.consumer !== 'client') {
+					return;
+				}
 
-			const resumeChunk = Object.values(bundle).find(
-				(item) => item.type === 'chunk' && isVirtualEntryChunk(item, RESUME_ENTRY_ORIGIN),
-			);
-			if (resumeChunk) {
-				resumeEntry.fileName = resumeChunk.fileName;
-			}
-			const navigationChunk = Object.values(bundle).find(
-				(item) =>
-					item.type === 'chunk' && isVirtualEntryChunk(item, NAVIGATION_ENTRY_ORIGIN),
-			);
-			if (navigationChunk) {
-				navigationEntry.fileName = navigationChunk.fileName;
-			}
-			routePreloads.routes = routeModulePreloadsFromBundle({
-				base: routePreloads.base,
-				bundle,
-				navigationChunk,
-				resumeChunk,
-				root: routePreloads.root,
-			});
-			patchRoutePreloadsInBundle(bundle, routePreloads.routes);
+				const resumeChunk = Object.values(bundle).find(
+					(item) =>
+						item.type === 'chunk' && isVirtualEntryChunk(item, RESUME_ENTRY_ORIGIN),
+				);
+				if (resumeChunk) {
+					resumeEntry.fileName = resumeChunk.fileName;
+				}
+				const navigationChunk = Object.values(bundle).find(
+					(item) =>
+						item.type === 'chunk' && isVirtualEntryChunk(item, NAVIGATION_ENTRY_ORIGIN),
+				);
+				if (navigationChunk) {
+					navigationEntry.fileName = navigationChunk.fileName;
+				}
+				routePreloads.routes = routeModulePreloadsFromBundle({
+					base: routePreloads.base,
+					bundle,
+					navigationChunk,
+					resumeChunk,
+					root: routePreloads.root,
+				});
+				patchRoutePreloadsInBundle(bundle, routePreloads.routes);
+			},
 		},
 	};
 }
