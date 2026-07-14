@@ -339,6 +339,140 @@ test.each([
 	).toEqual([]);
 });
 
+const catalogBaseEntries = [
+	'@{}',
+	'@if',
+	'@if-@else',
+	'@for-of',
+	'@for-index',
+	'@for-key',
+	'@for-index-key',
+	'@for-@empty',
+	'@switch-@case',
+	'@try-@pending',
+	'@try-@pending-@catch',
+] as const;
+const catalogClauseEntries = [
+	'@else',
+	'@else if',
+	'@empty',
+	'@case',
+	'@default',
+	'@pending',
+	'@catch',
+] as const;
+const catalogEntries = [
+	'function component',
+	...catalogBaseEntries,
+	...catalogClauseEntries,
+] as const;
+const catalogInsertText = {
+	'function component': 'export function ${1:ComponentName}(${2:props}) @{\n\t$0\n}',
+	'@if-@else': '@if (${1:condition}) {\n\t$2\n} @else {\n\t$3\n}',
+	'@for-index': '@for (const ${1:item} of ${2:items}; index ${3:i}) {\n\t$0\n}',
+	'@for-key': '@for (const ${1:item} of ${2:items}; key ${1:item}.${3:id}) {\n\t$0\n}',
+	'@for-index-key':
+		'@for (const ${1:item} of ${2:items}; index ${3:i}; key ${1:item}.${4:id}) {\n\t$0\n}',
+	'@try-@pending-@catch': '@try {\n\t$1\n} @pending {\n\t$2\n} @catch (${3:e}) {\n\t$0\n}',
+	'@else if': '@else if (${1:condition}) {\n\t$0\n}',
+} as const;
+
+test.each([
+	{
+		name: 'module scope',
+		marker: '/*M4C_MODULE*/',
+		expected: ['function component'],
+	},
+	{
+		name: 'statement base position',
+		marker: '/*M4C_STATEMENT_BASE*/',
+		expected: catalogBaseEntries,
+	},
+	{
+		name: 'JSX-children base position',
+		marker: '/*M4C_CHILDREN_BASE*/',
+		expected: catalogBaseEntries,
+	},
+	{
+		name: 'statement sibling after @if',
+		marker: '/*M4C_STATEMENT_AFTER_IF*/',
+		expected: [...catalogBaseEntries, '@else', '@else if'],
+	},
+	{
+		name: 'JSX-children sibling after @if',
+		marker: '/*M4C_CHILDREN_AFTER_IF*/',
+		expected: [...catalogBaseEntries, '@else', '@else if'],
+	},
+	{
+		name: 'statement sibling after @for',
+		marker: '/*M4C_STATEMENT_AFTER_FOR*/',
+		expected: [...catalogBaseEntries, '@empty'],
+	},
+	{
+		name: 'JSX-children sibling after @for',
+		marker: '/*M4C_CHILDREN_AFTER_FOR*/',
+		expected: [...catalogBaseEntries, '@empty'],
+	},
+	{
+		name: 'statement sibling after @try',
+		marker: '/*M4C_AFTER_TRY*/',
+		expected: ['@pending', '@catch'],
+	},
+	{
+		name: 'switch region',
+		marker: '/*M4C_SWITCH_REGION*/',
+		expected: ['@case', '@default'],
+	},
+])(
+	'M4c catalog: $name exposes the context label set and snippet shapes',
+	async ({ marker, expected }) => {
+		const fixture = openFixture('catalog.tsrx');
+		const position = positionAfterMarker(fixture.marked, marker);
+		const completion = await server.completionInfo(fixture.file, position);
+		const entries = completionEntries(completion);
+		const expectedNames = [...expected];
+		const actualCatalogNames = entries
+			.map((entry) => entry.name)
+			.filter((name) => catalogEntries.includes(name))
+			.sort();
+
+		expect(
+			actualCatalogNames,
+			`M4c catalog missing capability: ${marker} must expose exactly its context-valid catalog labels.`,
+		).toEqual(expectedNames.toSorted());
+
+		for (const name of expectedNames) {
+			const expectedInsertText = catalogInsertText[name as keyof typeof catalogInsertText];
+			if (expectedInsertText === undefined) continue;
+			const entry = entries.find((candidate) => candidate.name === name);
+			expect(
+				entry?.isSnippet,
+				`M4c catalog missing capability: ${name} must be a snippet at ${marker}.`,
+			).toBe(true);
+			expect(
+				entry?.insertText,
+				`M4c catalog missing capability: ${name} must preserve its catalog insertText at ${marker}.`,
+			).toBe(expectedInsertText);
+		}
+
+		if (expectedNames.includes('function component')) {
+			const entry = entries.find((candidate) => candidate.name === 'function component');
+			expect(
+				entry?.labelDetails?.description,
+				'M4c catalog missing capability: the module-scope function component must carry its catalog detail.',
+			).toBe('Markless component function');
+		}
+
+		if (marker === '/*M4C_AFTER_TRY*/') {
+			expect(
+				actualCatalogNames,
+				'M4c catalog invalid capability: @else if is not valid after @try.',
+			).not.toContain('@else if');
+		}
+	},
+	30_000,
+);
+
 test('M5 real tsserver resolves and defines cross-file .tsrx imports', async () => {
 	const fixture = openFixture('imports.tsrx');
 	const completion = await server.completionInfo(
