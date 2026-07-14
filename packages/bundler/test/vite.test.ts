@@ -28,6 +28,20 @@ export function App() @{
 `;
 
 describe('Vite adapter structure', () => {
+	test('prints the debugging playbook hint when the dev server starts', () => {
+		const plugin = getAsyncPlugin();
+		const info = vi.fn();
+
+		callConfigureServer(plugin, {
+			config: { logger: { info }, root: '/workspace/app' },
+			environments: {},
+		});
+
+		expect(info).toHaveBeenCalledExactlyOnceWith(
+			"markless diagnostics available - window.__MARKLESS_DEBUG__ records containers, lifecycles, and event routing; see AGENTS.md ('markless debugging playbook') or run: pnpm doctor.",
+		);
+	});
+
 	test('lets the framework bundle graph own app preloading instead of Vite modulepreload', () => {
 		const plugin = getAsyncPlugin();
 		const appConfig = {};

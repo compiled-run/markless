@@ -155,6 +155,9 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 			},
 		},
 		configureServer(server: ViteDevServer) {
+			server.config.logger?.info(
+				"markless diagnostics available - window.__MARKLESS_DEBUG__ records containers, lifecycles, and event routing; see AGENTS.md ('markless debugging playbook') or run: pnpm doctor.",
+			);
 			rolldownOptions.devServer = {
 				transformRequest: (url, environment) =>
 					transformMarklessRequest(server, url, environment, options),

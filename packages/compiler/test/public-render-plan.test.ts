@@ -244,7 +244,11 @@ test.each([
 			expect.objectContaining({
 				code: 'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
 				passId: 'public-render-plan',
-				message: expect.stringContaining(reason),
+				message: expect.stringMatching(
+					new RegExp(
+						`${reason}.*markless debugging playbook: see AGENTS\\.md, or run pnpm doctor`,
+					),
+				),
 				...(suggestion
 					? {
 							suggestions: [
@@ -606,7 +610,7 @@ export default function Catalog() @{
 		expect.arrayContaining([
 			expect.objectContaining({
 				message:
-					'The @for rows are not compiler-proven (reason: row-component-content-unsupported), so the render module drops the list content.',
+					'The @for rows are not compiler-proven (reason: row-component-content-unsupported), so the render module drops the list content. markless debugging playbook: see AGENTS.md, or run pnpm doctor',
 				suggestions: [
 					{
 						message:

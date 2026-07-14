@@ -304,14 +304,16 @@ function routeTerminationError(
 	symbol: MarklessSymbolManifestEntry,
 ): string | undefined {
 	const target = chunks.get(claimedChunk);
-	if (!target) return 'claimed chunk was not emitted';
+	if (!target) {
+		return 'claimed chunk was not emitted. markless debugging playbook: see AGENTS.md, or run pnpm doctor';
+	}
 
 	const symbolVirtualId = normalizeVirtualId(symbol.virtualModuleId);
 	if (!chunkOrReexportChainContainsSymbol(chunks, target, symbolVirtualId, symbol.exportName)) {
-		return `claimed chunk does not contain its generated symbol module ${symbol.virtualModuleId} or a live re-export chain to it`;
+		return `claimed chunk does not contain its generated symbol module ${symbol.virtualModuleId} or a live re-export chain to it. markless debugging playbook: see AGENTS.md, or run pnpm doctor`;
 	}
 	if (!(target.exports ?? []).includes(symbol.exportName)) {
-		return `claimed chunk does not export ${symbol.exportName}`;
+		return `claimed chunk does not export ${symbol.exportName}. markless debugging playbook: see AGENTS.md, or run pnpm doctor`;
 	}
 	return undefined;
 }

@@ -109,7 +109,8 @@ describe('bundle-size generated symbol tables', () => {
 				{
 					symbolId: first.symbolId,
 					claimedChunk: facade.fileName,
-					reason: 'claimed chunk was not emitted',
+					reason:
+						'claimed chunk was not emitted. markless debugging playbook: see AGENTS.md, or run pnpm doctor',
 				},
 			],
 		});
@@ -149,7 +150,9 @@ describe('bundle-size generated symbol tables', () => {
 				{
 					symbolId: first.symbolId,
 					claimedChunk: secondFacade.fileName,
-					reason: expect.stringContaining('does not contain its generated symbol module'),
+					reason: expect.stringMatching(
+						/does not contain its generated symbol module.*markless debugging playbook: see AGENTS\.md, or run pnpm doctor/,
+					),
 				},
 			],
 		});

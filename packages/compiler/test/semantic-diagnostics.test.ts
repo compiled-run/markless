@@ -958,7 +958,8 @@ test('buildSemanticGraph reports invalid and duplicate element handle bindings',
 			passId: 'tsrx-semantic-graph',
 			artifactKeys: ['semanticGraph'],
 			title: 'element() handle is bound more than once',
-			message: 'Cannot bind element handle "input" to multiple live host elements.',
+			message:
+				'Cannot bind element handle "input" to multiple live host elements. markless debugging playbook: see AGENTS.md, or run pnpm doctor',
 			why: 'A resumed element handle must resolve to one current DOM locator. Binding one handle to multiple live elements would make lazy event code ambiguous.',
 			primarySpan: {
 				filename: 'src/Handles.tsrx',
@@ -1233,7 +1234,8 @@ export function App() @{
 	expect(graph.diagnostics).toEqual([
 		expect.objectContaining({
 			code: 'MARKLESS_ROW_ELEMENT_HANDLE_UNSUPPORTED',
-			message: expect.stringContaining('el={row.current}'),
+			message:
+				'Cannot bind el={row.current} inside a keyed repeat. Stage-one row ownership supports only a direct element() handle identifier such as el={row}. markless debugging playbook: see AGENTS.md, or run pnpm doctor',
 		}),
 	]);
 });
