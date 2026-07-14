@@ -3,7 +3,9 @@ import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync }
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { compileTsrxForTypeService } from '@markless/compiler/type-service';
 import { afterAll, beforeAll, expect, test } from 'vitest';
+import { snippetCatalog } from '../src/completions.ts';
 import {
 	TsserverHarness,
 	copyFixtureProject,
@@ -38,6 +40,16 @@ beforeAll(() => {
 afterAll(async () => {
 	await server?.close();
 	if (project) removeFixtureProject(project);
+});
+
+test('completion catalog insertText is valid strict TSRX in its offered context', () => {
+	for (const item of snippetCatalog) {
+		const source = catalogValidityFixture(item.context, stripSnippetSyntax(item.insertText));
+		expect(
+			() => compileTsrxForTypeService(source, `completion-${item.name}.tsrx`, { loose: false }),
+			`Catalog entry ${item.name} must insert grammar-valid strict TSRX.`,
+		).not.toThrow();
+	}
 });
 
 test('M1 real tsserver completes and hovers Markless framework APIs', async () => {
@@ -145,25 +157,49 @@ test('M3 real tsserver serves DOM, standard-library, local, generic, hover, and 
 	);
 }, 20_000);
 
+const baseConstructEntries = [
+	'@{}',
+	'@if',
+	'@if-@else',
+	'@for-of',
+	'@for-index',
+	'@for-key',
+	'@for-index-key',
+	'@for-@empty',
+	'@switch-@case',
+	'@try-@pending',
+	'@try-@pending-@catch',
+] as const;
+const removedCatalogEntries = ['@{', '@for', '@switch', '@try'] as const;
+
 test('M4 real tsserver returns only context-valid TSRX @ construct completions', async () => {
 	const fixture = openFixture('constructs.tsrx');
-	const base = ['@{', '@if', '@for', '@switch', '@try'];
 	const contexts = [
-		{ marker: '/*M4_BODY*/', included: base, excluded: branchEntries },
+		{
+			marker: '/*M4_BODY*/',
+			included: baseConstructEntries,
+			excluded: [...branchEntries, ...removedCatalogEntries],
+		},
 		{
 			marker: '/*M4_AFTER_IF*/',
-			included: [...base, '@else'],
-			excluded: branchEntries.filter((name) => name !== '@else'),
+			included: [...baseConstructEntries, '@else'],
+			excluded: [
+				...branchEntries.filter((name) => name !== '@else'),
+				...removedCatalogEntries,
+			],
 		},
 		{
 			marker: '/*M4_AFTER_FOR*/',
-			included: [...base, '@empty'],
-			excluded: branchEntries.filter((name) => name !== '@empty'),
+			included: [...baseConstructEntries, '@empty'],
+			excluded: [
+				...branchEntries.filter((name) => name !== '@empty'),
+				...removedCatalogEntries,
+			],
 		},
 		{
 			marker: '/*M4_IN_SWITCH*/',
 			included: ['@case', '@default'],
-			excluded: ['@else', '@empty', '@pending', '@catch'],
+			excluded: ['@else', '@empty', '@pending', '@catch', ...removedCatalogEntries],
 		},
 		{
 			// PM adjudication (T004): the tsrx grammar REQUIRES @pending/@catch after a
@@ -171,7 +207,14 @@ test('M4 real tsserver returns only context-valid TSRX @ construct completions',
 			// Offering base constructs there would insert invalid code.
 			marker: '/*M4_AFTER_TRY*/',
 			included: ['@pending', '@catch'],
-			excluded: [...base, '@else', '@empty', '@case', '@default'],
+			excluded: [
+				...baseConstructEntries,
+				...removedCatalogEntries,
+				'@else',
+				'@empty',
+				'@case',
+				'@default',
+			],
 		},
 	] as const;
 
@@ -235,7 +278,7 @@ test('M4 real tsserver returns only context-valid TSRX @ construct completions',
 	}
 }, 30_000);
 
-const childrenBaseEntries = ['@{', '@if', '@for', '@switch', '@try'];
+const childrenBaseEntries = baseConstructEntries;
 const childrenBranchEntries = ['@else', '@empty', '@case', '@default', '@pending', '@catch'];
 
 test.each([
@@ -243,21 +286,27 @@ test.each([
 		name: 'children base',
 		marker: '/*M4B_CHILDREN_BASE*/',
 		included: childrenBaseEntries,
-		excluded: childrenBranchEntries,
+		excluded: [...childrenBranchEntries, ...removedCatalogEntries],
 		assertTriggerShapeEquivalence: true,
 	},
 	{
 		name: 'children after @if sibling',
 		marker: '/*M4B_CHILDREN_AFTER_IF*/',
 		included: [...childrenBaseEntries, '@else'],
-		excluded: childrenBranchEntries.filter((name) => name !== '@else'),
+		excluded: [
+			...childrenBranchEntries.filter((name) => name !== '@else'),
+			...removedCatalogEntries,
+		],
 		assertTriggerShapeEquivalence: false,
 	},
 	{
 		name: 'children after @for sibling',
 		marker: '/*M4B_CHILDREN_AFTER_FOR*/',
 		included: [...childrenBaseEntries, '@empty'],
-		excluded: childrenBranchEntries.filter((name) => name !== '@empty'),
+		excluded: [
+			...childrenBranchEntries.filter((name) => name !== '@empty'),
+			...removedCatalogEntries,
+		],
 		assertTriggerShapeEquivalence: false,
 	},
 ])(
@@ -339,19 +388,7 @@ test.each([
 	).toEqual([]);
 });
 
-const catalogBaseEntries = [
-	'@{}',
-	'@if',
-	'@if-@else',
-	'@for-of',
-	'@for-index',
-	'@for-key',
-	'@for-index-key',
-	'@for-@empty',
-	'@switch-@case',
-	'@try-@pending',
-	'@try-@pending-@catch',
-] as const;
+const catalogBaseEntries = baseConstructEntries;
 const catalogClauseEntries = [
 	'@else',
 	'@else if',
@@ -439,6 +476,12 @@ test.each([
 			actualCatalogNames,
 			`M4c catalog missing capability: ${marker} must expose exactly its context-valid catalog labels.`,
 		).toEqual(expectedNames.toSorted());
+		for (const removedName of removedCatalogEntries) {
+			expect(
+				entries.map((entry) => entry.name),
+				`M4c catalog invalid capability: removed duplicate or invalid label ${removedName} must stay absent at ${marker}.`,
+			).not.toContain(removedName);
+		}
 
 		for (const name of expectedNames) {
 			const expectedInsertText =
@@ -649,6 +692,31 @@ test('M7c packaged VSIX contains and can require both extension-local plugin ent
 });
 
 const branchEntries = ['@else', '@empty', '@case', '@default', '@pending', '@catch'];
+
+function stripSnippetSyntax(insertText: string): string {
+	return insertText
+		.replace(/\$\{\d+:([^}]*)\}/g, '$1')
+		.replace(/\$\{\d+\}/g, '')
+		.replace(/^([\t ]*)\$\d+([\t ]*)$/gm, '$1$2')
+		.replace(/\$\d+/g, 'true');
+}
+
+function catalogValidityFixture(
+	context: (typeof snippetCatalog)[number]['context'],
+	insertText: string,
+): string {
+	const contexts = Array.isArray(context) ? context : [context];
+	if (contexts.includes('module')) return insertText;
+
+	let body = insertText;
+	if (contexts.includes('after-if')) body = `@if (true) {}\n${insertText}`;
+	else if (contexts.includes('after-for')) {
+		body = `const items = [];\n@for (const item of items) {}\n${insertText}`;
+	} else if (contexts.includes('switch')) body = `@switch (true) {\n${insertText}\n}`;
+	else if (contexts.includes('after-try')) body = `@try {}\n${insertText}`;
+
+	return `export function CatalogValidityGuard() @{\n${body}\n}`;
+}
 
 function openFixture(
 	name: string,

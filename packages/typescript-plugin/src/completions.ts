@@ -25,7 +25,7 @@ type CatalogItem = {
 
 const baseConstructContexts = ['statement', 'children'] as const;
 
-const snippetCatalog: readonly CatalogItem[] = [
+export const snippetCatalog: readonly CatalogItem[] = [
 	{
 		name: 'function Component(props) @{ }',
 		filterText: '@component',
@@ -41,7 +41,6 @@ const snippetCatalog: readonly CatalogItem[] = [
 		description: 'Markless component function',
 	},
 	{ name: '@{}', insertText: '@{\n\t$0\n}', context: baseConstructContexts },
-	{ name: '@{', insertText: '@{\n\t$0\n}', context: baseConstructContexts },
 	{ name: '@if', insertText: '@if (${1:condition}) {\n\t$0\n}', context: baseConstructContexts },
 	{
 		name: '@if-@else',
@@ -50,11 +49,6 @@ const snippetCatalog: readonly CatalogItem[] = [
 	},
 	{
 		name: '@for-of',
-		insertText: '@for (const ${1:item} of ${2:items}) {\n\t$0\n}',
-		context: baseConstructContexts,
-	},
-	{
-		name: '@for',
 		insertText: '@for (const ${1:item} of ${2:items}) {\n\t$0\n}',
 		context: baseConstructContexts,
 	},
@@ -85,11 +79,6 @@ const snippetCatalog: readonly CatalogItem[] = [
 		context: baseConstructContexts,
 	},
 	{
-		name: '@switch',
-		insertText: '@switch ($1) {\n\t$0\n}',
-		context: baseConstructContexts,
-	},
-	{
 		name: '@try-@pending',
 		insertText: '@try {\n\t$1\n} @pending {\n\t$0\n}',
 		context: baseConstructContexts,
@@ -99,7 +88,6 @@ const snippetCatalog: readonly CatalogItem[] = [
 		insertText: '@try {\n\t$1\n} @pending {\n\t$2\n} @catch (${3:e}) {\n\t$0\n}',
 		context: baseConstructContexts,
 	},
-	{ name: '@try', insertText: '@try {\n\t$0\n}', context: baseConstructContexts },
 	{ name: '@else', insertText: '@else {\n\t$0\n}', context: 'after-if' },
 	{
 		name: '@else if',
