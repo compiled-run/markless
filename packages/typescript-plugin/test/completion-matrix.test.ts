@@ -362,12 +362,12 @@ const catalogClauseEntries = [
 	'@catch',
 ] as const;
 const catalogEntries = [
-	'function component',
+	'function Component(props) @{ }',
 	...catalogBaseEntries,
 	...catalogClauseEntries,
 ] as const;
 const catalogInsertText = {
-	'function component': 'export function ${1:ComponentName}(${2:props}) @{\n\t$0\n}',
+	'function Component(props) @{ }': 'export function ${1:ComponentName}(${2:props}) @{\n\t$0\n}',
 	'@if-@else': '@if (${1:condition}) {\n\t$2\n} @else {\n\t$3\n}',
 	'@for-index': '@for (const ${1:item} of ${2:items}; index ${3:i}) {\n\t$0\n}',
 	'@for-key': '@for (const ${1:item} of ${2:items}; key ${1:item}.${3:id}) {\n\t$0\n}',
@@ -381,7 +381,7 @@ test.each([
 	{
 		name: 'module scope',
 		marker: '/*M4C_MODULE*/',
-		expected: ['function component'],
+		expected: ['function Component(props) @{ }'],
 	},
 	{
 		name: 'statement base position',
@@ -455,8 +455,16 @@ test.each([
 			).toBe(expectedInsertText);
 		}
 
-		if (expectedNames.includes('function component')) {
-			const entry = entries.find((candidate) => candidate.name === 'function component');
+		if (expectedNames.includes('function Component(props) @{ }')) {
+			const entry = entries.find(
+				(candidate) => candidate.name === 'function Component(props) @{ }',
+			);
+			expect(entry?.name).toContain('@');
+			expect(entry?.filterText).toMatch(/^@/);
+			const details = await server.completionEntryDetails(fixture.file, position, [
+				{ name: entry?.name ?? '' },
+			]);
+			expect(details?.some((detail: any) => detail.name === entry?.name)).toBe(true);
 			expect(
 				entry?.labelDetails?.description,
 				'M4c catalog missing capability: the module-scope function component must carry its catalog detail.',

@@ -14,6 +14,7 @@ type ConstructContext =
 
 type CatalogItem = {
 	readonly name: string;
+	readonly filterText?: string;
 	readonly insertText: string;
 	readonly context: Exclude<ConstructContext, 'none'>;
 	readonly description?: string;
@@ -21,7 +22,8 @@ type CatalogItem = {
 
 const snippetCatalog: readonly CatalogItem[] = [
 	{
-		name: 'function component',
+		name: 'function Component(props) @{ }',
+		filterText: '@component',
 		insertText: 'export function ${1:ComponentName}(${2:props}) @{\n\t$0\n}',
 		context: 'module',
 		description: 'Markless component function',
@@ -142,6 +144,7 @@ export function installMarklessCompletions(
 					kind: typeScript.ScriptElementKind.string,
 					kindModifiers: '',
 					sortText: `0-markless-${String(index).padStart(2, '0')}`,
+					...(item.filterText ? { filterText: item.filterText } : undefined),
 					insertText: item.insertText,
 					isSnippet: true,
 					replacementSpan,
