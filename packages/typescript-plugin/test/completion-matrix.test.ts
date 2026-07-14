@@ -235,6 +235,110 @@ test('M4 real tsserver returns only context-valid TSRX @ construct completions',
 	}
 }, 30_000);
 
+const childrenBaseEntries = ['@{', '@if', '@for', '@switch', '@try'];
+const childrenBranchEntries = ['@else', '@empty', '@case', '@default', '@pending', '@catch'];
+
+test.each([
+	{
+		name: 'children base',
+		marker: '/*M4B_CHILDREN_BASE*/',
+		included: childrenBaseEntries,
+		excluded: childrenBranchEntries,
+		assertTriggerShapeEquivalence: true,
+	},
+	{
+		name: 'children after @if sibling',
+		marker: '/*M4B_CHILDREN_AFTER_IF*/',
+		included: [...childrenBaseEntries, '@else'],
+		excluded: childrenBranchEntries.filter((name) => name !== '@else'),
+		assertTriggerShapeEquivalence: false,
+	},
+	{
+		name: 'children after @for sibling',
+		marker: '/*M4B_CHILDREN_AFTER_FOR*/',
+		included: [...childrenBaseEntries, '@empty'],
+		excluded: childrenBranchEntries.filter((name) => name !== '@empty'),
+		assertTriggerShapeEquivalence: false,
+	},
+])(
+	'M4b real tsserver returns context-valid TSRX @ constructs inside JSX children: $name',
+	async ({ marker, included, excluded, assertTriggerShapeEquivalence }) => {
+		const fixture = openFixture('construct-children.tsrx');
+		const position = positionAfterMarker(fixture.marked, marker);
+		const completion = await server.completionInfo(fixture.file, position);
+		const names = completionNames(completion).filter((name) => name.startsWith('@'));
+
+		if (assertTriggerShapeEquivalence) {
+			const triggeredCompletion = await triggeredAtCompletionInfo(
+				server,
+				fixture.file,
+				position,
+			);
+			expect(
+				completionNames(triggeredCompletion).filter((name) => name.startsWith('@')),
+				'M4b protocol invariant: triggerKind 2 with triggerCharacter @ must return the same @ entries as plain completionInfo.',
+			).toEqual(names);
+		}
+
+		expect(
+			names,
+			`M4b missing capability: ${marker} must offer its context-valid TSRX constructs inside JSX children.`,
+		).toEqual(expect.arrayContaining(included));
+		for (const excludedName of excluded) {
+			expect(
+				names,
+				`M4b invalid capability: ${excludedName} must not be offered at ${marker}.`,
+			).not.toContain(excludedName);
+		}
+
+		const entries = completionEntries(completion).filter((entry) =>
+			included.includes(entry.name),
+		);
+		const details = await server.completionEntryDetails(
+			fixture.file,
+			position,
+			entries.map(({ name, source, data }) => ({ name, source, data })),
+		);
+		for (const expectedName of included) {
+			const entry = entries.find((candidate) => candidate.name === expectedName);
+			expect(
+				entry?.isSnippet,
+				`M4b missing capability: ${expectedName} must be a snippet completion inside JSX children.`,
+			).toBe(true);
+			expect(
+				entry?.insertText,
+				`M4b missing capability: ${expectedName} must carry snippet insertion text inside JSX children.`,
+			).toMatch(/\$\{?\d/);
+			const span = entry?.replacementSpan;
+			expect(
+				span && span.end.line === span.start.line && span.end.offset - span.start.offset,
+				`M4b missing capability: ${expectedName} must replace the typed @ prefix inside JSX children.`,
+			).toBe(1);
+			expect(
+				details?.some((detail: any) => detail.name === expectedName),
+				`M4b missing capability: completionEntryDetails must resolve ${expectedName} inside JSX children.`,
+			).toBe(true);
+		}
+	},
+	30_000,
+);
+
+test.each([
+	{ name: 'JSX attribute string value', marker: '/*M4B_ATTRIBUTE*/' },
+	{ name: 'JSX expression container', marker: '/*M4B_EXPRESSION_CONTAINER*/' },
+	{ name: 'ordinary component-body string literal', marker: '/*M4B_STRING_LITERAL*/' },
+])('M4b real tsserver excludes TSRX @ constructs inside $name', async ({ marker }) => {
+	const fixture = openFixture('construct-children.tsrx');
+	const completion = await server.completionInfo(
+		fixture.file,
+		positionAfterMarker(fixture.marked, marker),
+	);
+	expect(
+		completionNames(completion).filter((name) => name.startsWith('@')),
+		`M4b invalid capability: TSRX constructs must not be offered at ${marker}.`,
+	).toEqual([]);
+});
+
 test('M5 real tsserver resolves and defines cross-file .tsrx imports', async () => {
 	const fixture = openFixture('imports.tsrx');
 	const completion = await server.completionInfo(
@@ -415,6 +519,21 @@ function completionNames(completion: any): string[] {
 
 function displayText(info: any): string {
 	return info?.displayString ?? info?.displayParts?.map((part: any) => part.text).join('') ?? '';
+}
+
+function triggeredAtCompletionInfo(
+	harness: TsserverHarness,
+	file: string,
+	position: { line: number; offset: number },
+): Promise<any> {
+	return (harness as any).requestBody('completionInfo', {
+		file,
+		...position,
+		includeExternalModuleExports: true,
+		includeInsertTextCompletions: true,
+		triggerKind: 2,
+		triggerCharacter: '@',
+	});
 }
 
 function pluginResolutionErrors(log: string, pluginNames: readonly string[]): string[] {
