@@ -148,6 +148,7 @@ function routerConfigPlugin(
 	return {
 		name: 'markless-router:vite',
 		enforce: 'pre',
+		sharedDuringBuild: true,
 		config(config: UserConfig) {
 			throwIfUserAddedNitro(config.plugins, nitroPluginsFromRouter);
 			config.environments ??= {};
@@ -467,6 +468,7 @@ function virtualModulesPlugin(
 
 	return {
 		name: 'markless-router:routes',
+		sharedDuringBuild: true,
 		configResolved(config) {
 			root = config.root;
 		},
@@ -509,7 +511,10 @@ function virtualModulesPlugin(
 				);
 			}
 			if (id.startsWith(`\0${ROUTE_PRELOADS_ID}`)) {
-				return routePreloadsSource(routePreloads);
+				return routePreloadsSource(
+					routePreloads,
+					this?.environment?.config.consumer === 'client',
+				);
 			}
 			if (id.startsWith(`\0${ROUTER_OPTIONS_ID}`)) {
 				return 'export const routerMode = "path"; // retained for compat; hash paths are always first-class';
@@ -566,13 +571,19 @@ function rootScopeQuery(root: string, id = ''): string {
 	return query ? `?${query}&lang.ts` : '';
 }
 
-function routePreloadsSource(state: RoutePreloadState): string {
+function routePreloadsSource(state: RoutePreloadState, client: boolean): string {
+	const routes = client
+		? { navigation: state.routes.navigation, ssr: state.routes.ssr }
+		: state.routes;
+	const routeStylesheetExport = client
+		? []
+		: [`export const routeStylesheets = routePreloadData.styles ?? {};`];
 	return [
 		`const routePreloadsJson = globalThis.__marklessRouterRoutePreloadsJson ?? ${JSON.stringify(ROUTE_PRELOADS_PLACEHOLDER)};`,
-		`const routePreloadData = routePreloadsJson === ${JSON.stringify(ROUTE_PRELOADS_PLACEHOLDER)} ? ${JSON.stringify(state.routes)} : JSON.parse(routePreloadsJson);`,
+		`const routePreloadData = routePreloadsJson === ${JSON.stringify(ROUTE_PRELOADS_PLACEHOLDER)} ? ${JSON.stringify(routes)} : JSON.parse(routePreloadsJson);`,
 		`export const routeModulePreloads = routePreloadData.navigation ?? {};`,
 		`export const routeSsrModulePreloads = routePreloadData.ssr ?? {};`,
-		`export const routeStylesheets = routePreloadData.styles ?? {};`,
+		...routeStylesheetExport,
 		`export function preloadRouteModule(file, document = globalThis.document) {`,
 		`  const hrefs = routeModulePreloads[file];`,
 		`  if (!hrefs?.length || !document?.head) return [];`,
@@ -597,7 +608,9 @@ function patchRoutePreloadsInBundle(
 	bundle: Record<string, unknown>,
 	routes: RoutePreloadMaps,
 ): void {
-	const replacement = jsStringLiteralContent(JSON.stringify(routes));
+	const replacement = jsStringLiteralContent(
+		JSON.stringify({ navigation: routes.navigation, ssr: routes.ssr }),
+	);
 	for (const chunk of outputChunks(bundle)) {
 		if (!chunk.code?.includes(ROUTE_PRELOADS_PLACEHOLDER)) continue;
 		chunk.code = chunk.code.replace(ROUTE_PRELOADS_PLACEHOLDER, replacement);

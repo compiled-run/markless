@@ -43,6 +43,15 @@ test('wires request-file transforms before route virtual modules', () => {
 	expect(names.indexOf('markless-router:routes')).toBeLessThan(names.indexOf('nitro:init'));
 });
 
+test('shares route preload state across client and server build environments', () => {
+	const plugins = flattenPlugins([router()]);
+	const configPlugin = plugins.find((plugin) => plugin.name === 'markless-router:vite');
+	const routePlugin = plugins.find((plugin) => plugin.name === 'markless-router:routes');
+
+	expect(configPlugin?.sharedDuringBuild).toBe(true);
+	expect(routePlugin?.sharedDuringBuild).toBe(true);
+});
+
 test('can disable Nitro for route-only fixtures and apps', () => {
 	const plugins = flattenPlugins([router({ nitro: false })]);
 	const names = plugins.map((plugin) => plugin.name);
@@ -262,10 +271,13 @@ test('emits exact route modulepreload and stylesheet maps from client build chun
 	const configPlugin = plugins.find((plugin) => plugin.name === 'markless-router:vite');
 	const routePlugin = plugins.find((plugin) => plugin.name === 'markless-router:routes');
 	const routeLoad = hookHandler(routePlugin?.load) as
-		| ((id: string) => string | undefined)
+		| ((
+				this: { environment?: { config?: { consumer?: string } } },
+				id: string,
+		  ) => string | undefined)
 		| undefined;
 	const navigationChunk = chunk({
-		code: `const routePreloadsJson = globalThis.__marklessRouterRoutePreloadsJson ?? "__MARKLESS_ROUTER_ROUTE_PRELOADS__"; const routePreloadData = routePreloadsJson === "__MARKLESS_ROUTER_ROUTE_PRELOADS__" ? { navigation: {}, ssr: {} } : JSON.parse(routePreloadsJson); export const routeModulePreloads = routePreloadData.navigation; export const routeSsrModulePreloads = routePreloadData.ssr;`,
+		code: `const routePreloadsJson = globalThis.__marklessRouterRoutePreloadsJson ?? "__MARKLESS_ROUTER_ROUTE_PRELOADS__"; const routePreloadData = routePreloadsJson === "__MARKLESS_ROUTER_ROUTE_PRELOADS__" ? { navigation: {}, ssr: {} } : JSON.parse(routePreloadsJson); export const routeModulePreloads = routePreloadData.navigation; export const routeSsrModulePreloads = routePreloadData.ssr; const __vite__mapDeps = () => ["assets/docs.css"];`,
 		dynamicImports: ['build/docs.js', 'build/home.js', 'build/navigation-polyfill.js'],
 		fileName: 'build/navigation.js',
 		imports: ['build/shared.js'],
@@ -326,9 +338,17 @@ test('emits exact route modulepreload and stylesheet maps from client build chun
 		},
 	);
 
-	const source = routeLoad?.('\0virtual:markless-router/route-preloads');
+	const clientSource = routeLoad?.call(
+		{ environment: { config: { consumer: 'client' } } },
+		'\0virtual:markless-router/route-preloads',
+	);
+	const serverSource = routeLoad?.call(
+		{ environment: { config: { consumer: 'server' } } },
+		'\0virtual:markless-router/route-preloads',
+	);
 	const routePreloadData = JSON.parse(
-		source?.match(/routePreloadData = routePreloadsJson === .* \? (\{.*\}) :/)?.[1] ?? '{}',
+		serverSource?.match(/routePreloadData = routePreloadsJson === .* \? (\{.*\}) :/)?.[1] ??
+			'{}',
 	) as {
 		readonly navigation?: Record<string, string[]>;
 		readonly ssr?: Record<string, string[]>;
@@ -337,10 +357,21 @@ test('emits exact route modulepreload and stylesheet maps from client build chun
 	const routePreloads = routePreloadData.navigation ?? {};
 	const ssrPreloads = routePreloadData.ssr ?? {};
 	const stylesheets = routePreloadData.styles ?? {};
+	const patchedRoutePreloads = JSON.parse(
+		JSON.parse(
+			navigationChunk.code.match(/routePreloadsJson = .* \?\? ("(?:\\.|[^"\\])*")/)?.[1] ??
+				'"{}"',
+		),
+	) as Record<string, unknown>;
 
-	expect(source).toContain('"pages/docs/[...slug].mdx"');
-	expect(source).toContain('routeStylesheets');
+	expect(serverSource).toContain('"pages/docs/[...slug].mdx"');
+	expect(serverSource).toContain('routeStylesheets');
+	expect(clientSource).not.toContain('routeStylesheets');
+	expect(clientSource).not.toContain('assets/docs.css');
 	expect(navigationChunk.code).toContain('pages/docs/[...slug].mdx');
+	expect(Object.keys(patchedRoutePreloads)).toEqual(['navigation', 'ssr']);
+	expect(patchedRoutePreloads).not.toHaveProperty('styles');
+	expect(navigationChunk.code).toContain('const __vite__mapDeps = () => ["assets/docs.css"]');
 	expect(navigationChunk.code.match(/__MARKLESS_ROUTER_ROUTE_PRELOADS__/g)).toHaveLength(1);
 	expect(navigationChunk.code).toContain('JSON.parse(routePreloadsJson)');
 	expect(routePreloads['pages/docs/[...slug].mdx']).toEqual([
