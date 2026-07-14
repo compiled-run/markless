@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -355,15 +355,20 @@ test('M7c packaged VSIX contains and can require both extension-local plugin ent
 		existsSync(extensionDirectory),
 		'M7c missing capability: packages/vscode-plugin does not exist, so no packaged VSIX can be inspected.',
 	).toBe(true);
-	const vsix = findVsix(extensionDirectory);
+	const vsix = resolve(extensionDirectory, 'dist/markless-tsrx.vsix');
 	expect(
-		vsix,
+		existsSync(vsix),
 		'M7c missing capability: no built .vsix exists; run pnpm --dir packages/vscode-plugin package:vsix.',
-	).toBeDefined();
+	).toBe(true);
+	const runStartedAt = Number(process.env.MARKLESS_COMPLETION_MATRIX_STARTED_AT);
+	expect(
+		Number.isFinite(runStartedAt) && statSync(vsix).mtimeMs > runStartedAt,
+		'M7c missing capability: the inspected VSIX must be rebuilt after test:completion-matrix starts.',
+	).toBe(true);
 
 	const extracted = mkdtempSync(join(tmpdir(), 'markless-vsix-matrix-'));
 	try {
-		const unzip = spawnSync('unzip', ['-q', vsix!, '-d', extracted], { encoding: 'utf8' });
+		const unzip = spawnSync('unzip', ['-q', vsix, '-d', extracted], { encoding: 'utf8' });
 		expect(
 			unzip.status,
 			`M7c harness could not extract ${vsix}: ${unzip.stderr || unzip.stdout}`,
@@ -420,13 +425,4 @@ function pluginResolutionErrors(log: string, pluginNames: readonly string[]): st
 				/(failed|error|exception)/i.test(line) &&
 				pluginNames.some((pluginName) => line.includes(pluginName)),
 		);
-}
-
-function findVsix(extensionDirectory: string): string | undefined {
-	const candidates = [extensionDirectory, join(extensionDirectory, 'dist')];
-	for (const directory of candidates) {
-		if (!existsSync(directory)) continue;
-		const file = readdirSync(directory).find((name) => name.endsWith('.vsix'));
-		if (file) return join(directory, file);
-	}
 }

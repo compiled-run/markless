@@ -66,6 +66,7 @@
 	},
 	"scripts": {
 		"build:cjs": "vp pack src/typescript-plugin/index.ts --no-config --format cjs --platform node --out-dir dist --clean=false --no-dts --no-report && node -e \"require('node:fs').renameSync('dist/index.cjs','dist/typescript-plugin.cjs')\"",
+		"build:vsix": "vp pack src/typescript-plugin/index.ts --no-config --format cjs --platform node --out-dir ../vscode-plugin/dist/vsix-build/router --clean --no-dts --no-report --deps.alwaysBundle '/.*/' --deps.never-bundle typescript",
 		"test:boxes": "witness run",
 		"prepublishOnly": "node ../../scripts/release/verify-publish-ready.mjs"
 	},
