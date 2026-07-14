@@ -3208,7 +3208,7 @@
 					"match": "await"
 				},
 				{
-					"name": "meta.for-of-ripple",
+					"name": "meta.for-of-markless-tsrx",
 					"match": "\\(\\s*(?:(let|const|var)\\s+)?([_$[:alpha:]][_$[:alnum:]]*)\\s+(of)\\s+([^;]+?)\\s*;\\s*(?:(index)\\s+([_$[:alpha:]][_$[:alnum:]]*)(?:\\s*;\\s*(key)\\s+([^)]+?))?|(key)\\s+([^)]+?))\\s*\\)",
 					"captures": {
 						"1": {
@@ -3224,19 +3224,19 @@
 							"name": "variable.other.object.js"
 						},
 						"5": {
-							"name": "keyword.keyword.index.ripple"
+							"name": "keyword.keyword.index.markless-tsrx"
 						},
 						"6": {
 							"name": "variable.other.readwrite.js"
 						},
 						"7": {
-							"name": "keyword.keyword.key.ripple"
+							"name": "keyword.keyword.key.markless-tsrx"
 						},
 						"8": {
 							"name": "variable.other.object.js"
 						},
 						"9": {
-							"name": "keyword.keyword.key.ripple"
+							"name": "keyword.keyword.key.markless-tsrx"
 						},
 						"10": {
 							"name": "variable.other.object.js"
@@ -4169,7 +4169,7 @@
 					"match": "===|!==|==|!="
 				},
 				{
-					"name": "keyword.operator.relational.js operator.relational.ripple-force entity.name.operator.relational.ripple",
+					"name": "keyword.operator.relational.js operator.relational.markless-tsrx-force entity.name.operator.relational.markless-tsrx",
 					"match": "<=|>=|<>|<|>"
 				},
 				{
@@ -7153,5 +7153,5 @@
 			]
 		}
 	},
-	"fileTypes": ["ripple"]
+	"fileTypes": ["markless-tsrx"]
 }
