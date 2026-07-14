@@ -1,0 +1,71 @@
+{
+	"name": "markless-tsrx",
+	"displayName": "Markless TSRX",
+	"version": "0.0.1",
+	"private": true,
+	"description": "Markless TSRX language support for Visual Studio Code.",
+	"categories": [
+		"Programming Languages"
+	],
+	"license": "MIT",
+	"publisher": "markless-dev",
+	"scripts": {
+		"build": "node scripts/regenerate-textmate.mjs && node scripts/assemble-vsix.mjs",
+		"package:vsix": "node scripts/assemble-vsix.mjs && vsce package --no-dependencies --out dist/markless-tsrx.vsix && node scripts/repack-vsix.mjs"
+	},
+	"devDependencies": {
+		"@vscode/vsce": "catalog:",
+		"adm-zip": "catalog:"
+	},
+	"contributes": {
+		"languages": [
+			{
+				"id": "markless-tsrx",
+				"aliases": [
+					"Markless TSRX",
+					"markless-tsrx"
+				],
+				"extensions": [
+					".tsrx"
+				],
+				"icon": {
+					"light": "./assets/markless-logo.png",
+					"dark": "./assets/markless-logo.png"
+				},
+				"configuration": "./language-configuration.json"
+			}
+		],
+		"grammars": [
+			{
+				"language": "markless-tsrx",
+				"scopeName": "source.tsrx.markless",
+				"path": "./syntaxes/markless.tmLanguage.json",
+				"embeddedLanguages": {
+					"source.js.embedded.markless-tsrx": "javascriptreact",
+					"source.js.embedded.markless-tsrx-isolated": "javascript",
+					"source.css": "css"
+				}
+			}
+		],
+		"typescriptServerPlugins": [
+			{
+				"name": "@markless/typescript-plugin",
+				"enableForWorkspaceTypeScriptVersions": true,
+				"languages": [
+					"markless-tsrx"
+				]
+			},
+			{
+				"name": "@markless/router/typescript-plugin",
+				"enableForWorkspaceTypeScriptVersions": true,
+				"languages": [
+					"markless-tsrx"
+				]
+			}
+		]
+	},
+	"icon": "./assets/markless-logo.png",
+	"engines": {
+		"vscode": "^1.128.0"
+	}
+}

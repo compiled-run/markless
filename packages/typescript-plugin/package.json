@@ -13,11 +13,12 @@
 		"./language": "./src/language.ts"
 	},
 	"scripts": {
-		"build:cjs": "vp pack src/index.ts --no-config --format cjs --out-dir dist --clean --no-dts --no-report",
-		"test:completion-matrix": "pnpm run build:cjs && pnpm -w exec vp test packages/typescript-plugin/test/completion-matrix.test.ts"
+		"build:cjs": "vp pack src/index.ts --no-config --format cjs --platform node --out-dir dist --clean --no-dts --no-report",
+		"test:completion-matrix": "pnpm run build:cjs && pnpm --dir ../router run build:cjs && pnpm -w exec vp test packages/typescript-plugin/test/completion-matrix.test.ts"
 	},
 	"dependencies": {
 		"@markless/compiler": "workspace:*",
+		"@markless/router": "workspace:*",
 		"@volar/typescript": "catalog:"
 	},
 	"peerDependencies": {

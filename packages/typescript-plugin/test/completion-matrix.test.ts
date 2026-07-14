@@ -109,7 +109,9 @@ test('M3 real tsserver serves DOM, standard-library, local, generic, hover, and 
 		positionAfterMarker(fixture.marked, '/*M3_GENERIC*/'),
 	);
 	const diagnostics = await server.semanticDiagnosticsSync(fixture.file);
-	const errorAnchor = positionAtSearch(fixture.source, "'mapped-error'");
+	// PM adjudication (T004): TS2322 anchors on the declared variable name, not the
+	// string initializer — anchor where TypeScript actually reports it.
+	const errorAnchor = positionAtSearch(fixture.source, 'deliberateTypeError');
 
 	expect(
 		completionNames(dom),
@@ -123,10 +125,13 @@ test('M3 real tsserver serves DOM, standard-library, local, generic, hover, and 
 		completionNames(local),
 		'M3 missing capability: local declarations must complete inside a .tsrx component body.',
 	).toContain('identity');
+	// PM adjudication (T004): hovering a generic call site shows TypeScript's
+	// INSTANTIATED signature (real TS behavior); asserting it still proves hover
+	// maps through the .tsrx virtual code on a generic call.
 	expect(
 		displayText(generic),
 		'M3 missing capability: quickinfo must preserve the local generic function signature.',
-	).toContain('identity<T>(value: T): T');
+	).toContain('identity<"typed">(value: "typed"): "typed"');
 	expect(
 		diagnostics,
 		'M3 missing capability: the deliberate string-to-number error must surface at its mapped .tsrx source position.',
@@ -161,9 +166,12 @@ test('M4 real tsserver returns only context-valid TSRX @ construct completions',
 			excluded: ['@else', '@empty', '@pending', '@catch'],
 		},
 		{
+			// PM adjudication (T004): the tsrx grammar REQUIRES @pending/@catch after a
+			// @try block (verified: '@try {} @if ...' throws 'Missing @catch or @pending').
+			// Offering base constructs there would insert invalid code.
 			marker: '/*M4_AFTER_TRY*/',
-			included: [...base, '@pending', '@catch'],
-			excluded: ['@else', '@empty', '@case', '@default'],
+			included: ['@pending', '@catch'],
+			excluded: [...base, '@else', '@empty', '@case', '@default'],
 		},
 	] as const;
 
@@ -200,10 +208,14 @@ test('M4 real tsserver returns only context-valid TSRX @ construct completions',
 				entry?.insertText,
 				`M4 missing capability: ${expectedName} must carry snippet insertion text.`,
 			).toMatch(/\$\{?\d/);
+			// PM adjudication (T004): the tsserver protocol converts replacementSpan to
+			// {start:{line,offset}, end:{line,offset}} — assert the same one-character
+			// intent in protocol shape.
+			const span = entry?.replacementSpan;
 			expect(
-				entry?.replacementSpan,
+				span && span.end.line === span.start.line && span.end.offset - span.start.offset,
 				`M4 missing capability: ${expectedName} must replace the typed @ prefix.`,
-			).toMatchObject({ length: 1 });
+			).toBe(1);
 			expect(
 				details?.some((detail: any) => detail.name === expectedName),
 				`M4 missing capability: completionEntryDetails must resolve ${expectedName}.`,
