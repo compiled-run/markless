@@ -3,23 +3,97 @@ import type * as ts from 'typescript';
 
 type TypeScript = typeof ts;
 
-const snippets = [
-	['@{', '@{\n\t$0\n}'],
-	['@if', '@if ($1) {\n\t$0\n}'],
-	['@for', '@for (const ${1:item} of ${2:items}) {\n\t$0\n}'],
-	['@switch', '@switch ($1) {\n\t$0\n}'],
-	['@try', '@try {\n\t$0\n}'],
-	['@else', '@else {\n\t$0\n}'],
-	['@empty', '@empty {\n\t$0\n}'],
-	['@case', '@case $1: {\n\t$0\n}'],
-	['@default', '@default: {\n\t$0\n}'],
-	['@pending', '@pending {\n\t$0\n}'],
-	['@catch', '@catch (${1:error}) {\n\t$0\n}'],
-] as const;
+type ConstructContext =
+	| 'module'
+	| 'base'
+	| 'after-if'
+	| 'after-for'
+	| 'after-try'
+	| 'switch'
+	| 'none';
 
-const validationCache = new Map<string, readonly string[]>();
+type CatalogItem = {
+	readonly name: string;
+	readonly insertText: string;
+	readonly context: Exclude<ConstructContext, 'none'>;
+	readonly description?: string;
+};
+
+const snippetCatalog: readonly CatalogItem[] = [
+	{
+		name: 'function component',
+		insertText: 'export function ${1:ComponentName}(${2:props}) @{\n\t$0\n}',
+		context: 'module',
+		description: 'Markless component function',
+	},
+	{ name: '@{}', insertText: '@{\n\t$0\n}', context: 'base' },
+	{ name: '@{', insertText: '@{\n\t$0\n}', context: 'base' },
+	{ name: '@if', insertText: '@if (${1:condition}) {\n\t$0\n}', context: 'base' },
+	{
+		name: '@if-@else',
+		insertText: '@if (${1:condition}) {\n\t$2\n} @else {\n\t$3\n}',
+		context: 'base',
+	},
+	{
+		name: '@for-of',
+		insertText: '@for (const ${1:item} of ${2:items}) {\n\t$0\n}',
+		context: 'base',
+	},
+	{ name: '@for', insertText: '@for (const ${1:item} of ${2:items}) {\n\t$0\n}', context: 'base' },
+	{
+		name: '@for-index',
+		insertText: '@for (const ${1:item} of ${2:items}; index ${3:i}) {\n\t$0\n}',
+		context: 'base',
+	},
+	{
+		name: '@for-key',
+		insertText: '@for (const ${1:item} of ${2:items}; key ${1:item}.${3:id}) {\n\t$0\n}',
+		context: 'base',
+	},
+	{
+		name: '@for-index-key',
+		insertText:
+			'@for (const ${1:item} of ${2:items}; index ${3:i}; key ${1:item}.${4:id}) {\n\t$0\n}',
+		context: 'base',
+	},
+	{
+		name: '@for-@empty',
+		insertText: '@for (const ${1:item} of ${2:items}) {\n\t$2\n} @empty {\n\t$0\n}',
+		context: 'base',
+	},
+	{
+		name: '@switch-@case',
+		insertText: '@switch (${1:value}) {\n\t@case ${2:match}: {\n\t\t$0\n\t}\n}',
+		context: 'base',
+	},
+	{ name: '@switch', insertText: '@switch ($1) {\n\t$0\n}', context: 'base' },
+	{
+		name: '@try-@pending',
+		insertText: '@try {\n\t$1\n} @pending {\n\t$0\n}',
+		context: 'base',
+	},
+	{
+		name: '@try-@pending-@catch',
+		insertText: '@try {\n\t$1\n} @pending {\n\t$2\n} @catch (${3:e}) {\n\t$0\n}',
+		context: 'base',
+	},
+	{ name: '@try', insertText: '@try {\n\t$0\n}', context: 'base' },
+	{ name: '@else', insertText: '@else {\n\t$0\n}', context: 'after-if' },
+	{
+		name: '@else if',
+		insertText: '@else if (${1:condition}) {\n\t$0\n}',
+		context: 'after-if',
+	},
+	{ name: '@empty', insertText: '@empty {\n\t$0\n}', context: 'after-for' },
+	{ name: '@case', insertText: '@case $1: {\n\t$0\n}', context: 'switch' },
+	{ name: '@default', insertText: '@default: {\n\t$0\n}', context: 'switch' },
+	{ name: '@pending', insertText: '@pending {\n\t$0\n}', context: 'after-try' },
+	{ name: '@catch', insertText: '@catch (${1:error}) {\n\t$0\n}', context: 'after-try' },
+];
+
+const catalogNames = new Set(snippetCatalog.map((item) => item.name));
+const validationCache = new Map<string, ConstructContext>();
 const placeholderName = '__markless_at__';
-const baseConstructs = ['@{', '@if', '@for', '@switch', '@try'] as const;
 
 export function installMarklessCompletions(
 	typeScript: TypeScript,
@@ -57,20 +131,23 @@ export function installMarklessCompletions(
 		const prefix = source.slice(0, position).match(/@\w*$/)?.[0];
 		if (!prefix) return withAdditionalEntries(base, importEntries);
 
-		const validNames = validConstructs(source, fileName, position, prefix.length, info);
-		if (validNames.length === 0) return withoutSyntheticEntries(base);
+		const context = validConstructContext(source, fileName, position, prefix.length, info);
+		if (context === 'none') return withoutSyntheticEntries(base);
 		const replacementSpan = { start: position - prefix.length, length: prefix.length };
-		const entries = snippets
-			.filter(([name]) => validNames.includes(name))
+		const entries = snippetCatalog
+			.filter((item) => isCatalogItemValidInContext(item, context))
 			.map(
-				([name, insertText], index): ts.CompletionEntry => ({
-					name,
+				(item, index): ts.CompletionEntry => ({
+					name: item.name,
 					kind: typeScript.ScriptElementKind.string,
 					kindModifiers: '',
 					sortText: `0-markless-${String(index).padStart(2, '0')}`,
-					insertText,
+					insertText: item.insertText,
 					isSnippet: true,
 					replacementSpan,
+					...(item.description
+						? { labelDetails: { description: item.description } }
+						: undefined),
 				}),
 			);
 		const existing = base?.entries.filter((entry) => !entry.name.startsWith('@')) ?? [];
@@ -89,7 +166,7 @@ export function installMarklessCompletions(
 		preferences,
 		_data,
 	) => {
-		if (fileName.endsWith('.tsrx') && name.startsWith('@')) {
+		if (fileName.endsWith('.tsrx') && catalogNames.has(name)) {
 			return {
 				name,
 				kind: typeScript.ScriptElementKind.string,
@@ -115,17 +192,17 @@ export function installMarklessCompletions(
 	};
 }
 
-function validConstructs(
+function validConstructContext(
 	source: string,
 	fileName: string,
 	position: number,
 	prefixLength: number,
 	info: ts.server.PluginCreateInfo,
-): readonly string[] {
+): ConstructContext {
 	const version = info.languageServiceHost.getScriptVersion?.(fileName) ?? source;
 	const key = `${fileName}\0${version}\0${position}\0${prefixLength}`;
 	const cached = validationCache.get(key);
-	if (cached) return cached;
+	if (cached !== undefined) return cached;
 
 	const prefixStart = position - prefixLength;
 	const valid = classifyConstructContext(source, fileName, prefixStart, position);
@@ -152,7 +229,7 @@ function classifyConstructContext(
 	fileName: string,
 	prefixStart: number,
 	position: number,
-): readonly string[] {
+): ConstructContext {
 	const replacements = [
 		placeholderName,
 		`{${placeholderName}}`,
@@ -175,13 +252,13 @@ function classifyConstructContext(
 			// Try the recovery shape for the next structural context.
 		}
 	}
-	return [];
+	return 'none';
 }
 
-function classifyPlaceholder(location: AstLocation): readonly string[] | undefined {
+function classifyPlaceholder(location: AstLocation): ConstructContext | undefined {
 	const { node, ancestors } = location;
 	const parent = ancestors.at(-1);
-	if (!parent) return [];
+	if (!parent) return 'none';
 
 	if (parent.type === 'JSXExpressionContainer' && parent.expression === node) {
 		const childrenParent = ancestors.at(-2);
@@ -189,32 +266,43 @@ function classifyPlaceholder(location: AstLocation): readonly string[] | undefin
 			(childrenParent?.type !== 'JSXElement' && childrenParent?.type !== 'JSXFragment') ||
 			!Array.isArray(childrenParent.children)
 		) {
-			return [];
+			return 'none';
 		}
 		const childIndex = childrenParent.children.indexOf(parent);
-		if (childIndex < 0) return [];
+		if (childIndex < 0) return 'none';
 		const previous = childrenParent.children[childIndex - 1] as AstNode | undefined;
-		if (previous?.type === 'JSXIfExpression') return [...baseConstructs, '@else'];
-		if (previous?.type === 'JSXForExpression') return [...baseConstructs, '@empty'];
-		return baseConstructs;
+		if (previous?.type === 'JSXIfExpression') return 'after-if';
+		if (previous?.type === 'JSXForExpression') return 'after-for';
+		return 'base';
 	}
 
 	if (ancestors.some((ancestor) => ancestor.type === 'JSXSwitchExpression')) {
-		return ancestors.some((ancestor) => ancestor.type === 'SwitchCase')
-			? ['@case', '@default']
-			: [];
+		return ancestors.some((ancestor) => ancestor.type === 'SwitchCase') ? 'switch' : 'none';
 	}
-	if (parent.type !== 'ExpressionStatement' || parent.expression !== node) return [];
+	if (parent.type !== 'ExpressionStatement' || parent.expression !== node) return 'none';
 
 	const block = ancestors.at(-2);
-	if (block?.type !== 'JSXCodeBlock' || !Array.isArray(block.body)) return [];
+	if (block?.type === 'Program' && Array.isArray(block.body)) {
+		return block.body.includes(parent) ? 'module' : 'none';
+	}
+	if (block?.type !== 'JSXCodeBlock' || !Array.isArray(block.body)) return 'none';
 	const statementIndex = block.body.indexOf(parent);
-	if (statementIndex < 0) return [];
+	if (statementIndex < 0) return 'none';
 	const previous = block.body[statementIndex - 1] as AstNode | undefined;
-	if (previous?.type === 'JSXTryExpression') return ['@pending', '@catch'];
-	if (previous?.type === 'JSXIfExpression') return [...baseConstructs, '@else'];
-	if (previous?.type === 'JSXForExpression') return [...baseConstructs, '@empty'];
-	return baseConstructs;
+	if (previous?.type === 'JSXTryExpression') return 'after-try';
+	if (previous?.type === 'JSXIfExpression') return 'after-if';
+	if (previous?.type === 'JSXForExpression') return 'after-for';
+	return 'base';
+}
+
+function isCatalogItemValidInContext(
+	item: CatalogItem,
+	context: Exclude<ConstructContext, 'none'>,
+): boolean {
+	return (
+		item.context === context ||
+		(item.context === 'base' && (context === 'after-if' || context === 'after-for'))
+	);
 }
 
 function buildClassifierCandidate(
@@ -545,7 +633,7 @@ function withoutSyntheticEntries(
 	base: ts.CompletionInfo | undefined,
 ): ts.CompletionInfo | undefined {
 	if (!base) return undefined;
-	return { ...base, entries: base.entries.filter((entry) => !entry.name.startsWith('@')) };
+	return { ...base, entries: base.entries.filter((entry) => !catalogNames.has(entry.name)) };
 }
 
 function emptyCompletionInfo(): ts.CompletionInfo {
