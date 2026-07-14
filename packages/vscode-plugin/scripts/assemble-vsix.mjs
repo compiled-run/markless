@@ -12,12 +12,14 @@ const distRoot = resolve(packageRoot, 'dist');
 const buildRoot = resolve(distRoot, 'vsix-build');
 
 rmSync(buildRoot, { recursive: true, force: true });
+run('pnpm', ['--dir', packageRoot, 'run', 'build:runtime']);
 run('pnpm', ['--dir', resolve(workspaceRoot, 'packages/typescript-plugin'), 'build:vsix']);
 run('pnpm', ['--dir', resolve(workspaceRoot, 'packages/router'), 'build:vsix']);
 rmSync(resolve(distRoot, 'node_modules'), { recursive: true, force: true });
 
 assemblePackage('@markless/typescript-plugin', 'typescript-plugin', 'index.cjs');
 assemblePackage('@markless/router', 'router', 'index.cjs', './typescript-plugin');
+assertSelfContained(resolve(distRoot, 'extension.cjs'), ['vscode']);
 rmSync(buildRoot, { recursive: true, force: true });
 
 function assemblePackage(name, directory, entry, exportPath = '.') {
@@ -35,13 +37,14 @@ function assemblePackage(name, directory, entry, exportPath = '.') {
 	);
 }
 
-function assertSelfContained(entry) {
+function assertSelfContained(entry, hostModules = []) {
 	const source = readFileSync(entry, 'utf8');
 	const requires = [...source.matchAll(/\brequire\(["']([^"']+)["']\)/g)].map(
 		(match) => match[1],
 	);
 	const allowed = new Set([
 		'typescript',
+		...hostModules,
 		...builtinModules,
 		...builtinModules.map((name) => `node:${name}`),
 	]);

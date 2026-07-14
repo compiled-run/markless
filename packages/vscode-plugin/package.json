@@ -9,8 +9,13 @@
 	],
 	"license": "MIT",
 	"publisher": "markless-dev",
+	"main": "./dist/extension.cjs",
+	"activationEvents": [
+		"onLanguage:markless-tsrx"
+	],
 	"scripts": {
 		"build": "node scripts/regenerate-textmate.mjs && node scripts/assemble-vsix.mjs",
+		"build:runtime": "vp pack src/extension.ts --no-config --format cjs --platform node --out-dir dist --clean=false --no-dts --no-report --deps.alwaysBundle '/.*/' --deps.never-bundle vscode",
 		"package:vsix": "node scripts/assemble-vsix.mjs && vsce package --no-dependencies --out dist/markless-tsrx.vsix && node scripts/repack-vsix.mjs"
 	},
 	"devDependencies": {
@@ -62,7 +67,17 @@
 					"markless-tsrx"
 				]
 			}
-		]
+		],
+		"configuration": {
+			"title": "Markless",
+			"properties": {
+				"markless.autoClosingTags": {
+					"type": "boolean",
+					"default": true,
+					"description": "Automatically insert matching closing tags in TSRX files."
+				}
+			}
+		}
 	},
 	"icon": "./assets/markless-logo.png",
 	"engines": {

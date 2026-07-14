@@ -647,9 +647,20 @@ test('M7b VSIX manifest exposes markless-tsrx to both plugins and enables worksp
 		manifest.engines?.vscode,
 		'M7b missing capability: VS Code engine floor is fixed by T002.',
 	).toBe('^1.128.0');
+	expect(manifest.main, 'M7b missing capability: the extension runtime entry must be declared.').toBe(
+		'./dist/extension.cjs',
+	);
+	expect(
+		manifest.activationEvents,
+		'M7b missing capability: TSRX documents must activate the extension runtime.',
+	).toContain('onLanguage:markless-tsrx');
+	expect(
+		manifest.contributes?.configuration?.properties?.['markless.autoClosingTags'],
+		'M7b missing capability: users must be able to disable automatic closing tags.',
+	).toMatchObject({ type: 'boolean', default: true });
 });
 
-test('M7c packaged VSIX contains and can require both extension-local plugin entries', () => {
+test('M7c packaged VSIX contains both plugins and a valid extension runtime', () => {
 	const extensionDirectory = resolve(workspaceRoot, 'packages/vscode-plugin');
 	expect(
 		existsSync(extensionDirectory),
@@ -686,6 +697,16 @@ test('M7c packaged VSIX contains and can require both extension-local plugin ent
 				`M7c missing capability: extracted extension-local ${pluginName} must be require()-able without repository node_modules.`,
 			).toBe('function');
 		}
+		const runtime = join(extensionRoot, 'dist/extension.cjs');
+		expect(
+			existsSync(runtime),
+			'M7c missing capability: the extension runtime bundle must exist inside the extracted VSIX.',
+		).toBe(true);
+		const syntaxCheck = spawnSync(process.execPath, ['--check', runtime], { encoding: 'utf8' });
+		expect(
+			syntaxCheck.status,
+			`M7c extension runtime bundle must pass node --check: ${syntaxCheck.stderr || syntaxCheck.stdout}`,
+		).toBe(0);
 	} finally {
 		rmSync(extracted, { recursive: true, force: true });
 	}
