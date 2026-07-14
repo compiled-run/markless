@@ -212,6 +212,14 @@ test('creates a minimal Markless Router app with TSRX pages and Nitro-backed dep
 		scripts: Record<string, string>;
 	};
 	const viteConfig = await readFile(join(appRoot, 'vite.config.ts'), 'utf-8');
+	const vscodeSettings = JSON.parse(
+		await readFile(join(appRoot, '.vscode/settings.json'), 'utf-8'),
+	) as unknown;
+	const zedSettings = await readFile(join(appRoot, '.zed/settings.json'), 'utf-8');
+	const zedSettingsTemplate = await readFile(
+		new URL('../templates/common/.zed/settings.json', import.meta.url),
+		'utf-8',
+	);
 
 	expect(packageJson.scripts).toMatchObject({
 		build: 'vp build',
@@ -230,6 +238,12 @@ test('creates a minimal Markless Router app with TSRX pages and Nitro-backed dep
 		typescript: expect.any(String),
 		vite: expect.any(String),
 	});
+	expect(vscodeSettings).toEqual({
+		'files.associations': {
+			'*.tsrx': 'markless-tsrx',
+		},
+	});
+	expect(zedSettings).toBe(zedSettingsTemplate);
 	await expect(exists(join(appRoot, 'pages/index.tsrx'))).resolves.toBe(true);
 	await expect(exists(join(appRoot, 'public'))).resolves.toBe(true);
 	await expect(exists(join(appRoot, 'nitro.config.ts'))).resolves.toBe(false);

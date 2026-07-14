@@ -103,6 +103,9 @@ importers:
         specifier: workspace:*
         version: link:../../packages/router
     devDependencies:
+      '@markless/typescript-plugin':
+        specifier: workspace:*
+        version: link:../../packages/typescript-plugin
       rolldown:
         specifier: 1.0.3
         version: 1.0.3
