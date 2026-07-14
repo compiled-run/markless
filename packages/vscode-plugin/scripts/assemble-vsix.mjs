@@ -12,6 +12,7 @@ const distRoot = resolve(packageRoot, 'dist');
 const buildRoot = resolve(distRoot, 'vsix-build');
 
 rmSync(buildRoot, { recursive: true, force: true });
+rmSync(resolve(distRoot, 'markless-tsrx.vsix'), { force: true });
 run('pnpm', ['--dir', packageRoot, 'run', 'build:runtime']);
 run('pnpm', ['--dir', resolve(workspaceRoot, 'packages/typescript-plugin'), 'build:vsix']);
 run('pnpm', ['--dir', resolve(workspaceRoot, 'packages/router'), 'build:vsix']);

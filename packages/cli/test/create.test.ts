@@ -248,7 +248,7 @@ test('creates a minimal Markless Router app with TSRX pages and Nitro-backed dep
 		},
 	});
 	expect(vscodeExtensions).toEqual({
-		recommendations: ['markless-dev.markless-tsrx'],
+		recommendations: ['markless.markless'],
 		unwantedRecommendations: ['ripple-ts.ripple-ts-vscode-plugin'],
 	});
 	expect(zedSettings).toBe(zedSettingsTemplate);

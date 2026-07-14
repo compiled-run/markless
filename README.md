@@ -124,12 +124,14 @@ For VS Code, build and install the extension locally:
 
 ```sh
 pnpm --dir packages/vscode-plugin package:vsix
-code --install-extension packages/vscode-plugin/dist/markless-tsrx.vsix
+code --install-extension packages/vscode-plugin/dist/markless.vsix
 ```
 
-The extension identity is provisional and marketplace publishing is pending. Zed
-works out of the box in this repository through `.zed/settings.json`. Apps created
-with the CLI include both editor configurations.
+Uninstall any previously sideloaded build first (`code --uninstall-extension markless-dev.markless-tsrx`) so two extensions do not contend for `.tsrx` files.
+
+Marketplace publishing is pending. Zed works out of the box in this repository
+through `.zed/settings.json`. Apps created with the CLI include both editor
+configurations.
 
 Read these first when changing the repo:
 

@@ -617,6 +617,11 @@ test('M7b VSIX manifest exposes markless-tsrx to both plugins and enables worksp
 		'M7b missing capability: packages/vscode-plugin/package.json does not exist.',
 	).toBe(true);
 	const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as any;
+	expect(manifest).toMatchObject({
+		name: 'markless',
+		displayName: 'Markless',
+		publisher: 'markless',
+	});
 	const language = manifest.contributes?.languages?.find(
 		(item: any) => item.id === 'markless-tsrx',
 	);
@@ -625,6 +630,7 @@ test('M7b VSIX manifest exposes markless-tsrx to both plugins and enables worksp
 		'M7b missing capability: contributes.languages must register markless-tsrx.',
 	).toMatchObject({
 		id: 'markless-tsrx',
+		aliases: ['Markless', 'markless-tsrx'],
 		extensions: ['.tsrx'],
 		icon: { light: expect.any(String), dark: expect.any(String) },
 	});
@@ -666,7 +672,7 @@ test('M7c packaged VSIX contains both plugins and a valid extension runtime', ()
 		existsSync(extensionDirectory),
 		'M7c missing capability: packages/vscode-plugin does not exist, so no packaged VSIX can be inspected.',
 	).toBe(true);
-	const vsix = resolve(extensionDirectory, 'dist/markless-tsrx.vsix');
+	const vsix = resolve(extensionDirectory, 'dist/markless.vsix');
 	expect(
 		existsSync(vsix),
 		'M7c missing capability: no built .vsix exists; run pnpm --dir packages/vscode-plugin package:vsix.',

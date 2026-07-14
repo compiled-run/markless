@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 import AdmZip from 'adm-zip';
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const vsixPath = resolve(packageRoot, 'dist/markless-tsrx.vsix');
+const vsixPath = resolve(packageRoot, 'dist/markless.vsix');
 const extractRoot = resolve(packageRoot, 'dist/vsix-repack');
 if (!existsSync(vsixPath)) throw new Error(`VSIX not found: ${vsixPath}`);
 rmSync(extractRoot, { recursive: true, force: true });
