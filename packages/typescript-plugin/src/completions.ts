@@ -5,7 +5,8 @@ type TypeScript = typeof ts;
 
 type ConstructContext =
 	| 'module'
-	| 'base'
+	| 'statement'
+	| 'children'
 	| 'after-if'
 	| 'after-for'
 	| 'after-try'
@@ -16,9 +17,13 @@ type CatalogItem = {
 	readonly name: string;
 	readonly filterText?: string;
 	readonly insertText: string;
-	readonly context: Exclude<ConstructContext, 'none'>;
+	readonly context:
+		| Exclude<ConstructContext, 'none'>
+		| readonly Exclude<ConstructContext, 'none'>[];
 	readonly description?: string;
 };
+
+const baseConstructContexts = ['statement', 'children'] as const;
 
 const snippetCatalog: readonly CatalogItem[] = [
 	{
@@ -28,58 +33,73 @@ const snippetCatalog: readonly CatalogItem[] = [
 		context: 'module',
 		description: 'Markless component function',
 	},
-	{ name: '@{}', insertText: '@{\n\t$0\n}', context: 'base' },
-	{ name: '@{', insertText: '@{\n\t$0\n}', context: 'base' },
-	{ name: '@if', insertText: '@if (${1:condition}) {\n\t$0\n}', context: 'base' },
+	{
+		name: 'function Component(props) @{ }',
+		filterText: '@component',
+		insertText: 'function ${1:ComponentName}(${2:props}) @{\n\t$0\n}',
+		context: 'statement',
+		description: 'Markless component function',
+	},
+	{ name: '@{}', insertText: '@{\n\t$0\n}', context: baseConstructContexts },
+	{ name: '@{', insertText: '@{\n\t$0\n}', context: baseConstructContexts },
+	{ name: '@if', insertText: '@if (${1:condition}) {\n\t$0\n}', context: baseConstructContexts },
 	{
 		name: '@if-@else',
 		insertText: '@if (${1:condition}) {\n\t$2\n} @else {\n\t$3\n}',
-		context: 'base',
+		context: baseConstructContexts,
 	},
 	{
 		name: '@for-of',
 		insertText: '@for (const ${1:item} of ${2:items}) {\n\t$0\n}',
-		context: 'base',
+		context: baseConstructContexts,
 	},
-	{ name: '@for', insertText: '@for (const ${1:item} of ${2:items}) {\n\t$0\n}', context: 'base' },
+	{
+		name: '@for',
+		insertText: '@for (const ${1:item} of ${2:items}) {\n\t$0\n}',
+		context: baseConstructContexts,
+	},
 	{
 		name: '@for-index',
 		insertText: '@for (const ${1:item} of ${2:items}; index ${3:i}) {\n\t$0\n}',
-		context: 'base',
+		context: baseConstructContexts,
 	},
 	{
 		name: '@for-key',
 		insertText: '@for (const ${1:item} of ${2:items}; key ${1:item}.${3:id}) {\n\t$0\n}',
-		context: 'base',
+		context: baseConstructContexts,
 	},
 	{
 		name: '@for-index-key',
 		insertText:
 			'@for (const ${1:item} of ${2:items}; index ${3:i}; key ${1:item}.${4:id}) {\n\t$0\n}',
-		context: 'base',
+		context: baseConstructContexts,
 	},
 	{
 		name: '@for-@empty',
 		insertText: '@for (const ${1:item} of ${2:items}) {\n\t$2\n} @empty {\n\t$0\n}',
-		context: 'base',
+		context: baseConstructContexts,
 	},
 	{
 		name: '@switch-@case',
 		insertText: '@switch (${1:value}) {\n\t@case ${2:match}: {\n\t\t$0\n\t}\n}',
-		context: 'base',
+		context: baseConstructContexts,
 	},
-	{ name: '@switch', insertText: '@switch ($1) {\n\t$0\n}', context: 'base' },
+	{
+		name: '@switch',
+		insertText: '@switch ($1) {\n\t$0\n}',
+		context: baseConstructContexts,
+	},
 	{
 		name: '@try-@pending',
 		insertText: '@try {\n\t$1\n} @pending {\n\t$0\n}',
-		context: 'base',
+		context: baseConstructContexts,
 	},
 	{
 		name: '@try-@pending-@catch',
 		insertText: '@try {\n\t$1\n} @pending {\n\t$2\n} @catch (${3:e}) {\n\t$0\n}',
-		context: 'base',
+		context: baseConstructContexts,
 	},
-	{ name: '@try', insertText: '@try {\n\t$0\n}', context: 'base' },
+	{ name: '@try', insertText: '@try {\n\t$0\n}', context: baseConstructContexts },
 	{ name: '@else', insertText: '@else {\n\t$0\n}', context: 'after-if' },
 	{
 		name: '@else if',
@@ -276,7 +296,7 @@ function classifyPlaceholder(location: AstLocation): ConstructContext | undefine
 		const previous = childrenParent.children[childIndex - 1] as AstNode | undefined;
 		if (previous?.type === 'JSXIfExpression') return 'after-if';
 		if (previous?.type === 'JSXForExpression') return 'after-for';
-		return 'base';
+		return 'children';
 	}
 
 	if (ancestors.some((ancestor) => ancestor.type === 'JSXSwitchExpression')) {
@@ -295,16 +315,18 @@ function classifyPlaceholder(location: AstLocation): ConstructContext | undefine
 	if (previous?.type === 'JSXTryExpression') return 'after-try';
 	if (previous?.type === 'JSXIfExpression') return 'after-if';
 	if (previous?.type === 'JSXForExpression') return 'after-for';
-	return 'base';
+	return 'statement';
 }
 
 function isCatalogItemValidInContext(
 	item: CatalogItem,
 	context: Exclude<ConstructContext, 'none'>,
 ): boolean {
+	const itemContexts = Array.isArray(item.context) ? item.context : [item.context];
 	return (
-		item.context === context ||
-		(item.context === 'base' && (context === 'after-if' || context === 'after-for'))
+		itemContexts.includes(context) ||
+		(item.context === baseConstructContexts &&
+			(context === 'after-if' || context === 'after-for'))
 	);
 }
 

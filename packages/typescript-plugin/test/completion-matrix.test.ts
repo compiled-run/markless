@@ -367,7 +367,6 @@ const catalogEntries = [
 	...catalogClauseEntries,
 ] as const;
 const catalogInsertText = {
-	'function Component(props) @{ }': 'export function ${1:ComponentName}(${2:props}) @{\n\t$0\n}',
 	'@if-@else': '@if (${1:condition}) {\n\t$2\n} @else {\n\t$3\n}',
 	'@for-index': '@for (const ${1:item} of ${2:items}; index ${3:i}) {\n\t$0\n}',
 	'@for-key': '@for (const ${1:item} of ${2:items}; key ${1:item}.${3:id}) {\n\t$0\n}',
@@ -386,7 +385,7 @@ test.each([
 	{
 		name: 'statement base position',
 		marker: '/*M4C_STATEMENT_BASE*/',
-		expected: catalogBaseEntries,
+		expected: ['function Component(props) @{ }', ...catalogBaseEntries],
 	},
 	{
 		name: 'JSX-children base position',
@@ -442,7 +441,12 @@ test.each([
 		).toEqual(expectedNames.toSorted());
 
 		for (const name of expectedNames) {
-			const expectedInsertText = catalogInsertText[name as keyof typeof catalogInsertText];
+			const expectedInsertText =
+				name === 'function Component(props) @{ }'
+					? marker === '/*M4C_MODULE*/'
+						? 'export function ${1:ComponentName}(${2:props}) @{\n\t$0\n}'
+						: 'function ${1:ComponentName}(${2:props}) @{\n\t$0\n}'
+					: catalogInsertText[name as keyof typeof catalogInsertText];
 			if (expectedInsertText === undefined) continue;
 			const entry = entries.find((candidate) => candidate.name === name);
 			expect(
@@ -467,8 +471,15 @@ test.each([
 			expect(details?.some((detail: any) => detail.name === entry?.name)).toBe(true);
 			expect(
 				entry?.labelDetails?.description,
-				'M4c catalog missing capability: the module-scope function component must carry its catalog detail.',
+				'M4c catalog missing capability: the function component must carry its catalog detail.',
 			).toBe('Markless component function');
+		}
+
+		if (marker === '/*M4C_CHILDREN_BASE*/') {
+			expect(
+				actualCatalogNames,
+				'M4c catalog invalid capability: JSX children must not offer a function component declaration.',
+			).not.toContain('function Component(props) @{ }');
 		}
 
 		if (marker === '/*M4C_AFTER_TRY*/') {
