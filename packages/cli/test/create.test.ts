@@ -215,6 +215,17 @@ test('creates a minimal Markless Router app with TSRX pages and Nitro-backed dep
 		scripts: Record<string, string>;
 	};
 	const viteConfig = await readFile(join(appRoot, 'vite.config.ts'), 'utf-8');
+	const vscodeSettings = JSON.parse(
+		await readFile(join(appRoot, '.vscode/settings.json'), 'utf-8'),
+	) as unknown;
+	const vscodeExtensions = JSON.parse(
+		await readFile(join(appRoot, '.vscode/extensions.json'), 'utf-8'),
+	) as unknown;
+	const zedSettings = await readFile(join(appRoot, '.zed/settings.json'), 'utf-8');
+	const zedSettingsTemplate = await readFile(
+		new URL('../templates/common/.zed/settings.json', import.meta.url),
+		'utf-8',
+	);
 
 	expect(packageJson.scripts).toMatchObject({
 		build: 'vp build',
@@ -232,9 +243,20 @@ test('creates a minimal Markless Router app with TSRX pages and Nitro-backed dep
 	});
 	expect(packageJson.devDependencies).toMatchObject({
 		'@markless/analyzer': expect.any(String),
+		'@markless/typescript-plugin': expect.any(String),
 		typescript: expect.any(String),
 		vite: expect.any(String),
 	});
+	expect(vscodeSettings).toEqual({
+		'files.associations': {
+			'*.tsrx': 'markless-tsrx',
+		},
+	});
+	expect(vscodeExtensions).toEqual({
+		recommendations: ['markless.markless'],
+		unwantedRecommendations: ['ripple-ts.ripple-ts-vscode-plugin'],
+	});
+	expect(zedSettings).toBe(zedSettingsTemplate);
 	const agents = await readFile(join(appRoot, 'AGENTS.md'));
 	const claude = await readFile(join(appRoot, 'CLAUDE.md'));
 	expect(claude).toEqual(agents);
@@ -371,6 +393,9 @@ test('scaffolded manifests pin @markless deps to the publishing cli version, nev
 			expect(appManifest.dependencies['@markless/core']).toBe(expectedRange);
 			expect(appManifest.dependencies['@markless/router']).toBe(expectedRange);
 			expect(appManifest.devDependencies['@markless/analyzer']).toBe(expectedRange);
+			expect(appManifest.devDependencies['@markless/typescript-plugin']).toBe(
+				expectedRange,
+			);
 			for (const [name, range] of [
 				...Object.entries(appManifest.dependencies),
 				...Object.entries(appManifest.devDependencies),

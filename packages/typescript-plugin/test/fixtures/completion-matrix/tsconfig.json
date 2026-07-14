@@ -1,0 +1,16 @@
+{
+	"compilerOptions": {
+		"lib": ["ES2022", "DOM"],
+		"module": "ESNext",
+		"moduleResolution": "Bundler",
+		"noEmit": true,
+		"plugins": [
+			{ "name": "@markless/typescript-plugin" },
+			{ "name": "@markless/router/typescript-plugin", "pagesDir": "pages" }
+		],
+		"skipLibCheck": true,
+		"strict": true,
+		"target": "ES2022"
+	},
+	"include": ["**/*.ts", "**/*.tsrx"]
+}
