@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { compileTsrxForTypeService } from '@markless/compiler/type-service';
 import { afterAll, beforeAll, expect, test } from 'vitest';
-import { snippetCatalog } from '../src/completions.ts';
+import { intrinsicTagNames, snippetCatalog } from '../src/completions.ts';
 import {
 	TsserverHarness,
 	copyFixtureProject,
@@ -387,6 +387,65 @@ test.each([
 		`M4b invalid capability: TSRX constructs must not be offered at ${marker}.`,
 	).toEqual([]);
 });
+
+test('M4d real tsserver completes intrinsic and in-scope tag names', async () => {
+	const fixture = openFixture('tag-completions.tsrx');
+	const childrenPosition = positionAfterMarker(fixture.marked, '/*TAG_CHILDREN*/');
+	const childrenCompletion = await server.completionInfo(fixture.file, childrenPosition);
+	const childrenEntries = completionEntries(childrenCompletion);
+	const expectedNames = ['div', 'span', 'Nav', 'Inner'];
+	expect(intrinsicTagNames).toEqual(expect.arrayContaining(['div', 'span']));
+	expect(
+		childrenEntries.map((entry) => entry.name),
+		'M4d missing capability: bare < in element children must offer intrinsic tags plus imported and local components.',
+	).toEqual(expect.arrayContaining(expectedNames));
+	expect(
+		childrenEntries.find((entry) => entry.name === 'Nav')?.sortText <
+			childrenEntries.find((entry) => entry.name === 'div')?.sortText,
+	).toBe(true);
+
+	const childrenDetails = await server.completionEntryDetails(
+		fixture.file,
+		childrenPosition,
+		childrenEntries
+			.filter((entry) => expectedNames.includes(entry.name))
+			.map(({ name, source, data }) => ({ name, source, data })),
+	);
+	expect(childrenDetails?.map((detail: any) => detail.name)).toEqual(
+		expect.arrayContaining(expectedNames),
+	);
+
+	const partialFixture = openFixture('tag-completions-partial.tsrx');
+	const partialPosition = positionAfterMarker(partialFixture.marked, '/*TAG_PARTIAL*/');
+	const partialCompletion = await server.completionInfo(partialFixture.file, partialPosition);
+	const partialEntries = completionEntries(partialCompletion);
+	const nav = partialEntries.find((entry) => entry.name === 'Nav');
+	expect(
+		partialEntries.map((entry) => entry.name),
+		'M4d missing capability: <Na must retain the full synthesized tag catalog so the client can filter it to Nav.',
+	).toEqual(expect.arrayContaining(['Nav', 'div']));
+	expect(nav?.replacementSpan).toEqual({
+		start: { line: partialPosition.line, offset: partialPosition.offset - 2 },
+		end: partialPosition,
+	});
+
+	for (const [fixtureName, marker] of [
+		['tag-completions-string.tsrx', '/*TAG_STRING*/'],
+		['tag-completions-expression.tsrx', '/*TAG_EXPRESSION*/'],
+	] as const) {
+		const negativeFixture = openFixture(fixtureName);
+		const completion = await server.completionInfo(
+			negativeFixture.file,
+			positionAfterMarker(negativeFixture.marked, marker),
+		);
+		expect(
+			completionNames(completion).filter((name) =>
+				intrinsicTagNames.includes(name as (typeof intrinsicTagNames)[number]),
+			),
+			`M4d invalid capability: tag names must not be synthesized at ${marker}.`,
+		).toEqual([]);
+	}
+}, 20_000);
 
 const catalogBaseEntries = baseConstructEntries;
 const catalogClauseEntries = [
