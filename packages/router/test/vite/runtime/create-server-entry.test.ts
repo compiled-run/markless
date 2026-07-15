@@ -31,6 +31,92 @@ describe('server entry rendering', () => {
 		expect(html).toContain('<main>Home</main>');
 	});
 
+	it('places compiled and built route stylesheets in the document head', async () => {
+		const entry = createServerEntry({
+			documentModuleLoader: undefined,
+			pageModuleLoaders: {
+				'pages/index.tsrx': async () => ({
+					default: page('<main class="mk-page">Home</main>', {
+						headInjections: [
+							{
+								tag: 'link',
+								location: 'head',
+								attributes: {
+									rel: 'stylesheet',
+									href: '/@id/virtual:markless:style:page.css?direct',
+								},
+							},
+						],
+					}),
+				}),
+			},
+			routeFileIds: ['/pages/index.tsrx'],
+			routeModulePreloads: {
+				'pages/index.tsrx': ['/build/navigation.js'],
+			},
+			routeSsrModulePreloads: {
+				'pages/index.tsrx': ['/build/resume.js'],
+			},
+			routeStylesheets: {
+				'pages/index.tsrx': ['/assets/page.css'],
+			},
+		});
+
+		const response = await entry.fetch(new Request('http://markless-router.test/'));
+		const html = await response.text();
+		const head = html.slice(0, html.indexOf('</head>'));
+		const body = html.slice(html.indexOf('<body>'));
+
+		expect(head).toContain(
+			'<link rel="stylesheet" href="/@id/virtual:markless:style:page.css?direct">',
+		);
+		expect(head).toContain('<link rel="stylesheet" href="/assets/page.css">');
+		expect(body).not.toContain('rel="stylesheet"');
+	});
+
+	it('rejects persisted client assets when server route discovery changed', () => {
+		expect(() =>
+			createServerEntry({
+				documentModuleLoader: undefined,
+				pageModuleLoaders: {
+					'pages/index.tsrx': async () => ({ default: page('<main>Home</main>') }),
+				},
+				routeFileIds: ['/pages/index.tsrx'],
+				routeModulePreloads: { 'pages/old.tsrx': ['/build/old.js'] },
+				routeSsrModulePreloads: { 'pages/old.tsrx': ['/build/old.js'] },
+				routeStylesheets: { 'pages/old.tsrx': ['/assets/old.css'] },
+			}),
+		).toThrow('client-asset routes are stale');
+	});
+
+	it('rejects an empty persisted manifest when server routes exist', () => {
+		expect(() =>
+			createServerEntry({
+				documentModuleLoader: undefined,
+				pageModuleLoaders: {
+					'pages/index.tsrx': async () => ({ default: page('<main>Home</main>') }),
+				},
+				routeFileIds: ['/pages/index.tsrx'],
+				routeModulePreloads: {},
+				routeSsrModulePreloads: {},
+				routeStylesheets: {},
+			}),
+		).toThrow('client-asset routes are stale');
+	});
+
+	it('keeps manual module-preload adapters compatible without a persisted style map', () => {
+		expect(() =>
+			createServerEntry({
+				documentModuleLoader: undefined,
+				pageModuleLoaders: {
+					'pages/index.tsrx': async () => ({ default: page('<main>Home</main>') }),
+				},
+				routeFileIds: ['/pages/index.tsrx'],
+				routeModulePreloads: { 'pages/index.tsrx': ['/build/page.js'] },
+			}),
+		).not.toThrow();
+	});
+
 	it('emits resumability payloads without waking a client entry on page load', async () => {
 		const entry = createServerEntry({
 			resumeEntryPath: '/@id/virtual:markless-router/resume-entry',
@@ -628,12 +714,18 @@ describe('server entry streaming (default)', () => {
 function page(
 	html: string,
 	payload: {
+		readonly headInjections?: readonly {
+			readonly tag: string;
+			readonly location: 'head' | 'body';
+			readonly attributes?: Record<string, string>;
+		}[];
 		readonly modulePreloads?: readonly { readonly href: string }[];
 		readonly state?: unknown;
 		readonly view?: unknown;
 	} = {},
 ) {
 	return {
+		headInjections: payload.headInjections,
 		modulePreloads: payload.modulePreloads,
 		renderSsr() {
 			return { html, ...payload };

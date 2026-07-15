@@ -36,6 +36,7 @@ export interface TransformTsrxModuleInput {
 	clientOutput?: MarklessClientOutput;
 	resumeModuleUrl?: string;
 	headInjections?: GlobalInjections[];
+	styleModuleUrl?: (virtualModuleId: string) => string;
 	executionLog?: MarklessExecutionLogMode;
 	executionLogModuleHooks?: boolean;
 	inlineResumerDebug?: boolean;

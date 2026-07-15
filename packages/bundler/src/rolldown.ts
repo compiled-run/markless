@@ -182,8 +182,16 @@ export function createMarklessRolldownPlugin(input: {
 					moduleSideEffects: true,
 				};
 			}
-			if (virtualModules.has(normalized)) {
-				return { id: resolveVirtualId(normalized), moduleSideEffects: true };
+			const virtualModule = virtualModules.get(normalized);
+			if (virtualModule) {
+				const directQuery =
+					virtualModule.type === 'style' && /(?:[?&])direct(?:[=&]|$)/.test(source)
+						? '?direct'
+						: '';
+				return {
+					id: `${resolveVirtualId(normalized)}${directQuery}`,
+					moduleSideEffects: true,
+				};
 			}
 
 			const symbolSource = sourceForSymbolVirtualImporter(importer);
@@ -270,6 +278,19 @@ export function createMarklessRolldownPlugin(input: {
 				resumeModuleUrl:
 					internalOptions.dev === true && currentEnvironment === 'server'
 						? devBrowserSourceModuleUrl(source, getRoot(), internalOptions.publicPath)
+						: undefined,
+				styleModuleUrl:
+					internalOptions.dev === true && currentEnvironment === 'server'
+						? (virtualId) =>
+								withQuery(
+									devBrowserVirtualModuleUrl(
+										virtualId,
+										internalOptions.publicPath,
+									),
+									{
+										direct: null,
+									},
+								)
 						: undefined,
 				headInjections:
 					internalOptions.dev === true && currentEnvironment === 'server'

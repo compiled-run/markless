@@ -27,6 +27,11 @@ export function App() @{
 }
 `;
 
+const styledSource = source.replace(
+	'\t<button onClick={() => count++}>{count}</button>',
+	'\t<main>\n\t\t<button onClick={() => count++}>{count}</button>\n\t\t<style>button { background: red; }</style>\n\t</main>',
+);
+
 describe('Vite adapter structure', () => {
 	test('prints the debugging playbook hint when the dev server starts', () => {
 		const plugin = getAsyncPlugin();
@@ -266,7 +271,7 @@ describe('Vite adapter structure', () => {
 		expect(await callLoad(plugin, '\0virtual:markless-dev-client')).toBeNull();
 	});
 
-	test('threads the Vite client tag into dev SSR artifacts', async () => {
+	test('threads Vite and scoped stylesheet tags into dev SSR artifacts', async () => {
 		const plugin = getAsyncPlugin();
 
 		callConfig(plugin, {}, { command: 'serve', mode: 'development' });
@@ -277,7 +282,7 @@ describe('Vite adapter structure', () => {
 		});
 		const result = (await callTransform(
 			plugin,
-			source,
+			styledSource,
 			'/workspace/app/src/App.tsrx',
 			createViteHookContext('server'),
 		)) as { code: string };
@@ -286,6 +291,15 @@ describe('Vite adapter structure', () => {
 		expect(result.code).toContain('inlineResumerSources:');
 		expect(result.code).toMatch(/"debug":\s*true/);
 		expect(result.code).toContain('"src": "/dev/@vite/client"'); // re-print spaces object literals
+		expect(result.code).toContain('"rel": "stylesheet"');
+		expect(result.code).toMatch(
+			/"href": "\/dev\/@id\/__x00__virtual:markless:style:.*\.css\?direct"/,
+		);
+		const styleId = `\0virtual:markless:style:${encodeURIComponent('/workspace/app/src/App.tsrx')}.css`;
+		const resolvedStyle = await callResolveId(plugin, `${styleId}?direct`);
+		expect(resolvedStyle).toMatchObject({ id: `${styleId}?direct` });
+		expect(await callLoad(plugin, `${styleId}?direct`)).toContain('background: red');
+
 		// Dev resume URL points at the SOURCE module so the .tsrx stays in the client
 		// module graph (vite's no-accepting-boundary full-reload depends on it); the
 		// client source module re-exports resumeContainerEvent from the virtual

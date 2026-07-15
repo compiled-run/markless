@@ -21,6 +21,7 @@ test('router app fixture exposes root UI and status page artifacts', async () =>
 	const files = await fixtureFiles('router-app');
 
 	expect(files).toEqual([
+		'components/StyledChild.tsrx',
 		'document.tsrx',
 		'package.json',
 		'pages/404.tsrx',

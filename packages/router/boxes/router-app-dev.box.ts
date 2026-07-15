@@ -2,6 +2,7 @@ import { box } from '@async/witness';
 
 const FIXTURE = 'fixtures/router-app';
 const COUNTER = 'button';
+const UNSCOPED_BUTTON = '[data-unscoped-button]';
 const HOME_LINK = 'a[data-markless-router-link]';
 const WAIT = { timeoutMs: 10_000 };
 
@@ -24,6 +25,19 @@ export default box(
 
 		await expect.page.text(page, 'h1', 'Markless Router App', WAIT);
 		await expect.page.text(page, COUNTER, 'Count 0', WAIT);
+		await expect.page.exists(page, 'button[class^="mk-"]', WAIT);
+		await expect.page.computedStyle(
+			page,
+			COUNTER,
+			{ 'background-color': 'rgb(255, 0, 0)' },
+			WAIT,
+		);
+		await expect.page.computedStyle(
+			page,
+			UNSCOPED_BUTTON,
+			{ 'background-color': 'rgb(239, 239, 239)' },
+			WAIT,
+		);
 		await page.click(COUNTER, WAIT);
 		await expect.page.text(page, COUNTER, 'Count 1', WAIT);
 		await expect.page.text(page, HOME_LINK, 'Home', WAIT);

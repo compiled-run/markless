@@ -1,8 +1,13 @@
 import type { PageProps } from '../../index.ts';
-import { buildRouteManifestFromFileIds, matchRouteManifest } from '../../route-manifest.ts';
+import {
+	buildRouteManifestFromFileIds,
+	matchRouteManifest,
+	normalizeRouteFileId,
+} from '../../route-manifest.ts';
 import {
 	renderToString,
 	type ModulePreloadInput,
+	type RenderHeadInjection,
 	type SsrRenderArtifact,
 } from '@markless/web/render-to-string';
 import { renderToStream } from '@markless/web/render-to-stream';
@@ -13,6 +18,7 @@ export interface ServerEntryOptions {
 	readonly resumeEntryPath?: string;
 	readonly routeModulePreloads?: Record<string, readonly ModulePreloadInput[]>;
 	readonly routeSsrModulePreloads?: Record<string, readonly ModulePreloadInput[]>;
+	readonly routeStylesheets?: Record<string, readonly string[]>;
 	readonly documentModuleLoader: (() => Promise<unknown>) | undefined;
 	readonly pageModuleLoaders: Record<string, () => Promise<unknown>>;
 	readonly routeFileIds: readonly string[];
@@ -35,6 +41,7 @@ interface SsrArtifact {
 	readonly renderSsr?: SsrRender;
 	readonly resumeModuleUrl?: string;
 	readonly inlineResumerSources?: SsrRenderArtifact['inlineResumerSources'];
+	readonly headInjections?: ReadonlyArray<RenderHeadInjection>;
 }
 
 interface PageModule {
@@ -60,6 +67,7 @@ const DOCUMENT_CHILDREN_PLACEHOLDER = '__markless_router_document_children__';
 
 export function createServerEntry(options: ServerEntryOptions) {
 	const manifest = buildRouteManifestFromFileIds(options.routeFileIds);
+	assertCurrentRouteAssets(options);
 
 	async function fetch(request: Request): Promise<Response> {
 		const url = new URL(request.url);
@@ -133,6 +141,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 			pageProps,
 			file,
 			options.navigationEntryPath,
+			options.routeStylesheets?.[file],
 		);
 		const renderOptions = {
 			props: pageProps,
@@ -151,7 +160,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 
 		// Blocking opt-out: the pre-T107 whole-page await.
 		if (options.render === 'blocking') {
-			const pageHtml = splitLeadingModulePreloadLinks(
+			const pageHtml = splitLeadingHeadHtml(
 				await renderToString(pageArtifact as never, renderOptions),
 			);
 			const shell = await renderDocumentShell(documentModule, pageProps, pageHtml.headHtml);
@@ -166,7 +175,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 		// deadline render inline; the rest flush @pending and settle on the
 		// same open response.
 		const stream = await renderToStream(pageArtifact as never, renderOptions);
-		const pageHtml = splitLeadingModulePreloadLinks(stream.shell);
+		const pageHtml = splitLeadingHeadHtml(stream.shell);
 		const shell = await renderDocumentShell(documentModule, pageProps, pageHtml.headHtml);
 		if (stream.pendingArmCount === 0) {
 			return new Response(fillDocumentChildren(shell, pageHtml.bodyHtml), {
@@ -206,6 +215,28 @@ export function createServerEntry(options: ServerEntryOptions) {
 	return { fetch };
 }
 
+function assertCurrentRouteAssets(options: ServerEntryOptions): void {
+	// routeStylesheets is the persisted client-manifest signal. Existing manual
+	// adapters may provide only module preloads, while dev leaves this undefined.
+	if (options.routeStylesheets === undefined) return;
+	const routeMaps = [
+		['navigation', options.routeModulePreloads ?? {}],
+		['SSR', options.routeSsrModulePreloads ?? {}],
+		['style', options.routeStylesheets],
+	] as const;
+	const expected = [...new Set(options.routeFileIds.map(normalizeRouteFileId))]
+		.filter((file) => /^pages\/.+\.(?:tsrx|mdx)$/.test(file))
+		.toSorted();
+	for (const [label, routes] of routeMaps) {
+		const actual = Object.keys(routes).toSorted();
+		if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+			throw new Error(
+				`Markless Router ${label} client-asset routes are stale; expected ${JSON.stringify(expected)}, received ${JSON.stringify(actual)}. Rebuild the client environment before the server environment.`,
+			);
+		}
+	}
+}
+
 // Wraps the compiled page renderSsr with the route script, the lazy Link
 // bridge, and the serialized page-prop cell, FORWARDING the render context
 // so streaming reaches the page's async boundaries (T107).
@@ -215,10 +246,22 @@ function routedPageArtifact(
 	pageProps: PageComponentProps,
 	file: string,
 	navigationEntryPath: string | undefined,
+	stylesheetHrefs: readonly string[] | undefined,
 ) {
+	const headInjections = [
+		...(baseArtifact?.headInjections ?? []),
+		...(stylesheetHrefs ?? []).map(
+			(href): RenderHeadInjection => ({
+				tag: 'link',
+				location: 'head',
+				attributes: { rel: 'stylesheet', href },
+			}),
+		),
+	];
 	return {
 		resumeModuleUrl: baseArtifact?.resumeModuleUrl,
 		inlineResumerSources: baseArtifact?.inlineResumerSources,
+		...(headInjections.length > 0 ? { headInjections } : {}),
 		async renderSsr(renderProps?: unknown, renderContext?: unknown): Promise<RenderOutput> {
 			// Compiled marklessRenderSsr is async (initial render awaits demanded
 			// async work); interpolating the un-awaited Promise served 500s.
@@ -328,18 +371,13 @@ function addModulePreloads(
 	}
 }
 
-function splitLeadingModulePreloadLinks(html: string): PageHtml {
-	let bodyHtml = html;
-	const links: string[] = [];
-	while (bodyHtml.startsWith('<link ')) {
-		const end = bodyHtml.indexOf('>');
-		if (end === -1) break;
-		const link = bodyHtml.slice(0, end + 1);
-		if (!link.includes('rel="modulepreload"')) break;
-		links.push(link);
-		bodyHtml = bodyHtml.slice(end + 1);
-	}
-	return { bodyHtml, headHtml: links.join('') };
+function splitLeadingHeadHtml(html: string): PageHtml {
+	const containerStart = html.indexOf('<div data-async-container');
+	if (containerStart <= 0) return { bodyHtml: html, headHtml: '' };
+	return {
+		bodyHtml: html.slice(containerStart),
+		headHtml: html.slice(0, containerStart),
+	};
 }
 
 // The document with the children placeholder INTACT: blocking responses fill
