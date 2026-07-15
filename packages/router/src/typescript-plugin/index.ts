@@ -39,7 +39,14 @@ function init(modules: { typescript: TypeScript }): ts.server.PluginModule {
 					options,
 					formattingSettings,
 				);
-				return withRouteHrefCompletions(typeScript, info, pagesDir, completions);
+				return withRouteHrefCompletions(
+					typeScript,
+					info,
+					pagesDir,
+					fileName,
+					position,
+					completions,
+				);
 			};
 
 			return proxy;
@@ -51,8 +58,14 @@ function withRouteHrefCompletions(
 	typeScript: TypeScript,
 	info: ts.server.PluginCreateInfo,
 	pagesDir: string,
+	fileName: string,
+	position: number,
 	completions: ts.CompletionInfo | undefined,
 ): ts.CompletionInfo | undefined {
+	if (!isRouteHrefCompletionContext(typeScript, info, fileName, position)) {
+		return completions;
+	}
+
 	const routeHrefs = routeHrefCompletions(typeScript, info, pagesDir);
 	if (routeHrefs.length === 0) {
 		return completions;
@@ -76,6 +89,135 @@ function withRouteHrefCompletions(
 			...baseCompletions.entries.filter((entry) => !routeHrefSet.has(entry.name)),
 		],
 	};
+}
+
+function isRouteHrefCompletionContext(
+	typeScript: TypeScript,
+	info: ts.server.PluginCreateInfo,
+	fileName: string,
+	position: number,
+): boolean {
+	if (extname(fileName).toLowerCase() === '.tsrx') {
+		const snapshot = info.project.getScriptInfo(fileName)?.getSnapshot();
+		if (!snapshot || position < 0 || position > snapshot.getLength()) return false;
+		const source = snapshot.getText(0, snapshot.getLength());
+		return (
+			isInsideStringLikeToken(typeScript, source, position) ||
+			isInsideHrefAttributeInitializer(source, position)
+		);
+	}
+
+	const sourceFile = info.languageService.getProgram()?.getSourceFile(fileName);
+	if (!sourceFile || position < 0 || position > sourceFile.getFullText().length) return false;
+	const node = deepestNodeAtPosition(sourceFile, position);
+	if (node && isStringLikeNode(typeScript, node)) return true;
+	for (let current = node; current; current = current.parent) {
+		if (!typeScript.isJsxAttribute(current) || current.name.getText(sourceFile) !== 'href') {
+			continue;
+		}
+		const initializer = current.initializer;
+		return Boolean(
+			initializer && initializer.getStart(sourceFile) <= position && position <= initializer.end,
+		);
+	}
+
+	// An incomplete JSX initializer may not have a stable AST node yet. The source
+	// file still provides an original snapshot for the same narrow lexical check.
+	return isInsideHrefAttributeInitializer(sourceFile.getFullText(), position);
+}
+
+function isInsideStringLikeToken(
+	typeScript: TypeScript,
+	source: string,
+	position: number,
+): boolean {
+	const scanner = typeScript.createScanner(
+		typeScript.ScriptTarget.Latest,
+		false,
+		typeScript.LanguageVariant.JSX,
+		source,
+	);
+	const stringLikeTokens = new Set([
+		typeScript.SyntaxKind.StringLiteral,
+		typeScript.SyntaxKind.NoSubstitutionTemplateLiteral,
+		typeScript.SyntaxKind.TemplateHead,
+		typeScript.SyntaxKind.TemplateMiddle,
+		typeScript.SyntaxKind.TemplateTail,
+	]);
+
+	for (let token = scanner.scan(); token !== typeScript.SyntaxKind.EndOfFileToken; token = scanner.scan()) {
+		const start = scanner.getTokenPos();
+		const end = scanner.getTextPos();
+		if (position < start) return false;
+		if (stringLikeTokens.has(token) && start < position) {
+			if (position < end || (position === end && scanner.isUnterminated())) return true;
+		}
+		if (position < end) return false;
+	}
+	return false;
+}
+
+function isInsideHrefAttributeInitializer(source: string, position: number): boolean {
+	const tagStart = openJsxTagStartAtPosition(source, position);
+	if (tagStart === undefined) return false;
+	const prefix = source.slice(tagStart + 1, position);
+	return /(?:^|\s)href\s*=\s*(?:\{(?:[^{}]|\{[^{}]*\})*|[^\s>]*)$/s.test(prefix);
+}
+
+function openJsxTagStartAtPosition(source: string, position: number): number | undefined {
+	let tagStart: number | undefined;
+	let braceDepth = 0;
+	let quote: "'" | '"' | '`' | undefined;
+	let escaped = false;
+
+	for (let index = 0; index < position; index += 1) {
+		const character = source[index];
+		if (quote) {
+			if (escaped) escaped = false;
+			else if (character === '\\') escaped = true;
+			else if (character === quote) quote = undefined;
+			continue;
+		}
+		if (character === "'" || character === '"' || character === '`') {
+			quote = character;
+			continue;
+		}
+		if (tagStart === undefined && character === '<') {
+			const next = source[index + 1];
+			if (next && /[A-Za-z_$/{>]/.test(next)) {
+				tagStart = index;
+				braceDepth = 0;
+			}
+			continue;
+		}
+		if (tagStart === undefined) continue;
+		if (character === '{') braceDepth += 1;
+		else if (character === '}' && braceDepth > 0) braceDepth -= 1;
+		else if (character === '>' && braceDepth === 0) tagStart = undefined;
+	}
+
+	return tagStart;
+}
+
+function deepestNodeAtPosition(sourceFile: ts.SourceFile, position: number): ts.Node | undefined {
+	let deepest: ts.Node | undefined;
+	const visit = (node: ts.Node) => {
+		if (position < node.getFullStart() || position > node.end) return;
+		deepest = node;
+		node.forEachChild(visit);
+	};
+	visit(sourceFile);
+	return deepest;
+}
+
+function isStringLikeNode(typeScript: TypeScript, node: ts.Node): boolean {
+	return (
+		typeScript.isStringLiteral(node) ||
+		typeScript.isNoSubstitutionTemplateLiteral(node) ||
+		node.kind === typeScript.SyntaxKind.TemplateHead ||
+		node.kind === typeScript.SyntaxKind.TemplateMiddle ||
+		node.kind === typeScript.SyntaxKind.TemplateTail
+	);
 }
 
 function emptyCompletionInfo(): ts.CompletionInfo {

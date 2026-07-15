@@ -1,11 +1,22 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync } from 'node:fs';
+import {
+	existsSync,
+	mkdtempSync,
+	readFileSync,
+	realpathSync,
+	rmSync,
+	statSync,
+	writeFileSync,
+} from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { compileTsrxForTypeService } from '@markless/compiler/type-service';
+import initRouterPlugin from '@markless/router/typescript-plugin';
 import { afterAll, beforeAll, expect, test } from 'vitest';
+import typeScript from 'typescript';
 import { intrinsicTagNames, snippetCatalog } from '../src/completions.ts';
+import { getMarklessTsrxLanguagePlugin } from '../src/language.ts';
 import {
 	TsserverHarness,
 	copyFixtureProject,
@@ -640,6 +651,390 @@ test('M6 real tsserver preserves member completion immediately after a freshly t
 	).toEqual(expect.arrayContaining(['displayName', 'active']));
 }, 20_000);
 
+test('M8 real tsserver diagnoses wrong, missing, and mistyped component props at mapped source tokens', async () => {
+	const unknownFixture = openFixture('component-props.tsrx');
+	const missingFixture = openFixture('component-props-missing.tsrx');
+	const mistypedFixture = openFixture('component-props-mistyped.tsrx');
+	const [unknownDiagnostics, missingDiagnostics, mistypedDiagnostics] = await Promise.all([
+		server.semanticDiagnosticsSync(unknownFixture.file),
+		server.semanticDiagnosticsSync(missingFixture.file),
+		server.semanticDiagnosticsSync(mistypedFixture.file),
+	]);
+	const unknown = diagnosticMatching(unknownDiagnostics, /mystery/i);
+	const missing = diagnosticMatching(missingDiagnostics, /property 'label' is missing/i);
+	const mistyped = diagnosticMatching(mistypedDiagnostics, /number.*not assignable.*string/i);
+
+	expect(unknown?.start).toEqual(positionAtSearch(unknownFixture.source, 'mystery'));
+	expect(missing?.start).toEqual(positionAtSearch(missingFixture.source, 'Nav active'));
+	expectDiagnosticSpan(mistypedFixture.source, mistyped, 'label');
+}, 20_000);
+
+test('M9 real tsserver completes component props only inside opening tags', async () => {
+	const fixture = openFixture('component-prop-completions.tsrx');
+	const imported = completionNames(
+		await server.completionInfo(
+			fixture.file,
+			positionAfterMarker(fixture.marked, '/*M9_IMPORTED*/'),
+		),
+	);
+	const sameFile = completionNames(
+		await server.completionInfo(
+			fixture.file,
+			positionAfterMarker(fixture.marked, '/*M9_SAME_FILE*/'),
+		),
+	);
+	const children = completionNames(
+		await server.completionInfo(
+			fixture.file,
+			positionAfterMarker(fixture.marked, '/*M9_CHILDREN*/'),
+		),
+	);
+	const statement = completionNames(
+		await server.completionInfo(
+			fixture.file,
+			positionAfterMarker(fixture.marked, '/*M9_STATEMENT*/'),
+		),
+	);
+
+	expect(imported).toEqual(expect.arrayContaining(['label', 'active', 'children']));
+	expect(sameFile).toEqual(expect.arrayContaining(['title', 'compact']));
+	for (const name of ['label', 'active', 'children', 'title', 'compact']) {
+		expect(children, `M9 prop ${name} must not leak into component children.`).not.toContain(
+			name,
+		);
+		expect(statement, `M9 prop ${name} must not leak into statement positions.`).not.toContain(
+			name,
+		);
+	}
+}, 20_000);
+
+test('M11 real tsserver hovers and defines component tags in authored TSRX sources', async () => {
+	const fixture = openFixture('component-navigation.tsrx');
+	const opening = positionAtSearch(fixture.source, 'Nav label');
+	const closing = positionAtSearch(fixture.source, 'Nav>', 0);
+	const local = positionAtSearch(fixture.source, 'LocalBadge text');
+	const [info, openingDefinition, closingDefinition, localInfo] = await Promise.all([
+		server.quickinfo(fixture.file, opening),
+		server.definitionAndBoundSpan(fixture.file, opening),
+		server.definitionAndBoundSpan(fixture.file, closing),
+		server.quickinfo(fixture.file, local),
+	]);
+	const importedSource = realpathSync(fixturePath(project, 'Nav.tsrx'));
+
+	expect(displayText(info)).toMatch(
+		/Nav\([\s\S]*label: string;[\s\S]*active\?: boolean;[\s\S]*children\?: unknown/,
+	);
+	for (const definition of [openingDefinition, closingDefinition]) {
+		expect(definition?.definitions?.map((item: any) => realpathSync(item.file))).toContain(
+			importedSource,
+		);
+		expect(definition?.definitions?.some((item: any) => item.file.endsWith('.tsx'))).toBe(
+			false,
+		);
+	}
+	expect(displayText(localInfo)).toMatch(/LocalBadge\([\s\S]*text: string/);
+}, 20_000);
+
+test('M10a intrinsic class attribute is accepted', async () => {
+	const fixture = openFixture('intrinsic-class.tsrx');
+	const generated = compileTsrxForTypeService(fixture.source, fixture.file, { loose: true });
+	const syntactic = await server.syntacticDiagnosticsSync(fixture.file);
+	const semantic = await server.semanticDiagnosticsSync(fixture.file);
+	const classPosition = positionAtSearch(fixture.source, 'class=');
+
+	expect(syntactic).toEqual([]);
+	expect(generated.code).toContain('<div class="accepted" nonsense>accepted</div>');
+	expect(
+		semantic.some(
+			(diagnostic) =>
+				diagnostic.start?.line === classPosition.line &&
+				diagnostic.start?.offset === classPosition.offset,
+		),
+		'M10a intrinsic class must not produce a semantic diagnostic; nonsense rejection is deferred to W4.',
+	).toBe(false);
+}, 20_000);
+
+test('M10 cold-start: the intrinsic contract is present at the very first request', async () => {
+	const coldProject = copyFixtureProject(fixtureDirectory, workspaceRoot);
+	const coldServer = new TsserverHarness({
+		project: coldProject,
+		workspaceRoot,
+		globalPlugins: [corePlugin],
+	});
+	try {
+		const fixture = openFixture('intrinsic-contract.tsrx', coldProject, coldServer);
+		const diagnostics = await coldServer.semanticDiagnosticsSync(fixture.file);
+
+		expect(
+			diagnostics.filter((diagnostic) => [7016, 7026].includes(diagnostic.code)),
+			'M10 cold-start missing capability: the first semantic request must see the Markless JSX intrinsic contract.',
+		).toEqual([]);
+	} finally {
+		await coldServer.close();
+		removeFixtureProject(coldProject);
+	}
+}, 20_000);
+
+test('M10 intrinsic contract accepts Markless spellings, native events, element bindings, and tag-specific attributes', async () => {
+	const fixture = openFixture('intrinsic-contract.tsrx');
+	const syntactic = await server.syntacticDiagnosticsSync(fixture.file);
+	const semantic = await server.semanticDiagnosticsSync(fixture.file);
+
+	expect(syntactic).toEqual([]);
+	expect(
+		semantic,
+		'M10 accepted intrinsic attributes must use native DOM event types and concrete host element types without diagnostics.',
+	).toEqual([]);
+}, 20_000);
+
+test('M10 intrinsic contract rejects className, bogus and tag-wrong attributes, object style, and object children at authored tokens', async () => {
+	const fixture = openFixture('intrinsic-contract-errors.tsrx');
+	const diagnostics = await server.semanticDiagnosticsSync(fixture.file);
+
+	expectDiagnosticSpan(fixture.source, diagnosticMatching(diagnostics, /className/), 'className');
+	expectDiagnosticSpan(
+		fixture.source,
+		diagnosticMatching(diagnostics, /bogusAttribute/),
+		'bogusAttribute',
+	);
+	expectDiagnosticSpan(
+		fixture.source,
+		diagnosticMatching(diagnostics, /not assignable to type 'string'/),
+		'style',
+	);
+	expectDiagnosticSpan(fixture.source, diagnosticMatching(diagnostics, /src/), 'src');
+	expectDiagnosticSpan(fixture.source, diagnosticMatching(diagnostics, /invalid/), 'invalid');
+	expect(diagnostics).toHaveLength(5);
+}, 20_000);
+
+test('M10 plugin does not add the Markless declaration to a project without TSRX', async () => {
+	const plainProject = mkdtempSync(join(tmpdir(), 'markless-plain-tsx-'));
+	writeFileSync(
+		join(plainProject, 'tsconfig.json'),
+		JSON.stringify({
+			compilerOptions: { jsx: 'preserve', noEmit: true, strict: true },
+			include: ['*.tsx'],
+		}),
+	);
+	const file = join(plainProject, 'Plain.tsx');
+	const source = 'export const plain = <div class="reactless" />;\n';
+	writeFileSync(file, source);
+	const plainServer = new TsserverHarness({
+		project: plainProject,
+		workspaceRoot,
+		globalPlugins: [corePlugin],
+	});
+	try {
+		plainServer.open(file, source);
+		const diagnostics = await plainServer.semanticDiagnosticsSync(file);
+		expect(diagnostics.map((diagnostic) => diagnostic.code)).toContain(7026);
+		expect(plainServer.readLog()).not.toContain('markless-jsx.d.ts');
+	} finally {
+		await plainServer.close();
+		rmSync(plainProject, { recursive: true, force: true });
+	}
+}, 20_000);
+
+test('M10 Markless JSX contract does not pollute an adjacent plain TSX file', async () => {
+	const fixture = openFixture('plain-adjacent.tsx');
+	const diagnostics = await server.semanticDiagnosticsSync(fixture.file);
+
+	expect(diagnostics).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				start: expect.objectContaining(positionAtSearch(fixture.source, '<div')),
+				text: expect.stringMatching(/JSX element implicitly has type 'any'.*JSX\.IntrinsicElements/i),
+			}),
+		]),
+	);
+}, 20_000);
+
+test('M12a the service script is TSX', () => {
+	const languagePlugin = getMarklessTsrxLanguagePlugin();
+	const virtualCode = languagePlugin.createVirtualCode?.(
+		'/workspace/App.tsrx',
+		'markless-tsrx',
+		{
+			getText: () => 'export function App() @{ <div class="app">ok</div> }',
+			getLength: () => 57,
+			getChangeRange: () => undefined,
+		},
+	);
+	const serviceScript = languagePlugin.typescript?.getServiceScript?.(virtualCode);
+
+	expect(serviceScript).toMatchObject({ extension: '.tsx', scriptKind: 4 });
+	expect(virtualCode?.generatedCode).toContain('<div class="app">ok</div>');
+});
+
+test('M12 native jsxClosingTag answers through authored TSRX coordinates', async () => {
+	const fixture = openFixture('tag-closing-protocol.tsrx');
+	const answer = await server.jsxClosingTag(
+		fixture.file,
+		positionAtSearch(fixture.source, '<div>\n', '<div>'.length),
+	);
+
+	expect(answer).toEqual({ newText: '</div>', caretOffset: 0 });
+}, 20_000);
+
+test('M12 linkedEditingRange returns authored opening and closing tag-name spans', async () => {
+	const fixture = openFixture('tag-protocol.tsrx');
+	const answer = await server.linkedEditingRange(
+		fixture.file,
+		positionAtSearch(fixture.source, 'strong>linked'),
+	);
+
+	expect(answer?.ranges).toEqual([
+		protocolRangeAtSearch(fixture.source, 'strong>linked', 'strong'.length),
+		protocolRangeAtSearch(fixture.source, 'strong></section>', 'strong'.length),
+	]);
+	expect(answer?.wordPattern).toContain('a-zA-Z0-9');
+}, 20_000);
+
+test('M13 real tsserver type-checks construct branches without scaffolding diagnostics', async () => {
+	const fixture = openFixture('construct-typing.tsrx');
+	const syntactic = await server.syntacticDiagnosticsSync(fixture.file);
+	const semantic = await server.semanticDiagnosticsSync(fixture.file);
+
+	expect(syntactic).toEqual([]);
+	expect(
+		semantic,
+		'M13 clean construct branches must narrow locally and produce no diagnostics from authored code or synthetic IIFE scaffolding.',
+	).toEqual([]);
+}, 20_000);
+
+test('M13 real tsserver maps a branch-local type error to the authored token', async () => {
+	const fixture = openFixture('construct-typing-error.tsrx');
+	const diagnostics = await server.semanticDiagnosticsSync(fixture.file);
+	const authored = diagnosticMatching(diagnostics, /property 'missing' does not exist/i);
+
+	expect(diagnostics).toHaveLength(1);
+	expectDiagnosticSpan(fixture.source, authored, 'missing');
+}, 20_000);
+
+test('M14 real tsserver offers native state auto-import and maps its code action to TSRX source', async () => {
+	const fixture = openFixture('auto-import.tsrx');
+	const position = positionAfterMarker(fixture.marked, '/*M14_STATE*/');
+	const completion = await server.completionInfo(fixture.file, position);
+	const entry = completionEntries(completion).find(
+		(candidate) => candidate.name === 'state' && candidate.source === '@markless/core',
+	);
+
+	expect(
+		entry,
+		'M14 missing capability: bare stat must offer state as a native @markless/core module export.',
+	).toMatchObject({ name: 'state', source: '@markless/core', hasAction: true });
+
+	const details = await server.completionEntryDetails(fixture.file, position, [
+		{ name: entry?.name ?? 'state', source: entry?.source, data: entry?.data },
+	]);
+	const detail = details?.find((candidate: any) => candidate.name === 'state');
+	const action = detail?.codeActions?.find((candidate: any) =>
+		candidate.changes?.some((change: any) => change.fileName === fixture.file),
+	);
+	const sourceChanges = action?.changes?.filter(
+		(change: any) => change.fileName === fixture.file,
+	);
+
+	expect(
+		action,
+		`M14 missing capability: completion details must return a source-file import code action. Details: ${JSON.stringify(details)}`,
+	).toBeDefined();
+	expect(action?.changes?.map((change: any) => change.fileName)).toEqual([fixture.file]);
+	expect(
+		sourceChanges?.flatMap((change: any) => change.textChanges).map((change: any) => change.newText.trim()),
+	).toContain("import { state } from '@markless/core';");
+	expect(applyProtocolChanges(fixture.source, sourceChanges?.[0]?.textChanges ?? [])).toContain(
+		"import { state } from '@markless/core';",
+	);
+	expect(JSON.stringify(action)).not.toContain('@jsxImportSource');
+}, 20_000);
+
+test('M15 real tsserver exposes routes only in strings and href attribute values', async () => {
+	const dualProject = copyFixtureProject(fixtureDirectory, workspaceRoot);
+	const dualServer = new TsserverHarness({
+		project: dualProject,
+		workspaceRoot,
+		globalPlugins: [corePlugin, routerPlugin],
+	});
+	try {
+		const fixture = openFixture('router-contexts.tsrx', dualProject, dualServer);
+		for (const marker of [
+			'/*M15_STRING*/',
+			'/*M15_HREF_STRING*/',
+			'/*M15_HREF_EXPRESSION*/',
+		]) {
+			const completion = await dualServer.completionInfo(
+				fixture.file,
+				positionAfterMarker(fixture.marked, marker),
+			);
+			expect(
+				completionNames(completion),
+				`M15 missing capability: ${marker} must offer both fixture routes.`,
+			).toEqual(expect.arrayContaining(['/', '/library']));
+		}
+
+		for (const marker of [
+			'/*M15_IMPORT*/',
+			'/*M15_MEMBER*/',
+			'/*M15_IDENTIFIER*/',
+			'/*M15_EXPRESSION*/',
+		]) {
+			const completion = await dualServer.completionInfo(
+				fixture.file,
+				positionAfterMarker(fixture.marked, marker),
+			);
+			expect(
+				completionNames(completion),
+				`M15 invalid capability: ${marker} must not receive route completions.`,
+			).not.toEqual(expect.arrayContaining(['/', '/library']));
+		}
+	} finally {
+		await dualServer.close();
+		removeFixtureProject(dualProject);
+	}
+}, 30_000);
+
+test('M15 router skips page-directory scanning outside allowed source contexts', () => {
+	const source = `export function Probe() @{\n\tconst route = '';\n\tconst value = rou;\n}`;
+	const fileName = '/project/probe.tsrx';
+	let pageDirectoryScans = 0;
+	const instrumentedTypeScript = {
+		...typeScript,
+		sys: {
+			...typeScript.sys,
+			directoryExists: () => true,
+			readDirectory() {
+				pageDirectoryScans += 1;
+				return ['/project/pages/index.tsrx'];
+			},
+		},
+	};
+	const languageService = {
+		getCompletionsAtPosition: () => undefined,
+	};
+	const info = {
+		config: { pagesDir: 'pages' },
+		languageService,
+		languageServiceHost: {
+			getCurrentDirectory: () => '/project',
+			getScriptFileNames: () => [fileName],
+		},
+		project: {
+			getCurrentDirectory: () => '/project',
+			getScriptInfo: () => ({ getSnapshot: () => typeScript.ScriptSnapshot.fromString(source) }),
+			projectService: {},
+		},
+	};
+	const plugin = initRouterPlugin({ typescript: instrumentedTypeScript as typeof typeScript });
+	const proxy = plugin.create(info as any);
+
+	proxy.getCompletionsAtPosition(fileName, source.indexOf('rou') + 3, {});
+	expect(pageDirectoryScans).toBe(0);
+	const stringCompletion = proxy.getCompletionsAtPosition(fileName, source.indexOf("''") + 1, {});
+	expect(pageDirectoryScans).toBe(1);
+	expect(completionNames(stringCompletion)).toContain('/');
+});
+
 test('M7a real tsserver activates built core and router CJS plugins together and exposes route href completions', async () => {
 	const dualProject = copyFixtureProject(fixtureDirectory, workspaceRoot);
 	const dualServer = new TsserverHarness({
@@ -773,6 +1168,12 @@ test('M7c packaged VSIX contains both plugins and a valid extension runtime', ()
 				typeof extensionRequire(pluginName),
 				`M7c missing capability: extracted extension-local ${pluginName} must be require()-able without repository node_modules.`,
 			).toBe('function');
+			if (pluginName === corePlugin) {
+				expect(
+					existsSync(join(dirname(entry), 'markless-jsx.d.ts')),
+					'M7c missing capability: the plugin-managed JSX contract must ship beside the bundled core plugin.',
+				).toBe(true);
+			}
 		}
 		const runtime = join(extensionRoot, 'dist/extension.cjs');
 		expect(
@@ -838,6 +1239,53 @@ function completionNames(completion: any): string[] {
 
 function displayText(info: any): string {
 	return info?.displayString ?? info?.displayParts?.map((part: any) => part.text).join('') ?? '';
+}
+
+function diagnosticMatching(diagnostics: any[], pattern: RegExp): any {
+	return diagnostics.find((diagnostic) => pattern.test(String(diagnostic.text)));
+}
+
+function expectDiagnosticSpan(source: string, diagnostic: any, token: string): void {
+	const start = positionAtSearch(source, token);
+	const end = positionAtSearch(source, token, token.length);
+	expect(diagnostic?.start).toEqual(start);
+	expect(diagnostic?.end).toEqual(end);
+}
+
+function protocolRangeAtSearch(source: string, token: string, length: number): {
+	start: { line: number; offset: number };
+	end: { line: number; offset: number };
+} {
+	return {
+		start: positionAtSearch(source, token),
+		end: positionAtSearch(source, token, length),
+	};
+}
+
+function applyProtocolChanges(source: string, textChanges: readonly any[]): string {
+	return [...textChanges]
+		.sort(
+			(left, right) =>
+				protocolPositionOffset(source, right.start) -
+				protocolPositionOffset(source, left.start),
+		)
+		.reduce((current, change) => {
+			const start = protocolPositionOffset(source, change.start);
+			const end = protocolPositionOffset(source, change.end);
+			return `${current.slice(0, start)}${change.newText}${current.slice(end)}`;
+		}, source);
+}
+
+function protocolPositionOffset(
+	source: string,
+	position: { readonly line: number; readonly offset: number },
+): number {
+	const lines = source.split('\n');
+	return (
+		lines.slice(0, position.line - 1).reduce((length, line) => length + line.length + 1, 0) +
+		position.offset -
+		1
+	);
 }
 
 function triggeredAtCompletionInfo(

@@ -53,7 +53,7 @@ test('configures Zed to highlight .tsrx as TSX and load the workspace plugin', (
 	]);
 });
 
-test('feeds TypeScript a virtual .ts service script for TSRX source', () => {
+test('feeds TypeScript a virtual .tsx service script for TSRX source', () => {
 	const plugin = getMarklessTsrxLanguagePlugin();
 	const source = `
 		import { state } from '@markless/core';
@@ -71,11 +71,10 @@ test('feeds TypeScript a virtual .ts service script for TSRX source', () => {
 	);
 	const serviceScript = virtualCode && plugin.typescript?.getServiceScript?.(virtualCode);
 
-	expect(serviceScript).toMatchObject({ extension: '.ts', scriptKind: ts.ScriptKind.TS });
+	expect(serviceScript).toMatchObject({ extension: '.tsx', scriptKind: ts.ScriptKind.TSX });
 	expect(virtualCode?.generatedCode).toContain("import { state } from '@markless/core';");
 	expect(virtualCode?.generatedCode).toContain('count++');
-	expect(virtualCode?.generatedCode).toContain('void (count);');
-	expect(virtualCode?.generatedCode).not.toContain('<button');
+	expect(virtualCode?.generatedCode).toContain('return <button');
 	expect(virtualCode?.generatedCode).not.toContain('react/jsx-runtime');
 	expect(
 		formatDiagnostics(
@@ -106,12 +105,13 @@ export function App() @{
 	expect(virtualCode?.sourceAst?.type).toBe('Program');
 	expect(virtualCode?.usageErrors).toEqual([]);
 	expect(virtualCode?.generatedCode).toContain('count++');
-	expect(virtualCode?.generatedCode).not.toContain('<button');
+	expect(virtualCode?.generatedCode).toContain('<button');
 	expect(virtualCode?.embeddedCodes[0]?.languageId).toBe('css');
 	expect(virtualCode?.embeddedCodes[0]?.snapshot.getText(0, 100)).toContain('.counter');
 });
 
 test('package CommonJS entry is generated into dist instead of maintained in src', () => {
+	ensureGeneratedCjsBuild();
 	const packageJson = JSON.parse(
 		readFileSync('packages/typescript-plugin/package.json', 'utf8'),
 	) as any;
@@ -119,6 +119,10 @@ test('package CommonJS entry is generated into dist instead of maintained in src
 	expect(packageJson.main).toBe('./dist/index.cjs');
 	expect(packageJson.exports['.'].require).toBe('./dist/index.cjs');
 	expect(packageJson.scripts?.['build:cjs']).toContain('vp pack src/index.ts');
+	expect(packageJson.publishConfig.exports['./jsx-runtime'].types).toBe(
+		'./dist/markless-jsx.d.ts',
+	);
+	expect(existsSync('packages/typescript-plugin/dist/markless-jsx.d.ts')).toBe(true);
 	expect(existsSync('packages/typescript-plugin/src/index.cjs')).toBe(false);
 });
 
@@ -140,6 +144,7 @@ test('tsserver protocol opens configured .tsrx files without JSX or parser diagn
 	const result = await runTsrxTsserverProbe();
 
 	expect(result.loadedPlugin).toBe(true);
+	expect(result.loadedContract).toBe(true);
 	expect(result.results).toEqual([
 		{ file: 'Counter.tsrx', syntactic: [], semantic: [] },
 		{ file: 'NoImports.tsrx', syntactic: [], semantic: [] },
@@ -163,7 +168,7 @@ function typeCheckVirtualSource(
 		ts.sys,
 		dirname(configPath),
 	);
-	const virtualPath = `${sourceFileName}.ts`;
+	const virtualPath = `${sourceFileName}.tsx`;
 	const host = ts.createCompilerHost(parsedConfig.options);
 	const fileExists = host.fileExists.bind(host);
 	const readFile = host.readFile.bind(host);
@@ -171,7 +176,11 @@ function typeCheckVirtualSource(
 	host.fileExists = (fileName) => fileName === virtualPath || fileExists(fileName);
 	host.readFile = (fileName) => (fileName === virtualPath ? source : readFile(fileName));
 
-	const program = ts.createProgram([virtualPath], { ...parsedConfig.options, ...options }, host);
+	const program = ts.createProgram(
+		[virtualPath],
+		{ ...parsedConfig.options, jsx: ts.JsxEmit.Preserve, ...options },
+		host,
+	);
 	return ts
 		.getPreEmitDiagnostics(program)
 		.filter((diagnostic) => diagnostic.file?.fileName === virtualPath);
@@ -185,6 +194,7 @@ function formatDiagnostics(diagnostics: readonly ts.Diagnostic[]): string[] {
 
 async function runTsrxTsserverProbe(): Promise<{
 	loadedPlugin: boolean;
+	loadedContract: boolean;
 	results: Array<{ file: string; syntactic: unknown[]; semantic: unknown[] }>;
 }> {
 	ensureGeneratedCjsBuild();
@@ -281,7 +291,11 @@ export function App() @{
 			results.push({ file: fixture.name, syntactic, semantic });
 		}
 		const log = server.readLog();
-		return { loadedPlugin: log.includes('@markless/typescript-plugin'), results };
+		return {
+			loadedPlugin: log.includes('@markless/typescript-plugin'),
+			loadedContract: log.includes('markless-jsx.d.ts'),
+			results,
+		};
 	} finally {
 		await server.close();
 	}

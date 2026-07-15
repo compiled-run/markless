@@ -18,17 +18,25 @@ run('pnpm', ['--dir', resolve(workspaceRoot, 'packages/typescript-plugin'), 'bui
 run('pnpm', ['--dir', resolve(workspaceRoot, 'packages/router'), 'build:vsix']);
 rmSync(resolve(distRoot, 'node_modules'), { recursive: true, force: true });
 
-assemblePackage('@markless/typescript-plugin', 'typescript-plugin', 'index.cjs');
+assemblePackage('@markless/typescript-plugin', 'typescript-plugin', 'index.cjs', '.', [
+	'markless-jsx.d.ts',
+]);
 assemblePackage('@markless/router', 'router', 'index.cjs', './typescript-plugin');
 assertSelfContained(resolve(distRoot, 'extension.cjs'), ['vscode']);
 rmSync(buildRoot, { recursive: true, force: true });
 
-function assemblePackage(name, directory, entry, exportPath = '.') {
+function assemblePackage(name, directory, entry, exportPath = '.', extraDistFiles = []) {
 	const target = resolve(distRoot, 'node_modules', ...name.split('/'));
 	const sourceEntry = resolve(buildRoot, directory, entry);
 	assertSelfContained(sourceEntry);
 	mkdirSync(resolve(target, 'dist'), { recursive: true });
 	cpSync(sourceEntry, resolve(target, `dist/${entry}`));
+	for (const extra of extraDistFiles) {
+		cpSync(
+			resolve(workspaceRoot, `packages/${directory}/dist/${extra}`),
+			resolve(target, `dist/${extra}`),
+		);
+	}
 	const sourceManifest = JSON.parse(
 		readFileSync(resolve(workspaceRoot, `packages/${directory}/package.json`), 'utf8'),
 	);

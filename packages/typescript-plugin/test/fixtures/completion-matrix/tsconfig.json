@@ -1,6 +1,7 @@
 {
 	"compilerOptions": {
 		"lib": ["ES2022", "DOM"],
+		"jsx": "preserve",
 		"module": "ESNext",
 		"moduleResolution": "Bundler",
 		"noEmit": true,
@@ -12,5 +13,5 @@
 		"strict": true,
 		"target": "ES2022"
 	},
-	"include": ["**/*.ts", "**/*.tsrx"]
+	"include": ["**/*.ts", "**/*.tsx", "**/*.tsrx"]
 }

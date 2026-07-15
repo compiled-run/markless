@@ -851,11 +851,11 @@ function completionEntriesForImport(
 			try {
 				const compiled = compileTsrxForTypeService(targetSource, resolved, { loose: true });
 				const generatedFile = typeScript.createSourceFile(
-					`${resolved}.ts`,
+					`${resolved}.tsx`,
 					compiled.code,
 					typeScript.ScriptTarget.Latest,
 					true,
-					typeScript.ScriptKind.TS,
+					typeScript.ScriptKind.TSX,
 				);
 				for (const name of exportedDeclarationNames(typeScript, generatedFile)) {
 					if (entries.some((entry) => entry.name === name)) continue;

@@ -138,6 +138,11 @@ export class TsserverHarness {
 			...position,
 			includeExternalModuleExports: true,
 			includeInsertTextCompletions: true,
+		}).catch((error: unknown) => {
+			if (error instanceof Error && error.message.includes('No content available.')) {
+				return undefined;
+			}
+			throw error;
 		});
 	}
 
@@ -150,6 +155,7 @@ export class TsserverHarness {
 			readonly data?: any;
 		}>,
 	): Promise<any> {
+		this.send('configure', { preferences: { quotePreference: 'single' } });
 		return this.requestBody('completionEntryDetails', {
 			file,
 			...position,
@@ -163,6 +169,14 @@ export class TsserverHarness {
 
 	definitionAndBoundSpan(file: string, position: SourcePosition): Promise<any> {
 		return this.requestBody('definitionAndBoundSpan', { file, ...position });
+	}
+
+	jsxClosingTag(file: string, position: SourcePosition): Promise<any> {
+		return this.requestBody('jsxClosingTag', { file, ...position });
+	}
+
+	linkedEditingRange(file: string, position: SourcePosition): Promise<any> {
+		return this.requestBody('linkedEditingRange', { file, ...position });
 	}
 
 	syntacticDiagnosticsSync(file: string): Promise<any[]> {
@@ -240,10 +254,10 @@ export class TsserverHarness {
 			this.pending.set(requestSeq, {
 				resolve: (message) => {
 					if (!message.success) {
-						reject(
-							new Error(
-								`tsserver ${command} failed: ${message.message ?? 'unknown error'}`,
-							),
+					reject(
+						new Error(
+							`tsserver ${command} failed: ${message.message ?? 'unknown error'}`,
+						),
 						);
 						return;
 					}
@@ -322,7 +336,7 @@ export function positionAtSearch(source: string, search: string, insideOffset = 
 }
 
 export function sourceWithoutMarkers(source: string): string {
-	return source.replace(/\/\*M[1-7][A-Z0-9_]*\*\//g, '');
+	return source.replace(/\/\*M\d+[A-Z0-9_]*\*\//g, '');
 }
 
 function positionAtOffset(source: string, offset: number): SourcePosition {

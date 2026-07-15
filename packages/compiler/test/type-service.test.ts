@@ -28,14 +28,13 @@ export function List({ items, emptyLabel }: { items: { id: string; tag: string; 
 	expect(result.errors).toEqual([]);
 	expect(result.code).toContain("import { state } from '@markless/core';");
 	expect(result.code).toContain("import { Row } from './Row.tsrx';");
-	expect(result.code).toContain('for (const item of items)');
-	expect(result.code).toContain('const i = 0;');
-	expect(result.code).toContain('void (item.id);');
-	expect(result.code).toContain('void (item.active ? "on" : "off");');
+	expect(result.code).toContain('/** @jsxImportSource @markless/typescript-plugin */');
+	expect(result.code).toContain('return <section>');
+	expect(result.code).toContain('void (item.id)');
+	expect(result.code).toContain('class={item.active ? "on" : "off"}');
 	expect(result.code).toContain('item.select(i)');
-	expect(result.code).toContain('void (Row);');
-	expect(result.code).toContain('void (selected);');
-	expect(result.code).toContain('void (emptyLabel);');
+	expect(result.code).toContain('<Row label={item.label}>{selected}</Row>');
+	expect(result.code).toContain('<span>{emptyLabel}</span>');
 	expect(result.code).not.toContain('<{item.tag}');
 	expect(result.code).not.toContain('@empty');
 	expect(result.mappings.length).toBeGreaterThan(0);
@@ -59,6 +58,7 @@ test('compile_to_volar_mappings aliases the Markless type-service artifact for T
 
 	expect(result.sourceAst?.type).toBe('Program');
 	expect(result.code).toContain('count++');
+	expect(result.code).toContain('return <button');
 	expectExactMapping(result, source, 'count++');
 });
 
@@ -92,15 +92,97 @@ test('compileTsrxForTypeService maps TSRX control-flow expressions through gener
 
 	expect(result.errors).toEqual([]);
 	expect(result.code).toContain("if (ready && kind === 'a')");
-	expect(result.code).toContain('void (kind);');
-	expect(result.code).toContain('try {');
+	expect(result.code).toContain('switch (kind)');
 	expect(formatParseDiagnostics(result.code)).toEqual([]);
 	expect(result.code).not.toContain('@case');
-	expect(result.code).not.toContain('<span');
+	expect(result.code).toContain('return <section>');
 	expectExactMapping(result, source, "ready && kind === 'a'");
 	expectExactMapping(result, source, 'message.toUpperCase()');
 	expectExactMapping(result, source, 'load().then(Boolean)');
 	expectExactMapping(result, source, 'error.message');
+});
+
+test('compileTsrxForTypeService emits the ruled TSX envelopes for child constructs', () => {
+	const source = `export function Constructs({ value, items, load }: { value: { kind: 'a'; label: string } | { kind: 'b'; count: number }; items: { id: string }[]; load(): Promise<string> }) @{
+	<section>
+		@if (value.kind === 'a') {
+			<span>{value.label}</span>
+		} @else if (value.kind === 'b') {
+			@{ const doubled = value.count * 2; <span>{doubled}</span> }
+		} @else {
+			<span>other</span>
+		}
+		@switch (value.kind) {
+			@case 'a': { <span>{value.label}</span> }
+			@default: { <span>{value.count}</span> }
+		}
+		@try { <span>{load()}</span> } @pending { <span>pending</span> } @catch (error) { <span>{error.message}</span> }
+		@for (const item of items; index i; key item.id) { <span>{i.toFixed()} {item.id}</span> } @empty { <span>empty</span> }
+	</section>
+}`;
+
+	const result = compileTsrxForTypeService(source, 'Constructs.tsrx', { loose: false });
+	const compact = result.code.replace(/\s+/g, ' ');
+
+	expect(result.errors).toEqual([]);
+	expect(formatParseDiagnostics(result.code)).toEqual([]);
+	expect(compact).toContain(
+		"{(() => { if (value.kind === 'a') return <><span>{value.label}</span></>; else if (value.kind === 'b') return <>{(() => {const doubled = value.count * 2; return <><span>{doubled}</span></>;})()}</>; else return <><span>other</span></>; })()}",
+	);
+	expect(compact).toContain(
+		"{(() => { switch (value.kind) { case 'a': return <><span>{value.label}</span></>; default: return <><span>{value.count}</span></>; } return null; })()}",
+	);
+	expect(compact).toContain(
+		'{((__pending: boolean) => { if (__pending) return <><span>pending</span></>; try { return <><span>{load()}</span></>; } catch (__caught) { const error: any = __caught; return <><span>{error.message}</span></>; } })(false as boolean)}',
+	);
+	expect(compact).toContain(
+		'{(() => { const __rows: Array<__MarklessTypeService.Element> = []; let i = 0; for (const item of items) { void (item.id); __rows.push(<><span>{i.toFixed()} {item.id}</span></>); i += 1; } if (__rows.length === 0) __rows.push(<><span>empty</span></>); return __rows; })()}',
+	);
+	expect(result.code).not.toContain('@ts-expect-error');
+	expect(result.code).not.toContain('@ts-ignore');
+	for (const expression of [
+		"value.kind === 'a'",
+		"value.kind === 'b'",
+		'value.label',
+		'value.count * 2',
+		'error.message',
+		'items',
+		'item.id',
+		'i.toFixed()',
+	]) {
+		expectExactMapping(result, source, expression);
+	}
+	const ifSource = source.indexOf('@if');
+	const ifMapping = result.mappings.find(
+		(mapping) =>
+			mapping.sourceOffsets[0] === ifSource &&
+			result.code.slice(
+				mapping.generatedOffsets[0],
+				mapping.generatedOffsets[0] + mapping.generatedLengths[0],
+			) === 'if',
+	);
+	expect(ifMapping?.data).toMatchObject({
+		verification: false,
+		completion: false,
+		semantic: false,
+		navigation: false,
+		structure: true,
+	});
+});
+
+test('compileTsrxForTypeService reuses the ruled construct expression outside JSX children', () => {
+	const source = `export function ExpressionConstruct({ ready }: { ready: boolean }) @{
+	const chosen = @if (ready) { <span>yes</span> } @else { <span>no</span> };
+	<div>{chosen}</div>
+}`;
+	const result = compileTsrxForTypeService(source, 'ExpressionConstruct.tsrx', { loose: false });
+	const compact = result.code.replace(/\s+/g, ' ');
+
+	expect(result.errors).toEqual([]);
+	expect(formatParseDiagnostics(result.code)).toEqual([]);
+	expect(compact).toContain(
+		'const chosen = (() => { if (ready) return <><span>yes</span></>; else return <><span>no</span></>; })();',
+	);
 });
 
 test('compileTsrxForTypeService lowers nested statement containers and expression TSRX values', () => {
@@ -125,9 +207,9 @@ test('compileTsrxForTypeService lowers nested statement containers and expressio
 	expect(formatParseDiagnostics(result.code)).toEqual([]);
 	expect(result.code).not.toContain('@{');
 	expect(result.code).not.toContain('@if');
-	expect(result.code).not.toContain('<span');
+	expect(result.code).toContain('return <section>');
 	expect(result.code).toContain('const fallback =');
-	expect(result.code).toContain('void (value > 0)');
+	expect(result.code).toContain('if (value > 0)');
 	expect(result.code).toContain('const label = title.trim();');
 	expectExactMapping(result, source, 'value > 0');
 	expectExactMapping(result, source, 'title.toUpperCase()');
@@ -146,14 +228,12 @@ export function Spread({ attrs, id }: Props) @{
 
 	expect(result.errors).toEqual([]);
 	expect(formatParseDiagnostics(result.code)).toEqual([]);
-	expect(result.code).not.toContain('{...attrs}');
-	expect(result.code).toContain('void (attrs);');
-	expect(result.code).toContain('void (id);');
+	expect(result.code).toContain('<section {...attrs} data-id={id}>{id}</section>');
 	expectExactMapping(result, source, 'attrs');
 	expectExactMapping(result, source, 'id');
 });
 
-test('compileTsrxForTypeService lowers fragments without TSX parser output', () => {
+test('compileTsrxForTypeService preserves fragments as TSX parser output', () => {
 	const source = `export function Fragmented({ title, count }: { title: string; count: number }) @{
 	<>
 		<header>{title}</header>
@@ -165,12 +245,138 @@ test('compileTsrxForTypeService lowers fragments without TSX parser output', () 
 
 	expect(result.errors).toEqual([]);
 	expect(formatParseDiagnostics(result.code)).toEqual([]);
-	expect(result.code).not.toContain('<>');
-	expect(result.code).not.toContain('<header');
-	expect(result.code).toContain('void (title);');
-	expect(result.code).toContain('void (count + 1);');
+	expect(result.code).toContain('return <>');
+	expect(result.code).toContain('<header>{title}</header>');
+	expect(result.code).toContain('<span>{count + 1}</span>');
 	expectExactMapping(result, source, 'title');
 	expectExactMapping(result, source, 'count + 1');
+});
+
+test('compileTsrxForTypeService assigns ruled mapping profiles to TSX tokens and insertion gaps', () => {
+	const source = `export function Mapped({ value, attrs }: { value: string; attrs: Record<string, string> }) @{
+	<div class="card" title={value} {...attrs}>{value}</div>
+}`;
+	const result = compileTsrxForTypeService(source, 'Mapped.tsrx', { loose: true });
+	const mappingFor = (text: string, from = 0) => {
+		const sourceOffset = source.indexOf(text, from);
+		return result.mappings.find(
+			(mapping) =>
+				mapping.sourceOffsets[0] === sourceOffset &&
+				mapping.lengths[0] === text.length &&
+				result.code.slice(
+					mapping.generatedOffsets[0],
+					mapping.generatedOffsets[0] + mapping.generatedLengths[0],
+				) === text,
+		);
+	};
+
+	expect(mappingFor('div', source.indexOf('<div'))?.data).toMatchObject({
+		verification: true,
+		completion: true,
+		semantic: true,
+		navigation: true,
+		structure: true,
+		format: false,
+	});
+	expect(mappingFor('class')?.data).toMatchObject({ verification: true, structure: true });
+	expect(mappingFor('value', source.indexOf('title='))?.data).toMatchObject({
+		verification: true,
+		completion: true,
+		semantic: true,
+		navigation: true,
+		structure: false,
+	});
+	expect(mappingFor('<', source.indexOf('<div'))?.data).toMatchObject({
+		verification: false,
+		completion: true,
+		semantic: false,
+		navigation: false,
+		structure: true,
+	});
+	expect(mappingFor(' ', source.indexOf('<div'))?.data.verification).toBe(false);
+	expect(mappingFor('"card"')?.data.structure).toBe(false);
+	expect(mappingFor('card')?.data.structure).toBe(false);
+});
+
+test('compileTsrxForTypeService maps component tag names, attributes, and opening-tag insertion gaps', () => {
+	const source = `import { Nav } from './Nav.tsrx';
+export function App({ active }: { active: boolean }) @{
+	<Nav label="Home" active={active}>content</Nav>
+}`;
+	const result = compileTsrxForTypeService(source, 'App.tsrx', { loose: true });
+	const opening = source.indexOf('Nav label');
+	const closing = source.lastIndexOf('Nav>');
+	const gap = source.indexOf(' ', opening);
+	const mappingAt = (offset: number, length: number) =>
+		result.mappings.find(
+			(mapping) => mapping.sourceOffsets[0] === offset && mapping.lengths[0] === length,
+		);
+
+	expect(mappingAt(opening, 3)?.data).toMatchObject({
+		verification: true,
+		completion: true,
+		navigation: true,
+		structure: true,
+	});
+	expect(mappingAt(closing, 3)?.data).toMatchObject({ navigation: true, structure: true });
+	expect(mappingAt(source.indexOf('label='), 5)?.data).toMatchObject({
+		verification: true,
+		completion: true,
+		navigation: true,
+	});
+	expect(mappingAt(gap, 1)?.data).toMatchObject({
+		verification: false,
+		completion: true,
+		navigation: false,
+		structure: true,
+	});
+});
+
+test('compileTsrxForTypeService maps TypeScript import insertion boundaries', () => {
+	const withoutImports = `export function App() @{ <main /> }`;
+	const withoutImportsResult = compileTsrxForTypeService(withoutImports, 'App.tsrx', {
+		loose: true,
+	});
+	const fileStartMapping = withoutImportsResult.mappings.find(
+		(mapping) =>
+			mapping.sourceOffsets[0] === 0 &&
+			mapping.lengths[0] === 1 &&
+			mapping.generatedOffsets[0] === 0 &&
+			mapping.generatedLengths[0] === 1,
+	);
+
+	expect(fileStartMapping?.data).toMatchObject({
+		verification: false,
+		completion: true,
+		navigation: false,
+		structure: true,
+	});
+
+	const withImports = `import { Row } from './Row.tsrx';
+import type { Props } from './types.ts';
+export function App(props: Props) @{ <Row {...props} /> }`;
+	const withImportsResult = compileTsrxForTypeService(withImports, 'App.tsrx', {
+		loose: true,
+	});
+	for (const terminator of [withImports.indexOf(';') + 1, withImports.indexOf(';', 40) + 1]) {
+		const generatedTerminator = withImportsResult.code.indexOf(
+			';',
+			terminator === withImports.indexOf(';') + 1 ? 0 : withImportsResult.code.indexOf(';') + 1,
+		) + 1;
+		const boundaryMapping = withImportsResult.mappings.find(
+			(mapping) =>
+				mapping.sourceOffsets[0] === terminator - 1 &&
+				mapping.lengths[0] === 1 &&
+				mapping.generatedOffsets[0] === generatedTerminator - 1 &&
+				mapping.generatedLengths[0] === 1,
+		);
+		expect(boundaryMapping?.data).toMatchObject({
+			verification: false,
+			completion: true,
+			navigation: false,
+			structure: true,
+		});
+	}
 });
 
 function expectExactMapping(
@@ -196,7 +402,7 @@ function expectExactMapping(
 
 function formatParseDiagnostics(source: string): string[] {
 	return ts
-		.createSourceFile('virtual.ts', source, ts.ScriptTarget.ES2022, true, ts.ScriptKind.TS)
+		.createSourceFile('virtual.tsx', source, ts.ScriptTarget.ES2022, true, ts.ScriptKind.TSX)
 		.parseDiagnostics.map((diagnostic) =>
 			ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'),
 		);
