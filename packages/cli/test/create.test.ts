@@ -1,9 +1,27 @@
 import { execFile } from 'node:child_process';
-import { access, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import {
+	access,
+	lstat,
+	mkdir,
+	mkdtemp,
+	readFile,
+	readdir,
+	rename,
+	rm,
+	rmdir,
+	stat,
+	writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { promisify } from 'node:util';
 import { join } from 'pathe';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
+
+const detectAgenticEnvironment = vi.hoisted(() =>
+	vi.fn(() => ({ isAgentic: false, id: null, name: null, type: null })),
+);
+vi.mock('am-i-vibing', () => ({ detectAgenticEnvironment }));
 import {
 	CreateProgram,
 	PROJECT_FORMAT_CHOICES,
@@ -89,21 +107,18 @@ test('keeps CLI templates external and uses shared path and URL helpers', async 
 	expect(source).not.toContain('plugins: [markless(), router()]');
 });
 
-test('node executable adapter owns host APIs outside the reusable create program', async () => {
+test('node executable delegates to the testable host adapter outside the reusable program', async () => {
 	const nodeAdapter = await readFile(new URL('../src/node.ts', import.meta.url), 'utf-8');
+	const nodeRuntime = await readFile(new URL('../src/node-runtime.ts', import.meta.url), 'utf-8');
 	const programSource = await readFile(new URL('../src/index.ts', import.meta.url), 'utf-8');
 
 	expect(nodeAdapter).toContain('process.argv.slice(2)');
 	expect(nodeAdapter).toContain('new CreateProgram().run');
-	expect(nodeAdapter).toContain("from '@clack/prompts'");
-	expect(nodeAdapter).toContain('select(');
-	expect(nodeAdapter).toContain('text(');
-	expect(nodeAdapter).toContain('note(');
-	expect(nodeAdapter).toContain('outro(');
-	expect(nodeAdapter).toContain('isCancel(');
-	expect(nodeAdapter).toContain("from 'node:child_process'");
-	expect(nodeAdapter).toContain("from 'node:fs/promises'");
-	expect(nodeAdapter).not.toContain("from 'node:readline");
+	expect(nodeAdapter).toContain("from './node-runtime.ts'");
+	expect(nodeRuntime).toContain("from '@clack/prompts'");
+	expect(nodeRuntime).toContain("from 'node:child_process'");
+	expect(nodeRuntime).toContain("from 'node:fs/promises'");
+	expect(nodeRuntime).not.toContain("from 'node:readline");
 	expect(programSource).not.toMatch(
 		/from 'node:(child_process|fs|fs\/promises|path|process|url)'/,
 	);
@@ -152,6 +167,9 @@ test('prompts interactively when a TTY run has no target', async () => {
 					if (message === 'Initialize git?') return 'no';
 					if (message === 'Ready to create?') return 'create';
 					throw new Error(`Unexpected select prompt: ${message}`);
+				},
+				async multiselect() {
+					throw new Error('No agents should be found in this test.');
 				},
 				async text({ initialValue, message, placeholder, validate }) {
 					events.push(`text:${message}:${initialValue}:${placeholder}`);
@@ -235,13 +253,16 @@ test('creates a minimal Markless Router app with TSRX pages and Nitro-backed dep
 		typescript: expect.any(String),
 		vite: expect.any(String),
 	});
-	const agents = await readFile(join(appRoot, 'AGENTS.md'));
-	const claude = await readFile(join(appRoot, 'CLAUDE.md'));
-	expect(claude).toEqual(agents);
+	await expect(exists(join(appRoot, 'AGENTS.md'))).resolves.toBe(false);
+	await expect(exists(join(appRoot, 'CLAUDE.md'))).resolves.toBe(false);
+	await expect(exists(join(appRoot, '.claude'))).resolves.toBe(false);
+	await expect(exists(join(appRoot, '.codex'))).resolves.toBe(false);
+	await expect(exists(join(appRoot, '.gemini'))).resolves.toBe(false);
+	await expect(exists(join(appRoot, '.copilot'))).resolves.toBe(false);
+	await expect(exists(join(appRoot, '.cursor'))).resolves.toBe(false);
 	await expect(
-		readFile(join(appRoot, '.claude/skills/markless-debugging/SKILL.md'), 'utf-8'),
+		readFile(join(appRoot, 'scripts/markless-doctor.mjs'), 'utf-8'),
 	).resolves.toBeTruthy();
-	await expect(readFile(join(appRoot, 'scripts/markless-doctor.mjs'), 'utf-8')).resolves.toBeTruthy();
 	await expect(exists(join(appRoot, 'pages/index.tsrx'))).resolves.toBe(true);
 	await expect(exists(join(appRoot, 'public'))).resolves.toBe(true);
 	await expect(exists(join(appRoot, 'nitro.config.ts'))).resolves.toBe(false);
@@ -259,7 +280,7 @@ test('creates a minimal Markless Router app with TSRX pages and Nitro-backed dep
 	await expect(exists(join(appRoot, 'pages/index.tsx'))).resolves.toBe(false);
 });
 
-test('packs the agent discovery templates, including the dot-directory skill', async () => {
+test('packs no repository agent configuration templates', async () => {
 	const cache = await makeWorkspace();
 	const cliRoot = new URL('..', import.meta.url);
 	const { stdout } = await execFileAsync('npm', ['pack', '--dry-run', '--json'], {
@@ -269,8 +290,8 @@ test('packs the agent discovery templates, including the dot-directory skill', a
 	const [{ files }] = JSON.parse(stdout) as Array<{ files: Array<{ path: string }> }>;
 	const packedPaths = files.map((file) => file.path);
 
-	expect(packedPaths).toContain('templates/common/AGENTS.md');
-	expect(packedPaths).toContain(
+	expect(packedPaths).not.toContain('templates/common/AGENTS.md');
+	expect(packedPaths).not.toContain(
 		'templates/common/.claude/skills/markless-debugging/SKILL.md',
 	);
 	expect(packedPaths).toContain('templates/common/scripts/markless-doctor.mjs');
@@ -416,17 +437,43 @@ function runtime(
 		cwd: () => cwd,
 		env: { npm_config_user_agent: 'pnpm/10.33.2' },
 		fs: {
+			async atomicCreateFile(path, contents) {
+				try {
+					await writeFile(path, contents, { flag: 'wx' });
+					return true;
+				} catch (error) {
+					if ((error as NodeJS.ErrnoException).code === 'EEXIST') return false;
+					throw error;
+				}
+			},
+			async atomicWriteFile(path, contents) {
+				const temporaryPath = `${String(path)}.test-tmp`;
+				await writeFile(temporaryPath, contents);
+				await rename(temporaryPath, path);
+			},
+			async lstat(path) {
+				try {
+					return await lstat(path);
+				} catch (error) {
+					if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+					throw error;
+				}
+			},
 			async mkdir(path, options) {
 				await mkdir(path, options);
 			},
 			async readDirectory(path) {
 				const entries = await readdir(path, { withFileTypes: true });
-				return entries.flatMap((entry) => {
-					if (entry.isDirectory())
-						return [{ name: entry.name, kind: 'directory' as const }];
-					if (entry.isFile()) return [{ name: entry.name, kind: 'file' as const }];
-					return [];
-				});
+				return entries.map((entry) => ({
+					name: entry.name,
+					kind: entry.isDirectory()
+						? ('directory' as const)
+						: entry.isFile()
+							? ('file' as const)
+							: entry.isSymbolicLink()
+								? ('symlink' as const)
+								: ('other' as const),
+				}));
 			},
 			readFile(path) {
 				return readFile(path, 'utf-8');
@@ -434,10 +481,22 @@ function runtime(
 			async stat(path) {
 				return await stat(path).catch(() => null);
 			},
+			async remove(path, options) {
+				await rm(path, options);
+			},
+			async rmdir(path) {
+				try {
+					await rmdir(path);
+				} catch (error) {
+					const code = (error as NodeJS.ErrnoException).code;
+					if (code !== 'ENOTEMPTY' && code !== 'EEXIST') throw error;
+				}
+			},
 			async writeFile(path, contents) {
 				await writeFile(path, contents);
 			},
 		},
+		homeDir: join(cwd, 'fake-home'),
 		isTTY: overrides.isTTY ?? false,
 		prompts: overrides.prompts,
 		stdout: {
@@ -453,5 +512,8 @@ function runtime(
 			},
 		},
 		spawn: () => ({ status: 0 }),
+		async sha256(contents) {
+			return createHash('sha256').update(contents).digest('hex');
+		},
 	};
 }

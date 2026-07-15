@@ -305,15 +305,15 @@ function routeTerminationError(
 ): string | undefined {
 	const target = chunks.get(claimedChunk);
 	if (!target) {
-		return 'claimed chunk was not emitted. markless debugging playbook: see AGENTS.md, or run pnpm doctor';
+		return 'claimed chunk was not emitted. markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package';
 	}
 
 	const symbolVirtualId = normalizeVirtualId(symbol.virtualModuleId);
 	if (!chunkOrReexportChainContainsSymbol(chunks, target, symbolVirtualId, symbol.exportName)) {
-		return `claimed chunk does not contain its generated symbol module ${symbol.virtualModuleId} or a live re-export chain to it. markless debugging playbook: see AGENTS.md, or run pnpm doctor`;
+		return `claimed chunk does not contain its generated symbol module ${symbol.virtualModuleId} or a live re-export chain to it. markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package`;
 	}
 	if (!(target.exports ?? []).includes(symbol.exportName)) {
-		return `claimed chunk does not export ${symbol.exportName}. markless debugging playbook: see AGENTS.md, or run pnpm doctor`;
+		return `claimed chunk does not export ${symbol.exportName}. markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package`;
 	}
 	return undefined;
 }

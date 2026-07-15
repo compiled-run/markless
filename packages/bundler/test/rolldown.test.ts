@@ -721,7 +721,7 @@ let count = state(0);
 				},
 			}),
 		).rejects.toThrow(
-			/Markless symbol resolver table contains unresolved generated symbol chunks:.*markless debugging playbook: see AGENTS\.md, or run pnpm doctor/,
+			/Markless symbol resolver table contains unresolved generated symbol chunks:.*markless debugging playbook: run pnpm doctor, or read agent\/markless\.md in the installed @markless\/core package/,
 		);
 	});
 
@@ -781,7 +781,7 @@ let count = state(0);
 			}),
 		).rejects.toThrow(
 			new RegExp(
-				`Markless symbol resolver table integrity check failed:[\\s\\S]*${first.symbolId} -> build/symbol-1\\.js: claimed chunk does not contain its generated symbol module[\\s\\S]*markless debugging playbook: see AGENTS\\.md, or run pnpm doctor`,
+				`Markless symbol resolver table integrity check failed:[\\s\\S]*${first.symbolId} -> build/symbol-1\\.js: claimed chunk does not contain its generated symbol module[\\s\\S]*markless debugging playbook: run pnpm doctor, or read agent/markless\\.md in the installed @markless/core package`,
 			),
 		);
 	});

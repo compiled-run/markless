@@ -45,7 +45,11 @@ if (!skipBuild) {
 		execFileSync('pnpm', ['exec', 'vp', 'build'], { cwd: root, stdio: 'pipe' });
 		check('production build', true, 'vp build succeeded');
 	} catch (error) {
-		const output = `${error.stdout ?? ''}${error.stderr ?? ''}`.trim().split('\n').slice(-12).join('\n');
+		const output = `${error.stdout ?? ''}${error.stderr ?? ''}`
+			.trim()
+			.split('\n')
+			.slice(-12)
+			.join('\n');
 		check(
 			'production build',
 			false,
@@ -60,7 +64,8 @@ console.log(`
 Runtime debugging: dev builds expose window.__MARKLESS_DEBUG__ — a live channel recording
 containers, lifecycles, and event routing. For a dead click, evaluate in the page:
   window.__MARKLESS_DEBUG__.explainInteraction(document.querySelector('<selector>'), 'click')
-Full playbook: AGENTS.md ("Debugging playbook") and .claude/skills/markless-debugging/.
+Versioned playbook: resolve this project's installed @markless/core package and read
+agent/markless.md from that package root.
 `);
 
 process.exit(results.every((entry) => entry.ok) ? 0 : 1);

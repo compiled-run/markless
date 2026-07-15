@@ -672,8 +672,8 @@ export function duplicateElementHandleDiagnostic(
 		phase: 'semantic-graph',
 		title: 'element() handle is bound more than once',
 		message: repeated
-			? `Cannot bind element handle "${binding.handleName}" inside a keyed repeat because one authored handle would point at many row host elements. markless debugging playbook: see AGENTS.md, or run pnpm doctor`
-			: `Cannot bind element handle "${binding.handleName}" to multiple live host elements. markless debugging playbook: see AGENTS.md, or run pnpm doctor`,
+			? `Cannot bind element handle "${binding.handleName}" inside a keyed repeat because one authored handle would point at many row host elements. markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package`
+			: `Cannot bind element handle "${binding.handleName}" to multiple live host elements. markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package`,
 		why: repeated
 			? 'Each repeated row has its own DOM locator. A single element() handle cannot serialize one stable locator for every row instance.'
 			: 'A resumed element handle must resolve to one current DOM locator. Binding one handle to multiple live elements would make lazy event code ambiguous.',
@@ -699,7 +699,7 @@ export function unsupportedRowElementHandleDiagnostic(
 		severity: 'error',
 		phase: 'semantic-graph',
 		title: 'Keyed row element handles must be direct identifiers',
-		message: `Cannot bind el={${binding.handleName}} inside a keyed repeat. Stage-one row ownership supports only a direct element() handle identifier such as el={row}. markless debugging playbook: see AGENTS.md, or run pnpm doctor`,
+		message: `Cannot bind el={${binding.handleName}} inside a keyed repeat. Stage-one row ownership supports only a direct element() handle identifier such as el={row}. markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package`,
 		why: 'The keyed row record owns one host slot per authored handle and repeat key. Member paths, forwarded props, and nested repeat scopes do not identify one compiler-proven row-owned slot.',
 		primarySpan: binding.sourceSpan,
 		passId: 'tsrx-semantic-graph',

@@ -38,7 +38,7 @@ describe('Vite adapter structure', () => {
 		});
 
 		expect(info).toHaveBeenCalledExactlyOnceWith(
-			"markless diagnostics available - window.__MARKLESS_DEBUG__ records containers, lifecycles, and event routing; see AGENTS.md ('markless debugging playbook') or run: pnpm doctor.",
+			'markless diagnostics available - window.__MARKLESS_DEBUG__ records containers, lifecycles, and event routing; markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package.',
 		);
 	});
 
