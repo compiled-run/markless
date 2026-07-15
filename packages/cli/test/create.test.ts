@@ -246,6 +246,9 @@ test('creates a minimal Markless Router app with TSRX pages and Nitro-backed dep
 		'files.associations': {
 			'*.tsrx': 'markless-tsrx',
 		},
+		'emmet.includeLanguages': {
+			'markless-tsrx': 'html',
+		},
 	});
 	expect(vscodeExtensions).toEqual({
 		recommendations: ['markless.markless'],

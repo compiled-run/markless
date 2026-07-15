@@ -77,6 +77,11 @@
 					"description": "Automatically insert matching closing tags in TSRX files."
 				}
 			}
+		},
+		"configurationDefaults": {
+			"emmet.includeLanguages": {
+				"markless-tsrx": "html"
+			}
 		}
 	},
 	"icon": "./assets/markless-logo.png",

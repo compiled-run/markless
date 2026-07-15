@@ -339,6 +339,8 @@ function tagNameCompletionEntries(
 				kind: tagCompletionKind(typeScript, kind),
 				kindModifiers: '',
 				sortText: `0-markless-tag-${name}`,
+				insertText: `${name}$1 />`,
+				isSnippet: true,
 				replacementSpan,
 			}),
 		);
@@ -349,6 +351,8 @@ function tagNameCompletionEntries(
 			kind: typeScript.ScriptElementKind.string,
 			kindModifiers: '',
 			sortText: `1-markless-tag-${name}`,
+			insertText: `${name}$1>$0</${name}>`,
+			isSnippet: true,
 			replacementSpan,
 		});
 	}

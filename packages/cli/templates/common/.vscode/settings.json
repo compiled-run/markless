@@ -1,1 +1,8 @@
-{"files.associations": {"*.tsrx": "markless-tsrx"}}
+{
+	"files.associations": {
+		"*.tsrx": "markless-tsrx"
+	},
+	"emmet.includeLanguages": {
+		"markless-tsrx": "html"
+	}
+}

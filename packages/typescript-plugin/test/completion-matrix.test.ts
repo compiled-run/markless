@@ -403,6 +403,14 @@ test('M4d real tsserver completes intrinsic and in-scope tag names', async () =>
 		childrenEntries.find((entry) => entry.name === 'Nav')?.sortText <
 			childrenEntries.find((entry) => entry.name === 'div')?.sortText,
 	).toBe(true);
+	expect(childrenEntries.find((entry) => entry.name === 'div')).toMatchObject({
+		isSnippet: true,
+		insertText: 'div$1>$0</div>',
+	});
+	expect(childrenEntries.find((entry) => entry.name === 'Nav')).toMatchObject({
+		isSnippet: true,
+		insertText: 'Nav$1 />',
+	});
 
 	const childrenDetails = await server.completionEntryDetails(
 		fixture.file,
@@ -427,6 +435,10 @@ test('M4d real tsserver completes intrinsic and in-scope tag names', async () =>
 	expect(nav?.replacementSpan).toEqual({
 		start: { line: partialPosition.line, offset: partialPosition.offset - 2 },
 		end: partialPosition,
+	});
+	expect(nav).toMatchObject({
+		isSnippet: true,
+		insertText: 'Nav$1 />',
 	});
 
 	for (const [fixtureName, marker] of [

@@ -63,6 +63,11 @@ describe('closing insertion after an opening tag', () => {
 		const input = afterTyping('<div', '>', '</div>');
 		expect(getTagClosingInsertion(input.documentText, input.changeOffset, input.changeText)).toBeUndefined();
 	});
+
+	test('does not duplicate a closing tag inserted in the same programmatic change', () => {
+		const input = afterTyping('<', 'div></div>');
+		expect(getTagClosingInsertion(input.documentText, input.changeOffset, input.changeText)).toBeUndefined();
+	});
 });
 
 describe('matching completion after typing </', () => {
