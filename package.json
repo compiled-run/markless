@@ -8,7 +8,7 @@
 		"check": "vp check",
 		"fmt": "vp fmt",
 		"lint": "vp lint",
-		"test": "vp test && pnpm bench:jsfb:guard && pnpm --dir packages/bundler test:boxes && pnpm --dir packages/router test:boxes && pnpm --dir demos/music-player test:boxes && pnpm --dir demos/music-player-ssr test:boxes",
+		"test": "pnpm --dir packages/typescript-plugin test:completion-matrix && vp test && pnpm bench:jsfb:guard && pnpm --dir packages/bundler test:boxes && pnpm --dir packages/router test:boxes && pnpm --dir demos/music-player test:boxes && pnpm --dir demos/music-player-ssr test:boxes",
 		"bench:jsfb:compare": "node scripts/benchmarks/jsfb-baseline.mjs compare",
 		"bench:jsfb:guard": "node scripts/benchmarks/jsfb-baseline.mjs compare",
 		"bench:jsfb:prepare": "node scripts/benchmarks/prepare-jsfb-markless.mjs",

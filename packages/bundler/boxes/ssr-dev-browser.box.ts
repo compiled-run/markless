@@ -29,7 +29,9 @@ export default box(
 		await expect.page.text(page, COUNTER, '0', WAIT);
 		await page.click(COUNTER, WAIT);
 		await expect.page.text(page, COUNTER, '1', WAIT);
+		await page.click(COUNTER, WAIT);
+		await expect.page.text(page, COUNTER, '2', WAIT);
 		await expect.page.outcome(page, { consoleErrors: 0, failedRequests: 0 }, WAIT);
-		await receipt.capture('ssr dev lazy symbol resolver resumed counter click');
+		await receipt.capture('ssr dev lazy symbol resolver preserved repeated counter state');
 	},
 );

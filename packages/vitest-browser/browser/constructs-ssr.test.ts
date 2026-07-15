@@ -18,6 +18,7 @@ import RowsIndex from './fixtures/rows-index.tsrx';
 import ScopedStyle from './fixtures/scoped-style.tsrx';
 import SpreadClass from './fixtures/spread-class.tsrx';
 import SwitchArms from './fixtures/switch-arms.tsrx';
+import SyncPolicyState from './fixtures/sync-policy-state.tsrx';
 
 afterEach(() => cleanup());
 
@@ -42,6 +43,30 @@ test('SSR: input and click events both resume and drive the state text binding',
 
 	requireElement<HTMLButtonElement>(container, 'button[data-reset]').click();
 	await expect.poll(() => echo.textContent).toBe('reset');
+});
+
+test('SSR: graph-conditioned synchronous policy reads warm state on every action', async () => {
+	const screen = await renderSSR(SyncPolicyState);
+	const container = screen.container;
+	const policyAction = requireElement<HTMLButtonElement>(container, 'button[data-policy-action]');
+	const clicks = requireElement<HTMLOutputElement>(container, 'output[data-policy-clicks]');
+	const policyState = requireElement<HTMLOutputElement>(container, 'output[data-policy-state]');
+	const dispatchPolicyAction = () => {
+		const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+		policyAction.dispatchEvent(event);
+		return event;
+	};
+
+	const blockedEvent = dispatchPolicyAction();
+	await expect.poll(() => clicks.textContent).toBe('1');
+	expect(blockedEvent.defaultPrevented).toBe(true);
+
+	requireElement<HTMLButtonElement>(container, 'button[data-allow-action]').click();
+	await expect.poll(() => policyState.textContent).toBe('false');
+
+	const allowedEvent = dispatchPolicyAction();
+	await expect.poll(() => clicks.textContent).toBe('2');
+	expect(allowedEvent.defaultPrevented).toBe(false);
 });
 
 test('SSR: spread attributes render and the conditional class flips after resume', async () => {
@@ -128,6 +153,11 @@ test('SSR: keyed @for rows resume per-row locals from the clicked row', async ()
 	if (!secondRowButton) throw new Error('Expected a button in the second server-rendered row.');
 	secondRowButton.click();
 	await expect.poll(() => chosen.textContent).toBe('beta');
+
+	const firstRowButton = rows[0]?.querySelector<HTMLButtonElement>('button');
+	if (!firstRowButton) throw new Error('Expected a button in the first server-rendered row.');
+	firstRowButton.click();
+	await expect.poll(() => chosen.textContent).toBe('alpha');
 });
 
 test('SSR: keyed @for renders the @empty branch for an initially empty collection', async () => {

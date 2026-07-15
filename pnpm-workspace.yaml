@@ -2,6 +2,7 @@ packages:
     - packages/*
     - packages/*/fixtures/*
     - demos/*
+    - docs
     # Do not add ../native-tsrx here. @tsrx/core is an external dependency
     # boundary for this repo, and native compiler work is explicitly deferred.
 
@@ -18,6 +19,8 @@ catalogs:
         '@typescript-eslint/types': ^8.40.0
         '@volar/language-core': ~2.4.28
         '@volar/typescript': ~2.4.28
+        '@vscode/vsce': ^3.9.1
+        adm-zip: ^0.5.16
         acorn: ^8.15.0
         esrap: ^2.2.8
         hast-util-to-html: ^9.0.5

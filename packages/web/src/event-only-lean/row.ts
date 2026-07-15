@@ -41,7 +41,7 @@ export async function resumeScalarRowEventFromPayloadDocument(
 	if (!plan) return resumeFullEventOnly(input);
 
 	const elementsByHostId = new Map<string, EventOnlyResumeDomElement>();
-	const graph = await createLeanScalarGraph(plan, elementsByHostId, input.loadSymbol);
+	const graph = await createLeanScalarGraph(plan, elementsByHostId, input.loadSymbol, input.root);
 	const {
 		findKeyedRepeatRowEventMatch,
 		findRepeatItemByKey,

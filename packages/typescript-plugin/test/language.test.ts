@@ -1,9 +1,8 @@
-import { spawn, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { createInterface } from 'node:readline';
 import ts from 'typescript';
 import { expect, test } from 'vitest';
 import {
@@ -11,6 +10,7 @@ import {
 	getMarklessTsrxLanguagePlugin,
 	isMarklessTsrxFile,
 } from '../src/language.ts';
+import { TsserverHarness } from './tsserver-harness.ts';
 
 const require = createRequire(import.meta.url);
 
@@ -190,7 +190,6 @@ async function runTsrxTsserverProbe(): Promise<{
 	ensureGeneratedCjsBuild();
 	const root = process.cwd();
 	const project = mkdtempSync(join(tmpdir(), 'markless-tsserver-project-'));
-	const logFile = join(project, 'tsserver.log');
 	const fixtures = [
 		{
 			name: 'Counter.tsrx',
@@ -271,68 +270,21 @@ export function App() @{
 	);
 	for (const fixture of fixtures) writeFileSync(join(project, fixture.name), fixture.source);
 
-	const server = spawn(
-		process.execPath,
-		[
-			join(root, 'node_modules/typescript/lib/tsserver.js'),
-			'--globalPlugins',
-			'@markless/typescript-plugin',
-			'--pluginProbeLocations',
-			join(root, 'node_modules'),
-			'--allowLocalPluginLoads',
-			'--logVerbosity',
-			'verbose',
-			'--logFile',
-			logFile,
-		],
-		{ cwd: project, stdio: ['pipe', 'pipe', 'pipe'] },
-	);
-	let sequence = 0;
-	const pending = new Map<number, (message: any) => void>();
-	const lines = createInterface({ input: server.stdout });
-	lines.on('line', (line) => {
-		try {
-			const message = JSON.parse(line);
-			if (message.type === 'response' && pending.has(message.request_seq)) {
-				pending.get(message.request_seq)?.(message);
-				pending.delete(message.request_seq);
-			}
-		} catch {}
-	});
-	const send = (command: string, args: object) => {
-		const request = { seq: ++sequence, type: 'request', command, arguments: args };
-		server.stdin.write(`${JSON.stringify(request)}\n`);
-		return request.seq;
-	};
-	const request = (command: string, args: object) =>
-		new Promise<any>((resolve, reject) => {
-			const requestSeq = send(command, args);
-			const timer = setTimeout(() => {
-				pending.delete(requestSeq);
-				reject(new Error(`Timed out waiting for ${command}`));
-			}, 10_000);
-			pending.set(requestSeq, (message) => {
-				clearTimeout(timer);
-				resolve(message);
-			});
-		});
-
-	const results = [];
-	for (const fixture of fixtures) {
-		const file = join(project, fixture.name);
-		send('open', { file, projectRootPath: project });
-		const syntactic = await request('syntacticDiagnosticsSync', { file });
-		const semantic = await request('semanticDiagnosticsSync', { file });
-		results.push({
-			file: fixture.name,
-			syntactic: syntactic.body ?? [],
-			semantic: semantic.body ?? [],
-		});
+	const server = new TsserverHarness({ project, workspaceRoot: root });
+	try {
+		const results = [];
+		for (const fixture of fixtures) {
+			const file = join(project, fixture.name);
+			server.open(file);
+			const syntactic = await server.syntacticDiagnosticsSync(file);
+			const semantic = await server.semanticDiagnosticsSync(file);
+			results.push({ file: fixture.name, syntactic, semantic });
+		}
+		const log = server.readLog();
+		return { loadedPlugin: log.includes('@markless/typescript-plugin'), results };
+	} finally {
+		await server.close();
 	}
-	server.kill();
-	lines.close();
-	const log = existsSync(logFile) ? readFileSync(logFile, 'utf8') : '';
-	return { loadedPlugin: log.includes('@markless/typescript-plugin'), results };
 }
 
 let generatedCjsBuildReady = false;

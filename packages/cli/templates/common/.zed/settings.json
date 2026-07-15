@@ -1,0 +1,29 @@
+{
+	"$schema": "zed://schemas/settings",
+	"modeline_lines": 5,
+	"file_types": {
+		"TSX": ["tsrx", "**/*.tsrx"]
+	},
+	"lsp": {
+		"vtsls": {
+			"settings": {
+				"typescript": {
+					"tsdk": "./node_modules/typescript/lib"
+				},
+				"vtsls": {
+					"autoUseWorkspaceTsdk": true,
+					"tsserver": {
+						"globalPlugins": [
+							{
+								"name": "@markless/typescript-plugin",
+								"location": "./node_modules/@markless/typescript-plugin",
+								"languages": ["typescriptreact"],
+								"configNamespace": "typescript"
+							}
+						]
+					}
+				}
+			}
+		}
+	}
+}

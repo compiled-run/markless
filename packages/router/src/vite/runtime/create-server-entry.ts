@@ -1,6 +1,10 @@
 import type { PageProps } from '../../index.ts';
 import { buildRouteManifestFromFileIds, matchRouteManifest } from '../../route-manifest.ts';
-import { renderToString, type ModulePreloadInput } from '@markless/web/render-to-string';
+import {
+	renderToString,
+	type ModulePreloadInput,
+	type SsrRenderArtifact,
+} from '@markless/web/render-to-string';
 import { renderToStream } from '@markless/web/render-to-stream';
 import { __marklessDebugBootstrapSource } from '../../../../web/src/debug-channel.ts';
 
@@ -30,6 +34,7 @@ type SsrRender = (props?: unknown, renderContext?: unknown) => RenderOutput | Pr
 interface SsrArtifact {
 	readonly renderSsr?: SsrRender;
 	readonly resumeModuleUrl?: string;
+	readonly inlineResumerSources?: SsrRenderArtifact['inlineResumerSources'];
 }
 
 interface PageModule {
@@ -213,6 +218,7 @@ function routedPageArtifact(
 ) {
 	return {
 		resumeModuleUrl: baseArtifact?.resumeModuleUrl,
+		inlineResumerSources: baseArtifact?.inlineResumerSources,
 		async renderSsr(renderProps?: unknown, renderContext?: unknown): Promise<RenderOutput> {
 			// Compiled marklessRenderSsr is async (initial render awaits demanded
 			// async work); interpolating the un-awaited Promise served 500s.

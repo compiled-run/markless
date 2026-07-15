@@ -30,6 +30,8 @@ test('progressive execution: counter dispatch executes only the event dispatch c
 
 	button.click();
 	await expect.poll(() => button.textContent).toBe('Count 1');
+	button.click();
+	await expect.poll(() => button.textContent).toBe('Count 2');
 
 	const executed = executedModules();
 	const allowed = deriveAllowedModules(view, eventOnlyRuntimeDemandMap, action);

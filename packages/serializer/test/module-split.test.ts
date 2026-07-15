@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import { decodePayloadScripts, RuntimePayloadError, renderPayloadScripts } from '../src/index.ts';
+import { RuntimePayloadError as ClientRuntimePayloadError } from '../src/protocol-client.ts';
 import { createProtocolStatePayload } from '../src/protocol-state.ts';
 import { deserializeGraphValueForClient } from '../src/value-decode-client.ts';
 import { deserializeGraphValue } from '../src/value-decode.ts';
@@ -14,6 +15,38 @@ test('serializer split modules expose value, protocol-state, and payload-script 
 	expect(typeof decodePayloadScripts).toBe('function');
 	expect(typeof RuntimePayloadError).toBe('function');
 });
+
+test.each([RuntimePayloadError, ClientRuntimePayloadError])(
+	'%s preserves the structured runtime diagnostic shape',
+	(ErrorType) => {
+		const error = new ErrorType({
+			code: 'MARKLESS_PAYLOAD_INVALID',
+			severity: 'error',
+			phase: 'payload',
+			title: 'Invalid resumability payload',
+			message: 'Expected markless/state payload script.',
+			why: 'The payload script is required.',
+			payloadType: 'markless/state',
+			payloadScript: 'script[type="markless/state"]',
+			suggestions: [{ message: 'Emit the state payload.' }],
+			docsUrl: 'https://markless.dev/errors/MARKLESS_PAYLOAD_INVALID',
+		});
+
+		expect(error).toBeInstanceOf(ErrorType);
+		expect(error).toBeInstanceOf(Error);
+		expect(error.name).toBe('RuntimePayloadError');
+		expect(error.message).toBe('Expected markless/state payload script.');
+		expect(error).toMatchObject({
+			code: 'MARKLESS_PAYLOAD_INVALID',
+			severity: 'error',
+			phase: 'payload',
+			payloadType: 'markless/state',
+			payloadScript: 'script[type="markless/state"]',
+		});
+		expect(Object.hasOwn(error, 'expectedVersion')).toBe(true);
+		expect(Object.hasOwn(error, 'actualVersion')).toBe(true);
+	},
+);
 
 test('client value decoder keeps rare value records behind an async boundary', async () => {
 	const common = serializeGraphValue({

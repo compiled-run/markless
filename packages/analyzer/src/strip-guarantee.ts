@@ -27,7 +27,7 @@ export function evaluateDebugChannelStrip(input: {
 	const sentinels = input.sentinels ?? DEBUG_CHANNEL_SENTINELS;
 	const matches = input.artifacts.flatMap((artifact) =>
 		sentinels
-			.filter((sentinel) => artifact.content.includes(sentinel))
+			.filter((sentinel) => stripGeneratedRegionMarkers(artifact.content).includes(sentinel))
 			.map((sentinel) => ({ path: artifact.path, sentinel })),
 	);
 	const passed = input.debugEnabled ? matches.length > 0 : matches.length === 0;
@@ -42,4 +42,11 @@ export function evaluateDebugChannelStrip(input: {
 					(match) => `${match.path} retained debug-channel sentinel ${match.sentinel}`,
 				),
 	};
+}
+
+// Rolldown's readable server output annotates modules with absolute source
+// paths. Those marker lines are not executable and may inherit a sentinel from
+// a checkout directory name; the region body must remain fully scanned.
+function stripGeneratedRegionMarkers(source: string): string {
+	return source.replace(/^[\t ]*\/\/#(?:region\b[^\r\n]*|endregion\b[^\r\n]*)$/gm, '');
 }

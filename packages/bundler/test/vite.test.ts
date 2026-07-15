@@ -269,6 +269,7 @@ describe('Vite adapter structure', () => {
 	test('threads the Vite client tag into dev SSR artifacts', async () => {
 		const plugin = getAsyncPlugin();
 
+		callConfig(plugin, {}, { command: 'serve', mode: 'development' });
 		callConfigResolved(plugin, {
 			base: '/dev/',
 			command: 'serve',
@@ -282,6 +283,8 @@ describe('Vite adapter structure', () => {
 		)) as { code: string };
 
 		expect(result.code).toContain('headInjections:');
+		expect(result.code).toContain('inlineResumerSources:');
+		expect(result.code).toMatch(/"debug":\s*true/);
 		expect(result.code).toContain('"src": "/dev/@vite/client"'); // re-print spaces object literals
 		// Dev resume URL points at the SOURCE module so the .tsrx stays in the client
 		// module graph (vite's no-accepting-boundary full-reload depends on it); the

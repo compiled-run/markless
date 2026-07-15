@@ -36,18 +36,13 @@ const dependencyImportPatterns = (dependencies: Record<string, string> = {}) =>
 
 // QDS externalPackageImports: read the package's own manifest so every
 // declared dependency (including @markless/* workspace deps) is externalized.
-const externalPackageImports = (
-	packageName: string,
-	options?: { devDependencies?: boolean },
-) => {
+const externalPackageImports = (packageName: string, options?: { devDependencies?: boolean }) => {
 	const manifest = readPackageManifest(packageName);
 	return [
 		nodeBuiltinImportPattern,
 		...dependencyImportPatterns(manifest.dependencies),
 		...dependencyImportPatterns(manifest.peerDependencies),
-		...(options?.devDependencies
-			? dependencyImportPatterns(manifest.devDependencies)
-			: []),
+		...(options?.devDependencies ? dependencyImportPatterns(manifest.devDependencies) : []),
 	];
 };
 
@@ -132,6 +127,7 @@ const buildOrder: PackUserConfig[] = [
 			'event-only-lean/scalar-core': './src/event-only-lean/scalar-core.ts',
 			'event-only-lean/scalar-resume': './src/event-only-lean/scalar-resume.ts',
 			'event-resume': './src/event-resume.ts',
+			'inline/resumer': './src/inline/resumer.ts',
 			payload: './src/payload.ts',
 			render: './src/render.ts',
 			'render-to-stream': './src/render-to-stream.ts',
@@ -211,12 +207,15 @@ export default defineConfig({
 	},
 	pack: buildOrder,
 	test: {
+		// Keep CPU available for the concurrent Chromium + Vite transform pipeline.
+		maxWorkers: '50%',
 		projects: [
 			{
 				test: {
 					name: 'node',
 					environment: 'node',
 					include: ['packages/*/test/**/*.test.ts', 'scripts/**/*.test.ts'],
+					exclude: ['packages/typescript-plugin/test/completion-matrix.test.ts'],
 				},
 			},
 			'packages/vitest-browser/vitest.config.ts',

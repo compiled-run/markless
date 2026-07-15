@@ -112,6 +112,9 @@ describe('TSRX Rolldown plugin structure', () => {
 		expect(result.code).not.toContain('loadSymbol: loadSymbol,');
 		expect(result.code).not.toContain('function marklessResumeLoadSymbol');
 		expect(result.code).toContain('const marklessCompiledApp = {');
+		expect(result.code).toContain('inlineResumerSources:');
+		expect(result.code).not.toContain('__MARKLESS_INLINE_SYNC_POLICY__');
+		expect(result.code).not.toContain('runInlineResumer');
 		expect(result.code).toContain('renderCsr: App');
 		expect(result.code).toContain('renderSsr(props, marklessRenderContext) {');
 		expect(result.code).toContain('const marklessSsrStateValues = new Map');
@@ -163,6 +166,7 @@ describe('TSRX Rolldown plugin structure', () => {
 		});
 
 		expect(result.code).toContain('renderCsr: App');
+		expect(result.code).not.toContain('inlineResumerSources:');
 		expect(result.code).not.toContain('resumeEventOnlyFromPayloadDocument');
 		expect(result.code).not.toContain('resumeContainerEvent');
 		expect(result.code).not.toContain('preloadCsrLazySymbols');

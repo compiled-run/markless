@@ -1,6 +1,8 @@
+import { gzipSync } from 'node:zlib';
 import { box } from '@async/witness';
 import { planModulePreloadUrls } from '../../bundler/src/build/preload-plan.ts';
 import type { MarklessBundleGraph } from '../../bundler/src/types.ts';
+import { EVENT_ONLY_RESUMER_TARGET_BYTES } from '../../../poc/fixtures/proofs/resumer-script/src/resumer-source.mjs';
 import { evaluateRouterPreloadWindow, evaluateRouterRequests } from './analyzer-gate.ts';
 import { routerAnalyzerPolicy } from './analyzer/policy.ts';
 import { invalidateRouterAnalyzerReceipt, writeRouterAnalyzerReceipt } from './analyzer-receipt.ts';
@@ -43,6 +45,7 @@ export default box(
 		});
 		try {
 			const indexHtml = await preview.request('/');
+			const inlineResumerGzip = assertInlineResumerBudget(indexHtml);
 			const expectedPreloadHrefs = expectedInteractionPreloadHrefs(
 				JSON.parse(await preview.request(BUNDLE_GRAPH_REQUEST)) as MarklessBundleGraph,
 				indexHtml,
@@ -51,6 +54,10 @@ export default box(
 			await expect.html.contains(indexHtml, 'Button 0');
 			await expect.html.contains(indexHtml, 'data-markless-router-link');
 			await expect.html.contains(indexHtml, 'data-async-resumer');
+			await expect.html.contains(indexHtml, 'rel="icon" href="data:,"');
+			receipt.note(
+				`router production inline resumer gzip: ${inlineResumerGzip} / ${EVENT_ONLY_RESUMER_TARGET_BYTES} bytes`,
+			);
 			if (indexHtml.includes('<script type="module"')) {
 				throw new Error(
 					'Router preview HTML must not wake a module script on SSR startup.',
@@ -104,6 +111,8 @@ export default box(
 			await expect.page.text(page, COUNTER, 'Button 0', WAIT);
 			await page.click(COUNTER, WAIT);
 			await expect.page.text(page, COUNTER, 'Button 1', WAIT);
+			await page.click(COUNTER, WAIT);
+			await expect.page.text(page, COUNTER, 'Button 2', WAIT);
 			const documentRequests = (await page.networkRequests()).filter(
 				(request) => request.resourceType === 'Document',
 			);
@@ -154,6 +163,23 @@ function isolatedNitroOutput() {
 			serverDir: `${NITRO_OUTPUT_DIR}/server`,
 		},
 	};
+}
+
+function assertInlineResumerBudget(html: string): number {
+	const source = /<script\b(?=[^>]*\bdata-async-resumer\b)[^>]*>([\s\S]*?)<\/script>/.exec(
+		html,
+	)?.[1];
+	if (!source) throw new Error('Expected router preview HTML to contain an inline resumer.');
+	if (source.includes('runInlineResumer') || source.includes('__MARKLESS_INLINE_')) {
+		throw new Error('Expected router preview HTML to contain Rolldown/OXC output.');
+	}
+	const gzipBytes = gzipSync(Buffer.from(source), { level: 9 }).length;
+	if (gzipBytes > EVENT_ONLY_RESUMER_TARGET_BYTES) {
+		throw new Error(
+			`Router inline resumer gzip budget exceeded: ${gzipBytes} > ${EVENT_ONLY_RESUMER_TARGET_BYTES}`,
+		);
+	}
+	return gzipBytes;
 }
 
 type BrowserNetworkRequest = {

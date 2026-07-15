@@ -60,6 +60,12 @@ describe('package metadata', () => {
 			readonly name?: string;
 			readonly dependencies?: Record<string, string>;
 			readonly exports?: Record<string, string>;
+			readonly publishConfig?: {
+				readonly exports?: Record<
+					string,
+					{ readonly types?: string; readonly default?: string }
+				>;
+			};
 		};
 
 		expect(web.name).toBe('@markless/web');
@@ -82,10 +88,15 @@ describe('package metadata', () => {
 			'./dom-update': './src/dom-update.ts',
 			'./event-only-resume': './src/event-only-resume.ts',
 			'./event-resume': './src/event-resume.ts',
+			'./inline/resumer': './src/inline/resumer.ts',
 			'./payload': './src/payload.ts',
 			'./render': './src/render.ts',
 			'./render-to-string': './src/render-to-string.ts',
 			'./resume': './src/payload-full.ts',
+		});
+		expect(web.publishConfig?.exports?.['./inline/resumer']).toEqual({
+			types: './dist/inline/resumer.d.ts',
+			default: './dist/inline/resumer.js',
 		});
 	});
 
@@ -174,7 +185,7 @@ describe('package metadata', () => {
 		).rejects.toThrow();
 	});
 
-	test('workspace test script includes package-local Witness boxes', async () => {
+	test('workspace test script includes packaged completion matrix and Witness boxes', async () => {
 		const workspace = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8')) as {
 			readonly scripts?: Record<string, string>;
 		};
@@ -192,7 +203,7 @@ describe('package metadata', () => {
 		expect(bundler.scripts?.['test:boxes']).toBe('witness run');
 		expect(router.scripts?.['test:boxes']).toBe('witness run');
 		expect(workspace.scripts?.test).toBe(
-			'vp test && pnpm bench:jsfb:guard && pnpm --dir packages/bundler test:boxes && pnpm --dir packages/router test:boxes && pnpm --dir demos/music-player test:boxes && pnpm --dir demos/music-player-ssr test:boxes',
+			'pnpm --dir packages/typescript-plugin test:completion-matrix && vp test && pnpm bench:jsfb:guard && pnpm --dir packages/bundler test:boxes && pnpm --dir packages/router test:boxes && pnpm --dir demos/music-player test:boxes && pnpm --dir demos/music-player-ssr test:boxes',
 		);
 	});
 

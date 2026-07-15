@@ -14,6 +14,13 @@
 	],
 	"type": "module",
 	"sideEffects": false,
+	"typesVersions": {
+		"*": {
+			"typescript-plugin": [
+				"dist/typescript-plugin.cjs"
+			]
+		}
+	},
 	"exports": {
 		".": "./src/index.ts",
 		"./vite": "./src/vite/index.ts",
@@ -21,7 +28,7 @@
 		"./vite/runtime/mdx-route": "./src/vite/runtime/mdx-route.ts",
 		"./vite/runtime/create-server-entry": "./src/vite/runtime/create-server-entry.ts",
 		"./vite/route-href": "./src/vite/entries/route-href.ts",
-		"./typescript-plugin": "./src/typescript-plugin/index.ts"
+		"./typescript-plugin": "./dist/typescript-plugin.cjs"
 	},
 	"publishConfig": {
 		"access": "public",
@@ -52,11 +59,14 @@
 			},
 			"./typescript-plugin": {
 				"types": "./dist/typescript-plugin.d.ts",
+				"require": "./dist/typescript-plugin.cjs",
 				"default": "./dist/typescript-plugin.js"
 			}
 		}
 	},
 	"scripts": {
+		"build:cjs": "vp pack src/typescript-plugin/index.ts --no-config --format cjs --platform node --out-dir dist --clean=false --no-dts --no-report && node -e \"require('node:fs').renameSync('dist/index.cjs','dist/typescript-plugin.cjs')\"",
+		"build:vsix": "vp pack src/typescript-plugin/index.ts --no-config --format cjs --platform node --out-dir ../vscode-plugin/dist/vsix-build/router --clean --no-dts --no-report --deps.alwaysBundle '/.*/' --deps.never-bundle typescript",
 		"test:boxes": "witness run",
 		"prepublishOnly": "node ../../scripts/release/verify-publish-ready.mjs"
 	},
