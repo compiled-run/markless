@@ -216,6 +216,40 @@ test('compileTsrxForTypeService assigns ruled mapping profiles to TSX tokens and
 	expect(mappingFor('card')?.data.structure).toBe(false);
 });
 
+test('compileTsrxForTypeService maps component tag names, attributes, and opening-tag insertion gaps', () => {
+	const source = `import { Nav } from './Nav.tsrx';
+export function App({ active }: { active: boolean }) @{
+	<Nav label="Home" active={active}>content</Nav>
+}`;
+	const result = compileTsrxForTypeService(source, 'App.tsrx', { loose: true });
+	const opening = source.indexOf('Nav label');
+	const closing = source.lastIndexOf('Nav>');
+	const gap = source.indexOf(' ', opening);
+	const mappingAt = (offset: number, length: number) =>
+		result.mappings.find(
+			(mapping) => mapping.sourceOffsets[0] === offset && mapping.lengths[0] === length,
+		);
+
+	expect(mappingAt(opening, 3)?.data).toMatchObject({
+		verification: true,
+		completion: true,
+		navigation: true,
+		structure: true,
+	});
+	expect(mappingAt(closing, 3)?.data).toMatchObject({ navigation: true, structure: true });
+	expect(mappingAt(source.indexOf('label='), 5)?.data).toMatchObject({
+		verification: true,
+		completion: true,
+		navigation: true,
+	});
+	expect(mappingAt(gap, 1)?.data).toMatchObject({
+		verification: false,
+		completion: true,
+		navigation: false,
+		structure: true,
+	});
+});
+
 function expectExactMapping(
 	result: ReturnType<typeof compileTsrxForTypeService>,
 	source: string,

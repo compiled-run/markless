@@ -641,19 +641,88 @@ test('M6 real tsserver preserves member completion immediately after a freshly t
 	).toEqual(expect.arrayContaining(['displayName', 'active']));
 }, 20_000);
 
-test('M8a real tsserver reports a component prop type error at the mapped attribute position', async () => {
-	const fixture = openFixture('component-prop-error.tsrx');
-	const diagnostics = await server.semanticDiagnosticsSync(fixture.file);
-	const attribute = positionAtSearch(fixture.source, 'label={42}');
+test('M8 real tsserver diagnoses wrong, missing, and mistyped component props at mapped source tokens', async () => {
+	const unknownFixture = openFixture('component-props.tsrx');
+	const missingFixture = openFixture('component-props-missing.tsrx');
+	const mistypedFixture = openFixture('component-props-mistyped.tsrx');
+	const [unknownDiagnostics, missingDiagnostics, mistypedDiagnostics] = await Promise.all([
+		server.semanticDiagnosticsSync(unknownFixture.file),
+		server.semanticDiagnosticsSync(missingFixture.file),
+		server.semanticDiagnosticsSync(mistypedFixture.file),
+	]);
+	const unknown = diagnosticMatching(unknownDiagnostics, /mystery/i);
+	const missing = diagnosticMatching(missingDiagnostics, /property 'label' is missing/i);
+	const mistyped = diagnosticMatching(mistypedDiagnostics, /number.*not assignable.*string/i);
 
-	expect(diagnostics).toEqual(
-		expect.arrayContaining([
-			expect.objectContaining({
-				start: expect.objectContaining(attribute),
-				text: expect.stringMatching(/number.*not assignable.*string/i),
-			}),
-		]),
+	expect(unknown?.start).toEqual(positionAtSearch(unknownFixture.source, 'mystery'));
+	expect(missing?.start).toEqual(positionAtSearch(missingFixture.source, 'Nav active'));
+	expectDiagnosticSpan(mistypedFixture.source, mistyped, 'label');
+}, 20_000);
+
+test('M9 real tsserver completes component props only inside opening tags', async () => {
+	const fixture = openFixture('component-prop-completions.tsrx');
+	const imported = completionNames(
+		await server.completionInfo(
+			fixture.file,
+			positionAfterMarker(fixture.marked, '/*M9_IMPORTED*/'),
+		),
 	);
+	const sameFile = completionNames(
+		await server.completionInfo(
+			fixture.file,
+			positionAfterMarker(fixture.marked, '/*M9_SAME_FILE*/'),
+		),
+	);
+	const children = completionNames(
+		await server.completionInfo(
+			fixture.file,
+			positionAfterMarker(fixture.marked, '/*M9_CHILDREN*/'),
+		),
+	);
+	const statement = completionNames(
+		await server.completionInfo(
+			fixture.file,
+			positionAfterMarker(fixture.marked, '/*M9_STATEMENT*/'),
+		),
+	);
+
+	expect(imported).toEqual(expect.arrayContaining(['label', 'active', 'children']));
+	expect(sameFile).toEqual(expect.arrayContaining(['title', 'compact']));
+	for (const name of ['label', 'active', 'children', 'title', 'compact']) {
+		expect(children, `M9 prop ${name} must not leak into component children.`).not.toContain(
+			name,
+		);
+		expect(statement, `M9 prop ${name} must not leak into statement positions.`).not.toContain(
+			name,
+		);
+	}
+}, 20_000);
+
+test('M11 real tsserver hovers and defines component tags in authored TSRX sources', async () => {
+	const fixture = openFixture('component-navigation.tsrx');
+	const opening = positionAtSearch(fixture.source, 'Nav label');
+	const closing = positionAtSearch(fixture.source, 'Nav>', 0);
+	const local = positionAtSearch(fixture.source, 'LocalBadge text');
+	const [info, openingDefinition, closingDefinition, localInfo] = await Promise.all([
+		server.quickinfo(fixture.file, opening),
+		server.definitionAndBoundSpan(fixture.file, opening),
+		server.definitionAndBoundSpan(fixture.file, closing),
+		server.quickinfo(fixture.file, local),
+	]);
+	const importedSource = realpathSync(fixturePath(project, 'Nav.tsrx'));
+
+	expect(displayText(info)).toMatch(
+		/Nav\([\s\S]*label: string;[\s\S]*active\?: boolean;[\s\S]*children\?: unknown/,
+	);
+	for (const definition of [openingDefinition, closingDefinition]) {
+		expect(definition?.definitions?.map((item: any) => realpathSync(item.file))).toContain(
+			importedSource,
+		);
+		expect(definition?.definitions?.some((item: any) => item.file.endsWith('.tsx'))).toBe(
+			false,
+		);
+	}
+	expect(displayText(localInfo)).toMatch(/LocalBadge\([\s\S]*text: string/);
 }, 20_000);
 
 test('M10a intrinsic class attribute is accepted', async () => {
@@ -896,6 +965,17 @@ function completionNames(completion: any): string[] {
 
 function displayText(info: any): string {
 	return info?.displayString ?? info?.displayParts?.map((part: any) => part.text).join('') ?? '';
+}
+
+function diagnosticMatching(diagnostics: any[], pattern: RegExp): any {
+	return diagnostics.find((diagnostic) => pattern.test(String(diagnostic.text)));
+}
+
+function expectDiagnosticSpan(source: string, diagnostic: any, token: string): void {
+	const start = positionAtSearch(source, token);
+	const end = positionAtSearch(source, token, token.length);
+	expect(diagnostic?.start).toEqual(start);
+	expect(diagnostic?.end).toEqual(end);
 }
 
 function triggeredAtCompletionInfo(
