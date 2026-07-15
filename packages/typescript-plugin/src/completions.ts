@@ -25,6 +25,69 @@ type CatalogItem = {
 
 const baseConstructContexts = ['statement', 'children'] as const;
 
+export const intrinsicTagNames = [
+	'div',
+	'span',
+	'section',
+	'article',
+	'header',
+	'footer',
+	'nav',
+	'main',
+	'aside',
+	'ul',
+	'ol',
+	'li',
+	'p',
+	'h1',
+	'h2',
+	'h3',
+	'h4',
+	'h5',
+	'h6',
+	'a',
+	'img',
+	'button',
+	'input',
+	'form',
+	'label',
+	'select',
+	'option',
+	'textarea',
+	'table',
+	'thead',
+	'tbody',
+	'tr',
+	'td',
+	'th',
+	'video',
+	'audio',
+	'canvas',
+	'svg',
+	'pre',
+	'code',
+	'em',
+	'strong',
+	'b',
+	'i',
+	'u',
+	'small',
+	'br',
+	'hr',
+	'details',
+	'summary',
+	'dialog',
+	'figure',
+	'figcaption',
+	'blockquote',
+	'iframe',
+	'picture',
+	'source',
+	'template',
+	'slot',
+] as const;
+const intrinsicTagNameSet = new Set<string>(intrinsicTagNames);
+
 export const snippetCatalog: readonly CatalogItem[] = [
 	{
 		name: 'function Component(props) @{ }',
@@ -138,6 +201,29 @@ export function installMarklessCompletions(
 			source,
 			getSourceSnapshot,
 		);
+		const tagNameMatch = source.slice(0, position).match(/<([A-Za-z][\w.]*)?$/);
+		if (tagNameMatch) {
+			const context = validConstructContext(
+				source,
+				fileName,
+				position,
+				tagNameMatch[0].length,
+				info,
+			);
+			if (context === 'children' || context === 'statement') {
+				return withAdditionalEntries(
+					base,
+					tagNameCompletionEntries(
+						typeScript,
+						fileName,
+						position,
+						tagNameMatch[1] ?? '',
+						source,
+					),
+				);
+			}
+			return base;
+		}
 		const prefix = source.slice(0, position).match(/@\w*$/)?.[0];
 		if (!prefix) return withAdditionalEntries(base, importEntries);
 
@@ -173,20 +259,41 @@ export function installMarklessCompletions(
 		position,
 		name,
 		formatOptions,
-		source,
+		sourceName,
 		preferences,
 		_data,
 	) => {
-		if (fileName.endsWith('.tsrx') && catalogNames.has(name)) {
+		const tagKind = fileName.endsWith('.tsrx')
+			? tagCompletionKindAtPosition(fileName, position, name, getSourceSnapshot, info)
+			: undefined;
+		if (
+			fileName.endsWith('.tsrx') &&
+			(tagKind !== undefined || catalogNames.has(name))
+		) {
 			return {
 				name,
-				kind: typeScript.ScriptElementKind.string,
+				kind: tagKind
+					? tagCompletionKind(typeScript, tagKind)
+					: typeScript.ScriptElementKind.string,
 				kindModifiers: '',
 				displayParts: [{ text: name, kind: 'text' }],
-				documentation: [{ text: 'Markless TSRX construct', kind: 'text' }],
+				documentation: [
+					{
+						text: tagKind ? `Markless ${tagKind} tag` : 'Markless TSRX construct',
+						kind: 'text',
+					},
+				],
 			};
 		}
-		return getDetails(fileName, position, name, formatOptions, source, preferences, _data);
+		return getDetails(
+			fileName,
+			position,
+			name,
+			formatOptions,
+			sourceName,
+			preferences,
+			_data,
+		);
 	};
 
 	languageService.getDefinitionAndBoundSpan = (fileName, position) => {
@@ -201,6 +308,185 @@ export function installMarklessCompletions(
 			base
 		);
 	};
+}
+
+type TagCompletionKind = 'intrinsic' | 'import' | 'function';
+
+function tagNameCompletionEntries(
+	typeScript: TypeScript,
+	fileName: string,
+	position: number,
+	typedName: string,
+	source: string,
+): ts.CompletionEntry[] {
+	const replacementSpan = { start: position - typedName.length, length: typedName.length };
+	const parseableSource = buildClassifierCandidate(
+		source,
+		position - typedName.length - 1,
+		position,
+		'<div />',
+	).source;
+	const components = componentsInScope(
+		parseableSource,
+		fileName,
+		position - typedName.length,
+	);
+	const entries = [...components]
+		.sort(([left], [right]) => left.localeCompare(right))
+		.map(
+			([name, kind]): ts.CompletionEntry => ({
+				name,
+				kind: tagCompletionKind(typeScript, kind),
+				kindModifiers: '',
+				sortText: `0-markless-tag-${name}`,
+				insertText: `${name}$1 />`,
+				isSnippet: true,
+				replacementSpan,
+			}),
+		);
+	for (const name of intrinsicTagNames) {
+		if (components.has(name)) continue;
+		entries.push({
+			name,
+			kind: typeScript.ScriptElementKind.string,
+			kindModifiers: '',
+			sortText: `1-markless-tag-${name}`,
+			insertText: `${name}$1>$0</${name}>`,
+			isSnippet: true,
+			replacementSpan,
+		});
+	}
+	return entries;
+}
+
+function componentsInScope(
+	source: string,
+	fileName: string,
+	position: number,
+): Map<string, TagCompletionKind> {
+	let program: AstNode;
+	try {
+		program = compileTsrxForTypeService(source, fileName, { loose: true }).sourceAst as AstNode;
+	} catch {
+		return new Map();
+	}
+	const components = new Map<string, TagCompletionKind>();
+	const cursorScopes = new Set(
+		(findAstAncestorsAt(program, position) ?? []).filter(isComponentScope),
+	);
+	visitAst(program, (node, ancestors) => {
+		if (node.type === 'ImportDeclaration') {
+			const moduleSource = node.source as { readonly value?: unknown } | undefined;
+			if (
+				typeof moduleSource?.value !== 'string' ||
+				!/^(?:\.\.?)\/.*\.tsrx$/.test(moduleSource.value) ||
+				!Array.isArray(node.specifiers)
+			) {
+				return;
+			}
+			for (const specifier of node.specifiers as AstNode[]) {
+				const local = specifier.local as AstNode | undefined;
+				if (
+					specifier.type === 'ImportSpecifier' &&
+					typeof local?.name === 'string' &&
+					isComponentName(local.name)
+				) {
+					components.set(local.name, 'import');
+				}
+			}
+			return;
+		}
+		const identifier = node.id as AstNode | undefined;
+		if (
+			node.type === 'FunctionDeclaration' &&
+			typeof identifier?.name === 'string' &&
+			isComponentName(identifier.name) &&
+			ancestors.toReversed().find(isComponentScope) !== undefined &&
+			cursorScopes.has(ancestors.toReversed().find(isComponentScope)!)
+		) {
+			components.set(identifier.name, 'function');
+		}
+	});
+	return components;
+}
+
+function visitAst(
+	node: AstNode,
+	visit: (node: AstNode, ancestors: readonly AstNode[]) => void,
+	ancestors: readonly AstNode[] = [],
+): void {
+	visit(node, ancestors);
+	for (const value of Object.values(node)) {
+		const children = Array.isArray(value) ? value : [value];
+		for (const child of children) {
+			if (isAstNode(child)) visitAst(child, visit, [...ancestors, node]);
+		}
+	}
+}
+
+function findAstAncestorsAt(
+	node: AstNode,
+	offset: number,
+	ancestors: readonly AstNode[] = [],
+): readonly AstNode[] | undefined {
+	if (
+		node.start !== undefined &&
+		node.end !== undefined &&
+		(offset < node.start || offset >= node.end)
+	) {
+		return undefined;
+	}
+	for (const value of Object.values(node)) {
+		const children = Array.isArray(value) ? value : [value];
+		for (const child of children) {
+			if (!isAstNode(child)) continue;
+			const found = findAstAncestorsAt(child, offset, [...ancestors, node]);
+			if (found) return found;
+		}
+	}
+	return [...ancestors, node];
+}
+
+function isComponentScope(node: AstNode): boolean {
+	return node.type === 'Program' || node.type === 'JSXCodeBlock' || node.type === 'BlockStatement';
+}
+
+function isComponentName(name: string): boolean {
+	return /^[A-Z]/.test(name);
+}
+
+function tagCompletionKind(typeScript: TypeScript, kind: TagCompletionKind): ts.ScriptElementKind {
+	if (kind === 'import') return typeScript.ScriptElementKind.alias;
+	if (kind === 'function') return typeScript.ScriptElementKind.functionElement;
+	return typeScript.ScriptElementKind.string;
+}
+
+function tagCompletionKindAtPosition(
+	fileName: string,
+	position: number,
+	name: string,
+	getSourceSnapshot: (fileName: string) => ts.IScriptSnapshot | undefined,
+	info: ts.server.PluginCreateInfo,
+): TagCompletionKind | undefined {
+	const snapshot =
+		getSourceSnapshot(fileName) ?? info.project.getScriptInfo(fileName)?.getSnapshot();
+	if (!snapshot) return undefined;
+	const source = snapshot.getText(0, snapshot.getLength());
+	const match = source.slice(0, position).match(/<([A-Za-z][\w.]*)?$/);
+	if (!match) return undefined;
+	const parseableSource = buildClassifierCandidate(
+		source,
+		position - match[0].length,
+		position,
+		'<div />',
+	).source;
+	const componentKind = componentsInScope(
+		parseableSource,
+		fileName,
+		position - match[0].length + 1,
+	).get(name);
+	if (componentKind) return componentKind;
+	return intrinsicTagNameSet.has(name) ? 'intrinsic' : undefined;
 }
 
 function validConstructContext(

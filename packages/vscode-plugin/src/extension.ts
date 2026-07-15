@@ -3,7 +3,12 @@ import { getTagClosingInsertion } from './tag-closing.ts';
 
 const pendingChanges = new Map<string, ReturnType<typeof setTimeout>>();
 
-export function activate(context: vscode.ExtensionContext): void {
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
+	// The tsserver plugins only run once VS Code's built-in TypeScript extension
+	// is active, and nothing activates it in a window that only ever opens .tsrx
+	// files. Wake it explicitly (the same dependency Vue's extension declares).
+	await vscode.extensions.getExtension('vscode.typescript-language-features')?.activate();
+
 	context.subscriptions.push(
 		vscode.workspace.onDidChangeTextDocument((event) => {
 			if (event.document.languageId !== 'markless-tsrx' || event.contentChanges.length !== 1) {
