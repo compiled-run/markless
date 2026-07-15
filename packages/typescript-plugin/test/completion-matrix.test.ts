@@ -12,7 +12,9 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { compileTsrxForTypeService } from '@markless/compiler/type-service';
+import initRouterPlugin from '@markless/router/typescript-plugin';
 import { afterAll, beforeAll, expect, test } from 'vitest';
+import typeScript from 'typescript';
 import { intrinsicTagNames, snippetCatalog } from '../src/completions.ts';
 import { getMarklessTsrxLanguagePlugin } from '../src/language.ts';
 import {
@@ -909,6 +911,130 @@ test('M13 real tsserver maps a branch-local type error to the authored token', a
 	expectDiagnosticSpan(fixture.source, authored, 'missing');
 }, 20_000);
 
+test('M14 real tsserver offers native state auto-import and maps its code action to TSRX source', async () => {
+	const fixture = openFixture('auto-import.tsrx');
+	const position = positionAfterMarker(fixture.marked, '/*M14_STATE*/');
+	const completion = await server.completionInfo(fixture.file, position);
+	const entry = completionEntries(completion).find(
+		(candidate) => candidate.name === 'state' && candidate.source === '@markless/core',
+	);
+
+	expect(
+		entry,
+		'M14 missing capability: bare stat must offer state as a native @markless/core module export.',
+	).toMatchObject({ name: 'state', source: '@markless/core', hasAction: true });
+
+	const details = await server.completionEntryDetails(fixture.file, position, [
+		{ name: entry?.name ?? 'state', source: entry?.source, data: entry?.data },
+	]);
+	const detail = details?.find((candidate: any) => candidate.name === 'state');
+	const action = detail?.codeActions?.find((candidate: any) =>
+		candidate.changes?.some((change: any) => change.fileName === fixture.file),
+	);
+	const sourceChanges = action?.changes?.filter(
+		(change: any) => change.fileName === fixture.file,
+	);
+
+	expect(
+		action,
+		`M14 missing capability: completion details must return a source-file import code action. Details: ${JSON.stringify(details)}`,
+	).toBeDefined();
+	expect(action?.changes?.map((change: any) => change.fileName)).toEqual([fixture.file]);
+	expect(
+		sourceChanges?.flatMap((change: any) => change.textChanges).map((change: any) => change.newText.trim()),
+	).toContain("import { state } from '@markless/core';");
+	expect(applyProtocolChanges(fixture.source, sourceChanges?.[0]?.textChanges ?? [])).toContain(
+		"import { state } from '@markless/core';",
+	);
+	expect(JSON.stringify(action)).not.toContain('@jsxImportSource');
+}, 20_000);
+
+test('M15 real tsserver exposes routes only in strings and href attribute values', async () => {
+	const dualProject = copyFixtureProject(fixtureDirectory, workspaceRoot);
+	const dualServer = new TsserverHarness({
+		project: dualProject,
+		workspaceRoot,
+		globalPlugins: [corePlugin, routerPlugin],
+	});
+	try {
+		const fixture = openFixture('router-contexts.tsrx', dualProject, dualServer);
+		for (const marker of [
+			'/*M15_STRING*/',
+			'/*M15_HREF_STRING*/',
+			'/*M15_HREF_EXPRESSION*/',
+		]) {
+			const completion = await dualServer.completionInfo(
+				fixture.file,
+				positionAfterMarker(fixture.marked, marker),
+			);
+			expect(
+				completionNames(completion),
+				`M15 missing capability: ${marker} must offer both fixture routes.`,
+			).toEqual(expect.arrayContaining(['/', '/library']));
+		}
+
+		for (const marker of [
+			'/*M15_IMPORT*/',
+			'/*M15_MEMBER*/',
+			'/*M15_IDENTIFIER*/',
+			'/*M15_EXPRESSION*/',
+		]) {
+			const completion = await dualServer.completionInfo(
+				fixture.file,
+				positionAfterMarker(fixture.marked, marker),
+			);
+			expect(
+				completionNames(completion),
+				`M15 invalid capability: ${marker} must not receive route completions.`,
+			).not.toEqual(expect.arrayContaining(['/', '/library']));
+		}
+	} finally {
+		await dualServer.close();
+		removeFixtureProject(dualProject);
+	}
+}, 30_000);
+
+test('M15 router skips page-directory scanning outside allowed source contexts', () => {
+	const source = `export function Probe() @{\n\tconst route = '';\n\tconst value = rou;\n}`;
+	const fileName = '/project/probe.tsrx';
+	let pageDirectoryScans = 0;
+	const instrumentedTypeScript = {
+		...typeScript,
+		sys: {
+			...typeScript.sys,
+			directoryExists: () => true,
+			readDirectory() {
+				pageDirectoryScans += 1;
+				return ['/project/pages/index.tsrx'];
+			},
+		},
+	};
+	const languageService = {
+		getCompletionsAtPosition: () => undefined,
+	};
+	const info = {
+		config: { pagesDir: 'pages' },
+		languageService,
+		languageServiceHost: {
+			getCurrentDirectory: () => '/project',
+			getScriptFileNames: () => [fileName],
+		},
+		project: {
+			getCurrentDirectory: () => '/project',
+			getScriptInfo: () => ({ getSnapshot: () => typeScript.ScriptSnapshot.fromString(source) }),
+			projectService: {},
+		},
+	};
+	const plugin = initRouterPlugin({ typescript: instrumentedTypeScript as typeof typeScript });
+	const proxy = plugin.create(info as any);
+
+	proxy.getCompletionsAtPosition(fileName, source.indexOf('rou') + 3, {});
+	expect(pageDirectoryScans).toBe(0);
+	const stringCompletion = proxy.getCompletionsAtPosition(fileName, source.indexOf("''") + 1, {});
+	expect(pageDirectoryScans).toBe(1);
+	expect(completionNames(stringCompletion)).toContain('/');
+});
+
 test('M7a real tsserver activates built core and router CJS plugins together and exposes route href completions', async () => {
 	const dualProject = copyFixtureProject(fixtureDirectory, workspaceRoot);
 	const dualServer = new TsserverHarness({
@@ -1134,6 +1260,32 @@ function protocolRangeAtSearch(source: string, token: string, length: number): {
 		start: positionAtSearch(source, token),
 		end: positionAtSearch(source, token, length),
 	};
+}
+
+function applyProtocolChanges(source: string, textChanges: readonly any[]): string {
+	return [...textChanges]
+		.sort(
+			(left, right) =>
+				protocolPositionOffset(source, right.start) -
+				protocolPositionOffset(source, left.start),
+		)
+		.reduce((current, change) => {
+			const start = protocolPositionOffset(source, change.start);
+			const end = protocolPositionOffset(source, change.end);
+			return `${current.slice(0, start)}${change.newText}${current.slice(end)}`;
+		}, source);
+}
+
+function protocolPositionOffset(
+	source: string,
+	position: { readonly line: number; readonly offset: number },
+): number {
+	const lines = source.split('\n');
+	return (
+		lines.slice(0, position.line - 1).reduce((length, line) => length + line.length + 1, 0) +
+		position.offset -
+		1
+	);
 }
 
 function triggeredAtCompletionInfo(

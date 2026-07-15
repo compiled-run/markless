@@ -138,6 +138,11 @@ export class TsserverHarness {
 			...position,
 			includeExternalModuleExports: true,
 			includeInsertTextCompletions: true,
+		}).catch((error: unknown) => {
+			if (error instanceof Error && error.message.includes('No content available.')) {
+				return undefined;
+			}
+			throw error;
 		});
 	}
 
@@ -150,6 +155,7 @@ export class TsserverHarness {
 			readonly data?: any;
 		}>,
 	): Promise<any> {
+		this.send('configure', { preferences: { quotePreference: 'single' } });
 		return this.requestBody('completionEntryDetails', {
 			file,
 			...position,
@@ -248,10 +254,10 @@ export class TsserverHarness {
 			this.pending.set(requestSeq, {
 				resolve: (message) => {
 					if (!message.success) {
-						reject(
-							new Error(
-								`tsserver ${command} failed: ${message.message ?? 'unknown error'}`,
-							),
+					reject(
+						new Error(
+							`tsserver ${command} failed: ${message.message ?? 'unknown error'}`,
+						),
 						);
 						return;
 					}

@@ -78,8 +78,9 @@ export function getMarklessTsrxLanguagePlugin(): any {
 				if (virtualCode.languageId !== MARKLESS_TSRX_LANGUAGE_ID) return undefined;
 				return {
 					code: virtualCode,
-				extension: '.tsx',
-				scriptKind: SCRIPT_KIND_TSX,
+					extension: '.tsx',
+					scriptKind: SCRIPT_KIND_TSX,
+					preventLeadingOffset: true,
 				};
 			},
 		},

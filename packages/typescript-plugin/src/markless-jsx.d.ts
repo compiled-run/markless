@@ -1,3 +1,5 @@
+type __MarklessFrameworkApiIndex = typeof import('@markless/core');
+
 declare namespace __MarklessTypeService {
 	const elementBrand: unique symbol;
 

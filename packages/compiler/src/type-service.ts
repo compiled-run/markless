@@ -83,6 +83,7 @@ export function compileTsrxForTypeService(
 	}) as AST.Program;
 	const emittedCode = emitProgramForTypeService(sourceAst, source);
 	const generated = finalizeSourceMapMarkers(emittedCode);
+	addImportInsertionMappings(sourceAst, source, generated.mappings);
 
 	return {
 		code: generated.code,
@@ -96,7 +97,8 @@ export function compileTsrxForTypeService(
 export const compile_to_volar_mappings = compileTsrxForTypeService;
 
 function emitProgramForTypeService(program: AST.Program, source: string): string {
-	const body = asNodes(program.body)
+	const statements = asNodes(program.body);
+	const body = statements
 		.map((statement) => emitTopLevelStatement(statement, source))
 		.filter(Boolean)
 		.join('\n');
@@ -586,6 +588,33 @@ function collectCssMappings(ast: unknown, source: string): TsrxCodeMapping[] {
 		});
 	});
 	return mappings;
+}
+
+function addImportInsertionMappings(
+	program: AST.Program,
+	source: string,
+	mappings: TsrxCodeMapping[],
+): void {
+	if (source.length === 0) return;
+	mappings.push(createMapping(0, 1, 0, 1, gapMappingData));
+	const imports = asNodes(program.body).filter(
+		(statement) => statement.type === 'ImportDeclaration',
+	);
+
+	for (const declaration of imports) {
+		const span = sourceSpan(declaration);
+		if (!span || span.end <= span.start) continue;
+		const authoredMapping = mappings.find((mapping) => {
+			const mappingStart = mapping.sourceOffsets[0];
+			return span.start <= mappingStart && mappingStart < span.end;
+		});
+		if (!authoredMapping) continue;
+		const offsetDelta =
+			authoredMapping.generatedOffsets[0] - authoredMapping.sourceOffsets[0];
+		mappings.push(
+			createMapping(span.end - 1, 1, span.end - 1 + offsetDelta, 1, gapMappingData),
+		);
+	}
 }
 
 function finalizeSourceMapMarkers(codeWithMarkers: string): {

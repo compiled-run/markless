@@ -332,6 +332,53 @@ export function App({ active }: { active: boolean }) @{
 	});
 });
 
+test('compileTsrxForTypeService maps TypeScript import insertion boundaries', () => {
+	const withoutImports = `export function App() @{ <main /> }`;
+	const withoutImportsResult = compileTsrxForTypeService(withoutImports, 'App.tsrx', {
+		loose: true,
+	});
+	const fileStartMapping = withoutImportsResult.mappings.find(
+		(mapping) =>
+			mapping.sourceOffsets[0] === 0 &&
+			mapping.lengths[0] === 1 &&
+			mapping.generatedOffsets[0] === 0 &&
+			mapping.generatedLengths[0] === 1,
+	);
+
+	expect(fileStartMapping?.data).toMatchObject({
+		verification: false,
+		completion: true,
+		navigation: false,
+		structure: true,
+	});
+
+	const withImports = `import { Row } from './Row.tsrx';
+import type { Props } from './types.ts';
+export function App(props: Props) @{ <Row {...props} /> }`;
+	const withImportsResult = compileTsrxForTypeService(withImports, 'App.tsrx', {
+		loose: true,
+	});
+	for (const terminator of [withImports.indexOf(';') + 1, withImports.indexOf(';', 40) + 1]) {
+		const generatedTerminator = withImportsResult.code.indexOf(
+			';',
+			terminator === withImports.indexOf(';') + 1 ? 0 : withImportsResult.code.indexOf(';') + 1,
+		) + 1;
+		const boundaryMapping = withImportsResult.mappings.find(
+			(mapping) =>
+				mapping.sourceOffsets[0] === terminator - 1 &&
+				mapping.lengths[0] === 1 &&
+				mapping.generatedOffsets[0] === generatedTerminator - 1 &&
+				mapping.generatedLengths[0] === 1,
+		);
+		expect(boundaryMapping?.data).toMatchObject({
+			verification: false,
+			completion: true,
+			navigation: false,
+			structure: true,
+		});
+	}
+});
+
 function expectExactMapping(
 	result: ReturnType<typeof compileTsrxForTypeService>,
 	source: string,
