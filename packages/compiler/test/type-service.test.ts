@@ -31,11 +31,10 @@ export function List({ items, emptyLabel }: { items: { id: string; tag: string; 
 	expect(result.code).toContain('/** @jsxImportSource @markless/typescript-plugin */');
 	expect(result.code).toContain('return <section>');
 	expect(result.code).toContain('void (item.id)');
-	expect(result.code).toContain('void (item.active ? "on" : "off")');
+	expect(result.code).toContain('class={item.active ? "on" : "off"}');
 	expect(result.code).toContain('item.select(i)');
-	expect(result.code).toContain('void (Row)');
-	expect(result.code).toContain('void (selected)');
-	expect(result.code).toContain('void (emptyLabel)');
+	expect(result.code).toContain('<Row label={item.label}>{selected}</Row>');
+	expect(result.code).toContain('<span>{emptyLabel}</span>');
 	expect(result.code).not.toContain('<{item.tag}');
 	expect(result.code).not.toContain('@empty');
 	expect(result.mappings.length).toBeGreaterThan(0);
@@ -93,7 +92,7 @@ test('compileTsrxForTypeService maps TSRX control-flow expressions through gener
 
 	expect(result.errors).toEqual([]);
 	expect(result.code).toContain("if (ready && kind === 'a')");
-	expect(result.code).toContain('void (kind)');
+	expect(result.code).toContain('switch (kind)');
 	expect(formatParseDiagnostics(result.code)).toEqual([]);
 	expect(result.code).not.toContain('@case');
 	expect(result.code).toContain('return <section>');
@@ -101,6 +100,89 @@ test('compileTsrxForTypeService maps TSRX control-flow expressions through gener
 	expectExactMapping(result, source, 'message.toUpperCase()');
 	expectExactMapping(result, source, 'load().then(Boolean)');
 	expectExactMapping(result, source, 'error.message');
+});
+
+test('compileTsrxForTypeService emits the ruled TSX envelopes for child constructs', () => {
+	const source = `export function Constructs({ value, items, load }: { value: { kind: 'a'; label: string } | { kind: 'b'; count: number }; items: { id: string }[]; load(): Promise<string> }) @{
+	<section>
+		@if (value.kind === 'a') {
+			<span>{value.label}</span>
+		} @else if (value.kind === 'b') {
+			@{ const doubled = value.count * 2; <span>{doubled}</span> }
+		} @else {
+			<span>other</span>
+		}
+		@switch (value.kind) {
+			@case 'a': { <span>{value.label}</span> }
+			@default: { <span>{value.count}</span> }
+		}
+		@try { <span>{load()}</span> } @pending { <span>pending</span> } @catch (error) { <span>{error.message}</span> }
+		@for (const item of items; index i; key item.id) { <span>{i.toFixed()} {item.id}</span> } @empty { <span>empty</span> }
+	</section>
+}`;
+
+	const result = compileTsrxForTypeService(source, 'Constructs.tsrx', { loose: false });
+	const compact = result.code.replace(/\s+/g, ' ');
+
+	expect(result.errors).toEqual([]);
+	expect(formatParseDiagnostics(result.code)).toEqual([]);
+	expect(compact).toContain(
+		"{(() => { if (value.kind === 'a') return <><span>{value.label}</span></>; else if (value.kind === 'b') return <>{(() => {const doubled = value.count * 2; return <><span>{doubled}</span></>;})()}</>; else return <><span>other</span></>; })()}",
+	);
+	expect(compact).toContain(
+		"{(() => { switch (value.kind) { case 'a': return <><span>{value.label}</span></>; default: return <><span>{value.count}</span></>; } return null; })()}",
+	);
+	expect(compact).toContain(
+		'{((__pending: boolean) => { if (__pending) return <><span>pending</span></>; try { return <><span>{load()}</span></>; } catch (__caught) { const error: any = __caught; return <><span>{error.message}</span></>; } })(false as boolean)}',
+	);
+	expect(compact).toContain(
+		'{(() => { const __rows: Array<__MarklessTypeService.Element> = []; let i = 0; for (const item of items) { void (item.id); __rows.push(<><span>{i.toFixed()} {item.id}</span></>); i += 1; } if (__rows.length === 0) __rows.push(<><span>empty</span></>); return __rows; })()}',
+	);
+	expect(result.code).not.toContain('@ts-expect-error');
+	expect(result.code).not.toContain('@ts-ignore');
+	for (const expression of [
+		"value.kind === 'a'",
+		"value.kind === 'b'",
+		'value.label',
+		'value.count * 2',
+		'error.message',
+		'items',
+		'item.id',
+		'i.toFixed()',
+	]) {
+		expectExactMapping(result, source, expression);
+	}
+	const ifSource = source.indexOf('@if');
+	const ifMapping = result.mappings.find(
+		(mapping) =>
+			mapping.sourceOffsets[0] === ifSource &&
+			result.code.slice(
+				mapping.generatedOffsets[0],
+				mapping.generatedOffsets[0] + mapping.generatedLengths[0],
+			) === 'if',
+	);
+	expect(ifMapping?.data).toMatchObject({
+		verification: false,
+		completion: false,
+		semantic: false,
+		navigation: false,
+		structure: true,
+	});
+});
+
+test('compileTsrxForTypeService reuses the ruled construct expression outside JSX children', () => {
+	const source = `export function ExpressionConstruct({ ready }: { ready: boolean }) @{
+	const chosen = @if (ready) { <span>yes</span> } @else { <span>no</span> };
+	<div>{chosen}</div>
+}`;
+	const result = compileTsrxForTypeService(source, 'ExpressionConstruct.tsrx', { loose: false });
+	const compact = result.code.replace(/\s+/g, ' ');
+
+	expect(result.errors).toEqual([]);
+	expect(formatParseDiagnostics(result.code)).toEqual([]);
+	expect(compact).toContain(
+		'const chosen = (() => { if (ready) return <><span>yes</span></>; else return <><span>no</span></>; })();',
+	);
 });
 
 test('compileTsrxForTypeService lowers nested statement containers and expression TSRX values', () => {
@@ -127,7 +209,7 @@ test('compileTsrxForTypeService lowers nested statement containers and expressio
 	expect(result.code).not.toContain('@if');
 	expect(result.code).toContain('return <section>');
 	expect(result.code).toContain('const fallback =');
-	expect(result.code).toContain('void (value > 0)');
+	expect(result.code).toContain('if (value > 0)');
 	expect(result.code).toContain('const label = title.trim();');
 	expectExactMapping(result, source, 'value > 0');
 	expectExactMapping(result, source, 'title.toUpperCase()');

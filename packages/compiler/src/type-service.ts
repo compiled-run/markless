@@ -47,11 +47,21 @@ const gapMappingData: MappingData = {
 	semantic: false,
 	navigation: false,
 };
-type MappingProfile = 'full' | 'value' | 'gap';
+const structureMappingData: MappingData = {
+	verification: false,
+	completion: false,
+	semantic: false,
+	navigation: false,
+	structure: true,
+	format: false,
+	customData: {},
+};
+type MappingProfile = 'full' | 'value' | 'gap' | 'structure';
 const mappingProfiles: Record<MappingProfile, MappingData> = {
 	full: fullMappingData,
 	value: valueMappingData,
 	gap: gapMappingData,
+	structure: structureMappingData,
 };
 const mapStart = '\0markless-map:';
 const mapSeparator = '\0';
@@ -303,90 +313,204 @@ function emitDynamicElement(
 }
 
 function emitChildCodeBlock(node: TsrxAstNode, source: string): string {
+	return `{${emitChildCodeBlockExpression(node, source)}}`;
+}
+
+function emitChildCodeBlockExpression(node: TsrxAstNode, source: string): string {
 	const statements = asNodes(node.body).map((statement) => emitPlainStatement(statement, source));
 	const render = node.render ? emitTemplateNode(node.render, source) : '';
 	if (statements.length === 0 && !render) {
 		const span = sourceSpan(node);
-		return span ? `{${markSourceReplacement(span.start, 1, 'null', 'value')}}` : '{null}';
+		return span ? markSourceReplacement(span.start, 1, 'null', 'value') : 'null';
 	}
-	return `{(() => {${statements.join('\n')}${render ? `\nreturn ${render};` : '\nreturn null;'}})()}`;
+	return `(() => {${statements.join('\n')}${render ? `\nreturn <>${render}</>;` : '\nreturn null;'}})()`;
 }
 
 function emitDeferredConstruct(node: TsrxAstNode, source: string): string {
-	const span = sourceSpan(node);
-	const anchors: string[] = [];
-	if (span) {
-		for (let offset = source.indexOf('@', span.start); offset >= 0 && offset < span.end; ) {
-			anchors.push(`void (${markSourceReplacement(offset, 1, 'null', 'value')})`);
-			offset = source.indexOf('@', offset + 1);
-		}
-	}
-	let body = '';
+	return `{${emitConstructExpression(node, source)}}`;
+}
+
+function emitConstructExpression(node: TsrxAstNode, source: string): string {
 	switch (node.type) {
 		case 'JSXIfExpression':
-			body = emitIfExpression(node, source);
-			break;
+			return emitIfExpression(node, source);
 		case 'JSXForExpression':
-			body = emitForExpression(node, source);
-			break;
+			return emitForExpression(node, source);
 		case 'JSXTryExpression':
-			body = emitTryExpression(node, source);
-			break;
+			return emitTryExpression(node, source);
 		default:
-			body = emitSwitchExpression(node, source);
+			return emitSwitchExpression(node, source);
 	}
-	return `{(() => {${anchors.join(';')};${body}\nreturn null;})()}`;
 }
 
 function emitIfExpression(node: TsrxAstNode, source: string): string {
-	const consequent = emitErasedTemplateBlock(node.consequent, source);
-	if (!node.alternate) return `if (${sourceSlice(node.test, source)}) {\n${consequent}\n}`;
+	return `(() => {\n${emitIfChain(node, source)}\n})()`;
+}
 
-	const alternate =
-		isNode(node.alternate) && (node.alternate.type === 'JSXIfExpression' || node.alternate.type === 'IfStatement')
-			? emitIfExpression(node.alternate, source)
-			: emitErasedTemplateBlock(node.alternate, source);
-	if (isNode(node.alternate) && node.alternate.type === 'JSXIfExpression') {
-		return `if (${sourceSlice(node.test, source)}) {\n${consequent}\n} else ${alternate}`;
+function emitIfChain(node: TsrxAstNode, source: string): string {
+	const keyword = emitKeywordAt(node.start, '@if', 'if', source);
+	const consequent = emitConditionalReturningArm(node.consequent, source);
+	let output = `${keyword} (${emitValue(node.test, source)}) ${consequent}`;
+	if (!isNode(node.alternate)) return `${output}\nreturn null;`;
+
+	const elseOffset = findKeywordBefore('@else', node.alternate.start, node.consequent, source);
+	const elseKeyword = emitKeywordAt(elseOffset, '@else', 'else', source);
+	if (node.alternate.type === 'IfStatement' || node.alternate.type === 'JSXIfExpression') {
+		const ifKeyword = emitKeywordAt(node.alternate.start, 'if', 'if', source);
+		output += `\n${elseKeyword} ${emitIfChainWithKeyword(node.alternate, source, ifKeyword)}`;
+	} else {
+		output += `\n${elseKeyword} ${emitConditionalReturningArm(node.alternate, source)}`;
 	}
-	return `if (${sourceSlice(node.test, source)}) {\n${consequent}\n} else {\n${alternate}\n}`;
+	return output;
+}
+
+function emitIfChainWithKeyword(
+	node: TsrxAstNode,
+	source: string,
+	ifKeyword: string,
+): string {
+	let output = `${ifKeyword} (${emitValue(node.test, source)}) ${emitConditionalReturningArm(node.consequent, source)}`;
+	if (!isNode(node.alternate)) return `${output}\nreturn null;`;
+	const elseOffset = findKeywordBefore('@else', node.alternate.start, node.consequent, source);
+	const elseKeyword = emitKeywordAt(elseOffset, '@else', 'else', source);
+	if (node.alternate.type === 'IfStatement' || node.alternate.type === 'JSXIfExpression') {
+		output += `\n${elseKeyword} ${emitIfChainWithKeyword(
+			node.alternate,
+			source,
+			emitKeywordAt(node.alternate.start, 'if', 'if', source),
+		)}`;
+	} else {
+		output += `\n${elseKeyword} ${emitConditionalReturningArm(node.alternate, source)}`;
+	}
+	return output;
 }
 
 function emitForExpression(node: TsrxAstNode, source: string): string {
-	const setup: string[] = [];
-	if (node.index) setup.push(`const ${sourceSlice(node.index, source)} = 0;`);
-	if (node.key) setup.push(emitExpressionStatement(node.key, source));
-
-	const body = [setup.join('\n'), emitErasedTemplateBlock(node.body, source)]
-		.filter(Boolean)
-		.join('\n');
-	const empty = node.empty ? `\n{\n${emitErasedTemplateBlock(node.empty, source)}\n}` : '';
-	return `for (${sourceSlice(node.left, source)} of ${sourceSlice(node.right, source)}) {\n${body}\n}${empty}`;
+	const index = isNode(node.index) ? node.index : undefined;
+	const key = isNode(node.key) ? node.key : undefined;
+	const body = emitArmParts(node.body, source);
+	const left = isNode(node.left) && node.left.type === 'VariableDeclaration'
+		? emitValue(node.left, source)
+		: `const ${emitValue(node.left, source)}`;
+	const setup = index ? `\nlet ${emitValue(index, source)} = 0;` : '';
+	const keyCheck = key ? `\nvoid (${emitValue(key, source)});` : '';
+	const increment = index ? `\n${rawSourceSlice(index, source)} += 1;` : '';
+	let empty = '';
+	if (isNode(node.empty)) {
+		const emptyKeywordOffset = findKeywordBefore('@empty', node.empty.start, node.body, source);
+		const emptyKeyword = emitKeywordAt(emptyKeywordOffset, '@empty', 'if', source);
+		const emptyArm = emitArmParts(node.empty, source);
+		if (emptyArm.statements.length === 0) {
+			empty = `\n${emptyKeyword} (__rows.length === 0) __rows.push(<>${emptyArm.render}</>);`;
+		} else {
+			empty = `\n${emptyKeyword} (__rows.length === 0) {\n${emptyArm.statements.join('\n')}\n__rows.push(<>${emptyArm.render}</>);\n}`;
+		}
+	}
+	return `(() => {\nconst __rows: Array<__MarklessTypeService.Element> = [];${setup}\n${emitKeywordAt(node.start, '@for', 'for', source)} (${left} of ${emitValue(node.right, source)}) {${keyCheck}\n${body.statements.join('\n')}\n__rows.push(<>${body.render}</>);${increment}\n}${empty}\nreturn __rows;\n})()`;
 }
 
 function emitTryExpression(node: TsrxAstNode, source: string): string {
 	const handler = isNode(node.handler) ? node.handler : undefined;
-	const param = handler?.param ? sourceSlice(handler.param, source) : 'error';
-	const catchBody = handler?.body ? emitErasedTemplateBlock(handler.body, source) : '';
-	const pending = node.pending ? `\n{\n${emitErasedTemplateBlock(node.pending, source)}\n}` : '';
-	return `try {\n${emitErasedTemplateBlock(node.block, source)}\n} catch (${param}) {\n${catchBody}\n}${pending}`;
+	const pending = isNode(node.pending) ? node.pending : undefined;
+	const tryBlock = `${emitKeywordAt(node.start, '@try', 'try', source)} ${emitReturningArm(node.block, source)}`;
+	let catchBlock: string;
+	if (handler) {
+		const catchKeyword = emitKeywordAt(handler.start, '@catch', 'catch', source);
+		const declaration = isNode(handler.param)
+			? `const ${emitValue(handler.param, source)}: any = __caught;\n`
+			: '';
+		const arm = emitArmParts(handler.body, source);
+		catchBlock = `${catchKeyword} (__caught) {\n${declaration}${arm.statements.join('\n')}\nreturn <>${arm.render}</>;\n}`;
+	} else {
+		catchBlock = 'catch (__caught) {\nreturn null;\n}';
+	}
+	const tryAndCatch = `${tryBlock} ${catchBlock}`;
+	if (!pending) return `(() => {\n${tryAndCatch}\n})()`;
+
+	const pendingKeywordOffset = findKeywordBefore('@pending', pending.start, node.block, source);
+	const pendingKeyword = emitKeywordAt(pendingKeywordOffset, '@pending', 'if', source);
+	return `((__pending: boolean) => {\n${pendingKeyword} (__pending) ${emitConditionalReturningArm(pending, source)}\n${tryAndCatch}\n})(false as boolean)`;
 }
 
 function emitSwitchExpression(node: TsrxAstNode, source: string): string {
 	const discriminant = node.discriminant ?? node.test;
 	const cases = asNodes(node.cases).map((switchCase) => {
-		const test = switchCase.test ? emitExpressionStatement(switchCase.test, source) : '';
-		const consequent = emitErasedTemplateBlock({ type: 'BlockStatement', body: switchCase.consequent }, source);
-		return [test, consequent].filter(Boolean).join('\n');
+		const block = { type: 'BlockStatement', body: switchCase.consequent };
+		if (isNode(switchCase.test)) {
+			return `${emitKeywordAt(switchCase.start, '@case', 'case', source)} ${emitValue(switchCase.test, source)}: ${emitReturningArm(block, source, false)}`;
+		}
+		return `${emitKeywordAt(switchCase.start, '@default', 'default', source)}: ${emitReturningArm(block, source, false)}`;
 	});
-	return [`void (${sourceSlice(discriminant, source)});`, ...cases].filter(Boolean).join('\n');
+	return `(() => {\n${emitKeywordAt(node.start, '@switch', 'switch', source)} (${emitValue(discriminant, source)}) {\n${cases.join('\n')}\n}\nreturn null;\n})()`;
 }
 
-function emitErasedTemplateBlock(block: unknown, source: string): string {
-	if (!isNode(block)) return '';
-	const expressions: string[] = [];
-	collectTemplateExpressionSources(block, source, expressions);
-	return expressions.map((expression) => `void (${expression});`).join('\n');
+function emitReturningArm(block: unknown, source: string, braces = true): string {
+	const arm = emitArmParts(block, source);
+	const content = `${arm.statements.join('\n')}${arm.statements.length ? '\n' : ''}return <>${arm.render}</>;`;
+	return braces ? `{\n${content}\n}` : content;
+}
+
+function emitConditionalReturningArm(block: unknown, source: string): string {
+	const arm = emitArmParts(block, source);
+	if (arm.statements.length === 0) return `return <>${arm.render}</>;`;
+	return `{\n${arm.statements.join('\n')}\nreturn <>${arm.render}</>;\n}`;
+}
+
+function emitArmParts(
+	block: unknown,
+	source: string,
+): { readonly statements: string[]; readonly render: string } {
+	if (!isNode(block)) return { statements: [], render: '' };
+	const statements: string[] = [];
+	const rendered: string[] = [];
+	for (const item of asNodes(block.body)) {
+		if (isTemplateChildNode(item)) rendered.push(emitTemplateNode(item, source));
+		else statements.push(emitPlainStatement(item, source));
+	}
+	return { statements, render: rendered.filter(Boolean).join('\n') };
+}
+
+function isTemplateChildNode(node: TsrxAstNode): boolean {
+	return (
+		isTsrxTemplateSyntaxNode(node) ||
+		node.type === 'JSXExpressionContainer' ||
+		node.type === 'TSRXExpression'
+	);
+}
+
+function emitValue(node: unknown, source: string): string {
+	const span = sourceSpan(node);
+	return span && isNode(node)
+		? sourceSliceRange(node, source, span.start, span.end, 'value')
+		: '';
+}
+
+function rawSourceSlice(node: unknown, source: string): string {
+	const span = sourceSpan(node);
+	return span ? source.slice(span.start, span.end) : '';
+}
+
+function emitKeywordAt(
+	offset: unknown,
+	sourceKeyword: string,
+	generatedKeyword: string,
+	source: string,
+): string {
+	return typeof offset === 'number' && source.slice(offset, offset + sourceKeyword.length) === sourceKeyword
+		? markSourceReplacement(offset, sourceKeyword.length, generatedKeyword, 'structure')
+		: generatedKeyword;
+}
+
+function findKeywordBefore(
+	keyword: string,
+	before: unknown,
+	afterNode: unknown,
+	source: string,
+): number | undefined {
+	if (typeof before !== 'number') return;
+	const after = sourceSpan(afterNode)?.end ?? 0;
+	const offset = source.lastIndexOf(keyword, before);
+	return offset >= after ? offset : undefined;
 }
 
 function emitTemplateBlock(block: unknown, source: string): string {
@@ -404,12 +528,25 @@ function emitTemplateChildren(children: unknown, source: string): string {
 		.join('\n');
 }
 
-function emitExpressionStatement(expression: unknown, source: string): string {
-	if (!isNode(expression) || expression.type === 'JSXEmptyExpression') return '';
-	return `void (${sourceSlice(expression, source)});`;
-}
-
 function emitTemplateExpression(node: TsrxAstNode, source: string): string {
+	if (node.type === 'JSXCodeBlock') return emitChildCodeBlockExpression(node, source);
+	if (
+		node.type === 'JSXIfExpression' ||
+		node.type === 'JSXForExpression' ||
+		node.type === 'JSXTryExpression' ||
+		node.type === 'JSXSwitchExpression'
+	) {
+		return emitConstructExpression(node, source);
+	}
+	if (
+		node.type === 'JSXElement' ||
+		node.type === 'Element' ||
+		node.type === 'JSXFragment' ||
+		node.type === 'Fragment'
+	) {
+		return emitTemplateNode(node, source);
+	}
+	if (node.type === 'JSXStyleElement') return 'null';
 	const expressions: string[] = [];
 	collectTemplateExpressionSources(node, source, expressions);
 	if (expressions.length === 0) return 'void 0';

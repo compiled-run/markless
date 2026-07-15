@@ -761,6 +761,27 @@ test('M12a the service script is TSX', () => {
 	expect(virtualCode?.generatedCode).toContain('<div class="app">ok</div>');
 });
 
+test('M13 real tsserver type-checks construct branches without scaffolding diagnostics', async () => {
+	const fixture = openFixture('construct-typing.tsrx');
+	const syntactic = await server.syntacticDiagnosticsSync(fixture.file);
+	const semantic = await server.semanticDiagnosticsSync(fixture.file);
+
+	expect(syntactic).toEqual([]);
+	expect(
+		semantic,
+		'M13 clean construct branches must narrow locally and produce no diagnostics from authored code or synthetic IIFE scaffolding.',
+	).toEqual([]);
+}, 20_000);
+
+test('M13 real tsserver maps a branch-local type error to the authored token', async () => {
+	const fixture = openFixture('construct-typing-error.tsrx');
+	const diagnostics = await server.semanticDiagnosticsSync(fixture.file);
+	const authored = diagnosticMatching(diagnostics, /property 'missing' does not exist/i);
+
+	expect(diagnostics).toHaveLength(1);
+	expectDiagnosticSpan(fixture.source, authored, 'missing');
+}, 20_000);
+
 test('M7a real tsserver activates built core and router CJS plugins together and exposes route href completions', async () => {
 	const dualProject = copyFixtureProject(fixtureDirectory, workspaceRoot);
 	const dualServer = new TsserverHarness({
