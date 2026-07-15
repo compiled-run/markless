@@ -1,5 +1,20 @@
 import { basename, dirname, normalize, resolve } from 'pathe';
 import { withoutTrailingSlash } from 'ufo';
+import {
+	AGENT_NOTE_COPY,
+	AGENT_REGISTRY,
+	ALL_WRITABLE_AGENTS,
+	addAgentSkills,
+	agentChoices,
+	detectDrivingAgent,
+	displaySkillPath,
+	findInstalledAgents,
+	parseAgentList,
+	removeAgentSkills,
+	type AgentId,
+	type AgentWriteResult,
+	type WritableAgentId,
+} from './agents.ts';
 
 declare const __VERSION__: string | undefined;
 
@@ -11,6 +26,7 @@ export type Choice<T extends string> = {
 	readonly value: T;
 	readonly label: string;
 	readonly hint: string;
+	readonly disabled?: boolean;
 };
 
 export const PROJECT_FORMAT_CHOICES = [
@@ -50,18 +66,27 @@ export type ProgramPath = string | URL;
 
 export interface ProgramDirectoryEntry {
 	readonly name: string;
-	readonly kind: 'directory' | 'file';
+	readonly kind: 'directory' | 'file' | 'symlink' | 'other';
 }
 
 export interface ProgramFileStat {
 	isDirectory(): boolean;
+	isFile(): boolean;
 }
 
 export interface ProgramFileSystem {
+	atomicCreateFile(path: ProgramPath, contents: string): Promise<boolean>;
+	atomicWriteFile(path: ProgramPath, contents: string): Promise<void>;
+	lstat(path: ProgramPath): Promise<ProgramFileStat | null>;
 	mkdir(path: ProgramPath, options?: { readonly recursive?: boolean }): Promise<void>;
 	readDirectory(path: ProgramPath): Promise<ReadonlyArray<ProgramDirectoryEntry>>;
 	readFile(path: ProgramPath): Promise<string>;
 	stat(path: ProgramPath): Promise<ProgramFileStat | null>;
+	remove(
+		path: ProgramPath,
+		options?: { readonly force?: boolean; readonly recursive?: boolean },
+	): Promise<void>;
+	rmdir(path: ProgramPath): Promise<void>;
 	writeFile(path: ProgramPath, contents: string): Promise<void>;
 }
 
@@ -92,10 +117,18 @@ export interface ProgramPromptSelectOptions<T extends string> {
 	readonly initialValue: T;
 }
 
+export interface ProgramPromptMultiselectOptions<T extends string> {
+	readonly message: string;
+	readonly options: readonly Choice<T>[];
+	readonly initialValues: readonly T[];
+	readonly required?: boolean;
+}
+
 export interface ProgramPrompts {
 	intro(message: string): void;
 	note(message: string, title?: string): void;
 	select<T extends string>(options: ProgramPromptSelectOptions<T>): Promise<T>;
+	multiselect<T extends string>(options: ProgramPromptMultiselectOptions<T>): Promise<T[]>;
 	text(options: ProgramPromptTextOptions): Promise<string>;
 	outro(message: string): void;
 	cancel(message: string): void;
@@ -105,6 +138,7 @@ export interface ProgramRuntime {
 	cwd(): string;
 	env: Record<string, string | undefined>;
 	fs: ProgramFileSystem;
+	homeDir: string;
 	isTTY: boolean;
 	prompts?: ProgramPrompts;
 	stdout?: ProgramWritable;
@@ -114,6 +148,7 @@ export interface ProgramRuntime {
 		args: readonly string[],
 		options: ProgramCommandOptions,
 	) => ProgramCommandResult;
+	sha256(contents: string): Promise<string>;
 }
 
 export interface CreateProgramConfig {
@@ -132,6 +167,7 @@ export interface ValidatedCreateInput {
 	force: boolean;
 	help: boolean;
 	version: boolean;
+	agents?: WritableAgentId[];
 	cwd: string;
 	packageManager: PackageManager;
 }
@@ -145,6 +181,8 @@ export interface CreateOptions {
 	force: boolean;
 	packageManager: PackageManager;
 	cwd: string;
+	agents: WritableAgentId[];
+	agentDriven?: WritableAgentId;
 }
 
 type StarterFile = {
@@ -188,6 +226,9 @@ export class CreateProgram {
 
 	async interact(input: ValidatedCreateInput, runtime: ProgramRuntime): Promise<CreateOptions> {
 		if (input.yes || !runtime.isTTY) {
+			const driving = input.agents === undefined ? detectDrivingAgent(runtime) : undefined;
+			const agentDriven = driving && driving !== 'cursor' ? driving : undefined;
+			if (driving === 'cursor') writeCursorUnavailable(runtime);
 			return {
 				target: input.target!,
 				format: input.format ?? 'node',
@@ -197,6 +238,8 @@ export class CreateProgram {
 				force: input.force,
 				packageManager: input.packageManager,
 				cwd: input.cwd,
+				agents: input.agents ?? (agentDriven ? [agentDriven] : []),
+				agentDriven,
 			};
 		}
 
@@ -235,6 +278,7 @@ export class CreateProgram {
 				message: 'Where should it run?',
 				options: PROJECT_FORMAT_CHOICES,
 			}));
+		const agents = input.agents ?? (await promptForAgents(runtime, prompts));
 		const install =
 			input.install ??
 			(await prompts.select({
@@ -272,6 +316,7 @@ export class CreateProgram {
 			force: input.force,
 			packageManager: input.packageManager,
 			cwd: input.cwd,
+			agents,
 		};
 
 		prompts.note(creationSummary(options), 'Ready to create?');
@@ -306,6 +351,9 @@ export class CreateProgram {
 			runCommand(runtime, options.packageManager, ['install'], targetDir);
 		}
 
+		const agentResults = await addAgentSkills(options.agents, runtime);
+		writeAgentResults(agentResults, runtime, options.agentDriven);
+
 		if (runtime.prompts) {
 			runtime.prompts.note(nextSteps(options), `Created ${options.target}`);
 			runtime.prompts.outro('Markless app ready.');
@@ -316,6 +364,10 @@ export class CreateProgram {
 	}
 
 	async run(args: readonly string[], runtime: ProgramRuntime): Promise<void> {
+		if (args[0] === 'agents') {
+			await this.runAgentsCommand(args.slice(1), runtime);
+			return;
+		}
 		const input = this.validate(args, runtime);
 
 		if (input.help) {
@@ -330,6 +382,41 @@ export class CreateProgram {
 
 		const options = await this.interact(input, runtime);
 		await this.execute(options, runtime);
+	}
+
+	private async runAgentsCommand(
+		args: readonly string[],
+		runtime: ProgramRuntime,
+	): Promise<void> {
+		const action = args[0];
+		if (action !== 'add' && action !== 'remove') {
+			throw new Error('Usage: create-markless agents <add|remove> [--agents <list|none>]');
+		}
+		const explicit = parseAgentsOption(args.slice(1));
+		let agents: WritableAgentId[];
+		let agentDriven: WritableAgentId | undefined;
+		if (action === 'remove') {
+			agents = explicit ?? ALL_WRITABLE_AGENTS;
+		} else if (explicit !== undefined) {
+			agents = explicit;
+		} else if (runtime.isTTY) {
+			if (!runtime.prompts) throw new Error('Interactive agent prompts require prompts.');
+			agents = await promptForAgents(runtime, runtime.prompts);
+		} else {
+			const driving = detectDrivingAgent(runtime);
+			if (driving === 'cursor') writeCursorUnavailable(runtime);
+			agentDriven = driving && driving !== 'cursor' ? driving : undefined;
+			agents = agentDriven ? [agentDriven] : [];
+		}
+
+		const results =
+			action === 'add'
+				? await addAgentSkills(agents, runtime)
+				: await removeAgentSkills(agents, runtime);
+		writeAgentResults(results, runtime, agentDriven);
+		if (results.some((result) => result.status === 'collision')) {
+			throw new Error('Agent configuration finished with one or more collisions.');
+		}
 	}
 }
 
@@ -385,6 +472,15 @@ function parseArgs(args: readonly string[]): ValidatedCreateInput {
 			parsed.version = true;
 			continue;
 		}
+		if (arg === '--agents' || arg.startsWith('--agents=')) {
+			if (parsed.agents !== undefined) {
+				throw new Error('The --agents option may only be provided once.');
+			}
+			const value = arg.includes('=') ? arg.slice(arg.indexOf('=') + 1) : args[++index];
+			if (!value) throw new Error('Missing value for --agents.');
+			parsed.agents = parseAgentList(value);
+			continue;
+		}
 		if (arg === '--format' || arg.startsWith('--format=')) {
 			parsed.format = readChoice(
 				'format',
@@ -410,6 +506,21 @@ function parseArgs(args: readonly string[]): ValidatedCreateInput {
 	return parsed;
 }
 
+function parseAgentsOption(args: readonly string[]): WritableAgentId[] | undefined {
+	if (args.length === 0) return undefined;
+	let agents: WritableAgentId[] | undefined;
+	for (let index = 0; index < args.length; index += 1) {
+		const arg = args[index]!;
+		if (arg !== '--agents' && !arg.startsWith('--agents='))
+			throw new Error(`Unknown option: ${arg}`);
+		if (agents !== undefined) throw new Error('The --agents option may only be provided once.');
+		const value = arg.includes('=') ? arg.slice(arg.indexOf('=') + 1) : args[++index];
+		if (!value) throw new Error('Missing value for --agents.');
+		agents = parseAgentList(value);
+	}
+	return agents;
+}
+
 function readChoice<T extends string>(
 	name: string,
 	arg: string,
@@ -428,6 +539,70 @@ function readChoice<T extends string>(
 
 function choiceLabel<T extends string>(choices: readonly Choice<T>[], value: T): string {
 	return choices.find((choice) => choice.value === value)?.label ?? value;
+}
+
+async function promptForAgents(
+	runtime: ProgramRuntime,
+	prompts: ProgramPrompts,
+): Promise<WritableAgentId[]> {
+	const found = await findInstalledAgents(runtime);
+	if (found.length === 0) {
+		runtime.stdout?.write(
+			'○  No coding agents found on this machine — skipping agent setup.\n   (Add one later with: npx markless agents add)\n',
+		);
+		return [];
+	}
+
+	const foundLabels = AGENT_REGISTRY.filter((agent) => found.includes(agent.id)).map(
+		(agent) => agent.label,
+	);
+	prompts.note(
+		`Found on this machine: ${foundLabels.join(', ')}\n\n${AGENT_NOTE_COPY}`,
+		'Coding agents',
+	);
+	const selected = await prompts.multiselect<AgentId>({
+		message: 'Add Markless to your agents?',
+		options: agentChoices(found),
+		initialValues: found.filter((agent): agent is WritableAgentId => agent !== 'cursor'),
+		required: false,
+	});
+	return selected.filter((agent): agent is WritableAgentId => agent !== 'cursor');
+}
+
+function writeCursorUnavailable(runtime: ProgramRuntime): void {
+	runtime.stdout?.write(
+		`○  Detected Cursor running this setup — ${AGENT_REGISTRY.find((agent) => agent.id === 'cursor')!.unavailableReason}\n`,
+	);
+}
+
+function writeAgentResults(
+	results: readonly AgentWriteResult[],
+	runtime: ProgramRuntime,
+	agentDriven?: WritableAgentId,
+): void {
+	for (const result of results) {
+		const label = AGENT_REGISTRY.find((agent) => agent.id === result.agent)!.label;
+		if (agentDriven === result.agent && result.status === 'added') {
+			runtime.stdout?.write(
+				`◇  Detected ${label} running this setup — added Markless to its\n   config so it can debug this app for you. (${displaySkillPath(result.agent)})\n`,
+			);
+			continue;
+		}
+		if (result.status === 'collision') {
+			runtime.stderr?.write(
+				`Agent configuration collision at ${result.path}; left unchanged.\n`,
+			);
+			continue;
+		}
+		const messages: Record<Exclude<AgentWriteResult['status'], 'collision'>, string> = {
+			added: `Added Markless to ${label}: ${result.path}`,
+			updated: `Updated Markless for ${label}: ${result.path}`,
+			'already-configured': `Markless is already configured for ${label}: ${result.path}`,
+			removed: `Removed Markless from ${label}: ${result.path}`,
+			'not-configured': `Markless is not configured for ${label}: ${result.path}`,
+		};
+		runtime.stdout?.write(`${messages[result.status]}\n`);
+	}
 }
 
 function creationSummary(options: CreateOptions): string {
@@ -519,9 +694,7 @@ async function starterFiles(options: CreateOptions, fs: ProgramFileSystem): Prom
 		packageManager: options.packageManager,
 		packageName: packageName(options.target),
 	});
-	const agents = renderedFiles.find((file) => file.path === 'AGENTS.md');
-
-	return agents ? [...renderedFiles, { path: 'CLAUDE.md', contents: agents.contents }] : renderedFiles;
+	return renderedFiles;
 }
 
 const CLI_MANIFEST_URL = new URL('../package.json', import.meta.url);
@@ -641,6 +814,7 @@ Options:
   --yes, -y          Use defaults
   --format <name>   node, deno, or bun
   --starter <name>  minimal, app, docs, or full-stack
+  --agents <list>   claude-code, codex, gemini-cli, github-copilot, or none
   --no-install      Skip dependency installation
   --no-git          Skip git initialization
   --force           Write into a non-empty directory
