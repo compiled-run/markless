@@ -1,0 +1,26 @@
+{
+	"name": "docs",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "vp dev",
+		"build": "vp build",
+		"preview": "vp preview",
+		"check": "vp check README.md package.json pages scripts tsconfig.json vite.config.ts",
+		"doctor": "node scripts/markless-doctor.mjs",
+		"fmt": "vp fmt",
+		"test": "vp test"
+	},
+	"dependencies": {
+		"@markless/core": "workspace:*",
+		"@markless/router": "workspace:*",
+		"nitro": "3.0.260429-beta",
+		"vite-plus": "0.1.20"
+	},
+	"devDependencies": {
+		"@markless/analyzer": "workspace:*",
+		"@markless/typescript-plugin": "workspace:*",
+		"typescript": "^5.9.3",
+		"vite": "^8.0.16"
+	}
+}

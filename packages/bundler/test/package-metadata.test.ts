@@ -185,7 +185,7 @@ describe('package metadata', () => {
 		).rejects.toThrow();
 	});
 
-	test('workspace test script includes package-local Witness boxes', async () => {
+	test('workspace test script includes packaged completion matrix and Witness boxes', async () => {
 		const workspace = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8')) as {
 			readonly scripts?: Record<string, string>;
 		};
@@ -203,7 +203,7 @@ describe('package metadata', () => {
 		expect(bundler.scripts?.['test:boxes']).toBe('witness run');
 		expect(router.scripts?.['test:boxes']).toBe('witness run');
 		expect(workspace.scripts?.test).toBe(
-			'vp test && pnpm bench:jsfb:guard && pnpm --dir packages/bundler test:boxes && pnpm --dir packages/router test:boxes && pnpm --dir demos/music-player test:boxes && pnpm --dir demos/music-player-ssr test:boxes',
+			'pnpm --dir packages/typescript-plugin test:completion-matrix && vp test && pnpm bench:jsfb:guard && pnpm --dir packages/bundler test:boxes && pnpm --dir packages/router test:boxes && pnpm --dir demos/music-player test:boxes && pnpm --dir demos/music-player-ssr test:boxes',
 		);
 	});
 

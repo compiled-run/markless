@@ -215,6 +215,7 @@ export default defineConfig({
 					name: 'node',
 					environment: 'node',
 					include: ['packages/*/test/**/*.test.ts', 'scripts/**/*.test.ts'],
+					exclude: ['packages/typescript-plugin/test/completion-matrix.test.ts'],
 				},
 			},
 			'packages/vitest-browser/vitest.config.ts',

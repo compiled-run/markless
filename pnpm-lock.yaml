@@ -346,6 +346,34 @@ importers:
         specifier: 0.1.20
         version: 0.1.20(@types/node@24.12.2)(jiti@2.7.0)(typescript@5.9.3)(vite@8.0.16(@types/node@24.12.2)(jiti@2.7.0)(yaml@2.9.0))(yaml@2.9.0)
 
+  docs:
+    dependencies:
+      '@markless/core':
+        specifier: workspace:*
+        version: link:../packages/core
+      '@markless/router':
+        specifier: workspace:*
+        version: link:../packages/router
+      nitro:
+        specifier: 3.0.260429-beta
+        version: 3.0.260429-beta(@azure/identity@4.13.1)(chokidar@5.0.0)(dotenv@17.4.2)(giget@3.3.0)(jiti@2.7.0)(lru-cache@11.5.2)(vite@8.0.16(@types/node@24.12.2)(jiti@2.7.0)(yaml@2.9.0))
+      vite-plus:
+        specifier: 0.1.20
+        version: 0.1.20(@types/node@24.12.2)(jiti@2.7.0)(typescript@5.9.3)(vite@8.0.16(@types/node@24.12.2)(jiti@2.7.0)(yaml@2.9.0))(yaml@2.9.0)
+    devDependencies:
+      '@markless/analyzer':
+        specifier: workspace:*
+        version: link:../packages/analyzer
+      '@markless/typescript-plugin':
+        specifier: workspace:*
+        version: link:../packages/typescript-plugin
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vite:
+        specifier: ^8.0.16
+        version: 8.0.16(@types/node@24.12.2)(jiti@2.7.0)(yaml@2.9.0)
+
   packages/analyzer:
     dependencies:
       ufo:
