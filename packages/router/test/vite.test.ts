@@ -1,7 +1,15 @@
-import { readFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'pathe';
 import { expect, test } from 'vitest';
 import { nitro } from 'nitro/vite';
 import type { Plugin } from 'vite';
+import {
+	MARKLESS_ROUTER_CLIENT_ASSETS_MANIFEST,
+	clientAssetFileName,
+	readClientAssetsManifest,
+	writeClientAssetsManifest,
+} from '../src/vite/client-assets-manifest.ts';
 import { router } from '../src/vite/index.ts';
 
 const flattenPlugins = (plugins: unknown[]): Plugin[] =>
@@ -267,7 +275,382 @@ test('scopes router virtual entry modules by resolved Vite root', () => {
 	expect(first).not.toBe(second);
 });
 
-test('emits exact route modulepreload and stylesheet maps from client build chunks', () => {
+test('persists client assets for a fresh server plugin instance', async () => {
+	const workspace = await mkdtemp(join(tmpdir(), 'markless-router-client-assets-'));
+	const root = join(workspace, 'app');
+	const clientOutDir = join(root, 'dist/client');
+	const manifestPath = join(clientOutDir, MARKLESS_ROUTER_CLIENT_ASSETS_MANIFEST);
+	const resolvedConfig = {
+		base: '/docs/',
+		command: 'build',
+		environments: {
+			browser: { consumer: 'client', build: { outDir: 'dist/client' } },
+			ssr: { consumer: 'server', build: { outDir: join(root, 'dist/server') } },
+		},
+		root,
+	};
+	const navigationChunk = chunk({
+		code: `const routePreloadsJson = globalThis.__marklessRouterRoutePreloadsJson ?? "__MARKLESS_ROUTER_ROUTE_PRELOADS__";`,
+		dynamicImports: ['build/page-C3.js'],
+		fileName: 'build/navigation-A1.js',
+		moduleIds: ['/repo/packages/router/src/vite/entries/client-entry.ts'],
+	});
+	const bundle = {
+		'build/navigation-A1.js': navigationChunk,
+		'build/resume-B2.js': chunk({
+			code: `const routes = {"/pages/index.tsrx":()=>import("./page-C3.js")};`,
+			dynamicImports: ['build/page-C3.js'],
+			fileName: 'build/resume-B2.js',
+			moduleIds: ['/repo/packages/router/src/vite/entries/resume-entry.ts'],
+		}),
+		'build/page-C3.js': chunk({
+			fileName: 'build/page-C3.js',
+			imports: ['build/styled-child-D4.js'],
+			moduleIds: [join(root, 'pages/index.tsrx')],
+			viteMetadata: { importedCss: ['assets/page-E5.css'] },
+		}),
+		'build/styled-child-D4.js': chunk({
+			fileName: 'build/styled-child-D4.js',
+			moduleIds: [join(root, 'components/StyledChild.tsrx')],
+			viteMetadata: { importedCss: ['assets/child-F6.css'] },
+		}),
+		'build/page-symbols-G7.js': chunk({
+			fileName: 'build/page-symbols-G7.js',
+			moduleIds: [`${join(root, 'pages/index.tsrx')}?markless-symbols`],
+		}),
+		'build/page-handler-H8.js': chunk({
+			fileName: 'build/page-handler-H8.js',
+			moduleIds: [
+				`\0virtual:markless:symbol:${encodeURIComponent(join(root, 'pages/index.tsrx'))}:${encodeURIComponent('symbol:0')}`,
+			],
+		}),
+		'build/other-I9.js': chunk({
+			fileName: 'build/other-I9.js',
+			moduleIds: [join(root, 'pages/other.tsrx')],
+		}),
+		'build/other-handler-J0.js': chunk({
+			fileName: 'build/other-handler-J0.js',
+			moduleIds: [
+				`\0virtual:markless:symbol:${encodeURIComponent(join(root, 'pages/other.tsrx'))}:${encodeURIComponent('symbol:0')}`,
+			],
+		}),
+	};
+
+	try {
+		await mkdir(join(root, 'pages'), { recursive: true });
+		await writeFile(join(root, 'pages/index.tsrx'), 'export default function Page() @{}');
+
+		const clientPlugins = flattenPlugins([router()]);
+		const clientConfigPlugin = clientPlugins.find(
+			(plugin) => plugin.name === 'markless-router:vite',
+		);
+		const clientRoutePlugin = clientPlugins.find(
+			(plugin) => plugin.name === 'markless-router:routes',
+		);
+		clientConfigPlugin?.configResolved?.(resolvedConfig as never);
+		await hookHandler(clientConfigPlugin?.buildStart)?.call({
+			environment: { config: resolvedConfig.environments.browser },
+		});
+		await hookHandler(clientConfigPlugin?.generateBundle)?.call(
+			{ environment: { config: resolvedConfig.environments.browser } },
+			{},
+			bundle,
+		);
+
+		for (const fileName of [
+			...Object.keys(bundle),
+			'assets/page-E5.css',
+			'assets/child-F6.css',
+		]) {
+			const path = join(clientOutDir, fileName);
+			await mkdir(join(path, '..'), { recursive: true });
+			await writeFile(path, fileName.endsWith('.css') ? '/* scoped */' : 'export {};');
+		}
+		await hookHandler(clientConfigPlugin?.writeBundle)?.call(
+			{ environment: { config: resolvedConfig.environments.browser } },
+			{},
+			bundle,
+		);
+
+		const persisted = JSON.parse(await readFile(manifestPath, 'utf8')) as {
+			readonly entries: { readonly navigation: string; readonly resume: string };
+			readonly routes: {
+				readonly navigation: Record<string, readonly string[]>;
+				readonly ssr: Record<string, readonly string[]>;
+				readonly styles: Record<string, readonly string[]>;
+			};
+		};
+		expect(persisted.entries).toEqual({
+			navigation: '/docs/build/navigation-A1.js',
+			resume: '/docs/build/resume-B2.js',
+		});
+		expect(persisted.routes.styles['pages/index.tsrx']).toEqual([
+			'/docs/assets/child-F6.css',
+			'/docs/assets/page-E5.css',
+		]);
+		expect(persisted.routes.navigation['pages/index.tsrx']).toEqual([
+			'/docs/build/navigation-A1.js',
+			'/docs/build/page-C3.js',
+			'/docs/build/styled-child-D4.js',
+			'/docs/build/page-handler-H8.js',
+		]);
+		expect(persisted.routes.ssr['pages/index.tsrx']).toEqual([
+			'/docs/build/resume-B2.js',
+			'/docs/build/page-C3.js',
+			'/docs/build/styled-child-D4.js',
+			'/docs/build/page-handler-H8.js',
+		]);
+		expect(persisted.routes.navigation['pages/index.tsrx']).not.toContain(
+			'/docs/build/other-handler-J0.js',
+		);
+		expect(persisted.routes.ssr['pages/index.tsrx']).not.toContain(
+			'/docs/build/other-handler-J0.js',
+		);
+
+		const serverPlugins = flattenPlugins([router()]);
+		const serverConfigPlugin = serverPlugins.find(
+			(plugin) => plugin.name === 'markless-router:vite',
+		);
+		const serverRoutePlugin = serverPlugins.find(
+			(plugin) => plugin.name === 'markless-router:routes',
+		);
+		serverConfigPlugin?.configResolved?.(resolvedConfig as never);
+		serverRoutePlugin?.configResolved?.(resolvedConfig as never);
+		await hookHandler(serverConfigPlugin?.buildStart)?.call({
+			environment: { config: resolvedConfig.environments.ssr },
+		});
+		const serverLoad = hookHandler(serverRoutePlugin?.load);
+		const serverContext = { environment: { config: resolvedConfig.environments.ssr } };
+		const resumeSource = await serverLoad?.call(
+			serverContext,
+			'\0virtual:markless-router/resume-entry-path',
+		);
+		const navigationSource = await serverLoad?.call(
+			serverContext,
+			'\0virtual:markless-router/navigation-entry-path',
+		);
+		const preloadsSource = await serverLoad?.call(
+			serverContext,
+			'\0virtual:markless-router/route-preloads',
+		);
+
+		expect(resumeSource).toContain('/docs/build/resume-B2.js');
+		expect(navigationSource).toContain('/docs/build/navigation-A1.js');
+		expect(preloadsSource).toContain('/docs/assets/page-E5.css');
+		expect(preloadsSource).toContain('/docs/assets/child-F6.css');
+		expect(preloadsSource).not.toContain('/@id/');
+
+		await hookHandler(clientConfigPlugin?.buildStart)?.call({
+			environment: { config: resolvedConfig.environments.browser },
+		});
+		const resetPreloadsSource = await hookHandler(clientRoutePlugin?.load)?.call(
+			{ environment: { config: resolvedConfig.environments.ssr } },
+			'\0virtual:markless-router/route-preloads',
+		);
+		expect(resetPreloadsSource).not.toContain('pages/index.tsrx');
+		expect(() =>
+			hookHandler(clientConfigPlugin?.generateBundle)?.call(
+				{ environment: { config: resolvedConfig.environments.browser } },
+				{},
+				{},
+			),
+		).toThrow('did not emit its resume and navigation entries');
+	} finally {
+		await rm(workspace, { force: true, recursive: true });
+	}
+});
+
+test('rejects invalid persisted client-assets manifests and writes only the v1 schema', async () => {
+	const clientOutDir = await mkdtemp(join(tmpdir(), 'markless-router-invalid-assets-'));
+	const manifestPath = join(clientOutDir, MARKLESS_ROUTER_CLIENT_ASSETS_MANIFEST);
+	const routeFile = 'pages/index.tsrx';
+	const validManifest = () => ({
+		version: 1 as const,
+		base: '/docs/',
+		entries: {
+			resume: '/docs/build/resume.js',
+			navigation: '/docs/build/navigation.js',
+		},
+		routes: {
+			navigation: { [routeFile]: ['/docs/build/page.js'] },
+			ssr: { [routeFile]: ['/docs/build/page.js'] },
+			styles: { [routeFile]: ['/docs/assets/page.css'] },
+		},
+	});
+
+	try {
+		await expect(readClientAssetsManifest(clientOutDir, '/docs/')).rejects.toThrow(
+			'is missing',
+		);
+		await mkdir(join(manifestPath, '..'), { recursive: true });
+		await writeFile(manifestPath, '{', 'utf8');
+		await expect(readClientAssetsManifest(clientOutDir, '/docs/')).rejects.toThrow(
+			'is malformed',
+		);
+
+		const encodedRoute = 'pages/%2e%2e/secret.tsrx';
+		const controlRoute = 'pages/index.tsrx\n';
+		const invalidManifests = [
+			{
+				manifest: { ...validManifest(), version: 2 },
+				error: 'unsupported version',
+			},
+			{
+				manifest: { ...validManifest(), base: '/other/' },
+				error: 'was built for base',
+			},
+			{
+				manifest: {
+					...validManifest(),
+					entries: {
+						...validManifest().entries,
+						resume: 'https://markless-router.invalid/docs/build/resume.js',
+					},
+				},
+				error: 'outside base',
+			},
+			{
+				manifest: {
+					...validManifest(),
+					entries: { ...validManifest().entries, resume: '/docs/../secret.js' },
+				},
+				error: 'outside base',
+			},
+			{
+				manifest: {
+					...validManifest(),
+					entries: { ...validManifest().entries, resume: 'build/resume.js' },
+				},
+				error: 'non-canonical asset URL',
+			},
+			{
+				manifest: {
+					...validManifest(),
+					entries: {
+						...validManifest().entries,
+						resume: ' https://markless-router.invalid/docs/build/resume.js',
+					},
+				},
+				error: 'non-canonical asset URL',
+			},
+			{
+				manifest: {
+					...validManifest(),
+					routes: {
+						navigation: { [encodedRoute]: [] },
+						ssr: { [encodedRoute]: [] },
+						styles: { [encodedRoute]: [] },
+					},
+				},
+				error: 'invalid route key',
+			},
+			{
+				manifest: {
+					...validManifest(),
+					routes: {
+						navigation: { [controlRoute]: [] },
+						ssr: { [controlRoute]: [] },
+						styles: { [controlRoute]: [] },
+					},
+				},
+				error: 'invalid route key',
+			},
+			{
+				manifest: {
+					...validManifest(),
+					entries: {
+						...validManifest().entries,
+						resume: '/docs/build/missing.js',
+					},
+				},
+				error: 'references missing client asset',
+			},
+		];
+
+		for (const invalid of invalidManifests) {
+			await writeFile(manifestPath, JSON.stringify(invalid.manifest), 'utf8');
+			await expect(readClientAssetsManifest(clientOutDir, '/docs/')).rejects.toThrow(
+				invalid.error,
+			);
+		}
+
+		for (const fileName of [
+			'build/resume.js',
+			'build/navigation.js',
+			'build/page.js',
+			'assets/page.css',
+		]) {
+			const path = join(clientOutDir, fileName);
+			await mkdir(join(path, '..'), { recursive: true });
+			await writeFile(path, 'asset', 'utf8');
+		}
+		await writeClientAssetsManifest(clientOutDir, {
+			...validManifest(),
+			absoluteRoot: clientOutDir,
+			builtAt: '2026-07-15T00:00:00.000Z',
+			secret: 'do-not-persist',
+		} as never);
+		const persisted = await readFile(manifestPath, 'utf8');
+		expect(persisted).not.toContain(clientOutDir);
+		expect(persisted).not.toContain('builtAt');
+		expect(persisted).not.toContain('do-not-persist');
+		await expect(readClientAssetsManifest(clientOutDir, '/docs/')).resolves.toEqual(
+			validManifest(),
+		);
+		expect(
+			clientAssetFileName(
+				'https://cdn.example.test/docs/assets/page.css',
+				'https://cdn.example.test/docs/',
+			),
+		).toBe('assets/page.css');
+		expect(() => clientAssetFileName('/assets/page.css', './')).toThrow(
+			'non-canonical asset URL',
+		);
+	} finally {
+		await rm(clientOutDir, { force: true, recursive: true });
+	}
+});
+
+test('ignores unrelated server environments and rejects ambiguous client builds', async () => {
+	const root = join(tmpdir(), 'markless-router-environments');
+	const resolvedConfig = {
+		base: '/',
+		command: 'build',
+		environments: {
+			browser: { consumer: 'client', build: { outDir: 'dist/client' } },
+			ssr: { consumer: 'server', build: { outDir: 'dist/server' } },
+			worker: { consumer: 'server', build: { outDir: 'dist/worker' } },
+		},
+		root,
+	};
+	const configPlugin = flattenPlugins([router()]).find(
+		(plugin) => plugin.name === 'markless-router:vite',
+	);
+	configPlugin?.configResolved?.(resolvedConfig as never);
+	await expect(
+		hookHandler(configPlugin?.buildStart)?.call({
+			environment: {
+				name: 'worker',
+				config: resolvedConfig.environments.worker,
+			},
+		}),
+	).resolves.toBeUndefined();
+
+	const ambiguousPlugin = flattenPlugins([router()]).find(
+		(plugin) => plugin.name === 'markless-router:vite',
+	);
+	expect(() =>
+		ambiguousPlugin?.configResolved?.({
+			...resolvedConfig,
+			environments: {
+				...resolvedConfig.environments,
+				legacyBrowser: { consumer: 'client', build: { outDir: 'dist/legacy' } },
+			},
+		} as never),
+	).toThrow('requires exactly one client build environment; found 2');
+});
+
+test('emits exact route modulepreload maps from client build chunks', () => {
 	const plugins = flattenPlugins([router()]);
 	const configPlugin = plugins.find((plugin) => plugin.name === 'markless-router:vite');
 	const routePlugin = plugins.find((plugin) => plugin.name === 'markless-router:routes');
@@ -357,7 +740,6 @@ test('emits exact route modulepreload and stylesheet maps from client build chun
 	};
 	const routePreloads = routePreloadData.navigation ?? {};
 	const ssrPreloads = routePreloadData.ssr ?? {};
-	const stylesheets = routePreloadData.styles ?? {};
 	const patchedRoutePreloads = JSON.parse(
 		JSON.parse(
 			navigationChunk.code.match(/routePreloadsJson = .* \?\? ("(?:\\.|[^"\\])*")/)?.[1] ??
@@ -366,7 +748,7 @@ test('emits exact route modulepreload and stylesheet maps from client build chun
 	) as Record<string, unknown>;
 
 	expect(serverSource).toContain('"pages/docs/[...slug].mdx"');
-	expect(serverSource).toContain('routeStylesheets');
+	expect(serverSource).toContain('export const routeStylesheets = undefined;');
 	expect(clientSource).not.toContain('routeStylesheets');
 	expect(clientSource).not.toContain('assets/docs.css');
 	expect(navigationChunk.code).toContain('pages/docs/[...slug].mdx');
@@ -404,15 +786,6 @@ test('emits exact route modulepreload and stylesheet maps from client build chun
 	expect(ssrPreloads['pages/docs/[...slug].mdx']).not.toContain('/app/build/home-resume.js');
 	expect(ssrPreloads['pages/index.tsrx']).toContain('/app/build/home-resume.js');
 	expect(ssrPreloads['pages/index.tsrx']).not.toContain('/app/build/docs-resume.js');
-	expect(stylesheets['pages/docs/[...slug].mdx']).toEqual([
-		'/app/assets/docs-runtime.css',
-		'/app/assets/docs.css',
-		'/app/assets/shared.css',
-	]);
-	expect(stylesheets['pages/index.tsrx']).toEqual([
-		'/app/assets/home.css',
-		'/app/assets/shared.css',
-	]);
 });
 
 test('includes destination route resume chunks reached from the navigation route table', () => {
@@ -578,9 +951,7 @@ test('includes route-scoped symbol-module chunks in ssr and navigation modulepre
 			// A symbol of a non-page component in the gallery route's closure.
 			'build/light-table-symbol.js': chunk({
 				fileName: 'build/light-table-symbol.js',
-				moduleIds: [
-					symbolModuleId('/project/src/components/light-table.tsrx', 'symbol:0'),
-				],
+				moduleIds: [symbolModuleId('/project/src/components/light-table.tsrx', 'symbol:0')],
 			}),
 			'build/journal-save-symbol.js': chunk({
 				fileName: 'build/journal-save-symbol.js',
@@ -601,16 +972,12 @@ test('includes route-scoped symbol-module chunks in ssr and navigation modulepre
 		['navigation', routePreloadData.navigation ?? {}],
 		['ssr', routePreloadData.ssr ?? {}],
 	] as const) {
-		expect(preloads['pages/gallery.tsrx'], label).toContain(
-			'/app/build/gallery-tap-symbol.js',
-		);
+		expect(preloads['pages/gallery.tsrx'], label).toContain('/app/build/gallery-tap-symbol.js');
 		expect(preloads['pages/gallery.tsrx'], label).toContain(
 			'/app/build/gallery-lens-symbol.js',
 		);
 		expect(preloads['pages/gallery.tsrx'], label).toContain('/app/build/lens-runtime.js');
-		expect(preloads['pages/gallery.tsrx'], label).toContain(
-			'/app/build/light-table-symbol.js',
-		);
+		expect(preloads['pages/gallery.tsrx'], label).toContain('/app/build/light-table-symbol.js');
 		// Cross-route exclusion: the other route's symbol chunks never preload.
 		expect(preloads['pages/gallery.tsrx'], label).not.toContain(
 			'/app/build/journal-save-symbol.js',

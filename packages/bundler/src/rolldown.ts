@@ -66,7 +66,6 @@ export type MarklessRolldownPlugin = Plugin & { api: MarklessRolldownPluginApi }
 type InternalMarklessRolldownOptions = MarklessRolldownOptions & {
 	emitResumeModules?: boolean;
 	publicPath?: (fileName: string) => string;
-	styleModuleCssTextImport?: (virtualModuleId: string) => string;
 };
 
 const TSRX_SOURCE_FILE = /\.tsrx(?:[?#].*)?$/;
@@ -184,9 +183,12 @@ export function createMarklessRolldownPlugin(input: {
 			}
 			const virtualModule = virtualModules.get(normalized);
 			if (virtualModule) {
-				const styleQuery = virtualModule.type === 'style' ? parsePath(source).search : '';
+				const directQuery =
+					virtualModule.type === 'style' && /(?:[?&])direct(?:[=&]|$)/.test(source)
+						? '?direct'
+						: '';
 				return {
-					id: `${resolveVirtualId(normalized)}${styleQuery}`,
+					id: `${resolveVirtualId(normalized)}${directQuery}`,
 					moduleSideEffects: true,
 				};
 			}
@@ -287,10 +289,6 @@ export function createMarklessRolldownPlugin(input: {
 										direct: null,
 									},
 								)
-						: undefined,
-				styleModuleCssTextImport:
-					internalOptions.dev !== true && currentEnvironment === 'server'
-						? internalOptions.styleModuleCssTextImport
 						: undefined,
 				headInjections:
 					internalOptions.dev === true && currentEnvironment === 'server'

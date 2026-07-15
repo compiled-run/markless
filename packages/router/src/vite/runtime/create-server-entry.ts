@@ -1,6 +1,9 @@
 import type { PageProps } from '../../index.ts';
-import { buildRouteManifestFromFileIds, matchRouteManifest } from '../../route-manifest.ts';
-import { MARKLESS_SCOPED_STYLE_ATTRIBUTE } from '@markless/bundler/preload';
+import {
+	buildRouteManifestFromFileIds,
+	matchRouteManifest,
+	normalizeRouteFileId,
+} from '../../route-manifest.ts';
 import {
 	renderToString,
 	type ModulePreloadInput,
@@ -62,6 +65,7 @@ const DOCUMENT_CHILDREN_PLACEHOLDER = '__markless_router_document_children__';
 
 export function createServerEntry(options: ServerEntryOptions) {
 	const manifest = buildRouteManifestFromFileIds(options.routeFileIds);
+	assertCurrentRouteAssets(options);
 
 	async function fetch(request: Request): Promise<Response> {
 		const url = new URL(request.url);
@@ -209,6 +213,28 @@ export function createServerEntry(options: ServerEntryOptions) {
 	return { fetch };
 }
 
+function assertCurrentRouteAssets(options: ServerEntryOptions): void {
+	// routeStylesheets is the persisted client-manifest signal. Existing manual
+	// adapters may provide only module preloads, while dev leaves this undefined.
+	if (options.routeStylesheets === undefined) return;
+	const routeMaps = [
+		['navigation', options.routeModulePreloads ?? {}],
+		['SSR', options.routeSsrModulePreloads ?? {}],
+		['style', options.routeStylesheets],
+	] as const;
+	const expected = [...new Set(options.routeFileIds.map(normalizeRouteFileId))]
+		.filter((file) => /^pages\/.+\.(?:tsrx|mdx)$/.test(file))
+		.toSorted();
+	for (const [label, routes] of routeMaps) {
+		const actual = Object.keys(routes).toSorted();
+		if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+			throw new Error(
+				`Markless Router ${label} client-asset routes are stale; expected ${JSON.stringify(expected)}, received ${JSON.stringify(actual)}. Rebuild the client environment before the server environment.`,
+			);
+		}
+	}
+}
+
 // Wraps the compiled page renderSsr with the route script, the lazy Link
 // bridge, and the serialized page-prop cell, FORWARDING the render context
 // so streaming reaches the page's async boundaries (T107).
@@ -220,14 +246,8 @@ function routedPageArtifact(
 	navigationEntryPath: string | undefined,
 	stylesheetHrefs: readonly string[] | undefined,
 ) {
-	// Built route CSS includes transitive component styles and wins when the
-	// client build supplied it. The marked, pipeline-processed page fallback is
-	// retained only when that cross-environment map is unavailable.
-	const hasBuiltStylesheets = (stylesheetHrefs?.length ?? 0) > 0;
 	const headInjections = [
-		...(baseArtifact?.headInjections ?? []).filter(
-			(injection) => !hasBuiltStylesheets || !isScopedStyleFallback(injection),
-		),
+		...(baseArtifact?.headInjections ?? []),
 		...(stylesheetHrefs ?? []).map(
 			(href): RenderHeadInjection => ({
 				tag: 'link',
@@ -261,13 +281,6 @@ function routedPageArtifact(
 				: output;
 		},
 	};
-}
-
-function isScopedStyleFallback(injection: RenderHeadInjection): boolean {
-	return (
-		injection.tag === 'style' &&
-		injection.attributes?.[MARKLESS_SCOPED_STYLE_ATTRIBUTE] !== undefined
-	);
 }
 
 // Symbol modules and props+state computeds re-running on a resumed page read

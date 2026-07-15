@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { nitro } from 'nitro/vite';
-import { dirname, isAbsolute, join, normalize, relative } from 'pathe';
+import { dirname, isAbsolute, join, normalize, relative, resolve } from 'pathe';
 import {
 	type EnvironmentOptions,
 	sortUserPlugins,
@@ -24,6 +24,15 @@ import {
 import { symbolVirtualModuleSourceFile } from '@markless/bundler/preload';
 import { transformRequestFileSource } from '../request-files.ts';
 import { anchorTransformPlugin } from './anchor-transform.ts';
+import {
+	clientAssetFileName,
+	createClientAssetsManifest,
+	type MarklessRouterClientAssetRoutes,
+	type MarklessRouterClientAssetsManifest,
+	readClientAssetsManifest,
+	removeClientAssetsManifest,
+	writeClientAssetsManifest,
+} from './client-assets-manifest.ts';
 import { htmlTransformPlugin } from './html-transform.ts';
 import { mdxTransformPlugin } from './mdx.ts';
 import { routeTypegenPlugin } from './route-typegen.ts';
@@ -145,6 +154,13 @@ function routerConfigPlugin(
 	navigationEntry: ResumeEntryState,
 	routePreloads: RoutePreloadState,
 ): Plugin {
+	let clientOutDir = '';
+	let clientEnvironmentName = '';
+	let clientEnvironmentConfig: object | undefined;
+	let serverEnvironmentConfig: object | undefined;
+	let productionBuild = false;
+	let pendingClientAssets: MarklessRouterClientAssetsManifest | undefined;
+
 	return {
 		name: 'markless-router:vite',
 		enforce: 'pre',
@@ -173,6 +189,22 @@ function routerConfigPlugin(
 			};
 		},
 		configResolved(config) {
+			productionBuild = config.command === 'build';
+			if (productionBuild) {
+				const clientEnvironments = Object.entries(config.environments).filter(
+					([, environment]) => environment.consumer === 'client',
+				);
+				if (clientEnvironments.length !== 1) {
+					throw new Error(
+						`Markless Router requires exactly one client build environment; found ${clientEnvironments.length}.`,
+					);
+				}
+				const [name, environment] = clientEnvironments[0]!;
+				clientEnvironmentName = name;
+				clientEnvironmentConfig = environment;
+				serverEnvironmentConfig = config.environments.ssr;
+				clientOutDir = resolve(config.root, environment.build.outDir);
+			}
 			for (const entry of [resumeEntry, navigationEntry, routePreloads]) {
 				entry.base = config.base;
 			}
@@ -180,6 +212,42 @@ function routerConfigPlugin(
 		},
 		configEnvironment(_name, config) {
 			configureRouteInputs(config);
+		},
+		async buildStart() {
+			if (!productionBuild) return;
+			if (!clientOutDir) {
+				throw new Error(
+					'Markless Router could not resolve the client output directory for its client-assets manifest.',
+				);
+			}
+
+			const environment = this.environment;
+			const isClientEnvironment = environment?.name
+				? environment.name === clientEnvironmentName
+				: environment?.config === clientEnvironmentConfig;
+			const isRouterServerEnvironment = environment?.name
+				? environment.name === 'ssr'
+				: environment?.config === serverEnvironmentConfig;
+
+			if (isClientEnvironment) {
+				pendingClientAssets = undefined;
+				resumeEntry.fileName = undefined;
+				navigationEntry.fileName = undefined;
+				routePreloads.routes = { navigation: {}, ssr: {}, styles: {} };
+				routePreloads.persisted = false;
+				await removeClientAssetsManifest(clientOutDir);
+				return;
+			}
+			if (!isRouterServerEnvironment) return;
+
+			const manifest = await readClientAssetsManifest(clientOutDir, routePreloads.base);
+			resumeEntry.fileName = clientAssetFileName(manifest.entries.resume, manifest.base);
+			navigationEntry.fileName = clientAssetFileName(
+				manifest.entries.navigation,
+				manifest.base,
+			);
+			routePreloads.routes = manifest.routes;
+			routePreloads.persisted = true;
 		},
 		generateBundle: {
 			// Vite finalizes and propagates importedCss in vite:css-post.
@@ -211,7 +279,33 @@ function routerConfigPlugin(
 					root: routePreloads.root,
 				});
 				patchRoutePreloadsInBundle(bundle, routePreloads.routes);
+				if (productionBuild) {
+					if (!resumeEntry.fileName || !navigationEntry.fileName) {
+						throw new Error(
+							'Markless Router client build did not emit its resume and navigation entries.',
+						);
+					}
+					pendingClientAssets = createClientAssetsManifest({
+						base: routePreloads.base,
+						resumeEntry: joinURL(routePreloads.base, resumeEntry.fileName),
+						navigationEntry: joinURL(routePreloads.base, navigationEntry.fileName),
+						routes: routePreloads.routes,
+					});
+				}
 			},
+		},
+		async writeBundle() {
+			const environment = this.environment;
+			const isClientEnvironment = environment?.name
+				? environment.name === clientEnvironmentName
+				: environment?.config === clientEnvironmentConfig;
+			if (!productionBuild || !isClientEnvironment) return;
+			if (!pendingClientAssets) {
+				throw new Error(
+					'Markless Router client build finished without a client-assets manifest.',
+				);
+			}
+			await writeClientAssetsManifest(clientOutDir, pendingClientAssets);
 		},
 	};
 }
@@ -412,22 +506,24 @@ interface ResumeEntryState {
 
 interface RoutePreloadState {
 	base: string;
+	persisted: boolean;
 	root: string;
 	routes: RoutePreloadMaps;
 }
 
-interface RoutePreloadMaps {
-	readonly navigation: Record<string, readonly string[]>;
-	readonly ssr: Record<string, readonly string[]>;
-	readonly styles: Record<string, readonly string[]>;
-}
+type RoutePreloadMaps = MarklessRouterClientAssetRoutes;
 
 function resumeEntryState(): ResumeEntryState {
 	return { base: '/', fileName: undefined };
 }
 
 function routePreloadState(): RoutePreloadState {
-	return { base: '/', root: '.', routes: { navigation: {}, ssr: {}, styles: {} } };
+	return {
+		base: '/',
+		persisted: false,
+		root: '.',
+		routes: { navigation: {}, ssr: {}, styles: {} },
+	};
 }
 
 function routerClientInput(input: InputOption | undefined, root: string): InputOption | undefined {
@@ -577,12 +673,15 @@ function rootScopeQuery(root: string, id = ''): string {
 }
 
 function routePreloadsSource(state: RoutePreloadState, client: boolean): string {
-	const routes = client
-		? { navigation: state.routes.navigation, ssr: state.routes.ssr }
-		: state.routes;
+	const routes =
+		client || !state.persisted
+			? { navigation: state.routes.navigation, ssr: state.routes.ssr }
+			: state.routes;
 	const routeStylesheetExport = client
 		? []
-		: [`export const routeStylesheets = routePreloadData.styles ?? {};`];
+		: [
+				`export const routeStylesheets = ${state.persisted ? 'routePreloadData.styles ?? {}' : 'undefined'};`,
+			];
 	return [
 		`const routePreloadsJson = globalThis.__marklessRouterRoutePreloadsJson ?? ${JSON.stringify(ROUTE_PRELOADS_PLACEHOLDER)};`,
 		`const routePreloadData = routePreloadsJson === ${JSON.stringify(ROUTE_PRELOADS_PLACEHOLDER)} ? ${JSON.stringify(routes)} : JSON.parse(routePreloadsJson);`,
@@ -653,12 +752,14 @@ function routeModulePreloadsFromBundle(input: {
 }): RoutePreloadMaps {
 	const chunks = outputChunks(input.bundle);
 	const chunksByFileName = new Map(chunks.map((chunk) => [chunk.fileName, chunk]));
-	const routeChunks = new Map<string, OutputChunkLike>();
+	const routeChunks = new Map<string, OutputChunkLike[]>();
 	const routeChunkFileNames = new Set<string>();
 	for (const chunk of chunks) {
 		const routeFile = routeFileForChunk(input.root, chunk);
 		if (!routeFile) continue;
-		routeChunks.set(routeFile, chunk);
+		const routeFileChunks = routeChunks.get(routeFile) ?? [];
+		routeFileChunks.push(chunk);
+		routeChunks.set(routeFile, routeFileChunks);
 		routeChunkFileNames.add(chunk.fileName);
 	}
 
@@ -666,7 +767,8 @@ function routeModulePreloadsFromBundle(input: {
 	const navigation: Record<string, readonly string[]> = {};
 	const ssr: Record<string, readonly string[]> = {};
 	const styles: Record<string, readonly string[]> = {};
-	for (const [routeFile, routeChunk] of routeChunks) {
+	for (const [routeFile, routeFileChunks] of routeChunks) {
+		const routeChunk = primaryRouteChunk(input.root, routeFile, routeFileChunks);
 		const navigationFileNames = new Set<string>();
 		if (input.navigationChunk) {
 			includeChunk(navigationFileNames, chunksByFileName, input.navigationChunk.fileName);
@@ -892,6 +994,41 @@ function routeFileForChunk(root: string, chunk: OutputChunkLike): string | undef
 		const routeFile = routeFileForModuleId(root, moduleId);
 		if (routeFile) return routeFile;
 	}
+}
+
+function primaryRouteChunk(
+	root: string,
+	routeFile: string,
+	chunks: readonly OutputChunkLike[],
+): OutputChunkLike {
+	// The same route source can produce full, resume, and symbols-only chunks.
+	// Prefer the unqueried authored module, then resume, then symbols-only.
+	// Replace only for a strictly higher rank so bundle order breaks ties.
+	let selected = chunks[0]!;
+	let selectedRank = routeChunkRank(root, routeFile, selected);
+	for (const chunk of chunks.slice(1)) {
+		const rank = routeChunkRank(root, routeFile, chunk);
+		if (rank <= selectedRank) continue;
+		selected = chunk;
+		selectedRank = rank;
+	}
+	return selected;
+}
+
+function routeChunkRank(root: string, routeFile: string, chunk: OutputChunkLike): number {
+	let rank = 0;
+	for (const moduleId of [chunk.facadeModuleId, ...(chunk.moduleIds ?? [])]) {
+		if (routeFileForModuleId(root, moduleId) !== routeFile) continue;
+		const search = parsePath(moduleId!).search;
+		if (/(?:^|[?&])markless-symbols(?:[=&]|$)/.test(search)) {
+			rank = Math.max(rank, 1);
+		} else if (/(?:^|[?&])markless-resume(?:[=&]|$)/.test(search)) {
+			rank = Math.max(rank, 2);
+		} else {
+			return 3;
+		}
+	}
+	return rank;
 }
 
 function routeFileForModuleId(

@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vite-plus/test';
-import { MARKLESS_SCOPED_STYLE_ATTRIBUTE } from '@markless/bundler/preload';
 import { marklessSsrAttachSnapshots, marklessSsrRunAsyncComputed } from '@markless/web/fns/ssr';
 import { createServerEntry } from '../../../src/vite/runtime/create-server-entry.ts';
 
@@ -40,12 +39,6 @@ describe('server entry rendering', () => {
 					default: page('<main class="mk-page">Home</main>', {
 						headInjections: [
 							{
-								tag: 'style',
-								location: 'head',
-								attributes: { [MARKLESS_SCOPED_STYLE_ATTRIBUTE]: '' },
-								children: '.mk-page { color: red; }',
-							},
-							{
 								tag: 'link',
 								location: 'head',
 								attributes: {
@@ -58,6 +51,12 @@ describe('server entry rendering', () => {
 				}),
 			},
 			routeFileIds: ['/pages/index.tsrx'],
+			routeModulePreloads: {
+				'pages/index.tsrx': ['/build/navigation.js'],
+			},
+			routeSsrModulePreloads: {
+				'pages/index.tsrx': ['/build/resume.js'],
+			},
 			routeStylesheets: {
 				'pages/index.tsrx': ['/assets/page.css'],
 			},
@@ -72,38 +71,50 @@ describe('server entry rendering', () => {
 			'<link rel="stylesheet" href="/@id/virtual:markless:style:page.css?direct">',
 		);
 		expect(head).toContain('<link rel="stylesheet" href="/assets/page.css">');
-		expect(head).not.toContain(MARKLESS_SCOPED_STYLE_ATTRIBUTE);
-		expect(head).not.toContain('.mk-page { color: red; }');
 		expect(body).not.toContain('rel="stylesheet"');
 	});
 
-	it('keeps compiled scoped CSS when the built route stylesheet map is unavailable', async () => {
-		const entry = createServerEntry({
-			documentModuleLoader: undefined,
-			pageModuleLoaders: {
-				'pages/index.tsrx': async () => ({
-					default: page('<main class="mk-page">Home</main>', {
-						headInjections: [
-							{
-								tag: 'style',
-								location: 'head',
-								attributes: { [MARKLESS_SCOPED_STYLE_ATTRIBUTE]: '' },
-								children: '.mk-page { color: red; }',
-							},
-						],
-					}),
-				}),
-			},
-			routeFileIds: ['/pages/index.tsrx'],
-		});
+	it('rejects persisted client assets when server route discovery changed', () => {
+		expect(() =>
+			createServerEntry({
+				documentModuleLoader: undefined,
+				pageModuleLoaders: {
+					'pages/index.tsrx': async () => ({ default: page('<main>Home</main>') }),
+				},
+				routeFileIds: ['/pages/index.tsrx'],
+				routeModulePreloads: { 'pages/old.tsrx': ['/build/old.js'] },
+				routeSsrModulePreloads: { 'pages/old.tsrx': ['/build/old.js'] },
+				routeStylesheets: { 'pages/old.tsrx': ['/assets/old.css'] },
+			}),
+		).toThrow('client-asset routes are stale');
+	});
 
-		const response = await entry.fetch(new Request('http://markless-router.test/'));
-		const html = await response.text();
-		const head = html.slice(0, html.indexOf('</head>'));
+	it('rejects an empty persisted manifest when server routes exist', () => {
+		expect(() =>
+			createServerEntry({
+				documentModuleLoader: undefined,
+				pageModuleLoaders: {
+					'pages/index.tsrx': async () => ({ default: page('<main>Home</main>') }),
+				},
+				routeFileIds: ['/pages/index.tsrx'],
+				routeModulePreloads: {},
+				routeSsrModulePreloads: {},
+				routeStylesheets: {},
+			}),
+		).toThrow('client-asset routes are stale');
+	});
 
-		expect(head).toContain(
-			`<style ${MARKLESS_SCOPED_STYLE_ATTRIBUTE}="">.mk-page { color: red; }</style>`,
-		);
+	it('keeps manual module-preload adapters compatible without a persisted style map', () => {
+		expect(() =>
+			createServerEntry({
+				documentModuleLoader: undefined,
+				pageModuleLoaders: {
+					'pages/index.tsrx': async () => ({ default: page('<main>Home</main>') }),
+				},
+				routeFileIds: ['/pages/index.tsrx'],
+				routeModulePreloads: { 'pages/index.tsrx': ['/build/page.js'] },
+			}),
+		).not.toThrow();
 	});
 
 	it('emits resumability payloads without waking a client entry on page load', async () => {

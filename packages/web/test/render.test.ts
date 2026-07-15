@@ -1102,9 +1102,7 @@ test('renderToString emits an SSR container and omits the resumer for static out
 			}),
 			view: {
 				...staticView(),
-				locators: [
-					{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'main' },
-				],
+				locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'main' }],
 				domUpdates: [
 					{
 						hostNodeId: 'h0',
@@ -1120,9 +1118,7 @@ test('renderToString emits an SSR container and omits the resumer for static out
 	});
 
 	expect(componentBodyRuns).toBe(1);
-	expect(html).toBe(
-		'<div data-async-container><main><p>Static news</p></main></div>',
-	);
+	expect(html).toBe('<div data-async-container><main><p>Static news</p></main></div>');
 	expect(html).not.toContain('type="markless/state"');
 	expect(html).not.toContain('type="markless/view"');
 	expect(html).not.toContain('data-async-resumer');
@@ -1508,22 +1504,6 @@ test('renderToString emits compiled artifact head injections before the containe
 
 	expect(html).toContain('<script type="module" src="/@vite/client"></script>');
 	expect(html.indexOf('/@vite/client')).toBeLessThan(html.indexOf('<div'));
-});
-
-test('renderToString escapes closing style tags in compiled head injections', async () => {
-	const html = await renderToString({
-		headInjections: [
-			{
-				tag: 'style',
-				location: 'head',
-				children: '.card { --closing-tag: "</style>"; }',
-			},
-		],
-		renderSsr: () => ({ html: '<main class="card">Card</main>' }),
-	});
-
-	expect(html).toContain('<style>.card { --closing-tag: "<\\/style>"; }</style>');
-	expect(html).not.toContain('--closing-tag: "</style>"');
 });
 
 test('renderToString uses the compiled artifact resume module URL by default', async () => {

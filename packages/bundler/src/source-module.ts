@@ -1,10 +1,6 @@
-import {
-	MARKLESS_SCOPED_STYLE_ATTRIBUTE,
-	type MarklessClientOutput,
-	type MarklessEnvironment,
-	type MarklessExecutionLogMode,
-} from './types.ts';
+import type { MarklessClientOutput, MarklessEnvironment } from './types.ts';
 import { MARKLESS_EXECUTION_LOG_MODULE_ID } from './execution-log.ts';
+import type { MarklessExecutionLogMode } from './types.ts';
 
 export const MARKLESS_VIRTUAL_PREFIX = 'virtual:markless:';
 
@@ -118,7 +114,6 @@ export function emitSourceModule(input: {
 		readonly children?: string;
 		readonly location: 'head' | 'body';
 	}>;
-	readonly scopedStyleCssTextReference?: string;
 	readonly executionLog?: MarklessExecutionLogMode;
 	readonly needsFullResume?: boolean;
 	readonly devResumeReexport?: boolean;
@@ -178,7 +173,6 @@ export function emitSourceModule(input: {
 					environment: input.environment,
 					executionLog: input.executionLog,
 					headInjections: input.headInjections,
-					scopedStyleCssTextReference: input.scopedStyleCssTextReference,
 					resumeModuleUrl: input.resumeModuleUrl,
 					rootExportName: input.publicRenderRootExportName,
 					csrExportName: input.publicRenderCsrExportName,
@@ -277,7 +271,6 @@ function emitCompiledAppDefault(input: {
 		readonly children?: string;
 		readonly location: 'head' | 'body';
 	}>;
-	readonly scopedStyleCssTextReference?: string;
 	readonly resumeModuleUrl?: string;
 	readonly rootExportName: string | null;
 	readonly csrExportName: string | null;
@@ -301,17 +294,9 @@ function emitCompiledAppDefault(input: {
 		input.resumeModuleUrl && input.environment !== 'client'
 			? [`	resumeModuleUrl: ${JSON.stringify(input.resumeModuleUrl)},`]
 			: [];
-	const headInjections = [
-		...(input.headInjections ?? []).map((injection) => JSON.stringify(injection)),
-		...(input.scopedStyleCssTextReference && input.environment === 'server'
-			? [
-					`{ tag: "style", attributes: { ${JSON.stringify(MARKLESS_SCOPED_STYLE_ATTRIBUTE)}: "" }, children: ${input.scopedStyleCssTextReference}, location: "head" }`,
-				]
-			: []),
-	];
 	const headInjectionEntry =
-		headInjections.length > 0 && input.environment !== 'client'
-			? [`	headInjections: [${headInjections.join(', ')}],`]
+		input.headInjections?.length && input.environment !== 'client'
+			? [`	headInjections: ${JSON.stringify(input.headInjections)},`]
 			: [];
 	const modulePreloadEntry =
 		input.resumeModuleUrl && input.environment === 'server'

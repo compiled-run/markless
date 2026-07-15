@@ -2,8 +2,6 @@ export type MarklessEnvironment = 'client' | 'server' | 'lib';
 export type MarklessClientOutput = 'full' | 'symbols-only';
 export type MarklessExecutionLogMode = 'auto' | 'never' | 'always';
 
-export const MARKLESS_SCOPED_STYLE_ATTRIBUTE = 'data-markless-scoped-style';
-
 export interface MarklessDevServer {
 	transformRequest: (url: string, environment: MarklessEnvironment) => Promise<unknown> | unknown;
 }
@@ -39,7 +37,6 @@ export interface TransformTsrxModuleInput {
 	resumeModuleUrl?: string;
 	headInjections?: GlobalInjections[];
 	styleModuleUrl?: (virtualModuleId: string) => string;
-	styleModuleCssTextImport?: (virtualModuleId: string) => string;
 	executionLog?: MarklessExecutionLogMode;
 	executionLogModuleHooks?: boolean;
 }
