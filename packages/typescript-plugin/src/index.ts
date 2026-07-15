@@ -1,7 +1,11 @@
 import { createLanguageServicePlugin } from '@volar/typescript/lib/quickstart/createLanguageServicePlugin.js';
 import { join } from 'node:path';
 import { installMarklessCompletions } from './completions.ts';
-import { getMarklessTsrxLanguagePlugin } from './language.ts';
+import {
+	getMarklessTsrxLanguagePlugin,
+	isMarklessTsrxFile,
+	mapMarklessSourcePositionToGenerated,
+} from './language.ts';
 
 const volarPlugin = createLanguageServicePlugin(() => ({
 	languagePlugins: [getMarklessTsrxLanguagePlugin()],
@@ -14,14 +18,16 @@ const plugin = (modules: Parameters<typeof volarPlugin>[0]) => {
 		...volar,
 		getExternalFiles(project: any, updateLevel: any) {
 			const externalFiles = getExternalFiles?.(project, updateLevel) ?? [];
-			const hasTsrx = project.getFileNames?.().some((fileName: string) => fileName.endsWith('.tsrx'));
-			if (!hasTsrx) return externalFiles;
+			if (!projectContainsTsrx(project)) return externalFiles;
 			const contract = join(__dirname, 'markless-jsx.d.ts');
 			return externalFiles.includes(contract) ? externalFiles : [...externalFiles, contract];
 		},
 		create(info: Parameters<typeof volar.create>[0]) {
 			const getSourceSnapshot = info.languageServiceHost.getScriptSnapshot.bind(
 				info.languageServiceHost,
+			);
+			const nativeJsxClosingTag = info.languageService.getJsxClosingTagAtPosition?.bind(
+				info.languageService,
 			);
 			const languageService = volar.create(info);
 			const enhancedLanguageService = Object.create(null);
@@ -36,10 +42,69 @@ const plugin = (modules: Parameters<typeof volarPlugin>[0]) => {
 				enhancedLanguageService,
 				getSourceSnapshot,
 			);
+			if (nativeJsxClosingTag) {
+				const proxiedJsxClosingTag = languageService.getJsxClosingTagAtPosition?.bind(
+					languageService,
+				);
+				enhancedLanguageService.getJsxClosingTagAtPosition = (
+					fileName: string,
+					position: number,
+				) => {
+					if (!isMarklessTsrxFile(fileName)) {
+						return proxiedJsxClosingTag?.(fileName, position);
+					}
+					const snapshot = getSourceSnapshot(fileName);
+					if (!snapshot) return proxiedJsxClosingTag?.(fileName, position);
+					const generatedPosition = mapMarklessSourcePositionToGenerated(
+						fileName,
+						snapshot,
+						position,
+					);
+					if (generatedPosition === undefined) {
+						return proxiedJsxClosingTag?.(fileName, position);
+					}
+					return nativeJsxClosingTag(
+						fileName,
+						snapshot.getLength() + generatedPosition,
+					);
+				};
+			}
 			return enhancedLanguageService;
 		},
 	};
 };
+
+function projectContainsTsrx(project: any): boolean {
+	const fileNameLists = [
+		project.parsedCommandLine?.fileNames,
+		project.getRootFiles?.(),
+		project.getFileNames?.(),
+	];
+	if (
+		fileNameLists.some((fileNames) =>
+			fileNames?.some((fileName: string) => isMarklessTsrxFile(fileName)),
+		)
+	) {
+		return true;
+	}
+
+	// When an extra extension first opens, TypeScript has already associated it
+	// with a configured project but has not added it to that project's root names.
+	// Use that project-scoped open-file association for the initial external-files
+	// pull; later pulls take the normal root/program path above.
+	const projectService = project.projectService;
+	const configuredProject = project.canonicalConfigFilePath;
+	if (!projectService?.openFiles || !configuredProject) return false;
+	const canonicalize = projectService.toCanonicalFileName?.bind(projectService);
+	return [...projectService.openFiles.keys()].some((fileName: string) => {
+		if (!isMarklessTsrxFile(fileName)) return false;
+		const openFileConfig = projectService.configFileForOpenFiles?.get(fileName);
+		return (
+			typeof openFileConfig === 'string' &&
+			(canonicalize?.(openFileConfig) ?? openFileConfig) === configuredProject
+		);
+	});
+}
 
 Object.defineProperty(plugin, '__getMarklessTsrxLanguagePlugin', {
 	value: getMarklessTsrxLanguagePlugin,

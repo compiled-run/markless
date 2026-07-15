@@ -165,6 +165,14 @@ export class TsserverHarness {
 		return this.requestBody('definitionAndBoundSpan', { file, ...position });
 	}
 
+	jsxClosingTag(file: string, position: SourcePosition): Promise<any> {
+		return this.requestBody('jsxClosingTag', { file, ...position });
+	}
+
+	linkedEditingRange(file: string, position: SourcePosition): Promise<any> {
+		return this.requestBody('linkedEditingRange', { file, ...position });
+	}
+
 	syntacticDiagnosticsSync(file: string): Promise<any[]> {
 		return this.requestBody('syntacticDiagnosticsSync', { file });
 	}

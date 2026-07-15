@@ -25,6 +25,27 @@ export function isMarklessTsrxFile(fileName: FileNameOrUri): boolean {
 	);
 }
 
+export function mapMarklessSourcePositionToGenerated(
+	fileName: string,
+	snapshot: ScriptSnapshot,
+	position: number,
+): number | undefined {
+	const virtualCode = new MarklessTsrxVirtualCode(fileName, snapshot);
+	const candidates = virtualCode.mappings.filter((mapping) => {
+		const sourceStart = mapping.sourceOffsets[0];
+		const sourceEnd = sourceStart + mapping.lengths[0];
+		return mapping.data.structure && sourceStart <= position && position <= sourceEnd;
+	});
+	const mapping =
+		candidates.find(
+			(candidate) => candidate.sourceOffsets[0] + candidate.lengths[0] === position,
+		) ?? candidates[0];
+	if (!mapping) return undefined;
+
+	const sourceDelta = position - mapping.sourceOffsets[0];
+	return mapping.generatedOffsets[0] + Math.min(sourceDelta, mapping.generatedLengths[0]);
+}
+
 export function getMarklessTsrxLanguagePlugin(): any {
 	return {
 		getLanguageId(fileNameOrUri: FileNameOrUri) {

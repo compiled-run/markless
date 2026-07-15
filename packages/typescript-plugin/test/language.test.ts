@@ -144,6 +144,7 @@ test('tsserver protocol opens configured .tsrx files without JSX or parser diagn
 	const result = await runTsrxTsserverProbe();
 
 	expect(result.loadedPlugin).toBe(true);
+	expect(result.loadedContract).toBe(true);
 	expect(result.results).toEqual([
 		{ file: 'Counter.tsrx', syntactic: [], semantic: [] },
 		{ file: 'NoImports.tsrx', syntactic: [], semantic: [] },
@@ -193,6 +194,7 @@ function formatDiagnostics(diagnostics: readonly ts.Diagnostic[]): string[] {
 
 async function runTsrxTsserverProbe(): Promise<{
 	loadedPlugin: boolean;
+	loadedContract: boolean;
 	results: Array<{ file: string; syntactic: unknown[]; semantic: unknown[] }>;
 }> {
 	ensureGeneratedCjsBuild();
@@ -289,7 +291,11 @@ export function App() @{
 			results.push({ file: fixture.name, syntactic, semantic });
 		}
 		const log = server.readLog();
-		return { loadedPlugin: log.includes('@markless/typescript-plugin'), results };
+		return {
+			loadedPlugin: log.includes('@markless/typescript-plugin'),
+			loadedContract: log.includes('markless-jsx.d.ts'),
+			results,
+		};
 	} finally {
 		await server.close();
 	}

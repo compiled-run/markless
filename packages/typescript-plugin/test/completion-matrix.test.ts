@@ -1,5 +1,13 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync } from 'node:fs';
+import {
+	existsSync,
+	mkdtempSync,
+	readFileSync,
+	realpathSync,
+	rmSync,
+	statSync,
+	writeFileSync,
+} from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -744,6 +752,101 @@ test('M10a intrinsic class attribute is accepted', async () => {
 	).toBe(false);
 }, 20_000);
 
+test('M10 cold-start: the intrinsic contract is present at the very first request', async () => {
+	const coldProject = copyFixtureProject(fixtureDirectory, workspaceRoot);
+	const coldServer = new TsserverHarness({
+		project: coldProject,
+		workspaceRoot,
+		globalPlugins: [corePlugin],
+	});
+	try {
+		const fixture = openFixture('intrinsic-contract.tsrx', coldProject, coldServer);
+		const diagnostics = await coldServer.semanticDiagnosticsSync(fixture.file);
+
+		expect(
+			diagnostics.filter((diagnostic) => [7016, 7026].includes(diagnostic.code)),
+			'M10 cold-start missing capability: the first semantic request must see the Markless JSX intrinsic contract.',
+		).toEqual([]);
+	} finally {
+		await coldServer.close();
+		removeFixtureProject(coldProject);
+	}
+}, 20_000);
+
+test('M10 intrinsic contract accepts Markless spellings, native events, element bindings, and tag-specific attributes', async () => {
+	const fixture = openFixture('intrinsic-contract.tsrx');
+	const syntactic = await server.syntacticDiagnosticsSync(fixture.file);
+	const semantic = await server.semanticDiagnosticsSync(fixture.file);
+
+	expect(syntactic).toEqual([]);
+	expect(
+		semantic,
+		'M10 accepted intrinsic attributes must use native DOM event types and concrete host element types without diagnostics.',
+	).toEqual([]);
+}, 20_000);
+
+test('M10 intrinsic contract rejects className, bogus and tag-wrong attributes, object style, and object children at authored tokens', async () => {
+	const fixture = openFixture('intrinsic-contract-errors.tsrx');
+	const diagnostics = await server.semanticDiagnosticsSync(fixture.file);
+
+	expectDiagnosticSpan(fixture.source, diagnosticMatching(diagnostics, /className/), 'className');
+	expectDiagnosticSpan(
+		fixture.source,
+		diagnosticMatching(diagnostics, /bogusAttribute/),
+		'bogusAttribute',
+	);
+	expectDiagnosticSpan(
+		fixture.source,
+		diagnosticMatching(diagnostics, /not assignable to type 'string'/),
+		'style',
+	);
+	expectDiagnosticSpan(fixture.source, diagnosticMatching(diagnostics, /src/), 'src');
+	expectDiagnosticSpan(fixture.source, diagnosticMatching(diagnostics, /invalid/), 'invalid');
+	expect(diagnostics).toHaveLength(5);
+}, 20_000);
+
+test('M10 plugin does not add the Markless declaration to a project without TSRX', async () => {
+	const plainProject = mkdtempSync(join(tmpdir(), 'markless-plain-tsx-'));
+	writeFileSync(
+		join(plainProject, 'tsconfig.json'),
+		JSON.stringify({
+			compilerOptions: { jsx: 'preserve', noEmit: true, strict: true },
+			include: ['*.tsx'],
+		}),
+	);
+	const file = join(plainProject, 'Plain.tsx');
+	const source = 'export const plain = <div class="reactless" />;\n';
+	writeFileSync(file, source);
+	const plainServer = new TsserverHarness({
+		project: plainProject,
+		workspaceRoot,
+		globalPlugins: [corePlugin],
+	});
+	try {
+		plainServer.open(file, source);
+		const diagnostics = await plainServer.semanticDiagnosticsSync(file);
+		expect(diagnostics.map((diagnostic) => diagnostic.code)).toContain(7026);
+		expect(plainServer.readLog()).not.toContain('markless-jsx.d.ts');
+	} finally {
+		await plainServer.close();
+		rmSync(plainProject, { recursive: true, force: true });
+	}
+}, 20_000);
+
+test('M10 Markless JSX contract does not pollute an adjacent plain TSX file', async () => {
+	const fixture = openFixture('plain-adjacent.tsx');
+	const diagnostics = await server.semanticDiagnosticsSync(fixture.file);
+
+	expect(diagnostics).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				start: expect.objectContaining(positionAtSearch(fixture.source, '<div')),
+				text: expect.stringMatching(/JSX element implicitly has type 'any'.*JSX\.IntrinsicElements/i),
+			}),
+		]),
+	);
+}, 20_000);
+
 test('M12a the service script is TSX', () => {
 	const languagePlugin = getMarklessTsrxLanguagePlugin();
 	const virtualCode = languagePlugin.createVirtualCode?.(
@@ -760,6 +863,30 @@ test('M12a the service script is TSX', () => {
 	expect(serviceScript).toMatchObject({ extension: '.tsx', scriptKind: 4 });
 	expect(virtualCode?.generatedCode).toContain('<div class="app">ok</div>');
 });
+
+test('M12 native jsxClosingTag answers through authored TSRX coordinates', async () => {
+	const fixture = openFixture('tag-closing-protocol.tsrx');
+	const answer = await server.jsxClosingTag(
+		fixture.file,
+		positionAtSearch(fixture.source, '<div>\n', '<div>'.length),
+	);
+
+	expect(answer).toEqual({ newText: '</div>', caretOffset: 0 });
+}, 20_000);
+
+test('M12 linkedEditingRange returns authored opening and closing tag-name spans', async () => {
+	const fixture = openFixture('tag-protocol.tsrx');
+	const answer = await server.linkedEditingRange(
+		fixture.file,
+		positionAtSearch(fixture.source, 'strong>linked'),
+	);
+
+	expect(answer?.ranges).toEqual([
+		protocolRangeAtSearch(fixture.source, 'strong>linked', 'strong'.length),
+		protocolRangeAtSearch(fixture.source, 'strong></section>', 'strong'.length),
+	]);
+	expect(answer?.wordPattern).toContain('a-zA-Z0-9');
+}, 20_000);
 
 test('M13 real tsserver type-checks construct branches without scaffolding diagnostics', async () => {
 	const fixture = openFixture('construct-typing.tsrx');
@@ -997,6 +1124,16 @@ function expectDiagnosticSpan(source: string, diagnostic: any, token: string): v
 	const end = positionAtSearch(source, token, token.length);
 	expect(diagnostic?.start).toEqual(start);
 	expect(diagnostic?.end).toEqual(end);
+}
+
+function protocolRangeAtSearch(source: string, token: string, length: number): {
+	start: { line: number; offset: number };
+	end: { line: number; offset: number };
+} {
+	return {
+		start: positionAtSearch(source, token),
+		end: positionAtSearch(source, token, length),
+	};
 }
 
 function triggeredAtCompletionInfo(
