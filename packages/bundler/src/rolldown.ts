@@ -323,7 +323,7 @@ export function createMarklessRolldownPlugin(input: {
 				const tableRewrite = rewriteGeneratedSymbolTableUrls(manifestBundle);
 				if (tableRewrite.unresolved.length > 0) {
 					this.error(
-						`Markless symbol resolver table contains unresolved generated symbol chunks: ${tableRewrite.unresolved.join(', ')}. markless debugging playbook: see AGENTS.md, or run pnpm doctor`,
+						`Markless symbol resolver table contains unresolved generated symbol chunks: ${tableRewrite.unresolved.join(', ')}. markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package`,
 					);
 				}
 				const tableIntegrity = verifyGeneratedSymbolTableRoutes(

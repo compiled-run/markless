@@ -17,7 +17,7 @@ export function unsupportedRenderConstructDiagnostic(input: {
 		severity: 'error',
 		phase: 'public-render',
 		title: `${input.label} is not rendered by the public render path yet`,
-		message: `${input.message} markless debugging playbook: see AGENTS.md, or run pnpm doctor`,
+		message: `${input.message} markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package`,
 		why: 'The public render module only emits compiler-proven output. Content inside an unsupported construct would silently disappear from rendered HTML, so the compiler reports it instead.',
 		primarySpan: sourceSpan(input.node, input.filename),
 		passId: 'public-render-plan',

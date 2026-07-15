@@ -8,18 +8,6 @@
 		"url": "git+https://github.com/markless-dev/markless.git",
 		"directory": "packages/cli"
 	},
-	"publishConfig": {
-		"access": "public",
-		"exports": {
-			".": {
-				"types": "./dist/index.d.ts",
-				"default": "./dist/index.js"
-			}
-		},
-		"bin": {
-			"create-markless": "./dist/node.js"
-		}
-	},
 	"bin": {
 		"create-markless": "./src/node.ts"
 	},
@@ -31,12 +19,25 @@
 	"exports": {
 		".": "./src/index.ts"
 	},
-	"dependencies": {
-		"@clack/prompts": "^1.6.0",
-		"pathe": "catalog:",
-		"ufo": "catalog:"
+	"publishConfig": {
+		"access": "public",
+		"bin": {
+			"create-markless": "./dist/node.js"
+		},
+		"exports": {
+			".": {
+				"types": "./dist/index.d.ts",
+				"default": "./dist/index.js"
+			}
+		}
 	},
 	"scripts": {
 		"prepublishOnly": "node ../../scripts/release/verify-publish-ready.mjs"
+	},
+	"dependencies": {
+		"@clack/prompts": "^1.6.0",
+		"am-i-vibing": "^0.5.0",
+		"pathe": "catalog:",
+		"ufo": "catalog:"
 	}
 }
