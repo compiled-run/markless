@@ -2,10 +2,11 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { compileTsrxForTypeService } from '@markless/compiler/type-service';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 import { intrinsicTagNames, snippetCatalog } from '../src/completions.ts';
+import { getMarklessTsrxLanguagePlugin } from '../src/language.ts';
 import {
 	TsserverHarness,
 	copyFixtureProject,
@@ -640,6 +641,57 @@ test('M6 real tsserver preserves member completion immediately after a freshly t
 	).toEqual(expect.arrayContaining(['displayName', 'active']));
 }, 20_000);
 
+test('M8a real tsserver reports a component prop type error at the mapped attribute position', async () => {
+	const fixture = openFixture('component-prop-error.tsrx');
+	const diagnostics = await server.semanticDiagnosticsSync(fixture.file);
+	const attribute = positionAtSearch(fixture.source, 'label={42}');
+
+	expect(diagnostics).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				start: expect.objectContaining(attribute),
+				text: expect.stringMatching(/number.*not assignable.*string/i),
+			}),
+		]),
+	);
+}, 20_000);
+
+test('M10a intrinsic class attribute is accepted', async () => {
+	const fixture = openFixture('intrinsic-class.tsrx');
+	const generated = compileTsrxForTypeService(fixture.source, fixture.file, { loose: true });
+	const syntactic = await server.syntacticDiagnosticsSync(fixture.file);
+	const semantic = await server.semanticDiagnosticsSync(fixture.file);
+	const classPosition = positionAtSearch(fixture.source, 'class=');
+
+	expect(syntactic).toEqual([]);
+	expect(generated.code).toContain('<div class="accepted" nonsense>accepted</div>');
+	expect(
+		semantic.some(
+			(diagnostic) =>
+				diagnostic.start?.line === classPosition.line &&
+				diagnostic.start?.offset === classPosition.offset,
+		),
+		'M10a intrinsic class must not produce a semantic diagnostic; nonsense rejection is deferred to W4.',
+	).toBe(false);
+}, 20_000);
+
+test('M12a the service script is TSX', () => {
+	const languagePlugin = getMarklessTsrxLanguagePlugin();
+	const virtualCode = languagePlugin.createVirtualCode?.(
+		'/workspace/App.tsrx',
+		'markless-tsrx',
+		{
+			getText: () => 'export function App() @{ <div class="app">ok</div> }',
+			getLength: () => 57,
+			getChangeRange: () => undefined,
+		},
+	);
+	const serviceScript = languagePlugin.typescript?.getServiceScript?.(virtualCode);
+
+	expect(serviceScript).toMatchObject({ extension: '.tsx', scriptKind: 4 });
+	expect(virtualCode?.generatedCode).toContain('<div class="app">ok</div>');
+});
+
 test('M7a real tsserver activates built core and router CJS plugins together and exposes route href completions', async () => {
 	const dualProject = copyFixtureProject(fixtureDirectory, workspaceRoot);
 	const dualServer = new TsserverHarness({
@@ -773,6 +825,12 @@ test('M7c packaged VSIX contains both plugins and a valid extension runtime', ()
 				typeof extensionRequire(pluginName),
 				`M7c missing capability: extracted extension-local ${pluginName} must be require()-able without repository node_modules.`,
 			).toBe('function');
+			if (pluginName === corePlugin) {
+				expect(
+					existsSync(join(dirname(entry), 'markless-jsx.d.ts')),
+					'M7c missing capability: the plugin-managed JSX contract must ship beside the bundled core plugin.',
+				).toBe(true);
+			}
 		}
 		const runtime = join(extensionRoot, 'dist/extension.cjs');
 		expect(

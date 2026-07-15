@@ -16,7 +16,7 @@ type VirtualCodeSnapshot = {
 export const MARKLESS_TSRX_LANGUAGE_ID = 'markless-tsrx';
 export const MARKLESS_TSRX_EXTENSIONS = ['.tsrx'];
 
-const SCRIPT_KIND_TS = 3;
+const SCRIPT_KIND_TSX = 4;
 const SCRIPT_KIND_DEFERRED = 7;
 
 export function isMarklessTsrxFile(fileName: FileNameOrUri): boolean {
@@ -57,8 +57,8 @@ export function getMarklessTsrxLanguagePlugin(): any {
 				if (virtualCode.languageId !== MARKLESS_TSRX_LANGUAGE_ID) return undefined;
 				return {
 					code: virtualCode,
-					extension: '.ts',
-					scriptKind: SCRIPT_KIND_TS,
+				extension: '.tsx',
+				scriptKind: SCRIPT_KIND_TSX,
 				};
 			},
 		},
@@ -194,7 +194,7 @@ function compileRecoverableSource(
 
 	try {
 		const compiled = compileTsrxForTypeService(recoverableSource, fileName, { loose: true });
-		for (const dotPosition of dotPositions) restoreTypedDot(compiled, dotPosition);
+		for (const dotPosition of dotPositions) restoreTypedDot(compiled, dotPosition, source);
 		return compiled;
 	} catch {
 		// A bare @ is a common intermediate editor state. Replacing only those
@@ -207,7 +207,7 @@ function compileRecoverableSource(
 				loose: true,
 			});
 			repairRecoveryEditMappings(compiled, recovery.edits);
-			for (const dotPosition of dotPositions) restoreTypedDot(compiled, dotPosition);
+			for (const dotPosition of dotPositions) restoreTypedDot(compiled, dotPosition, source);
 			return compiled;
 		} catch {
 			return undefined;
@@ -302,10 +302,21 @@ function removeCharactersAt(source: string, positions: readonly number[]): strin
 		.join('');
 }
 
-function restoreTypedDot(compiled: MarklessTsrxTypeServiceResult, dotPosition: number): void {
-	const dotMapping = compiled.mappings.find(
-		(mapping) => mapping.sourceOffsets[0] + mapping.lengths[0] === dotPosition,
-	);
+function restoreTypedDot(
+	compiled: MarklessTsrxTypeServiceResult,
+	dotPosition: number,
+	source: string,
+): void {
+	const dotMapping = compiled.mappings.find((mapping) => {
+		if (!mapping.data.completion) return false;
+		if (mapping.sourceOffsets[0] + mapping.lengths[0] !== dotPosition) return false;
+		const recoveredToken = source.slice(mapping.sourceOffsets[0], dotPosition);
+		const generated = compiled.code.slice(
+			mapping.generatedOffsets[0],
+			mapping.generatedOffsets[0] + mapping.generatedLengths[0],
+		);
+		return generated === recoveredToken;
+	});
 	if (!dotMapping) return;
 
 	const generatedPosition = dotMapping.generatedOffsets[0] + dotMapping.generatedLengths[0];

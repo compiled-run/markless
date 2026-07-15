@@ -12,7 +12,13 @@
 			"import": "./src/index.ts",
 			"require": "./dist/index.cjs"
 		},
-		"./language": "./src/language.ts"
+		"./language": "./src/language.ts",
+		"./jsx-runtime": {
+			"types": "./src/markless-jsx.d.ts"
+		},
+		"./jsx-dev-runtime": {
+			"types": "./src/markless-jsx.d.ts"
+		}
 	},
 	"publishConfig": {
 		"access": "public",
@@ -24,12 +30,14 @@
 			"./language": {
 				"require": "./dist/language.cjs",
 				"default": "./dist/language.cjs"
-			}
+			},
+			"./jsx-runtime": { "types": "./dist/markless-jsx.d.ts" },
+			"./jsx-dev-runtime": { "types": "./dist/markless-jsx.d.ts" }
 		}
 	},
 	"scripts": {
-		"build:cjs": "vp pack src/index.ts src/language.ts --no-config --format cjs --platform node --out-dir dist --clean --no-dts --no-report",
-		"build:vsix": "vp pack src/index.ts --no-config --format cjs --platform node --out-dir ../vscode-plugin/dist/vsix-build/typescript-plugin --clean --no-dts --no-report --deps.alwaysBundle '/.*/' --deps.never-bundle typescript",
+		"build:cjs": "vp pack src/index.ts src/language.ts --no-config --format cjs --platform node --out-dir dist --clean --no-dts --no-report && cp src/markless-jsx.d.ts dist/markless-jsx.d.ts",
+		"build:vsix": "vp pack src/index.ts --no-config --format cjs --platform node --out-dir ../vscode-plugin/dist/vsix-build/typescript-plugin --clean --no-dts --no-report --deps.alwaysBundle '/.*/' --deps.never-bundle typescript && cp src/markless-jsx.d.ts ../vscode-plugin/dist/vsix-build/typescript-plugin/markless-jsx.d.ts",
 		"prepublishOnly": "pnpm run build:cjs && node ../../scripts/release/verify-publish-ready.mjs",
 		"test:completion-matrix": "MARKLESS_COMPLETION_MATRIX_STARTED_AT=$(node -p 'Date.now()') pnpm run test:completion-matrix:run",
 		"test:completion-matrix:run": "pnpm run build:cjs && pnpm --dir ../router run build:cjs && pnpm --dir ../vscode-plugin package:vsix && pnpm -w exec vp test packages/typescript-plugin/test/completion-matrix.test.ts"

@@ -322,7 +322,7 @@ export function positionAtSearch(source: string, search: string, insideOffset = 
 }
 
 export function sourceWithoutMarkers(source: string): string {
-	return source.replace(/\/\*M[1-7][A-Z0-9_]*\*\//g, '');
+	return source.replace(/\/\*M\d+[A-Z0-9_]*\*\//g, '');
 }
 
 function positionAtOffset(source: string, offset: number): SourcePosition {

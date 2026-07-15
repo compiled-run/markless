@@ -28,14 +28,14 @@ export function List({ items, emptyLabel }: { items: { id: string; tag: string; 
 	expect(result.errors).toEqual([]);
 	expect(result.code).toContain("import { state } from '@markless/core';");
 	expect(result.code).toContain("import { Row } from './Row.tsrx';");
-	expect(result.code).toContain('for (const item of items)');
-	expect(result.code).toContain('const i = 0;');
-	expect(result.code).toContain('void (item.id);');
-	expect(result.code).toContain('void (item.active ? "on" : "off");');
+	expect(result.code).toContain('/** @jsxImportSource @markless/typescript-plugin */');
+	expect(result.code).toContain('return <section>');
+	expect(result.code).toContain('void (item.id)');
+	expect(result.code).toContain('void (item.active ? "on" : "off")');
 	expect(result.code).toContain('item.select(i)');
-	expect(result.code).toContain('void (Row);');
-	expect(result.code).toContain('void (selected);');
-	expect(result.code).toContain('void (emptyLabel);');
+	expect(result.code).toContain('void (Row)');
+	expect(result.code).toContain('void (selected)');
+	expect(result.code).toContain('void (emptyLabel)');
 	expect(result.code).not.toContain('<{item.tag}');
 	expect(result.code).not.toContain('@empty');
 	expect(result.mappings.length).toBeGreaterThan(0);
@@ -59,6 +59,7 @@ test('compile_to_volar_mappings aliases the Markless type-service artifact for T
 
 	expect(result.sourceAst?.type).toBe('Program');
 	expect(result.code).toContain('count++');
+	expect(result.code).toContain('return <button');
 	expectExactMapping(result, source, 'count++');
 });
 
@@ -92,11 +93,10 @@ test('compileTsrxForTypeService maps TSRX control-flow expressions through gener
 
 	expect(result.errors).toEqual([]);
 	expect(result.code).toContain("if (ready && kind === 'a')");
-	expect(result.code).toContain('void (kind);');
-	expect(result.code).toContain('try {');
+	expect(result.code).toContain('void (kind)');
 	expect(formatParseDiagnostics(result.code)).toEqual([]);
 	expect(result.code).not.toContain('@case');
-	expect(result.code).not.toContain('<span');
+	expect(result.code).toContain('return <section>');
 	expectExactMapping(result, source, "ready && kind === 'a'");
 	expectExactMapping(result, source, 'message.toUpperCase()');
 	expectExactMapping(result, source, 'load().then(Boolean)');
@@ -125,7 +125,7 @@ test('compileTsrxForTypeService lowers nested statement containers and expressio
 	expect(formatParseDiagnostics(result.code)).toEqual([]);
 	expect(result.code).not.toContain('@{');
 	expect(result.code).not.toContain('@if');
-	expect(result.code).not.toContain('<span');
+	expect(result.code).toContain('return <section>');
 	expect(result.code).toContain('const fallback =');
 	expect(result.code).toContain('void (value > 0)');
 	expect(result.code).toContain('const label = title.trim();');
@@ -146,14 +146,12 @@ export function Spread({ attrs, id }: Props) @{
 
 	expect(result.errors).toEqual([]);
 	expect(formatParseDiagnostics(result.code)).toEqual([]);
-	expect(result.code).not.toContain('{...attrs}');
-	expect(result.code).toContain('void (attrs);');
-	expect(result.code).toContain('void (id);');
+	expect(result.code).toContain('<section {...attrs} data-id={id}>{id}</section>');
 	expectExactMapping(result, source, 'attrs');
 	expectExactMapping(result, source, 'id');
 });
 
-test('compileTsrxForTypeService lowers fragments without TSX parser output', () => {
+test('compileTsrxForTypeService preserves fragments as TSX parser output', () => {
 	const source = `export function Fragmented({ title, count }: { title: string; count: number }) @{
 	<>
 		<header>{title}</header>
@@ -165,12 +163,57 @@ test('compileTsrxForTypeService lowers fragments without TSX parser output', () 
 
 	expect(result.errors).toEqual([]);
 	expect(formatParseDiagnostics(result.code)).toEqual([]);
-	expect(result.code).not.toContain('<>');
-	expect(result.code).not.toContain('<header');
-	expect(result.code).toContain('void (title);');
-	expect(result.code).toContain('void (count + 1);');
+	expect(result.code).toContain('return <>');
+	expect(result.code).toContain('<header>{title}</header>');
+	expect(result.code).toContain('<span>{count + 1}</span>');
 	expectExactMapping(result, source, 'title');
 	expectExactMapping(result, source, 'count + 1');
+});
+
+test('compileTsrxForTypeService assigns ruled mapping profiles to TSX tokens and insertion gaps', () => {
+	const source = `export function Mapped({ value, attrs }: { value: string; attrs: Record<string, string> }) @{
+	<div class="card" title={value} {...attrs}>{value}</div>
+}`;
+	const result = compileTsrxForTypeService(source, 'Mapped.tsrx', { loose: true });
+	const mappingFor = (text: string, from = 0) => {
+		const sourceOffset = source.indexOf(text, from);
+		return result.mappings.find(
+			(mapping) =>
+				mapping.sourceOffsets[0] === sourceOffset &&
+				mapping.lengths[0] === text.length &&
+				result.code.slice(
+					mapping.generatedOffsets[0],
+					mapping.generatedOffsets[0] + mapping.generatedLengths[0],
+				) === text,
+		);
+	};
+
+	expect(mappingFor('div', source.indexOf('<div'))?.data).toMatchObject({
+		verification: true,
+		completion: true,
+		semantic: true,
+		navigation: true,
+		structure: true,
+		format: false,
+	});
+	expect(mappingFor('class')?.data).toMatchObject({ verification: true, structure: true });
+	expect(mappingFor('value', source.indexOf('title='))?.data).toMatchObject({
+		verification: true,
+		completion: true,
+		semantic: true,
+		navigation: true,
+		structure: false,
+	});
+	expect(mappingFor('<', source.indexOf('<div'))?.data).toMatchObject({
+		verification: false,
+		completion: true,
+		semantic: false,
+		navigation: false,
+		structure: true,
+	});
+	expect(mappingFor(' ', source.indexOf('<div'))?.data.verification).toBe(false);
+	expect(mappingFor('"card"')?.data.structure).toBe(false);
+	expect(mappingFor('card')?.data.structure).toBe(false);
 });
 
 function expectExactMapping(
@@ -196,7 +239,7 @@ function expectExactMapping(
 
 function formatParseDiagnostics(source: string): string[] {
 	return ts
-		.createSourceFile('virtual.ts', source, ts.ScriptTarget.ES2022, true, ts.ScriptKind.TS)
+		.createSourceFile('virtual.tsx', source, ts.ScriptTarget.ES2022, true, ts.ScriptKind.TSX)
 		.parseDiagnostics.map((diagnostic) =>
 			ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'),
 		);
