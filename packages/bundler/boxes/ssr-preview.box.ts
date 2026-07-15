@@ -7,6 +7,7 @@ import {
 } from '../test-support/execution-expectations.ts';
 import { executedModulesPlugin } from '../test-support/executed-modules-plugin.ts';
 import { runtimeSizeReport, type RuntimeSizeReport } from '../test-support/runtime-size.ts';
+import { EVENT_ONLY_RESUMER_TARGET_BYTES } from '../../../poc/fixtures/proofs/resumer-script/src/resumer-source.mjs';
 
 // Product truth: SSR resumability needs server-produced HTML. This box uses the
 // fixture's real Vite app build, then serves it through Vite preview. Preview
@@ -83,6 +84,8 @@ export default box(
 		// 195/200 pair came from a minimal-config capture - wrong context). Owner
 		// margin policy T006: ~1% app headroom, tighten-only.
 		await waitForCounterExecutionWall(page, 330, WAIT);
+		await page.click(COUNTER, WAIT);
+		await expect.page.text(page, COUNTER, '2', WAIT);
 		const clickedHtml = await page.content();
 		const executed = executedFromHtml(clickedHtml);
 		const view = viewPayloadFromHtml(clickedHtml);
@@ -179,6 +182,8 @@ export default box(
 
 		await shippedPage.click(COUNTER, WAIT);
 		await expect.page.text(shippedPage, COUNTER, '1', WAIT);
+		await shippedPage.click(COUNTER, WAIT);
+		await expect.page.text(shippedPage, COUNTER, '2', WAIT);
 		assertNoExecutionMirror(await shippedPage.content());
 		const executionSizes = JSON.parse(
 			await shippedPreview.request('/build/execution-sizes.json'),
@@ -223,7 +228,36 @@ export default box(
 		await expect.page.outcome(shippedPage, { consoleErrors: 0, failedRequests: 0 }, WAIT);
 
 		await shippedPreview.close();
-		await receipt.capture('ssr preview resumed TSRX artifact counter click');
+
+		// The logging fixture above intentionally builds the auto-log variant so
+		// interaction accounting is observable. Build once with ordinary
+		// production defaults as well and gate the exact inline bytes served by
+		// preview—the real renderer/toolchain path, not a copied source string.
+		const productionBuild = await pipeline.build({
+			config: (config) => ({
+				...config,
+				root: `${config.root}/${FIXTURE}`,
+				configFile: `${config.root}/${FIXTURE}/vite.config.ts`,
+				mode: 'production',
+			}),
+		});
+		await expect.build.environment(productionBuild, 'client');
+		await expect.build.environment(productionBuild, 'ssr');
+		const productionPreview = await pipeline.preview(productionBuild, {
+			config: (config) => ({
+				...config,
+				configFile: `${config.root}/${FIXTURE}/vite.config.ts`,
+			}),
+		});
+		const productionHtml = await productionPreview.request('/');
+		const inlineResumerGzip = assertInlineResumerBudget(productionHtml);
+		receipt.note(
+			`SSR production inline resumer gzip: ${inlineResumerGzip} / ${EVENT_ONLY_RESUMER_TARGET_BYTES} bytes`,
+		);
+		await productionPreview.close();
+		await receipt.capture(
+			'ssr preview preserved repeated state and shipped budgeted OXC output',
+		);
 	},
 );
 
@@ -304,6 +338,23 @@ function assertHtmlHasPreloadsWithoutExternalScripts(html: string): void {
 function assertNoExecutionMirror(html: string): void {
 	if (html.includes('data-markless-executed'))
 		throw new Error('Expected shipped SSR output to omit the test execution DOM mirror.');
+}
+
+function assertInlineResumerBudget(html: string): number {
+	const source = /<script\b(?=[^>]*\bdata-async-resumer\b)[^>]*>([\s\S]*?)<\/script>/.exec(
+		html,
+	)?.[1];
+	if (!source) throw new Error('Expected production SSR HTML to contain an inline resumer.');
+	if (source.includes('runInlineResumer') || source.includes('__MARKLESS_INLINE_')) {
+		throw new Error('Expected production SSR HTML to contain Rolldown/OXC output.');
+	}
+	const gzipBytes = gzipSync(Buffer.from(source), { level: 9 }).length;
+	if (gzipBytes > EVENT_ONLY_RESUMER_TARGET_BYTES) {
+		throw new Error(
+			`SSR inline resumer gzip budget exceeded: ${gzipBytes} > ${EVENT_ONLY_RESUMER_TARGET_BYTES}`,
+		);
+	}
+	return gzipBytes;
 }
 
 function modulePreloadHrefs(html: string): readonly string[] {

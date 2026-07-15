@@ -22,6 +22,7 @@
 		"./event-only-lean/scalar-core": "./src/event-only-lean/scalar-core.ts",
 		"./event-only-lean/scalar-resume": "./src/event-only-lean/scalar-resume.ts",
 		"./event-resume": "./src/event-resume.ts",
+		"./inline/resumer": "./src/inline/resumer.ts",
 		"./fns/*": "./src/fns/*.ts",
 		"./payload": "./src/payload.ts",
 		"./render": "./src/render.ts",
@@ -63,6 +64,10 @@
 			"./event-resume": {
 				"types": "./dist/event-resume.d.ts",
 				"default": "./dist/event-resume.js"
+			},
+			"./inline/resumer": {
+				"types": "./dist/inline/resumer.d.ts",
+				"default": "./dist/inline/resumer.js"
 			},
 			"./fns/*": {
 				"types": "./dist/fns/*.d.ts",

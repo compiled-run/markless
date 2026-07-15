@@ -65,11 +65,13 @@ export async function createLeanScalarGraph(
 	plan: LeanPlan,
 	elementsByHostId: Map<string, EventOnlyResumeDomElement>,
 	_loadSymbol: ResumeEventOnlyFromPayloadDocumentInput['loadSymbol'],
+	root: EventOnlyResumeDomElement,
 ): Promise<EventOnlyResumeContainer['graph']> {
-	const cells = new Map<string, unknown>();
+	const cells = (root.__marklessEventOnlyGraph ||= new Map());
 	const payloads = new Map(plan.cells.map((cell) => [cell.graphNodeId, cell.value]));
 	const dirty: Array<{ readonly graphNodeId: string }> = [];
 	for (const graphNodeId of plan.fullDecodeCellIds) {
+		if (cells.has(graphNodeId)) continue;
 		const payload = payloads.get(graphNodeId) as SerializedGraphPayload | undefined;
 		cells.set(graphNodeId, payload ? await decodeFullCell(payload) : undefined);
 	}

@@ -38,6 +38,7 @@ export interface TransformTsrxModuleInput {
 	headInjections?: GlobalInjections[];
 	executionLog?: MarklessExecutionLogMode;
 	executionLogModuleHooks?: boolean;
+	inlineResumerDebug?: boolean;
 }
 
 export interface TransformTsrxModuleResult {

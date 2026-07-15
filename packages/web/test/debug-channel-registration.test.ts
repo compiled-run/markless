@@ -87,7 +87,10 @@ const inlineHtml = () =>
 		{ executionLog: 'never' },
 	);
 function executeInline(html: string, root: FakeElement, nodes: FakeElement[]) {
-	const source = requiredScriptContent(html, /<script data-async-resumer>([\s\S]*?)<\/script>/);
+	const source = requiredScriptContent(
+		html,
+		/<script data-async-resumer\b[^>]*>([\s\S]*?)<\/script>/,
+	);
 	const payload = requiredScriptContent(
 		html,
 		/<script type="markless\/view">([\s\S]*?)<\/script>/,

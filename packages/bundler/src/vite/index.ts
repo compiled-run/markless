@@ -50,6 +50,7 @@ export interface MarklessViteOptions extends MarklessRolldownOptions {
 type MarklessOutputOptions = OutputOptions | OutputOptions[] | undefined;
 type InternalMarklessRolldownOptions = MarklessRolldownOptions & {
 	emitResumeModules?: boolean;
+	inlineResumerDebug?: boolean;
 	publicPath?: (fileName: string) => string;
 };
 type RolldownInputConfig = string | readonly string[] | Record<string, string> | undefined;
@@ -96,6 +97,7 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 			rolldownOptions.executionLog =
 				options.executionLog ?? (env.command === 'serve' ? 'auto' : 'never');
 			const debugEnabled = env.command === 'serve' || options.debug === true;
+			rolldownOptions.inlineResumerDebug = debugEnabled;
 			const debugDefine = JSON.stringify(debugEnabled);
 			const consumerDebugDefine = config.define?.__MARKLESS_DEBUG_ENABLED__;
 			if (

@@ -84,6 +84,8 @@ test('emitResumeModule emits a specialized scalar dispatcher with resolved const
 	expect(resumeCode).toContain('marklessFindElementAtDomOrderIndex(input.root, 5)');
 	expect(resumeCode).not.toContain('?? input.element ?? input.event.target');
 	expect(resumeCode).toContain('marklessReadScalarCell(input.root, 0)');
+	expect(resumeCode).toContain('input.root.__marklessEventOnlyGraph || new Map()');
+	expect(resumeCode).toContain('values.set("state:count", state.value)');
 	expect(resumeCode).toContain(
 		'marklessDecodeScalarCell(marklessReadScalarCell(input.root, 0), "state:count", "markless/state cell[0]")',
 	);
@@ -103,6 +105,30 @@ test('emitResumeModule emits a specialized scalar dispatcher with resolved const
 	expect(resumeCode).not.toContain('resumeEventOnlyFromPayloadDocument');
 	expect(resumeCode).not.toContain("import('@markless/core/web/resume')");
 	expect(resumeCode).toContain('marklessScalarSpecializedHostMiss');
+});
+
+test('emitSourceModule carries compiled inline variants only on server artifacts', () => {
+	const inlineResumerSources = {
+		debug: false,
+		executionLog: 'never' as const,
+		event: 'event-source',
+		syncPolicy: 'sync-source',
+		graphSyncPolicyOwner: 'graph-owner-source',
+		graphSyncPolicyConsumer: 'graph-consumer-source',
+	};
+	const renderInput = {
+		...baseInput,
+		inlineResumerSources,
+		publicSsrModuleSource: 'function marklessRenderSsr() {}',
+		publicRenderSsrExportName: 'marklessRenderSsr',
+	};
+
+	const server = emitSourceModule({ ...renderInput, environment: 'server' });
+	const client = emitSourceModule(renderInput);
+
+	expect(server).toContain('inlineResumerSources:');
+	expect(server).toContain(JSON.stringify(inlineResumerSources));
+	expect(client).not.toContain('inlineResumerSources:');
 });
 
 test('composed pages are excluded from scalar specialization (deferred projection design)', () => {

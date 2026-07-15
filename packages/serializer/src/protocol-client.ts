@@ -24,29 +24,22 @@ export type RuntimePayloadDiagnostic = {
 	readonly docsUrl: string;
 };
 export class RuntimePayloadError extends Error implements RuntimePayloadDiagnostic {
-	readonly code: RuntimePayloadErrorCode;
-	readonly severity = 'error' as const;
-	readonly phase = 'payload' as const;
-	readonly title: string;
-	readonly why: string;
-	readonly payloadType: RuntimePayloadType;
-	readonly payloadScript: string;
-	readonly expectedVersion?: number;
-	readonly actualVersion?: unknown;
-	readonly suggestions: ReadonlyArray<{ readonly message: string }>;
-	readonly docsUrl: string;
-	constructor(d: RuntimePayloadDiagnostic) {
-		super(d.message);
-		this.name = 'RuntimePayloadError';
-		this.code = d.code;
-		this.title = d.title;
-		this.why = d.why;
-		this.payloadType = d.payloadType;
-		this.payloadScript = d.payloadScript;
-		this.expectedVersion = d.expectedVersion;
-		this.actualVersion = d.actualVersion;
-		this.suggestions = d.suggestions;
-		this.docsUrl = d.docsUrl;
+	declare readonly code: RuntimePayloadErrorCode;
+	declare readonly severity: 'error';
+	declare readonly phase: 'payload';
+	declare readonly title: string;
+	declare readonly why: string;
+	declare readonly payloadType: RuntimePayloadType;
+	declare readonly payloadScript: string;
+	declare readonly expectedVersion?: number;
+	declare readonly actualVersion?: unknown;
+	declare readonly suggestions: ReadonlyArray<{ readonly message: string }>;
+	declare readonly docsUrl: string;
+	constructor(diagnostic: RuntimePayloadDiagnostic) {
+		super(diagnostic.message);
+		Object.assign(this, { expectedVersion: undefined, actualVersion: undefined }, diagnostic, {
+			name: 'RuntimePayloadError',
+		});
 	}
 }
 export function decodePayloadScripts(input: EncodedPayloadScripts): DecodedPayloadScripts {
