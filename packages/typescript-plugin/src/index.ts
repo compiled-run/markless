@@ -2,6 +2,8 @@ import { createLanguageServicePlugin } from '@volar/typescript/lib/quickstart/cr
 import { join } from 'node:path';
 import { installMarklessCompletions } from './completions.ts';
 import {
+	MARKLESS_TSRX_PARSE_ERROR_CODE,
+	getMarklessTsrxParseFailure,
 	getMarklessTsrxLanguagePlugin,
 	isMarklessTsrxFile,
 	mapMarklessSourcePositionToGenerated,
@@ -42,6 +44,29 @@ const plugin = (modules: Parameters<typeof volarPlugin>[0]) => {
 				enhancedLanguageService,
 				getSourceSnapshot,
 			);
+			const getSyntacticDiagnostics = enhancedLanguageService.getSyntacticDiagnostics.bind(
+				enhancedLanguageService,
+			);
+			enhancedLanguageService.getSyntacticDiagnostics = (fileName: string) => {
+				const diagnostics = getSyntacticDiagnostics(fileName);
+				if (!isMarklessTsrxFile(fileName)) return diagnostics;
+				const failure = getMarklessTsrxParseFailure(fileName);
+				if (!failure) return diagnostics;
+				const snapshot = getSourceSnapshot(fileName);
+				const sourceLength = snapshot?.getLength() ?? 0;
+				return [
+					...diagnostics,
+					{
+						file: enhancedLanguageService.getProgram()?.getSourceFile(fileName),
+						start: Math.min(Math.max(failure.pos, 0), sourceLength),
+						length: 1,
+						category: modules.typescript.DiagnosticCategory.Error,
+						code: MARKLESS_TSRX_PARSE_ERROR_CODE,
+						source: 'markless',
+						messageText: `Markless TSRX parse error: ${failure.message}`,
+					},
+				];
+			};
 			if (nativeJsxClosingTag) {
 				const proxiedJsxClosingTag = languageService.getJsxClosingTagAtPosition?.bind(
 					languageService,

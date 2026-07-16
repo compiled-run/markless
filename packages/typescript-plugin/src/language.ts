@@ -15,6 +15,14 @@ type VirtualCodeSnapshot = {
 
 export const MARKLESS_TSRX_LANGUAGE_ID = 'markless-tsrx';
 export const MARKLESS_TSRX_EXTENSIONS = ['.tsrx'];
+export const MARKLESS_TSRX_PARSE_ERROR_CODE = 91001;
+
+export type MarklessTsrxParseFailure = {
+	readonly message: string;
+	readonly pos: number;
+};
+
+const parseFailures = new Map<string, MarklessTsrxParseFailure>();
 
 const SCRIPT_KIND_TSX = 4;
 const SCRIPT_KIND_DEFERRED = 7;
@@ -23,6 +31,12 @@ export function isMarklessTsrxFile(fileName: FileNameOrUri): boolean {
 	return MARKLESS_TSRX_EXTENSIONS.some((extension) =>
 		normalizeFileName(fileName).endsWith(extension),
 	);
+}
+
+export function getMarklessTsrxParseFailure(
+	fileName: string,
+): MarklessTsrxParseFailure | undefined {
+	return parseFailures.get(normalizeFileName(fileName));
 }
 
 export function mapMarklessSourcePositionToGenerated(
@@ -116,16 +130,22 @@ export class MarklessTsrxVirtualCode {
 		const source = snapshot.getText(0, snapshot.getLength());
 		this.sourceSnapshot = snapshot;
 		let compiled: MarklessTsrxTypeServiceResult | undefined;
+		let parseFailure: unknown;
 		try {
 			compiled = compileTsrxForTypeService(source, this.fileName, { loose: true });
-		} catch {
+		} catch (error) {
+			parseFailure = error;
 			compiled = compileRecoverableSource(source, this.fileName);
 		}
 
 		// Keep the last successful virtual document when an edit cannot yet be
 		// parsed. Volar can continue serving the existing program until the next
 		// successful update instead of allowing a parser exception to escape.
-		if (!compiled) return;
+		if (!compiled) {
+			parseFailures.set(this.fileName, parserFailureDetails(parseFailure));
+			return;
+		}
+		parseFailures.delete(this.fileName);
 		addImportClauseInteriorMappings(compiled, source);
 		this.generatedCode = compiled.code;
 		this.sourceAst = compiled.sourceAst;
@@ -140,6 +160,18 @@ export class MarklessTsrxVirtualCode {
 		};
 		this.mappings = compiled.mappings;
 	}
+}
+
+function parserFailureDetails(error: unknown): MarklessTsrxParseFailure {
+	const message = error instanceof Error ? error.message : String(error);
+	const pos =
+		typeof error === 'object' &&
+		error !== null &&
+		'pos' in error &&
+		typeof error.pos === 'number'
+			? error.pos
+			: 0;
+	return { message, pos };
 }
 
 type AstNode = {

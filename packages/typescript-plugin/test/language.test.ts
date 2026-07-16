@@ -7,6 +7,8 @@ import ts from 'typescript';
 import { expect, test } from 'vitest';
 import {
 	MARKLESS_TSRX_LANGUAGE_ID,
+	MarklessTsrxVirtualCode,
+	getMarklessTsrxParseFailure,
 	getMarklessTsrxLanguagePlugin,
 	isMarklessTsrxFile,
 } from '../src/language.ts';
@@ -109,6 +111,51 @@ export function App() @{
 	expect(virtualCode?.embeddedCodes[0]?.languageId).toBe('css');
 	expect(virtualCode?.embeddedCodes[0]?.snapshot.getText(0, 100)).toContain('.counter');
 });
+
+test.each([
+	{
+		name: 'a stray greater-than token after a closing tag',
+		good: 'export function Controls() @{ <button>Save</button> }',
+		broken: 'export function Controls() @{ <button>Save</button>> }',
+		expectedPosition(source: string) {
+			return source.indexOf('</button>>') + '</button>'.length;
+		},
+	},
+	{
+		name: 'an alternate element with a mismatched closing tag',
+		good: 'export function Notice() @{ <article><strong>Ready</strong></article> }',
+		broken: 'export function Notice() @{ <article>Waiting</section> }',
+		expectedPosition(source: string) {
+			return source.indexOf('</section>');
+		},
+	},
+])(
+	'records $name without replacing the last-good virtual document',
+	({ good, broken, expectedPosition }) => {
+		const fileName = join(process.cwd(), `packages/core/src/parse-failure-${good.length}.tsrx`);
+		const virtualCode = new MarklessTsrxVirtualCode(
+			fileName,
+			ts.ScriptSnapshot.fromString(good),
+		);
+		const lastGoodGeneratedCode = virtualCode.generatedCode;
+		const lastGoodSnapshot = virtualCode.snapshot;
+
+		virtualCode.update(ts.ScriptSnapshot.fromString(broken));
+
+		expect(getMarklessTsrxParseFailure(fileName)).toMatchObject({
+			message: expect.any(String),
+			pos: expectedPosition(broken),
+		});
+		expect(virtualCode.generatedCode).toBe(lastGoodGeneratedCode);
+		expect(virtualCode.snapshot).toBe(lastGoodSnapshot);
+		expect(virtualCode.snapshot.getText(0, virtualCode.snapshot.getLength())).toBe(
+			lastGoodGeneratedCode,
+		);
+
+		virtualCode.update(ts.ScriptSnapshot.fromString(good));
+		expect(getMarklessTsrxParseFailure(fileName)).toBeUndefined();
+	},
+);
 
 test('package CommonJS entry is generated into dist instead of maintained in src', () => {
 	ensureGeneratedCjsBuild();

@@ -16,7 +16,10 @@ import initRouterPlugin from '@markless/router/typescript-plugin';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 import typeScript from 'typescript';
 import { intrinsicTagNames, snippetCatalog } from '../src/completions.ts';
-import { getMarklessTsrxLanguagePlugin } from '../src/language.ts';
+import {
+	MARKLESS_TSRX_PARSE_ERROR_CODE,
+	getMarklessTsrxLanguagePlugin,
+} from '../src/language.ts';
 import {
 	TsserverHarness,
 	copyFixtureProject,
@@ -166,6 +169,36 @@ test('M3 real tsserver serves DOM, standard-library, local, generic, hover, and 
 			}),
 		]),
 	);
+}, 20_000);
+
+test('real tsserver reports the current TSRX parse failure and no parse error for clean source', async () => {
+	const broken = openFixture('parse-error.tsrx');
+	const clean = openFixture('framework.tsrx');
+	const brokenDiagnostics = await server.syntacticDiagnosticsSync(broken.file);
+	const cleanDiagnostics = await server.syntacticDiagnosticsSync(clean.file);
+	const expectedStart = positionAtSearch(broken.source, '</button>>');
+	expectedStart.offset += '</button>'.length;
+	const parseDiagnostics = brokenDiagnostics.filter(
+		(diagnostic) =>
+			diagnostic.source === 'markless' &&
+			diagnostic.code === MARKLESS_TSRX_PARSE_ERROR_CODE,
+	);
+
+	expect(parseDiagnostics).toHaveLength(1);
+	expect(parseDiagnostics[0]).toMatchObject({
+		category: 'error',
+		code: MARKLESS_TSRX_PARSE_ERROR_CODE,
+		source: 'markless',
+		start: expectedStart,
+		text: expect.stringMatching(/^Markless TSRX parse error: /),
+	});
+	expect(
+		cleanDiagnostics.filter(
+			(diagnostic) =>
+				diagnostic.source === 'markless' &&
+				diagnostic.code === MARKLESS_TSRX_PARSE_ERROR_CODE,
+		),
+	).toEqual([]);
 }, 20_000);
 
 const baseConstructEntries = [
