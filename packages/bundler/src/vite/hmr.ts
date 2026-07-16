@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { joinURL, parsePath } from 'ufo';
 import type { DevEnvironment, EnvironmentModuleNode, HotUpdateOptions, ViteDevServer } from 'vite';
 import type { MarklessEnvironment } from '../types.ts';
@@ -19,11 +20,72 @@ interface ViteHmrOptions {
 	clientEnvironment: string;
 	enabled: boolean;
 	invalidateGeneratedModules?: (parent: string, environment?: MarklessEnvironment) => string[];
+	invalidSourceRecheckMs?: number;
 }
 
 export function createViteHmr(options: ViteHmrOptions) {
 	let server: ViteDevServer | undefined;
 	const invalidSources = new Set<string>();
+	let invalidSourceRecheck: ReturnType<typeof setInterval> | undefined;
+	let recheckingInvalidSources = false;
+
+	function startInvalidSourceRecheck() {
+		if (invalidSourceRecheck || invalidSources.size === 0) return;
+		invalidSourceRecheck = setInterval(() => {
+			void recheckInvalidSources();
+		}, options.invalidSourceRecheckMs ?? 300);
+		invalidSourceRecheck.unref?.();
+	}
+
+	function stopInvalidSourceRecheckIfIdle() {
+		if (!invalidSourceRecheck || invalidSources.size !== 0) return;
+		clearInterval(invalidSourceRecheck);
+		invalidSourceRecheck = undefined;
+	}
+
+	function addInvalidSource(id: string) {
+		invalidSources.add(id);
+		startInvalidSourceRecheck();
+	}
+
+	function deleteInvalidSource(id: string) {
+		const deleted = invalidSources.delete(id);
+		stopInvalidSourceRecheckIfIdle();
+		return deleted;
+	}
+
+	async function recheckInvalidSources() {
+		if (recheckingInvalidSources) return;
+		recheckingInvalidSources = true;
+		try {
+			for (const id of invalidSources) {
+				let source: string;
+				try {
+					source = await readFile(id, 'utf8');
+				} catch {
+					continue;
+				}
+
+				try {
+					await preflightTsrxModuleDiagnostics({ filename: id, source });
+				} catch {
+					continue;
+				}
+
+				if (!deleteInvalidSource(id)) continue;
+				const hot = server?.environments?.[options.clientEnvironment]?.hot;
+				hot?.send?.({
+					type: 'custom',
+					event: MARKLESS_DEV_ERROR_CLEAR_EVENT,
+					data: { id },
+				});
+				hot?.send?.({ type: 'full-reload' });
+			}
+		} finally {
+			recheckingInvalidSources = false;
+			stopInvalidSourceRecheckIfIdle();
+		}
+	}
 
 	return {
 		configureServer(nextServer: ViteDevServer) {
@@ -47,7 +109,7 @@ export function createViteHmr(options: ViteHmrOptions) {
 			const hot = clientHot(server, options, environment);
 			if (!hot?.send) return;
 			const payload = normalizeMarklessDevError(error);
-			invalidSources.add(payload.id);
+			addInvalidSource(payload.id);
 			hot.send({ type: 'custom', event: MARKLESS_DEV_ERROR_EVENT, data: payload });
 		},
 		async hotUpdate(environment: DevEnvironment | undefined, ctx: HotUpdateOptions) {
@@ -101,7 +163,7 @@ export function createViteHmr(options: ViteHmrOptions) {
 						});
 					} catch (error) {
 						const payload = normalizeMarklessDevError(error, { id: sourceId });
-						invalidSources.add(payload.id);
+						addInvalidSource(payload.id);
 						hot.send({
 							type: 'custom',
 							event: MARKLESS_DEV_ERROR_EVENT,
@@ -110,7 +172,7 @@ export function createViteHmr(options: ViteHmrOptions) {
 						return [];
 					}
 				}
-				if (editedSource !== undefined && invalidSources.delete(sourceId)) {
+				if (editedSource !== undefined && deleteInvalidSource(sourceId)) {
 					hot.send({
 						type: 'custom',
 						event: MARKLESS_DEV_ERROR_CLEAR_EVENT,

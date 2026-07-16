@@ -1,3 +1,6 @@
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, test, vi } from 'vitest';
 import {
 	MARKLESS_DEV_ERROR_CLEAR_EVENT,
@@ -5,6 +8,7 @@ import {
 	MARKLESS_DEV_ERROR_EVENT,
 } from '../src/dev-error/index.ts';
 import { transformTsrxModule } from '../src/rolldown.ts';
+import { createViteHmr } from '../src/vite/hmr.ts';
 import { markless } from '../src/vite/index.ts';
 import {
 	callBuildApp,
@@ -520,6 +524,95 @@ export function App() @{
 			data: { id: filename },
 		});
 		expect(send.mock.calls[1]?.[0]).toMatchObject({ type: 'full-reload' });
+	});
+
+	test('rechecks invalid files on disk when the restoring watcher event is swallowed', async () => {
+		const fixtureRoot = await mkdtemp(join(tmpdir(), 'markless-vite-hmr-'));
+		const filename = join(fixtureRoot, 'alternate-root.tsrx');
+		const broken = source.replace('</button>', '</button>>');
+		const send = vi.fn();
+		const clearIntervalSpy = vi.spyOn(globalThis, 'clearInterval');
+		const environment = {
+			config: { consumer: 'client' },
+			hot: { send },
+			moduleGraph: { getModuleById: vi.fn(), invalidateModule: vi.fn() },
+		};
+		const hmr = createViteHmr({
+			base: '/',
+			clientEnvironment: 'client',
+			enabled: true,
+			invalidSourceRecheckMs: 10,
+		});
+
+		try {
+			await writeFile(filename, broken);
+			hmr.configureServer({
+				config: { root: fixtureRoot },
+				environments: { client: environment },
+			} as never);
+			expect(
+				await hmr.hotUpdate(
+					environment as never,
+					{
+						file: filename,
+						modules: [],
+						read: async () => broken,
+						timestamp: 124,
+						type: 'update',
+					} as never,
+				),
+			).toEqual([]);
+
+			send.mockClear();
+			await writeFile(filename, source);
+			await vi.waitFor(() => {
+				expect(send.mock.calls).toEqual([
+					[
+						{
+							type: 'custom',
+							event: MARKLESS_DEV_ERROR_CLEAR_EVENT,
+							data: { id: filename },
+						},
+					],
+					[{ type: 'full-reload' }],
+				]);
+			});
+			await new Promise((resolve) => setTimeout(resolve, 30));
+			expect(send).toHaveBeenCalledTimes(2);
+			expect(clearIntervalSpy).toHaveBeenCalledTimes(1);
+		} finally {
+			clearIntervalSpy.mockRestore();
+			await rm(fixtureRoot, { force: true, recursive: true });
+		}
+	});
+
+	test('keeps non-file runtime errors without crashing the invalid-source recheck', async () => {
+		vi.useFakeTimers();
+		try {
+			const send = vi.fn();
+			const environment = { config: { consumer: 'client' }, hot: { send } };
+			const hmr = createViteHmr({
+				base: '/',
+				clientEnvironment: 'client',
+				enabled: true,
+				invalidSourceRecheckMs: 10,
+			});
+			hmr.configureServer({
+				environments: { client: environment },
+			} as never);
+
+			hmr.reportError(environment as never, new Error('navigation failed'));
+			await vi.advanceTimersByTimeAsync(30);
+
+			expect(send).toHaveBeenCalledExactlyOnceWith({
+				type: 'custom',
+				event: MARKLESS_DEV_ERROR_EVENT,
+				data: expect.objectContaining({ id: 'navigation:unknown' }),
+			});
+			expect(vi.getTimerCount()).toBe(1);
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	test('reports and rethrows transform failures that occur outside HMR preflight', async () => {

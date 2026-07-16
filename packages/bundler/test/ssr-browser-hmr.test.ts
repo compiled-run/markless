@@ -74,6 +74,60 @@ describe('SSR browser HMR', () => {
 		}
 	});
 
+	test('clears an invalid edit when restoring the original bytes emits no watcher update', async () => {
+		const fixture = await createSsrFixture();
+		let server: ViteDevServer | undefined;
+		try {
+			server = await createServer({
+				configFile: false,
+				mode: 'ssr',
+				root: fixture.root,
+				environments: { ssr: { build: { rolldownOptions: { input: fixture.entry } } } },
+				plugins: [markless(), fixtureSsrHost()],
+				resolve: { alias: marklessSourceAliases() },
+				server: { hmr: true, middlewareMode: true, ws: false },
+			});
+
+			const send = vi.spyOn(server.environments.client.hot, 'send');
+			await requestHtml(server);
+			await editFile(
+				server,
+				fixture.entry,
+				fixture.source.replace('</section>', '</section>>'),
+			);
+			await vi.waitFor(() => {
+				expect(customMessages(send, MARKLESS_DEV_ERROR_EVENT).at(-1)?.data).toMatchObject({
+					id: fixture.entry,
+					kind: 'compile',
+				});
+			});
+
+			const messagesBeforeRestore = send.mock.calls.length;
+			await writeFile(fixture.entry, fixture.source);
+			await vi.waitFor(
+				() => {
+					const restoredMessages = send.mock.calls.slice(messagesBeforeRestore);
+					const clearIndex = restoredMessages.findIndex(
+						([message]) =>
+							(message as { type?: string; event?: string }).type === 'custom' &&
+							(message as { event?: string }).event ===
+								MARKLESS_DEV_ERROR_CLEAR_EVENT,
+					);
+					const reloadIndex = restoredMessages.findIndex(
+						([message], index) =>
+							index > clearIndex &&
+							(message as HotPayload | undefined)?.type === 'full-reload',
+					);
+					expect(clearIndex).toBeGreaterThan(-1);
+					expect(reloadIndex).toBeGreaterThan(clearIndex);
+				},
+				{ timeout: 2_000 },
+			);
+		} finally {
+			await server?.close();
+		}
+	});
+
 	test('sends full reloads for repeated TSRX edits after the page is refetched', async () => {
 		const fixture = await createSsrFixture();
 		let server: ViteDevServer | undefined;
