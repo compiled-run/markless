@@ -48,8 +48,33 @@ test('continues to transform a clean module', async () => {
 	expect(result.virtualModules.length).toBeGreaterThan(0);
 });
 
-test('continues to transform a module carrying only an exempted diagnostic', async () => {
+test('continues to transform a helper module with only a warning diagnostic', async () => {
 	const result = await transform('src/helper.tsrx', 'export const helper = 1;');
+
+	expect(result.code).toBeTypeOf('string');
+	expect(result.virtualModules.length).toBeGreaterThan(0);
+});
+
+test('rejects an undeclared identifier write even when its diagnostic code also has warning variants', async () => {
+	const filename = 'src/MissingWrite.tsrx';
+	const source = `export function MissingWrite() @{
+	<button onClick={() => missing++}>Write</button>
+}`;
+
+	await expect(transform(filename, source)).rejects.toThrow(
+		'MARKLESS_STATE_UNRESOLVED_WRITE',
+	);
+});
+
+test('continues to transform a member-expression write carrying a warning diagnostic', async () => {
+	const result = await transform(
+		'src/HostWrite.tsrx',
+		`export function HostWrite() @{
+			<button onClick={(event) => {
+				(event.target as HTMLElement).dataset.done = 'yes';
+			}}>Write</button>
+		}`,
+	);
 
 	expect(result.code).toBeTypeOf('string');
 	expect(result.virtualModules.length).toBeGreaterThan(0);

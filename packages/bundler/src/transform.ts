@@ -59,17 +59,6 @@ async function stripEmittedTypes(code: string): Promise<string> {
 
 export { MARKLESS_VIRTUAL_PREFIX, resumeVirtualModuleId } from './source-module.ts';
 
-export const LEGACY_FAIL_OPEN_DIAGNOSTIC_CODES: ReadonlySet<string> = new Set([
-	// packages/bundler/fixtures/vite-ssr-dispose/src/root.tsrx and demos/chat-stream/fixture/app.tsrx
-	'MARKLESS_STATE_UNRESOLVED_WRITE',
-	// demos/js-framework-benchmark keyed markless root.tsrx and packages/cli/templates/starters/docs/components/docs/Sidebar.tsrx
-	'MARKLESS_TEMPLATE_EXPRESSION_STATIC',
-	// packages/vitest-browser/browser/fixtures/optional-context-frame.tsrx
-	'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
-	// packages/router/fixtures/router-full-stack/pages/about.tsrx — intentionally empty placeholder route
-	'MARKLESS_PUBLIC_RENDER_ROOT_UNSUPPORTED',
-]);
-
 export async function transformTsrxModule(
 	input: TransformTsrxModuleInput,
 ): Promise<TransformTsrxModuleResult> {
@@ -85,9 +74,7 @@ export async function transformTsrxModule(
 		symbols: [],
 	});
 	const blockingDiagnostics = collectTsrxModuleDiagnostics(compiled).filter(
-		(diagnostic) =>
-			diagnostic.severity === 'error' &&
-			!LEGACY_FAIL_OPEN_DIAGNOSTIC_CODES.has(diagnostic.code),
+		(diagnostic) => diagnostic.severity === 'error',
 	);
 	if (blockingDiagnostics.length > 0) {
 		throw new Error(formatBlockedCompileError(input, blockingDiagnostics));
