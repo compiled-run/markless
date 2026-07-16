@@ -2,6 +2,7 @@ export type * from './artifacts.ts';
 export type * from './diagnostics.ts';
 export type * from './type-service.ts';
 
+export { collectTsrxModuleDiagnostics } from './collect-diagnostics.ts';
 export { compileTsrxModule } from './compile-module.ts';
 export { compileTsrxForTypeService, compile_to_volar_mappings } from './type-service.ts';
 export { parseJavaScriptModule, type JavaScriptAstNode } from './js-ast.ts';
