@@ -36,7 +36,19 @@ export function isMarklessTsrxFile(fileName: FileNameOrUri): boolean {
 export function getMarklessTsrxParseFailure(
 	fileName: string,
 ): MarklessTsrxParseFailure | undefined {
-	return parseFailures.get(normalizeFileName(fileName));
+	return parseFailures.get(canonicalParseFailureFileName(fileName));
+}
+
+export function clampMarklessDiagnosticStart(
+	position: number,
+	sourceSnapshotLength: number,
+	sourceFileLength: number | undefined,
+): number {
+	return Math.min(
+		Math.max(position, 0),
+		sourceSnapshotLength,
+		sourceFileLength ?? Number.POSITIVE_INFINITY,
+	);
 }
 
 export function mapMarklessSourcePositionToGenerated(
@@ -142,10 +154,13 @@ export class MarklessTsrxVirtualCode {
 		// parsed. Volar can continue serving the existing program until the next
 		// successful update instead of allowing a parser exception to escape.
 		if (!compiled) {
-			parseFailures.set(this.fileName, parserFailureDetails(parseFailure));
+			parseFailures.set(
+				canonicalParseFailureFileName(this.fileName),
+				parserFailureDetails(parseFailure),
+			);
 			return;
 		}
-		parseFailures.delete(this.fileName);
+		parseFailures.delete(canonicalParseFailureFileName(this.fileName));
 		addImportClauseInteriorMappings(compiled, source);
 		this.generatedCode = compiled.code;
 		this.sourceAst = compiled.sourceAst;
@@ -428,6 +443,10 @@ function normalizeFileName(fileNameOrUri: FileNameOrUri): string {
 	return typeof fileNameOrUri === 'string'
 		? fileNameOrUri
 		: fileNameOrUri.fsPath.replace(/\\/g, '/');
+}
+
+function canonicalParseFailureFileName(fileNameOrUri: FileNameOrUri): string {
+	return normalizeFileName(fileNameOrUri).replace(/\\/g, '/').toLowerCase();
 }
 
 function shouldCreateMarklessTsrxVirtualCode(

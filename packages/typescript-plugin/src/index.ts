@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { installMarklessCompletions } from './completions.ts';
 import {
 	MARKLESS_TSRX_PARSE_ERROR_CODE,
+	clampMarklessDiagnosticStart,
 	getMarklessTsrxParseFailure,
 	getMarklessTsrxLanguagePlugin,
 	isMarklessTsrxFile,
@@ -54,11 +55,20 @@ const plugin = (modules: Parameters<typeof volarPlugin>[0]) => {
 				if (!failure) return diagnostics;
 				const snapshot = getSourceSnapshot(fileName);
 				const sourceLength = snapshot?.getLength() ?? 0;
+				const sourceFile = enhancedLanguageService.getProgram()?.getSourceFile(fileName);
+				// Volar uses an empty placeholder SourceFile for non-empty TSRX sources in
+				// tsserver. It cannot provide a meaningful direct-consumer coordinate bound.
+				const diagnosticFile =
+					sourceFile?.text.length === 0 && sourceLength > 0 ? undefined : sourceFile;
 				return [
 					...diagnostics,
 					{
-						file: enhancedLanguageService.getProgram()?.getSourceFile(fileName),
-						start: Math.min(Math.max(failure.pos, 0), sourceLength),
+						file: diagnosticFile,
+						start: clampMarklessDiagnosticStart(
+							failure.pos,
+							sourceLength,
+							diagnosticFile?.text.length,
+						),
 						length: 1,
 						category: modules.typescript.DiagnosticCategory.Error,
 						code: MARKLESS_TSRX_PARSE_ERROR_CODE,

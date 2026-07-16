@@ -8,6 +8,7 @@ import { expect, test } from 'vitest';
 import {
 	MARKLESS_TSRX_LANGUAGE_ID,
 	MarklessTsrxVirtualCode,
+	clampMarklessDiagnosticStart,
 	getMarklessTsrxParseFailure,
 	getMarklessTsrxLanguagePlugin,
 	isMarklessTsrxFile,
@@ -156,6 +157,36 @@ test.each([
 		expect(getMarklessTsrxParseFailure(fileName)).toBeUndefined();
 	},
 );
+
+test('finds and clears parse failures across file-name casing and separators', () => {
+	const fileName = join(process.cwd(), 'packages/core/src/Canonical-Failure.tsrx');
+	const good = 'export function Notice() @{ <article>Ready</article> }';
+	const broken = 'export function Notice() @{ <article>Waiting</section> }';
+	const virtualCode = new MarklessTsrxVirtualCode(
+		fileName,
+		ts.ScriptSnapshot.fromString(good),
+	);
+	const alternateFileNames = [fileName.toUpperCase(), fileName.replaceAll('/', '\\')];
+
+	virtualCode.update(ts.ScriptSnapshot.fromString(broken));
+	for (const alternateFileName of alternateFileNames) {
+		expect(getMarklessTsrxParseFailure(alternateFileName)).toMatchObject({
+			message: expect.any(String),
+			pos: broken.indexOf('</section>'),
+		});
+	}
+
+	virtualCode.update(ts.ScriptSnapshot.fromString(good));
+	for (const alternateFileName of alternateFileNames) {
+		expect(getMarklessTsrxParseFailure(alternateFileName)).toBeUndefined();
+	}
+});
+
+test('clamps a parse diagnostic start to both current source lengths', () => {
+	expect(clampMarklessDiagnosticStart(20, 12, 8)).toBe(8);
+	expect(clampMarklessDiagnosticStart(-4, 12, 8)).toBe(0);
+	expect(clampMarklessDiagnosticStart(6, 12, undefined)).toBe(6);
+});
 
 test('package CommonJS entry is generated into dist instead of maintained in src', () => {
 	ensureGeneratedCjsBuild();
