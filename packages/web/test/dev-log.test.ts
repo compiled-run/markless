@@ -25,14 +25,14 @@ test('executed sizes join local and route-prefixed symbol ids to a unique qualif
 	const sizes = new Map([[APP_SYMBOL_ID, { raw: 1024, estimated: true }]]);
 
 	expect(formatMarklessExecutedSize(['symbol:0'], sizes)).toBe(
-		'1.0 KB est. app executed · 0.0 KB instrument',
+		'1.0 KB est. source app executed · 0.0 KB instrument',
 	);
 	expect(formatMarklessExecutedSize(['c0:symbol:0'], sizes)).toBe(
-		'1.0 KB est. app executed · 0.0 KB instrument',
+		'1.0 KB est. source app executed · 0.0 KB instrument',
 	);
 	// Two spellings of the same module count once.
 	expect(formatMarklessExecutedSize(['symbol:0', APP_SYMBOL_ID], sizes)).toBe(
-		'1.0 KB est. app executed · 0.0 KB instrument',
+		'1.0 KB est. source app executed · 0.0 KB instrument',
 	);
 });
 
@@ -263,7 +263,7 @@ test('resume summary uses byte estimates when provided and counts otherwise', ()
 			]),
 		}),
 	).toBe(
-		'markless: resumed — 2.0 KB est. app executed, 4 modules preloaded (2 app executed) · 0.0 KB instrument',
+		'markless: resumed — 2.0 KB est. source app executed, 4 modules preloaded (2 app executed) · 0.0 KB instrument',
 	);
 	expect(
 		formatMarklessResumeSummary({
@@ -281,7 +281,7 @@ test('executed size labels estimates and real gzip bytes distinctly', () => {
 			['web:event-only-resume'],
 			new Map([['web:event-only-resume', { raw: 2048, estimated: true }]]),
 		),
-	).toBe('2.0 KB est. app executed · 0.0 KB instrument');
+	).toBe('2.0 KB est. source app executed · 0.0 KB instrument');
 	expect(
 		formatMarklessExecutedSize(
 			['web:missing'],

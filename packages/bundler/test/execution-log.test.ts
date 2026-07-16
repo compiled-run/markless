@@ -6,6 +6,8 @@ import {
 	injectExecutionLogModuleHook,
 	requalifyExecutionLogModuleHook,
 } from '../src/execution-log.ts';
+import { transformTsrxModule } from '../src/rolldown.ts';
+import { symbolVirtualModuleId } from '../src/source-module.ts';
 
 type ExecutionLogGlobal = typeof globalThis & {
 	__mxLog?: Set<string>;
@@ -291,7 +293,7 @@ test('rendered summary sizes every executed id the module hook can inject', asyn
 	]);
 	expect(logged).toHaveLength(1);
 	expect(logged[0]).toMatch(
-		/^markless: rendered — 0 app modules executed \(0\.0 KB app\) · 1 instrument module executed \(\d+\.\d KB est\.\)$/,
+		/^markless: rendered — 0 app modules executed \(0\.0 KB app\) · 1 instrument module executed \(\d+\.\d KB est\. source\)$/,
 	);
 });
 
@@ -322,11 +324,13 @@ test('interaction rows resolve qualified symbol ids and display them short', asy
 	// Woken id is the qualified id; warm id is the payload's local "symbol:0".
 	// Both must join the same size entry (counted once) instead of 0.0 KB.
 	expect(headers[0]).toContain('woke 1 modules');
-	expect(headers[0]).toMatch(/· 1\.0 KB est\. app · 0\.0 KB instrument$/);
-	expect(rows.some((row) => row.startsWith('woke symbol:0 (App.tsrx) (1.0 KB est.)'))).toBe(true);
-	expect(rows.some((row) => row.startsWith('ran warm symbol:0 (App.tsrx) (1.0 KB est.)'))).toBe(
-		true,
-	);
+	expect(headers[0]).toMatch(/· 1\.0 KB est\. source app · 0\.0 KB instrument$/);
+	expect(
+		rows.some((row) => row.startsWith('woke symbol:0 (App.tsrx) (1.0 KB est. source)')),
+	).toBe(true);
+	expect(
+		rows.some((row) => row.startsWith('ran warm symbol:0 (App.tsrx) (1.0 KB est. source)')),
+	).toBe(true);
 	expect(attributes.get('data-markless-log-app-bytes')).toBe('1024');
 	expect(attributes.get('data-markless-log-instrument-bytes')).toBe('0');
 });
@@ -372,6 +376,121 @@ test('pull attribution resolves both first-call lazy and direct installed-hook p
 	await mod.installMarklessExecutionLog({ printResumeSummary: false });
 	await (globalThis as ExecutionLogGlobal).__mxLogInteraction!(event);
 	expect(attributes.get('data-markless-log-app-bytes')).toBe('1830');
+});
+
+test('embedded attribution selects the child-owned symbol without fetching or guessing', async () => {
+	const attributes = stubExecutionLogDom('routes/arena.tsrx');
+	const parent = await transformTsrxModule({
+		filename: '/workspace/routes/Arena.tsrx',
+		source: `
+import { state } from '@markless/core';
+import Banner from '../widgets/Banner.tsrx';
+import ScorePad from '../widgets/ScorePad.tsrx';
+export default function Arena() @{
+	let round = state(0);
+	<main>
+		<button onClick={() => round++}>Next {round}</button>
+		<Banner />
+		<ScorePad />
+	</main>
+}`,
+		environment: 'client',
+	});
+	const child = await transformTsrxModule({
+		filename: '/workspace/widgets/ScorePad.tsrx',
+		source: `
+import { state } from '@markless/core';
+export default function ScorePad() @{
+	let score = state(0);
+	<button onClick={() => score++}>Score {score}</button>
+}`,
+		environment: 'client',
+	});
+	const parentSymbol = parent.manifest.symbols[0]!;
+	const childSymbol = child.manifest.symbols[0]!;
+	const childRoute = parent.manifest.symbolRoutes?.find((route) =>
+		route.importSource.includes('ScorePad.tsrx'),
+	);
+	if (!childRoute) throw new Error('expected compiler-produced child route');
+	const fetch = vi.fn();
+	vi.stubGlobal('fetch', fetch);
+	(globalThis as ExecutionLogGlobal).__mxLog = new Set();
+	const headers: string[] = [];
+	const rows: string[] = [];
+	vi.spyOn(console, 'groupCollapsed').mockImplementation((line: unknown) =>
+		headers.push(String(line)),
+	);
+	vi.spyOn(console, 'groupEnd').mockImplementation(() => {});
+	vi.spyOn(console, 'log').mockImplementation((line: unknown) => rows.push(String(line)));
+
+	const mod = await importExecutionLogModule(
+		executionLogVirtualModuleSource({
+			moduleSizes: new Map([
+				[parentSymbol.virtualModuleId, 1024],
+				[childSymbol.virtualModuleId, 4096],
+			]),
+			attribution: {
+				'routes/arena.tsrx': {
+					'': encodeURIComponent(parent.manifest.source),
+					[childRoute.prefix]: encodeURIComponent(child.manifest.source),
+				},
+			},
+		}),
+	);
+	await mod.logMarklessInteraction({
+		eventName: 'click',
+		selector: 'button.score',
+		eventRecord: {
+			hostNodeId: `${childRoute.prefix}h4`,
+			symbolIds: [`${childRoute.prefix}${childSymbol.symbolId}`],
+		},
+		before: new Set<string>([MARKLESS_EXECUTION_LOG_MODULE_ID]),
+		view: { behaviors: [{ hostNodeId: `${childRoute.prefix}h4` }] },
+	});
+
+	expect(fetch).not.toHaveBeenCalled();
+	expect(headers[0]).toContain('· 4.0 KB est. source app');
+	expect(headers[0]).not.toContain('bytes unknown');
+	expect(rows).toContainEqual(
+		expect.stringContaining('ran warm symbol:0 (ScorePad.tsrx) (4.0 KB est. source)'),
+	);
+	expect(attributes.get('data-markless-log-app-bytes')).toBe('4096');
+});
+
+test.each([
+	['missing route', 'routes/missing.tsrx', 'c1:symbol:0', 'c1:h4'],
+	['unknown scope', 'routes/arena.tsrx', 'c9:symbol:0', 'c9:h4'],
+	['ambiguous local symbol', 'routes/arena.tsrx', 'symbol:0', 'h4'],
+])('embedded attribution keeps %s bytes unknown', async (_, routeFile, symbolId, hostNodeId) => {
+	const attributes = stubExecutionLogDom(routeFile);
+	const parentSource = '/workspace/routes/Arena.tsrx';
+	const childSource = '/workspace/widgets/ScorePad.tsrx';
+	(globalThis as ExecutionLogGlobal).__mxLog = new Set();
+	const headers: string[] = [];
+	vi.spyOn(console, 'groupCollapsed').mockImplementation((line: unknown) =>
+		headers.push(String(line)),
+	);
+	vi.spyOn(console, 'groupEnd').mockImplementation(() => {});
+	vi.spyOn(console, 'log').mockImplementation(() => {});
+	const mod = await importExecutionLogModule(
+		executionLogVirtualModuleSource({
+			moduleSizes: new Map([
+				[symbolVirtualModuleId(parentSource, 'symbol:0'), 1024],
+				[symbolVirtualModuleId(childSource, 'symbol:0'), 4096],
+			]),
+			attribution: {
+				'routes/arena.tsrx': { 'c1:': encodeURIComponent(childSource) },
+			},
+		}),
+	);
+	await mod.logMarklessInteraction({
+		eventName: 'click',
+		eventRecord: { hostNodeId, symbolIds: [symbolId] },
+		before: new Set<string>([MARKLESS_EXECUTION_LOG_MODULE_ID]),
+	});
+
+	expect(headers[0]).toContain('bytes unknown; 1 unmapped');
+	expect(attributes.has('data-markless-log-app-bytes')).toBe(false);
 });
 
 test('generated logger inherits unprefixed symbol scope from the event host', async () => {
@@ -460,9 +579,9 @@ test('interaction accounting stays bounded by each caller snapshot', async () =>
 	await Promise.all([first, second]);
 
 	expect(headers[0]).toContain('[first]');
-	expect(headers[0]).toContain('· 0.1 KB est. app');
+	expect(headers[0]).toContain('· 0.1 KB est. source app');
 	expect(headers[1]).toContain('[second]');
-	expect(headers[1]).toContain('· 0.3 KB est. app');
+	expect(headers[1]).toContain('· 0.3 KB est. source app');
 	expect(attributes.get('data-markless-log-interactions')).toBe('2');
 });
 

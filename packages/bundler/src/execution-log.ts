@@ -48,6 +48,7 @@ export function requalifyExecutionLogModuleHook(source: string, moduleId: string
 export function executionLogVirtualModuleSource(
 	options: {
 		readonly moduleSizes?: ReadonlyMap<string, number>;
+		readonly attribution?: ExecutionAttributionTables;
 		readonly sizesUrl?: string;
 	} = {},
 ): string {
@@ -64,6 +65,7 @@ export function executionLogVirtualModuleSource(
 function executionLogVirtualModuleSourceWithOwnSize(
 	options: {
 		readonly moduleSizes?: ReadonlyMap<string, number>;
+		readonly attribution?: ExecutionAttributionTables;
 		readonly sizesUrl?: string;
 	},
 	ownRawSize: number | null,
@@ -80,6 +82,7 @@ function executionLogVirtualModuleSourceWithOwnSize(
 	return `
 globalThis.__mxLog?.add(${JSON.stringify(MARKLESS_EXECUTION_LOG_MODULE_ID)});
 const marklessDefaultModuleSizes = ${JSON.stringify(moduleSizes)};
+const marklessDefaultAttribution = ${JSON.stringify(options.attribution ?? null)};
 const marklessSizesUrl = ${JSON.stringify(options.sizesUrl ?? null)};
 let marklessSizesPromise;
 let marklessAttribution;
@@ -89,7 +92,7 @@ function sizeRecord(input) { return !input ? undefined : typeof input === 'numbe
 function normalizeSizes(input) { if (!input) return undefined; const map = new Map(); for (const id of Object.keys(input)) if (id !== 'attribution') map.set(id, sizeRecord(input[id])); return map; }
 async function loadModuleSizes(input) {
 	if (input.moduleSizes) return normalizeSizes(input.moduleSizes);
-	if (marklessDefaultModuleSizes) return normalizeSizes(marklessDefaultModuleSizes);
+	if (marklessDefaultModuleSizes) { marklessAttribution = marklessDefaultAttribution; return normalizeSizes(marklessDefaultModuleSizes); }
 	if (!marklessSizesUrl) return undefined;
 	marklessSizesPromise ||= fetch(marklessSizesUrl).then((response) => response.ok ? response.json() : undefined).then((payload) => { marklessAttribution = payload && payload.attribution; return normalizeSizes(payload); }).catch(() => undefined);
 	return marklessSizesPromise;
@@ -112,8 +115,8 @@ function accounting(items, sizes) {
 	for (const id of ids) { const record = sizes.get(id); if (!record) { appModules++; unmappedIds.push(id); continue; } const bytes = record.estimated ? record.raw : (record.gzip ?? record.raw); if (record.instrument) { instrumentModules++; instrumentBytes += bytes; instrumentEstimated ||= !!record.estimated; } else { appModules++; appBytes += bytes; appEstimated ||= !!record.estimated; } }
 	return { appBytes: unmappedIds.length ? null : appBytes, instrumentBytes, appModules, instrumentModules, estimated: { app: appEstimated, instrument: instrumentEstimated }, unmappedIds };
 }
-function category(a, name) { const bytes = name === 'app' ? a.appBytes : a.instrumentBytes; const count = name === 'app' ? a.appModules : a.instrumentModules; if (bytes === null) return count + ' ' + name + ' module' + (count === 1 ? '' : 's') + (name === 'app' && a.unmappedIds.length ? ' (bytes unknown; ' + a.unmappedIds.length + ' unmapped)' : ''); return (bytes / 1024).toFixed(1) + ' KB' + (a.estimated[name] ? ' est.' : '') + ' ' + name; }
-function rowKb(items, sizes) { const a = accounting(items, sizes); if (a.unmappedIds.length) return 'bytes unknown'; const total = (a.appBytes || 0) + (a.instrumentBytes || 0); return (total / 1024).toFixed(1) + ' KB' + (a.estimated.app || a.estimated.instrument ? ' est.' : ''); }
+function category(a, name) { const bytes = name === 'app' ? a.appBytes : a.instrumentBytes; const count = name === 'app' ? a.appModules : a.instrumentModules; if (bytes === null) return count + ' ' + name + ' module' + (count === 1 ? '' : 's') + (name === 'app' && a.unmappedIds.length ? ' (bytes unknown; ' + a.unmappedIds.length + ' unmapped)' : ''); return (bytes / 1024).toFixed(1) + ' KB' + (a.estimated[name] ? ' est. source' : '') + ' ' + name; }
+function rowKb(items, sizes) { const a = accounting(items, sizes); if (a.unmappedIds.length) return 'bytes unknown'; const total = (a.appBytes || 0) + (a.instrumentBytes || 0); return (total / 1024).toFixed(1) + ' KB' + (a.estimated.app || a.estimated.instrument ? ' est. source' : ''); }
 function warmIds(event) { return [...new Set([event.dispatchModuleId, ...((event.eventRecord && event.eventRecord.symbolIds) || [])].filter(Boolean))]; }
 function causeRows(input) {
 	const before = input.before || new Set(); const after = input.after || new Set(); const woken = [...after].filter((id) => !before.has(id)); const record = input.eventRecord;

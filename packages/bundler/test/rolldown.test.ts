@@ -7,6 +7,7 @@ import {
 	resumeVirtualModuleId,
 	transformTsrxModule,
 } from '../src/rolldown.ts';
+import { MARKLESS_EXECUTION_LOG_MODULE_ID } from '../src/execution-log.ts';
 import {
 	callBuildStart,
 	callGenerateBundle,
@@ -526,6 +527,72 @@ let count = state(0);
 		expect(symbolSource).not.toContain('__mxLog?.add("symbol:');
 		expect(logSource).toContain(JSON.stringify(symbolId));
 		expect(logSource).not.toContain('"symbol:symbol:0"');
+	});
+
+	test('dev logger embeds manifest-derived nested attribution and refreshes after invalidation', async () => {
+		const rootDir = '/workspace/studio';
+		const routeFile = `${rootDir}/routes/dashboard.tsrx`;
+		const panelFile = `${rootDir}/components/MetricPanel.tsrx`;
+		const gaugeFile = `${rootDir}/components/GaugeButton.tsrx`;
+		const replacementFile = `${rootDir}/components/TrendCard.tsrx`;
+		const plugin = marklessClient({ dev: true, executionLog: 'always', rootDir });
+		const component = (name: string, child?: string) =>
+			`${
+				child ? `import Child from ${JSON.stringify(child)};` : ''
+			}\nexport default function ${name}() @{ <article>${
+				child ? '<Child />' : '<button onClick={() => console.log(1)}>Run</button>'
+			}</article> }`;
+		const embeddedAttribution = async () => {
+			const loggerSource = (await callLoad(
+				plugin,
+				`\0${MARKLESS_EXECUTION_LOG_MODULE_ID}`,
+			)) as string;
+			const match = /const marklessDefaultAttribution = (.*);/.exec(loggerSource);
+			if (!match?.[1]) throw new Error('expected embedded execution attribution');
+			return JSON.parse(match[1]) as Record<string, Record<string, string>>;
+		};
+
+		callBuildStart(plugin, { cwd: rootDir });
+		const route = (await callTransform(
+			plugin,
+			component('Dashboard', '../components/MetricPanel.tsrx'),
+			routeFile,
+		)) as Awaited<ReturnType<typeof transformTsrxModule>>;
+		const panel = (await callTransform(
+			plugin,
+			component('MetricPanel', './GaugeButton.tsrx'),
+			panelFile,
+		)) as Awaited<ReturnType<typeof transformTsrxModule>>;
+		await callTransform(plugin, component('GaugeButton'), gaugeFile);
+
+		const routePrefix = route.manifest.symbolRoutes![0]!.prefix;
+		const panelPrefix = panel.manifest.symbolRoutes![0]!.prefix;
+		expect(await embeddedAttribution()).toEqual({
+			'routes/dashboard.tsrx': {
+				'': encodeURIComponent(routeFile),
+				[routePrefix]: encodeURIComponent(panelFile),
+				[routePrefix + panelPrefix]: encodeURIComponent(gaugeFile),
+			},
+		});
+
+		const resolvedLogger = await callResolveId(plugin, MARKLESS_EXECUTION_LOG_MODULE_ID);
+		const invalidated = plugin.api.invalidateGeneratedModules(routeFile, 'client');
+		expect(invalidated).toContain((resolvedLogger as { id: string }).id);
+		await callTransform(
+			plugin,
+			component('Dashboard', '../components/TrendCard.tsrx'),
+			routeFile,
+		);
+		await callTransform(plugin, component('TrendCard'), replacementFile);
+
+		const refreshed = await embeddedAttribution();
+		expect(refreshed['routes/dashboard.tsrx']).toEqual({
+			'': encodeURIComponent(routeFile),
+			[routePrefix]: encodeURIComponent(replacementFile),
+		});
+		expect(JSON.stringify(refreshed['routes/dashboard.tsrx'])).not.toContain(
+			encodeURIComponent(panelFile),
+		);
 	});
 
 	test('buildStart clears stale virtual modules and transform manifests', async () => {

@@ -264,7 +264,7 @@ function formatCategory(
 			? `${count} (bytes unknown; ${accounting.unmappedIds.length} unmapped)`
 			: count;
 	}
-	return `${(bytes / 1024).toFixed(1)} KB${accounting.estimated[category] ? ' est.' : ''} ${category}`;
+	return `${(bytes / 1024).toFixed(1)} KB${accounting.estimated[category] ? ' est. source' : ''} ${category}`;
 }
 
 function formatExecutedKb(
@@ -276,7 +276,7 @@ function formatExecutedKb(
 	if (accounting.unmappedIds.length) return 'bytes unknown';
 	const total = (accounting.appBytes ?? 0) + (accounting.instrumentBytes ?? 0);
 	const estimated = accounting.estimated.app || accounting.estimated.instrument;
-	return `${(total / 1024).toFixed(1)} KB${estimated ? ' est.' : ''}`;
+	return `${(total / 1024).toFixed(1)} KB${estimated ? ' est. source' : ''}`;
 }
 
 function moduleKbSuffix(

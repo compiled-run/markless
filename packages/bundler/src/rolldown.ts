@@ -113,15 +113,25 @@ export function createMarklessRolldownPlugin(input: {
 		api: {
 			invalidateGeneratedModules(parent: string, currentEnvironment?: MarklessEnvironment) {
 				const ids = dev.clear(parent, currentEnvironment);
-				const resolvedIds: string[] = [];
+				const resolvedIds = new Set<string>();
 				for (const id of ids) {
 					const type = virtualModules.get(id)?.type;
 					virtualModules.delete(id);
 					const resolvedId = resolveVirtualId(id);
-					resolvedIds.push(resolvedId);
-					if (type === 'style') resolvedIds.push(`${resolvedId}?direct`);
+					resolvedIds.add(resolvedId);
+					if (type === 'style') resolvedIds.add(`${resolvedId}?direct`);
 				}
-				return resolvedIds;
+				const invalidatesClient =
+					currentEnvironment === 'client' ||
+					(currentEnvironment === undefined && environment === 'client');
+				if (
+					invalidatesClient &&
+					internalOptions.dev === true &&
+					normalizeExecutionLogMode(internalOptions.executionLog) !== 'never'
+				) {
+					resolvedIds.add(resolveVirtualId(MARKLESS_EXECUTION_LOG_MODULE_ID));
+				}
+				return [...resolvedIds];
 			},
 		},
 		name,
@@ -212,11 +222,13 @@ export function createMarklessRolldownPlugin(input: {
 		},
 		load(id) {
 			if (normalizeVirtualId(id) === MARKLESS_EXECUTION_LOG_MODULE_ID) {
+				const embedsDevSizes =
+					internalOptions.dev === true && getEnvironment(this) === 'client';
 				return executionLogVirtualModuleSource({
-					moduleSizes:
-						internalOptions.dev === true && getEnvironment(this) === 'client'
-							? executionLogEstimatedSizes
-							: undefined,
+					moduleSizes: embedsDevSizes ? executionLogEstimatedSizes : undefined,
+					attribution: embedsDevSizes
+						? executionAttributionTables(transformManifests, getRoot())
+						: undefined,
 					sizesUrl:
 						internalOptions.dev === true
 							? undefined
