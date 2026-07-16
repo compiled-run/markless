@@ -11,6 +11,7 @@ const compiler = vi.hoisted(() => ({
 }));
 
 vi.mock('@markless/compiler', () => ({
+	collectTsrxModuleDiagnostics: vi.fn(() => []),
 	compileTsrxModule: vi.fn(async () => ({
 		semanticGraph: { componentEdges: compiler.componentEdges },
 		protocolView: compiler.protocolView,

@@ -1,6 +1,8 @@
 import {
+	collectTsrxModuleDiagnostics,
 	compileTsrxModule,
 	emitSymbolResolverModule,
+	type CompilerDiagnostic,
 	type RuntimeDemandMapArtifact,
 } from '@markless/compiler';
 import type { ProtocolViewPayload } from '@markless/serializer';
@@ -57,6 +59,17 @@ async function stripEmittedTypes(code: string): Promise<string> {
 
 export { MARKLESS_VIRTUAL_PREFIX, resumeVirtualModuleId } from './source-module.ts';
 
+export const LEGACY_FAIL_OPEN_DIAGNOSTIC_CODES: ReadonlySet<string> = new Set([
+	// packages/bundler/fixtures/vite-ssr-dispose/src/root.tsrx and demos/chat-stream/fixture/app.tsrx
+	'MARKLESS_STATE_UNRESOLVED_WRITE',
+	// demos/js-framework-benchmark keyed markless root.tsrx and packages/cli/templates/starters/docs/components/docs/Sidebar.tsrx
+	'MARKLESS_TEMPLATE_EXPRESSION_STATIC',
+	// packages/vitest-browser/browser/fixtures/optional-context-frame.tsrx
+	'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
+	// packages/router/fixtures/router-full-stack/pages/about.tsrx — intentionally empty placeholder route
+	'MARKLESS_PUBLIC_RENDER_ROOT_UNSUPPORTED',
+]);
+
 export async function transformTsrxModule(
 	input: TransformTsrxModuleInput,
 ): Promise<TransformTsrxModuleResult> {
@@ -71,6 +84,14 @@ export async function transformTsrxModule(
 		resolverId,
 		symbols: [],
 	});
+	const blockingDiagnostics = collectTsrxModuleDiagnostics(compiled).filter(
+		(diagnostic) =>
+			diagnostic.severity === 'error' &&
+			!LEGACY_FAIL_OPEN_DIAGNOSTIC_CODES.has(diagnostic.code),
+	);
+	if (blockingDiagnostics.length > 0) {
+		throw new Error(formatBlockedCompileError(input, blockingDiagnostics));
+	}
 	const symbolRows = compiled.symbolModules.modules.map((module) => ({
 		id: module.symbolId,
 		chunk: symbolVirtualModuleId(input.filename, module.symbolId),
@@ -209,6 +230,42 @@ export async function transformTsrxModule(
 		map: null,
 		virtualModules,
 		manifest,
+	};
+}
+
+function formatBlockedCompileError(
+	input: TransformTsrxModuleInput,
+	diagnostics: readonly CompilerDiagnostic[],
+): string {
+	const summary = `MARKLESS_COMPILE_BLOCKED: ${input.filename} has ${diagnostics.length} compiler error(s).`;
+	const blocks = diagnostics.map((diagnostic) => {
+		const position = diagnostic.primarySpan
+			? formatSourcePosition(input.source, diagnostic.primarySpan.start)
+			: undefined;
+		const location = position
+			? ` (${diagnostic.primarySpan!.filename}:${position.line}:${position.column})`
+			: '';
+		return [
+			`${diagnostic.code}: ${diagnostic.message}${location}`,
+			diagnostic.why,
+			diagnostic.suggestions[0]?.message,
+			diagnostic.docsUrl,
+		]
+			.filter((line): line is string => Boolean(line))
+			.join('\n');
+	});
+	return [summary, ...blocks].join('\n\n');
+}
+
+function formatSourcePosition(
+	source: string,
+	start: number,
+): { readonly line: number; readonly column: number } {
+	const sourceBeforeSpan = source.slice(0, start);
+	const lastLineBreak = sourceBeforeSpan.lastIndexOf('\n');
+	return {
+		line: sourceBeforeSpan.split('\n').length,
+		column: sourceBeforeSpan.length - lastLineBreak,
 	};
 }
 

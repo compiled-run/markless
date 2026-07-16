@@ -67,7 +67,7 @@ import { state } from '@markless/core';
 import { Link } from '@markless/core/router';
 
 export default function Home() @{
-	const count = state(0);
+	let count = state(0);
 
 	<main>
 		<h1>Markless Router</h1>
