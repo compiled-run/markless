@@ -1,7 +1,8 @@
 import { expect, test } from 'vitest';
 import { dispatchRouteUpdate, startRouteUpdateRenderer } from '@markless/core/router';
-import AlphaPage from './fixtures/nav-page-alpha.tsrx';
-import BetaPage from './fixtures/nav-page-beta.tsrx';
+import SlowPage from './fixtures/nav-page-slow.tsrx';
+import AlphaPage from './fixtures/nav-soak-alpha.tsrx';
+import BetaPage from './fixtures/nav-soak-beta.tsrx';
 
 // T116 best-effort 6 — SOAK: many nav/settle cycles through the full D8
 // route-swap machinery (hold -> settle -> swap commit) must not accumulate
@@ -12,9 +13,13 @@ import BetaPage from './fixtures/nav-page-beta.tsrx';
 // real-wait duration assertions (timing semantics live in the fake-clock
 // suites, see packages/router/test/navigation-hold.test.ts).
 //
-// Cycle count trades soak depth against suite wall time; each cycle is a
-// real render + boundary settle + one swap (~15-40ms).
+// Dedicated 1ms fixtures keep all 300 fast round-trips cheap while crossing
+// a macrotask, which is load-bearing: synchronous or microtask-only settle
+// would skip the destination hold machinery. A smaller deadline-branch soak
+// also alternates through the existing slow fixture so honest @pending swaps
+// and their later settle commits are covered by the same flatness checks.
 const SOAK_CYCLES = 300;
+const SLOW_SOAK_CYCLES = 10;
 
 test(
 	'navigation soak: document/window listeners and DOM stay flat across swap cycles',
@@ -70,22 +75,57 @@ test(
 				});
 
 			navigate(AlphaPage, '/alpha');
-			await settle('data-nav-settled="alpha"');
+			await settle('data-nav-settled="soak-alpha"');
 
-			// Baselines AFTER the first full cycle pair (lazy runtimes warmed).
+			// Fast-path warmup also proves the destination crosses a macrotask:
+			// synchronously after dispatch, it is not settled and the outgoing
+			// page remains mounted under the navigation hold.
 			navigate(BetaPage, '/beta');
-			await settle('data-nav-settled="beta"');
+			expect(routeDocument.body.innerHTML).not.toContain(
+				'data-nav-settled="soak-beta"',
+			);
+			expect(routeDocument.body.innerHTML).toContain('data-nav-page="soak-alpha"');
+			await settle('data-nav-settled="soak-beta"');
 			navigate(AlphaPage, '/alpha');
-			await settle('data-nav-settled="alpha"');
+			expect(routeDocument.body.innerHTML).not.toContain(
+				'data-nav-settled="soak-alpha"',
+			);
+			expect(routeDocument.body.innerHTML).toContain('data-nav-page="soak-beta"');
+			await settle('data-nav-settled="soak-alpha"');
+
+			// Warm the deadline-fired path before capturing baselines. Seeing the
+			// slow pending arm before its settled arm directly proves this route
+			// missed the deadline and committed honest pending UI.
+			navigate(SlowPage, '/slow');
+			await settle('data-nav-pending="slow"');
+			expect(routeDocument.body.innerHTML).not.toContain('data-nav-settled="slow"');
+			await settle('data-nav-settled="slow"');
+			navigate(AlphaPage, '/alpha');
+			await settle('data-nav-settled="soak-alpha"');
+
+			// Baselines AFTER one fast and one slow round-trip (lazy runtimes warmed).
 			const listenerBaseline = netListeners;
 			const nodeBaseline = routeDocument.body.querySelectorAll('*').length;
 			const bodyChildBaseline = routeDocument.body.childNodes.length;
 
 			for (let cycle = 0; cycle < SOAK_CYCLES; cycle++) {
 				navigate(BetaPage, '/beta');
-				await settle('data-nav-settled="beta"');
+				await settle('data-nav-settled="soak-beta"');
 				navigate(AlphaPage, '/alpha');
-				await settle('data-nav-settled="alpha"');
+				await settle('data-nav-settled="soak-alpha"');
+			}
+
+			for (let cycle = 0; cycle < SLOW_SOAK_CYCLES; cycle++) {
+				navigate(SlowPage, '/slow');
+				if (cycle === 0) {
+					await settle('data-nav-pending="slow"');
+					expect(routeDocument.body.innerHTML).not.toContain(
+						'data-nav-settled="slow"',
+					);
+				}
+				await settle('data-nav-settled="slow"');
+				navigate(AlphaPage, '/alpha');
+				await settle('data-nav-settled="soak-alpha"');
 			}
 
 			// Flat, not merely sub-linear: swaps must not add ANY lasting
