@@ -1,4 +1,9 @@
 import { expect, test } from 'vitest';
+import {
+	MarklessCompileError,
+	formatMarklessSourceFrame,
+	normalizeMarklessDevError,
+} from '../src/dev-error/index.ts';
 import { transformTsrxModule } from '../src/transform.ts';
 
 function transform(filename: string, source: string) {
@@ -22,6 +27,67 @@ test('rejects a module with a parse error', async () => {
 	);
 	await expect(transform(filename, source)).rejects.toThrow('MARKLESS_PARSE_ERROR');
 	await expect(transform(filename, source)).rejects.toThrow(filename);
+});
+
+test('throws a typed compile error whose structured payload survives Vite prepareError', async () => {
+	const filename = 'src/BrokenCard.tsrx';
+	const source = `export function BrokenCard() @{
+	<section>{missing}</section>>
+}`;
+	let caught: unknown;
+	try {
+		await transform(filename, source);
+	} catch (error) {
+		caught = error;
+	}
+
+	expect(caught).toBeInstanceOf(MarklessCompileError);
+	const error = caught as MarklessCompileError;
+	expect(error.payload).toMatchObject({
+		version: 1,
+		id: filename,
+		kind: 'compile',
+		details: expect.stringContaining('MARKLESS_COMPILE_BLOCKED'),
+		diagnostics: [
+			expect.objectContaining({
+				code: expect.stringMatching(/^MARKLESS_/),
+				filename,
+				line: 2,
+				column: expect.any(Number),
+				frame: expect.stringContaining('> 2 |'),
+			}),
+		],
+	});
+	expect(error.message).toBe(error.payload.details);
+	expect(error).toMatchObject({
+		id: filename,
+		plugin: 'markless',
+		pluginCode: expect.any(String),
+		loc: expect.objectContaining({ file: filename, line: 2, column: expect.any(Number) }),
+		frame: expect.stringContaining('> 2 |'),
+	});
+
+	const prepared = {
+		id: error.id,
+		frame: error.frame,
+		pluginCode: error.pluginCode,
+		loc: error.loc,
+	};
+	expect(normalizeMarklessDevError(prepared)).toEqual(error.payload);
+});
+
+test('formats two context lines and underlines a multiline span to the first line end', () => {
+	const source = ['zero', 'one', 'two', 'three target', 'continued', 'five', 'six'].join('\n');
+	const start = source.indexOf('target');
+	const end = source.indexOf('continued') + 4;
+	const frame = formatMarklessSourceFrame(source, { filename: 'src/Frame.tsrx', start, end });
+
+	expect(frame).toContain('  2 | one');
+	expect(frame).toContain('  3 | two');
+	expect(frame).toContain('> 4 | three target');
+	expect(frame).toContain('    |       ^^^^^^');
+	expect(frame).toContain('  5 | continued');
+	expect(frame).toContain('  6 | five');
 });
 
 test('rejects a write to a read-only prop with a source position', async () => {
@@ -61,9 +127,7 @@ test('rejects an undeclared identifier write even when its diagnostic code also 
 	<button onClick={() => missing++}>Write</button>
 }`;
 
-	await expect(transform(filename, source)).rejects.toThrow(
-		'MARKLESS_STATE_UNRESOLVED_WRITE',
-	);
+	await expect(transform(filename, source)).rejects.toThrow('MARKLESS_STATE_UNRESOLVED_WRITE');
 });
 
 test('continues to transform a member-expression write carrying a warning diagnostic', async () => {
@@ -86,7 +150,5 @@ test('rejects an alternate-shaped prefix write to a read-only prop', async () =>
 	<a onClick={() => --remaining}>{remaining}</a>
 }`;
 
-	await expect(transform(filename, source)).rejects.toThrow(
-		'MARKLESS_STATE_READ_ONLY_WRITE',
-	);
+	await expect(transform(filename, source)).rejects.toThrow('MARKLESS_STATE_READ_ONLY_WRITE');
 });

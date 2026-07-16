@@ -26,6 +26,26 @@ const retiredPackageManifests = [
 ] as const;
 
 describe('package metadata', () => {
+	test('bundler publishes the development error surface from dist', async () => {
+		const bundler = JSON.parse(
+			await readFile(resolve(root, 'packages/bundler/package.json'), 'utf8'),
+		) as {
+			readonly exports?: Record<string, string>;
+			readonly publishConfig?: {
+				readonly exports?: Record<
+					string,
+					{ readonly types?: string; readonly default?: string }
+				>;
+			};
+		};
+
+		expect(bundler.exports?.['./dev-error']).toBe('./src/dev-error/index.ts');
+		expect(bundler.publishConfig?.exports?.['./dev-error']).toEqual({
+			types: './dist/dev-error.d.ts',
+			default: './dist/dev-error.js',
+		});
+	});
+
 	test('framework packages are declared side-effect free for tree shaking', async () => {
 		for (const packageJsonPath of frameworkPackages) {
 			const packageJson = JSON.parse(

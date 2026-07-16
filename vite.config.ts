@@ -139,6 +139,7 @@ const buildOrder: PackUserConfig[] = [
 	marklessPack({
 		packageName: 'bundler',
 		entry: {
+			'dev-error': './src/dev-error/index.ts',
 			preload: './src/preload.ts',
 			rolldown: './src/rolldown.ts',
 			vite: './src/vite/index.ts',

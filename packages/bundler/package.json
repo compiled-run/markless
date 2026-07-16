@@ -14,6 +14,7 @@
 	"type": "module",
 	"sideEffects": false,
 	"exports": {
+		"./dev-error": "./src/dev-error/index.ts",
 		"./preload": "./src/preload.ts",
 		"./rolldown": "./src/rolldown.ts",
 		"./vite": "./src/vite/index.ts"
@@ -21,6 +22,10 @@
 	"publishConfig": {
 		"access": "public",
 		"exports": {
+			"./dev-error": {
+				"types": "./dist/dev-error.d.ts",
+				"default": "./dist/dev-error.js"
+			},
 			"./preload": {
 				"types": "./dist/preload.d.ts",
 				"default": "./dist/preload.js"

@@ -1,4 +1,9 @@
 import { describe, expect, test, vi } from 'vitest';
+import {
+	MARKLESS_DEV_ERROR_CLEAR_EVENT,
+	MARKLESS_DEV_ERROR_CLIENT_ID,
+	MARKLESS_DEV_ERROR_EVENT,
+} from '../src/dev-error/index.ts';
 import { transformTsrxModule } from '../src/rolldown.ts';
 import { markless } from '../src/vite/index.ts';
 import {
@@ -255,8 +260,14 @@ describe('Vite adapter structure', () => {
 		);
 	});
 
-	test('does not install a custom dev client for the full reload fallback', async () => {
+	test('resolves, loads, and injects the base-aware development error client', async () => {
 		const plugin = getAsyncPlugin();
+		const dispatchFetch = vi.fn(
+			async () =>
+				new Response('<html><head></head><body>app</body></html>', {
+					headers: { 'content-type': 'text/html', 'content-length': '52' },
+				}),
+		);
 
 		callConfigResolved(plugin, {
 			base: '/dev/',
@@ -267,8 +278,23 @@ describe('Vite adapter structure', () => {
 		expect(callTransformIndexHtml(plugin, '<html></html>')).toEqual([
 			expect.objectContaining({ tag: 'script', injectTo: 'head' }),
 		]);
-		expect(await callResolveId(plugin, 'virtual:markless-dev-client')).toBeNull();
-		expect(await callLoad(plugin, '\0virtual:markless-dev-client')).toBeNull();
+		expect(await callResolveId(plugin, MARKLESS_DEV_ERROR_CLIENT_ID)).toBe(
+			`\0${MARKLESS_DEV_ERROR_CLIENT_ID}`,
+		);
+		const client = await callLoad(plugin, `\0${MARKLESS_DEV_ERROR_CLIENT_ID}`);
+		expect(client).toContain('from "/dev/@vite/client"');
+		expect(client).toContain(MARKLESS_DEV_ERROR_EVENT);
+
+		const environment = { dispatchFetch };
+		callConfigureServer(plugin, {
+			config: { root: '/workspace/app' },
+			environments: { ssr: environment },
+		});
+		const response = await environment.dispatchFetch(new Request('http://markless.test/'));
+		const html = await response.text();
+		expect(html).toContain('src="/dev/@vite/client"');
+		expect(html).toContain(`src="/dev/@id/__x00__${MARKLESS_DEV_ERROR_CLIENT_ID}"`);
+		expect(response.headers.has('content-length')).toBe(false);
 	});
 
 	test('threads Vite and scoped stylesheet tags into dev SSR artifacts', async () => {
@@ -439,6 +465,89 @@ export function App() @{
 			type: 'full-reload',
 			path: '/src/App.tsrx',
 			triggeredBy: '/workspace/app/src/App.tsrx',
+		});
+	});
+
+	test('invalid edits report a structured error without invalidation or reload, then clear before reload when fixed', async () => {
+		const plugin = getAsyncPlugin();
+		const send = vi.fn();
+		const filename = '/workspace/app/src/App.tsrx';
+		const environment = {
+			config: { consumer: 'client' },
+			hot: { send },
+			moduleGraph: { getModuleById: vi.fn(), invalidateModule: vi.fn() },
+		};
+		callConfigResolved(plugin, { base: '/', command: 'serve', root: '/workspace/app' });
+		callConfigureServer(plugin, {
+			config: { root: '/workspace/app' },
+			environments: { client: environment },
+		});
+		await callTransform(plugin, source, filename, createViteHookContext('client'));
+		const hotUpdate = {
+			file: filename,
+			modules: [],
+			timestamp: 124,
+			type: 'update',
+		};
+		const broken = source.replace('</button>', '</button>>');
+
+		expect(
+			await callHotUpdate(
+				plugin,
+				{ ...hotUpdate, read: async () => broken },
+				{ environment },
+			),
+		).toEqual([]);
+		expect(environment.moduleGraph.invalidateModule).not.toHaveBeenCalled();
+		expect(send).toHaveBeenCalledWith({
+			type: 'custom',
+			event: MARKLESS_DEV_ERROR_EVENT,
+			data: expect.objectContaining({ version: 1, id: filename, kind: 'compile' }),
+		});
+		expect(send.mock.calls.some(([message]) => message.type === 'full-reload')).toBe(false);
+
+		send.mockClear();
+		expect(
+			await callHotUpdate(
+				plugin,
+				{ ...hotUpdate, read: async () => source.replace('count++', 'count += 3') },
+				{ environment },
+			),
+		).toEqual([]);
+		expect(send.mock.calls[0]?.[0]).toEqual({
+			type: 'custom',
+			event: MARKLESS_DEV_ERROR_CLEAR_EVENT,
+			data: { id: filename },
+		});
+		expect(send.mock.calls[1]?.[0]).toMatchObject({ type: 'full-reload' });
+	});
+
+	test('reports and rethrows transform failures that occur outside HMR preflight', async () => {
+		const plugin = getAsyncPlugin();
+		const send = vi.fn();
+		const environment = {
+			config: { consumer: 'client' },
+			hot: { send },
+			moduleGraph: { getModuleById: vi.fn(), invalidateModule: vi.fn() },
+		};
+		callConfigResolved(plugin, { base: '/', command: 'serve', root: '/workspace/app' });
+		callConfigureServer(plugin, {
+			config: { root: '/workspace/app' },
+			environments: { client: environment },
+		});
+
+		await expect(
+			callTransform(
+				plugin,
+				source.replace('</button>', '</button>>'),
+				'/workspace/app/src/Broken.tsrx',
+				{ ...createViteHookContext('client'), environment },
+			),
+		).rejects.toThrow('MARKLESS_COMPILE_BLOCKED');
+		expect(send).toHaveBeenCalledWith({
+			type: 'custom',
+			event: MARKLESS_DEV_ERROR_EVENT,
+			data: expect.objectContaining({ kind: 'compile' }),
 		});
 	});
 

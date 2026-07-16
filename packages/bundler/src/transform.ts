@@ -24,6 +24,7 @@ import {
 } from './source-module.ts';
 import { injectExecutionLogModuleHook } from './execution-log.ts';
 import { compileInlineResumerSources } from './inline-resumer.ts';
+import { createCompileErrorPayload, MarklessCompileError } from './dev-error/index.ts';
 
 // Authored TS (param annotations, assertions, type aliases) survives compilation
 // into emitted module code, but downstream consumers (Vite builtins, symbol
@@ -66,19 +67,11 @@ export async function transformTsrxModule(
 	const payloadId = `${MARKLESS_VIRTUAL_PREFIX}payload:${encodedFilename}`;
 	const resolverId = `${MARKLESS_VIRTUAL_PREFIX}resolver:${encodedFilename}`;
 	const resumeId = resumeVirtualModuleId(input.filename);
-	const compiled = await compileTsrxModule({
-		filename: input.filename,
-		source: input.source,
-		buildId: input.buildId,
+	const { compiled, blockingDiagnostics } = await compileWithBlockingDiagnostics(
+		input,
 		resolverId,
-		symbols: [],
-	});
-	const blockingDiagnostics = collectTsrxModuleDiagnostics(compiled).filter(
-		(diagnostic) => diagnostic.severity === 'error',
 	);
-	if (blockingDiagnostics.length > 0) {
-		throw new Error(formatBlockedCompileError(input, blockingDiagnostics));
-	}
+	throwIfBlocked(input, blockingDiagnostics);
 	const symbolRows = compiled.symbolModules.modules.map((module) => ({
 		id: module.symbolId,
 		chunk: symbolVirtualModuleId(input.filename, module.symbolId),
@@ -220,8 +213,51 @@ export async function transformTsrxModule(
 	};
 }
 
+export async function preflightTsrxModuleDiagnostics(
+	input: Pick<TransformTsrxModuleInput, 'filename' | 'source' | 'buildId'>,
+): Promise<void> {
+	const resolverId = `${MARKLESS_VIRTUAL_PREFIX}resolver:${encodeURIComponent(input.filename)}`;
+	const { blockingDiagnostics } = await compileWithBlockingDiagnostics(input, resolverId);
+	throwIfBlocked(input, blockingDiagnostics);
+}
+
+async function compileWithBlockingDiagnostics(
+	input: Pick<TransformTsrxModuleInput, 'filename' | 'source' | 'buildId'>,
+	resolverId: string,
+) {
+	const compiled = await compileTsrxModule({
+		filename: input.filename,
+		source: input.source,
+		buildId: input.buildId,
+		resolverId,
+		symbols: [],
+	});
+	return {
+		compiled,
+		blockingDiagnostics: collectTsrxModuleDiagnostics(compiled).filter(
+			(diagnostic) => diagnostic.severity === 'error',
+		),
+	};
+}
+
+function throwIfBlocked(
+	input: Pick<TransformTsrxModuleInput, 'filename' | 'source'>,
+	blockingDiagnostics: readonly CompilerDiagnostic[],
+) {
+	if (blockingDiagnostics.length === 0) return;
+	const details = formatBlockedCompileError(input, blockingDiagnostics);
+	throw new MarklessCompileError(
+		createCompileErrorPayload({
+			filename: input.filename,
+			source: input.source,
+			diagnostics: blockingDiagnostics,
+			details,
+		}),
+	);
+}
+
 function formatBlockedCompileError(
-	input: TransformTsrxModuleInput,
+	input: Pick<TransformTsrxModuleInput, 'filename' | 'source'>,
 	diagnostics: readonly CompilerDiagnostic[],
 ): string {
 	const summary = `MARKLESS_COMPILE_BLOCKED: ${input.filename} has ${diagnostics.length} compiler error(s).`;

@@ -195,7 +195,14 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 				if (rolldownOptions.dev === true && TSRX_INPUT_FILE.test(id)) {
 					transformedTsrxSources.set(parsePath(id).pathname, code);
 				}
-				return runHook(basePlugin.transform, this, code, id, transformOptions);
+				try {
+					return await runHook(basePlugin.transform, this, code, id, transformOptions);
+				} catch (error) {
+					if (rolldownOptions.dev === true && TSRX_INPUT_FILE.test(id)) {
+						hmr.reportError(this.environment, error);
+					}
+					throw error;
+				}
 			},
 		},
 		async hotUpdate(ctx) {

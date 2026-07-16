@@ -1,9 +1,18 @@
 import { joinURL, parsePath } from 'ufo';
 import type { DevEnvironment, EnvironmentModuleNode, HotUpdateOptions, ViteDevServer } from 'vite';
 import type { MarklessEnvironment } from '../types.ts';
+import { preflightTsrxModuleDiagnostics } from '../transform.ts';
+import { createDevErrorClientAsset } from '../dev-error/client-asset.ts';
+import {
+	MARKLESS_DEV_ERROR_CLEAR_EVENT,
+	MARKLESS_DEV_ERROR_CLIENT_ID,
+	MARKLESS_DEV_ERROR_EVENT,
+	normalizeMarklessDevError,
+} from '../dev-error/index.ts';
 import { fetchableDevEnvironment, marklessEnvironment } from './environment.ts';
 
 const SOURCE_FILE_EXTENSION = /\.tsrx(?:[?#].*)?$/;
+const RESOLVED_DEV_ERROR_CLIENT_ID = `\0${MARKLESS_DEV_ERROR_CLIENT_ID}`;
 
 interface ViteHmrOptions {
 	base: string;
@@ -14,6 +23,7 @@ interface ViteHmrOptions {
 
 export function createViteHmr(options: ViteHmrOptions) {
 	let server: ViteDevServer | undefined;
+	const invalidSources = new Set<string>();
 
 	return {
 		configureServer(nextServer: ViteDevServer) {
@@ -25,13 +35,22 @@ export function createViteHmr(options: ViteHmrOptions) {
 		transformIndexHtml() {
 			return undefined;
 		},
-		resolveId(_id: string) {
-			return null;
+		resolveId(id: string) {
+			return id === MARKLESS_DEV_ERROR_CLIENT_ID ? RESOLVED_DEV_ERROR_CLIENT_ID : null;
 		},
-		load(_id: string) {
-			return null;
+		load(id: string) {
+			return id === RESOLVED_DEV_ERROR_CLIENT_ID
+				? createDevErrorClientAsset(joinURL(options.base, '/@vite/client'))
+				: null;
 		},
-		hotUpdate(environment: DevEnvironment | undefined, ctx: HotUpdateOptions) {
+		reportError(environment: DevEnvironment | undefined, error: unknown) {
+			const hot = clientHot(server, options, environment);
+			if (!hot?.send) return;
+			const payload = normalizeMarklessDevError(error);
+			invalidSources.add(payload.id);
+			hot.send({ type: 'custom', event: MARKLESS_DEV_ERROR_EVENT, data: payload });
+		},
+		async hotUpdate(environment: DevEnvironment | undefined, ctx: HotUpdateOptions) {
 			if (!environment) {
 				return undefined;
 			}
@@ -41,10 +60,7 @@ export function createViteHmr(options: ViteHmrOptions) {
 				return undefined;
 			}
 
-			const hot =
-				env === 'server'
-					? server?.environments?.[options.clientEnvironment]?.hot
-					: environment.hot;
+			const hot = clientHot(server, options, environment);
 			if (!hot?.send) {
 				return undefined;
 			}
@@ -66,6 +82,41 @@ export function createViteHmr(options: ViteHmrOptions) {
 			}
 			if (!files.size) {
 				return undefined;
+			}
+
+			if (ctx.file && SOURCE_FILE_EXTENSION.test(ctx.file) && ctx.read) {
+				const sourceId = parsePath(ctx.file).pathname;
+				let editedSource: string | undefined;
+				try {
+					editedSource = await ctx.read();
+				} catch {
+					// A synthetic/query-suffixed watcher path may not be readable. Let the
+					// existing invalidation path handle it instead of reporting a fake compile error.
+				}
+				if (editedSource !== undefined) {
+					try {
+						await preflightTsrxModuleDiagnostics({
+							filename: sourceId,
+							source: editedSource,
+						});
+					} catch (error) {
+						const payload = normalizeMarklessDevError(error, { id: sourceId });
+						invalidSources.add(payload.id);
+						hot.send({
+							type: 'custom',
+							event: MARKLESS_DEV_ERROR_EVENT,
+							data: payload,
+						});
+						return [];
+					}
+				}
+				if (editedSource !== undefined && invalidSources.delete(sourceId)) {
+					hot.send({
+						type: 'custom',
+						event: MARKLESS_DEV_ERROR_CLEAR_EVENT,
+						data: { id: sourceId },
+					});
+				}
 			}
 
 			const invalidationEnvironments = moduleGraphEnvironments(
@@ -112,7 +163,7 @@ function installFetchViteClient(server: ViteDevServer, options: ViteHmrOptions) 
 			if (!response.headers.get('content-type')?.includes('text/html')) return response;
 
 			const html = await response.text();
-			const nextHtml = injectViteClient(html, options.base);
+			const nextHtml = injectDevClients(html, options.base);
 			const headers = new Headers(response.headers);
 			if (nextHtml !== html) headers.delete('content-length');
 			return new Response(nextHtml, {
@@ -124,13 +175,32 @@ function installFetchViteClient(server: ViteDevServer, options: ViteHmrOptions) 
 	}
 }
 
-function injectViteClient(html: string, base: string) {
-	if (!html || html.includes('/@vite/client')) return html;
+function injectDevClients(html: string, base: string) {
+	if (!html) return html;
+	const tags = [
+		...(html.includes('/@vite/client')
+			? []
+			: [`<script type="module" src="${joinURL(base, '/@vite/client')}"></script>`]),
+		...(html.includes(MARKLESS_DEV_ERROR_CLIENT_ID)
+			? []
+			: [
+					`<script type="module" src="${joinURL(base, `/@id/__x00__${MARKLESS_DEV_ERROR_CLIENT_ID}`)}"></script>`,
+				]),
+	].join('');
+	if (!tags) return html;
+	if (html.includes('</head>')) return html.replace('</head>', `${tags}</head>`);
+	if (html.includes('<head>')) return html.replace('<head>', `<head>${tags}`);
+	return `${tags}${html}`;
+}
 
-	const tag = `<script type="module" src="${joinURL(base, '/@vite/client')}"></script>`;
-	if (html.includes('</head>')) return html.replace('</head>', `${tag}</head>`);
-	if (html.includes('<head>')) return html.replace('<head>', `<head>${tag}`);
-	return `${tag}${html}`;
+function clientHot(
+	server: ViteDevServer | undefined,
+	options: ViteHmrOptions,
+	environment: DevEnvironment | undefined,
+) {
+	return marklessEnvironment(environment) === 'server'
+		? server?.environments?.[options.clientEnvironment]?.hot
+		: environment?.hot;
 }
 
 function changedFiles(modules: EnvironmentModuleNode[]) {

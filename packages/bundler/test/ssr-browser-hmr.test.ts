@@ -1,9 +1,14 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { createServer, type HotPayload, type ViteDevServer } from 'vite';
 import { markless } from '../src/vite/index.ts';
+import {
+	MARKLESS_DEV_ERROR_CLEAR_EVENT,
+	MARKLESS_DEV_ERROR_CLIENT_ID,
+	MARKLESS_DEV_ERROR_EVENT,
+} from '../src/dev-error/index.ts';
 import { fixtureSsrHost } from '../fixtures/vite-ssr/src/dev-server.ts';
 
 const root = resolve(import.meta.dirname, '../../..');
@@ -15,6 +20,60 @@ afterEach(async () => {
 });
 
 describe('SSR browser HMR', () => {
+	test('reports an invalid real edit without reload and clears it before the corrected reload', async () => {
+		const fixture = await createSsrFixture();
+		let server: ViteDevServer | undefined;
+		try {
+			server = await createServer({
+				configFile: false,
+				mode: 'ssr',
+				root: fixture.root,
+				environments: { ssr: { build: { rolldownOptions: { input: fixture.entry } } } },
+				plugins: [markless(), fixtureSsrHost()],
+				resolve: { alias: marklessSourceAliases() },
+				server: { hmr: true, middlewareMode: true, ws: false },
+			});
+
+			const send = vi.spyOn(server.environments.client.hot, 'send');
+			const html = await requestHtml(server);
+			expect(html).toContain(`/@id/__x00__${MARKLESS_DEV_ERROR_CLIENT_ID}`);
+			const reloadsBefore = fullReloadCount(send);
+
+			await editFile(
+				server,
+				fixture.entry,
+				fixture.source.replace('</section>', '</section>>'),
+			);
+			await vi.waitFor(() => {
+				const message = customMessages(send, MARKLESS_DEV_ERROR_EVENT).at(-1);
+				expect(message?.data).toMatchObject({
+					version: 1,
+					id: fixture.entry,
+					kind: 'compile',
+				});
+			});
+			expect(fullReloadCount(send)).toBe(reloadsBefore);
+
+			await editFile(server, fixture.entry, fixture.source.replace('count++', 'count += 4'));
+			await vi.waitFor(() => {
+				const clearIndex = send.mock.calls.findIndex(
+					([message]) =>
+						(message as { type?: string; event?: string }).type === 'custom' &&
+						(message as { event?: string }).event === MARKLESS_DEV_ERROR_CLEAR_EVENT,
+				);
+				const reloadIndex = send.mock.calls.findIndex(
+					([message], index) =>
+						index > clearIndex &&
+						(message as HotPayload | undefined)?.type === 'full-reload',
+				);
+				expect(clearIndex).toBeGreaterThan(-1);
+				expect(reloadIndex).toBeGreaterThan(clearIndex);
+			});
+		} finally {
+			await server?.close();
+		}
+	});
+
 	test('sends full reloads for repeated TSRX edits after the page is refetched', async () => {
 		const fixture = await createSsrFixture();
 		let server: ViteDevServer | undefined;
@@ -61,7 +120,7 @@ describe('SSR browser HMR', () => {
 });
 
 async function createSsrFixture() {
-	const root = await mkdtemp(join(tmpdir(), 'markless-ssr-hmr-'));
+	const root = await realpath(await mkdtemp(join(tmpdir(), 'markless-ssr-hmr-')));
 	cleanupRoots.push(root);
 	const src = join(root, 'src');
 	await mkdir(src, { recursive: true });
@@ -82,7 +141,10 @@ async function requestHtml(server: ViteDevServer) {
 		new Request('http://markless.test/', { headers: { accept: 'text/html' } }),
 	);
 	expect(response.status).toBe(200);
-	expect(await response.text()).toContain('/@vite/client');
+	const html = await response.text();
+	expect(html).toContain('/@vite/client');
+	expect(html).toContain(MARKLESS_DEV_ERROR_CLIENT_ID);
+	return html;
 }
 
 async function editFile(server: ViteDevServer, file: string, source: string, hotFile = file) {
@@ -99,6 +161,18 @@ async function waitForFullReloadCountAbove(send: ReturnType<typeof vi.spyOn>, co
 		expect(fullReloads).toBeGreaterThan(count);
 	});
 	return fullReloads;
+}
+
+function fullReloadCount(send: ReturnType<typeof vi.spyOn>) {
+	return send.mock.calls.filter(
+		([payload]) => (payload as HotPayload | undefined)?.type === 'full-reload',
+	).length;
+}
+
+function customMessages(send: ReturnType<typeof vi.spyOn>, event: string) {
+	return send.mock.calls
+		.map(([message]) => message as { type?: string; event?: string; data?: unknown })
+		.filter((message) => message.type === 'custom' && message.event === event);
 }
 
 function marklessSourceAliases() {
