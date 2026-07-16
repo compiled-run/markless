@@ -275,6 +275,22 @@ test('scopes router virtual entry modules by resolved Vite root', () => {
 	expect(first).not.toBe(second);
 });
 
+test('generated server entries pass Vite development mode explicitly', () => {
+	const routePlugin = flattenPlugins([router()]).find(
+		(plugin) => plugin.name === 'markless-router:routes',
+	);
+	const resolve = hookHandler(routePlugin?.resolveId) as
+		| ((id: string) => string | undefined)
+		| undefined;
+	const load = hookHandler(routePlugin?.load) as ((id: string) => string | undefined) | undefined;
+
+	routePlugin?.configResolved?.({ root: '/alternate/project' } as never);
+	const id = resolve?.('virtual:markless-router/server-entry');
+	const source = id ? load?.(id) : undefined;
+
+	expect(source).toContain('dev: import.meta.env.DEV');
+});
+
 test('persists client assets for a fresh server plugin instance', async () => {
 	const workspace = await mkdtemp(join(tmpdir(), 'markless-router-client-assets-'));
 	const root = join(workspace, 'app');

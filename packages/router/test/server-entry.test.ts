@@ -1,7 +1,16 @@
+import { readFile } from 'node:fs/promises';
 import { describe, expect, it, vi } from 'vite-plus/test';
 import { createServerEntry } from '../src/vite/runtime/create-server-entry.ts';
 
 describe('server entry with async compiled artifacts', () => {
+	it('passes Vite development mode from the source server entry', async () => {
+		const source = await readFile(
+			new URL('../src/vite/entries/server-entry.ts', import.meta.url),
+			'utf8',
+		);
+
+		expect(source).toContain('dev: import.meta.env.DEV');
+	});
 	it('awaits async renderSsr for pages and document modules', async () => {
 		// Compiled marklessRenderSsr is async since the initial-render awaiting
 		// work: the server entry must await it, not interpolate a Promise.

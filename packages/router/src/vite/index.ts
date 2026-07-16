@@ -646,6 +646,7 @@ function serverEntrySource(root: string): string {
 		`import { pageModuleLoaders, routeFileIds } from '${ROUTE_DISCOVERY_ID}${query}';`,
 		`const documentModuleLoaders = import.meta.glob(['/document.tsrx']);`,
 		`const entry = createServerEntry({`,
+		`  dev: import.meta.env.DEV,`,
 		`  resumeEntryPath,`,
 		`  navigationEntryPath,`,
 		`  routeModulePreloads,`,

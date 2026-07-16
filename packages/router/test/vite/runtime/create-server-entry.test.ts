@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vite-plus/test';
+import { describe, expect, it, vi } from 'vite-plus/test';
+import { MarklessCompileError, serializeMarklessDevError } from '@markless/bundler/dev-error';
 import { marklessSsrAttachSnapshots, marklessSsrRunAsyncComputed } from '@markless/web/fns/ssr';
 import { createServerEntry } from '../../../src/vite/runtime/create-server-entry.ts';
 
@@ -553,6 +554,150 @@ describe('server entry rendering', () => {
 
 		expect(response.status).toBe(404);
 		expect(html).toContain('<main>Missing</main>');
+	});
+
+	it.each([
+		{
+			name: 'typed compiler error',
+			error: new MarklessCompileError({
+				version: 1,
+				id: '/workspace/pages/weather.tsrx',
+				kind: 'compile',
+				diagnostics: [
+					{
+						code: 'MARKLESS_WEATHER_17',
+						message: 'Forecast <script> is invalid',
+						filename: '/workspace/pages/weather.tsrx',
+						line: 7,
+						column: 4,
+					},
+				],
+				details: 'Forecast <script> is invalid',
+			}),
+			code: 'MARKLESS_WEATHER_17',
+			unsafeText: 'Forecast <script> is invalid',
+			escapedText: 'Forecast &lt;script&gt; is invalid',
+		},
+		{
+			name: 'Vite-runner serialized compiler error',
+			error: {
+				message: 'Serialized crossing',
+				pluginCode: serializeMarklessDevError({
+					version: 1,
+					id: '/different/root/pages/tides.tsrx',
+					kind: 'compile',
+					diagnostics: [
+						{
+							code: 'MARKLESS_TIDE_42',
+							message: 'Tide & swell <unsafe>',
+							filename: '/different/root/pages/tides.tsrx',
+							line: 3,
+							column: 9,
+						},
+					],
+					details: 'Tide & swell <unsafe>',
+				}),
+			},
+			code: 'MARKLESS_TIDE_42',
+			unsafeText: 'Tide & swell <unsafe>',
+			escapedText: 'Tide &amp; swell &lt;unsafe&gt;',
+		},
+	])(
+		'renders the framework development document for a $name',
+		async ({ error, code, unsafeText, escapedText }) => {
+			const entry = createServerEntry({
+				dev: true,
+				documentModuleLoader: undefined,
+				pageModuleLoaders: {
+					'pages/index.tsrx': async () => {
+						throw error;
+					},
+				},
+				routeFileIds: ['/pages/index.tsrx'],
+			});
+
+			const response = await entry.fetch(new Request('http://markless-router.test/'));
+			const html = await response.text();
+
+			expect(response.status).toBe(500);
+			expect(response.headers.get('content-type')).toBe('text/html;charset=utf-8');
+			expect(response.headers.get('cache-control')).toBe('no-store');
+			expect(html).toContain(code);
+			expect(html).not.toContain(unsafeText);
+			expect(html).toContain(escapedText);
+		},
+	);
+
+	it('normalizes arbitrary runtime errors into the development error document', async () => {
+		const entry = createServerEntry({
+			dev: true,
+			documentModuleLoader: undefined,
+			pageModuleLoaders: {
+				'pages/index.tsrx': async () => {
+					throw new Error('Wind sensor failed');
+				},
+			},
+			routeFileIds: ['/pages/index.tsrx'],
+		});
+
+		const response = await entry.fetch(new Request('http://markless-router.test/'));
+		const html = await response.text();
+
+		expect(response.status).toBe(500);
+		expect(response.headers.get('content-type')).toBe('text/html;charset=utf-8');
+		expect(response.headers.get('cache-control')).toBe('no-store');
+		expect(html).toContain('MARKLESS_DEV_RUNTIME_ERROR');
+		expect(html).toContain('Wind sensor failed');
+	});
+
+	it('renders the configured production error route with status 500', async () => {
+		const entry = createServerEntry({
+			dev: false,
+			documentModuleLoader: undefined,
+			pageModuleLoaders: {
+				'pages/index.tsrx': async () => {
+					throw new Error('primary render failed');
+				},
+				'pages/500.tsrx': async () => ({
+					default: page('<main>Harbor unavailable</main>'),
+				}),
+			},
+			routeFileIds: ['/pages/index.tsrx', '/pages/500.tsrx'],
+		});
+
+		const response = await entry.fetch(new Request('http://markless-router.test/'));
+
+		expect(response.status).toBe(500);
+		expect(await response.text()).toContain('<main>Harbor unavailable</main>');
+	});
+
+	it('returns the terminal fallback when the production error route throws', async () => {
+		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const entry = createServerEntry({
+			dev: false,
+			documentModuleLoader: undefined,
+			pageModuleLoaders: {
+				'pages/index.tsrx': async () => {
+					throw new Error('primary render failed');
+				},
+				'pages/500.tsrx': async () => {
+					throw new Error('error route failed');
+				},
+			},
+			routeFileIds: ['/pages/index.tsrx', '/pages/500.tsrx'],
+		});
+
+		const response = await entry.fetch(new Request('http://markless-router.test/'));
+
+		expect(response.status).toBe(500);
+		expect(response.headers.get('content-type')).toBe('text/plain;charset=utf-8');
+		expect(await response.text()).toBe('Internal Server Error');
+		expect(
+			errorSpy.mock.calls.filter(
+				([message]) => message === '[markless-router] error page render failed:',
+			),
+		).toHaveLength(1);
+		errorSpy.mockRestore();
 	});
 
 	it('returns a useful 500 body when a matched page is not an Markless artifact', async () => {

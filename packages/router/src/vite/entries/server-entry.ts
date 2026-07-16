@@ -10,6 +10,7 @@ import { pageModuleLoaders, routeFileIds } from 'virtual:markless-router/routes'
 
 const documentModuleLoaders = import.meta.glob(['/document.tsrx']);
 const entry = createServerEntry({
+	dev: import.meta.env.DEV,
 	resumeEntryPath,
 	navigationEntryPath,
 	routeModulePreloads,

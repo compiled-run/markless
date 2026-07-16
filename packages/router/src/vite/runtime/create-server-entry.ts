@@ -11,9 +11,14 @@ import {
 	type SsrRenderArtifact,
 } from '@markless/web/render-to-string';
 import { renderToStream } from '@markless/web/render-to-stream';
+import {
+	normalizeMarklessDevError,
+	renderMarklessDevErrorDocument,
+} from '@markless/bundler/dev-error';
 import { __marklessDebugBootstrapSource } from '../../../../web/src/debug-channel.ts';
 
 export interface ServerEntryOptions {
+	readonly dev?: boolean;
 	readonly navigationEntryPath?: string;
 	readonly resumeEntryPath?: string;
 	readonly routeModulePreloads?: Record<string, readonly ModulePreloadInput[]>;
@@ -85,7 +90,47 @@ export function createServerEntry(options: ServerEntryOptions) {
 		} catch (error) {
 			// Surface the stack: a silent 500 hid the async-renderSsr break.
 			console.error('[markless-router] page render failed:', error);
-			return renderStatusPage(url, manifest.statusPages.error, 500, 'Internal Server Error');
+			if (options.dev) {
+				return renderDevelopmentError(url, error);
+			}
+			try {
+				return await renderStatusPage(
+					url,
+					manifest.statusPages.error,
+					500,
+					'Internal Server Error',
+				);
+			} catch (errorPageError) {
+				console.error('[markless-router] error page render failed:', errorPageError);
+				return new Response('Internal Server Error', {
+					status: 500,
+					headers: { 'content-type': 'text/plain;charset=utf-8' },
+				});
+			}
+		}
+	}
+
+	function renderDevelopmentError(url: URL, error: unknown): Response {
+		const headers = {
+			'cache-control': 'no-store',
+			'content-type': 'text/html;charset=utf-8',
+		};
+		try {
+			const payload = normalizeMarklessDevError(error, {
+				id: `navigation:${url.pathname}`,
+			});
+			return new Response(renderMarklessDevErrorDocument(payload), {
+				status: 500,
+				headers,
+			});
+		} catch {
+			return new Response(escapeHtml(flattenError(error)), {
+				status: 500,
+				headers: {
+					...headers,
+					'content-type': 'text/plain;charset=utf-8',
+				},
+			});
 		}
 	}
 
@@ -213,6 +258,19 @@ export function createServerEntry(options: ServerEntryOptions) {
 	}
 
 	return { fetch };
+}
+
+function flattenError(error: unknown): string {
+	if (error instanceof Error) return error.message;
+	if (
+		typeof error === 'object' &&
+		error !== null &&
+		'message' in error &&
+		typeof error.message === 'string'
+	) {
+		return error.message;
+	}
+	return String(error);
 }
 
 function assertCurrentRouteAssets(options: ServerEntryOptions): void {
