@@ -3,6 +3,7 @@ import type { CompilerDiagnostic } from './diagnostics.ts';
 
 type DiagnosticIdentity = readonly [
 	code: unknown,
+	severity: unknown,
 	message: unknown,
 	filename: unknown,
 	start: unknown,
@@ -20,24 +21,26 @@ export function collectTsrxModuleDiagnostics(
 	function visit(value: unknown): void {
 		if (!isObject(value) || visited.has(value)) return;
 		visited.add(value);
+		collectOwnDiagnostics(value);
 
 		if (Array.isArray(value)) {
 			for (const entry of value) visit(entry);
 			return;
 		}
 		if (!isPlainObject(value)) return;
+		for (const entry of Object.values(value)) visit(entry);
+	}
 
-		for (const [key, entry] of Object.entries(value)) {
-			if (key === 'diagnostics' && Array.isArray(entry)) {
-				for (const candidate of entry) {
-					if (!isCompilerDiagnostic(candidate)) continue;
-					const identity = diagnosticIdentity(candidate);
-					if (identities.some((seen) => sameIdentity(seen, identity))) continue;
-					identities.push(identity);
-					diagnostics.push(candidate);
-				}
-			}
-			visit(entry);
+	function collectOwnDiagnostics(value: Record<string, unknown>): void {
+		if (!Object.prototype.propertyIsEnumerable.call(value, 'diagnostics')) return;
+		const candidates = value.diagnostics;
+		if (!Array.isArray(candidates)) return;
+		for (const candidate of candidates) {
+			if (!isCompilerDiagnostic(candidate)) continue;
+			const identity = diagnosticIdentity(candidate);
+			if (identities.some((seen) => sameIdentity(seen, identity))) continue;
+			identities.push(identity);
+			diagnostics.push(candidate);
 		}
 	}
 
@@ -62,6 +65,7 @@ function diagnosticIdentity(diagnostic: CompilerDiagnostic): DiagnosticIdentity 
 	const primarySpan = isObject(diagnostic.primarySpan) ? diagnostic.primarySpan : undefined;
 	return [
 		diagnostic.code,
+		diagnostic.severity,
 		diagnostic.message,
 		primarySpan?.filename,
 		primarySpan?.start,

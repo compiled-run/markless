@@ -100,3 +100,41 @@ test('collectTsrxModuleDiagnostics structurally discovers and deduplicates futur
 		collectTsrxModuleDiagnostics(result as unknown as CompileTsrxModuleResult),
 	).toEqual([first, differentSpan]);
 });
+
+test('collectTsrxModuleDiagnostics keeps diagnostics that differ only by severity', () => {
+	const warning = {
+		code: 'MARKLESS_FUTURE_SEVERITY',
+		severity: 'warning',
+		message: 'The same diagnostic text.',
+		primarySpan: { filename: 'src/Future.tsrx', start: 10, end: 16 },
+	};
+	const error = { ...warning, severity: 'error' };
+	const result = { diagnostics: [warning, error] };
+
+	expect(
+		collectTsrxModuleDiagnostics(result as unknown as CompileTsrxModuleResult),
+	).toEqual([warning, error]);
+});
+
+test('collectTsrxModuleDiagnostics inspects class instance diagnostics without recursing', () => {
+	const direct = {
+		code: 'MARKLESS_CLASS_ARTIFACT',
+		severity: 'error',
+		message: 'A class artifact exposed this diagnostic.',
+		primarySpan: { filename: 'src/ClassArtifact.tsrx', start: 0, end: 1 },
+	};
+	const hiddenNested = {
+		...direct,
+		code: 'MARKLESS_CLASS_NESTED',
+	};
+	class FutureArtifact {
+		diagnostics = [direct];
+		nested = { diagnostics: [hiddenNested] };
+	}
+
+	expect(
+		collectTsrxModuleDiagnostics({
+			futureArtifact: new FutureArtifact(),
+		} as unknown as CompileTsrxModuleResult),
+	).toEqual([direct]);
+});

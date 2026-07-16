@@ -1140,7 +1140,7 @@ function double(value) { return value * 2; }
 	expect(result.publicRenderModule.diagnostics).toEqual([
 		expect.objectContaining({
 			code: 'MARKLESS_PUBLIC_RENDER_ROOT_UNSUPPORTED',
-			severity: 'error',
+			severity: 'warning',
 			phase: 'public-render',
 			title: 'No renderable component root was found',
 			message: expect.stringContaining('No component with a TSRX template root was found'),

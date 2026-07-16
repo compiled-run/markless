@@ -1001,8 +1001,43 @@ test('lowerStateAccess explains unresolved writes without rejecting declared pla
 	expect(lowered.diagnostics).toEqual([
 		expect.objectContaining({
 			code: 'MARKLESS_STATE_UNRESOLVED_WRITE',
+			severity: 'error',
 			message: 'Cannot write to "missing" because the compiler cannot resolve that target.',
 			why: 'This write is not a known state() graph path, graph alias, declared plain local, or classified module-scope binding.',
+		}),
+	]);
+});
+
+test('lowerStateAccess warns for unresolved member-expression host writes', async () => {
+	const source = `export function HostWrites({ event }) @{
+		<button onClick={() => {
+			host.dataset.attached = true;
+			(event.target as HTMLButtonElement).dataset.remaining = '0';
+			document.body.dataset.cleanup = 'done';
+		}}>Attach</button>
+	}`;
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/HostWrites.tsrx',
+		source,
+	});
+
+	const lowered = lowerStateAccess({ semanticGraph });
+
+	expect(lowered.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_STATE_UNRESOLVED_WRITE',
+			severity: 'warning',
+			source: 'host.dataset.attached',
+		}),
+		expect.objectContaining({
+			code: 'MARKLESS_STATE_UNRESOLVED_WRITE',
+			severity: 'warning',
+			source: '(event.target as HTMLButtonElement).dataset.remaining',
+		}),
+		expect.objectContaining({
+			code: 'MARKLESS_STATE_UNRESOLVED_WRITE',
+			severity: 'warning',
+			source: 'document.body.dataset.cleanup',
 		}),
 	]);
 });
@@ -1150,6 +1185,12 @@ export function App() @{
 		'MARKLESS_TEMPLATE_EXPRESSION_STATIC',
 		'MARKLESS_TEMPLATE_EXPRESSION_STATIC',
 		'MARKLESS_TEMPLATE_EXPRESSION_STATIC',
+	]);
+	expect(lowered.diagnostics.map((diagnostic) => diagnostic.severity)).toEqual([
+		'warning',
+		'warning',
+		'warning',
+		'warning',
 	]);
 	expect(lowered.diagnostics.map((diagnostic) => diagnostic.source)).toEqual([
 		"(() => flag ? 'on' : 'off')()",

@@ -14,7 +14,7 @@ export function unsupportedRenderConstructDiagnostic(input: {
 }): CompilerDiagnostic {
 	return {
 		code: 'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
-		severity: 'error',
+		severity: 'warning',
 		phase: 'public-render',
 		title: `${input.label} is not rendered by the public render path yet`,
 		message: `${input.message} markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package`,
@@ -160,7 +160,7 @@ export function noRenderableRootDiagnostic(input: {
 }): CompilerDiagnostic {
 	return {
 		code: 'MARKLESS_PUBLIC_RENDER_ROOT_UNSUPPORTED',
-		severity: 'error',
+		severity: 'warning',
 		phase: 'public-render',
 		title: 'No renderable component root was found',
 		message:

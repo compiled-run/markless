@@ -339,7 +339,7 @@ function templateExpressionStaticDiagnostic({
 }): StateLoweringDiagnostic {
 	return {
 		code: 'MARKLESS_TEMPLATE_EXPRESSION_STATIC',
-		severity: 'error',
+		severity: 'warning',
 		phase: 'state-lowering',
 		title: 'This expression reads state but never updates',
 		message: `This text reads \`${readSource}\`, but only plain reads like \`{${readSource}}\` update the page today. The expression renders its initial value and never changes when \`${readSource}\` changes.`,
@@ -401,13 +401,20 @@ function unresolvedWriteDiagnostic(
 	write: SemanticStateWrite,
 	filename: string,
 ): StateLoweringDiagnostic {
+	const memberExpression = isMemberExpressionWriteTarget(write.target);
 	return {
 		code: 'MARKLESS_STATE_UNRESOLVED_WRITE',
-		severity: 'error',
+		severity: memberExpression ? 'warning' : 'error',
 		phase: 'state-lowering',
-		title: 'Cannot resolve graph write target',
-		message: `Cannot write to "${write.target}" because the compiler cannot resolve that target.`,
-		why: 'This write is not a known state() graph path, graph alias, declared plain local, or classified module-scope binding.',
+		title: memberExpression
+			? 'Host-object write is not tracked as state'
+			: 'Cannot resolve graph write target',
+		message: memberExpression
+			? `The write to "${write.target}" runs imperatively, but Markless does not track it as graph state.`
+			: `Cannot write to "${write.target}" because the compiler cannot resolve that target.`,
+		why: memberExpression
+			? 'Member-expression writes can update host objects at runtime, but they do not produce resumable state graph updates.'
+			: 'This write is not a known state() graph path, graph alias, declared plain local, or classified module-scope binding.',
 		primarySpan: write.targetSpan ?? fallbackSpan(filename),
 		passId: 'state-lowering',
 		artifactKeys: ['semanticGraph', 'stateLowering'],
@@ -421,6 +428,14 @@ function unresolvedWriteDiagnostic(
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_UNRESOLVED_WRITE',
 	};
+}
+
+function isMemberExpressionWriteTarget(target: string): boolean {
+	// The semantic artifact preserves the authored assignment target. Keep this
+	// syntax classification in state-lowering, where unresolved-write severity is owned.
+	const source = target.trim();
+	if (source.startsWith('{') || source.startsWith('[')) return false;
+	return source.includes('.') || /[$\w)]\s*\[/.test(source);
 }
 
 function staleLocalWriteDiagnostic(

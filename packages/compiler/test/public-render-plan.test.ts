@@ -291,7 +291,7 @@ test.each([
 			expect.arrayContaining([
 				expect.objectContaining({
 					code: 'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
-					severity: 'error',
+					severity: 'warning',
 					phase: 'public-render',
 					passId: 'public-render-plan',
 					title: expect.stringContaining(label),
@@ -303,6 +303,21 @@ test.each([
 		);
 	},
 );
+
+test('planPublicRender warns when a module contains no TSRX component root', async () => {
+	const { plan } = await createRenderPlan(
+		'src/Helpers.tsrx',
+		'export const helper = 1;',
+	);
+
+	expect(plan.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_PUBLIC_RENDER_ROOT_UNSUPPORTED',
+			severity: 'warning',
+			title: 'No renderable component root was found',
+		}),
+	]);
+});
 
 test('planPublicRender gates plain-host record-free branch sites as supported', async () => {
 	const { plan } = await createRenderPlan(
