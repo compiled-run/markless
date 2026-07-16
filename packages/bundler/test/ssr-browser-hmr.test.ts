@@ -69,6 +69,9 @@ describe('SSR browser HMR', () => {
 				expect(clearIndex).toBeGreaterThan(-1);
 				expect(reloadIndex).toBeGreaterThan(clearIndex);
 			});
+			expect(customMessages(send, MARKLESS_DEV_ERROR_EVENT)).toHaveLength(1);
+			expect(customMessages(send, MARKLESS_DEV_ERROR_CLEAR_EVENT)).toHaveLength(1);
+			expect(fullReloadCount(send) - reloadsBefore).toBe(1);
 		} finally {
 			await server?.close();
 		}

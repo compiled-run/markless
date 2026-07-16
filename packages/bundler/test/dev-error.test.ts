@@ -54,7 +54,7 @@ describe('development error surface', () => {
 		expect(html).toContain('Unexpected &lt;script&gt; &amp; value');
 		expect(html).not.toContain('<script>alert(1)</script>');
 		expect(html).toContain(
-			'href="/docs/__open-in-editor?file=%2Fworkspace%2Fsrc%2FUnsafe.tsrx"',
+			'href="/docs/__open-in-editor?file=%2Fworkspace%2Fsrc%2FUnsafe.tsrx%3A3%3A7"',
 		);
 		expect(html).toContain('>Why<');
 		expect(html).toContain('>Suggested fix<');
@@ -77,6 +77,27 @@ describe('development error surface', () => {
 		expect(order).toEqual([...order].sort((a, b) => a - b));
 	});
 
+	test('only renders documentation links with an HTTP or HTTPS URL', () => {
+		for (const docsUrl of ['javascript:alert(1)', 'data:text/html,unsafe', 'not a URL']) {
+			const html = renderMarklessDevErrorDocument({
+				...payload,
+				diagnostics: [{ ...payload.diagnostics[0]!, docsUrl }],
+			});
+			expect(html).not.toContain('Read MARKLESS_PRIMARY documentation');
+		}
+
+		for (const docsUrl of [
+			'https://markless.dev/errors/MARKLESS_PRIMARY',
+			'http://localhost:3000/errors/MARKLESS_PRIMARY',
+		]) {
+			const html = renderMarklessDevErrorDocument({
+				...payload,
+				diagnostics: [{ ...payload.diagnostics[0]!, docsUrl }],
+			});
+			expect(html).toContain(`href="${docsUrl}"`);
+		}
+	});
+
 	test('keeps a plain-text fallback readable without client JavaScript', () => {
 		const html = renderMarklessDevErrorDocument(payload);
 		expect(html).toContain('<main');
@@ -92,6 +113,10 @@ describe('development error surface', () => {
 		expect(source).toContain('from "/docs/@vite/client"');
 		expect(source).toContain('markless-dev-error-overlay');
 		expect(source).toContain('const OPEN_IN_EDITOR = "/docs/__open-in-editor"');
+		expect(source).toContain(
+			"encodeURIComponent(diagnostic.filename + ':' + diagnostic.line + ':' + diagnostic.column)",
+		);
+		expect(source).toContain("url.protocol === 'http:' || url.protocol === 'https:'");
 		expect(source).toContain("attachShadow({ mode: 'open' })");
 		for (const forbidden of [
 			'@markless/web',

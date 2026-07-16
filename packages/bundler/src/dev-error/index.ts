@@ -224,10 +224,13 @@ function isObject(value: unknown): value is Record<string, unknown> {
 }
 
 function renderDiagnosticBody(diagnostic: MarklessDevDiagnostic, base: string): string {
-	const location =
+	const editorLocation =
 		diagnostic.filename && diagnostic.line !== undefined && diagnostic.column !== undefined
-			? `<a class="location" href="${escapeAttribute(joinURL(base, `/__open-in-editor?file=${encodeURIComponent(diagnostic.filename)}`))}">${escapeHtml(`${diagnostic.filename}:${diagnostic.line}:${diagnostic.column}`)}</a>`
-			: '';
+			? `${diagnostic.filename}:${diagnostic.line}:${diagnostic.column}`
+			: undefined;
+	const location = editorLocation
+		? `<a class="location" href="${escapeAttribute(joinURL(base, `/__open-in-editor?file=${encodeURIComponent(editorLocation)}`))}">${escapeHtml(editorLocation)}</a>`
+		: '';
 	const why = diagnostic.why
 		? `<section><h2>Why</h2><p>${escapeHtml(diagnostic.why)}</p></section>`
 		: '';
@@ -237,10 +240,20 @@ function renderDiagnosticBody(diagnostic: MarklessDevDiagnostic, base: string): 
 	const frame = diagnostic.frame
 		? `<pre class="frame">${escapeHtml(diagnostic.frame)}</pre>`
 		: '';
-	const docs = diagnostic.docsUrl
-		? `<p><a href="${escapeAttribute(diagnostic.docsUrl)}">Read ${escapeHtml(diagnostic.code)} documentation</a></p>`
-		: '';
+	const docs =
+		diagnostic.docsUrl && isHttpUrl(diagnostic.docsUrl)
+			? `<p><a href="${escapeAttribute(diagnostic.docsUrl)}">Read ${escapeHtml(diagnostic.code)} documentation</a></p>`
+			: '';
 	return `${location}${why}${suggestion}${frame}${docs}`;
+}
+
+function isHttpUrl(value: string): boolean {
+	try {
+		const url = new URL(value);
+		return url.protocol === 'http:' || url.protocol === 'https:';
+	} catch {
+		return false;
+	}
 }
 
 function escapeHtml(value: string): string {

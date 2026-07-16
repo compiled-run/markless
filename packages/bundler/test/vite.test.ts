@@ -1,4 +1,5 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { EventEmitter } from 'node:events';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, test, vi } from 'vitest';
@@ -526,6 +527,45 @@ export function App() @{
 		expect(send.mock.calls[1]?.[0]).toMatchObject({ type: 'full-reload' });
 	});
 
+	test('reports one error when client and SSR environments process the same invalid edit', async () => {
+		const filename = '/workspace/app/src/App.tsrx';
+		const send = vi.fn();
+		const client = {
+			config: { consumer: 'client' },
+			hot: { send },
+			moduleGraph: { getModuleById: vi.fn(), invalidateModule: vi.fn() },
+		};
+		const ssr = {
+			config: { consumer: 'server' },
+			moduleGraph: { getModuleById: vi.fn(), invalidateModule: vi.fn() },
+		};
+		const hmr = createViteHmr({
+			base: '/',
+			clientEnvironment: 'client',
+			enabled: true,
+		});
+		hmr.configureServer({
+			config: { root: '/workspace/app' },
+			environments: { client, ssr },
+		} as never);
+		const update = {
+			file: filename,
+			modules: [],
+			read: async () => source.replace('</button>', '</button>>'),
+			timestamp: 125,
+			type: 'update',
+		} as never;
+
+		expect(await hmr.hotUpdate(client as never, update)).toEqual([]);
+		expect(await hmr.hotUpdate(ssr as never, update)).toEqual([]);
+		expect(
+			send.mock.calls.filter(
+				([message]) =>
+					message.type === 'custom' && message.event === MARKLESS_DEV_ERROR_EVENT,
+			),
+		).toHaveLength(1);
+	});
+
 	test('rechecks invalid files on disk when the restoring watcher event is swallowed', async () => {
 		const fixtureRoot = await mkdtemp(join(tmpdir(), 'markless-vite-hmr-'));
 		const filename = join(fixtureRoot, 'alternate-root.tsrx');
@@ -609,7 +649,128 @@ export function App() @{
 				event: MARKLESS_DEV_ERROR_EVENT,
 				data: expect.objectContaining({ id: 'navigation:unknown' }),
 			});
+			expect(vi.getTimerCount()).toBe(0);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	test('clears a deleted invalid file and stops polling it', async () => {
+		const fixtureRoot = await mkdtemp(join(tmpdir(), 'markless-vite-hmr-deleted-'));
+		const filename = join(fixtureRoot, 'deleted.tsrx');
+		const send = vi.fn();
+		const environment = { config: { consumer: 'client' }, hot: { send } };
+		const hmr = createViteHmr({
+			base: '/',
+			clientEnvironment: 'client',
+			enabled: true,
+			invalidSourceRecheckMs: 10,
+		});
+
+		try {
+			await writeFile(filename, source);
+			hmr.configureServer({ environments: { client: environment } } as never);
+			hmr.reportError(environment as never, {
+				payload: {
+					version: 1,
+					id: filename,
+					kind: 'compile',
+					diagnostics: [],
+					details: 'broken',
+				},
+			});
+			send.mockClear();
+			await rm(filename);
+
+			await vi.waitFor(() => {
+				expect(send).toHaveBeenCalledExactlyOnceWith({
+					type: 'custom',
+					event: MARKLESS_DEV_ERROR_CLEAR_EVENT,
+					data: { id: filename },
+				});
+			});
+			await new Promise((resolve) => setTimeout(resolve, 30));
+			expect(send).toHaveBeenCalledTimes(1);
+		} finally {
+			await rm(fixtureRoot, { force: true, recursive: true });
+		}
+	});
+
+	test('batches multiple invalid-file recoveries into one full reload', async () => {
+		const fixtureRoot = await mkdtemp(join(tmpdir(), 'markless-vite-hmr-batch-'));
+		const filenames = [join(fixtureRoot, 'one.tsrx'), join(fixtureRoot, 'two.tsrx')];
+		const send = vi.fn();
+		const environment = { config: { consumer: 'client' }, hot: { send } };
+		const hmr = createViteHmr({
+			base: '/',
+			clientEnvironment: 'client',
+			enabled: true,
+			invalidSourceRecheckMs: 10,
+		});
+
+		try {
+			await Promise.all(filenames.map((filename) => writeFile(filename, source)));
+			hmr.configureServer({ environments: { client: environment } } as never);
+			for (const filename of filenames) {
+				hmr.reportError(environment as never, {
+					payload: {
+						version: 1,
+						id: filename,
+						kind: 'compile',
+						diagnostics: [],
+						details: 'broken',
+					},
+				});
+			}
+			send.mockClear();
+
+			await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(3));
+			expect(
+				send.mock.calls.filter(
+					([message]) =>
+						message.type === 'custom' &&
+						message.event === MARKLESS_DEV_ERROR_CLEAR_EVENT,
+				),
+			).toHaveLength(2);
+			expect(
+				send.mock.calls.filter(([message]) => message.type === 'full-reload'),
+			).toHaveLength(1);
+		} finally {
+			await rm(fixtureRoot, { force: true, recursive: true });
+		}
+	});
+
+	test('stops invalid-source polling when the dev server closes', async () => {
+		vi.useFakeTimers();
+		try {
+			const send = vi.fn();
+			const environment = { config: { consumer: 'client' }, hot: { send } };
+			const httpServer = new EventEmitter();
+			const hmr = createViteHmr({
+				base: '/',
+				clientEnvironment: 'client',
+				enabled: true,
+				invalidSourceRecheckMs: 10,
+			});
+			hmr.configureServer({
+				environments: { client: environment },
+				httpServer,
+			} as never);
+			hmr.reportError(environment as never, {
+				payload: {
+					version: 1,
+					id: '/workspace/app/src/Broken.tsrx',
+					kind: 'compile',
+					diagnostics: [],
+					details: 'broken',
+				},
+			});
 			expect(vi.getTimerCount()).toBe(1);
+
+			httpServer.emit('close');
+			expect(vi.getTimerCount()).toBe(0);
+			await vi.advanceTimersByTimeAsync(30);
+			expect(send).toHaveBeenCalledTimes(1);
 		} finally {
 			vi.useRealTimers();
 		}

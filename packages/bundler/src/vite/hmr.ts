@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { isAbsolute } from 'node:path';
 import { joinURL, parsePath } from 'ufo';
 import type { DevEnvironment, EnvironmentModuleNode, HotUpdateOptions, ViteDevServer } from 'vite';
 import type { MarklessEnvironment } from '../types.ts';
@@ -9,6 +10,7 @@ import {
 	MARKLESS_DEV_ERROR_CLIENT_ID,
 	MARKLESS_DEV_ERROR_EVENT,
 	normalizeMarklessDevError,
+	type MarklessDevErrorPayload,
 } from '../dev-error/index.ts';
 import { fetchableDevEnvironment, marklessEnvironment } from './environment.ts';
 
@@ -23,11 +25,35 @@ interface ViteHmrOptions {
 	invalidSourceRecheckMs?: number;
 }
 
+interface PreflightVerdict {
+	error?: MarklessDevErrorPayload;
+	messagesSent: boolean;
+}
+
 export function createViteHmr(options: ViteHmrOptions) {
 	let server: ViteDevServer | undefined;
 	const invalidSources = new Set<string>();
 	let invalidSourceRecheck: ReturnType<typeof setInterval> | undefined;
 	let recheckingInvalidSources = false;
+	const preflightByFile = new Map<
+		string,
+		{ source: string; verdict: Promise<PreflightVerdict> }
+	>();
+
+	function preflight(sourceId: string, source: string) {
+		const cached = preflightByFile.get(sourceId);
+		if (cached?.source === source) return cached.verdict;
+
+		const verdict = preflightTsrxModuleDiagnostics({ filename: sourceId, source }).then(
+			(): PreflightVerdict => ({ messagesSent: false }),
+			(error): PreflightVerdict => ({
+				error: normalizeMarklessDevError(error, { id: sourceId }),
+				messagesSent: false,
+			}),
+		);
+		preflightByFile.set(sourceId, { source, verdict });
+		return verdict;
+	}
 
 	function startInvalidSourceRecheck() {
 		if (invalidSourceRecheck || invalidSources.size === 0) return;
@@ -44,6 +70,7 @@ export function createViteHmr(options: ViteHmrOptions) {
 	}
 
 	function addInvalidSource(id: string) {
+		if (!isAbsolute(id) || !SOURCE_FILE_EXTENSION.test(id)) return;
 		invalidSources.add(id);
 		startInvalidSourceRecheck();
 	}
@@ -58,11 +85,15 @@ export function createViteHmr(options: ViteHmrOptions) {
 		if (recheckingInvalidSources) return;
 		recheckingInvalidSources = true;
 		try {
+			let recovered = false;
 			for (const id of invalidSources) {
 				let source: string;
 				try {
 					source = await readFile(id, 'utf8');
-				} catch {
+				} catch (error) {
+					if (hasErrorCode(error, 'ENOENT') || hasErrorCode(error, 'EISDIR')) {
+						if (deleteInvalidSource(id)) sendClear(id);
+					}
 					continue;
 				}
 
@@ -73,13 +104,13 @@ export function createViteHmr(options: ViteHmrOptions) {
 				}
 
 				if (!deleteInvalidSource(id)) continue;
-				const hot = server?.environments?.[options.clientEnvironment]?.hot;
-				hot?.send?.({
-					type: 'custom',
-					event: MARKLESS_DEV_ERROR_CLEAR_EVENT,
-					data: { id },
+				sendClear(id);
+				recovered = true;
+			}
+			if (recovered) {
+				server?.environments?.[options.clientEnvironment]?.hot?.send?.({
+					type: 'full-reload',
 				});
-				hot?.send?.({ type: 'full-reload' });
 			}
 		} finally {
 			recheckingInvalidSources = false;
@@ -87,9 +118,25 @@ export function createViteHmr(options: ViteHmrOptions) {
 		}
 	}
 
+	function sendClear(id: string) {
+		server?.environments?.[options.clientEnvironment]?.hot?.send?.({
+			type: 'custom',
+			event: MARKLESS_DEV_ERROR_CLEAR_EVENT,
+			data: { id },
+		});
+	}
+
+	function cleanup() {
+		if (invalidSourceRecheck) clearInterval(invalidSourceRecheck);
+		invalidSourceRecheck = undefined;
+		invalidSources.clear();
+	}
+
 	return {
 		configureServer(nextServer: ViteDevServer) {
 			server = nextServer;
+			nextServer.httpServer?.once('close', cleanup);
+			nextServer.watcher?.once?.('close', cleanup);
 			if (options.enabled) {
 				installFetchViteClient(nextServer, options);
 			}
@@ -146,6 +193,7 @@ export function createViteHmr(options: ViteHmrOptions) {
 				return undefined;
 			}
 
+			let sendMessages = true;
 			if (ctx.file && SOURCE_FILE_EXTENSION.test(ctx.file) && ctx.read) {
 				const sourceId = parsePath(ctx.file).pathname;
 				let editedSource: string | undefined;
@@ -156,23 +204,22 @@ export function createViteHmr(options: ViteHmrOptions) {
 					// existing invalidation path handle it instead of reporting a fake compile error.
 				}
 				if (editedSource !== undefined) {
-					try {
-						await preflightTsrxModuleDiagnostics({
-							filename: sourceId,
-							source: editedSource,
-						});
-					} catch (error) {
-						const payload = normalizeMarklessDevError(error, { id: sourceId });
-						addInvalidSource(payload.id);
-						hot.send({
-							type: 'custom',
-							event: MARKLESS_DEV_ERROR_EVENT,
-							data: payload,
-						});
+					const verdict = await preflight(sourceId, editedSource);
+					sendMessages = !verdict.messagesSent;
+					verdict.messagesSent = true;
+					if (verdict.error) {
+						if (sendMessages) {
+							addInvalidSource(verdict.error.id);
+							hot.send({
+								type: 'custom',
+								event: MARKLESS_DEV_ERROR_EVENT,
+								data: verdict.error,
+							});
+						}
 						return [];
 					}
 				}
-				if (editedSource !== undefined && deleteInvalidSource(sourceId)) {
+				if (editedSource !== undefined && sendMessages && deleteInvalidSource(sourceId)) {
 					hot.send({
 						type: 'custom',
 						event: MARKLESS_DEV_ERROR_CLEAR_EVENT,
@@ -203,15 +250,26 @@ export function createViteHmr(options: ViteHmrOptions) {
 				}
 			}
 
-			hot.send({
-				type: 'full-reload',
-				path: firstChangedFile(files),
-				triggeredBy: ctx.file,
-			});
+			if (sendMessages) {
+				hot.send({
+					type: 'full-reload',
+					path: firstChangedFile(files),
+					triggeredBy: ctx.file,
+				});
+			}
 
 			return [];
 		},
 	};
+}
+
+function hasErrorCode(error: unknown, code: string) {
+	return (
+		typeof error === 'object' &&
+		error !== null &&
+		'code' in error &&
+		(error as { code?: unknown }).code === code
+	);
 }
 
 function installFetchViteClient(server: ViteDevServer, options: ViteHmrOptions) {

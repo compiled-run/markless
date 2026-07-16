@@ -34,12 +34,17 @@ function append(parent, tag, text, className) {
 function diagnosticBody(parent, diagnostic) {
   if (diagnostic.filename && diagnostic.line != null && diagnostic.column != null) {
     const link = append(parent, 'a', diagnostic.filename + ':' + diagnostic.line + ':' + diagnostic.column, 'location');
-    link.href = new URL(OPEN_IN_EDITOR + '?file=' + encodeURIComponent(diagnostic.filename), document.baseURI).href;
+    link.href = new URL(OPEN_IN_EDITOR + '?file=' + encodeURIComponent(diagnostic.filename + ':' + diagnostic.line + ':' + diagnostic.column), document.baseURI).href;
   }
   if (diagnostic.why) { const section = append(parent, 'section'); append(section, 'h2', 'Why'); append(section, 'p', diagnostic.why); }
   if (diagnostic.suggestion) { const section = append(parent, 'section'); append(section, 'h2', 'Suggested fix'); append(section, 'p', diagnostic.suggestion); }
   if (diagnostic.frame) append(parent, 'pre', diagnostic.frame, 'frame');
-  if (diagnostic.docsUrl) { const paragraph = append(parent, 'p'); const link = append(paragraph, 'a', 'Read ' + diagnostic.code + ' documentation'); link.href = diagnostic.docsUrl; }
+  if (diagnostic.docsUrl) {
+    try {
+      const url = new URL(diagnostic.docsUrl);
+      if (url.protocol === 'http:' || url.protocol === 'https:') { const paragraph = append(parent, 'p'); const link = append(paragraph, 'a', 'Read ' + diagnostic.code + ' documentation'); link.href = url.href; }
+    } catch { /* Invalid documentation URLs are omitted. */ }
+  }
 }
 class MarklessDevErrorOverlay extends HTMLElement {
   constructor() {
