@@ -113,10 +113,15 @@ export function createMarklessRolldownPlugin(input: {
 		api: {
 			invalidateGeneratedModules(parent: string, currentEnvironment?: MarklessEnvironment) {
 				const ids = dev.clear(parent, currentEnvironment);
+				const resolvedIds: string[] = [];
 				for (const id of ids) {
+					const type = virtualModules.get(id)?.type;
 					virtualModules.delete(id);
+					const resolvedId = resolveVirtualId(id);
+					resolvedIds.push(resolvedId);
+					if (type === 'style') resolvedIds.push(`${resolvedId}?direct`);
 				}
-				return ids.map(resolveVirtualId);
+				return resolvedIds;
 			},
 		},
 		name,

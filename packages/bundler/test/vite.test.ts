@@ -442,6 +442,49 @@ export function App() @{
 		});
 	});
 
+	test('hot updates invalidate direct virtual style modules', async () => {
+		const plugin = getAsyncPlugin();
+		const filename = '/workspace/app/src/App.tsrx';
+		const directStyleId = `\0virtual:markless:style:${encodeURIComponent(filename)}.css?direct`;
+		const directStyleModule = { id: directStyleId };
+		const environment = {
+			config: { consumer: 'client' },
+			hot: { send: vi.fn() },
+			moduleGraph: {
+				getModuleById: vi.fn((id: string) =>
+					id === directStyleId ? directStyleModule : undefined,
+				),
+				invalidateModule: vi.fn(),
+			},
+		};
+
+		callConfigResolved(plugin, { base: '/', command: 'serve', root: '/workspace/app' });
+		callConfigureServer(plugin, {
+			config: { root: '/workspace/app' },
+			environments: { client: environment },
+		});
+		await callTransform(plugin, styledSource, filename, createViteHookContext('client'));
+
+		await callHotUpdate(
+			plugin,
+			{
+				file: filename,
+				modules: [],
+				read: async () => styledSource.replace('background: red', 'background: blue'),
+				timestamp: 123,
+				type: 'update',
+			},
+			{ environment },
+		);
+
+		expect(environment.moduleGraph.invalidateModule).toHaveBeenCalledWith(
+			directStyleModule,
+			expect.anything(),
+			123,
+			true,
+		);
+	});
+
 	test('hot updates with unchanged file content skip invalidation and full reload', async () => {
 		const plugin = getAsyncPlugin();
 		const send = vi.fn();
