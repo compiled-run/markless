@@ -78,7 +78,12 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 			const rowElementHandles = input.semanticGraph.elementHandleBindings.flatMap(
 				(binding) => {
 					if (binding.rowOwner?.repeatId !== repeat.id) return [];
-					const graphBinding = resolveElementHandleBinding(binding, input, bindings, aliases);
+					const graphBinding = resolveElementHandleBinding(
+						binding,
+						input,
+						bindings,
+						aliases,
+					);
 					if (!graphBinding || graphBinding.kind !== 'element') return [];
 					return [
 						{
@@ -192,20 +197,9 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 				),
 			};
 		});
-	const asyncBoundaries = input.semanticGraph.asyncBoundaries.map((boundary) => ({
-		id: boundary.id,
-		kind: 'async-boundary' as const,
-		anchorOrder: boundary.anchorOrder,
-		armRecords: boundaryArmRecords(boundary.id),
-		startAnchor: {
-			strategy: 'dom-order-comment' as const,
-			index: (anchorRank.get(boundary.id) ?? 0) * 2,
-		},
-		endAnchor: {
-			strategy: 'dom-order-comment' as const,
-			index: (anchorRank.get(boundary.id) ?? 0) * 2 + 1,
-		},
-		asyncReads: uniqueBy(
+	const computedByGraphNode = new Map(computed.map((entry) => [entry.graphNodeId, entry]));
+	const asyncBoundaries = input.semanticGraph.asyncBoundaries.map((boundary) => {
+		const directAsyncReads = uniqueBy(
 			[
 				...input.semanticGraph.templateReads,
 				// Keyed repeats inside the arm read their collection from the
@@ -244,8 +238,29 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 				];
 			}),
 			(read) => `${read.graphNodeId}:${read.path.join('.')}:${read.source}`,
-		),
-	}));
+		);
+		return {
+			id: boundary.id,
+			kind: 'async-boundary' as const,
+			anchorOrder: boundary.anchorOrder,
+			armRecords: boundaryArmRecords(boundary.id),
+			startAnchor: {
+				strategy: 'dom-order-comment' as const,
+				index: (anchorRank.get(boundary.id) ?? 0) * 2,
+			},
+			endAnchor: {
+				strategy: 'dom-order-comment' as const,
+				index: (anchorRank.get(boundary.id) ?? 0) * 2 + 1,
+			},
+			// Runner symbol IDs currently travel on boundary reads. Preserve the
+			// authored read first, then carry the async computed dependencies that
+			// must exist client-side even when no boundary reads them directly.
+			asyncReads: [
+				...directAsyncReads,
+				...transitiveAsyncComputedReads(directAsyncReads, computedByGraphNode),
+			],
+		};
+	});
 	return {
 		passId: 'payload-arena',
 		state: {
@@ -274,6 +289,45 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 		},
 		diagnostics: input.stateLowering.diagnostics,
 	};
+}
+
+function transitiveAsyncComputedReads(
+	directReads: ReadonlyArray<{
+		readonly source: string;
+		readonly graphNodeId: string;
+		readonly path: ReadonlyArray<string>;
+	}>,
+	computedByGraphNode: ReadonlyMap<string, PayloadArenaArtifact['state']['computed'][number]>,
+): ReadonlyArray<{
+	readonly source: string;
+	readonly graphNodeId: string;
+	readonly path: ReadonlyArray<string>;
+}> {
+	const seen = new Set(directReads.map((read) => read.graphNodeId));
+	const reads: Array<{
+		source: string;
+		graphNodeId: string;
+		path: ReadonlyArray<string>;
+	}> = [];
+
+	const visit = (graphNodeId: string): void => {
+		for (const dependency of computedByGraphNode.get(graphNodeId)?.dependencies ?? []) {
+			const dependencyComputed = computedByGraphNode.get(dependency.graphNodeId);
+			if (!dependencyComputed || seen.has(dependency.graphNodeId)) continue;
+
+			seen.add(dependency.graphNodeId);
+			if (dependencyComputed.async) {
+				reads.push({
+					source: dependency.source,
+					graphNodeId: dependency.graphNodeId,
+					path: dependency.path,
+				});
+			}
+			visit(dependency.graphNodeId);
+		}
+	};
+	for (const read of directReads) visit(read.graphNodeId);
+	return reads;
 }
 
 function resolveElementHandleBinding(

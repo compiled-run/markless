@@ -394,7 +394,7 @@ function emitAsyncBoundaryHtml(node: AnyNode, context: HtmlRenderContext): strin
 		// the stream (the helper awaits).
 		return joinSsrExpressions([
 			JSON.stringify(`<!--markless:async:${boundary.id}-->`),
-			`(await ((async (marklessSsrAsyncSnapshot) => marklessSsrAsyncSnapshot.status === "fulfilled" ? (async (${runner.name}) => ${tryHtml})(marklessSsrAsyncSnapshot.value) : marklessSsrAsyncSnapshot.status === "rejected" ? (async (${catchParam}) => ${catchHtml})(marklessSsrAsyncSnapshot.error) : (async () => ${pendingHtml})())(await marklessSsrRunAsyncComputed(marklessSsrAsyncSnapshots, ${JSON.stringify(runner.graphNodeId)}, ${runner.source}, marklessSsrRenderContext, ${String(node.pending != null)}))))`,
+			`(await ((async (marklessSsrAsyncSnapshot) => marklessSsrAsyncSnapshot.status === "fulfilled" ? (async (${runner.name}) => ${tryHtml})(marklessSsrAsyncSnapshot.value) : marklessSsrAsyncSnapshot.status === "rejected" ? (async (${catchParam}) => ${catchHtml})(marklessSsrAsyncSnapshot.error) : (async () => ${pendingHtml})())(await marklessSsrRunAsyncComputed(marklessSsrAsyncSnapshots, ${JSON.stringify(runner.graphNodeId)}, ${runner.source}, marklessSsrRenderContext, ${String(node.pending != null)}${context.asyncDependencyRegistry ? ', marklessSsrAsyncRunnerDefinitions, marklessSsrAsyncRuns' : ''}))))`,
 			JSON.stringify(`<!--/markless:async:${boundary.id}-->`),
 		]);
 	}
@@ -414,25 +414,15 @@ export function collectSsrAsyncRunners(
 	string,
 	{ readonly graphNodeId: string; readonly name: string; readonly source: string }
 > {
-	const asyncGraphNodeIds = new Set(
-		input.symbolResolver.symbols.flatMap((symbol) =>
-			symbol.kind === 'async-computed-runner' ? [symbol.graphNodeId] : [],
-		),
-	);
+	const definitions = collectSsrAsyncRunnerDefinitions(input);
 	const runnersByGraphNode = new Map(
-		input.symbolResolver.symbols.flatMap((symbol) =>
-			symbol.kind === 'async-computed-runner'
-				? [
-						[
-							symbol.graphNodeId,
-							{
-								name: symbol.name,
-								source: ssrAsyncRunnerSource(symbol, asyncGraphNodeIds),
-							},
-						] as const,
-					]
-				: [],
-		),
+		input.symbolResolver.symbols.flatMap((symbol) => {
+			if (symbol.kind !== 'async-computed-runner') return [];
+			const definition = definitions.get(symbol.graphNodeId);
+			return definition
+				? [[symbol.graphNodeId, { name: symbol.name, source: definition.source }] as const]
+				: [];
+		}),
 	);
 	const byBoundary = new Map<
 		string,
@@ -446,6 +436,39 @@ export function collectSsrAsyncRunners(
 		}
 	}
 	return byBoundary;
+}
+
+export function collectSsrAsyncRunnerDefinitions(input: PublicRenderModuleInput): ReadonlyMap<
+	string,
+	{
+		readonly source: string;
+		readonly dependencies: ReadonlyArray<string>;
+	}
+> {
+	const asyncGraphNodeIds = new Set(
+		input.symbolResolver.symbols.flatMap((symbol) =>
+			symbol.kind === 'async-computed-runner' ? [symbol.graphNodeId] : [],
+		),
+	);
+	return new Map(
+		input.symbolResolver.symbols.flatMap((symbol) =>
+			symbol.kind === 'async-computed-runner'
+				? [
+						[
+							symbol.graphNodeId,
+							{
+								source: ssrAsyncRunnerSource(symbol, asyncGraphNodeIds),
+								dependencies: (symbol.dependencies ?? []).flatMap((dependency) =>
+									asyncGraphNodeIds.has(dependency.graphNodeId)
+										? [dependency.graphNodeId]
+										: [],
+								),
+							},
+						] as const,
+					]
+				: [],
+		),
+	);
 }
 
 function ssrAsyncRunnerSource(

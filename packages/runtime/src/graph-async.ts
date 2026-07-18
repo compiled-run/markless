@@ -6,6 +6,7 @@ import type {
 import { readPath } from './graph-core.ts';
 
 export type RuntimeAsyncComputedNode = RuntimeGraphAsyncComputed & {
+	blockedByDependency?: 'pending' | 'rejected';
 	controller?: AbortController;
 	demanded: boolean;
 	keyValue: unknown;
@@ -52,6 +53,8 @@ export function readAsyncComputedNode(
 
 export function demandAsyncComputed(input: {
 	readonly node: RuntimeAsyncComputedNode;
+	readonly asyncComputedNodes: ReadonlyMap<string, RuntimeAsyncComputedNode>;
+	readonly demandAsyncComputed: (node: RuntimeAsyncComputedNode) => void;
 	readonly readGraph: RuntimeGraphRead;
 	readonly markDirtyPath: (graphNodeId: string, path: ReadonlyArray<string>) => void;
 	readonly scheduleFlush: () => void;
@@ -62,21 +65,137 @@ export function demandAsyncComputed(input: {
 	if (!input.node.pendingSnapshotNeedsRunner && input.node.snapshot.status !== 'idle') return;
 
 	input.node.demanded = true;
-	startAsyncComputed({ ...input, key: input.node.key(input.readGraph) });
+	advanceAsyncComputed(input);
 }
 
 export function invalidateAsyncComputed(input: {
 	readonly node: RuntimeAsyncComputedNode;
+	readonly asyncComputedNodes: ReadonlyMap<string, RuntimeAsyncComputedNode>;
+	readonly demandAsyncComputed: (node: RuntimeAsyncComputedNode) => void;
 	readonly readGraph: RuntimeGraphRead;
 	readonly markDirtyPath: (graphNodeId: string, path: ReadonlyArray<string>) => void;
 	readonly scheduleFlush: () => void;
 }): void {
 	if (!input.node.demanded) return;
 
+	advanceAsyncComputed(input);
+}
+
+function advanceAsyncComputed(input: {
+	readonly node: RuntimeAsyncComputedNode;
+	readonly asyncComputedNodes: ReadonlyMap<string, RuntimeAsyncComputedNode>;
+	readonly demandAsyncComputed: (node: RuntimeAsyncComputedNode) => void;
+	readonly readGraph: RuntimeGraphRead;
+	readonly markDirtyPath: (graphNodeId: string, path: ReadonlyArray<string>) => void;
+	readonly scheduleFlush: () => void;
+}): void {
+	const dependencyGate = gateAsyncComputedDependencies(input);
+	if (dependencyGate.status === 'pending') {
+		commitDependencyPending(input);
+		return;
+	}
+	if (dependencyGate.status === 'rejected') {
+		commitDependencyRejected(input, dependencyGate.error);
+		return;
+	}
+
 	const nextKey = input.node.key(input.readGraph);
-	if (input.node.snapshot.status !== 'idle' && Object.is(input.node.keyValue, nextKey)) return;
+	if (
+		input.node.blockedByDependency === undefined &&
+		!input.node.pendingSnapshotNeedsRunner &&
+		input.node.snapshot.status !== 'idle' &&
+		Object.is(input.node.keyValue, nextKey)
+	) {
+		return;
+	}
 
 	startAsyncComputed({ ...input, key: nextKey });
+}
+
+function gateAsyncComputedDependencies(input: {
+	readonly node: RuntimeAsyncComputedNode;
+	readonly asyncComputedNodes: ReadonlyMap<string, RuntimeAsyncComputedNode>;
+	readonly demandAsyncComputed: (node: RuntimeAsyncComputedNode) => void;
+}):
+	| { readonly status: 'ready' }
+	| { readonly status: 'pending' }
+	| { readonly status: 'rejected'; readonly error: unknown } {
+	const asyncDependencies = input.node.dependencies.flatMap((dependency) => {
+		const node = input.asyncComputedNodes.get(dependency.graphNodeId);
+		return node ? [node] : [];
+	});
+	const unsettled = asyncDependencies.filter(
+		(dependency) =>
+			dependency.snapshot.status === 'idle' || dependency.snapshot.status === 'pending',
+	);
+
+	// Start every missing upstream before publishing the downstream pending
+	// result. Their existing commit -> dirty -> invalidate cascade retries this
+	// key phase after they settle.
+	for (const dependency of unsettled) input.demandAsyncComputed(dependency);
+	if (unsettled.length > 0) return { status: 'pending' };
+
+	const rejected = asyncDependencies.find(
+		(dependency) => dependency.snapshot.status === 'rejected',
+	);
+	return rejected?.snapshot.status === 'rejected'
+		? { status: 'rejected', error: rejected.snapshot.error }
+		: { status: 'ready' };
+}
+
+function commitDependencyPending(input: {
+	readonly node: RuntimeAsyncComputedNode;
+	readonly markDirtyPath: (graphNodeId: string, path: ReadonlyArray<string>) => void;
+	readonly scheduleFlush: () => void;
+}): void {
+	if (input.node.blockedByDependency === 'pending') return;
+
+	input.node.controller?.abort();
+	input.node.controller = undefined;
+	input.node.blockedByDependency = 'pending';
+	input.node.pendingSnapshotNeedsRunner = false;
+	const version = input.node.version + 1;
+	input.node.version = version;
+	input.node.snapshot = {
+		status: 'pending',
+		version,
+		key: input.node.keyValue,
+		value: (input.node.snapshot as { readonly value?: unknown }).value,
+	};
+	input.markDirtyPath(input.node.graphNodeId, []);
+	input.scheduleFlush();
+}
+
+function commitDependencyRejected(
+	input: {
+		readonly node: RuntimeAsyncComputedNode;
+		readonly markDirtyPath: (graphNodeId: string, path: ReadonlyArray<string>) => void;
+		readonly scheduleFlush: () => void;
+	},
+	error: unknown,
+): void {
+	if (
+		input.node.blockedByDependency === 'rejected' &&
+		input.node.snapshot.status === 'rejected' &&
+		Object.is(input.node.snapshot.error, error)
+	) {
+		return;
+	}
+
+	input.node.controller?.abort();
+	input.node.controller = undefined;
+	input.node.blockedByDependency = 'rejected';
+	input.node.pendingSnapshotNeedsRunner = false;
+	const version = input.node.version + 1;
+	input.node.version = version;
+	input.node.snapshot = {
+		status: 'rejected',
+		version,
+		key: input.node.keyValue,
+		error,
+	};
+	input.markDirtyPath(input.node.graphNodeId, []);
+	input.scheduleFlush();
 }
 
 function startAsyncComputed(input: {
@@ -87,6 +206,7 @@ function startAsyncComputed(input: {
 	readonly scheduleFlush: () => void;
 }): void {
 	input.node.controller?.abort();
+	input.node.blockedByDependency = undefined;
 	input.node.pendingSnapshotNeedsRunner = false;
 
 	const controller = new AbortController();

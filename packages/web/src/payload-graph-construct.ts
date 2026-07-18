@@ -77,9 +77,11 @@ function asyncComputedFromPayload(
 	graphRef: () => RuntimeGraph,
 ): Promise<NonNullable<Parameters<RuntimeModule['createRuntimeGraph']>[0]['asyncComputed']>> {
 	const runnerSymbols = asyncRunnerSymbolsByGraphNode(input.view);
+	const demandedGraphNodeIds = asyncComputedDemandClosure(input.state, runnerSymbols.keys());
 	return Promise.all(
 		input.state.computed.flatMap(async (computed) => {
-			if (computed.async !== true) return [];
+			if (computed.async !== true || !demandedGraphNodeIds.has(computed.graphNodeId))
+				return [];
 			const runnerSymbolId = runnerSymbols.get(computed.graphNodeId);
 			if (!runnerSymbolId) return [];
 			const dependencies = computed.dependencies ?? [];
@@ -106,6 +108,27 @@ function asyncComputedFromPayload(
 			];
 		}),
 	).then((entries) => entries.flat());
+}
+
+function asyncComputedDemandClosure(
+	state: ProtocolStatePayload,
+	seedGraphNodeIds: Iterable<string>,
+): ReadonlySet<string> {
+	const computedByGraphNode = new Map(
+		state.computed.map((computed) => [computed.graphNodeId, computed]),
+	);
+	const demanded = new Set<string>();
+	const visit = (graphNodeId: string): void => {
+		if (demanded.has(graphNodeId)) return;
+		demanded.add(graphNodeId);
+		for (const dependency of computedByGraphNode.get(graphNodeId)?.dependencies ?? []) {
+			if (computedByGraphNode.get(dependency.graphNodeId)?.async === true) {
+				visit(dependency.graphNodeId);
+			}
+		}
+	};
+	for (const graphNodeId of seedGraphNodeIds) visit(graphNodeId);
+	return demanded;
 }
 
 async function deserializeAsyncComputedSnapshot(

@@ -261,11 +261,25 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	};
 
 	const demandAsyncComputed = (node: RuntimeAsyncComputedNode): void => {
-		demandRuntimeAsyncComputed({ node, readGraph, markDirtyPath, scheduleFlush });
+		demandRuntimeAsyncComputed({
+			node,
+			asyncComputedNodes,
+			demandAsyncComputed,
+			readGraph,
+			markDirtyPath,
+			scheduleFlush,
+		});
 	};
 
 	const invalidateAsyncComputed = (node: RuntimeAsyncComputedNode): void => {
-		invalidateRuntimeAsyncComputed({ node, readGraph, markDirtyPath, scheduleFlush });
+		invalidateRuntimeAsyncComputed({
+			node,
+			asyncComputedNodes,
+			demandAsyncComputed,
+			readGraph,
+			markDirtyPath,
+			scheduleFlush,
+		});
 	};
 
 	const sharedGraph = createSharedGraphPlane({
