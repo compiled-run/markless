@@ -121,6 +121,27 @@ export function createInlineResumerDebugRegistrationSource(): string {
 	return `(${registerInlineResumerDebug.toString()})`;
 }
 
+export function createInlineResumerSelfWakeSource(resumeModuleUrl: string | undefined): string {
+	return `;(${runInlineResumerSelfWake.toString()})(${JSON.stringify(resumeModuleUrl)});`;
+}
+
+// Serialized only into documents whose payload has an unsettled async runner.
+// Keeping this outside runInlineResumer leaves event-only documents on the
+// smaller interaction-triggered bootstrap.
+function runInlineResumerSelfWake(fallbackResumeModuleUrl: string | undefined): void {
+	const currentScript = document.currentScript as HTMLScriptElement | null;
+	const root = currentScript?.closest<InlineRoot>('[data-async-container]');
+	const resumeModuleUrl =
+		currentScript?.getAttribute?.('data-markless-resume-module') ?? fallbackResumeModuleUrl;
+	if (!root || !resumeModuleUrl) return;
+	queueMicrotask(async () => {
+		if (!root.__asyncResumeRuntimeStarted) {
+			const module = (await import(/* @vite-ignore */ resumeModuleUrl)) as InlineResumeModule;
+			await module.resumeContainerEvent({ root, event: 0 });
+		}
+	});
+}
+
 function registerInlineResumerDebug(input: {
 	readonly controls: InlineDebugControls | undefined;
 	readonly elements: ReadonlyArray<Element>;
@@ -488,9 +509,4 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 			debugControls?.activate();
 		} catch {}
 	}
-	if (currentScript?.dataset?.marklessSelfWake !== undefined)
-		queueMicrotask(async () => {
-			if (!root.__asyncResumeRuntimeStarted)
-				await (await loadModule(resumeModuleUrl)).resumeContainerEvent({ root, event: 0 });
-		});
 }

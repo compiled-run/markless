@@ -14,6 +14,7 @@ import { __marklessDebugBootstrapSource } from './debug-channel.ts';
 import type { MarklessExecutionLogMode } from './dev-log.ts';
 import {
 	createInlineResumerDebugRegistrationSource,
+	createInlineResumerSelfWakeSource,
 	createInlineResumerSource,
 	type InlineResumerSourceVariants,
 } from './inline/resumer.ts';
@@ -349,7 +350,8 @@ function renderInlineResumerScript(
 		? ` data-markless-resume-module="${escapeAttribute(resumeModuleUrl)}"`
 		: '';
 	const selfWakeAttribute = selfWake ? ' data-markless-self-wake' : '';
-	return `<script data-async-resumer${nonceAttribute}${resumeModuleAttribute}${selfWakeAttribute}>${escapeInlineScript(source)}</script>`;
+	const selfWakeSource = selfWake ? createInlineResumerSelfWakeSource(resumeModuleUrl) : '';
+	return `<script data-async-resumer${nonceAttribute}${resumeModuleAttribute}${selfWakeAttribute}>${escapeInlineScript(source + selfWakeSource)}</script>`;
 }
 
 function emptyStatePayload(): ProtocolStatePayload {

@@ -1449,6 +1449,7 @@ test('renderToString self-wakes when a fulfilled boundary read has an unsettled 
 	);
 
 	expect(html).toContain('data-markless-self-wake');
+	expect(extractResumerSource(html)).toContain('queueMicrotask');
 });
 
 test('renderToString self-wakes through a sync computed boundary read', async () => {
@@ -1653,6 +1654,7 @@ test('renderToString inline event resumer imports the resume module only after i
 	);
 	const view = JSON.parse(extractScriptText(html, 'markless/view')) as ProtocolViewPayload;
 	const resumerSource = extractResumerSource(html);
+	expect(resumerSource).not.toContain('queueMicrotask');
 	const button = element('BUTTON');
 	const root = element('DIV', [button]);
 	const listeners: Array<(event: FakeEvent) => Promise<void>> = [];
