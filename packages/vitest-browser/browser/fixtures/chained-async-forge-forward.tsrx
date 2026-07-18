@@ -9,6 +9,8 @@ export function App() @{
 		return { grade: 'refined-' + sample };
 	});
 	const makerSeal = computed(async ({ signal }) => {
+		const runs = ((globalThis as any).__forwardForgeRuns ||= { makerSeal: 0 });
+		runs.makerSeal++;
 		const grade = assaySheet.grade;
 		await new Promise((resolve) => setTimeout(resolve, 45));
 		if (signal.aborted) return { engraving: 'aborted' };

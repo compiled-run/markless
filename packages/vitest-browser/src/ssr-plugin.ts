@@ -1,25 +1,28 @@
 import { renderToString, type SsrRenderable } from '@markless/web';
+import { renderToStream } from '@markless/web/render-to-stream';
 import { dirname, isAbsolute, resolve } from 'pathe';
 import type { Plugin } from 'vite';
 import type { BrowserCommand } from 'vitest/node';
 
 // Node-side vitest plugin for SSR/resume browser tests. It rewrites
-// renderSSR(Component) and renderSSRPhased(Component) marker calls in browser
+// renderSSR(Component), renderSSRPhased(Component), and
+// renderStreamShell(Component) marker calls in browser
 // test files into a Vitest browser command RPC, and registers the command that
-// renders the compiled TSRX artifact to HTML with @markless/web
-// renderToString on the same Vite dev server that serves the browser's client
+// renders the compiled TSRX artifact with @markless/web renderToString or
+// renderToStream on the same Vite dev server that serves the browser's client
 // modules.
 //
 // v1 limitations (fail loudly instead of half-working):
 // - the component must be imported from a separate `.tsrx` module; local
 //   components declared inside the test file are not supported.
 // - props are not supported: `renderSSR(Component)` /
-//   `renderSSRPhased(Component)` only.
+//   `renderSSRPhased(Component)` / `renderStreamShell(Component)` only.
 
 const TEST_FILE_ID = /\.[jt]s(?:[?#].*)?$/;
 const TSRX_MODULE = /\.tsrx$/;
 
 type SsrCommandResult = { readonly html: string };
+type StreamShellCommandResult = { readonly shell: string };
 
 const renderSsrCommand: BrowserCommand<
 	[componentModulePath: string, exportName: string],
@@ -43,6 +46,26 @@ const renderSsrCommand: BrowserCommand<
 	return { html: await renderToString(artifact, { executionLog: 'never' }) };
 };
 
+const renderStreamShellCommand: BrowserCommand<
+	[componentModulePath: string, exportName: string],
+	StreamShellCommandResult
+> = async (context, componentModulePath, exportName) => {
+	const vite = context.project.browser?.vite ?? context.project.vite;
+	const moduleExports = (await vite.ssrLoadModule(componentModulePath)) as Record<
+		string,
+		SsrRenderable | undefined
+	>;
+	const artifact = moduleExports[exportName];
+	if (!artifact) {
+		throw new Error(
+			`renderStreamShell: export "${exportName}" not found in ${componentModulePath}. ` +
+				`Available exports: ${Object.keys(moduleExports).join(', ')}`,
+		);
+	}
+	const stream = await renderToStream(artifact, { executionLog: 'never' });
+	return { shell: stream.shell };
+};
+
 export function testSSR(): Plugin {
 	return {
 		name: 'markless:vitest-ssr-transform',
@@ -51,7 +74,10 @@ export function testSSR(): Plugin {
 			return {
 				test: {
 					browser: {
-						commands: { renderSSR: renderSsrCommand },
+						commands: {
+							renderSSR: renderSsrCommand,
+							renderStreamShell: renderStreamShellCommand,
+						},
 					},
 				},
 			} as never;
@@ -59,7 +85,7 @@ export function testSSR(): Plugin {
 		transform: {
 			filter: {
 				id: TEST_FILE_ID,
-				code: /renderSSR(?:Phased)?/,
+				code: /renderSSR(?:Phased)?|renderStreamShell/,
 			},
 			handler(code, id) {
 				return transformRenderSsrCalls(code, id);
@@ -79,14 +105,19 @@ export function transformRenderSsrCalls(
 	code: string,
 	id: string,
 ): { code: string; map: null } | null {
-	const calls = [...code.matchAll(/(?<![.\w$])(renderSSR|renderSSRPhased)\s*\(([^)]*)\)/g)];
+	const calls = [
+		...code.matchAll(/(?<![.\w$])(renderSSR|renderSSRPhased|renderStreamShell)\s*\(([^)]*)\)/g),
+	];
 	if (calls.length === 0) return null;
 
 	// Only files that import an SSR marker are rewritten. A file that
 	// calls a marker without importing it hits the marker module's own
 	// loud runtime error instead.
 	const imports = collectImportedNames(code);
-	const marker = imports.get('renderSSR') ?? imports.get('renderSSRPhased');
+	const marker =
+		imports.get('renderSSR') ??
+		imports.get('renderSSRPhased') ??
+		imports.get('renderStreamShell');
 	if (!marker) return null;
 
 	let transformed = code;
@@ -121,11 +152,14 @@ export function transformRenderSsrCalls(
 					`("${component.source}") are not supported yet. Use a relative import.`,
 			);
 		}
-		const renderCall = ` const ssr = await __marklessSsrCommands.renderSSR(${JSON.stringify(componentModulePath)}, ${JSON.stringify(component.exportName)});`;
+		const commandName = helperName === 'renderStreamShell' ? 'renderStreamShell' : 'renderSSR';
+		const renderCall = ` const ssr = await __marklessSsrCommands.${commandName}(${JSON.stringify(componentModulePath)}, ${JSON.stringify(component.exportName)});`;
 		const returnValue =
 			helperName === 'renderSSRPhased'
 				? ' return { html: ssr.html, mount(options) { return __marklessRenderServerHTML(ssr.html, options); } };'
-				: ' return __marklessRenderServerHTML(ssr.html);';
+				: helperName === 'renderStreamShell'
+					? ' return ssr.shell;'
+					: ' return __marklessRenderServerHTML(ssr.html);';
 		const replacement = '(async () => {' + renderCall + returnValue + ' })()';
 		transformed = transformed.replace(call[0], replacement);
 	}

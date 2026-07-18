@@ -7,7 +7,7 @@ import { testSSR } from './src/ssr-plugin.ts';
 // Browser test project for @markless/vitest-browser. Runs the CSR + SSR
 // resume harness tests in a real headless Chromium through the vite-plus
 // playwright provider. The markless plugin compiles .tsrx fixtures; testSSR
-// rewrites renderSSR(Component) marker calls into the SSR browser command.
+// rewrites string and first-flush streaming markers into SSR browser commands.
 export default defineProject({
 	plugins: [testSSR(), executedModulesPlugin(), markless()],
 	test: {

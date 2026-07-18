@@ -14,6 +14,7 @@ test('SSR: ordered template demand settles both levels of an async computed chai
 });
 
 test('cold CSR: a chained downstream boundary goes pending then fulfilled with no catch frame', async () => {
+	(globalThis as any).__forwardForgeRuns = { makerSeal: 0 };
 	const screen = await render(ForwardForge);
 	const container = screen.container as HTMLElement;
 	const samples: string[] = [];
@@ -25,6 +26,7 @@ test('cold CSR: a chained downstream boundary goes pending then fulfilled with n
 	observer.disconnect();
 
 	expect(samples).not.toContain('Seal cracked');
+	expect((globalThis as any).__forwardForgeRuns.makerSeal).toBe(1);
 });
 
 test('resume: an earlier upstream boundary settles without catch flashes and revalidates', async () => {
