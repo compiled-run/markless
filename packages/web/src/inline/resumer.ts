@@ -67,9 +67,9 @@ type InlineRoot = HTMLElement & {
 type InlineResumeModule = {
 	resumeContainerEvent(input: {
 		readonly root: InlineRoot;
-		readonly event: Event;
-		readonly element: Element | EventTarget | null;
-		readonly eventRecord: InlineEventRecord | null;
+		readonly event: Event | 0;
+		readonly element?: Element | EventTarget | null;
+		readonly eventRecord?: InlineEventRecord | null;
 		readonly syncPolicyAlreadyApplied?: boolean;
 	}): Promise<void> | void;
 };
@@ -488,4 +488,9 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 			debugControls?.activate();
 		} catch {}
 	}
+	if (currentScript?.dataset?.marklessSelfWake !== undefined)
+		queueMicrotask(async () => {
+			if (!root.__asyncResumeRuntimeStarted)
+				await (await loadModule(resumeModuleUrl)).resumeContainerEvent({ root, event: 0 });
+		});
 }

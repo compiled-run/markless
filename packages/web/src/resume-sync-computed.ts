@@ -11,42 +11,20 @@ type ResumeSyncComputedRecord = ProtocolStatePayload['computed'][number] & {
 };
 
 export async function refreshSyncComputed(input: {
+	readonly computed: ResumeSyncComputedRecord;
 	readonly graph: RuntimeGraph;
-	readonly graphNodeId: string;
-	readonly state?: ProtocolStatePayload;
 	readonly root: ResumeDomElement;
 	readonly loadSymbol: ResumeRuntimeInput['loadSymbol'];
 	readonly elementHandles: ElementHandleRegistry;
 }): Promise<void> {
-	for (const computed of syncComputedRecords(input.state)) {
-		if (computed.graphNodeId !== input.graphNodeId) continue;
-		const symbol = await input.loadSymbol(computed.deriveSymbolId);
-		const result = symbol({
-			graph: input.graph,
-			read: input.graph.read,
-			element: input.root,
-			getElementHandle: input.elementHandles.get,
-		});
-		input.graph.write({
-			graphNodeId: computed.graphNodeId,
-			value: isPromiseLike(result) ? await result : result,
-		});
-	}
-}
-export function hasSyncComputed(state: ProtocolStatePayload | undefined): boolean {
-	return syncComputedRecords(state).length > 0;
-}
-function syncComputedRecords(state: ProtocolStatePayload | undefined): ResumeSyncComputedRecord[] {
-	return (state?.computed ?? []).filter(
-		(computed): computed is ResumeSyncComputedRecord =>
-			computed.async === false &&
-			typeof (computed as ResumeSyncComputedRecord).deriveSymbolId === 'string',
-	);
-}
-function isPromiseLike<T>(value: T | PromiseLike<T>): value is PromiseLike<T> {
-	return (
-		value !== null &&
-		(typeof value === 'object' || typeof value === 'function') &&
-		typeof (value as { readonly then?: unknown }).then === 'function'
-	);
+	const result = (await input.loadSymbol(input.computed.deriveSymbolId))({
+		graph: input.graph,
+		read: input.graph.read,
+		element: input.root,
+		getElementHandle: input.elementHandles.get,
+	});
+	input.graph.write({
+		graphNodeId: input.computed.graphNodeId,
+		value: await result,
+	});
 }

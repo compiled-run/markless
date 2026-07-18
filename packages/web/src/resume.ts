@@ -69,6 +69,7 @@ export function createResumeRuntime(runtimeInput: ResumeRuntimeInput): ResumeRun
 			await (await loadRuntime()).start();
 		},
 		async dispatch(event: ResumeDomEvent, options?: ResumeDispatchOptions) {
+			if (!event) return;
 			await (await loadRuntime()).dispatch(event, options);
 		},
 		async activateBehaviors(hostNodeId: string) {

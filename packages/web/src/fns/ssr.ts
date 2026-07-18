@@ -197,15 +197,11 @@ function marklessSsrEnsureAsyncComputedRun(
 }
 
 function marklessSsrMaterializeAsyncComputedSnapshots(runs, snapshots, definitions, graphNodeId) {
-	const dependencyClosure = new Set();
-	const visit = (candidateGraphNodeId) => {
-		if (dependencyClosure.has(candidateGraphNodeId)) return;
-		dependencyClosure.add(candidateGraphNodeId);
+	const dependencyClosure = new Set([graphNodeId]);
+	for (const candidateGraphNodeId of dependencyClosure)
 		for (const dependencyGraphNodeId of definitions.get(candidateGraphNodeId)?.dependencies ??
 			[])
-			visit(dependencyGraphNodeId);
-	};
-	visit(graphNodeId);
+			dependencyClosure.add(dependencyGraphNodeId);
 	for (const candidateGraphNodeId of dependencyClosure) {
 		const entry = runs.get(candidateGraphNodeId);
 		if (!entry) continue;

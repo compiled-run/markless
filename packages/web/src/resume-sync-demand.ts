@@ -4,10 +4,6 @@ type SyncComputedRecord = NonNullable<ResumeRuntimeInput['state']>['computed'][n
 	readonly deriveSymbolId: string;
 };
 
-export function hasSyncComputedDemandTriggers(state: ResumeRuntimeInput['state']): boolean {
-	return syncComputedDemandRecords(state).length > 0;
-}
-
 export function wireSyncComputedDemandTriggersWithoutLoadingCapability(input: {
 	readonly graph: ResumeRuntimeInput['graph'];
 	readonly state: ResumeRuntimeInput['state'];
@@ -16,7 +12,9 @@ export function wireSyncComputedDemandTriggersWithoutLoadingCapability(input: {
 	readonly elementHandles: ResumePreparedCore['elementHandles'];
 	readonly storeContainerSubscription: (release: () => void) => void;
 }): void {
-	for (const computed of syncComputedDemandRecords(input.state)) {
+	for (const record of input.state?.computed ?? []) {
+		if (record.async !== false || typeof record.deriveSymbolId !== 'string') continue;
+		const computed = record as SyncComputedRecord;
 		for (const dependency of computed.dependencies ?? []) {
 			input.storeContainerSubscription(
 				input.graph.subscribe({
@@ -27,9 +25,8 @@ export function wireSyncComputedDemandTriggersWithoutLoadingCapability(input: {
 						await (
 							await import('./resume-sync-computed.ts')
 						).refreshSyncComputed({
+							computed,
 							graph: input.graph,
-							graphNodeId: computed.graphNodeId,
-							state: input.state,
 							root: input.root,
 							loadSymbol: input.loadSymbol,
 							elementHandles: input.elementHandles,
@@ -39,12 +36,4 @@ export function wireSyncComputedDemandTriggersWithoutLoadingCapability(input: {
 			);
 		}
 	}
-}
-
-function syncComputedDemandRecords(state: ResumeRuntimeInput['state']): SyncComputedRecord[] {
-	return (state?.computed ?? []).filter(
-		(computed): computed is SyncComputedRecord =>
-			computed.async === false &&
-			typeof (computed as { readonly deriveSymbolId?: unknown }).deriveSymbolId === 'string',
-	);
 }

@@ -36,12 +36,8 @@ export async function resumeFromPayloadDocument(
 
 	const scripts = readPayloadScriptsFromDocument(input.document);
 	return resumeFromPayloadScripts({
+		...input,
 		...scripts,
-		root: input.root,
-		loadSymbol: input.loadSymbol,
-		createVisibilityObserver: input.createVisibilityObserver,
-		createRemovalObserver: input.createRemovalObserver,
-		applyDomJournal: input.applyDomJournal,
 		renderBranchHtml: input.renderBranchHtml ?? documentTemplateBranchHtml(input.document),
 	});
 }

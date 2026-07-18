@@ -764,6 +764,26 @@ test('resume runtime can skip sync policy already applied by the inline resumer'
 	expect(loadedSymbols).toEqual(['symbol:click']);
 });
 
+test('resume runtime ignores the event-less self-wake after startup', async () => {
+	const root = element('MAIN');
+	const runtime = createResumeRuntime({
+		root,
+		graph: createRuntimeGraph({ cells: [] }),
+		view: {
+			locators: [],
+			events: [],
+			domUpdates: [],
+			behaviors: [],
+			elementHandles: [],
+			asyncBoundaries: [],
+		},
+		loadSymbol: () => () => undefined,
+	});
+
+	await runtime.start();
+	await expect(runtime.dispatch(0 as never)).resolves.toBeUndefined();
+});
+
 test('resume runtime activates element behaviors once on ordinary event triggers', async () => {
 	const button = element('BUTTON');
 	const root = element('SECTION', [button]);

@@ -132,16 +132,16 @@ export async function startResumeRuntime(input: {
 			onAsyncSnapshot,
 		});
 	}
-	const runnerGraphNodeIds = new Set(Object.keys(runtimeInput.view.asyncRunners ?? {}));
-	for (const boundary of runtimeInput.view.asyncBoundaries) {
-		for (const read of boundary.asyncReads) {
-			if (read.runnerSymbolId) runnerGraphNodeIds.add(read.graphNodeId);
-		}
-	}
 	for (const computed of runtimeInput.state?.computed ?? []) {
 		if (
 			computed.snapshot?.status === 'pending' &&
-			runnerGraphNodeIds.has(computed.graphNodeId)
+			(runtimeInput.view.asyncRunners?.[computed.graphNodeId] ||
+				runtimeInput.view.asyncBoundaries.some((boundary) =>
+					boundary.asyncReads.some(
+						(read) =>
+							read.graphNodeId === computed.graphNodeId && !!read.runnerSymbolId,
+					),
+				))
 		) {
 			runtimeInput.graph.read(computed.graphNodeId, ['status']);
 		}

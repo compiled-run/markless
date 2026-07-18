@@ -17,9 +17,9 @@ their prerequisites exist:
   (void-returning, no status reads), with the bump-a-state alias idiom as the
   documented interim.
 - Writable `computed()` (optimistic state).
-- Streaming SSR / out-of-order async boundary patching. The expected direction
-  is documented below, but it remains out of scope for the first implementation
-  plan.
+- Explicit sibling reveal ordering beyond independent async boundary streaming.
+  The deferred coordination direction is documented below; default streaming
+  boundary behavior is specified in [12-arm-rendering.md](./12-arm-rendering.md).
 - Server functions / RPC story. See "TSRX Submodule Host Boundary (Decision
   Draft)" below for the submodule-shaped slice of this decision.
 - Scoped `<style>` blocks: ACCEPTED 2026-07-02, see `01-tsrx-host-contract.md`.
@@ -60,12 +60,15 @@ their prerequisites exist:
   esbuild, terser, Rollup, SWC, webpack, Babel build pipelines, or similar tools
   as framework build dependencies unless this spec is deliberately reopened.
 
-## Streaming SSR / Out-Of-Order Patching
+## Deferred Reveal Coordination
 
-Out-of-order streaming should extend the async boundary model instead of adding
-a second authoring model. `@try` / `@pending` / `@catch` remains the semantic
-async UI boundary. Streaming controls how pending, resolved, and rejected
-boundary ranges are delivered; it does not expose streams to application source.
+Default out-of-order boundary streaming is specified in
+[12-arm-rendering.md](./12-arm-rendering.md). The deferred work here is explicit
+sibling reveal coordination, which extends that async boundary model instead of
+adding a second authoring model. `@try` / `@pending` / `@catch` remains the
+semantic async UI boundary. Streaming controls how pending, resolved, and
+rejected boundary ranges are delivered; it does not expose streams to
+application source.
 
 The expected author-facing coordination primitive is a compiler-known
 `<Reveal>` host intrinsic:

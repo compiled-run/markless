@@ -8,11 +8,7 @@ import {
 	type ResumePayloadScriptsInput,
 	type ResumePayloadScriptsResult,
 } from './payload-full.ts';
-import {
-	getAlreadyResumedPayload,
-	setResumedPayload,
-	startResumedPayload,
-} from './payload-resume-registry.ts';
+import { getAlreadyResumedPayload, setResumedPayload } from './payload-resume-registry.ts';
 
 // Streamed settles (T107) leave records + snapshot patches in the document.
 // Only pages that actually streamed pay for the adoption module: the check
@@ -42,7 +38,12 @@ export async function resumeFromPayloadScriptsImpl(
 ): Promise<ResumePayloadScriptsResult> {
 	const resumed = getAlreadyResumedPayload(input.root);
 	if (resumed) return resumed;
-	return startResumedPayload(input.root, () => startPayloadResume(input));
+	const root = input.root as typeof input.root & {
+		__mStart?: Promise<ResumePayloadScriptsResult>;
+	};
+	return (root.__mStart ??= startPayloadResume(input).finally(() => {
+		delete root.__mStart;
+	}));
 }
 
 async function startPayloadResume(

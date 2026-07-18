@@ -283,34 +283,27 @@ function hasUnsettledAsyncBoundaryRunner(
 	view: ProtocolViewPayload,
 	state: ProtocolStatePayload,
 ): boolean {
-	const runners = new Map(Object.entries(view.asyncRunners ?? {}));
+	const runners = { ...view.asyncRunners };
+	const reachable = new Set<string>();
 	for (const boundary of view.asyncBoundaries) {
 		for (const read of boundary.asyncReads) {
-			if (read.runnerSymbolId && !runners.has(read.graphNodeId)) {
-				runners.set(read.graphNodeId, read.runnerSymbolId);
-			}
+			reachable.add(read.graphNodeId);
+			if (read.runnerSymbolId) runners[read.graphNodeId] ??= read.runnerSymbolId;
 		}
 	}
 	const computedByGraphNode = new Map(
 		state.computed.map((computed) => [computed.graphNodeId, computed]),
 	);
-	const visited = new Set<string>();
-	const hasUnsettledRunner = (graphNodeId: string): boolean => {
-		if (visited.has(graphNodeId)) return false;
-		visited.add(graphNodeId);
+	for (const graphNodeId of reachable) {
 		const computed = computedByGraphNode.get(graphNodeId);
-		if (!computed) return false;
-		if (runners.has(graphNodeId)) {
+		if (!computed) continue;
+		if (runners[graphNodeId]) {
 			const status = computed.snapshot?.status;
-			if (status === undefined || status === 'idle' || status === 'pending') return true;
+			if (status !== 'fulfilled' && status !== 'rejected') return true;
 		}
-		return (computed.dependencies ?? []).some((dependency) =>
-			hasUnsettledRunner(dependency.graphNodeId),
-		);
-	};
-	return view.asyncBoundaries.some((boundary) =>
-		boundary.asyncReads.some((read) => hasUnsettledRunner(read.graphNodeId)),
-	);
+		for (const dependency of computed.dependencies ?? []) reachable.add(dependency.graphNodeId);
+	}
+	return false;
 }
 
 // In-arm event names from a boundary's armized record set. CSR-composed pages
@@ -356,11 +349,7 @@ function renderInlineResumerScript(
 		? ` data-markless-resume-module="${escapeAttribute(resumeModuleUrl)}"`
 		: '';
 	const selfWakeAttribute = selfWake ? ' data-markless-self-wake' : '';
-	const selfWakeSource =
-		selfWake && resumeModuleUrl
-			? `;{const s=document.currentScript,r=s?.closest('[data-async-container]');Promise.resolve().then(async()=>{if(!r||r.__asyncResumeRuntimeStarted)return;const m=await import(${JSON.stringify(resumeModuleUrl)}),e=new Event('markless:resume');await m.resumeContainerEvent({root:r,event:e,element:r,eventRecord:null})})}`
-			: '';
-	return `<script data-async-resumer${nonceAttribute}${resumeModuleAttribute}${selfWakeAttribute}>${escapeInlineScript(source + selfWakeSource)}</script>`;
+	return `<script data-async-resumer${nonceAttribute}${resumeModuleAttribute}${selfWakeAttribute}>${escapeInlineScript(source)}</script>`;
 }
 
 function emptyStatePayload(): ProtocolStatePayload {

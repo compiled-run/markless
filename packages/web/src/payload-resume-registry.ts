@@ -13,16 +13,12 @@ export type ResumeAlreadyResumedWarning = {
 };
 
 const resumedPayloadContainers = new WeakMap<ResumeDomElement, ResumePayloadScriptsResult>();
-const resumingPayloadContainers = new WeakMap<
-	ResumeDomElement,
-	Promise<ResumePayloadScriptsResult>
->();
 
 export function getAlreadyResumedPayload(
 	root: ResumeDomElement,
 ): ResumePayloadScriptsResult | undefined {
 	const resumed = resumedPayloadContainers.get(root);
-	return resumed ? { ...resumed, warnings: [alreadyResumedWarning()] } : undefined;
+	return resumed && { ...resumed, warnings: [alreadyResumedWarning] };
 }
 
 export function setResumedPayload(
@@ -30,30 +26,6 @@ export function setResumedPayload(
 	result: ResumePayloadScriptsResult,
 ): void {
 	resumedPayloadContainers.set(root, result);
-}
-
-export function startResumedPayload(
-	root: ResumeDomElement,
-	start: () => Promise<ResumePayloadScriptsResult>,
-): Promise<ResumePayloadScriptsResult> {
-	const existing = resumingPayloadContainers.get(root);
-	if (existing) return existing;
-
-	const starting = Promise.resolve().then(start);
-	resumingPayloadContainers.set(root, starting);
-	void starting.then(
-		() => {
-			if (resumingPayloadContainers.get(root) === starting) {
-				resumingPayloadContainers.delete(root);
-			}
-		},
-		() => {
-			if (resumingPayloadContainers.get(root) === starting) {
-				resumingPayloadContainers.delete(root);
-			}
-		},
-	);
-	return starting;
 }
 
 export function deleteResumedPayload(
@@ -64,17 +36,15 @@ export function deleteResumedPayload(
 	return resumed;
 }
 
-function alreadyResumedWarning(): ResumeAlreadyResumedWarning {
-	return {
-		code: 'MARKLESS_RESUME_ALREADY_RESUMED',
-		severity: 'warning',
-		phase: 'resume',
-		title: 'This container was already resumed',
-		message: 'resumeFromPayloadDocument was called again on an already live container.',
-		why: 'Resume attaches graph and event wiring once per payload container.',
-		suggestions: [
-			{ message: 'Resume each served container once, or dispose before resuming again.' },
-		],
-		docsUrl: 'https://markless.dev/errors/MARKLESS_RESUME_ALREADY_RESUMED',
-	};
-}
+const alreadyResumedWarning: ResumeAlreadyResumedWarning = {
+	code: 'MARKLESS_RESUME_ALREADY_RESUMED',
+	severity: 'warning',
+	phase: 'resume',
+	title: 'This container was already resumed',
+	message: 'resumeFromPayloadDocument was called again on an already live container.',
+	why: 'Resume attaches graph and event wiring once per payload container.',
+	suggestions: [
+		{ message: 'Resume each served container once, or dispose before resuming again.' },
+	],
+	docsUrl: 'https://markless.dev/errors/MARKLESS_RESUME_ALREADY_RESUMED',
+};

@@ -54,10 +54,8 @@ export function createAsyncBoundarySettleTracker(input: {
 	// SSR-resumed pages arrive with settled snapshots in the state payload;
 	// their boundaries already show settled content before any runner re-runs.
 	const settledGraphNodeIds = new Set<string>();
-	const syncGraphNodeIds = new Set<string>();
 	for (const computed of input.state?.computed ?? []) {
-		if (computed.async === false) syncGraphNodeIds.add(computed.graphNodeId);
-		if (isSettledStatus(computed.snapshot?.status)) {
+		if (computed.async === false || isSettledStatus(computed.snapshot?.status)) {
 			settledGraphNodeIds.add(computed.graphNodeId);
 		}
 	}
@@ -66,11 +64,7 @@ export function createAsyncBoundarySettleTracker(input: {
 		settledById.set(
 			boundary.id,
 			boundary.asyncReads.length > 0 &&
-				boundary.asyncReads.every(
-					(read) =>
-						syncGraphNodeIds.has(read.graphNodeId) ||
-						settledGraphNodeIds.has(read.graphNodeId),
-				),
+				boundary.asyncReads.every((read) => settledGraphNodeIds.has(read.graphNodeId)),
 		);
 	}
 	let commitFloor = 0;
@@ -183,33 +177,25 @@ function boundaryGateSnapshot(
 	observedGraphNodeId: string,
 	observedSnapshot: unknown,
 ): unknown {
-	let fulfilled: unknown = observedSnapshot;
-	const observedStatus = (observedSnapshot as { readonly status?: unknown } | null)?.status;
-	let pending: unknown =
-		observedStatus === 'pending' || observedStatus === 'idle' ? observedSnapshot : undefined;
-	let blocked = pending !== undefined;
-	for (const read of boundary.asyncReads) {
-		const snapshot = (
-			read.graphNodeId === observedGraphNodeId
+	const snapshots = boundary.asyncReads.map(
+		(read) =>
+			(read.graphNodeId === observedGraphNodeId
 				? observedSnapshot
-				: graph.read(read.graphNodeId, [])
-		) as {
-			readonly status?: unknown;
-			readonly error?: unknown;
-			readonly value?: unknown;
-		} | null;
-		if (snapshot?.status === 'rejected') {
-			return { status: 'rejected', error: snapshot.error };
-		}
-		if (snapshot?.status === 'fulfilled') fulfilled = snapshot;
-		else if (snapshot?.status === 'pending' || snapshot?.status === 'idle') {
-			blocked = true;
-			pending ??= snapshot;
-		} else if (snapshot === undefined) {
-			blocked = true;
-		}
-	}
-	return blocked ? (pending ?? { status: 'pending' }) : fulfilled;
+				: graph.read(read.graphNodeId, [])) as {
+				readonly status?: unknown;
+				readonly error?: unknown;
+			} | null,
+	);
+	const rejected = snapshots.find((snapshot) => snapshot?.status === 'rejected');
+	if (rejected) return { status: 'rejected', error: rejected.error };
+	return (
+		snapshots.find(
+			(snapshot) => snapshot?.status === 'pending' || snapshot?.status === 'idle',
+		) ??
+		(snapshots.includes(undefined)
+			? { status: 'pending' }
+			: snapshots.findLast((snapshot) => snapshot?.status === 'fulfilled'))
+	);
 }
 
 export async function settleAsyncBoundaryRange(

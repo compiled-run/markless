@@ -264,29 +264,19 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		});
 	};
 
-	const demandAsyncComputed = (node: RuntimeAsyncComputedNode): void => {
-		demandRuntimeAsyncComputed({
-			node,
-			computedNodes,
-			asyncComputedNodes,
-			demandAsyncComputed,
-			readGraph,
-			markDirtyPath,
-			scheduleFlush,
-		});
-	};
+	const asyncComputedInput = () => ({
+		computedNodes,
+		asyncComputedNodes,
+		demandAsyncComputed,
+		readGraph,
+		markDirtyPath,
+		scheduleFlush,
+	});
+	const demandAsyncComputed = (node: RuntimeAsyncComputedNode): void =>
+		demandRuntimeAsyncComputed({ node, ...asyncComputedInput() });
 
-	const invalidateAsyncComputed = (node: RuntimeAsyncComputedNode): void => {
-		invalidateRuntimeAsyncComputed({
-			node,
-			computedNodes,
-			asyncComputedNodes,
-			demandAsyncComputed,
-			readGraph,
-			markDirtyPath,
-			scheduleFlush,
-		});
-	};
+	const invalidateAsyncComputed = (node: RuntimeAsyncComputedNode): void =>
+		invalidateRuntimeAsyncComputed({ node, ...asyncComputedInput() });
 
 	const sharedGraph = createSharedGraphPlane({
 		cells,

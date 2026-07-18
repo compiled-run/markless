@@ -4,6 +4,7 @@ import type { ResumeDomElement, ResumeRuntimeInput } from './resume.ts';
 
 type RuntimeModule = typeof import('@markless/runtime');
 type RuntimeGraph = import('@markless/runtime').RuntimeGraph;
+type RuntimeGraphAsyncSnapshot = import('@markless/runtime').RuntimeGraphAsyncSnapshot;
 type RuntimeGraphRead = import('@markless/runtime').RuntimeGraphRead;
 
 export type ResumePayloadGraphInput = {
@@ -36,24 +37,14 @@ export async function createRuntimeGraphFromResumePayload(
 	const asyncComputed = await asyncComputedFromPayload(input, () => graph);
 	graph = createRuntimeGraph({
 		cells: await decodeStateCells(input.state, input.root.__marklessEventOnlyGraph),
-		computed: computedDependenciesFromPayload(input.state),
+		computed: input.state.computed.map((computed) => ({
+			...computed,
+			dependencies: computed.dependencies ?? [],
+		})),
 		sharedDefinitions: input.state.sharedDefinitions,
 		asyncComputed,
 	});
 	return graph;
-}
-
-function computedDependenciesFromPayload(state: ProtocolStatePayload) {
-	return state.computed.flatMap((computed) =>
-		computed.async === false
-			? [
-					{
-						graphNodeId: computed.graphNodeId,
-						dependencies: computed.dependencies ?? [],
-					},
-				]
-			: [],
-	);
 }
 
 async function decodeStateCells(
@@ -62,25 +53,19 @@ async function decodeStateCells(
 ) {
 	return Promise.all(
 		payload.cells.map(async (cell) => {
-			if (eventOnlyValues?.has(cell.graphNodeId)) {
-				return {
-					graphNodeId: cell.graphNodeId,
-					value: eventOnlyValues.get(cell.graphNodeId),
-				};
-			}
 			// CSR-mounted pages seed prop cells with live values that never
 			// crossed the HTML boundary — there is no serialized envelope to
 			// decode, the value is used as-is (dashboard-migration need 14).
 			const directValue = (cell as { readonly directValue?: unknown }).directValue;
-			if (directValue !== undefined) {
-				return { graphNodeId: cell.graphNodeId, value: directValue };
-			}
 			return {
 				graphNodeId: cell.graphNodeId,
-				value:
-					cell.value === undefined
-						? undefined
-						: await deserializeGraphValue(cell.value as SerializedGraphPayload),
+				value: eventOnlyValues?.has(cell.graphNodeId)
+					? eventOnlyValues.get(cell.graphNodeId)
+					: directValue !== undefined
+						? directValue
+						: cell.value === undefined
+							? undefined
+							: await deserializeGraphValue(cell.value as SerializedGraphPayload),
 			};
 		}),
 	);
@@ -91,30 +76,28 @@ function asyncComputedFromPayload(
 	graphRef: () => RuntimeGraph,
 ): Promise<NonNullable<Parameters<RuntimeModule['createRuntimeGraph']>[0]['asyncComputed']>> {
 	const runnerSymbols = asyncRunnerSymbolsByGraphNode(input.view);
-	const demandedGraphNodeIds = asyncComputedDemandClosure(input.state, [
-		...runnerSymbols.keys(),
-		...input.view.asyncBoundaries.flatMap((boundary) =>
-			boundary.asyncReads.map((read) => read.graphNodeId),
-		),
-	]);
 	return Promise.all(
-		input.state.computed.flatMap(async (computed) => {
-			if (computed.async !== true || !demandedGraphNodeIds.has(computed.graphNodeId))
-				return [];
-			const runnerSymbolId = runnerSymbols.get(computed.graphNodeId);
-			if (!runnerSymbolId) return [];
-			const dependencies = computed.dependencies ?? [];
-			return [
-				{
+		input.state.computed
+			.filter((computed) => computed.async === true && !!runnerSymbols[computed.graphNodeId])
+			.map(async (computed) => {
+				const runnerSymbolId = runnerSymbols[computed.graphNodeId]!;
+				const dependencies = computed.dependencies ?? [];
+				return {
 					graphNodeId: computed.graphNodeId,
 					dependencies,
-					initialSnapshot: computed.snapshot
-						? await deserializeAsyncComputedSnapshot(computed.snapshot)
-						: undefined,
-					key: (read: RuntimeGraphRead) => dependencyKey(dependencies, read),
+					initialSnapshot:
+						computed.snapshot &&
+						(await deserializeAsyncComputedSnapshot(computed.snapshot)),
+					key: (read: RuntimeGraphRead) => {
+						const dependency = dependencies[0];
+						return dependencies.length > 1
+							? dependencies.map((dependency) =>
+									read(dependency.graphNodeId, dependency.path),
+								)
+							: dependency && read(dependency.graphNodeId, dependency.path);
+					},
 					run: async ({ key, signal, read }) => {
-						const symbol = await input.loadSymbol(runnerSymbolId);
-						return await symbol({
+						return (await input.loadSymbol(runnerSymbolId))({
 							graph: graphRef(),
 							read,
 							key,
@@ -123,80 +106,32 @@ function asyncComputedFromPayload(
 							getElementHandle: () => undefined,
 						});
 					},
-				},
-			];
-		}),
-	).then((entries) => entries.flat());
+				};
+			}),
+	);
 }
 
-function asyncComputedDemandClosure(
-	state: ProtocolStatePayload,
-	seedGraphNodeIds: Iterable<string>,
-): ReadonlySet<string> {
-	const computedByGraphNode = new Map(
-		state.computed.map((computed) => [computed.graphNodeId, computed]),
-	);
-	const demanded = new Set<string>();
-	const visit = (graphNodeId: string): void => {
-		if (demanded.has(graphNodeId)) return;
-		demanded.add(graphNodeId);
-		for (const dependency of computedByGraphNode.get(graphNodeId)?.dependencies ?? []) {
-			if (computedByGraphNode.has(dependency.graphNodeId)) visit(dependency.graphNodeId);
-		}
-	};
-	for (const graphNodeId of seedGraphNodeIds) visit(graphNodeId);
-	return demanded;
+function asyncRunnerSymbolsByGraphNode(view: ProtocolViewPayload): Record<string, string> {
+	const symbols = { ...view.asyncRunners };
+	for (const boundary of view.asyncBoundaries)
+		for (const read of boundary.asyncReads)
+			if (read.runnerSymbolId) symbols[read.graphNodeId] ??= read.runnerSymbolId;
+	return symbols;
 }
 
 async function deserializeAsyncComputedSnapshot(
 	snapshot: NonNullable<ProtocolStatePayload['computed'][number]['snapshot']>,
 ) {
 	if (snapshot.status === 'idle') return snapshot;
-	const key = await deserializeGraphValue(snapshot.key as SerializedGraphPayload);
-	if (snapshot.status === 'pending') {
-		return { status: snapshot.status, version: snapshot.version, key };
-	}
-	if (snapshot.status === 'fulfilled') {
-		return {
-			status: snapshot.status,
-			version: snapshot.version,
-			key,
-			value: await deserializeGraphValue(snapshot.value as SerializedGraphPayload),
-		};
-	}
-	return {
-		status: snapshot.status,
-		version: snapshot.version,
-		key,
-		error: await deserializeGraphValue(snapshot.error as SerializedGraphPayload),
+	const decoded: Record<string, unknown> = {
+		...snapshot,
+		key: await deserializeGraphValue(snapshot.key as SerializedGraphPayload),
 	};
-}
-
-function asyncRunnerSymbolsByGraphNode(view: ProtocolViewPayload): Map<string, string> {
-	const symbols = new Map(Object.entries(view.asyncRunners ?? {}));
-	// Protocol-v1 hand-authored fixtures and adopted older documents carried
-	// direct runner IDs on boundary reads. Compiler output now owns the closure
-	// in asyncRunners, but retaining this reader keeps those payloads resumable.
-	for (const boundary of view.asyncBoundaries) {
-		for (const read of boundary.asyncReads) {
-			if (read.runnerSymbolId && !symbols.has(read.graphNodeId)) {
-				symbols.set(read.graphNodeId, read.runnerSymbolId);
-			}
-		}
-	}
-	return symbols;
-}
-
-function dependencyKey(
-	dependencies: NonNullable<ProtocolStatePayload['computed'][number]['dependencies']>,
-	read: RuntimeGraphRead,
-): unknown {
-	if (dependencies.length === 0) return undefined;
-	if (dependencies.length === 1) {
-		const dependency = dependencies[0]!;
-		return read(dependency.graphNodeId, dependency.path);
-	}
-	return dependencies.map((dependency) => read(dependency.graphNodeId, dependency.path));
+	if (snapshot.status === 'fulfilled')
+		decoded.value = await deserializeGraphValue(snapshot.value as SerializedGraphPayload);
+	else if (snapshot.status === 'rejected')
+		decoded.error = await deserializeGraphValue(snapshot.error as SerializedGraphPayload);
+	return decoded as RuntimeGraphAsyncSnapshot;
 }
 
 function runtimeModule(): Promise<RuntimeModule> {
