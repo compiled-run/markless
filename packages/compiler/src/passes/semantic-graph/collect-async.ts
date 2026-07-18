@@ -128,7 +128,6 @@ export function collectComputedDependencyCycleDiagnostics(
 		const activeIndex = active.get(binding.id);
 		if (activeIndex !== undefined) {
 			const cycleBindings = [...stack.slice(activeIndex), binding];
-			if (!cycleBindings.some((candidate) => candidate.async === true)) return;
 			const names = cycleBindings.map((candidate) => candidate.name);
 			const key = canonicalCycleKey(names);
 			if (reported.has(key)) return;

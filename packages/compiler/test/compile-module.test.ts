@@ -3063,9 +3063,11 @@ export function App() @{
 		document,
 		loadSymbol,
 	});
-	const output = (csrModule.marklessRenderCsr as () => {
-		readonly root: PublicRenderTestElement;
-	})();
+	const output = (
+		csrModule.marklessRenderCsr as () => {
+			readonly root: PublicRenderTestElement;
+		}
+	)();
 	const applied: Array<{ readonly type: string; readonly fragment?: unknown }> = [];
 	const container = await render(() => output as never, {
 		target: new PublicRenderTestElement('target') as never,
@@ -3526,7 +3528,10 @@ export function App() @{
 			};
 		}
 		if (childDomUpdateIds.has(symbolId)) {
-			return (context: { readonly domUpdate: { readonly hostNodeId: string }; readonly value: unknown }) => ({
+			return (context: {
+				readonly domUpdate: { readonly hostNodeId: string };
+				readonly value: unknown;
+			}) => ({
 				type: 'setText' as const,
 				locator: context.domUpdate.hostNodeId,
 				value: context.value,
@@ -3550,7 +3555,10 @@ export function App() @{
 			};
 		}
 		if (parentDomUpdateIds.has(requestedId)) {
-			return (context: { readonly domUpdate: { readonly hostNodeId: string }; readonly value: unknown }) => ({
+			return (context: {
+				readonly domUpdate: { readonly hostNodeId: string };
+				readonly value: unknown;
+			}) => ({
 				type: 'setText' as const,
 				locator: context.domUpdate.hostNodeId,
 				value: context.value,
@@ -3566,12 +3574,14 @@ export function App() @{
 			childComponent: { renderCsr: childModule.marklessRenderCsr },
 		},
 	);
-	const output = (parentModule.marklessRenderCsr as () => {
-		readonly root: PublicRenderTestElement;
-		readonly state: ProtocolStatePayload;
-		readonly view: ProtocolViewPayload;
-		readonly loadSymbol: typeof parentLoadSymbol;
-	})();
+	const output = (
+		parentModule.marklessRenderCsr as () => {
+			readonly root: PublicRenderTestElement;
+			readonly state: ProtocolStatePayload;
+			readonly view: ProtocolViewPayload;
+			readonly loadSymbol: typeof parentLoadSymbol;
+		}
+	)();
 	const container = await render(() => output as never, {
 		target: new PublicRenderTestElement('target') as never,
 	});
@@ -5919,6 +5929,31 @@ export default function Home() @{
 	expect(result.publicRenderModule.ssrModuleSource).toContain('marklessSsrRepeatRows');
 });
 
+test('SSR derives a template-read sync computed after all async ancestors settle', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/SignalCardSsr.tsrx',
+		source: `import { computed } from '@markless/core';
+export default function SignalCardSsr() @{
+	const east = computed(async () => ({ label: 'east' }));
+	const west = computed(async () => ({ label: 'west' }));
+	const card = computed(() => ({ label: east.label + '-' + west.label }));
+	<section>
+		@try { <p>{card.label}</p> }
+		@pending { <p>Aligning</p> }
+		@catch { <p>Unavailable</p> }
+	</section>
+}`,
+		symbols: [],
+	});
+	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	const output = await (
+		ssrModule.marklessRenderSsr as () => Promise<{ readonly html: string }>
+	)();
+
+	expect(output.html).toContain('<p>east-west</p>');
+	expect(output.html).not.toContain('Unavailable');
+});
+
 // D1 tier 4 parity: the arm-render module executes the composed @try content
 // in the browser and must produce the same html SSR served for the same
 // settled snapshot. Normalization note: both sides run through the test DOM's
@@ -6142,7 +6177,9 @@ export function App() @{
 	]);
 	expect(result.publicRenderModule.rootExportName).toBe('App');
 	expect(result.publicRenderModule.moduleSource).toContain('cleanupMarklessPublicRepeat0Record');
-	expect(result.publicRenderModule.moduleSource).toContain('attachMarklessPublicRepeat0Behaviors');
+	expect(result.publicRenderModule.moduleSource).toContain(
+		'attachMarklessPublicRepeat0Behaviors',
+	);
 	expect(result.protocolView.behaviors).toEqual([]);
 	expect(result.protocolView.keyedRepeats?.[0]).not.toHaveProperty('rowBehaviors');
 
@@ -6182,7 +6219,13 @@ export function App() @{
 	] as const;
 	const loadSymbol = (symbolId: string) => {
 		if (symbolId === behaviorSymbol?.id) {
-			return ({ element, behaviorInputs }: { readonly element: PublicRenderTestElement; readonly behaviorInputs: [string] }) => {
+			return ({
+				element,
+				behaviorInputs,
+			}: {
+				readonly element: PublicRenderTestElement;
+				readonly behaviorInputs: [string];
+			}) => {
 				const key = behaviorInputs[0];
 				attachments++;
 				hostsByKey.set(key, element);

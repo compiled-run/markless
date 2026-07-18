@@ -109,3 +109,28 @@ export function SyncHopCycle() @{
 		}),
 	]);
 });
+
+test('two sync computeds cannot form a dependency cycle', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/SyncCycle.tsrx',
+		source: `
+import { computed } from '@markless/core';
+
+export function SyncCycle() @{
+	const north = computed(() => ({ label: south.label }));
+	const south = computed(() => ({ label: north.label }));
+
+	<section><p>{north.label}</p></section>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.semanticGraph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_COMPUTED_DEPENDENCY_CYCLE',
+			severity: 'error',
+			message: expect.stringMatching(/north.*south.*north/),
+		}),
+	]);
+});

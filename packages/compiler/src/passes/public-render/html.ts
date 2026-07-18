@@ -15,6 +15,11 @@ import {
 	unwrapExpressionContainer,
 } from '../../ast/tsrx.ts';
 import type { PublicRenderModuleInput } from '../../artifacts.ts';
+import {
+	graphBindingMap,
+	resolveGraphPath,
+	semanticAliasMap,
+} from '../../artifact-helpers/graph-paths.ts';
 import { itemPathReadSource } from './source-expressions.ts';
 import {
 	emitCsrComponent,
@@ -417,7 +422,8 @@ export function collectSsrAsyncRunners(
 	const definitions = collectSsrAsyncRunnerDefinitions(input);
 	const runnersByGraphNode = new Map(
 		input.symbolResolver.symbols.flatMap((symbol) => {
-			if (symbol.kind !== 'async-computed-runner') return [];
+			if (symbol.kind !== 'async-computed-runner' && symbol.kind !== 'sync-computed-derive')
+				return [];
 			const definition = definitions.get(symbol.graphNodeId);
 			return definition
 				? [[symbol.graphNodeId, { name: symbol.name, source: definition.source }] as const]
@@ -428,8 +434,19 @@ export function collectSsrAsyncRunners(
 		string,
 		{ readonly graphNodeId: string; readonly name: string; readonly source: string }
 	>();
+	const bindings = graphBindingMap(input.semanticGraph);
+	const aliases = semanticAliasMap(input.semanticGraph);
 	for (const boundary of input.protocolView.asyncBoundaries) {
-		const read = boundary.asyncReads[0];
+		// Protocol-view expands a template-read sync computed to its async
+		// ancestor closure for browser gating. SSR still derives and binds the
+		// authored sync value named in the semantic template read.
+		const authored = input.semanticGraph.templateReads.find(
+			(read) => read.asyncBoundaryId === boundary.id,
+		);
+		const authoredBinding = authored
+			? resolveGraphPath(authored.source, bindings, aliases)?.binding
+			: undefined;
+		const read = authoredBinding ? { graphNodeId: authoredBinding.id } : boundary.asyncReads[0];
 		const runner = read ? runnersByGraphNode.get(read.graphNodeId) : undefined;
 		if (read && runner) {
 			byBoundary.set(boundary.id, { graphNodeId: read.graphNodeId, ...runner });
@@ -443,43 +460,44 @@ export function collectSsrAsyncRunnerDefinitions(input: PublicRenderModuleInput)
 	{
 		readonly source: string;
 		readonly dependencies: ReadonlyArray<string>;
+		readonly async: boolean;
 	}
 > {
-	const asyncGraphNodeIds = new Set(
+	const asyncCapableSyncIds = new Set(
+		input.semanticGraph.graphBindings.flatMap((binding) =>
+			binding.kind === 'computed' && binding.async !== true && binding.asyncCapable === true
+				? [binding.id]
+				: [],
+		),
+	);
+	const registeredGraphNodeIds = new Set(
 		input.symbolResolver.symbols.flatMap((symbol) =>
-			symbol.kind === 'async-computed-runner' ? [symbol.graphNodeId] : [],
+			symbol.kind === 'async-computed-runner' ||
+			(symbol.kind === 'sync-computed-derive' && asyncCapableSyncIds.has(symbol.graphNodeId))
+				? [symbol.graphNodeId]
+				: [],
 		),
 	);
 	const computedByGraphNode = new Map(
 		input.protocolState.computed.map((computed) => [computed.graphNodeId, computed]),
 	);
-	const asyncDependencies = (graphNodeId: string): ReadonlyArray<string> => {
-		const dependencies = new Set<string>();
-		const visited = new Set<string>([graphNodeId]);
-		const visit = (dependencyGraphNodeId: string): void => {
-			if (visited.has(dependencyGraphNodeId)) return;
-			visited.add(dependencyGraphNodeId);
-			if (asyncGraphNodeIds.has(dependencyGraphNodeId))
-				dependencies.add(dependencyGraphNodeId);
-			for (const dependency of computedByGraphNode.get(dependencyGraphNodeId)?.dependencies ??
-				[]) {
-				if (computedByGraphNode.has(dependency.graphNodeId)) visit(dependency.graphNodeId);
-			}
-		};
-		for (const dependency of computedByGraphNode.get(graphNodeId)?.dependencies ?? []) {
-			if (computedByGraphNode.has(dependency.graphNodeId)) visit(dependency.graphNodeId);
-		}
-		return [...dependencies];
-	};
 	return new Map(
 		input.symbolResolver.symbols.flatMap((symbol) =>
-			symbol.kind === 'async-computed-runner'
+			symbol.kind === 'async-computed-runner' ||
+			(symbol.kind === 'sync-computed-derive' && asyncCapableSyncIds.has(symbol.graphNodeId))
 				? [
 						[
 							symbol.graphNodeId,
 							{
-								source: ssrAsyncRunnerSource(symbol, asyncGraphNodeIds),
-								dependencies: asyncDependencies(symbol.graphNodeId),
+								source: ssrAsyncRunnerSource(symbol, registeredGraphNodeIds),
+								dependencies: (
+									computedByGraphNode.get(symbol.graphNodeId)?.dependencies ?? []
+								)
+									.map((dependency) => dependency.graphNodeId)
+									.filter((graphNodeId) =>
+										registeredGraphNodeIds.has(graphNodeId),
+									),
+								async: symbol.kind === 'async-computed-runner',
 							},
 						] as const,
 					]
@@ -491,14 +509,14 @@ export function collectSsrAsyncRunnerDefinitions(input: PublicRenderModuleInput)
 function ssrAsyncRunnerSource(
 	symbol: Extract<
 		PublicRenderModuleInput['symbolResolver']['symbols'][number],
-		{ readonly kind: 'async-computed-runner' }
+		{ readonly kind: 'async-computed-runner' | 'sync-computed-derive' }
 	>,
-	asyncGraphNodeIds: ReadonlySet<string>,
+	registeredGraphNodeIds: ReadonlySet<string>,
 ): string {
 	const declarations: string[] = [];
 	const names = new Set<string>();
 	for (const dependency of symbol.dependencies ?? []) {
-		if (!asyncGraphNodeIds.has(dependency.graphNodeId)) continue;
+		if (!registeredGraphNodeIds.has(dependency.graphNodeId)) continue;
 		const sourcePath = dependency.source.split('.');
 		const name = sourcePath[0];
 		if (!name || names.has(name) || sourcePath.some((part) => !/^[$A-Z_a-z][$\w]*$/.test(part)))
@@ -508,6 +526,9 @@ function ssrAsyncRunnerSource(
 		declarations.push(
 			`const ${name}=read(${JSON.stringify(dependency.graphNodeId)},${JSON.stringify(path)});`,
 		);
+	}
+	if (symbol.kind === 'sync-computed-derive') {
+		return `({read})=>{${declarations.join('')}const derive=${symbol.source};return derive()}`;
 	}
 	if (declarations.length === 0) return symbol.source;
 	return `({key,signal,read})=>{${declarations.join('')}const run=${symbol.source};return run({key,signal,read})}`;

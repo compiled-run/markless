@@ -189,7 +189,7 @@ type OrchardSensor = {
 
 function orchardArtifact(
 	sensors: ReadonlyArray<OrchardSensor>,
-	options: { readonly settleWaveLagMs?: number } = {},
+	options: { readonly settleWaveLagMs?: number; readonly shellBoundaryLagMs?: number } = {},
 ) {
 	let renderPass = 0;
 	return {
@@ -217,6 +217,9 @@ function orchardArtifact(
 				arms.push(
 					`<!--markless:async:orchard:${index}-->${arm}<!--/markless:async:orchard:${index}-->`,
 				);
+				if (renderPass === 2 && index === 0 && options.shellBoundaryLagMs) {
+					await new Promise((resolve) => setTimeout(resolve, options.shellBoundaryLagMs));
+				}
 			}
 			// Simulates a slow settle-wave re-render pass (composition work after
 			// the runs), so settles can race the pass — the request-versioning
@@ -275,6 +278,25 @@ function orchardArtifact(
 		},
 	};
 }
+
+test('a boundary keeps the pending snapshot captured before a sibling materializes', async () => {
+	const stream = await renderToStream(
+		orchardArtifact(
+			[
+				{ key: 'upper', delayMs: 15, label: 'Upper terrace ready' },
+				{ key: 'lower', delayMs: 50, label: 'Lower terrace ready' },
+			],
+			{ shellBoundaryLagMs: 10 },
+		) as never,
+		{},
+	);
+
+	expect(stream.shell).toContain('data-calibrating="upper"');
+	expect(stream.pendingArmCount).toBe(2);
+	const appended = (await collect(stream.appends())).join('');
+	expect(appended).toContain('<template m:arm="orchard:0">');
+	expect(appended).toContain('Upper terrace ready');
+});
 
 // C1 parallel runner starts (T113): every boundary runner starts at request
 // start, so a slow early boundary cannot consume the shared first-flush
@@ -560,7 +582,12 @@ function composedGroveArtifact() {
 									runnerSymbolId: 'symbol:forecast-run',
 								},
 							],
-							armRecords: { locators: [], events: [], behaviors: [], elementHandles: [] },
+							armRecords: {
+								locators: [],
+								events: [],
+								behaviors: [],
+								elementHandles: [],
+							},
 						},
 						{
 							id: 'c0:boundary:0',
@@ -616,7 +643,9 @@ test('a composed child-owned boundary streams under its instance-prefixed id wit
 	// The child boundary streams keyed by the COMPOSED id everywhere: the
 	// inert template, the arm-record script, and the reveal-train call.
 	const appended = (await collect(stream.appends())).join('');
-	expect(appended).toContain('<template m:arm="c0:boundary:0"><p data-settled>Rhubarb ready</p></template>');
+	expect(appended).toContain(
+		'<template m:arm="c0:boundary:0"><p data-settled>Rhubarb ready</p></template>',
+	);
 	expect(appended).toContain('<script type="markless/arm" data-boundary="c0:boundary:0">');
 	expect(appended).toContain('__mArm("c0:boundary:0")');
 	// The streamed record set keeps the composed id space (prefixed host and

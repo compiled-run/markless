@@ -108,6 +108,9 @@ export function GlassArchive() @{
 	expect(result.publicRenderModule.ssrModuleSource).toContain(
 		'dependencies:["computed:furnaceReading"]',
 	);
+	expect(result.publicRenderModule.ssrModuleSource).toContain(
+		'const displayCard=read("computed:displayCard",[]);',
+	);
 	const syncDerive = result.symbolModules.modules.find(
 		(module) =>
 			module.kind === 'sync-computed-derive' &&
@@ -161,4 +164,71 @@ export function InlineCard() @{
 	expect(result.publicRenderModule.csrModuleSource).toContain(
 		"const displayCard = (() => ({ caption: pigment + '-fired' }))();",
 	);
+});
+
+test('a template-read sync computed gates its boundary on every async ancestor', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/SignalCard.tsrx',
+		source: `
+import { computed } from '@markless/core';
+
+export function SignalCard() @{
+	const east = computed(async () => ({ label: 'east' }));
+	const west = computed(async () => ({ label: 'west' }));
+	const card = computed(() => ({ label: east.label + '-' + west.label }));
+
+	<section>
+		@try {
+			<p>{card.label}</p>
+		} @pending {
+			<p>Aligning</p>
+		} @catch {
+			<p>Unavailable</p>
+		}
+	</section>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.protocolView.asyncBoundaries[0]?.asyncReads).toEqual([
+		expect.objectContaining({ graphNodeId: 'computed:east' }),
+		expect.objectContaining({ graphNodeId: 'computed:west' }),
+		expect.objectContaining({ graphNodeId: 'computed:card' }),
+	]);
+	expect(result.publicRenderModule.ssrModuleSource).toContain(
+		"const derive=() => ({ label: east.label + '-' + west.label });return derive()",
+	);
+});
+
+test('a composed settled arm reads an async-capable sync computed as a plain value', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/ArchivePanel.tsrx',
+		source: `
+import { computed } from '@markless/core';
+import { Badge } from './Badge.tsrx';
+
+export function ArchivePanel() @{
+	const sample = computed(async () => ({ tone: 'cobalt' }));
+	const card = computed(() => ({ label: 'Card ' + sample.tone }));
+	const record = computed(async () => ({ ready: true }));
+
+	<section>
+		@try {
+			<Badge label={record.ready ? card.label : 'Waiting'} />
+		} @pending {
+			<p>Loading</p>
+		} @catch {
+			<p>Unavailable</p>
+		}
+	</section>
+}
+`,
+		symbols: [],
+	});
+
+	const update = result.symbolModules.modules.find(
+		(module) => module.kind === 'async-boundary-update',
+	);
+	expect(update?.source).toContain('const card = context.graph.read("computed:card", []);');
 });

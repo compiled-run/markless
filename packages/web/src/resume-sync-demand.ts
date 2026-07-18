@@ -16,7 +16,6 @@ export function wireSyncComputedDemandTriggersWithoutLoadingCapability(input: {
 	readonly elementHandles: ResumePreparedCore['elementHandles'];
 	readonly storeContainerSubscription: (release: () => void) => void;
 }): void {
-	let syncComputedRuntimeWired = false;
 	for (const computed of syncComputedDemandRecords(input.state)) {
 		for (const dependency of computed.dependencies ?? []) {
 			input.storeContainerSubscription(
@@ -25,15 +24,15 @@ export function wireSyncComputedDemandTriggersWithoutLoadingCapability(input: {
 					graphNodeId: dependency.graphNodeId,
 					path: dependency.path,
 					async run() {
-						if (syncComputedRuntimeWired) return;
-						syncComputedRuntimeWired = true;
-						(await import('./resume-sync-computed.ts')).wireSyncComputed({
+						await (
+							await import('./resume-sync-computed.ts')
+						).refreshSyncComputed({
 							graph: input.graph,
+							graphNodeId: computed.graphNodeId,
 							state: input.state,
 							root: input.root,
 							loadSymbol: input.loadSymbol,
 							elementHandles: input.elementHandles,
-							storeContainerSubscription: input.storeContainerSubscription,
 						});
 					},
 				}),

@@ -119,7 +119,7 @@ export function emitPublicSsrRenderModule(
 							]
 								.map(
 									([graphNodeId, definition]) =>
-										`[${JSON.stringify(graphNodeId)},{run:${definition.source},dependencies:${JSON.stringify(definition.dependencies)}}]`,
+										`[${JSON.stringify(graphNodeId)},{run:${definition.source},dependencies:${JSON.stringify(definition.dependencies)},async:${String(definition.async)}}]`,
 								)
 								.join(',')}]);`,
 						]

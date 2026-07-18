@@ -116,7 +116,7 @@ export async function marklessSsrRunAsyncComputed(
 		// the real render pass races any of them against the shared deadline.
 		if (streaming.prestart) {
 			const snapshot = entry.settled ?? { status: 'pending', version: 1, key: null };
-			marklessSsrMaterializeAsyncComputedSnapshots(runs, snapshots);
+			marklessSsrMaterializeAsyncComputedSnapshots(runs, snapshots, definitions, graphNodeId);
 			return snapshot;
 		}
 		if (!entry.settled) {
@@ -124,11 +124,11 @@ export async function marklessSsrRunAsyncComputed(
 			else if (streaming.deadline) await Promise.race([entry.promise, streaming.deadline]);
 		}
 		const snapshot = entry.settled ?? { status: 'pending', version: 1, key: null };
-		marklessSsrMaterializeAsyncComputedSnapshots(runs, snapshots);
+		marklessSsrMaterializeAsyncComputedSnapshots(runs, snapshots, definitions, graphNodeId);
 		return snapshot;
 	}
 	const snapshot = await entry.promise;
-	marklessSsrMaterializeAsyncComputedSnapshots(runs, snapshots);
+	marklessSsrMaterializeAsyncComputedSnapshots(runs, snapshots, definitions, graphNodeId);
 	return snapshot;
 }
 
@@ -153,6 +153,7 @@ function marklessSsrEnsureAsyncComputedRun(
 	// arbitrary document order, this prevents a malformed cycle from creating
 	// unbounded recursive entries; valid computed graphs remain acyclic.
 	const entry = {};
+	entry.async = definition.async !== false;
 	runs.set(graphNodeId, entry);
 	const dependencyPath = new Set(visiting);
 	dependencyPath.add(graphNodeId);
@@ -195,10 +196,22 @@ function marklessSsrEnsureAsyncComputedRun(
 	return entry;
 }
 
-function marklessSsrMaterializeAsyncComputedSnapshots(runs, snapshots) {
-	for (const [graphNodeId, entry] of runs) {
+function marklessSsrMaterializeAsyncComputedSnapshots(runs, snapshots, definitions, graphNodeId) {
+	const dependencyClosure = new Set();
+	const visit = (candidateGraphNodeId) => {
+		if (dependencyClosure.has(candidateGraphNodeId)) return;
+		dependencyClosure.add(candidateGraphNodeId);
+		for (const dependencyGraphNodeId of definitions.get(candidateGraphNodeId)?.dependencies ??
+			[])
+			visit(dependencyGraphNodeId);
+	};
+	visit(graphNodeId);
+	for (const candidateGraphNodeId of dependencyClosure) {
+		const entry = runs.get(candidateGraphNodeId);
+		if (!entry) continue;
+		if (entry.async === false) continue;
 		const snapshot = entry.settled ?? { status: 'pending', version: 1, key: null };
-		marklessSsrUpsertAsyncComputedSnapshot(graphNodeId, snapshot, snapshots);
+		marklessSsrUpsertAsyncComputedSnapshot(candidateGraphNodeId, snapshot, snapshots);
 	}
 }
 
@@ -206,11 +219,12 @@ function marklessSsrUpsertAsyncComputedSnapshot(graphNodeId, snapshot, snapshots
 	const index = snapshots.findIndex((entry) => entry.graphNodeId === graphNodeId);
 	const next = { graphNodeId, snapshot };
 	if (index === -1) snapshots.push(next);
-	else snapshots[index] = next;
 }
 
 function marklessSsrReadAsyncComputedSnapshot(graphNodeId, path = [], runs, snapshots) {
-	let value = runs.get(graphNodeId)?.settled;
+	const run = runs.get(graphNodeId);
+	let value = run?.settled;
+	if (run?.async === false && value?.status === 'fulfilled') value = value.value;
 	if (value === undefined) {
 		for (const entry of snapshots) {
 			if (entry.graphNodeId === graphNodeId) value = entry.snapshot;
