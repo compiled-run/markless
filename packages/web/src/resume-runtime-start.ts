@@ -132,6 +132,20 @@ export async function startResumeRuntime(input: {
 			onAsyncSnapshot,
 		});
 	}
+	const runnerGraphNodeIds = new Set(Object.keys(runtimeInput.view.asyncRunners ?? {}));
+	for (const boundary of runtimeInput.view.asyncBoundaries) {
+		for (const read of boundary.asyncReads) {
+			if (read.runnerSymbolId) runnerGraphNodeIds.add(read.graphNodeId);
+		}
+	}
+	for (const computed of runtimeInput.state?.computed ?? []) {
+		if (
+			computed.snapshot?.status === 'pending' &&
+			runnerGraphNodeIds.has(computed.graphNodeId)
+		) {
+			runtimeInput.graph.read(computed.graphNodeId, ['status']);
+		}
+	}
 	// Branch-runtime hooks live here with the settle machinery they depend on;
 	// the runtime core only carries their connection point.
 	input.connectBranchWiring({

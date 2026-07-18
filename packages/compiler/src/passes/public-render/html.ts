@@ -450,6 +450,27 @@ export function collectSsrAsyncRunnerDefinitions(input: PublicRenderModuleInput)
 			symbol.kind === 'async-computed-runner' ? [symbol.graphNodeId] : [],
 		),
 	);
+	const computedByGraphNode = new Map(
+		input.protocolState.computed.map((computed) => [computed.graphNodeId, computed]),
+	);
+	const asyncDependencies = (graphNodeId: string): ReadonlyArray<string> => {
+		const dependencies = new Set<string>();
+		const visited = new Set<string>([graphNodeId]);
+		const visit = (dependencyGraphNodeId: string): void => {
+			if (visited.has(dependencyGraphNodeId)) return;
+			visited.add(dependencyGraphNodeId);
+			if (asyncGraphNodeIds.has(dependencyGraphNodeId))
+				dependencies.add(dependencyGraphNodeId);
+			for (const dependency of computedByGraphNode.get(dependencyGraphNodeId)?.dependencies ??
+				[]) {
+				if (computedByGraphNode.has(dependency.graphNodeId)) visit(dependency.graphNodeId);
+			}
+		};
+		for (const dependency of computedByGraphNode.get(graphNodeId)?.dependencies ?? []) {
+			if (computedByGraphNode.has(dependency.graphNodeId)) visit(dependency.graphNodeId);
+		}
+		return [...dependencies];
+	};
 	return new Map(
 		input.symbolResolver.symbols.flatMap((symbol) =>
 			symbol.kind === 'async-computed-runner'
@@ -458,11 +479,7 @@ export function collectSsrAsyncRunnerDefinitions(input: PublicRenderModuleInput)
 							symbol.graphNodeId,
 							{
 								source: ssrAsyncRunnerSource(symbol, asyncGraphNodeIds),
-								dependencies: (symbol.dependencies ?? []).flatMap((dependency) =>
-									asyncGraphNodeIds.has(dependency.graphNodeId)
-										? [dependency.graphNodeId]
-										: [],
-								),
+								dependencies: asyncDependencies(symbol.graphNodeId),
 							},
 						] as const,
 					]

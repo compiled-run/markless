@@ -725,13 +725,14 @@ test('payload script resume restores fulfilled async computed snapshots before r
 	});
 });
 
-test('payload script resume restarts pending async computed snapshots on demand', async () => {
+test('payload script resume restarts pending async computed snapshots on graph start', async () => {
 	const start = comment('async:boundary:0:start');
 	const paragraph = element('P');
 	const end = comment('async:boundary:0:end');
 	const root = element('SECTION', [start, paragraph, end]);
 	const loadedSymbols: string[] = [];
 	const runnerInputs: Array<{ readonly key: unknown; readonly readValue: unknown }> = [];
+	let resolveRunner!: (value: { readonly title: string }) => void;
 	const state = createProtocolStatePayload({
 		cells: [
 			{
@@ -791,12 +792,14 @@ test('payload script resume restarts pending async computed snapshots on demand'
 			return async (context) => {
 				const readValue = context.read?.('state:userId', []);
 				runnerInputs.push({ key: context.key, readValue });
-				return { title: `User ${String(readValue)}` };
+				return new Promise<{ readonly title: string }>((resolve) => {
+					resolveRunner = resolve;
+				});
 			};
 		},
 	});
 
-	expect(loadedSymbols).toEqual([]);
+	expect(loadedSymbols).toEqual(['symbol:details-runner']);
 	expect(resumed.graph.read('computed:details')).toEqual({
 		status: 'pending',
 		version: 4,
@@ -804,6 +807,7 @@ test('payload script resume restarts pending async computed snapshots on demand'
 	});
 	expect(loadedSymbols).toEqual(['symbol:details-runner']);
 
+	resolveRunner({ title: 'User ada' });
 	await settleMicrotasks();
 	await resumed.graph.flush();
 
@@ -1421,6 +1425,49 @@ test('runtime treats a second payload resume for one container as an already-res
 			docsUrl: 'https://markless.dev/errors/MARKLESS_RESUME_ALREADY_RESUMED',
 		}),
 	]);
+});
+
+test('concurrent payload resumes for one container share a single runtime startup', async () => {
+	const button = element('BUTTON');
+	const root = element('SECTION', [button]);
+	const state = createProtocolStatePayload({
+		cells: [
+			{
+				graphNodeId: 'state:count',
+				name: 'count',
+				valueKind: 'scalar',
+				value: 0,
+			},
+		],
+	});
+	const view: ProtocolViewPayload = {
+		version: 1,
+		locators: [
+			{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'section' },
+			{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'button' },
+		],
+		events: [{ hostNodeId: 'h1', eventName: 'click', symbolIds: ['symbol:click'] }],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	const scripts = renderPayloadScripts({ state, view });
+	const document = payloadDocument(scripts.stateScript, scripts.viewScript);
+	const input = {
+		document,
+		root,
+		loadSymbol: () => () => undefined,
+	};
+
+	const [first, second] = await Promise.all([
+		resumeFromPayloadDocument(input),
+		resumeFromPayloadDocument(input),
+	]);
+
+	expect(second.runtime).toBe(first.runtime);
+	expect(second.graph).toBe(first.graph);
+	expect(root.listeners).toHaveLength(1);
 });
 
 function captureThrown(run: () => unknown): unknown {

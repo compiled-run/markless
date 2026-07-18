@@ -3501,6 +3501,80 @@ test('resume runtime keeps settled async boundary snapshots idle at startup', as
 	expect(applied).toEqual([]);
 });
 
+test('resume runtime re-demands a serialized pending closure runner behind a fulfilled boundary read', async () => {
+	const start = comment('markless:async:boundary:0');
+	const settled = element('P');
+	const end = comment('/markless:async:boundary:0');
+	const root = element('SECTION', [start, settled, end]);
+	let sourceRuns = 0;
+	const graph = createRuntimeGraph({
+		cells: [],
+		asyncComputed: [
+			{
+				graphNodeId: 'computed:source',
+				dependencies: [],
+				initialSnapshot: { status: 'pending', version: 1, key: undefined },
+				key: () => undefined,
+				run() {
+					sourceRuns++;
+					return new Promise(() => undefined);
+				},
+			},
+			{
+				graphNodeId: 'computed:details',
+				dependencies: [{ graphNodeId: 'computed:source', path: [] }],
+				initialSnapshot: {
+					status: 'fulfilled',
+					version: 1,
+					key: undefined,
+					value: { title: 'Prior title' },
+				},
+				key: (read) => read('computed:source'),
+				run: () => ({ title: 'Next title' }),
+			},
+		],
+	});
+	const resume = createResumeRuntime({
+		root,
+		graph,
+		state: {
+			...createProtocolStatePayload({ cells: [] }),
+			computed: [
+				{
+					graphNodeId: 'computed:source',
+					name: 'source',
+					async: true,
+					snapshot: { status: 'pending', version: 1, key: undefined },
+				},
+				{
+					graphNodeId: 'computed:details',
+					name: 'details',
+					async: true,
+					dependencies: [{ graphNodeId: 'computed:source', path: [] }],
+					snapshot: {
+						status: 'fulfilled',
+						version: 1,
+						key: undefined,
+						value: { title: 'Prior title' },
+					},
+				},
+			],
+		},
+		view: {
+			...updatableBoundaryView(),
+			asyncRunners: {
+				'computed:source': 'symbol:source',
+				'computed:details': 'symbol:details',
+			},
+		},
+		loadSymbol: () => () => undefined,
+	});
+
+	await resume.start();
+
+	expect(sourceRuns).toBe(1);
+});
+
 test('resume runtime starts unsettled async boundary runners at creation and settles the range', async () => {
 	const start = comment('markless:async:boundary:0');
 	const pending = element('P');

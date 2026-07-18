@@ -294,12 +294,22 @@ function hasUnsettledAsyncBoundaryRunner(
 	const computedByGraphNode = new Map(
 		state.computed.map((computed) => [computed.graphNodeId, computed]),
 	);
+	const visited = new Set<string>();
+	const hasUnsettledRunner = (graphNodeId: string): boolean => {
+		if (visited.has(graphNodeId)) return false;
+		visited.add(graphNodeId);
+		const computed = computedByGraphNode.get(graphNodeId);
+		if (!computed) return false;
+		if (runners.has(graphNodeId)) {
+			const status = computed.snapshot?.status;
+			if (status === undefined || status === 'idle' || status === 'pending') return true;
+		}
+		return (computed.dependencies ?? []).some((dependency) =>
+			hasUnsettledRunner(dependency.graphNodeId),
+		);
+	};
 	return view.asyncBoundaries.some((boundary) =>
-		boundary.asyncReads.some((read) => {
-			if (!runners.has(read.graphNodeId)) return false;
-			const status = computedByGraphNode.get(read.graphNodeId)?.snapshot?.status;
-			return status === undefined || status === 'idle' || status === 'pending';
-		}),
+		boundary.asyncReads.some((read) => hasUnsettledRunner(read.graphNodeId)),
 	);
 }
 

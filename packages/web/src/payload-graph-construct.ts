@@ -127,9 +127,7 @@ function asyncComputedDemandClosure(
 		if (demanded.has(graphNodeId)) return;
 		demanded.add(graphNodeId);
 		for (const dependency of computedByGraphNode.get(graphNodeId)?.dependencies ?? []) {
-			if (computedByGraphNode.get(dependency.graphNodeId)?.async === true) {
-				visit(dependency.graphNodeId);
-			}
+			if (computedByGraphNode.has(dependency.graphNodeId)) visit(dependency.graphNodeId);
 		}
 	};
 	for (const graphNodeId of seedGraphNodeIds) visit(graphNodeId);

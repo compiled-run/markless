@@ -33,3 +33,22 @@ test('resume gates a serialized pending downstream until its upstream settles, t
 		.toBe('Plaque ochre-fired');
 	expect((globalThis as any).__kilnResumeRuns).toEqual({ gauge: 2, plaque: 2 });
 });
+
+test('pending-shell self-wake and an immediate event share one runtime startup', async () => {
+	const shell = await renderStreamShell(KilnResume);
+	(globalThis as any).__kilnResumeRuns = { gauge: 0, plaque: 0 };
+	const screen = renderServerHTML(shell);
+	const container = screen.container;
+	const change = container.querySelector<HTMLButtonElement>('button[data-change-glaze]');
+	if (!change) throw new Error('Expected the glaze control in the pending shell.');
+
+	change.click();
+
+	await expect
+		.poll(() => container.querySelector('[data-plaque-arm]')?.textContent, { timeout: 5_000 })
+		.toBe('Plaque ochre-fired');
+	// Startup re-enters the shell's serialized pending gauge once. The immediate
+	// glaze write then aborts that cobalt run and revalidates it once for ochre.
+	// The plaque stays dependency-gated until the ochre gauge settles, so it runs once.
+	expect((globalThis as any).__kilnResumeRuns).toEqual({ gauge: 2, plaque: 1 });
+});

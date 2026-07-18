@@ -8,7 +8,11 @@ import {
 	type ResumePayloadScriptsInput,
 	type ResumePayloadScriptsResult,
 } from './payload-full.ts';
-import { getAlreadyResumedPayload, setResumedPayload } from './payload-resume-registry.ts';
+import {
+	getAlreadyResumedPayload,
+	setResumedPayload,
+	startResumedPayload,
+} from './payload-resume-registry.ts';
 
 // Streamed settles (T107) leave records + snapshot patches in the document.
 // Only pages that actually streamed pay for the adoption module: the check
@@ -38,7 +42,12 @@ export async function resumeFromPayloadScriptsImpl(
 ): Promise<ResumePayloadScriptsResult> {
 	const resumed = getAlreadyResumedPayload(input.root);
 	if (resumed) return resumed;
+	return startResumedPayload(input.root, () => startPayloadResume(input));
+}
 
+async function startPayloadResume(
+	input: ResumePayloadScriptsInput,
+): Promise<ResumePayloadScriptsResult> {
 	// Streamed settles left records + snapshot patches in the document; adopt
 	// them before graph construction so the settled DOM resumes interactive.
 	const decoded = await adoptStreamedPatchesIfPresent(decodePayloadScripts(input), input.root);

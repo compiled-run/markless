@@ -57,3 +57,49 @@ export function CeramicLedger() @{
 			],
 		]);
 });
+
+test('async runner transport crosses a sync computed dependency hop', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/GlassArchive.tsrx',
+		source: `
+import { computed, state } from '@markless/core';
+
+export function GlassArchive() @{
+	let pigment = state('indigo');
+	const furnaceReading = computed(async () => {
+		const batch = pigment;
+		return { tone: batch + '-fired' };
+	});
+	const displayCard = computed(() => ({ caption: furnaceReading.tone }));
+	const archiveEntry = computed(async () => {
+		return { text: 'Archive ' + displayCard.caption };
+	});
+
+	<article>
+		@try {
+			<strong>{archiveEntry.text}</strong>
+		} @pending {
+			<strong>Cataloguing</strong>
+		} @catch {
+			<strong>Archive unavailable</strong>
+		}
+	</article>
+}
+`,
+		symbols: [],
+	});
+
+	const upstreamRunner = result.symbolResolver.symbols.find(
+		(symbol) =>
+			symbol.kind === 'async-computed-runner' &&
+			symbol.graphNodeId === 'computed:furnaceReading',
+	);
+	if (!upstreamRunner) throw new Error('Expected the upstream async runner symbol.');
+
+	expect(result.protocolView.asyncRunners).toMatchObject({
+		'computed:furnaceReading': upstreamRunner.id,
+	});
+	expect(result.publicRenderModule.ssrModuleSource).toContain(
+		'dependencies:["computed:furnaceReading"]',
+	);
+});

@@ -13,6 +13,10 @@ export type ResumeAlreadyResumedWarning = {
 };
 
 const resumedPayloadContainers = new WeakMap<ResumeDomElement, ResumePayloadScriptsResult>();
+const resumingPayloadContainers = new WeakMap<
+	ResumeDomElement,
+	Promise<ResumePayloadScriptsResult>
+>();
 
 export function getAlreadyResumedPayload(
 	root: ResumeDomElement,
@@ -26,6 +30,30 @@ export function setResumedPayload(
 	result: ResumePayloadScriptsResult,
 ): void {
 	resumedPayloadContainers.set(root, result);
+}
+
+export function startResumedPayload(
+	root: ResumeDomElement,
+	start: () => Promise<ResumePayloadScriptsResult>,
+): Promise<ResumePayloadScriptsResult> {
+	const existing = resumingPayloadContainers.get(root);
+	if (existing) return existing;
+
+	const starting = Promise.resolve().then(start);
+	resumingPayloadContainers.set(root, starting);
+	void starting.then(
+		() => {
+			if (resumingPayloadContainers.get(root) === starting) {
+				resumingPayloadContainers.delete(root);
+			}
+		},
+		() => {
+			if (resumingPayloadContainers.get(root) === starting) {
+				resumingPayloadContainers.delete(root);
+			}
+		},
+	);
+	return starting;
 }
 
 export function deleteResumedPayload(
