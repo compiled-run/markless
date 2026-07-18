@@ -1,0 +1,14 @@
+{
+	"name": "markless-nav-intent-prefetch-poc",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"build": "node --experimental-strip-types build.mjs",
+		"check": "vp check build.mjs server.mjs src test package.json README.md",
+		"test": "node --test test/*.test.mjs",
+		"test:browser": "node --test test/browser.test.mjs",
+		"test:static": "node --test test/derivation.test.mjs"
+	},
+	"packageManager": "pnpm@10.33.2"
+}
