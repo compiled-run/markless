@@ -96,6 +96,7 @@ export async function assembleSsrContainer(
 	const view = containerScopedView(output.view ?? emptyViewPayload());
 	await validateKeyedRepeatPayloadKeys({ state, view });
 	const browserTriggers = hasBrowserTriggers(view, state);
+	const selfWake = hasUnsettledAsyncBoundaryRunner(view, state);
 	const payloadScripts =
 		hasPayload && browserTriggers ? renderPayloadScripts({ state, view }) : undefined;
 	const resumeModuleUrl = options.resumeModuleUrl ?? artifactResumeModuleUrl(component);
@@ -138,6 +139,7 @@ export async function assembleSsrContainer(
 					options.resumerSource ?? defaultSource,
 					options.nonce,
 					resumeModuleUrl,
+					selfWake,
 				)
 			: '';
 
@@ -262,6 +264,7 @@ function hasBrowserTriggers(view: ProtocolViewPayload, state: ProtocolStatePaylo
 					'string',
 		) ||
 		view.behaviors.some((behavior) => !!behavior.symbolId) ||
+		Object.keys(view.asyncRunners ?? {}).length > 0 ||
 		view.asyncBoundaries.some((boundary) =>
 			boundary.asyncReads.some((read) => !!read.runnerSymbolId),
 		) ||
@@ -273,6 +276,30 @@ function hasBrowserTriggers(view: ProtocolViewPayload, state: ProtocolStatePaylo
 		) ||
 		// Async boundary arm events also nest under armRecords (D3).
 		view.asyncBoundaries.some((boundary) => boundaryArmEventNames(boundary).length > 0)
+	);
+}
+
+function hasUnsettledAsyncBoundaryRunner(
+	view: ProtocolViewPayload,
+	state: ProtocolStatePayload,
+): boolean {
+	const runners = new Map(Object.entries(view.asyncRunners ?? {}));
+	for (const boundary of view.asyncBoundaries) {
+		for (const read of boundary.asyncReads) {
+			if (read.runnerSymbolId && !runners.has(read.graphNodeId)) {
+				runners.set(read.graphNodeId, read.runnerSymbolId);
+			}
+		}
+	}
+	const computedByGraphNode = new Map(
+		state.computed.map((computed) => [computed.graphNodeId, computed]),
+	);
+	return view.asyncBoundaries.some((boundary) =>
+		boundary.asyncReads.some((read) => {
+			if (!runners.has(read.graphNodeId)) return false;
+			const status = computedByGraphNode.get(read.graphNodeId)?.snapshot?.status;
+			return status === undefined || status === 'idle' || status === 'pending';
+		}),
 	);
 }
 
@@ -312,12 +339,18 @@ function renderInlineResumerScript(
 	source: string,
 	nonce: string | undefined,
 	resumeModuleUrl: string | undefined,
+	selfWake: boolean,
 ): string {
 	const nonceAttribute = nonce ? ` nonce="${escapeAttribute(nonce)}"` : '';
 	const resumeModuleAttribute = resumeModuleUrl
 		? ` data-markless-resume-module="${escapeAttribute(resumeModuleUrl)}"`
 		: '';
-	return `<script data-async-resumer${nonceAttribute}${resumeModuleAttribute}>${escapeInlineScript(source)}</script>`;
+	const selfWakeAttribute = selfWake ? ' data-markless-self-wake' : '';
+	const selfWakeSource =
+		selfWake && resumeModuleUrl
+			? `;{const s=document.currentScript,r=s?.closest('[data-async-container]');Promise.resolve().then(async()=>{if(!r||r.__asyncResumeRuntimeStarted)return;const m=await import(${JSON.stringify(resumeModuleUrl)}),e=new Event('markless:resume');await m.resumeContainerEvent({root:r,event:e,element:r,eventRecord:null})})}`
+			: '';
+	return `<script data-async-resumer${nonceAttribute}${resumeModuleAttribute}${selfWakeAttribute}>${escapeInlineScript(source + selfWakeSource)}</script>`;
 }
 
 function emptyStatePayload(): ProtocolStatePayload {

@@ -1,10 +1,5 @@
-import type { ProtocolViewPayload } from '@markless/serializer/protocol';
 import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../src/index.ts';
-
-type ProtocolViewWithAsyncRunners = ProtocolViewPayload & {
-	readonly asyncRunners: Readonly<Record<string, string>>;
-};
 
 test('chained async runners travel independently from boundary-authored reads', async () => {
 	const result = await compileTsrxModule({
@@ -42,7 +37,7 @@ export function CeramicLedger() @{
 	);
 	if (!upstreamRunner) throw new Error('Expected the upstream async runner symbol.');
 
-	const view = result.protocolView as ProtocolViewWithAsyncRunners;
+	const view = result.protocolView;
 	expect.soft(view.asyncRunners).toMatchObject({
 		'computed:kilnSensor': upstreamRunner.id,
 	});

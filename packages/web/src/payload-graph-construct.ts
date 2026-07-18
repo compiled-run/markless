@@ -77,7 +77,12 @@ function asyncComputedFromPayload(
 	graphRef: () => RuntimeGraph,
 ): Promise<NonNullable<Parameters<RuntimeModule['createRuntimeGraph']>[0]['asyncComputed']>> {
 	const runnerSymbols = asyncRunnerSymbolsByGraphNode(input.view);
-	const demandedGraphNodeIds = asyncComputedDemandClosure(input.state, runnerSymbols.keys());
+	const demandedGraphNodeIds = asyncComputedDemandClosure(input.state, [
+		...runnerSymbols.keys(),
+		...input.view.asyncBoundaries.flatMap((boundary) =>
+			boundary.asyncReads.map((read) => read.graphNodeId),
+		),
+	]);
 	return Promise.all(
 		input.state.computed.flatMap(async (computed) => {
 			if (computed.async !== true || !demandedGraphNodeIds.has(computed.graphNodeId))
@@ -156,7 +161,10 @@ async function deserializeAsyncComputedSnapshot(
 }
 
 function asyncRunnerSymbolsByGraphNode(view: ProtocolViewPayload): Map<string, string> {
-	const symbols = new Map<string, string>();
+	const symbols = new Map(Object.entries(view.asyncRunners ?? {}));
+	// Protocol-v1 hand-authored fixtures and adopted older documents carried
+	// direct runner IDs on boundary reads. Compiler output now owns the closure
+	// in asyncRunners, but retaining this reader keeps those payloads resumable.
 	for (const boundary of view.asyncBoundaries) {
 		for (const read of boundary.asyncReads) {
 			if (read.runnerSymbolId && !symbols.has(read.graphNodeId)) {

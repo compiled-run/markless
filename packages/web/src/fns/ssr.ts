@@ -298,6 +298,7 @@ export function marklessSsrComposeView(html, view, hostLocators, children, async
 	);
 	const branches = [...(view.branches ?? [])];
 	const asyncBoundaries = [...(view.asyncBoundaries ?? [])];
+	const asyncRunners = { ...view.asyncRunners };
 	const externalSymbolIds = new Set();
 	let inserted = 0;
 	for (const child of childData) {
@@ -312,6 +313,7 @@ export function marklessSsrComposeView(html, view, hostLocators, children, async
 				elementHandles,
 				branches,
 				asyncBoundaries,
+				asyncRunners,
 				externalSymbolIds,
 			});
 		inserted += child.hostCount;
@@ -333,6 +335,7 @@ export function marklessSsrComposeView(html, view, hostLocators, children, async
 			elementHandles,
 			branches: marklessSsrResolveAnchorRecords(html, 'branch', branches),
 			asyncBoundaries: armizedBoundaries,
+			...(Object.keys(asyncRunners).length > 0 ? { asyncRunners } : {}),
 		},
 		elementCount:
 			hostLocators.length +
@@ -443,6 +446,14 @@ export function marklessSsrAppendChildView(context) {
 	const childView = context.child.view;
 	const propEvents = context.child.output?.propEvents ?? [];
 	const callbackProps = context.child.callbackProps ?? {};
+	for (const [graphNodeId, symbolId] of Object.entries(childView.asyncRunners ?? {})) {
+		const mapped = marklessSsrRemapChildGraph(
+			{ graphNodeId, path: [] },
+			context.child.graphProps,
+		);
+		context.asyncRunners[mapped?.graphNodeId ?? graphNodeId] =
+			context.child.symbolPrefix + symbolId;
+	}
 	for (const locator of childView.locators)
 		context.locators.push({
 			...locator,

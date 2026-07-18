@@ -144,6 +144,10 @@ export type ProtocolArmRecordSet = {
 
 export type ProtocolViewPayload = {
 	readonly version: typeof ASYNC_PROTOCOL_VERSION;
+	// Async runner transport is independent from authored boundary reads. The
+	// compiler emits the dependency closure needed to reconstruct the client
+	// graph; optionality preserves protocol-v1 payloads with no async runners.
+	readonly asyncRunners?: Readonly<Record<string, string>>;
 	readonly locators: ReadonlyArray<{
 		readonly hostNodeId: string;
 		readonly strategy: 'dom-order';

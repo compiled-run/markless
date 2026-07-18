@@ -76,6 +76,13 @@ function baseState(value: unknown): asserts value is ProtocolStatePayload {
 }
 function baseView(value: unknown): asserts value is ProtocolViewPayload {
 	const payload = root(value, 'markless/view');
+	if ('asyncRunners' in payload) {
+		const runners = obj(payload.asyncRunners, 'markless/view asyncRunners');
+		for (const [graphNodeId, symbolId] of Object.entries(runners)) {
+			if (typeof symbolId !== 'string')
+				invalid(`markless/view asyncRunners.${graphNodeId}`, 'expected string.');
+		}
+	}
 	for (const key of [
 		'locators',
 		'events',

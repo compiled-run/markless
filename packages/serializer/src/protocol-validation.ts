@@ -179,6 +179,7 @@ export function assertProtocolViewPayload(
 	const behaviors = requiredPayloadArrayField(payload, 'behaviors', 'markless/view');
 	const elementHandles = requiredPayloadArrayField(payload, 'elementHandles', 'markless/view');
 	const asyncBoundaries = requiredPayloadArrayField(payload, 'asyncBoundaries', 'markless/view');
+	assertOptionalStringRecord(payload.asyncRunners, 'markless/view asyncRunners');
 
 	for (const [index, locator] of locators.entries()) {
 		const context = `markless/view locator[${index}]`;
@@ -1178,6 +1179,19 @@ function assertAsyncBoundaryReads(value: unknown, context: string): void {
 		assertStringField(read, 'graphNodeId', readContext);
 		assertStringArrayField(read, 'path', readContext);
 		assertOptionalStringField(read, 'runnerSymbolId', readContext);
+	}
+}
+
+function assertOptionalStringRecord(value: unknown, context: string): void {
+	if (value === undefined) return;
+	assertRecordShape(value, context);
+	for (const [key, entry] of Object.entries(value)) {
+		if (typeof entry !== 'string') {
+			throw invalidPayloadShapeError(
+				contextPayloadType(context),
+				`Invalid ${context}.${key}: expected string.`,
+			);
+		}
 	}
 }
 
