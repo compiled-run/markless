@@ -393,6 +393,87 @@ test('resume payload sync computed derives after dependency writes and updates D
 	expect(graph.read('computed:doubled')).toBe(6);
 });
 
+test('resume payload demand gates an async runner across a sync computed hop', async () => {
+	const kilnRequest = deferred<{ readonly tone: string }>();
+	const runs = { label: 0, sample: 0 };
+	const state = {
+		version: 1,
+		cells: [],
+		computed: [
+			{
+				graphNodeId: 'computed:kilnSample',
+				name: 'kilnSample',
+				async: true,
+				dependencies: [],
+			},
+			{
+				graphNodeId: 'computed:catalogCard',
+				name: 'catalogCard',
+				async: false,
+				deriveSymbolId: 'symbol:catalog-card',
+				dependencies: [{ graphNodeId: 'computed:kilnSample', path: ['value', 'tone'] }],
+			},
+			{
+				graphNodeId: 'computed:exhibitLabel',
+				name: 'exhibitLabel',
+				async: true,
+				dependencies: [{ graphNodeId: 'computed:catalogCard', path: ['caption'] }],
+			},
+		],
+	} as const;
+	const view = {
+		version: 1,
+		locators: [],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+		asyncRunners: {
+			'computed:kilnSample': 'symbol:kiln-sample',
+			'computed:exhibitLabel': 'symbol:exhibit-label',
+		},
+	} as const;
+	const root = element('SECTION');
+	const loadSymbol = (symbolId: string) => {
+		if (symbolId === 'symbol:kiln-sample') {
+			return () => {
+				runs.sample++;
+				return kilnRequest.promise;
+			};
+		}
+		if (symbolId === 'symbol:exhibit-label') {
+			return () => {
+				runs.label++;
+				return 'Exhibit label';
+			};
+		}
+		return () => ({ caption: 'Catalog card' });
+	};
+	const graph = await createRuntimeGraphFromResumePayload({
+		state: state as never,
+		view: view as never,
+		root,
+		loadSymbol,
+	});
+	const runtime = createResumeRuntime({
+		state: state as never,
+		view: view as never,
+		root,
+		graph,
+		loadSymbol,
+	});
+	await runtime.start();
+
+	expect(graph.read('computed:exhibitLabel', ['status'])).toBe('pending');
+	await settleMicrotasks();
+	expect(runs).toEqual({ label: 0, sample: 1 });
+
+	kilnRequest.resolve({ tone: 'ember' });
+	await vi.waitFor(() => expect(runs.label).toBe(1));
+	runtime.dispose();
+});
+
 test('resume runtime materializes view records and dispatches lazy symbols after sync policy', async () => {
 	const input = element('INPUT');
 	const root = element('SECTION', [input]);

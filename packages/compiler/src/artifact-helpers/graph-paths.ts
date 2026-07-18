@@ -29,19 +29,17 @@ export function graphBindingMap(
 	return bindings;
 }
 
-// Authored members on an async computed read through its resolved value. The
-// runtime reserves snapshot metadata at the graph root, so a colliding member
-// needs an explicit `value` hop to keep `result.value` distinct from the raw
-// snapshot's own value field.
+// Sync and template contexts read an async computed through its boundary-guarded
+// snapshot value. This includes a bare read: the graph root is snapshot metadata,
+// never the authored result.
 export function runtimeGraphReadPath(
 	binding: SemanticGraphBinding,
 	path: ReadonlyArray<string>,
 ): ReadonlyArray<string> {
 	return binding.kind === 'computed' &&
-		binding.asyncCapable === true &&
-		path[0] !== undefined &&
-		asyncSnapshotKeys.has(path[0])
-		? ['value', ...path]
+		binding.async === true &&
+		(path.length === 0 || asyncSnapshotKeys.has(path[0]))
+		? runtimeGraphDependencyPath(binding, path)
 		: path;
 }
 
@@ -52,9 +50,7 @@ export function runtimeGraphDependencyPath(
 	binding: SemanticGraphBinding,
 	path: ReadonlyArray<string>,
 ): ReadonlyArray<string> {
-	return binding.kind === 'computed' && binding.asyncCapable === true
-		? ['value', ...path]
-		: path;
+	return binding.kind === 'computed' && binding.async === true ? ['value', ...path] : path;
 }
 
 export function semanticAliasMap(

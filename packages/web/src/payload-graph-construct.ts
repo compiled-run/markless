@@ -36,10 +36,24 @@ export async function createRuntimeGraphFromResumePayload(
 	const asyncComputed = await asyncComputedFromPayload(input, () => graph);
 	graph = createRuntimeGraph({
 		cells: await decodeStateCells(input.state, input.root.__marklessEventOnlyGraph),
+		computed: computedDependenciesFromPayload(input.state),
 		sharedDefinitions: input.state.sharedDefinitions,
 		asyncComputed,
 	});
 	return graph;
+}
+
+function computedDependenciesFromPayload(state: ProtocolStatePayload) {
+	return state.computed.flatMap((computed) =>
+		computed.async === false
+			? [
+					{
+						graphNodeId: computed.graphNodeId,
+						dependencies: computed.dependencies ?? [],
+					},
+				]
+			: [],
+	);
 }
 
 async function decodeStateCells(

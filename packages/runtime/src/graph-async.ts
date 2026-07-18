@@ -4,6 +4,7 @@ import type {
 	RuntimeGraphRead,
 } from './graph.ts';
 import { readPath } from './graph-core.ts';
+import type { RuntimeComputedNode } from './graph-computed.ts';
 
 export type RuntimeAsyncComputedNode = RuntimeGraphAsyncComputed & {
 	blockedByDependency?: 'pending' | 'rejected';
@@ -53,6 +54,7 @@ export function readAsyncComputedNode(
 
 export function demandAsyncComputed(input: {
 	readonly node: RuntimeAsyncComputedNode;
+	readonly computedNodes: ReadonlyMap<string, RuntimeComputedNode>;
 	readonly asyncComputedNodes: ReadonlyMap<string, RuntimeAsyncComputedNode>;
 	readonly demandAsyncComputed: (node: RuntimeAsyncComputedNode) => void;
 	readonly readGraph: RuntimeGraphRead;
@@ -70,6 +72,7 @@ export function demandAsyncComputed(input: {
 
 export function invalidateAsyncComputed(input: {
 	readonly node: RuntimeAsyncComputedNode;
+	readonly computedNodes: ReadonlyMap<string, RuntimeComputedNode>;
 	readonly asyncComputedNodes: ReadonlyMap<string, RuntimeAsyncComputedNode>;
 	readonly demandAsyncComputed: (node: RuntimeAsyncComputedNode) => void;
 	readonly readGraph: RuntimeGraphRead;
@@ -83,6 +86,7 @@ export function invalidateAsyncComputed(input: {
 
 function advanceAsyncComputed(input: {
 	readonly node: RuntimeAsyncComputedNode;
+	readonly computedNodes: ReadonlyMap<string, RuntimeComputedNode>;
 	readonly asyncComputedNodes: ReadonlyMap<string, RuntimeAsyncComputedNode>;
 	readonly demandAsyncComputed: (node: RuntimeAsyncComputedNode) => void;
 	readonly readGraph: RuntimeGraphRead;
@@ -114,16 +118,14 @@ function advanceAsyncComputed(input: {
 
 function gateAsyncComputedDependencies(input: {
 	readonly node: RuntimeAsyncComputedNode;
+	readonly computedNodes: ReadonlyMap<string, RuntimeComputedNode>;
 	readonly asyncComputedNodes: ReadonlyMap<string, RuntimeAsyncComputedNode>;
 	readonly demandAsyncComputed: (node: RuntimeAsyncComputedNode) => void;
 }):
 	| { readonly status: 'ready' }
 	| { readonly status: 'pending' }
 	| { readonly status: 'rejected'; readonly error: unknown } {
-	const asyncDependencies = input.node.dependencies.flatMap((dependency) => {
-		const node = input.asyncComputedNodes.get(dependency.graphNodeId);
-		return node ? [node] : [];
-	});
+	const asyncDependencies = collectAsyncComputedDependencies(input);
 	const unsettled = asyncDependencies.filter(
 		(dependency) =>
 			dependency.snapshot.status === 'idle' || dependency.snapshot.status === 'pending',
@@ -141,6 +143,35 @@ function gateAsyncComputedDependencies(input: {
 	return rejected?.snapshot.status === 'rejected'
 		? { status: 'rejected', error: rejected.snapshot.error }
 		: { status: 'ready' };
+}
+
+function collectAsyncComputedDependencies(input: {
+	readonly node: RuntimeAsyncComputedNode;
+	readonly computedNodes: ReadonlyMap<string, RuntimeComputedNode>;
+	readonly asyncComputedNodes: ReadonlyMap<string, RuntimeAsyncComputedNode>;
+}): RuntimeAsyncComputedNode[] {
+	// Sync computeds have no settlement state, so walk through them until the
+	// gate reaches the async nodes whose snapshots can block this runner.
+	const asyncDependencies: RuntimeAsyncComputedNode[] = [];
+	const visited = new Set<string>([input.node.graphNodeId]);
+
+	const visit = (graphNodeId: string): void => {
+		if (visited.has(graphNodeId)) return;
+		visited.add(graphNodeId);
+
+		const asyncComputed = input.asyncComputedNodes.get(graphNodeId);
+		if (asyncComputed) {
+			asyncDependencies.push(asyncComputed);
+			return;
+		}
+
+		const computed = input.computedNodes.get(graphNodeId);
+		if (!computed) return;
+		for (const dependency of computed.dependencies) visit(dependency.graphNodeId);
+	};
+
+	for (const dependency of input.node.dependencies) visit(dependency.graphNodeId);
+	return asyncDependencies;
 }
 
 function commitDependencyPending(input: {

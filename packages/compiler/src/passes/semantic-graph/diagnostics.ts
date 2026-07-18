@@ -118,6 +118,20 @@ export function computedDependencyCycleDiagnostic(input: {
 	});
 }
 
+export function computedDependencyGraphCycleDiagnostic(input: {
+	readonly cycle: ReadonlyArray<string>;
+}): SemanticGraphDiagnostic {
+	const cycleSource = input.cycle.join(' -> ');
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_COMPUTED_DEPENDENCY_CYCLE',
+		title: 'Computed dependencies cannot form a cycle',
+		message: `Cannot create computed dependency cycle \`${cycleSource}\`.`,
+		why: 'A derive is a pull-based graph node; a cycle in its dependencies means there is no order in which the graph can produce the value.',
+		suggestion: `Break the dependency loop between ${input.cycle.slice(0, -1).join(', ')} so each computed can be evaluated from already available graph values.`,
+		docsUrl: 'https://markless.dev/errors/MARKLESS_COMPUTED_DEPENDENCY_CYCLE',
+	});
+}
+
 function semanticGraphDiagnostic(input: {
 	readonly code: SemanticGraphDiagnostic['code'];
 	readonly title: string;

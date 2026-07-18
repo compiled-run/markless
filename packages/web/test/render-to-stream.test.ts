@@ -109,6 +109,72 @@ async function collect(appends: AsyncGenerator<string>): Promise<string[]> {
 	return chunks;
 }
 
+test('SSR records one snapshot for an async upstream shared by two boundaries', async () => {
+	const snapshots: Array<{ readonly graphNodeId: string; readonly snapshot: unknown }> = [];
+	const runs = new Map();
+	const definitions = new Map([
+		['computed:ore', { run: async () => ({ grade: 'blue' }), dependencies: [] }],
+		[
+			'computed:leftCard',
+			{
+				run: async ({ read }: any) => ({
+					label: `left-${read('computed:ore', ['value', 'grade'])}`,
+				}),
+				dependencies: ['computed:ore'],
+			},
+		],
+		[
+			'computed:rightCard',
+			{
+				run: async ({ read }: any) => ({
+					label: `right-${read('computed:ore', ['value', 'grade'])}`,
+				}),
+				dependencies: ['computed:ore'],
+			},
+		],
+	]);
+
+	await marklessSsrRunAsyncComputed(
+		snapshots as never,
+		'computed:leftCard',
+		definitions.get('computed:leftCard')!.run,
+		undefined,
+		false,
+		definitions,
+		runs,
+	);
+	await marklessSsrRunAsyncComputed(
+		snapshots as never,
+		'computed:rightCard',
+		definitions.get('computed:rightCard')!.run,
+		undefined,
+		false,
+		definitions,
+		runs,
+	);
+
+	expect(snapshots.filter((entry) => entry.graphNodeId === 'computed:ore')).toHaveLength(1);
+});
+
+test('SSR rejects a malformed async dependency cycle without hanging', async () => {
+	const snapshots: Array<{ readonly graphNodeId: string; readonly snapshot: unknown }> = [];
+	const definitions = new Map([
+		['computed:first', { run: async () => 'first', dependencies: ['computed:second'] }],
+		['computed:second', { run: async () => 'second', dependencies: ['computed:first'] }],
+	]);
+	const result = marklessSsrRunAsyncComputed(
+		snapshots as never,
+		'computed:first',
+		definitions.get('computed:first')!.run,
+		undefined,
+		false,
+		definitions,
+		new Map(),
+	);
+
+	await expect(result).resolves.toMatchObject({ status: 'rejected' });
+});
+
 // Multi-boundary compiled-module-shaped artifact (alternate-shaped: orchard
 // sensor rows, not a dashboard). Sensors declare their own latency, whether
 // they authored a @pending arm (the streaming opt-in), and compiler-known

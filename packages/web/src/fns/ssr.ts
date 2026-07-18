@@ -106,7 +106,7 @@ export async function marklessSsrRunAsyncComputed(
 	const entry = marklessSsrEnsureAsyncComputedRun(graphNodeId, definitions, runs, snapshots);
 	if (!entry) {
 		const snapshot = { status: 'rejected', version: 1, key: null, error: undefined };
-		snapshots.push({ graphNodeId, snapshot });
+		marklessSsrUpsertAsyncComputedSnapshot(graphNodeId, snapshot, snapshots);
 		return snapshot;
 	}
 	if (streaming?.runs) {
@@ -116,7 +116,7 @@ export async function marklessSsrRunAsyncComputed(
 		// the real render pass races any of them against the shared deadline.
 		if (streaming.prestart) {
 			const snapshot = entry.settled ?? { status: 'pending', version: 1, key: null };
-			marklessSsrAppendAsyncComputedSnapshots(graphNodeId, definitions, runs, snapshots);
+			marklessSsrMaterializeAsyncComputedSnapshots(runs, snapshots);
 			return snapshot;
 		}
 		if (!entry.settled) {
@@ -124,15 +124,25 @@ export async function marklessSsrRunAsyncComputed(
 			else if (streaming.deadline) await Promise.race([entry.promise, streaming.deadline]);
 		}
 		const snapshot = entry.settled ?? { status: 'pending', version: 1, key: null };
-		marklessSsrAppendAsyncComputedSnapshots(graphNodeId, definitions, runs, snapshots);
+		marklessSsrMaterializeAsyncComputedSnapshots(runs, snapshots);
 		return snapshot;
 	}
 	const snapshot = await entry.promise;
-	marklessSsrAppendAsyncComputedSnapshots(graphNodeId, definitions, runs, snapshots);
+	marklessSsrMaterializeAsyncComputedSnapshots(runs, snapshots);
 	return snapshot;
 }
 
-function marklessSsrEnsureAsyncComputedRun(graphNodeId, definitions, runs, snapshots) {
+function marklessSsrEnsureAsyncComputedRun(
+	graphNodeId,
+	definitions,
+	runs,
+	snapshots,
+	visiting = new Set(),
+) {
+	if (visiting.has(graphNodeId)) {
+		const snapshot = { status: 'rejected', version: 1, key: null, error: undefined };
+		return { settled: snapshot, promise: Promise.resolve(snapshot) };
+	}
 	const existing = runs.get(graphNodeId);
 	if (existing) return existing;
 
@@ -144,6 +154,8 @@ function marklessSsrEnsureAsyncComputedRun(graphNodeId, definitions, runs, snaps
 	// unbounded recursive entries; valid computed graphs remain acyclic.
 	const entry = {};
 	runs.set(graphNodeId, entry);
+	const dependencyPath = new Set(visiting);
+	dependencyPath.add(graphNodeId);
 	entry.promise = Promise.resolve()
 		.then(async () => {
 			const dependencyEntries = [...new Set(definition.dependencies ?? [])].flatMap(
@@ -153,6 +165,7 @@ function marklessSsrEnsureAsyncComputedRun(graphNodeId, definitions, runs, snaps
 						definitions,
 						runs,
 						snapshots,
+						dependencyPath,
 					);
 					return dependency ? [dependency] : [];
 				},
@@ -182,28 +195,18 @@ function marklessSsrEnsureAsyncComputedRun(graphNodeId, definitions, runs, snaps
 	return entry;
 }
 
-function marklessSsrAppendAsyncComputedSnapshots(
-	graphNodeId,
-	definitions,
-	runs,
-	snapshots,
-	visited = new Set(),
-) {
-	if (visited.has(graphNodeId)) return;
-	visited.add(graphNodeId);
-	for (const dependencyGraphNodeId of definitions.get(graphNodeId)?.dependencies ?? []) {
-		marklessSsrAppendAsyncComputedSnapshots(
-			dependencyGraphNodeId,
-			definitions,
-			runs,
-			snapshots,
-			visited,
-		);
+function marklessSsrMaterializeAsyncComputedSnapshots(runs, snapshots) {
+	for (const [graphNodeId, entry] of runs) {
+		const snapshot = entry.settled ?? { status: 'pending', version: 1, key: null };
+		marklessSsrUpsertAsyncComputedSnapshot(graphNodeId, snapshot, snapshots);
 	}
-	const entry = runs.get(graphNodeId);
-	if (!entry) return;
-	const snapshot = entry.settled ?? { status: 'pending', version: 1, key: null };
-	snapshots.push({ graphNodeId, snapshot });
+}
+
+function marklessSsrUpsertAsyncComputedSnapshot(graphNodeId, snapshot, snapshots) {
+	const index = snapshots.findIndex((entry) => entry.graphNodeId === graphNodeId);
+	const next = { graphNodeId, snapshot };
+	if (index === -1) snapshots.push(next);
+	else snapshots[index] = next;
 }
 
 function marklessSsrReadAsyncComputedSnapshot(graphNodeId, path = [], runs, snapshots) {

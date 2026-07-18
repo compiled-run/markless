@@ -1,15 +1,22 @@
-import type { RuntimeGraphComputed, RuntimeGraphRead } from './graph.ts';
+import type {
+	RuntimeGraphComputed,
+	RuntimeGraphComputedDependencyNode,
+	RuntimeGraphRead,
+} from './graph.ts';
 import { pathsIntersect, readPath } from './graph-core.ts';
 import type { DirtyPath } from './graph-scheduler.ts';
 import type { RuntimeAsyncComputedNode } from './graph-async.ts';
 
-export type RuntimeComputedNode = RuntimeGraphComputed & {
+export type RuntimeComputedNode = Omit<RuntimeGraphComputed, 'compute'> & {
+	readonly compute?: RuntimeGraphComputed['compute'];
 	dirty: boolean;
 	value: unknown;
 };
 
 export function createRuntimeComputedNodes(
-	computedInput: ReadonlyArray<RuntimeGraphComputed> | undefined,
+	computedInput:
+		| ReadonlyArray<RuntimeGraphComputed | RuntimeGraphComputedDependencyNode>
+		| undefined,
 ): Map<string, RuntimeComputedNode> {
 	const computedNodes = new Map<string, RuntimeComputedNode>();
 	for (const computed of computedInput ?? []) {
@@ -23,7 +30,7 @@ export function createRuntimeComputedNodes(
 }
 
 export function readComputedNode(
-	computed: RuntimeComputedNode,
+	computed: RuntimeComputedNode & { readonly compute: RuntimeGraphComputed['compute'] },
 	readGraph: RuntimeGraphRead,
 	path: ReadonlyArray<string>,
 ): unknown {
@@ -47,7 +54,8 @@ export function markComputedDirty(input: {
 	input.visited.add(input.graphNodeId);
 
 	const computed = input.computedNodes.get(input.graphNodeId);
-	if (computed) computed.dirty = true;
+	if (!computed?.compute) return;
+	computed.dirty = true;
 
 	input.dirtyPaths.push({ graphNodeId: input.graphNodeId, path: [] });
 
@@ -55,7 +63,7 @@ export function markComputedDirty(input: {
 		const dirty = dependent.dependencies.some(
 			(dependency) => dependency.graphNodeId === input.graphNodeId,
 		);
-		if (dirty) {
+		if (dirty && dependent.compute) {
 			markComputedDirty({
 				...input,
 				graphNodeId: dependent.graphNodeId,
@@ -85,7 +93,7 @@ export function markDirtyComputedDependencies(input: {
 				dependency.graphNodeId === input.graphNodeId &&
 				pathsIntersect(input.path, dependency.path ?? []),
 		);
-		if (dirty) {
+		if (dirty && computed.compute) {
 			markComputedDirty({
 				...input,
 				graphNodeId: computed.graphNodeId,

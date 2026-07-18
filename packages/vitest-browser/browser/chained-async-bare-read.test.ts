@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from 'vitest';
-import { cleanup, render } from '../src/index.ts';
+import { cleanup, render, renderSSR } from '../src/index.ts';
 import BareConstellation from './fixtures/chained-async-bare-constellation.tsrx';
 
 afterEach(() => cleanup());
@@ -21,5 +21,12 @@ test('a bare async-computed read remains its awaited string after an arm flip', 
 	expect(container.querySelector('[data-beacon-reading]')?.textContent).toBe('Vega signal');
 	expect(container.querySelector('[data-beacon-reading]')?.textContent).not.toBe(
 		'[object Object]',
+	);
+});
+
+test('SSR renders a bare async-computed read as its snapshot value', async () => {
+	const screen = await renderSSR(BareConstellation);
+	expect(screen.container.querySelector('[data-beacon-reading]')?.textContent).toBe(
+		'Vega signal',
 	);
 });

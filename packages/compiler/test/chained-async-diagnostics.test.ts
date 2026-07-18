@@ -34,6 +34,78 @@ test('an async computed reading another async computed has no diagnostics', asyn
 		symbols: [],
 	});
 
-	// Stage 2 will extend the self-dependency check with an async-cycle diagnostic.
-	expect(result.diagnostics ?? []).toEqual([]);
+	expect(result.semanticGraph.diagnostics).toEqual([]);
+});
+
+test('two async computeds cannot form a dependency cycle', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/CyclicWorkshop.tsrx',
+		source: `
+import { computed } from '@markless/core';
+
+export function CyclicWorkshop() @{
+	const anneal = computed(async () => {
+		const temper = quench.temper;
+		await heat();
+		return { temper: 'annealed-' + temper };
+	});
+	const quench = computed(async () => {
+		const temper = anneal.temper;
+		await cool();
+		return { temper: 'quenched-' + temper };
+	});
+
+	@try {
+		<p>{anneal.temper}</p>
+	} @pending {
+		<p>Working</p>
+	} @catch {
+		<p>Stopped</p>
+	}
+}
+`,
+		symbols: [],
+	});
+	expect(result.semanticGraph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_COMPUTED_DEPENDENCY_CYCLE',
+			severity: 'error',
+			message: expect.stringMatching(/anneal.*quench.*anneal/),
+		}),
+	]);
+});
+
+test('async computeds cannot form a dependency cycle through a sync computed', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/SyncHopCycle.tsrx',
+		source: `
+import { computed } from '@markless/core';
+
+export function SyncHopCycle() @{
+	const fired = computed(async () => {
+		const label = card.label;
+		await heat();
+		return { label: 'fired-' + label };
+	});
+	const card = computed(() => ({ label: fired.label }));
+
+	@try {
+		<p>{fired.label}</p>
+	} @pending {
+		<p>Working</p>
+	} @catch {
+		<p>Stopped</p>
+	}
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.semanticGraph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_COMPUTED_DEPENDENCY_CYCLE',
+			severity: 'error',
+			message: expect.stringMatching(/fired.*card.*fired/),
+		}),
+	]);
 });
