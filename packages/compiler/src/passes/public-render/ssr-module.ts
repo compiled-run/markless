@@ -1,5 +1,5 @@
 import type { PublicRenderModuleInput } from '../../artifacts.ts';
-import { emitHtmlNode, collectSsrAsyncRunners } from './html.ts';
+import { collectSsrAsyncRunnerDefinitions, collectSsrAsyncRunners, emitHtmlNode } from './html.ts';
 import { renderBodyLines } from './render-body.ts';
 import { emitCatalogHelperImports, stateRuntimeImports } from './runtime-helpers.ts';
 import { emitSameModuleSsrComponents } from './same-module.ts';
@@ -32,6 +32,10 @@ export function emitPublicSsrRenderModule(
 		input.semanticGraph.componentEdges,
 		'__marklessSsrComponent',
 	);
+	const asyncRunnerDefinitions = collectSsrAsyncRunnerDefinitions(input);
+	const hasAsyncDependencyRegistry = [...asyncRunnerDefinitions.values()].some(
+		(definition) => definition.dependencies.length > 0,
+	);
 	const valueImports = publicRenderValueImports(
 		input.semanticGraph.moduleImports,
 		input.semanticGraph.componentEdges,
@@ -60,6 +64,7 @@ export function emitPublicSsrRenderModule(
 		asyncBoundaryGates: input.publicRenderPlan.asyncBoundaryGates,
 		nextAsyncBoundaryIndex: 0,
 		asyncRunners: collectSsrAsyncRunners(input),
+		asyncDependencyRegistry: hasAsyncDependencyRegistry,
 		hasChildrenProp: rootInfo.propNames.includes('children'),
 		branchSites: input.semanticGraph.branchSites,
 		branchReactivityGates: input.publicRenderPlan.branchReactivityGates,
@@ -106,6 +111,19 @@ export function emitPublicSsrRenderModule(
 				'const marklessSsrChildren = [];',
 				'const marklessSsrBranches = [];',
 				'const marklessSsrAsyncSnapshots = [];',
+				...(hasAsyncDependencyRegistry
+					? [
+							'const marklessSsrAsyncRuns = marklessSsrRenderContext?.streaming?.runs ?? new Map();',
+							`const marklessSsrAsyncRunnerDefinitions = new Map([${[
+								...asyncRunnerDefinitions,
+							]
+								.map(
+									([graphNodeId, definition]) =>
+										`[${JSON.stringify(graphNodeId)},{run:${definition.source},dependencies:${JSON.stringify(definition.dependencies)},async:${String(definition.async)}}]`,
+								)
+								.join(',')}]);`,
+						]
+					: []),
 				'const marklessSsrHostLocators = [];',
 				`const html = ${htmlExpression};`,
 			],

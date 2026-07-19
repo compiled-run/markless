@@ -104,6 +104,19 @@ export function renderSSRPhased(component: unknown): Promise<SsrPhasedRenderResu
 	);
 }
 
+// Marker rewritten by testSSR() into a Node-side renderToStream command. The
+// command returns only the first-flush shell and deliberately leaves stream
+// appends unconsumed so tests can model a connection that ended after flush.
+export function renderStreamShell(component: unknown): Promise<string> {
+	void component;
+	throw new Error(
+		'renderStreamShell(Component) was not transformed. Add testSSR() from ' +
+			'@markless/vitest-browser/ssr-plugin to the browser test project plugins ' +
+			'(before the markless plugin). v1 supports renderStreamShell(Component) with a ' +
+			'component imported from a separate .tsrx module and no props.',
+	);
+}
+
 export function renderServerHTML(
 	html: string,
 	options: SsrRenderHtmlOptions = {},

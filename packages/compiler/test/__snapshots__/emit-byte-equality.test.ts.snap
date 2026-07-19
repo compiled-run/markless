@@ -70,6 +70,9 @@ function marklessRenderCsr(props = {}) {
   },
   "view": {
     "version": 1,
+    "asyncRunners": {
+      "computed:details": "symbol:1"
+    },
     "locators": [
       {
         "hostNodeId": "h0",
@@ -164,7 +167,7 @@ function marklessRenderCsr(props = {}) {
     ]
   },
   "stateScript": "<script type=\\"markless/state\\">{\\"version\\":1,\\"cells\\":[{\\"graphNodeId\\":\\"state:query\\",\\"name\\":\\"query\\",\\"valueKind\\":\\"scalar\\",\\"value\\":{\\"version\\":1,\\"root\\":\\"Ada\\",\\"records\\":[]}}],\\"computed\\":[{\\"graphNodeId\\":\\"computed:details\\",\\"name\\":\\"details\\",\\"async\\":true,\\"dependencies\\":[{\\"graphNodeId\\":\\"state:query\\",\\"path\\":[]}]}],\\"sharedDefinitions\\":[]}</script>",
-  "viewScript": "<script type=\\"markless/view\\">{\\"version\\":1,\\"locators\\":[{\\"hostNodeId\\":\\"h0\\",\\"strategy\\":\\"dom-order\\",\\"index\\":0,\\"tagName\\":\\"main\\"}],\\"events\\":[],\\"domUpdates\\":[{\\"hostNodeId\\":\\"h1\\",\\"source\\":\\"details.title\\",\\"graphNodeId\\":\\"computed:details\\",\\"path\\":[\\"title\\"],\\"target\\":{\\"kind\\":\\"text\\"},\\"symbolId\\":\\"symbol:0\\"}],\\"behaviors\\":[],\\"elementHandles\\":[],\\"keyedRepeats\\":[],\\"branches\\":[],\\"asyncBoundaries\\":[{\\"id\\":\\"boundary:0\\",\\"startAnchor\\":{\\"strategy\\":\\"dom-order-comment\\",\\"index\\":0},\\"endAnchor\\":{\\"strategy\\":\\"dom-order-comment\\",\\"index\\":1},\\"asyncReads\\":[{\\"source\\":\\"details.title\\",\\"graphNodeId\\":\\"computed:details\\",\\"path\\":[\\"title\\"],\\"runnerSymbolId\\":\\"symbol:1\\"}],\\"armRecords\\":[{\\"locators\\":[{\\"hostNodeId\\":\\"h1\\",\\"strategy\\":\\"arm-relative\\",\\"index\\":0,\\"tagName\\":\\"p\\"}],\\"events\\":[],\\"behaviors\\":[],\\"elementHandles\\":[]},{\\"locators\\":[{\\"hostNodeId\\":\\"h3\\",\\"strategy\\":\\"arm-relative\\",\\"index\\":0,\\"tagName\\":\\"p\\"}],\\"events\\":[],\\"behaviors\\":[],\\"elementHandles\\":[]},{\\"locators\\":[{\\"hostNodeId\\":\\"h2\\",\\"strategy\\":\\"arm-relative\\",\\"index\\":0,\\"tagName\\":\\"p\\"}],\\"events\\":[],\\"behaviors\\":[],\\"elementHandles\\":[]}],\\"updateSymbolId\\":\\"symbol:2\\"}]}</script>"
+  "viewScript": "<script type=\\"markless/view\\">{\\"version\\":1,\\"asyncRunners\\":{\\"computed:details\\":\\"symbol:1\\"},\\"locators\\":[{\\"hostNodeId\\":\\"h0\\",\\"strategy\\":\\"dom-order\\",\\"index\\":0,\\"tagName\\":\\"main\\"}],\\"events\\":[],\\"domUpdates\\":[{\\"hostNodeId\\":\\"h1\\",\\"source\\":\\"details.title\\",\\"graphNodeId\\":\\"computed:details\\",\\"path\\":[\\"title\\"],\\"target\\":{\\"kind\\":\\"text\\"},\\"symbolId\\":\\"symbol:0\\"}],\\"behaviors\\":[],\\"elementHandles\\":[],\\"keyedRepeats\\":[],\\"branches\\":[],\\"asyncBoundaries\\":[{\\"id\\":\\"boundary:0\\",\\"startAnchor\\":{\\"strategy\\":\\"dom-order-comment\\",\\"index\\":0},\\"endAnchor\\":{\\"strategy\\":\\"dom-order-comment\\",\\"index\\":1},\\"asyncReads\\":[{\\"source\\":\\"details.title\\",\\"graphNodeId\\":\\"computed:details\\",\\"path\\":[\\"title\\"],\\"runnerSymbolId\\":\\"symbol:1\\"}],\\"armRecords\\":[{\\"locators\\":[{\\"hostNodeId\\":\\"h1\\",\\"strategy\\":\\"arm-relative\\",\\"index\\":0,\\"tagName\\":\\"p\\"}],\\"events\\":[],\\"behaviors\\":[],\\"elementHandles\\":[]},{\\"locators\\":[{\\"hostNodeId\\":\\"h3\\",\\"strategy\\":\\"arm-relative\\",\\"index\\":0,\\"tagName\\":\\"p\\"}],\\"events\\":[],\\"behaviors\\":[],\\"elementHandles\\":[]},{\\"locators\\":[{\\"hostNodeId\\":\\"h2\\",\\"strategy\\":\\"arm-relative\\",\\"index\\":0,\\"tagName\\":\\"p\\"}],\\"events\\":[],\\"behaviors\\":[],\\"elementHandles\\":[]}],\\"updateSymbolId\\":\\"symbol:2\\"}]}</script>"
 }",
     "protocolState": "{
   "version": 1,
@@ -197,6 +200,9 @@ function marklessRenderCsr(props = {}) {
 }",
     "protocolView": "{
   "version": 1,
+  "asyncRunners": {
+    "computed:details": "symbol:1"
+  },
   "locators": [
     {
       "hostNodeId": "h0",

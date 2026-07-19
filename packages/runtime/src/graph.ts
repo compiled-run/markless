@@ -46,6 +46,10 @@ export type RuntimeGraphComputed = {
 	readonly compute: (read: RuntimeGraphRead) => unknown;
 };
 
+export type RuntimeGraphComputedDependencyNode = Omit<RuntimeGraphComputed, 'compute'> & {
+	readonly compute?: never;
+};
+
 export type RuntimeGraphAsyncSnapshot =
 	| {
 			readonly status: 'idle';
@@ -122,7 +126,7 @@ export type DomJournalListener = (entries: ReadonlyArray<DomJournalEntry>) => vo
 
 export type RuntimeGraphInput = {
 	readonly cells: ReadonlyArray<RuntimeGraphCell>;
-	readonly computed?: ReadonlyArray<RuntimeGraphComputed>;
+	readonly computed?: ReadonlyArray<RuntimeGraphComputed | RuntimeGraphComputedDependencyNode>;
 	readonly asyncComputed?: ReadonlyArray<RuntimeGraphAsyncComputed>;
 	readonly sharedDefinitions?: ProtocolStatePayload['sharedDefinitions'];
 };
@@ -225,7 +229,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 
 	const readGraph: RuntimeGraphRead = (graphNodeId, path = []) => {
 		const computed = computedNodes.get(graphNodeId);
-		if (computed) {
+		if (computed?.compute) {
 			return readComputedNode(computed, readGraph, path);
 		}
 
@@ -260,13 +264,19 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		});
 	};
 
-	const demandAsyncComputed = (node: RuntimeAsyncComputedNode): void => {
-		demandRuntimeAsyncComputed({ node, readGraph, markDirtyPath, scheduleFlush });
-	};
+	const asyncComputedInput = () => ({
+		computedNodes,
+		asyncComputedNodes,
+		demandAsyncComputed,
+		readGraph,
+		markDirtyPath,
+		scheduleFlush,
+	});
+	const demandAsyncComputed = (node: RuntimeAsyncComputedNode): void =>
+		demandRuntimeAsyncComputed({ node, ...asyncComputedInput() });
 
-	const invalidateAsyncComputed = (node: RuntimeAsyncComputedNode): void => {
-		invalidateRuntimeAsyncComputed({ node, readGraph, markDirtyPath, scheduleFlush });
-	};
+	const invalidateAsyncComputed = (node: RuntimeAsyncComputedNode): void =>
+		invalidateRuntimeAsyncComputed({ node, ...asyncComputedInput() });
 
 	const sharedGraph = createSharedGraphPlane({
 		cells,

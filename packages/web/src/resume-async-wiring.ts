@@ -55,7 +55,7 @@ export function createAsyncBoundarySettleTracker(input: {
 	// their boundaries already show settled content before any runner re-runs.
 	const settledGraphNodeIds = new Set<string>();
 	for (const computed of input.state?.computed ?? []) {
-		if (isSettledStatus(computed.snapshot?.status)) {
+		if (computed.async === false || isSettledStatus(computed.snapshot?.status)) {
 			settledGraphNodeIds.add(computed.graphNodeId);
 		}
 	}
@@ -131,6 +131,12 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 					graphNodeId: asyncRead.graphNodeId,
 					path: [],
 					run(snapshot) {
+						snapshot = boundaryGateSnapshot(
+							input.graph,
+							boundary,
+							asyncRead.graphNodeId,
+							snapshot,
+						);
 						if (!boundary.updateSymbolId) {
 							const settled = isSettledStatus(
 								(snapshot as { readonly status?: unknown } | null)?.status,
@@ -163,6 +169,33 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 				input.graph.read(asyncRead.graphNodeId, ['status']);
 		}
 	}
+}
+
+function boundaryGateSnapshot(
+	graph: Parameters<typeof wireAsyncBoundariesWithoutLoadingCapability>[0]['graph'],
+	boundary: ResumeAsyncBoundaryRecord,
+	observedGraphNodeId: string,
+	observedSnapshot: unknown,
+): unknown {
+	const snapshots = boundary.asyncReads.map(
+		(read) =>
+			(read.graphNodeId === observedGraphNodeId
+				? observedSnapshot
+				: graph.read(read.graphNodeId, [])) as {
+				readonly status?: unknown;
+				readonly error?: unknown;
+			} | null,
+	);
+	const rejected = snapshots.find((snapshot) => snapshot?.status === 'rejected');
+	if (rejected) return { status: 'rejected', error: rejected.error };
+	return (
+		snapshots.find(
+			(snapshot) => snapshot?.status === 'pending' || snapshot?.status === 'idle',
+		) ??
+		(snapshots.includes(undefined)
+			? { status: 'pending' }
+			: snapshots.findLast((snapshot) => snapshot?.status === 'fulfilled'))
+	);
 }
 
 export async function settleAsyncBoundaryRange(

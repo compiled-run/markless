@@ -14,6 +14,7 @@ import { __marklessDebugBootstrapSource } from './debug-channel.ts';
 import type { MarklessExecutionLogMode } from './dev-log.ts';
 import {
 	createInlineResumerDebugRegistrationSource,
+	createInlineResumerSelfWakeSource,
 	createInlineResumerSource,
 	type InlineResumerSourceVariants,
 } from './inline/resumer.ts';
@@ -96,6 +97,7 @@ export async function assembleSsrContainer(
 	const view = containerScopedView(output.view ?? emptyViewPayload());
 	await validateKeyedRepeatPayloadKeys({ state, view });
 	const browserTriggers = hasBrowserTriggers(view, state);
+	const selfWake = hasUnsettledAsyncBoundaryRunner(view, state);
 	const payloadScripts =
 		hasPayload && browserTriggers ? renderPayloadScripts({ state, view }) : undefined;
 	const resumeModuleUrl = options.resumeModuleUrl ?? artifactResumeModuleUrl(component);
@@ -138,6 +140,7 @@ export async function assembleSsrContainer(
 					options.resumerSource ?? defaultSource,
 					options.nonce,
 					resumeModuleUrl,
+					selfWake,
 				)
 			: '';
 
@@ -262,6 +265,7 @@ function hasBrowserTriggers(view: ProtocolViewPayload, state: ProtocolStatePaylo
 					'string',
 		) ||
 		view.behaviors.some((behavior) => !!behavior.symbolId) ||
+		Object.keys(view.asyncRunners ?? {}).length > 0 ||
 		view.asyncBoundaries.some((boundary) =>
 			boundary.asyncReads.some((read) => !!read.runnerSymbolId),
 		) ||
@@ -274,6 +278,33 @@ function hasBrowserTriggers(view: ProtocolViewPayload, state: ProtocolStatePaylo
 		// Async boundary arm events also nest under armRecords (D3).
 		view.asyncBoundaries.some((boundary) => boundaryArmEventNames(boundary).length > 0)
 	);
+}
+
+function hasUnsettledAsyncBoundaryRunner(
+	view: ProtocolViewPayload,
+	state: ProtocolStatePayload,
+): boolean {
+	const runners = { ...view.asyncRunners };
+	const reachable = new Set<string>();
+	for (const boundary of view.asyncBoundaries) {
+		for (const read of boundary.asyncReads) {
+			reachable.add(read.graphNodeId);
+			if (read.runnerSymbolId) runners[read.graphNodeId] ??= read.runnerSymbolId;
+		}
+	}
+	const computedByGraphNode = new Map(
+		state.computed.map((computed) => [computed.graphNodeId, computed]),
+	);
+	for (const graphNodeId of reachable) {
+		const computed = computedByGraphNode.get(graphNodeId);
+		if (!computed) continue;
+		if (runners[graphNodeId]) {
+			const status = computed.snapshot?.status;
+			if (status !== 'fulfilled' && status !== 'rejected') return true;
+		}
+		for (const dependency of computed.dependencies ?? []) reachable.add(dependency.graphNodeId);
+	}
+	return false;
 }
 
 // In-arm event names from a boundary's armized record set. CSR-composed pages
@@ -312,12 +343,15 @@ function renderInlineResumerScript(
 	source: string,
 	nonce: string | undefined,
 	resumeModuleUrl: string | undefined,
+	selfWake: boolean,
 ): string {
 	const nonceAttribute = nonce ? ` nonce="${escapeAttribute(nonce)}"` : '';
 	const resumeModuleAttribute = resumeModuleUrl
 		? ` data-markless-resume-module="${escapeAttribute(resumeModuleUrl)}"`
 		: '';
-	return `<script data-async-resumer${nonceAttribute}${resumeModuleAttribute}>${escapeInlineScript(source)}</script>`;
+	const selfWakeAttribute = selfWake ? ' data-markless-self-wake' : '';
+	const selfWakeSource = selfWake ? createInlineResumerSelfWakeSource(resumeModuleUrl) : '';
+	return `<script data-async-resumer${nonceAttribute}${resumeModuleAttribute}${selfWakeAttribute}>${escapeInlineScript(source + selfWakeSource)}</script>`;
 }
 
 function emptyStatePayload(): ProtocolStatePayload {

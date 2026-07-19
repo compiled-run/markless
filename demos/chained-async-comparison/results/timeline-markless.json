@@ -1,0 +1,28 @@
+{
+	"schemaVersion": 1,
+	"lane": "markless",
+	"run": "markless-1784395218411-08342fa09105c8",
+	"pageStartMs": 39.807,
+	"events": [
+		{
+			"name": "session",
+			"startMs": 42.643,
+			"settledMs": 102.775
+		},
+		{
+			"name": "catalog",
+			"startMs": 42.982,
+			"settledMs": 123.9
+		},
+		{
+			"name": "reviews",
+			"startMs": 43.017,
+			"settledMs": 114.763
+		},
+		{
+			"name": "recommendations",
+			"startMs": 105.641,
+			"settledMs": 196.47
+		}
+	]
+}

@@ -5,10 +5,7 @@ import {
 	marklessCsrRemapGraphOutput,
 } from './csr.ts';
 
-export {
-	marklessAssertComposableStateNames,
-	marklessComposeState,
-};
+export { marklessAssertComposableStateNames, marklessComposeState };
 export const marklessSsrRemapChildGraph = marklessCsrRemapChildGraph;
 export const marklessSsrRemapGraphOutput = marklessCsrRemapGraphOutput;
 
@@ -93,6 +90,8 @@ export async function marklessSsrRunAsyncComputed(
 	run,
 	renderContext,
 	hasPendingArm,
+	runnerDefinitions,
+	requestRuns,
 ) {
 	// Streaming mode (T107, owner-ratified three-layer semantics): the render
 	// context carries a per-request runner registry. run() executes ONCE per
@@ -102,22 +101,22 @@ export async function marklessSsrRunAsyncComputed(
 	// Per-request tier: runners get until the shared first-flush deadline to
 	// settle inline; only still-pending boundaries stream.
 	const streaming = renderContext?.streaming;
+	const definitions = runnerDefinitions ?? new Map([[graphNodeId, { run, dependencies: [] }]]);
+	const runs = streaming?.runs ?? requestRuns ?? new Map();
+	const entry = marklessSsrEnsureAsyncComputedRun(graphNodeId, definitions, runs, snapshots);
+	if (!entry) {
+		const snapshot = { status: 'rejected', version: 1, key: null, error: undefined };
+		marklessSsrUpsertAsyncComputedSnapshot(graphNodeId, snapshot, snapshots);
+		return snapshot;
+	}
 	if (streaming?.runs) {
-		let entry = streaming.runs.get(graphNodeId);
-		if (!entry) {
-			entry = { promise: marklessSsrSettleAsyncComputed(run, snapshots) };
-			entry.promise.then((settledSnapshot) => {
-				entry.settled = settledSnapshot;
-			});
-			streaming.runs.set(graphNodeId, entry);
-		}
 		// Discovery pass (C1 parallel runner starts): the first streaming pass
 		// only STARTS runners — it never awaits one and never consumes the
 		// first-flush deadline, so every boundary's runner is in flight before
 		// the real render pass races any of them against the shared deadline.
 		if (streaming.prestart) {
 			const snapshot = entry.settled ?? { status: 'pending', version: 1, key: null };
-			snapshots.push({ graphNodeId, snapshot });
+			marklessSsrMaterializeAsyncComputedSnapshots(runs, snapshots, definitions, graphNodeId);
 			return snapshot;
 		}
 		if (!entry.settled) {
@@ -125,23 +124,115 @@ export async function marklessSsrRunAsyncComputed(
 			else if (streaming.deadline) await Promise.race([entry.promise, streaming.deadline]);
 		}
 		const snapshot = entry.settled ?? { status: 'pending', version: 1, key: null };
-		snapshots.push({ graphNodeId, snapshot });
+		marklessSsrMaterializeAsyncComputedSnapshots(runs, snapshots, definitions, graphNodeId);
 		return snapshot;
 	}
-	const snapshot = await marklessSsrSettleAsyncComputed(run, snapshots);
-	snapshots.push({ graphNodeId, snapshot });
+	const snapshot = await entry.promise;
+	marklessSsrMaterializeAsyncComputedSnapshots(runs, snapshots, definitions, graphNodeId);
 	return snapshot;
 }
-async function marklessSsrSettleAsyncComputed(run, snapshots) {
+
+function marklessSsrEnsureAsyncComputedRun(
+	graphNodeId,
+	definitions,
+	runs,
+	snapshots,
+	visiting = new Set(),
+) {
+	if (visiting.has(graphNodeId)) {
+		const snapshot = { status: 'rejected', version: 1, key: null, error: undefined };
+		return { settled: snapshot, promise: Promise.resolve(snapshot) };
+	}
+	const existing = runs.get(graphNodeId);
+	if (existing) return existing;
+
+	const definition = definitions.get(graphNodeId);
+	if (!definition) return undefined;
+
+	// Install the entry before traversing dependencies. Besides deduplicating
+	// arbitrary document order, this prevents a malformed cycle from creating
+	// unbounded recursive entries; valid computed graphs remain acyclic.
+	const entry = {};
+	entry.async = definition.async !== false;
+	runs.set(graphNodeId, entry);
+	const dependencyPath = new Set(visiting);
+	dependencyPath.add(graphNodeId);
+	entry.promise = Promise.resolve()
+		.then(async () => {
+			const dependencyEntries = [...new Set(definition.dependencies ?? [])].flatMap(
+				(dependencyGraphNodeId) => {
+					const dependency = marklessSsrEnsureAsyncComputedRun(
+						dependencyGraphNodeId,
+						definitions,
+						runs,
+						snapshots,
+						dependencyPath,
+					);
+					return dependency ? [dependency] : [];
+				},
+			);
+			const dependencySnapshots = await Promise.all(
+				dependencyEntries.map((dependency) => dependency.promise),
+			);
+			const rejected = dependencySnapshots.find(
+				(snapshot) => snapshot?.status === 'rejected',
+			);
+			if (rejected) {
+				return {
+					status: 'rejected',
+					version: 1,
+					key: null,
+					error: rejected.error,
+				};
+			}
+			return marklessSsrSettleAsyncComputed(definition.run, (readGraphNodeId, path) =>
+				marklessSsrReadAsyncComputedSnapshot(readGraphNodeId, path, runs, snapshots),
+			);
+		})
+		.then((settledSnapshot) => {
+			entry.settled = settledSnapshot;
+			return settledSnapshot;
+		});
+	return entry;
+}
+
+function marklessSsrMaterializeAsyncComputedSnapshots(runs, snapshots, definitions, graphNodeId) {
+	const dependencyClosure = new Set([graphNodeId]);
+	for (const candidateGraphNodeId of dependencyClosure)
+		for (const dependencyGraphNodeId of definitions.get(candidateGraphNodeId)?.dependencies ??
+			[])
+			dependencyClosure.add(dependencyGraphNodeId);
+	for (const candidateGraphNodeId of dependencyClosure) {
+		const entry = runs.get(candidateGraphNodeId);
+		if (!entry) continue;
+		if (entry.async === false) continue;
+		const snapshot = entry.settled ?? { status: 'pending', version: 1, key: null };
+		marklessSsrUpsertAsyncComputedSnapshot(candidateGraphNodeId, snapshot, snapshots);
+	}
+}
+
+function marklessSsrUpsertAsyncComputedSnapshot(graphNodeId, snapshot, snapshots) {
+	const index = snapshots.findIndex((entry) => entry.graphNodeId === graphNodeId);
+	const next = { graphNodeId, snapshot };
+	if (index === -1) snapshots.push(next);
+}
+
+function marklessSsrReadAsyncComputedSnapshot(graphNodeId, path = [], runs, snapshots) {
+	const run = runs.get(graphNodeId);
+	let value = run?.settled;
+	if (run?.async === false && value?.status === 'fulfilled') value = value.value;
+	if (value === undefined) {
+		for (const entry of snapshots) {
+			if (entry.graphNodeId === graphNodeId) value = entry.snapshot;
+		}
+	}
+	for (const segment of path) value = value?.[segment];
+	return value;
+}
+
+async function marklessSsrSettleAsyncComputed(run, read) {
 	const signal = new AbortController().signal;
 	try {
-		const read = (graphNodeId, path = []) => {
-			let value;
-			for (const entry of snapshots)
-				if (entry.graphNodeId === graphNodeId) value = entry.snapshot;
-			for (const segment of path) value = value?.[segment];
-			return value;
-		};
 		const value = await run({ key: null, signal, read });
 		return { status: 'fulfilled', version: 1, key: null, value };
 	} catch (error) {
@@ -220,6 +311,7 @@ export function marklessSsrComposeView(html, view, hostLocators, children, async
 	);
 	const branches = [...(view.branches ?? [])];
 	const asyncBoundaries = [...(view.asyncBoundaries ?? [])];
+	const asyncRunners = { ...view.asyncRunners };
 	const externalSymbolIds = new Set();
 	let inserted = 0;
 	for (const child of childData) {
@@ -234,6 +326,7 @@ export function marklessSsrComposeView(html, view, hostLocators, children, async
 				elementHandles,
 				branches,
 				asyncBoundaries,
+				asyncRunners,
 				externalSymbolIds,
 			});
 		inserted += child.hostCount;
@@ -255,6 +348,7 @@ export function marklessSsrComposeView(html, view, hostLocators, children, async
 			elementHandles,
 			branches: marklessSsrResolveAnchorRecords(html, 'branch', branches),
 			asyncBoundaries: armizedBoundaries,
+			...(Object.keys(asyncRunners).length > 0 ? { asyncRunners } : {}),
 		},
 		elementCount:
 			hostLocators.length +
@@ -365,6 +459,14 @@ export function marklessSsrAppendChildView(context) {
 	const childView = context.child.view;
 	const propEvents = context.child.output?.propEvents ?? [];
 	const callbackProps = context.child.callbackProps ?? {};
+	for (const [graphNodeId, symbolId] of Object.entries(childView.asyncRunners ?? {})) {
+		const mapped = marklessSsrRemapChildGraph(
+			{ graphNodeId, path: [] },
+			context.child.graphProps,
+		);
+		context.asyncRunners[mapped?.graphNodeId ?? graphNodeId] =
+			context.child.symbolPrefix + symbolId;
+	}
 	for (const locator of childView.locators)
 		context.locators.push({
 			...locator,

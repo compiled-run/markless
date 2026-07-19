@@ -4,12 +4,11 @@ import type {
 	RuntimeGraphRead,
 } from './graph.ts';
 import { readPath } from './graph-core.ts';
+import type { RuntimeComputedNode } from './graph-computed.ts';
 
 export type RuntimeAsyncComputedNode = RuntimeGraphAsyncComputed & {
 	controller?: AbortController;
-	demanded: boolean;
-	keyValue: unknown;
-	pendingSnapshotNeedsRunner: boolean;
+	gate: number;
 	snapshot: RuntimeGraphAsyncSnapshot;
 	version: number;
 };
@@ -27,9 +26,7 @@ export function createRuntimeAsyncComputedNodes(
 		};
 		asyncComputedNodes.set(asyncComputed.graphNodeId, {
 			...asyncComputed,
-			demanded: initialSnapshot.status !== 'idle',
-			keyValue: 'key' in initialSnapshot ? initialSnapshot.key : undefined,
-			pendingSnapshotNeedsRunner: initialSnapshot.status === 'pending',
+			gate: initialSnapshot.status === 'pending' ? 1 : 0,
 			snapshot: initialSnapshot,
 			version: initialSnapshot.version,
 		});
@@ -52,6 +49,9 @@ export function readAsyncComputedNode(
 
 export function demandAsyncComputed(input: {
 	readonly node: RuntimeAsyncComputedNode;
+	readonly computedNodes: ReadonlyMap<string, RuntimeComputedNode>;
+	readonly asyncComputedNodes: ReadonlyMap<string, RuntimeAsyncComputedNode>;
+	readonly demandAsyncComputed: (node: RuntimeAsyncComputedNode) => void;
 	readonly readGraph: RuntimeGraphRead;
 	readonly markDirtyPath: (graphNodeId: string, path: ReadonlyArray<string>) => void;
 	readonly scheduleFlush: () => void;
@@ -59,24 +59,113 @@ export function demandAsyncComputed(input: {
 	// A payload-planned pending snapshot still needs its runner started on
 	// first demand; otherwise only idle computeds start (startAsyncComputed
 	// clears the needs-runner flag itself).
-	if (!input.node.pendingSnapshotNeedsRunner && input.node.snapshot.status !== 'idle') return;
+	if (input.node.gate !== 1 && input.node.snapshot.status !== 'idle') return;
 
-	input.node.demanded = true;
-	startAsyncComputed({ ...input, key: input.node.key(input.readGraph) });
+	advanceAsyncComputed(input);
 }
 
 export function invalidateAsyncComputed(input: {
 	readonly node: RuntimeAsyncComputedNode;
+	readonly computedNodes: ReadonlyMap<string, RuntimeComputedNode>;
+	readonly asyncComputedNodes: ReadonlyMap<string, RuntimeAsyncComputedNode>;
+	readonly demandAsyncComputed: (node: RuntimeAsyncComputedNode) => void;
 	readonly readGraph: RuntimeGraphRead;
 	readonly markDirtyPath: (graphNodeId: string, path: ReadonlyArray<string>) => void;
 	readonly scheduleFlush: () => void;
 }): void {
-	if (!input.node.demanded) return;
+	if (input.node.snapshot.status === 'idle') return;
+
+	advanceAsyncComputed(input);
+}
+
+function advanceAsyncComputed(input: {
+	readonly node: RuntimeAsyncComputedNode;
+	readonly computedNodes: ReadonlyMap<string, RuntimeComputedNode>;
+	readonly asyncComputedNodes: ReadonlyMap<string, RuntimeAsyncComputedNode>;
+	readonly demandAsyncComputed: (node: RuntimeAsyncComputedNode) => void;
+	readonly readGraph: RuntimeGraphRead;
+	readonly markDirtyPath: (graphNodeId: string, path: ReadonlyArray<string>) => void;
+	readonly scheduleFlush: () => void;
+}): void {
+	// Sync computeds have no settlement state, so walk through them until the
+	// gate reaches the async nodes whose snapshots can block this runner.
+	const visited = new Set<string>([input.node.graphNodeId]);
+	let blocked: RuntimeAsyncComputedNode | undefined;
+	const visit = (graphNodeId: string): void => {
+		if (visited.has(graphNodeId)) return;
+		visited.add(graphNodeId);
+		const dependency = input.asyncComputedNodes.get(graphNodeId);
+		if (dependency) {
+			if (dependency.snapshot.status === 'idle' || dependency.snapshot.status === 'pending') {
+				blocked = dependency;
+				input.demandAsyncComputed(dependency);
+			} else if (!blocked && dependency.snapshot.status === 'rejected') blocked = dependency;
+			return;
+		}
+		for (const dependency of input.computedNodes.get(graphNodeId)?.dependencies ?? [])
+			visit(dependency.graphNodeId);
+	};
+	for (const dependency of input.node.dependencies) visit(dependency.graphNodeId);
+	if (blocked) {
+		commitDependencyBlock(
+			input,
+			blocked.snapshot.status === 'rejected' ? 'rejected' : 'pending',
+			(blocked.snapshot as { readonly error?: unknown }).error,
+		);
+		return;
+	}
 
 	const nextKey = input.node.key(input.readGraph);
-	if (input.node.snapshot.status !== 'idle' && Object.is(input.node.keyValue, nextKey)) return;
+	if (
+		!input.node.gate &&
+		input.node.snapshot.status !== 'idle' &&
+		Object.is((input.node.snapshot as { readonly key?: unknown }).key, nextKey)
+	) {
+		return;
+	}
 
 	startAsyncComputed({ ...input, key: nextKey });
+}
+
+function commitDependencyBlock(
+	input: {
+		readonly node: RuntimeAsyncComputedNode;
+		readonly markDirtyPath: (graphNodeId: string, path: ReadonlyArray<string>) => void;
+		readonly scheduleFlush: () => void;
+	},
+	status: 'pending' | 'rejected',
+	error: unknown,
+): void {
+	if (
+		input.node.gate === 2 &&
+		(status === 'pending' ||
+			(input.node.snapshot.status === 'rejected' &&
+				Object.is(input.node.snapshot.error, error)))
+	) {
+		return;
+	}
+
+	input.node.controller?.abort();
+	input.node.controller = undefined;
+	input.node.gate = 2;
+	const version = ++input.node.version;
+	const key = (input.node.snapshot as { readonly key?: unknown }).key;
+	publish(
+		input,
+		status === 'pending'
+			? {
+					status,
+					version,
+					key,
+					value: (input.node.snapshot as { readonly value?: unknown }).value,
+				}
+			: {
+					status,
+					version,
+					key,
+					error,
+				},
+	);
 }
 
 function startAsyncComputed(input: {
@@ -87,31 +176,27 @@ function startAsyncComputed(input: {
 	readonly scheduleFlush: () => void;
 }): void {
 	input.node.controller?.abort();
-	input.node.pendingSnapshotNeedsRunner = false;
+	input.node.gate = 0;
 
 	const controller = new AbortController();
-	const version = input.node.version + 1;
+	const version = ++input.node.version;
 	input.node.controller = controller;
-	input.node.keyValue = input.key;
-	input.node.version = version;
 	// A re-run keeps the prior settled value addressable while pending (spec
 	// D8 / Solid 2 `latest`): reads through the computed answer with it until
 	// the new snapshot commits. Consecutive re-runs carry it forward; a first
 	// run or a rejected prior carries undefined (reads answer undefined). The
 	// literal reads the prior snapshot before the assignment replaces it.
-	input.node.snapshot = {
+	publish(input, {
 		status: 'pending',
 		version,
 		key: input.key,
 		value: (input.node.snapshot as { readonly value?: unknown }).value,
-	};
+	});
 
 	const commit = (snapshot: RuntimeGraphAsyncSnapshot): void => {
-		if (input.node.version !== version || controller.signal.aborted) return;
+		if (input.node.version !== version) return;
 
-		input.node.snapshot = snapshot;
-		input.markDirtyPath(input.node.graphNodeId, []);
-		input.scheduleFlush();
+		publish(input, snapshot);
 	};
 	const commitRejected = (error: unknown): void =>
 		commit({ status: 'rejected', version, key: input.key, error });
@@ -126,7 +211,17 @@ function startAsyncComputed(input: {
 	} catch (error) {
 		commitRejected(error);
 	}
+}
 
+function publish(
+	input: {
+		readonly node: RuntimeAsyncComputedNode;
+		readonly markDirtyPath: (graphNodeId: string, path: ReadonlyArray<string>) => void;
+		readonly scheduleFlush: () => void;
+	},
+	snapshot: RuntimeGraphAsyncSnapshot,
+): void {
+	input.node.snapshot = snapshot;
 	input.markDirtyPath(input.node.graphNodeId, []);
 	input.scheduleFlush();
 }

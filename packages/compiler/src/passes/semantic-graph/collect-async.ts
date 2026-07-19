@@ -12,7 +12,11 @@ import {
 	semanticAliasMap,
 	uniqueBy,
 } from '../../artifact-helpers/graph-paths.ts';
-import { asyncBoundaryRequiredDiagnostic, asyncPostAwaitReadDiagnostic } from './diagnostics.ts';
+import {
+	asyncBoundaryRequiredDiagnostic,
+	asyncPostAwaitReadDiagnostic,
+	computedDependencyGraphCycleDiagnostic,
+} from './diagnostics.ts';
 import type { MutableSemanticGraphArtifact, SemanticGraphWalk, WalkState } from './types.ts';
 
 export function collectAsyncBoundary(
@@ -83,6 +87,77 @@ export function propagateAsyncComputedCapability(graph: MutableSemanticGraphArti
 	});
 }
 
+export function finalizeComputedDependencies(state: WalkState): void {
+	for (const pending of state.pendingComputedDependencies) {
+		const previousSharedDefinitionId = state.currentSharedDefinitionId;
+		state.currentSharedDefinitionId = pending.sharedDefinitionId;
+		const directBindingNames = new Set(
+			graphBindingMap(state.graph, currentGraphScope(state)).keys(),
+		);
+		const finalizedDependencies = collectGraphDependencies(pending.body, state).filter(
+			(dependency) => directBindingNames.has(dependency.source.split('.')[0] ?? ''),
+		);
+		state.currentSharedDefinitionId = previousSharedDefinitionId;
+		state.graph.graphBindings = state.graph.graphBindings.map((binding) => {
+			if (binding.id !== pending.graphNodeId) return binding;
+			const dependencies = uniqueBy(
+				[...(binding.dependencies ?? []), ...finalizedDependencies],
+				(dependency) =>
+					`${dependency.graphNodeId}:${dependency.path.join('.')}:${dependency.source}`,
+			);
+			return { ...binding, dependencies };
+		});
+	}
+}
+
+export function collectComputedDependencyCycleDiagnostics(
+	graph: MutableSemanticGraphArtifact,
+): void {
+	const computedById = new Map(
+		graph.graphBindings
+			.filter((binding) => binding.kind === 'computed')
+			.map((binding) => [binding.id, binding]),
+	);
+	const visited = new Set<string>();
+	const active = new Map<string, number>();
+	const stack: SemanticGraphBinding[] = [];
+	const reported = new Set<string>();
+
+	const visit = (binding: SemanticGraphBinding): void => {
+		if (visited.has(binding.id)) return;
+		const activeIndex = active.get(binding.id);
+		if (activeIndex !== undefined) {
+			const cycleBindings = [...stack.slice(activeIndex), binding];
+			const names = cycleBindings.map((candidate) => candidate.name);
+			const key = canonicalCycleKey(names);
+			if (reported.has(key)) return;
+			reported.add(key);
+			graph.diagnostics.push(computedDependencyGraphCycleDiagnostic({ cycle: names }));
+			return;
+		}
+
+		active.set(binding.id, stack.length);
+		stack.push(binding);
+		for (const dependency of binding.dependencies ?? []) {
+			const target = computedById.get(dependency.graphNodeId);
+			if (target) visit(target);
+		}
+		stack.pop();
+		active.delete(binding.id);
+		visited.add(binding.id);
+	};
+
+	for (const binding of computedById.values()) visit(binding);
+}
+
+function canonicalCycleKey(cycle: ReadonlyArray<string>): string {
+	const members = cycle.slice(0, -1);
+	if (members.length === 0) return cycle.join('->');
+	return members
+		.map((_, index) => [...members.slice(index), ...members.slice(0, index)].join('->'))
+		.sort()[0];
+}
+
 export function collectAsyncBoundaryDiagnostics(graph: MutableSemanticGraphArtifact): void {
 	const bindings = graphBindingMap(graph, null);
 	const aliases = semanticAliasMap(graph, null);
@@ -128,6 +203,12 @@ export function collectGraphDependencies(
 				}
 				return;
 			}
+		}
+
+		if (candidate.type === 'Property') {
+			if (candidate.computed === true) visit(candidate.key as AnyNode | undefined);
+			visit(candidate.value as AnyNode | undefined);
+			return;
 		}
 
 		if (candidate.type === 'MemberExpression') {

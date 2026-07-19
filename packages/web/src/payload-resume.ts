@@ -38,7 +38,17 @@ export async function resumeFromPayloadScriptsImpl(
 ): Promise<ResumePayloadScriptsResult> {
 	const resumed = getAlreadyResumedPayload(input.root);
 	if (resumed) return resumed;
+	const root = input.root as typeof input.root & {
+		__mStart?: Promise<ResumePayloadScriptsResult>;
+	};
+	return (root.__mStart ??= startPayloadResume(input).finally(() => {
+		delete root.__mStart;
+	}));
+}
 
+async function startPayloadResume(
+	input: ResumePayloadScriptsInput,
+): Promise<ResumePayloadScriptsResult> {
 	// Streamed settles left records + snapshot patches in the document; adopt
 	// them before graph construction so the settled DOM resumes interactive.
 	const decoded = await adoptStreamedPatchesIfPresent(decodePayloadScripts(input), input.root);

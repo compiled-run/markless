@@ -286,7 +286,7 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 			}
 			const isAsync = body?.async === true;
 			const dependencies = collectGraphDependencies(body, state);
-			state.graph.graphBindings.push({
+			const binding: SemanticGraphBinding = {
 				id: graphBindingId('computed', name, state),
 				name: graphBindingName(name, state),
 				kind: 'computed',
@@ -297,6 +297,12 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 				asyncCapable: isAsync,
 				dependencies,
 				functionSource: body ? expressionSource(body, state.source) : undefined,
+			};
+			state.graph.graphBindings.push(binding);
+			state.pendingComputedDependencies.push({
+				graphNodeId: binding.id,
+				body,
+				sharedDefinitionId: state.currentSharedDefinitionId,
 			});
 			collectExpressionReads(body, state);
 			if (isAsync) collectAsyncComputedPostAwaitReads(name, body, state);

@@ -206,7 +206,7 @@ test('planPayloadArena separates graph state from view wiring metadata', async (
 					inputIndex: 0,
 					source: 'details',
 					graphNodeId: 'computed:details',
-					path: [],
+					path: ['value'],
 				},
 			],
 		},

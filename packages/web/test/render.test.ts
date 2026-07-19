@@ -1396,6 +1396,108 @@ test('renderToString serializes runtime-attached async snapshots into valid payl
 	expect(() => assertProtocolStatePayload(JSON.parse(stateJson!))).not.toThrow();
 });
 
+test('renderToString self-wakes when a fulfilled boundary read has an unsettled upstream runner', async () => {
+	const html = await renderToString(
+		() => ({
+			html: '<p>Prior label</p>',
+			state: {
+				...createProtocolStatePayload({ cells: [] }),
+				computed: [
+					{
+						graphNodeId: 'computed:source',
+						name: 'source',
+						async: true,
+						snapshot: { status: 'pending', version: 1, key: null },
+					},
+					{
+						graphNodeId: 'computed:label',
+						name: 'label',
+						async: true,
+						dependencies: [{ graphNodeId: 'computed:source', path: [] }],
+						snapshot: {
+							status: 'fulfilled',
+							version: 1,
+							key: null,
+							value: { text: 'Prior label' },
+						},
+					},
+				],
+			} as never,
+			view: {
+				...staticView(),
+				asyncRunners: {
+					'computed:source': 'symbol:source',
+					'computed:label': 'symbol:label',
+				},
+				asyncBoundaries: [
+					{
+						id: 'boundary:0',
+						startAnchor: { strategy: 'dom-order-comment', index: 0 },
+						endAnchor: { strategy: 'dom-order-comment', index: 1 },
+						asyncReads: [
+							{
+								source: 'label.text',
+								graphNodeId: 'computed:label',
+								path: ['text'],
+							},
+						],
+					},
+				],
+			} as ProtocolViewPayload,
+		}),
+		{ resumeModuleUrl: '/app.js' },
+	);
+
+	expect(html).toContain('data-markless-self-wake');
+	expect(extractResumerSource(html)).toContain('queueMicrotask');
+});
+
+test('renderToString self-wakes through a sync computed boundary read', async () => {
+	const html = await renderToString(
+		() => ({
+			html: '<p>Loading</p>',
+			state: {
+				...createProtocolStatePayload({ cells: [] }),
+				computed: [
+					{
+						graphNodeId: 'computed:source',
+						name: 'source',
+						async: true,
+						snapshot: { status: 'idle', version: 0 },
+					},
+					{
+						graphNodeId: 'computed:card',
+						name: 'card',
+						async: false,
+						dependencies: [{ graphNodeId: 'computed:source', path: [] }],
+					},
+				],
+			} as never,
+			view: {
+				...staticView(),
+				asyncRunners: { 'computed:source': 'symbol:source' },
+				asyncBoundaries: [
+					{
+						id: 'boundary:0',
+						startAnchor: { strategy: 'dom-order-comment', index: 0 },
+						endAnchor: { strategy: 'dom-order-comment', index: 1 },
+						asyncReads: [
+							{
+								source: 'card.caption',
+								graphNodeId: 'computed:card',
+								path: ['caption'],
+							},
+						],
+					},
+				],
+			} as ProtocolViewPayload,
+		}),
+		{ resumeModuleUrl: '/app.js' },
+	);
+
+	expect(html).toContain('data-markless-self-wake');
+});
+
 test('renderToString emits the resumer for keyed-repeat row events', async () => {
 	const html = await renderToString(
 		() => ({
@@ -1552,6 +1654,7 @@ test('renderToString inline event resumer imports the resume module only after i
 	);
 	const view = JSON.parse(extractScriptText(html, 'markless/view')) as ProtocolViewPayload;
 	const resumerSource = extractResumerSource(html);
+	expect(resumerSource).not.toContain('queueMicrotask');
 	const button = element('BUTTON');
 	const root = element('DIV', [button]);
 	const listeners: Array<(event: FakeEvent) => Promise<void>> = [];

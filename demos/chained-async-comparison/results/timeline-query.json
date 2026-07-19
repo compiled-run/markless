@@ -1,0 +1,28 @@
+{
+	"schemaVersion": 1,
+	"lane": "query",
+	"run": "query-1784395218723-f309b127eaed38",
+	"pageStartMs": 31.542,
+	"events": [
+		{
+			"name": "session",
+			"startMs": 97.125,
+			"settledMs": 157.319
+		},
+		{
+			"name": "recommendations",
+			"startMs": 161.126,
+			"settledMs": 253.12
+		},
+		{
+			"name": "catalog",
+			"startMs": 161.368,
+			"settledMs": 242.328
+		},
+		{
+			"name": "reviews",
+			"startMs": 161.767,
+			"settledMs": 232.425
+		}
+	]
+}

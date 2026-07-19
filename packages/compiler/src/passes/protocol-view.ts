@@ -50,6 +50,7 @@ export function createProtocolViewPayload(
 	const excludedHostIds = new Set([...armHostIds(input), ...boundaryArmHostIds(input)]);
 	return {
 		version: ASYNC_PROTOCOL_VERSION,
+		...optionalAsyncRunnerRegistry(input, asyncRunnerSymbols),
 		locators: input.payloadArena.view.locators.filter(
 			(locator) => !excludedHostIds.has(locator.hostNodeId),
 		),
@@ -100,13 +101,74 @@ export function createProtocolViewPayload(
 					...boundary.endAnchor,
 					index: emittedPairRank(input, boundary.id) * 2 + 1,
 				},
-				asyncReads: boundary.asyncReads.map((read) => ({
+				asyncReads: protocolAsyncBoundaryReads(input, boundary).map((read) => ({
 					...read,
 					runnerSymbolId: asyncRunnerSymbols.get(read.graphNodeId),
 				})),
 			}),
 		),
 	};
+}
+
+function protocolAsyncBoundaryReads(
+	input: ProtocolViewPayloadInput,
+	boundary: ProtocolViewPayloadInput['payloadArena']['view']['asyncBoundaries'][number],
+): ProtocolViewPayloadInput['payloadArena']['view']['asyncBoundaries'][number]['asyncReads'] {
+	const computedByGraphNode = new Map(
+		input.payloadArena.state.computed.map((computed) => [computed.graphNodeId, computed]),
+	);
+	const reads: ProtocolViewPayloadInput['payloadArena']['view']['asyncBoundaries'][number]['asyncReads'][number][] =
+		[];
+	const seen = new Set<string>();
+	const visit = (graphNodeId: string, source: string, path: ReadonlyArray<string>): void => {
+		const computed = computedByGraphNode.get(graphNodeId);
+		if (!computed || computed.async === true) {
+			if (seen.has(graphNodeId)) return;
+			seen.add(graphNodeId);
+			reads.push({ source, graphNodeId, path });
+			return;
+		}
+		for (const dependency of computed.dependencies ?? []) {
+			visit(dependency.graphNodeId, source, dependency.path);
+		}
+	};
+	for (const read of boundary.asyncReads) {
+		visit(read.graphNodeId, read.source, read.path);
+		const computed = computedByGraphNode.get(read.graphNodeId);
+		if (computed?.async === false && !seen.has(read.graphNodeId)) {
+			seen.add(read.graphNodeId);
+			reads.push(read);
+		}
+	}
+	return reads;
+}
+
+function optionalAsyncRunnerRegistry(
+	input: ProtocolViewPayloadInput,
+	runnerSymbols: ReadonlyMap<string, string>,
+): { readonly asyncRunners?: Readonly<Record<string, string>> } {
+	const computedByGraphNode = new Map(
+		input.payloadArena.state.computed.map((computed) => [computed.graphNodeId, computed]),
+	);
+	const demanded = new Set<string>();
+	const visit = (graphNodeId: string): void => {
+		if (demanded.has(graphNodeId)) return;
+		demanded.add(graphNodeId);
+		for (const dependency of computedByGraphNode.get(graphNodeId)?.dependencies ?? []) {
+			if (computedByGraphNode.has(dependency.graphNodeId)) visit(dependency.graphNodeId);
+		}
+	};
+	for (const boundary of supportedAsyncBoundaries(input)) {
+		for (const read of boundary.asyncReads) visit(read.graphNodeId);
+	}
+
+	const asyncRunners = Object.fromEntries(
+		[...demanded].flatMap((graphNodeId) => {
+			const symbolId = runnerSymbols.get(graphNodeId);
+			return symbolId ? [[graphNodeId, symbolId]] : [];
+		}),
+	);
+	return Object.keys(asyncRunners).length > 0 ? { asyncRunners } : {};
 }
 
 function domUpdateTargetKey(

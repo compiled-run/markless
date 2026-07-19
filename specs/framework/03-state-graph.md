@@ -165,9 +165,25 @@ const rawUser = computed(async ({ signal }) =>
 const formattedUser = computed(() => formatUser(rawUser, locale));
 ```
 
-- Sync computeds may depend on async computeds. They become
-  async-pending-capable transitively and must still be read under an async
-  boundary if their upstream async value can be pending or rejected.
+- Async computeds compose through their key phases. If an async computed's
+  dependency closure contains an unsettled async computed, the dependent
+  becomes pending without its function running. Settlement of that closure
+  retries the dependent key phase. All unsettled async dependencies discovered
+  by the key phase are demanded in parallel; they are not serialized by source
+  or document order. If any required dependency rejects, the dependent rejects
+  without running its function.
+- A sync context — a template read, sync computed, or dependency record — reads
+  an async computed as the boundary-guarded snapshot value. A bare read is that
+  value, never status or snapshot metadata. Sync computeds may depend on async
+  computeds; readers of the sync computed gate on its complete async ancestor
+  closure and must still be dominated by an async boundary when an ancestor can
+  be pending or rejected.
+- Async chains have the same graph semantics during blocking SSR, streaming
+  SSR, browser resume, and CSR. Demand and settlement are independent of
+  boundary document order. Each async computed runs at most once during a
+  server render, even when multiple boundaries demand it.
+- Async dependency cycles are compile-time errors, including cycles whose path
+  crosses one or more sync computeds.
 - The runtime passes an `AbortSignal` to async computeds. On dependency-key
   change or disposal, stale work is aborted when possible; stale promise
   resolutions are ignored even if the underlying operation cannot abort.
@@ -178,12 +194,18 @@ const formattedUser = computed(() => formatUser(rawUser, locale));
   Missing boundaries are compile-time diagnostics in v1. A future router may
   provide route-level implicit boundaries, but the v1 compiler should keep the
   rule explicit.
-- In v1 non-streaming initial render, the runtime awaits all demanded async
-  nodes inside rendered boundaries before emitting final HTML. Streaming,
-  out-of-order flushing, stale-while-revalidate, and explicit cache policy are
-  separate features.
-- On browser revalidation, a dependency-key change returns the boundary to
-  `@pending` for the new key. Stale-content and cached-key policies are deferred.
+- Initial render streams boundaries with authored `@pending` arms by default;
+  blocking render is an explicit opt-out. Boundary flushing and deadline rules
+  are owned by [12-arm-rendering.md](./12-arm-rendering.md); they do not change
+  async dependency composition.
+- On browser revalidation, a dependency-key change makes the boundary pending
+  for the new key. The deadline-gated arm rules determine whether the prior
+  settled content remains visible or the authored `@pending` arm commits.
+  Cross-navigation cache policy is specified separately.
+
+Deferred: development-time diagnostics for avoidable async waterfalls and
+router-derived prefetching are recorded follow-ups. They are observability and
+demand-planning features, not part of the composition semantics above.
 
 Internally, the compiler can lower the single author-facing function into a
 resource-shaped pair:

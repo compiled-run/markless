@@ -243,7 +243,7 @@ function planOneArmRender(
 		`	const marklessArmSnapshot = context.graph.read(${JSON.stringify(candidate.read.graphNodeId)}, []);`,
 		...graphLocals.map(
 			(binding) =>
-				`	const ${binding.name} = context.graph.read(${JSON.stringify(binding.id)}, ${binding.kind === 'computed' && binding.asyncCapable === true ? '["value"]' : '[]'});`,
+				`	const ${binding.name} = context.graph.read(${JSON.stringify(binding.id)}, ${binding.kind === 'computed' && binding.async === true ? '["value"]' : '[]'});`,
 		),
 		'	const marklessCsrChildren = [];',
 		'	const marklessArmRoot = marklessArmIndex === 0',

@@ -70,6 +70,11 @@ export type WalkState = {
 	currentFunctionSite: 'computed' | 'handler' | 'helper' | null;
 	currentHelperCall: HelperStateCallSite | null;
 	helperFunctions: Map<string, AnyNode>;
+	pendingComputedDependencies: Array<{
+		readonly graphNodeId: string;
+		readonly body: AnyNode | undefined;
+		readonly sharedDefinitionId: string | null;
+	}>;
 	walk: SemanticGraphWalk | null;
 	nextComponentEdgeId: number;
 	nextBranchId: number;
@@ -141,6 +146,7 @@ export function createWalkState(input: {
 		currentFunctionSite: null,
 		currentHelperCall: null,
 		helperFunctions: new Map(),
+		pendingComputedDependencies: [],
 		walk: null,
 		nextComponentEdgeId: 0,
 		nextBranchId: 0,

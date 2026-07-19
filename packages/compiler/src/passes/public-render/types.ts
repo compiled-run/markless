@@ -23,6 +23,7 @@ export type SsrRenderContext = {
 		string,
 		{ readonly graphNodeId: string; readonly name: string; readonly source: string }
 	>;
+	readonly asyncDependencyRegistry?: boolean;
 	readonly branchSites: PublicRenderModuleInput['semanticGraph']['branchSites'];
 	readonly branchReactivityGates: PublicRenderModuleInput['publicRenderPlan']['branchReactivityGates'];
 	nextBranchSiteIndex: number;

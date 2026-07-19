@@ -47,6 +47,7 @@ export type MarklessSsrStream = {
 
 type StreamRunEntry = {
 	readonly promise: Promise<unknown>;
+	readonly async?: boolean;
 	settled?: { readonly status: 'fulfilled' | 'rejected' };
 };
 
@@ -127,9 +128,17 @@ function pendingStreamArms(
 		]),
 	);
 	const arms = (output.view?.asyncBoundaries ?? []).flatMap((boundary) => {
-		const graphNodeId = boundary.asyncReads[0]?.graphNodeId;
-		const entry = graphNodeId ? renderContext.streaming.runs.get(graphNodeId) : undefined;
-		return graphNodeId && entry && snapshotById.get(graphNodeId)?.status === 'pending'
+		const pendingRead = boundary.asyncReads.find(
+			(read) => snapshotById.get(read.graphNodeId)?.status === 'pending',
+		);
+		const graphNodeId = pendingRead?.graphNodeId;
+		const syncGateEntry = boundary.asyncReads
+			.map((read) => renderContext.streaming.runs.get(read.graphNodeId))
+			.find((entry) => entry?.async === false);
+		const entry =
+			syncGateEntry ??
+			(graphNodeId ? renderContext.streaming.runs.get(graphNodeId) : undefined);
+		return graphNodeId && entry
 			? [{ boundaryId: boundary.id, graphNodeId, entry, revealDependencyIds: [] as string[] }]
 			: [];
 	});

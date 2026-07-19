@@ -6,6 +6,7 @@ import type { PublicRenderRoot } from './types.ts';
 
 type GraphBinding = PublicRenderModuleInput['semanticGraph']['graphBindings'][number];
 const loweredFrameworkCalls = new Set(['computed', 'element', 'handler']);
+
 export function renderBodyLines(
 	input: PublicRenderModuleInput,
 	rootInfo: PublicRenderRoot,
@@ -75,6 +76,7 @@ function computedDeclarationLine(
 	if (
 		!binding ||
 		binding.async === true ||
+		binding.asyncCapable === true ||
 		!binding.functionSource ||
 		!isFrameworkCall(declaration.init as AnyNode | undefined, 'computed')
 	) {

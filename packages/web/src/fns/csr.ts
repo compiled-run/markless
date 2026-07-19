@@ -176,8 +176,9 @@ export function marklessCsrLoadChildSymbol(children, loadSymbol, symbolId) {
 export function marklessCsrRemapGraphOutput(output, graphProps) {
 	// A composed CSR prop is the source node's committed mount value. Seed that
 	// node before the page graph is built so a downstream-first write can read it.
-	const props = output.state.cells.find((cell) => cell.graphNodeId.startsWith('prop:'))
-		?.directValue;
+	const props = output.state.cells.find((cell) =>
+		cell.graphNodeId.startsWith('prop:'),
+	)?.directValue;
 	if (props)
 		for (const prop of graphProps ?? [])
 			if (!prop.path.length && props[prop.name] !== undefined)
@@ -196,23 +197,24 @@ export function marklessCsrRemapGraphOutput(output, graphProps) {
 	const loadSymbol = output.loadSymbol;
 	if (!loadSymbol || !graphProps?.length) return;
 	output.loadSymbol = (symbolId) =>
-		Promise.resolve(loadSymbol(symbolId)).then((symbol) => (context) =>
-			symbol({
-				...context,
-				graph: {
-					...context.graph,
-					read(graphNodeId, path = []) {
-						const mapped = marklessCsrRemapChildGraph(
-							{ graphNodeId, path },
-							graphProps,
-						);
-						return context.graph.read(
-							mapped?.graphNodeId ?? graphNodeId,
-							mapped?.path ?? path,
-						);
+		Promise.resolve(loadSymbol(symbolId)).then(
+			(symbol) => (context) =>
+				symbol({
+					...context,
+					graph: {
+						...context.graph,
+						read(graphNodeId, path = []) {
+							const mapped = marklessCsrRemapChildGraph(
+								{ graphNodeId, path },
+								graphProps,
+							);
+							return context.graph.read(
+								mapped?.graphNodeId ?? graphNodeId,
+								mapped?.path ?? path,
+							);
+						},
 					},
-				},
-			}),
+				}),
 		);
 }
 // Graph node ids are NAME-based per module and compose merges child state
@@ -267,6 +269,7 @@ export function marklessCsrComposeView(root, view, hostLocators, children) {
 	const locators = [];
 	const branches = [...(view.branches ?? [])];
 	const asyncBoundaries = [...(view.asyncBoundaries ?? [])];
+	const asyncRunners = { ...view.asyncRunners };
 	const csrCallbacks = new Map();
 	for (const locator of hostLocators) {
 		const element = marklessCsrNodeAtPath(root, locator.hostPath);
@@ -298,6 +301,7 @@ export function marklessCsrComposeView(root, view, hostLocators, children) {
 			elementHandles,
 			branches,
 			asyncBoundaries,
+			asyncRunners,
 			csrCallbacks,
 		});
 	locators.sort((a, b) => a.index - b.index);
@@ -316,6 +320,7 @@ export function marklessCsrComposeView(root, view, hostLocators, children) {
 		elementHandles,
 		branches: marklessCsrResolveAnchorRecords(root, 'branch', branches),
 		asyncBoundaries: marklessCsrResolveAnchorRecords(root, 'async', armizedBoundaries),
+		...(Object.keys(asyncRunners).length > 0 ? { asyncRunners } : {}),
 	};
 	return csrCallbacks.size > 0
 		? { ...composed, __marklessCsrCallbacks: Object.fromEntries(csrCallbacks) }
@@ -329,6 +334,14 @@ export function marklessCsrAppendChildView(context) {
 	const claimed = new Set();
 	const propEvents = context.child.output?.propEvents ?? [];
 	const callbackProps = context.child.output?.callbackProps ?? {};
+	for (const [graphNodeId, symbolId] of Object.entries(childView.asyncRunners ?? {})) {
+		const mapped = marklessCsrRemapChildGraph(
+			{ graphNodeId, path: [] },
+			context.child.graphProps,
+		);
+		context.asyncRunners[mapped?.graphNodeId ?? graphNodeId] =
+			context.child.symbolPrefix + symbolId;
+	}
 	for (const locator of childView.locators) {
 		const element = marklessCsrResolveChildLocatorElement(childElements, locator, claimed);
 		const index = element ? context.indexByElement.get(element) : undefined;

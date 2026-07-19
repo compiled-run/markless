@@ -91,15 +91,15 @@ Four implementation areas:
    shape is private and is not a VDOM. Never exposed as user vocabulary.
 3. **Serialization and render/resume protocol** — CSR `render()` creates a live
    runtime container directly from the app bundle and target element. SSR
-   initial render runs component bodies once, renders HTML, awaits demanded async
-   nodes in v1 non-streaming mode, wraps the output in a resumable container, and
-   serializes the resumability payload (state values, async snapshots,
-   subscription graph, listener→symbol map) into compact private data scripts.
-   The SSR output includes a tiny inline browser resumer scoped to that
-   container. The resumer attaches container-scoped event listeners and
-   visibility observers, then lazy-loads app symbols only on interaction,
-   visibility, or another explicit trigger. No hydration pass, no component
-   execution during browser resume.
+   initial render runs component bodies once, renders fulfilled boundaries
+   inline, streams still-pending boundaries by default, wraps the output in a
+   resumable container, and serializes the resumability payload (state values,
+   async snapshots, subscription graph, listener→symbol map) into compact
+   private data scripts. Blocking render is an explicit opt-out. The SSR output
+   includes a tiny inline browser resumer scoped to that container. The resumer
+   attaches container-scoped event listeners and visibility observers, then
+   lazy-loads app symbols only on interaction, visibility, or another explicit
+   trigger. No hydration pass, no component execution during browser resume.
 4. **Build integration** — a Rolldown plugin base exported by
    `@markless/bundler`,
    with framework adapters such as Vite consuming that base plugin. Extracted

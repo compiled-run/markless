@@ -5,6 +5,8 @@ import { applyMarklessAllowDirectives } from '../../diagnostics.ts';
 import {
 	collectAsyncBoundary,
 	collectAsyncBoundaryDiagnostics,
+	collectComputedDependencyCycleDiagnostics,
+	finalizeComputedDependencies,
 	propagateAsyncComputedCapability,
 } from './collect-async.ts';
 import { collectImports, collectModuleImports, getFrameworkApiForCall } from './imports.ts';
@@ -82,7 +84,9 @@ export async function buildSemanticGraph(
 		state.currentComponentName = previousComponentName;
 	}
 
+	finalizeComputedDependencies(state);
 	propagateAsyncComputedCapability(graph);
+	collectComputedDependencyCycleDiagnostics(graph);
 	collectElementHandleDiagnostics(graph);
 	collectAsyncBoundaryDiagnostics(graph);
 

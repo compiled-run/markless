@@ -78,7 +78,12 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 			const rowElementHandles = input.semanticGraph.elementHandleBindings.flatMap(
 				(binding) => {
 					if (binding.rowOwner?.repeatId !== repeat.id) return [];
-					const graphBinding = resolveElementHandleBinding(binding, input, bindings, aliases);
+					const graphBinding = resolveElementHandleBinding(
+						binding,
+						input,
+						bindings,
+						aliases,
+					);
 					if (!graphBinding || graphBinding.kind !== 'element') return [];
 					return [
 						{
@@ -192,20 +197,8 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 				),
 			};
 		});
-	const asyncBoundaries = input.semanticGraph.asyncBoundaries.map((boundary) => ({
-		id: boundary.id,
-		kind: 'async-boundary' as const,
-		anchorOrder: boundary.anchorOrder,
-		armRecords: boundaryArmRecords(boundary.id),
-		startAnchor: {
-			strategy: 'dom-order-comment' as const,
-			index: (anchorRank.get(boundary.id) ?? 0) * 2,
-		},
-		endAnchor: {
-			strategy: 'dom-order-comment' as const,
-			index: (anchorRank.get(boundary.id) ?? 0) * 2 + 1,
-		},
-		asyncReads: uniqueBy(
+	const asyncBoundaries = input.semanticGraph.asyncBoundaries.map((boundary) => {
+		const directAsyncReads = uniqueBy(
 			[
 				...input.semanticGraph.templateReads,
 				// Keyed repeats inside the arm read their collection from the
@@ -244,8 +237,23 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 				];
 			}),
 			(read) => `${read.graphNodeId}:${read.path.join('.')}:${read.source}`,
-		),
-	}));
+		);
+		return {
+			id: boundary.id,
+			kind: 'async-boundary' as const,
+			anchorOrder: boundary.anchorOrder,
+			armRecords: boundaryArmRecords(boundary.id),
+			startAnchor: {
+				strategy: 'dom-order-comment' as const,
+				index: (anchorRank.get(boundary.id) ?? 0) * 2,
+			},
+			endAnchor: {
+				strategy: 'dom-order-comment' as const,
+				index: (anchorRank.get(boundary.id) ?? 0) * 2 + 1,
+			},
+			asyncReads: directAsyncReads,
+		};
+	});
 	return {
 		passId: 'payload-arena',
 		state: {
