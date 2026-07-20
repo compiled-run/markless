@@ -28,6 +28,7 @@ export type SemanticComponentPropBinding =
 			readonly name: string;
 			readonly source: string;
 			readonly kind: 'callback' | 'serializable' | 'opaque';
+			readonly parameters?: ReadonlyArray<string>;
 			readonly sourceSpan?: SourceSpan;
 	  };
 
@@ -278,6 +279,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_ELEMENT_HANDLE_RENDER_READ'
 		| 'MARKLESS_ATTACH_HOST_ELEMENT_REQUIRED'
 		| 'MARKLESS_EVENT_HANDLER_NOT_A_FUNCTION'
+		| 'MARKLESS_CALLBACK_PROP_ARITY_UNSUPPORTED'
 		| 'MARKLESS_EVENT_SPREAD_UNSUPPORTED'
 		| 'MARKLESS_SPREAD_STATIC_SNAPSHOT'
 		| 'MARKLESS_ATTRIBUTE_OBJECT_VALUE'
@@ -637,6 +639,7 @@ export type PlannedSymbol =
 			readonly propName: string;
 			readonly source: string;
 			readonly sourceSpan?: SourceSpan;
+			readonly parameters?: ReadonlyArray<string>;
 			readonly moduleImports?: ReadonlyArray<SemanticModuleImport>;
 			readonly reads?: ReadonlyArray<LoweredStateRead>;
 			readonly writes?: ReadonlyArray<LoweredStateWrite>;

@@ -12,7 +12,7 @@ import type {
 	SymbolModulesArtifact,
 	SymbolModulesInput,
 } from '../artifacts.ts';
-import { walkNode, type AnyNode } from '../ast/nodes.ts';
+import { childNodes, type AnyNode } from '../ast/nodes.ts';
 import { parseJavaScriptModule } from '../js-ast.ts';
 
 export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtifact {
@@ -192,7 +192,7 @@ function emitEventHandlerModule(
 			'',
 		].join('\n');
 	}
-	const parameters = symbol.kind === 'event-handler' ? symbol.parameters : [];
+	const parameters = symbol.parameters ?? [];
 	const importedReference = importedHandlerReference(symbol);
 	const body = importedReference
 		? `return ${symbol.source.trim()}(context.event);`
@@ -254,7 +254,7 @@ function eventHandlerAuthoredBody(
 		body.source,
 		body.sourceStart,
 		symbol,
-		symbol.kind === 'event-handler' ? symbol.parameters : [],
+		symbol.parameters ?? [],
 		localNames,
 	);
 }
@@ -298,10 +298,20 @@ function spliceEventHandlerBody(
 ): string {
 	const replacements = [
 		...(symbol.reads ?? []).flatMap((read) =>
-			readBodySpans(bodySource, read).map((span) => ({
-				...span,
-				replacement: graphReadCallSource('context.graph.read', read.graphNodeId, read.path),
-			})),
+			readBodySpans(bodySource, read).map((span) => {
+				const graphRead = graphReadCallSource(
+					'context.graph.read',
+					read.graphNodeId,
+					read.path,
+				);
+				return {
+					start: span.start,
+					end: span.end,
+					replacement: span.shorthandKey
+						? `${span.shorthandKey}: ${graphRead}`
+						: graphRead,
+				};
+			}),
 		),
 		...(symbol.writes ?? []).flatMap((write) => {
 			const replacement = emitEventWriteExpression(
@@ -362,7 +372,11 @@ function spliceEventHandlerBody(
 function readBodySpans(
 	bodySource: string,
 	read: LoweredStateRead,
-): ReadonlyArray<{ readonly start: number; readonly end: number }> {
+): ReadonlyArray<{
+	readonly start: number;
+	readonly end: number;
+	readonly shorthandKey?: string;
+}> {
 	const prefix = 'async function* __marklessBody() {\n';
 	const source = `${prefix}${bodySource}\n}`;
 	let ast: AnyNode;
@@ -372,18 +386,52 @@ function readBodySpans(
 		return [];
 	}
 
-	const spans = new Map<number, { readonly start: number; readonly end: number }>();
-	walkNode(ast, (node) => {
-		if (!isGraphReadExpression(node)) return;
-		if (typeof node.start !== 'number' || typeof node.end !== 'number') return;
-		if (source.slice(node.start, node.end) !== read.source) return;
+	const spans = new Map<
+		number,
+		{ readonly start: number; readonly end: number; readonly shorthandKey?: string }
+	>();
+	const walkWithParent = (node: AnyNode, parent?: AnyNode): void => {
+		if (
+			isGraphReadExpression(node) &&
+			typeof node.start === 'number' &&
+			typeof node.end === 'number' &&
+			source.slice(node.start, node.end) === read.source
+		) {
+			const start = node.start - prefix.length;
+			const end = node.end - prefix.length;
+			if (start >= 0 && end <= bodySource.length) {
+				const shorthandKey = objectShorthandKeySource(parent, node, source);
+				spans.set(start, { start, end, ...(shorthandKey ? { shorthandKey } : {}) });
+			}
+		}
 
-		const start = node.start - prefix.length;
-		const end = node.end - prefix.length;
-		if (start < 0 || end > bodySource.length) return;
-		spans.set(start, { start, end });
-	});
+		for (const child of childNodes(node)) walkWithParent(child, node);
+	};
+	walkWithParent(ast);
 	return [...spans.values()];
+}
+
+function objectShorthandKeySource(
+	parent: AnyNode | undefined,
+	read: AnyNode,
+	source: string,
+): string | null {
+	if (parent?.type !== 'Property' || parent.shorthand !== true) return null;
+	const key = parent.key as AnyNode | undefined;
+	const value = parent.value as AnyNode | undefined;
+	if (
+		key?.type !== 'Identifier' ||
+		typeof key.start !== 'number' ||
+		typeof key.end !== 'number' ||
+		typeof value?.start !== 'number' ||
+		typeof value.end !== 'number' ||
+		read.start !== value.start ||
+		read.end !== value.end
+	) {
+		return null;
+	}
+
+	return source.slice(key.start, key.end);
 }
 
 function isGraphReadExpression(node: AnyNode): boolean {

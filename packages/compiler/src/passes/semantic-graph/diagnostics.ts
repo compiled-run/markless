@@ -118,6 +118,24 @@ export function computedDependencyCycleDiagnostic(input: {
 	});
 }
 
+export function callbackPropArityUnsupportedDiagnostic(input: {
+	readonly propName: string;
+	readonly parameterCount: number;
+	readonly callback: AnyNode;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_CALLBACK_PROP_ARITY_UNSUPPORTED',
+		title: 'Callback props accept at most one parameter',
+		message: `Callback prop \`${input.propName}\` declares ${input.parameterCount} parameters, but lazy callback symbols currently accept at most one.`,
+		why: 'The callback transport carries one callback value across the lazy-symbol boundary. Additional arguments would not have stable parameter bindings when the symbol runs.',
+		span: sourceSpan(input.callback, input.filename),
+		suggestion:
+			'Pass a single object instead — before: `(kind, payload) => ...`; after: `({ kind, payload }) => ...` — and invoke the callback with one object value.',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_CALLBACK_PROP_ARITY_UNSUPPORTED',
+	});
+}
+
 export function computedDependencyGraphCycleDiagnostic(input: {
 	readonly cycle: ReadonlyArray<string>;
 }): SemanticGraphDiagnostic {

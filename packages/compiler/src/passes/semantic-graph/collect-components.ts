@@ -15,6 +15,7 @@ import {
 } from '../../artifact-helpers/graph-paths.ts';
 import { collectExpressionReads } from './collect-expressions.ts';
 import { collectObjectPatternAliases } from './collect-aliases.ts';
+import { callbackPropArityUnsupportedDiagnostic } from './diagnostics.ts';
 import type { SemanticGraphWalk, WalkState } from './types.ts';
 
 export function collectComponentProps(component: AnyNode, state: WalkState): void {
@@ -109,7 +110,28 @@ function componentPropBindings(
 				: sourceSpan(attribute, state.filename);
 
 		if (expression && isCallbackExpression(expression)) {
-			props.push({ name, source, kind: 'callback', sourceSpan: span });
+			const parameterNodes = asNodes(expression.params);
+			if (parameterNodes.length > 1) {
+				state.graph.diagnostics.push(
+					callbackPropArityUnsupportedDiagnostic({
+						propName: name,
+						parameterCount: parameterNodes.length,
+						callback: expression,
+						filename: state.filename,
+					}),
+				);
+				continue;
+			}
+
+			props.push({
+				name,
+				source,
+				kind: 'callback',
+				parameters: parameterNodes.map((parameter) =>
+					expressionSource(parameter, state.source),
+				),
+				sourceSpan: span,
+			});
 			continue;
 		}
 
