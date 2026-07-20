@@ -121,17 +121,18 @@ export function computedDependencyCycleDiagnostic(input: {
 export function callbackPropArityUnsupportedDiagnostic(input: {
 	readonly propName: string;
 	readonly parameterCount: number;
+	readonly reason?: string;
 	readonly callback: AnyNode;
 	readonly filename: string;
 }): SemanticGraphDiagnostic {
 	return semanticGraphDiagnostic({
 		code: 'MARKLESS_CALLBACK_PROP_ARITY_UNSUPPORTED',
 		title: 'Callback props accept at most one parameter',
-		message: `Callback prop \`${input.propName}\` declares ${input.parameterCount} parameters, but lazy callback symbols currently accept at most one.`,
-		why: 'The callback transport carries one callback value across the lazy-symbol boundary. Additional arguments would not have stable parameter bindings when the symbol runs.',
+		message: `Callback prop \`${input.propName}\` is unsupported because ${input.reason ?? `it declares ${input.parameterCount} parameters`}. Lazy callback symbols accept zero parameters or one simple identifier, object pattern, or array pattern without top-level defaults or rest.`,
+		why: 'The callback transport carries one callback value across the lazy-symbol boundary. Multiple parameters, defaults, and rest bindings do not have supported parameter semantics when the symbol runs.',
 		span: sourceSpan(input.callback, input.filename),
 		suggestion:
-			'Pass a single object instead — before: `(kind, payload) => ...`; after: `({ kind, payload }) => ...` — and invoke the callback with one object value.',
+			'Pass a single object instead — change `(kind, payload) => ...` to `({ kind, payload }) => ...` and invoke the callback with one object value; remove parameter defaults and rest bindings.',
 		docsUrl: 'https://markless.dev/errors/MARKLESS_CALLBACK_PROP_ARITY_UNSUPPORTED',
 	});
 }

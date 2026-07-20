@@ -52,3 +52,25 @@ test('null guard returns remain accepted', async () => {
 		),
 	).toBe(false);
 });
+
+test.each([
+	['fragment', '<><p>hidden</p></>'],
+	['conditional', 'visible ? <p>a</p> : <p>b</p>'],
+])('%s-valued guard returns fail closed', async (_shape, guardValue) => {
+	const source = `export function Guarded({ visible }) @{
+	if (!visible) return ${guardValue};
+
+	<main>visible</main>
+}`;
+	const result = await compile(source);
+	const diagnostic = result.publicRenderPlan.diagnostics.find(
+		(item) => item.code === 'MARKLESS_ELEMENT_GUARD_RETURN_UNSUPPORTED',
+	);
+
+	expect(diagnostic).toMatchObject({
+		severity: 'error',
+		phase: 'public-render',
+		passId: 'public-render-plan',
+		artifactKeys: ['publicRenderPlan'],
+	});
+});

@@ -30,6 +30,42 @@ test('lazy event emission expands graph reads in object shorthand property posit
 	);
 });
 
+test('lazy event emission preserves non-computed object keys that collide with graph reads', async () => {
+	const result = await compile(`import { state } from '@markless/core';
+
+	export function PayloadButton({ onTrace }) @{
+		let total = state(0);
+		<button onClick={() => onTrace({ total: 1, value: total })}>send</button>
+	}`);
+	const symbol = result.symbolModules.modules.find(
+		(module) => module.kind === 'event-handler' && module.source.includes('onTrace'),
+	);
+
+	expect(symbol?.source).toContain(
+		`{ total: 1, value: context.graph.read("state:total") }`,
+	);
+	expect(transformSync(symbol?.symbolId ?? 'missing', symbol?.source ?? '').errors ?? []).toEqual(
+		[],
+	);
+});
+
+test('lazy event emission rewrites graph reads in computed object keys', async () => {
+	const result = await compile(`import { state } from '@markless/core';
+
+	export function PayloadButton({ onTrace }) @{
+		let total = state(0);
+		<button onClick={() => onTrace({ [total]: 1 })}>send</button>
+	}`);
+	const symbol = result.symbolModules.modules.find(
+		(module) => module.kind === 'event-handler' && module.source.includes('onTrace'),
+	);
+
+	expect(symbol?.source).toContain(`{ [context.graph.read("state:total")]: 1 }`);
+	expect(transformSync(symbol?.symbolId ?? 'missing', symbol?.source ?? '').errors ?? []).toEqual(
+		[],
+	);
+});
+
 test('callback props support zero or one parameter and reject multiple parameters', async () => {
 	const supported = await compile(`import { state } from '@markless/core';
 
@@ -88,4 +124,35 @@ test('callback props support zero or one parameter and reject multiple parameter
 	expect(
 		rejected.symbolResolver.symbols.some((symbol) => symbol.kind === 'callback-prop'),
 	).toBe(false);
+});
+
+test.each([
+	['default', '(payload = 1)'],
+	['rest', '(...payload)'],
+])('callback props reject a single %s parameter', async (_shape, parameters) => {
+	const result = await compile(`import { state } from '@markless/core';
+
+	function Child({ onValue }) @{
+		<button onClick={() => onValue(2)}>send</button>
+	}
+
+	export function Parent() @{
+		let message = state('none');
+		<Child onValue={${parameters} => message = payload} />
+	}`);
+	const diagnostic = result.semanticGraph.diagnostics.find(
+		(item) => item.code === 'MARKLESS_CALLBACK_PROP_ARITY_UNSUPPORTED',
+	);
+
+	expect(diagnostic).toMatchObject({
+		severity: 'error',
+		phase: 'semantic-graph',
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+	});
+	expect(diagnostic?.message).toContain('onValue');
+	expect(diagnostic?.suggestions[0]?.message).toContain('single');
+	expect(result.symbolResolver.symbols.some((symbol) => symbol.kind === 'callback-prop')).toBe(
+		false,
+	);
 });

@@ -393,6 +393,7 @@ function readBodySpans(
 	const walkWithParent = (node: AnyNode, parent?: AnyNode): void => {
 		if (
 			isGraphReadExpression(node) &&
+			isValuePositionGraphRead(node, parent) &&
 			typeof node.start === 'number' &&
 			typeof node.end === 'number' &&
 			source.slice(node.start, node.end) === read.source
@@ -409,6 +410,22 @@ function readBodySpans(
 	};
 	walkWithParent(ast);
 	return [...spans.values()];
+}
+
+function isValuePositionGraphRead(node: AnyNode, parent: AnyNode | undefined): boolean {
+	if (node.type !== 'Identifier' || !parent) return true;
+
+	if (parent.type === 'Property') {
+		const key = parent.key as AnyNode | undefined;
+		if (key === node && parent.computed !== true && parent.shorthand !== true) return false;
+	}
+
+	if (parent.type === 'MemberExpression' || parent.type === 'OptionalMemberExpression') {
+		const property = parent.property as AnyNode | undefined;
+		if (property === node && parent.computed !== true) return false;
+	}
+
+	return true;
 }
 
 function objectShorthandKeySource(

@@ -376,12 +376,9 @@ export function componentConditionalRootDiagnostics(ast: AnyNode, filename: stri
 			];
 		const root = firstComponentRoot(componentFunction.node);
 		const guardReturn = root
-			? returns.find((statement) => {
+			? componentReturnStatements(body).find((statement) => {
 					const argument = returnArgument(statement);
-					return (
-						argument !== root &&
-						(argument?.type === 'Element' || argument?.type === 'JSXElement')
-					);
+					return argument !== root && !isEmptyGuardReturnArgument(argument);
 				})
 			: undefined;
 		if (guardReturn) {
@@ -623,6 +620,30 @@ function templateReturnStatements(node: AnyNode): AnyNode[] {
 	};
 	for (const child of childNodes(node)) visit(child);
 	return returns;
+}
+
+function componentReturnStatements(node: AnyNode): AnyNode[] {
+	const returns: AnyNode[] = [];
+	const visit = (child: AnyNode | null | undefined): void => {
+		if (!child || typeof child !== 'object') return;
+		if (isFunctionNode(child) && child !== node) return;
+		if (child.type === 'ReturnStatement') {
+			returns.push(child);
+			return;
+		}
+		for (const grandchild of childNodes(child)) visit(grandchild);
+	};
+	for (const child of childNodes(node)) visit(child);
+	return returns;
+}
+
+function isEmptyGuardReturnArgument(node: AnyNode | undefined): boolean {
+	return (
+		!node ||
+		(node.type === 'Literal' && node.value === null) ||
+		node.type === 'NullLiteral' ||
+		(node.type === 'Identifier' && node.name === 'undefined')
+	);
 }
 
 function isFunctionNode(node: AnyNode): boolean {
