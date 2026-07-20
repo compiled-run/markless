@@ -15,6 +15,7 @@ import {
 import {
 	childrenOpacityDiagnostic,
 	conditionalComponentRootDiagnostic,
+	elementGuardReturnUnsupportedDiagnostic,
 	noRenderableRootDiagnostic,
 	repeatRowStateScopeUnsupportedDiagnostic,
 	undeclaredTemplateReadDiagnostic,
@@ -373,6 +374,25 @@ export function componentConditionalRootDiagnostics(ast: AnyNode, filename: stri
 					componentName: componentFunction.name,
 				}),
 			];
+		const root = firstComponentRoot(componentFunction.node);
+		const guardReturn = root
+			? returns.find((statement) => {
+					const argument = returnArgument(statement);
+					return (
+						argument !== root &&
+						(argument?.type === 'Element' || argument?.type === 'JSXElement')
+					);
+				})
+			: undefined;
+		if (guardReturn) {
+			return [
+				elementGuardReturnUnsupportedDiagnostic({
+					node: guardReturn,
+					filename,
+					componentName: componentFunction.name,
+				}),
+			];
+		}
 	}
 	return [];
 }

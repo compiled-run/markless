@@ -249,3 +249,28 @@ export function conditionalComponentRootDiagnostic(input: {
 		docsUrl: 'https://markless.dev/errors/MARKLESS_COMPONENT_ROOT_CONDITIONAL',
 	};
 }
+
+export function elementGuardReturnUnsupportedDiagnostic(input: {
+	readonly node: AnyNode;
+	readonly filename: string;
+	readonly componentName: string;
+}): CompilerDiagnostic {
+	return {
+		code: 'MARKLESS_ELEMENT_GUARD_RETURN_UNSUPPORTED',
+		severity: 'error',
+		phase: 'public-render',
+		title: 'Element-valued guard returns are not supported',
+		message: `${input.componentName} uses an element-valued guard return before its template root, so the public render plan cannot preserve both outcomes.`,
+		why: 'The public render module needs one planned component root with stable locators. An earlier element-valued return creates another root whose conditional statement flow is not represented by that plan.',
+		primarySpan: sourceSpan(input.node, input.filename),
+		passId: 'public-render-plan',
+		artifactKeys: ['publicRenderPlan'],
+		suggestions: [
+			{
+				message:
+					'Rewrite the two outcomes as a root-level @if/@else template, or use return null when the guard should render nothing.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_GUARD_RETURN_UNSUPPORTED',
+	};
+}
