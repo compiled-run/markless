@@ -1,4 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
+import { resolve } from 'pathe';
+import { build as viteBuild, type Plugin } from 'vite';
 import {
 	MARKLESS_BUNDLE_GRAPH,
 	marklessLib,
@@ -633,6 +635,83 @@ export default function App() @{ <main><Child /></main> }`,
 		await expect(callGenerateBundle(stalePlugin, {}, vi.fn())).rejects.toThrow(
 			'MARKLESS_CAPTURE_METADATA_MISSING: Parent module "/workspace/app/pages/App.tsrx" composes imported child "../components/Child.tsrx", but its compiled artifact has no current capture metadata. Rebuild the child with the current Markless compiler and clear any stale build cache.',
 		);
+	});
+
+	test('production build emits resolver routes for an imported composed child', async () => {
+		const parentFilename = resolve(
+			import.meta.dirname,
+			'fixtures/imported-resolver/Parent.tsrx',
+		);
+		const childFilename = resolve(
+			import.meta.dirname,
+			'fixtures/imported-resolver/CaptureButton.tsrx',
+		);
+		const fixturePlugin: Plugin = {
+			name: 'imported-resolver-fixture',
+			resolveId(id, importer) {
+				if (id === parentFilename) return parentFilename;
+				if (
+					id.split('?')[0] === './CaptureButton.tsrx' &&
+					importer?.split('?')[0] === parentFilename
+				) {
+					const query = id.includes('?') ? `?${id.split('?').slice(1).join('?')}` : '';
+					return `${childFilename}${query}`;
+				}
+				return null;
+			},
+			load(id) {
+				if (id.split('?')[0] === parentFilename) {
+					return `import { state } from '@markless/core';
+import { CaptureButton } from './CaptureButton.tsrx';
+export function App() @{
+	let label = state('Server spruce');
+	let result = state('none');
+	<main>
+		<CaptureButton label={label} onTrace={(value) => result = value} />
+		<output>{result}</output>
+	</main>
+}`;
+				}
+				if (id.split('?')[0] === childFilename) {
+					return `export function CaptureButton({ label, onTrace }) @{
+	<button type="button" onClick={() => onTrace(label)}>{label}</button>
+}`;
+				}
+				return null;
+			},
+		};
+
+		const output = await viteBuild({
+			configFile: false,
+			root: resolve(import.meta.dirname, '..'),
+			logLevel: 'silent',
+			plugins: [fixturePlugin, marklessClient({ executionLog: 'never' })],
+			build: {
+				write: false,
+				minify: false,
+				target: 'es2022',
+				rolldownOptions: { input: { symbols: parentFilename } },
+			},
+		});
+		const chunks = (Array.isArray(output) ? output.flatMap((item) => item.output) : output.output)
+			.filter((item) => item.type === 'chunk');
+		const childResolverId = `virtual:markless:resolver:${encodeURIComponent(childFilename)}`;
+		const normalizeModuleId = (id: string) => (id.startsWith('\0') ? id.slice(1) : id);
+
+		expect(
+			chunks.some((chunk) =>
+				chunk.moduleIds.some((id) => normalizeModuleId(id) === childResolverId),
+			),
+		).toBe(true);
+		expect(
+			chunks.some((chunk) =>
+				chunk.moduleIds.some((id) =>
+					normalizeModuleId(id).startsWith(
+						`virtual:markless:symbol:${encodeURIComponent(childFilename)}:`,
+					),
+				),
+			),
+		).toBe(true);
 	});
 
 	test('execution-log never mode emits no attribution section or size entries', async () => {

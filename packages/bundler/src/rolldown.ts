@@ -91,6 +91,8 @@ export function createMarklessRolldownPlugin(input: {
 	const virtualModules = new Map<string, MarklessVirtualModule>();
 	const transformManifests = new Map<string, MarklessTransformManifest>();
 	const importedChildren = new Map<string, ImportedChild>();
+	const importedChildSources = new Set<string>();
+	const emittedClientResolverSources = new Set<string>();
 	const sourceVirtualModules = new Map<string, Set<string>>();
 	const clientSymbolEntrySources = new Set<string>();
 	const executionLogEstimatedSizes = new Map<string, number>();
@@ -140,6 +142,8 @@ export function createMarklessRolldownPlugin(input: {
 			virtualModules.clear();
 			transformManifests.clear();
 			importedChildren.clear();
+			importedChildSources.clear();
+			emittedClientResolverSources.clear();
 			sourceVirtualModules.clear();
 			executionLogEstimatedSizes.clear();
 			dev.reset();
@@ -317,6 +321,7 @@ export function createMarklessRolldownPlugin(input: {
 			);
 			for (const child of resolvedChildren) {
 				importedChildren.set(importedChildKey(child), child);
+				importedChildSources.add(child.source);
 			}
 			if (internalOptions.dev === true) {
 				for (const child of resolvedChildren) {
@@ -334,18 +339,28 @@ export function createMarklessRolldownPlugin(input: {
 			}
 
 			if (currentEnvironment === 'client' && !internalOptions.dev) {
-				for (const module of transformed.virtualModules.filter(
-					(item) =>
-						item.type === 'symbol' ||
-						(item.type === 'resume' &&
-							internalOptions.emitResumeModules === true &&
-							clientSymbolEntrySources.has(source)),
-				)) {
+				for (const module of transformed.virtualModules.filter((item) => {
+					if (item.type === 'symbol') return true;
+					if (item.type === 'resolver') {
+						return (
+							importedChildSources.has(source) &&
+							!emittedClientResolverSources.has(source)
+						);
+					}
+					return (
+						item.type === 'resume' &&
+						internalOptions.emitResumeModules === true &&
+						clientSymbolEntrySources.has(source)
+					);
+				})) {
 					this.emitFile({
 						type: 'chunk',
 						id: module.id,
 						preserveSignature: 'strict',
 					});
+					if (module.type === 'resolver') {
+						emittedClientResolverSources.add(source);
+					}
 				}
 			}
 
