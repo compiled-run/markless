@@ -1,6 +1,11 @@
 import { asNodes, childNodes, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import {
+	graphBindingMap,
+	resolveGraphPath,
+	semanticAliasMap,
+} from '../../artifact-helpers/graph-paths.ts';
+import {
 	stateWriteInComputedDiagnostic,
 	stateWriteInTemplateDiagnostic,
 	templateAsValueDiagnostic,
@@ -132,7 +137,13 @@ export function collectExpressionReads(node: AnyNode | undefined, state: WalkSta
 		node.type === 'FunctionExpression' ||
 		node.type === 'FunctionDeclaration'
 	) {
+		const previousShadowedBindings = state.shadowedBindingNames;
+		state.shadowedBindingNames = new Set(previousShadowedBindings);
+		for (const parameter of asNodes(node.params)) {
+			for (const name of bindingNames(parameter)) state.shadowedBindingNames.add(name);
+		}
 		collectExpressionReads(node.body as AnyNode | undefined, state);
+		state.shadowedBindingNames = previousShadowedBindings;
 		return;
 	}
 
@@ -233,12 +244,45 @@ function isChainExpression(node: AnyNode | undefined): boolean {
 function addStateRead(node: AnyNode, state: WalkState): void {
 	const source = expressionSource(node, state.source);
 	if (!source) return;
+	const rootName = /^[$A-Z_a-z][$\w]*/.exec(source)?.[0];
+	if (rootName && state.shadowedBindingNames.has(rootName)) return;
+
+	const resolved = resolveGraphPath(
+		source,
+		graphBindingMap(state.graph, state.currentSharedDefinitionId, state.currentComponentName),
+		semanticAliasMap(state.graph, state.currentSharedDefinitionId, state.currentComponentName),
+	);
 
 	state.graph.stateReads.push({
 		source,
 		...sharedScope(state),
+		...(resolved?.bindingId ? { bindingId: resolved.bindingId } : {}),
+		...(resolved?.componentName
+			? { componentName: resolved.componentName }
+			: state.currentComponentName
+				? { componentName: state.currentComponentName }
+				: {}),
 		sourceSpan: sourceSpan(node, state.filename),
 	});
+}
+
+function bindingNames(node: AnyNode | undefined): string[] {
+	if (!node) return [];
+	if (node.type === 'Identifier') return [String(node.name ?? '')].filter(Boolean);
+	if (node.type === 'AssignmentPattern') return bindingNames(node.left as AnyNode | undefined);
+	if (node.type === 'RestElement') return bindingNames(node.argument as AnyNode | undefined);
+	if (node.type === 'ObjectPattern') {
+		return asNodes(node.properties).flatMap((property) =>
+			property.type === 'Property'
+				? bindingNames(property.value as AnyNode | undefined)
+				: bindingNames(property.argument as AnyNode | undefined),
+		);
+	}
+	if (node.type === 'ArrayPattern') {
+		return asNodes(node.elements).flatMap((element) => bindingNames(element));
+	}
+
+	return [];
 }
 
 function sharedScope(state: WalkState): { readonly sharedDefinitionId?: string } {

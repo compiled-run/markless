@@ -7,6 +7,7 @@ test('lowerStateAccess preserves update expression operator and prefix metadata'
 		passId: 'tsrx-semantic-graph',
 		filename: 'src/Counter.tsrx',
 		components: [{ name: 'Counter' }],
+		componentPropBindings: [],
 		componentEdges: [],
 		graphBindings: [
 			{

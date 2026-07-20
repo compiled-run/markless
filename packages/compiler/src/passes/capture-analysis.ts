@@ -2,29 +2,225 @@ import type {
 	CaptureAnalysisArtifact,
 	CaptureAnalysisDiagnostic,
 	CaptureAnalysisInput,
+	CaptureSlot,
+	CaptureSlotRoute,
+	LoweredStateRead,
 	PlannedSymbol,
+	SemanticComponentEdge,
 	SemanticLocalBinding,
 } from '../artifacts.ts';
+import {
+	graphBindingMap,
+	resolveGraphPath,
+	semanticAliasMap,
+} from '../artifact-helpers/graph-paths.ts';
 
 export function analyzeCaptures(input: CaptureAnalysisInput): CaptureAnalysisArtifact {
-	const extractedSymbols = input.symbolResolver.symbols.map((symbol) => ({
-		symbolId: symbol.id,
-		kind: symbol.kind,
-		source: symbolSource(symbol),
-	}));
-	const diagnostics = extractedSymbols.flatMap((symbol) =>
-		input.semanticGraph.localBindings.flatMap((binding) =>
-			isCaptured(symbol.source, binding.name)
-				? [unsupportedCaptureDiagnostic(symbol, binding)]
-				: [],
+	const extractedSymbols = input.symbolResolver.symbols.map((symbol) => {
+		const captureSlots = symbolCaptureSlots(symbol, input);
+		const firstOwner = captureSlots[0]?.owner;
+		return {
+			symbolId: symbol.id,
+			kind: symbol.kind,
+			source: symbolSource(symbol),
+			...(firstOwner?.componentId || firstOwner?.componentName
+				? {
+						owner: {
+							...(firstOwner.componentId
+								? { componentId: firstOwner.componentId }
+								: {}),
+							...(firstOwner.componentName
+								? { componentName: firstOwner.componentName }
+								: {}),
+						},
+					}
+				: {}),
+			captureSlots,
+		};
+	});
+	const diagnostics = [
+		...extractedSymbols.flatMap((symbol) => opaqueSlotDiagnostics(symbol)),
+		...extractedSymbols.flatMap((symbol) =>
+			input.semanticGraph.localBindings.flatMap((binding) =>
+				isCaptured(symbol.source, binding.name)
+					? [unsupportedCaptureDiagnostic(symbol, binding)]
+					: [],
+			),
 		),
-	);
+	];
 
 	return {
 		passId: 'capture-analysis',
 		extractedSymbols,
 		diagnostics,
 	};
+}
+
+function symbolCaptureSlots(
+	symbol: PlannedSymbol,
+	input: CaptureAnalysisInput,
+): ReadonlyArray<CaptureSlot> {
+	if (!('reads' in symbol) || !symbol.reads) return [];
+
+	return symbol.reads.map((read) => captureSlot(read, input));
+}
+
+function captureSlot(read: LoweredStateRead, input: CaptureAnalysisInput): CaptureSlot {
+	const declaration = read.bindingId
+		? input.semanticGraph.componentPropBindings.find(
+				(binding) => binding.bindingId === read.bindingId,
+			)
+		: undefined;
+	const componentName = declaration?.componentName ?? read.componentName;
+	const propName = read.graphNodeId.startsWith('prop:') ? read.path[0] : undefined;
+	const routePath = propName ? read.path.slice(1) : read.path;
+	const routes = propName
+		? propCaptureRoutes(componentName, propName, routePath, input)
+		: [
+				{
+					kind: 'graph-reference' as const,
+					graphNodeId: read.graphNodeId,
+					path: read.path,
+				},
+			];
+	const spanKey = read.sourceSpan
+		? `${read.sourceSpan.start}:${read.sourceSpan.end}`
+		: `${read.graphNodeId}:${read.path.join('.')}`;
+
+	return {
+		id: `capture-slot:${read.bindingId ?? read.graphNodeId}:${spanKey}`,
+		bindingId: read.bindingId ?? `graph-binding:${read.graphNodeId}`,
+		source: read.source,
+		...(read.sourceSpan ? { sourceSpan: read.sourceSpan } : {}),
+		owner: {
+			...(declaration?.componentId ? { componentId: declaration.componentId } : {}),
+			...(componentName ? { componentName } : {}),
+			...(declaration?.sourceSpan ? { declarationSpan: declaration.sourceSpan } : {}),
+		},
+		...(propName ? { propName } : {}),
+		path: routePath,
+		routes,
+	};
+}
+
+function propCaptureRoutes(
+	componentName: string | undefined,
+	propName: string,
+	readPath: ReadonlyArray<string>,
+	input: CaptureAnalysisInput,
+): ReadonlyArray<CaptureSlotRoute> {
+	const edges = componentName
+		? input.semanticGraph.componentEdges.filter(
+				(edge) => edge.childComponentName === componentName,
+			)
+		: [];
+	if (edges.length === 0) {
+		return [
+			{ kind: 'graph-reference', graphNodeId: 'prop:props', path: [propName, ...readPath] },
+		];
+	}
+
+	return edges.map((edge) => propCaptureRoute(edge, propName, readPath, input));
+}
+
+function propCaptureRoute(
+	edge: SemanticComponentEdge,
+	propName: string,
+	readPath: ReadonlyArray<string>,
+	input: CaptureAnalysisInput,
+): CaptureSlotRoute {
+	const prop = edge.props.find((candidate) => candidate.name === propName);
+	if (!prop) {
+		return {
+			kind: 'compiler-known-constant',
+			componentEdgeId: edge.id,
+			value: undefined,
+		};
+	}
+	if (prop.kind === 'graph-reference') {
+		const scoped = resolveGraphPath(
+			prop.source,
+			graphBindingMap(input.semanticGraph, undefined, edge.parentComponentName),
+			semanticAliasMap(input.semanticGraph, undefined, edge.parentComponentName),
+		);
+		return {
+			kind: 'graph-reference',
+			componentEdgeId: edge.id,
+			graphNodeId: scoped?.binding.id ?? prop.graphNodeId,
+			path: [...(scoped?.path ?? prop.path), ...readPath],
+		};
+	}
+	if (prop.kind === 'serializable') {
+		return {
+			kind: 'compiler-known-constant',
+			componentEdgeId: edge.id,
+			value: prop.value,
+		};
+	}
+	if (prop.kind === 'callback') {
+		const callbackSymbol = input.symbolResolver.symbols.find(
+			(symbol) =>
+				symbol.kind === 'callback-prop' &&
+				symbol.componentEdgeId === edge.id &&
+				symbol.propName === propName,
+		);
+		if (callbackSymbol) {
+			return {
+				kind: 'callback-route',
+				componentEdgeId: edge.id,
+				callbackSymbolId: callbackSymbol.id,
+			};
+		}
+	}
+
+	return {
+		kind: 'unsupported-opaque',
+		componentEdgeId: edge.id,
+		expression: prop.source,
+		...(prop.sourceSpan ? { sourceSpan: prop.sourceSpan } : {}),
+	};
+}
+
+function opaqueSlotDiagnostics(symbol: {
+	readonly symbolId: string;
+	readonly captureSlots: ReadonlyArray<CaptureSlot>;
+}): ReadonlyArray<CaptureAnalysisDiagnostic> {
+	const reportedRoutes = new Set<string>();
+	return symbol.captureSlots.flatMap((slot) =>
+		slot.routes.flatMap((route) => {
+			if (route.kind !== 'unsupported-opaque') return [];
+			const componentName = slot.owner.componentName ?? 'unknown component';
+			const propName = slot.propName ?? 'unknown prop';
+			const routeKey = `${route.componentEdgeId}:${propName}`;
+			if (reportedRoutes.has(routeKey)) return [];
+			reportedRoutes.add(routeKey);
+			return [
+				{
+					code: 'MARKLESS_CAPTURE_OPAQUE_PROP' as const,
+					severity: 'error' as const,
+					phase: 'capture-analysis' as const,
+					title: 'Lazy handler prop capture is not resumable',
+					message: `Cannot bind lazy symbol "${symbol.symbolId}" on component edge "${route.componentEdgeId}" because prop "${propName}" for "${componentName}" is the runtime expression "${route.expression}".`,
+					why: 'A demanded capture slot must route to a graph node, a compiler-known constant, or a callback symbol. This opaque runtime value cannot be reduced without adding a serialized capture protocol.',
+					...(route.sourceSpan ? { primarySpan: route.sourceSpan } : {}),
+					passId: 'capture-analysis' as const,
+					artifactKeys: ['semanticGraph', 'symbolResolver', 'captureAnalysis'],
+					symbolId: symbol.symbolId,
+					componentEdgeId: route.componentEdgeId,
+					componentName,
+					propName,
+					source: route.expression,
+					suggestions: [
+						{
+							message:
+								'Pass state()/computed() data, a literal value, or a callback prop to the lazy handler instead.',
+						},
+					],
+					docsUrl: 'https://markless.dev/errors/MARKLESS_CAPTURE_OPAQUE_PROP',
+				},
+			];
+		}),
+	);
 }
 
 function unsupportedCaptureDiagnostic(

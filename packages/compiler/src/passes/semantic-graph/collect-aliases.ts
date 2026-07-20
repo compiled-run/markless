@@ -65,6 +65,7 @@ export function collectObjectPatternAliases(
 	targetBase: string,
 	declarationKind: SemanticGraphBinding['declarationKind'],
 	state: WalkState,
+	propOwner?: PropAliasOwner,
 ): void {
 	const excludedPaths = objectPatternExcludedPaths(pattern);
 
@@ -73,14 +74,27 @@ export function collectObjectPatternAliases(
 			const local = localAliasIdentifier(property.argument as AnyNode | undefined);
 			if (!local) continue;
 
+			const span = sourceSpan(local, state.filename);
+			if (!span) continue;
+			const bindingId = sourceBindingId(span);
 			state.graph.aliases.push({
 				name: local.name,
 				target: targetBase,
+				...(propOwner
+					? {
+							bindingId,
+							componentId: propOwner.componentId,
+							componentName: propOwner.componentName,
+							propPath: propOwner.propPath,
+						}
+					: {}),
 				...sharedScope(state),
 				excludedPaths,
 				declarationKind,
-				sourceSpan: sourceSpan(local, state.filename),
+				sourceSpan: span,
 			});
+			if (propOwner)
+				recordComponentPropBinding(local.name, bindingId, span, propOwner, state);
 			continue;
 		}
 
@@ -98,24 +112,58 @@ export function collectObjectPatternAliases(
 
 		const nested = nestedDestructuringPattern(value);
 		if (nested?.type === 'ObjectPattern') {
-			collectObjectPatternAliases(nested, target, declarationKind, state);
+			collectObjectPatternAliases(
+				nested,
+				target,
+				declarationKind,
+				state,
+				propOwner && {
+					...propOwner,
+					propPath: [...propOwner.propPath, key],
+				},
+			);
 			continue;
 		}
 		if (nested?.type === 'ArrayPattern') {
-			collectArrayPatternAliases(nested, target, declarationKind, state);
+			collectArrayPatternAliases(
+				nested,
+				target,
+				declarationKind,
+				state,
+				propOwner && {
+					...propOwner,
+					propPath: [...propOwner.propPath, key],
+				},
+			);
 			continue;
 		}
 
 		const local = localAliasIdentifier(value);
 		if (!local) continue;
 
+		const span = sourceSpan(local, state.filename);
+		if (!span) continue;
+		const bindingId = sourceBindingId(span);
+		const ownedProp = propOwner && {
+			...propOwner,
+			propPath: [...propOwner.propPath, key],
+		};
 		state.graph.aliases.push({
 			name: local.name,
 			target,
+			...(ownedProp
+				? {
+						bindingId,
+						componentId: ownedProp.componentId,
+						componentName: ownedProp.componentName,
+						propPath: ownedProp.propPath,
+					}
+				: {}),
 			...sharedScope(state),
 			declarationKind,
-			sourceSpan: sourceSpan(local, state.filename),
+			sourceSpan: span,
 		});
+		if (ownedProp) recordComponentPropBinding(local.name, bindingId, span, ownedProp, state);
 	}
 }
 
@@ -124,6 +172,7 @@ export function collectArrayPatternAliases(
 	targetBase: string,
 	declarationKind: SemanticGraphBinding['declarationKind'],
 	state: WalkState,
+	propOwner?: PropAliasOwner,
 ): void {
 	const elements = Array.isArray(pattern.elements) ? pattern.elements : [];
 
@@ -139,24 +188,85 @@ export function collectArrayPatternAliases(
 
 		const nested = nestedDestructuringPattern(element);
 		if (nested?.type === 'ObjectPattern') {
-			collectObjectPatternAliases(nested, target, declarationKind, state);
+			collectObjectPatternAliases(
+				nested,
+				target,
+				declarationKind,
+				state,
+				propOwner && {
+					...propOwner,
+					propPath: [...propOwner.propPath, String(index)],
+				},
+			);
 			return;
 		}
 		if (nested?.type === 'ArrayPattern') {
-			collectArrayPatternAliases(nested, target, declarationKind, state);
+			collectArrayPatternAliases(
+				nested,
+				target,
+				declarationKind,
+				state,
+				propOwner && {
+					...propOwner,
+					propPath: [...propOwner.propPath, String(index)],
+				},
+			);
 			return;
 		}
 
 		const local = localAliasIdentifier(element);
 		if (!local) return;
 
+		const span = sourceSpan(local, state.filename);
+		if (!span) return;
+		const bindingId = sourceBindingId(span);
+		const ownedProp = propOwner && {
+			...propOwner,
+			propPath: [...propOwner.propPath, String(index)],
+		};
 		state.graph.aliases.push({
 			name: local.name,
 			target,
+			...(ownedProp
+				? {
+						bindingId,
+						componentId: ownedProp.componentId,
+						componentName: ownedProp.componentName,
+						propPath: ownedProp.propPath,
+					}
+				: {}),
 			...sharedScope(state),
 			declarationKind,
-			sourceSpan: sourceSpan(local, state.filename),
+			sourceSpan: span,
 		});
+		if (ownedProp) recordComponentPropBinding(local.name, bindingId, span, ownedProp, state);
+	});
+}
+
+type PropAliasOwner = {
+	readonly componentId: string;
+	readonly componentName: string;
+	readonly propPath: ReadonlyArray<string>;
+};
+
+function sourceBindingId(span: { readonly start: number; readonly end: number }): string {
+	return `binding:${span.start}:${span.end}`;
+}
+
+function recordComponentPropBinding(
+	localName: string,
+	bindingId: string,
+	span: NonNullable<ReturnType<typeof sourceSpan>>,
+	owner: PropAliasOwner,
+	state: WalkState,
+): void {
+	state.graph.componentPropBindings.push({
+		componentId: owner.componentId,
+		componentName: owner.componentName,
+		bindingId,
+		localName,
+		propPath: owner.propPath,
+		sourceSpan: span,
 	});
 }
 

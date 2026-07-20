@@ -242,14 +242,14 @@ test('buildSemanticGraph creates the first production compiler artifact', async 
 	]);
 
 	expect(graph.aliases).toEqual([
-		{
+		expect.objectContaining({
 			name: 'label',
 			target: 'props.label',
 			declarationKind: 'const',
 			sourceSpan: expect.objectContaining({
 				filename: 'src/App.tsrx',
 			}),
-		},
+		}),
 		{
 			name: 'menuTitle',
 			target: 'menu.title',

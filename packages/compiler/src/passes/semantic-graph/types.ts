@@ -1,6 +1,7 @@
 import type { AnyNode } from '../../ast/nodes.ts';
 import type {
 	SemanticComponent,
+	SemanticComponentPropDeclaration,
 	SemanticComponentEdge,
 	SemanticBehavior,
 	SemanticElementHandleBinding,
@@ -28,6 +29,7 @@ export type MutableSemanticGraphArtifact = {
 	passId: 'tsrx-semantic-graph';
 	filename: string;
 	components: SemanticComponent[];
+	componentPropBindings: SemanticComponentPropDeclaration[];
 	componentEdges: SemanticComponentEdge[];
 	moduleImports: SemanticModuleImport[];
 	graphBindings: SemanticGraphBinding[];
@@ -58,6 +60,8 @@ export type WalkState = {
 	readonly importedModuleInterfaces: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
 	readonly hostIds: WeakMap<object, string>;
 	currentComponentName: string | null;
+	currentComponentId: string | null;
+	shadowedBindingNames: Set<string>;
 	currentBranchScopeIds: string[];
 	currentKeyedRepeatScopeIds: string[];
 	currentHostNodeId: string | null;
@@ -92,6 +96,7 @@ export function createMutableSemanticGraphArtifact(filename: string): MutableSem
 		passId: 'tsrx-semantic-graph',
 		filename,
 		components: [],
+		componentPropBindings: [],
 		componentEdges: [],
 		moduleImports: [],
 		graphBindings: [],
@@ -135,6 +140,8 @@ export function createWalkState(input: {
 		importedModuleInterfaces: input.importedModuleInterfaces ?? {},
 		hostIds: new WeakMap<object, string>(),
 		currentComponentName: null,
+		currentComponentId: null,
+		shadowedBindingNames: new Set(),
 		currentBranchScopeIds: [],
 		currentKeyedRepeatScopeIds: [],
 		currentHostNodeId: null,

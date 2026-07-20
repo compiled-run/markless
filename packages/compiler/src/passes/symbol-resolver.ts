@@ -38,7 +38,7 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 				parameters: event.handlerParameters[order] ?? [],
 				...(moduleImports.length > 0 ? { moduleImports } : {}),
 				order,
-				reads: eventReads(source, input.stateLowering?.reads),
+				reads: eventReads(input.stateLowering?.reads, sourceSpan),
 				writes: eventWrites(source, input.stateLowering?.writes, sourceSpan),
 				elementHandleCalls: collectElementHandleCalls(
 					source,
@@ -64,7 +64,7 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 				sourceSpan: prop.sourceSpan,
 				parameters: prop.parameters ?? [],
 				...(moduleImports.length > 0 ? { moduleImports } : {}),
-				reads: eventReads(prop.source, input.stateLowering?.reads),
+				reads: eventReads(input.stateLowering?.reads, prop.sourceSpan),
 				writes: eventWrites(prop.source, input.stateLowering?.writes, prop.sourceSpan),
 			});
 		}
@@ -183,12 +183,21 @@ function eventWrites(
 }
 
 function eventReads(
-	handlerSource: string,
 	reads: ReadonlyArray<LoweredStateRead> | undefined,
+	handlerSpan: SourceSpan | undefined,
 ): ReadonlyArray<LoweredStateRead> {
-	if (!handlerSource || !reads?.length) return [];
+	if (!handlerSpan || !reads?.length) return [];
 
-	return reads.filter((read) => handlerSource.includes(read.source));
+	const contained = reads.filter(
+		(read) => read.sourceSpan !== undefined && spanContains(handlerSpan, read.sourceSpan),
+	);
+	const seen = new Set<string>();
+	return contained.filter((read) => {
+		const key = `${read.bindingId ?? ''}:${read.graphNodeId}:${read.path.join('.')}:${read.source}`;
+		if (seen.has(key)) return false;
+		seen.add(key);
+		return true;
+	});
 }
 
 function spanContains(container: SourceSpan, child: SourceSpan): boolean {
