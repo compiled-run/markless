@@ -79,6 +79,15 @@ export type WalkState = {
 		readonly body: AnyNode | undefined;
 		readonly sharedDefinitionId: string | null;
 	}>;
+	componentLocalBindings: Map<
+		string,
+		{
+			readonly declaration: SemanticLocalDeclaration;
+			readonly initializerNode?: AnyNode;
+		}
+	>;
+	resolvedComponentLocalBindingIds: WeakMap<object, string>;
+	resolvedComponentLocalBindingsBySpan: Map<string, string>;
 	walk: SemanticGraphWalk | null;
 	nextComponentEdgeId: number;
 	nextBranchId: number;
@@ -154,6 +163,9 @@ export function createWalkState(input: {
 		currentHelperCall: null,
 		helperFunctions: new Map(),
 		pendingComputedDependencies: [],
+		componentLocalBindings: new Map(),
+		resolvedComponentLocalBindingIds: new WeakMap<object, string>(),
+		resolvedComponentLocalBindingsBySpan: new Map(),
 		walk: null,
 		nextComponentEdgeId: 0,
 		nextBranchId: 0,

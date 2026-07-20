@@ -418,6 +418,18 @@ export type SemanticLocalDeclaration = {
 	readonly scope: 'module' | 'component' | 'function';
 	readonly componentName?: string;
 	readonly aliasOf?: string;
+	readonly bindingId?: string;
+	readonly lexicalScopeId?: string;
+	readonly declarationKind?: SemanticGraphBinding['declarationKind'] | 'function';
+	readonly declarationSpan?: SourceSpan;
+	readonly writeCount?: number;
+	readonly initializer?: {
+		readonly kind: 'arrow-function' | 'function-expression' | 'function-declaration';
+		readonly source: string;
+		readonly sourceSpan: SourceSpan;
+		readonly bodySpan?: SourceSpan;
+		readonly parameters: ReadonlyArray<string>;
+	};
 };
 
 export type SemanticSyncPolicyConstant = {

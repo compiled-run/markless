@@ -1,7 +1,11 @@
 import { parseModule } from '@tsrx/core';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
-import { sourceSpan } from '../../ast/source.ts';
-import type { SemanticGraphArtifact, SemanticGraphInput } from '../../artifacts.ts';
+import { expressionSource, sourceSpan } from '../../ast/source.ts';
+import type {
+	SemanticGraphArtifact,
+	SemanticGraphInput,
+	SemanticLocalDeclaration,
+} from '../../artifacts.ts';
 import { applyMarklessAllowDirectives } from '../../diagnostics.ts';
 import {
 	collectAsyncBoundary,
@@ -12,7 +16,7 @@ import {
 } from './collect-async.ts';
 import { collectImports, collectModuleImports, getFrameworkApiForCall } from './imports.ts';
 import { collectComponentProps } from './collect-components.ts';
-import { getComponentFunction } from '../../ast/tsrx.ts';
+import { getComponentFunction, getElementAttributes, unwrapExpressionContainer } from '../../ast/tsrx.ts';
 import {
 	collectConditionalBranchText,
 	collectElement,
@@ -88,8 +92,10 @@ export async function buildSemanticGraph(
 		}
 		state.currentComponentName = componentFunction.name;
 		state.currentComponentId = `component:${componentSpan.start}:${componentSpan.end}`;
+		prepareComponentLocalBindings(componentFunction.node.body as AnyNode, state);
 		collectComponentProps(componentFunction.node, state);
 		walk(componentFunction.node.body as AnyNode, state);
+		mergeComponentLocalDeclarations(state);
 		state.currentComponentName = previousComponentName;
 		state.currentComponentId = previousComponentId;
 	}
@@ -111,6 +117,258 @@ export async function buildSemanticGraph(
 			artifactKeys: ['semanticGraph'],
 		}) as SemanticGraphArtifact['diagnostics'],
 	};
+}
+
+type ComponentLocalBinding = WalkState['componentLocalBindings'] extends Map<
+	string,
+	infer Binding
+>
+	? Binding
+	: never;
+
+function prepareComponentLocalBindings(body: AnyNode, state: WalkState): void {
+	state.componentLocalBindings = new Map();
+	state.resolvedComponentLocalBindingsBySpan = new Map();
+	const bodySpan = sourceSpan(body, state.filename);
+	if (!bodySpan || !state.currentComponentName) return;
+	const lexicalScopeId = `scope:${bodySpan.start}:${bodySpan.end}`;
+	const bindingsByName = new Map<string, ComponentLocalBinding>();
+
+	for (const statement of asNodes(body.body)) {
+		if (statement.type === 'VariableDeclaration') {
+			for (const declarator of asNodes(statement.declarations)) {
+				const id = declarator.id as AnyNode | undefined;
+				const name = getIdentifierName(id);
+				const declarationSpan = id ? sourceSpan(id, state.filename) : undefined;
+				if (!name || !declarationSpan) continue;
+				const initializerNode = declarator.init as AnyNode | undefined;
+				const initializer = callbackInitializer(initializerNode, state);
+				const declaration: SemanticLocalDeclaration = {
+					name,
+					scope: 'component',
+					componentName: state.currentComponentName,
+					bindingId: `binding:${declarationSpan.start}:${declarationSpan.end}`,
+					lexicalScopeId,
+					declarationKind:
+						statement.kind === 'let' || statement.kind === 'var' ? statement.kind : 'const',
+					declarationSpan,
+					writeCount: initializerNode ? 1 : 0,
+					...(initializer ? { initializer } : {}),
+				};
+				const binding = {
+					declaration,
+					...(initializer ? { initializerNode } : {}),
+				};
+				bindingsByName.set(name, binding);
+				state.componentLocalBindings.set(declaration.bindingId!, binding);
+			}
+			continue;
+		}
+
+		if (statement.type === 'FunctionDeclaration') {
+			const id = statement.id as AnyNode | undefined;
+			const name = getIdentifierName(id);
+			const declarationSpan = id ? sourceSpan(id, state.filename) : undefined;
+			const initializer = callbackInitializer(statement, state);
+			if (!name || !declarationSpan || !initializer) continue;
+			const declaration: SemanticLocalDeclaration = {
+				name,
+				scope: 'component',
+				componentName: state.currentComponentName,
+				bindingId: `binding:${declarationSpan.start}:${declarationSpan.end}`,
+				lexicalScopeId,
+				declarationKind: 'function',
+				declarationSpan,
+				writeCount: 1,
+				initializer,
+			};
+			const binding = { declaration, initializerNode: statement };
+			bindingsByName.set(name, binding);
+			state.componentLocalBindings.set(declaration.bindingId!, binding);
+		}
+	}
+
+	resolveComponentLocalReferences(body, bindingsByName, state, true, new Set());
+}
+
+function callbackInitializer(
+	node: AnyNode | undefined,
+	state: WalkState,
+): SemanticLocalDeclaration['initializer'] | undefined {
+	if (
+		!node ||
+		(node.type !== 'ArrowFunctionExpression' &&
+			node.type !== 'FunctionExpression' &&
+			node.type !== 'FunctionDeclaration')
+	) {
+		return undefined;
+	}
+	const span = sourceSpan(node, state.filename);
+	if (!span) return undefined;
+	const body = node.body as AnyNode | undefined;
+	return {
+		kind:
+			node.type === 'ArrowFunctionExpression'
+				? 'arrow-function'
+				: node.type === 'FunctionExpression'
+					? 'function-expression'
+					: 'function-declaration',
+		source: expressionSource(node, state.source),
+		sourceSpan: span,
+		...(body ? { bodySpan: sourceSpan(body, state.filename) } : {}),
+		parameters: asNodes(node.params).map((parameter) =>
+			expressionSource(parameter, state.source),
+		),
+	};
+}
+
+function resolveComponentLocalReferences(
+	node: AnyNode | undefined,
+	bindings: ReadonlyMap<string, ComponentLocalBinding>,
+	state: WalkState,
+	isRootScope: boolean,
+	shadowed: ReadonlySet<string>,
+): void {
+	if (!node) return;
+	if (node.type === 'Element' || node.type === 'JSXElement') {
+		for (const attribute of getElementAttributes(node)) {
+			resolveComponentLocalReferences(
+				unwrapExpressionContainer(attribute.value as AnyNode | undefined),
+				bindings,
+				state,
+				false,
+				shadowed,
+			);
+		}
+		for (const child of asNodes(node.children)) {
+			resolveComponentLocalReferences(child, bindings, state, false, shadowed);
+		}
+		return;
+	}
+
+	if (node.type === 'Identifier') {
+		const name = getIdentifierName(node);
+		const binding = name && !shadowed.has(name) ? bindings.get(name) : undefined;
+		const bindingId = binding?.declaration.bindingId;
+		if (bindingId) {
+			state.resolvedComponentLocalBindingIds.set(node, bindingId);
+			const span = sourceSpan(node, state.filename);
+			if (span) state.resolvedComponentLocalBindingsBySpan.set(`${span.start}:${span.end}`, bindingId);
+		}
+		return;
+	}
+
+	if (node.type === 'AssignmentExpression' || node.type === 'UpdateExpression') {
+		const target = (node.type === 'AssignmentExpression' ? node.left : node.argument) as
+			| AnyNode
+			| undefined;
+		incrementComponentLocalWrites(target, bindings, shadowed);
+	}
+
+	if (
+		node.type === 'ArrowFunctionExpression' ||
+		node.type === 'FunctionExpression' ||
+		node.type === 'FunctionDeclaration'
+	) {
+		const functionShadowed = new Set(shadowed);
+		for (const parameter of asNodes(node.params)) {
+			for (const name of bindingPatternNames(parameter)) functionShadowed.add(name);
+		}
+		const functionBody = node.body as AnyNode | undefined;
+		for (const name of directScopeBindingNames(functionBody)) functionShadowed.add(name);
+		for (const child of childNodes(node)) {
+			resolveComponentLocalReferences(child, bindings, state, false, functionShadowed);
+		}
+		return;
+	}
+
+	let nestedShadowed = shadowed;
+	if (!isRootScope && isLexicalScopeNode(node)) {
+		const nextShadowed = new Set(shadowed);
+		for (const name of directScopeBindingNames(node)) nextShadowed.add(name);
+		nestedShadowed = nextShadowed;
+	}
+	for (const child of childNodes(node)) {
+		resolveComponentLocalReferences(child, bindings, state, false, nestedShadowed);
+	}
+}
+
+function incrementComponentLocalWrites(
+	target: AnyNode | undefined,
+	bindings: ReadonlyMap<string, ComponentLocalBinding>,
+	shadowed: ReadonlySet<string>,
+): void {
+	for (const name of bindingPatternNames(target)) {
+		if (shadowed.has(name)) continue;
+		const binding = bindings.get(name);
+		if (!binding) continue;
+		const writeCount = (binding.declaration.writeCount ?? 0) + 1;
+		Object.assign(binding.declaration, { writeCount });
+	}
+}
+
+function isLexicalScopeNode(node: AnyNode): boolean {
+	return (
+		node.type === 'BlockStatement' ||
+		node.type === 'JSXCodeBlock' ||
+		node.type === 'SwitchStatement' ||
+		node.type === 'CatchClause' ||
+		node.type === 'ForStatement' ||
+		node.type === 'ForInStatement' ||
+		node.type === 'ForOfStatement'
+	);
+}
+
+function directScopeBindingNames(node: AnyNode | undefined): ReadonlyArray<string> {
+	if (!node) return [];
+	const statements = asNodes(node.body);
+	return statements.flatMap((statement) => {
+		if (statement.type === 'VariableDeclaration') {
+			return asNodes(statement.declarations).flatMap((declaration) =>
+				bindingPatternNames(declaration.id as AnyNode | undefined),
+			);
+		}
+		if (statement.type === 'FunctionDeclaration' || statement.type === 'ClassDeclaration') {
+			return bindingPatternNames(statement.id as AnyNode | undefined);
+		}
+		return [];
+	});
+}
+
+function bindingPatternNames(node: AnyNode | undefined): ReadonlyArray<string> {
+	if (!node) return [];
+	if (node.type === 'Identifier') return getIdentifierName(node) ? [getIdentifierName(node)!] : [];
+	if (node.type === 'AssignmentPattern') {
+		return bindingPatternNames(node.left as AnyNode | undefined);
+	}
+	if (node.type === 'RestElement') {
+		return bindingPatternNames(node.argument as AnyNode | undefined);
+	}
+	if (node.type === 'ObjectPattern') {
+		return asNodes(node.properties).flatMap((property) =>
+			bindingPatternNames(
+				(property.type === 'Property' ? property.value : property.argument) as
+					| AnyNode
+					| undefined,
+			),
+		);
+	}
+	if (node.type === 'ArrayPattern') return asNodes(node.elements).flatMap(bindingPatternNames);
+	return [];
+}
+
+function mergeComponentLocalDeclarations(state: WalkState): void {
+	for (const binding of state.componentLocalBindings.values()) {
+		const declaration = binding.declaration;
+		const existing = state.graph.localDeclarations.find(
+			(candidate) =>
+				candidate.scope === 'component' &&
+				candidate.componentName === declaration.componentName &&
+				candidate.name === declaration.name,
+		);
+		if (existing) Object.assign(existing, declaration);
+		else state.graph.localDeclarations.push(declaration);
+	}
 }
 
 function walk(node: AnyNode | null | undefined, state: WalkState): void {

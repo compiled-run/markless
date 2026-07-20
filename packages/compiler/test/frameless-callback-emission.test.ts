@@ -126,6 +126,34 @@ test('callback props support zero or one parameter and reject multiple parameter
 	).toBe(false);
 });
 
+test('named component-local arrow and function callbacks emit their authored bodies', async () => {
+	const result = await compile(`import { state } from '@markless/core';
+
+	function Child({ onArrow, onFunction }) @{
+		<button onClick={() => { onArrow('cedar'); onFunction('birch'); }}>send</button>
+	}
+
+	export function Parent() @{
+		let message = state('none');
+		const selectArrow = (value) => message = 'arrow:' + value;
+		function selectFunction(value) {
+			message = 'function:' + value;
+		}
+		<Child onArrow={selectArrow} onFunction={selectFunction} />
+	}`);
+	const callbackSource = (propName: string) => {
+		const symbol = result.symbolResolver.symbols.find(
+			(candidate) => candidate.kind === 'callback-prop' && candidate.propName === propName,
+		);
+		return result.symbolModules.modules.find((module) => module.symbolId === symbol?.id)?.source;
+	};
+
+	expect(callbackSource('onArrow')).toContain(`graphNodeId: "state:message"`);
+	expect(callbackSource('onArrow')).toContain(`value: 'arrow:' + value`);
+	expect(callbackSource('onFunction')).toContain(`graphNodeId: "state:message"`);
+	expect(callbackSource('onFunction')).toContain(`value: 'function:' + value`);
+});
+
 test('callback parameter patterns shadow same-named graph state in emitted symbols', async () => {
 	const result = await compile(`import { state } from '@markless/core';
 
