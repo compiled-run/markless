@@ -377,6 +377,94 @@ export default function App() @{ <main><Child /></main> }`;
 		);
 	});
 
+	test('dev parent-first transforms bind imported sibling instances after eager child compilation', async () => {
+		const childFilename = '/workspace/app/components/Child.tsrx';
+		const parentFilename = '/workspace/app/pages/App.tsrx';
+		const childSource = `export function Child({ label, onTrace }) @{
+	<button onClick={() => onTrace(label)}>{label}</button>
+}`;
+		const parentSource = `import { state } from '@markless/core';
+import { Child } from '../components/Child.tsrx';
+export function App() @{
+	let first = state('Server spruce');
+	let second = state('Server copper');
+	let result = state('none');
+	<main>
+		<Child label={first} onTrace={(value) => result = value} />
+		<Child label={second} onTrace={(value) => result = value} />
+		<output>{result}</output>
+	</main>
+}`;
+		const firstPassParent = await transformTsrxModule({
+			filename: parentFilename,
+			source: parentSource,
+			environment: 'server',
+		});
+		expect(firstPassParent.manifest.captureMetadata?.boundResolverRows ?? []).toEqual([]);
+		const plugin = getAsyncPlugin();
+		callConfig(plugin, {}, { command: 'serve', mode: 'development' });
+		callConfigResolved(plugin, {
+			base: '/',
+			command: 'serve',
+			root: '/workspace/app',
+		});
+		let childResult: {
+			manifest: {
+				captureMetadata: { extractedSymbols: Array<{ symbolId: string; kind: string }> };
+			};
+		} | null = null;
+		const transformRequest = vi.fn(async (url: string) => {
+			childResult = (await callTransform(
+				plugin,
+				childSource,
+				url,
+				createViteHookContext('server'),
+			)) as typeof childResult;
+			return childResult;
+		});
+		callConfigureServer(plugin, {
+			config: { root: '/workspace/app' },
+			environments: { ssr: { transformRequest } },
+		});
+		callBuildStart(plugin, { cwd: '/workspace/app' }, createViteHookContext('server'));
+
+		const parent = (await callTransform(
+			plugin,
+			parentSource,
+			parentFilename,
+			createViteHookContext('server'),
+		)) as {
+			code: string;
+			manifest: {
+				captureMetadata: {
+					boundResolverRows: Array<{
+						id: string;
+						baseSymbolId: string;
+						componentEdgePath: string[];
+					}>;
+				};
+			};
+			virtualModules: Array<{ type: string; source: string }>;
+		};
+
+		expect(transformRequest).toHaveBeenCalledExactlyOnceWith(childFilename);
+		const childHandler = childResult!.manifest.captureMetadata.extractedSymbols.find(
+			(symbol) => symbol.kind === 'event-handler',
+		)!;
+		const rows = parent.manifest.captureMetadata.boundResolverRows.filter(
+			(row) => row.baseSymbolId === childHandler.symbolId,
+		);
+		expect(rows).toHaveLength(2);
+		expect(new Set(rows.map((row) => row.id)).size).toBe(2);
+		expect(rows.map((row) => row.componentEdgePath)).toEqual([
+			['component-edge:0'],
+			['component-edge:1'],
+		]);
+		for (const row of rows) expect(parent.code).toContain(row.id);
+		const resolver = parent.virtualModules.find((module) => module.type === 'resolver')!;
+		for (const row of rows) expect(resolver.source).toContain(row.id);
+	});
+
 	test('resolves and loads virtual module ids carrying the ?import suffix Vite adds to .tsrx-shaped imports', async () => {
 		// The dev resume module imports `virtual:markless:payload:<file>` — an id
 		// that ENDS in .tsrx, so Vite's import analysis treats it like an asset

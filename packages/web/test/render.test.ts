@@ -5,6 +5,7 @@ import { transformTsrxModule } from '../../bundler/src/transform.ts';
 import { compileTsrxModule } from '../../compiler/src/index.ts';
 import {
 	marklessCsrAttachPropEvent,
+	marklessCsrAppendChildView,
 	marklessCsrComposeView,
 	marklessCsrRenderChild,
 	marklessCsrReplaceChild,
@@ -295,6 +296,10 @@ function descendants(root: FakeElement, tagName: string): FakeElement[] {
 	);
 }
 
+function renderedText(node: FakeElement): string {
+	return node.textContent ?? node.childNodes.map(renderedText).join('');
+}
+
 test('marklessCsrReplaceChild returns a child that replaces the root placeholder', () => {
 	const child = element('STRONG');
 	const root = {
@@ -359,6 +364,130 @@ function viewWithClickDomUpdate(): ProtocolViewPayload {
 		],
 	};
 }
+
+test('resume wakes only the graph-routed sibling text update after child composition', async () => {
+	const graphButton = element('BUTTON');
+	graphButton.textContent = 'Server spruce';
+	const literalButton = element('BUTTON');
+	literalButton.textContent = 'Server copper';
+	const root = element('MAIN', [graphButton, literalButton]);
+	const locators: ProtocolViewPayload['locators'][number][] = [];
+	const domUpdates: ProtocolViewPayload['domUpdates'][number][] = [];
+	const elements = [root, graphButton, literalButton];
+	const indexByElement = new Map(elements.map((node, index) => [node, index]));
+	const childView: ProtocolViewPayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'button' }],
+		events: [],
+		domUpdates: [
+			{
+				hostNodeId: 'h0',
+				source: 'label',
+				graphNodeId: 'prop:label',
+				path: [],
+				target: { kind: 'text' },
+				symbolId: 'symbol:text',
+			},
+		],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	const append = (child: {
+		readonly root: FakeElement;
+		readonly hostPrefix: string;
+		readonly symbolPrefix: string;
+		readonly graphProps: ReadonlyArray<{
+			readonly name: string;
+			readonly kind?: 'graph-reference' | 'compiler-known-constant';
+			readonly graphNodeId?: string;
+			readonly path?: ReadonlyArray<string>;
+		}>;
+		readonly boundSymbols: Readonly<Record<string, string>>;
+	}) =>
+		marklessCsrAppendChildView({
+			child: { ...child, output: { root: child.root, view: childView } },
+			elements,
+			indexByElement,
+			locators,
+			events: [],
+			domUpdates,
+			behaviors: [],
+			elementHandles: [],
+			branches: [],
+			asyncBoundaries: [],
+			asyncRunners: {},
+			csrCallbacks: new Map(),
+		});
+	append({
+		root: graphButton,
+		hostPrefix: 'c0:',
+		symbolPrefix: 'c0:',
+		graphProps: [
+			{
+				name: 'label',
+				kind: 'graph-reference',
+				graphNodeId: 'state:graphLabel',
+				path: [],
+			},
+		],
+		boundSymbols: { 'symbol:text': 'bound:graph-text' },
+	});
+	append({
+		root: literalButton,
+		hostPrefix: 'c1:',
+		symbolPrefix: 'c1:',
+		graphProps: [{ name: 'label', kind: 'compiler-known-constant' }],
+		boundSymbols: { 'symbol:text': 'bound:literal-text' },
+	});
+
+	expect(domUpdates).toEqual([
+		expect.objectContaining({
+			hostNodeId: 'c0:h0',
+			graphNodeId: 'state:graphLabel',
+			symbolId: 'bound:graph-text',
+		}),
+	]);
+	const container = await render(
+		{
+			renderCsr: () => ({
+				root,
+				state: createProtocolStatePayload({
+					cells: [
+						{
+							graphNodeId: 'state:graphLabel',
+							name: 'graphLabel',
+							valueKind: 'scalar',
+							value: 'Server spruce',
+						},
+					],
+				}),
+				view: {
+					version: ASYNC_PROTOCOL_VERSION,
+					locators,
+					events: [],
+					domUpdates,
+					behaviors: [],
+					elementHandles: [],
+					asyncBoundaries: [],
+				},
+				loadSymbol: () => ({ value, domUpdate }: { value: unknown; domUpdate: { hostNodeId: string } }) => ({
+					type: 'setText' as const,
+					locator: domUpdate.hostNodeId,
+					value,
+				}),
+			}),
+		},
+		{ target: { replaceChildren() {} } },
+	);
+	expect(graphButton.textContent).toBe('Server spruce');
+	expect(literalButton.textContent).toBe('Server copper');
+	container.graph.write({ graphNodeId: 'state:graphLabel', value: 'Server birch' });
+	await container.graph.flush();
+
+	expect(graphButton.textContent).toBe('Server birch');
+	expect(literalButton.textContent).toBe('Server copper');
+});
 
 function viewWithClickSyncComputedDomUpdate(): ProtocolViewPayload {
 	return {
@@ -1161,6 +1290,8 @@ export default function CaptureSlotSiblings() @{
 
 			const buttons = descendants(output.root, 'BUTTON');
 			expect(buttons).toHaveLength(2);
+			expect(renderedText(buttons[0]!)).toBe('Graph cedar');
+			expect(renderedText(buttons[1]!)).toBe('Literal coral');
 			await runtime.runtime.dispatch(event('click', buttons[0]!) as never);
 			expect(runtime.graph.read('state:graphResult')).toBe('Graph cedar:1');
 			expect(runtime.graph.read('state:count')).toBe(99);

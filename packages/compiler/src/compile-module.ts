@@ -159,6 +159,7 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 					const captureAnalysis = analyzeCaptures({
 						semanticGraph,
 						symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
+						symbols: inputs.symbols as CompileTsrxModuleInput['symbols'],
 					});
 					return {
 						captureAnalysis: {

@@ -1,5 +1,7 @@
 import { describe, expect, test, vi } from 'vitest';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { resolve } from 'pathe';
+import { pathToFileURL } from 'node:url';
 import { build as viteBuild, type Plugin } from 'vite';
 import {
 	MARKLESS_BUNDLE_GRAPH,
@@ -604,8 +606,7 @@ let count = state(0);
 	test('production builds require capture metadata from imported compiled children', async () => {
 		const childFilename = '/workspace/app/components/Child.tsrx';
 		const parentFilename = '/workspace/app/pages/App.tsrx';
-		const childSource =
-			'export default function Child() @{ <button>Child</button> }';
+		const childSource = 'export default function Child() @{ <button>Child</button> }';
 		const parentSource = `import Child from '../components/Child.tsrx';
 export default function App() @{ <main><Child /></main> }`;
 		const validPlugin = marklessClient();
@@ -637,6 +638,178 @@ export default function App() @{ <main><Child /></main> }`,
 		);
 	});
 
+	test('imported sibling instances receive distinct parent-bound symbol rows', async () => {
+		const childFilename = '/workspace/app/components/Child.tsrx';
+		const parentFilename = '/workspace/app/pages/App.tsrx';
+		const childSource = `export function Child({ label, onTrace }) @{
+	<button onClick={() => onTrace(label)}>{label}</button>
+}`;
+		const parentSource = `import { state } from '@markless/core';
+import { Child } from '../components/Child.tsrx';
+export function App() @{
+	let first = state('Server spruce');
+	let result = state('none');
+	<main>
+		<Child label={first} onTrace={(value) => result = value} />
+		<Child label="Literal sibling" onTrace={(value) => result = value} />
+		<output>{result}</output>
+	</main>
+}`;
+		const plugin = marklessClient();
+		callBuildStart(plugin, { cwd: '/workspace/app' });
+		const child = (await callTransform(plugin, childSource, childFilename)) as {
+			manifest: {
+				captureMetadata: { extractedSymbols: Array<{ symbolId: string; kind: string }> };
+				symbols: Array<{ symbolId: string; virtualModuleId: string }>;
+			};
+			virtualModules: Array<{ id: string; type: string; source: string }>;
+		};
+		const parent = (await callTransform(plugin, parentSource, parentFilename)) as {
+			code: string;
+			manifest: {
+				captureMetadata: {
+					boundResolverRows: Array<{
+						id: string;
+						baseSymbolId: string;
+						loaderSymbolId?: string;
+						componentEdgePath: string[];
+					}>;
+				};
+			};
+			virtualModules: Array<{ type: string; source: string }>;
+		};
+		const childHandler = child.manifest.captureMetadata.extractedSymbols.find(
+			(symbol) => symbol.kind === 'event-handler',
+		)!;
+		const rows = parent.manifest.captureMetadata.boundResolverRows.filter(
+			(row) => row.baseSymbolId === childHandler.symbolId,
+		);
+
+		expect(rows).toHaveLength(2);
+		expect(new Set(rows.map((row) => row.id)).size).toBe(2);
+		expect(new Set(rows.map((row) => row.loaderSymbolId)).size).toBe(1);
+		expect(rows.map((row) => row.componentEdgePath)).toEqual([
+			['component-edge:0'],
+			['component-edge:1'],
+		]);
+		for (const row of rows) expect(parent.code).toContain(row.id);
+		const resolver = parent.virtualModules.find((module) => module.type === 'resolver')!;
+		expect(resolver.source).toContain(rows[0]!.loaderSymbolId);
+		const childHandlerManifest = child.manifest.symbols.find(
+			(symbol) => symbol.symbolId === childHandler.symbolId,
+		)!;
+		const childHandlerModule = child.virtualModules.find(
+			(module) => module.id === childHandlerManifest.virtualModuleId,
+		)!;
+		const childHandlerUrl = `data:text/javascript,${encodeURIComponent(childHandlerModule.source)}`;
+		const resolverUrl = `data:text/javascript,${encodeURIComponent(
+			resolver.source.split(childHandlerModule.id).join(childHandlerUrl),
+		)}`;
+		const loadedResolver = (await import(resolverUrl)) as {
+			loadSymbol(id: string): Promise<(context: unknown) => unknown>;
+		};
+		const siblingHandler = await loadedResolver.loadSymbol(rows[1]!.id);
+		const invoked: unknown[] = [];
+		const delivered = await siblingHandler({
+			event: { type: 'click' },
+			graph: {
+				read() {
+					throw new Error('shared prop fallback must not run');
+				},
+			},
+			invokeSymbol(symbolId: string, context: { args: unknown[] }) {
+				invoked.push(symbolId, ...context.args);
+				return context.args[0];
+			},
+		});
+
+		expect(delivered).toBe('Literal sibling');
+		expect(invoked).toEqual(['symbol:1', 'Literal sibling']);
+
+		const ssrOutputDirectory = await mkdtemp(
+			resolve(import.meta.dirname, '.imported-sibling-ssr-'),
+		);
+		try {
+			const ssrChildSource = `export function CaptureButton({ label, marker, count, onTrace }) @{
+	<button data-capture-graph={marker === 'graph'} data-capture-literal={marker === 'literal'}>{label}</button>
+}`;
+			const ssrParentSource = `import { state } from '@markless/core';
+import { CaptureButton } from '../components/Child.tsrx';
+export function App() @{
+	let graphLabel = state('Server spruce');
+	let count = state(0);
+	let trace = state('none');
+	<main>
+		<CaptureButton marker="graph" label={graphLabel} count={count} onTrace={(value) => trace = value} />
+		<CaptureButton marker="literal" label="Server copper" count={count} onTrace={(value) => trace = value} />
+	</main>
+}`;
+			const fixturePlugin: Plugin = {
+				name: 'imported-sibling-ssr-fixture',
+				resolveId(id, importer) {
+					if (id === parentFilename || id === childFilename) return id;
+					if (id === '../components/Child.tsrx' && importer === parentFilename) {
+						return childFilename;
+					}
+					return null;
+				},
+				load(id) {
+					if (id === parentFilename) return ssrParentSource;
+					if (id === childFilename) return ssrChildSource;
+					return null;
+				},
+			};
+			const ssrBuild = await viteBuild({
+				configFile: false,
+				root: resolve(import.meta.dirname, '..'),
+				logLevel: 'silent',
+				plugins: [fixturePlugin, marklessServer({ executionLog: 'never' })],
+				build: {
+					ssr: parentFilename,
+					outDir: ssrOutputDirectory,
+					emptyOutDir: false,
+					minify: false,
+					target: 'es2022',
+				},
+			});
+			const ssrChunks = Array.isArray(ssrBuild)
+				? ssrBuild.flatMap((item) => item.output)
+				: ssrBuild.output;
+			const ssrEntry = ssrChunks.find(
+				(item) => item.type === 'chunk' && item.isEntry,
+			);
+			expect(ssrEntry?.type).toBe('chunk');
+			const renderedModule = (await import(
+				`${pathToFileURL(resolve(ssrOutputDirectory, ssrEntry!.fileName)).href}?t=${Date.now()}`
+			)) as {
+				default: {
+					renderSsr(): Promise<{
+						readonly html: string;
+						readonly view: {
+							readonly domUpdates: ReadonlyArray<{
+								readonly hostNodeId: string;
+								readonly graphNodeId: string;
+							}>;
+						};
+					}>;
+				};
+			};
+			const rendered = await renderedModule.default.renderSsr();
+			expect(rendered.html).toContain('data-capture-graph="true"');
+			expect(rendered.html).toContain('data-capture-literal="true"');
+			expect(rendered.html).toContain('>Server spruce</button>');
+			expect(rendered.html).toContain('>Server copper</button>');
+			expect(rendered.view.domUpdates).toEqual([
+				expect.objectContaining({
+					hostNodeId: 'c0:h0',
+					graphNodeId: 'state:graphLabel',
+				}),
+			]);
+		} finally {
+			await rm(ssrOutputDirectory, { recursive: true, force: true });
+		}
+	});
+
 	test('production build emits resolver routes for an imported composed child', async () => {
 		const parentFilename = resolve(
 			import.meta.dirname,
@@ -664,10 +837,12 @@ export default function App() @{ <main><Child /></main> }`,
 					return `import { state } from '@markless/core';
 import { CaptureButton } from './CaptureButton.tsrx';
 export function App() @{
-	let label = state('Server spruce');
+	let first = state('Server spruce');
+	let second = state('Server copper');
 	let result = state('none');
 	<main>
-		<CaptureButton label={label} onTrace={(value) => result = value} />
+		<CaptureButton label={first} onTrace={(value) => result = value} />
+		<CaptureButton label={second} onTrace={(value) => result = value} />
 		<output>{result}</output>
 	</main>
 }`;
@@ -693,8 +868,9 @@ export function App() @{
 				rolldownOptions: { input: { symbols: parentFilename } },
 			},
 		});
-		const chunks = (Array.isArray(output) ? output.flatMap((item) => item.output) : output.output)
-			.filter((item) => item.type === 'chunk');
+		const chunks = (
+			Array.isArray(output) ? output.flatMap((item) => item.output) : output.output
+		).filter((item) => item.type === 'chunk');
 		const childResolverId = `virtual:markless:resolver:${encodeURIComponent(childFilename)}`;
 		const normalizeModuleId = (id: string) => (id.startsWith('\0') ? id.slice(1) : id);
 
@@ -712,6 +888,9 @@ export function App() @{
 				),
 			),
 		).toBe(true);
+		const emittedCode = chunks.map((chunk) => chunk.code).join('\n');
+		expect(emittedCode).toMatch(/bound:[^"']+:component-edge%3A0/);
+		expect(emittedCode).toMatch(/bound:[^"']+:component-edge%3A1/);
 	});
 
 	test('execution-log never mode emits no attribution section or size entries', async () => {

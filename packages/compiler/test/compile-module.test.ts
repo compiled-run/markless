@@ -4865,6 +4865,52 @@ export function Dashboard() @{
 	]);
 });
 
+test('compileTsrxModule renders imported sibling text from each SSR edge props', async () => {
+	const child = await compileTsrxModule({
+		filename: 'src/CaptureButton.tsrx',
+		source: `export function CaptureButton({ label, marker, count, onTrace }) @{
+	<button data-capture-graph={marker === 'graph'} data-capture-literal={marker === 'literal'}>{label}</button>
+}`,
+		symbols: [],
+	});
+	const parent = await compileTsrxModule({
+		filename: 'src/Page.tsrx',
+		source: `import { state } from '@markless/core';
+import { CaptureButton } from './CaptureButton.tsrx';
+
+export function Page() @{
+	let graphLabel = state('Server spruce');
+	let count = state(0);
+	let trace = state('none');
+	<main>
+		<CaptureButton marker="graph" label={graphLabel} count={count} onTrace={(value) => trace = value} />
+		<CaptureButton marker="literal" label="Server copper" count={count} onTrace={(value) => trace = value} />
+	</main>
+}`,
+		symbols: [],
+	});
+
+	const childSsrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(child));
+	const parentSsrModule = await importPublicRenderTestModule(
+		ssrRenderTestModuleSource(parent, { replaceChildImport: true }),
+		{ childComponent: { renderSsr: childSsrModule.marklessRenderSsr } },
+	);
+	const output = await (
+		parentSsrModule.marklessRenderSsr as () => Promise<{
+			readonly html: string;
+			readonly view: { readonly domUpdates: ReadonlyArray<{ readonly hostNodeId: string; readonly graphNodeId: string }> };
+		}>
+	)();
+
+	expect(output.html).toContain('data-capture-graph="true"');
+	expect(output.html).toContain('data-capture-literal="true"');
+	expect(output.html).toContain('>Server spruce</button>');
+	expect(output.html).toContain('>Server copper</button>');
+	expect(output.view.domUpdates).toEqual([
+		expect.objectContaining({ hostNodeId: 'c0:h0', graphNodeId: 'state:graphLabel' }),
+	]);
+});
+
 test('compileTsrxModule offsets sibling children by element count, not locator count', async () => {
 	const badge = await compileTsrxModule({
 		filename: 'src/StatusBadge.tsrx',

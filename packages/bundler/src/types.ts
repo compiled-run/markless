@@ -30,6 +30,7 @@ export interface MarklessVirtualModule {
 export interface TransformTsrxModuleInput {
 	filename: string;
 	source: string;
+	symbols?: import('@markless/compiler').SymbolResolverModuleInput['symbols'];
 	devResumeReexport?: boolean;
 	buildId?: string;
 	environment?: MarklessEnvironment;
@@ -52,7 +53,11 @@ export interface TransformTsrxModuleResult {
 export interface MarklessTransformManifest {
 	source: string;
 	captureMetadata?: import('@markless/compiler').CaptureAnalysisArtifact;
-	symbolRoutes?: ReadonlyArray<{ readonly prefix: string; readonly importSource: string }>;
+	symbolRoutes?: ReadonlyArray<{
+		readonly prefix: string;
+		readonly importSource: string;
+		readonly componentEdgeId?: string;
+	}>;
 	payload: MarklessBuildModuleReference;
 	resolver: MarklessBuildModuleReference;
 	symbols: MarklessSymbolManifestEntry[];

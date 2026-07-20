@@ -186,23 +186,55 @@ test('planBoundSymbolResolver derives bound rows from edge paths and recorded an
 					keyedRepeatScopeIds: ['repeat:actions'],
 				},
 			],
-			moduleImports: [], graphBindings: [], sharedDefinitions: [], sharedInstances: [],
-			aliases: [], localBindings: [], stateReads: [], stateWrites: [], events: [],
-			hostNodes: [], keyedRepeats: [], branchSites: [], behaviors: [], asyncBoundaries: [],
-			moduleGraphInterface: { passId: 'module-graph-interface', filename: 'src/App.tsrx', exports: [] },
+			moduleImports: [],
+			graphBindings: [],
+			sharedDefinitions: [],
+			sharedInstances: [],
+			aliases: [],
+			localBindings: [],
+			stateReads: [],
+			stateWrites: [],
+			events: [],
+			hostNodes: [],
+			keyedRepeats: [],
+			branchSites: [],
+			behaviors: [],
+			asyncBoundaries: [],
+			moduleGraphInterface: {
+				passId: 'module-graph-interface',
+				filename: 'src/App.tsrx',
+				exports: [],
+			},
 			diagnostics: [],
 		},
 		captureAnalysis: {
-			passId: 'capture-analysis', diagnostics: [],
-			extractedSymbols: [{
-				symbolId: 'symbol:action', kind: 'event-handler', source: '() => label',
-				owner: { componentName: 'Action' },
-				captureSlots: [{
-					id: 'capture-slot:label', bindingId: 'binding:label', source: 'label',
-					owner: { componentName: 'Action' }, path: [], propName: 'label',
-					routes: [{ kind: 'compiler-known-constant', componentEdgeId: 'component-edge:child', value: 'Save' }],
-				}],
-			}],
+			passId: 'capture-analysis',
+			diagnostics: [],
+			extractedSymbols: [
+				{
+					symbolId: 'symbol:action',
+					kind: 'event-handler',
+					source: '() => label',
+					owner: { componentName: 'Action' },
+					captureSlots: [
+						{
+							id: 'capture-slot:label',
+							bindingId: 'binding:label',
+							source: 'label',
+							owner: { componentName: 'Action' },
+							path: [],
+							propName: 'label',
+							routes: [
+								{
+									kind: 'compiler-known-constant',
+									componentEdgeId: 'component-edge:child',
+									value: 'Save',
+								},
+							],
+						},
+					],
+				},
+			],
 		},
 	});
 
@@ -211,10 +243,25 @@ test('planBoundSymbolResolver derives bound rows from edge paths and recorded an
 			baseSymbolId: 'symbol:action',
 			componentEdgePath: ['component-edge:parent', 'component-edge:child'],
 			ancestry: [
-				{ componentEdgeId: 'component-edge:parent', branchScopeIds: ['branch:panel'], keyedRepeatScopeIds: [] },
-				{ componentEdgeId: 'component-edge:child', branchScopeIds: [], keyedRepeatScopeIds: ['repeat:actions'] },
+				{
+					componentEdgeId: 'component-edge:parent',
+					branchScopeIds: ['branch:panel'],
+					keyedRepeatScopeIds: [],
+				},
+				{
+					componentEdgeId: 'component-edge:child',
+					branchScopeIds: [],
+					keyedRepeatScopeIds: ['repeat:actions'],
+				},
 			],
-			captureSlots: [{ slotId: 'capture-slot:label', path: [], route: expect.objectContaining({ value: 'Save' }) }],
+			captureSlots: [
+				{
+					slotId: 'capture-slot:label',
+					path: [],
+					legacyGraphRead: { graphNodeId: 'prop:props', path: ['label'] },
+					route: expect.objectContaining({ value: 'Save' }),
+				},
+			],
 		}),
 	]);
 	expect(artifact.rows[0]?.id).toContain('component-edge%3Aparent');

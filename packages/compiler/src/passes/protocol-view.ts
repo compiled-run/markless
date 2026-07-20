@@ -13,6 +13,7 @@ export function createProtocolViewPayload(
 	input: ProtocolViewPayloadInput,
 ): ProtocolViewPayloadWithArmRecords {
 	const boundEventSymbols = boundEventSymbolIds(input);
+	const boundDomUpdateSymbols = boundDomUpdateSymbolIds(input);
 	const eventSymbols = new Map<string, string[]>();
 	const domUpdateSymbols = new Map<string, string>();
 	const behaviorSymbols = new Map<string, string[]>();
@@ -29,7 +30,7 @@ export function createProtocolViewPayload(
 		if (symbol.kind === 'dom-update') {
 			domUpdateSymbols.set(
 				`${symbol.hostNodeId}:${domUpdateTargetKey(symbol.target)}:${symbol.graphNodeId}:${symbol.source}`,
-				symbol.id,
+				boundDomUpdateSymbols.get(symbol.id) ?? symbol.id,
 			);
 		}
 
@@ -378,6 +379,7 @@ function branchArmRecords(input: ProtocolViewPayloadInput, branchSiteId: string)
 	if (!arms?.armHosts) return undefined;
 	const eventSymbols = new Map<string, string[]>();
 	const boundEventSymbols = boundEventSymbolIds(input);
+	const boundDomUpdateSymbols = boundDomUpdateSymbolIds(input);
 	const domUpdateSymbols = new Map<string, string>();
 	for (const symbol of input.symbolResolver.symbols) {
 		if (symbol.kind === 'event-handler') {
@@ -389,7 +391,7 @@ function branchArmRecords(input: ProtocolViewPayloadInput, branchSiteId: string)
 		if (symbol.kind === 'dom-update') {
 			domUpdateSymbols.set(
 				`${symbol.hostNodeId}:${domUpdateTargetKey(symbol.target)}:${symbol.graphNodeId}:${symbol.source}`,
-				symbol.id,
+				boundDomUpdateSymbols.get(symbol.id) ?? symbol.id,
 			);
 		}
 	}
@@ -431,14 +433,25 @@ function branchArmRecords(input: ProtocolViewPayloadInput, branchSiteId: string)
 }
 
 function boundEventSymbolIds(input: ProtocolViewPayloadInput): ReadonlyMap<string, string> {
-	const eventSymbolIds = new Set(
+	return boundSymbolIds(input, new Set(['event-handler']));
+}
+
+function boundDomUpdateSymbolIds(input: ProtocolViewPayloadInput): ReadonlyMap<string, string> {
+	return boundSymbolIds(input, new Set(['dom-update']));
+}
+
+function boundSymbolIds(
+	input: ProtocolViewPayloadInput,
+	kinds: ReadonlySet<string>,
+): ReadonlyMap<string, string> {
+	const baseSymbolIds = new Set(
 		input.symbolResolver.symbols.flatMap((symbol) =>
-			symbol.kind === 'event-handler' ? [symbol.id] : [],
+			kinds.has(symbol.kind) ? [symbol.id] : [],
 		),
 	);
 	return new Map(
 		(input.captureAnalysis?.boundResolverRows ?? []).flatMap((row) =>
-			eventSymbolIds.has(row.baseSymbolId) ? [[row.baseSymbolId, row.id] as const] : [],
+			baseSymbolIds.has(row.baseSymbolId) ? [[row.baseSymbolId, row.id] as const] : [],
 		),
 	);
 }

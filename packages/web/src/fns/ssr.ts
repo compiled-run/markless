@@ -505,7 +505,9 @@ export function marklessSsrAppendChildView(context) {
 			hostNodeId: context.child.hostPrefix + update.hostNodeId,
 			graphNodeId: mapped.graphNodeId,
 			path: mapped.path,
-			...(update.symbolId ? { symbolId: context.child.symbolPrefix + update.symbolId } : {}),
+			...(update.symbolId
+				? { symbolId: marklessBoundSymbolId(context.child, update.symbolId) }
+				: {}),
 		});
 	}
 	for (const behavior of childView.behaviors)
@@ -670,7 +672,7 @@ export function marklessSsrPrefixArmRecord(arm, child) {
 						graphNodeId: mapped.graphNodeId,
 						path: mapped.path,
 						...(update.symbolId
-							? { symbolId: child.symbolPrefix + update.symbolId }
+							? { symbolId: marklessBoundSymbolId(child, update.symbolId) }
 							: {}),
 					}
 				: update;

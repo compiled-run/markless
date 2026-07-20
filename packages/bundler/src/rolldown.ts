@@ -261,7 +261,7 @@ export function createMarklessRolldownPlugin(input: {
 			}
 			const source = pathname(id);
 			clearSourceVirtualModules(source, virtualModules, sourceVirtualModules);
-			const transformed = await transformTsrxModule({
+			let transformed = await transformTsrxModule({
 				filename: source,
 				source: code,
 				buildId: internalOptions.buildId,
@@ -304,6 +304,8 @@ export function createMarklessRolldownPlugin(input: {
 						: undefined,
 				devResumeReexport: internalOptions.dev === true && currentEnvironment === 'client',
 			});
+			// Register the first-pass artifact before loading children so the existing
+			// cross-module registry can validate both sides of the composition edge.
 			registerTransformArtifacts({
 				source,
 				result: transformed,
@@ -323,14 +325,74 @@ export function createMarklessRolldownPlugin(input: {
 				importedChildren.set(importedChildKey(child), child);
 				importedChildSources.add(child.source);
 			}
-			if (internalOptions.dev === true) {
-				for (const child of resolvedChildren) {
-					if (!transformManifests.has(child.source)) {
-						await internalOptions.devServer?.transformRequest(child.source, currentEnvironment);
+			for (const child of resolvedChildren) {
+				if (!transformManifests.has(child.source)) {
+					if (internalOptions.dev === true) {
+						await internalOptions.devServer?.transformRequest(
+							child.source,
+							currentEnvironment,
+						);
+					} else if (typeof this.load === 'function') {
+						await this.load({ id: child.source });
 					}
+				}
+				if (internalOptions.dev === true) {
 					validateImportedChild(child, transformManifests);
 				}
 			}
+			if (resolvedChildren.length > 0) {
+				transformed = await transformTsrxModule({
+					filename: source,
+					source: code,
+					buildId: internalOptions.buildId,
+					symbols: importedSymbolInputs(resolvedChildren, transformManifests),
+					executionLog: normalizeExecutionLogMode(internalOptions.executionLog),
+					executionLogModuleHooks:
+						internalOptions.dev === true && currentEnvironment === 'client',
+					inlineResumerDebug: internalOptions.inlineResumerDebug === true,
+					environment: currentEnvironment,
+					clientOutput:
+						currentEnvironment === 'client' &&
+						(clientSymbolEntrySources.has(source) || isSymbolOnlySourceRequest(id))
+							? 'symbols-only'
+							: undefined,
+					resumeModuleUrl:
+						internalOptions.dev === true && currentEnvironment === 'server'
+							? devBrowserSourceModuleUrl(
+									source,
+									getRoot(),
+									internalOptions.publicPath,
+								)
+							: undefined,
+					styleModuleUrl:
+						internalOptions.dev === true && currentEnvironment === 'server'
+							? (virtualId) =>
+									withQuery(
+										devBrowserVirtualModuleUrl(
+											virtualId,
+											internalOptions.publicPath,
+										),
+										{ direct: null },
+									)
+							: undefined,
+					headInjections:
+						internalOptions.dev === true && currentEnvironment === 'server'
+							? internalOptions.devInjections
+							: undefined,
+					devResumeReexport:
+						internalOptions.dev === true && currentEnvironment === 'client',
+				});
+			}
+			registerTransformArtifacts({
+				source,
+				result: transformed,
+				virtualModules,
+				transformManifests,
+				sourceVirtualModules,
+				executionLogEstimatedSizes,
+				dev,
+				environment: currentEnvironment,
+			});
 			if (currentEnvironment === 'client' && isResumeSourceRequest(id)) {
 				const resumeModule = transformed.virtualModules.find(
 					(module) => module.type === 'resume',
@@ -343,7 +405,9 @@ export function createMarklessRolldownPlugin(input: {
 					if (item.type === 'symbol') return true;
 					if (item.type === 'resolver') {
 						return (
-							importedChildSources.has(source) &&
+							(importedChildSources.has(source) ||
+								(transformed.manifest.captureMetadata?.boundResolverRows?.length ??
+									0) > 0) &&
 							!emittedClientResolverSources.has(source)
 						);
 					}
@@ -475,6 +539,7 @@ type ImportedChild = {
 	readonly parent: string;
 	readonly specifier: string;
 	readonly source: string;
+	readonly componentEdgeId?: string;
 };
 
 async function resolveImportedChildren(
@@ -490,7 +555,9 @@ async function resolveImportedChildren(
 ): Promise<ImportedChild[]> {
 	return await Promise.all(
 		(manifest.symbolRoutes ?? []).map(async (route) => {
-			const resolvedImport = await this.resolve(route.importSource, parent, { skipSelf: true });
+			const resolvedImport = await this.resolve(route.importSource, parent, {
+				skipSelf: true,
+			});
 			const resolvedId =
 				typeof resolvedImport === 'string'
 					? resolvedImport
@@ -501,9 +568,36 @@ async function resolveImportedChildren(
 				parent,
 				specifier: route.importSource,
 				source: pathname(resolvedId),
+				componentEdgeId: route.componentEdgeId,
 			};
 		}),
 	);
+}
+
+function importedSymbolInputs(
+	children: ReadonlyArray<ImportedChild>,
+	manifests: ReadonlyMap<string, MarklessTransformManifest>,
+): NonNullable<TransformTsrxModuleInput['symbols']> {
+	return children.flatMap((child) => {
+		const manifest = manifests.get(child.source);
+		if (!manifest?.captureMetadata || !child.componentEdgeId) return [];
+		return manifest.symbols.flatMap((symbol) => {
+			const captureSymbol = manifest.captureMetadata?.extractedSymbols.find(
+				(candidate) => candidate.symbolId === symbol.symbolId,
+			);
+			return captureSymbol?.captureSlots.some((slot) => slot.propName !== undefined)
+				? [
+						{
+							id: `imported:${encodeURIComponent(child.source)}:${symbol.symbolId}`,
+							chunk: symbol.virtualModuleId,
+							exportName: symbol.exportName,
+							componentEdgeId: child.componentEdgeId,
+							captureSymbol,
+						},
+					]
+				: [];
+		});
+	});
 }
 
 function fallbackImportedSource(parent: string, specifier: string): string {

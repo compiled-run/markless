@@ -69,20 +69,28 @@ export async function transformTsrxModule(
 		source: input.source,
 		buildId: input.buildId,
 		resolverId,
-		symbols: [],
+		symbols: input.symbols ?? [],
 	});
 	const symbolRows = compiled.symbolModules.modules.map((module) => ({
 		id: module.symbolId,
 		chunk: symbolVirtualModuleId(input.filename, module.symbolId),
 		exportName: scopedSymbolExportName(input.filename, module.exportName),
 	}));
-	const resolverSource = emitSymbolResolverModule({
-		buildId: input.buildId,
-		symbols: symbolRows,
-		boundSymbols: compiled.boundSymbolResolver.rows,
-	});
+	const importedBoundRows = compiled.boundSymbolResolver.rows.map((row) =>
+		row.loaderSymbolId ? { ...row, baseSymbolId: row.loaderSymbolId } : row,
+	);
+	const resolverSource = adaptImportedCaptureResolver(
+		emitSymbolResolverModule({
+			buildId: input.buildId,
+			symbols: uniqueSymbolsById([...(input.symbols ?? []), ...symbolRows]),
+			boundSymbols: importedBoundRows,
+		}),
+		importedBoundRows.some((row) => row.loaderSymbolId !== undefined),
+	);
 	const symbolRoutes = compiled.semanticGraph.componentEdges.flatMap((edge, index) =>
-		edge.importSource ? [{ prefix: `c${index}:`, importSource: edge.importSource }] : [],
+		edge.importSource
+			? [{ prefix: `c${index}:`, importSource: edge.importSource, componentEdgeId: edge.id }]
+			: [],
 	);
 	const executionLogModuleHookMode =
 		input.executionLogModuleHooks === false ? 'never' : input.executionLog;
@@ -214,6 +222,46 @@ export async function transformTsrxModule(
 		virtualModules,
 		manifest,
 	};
+}
+
+function uniqueSymbolsById<T extends { readonly id: string }>(symbols: ReadonlyArray<T>): T[] {
+	return [...new Map(symbols.map((symbol) => [symbol.id, symbol])).values()];
+}
+
+// Imported child modules were compiled before their parent edges were known, so
+// their symbol code still reads the legacy prop graph cell. Bound rows carry the
+// parent-proven routes; this adapter makes those reads edge-specific at load time.
+function adaptImportedCaptureResolver(source: string, hasImportedRows: boolean): string {
+	if (!hasImportedRows) return source;
+	const original =
+		'\treturn (context) => base({ ...context, capture: createCaptureContext(context, bound) });';
+	const replacement = [
+		'\treturn (context) => {',
+		'\t\tconst capture = createCaptureContext(context, bound);',
+		'\t\treturn base({ ...context, graph: createBoundGraph(context, bound, capture), capture });',
+		'\t};',
+	].join('\n');
+	const helper = [
+		'function createBoundGraph(context, bound, capture) {',
+		'\tconst legacySlots = new Map(bound.captureSlots.flatMap((slot) => slot.legacyGraphRead ? [[JSON.stringify([slot.legacyGraphRead.graphNodeId, slot.legacyGraphRead.path]), slot]] : []));',
+		'\treturn {',
+		'\t\t...context.graph,',
+		'\t\tread(graphNodeId, path = []) {',
+		'\t\t\tconst slot = legacySlots.get(JSON.stringify([graphNodeId, path]));',
+		'\t\t\tif (!slot) return context.graph.read(graphNodeId, path);',
+		'\t\t\tif (slot.route.kind === "callback-route") return (...args) => context.invokeSymbol(slot.route.callbackSymbolId, { ...context, event: context.event, args });',
+		'\t\t\treturn capture.read(slot.slotId);',
+		'\t\t},',
+		'\t};',
+		'}',
+		'',
+	].join('\n');
+	return source
+		.replace(original, replacement)
+		.replace(
+			'function createCaptureContext(context, bound) {',
+			`${helper}function createCaptureContext(context, bound) {`,
+		);
 }
 
 function containerScopedResumeView(view: ProtocolViewPayload): ProtocolViewPayload {

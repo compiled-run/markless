@@ -1,4 +1,4 @@
-import { marklessBoundSymbolId } from './bound-symbol.ts';
+import { marklessBoundSymbolId, marklessLiveBoundGraphRoute } from './bound-symbol.ts';
 
 export function marklessCsrFragmentFromHtml(html) {
 	const template = document.createElement('template');
@@ -187,7 +187,10 @@ export function marklessCsrRemapGraphOutput(output, graphProps) {
 	)?.directValue;
 	if (props)
 		for (const prop of graphProps ?? [])
-			if (!prop.path.length && props[prop.name] !== undefined)
+			if (
+				marklessLiveBoundGraphRoute(prop)?.path.length === 0 &&
+				props[prop.name] !== undefined
+			)
 				output.state.cells.push({
 					graphNodeId: prop.graphNodeId,
 					directValue: props[prop.name],
@@ -387,7 +390,9 @@ export function marklessCsrAppendChildView(context) {
 			hostNodeId: context.child.hostPrefix + update.hostNodeId,
 			graphNodeId: mapped.graphNodeId,
 			path: mapped.path,
-			...(update.symbolId ? { symbolId: context.child.symbolPrefix + update.symbolId } : {}),
+			...(update.symbolId
+				? { symbolId: marklessBoundSymbolId(context.child, update.symbolId) }
+				: {}),
 		});
 	}
 	for (const behavior of childView.behaviors)
@@ -645,10 +650,11 @@ export function marklessCsrRemapChildGraph(record, graphProps) {
 	const binding = graphProps.find(
 		(prop) => prop.name === (whole ? record.path[0] : record.graphNodeId.slice(5)),
 	);
-	return binding
+	const liveRoute = marklessLiveBoundGraphRoute(binding);
+	return liveRoute
 		? {
-				graphNodeId: binding.graphNodeId,
-				path: [...binding.path, ...record.path.slice(+whole)],
+				graphNodeId: liveRoute.graphNodeId,
+				path: [...liveRoute.path, ...record.path.slice(+whole)],
 			}
 		: null;
 }
@@ -674,7 +680,7 @@ export function marklessCsrPrefixArmRecord(arm, child) {
 						graphNodeId: mapped.graphNodeId,
 						path: mapped.path,
 						...(update.symbolId
-							? { symbolId: child.symbolPrefix + update.symbolId }
+							? { symbolId: marklessBoundSymbolId(child, update.symbolId) }
 							: {}),
 					}
 				: update;

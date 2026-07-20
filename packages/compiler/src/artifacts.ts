@@ -749,6 +749,9 @@ export type BoundSymbolCaptureRoute = Exclude<
 export type BoundSymbolResolverRow = {
 	readonly id: string;
 	readonly baseSymbolId: string;
+	// Imported symbols keep their child-local base ID for view composition, while
+	// the parent resolver loads the edge-scoped symbol route registered by the bundler.
+	readonly loaderSymbolId?: string;
 	readonly componentEdgePath: ReadonlyArray<string>;
 	readonly ancestry: ReadonlyArray<{
 		readonly componentEdgeId: string;
@@ -759,6 +762,10 @@ export type BoundSymbolResolverRow = {
 		readonly slotId: string;
 		readonly path: ReadonlyArray<string>;
 		readonly route: BoundSymbolCaptureRoute;
+		readonly legacyGraphRead?: {
+			readonly graphNodeId: string;
+			readonly path: ReadonlyArray<string>;
+		};
 	}>;
 };
 
@@ -775,6 +782,7 @@ export type BoundSymbolResolverInput = {
 export type CaptureAnalysisInput = {
 	readonly semanticGraph: SemanticGraphArtifact;
 	readonly symbolResolver: SymbolResolverPlan;
+	readonly symbols?: SymbolResolverModuleInput['symbols'];
 };
 
 export type CaptureAnalysisDiagnostic = CompilerDiagnostic & {
@@ -838,19 +846,22 @@ export type CaptureSlot = {
 	readonly routes: ReadonlyArray<CaptureSlotRoute>;
 };
 
+export type ExtractedCaptureSymbol = {
+	readonly symbolId: string;
+	readonly loaderSymbolId?: string;
+	readonly kind: PlannedSymbol['kind'];
+	readonly source: string;
+	readonly owner?: {
+		readonly componentId?: string;
+		readonly componentName?: string;
+	};
+	readonly captureSlots: ReadonlyArray<CaptureSlot>;
+};
+
 export type CaptureAnalysisArtifact = {
 	readonly passId: 'capture-analysis';
 	readonly boundResolverRows?: ReadonlyArray<BoundSymbolResolverRow>;
-	readonly extractedSymbols: ReadonlyArray<{
-		readonly symbolId: string;
-		readonly kind: PlannedSymbol['kind'];
-		readonly source: string;
-		readonly owner?: {
-			readonly componentId?: string;
-			readonly componentName?: string;
-		};
-		readonly captureSlots: ReadonlyArray<CaptureSlot>;
-	}>;
+	readonly extractedSymbols: ReadonlyArray<ExtractedCaptureSymbol>;
 	readonly diagnostics: ReadonlyArray<CaptureAnalysisDiagnostic>;
 };
 
@@ -938,6 +949,8 @@ export type SymbolResolverModuleInput = {
 		readonly id: string;
 		readonly chunk: string;
 		readonly exportName: string;
+		readonly componentEdgeId?: string;
+		readonly captureSymbol?: ExtractedCaptureSymbol;
 	}>;
 	readonly boundSymbols?: ReadonlyArray<BoundSymbolResolverRow>;
 };

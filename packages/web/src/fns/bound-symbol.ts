@@ -17,6 +17,26 @@ export function marklessBoundSymbolId(
 	return rebound ?? `${child.symbolPrefix ?? ''}${symbolId}`;
 }
 
+export function marklessLiveBoundGraphRoute(binding: {
+	readonly kind?: string;
+	readonly graphNodeId?: unknown;
+	readonly path?: unknown;
+} | undefined):
+	| { readonly graphNodeId: string; readonly path: ReadonlyArray<string> }
+	| undefined {
+	if (
+		!binding ||
+		(binding.kind !== undefined && binding.kind !== 'graph-reference') ||
+		typeof binding.graphNodeId !== 'string'
+	) {
+		return undefined;
+	}
+	return {
+		graphNodeId: binding.graphNodeId,
+		path: Array.isArray(binding.path) ? binding.path : [],
+	};
+}
+
 function marklessBaseSymbolId(symbolId: string): string | undefined {
 	if (!symbolId.startsWith('bound:')) return undefined;
 	const separator = symbolId.indexOf(':', 'bound:'.length);

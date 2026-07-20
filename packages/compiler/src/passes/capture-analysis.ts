@@ -18,7 +18,7 @@ import { childNodes, type AnyNode } from '../ast/nodes.ts';
 import { parseJavaScriptModule } from '../js-ast.ts';
 
 export function analyzeCaptures(input: CaptureAnalysisInput): CaptureAnalysisArtifact {
-	const extractedSymbols = input.symbolResolver.symbols.map((symbol) => {
+	const localSymbols = input.symbolResolver.symbols.map((symbol) => {
 		const captureSlots = symbolCaptureSlots(symbol, input);
 		const firstOwner = captureSlots[0]?.owner;
 		return {
@@ -40,6 +40,7 @@ export function analyzeCaptures(input: CaptureAnalysisInput): CaptureAnalysisArt
 			captureSlots,
 		};
 	});
+	const extractedSymbols = [...localSymbols, ...importedCaptureSymbols(input)];
 	const diagnostics = [
 		...extractedSymbols.flatMap((symbol) => opaqueSlotDiagnostics(symbol)),
 		...extractedSymbols.flatMap((symbol) =>
@@ -56,6 +57,38 @@ export function analyzeCaptures(input: CaptureAnalysisInput): CaptureAnalysisArt
 		extractedSymbols,
 		diagnostics,
 	};
+}
+
+function importedCaptureSymbols(
+	input: CaptureAnalysisInput,
+): CaptureAnalysisArtifact['extractedSymbols'] {
+	return (input.symbols ?? []).flatMap((symbol) => {
+		if (!symbol.captureSymbol || !symbol.componentEdgeId) return [];
+		const edge = input.semanticGraph.componentEdges.find(
+			(candidate) => candidate.id === symbol.componentEdgeId,
+		);
+		if (!edge) return [];
+		return [
+			{
+				...symbol.captureSymbol,
+				loaderSymbolId: symbol.id,
+				captureSlots: symbol.captureSymbol.captureSlots.map((slot) => ({
+					...slot,
+					routes: slot.propName
+						? [propCaptureRoute([edge], slot.propName, slot.path, input)]
+						: slot.routes.map((route) =>
+								route.kind === 'graph-reference'
+									? {
+											...route,
+											componentEdgeId: edge.id,
+											componentEdgePath: [edge.id],
+										}
+									: route,
+							),
+				})),
+			},
+		];
+	});
 }
 
 function symbolCaptureSlots(
@@ -288,7 +321,8 @@ function componentEdgePathsEndingAt(
 	const nextSeen = new Set(seen).add(edge.id);
 	const incoming = edges.filter(
 		(candidate) =>
-			candidate.childComponentName === edge.parentComponentName && !nextSeen.has(candidate.id),
+			candidate.childComponentName === edge.parentComponentName &&
+			!nextSeen.has(candidate.id),
 	);
 	if (incoming.length === 0) return [[edge]];
 	return incoming.flatMap((parent) =>
@@ -638,7 +672,9 @@ function nodeArray(value: unknown): AnyNode[] {
 	return Array.isArray(value)
 		? value.filter(
 				(item): item is AnyNode =>
-					typeof item === 'object' && item !== null && typeof (item as AnyNode).type === 'string',
+					typeof item === 'object' &&
+					item !== null &&
+					typeof (item as AnyNode).type === 'string',
 			)
 		: [];
 }

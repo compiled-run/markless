@@ -192,7 +192,9 @@ export function planBoundSymbolResolver(
 		);
 		const terminalEdgeIds = new Set(
 			edgeDependentSlots.flatMap((slot) =>
-				slot.routes.flatMap((route) => route.componentEdgeId ? [route.componentEdgeId] : []),
+				slot.routes.flatMap((route) =>
+					route.componentEdgeId ? [route.componentEdgeId] : [],
+				),
 			),
 		);
 		for (const terminalEdgeId of terminalEdgeIds) {
@@ -203,12 +205,28 @@ export function planBoundSymbolResolver(
 						(candidate) =>
 							candidate.componentEdgeId === terminalEdgeId &&
 							(!candidate.componentEdgePath ||
-								candidate.componentEdgePath.every(
+								(candidate.componentEdgePath.every(
 									(edgeId, index) => componentEdgePath[index] === edgeId,
-								) && candidate.componentEdgePath.length === componentEdgePath.length),
+								) &&
+									candidate.componentEdgePath.length ===
+										componentEdgePath.length)),
 					);
 					return route && route.kind !== 'unsupported-opaque'
-						? [{ slotId: slot.id, path: slot.path, route }]
+						? [
+								{
+									slotId: slot.id,
+									path: slot.path,
+									route,
+									...(slot.propName
+										? {
+												legacyGraphRead: {
+													graphNodeId: 'prop:props',
+													path: [slot.propName, ...slot.path],
+												},
+											}
+										: {}),
+								},
+							]
 						: [];
 				});
 				if (captureSlots.length !== edgeDependentSlots.length) continue;
@@ -220,6 +238,7 @@ export function planBoundSymbolResolver(
 				rows.push({
 					id: boundSymbolId(symbol.symbolId, ancestry),
 					baseSymbolId: symbol.symbolId,
+					...(symbol.loaderSymbolId ? { loaderSymbolId: symbol.loaderSymbolId } : {}),
 					componentEdgePath,
 					ancestry,
 					captureSlots,
@@ -238,7 +257,10 @@ function componentEdgePaths(edges: SymbolResolverInput['semanticGraph']['compone
 		incomingByComponent.set(edge.childComponentName, [...incoming, edge]);
 	}
 	const result = new Map<string, Array<Array<(typeof edges)[number]>>>();
-	const visit = (edge: (typeof edges)[number], seen: ReadonlySet<string>): Array<Array<(typeof edges)[number]>> => {
+	const visit = (
+		edge: (typeof edges)[number],
+		seen: ReadonlySet<string>,
+	): Array<Array<(typeof edges)[number]>> => {
 		if (seen.has(edge.id)) return [];
 		const nextSeen = new Set(seen).add(edge.id);
 		const parents = (incomingByComponent.get(edge.parentComponentName) ?? []).filter(
@@ -251,13 +273,13 @@ function componentEdgePaths(edges: SymbolResolverInput['semanticGraph']['compone
 	return result;
 }
 
-function boundSymbolId(
-	baseSymbolId: string,
-	ancestry: BoundSymbolResolverRow['ancestry'],
-): string {
+function boundSymbolId(baseSymbolId: string, ancestry: BoundSymbolResolverRow['ancestry']): string {
 	const segment = (values: ReadonlyArray<string>) => values.map(encodeURIComponent).join(',');
 	return `bound:${encodeURIComponent(baseSymbolId)}:${ancestry
-		.map((entry) => `${encodeURIComponent(entry.componentEdgeId)}[b=${segment(entry.branchScopeIds)};k=${segment(entry.keyedRepeatScopeIds)}]`)
+		.map(
+			(entry) =>
+				`${encodeURIComponent(entry.componentEdgeId)}[b=${segment(entry.branchScopeIds)};k=${segment(entry.keyedRepeatScopeIds)}]`,
+		)
 		.join('/')}`;
 }
 

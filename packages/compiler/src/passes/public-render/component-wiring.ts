@@ -26,7 +26,7 @@ export function emitSsrComponent(
 	const placement = {
 		hostPrefix: `c${childIndex}:`,
 		symbolPrefix: edge?.importSource ? `c${childIndex}:` : '',
-		graphProps: graphReferenceProps(edge),
+		graphProps: componentEdgeGraphRoutes(edge),
 		boundSymbols: boundSymbolsForEdge(edge, context.callbackSymbols),
 	};
 
@@ -103,7 +103,7 @@ export function emitCsrComponent(
 		node === context.componentRoot
 			? `	root = marklessCsrReplaceChild(root, ${index}, ${childName}?.root);`
 			: `	marklessCsrReplaceChild(root, ${index}, ${childName}?.root);`,
-		`	marklessCsrChildren.push({ hostPrefix: ${JSON.stringify(`c${index}:`)}, symbolPrefix: ${JSON.stringify(edge?.importSource ? `c${index}:` : '')}, output: ${childName}, graphProps: ${JSON.stringify(graphReferenceProps(edge))}, boundSymbols: ${JSON.stringify(boundSymbolsForEdge(edge, context.callbackSymbols))} });`,
+		`	marklessCsrChildren.push({ hostPrefix: ${JSON.stringify(`c${index}:`)}, symbolPrefix: ${JSON.stringify(edge?.importSource ? `c${index}:` : '')}, output: ${childName}, graphProps: ${JSON.stringify(componentEdgeGraphRoutes(edge))}, boundSymbols: ${JSON.stringify(boundSymbolsForEdge(edge, context.callbackSymbols))} });`,
 	);
 	return JSON.stringify(`<span data-markless-csr-child="${index}"></span>`);
 }
@@ -208,11 +208,14 @@ function ssrComponentPropsSource(
 	return props;
 }
 
-export function graphReferenceProps(edge: ComponentEdge | undefined) {
-	return (edge?.props ?? []).flatMap((prop) =>
+export function componentEdgeGraphRoutes(edge: ComponentEdge | undefined) {
+	return (edge?.props ?? []).map((prop) =>
 		prop.kind === 'graph-reference'
-			? [{ name: prop.name, graphNodeId: prop.graphNodeId, path: prop.path }]
-			: [],
+			? { name: prop.name, graphNodeId: prop.graphNodeId, path: prop.path }
+			: {
+					name: prop.name,
+					kind: prop.kind === 'serializable' ? 'compiler-known-constant' : prop.kind,
+				},
 	);
 }
 
