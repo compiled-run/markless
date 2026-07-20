@@ -126,6 +126,47 @@ test('callback props support zero or one parameter and reject multiple parameter
 	).toBe(false);
 });
 
+test('callback parameter patterns shadow same-named graph state in emitted symbols', async () => {
+	const result = await compile(`import { state } from '@markless/core';
+
+	function Child({ onObject, onRenamed, onArray }) @{
+		<button onClick={() => {
+			onObject({ count: 1, source: 'cedar' });
+			onRenamed({ count: 2, source: 'birch' });
+			onArray([3, 'ash']);
+		}}>send</button>
+	}
+
+	export function Parent() @{
+		let count = state(99);
+		let graphResult = state('');
+		<Child
+			onObject={({ count, source }) => graphResult = source + ':' + count}
+			onRenamed={({ count: nextCount, source: nextSource }) => graphResult = nextSource + ':' + nextCount}
+			onArray={([count, source]) => graphResult = source + ':' + count}
+		/>
+	}`);
+	const callbackSource = (propName: string) => {
+		const symbol = result.symbolResolver.symbols.find(
+			(candidate) => candidate.kind === 'callback-prop' && candidate.propName === propName,
+		);
+		return result.symbolModules.modules.find((module) => module.symbolId === symbol?.id)?.source;
+	};
+
+	const objectCallback = callbackSource('onObject');
+	const renamedCallback = callbackSource('onRenamed');
+	const arrayCallback = callbackSource('onArray');
+
+	expect(objectCallback).toContain('const { count, source } = context.args?.[0];');
+	expect(objectCallback).not.toContain('context.graph.read("state:count")');
+	expect(renamedCallback).toContain(
+		'const { count: nextCount, source: nextSource } = context.args?.[0];',
+	);
+	expect(renamedCallback).not.toContain('context.graph.read("state:count")');
+	expect(arrayCallback).toContain('const [count, source] = context.args?.[0];');
+	expect(arrayCallback).not.toContain('context.graph.read("state:count")');
+});
+
 test.each([
 	['default', '(payload = 1)'],
 	['rest', '(...payload)'],

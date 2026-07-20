@@ -12,6 +12,7 @@ import type {
 export function createProtocolViewPayload(
 	input: ProtocolViewPayloadInput,
 ): ProtocolViewPayloadWithArmRecords {
+	const boundEventSymbols = boundEventSymbolIds(input);
 	const eventSymbols = new Map<string, string[]>();
 	const domUpdateSymbols = new Map<string, string>();
 	const behaviorSymbols = new Map<string, string[]>();
@@ -21,7 +22,7 @@ export function createProtocolViewPayload(
 		if (symbol.kind === 'event-handler') {
 			const key = `${symbol.hostNodeId}:${symbol.eventName}`;
 			const symbols = eventSymbols.get(key) ?? [];
-			symbols[symbol.order] = symbol.id;
+			symbols[symbol.order] = boundEventSymbols.get(symbol.id) ?? symbol.id;
 			eventSymbols.set(key, symbols);
 		}
 
@@ -256,6 +257,7 @@ function supportedBranchRecords(input: ProtocolViewPayloadInput) {
 // row-relative host paths to them so resume can dispatch per row instance
 // with keys derived from the serialized collection by row index.
 function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
+	const boundEventSymbols = boundEventSymbolIds(input);
 	const planEntries = new Map(
 		input.publicRenderPlan.keyedRepeats.map((entry) => [entry.repeatId, entry]),
 	);
@@ -274,7 +276,7 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 				rowEvents: plan.eventControls.map((control) => ({
 					hostPath: control.hostPath,
 					eventName: control.eventName,
-					symbolIds: [control.symbolId],
+					symbolIds: [boundEventSymbols.get(control.symbolId) ?? control.symbolId],
 				})),
 			},
 		];
@@ -318,21 +320,25 @@ function wiredArmRecordSet(
 	arm: number,
 ): ProtocolViewArmRecordSet {
 	const flipHostIds = armScopedBranchHostIds(input.publicRenderPlan.branchArms, boundaryId);
+	const boundEventSymbols = boundEventSymbolIds(input);
 	const eventSymbols = new Map<string, string[]>();
 	for (const symbol of input.symbolResolver.symbols) {
 		if (symbol.kind !== 'event-handler') continue;
 		const key = `${symbol.hostNodeId}:${symbol.eventName}`;
 		const symbols = eventSymbols.get(key) ?? [];
-		symbols[symbol.order] = symbol.id;
+		symbols[symbol.order] = boundEventSymbols.get(symbol.id) ?? symbol.id;
 		eventSymbols.set(key, symbols);
 	}
-	const branches = armScopedBranchRecords({
-		publicRenderPlan: input.publicRenderPlan,
-		symbols: input.symbolResolver.symbols,
-		payloadView: input.payloadArena.view,
-		boundaryId,
-		arm,
-	});
+	const branches = bindArmBranchEventSymbols(
+		input,
+		armScopedBranchRecords({
+			publicRenderPlan: input.publicRenderPlan,
+			symbols: input.symbolResolver.symbols,
+			payloadView: input.payloadArena.view,
+			boundaryId,
+			arm,
+		}),
+	);
 	return {
 		locators: set.locators.filter((locator) => !flipHostIds.has(locator.hostNodeId)),
 		events: set.events
@@ -371,12 +377,13 @@ function branchArmRecords(input: ProtocolViewPayloadInput, branchSiteId: string)
 	);
 	if (!arms?.armHosts) return undefined;
 	const eventSymbols = new Map<string, string[]>();
+	const boundEventSymbols = boundEventSymbolIds(input);
 	const domUpdateSymbols = new Map<string, string>();
 	for (const symbol of input.symbolResolver.symbols) {
 		if (symbol.kind === 'event-handler') {
 			const key = `${symbol.hostNodeId}:${symbol.eventName}`;
 			const symbols = eventSymbols.get(key) ?? [];
-			symbols[symbol.order] = symbol.id;
+			symbols[symbol.order] = boundEventSymbols.get(symbol.id) ?? symbol.id;
 			eventSymbols.set(key, symbols);
 		}
 		if (symbol.kind === 'dom-update') {
@@ -421,6 +428,43 @@ function branchArmRecords(input: ProtocolViewPayloadInput, branchSiteId: string)
 				})),
 		};
 	});
+}
+
+function boundEventSymbolIds(input: ProtocolViewPayloadInput): ReadonlyMap<string, string> {
+	const eventSymbolIds = new Set(
+		input.symbolResolver.symbols.flatMap((symbol) =>
+			symbol.kind === 'event-handler' ? [symbol.id] : [],
+		),
+	);
+	return new Map(
+		(input.captureAnalysis?.boundResolverRows ?? []).flatMap((row) =>
+			eventSymbolIds.has(row.baseSymbolId) ? [[row.baseSymbolId, row.id] as const] : [],
+		),
+	);
+}
+
+function bindArmBranchEventSymbols(
+	input: ProtocolViewPayloadInput,
+	branches: NonNullable<ProtocolViewArmRecordSet['branches']> | undefined,
+): NonNullable<ProtocolViewArmRecordSet['branches']> | undefined {
+	if (!branches) return undefined;
+	const boundEventSymbols = boundEventSymbolIds(input);
+	return branches.map((branch) => ({
+		...branch,
+		...(branch.armRecords
+			? {
+					armRecords: branch.armRecords.map((arm) => ({
+						...arm,
+						events: arm.events.map((event) => ({
+							...event,
+							symbolIds: event.symbolIds.map(
+								(symbolId) => boundEventSymbols.get(symbolId) ?? symbolId,
+							),
+						})),
+					})),
+				}
+			: {}),
+	}));
 }
 
 function behaviorSymbolsForArms(input: ProtocolViewPayloadInput): ReadonlyMap<string, string[]> {

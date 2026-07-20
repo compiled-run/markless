@@ -35,6 +35,15 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 			),
 		),
 	);
+	const unsupportedCaptureSymbolIds = new Set(
+		input.captureAnalysis.extractedSymbols.flatMap((symbol) =>
+			symbol.captureSlots.some((slot) =>
+				slot.routes.some((route) => route.kind === 'unsupported-opaque'),
+			)
+				? [symbol.symbolId]
+				: [],
+		),
+	);
 
 	const branchArmsBySite = new Map(
 		(input.publicRenderPlan?.branchArms ?? []).map((entry) => [entry.branchSiteId, entry]),
@@ -52,6 +61,7 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 	return {
 		passId: 'symbol-modules',
 		modules: input.symbolResolver.symbols.flatMap((symbol) => {
+			if (unsupportedCaptureSymbolIds.has(symbol.id)) return [];
 			if (symbol.kind === 'branch-update') {
 				const arms = branchArmsBySite.get(symbol.branchSiteId);
 				return arms ? [emitBranchUpdateModule(symbol, arms)] : [];
@@ -397,20 +407,73 @@ function captureArgumentSource(
 	argument: string,
 	valueSlots: ReadonlyArray<CaptureSlot>,
 	eventParameters: ReadonlyArray<string>,
+	reads: ReadonlyArray<LoweredStateRead>,
 ): string {
-	let emitted = argument;
-	for (const slot of [...valueSlots].sort((left, right) => right.source.length - left.source.length)) {
-		emitted = replaceIdentifierPath(
-			emitted,
-			slot.source,
-			`context.capture.read(${JSON.stringify(slot.id)})`,
+	const replacements = [
+		...reads.flatMap((read) =>
+			argumentReadBodySpans(argument, read).map((span) => {
+				const slot = valueSlots.find((candidate) => captureSlotMatchesRead(candidate, read));
+				const graphRead = slot
+					? `context.capture.read(${JSON.stringify(slot.id)})`
+					: graphReadCallSource('context.graph.read', read.graphNodeId, read.path);
+				return {
+					start: span.start,
+					end: span.end,
+					replacement: span.shorthandKey
+						? `${span.shorthandKey}: ${graphRead}`
+						: graphRead,
+				};
+			}),
+		),
+		...valueSlots.flatMap((slot) => {
+			if (reads.some((read) => captureSlotMatchesRead(slot, read))) return [];
+			return argumentReadBodySpans(argument, slot).map((span) => {
+				const captureRead = `context.capture.read(${JSON.stringify(slot.id)})`;
+				return {
+					start: span.start,
+					end: span.end,
+					replacement: span.shorthandKey
+						? `${span.shorthandKey}: ${captureRead}`
+						: captureRead,
+				};
+			});
+		}),
+	]
+		.sort((left, right) => right.start - left.start || right.end - left.end)
+		.filter(
+			(item, index, items) =>
+				!items.some(
+					(other, otherIndex) =>
+						otherIndex !== index &&
+						item.start >= other.start &&
+						item.end <= other.end &&
+						other.end - other.start > item.end - item.start,
+				),
 		);
+
+	let emitted = argument;
+	for (const replacement of replacements) {
+		emitted =
+			emitted.slice(0, replacement.start) +
+			replacement.replacement +
+			emitted.slice(replacement.end);
 	}
 	for (const parameter of eventParameters) {
 		const pattern = new RegExp(`\\b${escapeRegExp(parameter)}(?:\\.[$A-Z_a-z][$0-9A-Z_a-z]*)*`, 'g');
 		emitted = emitted.replace(pattern, (source) => eventFieldAssignmentSource(source, [parameter]) ?? source);
 	}
 	return emitted;
+}
+
+function argumentReadBodySpans(
+	argument: string,
+	read: Pick<LoweredStateRead, 'source'>,
+): ReturnType<typeof readBodySpans> {
+	return readBodySpans(`(${argument})`, read).flatMap((span) =>
+		span.start > 0 && span.end <= argument.length + 1
+			? [{ ...span, start: span.start - 1, end: span.end - 1 }]
+			: [],
+	);
 }
 
 function escapeRegExp(source: string): string {
@@ -433,7 +496,9 @@ function spliceEventHandlerBody(
 				start: call.start,
 				end: call.end,
 				replacement: `await context.capture.invoke(${JSON.stringify(slot.id)}, [${call.arguments
-					.map((argument) => captureArgumentSource(argument, valueSlots, eventParameters))
+					.map((argument) =>
+						captureArgumentSource(argument, valueSlots, eventParameters, symbol.reads ?? []),
+					)
 					.join(', ')}])`,
 			})),
 		),
@@ -510,7 +575,7 @@ function spliceEventHandlerBody(
 
 function readBodySpans(
 	bodySource: string,
-	read: LoweredStateRead,
+	read: Pick<LoweredStateRead, 'source'>,
 ): ReadonlyArray<{
 	readonly start: number;
 	readonly end: number;

@@ -6,6 +6,10 @@ import {
 	planPayloadArena,
 	planSymbolResolver,
 } from '../src/index.ts';
+import type { PublicRenderModuleInput } from '../src/artifacts.ts';
+import { createCompilerKnownConstantCaptureRoute } from '../src/passes/capture-analysis.ts';
+import { callbackSymbolIds } from '../src/passes/public-render/shared.ts';
+import { planBoundSymbolResolver } from '../src/passes/symbol-resolver.ts';
 
 async function compileCaptureArtifacts(source: string) {
 	const semanticGraph = await buildSemanticGraph({
@@ -15,7 +19,14 @@ async function compileCaptureArtifacts(source: string) {
 	const stateLowering = lowerStateAccess({ semanticGraph });
 	const payloadArena = planPayloadArena({ semanticGraph, stateLowering });
 	const symbolResolver = planSymbolResolver({ semanticGraph, payloadArena, stateLowering });
-	const captureAnalysis = analyzeCaptures({ semanticGraph, symbolResolver });
+	const analyzedCaptures = analyzeCaptures({ semanticGraph, symbolResolver });
+	const captureAnalysis = {
+		...analyzedCaptures,
+		boundResolverRows: planBoundSymbolResolver({
+			semanticGraph,
+			captureAnalysis: analyzedCaptures,
+		}).rows,
+	};
 	return { semanticGraph, stateLowering, symbolResolver, captureAnalysis };
 }
 
@@ -162,6 +173,225 @@ export function App() @{
 	expect(captureAnalysis.diagnostics).toEqual([]);
 });
 
+test('supported destructured callback parameters produce callback capture routes', async () => {
+	const source = `
+function Child({ onObject, onArray }) @{
+	<button onClick={() => { onObject({ count: 1 }); onArray([2]); }}>Run</button>
+}
+
+export function App() @{
+	<Child
+		onObject={({ count: nextCount }) => console.log(nextCount)}
+		onArray={([count]) => console.log(count)}
+	/>
+}
+`;
+	const { captureAnalysis } = await compileCaptureArtifacts(source);
+	const handler = captureAnalysis.extractedSymbols.find(
+		(symbol) => symbol.kind === 'event-handler' && symbol.owner?.componentName === 'Child',
+	);
+
+	expect(handler?.captureSlots).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				propName: 'onObject',
+				routes: [expect.objectContaining({ kind: 'callback-route' })],
+			}),
+			expect.objectContaining({
+				propName: 'onArray',
+				routes: [expect.objectContaining({ kind: 'callback-route' })],
+			}),
+		]),
+	);
+	expect(captureAnalysis.diagnostics).toEqual([]);
+});
+
+test('a missing prop cannot construct a compiler-known constant route without a value', async () => {
+	const source = `
+function Child({ onTrace }) @{
+	<button onClick={() => onTrace()}>Trace</button>
+}
+
+export function App() @{
+	<Child />
+}
+`;
+
+	const { captureAnalysis } = await compileCaptureArtifacts(source);
+	const slot = captureAnalysis.extractedSymbols[0]?.captureSlots[0];
+
+	expect(slot?.routes).toEqual([
+		expect.objectContaining({
+			kind: 'unsupported-opaque',
+			expression: 'onTrace',
+		}),
+	]);
+	expect(slot?.routes).not.toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({ kind: 'compiler-known-constant' }),
+		]),
+	);
+	expect(captureAnalysis.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_CAPTURE_OPAQUE_PROP',
+			propName: 'onTrace',
+		}),
+	]);
+});
+
+test('compiler-known constant route construction rejects an undefined value', () => {
+	expect(() =>
+		createCompilerKnownConstantCaptureRoute('component-edge:missing', [], undefined),
+	).toThrow(
+		'Cannot construct compiler-known constant capture route without a materialized value',
+	);
+});
+
+test('capture slots resolve forwarded callback, graph, and constant routes through two edges', async () => {
+	const source = `
+import { state } from '@markless/core';
+
+function Child({ count, label, onForward }: { count: number; label: string; onForward: (value: number) => void }) @{
+	<button onClick={() => { console.log(count, label.length); onForward(count); }}>Forward</button>
+}
+
+function Parent({ count, label, onForward }: { count: number; label: string; onForward: (value: number) => void }) @{
+	<Child count={count} label={label} onForward={onForward} />
+}
+
+export function App() @{
+	let count = state(1);
+	let observed = state(0);
+	<Parent count={count} label="stable" onForward={(value) => observed = value} />
+}
+`;
+	const { captureAnalysis, symbolResolver } = await compileCaptureArtifacts(source);
+	const childHandler = captureAnalysis.extractedSymbols.find(
+		(symbol) => symbol.kind === 'event-handler' && symbol.owner?.componentName === 'Child',
+	);
+	const originCallback = symbolResolver.symbols.find(
+		(symbol) => symbol.kind === 'callback-prop' && symbol.componentEdgeId === 'component-edge:1',
+	);
+
+	expect(childHandler?.captureSlots).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				propName: 'count',
+				routes: [expect.objectContaining({
+					kind: 'graph-reference',
+					graphNodeId: 'state:count',
+					path: [],
+					componentEdgePath: ['component-edge:1', 'component-edge:0'],
+				})],
+			}),
+			expect.objectContaining({
+				propName: 'label',
+				path: ['length'],
+				routes: [expect.objectContaining({
+					kind: 'compiler-known-constant',
+					value: 'stable',
+					componentEdgePath: ['component-edge:1', 'component-edge:0'],
+				})],
+			}),
+			expect.objectContaining({
+				propName: 'onForward',
+				routes: [expect.objectContaining({
+					kind: 'callback-route',
+					callbackSymbolId: originCallback?.id,
+					componentEdgePath: ['component-edge:1', 'component-edge:0'],
+				})],
+			}),
+		]),
+	);
+	expect(captureAnalysis.diagnostics).toEqual([]);
+});
+
+test('nested forwarding keeps a bound row for each outer component-edge instance', async () => {
+	const source = `
+function Trigger({ label, onForward }) @{
+	<button onClick={() => onForward(label)}>{label}</button>
+}
+
+function Relay({ label, onForward }) @{
+	<Trigger label={label} onForward={onForward} />
+}
+
+export function App() @{
+	<>
+		<Relay label="elm" onForward={(value) => console.log('first', value)} />
+		<Relay label="quartz" onForward={(value) => console.log('second', value)} />
+	</>
+}
+`;
+	const { semanticGraph, symbolResolver, captureAnalysis } = await compileCaptureArtifacts(source);
+	const handler = captureAnalysis.extractedSymbols.find(
+		(symbol) => symbol.kind === 'event-handler' && symbol.owner?.componentName === 'Trigger',
+	);
+	const rows = captureAnalysis.boundResolverRows.filter(
+		(row) => row.baseSymbolId === handler?.symbolId,
+	);
+	const symbols = callbackSymbolIds({
+		semanticGraph,
+		symbolResolver,
+		captureAnalysis,
+	} as PublicRenderModuleInput);
+
+	expect(rows.map((row) => row.componentEdgePath)).toEqual([
+		['component-edge:1', 'component-edge:0'],
+		['component-edge:2', 'component-edge:0'],
+	]);
+	expect(symbols.get(`bound:component-edge:1:${handler?.symbolId}`)).toBe(rows[0]?.id);
+	expect(symbols.get(`bound:component-edge:2:${handler?.symbolId}`)).toBe(rows[1]?.id);
+});
+
+test('an unroutable forwarded prop chain stays fail-closed', async () => {
+	const source = `
+function Child({ formatter }: { formatter: { format(value: number): string } }) @{
+	<button onClick={() => console.log(formatter.format(1))}>Format</button>
+}
+
+function Parent({ formatter }: { formatter: { format(value: number): string } }) @{
+	<Child formatter={formatter} />
+}
+
+export function App() @{
+	<Parent formatter={makeFormatter()} />
+}
+`;
+	const { captureAnalysis } = await compileCaptureArtifacts(source);
+
+	expect(captureAnalysis.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_CAPTURE_OPAQUE_PROP',
+			componentName: 'Child',
+			propName: 'formatter',
+			source: 'makeFormatter()',
+		}),
+	]);
+});
+
+test('reading a callback-routed slot without calling it stays fail-closed', async () => {
+	const source = `
+function Child({ onForward }: { onForward: (value: number) => void }) @{
+	<button onClick={() => console.log(onForward)}>Inspect</button>
+}
+
+export function App() @{
+	<Child onForward={(value) => console.log(value)} />
+}
+`;
+	const { captureAnalysis } = await compileCaptureArtifacts(source);
+
+	expect(captureAnalysis.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_CAPTURE_OPAQUE_PROP',
+			componentName: 'Child',
+			propName: 'onForward',
+			source: 'onForward',
+		}),
+	]);
+});
+
 test('callback parameter member reads do not capture an unrelated state binding', async () => {
 	const source = `
 import { state } from '@markless/core';
@@ -189,6 +419,40 @@ export function App() @{
 			writes: [expect.objectContaining({ graphNodeId: 'state:observed' })],
 		}),
 	);
+});
+
+test('callback parameter pattern bindings do not plan reads of same-named state', async () => {
+	const source = `
+import { state } from '@markless/core';
+
+function Child({ onObject, onRenamed, onArray }) @{
+	<button onClick={() => {
+		onObject({ count: 1 });
+		onRenamed({ count: 2 });
+		onArray([3]);
+	}}>Trace</button>
+}
+
+export function App() @{
+	let count = state(99);
+	let observed = state(0);
+	<Child
+		onObject={({ count }) => observed = count}
+		onRenamed={({ count: nextCount }) => observed = nextCount}
+		onArray={([count]) => observed = count}
+	/>
+}
+`;
+	const { symbolResolver } = await compileCaptureArtifacts(source);
+	const callbacks = symbolResolver.symbols.filter((symbol) => symbol.kind === 'callback-prop');
+
+	expect(callbacks).toHaveLength(3);
+	for (const callback of callbacks) {
+		expect(callback.reads).toEqual([]);
+		expect(callback.writes).toEqual([
+			expect.objectContaining({ graphNodeId: 'state:observed' }),
+		]);
+	}
 });
 
 test('a demanded opaque prop produces a blocking capture diagnostic', async () => {

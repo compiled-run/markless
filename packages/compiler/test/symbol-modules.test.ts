@@ -1838,6 +1838,65 @@ export function App() @{
 	expect(multiArgumentCallback).toContain('const reason = context.args?.[1];');
 });
 
+test('a callback forwarded through two component edges emits capture.invoke for the child call', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/ForwardedCallback.tsrx',
+		source: `
+function Child({ onForward }: { onForward: (value: number) => void }) @{
+	<button onClick={() => onForward(7)}>Forward</button>
+}
+function Parent({ onForward }: { onForward: (value: number) => void }) @{
+	<Child onForward={onForward} />
+}
+export function App() @{
+	<Parent onForward={(value) => console.log(value)} />
+}
+`,
+		symbols: [],
+	});
+	const child = result.symbolModules.modules.find(
+		(module) => module.kind === 'event-handler',
+	);
+	const childRow = result.boundSymbolResolver.rows.find(
+		(row) => row.baseSymbolId === child?.symbolId,
+	);
+
+	expect(child?.source).toContain('await context.capture.invoke(');
+	expect(child?.source).not.toContain('context.capture.read(');
+	expect(childRow).toEqual(
+		expect.objectContaining({
+			componentEdgePath: ['component-edge:1', 'component-edge:0'],
+			captureSlots: [
+				expect.objectContaining({
+					route: expect.objectContaining({ kind: 'callback-route' }),
+				}),
+			],
+		}),
+	);
+});
+
+test('a callback capture read without a call emits a diagnostic and no runnable symbol', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/CallbackRead.tsrx',
+		source: `
+function Child({ onForward }: { onForward: (value: number) => void }) @{
+	<button onClick={() => console.log(onForward)}>Inspect</button>
+}
+export function App() @{
+	<Child onForward={(value) => console.log(value)} />
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.captureAnalysis.diagnostics).toEqual([
+		expect.objectContaining({ code: 'MARKLESS_CAPTURE_OPAQUE_PROP' }),
+	]);
+	expect(
+		result.symbolModules.modules.some((module) => module.kind === 'event-handler'),
+	).toBe(false);
+});
+
 test('B908 preserves setTimeout deferral while splicing nested writes', () => {
 	const source = emitEventHandlerSource({
 		id: 'symbol:later',

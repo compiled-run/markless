@@ -41,7 +41,11 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 				parameters: event.handlerParameters[order] ?? [],
 				...(moduleImports.length > 0 ? { moduleImports } : {}),
 				order,
-				reads: eventReads(input.stateLowering?.reads, sourceSpan),
+				reads: eventReads(
+					input.stateLowering?.reads,
+					sourceSpan,
+					functionParameterBindingNames(source),
+				),
 				writes: eventWrites(source, input.stateLowering?.writes, sourceSpan),
 				elementHandleCalls: collectElementHandleCalls(
 					source,
@@ -67,7 +71,11 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 				sourceSpan: prop.sourceSpan,
 				parameters: prop.parameters ?? [],
 				...(moduleImports.length > 0 ? { moduleImports } : {}),
-				reads: eventReads(input.stateLowering?.reads, prop.sourceSpan),
+				reads: eventReads(
+					input.stateLowering?.reads,
+					prop.sourceSpan,
+					functionParameterBindingNames(prop.source),
+				),
 				writes: eventWrites(prop.source, input.stateLowering?.writes, prop.sourceSpan),
 			});
 		}
@@ -179,20 +187,31 @@ export function planBoundSymbolResolver(
 	const rows: BoundSymbolResolverRow[] = [];
 
 	for (const symbol of input.captureAnalysis.extractedSymbols) {
+		const edgeDependentSlots = symbol.captureSlots.filter((slot) =>
+			slot.routes.some((route) => route.componentEdgeId !== undefined),
+		);
 		const terminalEdgeIds = new Set(
-			symbol.captureSlots.flatMap((slot) =>
+			edgeDependentSlots.flatMap((slot) =>
 				slot.routes.flatMap((route) => route.componentEdgeId ? [route.componentEdgeId] : []),
 			),
 		);
 		for (const terminalEdgeId of terminalEdgeIds) {
 			for (const path of pathsByTerminalEdge.get(terminalEdgeId) ?? []) {
-				const captureSlots = symbol.captureSlots.flatMap((slot) => {
-					const route = slot.routes.find((candidate) => candidate.componentEdgeId === terminalEdgeId);
+				const componentEdgePath = path.map((edge) => edge.id);
+				const captureSlots = edgeDependentSlots.flatMap((slot) => {
+					const route = slot.routes.find(
+						(candidate) =>
+							candidate.componentEdgeId === terminalEdgeId &&
+							(!candidate.componentEdgePath ||
+								candidate.componentEdgePath.every(
+									(edgeId, index) => componentEdgePath[index] === edgeId,
+								) && candidate.componentEdgePath.length === componentEdgePath.length),
+					);
 					return route && route.kind !== 'unsupported-opaque'
 						? [{ slotId: slot.id, path: slot.path, route }]
 						: [];
 				});
-				if (captureSlots.length !== symbol.captureSlots.length) continue;
+				if (captureSlots.length !== edgeDependentSlots.length) continue;
 				const ancestry = path.map((edge) => ({
 					componentEdgeId: edge.id,
 					branchScopeIds: edge.branchScopeIds,
@@ -201,7 +220,7 @@ export function planBoundSymbolResolver(
 				rows.push({
 					id: boundSymbolId(symbol.symbolId, ancestry),
 					baseSymbolId: symbol.symbolId,
-					componentEdgePath: path.map((edge) => edge.id),
+					componentEdgePath,
 					ancestry,
 					captureSlots,
 				});
@@ -258,11 +277,15 @@ function eventWrites(
 function eventReads(
 	reads: ReadonlyArray<LoweredStateRead> | undefined,
 	handlerSpan: SourceSpan | undefined,
+	parameterBindingNames: ReadonlySet<string>,
 ): ReadonlyArray<LoweredStateRead> {
 	if (!handlerSpan || !reads?.length) return [];
 
 	const contained = reads.filter(
-		(read) => read.sourceSpan !== undefined && spanContains(handlerSpan, read.sourceSpan),
+		(read) =>
+			read.sourceSpan !== undefined &&
+			spanContains(handlerSpan, read.sourceSpan) &&
+			!parameterBindingNames.has(rootIdentifierName(read.source)),
 	);
 	const seen = new Set<string>();
 	return contained.filter((read) => {
@@ -271,6 +294,63 @@ function eventReads(
 		seen.add(key);
 		return true;
 	});
+}
+
+function functionParameterBindingNames(source: string): ReadonlySet<string> {
+	const prefix = 'const __marklessHandler = ';
+	let ast: AnyNode;
+	try {
+		ast = parseJavaScriptModule(`${prefix}${source};`);
+	} catch {
+		return new Set();
+	}
+
+	const names = new Set<string>();
+	let foundFunction = false;
+	walkNode(ast, (node) => {
+		if (
+			foundFunction ||
+			(node.type !== 'ArrowFunctionExpression' &&
+				node.type !== 'FunctionExpression' &&
+				node.type !== 'FunctionDeclaration')
+		) {
+			return;
+		}
+		foundFunction = true;
+		for (const parameter of asNodeArray(node.params)) {
+			for (const name of bindingPatternNames(parameter)) names.add(name);
+		}
+	});
+	return names;
+}
+
+function bindingPatternNames(node: AnyNode | undefined): ReadonlyArray<string> {
+	if (!node) return [];
+	if (node.type === 'Identifier') {
+		const name = getIdentifierName(node);
+		return name ? [name] : [];
+	}
+	if (node.type === 'AssignmentPattern') {
+		return bindingPatternNames(node.left as AnyNode | undefined);
+	}
+	if (node.type === 'RestElement') {
+		return bindingPatternNames(node.argument as AnyNode | undefined);
+	}
+	if (node.type === 'ObjectPattern') {
+		return asNodeArray(node.properties).flatMap((property) =>
+			property.type === 'Property'
+				? bindingPatternNames(property.value as AnyNode | undefined)
+				: bindingPatternNames(property.argument as AnyNode | undefined),
+		);
+	}
+	if (node.type === 'ArrayPattern') {
+		return asNodeArray(node.elements).flatMap((element) => bindingPatternNames(element));
+	}
+	return [];
+}
+
+function rootIdentifierName(source: string): string {
+	return /^[$A-Z_a-z][$0-9A-Z_a-z]*/.exec(source)?.[0] ?? '';
 }
 
 function spanContains(container: SourceSpan, child: SourceSpan): boolean {

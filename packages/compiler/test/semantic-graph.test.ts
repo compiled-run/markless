@@ -495,6 +495,38 @@ test('buildSemanticGraph records component edges from TSRX AST', async () => {
 	});
 });
 
+test('component edges classify supported destructured callback parameters as callbacks', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/Callbacks.tsrx',
+		source: `
+function Child({ onObject, onArray }) @{
+	<button onClick={() => { onObject({ count: 1, source: 'object' }); onArray([2, 'array']); }}>Run</button>
+}
+
+export function App() @{
+	<Child
+		onObject={({ count: nextCount, source }) => console.log(nextCount, source)}
+		onArray={([count, source]) => console.log(count, source)}
+	/>
+}
+`,
+	});
+
+	expect(graph.componentEdges[0]?.props).toEqual([
+		expect.objectContaining({
+			name: 'onObject',
+			kind: 'callback',
+			parameters: ['{ count: nextCount, source }'],
+		}),
+		expect.objectContaining({
+			name: 'onArray',
+			kind: 'callback',
+			parameters: ['[count, source]'],
+		}),
+	]);
+	expect(graph.diagnostics).toEqual([]);
+});
+
 test('B918 records element handle props and accepts same-module prop forwarding', async () => {
 	const graph = await buildSemanticGraph({
 		filename: 'src/ForwardedHandle.tsrx',

@@ -23,10 +23,11 @@ export function callbackSymbolIds(input: PublicRenderModuleInput): ReadonlyMap<s
 				? [[`${symbol.componentEdgeId}:${symbol.propName}`, symbol.id] as const]
 				: [],
 		),
-		...(input.captureAnalysis.boundResolverRows ?? []).flatMap((row) => {
-			const edgeId = row.componentEdgePath.at(-1);
-			return edgeId ? [[`bound:${edgeId}:${row.baseSymbolId}`, row.id] as const] : [];
-		}),
+		...(input.captureAnalysis.boundResolverRows ?? []).flatMap((row) =>
+			row.componentEdgePath.map(
+				(edgeId) => [`bound:${edgeId}:${row.baseSymbolId}`, row.id] as const,
+			),
+		),
 	]);
 }
 

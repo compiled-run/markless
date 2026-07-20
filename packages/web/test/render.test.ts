@@ -1,6 +1,8 @@
 import { ASYNC_PROTOCOL_VERSION, type ProtocolViewPayload } from '@markless/serializer';
 import { createProtocolStatePayload } from '@markless/serializer';
 import { expect, test } from 'vitest';
+import { transformTsrxModule } from '../../bundler/src/transform.ts';
+import { compileTsrxModule } from '../../compiler/src/index.ts';
 import {
 	marklessCsrAttachPropEvent,
 	marklessCsrComposeView,
@@ -83,6 +85,214 @@ function element(tagName: string, childNodes: FakeElement[] = []): FakeElement {
 
 function event(type: string, target: FakeElement): FakeEvent {
 	return { type, target };
+}
+
+function captureDispatchDocument() {
+	return {
+		createElement(tagName: string) {
+			if (tagName !== 'template') return captureDispatchElement(tagName);
+			let childNodes: FakeElement[] = [];
+			return {
+				content: {
+					get childNodes() {
+						return childNodes;
+					},
+					get firstElementChild() {
+						return childNodes.find((child) => child.nodeType === 1);
+					},
+				},
+				set innerHTML(html: string) {
+					childNodes = parseCaptureDispatchHtml(html);
+				},
+			};
+		},
+	};
+}
+
+function captureDispatchElement(
+	tagName: string,
+	attributes: ReadonlyArray<readonly [string, string]> = [],
+): FakeElement {
+	const node = element(tagName.toUpperCase()) as FakeElement & {
+		attributes: Map<string, string>;
+		getAttribute(name: string): string | null;
+		setAttribute(name: string, value: string): void;
+		replaceWith(replacement: FakeElement): void;
+		remove(): void;
+	};
+	node.attributes = new Map(attributes);
+	node.getAttribute = (name) => node.attributes.get(name) ?? null;
+	node.setAttribute = (name, value) => node.attributes.set(name, value);
+	node.querySelector = (selector) => {
+		const match = selector.match(/^\[([^=]+)="([^"]*)"\]$/);
+		if (!match) return null;
+		const [, name, value] = match;
+		const visit = (candidate: FakeElement): FakeElement | null => {
+			if (
+				candidate.nodeType === 1 &&
+				(candidate as typeof node).getAttribute?.(name!) === value
+			)
+				return candidate;
+			for (const child of candidate.childNodes ?? []) {
+				const found = visit(child);
+				if (found) return found;
+			}
+			return null;
+		};
+		for (const child of node.childNodes) {
+			const found = visit(child);
+			if (found) return found;
+		}
+		return null;
+	};
+	node.replaceWith = (replacement) => {
+		const parent = node.parentElement;
+		if (!parent) return;
+		const index = parent.childNodes.indexOf(node);
+		if (index < 0) return;
+		parent.childNodes.splice(index, 1, replacement);
+		replacement.parentElement = parent;
+		node.parentElement = null;
+	};
+	node.remove = () => {
+		const parent = node.parentElement;
+		if (!parent) return;
+		const index = parent.childNodes.indexOf(node);
+		if (index >= 0) parent.childNodes.splice(index, 1);
+		node.parentElement = null;
+	};
+	return node;
+}
+
+function parseCaptureDispatchHtml(html: string): FakeElement[] {
+	const root = captureDispatchElement('root');
+	const stack = [root];
+	for (const token of html.match(/<\/?[^>]+>|[^<]+/g) ?? []) {
+		if (token.startsWith('</')) {
+			stack.pop();
+			continue;
+		}
+		const parent = stack[stack.length - 1]!;
+		if (token.startsWith('<')) {
+			const match = token.match(/^<([A-Za-z][\w-]*)([^>]*)>/);
+			if (!match) continue;
+			const attributes = [...match[2]!.matchAll(/\s+([^\s=]+)(?:="([^"]*)")?/g)].map(
+				(attribute) => [attribute[1]!, attribute[2] ?? ''] as const,
+			);
+			const child = captureDispatchElement(match[1]!, attributes);
+			parent.childNodes.push(child);
+			child.parentElement = parent;
+			if (!token.endsWith('/>')) stack.push(child);
+			continue;
+		}
+		const text = {
+			nodeType: 3,
+			textContent: token,
+			childNodes: [],
+			parentElement: parent,
+		} as unknown as FakeElement;
+		parent.childNodes.push(text);
+	}
+	return root.childNodes;
+}
+
+function javascriptModuleUrl(source: string): string {
+	return `data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`;
+}
+
+function localWebFunctionImports(source: string): string {
+	return source.replace(
+		/from ["']@markless\/web\/fns\/([^"']+)["']/g,
+		(_match, helperModule: string) =>
+			`from '${new URL(`../src/fns/${helperModule}.ts`, import.meta.url).href}'`,
+	);
+}
+
+type CompiledCaptureDispatch = {
+	readonly compiled: Awaited<ReturnType<typeof compileTsrxModule>>;
+	readonly loadedIds: string[];
+	readonly output: {
+		readonly root: FakeElement;
+		readonly state: ReturnType<typeof createProtocolStatePayload>;
+		readonly view: ProtocolViewPayload;
+		readonly loadSymbol: (symbolId: string) => unknown;
+	};
+	readonly runtime: Awaited<ReturnType<typeof render>>;
+};
+
+async function withCompiledCaptureDispatch(
+	filename: string,
+	source: string,
+	inspect: (result: CompiledCaptureDispatch) => Promise<void>,
+): Promise<void> {
+	const compiled = await compileTsrxModule({ filename, source, symbols: [] });
+	const transformed = await transformTsrxModule({
+		filename,
+		source,
+		environment: 'client',
+		executionLog: 'never',
+	});
+	const symbolUrls = new Map(
+		transformed.virtualModules
+			.filter((module) => module.type === 'symbol')
+			.map((module) => [module.id, javascriptModuleUrl(localWebFunctionImports(module.source))]),
+	);
+	const resolver = transformed.virtualModules.find((module) => module.type === 'resolver')!;
+	let resolverSource = resolver.source;
+	for (const [moduleId, moduleUrl] of symbolUrls) {
+		resolverSource = resolverSource.split(moduleId).join(moduleUrl);
+	}
+	const resolverUrl = javascriptModuleUrl(resolverSource);
+	const payload = transformed.virtualModules.find((module) => module.type === 'payload')!;
+	const payloadUrl = javascriptModuleUrl(payload.source);
+	const browserModuleSource = localWebFunctionImports(
+		transformed.code
+			.split(payload.id)
+			.join(payloadUrl)
+			.split(resolver.id)
+			.join(resolverUrl),
+	);
+
+	expect(transformed.code).toMatch(
+		/const marklessSymbolResolverModule = \(\) => import\(["']virtual:markless:resolver:/,
+	);
+	expect(transformed.code).not.toContain('readMarklessSourceSymbol');
+	expect(compiled.publicRenderModule.csrModuleSource).toContain('marklessCsrComposeView');
+
+	const global = globalThis as { document?: unknown };
+	const previousDocument = global.document;
+	global.document = captureDispatchDocument();
+	try {
+		const browserModule = (await import(javascriptModuleUrl(browserModuleSource))) as {
+			readonly default: {
+				readonly renderCsr: () => CompiledCaptureDispatch['output'];
+			};
+		};
+		const output = browserModule.default.renderCsr();
+		const loadedIds: string[] = [];
+		const loadSymbol = output.loadSymbol;
+		const runtime = await render(
+			{
+				renderCsr: () => ({
+					...output,
+					loadSymbol(symbolId: string) {
+						loadedIds.push(symbolId);
+						return loadSymbol(symbolId);
+					},
+				}),
+			},
+			{ target: { replaceChildren() {} } },
+		);
+		await inspect({ compiled, loadedIds, output, runtime });
+	} finally {
+		global.document = previousDocument;
+	}
+}
+
+function descendants(root: FakeElement, tagName: string): FakeElement[] {
+	return [root, ...root.childNodes.flatMap((child) => descendants(child, tagName))].filter(
+		(node) => node.tagName === tagName,
+	);
 }
 
 test('marklessCsrReplaceChild returns a child that replaces the root placeholder', () => {
@@ -794,6 +1004,250 @@ test('render flips the seventh composed child CSR branch independently', async (
 		tagName: 'SPAN',
 		outerHTML: '<span class="play-icon">❚❚</span>',
 	});
+});
+
+test('resume-events dispatches a compiled child record through its instance-bound captures', async () => {
+	const source = `
+import { state } from '@markless/core';
+
+function Child({ label, onTrace }: { label: string; onTrace: (payload: { count: number; label: string }) => void }) @{
+	let count = state(0);
+	<button onClick={() => { count++; onTrace({ count, label }); }}>Increment</button>
+}
+
+export function App() @{
+	let observed = state(0);
+	<main><Child label="trace" onTrace={(payload) => observed = payload.count} /><output>{observed}</output></main>
+}
+`;
+	const compiled = await compileTsrxModule({
+		filename: 'src/CaptureDispatch.tsrx',
+		source,
+		symbols: [],
+	});
+	const transformed = await transformTsrxModule({
+		filename: 'src/CaptureDispatch.tsrx',
+		source,
+		environment: 'client',
+		executionLog: 'never',
+	});
+	const symbolUrls = new Map(
+		transformed.virtualModules
+			.filter((module) => module.type === 'symbol')
+			.map((module) => [module.id, javascriptModuleUrl(localWebFunctionImports(module.source))]),
+	);
+	const resolver = transformed.virtualModules.find((module) => module.type === 'resolver')!;
+	let resolverSource = resolver.source;
+	for (const [moduleId, moduleUrl] of symbolUrls) {
+		resolverSource = resolverSource.split(moduleId).join(moduleUrl);
+	}
+	const resolverUrl = javascriptModuleUrl(resolverSource);
+	const payload = transformed.virtualModules.find((module) => module.type === 'payload')!;
+	const payloadUrl = javascriptModuleUrl(payload.source);
+	const browserModuleSource = localWebFunctionImports(
+		transformed.code
+		.split(payload.id)
+		.join(payloadUrl)
+		.split(resolver.id)
+		.join(resolverUrl),
+	);
+
+	expect(transformed.code).toMatch(
+		/const marklessSymbolResolverModule = \(\) => import\(["']virtual:markless:resolver:/,
+	);
+	expect(transformed.code).not.toContain('readMarklessSourceSymbol');
+	expect(compiled.publicRenderModule.csrModuleSource).toContain('marklessCsrComposeView');
+
+	const global = globalThis as { document?: unknown };
+	const previousDocument = global.document;
+	global.document = captureDispatchDocument();
+	try {
+		const browserModule = (await import(javascriptModuleUrl(browserModuleSource))) as {
+			readonly default: { readonly renderCsr: () => {
+				readonly root: FakeElement;
+				readonly state: ReturnType<typeof createProtocolStatePayload>;
+				readonly view: ProtocolViewPayload;
+				readonly loadSymbol: (symbolId: string) => unknown;
+			} };
+		};
+		const output = browserModule.default.renderCsr();
+		const registeredRecord = output.view.events.find(
+			(record) => record.hostNodeId === 'c0:h0' && record.eventName === 'click',
+		)!;
+		const childHandler = compiled.captureAnalysis.extractedSymbols.find(
+			(symbol) => symbol.kind === 'event-handler' && symbol.owner?.componentName === 'Child',
+		)!;
+		const boundRow = compiled.boundSymbolResolver.rows.find(
+			(row) => row.baseSymbolId === childHandler.symbolId,
+		)!;
+		const loadedIds: string[] = [];
+		const loadSymbol = output.loadSymbol;
+		const runtimeOutput = {
+			...output,
+			loadSymbol(symbolId: string) {
+				loadedIds.push(symbolId);
+				return loadSymbol(symbolId);
+			},
+		};
+		const container = await render(
+			{ renderCsr: () => runtimeOutput },
+			{ target: { replaceChildren() {} } },
+		);
+		const button = output.root.childNodes.find((child) => child.tagName === 'BUTTON')!;
+
+		expect(registeredRecord.symbolIds).toEqual([boundRow.id]);
+		expect(registeredRecord.symbolIds).not.toContain(childHandler.symbolId);
+		await container.runtime.dispatch(event('click', button) as never);
+
+		expect(container.graph.read('state:observed')).toBe(1);
+		expect(loadedIds[0]).toBe(boundRow.id);
+		expect(loadedIds).not.toContain(childHandler.symbolId);
+	} finally {
+		global.document = previousDocument;
+	}
+});
+
+test('compiled sibling captures dispatch through distinct instance-bound routes', async () => {
+	const source = `
+import { state } from '@markless/core';
+
+function SignalButton({ label, onTrace }) @{
+	// Stateless by design: instance-scoped state() is out of this tranche, so the
+	// per-instance proof rides on distinct labels and callbacks, not child state.
+	<button type="button" data-signal={label} onClick={() => {
+		onTrace({ count: 1, source: label });
+	}}>{label}</button>
+}
+
+export default function CaptureSlotSiblings() @{
+	let graphLabel = state('Graph cedar');
+	let graphResult = state('none');
+	let count = state(99);
+	<section>
+		<SignalButton
+			label={graphLabel}
+			onTrace={(payload) => graphResult = payload.source + ':' + payload.count}
+		/>
+		<SignalButton
+			label="Literal coral"
+			onTrace={(payload) => count = payload.count}
+		/>
+		<output>{graphResult}</output>
+		<output>{count}</output>
+	</section>
+}
+`;
+	await withCompiledCaptureDispatch(
+		'src/CaptureSlotSiblings.tsrx',
+		source,
+		async ({ compiled, loadedIds, output, runtime }) => {
+			const childHandler = compiled.captureAnalysis.extractedSymbols.find(
+				(symbol) =>
+					symbol.kind === 'event-handler' && symbol.owner?.componentName === 'SignalButton',
+			)!;
+			const rows = compiled.boundSymbolResolver.rows.filter(
+				(row) => row.baseSymbolId === childHandler.symbolId,
+			);
+			const records = output.view.events.filter((record) => record.eventName === 'click');
+
+			expect(childHandler.captureSlots.length).toBeGreaterThanOrEqual(3);
+			expect(rows).toHaveLength(2);
+			expect(rows.map((row) => row.componentEdgePath)).toEqual([
+				['component-edge:0'],
+				['component-edge:1'],
+			]);
+			expect(records.map((record) => record.hostNodeId)).toEqual(['c0:h0', 'c3:h0']);
+			expect(records.map((record) => record.symbolIds[0])).toEqual(rows.map((row) => row.id));
+
+			const buttons = descendants(output.root, 'BUTTON');
+			expect(buttons).toHaveLength(2);
+			await runtime.runtime.dispatch(event('click', buttons[0]!) as never);
+			expect(runtime.graph.read('state:graphResult')).toBe('Graph cedar:1');
+			expect(runtime.graph.read('state:count')).toBe(99);
+
+			await runtime.runtime.dispatch(event('click', buttons[1]!) as never);
+			expect(runtime.graph.read('state:count')).toBe(1);
+			expect(runtime.graph.read('state:graphResult')).toBe('Graph cedar:1');
+			expect(loadedIds.filter((symbolId) => symbolId.startsWith('bound:'))).toEqual(
+				rows.map((row) => row.id),
+			);
+		},
+	);
+});
+
+test('compiled nested forwarding dispatches each callback through its full edge path', async () => {
+	const source = `
+import { state } from '@markless/core';
+
+function NestedTrigger({ label, onForward }) @{
+	<button type="button" onClick={() => onForward(label)}>{label}</button>
+}
+
+function DirectRelay({ label, onForward }) @{
+	<div><NestedTrigger label={label} onForward={onForward} /></div>
+}
+
+export default function CaptureSlotNested() @{
+	let firstCalls = state(0);
+	let secondCalls = state(0);
+	let firstValue = state('none');
+	let secondValue = state('none');
+	<section>
+		<DirectRelay
+			label="Nested elm"
+			onForward={(value) => { firstCalls++; firstValue = value; }}
+		/>
+		<DirectRelay
+			label="Nested quartz"
+			onForward={(value) => { secondCalls++; secondValue = value; }}
+		/>
+		<output>{firstCalls}:{firstValue}</output>
+		<output>{secondCalls}:{secondValue}</output>
+	</section>
+}
+`;
+	await withCompiledCaptureDispatch(
+		'src/CaptureSlotNested.tsrx',
+		source,
+		async ({ compiled, loadedIds, output, runtime }) => {
+			const childHandler = compiled.captureAnalysis.extractedSymbols.find(
+				(symbol) =>
+					symbol.kind === 'event-handler' && symbol.owner?.componentName === 'NestedTrigger',
+			)!;
+			const rows = compiled.boundSymbolResolver.rows.filter(
+				(row) => row.baseSymbolId === childHandler.symbolId,
+			);
+			const records = output.view.events.filter((record) => record.eventName === 'click');
+
+			expect(childHandler.captureSlots).toHaveLength(2);
+			expect(rows).toHaveLength(2);
+			expect(rows.map((row) => row.componentEdgePath)).toEqual([
+				['component-edge:1', 'component-edge:0'],
+				['component-edge:2', 'component-edge:0'],
+			]);
+			expect(records.map((record) => record.hostNodeId)).toEqual([
+				'c0:c0:h0',
+				'c3:c0:h0',
+			]);
+			const recordSymbolIds = records.map((record) => record.symbolIds[0]);
+
+			const buttons = descendants(output.root, 'BUTTON');
+			expect(buttons).toHaveLength(2);
+			await runtime.runtime.dispatch(event('click', buttons[0]!) as never);
+			expect(runtime.graph.read('state:firstCalls')).toBe(1);
+			expect(runtime.graph.read('state:firstValue')).toBe('Nested elm');
+			expect(runtime.graph.read('state:secondCalls')).toBe(0);
+
+			await runtime.runtime.dispatch(event('click', buttons[1]!) as never);
+			expect(runtime.graph.read('state:secondCalls')).toBe(1);
+			expect(runtime.graph.read('state:secondValue')).toBe('Nested quartz');
+			expect(runtime.graph.read('state:firstCalls')).toBe(1);
+			expect(recordSymbolIds).toEqual(rows.map((row) => row.id));
+			expect(loadedIds.filter((symbolId) => symbolId.startsWith('bound:'))).toEqual(
+				rows.map((row) => row.id),
+			);
+		},
+	);
 });
 
 test('render dispatch throws a tagged error when no event record matches', async () => {

@@ -796,22 +796,26 @@ export type CaptureSlotRoute =
 	| {
 			readonly kind: 'graph-reference';
 			readonly componentEdgeId?: string;
+			readonly componentEdgePath?: ReadonlyArray<string>;
 			readonly graphNodeId: string;
 			readonly path: ReadonlyArray<string>;
 	  }
 	| {
 			readonly kind: 'compiler-known-constant';
 			readonly componentEdgeId: string;
+			readonly componentEdgePath?: ReadonlyArray<string>;
 			readonly value: unknown;
 	  }
 	| {
 			readonly kind: 'callback-route';
 			readonly componentEdgeId: string;
+			readonly componentEdgePath?: ReadonlyArray<string>;
 			readonly callbackSymbolId: string;
 	  }
 	| {
 			readonly kind: 'unsupported-opaque';
 			readonly componentEdgeId: string;
+			readonly componentEdgePath?: ReadonlyArray<string>;
 			readonly expression: string;
 			readonly sourceSpan?: SourceSpan;
 	  };
@@ -957,6 +961,7 @@ export type ProtocolViewPayloadInput = {
 	readonly payloadArena: PayloadArenaArtifact;
 	readonly symbolResolver: SymbolResolverPlan;
 	readonly publicRenderPlan: PublicRenderPlanArtifact;
+	readonly captureAnalysis?: CaptureAnalysisArtifact;
 };
 
 // Wire shape of a boundary arm record set: the payload arena plan with lazy
