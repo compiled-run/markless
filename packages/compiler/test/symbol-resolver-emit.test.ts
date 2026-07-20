@@ -193,6 +193,29 @@ test('emitSymbolResolverModule fails closed for unknown symbols with structured 
 	);
 });
 
+test('emitSymbolResolverModule resolves bound rows and fails loudly for unknown bound IDs', async () => {
+	const moduleUrl = `data:text/javascript,${encodeURIComponent(
+		'export async function symbol_child(context) { return [context.capture.read("slot:label"), context.event.type]; }',
+	)}`;
+	const output = emitSymbolResolverModule({
+		symbols: [{ id: 'symbol:child', chunk: moduleUrl, exportName: 'symbol_child' }],
+		boundSymbols: [{
+			id: 'bound:known', baseSymbolId: 'symbol:child', componentEdgePath: ['edge:0'],
+			ancestry: [{ componentEdgeId: 'edge:0', branchScopeIds: [], keyedRepeatScopeIds: [] }],
+			captureSlots: [{ slotId: 'slot:label', path: [], route: { kind: 'compiler-known-constant', componentEdgeId: 'edge:0', value: 'Save' } }],
+		}],
+	});
+	const generatedModule = (await import(`data:text/javascript,${encodeURIComponent(output)}`)) as {
+		loadSymbol(id: string): Promise<(context: unknown) => unknown>;
+	};
+	const bound = await generatedModule.loadSymbol('bound:known');
+	await expect(bound({ event: { type: 'click' }, graph: { read() {} } })).resolves.toEqual(['Save', 'click']);
+	await expect(generatedModule.loadSymbol('bound:missing')).rejects.toMatchObject({
+		code: 'MARKLESS_SYMBOL_UNKNOWN', symbolId: 'bound:missing',
+	});
+	expect(output).not.toContain('switch (id)');
+});
+
 test('emitSymbolResolverModule exports the symbol manifest with protocol and build identity', async () => {
 	const output = emitSymbolResolverModule({
 		buildId: 'build:abc123',

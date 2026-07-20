@@ -1,4 +1,7 @@
 import type {
+	BoundSymbolResolverArtifact,
+	BoundSymbolResolverInput,
+	BoundSymbolResolverRow,
 	LoweredStateRead,
 	LoweredStateWrite,
 	PlannedSymbol,
@@ -167,6 +170,76 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 			})),
 		diagnostics: input.payloadArena.diagnostics,
 	};
+}
+
+export function planBoundSymbolResolver(
+	input: BoundSymbolResolverInput,
+): BoundSymbolResolverArtifact {
+	const pathsByTerminalEdge = componentEdgePaths(input.semanticGraph.componentEdges);
+	const rows: BoundSymbolResolverRow[] = [];
+
+	for (const symbol of input.captureAnalysis.extractedSymbols) {
+		const terminalEdgeIds = new Set(
+			symbol.captureSlots.flatMap((slot) =>
+				slot.routes.flatMap((route) => route.componentEdgeId ? [route.componentEdgeId] : []),
+			),
+		);
+		for (const terminalEdgeId of terminalEdgeIds) {
+			for (const path of pathsByTerminalEdge.get(terminalEdgeId) ?? []) {
+				const captureSlots = symbol.captureSlots.flatMap((slot) => {
+					const route = slot.routes.find((candidate) => candidate.componentEdgeId === terminalEdgeId);
+					return route && route.kind !== 'unsupported-opaque'
+						? [{ slotId: slot.id, path: slot.path, route }]
+						: [];
+				});
+				if (captureSlots.length !== symbol.captureSlots.length) continue;
+				const ancestry = path.map((edge) => ({
+					componentEdgeId: edge.id,
+					branchScopeIds: edge.branchScopeIds,
+					keyedRepeatScopeIds: edge.keyedRepeatScopeIds,
+				}));
+				rows.push({
+					id: boundSymbolId(symbol.symbolId, ancestry),
+					baseSymbolId: symbol.symbolId,
+					componentEdgePath: path.map((edge) => edge.id),
+					ancestry,
+					captureSlots,
+				});
+			}
+		}
+	}
+
+	return { passId: 'bound-symbol-resolver', rows };
+}
+
+function componentEdgePaths(edges: SymbolResolverInput['semanticGraph']['componentEdges']) {
+	const incomingByComponent = new Map<string, typeof edges>();
+	for (const edge of edges) {
+		const incoming = incomingByComponent.get(edge.childComponentName) ?? [];
+		incomingByComponent.set(edge.childComponentName, [...incoming, edge]);
+	}
+	const result = new Map<string, Array<Array<(typeof edges)[number]>>>();
+	const visit = (edge: (typeof edges)[number], seen: ReadonlySet<string>): Array<Array<(typeof edges)[number]>> => {
+		if (seen.has(edge.id)) return [];
+		const nextSeen = new Set(seen).add(edge.id);
+		const parents = (incomingByComponent.get(edge.parentComponentName) ?? []).filter(
+			(parent) => !nextSeen.has(parent.id),
+		);
+		if (parents.length === 0) return [[edge]];
+		return parents.flatMap((parent) => visit(parent, nextSeen).map((path) => [...path, edge]));
+	};
+	for (const edge of edges) result.set(edge.id, visit(edge, new Set()));
+	return result;
+}
+
+function boundSymbolId(
+	baseSymbolId: string,
+	ancestry: BoundSymbolResolverRow['ancestry'],
+): string {
+	const segment = (values: ReadonlyArray<string>) => values.map(encodeURIComponent).join(',');
+	return `bound:${encodeURIComponent(baseSymbolId)}:${ancestry
+		.map((entry) => `${encodeURIComponent(entry.componentEdgeId)}[b=${segment(entry.branchScopeIds)};k=${segment(entry.keyedRepeatScopeIds)}]`)
+		.join('/')}`;
 }
 
 function eventWrites(

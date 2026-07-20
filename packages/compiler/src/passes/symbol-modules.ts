@@ -1,4 +1,5 @@
 import type {
+	CaptureSlot,
 	GeneratedSymbolModule,
 	PublicRenderPlanAsyncBoundaryArmRender,
 	PublicRenderPlanAsyncBoundaryArms,
@@ -17,6 +18,23 @@ import { parseJavaScriptModule } from '../js-ast.ts';
 
 export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtifact {
 	const localNamesBySymbol = publicRenderLocalNamesBySymbol(input.publicRenderPlan);
+	const captureSlotsBySymbol = new Map(
+		input.captureAnalysis.extractedSymbols.map((symbol) => [
+			symbol.symbolId,
+			symbol.captureSlots.filter((slot) =>
+				slot.routes.some((route) => route.componentEdgeId !== undefined),
+			),
+		]),
+	);
+	const boundCallbackSymbolIds = new Set(
+		input.captureAnalysis.extractedSymbols.flatMap((symbol) =>
+			symbol.captureSlots.flatMap((slot) =>
+				slot.routes.flatMap((route) =>
+					route.kind === 'callback-route' ? [route.callbackSymbolId] : [],
+				),
+			),
+		),
+	);
 
 	const branchArmsBySite = new Map(
 		(input.publicRenderPlan?.branchArms ?? []).map((entry) => [entry.branchSiteId, entry]),
@@ -44,7 +62,12 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 				const armRender = boundaryArmRendersById.get(symbol.boundaryId);
 				return armRender ? [emitAsyncBoundaryArmRenderModule(symbol, armRender)] : [];
 			}
-			return emitSymbolModule(symbol, localNamesBySymbol.get(symbol.id) ?? emptyLocalNames);
+			return emitSymbolModule(
+				symbol,
+				localNamesBySymbol.get(symbol.id) ?? emptyLocalNames,
+				captureSlotsBySymbol.get(symbol.id) ?? [],
+				boundCallbackSymbolIds.has(symbol.id),
+			);
 		}),
 		diagnostics: input.captureAnalysis.diagnostics,
 	};
@@ -118,6 +141,8 @@ function publicRenderLocalNamesBySymbol(
 function emitSymbolModule(
 	symbol: PlannedSymbol,
 	localNames: ReadonlySet<string>,
+	captureSlots: ReadonlyArray<CaptureSlot>,
+	usesArgumentVector: boolean,
 ): GeneratedSymbolModule[] {
 	if (symbol.kind === 'event-handler' || symbol.kind === 'callback-prop') {
 		return [
@@ -125,7 +150,7 @@ function emitSymbolModule(
 				symbolId: symbol.id,
 				kind: symbol.kind,
 				exportName: symbolExportName(symbol.id),
-				source: emitEventHandlerModule(symbol, localNames),
+				source: emitEventHandlerModule(symbol, localNames, captureSlots, usesArgumentVector),
 			},
 		];
 	}
@@ -178,9 +203,11 @@ function emitSymbolModule(
 function emitEventHandlerModule(
 	symbol: Extract<PlannedSymbol, { readonly kind: 'event-handler' | 'callback-prop' }>,
 	localNames: ReadonlySet<string>,
+	captureSlots: ReadonlyArray<CaptureSlot>,
+	usesArgumentVector: boolean,
 ): string {
 	const exportName = symbolExportName(symbol.id);
-	const scalarWriteLeaf = scalarWriteLeafSource(symbol, localNames);
+	const scalarWriteLeaf = captureSlots.length === 0 ? scalarWriteLeafSource(symbol, localNames) : null;
 	if (scalarWriteLeaf) {
 		return [
 			"import { marklessWriteScalar } from '@markless/web/fns/write-scalar';",
@@ -195,13 +222,27 @@ function emitEventHandlerModule(
 	const parameters = symbol.parameters ?? [];
 	const importedReference = importedHandlerReference(symbol);
 	const body = importedReference
-		? `return ${symbol.source.trim()}(context.event);`
-		: eventHandlerAuthoredBody(symbol, localNames);
+		? symbol.kind === 'callback-prop' && (usesArgumentVector || parameters.length > 1)
+			? `return ${symbol.source.trim()}(...(context.args ?? []));`
+			: `return ${symbol.source.trim()}(context.event);`
+		: eventHandlerAuthoredBody(symbol, localNames, captureSlots);
 	const imports = eventModuleImports(symbol, body);
-	const asyncKeyword = !importedReference && eventHandlerIsAsync(symbol.source) ? 'async ' : '';
+	const asyncKeyword =
+		!importedReference &&
+		(eventHandlerIsAsync(symbol.source) || captureSlots.some(callbackCaptureSlot))
+			? 'async '
+			: '';
 	const parameterDeclarations =
 		!importedReference && parameters.length > 0
-			? parameters.map((parameter) => `	const ${parameter} = context.event;`)
+			? parameters.flatMap((parameter, index) => {
+					if (symbol.kind !== 'callback-prop' || (!usesArgumentVector && parameters.length <= 1)) {
+						return [`	const ${parameter} = context.event;`];
+					}
+					return [
+						`	const ${parameter} = context.args?.[${index}];`,
+						`	/* legacy callback binding was: const ${parameter} = context.event; */`,
+					];
+				})
 			: [];
 
 	return [
@@ -246,6 +287,7 @@ function importedHandlerReference(
 function eventHandlerAuthoredBody(
 	symbol: Extract<PlannedSymbol, { readonly kind: 'event-handler' | 'callback-prop' }>,
 	localNames: ReadonlySet<string>,
+	captureSlots: ReadonlyArray<CaptureSlot>,
 ): string {
 	const body = eventHandlerBodySource(symbol.source);
 	if (!body) return 'void context;';
@@ -256,6 +298,7 @@ function eventHandlerAuthoredBody(
 		symbol,
 		symbol.parameters ?? [],
 		localNames,
+		captureSlots,
 	);
 }
 
@@ -289,21 +332,117 @@ function eventHandlerIsAsync(source: string): boolean {
 	return source.trimStart().startsWith('async ');
 }
 
+function callbackCaptureSlot(slot: CaptureSlot): boolean {
+	return slot.routes.some((route) => route.kind === 'callback-route');
+}
+
+function captureSlotMatchesRead(slot: CaptureSlot, read: LoweredStateRead): boolean {
+	if (read.bindingId && slot.bindingId !== read.bindingId) return false;
+	if (slot.sourceSpan && read.sourceSpan) {
+		return (
+			slot.sourceSpan.filename === read.sourceSpan.filename &&
+			slot.sourceSpan.start === read.sourceSpan.start &&
+			slot.sourceSpan.end === read.sourceSpan.end
+		);
+	}
+	return slot.source === read.source;
+}
+
+function callbackInvocationSpans(
+	source: string,
+	callee: string,
+): ReadonlyArray<{ start: number; end: number; arguments: ReadonlyArray<string> }> {
+	const prefix = 'async function* __marklessCallbackBody() {\n';
+	const moduleSource = `${prefix}${source}\n}`;
+	const calls: Array<{ start: number; end: number; arguments: ReadonlyArray<string> }> = [];
+	let ast: AnyNode;
+	try {
+		ast = parseJavaScriptModule(moduleSource);
+	} catch {
+		return [];
+	}
+	const visit = (node: AnyNode): void => {
+		if (
+			node.type === 'CallExpression' &&
+			typeof node.start === 'number' &&
+			typeof node.end === 'number'
+		) {
+			const called = node.callee as AnyNode | undefined;
+			const argumentNodes = Array.isArray(node.arguments) ? (node.arguments as AnyNode[]) : [];
+			if (
+				called &&
+				typeof called.start === 'number' &&
+				typeof called.end === 'number' &&
+				moduleSource.slice(called.start, called.end) === callee &&
+				argumentNodes.every(
+					(argument) => typeof argument.start === 'number' && typeof argument.end === 'number',
+				)
+			) {
+				calls.push({
+					start: node.start - prefix.length,
+					end: node.end - prefix.length,
+					arguments: argumentNodes.map((argument) =>
+						moduleSource.slice(argument.start as number, argument.end as number),
+					),
+				});
+			}
+		}
+		for (const child of childNodes(node)) visit(child);
+	};
+	visit(ast);
+	return calls;
+}
+
+function captureArgumentSource(
+	argument: string,
+	valueSlots: ReadonlyArray<CaptureSlot>,
+	eventParameters: ReadonlyArray<string>,
+): string {
+	let emitted = argument;
+	for (const slot of [...valueSlots].sort((left, right) => right.source.length - left.source.length)) {
+		emitted = replaceIdentifierPath(
+			emitted,
+			slot.source,
+			`context.capture.read(${JSON.stringify(slot.id)})`,
+		);
+	}
+	for (const parameter of eventParameters) {
+		const pattern = new RegExp(`\\b${escapeRegExp(parameter)}(?:\\.[$A-Z_a-z][$0-9A-Z_a-z]*)*`, 'g');
+		emitted = emitted.replace(pattern, (source) => eventFieldAssignmentSource(source, [parameter]) ?? source);
+	}
+	return emitted;
+}
+
+function escapeRegExp(source: string): string {
+	return source.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function spliceEventHandlerBody(
 	bodySource: string,
 	bodyStartInHandlerSource: number,
 	symbol: Extract<PlannedSymbol, { readonly kind: 'event-handler' | 'callback-prop' }>,
 	eventParameters: ReadonlyArray<string>,
 	localNames: ReadonlySet<string>,
+	captureSlots: ReadonlyArray<CaptureSlot>,
 ): string {
+	const callbackSlots = captureSlots.filter(callbackCaptureSlot);
+	const valueSlots = captureSlots.filter((slot) => !callbackCaptureSlot(slot));
 	const replacements = [
+		...callbackSlots.flatMap((slot) =>
+			callbackInvocationSpans(bodySource, slot.source).map((call) => ({
+				start: call.start,
+				end: call.end,
+				replacement: `await context.capture.invoke(${JSON.stringify(slot.id)}, [${call.arguments
+					.map((argument) => captureArgumentSource(argument, valueSlots, eventParameters))
+					.join(', ')}])`,
+			})),
+		),
 		...(symbol.reads ?? []).flatMap((read) =>
 			readBodySpans(bodySource, read).map((span) => {
-				const graphRead = graphReadCallSource(
-					'context.graph.read',
-					read.graphNodeId,
-					read.path,
-				);
+				const slot = valueSlots.find((candidate) => captureSlotMatchesRead(candidate, read));
+				const graphRead = slot
+					? `context.capture.read(${JSON.stringify(slot.id)})`
+					: graphReadCallSource('context.graph.read', read.graphNodeId, read.path);
 				return {
 					start: span.start,
 					end: span.end,
@@ -316,7 +455,7 @@ function spliceEventHandlerBody(
 		...(symbol.writes ?? []).flatMap((write) => {
 			const replacement = emitEventWriteExpression(
 				write,
-				eventParameters,
+				symbol.kind === 'callback-prop' ? [] : eventParameters,
 				symbol.reads ?? [],
 				symbol.moduleImports ?? [],
 				localNames,

@@ -245,6 +245,26 @@ test('compileTsrxModule keeps valid source output byte-identical', async () => {
 	expect(result.semanticGraph.diagnostics).toEqual([]);
 });
 
+test('compileTsrxModule exposes typed bound resolver rows for same-module children', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Bound.tsrx',
+		source: `
+function Child({ label }: { label: string }) @{
+	<button onClick={() => console.log(label)}>{label}</button>
+}
+export function App() @{
+	<><Child label="first" /><Child label="second" /></>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.boundSymbolResolver.passId).toBe('bound-symbol-resolver');
+	expect(result.boundSymbolResolver.rows).toHaveLength(2);
+	expect(new Set(result.boundSymbolResolver.rows.map((row) => row.id)).size).toBe(2);
+	expect(result.boundSymbolResolver.rows.every((row) => row.baseSymbolId.startsWith('symbol:'))).toBe(true);
+});
+
 type PublicRenderTestEvent = {
 	readonly type: string;
 	readonly target: PublicRenderTestElement | null;

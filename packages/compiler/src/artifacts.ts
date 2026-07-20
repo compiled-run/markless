@@ -739,6 +739,36 @@ export type SymbolResolverPlan = {
 	readonly diagnostics: ReadonlyArray<PayloadArenaDiagnostic>;
 };
 
+export type BoundSymbolCaptureRoute = Exclude<CaptureSlotRoute, { readonly kind: 'unsupported-opaque' }>;
+
+// A bound row is data only. Its opaque ID addresses one rendered component-edge
+// path; the generated resolver turns the row into an adapter at load time.
+export type BoundSymbolResolverRow = {
+	readonly id: string;
+	readonly baseSymbolId: string;
+	readonly componentEdgePath: ReadonlyArray<string>;
+	readonly ancestry: ReadonlyArray<{
+		readonly componentEdgeId: string;
+		readonly branchScopeIds: ReadonlyArray<string>;
+		readonly keyedRepeatScopeIds: ReadonlyArray<string>;
+	}>;
+	readonly captureSlots: ReadonlyArray<{
+		readonly slotId: string;
+		readonly path: ReadonlyArray<string>;
+		readonly route: BoundSymbolCaptureRoute;
+	}>;
+};
+
+export type BoundSymbolResolverArtifact = {
+	readonly passId: 'bound-symbol-resolver';
+	readonly rows: ReadonlyArray<BoundSymbolResolverRow>;
+};
+
+export type BoundSymbolResolverInput = {
+	readonly semanticGraph: SemanticGraphArtifact;
+	readonly captureAnalysis: CaptureAnalysisArtifact;
+};
+
 export type CaptureAnalysisInput = {
 	readonly semanticGraph: SemanticGraphArtifact;
 	readonly symbolResolver: SymbolResolverPlan;
@@ -803,6 +833,7 @@ export type CaptureSlot = {
 
 export type CaptureAnalysisArtifact = {
 	readonly passId: 'capture-analysis';
+	readonly boundResolverRows?: ReadonlyArray<BoundSymbolResolverRow>;
 	readonly extractedSymbols: ReadonlyArray<{
 		readonly symbolId: string;
 		readonly kind: PlannedSymbol['kind'];
@@ -901,6 +932,7 @@ export type SymbolResolverModuleInput = {
 		readonly chunk: string;
 		readonly exportName: string;
 	}>;
+	readonly boundSymbols?: ReadonlyArray<BoundSymbolResolverRow>;
 };
 
 export type SymbolResolverModuleManifest = readonly [
@@ -1313,6 +1345,7 @@ export type CompileTsrxModuleResult = {
 	readonly stateLowering: StateLoweringArtifact;
 	readonly payloadArena: PayloadArenaArtifact;
 	readonly symbolResolver: SymbolResolverPlan;
+	readonly boundSymbolResolver: BoundSymbolResolverArtifact;
 	readonly captureAnalysis: CaptureAnalysisArtifact;
 	readonly protocolState: ProtocolStatePayload;
 	readonly protocolView: ProtocolViewPayload;

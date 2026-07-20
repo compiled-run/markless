@@ -1798,6 +1798,46 @@ test('B908 emits async handler bodies with await ordering before spliced writes'
 	expect(source.indexOf('await save();')).toBeLessThan(source.indexOf('context.graph.update({'));
 });
 
+test('bound symbols read capture slots, await callback vectors, and keep DOM events separate', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Captures.tsrx',
+		source: `
+function Child({ label, onTrace }: { label: string; onTrace: (payload: { value: number }, reason: string) => void }) @{
+	<button onClick={(event) => onTrace({ value: label.length }, event.type)}>{label}</button>
+}
+export function App() @{
+	<Child label="Save" onTrace={(payload) => console.log(payload.value)} />
+}
+`,
+		symbols: [],
+	});
+	const child = result.symbolModules.modules.find((module) =>
+		module.kind === 'event-handler' && module.source.includes('capture.invoke'),
+	);
+	const callback = result.symbolModules.modules.find((module) => module.kind === 'callback-prop');
+	expect(child?.source).toContain('context.capture.read(');
+	expect(child?.source).not.toContain('context.graph.read("prop:props"');
+	expect(child?.source).toContain('await context.capture.invoke(');
+	expect(child?.source).toContain('[{ value: context.capture.read(');
+	expect(child?.source).toContain('context.event?.type');
+	expect(callback?.source).toContain('const payload = context.args?.[0];');
+
+	const multiArgumentCallback = emitSymbolModules({
+		symbolResolver: {
+			passId: 'symbol-resolver', dynamicImportOwner: 'generated-symbol-resolver',
+			symbols: [{
+				id: 'symbol:callback', kind: 'callback-prop', componentEdgeId: 'edge:0',
+				propName: 'onTrace', source: '(payload, reason) => console.log(payload, reason)',
+				parameters: ['payload', 'reason'], reads: [], writes: [],
+			}],
+			syncPolicies: [], diagnostics: [],
+		},
+		captureAnalysis: { passId: 'capture-analysis', extractedSymbols: [], diagnostics: [] },
+	}).modules[0]?.source;
+	expect(multiArgumentCallback).toContain('const payload = context.args?.[0];');
+	expect(multiArgumentCallback).toContain('const reason = context.args?.[1];');
+});
+
 test('B908 preserves setTimeout deferral while splicing nested writes', () => {
 	const source = emitEventHandlerSource({
 		id: 'symbol:later',
