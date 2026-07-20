@@ -173,6 +173,139 @@ export function App() @{
 	expect(captureAnalysis.diagnostics).toEqual([]);
 });
 
+test('a named component-local arrow classifies as a callback and captures its body', async () => {
+	const source = `
+import { state } from '@markless/core';
+
+function Child({ onSelect }) @{
+	<button onClick={() => onSelect('cedar')}>Select</button>
+}
+
+export function App() @{
+	let selected = state('');
+	let prefix = state('song:');
+	const onSelectOne = (song) => selected = prefix + song;
+	<Child onSelect={onSelectOne} />
+}
+`;
+	const { semanticGraph, symbolResolver, captureAnalysis } = await compileCaptureArtifacts(source);
+	const declaration = semanticGraph.localDeclarations.find(
+		(candidate) => candidate.componentName === 'App' && candidate.name === 'onSelectOne',
+	);
+	const callback = symbolResolver.symbols.find(
+		(symbol) => symbol.kind === 'callback-prop' && symbol.propName === 'onSelect',
+	);
+
+	expect(declaration).toEqual(
+		expect.objectContaining({
+			bindingId: expect.stringMatching(/^binding:/),
+			lexicalScopeId: expect.stringMatching(/^scope:/),
+			declarationKind: 'const',
+			writeCount: 1,
+			initializer: expect.objectContaining({
+				kind: 'arrow-function',
+				parameters: ['song'],
+			}),
+		}),
+	);
+	expect(callback).toEqual(
+		expect.objectContaining({
+			source: '(song) => selected = prefix + song',
+			parameters: ['song'],
+			reads: [expect.objectContaining({ graphNodeId: 'state:prefix' })],
+			writes: [expect.objectContaining({ graphNodeId: 'state:selected' })],
+		}),
+	);
+	expect(captureAnalysis.extractedSymbols).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				kind: 'callback-prop',
+				captureSlots: [
+					expect.objectContaining({
+						routes: [expect.objectContaining({ graphNodeId: 'state:prefix' })],
+					}),
+				],
+			}),
+		]),
+	);
+	expect(captureAnalysis.diagnostics).toEqual([]);
+});
+
+test('a component-body function declaration classifies as a callback', async () => {
+	const source = `
+import { state } from '@markless/core';
+
+function Child({ onSelect }) @{
+	<button onClick={() => onSelect('birch')}>Select</button>
+}
+
+export function App() @{
+	let selected = state('');
+	function onSelectOne(song) {
+		selected = song;
+	}
+	<Child onSelect={onSelectOne} />
+}
+`;
+	const { semanticGraph, symbolResolver, captureAnalysis } = await compileCaptureArtifacts(source);
+	const declaration = semanticGraph.localDeclarations.find(
+		(candidate) => candidate.componentName === 'App' && candidate.name === 'onSelectOne',
+	);
+	const callback = symbolResolver.symbols.find(
+		(symbol) => symbol.kind === 'callback-prop' && symbol.propName === 'onSelect',
+	);
+
+	expect(declaration).toEqual(
+		expect.objectContaining({
+			declarationKind: 'function',
+			writeCount: 1,
+			initializer: expect.objectContaining({
+				kind: 'function-declaration',
+				parameters: ['song'],
+			}),
+		}),
+	);
+	expect(callback).toEqual(
+		expect.objectContaining({
+			source: expect.stringContaining('function onSelectOne(song)'),
+			parameters: ['song'],
+			writes: [expect.objectContaining({ graphNodeId: 'state:selected' })],
+		}),
+	);
+	expect(captureAnalysis.diagnostics).toEqual([]);
+});
+
+test('a reassigned component-local callback stays fail-closed opaque', async () => {
+	const source = `
+function Child({ onSelect }) @{
+	<button onClick={() => onSelect('ash')}>Select</button>
+}
+
+export function App() @{
+	let onSelectOne = (song) => console.log('first', song);
+	onSelectOne = (song) => console.log('second', song);
+	<Child onSelect={onSelectOne} />
+}
+`;
+	const { semanticGraph, symbolResolver, captureAnalysis } = await compileCaptureArtifacts(source);
+	const declaration = semanticGraph.localDeclarations.find(
+		(candidate) => candidate.componentName === 'App' && candidate.name === 'onSelectOne',
+	);
+
+	expect(declaration).toEqual(expect.objectContaining({ declarationKind: 'let', writeCount: 2 }));
+	expect(
+		semanticGraph.componentEdges[0]?.props.find((prop) => prop.name === 'onSelect'),
+	).toEqual(expect.objectContaining({ kind: 'opaque', source: 'onSelectOne' }));
+	expect(symbolResolver.symbols.some((symbol) => symbol.kind === 'callback-prop')).toBe(false);
+	expect(captureAnalysis.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_CAPTURE_OPAQUE_PROP',
+			propName: 'onSelect',
+			source: 'onSelectOne',
+		}),
+	]);
+});
+
 test('supported destructured callback parameters produce callback capture routes', async () => {
 	const source = `
 function Child({ onObject, onArray }) @{

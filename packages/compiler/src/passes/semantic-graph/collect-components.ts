@@ -133,9 +133,26 @@ function componentPropBindings(
 			: value
 				? sourceSpan(value, state.filename)
 				: sourceSpan(attribute, state.filename);
+		const expressionSpan = expression ? sourceSpan(expression, state.filename) : undefined;
+		const localBindingId = expression
+			? state.resolvedComponentLocalBindingIds.get(expression) ??
+				(expressionSpan
+					? state.resolvedComponentLocalBindingsBySpan.get(
+							`${expressionSpan.start}:${expressionSpan.end}`,
+						)
+					: undefined)
+			: undefined;
+		const localBinding = localBindingId
+			? state.componentLocalBindings.get(localBindingId)
+			: undefined;
+		// Deliberately bounded: only the declaration's direct function initializer
+		// is callable here. Identifier aliases do not inherit callback identity.
+		const namedCallback =
+			localBinding?.declaration.writeCount === 1 ? localBinding.initializerNode : undefined;
+		const callback = expression && isCallbackExpression(expression) ? expression : namedCallback;
 
-		if (expression && isCallbackExpression(expression)) {
-			const parameterNodes = asNodes(expression.params);
+		if (callback && isCallbackExpression(callback)) {
+			const parameterNodes = asNodes(callback.params);
 			const unsupportedParameterReason = callbackParameterUnsupportedReason(parameterNodes);
 			if (unsupportedParameterReason) {
 				state.graph.diagnostics.push(
@@ -143,7 +160,7 @@ function componentPropBindings(
 						propName: name,
 						parameterCount: parameterNodes.length,
 						reason: unsupportedParameterReason,
-						callback: expression,
+						callback,
 						filename: state.filename,
 					}),
 				);
@@ -152,12 +169,12 @@ function componentPropBindings(
 
 			props.push({
 				name,
-				source,
+				source: expressionSource(callback, state.source),
 				kind: 'callback',
 				parameters: parameterNodes.map((parameter) =>
 					expressionSource(parameter, state.source),
 				),
-				sourceSpan: span,
+				sourceSpan: sourceSpan(callback, state.filename),
 			});
 			continue;
 		}
@@ -208,7 +225,11 @@ function componentChildCount(node: AnyNode): number {
 }
 
 function isCallbackExpression(node: AnyNode): boolean {
-	return node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression';
+	return (
+		node.type === 'ArrowFunctionExpression' ||
+		node.type === 'FunctionExpression' ||
+		node.type === 'FunctionDeclaration'
+	);
 }
 
 function callbackParameterUnsupportedReason(parameters: ReadonlyArray<AnyNode>): string | null {

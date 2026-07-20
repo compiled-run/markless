@@ -316,7 +316,7 @@ function eventHandlerBodySource(
 	source: string,
 ): { readonly source: string; readonly sourceStart: number } | null {
 	const arrowIndex = source.indexOf('=>');
-	if (arrowIndex === -1) return null;
+	if (arrowIndex === -1) return declaredFunctionBodySource(source);
 
 	const bodyStart = arrowIndex + 2 + leadingWhitespaceLength(source.slice(arrowIndex + 2));
 	if (bodyStart >= source.length) return null;
@@ -336,6 +336,49 @@ function eventHandlerBodySource(
 		source: `return ${source.slice(bodyStart).trim()};`,
 		sourceStart: bodyStart,
 	};
+}
+
+function declaredFunctionBodySource(
+	source: string,
+): { readonly source: string; readonly sourceStart: number } | null {
+	if (!/^\s*(?:async\s+)?function\b/.test(source)) return null;
+	let parameterDepth = 0;
+	let sawParameters = false;
+	let quote: string | null = null;
+	let escaped = false;
+
+	for (let index = 0; index < source.length; index++) {
+		const char = source[index] ?? '';
+		if (quote) {
+			if (escaped) escaped = false;
+			else if (char === '\\') escaped = true;
+			else if (char === quote) quote = null;
+			continue;
+		}
+		if (char === '"' || char === "'" || char === '`') {
+			quote = char;
+			continue;
+		}
+		if (char === '(') {
+			parameterDepth++;
+			sawParameters = true;
+			continue;
+		}
+		if (char === ')') {
+			parameterDepth = Math.max(0, parameterDepth - 1);
+			continue;
+		}
+		if (char !== '{' || !sawParameters || parameterDepth !== 0) continue;
+		const bodyEnd = source.lastIndexOf('}');
+		if (bodyEnd <= index) return null;
+		const inner = source.slice(index + 1, bodyEnd);
+		return {
+			source: inner.trim(),
+			sourceStart: index + 1 + leadingWhitespaceLength(inner),
+		};
+	}
+
+	return null;
 }
 
 function eventHandlerIsAsync(source: string): boolean {
