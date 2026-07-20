@@ -1,6 +1,9 @@
 import { expect, test } from 'vitest';
 import { createProtocolStatePayload, renderPayloadScripts } from '../../serializer/src/index.ts';
-import { resumeEventFromPayloadDocument } from '../src/event-resume.ts';
+import {
+	createEventResumeContainerFromPayloads,
+	resumeEventFromPayloadDocument,
+} from '../src/event-resume.ts';
 import type { ProtocolViewPayload } from '@markless/serializer';
 
 type FakeElement = {
@@ -182,4 +185,52 @@ test('event resume accepts wildcard dynamic-tag locators', async () => {
 	});
 
 	expect(result.graph.read('state:count')).toBe(0);
+});
+
+test('nested callback invocation shares the outer turn and flushes exactly once', async () => {
+	const button = element('BUTTON');
+	const root = element('DIV', [button]);
+	const order: string[] = [];
+	const container = await createEventResumeContainerFromPayloads({
+		state: createProtocolStatePayload({ cells: [] }),
+		view: {
+			version: 1,
+			locators: [
+				{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'div' },
+				{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'button' },
+			],
+			events: [{ hostNodeId: 'h1', eventName: 'click', symbolIds: ['bound:child'] }],
+			domUpdates: [],
+			behaviors: [],
+			elementHandles: [],
+			asyncBoundaries: [],
+		},
+		root,
+		loadSymbol(symbolId) {
+			if (symbolId === 'bound:child')
+				return async (context) => {
+					order.push('child:start');
+					await context.invokeCallback?.('symbol:parent', [{ value: 7 }, 'saved']);
+					order.push('child:end');
+				};
+			if (symbolId === 'symbol:parent')
+				return async (context) => {
+					await Promise.resolve();
+					order.push(
+						`parent:${String(context.args?.[0] && (context.args[0] as { value: number }).value)}:${String(context.args?.[1])}`,
+					);
+				};
+			throw new Error(`unknown ${symbolId}`);
+		},
+	});
+	let flushes = 0;
+	const originalFlush = container.graph.flush.bind(container.graph);
+	(container.graph as { flush: () => Promise<void> }).flush = async () => {
+		flushes++;
+		await originalFlush();
+	};
+
+	await container.dispatch({ type: 'click', target: button });
+	expect(order).toEqual(['child:start', 'parent:7:saved', 'child:end']);
+	expect(flushes).toBe(1);
 });

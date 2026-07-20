@@ -1,4 +1,7 @@
 import type {
+	BoundSymbolResolverArtifact,
+	BoundSymbolResolverInput,
+	BoundSymbolResolverRow,
 	LoweredStateRead,
 	LoweredStateWrite,
 	PlannedSymbol,
@@ -38,7 +41,11 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 				parameters: event.handlerParameters[order] ?? [],
 				...(moduleImports.length > 0 ? { moduleImports } : {}),
 				order,
-				reads: eventReads(source, input.stateLowering?.reads),
+				reads: eventReads(
+					input.stateLowering?.reads,
+					sourceSpan,
+					functionParameterBindingNames(source),
+				),
 				writes: eventWrites(source, input.stateLowering?.writes, sourceSpan),
 				elementHandleCalls: collectElementHandleCalls(
 					source,
@@ -64,7 +71,11 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 				sourceSpan: prop.sourceSpan,
 				parameters: prop.parameters ?? [],
 				...(moduleImports.length > 0 ? { moduleImports } : {}),
-				reads: eventReads(prop.source, input.stateLowering?.reads),
+				reads: eventReads(
+					input.stateLowering?.reads,
+					prop.sourceSpan,
+					functionParameterBindingNames(prop.source),
+				),
 				writes: eventWrites(prop.source, input.stateLowering?.writes, prop.sourceSpan),
 			});
 		}
@@ -169,6 +180,109 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 	};
 }
 
+export function planBoundSymbolResolver(
+	input: BoundSymbolResolverInput,
+): BoundSymbolResolverArtifact {
+	const pathsByTerminalEdge = componentEdgePaths(input.semanticGraph.componentEdges);
+	const rows: BoundSymbolResolverRow[] = [];
+
+	for (const symbol of input.captureAnalysis.extractedSymbols) {
+		const edgeDependentSlots = symbol.captureSlots.filter((slot) =>
+			slot.routes.some((route) => route.componentEdgeId !== undefined),
+		);
+		const terminalEdgeIds = new Set(
+			edgeDependentSlots.flatMap((slot) =>
+				slot.routes.flatMap((route) =>
+					route.componentEdgeId ? [route.componentEdgeId] : [],
+				),
+			),
+		);
+		for (const terminalEdgeId of terminalEdgeIds) {
+			for (const path of pathsByTerminalEdge.get(terminalEdgeId) ?? []) {
+				const componentEdgePath = path.map((edge) => edge.id);
+				const captureSlots = edgeDependentSlots.flatMap((slot) => {
+					const route = slot.routes.find(
+						(candidate) =>
+							candidate.componentEdgeId === terminalEdgeId &&
+							(!candidate.componentEdgePath ||
+								(candidate.componentEdgePath.every(
+									(edgeId, index) => componentEdgePath[index] === edgeId,
+								) &&
+									candidate.componentEdgePath.length ===
+										componentEdgePath.length)),
+					);
+					return route && route.kind !== 'unsupported-opaque'
+						? [
+								{
+									slotId: slot.id,
+									path: slot.path,
+									route,
+									...(slot.propName
+										? {
+												legacyGraphRead: {
+													graphNodeId: 'prop:props',
+													path: [slot.propName, ...slot.path],
+												},
+											}
+										: {}),
+								},
+							]
+						: [];
+				});
+				if (captureSlots.length !== edgeDependentSlots.length) continue;
+				const ancestry = path.map((edge) => ({
+					componentEdgeId: edge.id,
+					branchScopeIds: edge.branchScopeIds,
+					keyedRepeatScopeIds: edge.keyedRepeatScopeIds,
+				}));
+				rows.push({
+					id: boundSymbolId(symbol.symbolId, ancestry),
+					baseSymbolId: symbol.symbolId,
+					...(symbol.loaderSymbolId ? { loaderSymbolId: symbol.loaderSymbolId } : {}),
+					componentEdgePath,
+					ancestry,
+					captureSlots,
+				});
+			}
+		}
+	}
+
+	return { passId: 'bound-symbol-resolver', rows };
+}
+
+function componentEdgePaths(edges: SymbolResolverInput['semanticGraph']['componentEdges']) {
+	const incomingByComponent = new Map<string, typeof edges>();
+	for (const edge of edges) {
+		const incoming = incomingByComponent.get(edge.childComponentName) ?? [];
+		incomingByComponent.set(edge.childComponentName, [...incoming, edge]);
+	}
+	const result = new Map<string, Array<Array<(typeof edges)[number]>>>();
+	const visit = (
+		edge: (typeof edges)[number],
+		seen: ReadonlySet<string>,
+	): Array<Array<(typeof edges)[number]>> => {
+		if (seen.has(edge.id)) return [];
+		const nextSeen = new Set(seen).add(edge.id);
+		const parents = (incomingByComponent.get(edge.parentComponentName) ?? []).filter(
+			(parent) => !nextSeen.has(parent.id),
+		);
+		if (parents.length === 0) return [[edge]];
+		return parents.flatMap((parent) => visit(parent, nextSeen).map((path) => [...path, edge]));
+	};
+	for (const edge of edges) result.set(edge.id, visit(edge, new Set()));
+	return result;
+}
+
+function boundSymbolId(baseSymbolId: string, ancestry: BoundSymbolResolverRow['ancestry']): string {
+	const segment = (values: ReadonlyArray<string>) => values.map(encodeURIComponent).join(',');
+	return `bound:${encodeURIComponent(baseSymbolId)}:${ancestry
+		.map(
+			(entry) =>
+				`${encodeURIComponent(entry.componentEdgeId)}[b=${segment(entry.branchScopeIds)};k=${segment(entry.keyedRepeatScopeIds)}]`,
+		)
+		.join('/')}`;
+}
+
 function eventWrites(
 	handlerSource: string,
 	writes: ReadonlyArray<LoweredStateWrite> | undefined,
@@ -183,12 +297,82 @@ function eventWrites(
 }
 
 function eventReads(
-	handlerSource: string,
 	reads: ReadonlyArray<LoweredStateRead> | undefined,
+	handlerSpan: SourceSpan | undefined,
+	parameterBindingNames: ReadonlySet<string>,
 ): ReadonlyArray<LoweredStateRead> {
-	if (!handlerSource || !reads?.length) return [];
+	if (!handlerSpan || !reads?.length) return [];
 
-	return reads.filter((read) => handlerSource.includes(read.source));
+	const contained = reads.filter(
+		(read) =>
+			read.sourceSpan !== undefined &&
+			spanContains(handlerSpan, read.sourceSpan) &&
+			!parameterBindingNames.has(rootIdentifierName(read.source)),
+	);
+	const seen = new Set<string>();
+	return contained.filter((read) => {
+		const key = `${read.bindingId ?? ''}:${read.graphNodeId}:${read.path.join('.')}:${read.source}`;
+		if (seen.has(key)) return false;
+		seen.add(key);
+		return true;
+	});
+}
+
+function functionParameterBindingNames(source: string): ReadonlySet<string> {
+	const prefix = 'const __marklessHandler = ';
+	let ast: AnyNode;
+	try {
+		ast = parseJavaScriptModule(`${prefix}${source};`);
+	} catch {
+		return new Set();
+	}
+
+	const names = new Set<string>();
+	let foundFunction = false;
+	walkNode(ast, (node) => {
+		if (
+			foundFunction ||
+			(node.type !== 'ArrowFunctionExpression' &&
+				node.type !== 'FunctionExpression' &&
+				node.type !== 'FunctionDeclaration')
+		) {
+			return;
+		}
+		foundFunction = true;
+		for (const parameter of asNodeArray(node.params)) {
+			for (const name of bindingPatternNames(parameter)) names.add(name);
+		}
+	});
+	return names;
+}
+
+function bindingPatternNames(node: AnyNode | undefined): ReadonlyArray<string> {
+	if (!node) return [];
+	if (node.type === 'Identifier') {
+		const name = getIdentifierName(node);
+		return name ? [name] : [];
+	}
+	if (node.type === 'AssignmentPattern') {
+		return bindingPatternNames(node.left as AnyNode | undefined);
+	}
+	if (node.type === 'RestElement') {
+		return bindingPatternNames(node.argument as AnyNode | undefined);
+	}
+	if (node.type === 'ObjectPattern') {
+		return asNodeArray(node.properties).flatMap((property) =>
+			property.type === 'Property'
+				? bindingPatternNames(property.value as AnyNode | undefined)
+				: bindingPatternNames(property.argument as AnyNode | undefined),
+		);
+	}
+	if (node.type === 'ArrayPattern') {
+		return asNodeArray(node.elements).flatMap((element) => bindingPatternNames(element));
+	}
+	return [];
+}
+
+function rootIdentifierName(source: string): string {
+	return /^[$A-Z_a-z][$0-9A-Z_a-z]*/.exec(source)?.[0] ?? '';
 }
 
 function spanContains(container: SourceSpan, child: SourceSpan): boolean {

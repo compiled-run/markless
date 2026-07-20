@@ -245,6 +245,26 @@ test('compileTsrxModule keeps valid source output byte-identical', async () => {
 	expect(result.semanticGraph.diagnostics).toEqual([]);
 });
 
+test('compileTsrxModule exposes typed bound resolver rows for same-module children', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Bound.tsrx',
+		source: `
+function Child({ label }: { label: string }) @{
+	<button onClick={() => console.log(label)}>{label}</button>
+}
+export function App() @{
+	<><Child label="first" /><Child label="second" /></>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.boundSymbolResolver.passId).toBe('bound-symbol-resolver');
+	expect(result.boundSymbolResolver.rows).toHaveLength(2);
+	expect(new Set(result.boundSymbolResolver.rows.map((row) => row.id)).size).toBe(2);
+	expect(result.boundSymbolResolver.rows.every((row) => row.baseSymbolId.startsWith('symbol:'))).toBe(true);
+});
+
 type PublicRenderTestEvent = {
 	readonly type: string;
 	readonly target: PublicRenderTestElement | null;
@@ -4842,6 +4862,52 @@ export function Dashboard() @{
 			endAnchor: expect.objectContaining({ index: 1 }),
 			testReads: [expect.objectContaining({ graphNodeId: 'state:streaming' })],
 		}),
+	]);
+});
+
+test('compileTsrxModule renders imported sibling text from each SSR edge props', async () => {
+	const child = await compileTsrxModule({
+		filename: 'src/CaptureButton.tsrx',
+		source: `export function CaptureButton({ label, marker, count, onTrace }) @{
+	<button data-capture-graph={marker === 'graph'} data-capture-literal={marker === 'literal'}>{label}</button>
+}`,
+		symbols: [],
+	});
+	const parent = await compileTsrxModule({
+		filename: 'src/Page.tsrx',
+		source: `import { state } from '@markless/core';
+import { CaptureButton } from './CaptureButton.tsrx';
+
+export function Page() @{
+	let graphLabel = state('Server spruce');
+	let count = state(0);
+	let trace = state('none');
+	<main>
+		<CaptureButton marker="graph" label={graphLabel} count={count} onTrace={(value) => trace = value} />
+		<CaptureButton marker="literal" label="Server copper" count={count} onTrace={(value) => trace = value} />
+	</main>
+}`,
+		symbols: [],
+	});
+
+	const childSsrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(child));
+	const parentSsrModule = await importPublicRenderTestModule(
+		ssrRenderTestModuleSource(parent, { replaceChildImport: true }),
+		{ childComponent: { renderSsr: childSsrModule.marklessRenderSsr } },
+	);
+	const output = await (
+		parentSsrModule.marklessRenderSsr as () => Promise<{
+			readonly html: string;
+			readonly view: { readonly domUpdates: ReadonlyArray<{ readonly hostNodeId: string; readonly graphNodeId: string }> };
+		}>
+	)();
+
+	expect(output.html).toContain('data-capture-graph="true"');
+	expect(output.html).toContain('data-capture-literal="true"');
+	expect(output.html).toContain('>Server spruce</button>');
+	expect(output.html).toContain('>Server copper</button>');
+	expect(output.view.domUpdates).toEqual([
+		expect.objectContaining({ hostNodeId: 'c0:h0', graphNodeId: 'state:graphLabel' }),
 	]);
 });
 

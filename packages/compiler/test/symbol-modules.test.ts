@@ -1798,6 +1798,152 @@ test('B908 emits async handler bodies with await ordering before spliced writes'
 	expect(source.indexOf('await save();')).toBeLessThan(source.indexOf('context.graph.update({'));
 });
 
+test('bound symbols read capture slots, await callback vectors, and keep DOM events separate', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Captures.tsrx',
+		source: `
+function Child({ label, onTrace }: { label: string; onTrace: (payload: { value: number }, reason: string) => void }) @{
+	<button onClick={(event) => onTrace({ value: label.length }, event.type)}>{label}</button>
+}
+export function App() @{
+	<Child label="Save" onTrace={(payload) => console.log(payload.value)} />
+}
+`,
+		symbols: [],
+	});
+	const child = result.symbolModules.modules.find((module) =>
+		module.kind === 'event-handler' && module.source.includes('capture.invoke'),
+	);
+	const callback = result.symbolModules.modules.find((module) => module.kind === 'callback-prop');
+	expect(child?.source).toContain('context.capture.read(');
+	expect(child?.source).not.toContain('context.graph.read("prop:props"');
+	expect(child?.source).toContain('await context.capture.invoke(');
+	expect(child?.source).toContain('[{ value: context.capture.read(');
+	expect(child?.source).toContain('context.event?.type');
+	expect(callback?.source).toContain('const payload = context.args?.[0];');
+
+	const multiArgumentCallback = emitSymbolModules({
+		symbolResolver: {
+			passId: 'symbol-resolver', dynamicImportOwner: 'generated-symbol-resolver',
+			symbols: [{
+				id: 'symbol:callback', kind: 'callback-prop', componentEdgeId: 'edge:0',
+				propName: 'onTrace', source: '(payload, reason) => console.log(payload, reason)',
+				parameters: ['payload', 'reason'], reads: [], writes: [],
+			}],
+			syncPolicies: [], diagnostics: [],
+		},
+		captureAnalysis: { passId: 'capture-analysis', extractedSymbols: [], diagnostics: [] },
+	}).modules[0]?.source;
+	expect(multiArgumentCallback).toContain('const payload = context.args?.[0];');
+	expect(multiArgumentCallback).toContain('const reason = context.args?.[1];');
+});
+
+test('local declarations shadow component props when callback arguments are emitted', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/ShadowedCapture.tsrx',
+		source: `
+function Child({ label, onTrace }: { label: string; onTrace: (value: string) => void }) @{
+	<>
+		<button onClick={() => { const label = "local"; onTrace(label); }}>Local</button>
+		<button onClick={() => { { const label = "nested"; onTrace(label); } }}>Nested</button>
+		<button onClick={() => { const { label } = { label: "pattern" }; onTrace(label); }}>Pattern</button>
+		<button onClick={() => { for (const label of ["loop"]) onTrace(label); }}>Loop</button>
+		<button onClick={() => onTrace(label)}>Prop</button>
+	</>
+}
+export function App() @{
+	<Child label="edge" onTrace={(value) => console.log(value)} />
+}
+`,
+		symbols: [],
+	});
+	const handlers = result.symbolModules.modules.filter(
+		(module) => module.kind === 'event-handler',
+	);
+	const local = handlers.find((module) => module.source.includes('"local"'));
+	const nested = handlers.find((module) => module.source.includes('"nested"'));
+	const pattern = handlers.find((module) => module.source.includes('"pattern"'));
+	const loop = handlers.find((module) => module.source.includes('"loop"'));
+	const prop = handlers.find(
+		(module) => module.source.includes('capture.invoke') && module.source.includes('capture.read'),
+	);
+
+	expect(local?.source).toContain('const label = "local";');
+	expect(local?.source).toContain('await context.capture.invoke(');
+	expect(local?.source).toContain('[label]');
+	expect(local?.source).not.toContain('context.capture.read(');
+	expect(nested?.source).toContain('const label = "nested";');
+	expect(nested?.source).toContain('[label]');
+	expect(nested?.source).not.toContain('context.capture.read(');
+	expect(pattern?.source).toContain('const { label } = { label: "pattern" };');
+	expect(pattern?.source).toContain('[label]');
+	expect(pattern?.source).not.toContain('context.capture.read(');
+	expect(loop?.source).toContain('for (const label of ["loop"])');
+	expect(loop?.source).toContain('[label]');
+	expect(loop?.source).not.toContain('context.capture.read(');
+	expect(prop?.source).toContain('await context.capture.invoke(');
+	expect(prop?.source).toContain('[context.capture.read(');
+});
+
+test('a callback forwarded through two component edges emits capture.invoke for the child call', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/ForwardedCallback.tsrx',
+		source: `
+function Child({ onForward }: { onForward: (value: number) => void }) @{
+	<button onClick={() => onForward(7)}>Forward</button>
+}
+function Parent({ onForward }: { onForward: (value: number) => void }) @{
+	<Child onForward={onForward} />
+}
+export function App() @{
+	<Parent onForward={(value) => console.log(value)} />
+}
+`,
+		symbols: [],
+	});
+	const child = result.symbolModules.modules.find(
+		(module) => module.kind === 'event-handler',
+	);
+	const childRow = result.boundSymbolResolver.rows.find(
+		(row) => row.baseSymbolId === child?.symbolId,
+	);
+
+	expect(child?.source).toContain('await context.capture.invoke(');
+	expect(child?.source).not.toContain('context.capture.read(');
+	expect(childRow).toEqual(
+		expect.objectContaining({
+			componentEdgePath: ['component-edge:1', 'component-edge:0'],
+			captureSlots: [
+				expect.objectContaining({
+					route: expect.objectContaining({ kind: 'callback-route' }),
+				}),
+			],
+		}),
+	);
+});
+
+test('a callback capture read without a call emits a diagnostic and no runnable symbol', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/CallbackRead.tsrx',
+		source: `
+function Child({ onForward }: { onForward: (value: number) => void }) @{
+	<button onClick={() => console.log(onForward)}>Inspect</button>
+}
+export function App() @{
+	<Child onForward={(value) => console.log(value)} />
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.captureAnalysis.diagnostics).toEqual([
+		expect.objectContaining({ code: 'MARKLESS_CAPTURE_OPAQUE_PROP' }),
+	]);
+	expect(
+		result.symbolModules.modules.some((module) => module.kind === 'event-handler'),
+	).toBe(false);
+});
+
 test('B908 preserves setTimeout deferral while splicing nested writes', () => {
 	const source = emitEventHandlerSource({
 		id: 'symbol:later',

@@ -86,7 +86,7 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 
 	for (const read of input.semanticGraph.stateReads) {
 		const sharedDefinitionId = read.sharedDefinitionId ?? null;
-		const lookup = scopedGraphLookup(input, sharedDefinitionId);
+		const lookup = scopedGraphLookup(input, sharedDefinitionId, read.componentName);
 		const resolved = resolveStateGraphPath(input, read.source, lookup, sharedDefinitionId);
 		if (!resolved) {
 			if (
@@ -110,6 +110,13 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 
 		reads.push({
 			source: read.source,
+			...(read.sourceSpan ? { sourceSpan: read.sourceSpan } : {}),
+			...((read.bindingId ?? resolved.bindingId)
+				? { bindingId: read.bindingId ?? resolved.bindingId }
+				: {}),
+			...((read.componentName ?? resolved.componentName)
+				? { componentName: read.componentName ?? resolved.componentName }
+				: {}),
 			graphNodeId: resolved.binding.id,
 			path: resolved.path,
 		});
@@ -117,7 +124,7 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 
 	for (const write of input.semanticGraph.stateWrites) {
 		const sharedDefinitionId = write.sharedDefinitionId ?? null;
-		const lookup = scopedGraphLookup(input, sharedDefinitionId);
+		const lookup = scopedGraphLookup(input, sharedDefinitionId, write.componentName);
 
 		if (write.optional === true) {
 			diagnostics.push(optionalChainWriteDiagnostic(write, input.semanticGraph.filename));
@@ -221,7 +228,8 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 		passId: 'state-lowering',
 		reads: uniqueBy(
 			reads,
-			(read) => `${read.graphNodeId}:${read.path.join('.')}:${read.source}`,
+			(read) =>
+				`${read.bindingId ?? ''}:${read.graphNodeId}:${read.path.join('.')}:${read.source}:${read.sourceSpan?.start ?? ''}:${read.sourceSpan?.end ?? ''}`,
 		),
 		writes,
 		diagnostics,
@@ -236,6 +244,8 @@ type GraphLookup = {
 type ResolvedStateGraphPath = {
 	readonly binding: SemanticGraphBinding;
 	readonly path: ReadonlyArray<string>;
+	readonly bindingId?: string;
+	readonly componentName?: string;
 };
 
 function templateExpressionGraphReadSource(source: string, lookup: GraphLookup): string | null {
@@ -268,10 +278,11 @@ function escapeRegExp(value: string): string {
 function scopedGraphLookup(
 	input: StateLoweringInput,
 	sharedDefinitionId: string | null,
+	componentName?: string,
 ): GraphLookup {
 	return {
-		bindings: graphBindingMap(input.semanticGraph, sharedDefinitionId),
-		aliases: semanticAliasMap(input.semanticGraph, sharedDefinitionId),
+		bindings: graphBindingMap(input.semanticGraph, sharedDefinitionId, componentName),
+		aliases: semanticAliasMap(input.semanticGraph, sharedDefinitionId, componentName),
 	};
 }
 

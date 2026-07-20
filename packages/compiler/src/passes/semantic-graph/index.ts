@@ -1,5 +1,6 @@
 import { parseModule } from '@tsrx/core';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
+import { sourceSpan } from '../../ast/source.ts';
 import type { SemanticGraphArtifact, SemanticGraphInput } from '../../artifacts.ts';
 import { applyMarklessAllowDirectives } from '../../diagnostics.ts';
 import {
@@ -77,11 +78,20 @@ export async function buildSemanticGraph(
 		if (!componentFunction) continue;
 
 		graph.components.push({ name: componentFunction.name });
-		collectComponentProps(componentFunction.node, state);
 		const previousComponentName = state.currentComponentName;
+		const previousComponentId = state.currentComponentId;
+		const componentSpan = sourceSpan(componentFunction.node, input.filename);
+		if (!componentSpan) {
+			throw new Error(
+				`TSRX parser omitted the source span for component "${componentFunction.name}".`,
+			);
+		}
 		state.currentComponentName = componentFunction.name;
+		state.currentComponentId = `component:${componentSpan.start}:${componentSpan.end}`;
+		collectComponentProps(componentFunction.node, state);
 		walk(componentFunction.node.body as AnyNode, state);
 		state.currentComponentName = previousComponentName;
+		state.currentComponentId = previousComponentId;
 	}
 
 	finalizeComputedDependencies(state);

@@ -1,11 +1,114 @@
 import { expect, test } from 'vitest';
 import {
 	buildSemanticGraph,
+	compileTsrxModule,
 	createProtocolViewPayload,
 	lowerStateAccess,
 	planPayloadArena,
 	planSymbolResolver,
 } from '../src/index.ts';
+
+test('mixed local graph and callback captures keep the child event instance-bound', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/MixedCaptureView.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+function Child({ label, onTrace }: { label: string; onTrace: (payload: { count: number; label: string }) => void }) @{
+	let count = state(0);
+	<button onClick={() => { count++; onTrace({ count, label }); }}>Increment</button>
+}
+
+export function App() @{
+	let observed = state(0);
+	<main><Child label="trace" onTrace={(payload) => observed = payload.count} /><output>{observed}</output></main>
+}
+`,
+		symbols: [],
+	});
+	const childHandler = result.captureAnalysis.extractedSymbols.find(
+		(symbol) => symbol.kind === 'event-handler' && symbol.owner?.componentName === 'Child',
+	);
+	const boundRow = result.boundSymbolResolver.rows.find(
+		(row) => row.baseSymbolId === childHandler?.symbolId,
+	);
+	const childModule = result.symbolModules.modules.find(
+		(module) => module.symbolId === childHandler?.symbolId,
+	);
+
+	expect(boundRow).toEqual(
+		expect.objectContaining({
+			componentEdgePath: ['component-edge:0'],
+			captureSlots: expect.arrayContaining([
+				expect.objectContaining({ route: expect.objectContaining({ kind: 'callback-route' }) }),
+				expect.objectContaining({
+					route: expect.objectContaining({ kind: 'compiler-known-constant', value: 'trace' }),
+				}),
+			]),
+		}),
+	);
+	expect(boundRow?.captureSlots).not.toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({ route: expect.objectContaining({ graphNodeId: 'state:count' }) }),
+		]),
+	);
+	expect(result.protocolView.events[0]?.symbolIds).toEqual([boundRow?.id]);
+	expect(result.publicRenderModule.csrModuleSource).toContain(
+		`${JSON.stringify(childHandler?.symbolId)}:${JSON.stringify(boundRow?.id)}`,
+	);
+	expect(childModule?.source).toContain(
+		'{ count: context.graph.read("state:count"), label: context.capture.read(',
+	);
+});
+
+test('composed child event records use the instance-bound resolver ID', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/BoundView.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+function Child({ label, onUse }: { label: string; onUse: (value: string) => void }) @{
+	<button onClick={() => onUse(label)}>Use</button>
+}
+
+export function App() @{
+	let selected = state('none');
+	<Child label="first" onUse={(value) => selected = value} />
+}
+`,
+		symbols: [],
+	});
+	const childHandler = result.captureAnalysis.extractedSymbols.find(
+		(symbol) => symbol.kind === 'event-handler' && symbol.owner?.componentName === 'Child',
+	);
+	const boundRow = result.boundSymbolResolver.rows.find(
+		(row) => row.baseSymbolId === childHandler?.symbolId,
+	);
+	const childEvent = result.protocolView.events.find((event) =>
+		event.symbolIds.includes(boundRow?.id ?? ''),
+	);
+	const rootResult = await compileTsrxModule({
+		filename: 'src/RootView.tsrx',
+		source: `
+import { state } from '@markless/core';
+export function App() @{
+	let selected = state('none');
+	<button onClick={() => selected = 'root'}>Root</button>
+}
+`,
+		symbols: [],
+	});
+	const rootHandler = rootResult.symbolResolver.symbols.find(
+		(symbol) => symbol.kind === 'event-handler',
+	);
+
+	expect(boundRow).toBeDefined();
+	expect(childEvent?.symbolIds).toEqual([boundRow?.id]);
+	expect(result.publicRenderModule.csrModuleSource).toContain(boundRow!.id);
+	expect(result.publicRenderModule.ssrModuleSource).toContain(boundRow!.id);
+	expect(rootResult.boundSymbolResolver.rows).toEqual([]);
+	expect(rootResult.protocolView.events[0]?.symbolIds).toEqual([rootHandler?.id]);
+});
 
 const source = `
 import { state } from '@markless/core';

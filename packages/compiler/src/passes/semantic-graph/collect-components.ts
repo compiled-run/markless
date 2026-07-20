@@ -20,7 +20,10 @@ import type { SemanticGraphWalk, WalkState } from './types.ts';
 
 export function collectComponentProps(component: AnyNode, state: WalkState): void {
 	const firstParam = asNodes(component.params)[0];
-	if (!firstParam) return;
+	if (!firstParam || !state.currentComponentId || !state.currentComponentName) return;
+	const span = sourceSpan(firstParam, state.filename);
+	if (!span) return;
+	const bindingId = `binding:${span.start}:${span.end}`;
 
 	if (firstParam.type === 'Identifier') {
 		const name = getIdentifierName(firstParam);
@@ -30,9 +33,21 @@ export function collectComponentProps(component: AnyNode, state: WalkState): voi
 			id: `prop:${name}`,
 			name,
 			kind: 'prop',
+			bindingId,
+			componentId: state.currentComponentId,
+			componentName: state.currentComponentName,
+			sourceSpan: span,
 			declarationKind: 'const',
 			writable: false,
 			valueKind: 'object',
+		});
+		state.graph.componentPropBindings.push({
+			componentId: state.currentComponentId,
+			componentName: state.currentComponentName,
+			bindingId,
+			localName: name,
+			propPath: [],
+			sourceSpan: span,
 		});
 		return;
 	}
@@ -43,11 +58,19 @@ export function collectComponentProps(component: AnyNode, state: WalkState): voi
 		id: 'prop:props',
 		name: 'props',
 		kind: 'prop',
+		bindingId,
+		componentId: state.currentComponentId,
+		componentName: state.currentComponentName,
+		sourceSpan: span,
 		declarationKind: 'const',
 		writable: false,
 		valueKind: 'object',
 	});
-	collectObjectPatternAliases(firstParam, 'props', 'const', state);
+	collectObjectPatternAliases(firstParam, 'props', 'const', state, {
+		componentId: state.currentComponentId,
+		componentName: state.currentComponentName,
+		propPath: [],
+	});
 }
 
 export function collectComponentEdge(
@@ -90,6 +113,8 @@ function componentPropBindings(
 	node: AnyNode,
 	state: WalkState,
 ): ReadonlyArray<SemanticComponentPropBinding> {
+	// Keep the legacy edge projection stable until bound-symbol emission consumes
+	// the scoped capture routes introduced by this package.
 	const bindings = graphBindingMap(state.graph);
 	const aliases = semanticAliasMap(state.graph);
 	const props: SemanticComponentPropBinding[] = [];
@@ -151,10 +176,12 @@ function componentPropBindings(
 			continue;
 		}
 
-		const kind: 'serializable' | 'opaque' = isSerializableLiteral(expression ?? value)
-			? 'serializable'
-			: 'opaque';
-		props.push({ name, source, kind, sourceSpan: span });
+		const literal = serializableLiteralValue(expression ?? value);
+		props.push(
+			literal.known
+				? { name, source, kind: 'serializable', value: literal.value, sourceSpan: span }
+				: { name, source, kind: 'opaque', sourceSpan: span },
+		);
 	}
 
 	return props;
@@ -194,7 +221,8 @@ function callbackParameterUnsupportedReason(parameters: ReadonlyArray<AnyNode>):
 		return properties.some(
 			(property) =>
 				property.type === 'RestElement' ||
-				(property.type === 'Property' && (property.value as AnyNode | undefined)?.type === 'AssignmentPattern'),
+				(property.type === 'Property' &&
+					(property.value as AnyNode | undefined)?.type === 'AssignmentPattern'),
 		)
 			? 'its top-level object pattern contains a default or rest binding'
 			: null;
@@ -209,6 +237,11 @@ function callbackParameterUnsupportedReason(parameters: ReadonlyArray<AnyNode>):
 	return 'its parameter uses a default or rest binding';
 }
 
-function isSerializableLiteral(node: AnyNode | undefined): boolean {
-	return !node || node.type === 'Literal';
+function serializableLiteralValue(
+	node: AnyNode | undefined,
+): { readonly known: true; readonly value: unknown } | { readonly known: false } {
+	if (!node) return { known: true, value: true };
+	if (node.type !== 'Literal') return { known: false };
+
+	return { known: true, value: node.value };
 }

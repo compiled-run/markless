@@ -9,6 +9,7 @@ import type {
 	ResumeKeyedRepeatRowEvent,
 	ResumeRuntimeErrorContext,
 	ResumeRuntimeInput,
+	ResumeSymbolContext,
 } from './resume-types.ts';
 
 export type ResumeRowEventMatch = {
@@ -164,16 +165,22 @@ export function createEventWiring(input: {
 			}
 			const activation = input.activateBehaviorsFromTrigger(eventRecord.hostNodeId);
 			if (activation) await activation;
+			const invokeSymbol = async (symbolId: string, context: ResumeSymbolContext) => {
+				const symbol = await input.loadSymbol(symbolId);
+				const result = symbol({ ...context, invokeCallback, invokeSymbol });
+				return isPromiseLike(result) ? await result : result;
+			};
+			const baseContext = {
+				graph: input.graph,
+				event,
+				element,
+				getElementHandle: input.elementHandles.get,
+			} as ResumeSymbolContext;
+			const invokeCallback = (symbolId: string, args: ReadonlyArray<unknown>) =>
+				invokeSymbol(symbolId, { ...baseContext, args, invokeCallback, invokeSymbol });
 			for (const symbolId of eventRecord.symbolIds) {
 				activeSymbolId = symbolId;
-				const symbol = await input.loadSymbol(symbolId);
-				const result = symbol({
-					graph: input.graph,
-					event,
-					element,
-					getElementHandle: input.elementHandles.get,
-				});
-				if (isPromiseLike(result)) await result;
+				await invokeSymbol(symbolId, baseContext);
 			}
 		} catch (error) {
 			await input.reportRuntimeError(error, {

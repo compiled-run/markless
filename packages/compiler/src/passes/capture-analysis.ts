@@ -2,29 +2,412 @@ import type {
 	CaptureAnalysisArtifact,
 	CaptureAnalysisDiagnostic,
 	CaptureAnalysisInput,
+	CaptureSlot,
+	CaptureSlotRoute,
+	LoweredStateRead,
 	PlannedSymbol,
+	SemanticComponentEdge,
 	SemanticLocalBinding,
 } from '../artifacts.ts';
+import {
+	graphBindingMap,
+	resolveGraphPath,
+	semanticAliasMap,
+} from '../artifact-helpers/graph-paths.ts';
+import { childNodes, type AnyNode } from '../ast/nodes.ts';
+import { parseJavaScriptModule } from '../js-ast.ts';
 
 export function analyzeCaptures(input: CaptureAnalysisInput): CaptureAnalysisArtifact {
-	const extractedSymbols = input.symbolResolver.symbols.map((symbol) => ({
-		symbolId: symbol.id,
-		kind: symbol.kind,
-		source: symbolSource(symbol),
-	}));
-	const diagnostics = extractedSymbols.flatMap((symbol) =>
-		input.semanticGraph.localBindings.flatMap((binding) =>
-			isCaptured(symbol.source, binding.name)
-				? [unsupportedCaptureDiagnostic(symbol, binding)]
-				: [],
+	const localSymbols = input.symbolResolver.symbols.map((symbol) => {
+		const captureSlots = symbolCaptureSlots(symbol, input);
+		const firstOwner = captureSlots[0]?.owner;
+		return {
+			symbolId: symbol.id,
+			kind: symbol.kind,
+			source: symbolSource(symbol),
+			...(firstOwner?.componentId || firstOwner?.componentName
+				? {
+						owner: {
+							...(firstOwner.componentId
+								? { componentId: firstOwner.componentId }
+								: {}),
+							...(firstOwner.componentName
+								? { componentName: firstOwner.componentName }
+								: {}),
+						},
+					}
+				: {}),
+			captureSlots,
+		};
+	});
+	const extractedSymbols = [...localSymbols, ...importedCaptureSymbols(input)];
+	const diagnostics = [
+		...extractedSymbols.flatMap((symbol) => opaqueSlotDiagnostics(symbol)),
+		...extractedSymbols.flatMap((symbol) =>
+			input.semanticGraph.localBindings.flatMap((binding) =>
+				isCaptured(symbol.source, binding.name)
+					? [unsupportedCaptureDiagnostic(symbol, binding)]
+					: [],
+			),
 		),
-	);
+	];
 
 	return {
 		passId: 'capture-analysis',
 		extractedSymbols,
 		diagnostics,
 	};
+}
+
+function importedCaptureSymbols(
+	input: CaptureAnalysisInput,
+): CaptureAnalysisArtifact['extractedSymbols'] {
+	return (input.symbols ?? []).flatMap((symbol) => {
+		if (!symbol.captureSymbol || !symbol.componentEdgeId) return [];
+		const edge = input.semanticGraph.componentEdges.find(
+			(candidate) => candidate.id === symbol.componentEdgeId,
+		);
+		if (!edge) return [];
+		return [
+			{
+				...symbol.captureSymbol,
+				loaderSymbolId: symbol.id,
+				captureSlots: symbol.captureSymbol.captureSlots.map((slot) => ({
+					...slot,
+					routes: slot.propName
+						? [propCaptureRoute([edge], slot.propName, slot.path, input)]
+						: slot.routes.map((route) =>
+								route.kind === 'graph-reference'
+									? {
+											...route,
+											componentEdgeId: edge.id,
+											componentEdgePath: [edge.id],
+										}
+									: route,
+							),
+				})),
+			},
+		];
+	});
+}
+
+function symbolCaptureSlots(
+	symbol: PlannedSymbol,
+	input: CaptureAnalysisInput,
+): ReadonlyArray<CaptureSlot> {
+	if (!('reads' in symbol) || !symbol.reads) return [];
+
+	return symbol.reads.map((read) => captureSlot(read, symbol, input));
+}
+
+function captureSlot(
+	read: LoweredStateRead,
+	symbol: PlannedSymbol,
+	input: CaptureAnalysisInput,
+): CaptureSlot {
+	const declaration = read.bindingId
+		? input.semanticGraph.componentPropBindings.find(
+				(binding) => binding.bindingId === read.bindingId,
+			)
+		: undefined;
+	const componentName = declaration?.componentName ?? read.componentName;
+	const propName = read.graphNodeId.startsWith('prop:') ? read.path[0] : undefined;
+	const routePath = propName ? read.path.slice(1) : read.path;
+	let routes = propName
+		? propCaptureRoutes(componentName, propName, routePath, input)
+		: [
+				{
+					kind: 'graph-reference' as const,
+					graphNodeId: read.graphNodeId,
+					path: read.path,
+				},
+			];
+	if (
+		routes.some((route) => route.kind === 'callback-route') &&
+		!sourceInvokesReference(symbolSource(symbol), read.source)
+	) {
+		routes = routes.map((route) =>
+			route.kind === 'callback-route'
+				? {
+						kind: 'unsupported-opaque' as const,
+						componentEdgeId: route.componentEdgeId,
+						...(route.componentEdgePath
+							? { componentEdgePath: route.componentEdgePath }
+							: {}),
+						expression: read.source,
+						...(read.sourceSpan ? { sourceSpan: read.sourceSpan } : {}),
+					}
+				: route,
+		);
+	}
+	const spanKey = read.sourceSpan
+		? `${read.sourceSpan.start}:${read.sourceSpan.end}`
+		: `${read.graphNodeId}:${read.path.join('.')}`;
+
+	return {
+		id: `capture-slot:${read.bindingId ?? read.graphNodeId}:${spanKey}`,
+		bindingId: read.bindingId ?? `graph-binding:${read.graphNodeId}`,
+		source: read.source,
+		...(read.sourceSpan ? { sourceSpan: read.sourceSpan } : {}),
+		owner: {
+			...(declaration?.componentId ? { componentId: declaration.componentId } : {}),
+			...(componentName ? { componentName } : {}),
+			...(declaration?.sourceSpan ? { declarationSpan: declaration.sourceSpan } : {}),
+		},
+		...(propName ? { propName } : {}),
+		path: routePath,
+		routes,
+	};
+}
+
+function propCaptureRoutes(
+	componentName: string | undefined,
+	propName: string,
+	readPath: ReadonlyArray<string>,
+	input: CaptureAnalysisInput,
+): ReadonlyArray<CaptureSlotRoute> {
+	const edges = componentName
+		? input.semanticGraph.componentEdges.filter(
+				(edge) => edge.childComponentName === componentName,
+			)
+		: [];
+	if (edges.length === 0) {
+		return [
+			{ kind: 'graph-reference', graphNodeId: 'prop:props', path: [propName, ...readPath] },
+		];
+	}
+
+	return edges.flatMap((edge) =>
+		componentEdgePathsEndingAt(edge, input.semanticGraph.componentEdges).map((path) =>
+			propCaptureRoute(path, propName, readPath, input),
+		),
+	);
+}
+
+function propCaptureRoute(
+	componentEdgePath: ReadonlyArray<SemanticComponentEdge>,
+	propName: string,
+	readPath: ReadonlyArray<string>,
+	input: CaptureAnalysisInput,
+): CaptureSlotRoute {
+	const terminalEdge = componentEdgePath.at(-1);
+	if (!terminalEdge) {
+		throw new Error('Capture route planning requires a terminal component edge.');
+	}
+	return resolvePropCaptureRoute(
+		componentEdgePath,
+		componentEdgePath.length - 1,
+		propName,
+		[],
+		readPath,
+		terminalEdge.id,
+		input,
+	);
+}
+
+function resolvePropCaptureRoute(
+	componentEdgePath: ReadonlyArray<SemanticComponentEdge>,
+	edgeIndex: number,
+	propName: string,
+	forwardedPath: ReadonlyArray<string>,
+	readPath: ReadonlyArray<string>,
+	terminalEdgeId: string,
+	input: CaptureAnalysisInput,
+): CaptureSlotRoute {
+	const edge = componentEdgePath[edgeIndex];
+	if (!edge) throw new Error('Capture route ancestry ended before its terminal value.');
+	const edgePathIds = componentEdgePath.map((candidate) => candidate.id);
+	const prop = edge.props.find((candidate) => candidate.name === propName);
+	if (!prop) {
+		return {
+			kind: 'unsupported-opaque',
+			componentEdgeId: terminalEdgeId,
+			componentEdgePath: edgePathIds,
+			expression: propName,
+		};
+	}
+	if (prop.kind === 'graph-reference') {
+		const scoped = resolveGraphPath(
+			prop.source,
+			graphBindingMap(input.semanticGraph, undefined, edge.parentComponentName),
+			semanticAliasMap(input.semanticGraph, undefined, edge.parentComponentName),
+		);
+		if (scoped?.binding.kind === 'prop') {
+			const upstreamPropName = scoped.path[0];
+			if (edgeIndex > 0 && upstreamPropName) {
+				return resolvePropCaptureRoute(
+					componentEdgePath,
+					edgeIndex - 1,
+					upstreamPropName,
+					[...scoped.path.slice(1), ...forwardedPath],
+					readPath,
+					terminalEdgeId,
+					input,
+				);
+			}
+			return {
+				kind: 'unsupported-opaque',
+				componentEdgeId: terminalEdgeId,
+				componentEdgePath: edgePathIds,
+				expression: prop.source,
+				...(prop.sourceSpan ? { sourceSpan: prop.sourceSpan } : {}),
+			};
+		}
+		return {
+			kind: 'graph-reference',
+			componentEdgeId: terminalEdgeId,
+			componentEdgePath: edgePathIds,
+			graphNodeId: scoped?.binding.id ?? prop.graphNodeId,
+			path: [...(scoped?.path ?? prop.path), ...forwardedPath, ...readPath],
+		};
+	}
+	if (prop.kind === 'serializable') {
+		return createCompilerKnownConstantCaptureRoute(
+			terminalEdgeId,
+			edgePathIds,
+			valueAtPath(prop.value, forwardedPath),
+		);
+	}
+	if (prop.kind === 'callback' && forwardedPath.length === 0 && readPath.length === 0) {
+		const callbackSymbol = input.symbolResolver.symbols.find(
+			(symbol) =>
+				symbol.kind === 'callback-prop' &&
+				symbol.componentEdgeId === edge.id &&
+				symbol.propName === propName,
+		);
+		if (callbackSymbol) {
+			return {
+				kind: 'callback-route',
+				componentEdgeId: terminalEdgeId,
+				componentEdgePath: edgePathIds,
+				callbackSymbolId: callbackSymbol.id,
+			};
+		}
+	}
+
+	return {
+		kind: 'unsupported-opaque',
+		componentEdgeId: terminalEdgeId,
+		componentEdgePath: edgePathIds,
+		expression: prop.source,
+		...(prop.sourceSpan ? { sourceSpan: prop.sourceSpan } : {}),
+	};
+}
+
+export function createCompilerKnownConstantCaptureRoute(
+	componentEdgeId: string,
+	componentEdgePath: ReadonlyArray<string>,
+	value: unknown,
+): Extract<CaptureSlotRoute, { readonly kind: 'compiler-known-constant' }> {
+	if (value === undefined) {
+		throw new Error(
+			`Cannot construct compiler-known constant capture route without a materialized value for component edge ${componentEdgeId}.`,
+		);
+	}
+	return {
+		kind: 'compiler-known-constant',
+		componentEdgeId,
+		componentEdgePath,
+		value,
+	};
+}
+
+function componentEdgePathsEndingAt(
+	edge: SemanticComponentEdge,
+	edges: ReadonlyArray<SemanticComponentEdge>,
+	seen: ReadonlySet<string> = new Set(),
+): ReadonlyArray<ReadonlyArray<SemanticComponentEdge>> {
+	if (seen.has(edge.id)) return [];
+	const nextSeen = new Set(seen).add(edge.id);
+	const incoming = edges.filter(
+		(candidate) =>
+			candidate.childComponentName === edge.parentComponentName &&
+			!nextSeen.has(candidate.id),
+	);
+	if (incoming.length === 0) return [[edge]];
+	return incoming.flatMap((parent) =>
+		componentEdgePathsEndingAt(parent, edges, nextSeen).map((path) => [...path, edge]),
+	);
+}
+
+function valueAtPath(value: unknown, path: ReadonlyArray<string>): unknown {
+	return path.reduce<unknown>((current, key) => {
+		if ((typeof current !== 'object' && typeof current !== 'function') || current === null) {
+			return undefined;
+		}
+		return (current as Record<string, unknown>)[key];
+	}, value);
+}
+
+function sourceInvokesReference(source: string, reference: string): boolean {
+	const moduleSource = `const __marklessCaptureSource = ${source};`;
+	let ast: AnyNode;
+	try {
+		ast = parseJavaScriptModule(moduleSource);
+	} catch {
+		return false;
+	}
+	let invoked = false;
+	const visit = (node: AnyNode): void => {
+		if (invoked) return;
+		if (node.type === 'CallExpression') {
+			const callee = node.callee as AnyNode | undefined;
+			if (
+				callee &&
+				typeof callee.start === 'number' &&
+				typeof callee.end === 'number' &&
+				moduleSource.slice(callee.start, callee.end) === reference
+			) {
+				invoked = true;
+				return;
+			}
+		}
+		for (const child of childNodes(node)) visit(child);
+	};
+	visit(ast);
+	return invoked;
+}
+
+function opaqueSlotDiagnostics(symbol: {
+	readonly symbolId: string;
+	readonly captureSlots: ReadonlyArray<CaptureSlot>;
+}): ReadonlyArray<CaptureAnalysisDiagnostic> {
+	const reportedRoutes = new Set<string>();
+	return symbol.captureSlots.flatMap((slot) =>
+		slot.routes.flatMap((route) => {
+			if (route.kind !== 'unsupported-opaque') return [];
+			const componentName = slot.owner.componentName ?? 'unknown component';
+			const propName = slot.propName ?? 'unknown prop';
+			const routeKey = `${route.componentEdgeId}:${propName}`;
+			if (reportedRoutes.has(routeKey)) return [];
+			reportedRoutes.add(routeKey);
+			return [
+				{
+					code: 'MARKLESS_CAPTURE_OPAQUE_PROP' as const,
+					severity: 'error' as const,
+					phase: 'capture-analysis' as const,
+					title: 'Lazy handler prop capture is not resumable',
+					message: `Cannot bind lazy symbol "${symbol.symbolId}" on component edge "${route.componentEdgeId}" because prop "${propName}" for "${componentName}" is the runtime expression "${route.expression}".`,
+					why: 'A demanded capture slot must route to a graph node, a compiler-known constant, or a callback symbol. This opaque runtime value cannot be reduced without adding a serialized capture protocol.',
+					...(route.sourceSpan ? { primarySpan: route.sourceSpan } : {}),
+					passId: 'capture-analysis' as const,
+					artifactKeys: ['semanticGraph', 'symbolResolver', 'captureAnalysis'],
+					symbolId: symbol.symbolId,
+					componentEdgeId: route.componentEdgeId,
+					componentName,
+					propName,
+					source: route.expression,
+					suggestions: [
+						{
+							message:
+								'Pass state()/computed() data, a literal value, or a callback prop to the lazy handler instead.',
+						},
+					],
+					docsUrl: 'https://markless.dev/errors/MARKLESS_CAPTURE_OPAQUE_PROP',
+				},
+			];
+		}),
+	);
 }
 
 function unsupportedCaptureDiagnostic(
@@ -183,7 +566,7 @@ function leadingArrowFunctionParameterNamesFrom(
 		const afterParams = nextNonWhitespaceIndex(source, paramsEnd + 1);
 		if (!startsWithArrow(source, afterParams)) return new Set();
 
-		return simpleParameterNames(source.slice(start + 1, paramsEnd));
+		return parameterBindingNames(source.slice(start + 1, paramsEnd));
 	}
 
 	const identifierEnd = identifierEndIndex(source, start);
@@ -239,19 +622,61 @@ function leadingArrowFunctionBodyStartFrom(source: string, start: number): numbe
 	return nextNonWhitespaceIndex(source, afterIdentifier + 2);
 }
 
-function simpleParameterNames(source: string): ReadonlySet<string> {
-	const names = new Set<string>();
-
-	for (const rawParam of source.split(',')) {
-		const param = rawParam
-			.trim()
-			.replace(/^\.\.\./, '')
-			.trim();
-		const nameEnd = identifierEndIndex(param, 0);
-		if (nameEnd > 0) names.add(param.slice(0, nameEnd));
+function parameterBindingNames(source: string): ReadonlySet<string> {
+	let ast: AnyNode;
+	try {
+		ast = parseJavaScriptModule(`const __marklessParameters = (${source}) => {};`);
+	} catch {
+		return new Set();
 	}
 
+	const names = new Set<string>();
+	const visit = (node: AnyNode): void => {
+		if (node.type === 'ArrowFunctionExpression') {
+			for (const parameter of nodeArray(node.params)) {
+				for (const name of bindingPatternNames(parameter)) names.add(name);
+			}
+			return;
+		}
+		for (const child of childNodes(node)) visit(child);
+	};
+	visit(ast);
 	return names;
+}
+
+function bindingPatternNames(node: AnyNode | undefined): ReadonlyArray<string> {
+	if (!node) return [];
+	if (node.type === 'Identifier') {
+		return typeof node.name === 'string' ? [node.name] : [];
+	}
+	if (node.type === 'AssignmentPattern') {
+		return bindingPatternNames(node.left as AnyNode | undefined);
+	}
+	if (node.type === 'RestElement') {
+		return bindingPatternNames(node.argument as AnyNode | undefined);
+	}
+	if (node.type === 'ObjectPattern') {
+		return nodeArray(node.properties).flatMap((property) =>
+			property.type === 'Property'
+				? bindingPatternNames(property.value as AnyNode | undefined)
+				: bindingPatternNames(property.argument as AnyNode | undefined),
+		);
+	}
+	if (node.type === 'ArrayPattern') {
+		return nodeArray(node.elements).flatMap((element) => bindingPatternNames(element));
+	}
+	return [];
+}
+
+function nodeArray(value: unknown): AnyNode[] {
+	return Array.isArray(value)
+		? value.filter(
+				(item): item is AnyNode =>
+					typeof item === 'object' &&
+					item !== null &&
+					typeof (item as AnyNode).type === 'string',
+			)
+		: [];
 }
 
 function topLevelDeclarationNames(source: string): ReadonlySet<string> {

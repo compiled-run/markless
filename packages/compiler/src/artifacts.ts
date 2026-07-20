@@ -14,6 +14,19 @@ export type SemanticComponent = {
 	readonly name: string;
 };
 
+// An authored prop binding is identified by its declaration span, not by the
+// shared legacy prop graph cell. This lets lazy-symbol consumers distinguish
+// same-named props declared by different components while package 2 migrates
+// emitted reads away from `prop:props`.
+export type SemanticComponentPropDeclaration = {
+	readonly componentId: string;
+	readonly componentName: string;
+	readonly bindingId: string;
+	readonly localName: string;
+	readonly propPath: ReadonlyArray<string>;
+	readonly sourceSpan: SourceSpan;
+};
+
 export type SemanticComponentPropBinding =
 	| {
 			readonly name: string;
@@ -29,6 +42,7 @@ export type SemanticComponentPropBinding =
 			readonly source: string;
 			readonly kind: 'callback' | 'serializable' | 'opaque';
 			readonly parameters?: ReadonlyArray<string>;
+			readonly value?: unknown;
 			readonly sourceSpan?: SourceSpan;
 	  };
 
@@ -63,6 +77,10 @@ export type SemanticGraphBinding = {
 	readonly id: string;
 	readonly name: string;
 	readonly kind: 'state' | 'computed' | 'element' | 'prop';
+	readonly bindingId?: string;
+	readonly componentId?: string;
+	readonly componentName?: string;
+	readonly sourceSpan?: SourceSpan;
 	readonly sharedDefinitionId?: string;
 	readonly declarationKind?: 'const' | 'let' | 'var';
 	readonly writable: boolean;
@@ -316,6 +334,8 @@ export type SemanticStateWrite = {
 export type SemanticStateRead = {
 	readonly source: string;
 	readonly sharedDefinitionId?: string;
+	readonly bindingId?: string;
+	readonly componentName?: string;
 	readonly sourceSpan?: SourceSpan;
 };
 
@@ -347,6 +367,10 @@ export type SemanticTemplateBindingTarget =
 export type SemanticGraphAlias = {
 	readonly name: string;
 	readonly target: string;
+	readonly bindingId?: string;
+	readonly componentId?: string;
+	readonly componentName?: string;
+	readonly propPath?: ReadonlyArray<string>;
 	readonly sharedDefinitionId?: string;
 	readonly excludedPaths?: ReadonlyArray<ReadonlyArray<string>>;
 	readonly declarationKind?: SemanticGraphBinding['declarationKind'];
@@ -405,6 +429,7 @@ export type SemanticGraphArtifact = {
 	readonly passId: 'tsrx-semantic-graph';
 	readonly filename: string;
 	readonly components: ReadonlyArray<SemanticComponent>;
+	readonly componentPropBindings: ReadonlyArray<SemanticComponentPropDeclaration>;
 	readonly componentEdges: ReadonlyArray<SemanticComponentEdge>;
 	readonly moduleImports: ReadonlyArray<SemanticModuleImport>;
 	readonly graphBindings: ReadonlyArray<SemanticGraphBinding>;
@@ -452,6 +477,9 @@ export type StateLoweringDiagnostic = CompilerDiagnostic & {
 
 export type LoweredStateRead = {
 	readonly source: string;
+	readonly sourceSpan?: SourceSpan;
+	readonly bindingId?: string;
+	readonly componentName?: string;
 	readonly graphNodeId: string;
 	readonly path: ReadonlyArray<string>;
 };
@@ -711,29 +739,129 @@ export type SymbolResolverPlan = {
 	readonly diagnostics: ReadonlyArray<PayloadArenaDiagnostic>;
 };
 
+export type BoundSymbolCaptureRoute = Exclude<
+	CaptureSlotRoute,
+	{ readonly kind: 'unsupported-opaque' }
+>;
+
+// A bound row is data only. Its opaque ID addresses one rendered component-edge
+// path; the generated resolver turns the row into an adapter at load time.
+export type BoundSymbolResolverRow = {
+	readonly id: string;
+	readonly baseSymbolId: string;
+	// Imported symbols keep their child-local base ID for view composition, while
+	// the parent resolver loads the edge-scoped symbol route registered by the bundler.
+	readonly loaderSymbolId?: string;
+	readonly componentEdgePath: ReadonlyArray<string>;
+	readonly ancestry: ReadonlyArray<{
+		readonly componentEdgeId: string;
+		readonly branchScopeIds: ReadonlyArray<string>;
+		readonly keyedRepeatScopeIds: ReadonlyArray<string>;
+	}>;
+	readonly captureSlots: ReadonlyArray<{
+		readonly slotId: string;
+		readonly path: ReadonlyArray<string>;
+		readonly route: BoundSymbolCaptureRoute;
+		readonly legacyGraphRead?: {
+			readonly graphNodeId: string;
+			readonly path: ReadonlyArray<string>;
+		};
+	}>;
+};
+
+export type BoundSymbolResolverArtifact = {
+	readonly passId: 'bound-symbol-resolver';
+	readonly rows: ReadonlyArray<BoundSymbolResolverRow>;
+};
+
+export type BoundSymbolResolverInput = {
+	readonly semanticGraph: SemanticGraphArtifact;
+	readonly captureAnalysis: CaptureAnalysisArtifact;
+};
+
 export type CaptureAnalysisInput = {
 	readonly semanticGraph: SemanticGraphArtifact;
 	readonly symbolResolver: SymbolResolverPlan;
+	readonly symbols?: SymbolResolverModuleInput['symbols'];
 };
 
 export type CaptureAnalysisDiagnostic = CompilerDiagnostic & {
 	readonly code:
 		| 'MARKLESS_CAPTURE_UNSUPPORTED_VALUE'
+		| 'MARKLESS_CAPTURE_OPAQUE_PROP'
 		| 'MARKLESS_BEHAVIOR_SYMBOL_EMIT_UNSUPPORTED'
 		| 'MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED';
 	readonly phase: 'capture-analysis';
 	readonly passId: 'capture-analysis';
 	readonly symbolId?: string;
+	readonly componentEdgeId?: string;
+	readonly componentName?: string;
+	readonly propName?: string;
 	readonly source: string;
+};
+
+export type CaptureSlotRoute =
+	| {
+			readonly kind: 'graph-reference';
+			readonly componentEdgeId?: string;
+			readonly componentEdgePath?: ReadonlyArray<string>;
+			readonly graphNodeId: string;
+			readonly path: ReadonlyArray<string>;
+	  }
+	| {
+			readonly kind: 'compiler-known-constant';
+			readonly componentEdgeId: string;
+			readonly componentEdgePath?: ReadonlyArray<string>;
+			readonly value: unknown;
+	  }
+	| {
+			readonly kind: 'callback-route';
+			readonly componentEdgeId: string;
+			readonly componentEdgePath?: ReadonlyArray<string>;
+			readonly callbackSymbolId: string;
+	  }
+	| {
+			readonly kind: 'unsupported-opaque';
+			readonly componentEdgeId: string;
+			readonly componentEdgePath?: ReadonlyArray<string>;
+			readonly expression: string;
+			readonly sourceSpan?: SourceSpan;
+	  };
+
+// A slot belongs to one authored binding in one component and may have one
+// route per incoming component edge. Repeated child instances therefore share
+// base symbol code without sharing instance values.
+export type CaptureSlot = {
+	readonly id: string;
+	readonly bindingId: string;
+	readonly source: string;
+	readonly sourceSpan?: SourceSpan;
+	readonly owner: {
+		readonly componentId?: string;
+		readonly componentName?: string;
+		readonly declarationSpan?: SourceSpan;
+	};
+	readonly propName?: string;
+	readonly path: ReadonlyArray<string>;
+	readonly routes: ReadonlyArray<CaptureSlotRoute>;
+};
+
+export type ExtractedCaptureSymbol = {
+	readonly symbolId: string;
+	readonly loaderSymbolId?: string;
+	readonly kind: PlannedSymbol['kind'];
+	readonly source: string;
+	readonly owner?: {
+		readonly componentId?: string;
+		readonly componentName?: string;
+	};
+	readonly captureSlots: ReadonlyArray<CaptureSlot>;
 };
 
 export type CaptureAnalysisArtifact = {
 	readonly passId: 'capture-analysis';
-	readonly extractedSymbols: ReadonlyArray<{
-		readonly symbolId: string;
-		readonly kind: PlannedSymbol['kind'];
-		readonly source: string;
-	}>;
+	readonly boundResolverRows?: ReadonlyArray<BoundSymbolResolverRow>;
+	readonly extractedSymbols: ReadonlyArray<ExtractedCaptureSymbol>;
 	readonly diagnostics: ReadonlyArray<CaptureAnalysisDiagnostic>;
 };
 
@@ -821,7 +949,10 @@ export type SymbolResolverModuleInput = {
 		readonly id: string;
 		readonly chunk: string;
 		readonly exportName: string;
+		readonly componentEdgeId?: string;
+		readonly captureSymbol?: ExtractedCaptureSymbol;
 	}>;
+	readonly boundSymbols?: ReadonlyArray<BoundSymbolResolverRow>;
 };
 
 export type SymbolResolverModuleManifest = readonly [
@@ -843,6 +974,7 @@ export type ProtocolViewPayloadInput = {
 	readonly payloadArena: PayloadArenaArtifact;
 	readonly symbolResolver: SymbolResolverPlan;
 	readonly publicRenderPlan: PublicRenderPlanArtifact;
+	readonly captureAnalysis?: CaptureAnalysisArtifact;
 };
 
 // Wire shape of a boundary arm record set: the payload arena plan with lazy
@@ -1161,6 +1293,7 @@ export type PublicRenderModuleInput = {
 	readonly semanticGraph: SemanticGraphArtifact;
 	readonly publicRenderPlan: PublicRenderPlanArtifact;
 	readonly symbolResolver: SymbolResolverPlan;
+	readonly captureAnalysis: CaptureAnalysisArtifact;
 	readonly protocolState: ProtocolStatePayload;
 	readonly protocolView: ProtocolViewPayload;
 };
@@ -1234,6 +1367,7 @@ export type CompileTsrxModuleResult = {
 	readonly stateLowering: StateLoweringArtifact;
 	readonly payloadArena: PayloadArenaArtifact;
 	readonly symbolResolver: SymbolResolverPlan;
+	readonly boundSymbolResolver: BoundSymbolResolverArtifact;
 	readonly captureAnalysis: CaptureAnalysisArtifact;
 	readonly protocolState: ProtocolStatePayload;
 	readonly protocolView: ProtocolViewPayload;

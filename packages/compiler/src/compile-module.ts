@@ -34,7 +34,7 @@ import {
 	createSymbolResolverModuleManifest,
 	emitSymbolResolverModule,
 } from './passes/symbol-resolver-module.ts';
-import { planSymbolResolver } from './passes/symbol-resolver.ts';
+import { planBoundSymbolResolver, planSymbolResolver } from './passes/symbol-resolver.ts';
 
 export async function compileTsrxModule(
 	input: CompileTsrxModuleInput,
@@ -76,6 +76,10 @@ export async function compileTsrxModule(
 		stateLowering: artifacts.stateLowering,
 		payloadArena: artifacts.payloadArena,
 		symbolResolver: artifacts.symbolResolver,
+		boundSymbolResolver: {
+			passId: 'bound-symbol-resolver',
+			rows: artifacts.captureAnalysis.boundResolverRows ?? [],
+		},
 		captureAnalysis: artifacts.captureAnalysis,
 		protocolState: artifacts.protocolState,
 		protocolView: artifacts.protocolView,
@@ -151,11 +155,20 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 			return {
 				...pass,
 				run({ inputs }) {
+					const semanticGraph = inputs.semanticGraph as SemanticGraphArtifact;
+					const captureAnalysis = analyzeCaptures({
+						semanticGraph,
+						symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
+						symbols: inputs.symbols as CompileTsrxModuleInput['symbols'],
+					});
 					return {
-						captureAnalysis: analyzeCaptures({
-							semanticGraph: inputs.semanticGraph as SemanticGraphArtifact,
-							symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
-						}),
+						captureAnalysis: {
+							...captureAnalysis,
+							boundResolverRows: planBoundSymbolResolver({
+								semanticGraph,
+								captureAnalysis,
+							}).rows,
+						},
 					};
 				},
 			};
@@ -195,6 +208,7 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 							semanticGraph,
 							publicRenderPlan: inputs.publicRenderPlan as PublicRenderPlanArtifact,
 							symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
+							captureAnalysis: inputs.captureAnalysis as CaptureAnalysisArtifact,
 							protocolState:
 								inputs.protocolState as CompileTsrxModuleResult['protocolState'],
 							protocolView:
@@ -228,6 +242,7 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 							payloadArena: inputs.payloadArena as PayloadArenaArtifact,
 							symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
 							publicRenderPlan: inputs.publicRenderPlan as PublicRenderPlanArtifact,
+							captureAnalysis: inputs.captureAnalysis as CaptureAnalysisArtifact,
 						}),
 					};
 				},
@@ -272,6 +287,7 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 					return {
 						runtimeDemandMap: createRuntimeDemandMap({
 							symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
+							captureAnalysis: inputs.captureAnalysis as CaptureAnalysisArtifact,
 							symbolModules: inputs.symbolModules as SymbolModulesArtifact,
 							publicRenderModule:
 								inputs.publicRenderModule as CompileTsrxModuleResult['publicRenderModule'],

@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { buildSemanticGraph, lowerStateAccess, planPayloadArena } from '../src/index.ts';
-import { planSymbolResolver } from '../src/passes/symbol-resolver.ts';
+import { planBoundSymbolResolver, planSymbolResolver } from '../src/passes/symbol-resolver.ts';
 
 const source = `
 import { state, computed } from '@markless/core';
@@ -157,6 +157,115 @@ test('planSymbolResolver assigns lazy symbols while resolver owns import boundar
 		}),
 	]);
 	expect(plan.diagnostics).toEqual([]);
+});
+
+test('planBoundSymbolResolver derives bound rows from edge paths and recorded ancestry', () => {
+	const artifact = planBoundSymbolResolver({
+		semanticGraph: {
+			passId: 'tsrx-semantic-graph',
+			filename: 'src/App.tsrx',
+			components: [],
+			componentPropBindings: [],
+			componentEdges: [
+				{
+					id: 'component-edge:parent',
+					parentComponentName: 'App',
+					childComponentName: 'Panel',
+					props: [],
+					children: { childCount: 1 },
+					branchScopeIds: ['branch:panel'],
+					keyedRepeatScopeIds: [],
+				},
+				{
+					id: 'component-edge:child',
+					parentComponentName: 'Panel',
+					childComponentName: 'Action',
+					props: [],
+					children: { childCount: 0 },
+					branchScopeIds: [],
+					keyedRepeatScopeIds: ['repeat:actions'],
+				},
+			],
+			moduleImports: [],
+			graphBindings: [],
+			sharedDefinitions: [],
+			sharedInstances: [],
+			aliases: [],
+			localBindings: [],
+			stateReads: [],
+			stateWrites: [],
+			events: [],
+			hostNodes: [],
+			keyedRepeats: [],
+			branchSites: [],
+			behaviors: [],
+			asyncBoundaries: [],
+			moduleGraphInterface: {
+				passId: 'module-graph-interface',
+				filename: 'src/App.tsrx',
+				exports: [],
+			},
+			diagnostics: [],
+		},
+		captureAnalysis: {
+			passId: 'capture-analysis',
+			diagnostics: [],
+			extractedSymbols: [
+				{
+					symbolId: 'symbol:action',
+					kind: 'event-handler',
+					source: '() => label',
+					owner: { componentName: 'Action' },
+					captureSlots: [
+						{
+							id: 'capture-slot:label',
+							bindingId: 'binding:label',
+							source: 'label',
+							owner: { componentName: 'Action' },
+							path: [],
+							propName: 'label',
+							routes: [
+								{
+									kind: 'compiler-known-constant',
+									componentEdgeId: 'component-edge:child',
+									value: 'Save',
+								},
+							],
+						},
+					],
+				},
+			],
+		},
+	});
+
+	expect(artifact.rows).toEqual([
+		expect.objectContaining({
+			baseSymbolId: 'symbol:action',
+			componentEdgePath: ['component-edge:parent', 'component-edge:child'],
+			ancestry: [
+				{
+					componentEdgeId: 'component-edge:parent',
+					branchScopeIds: ['branch:panel'],
+					keyedRepeatScopeIds: [],
+				},
+				{
+					componentEdgeId: 'component-edge:child',
+					branchScopeIds: [],
+					keyedRepeatScopeIds: ['repeat:actions'],
+				},
+			],
+			captureSlots: [
+				{
+					slotId: 'capture-slot:label',
+					path: [],
+					legacyGraphRead: { graphNodeId: 'prop:props', path: ['label'] },
+					route: expect.objectContaining({ value: 'Save' }),
+				},
+			],
+		}),
+	]);
+	expect(artifact.rows[0]?.id).toContain('component-edge%3Aparent');
+	expect(artifact.rows[0]?.id).not.toContain('Action');
 });
 
 test('planSymbolResolver assigns derive symbols for sync computed records', async () => {

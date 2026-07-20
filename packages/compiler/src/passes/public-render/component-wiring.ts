@@ -26,10 +26,11 @@ export function emitSsrComponent(
 	const placement = {
 		hostPrefix: `c${childIndex}:`,
 		symbolPrefix: edge?.importSource ? `c${childIndex}:` : '',
-		graphProps: graphReferenceProps(edge),
+		graphProps: componentEdgeGraphRoutes(edge),
+		boundSymbols: boundSymbolsForEdge(edge, context.callbackSymbols),
 	};
 
-	return `(await marklessSsrRenderChild(marklessSsrChildren, ${localName}, { ${props.join(', ')} }, { hostPrefix: ${JSON.stringify(placement.hostPrefix)}, symbolPrefix: ${JSON.stringify(placement.symbolPrefix)}, localIndex: marklessSsrHostLocators.length, graphProps: ${JSON.stringify(placement.graphProps)} }, marklessSsrRenderContext))`;
+	return `(await marklessSsrRenderChild(marklessSsrChildren, ${localName}, { ${props.join(', ')} }, { hostPrefix: ${JSON.stringify(placement.hostPrefix)}, symbolPrefix: ${JSON.stringify(placement.symbolPrefix)}, localIndex: marklessSsrHostLocators.length, graphProps: ${JSON.stringify(placement.graphProps)}, boundSymbols: ${JSON.stringify(placement.boundSymbols)} }, marklessSsrRenderContext))`;
 }
 
 // Component invocation inside a keyed repeat row (SSR): the row mapper
@@ -102,7 +103,7 @@ export function emitCsrComponent(
 		node === context.componentRoot
 			? `	root = marklessCsrReplaceChild(root, ${index}, ${childName}?.root);`
 			: `	marklessCsrReplaceChild(root, ${index}, ${childName}?.root);`,
-		`	marklessCsrChildren.push({ hostPrefix: ${JSON.stringify(`c${index}:`)}, symbolPrefix: ${JSON.stringify(edge?.importSource ? `c${index}:` : '')}, output: ${childName}, graphProps: ${JSON.stringify(graphReferenceProps(edge))} });`,
+		`	marklessCsrChildren.push({ hostPrefix: ${JSON.stringify(`c${index}:`)}, symbolPrefix: ${JSON.stringify(edge?.importSource ? `c${index}:` : '')}, output: ${childName}, graphProps: ${JSON.stringify(componentEdgeGraphRoutes(edge))}, boundSymbols: ${JSON.stringify(boundSymbolsForEdge(edge, context.callbackSymbols))} });`,
 	);
 	return JSON.stringify(`<span data-markless-csr-child="${index}"></span>`);
 }
@@ -158,6 +159,19 @@ function componentPropsSource(
 	return props;
 }
 
+function boundSymbolsForEdge(
+	edge: ComponentEdge | undefined,
+	symbols: ReadonlyMap<string, string>,
+): Readonly<Record<string, string>> {
+	if (!edge) return {};
+	const prefix = `bound:${edge.id}:`;
+	return Object.fromEntries(
+		[...symbols].flatMap(([key, value]) =>
+			key.startsWith(prefix) ? [[key.slice(prefix.length), value]] : [],
+		),
+	);
+}
+
 function ssrComponentPropsSource(
 	node: AnyNode,
 	context: SsrRenderContext,
@@ -194,11 +208,14 @@ function ssrComponentPropsSource(
 	return props;
 }
 
-export function graphReferenceProps(edge: ComponentEdge | undefined) {
-	return (edge?.props ?? []).flatMap((prop) =>
+export function componentEdgeGraphRoutes(edge: ComponentEdge | undefined) {
+	return (edge?.props ?? []).map((prop) =>
 		prop.kind === 'graph-reference'
-			? [{ name: prop.name, graphNodeId: prop.graphNodeId, path: prop.path }]
-			: [],
+			? { name: prop.name, graphNodeId: prop.graphNodeId, path: prop.path }
+			: {
+					name: prop.name,
+					kind: prop.kind === 'serializable' ? 'compiler-known-constant' : prop.kind,
+				},
 	);
 }
 

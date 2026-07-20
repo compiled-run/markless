@@ -68,6 +68,12 @@ export type EventOnlyResumeSymbolContext = {
 	readonly locals?: Readonly<Record<string, unknown>>;
 	readonly value?: unknown;
 	readonly behaviorInputs?: ReadonlyArray<unknown>;
+	readonly args?: ReadonlyArray<unknown>;
+	readonly invokeCallback?: (symbolId: string, args: ReadonlyArray<unknown>) => Promise<unknown>;
+	readonly invokeSymbol?: (
+		symbolId: string,
+		context: EventOnlyResumeSymbolContext,
+	) => Promise<unknown>;
 };
 
 export type EventOnlyResumeBehaviorCleanup = () => void;

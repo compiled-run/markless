@@ -196,7 +196,9 @@ test('lowerStateAccess resolves plain reads and writes to graph operations', asy
 	const lowered = lowerStateAccess({ semanticGraph });
 
 	expect(lowered.passId).toBe('state-lowering');
-	expect(lowered.reads).toEqual(
+	expect(
+		lowered.reads.map(({ source, graphNodeId, path }) => ({ source, graphNodeId, path })),
+	).toEqual(
 		expect.arrayContaining([
 			{
 				source: 'count',
@@ -468,7 +470,9 @@ test('lowerStateAccess resolves shared factory graph reads and writes to shared-
 
 	const lowered = lowerStateAccess({ semanticGraph });
 
-	expect(lowered.reads).toEqual(
+	expect(
+		lowered.reads.map(({ source, graphNodeId, path }) => ({ source, graphNodeId, path })),
+	).toEqual(
 		expect.arrayContaining([
 			{
 				source: 'data.user',
@@ -561,6 +565,7 @@ test('lowerStateAccess resolves array destructured aliases to indexed graph path
 		passId: 'tsrx-semantic-graph',
 		filename: 'src/Queue.tsrx',
 		components: [{ name: 'Queue' }],
+		componentPropBindings: [],
 		componentEdges: [],
 		graphBindings: [
 			{
@@ -631,6 +636,7 @@ test('lowerStateAccess reports a structured diagnostic for dynamic graph path wr
 		passId: 'tsrx-semantic-graph',
 		filename: 'src/Queue.tsrx',
 		components: [{ name: 'Queue' }],
+		componentPropBindings: [],
 		componentEdges: [],
 		graphBindings: [
 			{
@@ -698,6 +704,7 @@ test('lowerStateAccess reports a structured diagnostic for dynamic graph path re
 		passId: 'tsrx-semantic-graph',
 		filename: 'src/Queue.tsrx',
 		components: [{ name: 'Queue' }],
+		componentPropBindings: [],
 		componentEdges: [],
 		graphBindings: [
 			{
@@ -765,6 +772,7 @@ test('lowerStateAccess reports a structured diagnostic for writes to paths exclu
 		passId: 'tsrx-semantic-graph',
 		filename: 'src/Menu.tsrx',
 		components: [{ name: 'Menu' }],
+		componentPropBindings: [],
 		componentEdges: [],
 		graphBindings: [
 			{
@@ -839,6 +847,7 @@ test('lowerStateAccess reports a structured diagnostic for optional graph writes
 		passId: 'tsrx-semantic-graph',
 		filename: 'src/Queue.tsrx',
 		components: [{ name: 'Queue' }],
+		componentPropBindings: [],
 		componentEdges: [],
 		graphBindings: [
 			{

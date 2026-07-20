@@ -30,10 +30,11 @@ export function createSymbolResolverModuleManifest(
 
 export function emitSymbolResolverModule(input: SymbolResolverModuleInput): string {
 	const manifest = createSymbolResolverModuleManifest(input);
-	if (input.symbols.length > 0 && input.symbols.length <= SMALL_SYMBOL_SWITCH_LIMIT) {
-		return emitSmallSymbolResolverModule(input);
+	if ((input.boundSymbols?.length ?? 0) === 0) {
+		return input.symbols.length > 0 && input.symbols.length <= SMALL_SYMBOL_SWITCH_LIMIT
+			? emitSmallSymbolResolverModule(input)
+			: emitTableSymbolResolverModule(manifest);
 	}
-
 	return [
 		'export const symbolManifest = ',
 		JSON.stringify(manifest),
@@ -42,8 +43,11 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'const moduleUrls = symbolManifest[3];',
 		'const exportNames = symbolManifest[4];',
 		'const symbolRows = symbolManifest[5];',
+		`const boundRows = ${JSON.stringify(Object.fromEntries((input.boundSymbols ?? []).map((row) => [row.id, row])))};`,
 		'',
 		'export async function loadSymbol(id) {',
+		'	const bound = boundRows[id];',
+		'	if (bound) return loadBoundSymbol(bound);',
 		'	const row = symbolRows[id];',
 		'	if (!row) throw createUnknownSymbolError(id);',
 		'	return import(/* @vite-ignore */ moduleUrls[row[0]])',
@@ -51,6 +55,36 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'			runGeneratedSymbolChunkInitializers(mod);',
 		'			return mod[exportNames[row[1]]];',
 		'		});',
+		'}',
+		'',
+		'async function loadBoundSymbol(bound) {',
+		'	const base = await loadSymbol(bound.baseSymbolId);',
+		'	return (context) => base({ ...context, capture: createCaptureContext(context, bound) });',
+		'}',
+		'',
+		'function createCaptureContext(context, bound) {',
+		'	const slots = Object.fromEntries(bound.captureSlots.map((slot) => [slot.slotId, slot]));',
+		'	return {',
+		'		read(slotId) {',
+		'			const slot = requiredCaptureSlot(slots, slotId);',
+		'			const route = slot.route;',
+		'			if (route.kind === "compiler-known-constant") return slot.path.reduce((value, key) => value == null ? value : value[key], route.value);',
+		'			if (route.kind === "graph-reference") return context.graph.read(route.graphNodeId, route.path);',
+		'			throw new Error(`Capture slot ${slotId} is a callback route`);',
+		'		},',
+		'		invoke(slotId, args) {',
+		'			const route = requiredCaptureSlot(slots, slotId).route;',
+		'			if (route.kind !== "callback-route") throw new Error(`Capture slot ${slotId} is not a callback route`);',
+		'			if (typeof context.invokeSymbol !== "function") throw new Error("Bound callback invocation is unavailable");',
+		'			return context.invokeSymbol(route.callbackSymbolId, { ...context, event: context.event, args });',
+		'		},',
+		'	};',
+		'}',
+		'',
+		'function requiredCaptureSlot(slots, slotId) {',
+		'	const slot = slots[slotId];',
+		'	if (!slot) throw new Error(`Unknown capture slot ${slotId}`);',
+		'	return slot;',
 		'}',
 		'',
 		'function runGeneratedSymbolChunkInitializers(mod) {',
@@ -68,6 +102,46 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'		symbolId: String(id),',
 		'		docsUrl: "https://markless.dev/errors/MARKLESS_SYMBOL_UNKNOWN",',
 		'	});',
+		'}',
+		'',
+	].join('\n');
+}
+
+function emitTableSymbolResolverModule(manifest: SymbolResolverModuleManifest): string {
+	return [
+		'export const symbolManifest = ',
+		JSON.stringify(manifest),
+		';',
+		'',
+		'const moduleUrls = symbolManifest[3];',
+		'const exportNames = symbolManifest[4];',
+		'const symbolRows = symbolManifest[5];',
+		'',
+		'export async function loadSymbol(id) {',
+		'\tconst row = symbolRows[id];',
+		'\tif (!row) throw createUnknownSymbolError(id);',
+		'\treturn import(/* @vite-ignore */ moduleUrls[row[0]])',
+		'\t\t.then((mod) => {',
+		'\t\t\trunGeneratedSymbolChunkInitializers(mod);',
+		'\t\t\treturn mod[exportNames[row[1]]];',
+		'\t\t});',
+		'}',
+		'',
+		'function runGeneratedSymbolChunkInitializers(mod) {',
+		'\tfor (const name in mod) {',
+		'\t\tif (!name.startsWith("init__virtual_markless_symbol")) continue;',
+		'\t\tconst init = mod[name];',
+		'\t\tif (typeof init === "function") init();',
+		'\t}',
+		'}',
+		'',
+		'function createUnknownSymbolError(id) {',
+		'\treturn Object.assign(new Error(`Unknown async symbol ${id}`), {',
+		'\t\tcode: "MARKLESS_SYMBOL_UNKNOWN",',
+		'\t\tphase: "resume",',
+		'\t\tsymbolId: String(id),',
+		'\t\tdocsUrl: "https://markless.dev/errors/MARKLESS_SYMBOL_UNKNOWN",',
+		'\t});',
 		'}',
 		'',
 	].join('\n');

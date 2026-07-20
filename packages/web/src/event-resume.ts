@@ -71,6 +71,12 @@ export type EventResumeSymbolContext = {
 	readonly domUpdate?: EventResumeDomUpdateRecord;
 	readonly locals?: Readonly<Record<string, unknown>>;
 	readonly value?: unknown;
+	readonly args?: ReadonlyArray<unknown>;
+	readonly invokeCallback?: (symbolId: string, args: ReadonlyArray<unknown>) => Promise<unknown>;
+	readonly invokeSymbol?: (
+		symbolId: string,
+		context: EventResumeSymbolContext,
+	) => Promise<unknown>;
 };
 
 export type EventResumeSymbol = (
@@ -352,15 +358,22 @@ async function dispatchEvent(input: {
 	if (!matched?.element) return;
 
 	try {
+		const baseContext = {
+			graph: input.graph,
+			event: input.event,
+			element: matched.element,
+			getElementHandle: input.getElementHandle,
+		};
+		const invokeSymbol = async (symbolId: string, context: EventResumeSymbolContext) => {
+			const loaded = input.loadSymbol(symbolId);
+			const symbol = isPromiseLike(loaded) ? await loaded : loaded;
+			const result = symbol({ ...context, invokeCallback, invokeSymbol });
+			return isPromiseLike(result) ? await result : result;
+		};
+		const invokeCallback = (symbolId: string, args: ReadonlyArray<unknown>) =>
+			invokeSymbol(symbolId, { ...baseContext, args, invokeCallback, invokeSymbol });
 		for (const symbolId of matched.eventRecord.symbolIds) {
-			const loadedSymbol = input.loadSymbol(symbolId);
-			const symbol = isPromiseLike(loadedSymbol) ? await loadedSymbol : loadedSymbol;
-			const result = symbol({
-				graph: input.graph,
-				event: input.event,
-				element: matched.element,
-				getElementHandle: input.getElementHandle,
-			});
+			const result = invokeSymbol(symbolId, baseContext);
 			applyDomJournalResult(
 				isPromiseLike(result) ? await result : result,
 				input.elementsByHostId,

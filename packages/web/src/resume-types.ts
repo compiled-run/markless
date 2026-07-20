@@ -168,6 +168,9 @@ export type ResumeSymbolContext = {
 	readonly asyncBoundary?: ResumeAsyncBoundaryRecord;
 	readonly asyncRead?: ResumeAsyncBoundaryRead;
 	readonly status?: 'fulfilled' | 'rejected';
+	readonly args?: ReadonlyArray<unknown>;
+	readonly invokeCallback?: (symbolId: string, args: ReadonlyArray<unknown>) => Promise<unknown>;
+	readonly invokeSymbol?: (symbolId: string, context: ResumeSymbolContext) => Promise<unknown>;
 };
 export type ResumeBehaviorCleanup = () => void;
 export type ResumeSymbol = (

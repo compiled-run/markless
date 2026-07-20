@@ -1,6 +1,11 @@
 import { asNodes, childNodes, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import {
+	graphBindingMap,
+	resolveGraphPath,
+	semanticAliasMap,
+} from '../../artifact-helpers/graph-paths.ts';
+import {
 	stateWriteInComputedDiagnostic,
 	stateWriteInTemplateDiagnostic,
 	templateAsValueDiagnostic,
@@ -132,7 +137,53 @@ export function collectExpressionReads(node: AnyNode | undefined, state: WalkSta
 		node.type === 'FunctionExpression' ||
 		node.type === 'FunctionDeclaration'
 	) {
+		const previousShadowedBindings = state.shadowedBindingNames;
+		state.shadowedBindingNames = new Set(previousShadowedBindings);
+		for (const name of bindingNames(node.id as AnyNode | undefined)) {
+			state.shadowedBindingNames.add(name);
+		}
+		for (const parameter of asNodes(node.params)) {
+			for (const name of bindingNames(parameter)) state.shadowedBindingNames.add(name);
+		}
+		for (const name of functionScopedBindingNames(node.body as AnyNode | undefined)) {
+			state.shadowedBindingNames.add(name);
+		}
 		collectExpressionReads(node.body as AnyNode | undefined, state);
+		state.shadowedBindingNames = previousShadowedBindings;
+		return;
+	}
+
+	if (node.type === 'BlockStatement' || node.type === 'SwitchStatement') {
+		withShadowedBindings(state, blockScopedBindingNames(node), () => {
+			for (const child of childNodes(node)) collectExpressionReads(child, state);
+		});
+		return;
+	}
+
+	if (
+		node.type === 'ForStatement' ||
+		node.type === 'ForInStatement' ||
+		node.type === 'ForOfStatement'
+	) {
+		withShadowedBindings(state, forHeadBindingNames(node), () => {
+			for (const child of childNodes(node)) collectExpressionReads(child, state);
+		});
+		return;
+	}
+
+	if (node.type === 'CatchClause') {
+		withShadowedBindings(state, bindingNames(node.param as AnyNode | undefined), () => {
+			collectExpressionReads(node.body as AnyNode | undefined, state);
+		});
+		return;
+	}
+
+	if (node.type === 'VariableDeclaration') {
+		withShadowedBindings(state, declarationBindingNames(node), () => {
+			for (const declaration of asNodes(node.declarations)) {
+				collectExpressionReads(declaration.init as AnyNode | undefined, state);
+			}
+		});
 		return;
 	}
 
@@ -233,12 +284,109 @@ function isChainExpression(node: AnyNode | undefined): boolean {
 function addStateRead(node: AnyNode, state: WalkState): void {
 	const source = expressionSource(node, state.source);
 	if (!source) return;
+	const rootName = /^[$A-Z_a-z][$\w]*/.exec(source)?.[0];
+	if (rootName && state.shadowedBindingNames.has(rootName)) return;
+
+	const resolved = resolveGraphPath(
+		source,
+		graphBindingMap(state.graph, state.currentSharedDefinitionId, state.currentComponentName),
+		semanticAliasMap(state.graph, state.currentSharedDefinitionId, state.currentComponentName),
+	);
 
 	state.graph.stateReads.push({
 		source,
 		...sharedScope(state),
+		...(resolved?.bindingId ? { bindingId: resolved.bindingId } : {}),
+		...(resolved?.componentName
+			? { componentName: resolved.componentName }
+			: state.currentComponentName
+				? { componentName: state.currentComponentName }
+				: {}),
 		sourceSpan: sourceSpan(node, state.filename),
 	});
+}
+
+function bindingNames(node: AnyNode | undefined): string[] {
+	if (!node) return [];
+	if (node.type === 'Identifier') return [String(node.name ?? '')].filter(Boolean);
+	if (node.type === 'AssignmentPattern') return bindingNames(node.left as AnyNode | undefined);
+	if (node.type === 'RestElement') return bindingNames(node.argument as AnyNode | undefined);
+	if (node.type === 'ObjectPattern') {
+		return asNodes(node.properties).flatMap((property) =>
+			property.type === 'Property'
+				? bindingNames(property.value as AnyNode | undefined)
+				: bindingNames(property.argument as AnyNode | undefined),
+		);
+	}
+	if (node.type === 'ArrayPattern') {
+		return asNodes(node.elements).flatMap((element) => bindingNames(element));
+	}
+
+	return [];
+}
+
+function declarationBindingNames(node: AnyNode | undefined): string[] {
+	if (node?.type !== 'VariableDeclaration') return [];
+	return asNodes(node.declarations).flatMap((declaration) =>
+		bindingNames(declaration.id as AnyNode | undefined),
+	);
+}
+
+function blockScopedBindingNames(node: AnyNode): string[] {
+	const statements =
+		node.type === 'SwitchStatement'
+			? asNodes(node.cases).flatMap((switchCase) => asNodes(switchCase.consequent))
+			: asNodes(node.body);
+	return statements.flatMap((statement) => {
+		if (
+			statement.type === 'VariableDeclaration' &&
+			(statement.kind === 'const' || statement.kind === 'let')
+		) {
+			return declarationBindingNames(statement);
+		}
+		if (statement.type === 'FunctionDeclaration' || statement.type === 'ClassDeclaration') {
+			return bindingNames(statement.id as AnyNode | undefined);
+		}
+		return [];
+	});
+}
+
+function functionScopedBindingNames(node: AnyNode | undefined): string[] {
+	if (!node) return [];
+	if (
+		node.type === 'ArrowFunctionExpression' ||
+		node.type === 'FunctionExpression' ||
+		node.type === 'FunctionDeclaration'
+	) {
+		return [];
+	}
+	const own =
+		node.type === 'VariableDeclaration' && node.kind === 'var'
+			? declarationBindingNames(node)
+			: [];
+	return [...own, ...childNodes(node).flatMap(functionScopedBindingNames)];
+}
+
+function forHeadBindingNames(node: AnyNode): string[] {
+	return [node.init, node.left].flatMap((head) =>
+		declarationBindingNames(head as AnyNode | undefined),
+	);
+}
+
+function withShadowedBindings(
+	state: WalkState,
+	names: ReadonlyArray<string>,
+	visit: () => void,
+): void {
+	if (names.length === 0) {
+		visit();
+		return;
+	}
+	const previousShadowedBindings = state.shadowedBindingNames;
+	state.shadowedBindingNames = new Set(previousShadowedBindings);
+	for (const name of names) state.shadowedBindingNames.add(name);
+	visit();
+	state.shadowedBindingNames = previousShadowedBindings;
 }
 
 function sharedScope(state: WalkState): { readonly sharedDefinitionId?: string } {

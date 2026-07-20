@@ -127,6 +127,7 @@ export function emitSourceModule(input: {
 	readonly publicRenderSsrExportName: string | null;
 	readonly symbols: ReadonlyArray<SourceSymbolRow>;
 	readonly symbolRoutes: ReadonlyArray<SourceSymbolRoute>;
+	readonly hasBoundSymbols?: boolean;
 }) {
 	const symbolsOnly = input.environment === 'client' && input.clientOutput === 'symbols-only';
 	const routeSymbols = input.environment === 'client' && input.symbolRoutes.length > 0;
@@ -197,6 +198,7 @@ export function emitResumeModule(input: {
 	readonly symbols: ReadonlyArray<SourceSymbolRow>;
 	readonly symbolRoutes: ReadonlyArray<SourceSymbolRoute>;
 	readonly executionLog?: MarklessExecutionLogMode;
+	readonly hasBoundSymbols?: boolean;
 }) {
 	const routeSymbols = input.symbolRoutes.length > 0;
 	const resumeSymbolLoader = routeSymbols ? 'marklessSsrLoadSymbolRoute' : 'loadSymbol';
@@ -763,8 +765,13 @@ function emitExecutionLogLoader(): string {
 function emitLoadSymbol(input: {
 	readonly resolverId: string;
 	readonly symbols: ReadonlyArray<SourceSymbolRow>;
+	readonly hasBoundSymbols?: boolean;
 }) {
-	if (input.symbols.length > 0 && input.symbols.length <= SMALL_SYMBOL_DIRECT_LOAD_LIMIT) {
+	if (
+		!input.hasBoundSymbols &&
+		input.symbols.length > 0 &&
+		input.symbols.length <= SMALL_SYMBOL_DIRECT_LOAD_LIMIT
+	) {
 		return emitDirectSourceSymbolLoader(input.symbols);
 	}
 

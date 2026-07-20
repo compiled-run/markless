@@ -90,6 +90,9 @@ export function createMarklessRolldownPlugin(input: {
 	const internalOptions = (input.options ?? {}) as InternalMarklessRolldownOptions;
 	const virtualModules = new Map<string, MarklessVirtualModule>();
 	const transformManifests = new Map<string, MarklessTransformManifest>();
+	const importedChildren = new Map<string, ImportedChild>();
+	const importedChildSources = new Set<string>();
+	const emittedClientResolverSources = new Set<string>();
 	const sourceVirtualModules = new Map<string, Set<string>>();
 	const clientSymbolEntrySources = new Set<string>();
 	const executionLogEstimatedSizes = new Map<string, number>();
@@ -153,6 +156,9 @@ export function createMarklessRolldownPlugin(input: {
 			clientSymbolEntrySources.clear();
 			virtualModules.clear();
 			transformManifests.clear();
+			importedChildren.clear();
+			importedChildSources.clear();
+			emittedClientResolverSources.clear();
 			sourceVirtualModules.clear();
 			executionLogEstimatedSizes.clear();
 			dev.reset();
@@ -272,7 +278,7 @@ export function createMarklessRolldownPlugin(input: {
 			}
 			const source = pathname(id);
 			clearSourceVirtualModules(source, virtualModules, sourceVirtualModules);
-			const transformed = await transformTsrxModule({
+			let transformed = await transformTsrxModule({
 				filename: source,
 				source: code,
 				buildId: internalOptions.buildId,
@@ -315,6 +321,8 @@ export function createMarklessRolldownPlugin(input: {
 						: undefined,
 				devResumeReexport: internalOptions.dev === true && currentEnvironment === 'client',
 			});
+			// Register the first-pass artifact before loading children so the existing
+			// cross-module registry can validate both sides of the composition edge.
 			registerTransformArtifacts({
 				source,
 				result: transformed,
@@ -325,6 +333,90 @@ export function createMarklessRolldownPlugin(input: {
 				dev,
 				environment: currentEnvironment,
 			});
+			const resolvedChildren = await resolveImportedChildren.call(
+				this,
+				source,
+				transformed.manifest,
+			);
+			for (const child of resolvedChildren) {
+				importedChildren.set(importedChildKey(child), child);
+				importedChildSources.add(child.source);
+			}
+			for (const child of resolvedChildren) {
+				if (!transformManifests.has(child.source)) {
+					if (internalOptions.dev === true) {
+						await internalOptions.devServer?.transformRequest(
+							child.source,
+							currentEnvironment,
+						);
+					} else if (typeof this.load === 'function') {
+						await this.load({ id: child.source });
+					}
+				}
+				if (internalOptions.dev === true) {
+					validateImportedChild(child, transformManifests);
+				}
+			}
+			if (resolvedChildren.length > 0) {
+				transformed = await transformTsrxModule({
+					filename: source,
+					source: code,
+					buildId: internalOptions.buildId,
+					symbols: importedSymbolInputs(resolvedChildren, transformManifests),
+					executionLog: normalizeExecutionLogMode(internalOptions.executionLog),
+					executionLogModuleHooks:
+						internalOptions.dev === true && currentEnvironment === 'client',
+					inlineResumerDebug: internalOptions.inlineResumerDebug === true,
+					environment: currentEnvironment,
+					clientOutput:
+						currentEnvironment === 'client' &&
+						(clientSymbolEntrySources.has(source) || isSymbolOnlySourceRequest(id))
+							? 'symbols-only'
+							: undefined,
+					resumeModuleUrl:
+						internalOptions.dev === true && currentEnvironment === 'server'
+							? devBrowserSourceModuleUrl(
+									source,
+									getRoot(),
+									internalOptions.publicPath,
+								)
+							: undefined,
+					styleModuleUrl:
+						internalOptions.dev === true && currentEnvironment === 'server'
+							? (virtualId) =>
+									withQuery(
+										devBrowserVirtualModuleUrl(
+											virtualId,
+											internalOptions.publicPath,
+										),
+										{ direct: null },
+									)
+							: undefined,
+					headInjections:
+						internalOptions.dev === true && currentEnvironment === 'server'
+							? internalOptions.devInjections
+							: undefined,
+					devResumeReexport:
+						internalOptions.dev === true && currentEnvironment === 'client',
+				});
+			}
+			registerTransformArtifacts({
+				source,
+				result: transformed,
+				virtualModules,
+				transformManifests,
+				sourceVirtualModules,
+				executionLogEstimatedSizes,
+				dev,
+				environment: currentEnvironment,
+			});
+			for (const child of resolvedChildren) {
+				dev.record(
+					child.source,
+					[transformed.manifest.resolver.virtualModuleId],
+					currentEnvironment,
+				);
+			}
 			if (currentEnvironment === 'client' && isResumeSourceRequest(id)) {
 				const resumeModule = transformed.virtualModules.find(
 					(module) => module.type === 'resume',
@@ -333,18 +425,30 @@ export function createMarklessRolldownPlugin(input: {
 			}
 
 			if (currentEnvironment === 'client' && !internalOptions.dev) {
-				for (const module of transformed.virtualModules.filter(
-					(item) =>
-						item.type === 'symbol' ||
-						(item.type === 'resume' &&
-							internalOptions.emitResumeModules === true &&
-							clientSymbolEntrySources.has(source)),
-				)) {
+				for (const module of transformed.virtualModules.filter((item) => {
+					if (item.type === 'symbol') return true;
+					if (item.type === 'resolver') {
+						return (
+							(importedChildSources.has(source) ||
+								(transformed.manifest.captureMetadata?.boundResolverRows?.length ??
+									0) > 0) &&
+							!emittedClientResolverSources.has(source)
+						);
+					}
+					return (
+						item.type === 'resume' &&
+						internalOptions.emitResumeModules === true &&
+						clientSymbolEntrySources.has(source)
+					);
+				})) {
 					this.emitFile({
 						type: 'chunk',
 						id: module.id,
 						preserveSignature: 'strict',
 					});
+					if (module.type === 'resolver') {
+						emittedClientResolverSources.add(source);
+					}
 				}
 			}
 
@@ -353,6 +457,9 @@ export function createMarklessRolldownPlugin(input: {
 		generateBundle: {
 			order: 'post',
 			async handler(_, bundle) {
+				for (const child of importedChildren.values()) {
+					validateImportedChild(child, transformManifests);
+				}
 				if (getEnvironment(this) !== 'client') return;
 
 				stripEmptyPreloadWrappersFromChunks(bundle);
@@ -450,6 +557,100 @@ export function createMarklessRolldownPlugin(input: {
 	} satisfies Plugin & { api: MarklessRolldownPluginApi };
 
 	return plugin;
+}
+
+type ImportedChild = {
+	readonly parent: string;
+	readonly specifier: string;
+	readonly source: string;
+	readonly componentEdgeId?: string;
+};
+
+async function resolveImportedChildren(
+	this: {
+		resolve(
+			source: string,
+			importer?: string,
+			options?: { readonly skipSelf?: boolean },
+		): Promise<{ readonly id: string } | null>;
+	},
+	parent: string,
+	manifest: MarklessTransformManifest,
+): Promise<ImportedChild[]> {
+	return await Promise.all(
+		(manifest.symbolRoutes ?? []).map(async (route) => {
+			const resolvedImport = await this.resolve(route.importSource, parent, {
+				skipSelf: true,
+			});
+			const resolvedId =
+				typeof resolvedImport === 'string'
+					? resolvedImport
+					: resolvedImport && typeof resolvedImport === 'object' && 'id' in resolvedImport
+						? String(resolvedImport.id)
+						: fallbackImportedSource(parent, route.importSource);
+			return {
+				parent,
+				specifier: route.importSource,
+				source: pathname(resolvedId),
+				componentEdgeId: route.componentEdgeId,
+			};
+		}),
+	);
+}
+
+function importedSymbolInputs(
+	children: ReadonlyArray<ImportedChild>,
+	manifests: ReadonlyMap<string, MarklessTransformManifest>,
+): NonNullable<TransformTsrxModuleInput['symbols']> {
+	return children.flatMap((child) => {
+		const manifest = manifests.get(child.source);
+		if (!manifest?.captureMetadata || !child.componentEdgeId) return [];
+		return manifest.symbols.flatMap((symbol) => {
+			const captureSymbol = manifest.captureMetadata?.extractedSymbols.find(
+				(candidate) => candidate.symbolId === symbol.symbolId,
+			);
+			return captureSymbol?.captureSlots.some((slot) => slot.propName !== undefined)
+				? [
+						{
+							id: `imported:${encodeURIComponent(child.source)}:${symbol.symbolId}`,
+							chunk: symbol.virtualModuleId,
+							exportName: symbol.exportName,
+							componentEdgeId: child.componentEdgeId,
+							captureSymbol,
+						},
+					]
+				: [];
+		});
+	});
+}
+
+function fallbackImportedSource(parent: string, specifier: string): string {
+	const source = specifier.split('?')[0]!;
+	return isRelativeImport(source) ? resolve(dirname(parent), source) : source;
+}
+
+function importedChildKey(child: ImportedChild): string {
+	return `${child.parent}\0${child.specifier}\0${child.source}`;
+}
+
+function validateImportedChild(
+	child: ImportedChild,
+	manifests: ReadonlyMap<string, MarklessTransformManifest>,
+) {
+	const parentMetadata = manifests.get(child.parent)?.captureMetadata;
+	const childMetadata = manifests.get(child.source)?.captureMetadata;
+	if (
+		parentMetadata &&
+		childMetadata?.passId === parentMetadata.passId &&
+		Array.isArray(childMetadata.extractedSymbols) &&
+		Array.isArray(childMetadata.diagnostics)
+	) {
+		return;
+	}
+
+	throw new Error(
+		`MARKLESS_CAPTURE_METADATA_MISSING: Parent module ${JSON.stringify(child.parent)} composes imported child ${JSON.stringify(child.specifier)}, but its compiled artifact has no current capture metadata. Rebuild the child with the current Markless compiler and clear any stale build cache.`,
+	);
 }
 
 function executionAttributionRoots(

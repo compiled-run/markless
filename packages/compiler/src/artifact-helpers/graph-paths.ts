@@ -10,19 +10,36 @@ export function resolveGraphPath(
 	source: string,
 	bindings: ReadonlyMap<string, SemanticGraphBinding>,
 	aliases: ReadonlyMap<string, SemanticGraphAlias> = new Map(),
-): { readonly binding: SemanticGraphBinding; readonly path: ReadonlyArray<string> } | null {
+): ResolvedGraphPath | null {
 	const segments = splitStaticGraphPath(source);
-	return resolveGraphSegments(segments, bindings, aliases, new Set());
+	return resolveGraphSegments(segments, bindings, aliases, new Set(), undefined);
 }
+
+export type ResolvedGraphPath = {
+	readonly binding: SemanticGraphBinding;
+	readonly path: ReadonlyArray<string>;
+	readonly bindingId?: string;
+	readonly componentId?: string;
+	readonly componentName?: string;
+	readonly declarationSpan?: SemanticGraphBinding['sourceSpan'];
+};
 
 export function graphBindingMap(
 	graph: Pick<SemanticGraphArtifact, 'graphBindings'>,
 	sharedDefinitionId?: string | null,
+	componentName?: string | null,
 ): ReadonlyMap<string, SemanticGraphBinding> {
 	const bindings = new Map<string, SemanticGraphBinding>();
 
 	for (const binding of graph.graphBindings) {
 		if (!isInGraphScope(binding.sharedDefinitionId, sharedDefinitionId)) continue;
+		if (
+			componentName !== undefined &&
+			binding.componentName !== undefined &&
+			binding.componentName !== componentName
+		) {
+			continue;
+		}
 		bindings.set(binding.name, binding);
 	}
 
@@ -56,11 +73,19 @@ export function runtimeGraphDependencyPath(
 export function semanticAliasMap(
 	graph: Pick<SemanticGraphArtifact, 'aliases'>,
 	sharedDefinitionId?: string | null,
+	componentName?: string | null,
 ): ReadonlyMap<string, SemanticGraphAlias> {
 	const aliases = new Map<string, SemanticGraphAlias>();
 
 	for (const alias of graph.aliases) {
 		if (!isInGraphScope(alias.sharedDefinitionId, sharedDefinitionId)) continue;
+		if (
+			componentName !== undefined &&
+			alias.componentName !== undefined &&
+			alias.componentName !== componentName
+		) {
+			continue;
+		}
 		aliases.set(alias.name, alias);
 	}
 
@@ -104,7 +129,8 @@ function resolveGraphSegments(
 	bindings: ReadonlyMap<string, SemanticGraphBinding>,
 	aliases: ReadonlyMap<string, SemanticGraphAlias>,
 	visitedAliases: Set<string>,
-): { readonly binding: SemanticGraphBinding; readonly path: ReadonlyArray<string> } | null {
+	owner: Omit<ResolvedGraphPath, 'binding' | 'path'> | undefined,
+): ResolvedGraphPath | null {
 	if (segments.length === 0) return null;
 
 	const alias = aliases.get(segments[0]);
@@ -118,6 +144,12 @@ function resolveGraphSegments(
 			bindings,
 			aliases,
 			visitedAliases,
+			owner ?? {
+				bindingId: alias.bindingId,
+				componentId: alias.componentId,
+				componentName: alias.componentName,
+				declarationSpan: alias.sourceSpan,
+			},
 		);
 	}
 
@@ -127,6 +159,10 @@ function resolveGraphSegments(
 	return {
 		binding,
 		path: segments.slice(1),
+		bindingId: owner?.bindingId ?? binding.bindingId,
+		componentId: owner?.componentId ?? binding.componentId,
+		componentName: owner?.componentName ?? binding.componentName,
+		declarationSpan: owner?.declarationSpan ?? binding.sourceSpan,
 	};
 }
 

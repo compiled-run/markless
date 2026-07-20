@@ -1,4 +1,5 @@
 import type {
+	CaptureAnalysisArtifact,
 	GeneratedSymbolModule,
 	PublicRenderModuleArtifact,
 	PlannedSymbol,
@@ -65,6 +66,7 @@ const RECORD_KINDS = [
 
 export function createRuntimeDemandMap(input: {
 	readonly symbolResolver: SymbolResolverPlan;
+	readonly captureAnalysis?: CaptureAnalysisArtifact;
 	readonly symbolModules: SymbolModulesArtifact;
 	readonly publicRenderModule: PublicRenderModuleArtifact;
 	readonly protocolView: ProtocolViewPayload;
@@ -85,12 +87,17 @@ export function createRuntimeDemandMap(input: {
 	const symbolDemand = new Map(
 		symbols.map((symbol) => [symbol.symbolId, symbol.runtimeModuleIds]),
 	);
-	const scalarEventKeys = scalarCoreEventKeys(input.symbolResolver, input.protocolView);
+	const closedSymbolDemand = transitiveSymbolDemand(symbolDemand, input.captureAnalysis);
+	const scalarEventKeys = scalarCoreEventKeys(
+		input.symbolResolver,
+		input.protocolView,
+		input.captureAnalysis,
+	);
 	const scalarEvents = scalarEventKeys.size > 0;
 	const scalarRows = isScalarOnlyKeyedRepeatModule(input.symbolResolver, input.protocolView);
 	const payloadRecords = payloadDemandRecords(
 		input.protocolView,
-		symbolDemand,
+		closedSymbolDemand,
 		renderRuntimeModuleIds,
 		{
 			scalarEventKeys,
@@ -107,8 +114,9 @@ export function createRuntimeDemandMap(input: {
 			input.symbolResolver,
 			input.protocolView,
 			payloadRecords,
-			symbolDemand,
+			closedSymbolDemand,
 			scalarRows,
+			input.captureAnalysis,
 		),
 		unknownRecordModuleIds: unique([
 			...DISPATCH_CORE,
@@ -143,6 +151,7 @@ function recordKindPhases(input: {
 function scalarCoreEventKeys(
 	resolver: SymbolResolverPlan,
 	view: ProtocolViewPayload,
+	captureAnalysis?: CaptureAnalysisArtifact,
 ): ReadonlySet<string> {
 	if ((view.events?.length ?? 0) === 0 || (view.domUpdates?.length ?? 0) === 0) return new Set();
 	if ((view.branches?.length ?? 0) > 0) return new Set();
@@ -160,6 +169,8 @@ function scalarCoreEventKeys(
 		(view.events ?? [])
 			.filter(
 				(event) =>
+					transitiveSymbolIds(event.symbolIds ?? [], captureAnalysis).length ===
+						(event.symbolIds ?? []).length &&
 					(event.symbolIds ?? []).length === 1 &&
 					!(event.symbolIds ?? []).some((symbolId) => rowSymbolIds.has(symbolId)) &&
 					(event.symbolIds ?? []).every((symbolId) => {
@@ -579,6 +590,7 @@ function actionDemandRecords(
 	records: RuntimeDemandMapArtifact['payloadRecords'],
 	symbolDemand: ReadonlyMap<string, ReadonlyArray<string>>,
 	scalarRows: boolean,
+	captureAnalysis?: CaptureAnalysisArtifact,
 ): RuntimeDemandMapArtifact['actions'] {
 	const branchDemand = view.branches?.length ? modulesForKind(records, 'branch') : [];
 	const branchKinds = view.branches?.length ? ['branch'] : [];
@@ -586,7 +598,7 @@ function actionDemandRecords(
 		...(view.events ?? []).map((event) => {
 			const subscriberRecords = writeSubscriberRecords(
 				resolver,
-				event.symbolIds ?? [],
+				transitiveSymbolIds(event.symbolIds ?? [], captureAnalysis),
 				view,
 				records,
 			);
@@ -616,7 +628,7 @@ function actionDemandRecords(
 			repeat.rowEvents.map((event) => {
 				const subscriberRecords = writeSubscriberRecords(
 					resolver,
-					event.symbolIds ?? [],
+					transitiveSymbolIds(event.symbolIds ?? [], captureAnalysis),
 					view,
 					records,
 				);
@@ -837,6 +849,59 @@ function symbolIdsDemand(
 	symbolDemand: ReadonlyMap<string, ReadonlyArray<string>>,
 ): ReadonlyArray<string> {
 	return symbolIds.flatMap((symbolId) => symbolDemand.get(symbolId) ?? []);
+}
+
+function transitiveSymbolDemand(
+	demand: ReadonlyMap<string, ReadonlyArray<string>>,
+	captureAnalysis?: CaptureAnalysisArtifact,
+): ReadonlyMap<string, ReadonlyArray<string>> {
+	if (!captureAnalysis) return demand;
+	const result = new Map<string, ReadonlyArray<string>>();
+	const ids = new Set([
+		...demand.keys(),
+		...(captureAnalysis.boundResolverRows ?? []).map((row) => row.id),
+	]);
+	for (const id of ids) {
+		result.set(
+			id,
+			unique(
+				transitiveSymbolIds([id], captureAnalysis).flatMap(
+					(symbolId) => demand.get(symbolId) ?? [],
+				),
+			),
+		);
+	}
+	return result;
+}
+
+function transitiveSymbolIds(
+	symbolIds: ReadonlyArray<string>,
+	captureAnalysis?: CaptureAnalysisArtifact,
+): string[] {
+	if (!captureAnalysis) return [...symbolIds];
+	const baseByBound = new Map(
+		(captureAnalysis.boundResolverRows ?? []).map((row) => [row.id, row.baseSymbolId]),
+	);
+	const callbacksBySymbol = new Map(
+		captureAnalysis.extractedSymbols.map((symbol) => [
+			symbol.symbolId,
+			symbol.captureSlots.flatMap((slot) =>
+				slot.routes.flatMap((route) =>
+					route.kind === 'callback-route' ? [route.callbackSymbolId] : [],
+				),
+			),
+		]),
+	);
+	const result: string[] = [];
+	const pending = [...symbolIds];
+	while (pending.length > 0) {
+		const requested = pending.shift()!;
+		const symbolId = baseByBound.get(requested) ?? requested;
+		if (result.includes(symbolId)) continue;
+		result.push(symbolId);
+		pending.push(...(callbacksBySymbol.get(symbolId) ?? []));
+	}
+	return result;
 }
 
 function eventKey(hostNodeId: string, eventName: string): string {

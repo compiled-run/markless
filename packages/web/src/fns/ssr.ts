@@ -4,6 +4,7 @@ import {
 	marklessCsrRemapChildGraph,
 	marklessCsrRemapGraphOutput,
 } from './csr.ts';
+import { marklessBoundSymbolId } from './bound-symbol.ts';
 
 export { marklessAssertComposableStateNames, marklessComposeState };
 export const marklessSsrRemapChildGraph = marklessCsrRemapChildGraph;
@@ -464,8 +465,10 @@ export function marklessSsrAppendChildView(context) {
 			{ graphNodeId, path: [] },
 			context.child.graphProps,
 		);
-		context.asyncRunners[mapped?.graphNodeId ?? graphNodeId] =
-			context.child.symbolPrefix + symbolId;
+		context.asyncRunners[mapped?.graphNodeId ?? graphNodeId] = marklessBoundSymbolId(
+			context.child,
+			symbolId,
+		);
 	}
 	for (const locator of childView.locators)
 		context.locators.push({
@@ -483,7 +486,7 @@ export function marklessSsrAppendChildView(context) {
 			: event.symbolIds.map((symbolId) =>
 					context.child.externalSymbolIds.has(symbolId)
 						? symbolId
-						: context.child.symbolPrefix + symbolId,
+						: marklessBoundSymbolId(context.child, symbolId),
 				);
 		for (const symbolId of symbolIds)
 			if (callbackSymbolId || context.child.externalSymbolIds.has(symbolId))
@@ -502,7 +505,9 @@ export function marklessSsrAppendChildView(context) {
 			hostNodeId: context.child.hostPrefix + update.hostNodeId,
 			graphNodeId: mapped.graphNodeId,
 			path: mapped.path,
-			...(update.symbolId ? { symbolId: context.child.symbolPrefix + update.symbolId } : {}),
+			...(update.symbolId
+				? { symbolId: marklessBoundSymbolId(context.child, update.symbolId) }
+				: {}),
 		});
 	}
 	for (const behavior of childView.behaviors)
@@ -589,7 +594,9 @@ export function marklessSsrPrefixBoundaryArmRecords(set, child) {
 			...event,
 			hostNodeId: child.hostPrefix + event.hostNodeId,
 			symbolIds: (event.symbolIds ?? []).map((symbolId) =>
-				child.externalSymbolIds?.has?.(symbolId) ? symbolId : child.symbolPrefix + symbolId,
+				child.externalSymbolIds?.has?.(symbolId)
+					? symbolId
+					: marklessBoundSymbolId(child, symbolId),
 			),
 		})),
 		behaviors: (set.behaviors ?? []).map((behavior) => ({
@@ -655,7 +662,7 @@ export function marklessSsrPrefixArmRecord(arm, child) {
 		...arm,
 		events: (arm.events ?? []).map((event) => ({
 			...event,
-			symbolIds: event.symbolIds.map((symbolId) => child.symbolPrefix + symbolId),
+			symbolIds: event.symbolIds.map((symbolId) => marklessBoundSymbolId(child, symbolId)),
 		})),
 		domUpdates: (arm.domUpdates ?? []).map((update) => {
 			const mapped = marklessSsrRemapChildGraph(update, child.graphProps);
@@ -665,7 +672,7 @@ export function marklessSsrPrefixArmRecord(arm, child) {
 						graphNodeId: mapped.graphNodeId,
 						path: mapped.path,
 						...(update.symbolId
-							? { symbolId: child.symbolPrefix + update.symbolId }
+							? { symbolId: marklessBoundSymbolId(child, update.symbolId) }
 							: {}),
 					}
 				: update;

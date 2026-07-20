@@ -242,14 +242,14 @@ test('buildSemanticGraph creates the first production compiler artifact', async 
 	]);
 
 	expect(graph.aliases).toEqual([
-		{
+		expect.objectContaining({
 			name: 'label',
 			target: 'props.label',
 			declarationKind: 'const',
 			sourceSpan: expect.objectContaining({
 				filename: 'src/App.tsrx',
 			}),
-		},
+		}),
 		{
 			name: 'menuTitle',
 			target: 'menu.title',
@@ -493,6 +493,38 @@ test('buildSemanticGraph records component edges from TSRX AST', async () => {
 		keyedRepeatScopeIds: ['repeat:0'],
 		props: [expect.objectContaining({ name: 'row', source: 'row', kind: 'opaque' })],
 	});
+});
+
+test('component edges classify supported destructured callback parameters as callbacks', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/Callbacks.tsrx',
+		source: `
+function Child({ onObject, onArray }) @{
+	<button onClick={() => { onObject({ count: 1, source: 'object' }); onArray([2, 'array']); }}>Run</button>
+}
+
+export function App() @{
+	<Child
+		onObject={({ count: nextCount, source }) => console.log(nextCount, source)}
+		onArray={([count, source]) => console.log(count, source)}
+	/>
+}
+`,
+	});
+
+	expect(graph.componentEdges[0]?.props).toEqual([
+		expect.objectContaining({
+			name: 'onObject',
+			kind: 'callback',
+			parameters: ['{ count: nextCount, source }'],
+		}),
+		expect.objectContaining({
+			name: 'onArray',
+			kind: 'callback',
+			parameters: ['[count, source]'],
+		}),
+	]);
+	expect(graph.diagnostics).toEqual([]);
 });
 
 test('B918 records element handle props and accepts same-module prop forwarding', async () => {
