@@ -312,6 +312,71 @@ describe('Vite adapter structure', () => {
 		);
 	});
 
+	test('dev transforms reject imported compiled children without capture metadata', async () => {
+		const childFilename = '/workspace/app/components/Child.tsrx';
+		const parentFilename = '/workspace/app/pages/App.tsrx';
+		const childSource =
+			'export default function Child() @{ <button>Child</button> }';
+		const parentSource = `import Child from '../components/Child.tsrx';
+export default function App() @{ <main><Child /></main> }`;
+		const validPlugin = getAsyncPlugin();
+		callConfig(validPlugin, {}, { command: 'serve', mode: 'development' });
+		callConfigResolved(validPlugin, {
+			base: '/',
+			command: 'serve',
+			root: '/workspace/app',
+		});
+		const transformRequest = vi.fn((url: string) =>
+			callTransform(
+				validPlugin,
+				childSource,
+				url,
+				createViteHookContext('server'),
+			),
+		);
+		callConfigureServer(validPlugin, {
+			config: { root: '/workspace/app' },
+			environments: { ssr: { transformRequest } },
+		});
+		callBuildStart(validPlugin, { cwd: '/workspace/app' }, createViteHookContext('server'));
+		await expect(
+			callTransform(
+				validPlugin,
+				parentSource,
+				parentFilename,
+				createViteHookContext('server'),
+			),
+		).resolves.toMatchObject({ manifest: { captureMetadata: expect.any(Object) } });
+		expect(transformRequest).toHaveBeenCalledExactlyOnceWith(childFilename);
+
+		const plugin = getAsyncPlugin();
+		callConfig(plugin, {}, { command: 'serve', mode: 'development' });
+		callConfigResolved(plugin, {
+			base: '/',
+			command: 'serve',
+			root: '/workspace/app',
+		});
+		callBuildStart(plugin, { cwd: '/workspace/app' }, createViteHookContext('server'));
+		const staleChild = (await callTransform(
+			plugin,
+			childSource,
+			childFilename,
+			createViteHookContext('server'),
+		)) as { manifest: { captureMetadata?: unknown } };
+		delete staleChild.manifest.captureMetadata;
+
+		await expect(
+			callTransform(
+				plugin,
+				parentSource,
+				parentFilename,
+				createViteHookContext('server'),
+			),
+		).rejects.toThrow(
+			'MARKLESS_CAPTURE_METADATA_MISSING: Parent module "/workspace/app/pages/App.tsrx" composes imported child "../components/Child.tsrx", but its compiled artifact has no current capture metadata. Rebuild the child with the current Markless compiler and clear any stale build cache.',
+		);
+	});
+
 	test('resolves and loads virtual module ids carrying the ?import suffix Vite adds to .tsrx-shaped imports', async () => {
 		// The dev resume module imports `virtual:markless:payload:<file>` — an id
 		// that ENDS in .tsrx, so Vite's import analysis treats it like an asset

@@ -51,6 +51,7 @@ export interface TransformTsrxModuleResult {
 
 export interface MarklessTransformManifest {
 	source: string;
+	captureMetadata?: import('@markless/compiler').CaptureAnalysisArtifact;
 	symbolRoutes?: ReadonlyArray<{ readonly prefix: string; readonly importSource: string }>;
 	payload: MarklessBuildModuleReference;
 	resolver: MarklessBuildModuleReference;

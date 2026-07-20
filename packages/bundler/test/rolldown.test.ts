@@ -599,6 +599,42 @@ let count = state(0);
 		expect(JSON.stringify(payload.attribution)).not.toContain('virtual:markless:');
 	});
 
+	test('production builds require capture metadata from imported compiled children', async () => {
+		const childFilename = '/workspace/app/components/Child.tsrx';
+		const parentFilename = '/workspace/app/pages/App.tsrx';
+		const childSource =
+			'export default function Child() @{ <button>Child</button> }';
+		const parentSource = `import Child from '../components/Child.tsrx';
+export default function App() @{ <main><Child /></main> }`;
+		const validPlugin = marklessClient();
+
+		callBuildStart(validPlugin, { cwd: '/workspace/app' });
+		await callTransform(validPlugin, childSource, childFilename);
+		await callTransform(validPlugin, parentSource, parentFilename);
+		await expect(callGenerateBundle(validPlugin, {}, vi.fn())).resolves.toBeUndefined();
+		const sameModulePlugin = marklessClient();
+		callBuildStart(sameModulePlugin, { cwd: '/workspace/app' });
+		await callTransform(
+			sameModulePlugin,
+			`function Child() @{ <button>Child</button> }
+export default function App() @{ <main><Child /></main> }`,
+			parentFilename,
+		);
+		await expect(callGenerateBundle(sameModulePlugin, {}, vi.fn())).resolves.toBeUndefined();
+
+		const stalePlugin = marklessClient();
+		callBuildStart(stalePlugin, { cwd: '/workspace/app' });
+		const staleChild = (await callTransform(stalePlugin, childSource, childFilename)) as {
+			manifest: { captureMetadata?: unknown };
+		};
+		delete staleChild.manifest.captureMetadata;
+		await callTransform(stalePlugin, parentSource, parentFilename);
+
+		await expect(callGenerateBundle(stalePlugin, {}, vi.fn())).rejects.toThrow(
+			'MARKLESS_CAPTURE_METADATA_MISSING: Parent module "/workspace/app/pages/App.tsrx" composes imported child "../components/Child.tsrx", but its compiled artifact has no current capture metadata. Rebuild the child with the current Markless compiler and clear any stale build cache.',
+		);
+	});
+
 	test('execution-log never mode emits no attribution section or size entries', async () => {
 		const plugin = marklessClient({ executionLog: 'never', rootDir: '/workspace/app' });
 		const emitFile = vi.fn();

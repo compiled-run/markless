@@ -90,6 +90,7 @@ export function createMarklessRolldownPlugin(input: {
 	const internalOptions = (input.options ?? {}) as InternalMarklessRolldownOptions;
 	const virtualModules = new Map<string, MarklessVirtualModule>();
 	const transformManifests = new Map<string, MarklessTransformManifest>();
+	const importedChildren = new Map<string, ImportedChild>();
 	const sourceVirtualModules = new Map<string, Set<string>>();
 	const clientSymbolEntrySources = new Set<string>();
 	const executionLogEstimatedSizes = new Map<string, number>();
@@ -138,6 +139,7 @@ export function createMarklessRolldownPlugin(input: {
 			clientSymbolEntrySources.clear();
 			virtualModules.clear();
 			transformManifests.clear();
+			importedChildren.clear();
 			sourceVirtualModules.clear();
 			executionLogEstimatedSizes.clear();
 			dev.reset();
@@ -308,6 +310,22 @@ export function createMarklessRolldownPlugin(input: {
 				dev,
 				environment: currentEnvironment,
 			});
+			const resolvedChildren = await resolveImportedChildren.call(
+				this,
+				source,
+				transformed.manifest,
+			);
+			for (const child of resolvedChildren) {
+				importedChildren.set(importedChildKey(child), child);
+			}
+			if (internalOptions.dev === true) {
+				for (const child of resolvedChildren) {
+					if (!transformManifests.has(child.source)) {
+						await internalOptions.devServer?.transformRequest(child.source, currentEnvironment);
+					}
+					validateImportedChild(child, transformManifests);
+				}
+			}
 			if (currentEnvironment === 'client' && isResumeSourceRequest(id)) {
 				const resumeModule = transformed.virtualModules.find(
 					(module) => module.type === 'resume',
@@ -336,6 +354,9 @@ export function createMarklessRolldownPlugin(input: {
 		generateBundle: {
 			order: 'post',
 			async handler(_, bundle) {
+				for (const child of importedChildren.values()) {
+					validateImportedChild(child, transformManifests);
+				}
 				if (getEnvironment(this) !== 'client') return;
 
 				stripEmptyPreloadWrappersFromChunks(bundle);
@@ -433,6 +454,70 @@ export function createMarklessRolldownPlugin(input: {
 	} satisfies Plugin & { api: MarklessRolldownPluginApi };
 
 	return plugin;
+}
+
+type ImportedChild = {
+	readonly parent: string;
+	readonly specifier: string;
+	readonly source: string;
+};
+
+async function resolveImportedChildren(
+	this: {
+		resolve(
+			source: string,
+			importer?: string,
+			options?: { readonly skipSelf?: boolean },
+		): Promise<{ readonly id: string } | null>;
+	},
+	parent: string,
+	manifest: MarklessTransformManifest,
+): Promise<ImportedChild[]> {
+	return await Promise.all(
+		(manifest.symbolRoutes ?? []).map(async (route) => {
+			const resolvedImport = await this.resolve(route.importSource, parent, { skipSelf: true });
+			const resolvedId =
+				typeof resolvedImport === 'string'
+					? resolvedImport
+					: resolvedImport && typeof resolvedImport === 'object' && 'id' in resolvedImport
+						? String(resolvedImport.id)
+						: fallbackImportedSource(parent, route.importSource);
+			return {
+				parent,
+				specifier: route.importSource,
+				source: pathname(resolvedId),
+			};
+		}),
+	);
+}
+
+function fallbackImportedSource(parent: string, specifier: string): string {
+	const source = specifier.split('?')[0]!;
+	return isRelativeImport(source) ? resolve(dirname(parent), source) : source;
+}
+
+function importedChildKey(child: ImportedChild): string {
+	return `${child.parent}\0${child.specifier}\0${child.source}`;
+}
+
+function validateImportedChild(
+	child: ImportedChild,
+	manifests: ReadonlyMap<string, MarklessTransformManifest>,
+) {
+	const parentMetadata = manifests.get(child.parent)?.captureMetadata;
+	const childMetadata = manifests.get(child.source)?.captureMetadata;
+	if (
+		parentMetadata &&
+		childMetadata?.passId === parentMetadata.passId &&
+		Array.isArray(childMetadata.extractedSymbols) &&
+		Array.isArray(childMetadata.diagnostics)
+	) {
+		return;
+	}
+
+	throw new Error(
+		`MARKLESS_CAPTURE_METADATA_MISSING: Parent module ${JSON.stringify(child.parent)} composes imported child ${JSON.stringify(child.specifier)}, but its compiled artifact has no current capture metadata. Rebuild the child with the current Markless compiler and clear any stale build cache.`,
+	);
 }
 
 function executionAttributionRoots(
