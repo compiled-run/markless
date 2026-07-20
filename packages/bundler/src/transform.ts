@@ -326,13 +326,13 @@ function adaptImportedCaptureResolver(source: string, hasImportedRows: boolean):
 	].join('\n');
 	const helper = [
 		'function createBoundGraph(context, bound, capture, pendingCallbacks) {',
-		'\tconst legacySlots = new Map(bound.captureSlots.flatMap((slot) => slot.legacyGraphRead ? [[JSON.stringify([slot.legacyGraphRead.graphNodeId, slot.legacyGraphRead.path]), slot]] : []));',
+		'\tconst legacySlots = new Map(bound.captureSlots.flatMap((slot) => slot.legacyGraphRead ? [[JSON.stringify([slot.legacyGraphRead.graphNodeId, slot.legacyGraphRead.path ?? []]), slot]] : []));',
 		'\treturn {',
 		'\t\t...context.graph,',
 		'\t\tread(graphNodeId, path = []) {',
 		'\t\t\tconst slot = legacySlots.get(JSON.stringify([graphNodeId, path]));',
 		'\t\t\tif (!slot) return context.graph.read(graphNodeId, path);',
-		'\t\t\tif (slot.route.kind === "callback-route") return (...args) => {',
+		'\t\t\tif (slot.route.kind === callbackRoute) return (...args) => {',
 		'\t\t\t\tconst pending = context.invokeSymbol(slot.route.callbackSymbolId, { ...context, event: context.event, args });',
 		'\t\t\t\tpendingCallbacks.push(Promise.resolve(pending));',
 		'\t\t\t\treturn pending;',

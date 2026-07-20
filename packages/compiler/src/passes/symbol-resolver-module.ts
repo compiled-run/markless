@@ -43,7 +43,8 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'const moduleUrls = symbolManifest[3];',
 		'const exportNames = symbolManifest[4];',
 		'const symbolRows = symbolManifest[5];',
-		`const boundRows = ${JSON.stringify(Object.fromEntries((input.boundSymbols ?? []).map((row) => [row.id, row])))};`,
+		`const boundRows = ${serializeBoundRows(input.boundSymbols ?? [])};`,
+		'const callbackRoute = "callback-route";',
 		'',
 		'export async function loadSymbol(id) {',
 		'	const bound = boundRows[id];',
@@ -63,18 +64,19 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'}',
 		'',
 		'function createCaptureContext(context, bound) {',
-		'	const slots = Object.fromEntries(bound.captureSlots.map((slot) => [slot.slotId, slot]));',
+		'	const slots = {};',
+		'	for (const slot of bound.captureSlots) slots[slot.slotId] = slot;',
 		'	return {',
 		'		read(slotId) {',
 		'			const slot = requiredCaptureSlot(slots, slotId);',
 		'			const route = slot.route;',
-		'			if (route.kind === "compiler-known-constant") return slot.path.reduce((value, key) => value == null ? value : value[key], route.value);',
-		'			if (route.kind === "graph-reference") return context.graph.read(route.graphNodeId, route.path);',
+		'			if (route.kind === "compiler-known-constant") return (slot.path ?? []).reduce((value, key) => value == null ? value : value[key], route.value);',
+		'			if (route.kind === "graph-reference") return context.graph.read(route.graphNodeId, route.path ?? []);',
 		'			throw new Error(`Capture slot ${slotId} is a callback route`);',
 		'		},',
 		'		invoke(slotId, args) {',
 		'			const route = requiredCaptureSlot(slots, slotId).route;',
-		'			if (route.kind !== "callback-route") throw new Error(`Capture slot ${slotId} is not a callback route`);',
+		'			if (route.kind !== callbackRoute) throw new Error(`Capture slot ${slotId} is not a callback route`);',
 		'			if (typeof context.invokeSymbol !== "function") throw new Error("Bound callback invocation is unavailable");',
 		'			return context.invokeSymbol(route.callbackSymbolId, { ...context, event: context.event, args });',
 		'		},',
@@ -105,6 +107,32 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'}',
 		'',
 	].join('\n');
+}
+
+const OMITTED_EMPTY_BOUND_ROW_FIELDS = new Set([
+	'ancestry',
+	'path',
+	'branchScopeIds',
+	'keyedRepeatScopeIds',
+]);
+
+function serializeBoundRows(rows: SymbolResolverModuleInput['boundSymbols']): string {
+	const serializedRows = (rows ?? []).map((row) => [
+		row.id,
+		{
+			...row,
+			ancestry: row.ancestry.map(({ componentEdgeId: _, ...entry }) => entry),
+		},
+	]);
+	return JSON.stringify(
+		Object.fromEntries(serializedRows),
+		(key, value) =>
+			Array.isArray(value) &&
+			value.length === 0 &&
+			OMITTED_EMPTY_BOUND_ROW_FIELDS.has(key)
+				? undefined
+				: value,
+	);
 }
 
 function emitTableSymbolResolverModule(manifest: SymbolResolverModuleManifest): string {

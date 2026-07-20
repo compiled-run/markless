@@ -276,10 +276,14 @@ function componentEdgePaths(edges: SymbolResolverInput['semanticGraph']['compone
 function boundSymbolId(baseSymbolId: string, ancestry: BoundSymbolResolverRow['ancestry']): string {
 	const segment = (values: ReadonlyArray<string>) => values.map(encodeURIComponent).join(',');
 	return `bound:${encodeURIComponent(baseSymbolId)}:${ancestry
-		.map(
-			(entry) =>
-				`${encodeURIComponent(entry.componentEdgeId)}[b=${segment(entry.branchScopeIds)};k=${segment(entry.keyedRepeatScopeIds)}]`,
-		)
+		.map((entry) => {
+			const scopes =
+				entry.branchScopeIds.length === 0 && entry.keyedRepeatScopeIds.length === 0
+					? ''
+					: `b=${segment(entry.branchScopeIds)};k=${segment(entry.keyedRepeatScopeIds)}`;
+			const edgeId = encodeURIComponent(entry.componentEdgeId);
+			return scopes ? `${edgeId}[${scopes}]` : edgeId;
+		})
 		.join('/')}`;
 }
 

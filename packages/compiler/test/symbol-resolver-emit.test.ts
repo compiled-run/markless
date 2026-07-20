@@ -214,6 +214,11 @@ test('emitSymbolResolverModule resolves bound rows and fails loudly for unknown 
 		code: 'MARKLESS_SYMBOL_UNKNOWN', symbolId: 'bound:missing',
 	});
 	expect(output).not.toContain('switch (id)');
+	expect(output).not.toContain('"branchScopeIds"');
+	expect(output).not.toContain('"keyedRepeatScopeIds"');
+	expect(output).not.toContain('"path":[]');
+	expect(output).toContain('"slotId"');
+	expect(output).toContain('"ancestry":[{}]');
 });
 
 test('emitSymbolResolverModule exports the symbol manifest with protocol and build identity', async () => {
