@@ -15,6 +15,7 @@ vi.mock('@markless/compiler', () => ({
 		semanticGraph: { componentEdges: compiler.componentEdges },
 		protocolView: compiler.protocolView,
 		symbolModules: { modules: [] },
+		boundSymbolResolver: { rows: [] },
 		publicRenderPlan: { styleScopes: [] },
 		payloadScripts: { state: {}, view: {} },
 		publicRenderModule: {
