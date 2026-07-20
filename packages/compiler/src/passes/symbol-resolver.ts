@@ -62,6 +62,7 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 				propName: prop.name,
 				source: prop.source,
 				sourceSpan: prop.sourceSpan,
+				parameters: prop.parameters ?? [],
 				...(moduleImports.length > 0 ? { moduleImports } : {}),
 				reads: eventReads(prop.source, input.stateLowering?.reads),
 				writes: eventWrites(prop.source, input.stateLowering?.writes, prop.sourceSpan),

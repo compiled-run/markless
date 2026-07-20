@@ -11,6 +11,7 @@ import {
 	componentPropNames,
 	destructureProps,
 	hasPropDependentComputed,
+	isComponentRoot,
 	isFragmentNode,
 	sameModuleComponentMap,
 	assignSsrHostIds,
@@ -45,6 +46,7 @@ export function emitSameModuleCsrComponents(
 		const renderContext: CsrRenderContext = {
 			mode: 'csr',
 			childReplacements: [],
+			...(isComponentRoot(rootInfo.root) ? { componentRoot: rootInfo.root } : {}),
 			componentEdges: componentEdgesFor(input, reference.componentName),
 			componentImports: referenceMap,
 			callbackSymbols: callbackSymbolIds(input),
@@ -73,7 +75,7 @@ export function emitSameModuleCsrComponents(
 		return [
 			`const ${reference.localName} = { renderCsr: ${functionName} };`,
 			`function ${functionName}(props = {}) {`,
-			destructureProps(rootInfo.propNames),
+			destructureProps(rootInfo.propNames, rootInfo.component),
 			'	const marklessCsrPayloadState = { ...marklessCloneState(payloadState), cells: [], computed: [] };',
 			'	const marklessCsrRenderStateValues = new Map(marklessCsrStateValues);',
 			...renderBodyLines(
@@ -85,7 +87,7 @@ export function emitSameModuleCsrComponents(
 				[
 					'const marklessCsrRuntimeState = { graph: null };',
 					'const marklessCsrChildren = [];',
-					`const root = ${isFragmentNode(rootInfo.root) ? 'marklessCsrFragmentFromHtml' : 'marklessCsrRootFromHtml'}(${emitHtmlNode(rootInfo.root, renderContext)});`,
+					`${renderContext.componentRoot ? 'let' : 'const'} root = ${isFragmentNode(rootInfo.root) ? 'marklessCsrFragmentFromHtml' : 'marklessCsrRootFromHtml'}(${emitHtmlNode(rootInfo.root, renderContext)});`,
 				],
 			),
 			...renderContext.childReplacements,
@@ -148,7 +150,7 @@ export function emitSameModuleSsrComponents(
 		return [
 			`const ${reference.localName} = { renderSsr: ${functionName} };`,
 			`async function ${functionName}(props = {}, marklessSsrRenderContext) {`,
-			destructureProps(rootInfo.propNames),
+			destructureProps(rootInfo.propNames, rootInfo.component),
 			'	const marklessSsrPayloadState = { ...marklessCloneState(payloadState), cells: [], computed: [] };',
 			'	const marklessSsrRenderStateValues = new Map(marklessSsrStateValues);',
 			...renderBodyLines(

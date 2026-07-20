@@ -98,7 +98,7 @@ export function emitPublicSsrRenderModule(
 		// (T107): renderToStream threads it through child renders and async
 		// runners. Omitted = exact blocking behavior.
 		'async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {',
-		destructureProps(rootInfo.propNames),
+		destructureProps(rootInfo.propNames, rootInfo.component),
 		'	const marklessSsrPayloadState = marklessCloneState(payloadState);',
 		'	const marklessSsrRenderStateValues = new Map(marklessSsrStateValues);',
 		...renderBodyLines(

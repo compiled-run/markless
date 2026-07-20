@@ -15,6 +15,7 @@ import {
 } from '../../artifact-helpers/graph-paths.ts';
 import { collectExpressionReads } from './collect-expressions.ts';
 import { collectObjectPatternAliases } from './collect-aliases.ts';
+import { callbackPropArityUnsupportedDiagnostic } from './diagnostics.ts';
 import type { SemanticGraphWalk, WalkState } from './types.ts';
 
 export function collectComponentProps(component: AnyNode, state: WalkState): void {
@@ -109,7 +110,30 @@ function componentPropBindings(
 				: sourceSpan(attribute, state.filename);
 
 		if (expression && isCallbackExpression(expression)) {
-			props.push({ name, source, kind: 'callback', sourceSpan: span });
+			const parameterNodes = asNodes(expression.params);
+			const unsupportedParameterReason = callbackParameterUnsupportedReason(parameterNodes);
+			if (unsupportedParameterReason) {
+				state.graph.diagnostics.push(
+					callbackPropArityUnsupportedDiagnostic({
+						propName: name,
+						parameterCount: parameterNodes.length,
+						reason: unsupportedParameterReason,
+						callback: expression,
+						filename: state.filename,
+					}),
+				);
+				continue;
+			}
+
+			props.push({
+				name,
+				source,
+				kind: 'callback',
+				parameters: parameterNodes.map((parameter) =>
+					expressionSource(parameter, state.source),
+				),
+				sourceSpan: span,
+			});
 			continue;
 		}
 
@@ -158,6 +182,31 @@ function componentChildCount(node: AnyNode): number {
 
 function isCallbackExpression(node: AnyNode): boolean {
 	return node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression';
+}
+
+function callbackParameterUnsupportedReason(parameters: ReadonlyArray<AnyNode>): string | null {
+	if (parameters.length > 1) return 'it declares more than one parameter';
+	const parameter = parameters[0];
+	if (!parameter) return null;
+	if (parameter.type === 'Identifier') return null;
+	if (parameter.type === 'ObjectPattern') {
+		const properties = asNodes(parameter.properties);
+		return properties.some(
+			(property) =>
+				property.type === 'RestElement' ||
+				(property.type === 'Property' && (property.value as AnyNode | undefined)?.type === 'AssignmentPattern'),
+		)
+			? 'its top-level object pattern contains a default or rest binding'
+			: null;
+	}
+	if (parameter.type === 'ArrayPattern') {
+		return asNodes(parameter.elements).some(
+			(element) => element.type === 'AssignmentPattern' || element.type === 'RestElement',
+		)
+			? 'its top-level array pattern contains a default or rest binding'
+			: null;
+	}
+	return 'its parameter uses a default or rest binding';
 }
 
 function isSerializableLiteral(node: AnyNode | undefined): boolean {

@@ -46,8 +46,36 @@ export function moduleScopeLines(source: string, filename: string): string[] {
 	});
 }
 
-export function destructureProps(propNames: ReadonlyArray<string>): string | null {
-	return propNames.length > 0 ? `	const { ${propNames.join(', ')} } = props ?? {};` : null;
+export function destructureProps(
+	propNames: ReadonlyArray<string>,
+	component?: AnyNode,
+): string | null {
+	if (propNames.length === 0) return null;
+	const param = component ? asNodes(component.params)[0] : undefined;
+	if (param?.type !== 'ObjectPattern') {
+		return `	const { ${propNames.join(', ')} } = props ?? {};`;
+	}
+
+	const bindings = asNodes(param.properties).flatMap((property) => {
+		const key = property.key as AnyNode | undefined;
+		const value = property.value as AnyNode | undefined;
+		const fallback = getIdentifierName(value) ?? getIdentifierName(key);
+		if (!fallback) return [];
+		if (
+			property.type === 'Property' &&
+			!property.computed &&
+			key?.type === 'Identifier' &&
+			value?.type === 'Identifier'
+		) {
+			const authoredName = getIdentifierName(key);
+			const localName = getIdentifierName(value);
+			if (authoredName && localName && authoredName !== localName) {
+				return [`${authoredName}: ${localName}`];
+			}
+		}
+		return [fallback];
+	});
+	return `	const { ${bindings.join(', ')} } = props ?? {};`;
 }
 
 // Page props live in the runtime graph under one cell: `prop:props` for a
@@ -72,14 +100,13 @@ export function hasPropDependentComputed(input: PublicRenderModuleInput): boolea
 }
 
 export function composedGraphProps(input: PublicRenderModuleInput) {
-	return input.semanticGraph.componentEdges
-		.flatMap((edge) =>
-			edge.props.flatMap((prop) =>
-				prop.kind === 'graph-reference'
-					? [{ name: prop.name, graphNodeId: prop.graphNodeId, path: prop.path }]
-					: [],
-			),
-		);
+	return input.semanticGraph.componentEdges.flatMap((edge) =>
+		edge.props.flatMap((prop) =>
+			prop.kind === 'graph-reference'
+				? [{ name: prop.name, graphNodeId: prop.graphNodeId, path: prop.path }]
+				: [],
+		),
+	);
 }
 
 export function staticHostLocators(input: PublicRenderModuleInput) {
