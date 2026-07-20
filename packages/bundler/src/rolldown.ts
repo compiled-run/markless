@@ -534,7 +534,11 @@ export function createMarklessRolldownPlugin(input: {
 						clientManifest,
 						stripBuildPrefix,
 						executionLogInjection
-							? executionAttributionTables(transformManifests, getRoot())
+							? executionAttributionTables(
+									transformManifests,
+									getRoot(),
+									importedChildren.values(),
+								)
 							: undefined,
 					),
 				);
@@ -639,6 +643,10 @@ function validateImportedChild(
 ) {
 	const parentMetadata = manifests.get(child.parent)?.captureMetadata;
 	const childMetadata = manifests.get(child.source)?.captureMetadata;
+	// Plain TypeScript source components (for example @markless/router's Html)
+	// are author-time helpers, not compiled TSRX artifacts. A built JavaScript
+	// component remains subject to the fail-closed metadata check below.
+	if (!childMetadata && isPlainTypeScriptSource(child.source)) return;
 	if (
 		parentMetadata &&
 		childMetadata?.passId === parentMetadata.passId &&
@@ -653,13 +661,19 @@ function validateImportedChild(
 	);
 }
 
+function isPlainTypeScriptSource(source: string): boolean {
+	return /\.[cm]?tsx?$/.test(source);
+}
+
 function executionAttributionRoots(
 	manifests: ReadonlyMap<string, MarklessTransformManifest>,
+	childrenByRoute: ReadonlyMap<string, string>,
 ): string[] {
 	const children = new Set<string>();
 	for (const manifest of manifests.values()) {
 		for (const route of manifest.symbolRoutes ?? []) {
-			children.add(resolve(dirname(manifest.source), route.importSource.split('?')[0]!));
+			const child = resolvedRouteSource(manifest.source, route.importSource, childrenByRoute);
+			if (manifests.has(child)) children.add(child);
 		}
 	}
 	return [...manifests.keys()].filter((source) => !children.has(source));
@@ -668,13 +682,17 @@ function executionAttributionRoots(
 function executionAttributionTables(
 	manifests: ReadonlyMap<string, MarklessTransformManifest>,
 	root: string | undefined,
+	children: Iterable<ImportedChild>,
 ): Record<string, Record<string, string>> {
+	const childrenByRoute = new Map(
+		[...children].map((child) => [routeKey(child.parent, child.specifier), child.source]),
+	);
 	return Object.fromEntries(
-		executionAttributionRoots(manifests)
+		executionAttributionRoots(manifests, childrenByRoute)
 			.sort()
 			.map((source) => [
 				executionAttributionRouteKey(source, root),
-				flattenExecutionAttributionScopes(source, manifests),
+				flattenExecutionAttributionScopes(source, manifests, childrenByRoute),
 			]),
 	);
 }
@@ -690,6 +708,7 @@ function executionAttributionRouteKey(source: string, root: string | undefined):
 function flattenExecutionAttributionScopes(
 	root: string,
 	manifests: ReadonlyMap<string, MarklessTransformManifest>,
+	childrenByRoute: ReadonlyMap<string, string>,
 ): Record<string, string> {
 	const scopes: Record<string, string> = {};
 	const visit = (source: string, scope: string, seen: ReadonlySet<string>) => {
@@ -697,12 +716,25 @@ function flattenExecutionAttributionScopes(
 		scopes[scope] = encodedSymbolSource(source);
 		const manifest = manifests.get(source);
 		for (const route of manifest?.symbolRoutes ?? []) {
-			const child = resolve(dirname(source), route.importSource.split('?')[0]!);
+			const child = resolvedRouteSource(source, route.importSource, childrenByRoute);
+			if (!manifests.has(child)) continue;
 			visit(child, scope + route.prefix, new Set([...seen, source]));
 		}
 	};
 	visit(root, '', new Set());
 	return scopes;
+}
+
+function resolvedRouteSource(
+	parent: string,
+	specifier: string,
+	childrenByRoute: ReadonlyMap<string, string>,
+): string {
+	return childrenByRoute.get(routeKey(parent, specifier)) ?? fallbackImportedSource(parent, specifier);
+}
+
+function routeKey(parent: string, specifier: string): string {
+	return `${parent}\0${specifier}`;
 }
 
 function bundleWithoutRemovedChunks(

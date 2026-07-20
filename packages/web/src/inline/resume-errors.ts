@@ -20,25 +20,34 @@ export class RuntimeResumeError extends Error implements RuntimeResumeDiagnostic
 	}
 }
 
+export function runtimeResumeError(
+	code: RuntimeResumeErrorCode,
+	message: string,
+): RuntimeResumeError {
+	return new RuntimeResumeError({
+		code,
+		message,
+		docsUrl: `https://markless.dev/errors/${code}`,
+	});
+}
+
 export function missingElementLocatorError(
 	locator: ProtocolViewPayload['locators'][number],
 ): RuntimeResumeError {
-	return new RuntimeResumeError({
-		code: 'MARKLESS_RESUME_LOCATOR_MISSING',
-		message: `Resume locator ${locator.hostNodeId} expected <${locator.tagName}> at DOM order index ${String(locator.index)}.`,
-		docsUrl: 'https://markless.dev/errors/MARKLESS_RESUME_LOCATOR_MISSING',
-	});
+	return runtimeResumeError(
+		'MARKLESS_RESUME_LOCATOR_MISSING',
+		`Resume locator ${locator.hostNodeId} expected <${locator.tagName}> at DOM order index ${locator.index}.`,
+	);
 }
 export function mismatchedElementLocatorError(
 	locator: ProtocolViewPayload['locators'][number],
 	actualTagName: string,
 ): RuntimeResumeError {
-	return new RuntimeResumeError({
-		code: 'MARKLESS_RESUME_LOCATOR_MISMATCH',
-		message: `Resume locator ${locator.hostNodeId} expected <${locator.tagName.toLowerCase()}> at DOM order index ${String(locator.index)} but found <${actualTagName}>.`,
-		docsUrl: 'https://markless.dev/errors/MARKLESS_RESUME_LOCATOR_MISMATCH',
-	});
+	return runtimeResumeError(
+		'MARKLESS_RESUME_LOCATOR_MISMATCH',
+		`Resume locator ${locator.hostNodeId} expected <${locator.tagName.toLowerCase()}> at DOM order index ${locator.index} but found <${actualTagName}>.`,
+	);
 }
 export function domOrderCommentLocator(index: number): string {
-	return `dom-order-comment:${String(index)}`;
+	return `dom-order-comment:${index}`;
 }

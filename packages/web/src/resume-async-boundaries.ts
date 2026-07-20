@@ -1,5 +1,5 @@
 import type { DomJournalEntry, DomJournalResult, RuntimeGraph } from '@markless/runtime';
-import { RuntimeResumeError } from './inline/resume-errors.ts';
+import { RuntimeResumeError, runtimeResumeError } from './inline/resume-errors.ts';
 import { isArmBranchAnchorComment } from './resume-anchor-census.ts';
 import type {
 	ElementHandleRegistry,
@@ -140,9 +140,8 @@ function missingCommentAnchorError(
 	name: 'startAnchor' | 'endAnchor',
 	index: number,
 ): RuntimeResumeError {
-	return new RuntimeResumeError({
-		code: 'MARKLESS_RESUME_LOCATOR_MISSING',
-		message: `Resume locator ${id} ${name} expected a comment at DOM order index ${String(index)}.`,
-		docsUrl: 'https://markless.dev/errors/MARKLESS_RESUME_LOCATOR_MISSING',
-	});
+	return runtimeResumeError(
+		'MARKLESS_RESUME_LOCATOR_MISSING',
+		`Resume locator ${id} ${name} expected a comment at DOM order index ${index}.`,
+	);
 }

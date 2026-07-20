@@ -670,6 +670,47 @@ let count = state(0);
 		expect(JSON.stringify(payload.attribution)).not.toContain('virtual:markless:');
 	});
 
+	test('attribution follows resolved package module ids', async () => {
+		const plugin = marklessClient({ executionLog: 'always', rootDir: '/workspace/app' });
+		const emitFile = vi.fn();
+		const routeFilename = '/workspace/app/pages/a.tsrx';
+		const branchFilename = '/workspace/packages/branch/index.tsrx';
+		const leafFilename = '/workspace/packages/branch/Leaf.tsrx';
+		const resolvePackage = vi.fn(async (specifier: string) =>
+			specifier === '@fixtures/branch' ? { id: branchFilename } : null,
+		);
+		callBuildStart(plugin, { cwd: '/workspace/app' });
+		await callTransform(
+			plugin,
+			`import Branch from '@fixtures/branch';
+export default function Route() @{ <Branch /> }`,
+			routeFilename,
+			{ resolve: resolvePackage },
+		);
+		await callTransform(
+			plugin,
+			`import Leaf from './Leaf.tsrx';
+export default function Branch() @{ <Leaf /> }`,
+			branchFilename,
+		);
+		await callTransform(
+			plugin,
+			'export default function Leaf() @{ <span>Leaf</span> }',
+			leafFilename,
+		);
+		await callGenerateBundle(plugin, {}, emitFile);
+
+		const sizes = emittedAsset(emitFile, 'build/execution-sizes.json');
+		const payload = JSON.parse(String(sizes?.source)) as {
+			attribution: Record<string, Record<string, string>>;
+		};
+		expect(Object.keys(payload.attribution)).toEqual(['pages/a.tsrx']);
+		expect(payload.attribution['pages/a.tsrx']).toMatchObject({
+			'c0:': encodeURIComponent(branchFilename),
+			'c0:c0:': encodeURIComponent(leafFilename),
+		});
+	});
+
 	test('production builds require capture metadata from imported compiled children', async () => {
 		const childFilename = '/workspace/app/components/Child.tsrx';
 		const parentFilename = '/workspace/app/pages/App.tsrx';
@@ -702,6 +743,69 @@ export default function App() @{ <main><Child /></main> }`,
 
 		await expect(callGenerateBundle(stalePlugin, {}, vi.fn())).rejects.toThrow(
 			'MARKLESS_CAPTURE_METADATA_MISSING: Parent module "/workspace/app/pages/App.tsrx" composes imported child "../components/Child.tsrx", but its compiled artifact has no current capture metadata. Rebuild the child with the current Markless compiler and clear any stale build cache.',
+		);
+	});
+
+	test('production metadata validation uses resolved package module ids', async () => {
+		const childFilename = '/workspace/packages/source-child/index.tsrx';
+		const parentFilename = '/workspace/app/pages/App.tsrx';
+		const childSource = 'export default function Child() @{ <button>Child</button> }';
+		const parentSource = `import Child from '@fixtures/source-child';
+export default function App() @{ <main><Child /></main> }`;
+		const plugin = marklessClient();
+		const resolvePackage = vi.fn(async (specifier: string) =>
+			specifier === '@fixtures/source-child' ? { id: childFilename } : null,
+		);
+
+		callBuildStart(plugin, { cwd: '/workspace/app' });
+		await callTransform(plugin, childSource, childFilename, { resolve: resolvePackage });
+		await callTransform(plugin, parentSource, parentFilename, { resolve: resolvePackage });
+
+		await expect(callGenerateBundle(plugin, {}, vi.fn())).resolves.toBeUndefined();
+		expect(resolvePackage).toHaveBeenCalledWith('@fixtures/source-child', parentFilename, {
+			skipSelf: true,
+		});
+	});
+
+	test('source TypeScript package components are not stale compiled TSRX artifacts', async () => {
+		const childFilename = '/workspace/packages/router/src/index.ts';
+		const parentFilename = '/workspace/app/document.tsrx';
+		const plugin = marklessServer();
+		const resolvePackage = vi.fn(async (specifier: string) =>
+			specifier === '@markless/router' ? { id: childFilename } : null,
+		);
+
+		callBuildStart(plugin, { cwd: '/workspace/app' });
+		await callTransform(
+			plugin,
+			`import { Html } from '@markless/router';
+export default function Document() @{ <Html><body>Ready</body></Html> }`,
+			parentFilename,
+			{ resolve: resolvePackage },
+		);
+
+		await expect(callGenerateBundle(plugin, {}, vi.fn())).resolves.toBeUndefined();
+	});
+
+	test('prebuilt package components without current metadata still fail closed', async () => {
+		const childFilename = '/workspace/node_modules/stale-child/dist/index.js';
+		const parentFilename = '/workspace/app/pages/App.tsrx';
+		const plugin = marklessClient();
+		const resolvePackage = vi.fn(async (specifier: string) =>
+			specifier === 'stale-child' ? { id: childFilename } : null,
+		);
+
+		callBuildStart(plugin, { cwd: '/workspace/app' });
+		await callTransform(
+			plugin,
+			`import Child from 'stale-child';
+export default function App() @{ <main><Child /></main> }`,
+			parentFilename,
+			{ resolve: resolvePackage },
+		);
+
+		await expect(callGenerateBundle(plugin, {}, vi.fn())).rejects.toThrow(
+			'MARKLESS_CAPTURE_METADATA_MISSING: Parent module "/workspace/app/pages/App.tsrx" composes imported child "stale-child", but its compiled artifact has no current capture metadata.',
 		);
 	});
 

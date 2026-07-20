@@ -1,7 +1,7 @@
 import {
-	RuntimeResumeError,
 	mismatchedElementLocatorError,
 	missingElementLocatorError,
+	runtimeResumeError,
 } from './inline/resume-errors.ts';
 import { isArmBranchAnchorComment } from './resume-anchor-census.ts';
 import type {
@@ -113,11 +113,10 @@ function armBranchCommentCensus(
 }
 
 function missingArmBranchAnchorError(id: string, index: number): Error {
-	return new RuntimeResumeError({
-		code: 'MARKLESS_RESUME_LOCATOR_MISSING',
-		message: `Arm-scoped branch ${id} expected an arm-branch comment anchor at arm-local index ${String(index)}.`,
-		docsUrl: 'https://markless.dev/errors/MARKLESS_RESUME_LOCATOR_MISSING',
-	});
+	return runtimeResumeError(
+		'MARKLESS_RESUME_LOCATOR_MISSING',
+		`Arm-scoped branch ${id} expected an arm-branch comment anchor at arm-local index ${index}.`,
+	);
 }
 
 // Expands every boundary's armized record set into flat runtime records so

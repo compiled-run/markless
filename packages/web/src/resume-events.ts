@@ -128,14 +128,12 @@ export function createEventWiring(input: {
 		const target = event.target;
 		if (!target) throw unmatchedDispatchError(event, undefined);
 		const selector = describeResumeEventTarget(target);
-		if (
-			!containsElement(input.root, target) &&
-			!ignoredDisposedTarget(input.ignoredDisposedEventTargets, target)
-		)
+		const ignoredDisposed = input.ignoredDisposedEventTargets.has(target);
+		if (!containsElement(input.root, target) && !ignoredDisposed)
 			throw unmatchedDispatchError(event, selector);
 		const matched = findDispatchMatch(target, event.type, eventRecords, rowEventRecords);
 		if (!matched) {
-			if (ignoredDisposedTarget(input.ignoredDisposedEventTargets, target)) return;
+			if (ignoredDisposed) return;
 			await marklessLogInteraction({
 				eventName: event.type,
 				eventRecord: null,
@@ -165,11 +163,8 @@ export function createEventWiring(input: {
 			}
 			const activation = input.activateBehaviorsFromTrigger(eventRecord.hostNodeId);
 			if (activation) await activation;
-			const invokeSymbol = async (symbolId: string, context: ResumeSymbolContext) => {
-				const symbol = await input.loadSymbol(symbolId);
-				const result = symbol({ ...context, invokeCallback, invokeSymbol });
-				return isPromiseLike(result) ? await result : result;
-			};
+			const invokeSymbol = async (symbolId: string, context: ResumeSymbolContext) =>
+				(await input.loadSymbol(symbolId))({ ...context, invokeCallback, invokeSymbol });
 			const baseContext = {
 				graph: input.graph,
 				event,
@@ -340,12 +335,6 @@ function findDispatchMatch(
 	}
 	return null;
 }
-function ignoredDisposedTarget(
-	disposedTargets: WeakSet<ResumeDomElement>,
-	target: ResumeDomElement,
-): boolean {
-	return disposedTargets.has(target);
-}
 // Local copy of the resume-locators containsElement: importing that module
 // here regroups the wall-counted chunk graph, which costs more than the
 // duplication saves (T120 measurement; re-confirmed on this tree).
@@ -356,16 +345,17 @@ function containsElement(root: ResumeDomElement, target: ResumeDomElement): bool
 	return false;
 }
 function unmatchedDispatchError(event: ResumeDomEvent, selector: string | undefined): Error {
+	const code = 'MARKLESS_EVENT_DISPATCH_UNMATCHED';
 	const error = new Error(
-		`MARKLESS_EVENT_DISPATCH_UNMATCHED: No event record matched ${event.type} dispatch${selector ? ` at ${selector}` : ''}.`,
+		`${code}: No event record matched ${event.type} dispatch${selector ? ` at ${selector}` : ''}.`,
 	) as Error & Record<string, unknown>;
 	error.name = 'RuntimeResumeError';
-	error.code = 'MARKLESS_EVENT_DISPATCH_UNMATCHED';
+	error.code = code;
 	error.phase = 'event';
 	error.eventName = event.type;
 	error.selector = selector;
 	error.dispatchModuleId = 'web:resume-events';
-	error.docsUrl = 'https://markless.dev/errors/MARKLESS_EVENT_DISPATCH_UNMATCHED';
+	error.docsUrl = `https://markless.dev/errors/${code}`;
 	return error;
 }
 function isPromiseLike<T>(value: T | PromiseLike<T>): value is PromiseLike<T> {
