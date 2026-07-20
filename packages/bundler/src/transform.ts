@@ -79,6 +79,7 @@ export async function transformTsrxModule(
 	const resolverSource = emitSymbolResolverModule({
 		buildId: input.buildId,
 		symbols: symbolRows,
+		boundSymbols: compiled.boundSymbolResolver.rows,
 	});
 	const symbolRoutes = compiled.semanticGraph.componentEdges.flatMap((edge, index) =>
 		edge.importSource ? [{ prefix: `c${index}:`, importSource: edge.importSource }] : [],
@@ -130,6 +131,7 @@ export async function transformTsrxModule(
 				runtimeDemandMap: compiled.runtimeDemandMap,
 				executionLog: input.executionLog,
 				needsFullResume: needsFullResume(compiled.protocolView, compiled.runtimeDemandMap),
+				hasBoundSymbols: compiled.boundSymbolResolver.rows.length > 0,
 				symbols: symbolRows,
 				symbolRoutes,
 			}),
@@ -202,6 +204,7 @@ export async function transformTsrxModule(
 					publicRenderCsrExportName: compiled.publicRenderModule.csrExportName,
 					publicSsrModuleSource: compiled.publicRenderModule.ssrModuleSource,
 					publicRenderSsrExportName: compiled.publicRenderModule.ssrExportName,
+					hasBoundSymbols: compiled.boundSymbolResolver.rows.length > 0,
 					symbols: symbolRows,
 					symbolRoutes,
 				}),

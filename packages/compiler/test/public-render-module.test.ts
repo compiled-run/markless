@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import { compileTsrxModule } from '../src/compile-module.ts';
 import {
 	domNodePathExpression,
 	graphReadExpression,
@@ -91,4 +92,26 @@ test('public render module literal gate accepts only directly embeddable state v
 	const recursive: unknown[] = [];
 	recursive.push(recursive);
 	expect(isDirectPublicLiteralValue(recursive)).toBe(false);
+});
+
+test('public CSR and SSR composition bind sibling child events to distinct resolver IDs', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/BoundChildren.tsrx',
+		source: `
+function Child({ label }: { label: string }) @{
+	<button onClick={() => console.log(label)}>{label}</button>
+}
+export function App() @{
+	<main><Child label="first" /><Child label="second" /></main>
+}
+`,
+		symbols: [],
+	});
+	const ids = result.boundSymbolResolver.rows.map((row) => row.id);
+	expect(ids).toHaveLength(2);
+	expect(new Set(ids).size).toBe(2);
+	for (const id of ids) {
+		expect(result.publicRenderModule.csrModuleSource).toContain(id);
+		expect(result.publicRenderModule.ssrModuleSource).toContain(id);
+	}
 });

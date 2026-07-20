@@ -27,9 +27,10 @@ export function emitSsrComponent(
 		hostPrefix: `c${childIndex}:`,
 		symbolPrefix: edge?.importSource ? `c${childIndex}:` : '',
 		graphProps: graphReferenceProps(edge),
+		boundSymbols: boundSymbolsForEdge(edge, context.callbackSymbols),
 	};
 
-	return `(await marklessSsrRenderChild(marklessSsrChildren, ${localName}, { ${props.join(', ')} }, { hostPrefix: ${JSON.stringify(placement.hostPrefix)}, symbolPrefix: ${JSON.stringify(placement.symbolPrefix)}, localIndex: marklessSsrHostLocators.length, graphProps: ${JSON.stringify(placement.graphProps)} }, marklessSsrRenderContext))`;
+	return `(await marklessSsrRenderChild(marklessSsrChildren, ${localName}, { ${props.join(', ')} }, { hostPrefix: ${JSON.stringify(placement.hostPrefix)}, symbolPrefix: ${JSON.stringify(placement.symbolPrefix)}, localIndex: marklessSsrHostLocators.length, graphProps: ${JSON.stringify(placement.graphProps)}, boundSymbols: ${JSON.stringify(placement.boundSymbols)} }, marklessSsrRenderContext))`;
 }
 
 // Component invocation inside a keyed repeat row (SSR): the row mapper
@@ -102,7 +103,7 @@ export function emitCsrComponent(
 		node === context.componentRoot
 			? `	root = marklessCsrReplaceChild(root, ${index}, ${childName}?.root);`
 			: `	marklessCsrReplaceChild(root, ${index}, ${childName}?.root);`,
-		`	marklessCsrChildren.push({ hostPrefix: ${JSON.stringify(`c${index}:`)}, symbolPrefix: ${JSON.stringify(edge?.importSource ? `c${index}:` : '')}, output: ${childName}, graphProps: ${JSON.stringify(graphReferenceProps(edge))} });`,
+		`	marklessCsrChildren.push({ hostPrefix: ${JSON.stringify(`c${index}:`)}, symbolPrefix: ${JSON.stringify(edge?.importSource ? `c${index}:` : '')}, output: ${childName}, graphProps: ${JSON.stringify(graphReferenceProps(edge))}, boundSymbols: ${JSON.stringify(boundSymbolsForEdge(edge, context.callbackSymbols))} });`,
 	);
 	return JSON.stringify(`<span data-markless-csr-child="${index}"></span>`);
 }
@@ -156,6 +157,19 @@ function componentPropsSource(
 		props.push(`children: ${children}`);
 	}
 	return props;
+}
+
+function boundSymbolsForEdge(
+	edge: ComponentEdge | undefined,
+	symbols: ReadonlyMap<string, string>,
+): Readonly<Record<string, string>> {
+	if (!edge) return {};
+	const prefix = `bound:${edge.id}:`;
+	return Object.fromEntries(
+		[...symbols].flatMap(([key, value]) =>
+			key.startsWith(prefix) ? [[key.slice(prefix.length), value]] : [],
+		),
+	);
 }
 
 function ssrComponentPropsSource(

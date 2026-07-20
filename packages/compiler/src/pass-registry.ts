@@ -32,6 +32,12 @@ export const defaultCompilerPasses: ReadonlyArray<CompilerPassDefinition> = [
 		produces: ['publicRenderPlan'],
 	},
 	{
+		passId: 'capture-analysis',
+		description: 'Analyze extracted symbol sources for resumable capture eligibility.',
+		consumes: ['semanticGraph', 'symbolResolver'],
+		produces: ['captureAnalysis'],
+	},
+	{
 		passId: 'protocol-state',
 		description: 'Create the serializable protocol state payload.',
 		consumes: ['semanticGraph', 'payloadArena'],
@@ -52,16 +58,11 @@ export const defaultCompilerPasses: ReadonlyArray<CompilerPassDefinition> = [
 			'semanticGraph',
 			'publicRenderPlan',
 			'symbolResolver',
+			'captureAnalysis',
 			'protocolState',
 			'protocolView',
 		],
 		produces: ['publicRenderModule'],
-	},
-	{
-		passId: 'capture-analysis',
-		description: 'Analyze extracted symbol sources for resumable capture eligibility.',
-		consumes: ['semanticGraph', 'symbolResolver'],
-		produces: ['captureAnalysis'],
 	},
 	{
 		passId: 'payload-scripts',
@@ -78,7 +79,13 @@ export const defaultCompilerPasses: ReadonlyArray<CompilerPassDefinition> = [
 	{
 		passId: 'runtime-demand-map',
 		description: 'Map emitted symbols and payload records to exact runtime module demands.',
-		consumes: ['symbolResolver', 'symbolModules', 'publicRenderModule', 'protocolView'],
+		consumes: [
+			'symbolResolver',
+			'captureAnalysis',
+			'symbolModules',
+			'publicRenderModule',
+			'protocolView',
+		],
 		produces: ['runtimeDemandMap'],
 	},
 	{

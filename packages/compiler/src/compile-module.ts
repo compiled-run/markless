@@ -163,7 +163,10 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 					return {
 						captureAnalysis: {
 							...captureAnalysis,
-							boundResolverRows: planBoundSymbolResolver({ semanticGraph, captureAnalysis }).rows,
+							boundResolverRows: planBoundSymbolResolver({
+								semanticGraph,
+								captureAnalysis,
+							}).rows,
 						},
 					};
 				},
@@ -204,6 +207,7 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 							semanticGraph,
 							publicRenderPlan: inputs.publicRenderPlan as PublicRenderPlanArtifact,
 							symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
+							captureAnalysis: inputs.captureAnalysis as CaptureAnalysisArtifact,
 							protocolState:
 								inputs.protocolState as CompileTsrxModuleResult['protocolState'],
 							protocolView:
@@ -281,6 +285,7 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 					return {
 						runtimeDemandMap: createRuntimeDemandMap({
 							symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
+							captureAnalysis: inputs.captureAnalysis as CaptureAnalysisArtifact,
 							symbolModules: inputs.symbolModules as SymbolModulesArtifact,
 							publicRenderModule:
 								inputs.publicRenderModule as CompileTsrxModuleResult['publicRenderModule'],

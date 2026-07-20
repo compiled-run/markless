@@ -739,7 +739,10 @@ export type SymbolResolverPlan = {
 	readonly diagnostics: ReadonlyArray<PayloadArenaDiagnostic>;
 };
 
-export type BoundSymbolCaptureRoute = Exclude<CaptureSlotRoute, { readonly kind: 'unsupported-opaque' }>;
+export type BoundSymbolCaptureRoute = Exclude<
+	CaptureSlotRoute,
+	{ readonly kind: 'unsupported-opaque' }
+>;
 
 // A bound row is data only. Its opaque ID addresses one rendered component-edge
 // path; the generated resolver turns the row into an adapter at load time.
@@ -1272,6 +1275,7 @@ export type PublicRenderModuleInput = {
 	readonly semanticGraph: SemanticGraphArtifact;
 	readonly publicRenderPlan: PublicRenderPlanArtifact;
 	readonly symbolResolver: SymbolResolverPlan;
+	readonly captureAnalysis: CaptureAnalysisArtifact;
 	readonly protocolState: ProtocolStatePayload;
 	readonly protocolView: ProtocolViewPayload;
 };

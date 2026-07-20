@@ -1,3 +1,5 @@
+import { marklessBoundSymbolId } from './bound-symbol.ts';
+
 export function marklessCsrFragmentFromHtml(html) {
 	const template = document.createElement('template');
 	template.innerHTML = html;
@@ -343,8 +345,10 @@ export function marklessCsrAppendChildView(context) {
 			{ graphNodeId, path: [] },
 			context.child.graphProps,
 		);
-		context.asyncRunners[mapped?.graphNodeId ?? graphNodeId] =
-			context.child.symbolPrefix + symbolId;
+		context.asyncRunners[mapped?.graphNodeId ?? graphNodeId] = marklessBoundSymbolId(
+			context.child,
+			symbolId,
+		);
 	}
 	for (const locator of childView.locators) {
 		const element = marklessCsrResolveChildLocatorElement(childElements, locator, claimed);
@@ -372,7 +376,7 @@ export function marklessCsrAppendChildView(context) {
 			hostNodeId: context.child.hostPrefix + event.hostNodeId,
 			symbolIds: callbackSymbolId
 				? [callbackSymbolId]
-				: event.symbolIds.map((symbolId) => context.child.symbolPrefix + symbolId),
+				: event.symbolIds.map((symbolId) => marklessBoundSymbolId(context.child, symbolId)),
 		});
 	}
 	for (const update of childView.domUpdates) {
@@ -477,7 +481,9 @@ export function marklessCsrPrefixBoundaryArmRecords(set, child) {
 		locators: (set.locators ?? []).map(prefixHost),
 		events: (set.events ?? []).map((event) => ({
 			...prefixHost(event),
-			symbolIds: (event.symbolIds ?? []).map((symbolId) => child.symbolPrefix + symbolId),
+			symbolIds: (event.symbolIds ?? []).map((symbolId) =>
+				marklessBoundSymbolId(child, symbolId),
+			),
 		})),
 		behaviors: (set.behaviors ?? []).map((behavior) => ({
 			...prefixHost(behavior),
@@ -658,7 +664,7 @@ export function marklessCsrPrefixArmRecord(arm, child) {
 		...arm,
 		events: (arm.events ?? []).map((event) => ({
 			...event,
-			symbolIds: event.symbolIds.map((symbolId) => child.symbolPrefix + symbolId),
+			symbolIds: event.symbolIds.map((symbolId) => marklessBoundSymbolId(child, symbolId)),
 		})),
 		domUpdates: (arm.domUpdates ?? []).map((update) => {
 			const mapped = marklessCsrRemapChildGraph(update, child.graphProps);

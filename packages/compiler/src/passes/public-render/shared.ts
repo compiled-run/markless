@@ -17,13 +17,17 @@ export function isComponentRoot(root: AnyNode): boolean {
 }
 
 export function callbackSymbolIds(input: PublicRenderModuleInput): ReadonlyMap<string, string> {
-	return new Map(
-		input.symbolResolver.symbols.flatMap((symbol) =>
+	return new Map([
+		...input.symbolResolver.symbols.flatMap((symbol) =>
 			symbol.kind === 'callback-prop'
-				? [[`${symbol.componentEdgeId}:${symbol.propName}`, symbol.id]]
+				? [[`${symbol.componentEdgeId}:${symbol.propName}`, symbol.id] as const]
 				: [],
 		),
-	);
+		...(input.captureAnalysis.boundResolverRows ?? []).flatMap((row) => {
+			const edgeId = row.componentEdgePath.at(-1);
+			return edgeId ? [[`bound:${edgeId}:${row.baseSymbolId}`, row.id] as const] : [];
+		}),
+	]);
 }
 
 export function moduleScopeLines(source: string, filename: string): string[] {
