@@ -98,16 +98,18 @@ async function loadModuleSizes(input) {
 	return marklessSizesPromise;
 }
 function symbolParts(id) { const match = /^virtual:markless:symbol:([^:]+):([^:]+)$/.exec(id); if (!match) return null; try { return { source: decodeURIComponent(match[1]), symbolId: decodeURIComponent(match[2]) }; } catch { return null; } }
+function baseSymbolId(id) { if (!id.startsWith('bound:')) return null; const separator = id.indexOf(':', 'bound:'.length); if (separator < 0) return null; try { return decodeURIComponent(id.slice('bound:'.length, separator)); } catch { return null; } }
 function routeFile() { const text = document.querySelector?.('script[type="@markless/core/route"]')?.textContent; if (!text) return null; try { const value = JSON.parse(text).file; return typeof value === 'string' ? value : null; } catch { return null; } }
-function qualifySymbolIds(ids, hostNodeId, sizes, tables) { const route = routeFile(); if (!route || route.includes('..') || route.includes('\\\\')) return ids; const canonical = route.replace(/^\\/+/, ''); const scopes = tables && Object.prototype.hasOwnProperty.call(tables, canonical) ? tables[canonical] : undefined; if (!scopes) return ids; const host = /^((?:c\\d+:)*)[^:]+$/.exec(hostNodeId); const hostScope = host && host[1]; return ids.map((id) => { const own = /^((?:c\\d+:)+)(.*)$/.exec(id); const scope = own ? own[1] : hostScope; if (scope === null || !Object.prototype.hasOwnProperty.call(scopes, scope)) return id; const local = own ? own[2] : id; if (!local.startsWith('symbol:')) return id; const matches = [...(sizes?.keys() || [])].filter((key) => { const match = /^virtual:markless:symbol:([^:]+):([^:]+)$/.exec(key); if (!match || match[1] !== scopes[scope]) return false; try { return decodeURIComponent(match[2]) === local; } catch { return false; } }); return matches.length === 1 ? matches[0] : id; }); }
+function qualifySymbolIds(ids, hostNodeId, sizes, tables) { const route = routeFile(); if (!route || route.includes('..') || route.includes('\\\\')) return ids; const canonical = route.replace(/^\\/+/, ''); const scopes = tables && Object.prototype.hasOwnProperty.call(tables, canonical) ? tables[canonical] : undefined; if (!scopes) return ids; const host = /^((?:c\\d+:)*)[^:]+$/.exec(hostNodeId); const hostScope = host && host[1]; return ids.map((id) => { const own = /^((?:c\\d+:)+)(.*)$/.exec(id); const scope = own ? own[1] : hostScope; if (scope === null || !Object.prototype.hasOwnProperty.call(scopes, scope)) return id; const local = own ? own[2] : id; const base = baseSymbolId(local); const sizeSymbolId = base || local; if (!sizeSymbolId.startsWith('symbol:')) return id; const matches = [...(sizes?.keys() || [])].filter((key) => { const match = /^virtual:markless:symbol:([^:]+):([^:]+)$/.exec(key); if (!match || match[1] !== scopes[scope]) return false; try { return decodeURIComponent(match[2]) === sizeSymbolId; } catch { return false; } }); if (matches.length !== 1) return id; if (!base) return matches[0]; const match = /^virtual:markless:symbol:([^:]+):/.exec(matches[0]); return match ? 'virtual:markless:symbol:' + match[1] + ':' + encodeURIComponent(local) : id; }); }
 function canonicalId(id, sizes) {
 	if (!sizes || sizes.has(id)) return id;
-	const local = id.replace(/^(?:c\\d+:)+/, '');
-	if (!local.startsWith('symbol:')) return id;
-	const matches = [...sizes.keys()].filter((key) => { const parts = symbolParts(key); return !!parts && parts.symbolId === local; });
+	const qualified = symbolParts(id); const local = qualified ? qualified.symbolId : id.replace(/^(?:c\\d+:)+/, ''); const sizeSymbolId = baseSymbolId(local) || local;
+	if (!sizeSymbolId.startsWith('symbol:')) return id;
+	const matches = [...sizes.keys()].filter((key) => { const parts = symbolParts(key); return !!parts && parts.symbolId === sizeSymbolId && (!qualified || parts.source === qualified.source); });
 	return matches.length === 1 ? matches[0] : id;
 }
 function displayId(id) { const parts = symbolParts(id); return parts ? parts.symbolId + ' (' + (parts.source.split('/').pop() || parts.source) + ')' : id; }
+function displayObservedId(id, sizes) { const parts = symbolParts(id); return displayId(baseSymbolId(parts ? parts.symbolId : id) ? id : canonicalId(id, sizes)); }
 function accounting(items, sizes) {
 	const ids = [...new Set(items.map((id) => canonicalId(id, sizes)))];
 	if (!sizes) return { appBytes: ids.length ? null : 0, instrumentBytes: 0, appModules: ids.length, instrumentModules: 0, estimated: { app: false, instrument: false }, unmappedIds: [] };
@@ -121,7 +123,7 @@ function warmIds(event) { return [...new Set([event.dispatchModuleId, ...((event
 function causeRows(input) {
 	const before = input.before || new Set(); const after = input.after || new Set(); const woken = [...after].filter((id) => !before.has(id)); const record = input.eventRecord;
 	const cause = record ? input.eventName + ' matched event record ' + record.hostNodeId : input.eventName + ' matched runtime records';
-	const label = (id) => displayId(canonicalId(id, input.moduleSizes));
+	const label = (id) => displayObservedId(id, input.moduleSizes);
 	const rows = woken.map((id) => 'woke ' + label(id) + (input.moduleSizes ? ' (' + rowKb([id], input.moduleSizes) + (input.moduleSizes.get(canonicalId(id, input.moduleSizes))?.instrument ? ' instrument' : '') + ')' : '') + ' <- ' + cause);
 	if (record) for (const id of warmIds(input)) rows.push('ran warm ' + label(id) + (input.moduleSizes ? ' (' + rowKb([id], input.moduleSizes) + (input.moduleSizes.get(canonicalId(id, input.moduleSizes))?.instrument ? ' instrument' : '') + ')' : '') + ' <- ' + cause);
 	if (record && !(input.view?.behaviors || []).some((b) => b.hostNodeId === record.hostNodeId)) rows.push('skip behavior — no matching record touched');

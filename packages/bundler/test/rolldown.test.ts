@@ -557,17 +557,17 @@ let count = state(0);
 		};
 
 		callBuildStart(plugin, { cwd: rootDir });
-		const route = (await callTransform(
-			plugin,
-			component('Dashboard', '../components/MetricPanel.tsrx'),
-			routeFile,
-		)) as Awaited<ReturnType<typeof transformTsrxModule>>;
+		await callTransform(plugin, component('GaugeButton'), gaugeFile);
 		const panel = (await callTransform(
 			plugin,
 			component('MetricPanel', './GaugeButton.tsrx'),
 			panelFile,
 		)) as Awaited<ReturnType<typeof transformTsrxModule>>;
-		await callTransform(plugin, component('GaugeButton'), gaugeFile);
+		const route = (await callTransform(
+			plugin,
+			component('Dashboard', '../components/MetricPanel.tsrx'),
+			routeFile,
+		)) as Awaited<ReturnType<typeof transformTsrxModule>>;
 
 		const routePrefix = route.manifest.symbolRoutes![0]!.prefix;
 		const panelPrefix = panel.manifest.symbolRoutes![0]!.prefix;
@@ -582,12 +582,12 @@ let count = state(0);
 		const resolvedLogger = await callResolveId(plugin, MARKLESS_EXECUTION_LOG_MODULE_ID);
 		const invalidated = plugin.api.invalidateGeneratedModules(routeFile, 'client');
 		expect(invalidated).toContain((resolvedLogger as { id: string }).id);
+		await callTransform(plugin, component('TrendCard'), replacementFile);
 		await callTransform(
 			plugin,
 			component('Dashboard', '../components/TrendCard.tsrx'),
 			routeFile,
 		);
-		await callTransform(plugin, component('TrendCard'), replacementFile);
 
 		const refreshed = await embeddedAttribution();
 		expect(refreshed['routes/dashboard.tsrx']).toEqual({

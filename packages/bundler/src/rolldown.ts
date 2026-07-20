@@ -233,7 +233,7 @@ export function createMarklessRolldownPlugin(input: {
 				return executionLogVirtualModuleSource({
 					moduleSizes: embedsDevSizes ? executionLogEstimatedSizes : undefined,
 					attribution: embedsDevSizes
-						? executionAttributionTables(transformManifests, getRoot())
+						? executionAttributionTables(transformManifests, getRoot(), importedChildren.values())
 						: undefined,
 					sizesUrl:
 						internalOptions.dev === true

@@ -457,6 +457,47 @@ export default function ScorePad() @{
 	expect(attributes.get('data-markless-log-app-bytes')).toBe('4096');
 });
 
+test('bound symbol attribution charges the base module once and preserves the observed id', async () => {
+	const attributes = stubExecutionLogDom('routes/arena.tsrx');
+	const childSource = '/workspace/widgets/ScorePad.tsrx';
+	const baseSymbol = symbolVirtualModuleId(childSource, 'symbol:0');
+	const boundSymbolId = `bound:${encodeURIComponent('symbol:0')}:${encodeURIComponent('component-edge:0')}`;
+	(globalThis as ExecutionLogGlobal).__mxLog = new Set([baseSymbol]);
+	const headers: string[] = [];
+	const rows: string[] = [];
+	vi.spyOn(console, 'groupCollapsed').mockImplementation((line: unknown) =>
+		headers.push(String(line)),
+	);
+	vi.spyOn(console, 'groupEnd').mockImplementation(() => {});
+	vi.spyOn(console, 'log').mockImplementation((line: unknown) => rows.push(String(line)));
+
+	const mod = await importExecutionLogModule(
+		executionLogVirtualModuleSource({
+			moduleSizes: new Map([[baseSymbol, 4096]]),
+			attribution: {
+				'routes/arena.tsrx': { 'c1:': encodeURIComponent(childSource) },
+			},
+		}),
+	);
+	await mod.logMarklessInteraction({
+		eventName: 'click',
+		selector: 'button.score',
+		eventRecord: { hostNodeId: 'c1:h4', symbolIds: [boundSymbolId] },
+		before: new Set<string>([MARKLESS_EXECUTION_LOG_MODULE_ID]),
+		view: { behaviors: [{ hostNodeId: 'c1:h4' }] },
+	});
+
+	expect(headers[0]).toContain('woke 1 modules');
+	expect(headers[0]).toContain('ran warm 1 modules');
+	expect(headers[0]).toContain('· 4.0 KB est. source app');
+	expect(rows).toContainEqual(
+		expect.stringContaining(
+			`ran warm ${boundSymbolId} (ScorePad.tsrx) (4.0 KB est. source)`,
+		),
+	);
+	expect(attributes.get('data-markless-log-app-bytes')).toBe('4096');
+});
+
 test.each([
 	['missing route', 'routes/missing.tsrx', 'c1:symbol:0', 'c1:h4'],
 	['unknown scope', 'routes/arena.tsrx', 'c9:symbol:0', 'c9:h4'],
