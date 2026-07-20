@@ -760,6 +760,7 @@ function renderTemplateFiles(
 ): StarterFile[] {
 	return files.map((file) => ({
 		...file,
+		path: file.path === 'gitignore' ? '.gitignore' : file.path,
 		contents: file.contents.replace(/\{\{([A-Za-z][A-Za-z0-9]*)\}\}/g, (match, name) => {
 			return context[name] ?? match;
 		}),

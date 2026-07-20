@@ -233,6 +233,7 @@ test('creates a minimal Markless Router app with TSRX pages and Nitro-backed dep
 		scripts: Record<string, string>;
 	};
 	const viteConfig = await readFile(join(appRoot, 'vite.config.ts'), 'utf-8');
+	const gitignore = await readFile(join(appRoot, '.gitignore'), 'utf-8');
 	const vscodeSettings = JSON.parse(
 		await readFile(join(appRoot, '.vscode/settings.json'), 'utf-8'),
 	) as unknown;
@@ -301,6 +302,8 @@ test('creates a minimal Markless Router app with TSRX pages and Nitro-backed dep
 	expect(viteConfig).not.toContain('@vitejs/devtools');
 	expect(viteConfig).not.toContain('DevTools');
 	expect(viteConfig).not.toContain('nitro()');
+	expect(gitignore).toBe('node_modules/\ndist/\n.vite/\n*.log\n.DS_Store\n');
+	await expect(exists(join(appRoot, 'gitignore'))).resolves.toBe(false);
 	await expect(readFile(join(appRoot, 'tsconfig.json'), 'utf-8')).resolves.not.toContain('tsx');
 	await expect(exists(join(appRoot, 'pages/index.tsx'))).resolves.toBe(false);
 });
@@ -320,6 +323,8 @@ test('packs no repository agent configuration templates', async () => {
 		'templates/common/.claude/skills/markless-debugging/SKILL.md',
 	);
 	expect(packedPaths).toContain('templates/common/scripts/markless-doctor.mjs');
+	expect(packedPaths).toContain('templates/common/gitignore');
+	expect(packedPaths).not.toContain('templates/common/.gitignore');
 });
 
 test('generates app and full-stack status pages under pages', async () => {
@@ -335,6 +340,7 @@ test('generates app and full-stack status pages under pages', async () => {
 
 			const appRoot = join(root, `${starter}-app`);
 			const tsconfigJson = await readFile(join(appRoot, 'tsconfig.json'), 'utf-8');
+			const gitignore = await readFile(join(appRoot, '.gitignore'), 'utf-8');
 
 			await expect(exists(join(appRoot, 'pages/404.tsrx'))).resolves.toBe(true);
 			await expect(exists(join(appRoot, 'pages/500.tsrx'))).resolves.toBe(true);
@@ -343,6 +349,12 @@ test('generates app and full-stack status pages under pages', async () => {
 			expect(tsconfigJson).toContain('"pages"');
 			expect(tsconfigJson).not.toContain('"404.tsrx"');
 			expect(tsconfigJson).not.toContain('"500.tsrx"');
+			expect(gitignore).toContain('node_modules/');
+			expect(gitignore).toContain('dist/');
+			expect(gitignore).toContain('.vite/');
+			expect(gitignore).toContain('*.log');
+			expect(gitignore).toContain('.DS_Store');
+			await expect(exists(join(appRoot, 'gitignore'))).resolves.toBe(false);
 		}),
 	);
 });
