@@ -74,8 +74,21 @@ function importedCaptureSymbols(
 				loaderSymbolId: symbol.id,
 				captureSlots: symbol.captureSymbol.captureSlots.map((slot) => ({
 					...slot,
-					routes: slot.propName
-						? [propCaptureRoute([edge], slot.propName, slot.path, input)]
+					routes: slot.routes.some((route) => route.kind === 'passthrough-route')
+						? slot.routes.flatMap((route) =>
+								route.kind === 'passthrough-route'
+									? [
+											propCaptureRoute(
+												[edge],
+												route.propName,
+												[...route.path, ...slot.path],
+												input,
+											),
+										]
+									: [],
+							)
+						: slot.propName
+							? [propCaptureRoute([edge], slot.propName, slot.path, input)]
 						: slot.routes.map((route) =>
 								route.kind === 'graph-reference'
 									? {
@@ -244,6 +257,16 @@ function resolvePropCaptureRoute(
 					terminalEdgeId,
 					input,
 				);
+			}
+			if (upstreamPropName && scoped.bindingId) {
+				return {
+					kind: 'passthrough-route',
+					componentEdgeId: terminalEdgeId,
+					componentEdgePath: edgePathIds,
+					bindingId: scoped.bindingId,
+					propName: upstreamPropName,
+					path: [...scoped.path.slice(1), ...forwardedPath],
+				};
 			}
 			return {
 				kind: 'unsupported-opaque',

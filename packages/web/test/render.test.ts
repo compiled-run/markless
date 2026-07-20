@@ -11,6 +11,7 @@ import {
 	marklessCsrReplaceChild,
 } from '../src/fns/csr.ts';
 import { render, renderToString } from '../src/index.ts';
+import { marklessBoundSymbolId } from '../src/fns/bound-symbol.ts';
 
 type FakeElement = {
 	readonly nodeType: 1;
@@ -1379,6 +1380,156 @@ export default function CaptureSlotNested() @{
 			);
 		},
 	);
+});
+
+test('compiled imported child dispatches through a forwarding component to the grandparent callback', async () => {
+	const childSource = `
+export function LibrarySong({ song, onSelect }) @{
+	<button type="button" onClick={() => onSelect(song.name)}>{song.name}</button>
+}
+`;
+	const child = await compileTsrxModule({
+		filename: 'src/LibrarySong.tsrx',
+		source: childSource,
+		symbols: [],
+	});
+	const childTransform = await transformTsrxModule({
+		filename: 'src/LibrarySong.tsrx',
+		source: childSource,
+		environment: 'client',
+		executionLog: 'never',
+	});
+	const childHandler = child.captureAnalysis.extractedSymbols.find(
+		(symbol) => symbol.kind === 'event-handler',
+	)!;
+	const childManifestSymbol = childTransform.manifest.symbols.find(
+		(symbol) => symbol.symbolId === childHandler.symbolId,
+	)!;
+	const childSymbolModule = childTransform.virtualModules.find(
+		(module) => module.id === childManifestSymbol.virtualModuleId,
+	)!;
+	const childInput = {
+		id: 'imported:LibrarySong:symbol:0',
+		chunk: childManifestSymbol.virtualModuleId,
+		exportName: childManifestSymbol.exportName,
+		componentEdgeId: 'component-edge:0',
+		captureSymbol: childHandler,
+	};
+	const library = await compileTsrxModule({
+		filename: 'src/Library.tsrx',
+		source: `
+import { LibrarySong } from './LibrarySong.tsrx';
+
+export function Library({ songOne, onSelectOne }) @{
+	<LibrarySong song={songOne} onSelect={onSelectOne} />
+}
+`,
+		symbols: [childInput],
+	});
+	const forwarded = library.captureAnalysis.extractedSymbols.find(
+		(symbol) => symbol.loaderSymbolId === childInput.id,
+	)!;
+	const libraryRow = library.boundSymbolResolver.rows.find(
+		(row) => row.baseSymbolId === childHandler.symbolId,
+	)!;
+	const appSource = `
+import { state } from '@markless/core';
+import { Library } from './Library.tsrx';
+
+export function App() @{
+	let song = state({ name: 'Imported cedar' });
+	let selected = state('none');
+	<main>
+		<Library songOne={song} onSelectOne={(name) => selected = name} />
+		<output>{selected}</output>
+	</main>
+}
+`;
+	const appInput = {
+		id: 'imported:Library:symbol:0',
+		chunk: childManifestSymbol.virtualModuleId,
+		exportName: childManifestSymbol.exportName,
+		componentEdgeId: 'component-edge:0',
+		captureSymbol: forwarded,
+	};
+	const app = await compileTsrxModule({
+		filename: 'src/App.tsrx',
+		source: appSource,
+		symbols: [appInput],
+	});
+	const appTransform = await transformTsrxModule({
+		filename: 'src/App.tsrx',
+		source: appSource,
+		symbols: [appInput],
+		environment: 'client',
+		executionLog: 'never',
+	});
+	const appRow = app.boundSymbolResolver.rows.find(
+		(row) => row.baseSymbolId === childHandler.symbolId,
+	)!;
+	const libraryBoundId = marklessBoundSymbolId(
+		{ boundSymbols: { [childHandler.symbolId]: libraryRow.id } },
+		childHandler.symbolId,
+	);
+	const appBoundId = marklessBoundSymbolId(
+		{ boundSymbols: { [childHandler.symbolId]: appRow.id } },
+		libraryBoundId,
+	);
+
+	expect(libraryBoundId).toBe(libraryRow.id);
+	expect(appBoundId).toBe(appRow.id);
+	expect(app.captureAnalysis.diagnostics).toEqual([]);
+	expect(appRow.captureSlots.map((slot) => slot.route)).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({ kind: 'callback-route' }),
+			expect.objectContaining({ kind: 'graph-reference', graphNodeId: 'state:song' }),
+		]),
+	);
+
+	const symbolUrls = new Map(
+		appTransform.virtualModules
+			.filter((module) => module.type === 'symbol')
+			.map((module) => [module.id, javascriptModuleUrl(localWebFunctionImports(module.source))]),
+	);
+	symbolUrls.set(
+		childManifestSymbol.virtualModuleId,
+		javascriptModuleUrl(localWebFunctionImports(childSymbolModule.source)),
+	);
+	const resolver = appTransform.virtualModules.find((module) => module.type === 'resolver')!;
+	let resolverSource = resolver.source;
+	for (const [moduleId, moduleUrl] of symbolUrls) {
+		resolverSource = resolverSource.split(moduleId).join(moduleUrl);
+	}
+	const loadedResolver = (await import(javascriptModuleUrl(resolverSource))) as {
+		readonly loadSymbol: (symbolId: string) => unknown;
+	};
+	const button = element('BUTTON');
+	const runtime = await render(
+		{
+			renderCsr: () => ({
+				root: button,
+				state: app.protocolState,
+				view: {
+					version: ASYNC_PROTOCOL_VERSION,
+					locators: [
+						{ hostNodeId: 'c0:c0:h0', strategy: 'dom-order', index: 0, tagName: 'button' },
+					],
+					events: [
+						{ hostNodeId: 'c0:c0:h0', eventName: 'click', symbolIds: [appBoundId] },
+					],
+					domUpdates: [],
+					behaviors: [],
+					elementHandles: [],
+					asyncBoundaries: [],
+				},
+				loadSymbol: loadedResolver.loadSymbol,
+			}),
+		},
+		{ target: { replaceChildren() {} } },
+	);
+
+	await runtime.runtime.dispatch(event('click', button) as never);
+	expect(runtime.graph.read('state:selected')).toBe('Imported cedar');
 });
 
 test('render dispatch throws a tagged error when no event record matches', async () => {

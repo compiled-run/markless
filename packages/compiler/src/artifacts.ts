@@ -833,6 +833,17 @@ export type CaptureSlotRoute =
 			readonly callbackSymbolId: string;
 	  }
 	| {
+			// An imported descendant reads a prop owned by this forwarding component.
+			// A consuming module replaces this compiler-only route when it composes the
+			// forwarding component through a concrete instance edge.
+			readonly kind: 'passthrough-route';
+			readonly componentEdgeId: string;
+			readonly componentEdgePath?: ReadonlyArray<string>;
+			readonly bindingId: string;
+			readonly propName: string;
+			readonly path: ReadonlyArray<string>;
+	  }
+	| {
 			readonly kind: 'unsupported-opaque';
 			readonly componentEdgeId: string;
 			readonly componentEdgePath?: ReadonlyArray<string>;

@@ -2,6 +2,7 @@ import { expect, test } from 'vitest';
 import {
 	analyzeCaptures,
 	buildSemanticGraph,
+	compileTsrxModule,
 	lowerStateAccess,
 	planPayloadArena,
 	planSymbolResolver,
@@ -29,6 +30,117 @@ async function compileCaptureArtifacts(source: string) {
 	};
 	return { semanticGraph, stateLowering, symbolResolver, captureAnalysis };
 }
+
+test('an imported child capture preserves a forwarding component own-prop route', async () => {
+	const child = await compileTsrxModule({
+		filename: 'src/LibrarySong.tsrx',
+		source: `
+export function LibrarySong({ song, onSelect }) @{
+	<button onClick={() => onSelect(song.name)}>{song.name}</button>
+}
+`,
+		symbols: [],
+	});
+	const childHandler = child.captureAnalysis.extractedSymbols.find(
+		(symbol) => symbol.kind === 'event-handler',
+	)!;
+	const library = await compileTsrxModule({
+		filename: 'src/Library.tsrx',
+		source: `
+import { LibrarySong } from './LibrarySong.tsrx';
+
+export function Library({ songOne, onSelectOne }) @{
+	<LibrarySong song={songOne} onSelect={onSelectOne} />
+}
+`,
+		symbols: [
+		{
+			id: 'imported:LibrarySong:symbol:0',
+			chunk: 'virtual:markless:symbol:LibrarySong:0',
+			exportName: 'librarySongHandler',
+			componentEdgeId: 'component-edge:0',
+			captureSymbol: childHandler,
+		},
+		],
+	});
+	expect(
+		library.captureAnalysis.diagnostics.filter(
+			(diagnostic) => diagnostic.code === 'MARKLESS_CAPTURE_OPAQUE_PROP',
+		),
+	).toEqual([]);
+	const imported = library.captureAnalysis.extractedSymbols.find(
+		(symbol) => symbol.loaderSymbolId === 'imported:LibrarySong:symbol:0',
+	);
+	const onSelect = imported?.captureSlots.find((slot) => slot.propName === 'onSelect');
+	const songName = imported?.captureSlots.find((slot) => slot.propName === 'song');
+	expect(onSelect).toEqual(
+		expect.objectContaining({
+			routes: [
+				expect.objectContaining({
+					kind: 'passthrough-route',
+					bindingId: expect.stringMatching(/^binding:/),
+					propName: 'onSelectOne',
+				}),
+			],
+		}),
+	);
+	expect(songName).toEqual(
+		expect.objectContaining({
+			routes: [
+				expect.objectContaining({
+					kind: 'passthrough-route',
+					bindingId: expect.stringMatching(/^binding:/),
+					propName: 'songOne',
+				}),
+			],
+		}),
+	);
+	expect(library.boundSymbolResolver.rows).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				baseSymbolId: childHandler.symbolId,
+				captureSlots: expect.arrayContaining([
+					expect.objectContaining({
+						route: expect.objectContaining({ kind: 'passthrough-route' }),
+					}),
+				]),
+			}),
+		]),
+	);
+
+	const app = await compileTsrxModule({
+		filename: 'src/App.tsrx',
+		source: `
+import { state } from '@markless/core';
+import { Library } from './Library.tsrx';
+
+export function App() @{
+	let song = state({ name: 'Cedar' });
+	let selected = state('none');
+	<Library songOne={song} onSelectOne={(name) => selected = name} />
+}
+`,
+		symbols: [
+		{
+			id: 'imported:Library:symbol:0',
+			chunk: 'virtual:markless:symbol:Library:0',
+			exportName: 'libraryHandler',
+			componentEdgeId: 'component-edge:0',
+			captureSymbol: imported!,
+		},
+	],
+	});
+	expect(app.captureAnalysis.diagnostics).toEqual([]);
+	const appRow = app.boundSymbolResolver.rows.find(
+		(row) => row.baseSymbolId === childHandler.symbolId,
+	);
+	expect(appRow?.captureSlots.map((slot) => slot.route)).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({ kind: 'callback-route' }),
+			expect.objectContaining({ kind: 'graph-reference', graphNodeId: 'state:song' }),
+		]),
+	);
+});
 
 test('prop declarations and reads retain distinct AST binding ownership', async () => {
 	const source = `
