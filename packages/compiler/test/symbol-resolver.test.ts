@@ -179,6 +179,15 @@ test('planBoundSymbolResolver derives bound rows from edge paths and recorded an
 				{
 					id: 'component-edge:child',
 					parentComponentName: 'Panel',
+					childComponentName: 'Group',
+					props: [],
+					children: { childCount: 1 },
+					branchScopeIds: [],
+					keyedRepeatScopeIds: [],
+				},
+				{
+					id: 'component-edge:action',
+					parentComponentName: 'Group',
 					childComponentName: 'Action',
 					props: [],
 					children: { childCount: 0 },
@@ -227,7 +236,7 @@ test('planBoundSymbolResolver derives bound rows from edge paths and recorded an
 							routes: [
 								{
 									kind: 'compiler-known-constant',
-									componentEdgeId: 'component-edge:child',
+									componentEdgeId: 'component-edge:action',
 									value: 'Save',
 								},
 							],
@@ -241,7 +250,11 @@ test('planBoundSymbolResolver derives bound rows from edge paths and recorded an
 	expect(artifact.rows).toEqual([
 		expect.objectContaining({
 			baseSymbolId: 'symbol:action',
-			componentEdgePath: ['component-edge:parent', 'component-edge:child'],
+			componentEdgePath: [
+				'component-edge:parent',
+				'component-edge:child',
+				'component-edge:action',
+			],
 			ancestry: [
 				{
 					componentEdgeId: 'component-edge:parent',
@@ -250,6 +263,11 @@ test('planBoundSymbolResolver derives bound rows from edge paths and recorded an
 				},
 				{
 					componentEdgeId: 'component-edge:child',
+					branchScopeIds: [],
+					keyedRepeatScopeIds: [],
+				},
+				{
+					componentEdgeId: 'component-edge:action',
 					branchScopeIds: [],
 					keyedRepeatScopeIds: ['repeat:actions'],
 				},
@@ -266,6 +284,7 @@ test('planBoundSymbolResolver derives bound rows from edge paths and recorded an
 	]);
 	expect(artifact.rows[0]?.id).toContain('component-edge%3Aparent');
 	expect(artifact.rows[0]?.id).not.toContain('Action');
+	expect(artifact.rows[0]?.id).not.toContain('component-edge%3Achild[]');
 });
 
 test('planSymbolResolver assigns derive symbols for sync computed records', async () => {
