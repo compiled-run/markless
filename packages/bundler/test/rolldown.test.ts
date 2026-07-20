@@ -642,7 +642,7 @@ export default function App() @{ <main><Child /></main> }`,
 		const childFilename = '/workspace/app/components/Child.tsrx';
 		const parentFilename = '/workspace/app/pages/App.tsrx';
 		const childSource = `export function Child({ label, onTrace }) @{
-	<button onClick={() => onTrace(label)}>{label}</button>
+	<button onClick={() => { onTrace(label); }}>{label}</button>
 }`;
 		const parentSource = `import { state } from '@markless/core';
 import { Child } from '../components/Child.tsrx';
@@ -710,21 +710,43 @@ export function App() @{
 		};
 		const siblingHandler = await loadedResolver.loadSymbol(rows[1]!.id);
 		const invoked: unknown[] = [];
-		const delivered = await siblingHandler({
-			event: { type: 'click' },
-			graph: {
-				read() {
-					throw new Error('shared prop fallback must not run');
+		const order: string[] = [];
+		let flushes = 0;
+		let delivered: unknown;
+		try {
+			delivered = await siblingHandler({
+				event: { type: 'click' },
+				graph: {
+					read() {
+						throw new Error('shared prop fallback must not run');
+					},
 				},
-			},
-			invokeSymbol(symbolId: string, context: { args: unknown[] }) {
-				invoked.push(symbolId, ...context.args);
-				return context.args[0];
-			},
-		});
+				async invokeSymbol(symbolId: string, context: { args: unknown[] }) {
+					order.push('parent:start');
+					invoked.push(symbolId, ...context.args);
+					await Promise.resolve();
+					order.push('parent:end');
+					return context.args[0];
+				},
+			});
+			order.push('following:complete');
+		} finally {
+			flushes++;
+			order.push('flush');
+		}
 
-		expect(delivered).toBe('Literal sibling');
+		expect(delivered).toBeUndefined();
 		expect(invoked).toEqual(['symbol:1', 'Literal sibling']);
+		expect(order).toEqual([
+			'parent:start',
+			'parent:end',
+			'following:complete',
+			'flush',
+		]);
+		expect(flushes).toBe(1);
+		expect(plugin.api.invalidateGeneratedModules(childFilename, 'client')).toContain(
+			`\0virtual:markless:resolver:${encodeURIComponent(parentFilename)}`,
+		);
 
 		const ssrOutputDirectory = await mkdtemp(
 			resolve(import.meta.dirname, '.imported-sibling-ssr-'),

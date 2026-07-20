@@ -393,6 +393,13 @@ export function createMarklessRolldownPlugin(input: {
 				dev,
 				environment: currentEnvironment,
 			});
+			for (const child of resolvedChildren) {
+				dev.record(
+					child.source,
+					[transformed.manifest.resolver.virtualModuleId],
+					currentEnvironment,
+				);
+			}
 			if (currentEnvironment === 'client' && isResumeSourceRequest(id)) {
 				const resumeModule = transformed.virtualModules.find(
 					(module) => module.type === 'resume',

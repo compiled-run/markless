@@ -1838,6 +1838,53 @@ export function App() @{
 	expect(multiArgumentCallback).toContain('const reason = context.args?.[1];');
 });
 
+test('local declarations shadow component props when callback arguments are emitted', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/ShadowedCapture.tsrx',
+		source: `
+function Child({ label, onTrace }: { label: string; onTrace: (value: string) => void }) @{
+	<>
+		<button onClick={() => { const label = "local"; onTrace(label); }}>Local</button>
+		<button onClick={() => { { const label = "nested"; onTrace(label); } }}>Nested</button>
+		<button onClick={() => { const { label } = { label: "pattern" }; onTrace(label); }}>Pattern</button>
+		<button onClick={() => { for (const label of ["loop"]) onTrace(label); }}>Loop</button>
+		<button onClick={() => onTrace(label)}>Prop</button>
+	</>
+}
+export function App() @{
+	<Child label="edge" onTrace={(value) => console.log(value)} />
+}
+`,
+		symbols: [],
+	});
+	const handlers = result.symbolModules.modules.filter(
+		(module) => module.kind === 'event-handler',
+	);
+	const local = handlers.find((module) => module.source.includes('"local"'));
+	const nested = handlers.find((module) => module.source.includes('"nested"'));
+	const pattern = handlers.find((module) => module.source.includes('"pattern"'));
+	const loop = handlers.find((module) => module.source.includes('"loop"'));
+	const prop = handlers.find(
+		(module) => module.source.includes('capture.invoke') && module.source.includes('capture.read'),
+	);
+
+	expect(local?.source).toContain('const label = "local";');
+	expect(local?.source).toContain('await context.capture.invoke(');
+	expect(local?.source).toContain('[label]');
+	expect(local?.source).not.toContain('context.capture.read(');
+	expect(nested?.source).toContain('const label = "nested";');
+	expect(nested?.source).toContain('[label]');
+	expect(nested?.source).not.toContain('context.capture.read(');
+	expect(pattern?.source).toContain('const { label } = { label: "pattern" };');
+	expect(pattern?.source).toContain('[label]');
+	expect(pattern?.source).not.toContain('context.capture.read(');
+	expect(loop?.source).toContain('for (const label of ["loop"])');
+	expect(loop?.source).toContain('[label]');
+	expect(loop?.source).not.toContain('context.capture.read(');
+	expect(prop?.source).toContain('await context.capture.invoke(');
+	expect(prop?.source).toContain('[context.capture.read(');
+});
+
 test('a callback forwarded through two component edges emits capture.invoke for the child call', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/ForwardedCallback.tsrx',

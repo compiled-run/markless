@@ -236,20 +236,27 @@ function adaptImportedCaptureResolver(source: string, hasImportedRows: boolean):
 	const original =
 		'\treturn (context) => base({ ...context, capture: createCaptureContext(context, bound) });';
 	const replacement = [
-		'\treturn (context) => {',
+		'\treturn async (context) => {',
+		'\t\tconst pendingCallbacks = [];',
 		'\t\tconst capture = createCaptureContext(context, bound);',
-		'\t\treturn base({ ...context, graph: createBoundGraph(context, bound, capture), capture });',
+		'\t\tconst result = await base({ ...context, graph: createBoundGraph(context, bound, capture, pendingCallbacks), capture });',
+		'\t\tawait Promise.all(pendingCallbacks);',
+		'\t\treturn result;',
 		'\t};',
 	].join('\n');
 	const helper = [
-		'function createBoundGraph(context, bound, capture) {',
+		'function createBoundGraph(context, bound, capture, pendingCallbacks) {',
 		'\tconst legacySlots = new Map(bound.captureSlots.flatMap((slot) => slot.legacyGraphRead ? [[JSON.stringify([slot.legacyGraphRead.graphNodeId, slot.legacyGraphRead.path]), slot]] : []));',
 		'\treturn {',
 		'\t\t...context.graph,',
 		'\t\tread(graphNodeId, path = []) {',
 		'\t\t\tconst slot = legacySlots.get(JSON.stringify([graphNodeId, path]));',
 		'\t\t\tif (!slot) return context.graph.read(graphNodeId, path);',
-		'\t\t\tif (slot.route.kind === "callback-route") return (...args) => context.invokeSymbol(slot.route.callbackSymbolId, { ...context, event: context.event, args });',
+		'\t\t\tif (slot.route.kind === "callback-route") return (...args) => {',
+		'\t\t\t\tconst pending = context.invokeSymbol(slot.route.callbackSymbolId, { ...context, event: context.event, args });',
+		'\t\t\t\tpendingCallbacks.push(Promise.resolve(pending));',
+		'\t\t\t\treturn pending;',
+		'\t\t\t};',
 		'\t\t\treturn capture.read(slot.slotId);',
 		'\t\t},',
 		'\t};',
