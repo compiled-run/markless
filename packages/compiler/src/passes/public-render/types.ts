@@ -39,6 +39,9 @@ export type SsrRenderContext = {
 export type CsrRenderContext = {
 	readonly mode: 'csr';
 	readonly childReplacements: string[];
+	// The selected root when this renderer is rooted at a component invocation.
+	// Component wiring uses identity to restrict root reassignment to that node.
+	readonly componentRoot?: AnyNode;
 	readonly componentEdges: PublicRenderModuleInput['semanticGraph']['componentEdges'];
 	readonly componentImports: ReadonlyMap<string, string>;
 	readonly callbackSymbols: ReadonlyMap<string, string>;

@@ -27,9 +27,13 @@ export function marklessCsrRenderChild(component, props) {
 	return output && Object.keys(callbackProps).length > 0 ? { ...output, callbackProps } : output;
 }
 export function marklessCsrReplaceChild(root, index, child) {
+	if (root.getAttribute?.('data-markless-csr-child') === String(index)) {
+		return child ?? root;
+	}
 	const placeholder = root.querySelector?.(`[data-markless-csr-child="${index}"]`);
 	if (placeholder && child) placeholder.replaceWith(child);
 	else placeholder?.remove?.();
+	return root;
 }
 // Component invocation inside a keyed repeat row (CSR mirror of
 // marklessSsrRowChild): rows repeat, so the child contributes markup only and

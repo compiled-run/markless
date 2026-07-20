@@ -5,6 +5,7 @@ import {
 	marklessCsrAttachPropEvent,
 	marklessCsrComposeView,
 	marklessCsrRenderChild,
+	marklessCsrReplaceChild,
 } from '../src/fns/csr.ts';
 import { render, renderToString } from '../src/index.ts';
 
@@ -83,6 +84,43 @@ function element(tagName: string, childNodes: FakeElement[] = []): FakeElement {
 function event(type: string, target: FakeElement): FakeEvent {
 	return { type, target };
 }
+
+test('marklessCsrReplaceChild returns a child that replaces the root placeholder', () => {
+	const child = element('STRONG');
+	const root = {
+		getAttribute(name: string) {
+			return name === 'data-markless-csr-child' ? '3' : null;
+		},
+		querySelector() {
+			throw new Error('A matching root placeholder must not search descendants.');
+		},
+	};
+
+	expect(marklessCsrReplaceChild(root, 3, child)).toBe(child);
+	expect(marklessCsrReplaceChild(root, 3, undefined)).toBe(root);
+});
+
+test('marklessCsrReplaceChild preserves the root when replacing a descendant placeholder', () => {
+	const child = element('STRONG');
+	let replacement: FakeElement | undefined;
+	const placeholder = {
+		replaceWith(node: FakeElement) {
+			replacement = node;
+		},
+	};
+	const root = {
+		getAttribute() {
+			return null;
+		},
+		querySelector(selector: string) {
+			expect(selector).toBe('[data-markless-csr-child="2"]');
+			return placeholder;
+		},
+	};
+
+	expect(marklessCsrReplaceChild(root, 2, child)).toBe(root);
+	expect(replacement).toBe(child);
+});
 
 function viewWithClick(): ProtocolViewPayload {
 	return {

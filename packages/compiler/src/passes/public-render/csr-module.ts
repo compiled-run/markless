@@ -13,6 +13,7 @@ import {
 	emitComponentImport,
 	emitValueImport,
 	hasPropDependentComputed,
+	isComponentRoot,
 	isFragmentNode,
 	publicRenderValueImports,
 	composedGraphProps,
@@ -76,6 +77,7 @@ export function emitPublicCsrRenderModule(
 	const renderContext: CsrRenderContext = {
 		mode: 'csr',
 		childReplacements: [],
+		...(isComponentRoot(rootInfo.root) ? { componentRoot: rootInfo.root } : {}),
 		componentEdges: componentEdgesFor(input, rootInfo.componentName),
 		componentImports: new Map(references.map((item) => [item.componentName, item.localName])),
 		callbackSymbols: callbackSymbolIds(input),
@@ -112,7 +114,7 @@ export function emitPublicCsrRenderModule(
 		stateEntries(input).join(',\n'),
 		']);',
 		'function marklessRenderCsr(props = {}) {',
-		destructureProps(rootInfo.propNames),
+		destructureProps(rootInfo.propNames, rootInfo.component),
 		'	const marklessCsrPayloadState = marklessCloneState(payloadState);',
 		// Lazy symbol modules read captured page props through the prop cell;
 		// the live value never crosses HTML, so it travels as directValue
@@ -131,7 +133,7 @@ export function emitPublicCsrRenderModule(
 				'const marklessCsrRuntimeState = { graph: null };',
 				'const marklessCsrChildren = [];',
 				'const marklessCsrLoadSymbol = (symbolId) => marklessCsrLoadChildSymbol(marklessCsrChildren, loadSymbol, symbolId);',
-				`const root = ${isFragmentNode(rootInfo.root) ? 'marklessCsrFragmentFromHtml' : 'marklessCsrRootFromHtml'}(${emitHtmlNode(rootInfo.root, renderContext)});`,
+				`${renderContext.componentRoot ? 'let' : 'const'} root = ${isFragmentNode(rootInfo.root) ? 'marklessCsrFragmentFromHtml' : 'marklessCsrRootFromHtml'}(${emitHtmlNode(rootInfo.root, renderContext)});`,
 			],
 		),
 		...renderContext.childReplacements,

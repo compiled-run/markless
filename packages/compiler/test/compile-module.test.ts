@@ -6117,6 +6117,59 @@ export default function Page() @{
 	expect(result.publicRenderModule.csrModuleSource).toContain('./shell.tsrx');
 });
 
+test('component-rooted CSR returns an imported child as the rendered root', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/ImportedRoot.tsrx',
+		source: `import Child from './Child.tsrx';
+
+export default function Page() @{
+	<Child />
+}`,
+		symbols: [],
+	});
+	const csrSource = result.publicRenderModule.csrModuleSource;
+
+	expect(csrSource).toContain('let root = marklessCsrRootFromHtml');
+	expect(csrSource).toContain(
+		'root = marklessCsrReplaceChild(root, 0, marklessCsrChild0?.root);',
+	);
+
+	const childRoot = new PublicRenderTestElement('strong');
+	childRoot.textContent = 'Imported child';
+	const csrModule = await importPublicRenderTestModule(
+		csrRenderTestModuleSource(result, { replaceChildImport: true }),
+		{
+			document: publicRenderTestDocument(),
+			childComponent: {
+				renderCsr() {
+					return {
+						root: childRoot,
+						state: { version: 1, cells: [], computed: [] },
+						view: {
+							version: 1,
+							locators: [],
+							events: [],
+							domUpdates: [],
+							behaviors: [],
+							elementHandles: [],
+							asyncBoundaries: [],
+						},
+					};
+				},
+			},
+		},
+	);
+	const output = (
+		csrModule.marklessRenderCsr as () => {
+			readonly root: PublicRenderTestElement;
+		}
+	)();
+
+	expect(output.root).toBe(childRoot);
+	expect(output.root.tagName).toBe('strong');
+	expect(output.root.textContent).toBe('Imported child');
+});
+
 test('event-handler symbol modules import every referenced module import (need 13 tail)', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/App.tsrx',
