@@ -8,7 +8,7 @@ export type SharedOptions = {
 	readonly scope: SharedScope;
 };
 
-export type FrameworkApiName = 'state' | 'computed' | 'element' | 'shared';
+export type FrameworkApiName = 'state' | 'computed' | 'element' | 'shared' | 'storage';
 
 export type FrameworkApiRuntimeDiagnostic = {
 	readonly code: 'MARKLESS_FRAMEWORK_API_RUNTIME_CALL';
@@ -62,6 +62,10 @@ export type SharedDefinition<T> = () => T;
 
 export function shared<T>(create: () => T, options?: SharedOptions): SharedDefinition<T> {
 	return frameworkApi<SharedDefinition<T>>('shared', create, options);
+}
+
+export function storage(key: string, fallback: string): string {
+	return frameworkApi<string>('storage', key, fallback);
 }
 
 function frameworkApi<T>(name: string, ..._args: unknown[]): T {

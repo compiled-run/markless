@@ -1,5 +1,12 @@
 import { expect, test } from 'vitest';
-import { computed, element, FrameworkApiRuntimeError, shared, state } from '../src/index.ts';
+import {
+	computed,
+	element,
+	FrameworkApiRuntimeError,
+	shared,
+	state,
+	storage,
+} from '../src/index.ts';
 
 test('framework APIs fail loudly when executed without the TSRX compiler', () => {
 	expect(() => state(0)).toThrow(
@@ -13,6 +20,9 @@ test('framework APIs fail loudly when executed without the TSRX compiler', () =>
 	);
 	expect(() => shared(() => ({ user: 'Ada' }), { scope: 'page' })).toThrow(
 		'markless shared() must be compiled from a .tsrx file before it can run.',
+	);
+	expect(() => storage('theme', 'light')).toThrow(
+		'markless storage() must be compiled from a .tsrx file before it can run.',
 	);
 });
 

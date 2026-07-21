@@ -1,4 +1,11 @@
-export { computed, element, shared, state, FrameworkApiRuntimeError } from './framework-api.ts';
+export {
+	computed,
+	element,
+	shared,
+	state,
+	storage,
+	FrameworkApiRuntimeError,
+} from './framework-api.ts';
 export type {
 	AsyncComputedValue,
 	ElementHandle,

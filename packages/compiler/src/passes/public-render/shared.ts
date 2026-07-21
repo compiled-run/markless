@@ -9,6 +9,7 @@ import {
 	getElementTagName,
 	isHostTagName,
 } from '../../ast/tsrx.ts';
+import { isStorageKey } from '../semantic-graph/collect-storage.ts';
 import type { ComponentEdge } from './types.ts';
 
 export function isComponentRoot(root: AnyNode): boolean {
@@ -30,9 +31,7 @@ export function callbackSymbolIds(input: PublicRenderModuleInput): ReadonlyMap<s
 							(symbol) => symbol.loaderSymbolId === row.loaderSymbolId,
 						)?.symbolId
 					: row.baseSymbolId;
-				return childSymbolId
-					? [[`bound:${edgeId}:${childSymbolId}`, row.id] as const]
-					: [];
+				return childSymbolId ? [[`bound:${edgeId}:${childSymbolId}`, row.id] as const] : [];
 			}),
 		),
 	]);
@@ -40,6 +39,7 @@ export function callbackSymbolIds(input: PublicRenderModuleInput): ReadonlyMap<s
 
 export function moduleScopeLines(source: string, filename: string): string[] {
 	const ast = parseModule(source, filename) as unknown as AnyNode;
+	const storageImports = storageImportNames(ast);
 	return asNodes(ast.body).flatMap((statement) => {
 		if (statement.type === 'ImportDeclaration' || getComponentFunction(statement)) return [];
 		const declaration =
@@ -53,9 +53,74 @@ export function moduleScopeLines(source: string, filename: string): string[] {
 			declaration.type !== 'ClassDeclaration'
 		)
 			return [];
-		const sourceText = expressionSource(declaration, source);
+		const sourceText = lowerModuleStorageDeclaration(declaration, source, storageImports);
 		return sourceText ? [sourceText] : [];
 	});
+}
+
+function storageImportNames(ast: AnyNode): ReadonlySet<string> {
+	const names = new Set<string>();
+	for (const statement of asNodes(ast.body)) {
+		if (statement.type !== 'ImportDeclaration') continue;
+		const importSource = (statement.source as AnyNode | undefined)?.value;
+		if (importSource !== '@markless/core') continue;
+		for (const specifier of asNodes(statement.specifiers)) {
+			if (specifier.type !== 'ImportSpecifier') continue;
+			if (getIdentifierName(specifier.imported as AnyNode | undefined) !== 'storage')
+				continue;
+			const localName = getIdentifierName(specifier.local as AnyNode | undefined);
+			if (localName) names.add(localName);
+		}
+	}
+	return names;
+}
+
+function lowerModuleStorageDeclaration(
+	declaration: AnyNode,
+	source: string,
+	storageImports: ReadonlySet<string>,
+): string {
+	const declarationSource = expressionSource(declaration, source);
+	if (declaration.type !== 'VariableDeclaration' || declaration.kind !== 'const') {
+		return declarationSource;
+	}
+	if (typeof declaration.start !== 'number') return declarationSource;
+
+	const replacements = asNodes(declaration.declarations).flatMap((declarator) => {
+		const init = declarator.init as AnyNode | undefined;
+		if (init?.type !== 'CallExpression') return [];
+		const callName = getIdentifierName(init.callee as AnyNode | undefined);
+		if (!callName || !storageImports.has(callName)) return [];
+		const args = asNodes(init.arguments);
+		const key = args[0];
+		const fallback = args[1];
+		if (
+			key?.type !== 'Literal' ||
+			typeof key.value !== 'string' ||
+			!isStorageKey(key.value) ||
+			fallback?.type !== 'Literal' ||
+			typeof fallback.value !== 'string' ||
+			typeof init.start !== 'number' ||
+			typeof init.end !== 'number'
+		) {
+			return [];
+		}
+		return [
+			{
+				start: init.start - declaration.start!,
+				end: init.end - declaration.start!,
+				value: expressionSource(fallback, source),
+			},
+		];
+	});
+
+	return replacements
+		.sort((left, right) => right.start - left.start)
+		.reduce(
+			(text, replacement) =>
+				`${text.slice(0, replacement.start)}${replacement.value}${text.slice(replacement.end)}`,
+			declarationSource,
+		);
 }
 
 export function destructureProps(

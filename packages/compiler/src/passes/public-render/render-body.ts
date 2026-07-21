@@ -5,7 +5,7 @@ import { isIgnorableJsxTextNode as isIgnorableTextNode } from '../../ast/tsrx.ts
 import type { PublicRenderRoot } from './types.ts';
 
 type GraphBinding = PublicRenderModuleInput['semanticGraph']['graphBindings'][number];
-const loweredFrameworkCalls = new Set(['computed', 'element', 'handler']);
+const loweredFrameworkCalls = new Set(['computed', 'element', 'handler', 'storage']);
 
 export function renderBodyLines(
 	input: PublicRenderModuleInput,
@@ -100,9 +100,15 @@ function stateDeclarationLine(
 	const declaration = declarations[0]!;
 	const name = getIdentifierName(declaration.id as AnyNode | undefined);
 	const binding = name ? stateBindings.get(name) : undefined;
-	if (!binding || !isFrameworkCall(declaration.init as AnyNode | undefined, 'state')) return null;
-	const initializerSource = (binding as GraphBinding & { readonly initializerSource?: string })
-		.initializerSource;
+	const init = declaration.init as AnyNode | undefined;
+	if (
+		!binding ||
+		(!isFrameworkCall(init, 'state') && !(binding.storage && isFrameworkCall(init, 'storage')))
+	)
+		return null;
+	const initializerSource =
+		(binding as GraphBinding & { readonly initializerSource?: string }).initializerSource ??
+		(binding.storage ? JSON.stringify(binding.initialValue) : undefined);
 	const args = [
 		stateValuesName,
 		statePayloadName,
@@ -115,9 +121,10 @@ function stateDeclarationLine(
 function isStateDeclaration(statement: AnyNode): boolean {
 	return (
 		statement.type === 'VariableDeclaration' &&
-		asNodes(statement.declarations).some((declaration) =>
-			isFrameworkCall(declaration.init as AnyNode | undefined, 'state'),
-		)
+		asNodes(statement.declarations).some((declaration) => {
+			const init = declaration.init as AnyNode | undefined;
+			return isFrameworkCall(init, 'state') || isFrameworkCall(init, 'storage');
+		})
 	);
 }
 

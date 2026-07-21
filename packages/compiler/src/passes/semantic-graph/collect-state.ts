@@ -336,13 +336,18 @@ export function collectModuleGraphInterface(input: {
 				const localName = getIdentifierName(declarator.id as AnyNode | undefined);
 				const init = declarator.init as AnyNode | undefined;
 				const frameworkApi = getFrameworkApiForCall(init, input.state.frameworkApiImports);
-				if (!localName || (frameworkApi !== 'state' && frameworkApi !== 'computed'))
+				if (
+					!localName ||
+					(frameworkApi !== 'state' &&
+						frameworkApi !== 'computed' &&
+						frameworkApi !== 'storage')
+				)
 					continue;
 				exportedHelpers.push({
 					exportName: localName,
 					localName,
 					kind: 'graph-binding',
-					bindingKind: frameworkApi,
+					bindingKind: frameworkApi === 'storage' ? 'state' : frameworkApi,
 				});
 			}
 			continue;

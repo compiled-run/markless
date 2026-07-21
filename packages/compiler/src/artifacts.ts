@@ -86,6 +86,7 @@ export type SemanticGraphBinding = {
 	readonly writable: boolean;
 	readonly valueKind?: 'scalar' | 'object' | 'array' | 'unknown';
 	readonly initialValue?: unknown;
+	readonly storage?: { readonly key: string };
 	readonly async?: boolean;
 	readonly asyncCapable?: boolean;
 	readonly dependencies?: ReadonlyArray<SemanticGraphDependency>;
@@ -274,6 +275,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_PARSE_ERROR'
 		| 'MARKLESS_FRAMEWORK_IMPORT_REQUIRED'
 		| 'MARKLESS_FRAMEWORK_API_ALIAS_UNSUPPORTED'
+		| 'MARKLESS_STORAGE_KEY_STATIC'
 		| 'MARKLESS_STATE_MODULE_SCOPE'
 		| 'MARKLESS_STATE_CREATION_SITE_UNSTABLE'
 		| 'MARKLESS_STATE_HELPER_RETURN_UNSUPPORTED'

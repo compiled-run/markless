@@ -12,6 +12,29 @@ import type {
 import type { FrameworkApiName } from './imports.ts';
 import type { WalkState } from './types.ts';
 
+export function storageKeyStaticDiagnostic(input: {
+	readonly argument: 'key' | 'fallback';
+	readonly call: AnyNode;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	const keyArgument = input.argument === 'key';
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_STORAGE_KEY_STATIC',
+		title: keyArgument ? 'Storage key must be static' : 'Storage fallback must be static',
+		message: keyArgument
+			? 'storage() requires a string-literal key matching /^[a-z][a-z0-9-]*$/.'
+			: 'storage() requires its fallback to be a static string literal.',
+		why: keyArgument
+			? 'The compiler uses the key to create a stable graph identity and a valid storage attribute name.'
+			: 'The compiler must embed the fallback as the initial graph value without executing storage() at runtime.',
+		span: sourceSpan(input.call, input.filename),
+		suggestion: keyArgument
+			? "Use a lowercase kebab-case literal, for example `storage('theme-mode', 'light')`."
+			: "Use a string literal fallback, for example `storage('theme-mode', 'light')`.",
+		docsUrl: 'https://markless.dev/errors/MARKLESS_STORAGE_KEY_STATIC',
+	});
+}
+
 export function frameworkImportRequiredDiagnostic(
 	apiName: FrameworkApiName,
 	call: AnyNode,
@@ -25,7 +48,7 @@ export function frameworkImportRequiredDiagnostic(
 			code: 'MARKLESS_FRAMEWORK_IMPORT_REQUIRED',
 			title: 'Framework API must be imported',
 			message: `\`${callSource}\` calls your local function \`${apiName}\`, but in \`.tsrx\` files \`${apiName}\` is a compiler-recognized markless API name. Rename the local function, or import the framework API from \`@markless/core\`.`,
-			why: 'The compiler recognizes `state`/`computed`/`element`/`shared` by name in `.tsrx` reactive scopes so that graph ownership stays unambiguous for readers and tools.',
+			why: 'The compiler recognizes `state`/`computed`/`element`/`shared`/`storage` by name in `.tsrx` reactive scopes so that graph ownership stays unambiguous for readers and tools.',
 			span: sourceSpan(call, filename),
 			suggestion: `Rename the helper (before: \`function ${apiName}(value) { ... }\` — after: \`function doubleValue(value) { ... }\`), or, if graph state was intended, delete the helper and add \`import { ${apiName} } from '@markless/core';\`.`,
 			docsUrl: 'https://markless.dev/errors/MARKLESS_FRAMEWORK_IMPORT_REQUIRED',

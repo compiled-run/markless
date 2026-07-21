@@ -9,6 +9,7 @@ import {
 	resumeFromPayloadScripts,
 	shared,
 	state,
+	storage,
 } from '../src/index.ts';
 import * as rootSurface from '../src/index.ts';
 import { marklessClient } from '../src/rolldown.ts';
@@ -32,6 +33,7 @@ test('main package exposes the curated author and build surface', () => {
 	expect(typeof computed).toBe('function');
 	expect(typeof element).toBe('function');
 	expect(typeof shared).toBe('function');
+	expect(typeof storage).toBe('function');
 	expect(typeof render).toBe('function');
 	expect(typeof renderToString).toBe('function');
 	expect(typeof resumeFromPayloadDocument).toBe('function');

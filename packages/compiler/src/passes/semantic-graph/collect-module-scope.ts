@@ -8,6 +8,7 @@ import {
 import { evaluateSyncPolicyConstant } from './collect-state.ts';
 import { getFrameworkApiForCall, getCallName, isFrameworkApiName } from './imports.ts';
 import { collectSharedDefinition } from './collect-shared.ts';
+import { collectStorageBinding } from './collect-storage.ts';
 import type { WalkState } from './types.ts';
 
 export function collectModuleScopeGraphCreation(statement: AnyNode, state: WalkState): void {
@@ -48,6 +49,13 @@ export function collectModuleScopeGraphCreation(statement: AnyNode, state: WalkS
 
 		if (frameworkApi === 'shared' && name && init) {
 			collectSharedDefinition({ name, init, state });
+			continue;
+		}
+
+		if (frameworkApi === 'storage' && name && init) {
+			if (declaration.kind === 'const') {
+				collectStorageBinding({ name, id, init, state });
+			}
 			continue;
 		}
 

@@ -1,9 +1,15 @@
 import { asNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import type { SemanticModuleImport } from '../../artifacts.ts';
 
-export type FrameworkApiName = 'state' | 'computed' | 'element' | 'shared';
+export type FrameworkApiName = 'state' | 'computed' | 'element' | 'shared' | 'storage';
 
-const frameworkApiNames = new Set<FrameworkApiName>(['state', 'computed', 'element', 'shared']);
+const frameworkApiNames = new Set<FrameworkApiName>([
+	'state',
+	'computed',
+	'element',
+	'shared',
+	'storage',
+]);
 const frameworkApiSources = new Set(['@markless/core']);
 
 // These imports make compiler-rewritten APIs explicit in user code.
