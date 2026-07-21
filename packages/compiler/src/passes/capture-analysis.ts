@@ -68,6 +68,9 @@ function importedCaptureSymbols(
 			(candidate) => candidate.id === symbol.componentEdgeId,
 		);
 		if (!edge) return [];
+		const absentPropIsUndefined =
+			symbol.captureSymbol.kind !== 'event-handler' &&
+			symbol.captureSymbol.kind !== 'callback-prop';
 		return [
 			{
 				...symbol.captureSymbol,
@@ -84,12 +87,21 @@ function importedCaptureSymbols(
 													route.propName,
 													[...route.path, ...slot.path],
 													input,
+													absentPropIsUndefined,
 												),
 											]
 										: [],
 								)
 							: slot.propName
-								? [propCaptureRoute([edge], slot.propName, slot.path, input)]
+								? [
+										propCaptureRoute(
+											[edge],
+											slot.propName,
+											slot.path,
+											input,
+											absentPropIsUndefined,
+										),
+									]
 								: slot.routes.map((route) =>
 										route.kind === 'graph-reference'
 											? {
@@ -384,6 +396,7 @@ function propCaptureRoute(
 	propName: string,
 	readPath: ReadonlyArray<string>,
 	input: CaptureAnalysisInput,
+	absentPropIsUndefined = false,
 ): CaptureSlotRoute {
 	const terminalEdge = componentEdgePath.at(-1);
 	if (!terminalEdge) {
@@ -397,6 +410,7 @@ function propCaptureRoute(
 		readPath,
 		terminalEdge.id,
 		input,
+		absentPropIsUndefined,
 	);
 }
 
@@ -408,12 +422,20 @@ function resolvePropCaptureRoute(
 	readPath: ReadonlyArray<string>,
 	terminalEdgeId: string,
 	input: CaptureAnalysisInput,
+	absentPropIsUndefined: boolean,
 ): CaptureSlotRoute {
 	const edge = componentEdgePath[edgeIndex];
 	if (!edge) throw new Error('Capture route ancestry ended before its terminal value.');
 	const edgePathIds = componentEdgePath.map((candidate) => candidate.id);
 	const prop = edge.props.find((candidate) => candidate.name === propName);
 	if (!prop) {
+		if (absentPropIsUndefined) {
+			return createCompilerKnownConstantCaptureRoute(
+				terminalEdgeId,
+				edgePathIds,
+				undefined,
+			);
+		}
 		return {
 			kind: 'unsupported-opaque',
 			componentEdgeId: terminalEdgeId,
@@ -438,6 +460,7 @@ function resolvePropCaptureRoute(
 					readPath,
 					terminalEdgeId,
 					input,
+					absentPropIsUndefined,
 				);
 			}
 			if (upstreamPropName && scoped.bindingId) {
@@ -504,11 +527,6 @@ export function createCompilerKnownConstantCaptureRoute(
 	componentEdgePath: ReadonlyArray<string>,
 	value: unknown,
 ): Extract<CaptureSlotRoute, { readonly kind: 'compiler-known-constant' }> {
-	if (value === undefined) {
-		throw new Error(
-			`Cannot construct compiler-known constant capture route without a materialized value for component edge ${componentEdgeId}.`,
-		);
-	}
 	return {
 		kind: 'compiler-known-constant',
 		componentEdgeId,

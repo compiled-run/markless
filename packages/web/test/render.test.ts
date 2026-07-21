@@ -439,6 +439,9 @@ async function captureDispatchModuleUrl(
 
 type CompiledCaptureDispatch = {
 	readonly compiled: Awaited<ReturnType<typeof compileTsrxModule>>;
+	readonly composedCaptureAnalysis: NonNullable<
+		Awaited<ReturnType<typeof transformCaptureDispatchModule>>['manifest']['captureMetadata']
+	>;
 	readonly loadedIds: string[];
 	readonly output: {
 		readonly root: FakeElement;
@@ -540,7 +543,13 @@ async function withCompiledCaptureDispatch(
 			},
 			{ target: { replaceChildren() {} } },
 		);
-		await inspect({ compiled, loadedIds, output, runtime });
+		await inspect({
+			compiled,
+			composedCaptureAnalysis: transformed.manifest.captureMetadata!,
+			loadedIds,
+			output,
+			runtime,
+		});
 	} finally {
 		global.document = previousDocument;
 	}
@@ -2082,7 +2091,12 @@ export default function OptionalPage() @{
 	await withCompiledCaptureDispatch(
 		'src/OptionalPage.tsrx',
 		source,
-		async ({ output, runtime }) => {
+		async ({ composedCaptureAnalysis, output, runtime }) => {
+			expect(
+				composedCaptureAnalysis.diagnostics.filter(
+					(diagnostic) => diagnostic.severity === 'error',
+				),
+			).toEqual([]);
 			for (let index = 0; index < 8; index++) await Promise.resolve();
 			await runtime.graph.flush?.();
 			for (let index = 0; index < 8; index++) await Promise.resolve();
@@ -2156,7 +2170,12 @@ export default function BranchPage() @{
 	await withCompiledCaptureDispatch(
 		'src/BranchPage.tsrx',
 		source,
-		async ({ output, runtime }) => {
+		async ({ composedCaptureAnalysis, output, runtime }) => {
+			expect(
+				composedCaptureAnalysis.diagnostics.filter(
+					(diagnostic) => diagnostic.severity === 'error',
+				),
+			).toEqual([]);
 			const settle = async () => {
 				for (let index = 0; index < 8; index++) await Promise.resolve();
 				await runtime.graph.flush?.();
