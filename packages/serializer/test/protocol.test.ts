@@ -3,6 +3,7 @@ import {
 	ASYNC_PROTOCOL_VERSION,
 	decodePayloadScripts,
 	renderPayloadScripts,
+	STORAGE_PROTOCOL_VERSION,
 	type ProtocolArmRecordSet,
 	type ProtocolStatePayload,
 	type ProtocolViewPayload,
@@ -27,6 +28,91 @@ test('protocol payloads share the current async protocol version', () => {
 	expect(ASYNC_PROTOCOL_VERSION).toBe(1);
 	expect(state.version).toBe(1);
 	expect(view.version).toBe(1);
+});
+
+test('protocol versions 1 and 2 round-trip and unknown versions remain rejected', () => {
+	const view: ProtocolViewPayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	const stateV1: ProtocolStatePayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		cells: [],
+		computed: [],
+	};
+	const stateV2: ProtocolStatePayload = {
+		version: STORAGE_PROTOCOL_VERSION,
+		cells: [
+			{
+				graphNodeId: 'storage:src/App.tsrx#theme-mode',
+				name: 'theme',
+				valueKind: 'scalar',
+				value: { version: 1, root: 'light', records: [] },
+			},
+		],
+		computed: [],
+		storage: [
+			{
+				graphNodeId: 'storage:src/App.tsrx#theme-mode',
+				key: 'theme-mode',
+			},
+		],
+	};
+
+	expect(decodePayloadScripts(renderPayloadScripts({ state: stateV1, view })).state).toEqual(
+		stateV1,
+	);
+	expect(decodePayloadScripts(renderPayloadScripts({ state: stateV2, view })).state).toEqual(
+		stateV2,
+	);
+	expect(() =>
+		decodePayloadScripts(
+			renderPayloadScripts({ state: { ...stateV2, version: 3 } as never, view }),
+		),
+	).toThrow(/Unsupported markless\/state protocol version 3/);
+});
+
+test.each([
+	{
+		name: 'missing cell',
+		storage: [{ graphNodeId: 'storage:missing#theme-mode', key: 'theme-mode' }],
+	},
+	{
+		name: 'invalid key',
+		storage: [{ graphNodeId: 'storage:src/App.tsrx#theme-mode', key: 'Theme_mode' }],
+	},
+])('version 2 rejects $name storage metadata', ({ storage }) => {
+	const state = {
+		version: STORAGE_PROTOCOL_VERSION,
+		cells: [
+			{
+				graphNodeId: 'storage:src/App.tsrx#theme-mode',
+				name: 'theme',
+				valueKind: 'scalar',
+				value: { version: 1, root: 'light', records: [] },
+			},
+		],
+		computed: [],
+		storage,
+	};
+	const view = {
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	} as ProtocolViewPayload;
+
+	expect(() =>
+		decodePayloadScripts(renderPayloadScripts({ state: state as never, view })),
+	).toThrow(/Invalid markless\/state storage\[0\]/);
 });
 
 // D3 graduation (T101/T107): async boundary arm records are first-class

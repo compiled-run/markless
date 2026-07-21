@@ -14,7 +14,12 @@ import {
 	finalizeComputedDependencies,
 	propagateAsyncComputedCapability,
 } from './collect-async.ts';
-import { collectImports, collectModuleImports, getFrameworkApiForCall } from './imports.ts';
+import {
+	collectImports,
+	collectModuleImports,
+	frameworkApiSources,
+	getFrameworkApiForCall,
+} from './imports.ts';
 import { collectComponentProps } from './collect-components.ts';
 import { getComponentFunction, getElementAttributes, unwrapExpressionContainer } from '../../ast/tsrx.ts';
 import {
@@ -47,8 +52,9 @@ export async function buildSemanticGraph(
 	const ast = parseModule(input.source, input.filename) as unknown as AnyNode;
 	const statements = asNodes(ast.body);
 	const graph = createMutableSemanticGraphArtifact(input.filename);
-	graph.moduleImports.push(...collectModuleImports(statements));
-	const frameworkApiImports = collectImports(statements);
+	const apiSources = frameworkApiSources(input.additionalFrameworkApiSources);
+	graph.moduleImports.push(...collectModuleImports(statements, apiSources));
+	const frameworkApiImports = collectImports(statements, apiSources);
 	const state = createWalkState({
 		filename: input.filename,
 		source: input.source,

@@ -1,4 +1,8 @@
-import { ASYNC_PROTOCOL_VERSION, type ProtocolStatePayload } from './protocol.ts';
+import {
+	ASYNC_PROTOCOL_VERSION,
+	STORAGE_PROTOCOL_VERSION,
+	type ProtocolStatePayload,
+} from './protocol.ts';
 import {
 	serializeGraphValue,
 	type SerializedGraphPayload,
@@ -41,6 +45,7 @@ export type ProtocolStatePayloadInput = {
 		}
 	>;
 	readonly sharedDefinitions?: ProtocolStatePayload['sharedDefinitions'];
+	readonly storage?: ProtocolStatePayload['storage'];
 };
 
 export type ProtocolStateSerializationDiagnostic = SerializationDiagnostic & {
@@ -84,8 +89,9 @@ export class ProtocolStateSerializationError
 }
 
 export function createProtocolStatePayload(input: ProtocolStatePayloadInput): ProtocolStatePayload {
+	const storage = input.storage ?? [];
 	return {
-		version: ASYNC_PROTOCOL_VERSION,
+		version: storage.length > 0 ? STORAGE_PROTOCOL_VERSION : ASYNC_PROTOCOL_VERSION,
 		cells: input.cells.map((cell) => {
 			const result = serializeGraphValue(cell.value);
 			if (!result.ok) {
@@ -101,6 +107,7 @@ export function createProtocolStatePayload(input: ProtocolStatePayloadInput): Pr
 		}),
 		computed: (input.computed ?? []).map(serializeComputedSnapshot),
 		sharedDefinitions: input.sharedDefinitions,
+		...(storage.length > 0 ? { storage } : {}),
 	};
 }
 

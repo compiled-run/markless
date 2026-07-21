@@ -1,5 +1,6 @@
 import {
 	ASYNC_PROTOCOL_VERSION,
+	STORAGE_PROTOCOL_VERSION,
 	type ProtocolStatePayload,
 	type ProtocolViewPayload,
 } from './protocol.ts';
@@ -135,6 +136,7 @@ export function assertProtocolStatePayload(
 	}
 
 	assertOptionalSharedDefinitions(payload);
+	assertStorageRecords(payload);
 }
 
 export function assertProtocolStateCellPayload(
@@ -246,8 +248,41 @@ export function assertProtocolViewPayload(
 }
 
 function assertProtocolVersion(version: unknown, type: RuntimePayloadType): void {
-	if (version !== ASYNC_PROTOCOL_VERSION) {
+	if (
+		version !== ASYNC_PROTOCOL_VERSION &&
+		!(type === 'markless/state' && version === STORAGE_PROTOCOL_VERSION)
+	) {
 		throw protocolVersionMismatchError(type, version);
+	}
+}
+
+function assertStorageRecords(payload: Record<string, unknown>): void {
+	if (payload.version === ASYNC_PROTOCOL_VERSION) {
+		return;
+	}
+	if (payload.version !== STORAGE_PROTOCOL_VERSION) return;
+
+	const storage = requiredPayloadArrayField(payload, 'storage', 'markless/state');
+	const cellIds = new Set(
+		(payload.cells as ReadonlyArray<Record<string, unknown>>).map((cell) => cell.graphNodeId),
+	);
+	for (const [index, entry] of storage.entries()) {
+		const context = `markless/state storage[${index}]`;
+		assertRecordShape(entry, context);
+		assertStringField(entry, 'graphNodeId', context);
+		assertStringField(entry, 'key', context);
+		if (!cellIds.has(entry.graphNodeId)) {
+			throw invalidPayloadShapeError(
+				'markless/state',
+				`Invalid ${context}: graphNodeId must match a state cell.`,
+			);
+		}
+		if (!/^[a-z][a-z0-9-]*$/.test(entry.key as string)) {
+			throw invalidPayloadShapeError(
+				'markless/state',
+				`Invalid ${context}: key must match /^[a-z][a-z0-9-]*$/.`,
+			);
+		}
 	}
 }
 
@@ -1363,13 +1398,17 @@ function protocolVersionMismatchError(
 	payloadType: RuntimePayloadType,
 	actualVersion: unknown,
 ): RuntimePayloadError {
+	const supportedVersions =
+		payloadType === 'markless/state'
+			? `${String(ASYNC_PROTOCOL_VERSION)} or ${String(STORAGE_PROTOCOL_VERSION)}`
+			: String(ASYNC_PROTOCOL_VERSION);
 	return new RuntimePayloadError({
 		code: 'MARKLESS_PROTOCOL_VERSION_MISMATCH',
 		severity: 'error',
 		phase: 'payload',
 		title: 'Unsupported resumability protocol version',
 		message: `Unsupported ${payloadType} protocol version ${String(actualVersion)}.`,
-		why: `The ${payloadType} payload was produced for protocol version ${String(actualVersion)}, but this runtime can only decode version ${String(ASYNC_PROTOCOL_VERSION)}.`,
+		why: `The ${payloadType} payload was produced for protocol version ${String(actualVersion)}, but this runtime can only decode version ${supportedVersions}.`,
 		payloadType,
 		payloadScript: payloadScriptSelector(payloadType),
 		expectedVersion: ASYNC_PROTOCOL_VERSION,

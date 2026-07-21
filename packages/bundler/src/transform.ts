@@ -5,7 +5,7 @@ import {
 	type CompilerDiagnostic,
 	type RuntimeDemandMapArtifact,
 } from '@markless/compiler';
-import type { ProtocolViewPayload } from '@markless/serializer';
+import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer';
 import type {
 	MarklessTransformManifest,
 	MarklessVirtualModule,
@@ -140,7 +140,11 @@ export async function transformTsrxModule(
 				payloadView: containerScopedResumeView(compiled.payloadScripts.view),
 				runtimeDemandMap: compiled.runtimeDemandMap,
 				executionLog: input.executionLog,
-				needsFullResume: needsFullResume(compiled.protocolView, compiled.runtimeDemandMap),
+				needsFullResume: needsFullResume(
+					compiled.protocolState,
+					compiled.protocolView,
+					compiled.runtimeDemandMap,
+				),
 				hasBoundSymbols: compiled.boundSymbolResolver.rows.length > 0,
 				symbols: symbolRows,
 				symbolRoutes,
@@ -204,6 +208,7 @@ export async function transformTsrxModule(
 					inlineResumerSources,
 					devResumeReexport: input.devResumeReexport === true,
 					needsFullResume: needsFullResume(
+						compiled.protocolState,
 						compiled.protocolView,
 						compiled.runtimeDemandMap,
 					),
@@ -363,9 +368,11 @@ function containerScopedResumeView(view: ProtocolViewPayload): ProtocolViewPaylo
 }
 
 function needsFullResume(
+	state: ProtocolStatePayload,
 	view: ProtocolViewPayload,
 	runtimeDemandMap: RuntimeDemandMapArtifact,
 ): boolean {
+	if ((state.storage?.length ?? 0) > 0) return true;
 	if ((view.branches?.length ?? 0) > 0) return true;
 	if ((view.elementHandles?.length ?? 0) > 0) return true;
 	if ((view.asyncBoundaries?.length ?? 0) > 0) return true;

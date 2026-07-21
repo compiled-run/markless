@@ -84,6 +84,7 @@ export const defaultCompilerPasses: ReadonlyArray<CompilerPassDefinition> = [
 			'captureAnalysis',
 			'symbolModules',
 			'publicRenderModule',
+			'protocolState',
 			'protocolView',
 		],
 		produces: ['runtimeDemandMap'],

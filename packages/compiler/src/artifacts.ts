@@ -8,6 +8,7 @@ export type SemanticGraphInput = {
 	readonly filename: string;
 	readonly source: string;
 	readonly importedModuleInterfaces?: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
+	readonly additionalFrameworkApiSources?: readonly string[];
 };
 
 export type SemanticComponent = {
@@ -598,6 +599,10 @@ export type PayloadArenaArtifact = {
 			readonly graphNodeId: string;
 			readonly name: string;
 			readonly valueKind: SemanticGraphBinding['valueKind'];
+		}>;
+		readonly storage: ReadonlyArray<{
+			readonly graphNodeId: string;
+			readonly key: string;
 		}>;
 		readonly computed: ReadonlyArray<{
 			readonly graphNodeId: string;

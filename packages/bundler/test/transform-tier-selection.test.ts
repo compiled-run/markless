@@ -2,6 +2,7 @@ import { expect, test, vi } from 'vitest';
 
 const compiler = vi.hoisted(() => ({
 	componentEdges: [] as unknown[],
+	protocolState: { version: 1, cells: [], computed: [] },
 	protocolView: {
 		branches: [],
 		keyedRepeats: [],
@@ -14,6 +15,7 @@ vi.mock('@markless/compiler', () => ({
 	collectTsrxModuleDiagnostics: vi.fn(() => []),
 	compileTsrxModule: vi.fn(async () => ({
 		semanticGraph: { componentEdges: compiler.componentEdges },
+		protocolState: compiler.protocolState,
 		protocolView: compiler.protocolView,
 		symbolModules: { modules: [] },
 		boundSymbolResolver: { rows: [] },

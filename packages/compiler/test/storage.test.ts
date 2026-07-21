@@ -44,6 +44,45 @@ test('semantic graph records module storage as writable state metadata', async (
 	]);
 });
 
+test('compile entry accepts additional framework API import sources', async () => {
+	const markless = await compileTsrxModule({
+		filename: 'src/settings.tsrx',
+		source: validStorageSource,
+		symbols: [],
+	});
+	const framelessSource = validStorageSource.replace('@markless/core', '@frameless/core');
+	const frameless = await compileTsrxModule({
+		filename: 'src/settings.tsrx',
+		source: framelessSource,
+		symbols: [],
+		additionalFrameworkApiSources: ['@frameless/core'],
+	});
+	const unconfigured = await compileTsrxModule({
+		filename: 'src/settings.tsrx',
+		source: framelessSource,
+		symbols: [],
+	});
+
+	expect(
+		frameless.semanticGraph.graphBindings.map(
+			({ sourceSpan: _sourceSpan, ...binding }) => binding,
+		),
+	).toEqual(
+		markless.semanticGraph.graphBindings.map(
+			({ sourceSpan: _sourceSpan, ...binding }) => binding,
+		),
+	);
+	expect(frameless.semanticGraph.moduleGraphInterface).toEqual(
+		markless.semanticGraph.moduleGraphInterface,
+	);
+	expect(frameless.semanticGraph.moduleImports).toEqual([]);
+	expect(frameless.semanticGraph.diagnostics).toEqual([]);
+	expect(unconfigured.semanticGraph.graphBindings).toEqual([]);
+	expect(unconfigured.semanticGraph.diagnostics).toEqual([
+		expect.objectContaining({ code: 'MARKLESS_FRAMEWORK_IMPORT_REQUIRED' }),
+	]);
+});
+
 test.each([
 	{
 		name: 'dynamic key',
@@ -97,6 +136,66 @@ test('public render lowering removes executable storage calls', async () => {
 	];
 	for (const emittedSource of emittedSources) expect(emittedSource).not.toContain('storage(');
 	expect(result.publicRenderModule.ssrModuleSource).toContain("const theme = 'light';");
+	expect(result.payloadArena.state.storage).toEqual([
+		{
+			graphNodeId: 'storage:src/settings.tsrx#theme-mode',
+			key: 'theme-mode',
+		},
+	]);
+	expect(result.protocolState).toMatchObject({
+		version: 2,
+		storage: [
+			{
+				graphNodeId: 'storage:src/settings.tsrx#theme-mode',
+				key: 'theme-mode',
+			},
+		],
+	});
+});
+
+test('payload arena drops declared storage that no component reads or writes', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/unused-settings.tsrx',
+		source: `
+import { storage } from '@markless/core';
+export const theme = storage('theme-mode', 'light');
+export function App() @{ <p>Static</p> }
+`,
+		symbols: [],
+	});
+
+	expect(result.semanticGraph.graphBindings).toEqual([
+		expect.objectContaining({ storage: { key: 'theme-mode' } }),
+	]);
+	expect(result.payloadArena.state.cells).toEqual([]);
+	expect(result.payloadArena.state.storage).toEqual([]);
+	expect(result.protocolState.storage).toBeUndefined();
+	expect(result.protocolState.version).toBe(1);
+});
+
+test('used storage disables lean runtime action plans', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/storage-counter.tsrx',
+		source: `
+import { state, storage } from '@markless/core';
+export const theme = storage('theme-mode', 'light');
+export function App() @{
+	let count = state(0);
+	<main data-theme={theme}>
+		<button onClick={() => count++}>Add</button>
+		<output>{count}</output>
+	</main>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.protocolState.storage).toHaveLength(1);
+	expect(result.runtimeDemandMap.actions).not.toEqual([]);
+	expect(result.runtimeDemandMap.actions.every((action) => action.plan === undefined)).toBe(true);
+	expect(result.runtimeDemandMap.recordKinds).toEqual(
+		expect.arrayContaining([expect.objectContaining({ kind: 'event', replaced: false })]),
+	);
 });
 
 test('render body lowering treats storage metadata as a state initializer', () => {

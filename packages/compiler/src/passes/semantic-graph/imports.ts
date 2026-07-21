@@ -10,18 +10,24 @@ const frameworkApiNames = new Set<FrameworkApiName>([
 	'shared',
 	'storage',
 ]);
-const frameworkApiSources = new Set(['@markless/core']);
+
+export function frameworkApiSources(
+	additionalSources: readonly string[] = [],
+): ReadonlySet<string> {
+	return new Set(['@markless/core', ...additionalSources]);
+}
 
 // These imports make compiler-rewritten APIs explicit in user code.
 // A bare state() call is not enough; it must resolve to an import from markless.
 export function collectImports(
 	statements: ReadonlyArray<AnyNode>,
+	sources: ReadonlySet<string> = frameworkApiSources(),
 ): ReadonlyMap<string, FrameworkApiName> {
 	const imports = new Map<string, FrameworkApiName>();
 
 	for (const statement of statements) {
 		if (statement.type !== 'ImportDeclaration') continue;
-		if (!isFrameworkApiSource(importSource(statement))) continue;
+		if (!isFrameworkApiSource(importSource(statement), sources)) continue;
 
 		for (const specifier of asNodes(statement.specifiers)) {
 			if (specifier.type !== 'ImportSpecifier') continue;
@@ -39,6 +45,7 @@ export function collectImports(
 
 export function collectModuleImports(
 	statements: ReadonlyArray<AnyNode>,
+	sources: ReadonlySet<string> = frameworkApiSources(),
 ): ReadonlyArray<SemanticModuleImport> {
 	const imports: SemanticModuleImport[] = [];
 
@@ -52,7 +59,8 @@ export function collectModuleImports(
 				const importedName = getIdentifierName(specifier.imported as AnyNode | undefined);
 				const localName = getIdentifierName(specifier.local as AnyNode | undefined);
 				if (!importedName || !localName) continue;
-				if (isFrameworkApiSource(source) && isFrameworkApiName(importedName)) continue;
+				if (isFrameworkApiSource(source, sources) && isFrameworkApiName(importedName))
+					continue;
 
 				imports.push({
 					localName,
@@ -111,8 +119,8 @@ export function isFrameworkApiName(name: string | null): name is FrameworkApiNam
 	return frameworkApiNames.has(name as FrameworkApiName);
 }
 
-function isFrameworkApiSource(source: string | null): boolean {
-	return !!source && frameworkApiSources.has(source);
+function isFrameworkApiSource(source: string | null, sources: ReadonlySet<string>): boolean {
+	return !!source && sources.has(source);
 }
 
 function importSource(node: AnyNode): string | null {

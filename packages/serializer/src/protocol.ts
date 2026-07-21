@@ -1,4 +1,5 @@
 export const ASYNC_PROTOCOL_VERSION = 1;
+export const STORAGE_PROTOCOL_VERSION = 2;
 
 export type ProtocolSyncPolicyCondition =
 	| {
@@ -40,7 +41,7 @@ export type ProtocolSyncPolicy =
 	  };
 
 export type ProtocolStatePayload = {
-	readonly version: typeof ASYNC_PROTOCOL_VERSION;
+	readonly version: typeof ASYNC_PROTOCOL_VERSION | typeof STORAGE_PROTOCOL_VERSION;
 	readonly cells: ReadonlyArray<{
 		readonly graphNodeId: string;
 		readonly name: string;
@@ -106,6 +107,10 @@ export type ProtocolStatePayload = {
 					readonly name: string;
 			  }
 		>;
+	}>;
+	readonly storage?: ReadonlyArray<{
+		readonly graphNodeId: string;
+		readonly key: string;
 	}>;
 };
 

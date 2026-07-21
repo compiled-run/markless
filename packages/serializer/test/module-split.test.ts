@@ -1,6 +1,9 @@
 import { expect, test } from 'vitest';
 import { decodePayloadScripts, RuntimePayloadError, renderPayloadScripts } from '../src/index.ts';
-import { RuntimePayloadError as ClientRuntimePayloadError } from '../src/protocol-client.ts';
+import {
+	decodePayloadScripts as decodeClientPayloadScripts,
+	RuntimePayloadError as ClientRuntimePayloadError,
+} from '../src/protocol-client.ts';
 import { createProtocolStatePayload } from '../src/protocol-state.ts';
 import { deserializeGraphValueForClient } from '../src/value-decode-client.ts';
 import { deserializeGraphValue } from '../src/value-decode.ts';
@@ -76,4 +79,50 @@ test('client value decoder keeps rare value records behind an async boundary', a
 	expect(decoded.pattern.flags).toBe('gi');
 	expect(decoded.link.href).toBe('https://example.test/path');
 	expect([...decoded.bytes]).toEqual([1, 2, 3]);
+});
+
+test('the browser decoder accepts storage protocol version 2', () => {
+	const rendered = renderPayloadScripts({
+		state: {
+			version: 2,
+			cells: [
+				{
+					graphNodeId: 'storage:src/App.tsrx#theme-mode',
+					name: 'theme',
+					valueKind: 'scalar',
+					value: { version: 1, root: 'light', records: [] },
+				},
+			],
+			computed: [],
+			storage: [
+				{
+					graphNodeId: 'storage:src/App.tsrx#theme-mode',
+					key: 'theme-mode',
+				},
+			],
+		},
+		view: {
+			version: 1,
+			locators: [],
+			events: [],
+			domUpdates: [],
+			behaviors: [],
+			elementHandles: [],
+			asyncBoundaries: [],
+		},
+	});
+
+	expect(decodeClientPayloadScripts(rendered).state.version).toBe(2);
+	expect(() =>
+		decodeClientPayloadScripts({
+			...rendered,
+			stateScript: rendered.stateScript.replace('"theme-mode"', '"Theme_mode"'),
+		}),
+	).toThrow(/invalid storage record/);
+	expect(() =>
+		decodeClientPayloadScripts({
+			...rendered,
+			stateScript: rendered.stateScript.replace('"version":2', '"version":3'),
+		}),
+	).toThrow(/Unsupported markless\/state protocol version 3/);
 });

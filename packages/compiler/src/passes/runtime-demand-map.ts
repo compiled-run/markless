@@ -8,7 +8,7 @@ import type {
 	SymbolModulesArtifact,
 	SymbolResolverPlan,
 } from '../artifacts.ts';
-import type { ProtocolViewPayload } from '@markless/serializer';
+import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer';
 
 const DISPATCH_CORE = [
 	'core/web/resume',
@@ -70,7 +70,9 @@ export function createRuntimeDemandMap(input: {
 	readonly symbolModules: SymbolModulesArtifact;
 	readonly publicRenderModule: PublicRenderModuleArtifact;
 	readonly protocolView: ProtocolViewPayload;
+	readonly protocolState: ProtocolStatePayload;
 }): RuntimeDemandMapArtifact {
+	const storageRequiresFullResume = (input.protocolState.storage?.length ?? 0) > 0;
 	const emittedModules = new Map(
 		input.symbolModules.modules.map((module) => [module.symbolId, module]),
 	);
@@ -93,8 +95,10 @@ export function createRuntimeDemandMap(input: {
 		input.protocolView,
 		input.captureAnalysis,
 	);
-	const scalarEvents = scalarEventKeys.size > 0;
-	const scalarRows = isScalarOnlyKeyedRepeatModule(input.symbolResolver, input.protocolView);
+	const scalarEvents = !storageRequiresFullResume && scalarEventKeys.size > 0;
+	const scalarRows =
+		!storageRequiresFullResume &&
+		isScalarOnlyKeyedRepeatModule(input.symbolResolver, input.protocolView);
 	const payloadRecords = payloadDemandRecords(
 		input.protocolView,
 		closedSymbolDemand,
@@ -115,6 +119,7 @@ export function createRuntimeDemandMap(input: {
 			input.protocolView,
 			payloadRecords,
 			closedSymbolDemand,
+			scalarEvents,
 			scalarRows,
 			input.captureAnalysis,
 		),
@@ -589,6 +594,7 @@ function actionDemandRecords(
 	view: ProtocolViewPayload,
 	records: RuntimeDemandMapArtifact['payloadRecords'],
 	symbolDemand: ReadonlyMap<string, ReadonlyArray<string>>,
+	scalarEvents: boolean,
 	scalarRows: boolean,
 	captureAnalysis?: CaptureAnalysisArtifact,
 ): RuntimeDemandMapArtifact['actions'] {
@@ -602,7 +608,9 @@ function actionDemandRecords(
 				view,
 				records,
 			);
-			const plan = scalarActionPlan(resolver, event, view, subscriberRecords);
+			const plan = scalarEvents
+				? scalarActionPlan(resolver, event, view, subscriberRecords)
+				: undefined;
 			return {
 				hostNodeId: event.hostNodeId,
 				eventName: event.eventName,

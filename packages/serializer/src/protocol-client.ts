@@ -64,14 +64,29 @@ function parse(script: string, type: RuntimePayloadType): unknown {
 }
 function baseState(value: unknown): asserts value is ProtocolStatePayload {
 	const payload = root(value, 'markless/state');
-	arr(payload, 'cells', 'markless/state');
+	const cells = arr(payload, 'cells', 'markless/state');
 	arr(payload, 'computed', 'markless/state');
-	for (const [index, cell] of payload.cells.entries()) {
+	for (const [index, cell] of cells.entries()) {
 		const context = `markless/state cell[${index}]`;
 		const record = obj(cell, context);
 		str(record, 'graphNodeId', context);
 		str(record, 'name', context);
 		if ('value' in record) serialized(record.value, `${context}.value`);
+	}
+	if (payload.version === 2) {
+		const storage = arr(payload, 'storage', 'markless/state');
+		for (const entry of storage) {
+			const context = 'markless/state storage';
+			const record = obj(entry, context);
+			if (
+				typeof record.key !== 'string' ||
+				!/^[a-z][a-z0-9-]*$/.test(record.key) ||
+				!cells.some(
+					(cell) => (cell as Record<string, unknown>).graphNodeId === record.graphNodeId,
+				)
+			)
+				invalid(context, 'invalid storage record.');
+		}
 	}
 }
 function baseView(value: unknown): asserts value is ProtocolViewPayload {
@@ -133,14 +148,18 @@ function serialized(value: unknown, context: string): void {
 	if (!Array.isArray(record.records)) invalid(context, 'expected records array.');
 }
 function version(actualVersion: unknown, type: RuntimePayloadType): void {
-	if (actualVersion === ASYNC_PROTOCOL_VERSION) return;
+	if (
+		actualVersion === ASYNC_PROTOCOL_VERSION ||
+		(type === 'markless/state' && actualVersion === 2)
+	)
+		return;
 	throw new RuntimePayloadError({
 		code: 'MARKLESS_PROTOCOL_VERSION_MISMATCH',
 		severity: 'error',
 		phase: 'payload',
 		title: 'Unsupported resumability protocol version',
 		message: `Unsupported ${type} protocol version ${String(actualVersion)}.`,
-		why: `The ${type} payload must use version ${ASYNC_PROTOCOL_VERSION}.`,
+		why: `The ${type} payload must use a supported protocol version.`,
 		payloadType: type,
 		payloadScript: payloadScriptSelector(type),
 		expectedVersion: ASYNC_PROTOCOL_VERSION,

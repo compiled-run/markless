@@ -293,6 +293,8 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 								inputs.publicRenderModule as CompileTsrxModuleResult['publicRenderModule'],
 							protocolView:
 								inputs.protocolView as CompileTsrxModuleResult['protocolView'],
+							protocolState:
+								inputs.protocolState as CompileTsrxModuleResult['protocolState'],
 						}),
 					};
 				},

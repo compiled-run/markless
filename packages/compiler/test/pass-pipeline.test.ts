@@ -101,6 +101,7 @@ test('default compiler passes declare stable artifact boundaries', () => {
 					'captureAnalysis',
 					'symbolModules',
 					'publicRenderModule',
+					'protocolState',
 					'protocolView',
 				],
 				produces: ['runtimeDemandMap'],

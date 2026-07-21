@@ -37,6 +37,40 @@ test('createProtocolStatePayload serializes async computed snapshot values', () 
 	expect(deserializeGraphValue(snapshot.value)).toEqual({ title: 'User ada' });
 });
 
+test('storage-free protocol state remains version 1 byte-identical', () => {
+	const payload = createProtocolStatePayload({ cells: [] });
+
+	expect(JSON.stringify(payload)).toBe('{"version":1,"cells":[],"computed":[]}');
+});
+
+test('storage protocol state emits version 2 records beside fallback cells', () => {
+	const payload = createProtocolStatePayload({
+		cells: [
+			{
+				graphNodeId: 'storage:src/App.tsrx#theme-mode',
+				name: 'theme',
+				valueKind: 'scalar',
+				value: 'light',
+			},
+		],
+		storage: [
+			{
+				graphNodeId: 'storage:src/App.tsrx#theme-mode',
+				key: 'theme-mode',
+			},
+		],
+	});
+
+	expect(payload.version).toBe(2);
+	expect(payload.storage).toEqual([
+		{
+			graphNodeId: 'storage:src/App.tsrx#theme-mode',
+			key: 'theme-mode',
+		},
+	]);
+	expect(deserializeGraphValue(payload.cells[0]?.value as never)).toBe('light');
+});
+
 test('createProtocolStatePayload preserves structured serialization diagnostics when a state cell fails', () => {
 	const error = captureThrown(() =>
 		createProtocolStatePayload({

@@ -53,6 +53,7 @@ export function createProtocolStatePayloadFromArena(
 		cells: [],
 		computed,
 		sharedDefinitions,
+		storage: input.payloadArena.state.storage,
 	});
 
 	return {

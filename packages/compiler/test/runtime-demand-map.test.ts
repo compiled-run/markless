@@ -113,6 +113,7 @@ test('callback capture writes close over DOM and async subscribers and disable s
 				},
 			],
 		} as never,
+		protocolState: { version: 1, cells: [], computed: [] },
 	});
 
 	const action = result.actions[0];

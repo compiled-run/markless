@@ -23,9 +23,28 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 		bindings.set(binding.name, binding);
 		bindingsById.set(binding.id, binding);
 	}
+	const usedStorageBindings = new Set(
+		[
+			...input.semanticGraph.templateReads.map(
+				(read) => resolveGraphPath(read.source, bindings, aliases)?.binding,
+			),
+			...input.semanticGraph.stateReads
+				.filter((read) => read.componentName !== undefined)
+				.map((read) => resolveGraphPath(read.source, bindings, aliases)?.binding),
+			...input.semanticGraph.stateWrites
+				.filter((write) => write.componentName !== undefined)
+				.map((write) => resolveGraphPath(write.target, bindings, aliases)?.binding),
+		]
+			.filter((binding): binding is SemanticGraphBinding => binding?.storage !== undefined)
+			.map((binding) => binding.id),
+	);
 
 	const cells = input.semanticGraph.graphBindings
-		.filter((binding) => binding.kind === 'state')
+		.filter(
+			(binding) =>
+				binding.kind === 'state' &&
+				(binding.storage === undefined || usedStorageBindings.has(binding.id)),
+		)
 		.map((binding) => ({
 			graphNodeId: binding.id,
 			name: binding.name,
@@ -258,6 +277,11 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 		passId: 'payload-arena',
 		state: {
 			cells,
+			storage: input.semanticGraph.graphBindings.flatMap((binding) =>
+				binding.storage && usedStorageBindings.has(binding.id)
+					? [{ graphNodeId: binding.id, key: binding.storage.key }]
+					: [],
+			),
 			computed,
 			sharedDefinitions,
 		},
