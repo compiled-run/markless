@@ -72,36 +72,51 @@ function importedCaptureSymbols(
 			{
 				...symbol.captureSymbol,
 				loaderSymbolId: symbol.id,
-				captureSlots: symbol.captureSymbol.captureSlots.map((slot) => ({
-					...slot,
-					routes: slot.routes.some((route) => route.kind === 'passthrough-route')
-						? slot.routes.flatMap((route) =>
-								route.kind === 'passthrough-route'
-									? [
-											propCaptureRoute(
-												[edge],
-												route.propName,
-												[...route.path, ...slot.path],
-												input,
-											),
-										]
-									: [],
-							)
-						: slot.propName
-							? [propCaptureRoute([edge], slot.propName, slot.path, input)]
-						: slot.routes.map((route) =>
-								route.kind === 'graph-reference'
-									? {
-											...route,
-											componentEdgeId: edge.id,
-											componentEdgePath: [edge.id],
-										}
-									: route,
-							),
-				})),
+				captureSlots: symbol.captureSymbol.captureSlots
+					.map((slot) => ({
+						...slot,
+						routes: slot.routes.some((route) => route.kind === 'passthrough-route')
+							? slot.routes.flatMap((route) =>
+									route.kind === 'passthrough-route'
+										? [
+												propCaptureRoute(
+													[edge],
+													route.propName,
+													[...route.path, ...slot.path],
+													input,
+												),
+											]
+										: [],
+								)
+							: slot.propName
+								? [propCaptureRoute([edge], slot.propName, slot.path, input)]
+								: slot.routes.map((route) =>
+										route.kind === 'graph-reference'
+											? {
+													...route,
+													componentEdgeId: edge.id,
+													componentEdgePath: [edge.id],
+												}
+											: route,
+									),
+					}))
+					.filter((slot) => !wasProjectedThroughComponentEdge(slot.propName, edge)),
 			},
 		];
 	});
+}
+
+// Projected children are compiler-owned template content, not a runtime prop
+// value. Component edges retain enough structure to make that classification
+// when imported capture metadata is rebound into the consuming module.
+function wasProjectedThroughComponentEdge(
+	propName: string | undefined,
+	edge: SemanticComponentEdge,
+): boolean {
+	return (
+		propName === 'children' &&
+		(edge.children.childCount > 0 || edge.props.some((prop) => prop.name === 'children'))
+	);
 }
 
 function symbolCaptureSlots(
