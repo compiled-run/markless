@@ -98,7 +98,8 @@ export function Library({ songOne, onSelectOne }) @{
 	expect(library.boundSymbolResolver.rows).toEqual(
 		expect.arrayContaining([
 			expect.objectContaining({
-				baseSymbolId: childHandler.symbolId,
+				baseSymbolId: 'imported:LibrarySong:symbol:0',
+				loaderSymbolId: 'imported:LibrarySong:symbol:0',
 				captureSlots: expect.arrayContaining([
 					expect.objectContaining({
 						route: expect.objectContaining({ kind: 'passthrough-route' }),
@@ -132,7 +133,7 @@ export function App() @{
 	});
 	expect(app.captureAnalysis.diagnostics).toEqual([]);
 	const appRow = app.boundSymbolResolver.rows.find(
-		(row) => row.baseSymbolId === childHandler.symbolId,
+		(row) => row.loaderSymbolId === 'imported:Library:symbol:0',
 	);
 	expect(appRow?.captureSlots.map((slot) => slot.route)).toEqual(
 		expect.arrayContaining([
@@ -283,6 +284,99 @@ export function App() @{
 		}),
 	);
 	expect(captureAnalysis.diagnostics).toEqual([]);
+});
+
+test('sibling child computed derives read their instance-bound prop capture', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/ComputedCaptureSiblings.tsrx',
+		source: `
+import { computed, state } from '@markless/core';
+
+function Child({ value }) @{
+	const doubled = computed(() => value * 2);
+	<output>{doubled}</output>
+}
+
+export function App() @{
+	let left = state(1);
+	let right = state(10);
+	<main><Child value={left} /><Child value={right} /></main>
+}
+`,
+		symbols: [],
+	});
+	const derive = result.captureAnalysis.extractedSymbols.find(
+		(symbol) =>
+			symbol.kind === 'sync-computed-derive' && symbol.owner?.componentName === 'Child',
+	)!;
+	const valueSlot = derive.captureSlots.find((slot) => slot.propName === 'value')!;
+	const rows = result.boundSymbolResolver.rows.filter(
+		(row) => row.baseSymbolId === derive.symbolId,
+	);
+	const module = result.symbolModules.modules.find(
+		(candidate) => candidate.symbolId === derive.symbolId,
+	)!;
+
+	expect(rows).toHaveLength(2);
+	expect(rows.map((row) => row.captureSlots[0]?.route)).toEqual([
+		expect.objectContaining({ kind: 'graph-reference', graphNodeId: 'state:left' }),
+		expect.objectContaining({ kind: 'graph-reference', graphNodeId: 'state:right' }),
+	]);
+	expect(module.source).toContain(`context.capture.read(${JSON.stringify(valueSlot.id)})`);
+	expect(module.source).not.toContain('context.graph.read("prop:props", ["value"])');
+});
+
+test('a child root class driven by a component prop gets an instance-bound DOM update route', async () => {
+	const source = `
+import { state } from '@markless/core';
+
+function Library({ libraryOpen }: { libraryOpen: boolean }) @{
+	<aside class={libraryOpen ? 'library active-library' : 'library'}>Songs</aside>
+}
+
+export function App() @{
+	let sidebarOpen = state(false);
+	<Library libraryOpen={sidebarOpen} />
+}
+`;
+	const { captureAnalysis } = await compileCaptureArtifacts(source);
+	const update = captureAnalysis.extractedSymbols.find(
+		(symbol) => symbol.kind === 'dom-update' && symbol.source === 'libraryOpen',
+	);
+	const rows = captureAnalysis.boundResolverRows.filter(
+		(row) => row.baseSymbolId === update?.symbolId,
+	);
+
+	expect(update).toEqual(
+		expect.objectContaining({
+			owner: expect.objectContaining({ componentName: 'Library' }),
+			captureSlots: [
+				expect.objectContaining({
+					propName: 'libraryOpen',
+					routes: [
+						expect.objectContaining({
+							kind: 'graph-reference',
+							componentEdgeId: 'component-edge:0',
+							graphNodeId: 'state:sidebarOpen',
+						}),
+					],
+				}),
+			],
+		}),
+	);
+	expect(rows).toEqual([
+		expect.objectContaining({
+			componentEdgePath: ['component-edge:0'],
+			captureSlots: [
+				expect.objectContaining({
+					route: expect.objectContaining({
+						kind: 'graph-reference',
+						graphNodeId: 'state:sidebarOpen',
+					}),
+				}),
+			],
+		}),
+	]);
 });
 
 test('a named component-local arrow classifies as a callback and captures its body', async () => {

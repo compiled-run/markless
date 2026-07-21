@@ -108,9 +108,176 @@ function symbolCaptureSlots(
 	symbol: PlannedSymbol,
 	input: CaptureAnalysisInput,
 ): ReadonlyArray<CaptureSlot> {
-	if (!('reads' in symbol) || !symbol.reads) return [];
+	const reads = lazySymbolReads(symbol, input);
+	const slots = reads.map((read) => captureSlot(read, symbol, input));
+	if (symbol.kind === 'event-handler' || symbol.kind === 'callback-prop') return slots;
 
-	return symbol.reads.map((read) => captureSlot(read, symbol, input));
+	// A non-callback lazy symbol does not need an opaque presentation value at
+	// resume time: it rendered once, and the value has no live graph route that
+	// could schedule it again. Keep callback captures fail-closed above, but drop
+	// opaque routes (and empty slots) for update-only symbols.
+	return slots.flatMap((slot) => {
+		const routes = slot.routes.filter((route) => route.kind !== 'unsupported-opaque');
+		return routes.length > 0 ? [{ ...slot, routes }] : [];
+	});
+}
+
+// Handlers already carry their lowered reads. Other lazy symbols are planned
+// from view records, so recover prop ownership from the semantic read that
+// produced the record without adding another field to the emitted wire shape.
+function lazySymbolReads(
+	symbol: PlannedSymbol,
+	input: CaptureAnalysisInput,
+): ReadonlyArray<LoweredStateRead> {
+	if ('reads' in symbol && symbol.reads) return symbol.reads;
+
+	if (symbol.kind === 'dom-update') {
+		return propReadForLazySymbol(
+			{
+				source: symbol.source,
+				graphNodeId: symbol.graphNodeId,
+				path: domUpdatePath(symbol, input),
+			},
+			symbol,
+			input,
+		);
+	}
+
+	if (symbol.kind === 'branch-update') {
+		return symbol.testReads.flatMap((read) => propReadForLazySymbol(read, symbol, input));
+	}
+
+	if (symbol.kind === 'behavior') {
+		return symbol.inputSources.flatMap((source) => {
+			const read = input.semanticGraph.stateReads.find(
+				(candidate) => candidate.source === source,
+			);
+			if (!read) return [];
+			const resolved = resolveGraphPath(
+				read.source,
+				graphBindingMap(input.semanticGraph, undefined, read.componentName),
+				semanticAliasMap(input.semanticGraph, undefined, read.componentName),
+			);
+			return resolved
+				? propReadForLazySymbol(
+						{
+							source,
+							graphNodeId: resolved.binding.id,
+							path: resolved.path,
+						},
+						symbol,
+						input,
+					)
+				: [];
+		});
+	}
+
+	if (symbol.kind === 'async-computed-runner' || symbol.kind === 'sync-computed-derive') {
+		return (symbol.dependencies ?? []).flatMap((dependency) =>
+			propReadForLazySymbol(dependency, symbol, input),
+		);
+	}
+
+	return [];
+}
+
+function domUpdatePath(
+	symbol: Extract<PlannedSymbol, { readonly kind: 'dom-update' }>,
+	input: CaptureAnalysisInput,
+): ReadonlyArray<string> {
+	const read = input.semanticGraph.templateReads.find(
+		(candidate) =>
+			candidate.hostNodeId === symbol.hostNodeId && candidate.source === symbol.source,
+	);
+	if (symbol.graphNodeId === 'prop:props') {
+		const declaration = componentPropDeclarationForSymbol(symbol, read?.sourceSpan, input);
+		return declaration?.propPath ?? [];
+	}
+	const resolved = resolveGraphPath(
+		symbol.source,
+		graphBindingMap(input.semanticGraph),
+		semanticAliasMap(input.semanticGraph),
+	);
+	return resolved?.path ?? [];
+}
+
+function propReadForLazySymbol(
+	read: Pick<LoweredStateRead, 'source' | 'graphNodeId' | 'path'>,
+	symbol: PlannedSymbol,
+	input: CaptureAnalysisInput,
+): ReadonlyArray<LoweredStateRead> {
+	if (!read.graphNodeId.startsWith('prop:')) return [];
+	const semanticRead = semanticReadForSymbol(symbol, read.source, input);
+	const declaration = componentPropDeclarationForSymbol(
+		symbol,
+		semanticRead?.sourceSpan,
+		input,
+		semanticRead?.bindingId,
+	);
+	return [
+		{
+			...read,
+			...(semanticRead?.sourceSpan ? { sourceSpan: semanticRead.sourceSpan } : {}),
+			...(declaration?.bindingId ? { bindingId: declaration.bindingId } : {}),
+			...(declaration?.componentName
+				? { componentName: declaration.componentName }
+				: semanticRead?.componentName
+					? { componentName: semanticRead.componentName }
+					: {}),
+		},
+	];
+}
+
+function semanticReadForSymbol(
+	symbol: PlannedSymbol,
+	source: string,
+	input: CaptureAnalysisInput,
+) {
+	if (symbol.kind === 'dom-update') {
+		return input.semanticGraph.templateReads.find(
+			(read) => read.hostNodeId === symbol.hostNodeId && read.source === source,
+		);
+	}
+	return input.semanticGraph.stateReads.find((read) => read.source === source);
+}
+
+function componentPropDeclarationForSymbol(
+	symbol: PlannedSymbol,
+	readSpan: { readonly start: number; readonly end: number } | undefined,
+	input: CaptureAnalysisInput,
+	bindingId?: string,
+) {
+	if (bindingId) {
+		const direct = input.semanticGraph.componentPropBindings.find(
+			(declaration) => declaration.bindingId === bindingId,
+		);
+		if (direct) return direct;
+	}
+	const propName =
+		symbol.kind === 'dom-update' && symbol.graphNodeId.startsWith('prop:')
+			? symbol.graphNodeId === 'prop:props'
+				? rootIdentifierName(symbol.source)
+				: symbol.graphNodeId.slice('prop:'.length)
+			: rootIdentifierName(symbolSource(symbol));
+	return input.semanticGraph.componentPropBindings.find((declaration) => {
+		if (
+			declaration.localName !== propName &&
+			declaration.propPath[0] !== propName
+		)
+			return false;
+		if (!readSpan) return true;
+		const range = componentSourceRange(declaration.componentId);
+		return range ? range.start <= readSpan.start && range.end >= readSpan.end : false;
+	});
+}
+
+function componentSourceRange(componentId: string) {
+	const match = /^component:(\d+):(\d+)$/.exec(componentId);
+	return match ? { start: Number(match[1]), end: Number(match[2]) } : undefined;
+}
+
+function rootIdentifierName(source: string): string | undefined {
+	return /^\s*([A-Za-z_$][\w$]*)/.exec(source)?.[1];
 }
 
 function captureSlot(

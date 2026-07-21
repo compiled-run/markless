@@ -3218,7 +3218,7 @@ function marklessRenderCsr(props = {}) {
 	const root = marklessCsrRootFromHtml("<main>" + "<span data-markless-csr-child=\\"0\\"></span>" + "</main>");
 	const marklessCsrChild0 = marklessCsrRenderChild(__marklessCsrComponent0, { active: active });
 	marklessCsrReplaceChild(root, 0, marklessCsrChild0?.root);
-	marklessCsrChildren.push({ hostPrefix: "c0:", symbolPrefix: "", output: marklessCsrChild0, graphProps: [{"name":"active","graphNodeId":"prop:props","path":["active"]}], boundSymbols: {} });
+	marklessCsrChildren.push({ hostPrefix: "c0:", symbolPrefix: "", output: marklessCsrChild0, graphProps: [{"name":"active","graphNodeId":"state:active","path":[]}], boundSymbols: {"symbol:0":"bound:symbol%3A0:component-edge%3A0","symbol:1":"bound:symbol%3A1:component-edge%3A0"} });
 	const marklessCsrView = marklessCsrComposeView(root, payloadView, marklessCsrHostLocators, marklessCsrChildren);
 	const marklessCsrState = marklessComposeState(marklessCsrPayloadState, marklessCsrChildren);
 	return {
@@ -3301,7 +3301,7 @@ function marklessRenderCsr(props = {}) {
           "trueValue": "Live",
           "falseValue": "Idle"
         },
-        "symbolId": "symbol:0"
+        "symbolId": "bound:symbol%3A0:component-edge%3A0"
       },
       {
         "hostNodeId": "h2",
@@ -3315,7 +3315,7 @@ function marklessRenderCsr(props = {}) {
           "trueValue": "Live",
           "falseValue": "Idle"
         },
-        "symbolId": "symbol:1"
+        "symbolId": "bound:symbol%3A1:component-edge%3A0"
       }
     ],
     "behaviors": [],
@@ -3325,7 +3325,7 @@ function marklessRenderCsr(props = {}) {
     "asyncBoundaries": []
   },
   "stateScript": "<script type=\\"markless/state\\">{\\"version\\":1,\\"cells\\":[{\\"graphNodeId\\":\\"state:active\\",\\"name\\":\\"active\\",\\"valueKind\\":\\"scalar\\",\\"value\\":{\\"version\\":1,\\"root\\":true,\\"records\\":[]}}],\\"computed\\":[],\\"sharedDefinitions\\":[]}</script>",
-  "viewScript": "<script type=\\"markless/view\\">{\\"version\\":1,\\"locators\\":[{\\"hostNodeId\\":\\"h0\\",\\"strategy\\":\\"dom-order\\",\\"index\\":0,\\"tagName\\":\\"span\\"},{\\"hostNodeId\\":\\"h1\\",\\"strategy\\":\\"dom-order\\",\\"index\\":1,\\"tagName\\":\\"em\\"},{\\"hostNodeId\\":\\"h2\\",\\"strategy\\":\\"dom-order\\",\\"index\\":2,\\"tagName\\":\\"em\\"},{\\"hostNodeId\\":\\"h3\\",\\"strategy\\":\\"dom-order\\",\\"index\\":3,\\"tagName\\":\\"main\\"}],\\"events\\":[],\\"domUpdates\\":[{\\"hostNodeId\\":\\"h1\\",\\"source\\":\\"active\\",\\"graphNodeId\\":\\"prop:props\\",\\"path\\":[\\"active\\"],\\"target\\":{\\"kind\\":\\"text\\",\\"trueValue\\":\\"Live\\",\\"falseValue\\":\\"Idle\\"},\\"symbolId\\":\\"symbol:0\\"},{\\"hostNodeId\\":\\"h2\\",\\"source\\":\\"active\\",\\"graphNodeId\\":\\"prop:props\\",\\"path\\":[\\"active\\"],\\"target\\":{\\"kind\\":\\"text\\",\\"trueValue\\":\\"Live\\",\\"falseValue\\":\\"Idle\\"},\\"symbolId\\":\\"symbol:1\\"}],\\"behaviors\\":[],\\"elementHandles\\":[],\\"keyedRepeats\\":[],\\"branches\\":[],\\"asyncBoundaries\\":[]}</script>"
+  "viewScript": "<script type=\\"markless/view\\">{\\"version\\":1,\\"locators\\":[{\\"hostNodeId\\":\\"h0\\",\\"strategy\\":\\"dom-order\\",\\"index\\":0,\\"tagName\\":\\"span\\"},{\\"hostNodeId\\":\\"h1\\",\\"strategy\\":\\"dom-order\\",\\"index\\":1,\\"tagName\\":\\"em\\"},{\\"hostNodeId\\":\\"h2\\",\\"strategy\\":\\"dom-order\\",\\"index\\":2,\\"tagName\\":\\"em\\"},{\\"hostNodeId\\":\\"h3\\",\\"strategy\\":\\"dom-order\\",\\"index\\":3,\\"tagName\\":\\"main\\"}],\\"events\\":[],\\"domUpdates\\":[{\\"hostNodeId\\":\\"h1\\",\\"source\\":\\"active\\",\\"graphNodeId\\":\\"prop:props\\",\\"path\\":[\\"active\\"],\\"target\\":{\\"kind\\":\\"text\\",\\"trueValue\\":\\"Live\\",\\"falseValue\\":\\"Idle\\"},\\"symbolId\\":\\"bound:symbol%3A0:component-edge%3A0\\"},{\\"hostNodeId\\":\\"h2\\",\\"source\\":\\"active\\",\\"graphNodeId\\":\\"prop:props\\",\\"path\\":[\\"active\\"],\\"target\\":{\\"kind\\":\\"text\\",\\"trueValue\\":\\"Live\\",\\"falseValue\\":\\"Idle\\"},\\"symbolId\\":\\"bound:symbol%3A1:component-edge%3A0\\"}],\\"behaviors\\":[],\\"elementHandles\\":[],\\"keyedRepeats\\":[],\\"branches\\":[],\\"asyncBoundaries\\":[]}</script>"
 }",
     "protocolState": "{
   "version": 1,
@@ -3386,7 +3386,7 @@ function marklessRenderCsr(props = {}) {
         "trueValue": "Live",
         "falseValue": "Idle"
       },
-      "symbolId": "symbol:0"
+      "symbolId": "bound:symbol%3A0:component-edge%3A0"
     },
     {
       "hostNodeId": "h2",
@@ -3400,7 +3400,7 @@ function marklessRenderCsr(props = {}) {
         "trueValue": "Live",
         "falseValue": "Idle"
       },
-      "symbolId": "symbol:1"
+      "symbolId": "bound:symbol%3A1:component-edge%3A0"
     }
   ],
   "behaviors": [],
@@ -3441,7 +3441,7 @@ function marklessRenderCsr(props = {}) {
   "styleScopes": [],
   "diagnostics": []
 }",
-    "ssrModuleSource": "import { marklessSsrRenderChild, marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrHost, marklessSsrCallbacks, marklessSsrCallbackSymbol, marklessComposeState as marklessSsrComposeState, marklessViewWithoutAnchors, marklessSsrComposeView } from '@markless/web/fns/ssr';
+    "ssrModuleSource": "import { marklessSsrRenderChild, marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrHost, marklessComposeState as marklessSsrComposeState, marklessViewWithoutAnchors, marklessSsrComposeView } from '@markless/web/fns/ssr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
 const __marklessSsrComponent0 = { renderSsr: marklessRenderSsrBadge };
 async function marklessRenderSsrBadge(props = {}, marklessSsrRenderContext) {
@@ -3469,7 +3469,7 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 	const marklessSsrBranches = [];
 	const marklessSsrAsyncSnapshots = [];
 	const marklessSsrHostLocators = [];
-	const html = marklessSsrHost(marklessSsrHostLocators, "h3", "main") + "<main>" + (await marklessSsrRenderChild(marklessSsrChildren, __marklessSsrComponent0, { active: active, __marklessSsrCallbacks: marklessSsrCallbacks({ "active": marklessSsrCallbackSymbol(props, ["active"]) }) }, { hostPrefix: "c0:", symbolPrefix: "", localIndex: marklessSsrHostLocators.length, graphProps: [{"name":"active","graphNodeId":"prop:props","path":["active"]}], boundSymbols: {} }, marklessSsrRenderContext)) + "</main>";
+	const html = marklessSsrHost(marklessSsrHostLocators, "h3", "main") + "<main>" + (await marklessSsrRenderChild(marklessSsrChildren, __marklessSsrComponent0, { active: active }, { hostPrefix: "c0:", symbolPrefix: "", localIndex: marklessSsrHostLocators.length, graphProps: [{"name":"active","graphNodeId":"state:active","path":[]}], boundSymbols: {"symbol:0":"bound:symbol%3A0:component-edge%3A0","symbol:1":"bound:symbol%3A1:component-edge%3A0"} }, marklessSsrRenderContext)) + "</main>";
 	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren, marklessSsrAsyncSnapshots);
 	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {

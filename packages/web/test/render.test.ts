@@ -96,12 +96,36 @@ function captureDispatchDocument() {
 			let childNodes: FakeElement[] = [];
 			return {
 				content: {
+					nodeType: 11 as const,
 					get childNodes() {
 						return childNodes;
 					},
 					get firstElementChild() {
 						return childNodes.find((child) => child.nodeType === 1);
 					},
+					querySelector(selector: string) {
+						const match = selector.match(/^\[([^=]+)="([^"]*)"\]$/);
+						if (!match) return null;
+						const [, name, value] = match;
+						const pending = [...childNodes];
+						while (pending.length > 0) {
+							const candidate = pending.shift()!;
+							if (
+								(candidate as FakeElement & { getAttribute?: (name: string) => string | null })
+									.getAttribute?.(name!) === value
+							)
+								return candidate;
+							pending.push(...(candidate.childNodes ?? []));
+						}
+						return null;
+					},
+					appendChild(node: FakeFragment | FakeElement) {
+						childNodes.push(...(node.nodeType === 11 ? node.childNodes : [node]));
+						return node;
+					},
+				},
+				get innerHTML() {
+					return childNodes.map(serializeCaptureDispatchNode).join('');
 				},
 				set innerHTML(html: string) {
 					childNodes = parseCaptureDispatchHtml(html);
@@ -109,6 +133,19 @@ function captureDispatchDocument() {
 			};
 		},
 	};
+}
+
+function serializeCaptureDispatchNode(node: FakeElement): string {
+	if (node.nodeType === 8) return `<!--${node.textContent ?? ''}-->`;
+	if (node.nodeType !== 1) return node.textContent ?? '';
+	const attributes = (node as FakeElement & { attributes?: Map<string, string> }).attributes;
+	const renderedAttributes = attributes
+		? [...attributes].map(([name, value]) => ` ${name}="${value}"`).join('')
+		: '';
+	const tagName = node.tagName.toLowerCase();
+	return `<${tagName}${renderedAttributes}>${node.childNodes
+		.map(serializeCaptureDispatchNode)
+		.join('')}</${tagName}>`;
 }
 
 function captureDispatchElement(
@@ -119,12 +156,14 @@ function captureDispatchElement(
 		attributes: Map<string, string>;
 		getAttribute(name: string): string | null;
 		setAttribute(name: string, value: string): void;
+		removeAttribute(name: string): void;
 		replaceWith(replacement: FakeElement): void;
 		remove(): void;
 	};
 	node.attributes = new Map(attributes);
 	node.getAttribute = (name) => node.attributes.get(name) ?? null;
 	node.setAttribute = (name, value) => node.attributes.set(name, value);
+	node.removeAttribute = (name) => node.attributes.delete(name);
 	node.querySelector = (selector) => {
 		const match = selector.match(/^\[([^=]+)="([^"]*)"\]$/);
 		if (!match) return null;
@@ -176,6 +215,17 @@ function parseCaptureDispatchHtml(html: string): FakeElement[] {
 		}
 		const parent = stack[stack.length - 1]!;
 		if (token.startsWith('<')) {
+			if (token.startsWith('<!--')) {
+				const comment = {
+					nodeType: 8,
+					textContent: token.slice(4, -3),
+					childNodes: [],
+					parentElement: parent,
+					parentNode: parent,
+				} as unknown as FakeElement;
+				parent.childNodes.push(comment);
+				continue;
+			}
 			const match = token.match(/^<([A-Za-z][\w-]*)([^>]*)>/);
 			if (!match) continue;
 			const attributes = [...match[2]!.matchAll(/\s+([^\s=]+)(?:="([^"]*)")?/g)].map(
@@ -184,6 +234,7 @@ function parseCaptureDispatchHtml(html: string): FakeElement[] {
 			const child = captureDispatchElement(match[1]!, attributes);
 			parent.childNodes.push(child);
 			child.parentElement = parent;
+			(child as unknown as { parentNode?: FakeElement }).parentNode = parent;
 			if (!token.endsWith('/>')) stack.push(child);
 			continue;
 		}
@@ -192,6 +243,7 @@ function parseCaptureDispatchHtml(html: string): FakeElement[] {
 			textContent: token,
 			childNodes: [],
 			parentElement: parent,
+			parentNode: parent,
 		} as unknown as FakeElement;
 		parent.childNodes.push(text);
 	}
@@ -210,6 +262,181 @@ function localWebFunctionImports(source: string): string {
 	);
 }
 
+type CaptureDispatchImport = {
+	readonly specifier: string;
+	readonly filename: string;
+	readonly source: string;
+	readonly imports?: ReadonlyArray<CaptureDispatchImport>;
+};
+
+async function transformCaptureDispatchModule(
+	filename: string,
+	source: string,
+	imports: ReadonlyArray<CaptureDispatchImport> = [],
+	environment: 'client' | 'server' = 'client',
+) {
+	const transformed = await transformTsrxModule({
+		filename,
+		source,
+		environment,
+		executionLog: 'never',
+	});
+	if (imports.length === 0) return transformed;
+
+	const children = await Promise.all(
+		imports.map(async (imported) => ({
+			imported,
+			transformed: await transformCaptureDispatchModule(
+				imported.filename,
+				imported.source,
+				imported.imports,
+				environment,
+			),
+		})),
+	);
+	const importedSymbols = children.flatMap(({ imported, transformed: child }) => {
+		const componentEdgeId = transformed.manifest.symbolRoutes?.find(
+			(route) => route.importSource === imported.specifier,
+		)?.componentEdgeId;
+		if (!componentEdgeId || !child.manifest.captureMetadata) return [];
+		return child.manifest.symbols.flatMap((symbol) => {
+			const captureSymbol = child.manifest.captureMetadata?.extractedSymbols.find(
+				(candidate) => candidate.symbolId === symbol.symbolId,
+			);
+			return captureSymbol?.captureSlots.some((slot) => slot.propName !== undefined)
+				? [
+						{
+							id: `imported:${encodeURIComponent(imported.filename)}:${symbol.symbolId}`,
+							chunk: symbol.virtualModuleId,
+							exportName: symbol.exportName,
+							componentEdgeId,
+							captureSymbol,
+						},
+					]
+				: [];
+		});
+	});
+	return transformTsrxModule({
+		filename,
+		source,
+		symbols: importedSymbols,
+		environment,
+		executionLog: 'never',
+	});
+}
+
+async function captureDispatchSymbolSource(
+	source: string,
+	imports: ReadonlyArray<CaptureDispatchImport>,
+	environment: 'client' | 'server' = 'client',
+): Promise<string> {
+	let localized = localWebFunctionImports(source);
+	for (const imported of imports) {
+		localized = localized
+			.split(imported.specifier)
+			.join(
+				await captureDispatchModuleUrl(
+					imported.filename,
+					imported.source,
+					imported.imports,
+					environment,
+				),
+			);
+	}
+	return localized;
+}
+
+async function captureDispatchImportedSymbolUrls(
+	imports: ReadonlyArray<CaptureDispatchImport>,
+	environment: 'client' | 'server' = 'client',
+): Promise<Map<string, string>> {
+	const entries: Array<readonly [string, string]> = [];
+	for (const imported of imports) {
+		const transformed = await transformCaptureDispatchModule(
+			imported.filename,
+			imported.source,
+			imported.imports,
+			environment,
+		);
+		for (const module of transformed.virtualModules.filter(
+			(candidate) => candidate.type === 'symbol',
+		)) {
+			entries.push([
+				module.id,
+				javascriptModuleUrl(
+					await captureDispatchSymbolSource(
+						module.source,
+						imported.imports ?? [],
+						environment,
+					),
+				),
+			]);
+		}
+		entries.push(
+			...(await captureDispatchImportedSymbolUrls(imported.imports ?? [], environment)),
+		);
+	}
+	return new Map(entries);
+}
+
+async function captureDispatchModuleUrl(
+	filename: string,
+	source: string,
+	imports: ReadonlyArray<CaptureDispatchImport> = [],
+	environment: 'client' | 'server' = 'client',
+): Promise<string> {
+	const transformed = await transformCaptureDispatchModule(
+		filename,
+		source,
+		imports,
+		environment,
+	);
+	const symbolUrls = new Map(
+		await Promise.all(
+			transformed.virtualModules
+				.filter((module) => module.type === 'symbol')
+				.map(async (module) => [
+					module.id,
+					javascriptModuleUrl(
+						await captureDispatchSymbolSource(module.source, imports, environment),
+					),
+				] as const),
+		),
+	);
+	const allSymbolUrls = new Map([
+		...symbolUrls,
+		...(await captureDispatchImportedSymbolUrls(imports, environment)),
+	]);
+	const resolver = transformed.virtualModules.find((module) => module.type === 'resolver');
+	let browserModuleSource = transformed.code;
+	if (resolver) {
+		let resolverSource = resolver.source;
+		for (const [moduleId, moduleUrl] of allSymbolUrls)
+			resolverSource = resolverSource.split(moduleId).join(moduleUrl);
+		browserModuleSource = browserModuleSource
+			.split(resolver.id)
+			.join(javascriptModuleUrl(resolverSource));
+	}
+	const payload = transformed.virtualModules.find((module) => module.type === 'payload')!;
+	browserModuleSource = localWebFunctionImports(
+		browserModuleSource.split(payload.id).join(javascriptModuleUrl(payload.source)),
+	);
+	for (const [moduleId, moduleUrl] of allSymbolUrls)
+		browserModuleSource = browserModuleSource.split(moduleId).join(moduleUrl);
+	for (const imported of imports) {
+		const moduleUrl = await captureDispatchModuleUrl(
+			imported.filename,
+			imported.source,
+			imported.imports,
+			environment,
+		);
+		browserModuleSource = browserModuleSource.split(imported.specifier).join(moduleUrl);
+	}
+	const unresolvedVirtualIds = browserModuleSource.match(/virtual:markless:[^"']+/g);
+	if (unresolvedVirtualIds) throw new Error(`${filename}: ${JSON.stringify(unresolvedVirtualIds)}`);
+	return javascriptModuleUrl(browserModuleSource);
+}
+
 type CompiledCaptureDispatch = {
 	readonly compiled: Awaited<ReturnType<typeof compileTsrxModule>>;
 	readonly loadedIds: string[];
@@ -226,39 +453,67 @@ async function withCompiledCaptureDispatch(
 	filename: string,
 	source: string,
 	inspect: (result: CompiledCaptureDispatch) => Promise<void>,
+	options: {
+		readonly expectResolver?: boolean;
+		readonly imports?: ReadonlyArray<CaptureDispatchImport>;
+	} = {},
 ): Promise<void> {
 	const compiled = await compileTsrxModule({ filename, source, symbols: [] });
-	const transformed = await transformTsrxModule({
+	const transformed = await transformCaptureDispatchModule(
 		filename,
 		source,
-		environment: 'client',
-		executionLog: 'never',
-	});
-	const symbolUrls = new Map(
-		transformed.virtualModules
-			.filter((module) => module.type === 'symbol')
-			.map((module) => [module.id, javascriptModuleUrl(localWebFunctionImports(module.source))]),
+		options.imports,
 	);
+	const symbolUrls = new Map(
+		await Promise.all(
+			transformed.virtualModules
+				.filter((module) => module.type === 'symbol')
+				.map(async (module) => [
+					module.id,
+					javascriptModuleUrl(
+						await captureDispatchSymbolSource(module.source, options.imports ?? []),
+					),
+				] as const),
+		),
+	);
+	const allSymbolUrls = new Map([
+		...symbolUrls,
+		...(await captureDispatchImportedSymbolUrls(options.imports ?? [])),
+	]);
 	const resolver = transformed.virtualModules.find((module) => module.type === 'resolver')!;
 	let resolverSource = resolver.source;
-	for (const [moduleId, moduleUrl] of symbolUrls) {
+	for (const [moduleId, moduleUrl] of allSymbolUrls) {
 		resolverSource = resolverSource.split(moduleId).join(moduleUrl);
 	}
 	const resolverUrl = javascriptModuleUrl(resolverSource);
 	const payload = transformed.virtualModules.find((module) => module.type === 'payload')!;
 	const payloadUrl = javascriptModuleUrl(payload.source);
-	const browserModuleSource = localWebFunctionImports(
+	let browserModuleSource = localWebFunctionImports(
 		transformed.code
 			.split(payload.id)
 			.join(payloadUrl)
 			.split(resolver.id)
 			.join(resolverUrl),
 	);
+	for (const [moduleId, moduleUrl] of allSymbolUrls)
+		browserModuleSource = browserModuleSource.split(moduleId).join(moduleUrl);
+	for (const imported of options.imports ?? []) {
+		const moduleUrl = await captureDispatchModuleUrl(
+			imported.filename,
+			imported.source,
+			imported.imports,
+		);
+		browserModuleSource = browserModuleSource.split(imported.specifier).join(moduleUrl);
+	}
+	const unresolvedVirtualIds = browserModuleSource.match(/virtual:markless:[^"']+/g);
+	if (unresolvedVirtualIds) throw new Error(JSON.stringify(unresolvedVirtualIds));
 
-	expect(transformed.code).toMatch(
-		/const marklessSymbolResolverModule = \(\) => import\(["']virtual:markless:resolver:/,
-	);
-	expect(transformed.code).not.toContain('readMarklessSourceSymbol');
+	if (options.expectResolver !== false) {
+		expect(transformed.code).toMatch(
+			/const marklessSymbolResolverModule = \(\) => import\(["']virtual:markless:resolver:/,
+		);
+		expect(transformed.code).not.toContain('readMarklessSourceSymbol');
+	}
 	expect(compiled.publicRenderModule.csrModuleSource).toContain('marklessCsrComposeView');
 
 	const global = globalThis as { document?: unknown };
@@ -286,6 +541,54 @@ async function withCompiledCaptureDispatch(
 			{ target: { replaceChildren() {} } },
 		);
 		await inspect({ compiled, loadedIds, output, runtime });
+	} finally {
+		global.document = previousDocument;
+	}
+}
+
+async function withCompiledCaptureResume(
+	filename: string,
+	source: string,
+	imports: ReadonlyArray<CaptureDispatchImport>,
+	inspect: (result: {
+		readonly root: FakeElement;
+		readonly view: ProtocolViewPayload;
+		readonly runtime: Awaited<ReturnType<typeof render>>;
+	}) => Promise<void>,
+): Promise<void> {
+	const [clientUrl, serverUrl] = await Promise.all([
+		captureDispatchModuleUrl(filename, source, imports, 'client'),
+		captureDispatchModuleUrl(filename, source, imports, 'server'),
+	]);
+	const global = globalThis as { document?: unknown };
+	const previousDocument = global.document;
+	global.document = captureDispatchDocument();
+	try {
+		const clientModule = (await import(clientUrl)) as {
+			readonly default: { readonly renderCsr: () => CompiledCaptureDispatch['output'] };
+		};
+		const serverModule = (await import(serverUrl)) as {
+			readonly default: {
+				readonly renderSsr: () => Promise<{
+					readonly html: string;
+					readonly state: ReturnType<typeof createProtocolStatePayload>;
+					readonly view: ProtocolViewPayload;
+				}>;
+			};
+		};
+		const clientOutput = clientModule.default.renderCsr();
+		const serverOutput = await serverModule.default.renderSsr();
+		const root = parseCaptureDispatchHtml(serverOutput.html)[0]!;
+		const runtime = await render(
+			() => ({
+				root,
+				state: serverOutput.state,
+				view: serverOutput.view,
+				loadSymbol: clientOutput.loadSymbol,
+			}),
+			{ target: { replaceChildren() {} } },
+		);
+		await inspect({ root, view: serverOutput.view, runtime });
 	} finally {
 		global.document = previousDocument;
 	}
@@ -488,6 +791,100 @@ test('resume wakes only the graph-routed sibling text update after child composi
 
 	expect(graphButton.textContent).toBe('Server birch');
 	expect(literalButton.textContent).toBe('Server copper');
+});
+
+test('composing a child DOM update with no prop route fails loudly', () => {
+	const childRoot = captureDispatchElement('aside');
+	const childView: ProtocolViewPayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'aside' }],
+		events: [],
+		domUpdates: [
+			{
+				hostNodeId: 'h0',
+				source: 'libraryOpen',
+				graphNodeId: 'prop:libraryOpen',
+				path: [],
+				target: { kind: 'class', trueValue: 'library active', falseValue: 'library' },
+				symbolId: 'symbol:library-class',
+			},
+		],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+
+	expect(() =>
+		marklessCsrAppendChildView({
+			child: {
+				hostPrefix: 'c4:',
+				symbolPrefix: '',
+				graphProps: [],
+				boundSymbols: {},
+				output: { root: childRoot, view: childView },
+			},
+			elements: [childRoot],
+			indexByElement: new Map([[childRoot, 0]]),
+			locators: [],
+			events: [],
+			domUpdates: [],
+			behaviors: [],
+			elementHandles: [],
+			branches: [],
+			asyncBoundaries: [],
+			asyncRunners: {},
+			csrCallbacks: new Map(),
+		}),
+	).toThrowError(
+		'MARKLESS_COMPOSED_DOM_UPDATE_UNMAPPED: DOM update "dom-update:h0:class" on host "c4:h0" with symbol "symbol:library-class" reads prop "libraryOpen", but composition found no route.',
+	);
+});
+
+test('composing a child DOM update backed by an opaque prop drops it silently', () => {
+	const childRoot = captureDispatchElement('aside');
+	const childView: ProtocolViewPayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'aside' }],
+		events: [],
+		domUpdates: [
+			{
+				hostNodeId: 'h0',
+				source: 'libraryOpen',
+				graphNodeId: 'prop:libraryOpen',
+				path: [],
+				target: { kind: 'class', trueValue: 'library active', falseValue: 'library' },
+				symbolId: 'symbol:library-class',
+			},
+		],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	const domUpdates: ProtocolViewPayload['domUpdates'][number][] = [];
+
+	expect(() =>
+		marklessCsrAppendChildView({
+			child: {
+				hostPrefix: 'c4:',
+				symbolPrefix: '',
+				graphProps: [{ name: 'libraryOpen', kind: 'opaque' }],
+				boundSymbols: {},
+				output: { root: childRoot, view: childView },
+			},
+			elements: [childRoot],
+			indexByElement: new Map([[childRoot, 0]]),
+			locators: [],
+			events: [],
+			domUpdates,
+			behaviors: [],
+			elementHandles: [],
+			branches: [],
+			asyncBoundaries: [],
+			asyncRunners: {},
+			csrCallbacks: new Map(),
+		}),
+	).not.toThrow();
+	expect(domUpdates).toEqual([]);
 });
 
 function viewWithClickSyncComputedDomUpdate(): ProtocolViewPayload {
@@ -1307,6 +1704,572 @@ export default function CaptureSlotSiblings() @{
 	);
 });
 
+test('compiled sibling keyed child rows dispatch through their instance callback route', async () => {
+	const source = `
+import { state } from '@markless/core';
+import { RowList } from './row-list.tsrx';
+
+export default function KeyedChildSiblings() @{
+	let firstRows = state([{ id: 'first', label: 'First cedar' }]);
+	let secondRows = state([{ id: 'second', label: 'Second quartz' }]);
+	let firstResult = state('none');
+	let secondResult = state('none');
+	<main>
+		<RowList rows={firstRows} onPick={() => firstResult = 'first'} />
+		<RowList rows={secondRows} onPick={() => secondResult = 'second'} />
+		<output>{firstResult}</output>
+		<output>{secondResult}</output>
+	</main>
+}
+`;
+	await withCompiledCaptureDispatch(
+		'src/KeyedChildSiblings.tsrx',
+		source,
+		async ({ output, runtime }) => {
+			const repeats = output.view.keyedRepeats ?? [];
+			expect(repeats.map((repeat) => repeat.id)).toEqual(['c0:repeat:0', 'c3:repeat:0']);
+			expect(repeats.map((repeat) => repeat.parentHostNodeId)).toEqual(['c0:h0', 'c3:h0']);
+			expect(repeats.map((repeat) => repeat.collectionGraphNodeId)).toEqual([
+				'state:firstRows',
+				'state:secondRows',
+			]);
+			expect(repeats[0]!.rowEvents[0]!.symbolIds).not.toEqual(
+				repeats[1]!.rowEvents[0]!.symbolIds,
+			);
+			const buttons = descendants(output.root, 'BUTTON');
+			expect(buttons.map(renderedText)).toEqual(['First cedar', 'Second quartz']);
+			await runtime.runtime.dispatch(event('click', buttons[1]!) as never);
+			expect(runtime.graph.read('state:firstResult')).toBe('none');
+			expect(runtime.graph.read('state:secondResult')).toBe('second');
+		},
+		{
+			imports: [
+				{
+					specifier: './row-list.tsrx',
+					filename: 'src/row-list.tsrx',
+					source: `
+export function RowList({ rows, onPick }) @{
+	<ul>
+		@for (const row of rows; key row.id) {
+			<li><button type="button" onClick={() => onPick()}>{row.label}</button></li>
+		}
+	</ul>
+}
+`,
+				},
+			],
+		},
+	);
+});
+
+test('compiled parent state keeps a child prop-driven class update instance-bound and executable', async () => {
+	const source = `
+import { state } from '@markless/core';
+
+function Library({ libraryOpen }: { libraryOpen: boolean }) @{
+	<aside class={libraryOpen ? 'library active-library' : 'library'}>Songs</aside>
+}
+
+export default function MusicPlayer() @{
+	let libraryOpen = state(false);
+	<main>
+		<button type="button" onClick={() => libraryOpen = !libraryOpen}>Toggle</button>
+		<Library libraryOpen={libraryOpen} />
+	</main>
+}
+`;
+	await withCompiledCaptureDispatch(
+		'src/MusicPlayer.tsrx',
+		source,
+		async ({ compiled, output, runtime }) => {
+			const updateSymbol = compiled.captureAnalysis.extractedSymbols.find(
+				(symbol) =>
+					symbol.kind === 'dom-update' && symbol.owner?.componentName === 'Library',
+			)!;
+			const row = compiled.boundSymbolResolver.rows.find(
+				(candidate) => candidate.baseSymbolId === updateSymbol.symbolId,
+			)!;
+			const update = output.view.domUpdates.find(
+				(candidate) => candidate.target.kind === 'class',
+			)!;
+			const button = descendants(output.root, 'BUTTON')[0]!;
+			const sidebar = descendants(output.root, 'ASIDE')[0] as FakeElement & {
+				getAttribute(name: string): string | null;
+			};
+
+			expect(update).toEqual(
+				expect.objectContaining({
+					hostNodeId: 'c0:h0',
+					graphNodeId: 'state:libraryOpen',
+					symbolId: row.id,
+				}),
+			);
+			expect(sidebar.getAttribute('class')).toBe('library');
+			await runtime.runtime.dispatch(event('click', button) as never);
+			expect(sidebar.getAttribute('class')).toBe('library active-library');
+		},
+	);
+});
+
+test('compiled parent state updates a composed child direct-value attribute after dispatch', async () => {
+	const source = `
+import { state } from '@markless/core';
+import { Song } from './song.tsrx';
+import { Player } from './player.tsrx';
+
+export default function MusicPlayer() @{
+	let playerCommand = state('cue');
+	let playerCommandVersion = state(0);
+	let isPlaying = state(false);
+	const currentSong = state({
+		name: 'Cedar',
+		artist: 'Quartz',
+		cover: '/cedar.jpg',
+		videoId: 'cedar-1',
+	});
+	<main>
+		<Song
+			currentSong={currentSong}
+			isPlaying={isPlaying}
+			playerCommand={playerCommand}
+			playerCommandVersion={playerCommandVersion}
+		/>
+		<Player onPlayToggle={() => {
+			playerCommand = isPlaying ? 'pause' : 'play';
+			playerCommandVersion++;
+			isPlaying = !isPlaying;
+		}} />
+	</main>
+}
+`;
+	await withCompiledCaptureDispatch(
+		'src/DirectValueChild.tsrx',
+		source,
+		async ({ output, runtime }) => {
+			const button = descendants(output.root, 'BUTTON')[0]!;
+			const frame = descendants(output.root, 'DIV')[0] as FakeElement & {
+				getAttribute(name: string): string | null;
+			};
+
+			expect(frame.getAttribute('data-command')).toBe('cue');
+			await runtime.runtime.dispatch(event('click', button) as never);
+			expect(frame.getAttribute('data-command')).toBe('play');
+		},
+		{
+			expectResolver: false,
+			imports: [
+				{
+					specifier: './song.tsrx',
+					filename: 'src/song.tsrx',
+					source: `
+import { YouTubePlayer } from './youtube-player.tsrx';
+
+export function Song({ currentSong, isPlaying, playerCommand, playerCommandVersion }) @{
+	<article>
+		<YouTubePlayer
+			isPlaying={isPlaying}
+			playerCommand={playerCommand}
+			playerCommandVersion={playerCommandVersion}
+			track={currentSong}
+		/>
+		<div class={isPlaying ? 'record rotating' : 'record'}>
+			<img alt={currentSong.name} src={currentSong.cover} />
+		</div>
+		<h2>{currentSong.name}</h2>
+		<h3>{currentSong.artist}</h3>
+	</article>
+}
+`,
+					imports: [
+						{
+							specifier: './youtube-player.tsrx',
+							filename: 'src/youtube-player.tsrx',
+							source: `
+export function YouTubePlayer({ isPlaying, playerCommand, playerCommandVersion, track }) @{
+	<div
+		class="youtube-frame-host"
+		data-video-id={track.videoId}
+		data-playing={isPlaying}
+		data-command={playerCommand}
+		data-command-version={playerCommandVersion}
+	></div>
+}
+`,
+						},
+					],
+				},
+				{
+					specifier: './player.tsrx',
+					filename: 'src/player.tsrx',
+					source: `
+export function Player({ onPlayToggle }) @{
+	<button type="button" onClick={() => onPlayToggle()}>Play</button>
+}
+`,
+				},
+			],
+		},
+	);
+});
+
+test('resumed parent state updates a composed child direct-value attribute after dispatch', async () => {
+	const source = `
+import { state } from '@markless/core';
+import { Song } from './resume-song.tsrx';
+
+export default function ResumedMusicPlayer() @{
+	let command = state('cue');
+	let highlighted = state(false);
+	<main>
+		<button type="button" onClick={() => command = 'play'}>Play</button>
+		<Song command={command} highlighted={highlighted} />
+	</main>
+}
+`;
+	const imports: ReadonlyArray<CaptureDispatchImport> = [
+		{
+			specifier: './resume-song.tsrx',
+			filename: 'src/resume-song.tsrx',
+			source: `
+import { CommandHost } from './command-host.tsrx';
+
+export function Song({ command, highlighted }) @{
+	<article>
+		<CommandHost command={command} />
+		<div class={highlighted ? 'song active' : 'song'}>Track</div>
+	</article>
+}
+`,
+			imports: [
+				{
+					specifier: './command-host.tsrx',
+					filename: 'src/command-host.tsrx',
+					source: `
+export function CommandHost({ command }) @{
+	<div class="youtube-frame-host" data-command={command}></div>
+}
+`,
+				},
+			],
+		},
+	];
+	await withCompiledCaptureResume(
+		'src/ResumedDirectValueChild.tsrx',
+		source,
+		imports,
+		async ({ root, runtime }) => {
+			const button = descendants(root, 'BUTTON')[0]!;
+			const frame = descendants(root, 'DIV').find(
+				(candidate) =>
+					(candidate as FakeElement & { getAttribute(name: string): string | null }).getAttribute(
+						'class',
+					) === 'youtube-frame-host',
+			) as FakeElement & { getAttribute(name: string): string | null };
+
+			expect(frame.getAttribute('data-command')).toBe('cue');
+			await runtime.runtime.dispatch(event('click', button) as never);
+			expect(frame.getAttribute('data-command')).toBe('play');
+		},
+	);
+});
+
+test('compiled parent state updates alternate composed child value targets after dispatch', async () => {
+	const source = `
+import { state } from '@markless/core';
+
+function StatusReadout({ announcement, accessibilityLabel }) @{
+	<output aria-label={accessibilityLabel}>{announcement}</output>
+}
+
+export default function Dashboard() @{
+	let announcement = state('Waiting');
+	let accessibilityLabel = state('Pending status');
+	<section>
+		<button type="button" onClick={() => {
+			announcement = 'Ready';
+			accessibilityLabel = 'Ready status';
+		}}>Advance</button>
+		<StatusReadout
+			announcement={announcement}
+			accessibilityLabel={accessibilityLabel}
+		/>
+	</section>
+}
+`;
+	await withCompiledCaptureDispatch(
+		'src/AlternateValueTargets.tsrx',
+		source,
+		async ({ output, runtime }) => {
+			const button = descendants(output.root, 'BUTTON')[0]!;
+			const status = descendants(output.root, 'OUTPUT')[0] as FakeElement & {
+				getAttribute(name: string): string | null;
+			};
+			expect(status.getAttribute('aria-label')).toBe('Pending status');
+			expect(renderedText(status)).toBe('Waiting');
+			await runtime.runtime.dispatch(event('click', button) as never);
+			expect(status.getAttribute('aria-label')).toBe('Ready status');
+			expect(renderedText(status)).toBe('Ready');
+		},
+	);
+});
+
+test('compiled static children projection composes without classifying the projection as an unmapped child prop update', async () => {
+	const source = `
+import { state } from '@markless/core';
+import { Card } from './card.tsrx';
+
+export default function ProjectedCard() @{
+	let note = state('none');
+	<main>
+		<Card><p class="projected">Projected content</p></Card>
+		<button onClick={() => note = 'clicked'}>Go</button>
+		<output>{note}</output>
+	</main>
+}
+`;
+	await withCompiledCaptureDispatch(
+		'src/ProjectedCard.tsrx',
+		source,
+		async ({ output, runtime }) => {
+			const projected = descendants(output.root, 'P')[0]!;
+			const button = descendants(output.root, 'BUTTON')[0]!;
+			const status = descendants(output.root, 'OUTPUT')[0]!;
+
+			expect(renderedText(projected)).toBe('Projected content');
+			await runtime.runtime.dispatch(event('click', button) as never);
+			expect(renderedText(status)).toBe('clicked');
+		},
+		{
+			expectResolver: false,
+			imports: [
+				{
+					specifier: './card.tsrx',
+					filename: 'src/card.tsrx',
+					source: `
+export function Card({ children }) @{
+	<section class="card">{children}</section>
+}
+`,
+				},
+			],
+		},
+	);
+});
+
+test('compiled async page settles with an optional-prop component in the falsy child arm', async () => {
+	const source = `
+import { computed } from '@markless/core';
+import { OptionalFrame } from './optional-frame.tsrx';
+
+export default function OptionalPage() @{
+	const model = computed(async () => {
+		await Promise.resolve();
+		return { rows: [{ id: 'a', label: 'first' }, { id: 'b', label: 'second' }] };
+	});
+	<div>
+		@try {
+			<OptionalFrame>
+				<ul>
+					@for (const row of model.rows; key row.id) {
+						<li data-row>{row.label}</li>
+					}
+				</ul>
+			</OptionalFrame>
+		} @pending { <p data-pending>loading</p> }
+	</div>
+}
+`;
+	await withCompiledCaptureDispatch(
+		'src/OptionalPage.tsrx',
+		source,
+		async ({ output, runtime }) => {
+			for (let index = 0; index < 8; index++) await Promise.resolve();
+			await runtime.graph.flush?.();
+			for (let index = 0; index < 8; index++) await Promise.resolve();
+
+			expect(descendants(output.root, 'LI').map(renderedText)).toEqual(['first', 'second']);
+			expect(descendants(output.root, 'EM').map(renderedText)).toEqual(['no context']);
+			expect(descendants(output.root, 'SPAN')).toEqual([]);
+		},
+		{
+			expectResolver: false,
+			imports: [
+				{
+					specifier: './optional-frame.tsrx',
+					filename: 'src/optional-frame.tsrx',
+					source: `
+import { Card } from './card.tsrx';
+export function OptionalFrame({ info, children }) @{
+	<section>
+		@if (info) { <span><Card>{info.owner.name}</Card></span> }
+		@else { <em>no context</em> }
+		<main>{children}</main>
+	</section>
+}
+`,
+					imports: [
+						{
+							specifier: './card.tsrx',
+							filename: 'src/card.tsrx',
+							source: `
+export function Card({ children }) @{
+	<strong>{children}</strong>
+}
+`,
+						},
+					],
+				},
+			],
+		},
+	);
+});
+
+test('compiled sync-state branch inside projected async content flips and rewires after settle', async () => {
+	const source = `
+import { computed, state } from '@markless/core';
+import { PanelFrame } from './panel-frame.tsrx';
+
+export default function BranchPage() @{
+	let drawerOpen = state(false);
+	let region = state('west');
+	const roster = computed(async () => {
+		await Promise.resolve();
+		return { zone: region, crews: [{ id: region + '-a' }, { id: region + '-b' }] };
+	});
+	<main>
+		<button data-region onClick={() => region = 'east'}>Region</button>
+		@try {
+			<PanelFrame>
+				<button data-drawer onClick={() => drawerOpen = !drawerOpen}>{roster.zone}</button>
+				@if (drawerOpen) {
+					<div data-menu>
+						@for (const crew of roster.crews; key crew.id) {
+							<span class="crew">{crew.id}</span>
+						}
+					</div>
+				}
+			</PanelFrame>
+		} @pending { <p>loading</p> }
+	</main>
+}
+`;
+	await withCompiledCaptureDispatch(
+		'src/BranchPage.tsrx',
+		source,
+		async ({ output, runtime }) => {
+			const settle = async () => {
+				for (let index = 0; index < 8; index++) await Promise.resolve();
+				await runtime.graph.flush?.();
+				for (let index = 0; index < 8; index++) await Promise.resolve();
+			};
+			const button = (name: string) =>
+				descendants(output.root, 'BUTTON').find(
+					(candidate) =>
+						(candidate as FakeElement & { getAttribute(name: string): string | null })
+							.getAttribute(name) !== null,
+				)!;
+
+			await settle();
+			await runtime.runtime.dispatch(event('click', button('data-drawer')) as never);
+			expect(descendants(output.root, 'SPAN').map(renderedText)).toEqual(['west-a', 'west-b']);
+			await runtime.runtime.dispatch(event('click', button('data-drawer')) as never);
+			expect(descendants(output.root, 'SPAN')).toEqual([]);
+
+			await runtime.runtime.dispatch(event('click', button('data-region')) as never);
+			await settle();
+			expect(renderedText(button('data-drawer'))).toBe('east');
+			await runtime.runtime.dispatch(event('click', button('data-drawer')) as never);
+			expect(descendants(output.root, 'SPAN').map(renderedText)).toEqual(['east-a', 'east-b']);
+		},
+		{
+			expectResolver: false,
+			imports: [
+				{
+					specifier: './panel-frame.tsrx',
+					filename: 'src/panel-frame.tsrx',
+					source: `
+export function PanelFrame({ children }) @{
+	<section>{children}</section>
+}
+`,
+				},
+			],
+		},
+	);
+});
+
+test('compiled child branch remaps its parent-prop test read and flips after dispatch', async () => {
+	const source = `
+import { state } from '@markless/core';
+import { StatusBadge } from './status-badge.tsrx';
+
+export default function Dashboard() @{
+	let streaming = state(true);
+	<main>
+		<button onClick={() => streaming = !streaming}>Toggle</button>
+		<StatusBadge active={streaming} />
+	</main>
+}
+`;
+	await withCompiledCaptureDispatch(
+		'src/Dashboard.tsrx',
+		source,
+		async ({ output, runtime }) => {
+			const button = descendants(output.root, 'BUTTON')[0]!;
+			const initialBadges = descendants(output.root, 'EM');
+			expect(initialBadges.map(renderedText)).toEqual(['Live']);
+			expect(output.view.events).toEqual([
+				expect.objectContaining({ eventName: 'click', symbolIds: ['symbol:0'] }),
+			]);
+			await runtime.runtime.dispatch(event('click', button) as never);
+			expect(runtime.graph.read('state:streaming')).toBe(false);
+			expect(output.view.branches![0]!.testReads).toEqual([
+				{ source: 'active', graphNodeId: 'state:streaming', path: [] },
+			]);
+			expect(descendants(output.root, 'EM').map(renderedText)).toEqual(['Idle']);
+		},
+		{
+			expectResolver: false,
+			imports: [
+				{
+					specifier: './status-badge.tsrx',
+					filename: 'src/status-badge.tsrx',
+					source: `
+export function StatusBadge({ active }) @{
+	<span class="badge">
+		@if (active) { <em class="live">Live</em> } @else { <em class="idle">Idle</em> }
+	</span>
+}
+`,
+				},
+			],
+		},
+	);
+});
+
+test('compiled constant-prop child branch keeps its rendered arm without a live branch record', async () => {
+	const source = `
+function Badge({ active }) @{
+	<span class="badge">
+		@if (active) { <em>Live</em> } @else { <em>Idle</em> }
+	</span>
+}
+
+export default function Dashboard() @{
+	<main><Badge active={true} /></main>
+}
+`;
+	await withCompiledCaptureDispatch(
+		'src/ConstantBadge.tsrx',
+		source,
+		async ({ output }) => {
+			expect(descendants(output.root, 'EM').map(renderedText)).toEqual(['Live']);
+			expect(output.view.branches).toEqual([]);
+		},
+		{ expectResolver: false },
+	);
+});
+
 test('compiled nested forwarding dispatches each callback through its full edge path', async () => {
 	const source = `
 import { state } from '@markless/core';
@@ -1430,7 +2393,7 @@ export function Library({ songOne, onSelectOne }) @{
 		(symbol) => symbol.loaderSymbolId === childInput.id,
 	)!;
 	const libraryRow = library.boundSymbolResolver.rows.find(
-		(row) => row.baseSymbolId === childHandler.symbolId,
+		(row) => row.loaderSymbolId === childInput.id,
 	)!;
 	const appSource = `
 import { state } from '@markless/core';
@@ -1465,7 +2428,7 @@ export function App() @{
 		executionLog: 'never',
 	});
 	const appRow = app.boundSymbolResolver.rows.find(
-		(row) => row.baseSymbolId === childHandler.symbolId,
+		(row) => row.loaderSymbolId === appInput.id,
 	)!;
 	const libraryBoundId = marklessBoundSymbolId(
 		{ boundSymbols: { [childHandler.symbolId]: libraryRow.id } },
