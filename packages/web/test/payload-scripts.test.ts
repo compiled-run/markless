@@ -1199,7 +1199,7 @@ test('runtime protocol version mismatch errors expose expected and actual versio
 	const error = captureThrown(() =>
 		decodePayloadScripts({
 			stateScript:
-				'<script type="markless/state">{"version":2,"cells":[],"computed":[]}</script>',
+				'<script type="markless/state">{"version":3,"cells":[],"computed":[]}</script>',
 			viewScript: validView,
 		}),
 	);
@@ -1213,11 +1213,11 @@ test('runtime protocol version mismatch errors expose expected and actual versio
 		payloadType: 'markless/state',
 		payloadScript: 'script[type="markless/state"]',
 		expectedVersion: 1,
-		actualVersion: 2,
+		actualVersion: 3,
 		docsUrl: 'https://markless.dev/errors/MARKLESS_PROTOCOL_VERSION_MISMATCH',
 	});
 	expect(error).toMatchObject({
-		message: 'Unsupported markless/state protocol version 2.',
+		message: 'Unsupported markless/state protocol version 3.',
 		why: expect.stringContaining('version 1'),
 	});
 });

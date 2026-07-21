@@ -94,12 +94,15 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 		},
 		config(config, env) {
 			command = env.command;
+			const devEnabled = env.command === 'serve';
 			rolldownOptions.executionLog =
-				options.executionLog ?? (env.command === 'serve' ? 'auto' : 'never');
-			const debugEnabled = env.command === 'serve' || options.debug === true;
+				options.executionLog ?? (devEnabled ? 'auto' : 'never');
+			const debugEnabled = devEnabled || options.debug === true;
 			rolldownOptions.inlineResumerDebug = debugEnabled;
 			const debugDefine = JSON.stringify(debugEnabled);
+			const devDefine = JSON.stringify(devEnabled);
 			const consumerDebugDefine = config.define?.__MARKLESS_DEBUG_ENABLED__;
+			const consumerDevDefine = config.define?.__MARKLESS_DEV_ENABLED__;
 			if (
 				consumerDebugDefine !== undefined &&
 				consumerDebugDefine !== debugDefine &&
@@ -109,7 +112,20 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 					'MARKLESS_DEBUG_DEFINE_CONFLICT: __MARKLESS_DEBUG_ENABLED__ is controlled by markless(). Remove the consumer definition or set markless({ debug: true }).',
 				);
 			}
-			config.define = { ...config.define, __MARKLESS_DEBUG_ENABLED__: debugDefine };
+			if (
+				consumerDevDefine !== undefined &&
+				consumerDevDefine !== devDefine &&
+				consumerDevDefine !== devEnabled
+			) {
+				throw new Error(
+					'MARKLESS_DEV_DEFINE_CONFLICT: __MARKLESS_DEV_ENABLED__ is controlled by markless(). Remove the consumer definition.',
+				);
+			}
+			config.define = {
+				...config.define,
+				__MARKLESS_DEBUG_ENABLED__: debugDefine,
+				__MARKLESS_DEV_ENABLED__: devDefine,
+			};
 			configDefaults(config, options, rolldownOptions);
 		},
 		configResolved(resolvedConfig) {

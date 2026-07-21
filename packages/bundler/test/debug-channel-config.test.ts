@@ -34,7 +34,10 @@ describe('browser debug channel compile gate', () => {
 
 		callConfig(plugin, config, { command: name === 'serve' ? 'serve' : 'build' });
 
-		expect(config.define).toEqual({ __MARKLESS_DEBUG_ENABLED__: expected });
+		expect(config.define).toEqual({
+			__MARKLESS_DEBUG_ENABLED__: expected,
+			__MARKLESS_DEV_ENABLED__: name === 'serve' ? 'true' : 'false',
+		});
 	});
 
 	test('rejects a conflicting consumer definition with an actionable message', () => {
@@ -48,6 +51,20 @@ describe('browser debug channel compile gate', () => {
 			),
 		).toThrowError(
 			'MARKLESS_DEBUG_DEFINE_CONFLICT: __MARKLESS_DEBUG_ENABLED__ is controlled by markless(). Remove the consumer definition or set markless({ debug: true }).',
+		);
+	});
+
+	test('rejects a conflicting consumer development definition', () => {
+		const plugin = getPlugin(markless(), 'vite-plugin-markless');
+
+		expect(() =>
+			callConfig(
+				plugin,
+				{ define: { __MARKLESS_DEV_ENABLED__: 'true' } },
+				{ command: 'build' },
+			),
+		).toThrowError(
+			'MARKLESS_DEV_DEFINE_CONFLICT: __MARKLESS_DEV_ENABLED__ is controlled by markless(). Remove the consumer definition.',
 		);
 	});
 });

@@ -44,27 +44,28 @@ export type ResumePayloadScriptsResult = {
 	readonly warnings?: ReadonlyArray<ResumeAlreadyResumedWarning>;
 };
 
-let devPayloadValidator: DevProtocolValidationModule['decodePayloadScripts'] | undefined;
+declare const __MARKLESS_DEV_ENABLED__: boolean;
 
-declare global {
-	interface ImportMeta {
-		readonly env: { readonly DEV?: boolean };
-	}
-}
+export const decodePayloadScripts =
+	typeof __MARKLESS_DEV_ENABLED__ === 'undefined' || __MARKLESS_DEV_ENABLED__
+		? decodeWithDevValidation(
+				(
+					await import('../../serializer/src/protocol-validation.ts')
+				).decodePayloadScripts,
+			)
+		: decodePayloadScriptsClient;
 
-if (import.meta.env?.DEV) {
-	const { decodePayloadScripts: decodePayloadScriptsDev } =
-		await import('../../serializer/src/protocol-validation.ts');
-	devPayloadValidator = decodePayloadScriptsDev;
-}
-
-export function decodePayloadScripts(input: EncodedPayloadScripts): DecodedPayloadScripts {
-	try {
-		devPayloadValidator?.(input);
-	} catch (error) {
-		throw normalizeRuntimePayloadError(error);
-	}
-	return decodePayloadScriptsClient(input);
+function decodeWithDevValidation(
+	validate: DevProtocolValidationModule['decodePayloadScripts'],
+): typeof decodePayloadScriptsClient {
+	return (input) => {
+		try {
+			validate(input);
+		} catch (error) {
+			throw normalizeRuntimePayloadError(error);
+		}
+		return decodePayloadScriptsClient(input);
+	};
 }
 
 function normalizeRuntimePayloadError(error: unknown): Error {
