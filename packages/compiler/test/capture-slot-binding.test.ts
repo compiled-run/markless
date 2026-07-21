@@ -143,6 +143,50 @@ export function App() @{
 	);
 });
 
+test('an imported child projection does not demand an opaque children capture', async () => {
+	const card = await compileTsrxModule({
+		filename: 'src/Card.tsrx',
+		source: `
+export function Card({ children }) @{
+	<section>{children}</section>
+}
+`,
+		symbols: [],
+	});
+	const projectedChildrenSymbol = card.captureAnalysis.extractedSymbols.find((symbol) =>
+		symbol.captureSlots.some((slot) => slot.propName === 'children'),
+	)!;
+	const page = await compileTsrxModule({
+		filename: 'src/Page.tsrx',
+		source: `
+import { Card } from './Card.tsrx';
+
+export function Page() @{
+	<Card><p>Projected content</p></Card>
+}
+`,
+		symbols: [
+			{
+				id: 'imported:Card:symbol:0',
+				chunk: 'virtual:markless:symbol:Card:0',
+				exportName: 'cardChildrenUpdate',
+				componentEdgeId: 'component-edge:0',
+				captureSymbol: projectedChildrenSymbol,
+			},
+		],
+	});
+
+	expect(
+		page.captureAnalysis.diagnostics.filter((diagnostic) => diagnostic.severity === 'error'),
+	).toEqual([]);
+	expect(
+		page.captureAnalysis.extractedSymbols
+			.filter((symbol) => symbol.loaderSymbolId === 'imported:Card:symbol:0')
+			.flatMap((symbol) => symbol.captureSlots)
+			.filter((slot) => slot.propName === 'children'),
+	).toEqual([]);
+});
+
 test('prop declarations and reads retain distinct AST binding ownership', async () => {
 	const source = `
 function First({ label }: { label: string }) @{
