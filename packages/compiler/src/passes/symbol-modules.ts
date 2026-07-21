@@ -19,12 +19,18 @@ import { parseJavaScriptModule } from '../js-ast.ts';
 export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtifact {
 	const localNamesBySymbol = publicRenderLocalNamesBySymbol(input.publicRenderPlan);
 	const captureSlotsBySymbol = new Map(
-		input.captureAnalysis.extractedSymbols.map((symbol) => [
-			symbol.symbolId,
-			symbol.captureSlots.filter((slot) =>
-				slot.routes.some((route) => route.componentEdgeId !== undefined),
-			),
-		]),
+		input.captureAnalysis.extractedSymbols.flatMap((symbol) =>
+			symbol.loaderSymbolId
+				? []
+				: [
+						[
+							symbol.symbolId,
+							symbol.captureSlots.filter((slot) =>
+								slot.routes.some((route) => route.componentEdgeId !== undefined),
+							),
+						] as const,
+					],
+		),
 	);
 	const boundCallbackSymbolIds = new Set(
 		input.captureAnalysis.extractedSymbols.flatMap((symbol) =>
@@ -37,7 +43,7 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 	);
 	const unsupportedCaptureSymbolIds = new Set(
 		input.captureAnalysis.extractedSymbols.flatMap((symbol) =>
-			symbol.captureSlots.some((slot) =>
+			!symbol.loaderSymbolId && symbol.captureSlots.some((slot) =>
 				slot.routes.some((route) => route.kind === 'unsupported-opaque'),
 			)
 				? [symbol.symbolId]
@@ -182,7 +188,7 @@ function emitSymbolModule(
 				symbolId: symbol.id,
 				kind: symbol.kind,
 				exportName: symbolExportName(symbol.id),
-				source: emitAsyncComputedRunnerModule(symbol),
+				source: emitAsyncComputedRunnerModule(symbol, captureSlots),
 			},
 		];
 	}
@@ -193,7 +199,7 @@ function emitSymbolModule(
 				symbolId: symbol.id,
 				kind: symbol.kind,
 				exportName: symbolExportName(symbol.id),
-				source: emitSyncComputedDeriveModule(symbol),
+				source: emitSyncComputedDeriveModule(symbol, captureSlots),
 			},
 		];
 	}
@@ -1080,10 +1086,14 @@ function isInlineFunctionSource(source: string): boolean {
 
 function emitAsyncComputedRunnerModule(
 	symbol: Extract<PlannedSymbol, { readonly kind: 'async-computed-runner' }>,
+	captureSlots: ReadonlyArray<CaptureSlot>,
 ): string {
 	const exportName = symbolExportName(symbol.id);
 	const imports = uniqueModuleImports(symbol.moduleImports ?? []);
-	const dependencyDeclarations = asyncRunnerDependencyDeclarations(symbol.dependencies ?? []);
+	const dependencyDeclarations = asyncRunnerDependencyDeclarations(
+		symbol.dependencies ?? [],
+		captureSlots,
+	);
 
 	return [
 		...imports.map(emitModuleImport),
@@ -1102,9 +1112,10 @@ function emitAsyncComputedRunnerModule(
 
 function emitSyncComputedDeriveModule(
 	symbol: Extract<PlannedSymbol, { readonly kind: 'sync-computed-derive' }>,
+	captureSlots: ReadonlyArray<CaptureSlot>,
 ): string {
 	const exportName = symbolExportName(symbol.id);
-	const body = syncComputedDeriveBody(symbol);
+	const body = syncComputedDeriveBody(symbol, captureSlots);
 	const imports = uniqueModuleImports(
 		(symbol.moduleImports ?? []).filter((moduleImport) =>
 			sourceReferencesIdentifier(body, moduleImport.localName),
@@ -1125,6 +1136,7 @@ function emitSyncComputedDeriveModule(
 
 function syncComputedDeriveBody(
 	symbol: Extract<PlannedSymbol, { readonly kind: 'sync-computed-derive' }>,
+	captureSlots: ReadonlyArray<CaptureSlot>,
 ): string {
 	const body = eventHandlerBodySource(symbol.source);
 	if (!body) return 'return undefined;';
@@ -1132,14 +1144,21 @@ function syncComputedDeriveBody(
 	let emitted = body.source;
 	const replacements = (symbol.dependencies ?? [])
 		.flatMap((dependency) =>
-			readBodySpans(body.source, dependency).map((span) => ({
-				...span,
-				replacement: graphReadCallSource(
-					'context.graph.read',
-					dependency.graphNodeId,
-					dependency.path,
-				),
-			})),
+			readBodySpans(body.source, dependency).map((span) => {
+				const slot = captureSlots.find((candidate) =>
+					captureSlotMatchesRead(candidate, dependency),
+				);
+				return {
+					...span,
+					replacement: slot
+						? `context.capture.read(${JSON.stringify(slot.id)})`
+						: graphReadCallSource(
+								'context.graph.read',
+								dependency.graphNodeId,
+								dependency.path,
+							),
+				};
+			}),
 		)
 		.sort((left, right) => right.start - left.start || right.end - left.end);
 
@@ -1155,6 +1174,7 @@ function syncComputedDeriveBody(
 
 function asyncRunnerDependencyDeclarations(
 	dependencies: ReadonlyArray<SemanticGraphDependency>,
+	captureSlots: ReadonlyArray<CaptureSlot>,
 ): string[] {
 	const declarations: string[] = [];
 	const seenNames = new Set<string>();
@@ -1164,8 +1184,15 @@ function asyncRunnerDependencyDeclarations(
 		if (!declaration || seenNames.has(declaration.name)) continue;
 
 		seenNames.add(declaration.name);
+		const slot = captureSlots.find((candidate) =>
+			captureSlotMatchesRead(candidate, dependency),
+		);
 		declarations.push(
-			`	const ${declaration.name} = ${graphReadCallSource('read', declaration.graphNodeId, declaration.path)};`,
+			`	const ${declaration.name} = ${
+				slot
+					? `context.capture.read(${JSON.stringify(slot.id)})`
+					: graphReadCallSource('read', declaration.graphNodeId, declaration.path)
+			};`,
 		);
 	}
 

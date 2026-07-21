@@ -2,9 +2,12 @@ import {
 	marklessAssertComposableStateNames,
 	marklessComposeState,
 	marklessCsrRemapChildGraph,
+	marklessCsrRemapChildDomUpdate,
+	marklessCsrRemapChildKeyedRepeat,
 	marklessCsrRemapGraphOutput,
+	marklessCsrUnbindLocalView,
 } from './csr.ts';
-import { marklessBoundSymbolId } from './bound-symbol.ts';
+import { marklessBoundSymbolId, marklessDomUpdateSymbolId } from './bound-symbol.ts';
 
 export { marklessAssertComposableStateNames, marklessComposeState };
 export const marklessSsrRemapChildGraph = marklessCsrRemapChildGraph;
@@ -304,14 +307,12 @@ export function marklessSsrComposeView(html, view, hostLocators, children, async
 		...locator,
 		index: locator.index + offsetFor(locator.index),
 	}));
-	const events = view.events.filter((event) => localHostIds.has(event.hostNodeId));
-	const domUpdates = view.domUpdates.filter((update) => localHostIds.has(update.hostNodeId));
+	const { events, domUpdates, keyedRepeats, branches, asyncBoundaries } =
+		marklessCsrUnbindLocalView(view, localHostIds);
 	const behaviors = view.behaviors.filter((behavior) => localHostIds.has(behavior.hostNodeId));
 	const elementHandles = view.elementHandles.filter((handle) =>
 		localHostIds.has(handle.hostNodeId),
 	);
-	const branches = [...(view.branches ?? [])];
-	const asyncBoundaries = [...(view.asyncBoundaries ?? [])];
 	const asyncRunners = { ...view.asyncRunners };
 	const externalSymbolIds = new Set();
 	let inserted = 0;
@@ -323,6 +324,7 @@ export function marklessSsrComposeView(html, view, hostLocators, children, async
 				locators,
 				events,
 				domUpdates,
+				keyedRepeats,
 				behaviors,
 				elementHandles,
 				branches,
@@ -345,6 +347,7 @@ export function marklessSsrComposeView(html, view, hostLocators, children, async
 			locators,
 			events,
 			domUpdates,
+			keyedRepeats,
 			behaviors,
 			elementHandles,
 			branches: marklessSsrResolveAnchorRecords(html, 'branch', branches),
@@ -498,7 +501,11 @@ export function marklessSsrAppendChildView(context) {
 		});
 	}
 	for (const update of childView.domUpdates) {
-		const mapped = marklessSsrRemapChildGraph(update, context.child.graphProps);
+		const mapped = marklessCsrRemapChildDomUpdate(
+			update,
+			context.child.graphProps,
+			context.child.hostPrefix,
+		);
 		if (!mapped) continue;
 		context.domUpdates.push({
 			...update,
@@ -506,8 +513,30 @@ export function marklessSsrAppendChildView(context) {
 			graphNodeId: mapped.graphNodeId,
 			path: mapped.path,
 			...(update.symbolId
-				? { symbolId: marklessBoundSymbolId(context.child, update.symbolId) }
+				? { symbolId: marklessDomUpdateSymbolId(context.child, update.symbolId) }
 				: {}),
+		});
+	}
+	for (const repeat of childView.keyedRepeats ?? []) {
+		const mapped = marklessCsrRemapChildKeyedRepeat(
+			repeat,
+			context.child.graphProps,
+			context.child.hostPrefix,
+		);
+		if (!mapped) continue;
+		const rowEvents = repeat.rowEvents.map((event) => ({
+			...event,
+			symbolIds: event.symbolIds.map((symbolId) =>
+				marklessBoundSymbolId(context.child, symbolId),
+			),
+		}));
+		context.keyedRepeats.push({
+			...repeat,
+			id: context.child.hostPrefix + repeat.id,
+			parentHostNodeId: context.child.hostPrefix + repeat.parentHostNodeId,
+			collectionGraphNodeId: mapped.graphNodeId,
+			collectionPath: mapped.path,
+			rowEvents,
 		});
 	}
 	for (const behavior of childView.behaviors)
@@ -528,7 +557,7 @@ export function marklessSsrAppendChildView(context) {
 					}
 				: {}),
 			...(behavior.symbolId
-				? { symbolId: context.child.symbolPrefix + behavior.symbolId }
+				? { symbolId: marklessBoundSymbolId(context.child, behavior.symbolId) }
 				: {}),
 		});
 	for (const handle of childView.elementHandles)
@@ -545,7 +574,9 @@ export function marklessSsrAppendChildView(context) {
 				context.child.graphProps,
 				context.child.hostPrefix + branch.id,
 			),
-			...(branch.symbolId ? { symbolId: context.child.symbolPrefix + branch.symbolId } : {}),
+			...(branch.symbolId
+				? { symbolId: marklessBoundSymbolId(context.child, branch.symbolId) }
+				: {}),
 			...(branch.armRecords
 				? {
 						armRecords: branch.armRecords.map((arm) =>
@@ -565,11 +596,11 @@ export function marklessSsrAppendChildView(context) {
 			).map((read) => ({
 				...read,
 				...(read.runnerSymbolId
-					? { runnerSymbolId: context.child.symbolPrefix + read.runnerSymbolId }
+					? { runnerSymbolId: marklessBoundSymbolId(context.child, read.runnerSymbolId) }
 					: {}),
 			})),
 			...(boundary.updateSymbolId
-				? { updateSymbolId: context.child.symbolPrefix + boundary.updateSymbolId }
+				? { updateSymbolId: marklessBoundSymbolId(context.child, boundary.updateSymbolId) }
 				: {}),
 			...(boundary.armRecords && !Array.isArray(boundary.armRecords)
 				? {
@@ -612,7 +643,9 @@ export function marklessSsrPrefixBoundaryArmRecords(set, child) {
 						}),
 					}
 				: {}),
-			...(behavior.symbolId ? { symbolId: child.symbolPrefix + behavior.symbolId } : {}),
+			...(behavior.symbolId
+				? { symbolId: marklessBoundSymbolId(child, behavior.symbolId) }
+				: {}),
 		})),
 		elementHandles: (set.elementHandles ?? []).map((handle) => ({
 			...handle,
@@ -631,7 +664,7 @@ export function marklessSsrPrefixBoundaryArmRecords(set, child) {
 							child.hostPrefix + branch.id,
 						),
 						...(branch.symbolId
-							? { symbolId: child.symbolPrefix + branch.symbolId }
+							? { symbolId: marklessBoundSymbolId(child, branch.symbolId) }
 							: {}),
 						...(branch.armRecords
 							? {
@@ -664,18 +697,22 @@ export function marklessSsrPrefixArmRecord(arm, child) {
 			...event,
 			symbolIds: event.symbolIds.map((symbolId) => marklessBoundSymbolId(child, symbolId)),
 		})),
-		domUpdates: (arm.domUpdates ?? []).map((update) => {
-			const mapped = marklessSsrRemapChildGraph(update, child.graphProps);
+		domUpdates: (arm.domUpdates ?? []).flatMap((update) => {
+			const mapped = marklessCsrRemapChildDomUpdate(
+				update,
+				child.graphProps,
+				child.hostPrefix,
+			);
 			return mapped
-				? {
+				? [{
 						...update,
 						graphNodeId: mapped.graphNodeId,
 						path: mapped.path,
 						...(update.symbolId
-							? { symbolId: marklessBoundSymbolId(child, update.symbolId) }
+							? { symbolId: marklessDomUpdateSymbolId(child, update.symbolId) }
 							: {}),
-					}
-				: update;
+					}]
+				: [];
 		}),
 	};
 }

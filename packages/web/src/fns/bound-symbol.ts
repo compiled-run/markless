@@ -17,6 +17,24 @@ export function marklessBoundSymbolId(
 	return rebound ?? `${child.symbolPrefix ?? ''}${symbolId}`;
 }
 
+// A composed DOM update receives its current value from the remapped graph
+// record. If an inner component already bound the update symbol, keep that
+// complete ID in the inner resolver's namespace instead of rebinding its bare
+// `symbol:N` segment through an unrelated outer symbol with the same local ID.
+export function marklessDomUpdateSymbolId(
+	child: {
+		readonly symbolPrefix?: string;
+		readonly boundSymbols?: Readonly<Record<string, string>>;
+	},
+	symbolId: string,
+): string {
+	const direct = child.boundSymbols?.[symbolId];
+	if (direct) return direct;
+	return marklessBaseSymbolId(symbolId)
+		? `${child.symbolPrefix ?? ''}${symbolId}`
+		: marklessBoundSymbolId(child, symbolId);
+}
+
 export function marklessLiveBoundGraphRoute(binding: {
 	readonly kind?: string;
 	readonly graphNodeId?: unknown;
@@ -37,7 +55,7 @@ export function marklessLiveBoundGraphRoute(binding: {
 	};
 }
 
-function marklessBaseSymbolId(symbolId: string): string | undefined {
+export function marklessBaseSymbolId(symbolId: string): string | undefined {
 	if (!symbolId.startsWith('bound:')) return undefined;
 	const separator = symbolId.indexOf(':', 'bound:'.length);
 	if (separator < 0) return undefined;

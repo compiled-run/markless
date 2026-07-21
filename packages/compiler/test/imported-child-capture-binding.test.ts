@@ -45,9 +45,14 @@ test('imported child capture metadata produces one bound row per parent edge', a
 	});
 
 	const rows = parent.boundSymbolResolver.rows.filter(
-		(row) => row.baseSymbolId === childHandler.symbolId,
+		(row) => row.loaderSymbolId === 'imported:Child:symbol:0',
 	);
 	expect(rows).toHaveLength(2);
+	expect(rows.map((row) => row.baseSymbolId)).toEqual([
+		'imported:Child:symbol:0',
+		'imported:Child:symbol:0',
+	]);
+	expect(rows.every((row) => row.baseSymbolId !== childHandler.symbolId)).toBe(true);
 	expect(rows.map((row) => row.loaderSymbolId)).toEqual([
 		'imported:Child:symbol:0',
 		'imported:Child:symbol:0',

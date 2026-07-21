@@ -25,6 +25,18 @@
 				"MLA-I5-ACTION-BUDGET",
 				"MLA-EXT-WITNESS"
 			]
+		},
+		{
+			"fixture": "csr-library-toggle",
+			"interactions": ["open-library", "close-library"],
+			"surfaces": [
+				"MLA-S1-PRELOAD-INTEGRITY",
+				"MLA-I1-CONSOLE",
+				"MLA-I2-NETWORK",
+				"MLA-I5-BOOTSTRAP-BUDGET",
+				"MLA-I5-ACTION-BUDGET",
+				"MLA-EXT-WITNESS"
+			]
 		}
 	]
 }

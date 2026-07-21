@@ -24,6 +24,10 @@ describe('music-player CSR analyzer gate', () => {
 		).toEqual([
 			{ fixture: 'csr-command-state', interactions: ['play', 'next-track'] },
 			{ fixture: 'csr-play-branch', interactions: ['play', 'pause'] },
+			{
+				fixture: 'csr-library-toggle',
+				interactions: ['open-library', 'close-library'],
+			},
 		]);
 		for (const fixture of matrix.fixtures)
 			expect(fixture.surfaces).toEqual([

@@ -471,6 +471,7 @@ export function App() @{
 					boundResolverRows: Array<{
 						id: string;
 						baseSymbolId: string;
+						loaderSymbolId?: string;
 						componentEdgePath: string[];
 					}>;
 				};
@@ -482,11 +483,17 @@ export function App() @{
 		const childHandler = childResult!.manifest.captureMetadata.extractedSymbols.find(
 			(symbol) => symbol.kind === 'event-handler',
 		)!;
+		const loaderSymbolId = `imported:${encodeURIComponent(childFilename)}:${childHandler.symbolId}`;
 		const rows = parent.manifest.captureMetadata.boundResolverRows.filter(
-			(row) => row.baseSymbolId === childHandler.symbolId,
+			(row) => row.baseSymbolId === loaderSymbolId,
 		);
 		expect(rows).toHaveLength(2);
+		expect(rows.map((row) => row.id)).toEqual([
+			`bound:${encodeURIComponent(childHandler.symbolId)}:${encodeURIComponent('component-edge:0')}`,
+			`bound:${encodeURIComponent(childHandler.symbolId)}:${encodeURIComponent('component-edge:1')}`,
+		]);
 		expect(new Set(rows.map((row) => row.id)).size).toBe(2);
+		expect(new Set(rows.map((row) => row.loaderSymbolId))).toEqual(new Set([loaderSymbolId]));
 		expect(rows.map((row) => row.componentEdgePath)).toEqual([
 			['component-edge:0'],
 			['component-edge:1'],

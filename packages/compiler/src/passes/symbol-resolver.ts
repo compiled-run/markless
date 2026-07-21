@@ -230,6 +230,14 @@ export function planBoundSymbolResolver(
 						: [];
 				});
 				if (captureSlots.length !== edgeDependentSlots.length) continue;
+				if (
+					symbol.kind !== 'event-handler' &&
+					symbol.kind !== 'callback-prop' &&
+					captureSlots.every(
+						(slot) => slot.route.kind === 'compiler-known-constant',
+					)
+				)
+					continue;
 				const ancestry = path.map((edge) => ({
 					componentEdgeId: edge.id,
 					branchScopeIds: edge.branchScopeIds,
@@ -237,7 +245,11 @@ export function planBoundSymbolResolver(
 				}));
 				rows.push({
 					id: boundSymbolId(symbol.symbolId, ancestry),
-					baseSymbolId: symbol.symbolId,
+					// Imported symbols keep the child-local ID in the bound record ID,
+					// but the parent resolver owns a module-scoped loader ID. Using that
+					// loader ID as the row key prevents a child `symbol:0` from claiming
+					// an unrelated parent-owned `symbol:0` record.
+					baseSymbolId: symbol.loaderSymbolId ?? symbol.symbolId,
 					...(symbol.loaderSymbolId ? { loaderSymbolId: symbol.loaderSymbolId } : {}),
 					componentEdgePath,
 					ancestry,

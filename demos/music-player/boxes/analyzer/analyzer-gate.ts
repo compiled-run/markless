@@ -30,7 +30,11 @@ export interface MusicCsrFixtureSurfaceMatrix {
 	}[];
 }
 
-const fixtureIds = new Set<MusicCsrFixtureId>(['csr-command-state', 'csr-play-branch']);
+const fixtureIds = new Set<MusicCsrFixtureId>([
+	'csr-command-state',
+	'csr-play-branch',
+	'csr-library-toggle',
+]);
 const surfaceIds = new Set<MusicCsrAnalyzerSurface>([
 	'MLA-S1-PRELOAD-INTEGRITY',
 	'MLA-I1-CONSOLE',

@@ -26,7 +26,7 @@ export function emitSsrComponent(
 	const placement = {
 		hostPrefix: `c${childIndex}:`,
 		symbolPrefix: edge?.importSource ? `c${childIndex}:` : '',
-		graphProps: componentEdgeGraphRoutes(edge),
+		graphProps: componentEdgeGraphRoutes(edge, hasChildrenProjection(node)),
 		boundSymbols: boundSymbolsForEdge(edge, context.callbackSymbols),
 	};
 
@@ -97,13 +97,14 @@ export function emitCsrComponent(
 			: context.childReplacements.length;
 	const edge = context.componentEdges[context.nextComponentEdgeIndex++];
 	const props = componentPropsSource(node, context, edge, context.callbackSymbols);
+	const graphProps = componentEdgeGraphRoutes(edge, hasChildrenProjection(node));
 	const childName = `marklessCsrChild${index}`;
 	context.childReplacements.push(
 		`	const ${childName} = marklessCsrRenderChild(${localName}, { ${props.join(', ')} });`,
 		node === context.componentRoot
 			? `	root = marklessCsrReplaceChild(root, ${index}, ${childName}?.root);`
 			: `	marklessCsrReplaceChild(root, ${index}, ${childName}?.root);`,
-		`	marklessCsrChildren.push({ hostPrefix: ${JSON.stringify(`c${index}:`)}, symbolPrefix: ${JSON.stringify(edge?.importSource ? `c${index}:` : '')}, output: ${childName}, graphProps: ${JSON.stringify(componentEdgeGraphRoutes(edge))}, boundSymbols: ${JSON.stringify(boundSymbolsForEdge(edge, context.callbackSymbols))} });`,
+		`	marklessCsrChildren.push({ hostPrefix: ${JSON.stringify(`c${index}:`)}, symbolPrefix: ${JSON.stringify(edge?.importSource ? `c${index}:` : '')}, output: ${childName}, graphProps: ${JSON.stringify(graphProps)}, boundSymbols: ${JSON.stringify(boundSymbolsForEdge(edge, context.callbackSymbols))} });`,
 	);
 	return JSON.stringify(`<span data-markless-csr-child="${index}"></span>`);
 }
@@ -208,8 +209,11 @@ function ssrComponentPropsSource(
 	return props;
 }
 
-export function componentEdgeGraphRoutes(edge: ComponentEdge | undefined) {
-	return (edge?.props ?? []).map((prop) =>
+export function componentEdgeGraphRoutes(
+	edge: ComponentEdge | undefined,
+	hasProjection = false,
+) {
+	const routes = (edge?.props ?? []).map((prop) =>
 		prop.kind === 'graph-reference'
 			? { name: prop.name, graphNodeId: prop.graphNodeId, path: prop.path }
 			: {
@@ -217,6 +221,19 @@ export function componentEdgeGraphRoutes(edge: ComponentEdge | undefined) {
 					kind: prop.kind === 'serializable' ? 'compiler-known-constant' : prop.kind,
 				},
 	);
+	return hasProjection && !routes.some((route) => route.name === 'children')
+		? [...routes, { name: 'children', kind: 'projection' }]
+		: routes;
+}
+
+function hasChildrenProjection(node: AnyNode): boolean {
+	if (
+		getElementAttributes(node).some(
+			(attribute) => getIdentifierName(attribute.name as AnyNode | undefined) === 'children',
+		)
+	)
+		return true;
+	return asNodes(node.children).some((child) => !isIgnorableTextNode(child));
 }
 
 function componentAttributePropSource(attribute: AnyNode, source: string): string[] {

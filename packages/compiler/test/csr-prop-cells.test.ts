@@ -103,6 +103,28 @@ export default function Page() @{
 	);
 });
 
+test('capture routes hand parent state through same-named child prop metadata in CSR and SSR', async () => {
+	const result = await compileTsrxModule({
+		filename: 'pages/state-prop-handoff.tsrx',
+		source: `import { state } from '@markless/core';
+
+function Library({ libraryOpen }) @{
+	<aside class={libraryOpen ? 'library active' : 'library'}>Songs</aside>
+}
+
+export default function Page() @{
+	let libraryOpen = state(false);
+	<main><Library libraryOpen={libraryOpen} /></main>
+}`,
+		symbols: [],
+	});
+	const graphProps =
+		'graphProps: [{"name":"libraryOpen","graphNodeId":"state:libraryOpen","path":[]}]';
+
+	expect(result.publicRenderModule.csrModuleSource).toContain(graphProps);
+	expect(result.publicRenderModule.ssrModuleSource).toContain(graphProps);
+});
+
 test('components without prop-dependent computeds do not import the graph remapper', async () => {
 	const result = await compileTsrxModule({
 		filename: 'pages/presentational-child.tsrx',

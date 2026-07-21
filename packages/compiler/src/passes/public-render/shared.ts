@@ -24,9 +24,16 @@ export function callbackSymbolIds(input: PublicRenderModuleInput): ReadonlyMap<s
 				: [],
 		),
 		...(input.captureAnalysis.boundResolverRows ?? []).flatMap((row) =>
-			row.componentEdgePath.map(
-				(edgeId) => [`bound:${edgeId}:${row.baseSymbolId}`, row.id] as const,
-			),
+			row.componentEdgePath.flatMap((edgeId) => {
+				const childSymbolId = row.loaderSymbolId
+					? input.captureAnalysis.extractedSymbols.find(
+							(symbol) => symbol.loaderSymbolId === row.loaderSymbolId,
+						)?.symbolId
+					: row.baseSymbolId;
+				return childSymbolId
+					? [[`bound:${edgeId}:${childSymbolId}`, row.id] as const]
+					: [];
+			}),
 		),
 	]);
 }
@@ -106,7 +113,7 @@ export function hasPropDependentComputed(input: PublicRenderModuleInput): boolea
 
 export function composedGraphProps(input: PublicRenderModuleInput) {
 	return input.semanticGraph.componentEdges.flatMap((edge) =>
-		edge.props.flatMap((prop) =>
+		componentEdgeWithCaptureRouteHandoff(input, edge).props.flatMap((prop) =>
 			prop.kind === 'graph-reference'
 				? [{ name: prop.name, graphNodeId: prop.graphNodeId, path: prop.path }]
 				: [],
@@ -172,9 +179,47 @@ export function componentEdgesFor(
 	input: PublicRenderModuleInput,
 	componentName: string,
 ): PublicRenderModuleInput['semanticGraph']['componentEdges'] {
-	return input.semanticGraph.componentEdges.filter(
-		(edge) => edge.parentComponentName === componentName,
-	);
+	return input.semanticGraph.componentEdges
+		.filter((edge) => edge.parentComponentName === componentName)
+		.map((edge) => componentEdgeWithCaptureRouteHandoff(input, edge));
+}
+
+// Capture analysis resolves a child prop through its concrete component edge.
+// Hand that route back to public rendering when the legacy semantic edge still
+// points at the child's whole-props cell, so CSR and SSR compose the instance
+// against the parent's live graph node.
+function componentEdgeWithCaptureRouteHandoff(
+	input: PublicRenderModuleInput,
+	edge: ComponentEdge,
+): ComponentEdge {
+	return {
+		...edge,
+		props: edge.props.map((prop) => {
+			if (prop.kind !== 'graph-reference') return prop;
+			for (const symbol of input.captureAnalysis.extractedSymbols) {
+				for (const slot of symbol.captureSlots) {
+					if (
+						slot.owner.componentName !== edge.childComponentName ||
+						slot.propName !== prop.name
+					)
+						continue;
+					const route = slot.routes.find(
+						(candidate) =>
+							candidate.kind === 'graph-reference' &&
+							candidate.componentEdgeId === edge.id,
+					);
+					if (!route || route.kind !== 'graph-reference') continue;
+					const pathLength = Math.max(0, route.path.length - slot.path.length);
+					return {
+						...prop,
+						graphNodeId: route.graphNodeId,
+						path: route.path.slice(0, pathLength),
+					};
+				}
+			}
+			return prop;
+		}),
+	};
 }
 
 function isTsrxComponentImport(importSource: string): boolean {
