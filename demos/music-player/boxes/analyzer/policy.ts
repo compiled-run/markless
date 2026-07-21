@@ -1,4 +1,4 @@
-export type MusicCsrFixtureId = 'csr-command-state' | 'csr-play-branch';
+export type MusicCsrFixtureId = 'csr-command-state' | 'csr-play-branch' | 'csr-library-toggle';
 
 export interface MusicCsrNetworkRule {
 	readonly method: 'GET';

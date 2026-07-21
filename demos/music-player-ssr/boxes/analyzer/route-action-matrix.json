@@ -50,6 +50,36 @@
 					"expectedRejectedBoundaryIds": [],
 					"reset": { "mode": "none" },
 					"navigates": false
+				},
+				{
+					"id": "open-library",
+					"fixtureUrlId": "player",
+					"safety": "safe",
+					"defaultCrawl": true,
+					"locator": { "kind": "css", "value": ".library-button" },
+					"operation": "click",
+					"expectedEventTypes": ["click"],
+					"expectedInteraction": "inline-resumer",
+					"apiContractIds": [],
+					"pendingPolicy": { "allow": false },
+					"expectedRejectedBoundaryIds": [],
+					"reset": { "mode": "none" },
+					"navigates": false
+				},
+				{
+					"id": "close-library",
+					"fixtureUrlId": "player",
+					"safety": "safe",
+					"defaultCrawl": true,
+					"locator": { "kind": "css", "value": ".library-button" },
+					"operation": "click",
+					"expectedEventTypes": ["click"],
+					"expectedInteraction": "inline-resumer",
+					"apiContractIds": [],
+					"pendingPolicy": { "allow": false },
+					"expectedRejectedBoundaryIds": [],
+					"reset": { "mode": "none" },
+					"navigates": false
 				}
 			],
 			"bootstrapPendingPolicy": { "allow": false },

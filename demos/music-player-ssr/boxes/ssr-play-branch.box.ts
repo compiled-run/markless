@@ -27,6 +27,8 @@ import { musicSsrAnalyzerPolicy } from './analyzer/policy.ts';
 // reuses the first (closed) server entry module and 404s.
 const PLAY_TOGGLE = '[aria-label="Play or pause"]';
 const PLAY_ICON = '.play .play-icon';
+const LIBRARY_BUTTON = '.library-button';
+const LIBRARY_PANEL = '.library';
 const PAUSED_ICON = '▶';
 const PLAYING_ICON = '❚❚';
 const WAIT = { timeoutMs: 10_000 };
@@ -157,6 +159,25 @@ export default box(
 			'm_qlgFQs7E4',
 			WAIT,
 		);
+
+		// Witness currently permits only one Nitro preview per run, so the
+		// library regression probe shares this box's resumed page. Unlike the
+		// button binding, the panel binding belongs to the composed Library child
+		// and turns red when a child-edge dom-update record is dropped.
+		await expect.page.attribute(page, LIBRARY_PANEL, 'class', 'library', WAIT);
+		await expect.page.attribute(page, LIBRARY_BUTTON, 'class', 'library-button', WAIT);
+		await page.click(LIBRARY_BUTTON, WAIT);
+		await expect.page.attribute(page, LIBRARY_PANEL, 'class', 'library active-library', WAIT);
+		await expect.page.attribute(page, LIBRARY_BUTTON, 'class', 'library-button active', WAIT);
+		await expect.page.computedStyle(
+			page,
+			LIBRARY_PANEL,
+			{ transform: 'matrix(1, 0, 0, 1, 0, 0)' },
+			WAIT,
+		);
+		await page.click(LIBRARY_BUTTON, WAIT);
+		await expect.page.attribute(page, LIBRARY_PANEL, 'class', 'library', WAIT);
+		await expect.page.attribute(page, LIBRARY_BUTTON, 'class', 'library-button', WAIT);
 		await expect.page.outcome(page, { consoleErrors: 0, failedRequests: 0 }, WAIT);
 		const requests = await page.networkRequests();
 		const fixtureOrigin = new URL(page.url).origin;
@@ -169,8 +190,11 @@ export default box(
 				// player internals are I2's jurisdiction (network rules below).
 				observedRequests: requests
 					.map((request, index) => ({
-						phase: index < actionStartIndex ? ('bootstrap' as const) : ('action' as const),
-						...(index < actionStartIndex ? {} : { actionId: 'play-pause-or-next' }),
+						phase:
+							index < actionStartIndex ? ('bootstrap' as const) : ('action' as const),
+						...(index < actionStartIndex
+							? {}
+							: { actionId: 'play-pause-next-or-library' }),
 						url: request.url,
 					}))
 					.filter((observation) => new URL(observation.url).origin === fixtureOrigin),
@@ -188,7 +212,9 @@ export default box(
 		}
 
 		await preview.close();
-		await receipt.capture('music-player ssr served the page and round-tripped the icon branch');
+		await receipt.capture(
+			'music-player ssr round-tripped the icon branch and library panel class',
+		);
 		await writeMusicSsrReceipt(analyzerResults);
 	},
 );
