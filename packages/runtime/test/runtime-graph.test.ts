@@ -1,5 +1,80 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { createRuntimeGraph } from '../src/index.ts';
+
+test('lazy cells initialize exactly once on the first read', async () => {
+	const initialize = vi.fn(() => 'stored');
+	const graph = createRuntimeGraph({
+		cells: [{ graphNodeId: 'storage:theme', value: 'fallback', readInitializer: initialize }],
+	});
+
+	expect(initialize).not.toHaveBeenCalled();
+	expect(graph.read('storage:theme')).toBe('stored');
+	expect(graph.read('storage:theme')).toBe('stored');
+	expect(initialize).toHaveBeenCalledOnce();
+	await graph.flush();
+});
+
+test('a throwing lazy cell initializer keeps its fallback and is not retried', () => {
+	const initialize = vi.fn(() => {
+		throw new Error('storage denied');
+	});
+	const graph = createRuntimeGraph({
+		cells: [{ graphNodeId: 'storage:theme', value: 'fallback', readInitializer: initialize }],
+	});
+
+	expect(graph.read('storage:theme')).toBe('fallback');
+	expect(graph.read('storage:theme')).toBe('fallback');
+	expect(initialize).toHaveBeenCalledOnce();
+});
+
+test('a lazy cell initialization notifies dependents like a graph write', async () => {
+	const values: unknown[] = [];
+	const graph = createRuntimeGraph({
+		cells: [
+			{
+				graphNodeId: 'storage:theme',
+				value: 'fallback',
+				readInitializer: () => 'stored',
+			},
+		],
+		computed: [
+			{
+				graphNodeId: 'computed:theme-label',
+				dependencies: [{ graphNodeId: 'storage:theme' }],
+				compute: (read) => `${read('storage:theme')}-label`,
+			},
+		],
+	});
+	graph.subscribe({
+		id: 'storage-observer',
+		graphNodeId: 'computed:theme-label',
+		run(value) {
+			values.push(value);
+		},
+	});
+
+	expect(graph.read('storage:theme')).toBe('stored');
+	await graph.flush();
+	expect(values).toEqual(['stored-label']);
+});
+
+test('ordinary cells keep their existing read and notification behavior', async () => {
+	const values: unknown[] = [];
+	const graph = createRuntimeGraph({
+		cells: [{ graphNodeId: 'state:theme', value: 'fallback' }],
+	});
+	graph.subscribe({
+		id: 'ordinary-observer',
+		graphNodeId: 'state:theme',
+		run(value) {
+			values.push(value);
+		},
+	});
+
+	expect(graph.read('state:theme')).toBe('fallback');
+	await graph.flush();
+	expect(values).toEqual([]);
+});
 
 test('runtime graph invalidates path subscribers and flushes concrete journal entries', async () => {
 	const graph = createRuntimeGraph({

@@ -423,6 +423,9 @@ importers:
       '@markless/compiler':
         specifier: workspace:*
         version: link:../compiler
+      '@markless/serializer':
+        specifier: workspace:*
+        version: link:../serializer
       '@markless/web':
         specifier: workspace:*
         version: link:../web

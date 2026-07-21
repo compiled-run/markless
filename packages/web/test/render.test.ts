@@ -3364,6 +3364,128 @@ test('renderToString emits compiled artifact head injections before the containe
 	expect(html.indexOf('/@vite/client')).toBeLessThan(html.indexOf('<div'));
 });
 
+test('renderToString keeps storage-free output byte-identical when seed metadata is absent', async () => {
+	const html = await renderToString(() => ({ html: '<main>Archive</main>' }));
+
+	expect(html).toBe('<div data-async-container><main>Archive</main></div>');
+});
+
+test('renderToString emits the immediate storage seed as the leading fragment and keeps storage-only payloads', async () => {
+	const html = await renderToString({
+		storageSeeds: [
+			{
+				slotKey: 'src/Settings.tsrx#theme-mode',
+				driverKey: 'theme-mode',
+				fallback: 'light',
+			},
+		],
+		renderSsr: () => ({
+			html: '<main>Settings</main>',
+			state: createProtocolStatePayload({
+				cells: [],
+				storage: [
+					{
+						graphNodeId: 'storage:src/Settings.tsrx#theme-mode',
+						key: 'theme-mode',
+					},
+				],
+			}),
+			view: staticView(),
+		}),
+	} as never);
+
+	expect(html).toMatch(/^<script>/);
+	const seed = html.slice(0, html.indexOf('</script>'));
+	expect(seed).toContain('Symbol.for("tsrx.storage/1")');
+	expect(seed).toContain('::mode');
+	expect(seed).toContain('immediate');
+	expect(seed).toContain('src/Settings.tsrx#theme-mode');
+	expect(seed).toContain('localStorage.getItem');
+	expect(seed).toContain("document.documentElement.setAttribute('data-'+");
+	expect(html.indexOf('</script>')).toBeLessThan(html.indexOf('<div data-async-container'));
+	expect(html).toContain('type="markless/state"');
+	expect(html).toContain('type="markless/view"');
+	expect(html).toContain('data-async-resumer');
+});
+
+test('renderToString deferred storage seeds use fallbacks without driver or attribute access', async () => {
+	const html = await renderToString(
+		{
+			storageSeeds: [
+				{
+					slotKey: 'src/Settings.tsrx#theme-mode',
+					driverKey: 'theme-mode',
+					fallback: 'light',
+				},
+			],
+			renderSsr: () => ({ html: '<main>Settings</main>' }),
+		} as never,
+		{ storageAccess: 'deferred' } as never,
+	);
+	const seed = html.slice(0, html.indexOf('</script>'));
+
+	expect(seed).toContain('src/Settings.tsrx#theme-mode');
+	expect(seed).toContain('light');
+	expect(seed).toContain('::mode');
+	expect(seed).toContain('deferred');
+	expect(seed).not.toContain('localStorage');
+	expect(seed).not.toContain('documentElement');
+	expect(seed).not.toContain('setAttribute');
+});
+
+test('renderToString applies the executable nonce to the storage seed', async () => {
+	const html = await renderToString(
+		{
+			storageSeeds: [
+				{
+					slotKey: 'src/Settings.tsrx#theme-mode',
+					driverKey: 'theme-mode',
+					fallback: 'light',
+				},
+			],
+			renderSsr: () => ({ html: '<main>Settings</main>' }),
+		} as never,
+		{ nonce: 'seed-nonce' },
+	);
+
+	expect(html).toMatch(/^<script nonce="seed-nonce">/);
+});
+
+test('the server transform carries reachable storage seeds as structured artifact metadata', async () => {
+	const transformed = await transformTsrxModule({
+		filename: 'src/Settings.tsrx',
+		source: `
+import { storage } from '@markless/core';
+export const theme = storage('theme-mode', 'light');
+export function Settings() @{
+	<main>{theme}</main>
+}
+`,
+		environment: 'server',
+		executionLog: 'never',
+	});
+
+	expect(transformed.code).toContain('storageSeeds:');
+	expect(transformed.code).toContain('"slotKey": "src/Settings.tsrx#theme-mode"');
+	expect(transformed.code).toContain('"driverKey": "theme-mode"');
+	expect(transformed.code).toContain('"fallback": "light"');
+	expect(transformed.code).not.toContain('localStorage.getItem');
+
+	const unused = await transformTsrxModule({
+		filename: 'src/UnusedSettings.tsrx',
+		source: `
+import { storage } from '@markless/core';
+export const theme = storage('theme-mode', 'light');
+export function Settings() @{
+	<main>Settings</main>
+}
+`,
+		environment: 'server',
+		executionLog: 'never',
+	});
+	expect(unused.code).not.toContain('storageSeeds:');
+});
+
 test('renderToString uses the compiled artifact resume module URL by default', async () => {
 	const resumeModuleUrl = createResumeModuleUrl('artifact-default');
 	const html = await renderToString({

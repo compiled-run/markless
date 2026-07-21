@@ -1,9 +1,14 @@
 import {
 	ASYNC_PROTOCOL_VERSION,
+	STORAGE_SLOT_MODE_DEFERRED,
+	STORAGE_SLOT_MODE_IMMEDIATE,
+	STORAGE_SLOT_MODE_KEY,
+	STORAGE_SLOT_SYMBOL_KEY,
 	type ProtocolSyncPolicy,
 	type ProtocolSyncPolicyCondition,
 	type ProtocolStatePayload,
 	type ProtocolViewPayload,
+	type StorageSeedMetadata,
 } from '@markless/serializer';
 import {
 	renderPayloadScripts,
@@ -29,6 +34,7 @@ export type SsrRenderOutput = {
 export type SsrRenderArtifact = {
 	readonly renderSsr: (props?: unknown) => SsrRenderOutput;
 	readonly headInjections?: ReadonlyArray<RenderHeadInjection>;
+	readonly storageSeeds?: ReadonlyArray<StorageSeedMetadata>;
 	readonly modulePreloads?: ReadonlyArray<ModulePreloadInput>;
 	readonly resumeModuleUrl?: string;
 	readonly executionLog?: MarklessExecutionLogMode;
@@ -49,6 +55,12 @@ export type RenderToStringOptions = {
 		| ((html: string) => ReadonlyArray<ModulePreloadInput> | undefined);
 	readonly inlineRuntimeRegistry?: Set<string>;
 	readonly executionLog?: MarklessExecutionLogMode;
+	/**
+	 * Controls whether the leading storage seed reads browser storage immediately.
+	 * Defaults to `immediate`. When storage metadata is present, the seed script is
+	 * the leading fragment returned by direct `renderToString` hosts.
+	 */
+	readonly storageAccess?: 'immediate' | 'deferred';
 	// Page props forwarded to the compiled renderSsr (router hosts).
 	readonly props?: unknown;
 };
@@ -143,8 +155,14 @@ export async function assembleSsrContainer(
 					selfWake,
 				)
 			: '';
+	const storageSeedScript = renderStorageSeedScript(
+		artifactStorageSeeds(component),
+		options.storageAccess ?? 'immediate',
+		options.nonce,
+	);
 
 	return [
+		storageSeedScript,
 		renderHeadInjections(artifactHeadInjections(component), options.nonce),
 		renderModulePreloadLinks(modulePreloads, options.nonce),
 		`<div${renderContainerAttributes(options.containerId)}>`,
@@ -195,6 +213,12 @@ function artifactHeadInjections(
 	return typeof component === 'object' ? component.headInjections : undefined;
 }
 
+function artifactStorageSeeds(
+	component: SsrRenderable,
+): ReadonlyArray<StorageSeedMetadata> | undefined {
+	return typeof component === 'object' ? component.storageSeeds : undefined;
+}
+
 function artifactExecutionLog(component: SsrRenderable): MarklessExecutionLogMode | undefined {
 	return typeof component === 'object' ? component.executionLog : undefined;
 }
@@ -214,6 +238,20 @@ function renderHeadInjections(
 		.filter((injection) => injection.location === 'head')
 		.map((injection) => renderHeadInjection(injection, nonce))
 		.join('');
+}
+
+function renderStorageSeedScript(
+	seeds: ReadonlyArray<StorageSeedMetadata> | undefined,
+	storageAccess: 'immediate' | 'deferred',
+	nonce: string | undefined,
+): string {
+	if (!seeds?.length) return '';
+	const nonceAttribute = nonce ? ` nonce="${escapeAttribute(nonce)}"` : '';
+	const source =
+		storageAccess === 'deferred'
+			? `(()=>{const s=globalThis[Symbol.for(${JSON.stringify(STORAGE_SLOT_SYMBOL_KEY)})]||={};s[${JSON.stringify(STORAGE_SLOT_MODE_KEY)}]=${JSON.stringify(STORAGE_SLOT_MODE_DEFERRED)};for(const[k,v]of ${JSON.stringify(seeds.map((seed) => [seed.slotKey, seed.fallback]))})s[k]=v})()`
+			: `(()=>{const s=globalThis[Symbol.for(${JSON.stringify(STORAGE_SLOT_SYMBOL_KEY)})]||={};s[${JSON.stringify(STORAGE_SLOT_MODE_KEY)}]=${JSON.stringify(STORAGE_SLOT_MODE_IMMEDIATE)};for(const[k,d,f]of ${JSON.stringify(seeds.map((seed) => [seed.slotKey, seed.driverKey, seed.fallback]))}){let v=f;try{v=localStorage.getItem(d)??f}catch{}s[k]=v;document.documentElement.setAttribute('data-'+d,v)}})()`;
+	return `<script${nonceAttribute}>${escapeInlineScript(source)}</script>`;
 }
 
 function renderHeadInjection(injection: RenderHeadInjection, nonce: string | undefined): string {
@@ -257,6 +295,7 @@ function renderModulePreloadLinks(
 
 function hasBrowserTriggers(view: ProtocolViewPayload, state: ProtocolStatePayload): boolean {
 	return (
+		(state.storage?.length ?? 0) > 0 ||
 		view.events.length > 0 ||
 		state.computed.some(
 			(computed) =>

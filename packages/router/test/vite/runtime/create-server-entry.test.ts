@@ -75,6 +75,33 @@ describe('server entry rendering', () => {
 		expect(body).not.toContain('rel="stylesheet"');
 	});
 
+	it('relocates the leading storage seed into the document head', async () => {
+		const entry = createServerEntry({
+			documentModuleLoader: undefined,
+			pageModuleLoaders: {
+				'pages/index.tsrx': async () => ({
+					default: page('<main>Settings</main>', {
+						storageSeeds: [
+							{
+								slotKey: 'pages/index.tsrx#theme-mode',
+								driverKey: 'theme-mode',
+								fallback: 'light',
+							},
+						],
+					}),
+				}),
+			},
+			routeFileIds: ['/pages/index.tsrx'],
+		});
+
+		const html = await (await entry.fetch(new Request('http://markless-router.test/'))).text();
+		const head = html.slice(0, html.indexOf('</head>'));
+		const body = html.slice(html.indexOf('<body>'));
+
+		expect(head).toContain('Symbol.for("tsrx.storage/1")');
+		expect(body).not.toContain('Symbol.for("tsrx.storage/1")');
+	});
+
 	it('rejects persisted client assets when server route discovery changed', () => {
 		expect(() =>
 			createServerEntry({
@@ -859,6 +886,11 @@ describe('server entry streaming (default)', () => {
 function page(
 	html: string,
 	payload: {
+		readonly storageSeeds?: readonly {
+			readonly slotKey: string;
+			readonly driverKey: string;
+			readonly fallback: string;
+		}[];
 		readonly headInjections?: readonly {
 			readonly tag: string;
 			readonly location: 'head' | 'body';
@@ -871,6 +903,7 @@ function page(
 ) {
 	return {
 		headInjections: payload.headInjections,
+		storageSeeds: payload.storageSeeds,
 		modulePreloads: payload.modulePreloads,
 		renderSsr() {
 			return { html, ...payload };

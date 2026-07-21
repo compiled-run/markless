@@ -2,6 +2,7 @@ import type { MarklessClientOutput, MarklessEnvironment } from './types.ts';
 import { MARKLESS_EXECUTION_LOG_MODULE_ID } from './execution-log.ts';
 import type { MarklessExecutionLogMode } from './types.ts';
 import type { InlineResumerSourceVariants } from '@markless/web/inline/resumer';
+import type { StorageSeedMetadata } from '@markless/serializer';
 
 export const MARKLESS_VIRTUAL_PREFIX = 'virtual:markless:';
 
@@ -115,6 +116,7 @@ export function emitSourceModule(input: {
 		readonly children?: string;
 		readonly location: 'head' | 'body';
 	}>;
+	readonly storageSeeds?: ReadonlyArray<StorageSeedMetadata>;
 	readonly executionLog?: MarklessExecutionLogMode;
 	readonly inlineResumerSources?: InlineResumerSourceVariants;
 	readonly needsFullResume?: boolean;
@@ -176,6 +178,7 @@ export function emitSourceModule(input: {
 					environment: input.environment,
 					executionLog: input.executionLog,
 					headInjections: input.headInjections,
+					storageSeeds: input.storageSeeds,
 					inlineResumerSources: input.inlineResumerSources,
 					resumeModuleUrl: input.resumeModuleUrl,
 					rootExportName: input.publicRenderRootExportName,
@@ -277,6 +280,7 @@ function emitCompiledAppDefault(input: {
 		readonly children?: string;
 		readonly location: 'head' | 'body';
 	}>;
+	readonly storageSeeds?: ReadonlyArray<StorageSeedMetadata>;
 	readonly resumeModuleUrl?: string;
 	readonly rootExportName: string | null;
 	readonly csrExportName: string | null;
@@ -308,6 +312,10 @@ function emitCompiledAppDefault(input: {
 		input.headInjections?.length && input.environment !== 'client'
 			? [`	headInjections: ${JSON.stringify(input.headInjections)},`]
 			: [];
+	const storageSeedEntry =
+		input.storageSeeds?.length && input.environment !== 'client'
+			? [`\tstorageSeeds: ${JSON.stringify(input.storageSeeds)},`]
+			: [];
 	const modulePreloadEntry =
 		input.resumeModuleUrl && input.environment === 'server'
 			? [
@@ -319,6 +327,7 @@ function emitCompiledAppDefault(input: {
 			? []
 			: [
 					...headInjectionEntry,
+					...storageSeedEntry,
 					...resumeModuleEntry,
 					...inlineResumerEntry,
 					...modulePreloadEntry,

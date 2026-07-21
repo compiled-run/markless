@@ -1,4 +1,4 @@
-import { ASYNC_PROTOCOL_VERSION } from '@markless/serializer';
+import { ASYNC_PROTOCOL_VERSION, createProtocolStatePayload } from '@markless/serializer';
 import { expect, test } from 'vitest';
 import { marklessSsrAttachSnapshots, marklessSsrRunAsyncComputed } from '../src/fns/ssr.ts';
 import { renderToStream } from '../src/render-to-stream.ts';
@@ -403,6 +403,36 @@ test('renderToStream flushes the pending shell and appends the settled arm out o
 	expect(chunk).toContain('__mArm("boundary:0")');
 	// The executor learns the resume module for post-commit wake triggers.
 	expect(chunk).toContain('/build/relay-resume.js');
+});
+
+test('renderToStream emits the same leading storage seed contract as renderToString', async () => {
+	const stream = await renderToStream({
+		storageSeeds: [
+			{
+				slotKey: 'src/StreamSettings.tsrx#contrast',
+				driverKey: 'contrast',
+				fallback: 'standard',
+			},
+		],
+		renderSsr: () => ({
+			html: '<main>Stream settings</main>',
+			state: createProtocolStatePayload({
+				cells: [],
+				storage: [
+					{
+						graphNodeId: 'storage:src/StreamSettings.tsrx#contrast',
+						key: 'contrast',
+					},
+				],
+			}),
+		}),
+	} as never);
+
+	expect(stream.shell).toMatch(/^<script>/);
+	expect(stream.shell).toContain('Symbol.for("tsrx.storage/1")');
+	expect(stream.shell.indexOf('</script>')).toBeLessThan(
+		stream.shell.indexOf('<div data-async-container'),
+	);
 });
 
 test('renderToStream renders inline when the runner beats the first-flush deadline', async () => {

@@ -26,6 +26,16 @@ export function createResumeRuntime(
 	prepared: ResumePreparedCore,
 ): ResumeRuntime {
 	const { elementsByHostId, elementHandles } = prepared;
+	let storagePlane: import('./storage-plane.ts').StoragePlane | undefined;
+	let storagePlanePromise: Promise<import('./storage-plane.ts').StoragePlane> | undefined;
+	const getStoragePlane = () =>
+		(storagePlanePromise ??= import('./storage-plane.ts').then(
+			(module) =>
+				(storagePlane = module.createStoragePlane({
+					graph: input.graph,
+					state: input.state,
+				})),
+		));
 	let disposed = false,
 		debugModule: typeof import('./debug-channel.ts') | undefined;
 	const debugRoot =
@@ -300,6 +310,7 @@ export function createResumeRuntime(
 		behaviorRuntime?.disconnect();
 		for (const hostNodeId of Array.from(elementsByHostId.keys())) disposeHost(hostNodeId);
 		for (const release of containerSubscriptionReleases.splice(0)) release();
+		storagePlane?.dispose();
 		if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__) {
 			const root = debugRoot?.deref();
 			if (root && debugModule) debugModule.__marklessDebugDisposeContainer(root);
@@ -325,6 +336,7 @@ export function createResumeRuntime(
 		return ids;
 	}
 	async function start(): Promise<void> {
+		await getStoragePlane();
 		settleTracker = await (
 			await import('./resume-runtime-start.ts')
 		).startResumeRuntime({
@@ -432,6 +444,7 @@ export function createResumeRuntime(
 	}
 	return {
 		start,
+		enableStorage: async () => (await getStoragePlane()).enableStorage(),
 		dispatch: async (event: ResumeDomEvent, options?: ResumeDispatchOptions) =>
 			(await getEvents()).dispatch(event, options),
 		activateBehaviors: async (hostNodeId: string) =>

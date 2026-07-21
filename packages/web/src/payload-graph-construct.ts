@@ -1,4 +1,10 @@
 import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer/protocol';
+import {
+	STORAGE_SLOT_MODE_DEFERRED,
+	STORAGE_SLOT_MODE_KEY,
+	STORAGE_SLOT_SYMBOL_KEY,
+	storageSlotEntryKeyFromGraphNodeId,
+} from '../../serializer/src/storage-slot.ts';
 import type { SerializedGraphPayload } from '../../serializer/src/value-decode-client.ts';
 import type { ResumeDomElement, ResumeRuntimeInput } from './resume.ts';
 
@@ -51,7 +57,7 @@ async function decodeStateCells(
 	payload: ProtocolStatePayload,
 	eventOnlyValues?: ReadonlyMap<string, unknown>,
 ) {
-	return Promise.all(
+	const cells = await Promise.all(
 		payload.cells.map(async (cell) => {
 			// CSR-mounted pages seed prop cells with live values that never
 			// crossed the HTML boundary — there is no serialized envelope to
@@ -69,6 +75,34 @@ async function decodeStateCells(
 			};
 		}),
 	);
+	const storage = payload.storage ?? [];
+	if (storage.length === 0) return cells;
+	const slot = storageSlot();
+	const deferred = slot?.[STORAGE_SLOT_MODE_KEY] === STORAGE_SLOT_MODE_DEFERRED;
+	return cells.map((cell) => {
+		const record = storage.find((entry) => entry.graphNodeId === cell.graphNodeId);
+		if (!record) return cell;
+		const slotKey = storageSlotEntryKeyFromGraphNodeId(record.graphNodeId);
+		if (slot && Object.hasOwn(slot, slotKey)) return { ...cell, value: slot[slotKey] };
+		if (slot || deferred) return cell;
+		const fallback = cell.value;
+		return {
+			...cell,
+			readInitializer() {
+				try {
+					return globalThis.localStorage.getItem(record.key) ?? fallback;
+				} catch {
+					return fallback;
+				}
+			},
+		};
+	});
+}
+
+function storageSlot(): Record<string, unknown> | undefined {
+	return (globalThis as typeof globalThis & Record<symbol, Record<string, unknown> | undefined>)[
+		Symbol.for(STORAGE_SLOT_SYMBOL_KEY)
+	];
 }
 
 function asyncComputedFromPayload(

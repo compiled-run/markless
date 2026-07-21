@@ -31,6 +31,7 @@ declare const __MARKLESS_DEBUG_ENABLED__: boolean;
 export type RuntimeGraphCell = {
 	readonly graphNodeId: string;
 	readonly value: unknown;
+	readonly readInitializer?: () => unknown;
 };
 
 export type RuntimeGraphRead = (graphNodeId: string, path?: ReadonlyArray<string>) => unknown;
@@ -213,6 +214,7 @@ type RuntimeSharedDefinition = NonNullable<ProtocolStatePayload['sharedDefinitio
 
 export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	const cells = new Map<string, unknown>();
+	const readInitializers = new Map<string, () => unknown>();
 	const computedNodes = createRuntimeComputedNodes(input.computed);
 	const asyncComputedNodes = createRuntimeAsyncComputedNodes(input.asyncComputed);
 	const subscriptions: RuntimeGraphSubscription[] = [];
@@ -225,6 +227,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 
 	for (const cell of input.cells) {
 		cells.set(cell.graphNodeId, cell.value);
+		if (cell.readInitializer) readInitializers.set(cell.graphNodeId, cell.readInitializer);
 	}
 
 	const readGraph: RuntimeGraphRead = (graphNodeId, path = []) => {
@@ -238,6 +241,20 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			return readAsyncComputedNode(asyncComputed, path, () =>
 				demandAsyncComputed(asyncComputed),
 			);
+		}
+
+		const initialize = readInitializers.get(graphNodeId);
+		if (initialize) {
+			readInitializers.delete(graphNodeId);
+			const current = cells.get(graphNodeId);
+			try {
+				const value = initialize();
+				if (!Object.is(current, value)) {
+					cells.set(graphNodeId, value);
+					markDirtyPath(graphNodeId, dirtyPathForGraphWrite(current, []));
+					scheduleFlush();
+				}
+			} catch {}
 		}
 
 		return readPath(cells.get(graphNodeId), path);

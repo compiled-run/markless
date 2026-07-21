@@ -68,6 +68,9 @@ export function createResumeRuntime(runtimeInput: ResumeRuntimeInput): ResumeRun
 		async start() {
 			await (await loadRuntime()).start();
 		},
+		async enableStorage() {
+			await (await loadRuntime()).enableStorage();
+		},
 		async dispatch(event: ResumeDomEvent, options?: ResumeDispatchOptions) {
 			if (!event) return;
 			await (await loadRuntime()).dispatch(event, options);

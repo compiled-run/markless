@@ -47,6 +47,7 @@ interface SsrArtifact {
 	readonly resumeModuleUrl?: string;
 	readonly inlineResumerSources?: SsrRenderArtifact['inlineResumerSources'];
 	readonly headInjections?: ReadonlyArray<RenderHeadInjection>;
+	readonly storageSeeds?: SsrRenderArtifact['storageSeeds'];
 }
 
 interface PageModule {
@@ -319,6 +320,7 @@ function routedPageArtifact(
 	return {
 		resumeModuleUrl: baseArtifact?.resumeModuleUrl,
 		inlineResumerSources: baseArtifact?.inlineResumerSources,
+		storageSeeds: baseArtifact?.storageSeeds,
 		...(headInjections.length > 0 ? { headInjections } : {}),
 		async renderSsr(renderProps?: unknown, renderContext?: unknown): Promise<RenderOutput> {
 			// Compiled marklessRenderSsr is async (initial render awaits demanded

@@ -226,6 +226,7 @@ export type ResumeDispatchOptions = {
 // duration). Optional: event-only containers never carry async boundaries.
 export type ResumeRuntime = {
 	readonly start: () => Promise<void>;
+	readonly enableStorage: () => Promise<void>;
 	readonly dispatch: (event: ResumeDomEvent, options?: ResumeDispatchOptions) => Promise<void>;
 	readonly activateBehaviors: (hostNodeId: string) => Promise<void>;
 	readonly getElement: (hostNodeId: string) => ResumeDomElement | undefined;

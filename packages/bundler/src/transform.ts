@@ -5,7 +5,11 @@ import {
 	type CompilerDiagnostic,
 	type RuntimeDemandMapArtifact,
 } from '@markless/compiler';
-import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer';
+import {
+	createStorageSeedMetadata,
+	type ProtocolStatePayload,
+	type ProtocolViewPayload,
+} from '@markless/serializer';
 import type {
 	MarklessTransformManifest,
 	MarklessVirtualModule,
@@ -193,6 +197,17 @@ export async function transformTsrxModule(
 				]
 			: []),
 	];
+	const storageSeeds = compiled.payloadArena.state.storage.map((storage) => {
+		const binding = compiled.semanticGraph.graphBindings.find(
+			(candidate) => candidate.id === storage.graphNodeId,
+		);
+		if (typeof binding?.initialValue !== 'string') {
+			throw new Error(
+				`MARKLESS_STORAGE_SEED_FALLBACK_MISSING: ${storage.graphNodeId} has no static string fallback.`,
+			);
+		}
+		return createStorageSeedMetadata(input.filename, storage.key, binding.initialValue);
+	});
 	return {
 		code:
 			styleImport +
@@ -205,6 +220,7 @@ export async function transformTsrxModule(
 					clientOutput: input.clientOutput ?? 'full',
 					executionLog: input.executionLog,
 					headInjections: headInjections.length > 0 ? headInjections : undefined,
+					storageSeeds: storageSeeds.length > 0 ? storageSeeds : undefined,
 					inlineResumerSources,
 					devResumeReexport: input.devResumeReexport === true,
 					needsFullResume: needsFullResume(
