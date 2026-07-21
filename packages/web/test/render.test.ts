@@ -2147,8 +2147,9 @@ export default function BranchPage() @{
 	let drawerOpen = state(false);
 	let region = state('west');
 	const roster = computed(async () => {
+		const zone = region;
 		await Promise.resolve();
-		return { zone: region, crews: [{ id: region + '-a' }, { id: region + '-b' }] };
+		return { zone, crews: [{ id: zone + '-a' }, { id: zone + '-b' }] };
 	});
 	<main>
 		<button data-region onClick={() => region = 'east'}>Region</button>
