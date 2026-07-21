@@ -622,12 +622,67 @@ export function App() @{
 	]);
 });
 
-test('compiler-known constant route construction rejects an undefined value', () => {
-	expect(() =>
-		createCompilerKnownConstantCaptureRoute('component-edge:missing', [], undefined),
-	).toThrow(
-		'Cannot construct compiler-known constant capture route without a materialized value',
+test('an imported update-only capture classifies an absent prop as undefined', async () => {
+	const child = await compileTsrxModule({
+		filename: 'src/OptionalFrame.tsrx',
+		source: `
+export function OptionalFrame({ info }) @{
+	@if (info) { <span>{info.owner.name}</span> }
+}
+`,
+		symbols: [],
+	});
+	const childUpdate = child.captureAnalysis.extractedSymbols.find(
+		(symbol) => symbol.kind === 'dom-update' && symbol.captureSlots[0]?.propName === 'info',
+	)!;
+	const parent = await compileTsrxModule({
+		filename: 'src/Page.tsrx',
+		source: `
+import { OptionalFrame } from './OptionalFrame.tsrx';
+
+export function Page() @{
+	<OptionalFrame />
+}
+`,
+		symbols: [
+			{
+				id: 'imported:OptionalFrame:symbol:0',
+				chunk: 'virtual:markless:symbol:OptionalFrame:0',
+				exportName: 'optionalFrameUpdate',
+				componentEdgeId: 'component-edge:0',
+				captureSymbol: childUpdate,
+			},
+		],
+	});
+	const imported = parent.captureAnalysis.extractedSymbols.find(
+		(symbol) => symbol.loaderSymbolId === 'imported:OptionalFrame:symbol:0',
 	);
+
+	expect(imported?.captureSlots).toEqual([
+		expect.objectContaining({
+			propName: 'info',
+			routes: [
+				expect.objectContaining({
+					kind: 'compiler-known-constant',
+					componentEdgeId: 'component-edge:0',
+					value: undefined,
+				}),
+			],
+		}),
+	]);
+	expect(parent.captureAnalysis.diagnostics).toEqual([]);
+	expect(parent.boundSymbolResolver.rows).toEqual([]);
+});
+
+test('compiler-known constant route construction preserves an undefined value', () => {
+	expect(
+		createCompilerKnownConstantCaptureRoute('component-edge:missing', [], undefined),
+	).toEqual({
+		kind: 'compiler-known-constant',
+		componentEdgeId: 'component-edge:missing',
+		componentEdgePath: [],
+		value: undefined,
+	});
 });
 
 test('capture slots resolve forwarded callback, graph, and constant routes through two edges', async () => {
