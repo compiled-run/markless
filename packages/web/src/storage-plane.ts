@@ -32,6 +32,17 @@ export function createStoragePlane(input: {
 		}),
 	);
 
+	// Immediate mode: trigger each storage cell's read initializer now, so the
+	// slot-seeded value is adopted into the graph and its dependents (the SSR
+	// text bindings) reconcile from the fallback to the seeded value. Without
+	// this the initializer only fires if some later read happens to touch the
+	// cell, and an SSR-rendered binding never re-reads on its own — the
+	// warm/write-remount bug. Reads go through the slot-backed initializer, so
+	// no extra driver read occurs.
+	if (enabled) {
+		for (const record of records) input.graph.read(record.graphNodeId);
+	}
+
 	return {
 		enableStorage() {
 			if (activated) return;

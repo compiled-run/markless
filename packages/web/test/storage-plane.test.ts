@@ -45,6 +45,42 @@ test('wake construction overrides storage fallbacks from the protocol slot', asy
 	expect(getItem).not.toHaveBeenCalled();
 });
 
+test('immediate warm mount reconciles a dependent from fallback to the seeded value', async () => {
+	// Reproduces the warm/write-remount browser failure at the graph level: the
+	// SSR text binding (a dependent subscriber) is created reading the fallback,
+	// and the slot-seeded value must reconcile it to 'dark' when the storage
+	// plane mounts — without an extra driver read.
+	(globalThis as typeof globalThis & Record<symbol, unknown>)[storageSlotSymbol] = {
+		'src/App.tsrx#theme-mode': 'dark',
+	};
+	const getItem = vi.fn();
+	const setItem = vi.fn();
+	const setAttribute = vi.fn();
+	vi.stubGlobal('localStorage', { getItem, setItem });
+	vi.stubGlobal('document', { documentElement: { setAttribute } });
+
+	const state = storageState();
+	const graph = await createRuntimeGraphFromStatePayload(state as never);
+
+	// A dependent that mirrors the SSR-rendered text binding: it captured the
+	// fallback at render time and updates only when the cell notifies.
+	const rendered: string[] = [];
+	graph.subscribe({
+		id: 'text:theme',
+		graphNodeId: 'storage:src/App.tsrx#theme-mode',
+		run(value) {
+			rendered.push(String(value));
+		},
+	});
+
+	createStoragePlane({ graph, state: state as never });
+	await graph.flush();
+
+	expect(rendered).toEqual(['dark']); // reconciled from fallback, exactly once
+	expect(graph.read('storage:src/App.tsrx#theme-mode')).toBe('dark');
+	expect(getItem).not.toHaveBeenCalled(); // adopted from slot, no extra driver read
+});
+
 test('an absent slot lazily reads storage once on the first graph read', async () => {
 	const getItem = vi.fn(() => 'dark');
 	vi.stubGlobal('localStorage', { getItem });
