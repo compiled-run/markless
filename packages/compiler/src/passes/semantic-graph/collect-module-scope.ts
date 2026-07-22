@@ -53,8 +53,14 @@ export function collectModuleScopeGraphCreation(statement: AnyNode, state: WalkS
 		}
 
 		if (frameworkApi === 'storage' && name && init) {
-			if (declaration.kind === 'const') {
-				collectStorageBinding({ name, id, init, state });
+			if (declaration.kind === 'let' || declaration.kind === 'const') {
+				collectStorageBinding({
+					name,
+					id,
+					init,
+					declarationKind: declaration.kind,
+					state,
+				});
 			}
 			continue;
 		}

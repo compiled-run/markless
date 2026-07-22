@@ -6,6 +6,7 @@ import {
 	type CsrRenderOptions,
 	type RenderTarget,
 } from '@markless/web';
+import type { SsrFixtureRenderOptions } from './ssr-plugin.ts';
 
 export type BrowserRenderElement = RenderTarget & {
 	innerHTML?: string;
@@ -81,8 +82,12 @@ export type SsrPhasedRenderResult = {
 // Marker rewritten by the testSSR() vitest plugin into the Node-side
 // commands.renderSSR RPC plus renderServerHTML(). Calling it untransformed
 // means the browser project is missing the plugin, so fail loudly.
-export function renderSSR(component: unknown): Promise<SsrRenderResult> {
+export function renderSSR(
+	component: unknown,
+	options?: SsrFixtureRenderOptions,
+): Promise<SsrRenderResult> {
 	void component;
+	void options;
 	throw new Error(
 		'renderSSR(Component) was not transformed. Add testSSR() from ' +
 			'@markless/vitest-browser/ssr-plugin to the browser test project plugins ' +
@@ -94,8 +99,12 @@ export function renderSSR(component: unknown): Promise<SsrRenderResult> {
 // Marker rewritten by testSSR() into the same Node-side render command as
 // renderSSR(), but leaves client mounting explicit so tests can reset
 // instrumentation between server render and browser load.
-export function renderSSRPhased(component: unknown): Promise<SsrPhasedRenderResult> {
+export function renderSSRPhased(
+	component: unknown,
+	options?: SsrFixtureRenderOptions,
+): Promise<SsrPhasedRenderResult> {
 	void component;
+	void options;
 	throw new Error(
 		'renderSSRPhased(Component) was not transformed. Add testSSR() from ' +
 			'@markless/vitest-browser/ssr-plugin to the browser test project plugins ' +
@@ -107,8 +116,12 @@ export function renderSSRPhased(component: unknown): Promise<SsrPhasedRenderResu
 // Marker rewritten by testSSR() into a Node-side renderToStream command. The
 // command returns only the first-flush shell and deliberately leaves stream
 // appends unconsumed so tests can model a connection that ended after flush.
-export function renderStreamShell(component: unknown): Promise<string> {
+export function renderStreamShell(
+	component: unknown,
+	options?: SsrFixtureRenderOptions,
+): Promise<string> {
 	void component;
+	void options;
 	throw new Error(
 		'renderStreamShell(Component) was not transformed. Add testSSR() from ' +
 			'@markless/vitest-browser/ssr-plugin to the browser test project plugins ' +

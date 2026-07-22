@@ -1,11 +1,12 @@
 import { expect, test } from 'vitest';
 import { buildSemanticGraph, compileTsrxModule } from '../src/index.ts';
 import { renderBodyLines } from '../src/passes/public-render/render-body.ts';
+import { lowerStateAccess } from '../src/passes/state-lowering.ts';
 
 const validStorageSource = `
 import { storage } from '@markless/core';
 
-export const theme = storage('theme-mode', 'light');
+export let theme = storage('theme-mode', 'light');
 
 export function App() @{
 	<p>{theme}</p>
@@ -23,7 +24,7 @@ test('semantic graph records module storage as writable state metadata', async (
 			id: 'storage:src/settings.tsrx#theme-mode',
 			name: 'theme',
 			kind: 'state',
-			declarationKind: 'const',
+			declarationKind: 'let',
 			writable: true,
 			valueKind: 'scalar',
 			initialValue: 'light',
@@ -41,6 +42,56 @@ test('semantic graph records module storage as writable state metadata', async (
 			kind: 'graph-binding',
 			bindingKind: 'state',
 		},
+	]);
+});
+
+test('semantic graph records const module storage as read-only state metadata', async () => {
+	const source = `
+import { storage } from '@markless/core';
+
+export const theme = storage('theme-mode', 'light');
+
+export function App() @{
+	<button onClick={() => theme = 'dark'}>{theme}</button>
+}
+`;
+	const graph = await buildSemanticGraph({
+		filename: 'src/const-settings.tsrx',
+		source,
+	});
+	const targetStart = source.indexOf("theme = 'dark'");
+
+	expect(graph.graphBindings).toEqual([
+		expect.objectContaining({
+			id: 'storage:src/const-settings.tsrx#theme-mode',
+			name: 'theme',
+			kind: 'state',
+			declarationKind: 'const',
+			writable: false,
+			valueKind: 'scalar',
+			initialValue: 'light',
+			storage: { key: 'theme-mode' },
+		}),
+	]);
+
+	const lowered = lowerStateAccess({ semanticGraph: graph });
+
+	expect(lowered.writes).toEqual([]);
+	expect(lowered.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_STATE_CONST_REASSIGNMENT',
+			severity: 'error',
+			phase: 'state-lowering',
+			passId: 'state-lowering',
+			artifactKeys: ['semanticGraph', 'stateLowering'],
+			title: 'Cannot reassign a const graph binding',
+			primarySpan: {
+				filename: 'src/const-settings.tsrx',
+				start: targetStart,
+				end: targetStart + 'theme'.length,
+			},
+			docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_CONST_REASSIGNMENT',
+		}),
 	]);
 });
 
@@ -135,7 +186,7 @@ test('public render lowering removes executable storage calls', async () => {
 		result.publicRenderModule.ssrModuleSource,
 	];
 	for (const emittedSource of emittedSources) expect(emittedSource).not.toContain('storage(');
-	expect(result.publicRenderModule.ssrModuleSource).toContain("const theme = 'light';");
+	expect(result.publicRenderModule.ssrModuleSource).toContain("let theme = 'light';");
 	expect(result.payloadArena.state.storage).toEqual([
 		{
 			graphNodeId: 'storage:src/settings.tsrx#theme-mode',

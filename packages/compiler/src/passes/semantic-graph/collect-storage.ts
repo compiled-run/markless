@@ -14,6 +14,7 @@ export function collectStorageBinding(input: {
 	readonly name: string;
 	readonly id: AnyNode | undefined;
 	readonly init: AnyNode;
+	readonly declarationKind: 'const' | 'let';
 	readonly state: WalkState;
 }): void {
 	const args = asNodes(input.init.arguments);
@@ -44,8 +45,8 @@ export function collectStorageBinding(input: {
 		id: storageGraphId(input.state.filename, key),
 		name: input.name,
 		kind: 'state',
-		declarationKind: 'const',
-		writable: true,
+		declarationKind: input.declarationKind,
+		writable: input.declarationKind === 'let',
 		valueKind: 'scalar',
 		initialValue: fallback,
 		initialValueKnown: true,

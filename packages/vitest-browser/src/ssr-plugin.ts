@@ -1,4 +1,4 @@
-import { renderToString, type SsrRenderable } from '@markless/web';
+import { renderToString, type RenderToStringOptions, type SsrRenderable } from '@markless/web';
 import { renderToStream } from '@markless/web/render-to-stream';
 import { dirname, isAbsolute, resolve } from 'pathe';
 import type { Plugin } from 'vite';
@@ -15,19 +15,20 @@ import type { BrowserCommand } from 'vitest/node';
 // v1 limitations (fail loudly instead of half-working):
 // - the component must be imported from a separate `.tsrx` module; local
 //   components declared inside the test file are not supported.
-// - props are not supported: `renderSSR(Component)` /
-//   `renderSSRPhased(Component)` / `renderStreamShell(Component)` only.
+// - props are not supported. The optional second argument is limited to the
+//   render options the browser fixture harness exposes.
 
 const TEST_FILE_ID = /\.[jt]s(?:[?#].*)?$/;
 const TSRX_MODULE = /\.tsrx$/;
 
 type SsrCommandResult = { readonly html: string };
 type StreamShellCommandResult = { readonly shell: string };
+export type SsrFixtureRenderOptions = Pick<RenderToStringOptions, 'nonce' | 'storageAccess'>;
 
 const renderSsrCommand: BrowserCommand<
-	[componentModulePath: string, exportName: string],
+	[componentModulePath: string, exportName: string, options?: SsrFixtureRenderOptions],
 	SsrCommandResult
-> = async (context, componentModulePath, exportName) => {
+> = async (context, componentModulePath, exportName, options) => {
 	// The browser server compiles the client modules the payload links to
 	// (resume module URL, symbol resolver virtual modules), so SSR must load
 	// the component through the same server for those URLs to stay live.
@@ -43,13 +44,13 @@ const renderSsrCommand: BrowserCommand<
 				`Available exports: ${Object.keys(moduleExports).join(', ')}`,
 		);
 	}
-	return { html: await renderToString(artifact, { executionLog: 'never' }) };
+	return { html: await renderToString(artifact, { ...options, executionLog: 'never' }) };
 };
 
 const renderStreamShellCommand: BrowserCommand<
-	[componentModulePath: string, exportName: string],
+	[componentModulePath: string, exportName: string, options?: SsrFixtureRenderOptions],
 	StreamShellCommandResult
-> = async (context, componentModulePath, exportName) => {
+> = async (context, componentModulePath, exportName, options) => {
 	const vite = context.project.browser?.vite ?? context.project.vite;
 	const moduleExports = (await vite.ssrLoadModule(componentModulePath)) as Record<
 		string,
@@ -62,7 +63,7 @@ const renderStreamShellCommand: BrowserCommand<
 				`Available exports: ${Object.keys(moduleExports).join(', ')}`,
 		);
 	}
-	const stream = await renderToStream(artifact, { executionLog: 'never' });
+	const stream = await renderToStream(artifact, { ...options, executionLog: 'never' });
 	return { shell: stream.shell };
 };
 
@@ -123,11 +124,12 @@ export function transformRenderSsrCalls(
 	let transformed = code;
 	for (const call of calls) {
 		const helperName = call[1]!;
-		const argument = call[2]!.trim();
-		if (argument.includes(',')) {
+		const argumentSource = call[2]!.trim();
+		const [argument, options, ...extraArguments] = splitCallArguments(argumentSource);
+		if (!argument || extraArguments.length > 0) {
 			throw new Error(
-				`${helperName}(${argument}) in ${id}: props are not supported yet. ` +
-					`v1 supports ${helperName}(Component) with no extra arguments.`,
+				`${helperName}(${argumentSource}) in ${id}: the fixture harness supports only ` +
+					'a component and optional render options.',
 			);
 		}
 		if (!/^[A-Za-z_$][\w$]*$/.test(argument)) {
@@ -153,7 +155,8 @@ export function transformRenderSsrCalls(
 			);
 		}
 		const commandName = helperName === 'renderStreamShell' ? 'renderStreamShell' : 'renderSSR';
-		const renderCall = ` const ssr = await __marklessSsrCommands.${commandName}(${JSON.stringify(componentModulePath)}, ${JSON.stringify(component.exportName)});`;
+		const renderOptions = options ? `, ${options}` : '';
+		const renderCall = ` const ssr = await __marklessSsrCommands.${commandName}(${JSON.stringify(componentModulePath)}, ${JSON.stringify(component.exportName)}${renderOptions});`;
 		const returnValue =
 			helperName === 'renderSSRPhased'
 				? ' return { html: ssr.html, mount(options) { return __marklessRenderServerHTML(ssr.html, options); } };'
@@ -170,6 +173,33 @@ export function transformRenderSsrCalls(
 		`import { commands as __marklessSsrCommands } from 'vitest/browser';\n` +
 		`import { renderServerHTML as __marklessRenderServerHTML } from ${JSON.stringify(marker.source)};\n`;
 	return { code: injectedImports + transformed, map: null };
+}
+
+function splitCallArguments(source: string): string[] {
+	const arguments_: string[] = [];
+	let start = 0;
+	let depth = 0;
+	let quote = '';
+	for (let index = 0; index < source.length; index++) {
+		const character = source[index]!;
+		if (quote) {
+			if (character === '\\') index++;
+			else if (character === quote) quote = '';
+			continue;
+		}
+		if (character === '"' || character === "'" || character === '`') {
+			quote = character;
+			continue;
+		}
+		if (character === '{' || character === '[' || character === '(') depth++;
+		else if (character === '}' || character === ']' || character === ')') depth--;
+		else if (character === ',' && depth === 0) {
+			arguments_.push(source.slice(start, index).trim());
+			start = index + 1;
+		}
+	}
+	arguments_.push(source.slice(start).trim());
+	return arguments_;
 }
 
 function collectImportedNames(code: string): Map<string, ImportedName> {

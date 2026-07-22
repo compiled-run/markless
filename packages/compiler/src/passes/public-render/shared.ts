@@ -81,7 +81,10 @@ function lowerModuleStorageDeclaration(
 	storageImports: ReadonlySet<string>,
 ): string {
 	const declarationSource = expressionSource(declaration, source);
-	if (declaration.type !== 'VariableDeclaration' || declaration.kind !== 'const') {
+	if (
+		declaration.type !== 'VariableDeclaration' ||
+		(declaration.kind !== 'const' && declaration.kind !== 'let')
+	) {
 		return declarationSource;
 	}
 	if (typeof declaration.start !== 'number') return declarationSource;

@@ -21,18 +21,33 @@ test('rewrites renderSSR(Component) into the browser command RPC', () => {
 	expect(result?.code).toContain('from "../src/index.ts"');
 });
 
+test('forwards supported render options through the browser command RPC', () => {
+	const code = [
+		"import { renderSSR } from '../src/index.ts';",
+		"import Settings from './fixtures/settings.tsrx';",
+		"const screen = await renderSSR(Settings, { storageAccess: 'deferred', nonce: 'test-nonce' });",
+	].join('\n');
+
+	const result = transformRenderSsrCalls(code, testFileId);
+	expect(result?.code).toContain(
+		`__marklessSsrCommands.renderSSR("/repo/packages/vitest-browser/browser/fixtures/settings.tsrx", "default", { storageAccess: 'deferred', nonce: 'test-nonce' })`,
+	);
+});
+
 test('leaves files without a renderSSR marker import untouched', () => {
 	const code = 'export function renderSSR(component: unknown) { return component; }';
 	expect(transformRenderSsrCalls(code, testFileId)).toBeNull();
 });
 
-test('rejects props until the v1 limitation is lifted', () => {
+test('rejects arguments beyond component and render options', () => {
 	const code = [
 		"import { renderSSR } from '../src/index.ts';",
 		"import Counter from './fixtures/counter.tsrx';",
-		'await renderSSR(Counter, { start: 2 });',
+		"await renderSSR(Counter, { storageAccess: 'deferred' }, { start: 2 });",
 	].join('\n');
-	expect(() => transformRenderSsrCalls(code, testFileId)).toThrowError(/props are not supported/);
+	expect(() => transformRenderSsrCalls(code, testFileId)).toThrowError(
+		/supports only a component and optional render options/,
+	);
 });
 
 test('rejects components that are not imported from a .tsrx module', () => {

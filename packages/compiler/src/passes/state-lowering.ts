@@ -182,6 +182,11 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 			continue;
 		}
 
+		if (isConstBindingReassignment(write, resolved.binding, resolved.path)) {
+			diagnostics.push(constBindingReassignmentDiagnostic(write));
+			continue;
+		}
+
 		if (!resolved.binding.writable) {
 			diagnostics.push(readOnlyWriteDiagnostic(write, resolved.binding));
 			continue;
@@ -200,11 +205,6 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 		}
 
 		if (isConstAliasReassignment(write, lookup.aliases)) {
-			diagnostics.push(constBindingReassignmentDiagnostic(write));
-			continue;
-		}
-
-		if (isConstBindingReassignment(write, resolved.binding, resolved.path)) {
 			diagnostics.push(constBindingReassignmentDiagnostic(write));
 			continue;
 		}
