@@ -83,7 +83,22 @@ async function decodeStateCells(
 		const record = storage.find((entry) => entry.graphNodeId === cell.graphNodeId);
 		if (!record) return cell;
 		const slotKey = storageSlotEntryKeyFromGraphNodeId(record.graphNodeId);
-		if (slot && Object.hasOwn(slot, slotKey)) return { ...cell, value: slot[slotKey] };
+		if (slot && Object.hasOwn(slot, slotKey)) {
+			// Keep the cell at its SSR fallback value so the mounted DOM matches;
+			// deliver the seeded value through a read initializer, which marks the
+			// cell dirty on first read and reconciles the SSR text to the seeded
+			// value. Reads from the slot (already populated by the seed script), so
+			// no extra driver read occurs. Setting cell.value directly would be
+			// Object.is-suppressed against the SSR-rendered text and never
+			// reconcile — the warm/write-remount bug.
+			const seeded = slot[slotKey];
+			return {
+				...cell,
+				readInitializer() {
+					return seeded;
+				},
+			};
+		}
 		if (slot || deferred) return cell;
 		const fallback = cell.value;
 		return {

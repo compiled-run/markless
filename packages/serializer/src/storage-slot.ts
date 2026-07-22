@@ -28,3 +28,19 @@ export function createStorageSeedMetadata(
 		fallback,
 	};
 }
+
+// The seed's slotKey MUST anchor to the same graphNodeId the wake-time override
+// (payload-graph-construct) derives its lookup key from — otherwise a warm slot
+// is written under one key and read under another, and the component silently
+// falls back. Derive it from the graphNodeId so they match by construction.
+export function createStorageSeedMetadataFromGraphNodeId(
+	graphNodeId: string,
+	driverKey: string,
+	fallback: string,
+): StorageSeedMetadata {
+	return {
+		slotKey: storageSlotEntryKeyFromGraphNodeId(graphNodeId),
+		driverKey,
+		fallback,
+	};
+}

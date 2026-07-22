@@ -6,7 +6,7 @@ import {
 	type RuntimeDemandMapArtifact,
 } from '@markless/compiler';
 import {
-	createStorageSeedMetadata,
+	createStorageSeedMetadataFromGraphNodeId,
 	type ProtocolStatePayload,
 	type ProtocolViewPayload,
 } from '@markless/serializer';
@@ -206,7 +206,11 @@ export async function transformTsrxModule(
 				`MARKLESS_STORAGE_SEED_FALLBACK_MISSING: ${storage.graphNodeId} has no static string fallback.`,
 			);
 		}
-		return createStorageSeedMetadata(input.filename, storage.key, binding.initialValue);
+		return createStorageSeedMetadataFromGraphNodeId(
+			storage.graphNodeId,
+			storage.key,
+			binding.initialValue,
+		);
 	});
 	return {
 		code:
