@@ -1,5 +1,4 @@
 import { afterEach, expect, test } from 'vitest';
-import { resumeFromPayloadDocument } from '@markless/web/resume';
 import { cleanup, renderSSRPhased, type SsrRenderResult } from '../src/index.ts';
 import StorageFixture from './fixtures/storage.tsrx';
 
@@ -97,42 +96,4 @@ test('storage writes update every plane and survive a fresh SSR mount', async ()
 	await expect.poll(() => themeValue(reloaded).textContent).toBe('dark');
 	expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
 	expect(localStorage.getItem('theme')).toBe('dark');
-});
-
-test('deferred storage waits for enableStorage and persists later writes', async () => {
-	localStorage.setItem('theme', 'dark');
-	const probe = installStorageReadProbe();
-	try {
-		const pending = await renderSSRPhased(StorageFixture, { storageAccess: 'deferred' });
-		const screen = pending.mount();
-
-		expect(probe.keys).toEqual([]);
-		expect(document.documentElement.hasAttribute('data-theme')).toBe(false);
-		expect(themeValue(screen).textContent).toBe('light');
-
-		await wake(screen);
-		expect(probe.keys).toEqual([]);
-		const root = required<HTMLElement>(screen.container, '[data-async-container]');
-		const resumed = await resumeFromPayloadDocument({
-			document: root,
-			root,
-			loadSymbol: () => {
-				throw new Error('The already-resumed container must retain its symbol loader.');
-			},
-		});
-		await resumed.runtime.enableStorage();
-
-		expect(probe.keys).toEqual(['theme']);
-		await expect.poll(() => themeValue(screen).textContent).toBe('dark');
-		expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
-
-		required<HTMLButtonElement>(screen.container, 'button[data-toggle]').click();
-		await expect.poll(() => themeValue(screen).textContent).toBe('light');
-		expect(document.documentElement.getAttribute('data-theme')).toBe('light');
-		expect(probe.keys).toEqual(['theme']);
-		probe.restore();
-		expect(localStorage.getItem('theme')).toBe('light');
-	} finally {
-		probe.restore();
-	}
 });

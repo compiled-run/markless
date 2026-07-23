@@ -3397,8 +3397,6 @@ test('renderToString emits the immediate storage seed as the leading fragment an
 	expect(html).toMatch(/^<script>/);
 	const seed = html.slice(0, html.indexOf('</script>'));
 	expect(seed).toContain('Symbol.for("tsrx.storage/1")');
-	expect(seed).toContain('::mode');
-	expect(seed).toContain('immediate');
 	expect(seed).toContain('src/Settings.tsrx#theme-mode');
 	expect(seed).toContain('localStorage.getItem');
 	expect(seed).toContain("document.documentElement.setAttribute('data-'+");
@@ -3406,31 +3404,6 @@ test('renderToString emits the immediate storage seed as the leading fragment an
 	expect(html).toContain('type="markless/state"');
 	expect(html).toContain('type="markless/view"');
 	expect(html).toContain('data-async-resumer');
-});
-
-test('renderToString deferred storage seeds use fallbacks without driver or attribute access', async () => {
-	const html = await renderToString(
-		{
-			storageSeeds: [
-				{
-					slotKey: 'src/Settings.tsrx#theme-mode',
-					driverKey: 'theme-mode',
-					fallback: 'light',
-				},
-			],
-			renderSsr: () => ({ html: '<main>Settings</main>' }),
-		} as never,
-		{ storageAccess: 'deferred' } as never,
-	);
-	const seed = html.slice(0, html.indexOf('</script>'));
-
-	expect(seed).toContain('src/Settings.tsrx#theme-mode');
-	expect(seed).toContain('light');
-	expect(seed).toContain('::mode');
-	expect(seed).toContain('deferred');
-	expect(seed).not.toContain('localStorage');
-	expect(seed).not.toContain('documentElement');
-	expect(seed).not.toContain('setAttribute');
 });
 
 test('renderToString applies the executable nonce to the storage seed', async () => {

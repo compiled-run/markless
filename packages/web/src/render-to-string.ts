@@ -1,8 +1,5 @@
 import {
 	ASYNC_PROTOCOL_VERSION,
-	STORAGE_SLOT_MODE_DEFERRED,
-	STORAGE_SLOT_MODE_IMMEDIATE,
-	STORAGE_SLOT_MODE_KEY,
 	STORAGE_SLOT_SYMBOL_KEY,
 	type ProtocolSyncPolicy,
 	type ProtocolSyncPolicyCondition,
@@ -55,12 +52,6 @@ export type RenderToStringOptions = {
 		| ((html: string) => ReadonlyArray<ModulePreloadInput> | undefined);
 	readonly inlineRuntimeRegistry?: Set<string>;
 	readonly executionLog?: MarklessExecutionLogMode;
-	/**
-	 * Controls whether the leading storage seed reads browser storage immediately.
-	 * Defaults to `immediate`. When storage metadata is present, the seed script is
-	 * the leading fragment returned by direct `renderToString` hosts.
-	 */
-	readonly storageAccess?: 'immediate' | 'deferred';
 	// Page props forwarded to the compiled renderSsr (router hosts).
 	readonly props?: unknown;
 };
@@ -155,11 +146,7 @@ export async function assembleSsrContainer(
 					selfWake,
 				)
 			: '';
-	const storageSeedScript = renderStorageSeedScript(
-		artifactStorageSeeds(component),
-		options.storageAccess ?? 'immediate',
-		options.nonce,
-	);
+	const storageSeedScript = renderStorageSeedScript(artifactStorageSeeds(component), options.nonce);
 
 	return [
 		storageSeedScript,
@@ -242,15 +229,14 @@ function renderHeadInjections(
 
 function renderStorageSeedScript(
 	seeds: ReadonlyArray<StorageSeedMetadata> | undefined,
-	storageAccess: 'immediate' | 'deferred',
 	nonce: string | undefined,
 ): string {
 	if (!seeds?.length) return '';
 	const nonceAttribute = nonce ? ` nonce="${escapeAttribute(nonce)}"` : '';
-	const source =
-		storageAccess === 'deferred'
-			? `(()=>{const s=globalThis[Symbol.for(${JSON.stringify(STORAGE_SLOT_SYMBOL_KEY)})]||={};s[${JSON.stringify(STORAGE_SLOT_MODE_KEY)}]=${JSON.stringify(STORAGE_SLOT_MODE_DEFERRED)};for(const[k,v]of ${JSON.stringify(seeds.map((seed) => [seed.slotKey, seed.fallback]))})s[k]=v})()`
-			: `(()=>{const s=globalThis[Symbol.for(${JSON.stringify(STORAGE_SLOT_SYMBOL_KEY)})]||={};s[${JSON.stringify(STORAGE_SLOT_MODE_KEY)}]=${JSON.stringify(STORAGE_SLOT_MODE_IMMEDIATE)};for(const[k,d,f]of ${JSON.stringify(seeds.map((seed) => [seed.slotKey, seed.driverKey, seed.fallback]))}){let v=f;try{v=localStorage.getItem(d)??f}catch{}s[k]=v;document.documentElement.setAttribute('data-'+d,v)}})()`;
+	// Leading-fragment seed: before the framework wakes, read each driver key
+	// (fallback on miss/throw), publish it into the landing slot the runtime
+	// consumes, and set the no-flash data attribute on <html>.
+	const source = `(()=>{const s=globalThis[Symbol.for(${JSON.stringify(STORAGE_SLOT_SYMBOL_KEY)})]||={};for(const[k,d,f]of ${JSON.stringify(seeds.map((seed) => [seed.slotKey, seed.driverKey, seed.fallback]))}){let v=f;try{v=localStorage.getItem(d)??f}catch{}s[k]=v;document.documentElement.setAttribute('data-'+d,v)}})()`;
 	return `<script${nonceAttribute}>${escapeInlineScript(source)}</script>`;
 }
 

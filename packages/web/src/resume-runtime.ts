@@ -444,7 +444,6 @@ export function createResumeRuntime(
 	}
 	return {
 		start,
-		enableStorage: async () => (await getStoragePlane()).enableStorage(),
 		dispatch: async (event: ResumeDomEvent, options?: ResumeDispatchOptions) =>
 			(await getEvents()).dispatch(event, options),
 		activateBehaviors: async (hostNodeId: string) =>

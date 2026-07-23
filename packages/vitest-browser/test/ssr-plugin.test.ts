@@ -25,12 +25,12 @@ test('forwards supported render options through the browser command RPC', () => 
 	const code = [
 		"import { renderSSR } from '../src/index.ts';",
 		"import Settings from './fixtures/settings.tsrx';",
-		"const screen = await renderSSR(Settings, { storageAccess: 'deferred', nonce: 'test-nonce' });",
+		"const screen = await renderSSR(Settings, { nonce: 'test-nonce' });",
 	].join('\n');
 
 	const result = transformRenderSsrCalls(code, testFileId);
 	expect(result?.code).toContain(
-		`__marklessSsrCommands.renderSSR("/repo/packages/vitest-browser/browser/fixtures/settings.tsrx", "default", { storageAccess: 'deferred', nonce: 'test-nonce' })`,
+		`__marklessSsrCommands.renderSSR("/repo/packages/vitest-browser/browser/fixtures/settings.tsrx", "default", { nonce: 'test-nonce' })`,
 	);
 });
 
@@ -43,7 +43,7 @@ test('rejects arguments beyond component and render options', () => {
 	const code = [
 		"import { renderSSR } from '../src/index.ts';",
 		"import Counter from './fixtures/counter.tsrx';",
-		"await renderSSR(Counter, { storageAccess: 'deferred' }, { start: 2 });",
+		"await renderSSR(Counter, { nonce: 'test-nonce' }, { start: 2 });",
 	].join('\n');
 	expect(() => transformRenderSsrCalls(code, testFileId)).toThrowError(
 		/supports only a component and optional render options/,

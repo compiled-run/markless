@@ -1,7 +1,4 @@
 export const STORAGE_SLOT_SYMBOL_KEY = 'tsrx.storage/1';
-export const STORAGE_SLOT_MODE_KEY = '::mode';
-export const STORAGE_SLOT_MODE_IMMEDIATE = 'immediate';
-export const STORAGE_SLOT_MODE_DEFERRED = 'deferred';
 
 export type StorageSeedMetadata = {
 	readonly slotKey: string;

@@ -23,7 +23,7 @@ const TSRX_MODULE = /\.tsrx$/;
 
 type SsrCommandResult = { readonly html: string };
 type StreamShellCommandResult = { readonly shell: string };
-export type SsrFixtureRenderOptions = Pick<RenderToStringOptions, 'nonce' | 'storageAccess'>;
+export type SsrFixtureRenderOptions = Pick<RenderToStringOptions, 'nonce'>;
 
 const renderSsrCommand: BrowserCommand<
 	[componentModulePath: string, exportName: string, options?: SsrFixtureRenderOptions],

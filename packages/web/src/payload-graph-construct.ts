@@ -1,7 +1,5 @@
 import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer/protocol';
 import {
-	STORAGE_SLOT_MODE_DEFERRED,
-	STORAGE_SLOT_MODE_KEY,
 	STORAGE_SLOT_SYMBOL_KEY,
 	storageSlotEntryKeyFromGraphNodeId,
 } from '../../serializer/src/storage-slot.ts';
@@ -78,7 +76,6 @@ async function decodeStateCells(
 	const storage = payload.storage ?? [];
 	if (storage.length === 0) return cells;
 	const slot = storageSlot();
-	const deferred = slot?.[STORAGE_SLOT_MODE_KEY] === STORAGE_SLOT_MODE_DEFERRED;
 	return cells.map((cell) => {
 		const record = storage.find((entry) => entry.graphNodeId === cell.graphNodeId);
 		if (!record) return cell;
@@ -99,7 +96,7 @@ async function decodeStateCells(
 				},
 			};
 		}
-		if (slot || deferred) return cell;
+		if (slot) return cell;
 		const fallback = cell.value;
 		return {
 			...cell,

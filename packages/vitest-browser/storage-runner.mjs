@@ -32,24 +32,12 @@ const vite = await createServer({
 
 vite.middlewares.use(async (req, res, next) => {
 	const url = (req.url || '/').split('?')[0];
-	if (url !== '/' && url !== '/deferred') return next();
+	if (url !== '/') return next();
 	try {
 		const mod = await vite.ssrLoadModule(fixture);
 		const artifact = mod.default ?? mod.App;
-		const storageAccess = url === '/deferred' ? 'deferred' : 'immediate';
-		const body = await renderToString(artifact, { storageAccess, executionLog: 'never' });
-		let html =
-			`<!doctype html><html><head></head><body>${body}` +
-			`<script type="module">` +
-			`import { resumeFromPayloadDocument } from '@markless/web/resume';` +
-			`window.__enableStorage = async () => {` +
-			`  const el = document.querySelector('[data-async-container]');` +
-			`  const resumed = await resumeFromPayloadDocument({ document: el, root: el, loadSymbol: () => { throw new Error('already resumed'); } });` +
-			`  await resumed.runtime.enableStorage();` +
-			`};` +
-			`window.__enableStorageReady = true;` +
-			`</script></body></html>`;
-		html = await vite.transformIndexHtml(url, html);
+		const body = await renderToString(artifact, { executionLog: 'never' });
+		let html = await vite.transformIndexHtml(url, `<!doctype html><html><head></head><body>${body}</body></html>`);
 		res.setHeader('content-type', 'text/html');
 		res.end(html);
 	} catch (error) {
@@ -141,23 +129,6 @@ try {
 		await pollThemeText(page, 'dark');
 		assert.equal(await dataTheme(page), 'dark', 'attr after remount');
 		assert.equal(await page.evaluate(() => localStorage.getItem('theme')), 'dark', 'localStorage after remount');
-	});
-
-	// 4. deferred: zero reads until enableStorage(), then exactly-once read + patch + persist.
-	await testCase('deferred storage waits for enableStorage and persists later writes', async (page) => {
-		await page.addInitScript(SEED_DARK);
-		await page.addInitScript(PROBE_INIT);
-		await page.goto(`${origin}/deferred`, { waitUntil: 'load' });
-		await page.waitForFunction(() => window.__enableStorageReady === true, null, { timeout: 10_000 });
-		assert.deepEqual(await page.evaluate(() => window.__getItemKeys), [], 'no reads before enableStorage');
-		assert.equal(await page.evaluate(() => document.documentElement.hasAttribute('data-theme')), false, 'no data-theme before enable');
-		assert.equal(await themeText(page), 'light', 'fallback before enable');
-		await wake(page);
-		assert.deepEqual(await page.evaluate(() => window.__getItemKeys), [], 'still no reads after wake');
-		await page.evaluate(() => window.__enableStorage());
-		await pollThemeText(page, 'dark');
-		assert.deepEqual(await page.evaluate(() => window.__getItemKeys), ['theme'], 'exactly one read on enable');
-		assert.equal(await dataTheme(page), 'dark', 'attr after enable');
 	});
 } finally {
 	await browser.close();
