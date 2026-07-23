@@ -1,3 +1,4 @@
+import { storageAttributeName } from '../../serializer/src/storage-slot.ts';
 import type { ProtocolStatePayload } from '@markless/serializer/protocol';
 import type { RuntimeGraph } from '@markless/runtime';
 
@@ -40,6 +41,6 @@ export function createStoragePlane(input: {
 
 function setStorageAttribute(key: string, value: unknown): void {
 	try {
-		globalThis.document.documentElement.setAttribute(`data-${key}`, String(value));
+		globalThis.document.documentElement.setAttribute(storageAttributeName(key), String(value));
 	} catch {}
 }

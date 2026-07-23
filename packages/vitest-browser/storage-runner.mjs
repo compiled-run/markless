@@ -19,7 +19,10 @@ import { renderToString } from '@markless/web';
 import { chromium } from 'playwright';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
-const fixture = path.join(root, 'browser/fixtures/storage.tsrx');
+const fixtures = {
+	'/': path.join(root, 'browser/fixtures/storage.tsrx'), // explicit key 'theme'
+	'/derived': path.join(root, 'browser/fixtures/storage-derived.tsrx'), // derived key markless:theme
+};
 
 const vite = await createServer({
 	configFile: false,
@@ -32,7 +35,8 @@ const vite = await createServer({
 
 vite.middlewares.use(async (req, res, next) => {
 	const url = (req.url || '/').split('?')[0];
-	if (url !== '/') return next();
+	const fixture = fixtures[url];
+	if (!fixture) return next();
 	try {
 		const mod = await vite.ssrLoadModule(fixture);
 		const artifact = mod.default ?? mod.App;
@@ -129,6 +133,30 @@ try {
 		await pollThemeText(page, 'dark');
 		assert.equal(await dataTheme(page), 'dark', 'attr after remount');
 		assert.equal(await page.evaluate(() => localStorage.getItem('theme')), 'dark', 'localStorage after remount');
+	});
+
+	// 4. derived key: storage('light') -> localStorage key markless:theme + sanitized attr data-markless-theme.
+	await testCase('derived key uses markless:<identifier> and a sanitized data attribute', async (page) => {
+		await page.goto(`${origin}/derived`, { waitUntil: 'load' });
+		await page.waitForSelector('output[data-theme-value]');
+		assert.equal(await page.getAttribute('html', 'data-markless-theme'), 'light', 'derived cold attr');
+		assert.equal(await themeText(page), 'light', 'derived cold value');
+		await page.click('button[data-toggle]');
+		await pollThemeText(page, 'dark');
+		assert.equal(await page.getAttribute('html', 'data-markless-theme'), 'dark', 'derived attr after toggle');
+		assert.equal(await page.evaluate(() => localStorage.getItem('markless:theme')), 'dark', 'derived localStorage key');
+		assert.equal(await page.evaluate(() => localStorage.getItem('theme')), null, 'no unprefixed key written');
+	});
+
+	// 5. derived warm: a stored markless:theme value seeds the no-flash attr before
+	// wake, and the component adopts it on wake (mirrors the explicit warm case).
+	await testCase('derived key adopts a warm markless:theme value', async (page) => {
+		await page.addInitScript(`try { localStorage.setItem('markless:theme', 'dark'); } catch {}`);
+		await page.goto(`${origin}/derived`, { waitUntil: 'load' });
+		await page.waitForSelector('output[data-theme-value]');
+		assert.equal(await page.getAttribute('html', 'data-markless-theme'), 'dark', 'derived warm attr at first paint');
+		await wake(page);
+		await pollThemeText(page, 'dark');
 	});
 } finally {
 	await browser.close();

@@ -1,6 +1,7 @@
 import {
 	ASYNC_PROTOCOL_VERSION,
 	STORAGE_SLOT_SYMBOL_KEY,
+	storageAttributeName,
 	type ProtocolSyncPolicy,
 	type ProtocolSyncPolicyCondition,
 	type ProtocolStatePayload,
@@ -235,8 +236,9 @@ function renderStorageSeedScript(
 	const nonceAttribute = nonce ? ` nonce="${escapeAttribute(nonce)}"` : '';
 	// Leading-fragment seed: before the framework wakes, read each driver key
 	// (fallback on miss/throw), publish it into the landing slot the runtime
-	// consumes, and set the no-flash data attribute on <html>.
-	const source = `(()=>{const s=globalThis[Symbol.for(${JSON.stringify(STORAGE_SLOT_SYMBOL_KEY)})]||={};for(const[k,d,f]of ${JSON.stringify(seeds.map((seed) => [seed.slotKey, seed.driverKey, seed.fallback]))}){let v=f;try{v=localStorage.getItem(d)??f}catch{}s[k]=v;document.documentElement.setAttribute('data-'+d,v)}})()`;
+	// consumes, and set the no-flash data attribute on <html>. The attribute name
+	// is precomputed (sanitized) so a derived markless:<key> becomes data-markless-<key>.
+	const source = `(()=>{const s=globalThis[Symbol.for(${JSON.stringify(STORAGE_SLOT_SYMBOL_KEY)})]||={};for(const[k,d,a,f]of ${JSON.stringify(seeds.map((seed) => [seed.slotKey, seed.driverKey, storageAttributeName(seed.driverKey), seed.fallback]))}){let v=f;try{v=localStorage.getItem(d)??f}catch{}s[k]=v;document.documentElement.setAttribute(a,v)}})()`;
 	return `<script${nonceAttribute}>${escapeInlineScript(source)}</script>`;
 }
 

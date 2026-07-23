@@ -113,10 +113,18 @@ test('the browser decoder accepts storage protocol version 2', () => {
 	});
 
 	expect(decodeClientPayloadScripts(rendered).state.version).toBe(2);
+	// A derived markless:<identifier> key (with a colon) decodes fine.
+	expect(
+		decodeClientPayloadScripts({
+			...rendered,
+			stateScript: rendered.stateScript.replace('"theme-mode"', '"markless:theme"'),
+		}).state.version,
+	).toBe(2);
+	// A structurally invalid key (whitespace) is still rejected.
 	expect(() =>
 		decodeClientPayloadScripts({
 			...rendered,
-			stateScript: rendered.stateScript.replace('"theme-mode"', '"Theme_mode"'),
+			stateScript: rendered.stateScript.replace('"theme-mode"', '"theme mode"'),
 		}),
 	).toThrow(/invalid storage record/);
 	expect(() =>

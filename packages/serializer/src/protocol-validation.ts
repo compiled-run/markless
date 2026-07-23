@@ -4,6 +4,7 @@ import {
 	type ProtocolStatePayload,
 	type ProtocolViewPayload,
 } from './protocol.ts';
+import { isValidStorageKey } from './storage-slot.ts';
 
 export type EncodedPayloadScripts = {
 	readonly stateScript: string;
@@ -277,10 +278,10 @@ function assertStorageRecords(payload: Record<string, unknown>): void {
 				`Invalid ${context}: graphNodeId must match a state cell.`,
 			);
 		}
-		if (!/^[a-z][a-z0-9-]*$/.test(entry.key as string)) {
+		if (!isValidStorageKey(entry.key as string)) {
 			throw invalidPayloadShapeError(
 				'markless/state',
-				`Invalid ${context}: key must match /^[a-z][a-z0-9-]*$/.`,
+				`Invalid ${context}: key must be a verbatim key or a derived markless:<identifier>.`,
 			);
 		}
 	}

@@ -84,7 +84,7 @@ test.each([
 	},
 	{
 		name: 'invalid key',
-		storage: [{ graphNodeId: 'storage:src/App.tsrx#theme-mode', key: 'Theme_mode' }],
+		storage: [{ graphNodeId: 'storage:src/App.tsrx#theme-mode', key: 'theme mode' }],
 	},
 ])('version 2 rejects $name storage metadata', ({ storage }) => {
 	const state = {

@@ -1,3 +1,4 @@
+import { isValidStorageKey } from './storage-slot.ts';
 import type { ProtocolStatePayload, ProtocolViewPayload } from './protocol.ts';
 const ASYNC_PROTOCOL_VERSION = 1;
 export type EncodedPayloadScripts = { readonly stateScript: string; readonly viewScript: string };
@@ -80,7 +81,7 @@ function baseState(value: unknown): asserts value is ProtocolStatePayload {
 			const record = obj(entry, context);
 			if (
 				typeof record.key !== 'string' ||
-				!/^[a-z][a-z0-9-]*$/.test(record.key) ||
+				!isValidStorageKey(record.key) ||
 				!cells.some(
 					(cell) => (cell as Record<string, unknown>).graphNodeId === record.graphNodeId,
 				)

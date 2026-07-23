@@ -134,14 +134,65 @@ test('compile entry accepts additional framework API import sources', async () =
 	]);
 });
 
+test('storage derives markless:<identifier> when the key is omitted', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/settings.tsrx',
+		source: `import { storage } from '@markless/core';\nexport let theme = storage('light');\nexport function App() @{ <p>{theme}</p> }`,
+	});
+
+	expect(graph.graphBindings).toEqual([
+		expect.objectContaining({
+			id: 'storage:src/settings.tsrx#markless:theme',
+			name: 'theme',
+			kind: 'state',
+			writable: true,
+			initialValue: 'light',
+			storage: { key: 'markless:theme' },
+		}),
+	]);
+	expect(graph.diagnostics).toEqual([]);
+});
+
+test('storage keeps an explicit key verbatim, including non-kebab characters', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/settings.tsrx',
+		source: `import { storage } from '@markless/core';\nexport let theme = storage('Theme_mode', 'light');\nexport function App() @{ <p>{theme}</p> }`,
+	});
+
+	expect(graph.graphBindings).toEqual([
+		expect.objectContaining({
+			id: 'storage:src/settings.tsrx#Theme_mode',
+			storage: { key: 'Theme_mode' },
+			initialValue: 'light',
+		}),
+	]);
+	expect(graph.diagnostics).toEqual([]);
+});
+
+test('derived storage bakes a stable literal key and lowers the executable call', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/settings.tsrx',
+		source: `import { storage } from '@markless/core';\nexport let theme = storage('light');\nexport function App() @{ <p>{theme}</p> }`,
+		symbols: [],
+	});
+
+	for (const emittedSource of [
+		result.publicRenderModule.moduleSource,
+		result.publicRenderModule.csrModuleSource,
+		result.publicRenderModule.ssrModuleSource,
+	]) {
+		expect(emittedSource).not.toContain('storage(');
+	}
+	expect(result.publicRenderModule.ssrModuleSource).toContain("let theme = 'light';");
+	expect(result.payloadArena.state.storage).toEqual([
+		{ graphNodeId: 'storage:src/settings.tsrx#markless:theme', key: 'markless:theme' },
+	]);
+});
+
 test.each([
 	{
 		name: 'dynamic key',
 		declaration: "const theme = storage(key, 'light');",
-	},
-	{
-		name: 'invalid key characters',
-		declaration: "const theme = storage('Theme_mode', 'light');",
 	},
 	{
 		name: 'dynamic fallback',

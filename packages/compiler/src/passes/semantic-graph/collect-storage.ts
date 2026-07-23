@@ -4,10 +4,14 @@ import type { SemanticGraphBinding } from '../../artifacts.ts';
 import { storageKeyStaticDiagnostic } from './diagnostics.ts';
 import type { WalkState } from './types.ts';
 
-const storageKeyPattern = /^[a-z][a-z0-9-]*$/;
-
-export function isStorageKey(value: string): boolean {
-	return storageKeyPattern.test(value);
+// storage(fallback) derives the persistence key from the binding identifier,
+// namespaced (markless:<name>) so cross-module keys never collide by accident.
+// storage(key, fallback) uses the explicit key VERBATIM — the escape hatch for
+// interop with an existing store or deliberate cross-module sharing. The derived
+// key is a compile-time literal baked from the AUTHORED identifier, so it is
+// stable and never depends on a minified runtime name.
+export function derivedStorageKey(identifier: string): string {
+	return `markless:${identifier}`;
 }
 
 export function collectStorageBinding(input: {
@@ -18,9 +22,12 @@ export function collectStorageBinding(input: {
 	readonly state: WalkState;
 }): void {
 	const args = asNodes(input.init.arguments);
-	const key = stringLiteral(args[0]);
-	const fallback = stringLiteral(args[1]);
-	if (key === null || !isStorageKey(key)) {
+	const explicit = args.length >= 2;
+	// Derived keys are never null; an explicit non-literal key falls through to
+	// the static-key diagnostic below.
+	const key = explicit ? stringLiteral(args[0]) : derivedStorageKey(input.name);
+	const fallback = explicit ? stringLiteral(args[1]) : stringLiteral(args[0]);
+	if (key === null) {
 		input.state.graph.diagnostics.push(
 			storageKeyStaticDiagnostic({
 				argument: 'key',

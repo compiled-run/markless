@@ -3399,7 +3399,8 @@ test('renderToString emits the immediate storage seed as the leading fragment an
 	expect(seed).toContain('Symbol.for("tsrx.storage/1")');
 	expect(seed).toContain('src/Settings.tsrx#theme-mode');
 	expect(seed).toContain('localStorage.getItem');
-	expect(seed).toContain("document.documentElement.setAttribute('data-'+");
+	expect(seed).toContain('document.documentElement.setAttribute(a,v)');
+	expect(seed).toContain('"data-theme-mode"');
 	expect(html.indexOf('</script>')).toBeLessThan(html.indexOf('<div data-async-container'));
 	expect(html).toContain('type="markless/state"');
 	expect(html).toContain('type="markless/view"');

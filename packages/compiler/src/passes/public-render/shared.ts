@@ -9,7 +9,6 @@ import {
 	getElementTagName,
 	isHostTagName,
 } from '../../ast/tsrx.ts';
-import { isStorageKey } from '../semantic-graph/collect-storage.ts';
 import type { ComponentEdge } from './types.ts';
 
 export function isComponentRoot(root: AnyNode): boolean {
@@ -94,13 +93,14 @@ function lowerModuleStorageDeclaration(
 		if (init?.type !== 'CallExpression') return [];
 		const callName = getIdentifierName(init.callee as AnyNode | undefined);
 		if (!callName || !storageImports.has(callName)) return [];
+		// storage(fallback) — derived key, single arg is the fallback.
+		// storage(key, fallback) — explicit verbatim key, second arg is the fallback.
 		const args = asNodes(init.arguments);
-		const key = args[0];
-		const fallback = args[1];
+		const explicit = args.length >= 2;
+		const key = explicit ? args[0] : undefined;
+		const fallback = explicit ? args[1] : args[0];
 		if (
-			key?.type !== 'Literal' ||
-			typeof key.value !== 'string' ||
-			!isStorageKey(key.value) ||
+			(explicit && (key?.type !== 'Literal' || typeof key.value !== 'string')) ||
 			fallback?.type !== 'Literal' ||
 			typeof fallback.value !== 'string' ||
 			typeof init.start !== 'number' ||
