@@ -4,8 +4,9 @@ Use this file as the guidance for the installed `@markless/core` version in the 
 
 ## Authoring
 
-- Import the public authoring APIs (`state`, `computed`, `element`, and `shared`) from `@markless/core`. Keep reactive component authoring in `.tsrx` files.
+- Import the public authoring APIs (`state`, `computed`, `element`, `shared`, and `storage`) from `@markless/core`. Keep reactive component authoring in `.tsrx` files.
 - Declare mutable state with `state(...)`, derived values with `computed(...)`, and update state with ordinary assignment. Do not introduce hooks, an effects system, or a client component rerender path.
+- Persist reactive state with `storage(fallback)`. It reads and writes like ordinary state — reading the binding returns the value; assigning to it persists to `localStorage` (v1: strings only) and sets a `data-<key>` attribute on `<html>` for no-flash CSS. The compiler seeds the value before the framework wakes, so first paint is correct with no double read. By default the persistence key is **derived from the binding identifier**, namespaced: `let theme = storage('light')` persists under `markless:theme` (attr `data-markless-theme`). The derived key is a stable compile-time literal, so minification never changes it — but **renaming the binding changes the key and orphans existing users' saved data**. For anything you ship to real users, **pin an explicit key**, which is used verbatim and is rename-proof: `let theme = storage('theme', 'light')` persists under `theme`. Use derived keys for local/prototype state; pin explicit keys for durable user data. (A build-time rename-drift guard that warns when a derived key disappears is a planned fast-follow — see the framework's storage-ergonomics notes.)
 - Use `element()` handles and `attach` behaviors for element lifetime work. Return cleanup from an attachment when it owns resources.
 - Treat event arguments as native events. Inspect `event.target`; a deferred handler must not depend on `event.currentTarget` remaining populated.
 - Prefer build diagnostics over guesses. If the compiler rejects an authored shape, change that shape instead of suppressing the gate.
