@@ -10,6 +10,51 @@ everything else.
 
 This file starts at 0.2.0. Earlier versions have no changelog entries.
 
+## 0.2.1
+
+A type-only fix. No runtime behavior changes, and no code that worked on 0.2.0
+stops working.
+
+### `storage()` accepts one argument, as documented
+
+0.2.0 shipped a contradiction inside the `@markless/core` tarball. The type
+declaration required two arguments:
+
+```ts
+declare function storage(key: string, fallback: string): string;
+```
+
+while `agent/markless.md`, in that same tarball, documented the one-argument
+form:
+
+```tsx
+let theme = storage('light'); // persists under markless:theme
+```
+
+The compiler has always accepted the one-argument form, so the code compiled and
+ran correctly and your editor put a red line under it anyway. That was
+especially unhelpful for AI agents, since `agent/markless.md` exists precisely to
+tell them how to use the framework, and it was telling them to write something
+the types rejected.
+
+`storage()` is now declared as two overloads:
+
+```ts
+export function storage(fallback: string): string;
+export function storage(key: string, fallback: string): string;
+```
+
+Arity is what distinguishes them. With one argument, that argument is the
+fallback and the storage key is derived from the binding name. With two, the
+first is an explicit key. This mirrors what the compiler already did.
+
+An optional second parameter would have been wrong here: `storage(key,
+fallback?)` types a lone argument as a *key*, which is the opposite of what the
+compiler does with it.
+
+Nothing else changed. The two-argument form, the derived-key behavior, the
+persistence format, and every other package are untouched.
+
 ## 0.2.0
 
 The first release since 0.1.1 (published 8 July 2026). Nothing was removed: no

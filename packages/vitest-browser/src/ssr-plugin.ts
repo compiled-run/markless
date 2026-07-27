@@ -67,6 +67,25 @@ const renderStreamShellCommand: BrowserCommand<
 	return { shell: stream.shell };
 };
 
+// Types for the browser commands testSSR() registers above. This block lives
+// inside a pack ENTRY on purpose: a standalone ambient .d.ts is not an entry and
+// is dropped by the build, which is why these types never reached consumers.
+// An inline `declare module` in an entry survives into the emitted .d.ts.
+declare module 'vitest/browser' {
+	export interface BrowserCommands {
+		renderSSR(
+			componentModulePath: string,
+			exportName: string,
+			options?: SsrFixtureRenderOptions,
+		): Promise<{ readonly html: string }>;
+		renderStreamShell(
+			componentModulePath: string,
+			exportName: string,
+			options?: SsrFixtureRenderOptions,
+		): Promise<{ readonly shell: string }>;
+	}
+}
+
 export function testSSR(): Plugin {
 	return {
 		name: 'markless:vitest-ssr-transform',
