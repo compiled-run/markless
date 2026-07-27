@@ -27,17 +27,10 @@ export function createResumeRuntime(
 ): ResumeRuntime {
 	const { elementsByHostId, elementHandles } = prepared;
 	let storagePlane: import('./storage-plane.ts').StoragePlane | undefined;
-	let storagePlanePromise: Promise<import('./storage-plane.ts').StoragePlane> | undefined;
-	// Load gate — contract documented in storage-plane.ts.
+	// Load gate — contract documented in storage-plane.ts. The plane is created
+	// exactly once, from start(); `storagePlane` is its own idempotence guard, so
+	// no memoised promise is needed.
 	const hasStorageCells = (input.state?.storage?.length ?? 0) > 0;
-	const getStoragePlane = () =>
-		(storagePlanePromise ??= import('./storage-plane.ts').then(
-			(module) =>
-				(storagePlane = module.createStoragePlane({
-					graph: input.graph,
-					state: input.state,
-				})),
-		));
 	let disposed = false,
 		debugModule: typeof import('./debug-channel.ts') | undefined;
 	const debugRoot =
@@ -338,7 +331,11 @@ export function createResumeRuntime(
 		return ids;
 	}
 	async function start(): Promise<void> {
-		if (hasStorageCells) await getStoragePlane();
+		if (hasStorageCells && !storagePlane)
+			storagePlane = (await import('./storage-plane.ts')).createStoragePlane({
+				graph: input.graph,
+				state: input.state,
+			});
 		settleTracker = await (
 			await import('./resume-runtime-start.ts')
 		).startResumeRuntime({

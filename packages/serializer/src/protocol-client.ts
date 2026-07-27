@@ -1,4 +1,4 @@
-import { isValidStorageKey } from './storage-slot.ts';
+import { isValidStorageKey } from './storage-key.ts';
 import type { ProtocolStatePayload, ProtocolViewPayload } from './protocol.ts';
 const ASYNC_PROTOCOL_VERSION = 1;
 export type EncodedPayloadScripts = { readonly stateScript: string; readonly viewScript: string };

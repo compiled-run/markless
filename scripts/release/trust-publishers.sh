@@ -6,8 +6,9 @@
 # with no credential at all and npm generates a provenance attestation for each
 # package automatically.
 #
-#   pnpm release:trust           # attach
-#   pnpm release:trust --check   # report current state, change nothing
+#   pnpm release:trust                    # attach for every release package
+#   pnpm release:trust --only <name>      # just one, e.g. @markless/vitest-browser
+#   pnpm release:trust --check            # report current state, change nothing
 #
 # npm's 2FA window is a few minutes, long enough to do all of them in one go.
 #
@@ -19,7 +20,18 @@ set -u
 
 WORKFLOW="release.yml"
 CHECK=0
-[ "${1:-}" = "--check" ] && CHECK=1
+ONLY=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --check) CHECK=1 ;;
+    # Attaching one package should not mean sitting through a 409 and a rate-limit
+    # sleep for every already-configured one. This is the path you want right after
+    # bootstrapping a single new name.
+    --only) shift; ONLY="${1:-}"; [ -z "$ONLY" ] && { echo "--only needs a package name" >&2; exit 1; } ;;
+    *) echo "unknown argument: $1" >&2; exit 1 ;;
+  esac
+  shift
+done
 
 cd "$(dirname "$0")/../.." || exit 1
 
@@ -51,6 +63,18 @@ NAMES=$(node -e '
 if [ -z "$NAMES" ]; then
   echo "no release packages found" >&2
   exit 1
+fi
+
+if [ -n "$ONLY" ]; then
+  # Validate against the derived set rather than trusting the argument, so a typo
+  # cannot quietly register nothing and report success.
+  if ! printf '%s\n' "$NAMES" | grep -qxF "$ONLY"; then
+    echo "not a release package: $ONLY" >&2
+    echo "known:" >&2
+    printf '%s\n' "$NAMES" | sed 's/^/  /' >&2
+    exit 1
+  fi
+  NAMES="$ONLY"
 fi
 
 if ! npm whoami >/dev/null 2>&1; then

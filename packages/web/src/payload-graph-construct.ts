@@ -1,8 +1,4 @@
 import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer/protocol';
-import {
-	STORAGE_SLOT_SYMBOL_KEY,
-	storageSlotEntryKeyFromGraphNodeId,
-} from '../../serializer/src/storage-slot.ts';
 import type { SerializedGraphPayload } from '../../serializer/src/value-decode-client.ts';
 import type { ResumeDomElement, ResumeRuntimeInput } from './resume.ts';
 
@@ -75,46 +71,10 @@ async function decodeStateCells(
 	);
 	const storage = payload.storage ?? [];
 	if (storage.length === 0) return cells;
-	const slot = storageSlot();
-	return cells.map((cell) => {
-		const record = storage.find((entry) => entry.graphNodeId === cell.graphNodeId);
-		if (!record) return cell;
-		const slotKey = storageSlotEntryKeyFromGraphNodeId(record.graphNodeId);
-		if (slot && Object.hasOwn(slot, slotKey)) {
-			// Keep the cell at its SSR fallback value so the mounted DOM matches;
-			// deliver the seeded value through a read initializer, which marks the
-			// cell dirty on first read and reconciles the SSR text to the seeded
-			// value. Reads from the slot (already populated by the seed script), so
-			// no extra driver read occurs. Setting cell.value directly would be
-			// Object.is-suppressed against the SSR-rendered text and never
-			// reconcile — the warm/write-remount bug.
-			const seeded = slot[slotKey];
-			return {
-				...cell,
-				readInitializer() {
-					return seeded;
-				},
-			};
-		}
-		if (slot) return cell;
-		const fallback = cell.value;
-		return {
-			...cell,
-			readInitializer() {
-				try {
-					return globalThis.localStorage.getItem(record.key) ?? fallback;
-				} catch {
-					return fallback;
-				}
-			},
-		};
-	});
-}
-
-function storageSlot(): Record<string, unknown> | undefined {
-	return (globalThis as typeof globalThis & Record<symbol, Record<string, unknown> | undefined>)[
-		Symbol.for(STORAGE_SLOT_SYMBOL_KEY)
-	];
+	// Storage-free pages must carry none of the storage surface: the slot-override
+	// pass lives in the demand-loaded storage plane, behind the same emptiness
+	// signal the resume runtime's `hasStorageCells` gate reads.
+	return (await import('./storage-plane.ts')).applyStorageReadInitializers(cells, storage);
 }
 
 function asyncComputedFromPayload(

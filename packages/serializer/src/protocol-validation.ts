@@ -4,7 +4,7 @@ import {
 	type ProtocolStatePayload,
 	type ProtocolViewPayload,
 } from './protocol.ts';
-import { isValidStorageKey } from './storage-slot.ts';
+import { isValidStorageKey } from './storage-key.ts';
 
 export type EncodedPayloadScripts = {
 	readonly stateScript: string;

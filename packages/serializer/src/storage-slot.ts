@@ -1,3 +1,5 @@
+export { isValidStorageKey } from './storage-key.ts';
+
 export const STORAGE_SLOT_SYMBOL_KEY = 'tsrx.storage/1';
 
 // The no-flash <html> attribute name for a driver key. Derived keys contain a
@@ -7,17 +9,6 @@ export const STORAGE_SLOT_SYMBOL_KEY = 'tsrx.storage/1';
 // so both write the same attribute.
 export function storageAttributeName(driverKey: string): string {
 	return `data-${driverKey.replace(/[^A-Za-z0-9-]+/g, '-')}`;
-}
-
-// A storage key is either an author's verbatim explicit key or a derived
-// markless:<identifier>. Permissive but structurally safe: letters, digits, and
-// $ _ : . - only (no whitespace, quotes, brackets, or control characters). The
-// colon admits the markless: namespace; the resume decoder uses this to reject
-// malformed payloads.
-const STORAGE_KEY_PATTERN = /^[A-Za-z0-9$_:.-]+$/;
-
-export function isValidStorageKey(value: string): boolean {
-	return STORAGE_KEY_PATTERN.test(value);
 }
 
 export type StorageSeedMetadata = {
