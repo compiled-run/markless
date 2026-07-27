@@ -13,8 +13,9 @@ export function App() @{
 	const exhibitLabel = computed(async () => {
 		const runs = ((globalThis as any).__syncHopRuns ||= { sample: 0, label: 0 });
 		runs.label++;
+		const caption = catalogCard.caption;
 		await Promise.resolve();
-		return { text: 'Exhibit ' + catalogCard.caption };
+		return { text: 'Exhibit ' + caption };
 	});
 
 	<section>

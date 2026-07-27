@@ -10,7 +10,7 @@ import {
 	stateWriteInTemplateDiagnostic,
 	templateAsValueDiagnostic,
 } from './diagnostics.ts';
-import type { WalkState } from './types.ts';
+import type { DeferredComputedWrite, WalkState } from './types.ts';
 
 export function collectAssignment(node: AnyNode, state: WalkState): void {
 	const target = unwrapChainExpression(node.left as AnyNode | undefined);
@@ -261,8 +261,14 @@ function diagnoseBannedWriteSite(node: AnyNode, target: AnyNode, state: WalkStat
 	};
 
 	if (state.currentCreationSite === 'computed') {
-		state.graph.diagnostics.push(stateWriteInComputedDiagnostic(diagnosticInput));
-		return true;
+		// The rule bans writing *graph state* from a derive, because that is the
+		// self-waking cycle. Writing a local accumulator or a plain object that
+		// happens to live inside the derive is ordinary JavaScript. Whether the
+		// target is graph state can depend on a binding declared later in the
+		// component body, so the decision is deferred to a post-walk pass that
+		// sees the finished graph.
+		deferComputedWrite(target, diagnosticInput, state);
+		return false;
 	}
 
 	if (state.currentHostNodeId && state.currentTextTarget) {
@@ -271,6 +277,85 @@ function diagnoseBannedWriteSite(node: AnyNode, target: AnyNode, state: WalkStat
 	}
 
 	return false;
+}
+
+function deferComputedWrite(
+	target: AnyNode,
+	diagnosticInput: DeferredComputedWrite['diagnosticInput'],
+	state: WalkState,
+): void {
+	const targetSource = expressionSource(target, state.source);
+	const rootName = graphPathRootName(targetSource);
+	// A name declared inside the derive shadows any graph binding of the same
+	// name, so it can never be the graph cell.
+	if (!rootName || state.computedBodyLocalNames?.has(rootName)) return;
+
+	state.deferredComputedWrites.push({
+		writeIndex: state.graph.stateWrites.length,
+		targetSource,
+		diagnosticInput,
+		sharedDefinitionId: state.currentSharedDefinitionId,
+		componentName: state.currentComponentName,
+	});
+}
+
+// Post-walk decision for every write recorded inside a computed body. Only a
+// target that resolves to a graph binding (state, computed, shared, or prop) is
+// the self-waking cycle the rule exists to stop; the recorded write for such a
+// target is dropped so downstream passes never lower a banned write.
+export function collectComputedWriteDiagnostics(state: WalkState): void {
+	if (state.deferredComputedWrites.length === 0) return;
+
+	const bannedWriteIndexes = new Set<number>();
+	for (const candidate of state.deferredComputedWrites) {
+		const resolved = resolveGraphPath(
+			candidate.targetSource,
+			graphBindingMap(state.graph, candidate.sharedDefinitionId, candidate.componentName),
+			semanticAliasMap(state.graph, candidate.sharedDefinitionId, candidate.componentName),
+		);
+		if (!resolved) continue;
+		state.graph.diagnostics.push(stateWriteInComputedDiagnostic(candidate.diagnosticInput));
+		bannedWriteIndexes.add(candidate.writeIndex);
+	}
+
+	if (bannedWriteIndexes.size === 0) return;
+	const kept = state.graph.stateWrites.filter((_, index) => !bannedWriteIndexes.has(index));
+	state.graph.stateWrites.length = 0;
+	state.graph.stateWrites.push(...kept);
+}
+
+export function graphPathRootName(source: string): string | null {
+	if (!source) return null;
+	return /^[$A-Z_a-z][$\w]*/.exec(source)?.[0] ?? null;
+}
+
+// Every name a derive body binds itself: its own parameters, and any
+// declaration at any depth inside it. Collected conservatively — an extra name
+// only means one fewer diagnostic, never a wrong one.
+export function declaredBindingNamesDeep(node: AnyNode | undefined): Set<string> {
+	const names = new Set<string>();
+	const visit = (current: AnyNode | undefined): void => {
+		if (!current) return;
+		if (
+			current.type === 'ArrowFunctionExpression' ||
+			current.type === 'FunctionExpression' ||
+			current.type === 'FunctionDeclaration'
+		) {
+			for (const name of bindingNames(current.id as AnyNode | undefined)) names.add(name);
+			for (const parameter of asNodes(current.params)) {
+				for (const name of bindingNames(parameter)) names.add(name);
+			}
+		} else if (current.type === 'VariableDeclaration') {
+			for (const name of declarationBindingNames(current)) names.add(name);
+		} else if (current.type === 'ClassDeclaration' || current.type === 'ClassExpression') {
+			for (const name of bindingNames(current.id as AnyNode | undefined)) names.add(name);
+		} else if (current.type === 'CatchClause') {
+			for (const name of bindingNames(current.param as AnyNode | undefined)) names.add(name);
+		}
+		for (const child of childNodes(current)) visit(child);
+	};
+	visit(node);
+	return names;
 }
 
 function unwrapChainExpression(node: AnyNode | undefined): AnyNode | undefined {

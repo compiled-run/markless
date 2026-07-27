@@ -669,6 +669,100 @@ test('buildSemanticGraph reports state writes inside computed derives', async ()
 	]);
 });
 
+test('buildSemanticGraph allows non-graph writes inside computed derives', async () => {
+	const localAccumulator = await buildSemanticGraph({
+		filename: 'src/ComputedLocalWrite.tsrx',
+		source: `
+import { state, computed } from '@markless/core';
+
+export function App() @{
+	const items = state([1, 2, 3]);
+	const total = computed(() => {
+		let sum = 0;
+		for (const item of items) {
+			sum += item;
+		}
+		return sum;
+	});
+
+	<p>{total}</p>
+}
+`,
+	});
+
+	expect(localAccumulator.diagnostics).toEqual([]);
+
+	const globalObjectWrite = await buildSemanticGraph({
+		filename: 'src/ComputedGlobalWrite.tsrx',
+		source: `
+import { state, computed } from '@markless/core';
+
+export function App() @{
+	const glaze = state('cobalt');
+	const gauge = computed(() => {
+		const runs = ((globalThis as any).__runs ||= { gauge: 0 });
+		runs.gauge++;
+		return glaze + '-fired';
+	});
+
+	<p>{gauge}</p>
+}
+`,
+	});
+
+	expect(globalObjectWrite.diagnostics).toEqual([]);
+});
+
+test('buildSemanticGraph reports a computed write to graph state declared after the derive', async () => {
+	const source = `
+import { state, computed } from '@markless/core';
+
+export function App() @{
+	const label = computed(() => {
+		count++;
+		return 'seen ' + count;
+	});
+	let count = state(0);
+
+	<p>{label}</p>
+}
+`;
+	const graph = await buildSemanticGraph({ filename: 'src/ComputedLateWrite.tsrx', source });
+
+	expect(
+		graph.diagnostics.map((diagnostic) => ({
+			code: diagnostic.code,
+			statePath: diagnostic.statePath,
+		})),
+	).toEqual([{ code: 'MARKLESS_STATE_WRITE_IN_COMPUTED', statePath: 'count' }]);
+	expect(graph.stateWrites.map((write) => write.target)).not.toContain('count');
+});
+
+test('buildSemanticGraph does not report a computed write to a local that shadows graph state', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/ComputedShadowedWrite.tsrx',
+		source: `
+import { state, computed } from '@markless/core';
+
+export function App() @{
+	let count = state(0);
+	const items = state([1, 2, 3]);
+	const label = computed(() => {
+		let count = 0;
+		for (const item of items) {
+			count += item;
+		}
+		return 'total ' + count;
+	});
+
+	<p>{label}</p>
+}
+`,
+	});
+
+	expect(graph.diagnostics).toEqual([]);
+});
+
 test('buildSemanticGraph reports unextractable synchronous event policy', async () => {
 	const graph = await buildSemanticGraph({
 		filename: 'src/Form.tsrx',
@@ -839,6 +933,82 @@ test('buildSemanticGraph reports reactive reads after await in async computed bo
 			}),
 		]),
 	);
+});
+
+test('buildSemanticGraph allows post-await reads of a local snapshotted before the await', async () => {
+	// Two derives snapshot the same graph state into a local of the same name.
+	// Aliases are keyed by name for the whole module, so the second body used to
+	// resolve its own local back to the graph binding and report a post-await
+	// graph read — for the very pattern this diagnostic prescribes.
+	const graph = await buildSemanticGraph({
+		filename: 'src/Quarry.tsrx',
+		source: `
+import { state, computed } from '@markless/core';
+
+export function App() @{
+	let stratum = state('amber');
+	const shale = computed(async () => {
+		const sample = stratum;
+		await Promise.resolve();
+		return { texture: sample + '-rough' };
+	});
+	const crystal = computed(async () => {
+		const sample = stratum;
+		await Promise.resolve();
+		return { clarity: sample + '-clear' };
+	});
+
+	@try {
+		<p>{shale.texture} {crystal.clarity}</p>
+	} @pending {
+		<p>Grinding</p>
+	} @catch {
+		<p>Fractured</p>
+	}
+}
+`,
+	});
+
+	expect(graph.diagnostics).toEqual([]);
+});
+
+test('buildSemanticGraph still reports a graph read that creates a local after the await', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/LateSnapshot.tsrx',
+		source: `
+import { state, computed } from '@markless/core';
+
+export function App() @{
+	let stratum = state('amber');
+	const shale = computed(async () => {
+		await Promise.resolve();
+		const sample = stratum;
+		return { texture: sample + '-rough' };
+	});
+
+	@try {
+		<p>{shale.texture}</p>
+	} @pending {
+		<p>Grinding</p>
+	} @catch {
+		<p>Fractured</p>
+	}
+}
+`,
+	});
+
+	expect(
+		graph.diagnostics.map((diagnostic) => ({
+			code: diagnostic.code,
+			message: diagnostic.message,
+		})),
+	).toEqual([
+		{
+			code: 'MARKLESS_ASYNC_POST_AWAIT_READ',
+			message:
+				'Cannot read "stratum" after await in async computed "shale". Snapshot the value before awaiting.',
+		},
+	]);
 });
 
 test('buildSemanticGraph reports async computed template reads outside async boundaries', async () => {

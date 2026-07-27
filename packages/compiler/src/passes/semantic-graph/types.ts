@@ -1,4 +1,5 @@
 import type { AnyNode } from '../../ast/nodes.ts';
+import type { SourceSpan } from '../../diagnostics.ts';
 import type {
 	SemanticComponent,
 	SemanticComponentPropDeclaration,
@@ -72,6 +73,10 @@ export type WalkState = {
 	currentSharedDefinitionId: string | null;
 	currentCreationSite: 'computed' | 'handler' | 'helper' | 'branch' | 'loop' | null;
 	currentFunctionSite: 'computed' | 'handler' | 'helper' | null;
+	// Names bound by the computed body currently being walked. They shadow any
+	// graph binding of the same name, so a write to one is never a graph write.
+	computedBodyLocalNames: ReadonlySet<string> | null;
+	deferredComputedWrites: DeferredComputedWrite[];
 	currentHelperCall: HelperStateCallSite | null;
 	helperFunctions: Map<string, AnyNode>;
 	pendingComputedDependencies: Array<{
@@ -96,6 +101,21 @@ export type WalkState = {
 	nextBoundaryId: number;
 	nextBranchSiteId: number;
 	nextAnchorOrder: number;
+};
+
+// A write recorded inside a computed body whose target has not yet been proven
+// to be graph state. Resolved after the walk, when every graph binding exists.
+export type DeferredComputedWrite = {
+	readonly writeIndex: number;
+	readonly targetSource: string;
+	readonly diagnosticInput: {
+		readonly source: string;
+		readonly target: string;
+		readonly targetSpan?: SourceSpan;
+		readonly filename: string;
+	};
+	readonly sharedDefinitionId: string | null;
+	readonly componentName: string | null;
 };
 
 export type SemanticGraphWalk = (node: AnyNode | null | undefined, state: WalkState) => void;
@@ -160,6 +180,8 @@ export function createWalkState(input: {
 		currentSharedDefinitionId: null,
 		currentCreationSite: null,
 		currentFunctionSite: null,
+		computedBodyLocalNames: null,
+		deferredComputedWrites: [],
 		currentHelperCall: null,
 		helperFunctions: new Map(),
 		pendingComputedDependencies: [],

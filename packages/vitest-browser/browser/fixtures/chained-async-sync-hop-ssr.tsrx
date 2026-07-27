@@ -3,13 +3,15 @@ import { computed, state } from '@markless/core';
 export function App() @{
 	let mineral = state('cobalt');
 	const kilnSample = computed(async () => {
+		const batch = mineral;
 		await Promise.resolve();
-		return { tone: mineral + '-fired' };
+		return { tone: batch + '-fired' };
 	});
 	const catalogCard = computed(() => ({ caption: kilnSample.tone }));
 	const exhibitLabel = computed(async () => {
+		const caption = catalogCard.caption;
 		await Promise.resolve();
-		return { text: 'Exhibit ' + catalogCard.caption };
+		return { text: 'Exhibit ' + caption };
 	});
 
 	<section>

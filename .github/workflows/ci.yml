@@ -220,10 +220,17 @@ jobs:
                   restore-keys: |
                       jsfb-npm-${{ runner.os }}-node24-
 
+            # --legacy-peer-deps applies to the upstream root install only. The
+            # js-framework-benchmark root package.json pins eslint ^10.7.0 next to
+            # eslint-plugin-react ^7.37.5, whose peer range stops at eslint ^9.7, so
+            # npm ci fails ERESOLVE on a tree we do not own and cannot pin from here.
+            # The conflict is confined to their lint tooling, which no benchmark step
+            # runs. The webdriver-ts and server installs below have no eslint
+            # dependency, so they stay strict.
             - name: Install JS Framework Benchmark dependencies
               working-directory: ${{ env.JSFB_ROOT }}
               run: |
-                  npm ci --ignore-scripts --prefer-offline --no-audit --fund=false
+                  npm ci --legacy-peer-deps --ignore-scripts --prefer-offline --no-audit --fund=false
                   npm run install-webdriver-ts
                   npm run install-server
 

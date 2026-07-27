@@ -31,9 +31,11 @@ import {
 import {
 	collectAssignment,
 	collectCollectionCall,
+	collectComputedWriteDiagnostics,
 	collectDelete,
 	collectExpressionReads,
 	collectUpdate,
+	declaredBindingNamesDeep,
 } from './collect-expressions.ts';
 import { collectModuleScopeGraphCreation } from './collect-module-scope.ts';
 import { submoduleUnsupportedDiagnostic } from './diagnostics.ts';
@@ -106,6 +108,7 @@ export async function buildSemanticGraph(
 		state.currentComponentId = previousComponentId;
 	}
 
+	collectComputedWriteDiagnostics(state);
 	finalizeComputedDependencies(state);
 	propagateAsyncComputedCapability(graph);
 	collectComputedDependencyCycleDiagnostics(graph);
@@ -465,9 +468,12 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 			collectCollectionCall(node, state);
 			if (getFrameworkApiForCall(node, state.frameworkApiImports) === 'computed') {
 				const [body, ...rest] = asNodes(node.arguments);
+				const previousComputedBodyLocalNames = state.computedBodyLocalNames;
+				state.computedBodyLocalNames = declaredBindingNamesDeep(body);
 				withFunctionSite(state, 'computed', () => {
 					withCreationSite(state, 'computed', () => walk(body, state));
 				});
+				state.computedBodyLocalNames = previousComputedBodyLocalNames;
 				for (const argument of rest) walk(argument, state);
 				return;
 			}

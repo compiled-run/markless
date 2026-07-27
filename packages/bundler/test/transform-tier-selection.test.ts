@@ -17,6 +17,10 @@ vi.mock('@markless/compiler', () => ({
 		semanticGraph: { componentEdges: compiler.componentEdges },
 		protocolState: compiler.protocolState,
 		protocolView: compiler.protocolView,
+		// The real compiler always returns payloadArena (non-optional on
+		// CompileTsrxModuleResult); transform.ts reads payloadArena.state.storage
+		// unguarded. Empty storage keeps this test focused on tier selection.
+		payloadArena: { state: { storage: [] } },
 		symbolModules: { modules: [] },
 		boundSymbolResolver: { rows: [] },
 		publicRenderPlan: { styleScopes: [] },
