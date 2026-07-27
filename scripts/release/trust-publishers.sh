@@ -6,9 +6,14 @@
 # with no credential at all and npm generates a provenance attestation for each
 # package automatically.
 #
-#   pnpm release:trust                    # attach for every release package
-#   pnpm release:trust --only <name>      # just one, e.g. @markless/vitest-browser
-#   pnpm release:trust --check            # report current state, change nothing
+#   pnpm release:trust                          # attach for every release package
+#   pnpm release:trust --only <name>            # just one, e.g. @markless/vitest-browser
+#   pnpm release:trust --only <name> --otp 123456   # non-interactive, code from your app
+#   pnpm release:trust --check                  # report current state, change nothing
+#
+# npm requires 2FA for every one of these calls. Passing --otp skips npm's
+# browser round trip entirely and is the reliable path: the interactive flow
+# needs stdout to be a real terminal, which is easy to lose through a pipe.
 #
 # npm's 2FA window is a few minutes, long enough to do all of them in one go.
 #
@@ -21,6 +26,7 @@ set -u
 WORKFLOW="release.yml"
 CHECK=0
 ONLY=""
+OTP=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --check) CHECK=1 ;;
@@ -28,6 +34,8 @@ while [ $# -gt 0 ]; do
     # sleep for every already-configured one. This is the path you want right after
     # bootstrapping a single new name.
     --only) shift; ONLY="${1:-}"; [ -z "$ONLY" ] && { echo "--only needs a package name" >&2; exit 1; } ;;
+    # One code covers the whole run: npm's 2FA window outlives a handful of calls.
+    --otp) shift; OTP="${1:-}"; [ -z "$OTP" ] && { echo "--otp needs a code" >&2; exit 1; } ;;
     *) echo "unknown argument: $1" >&2; exit 1 ;;
   esac
   shift
@@ -141,23 +149,34 @@ for name in $NAMES; do
     continue
   fi
 
-  # npm prompts for 2FA here and prints a URL to authenticate against, so it
-  # needs the real terminal, which is why output is teed rather than captured:
-  # swallowing it turns the prompt into a silent hang.
+  # npm's 2FA flow prints a URL on STDOUT and waits for ENTER on STDIN, so both
+  # must stay attached to the real terminal. Piping stdout through `tee` to
+  # capture the 409 text made stdout a pipe, npm saw no TTY, and it gave up with
+  # EOTP instead of prompting — the capture broke the very thing the script
+  # exists to do.
+  #
+  # So only STDERR is redirected. Errors (including the 409) land in a file we
+  # can classify, stdout and stdin stay on the terminal for the prompt, and the
+  # captured stderr is echoed afterwards so nothing is hidden. No pipe means
+  # npm's exit status needs no rescuing either.
   echo ">>> $name"
   attempt_log=$(mktemp)
-  status_file=$(mktemp)
-  # npm's exit status has to survive the pipe. In POSIX sh a pipeline reports
-  # only its LAST command, so `if npm ... | tee` would be testing tee, which
-  # always succeeds — every failure would be reported as a success. Stash npm's
-  # own status in a file inside the subshell and read it back.
-  { npm trust github "$name" \
+  if [ -n "$OTP" ]; then
+    npm trust github "$name" \
       --repo "$REPO" \
       --file "$WORKFLOW" \
       --allow-publish \
-      --yes 2>&1; echo $? >"$status_file"; } | tee "$attempt_log"
-  trust_status=$(cat "$status_file")
-  rm -f "$status_file"
+      --otp "$OTP" \
+      --yes 2>"$attempt_log"
+  else
+    npm trust github "$name" \
+      --repo "$REPO" \
+      --file "$WORKFLOW" \
+      --allow-publish \
+      --yes 2>"$attempt_log"
+  fi
+  trust_status=$?
+  [ -s "$attempt_log" ] && cat "$attempt_log" >&2
 
   if [ "$trust_status" -eq 0 ]; then
     echo "  trusted   $name"
