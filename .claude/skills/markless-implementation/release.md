@@ -1,8 +1,14 @@
 # Release Workflow
 
-- The owner controls authentication, 2FA, registry publication, tag pushes, and GitHub release creation. Never automate irreversible release steps.
+- Publishing happens from CI, not from a laptop. `.github/workflows/release.yml` publishes to npm via trusted publishing: GitHub mints a short-lived OIDC token, the npm CLI trades it with the registry, and no npm token is stored anywhere in this repository. The workflow asserts a stored token is absent rather than trusting that nobody added one.
+- Publish authority is therefore "whoever can land a change to `.github/workflows/release.yml` and dispatch it", not "whoever holds the owner's npm 2FA device". Treat any edit to that workflow, or to the `scripts/release/` code it runs, as a change to who can publish.
+- The workflow filename is load-bearing. Every package's trusted-publisher entry on npmjs.com names `release.yml` literally, so renaming the file silently breaks publishing for all of them, with an authentication error that says nothing about a rename.
+- Nothing publishes on a merge or a tag push. The only trigger is `workflow_dispatch`, it defaults to dry-run, and publish mode additionally requires a typed confirmation phrase matching the dispatched version. Irreversible steps are automated but never automatic. A green dry run proves packaging and version lockstep; it does not prove the OIDC exchange or provenance, so only a publish-mode run proves those.
+- CI never bumps versions. The dispatched `version` input must already equal the root version and every release package version at that ref, and the workflow refuses to run otherwise. Version bumps stay with the owner, in a commit; so do tag pushes, GitHub release creation, and the decision to dispatch at all.
+- Attaching a trusted publisher to a package is owner-side on npmjs.com and cannot be automated from this repo. npm cannot attach one to a name that has never been published, so a first-time package needs a one-time owner-run bootstrap publish before CI can take over.
+- The release set is derived from the workspace by `scripts/release/release-packages.mjs`, never restated as a literal list. Three copies of that list existed and each drifted, which is how the `--all` guard sweep silently stopped checking two packages.
 - Establish package and dependency closure before packing: intended packages, versions, workspace dependency ranges, build order, included files, and public entry points must agree.
 - Run `vp pack`, inspect the produced tarballs, and install them in a clean consumer to verify imports, types, runtime behavior, and the absence of workspace-only dependencies or unintended files.
 - Release scripts must be fail-closed and resumable. Validate prerequisites before mutation, record completed stages, stop on ambiguous state, and make reruns skip only steps already verified.
-- After owner-executed publication, verify registry versions and dist-tags, package contents, repository tags, and GitHub release metadata against the release plan.
+- After publication, verify registry versions and dist-tags, package contents, provenance attestations for every published package, repository tags, and GitHub release metadata against the release plan.
 - Package or tooling changes must also read `implementation.md` and `bundler.md`.

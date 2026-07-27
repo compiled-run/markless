@@ -1,6 +1,6 @@
 {
 	"name": "@markless/analyzer",
-	"version": "0.1.1",
+	"version": "0.2.0",
 	"description": "Portable browser QA analysis contracts with an optional Playwright driver.",
 	"license": "MIT",
 	"repository": {
@@ -21,6 +21,7 @@
 	},
 	"publishConfig": {
 		"access": "public",
+		"provenance": true,
 		"exports": {
 			".": {
 				"types": "./dist/index.d.ts",

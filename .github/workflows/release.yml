@@ -1,0 +1,196 @@
+# npm trusted publishing for the @markless packages.
+#
+# THE FILENAME IS LOAD-BEARING. DO NOT RENAME THIS FILE.
+# Every package's trusted-publisher entry on npmjs.com names `release.yml`
+# literally. Renaming this file silently breaks publishing for all of them, with
+# an authentication error that says nothing about a rename.
+#
+# How publishing is authenticated: it is not. There is no stored npm token
+# anywhere in this repository. GitHub mints a short-lived OIDC identity token
+# for this workflow (that is what `id-token: write` buys), the npm CLI trades it
+# with the registry, and the registry checks that the claim matches the trusted
+# publisher configured for each package. Two consequences worth knowing:
+#
+#   - Publish authority is now "whoever can land a change to this file and
+#     dispatch it", not "whoever holds the owner's npm 2FA device".
+#   - A stored NPM_TOKEN would defeat the entire point, so this workflow
+#     asserts one is NOT present rather than trusting that nobody added one.
+#
+# The workflow never writes to git: no commit, no tag, no GitHub release. It
+# publishes exactly the versions already committed at the dispatched ref, and
+# refuses to run if the `version` input disagrees with any manifest. Tagging and
+# release notes stay with the owner.
+name: Release
+
+on:
+    workflow_dispatch:
+        inputs:
+            version:
+                description: 'Version to publish. Must ALREADY equal the root version and every release package version at this ref; CI never bumps.'
+                required: true
+                type: string
+            mode:
+                description: 'dry-run packs and verifies without touching the registry. publish uploads to npm and is irreversible.'
+                required: true
+                type: choice
+                default: dry-run
+                options:
+                    - dry-run
+                    - publish
+            confirm:
+                description: 'Publish mode only. Type exactly: publish markless <version>'
+                required: false
+                type: string
+                default: ''
+            dist_tag:
+                description: 'Optional npm dist-tag. Empty means the registry default (latest).'
+                required: false
+                type: string
+                default: ''
+
+# One release at a time, and never cancel one in flight: publishing is
+# irreversible, so a cancelled run can leave a partial release behind.
+concurrency:
+    group: release
+    cancel-in-progress: false
+
+permissions:
+    contents: read
+
+jobs:
+    release:
+        # Forks and clones must not be able to dispatch a publish that claims to
+        # be this repository.
+        if: github.repository == 'markless-dev/markless'
+        runs-on: ubuntu-latest
+        timeout-minutes: 45
+        permissions:
+            contents: read
+            # The whole mechanism. Lets GitHub mint the OIDC token npm trades
+            # with the registry in place of a stored credential.
+            id-token: write
+        env:
+            NPM_CONFIG_AUDIT: 'false'
+            NPM_CONFIG_FUND: 'false'
+            RELEASE_VERSION: ${{ inputs.version }}
+            RELEASE_MODE: ${{ inputs.mode }}
+            RELEASE_CONFIRM: ${{ inputs.confirm }}
+            RELEASE_DIST_TAG: ${{ inputs.dist_tag }}
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Refuse to run with a stored npm token available
+              run: |
+                  set -euo pipefail
+                  failed=0
+                  for name in NODE_AUTH_TOKEN NPM_TOKEN; do
+                    value="$(printenv "$name" || true)"
+                    if [ -n "$value" ]; then
+                      echo "::error::$name is set in this job. This release publishes via OIDC trusted publishing; a stored token would mean nothing about trusted publishing was proven."
+                      failed=1
+                    fi
+                  done
+                  # A future edit that wires a stored credential back in must
+                  # fail here rather than quietly publish with a token again.
+                  # Comment lines are excluded so the explanation above can name
+                  # the thing it forbids.
+                  if grep -vE '^[[:space:]]*#' .github/workflows/release.yml | grep -nE 'secrets\.'; then
+                    echo "::error::This workflow reads a repository secret. Trusted publishing must use no stored credential."
+                    failed=1
+                  fi
+                  if [ "$failed" -ne 0 ]; then exit 1; fi
+                  echo "no stored npm credential is present in this job"
+
+            - name: Assert the dispatched version matches every manifest
+              run: node scripts/release/assert-release-version.mjs "$RELEASE_VERSION"
+
+            - name: Require the typed confirmation phrase
+              if: inputs.mode == 'publish'
+              run: |
+                  set -euo pipefail
+                  expected="publish markless ${RELEASE_VERSION}"
+                  if [ "$RELEASE_CONFIRM" != "$expected" ]; then
+                    echo "::error::confirm must be exactly: ${expected}"
+                    exit 1
+                  fi
+                  echo "confirmation accepted for ${RELEASE_VERSION}"
+
+            # No `version:` here on purpose: pnpm/action-setup reads
+            # packageManager from package.json, so the pnpm that publishes is
+            # the pnpm this repo pins. A second copy here could drift from it.
+            - uses: pnpm/action-setup@v4
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  # Writes an .npmrc pointing at the public registry. It carries
+                  # no token; npm falls back to the OIDC exchange.
+                  registry-url: 'https://registry.npmjs.org'
+                  cache: pnpm
+
+            # `pnpm publish` packs the tarball itself (which is what rewrites the
+            # workspace: and catalog: ranges) and then shells out to whatever
+            # `npm` is on PATH to do the upload. So the npm pinned here is the
+            # binary that performs the OIDC exchange and generates provenance.
+            - name: Pin and verify the npm CLI that performs the OIDC exchange
+              run: |
+                  set -euo pipefail
+                  npm install -g npm@11.18.0
+                  echo "which npm: $(which npm)"
+                  echo "npm --version: $(npm --version)"
+                  node -e '
+                    const floor = [11, 5, 1];
+                    const actual = process.argv[1].trim().split(".").map(Number);
+                    for (let index = 0; index < floor.length; index += 1) {
+                      const part = actual[index] ?? 0;
+                      if (part > floor[index]) break;
+                      if (part < floor[index]) {
+                        console.error(`npm ${process.argv[1]} is below the ${floor.join(".")} trusted-publishing floor`);
+                        process.exit(1);
+                      }
+                    }
+                    console.log(`npm ${process.argv[1]} supports trusted publishing`);
+                  ' "$(npm --version)"
+
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Build publishable output
+              run: pnpm build
+
+            - name: Guard sweep — every release package is publish-ready
+              run: node scripts/release/verify-publish-ready.mjs --all
+
+            - name: Verify the tarballs a publish would actually upload
+              run: node scripts/release/verify-packed-manifests.mjs
+
+            - name: Dry run — pack and validate, no registry write
+              if: inputs.mode == 'dry-run'
+              env:
+                  # Provenance generation needs a real OIDC exchange, which a dry
+                  # run cannot perform, so it must be off here. This is the ONLY
+                  # place this workflow touches the provenance setting: on the
+                  # real path it comes from each package's
+                  # publishConfig.provenance, which is the package's own fact.
+                  NPM_CONFIG_PROVENANCE: 'false'
+              run: |
+                  echo "::notice::A green dry run proves packaging, version lockstep and registry reachability. It does NOT prove the OIDC exchange or provenance. Only a publish-mode run proves those."
+                  node scripts/release/publish-workspace.mjs --version "$RELEASE_VERSION" --tag "$RELEASE_DIST_TAG" --dry-run
+
+            - name: Publish to npm via trusted publishing
+              if: inputs.mode == 'publish'
+              run: node scripts/release/publish-workspace.mjs --version "$RELEASE_VERSION" --tag "$RELEASE_DIST_TAG"
+
+            # The failure this catches: everything publishes, the run goes green,
+            # and npm attached no attestation, so trusted publishing never
+            # actually took effect and nobody notices.
+            - name: Assert npm recorded a provenance attestation for every package
+              if: inputs.mode == 'publish'
+              run: node scripts/release/verify-provenance.mjs --version "$RELEASE_VERSION"
+
+            - name: What is left for the owner
+              if: inputs.mode == 'publish'
+              run: |
+                  echo "Published ${RELEASE_VERSION} with provenance."
+                  echo "This workflow writes nothing to git. Still owner-side: tag v${RELEASE_VERSION}, push it, and create the GitHub release."

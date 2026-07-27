@@ -1,6 +1,12 @@
 {
 	"name": "@markless/typescript-plugin",
-	"version": "0.1.1",
+	"version": "0.2.0",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/markless-dev/markless.git",
+		"directory": "packages/typescript-plugin"
+	},
 	"files": [
 		"dist"
 	],
@@ -22,12 +28,15 @@
 	},
 	"publishConfig": {
 		"access": "public",
+		"provenance": true,
 		"exports": {
 			".": {
+				"types": "./dist/index.d.cts",
 				"require": "./dist/index.cjs",
 				"default": "./dist/index.cjs"
 			},
 			"./language": {
+				"types": "./dist/language.d.cts",
 				"require": "./dist/language.cjs",
 				"default": "./dist/language.cjs"
 			},
@@ -36,7 +45,7 @@
 		}
 	},
 	"scripts": {
-		"build:cjs": "vp pack src/index.ts src/language.ts --no-config --format cjs --platform node --out-dir dist --clean --no-dts --no-report && cp src/markless-jsx.d.ts dist/markless-jsx.d.ts",
+		"build:cjs": "vp pack src/index.ts src/language.ts --no-config --format cjs --platform node --out-dir dist --clean --dts --no-report && cp src/markless-jsx.d.ts dist/markless-jsx.d.ts",
 		"build:vsix": "vp pack src/index.ts --no-config --format cjs --platform node --out-dir ../vscode-plugin/dist/vsix-build/typescript-plugin --clean --no-dts --no-report --deps.alwaysBundle '/.*/' --deps.never-bundle typescript && cp src/markless-jsx.d.ts ../vscode-plugin/dist/vsix-build/typescript-plugin/markless-jsx.d.ts",
 		"prepublishOnly": "pnpm run build:cjs && node ../../scripts/release/verify-publish-ready.mjs",
 		"test:completion-matrix": "MARKLESS_COMPLETION_MATRIX_STARTED_AT=$(node -p 'Date.now()') pnpm run test:completion-matrix:run",

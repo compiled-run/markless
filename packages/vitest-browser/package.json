@@ -1,12 +1,40 @@
 {
 	"name": "@markless/vitest-browser",
 	"version": "0.1.1",
+	"description": "Vitest browser-mode provider for Markless components.",
+	"license": "MIT",
+	"//": "STILL PRIVATE ON PURPOSE. This name has never existed on npm, and npm cannot attach a trusted publisher to a name that was never published, so it needs a one-time owner-run bootstrap publish first. Everything else about publishing it is already prepared here and is proven on every run by scripts/release/verify-packed-manifests.mjs, which packs this package regardless of the private flag. Flipping private to false is what adds it to the release set.",
 	"private": true,
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/markless-dev/markless.git",
+		"directory": "packages/vitest-browser"
+	},
+	"files": [
+		"dist"
+	],
 	"type": "module",
 	"sideEffects": false,
 	"exports": {
 		".": "./src/index.ts",
 		"./vitest": "./src/vitest.ts"
+	},
+	"publishConfig": {
+		"access": "public",
+		"provenance": true,
+		"exports": {
+			".": {
+				"types": "./dist/index.d.ts",
+				"default": "./dist/index.js"
+			},
+			"./vitest": {
+				"types": "./dist/vitest.d.ts",
+				"default": "./dist/vitest.js"
+			}
+		}
+	},
+	"scripts": {
+		"prepublishOnly": "node ../../scripts/release/verify-publish-ready.mjs"
 	},
 	"dependencies": {
 		"@markless/core": "workspace:*",

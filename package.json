@@ -1,10 +1,10 @@
 {
 	"name": "@markless/markless-workspace",
-	"version": "0.1.1",
+	"version": "0.2.0",
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"build": "vp pack",
+		"build": "vp pack && pnpm --filter @markless/router run build:cjs && pnpm --filter @markless/typescript-plugin run build:cjs",
 		"check": "vp check",
 		"fmt": "vp fmt",
 		"lint": "vp lint",
@@ -17,6 +17,7 @@
 		"test:compiler": "vp test packages/compiler/test/*.test.ts",
 		"publish": "pnpm --filter '@markless/*' --filter create-markless publish --access public --no-git-checks",
 		"release": "node scripts/release/run-release.mjs",
+		"release:trust": "sh scripts/release/trust-publishers.sh",
 		"state": "node scripts/state-ledger.mjs",
 		"rules": "npx -y @intellectronica/ruler apply",
 		"prepare": "git config core.hooksPath .githooks"

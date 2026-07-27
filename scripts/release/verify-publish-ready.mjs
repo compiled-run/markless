@@ -2,29 +2,29 @@
 // package, so `pnpm publish` aborts unless the packed dist output matches the
 // published exports surface. Run with `--all` from the repo root to check the
 // whole release set (the `pnpm release` flow does this after `vp pack`).
+//
+// The release set is derived from packages/*/package.json by
+// release-packages.mjs. It used to be an eight-name literal here, which had
+// silently stopped covering @markless/analyzer and @markless/typescript-plugin.
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import process from 'node:process';
-import { fileURLToPath } from 'node:url';
+import { releasePackages } from './release-packages.mjs';
 
-const repoRoot = resolve(fileURLToPath(import.meta.url), '../../..');
-
-const releasePackages = [
-	'core',
-	'web',
-	'router',
-	'bundler',
-	'runtime',
-	'serializer',
-	'compiler',
-	'cli',
-];
-
+// Every string leaf under an exports target, whatever conditions wrap it.
+// Reading only `types`/`default` skipped `require` entries, so a CommonJS
+// export could point at a file no build produced and still pass this guard.
 function targetPaths(target) {
 	if (typeof target === 'string') {
 		return [target];
 	}
-	return [target.types, target.default].filter((path) => path !== undefined);
+	if (Array.isArray(target)) {
+		return target.flatMap(targetPaths);
+	}
+	if (target !== null && typeof target === 'object') {
+		return Object.values(target).flatMap(targetPaths);
+	}
+	return [];
 }
 
 // Expands `*` in a published target against the dev exports source glob so
@@ -60,6 +60,17 @@ function verifyPackage(packageDir) {
 	}
 	if (manifest.publishConfig?.access !== 'public') {
 		failures.push(`${label}: publishConfig.access must be "public"`);
+	}
+	// Provenance is a package-owned fact, declared once per manifest. The
+	// release workflow must not set NPM_CONFIG_PROVENANCE=true instead; that
+	// would be a second copy of it that can drift.
+	if (manifest.publishConfig?.provenance !== true) {
+		failures.push(`${label}: publishConfig.provenance must be true (npm provenance attestation)`);
+	}
+	// npm refuses to attest a package whose manifest names a different
+	// repository than the one publishing it.
+	if (typeof manifest.repository?.url !== 'string') {
+		failures.push(`${label}: repository.url is required for npm provenance`);
 	}
 	if (!Array.isArray(manifest.files) || !manifest.files.includes('dist')) {
 		failures.push(`${label}: files must include "dist"`);
@@ -142,7 +153,7 @@ function verifyPackage(packageDir) {
 }
 
 const packageDirs = process.argv.includes('--all')
-	? releasePackages.map((packageName) => resolve(repoRoot, 'packages', packageName))
+	? releasePackages().map((entry) => entry.packageDir)
 	: [process.cwd()];
 
 const failures = packageDirs.flatMap((packageDir) => verifyPackage(packageDir));
