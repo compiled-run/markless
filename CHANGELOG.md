@@ -10,6 +10,51 @@ everything else.
 
 This file starts at 0.2.0. Earlier versions have no changelog entries.
 
+## 0.2.1
+
+A type-only fix. No runtime behavior changes, and no code that worked on 0.2.0
+stops working.
+
+### `storage()` accepts one argument, as documented
+
+0.2.0 shipped a contradiction inside the `@markless/core` tarball. The type
+declaration required two arguments:
+
+```ts
+declare function storage(key: string, fallback: string): string;
+```
+
+while `agent/markless.md`, in that same tarball, documented the one-argument
+form:
+
+```tsx
+let theme = storage('light'); // persists under markless:theme
+```
+
+The compiler has always accepted the one-argument form, so the code compiled and
+ran correctly and your editor put a red line under it anyway. That was
+especially unhelpful for AI agents, since `agent/markless.md` exists precisely to
+tell them how to use the framework, and it was telling them to write something
+the types rejected.
+
+`storage()` is now declared as two overloads:
+
+```ts
+export function storage(fallback: string): string;
+export function storage(key: string, fallback: string): string;
+```
+
+Arity is what distinguishes them. With one argument, that argument is the
+fallback and the storage key is derived from the binding name. With two, the
+first is an explicit key. This mirrors what the compiler already did.
+
+An optional second parameter would have been wrong here: `storage(key,
+fallback?)` types a lone argument as a *key*, which is the opposite of what the
+compiler does with it.
+
+Nothing else changed. The two-argument form, the derived-key behavior, the
+persistence format, and every other package are untouched.
+
 ## 0.2.0
 
 The first release since 0.1.1 (published 8 July 2026). Nothing was removed: no
@@ -47,7 +92,7 @@ value, and assigning to it persists the new value. Details worth knowing:
   surprising runtime behavior.
 - The compiler also accepts a one-argument form, `storage('light')`, which
   derives the key from the binding name and namespaces it, so `let theme =
-storage('light')` persists under `markless:theme`. The derived key is a
+  storage('light')` persists under `markless:theme`. The derived key is a
   compile-time literal, so minification cannot change it, but renaming the
   binding does change it and orphans data already saved by your users. For
   anything you ship, pin an explicit key.
@@ -160,9 +205,9 @@ Behavior changes:
 - New exports: `MARKLESS_TSRX_EXTENSIONS`, `MARKLESS_TSRX_LANGUAGE_ID`,
   `MARKLESS_TSRX_PARSE_ERROR_CODE`, `MarklessTsrxParseFailure`,
   `MarklessTsrxVirtualCode`, `clampMarklessDiagnosticStart`,
-  `getMarklessTsrxParseFailure`, `isMarklessTsrxFile`,
-  `mapMarklessSourcePositionToGenerated`, and
-  `updateMarklessTsrxParseFailure`. Most of these existed in 0.1.1 but were
+  `getMarklessTsrxLanguagePlugin`, `getMarklessTsrxParseFailure`,
+  `isMarklessTsrxFile`, `mapMarklessSourcePositionToGenerated`, and
+  `transformTsrxForTypeScriptService`. These existed in 0.1.1 but were
   unusable from TypeScript, because that release shipped no type declarations
   at all.
 
@@ -174,11 +219,6 @@ Behavior changes:
 - Scaffolded projects recommend the Markless editor extension and are wired for
   it independently of which extension identity is installed.
 - Scaffolded projects now get a `.gitignore`.
-- The scaffolded `tsconfig.json` declares the Markless compiler
-  (`"tsrx": { "compiler": "@markless/typescript-plugin/volar" }`) and sets
-  `"jsx": "preserve"`, so a new app's editor answers completions, hover and
-  go-to-definition immediately. `markless doctor` now fails when that
-  declaration is missing and names the exact line to add.
 - The minimal starter's counter is fixed: reactive state needs `let`, not
   `const`.
 - New export `ProgramPromptMultiselectOptions`.

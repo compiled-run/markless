@@ -39,14 +39,47 @@ try {
 
 const failures = [];
 
+// The registry's read replicas lag its write path. On the 0.2.0 release the
+// last package published at 04:12:25 and was read back 4 seconds later, which
+// returned E404 "No match found for version 0.2.0" for a package that had in
+// fact published correctly WITH provenance. That reported a good release as a
+// failed one.
+//
+// So a miss is retried before it is believed. Only a miss that survives every
+// attempt counts, which keeps the real signal (published without provenance)
+// while removing the false one (published seconds ago).
+const ATTEMPTS = 6;
+const BACKOFF_MS = 5000;
+
+function sleep(ms) {
+	Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/** npm view, retried while the registry is still catching up. */
+function readAttestations(name) {
+	let last;
+	for (let attempt = 1; attempt <= ATTEMPTS; attempt += 1) {
+		last = spawnSync('npm', ['view', `${name}@${version}`, 'dist.attestations', '--json'], {
+			encoding: 'utf-8',
+		});
+		const settled = last.status === 0 && (last.stdout ?? '').trim() !== '';
+		if (settled || attempt === ATTEMPTS) {
+			return last;
+		}
+		console.log(
+			`  waiting for the registry to catch up on ${name}@${version} (attempt ${attempt}/${ATTEMPTS})`,
+		);
+		sleep(BACKOFF_MS);
+	}
+	return last;
+}
+
 for (const entry of releasePackages()) {
-	const result = spawnSync('npm', ['view', `${entry.name}@${version}`, 'dist.attestations', '--json'], {
-		encoding: 'utf-8',
-	});
+	const result = readAttestations(entry.name);
 	const raw = (result.stdout ?? '').trim();
 	if (result.status !== 0) {
 		failures.push(
-			`${entry.name}@${version}: npm view failed — ${(result.stderr ?? '').trim() || 'no output'}`,
+			`${entry.name}@${version}: npm view failed after ${ATTEMPTS} attempts — ${(result.stderr ?? '').trim() || 'no output'}`,
 		);
 		continue;
 	}

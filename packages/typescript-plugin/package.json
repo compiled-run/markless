@@ -1,6 +1,6 @@
 {
 	"name": "@markless/typescript-plugin",
-	"version": "0.2.0",
+	"version": "0.2.1",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
@@ -49,8 +49,12 @@
 				"require": "./dist/volar.cjs",
 				"default": "./dist/volar.cjs"
 			},
-			"./jsx-runtime": { "types": "./dist/markless-jsx.d.ts" },
-			"./jsx-dev-runtime": { "types": "./dist/markless-jsx.d.ts" }
+			"./jsx-runtime": {
+				"types": "./dist/markless-jsx.d.ts"
+			},
+			"./jsx-dev-runtime": {
+				"types": "./dist/markless-jsx.d.ts"
+			}
 		}
 	},
 	"scripts": {

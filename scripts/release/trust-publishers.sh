@@ -78,13 +78,34 @@ echo "workflow: $WORKFLOW"
 echo
 
 ok=0
+already=0
 skipped=0
 failed=0
+
+# A name that was JUST published is not visible on the registry's read path for
+# a while, and a brand-new package name is slowest of all because the whole
+# packument is new rather than one more version of an existing one. Retrying
+# keeps this script usable immediately after a bootstrap publish, which is
+# exactly when someone runs it. Without this, the very package you just
+# published is the one reported "not published yet".
+package_exists() {
+  attempt=1
+  while [ "$attempt" -le 6 ]; do
+    if npm view "$1" version >/dev/null 2>&1; then
+      return 0
+    fi
+    [ "$attempt" -eq 6 ] && return 1
+    echo "  waiting for the registry to show $1 (attempt $attempt/6)"
+    sleep 10
+    attempt=$((attempt + 1))
+  done
+  return 1
+}
 
 for name in $NAMES; do
   # npm cannot attach a trusted publisher to a name that has never been
   # published. Those need one manual publish first.
-  if ! npm view "$name" version >/dev/null 2>&1; then
+  if ! package_exists "$name"; then
     echo "  not published yet, skipping   $name"
     skipped=$((skipped + 1))
     continue
@@ -97,21 +118,39 @@ for name in $NAMES; do
   fi
 
   # npm prompts for 2FA here and prints a URL to authenticate against, so it
-  # needs the real terminal. Capturing its output turns the prompt into a
-  # silent hang.
+  # needs the real terminal, which is why output is teed rather than captured:
+  # swallowing it turns the prompt into a silent hang.
   echo ">>> $name"
-  if npm trust github "$name" \
-    --repo "$REPO" \
-    --file "$WORKFLOW" \
-    --allow-publish \
-    --yes
-  then
+  attempt_log=$(mktemp)
+  status_file=$(mktemp)
+  # npm's exit status has to survive the pipe. In POSIX sh a pipeline reports
+  # only its LAST command, so `if npm ... | tee` would be testing tee, which
+  # always succeeds — every failure would be reported as a success. Stash npm's
+  # own status in a file inside the subshell and read it back.
+  { npm trust github "$name" \
+      --repo "$REPO" \
+      --file "$WORKFLOW" \
+      --allow-publish \
+      --yes 2>&1; echo $? >"$status_file"; } | tee "$attempt_log"
+  trust_status=$(cat "$status_file")
+  rm -f "$status_file"
+
+  if [ "$trust_status" -eq 0 ]; then
     echo "  trusted   $name"
     ok=$((ok + 1))
+  elif grep -q 'trusted publisher config already exists' "$attempt_log"; then
+    # E409. The package is already wired to a trusted publisher, which is the
+    # desired end state, so re-running this script must not report it as a
+    # failure. npm has no upsert here: changing an existing config means
+    # deleting it first. Reporting this as FAILED sent a previous run down a
+    # wrong diagnosis, because the summary blamed the 2FA setting instead.
+    echo "  already configured   $name"
+    already=$((already + 1))
   else
     echo "  FAILED    $name"
     failed=$((failed + 1))
   fi
+  rm -f "$attempt_log"
   # npm rate limits bursts of writes.
   sleep 2
 done
@@ -119,12 +158,15 @@ done
 [ "$CHECK" -eq 1 ] && exit 0
 
 echo
-echo "trusted $ok, skipped $skipped, failed $failed"
+echo "trusted $ok, already configured $already, skipped $skipped, failed $failed"
 
 if [ "$failed" -gt 0 ]; then
   echo
-  echo "A package set to 'require two-factor authentication and disallow tokens'"
-  echo "on npmjs.com rejects trusted publishing. That is the usual cause."
+  echo "For a genuine failure the usual cause is a package set to 'require"
+  echo "two-factor authentication and disallow tokens' on npmjs.com, which"
+  echo "rejects trusted publishing. Note that an already-configured package is"
+  echo "NOT counted here: npm returns 409 for those and they are reported"
+  echo "separately, because re-running this script is meant to be safe."
   exit 1
 fi
 
