@@ -58,10 +58,24 @@ try {
 // A stored token here would mean the run is not proving trusted publishing at
 // all. The workflow asserts this too; asserting it again keeps the guarantee
 // attached to the publisher rather than to one YAML file.
+//
+// The one value that is NOT a credential: actions/setup-node writes an .npmrc
+// containing `_authToken=${NODE_AUTH_TOKEN}` whenever it is given a
+// registry-url, and exports this literal placeholder so that template resolves
+// to something. npm's own recommended trusted-publishing workflow uses
+// registry-url and sets no token, so the placeholder is present there too and
+// the OIDC exchange still happens. Rejecting it would mean rejecting the
+// documented configuration.
+//
+// Do not "simplify" this back to a non-empty check. That is what failed the
+// first real dry run of this workflow.
+const SETUP_NODE_PLACEHOLDER = 'XXXXX-XXXXX-XXXXX-XXXXX';
+
 for (const variable of ['NODE_AUTH_TOKEN', 'NPM_TOKEN']) {
-	if ((process.env[variable] ?? '') !== '') {
+	const value = process.env[variable] ?? '';
+	if (value !== '' && value !== SETUP_NODE_PLACEHOLDER) {
 		fail(
-			`${variable} is set. This publisher exists to prove no stored npm token is used; remove it and rely on the OIDC exchange.`,
+			`${variable} is set to a real value. This publisher exists to prove no stored npm token is used; remove it and rely on the OIDC exchange.`,
 		);
 	}
 }

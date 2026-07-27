@@ -84,10 +84,18 @@ jobs:
               run: |
                   set -euo pipefail
                   failed=0
+                  # actions/setup-node exports this literal placeholder when it
+                  # is given a registry-url, so its .npmrc template resolves. It
+                  # is not a credential, and npm's own recommended
+                  # trusted-publishing workflow produces it. This step currently
+                  # runs before setup-node, but stays placeholder-aware so
+                  # reordering the steps cannot turn a correct configuration
+                  # into a confusing failure.
+                  placeholder='XXXXX-XXXXX-XXXXX-XXXXX'
                   for name in NODE_AUTH_TOKEN NPM_TOKEN; do
                     value="$(printenv "$name" || true)"
-                    if [ -n "$value" ]; then
-                      echo "::error::$name is set in this job. This release publishes via OIDC trusted publishing; a stored token would mean nothing about trusted publishing was proven."
+                    if [ -n "$value" ] && [ "$value" != "$placeholder" ]; then
+                      echo "::error::$name is set to a real value in this job. This release publishes via OIDC trusted publishing; a stored token would mean nothing about trusted publishing was proven."
                       failed=1
                     fi
                   done
