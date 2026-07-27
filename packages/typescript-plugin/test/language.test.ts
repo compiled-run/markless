@@ -11,7 +11,7 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import ts from 'typescript';
-import { expect, test } from 'vitest';
+import { beforeAll, expect, test } from 'vitest';
 import {
 	MARKLESS_TSRX_LANGUAGE_ID,
 	MARKLESS_TSRX_PARSE_ERROR_CODE,
@@ -494,6 +494,17 @@ function countMarklessParseErrors(diagnostics: readonly any[]): number {
 }
 
 let generatedCjsBuildReady = false;
+
+// Five tests need the generated CommonJS build. Running it lazily inside
+// whichever test happened to run first meant that test paid the whole build
+// cost against the default 5s timeout, and it began timing out in CI at 5346ms
+// once the ./volar entry made build:cjs two `vp pack` passes instead of one.
+// It kept passing locally only because dist/ was already warm. Hoisting it into
+// beforeAll gives the build its own generous budget and stops the cost landing
+// on an arbitrary test.
+beforeAll(() => {
+	ensureGeneratedCjsBuild();
+}, 180_000);
 
 function ensureGeneratedCjsBuild(): void {
 	if (generatedCjsBuildReady) return;
