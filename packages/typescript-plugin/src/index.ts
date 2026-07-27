@@ -1,38 +1,75 @@
-import { createLanguageServicePlugin } from '@volar/typescript/lib/quickstart/createLanguageServicePlugin.js';
+import upstreamTsrxTypeScriptPlugin from '@tsrx/typescript-plugin';
 import { join } from 'node:path';
 import { installMarklessCompletions } from './completions.ts';
 import {
 	MARKLESS_TSRX_PARSE_ERROR_CODE,
 	clampMarklessDiagnosticStart,
 	getMarklessTsrxParseFailure,
-	getMarklessTsrxLanguagePlugin,
 	isMarklessTsrxFile,
 	mapMarklessSourcePositionToGenerated,
+	updateMarklessTsrxParseFailure,
 } from './language.ts';
 
-const volarPlugin = createLanguageServicePlugin(() => ({
-	languagePlugins: [getMarklessTsrxLanguagePlugin()],
-}));
+type TsserverPluginModules = { readonly typescript: any };
+type TsserverPlugin = {
+	create(info: any): any;
+	getExternalFiles?(project: any, updateLevel?: any): string[];
+};
 
-const plugin = (modules: Parameters<typeof volarPlugin>[0]) => {
-	const volar = volarPlugin(modules);
-	const getExternalFiles = volar.getExternalFiles?.bind(volar);
+// @tsrx/typescript-plugin is nested inside this package as a regular dependency so a
+// Markless app installs one package and writes one plugin name. Upstream owns the Volar
+// language layer and reaches the Markless compiler through the tsconfig `tsrx.compiler`
+// declaration; this module layers the Markless editor behaviour on top of it. Upstream
+// ships JavaScript without type declarations, so its published factory shape - a
+// tsserver plugin init function - is asserted here once instead of at every call site.
+const upstreamPlugin = upstreamTsrxTypeScriptPlugin as unknown as (
+	modules: TsserverPluginModules,
+) => TsserverPlugin;
+
+// tsserver calls create() once per project, but a consumer who copies upstream's README
+// can end up listing @tsrx/typescript-plugin next to @markless/typescript-plugin. Key the
+// guard on the language service host: upstream replaces info.languageService with its own
+// proxy during create, while the host object stays the same identity across both plugin
+// entries. It is also the identity Volar's own duplicate-decoration guard uses.
+const marklessLanguageServices = new WeakMap<object, any>();
+
+// The Markless parse failure for a file is recorded while the Markless virtual code
+// compiles it. Upstream owns the registered language layer, so the record is refreshed
+// here from the authored snapshot instead, once per script version.
+const parseFailureVersions = new Map<string, string>();
+
+const plugin = (modules: TsserverPluginModules) => {
+	const upstream = upstreamPlugin(modules);
+	const getUpstreamExternalFiles = upstream.getExternalFiles?.bind(upstream);
 	return {
-		...volar,
+		...upstream,
 		getExternalFiles(project: any, updateLevel: any) {
-			const externalFiles = getExternalFiles?.(project, updateLevel) ?? [];
+			const externalFiles = getUpstreamExternalFiles?.(project, updateLevel) ?? [];
 			if (!projectContainsTsrx(project)) return externalFiles;
 			const contract = join(__dirname, 'markless-jsx.d.ts');
 			return externalFiles.includes(contract) ? externalFiles : [...externalFiles, contract];
 		},
-		create(info: Parameters<typeof volar.create>[0]) {
+		create(info: any) {
+			const alreadyInstalled = marklessLanguageServices.get(info.languageServiceHost);
+			if (alreadyInstalled) return alreadyInstalled;
+
+			// Bind before upstream's create: it decorates the host and swaps in a proxy
+			// language service, and both of these must still read authored TSRX coordinates.
 			const getSourceSnapshot = info.languageServiceHost.getScriptSnapshot.bind(
+				info.languageServiceHost,
+			);
+			const getSourceVersion = info.languageServiceHost.getScriptVersion?.bind(
 				info.languageServiceHost,
 			);
 			const nativeJsxClosingTag = info.languageService.getJsxClosingTagAtPosition?.bind(
 				info.languageService,
 			);
-			const languageService = volar.create(info);
+			const nativeCompletionEntryDetails =
+				info.languageService.getCompletionEntryDetails?.bind(info.languageService);
+			// Upstream short-circuits and hands back info.languageService untouched when this
+			// host was already decorated, so the result is treated as an opaque service rather
+			// than as a guaranteed Volar proxy.
+			const languageService = upstream.create(info) ?? info.languageService;
 			const enhancedLanguageService = Object.create(null);
 			for (const key of Object.keys(languageService)) {
 				const value = languageService[key as keyof typeof languageService];
@@ -45,15 +82,15 @@ const plugin = (modules: Parameters<typeof volarPlugin>[0]) => {
 				enhancedLanguageService,
 				getSourceSnapshot,
 			);
-			const getSyntacticDiagnostics = enhancedLanguageService.getSyntacticDiagnostics.bind(
-				enhancedLanguageService,
-			);
+			const getSyntacticDiagnostics =
+				enhancedLanguageService.getSyntacticDiagnostics.bind(enhancedLanguageService);
 			enhancedLanguageService.getSyntacticDiagnostics = (fileName: string) => {
 				const diagnostics = getSyntacticDiagnostics(fileName);
 				if (!isMarklessTsrxFile(fileName)) return diagnostics;
+				const snapshot = getSourceSnapshot(fileName);
+				refreshMarklessParseFailure(fileName, snapshot, getSourceVersion?.(fileName));
 				const failure = getMarklessTsrxParseFailure(fileName);
 				if (!failure) return diagnostics;
-				const snapshot = getSourceSnapshot(fileName);
 				const sourceLength = snapshot?.getLength() ?? 0;
 				const sourceFile = enhancedLanguageService.getProgram()?.getSourceFile(fileName);
 				// Volar uses an empty placeholder SourceFile for non-empty TSRX sources in
@@ -77,10 +114,60 @@ const plugin = (modules: Parameters<typeof volarPlugin>[0]) => {
 					},
 				];
 			};
+			if (nativeCompletionEntryDetails) {
+				const getCompletionEntryDetails =
+					enhancedLanguageService.getCompletionEntryDetails.bind(enhancedLanguageService);
+				enhancedLanguageService.getCompletionEntryDetails = (
+					fileName: string,
+					position: number,
+					entryName: string,
+					formatOptions: unknown,
+					importSource: string | undefined,
+					preferences: unknown,
+					data: unknown,
+				) => {
+					const details = getCompletionEntryDetails(
+						fileName,
+						position,
+						entryName,
+						formatOptions,
+						importSource,
+						preferences,
+						data,
+					);
+					if (
+						!isMarklessTsrxFile(fileName) ||
+						!hasUnmappedCodeAction(details, fileName)
+					) {
+						return details;
+					}
+					const snapshot = getSourceSnapshot(fileName);
+					if (!snapshot) return details;
+					const generatedPosition = mapMarklessSourcePositionToGenerated(
+						fileName,
+						snapshot,
+						position,
+					);
+					if (generatedPosition === undefined) return details;
+					return withLeadingRegionChanges(
+						details,
+						nativeCompletionEntryDetails(
+							fileName,
+							snapshot.getLength() + generatedPosition,
+							entryName,
+							formatOptions,
+							importSource,
+							preferences,
+							data,
+						),
+						fileName,
+						snapshot.getLength(),
+					);
+				};
+			}
 			if (nativeJsxClosingTag) {
-				const proxiedJsxClosingTag = languageService.getJsxClosingTagAtPosition?.bind(
-					languageService,
-				);
+				const proxiedJsxClosingTag =
+					languageService.getJsxClosingTagAtPosition?.bind(languageService);
 				enhancedLanguageService.getJsxClosingTagAtPosition = (
 					fileName: string,
 					position: number,
@@ -98,16 +185,67 @@ const plugin = (modules: Parameters<typeof volarPlugin>[0]) => {
 					if (generatedPosition === undefined) {
 						return proxiedJsxClosingTag?.(fileName, position);
 					}
-					return nativeJsxClosingTag(
-						fileName,
-						snapshot.getLength() + generatedPosition,
-					);
+					return nativeJsxClosingTag(fileName, snapshot.getLength() + generatedPosition);
 				};
 			}
+			marklessLanguageServices.set(info.languageServiceHost, enhancedLanguageService);
 			return enhancedLanguageService;
 		},
 	};
 };
+
+// Compiling the authored source is what records - or clears - the file's parse failure,
+// so this recompiles it when its script version changes and then leaves the record for
+// getSyntacticDiagnostics to read.
+function refreshMarklessParseFailure(
+	fileName: string,
+	snapshot: any,
+	version: string | undefined,
+): void {
+	if (!snapshot) return;
+	if (version !== undefined && parseFailureVersions.get(fileName) === version) return;
+	if (version !== undefined) parseFailureVersions.set(fileName, version);
+	updateMarklessTsrxParseFailure(fileName, snapshot.getText(0, snapshot.getLength()));
+}
+
+function hasUnmappedCodeAction(details: any, fileName: string): boolean {
+	return Boolean(
+		details?.codeActions?.some(
+			(action: any) => !action.changes?.some((change: any) => change.fileName === fileName),
+		),
+	);
+}
+
+// TypeScript inserts a brand-new import at offset 0 of the document it is handed. For a
+// .tsrx file that document is a blanked-out copy of the authored source followed by the
+// generated TSX, so offset 0 lands in the blanked copy, which carries no mappings - the
+// editor host drops the whole code action and the user is offered an import that changes
+// nothing. The blanked copy is character-for-character as long as the authored source, so
+// a change inside it belongs at the same authored offset; re-anchor exactly those.
+function withLeadingRegionChanges(
+	details: any,
+	generatedDetails: any,
+	fileName: string,
+	sourceLength: number,
+): any {
+	return {
+		...details,
+		codeActions: details.codeActions.map((action: any, index: number) => {
+			if (action.changes?.some((change: any) => change.fileName === fileName)) return action;
+			const generatedAction = generatedDetails?.codeActions?.[index];
+			if (generatedAction?.description !== action.description) return action;
+			const textChanges = (generatedAction.changes ?? [])
+				.filter((change: any) => change.fileName === fileName)
+				.flatMap((change: any) => change.textChanges)
+				.filter(
+					(textChange: any) =>
+						textChange.span.start + textChange.span.length <= sourceLength,
+				);
+			if (textChanges.length === 0) return action;
+			return { ...action, changes: [...(action.changes ?? []), { fileName, textChanges }] };
+		}),
+	};
+}
 
 function projectContainsTsrx(project: any): boolean {
 	const fileNameLists = [
@@ -140,9 +278,5 @@ function projectContainsTsrx(project: any): boolean {
 		);
 	});
 }
-
-Object.defineProperty(plugin, '__getMarklessTsrxLanguagePlugin', {
-	value: getMarklessTsrxLanguagePlugin,
-});
 
 export default plugin;

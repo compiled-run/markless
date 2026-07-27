@@ -1,5 +1,12 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	symlinkSync,
+	writeFileSync,
+} from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -7,32 +14,31 @@ import ts from 'typescript';
 import { expect, test } from 'vitest';
 import {
 	MARKLESS_TSRX_LANGUAGE_ID,
+	MARKLESS_TSRX_PARSE_ERROR_CODE,
 	MarklessTsrxVirtualCode,
 	clampMarklessDiagnosticStart,
 	getMarklessTsrxParseFailure,
-	getMarklessTsrxLanguagePlugin,
 	isMarklessTsrxFile,
 } from '../src/language.ts';
 import { TsserverHarness } from './tsserver-harness.ts';
 
 const require = createRequire(import.meta.url);
 
-test('registers .tsrx through the Markless language plugin without mixed TSX parsing', () => {
-	const plugin = getMarklessTsrxLanguagePlugin();
-
+// Registering .tsrx with Volar - the language id, the extra file extension and its script
+// kind - is @tsrx/typescript-plugin's job now, so there is no Markless registration object
+// left to assert on. What src/index.ts still decides for itself is which files are Markless
+// TSRX at all: every hook it layers on the host is gated on this predicate.
+test('recognizes .tsrx as Markless TSRX and leaves other extensions alone', () => {
 	expect(isMarklessTsrxFile('/workspace/src/App.tsrx')).toBe(true);
 	expect(isMarklessTsrxFile('/workspace/src/App.tsx')).toBe(false);
-	expect(plugin.getLanguageId?.('/workspace/src/App.tsrx')).toBe(MARKLESS_TSRX_LANGUAGE_ID);
+	expect(isMarklessTsrxFile('/workspace/src/App.ts')).toBe(false);
+	expect(isMarklessTsrxFile({ fsPath: 'C:\\workspace\\src\\App.tsrx' })).toBe(true);
 	expect(
-		plugin.createVirtualCode?.(
+		new MarklessTsrxVirtualCode(
 			'/workspace/src/App.tsrx',
-			'typescriptreact',
 			ts.ScriptSnapshot.fromString('export function App() @{}'),
-		)?.languageId,
+		).languageId,
 	).toBe(MARKLESS_TSRX_LANGUAGE_ID);
-	expect(plugin.typescript?.extraFileExtensions).toEqual([
-		{ extension: 'tsrx', isMixedContent: false, scriptKind: ts.ScriptKind.Deferred },
-	]);
 });
 
 test('configures Zed to highlight .tsrx as TSX and load the workspace plugin', () => {
@@ -56,8 +62,7 @@ test('configures Zed to highlight .tsrx as TSX and load the workspace plugin', (
 	]);
 });
 
-test('feeds TypeScript a virtual .tsx service script for TSRX source', () => {
-	const plugin = getMarklessTsrxLanguagePlugin();
+test('compiles TSRX source into type-checkable TSX for TypeScript', () => {
 	const source = `
 		import { state } from '@markless/core';
 
@@ -67,21 +72,18 @@ test('feeds TypeScript a virtual .tsx service script for TSRX source', () => {
 		}
 	`;
 	const fileName = join(process.cwd(), 'packages/core/src/Counter.tsrx');
-	const virtualCode = plugin.createVirtualCode?.(
-		fileName,
-		MARKLESS_TSRX_LANGUAGE_ID,
-		ts.ScriptSnapshot.fromString(source),
-	);
-	const serviceScript = virtualCode && plugin.typescript?.getServiceScript?.(virtualCode);
+	const virtualCode = new MarklessTsrxVirtualCode(fileName, ts.ScriptSnapshot.fromString(source));
 
-	expect(serviceScript).toMatchObject({ extension: '.tsx', scriptKind: ts.ScriptKind.TSX });
-	expect(virtualCode?.generatedCode).toContain("import { state } from '@markless/core';");
-	expect(virtualCode?.generatedCode).toContain('count++');
-	expect(virtualCode?.generatedCode).toContain('return <button');
-	expect(virtualCode?.generatedCode).not.toContain('react/jsx-runtime');
+	expect(virtualCode.generatedCode).toContain("import { state } from '@markless/core';");
+	expect(virtualCode.generatedCode).toContain('count++');
+	expect(virtualCode.generatedCode).toContain('return <button');
+	expect(virtualCode.generatedCode).not.toContain('react/jsx-runtime');
+	// The generated document is what every mapped editor answer is resolved against, so it
+	// has to type-check as TSX on its own - a scaffolding diagnostic here would surface to
+	// the user on a file they wrote correctly.
 	expect(
 		formatDiagnostics(
-			typeCheckVirtualSource(fileName, virtualCode?.generatedCode ?? '', {
+			typeCheckVirtualSource(fileName, virtualCode.generatedCode, {
 				noUnusedLocals: true,
 			}),
 		),
@@ -89,7 +91,6 @@ test('feeds TypeScript a virtual .tsx service script for TSRX source', () => {
 });
 
 test('populates virtual code from the Markless compiler type-service artifact', () => {
-	const plugin = getMarklessTsrxLanguagePlugin();
 	const source = `import { state } from '@markless/core';
 export function App() @{
 	let count = state(0);
@@ -99,9 +100,8 @@ export function App() @{
 	</section>
 }`;
 	const fileName = join(process.cwd(), 'packages/core/src/App.tsrx');
-	const virtualCode = plugin.createVirtualCode?.(
+	const virtualCode = new MarklessTsrxVirtualCode(
 		fileName,
-		MARKLESS_TSRX_LANGUAGE_ID,
 		ts.ScriptSnapshot.fromString(source),
 	) as any;
 
@@ -162,10 +162,7 @@ test('finds and clears parse failures across file-name casing and separators', (
 	const fileName = join(process.cwd(), 'packages/core/src/Canonical-Failure.tsrx');
 	const good = 'export function Notice() @{ <article>Ready</article> }';
 	const broken = 'export function Notice() @{ <article>Waiting</section> }';
-	const virtualCode = new MarklessTsrxVirtualCode(
-		fileName,
-		ts.ScriptSnapshot.fromString(good),
-	);
+	const virtualCode = new MarklessTsrxVirtualCode(fileName, ts.ScriptSnapshot.fromString(good));
 	const alternateFileNames = [fileName.toUpperCase(), fileName.replaceAll('/', '\\')];
 
 	virtualCode.update(ts.ScriptSnapshot.fromString(broken));
@@ -207,15 +204,30 @@ test('package CommonJS entry is generated into dist instead of maintained in src
 test('exports a generated CommonJS factory for tsserver plugin loading', () => {
 	ensureGeneratedCjsBuild();
 	const cjsPlugin = require('@markless/typescript-plugin') as any;
-	const languagePlugin = cjsPlugin.__getMarklessTsrxLanguagePlugin?.();
-	const virtualCode = languagePlugin?.createVirtualCode?.(
-		join(process.cwd(), 'packages/core/src/App.tsrx'),
-		MARKLESS_TSRX_LANGUAGE_ID,
-		ts.ScriptSnapshot.fromString('export function App() @{ <span>ok</span> }'),
-	) as any;
 
+	// TypeScript's plugin loader requires the module itself to be callable and loads the
+	// plugin as a silent no-op when it is not, so this is the contract that decides whether
+	// any Markless editor behaviour runs at all.
 	expect(typeof cjsPlugin).toBe('function');
-	expect(virtualCode?.sourceAst?.type).toBe('Program');
+});
+
+test('the CommonJS volar entry compiles TSRX the way the host reaches it', () => {
+	ensureGeneratedCjsBuild();
+	// @tsrx/typescript-plugin resolves the tsconfig `tsrx.compiler` declaration and requires
+	// this subpath - it is the only seam through which upstream reaches the Markless
+	// compiler, so the packaged CommonJS build has to answer on it.
+	const compileToVolarMappings = (require('@markless/typescript-plugin/volar') as any)
+		.compileToVolarMappings;
+	const compiled = compileToVolarMappings(
+		'export function App() @{ <span>ok</span> }',
+		join(process.cwd(), 'packages/core/src/App.tsrx'),
+		{ loose: true },
+	);
+
+	expect(typeof compileToVolarMappings).toBe('function');
+	expect(compiled.sourceAst?.type).toBe('Program');
+	expect(compiled.code).toContain('<span>ok</span>');
+	expect(compiled.mappings.length).toBeGreaterThan(0);
 });
 
 test('tsserver protocol opens configured .tsrx files without JSX or parser diagnostics', async () => {
@@ -230,6 +242,18 @@ test('tsserver protocol opens configured .tsrx files without JSX or parser diagn
 		{ file: 'List.tsrx', syntactic: [], semantic: [] },
 		{ file: 'Control.tsrx', syntactic: [], semantic: [] },
 	]);
+}, 20_000);
+
+test('a project that also lists the nested upstream plugin installs Markless behaviour once', async () => {
+	const result = await runDoubleRegistrationProbe();
+
+	expect(result.loadedMarklessPlugin).toBe(true);
+	expect(result.loadedUpstreamPlugin).toBe(true);
+	// Both plugin entries decorate the same language service host. If the Markless
+	// wrapper installed its hooks a second time on top of the short-circuited upstream
+	// service, its parse diagnostic would be appended twice for the same file.
+	expect(result.parseErrorCount).toBe(1);
+	expect(result.cleanFileParseErrorCount).toBe(0);
 }, 20_000);
 
 function typeCheckVirtualSource(
@@ -341,9 +365,17 @@ export function App() @{
 		join(project, 'node_modules/@markless/core/index.d.ts'),
 		'export declare function state<T>(initial: T): T;\n',
 	);
+	// The nested upstream plugin resolves the tsconfig `tsrx.compiler` specifier from the
+	// project directory, exactly as a real Markless app does.
+	symlinkSync(
+		join(root, 'packages/typescript-plugin'),
+		join(project, 'node_modules/@markless/typescript-plugin'),
+		'dir',
+	);
 	writeFileSync(
 		join(project, 'tsconfig.json'),
 		JSON.stringify({
+			tsrx: { compiler: '@markless/typescript-plugin/volar' },
 			compilerOptions: {
 				lib: ['ES2022', 'DOM'],
 				module: 'ESNext',
@@ -377,6 +409,88 @@ export function App() @{
 	} finally {
 		await server.close();
 	}
+}
+
+// A consumer who copies upstream's README ends up listing @tsrx/typescript-plugin next to
+// @markless/typescript-plugin. Upstream is loaded first here so that the Markless wrapper
+// takes the branch where its nested upstream create() short-circuits on the already
+// decorated host and hands back the language service untouched.
+async function runDoubleRegistrationProbe(): Promise<{
+	loadedMarklessPlugin: boolean;
+	loadedUpstreamPlugin: boolean;
+	parseErrorCount: number;
+	cleanFileParseErrorCount: number;
+}> {
+	ensureGeneratedCjsBuild();
+	const root = process.cwd();
+	const project = mkdtempSync(join(tmpdir(), 'markless-double-registration-'));
+	mkdirSync(join(project, 'node_modules/@markless'), { recursive: true });
+	symlinkSync(
+		join(root, 'packages/typescript-plugin'),
+		join(project, 'node_modules/@markless/typescript-plugin'),
+		'dir',
+	);
+	writeFileSync(
+		join(project, 'tsconfig.json'),
+		JSON.stringify({
+			tsrx: { compiler: '@markless/typescript-plugin/volar' },
+			compilerOptions: {
+				lib: ['ES2022', 'DOM'],
+				module: 'ESNext',
+				moduleResolution: 'Bundler',
+				noEmit: true,
+				plugins: [
+					{ name: '@tsrx/typescript-plugin' },
+					{ name: '@markless/typescript-plugin' },
+				],
+				skipLibCheck: true,
+				target: 'ES2022',
+			},
+			include: ['*.tsrx'],
+		}),
+	);
+	writeFileSync(
+		join(project, 'Broken.tsrx'),
+		'export function Broken() @{\n\t<button>Save</button>>\n}\n',
+	);
+	writeFileSync(
+		join(project, 'Clean.tsrx'),
+		'export function Clean() @{\n\t<span>ok</span>\n}\n',
+	);
+
+	const server = new TsserverHarness({
+		project,
+		workspaceRoot: root,
+		globalPlugins: ['@tsrx/typescript-plugin', '@markless/typescript-plugin'],
+		pluginProbeLocations: [
+			join(root, 'packages/typescript-plugin/node_modules'),
+			join(root, 'node_modules'),
+		],
+	});
+	try {
+		const brokenFile = join(project, 'Broken.tsrx');
+		const cleanFile = join(project, 'Clean.tsrx');
+		server.open(brokenFile);
+		server.open(cleanFile);
+		const brokenDiagnostics = await server.syntacticDiagnosticsSync(brokenFile);
+		const cleanDiagnostics = await server.syntacticDiagnosticsSync(cleanFile);
+		const log = server.readLog();
+		return {
+			loadedMarklessPlugin: log.includes('@markless/typescript-plugin'),
+			loadedUpstreamPlugin: log.includes('@tsrx/typescript-plugin'),
+			parseErrorCount: countMarklessParseErrors(brokenDiagnostics),
+			cleanFileParseErrorCount: countMarklessParseErrors(cleanDiagnostics),
+		};
+	} finally {
+		await server.close();
+	}
+}
+
+function countMarklessParseErrors(diagnostics: readonly any[]): number {
+	return diagnostics.filter(
+		(diagnostic) =>
+			diagnostic.source === 'markless' && diagnostic.code === MARKLESS_TSRX_PARSE_ERROR_CODE,
+	).length;
 }
 
 let generatedCjsBuildReady = false;

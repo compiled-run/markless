@@ -1,6 +1,6 @@
 {
 	"name": "create-markless",
-	"version": "0.1.1",
+	"version": "0.2.0",
 	"description": "Create Markless apps.",
 	"license": "MIT",
 	"repository": {
@@ -21,6 +21,7 @@
 	},
 	"publishConfig": {
 		"access": "public",
+		"provenance": true,
 		"bin": {
 			"create-markless": "./dist/node.js"
 		},

@@ -234,6 +234,10 @@ test('creates a minimal Markless Router app with TSRX pages and Nitro-backed dep
 	};
 	const viteConfig = await readFile(join(appRoot, 'vite.config.ts'), 'utf-8');
 	const gitignore = await readFile(join(appRoot, '.gitignore'), 'utf-8');
+	const tsconfig = JSON.parse(await readFile(join(appRoot, 'tsconfig.json'), 'utf-8')) as {
+		tsrx?: { compiler?: string };
+		compilerOptions: { jsx?: string; plugins: Array<{ name: string }> };
+	};
 	const vscodeSettings = JSON.parse(
 		await readFile(join(appRoot, '.vscode/settings.json'), 'utf-8'),
 	) as unknown;
@@ -266,17 +270,18 @@ test('creates a minimal Markless Router app with TSRX pages and Nitro-backed dep
 		typescript: expect.any(String),
 		vite: expect.any(String),
 	});
+	// The upstream TSRX extension already claims `.tsrx` through its own language contribution,
+	// so the scaffold must NOT pin a `files.associations` entry: naming a language id that no
+	// longer exists is what silently kills syntax highlighting in a scaffolded app.
 	expect(vscodeSettings).toEqual({
-		'files.associations': {
-			'*.tsrx': 'markless-tsrx',
-		},
 		'emmet.includeLanguages': {
-			'markless-tsrx': 'html',
+			ripple: 'html',
 		},
 	});
+	// Editor support comes from the upstream extension plus @markless/typescript-plugin.
+	// Recommending it (and never marking it unwanted) is the whole editor setup story.
 	expect(vscodeExtensions).toEqual({
-		recommendations: ['markless.markless'],
-		unwantedRecommendations: ['ripple-ts.ripple-ts-vscode-plugin'],
+		recommendations: ['ripple-ts.ripple-ts-vscode-plugin'],
 	});
 	expect(zedSettings).toBe(zedSettingsTemplate);
 	await expect(exists(join(appRoot, 'AGENTS.md'))).resolves.toBe(false);
@@ -306,6 +311,16 @@ test('creates a minimal Markless Router app with TSRX pages and Nitro-backed dep
 	await expect(exists(join(appRoot, 'gitignore'))).resolves.toBe(false);
 	await expect(readFile(join(appRoot, 'tsconfig.json'), 'utf-8')).resolves.not.toContain('tsx');
 	await expect(exists(join(appRoot, 'pages/index.tsx'))).resolves.toBe(false);
+	// The nested upstream TypeScript plugin reaches the Markless compiler only through this
+	// top-level declaration. Drop it and the scaffolded app opens with a silently dead editor.
+	expect(tsconfig.tsrx?.compiler).toBe('@markless/typescript-plugin/volar');
+	// Importing a component with its .tsrx extension resolves to a TSX service script;
+	// without a jsx setting TypeScript reports TS6142 on that import.
+	expect(tsconfig.compilerOptions.jsx).toBe('preserve');
+	expect(tsconfig.compilerOptions.plugins.map((plugin) => plugin.name)).toEqual([
+		'@markless/typescript-plugin',
+		'@markless/router/typescript-plugin',
+	]);
 });
 
 test('packs no repository agent configuration templates', async () => {
@@ -315,7 +330,12 @@ test('packs no repository agent configuration templates', async () => {
 		cwd: cliRoot,
 		env: { ...process.env, npm_config_cache: cache },
 	});
-	const [{ files }] = JSON.parse(stdout) as Array<{ files: Array<{ path: string }> }>;
+	// npm 11 and earlier report `npm pack --json` as an array of package summaries; npm 12
+	// reports an object keyed by package name. Accept either so the assertions below stay
+	// about the packed file list rather than the installed npm's report shape.
+	type PackReport = { files: Array<{ path: string }> };
+	const report = JSON.parse(stdout) as PackReport[] | Record<string, PackReport>;
+	const [{ files }] = Array.isArray(report) ? report : Object.values(report);
 	const packedPaths = files.map((file) => file.path);
 
 	expect(packedPaths).not.toContain('templates/common/AGENTS.md');
@@ -347,6 +367,7 @@ test('generates app and full-stack status pages under pages', async () => {
 			await expect(exists(join(appRoot, '404.tsrx'))).resolves.toBe(false);
 			await expect(exists(join(appRoot, '500.tsrx'))).resolves.toBe(false);
 			expect(tsconfigJson).toContain('"pages"');
+			expect(tsconfigJson).toContain('"compiler": "@markless/typescript-plugin/volar"');
 			expect(tsconfigJson).not.toContain('"404.tsrx"');
 			expect(tsconfigJson).not.toContain('"500.tsrx"');
 			expect(gitignore).toContain('node_modules/');
@@ -365,10 +386,17 @@ test('generates Deno format imports with Nitro available', async () => {
 
 	await program.run(['deno-app', '--format', 'deno', '--no-install', '--no-git'], runtime(root));
 
-	const denoJson = JSON.parse(await readFile(join(root, 'deno-app/deno.json'), 'utf-8')) as {
+	const appRoot = join(root, 'deno-app');
+	const denoJson = JSON.parse(await readFile(join(appRoot, 'deno.json'), 'utf-8')) as {
 		imports: Record<string, string>;
 		nodeModulesDir?: string;
+		tasks: Record<string, string>;
 	};
+	const tsconfig = JSON.parse(await readFile(join(appRoot, 'tsconfig.json'), 'utf-8')) as {
+		tsrx?: { compiler?: string };
+		compilerOptions: { plugins: Array<{ name: string }> };
+	};
+	const readme = await readFile(join(appRoot, 'README.md'), 'utf-8');
 
 	expect(denoJson.nodeModulesDir).toBe('auto');
 	expect(denoJson.imports).toMatchObject({
@@ -376,6 +404,35 @@ test('generates Deno format imports with Nitro available', async () => {
 		'@markless/router': expect.stringMatching(/^npm:@markless\/router@\^/),
 		nitro: 'npm:nitro@3.0.260429-beta',
 	});
+	// tsconfig.json is shared by all three formats, so a Deno app gets the same editor
+	// wiring the Node and Bun apps get. Deno's own language server ignores it — it reads
+	// deno.json and reports `plugins` as an unsupported compiler option — but tsserver-based
+	// editors read it, and they resolve both the plugin and the declared compiler from the
+	// app's node_modules, which `deno install` populates from these imports. Without the
+	// import the app declares an editor toolchain it never installs, and .tsrx files are read
+	// as plain TypeScript: no intrinsic tag completions, and `count` types as any.
+	expect(denoJson.imports['@markless/typescript-plugin']).toMatch(
+		/^npm:@markless\/typescript-plugin@\^/,
+	);
+	expect(tsconfig.tsrx?.compiler).toBe('@markless/typescript-plugin/volar');
+	expect(tsconfig.compilerOptions.plugins.map((plugin) => plugin.name)).toEqual([
+		'@markless/typescript-plugin',
+		'@markless/router/typescript-plugin',
+	]);
+	// No doctor task, deliberately: scripts/markless-doctor.mjs reads package.json, which the
+	// Deno format does not create, so the task would crash on its first line. Make the doctor
+	// read deno.json before adding one here.
+	expect(denoJson.tasks.doctor).toBeUndefined();
+	expect(Object.keys(denoJson.tasks)).toEqual([
+		'dev',
+		'build',
+		'preview',
+		'check',
+		'fmt',
+		'test',
+	]);
+	// The limitation is recorded for the app author, not just for us.
+	expect(readme).toContain("Deno's language server does not");
 });
 
 test('generates docs with MDX routes and component layouts only', async () => {
@@ -429,9 +486,7 @@ test('scaffolded manifests pin @markless deps to the publishing cli version, nev
 			expect(appManifest.dependencies['@markless/core']).toBe(expectedRange);
 			expect(appManifest.dependencies['@markless/router']).toBe(expectedRange);
 			expect(appManifest.devDependencies['@markless/analyzer']).toBe(expectedRange);
-			expect(appManifest.devDependencies['@markless/typescript-plugin']).toBe(
-				expectedRange,
-			);
+			expect(appManifest.devDependencies['@markless/typescript-plugin']).toBe(expectedRange);
 			for (const [name, range] of [
 				...Object.entries(appManifest.dependencies),
 				...Object.entries(appManifest.devDependencies),
@@ -455,6 +510,9 @@ test('scaffolded manifests pin @markless deps to the publishing cli version, nev
 
 	expect(denoJson.imports['@markless/core']).toBe(`npm:@markless/core@${expectedRange}`);
 	expect(denoJson.imports['@markless/router']).toBe(`npm:@markless/router@${expectedRange}`);
+	expect(denoJson.imports['@markless/typescript-plugin']).toBe(
+		`npm:@markless/typescript-plugin@${expectedRange}`,
+	);
 });
 
 test('rejects --yes without a positional target', async () => {

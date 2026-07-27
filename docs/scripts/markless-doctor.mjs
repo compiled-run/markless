@@ -39,6 +39,71 @@ check(
 	'add @markless/analyzer as a devDependency to verify preload/network/resume invariants in tests',
 );
 
+// tsconfig.json allows // and /* */ comments plus trailing commas; JSON.parse does not.
+// Strip both while respecting string literals, so a commented config still reads.
+const parseTsconfig = (source) => {
+	let json = '';
+	let insideString = false;
+	for (let index = 0; index < source.length; index += 1) {
+		const character = source[index];
+		if (insideString) {
+			json += character;
+			if (character === '\\') {
+				index += 1;
+				json += source[index] ?? '';
+			} else if (character === '"') {
+				insideString = false;
+			}
+			continue;
+		}
+		if (character === '"') {
+			insideString = true;
+			json += character;
+			continue;
+		}
+		if (character === '/' && source[index + 1] === '/') {
+			while (index < source.length && source[index] !== '\n') index += 1;
+			json += '\n';
+			continue;
+		}
+		if (character === '/' && source[index + 1] === '*') {
+			index += 2;
+			while (index < source.length && !(source[index] === '*' && source[index + 1] === '/')) {
+				index += 1;
+			}
+			index += 1;
+			continue;
+		}
+		// Outside a string, a comma directly before a closing brace or bracket is a
+		// trailing comma, which JSON rejects.
+		if (character === '}' || character === ']') json = json.replace(/,\s*$/, '');
+		json += character;
+	}
+	return JSON.parse(json);
+};
+
+// The TypeScript plugin reaches the Markless compiler ONLY through the top-level
+// `tsrx` declaration in this app's tsconfig.json. Without it the editor answers
+// nothing — no completions, no hover, no go-to-definition — and says nothing about why.
+const tsconfigPath = resolve(root, 'tsconfig.json');
+let declaredCompiler;
+let editorWiringDetail;
+try {
+	declaredCompiler = parseTsconfig(readFileSync(tsconfigPath, 'utf8'))?.tsrx?.compiler;
+	editorWiringDetail =
+		typeof declaredCompiler === 'string' && declaredCompiler
+			? declaredCompiler
+			: 'tsconfig.json does not declare tsrx.compiler';
+} catch (error) {
+	editorWiringDetail = `could not read tsconfig.json — ${error.message}`;
+}
+check(
+	'editor wiring declares the markless compiler',
+	typeof declaredCompiler === 'string' && declaredCompiler.length > 0,
+	editorWiringDetail,
+	'add this as a top-level key of tsconfig.json, beside compilerOptions: "tsrx": { "compiler": "@markless/typescript-plugin/volar" }',
+);
+
 const skipBuild = process.argv.includes('--no-build');
 if (!skipBuild) {
 	try {

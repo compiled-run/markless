@@ -64,8 +64,16 @@ export function shared<T>(create: () => T, options?: SharedOptions): SharedDefin
 	return frameworkApi<SharedDefinition<T>>('shared', create, options);
 }
 
-export function storage(key: string, fallback: string): string {
-	return frameworkApi<string>('storage', key, fallback);
+// Arity is the discriminator, matching the compiler's rule in
+// packages/compiler/src/passes/semantic-graph/collect-storage.ts: two or more
+// arguments means an explicit key, and otherwise the sole argument IS the
+// fallback and the key is derived from the binding identifier. An optional
+// second parameter would type a lone argument as a KEY — the exact inverse — so
+// these must stay overloads.
+export function storage(fallback: string): string;
+export function storage(key: string, fallback: string): string;
+export function storage(...args: [fallback: string] | [key: string, fallback: string]): string {
+	return frameworkApi<string>('storage', ...args);
 }
 
 function frameworkApi<T>(name: string, ..._args: unknown[]): T {

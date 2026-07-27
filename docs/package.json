@@ -6,7 +6,7 @@
 		"dev": "vp dev",
 		"build": "vp build",
 		"preview": "vp preview",
-		"check": "vp check README.md package.json pages scripts tsconfig.json vite.config.ts",
+		"check": "vp check",
 		"doctor": "node scripts/markless-doctor.mjs",
 		"fmt": "vp fmt",
 		"test": "vp test"

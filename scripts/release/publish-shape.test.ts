@@ -6,21 +6,19 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, test } from 'vitest';
+import { releasePackages } from './release-packages.mjs';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
-const releasePackages = [
-	'core',
-	'web',
-	'router',
-	'bundler',
-	'runtime',
-	'serializer',
-	'compiler',
-	'cli',
-] as const;
+// Derived, never restated. This file used to carry an eight-name literal — the
+// third copy of the release set — and a copy like it is exactly how
+// `verify-publish-ready.mjs --all` silently stopped covering
+// @markless/analyzer and @markless/typescript-plugin.
+const releasePackageDirs: readonly string[] = releasePackages().map(
+	(entry: { dir: string }) => entry.dir,
+);
 
-type ExportTarget = string | { readonly types?: string; readonly default?: string };
+type ExportTarget = string | { readonly [condition: string]: ExportTarget | undefined };
 
 type PackageManifest = {
 	readonly name?: string;
@@ -45,11 +43,29 @@ function readManifest(packageName: string): PackageManifest {
 	) as PackageManifest;
 }
 
+/**
+ * Every string leaf under an exports target, whatever conditions wrap it.
+ * Reading only `types`/`default` skipped `require` entries, so a CommonJS
+ * export could point at a file no build produced and still pass. Mirrors
+ * `verify-publish-ready.mjs`.
+ */
 function targetPaths(target: ExportTarget): string[] {
 	if (typeof target === 'string') {
 		return [target];
 	}
-	return [target.types, target.default].filter((path): path is string => path !== undefined);
+	return Object.values(target)
+		.filter((value): value is ExportTarget => value !== undefined)
+		.flatMap(targetPaths);
+}
+
+/**
+ * A TypeScript declaration file. `.d.cts` is the correct extension for the
+ * declarations of a CommonJS entry inside a `"type": "module"` package
+ * (@markless/typescript-plugin ships CJS because tsserver `require`s plugins);
+ * naming it `.d.ts` there would declare it ESM-flavoured and misresolve.
+ */
+function isDeclarationTarget(path: string): boolean {
+	return /\.d\.(?:c|m)?ts$/.test(path);
 }
 
 /**
@@ -97,7 +113,7 @@ describe('publish manifest shape', () => {
 	test('release version is a concrete semver', () => {
 		expect(releaseVersion).toMatch(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/);
 	});
-	for (const packageName of releasePackages) {
+	for (const packageName of releasePackageDirs) {
 		test(`@markless/${packageName} carries publishable fields`, () => {
 			const manifest = readManifest(packageName);
 			expect(manifest.private, `${packageName} must not be private`).toBeUndefined();
@@ -131,7 +147,7 @@ describe('publish manifest shape', () => {
 					).toBe(true);
 				}
 				expect(
-					targetPaths(target).some((path) => path.endsWith('.d.ts')),
+					targetPaths(target).some(isDeclarationTarget),
 					`${packageName} ${subpath} needs a types target`,
 				).toBe(true);
 			}
@@ -215,12 +231,12 @@ describe('publish manifest shape', () => {
 // Requires `vp pack` output. Skipped when dist is absent (CI runs `vp test`
 // without packing); the prepublishOnly guard re-enforces this fail-closed at
 // publish time, so a publish can never skip these checks.
-const packedDistExists = releasePackages.every((packageName) =>
+const packedDistExists = releasePackageDirs.every((packageName) =>
 	existsSync(resolve(repoRoot, 'packages', packageName, 'dist')),
 );
 
 describe.skipIf(!packedDistExists)('packed dist output (run `vp pack` first)', () => {
-	for (const packageName of releasePackages) {
+	for (const packageName of releasePackageDirs) {
 		test(`@markless/${packageName} publishConfig.exports targets all exist after vp pack`, () => {
 			const manifest = readManifest(packageName);
 			const devExports = manifest.exports ?? {};

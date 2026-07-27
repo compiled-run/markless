@@ -7,7 +7,7 @@
 //   the publish succeeds. Failures before that revert the manifests, so a
 //   failed release never keeps the version.
 import { spawnSync } from 'node:child_process';
-import { readFileSync, readdirSync } from 'node:fs';
+import { releasePackageNames, rootVersion } from './release-packages.mjs';
 
 const MANIFEST_PATHSPECS = ['package.json', 'packages/*/package.json'];
 
@@ -20,26 +20,6 @@ function run(command, args, options = {}) {
 function capture(command, args) {
 	const result = spawnSync(command, args, { encoding: 'utf-8' });
 	return { status: result.status ?? 1, stdout: (result.stdout ?? '').trim() };
-}
-
-function rootVersion() {
-	return JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf-8'))
-		.version;
-}
-
-function releasePackageNames() {
-	return readdirSync(new URL('../../packages', import.meta.url))
-		.map((dir) => {
-			try {
-				return JSON.parse(
-					readFileSync(new URL(`../../packages/${dir}/package.json`, import.meta.url), 'utf-8'),
-				);
-			} catch {
-				return null;
-			}
-		})
-		.filter((manifest) => manifest !== null && manifest.private !== true)
-		.map((manifest) => manifest.name);
 }
 
 function isPublished(name, version) {

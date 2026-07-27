@@ -52,6 +52,8 @@ export type SourcePosition = {
 export class TsserverHarness {
 	readonly project: string;
 	readonly logFile: string;
+	/** The exact tsserver command line, so tests can assert how the server was started. */
+	readonly serverArguments: readonly string[];
 
 	private readonly server: ChildProcessWithoutNullStreams;
 	private readonly lines: Interface;
@@ -72,22 +74,26 @@ export class TsserverHarness {
 			join(workspaceRoot, 'node_modules'),
 		];
 
-		this.server = spawn(
-			process.execPath,
-			[
-				join(workspaceRoot, 'node_modules/typescript/lib/tsserver.js'),
-				'--globalPlugins',
-				globalPlugins.join(','),
-				'--pluginProbeLocations',
-				probeLocations.join(','),
-				'--allowLocalPluginLoads',
-				'--logVerbosity',
-				'verbose',
-				'--logFile',
-				this.logFile,
-			],
-			{ cwd: options.project, stdio: ['pipe', 'pipe', 'pipe'] },
-		);
+		// An empty globalPlugins list omits the flag entirely instead of passing an empty
+		// value. A caller asking for "no global plugins" then gets a server that was never
+		// told about any, so the only remaining way a plugin can load is the project
+		// tsconfig's compilerOptions.plugins - the path a scaffolded Markless app uses.
+		this.serverArguments = [
+			join(workspaceRoot, 'node_modules/typescript/lib/tsserver.js'),
+			...(globalPlugins.length > 0 ? ['--globalPlugins', globalPlugins.join(',')] : []),
+			'--pluginProbeLocations',
+			probeLocations.join(','),
+			'--allowLocalPluginLoads',
+			'--logVerbosity',
+			'verbose',
+			'--logFile',
+			this.logFile,
+		];
+
+		this.server = spawn(process.execPath, this.serverArguments, {
+			cwd: options.project,
+			stdio: ['pipe', 'pipe', 'pipe'],
+		});
 		this.server.stderr.setEncoding('utf8');
 		this.server.stderr.on('data', (chunk) => this.stderr.push(String(chunk)));
 		this.server.once('exit', (code, signal) => {
@@ -254,10 +260,10 @@ export class TsserverHarness {
 			this.pending.set(requestSeq, {
 				resolve: (message) => {
 					if (!message.success) {
-					reject(
-						new Error(
-							`tsserver ${command} failed: ${message.message ?? 'unknown error'}`,
-						),
+						reject(
+							new Error(
+								`tsserver ${command} failed: ${message.message ?? 'unknown error'}`,
+							),
 						);
 						return;
 					}
@@ -309,6 +315,13 @@ export function copyFixtureProject(
 	const project = mkdtempSync(join(tmpdir(), 'markless-completion-matrix-'));
 	cpSync(fixtureDirectory, project, { recursive: true });
 	linkWorkspacePackage(project, '@markless/core', join(workspaceRoot, 'packages/core'));
+	// The nested upstream plugin resolves the tsconfig `tsrx.compiler` specifier from the
+	// project directory, exactly as a real Markless app does.
+	linkWorkspacePackage(
+		project,
+		'@markless/typescript-plugin',
+		join(workspaceRoot, 'packages/typescript-plugin'),
+	);
 	return project;
 }
 

@@ -1,4 +1,7 @@
 {
+	"tsrx": {
+		"compiler": "@markless/typescript-plugin/volar"
+	},
 	"compilerOptions": {
 		"lib": ["ES2022", "DOM"],
 		"jsx": "preserve",

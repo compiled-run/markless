@@ -1,25 +1,20 @@
-import { spawnSync } from 'node:child_process';
 import {
 	existsSync,
 	mkdtempSync,
 	readFileSync,
 	realpathSync,
 	rmSync,
-	statSync,
 	writeFileSync,
 } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { compileTsrxForTypeService } from '@markless/compiler/type-service';
 import initRouterPlugin from '@markless/router/typescript-plugin';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 import typeScript from 'typescript';
 import { intrinsicTagNames, snippetCatalog } from '../src/completions.ts';
-import {
-	MARKLESS_TSRX_PARSE_ERROR_CODE,
-	getMarklessTsrxLanguagePlugin,
-} from '../src/language.ts';
+import { MARKLESS_TSRX_PARSE_ERROR_CODE, MarklessTsrxVirtualCode } from '../src/language.ts';
 import {
 	TsserverHarness,
 	copyFixtureProject,
@@ -37,6 +32,8 @@ const fixtureDirectory = resolve(
 );
 const corePlugin = '@markless/typescript-plugin';
 const routerPlugin = '@markless/router/typescript-plugin';
+// The tsconfig key the upstream TSRX language server reads to find the Markless compiler.
+const volarCompiler = '@markless/typescript-plugin/volar';
 
 let project = '';
 let server: TsserverHarness;
@@ -60,7 +57,8 @@ test('completion catalog insertText is valid strict TSRX in its offered context'
 	for (const item of snippetCatalog) {
 		const source = catalogValidityFixture(item.context, stripSnippetSyntax(item.insertText));
 		expect(
-			() => compileTsrxForTypeService(source, `completion-${item.name}.tsrx`, { loose: false }),
+			() =>
+				compileTsrxForTypeService(source, `completion-${item.name}.tsrx`, { loose: false }),
 			`Catalog entry ${item.name} must insert grammar-valid strict TSRX.`,
 		).not.toThrow();
 	}
@@ -180,8 +178,7 @@ test('real tsserver reports the current TSRX parse failure and no parse error fo
 	expectedStart.offset += '</button>'.length;
 	const parseDiagnostics = brokenDiagnostics.filter(
 		(diagnostic) =>
-			diagnostic.source === 'markless' &&
-			diagnostic.code === MARKLESS_TSRX_PARSE_ERROR_CODE,
+			diagnostic.source === 'markless' && diagnostic.code === MARKLESS_TSRX_PARSE_ERROR_CODE,
 	);
 
 	expect(parseDiagnostics).toHaveLength(1);
@@ -198,6 +195,28 @@ test('real tsserver reports the current TSRX parse failure and no parse error fo
 				diagnostic.source === 'markless' &&
 				diagnostic.code === MARKLESS_TSRX_PARSE_ERROR_CODE,
 		),
+	).toEqual([]);
+}, 20_000);
+
+test('real tsserver keeps typed features and reports no parse error while a construct is half typed', async () => {
+	// constructs.tsrx is unparseable as written: every marker sits after a bare @. Without
+	// Markless recovery the host has no virtual code for it, so hover answers nothing and
+	// the file looks broken to the user mid-keystroke.
+	const fixture = openFixture('constructs.tsrx');
+	const hover = await server.quickinfo(fixture.file, positionAtSearch(fixture.source, 'value)'));
+	const diagnostics = await server.syntacticDiagnosticsSync(fixture.file);
+
+	expect(
+		displayText(hover),
+		'A half-typed @ construct must not cost the rest of the file its types.',
+	).toContain('(parameter) value: string');
+	expect(
+		diagnostics.filter(
+			(diagnostic) =>
+				diagnostic.source === 'markless' &&
+				diagnostic.code === MARKLESS_TSRX_PARSE_ERROR_CODE,
+		),
+		'A recovered file is still being typed, not broken: it must not report a parse error.',
 	).toEqual([]);
 }, 20_000);
 
@@ -876,27 +895,34 @@ test('M10 Markless JSX contract does not pollute an adjacent plain TSX file', as
 		expect.arrayContaining([
 			expect.objectContaining({
 				start: expect.objectContaining(positionAtSearch(fixture.source, '<div')),
-				text: expect.stringMatching(/JSX element implicitly has type 'any'.*JSX\.IntrinsicElements/i),
+				text: expect.stringMatching(
+					/JSX element implicitly has type 'any'.*JSX\.IntrinsicElements/i,
+				),
 			}),
 		]),
 	);
 }, 20_000);
 
-test('M12a the service script is TSX', () => {
-	const languagePlugin = getMarklessTsrxLanguagePlugin();
-	const virtualCode = languagePlugin.createVirtualCode?.(
-		'/workspace/App.tsrx',
-		'markless-tsrx',
-		{
-			getText: () => 'export function App() @{ <div class="app">ok</div> }',
-			getLength: () => 57,
-			getChangeRange: () => undefined,
-		},
-	);
-	const serviceScript = languagePlugin.typescript?.getServiceScript?.(virtualCode);
+test('M12a the Markless virtual code is TSX carrying the authored markup', () => {
+	// @tsrx/typescript-plugin registers .tsrx with Volar and decides the service script's
+	// extension and script kind; that .tsrx reaches TypeScript as TSX is proven live by
+	// M10, M12 and M13 rather than by inspecting a registration object here. What stays
+	// Markless-owned is the compile: the generated document must be TSX that preserves the
+	// authored markup, because every mapped editor answer is resolved against it.
+	const virtualCode = new MarklessTsrxVirtualCode('/workspace/App.tsrx', {
+		getText: () => 'export function App() @{ <div class="app">ok</div> }',
+		getLength: () => 57,
+		getChangeRange: () => undefined,
+	});
 
-	expect(serviceScript).toMatchObject({ extension: '.tsx', scriptKind: 4 });
-	expect(virtualCode?.generatedCode).toContain('<div class="app">ok</div>');
+	expect(virtualCode.generatedCode).toContain('<div class="app">ok</div>');
+	expect(
+		virtualCode.generatedCode,
+		'M12a missing capability: the generated document must be TSX, not a compiled render call.',
+	).toContain('return <div');
+	expect(virtualCode.snapshot.getText(0, virtualCode.snapshot.getLength())).toBe(
+		virtualCode.generatedCode,
+	);
 });
 
 test('M12 native jsxClosingTag answers through authored TSRX coordinates', async () => {
@@ -974,12 +1000,51 @@ test('M14 real tsserver offers native state auto-import and maps its code action
 	).toBeDefined();
 	expect(action?.changes?.map((change: any) => change.fileName)).toEqual([fixture.file]);
 	expect(
-		sourceChanges?.flatMap((change: any) => change.textChanges).map((change: any) => change.newText.trim()),
+		sourceChanges
+			?.flatMap((change: any) => change.textChanges)
+			.map((change: any) => change.newText.trim()),
 	).toContain("import { state } from '@markless/core';");
 	expect(applyProtocolChanges(fixture.source, sourceChanges?.[0]?.textChanges ?? [])).toContain(
 		"import { state } from '@markless/core';",
 	);
 	expect(JSON.stringify(action)).not.toContain('@jsxImportSource');
+}, 20_000);
+
+test('M14 real tsserver adds an auto-imported name to an existing import clause', async () => {
+	// The other M14 case has no imports, so TypeScript writes a whole new import at the
+	// very top of the document. Here the insertion lands inside the existing clause, which
+	// is the branch that must keep mapping through the ordinary token mappings.
+	const fixture = openFixture('auto-import-existing.tsrx');
+	const position = positionAfterMarker(fixture.marked, '/*M14_COMPUTED*/');
+	const completion = await server.completionInfo(fixture.file, position);
+	const entry = completionEntries(completion).find(
+		(candidate) => candidate.name === 'computed' && candidate.source === '@markless/core',
+	);
+
+	expect(
+		entry,
+		'M14 missing capability: bare compu must offer computed as a native @markless/core module export.',
+	).toMatchObject({ name: 'computed', source: '@markless/core', hasAction: true });
+
+	const details = await server.completionEntryDetails(fixture.file, position, [
+		{ name: entry?.name ?? 'computed', source: entry?.source, data: entry?.data },
+	]);
+	const action = details
+		?.find((candidate: any) => candidate.name === 'computed')
+		?.codeActions?.find((candidate: any) =>
+			candidate.changes?.some((change: any) => change.fileName === fixture.file),
+		);
+	const textChanges = action?.changes
+		?.filter((change: any) => change.fileName === fixture.file)
+		.flatMap((change: any) => change.textChanges);
+
+	expect(
+		action,
+		`M14 missing capability: completion details must return a source-file import code action. Details: ${JSON.stringify(details)}`,
+	).toBeDefined();
+	expect(applyProtocolChanges(fixture.source, textChanges ?? [])).toContain(
+		"import { computed, state } from '@markless/core';",
+	);
 }, 20_000);
 
 test('M15 real tsserver exposes routes only in strings and href attribute values', async () => {
@@ -991,11 +1056,7 @@ test('M15 real tsserver exposes routes only in strings and href attribute values
 	});
 	try {
 		const fixture = openFixture('router-contexts.tsrx', dualProject, dualServer);
-		for (const marker of [
-			'/*M15_STRING*/',
-			'/*M15_HREF_STRING*/',
-			'/*M15_HREF_EXPRESSION*/',
-		]) {
+		for (const marker of ['/*M15_STRING*/', '/*M15_HREF_STRING*/', '/*M15_HREF_EXPRESSION*/']) {
 			const completion = await dualServer.completionInfo(
 				fixture.file,
 				positionAfterMarker(fixture.marked, marker),
@@ -1054,7 +1115,9 @@ test('M15 router skips page-directory scanning outside allowed source contexts',
 		},
 		project: {
 			getCurrentDirectory: () => '/project',
-			getScriptInfo: () => ({ getSnapshot: () => typeScript.ScriptSnapshot.fromString(source) }),
+			getScriptInfo: () => ({
+				getSnapshot: () => typeScript.ScriptSnapshot.fromString(source),
+			}),
 			projectService: {},
 		},
 	};
@@ -1109,119 +1172,148 @@ test('M7a real tsserver activates built core and router CJS plugins together and
 	}
 }, 20_000);
 
-test('M7b VSIX manifest exposes markless-tsrx to both plugins and enables workspace TypeScript', () => {
-	const manifestPath = resolve(workspaceRoot, 'packages/vscode-plugin/package.json');
-	expect(
-		existsSync(manifestPath),
-		'M7b missing capability: packages/vscode-plugin/package.json does not exist.',
-	).toBe(true);
-	const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as any;
-	expect(manifest).toMatchObject({
-		name: 'markless',
-		displayName: 'Markless',
-		publisher: 'markless',
+test('M7a plugin-resolution check still catches a plugin that cannot be resolved', async () => {
+	const missingPlugin = '@markless/typescript-plugin-that-is-not-installed';
+	const failingProject = copyFixtureProject(fixtureDirectory, workspaceRoot);
+	const failingServer = new TsserverHarness({
+		project: failingProject,
+		workspaceRoot,
+		globalPlugins: [corePlugin, routerPlugin, missingPlugin],
 	});
-	const language = manifest.contributes?.languages?.find(
-		(item: any) => item.id === 'markless-tsrx',
-	);
-	expect(
-		language,
-		'M7b missing capability: contributes.languages must register markless-tsrx.',
-	).toMatchObject({
-		id: 'markless-tsrx',
-		aliases: ['Markless', 'markless-tsrx'],
-		extensions: ['.tsrx'],
-		icon: { light: expect.any(String), dark: expect.any(String) },
-	});
-	expect(
-		manifest.contributes?.typescriptServerPlugins,
-		'M7b missing capability: both tsserver plugins must be exposed to workspace TypeScript.',
-	).toEqual([
-		{
-			name: corePlugin,
-			enableForWorkspaceTypeScriptVersions: true,
-			languages: ['markless-tsrx'],
-		},
-		{
-			name: routerPlugin,
-			enableForWorkspaceTypeScriptVersions: true,
-			languages: ['markless-tsrx'],
-		},
-	]);
-	expect(
-		manifest.engines?.vscode,
-		'M7b missing capability: VS Code engine floor is fixed by T002.',
-	).toBe('^1.128.0');
-	expect(manifest.main, 'M7b missing capability: the extension runtime entry must be declared.').toBe(
-		'./dist/extension.cjs',
-	);
-	expect(
-		manifest.activationEvents,
-		'M7b missing capability: TSRX documents must activate the extension runtime.',
-	).toContain('onLanguage:markless-tsrx');
-	expect(
-		manifest.contributes?.configuration?.properties?.['markless.autoClosingTags'],
-		'M7b missing capability: users must be able to disable automatic closing tags.',
-	).toMatchObject({ type: 'boolean', default: true });
-});
-
-test('M7c packaged VSIX contains both plugins and a valid extension runtime', () => {
-	const extensionDirectory = resolve(workspaceRoot, 'packages/vscode-plugin');
-	expect(
-		existsSync(extensionDirectory),
-		'M7c missing capability: packages/vscode-plugin does not exist, so no packaged VSIX can be inspected.',
-	).toBe(true);
-	const vsix = resolve(extensionDirectory, 'dist/markless.vsix');
-	expect(
-		existsSync(vsix),
-		'M7c missing capability: no built .vsix exists; run pnpm --dir packages/vscode-plugin package:vsix.',
-	).toBe(true);
-	const runStartedAt = Number(process.env.MARKLESS_COMPLETION_MATRIX_STARTED_AT);
-	expect(
-		Number.isFinite(runStartedAt) && statSync(vsix).mtimeMs > runStartedAt,
-		'M7c missing capability: the inspected VSIX must be rebuilt after test:completion-matrix starts.',
-	).toBe(true);
-
-	const extracted = mkdtempSync(join(tmpdir(), 'markless-vsix-matrix-'));
 	try {
-		const unzip = spawnSync('unzip', ['-q', vsix, '-d', extracted], { encoding: 'utf8' });
+		const fixture = openFixture('router.tsrx', failingProject, failingServer);
+		await failingServer.quickinfo(
+			fixture.file,
+			positionAfterMarker(fixture.marked, '/*M7_CORE*/'),
+		);
+		// Every fixture with `error` in its name is compiled into this project, and
+		// tsserver's watchers log `Failed Lookup Locations` for the plugin directory, so
+		// this log carries exactly the noise that must not be read as a failure.
+		const log = failingServer.readLog();
+		expect(log).toContain('component-prop-error.tsrx');
+		expect(log).toContain('WatchType: Failed Lookup Locations');
+
+		const missingPluginErrors = pluginResolutionErrors(log, [missingPlugin]);
 		expect(
-			unzip.status,
-			`M7c harness could not extract ${vsix}: ${unzip.stderr || unzip.stdout}`,
-		).toBe(0);
-		const extensionRoot = join(extracted, 'extension');
-		const extensionRequire = createRequire(join(extensionRoot, 'package.json'));
-		for (const pluginName of [corePlugin, routerPlugin]) {
-			const entry = extensionRequire.resolve(pluginName);
-			expect(
-				realpathSync(entry).startsWith(`${realpathSync(extensionRoot)}/`),
-				`M7c missing capability: ${pluginName} must resolve inside the extracted extension/node_modules tree.`,
-			).toBe(true);
-			expect(
-				typeof extensionRequire(pluginName),
-				`M7c missing capability: extracted extension-local ${pluginName} must be require()-able without repository node_modules.`,
-			).toBe('function');
-			if (pluginName === corePlugin) {
-				expect(
-					existsSync(join(dirname(entry), 'markless-jsx.d.ts')),
-					'M7c missing capability: the plugin-managed JSX contract must ship beside the bundled core plugin.',
-				).toBe(true);
-			}
-		}
-		const runtime = join(extensionRoot, 'dist/extension.cjs');
-		expect(
-			existsSync(runtime),
-			'M7c missing capability: the extension runtime bundle must exist inside the extracted VSIX.',
-		).toBe(true);
-		const syntaxCheck = spawnSync(process.execPath, ['--check', runtime], { encoding: 'utf8' });
-		expect(
-			syntaxCheck.status,
-			`M7c extension runtime bundle must pass node --check: ${syntaxCheck.stderr || syntaxCheck.stdout}`,
-		).toBe(0);
+			missingPluginErrors,
+			`A plugin tsserver could not resolve must still be reported. Log tail: ${log.slice(-2000)}`,
+		).not.toEqual([]);
+		expect(missingPluginErrors.every((line) => line.includes(missingPlugin))).toBe(true);
+		expect(pluginResolutionErrors(log, [corePlugin, routerPlugin])).toEqual([]);
 	} finally {
-		rmSync(extracted, { recursive: true, force: true });
+		await failingServer.close();
+		removeFixtureProject(failingProject);
 	}
+}, 20_000);
+
+// M7b' replaces M7b. M7b read the VS Code extension manifest, because that manifest was
+// where a Markless app declared "load these two plugins". In an app that uses the upstream
+// TSRX extension the same declaration lives in the app's own tsconfig.json, so the successor
+// pins it in both places a real app gets it from: the create-markless scaffold template and
+// the reference app (docs). It also proves the declaration resolves to loadable code.
+test("M7b' scaffold and reference-app tsconfigs declare both plugins and a loadable tsrx compiler", () => {
+	for (const relativePath of [
+		'packages/cli/templates/common/tsconfig.json',
+		'docs/tsconfig.json',
+	]) {
+		const tsconfigPath = resolve(workspaceRoot, relativePath);
+		expect(
+			existsSync(tsconfigPath),
+			`M7b' missing capability: ${relativePath} must exist — it is where a Markless app declares its editor plugins.`,
+		).toBe(true);
+		const tsconfig = JSON.parse(readFileSync(tsconfigPath, 'utf8')) as any;
+		expect(
+			tsconfig.tsrx?.compiler,
+			`M7b' missing capability: ${relativePath} must point the editor language server at the Markless compiler.`,
+		).toBe(volarCompiler);
+		expect(
+			(tsconfig.compilerOptions?.plugins ?? []).map((plugin: any) => plugin?.name),
+			`M7b' missing capability: ${relativePath} must declare both Markless tsserver plugins by exact name.`,
+		).toEqual([corePlugin, routerPlugin]);
+	}
+
+	const pluginRoot = resolve(workspaceRoot, 'packages/typescript-plugin');
+	const manifest = JSON.parse(readFileSync(join(pluginRoot, 'package.json'), 'utf8')) as any;
+	const volarSubpath = volarCompiler.slice(corePlugin.length + 1);
+	const volarRequireTarget = manifest.exports?.[`./${volarSubpath}`]?.require;
+	expect(
+		volarRequireTarget,
+		`M7b' missing capability: ${corePlugin} must expose a require-condition export for ./${volarSubpath}; a tsconfig tsrx.compiler entry is loaded with require().`,
+	).toEqual(expect.any(String));
+	const volarEntry = resolve(pluginRoot, volarRequireTarget);
+	expect(
+		existsSync(volarEntry),
+		`M7b' missing capability: ${volarCompiler} must resolve to a file that exists after build:cjs (looked for ${volarEntry}).`,
+	).toBe(true);
+	expect(
+		typeof createRequire(join(pluginRoot, 'package.json'))(volarEntry),
+		`M7b' missing capability: ${volarCompiler} must be require()-able, not merely present on disk.`,
+	).toBe('object');
 });
+
+// M7c' replaces M7c. M7c unzipped the packaged extension and proved both plugins resolved
+// inside its private node_modules tree — a packaging detail of an artifact this repository
+// stops producing. The successor proves the delivery path every scaffolded app actually
+// uses: no --globalPlugins is passed at all, so the only thing that can load either plugin
+// is the project tsconfig's compilerOptions.plugins block.
+test("M7c' tsserver loads both plugins from compilerOptions.plugins alone, with no globalPlugins", async () => {
+	const scaffoldProject = copyFixtureProject(fixtureDirectory, workspaceRoot);
+	const scaffoldServer = new TsserverHarness({
+		project: scaffoldProject,
+		workspaceRoot,
+		globalPlugins: [],
+	});
+	try {
+		expect(
+			scaffoldServer.serverArguments,
+			"M7c' harness invariant: the server must be started without --globalPlugins, otherwise this test cannot attribute plugin loading to the project tsconfig.",
+		).not.toContain('--globalPlugins');
+
+		const constructs = openFixture('constructs.tsrx', scaffoldProject, scaffoldServer);
+		const catalog = await scaffoldServer.completionInfo(
+			constructs.file,
+			positionAfterMarker(constructs.marked, '/*M4_BODY*/'),
+		);
+		expect(
+			completionNames(catalog).filter((name) => name.startsWith('@')),
+			`M7c' missing capability: the core plugin's @ construct catalog must answer when only compilerOptions.plugins loads it.`,
+		).toEqual(expect.arrayContaining([...baseConstructEntries]));
+
+		const routerContexts = openFixture('router-contexts.tsrx', scaffoldProject, scaffoldServer);
+		const hrefCompletion = await scaffoldServer.completionInfo(
+			routerContexts.file,
+			positionAfterMarker(routerContexts.marked, '/*M15_HREF_STRING*/'),
+		);
+		expect(
+			completionNames(hrefCompletion),
+			`M7c' missing capability: the router plugin must add the /library href completion when only compilerOptions.plugins loads it.`,
+		).toContain('/library');
+
+		const log = scaffoldServer.readLog();
+		expect(
+			log,
+			`M7c' missing capability: the router plugin must log successful initialization, not merely appear resolvable.`,
+		).toContain('[markless-router] TypeScript plugin loaded');
+		expect(
+			pluginResolutionErrors(log, [corePlugin, routerPlugin]),
+			`M7c' missing capability: both plugins must initialize without resolution errors on the compilerOptions.plugins path.`,
+		).toEqual([]);
+
+		// Asserted last, so that removing a plugin entry from the fixture tsconfig fails on
+		// the behaviour above first and names the capability that was lost, rather than
+		// failing here on the declaration and saying nothing about what stopped working.
+		const projectTsconfig = JSON.parse(
+			readFileSync(join(scaffoldProject, 'tsconfig.json'), 'utf8'),
+		) as any;
+		expect(
+			(projectTsconfig.compilerOptions?.plugins ?? []).map((plugin: any) => plugin?.name),
+			"M7c' harness invariant: the behaviour above must be attributable to the fixture project declaring both plugins the way a scaffolded app does.",
+		).toEqual([corePlugin, routerPlugin]);
+	} finally {
+		await scaffoldServer.close();
+		removeFixtureProject(scaffoldProject);
+	}
+}, 30_000);
 
 const branchEntries = ['@else', '@empty', '@case', '@default', '@pending', '@catch'];
 
@@ -1285,7 +1377,11 @@ function expectDiagnosticSpan(source: string, diagnostic: any, token: string): v
 	expect(diagnostic?.end).toEqual(end);
 }
 
-function protocolRangeAtSearch(source: string, token: string, length: number): {
+function protocolRangeAtSearch(
+	source: string,
+	token: string,
+	length: number,
+): {
 	start: { line: number; offset: number };
 	end: { line: number; offset: number };
 } {
@@ -1336,12 +1432,27 @@ function triggeredAtCompletionInfo(
 	});
 }
 
+// tsserver writes plugin resolution and activation failures with fixed message shapes.
+// Anchoring on those shapes keeps this check on real failures: a bare `failed|error`
+// substring also matches routine `WatchType: Failed Lookup Locations` watcher records and
+// any log line naming a fixture such as component-prop-error.tsrx.
+const pluginFailureShapes = [
+	{ pattern: /^Failed to (?:load|dynamically import) module '([^']+)' from /, named: true },
+	{ pattern: /^Couldn't find (\S+)$/, named: true },
+	{ pattern: /^Skipped loading plugin (\S+) because /, named: true },
+	// tsserver does not name the plugin on this one, so it is reported for any plugin.
+	{ pattern: /^Plugin activation failed: /, named: false },
+] as const;
+
+const tsserverLogPrefix = /^(?:Err|Info|Perf)\s+\d+\s+\[[^\]]*\]\s*/;
+
 function pluginResolutionErrors(log: string, pluginNames: readonly string[]): string[] {
-	return log
-		.split('\n')
-		.filter(
-			(line) =>
-				/(failed|error|exception)/i.test(line) &&
-				pluginNames.some((pluginName) => line.includes(pluginName)),
-		);
+	return log.split('\n').filter((line) => {
+		const message = line.replace(tsserverLogPrefix, '');
+		return pluginFailureShapes.some(({ pattern, named }) => {
+			const match = pattern.exec(message);
+			if (!match) return false;
+			return !named || pluginNames.includes(match[1]);
+		});
+	});
 }

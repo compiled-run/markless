@@ -120,18 +120,25 @@ pnpm build
 
 ## Editor support
 
-For VS Code, build and install the extension locally:
+For VS Code, install the upstream TSRX extension, which owns the `.tsrx` language
+id, syntax highlighting, and the TSRX language server:
 
 ```sh
-pnpm --dir packages/vscode-plugin package:vsix
-code --install-extension packages/vscode-plugin/dist/markless.vsix
+code --install-extension ripple-ts.ripple-ts-vscode-plugin
 ```
 
-Uninstall any previously sideloaded build first (`code --uninstall-extension markless-dev.markless-tsrx`) so two extensions do not contend for `.tsrx` files.
+`.vscode/extensions.json` already recommends it, so VS Code offers to install it
+when you open this repository. Markless no longer ships its own extension; if you
+sideloaded an earlier build, remove it (`code --uninstall-extension markless.markless`)
+so two extensions do not contend for `.tsrx` files.
 
-Marketplace publishing is pending. Zed works out of the box in this repository
-through `.zed/settings.json`. Apps created with the CLI include both editor
-configurations.
+The Markless-specific editor behaviour is wired through `tsconfig.json` rather
+than through an extension: the top-level `tsrx.compiler` key points the TSRX
+language server at `@markless/typescript-plugin/volar`, and the
+`compilerOptions.plugins` entries load `@markless/typescript-plugin` and
+`@markless/router/typescript-plugin` into TypeScript's own language server.
+Zed reads the same plugins through `.zed/settings.json`. Apps created with the
+CLI ship both editor configurations.
 
 Read these first when changing the repo:
 

@@ -1,6 +1,6 @@
 {
 	"name": "@markless/web",
-	"version": "0.1.1",
+	"version": "0.2.0",
 	"description": "Markless unified render/resume runtime for the web.",
 	"license": "MIT",
 	"repository": {
@@ -32,6 +32,7 @@
 	},
 	"publishConfig": {
 		"access": "public",
+		"provenance": true,
 		"exports": {
 			".": {
 				"types": "./dist/index.d.ts",

@@ -1,8 +1,12 @@
 {
+	"tsrx": {
+		"compiler": "@markless/typescript-plugin/volar"
+	},
 	"compilerOptions": {
 		"target": "ES2023",
 		"module": "ESNext",
 		"moduleResolution": "Bundler",
+		"jsx": "preserve",
 		"strict": true,
 		"types": ["vite/client"],
 		"plugins": [

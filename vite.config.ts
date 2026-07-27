@@ -197,6 +197,9 @@ const buildOrder: PackUserConfig[] = [
 		devDependencies: true,
 		entry: {
 			index: './src/index.ts',
+			// Published as ./ssr-plugin. Its vite and vitest/node imports are
+			// `import type` only, so the emitted JS pulls in no build tooling.
+			'ssr-plugin': './src/ssr-plugin.ts',
 			vitest: './src/vitest.ts',
 		},
 	}),
