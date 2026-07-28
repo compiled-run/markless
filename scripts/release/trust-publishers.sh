@@ -161,12 +161,14 @@ for name in $NAMES; do
   # npm's exit status needs no rescuing either.
   echo ">>> $name"
   attempt_log=$(mktemp)
+  # `npm trust github` has a strict option allowlist and rejects --otp as a
+  # positional argument. npm still reads the value from its env-var config
+  # form, which bypasses that parser entirely.
   if [ -n "$OTP" ]; then
-    npm trust github "$name" \
+    npm_config_otp="$OTP" npm trust github "$name" \
       --repo "$REPO" \
       --file "$WORKFLOW" \
       --allow-publish \
-      --otp "$OTP" \
       --yes 2>"$attempt_log"
   else
     npm trust github "$name" \
