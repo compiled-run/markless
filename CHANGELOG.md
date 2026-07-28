@@ -1,14 +1,71 @@
 # Changelog
 
-Every published Markless package shares one version number: the ten packages
+Every published Markless package shares one version number: the eleven packages
 (`@markless/analyzer`, `@markless/bundler`, `@markless/compiler`,
 `@markless/core`, `@markless/router`, `@markless/runtime`,
-`@markless/serializer`, `@markless/typescript-plugin`, `@markless/web`, and
-`create-markless`) are always released together at the same version, because a
-project scaffolded by `create-markless` asks for that exact version of
-everything else.
+`@markless/serializer`, `@markless/typescript-plugin`, `@markless/vitest-browser`,
+`@markless/web`, and `create-markless`) are always released together at the same
+version, because a project scaffolded by `create-markless` asks for that exact
+version of everything else.
 
 This file starts at 0.2.0. Earlier versions have no changelog entries.
+
+## 0.2.2
+
+Two compiler diagnostics were rejecting correct code. If you hit either on
+0.2.1, this release is the fix.
+
+### `computed()` no longer rejects local variables
+
+`MARKLESS_STATE_WRITE_IN_COMPUTED` flagged every assignment written inside a
+`computed()` body without checking whether the target was reactive state at
+all. Ordinary local work was refused:
+
+```tsx
+const total = computed(() => {
+	let sum = 0;
+	for (const item of items) sum += item; // rejected on 0.2.1
+	return sum;
+});
+```
+
+`sum` is declared inside the derivation and cannot re-trigger it. The rule now
+resolves the assignment target against the real dependency graph, so writing to
+actual state inside a `computed()` still errors, and a local accumulator does
+not.
+
+### Snapshot-before-await stopped depending on variable names
+
+`MARKLESS_ASYNC_POST_AWAIT_READ` asks you to read state *before* awaiting, then
+use the snapshot afterwards. It resolved a derivation's own local variable back
+to a module-wide name, so the same correct pattern passed in one `computed()`
+and failed in the next one that happened to reuse the variable name. Names a
+derivation binds itself now shadow outer ones.
+
+Reading state directly after an `await` is still an error. That rule is real and
+unchanged.
+
+### Pages without `storage()` no longer load the storage runtime
+
+The resume path loaded the storage plane on every page, including pages that
+declare no persistent state. It now loads only when the page actually has
+storage cells. Fewer bytes fetched and executed on pages that never asked for
+persistence.
+
+Some storage code was also reaching every page through a bundling quirk: a
+module needed eagerly by the payload decoder also held client-storage-only
+constants, which pinned the whole file into the eager chunk. Splitting it keeps
+those bytes on the pages that use them.
+
+### `@markless/vitest-browser` is published
+
+The browser-mode testing package is on npm for the first time, at the same
+version as everything else. It gains a `./ssr-plugin` entry point, which its own
+error messages already told you to import but which was never actually exported,
+and it now ships the TypeScript types for the browser commands it registers.
+
+`vitest` is a required peer dependency (`^4.1.5`) because the package imports it
+directly; `vite` is optional.
 
 ## 0.2.1
 
