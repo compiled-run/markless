@@ -21,7 +21,6 @@
 	},
 	"publishConfig": {
 		"access": "public",
-		"provenance": true,
 		"bin": {
 			"create-markless": "./dist/node.js"
 		},
@@ -30,7 +29,8 @@
 				"types": "./dist/index.d.ts",
 				"default": "./dist/index.js"
 			}
-		}
+		},
+		"provenance": true
 	},
 	"scripts": {
 		"prepublishOnly": "node ../../scripts/release/verify-publish-ready.mjs"
@@ -38,7 +38,13 @@
 	"dependencies": {
 		"@clack/prompts": "^1.6.0",
 		"am-i-vibing": "^0.5.0",
+		"jsonc-parser": "^3.3.1",
 		"pathe": "catalog:",
-		"ufo": "catalog:"
+		"picomatch": "^4.0.4",
+		"ufo": "catalog:",
+		"yaml": "^2.9.0"
+	},
+	"devDependencies": {
+		"@types/picomatch": "^4.0.2"
 	}
 }

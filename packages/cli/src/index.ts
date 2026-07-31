@@ -15,6 +15,24 @@ import {
 	type AgentWriteResult,
 	type WritableAgentId,
 } from './agents.ts';
+import {
+	addWorkspaceMember,
+	detectEnclosingWorkspace,
+	installManagerFor,
+	joinsWorkspace,
+	planInstall,
+	workspaceJoinNote,
+	type EnclosingWorkspace,
+} from './workspace.ts';
+
+export type { EnclosingWorkspace, InstallPlan, ManagerFlavor, PreparedFile } from './workspace.ts';
+export {
+	addWorkspaceMember,
+	detectEnclosingWorkspace,
+	installManagerFor,
+	joinsWorkspace,
+	planInstall,
+} from './workspace.ts';
 
 declare const __VERSION__: string | undefined;
 
@@ -163,6 +181,12 @@ export interface ValidatedCreateInput {
 	starter?: Starter;
 	install?: boolean;
 	git?: boolean;
+	/**
+	 * `--workspace` / `--no-workspace`. Undefined when neither was passed, which
+	 * is what makes a non-interactive run default to keeping the app separate.
+	 * Inert when no enclosing workspace was detected.
+	 */
+	workspace?: boolean;
 	yes: boolean;
 	force: boolean;
 	help: boolean;
@@ -183,6 +207,17 @@ export interface CreateOptions {
 	cwd: string;
 	agents: WritableAgentId[];
 	agentDriven?: WritableAgentId;
+	/**
+	 * The workspace the new app would land inside, decided once in `interact`
+	 * and only read from here on. Null when the app is not inside one.
+	 */
+	enclosingWorkspace?: EnclosingWorkspace | null;
+	/**
+	 * Whether the user chose to join that workspace. Undefined when they were
+	 * never asked and never passed a flag, which means keeping the app separate.
+	 * The enclosing config is written only when this is explicitly true.
+	 */
+	workspace?: boolean;
 }
 
 type StarterFile = {
@@ -229,9 +264,11 @@ export class CreateProgram {
 			const driving = input.agents === undefined ? detectDrivingAgent(runtime) : undefined;
 			const agentDriven = driving && driving !== 'cursor' ? driving : undefined;
 			if (driving === 'cursor') writeCursorUnavailable(runtime);
+			const target = input.target!;
+			const format = input.format ?? 'node';
 			return {
-				target: input.target!,
-				format: input.format ?? 'node',
+				target,
+				format,
 				starter: input.starter ?? 'minimal',
 				install: input.install ?? true,
 				git: input.git ?? true,
@@ -240,6 +277,14 @@ export class CreateProgram {
 				cwd: input.cwd,
 				agents: input.agents ?? (agentDriven ? [agentDriven] : []),
 				agentDriven,
+				// A run that cannot ask defaults to keeping the app separate,
+				// and says so before installing. `--workspace` is the only way
+				// such a run joins.
+				enclosingWorkspace: await findEnclosingWorkspace(
+					{ cwd: input.cwd, format, packageManager: input.packageManager, target },
+					runtime,
+				),
+				workspace: input.workspace,
 			};
 		}
 
@@ -278,6 +323,17 @@ export class CreateProgram {
 				message: 'Where should it run?',
 				options: PROJECT_FORMAT_CHOICES,
 			}));
+		// Detected here rather than right after the target prompt because the
+		// format decides which manager actually installs, and that decides
+		// which workspace flavor is even relevant.
+		const enclosingWorkspace = await findEnclosingWorkspace(
+			{ cwd: input.cwd, format, packageManager: input.packageManager, target },
+			runtime,
+		);
+		const workspace = await chooseWorkspace(
+			{ chosen: input.workspace, enclosing: enclosingWorkspace, target },
+			prompts,
+		);
 		const agents = input.agents ?? (await promptForAgents(runtime, prompts));
 		const install =
 			input.install ??
@@ -317,6 +373,8 @@ export class CreateProgram {
 			packageManager: input.packageManager,
 			cwd: input.cwd,
 			agents,
+			enclosingWorkspace,
+			workspace,
 		};
 
 		prompts.note(creationSummary(options), 'Ready to create?');
@@ -347,8 +405,16 @@ export class CreateProgram {
 			runCommand(runtime, 'git', ['init'], targetDir);
 		}
 
+		// Written whether or not dependencies are installed now: joining the
+		// workspace is the user's decision about where the app lives, not about
+		// when it installs.
+		const enclosing = options.enclosingWorkspace;
+		if (enclosing && joinsWorkspace({ enclosing, workspace: options.workspace })) {
+			await joinEnclosingWorkspace(enclosing, runtime);
+		}
+
 		if (options.install) {
-			runCommand(runtime, options.packageManager, ['install'], targetDir);
+			await installDependencies(options, targetDir, runtime);
 		}
 
 		const agentResults = await addAgentSkills(options.agents, runtime);
@@ -462,6 +528,15 @@ function parseArgs(args: readonly string[]): ValidatedCreateInput {
 		}
 		if (arg === '--no-git') {
 			parsed.git = false;
+			continue;
+		}
+		// Inert when there is no enclosing workspace to join or stay out of.
+		if (arg === '--workspace') {
+			parsed.workspace = true;
+			continue;
+		}
+		if (arg === '--no-workspace') {
+			parsed.workspace = false;
 			continue;
 		}
 		if (arg === '--help' || arg === '-h') {
@@ -606,20 +681,38 @@ function writeAgentResults(
 }
 
 function creationSummary(options: CreateOptions): string {
+	const enclosing = options.enclosingWorkspace;
+
 	return [
 		`App:      ${options.target}`,
 		`Starter:  ${choiceLabel(STARTER_CHOICES, options.starter)}`,
 		`Runtime:  ${choiceLabel(PROJECT_FORMAT_CHOICES, options.format)}`,
 		`Install:  ${options.install ? `Yes, with ${options.packageManager}` : 'No'}`,
 		`Git:      ${options.git ? 'Yes' : 'No'}`,
+		// Left out for an app that already matches a member declaration: that
+		// case is silent, and there is no choice to report.
+		...(enclosing && !enclosing.isMember
+			? [
+					`Workspace: ${
+						options.workspace
+							? `Joining ${enclosing.root}`
+							: `Separate from ${enclosing.root}`
+					}`,
+				]
+			: []),
 	].join('\n');
 }
 
 function nextSteps(options: CreateOptions): string {
+	// A deno app declares `tasks`, not `scripts`, and `deno dev` is not a
+	// command. Keyed on the format because the format is what wrote deno.json.
+	const devCommand =
+		options.format === 'deno' ? 'deno task dev' : `${options.packageManager} dev`;
+
 	return [
 		'Next steps:',
 		`  cd ${options.target}`,
-		`  ${options.packageManager} dev`,
+		`  ${devCommand}`,
 		'',
 		'Then open:',
 		'  http://localhost:5173',
@@ -786,6 +879,123 @@ function inferPackageManager(env: ProgramRuntime['env']): PackageManager {
 	return 'npm';
 }
 
+async function findEnclosingWorkspace(
+	options: {
+		readonly cwd: string;
+		readonly format: ProjectFormat;
+		readonly packageManager: PackageManager;
+		readonly target: string;
+	},
+	runtime: ProgramRuntime,
+): Promise<EnclosingWorkspace | null> {
+	return await detectEnclosingWorkspace({
+		env: runtime.env,
+		fs: runtime.fs,
+		manager: installManagerFor(options),
+		targetDir: resolve(options.cwd, options.target),
+	});
+}
+
+/**
+ * Asks how the new app should be installed when it would land inside a
+ * workspace it does not belong to. Skipped entirely when a flag already
+ * answered, when there is no enclosing workspace, and when the app already
+ * matches a member declaration — that last case stays silent on purpose.
+ */
+async function chooseWorkspace(
+	options: {
+		readonly chosen: boolean | undefined;
+		readonly enclosing: EnclosingWorkspace | null;
+		readonly target: string;
+	},
+	prompts: ProgramPrompts,
+): Promise<boolean | undefined> {
+	const enclosing = options.enclosing;
+	if (options.chosen !== undefined || !enclosing || enclosing.isMember) return options.chosen;
+
+	prompts.note(
+		`Found a ${enclosing.manager} workspace at ${enclosing.root}\n` +
+			`${options.target} would not be one of its members.`,
+	);
+
+	return (
+		(await prompts.select({
+			initialValue: 'separate',
+			message: `How should ${options.target} be installed?`,
+			options: [
+				{
+					value: 'separate',
+					label: 'Keep it separate (recommended)',
+					hint: `Installs only ${options.target}. ${enclosing.root} is not modified.`,
+				},
+				{
+					value: 'join',
+					label: `Add it to the ${enclosing.manager} workspace`,
+					hint: `Adds "${enclosing.memberPath}" to ${basename(enclosing.configFile)} and installs at ${enclosing.root}.`,
+				},
+			],
+		})) === 'join'
+	);
+}
+
+/**
+ * Writes the new app into the enclosing workspace config. The one place this
+ * CLI touches a file outside the new app directory, and only ever reached from
+ * an explicit `--workspace` or an explicit answer to the prompt above.
+ */
+async function joinEnclosingWorkspace(
+	enclosing: EnclosingWorkspace,
+	runtime: ProgramRuntime,
+): Promise<void> {
+	const contents = await runtime.fs.readFile(enclosing.configFile).catch(() => {
+		throw new Error(
+			`Cannot join the ${enclosing.manager} workspace at ${enclosing.root}: ${enclosing.configFile} could not be read.`,
+		);
+	});
+
+	await runtime.fs.writeFile(enclosing.configFile, addWorkspaceMember({ contents, enclosing }));
+	runtime.stdout?.write(workspaceJoinNote(enclosing));
+}
+
+/**
+ * Installs the new app's dependencies. Exported so a real-binary test can run
+ * the same command this CLI runs instead of rebuilding the arguments itself.
+ */
+export async function installDependencies(
+	options: CreateOptions,
+	targetDir: string,
+	runtime: ProgramRuntime,
+): Promise<void> {
+	const plan = planInstall({
+		enclosing: options.enclosingWorkspace,
+		manager: installManagerFor(options),
+		target: options.target,
+		workspace: options.workspace,
+	});
+
+	if (plan.skipped) {
+		// A deliberate outcome, not a failure: the files are written, git is set
+		// up, and the run still finishes successfully.
+		if (plan.note) runtime.stdout?.write(plan.note);
+		return;
+	}
+
+	// Only ever inside the new app directory: the enclosing workspace config is
+	// written by joinEnclosingWorkspace, and only when the user asked to join.
+	for (const file of plan.prepareFiles) {
+		await runtime.fs.writeFile(resolve(targetDir, file.path), file.contents);
+	}
+
+	if (plan.note) runtime.stdout?.write(plan.note);
+
+	// Joining installs at the workspace root, because that is the only cwd from
+	// which the manager resolves the app it now declares as a member.
+	const workspaceRoot = options.enclosingWorkspace?.root;
+	const cwd = plan.runIn === 'workspace-root' && workspaceRoot ? workspaceRoot : targetDir;
+
+	runCommand(runtime, plan.command, plan.args, cwd);
+}
+
 function runCommand(
 	runtime: ProgramRuntime,
 	command: string,
@@ -818,6 +1028,8 @@ Options:
   --agents <list>   claude-code, codex, gemini-cli, github-copilot, or none
   --no-install      Skip dependency installation
   --no-git          Skip git initialization
+  --workspace       Add the app to the enclosing workspace, if there is one
+  --no-workspace    Keep the app separate from the enclosing workspace
   --force           Write into a non-empty directory
 `;
 }
