@@ -15,7 +15,7 @@ import {
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { promisify } from 'node:util';
-import { join } from 'pathe';
+import { dirname, join } from 'pathe';
 import { afterEach, expect, test, vi } from 'vitest';
 
 const detectAgenticEnvironment = vi.hoisted(() =>
@@ -26,8 +26,16 @@ import {
 	CreateProgram,
 	PROJECT_FORMAT_CHOICES,
 	STARTER_CHOICES,
+	detectEnclosingWorkspace,
+	installDependencies,
+	planInstall,
+	type EnclosingWorkspace,
+	type ManagerFlavor,
+	type PackageManager,
 	type ProgramRuntime,
 } from '../src/index.ts';
+
+type SpawnCall = { readonly command: string; readonly args: string[]; readonly cwd: string };
 
 const cleanupRoots: string[] = [];
 const execFileAsync = promisify(execFile);
@@ -524,16 +532,820 @@ test('rejects --yes without a positional target', async () => {
 	);
 });
 
+const writeFiles = async (root: string, files: Record<string, string>) => {
+	for (const [path, contents] of Object.entries(files)) {
+		const full = join(root, path);
+		await mkdir(dirname(full), { recursive: true });
+		await writeFile(full, contents);
+	}
+};
+
+const hostManifest = (workspaces: unknown) =>
+	`${JSON.stringify({ name: 'host', private: true, workspaces }, null, 2)}\n`;
+
+/**
+ * The host workspace shape every lane is scaffolded into: a root declaring
+ * `packages/*` (or the deno equivalent) plus one real member. Passing
+ * `memberPath` adds the new app to the declaration, which is the already-a-member
+ * case deno needs spelled out because it lists explicit paths.
+ */
+const hostWorkspaceFiles = (flavor: ManagerFlavor, memberPath?: string): Record<string, string> => {
+	const member = {
+		'packages/member/package.json': `${JSON.stringify({ name: 'member', version: '1.0.0' }, null, 2)}\n`,
+	};
+
+	if (flavor === 'deno') {
+		return {
+			...member,
+			'deno.json': `${JSON.stringify(
+				{ workspace: ['./packages/member', ...(memberPath ? [`./${memberPath}`] : [])] },
+				null,
+				2,
+			)}\n`,
+		};
+	}
+	if (flavor === 'pnpm') {
+		return { ...member, 'pnpm-workspace.yaml': "packages:\n  - 'packages/*'\n" };
+	}
+	if (flavor === 'yarn-berry') {
+		return { ...member, 'package.json': hostManifest(['packages/*']), 'yarn.lock': '' };
+	}
+	return { ...member, 'package.json': hostManifest(['packages/*']) };
+};
+
+const detect = async (
+	root: string,
+	manager: PackageManager,
+	targetDir: string,
+	userAgent?: string,
+) =>
+	await detectEnclosingWorkspace({
+		env: { npm_config_user_agent: userAgent ?? `${manager}/1.0.0` },
+		fs: runtime(root).fs,
+		manager,
+		targetDir,
+	});
+
+// A workspace root above the fixture belongs to the machine running the test,
+// not to the fixture, so negative assertions only look inside the fixture.
+const insideFixture = (found: EnclosingWorkspace | null, root: string) =>
+	found && found.root.startsWith(root) ? found : null;
+
+const MANAGER_LANES = [
+	{
+		flavor: 'npm',
+		format: 'node',
+		manager: 'npm',
+		standaloneArgs: ['install', '--workspaces=false'],
+		userAgent: 'npm/12.0.1 node/v24.15.0',
+	},
+	{
+		flavor: 'pnpm',
+		format: 'node',
+		manager: 'pnpm',
+		standaloneArgs: ['install', '--ignore-workspace'],
+		userAgent: 'pnpm/10.33.2 npm/? node/v24.15.0',
+	},
+	{
+		flavor: 'yarn-classic',
+		format: 'node',
+		manager: 'yarn',
+		standaloneArgs: ['install'],
+		userAgent: 'yarn/1.22.22 npm/? node/v24.15.0',
+	},
+	{
+		flavor: 'yarn-berry',
+		format: 'node',
+		manager: 'yarn',
+		standaloneArgs: ['install'],
+		userAgent: 'yarn/4.17.1 npm/? node/v24.15.0',
+	},
+	{
+		flavor: 'bun',
+		format: 'node',
+		manager: 'bun',
+		standaloneArgs: ['install'],
+		userAgent: 'bun/1.3.14 npm/? node/v24.15.0',
+	},
+	{
+		flavor: 'deno',
+		format: 'deno',
+		manager: 'deno',
+		standaloneArgs: ['install'],
+		userAgent: 'deno/2.8.3 npm/? deno/2.8.3',
+	},
+] as const satisfies readonly {
+	flavor: ManagerFlavor;
+	format: 'node' | 'deno';
+	manager: PackageManager;
+	standaloneArgs: readonly string[];
+	userAgent: string;
+}[];
+
+/**
+ * Drives the production path — validate, interact (which is where detection
+ * runs), then the same install step `execute` calls — and hands back everything
+ * the CLI would have done to the outside world.
+ */
+const installThroughCli = async (
+	root: string,
+	lane: (typeof MANAGER_LANES)[number],
+	appPath: string,
+) => {
+	const spawnCalls: SpawnCall[] = [];
+	const stdoutWrites: string[] = [];
+	const host = runtime(root, {
+		env: { npm_config_user_agent: lane.userAgent },
+		spawnCalls,
+		stdoutWrites,
+	});
+	const targetDir = join(root, appPath);
+	await mkdir(targetDir, { recursive: true });
+
+	const program = new CreateProgram();
+	const input = program.validate(
+		[appPath, '--yes', '--agents', 'none', '--format', lane.format],
+		host,
+	);
+	const created = await program.interact(input, host);
+	await installDependencies(created, targetDir, host);
+
+	return { created, spawnCalls, stdoutWrites, targetDir };
+};
+
+/**
+ * Drives the whole CLI, including `execute`, which is where the enclosing
+ * workspace config is written. Returns everything the run did to the outside
+ * world.
+ */
+const runThroughCli = async (
+	root: string,
+	lane: (typeof MANAGER_LANES)[number],
+	appPath: string,
+	extraArgs: readonly string[] = [],
+) => {
+	const spawnCalls: SpawnCall[] = [];
+	const stdoutWrites: string[] = [];
+	const host = runtime(root, {
+		env: { npm_config_user_agent: lane.userAgent },
+		spawnCalls,
+		stdoutWrites,
+	});
+
+	await new CreateProgram().run(
+		[appPath, '--yes', '--agents', 'none', '--no-git', '--format', lane.format, ...extraArgs],
+		host,
+	);
+
+	return { spawnCalls, stdoutWrites, targetDir: join(root, appPath) };
+};
+
+const lane = (flavor: ManagerFlavor) => MANAGER_LANES.find((entry) => entry.flavor === flavor)!;
+
+/**
+ * One case per config format, each carrying the formatting a real repo has:
+ * comments, a non-default indent, tabs, a single-line array, the object form of
+ * `workspaces`. `after` is written out in full so the assertion is byte-exact
+ * rather than "parses to the same thing".
+ */
+const JOIN_CASES = [
+	{
+		after: [
+			'# Do not add ../native-tsrx here. @tsrx/core is an external dependency',
+			'# boundary for this repo.',
+			'packages:',
+			"    - 'packages/*'",
+			"    - 'nested/newapp'",
+			'',
+			'catalogs:',
+			'    default:',
+			'        vite: ^7.0.0',
+			'',
+		].join('\n'),
+		before: [
+			'# Do not add ../native-tsrx here. @tsrx/core is an external dependency',
+			'# boundary for this repo.',
+			'packages:',
+			"    - 'packages/*'",
+			'',
+			'catalogs:',
+			'    default:',
+			'        vite: ^7.0.0',
+			'',
+		].join('\n'),
+		configFile: 'pnpm-workspace.yaml',
+		flavor: 'pnpm',
+		what: 'a commented, four-space pnpm-workspace.yaml',
+	},
+	{
+		after: '{\n  "name": "host",\n  "private": true,\n  "workspaces": [\n    "packages/*",\n    "nested/newapp"\n  ]\n}\n',
+		before: '{\n  "name": "host",\n  "private": true,\n  "workspaces": [\n    "packages/*"\n  ]\n}\n',
+		configFile: 'package.json',
+		flavor: 'npm',
+		what: 'a two-space package.json with a multi-line workspaces array',
+	},
+	{
+		after: '{\n\t"name": "host",\n\t"workspaces": ["packages/*", "nested/newapp"],\n\t"private": true\n}\n',
+		before: '{\n\t"name": "host",\n\t"workspaces": ["packages/*"],\n\t"private": true\n}\n',
+		configFile: 'package.json',
+		flavor: 'yarn-classic',
+		what: 'a tab-indented package.json whose workspaces array is on one line',
+	},
+	{
+		after: '{\n\t"name": "host",\n\t"private": true,\n\t"workspaces": [\n\t\t"packages/*",\n\t\t"nested/newapp"\n\t]\n}\n',
+		before: '{\n\t"name": "host",\n\t"private": true,\n\t"workspaces": [\n\t\t"packages/*"\n\t]\n}\n',
+		configFile: 'package.json',
+		extraHost: { 'yarn.lock': '' },
+		flavor: 'yarn-berry',
+		what: 'a tab-indented package.json with a multi-line workspaces array',
+	},
+	{
+		after: '{\n  "name": "host",\n  "workspaces": {\n    "nohoist": ["**/left-pad"],\n    "packages": ["packages/*", "nested/newapp"]\n  }\n}\n',
+		before: '{\n  "name": "host",\n  "workspaces": {\n    "nohoist": ["**/left-pad"],\n    "packages": ["packages/*"]\n  }\n}\n',
+		configFile: 'package.json',
+		flavor: 'bun',
+		what: 'the object form of workspaces, written into its packages key',
+	},
+	{
+		after: '{\n\t// the members of this workspace\n\t"workspace": ["./packages/member", "./nested/newapp"],\n}\n',
+		before: '{\n\t// the members of this workspace\n\t"workspace": ["./packages/member"],\n}\n',
+		configFile: 'deno.jsonc',
+		flavor: 'deno',
+		what: 'a commented deno.jsonc with a trailing comma',
+	},
+] as const satisfies readonly {
+	after: string;
+	before: string;
+	configFile: string;
+	extraHost?: Record<string, string>;
+	flavor: ManagerFlavor;
+	what: string;
+}[];
+
+test('joining writes exactly one member entry and leaves every other byte alone', async () => {
+	for (const joinCase of JOIN_CASES) {
+		const root = await makeWorkspace();
+		const hostFiles = {
+			[joinCase.configFile]: joinCase.before,
+			...('extraHost' in joinCase ? joinCase.extraHost : {}),
+		};
+		await writeFiles(root, hostFiles);
+
+		const { spawnCalls, stdoutWrites } = await runThroughCli(
+			root,
+			lane(joinCase.flavor),
+			'nested/newapp',
+			['--workspace'],
+		);
+
+		await expect(
+			readFile(join(root, joinCase.configFile), 'utf-8'),
+			`${joinCase.flavor}: ${joinCase.what}`,
+		).resolves.toBe(joinCase.after);
+		// The install runs at the workspace root: that is the only directory the
+		// manager resolves the app from now that it is a declared member.
+		expect(spawnCalls, joinCase.flavor).toEqual([
+			{ args: ['install'], command: lane(joinCase.flavor).manager, cwd: root },
+		]);
+		expect(stdoutWrites.join(''), joinCase.flavor).toContain(
+			`Added "nested/newapp" to ${joinCase.configFile} and installing at ${root}`,
+		);
+		expect(stdoutWrites.join(''), joinCase.flavor).not.toContain('is not one of its members');
+	}
+});
+
+test('leaves the enclosing config untouched unless the user asked to join', async () => {
+	for (const joinCase of JOIN_CASES) {
+		for (const args of [[], ['--no-workspace']]) {
+			const root = await makeWorkspace();
+			await writeFiles(root, {
+				[joinCase.configFile]: joinCase.before,
+				...('extraHost' in joinCase ? joinCase.extraHost : {}),
+			});
+
+			const { spawnCalls, targetDir } = await runThroughCli(
+				root,
+				lane(joinCase.flavor),
+				'nested/newapp',
+				args,
+			);
+
+			await expect(
+				readFile(join(root, joinCase.configFile), 'utf-8'),
+				`${joinCase.flavor} with ${args.join(' ') || 'no flag'}`,
+			).resolves.toBe(joinCase.before);
+			expect(spawnCalls[0]?.cwd, joinCase.flavor).toBe(targetDir);
+		}
+	}
+});
+
+test('tells a default run that joining was an option, and a chosen run nothing of the sort', async () => {
+	const root = await makeWorkspace();
+	await writeFiles(root, hostWorkspaceFiles('pnpm'));
+	const fallback = await runThroughCli(root, lane('pnpm'), 'nested/newapp');
+
+	expect(fallback.stdoutWrites.join('')).toContain(
+		'Pass --workspace to add it to that workspace instead.',
+	);
+
+	const chosen = await makeWorkspace();
+	await writeFiles(chosen, hostWorkspaceFiles('pnpm'));
+	const explicit = await runThroughCli(chosen, lane('pnpm'), 'nested/newapp', ['--no-workspace']);
+
+	expect(explicit.stdoutWrites.join('')).toContain('is not one of its members');
+	expect(explicit.stdoutWrites.join('')).not.toContain('Pass --workspace');
+});
+
+test('refuses, explains, and still succeeds when a declared member cannot install on its own', async () => {
+	// bun swallows --ignore-workspace and hoists anyway, yarn classic has no
+	// equivalent flag, and deno only isolates directories its workspace does not
+	// declare. Installing nothing is the honest outcome.
+	for (const flavor of ['yarn-classic', 'bun', 'deno'] as const) {
+		const root = await makeWorkspace();
+		await writeFiles(root, hostWorkspaceFiles(flavor, 'packages/newapp'));
+
+		const { spawnCalls, stdoutWrites } = await runThroughCli(
+			root,
+			lane(flavor),
+			'packages/newapp',
+			['--no-workspace'],
+		);
+		const output = stdoutWrites.join('');
+		const manager = lane(flavor).manager;
+
+		expect(spawnCalls, flavor).toEqual([]);
+		expect(output, flavor).toContain('Skipped installing dependencies.');
+		expect(output, flavor).toContain(
+			`packages/newapp is inside the ${manager} workspace at ${root}, and ${manager} provides no way to install a workspace member on its own.`,
+		);
+		expect(output, flavor).toContain(
+			`To install: run \`${manager} install\` at ${root}, or move packages/newapp outside that workspace.`,
+		);
+		// A skipped install is not a failed one: the app is still scaffolded.
+		const manifest = lane(flavor).format === 'deno' ? 'deno.json' : 'package.json';
+		await expect(exists(join(root, 'packages/newapp', manifest)), flavor).resolves.toBe(true);
+	}
+});
+
+test('installs a declared member on its own when the manager offers a way to', async () => {
+	const expected: Record<string, readonly string[]> = {
+		npm: ['install', '--workspaces=false'],
+		pnpm: ['install', '--ignore-workspace'],
+		'yarn-berry': ['install'],
+	};
+
+	for (const flavor of ['npm', 'pnpm', 'yarn-berry'] as const) {
+		const root = await makeWorkspace();
+		await writeFiles(root, hostWorkspaceFiles(flavor, 'packages/newapp'));
+
+		const { spawnCalls, stdoutWrites, targetDir } = await runThroughCli(
+			root,
+			lane(flavor),
+			'packages/newapp',
+			['--no-workspace'],
+		);
+
+		expect(spawnCalls, flavor).toEqual([
+			{ args: [...expected[flavor]!], command: lane(flavor).manager, cwd: targetDir },
+		]);
+		expect(stdoutWrites.join(''), flavor).toContain(
+			`packages/newapp is inside the ${lane(flavor).manager} workspace at ${root}, but --no-workspace was passed`,
+		);
+		await expect(exists(join(targetDir, 'yarn.lock'))).resolves.toBe(flavor === 'yarn-berry');
+	}
+});
+
+/**
+ * Drives the interactive flow, answering the workspace question with
+ * `workspaceAnswer` and recording every prompt so the copy can be asserted.
+ */
+const promptThroughCli = async (
+	root: string,
+	appPath: string,
+	workspaceAnswer: 'separate' | 'join' | null,
+) => {
+	const events: string[] = [];
+	const spawnCalls: SpawnCall[] = [];
+
+	await new CreateProgram().run(
+		[appPath, '--agents', 'none', '--no-git'],
+		runtime(root, {
+			env: { npm_config_user_agent: 'pnpm/10.33.2' },
+			isTTY: true,
+			spawnCalls,
+			prompts: {
+				intro() {},
+				async select({ message, options, initialValue }) {
+					events.push(
+						`select:${message}:${initialValue}:${options
+							.map((option) => `${option.label}|${option.hint}`)
+							.join(',')}`,
+					);
+					if (message === 'What are you building today?') return 'minimal';
+					if (message === 'Where should it run?') return 'node';
+					if (message === 'Install dependencies now?') return 'yes';
+					if (message === 'Initialize git?') return 'no';
+					if (message === 'Ready to create?') return 'create';
+					if (message === `How should ${appPath} be installed?`) {
+						if (!workspaceAnswer) throw new Error('Unexpected workspace prompt.');
+						return workspaceAnswer;
+					}
+					throw new Error(`Unexpected select prompt: ${message}`);
+				},
+				async multiselect() {
+					throw new Error('No agents should be found in this test.');
+				},
+				async text() {
+					throw new Error('The target is passed as an argument.');
+				},
+				note(message, title) {
+					events.push(`note:${title}:${message}`);
+				},
+				outro() {},
+				cancel() {},
+			},
+		}),
+	);
+
+	return { events, spawnCalls };
+};
+
+test('asks how to install an app that would land inside a workspace it does not belong to', async () => {
+	const root = await makeWorkspace();
+	const before = "packages:\n  - 'packages/*'\n";
+	await writeFiles(root, { 'pnpm-workspace.yaml': before });
+
+	const { events, spawnCalls } = await promptThroughCli(root, 'newapp', 'join');
+
+	expect(events).toContain(
+		`note:undefined:Found a pnpm workspace at ${root}\nnewapp would not be one of its members.`,
+	);
+	expect(events).toContain(
+		`select:How should newapp be installed?:separate:Keep it separate (recommended)|Installs only newapp. ${root} is not modified.,Add it to the pnpm workspace|Adds "newapp" to pnpm-workspace.yaml and installs at ${root}.`,
+	);
+	expect(events.join('\n')).toContain(`Workspace: Joining ${root}`);
+	await expect(readFile(join(root, 'pnpm-workspace.yaml'), 'utf-8')).resolves.toBe(
+		"packages:\n  - 'packages/*'\n  - 'newapp'\n",
+	);
+	expect(spawnCalls).toEqual([{ args: ['install'], command: 'pnpm', cwd: root }]);
+});
+
+test('keeps the app separate when the prompt is answered that way', async () => {
+	const root = await makeWorkspace();
+	const before = "packages:\n  - 'packages/*'\n";
+	await writeFiles(root, { 'pnpm-workspace.yaml': before });
+
+	const { events, spawnCalls } = await promptThroughCli(root, 'newapp', 'separate');
+
+	expect(events.join('\n')).toContain(`Workspace: Separate from ${root}`);
+	await expect(readFile(join(root, 'pnpm-workspace.yaml'), 'utf-8')).resolves.toBe(before);
+	expect(spawnCalls).toEqual([
+		{ args: ['install', '--ignore-workspace'], command: 'pnpm', cwd: join(root, 'newapp') },
+	]);
+});
+
+test('never asks, and never reports a workspace, for an app that is already a member', async () => {
+	const root = await makeWorkspace();
+	await writeFiles(root, { 'pnpm-workspace.yaml': "packages:\n  - 'packages/*'\n" });
+
+	// A null answer makes the workspace prompt throw, so reaching the end proves
+	// it was never shown.
+	const { events, spawnCalls } = await promptThroughCli(root, 'packages/newapp', null);
+
+	expect(events.join('\n')).not.toContain('Workspace:');
+	expect(events.join('\n')).not.toContain('would not be one of its members');
+	expect(spawnCalls).toEqual([
+		{ args: ['install'], command: 'pnpm', cwd: join(root, 'packages/newapp') },
+	]);
+});
+
+test('parses both workspace flags and defaults --yes to keeping the app separate', async () => {
+	const root = await makeWorkspace();
+	const program = new CreateProgram();
+
+	expect(program.validate(['my-app', '--yes'], runtime(root)).workspace).toBeUndefined();
+	expect(program.validate(['my-app', '--yes', '--workspace'], runtime(root)).workspace).toBe(
+		true,
+	);
+	expect(program.validate(['my-app', '--yes', '--no-workspace'], runtime(root)).workspace).toBe(
+		false,
+	);
+});
+
+test('documents both workspace flags in the help output and the README', async () => {
+	const root = await makeWorkspace();
+	const stdoutWrites: string[] = [];
+
+	await new CreateProgram().run(['--help'], runtime(root, { stdoutWrites }));
+
+	expect(stdoutWrites.join('')).toContain(
+		'  --workspace       Add the app to the enclosing workspace, if there is one',
+	);
+	expect(stdoutWrites.join('')).toContain(
+		'  --no-workspace    Keep the app separate from the enclosing workspace',
+	);
+
+	const readme = await readFile(new URL('../README.md', import.meta.url), 'utf-8');
+	expect(readme).toContain('--workspace');
+	expect(readme).toContain('--no-workspace');
+});
+
+test('installs standalone for every manager when the app matches no member declaration', async () => {
+	for (const lane of MANAGER_LANES) {
+		const root = await makeWorkspace();
+		await writeFiles(root, hostWorkspaceFiles(lane.flavor));
+
+		const { created, spawnCalls, stdoutWrites, targetDir } = await installThroughCli(
+			root,
+			lane,
+			'nested/newapp',
+		);
+
+		expect(created.enclosingWorkspace?.flavor, lane.flavor).toBe(lane.flavor);
+		expect(created.enclosingWorkspace?.root, lane.flavor).toBe(root);
+		expect(created.enclosingWorkspace?.isMember, lane.flavor).toBe(false);
+		expect(created.enclosingWorkspace?.memberPath, lane.flavor).toBe('nested/newapp');
+		expect(spawnCalls, lane.flavor).toEqual([
+			{ args: [...lane.standaloneArgs], command: lane.manager, cwd: targetDir },
+		]);
+		expect(stdoutWrites.join(''), lane.flavor).toContain(
+			`Found a ${lane.manager} workspace at ${root}. nested/newapp is not one of its members`,
+		);
+		// Berry refuses to install from inside its project unless the directory
+		// declares itself a separate project with its own lockfile.
+		await expect(exists(join(targetDir, 'yarn.lock'))).resolves.toBe(
+			lane.flavor === 'yarn-berry',
+		);
+		// Nothing was written at or below the enclosing root except in the app.
+		await expect(exists(join(root, 'node_modules'))).resolves.toBe(false);
+		await expect(exists(join(root, 'yarn.lock'))).resolves.toBe(lane.flavor === 'yarn-berry');
+	}
+});
+
+test('never hands bun the workspace flag it accepts and ignores', async () => {
+	const lane = MANAGER_LANES.find((entry) => entry.flavor === 'bun')!;
+	const root = await makeWorkspace();
+	await writeFiles(root, hostWorkspaceFiles('bun'));
+
+	const { spawnCalls } = await installThroughCli(root, lane, 'nested/newapp');
+
+	// bun 1.3.14 accepts `--ignore-workspace` without error and hoists to the
+	// host root anyway, so passing it would look correct and be wrong.
+	expect(spawnCalls[0]?.args).toEqual(['install']);
+	expect(spawnCalls[0]?.args).not.toContain('--ignore-workspace');
+});
+
+test('stays completely silent when the app already matches a member declaration', async () => {
+	for (const lane of MANAGER_LANES) {
+		const root = await makeWorkspace();
+		await writeFiles(root, hostWorkspaceFiles(lane.flavor, 'packages/newapp'));
+
+		const { created, spawnCalls, stdoutWrites, targetDir } = await installThroughCli(
+			root,
+			lane,
+			'packages/newapp',
+		);
+
+		expect(created.enclosingWorkspace?.isMember, lane.flavor).toBe(true);
+		expect(spawnCalls, lane.flavor).toEqual([
+			{ args: ['install'], command: lane.manager, cwd: targetDir },
+		]);
+		expect(stdoutWrites.join(''), lane.flavor).not.toContain('Found a');
+		await expect(exists(join(targetDir, 'yarn.lock'))).resolves.toBe(false);
+	}
+});
+
+test('scaffolding the frameless shape installs only the new app', async () => {
+	const root = await makeWorkspace();
+	const workspaceYaml = [
+		'# Do not add ../native-tsrx here.',
+		'packages:',
+		"    - 'packages/*'",
+		'',
+	].join('\n');
+	await writeFiles(root, {
+		'package.json': hostManifest(undefined),
+		'packages/one/package.json': `${JSON.stringify({ name: 'one', version: '1.0.0' }, null, 2)}\n`,
+		'packages/two/package.json': `${JSON.stringify({ name: 'two', version: '1.0.0' }, null, 2)}\n`,
+		'pnpm-workspace.yaml': workspaceYaml,
+	});
+	const spawnCalls: SpawnCall[] = [];
+	const stdoutWrites: string[] = [];
+
+	await new CreateProgram().run(
+		['nested/newapp', '--yes', '--agents', 'none', '--no-git'],
+		runtime(root, {
+			env: { npm_config_user_agent: 'pnpm/10.33.2' },
+			spawnCalls,
+			stdoutWrites,
+		}),
+	);
+
+	expect(spawnCalls).toEqual([
+		{
+			args: ['install', '--ignore-workspace'],
+			command: 'pnpm',
+			cwd: join(root, 'nested/newapp'),
+		},
+	]);
+	await expect(readFile(join(root, 'pnpm-workspace.yaml'), 'utf-8')).resolves.toBe(workspaceYaml);
+	await expect(exists(join(root, 'node_modules'))).resolves.toBe(false);
+	await expect(exists(join(root, 'pnpm-lock.yaml'))).resolves.toBe(false);
+	await expect(exists(join(root, 'nested/newapp/package.json'))).resolves.toBe(true);
+	expect(stdoutWrites.join('')).toContain('is not one of its members');
+});
+
+test('a deno-format app installs with deno and is told to run deno task dev', async () => {
+	const root = await makeWorkspace();
+	const spawnCalls: SpawnCall[] = [];
+	const stdoutWrites: string[] = [];
+
+	// The inferred manager is pnpm, but a deno-format app writes no
+	// package.json at all, so pnpm would have nothing to install.
+	await new CreateProgram().run(
+		['deno-app', '--format', 'deno', '--yes', '--agents', 'none', '--no-git'],
+		runtime(root, {
+			env: { npm_config_user_agent: 'pnpm/10.33.2' },
+			spawnCalls,
+			stdoutWrites,
+		}),
+	);
+
+	expect(spawnCalls).toEqual([
+		{ args: ['install'], command: 'deno', cwd: join(root, 'deno-app') },
+	]);
+	expect(stdoutWrites.join('')).toContain('  deno task dev');
+	expect(stdoutWrites.join('')).not.toContain('deno dev');
+});
+
+test('leaves the install command alone when there is no enclosing workspace', () => {
+	const plain = {
+		args: ['install'],
+		command: 'pnpm',
+		note: null,
+		prepareFiles: [],
+		runIn: 'app',
+		skipped: false,
+	};
+
+	expect(planInstall({ enclosing: null, manager: 'pnpm', target: 'my-app' })).toEqual(plain);
+
+	// Both flags are inert when nothing encloses the app: there is no workspace
+	// to join and none to stay out of.
+	for (const workspace of [true, false, undefined]) {
+		expect(
+			planInstall({ enclosing: null, manager: 'pnpm', target: 'my-app', workspace }),
+			`--workspace=${String(workspace)}`,
+		).toEqual(plain);
+	}
+});
+
+test('reports no enclosing workspace when nothing in the tree declares one', async () => {
+	const root = await makeWorkspace();
+	await writeFiles(root, {
+		'nested/package.json': `${JSON.stringify({ name: 'plain' }, null, 2)}\n`,
+	});
+
+	for (const manager of ['npm', 'pnpm', 'yarn', 'bun', 'deno'] as const) {
+		const found = await detect(root, manager, join(root, 'nested/newapp'));
+		expect(insideFixture(found, root), manager).toBe(null);
+	}
+});
+
+test('walks past a directory gap and keeps the nearest workspace root', async () => {
+	const root = await makeWorkspace();
+	await writeFiles(root, { 'pnpm-workspace.yaml': "packages:\n  - 'gap/deeper/*'\n" });
+
+	// `gap` and `gap/deeper` hold no manifest at all, and the scan must not
+	// stop there: berry was observed claiming a root three levels above a
+	// directory with no marker.
+	const outer = await detect(root, 'pnpm', join(root, 'gap/deeper/newapp'));
+	expect(outer?.root).toBe(root);
+	expect(outer?.isMember).toBe(true);
+
+	await writeFiles(root, { 'gap/pnpm-workspace.yaml': "packages:\n  - 'other/*'\n" });
+	const nearest = await detect(root, 'pnpm', join(root, 'gap/deeper/newapp'));
+	expect(nearest?.root).toBe(join(root, 'gap'));
+	expect(nearest?.isMember).toBe(false);
+});
+
+test('matches member globs with one-segment, recursive, negated and trailing-slash patterns', async () => {
+	const root = await makeWorkspace();
+	const isMember = async (path: string) =>
+		(await detect(root, 'pnpm', join(root, path)))?.isMember;
+
+	await writeFiles(root, {
+		'pnpm-workspace.yaml': [
+			'packages:',
+			"  - 'packages/*'",
+			"  - '!packages/excluded'",
+			"  - 'apps/*/'",
+			'',
+		].join('\n'),
+	});
+
+	await expect(isMember('packages/a')).resolves.toBe(true);
+	await expect(isMember('packages/deep/b')).resolves.toBe(false);
+	await expect(isMember('packages/excluded')).resolves.toBe(false);
+	await expect(isMember('apps/c')).resolves.toBe(true);
+	await expect(isMember('other')).resolves.toBe(false);
+
+	await writeFiles(root, { 'pnpm-workspace.yaml': "packages:\n  - 'packages/**'\n" });
+	await expect(isMember('packages/deep/b')).resolves.toBe(true);
+});
+
+test('reads the object form of the workspaces field', async () => {
+	const root = await makeWorkspace();
+	await writeFiles(root, {
+		'package.json': hostManifest({ nohoist: ['**/left-pad'], packages: ['packages/*'] }),
+	});
+
+	await expect(
+		detect(root, 'npm', join(root, 'packages/newapp')).then((found) => found?.isMember),
+	).resolves.toBe(true);
+	await expect(
+		detect(root, 'npm', join(root, 'nested/newapp')).then((found) => found?.isMember),
+	).resolves.toBe(false);
+});
+
+test('reads deno workspace members from explicit paths in a commented jsonc config', async () => {
+	const root = await makeWorkspace();
+	await writeFiles(root, {
+		'deno.jsonc':
+			'{\n\t// the members of this workspace\n\t"workspace": ["./packages/member"],\n}\n',
+	});
+
+	const member = await detect(root, 'deno', join(root, 'packages/member'));
+	expect(member?.isMember).toBe(true);
+	expect(member?.configFile).toBe(join(root, 'deno.jsonc'));
+
+	const away = await detect(root, 'deno', join(root, 'nested/newapp'));
+	expect(away?.isMember).toBe(false);
+	expect(away?.uncertain).toBe(false);
+
+	// Deno's own glob resolution inside `workspace` was never confirmed, and
+	// "member" is the silent, no-write answer.
+	await writeFiles(root, { 'deno.jsonc': '{ "workspace": ["./packages/*"] }\n' });
+	const globbed = await detect(root, 'deno', join(root, 'nested/newapp'));
+	expect(globbed?.isMember).toBe(true);
+	expect(globbed?.uncertain).toBe(true);
+});
+
+test('falls to the safe side for member patterns it cannot claim parity on', async () => {
+	const root = await makeWorkspace();
+	await writeFiles(root, {
+		'package.json': hostManifest(['packages/{a,b}']),
+		'pnpm-workspace.yaml': "packages:\n  - 'packages/{a,b}'\n",
+	});
+
+	// pnpm is the only manager that reinstalls the host from a non-member
+	// directory, so an unmatched pattern makes it install on its own.
+	const pnpmVerdict = await detect(root, 'pnpm', join(root, 'packages/a'));
+	expect(pnpmVerdict?.uncertain).toBe(true);
+	expect(pnpmVerdict?.isMember).toBe(false);
+
+	// Every other manager is already correct when it stays silent.
+	const npmVerdict = await detect(root, 'npm', join(root, 'packages/a'));
+	expect(npmVerdict?.uncertain).toBe(true);
+	expect(npmVerdict?.isMember).toBe(true);
+});
+
+test('separates yarn berry from yarn classic by the version in the user agent', async () => {
+	const root = await makeWorkspace();
+	await writeFiles(root, {
+		// Classic reads `workspaces` from a package.json; berry's project root
+		// is the nearest ancestor holding a yarn.lock.
+		'inner/yarn.lock': '',
+		'package.json': hostManifest(['packages/*']),
+	});
+	const appDir = join(root, 'inner/app');
+
+	const classic = await detect(root, 'yarn', appDir, 'yarn/1.22.22 npm/? node/v24.15.0');
+	expect(classic?.flavor).toBe('yarn-classic');
+	expect(classic?.root).toBe(root);
+
+	const berry = await detect(root, 'yarn', appDir, 'yarn/4.17.1 npm/? node/v24.15.0');
+	expect(berry?.flavor).toBe('yarn-berry');
+	expect(berry?.root).toBe(join(root, 'inner'));
+	expect(berry?.isMember).toBe(false);
+
+	// An unreadable version falls back to the marker files, and berry's marker
+	// is the one whose miss is a hard install failure.
+	const unknown = await detect(root, 'yarn', appDir, 'yarn/unknown');
+	expect(unknown?.flavor).toBe('yarn-berry');
+});
+
 function runtime(
 	cwd: string,
-	overrides: Partial<Pick<ProgramRuntime, 'isTTY' | 'prompts'>> & {
+	overrides: Partial<Pick<ProgramRuntime, 'env' | 'isTTY' | 'prompts'>> & {
 		readonly stdoutWrites?: string[];
 		readonly stderrWrites?: string[];
+		readonly spawnCalls?: SpawnCall[];
 	} = {},
 ): ProgramRuntime {
 	return {
 		cwd: () => cwd,
-		env: { npm_config_user_agent: 'pnpm/10.33.2' },
+		env: overrides.env ?? { npm_config_user_agent: 'pnpm/10.33.2' },
 		fs: {
 			async atomicCreateFile(path, contents) {
 				try {
@@ -609,7 +1421,14 @@ function runtime(
 				return true;
 			},
 		},
-		spawn: () => ({ status: 0 }),
+		// Records every command the CLI runs so a test can assert the exact
+		// argv a package manager would have been handed. `bun install
+		// --ignore-workspace` is the one this guards: bun accepts that flag and
+		// hoists to the host root anyway, so it would look correct and be wrong.
+		spawn: (command, args, options) => {
+			overrides.spawnCalls?.push({ args: [...args], command, cwd: options.cwd });
+			return { status: 0 };
+		},
 		async sha256(contents) {
 			return createHash('sha256').update(contents).digest('hex');
 		},
