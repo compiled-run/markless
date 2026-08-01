@@ -8,6 +8,7 @@ import {
 	marklessCsrUnbindLocalView,
 } from './csr.ts';
 import { marklessBoundSymbolId, marklessDomUpdateSymbolId } from './bound-symbol.ts';
+import { ASYNC_BOUNDARY_ARM } from '@markless/serializer';
 
 export { marklessAssertComposableStateNames, marklessComposeState };
 export const marklessSsrRemapChildGraph = marklessCsrRemapChildGraph;
@@ -408,11 +409,17 @@ export function marklessSsrArmizeBoundaries(html, boundaries, streams, asyncSnap
 					moved[key].unshift(...streams[key].splice(i, 1));
 			}
 		}
-		const status = snapshotById.get(boundary.asyncReads?.[0]?.graphNodeId)?.status;
-		const takenArm = status === 'fulfilled' ? 0 : status === 'rejected' ? 2 : 1;
+		const status = snapshotById.get(boundary.runnerGraphNodeId)?.status;
+		const takenArm =
+			status === 'fulfilled'
+				? ASYNC_BOUNDARY_ARM.try
+				: status === 'rejected'
+					? ASYNC_BOUNDARY_ARM.catch
+					: ASYNC_BOUNDARY_ARM.pending;
 		const planned = boundary.armRecords[takenArm] ?? {};
 		return {
 			...boundary,
+			initiallyServedArm: takenArm,
 			armRecords: {
 				locators: armLocators,
 				events: [...(planned.events ?? []), ...moved.events],
@@ -704,14 +711,16 @@ export function marklessSsrPrefixArmRecord(arm, child) {
 				child.hostPrefix,
 			);
 			return mapped
-				? [{
-						...update,
-						graphNodeId: mapped.graphNodeId,
-						path: mapped.path,
-						...(update.symbolId
-							? { symbolId: marklessDomUpdateSymbolId(child, update.symbolId) }
-							: {}),
-					}]
+				? [
+						{
+							...update,
+							graphNodeId: mapped.graphNodeId,
+							path: mapped.path,
+							...(update.symbolId
+								? { symbolId: marklessDomUpdateSymbolId(child, update.symbolId) }
+								: {}),
+						},
+					]
 				: [];
 		}),
 	};

@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import { ASYNC_BOUNDARY_ARM } from '@markless/serializer';
 import { createFakeClock } from '../../../scripts/test-utils/fake-clock.ts';
 import {
 	createAsyncBoundarySettleTracker,
@@ -27,6 +28,8 @@ const PENDING_MIN = 200; // MARKLESS_PENDING_MIN_VISIBLE_MS
 function boundaryRecord(id: string): ResumeAsyncBoundaryRecord {
 	return {
 		id,
+		runnerGraphNodeId: `computed:${id}`,
+		initiallyServedArm: ASYNC_BOUNDARY_ARM.try,
 		updateSymbolId: 'symbol:update',
 		asyncReads: [{ graphNodeId: `computed:${id}`, path: [] }],
 	} as unknown as ResumeAsyncBoundaryRecord;
@@ -54,9 +57,6 @@ function createHarness(available: boolean, commitWaitMs = 0) {
 	const pendingCommittedAt: number[] = [];
 	const tracker = createAsyncBoundarySettleTracker({
 		boundaries: [boundary],
-		state: {
-			computed: [{ graphNodeId: 'computed:report', snapshot: { status: 'fulfilled' } }],
-		} as never,
 		clock,
 	});
 	const hold = createResettleHold({

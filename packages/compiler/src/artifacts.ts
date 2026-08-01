@@ -551,6 +551,8 @@ export type PayloadAsyncBoundary = {
 	readonly id: string;
 	readonly kind: 'async-boundary';
 	readonly anchorOrder: number;
+	readonly runnerGraphNodeId: ProtocolViewPayload['asyncBoundaries'][number]['runnerGraphNodeId'];
+	readonly initiallyServedArm: ProtocolViewPayload['asyncBoundaries'][number]['initiallyServedArm'];
 	readonly startAnchor: {
 		readonly strategy: 'dom-order-comment';
 		readonly index: number;

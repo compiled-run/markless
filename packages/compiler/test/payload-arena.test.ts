@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import { ASYNC_BOUNDARY_ARM } from '@markless/serializer';
 import { buildSemanticGraph, lowerStateAccess } from '../src/index.ts';
 import { planPayloadArena } from '../src/passes/payload-arena.ts';
 
@@ -223,6 +224,8 @@ test('planPayloadArena separates graph state from view wiring metadata', async (
 			id: 'boundary:0',
 			kind: 'async-boundary',
 			anchorOrder: 0,
+			runnerGraphNodeId: 'computed:details',
+			initiallyServedArm: ASYNC_BOUNDARY_ARM.pending,
 			armRecords: [
 				{
 					locators: [
@@ -336,9 +339,7 @@ export function App() @{
 	expect(payload.view.behaviors).toEqual([]);
 	expect(payload.view.keyedRepeats).toEqual([
 		expect.objectContaining({
-			rowElementHandles: [
-				expect.objectContaining({ handleId: 'element:row', name: 'row' }),
-			],
+			rowElementHandles: [expect.objectContaining({ handleId: 'element:row', name: 'row' })],
 			rowBehaviors: [
 				expect.objectContaining({
 					source: 'installRow(item.id)',

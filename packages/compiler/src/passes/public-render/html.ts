@@ -15,11 +15,7 @@ import {
 	unwrapExpressionContainer,
 } from '../../ast/tsrx.ts';
 import type { PublicRenderModuleInput } from '../../artifacts.ts';
-import {
-	graphBindingMap,
-	resolveGraphPath,
-	semanticAliasMap,
-} from '../../artifact-helpers/graph-paths.ts';
+import { resolveBoundaryRunners } from './boundary-runner.ts';
 import { itemPathReadSource } from './source-expressions.ts';
 import {
 	emitCsrComponent,
@@ -434,19 +430,12 @@ export function collectSsrAsyncRunners(
 		string,
 		{ readonly graphNodeId: string; readonly name: string; readonly source: string }
 	>();
-	const bindings = graphBindingMap(input.semanticGraph);
-	const aliases = semanticAliasMap(input.semanticGraph);
+	const boundaryRunners = resolveBoundaryRunners(input.semanticGraph);
 	for (const boundary of input.protocolView.asyncBoundaries) {
 		// Protocol-view expands a template-read sync computed to its async
 		// ancestor closure for browser gating. SSR still derives and binds the
 		// authored sync value named in the semantic template read.
-		const authored = input.semanticGraph.templateReads.find(
-			(read) => read.asyncBoundaryId === boundary.id,
-		);
-		const authoredBinding = authored
-			? resolveGraphPath(authored.source, bindings, aliases)?.binding
-			: undefined;
-		const read = authoredBinding ? { graphNodeId: authoredBinding.id } : boundary.asyncReads[0];
+		const read = boundaryRunners.get(boundary.id)?.authored;
 		const runner = read ? runnersByGraphNode.get(read.graphNodeId) : undefined;
 		if (read && runner) {
 			byBoundary.set(boundary.id, { graphNodeId: read.graphNodeId, ...runner });

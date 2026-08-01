@@ -1,4 +1,5 @@
 import {
+	ASYNC_BOUNDARY_ARM,
 	ASYNC_PROTOCOL_VERSION,
 	STORAGE_PROTOCOL_VERSION,
 	type ProtocolStatePayload,
@@ -239,6 +240,8 @@ export function assertProtocolViewPayload(
 		const context = `markless/view asyncBoundary[${index}]`;
 		assertRecordShape(boundary, context);
 		assertStringField(boundary, 'id', context);
+		assertNullableStringField(boundary, 'runnerGraphNodeId', context);
+		assertAsyncBoundaryArm(boundary.initiallyServedArm, context);
 		assertCommentAnchor(boundary.startAnchor, `${context}.startAnchor`);
 		assertCommentAnchor(boundary.endAnchor, `${context}.endAnchor`);
 		assertAsyncBoundaryReads(boundary.asyncReads, context);
@@ -246,6 +249,28 @@ export function assertProtocolViewPayload(
 
 	assertOptionalKeyedRepeats(payload);
 	assertOptionalBranches(payload);
+}
+
+function assertNullableStringField(
+	record: Record<string, unknown>,
+	field: string,
+	context: string,
+): void {
+	if (record[field] !== null && typeof record[field] !== 'string') {
+		throw invalidPayloadShapeError(
+			contextPayloadType(context),
+			`Invalid ${context}: expected ${field} string or null.`,
+		);
+	}
+}
+
+function assertAsyncBoundaryArm(value: unknown, context: string): void {
+	if (!Object.values(ASYNC_BOUNDARY_ARM).includes(value as never)) {
+		throw invalidPayloadShapeError(
+			contextPayloadType(context),
+			`Invalid ${context}: expected initiallyServedArm to name a protocol async boundary arm.`,
+		);
+	}
 }
 
 function assertProtocolVersion(version: unknown, type: RuntimePayloadType): void {

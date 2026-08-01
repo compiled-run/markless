@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import { ASYNC_BOUNDARY_ARM } from '@markless/serializer';
 import { createArmCommitter } from '../src/resume-commit-arm.ts';
 import type {
 	ResumeArmRecordSet,
@@ -80,6 +81,8 @@ function asElement(node: FakeNode): ResumeDomElement {
 function boundaryFor(start: FakeNode, end: FakeNode): ResumeAsyncBoundaryRecord {
 	return {
 		id: 'b0',
+		runnerGraphNodeId: null,
+		initiallyServedArm: ASYNC_BOUNDARY_ARM.pending,
 		updateSymbolId: 'sym:update',
 		startAnchor: start as never,
 		endAnchor: end as never,

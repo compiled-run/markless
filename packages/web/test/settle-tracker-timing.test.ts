@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import { ASYNC_BOUNDARY_ARM } from '@markless/serializer';
 import { createFakeClock } from '../../../scripts/test-utils/fake-clock.ts';
 import {
 	createAsyncBoundarySettleTracker,
@@ -15,9 +16,15 @@ import type { ResumeAsyncBoundaryRecord } from '../src/resume-types.ts';
 // packages/router/test/navigation-hold.test.ts; browser fixtures stay as
 // integration proof only.
 
-function boundaryRecord(id: string, updateSymbolId?: string): ResumeAsyncBoundaryRecord {
+function boundaryRecord(
+	id: string,
+	updateSymbolId?: string,
+	initiallyServedArm = ASYNC_BOUNDARY_ARM.pending,
+): ResumeAsyncBoundaryRecord {
 	return {
 		id,
+		runnerGraphNodeId: `computed:${id}`,
+		initiallyServedArm,
 		updateSymbolId,
 		asyncReads: [{ graphNodeId: `computed:${id}`, path: [] }],
 	} as unknown as ResumeAsyncBoundaryRecord;
@@ -47,16 +54,13 @@ test('whenAllSettled resolves exactly at the last boundary for every settle orde
 	}
 });
 
-test('SSR-resumed boundaries with settled snapshots start settled; pending ones do not', async () => {
+test('the initially served arm alone determines whether resumed content starts settled', async () => {
 	const tracker = createAsyncBoundarySettleTracker({
-		boundaries: [boundaryRecord('done'), boundaryRecord('failed'), boundaryRecord('loading')],
-		state: {
-			computed: [
-				{ graphNodeId: 'computed:done', snapshot: { status: 'fulfilled' } },
-				{ graphNodeId: 'computed:failed', snapshot: { status: 'rejected' } },
-				{ graphNodeId: 'computed:loading', snapshot: { status: 'pending' } },
-			],
-		} as never,
+		boundaries: [
+			boundaryRecord('done', undefined, ASYNC_BOUNDARY_ARM.try),
+			boundaryRecord('failed', undefined, ASYNC_BOUNDARY_ARM.catch),
+			boundaryRecord('loading'),
+		],
 	});
 	expect(tracker.hasSettledContent('done')).toBe(true);
 	expect(tracker.hasSettledContent('failed')).toBe(true);

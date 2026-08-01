@@ -1,6 +1,6 @@
 import { expect, test, vi } from 'vitest';
 import { createRuntimeGraph } from '@markless/runtime';
-import { createProtocolStatePayload } from '@markless/serializer';
+import { ASYNC_BOUNDARY_ARM, createProtocolStatePayload } from '@markless/serializer';
 import {
 	applyDomJournalEntries,
 	createResumeRuntime,
@@ -2403,6 +2403,8 @@ test('resume runtime materializes async boundary comment anchors', async () => {
 			asyncBoundaries: [
 				{
 					id: 'boundary:0',
+					runnerGraphNodeId: 'computed:details',
+					initiallyServedArm: ASYNC_BOUNDARY_ARM.pending,
 					startAnchor: {
 						strategy: 'dom-order-comment',
 						index: 0,
@@ -2431,6 +2433,9 @@ test('resume runtime materializes async boundary comment anchors', async () => {
 
 	expect(resume.getAsyncBoundary('boundary:0')).toEqual({
 		id: 'boundary:0',
+		runnerGraphNodeId: 'computed:details',
+		initiallyServedArm: ASYNC_BOUNDARY_ARM.pending,
+		updateSymbolId: undefined,
 		startAnchor: start,
 		endAnchor: end,
 		asyncReads: [

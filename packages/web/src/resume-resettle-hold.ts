@@ -65,8 +65,11 @@ export function createResettleHold(deps: {
 			// re-check, then the commit. A commit failure rejects unhandled —
 			// a broken anchor census must fail loudly (D2), never silently.
 			deps.tracker.holdSettleCommitsFor(MARKLESS_PENDING_MIN_VISIBLE_MS);
-			const read = boundary.asyncReads[0];
-			if (!read || deps.readStatus(read.graphNodeId) !== 'pending') return;
+			if (
+				boundary.runnerGraphNodeId === null ||
+				deps.readStatus(boundary.runnerGraphNodeId) !== 'pending'
+			)
+				return;
 			await deps.commitPendingArm(boundary);
 		})();
 	};

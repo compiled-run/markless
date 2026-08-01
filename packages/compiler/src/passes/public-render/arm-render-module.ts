@@ -12,7 +12,11 @@ import type {
 	PublicRenderPlanInput,
 } from '../../artifacts.ts';
 import type { CompilerDiagnostic } from '../../diagnostics.ts';
-import { asyncArmRenderUnsupportedDiagnostic } from './diagnostics.ts';
+import { resolveBoundaryRunners } from './boundary-runner.ts';
+import {
+	asyncArmRenderUnsupportedDiagnostic,
+	gatePlanDisagreementDiagnostic,
+} from './diagnostics.ts';
 import { emitHtmlNode } from './html.ts';
 import { emitCatalogHelperImports } from './runtime-helpers.ts';
 import {
@@ -54,6 +58,7 @@ export function planAsyncBoundaryArmRenders(context: {
 	const diagnostics: CompilerDiagnostic[] = [];
 	const { input } = context;
 	const partsBoundaryIds = new Set(context.asyncBoundaryArms.map((entry) => entry.boundaryId));
+	const boundaryRunners = resolveBoundaryRunners(input.semanticGraph);
 
 	input.semanticGraph.asyncBoundaries.forEach((boundarySite, index) => {
 		const found = context.boundaryNodes[index];
@@ -65,12 +70,37 @@ export function planAsyncBoundaryArmRenders(context: {
 		const payloadBoundary = input.payloadArena.view.asyncBoundaries.find(
 			(boundary) => boundary.id === boundarySite.id,
 		);
-		const read = payloadBoundary?.asyncReads[0];
+		const resolution = boundaryRunners.get(boundarySite.id);
+		const read = resolution?.runnerGraphNodeId
+			? { graphNodeId: resolution.runnerGraphNodeId }
+			: undefined;
 		const runner = input.symbolResolver.symbols.find(
 			(symbol) =>
 				symbol.kind === 'async-computed-runner' && symbol.graphNodeId === read?.graphNodeId,
 		);
-		if (!payloadBoundary || !read || !runner || runner.kind !== 'async-computed-runner') return;
+		if (
+			!payloadBoundary ||
+			resolution?.reads.length !== 1 ||
+			!read ||
+			!runner ||
+			runner.kind !== 'async-computed-runner'
+		) {
+			const readNames = resolution?.reads.map((item) => `"${item.source}"`) ?? [];
+			diagnostics.push(
+				gatePlanDisagreementDiagnostic({
+					label: '@try',
+					message:
+						readNames.length > 1
+							? `This @try block reads more than one async value (${readNames.join(', ')}), so one runner cannot safely bind every name used by its settled content.`
+							: 'This @try block has no single resolvable async computed read, so no runner can settle its rendered content.',
+					node: found.node,
+					filename: input.source.filename,
+					suggestion:
+						'Make the @try content read one async computed value directly. Deriving additional values inside a settled browser arm is not supported yet.',
+				}),
+			);
+			return;
+		}
 
 		const plan = planOneArmRender({
 			...context,

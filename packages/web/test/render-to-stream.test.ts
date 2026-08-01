@@ -1,4 +1,8 @@
-import { ASYNC_PROTOCOL_VERSION, createProtocolStatePayload } from '@markless/serializer';
+import {
+	ASYNC_BOUNDARY_ARM,
+	ASYNC_PROTOCOL_VERSION,
+	createProtocolStatePayload,
+} from '@markless/serializer';
 import { expect, test } from 'vitest';
 import { marklessSsrAttachSnapshots, marklessSsrRunAsyncComputed } from '../src/fns/ssr.ts';
 import { renderToStream } from '../src/render-to-stream.ts';
@@ -84,6 +88,13 @@ function relayArtifact(input: { readonly delayMs: number; readonly fail?: boolea
 					asyncBoundaries: [
 						{
 							id: 'boundary:0',
+							runnerGraphNodeId: 'computed:report',
+							initiallyServedArm:
+								snapshot.status === 'fulfilled'
+									? ASYNC_BOUNDARY_ARM.try
+									: snapshot.status === 'rejected'
+										? ASYNC_BOUNDARY_ARM.catch
+										: ASYNC_BOUNDARY_ARM.pending,
 							startAnchor: { strategy: 'dom-order-comment', index: 0 },
 							endAnchor: { strategy: 'dom-order-comment', index: 1 },
 							asyncReads: [
@@ -197,6 +208,7 @@ function orchardArtifact(
 			renderPass += 1;
 			const snapshots: unknown[] = [];
 			const arms: string[] = [];
+			const servedArms: number[] = [];
 			for (const [index, sensor] of sensors.entries()) {
 				const snapshot = (await marklessSsrRunAsyncComputed(
 					snapshots as never,
@@ -214,6 +226,13 @@ function orchardArtifact(
 						: snapshot.status === 'rejected'
 							? `<p data-fault="${sensor.key}">sensor offline</p>`
 							: `<p data-calibrating="${sensor.key}">calibrating</p>`;
+				servedArms.push(
+					snapshot.status === 'fulfilled'
+						? ASYNC_BOUNDARY_ARM.try
+						: snapshot.status === 'rejected'
+							? ASYNC_BOUNDARY_ARM.catch
+							: ASYNC_BOUNDARY_ARM.pending,
+				);
 				arms.push(
 					`<!--markless:async:orchard:${index}-->${arm}<!--/markless:async:orchard:${index}-->`,
 				);
@@ -261,6 +280,8 @@ function orchardArtifact(
 					elementHandles: [],
 					asyncBoundaries: sensors.map((sensor, index) => ({
 						id: `orchard:${index}`,
+						runnerGraphNodeId: `computed:${sensor.key}`,
+						initiallyServedArm: servedArms[index],
 						startAnchor: { strategy: 'dom-order-comment', index: index * 2 },
 						endAnchor: { strategy: 'dom-order-comment', index: index * 2 + 1 },
 						asyncReads: [
@@ -602,6 +623,8 @@ function composedGroveArtifact() {
 					asyncBoundaries: [
 						{
 							id: 'boundary:0',
+							runnerGraphNodeId: 'computed:forecast',
+							initiallyServedArm: ASYNC_BOUNDARY_ARM.try,
 							startAnchor: { strategy: 'dom-order-comment', index: 0 },
 							endAnchor: { strategy: 'dom-order-comment', index: 1 },
 							asyncReads: [
@@ -621,6 +644,8 @@ function composedGroveArtifact() {
 						},
 						{
 							id: 'c0:boundary:0',
+							runnerGraphNodeId: 'computed:crop',
+							initiallyServedArm: ASYNC_BOUNDARY_ARM.pending,
 							updateSymbolId: 'c0:symbol:crop-update',
 							startAnchor: { strategy: 'dom-order-comment', index: 2 },
 							endAnchor: { strategy: 'dom-order-comment', index: 3 },

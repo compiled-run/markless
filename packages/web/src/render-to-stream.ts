@@ -1,4 +1,4 @@
-import { serializeRuntimeAsyncSnapshots } from '@markless/serializer';
+import { ASYNC_BOUNDARY_ARM, serializeRuntimeAsyncSnapshots } from '@markless/serializer';
 import {
 	MARKLESS_PENDING_MIN_VISIBLE_MS,
 	MARKLESS_REVEAL_TRAIN_CADENCE_MS,
@@ -121,24 +121,10 @@ function pendingStreamArms(
 	output: SsrRenderOutput,
 	renderContext: StreamRenderContext,
 ): PendingArm[] {
-	const snapshotById = new Map(
-		(output.state?.computed ?? []).map((computed) => [
-			computed.graphNodeId,
-			(computed as { readonly snapshot?: { readonly status?: string } }).snapshot,
-		]),
-	);
 	const arms = (output.view?.asyncBoundaries ?? []).flatMap((boundary) => {
-		const pendingRead = boundary.asyncReads.find(
-			(read) => snapshotById.get(read.graphNodeId)?.status === 'pending',
-		);
-		const graphNodeId = pendingRead?.graphNodeId;
-		const syncGateEntry = boundary.asyncReads
-			.map((read) => renderContext.streaming.runs.get(read.graphNodeId))
-			.find((entry) => entry?.async === false);
-		const entry =
-			syncGateEntry ??
-			(graphNodeId ? renderContext.streaming.runs.get(graphNodeId) : undefined);
-		return graphNodeId && entry
+		const graphNodeId = boundary.runnerGraphNodeId;
+		const entry = graphNodeId ? renderContext.streaming.runs.get(graphNodeId) : undefined;
+		return graphNodeId && entry && boundary.initiallyServedArm === ASYNC_BOUNDARY_ARM.pending
 			? [{ boundaryId: boundary.id, graphNodeId, entry, revealDependencyIds: [] as string[] }]
 			: [];
 	});
