@@ -41,3 +41,31 @@ test.each([
 		expect(armized.armRecords.events).toEqual([{ marker: expectedMarker }]);
 	},
 );
+
+test('SSR armization records the served arm for an authored sync gate', () => {
+	const [armized] = marklessSsrArmizeBoundaries(
+		'<!--markless:async:boundary:card--><p>east-west</p><!--/markless:async:boundary:card-->',
+		[
+			{
+				id: 'boundary:card',
+				runnerGraphNodeId: 'computed:card',
+				initiallyServedArm: ASYNC_BOUNDARY_ARM.pending,
+				startAnchor: { strategy: 'dom-order-comment', index: 0 },
+				endAnchor: { strategy: 'dom-order-comment', index: 1 },
+				asyncReads: [
+					{ graphNodeId: 'computed:east', path: [], runnerSymbolId: 'symbol:east' },
+					{ graphNodeId: 'computed:west', path: [], runnerSymbolId: 'symbol:west' },
+					{ graphNodeId: 'computed:card', path: [] },
+				],
+				armRecords: [{}, {}, {}],
+			},
+		],
+		{ locators: [], events: [], behaviors: [], elementHandles: [] },
+		[
+			{ graphNodeId: 'computed:east', snapshot: { status: 'fulfilled' } },
+			{ graphNodeId: 'computed:west', snapshot: { status: 'fulfilled' } },
+		],
+	);
+
+	expect(armized.initiallyServedArm).toBe(ASYNC_BOUNDARY_ARM.try);
+});

@@ -409,7 +409,22 @@ export function marklessSsrArmizeBoundaries(html, boundaries, streams, asyncSnap
 					moved[key].unshift(...streams[key].splice(i, 1));
 			}
 		}
-		const status = snapshotById.get(boundary.runnerGraphNodeId)?.status;
+		const directStatus = snapshotById.get(boundary.runnerGraphNodeId)?.status;
+		// Authored sync gates are the recorded settle nodes, while their snapshots
+		// are derived request-locally and intentionally absent from the serialized
+		// async snapshot list. In that case the expanded async-read closure tells us
+		// which arm SSR actually served.
+		const dependencyStatuses = (boundary.asyncReads ?? [])
+			.filter((read) => read.runnerSymbolId)
+			.map((read) => snapshotById.get(read.graphNodeId)?.status);
+		const status =
+			directStatus ??
+			(dependencyStatuses.includes('rejected')
+				? 'rejected'
+				: dependencyStatuses.length > 0 &&
+					  dependencyStatuses.every((candidate) => candidate === 'fulfilled')
+					? 'fulfilled'
+					: 'pending');
 		const takenArm =
 			status === 'fulfilled'
 				? ASYNC_BOUNDARY_ARM.try

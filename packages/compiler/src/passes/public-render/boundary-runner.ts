@@ -1,4 +1,4 @@
-import type { SemanticGraphArtifact, SemanticGraphBinding } from '../../artifacts.ts';
+import type { SemanticGraphArtifact } from '../../artifacts.ts';
 import {
 	graphBindingMap,
 	resolveGraphPath,
@@ -16,6 +16,7 @@ export type BoundaryRunnerResolution = {
 	readonly authored: BoundaryRunnerRead | null;
 	readonly runnerGraphNodeId: string | null;
 	readonly reads: ReadonlyArray<BoundaryRunnerRead>;
+	readonly unresolvedSources: ReadonlyArray<string>;
 };
 
 // Async boundary runner identity is a semantic-graph fact. Emitters must not
@@ -47,12 +48,16 @@ export function resolveBoundaryRunners(
 	return new Map(
 		semanticGraph.asyncBoundaries.map((boundary) => {
 			const reads: BoundaryRunnerRead[] = [];
+			const unresolvedSources: string[] = [];
 			const seenGraphNodeIds = new Set<string>();
 			for (const read of boundaryReads) {
 				if (read.asyncBoundaryId !== boundary.id) continue;
 				const resolved = resolveGraphPath(read.source, bindings, aliases);
+				if (!resolved) {
+					unresolvedSources.push(read.source);
+					continue;
+				}
 				if (
-					!resolved ||
 					resolved.binding.kind !== 'computed' ||
 					resolved.binding.asyncCapable !== true ||
 					seenGraphNodeIds.has(resolved.binding.id)
@@ -67,48 +72,28 @@ export function resolveBoundaryRunners(
 				});
 			}
 
-			const authored = reads[0] ?? null;
+			// A directly authored sync computed is the boundary's settle node. Its
+			// dependency closure may contain several async computeds, but protocol-view
+			// already expands that closure for gating; choosing one ancestor here would
+			// lose the authored value the settled arm actually reads.
+			const authoredSyncGates = reads.filter(
+				(read) => bindingsById.get(read.graphNodeId)?.async !== true,
+			);
+			const authored =
+				authoredSyncGates.length === 1
+					? (authoredSyncGates[0] ?? null)
+					: reads.length === 1
+						? (reads[0] ?? null)
+						: null;
 			return [
 				boundary.id,
 				{
 					authored,
-					runnerGraphNodeId: authored
-						? nearestAsyncRunner(authored.graphNodeId, bindingsById)
-						: null,
+					runnerGraphNodeId: authored?.graphNodeId ?? null,
 					reads,
+					unresolvedSources,
 				},
 			] as const;
 		}),
 	);
-}
-
-function nearestAsyncRunner(
-	graphNodeId: string,
-	bindingsById: ReadonlyMap<string, SemanticGraphBinding>,
-): string | null {
-	let candidates = [graphNodeId];
-	const visited = new Set<string>();
-
-	while (candidates.length > 0) {
-		const asyncRunners = candidates.filter(
-			(id) =>
-				bindingsById.get(id)?.kind === 'computed' && bindingsById.get(id)?.async === true,
-		);
-		if (asyncRunners.length === 1) return asyncRunners[0] ?? null;
-		if (asyncRunners.length > 1) return null;
-
-		const next = new Set<string>();
-		for (const id of candidates) {
-			if (visited.has(id)) continue;
-			visited.add(id);
-			for (const dependency of bindingsById.get(id)?.dependencies ?? []) {
-				const binding = bindingsById.get(dependency.graphNodeId);
-				if (binding?.kind === 'computed' && binding.asyncCapable === true)
-					next.add(binding.id);
-			}
-		}
-		candidates = [...next];
-	}
-
-	return null;
 }

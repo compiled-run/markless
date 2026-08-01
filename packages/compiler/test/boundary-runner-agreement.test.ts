@@ -110,15 +110,15 @@ export function KilnRoster() @{
 	});
 });
 
-test('a part-buildable boundary with two async-capable reads fails loudly', async () => {
+test('a parts-covered boundary with no authored sync gate and two async reads fails loudly', async () => {
 	const result = await compileTsrxModule({
-		filename: 'src/DerivedFeed.tsrx',
+		filename: 'src/CompassCard.tsrx',
 		source: `
 import { computed } from '@markless/core';
-export function DerivedFeed() @{
-	const feed = computed(async () => ({ releases: [{ id: 'r1', title: 'First' }] }));
-	const summary = computed(() => feed.releases.length + ' releases');
-	<main>@try { <><p>{summary}</p><ul>@for (const release of feed.releases; key release.id) {<li>{release.title}</li>}</ul></> } @pending { <p>Loading</p> } @catch { <p>Failed</p> }</main>
+export function CompassCard() @{
+	const east = computed(async () => ({ label: 'east' }));
+	const west = computed(async () => ({ label: 'west' }));
+	<main>@try { <p>{east.label}-{west.label}</p> } @pending { <p>Loading</p> } @catch { <p>Failed</p> }</main>
 }
 `,
 		symbols: [],
@@ -129,18 +129,15 @@ export function DerivedFeed() @{
 		boundaryId,
 		supported: true,
 	});
-	expect(result.publicRenderPlan.asyncBoundaryArms).toEqual([]);
-	expect(result.publicRenderPlan.asyncBoundaryArmRenders).toEqual([]);
-	// Re-deriving the browser/settle direction from the payload's element zero
-	// selects the authored sync derive, not its async runner ancestor.
-	expect(result.payloadArena.view.asyncBoundaries[0]?.asyncReads.at(0)?.graphNodeId).toBe(
-		'computed:summary',
+	expect(result.publicRenderPlan.asyncBoundaryArms).toContainEqual(
+		expect.objectContaining({ boundaryId }),
 	);
+	expect(result.publicRenderPlan.asyncBoundaryArmRenders).toEqual([]);
 	expect(
 		result.symbolResolver.symbols.find(
 			(symbol) => symbol.kind === 'async-boundary-update' && symbol.boundaryId === boundaryId,
 		)?.graphNodeId,
-	).toBe('computed:feed');
+	).toBeUndefined();
 	expect(collectTsrxModuleDiagnostics(result)).toEqual(
 		expect.arrayContaining([
 			expect.objectContaining({

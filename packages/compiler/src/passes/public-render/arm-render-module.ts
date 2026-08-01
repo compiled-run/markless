@@ -63,28 +63,26 @@ export function planAsyncBoundaryArmRenders(context: {
 	input.semanticGraph.asyncBoundaries.forEach((boundarySite, index) => {
 		const found = context.boundaryNodes[index];
 		const gate = context.asyncBoundaryGates.find((item) => item.boundaryId === boundarySite.id);
-		// The parts tier already covers the boundary, or the boundary cannot
-		// render anchors at all (its own diagnostic explains that case).
-		if (!found || !gate?.supported || partsBoundaryIds.has(boundarySite.id)) return;
+		// A boundary that cannot render anchors has its own gate diagnostic.
+		if (!found || !gate?.supported) return;
 
 		const payloadBoundary = input.payloadArena.view.asyncBoundaries.find(
 			(boundary) => boundary.id === boundarySite.id,
 		);
 		const resolution = boundaryRunners.get(boundarySite.id);
+		// A syntactic @try with no async-capable read keeps its established static
+		// pending behavior; there is no async settle contract to validate.
+		if (resolution?.reads.length === 0 && resolution.unresolvedSources.length === 0) return;
 		const read = resolution?.runnerGraphNodeId
 			? { graphNodeId: resolution.runnerGraphNodeId }
 			: undefined;
 		const runner = input.symbolResolver.symbols.find(
 			(symbol) =>
-				symbol.kind === 'async-computed-runner' && symbol.graphNodeId === read?.graphNodeId,
+				(symbol.kind === 'async-computed-runner' ||
+					symbol.kind === 'sync-computed-derive') &&
+				symbol.graphNodeId === read?.graphNodeId,
 		);
-		if (
-			!payloadBoundary ||
-			resolution?.reads.length !== 1 ||
-			!read ||
-			!runner ||
-			runner.kind !== 'async-computed-runner'
-		) {
+		if (!payloadBoundary || !read || !runner) {
 			const readNames = resolution?.reads.map((item) => `"${item.source}"`) ?? [];
 			diagnostics.push(
 				gatePlanDisagreementDiagnostic({
@@ -101,6 +99,10 @@ export function planAsyncBoundaryArmRenders(context: {
 			);
 			return;
 		}
+
+		// The cheap parts tier still needs the same resolved settle node and
+		// symbol contract. Validate those before allowing it to skip tier 4.
+		if (partsBoundaryIds.has(boundarySite.id)) return;
 
 		const plan = planOneArmRender({
 			...context,
@@ -125,7 +127,10 @@ type ArmRenderCandidate = Parameters<typeof planAsyncBoundaryArmRenders>[0] & {
 	readonly found: AsyncBoundaryNode;
 	readonly payloadBoundary: PublicRenderPlanInput['payloadArena']['view']['asyncBoundaries'][number];
 	readonly read: { readonly graphNodeId: string };
-	readonly runner: Extract<PlannedSymbol, { kind: 'async-computed-runner' }>;
+	readonly runner: Extract<
+		PlannedSymbol,
+		{ kind: 'async-computed-runner' | 'sync-computed-derive' }
+	>;
 };
 
 function planOneArmRender(
