@@ -1,0 +1,18 @@
+{
+	"compilerOptions": {
+		"target": "ES2022",
+		"useDefineForClassFields": true,
+		"module": "ESNext",
+		"moduleResolution": "Bundler",
+		"plugins": [
+			{ "name": "@markless/typescript-plugin" },
+			{ "name": "@markless/router/typescript-plugin" }
+		],
+		"strict": true,
+		"jsx": "preserve",
+		"allowImportingTsExtensions": true,
+		"noEmit": true,
+		"types": ["vite/client"]
+	},
+	"include": ["document.tsrx", "pages", "src", "vite.config.ts"]
+}

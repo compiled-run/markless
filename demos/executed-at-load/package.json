@@ -1,0 +1,19 @@
+{
+	"name": "@markless/executed-at-load",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"baseline": "node measure.mjs baseline",
+		"gate": "vitest run --config vitest.config.ts && node measure.mjs gate",
+		"test": "vitest run --config vitest.config.ts"
+	},
+	"dependencies": {
+		"@markless/compiler": "workspace:*"
+	},
+	"devDependencies": {
+		"playwright": "1.58.2",
+		"vitest": "4.1.5"
+	},
+	"packageManager": "pnpm@10.33.2"
+}
