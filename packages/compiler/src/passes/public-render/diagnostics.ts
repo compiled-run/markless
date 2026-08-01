@@ -2,6 +2,28 @@ import type { AnyNode } from '../../ast/nodes.ts';
 import { sourceSpan } from '../../ast/source.ts';
 import type { CompilerDiagnostic } from '../../diagnostics.ts';
 
+export function gatePlanDisagreementDiagnostic(input: {
+	readonly label: '@try' | '@if' | '@switch' | '@for';
+	readonly message: string;
+	readonly node: AnyNode;
+	readonly filename: string;
+	readonly suggestion: string;
+}): CompilerDiagnostic {
+	return {
+		code: 'MARKLESS_PUBLIC_RENDER_GATE_PLAN_DISAGREEMENT',
+		severity: 'error',
+		phase: 'public-render',
+		title: `${input.label} passed render support checks but has no usable render plan`,
+		message: input.message,
+		why: 'The public render gate admitted this authored construct, so silently omitting its render plan would produce output that can fail or remain permanently unsettled at request time.',
+		primarySpan: sourceSpan(input.node, input.filename),
+		passId: 'public-render-plan',
+		artifactKeys: ['publicRenderPlan'],
+		suggestions: [{ message: input.suggestion }],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_PUBLIC_RENDER_GATE_PLAN_DISAGREEMENT',
+	};
+}
+
 // The public render module emitter renders only compiler-proven constructs.
 // Anything else must be reported here so authored content never disappears
 // from CSR/SSR output without an explanation the author can act on.

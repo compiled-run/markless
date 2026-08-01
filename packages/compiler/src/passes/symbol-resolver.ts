@@ -17,6 +17,7 @@ import {
 } from '../artifact-helpers/graph-paths.ts';
 import { getIdentifierName, walkNode, type AnyNode } from '../ast/nodes.ts';
 import { parseJavaScriptModule } from '../js-ast.ts';
+import { resolveBoundaryRunners } from './public-render/boundary-runner.ts';
 
 export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPlan {
 	const symbols: PlannedSymbol[] = [];
@@ -130,14 +131,15 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 
 	// Boundary settle symbols (gate-blind; protocol-view wires only boundaries
 	// with a plan arms entry).
+	const boundaryRunners = resolveBoundaryRunners(input.semanticGraph);
 	for (const boundary of input.payloadArena.view.asyncBoundaries) {
-		const read = boundary.asyncReads[0];
-		if (!read) continue;
+		const graphNodeId = boundaryRunners.get(boundary.id)?.runnerGraphNodeId;
+		if (!graphNodeId) continue;
 		symbols.push({
 			id: `symbol:${nextSymbolId++}`,
 			kind: 'async-boundary-update',
 			boundaryId: boundary.id,
-			graphNodeId: read.graphNodeId,
+			graphNodeId,
 		});
 	}
 
@@ -233,9 +235,7 @@ export function planBoundSymbolResolver(
 				if (
 					symbol.kind !== 'event-handler' &&
 					symbol.kind !== 'callback-prop' &&
-					captureSlots.every(
-						(slot) => slot.route.kind === 'compiler-known-constant',
-					)
+					captureSlots.every((slot) => slot.route.kind === 'compiler-known-constant')
 				)
 					continue;
 				const ancestry = path.map((edge) => ({

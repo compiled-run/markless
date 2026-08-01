@@ -106,7 +106,6 @@ export async function startResumeRuntime(input: {
 		// transition settle promise, pending minimum duration).
 		settleTracker = asyncWiring.createAsyncBoundarySettleTracker({
 			boundaries: prepared.asyncBoundariesById.values(),
-			state: runtimeInput.state,
 		});
 		// T119/T120: deadline-gated @pending on re-settles (captures the mounted
 		// @pending arms before the runners are demanded below).
@@ -153,8 +152,7 @@ export async function startResumeRuntime(input: {
 		// with the current snapshot so the whole arm re-renders through commitArm.
 		resettleBoundary: async (boundaryId): Promise<DomJournalResult | void> => {
 			const boundary = prepared.asyncBoundariesById.get(boundaryId);
-			const read = boundary?.asyncReads[0];
-			if (!boundary?.updateSymbolId || !read) return;
+			if (!boundary?.updateSymbolId || boundary.runnerGraphNodeId === null) return;
 			const { settleAsyncBoundaryRange } = await import('./resume-async-wiring.ts');
 			return settleAsyncBoundaryRange(
 				{
@@ -167,7 +165,7 @@ export async function startResumeRuntime(input: {
 					settleTracker,
 				},
 				boundary,
-				runtimeInput.graph.read(read.graphNodeId, []),
+				runtimeInput.graph.read(boundary.runnerGraphNodeId, []),
 			);
 		},
 		// Spec D8: a branch flip whose deciding test read goes THROUGH an async

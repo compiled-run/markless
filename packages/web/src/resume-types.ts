@@ -67,6 +67,8 @@ export type ResumeAsyncBoundaryRead =
 	ProtocolViewPayload['asyncBoundaries'][number]['asyncReads'][number];
 export type ResumeAsyncBoundaryRecord = {
 	readonly id: string;
+	readonly runnerGraphNodeId: ProtocolViewPayload['asyncBoundaries'][number]['runnerGraphNodeId'];
+	readonly initiallyServedArm: ProtocolViewPayload['asyncBoundaries'][number]['initiallyServedArm'];
 	readonly updateSymbolId?: string;
 	readonly startAnchor: ResumeDomComment;
 	readonly endAnchor: ResumeDomComment;

@@ -1,5 +1,5 @@
 import type { DomJournalEntry, DomJournalResult } from '@markless/runtime';
-import type { ProtocolStatePayload } from '@markless/serializer';
+import { ASYNC_BOUNDARY_ARM } from '@markless/serializer';
 import { boundaryArmRecordSet } from './resume-arm-records.ts';
 import type { ArmCommitUpdate } from './resume-commit-arm.ts';
 import type {
@@ -47,24 +47,15 @@ function isSettledStatus(status: unknown): boolean {
 
 export function createAsyncBoundarySettleTracker(input: {
 	readonly boundaries: Iterable<ResumeAsyncBoundaryRecord>;
-	readonly state?: ProtocolStatePayload;
 	readonly clock?: SettleTrackerClock;
 }): AsyncBoundarySettleTracker {
 	const now = input.clock?.now ?? Date.now;
-	// SSR-resumed pages arrive with settled snapshots in the state payload;
-	// their boundaries already show settled content before any runner re-runs.
-	const settledGraphNodeIds = new Set<string>();
-	for (const computed of input.state?.computed ?? []) {
-		if (computed.async === false || isSettledStatus(computed.snapshot?.status)) {
-			settledGraphNodeIds.add(computed.graphNodeId);
-		}
-	}
 	const settledById = new Map<string, boolean>();
 	for (const boundary of input.boundaries) {
 		settledById.set(
 			boundary.id,
-			boundary.asyncReads.length > 0 &&
-				boundary.asyncReads.every((read) => settledGraphNodeIds.has(read.graphNodeId)),
+			boundary.initiallyServedArm === ASYNC_BOUNDARY_ARM.try ||
+				boundary.initiallyServedArm === ASYNC_BOUNDARY_ARM.catch,
 		);
 	}
 	let commitFloor = 0;
@@ -220,10 +211,13 @@ export async function settleAsyncBoundaryRange(
 	// hold raises the floor BEFORE its pending commit, so this wait also
 	// orders settle commits behind an in-flight pending-arm commit.
 	if ((await input.settleTracker?.waitOutCommitHold()) === true) {
-		const read = boundary.asyncReads[0];
 		// A newer run superseded this settle while it waited; its own settle
 		// subscription commits the fresher snapshot.
-		if (read && input.graph.read(read.graphNodeId, ['status']) !== status) return;
+		if (
+			boundary.runnerGraphNodeId !== null &&
+			input.graph.read(boundary.runnerGraphNodeId, ['status']) !== status
+		)
+			return;
 	}
 	const symbol = await input.loadSymbol(boundary.updateSymbolId!);
 	const update = await symbol({

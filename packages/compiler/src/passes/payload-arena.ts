@@ -1,3 +1,4 @@
+import { ASYNC_BOUNDARY_ARM } from '@markless/serializer';
 import type {
 	PayloadArenaArtifact,
 	PayloadArenaInput,
@@ -13,6 +14,7 @@ import {
 	semanticAliasMap,
 	uniqueBy,
 } from '../artifact-helpers/graph-paths.ts';
+import { resolveBoundaryRunners } from './public-render/boundary-runner.ts';
 
 export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact {
 	const bindings = new Map<string, SemanticGraphBinding>();
@@ -216,6 +218,7 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 				),
 			};
 		});
+	const boundaryRunners = resolveBoundaryRunners(input.semanticGraph);
 	const asyncBoundaries = input.semanticGraph.asyncBoundaries.map((boundary) => {
 		const directAsyncReads = uniqueBy(
 			[
@@ -261,6 +264,8 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 			id: boundary.id,
 			kind: 'async-boundary' as const,
 			anchorOrder: boundary.anchorOrder,
+			runnerGraphNodeId: boundaryRunners.get(boundary.id)?.runnerGraphNodeId ?? null,
+			initiallyServedArm: ASYNC_BOUNDARY_ARM.pending,
 			armRecords: boundaryArmRecords(boundary.id),
 			startAnchor: {
 				strategy: 'dom-order-comment' as const,

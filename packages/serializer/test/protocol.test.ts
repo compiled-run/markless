@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import {
+	ASYNC_BOUNDARY_ARM,
 	ASYNC_PROTOCOL_VERSION,
 	decodePayloadScripts,
 	renderPayloadScripts,
@@ -129,6 +130,8 @@ test('async boundary armRecords round-trip payload scripts in both protocol shap
 	const boundaryBase = {
 		startAnchor: { strategy: 'dom-order-comment', index: 0 },
 		endAnchor: { strategy: 'dom-order-comment', index: 1 },
+		runnerGraphNodeId: 'computed:rows',
+		initiallyServedArm: ASYNC_BOUNDARY_ARM.pending,
 		asyncReads: [{ source: 'rows', graphNodeId: 'computed:rows', path: [] }],
 	} as const;
 	const view: ProtocolViewPayload = {
@@ -162,6 +165,47 @@ test('async boundary armRecords round-trip payload scripts in both protocol shap
 
 	expect(decoded.view.asyncBoundaries[0]?.armRecords).toEqual(armized);
 	expect(Array.isArray(decoded.view.asyncBoundaries[1]?.armRecords)).toBe(true);
+	expect(decoded.view.asyncBoundaries[0]).toMatchObject({
+		runnerGraphNodeId: 'computed:rows',
+		initiallyServedArm: ASYNC_BOUNDARY_ARM.pending,
+	});
+});
+
+test.each([
+	['missing runnerGraphNodeId', { initiallyServedArm: ASYNC_BOUNDARY_ARM.pending }],
+	[
+		'non-string runnerGraphNodeId',
+		{ runnerGraphNodeId: 7, initiallyServedArm: ASYNC_BOUNDARY_ARM.pending },
+	],
+	['missing initiallyServedArm', { runnerGraphNodeId: 'computed:rows' }],
+	['unknown initiallyServedArm', { runnerGraphNodeId: 'computed:rows', initiallyServedArm: 3 }],
+])('async boundary records reject %s', (_label, fields) => {
+	const state: ProtocolStatePayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		cells: [],
+		computed: [],
+	};
+	const view = {
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [
+			{
+				id: 'async:0',
+				startAnchor: { strategy: 'dom-order-comment', index: 0 },
+				endAnchor: { strategy: 'dom-order-comment', index: 1 },
+				asyncReads: [],
+				...fields,
+			},
+		],
+	};
+
+	expect(() => decodePayloadScripts(renderPayloadScripts({ state, view } as never))).toThrow(
+		/runnerGraphNodeId|initiallyServedArm/,
+	);
 });
 
 // directValue is the LIVE-value channel (CSR mounts, T105): it must never be

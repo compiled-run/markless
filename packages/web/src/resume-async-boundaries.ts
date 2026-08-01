@@ -117,6 +117,8 @@ function materializeAsyncBoundaryLocators(
 			throw missingCommentAnchorError(boundary.id, 'endAnchor', boundary.endAnchor.index);
 		byId.set(boundary.id, {
 			id: boundary.id,
+			runnerGraphNodeId: boundary.runnerGraphNodeId,
+			initiallyServedArm: boundary.initiallyServedArm,
 			updateSymbolId: boundary.updateSymbolId,
 			startAnchor,
 			endAnchor,

@@ -1,5 +1,10 @@
 import { expect, test } from 'vitest';
-import { decodePayloadScripts, RuntimePayloadError, renderPayloadScripts } from '../src/index.ts';
+import {
+	ASYNC_BOUNDARY_ARM,
+	decodePayloadScripts,
+	RuntimePayloadError,
+	renderPayloadScripts,
+} from '../src/index.ts';
 import {
 	decodePayloadScripts as decodeClientPayloadScripts,
 	RuntimePayloadError as ClientRuntimePayloadError,
@@ -133,4 +138,51 @@ test('the browser decoder accepts storage protocol version 2', () => {
 			stateScript: rendered.stateScript.replace('"version":2', '"version":3'),
 		}),
 	).toThrow(/Unsupported markless\/state protocol version 3/);
+});
+
+test('the browser decoder validates async boundary decision fields', () => {
+	const rendered = renderPayloadScripts({
+		state: { version: 1, cells: [], computed: [] },
+		view: {
+			version: 1,
+			locators: [],
+			events: [],
+			domUpdates: [],
+			behaviors: [],
+			elementHandles: [],
+			asyncBoundaries: [
+				{
+					id: 'boundary:0',
+					startAnchor: { strategy: 'dom-order-comment', index: 0 },
+					endAnchor: { strategy: 'dom-order-comment', index: 1 },
+					runnerGraphNodeId: 'computed:details',
+					initiallyServedArm: ASYNC_BOUNDARY_ARM.pending,
+					asyncReads: [],
+				},
+			],
+		} as never,
+	});
+
+	expect(decodeClientPayloadScripts(rendered).view.asyncBoundaries[0]).toMatchObject({
+		runnerGraphNodeId: 'computed:details',
+		initiallyServedArm: ASYNC_BOUNDARY_ARM.pending,
+	});
+	expect(() =>
+		decodeClientPayloadScripts({
+			...rendered,
+			viewScript: rendered.viewScript.replace(
+				'"runnerGraphNodeId":"computed:details"',
+				'"runnerGraphNodeId":7',
+			),
+		}),
+	).toThrow(/runnerGraphNodeId/);
+	expect(() =>
+		decodeClientPayloadScripts({
+			...rendered,
+			viewScript: rendered.viewScript.replace(
+				`"initiallyServedArm":${String(ASYNC_BOUNDARY_ARM.pending)}`,
+				'"initiallyServedArm":9',
+			),
+		}),
+	).toThrow(/initiallyServedArm/);
 });

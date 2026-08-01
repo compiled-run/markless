@@ -1,6 +1,10 @@
 import { createRuntimeGraph } from '@markless/runtime';
 import { beforeEach, describe, expect, test } from 'vitest';
-import { createProtocolStatePayload, renderPayloadScripts } from '../../serializer/src/index.ts';
+import {
+	ASYNC_BOUNDARY_ARM,
+	createProtocolStatePayload,
+	renderPayloadScripts,
+} from '../../serializer/src/index.ts';
 import {
 	__marklessDebugRecordViolation,
 	__marklessDebugInvalidateElement,
@@ -168,6 +172,10 @@ function streamArtifact() {
 					asyncBoundaries: [
 						{
 							id: 'stream',
+							runnerGraphNodeId: 'computed:stream',
+							initiallyServedArm: settled
+								? ASYNC_BOUNDARY_ARM.try
+								: ASYNC_BOUNDARY_ARM.pending,
 							startAnchor: { strategy: 'dom-order-comment', index: 0 },
 							endAnchor: { strategy: 'dom-order-comment', index: 1 },
 							asyncReads: [{ graphNodeId: 'computed:stream', path: [] }],

@@ -8,6 +8,7 @@ import {
 	marklessCsrUnbindLocalView,
 } from './csr.ts';
 import { marklessBoundSymbolId, marklessDomUpdateSymbolId } from './bound-symbol.ts';
+import { ASYNC_BOUNDARY_ARM } from '@markless/serializer';
 
 export { marklessAssertComposableStateNames, marklessComposeState };
 export const marklessSsrRemapChildGraph = marklessCsrRemapChildGraph;
@@ -408,11 +409,32 @@ export function marklessSsrArmizeBoundaries(html, boundaries, streams, asyncSnap
 					moved[key].unshift(...streams[key].splice(i, 1));
 			}
 		}
-		const status = snapshotById.get(boundary.asyncReads?.[0]?.graphNodeId)?.status;
-		const takenArm = status === 'fulfilled' ? 0 : status === 'rejected' ? 2 : 1;
+		const directStatus = snapshotById.get(boundary.runnerGraphNodeId)?.status;
+		// Authored sync gates are the recorded settle nodes, while their snapshots
+		// are derived request-locally and intentionally absent from the serialized
+		// async snapshot list. In that case the expanded async-read closure tells us
+		// which arm SSR actually served.
+		const dependencyStatuses = (boundary.asyncReads ?? [])
+			.filter((read) => read.runnerSymbolId)
+			.map((read) => snapshotById.get(read.graphNodeId)?.status);
+		const status =
+			directStatus ??
+			(dependencyStatuses.includes('rejected')
+				? 'rejected'
+				: dependencyStatuses.length > 0 &&
+					  dependencyStatuses.every((candidate) => candidate === 'fulfilled')
+					? 'fulfilled'
+					: 'pending');
+		const takenArm =
+			status === 'fulfilled'
+				? ASYNC_BOUNDARY_ARM.try
+				: status === 'rejected'
+					? ASYNC_BOUNDARY_ARM.catch
+					: ASYNC_BOUNDARY_ARM.pending;
 		const planned = boundary.armRecords[takenArm] ?? {};
 		return {
 			...boundary,
+			initiallyServedArm: takenArm,
 			armRecords: {
 				locators: armLocators,
 				events: [...(planned.events ?? []), ...moved.events],
@@ -704,14 +726,16 @@ export function marklessSsrPrefixArmRecord(arm, child) {
 				child.hostPrefix,
 			);
 			return mapped
-				? [{
-						...update,
-						graphNodeId: mapped.graphNodeId,
-						path: mapped.path,
-						...(update.symbolId
-							? { symbolId: marklessDomUpdateSymbolId(child, update.symbolId) }
-							: {}),
-					}]
+				? [
+						{
+							...update,
+							graphNodeId: mapped.graphNodeId,
+							path: mapped.path,
+							...(update.symbolId
+								? { symbolId: marklessDomUpdateSymbolId(child, update.symbolId) }
+								: {}),
+						},
+					]
 				: [];
 		}),
 	};

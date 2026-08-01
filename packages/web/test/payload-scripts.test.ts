@@ -1,5 +1,9 @@
 import { expect, test } from 'vitest';
-import { createProtocolStatePayload, renderPayloadScripts } from '../../serializer/src/index.ts';
+import {
+	ASYNC_BOUNDARY_ARM,
+	createProtocolStatePayload,
+	renderPayloadScripts,
+} from '../../serializer/src/index.ts';
 import { createDomUpdateEntry } from '../src/dom-update.ts';
 import {
 	createResumeRuntime,
@@ -574,6 +578,8 @@ test('payload script resume loads async computed runner symbols only when demand
 		asyncBoundaries: [
 			{
 				id: 'boundary:0',
+				runnerGraphNodeId: 'computed:details',
+				initiallyServedArm: ASYNC_BOUNDARY_ARM.pending,
 				startAnchor: { strategy: 'dom-order-comment', index: 0 },
 				endAnchor: { strategy: 'dom-order-comment', index: 1 },
 				asyncReads: [
@@ -677,6 +683,8 @@ test('payload script resume restores fulfilled async computed snapshots before r
 		asyncBoundaries: [
 			{
 				id: 'boundary:0',
+				runnerGraphNodeId: 'computed:details',
+				initiallyServedArm: ASYNC_BOUNDARY_ARM.try,
 				startAnchor: { strategy: 'dom-order-comment', index: 0 },
 				endAnchor: { strategy: 'dom-order-comment', index: 1 },
 				asyncReads: [
@@ -769,6 +777,8 @@ test('payload script resume restarts pending async computed snapshots on graph s
 		asyncBoundaries: [
 			{
 				id: 'boundary:0',
+				runnerGraphNodeId: 'computed:details',
+				initiallyServedArm: ASYNC_BOUNDARY_ARM.pending,
 				startAnchor: { strategy: 'dom-order-comment', index: 0 },
 				endAnchor: { strategy: 'dom-order-comment', index: 1 },
 				asyncReads: [
@@ -1112,8 +1122,7 @@ test('runtime rejects payload scripts with malformed nested view records', () =>
 	expect(() =>
 		decodePayloadScripts({
 			stateScript: validState,
-			viewScript:
-				'<script type="markless/view">{"version":1,"locators":[],"events":[],"domUpdates":[],"behaviors":[],"elementHandles":[],"asyncBoundaries":[{"id":"boundary:0","startAnchor":{"strategy":"dom-order-comment","index":0.5},"endAnchor":{"strategy":"dom-order-comment","index":1},"asyncReads":[]}]}</script>',
+			viewScript: `<script type="markless/view">{"version":1,"locators":[],"events":[],"domUpdates":[],"behaviors":[],"elementHandles":[],"asyncBoundaries":[{"id":"boundary:0","runnerGraphNodeId":null,"initiallyServedArm":${ASYNC_BOUNDARY_ARM.pending},"startAnchor":{"strategy":"dom-order-comment","index":0.5},"endAnchor":{"strategy":"dom-order-comment","index":1},"asyncReads":[]}]}</script>`,
 		}),
 	).toThrow(
 		'Invalid markless/view asyncBoundary[0].startAnchor: expected index non-negative integer.',
@@ -1599,8 +1608,7 @@ test('payload document resume settles pending async boundaries through the defau
 	const loadedSymbols: string[] = [];
 	const state =
 		'{"version":1,"cells":[{"graphNodeId":"state:userId","name":"userId","valueKind":"scalar","value":{"version":1,"root":"ada","records":[]}}],"computed":[{"graphNodeId":"computed:details","name":"details","async":true,"dependencies":[{"graphNodeId":"state:userId","path":[]}]}]}';
-	const view =
-		'{"version":1,"locators":[{"hostNodeId":"h0","strategy":"dom-order","index":0,"tagName":"main"}],"events":[],"domUpdates":[],"behaviors":[],"elementHandles":[],"asyncBoundaries":[{"id":"boundary:0","updateSymbolId":"symbol:boundary-update","startAnchor":{"strategy":"dom-order-comment","index":0},"endAnchor":{"strategy":"dom-order-comment","index":1},"asyncReads":[{"source":"details","graphNodeId":"computed:details","path":[],"runnerSymbolId":"symbol:details-runner"}]}]}';
+	const view = `{"version":1,"locators":[{"hostNodeId":"h0","strategy":"dom-order","index":0,"tagName":"main"}],"events":[],"domUpdates":[],"behaviors":[],"elementHandles":[],"asyncBoundaries":[{"id":"boundary:0","runnerGraphNodeId":"computed:details","initiallyServedArm":${ASYNC_BOUNDARY_ARM.pending},"updateSymbolId":"symbol:boundary-update","startAnchor":{"strategy":"dom-order-comment","index":0},"endAnchor":{"strategy":"dom-order-comment","index":1},"asyncReads":[{"source":"details","graphNodeId":"computed:details","path":[],"runnerSymbolId":"symbol:details-runner"}]}]}`;
 	const insertedTag = 'SPAN';
 	const template = { innerHTML: '', content: { childNodes: [fakeElement(insertedTag)] } };
 	const documentFake = {

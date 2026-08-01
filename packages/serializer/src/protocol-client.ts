@@ -1,6 +1,10 @@
 import { isValidStorageKey } from './storage-key.ts';
+import {
+	ASYNC_BOUNDARY_ARM,
+	ASYNC_PROTOCOL_VERSION,
+	STORAGE_PROTOCOL_VERSION,
+} from './protocol-constants.ts';
 import type { ProtocolStatePayload, ProtocolViewPayload } from './protocol.ts';
-const ASYNC_PROTOCOL_VERSION = 1;
 export type EncodedPayloadScripts = { readonly stateScript: string; readonly viewScript: string };
 export type DecodedPayloadScripts = {
 	readonly state: ProtocolStatePayload;
@@ -74,7 +78,7 @@ function baseState(value: unknown): asserts value is ProtocolStatePayload {
 		str(record, 'name', context);
 		if ('value' in record) serialized(record.value, `${context}.value`);
 	}
-	if (payload.version === 2) {
+	if (payload.version === STORAGE_PROTOCOL_VERSION) {
 		const storage = arr(payload, 'storage', 'markless/state');
 		for (const entry of storage) {
 			const context = 'markless/state storage';
@@ -124,6 +128,14 @@ function baseView(value: unknown): asserts value is ProtocolViewPayload {
 		str(record, 'eventName', context);
 		if (!Array.isArray(record.symbolIds)) invalid(context, 'expected symbolIds array.');
 	}
+	for (const [index, boundary] of payload.asyncBoundaries.entries()) {
+		const context = `markless/view asyncBoundary[${index}]`;
+		const record = obj(boundary, context);
+		if (record.runnerGraphNodeId !== null && typeof record.runnerGraphNodeId !== 'string')
+			invalid(context, 'expected runnerGraphNodeId string or null.');
+		if (!Object.values(ASYNC_BOUNDARY_ARM).includes(record.initiallyServedArm as never))
+			invalid(context, 'expected initiallyServedArm to name a protocol async boundary arm.');
+	}
 }
 function root(value: unknown, type: RuntimePayloadType): Record<string, unknown> {
 	const record = obj(value, type);
@@ -151,7 +163,7 @@ function serialized(value: unknown, context: string): void {
 function version(actualVersion: unknown, type: RuntimePayloadType): void {
 	if (
 		actualVersion === ASYNC_PROTOCOL_VERSION ||
-		(type === 'markless/state' && actualVersion === 2)
+		(type === 'markless/state' && actualVersion === STORAGE_PROTOCOL_VERSION)
 	)
 		return;
 	throw new RuntimePayloadError({

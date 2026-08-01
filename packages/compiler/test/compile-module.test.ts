@@ -1,6 +1,10 @@
 import { expect, test, vi } from 'vitest';
 import { compileTsrxModule } from '../src/index.ts';
-import { deserializeGraphValue, renderPayloadScripts } from '../../serializer/src/index.ts';
+import {
+	ASYNC_BOUNDARY_ARM,
+	deserializeGraphValue,
+	renderPayloadScripts,
+} from '../../serializer/src/index.ts';
 import { resumeFromPayloadScripts } from '../../web/src/payload.ts';
 import { render } from '../../web/src/render.ts';
 import type { ProtocolStatePayload, ProtocolViewPayload } from '../../serializer/src/index.ts';
@@ -6013,11 +6017,21 @@ export default function SignalCardSsr() @{
 	});
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
 	const output = await (
-		ssrModule.marklessRenderSsr as () => Promise<{ readonly html: string }>
+		ssrModule.marklessRenderSsr as () => Promise<{
+			readonly html: string;
+			readonly view: ProtocolViewPayload;
+		}>
 	)();
 
 	expect(output.html).toContain('<p>east-west</p>');
 	expect(output.html).not.toContain('Unavailable');
+	expect(output.view.asyncBoundaries[0]).toEqual(
+		expect.objectContaining({
+			runnerGraphNodeId: 'computed:card',
+			initiallyServedArm: ASYNC_BOUNDARY_ARM.try,
+			updateSymbolId: expect.any(String),
+		}),
+	);
 });
 
 // D1 tier 4 parity: the arm-render module executes the composed @try content

@@ -1,5 +1,12 @@
-export const ASYNC_PROTOCOL_VERSION = 1;
-export const STORAGE_PROTOCOL_VERSION = 2;
+import {
+	ASYNC_BOUNDARY_ARM,
+	ASYNC_PROTOCOL_VERSION,
+	STORAGE_PROTOCOL_VERSION,
+} from './protocol-constants.ts';
+
+export { ASYNC_BOUNDARY_ARM, ASYNC_PROTOCOL_VERSION, STORAGE_PROTOCOL_VERSION };
+
+export type ProtocolAsyncBoundaryArm = (typeof ASYNC_BOUNDARY_ARM)[keyof typeof ASYNC_BOUNDARY_ARM];
 
 export type ProtocolSyncPolicyCondition =
 	| {
@@ -255,6 +262,8 @@ export type ProtocolViewPayload = {
 	}>;
 	readonly asyncBoundaries: ReadonlyArray<{
 		readonly id: string;
+		readonly runnerGraphNodeId: string | null;
+		readonly initiallyServedArm: ProtocolAsyncBoundaryArm;
 		readonly updateSymbolId?: string;
 		// A single set is the armized truth for the arm the render actually
 		// served (SSR compose / arm-render modules); an array is the compiler's

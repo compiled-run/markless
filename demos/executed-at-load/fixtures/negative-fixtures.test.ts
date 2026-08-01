@@ -3,17 +3,19 @@ import { fileURLToPath } from 'node:url';
 import { collectTsrxModuleDiagnostics, compileTsrxModule } from '@markless/compiler';
 import { expect, test } from 'vitest';
 
-const fixtures = [
-	{
-		filename: 'computed-repeat-async-arm.tsrx',
-		observe(result: Awaited<ReturnType<typeof compileFixture>>) {
-			return {
-				diagnostics: collectTsrxModuleDiagnostics(result).map(diagnosticIdentity),
-				asyncBoundaryGates: result.publicRenderPlan.asyncBoundaryGates,
-				asyncArmRenderCount: result.publicRenderPlan.asyncBoundaryArmRenders.length,
-			};
-		},
-	},
+test('computed-repeat-async-arm.tsrx fails the build with the boundary-runner diagnostic', async () => {
+	const result = await compileFixture('computed-repeat-async-arm.tsrx');
+	expect(collectTsrxModuleDiagnostics(result)).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				code: 'MARKLESS_PUBLIC_RENDER_GATE_PLAN_DISAGREEMENT',
+				severity: 'error',
+			}),
+		]),
+	);
+});
+
+const diseaseFixtures = [
 	{
 		filename: 'for-call-expression.tsrx',
 		observe(result: Awaited<ReturnType<typeof compileFixture>>) {
@@ -26,10 +28,10 @@ const fixtures = [
 	},
 ] as const;
 
-// DISEASE PIN: these fixtures intentionally preserve today's silent/broken
-// compiler behavior. The next architecture package must flip both assertions
-// to expected build errors; it must not make the silent output look supported.
-for (const fixture of fixtures) {
+// DISEASE PIN: this fixture intentionally preserves today's silent/broken
+// compiler behavior. A later architecture package must flip this assertion
+// to an expected build error; it must not make the silent output look supported.
+for (const fixture of diseaseFixtures) {
 	test(`pins the current disease for ${fixture.filename}`, async () => {
 		const result = await compileFixture(fixture.filename);
 		expect(fixture.observe(result)).toMatchSnapshot();

@@ -199,6 +199,21 @@ export function SignalCard() @{
 	expect(result.publicRenderModule.ssrModuleSource).toContain(
 		"const derive=() => ({ label: east.label + '-' + west.label });return derive()",
 	);
+	expect(result.publicRenderModule.ssrModuleSource).toContain(
+		'marklessSsrRunAsyncComputed(marklessSsrAsyncSnapshots, "computed:card"',
+	);
+	const boundary = result.protocolView.asyncBoundaries[0];
+	const updateSymbol = result.symbolResolver.symbols.find(
+		(symbol) => symbol.kind === 'async-boundary-update' && symbol.boundaryId === boundary?.id,
+	);
+	expect(boundary?.runnerGraphNodeId).toBe('computed:card');
+	expect(boundary?.updateSymbolId).toBe(updateSymbol?.id);
+	expect(
+		result.symbolModules.modules.some(
+			(module) =>
+				module.kind === 'async-boundary-update' && module.symbolId === updateSymbol?.id,
+		),
+	).toBe(true);
 });
 
 test('a composed settled arm reads an async-capable sync computed as a plain value', async () => {

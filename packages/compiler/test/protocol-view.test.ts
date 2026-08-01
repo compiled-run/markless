@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import { ASYNC_BOUNDARY_ARM } from '@markless/serializer';
 import {
 	buildSemanticGraph,
 	compileTsrxModule,
@@ -40,16 +41,23 @@ export function App() @{
 		expect.objectContaining({
 			componentEdgePath: ['component-edge:0'],
 			captureSlots: expect.arrayContaining([
-				expect.objectContaining({ route: expect.objectContaining({ kind: 'callback-route' }) }),
 				expect.objectContaining({
-					route: expect.objectContaining({ kind: 'compiler-known-constant', value: 'trace' }),
+					route: expect.objectContaining({ kind: 'callback-route' }),
+				}),
+				expect.objectContaining({
+					route: expect.objectContaining({
+						kind: 'compiler-known-constant',
+						value: 'trace',
+					}),
 				}),
 			]),
 		}),
 	);
 	expect(boundRow?.captureSlots).not.toEqual(
 		expect.arrayContaining([
-			expect.objectContaining({ route: expect.objectContaining({ graphNodeId: 'state:count' }) }),
+			expect.objectContaining({
+				route: expect.objectContaining({ graphNodeId: 'state:count' }),
+			}),
 		]),
 	);
 	expect(result.protocolView.events[0]?.symbolIds).toEqual([boundRow?.id]);
@@ -243,6 +251,8 @@ test('createProtocolViewPayload links async boundary reads to runner symbols', a
 	expect(view.asyncBoundaries).toEqual([
 		{
 			id: 'boundary:0',
+			runnerGraphNodeId: 'computed:details',
+			initiallyServedArm: ASYNC_BOUNDARY_ARM.pending,
 			armRecords: [
 				{
 					locators: [

@@ -7,6 +7,7 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ASYNC_BOUNDARY_ARM } from '../../packages/serializer/src/protocol-constants.ts';
 
 const PACKAGE_DIR = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(PACKAGE_DIR, '../..');
@@ -47,7 +48,7 @@ const combos = [
 		path: '/?latency=0',
 		settledSelector: '[data-update-list][data-row-count="3"]',
 		proof: proveLiveFeedCsr,
-		interact: page => interactLiveFeed(page, { weightedCountAfter: '6' }),
+		interact: (page) => interactLiveFeed(page, { weightedCountAfter: '6' }),
 	},
 	{
 		id: 'live-feed-ssr',
@@ -57,7 +58,7 @@ const combos = [
 		path: '/?latency=0',
 		settledSelector: '[data-update-list][data-row-count="3"]',
 		proof: proveLiveFeedSsr,
-		interact: page => interactLiveFeed(page, { weightedCountAfter: '9' }),
+		interact: (page) => interactLiveFeed(page, { weightedCountAfter: '9' }),
 	},
 ];
 
@@ -111,7 +112,7 @@ for (const combo of combos) {
 }
 
 const proofIds = Object.keys(measurements);
-if (proofIds.length !== combos.length || combos.some(combo => !measurements[combo.id])) {
+if (proofIds.length !== combos.length || combos.some((combo) => !measurements[combo.id])) {
 	throw new Error('All four proved combinations must be present before recording.');
 }
 
@@ -190,7 +191,7 @@ async function measureCombo(combo) {
 		await cdp.send('Profiler.enable');
 		await cdp.send('Runtime.enable');
 		await cdp.send('Debugger.enable');
-		cdp.on('Debugger.scriptParsed', event => scriptUrlById.set(event.scriptId, event.url));
+		cdp.on('Debugger.scriptParsed', (event) => scriptUrlById.set(event.scriptId, event.url));
 		await cdp.send('Profiler.startPreciseCoverage', {
 			callCount: false,
 			detailed: true,
@@ -199,6 +200,7 @@ async function measureCombo(combo) {
 
 		const url = comboUrl(combo);
 		await page.goto(url, { waitUntil: 'load' });
+		await assertBoundaryDecisionFieldsAgree(page, combo.id);
 		await page.waitForSelector(combo.settledSelector, { timeout: 15_000 });
 		await fixedMicrotaskWindow(page);
 		const beforeInteraction = coverageSnapshot(
@@ -229,6 +231,65 @@ async function measureCombo(combo) {
 		};
 	} finally {
 		await browser.close();
+	}
+}
+
+// Transitional test-only proof for the protocol cutover: every measured demo
+// payload must carry the same runner node and served arm the former browser
+// derivations chose. Production consumers no longer perform these derivations.
+async function assertBoundaryDecisionFieldsAgree(page, comboId) {
+	const result = await page.evaluate((asyncBoundaryArm) => {
+		const viewScripts = [...document.querySelectorAll('script[type="markless/view"]')];
+		const stateScripts = [...document.querySelectorAll('script[type="markless/state"]')];
+		const disagreements = [];
+		for (const [payloadIndex, script] of viewScripts.entries()) {
+			const payload = JSON.parse(script.textContent || 'null');
+			const state = JSON.parse(stateScripts[payloadIndex]?.textContent || 'null');
+			const computedById = new Map(
+				(state?.computed ?? []).map((computed) => [computed.graphNodeId, computed]),
+			);
+			for (const boundary of payload?.asyncBoundaries ?? []) {
+				const derivedRunnerGraphNodeId = boundary.asyncReads?.[0]?.graphNodeId ?? null;
+				const runner = computedById.get(derivedRunnerGraphNodeId);
+				const derivedInitiallyServedArm =
+					runner?.snapshot?.status === 'fulfilled'
+						? asyncBoundaryArm.try
+						: runner?.snapshot?.status === 'rejected'
+							? asyncBoundaryArm.catch
+							: asyncBoundaryArm.pending;
+				if (
+					boundary.runnerGraphNodeId !== derivedRunnerGraphNodeId ||
+					boundary.initiallyServedArm !== derivedInitiallyServedArm
+				) {
+					disagreements.push({
+						payloadIndex,
+						boundaryId: boundary.id,
+						runnerGraphNodeId: boundary.runnerGraphNodeId,
+						derivedRunnerGraphNodeId,
+						initiallyServedArm: boundary.initiallyServedArm,
+						derivedInitiallyServedArm,
+					});
+				}
+			}
+		}
+		return {
+			viewPayloadCount: viewScripts.length,
+			statePayloadCount: stateScripts.length,
+			disagreements,
+		};
+	}, ASYNC_BOUNDARY_ARM);
+	if (result.viewPayloadCount === 0) {
+		throw new Error(`${comboId}: expected at least one markless/view demo payload.`);
+	}
+	if (result.statePayloadCount !== result.viewPayloadCount) {
+		throw new Error(
+			`${comboId}: expected one markless/state payload for every markless/view payload.`,
+		);
+	}
+	if (result.disagreements.length > 0) {
+		throw new Error(
+			`${comboId}: async-boundary decision fields disagree with the old derivations: ${JSON.stringify(result.disagreements)}`,
+		);
 	}
 }
 
@@ -310,7 +371,11 @@ async function proveLiveFeedCsr(page, combo) {
 async function proveLiveFeedSsr(page, combo) {
 	const response = await page.request.get(comboUrl(combo));
 	const html = await response.text();
-	if (!response.ok() || !html.includes('data-feed-settled') || html.includes('data-feed-pending')) {
+	if (
+		!response.ok() ||
+		!html.includes('data-feed-settled') ||
+		html.includes('data-feed-pending')
+	) {
 		throw new Error('Fast SSR proof did not return an already-settled page.');
 	}
 	await page.goto(comboUrl(combo), { waitUntil: 'load' });
@@ -334,7 +399,10 @@ async function proveHeldPendingSsr(combo) {
 		firstFlush += decoder.decode(chunk.value, { stream: true });
 	}
 	await reader.cancel();
-	if (!firstFlush.includes('data-feed-pending') || !firstFlush.includes('data-markless-self-wake')) {
+	if (
+		!firstFlush.includes('data-feed-pending') ||
+		!firstFlush.includes('data-markless-self-wake')
+	) {
 		throw new Error('Held SSR proof did not flush pending plus self-wake markers.');
 	}
 }
@@ -342,7 +410,12 @@ async function proveHeldPendingSsr(combo) {
 async function proveSettledLiveFeed(page) {
 	await waitForAttribute(page, '[data-update-list]', 'data-row-count', '3');
 	await waitForAttribute(page, '[data-update-list] > :nth-child(1)', 'data-row-key', 'atlas-204');
-	await waitForAttribute(page, '[data-update-list] > :nth-child(2)', 'data-row-key', 'beacon-118');
+	await waitForAttribute(
+		page,
+		'[data-update-list] > :nth-child(2)',
+		'data-row-key',
+		'beacon-118',
+	);
 	await waitForText(page, '[data-weighted-count]', 'Weighted count 6');
 	await page.click('[data-row-key="beacon-118"]');
 	// PINNED DISEASE (2026-08-01, T005): in-arm row events register no event record in
@@ -370,28 +443,29 @@ async function waitForText(page, selector, text) {
 
 async function waitForAttribute(page, selector, attribute, value) {
 	await page.waitForFunction(
-		({ selector, attribute, value }) => document.querySelector(selector)?.getAttribute(attribute) === value,
+		({ selector, attribute, value }) =>
+			document.querySelector(selector)?.getAttribute(attribute) === value,
 		{ selector, attribute, value },
 		{ timeout: 15_000 },
 	);
 }
 
 async function fixedMicrotaskWindow(page) {
-	await page.evaluate(async turns => {
+	await page.evaluate(async (turns) => {
 		for (let index = 0; index < turns; index++) await new Promise(queueMicrotask);
 	}, FIXED_MICROTASK_TURNS);
 }
 
 function capturePageFailures(page) {
 	const failures = [];
-	page.on('pageerror', error => failures.push(`page error: ${error.message}`));
-	page.on('console', message => {
+	page.on('pageerror', (error) => failures.push(`page error: ${error.message}`));
+	page.on('console', (message) => {
 		// The rejection proof forces the demo endpoint to answer 503 on purpose; the
 		// browser's resource-load error for that response is expected, not dirt.
 		if (message.type() === 'error' && !/status of 503/.test(message.text()))
 			failures.push(`console error: ${message.text()}`);
 	});
-	page.on('requestfailed', request => {
+	page.on('requestfailed', (request) => {
 		if (new URL(request.url()).origin === new URL(page.url()).origin) {
 			failures.push(
 				`failed same-origin request: ${request.url()} (${request.failure()?.errorText ?? 'unknown'})`,
@@ -401,15 +475,18 @@ function capturePageFailures(page) {
 	return {
 		assertClean(label) {
 			if (page.isClosed()) failures.push('page closed before proof completed');
-			if (failures.length > 0) throw new Error(`${label} proof failed:\n${failures.join('\n')}`);
+			if (failures.length > 0)
+				throw new Error(`${label} proof failed:\n${failures.join('\n')}`);
 		},
 	};
 }
 
 function assertRepeatable(label, runs) {
 	const signatures = runs.map(repeatabilitySignature);
-	if (signatures.some(signature => signature !== signatures[0])) {
-		throw new Error(`${label} precise coverage was not exactly repeatable across ${runs.length} runs.`);
+	if (signatures.some((signature) => signature !== signatures[0])) {
+		throw new Error(
+			`${label} precise coverage was not exactly repeatable across ${runs.length} runs.`,
+		);
 	}
 }
 
@@ -460,7 +537,7 @@ async function waitForServer(url, child) {
 			const response = await fetch(url);
 			if (response.ok) return;
 		} catch {}
-		await new Promise(resolve => setTimeout(resolve, 100));
+		await new Promise((resolve) => setTimeout(resolve, 100));
 	}
 	throw new Error(`Preview did not become ready: ${url}`);
 }
@@ -484,11 +561,13 @@ async function capture(command, args, options = {}) {
 		});
 		let stdout = '';
 		let stderr = '';
-		child.stdout.on('data', chunk => (stdout += chunk));
-		child.stderr.on('data', chunk => (stderr += chunk));
+		child.stdout.on('data', (chunk) => (stdout += chunk));
+		child.stderr.on('data', (chunk) => (stderr += chunk));
 		child.on('error', reject);
-		child.on('exit', code =>
-			code === 0 ? resolvePromise(stdout) : reject(new Error(stderr || `${command} exited ${code}`)),
+		child.on('exit', (code) =>
+			code === 0
+				? resolvePromise(stdout)
+				: reject(new Error(stderr || `${command} exited ${code}`)),
 		);
 	});
 }
@@ -497,7 +576,7 @@ async function waitForExit(child) {
 	if (child.exitCode !== null) return child.exitCode;
 	return await new Promise((resolvePromise, reject) => {
 		child.once('error', reject);
-		child.once('exit', code => resolvePromise(code ?? 1));
+		child.once('exit', (code) => resolvePromise(code ?? 1));
 	});
 }
 
