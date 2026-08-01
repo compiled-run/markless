@@ -1,6 +1,7 @@
 import { isValidStorageKey } from './storage-key.ts';
 import {
-	ASYNC_BOUNDARY_ARM,
+	ASYNC_BOUNDARY_ARM_MAX,
+	ASYNC_BOUNDARY_ARM_MIN,
 	ASYNC_PROTOCOL_VERSION,
 	STORAGE_PROTOCOL_VERSION,
 } from './protocol-constants.ts';
@@ -128,14 +129,23 @@ function baseView(value: unknown): asserts value is ProtocolViewPayload {
 		str(record, 'eventName', context);
 		if (!Array.isArray(record.symbolIds)) invalid(context, 'expected symbolIds array.');
 	}
-	for (const [index, boundary] of payload.asyncBoundaries.entries()) {
-		const context = `markless/view asyncBoundary[${index}]`;
-		const record = obj(boundary, context);
-		if (record.runnerGraphNodeId !== null && typeof record.runnerGraphNodeId !== 'string')
-			invalid(context, 'expected runnerGraphNodeId string or null.');
-		if (!Object.values(ASYNC_BOUNDARY_ARM).includes(record.initiallyServedArm as never))
-			invalid(context, 'expected initiallyServedArm to name a protocol async boundary arm.');
-	}
+	if (payload.asyncBoundaries.length > 0)
+		for (const [index, boundary] of payload.asyncBoundaries.entries()) {
+			const context = `markless/view asyncBoundary[${index}]`;
+			const record = obj(boundary, context);
+			if (record.runnerGraphNodeId !== null && typeof record.runnerGraphNodeId !== 'string')
+				invalid(context, 'expected runnerGraphNodeId string or null.');
+			if (
+				typeof record.initiallyServedArm !== 'number' ||
+				!Number.isInteger(record.initiallyServedArm) ||
+				record.initiallyServedArm < ASYNC_BOUNDARY_ARM_MIN ||
+				record.initiallyServedArm > ASYNC_BOUNDARY_ARM_MAX
+			)
+				invalid(
+					context,
+					'expected initiallyServedArm to name a protocol async boundary arm.',
+				);
+		}
 }
 function root(value: unknown, type: RuntimePayloadType): Record<string, unknown> {
 	const record = obj(value, type);

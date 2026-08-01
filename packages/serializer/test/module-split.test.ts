@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { expect, test } from 'vitest';
 import {
 	ASYNC_BOUNDARY_ARM,
@@ -185,4 +186,10 @@ test('the browser decoder validates async boundary decision fields', () => {
 			),
 		}),
 	).toThrow(/initiallyServedArm/);
+});
+
+test('the browser decoder keeps the async boundary arm object out of its eager dependency path', async () => {
+	const source = await readFile(new URL('../src/protocol-client.ts', import.meta.url), 'utf8');
+
+	expect(source).not.toMatch(/\bASYNC_BOUNDARY_ARM\b/);
 });

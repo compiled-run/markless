@@ -1,0 +1,11 @@
+import {
+	ASYNC_BOUNDARY_ARM_MAX,
+	ASYNC_BOUNDARY_ARM_MIN,
+	ASYNC_BOUNDARY_ARM_PENDING,
+} from './protocol-constants.ts';
+
+export const ASYNC_BOUNDARY_ARM = {
+	try: ASYNC_BOUNDARY_ARM_MIN,
+	pending: ASYNC_BOUNDARY_ARM_PENDING,
+	catch: ASYNC_BOUNDARY_ARM_MAX,
+} as const;

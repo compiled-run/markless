@@ -3,6 +3,10 @@ import { dirname, isAbsolute, resolve } from 'pathe';
 import { joinURL, parsePath, withQuery, withoutLeadingSlash } from 'ufo';
 import { type MarklessBuildMetadataBundle, createBuildMetadata } from './build/build-metadata.ts';
 import { MARKLESS_BUILD_PREFIX, MARKLESS_BUNDLE_GRAPH, outputDefaults } from './build/chunking.ts';
+import {
+	MARKLESS_EXECUTION_SIZES,
+	createExecutionSizesAsset,
+} from './build/execution-sizes.ts';
 import { collectModulePreloadInjections, injectHeadLinks } from './build/head-links.ts';
 import { stripEmptyVitePreloadWrappers } from './build/preload-cleanup.ts';
 import {
@@ -17,8 +21,6 @@ import {
 import { createMarklessDevGraph } from './dev.ts';
 import {
 	MARKLESS_EXECUTION_LOG_MODULE_ID,
-	MARKLESS_EXECUTION_SIZES,
-	createExecutionSizesAsset,
 	executionLogActivationInjection,
 	executionLogVirtualModuleSource,
 	injectExecutionLogModuleHook,

@@ -1,7 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
+import { createExecutionSizesAsset } from '../src/build/execution-sizes.ts';
 import {
 	MARKLESS_EXECUTION_LOG_MODULE_ID,
-	createExecutionSizesAsset,
 	executionLogVirtualModuleSource,
 	injectExecutionLogModuleHook,
 	requalifyExecutionLogModuleHook,
@@ -110,6 +110,41 @@ test('execution size asset maps runtime and symbol log ids to raw and gzip chunk
 	expect(sizes['virtual:markless:symbol:%2Fworkspace%2Fsrc%2FApp.tsrx:play']).toEqual(
 		sizes['web:event-only-resume'],
 	);
+});
+
+test('execution gzip accounting ignores content-hash module specifier names', async () => {
+	const assetFor = (hash: string) =>
+		createExecutionSizesAsset(
+			{
+				'build/chunk-entry.js': {
+					type: 'chunk',
+					fileName: 'build/chunk-entry.js',
+					name: 'chunk-entry',
+					code:
+						`import { resume } from "./chunk-${hash}.js";\n` +
+						`const unrelated = "AbCdEf12 AbCdEf12 AbCdEf12 AbCdEf12";\n` +
+						`resume(unrelated);`,
+					exports: [],
+					imports: [`build/chunk-${hash}.js`],
+					dynamicImports: [],
+					moduleIds: ['/workspace/packages/web/src/resume-events.ts'],
+					facadeModuleId: null,
+				},
+			},
+			{ version: 1, modules: [], bundles: {} },
+			(fileName) => fileName.replace(/^build\//, ''),
+		);
+
+	const first = JSON.parse(String((await assetFor('AbCdEf12')).source)) as Record<
+		string,
+		{ gzip: number }
+	>;
+	const second = JSON.parse(String((await assetFor('zYxWvU98')).source)) as Record<
+		string,
+		{ gzip: number }
+	>;
+
+	expect(first['web:resume-events']?.gzip).toBe(second['web:resume-events']?.gzip);
 });
 
 test('execution size asset covers the dev-log module id that logs itself', async () => {
