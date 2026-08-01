@@ -298,6 +298,14 @@ export function App() @{
 	expect(result.runtimeDemandMap.recordKinds).toEqual(
 		expect.arrayContaining([expect.objectContaining({ kind: 'event', replaced: false })]),
 	);
+	expect(result.runtimeDemandMap.unknownRecordModuleIds).toContain('core/web/resume');
+	expect(result.runtimeDemandMap.unknownRecordModuleIds).toContain('web/payload-full');
+	expect(result.runtimeDemandMap.unknownRecordModuleIds).not.toContain(
+		'core/web/resume-storage-free',
+	);
+	expect(result.runtimeDemandMap.unknownRecordModuleIds).not.toContain(
+		'web/payload-full-storage-free',
+	);
 });
 
 test('render body lowering treats storage metadata as a state initializer', () => {

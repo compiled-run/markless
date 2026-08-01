@@ -34,7 +34,10 @@ const WEB_RUNTIME_CAPABILITY_GROUPS = [
 	{ name: 'markless-resume-errors', test: fileBasenamePattern('resume-errors') },
 	{ name: 'markless-resume-sync-computed', test: fileBasenamePattern('resume-sync-computed') },
 	{ name: 'markless-resume-sync-demand', test: fileBasenamePattern('resume-sync-demand') },
-	{ name: 'markless-payload-full', test: fileBasenamePattern('payload-full') },
+	{
+		name: 'markless-payload-full',
+		test: fileBasenamePattern('payload-full', 'payload-full-storage-free'),
+	},
 	{ name: 'markless-payload-resume', test: fileBasenamePattern('payload-resume') },
 	{
 		name: 'markless-inline-payload-document',
@@ -42,7 +45,11 @@ const WEB_RUNTIME_CAPABILITY_GROUPS = [
 	},
 	{
 		name: 'markless-payload-document',
-		test: fileBasenamePattern('payload-document', 'payload-resume-registry'),
+		test: fileBasenamePattern(
+			'payload-document',
+			'payload-document-common',
+			'payload-resume-registry',
+		),
 	},
 	{
 		name: 'markless-payload-graph-construct',
@@ -51,7 +58,12 @@ const WEB_RUNTIME_CAPABILITY_GROUPS = [
 	{ name: 'markless-dom-journal', test: fileBasenamePattern('dom-journal') },
 	{
 		name: 'markless-protocol-decode',
-		test: fileBasenamePattern('protocol-client', 'protocol-state'),
+		test: fileBasenamePattern(
+			'protocol-client',
+			'protocol-client-storage',
+			'protocol-state',
+			'storage-record-client',
+		),
 	},
 	{
 		name: 'markless-value-decode',

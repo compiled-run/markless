@@ -36,11 +36,11 @@
 		"./web/render": "./src/web/render.ts",
 		"./web/render-to-string": "./src/web/render-to-string.ts",
 		"./web/resume": "./src/web/resume.ts",
+		"./web/resume-storage-free": "./src/web/resume-storage-free.ts",
 		"./vite": "./src/vite.ts"
 	},
 	"publishConfig": {
 		"access": "public",
-		"provenance": true,
 		"exports": {
 			".": {
 				"types": "./dist/index.d.ts",
@@ -126,11 +126,16 @@
 				"types": "./dist/web/resume.d.ts",
 				"default": "./dist/web/resume.js"
 			},
+			"./web/resume-storage-free": {
+				"types": "./dist/web/resume-storage-free.d.ts",
+				"default": "./dist/web/resume-storage-free.js"
+			},
 			"./vite": {
 				"types": "./dist/vite.d.ts",
 				"default": "./dist/vite.js"
 			}
-		}
+		},
+		"provenance": true
 	},
 	"scripts": {
 		"prepublishOnly": "node ../../scripts/release/verify-publish-ready.mjs"

@@ -72,6 +72,17 @@ test('payload-full keeps heavy resume dependencies behind dynamic gates', async 
 	}
 });
 
+test('storage-free resume statically selects only storage-free payload validation', async () => {
+	const payloadSource = await readSource('../src/payload-full-storage-free.ts');
+	const clientSource = await readSource('../../serializer/src/protocol-client.ts');
+	const validationSource = await readSource('../../serializer/src/protocol-validation.ts');
+
+	expect(payloadSource).toContain("from '../../serializer/src/protocol-client.ts'");
+	expect(payloadSource).not.toMatch(/protocol-client-storage|protocol-validation-storage/);
+	for (const source of [clientSource, validationSource])
+		expect(source).not.toMatch(/storage-key|storage-record-client|isValidStorageKey/);
+});
+
 test('payload graph construction stays isolated in its own module', async () => {
 	const payloadSource = await readSource('../src/payload-full.ts');
 	const graphSource = await readSource('../src/payload-graph-construct.ts');

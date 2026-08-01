@@ -1,4 +1,3 @@
-import { isValidStorageKey } from './storage-key.ts';
 import {
 	ASYNC_BOUNDARY_ARM_MAX,
 	ASYNC_BOUNDARY_ARM_MIN,
@@ -49,11 +48,18 @@ export class RuntimePayloadError extends Error implements RuntimePayloadDiagnost
 	}
 }
 export function decodePayloadScripts(input: EncodedPayloadScripts): DecodedPayloadScripts {
+	return decodePayloadScriptsWithVersion(input, false);
+}
+
+export function decodePayloadScriptsWithVersion(
+	input: EncodedPayloadScripts,
+	allowStorage: boolean,
+): DecodedPayloadScripts {
 	const state = parse(input.stateScript, 'markless/state') as ProtocolStatePayload;
 	const view = parse(input.viewScript, 'markless/view') as ProtocolViewPayload;
 	baseState(state);
 	baseView(view);
-	version(state.version, 'markless/state');
+	version(state.version, 'markless/state', allowStorage);
 	version(view.version, 'markless/view');
 	return { state, view };
 }
@@ -78,21 +84,6 @@ function baseState(value: unknown): asserts value is ProtocolStatePayload {
 		str(record, 'graphNodeId', context);
 		str(record, 'name', context);
 		if ('value' in record) serialized(record.value, `${context}.value`);
-	}
-	if (payload.version === STORAGE_PROTOCOL_VERSION) {
-		const storage = arr(payload, 'storage', 'markless/state');
-		for (const entry of storage) {
-			const context = 'markless/state storage';
-			const record = obj(entry, context);
-			if (
-				typeof record.key !== 'string' ||
-				!isValidStorageKey(record.key) ||
-				!cells.some(
-					(cell) => (cell as Record<string, unknown>).graphNodeId === record.graphNodeId,
-				)
-			)
-				invalid(context, 'invalid storage record.');
-		}
 	}
 }
 function baseView(value: unknown): asserts value is ProtocolViewPayload {
@@ -170,10 +161,10 @@ function serialized(value: unknown, context: string): void {
 	if (!('root' in record)) invalid(context, 'expected root.');
 	if (!Array.isArray(record.records)) invalid(context, 'expected records array.');
 }
-function version(actualVersion: unknown, type: RuntimePayloadType): void {
+function version(actualVersion: unknown, type: RuntimePayloadType, allowStorage = false): void {
 	if (
 		actualVersion === ASYNC_PROTOCOL_VERSION ||
-		(type === 'markless/state' && actualVersion === STORAGE_PROTOCOL_VERSION)
+		(allowStorage && type === 'markless/state' && actualVersion === STORAGE_PROTOCOL_VERSION)
 	)
 		return;
 	throw new RuntimePayloadError({

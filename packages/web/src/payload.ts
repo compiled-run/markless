@@ -8,7 +8,7 @@ import {
 	type RuntimePayloadDiagnostic,
 	type RuntimePayloadErrorCode,
 	type RuntimePayloadType,
-} from '../../serializer/src/protocol-client.ts';
+} from '../../serializer/src/protocol-client-storage.ts';
 import type {
 	ResumePayloadDocumentInput,
 	ResumePayloadScriptsInput,

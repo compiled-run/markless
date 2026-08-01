@@ -6,7 +6,7 @@ import {
 	type RuntimePayloadDiagnostic,
 	type RuntimePayloadErrorCode,
 	type RuntimePayloadType,
-} from '../../serializer/src/protocol-client.ts';
+} from '../../serializer/src/protocol-client-storage.ts';
 import type { ResumeDomElement, ResumeRuntime, ResumeRuntimeInput } from './resume.ts';
 import {
 	deleteResumedPayload,
@@ -24,7 +24,8 @@ export {
 	type RuntimePayloadErrorCode,
 	type RuntimePayloadType,
 };
-type DevProtocolValidationModule = typeof import('../../serializer/src/protocol-validation.ts');
+type DevProtocolValidationModule =
+	typeof import('../../serializer/src/protocol-validation-storage.ts');
 type RuntimeGraph = import('@markless/runtime').RuntimeGraph;
 
 export type ResumePayloadScriptsInput = EncodedPayloadScripts &
@@ -49,9 +50,8 @@ declare const __MARKLESS_DEV_ENABLED__: boolean;
 export const decodePayloadScripts =
 	typeof __MARKLESS_DEV_ENABLED__ === 'undefined' || __MARKLESS_DEV_ENABLED__
 		? decodeWithDevValidation(
-				(
-					await import('../../serializer/src/protocol-validation.ts')
-				).decodePayloadScripts,
+				(await import('../../serializer/src/protocol-validation-storage.ts'))
+					.decodePayloadScripts,
 			)
 		: decodePayloadScriptsClient;
 
@@ -93,7 +93,7 @@ export async function resumeFromPayloadScripts(
 	input: ResumePayloadScriptsInput,
 ): Promise<ResumePayloadScriptsResult> {
 	const resume = await import('./payload-resume.ts');
-	return resume.resumeFromPayloadScriptsImpl(input);
+	return resume.resumeFromPayloadScriptsImpl(input, decodePayloadScripts);
 }
 
 export async function resumeFromPayloadDocument(

@@ -8,9 +8,20 @@
 		"url": "git+https://github.com/markless-dev/markless.git",
 		"directory": "packages/serializer"
 	},
+	"files": [
+		"dist"
+	],
+	"type": "module",
+	"sideEffects": false,
+	"exports": {
+		".": "./src/index.ts",
+		"./decode": "./src/value-decode.ts",
+		"./decode-client": "./src/value-decode-client.ts",
+		"./protocol": "./src/protocol.ts",
+		"./protocol-validation": "./src/protocol-validation-storage.ts"
+	},
 	"publishConfig": {
 		"access": "public",
-		"provenance": true,
 		"exports": {
 			".": {
 				"types": "./dist/index.d.ts",
@@ -32,20 +43,9 @@
 				"types": "./dist/protocol-validation.d.ts",
 				"default": "./dist/protocol-validation.js"
 			}
-		}
+		},
+		"provenance": true
 	},
-	"type": "module",
-	"sideEffects": false,
-	"exports": {
-		".": "./src/index.ts",
-		"./decode": "./src/value-decode.ts",
-		"./decode-client": "./src/value-decode-client.ts",
-		"./protocol": "./src/protocol.ts",
-		"./protocol-validation": "./src/protocol-validation.ts"
-	},
-	"files": [
-		"dist"
-	],
 	"scripts": {
 		"prepublishOnly": "node ../../scripts/release/verify-publish-ready.mjs"
 	}

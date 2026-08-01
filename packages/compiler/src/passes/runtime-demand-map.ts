@@ -8,17 +8,18 @@ import type {
 	SymbolModulesArtifact,
 	SymbolResolverPlan,
 } from '../artifacts.ts';
-import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer';
+import {
+	ASYNC_PROTOCOL_VERSION,
+	type ProtocolStatePayload,
+	type ProtocolViewPayload,
+} from '@markless/serializer';
 
-const DISPATCH_CORE = [
-	'core/web/resume',
-	'web/resume',
+const DISPATCH_CORE_COMMON = [
 	'web/resume-runtime',
 	'web/resume-runtime-shared',
 	'web/resume-runtime-start',
 	'web/resume-events',
 	'web/resume-locators',
-	'web/payload-full',
 	'web/payload-resume',
 	'web/payload-graph-construct',
 	'web/resume-async-wiring',
@@ -42,18 +43,27 @@ const BRANCH = ['web/resume-branches'];
 const ASYNC_BOUNDARY = ['web/resume-async-boundaries'];
 const BEHAVIOR = ['web/resume-behaviors'];
 const FULL_RESUME_CORE = ['web/resume-locators'];
-const FULL_TIER = [
-	'core/web/resume',
-	'web/resume',
+const FULL_TIER_COMMON = [
 	'web/resume-runtime',
 	'web/resume-runtime-shared',
 	'web/resume-runtime-start',
 	'web/resume-events',
-	'web/payload-full',
 	'web/payload-resume',
 	'web/payload-graph-construct',
 	'web/resume-async-wiring',
 ];
+
+function payloadResumeModules(storageFree: boolean): string[] {
+	return storageFree
+		? [
+				'core/web/resume-storage-free',
+				// 'web/resume-storage-free' does not exist as a source module (ids derive
+				// from source paths); resume-core preload is covered by payload-resume's
+				// static-import closure. Critique finding 2026-08-01.
+				'web/payload-full-storage-free',
+			]
+		: ['core/web/resume', 'web/resume', 'web/payload-full'];
+}
 const RECORD_KINDS = [
 	'async-boundary',
 	'behavior',
@@ -73,6 +83,9 @@ export function createRuntimeDemandMap(input: {
 	readonly protocolState: ProtocolStatePayload;
 }): RuntimeDemandMapArtifact {
 	const storageRequiresFullResume = (input.protocolState.storage?.length ?? 0) > 0;
+	const storageFreePayload = input.protocolState.version === ASYNC_PROTOCOL_VERSION;
+	const dispatchCore = [...payloadResumeModules(storageFreePayload), ...DISPATCH_CORE_COMMON];
+	const fullTier = [...payloadResumeModules(storageFreePayload), ...FULL_TIER_COMMON];
 	const emittedModules = new Map(
 		input.symbolModules.modules.map((module) => [module.symbolId, module]),
 	);
@@ -107,6 +120,8 @@ export function createRuntimeDemandMap(input: {
 			scalarEventKeys,
 			scalarRows,
 		},
+		dispatchCore,
+		fullTier,
 	);
 	return {
 		passId: 'runtime-demand-map',
@@ -124,7 +139,7 @@ export function createRuntimeDemandMap(input: {
 			input.captureAnalysis,
 		),
 		unknownRecordModuleIds: unique([
-			...DISPATCH_CORE,
+			...dispatchCore,
 			...SCALAR_LEAN_DISPATCH_CORE,
 			...ROW_LEAN_DISPATCH_CORE,
 			...SYNC_POLICY,
@@ -136,7 +151,7 @@ export function createRuntimeDemandMap(input: {
 			...ASYNC_BOUNDARY,
 			...BEHAVIOR,
 			...FULL_RESUME_CORE,
-			...FULL_TIER,
+			...fullTier,
 		]),
 	};
 }
@@ -503,8 +518,10 @@ function payloadDemandRecords(
 	symbolDemand: ReadonlyMap<string, ReadonlyArray<string>>,
 	renderRuntimeModuleIds: ReadonlyArray<string>,
 	replacement: { readonly scalarEventKeys: ReadonlySet<string>; readonly scalarRows: boolean },
+	dispatchCore: ReadonlyArray<string>,
+	fullTier: ReadonlyArray<string>,
 ): RuntimeDemandMapArtifact['payloadRecords'] {
-	const rowDispatchCore = replacement.scalarRows ? ROW_LEAN_DISPATCH_CORE : FULL_TIER;
+	const rowDispatchCore = replacement.scalarRows ? ROW_LEAN_DISPATCH_CORE : fullTier;
 	return [
 		...(view.events ?? []).map((event) => ({
 			recordId: `event:${event.hostNodeId}:${event.eventName}`,
@@ -515,7 +532,7 @@ function payloadDemandRecords(
 			runtimeModuleIds: unique([
 				...(replacement.scalarEventKeys.has(eventKey(event.hostNodeId, event.eventName))
 					? SCALAR_LEAN_DISPATCH_CORE
-					: DISPATCH_CORE),
+					: dispatchCore),
 				...(event.syncPolicy ? SYNC_POLICY : []),
 				...symbolIdsDemand(event.symbolIds ?? [], symbolDemand),
 			]),
@@ -559,7 +576,7 @@ function payloadDemandRecords(
 				].filter((id): id is string => !!id),
 			),
 			runtimeModuleIds: unique([
-				...FULL_TIER,
+				...fullTier,
 				...ASYNC_BOUNDARY,
 				...symbolIdsDemand(
 					[

@@ -121,4 +121,8 @@ test('callback capture writes close over DOM and async subscribers and disable s
 		expect.arrayContaining(['event', 'dom-update', 'async-boundary']),
 	);
 	expect(action?.plan).toBeUndefined();
+	expect(result.unknownRecordModuleIds).toContain('core/web/resume-storage-free');
+	expect(result.unknownRecordModuleIds).toContain('web/payload-full-storage-free');
+	expect(result.unknownRecordModuleIds).not.toContain('core/web/resume');
+	expect(result.unknownRecordModuleIds).not.toContain('web/payload-full');
 });
