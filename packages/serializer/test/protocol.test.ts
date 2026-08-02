@@ -7,8 +7,18 @@ import {
 	STORAGE_PROTOCOL_VERSION,
 	type ProtocolArmRecordSet,
 	type ProtocolStatePayload,
+	type ProtocolStreamedArmPatch,
 	type ProtocolViewPayload,
 } from '../src/index.ts';
+
+test('streamed arm patches keep the served arm beside its records', () => {
+	const patch = [
+		ASYNC_BOUNDARY_ARM.try,
+		{ locators: [], events: [], domUpdates: [], behaviors: [], elementHandles: [] },
+	] satisfies ProtocolStreamedArmPatch;
+
+	expect(JSON.stringify(patch)).toBe('[0,{"locators":[],"events":[],"domUpdates":[],"behaviors":[],"elementHandles":[]}]');
+});
 
 test('protocol payloads share the current async protocol version', () => {
 	const state: ProtocolStatePayload = {

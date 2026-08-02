@@ -126,9 +126,13 @@ export function createArmCommitter(
 			deps.disposeHost(hostNodeId);
 		}
 		replaceAnchorRange(boundary, fresh);
-		const materialized = await registerArmRecordSet(deps, installEventType, boundary, update, {
-			eventTypesInstalled: true,
-		});
+		const materialized = await registerArmRecordSet(
+			deps,
+			installEventType,
+			boundary,
+			update,
+			true,
+		);
 		restoreFocusScroll(deps, boundary, captured, materialized.elementsByHostId);
 	};
 }
@@ -140,7 +144,7 @@ export async function registerArmRecordSet(
 	installEventType: (eventType: string) => void,
 	boundary: ResumeAsyncBoundaryRecord,
 	update: Pick<ArmCommitUpdate, 'armRecords' | 'elementsByHostId' | 'computed'>,
-	options: { readonly eventTypesInstalled?: boolean } = {},
+	eventTypesInstalled?: boolean,
 ) {
 	const exhaustive = {
 		locators: true,
@@ -153,7 +157,7 @@ export async function registerArmRecordSet(
 	} satisfies Record<keyof ResumeArmRecordSet, true>;
 	void exhaustive;
 	if (update.elementsByHostId) assertNativeArmRecordHosts(update);
-	if (!options.eventTypesInstalled) installArmEventTypes(update.armRecords, installEventType);
+	if (!eventTypesInstalled) installArmEventTypes(update.armRecords, installEventType);
 	// Locator misalignment against the live DOM throws loud here (D2): a
 	// registration that cannot prove its census must never half-register.
 	const materialized = materializeArmRecords({
@@ -180,15 +184,15 @@ export async function registerArmRecordSet(
 	const computedRefreshes = (update.computed ?? []).filter(
 		(computed) => computed.async === false && typeof computed.deriveSymbolId === 'string',
 	);
-	if (computedRefreshes.length > 0) {
+	if (computedRefreshes.length) {
 		if (!deps.registerComputedRefreshes)
 			throw new Error('Markless async arm computed-refresh registration is unavailable.');
 		await deps.registerComputedRefreshes(computedRefreshes);
 	}
 	registerArmDomUpdates(deps, materialized.domUpdates);
-	if (deps.registerKeyedRepeats && materialized.keyedRepeats.length > 0)
-		await deps.registerKeyedRepeats(materialized.keyedRepeats);
-	if (deps.addBehaviors && materialized.behaviors.length > 0) {
+	if (materialized.keyedRepeats.length)
+		await deps.registerKeyedRepeats?.(materialized.keyedRepeats);
+	if (deps.addBehaviors && materialized.behaviors.length) {
 		const byHost = new Map<string, ResumeBehaviorRecord[]>();
 		for (const behavior of materialized.behaviors) {
 			const records = byHost.get(behavior.hostNodeId) ?? [];
@@ -197,9 +201,8 @@ export async function registerArmRecordSet(
 		}
 		for (const [hostNodeId, records] of byHost) await deps.addBehaviors(hostNodeId, records);
 	}
-	if (deps.registerArmBranches && materialized.branches.length > 0) {
-		await deps.registerArmBranches(boundary.id, materialized.branches);
-	}
+	if (materialized.branches.length)
+		await deps.registerArmBranches?.(boundary.id, materialized.branches);
 	return materialized;
 }
 
@@ -217,14 +220,15 @@ function installArmEventTypes(
 
 function assertNativeArmRecordHosts(update: ArmCommitUpdate): void {
 	const elements = update.elementsByHostId!;
-	const records = [
-		...update.armRecords.events,
-		...(update.armRecords.domUpdates ?? []),
-		...update.armRecords.behaviors,
-		...update.armRecords.elementHandles,
-	];
-	const missing = records.find((record) => !elements.has(record.hostNodeId));
-	if (missing) throw armRecordHostMissingError(missing.hostNodeId, 'native');
+	for (const records of [
+		update.armRecords.events,
+		update.armRecords.domUpdates ?? [],
+		update.armRecords.behaviors,
+		update.armRecords.elementHandles,
+	])
+		for (const record of records)
+			if (!elements.has(record.hostNodeId))
+				throw armRecordHostMissingError(record.hostNodeId, 'native');
 	const repeat = (update.armRecords.keyedRepeats ?? []).find(
 		(record) => !elements.has(record.parentHostNodeId),
 	);
@@ -242,10 +246,10 @@ function registerArmDomUpdates(
 		const element = deps.elementsByHostId.get(domUpdate.hostNodeId);
 		if (!element) throw armRecordHostMissingError(domUpdate.hostNodeId, 'DOM update');
 		if (
-			(deps.graphNodeIds?.size ?? 0) > 0 &&
-			!deps.graphNodeIds?.has(domUpdate.graphNodeId) &&
 			typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' &&
-			__MARKLESS_DEBUG_ENABLED__
+			__MARKLESS_DEBUG_ENABLED__ &&
+			(deps.graphNodeIds?.size ?? 0) > 0 &&
+			!deps.graphNodeIds?.has(domUpdate.graphNodeId)
 		)
 			throw new Error(`Markless DOM update expected graph node ${domUpdate.graphNodeId}.`);
 		deps.storeHostSubscription(

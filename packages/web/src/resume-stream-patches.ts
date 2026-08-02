@@ -1,6 +1,5 @@
 import type { DecodedPayloadScripts } from '../../serializer/src/protocol-client.ts';
-import { ASYNC_BOUNDARY_ARM } from '@markless/serializer';
-import type { ProtocolStatePayload } from '@markless/serializer';
+import type { ProtocolStatePayload, ProtocolStreamedArmPatch } from '@markless/serializer';
 
 // Show-then-adopt, adopt half (T107 streaming): the __mArm executor already
 // swapped settled arm content into the boundary's anchor range pre-runtime;
@@ -36,92 +35,73 @@ export function adoptStreamedArmPatches(
 ): DecodedPayloadScripts {
 	const query = root.ownerDocument?.querySelectorAll?.bind(root.ownerDocument);
 	if (!query) return decoded;
-	const armScripts = [...query('script[type="markless/arm"][data-boundary]')];
-	const patchScripts = [...query('script[type="markless/state-patch"][data-graph-node]')];
-	if (armScripts.length === 0 && patchScripts.length === 0) return decoded;
+	const scripts = [
+		...query(
+			'script[type="markless/arm"],script[type="markless/state-patch"]',
+		),
+	];
+	if (!scripts.length) return decoded;
 
 	const uncommittedBoundaryIds = new Set(
 		[...query('template[m\\:arm]')].map((template) => template.getAttribute('m:arm')),
 	);
-	const uncommittedGraphNodeIds = new Set(
-		decoded.view.asyncBoundaries
-			.filter((boundary) => uncommittedBoundaryIds.has(boundary.id))
-			.flatMap((boundary) => boundary.asyncReads.map((read) => read.graphNodeId)),
-	);
-	const armRecordsByBoundary = new Map(
-		armScripts
-			.filter((script) => !uncommittedBoundaryIds.has(script.getAttribute('data-boundary')))
-			.map((script) => [
-				script.getAttribute('data-boundary'),
-				JSON.parse(script.textContent ?? 'null') as unknown,
-			]),
-	);
-	const ownedRunnerIds = new Set(
-		decoded.view.asyncBoundaries.flatMap((boundary) =>
-			boundary.runnerGraphNodeId ? [boundary.runnerGraphNodeId] : [],
-		),
-	);
-	const patchByGraphNode = new Map(
-		patchScripts
-			.filter((script) => {
-				const graphNodeId = script.getAttribute('data-graph-node') ?? '';
-				return ownedRunnerIds.has(graphNodeId) && !uncommittedGraphNodeIds.has(graphNodeId);
-			})
-			.map((script) => [
-				script.getAttribute('data-graph-node'),
-				JSON.parse(script.textContent ?? 'null') as StreamedStateDelta | null,
-			]),
-	);
-	const deltas = [...patchByGraphNode.values()].filter(
-		(delta): delta is StreamedStateDelta => !!delta,
-	);
-	const cells = mergeStateRecords(
-		decoded.state.cells,
-		deltas.flatMap((delta) => delta.cells),
-	);
-	const computed = mergeStateRecords(
-		decoded.state.computed,
-		deltas.flatMap((delta) => delta.computed),
-	);
+	const armPatchesByBoundary = new Map<string, ProtocolStreamedArmPatch>();
+	const deltas = new Map<string, StreamedStateDelta>();
+	for (const script of scripts) {
+		const boundaryId = script.getAttribute('data-boundary');
+		if (boundaryId) {
+			if (!uncommittedBoundaryIds.has(boundaryId))
+				armPatchesByBoundary.set(
+					boundaryId,
+					JSON.parse(script.textContent as string) as ProtocolStreamedArmPatch,
+				);
+			continue;
+		}
+		const graphNodeId = script.getAttribute('data-graph-node') ?? '';
+		const boundary = decoded.view.asyncBoundaries.find(
+			(candidate) => candidate.runnerGraphNodeId === graphNodeId,
+		);
+		if (!boundary || uncommittedBoundaryIds.has(boundary.id)) continue;
+		const delta = JSON.parse(script.textContent as string) as StreamedStateDelta | null;
+		if (delta) deltas.set(graphNodeId, delta);
+	}
+	const cells = mergeStateRecords(decoded.state.cells, deltas.values(), 'cells');
+	const computed = mergeStateRecords(decoded.state.computed, deltas.values(), 'computed');
 
 	return {
 		state: {
 			...decoded.state,
-			cells,
-			computed,
+			cells: [...cells.values()],
+			computed: [...computed.values()],
 		},
 		view: {
 			...decoded.view,
 			asyncBoundaries: decoded.view.asyncBoundaries.map((boundary) => {
-				const armRecords = armRecordsByBoundary.get(boundary.id);
-				if (!armRecords) return boundary;
-				const snapshot = computed.find(
-					(record) => record.graphNodeId === boundary.runnerGraphNodeId,
-				)?.snapshot as { readonly status?: unknown } | undefined;
-				const initiallyServedArm =
-					snapshot?.status === 'fulfilled'
-						? ASYNC_BOUNDARY_ARM.try
-						: snapshot?.status === 'rejected'
-							? ASYNC_BOUNDARY_ARM.catch
-							: boundary.initiallyServedArm;
+				const armPatch = armPatchesByBoundary.get(boundary.id);
+				if (!armPatch) return boundary;
 				return {
 					...boundary,
-					initiallyServedArm,
-					armRecords: armRecords as (typeof boundary)['armRecords'],
+					initiallyServedArm: armPatch[0],
+					armRecords: armPatch[1] as (typeof boundary)['armRecords'],
 				};
 			}),
 		},
 	};
 }
 
-function mergeStateRecords<T extends { readonly graphNodeId: string }>(
+function mergeStateRecords<
+	T extends { readonly graphNodeId: string },
+	K extends keyof StreamedStateDelta,
+>(
 	base: ReadonlyArray<T>,
-	additions: ReadonlyArray<T>,
-): T[] {
+	deltas: Iterable<StreamedStateDelta>,
+	key: K,
+): Map<string, T> {
 	const records = new Map(base.map((record) => [record.graphNodeId, record]));
-	for (const addition of additions) {
-		const current = records.get(addition.graphNodeId);
-		records.set(addition.graphNodeId, current ? { ...current, ...addition } : addition);
-	}
-	return [...records.values()];
+	for (const delta of deltas)
+		for (const addition of delta[key] as ReadonlyArray<T>) {
+			const current = records.get(addition.graphNodeId);
+			records.set(addition.graphNodeId, current ? { ...current, ...addition } : addition);
+		}
+	return records;
 }

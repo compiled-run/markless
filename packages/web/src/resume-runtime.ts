@@ -55,7 +55,10 @@ export function createResumeRuntime(
 	let behaviorRuntime: BehaviorRuntime | undefined, branchRuntime: BranchRuntime | undefined;
 	let events: EventWiring | undefined, runtimeShared: RuntimeShared | undefined;
 	const behaviorHostIds = new Set(input.view.behaviors.map((behavior) => behavior.hostNodeId));
-	const graphNodeIds = registrationGraphNodeCensus(input.state);
+	const graphNodeIds =
+		typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
+			? registrationGraphNodeCensus(input.state)
+			: undefined;
 	const registeredComputedRefreshIds = new Set(
 		(input.state?.computed ?? [])
 			.filter(
@@ -244,14 +247,13 @@ export function createResumeRuntime(
 		const behaviors = records.behaviors.length > 0 ? await loadBehaviorRuntime() : undefined;
 		return {
 			root: input.root,
-			renderHtml: input.renderBranchHtml,
 			elementsByHostId,
 			disposedHosts,
 			disposeHost,
 			addEventRecord: eventWiring.addEventRecord,
 			registerElementHandle: elementHandles.register,
 			graph: input.graph,
-			graphNodeIds,
+			...(graphNodeIds ? { graphNodeIds } : {}),
 			registerComputedRefreshes: async (records) => {
 				const fresh = records.filter(
 					(record) => !registeredComputedRefreshIds.has(record.graphNodeId),
@@ -259,7 +261,7 @@ export function createResumeRuntime(
 				if (fresh.length === 0) return;
 				for (const record of fresh) {
 					registeredComputedRefreshIds.add(record.graphNodeId);
-					graphNodeIds.add(record.graphNodeId);
+					graphNodeIds?.add(record.graphNodeId);
 				}
 				(
 					await import('./resume-sync-demand.ts')
@@ -526,11 +528,13 @@ export function createResumeRuntime(
 	};
 }
 
-export function registrationGraphNodeCensus(state: ResumeRuntimeInput['state']): Set<string> {
-	return new Set([
-		...(state?.cells ?? []).map((cell) => cell.graphNodeId),
-		...(state?.computed ?? []).map((computed) => computed.graphNodeId),
-	]);
+export function registrationGraphNodeCensus(
+	state: ResumeRuntimeInput['state'],
+): Set<string> {
+	const ids = new Set<string>();
+	for (const cell of state?.cells ?? []) ids.add(cell.graphNodeId);
+	for (const computed of state?.computed ?? []) ids.add(computed.graphNodeId);
+	return ids;
 }
 
 // Local copies of the resume-locators helpers: importing that module here

@@ -8,8 +8,12 @@ const root = import.meta.dirname;
 export function liveFeedConfig(
 	executionLog = process.env.MARKLESS_CONSUMER_BUILD ? ('never' as const) : ('auto' as const),
 ) {
-	const prerender = process.env.MARKLESS_PRERENDER !== '0';
-	if (prerender) process.env.MARKLESS_PRERENDER = '1';
+	// Default stays LEGACY until wake staging (T008) shrinks settlement cost:
+	// prerendered live-feed pays the full wake before its settled selector and
+	// blew the 30,371 ceiling at 65,379 executed bytes (measured 2026-08-02).
+	// The matrix's prerendered cells still build with MARKLESS_PRERENDER=1 via
+	// the box config; flip the default back after T008 lands.
+	const prerender = process.env.MARKLESS_PRERENDER === '1';
 	return {
 		plugins: [
 			...markless({ executionLog }),

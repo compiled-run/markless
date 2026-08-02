@@ -3,6 +3,7 @@ import {
 	serializeRuntimeAsyncSnapshots,
 	serializeRuntimeStateCells,
 	type ProtocolStatePayload,
+	type ProtocolStreamedArmPatch,
 } from '@markless/serializer';
 import {
 	MARKLESS_PENDING_MIN_VISIBLE_MS,
@@ -290,6 +291,7 @@ function renderArmAppend(
 		cells,
 		computed: serializeRuntimeAsyncSnapshots([...computedById.values()]),
 	};
+	const armPatch: ProtocolStreamedArmPatch = [boundary.initiallyServedArm, armRecords as never];
 	const nonceAttribute = nonce ? ` nonce="${escapeAttribute(nonce)}"` : '';
 
 	const revealArguments = arm.revealDependencyIds.length
@@ -298,7 +300,7 @@ function renderArmAppend(
 
 	return (
 		`<template m:arm="${escapeAttribute(arm.boundaryId)}">${armHtml}</template>` +
-		`<script type="markless/arm" data-boundary="${escapeAttribute(arm.boundaryId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(armRecords))}</script>` +
+		`<script type="markless/arm" data-boundary="${escapeAttribute(arm.boundaryId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(armPatch))}</script>` +
 		`<script type="markless/state-patch" data-graph-node="${escapeAttribute(arm.graphNodeId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(patch))}</script>` +
 		`<script${nonceAttribute}>__mArm(${escapeScriptJson(revealArguments)})</script>`
 	);
@@ -348,7 +350,7 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 		const rec = d.querySelector('script[type="markless/arm"][data-boundary="' + id + '"]');
 		const r = s.parentElement && s.parentElement.closest && s.parentElement.closest('[data-async-container]');
 		if (!rec || !r) return;
-			const records = JSON.parse(rec.textContent || 'null') || {};
+			const records = (JSON.parse(rec.textContent || 'null') || [])[1] || {};
 			const names = new Set((records.events || []).map((x) => x.eventName));
 			${debugSetup}
 			for (const t of names) {

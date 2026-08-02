@@ -146,11 +146,19 @@ export type ProtocolArmRecordSet = {
 		readonly tagName: string;
 	}>;
 	readonly events: ProtocolViewPayload['events'];
+	readonly domUpdates?: ProtocolViewPayload['domUpdates'];
 	readonly behaviors: ProtocolViewPayload['behaviors'];
 	readonly elementHandles: ProtocolViewPayload['elementHandles'];
 	readonly keyedRepeats?: ProtocolViewPayload['keyedRepeats'];
 	readonly branches?: ReadonlyArray<ProtocolArmBranchRecord>;
 };
+
+// A streamed arm carries its served-arm discriminator beside the record set,
+// avoiding a second snapshot scan during pre-resume adoption.
+export type ProtocolStreamedArmPatch = readonly [
+	arm: ProtocolAsyncBoundaryArm,
+	records: ProtocolArmRecordSet,
+];
 
 export type ProtocolViewPayload = {
 	readonly version: typeof ASYNC_PROTOCOL_VERSION;

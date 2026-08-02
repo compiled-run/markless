@@ -15,7 +15,10 @@ function fakeScript(attributes: Record<string, string>, textContent: string) {
 function fakeRoot(scriptsBySelector: Record<string, ReturnType<typeof fakeScript>[]>) {
 	return {
 		ownerDocument: {
-			querySelectorAll: (selector: string) => scriptsBySelector[selector] ?? [],
+			querySelectorAll: (selector: string) =>
+				selector
+					.split(',')
+					.flatMap((part) => scriptsBySelector[part] ?? []),
 		},
 	};
 }
@@ -62,10 +65,13 @@ test('adoptStreamedArmPatches overlays streamed snapshots and arm records before
 		elementHandles: [],
 	};
 	const root = fakeRoot({
-		'script[type="markless/arm"][data-boundary]': [
-			fakeScript({ 'data-boundary': 'boundary:0' }, JSON.stringify(settledRecords)),
+		'script[type="markless/arm"]': [
+			fakeScript(
+				{ 'data-boundary': 'boundary:0' },
+				JSON.stringify([ASYNC_BOUNDARY_ARM.try, settledRecords]),
+			),
 		],
-		'script[type="markless/state-patch"][data-graph-node]': [
+		'script[type="markless/state-patch"]': [
 			fakeScript(
 				{ 'data-graph-node': 'computed:report' },
 				JSON.stringify({
@@ -136,10 +142,13 @@ test('adoptStreamedArmPatches skips boundaries whose streamed template is still 
 	};
 	const root = fakeRoot({
 		'template[m\\:arm]': [fakeScript({ 'm:arm': 'boundary:0' }, '')],
-		'script[type="markless/arm"][data-boundary]': [
-			fakeScript({ 'data-boundary': 'boundary:0' }, JSON.stringify(settledRecords)),
+		'script[type="markless/arm"]': [
+			fakeScript(
+				{ 'data-boundary': 'boundary:0' },
+				JSON.stringify([ASYNC_BOUNDARY_ARM.try, settledRecords]),
+			),
 		],
-		'script[type="markless/state-patch"][data-graph-node]': [
+		'script[type="markless/state-patch"]': [
 			fakeScript(
 				{ 'data-graph-node': 'computed:report' },
 				JSON.stringify({
@@ -173,10 +182,13 @@ test('adoptStreamedArmPatches skips boundaries whose streamed template is still 
 
 test('adoptStreamedArmPatches ignores patches for other containers payloads', () => {
 	const root = fakeRoot({
-		'script[type="markless/arm"][data-boundary]': [
-			fakeScript({ 'data-boundary': 'boundary:99' }, JSON.stringify({ locators: [] })),
+		'script[type="markless/arm"]': [
+			fakeScript(
+				{ 'data-boundary': 'boundary:99' },
+				JSON.stringify([ASYNC_BOUNDARY_ARM.try, { locators: [] }]),
+			),
 		],
-		'script[type="markless/state-patch"][data-graph-node]': [
+		'script[type="markless/state-patch"]': [
 			fakeScript(
 				{ 'data-graph-node': 'computed:unknown' },
 				JSON.stringify({

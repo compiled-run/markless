@@ -41,7 +41,7 @@ export function materializeArmRecords(input: ArmMaterializeInput) {
 	} satisfies Record<keyof ResumeArmRecordSet, true>;
 	void exhaustive;
 	const byHostId = new Map<string, ResumeDomElement>(input.elementsByHostId);
-	if (input.armRecords.locators.length > 0) {
+	if (input.armRecords.locators.length) {
 		const { elements, offset } = elementsAndAnchorOffset(input.root, input.startAnchor);
 		for (const locator of input.armRecords.locators) {
 			const element = elements[offset + locator.index];
@@ -76,7 +76,7 @@ function materializeArmBranchRecords(
 	input: ArmMaterializeInput,
 ): ReadonlyArray<ResumeArmBranchRecord> {
 	const records = input.armRecords.branches ?? [];
-	if (records.length === 0) return [];
+	if (!records.length) return [];
 	const census = records.some((record) => record.startAnchor)
 		? armBranchCommentCensus(input.root, input.startAnchor, input.endAnchor)
 		: [];
