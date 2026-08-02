@@ -1,3 +1,9 @@
+import type {
+	ModuleGraphInterfaceArtifact,
+	SemanticGraphArtifact,
+	SemanticGraphInput,
+} from '@markless/compiler';
+
 export type MarklessEnvironment = 'client' | 'server' | 'lib';
 export type MarklessClientOutput = 'full' | 'symbols-only';
 export type MarklessExecutionLogMode = 'auto' | 'never' | 'always';
@@ -30,6 +36,7 @@ export interface MarklessVirtualModule {
 export interface TransformTsrxModuleInput {
 	filename: string;
 	source: string;
+	importedModuleInterfaces?: SemanticGraphInput['importedModuleInterfaces'];
 	symbols?: import('@markless/compiler').SymbolResolverModuleInput['symbols'];
 	devResumeReexport?: boolean;
 	buildId?: string;
@@ -48,7 +55,14 @@ export interface TransformTsrxModuleResult {
 	map: null;
 	virtualModules: MarklessVirtualModule[];
 	manifest: MarklessTransformManifest;
+	moduleGraphInterface: ModuleGraphInterfaceArtifact;
+	moduleImports: SemanticGraphArtifact['moduleImports'];
 }
+
+export type MarklessModuleLinkArtifact = Pick<
+	TransformTsrxModuleResult,
+	'moduleGraphInterface' | 'moduleImports'
+>;
 
 export interface MarklessTransformManifest {
 	source: string;

@@ -3,6 +3,7 @@ import {
 	compileTsrxModule,
 	emitSymbolResolverModule,
 	type CompilerDiagnostic,
+	type CompileTsrxModuleResult,
 	type RuntimeDemandMapArtifact,
 } from '@markless/compiler';
 import {
@@ -247,6 +248,27 @@ export async function transformTsrxModule(
 		map: null,
 		virtualModules,
 		manifest,
+		moduleGraphInterface: compiled.moduleGraphInterface,
+		moduleImports: compiled.semanticGraph.moduleImports,
+	};
+}
+
+export async function compileTsrxModuleLinkArtifact(
+	input: Pick<TransformTsrxModuleInput, 'filename' | 'source' | 'buildId'>,
+): Promise<
+	Pick<CompileTsrxModuleResult, 'moduleGraphInterface'> & {
+		readonly moduleImports: CompileTsrxModuleResult['semanticGraph']['moduleImports'];
+	}
+> {
+	const compiled = await compileTsrxModule({
+		filename: input.filename,
+		source: input.source,
+		buildId: input.buildId,
+		symbols: [],
+	});
+	return {
+		moduleGraphInterface: compiled.moduleGraphInterface,
+		moduleImports: compiled.semanticGraph.moduleImports,
 	};
 }
 
@@ -259,7 +281,10 @@ export async function preflightTsrxModuleDiagnostics(
 }
 
 async function compileWithBlockingDiagnostics(
-	input: Pick<TransformTsrxModuleInput, 'filename' | 'source' | 'buildId' | 'symbols'>,
+	input: Pick<
+		TransformTsrxModuleInput,
+		'filename' | 'source' | 'buildId' | 'symbols' | 'importedModuleInterfaces'
+	>,
 	resolverId: string,
 ) {
 	const compiled = await compileTsrxModule({
@@ -268,6 +293,7 @@ async function compileWithBlockingDiagnostics(
 		buildId: input.buildId,
 		resolverId,
 		symbols: input.symbols ?? [],
+		importedModuleInterfaces: input.importedModuleInterfaces,
 	});
 	return {
 		compiled,

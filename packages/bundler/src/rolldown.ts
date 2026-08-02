@@ -30,11 +30,13 @@ import {
 import { encodedSymbolSource, symbolVirtualModuleSourceFile } from './source-module.ts';
 import {
 	MARKLESS_VIRTUAL_PREFIX,
+	compileTsrxModuleLinkArtifact,
 	resumeVirtualModuleId,
 	transformTsrxModule,
 } from './transform.ts';
 import type {
 	MarklessEnvironment,
+	MarklessModuleLinkArtifact,
 	MarklessRolldownOptions,
 	MarklessRolldownPluginApi,
 	MarklessTransformManifest,
@@ -92,6 +94,7 @@ export function createMarklessRolldownPlugin(input: {
 	const internalOptions = (input.options ?? {}) as InternalMarklessRolldownOptions;
 	const virtualModules = new Map<string, MarklessVirtualModule>();
 	const transformManifests = new Map<string, MarklessTransformManifest>();
+	const moduleLinkArtifacts = new Map<string, MarklessModuleLinkArtifact>();
 	const importedChildren = new Map<string, ImportedChild>();
 	const importedChildSources = new Set<string>();
 	const emittedClientResolverSources = new Set<string>();
@@ -158,6 +161,7 @@ export function createMarklessRolldownPlugin(input: {
 			clientSymbolEntrySources.clear();
 			virtualModules.clear();
 			transformManifests.clear();
+			moduleLinkArtifacts.clear();
 			importedChildren.clear();
 			importedChildSources.clear();
 			emittedClientResolverSources.clear();
@@ -235,7 +239,11 @@ export function createMarklessRolldownPlugin(input: {
 				return executionLogVirtualModuleSource({
 					moduleSizes: embedsDevSizes ? executionLogEstimatedSizes : undefined,
 					attribution: embedsDevSizes
-						? executionAttributionTables(transformManifests, getRoot(), importedChildren.values())
+						? executionAttributionTables(
+								transformManifests,
+								getRoot(),
+								importedChildren.values(),
+							)
 						: undefined,
 					sizesUrl:
 						internalOptions.dev === true
@@ -280,7 +288,7 @@ export function createMarklessRolldownPlugin(input: {
 			}
 			const source = pathname(id);
 			clearSourceVirtualModules(source, virtualModules, sourceVirtualModules);
-			let transformed = await transformTsrxModule({
+			const transformInput = {
 				filename: source,
 				source: code,
 				buildId: internalOptions.buildId,
@@ -322,7 +330,36 @@ export function createMarklessRolldownPlugin(input: {
 						? internalOptions.devInjections
 						: undefined,
 				devResumeReexport: internalOptions.dev === true && currentEnvironment === 'client',
-			});
+			};
+			let transformed: TransformTsrxModuleResult;
+			try {
+				transformed = await transformTsrxModule(transformInput);
+			} catch (error) {
+				// Imported graph helpers can diagnose before their interface is linked.
+				// Publish only this compiler-owned link artifact so cycles never wait.
+				const provisional = await compileTsrxModuleLinkArtifact(transformInput);
+				moduleLinkArtifacts.set(source, provisional);
+				const provisionalImports = await resolveImportedModuleInterfaces.call(
+					this,
+					source,
+					provisional.moduleImports,
+				);
+				if (provisionalImports.length === 0) throw error;
+				await forceImportedModules.call(
+					this,
+					provisionalImports,
+					moduleLinkArtifacts,
+					internalOptions,
+					currentEnvironment,
+				);
+				transformed = await transformTsrxModule({
+					...transformInput,
+					importedModuleInterfaces: importedModuleInterfaces(
+						provisionalImports,
+						moduleLinkArtifacts,
+					),
+				});
+			}
 			// Register the first-pass artifact before loading children so the existing
 			// cross-module registry can validate both sides of the composition edge.
 			registerTransformArtifacts({
@@ -330,11 +367,17 @@ export function createMarklessRolldownPlugin(input: {
 				result: transformed,
 				virtualModules,
 				transformManifests,
+				moduleLinkArtifacts,
 				sourceVirtualModules,
 				executionLogEstimatedSizes,
 				dev,
 				environment: currentEnvironment,
 			});
+			const resolvedInterfaceImports = await resolveImportedModuleInterfaces.call(
+				this,
+				source,
+				transformed.moduleImports,
+			);
 			const resolvedChildren = await resolveImportedChildren.call(
 				this,
 				source,
@@ -344,62 +387,26 @@ export function createMarklessRolldownPlugin(input: {
 				importedChildren.set(importedChildKey(child), child);
 				importedChildSources.add(child.source);
 			}
+			await forceImportedModules.call(
+				this,
+				uniqueImportedModules([...resolvedInterfaceImports, ...resolvedChildren]),
+				moduleLinkArtifacts,
+				internalOptions,
+				currentEnvironment,
+			);
 			for (const child of resolvedChildren) {
-				if (!transformManifests.has(child.source)) {
-					if (internalOptions.dev === true) {
-						await internalOptions.devServer?.transformRequest(
-							child.source,
-							currentEnvironment,
-						);
-					} else if (typeof this.load === 'function') {
-						await this.load({ id: child.source });
-					}
-				}
 				if (internalOptions.dev === true) {
 					validateImportedChild(child, transformManifests);
 				}
 			}
-			if (resolvedChildren.length > 0) {
+			if (resolvedChildren.length > 0 || resolvedInterfaceImports.length > 0) {
 				transformed = await transformTsrxModule({
-					filename: source,
-					source: code,
-					buildId: internalOptions.buildId,
+					...transformInput,
 					symbols: importedSymbolInputs(resolvedChildren, transformManifests),
-					executionLog: normalizeExecutionLogMode(internalOptions.executionLog),
-					executionLogModuleHooks:
-						internalOptions.dev === true && currentEnvironment === 'client',
-					inlineResumerDebug: internalOptions.inlineResumerDebug === true,
-					environment: currentEnvironment,
-					clientOutput:
-						currentEnvironment === 'client' &&
-						(clientSymbolEntrySources.has(source) || isSymbolOnlySourceRequest(id))
-							? 'symbols-only'
-							: undefined,
-					resumeModuleUrl:
-						internalOptions.dev === true && currentEnvironment === 'server'
-							? devBrowserSourceModuleUrl(
-									source,
-									getRoot(),
-									internalOptions.publicPath,
-								)
-							: undefined,
-					styleModuleUrl:
-						internalOptions.dev === true && currentEnvironment === 'server'
-							? (virtualId) =>
-									withQuery(
-										devBrowserVirtualModuleUrl(
-											virtualId,
-											internalOptions.publicPath,
-										),
-										{ direct: null },
-									)
-							: undefined,
-					headInjections:
-						internalOptions.dev === true && currentEnvironment === 'server'
-							? internalOptions.devInjections
-							: undefined,
-					devResumeReexport:
-						internalOptions.dev === true && currentEnvironment === 'client',
+					importedModuleInterfaces: importedModuleInterfaces(
+						resolvedInterfaceImports,
+						moduleLinkArtifacts,
+					),
 				});
 			}
 			registerTransformArtifacts({
@@ -407,6 +414,7 @@ export function createMarklessRolldownPlugin(input: {
 				result: transformed,
 				virtualModules,
 				transformManifests,
+				moduleLinkArtifacts,
 				sourceVirtualModules,
 				executionLogEstimatedSizes,
 				dev,
@@ -604,6 +612,79 @@ async function resolveImportedChildren(
 	);
 }
 
+async function resolveImportedModuleInterfaces(
+	this: {
+		resolve(
+			source: string,
+			importer?: string,
+			options?: { readonly skipSelf?: boolean },
+		): Promise<{ readonly id: string } | string | null>;
+	},
+	parent: string,
+	moduleImports: MarklessModuleLinkArtifact['moduleImports'],
+): Promise<ImportedChild[]> {
+	return await Promise.all(
+		moduleImports
+			.filter((moduleImport) => TSRX_SOURCE_FILE.test(moduleImport.source))
+			.map(async (moduleImport) => {
+				const resolvedImport = await this.resolve(moduleImport.source, parent, {
+					skipSelf: true,
+				});
+				const resolvedId =
+					typeof resolvedImport === 'string'
+						? resolvedImport
+						: resolvedImport && 'id' in resolvedImport
+							? String(resolvedImport.id)
+							: fallbackImportedSource(parent, moduleImport.source);
+				return {
+					parent,
+					specifier: moduleImport.source,
+					source: pathname(resolvedId),
+				};
+			}),
+	);
+}
+
+async function forceImportedModules(
+	this: { load?: (input: { readonly id: string }) => Promise<unknown> | unknown },
+	imports: ReadonlyArray<ImportedChild>,
+	artifacts: ReadonlyMap<string, MarklessModuleLinkArtifact>,
+	options: Pick<InternalMarklessRolldownOptions, 'dev' | 'devServer'>,
+	environment: MarklessEnvironment,
+) {
+	for (const imported of imports) {
+		if (artifacts.has(imported.source)) continue;
+		if (options.dev === true) {
+			await options.devServer?.transformRequest(imported.source, environment);
+		} else if (typeof this.load === 'function') {
+			await this.load({ id: imported.source });
+		}
+	}
+}
+
+function importedModuleInterfaces(
+	imports: ReadonlyArray<ImportedChild>,
+	artifacts: ReadonlyMap<string, MarklessModuleLinkArtifact>,
+): NonNullable<import('./types.ts').TransformTsrxModuleInput['importedModuleInterfaces']> {
+	return Object.fromEntries(
+		imports.flatMap((imported) => {
+			const artifact = artifacts.get(imported.source);
+			return artifact ? [[imported.specifier, artifact.moduleGraphInterface] as const] : [];
+		}),
+	);
+}
+
+function uniqueImportedModules(imports: ReadonlyArray<ImportedChild>): ImportedChild[] {
+	return [
+		...new Map(
+			imports.map((imported) => [
+				`${imported.parent}\0${imported.specifier}\0${imported.source}`,
+				imported,
+			]),
+		).values(),
+	];
+}
+
 function importedSymbolInputs(
 	children: ReadonlyArray<ImportedChild>,
 	manifests: ReadonlyMap<string, MarklessTransformManifest>,
@@ -732,7 +813,10 @@ function resolvedRouteSource(
 	specifier: string,
 	childrenByRoute: ReadonlyMap<string, string>,
 ): string {
-	return childrenByRoute.get(routeKey(parent, specifier)) ?? fallbackImportedSource(parent, specifier);
+	return (
+		childrenByRoute.get(routeKey(parent, specifier)) ??
+		fallbackImportedSource(parent, specifier)
+	);
 }
 
 function routeKey(parent: string, specifier: string): string {
@@ -801,6 +885,7 @@ function registerTransformArtifacts(input: {
 	result: TransformTsrxModuleResult;
 	virtualModules: Map<string, MarklessVirtualModule>;
 	transformManifests: Map<string, MarklessTransformManifest>;
+	moduleLinkArtifacts: Map<string, MarklessModuleLinkArtifact>;
 	sourceVirtualModules: Map<string, Set<string>>;
 	executionLogEstimatedSizes: Map<string, number>;
 	dev: ReturnType<typeof createMarklessDevGraph>;
@@ -822,6 +907,10 @@ function registerTransformArtifacts(input: {
 		}
 	}
 	input.transformManifests.set(input.source, input.result.manifest);
+	input.moduleLinkArtifacts.set(input.source, {
+		moduleGraphInterface: input.result.moduleGraphInterface,
+		moduleImports: input.result.moduleImports,
+	});
 	input.sourceVirtualModules.set(input.source, ids);
 	input.dev.record(input.source, ids, input.environment);
 }
