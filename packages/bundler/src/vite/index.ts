@@ -8,8 +8,10 @@ import type {
 	ViteDevServer,
 } from 'vite';
 import type { OutputOptions } from 'rolldown';
+import { resolve } from 'pathe';
 import { joinURL, parsePath } from 'ufo';
 import { createPreloadGraphAdder } from '../build/bundle-graph.ts';
+import { emitPrerenderedPage } from '../build/prerender.ts';
 import { executionLogActivationInjection } from '../execution-log.ts';
 import { outputDefaults } from '../build/chunking.ts';
 import { createMarklessRolldownPlugin } from '../rolldown.ts';
@@ -52,6 +54,8 @@ type MarklessOutputOptions = OutputOptions | OutputOptions[] | undefined;
 type InternalMarklessRolldownOptions = MarklessRolldownOptions & {
 	emitResumeModules?: boolean;
 	inlineResumerDebug?: boolean;
+	prerender?: boolean;
+	productionResumeModuleUrls?: Map<string, string>;
 	publicPath?: (fileName: string) => string;
 };
 type RolldownInputConfig = string | readonly string[] | Record<string, string> | undefined;
@@ -63,6 +67,12 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 	const bundleGraphAdders = new Set<BundleGraphAdder>();
 	const transformedTsrxSources = new Map<string, string>();
 	const rolldownOptions: InternalMarklessRolldownOptions = { ...options };
+	const prerender = process.env.MARKLESS_PRERENDER === '1';
+	rolldownOptions.prerender = false;
+	rolldownOptions.productionResumeModuleUrls = new Map();
+	let prerenderEntry: string | null = null;
+	let resolvedRoot = '';
+	let clientOutDir = 'dist';
 	rolldownOptions.bundleGraphAdders = bundleGraphAdders;
 	const hmrOptions = {
 		base: '/',
@@ -99,8 +109,7 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 		config(config, env) {
 			command = env.command;
 			const devEnabled = env.command === 'serve';
-			rolldownOptions.executionLog =
-				options.executionLog ?? (devEnabled ? 'auto' : 'never');
+			rolldownOptions.executionLog = options.executionLog ?? (devEnabled ? 'auto' : 'never');
 			const debugEnabled = devEnabled || options.debug === true;
 			rolldownOptions.inlineResumerDebug = debugEnabled;
 			const debugDefine = JSON.stringify(debugEnabled);
@@ -131,8 +140,14 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 				__MARKLESS_DEV_ENABLED__: devDefine,
 			};
 			configDefaults(config, options, rolldownOptions);
+			if (prerender) {
+				prerenderEntry = ssrTsrxInput(config, options);
+				rolldownOptions.prerender = prerenderEntry !== null;
+			}
 		},
 		configResolved(resolvedConfig) {
+			resolvedRoot = resolvedConfig.root;
+			clientOutDir = resolvedConfig.build?.outDir ?? 'dist';
 			const serve = resolvedConfig.command === 'serve';
 			hmrOptions.base = resolvedConfig.base;
 			hmrOptions.enabled = serve && options.hmr !== false;
@@ -172,8 +187,23 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 		},
 		buildApp: {
 			order: 'pre',
-			handler(builder) {
-				return buildMarklessEnvironments(builder, options);
+			async handler(builder) {
+				await buildMarklessEnvironments(builder, options);
+				if (prerender && prerenderEntry) {
+					await emitPrerenderedPage({
+						root: resolvedRoot,
+						entry: resolve(resolvedRoot, prerenderEntry),
+						outDir: clientOutDir,
+						serverPlugin: createMarklessRolldownPlugin({
+							environment: 'server',
+							options: {
+								...rolldownOptions,
+								rootDir: resolvedRoot,
+								dev: false,
+							},
+						}),
+					});
+				}
 			},
 		},
 		configureServer(server: ViteDevServer) {

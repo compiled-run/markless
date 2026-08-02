@@ -147,7 +147,7 @@ describe('package metadata', () => {
 		}
 	});
 
-	test('music player demo is a plain CSR app without router or SSR hosts', async () => {
+	test('music player demo stays plain CSR by default with only the internal prerender gate', async () => {
 		const manifest = JSON.parse(
 			await readFile(resolve(root, 'demos/music-player/package.json'), 'utf8'),
 		) as {
@@ -159,7 +159,9 @@ describe('package metadata', () => {
 		expect(manifest.dependencies).not.toHaveProperty('@markless/router');
 		expect(manifest.scripts).not.toHaveProperty('smoke:ssr');
 		expect(config).not.toContain('@markless/router');
-		expect(config).toContain('plugins: [markless({ executionLog })]');
+		expect(config).toContain('...markless({ executionLog })');
+		expect(config).toContain("process.env.MARKLESS_PRERENDER === '1'");
+		expect(config).toContain("input: { prerender: resolve(root, 'src/App.tsrx') }");
 		await expect(access(resolve(root, 'demos/music-player/index.html'))).resolves.toBe(
 			undefined,
 		);

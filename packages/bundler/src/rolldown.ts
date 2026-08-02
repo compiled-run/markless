@@ -69,6 +69,8 @@ export type MarklessRolldownPlugin = Plugin & { api: MarklessRolldownPluginApi }
 type InternalMarklessRolldownOptions = MarklessRolldownOptions & {
 	emitResumeModules?: boolean;
 	inlineResumerDebug?: boolean;
+	prerender?: boolean;
+	productionResumeModuleUrls?: Map<string, string>;
 	publicPath?: (fileName: string) => string;
 };
 
@@ -393,7 +395,9 @@ export function createMarklessRolldownPlugin(input: {
 				resumeModuleUrl:
 					internalOptions.dev === true && currentEnvironment === 'server'
 						? devBrowserSourceModuleUrl(source, getRoot(), internalOptions.publicPath)
-						: undefined,
+						: currentEnvironment === 'server'
+							? internalOptions.productionResumeModuleUrls?.get(source)
+							: undefined,
 				styleModuleUrl:
 					internalOptions.dev === true && currentEnvironment === 'server'
 						? (virtualId) =>
@@ -605,7 +609,14 @@ export function createMarklessRolldownPlugin(input: {
 				}
 				if (getEnvironment(this) !== 'client') return;
 
-				injectCsrNativeMarkup(bundle, transformManifests.values());
+				recordProductionResumeModuleUrls(
+					bundle,
+					internalOptions.productionResumeModuleUrls,
+					internalOptions.publicPath,
+				);
+				if (!internalOptions.prerender) {
+					injectCsrNativeMarkup(bundle, transformManifests.values());
+				}
 
 				stripEmptyPreloadWrappersFromChunks(bundle);
 				const removedSymbolFacades = rewriteGeneratedSymbolFacadeImports(bundle);
@@ -1193,6 +1204,30 @@ function sourceForResumeVirtualImporter(importer: string | undefined): string | 
 
 	const match = normalizeVirtualId(importer).match(RESUME_VIRTUAL_ID_RE);
 	return match?.[1] ? decodeURIComponent(match[1]) : null;
+}
+
+function recordProductionResumeModuleUrls(
+	bundle: Record<string, unknown>,
+	urls: Map<string, string> | undefined,
+	publicPath: ((fileName: string) => string) | undefined,
+): void {
+	if (!urls) return;
+	for (const output of Object.values(bundle)) {
+		if (!output || typeof output !== 'object') continue;
+		const chunk = output as {
+			readonly type?: unknown;
+			readonly facadeModuleId?: unknown;
+			readonly fileName?: unknown;
+		};
+		if (
+			chunk.type !== 'chunk' ||
+			typeof chunk.facadeModuleId !== 'string' ||
+			typeof chunk.fileName !== 'string'
+		)
+			continue;
+		const source = sourceForResumeVirtualImporter(chunk.facadeModuleId);
+		if (source) urls.set(source, publicPath?.(chunk.fileName) ?? `/${chunk.fileName}`);
+	}
 }
 
 function isRelativeImport(source: string): boolean {

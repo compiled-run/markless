@@ -3,8 +3,13 @@ import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { ProtocolViewPayload } from '@markless/serializer';
 import { compileTsrxModule } from '../../../compiler/src/index.ts';
-import type { CompileTsrxModuleResult, SemanticComponentEdge } from '../../../compiler/src/artifacts.ts';
+import type {
+	CompileTsrxModuleResult,
+	SemanticComponentEdge,
+} from '../../../compiler/src/artifacts.ts';
 import { expect, test } from 'vitest';
+import { assembleSsrContainer, renderToString } from '../../src/render-to-string.ts';
+import { evaluateBuiltPageClosure } from '../../src/prerender/evaluator.ts';
 import { compareSsrHtml, renderSsrData, type SsrDataResidue } from '../../src/ssr-data/renderer.ts';
 
 type DemoModule = {
@@ -34,10 +39,16 @@ test('music-player-ssr production renderData SSR matches the independent data re
 	const current = await currentEmitterOutput(page, modules);
 	const shadow = await dataRendererOutput(page, modules);
 	expect(page.compiled.publicRenderModule.ssrModuleSource).toContain('renderSsrData');
-	expect(page.compiled.publicRenderModule.ssrModuleSource).not.toContain('marklessSsrHostLocators');
+	expect(page.compiled.publicRenderModule.ssrModuleSource).not.toContain(
+		'marklessSsrHostLocators',
+	);
 
-	expect(compareSsrHtml(normalizeKnownChunkBytes(current.html), normalizeKnownChunkBytes(shadow.html)))
-		.toEqual({ equal: true });
+	expect(
+		compareSsrHtml(
+			normalizeKnownChunkBytes(current.html),
+			normalizeKnownChunkBytes(shadow.html),
+		),
+	).toEqual({ equal: true });
 });
 
 test('live-feed-ssr settled production renderData SSR matches the independent data renderer', async () => {
@@ -66,7 +77,9 @@ test('live-feed-ssr settled production renderData SSR matches the independent da
 test('live-feed-ssr production streaming pending shell matches the independent data renderer', async () => {
 	const modules = await compileDemoModules(liveFiles);
 	const page = modules.get('demos/live-feed-ssr/pages/index.tsrx')!;
-	const streaming = { streaming: { runs: new Map<string, { readonly promise: Promise<unknown> }>() } };
+	const streaming = {
+		streaming: { runs: new Map<string, { readonly promise: Promise<unknown> }>() },
+	};
 	const current = await currentEmitterOutput(page, modules, {
 		props: { url: new URL('http://markless.test/') },
 		renderContext: streaming,
@@ -77,8 +90,12 @@ test('live-feed-ssr production streaming pending shell matches the independent d
 		view: current.view,
 	});
 
-	expect(compareSsrHtml(normalizeKnownChunkBytes(current.html), normalizeKnownChunkBytes(shadow.html)))
-		.toEqual({ equal: true });
+	expect(
+		compareSsrHtml(
+			normalizeKnownChunkBytes(current.html),
+			normalizeKnownChunkBytes(shadow.html),
+		),
+	).toEqual({ equal: true });
 	await Promise.all([...streaming.streaming.runs.values()].map((run) => run.promise));
 });
 
@@ -92,15 +109,38 @@ test('demo shadow comparison reports DIFFERENT after deliberate output mutation'
 	expect(comparison).toMatchObject({ equal: false, expected: current.html });
 });
 
+test('music-player prerender container has exact renderToString parity with its SSR twin', async () => {
+	const modules = await compileDemoModules(musicFiles);
+	const page = modules.get('demos/music-player-ssr/pages/index.tsrx')!;
+	const artifact = {
+		renderSsr: () => currentEmitterOutput(page, modules),
+	};
+	const evaluated = await evaluateBuiltPageClosure(artifact);
+	const prerendered = await assembleSsrContainer(artifact, evaluated, {});
+	const ssrTwin = await renderToString(artifact);
+
+	// Named parity deltas: none. Both paths consume the same linked page closure
+	// and the same full-container assembler, so allowing any delta would hide a
+	// prerender/SSR contract split.
+	const allowedParityDeltas: ReadonlyArray<string> = [];
+	expect(allowedParityDeltas).toEqual([]);
+	expect(prerendered).toBe(ssrTwin);
+});
+
 async function compileDemoModules(files: ReadonlyArray<string>): Promise<Map<string, DemoModule>> {
-	const modules = await Promise.all(files.map(async (filename) => {
-		const source = await readFile(resolve(filename), 'utf8');
-		return [filename, {
-			filename,
-			source,
-			compiled: await compileTsrxModule({ filename, source, symbols: [] }),
-		}] as const;
-	}));
+	const modules = await Promise.all(
+		files.map(async (filename) => {
+			const source = await readFile(resolve(filename), 'utf8');
+			return [
+				filename,
+				{
+					filename,
+					source,
+					compiled: await compileTsrxModule({ filename, source, symbols: [] }),
+				},
+			] as const;
+		}),
+	);
 	return new Map(modules);
 }
 
@@ -143,7 +183,8 @@ async function dataRendererOutput(
 
 	const read = (residue: SsrDataResidue, context: { readonly repeatItem?: unknown }) => {
 		if (residue.kind === 'repeat-item') return readPath(context.repeatItem, residue.path);
-		if (residue.kind === 'graph-read') return readPath(values.get(residue.graphNodeId), residue.path);
+		if (residue.kind === 'graph-read')
+			return readPath(values.get(residue.graphNodeId), residue.path);
 		return evaluateExpression(residue.source, scope);
 	};
 
@@ -178,11 +219,13 @@ function childProps(
 	values: ReadonlyMap<string, unknown>,
 	scope: Readonly<Record<string, unknown>>,
 ): Record<string, unknown> {
-	return Object.fromEntries(edge.props.map((prop) => {
-		if (prop.kind === 'graph-reference' && prop.graphNodeId)
-			return [prop.name, readPath(values.get(prop.graphNodeId), prop.path ?? [])];
-		return [prop.name, evaluateExpression(prop.source, scope)];
-	}));
+	return Object.fromEntries(
+		edge.props.map((prop) => {
+			if (prop.kind === 'graph-reference' && prop.graphNodeId)
+				return [prop.name, readPath(values.get(prop.graphNodeId), prop.path ?? [])];
+			return [prop.name, evaluateExpression(prop.source, scope)];
+		}),
+	);
 }
 
 function resolveChildModule(
@@ -190,8 +233,10 @@ function resolveChildModule(
 	edge: SemanticComponentEdge,
 	modules: ReadonlyMap<string, DemoModule>,
 ): DemoModule {
-	const filename = resolve(dirname(parent.filename), edge.importSource ?? '')
-		.replace(`${process.cwd()}/`, '');
+	const filename = resolve(dirname(parent.filename), edge.importSource ?? '').replace(
+		`${process.cwd()}/`,
+		'',
+	);
 	const child = modules.get(filename);
 	if (!child) throw new Error(`Missing shadow module ${filename}`);
 	return child;
@@ -206,16 +251,18 @@ async function currentEmitterOutput(
 		readonly values?: Record<string, unknown>;
 	} = {},
 ): Promise<{ readonly html: string; readonly view: ProtocolViewPayload }> {
-	const childArtifacts = await Promise.all(module.compiled.semanticGraph.componentEdges.map(async (edge) => {
-		const child = resolveChildModule(module, edge, modules);
-		return {
-			edge,
-			artifact: {
-				renderSsr: (props?: Record<string, unknown>, renderContext?: unknown) =>
-					currentEmitterOutput(child, modules, { props, renderContext }),
-			},
-		};
-	}));
+	const childArtifacts = await Promise.all(
+		module.compiled.semanticGraph.componentEdges.map(async (edge) => {
+			const child = resolveChildModule(module, edge, modules);
+			return {
+				edge,
+				artifact: {
+					renderSsr: (props?: Record<string, unknown>, renderContext?: unknown) =>
+						currentEmitterOutput(child, modules, { props, renderContext }),
+				},
+			};
+		}),
+	);
 	const globalScope = globalThis as Record<string, unknown>;
 	const cleanup: string[] = [];
 	let source = module.compiled.publicRenderModule.ssrModuleSource;
@@ -233,19 +280,31 @@ async function currentEmitterOutput(
 	cleanup.push(fetchName);
 	source = source
 		.replace(/import \{ PageProps \} from "@markless\/router";\n/, '')
-		.replace(/import \{ fetchLocalUpdates \} from [^;]+;/, `const fetchLocalUpdates = globalThis.${fetchName};`)
-		.replace(/import \{ installYouTubeController \} from [^;]+;/, 'const installYouTubeController = () => {};')
-		.replace(/from '@markless\/web\/fns\/([^']+)'/g, (_match, helper: string) =>
-			`from '${pathToFileURL(resolve(`packages/web/src/fns/${helper}.ts`)).href}'`);
+		.replace(
+			/import \{ fetchLocalUpdates \} from [^;]+;/,
+			`const fetchLocalUpdates = globalThis.${fetchName};`,
+		)
+		.replace(
+			/import \{ installYouTubeController \} from [^;]+;/,
+			'const installYouTubeController = () => {};',
+		)
+		.replace(
+			/from '@markless\/web\/fns\/([^']+)'/g,
+			(_match, helper: string) =>
+				`from '${pathToFileURL(resolve(`packages/web/src/fns/${helper}.ts`)).href}'`,
+		);
 	const testSource = [
 		`const payloadState = ${JSON.stringify(module.compiled.protocolState)};`,
 		`const payloadView = ${JSON.stringify(module.compiled.protocolView)};`,
+		`const marklessRenderData = ${JSON.stringify(module.compiled.renderData)};`,
 		source,
 		'export { marklessRenderSsr };',
 	].join('\n');
 
 	try {
-		const loaded = await import(`data:text/javascript;charset=utf-8,${encodeURIComponent(testSource)}`) as {
+		const loaded = (await import(
+			`data:text/javascript;charset=utf-8,${encodeURIComponent(testSource)}`
+		)) as {
 			readonly marklessRenderSsr: (
 				props?: Record<string, unknown>,
 				renderContext?: unknown,
@@ -259,7 +318,8 @@ async function currentEmitterOutput(
 
 function readPath(value: unknown, path: ReadonlyArray<string>): unknown {
 	let current = value;
-	for (const key of path) current = (current as Record<string, unknown> | null | undefined)?.[key];
+	for (const key of path)
+		current = (current as Record<string, unknown> | null | undefined)?.[key];
 	return current;
 }
 
