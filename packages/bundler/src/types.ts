@@ -66,6 +66,14 @@ export type MarklessModuleLinkArtifact = Pick<
 
 export interface MarklessTransformManifest {
 	source: string;
+	csrNativeMarkup?: ReadonlyArray<{
+		readonly dataId: string;
+		readonly definition: Readonly<Record<string, unknown>>;
+		readonly templates: ReadonlyArray<{
+			readonly id: string;
+			readonly markup: string;
+		}>;
+	}>;
 	captureMetadata?: import('@markless/compiler').CaptureAnalysisArtifact;
 	symbolRoutes?: ReadonlyArray<{
 		readonly prefix: string;

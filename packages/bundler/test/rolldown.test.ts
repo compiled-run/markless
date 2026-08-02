@@ -312,12 +312,12 @@ let active = state(true);
 		expect(result.code).toContain('export function App()');
 		expect(result.code).toContain('renderCsr: App');
 		expect(result.code).toContain('export default marklessCompiledApp;');
-		expect(result.code).toContain('<main><section></section><footer>Done</footer></main>');
-		expect(result.code).toContain('syncMarklessPublicRepeat0');
+		expect(result.code).toContain('<main><section><!--markless-slot:0-->');
+		expect(result.code).toContain('const marklessDirectChunkData');
+		expect(result.code).toContain('createMarklessDirectChunkRenderer(marklessDirectChunkData)');
 		expect(result.code).toContain('const graph = createMarklessPublicGraph()');
 		expect(result.code).toContain('runtime: { async dispatch() {} }');
 		expect(result.code).not.toContain('function createMarklessPublicRuntime');
-		expect(result.code).toContain('attachMarklessPublicStaticEvents');
 		expect(result.code).toContain('const marklessSsrState = marklessSsrComposeState'); // SSR-side alias (compose-state import dedup)
 		expect(result.code).toContain(
 			'state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots)',
@@ -328,10 +328,10 @@ let active = state(true);
 		expect(result.code).not.toContain('view: marklessPublicView');
 		expect(result.code).not.toContain('payloadView.locators.filter');
 		expect(result.code).not.toContain('marklessPublicHostNodeIndexes');
-		expect(result.code).toContain('locals: { "entry": record.item }');
-		expect(result.code).toContain('delegateMarklessPublicRepeat0Events');
-		expect(result.code).toContain('parent.addEventListener("click"');
-		expect(result.code).toContain('element0.__marklessPublicRepeat0Event0 = record;');
+		expect(result.code).toContain('"eventControls"');
+		expect(result.code).toContain('"itemName": "entry"');
+		expect(result.code).toContain('"eventName": "click"');
+		expect(result.code).toContain('"symbolId": "symbol:0"');
 		expect(result.code).not.toContain('element0.addEventListener("click"');
 		expect(result.code).not.toContain('findMarklessPublicRepeatEventRecord');
 		expect(result.code).toContain('"state:entries"');
@@ -838,6 +838,7 @@ export function App() @{
 		const parent = (await callTransform(plugin, parentSource, parentFilename)) as {
 			code: string;
 			manifest: {
+				csrNativeMarkup?: unknown;
 				captureMetadata: {
 					boundResolverRows: Array<{
 						id: string;
@@ -868,7 +869,8 @@ export function App() @{
 			['component-edge:0'],
 			['component-edge:1'],
 		]);
-		for (const row of rows) expect(parent.code).toContain(row.id);
+		const parentStartupTransport = parent.code + JSON.stringify(parent.manifest.csrNativeMarkup);
+		for (const row of rows) expect(parentStartupTransport).toContain(row.id);
 		const resolver = parent.virtualModules.find((module) => module.type === 'resolver')!;
 		expect(resolver.source).toContain(rows[0]!.loaderSymbolId);
 		const childHandlerManifest = child.manifest.symbols.find(

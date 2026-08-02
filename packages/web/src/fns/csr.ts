@@ -213,6 +213,7 @@ export function createMarklessCsrChunkRenderer(input) {
 }
 
 function renderChunkComponent(definition, props, components, idPrefix, symbolPrefix, depth, armBoundary) {
+	definition = marklessCsrNativeDefinition(definition);
 	if (depth > 32) throw new Error(`Markless CSR component recursion exceeded at ${definition.name}.`);
 	if (definition.shouldRender && !definition.shouldRender(props)) return null;
 	const chunks = new Map(definition.chunks.map((chunk) => [chunk.id, chunk]));
@@ -257,17 +258,24 @@ function renderChunkComponent(definition, props, components, idPrefix, symbolPre
 	const runtimeState = { graph: null, root: null };
 	const childOutputs = [];
 	const activeHostNodeIds = new Set();
-	const cloneChunk = (chunkId) => {
-		const chunk = chunks.get(chunkId);
-		if (!chunk) throw new Error(`Missing Markless render chunk ${chunkId}.`);
-		let template = templates.get(chunkId);
-		if (!template) {
-			template = document.createElement('template');
-			template.innerHTML = chunk.statics.join('');
-			templates.set(chunkId, template);
-		}
-		return { chunk, content: template.content.cloneNode(true) };
-	};
+		const cloneChunk = (chunkId) => {
+			const chunk = chunks.get(chunkId);
+			if (!chunk) throw new Error(`Missing Markless render chunk ${chunkId}.`);
+			let template = templates.get(chunkId);
+			if (!template) {
+				template = chunk.nativeTemplateId
+					? document.getElementById?.(chunk.nativeTemplateId)
+					: undefined;
+				if (!template) {
+					// Test-only/backward-compatible definitions may still provide inline
+					// statics. Compiler output always supplies a browser-parsed template.
+					template = document.createElement('template');
+					template.innerHTML = chunk.statics.join('');
+				}
+				templates.set(chunkId, template);
+			}
+			return { chunk, content: template.content.cloneNode(true) };
+		};
 
 	const renderChunk = (chunkId, locals = {}, armBoundary = false) => {
 		const cloned = cloneChunk(chunkId);
@@ -645,11 +653,27 @@ function renderChunkComponent(definition, props, components, idPrefix, symbolPre
 	return output;
 }
 
+const marklessCsrNativeDefinitions = new Map();
+
+function marklessCsrNativeDefinition(shell) {
+	if (!shell.dataId) return shell;
+	let definition = marklessCsrNativeDefinitions.get(shell.dataId);
+	if (!definition) {
+		const script = document.getElementById?.(shell.dataId);
+		if (script) definition = JSON.parse(script.textContent ?? '');
+		else if (shell.nativeFallback) return { ...shell.nativeFallback(), ...shell };
+		else throw new Error(`Missing Markless CSR native data ${shell.dataId}.`);
+		marklessCsrNativeDefinitions.set(shell.dataId, definition);
+	}
+	return { ...definition, ...shell };
+}
+
 // Components reachable only through an inactive branch/async arm still own
 // graph definitions that must exist before that arm commits. Build those
 // definitions and symbol routes from compiler data only: no component body or
 // DOM chunk runs here.
 function marklessCsrDeferredChunkOutput(definition, components, depth) {
+	definition = marklessCsrNativeDefinition(definition);
 	if (depth > 32) throw new Error(`Markless CSR component recursion exceeded at ${definition.name}.`);
 	const children = (definition.edges ?? []).flatMap((edge) => {
 		const childDefinition = definition.getComponent?.(edge.childComponentName) ?? components[edge.childComponentName];
@@ -807,7 +831,7 @@ function marklessCsrChunkChildProps(edge, read, locals, getValues, runtimeState,
 }
 
 function marklessCsrChunkState(definition, props, initial, children) {
-	const source = definition.getState?.() ?? { version: 1, cells: [], computed: [] };
+	const source = definition.state ?? definition.getState?.() ?? { version: 1, cells: [], computed: [] };
 	const owned = new Set(definition.stateGraphNodeIds ?? []);
 	const cells = (source.cells ?? [])
 		.filter((cell) => owned.has(cell.graphNodeId))
@@ -840,7 +864,7 @@ function marklessCsrChunkState(definition, props, initial, children) {
 }
 
 function marklessCsrChunkView(definition, placements, children, idPrefix, symbolPrefix, active) {
-	const source = definition.getView?.() ?? {};
+	const source = definition.view ?? definition.getView?.() ?? {};
 	const hostIds = active?.hostNodeIds ?? new Set(definition.hostNodeIds ?? []);
 	const repeatIds = active?.repeatIds ?? new Set(definition.repeatIds ?? []);
 	const branchIds = active?.branchIds ?? new Set(definition.branchIds ?? []);

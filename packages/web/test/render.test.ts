@@ -85,8 +85,36 @@ function event(type: string, target: FakeElement): FakeEvent {
 	return { type, target };
 }
 
-function captureDispatchDocument() {
-	return {
+function captureDispatchDocument(
+	nativePayloads: ReadonlyArray<{
+		readonly dataId: string;
+		readonly definition: Readonly<Record<string, unknown>>;
+		readonly templates: ReadonlyArray<{ readonly id: string; readonly markup: string }>;
+	}> = [],
+) {
+	const definitions = new Map(nativePayloads.map((payload) => [payload.dataId, payload.definition]));
+	const templates = new Map(
+		nativePayloads.flatMap((payload) =>
+			payload.templates.map((template) => [template.id, template.markup] as const),
+		),
+	);
+	const nativeNodes = new Map<string, unknown>();
+	const document = {
+		getElementById(id: string) {
+			let node = nativeNodes.get(id);
+			if (node) return node;
+			const definition = definitions.get(id);
+			if (definition) node = { textContent: JSON.stringify(definition) };
+			else {
+				const markup = templates.get(id);
+				if (markup !== undefined) {
+					node = document.createElement('template');
+					(node as { innerHTML: string }).innerHTML = markup;
+				}
+			}
+			if (node) nativeNodes.set(id, node);
+			return node;
+		},
 		createTextNode(value: string) {
 			return captureDispatchText(value);
 		},
@@ -138,6 +166,7 @@ function captureDispatchDocument() {
 			};
 		},
 	};
+	return document;
 }
 
 function serializeCaptureDispatchNode(node: FakeElement): string {
@@ -582,7 +611,9 @@ async function withCompiledCaptureDispatch(
 
 	const global = globalThis as { document?: unknown };
 	const previousDocument = global.document;
-	global.document = captureDispatchDocument();
+	global.document = captureDispatchDocument(
+		await captureDispatchNativeMarkup(transformed, options.imports ?? []),
+	);
 	try {
 		const browserModule = (await import(javascriptModuleUrl(browserModuleSource))) as {
 			readonly default: {
@@ -616,6 +647,23 @@ async function withCompiledCaptureDispatch(
 	}
 }
 
+async function captureDispatchNativeMarkup(
+	transformed: Awaited<ReturnType<typeof transformCaptureDispatchModule>>,
+	imports: ReadonlyArray<CaptureDispatchImport>,
+): Promise<NonNullable<typeof transformed.manifest.csrNativeMarkup>[number][]> {
+	const children = await Promise.all(
+		imports.map(async (imported) => {
+			const child = await transformCaptureDispatchModule(
+				imported.filename,
+				imported.source,
+				imported.imports,
+			);
+			return captureDispatchNativeMarkup(child, imported.imports ?? []);
+		}),
+	);
+	return [...(transformed.manifest.csrNativeMarkup ?? []), ...children.flat()];
+}
+
 async function withCompiledCaptureResume(
 	filename: string,
 	source: string,
@@ -630,9 +678,12 @@ async function withCompiledCaptureResume(
 		captureDispatchModuleUrl(filename, source, imports, 'client'),
 		captureDispatchModuleUrl(filename, source, imports, 'server'),
 	]);
+	const clientTransformed = await transformCaptureDispatchModule(filename, source, imports);
 	const global = globalThis as { document?: unknown };
 	const previousDocument = global.document;
-	global.document = captureDispatchDocument();
+	global.document = captureDispatchDocument(
+		await captureDispatchNativeMarkup(clientTransformed, imports),
+	);
 	try {
 		const clientModule = (await import(clientUrl)) as {
 			readonly default: { readonly renderCsr: () => CompiledCaptureDispatch['output'] };
@@ -1087,7 +1138,7 @@ export function App() @{
 
 	const global = globalThis as { document?: unknown };
 	const previousDocument = global.document;
-	global.document = captureDispatchDocument();
+	global.document = captureDispatchDocument(transformed.manifest.csrNativeMarkup ?? []);
 	try {
 		const browserModule = (await import(javascriptModuleUrl(browserModuleSource))) as {
 			readonly default: { readonly renderCsr: () => {

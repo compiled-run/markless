@@ -125,6 +125,7 @@ export function emitSourceModule(input: {
 	readonly publicRenderModuleSource: string;
 	readonly publicRenderRootExportName: string | null;
 	readonly publicCsrModuleSource: string;
+	readonly nativeCsr?: boolean;
 	readonly publicRenderCsrExportName: string | null;
 	readonly publicSsrModuleSource: string;
 	readonly publicRenderSsrExportName: string | null;
@@ -135,7 +136,7 @@ export function emitSourceModule(input: {
 	const symbolsOnly = input.environment === 'client' && input.clientOutput === 'symbols-only';
 	const routeSymbols = input.environment === 'client' && input.symbolRoutes.length > 0;
 	return [
-		symbolsOnly
+		symbolsOnly || (input.environment === 'client' && input.nativeCsr)
 			? ''
 			: `import { state as payloadState, view as payloadView, runtimeDemandMap as payloadRuntimeDemandMap } from '${input.payloadId}';`,
 		'',
@@ -145,8 +146,8 @@ export function emitSourceModule(input: {
 			: '',
 		routeSymbols ? 'const marklessLoadLocalSymbol = loadSymbol;' : '',
 		symbolsOnly && !routeSymbols ? 'export { loadSymbol };' : '',
-		symbolsOnly ? '' : 'export { payloadView };',
-		symbolsOnly ? '' : 'export { payloadRuntimeDemandMap };',
+		symbolsOnly || (input.environment === 'client' && input.nativeCsr) ? '' : 'export { payloadView };',
+		symbolsOnly || (input.environment === 'client' && input.nativeCsr) ? '' : 'export { payloadRuntimeDemandMap };',
 		// Dev only: re-export the resume entry from the virtual resume module so the
 		// inline resumer can import THIS source module (keeping the .tsrx in the client
 		// module graph — vite's no-accepting-boundary full-reload depends on it).

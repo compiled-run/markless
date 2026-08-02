@@ -77,6 +77,7 @@ export async function transformTsrxModule(
 		resolverId,
 	);
 	throwIfBlocked(input, blockingDiagnostics);
+	const csrNative = extractCsrNativeMarkup(compiled.publicRenderModule.csrModuleSource);
 	const symbolRows = compiled.symbolModules.modules.map((module) => ({
 		id: module.symbolId,
 		chunk: symbolVirtualModuleId(input.filename, module.symbolId),
@@ -102,6 +103,7 @@ export async function transformTsrxModule(
 		input.executionLogModuleHooks === false ? 'never' : input.executionLog;
 	const manifest: MarklessTransformManifest = {
 		source: input.filename,
+		...(csrNative.payloads.length > 0 ? { csrNativeMarkup: csrNative.payloads } : {}),
 		captureMetadata: compiled.captureAnalysis,
 		symbolRoutes,
 		payload: { virtualModuleId: payloadId },
@@ -236,7 +238,8 @@ export async function transformTsrxModule(
 					resumeModuleUrl: input.resumeModuleUrl,
 					publicRenderModuleSource: compiled.publicRenderModule.moduleSource,
 					publicRenderRootExportName: compiled.publicRenderModule.rootExportName,
-					publicCsrModuleSource: compiled.publicRenderModule.csrModuleSource,
+					publicCsrModuleSource: csrNative.source,
+					nativeCsr: csrNative.payloads.length > 0,
 					publicRenderCsrExportName: compiled.publicRenderModule.csrExportName,
 					publicSsrModuleSource: compiled.publicRenderModule.ssrModuleSource,
 					publicRenderSsrExportName: compiled.publicRenderModule.ssrExportName,
@@ -251,6 +254,24 @@ export async function transformTsrxModule(
 		moduleGraphInterface: compiled.moduleGraphInterface,
 		moduleImports: compiled.semanticGraph.moduleImports,
 	};
+}
+
+const CSR_NATIVE_MARKER =
+	/\/\*MARKLESS_CSR_NATIVE_START:([\s\S]*?):MARKLESS_CSR_NATIVE_END\*\//g;
+
+function extractCsrNativeMarkup(source: string): {
+	readonly source: string;
+	readonly payloads: NonNullable<MarklessTransformManifest['csrNativeMarkup']>;
+} {
+	const payloads: Array<NonNullable<MarklessTransformManifest['csrNativeMarkup']>[number]> = [];
+	const executableSource = source.replace(CSR_NATIVE_MARKER, (_marker, encoded: string) => {
+		const parsed = JSON.parse(decodeURIComponent(encoded)) as NonNullable<
+			MarklessTransformManifest['csrNativeMarkup']
+		>;
+		payloads.push(...parsed);
+		return '';
+	}).replace(/\/\*MARKLESS_CSR_TEST_START\*\/[\s\S]*?\/\*MARKLESS_CSR_TEST_END\*\//g, '');
+	return { source: executableSource, payloads };
 }
 
 export async function compileTsrxModuleLinkArtifact(

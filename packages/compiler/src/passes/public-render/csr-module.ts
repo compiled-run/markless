@@ -44,6 +44,11 @@ export function emitPublicCsrRenderModule(
 
 	const componentNames = new Set(input.semanticGraph.components.map((component) => component.name));
 	const callbacks = callbackSymbolIds(input);
+	const nativePayloads: Array<{
+		readonly dataId: string;
+		readonly definition: Record<string, unknown>;
+		readonly templates: ReadonlyArray<{ readonly id: string; readonly markup: string }>;
+	}> = [];
 	const componentInvocations = new Map<number, AnyNode>();
 	walkNode(ast, (node) => {
 		if (node.type === 'JSXElement' && typeof node.start === 'number')
@@ -80,7 +85,7 @@ export function emitPublicCsrRenderModule(
 					...(prop.kind === 'callback'
 						? { symbolId: callbacks.get(`${edge.id}:${prop.name}`) }
 						: {}),
-					source: prop.source,
+					...(prop.kind === 'callback' ? {} : { source: prop.source }),
 				})),
 			}));
 		const hostNodeIds = new Set(chunks.flatMap((chunk) => chunk.hosts.map((host) => host.hostNodeId)));
@@ -142,34 +147,52 @@ export function emitPublicCsrRenderModule(
 				return symbol ? [[initial.graphNodeId, symbol.kind]] : [];
 			}),
 		);
+		const dataId = `markless-csr-data:${encodeURIComponent(input.source.filename)}:${encodeURIComponent(componentName)}`;
+        const nativeChunks = chunks.map(({ statics: _statics, ...chunk }) => ({
+			...chunk,
+			nativeTemplateId: `${dataId}:template:${encodeURIComponent(chunk.id)}`,
+		}));
+		const definitionData = {
+			name: componentName,
+			state: input.protocolState,
+			view: input.protocolView,
+			rootChunkId: rootChunk.id,
+			chunks: nativeChunks,
+			hostNodeIds: [...hostNodeIds],
+			branchIds: [...branchIds],
+			boundaryIds: [...boundaryIds],
+			repeatIds: [...repeatIds],
+			initialValues: input.renderData.initialValues,
+			initialValueSources,
+			initialValueKinds,
+			stateGraphNodeIds,
+			branches: input.renderData.branches.filter((branch) => branchIds.has(branch.branchSiteId)),
+			repeats: input.renderData.repeats.filter((repeat) => repeatIds.has(repeat.repeatId)),
+			boundaries: input.renderData.boundaries.filter((boundary) => boundaryIds.has(boundary.boundaryId)),
+			edges,
+			propCellId: input.semanticGraph.components.find((component) => component.name === componentName)
+				? componentNode
+					? componentPropCellId(componentNode)
+					: null
+				: null,
+			ownsModuleData: componentName === rootInfo.componentName,
+		};
+		nativePayloads.push({
+			dataId,
+			definition: definitionData,
+			templates: chunks.map((chunk, index) => ({
+				id: nativeChunks[index]!.nativeTemplateId,
+				markup: chunk.statics.join(''),
+			})),
+		});
 		return [
 			`${JSON.stringify(componentName)}: {` +
 				`name:${JSON.stringify(componentName)},` +
-				`rootChunkId:${JSON.stringify(rootChunk.id)},` +
-				`chunks:${JSON.stringify(chunks)},` +
-				`hostNodeIds:${JSON.stringify([...hostNodeIds])},` +
-				`branchIds:${JSON.stringify([...branchIds])},` +
-				`boundaryIds:${JSON.stringify([...boundaryIds])},` +
-				`repeatIds:${JSON.stringify([...repeatIds])},` +
-				`initialValues:${JSON.stringify(input.renderData.initialValues)},` +
-				`initialValueSources:${JSON.stringify(initialValueSources)},` +
-				`initialValueKinds:${JSON.stringify(initialValueKinds)},` +
-				`stateGraphNodeIds:${JSON.stringify(stateGraphNodeIds)},` +
-				`branches:${JSON.stringify(input.renderData.branches.filter((branch) => branchIds.has(branch.branchSiteId)))},` +
-				`repeats:${JSON.stringify(input.renderData.repeats.filter((repeat) => repeatIds.has(repeat.repeatId)))},` +
-				`boundaries:${JSON.stringify(input.renderData.boundaries.filter((boundary) => boundaryIds.has(boundary.boundaryId)))},` +
-				`edges:${JSON.stringify(edges)},` +
+				`dataId:${JSON.stringify(dataId)},` +
+				`/*MARKLESS_CSR_TEST_START*/nativeFallback:()=>(${JSON.stringify({ ...definitionData, chunks })}),/*MARKLESS_CSR_TEST_END*/` +
 				'getComponent:(name)=>marklessCsrAllChunkComponents[name],' +
 				(guard ? `shouldRender:(props)=>{${destructureProps(componentPropNames(componentNode!), componentNode!).trim()}return !(${guard});},` : '') +
-				`propCellId:${JSON.stringify(
-					input.semanticGraph.components.find((component) => component.name === componentName)
-						? componentNode
-							? componentPropCellId(componentNode)
-							: null
-						: null,
-				)},` +
-				`ownsModuleData:${String(componentName === rootInfo.componentName)},` +
-				`getState:()=>payloadState,getView:()=>payloadView,loadSymbol,` +
+				`loadSymbol,` +
 				`createValues:${emitValueFactory(input, valueSources, componentNode && componentRoot ? { component: componentNode, componentName, root: componentRoot, propNames: componentPropNames(componentNode) } : null)}` +
 				`}`,
 		];
@@ -186,6 +209,7 @@ export function emitPublicCsrRenderModule(
 		registry,
 		`const marklessRenderCsrChunks = createMarklessCsrChunkRenderer({ rootComponentName: ${JSON.stringify(rootInfo.componentName)}, components: marklessCsrAllChunkComponents });`,
 		'function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); }',
+		`/*MARKLESS_CSR_NATIVE_START:${encodeURIComponent(JSON.stringify(nativePayloads))}:MARKLESS_CSR_NATIVE_END*/`,
 	].join('\n');
 
 	return [
@@ -208,7 +232,9 @@ function componentValueSources(
 	input: PublicRenderModuleInput,
 	componentName: string,
 	chunks: PublicRenderModuleInput['renderData']['chunks'],
-	edges: ReadonlyArray<{ readonly props: ReadonlyArray<{ readonly source: string }> }>,
+	edges: ReadonlyArray<{
+		readonly props: ReadonlyArray<{ readonly kind: string; readonly source?: string }>;
+	}>,
 ): string[] {
 	const sources = new Set<string>();
 	for (const chunk of chunks) {
@@ -229,7 +255,9 @@ function componentValueSources(
 			)
 		)
 			sources.add(branch.testSource);
-	for (const edge of edges) for (const prop of edge.props) sources.add(prop.source);
+	for (const edge of edges)
+		for (const prop of edge.props)
+			if (prop.kind !== 'callback' && prop.source) sources.add(prop.source);
 	for (const initial of input.renderData.initialValues) {
 		if (initial.value.kind !== 'symbol-function') continue;
 		const symbol = input.symbolResolver.symbols.find(

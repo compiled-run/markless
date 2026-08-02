@@ -34,7 +34,7 @@ test('CSR module seeds the prop:props cell from the renderCsr props argument', a
 	const result = await compilePage('{ params }');
 	const csrModule = result.publicRenderModule.csrModuleSource;
 
-	expect(csrModule).toContain('propCellId:"prop:props"');
+	expect(csrModule).toContain('"propCellId":"prop:props"');
 });
 
 test('CSR module seeds an identifier-parameter page under its prop:<name> cell', async () => {
@@ -52,7 +52,7 @@ export default function Page(pageProps) @{
 		symbols: [],
 	});
 
-	expect(result.publicRenderModule.csrModuleSource).toContain('propCellId:"prop:pageProps"');
+	expect(result.publicRenderModule.csrModuleSource).toContain('"propCellId":"prop:pageProps"');
 });
 
 test('pages without props emit no prop cell seeding', async () => {

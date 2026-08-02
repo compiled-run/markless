@@ -2,6 +2,7 @@ import type { InputOptions, Plugin } from 'rolldown';
 import { dirname, isAbsolute, resolve } from 'pathe';
 import { joinURL, parsePath, withQuery, withoutLeadingSlash } from 'ufo';
 import { type MarklessBuildMetadataBundle, createBuildMetadata } from './build/build-metadata.ts';
+import { injectCsrNativeMarkup } from './build/csr-native-markup.ts';
 import { MARKLESS_BUILD_PREFIX, MARKLESS_BUNDLE_GRAPH, outputDefaults } from './build/chunking.ts';
 import {
 	MARKLESS_EXECUTION_SIZES,
@@ -471,6 +472,8 @@ export function createMarklessRolldownPlugin(input: {
 					validateImportedChild(child, transformManifests);
 				}
 				if (getEnvironment(this) !== 'client') return;
+
+				injectCsrNativeMarkup(bundle, transformManifests.values());
 
 				stripEmptyPreloadWrappersFromChunks(bundle);
 				const removedSymbolFacades = rewriteGeneratedSymbolFacadeImports(bundle);
