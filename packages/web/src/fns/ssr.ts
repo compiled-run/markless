@@ -324,9 +324,18 @@ function marklessSsrUnbindLocalView(view, localHostIds) {
 
 export function marklessSsrComposeView(structure, view, children, asyncSnapshots, idPrefix = '') {
 	const renderedHostIds = new Set(structure.locators.map((locator) => locator.hostNodeId));
+	const plannedArmHostIds = new Set(
+		(view.asyncBoundaries ?? []).flatMap((boundary) =>
+			Array.isArray(boundary.armRecords)
+				? boundary.armRecords.flatMap((arm) =>
+						(arm.locators ?? []).map((locator) => locator.hostNodeId),
+					)
+				: [],
+		),
+	);
 	const localHostIds = new Set(
-		view.locators.flatMap((locator) =>
-			renderedHostIds.has(idPrefix + locator.hostNodeId) ? [locator.hostNodeId] : [],
+		[...view.locators.map((locator) => locator.hostNodeId), ...plannedArmHostIds].flatMap(
+			(hostNodeId) => renderedHostIds.has(idPrefix + hostNodeId) ? [hostNodeId] : [],
 		),
 	);
 	const childData = children
@@ -376,7 +385,7 @@ export function marklessSsrComposeView(structure, view, children, asyncSnapshots
 	const armizedBoundaries = marklessSsrArmizeBoundaries(
 		structure,
 		marklessSsrResolveAnchorRecords(structure, 'async', asyncBoundaries, idPrefix),
-		{ locators, events, behaviors, elementHandles },
+		{ locators, events, behaviors, elementHandles, keyedRepeats },
 		asyncSnapshots,
 		idPrefix,
 	);
@@ -464,6 +473,31 @@ export function marklessSsrArmizeBoundaries(structure, boundaries, streams, asyn
 					? ASYNC_BOUNDARY_ARM.catch
 					: ASYNC_BOUNDARY_ARM.pending;
 		const planned = boundary.armRecords[takenArm] ?? {};
+		const renderedArmLocators = new Map();
+		for (const locator of structure.locators) {
+			if (locator.index < opensStart || locator.index >= opensEnd) continue;
+			if (!renderedArmLocators.has(locator.hostNodeId))
+				renderedArmLocators.set(locator.hostNodeId, locator);
+		}
+		for (const locator of planned.locators ?? []) {
+			const rendered = renderedArmLocators.get(idPrefix + locator.hostNodeId);
+			if (!rendered) continue;
+			if (armLocators.some((candidate) => candidate.hostNodeId === locator.hostNodeId)) continue;
+			armLocators.push({
+				...locator,
+				strategy: 'arm-relative',
+				index: rendered.index - opensStart,
+				tagName: rendered.tagName,
+			});
+		}
+		armLocators.sort((left, right) => left.index - right.index);
+		const completeArmHostIds = new Set(armLocators.map((locator) => locator.hostNodeId));
+		const movedKeyedRepeats = [];
+		for (let i = (streams.keyedRepeats ?? []).length - 1; i >= 0; i--) {
+			if (completeArmHostIds.has(streams.keyedRepeats[i].parentHostNodeId))
+				movedKeyedRepeats.unshift(...streams.keyedRepeats.splice(i, 1));
+		}
+		const keyedRepeats = [...(planned.keyedRepeats ?? []), ...movedKeyedRepeats];
 		return {
 			...boundary,
 			initiallyServedArm: takenArm,
@@ -472,6 +506,7 @@ export function marklessSsrArmizeBoundaries(structure, boundaries, streams, asyn
 				events: [...(planned.events ?? []), ...moved.events],
 				behaviors: [...(planned.behaviors ?? []), ...moved.behaviors],
 				elementHandles: [...(planned.elementHandles ?? []), ...moved.elementHandles],
+				...(keyedRepeats.length > 0 ? { keyedRepeats } : {}),
 				// Arm-scoped branch records (flips + escalations) ride the taken
 				// arm's planned set; resume resolves their anchors arm-locally.
 				branches: planned.branches ?? [],

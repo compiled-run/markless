@@ -125,6 +125,16 @@ test('async boundary armRecords round-trip payload scripts in both protocol shap
 		events: [{ hostNodeId: 'h3', eventName: 'click', symbolIds: ['symbol:3'] }],
 		behaviors: [],
 		elementHandles: [],
+		keyedRepeats: [{
+			id: 'repeat:rows',
+			parentHostNodeId: 'h3',
+			collectionGraphNodeId: 'computed:rows',
+			collectionPath: [],
+			keyPath: ['id'],
+			itemName: 'row',
+			rowElementCount: 1,
+			rowEvents: [{ hostPath: [], eventName: 'click', symbolIds: ['symbol:row'] }],
+		}],
 		branches: [],
 	};
 	const boundaryBase = {

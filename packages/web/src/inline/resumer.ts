@@ -440,7 +440,12 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 		...view.asyncBoundaries.flatMap((boundary) => {
 			const armRecords = boundary.armRecords;
 			return armRecords && !Array.isArray(armRecords)
-				? (armRecords.events ?? []).map((event) => event.eventName)
+				? [
+						...(armRecords.events ?? []).map((event) => event.eventName),
+						...(armRecords.keyedRepeats ?? []).flatMap((repeat) =>
+							repeat.rowEvents.map((event) => event.eventName),
+						),
+					]
 				: [];
 		}),
 	]);
