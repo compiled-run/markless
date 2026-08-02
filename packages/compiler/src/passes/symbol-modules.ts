@@ -193,6 +193,17 @@ function emitSymbolModule(
 		];
 	}
 
+	if (symbol.kind === 'state-initializer') {
+		return [
+			{
+				symbolId: symbol.id,
+				kind: symbol.kind,
+				exportName: symbolExportName(symbol.id),
+				source: emitStateInitializerModule(symbol),
+			},
+		];
+	}
+
 	if (symbol.kind === 'sync-computed-derive') {
 		return [
 			{
@@ -1105,6 +1116,23 @@ function emitAsyncComputedRunnerModule(
 		...dependencyDeclarations,
 		`	const run = ${symbol.source};`,
 		'	return run({ key: context.key, signal: context.signal, read });',
+		'}',
+		'',
+	].join('\n');
+}
+
+function emitStateInitializerModule(
+	symbol: Extract<PlannedSymbol, { readonly kind: 'state-initializer' }>,
+): string {
+	const exportName = symbolExportName(symbol.id);
+	const imports = uniqueModuleImports(symbol.moduleImports ?? []);
+	return [
+		...imports.map(emitModuleImport),
+		...(imports.length > 0 ? [''] : []),
+		`export const authoredSource = ${JSON.stringify(symbol.source)};`,
+		'',
+		`export function ${exportName}() {`,
+		`\treturn (${symbol.source});`,
 		'}',
 		'',
 	].join('\n');

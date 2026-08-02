@@ -1,5 +1,10 @@
 import { expect, test } from 'vitest';
-import { buildSemanticGraph, compileTsrxModule, lowerStateAccess } from '../src/index.ts';
+import {
+	buildSemanticGraph,
+	compileTsrxModule,
+	createRenderData,
+	lowerStateAccess,
+} from '../src/index.ts';
 import { planPayloadArena } from '../src/passes/payload-arena.ts';
 import { createProtocolViewPayload } from '../src/passes/protocol-view.ts';
 import { planPublicRender } from '../src/passes/public-render/plan.ts';
@@ -54,7 +59,13 @@ async function planFixture(filename: string, source: string) {
 		payloadArena,
 		symbolResolver,
 	});
-	return { semanticGraph, payloadArena, symbolResolver, plan };
+	return {
+		semanticGraph,
+		payloadArena,
+		symbolResolver,
+		renderData: createRenderData({ semanticGraph, symbolResolver }),
+		plan,
+	};
 }
 
 test('an @if inside an @try arm plans a real flip: armFlip gate + arm-scoped branch arms with repeat parts', async () => {
@@ -96,13 +107,14 @@ test('an @if inside an @try arm plans a real flip: armFlip gate + arm-scoped bra
 });
 
 test('protocol view nests the arm-scoped flip record under the boundary in an arm-local anchor space', async () => {
-	const { payloadArena, symbolResolver, plan } = await planFixture(
+	const { payloadArena, symbolResolver, renderData, plan } = await planFixture(
 		'src/DrawerMenu.tsrx',
 		menuShapedSource,
 	);
 	const view = createProtocolViewPayload({
 		payloadArena,
 		symbolResolver,
+		renderData,
 		publicRenderPlan: plan,
 	});
 

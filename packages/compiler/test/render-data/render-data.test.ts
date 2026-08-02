@@ -131,7 +131,7 @@ export function App() @{
 	);
 });
 
-test('renderData keeps the repeat trailing-sibling landmine visible while the public plan rejects it', async () => {
+test('renderData keeps the repeat trailing-sibling content and the legacy emitter fails the build loudly', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/RepeatLandmine.tsrx',
 		source: `
@@ -150,7 +150,7 @@ export function App() @{
 	expect(result.publicRenderPlan.diagnostics).toContainEqual(
 		expect.objectContaining({
 			code: 'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
-			severity: 'warning',
+			severity: 'error',
 		}),
 	);
 	expect(result.publicRenderPlan.rootTemplateHtml).toContain('<li>Trailing</li>');
@@ -162,7 +162,7 @@ export function App() @{
 	expect(root?.statics.join('')).toContain('<li>Trailing</li>');
 });
 
-test('renderData keeps a same-file child async chunk visible while the public plan pins the drop', async () => {
+test('renderData keeps a same-file child async chunk visible while the legacy emitter fails loudly', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/AsyncChildLandmine.tsrx',
 		source: `
@@ -179,7 +179,7 @@ export function App() @{ <main><Child /></main> }
 	expect(result.publicRenderPlan.diagnostics).toContainEqual(
 		expect.objectContaining({
 			code: 'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
-			severity: 'warning',
+			severity: 'error',
 		}),
 	);
 	expect(result.publicRenderPlan.rootTemplateHtml).toBe('<main></main>');
@@ -189,4 +189,54 @@ export function App() @{ <main><Child /></main> }
 			statics: expect.arrayContaining([expect.stringContaining('<strong>')]),
 		}),
 	);
+});
+
+test('renderData references non-literal state initializers and sync derives by keyed symbol', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/KeyedValues.tsrx',
+		source: `
+import { state, computed } from '@markless/core';
+import { makeSeed } from './seed.ts';
+export function App() @{
+	const seed = state(makeSeed());
+	const doubled = computed(() => seed.count * 2);
+	<output>{doubled}</output>
+}
+`,
+		symbols: [],
+	});
+
+	const initializer = result.renderData.initialValues.find(
+		(entry) => entry.graphNodeId === 'state:seed',
+	);
+	const derive = result.renderData.initialValues.find(
+		(entry) => entry.graphNodeId === 'computed:doubled',
+	);
+	expect(initializer?.value).toEqual({ kind: 'symbol-function', symbolId: expect.any(String) });
+	expect(derive?.value).toEqual({ kind: 'symbol-function', symbolId: expect.any(String) });
+	const initializerSymbolId =
+		initializer?.value.kind === 'symbol-function' ? initializer.value.symbolId : undefined;
+	expect(
+		result.symbolModules.modules.find((module) => module.symbolId === initializerSymbolId),
+	).toEqual(expect.objectContaining({ kind: 'state-initializer' }));
+});
+
+test('moduleGraphInterface publishes child chunk summaries and component inputs', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Card.tsrx',
+		source: `export function Card({ title }: { title: string }) @{ <article><h2>{title}</h2></article> }`,
+		symbols: [],
+	});
+
+	expect(result.moduleGraphInterface.render).toEqual({
+		version: 1,
+		components: [
+			expect.objectContaining({
+				componentName: 'Card',
+				rootChunkId: 'template:Card',
+				childChunks: [],
+				inputs: [expect.objectContaining({ localName: 'title', path: ['title'] })],
+			}),
+		],
+	});
 });

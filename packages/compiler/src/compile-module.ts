@@ -130,10 +130,15 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 			return {
 				...pass,
 				run({ inputs }) {
+					const semanticGraph = inputs.semanticGraph as SemanticGraphArtifact;
 					return {
 						payloadArena: planPayloadArena({
-							semanticGraph: inputs.semanticGraph as SemanticGraphArtifact,
+							semanticGraph,
 							stateLowering: inputs.stateLowering as StateLoweringArtifact,
+							renderData: createRenderData({
+								semanticGraph,
+								symbolResolver: emptySymbolResolver(),
+							}),
 						}),
 					};
 				},
@@ -259,7 +264,7 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 						protocolView: createProtocolViewPayload({
 							payloadArena: inputs.payloadArena as PayloadArenaArtifact,
 							symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
-							publicRenderPlan: inputs.publicRenderPlan as PublicRenderPlanArtifact,
+							renderData: inputs.renderData as RenderDataArtifact,
 							captureAnalysis: inputs.captureAnalysis as CaptureAnalysisArtifact,
 						}),
 					};
@@ -331,6 +336,16 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 			},
 		};
 	});
+}
+
+function emptySymbolResolver(): SymbolResolverPlan {
+	return {
+		passId: 'symbol-resolver',
+		dynamicImportOwner: 'generated-symbol-resolver',
+		symbols: [],
+		syncPolicies: [],
+		diagnostics: [],
+	};
 }
 
 function sourceInput(value: unknown): CompileTsrxModuleInput {

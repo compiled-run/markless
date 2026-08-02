@@ -1,4 +1,3 @@
-import { ASYNC_BOUNDARY_ARM } from '@markless/serializer';
 import type {
 	PayloadArenaArtifact,
 	PayloadArenaInput,
@@ -14,9 +13,21 @@ import {
 	semanticAliasMap,
 	uniqueBy,
 } from '../artifact-helpers/graph-paths.ts';
-import { resolveBoundaryRunners } from './public-render/boundary-runner.ts';
+import { createRenderData } from './render-data/index.ts';
 
 export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact {
+	const renderData =
+		input.renderData ??
+		createRenderData({
+			semanticGraph: input.semanticGraph,
+			symbolResolver: {
+				passId: 'symbol-resolver',
+				dynamicImportOwner: 'generated-symbol-resolver',
+				symbols: [],
+				syncPolicies: [],
+				diagnostics: [],
+			},
+		});
 	const bindings = new Map<string, SemanticGraphBinding>();
 	const bindingsById = new Map<string, SemanticGraphBinding>();
 	const aliases = semanticAliasMap(input.semanticGraph);
@@ -83,8 +94,8 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 			graphNodeIds,
 		};
 	});
-	const locators = input.semanticGraph.hostNodes.map((hostNode, index) => ({
-		hostNodeId: hostNode.id,
+	const locators = renderData.hosts.map((hostNode, index) => ({
+		hostNodeId: hostNode.hostNodeId,
 		strategy: 'dom-order' as const,
 		index,
 		tagName: hostNode.tagName,
@@ -92,13 +103,13 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 	const behaviors = input.semanticGraph.behaviors.map((behavior) =>
 		payloadBehavior(behavior, bindings, aliases),
 	);
-	const keyedRepeats = input.semanticGraph.keyedRepeats.flatMap(
+	const keyedRepeats = renderData.repeats.flatMap(
 		(repeat): PayloadKeyedRepeat[] => {
 			if (!repeat.collectionGraphNodeId) return [];
 
 			const rowElementHandles = input.semanticGraph.elementHandleBindings.flatMap(
 				(binding) => {
-					if (binding.rowOwner?.repeatId !== repeat.id) return [];
+					if (binding.rowOwner?.repeatId !== repeat.repeatId) return [];
 					const graphBinding = resolveElementHandleBinding(
 						binding,
 						input,
@@ -116,12 +127,12 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 				},
 			);
 			const rowBehaviors = behaviors.filter((behavior) =>
-				behavior.keyedRepeatScopeIds?.includes(repeat.id),
+				behavior.keyedRepeatScopeIds?.includes(repeat.repeatId),
 			);
 
 			return [
 				{
-					id: repeat.id,
+					id: repeat.repeatId,
 					parentHostNodeId: repeat.parentHostNodeId,
 					...(repeat.rowHostNodeId ? { rowHostNodeId: repeat.rowHostNodeId } : {}),
 					collectionGraphNodeId: repeat.collectionGraphNodeId,
@@ -179,11 +190,14 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 		[
 			// Arm-scoped branch sites render as anchor-less ternaries (need 8);
 			// they must not consume comment-anchor ranks.
-			...input.semanticGraph.branchSites.filter((site) => !site.asyncBoundaryId),
-			...input.semanticGraph.asyncBoundaries,
+			...renderData.branches.filter((site) => !site.asyncBoundaryId),
+			...renderData.boundaries,
 		]
 			.sort((left, right) => left.anchorOrder - right.anchorOrder)
-			.map((record, rank) => [record.id, rank] as const),
+			.map((record, rank) => [
+				'branchSiteId' in record ? record.branchSiteId : record.boundaryId,
+				rank,
+			] as const),
 	);
 	// D3: content inside a boundary arm lives in the boundary's own coordinate
 	// space. Each arm's locators index from 0 = first element after the start
@@ -192,15 +206,14 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 	// compose step replaces them with the rendered arm's truth.
 	const boundaryArmRecords = (boundaryId: string): ReadonlyArray<PayloadArmRecordSet> =>
 		[0, 1, 2].map((arm) => {
-			const armHosts = input.semanticGraph.hostNodes.filter(
-				(hostNode) =>
-					hostNode.asyncBoundaryId === boundaryId &&
-					(hostNode.asyncBoundaryArm ?? 0) === arm,
+			const armHosts = renderData.hosts.filter(
+				(host) =>
+					host.asyncBoundaryId === boundaryId && (host.asyncBoundaryArm ?? 0) === arm,
 			);
-			const armHostIds = new Set(armHosts.map((hostNode) => hostNode.id));
+			const armHostIds = new Set(armHosts.map((hostNode) => hostNode.hostNodeId));
 			return {
 				locators: armHosts.map((hostNode, index) => ({
-					hostNodeId: hostNode.id,
+					hostNodeId: hostNode.hostNodeId,
 					strategy: 'arm-relative' as const,
 					index,
 					tagName: hostNode.tagName,
@@ -218,64 +231,23 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 				),
 			};
 		});
-	const boundaryRunners = resolveBoundaryRunners(input.semanticGraph);
-	const asyncBoundaries = input.semanticGraph.asyncBoundaries.map((boundary) => {
-		const directAsyncReads = uniqueBy(
-			[
-				...input.semanticGraph.templateReads,
-				// Keyed repeats inside the arm read their collection from the
-				// boundary's async computed — the boundary owns that read too.
-				...input.semanticGraph.keyedRepeats.map((repeat) => ({
-					source: repeat.collectionSource,
-					asyncBoundaryId: repeat.asyncBoundaryId,
-				})),
-				// Components inside the arm read the async computed through their
-				// graph-reference props (need 10).
-				...input.semanticGraph.componentEdges.flatMap((edge) =>
-					edge.props.flatMap((prop) =>
-						prop.kind === 'graph-reference'
-							? [{ source: prop.source, asyncBoundaryId: edge.asyncBoundaryId }]
-							: [],
-					),
-				),
-			].flatMap((read) => {
-				if (read.asyncBoundaryId !== boundary.id) return [];
-
-				const resolved = resolveGraphPath(read.source, bindings, aliases);
-				if (!resolved) return [];
-				if (
-					resolved.binding.kind !== 'computed' ||
-					resolved.binding.asyncCapable !== true
-				) {
-					return [];
-				}
-
-				return [
-					{
-						source: read.source,
-						graphNodeId: resolved.binding.id,
-						path: runtimeGraphReadPath(resolved.binding, resolved.path),
-					},
-				];
-			}),
-			(read) => `${read.graphNodeId}:${read.path.join('.')}:${read.source}`,
-		);
+	const asyncBoundaries = renderData.boundaries.map((boundary) => {
 		return {
-			id: boundary.id,
+			id: boundary.boundaryId,
 			kind: 'async-boundary' as const,
 			anchorOrder: boundary.anchorOrder,
-			runnerGraphNodeId: boundaryRunners.get(boundary.id)?.runnerGraphNodeId ?? null,
-			initiallyServedArm: ASYNC_BOUNDARY_ARM.pending,
-			armRecords: boundaryArmRecords(boundary.id),
+			runnerGraphNodeId: boundary.runnerGraphNodeId,
+			initiallyServedArm: boundary.initiallyServedArm,
+			armRecords: boundaryArmRecords(boundary.boundaryId),
 			startAnchor: {
 				strategy: 'dom-order-comment' as const,
-				index: (anchorRank.get(boundary.id) ?? 0) * 2,
+				index: (anchorRank.get(boundary.boundaryId) ?? 0) * 2,
 			},
 			endAnchor: {
 				strategy: 'dom-order-comment' as const,
-				index: (anchorRank.get(boundary.id) ?? 0) * 2 + 1,
+				index: (anchorRank.get(boundary.boundaryId) ?? 0) * 2 + 1,
 			},
-			asyncReads: directAsyncReads,
+			asyncReads: boundary.reads,
 		};
 	});
 	return {
@@ -304,8 +276,8 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 			),
 			elementHandles,
 			asyncBoundaries,
-			branchSites: input.semanticGraph.branchSites.map((site) => ({
-				id: site.id,
+			branchSites: renderData.branches.map((site) => ({
+				id: site.branchSiteId,
 				anchorOrder: site.anchorOrder,
 			})),
 		},

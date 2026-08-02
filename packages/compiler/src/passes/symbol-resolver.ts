@@ -129,6 +129,23 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 		});
 	}
 
+	for (const binding of input.semanticGraph.graphBindings) {
+		if (binding.kind !== 'state' || !binding.initializerSource || binding.initialValueKnown)
+			continue;
+		const moduleImports = referencedModuleImports(
+			input.semanticGraph.moduleImports,
+			binding.initializerSource,
+		);
+		symbols.push({
+			id: `symbol:${nextSymbolId++}`,
+			kind: 'state-initializer',
+			graphNodeId: binding.id,
+			name: binding.name,
+			source: binding.initializerSource,
+			...(moduleImports.length > 0 ? { moduleImports } : {}),
+		});
+	}
+
 	// Boundary settle symbols (gate-blind; protocol-view wires only boundaries
 	// with a plan arms entry).
 	const boundaryRunners = resolveBoundaryRunners(input.semanticGraph);

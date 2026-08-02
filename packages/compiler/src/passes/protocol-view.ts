@@ -1,13 +1,17 @@
 import { ASYNC_PROTOCOL_VERSION } from '@markless/serializer';
-import {
-	armScopedBranchHostIds,
-	armScopedBranchRecords,
-} from '../artifact-helpers/arm-branch-records.ts';
 import type {
 	ProtocolViewArmRecordSet,
 	ProtocolViewPayloadInput,
 	ProtocolViewPayloadWithArmRecords,
+	RenderDataArtifact,
 } from '../artifacts.ts';
+
+function renderDataOf(input: ProtocolViewPayloadInput): RenderDataArtifact {
+	if (!input.renderData) {
+		throw new Error('createProtocolViewPayload requires the registered renderData artifact.');
+	}
+	return input.renderData;
+}
 
 export function createProtocolViewPayload(
 	input: ProtocolViewPayloadInput,
@@ -188,9 +192,9 @@ function domUpdateTargetKey(
 
 function supportedAsyncBoundaries(input: ProtocolViewPayloadInput) {
 	const supported = new Set(
-		input.publicRenderPlan.asyncBoundaryGates.flatMap((gate) =>
-			gate.supported ? [gate.boundaryId] : [],
-		),
+		renderDataOf(input).boundaries
+			.filter((boundary) => boundary.protocolSupported)
+			.map((boundary) => boundary.boundaryId),
 	);
 	return input.payloadArena.view.asyncBoundaries.filter((boundary) => supported.has(boundary.id));
 }
@@ -198,9 +202,14 @@ function supportedAsyncBoundaries(input: ProtocolViewPayloadInput) {
 function supportedBranchIds(input: ProtocolViewPayloadInput): ReadonlySet<string> {
 	// armScoped branches render as anchor-less ternaries re-evaluated on arm
 	// settle (need 8): no flip records, no anchor pairs.
+	const flattenedBranchIds = preLinkFlattenedBranchIds(input);
 	return new Set(
-		(input.publicRenderPlan.branchReactivityGates ?? []).flatMap((gate) =>
-			gate.supported && gate.armScoped !== true ? [gate.branchSiteId] : [],
+		renderDataOf(input).branches.flatMap((branch) =>
+			branch.asyncBoundaryId ||
+			branch.update === 'boundary' ||
+			flattenedBranchIds.has(branch.branchSiteId)
+				? []
+				: [branch.branchSiteId],
 		),
 	);
 }
@@ -208,9 +217,9 @@ function supportedBranchIds(input: ProtocolViewPayloadInput): ReadonlySet<string
 function emittedAnchorPairs(input: ProtocolViewPayloadInput) {
 	const branchIds = supportedBranchIds(input);
 	const supportedBoundaryIds = new Set(
-		input.publicRenderPlan.asyncBoundaryGates.flatMap((gate) =>
-			gate.supported ? [gate.boundaryId] : [],
-		),
+		renderDataOf(input).boundaries
+			.filter((boundary) => boundary.protocolSupported)
+			.map((boundary) => boundary.boundaryId),
 	);
 	return [
 		...(input.payloadArena.view.branchSites ?? []).filter((site) => branchIds.has(site.id)),
@@ -231,12 +240,27 @@ function supportedBranchRecords(input: ProtocolViewPayloadInput) {
 			symbol.kind === 'branch-update' ? [[symbol.branchSiteId, symbol] as const] : [],
 		),
 	);
-	const armsBySite = new Map(
-		(input.publicRenderPlan.branchArms ?? []).map((entry) => [entry.branchSiteId, entry]),
-	);
 	return (input.payloadArena.view.branchSites ?? [])
 		.filter((site) => branchIds.has(site.id))
 		.map((site) => ({
+			...(renderDataOf(input).branches.find(
+				(branch) => branch.branchSiteId === site.id,
+			)?.armTests
+				? {
+						armTests: renderDataOf(input).branches.find(
+							(branch) => branch.branchSiteId === site.id,
+						)?.armTests,
+					}
+				: {}),
+			...(renderDataOf(input).branches.find(
+				(branch) => branch.branchSiteId === site.id,
+			)?.declaredEmptyArms
+				? {
+						declaredEmptyArms: renderDataOf(input).branches.find(
+							(branch) => branch.branchSiteId === site.id,
+						)?.declaredEmptyArms,
+					}
+				: {}),
 			id: site.id,
 			startAnchor: {
 				strategy: 'dom-order-comment' as const,
@@ -246,10 +270,8 @@ function supportedBranchRecords(input: ProtocolViewPayloadInput) {
 				strategy: 'dom-order-comment' as const,
 				index: emittedPairRank(input, site.id) * 2 + 1,
 			},
-			symbolId: armsBySite.get(site.id) ? branchSymbols.get(site.id)?.id : undefined,
+			symbolId: branchSymbols.get(site.id)?.id,
 			testReads: branchSymbols.get(site.id)?.testReads ?? [],
-			armTests: armsBySite.get(site.id)?.armTests,
-			declaredEmptyArms: armsBySite.get(site.id)?.declaredEmptyArms,
 			armRecords: branchArmRecords(input, site.id),
 		}));
 }
@@ -259,12 +281,13 @@ function supportedBranchRecords(input: ProtocolViewPayloadInput) {
 // with keys derived from the serialized collection by row index.
 function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 	const boundEventSymbols = boundEventSymbolIds(input);
-	const planEntries = new Map(
-		input.publicRenderPlan.keyedRepeats.map((entry) => [entry.repeatId, entry]),
+	const renderEntries = new Map(
+		renderDataOf(input).repeats.map((entry) => [entry.repeatId, entry]),
 	);
 	return (input.payloadArena.view.keyedRepeats ?? []).flatMap((repeat) => {
-		const plan = planEntries.get(repeat.id);
-		if (!plan || plan.rowElementCount === undefined) return [];
+		const render = renderEntries.get(repeat.id);
+		if (!render || render.keyPath.length === 0 || render.rowElementCount === 0) return [];
+		const rowHostPaths = hostPathsForChunk(input, render.rowChunkId, true);
 		return [
 			{
 				id: repeat.id,
@@ -272,13 +295,17 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 				collectionGraphNodeId: repeat.collectionGraphNodeId,
 				collectionPath: repeat.collectionPath,
 				keyPath: repeat.keyPath,
-				itemName: plan.itemName,
-				rowElementCount: plan.rowElementCount,
-				rowEvents: plan.eventControls.map((control) => ({
-					hostPath: control.hostPath,
-					eventName: control.eventName,
-					symbolIds: [boundEventSymbols.get(control.symbolId) ?? control.symbolId],
-				})),
+				itemName: render.itemName,
+				rowElementCount: render.rowElementCount,
+				rowEvents: input.payloadArena.view.events
+					.filter((event) => rowHostPaths.has(event.hostNodeId))
+					.map((event) => ({
+						hostPath: rowHostPaths.get(event.hostNodeId)!,
+						eventName: event.eventName,
+						symbolIds: eventSymbolsForHost(input, event.hostNodeId, event.eventName).map(
+							(symbolId) => boundEventSymbols.get(symbolId) ?? symbolId,
+						),
+					})),
 			},
 		];
 	});
@@ -287,10 +314,11 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 function boundaryUpdateSymbols(input: ProtocolViewPayloadInput): ReadonlyMap<string, string> {
 	// Parts-based (tier 3) and component-executing (tier 4) update modules
 	// share the async-boundary-update wiring: either one settles the range.
-	const armsBoundaries = new Set([
-		...(input.publicRenderPlan.asyncBoundaryArms ?? []).map((entry) => entry.boundaryId),
-		...(input.publicRenderPlan.asyncBoundaryArmRenders ?? []).map((entry) => entry.boundaryId),
-	]);
+	const armsBoundaries = new Set(
+		renderDataOf(input).boundaries
+			.filter((entry) => entry.protocolSupported)
+			.map((entry) => entry.boundaryId),
+	);
 	return new Map(
 		input.symbolResolver.symbols.flatMap((symbol) =>
 			symbol.kind === 'async-boundary-update' && armsBoundaries.has(symbol.boundaryId)
@@ -320,7 +348,7 @@ function wiredArmRecordSet(
 	boundaryId: string,
 	arm: number,
 ): ProtocolViewArmRecordSet {
-	const flipHostIds = armScopedBranchHostIds(input.publicRenderPlan.branchArms, boundaryId);
+	const flipHostIds = armScopedBranchHostIds(input, boundaryId);
 	const boundEventSymbols = boundEventSymbolIds(input);
 	const eventSymbols = new Map<string, string[]>();
 	for (const symbol of input.symbolResolver.symbols) {
@@ -330,16 +358,7 @@ function wiredArmRecordSet(
 		symbols[symbol.order] = boundEventSymbols.get(symbol.id) ?? symbol.id;
 		eventSymbols.set(key, symbols);
 	}
-	const branches = bindArmBranchEventSymbols(
-		input,
-		armScopedBranchRecords({
-			publicRenderPlan: input.publicRenderPlan,
-			symbols: input.symbolResolver.symbols,
-			payloadView: input.payloadArena.view,
-			boundaryId,
-			arm,
-		}),
-	);
+	const branches = bindArmBranchEventSymbols(input, armScopedBranchRecords(input, boundaryId, arm));
 	return {
 		locators: set.locators.filter((locator) => !flipHostIds.has(locator.hostNodeId)),
 		events: set.events
@@ -362,21 +381,164 @@ function wiredArmRecordSet(
 }
 
 function armHostIds(input: ProtocolViewPayloadInput): ReadonlySet<string> {
+	const flattenedBranchIds = preLinkFlattenedBranchIds(input);
 	return new Set(
-		(input.publicRenderPlan.branchArms ?? []).flatMap((entry) =>
-			(entry.armHosts ?? []).flatMap((arm) => arm.map((host) => host.hostNodeId)),
+		renderDataOf(input).branches.flatMap((branch) =>
+			flattenedBranchIds.has(branch.branchSiteId)
+				? []
+				: branch.armChunkIds.flatMap((chunkId) => [
+						...hostPathsForChunk(input, chunkId).keys(),
+					]),
 		),
 	);
+}
+
+// Same-module children are rendered before the linker can give their branch
+// arms an independent range. Keep renderData's chunk ownership intact, but
+// project those arm hosts back into the legacy flat view consumed by the
+// pre-link emitter. T009/T010b can remove this compatibility projection with
+// that emitter.
+function preLinkFlattenedBranchIds(input: ProtocolViewPayloadInput): ReadonlySet<string> {
+	const data = renderDataOf(input);
+	const rootComponentName = data.root?.componentName;
+	if (!rootComponentName) return new Set();
+	return new Set(
+		data.branches.flatMap((branch) => {
+			if (branch.asyncBoundaryId) return [];
+			const owner = data.chunks.find((chunk) =>
+				chunk.slots.some(
+					(slot) => slot.kind === 'branch' && slot.branchSiteId === branch.branchSiteId,
+				),
+			);
+			const composesChild = branch.armChunkIds.some((chunkId) =>
+				data.chunks
+					.find((chunk) => chunk.id === chunkId)
+					?.slots.some((slot) => slot.kind === 'child-component'),
+			);
+			return (owner && owner.componentName !== rootComponentName) || composesChild
+				? [branch.branchSiteId]
+				: [];
+		}),
+	);
+}
+
+function hostPathsForChunk(
+	input: ProtocolViewPayloadInput,
+	chunkId: string,
+	relativeToRoot = false,
+): ReadonlyMap<string, ReadonlyArray<number>> {
+	const chunk = renderDataOf(input).chunks.find((candidate) => candidate.id === chunkId);
+	return new Map(
+		(chunk?.hosts ?? []).map((host) => [
+			host.hostNodeId,
+			relativeToRoot && host.coordinate.path[0] === 0
+				? host.coordinate.path.slice(1)
+				: host.coordinate.path,
+		]),
+	);
+}
+
+function eventSymbolsForHost(
+	input: ProtocolViewPayloadInput,
+	hostNodeId: string,
+	eventName: string,
+): ReadonlyArray<string> {
+	return input.symbolResolver.symbols
+		.filter(
+			(symbol) =>
+				symbol.kind === 'event-handler' &&
+				symbol.hostNodeId === hostNodeId &&
+				symbol.eventName === eventName,
+		)
+		.sort((left, right) => left.order - right.order)
+		.map((symbol) => symbol.id);
+}
+
+function armScopedBranchHostIds(
+	input: ProtocolViewPayloadInput,
+	boundaryId: string,
+): ReadonlySet<string> {
+	return new Set(
+		renderDataOf(input).branches
+			.filter((branch) => branch.asyncBoundaryId === boundaryId)
+			.flatMap((branch) =>
+				branch.armChunkIds.flatMap((chunkId) => hostIdsForChunkTree(input, chunkId)),
+			),
+	);
+}
+
+function hostIdsForChunkTree(
+	input: ProtocolViewPayloadInput,
+	chunkId: string,
+	seen = new Set<string>(),
+): ReadonlyArray<string> {
+	if (seen.has(chunkId)) return [];
+	seen.add(chunkId);
+	const data = renderDataOf(input);
+	const chunk = data.chunks.find((candidate) => candidate.id === chunkId);
+	if (!chunk) return [];
+	const childChunkIds = chunk.slots.flatMap((slot) => {
+		if (slot.kind === 'branch') return slot.armTemplateIds;
+		if (slot.kind === 'repeat')
+			return [slot.rowTemplateId, ...(slot.emptyTemplateId ? [slot.emptyTemplateId] : [])];
+		if (slot.kind === 'async')
+			return [
+				slot.armTemplateIds.try,
+				...(slot.armTemplateIds.pending ? [slot.armTemplateIds.pending] : []),
+				...(slot.armTemplateIds.catch ? [slot.armTemplateIds.catch] : []),
+			];
+		if (slot.kind === 'dynamic-host') return [slot.childChunkId];
+		return [];
+	});
+	return [
+		...chunk.hosts.map((host) => host.hostNodeId),
+		...childChunkIds.flatMap((childChunkId) => hostIdsForChunkTree(input, childChunkId, seen)),
+	];
+}
+
+function armScopedBranchRecords(
+	input: ProtocolViewPayloadInput,
+	boundaryId: string,
+	arm: number,
+): ReadonlyArray<ProtocolViewArmRecordSet['branches'][number]> | undefined {
+	const branches = renderDataOf(input).branches.filter(
+		(branch) =>
+			branch.asyncBoundaryId === boundaryId && branch.asyncBoundaryArm === arm,
+	);
+	if (branches.length === 0) return undefined;
+	const branchSymbols = new Map(
+		input.symbolResolver.symbols.flatMap((symbol) =>
+			symbol.kind === 'branch-update' ? [[symbol.branchSiteId, symbol] as const] : [],
+		),
+	);
+	return branches.map((branch, rank) =>
+		branch.update === 'boundary'
+			? {
+					id: branch.branchSiteId,
+					testReads: branchSymbols.get(branch.branchSiteId)?.testReads ?? [],
+				}
+			: ({
+		id: branch.branchSiteId,
+		symbolId: branchSymbols.get(branch.branchSiteId)?.id,
+		testReads: branchSymbols.get(branch.branchSiteId)?.testReads ?? [],
+		startAnchor: { strategy: 'arm-branch-comment', index: rank * 2 },
+		endAnchor: { strategy: 'arm-branch-comment', index: rank * 2 + 1 },
+		armRecords: branchArmRecords(input, branch.branchSiteId),
+		...(branch.armTests ? { armTests: branch.armTests } : {}),
+		...(branch.declaredEmptyArms
+			? { declaredEmptyArms: branch.declaredEmptyArms }
+			: {}),
+	}));
 }
 
 // Per-arm records for gate-supported branch sites: everything the resume
 // runtime must rewire when an arm flips in, addressed by arm-relative host
 // paths (the keyed-repeat rowEvents convention).
 function branchArmRecords(input: ProtocolViewPayloadInput, branchSiteId: string) {
-	const arms = (input.publicRenderPlan.branchArms ?? []).find(
+	const branch = renderDataOf(input).branches.find(
 		(entry) => entry.branchSiteId === branchSiteId,
 	);
-	if (!arms?.armHosts) return undefined;
+	if (!branch) return undefined;
 	const eventSymbols = new Map<string, string[]>();
 	const boundEventSymbols = boundEventSymbolIds(input);
 	const boundDomUpdateSymbols = boundDomUpdateSymbolIds(input);
@@ -395,8 +557,8 @@ function branchArmRecords(input: ProtocolViewPayloadInput, branchSiteId: string)
 			);
 		}
 	}
-	return arms.armHosts.map((armHostList) => {
-		const hostIds = new Map(armHostList.map((host) => [host.hostNodeId, host.hostPath]));
+	return branch.armChunkIds.map((chunkId) => {
+		const hostIds = hostPathsForChunk(input, chunkId);
 		return {
 			events: input.payloadArena.view.events
 				.filter((event) => hostIds.has(event.hostNodeId))

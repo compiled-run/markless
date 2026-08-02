@@ -42,7 +42,11 @@ export function collectAsyncBoundary(
 		[node.handler, 2],
 	]);
 
-	state.graph.asyncBoundaries.push({ id: boundaryId, anchorOrder: state.nextAnchorOrder++ });
+	state.graph.asyncBoundaries.push({
+		id: boundaryId,
+		anchorOrder: state.nextAnchorOrder++,
+		...(previousBoundaryId ? { parentBoundaryId: previousBoundaryId } : {}),
+	});
 	state.currentAsyncBoundaryId = boundaryId;
 
 	for (const child of childNodes(node)) {
