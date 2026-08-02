@@ -5999,6 +5999,39 @@ export default function Home() @{
 	expect(result.publicRenderModule.ssrModuleSource).toContain('marklessSsrRepeatRows');
 });
 
+test('keyed repeat row handlers inside async arms keep their row binding in context', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/AsyncFeed.tsrx',
+		source: `import { computed, state } from '@markless/core';
+export default function AsyncFeed() @{
+	let selectedKey = state('none');
+	const feed = computed(async () => ({
+		updates: [{ id: 'one', project: 'compiler', version: '1.0', stage: 'ready' }],
+	}));
+	<main>
+		@try {
+			<ul>
+				@for (const update of feed.updates; key update.id) {
+					<li onClick={() => selectedKey = update.id}>
+						<strong>{update.project}</strong>
+						<span>{update.version}</span>
+						<span>{update.stage}</span>
+					</li>
+				}
+			</ul>
+		} @pending { <p>Loading</p> } @catch { <p>Failed</p> }
+	</main>
+}`,
+		symbols: [],
+	});
+	const handler = result.symbolModules.modules.find(
+		(module) => module.kind === 'event-handler',
+	);
+
+	expect(handler?.source).toContain('value: context.locals?.update?.id');
+	expect(handler?.source).not.toMatch(/\bvalue:\s*update\.id\b/);
+});
+
 test('SSR derives a template-read sync computed after all async ancestors settle', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/SignalCardSsr.tsrx',

@@ -8,6 +8,7 @@ import type {
 	LoweredStateWrite,
 	PlannedSymbol,
 	PublicRenderPlanArtifact,
+	RenderDataArtifact,
 	SemanticGraphDependency,
 	SemanticModuleImport,
 	SymbolModulesArtifact,
@@ -17,7 +18,7 @@ import { childNodes, type AnyNode } from '../ast/nodes.ts';
 import { parseJavaScriptModule } from '../js-ast.ts';
 
 export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtifact {
-	const localNamesBySymbol = publicRenderLocalNamesBySymbol(input.publicRenderPlan);
+	const localNamesBySymbol = rowLocalNamesBySymbol(input.publicRenderPlan, input.renderData);
 	const captureSlotsBySymbol = new Map(
 		input.captureAnalysis.extractedSymbols.flatMap((symbol) =>
 			symbol.loaderSymbolId
@@ -137,21 +138,69 @@ function emitBranchUpdateModule(
 
 const emptyLocalNames = new Set<string>();
 
-function publicRenderLocalNamesBySymbol(
+function rowLocalNamesBySymbol(
 	publicRenderPlan: PublicRenderPlanArtifact | undefined,
+	renderData: RenderDataArtifact | undefined,
 ): ReadonlyMap<string, ReadonlySet<string>> {
 	const localNamesBySymbol = new Map<string, Set<string>>();
+	const addLocal = (symbolId: string, itemName: string): void => {
+		let localNames = localNamesBySymbol.get(symbolId);
+		if (!localNames) {
+			localNames = new Set();
+			localNamesBySymbol.set(symbolId, localNames);
+		}
+		localNames.add(itemName);
+	};
 	for (const repeat of publicRenderPlan?.keyedRepeats ?? []) {
 		for (const eventControl of repeat.eventControls) {
-			let localNames = localNamesBySymbol.get(eventControl.symbolId);
-			if (!localNames) {
-				localNames = new Set();
-				localNamesBySymbol.set(eventControl.symbolId, localNames);
+			addLocal(eventControl.symbolId, eventControl.itemContext.itemName);
+		}
+	}
+	if (renderData) {
+		for (const repeat of renderData.repeats) {
+			const rowHostIds = renderChunkHostIds(renderData, repeat.rowChunkId);
+			for (const interaction of renderData.interactions) {
+				if (!rowHostIds.has(interaction.hostNodeId)) continue;
+				for (const symbolId of interaction.symbolIds) addLocal(symbolId, repeat.itemName);
 			}
-			localNames.add(eventControl.itemContext.itemName);
 		}
 	}
 	return localNamesBySymbol;
+}
+
+// Row modules execute outside the authored @for callback. The repeat runtime
+// supplies the item through context.locals, so symbols owned by a row chunk
+// must retain that existing capture context even when the legacy public plan
+// has no top-level record for an async-arm repeat.
+function renderChunkHostIds(
+	renderData: RenderDataArtifact,
+	chunkId: string,
+	seen = new Set<string>(),
+): ReadonlySet<string> {
+	if (seen.has(chunkId)) return new Set();
+	seen.add(chunkId);
+	const chunk = renderData.chunks.find((candidate) => candidate.id === chunkId);
+	const hostIds = new Set((chunk?.hosts ?? []).map((host) => host.hostNodeId));
+	for (const slot of chunk?.slots ?? []) {
+		const childChunkIds =
+			slot.kind === 'branch'
+				? slot.armTemplateIds
+				: slot.kind === 'repeat'
+					? [slot.rowTemplateId, ...(slot.emptyTemplateId ? [slot.emptyTemplateId] : [])]
+					: slot.kind === 'async'
+						? Object.values(slot.armTemplateIds).filter(
+								(candidate): candidate is string => candidate !== undefined,
+							)
+						: slot.kind === 'child-component'
+							? [slot.childTemplateId]
+							: slot.kind === 'dynamic-host'
+								? [slot.childChunkId]
+								: [];
+		for (const childChunkId of childChunkIds) {
+			for (const hostId of renderChunkHostIds(renderData, childChunkId, seen)) hostIds.add(hostId);
+		}
+	}
+	return hostIds;
 }
 
 function emitSymbolModule(

@@ -79,7 +79,7 @@ export const defaultCompilerPasses: ReadonlyArray<CompilerPassDefinition> = [
 	{
 		passId: 'symbol-modules',
 		description: 'Emit lazy symbol module sources for planned symbols.',
-		consumes: ['symbolResolver', 'captureAnalysis', 'publicRenderPlan'],
+		consumes: ['symbolResolver', 'captureAnalysis', 'renderData', 'publicRenderPlan'],
 		produces: ['symbolModules'],
 	},
 	{

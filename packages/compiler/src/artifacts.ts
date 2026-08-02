@@ -1114,6 +1114,7 @@ export type CaptureAnalysisArtifact = {
 export type SymbolModulesInput = {
 	readonly symbolResolver: SymbolResolverPlan;
 	readonly captureAnalysis: CaptureAnalysisArtifact;
+	readonly renderData?: RenderDataArtifact;
 	readonly publicRenderPlan?: PublicRenderPlanArtifact;
 };
 

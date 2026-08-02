@@ -296,6 +296,7 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 						symbolModules: emitSymbolModules({
 							symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
 							captureAnalysis: inputs.captureAnalysis as CaptureAnalysisArtifact,
+							renderData: inputs.renderData as RenderDataArtifact,
 							publicRenderPlan: inputs.publicRenderPlan as PublicRenderPlanArtifact,
 						}),
 					};
