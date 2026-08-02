@@ -1,11 +1,11 @@
 import { expect, test } from 'vitest';
 import { transformTsrxModule } from '../src/transform.ts';
 
-// Tier-4 arm-render symbol modules import child components and helper-catalog
-// functions. The virtual-module pipeline must keep those imports intact and
-// still apply the scoped export rename (the resolver dispatches on it), and
-// the relative child import must resolve against the source .tsrx importer.
-test('arm-render symbol virtual modules keep component imports and the scoped export rename', async () => {
+// Chunk commits deleted async-boundary-update symbol modules: settled arms are
+// now browser-parsed native templates, while only the async runner remains a
+// demand-loaded symbol. Keep this focused artifact contract beside the broader
+// native-markup integration tests so the deleted symbol cannot creep back in.
+test('settled arms stay native chunks and only their runner is demand-loadable', async () => {
 	const result = await transformTsrxModule({
 		filename: '/workspace/app/src/IssuesPage.tsrx',
 		source: `
@@ -29,21 +29,28 @@ export default function Page() @{
 		environment: 'client',
 	});
 
-	const manifestEntry = result.manifest.symbols.find(
-		(symbol) => symbol.kind === 'async-boundary-update',
+	expect(result.manifest.symbols.some((symbol) => symbol.kind === 'async-boundary-update')).toBe(
+		false,
 	);
-	expect(manifestEntry).toBeDefined();
-	const virtualModule = result.virtualModules.find(
-		(module) => module.type === 'symbol' && module.symbolId === manifestEntry!.symbolId,
+	const native = result.manifest.csrNativeMarkup?.[0];
+	const armChunks = native?.definition.chunks.filter((chunk) => chunk.kind === 'async-arm');
+	expect(armChunks?.map((chunk) => chunk.id)).toEqual([
+		'async:boundary:0:arm:try',
+		'async:boundary:0:arm:pending',
+		'async:boundary:0:arm:catch',
+	]);
+	for (const chunk of armChunks ?? []) {
+		expect(chunk.nativeTemplateId).toEqual(expect.any(String));
+		expect(native?.templates.some((template) => template.id === chunk.nativeTemplateId)).toBe(
+			true,
+		);
+	}
+	const runner = result.manifest.symbols.find(
+		(symbol) => symbol.kind === 'async-computed-runner',
 	);
-	expect(virtualModule).toBeDefined();
-	// Scoped rename applied to the plain `export function` form.
-	expect(virtualModule!.source).toContain(`export function ${manifestEntry!.exportName}(`);
-	expect(manifestEntry!.exportName).toMatch(/_[0-9a-z]+$/);
-	// Component + helper-catalog imports survive the virtual module pipeline.
-	expect(virtualModule!.source).toContain('from "./shell.tsrx"');
-	expect(virtualModule!.source).toMatch(/from ["']@markless\/web\/fns\/csr["']/);
-	// The boundary record dispatches to this module at settle time.
-	const payloadModule = result.virtualModules.find((module) => module.type === 'payload');
-	expect(payloadModule!.source).toContain(`"updateSymbolId": "${manifestEntry!.symbolId}"`);
+	expect(runner).toBeDefined();
+	const resolver = result.virtualModules.find((module) => module.type === 'resolver');
+	expect(resolver?.source).toContain(`import(/* @vite-ignore */ "${runner!.virtualModuleId}")`);
+	expect(result.code).toContain('from "./shell.tsrx"');
+	expect(result.code).toContain('from "@markless/web/fns/csr"');
 });

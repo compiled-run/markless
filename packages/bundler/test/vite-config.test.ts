@@ -232,6 +232,8 @@ describe('Vite config integration', () => {
 			hoistTransitiveImports: false,
 		});
 		expect(clientOutput.codeSplitting?.groups?.map((group) => group.name)).toEqual([
+			'markless-direct-renderer',
+			'markless-resume-csr-coordinate',
 			'markless-resume-branches',
 			'markless-resume-behaviors',
 			'markless-resume-repeats',

@@ -28,21 +28,11 @@ export default box(
 		await waitForSettledLoadAccounting(settledPage, WAIT);
 
 		await settledPage.click('[data-row-key="beacon-118"]', WAIT);
-		// PINNED DISEASE (2026-08-01, precompute-first-architecture T005): row events on
-		// keyed-repeat rows inside an async arm never register an event record in EITHER
-		// environment (framework log: "click [...] — no event record matched"). The handler
-		// stays in the authored source because the construct is required and its symbol must
-		// exist in the payload; this assertion pins today's broken behavior and MUST be
-		// flipped to expect "Selected beacon-118" when the arm-commit event re-registration
-		// gap is fixed (packages 4/6 of goals/precompute-first-architecture).
-		await expect.page.text(settledPage, '[data-selected-key]', 'Selected none', WAIT);
+		// Regression pin: settled-arm keyed-repeat rows register their event records.
+		await expect.page.text(settledPage, '[data-selected-key]', 'Selected beacon-118', WAIT);
 		await settledPage.click('[data-increase-weight]', WAIT);
 		await expect.page.attribute(settledPage, '[data-weight]', 'data-weight', '3', WAIT);
-		// EXECUTED-PROVEN DIVERGENCE (2026-08-01, precompute-first-architecture T005): SSR's
-		// resumed graph DOES recompute the in-arm child computed (6 -> 9) — the CSR twin
-		// pins 6 because its arm-commit path never wires the record. Same source, same
-		// click, different result. This assertion is the WORKING side; keep it at 9. The
-		// CSR twin's pin flips to 9 when the arm-commit gap closes (packages 4/6).
+		// Regression pin: the settled arm's child computed stays connected after commit.
 		await expect.page.text(settledPage, '[data-weighted-count]', 'Weighted count 9', WAIT);
 
 		// Raw response timing is deliberately separate from painted-DOM checks:

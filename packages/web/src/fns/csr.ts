@@ -212,7 +212,7 @@ export function createMarklessCsrChunkRenderer(input) {
 	};
 }
 
-function renderChunkComponent(definition, props, components, idPrefix, symbolPrefix, depth, armBoundary) {
+function renderChunkComponent(definition, props, components, idPrefix, symbolPrefix, depth, armBoundary, eventElements) {
 	definition = marklessCsrNativeDefinition(definition);
 	if (depth > 32) throw new Error(`Markless CSR component recursion exceeded at ${definition.name}.`);
 	if (definition.shouldRender && !definition.shouldRender(props)) return null;
@@ -277,6 +277,7 @@ function renderChunkComponent(definition, props, components, idPrefix, symbolPre
 			return { chunk, content: template.content.cloneNode(true) };
 		};
 
+	let eventCoordinates = eventElements;
 	const renderChunk = (chunkId, locals = {}, armBoundary = false) => {
 		const cloned = cloneChunk(chunkId);
 		const hostNodes = new Map(
@@ -285,6 +286,7 @@ function renderChunkComponent(definition, props, components, idPrefix, symbolPre
 				return node?.nodeType === 1 ? [[host.hostNodeId, node]] : [];
 			}),
 		);
+		if (eventCoordinates) collectEventCoordinates(eventCoordinates, hostNodes, idPrefix);
 		const renderedHostNodeIds = new Set(cloned.chunk.hosts.map((host) => host.hostNodeId));
 		const renderedRepeatIds = new Set();
 		const renderedBranchIds = new Set();
@@ -369,6 +371,7 @@ function renderChunkComponent(definition, props, components, idPrefix, symbolPre
 					symbolPrefix + edge.symbolPrefix,
 					depth + 1,
 					armBoundary,
+					eventCoordinates,
 				);
 				if (!child) {
 					target.remove?.();
@@ -548,7 +551,10 @@ function renderChunkComponent(definition, props, components, idPrefix, symbolPre
 						: slot.armTemplateIds.try;
 					if (!chunkId) throw new Error(`Missing Markless async arm chunk for ${boundary.id}.`);
 					const childStart = childOutputs.length;
+					const parentEventCoordinates = eventCoordinates;
+					const armEventElements = (eventCoordinates = new Map());
 					const arm = renderChunk(chunkId, {}, true);
+					eventCoordinates = parentEventCoordinates;
 					const armChildren = childOutputs.slice(childStart);
 					const armRoot = arm.content;
 					let armView = marklessCsrChunkView(
@@ -592,6 +598,7 @@ function renderChunkComponent(definition, props, components, idPrefix, symbolPre
 					return {
 						nodes: Array.from(armRoot.childNodes ?? []),
 						elementsByHostId: liveElements,
+						eventElementsByHostId: armEventElements,
 						armRecords: {
 							locators: [],
 							events: [...armView.events, ...plannedEvents],
@@ -612,34 +619,26 @@ function renderChunkComponent(definition, props, components, idPrefix, symbolPre
 		view,
 		elementCount: rendered.hostCount,
 		liveHostNodes,
-		routePrefixes: childOutputs.flatMap((child) =>
-			child.edge.symbolPrefix
-				? [child.edge.symbolPrefix]
-				: child.output.routePrefixes ?? [],
+		routePrefixes: childOutputs.flatMap(
+			(child) => child.edge.symbolPrefix || child.output.routePrefixes || [],
 		),
 		symbolIds: new Set([
-			...state.computed.flatMap((computed) => computed.deriveSymbolId ? [computed.deriveSymbolId] : []),
+			...state.computed.map((computed) => computed.deriveSymbolId).filter((symbolId) => symbolId),
 			...view.events.flatMap((event) => event.symbolIds ?? []),
-			...view.domUpdates.flatMap((update) => update.symbolId ? [update.symbolId] : []),
-			...view.behaviors.flatMap((behavior) => behavior.symbolId ? [behavior.symbolId] : []),
+			...view.domUpdates.map((update) => update.symbolId).filter((symbolId) => symbolId),
+			...view.behaviors.map((behavior) => behavior.symbolId).filter((symbolId) => symbolId),
 		]),
 		loadSymbol(symbolId) {
 			for (const child of symbolRoutes) {
-				if (child.edge.symbolPrefix && symbolId.startsWith(child.edge.symbolPrefix))
-					return marklessCsrChunkRemapLoadedSymbol(
-						child.output.loadSymbol(symbolId.slice(child.edge.symbolPrefix.length)),
-						child.edge.props,
-					);
-				if (!child.edge.symbolPrefix && child.output.symbolIds?.has(symbolId))
-					return marklessCsrChunkRemapLoadedSymbol(
-						child.output.loadSymbol(symbolId),
-						child.edge.props,
-					);
+				const prefix = child.edge.symbolPrefix;
 				if (
-					!child.edge.symbolPrefix &&
-					(child.output.routePrefixes ?? []).some((prefix) => symbolId.startsWith(prefix))
-				) return marklessCsrChunkRemapLoadedSymbol(
-					child.output.loadSymbol(symbolId),
+					prefix
+						? !symbolId.startsWith(prefix)
+						: !child.output.symbolIds?.has(symbolId) &&
+							!(child.output.routePrefixes ?? []).some((route) => symbolId.startsWith(route))
+				) continue;
+				return marklessCsrChunkRemapLoadedSymbol(
+					child.output.loadSymbol(prefix ? symbolId.slice(prefix.length) : symbolId),
 					child.edge.props,
 				);
 			}
@@ -651,6 +650,14 @@ function renderChunkComponent(definition, props, components, idPrefix, symbolPre
 		},
 	};
 	return output;
+}
+
+function collectEventCoordinates(coordinates, hostNodes, idPrefix) {
+	for (const [hostNodeId, node] of hostNodes) {
+		const nodes = coordinates.get(idPrefix + hostNodeId) ?? [];
+		nodes.push(node);
+		coordinates.set(idPrefix + hostNodeId, nodes);
+	}
 }
 
 const marklessCsrNativeDefinitions = new Map();

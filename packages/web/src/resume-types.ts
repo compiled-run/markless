@@ -79,6 +79,10 @@ export type ResumeAsyncBoundaryRecord = {
 		readonly nodes: ReadonlyArray<ResumeDomNode>;
 		readonly armRecords: ResumeArmRecordSet;
 		readonly elementsByHostId: ReadonlyMap<string, ResumeDomElement>;
+		readonly eventElementsByHostId?: ReadonlyMap<
+			string,
+			ReadonlyArray<ResumeDomElement>
+		>;
 	};
 };
 export type ResumeBehaviorRecord = ProtocolViewPayload['behaviors'][number];
@@ -224,6 +228,7 @@ export type ResumeRuntimeInput = {
 	) => void | Promise<void>;
 	readonly dispatchSharedPatch?: ResumeSharedPatchDispatcher;
 	readonly onError?: ResumeRuntimeErrorHook;
+	readonly demandAsyncBoundaries?: boolean;
 };
 export type ResumeDispatchOptions = {
 	readonly syncPolicyAlreadyApplied?: boolean;

@@ -11,6 +11,13 @@ export const MARKLESS_BUNDLE_GRAPH = `${MARKLESS_BUILD_PREFIX}bundle-graph.json`
 // fixture-builds.test.ts). Named groups FORCE-merge their matches into one chunk,
 // so every group here must stay under the walls on its own (~8K raw / ~2K gz).
 const WEB_RUNTIME_CAPABILITY_GROUPS = [
+	// Keep the sizeable direct renderer out of the public render chunk so both
+	// halves remain below the permanent runtime-heavy chunk walls.
+	{ name: 'markless-direct-renderer', test: fileBasenamePattern('direct') },
+	{
+		name: 'markless-resume-csr-coordinate',
+		test: fileBasenamePattern('resume-csr-coordinate'),
+	},
 	{ name: 'markless-resume-branches', test: fileBasenamePattern('resume-branches') },
 	{ name: 'markless-resume-behaviors', test: fileBasenamePattern('resume-behaviors') },
 	{

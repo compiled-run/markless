@@ -67,7 +67,7 @@ export async function renderCsrRuntime(input: {
 	output.connectRuntime?.({ graph, runtime });
 	await runtime.start();
 	await activateCsrBehaviors(runtime, view);
-	await marklessLogCsrSummary();
+	if ((globalThis as ExecutionLogGlobal).__mxLog) await marklessLogCsrSummary();
 
 	return {
 		phase: 'csr',
@@ -79,7 +79,6 @@ export async function renderCsrRuntime(input: {
 
 async function marklessLogCsrSummary(): Promise<void> {
 	const global = globalThis as ExecutionLogGlobal;
-	if (!global.__mxLog) return;
 	try {
 		const log = await global.__mxLoadLog?.();
 		await log?.logMarklessRenderSummary?.();
@@ -158,8 +157,7 @@ function withCsrCallbackSymbols(
 			readonly __marklessCsrCallbacks?: Readonly<Record<string, (event: unknown) => unknown>>;
 		}
 	).__marklessCsrCallbacks;
-	if (!callbacks || Object.keys(callbacks).length === 0) return loadSymbol;
-	return (symbolId) => {
+	return callbacks ? (symbolId) => {
 		const callback = callbacks[symbolId];
 		if (!callback) return loadSymbol(symbolId);
 		return async (context) => {
@@ -168,7 +166,7 @@ function withCsrCallbackSymbols(
 			const result = callback(context.event);
 			if (isPromiseLike(result)) await result;
 		};
-	};
+	} : loadSymbol;
 }
 
 function missingCsrJournalTargetError(locator: string): Error {

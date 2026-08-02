@@ -48,7 +48,7 @@ const combos = [
 		path: '/?latency=0',
 		settledSelector: '[data-update-list][data-row-count="3"]',
 		proof: proveLiveFeedCsr,
-		interact: (page) => interactLiveFeed(page, { weightedCountAfter: '6' }),
+		interact: interactLiveFeed,
 	},
 	{
 		id: 'live-feed-ssr',
@@ -58,7 +58,7 @@ const combos = [
 		path: '/?latency=0',
 		settledSelector: '[data-update-list][data-row-count="3"]',
 		proof: proveLiveFeedSsr,
-		interact: (page) => interactLiveFeed(page, { weightedCountAfter: '9' }),
+		interact: interactLiveFeed,
 	},
 ];
 
@@ -86,6 +86,9 @@ for (const combo of combos) {
 		}
 		assertRepeatable(combo.id, runs);
 		measurements[combo.id] = runs[0];
+		console.log(
+			`-- ${combo.id}: load=${runs[0].totalExecutedBytes} post-interaction=${runs[0].postInteraction.totalExecutedBytes}`,
+		);
 
 		if (combo.id === 'live-feed-ssr') {
 			for (let runIndex = 0; runIndex < repeatCount; runIndex++) {
@@ -428,19 +431,15 @@ async function proveSettledLiveFeed(page) {
 	);
 	await waitForText(page, '[data-weighted-count]', 'Weighted count 6');
 	await page.click('[data-row-key="beacon-118"]');
-	// PINNED DISEASE (2026-08-01, T005): in-arm row events register no event record in
-	// either environment — selection must stay 'none' today. Flip to 'Selected beacon-118'
-	// when the arm-commit re-registration gap closes (packages 4/6).
-	await waitForText(page, '[data-selected-key]', 'Selected none');
+	// T009c chunk commits register settled-arm row events in both environments.
+	await waitForText(page, '[data-selected-key]', 'Selected beacon-118');
 }
 
-async function interactLiveFeed(page, { weightedCountAfter }) {
+async function interactLiveFeed(page) {
 	await page.click('[data-increase-weight]');
 	await waitForAttribute(page, '[data-weight]', 'data-weight', '3');
-	// EXECUTED-PROVEN DIVERGENCE (2026-08-01, T005): SSR's resumed graph recomputes the
-	// in-arm child computed (9); CSR's arm-commit path does not (stays 6). Callers pass
-	// the per-environment expectation; both collapse to '9' when unification closes it.
-	await waitForText(page, '[data-weighted-count]', `Weighted count ${weightedCountAfter}`);
+	// T009d keeps the settled arm's child computed connected in CSR and SSR.
+	await waitForText(page, '[data-weighted-count]', 'Weighted count 9');
 }
 
 async function waitForText(page, selector, text) {

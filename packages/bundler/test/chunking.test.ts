@@ -26,6 +26,8 @@ describe('markless chunking defaults', () => {
 		});
 		expect(clientOutput.codeSplitting?.groups?.map((group) => group.name)).toEqual(
 			expect.arrayContaining([
+				'markless-direct-renderer',
+				'markless-resume-csr-coordinate',
 				'markless-resume-branches',
 				'markless-resume-behaviors',
 				'markless-resume-repeats',
@@ -81,6 +83,8 @@ describe('markless chunking defaults', () => {
 
 		expect(output.codeSplitting?.groups?.map((group) => group.name)).toEqual(
 			expect.arrayContaining([
+				'markless-direct-renderer',
+				'markless-resume-csr-coordinate',
 				'markless-resume-branches',
 				'markless-resume-behaviors',
 				'markless-resume-repeats',
@@ -137,6 +141,14 @@ describe('markless chunking defaults', () => {
 			output.codeSplitting?.groups?.map((group) => [group.name, group.test]) ?? [],
 		);
 
+		expect(
+			groups
+				.get('markless-resume-csr-coordinate')
+				?.test('/repo/packages/web/src/resume-csr-coordinate.ts'),
+		).toBe(true);
+		expect(
+			groups.get('markless-direct-renderer')?.test('/repo/packages/web/src/fns/direct.ts'),
+		).toBe(true);
 		expect(
 			groups
 				.get('markless-resume-async')
