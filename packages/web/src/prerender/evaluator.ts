@@ -7,6 +7,9 @@ import {
 	type SsrRenderData,
 } from '../ssr-data/renderer.ts';
 import type { SsrRenderable, SsrRenderOutput } from '../render-to-string.ts';
+import type { ResumeArmRecordSet } from '../resume-types.ts';
+import type { RuntimeGraph } from '@markless/runtime';
+import type { ProtocolStatePayload } from '@markless/serializer';
 import { prepareSsrResumeRecords } from './records.ts';
 
 type Awaitable<T> = T | Promise<T>;
@@ -120,13 +123,56 @@ export async function evaluateBuiltPageClosure(
 	page: SsrRenderable,
 	props?: unknown,
 ): Promise<SsrRenderOutput> {
-	if (typeof page === 'function') return page(props, undefined);
-	if (page && typeof page.renderSsr === 'function') return page.renderSsr(props, undefined);
+	const renderContext = { prerender: true };
+	if (typeof page === 'function')
+		return (page as (props?: unknown, renderContext?: unknown) => SsrRenderOutput)(
+			props,
+			renderContext,
+		);
+	if (page && typeof page.renderSsr === 'function') return page.renderSsr(props, renderContext);
 	throw new TypeError('Prerender resume requires a compiled TSRX artifact.');
 }
 
 export async function derivePrerenderResumeRecords(page: SsrRenderable, props?: unknown) {
 	return prepareSsrResumeRecords(await evaluateBuiltPageClosure(page, props));
+}
+
+export async function renderPrerenderBoundary(
+	page: SsrRenderable,
+	boundaryId: string,
+	_status: 'fulfilled' | 'rejected',
+	graph: RuntimeGraph,
+	props?: unknown,
+): Promise<{
+	readonly html: string;
+	readonly armRecords: ResumeArmRecordSet;
+	readonly computed: ProtocolStatePayload['computed'];
+}> {
+	const output = await renderBuiltPage(page, props, { prerenderSettle: { graph } });
+	const records = await prepareSsrResumeRecords(output);
+	const anchor = output.structure?.anchors.find(
+		(candidate) => candidate.kind === 'async' && candidate.id === boundaryId,
+	);
+	const boundary = records.view.asyncBoundaries.find((candidate) => candidate.id === boundaryId);
+	const armRecords = boundary?.armRecords;
+	if (!anchor || !armRecords || Array.isArray(armRecords)) {
+		throw new Error(`MARKLESS_PRERENDER_BOUNDARY_MISSING: ${boundaryId}`);
+	}
+	return { html: anchor.html, armRecords, computed: records.state.computed };
+}
+
+function renderBuiltPage(
+	page: SsrRenderable,
+	props: unknown,
+	renderContext: unknown,
+): SsrRenderOutput | Promise<SsrRenderOutput> {
+	if (typeof page === 'function')
+		return (page as (props?: unknown, renderContext?: unknown) => SsrRenderOutput)(
+			props,
+			renderContext,
+		);
+	if (page && typeof page.renderSsr === 'function') return page.renderSsr(props, renderContext);
+	throw new TypeError('Prerender resume requires a compiled TSRX artifact.');
 }
 
 function readPath(value: unknown, path: ReadonlyArray<string>): unknown {

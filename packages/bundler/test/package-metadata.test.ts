@@ -177,6 +177,28 @@ describe('package metadata', () => {
 		).rejects.toThrow();
 	});
 
+	test('live feed demo defaults to the internal prerender build', async () => {
+		const manifest = JSON.parse(
+			await readFile(resolve(root, 'demos/live-feed/package.json'), 'utf8'),
+		) as {
+			readonly scripts?: Record<string, string>;
+			readonly dependencies?: Record<string, string>;
+		};
+		const config = await readFile(resolve(root, 'demos/live-feed/vite.config.ts'), 'utf8');
+
+		expect(manifest.dependencies).not.toHaveProperty('@markless/router');
+		expect(manifest.scripts).not.toHaveProperty('smoke:ssr');
+		expect(config).not.toContain('@markless/router');
+		expect(config).toContain('...markless({ executionLog })');
+		expect(config).toContain("process.env.MARKLESS_PRERENDER !== '0'");
+		expect(config).toContain("input: { prerender: resolve(root, 'src/App.tsrx') }");
+		await expect(access(resolve(root, 'demos/live-feed/index.html'))).resolves.toBe(undefined);
+		await expect(access(resolve(root, 'demos/live-feed/src/main.ts'))).resolves.toBe(undefined);
+		await expect(access(resolve(root, 'demos/live-feed/document.tsrx'))).rejects.toThrow();
+		await expect(access(resolve(root, 'demos/live-feed/pages/index.tsrx'))).rejects.toThrow();
+		await expect(access(resolve(root, 'demos/live-feed/src/dev-server.ts'))).rejects.toThrow();
+	});
+
 	test('music player SSR demo stays a router app without custom client or SSR hosts', async () => {
 		const manifest = JSON.parse(
 			await readFile(resolve(root, 'demos/music-player-ssr/package.json'), 'utf8'),

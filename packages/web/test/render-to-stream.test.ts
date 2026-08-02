@@ -72,8 +72,33 @@ function relayArtifact(input: { readonly delayMs: number; readonly fail?: boolea
 				state: marklessSsrAttachSnapshots(
 					{
 						version: ASYNC_PROTOCOL_VERSION,
-						cells: [],
-						computed: [{ graphNodeId: 'computed:report', name: 'report', async: true }],
+						cells:
+							snapshot.status === 'fulfilled'
+								? [
+										{
+											graphNodeId: 'state:weight',
+											name: 'weight',
+											valueKind: 'scalar',
+											directValue: 3,
+										},
+									]
+								: [],
+						computed: [
+							{ graphNodeId: 'computed:report', name: 'report', async: true },
+							...(snapshot.status === 'fulfilled'
+								? [
+										{
+											graphNodeId: 'computed:weightedCount',
+											name: 'weightedCount',
+											async: false,
+											deriveSymbolId: 'symbol:weighted-count',
+											dependencies: [
+												{ graphNodeId: 'state:weight', path: [] },
+											],
+										},
+									]
+								: []),
+						],
 					},
 					snapshots as never,
 				),
@@ -120,6 +145,61 @@ async function collect(appends: AsyncGenerator<string>): Promise<string[]> {
 	for await (const chunk of appends) chunks.push(chunk);
 	return chunks;
 }
+
+test('prerender evaluation records a pending async snapshot without starting the runner', async () => {
+	const snapshots: Array<{ readonly graphNodeId: string; readonly snapshot: unknown }> = [];
+	let runs = 0;
+
+	const snapshot = await marklessSsrRunAsyncComputed(
+		snapshots as never,
+		'computed:feed',
+		async () => {
+			runs += 1;
+			return { channel: 'stable' };
+		},
+		{ prerender: true },
+		true,
+	);
+
+	expect(runs).toBe(0);
+	expect(snapshot).toMatchObject({ status: 'pending', version: 1, key: null });
+	expect(snapshots).toEqual([
+		{
+			graphNodeId: 'computed:feed',
+			snapshot: { status: 'pending', version: 1, key: null },
+		},
+	]);
+});
+
+test('prerender settle rendering reuses the resumed graph snapshot without rerunning', async () => {
+	const snapshots: Array<{ readonly graphNodeId: string; readonly snapshot: unknown }> = [];
+	const fulfilled = {
+		status: 'fulfilled',
+		version: 1,
+		key: null,
+		value: { channel: 'stable' },
+	};
+	let runs = 0;
+
+	const snapshot = await marklessSsrRunAsyncComputed(
+		snapshots as never,
+		'computed:feed',
+		async () => {
+			runs += 1;
+			return { channel: 'wrong' };
+		},
+		{
+			prerenderSettle: {
+				graph: { read: () => fulfilled },
+			},
+		},
+		true,
+	);
+
+	expect(runs).toBe(0);
+	expect(snapshot).toEqual(fulfilled);
+	expect(snapshots).toEqual([{ graphNodeId: 'computed:feed', snapshot: fulfilled }]);
+});
 
 test('SSR records one snapshot for an async upstream shared by two boundaries', async () => {
 	const snapshots: Array<{ readonly graphNodeId: string; readonly snapshot: unknown }> = [];
@@ -253,7 +333,11 @@ function orchardArtifact(
 			return {
 				html: `<main>${arms.join('')}</main>`,
 				structure: {
-					anchors: armBodies.map((html, index) => ({ kind: 'async', id: `orchard:${index}`, html })),
+					anchors: armBodies.map((html, index) => ({
+						kind: 'async',
+						id: `orchard:${index}`,
+						html,
+					})),
 				},
 				state: marklessSsrAttachSnapshots(
 					{
@@ -425,6 +509,9 @@ test('renderToStream flushes the pending shell and appends the settled arm out o
 		'<script type="markless/state-patch" data-graph-node="computed:report">',
 	);
 	expect(chunk).toContain('"status":"fulfilled"');
+	expect(chunk).toContain('"graphNodeId":"state:weight"');
+	expect(chunk).toContain('"graphNodeId":"computed:weightedCount"');
+	expect(chunk).toContain('"deriveSymbolId":"symbol:weighted-count"');
 	// Snapshot values are envelope-encoded like every served payload field.
 	expect(chunk).toContain('"records"');
 	expect(chunk).toContain('__mArm("boundary:0")');

@@ -31,9 +31,7 @@ type CoordinateSettlerInput = {
 	readonly updateRuntimeInput: (input: ResumeRuntimeInput) => void;
 };
 
-export type CsrCoordinateSettler = NonNullable<
-	ReturnType<typeof tryStartCsrCoordinateSettler>
->;
+export type CsrCoordinateSettler = NonNullable<ReturnType<typeof tryStartCsrCoordinateSettler>>;
 
 // CSR-native chunks already carry exact anchors, hosts, and slot coordinates.
 // This initial-settle path therefore touches only those declared coordinates:
@@ -193,7 +191,8 @@ function createCsrCoordinateSettler(input: CoordinateSettlerInput) {
 						}),
 					);
 				}
-				for (const read of boundary.asyncReads) input.graph.read(read.graphNodeId, ['status']);
+				for (const read of boundary.asyncReads)
+					input.graph.read(read.graphNodeId, ['status']);
 			}
 		},
 		whenSettled(): Promise<void> {
@@ -218,6 +217,16 @@ function settledRuntimeInput(
 	arms: ReadonlyMap<string, number>,
 	current: ResumeRuntimeInput,
 ): ResumeRuntimeInput {
+	const exhaustive = {
+		locators: true,
+		events: true,
+		domUpdates: true,
+		behaviors: true,
+		elementHandles: true,
+		keyedRepeats: true,
+		branches: true,
+	} satisfies Record<keyof ArmCommitUpdate['armRecords'], true>;
+	void exhaustive;
 	const events = [...baseView.events];
 	const domUpdates = [...baseView.domUpdates];
 	const behaviors = [...baseView.behaviors];
@@ -290,7 +299,8 @@ function assertCoordinateHosts(update: ArmCommitUpdate): void {
 		...update.armRecords.elementHandles,
 	];
 	for (const record of records)
-		if (!elements.has(record.hostNodeId)) throw missingCoordinateHost(record.hostNodeId, 'record');
+		if (!elements.has(record.hostNodeId))
+			throw missingCoordinateHost(record.hostNodeId, 'record');
 	for (const repeat of update.armRecords.keyedRepeats ?? [])
 		if (!elements.has(repeat.parentHostNodeId))
 			throw missingCoordinateHost(repeat.parentHostNodeId, 'keyed repeat');
@@ -300,7 +310,8 @@ function replaceCoordinateRange(
 	boundary: ResumeAsyncBoundaryRecord,
 	fresh: ReadonlyArray<ResumeDomNode> | undefined,
 ): void {
-	if (!fresh) throw new Error(`Markless CSR boundary ${boundary.id} has no coordinate arm nodes.`);
+	if (!fresh)
+		throw new Error(`Markless CSR boundary ${boundary.id} has no coordinate arm nodes.`);
 	const start = boundary.startAnchor as typeof boundary.startAnchor & {
 		readonly parentNode?: CoordinateParent | null;
 		readonly parentElement?: CoordinateParent | null;

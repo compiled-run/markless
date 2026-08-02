@@ -110,6 +110,7 @@ async function startDecodedResume(
 		createRemovalObserver: input.createRemovalObserver,
 		applyDomJournal,
 		renderBranchHtml: input.renderBranchHtml,
+		renderAsyncBoundary: input.renderAsyncBoundary,
 	});
 	await runtime.start();
 	(

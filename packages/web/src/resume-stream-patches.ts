@@ -1,5 +1,6 @@
 import type { DecodedPayloadScripts } from '../../serializer/src/protocol-client.ts';
 import { ASYNC_BOUNDARY_ARM } from '@markless/serializer';
+import type { ProtocolStatePayload } from '@markless/serializer';
 
 // Show-then-adopt, adopt half (T107 streaming): the __mArm executor already
 // swapped settled arm content into the boundary's anchor range pre-runtime;
@@ -27,6 +28,8 @@ type StreamPatchDocumentRoot = {
 	} | null;
 };
 
+type StreamedStateDelta = Pick<ProtocolStatePayload, 'cells' | 'computed'>;
+
 export function adoptStreamedArmPatches(
 	decoded: DecodedPayloadScripts,
 	root: StreamPatchDocumentRoot,
@@ -53,41 +56,54 @@ export function adoptStreamedArmPatches(
 				JSON.parse(script.textContent ?? 'null') as unknown,
 			]),
 	);
+	const ownedRunnerIds = new Set(
+		decoded.view.asyncBoundaries.flatMap((boundary) =>
+			boundary.runnerGraphNodeId ? [boundary.runnerGraphNodeId] : [],
+		),
+	);
 	const patchByGraphNode = new Map(
 		patchScripts
-			.filter(
-				(script) =>
-					!uncommittedGraphNodeIds.has(script.getAttribute('data-graph-node') ?? ''),
-			)
+			.filter((script) => {
+				const graphNodeId = script.getAttribute('data-graph-node') ?? '';
+				return ownedRunnerIds.has(graphNodeId) && !uncommittedGraphNodeIds.has(graphNodeId);
+			})
 			.map((script) => [
 				script.getAttribute('data-graph-node'),
-				JSON.parse(script.textContent ?? 'null') as { readonly snapshot?: unknown } | null,
+				JSON.parse(script.textContent ?? 'null') as StreamedStateDelta | null,
 			]),
+	);
+	const deltas = [...patchByGraphNode.values()].filter(
+		(delta): delta is StreamedStateDelta => !!delta,
+	);
+	const cells = mergeStateRecords(
+		decoded.state.cells,
+		deltas.flatMap((delta) => delta.cells),
+	);
+	const computed = mergeStateRecords(
+		decoded.state.computed,
+		deltas.flatMap((delta) => delta.computed),
 	);
 
 	return {
 		state: {
 			...decoded.state,
-			computed: decoded.state.computed.map((computed) => {
-				const snapshot = patchByGraphNode.get(computed.graphNodeId)?.snapshot;
-				return snapshot
-					? { ...computed, snapshot: snapshot as NonNullable<typeof computed.snapshot> }
-					: computed;
-			}),
+			cells,
+			computed,
 		},
 		view: {
 			...decoded.view,
 			asyncBoundaries: decoded.view.asyncBoundaries.map((boundary) => {
 				const armRecords = armRecordsByBoundary.get(boundary.id);
 				if (!armRecords) return boundary;
-				const snapshot = patchByGraphNode.get(boundary.runnerGraphNodeId ?? '')?.snapshot as
-					| { readonly status?: unknown }
-					| undefined;
-				const initiallyServedArm = snapshot?.status === 'fulfilled'
-					? ASYNC_BOUNDARY_ARM.try
-					: snapshot?.status === 'rejected'
-						? ASYNC_BOUNDARY_ARM.catch
-						: boundary.initiallyServedArm;
+				const snapshot = computed.find(
+					(record) => record.graphNodeId === boundary.runnerGraphNodeId,
+				)?.snapshot as { readonly status?: unknown } | undefined;
+				const initiallyServedArm =
+					snapshot?.status === 'fulfilled'
+						? ASYNC_BOUNDARY_ARM.try
+						: snapshot?.status === 'rejected'
+							? ASYNC_BOUNDARY_ARM.catch
+							: boundary.initiallyServedArm;
 				return {
 					...boundary,
 					initiallyServedArm,
@@ -96,4 +112,16 @@ export function adoptStreamedArmPatches(
 			}),
 		},
 	};
+}
+
+function mergeStateRecords<T extends { readonly graphNodeId: string }>(
+	base: ReadonlyArray<T>,
+	additions: ReadonlyArray<T>,
+): T[] {
+	const records = new Map(base.map((record) => [record.graphNodeId, record]));
+	for (const addition of additions) {
+		const current = records.get(addition.graphNodeId);
+		records.set(addition.graphNodeId, current ? { ...current, ...addition } : addition);
+	}
+	return [...records.values()];
 }

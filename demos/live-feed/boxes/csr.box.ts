@@ -1,68 +1,50 @@
 import { box } from '@async/witness';
+import { assertArmRecordCell, reachableArmRecordCells } from './arm-record-cells';
 
 const WAIT = { timeoutMs: 10_000 };
 
 export default box(
 	{
-		name: 'live-feed csr: local async data settles, rejects, and stays interactive',
-		tags: ['live-feed', 'csr', 'preview', 'browser', 'async', 'repeat'],
+		name: 'live-feed csr: legacy and prerendered arm-record cells stay interactive',
+		tags: ['live-feed', 'csr', 'preview', 'browser', 'async', 'repeat', 'prerender'],
 		modes: ['build', 'preview'],
 	},
 	async ({ pipeline, expect, receipt }) => {
-		const build = await pipeline.build({
-			config: (config) => ({ ...config, configFile: 'boxes/vite.config.ts' }),
-		});
-		const preview = await pipeline.preview(build);
+		for (const posture of ['csr-legacy', 'prerendered'] as const) {
+			const configFile =
+				posture === 'csr-legacy'
+					? 'boxes/vite.legacy.config.ts'
+					: 'boxes/vite.config.ts';
+			const build = await pipeline.build({
+				config: (config) => ({ ...config, configFile }),
+			});
+			const preview = await pipeline.preview(build);
+			try {
+				for (const cell of reachableArmRecordCells('csr').filter(
+					(cell) => cell.posture === posture,
+				)) {
+					const page = await preview.browser.visit(`/?latency=${cell.latencyMs}`);
+					await assertArmRecordCell(page, expect, cell);
+					receipt.note(`arm-record matrix passed: ${cell.id}`);
+				}
 
-		const page = await preview.browser.visit('/?latency=600');
-		await expect.page.text(page, '[data-feed-title]', 'Local build updates', WAIT);
-		await expect.page.attribute(page, '[data-weight]', 'data-weight', '2', WAIT);
-		await expect.page.text(page, '[data-feed-pending]', 'Checking local updates…', WAIT);
+				const failedPage = await preview.browser.visit('/?latency=40&fail=1');
+				await expect.page.text(
+					failedPage,
+					'[data-feed-error]',
+					'Local updates unavailable',
+					WAIT,
+				);
+				await expect.page.outcome(
+					failedPage,
+					{ consoleErrors: 0, failedRequests: 0 },
+					WAIT,
+				);
+			} finally {
+				await preview.close();
+			}
+		}
 
-		await expect.page.attribute(page, '[data-update-list]', 'data-row-count', '3', WAIT);
-		await expect.page.attribute(
-			page,
-			'[data-update-list] > :nth-child(1)',
-			'data-row-key',
-			'atlas-204',
-			WAIT,
-		);
-		await expect.page.attribute(
-			page,
-			'[data-update-list] > :nth-child(2)',
-			'data-row-key',
-			'beacon-118',
-			WAIT,
-		);
-		await expect.page.attribute(
-			page,
-			'[data-update-list] > :nth-child(3)',
-			'data-row-key',
-			'cinder-73',
-			WAIT,
-		);
-		await expect.page.text(page, '[data-row-key="atlas-204"] [data-version]', '2.0.4', WAIT);
-		await expect.page.text(page, '[data-row-key="beacon-118"] [data-version]', '1.1.8', WAIT);
-		await expect.page.text(page, '[data-row-key="cinder-73"] [data-version]', '0.7.3', WAIT);
-		await expect.page.text(page, '[data-weighted-count]', 'Weighted count 6', WAIT);
-
-		await page.click('[data-row-key="beacon-118"]', WAIT);
-		// Regression pin: keyed-repeat row events inside a settled async arm are registered.
-		await expect.page.text(page, '[data-selected-key]', 'Selected beacon-118', WAIT);
-
-		await page.click('[data-increase-weight]', WAIT);
-		await expect.page.attribute(page, '[data-weight]', 'data-weight', '3', WAIT);
-		// Regression pin: in-arm child computed records remain live after the arm commit.
-		await expect.page.text(page, '[data-weighted-count]', 'Weighted count 9', WAIT);
-
-		const failedPage = await preview.browser.visit('/?latency=40&fail=1');
-		await expect.page.text(failedPage, '[data-feed-error]', 'Local updates unavailable', WAIT);
-		await expect.page.outcome(page, { consoleErrors: 0, failedRequests: 0 }, WAIT);
-		await expect.page.outcome(failedPage, { consoleErrors: 0, failedRequests: 0 }, WAIT);
-
-		await preview.close();
-		await receipt.capture(
-			'live-feed csr pending, settle, interaction, mutation, and rejection',
-		);
+		await receipt.capture('live-feed CSR arm-record posture and settle-timing matrix');
 	},
 );

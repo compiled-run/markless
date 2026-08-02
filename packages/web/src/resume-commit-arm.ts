@@ -14,6 +14,7 @@ import type {
 	ResumeEventRecord,
 	ResumeKeyedRepeatRecord,
 } from './resume-types.ts';
+import type { ProtocolStatePayload } from '@markless/serializer';
 
 // D1 tier 4: commitArm replaces the DOM range between an async boundary's
 // comment-anchor pair with freshly rendered arm content and re-registers the
@@ -28,7 +29,10 @@ export type ArmCommitUpdate = {
 	readonly armRecords: ResumeArmRecordSet;
 	readonly elementsByHostId?: ReadonlyMap<string, ResumeDomElement>;
 	readonly eventElementsByHostId?: ReadonlyMap<string, ReadonlyArray<ResumeDomElement>>;
+	readonly computed?: ProtocolStatePayload['computed'];
 };
+
+export type ArmRegistrationDeps = Parameters<typeof createArmCommitter>[0];
 
 type CommitParent = {
 	readonly childNodes: ArrayLike<ResumeDomNode>;
@@ -91,6 +95,9 @@ export function createArmCommitter(
 		) => Promise<void>;
 		readonly graph?: import('@markless/runtime').RuntimeGraph;
 		readonly graphNodeIds?: ReadonlySet<string>;
+		readonly registerComputedRefreshes?: (
+			records: ProtocolStatePayload['computed'],
+		) => Promise<void> | void;
 		readonly loadSymbol?: (symbolId: string) => unknown | Promise<unknown>;
 		readonly getElementHandle?: (handleId: string) => ResumeDomElement | undefined;
 		readonly storeHostSubscription?: (hostNodeId: string, release: () => void) => void;
@@ -108,65 +115,104 @@ export function createArmCommitter(
 		if (!update.nodes && (!deps.renderHtml || update.html === undefined))
 			throw armCommitRendererMissingError(boundary);
 		const fresh = update.nodes ?? deps.renderHtml!(update.html!);
-		if (update.elementsByHostId) assertNativeArmRecordHosts(update);
 		const outgoing = elementsBetweenAnchors(
 			deps.root,
 			boundary.startAnchor,
 			boundary.endAnchor,
 		);
 		const captured = captureFocusScroll(deps, outgoing);
-		// Install delegation before replacement exposes fresh interactive DOM.
-		for (const event of update.armRecords.events) installEventType(event.eventName);
-		for (const branch of update.armRecords.branches ?? [])
-			for (const arm of branch.armRecords ?? [])
-				for (const event of arm.events) installEventType(event.eventName);
-		for (const repeat of update.armRecords.keyedRepeats ?? [])
-			for (const event of repeat.rowEvents) installEventType(event.eventName);
+		installArmEventTypes(update.armRecords, installEventType);
 		for (const hostNodeId of hostIdsInsideRemovedElements(deps.elementsByHostId, outgoing)) {
 			deps.disposeHost(hostNodeId);
 		}
 		replaceAnchorRange(boundary, fresh);
-		// Locator misalignment against the fresh DOM throws loud here (D2): a
-		// commit that cannot prove its census must never half-register records.
-		const materialized = materializeArmRecords({
-			root: deps.root,
-			startAnchor: boundary.startAnchor,
-			endAnchor: boundary.endAnchor,
-			armRecords: update.armRecords,
-			elementsByHostId: update.elementsByHostId,
+		const materialized = await registerArmRecordSet(deps, installEventType, boundary, update, {
+			eventTypesInstalled: true,
 		});
-		for (const [hostNodeId, element] of materialized.elementsByHostId) {
-			deps.disposedHosts.delete(hostNodeId);
-			deps.elementsByHostId.set(hostNodeId, element);
-		}
-		for (const record of materialized.events) {
-			const element = materialized.elementsByHostId.get(record.hostNodeId);
-			if (!element) throw armRecordHostMissingError(record.hostNodeId, 'event');
-			deps.addEventRecord(element, record);
-		}
-		for (const handle of materialized.elementHandles) {
-			const element = materialized.elementsByHostId.get(handle.hostNodeId);
-			if (!element) throw armRecordHostMissingError(handle.hostNodeId, 'element handle');
-			deps.registerElementHandle(handle.hostNodeId, handle, element);
-		}
-		registerArmDomUpdates(deps, materialized.domUpdates);
-		if (deps.registerKeyedRepeats && materialized.keyedRepeats.length > 0)
-			await deps.registerKeyedRepeats(materialized.keyedRepeats);
-		if (deps.addBehaviors && materialized.behaviors.length > 0) {
-			const byHost = new Map<string, ResumeBehaviorRecord[]>();
-			for (const behavior of materialized.behaviors) {
-				const records = byHost.get(behavior.hostNodeId) ?? [];
-				records.push(behavior);
-				byHost.set(behavior.hostNodeId, records);
-			}
-			for (const [hostNodeId, records] of byHost)
-				await deps.addBehaviors(hostNodeId, records);
-		}
-		if (deps.registerArmBranches && materialized.branches.length > 0) {
-			await deps.registerArmBranches(boundary.id, materialized.branches);
-		}
 		restoreFocusScroll(deps, boundary, captured, materialized.elementsByHostId);
 	};
+}
+
+// One seven-kind registration core serves both destructive arm commits and
+// settled arms that were already in the served DOM at boot.
+export async function registerArmRecordSet(
+	deps: ArmRegistrationDeps,
+	installEventType: (eventType: string) => void,
+	boundary: ResumeAsyncBoundaryRecord,
+	update: Pick<ArmCommitUpdate, 'armRecords' | 'elementsByHostId' | 'computed'>,
+	options: { readonly eventTypesInstalled?: boolean } = {},
+) {
+	const exhaustive = {
+		locators: true,
+		events: true,
+		domUpdates: true,
+		behaviors: true,
+		elementHandles: true,
+		keyedRepeats: true,
+		branches: true,
+	} satisfies Record<keyof ResumeArmRecordSet, true>;
+	void exhaustive;
+	if (update.elementsByHostId) assertNativeArmRecordHosts(update);
+	if (!options.eventTypesInstalled) installArmEventTypes(update.armRecords, installEventType);
+	// Locator misalignment against the live DOM throws loud here (D2): a
+	// registration that cannot prove its census must never half-register.
+	const materialized = materializeArmRecords({
+		root: deps.root,
+		startAnchor: boundary.startAnchor,
+		endAnchor: boundary.endAnchor,
+		armRecords: update.armRecords,
+		elementsByHostId: update.elementsByHostId,
+	});
+	for (const [hostNodeId, element] of materialized.elementsByHostId) {
+		deps.disposedHosts.delete(hostNodeId);
+		deps.elementsByHostId.set(hostNodeId, element);
+	}
+	for (const record of materialized.events) {
+		const element = materialized.elementsByHostId.get(record.hostNodeId);
+		if (!element) throw armRecordHostMissingError(record.hostNodeId, 'event');
+		deps.addEventRecord(element, record);
+	}
+	for (const handle of materialized.elementHandles) {
+		const element = materialized.elementsByHostId.get(handle.hostNodeId);
+		if (!element) throw armRecordHostMissingError(handle.hostNodeId, 'element handle');
+		deps.registerElementHandle(handle.hostNodeId, handle, element);
+	}
+	const computedRefreshes = (update.computed ?? []).filter(
+		(computed) => computed.async === false && typeof computed.deriveSymbolId === 'string',
+	);
+	if (computedRefreshes.length > 0) {
+		if (!deps.registerComputedRefreshes)
+			throw new Error('Markless async arm computed-refresh registration is unavailable.');
+		await deps.registerComputedRefreshes(computedRefreshes);
+	}
+	registerArmDomUpdates(deps, materialized.domUpdates);
+	if (deps.registerKeyedRepeats && materialized.keyedRepeats.length > 0)
+		await deps.registerKeyedRepeats(materialized.keyedRepeats);
+	if (deps.addBehaviors && materialized.behaviors.length > 0) {
+		const byHost = new Map<string, ResumeBehaviorRecord[]>();
+		for (const behavior of materialized.behaviors) {
+			const records = byHost.get(behavior.hostNodeId) ?? [];
+			records.push(behavior);
+			byHost.set(behavior.hostNodeId, records);
+		}
+		for (const [hostNodeId, records] of byHost) await deps.addBehaviors(hostNodeId, records);
+	}
+	if (deps.registerArmBranches && materialized.branches.length > 0) {
+		await deps.registerArmBranches(boundary.id, materialized.branches);
+	}
+	return materialized;
+}
+
+function installArmEventTypes(
+	records: ResumeArmRecordSet,
+	installEventType: (eventType: string) => void,
+): void {
+	for (const event of records.events) installEventType(event.eventName);
+	for (const branch of records.branches ?? [])
+		for (const arm of branch.armRecords ?? [])
+			for (const event of arm.events) installEventType(event.eventName);
+	for (const repeat of records.keyedRepeats ?? [])
+		for (const event of repeat.rowEvents) installEventType(event.eventName);
 }
 
 function assertNativeArmRecordHosts(update: ArmCommitUpdate): void {
@@ -200,7 +246,8 @@ function registerArmDomUpdates(
 			!deps.graphNodeIds?.has(domUpdate.graphNodeId) &&
 			typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' &&
 			__MARKLESS_DEBUG_ENABLED__
-		) throw new Error(`Markless DOM update expected graph node ${domUpdate.graphNodeId}.`);
+		)
+			throw new Error(`Markless DOM update expected graph node ${domUpdate.graphNodeId}.`);
 		deps.storeHostSubscription(
 			domUpdate.hostNodeId,
 			deps.graph.subscribe({
@@ -208,7 +255,9 @@ function registerArmDomUpdates(
 				graphNodeId: domUpdate.graphNodeId,
 				path: domUpdate.path,
 				async run(value) {
-					const symbol = (await deps.loadSymbol(domUpdate.symbolId!)) as (context: unknown) => unknown;
+					const symbol = (await deps.loadSymbol(domUpdate.symbolId!)) as (
+						context: unknown,
+					) => unknown;
 					return symbol({
 						graph: deps.graph,
 						element,

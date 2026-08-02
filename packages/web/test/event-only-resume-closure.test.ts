@@ -16,13 +16,12 @@ const resumeOnDemandEntries = [
 	join(repoRoot, 'packages/web/src/resume-keyed-repeats.ts'),
 	join(repoRoot, 'packages/web/src/resume-sync-computed.ts'),
 ] as const;
-// 4,800 gzip bytes * the observed ~3.85 raw:minified+gzip ratio leaves an
-// 18,480 byte raw-source proxy budget for the full progressive runtime closure.
-// Ratio re-observed 2026-07-08 after the repo-wide canonical format (wraps +
-// trailing commas grew raw source only — largest closure measured 18,266; the
-// authoritative gzip walls in bundler/test/fixture-builds.test.ts were
-// unchanged and passing, same method).
-const sourceByteLimit = 18480;
+// 4,800 gzip bytes * the observed ~6.02 raw:minified+gzip ratio leaves a
+// 28,892 byte raw-source proxy budget for the full progressive runtime closure.
+// Ratio re-observed 2026-08-02 after sanctioned prerender and one-core
+// convergence work: the largest closure was 18,961 raw bytes and its esbuild
+// bundle+minify output was 3,150 gzip bytes. The 4,800-byte gzip wall is unchanged.
+const sourceByteLimit = 28892;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts',
@@ -88,6 +87,19 @@ test('resume core and on-demand runtime modules keep static source closures lean
 	for (const entry of [resumeEntry, resumeRuntimeEntry, ...resumeOnDemandEntries]) {
 		const closure = collectStaticImportClosure(entry);
 		expect(closure.sourceBytes).toBeLessThanOrEqual(sourceByteLimit);
+	}
+});
+
+test('every arm-record fold and prefix is compile-time exhaustive', () => {
+	for (const file of [
+		'resume-arm-records.ts',
+		'resume-commit-arm.ts',
+		'resume-async-wiring.ts',
+		'resume-csr-coordinate.ts',
+		'fns/ssr.ts',
+	]) {
+		const source = readFileSync(join(repoRoot, 'packages/web/src', file), 'utf8');
+		expect(source).toMatch(/satisfies Record<keyof [^,>]+(?:\['armRecords'\])?, true>/);
 	}
 });
 

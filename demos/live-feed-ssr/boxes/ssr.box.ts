@@ -1,4 +1,8 @@
 import { box } from '@async/witness';
+import {
+	assertArmRecordCell,
+	reachableArmRecordCells,
+} from '../../live-feed/boxes/arm-record-cells';
 
 const WAIT = { timeoutMs: 10_000 };
 
@@ -22,18 +26,13 @@ export default box(
 		if (settledHtml.includes('data-feed-pending')) {
 			throw new Error('Expected the fast SSR response to settle before the shell flush.');
 		}
-		const settledPage = await preview.browser.visit('/?latency=0');
-		await expect.page.attribute(settledPage, '[data-update-list]', 'data-row-count', '3', WAIT);
-		await expect.page.text(settledPage, '[data-weighted-count]', 'Weighted count 6', WAIT);
+		const settledCell = reachableArmRecordCells('ssr').find(
+			(cell) => cell.posture === 'ssr-settled',
+		)!;
+		const settledPage = await preview.browser.visit(`/?latency=${settledCell.latencyMs}`);
 		await waitForSettledLoadAccounting(settledPage, WAIT);
-
-		await settledPage.click('[data-row-key="beacon-118"]', WAIT);
-		// Regression pin: settled-arm keyed-repeat rows register their event records.
-		await expect.page.text(settledPage, '[data-selected-key]', 'Selected beacon-118', WAIT);
-		await settledPage.click('[data-increase-weight]', WAIT);
-		await expect.page.attribute(settledPage, '[data-weight]', 'data-weight', '3', WAIT);
-		// Regression pin: the settled arm's child computed stays connected after commit.
-		await expect.page.text(settledPage, '[data-weighted-count]', 'Weighted count 9', WAIT);
+		await assertArmRecordCell(settledPage, expect, settledCell);
+		receipt.note(`arm-record matrix passed: ${settledCell.id}`);
 
 		// Raw response timing is deliberately separate from painted-DOM checks:
 		// pending can flush in the stream without the browser ever painting it.
@@ -51,8 +50,14 @@ export default box(
 			`held pending raw-stream scenario: first=${held.firstChunkElapsedMs}ms total=${held.totalElapsedMs}ms`,
 		);
 
-		const heldPage = await preview.browser.visit('/?latency=900');
-		await expect.page.attribute(heldPage, '[data-update-list]', 'data-row-count', '3', WAIT);
+		const streamedCells = reachableArmRecordCells('ssr').filter(
+			(cell) => cell.posture === 'ssr-streamed',
+		);
+		const heldPage = await preview.browser.visit(
+			`/?latency=${streamedCells[0]!.latencyMs}`,
+		);
+		await assertArmRecordCell(heldPage, expect, streamedCells[0]!);
+		receipt.note(`arm-record matrix passed: ${streamedCells[0]!.id}`);
 		const heldStartupScripts = (await heldPage.networkRequests())
 			.map((request) => new URL(request.url).pathname)
 			.filter((path) => path.startsWith('/build/') && path.endsWith('.js'));
@@ -62,6 +67,10 @@ export default box(
 			);
 		}
 		receipt.note(`held pending self-wake startup JS: ${heldStartupScripts.join(', ')}`);
+
+		receipt.note(
+			'covered cells (see arm-record-cells.ts reasons): ssr-streamed:settle-after-interaction (witness visit awaits the load event, so no click can land inside a held stream) and ssr-streamed:queued-commit-at-wake — both pinned by ssr-streamed:settle-before-interaction + prerendered:settle-after-interaction',
+		);
 
 		const rejectedHtml = await preview.request('/?latency=0&fail=1');
 		await expect.html.contains(rejectedHtml, 'data-feed-error');

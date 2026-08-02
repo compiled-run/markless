@@ -1,7 +1,9 @@
 import { expect, test } from 'vitest';
 import {
 	derivePrerenderResumeRecords,
+	evaluateBuiltPageClosure,
 	evaluatePrerenderClosure,
+	renderPrerenderBoundary,
 } from '../src/prerender/evaluator.ts';
 import {
 	assemblePrerenderContainer,
@@ -214,4 +216,130 @@ test('assembles a prerendered container with delegated triggers and zero payload
 	expect(html).toContain('addEventListener');
 	expect(parts.head).toContain('<link rel="modulepreload" href="/build/resume.js"');
 	expect(parts.container).not.toContain('rel="modulepreload"');
+});
+
+test('self-wakes an unsettled prerendered async boundary without payload scripts', async () => {
+	const artifact: SsrRenderArtifact = {
+		resumeModuleUrl: '/build/resume.js',
+		renderSsr: () => ({ html: '<p>Checking updates…</p>' }),
+	};
+	const output = {
+		html: '<p>Checking updates…</p>',
+		state: {
+			version: 1,
+			cells: [],
+			computed: [
+				{
+					graphNodeId: 'computed:feed',
+					name: 'feed',
+					async: true,
+					snapshot: { status: 'pending' as const, version: 1, key: null },
+				},
+			],
+			sharedDefinitions: [],
+		},
+		view: {
+			version: 1,
+			locators: [],
+			events: [],
+			domUpdates: [],
+			behaviors: [],
+			elementHandles: [],
+			keyedRepeats: [],
+			branches: [],
+			asyncRunners: { 'computed:feed': 'symbol:feed-runner' },
+			asyncBoundaries: [
+				{
+					id: 'boundary:0',
+					startAnchor: { strategy: 'dom-order-comment' as const, index: 0 },
+					endAnchor: { strategy: 'dom-order-comment' as const, index: 1 },
+					asyncReads: [
+						{
+							source: 'feed',
+							graphNodeId: 'computed:feed',
+							path: [],
+							runnerSymbolId: 'symbol:feed-runner',
+						},
+					],
+				},
+			],
+		},
+	};
+
+	const html = await assemblePrerenderContainer(artifact, output, {});
+
+	expect(html).not.toContain('type="markless/state"');
+	expect(html).not.toContain('type="markless/view"');
+	expect(html).toContain('data-markless-self-wake');
+	expect(html).toContain('queueMicrotask');
+	expect(html).toContain('DOMContentLoaded');
+});
+
+test('built prerender closure uses pending-only async evaluation', async () => {
+	let receivedContext: unknown;
+	const artifact: SsrRenderArtifact = {
+		async renderSsr(_props, renderContext) {
+			receivedContext = renderContext;
+			return { html: '<p>Pending</p>' };
+		},
+	};
+
+	await evaluateBuiltPageClosure(artifact);
+
+	expect(receivedContext).toEqual({ prerender: true });
+});
+
+test('renders a settled prerender boundary from declared structure coordinates', async () => {
+	const armRecords = {
+		locators: [],
+		events: [],
+		behaviors: [],
+		elementHandles: [],
+		keyedRepeats: [],
+		branches: [],
+	};
+	let receivedContext: unknown;
+	const artifact: SsrRenderArtifact = {
+		async renderSsr(_props, renderContext) {
+			receivedContext = renderContext;
+			return {
+				html: '<main><!--markless:async:boundary:0--><section>Stable</section><!--/markless:async:boundary:0--></main>',
+				structure: {
+					anchors: [
+						{ kind: 'async', id: 'boundary:0', html: '<section>Stable</section>' },
+					],
+				},
+				view: {
+					version: 1,
+					locators: [],
+					events: [],
+					domUpdates: [],
+					behaviors: [],
+					elementHandles: [],
+					keyedRepeats: [],
+					branches: [],
+					asyncBoundaries: [
+						{
+							id: 'boundary:0',
+							startAnchor: { strategy: 'dom-order-comment', index: 0 },
+							endAnchor: { strategy: 'dom-order-comment', index: 1 },
+							asyncReads: [],
+							armRecords,
+						},
+					],
+				},
+			};
+		},
+	};
+	const graph = { read: () => ({ status: 'fulfilled' }) };
+
+	const rendered = await renderPrerenderBoundary(
+		artifact,
+		'boundary:0',
+		'fulfilled',
+		graph as never,
+	);
+
+	expect(receivedContext).toEqual({ prerenderSettle: { graph } });
+	expect(rendered).toEqual({ html: '<section>Stable</section>', armRecords, computed: [] });
 });

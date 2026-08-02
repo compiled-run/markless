@@ -1,4 +1,9 @@
-import { ASYNC_BOUNDARY_ARM, serializeRuntimeAsyncSnapshots } from '@markless/serializer';
+import {
+	ASYNC_BOUNDARY_ARM,
+	serializeRuntimeAsyncSnapshots,
+	serializeRuntimeStateCells,
+	type ProtocolStatePayload,
+} from '@markless/serializer';
 import {
 	MARKLESS_PENDING_MIN_VISIBLE_MS,
 	MARKLESS_REVEAL_TRAIN_CADENCE_MS,
@@ -116,7 +121,14 @@ export async function renderToStream(
 		shell,
 		pendingArmCount: pendingArms.length,
 		appends: () =>
-			streamArmAppends({ component, options, renderContext, pendingArms, resumeModuleUrl }),
+			streamArmAppends({
+				component,
+				options,
+				renderContext,
+				pendingArms,
+				resumeModuleUrl,
+				shellState: output.state,
+			}),
 		cancel: (reason) => settleController.abort(reason),
 	};
 }
@@ -172,6 +184,7 @@ async function* streamArmAppends(input: {
 	readonly renderContext: StreamRenderContext;
 	readonly pendingArms: ReadonlyArray<PendingArm>;
 	readonly resumeModuleUrl: string | undefined;
+	readonly shellState: ProtocolStatePayload | undefined;
 }): AsyncGenerator<string, void, void> {
 	const remaining = new Map(input.pendingArms.map((arm) => [arm.graphNodeId, arm]));
 	const signal = input.renderContext.streaming.signal;
@@ -207,8 +220,9 @@ async function* streamArmAppends(input: {
 			// as if it were the settled content.
 			const settledInWave = new Set(
 				(output.state?.computed ?? []).flatMap((computed) => {
-					const status = (computed as { readonly snapshot?: { readonly status?: string } })
-						.snapshot?.status;
+					const status = (
+						computed as { readonly snapshot?: { readonly status?: string } }
+					).snapshot?.status;
 					return status === 'fulfilled' || status === 'rejected'
 						? [computed.graphNodeId]
 						: [];
@@ -223,7 +237,7 @@ async function* streamArmAppends(input: {
 					parts.push(armExecutorScript(input.resumeModuleUrl, input.options.nonce));
 					executorEmitted = true;
 				}
-				parts.push(renderArmAppend(output, arm, input.options.nonce));
+				parts.push(renderArmAppend(output, arm, input.options.nonce, input.shellState));
 			}
 			if (parts.length > 0) yield parts.join('');
 		}
@@ -236,11 +250,13 @@ function renderArmAppend(
 	output: SsrRenderOutput,
 	arm: PendingArm,
 	nonce: string | undefined,
+	shellState: ProtocolStatePayload | undefined,
 ): string {
 	const renderedAnchor = output.structure?.anchors.find(
 		(candidate) => candidate.kind === 'async' && candidate.id === arm.boundaryId,
 	);
-	if (!renderedAnchor) throw streamArmError(arm.boundaryId, 'renderData boundary record', 'structure');
+	if (!renderedAnchor)
+		throw streamArmError(arm.boundaryId, 'renderData boundary record', 'structure');
 	const armHtml = renderedAnchor.html;
 
 	const boundary = (output.view?.asyncBoundaries ?? []).find(
@@ -254,8 +270,26 @@ function renderArmAppend(
 		(candidate) => candidate.graphNodeId === arm.graphNodeId,
 	);
 	if (!computed) throw streamArmError(arm.boundaryId, 'a settled snapshot', 'state payload');
-	const [serialized] = serializeRuntimeAsyncSnapshots([computed]);
-	const patch = { graphNodeId: arm.graphNodeId, snapshot: serialized?.snapshot };
+	const shellGraphNodeIds = new Set([
+		...(shellState?.cells ?? []).map((cell) => cell.graphNodeId),
+		...(shellState?.computed ?? []).map((definition) => definition.graphNodeId),
+	]);
+	const cells = serializeRuntimeStateCells(
+		(output.state?.cells ?? []).filter((cell) => !shellGraphNodeIds.has(cell.graphNodeId)),
+	);
+	const computedById = new Map(
+		(output.state?.computed ?? [])
+			.filter(
+				(definition) =>
+					definition.graphNodeId === arm.graphNodeId ||
+					!shellGraphNodeIds.has(definition.graphNodeId),
+			)
+			.map((definition) => [definition.graphNodeId, definition]),
+	);
+	const patch: Pick<ProtocolStatePayload, 'cells' | 'computed'> = {
+		cells,
+		computed: serializeRuntimeAsyncSnapshots([...computedById.values()]),
+	};
 	const nonceAttribute = nonce ? ` nonce="${escapeAttribute(nonce)}"` : '';
 
 	const revealArguments = arm.revealDependencyIds.length

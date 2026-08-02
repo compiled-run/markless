@@ -1,6 +1,7 @@
 import { ASYNC_BOUNDARY_ARM, ASYNC_PROTOCOL_VERSION } from '@markless/serializer';
 import { expect, test } from 'vitest';
 import { adoptStreamedArmPatches } from '../src/resume-stream-patches.ts';
+import { registrationGraphNodeCensus } from '../src/resume-runtime.ts';
 
 // Streamed pages leave their settled-arm records and incremental snapshots
 // in the document as inert scripts; the resume runtime adopts them BEFORE
@@ -68,13 +69,34 @@ test('adoptStreamedArmPatches overlays streamed snapshots and arm records before
 			fakeScript(
 				{ 'data-graph-node': 'computed:report' },
 				JSON.stringify({
-					graphNodeId: 'computed:report',
-					snapshot: {
-						status: 'fulfilled',
-						version: 1,
-						key: null,
-						value: { root: 7, records: [] },
-					},
+					cells: [
+						{
+							graphNodeId: 'state:weight',
+							name: 'weight',
+							valueKind: 'scalar',
+							value: 3,
+						},
+					],
+					computed: [
+						{
+							graphNodeId: 'computed:report',
+							name: 'report',
+							async: true,
+							snapshot: {
+								status: 'fulfilled',
+								version: 1,
+								key: null,
+								value: { root: 7, records: [] },
+							},
+						},
+						{
+							graphNodeId: 'computed:weightedCount',
+							name: 'weightedCount',
+							async: false,
+							deriveSymbolId: 'symbol:weighted-count',
+							dependencies: [{ graphNodeId: 'state:weight', path: [] }],
+						},
+					],
 				}),
 			),
 		],
@@ -83,6 +105,13 @@ test('adoptStreamedArmPatches overlays streamed snapshots and arm records before
 	const adopted = adoptStreamedArmPatches(decoded, root as never);
 
 	expect(adopted.state.computed[0]?.snapshot).toMatchObject({ status: 'fulfilled' });
+	expect(adopted.state.cells.map((record) => record.graphNodeId)).toContain('state:weight');
+	expect(adopted.state.computed.map((record) => record.graphNodeId)).toContain(
+		'computed:weightedCount',
+	);
+	expect(registrationGraphNodeCensus(adopted.state)).toEqual(
+		new Set(['computed:report', 'state:weight', 'computed:weightedCount']),
+	);
 	expect(adopted.view.asyncBoundaries[0]?.armRecords).toEqual(settledRecords);
 	expect(adopted.view.asyncBoundaries[0]?.initiallyServedArm).toBe(ASYNC_BOUNDARY_ARM.try);
 });
@@ -114,13 +143,18 @@ test('adoptStreamedArmPatches skips boundaries whose streamed template is still 
 			fakeScript(
 				{ 'data-graph-node': 'computed:report' },
 				JSON.stringify({
-					graphNodeId: 'computed:report',
-					snapshot: {
-						status: 'fulfilled',
-						version: 1,
-						key: null,
-						value: { root: 7, records: [] },
-					},
+					cells: [],
+					computed: [
+						{
+							...decoded.state.computed[0],
+							snapshot: {
+								status: 'fulfilled',
+								version: 1,
+								key: null,
+								value: { root: 7, records: [] },
+							},
+						},
+					],
 				}),
 			),
 		],
@@ -146,8 +180,8 @@ test('adoptStreamedArmPatches ignores patches for other containers payloads', ()
 			fakeScript(
 				{ 'data-graph-node': 'computed:unknown' },
 				JSON.stringify({
-					graphNodeId: 'computed:unknown',
-					snapshot: { status: 'fulfilled' },
+					cells: [{ graphNodeId: 'state:foreign', name: 'foreign', valueKind: 'scalar' }],
+					computed: [],
 				}),
 			),
 		],

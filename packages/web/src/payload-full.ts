@@ -36,6 +36,7 @@ export type ResumePayloadScriptsInput = EncodedPayloadScripts &
 		| 'createRemovalObserver'
 		| 'applyDomJournal'
 		| 'renderBranchHtml'
+		| 'renderAsyncBoundary'
 	> & { readonly root: ResumeDomElement };
 
 export type ResumePayloadScriptsResult = {

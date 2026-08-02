@@ -221,6 +221,15 @@ export type ResumeRuntimeInput = {
 	readonly liveHostNodes?: ReadonlyMap<string, ResumeDomElement>;
 	readonly loadSymbol: (symbolId: string) => ResumeSymbol | Promise<ResumeSymbol>;
 	readonly renderBranchHtml?: (html: string) => ReadonlyArray<ResumeDomNode>;
+	readonly renderAsyncBoundary?: (
+		boundaryId: string,
+		status: 'fulfilled' | 'rejected',
+		graph: RuntimeGraph,
+	) => Promise<{
+		readonly html: string;
+		readonly armRecords: ResumeArmRecordSet;
+		readonly computed?: ProtocolStatePayload['computed'];
+	}>;
 	readonly createVisibilityObserver?: ResumeVisibilityObserverFactory;
 	readonly createRemovalObserver?: ResumeRemovalObserverFactory;
 	readonly applyDomJournal?: (

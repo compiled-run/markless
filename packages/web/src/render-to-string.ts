@@ -185,13 +185,14 @@ export async function assemblePrerenderPageParts(
 	const modulePreloads =
 		optionPreloads ?? (browserTriggers ? artifactModulePreloads(component) : undefined);
 	const eventNames = browserEventNames(view);
+	const selfWake = hasUnsettledAsyncBoundaryRunner(view, state);
 	const resumerScript =
 		browserTriggers && resumeModuleUrl
 			? renderInlineResumerScript(
 					createPrerenderInlineResumerSource(eventNames, resumeModuleUrl),
 					options.nonce,
 					resumeModuleUrl,
-					false,
+					selfWake,
 				)
 			: '';
 

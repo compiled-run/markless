@@ -95,6 +95,7 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 	readonly root: ResumeRuntimeInput['root'];
 	readonly loadSymbol: ResumeRuntimeInput['loadSymbol'];
 	readonly renderBranchHtml: ResumeRuntimeInput['renderBranchHtml'];
+	readonly renderAsyncBoundary?: ResumeRuntimeInput['renderAsyncBoundary'];
 	readonly elementHandles: ResumePreparedCore['elementHandles'];
 	readonly storeContainerSubscription: (release: () => void) => void;
 	// D1 tier 4: update symbols returning armRecords settle through commitArm
@@ -199,6 +200,7 @@ export async function settleAsyncBoundaryRange(
 		| 'root'
 		| 'loadSymbol'
 		| 'renderBranchHtml'
+		| 'renderAsyncBoundary'
 		| 'elementHandles'
 		| 'commitArm'
 		| 'settleTracker'
@@ -222,13 +224,27 @@ export async function settleAsyncBoundaryRange(
 		)
 			return;
 	}
-	if (input.commitArm && boundary.renderArm) {
-		const rendered = boundary.renderArm(status);
-		await input.commitArm(boundary, rendered);
+	const source = resolveBoundarySettleSource(input, boundary);
+	if (source === 'renderArm') {
+		const rendered = boundary.renderArm!(status);
+		if (!boundaryArmRecordSet(rendered?.armRecords)) throw emptySettleRenderError(boundary.id);
+		await input.commitArm!(boundary, rendered);
 		input.settleTracker?.markSettled(boundary.id);
 		return;
 	}
-	const symbol = await input.loadSymbol(boundary.updateSymbolId!);
+	if (source === 'renderAsyncBoundary') {
+		const rendered = await input.renderAsyncBoundary(boundary.id, status, input.graph);
+		const armRecords = boundaryArmRecordSet(rendered.armRecords);
+		if (!armRecords) throw emptySettleRenderError(boundary.id);
+		await input.commitArm!(boundary, {
+			html: rendered.html,
+			armRecords: composedBoundaryArmRecords(boundary.id, armRecords),
+			computed: rendered.computed,
+		});
+		input.settleTracker?.markSettled(boundary.id);
+		return;
+	}
+	const symbol = await input.loadSymbol(source.symbolId);
 	const update = await symbol({
 		graph: input.graph,
 		status,
@@ -236,11 +252,11 @@ export async function settleAsyncBoundaryRange(
 		getElementHandle: input.elementHandles.get,
 		asyncBoundary: boundary,
 	});
-	if (!isResumeBranchUpdate(update)) return;
+	if (!isResumeBranchUpdate(update)) throw emptySettleRenderError(boundary.id);
 	if (input.commitArm) {
-		const armRecords = boundaryArmRecordSet(
-			(update as { readonly armRecords?: unknown }).armRecords,
-		);
+		const rawArmRecords = (update as { readonly armRecords?: unknown }).armRecords;
+		const armRecords = boundaryArmRecordSet(rawArmRecords);
+		if (rawArmRecords !== undefined && !armRecords) throw emptySettleRenderError(boundary.id);
 		if (armRecords) {
 			await input.commitArm(boundary, {
 				html: update.html,
@@ -254,6 +270,35 @@ export async function settleAsyncBoundaryRange(
 	const fragment = input.renderBranchHtml ? input.renderBranchHtml(update.html) : update.html;
 	input.settleTracker?.markSettled(boundary.id);
 	return boundaryRangeJournal(boundary.id, fragment);
+}
+
+type SettleSource = 'renderArm' | 'renderAsyncBoundary' | { readonly symbolId: string };
+
+function resolveBoundarySettleSource(
+	input: Pick<
+		Parameters<typeof wireAsyncBoundariesWithoutLoadingCapability>[0],
+		'commitArm' | 'renderAsyncBoundary'
+	>,
+	boundary: ResumeAsyncBoundaryRecord,
+): SettleSource {
+	const byPrecedence = [
+		input.commitArm && boundary.renderArm ? ['renderArm' as const] : [],
+		input.commitArm && input.renderAsyncBoundary ? ['renderAsyncBoundary' as const] : [],
+		boundary.updateSymbolId ? [{ symbolId: boundary.updateSymbolId }] : [],
+	];
+	for (const candidates of byPrecedence) {
+		if (candidates.length > 1) throw ambiguousSettleSourceError(boundary.id);
+		if (candidates[0]) return candidates[0];
+	}
+	throw emptySettleRenderError(boundary.id);
+}
+
+function ambiguousSettleSourceError(boundaryId: string): Error {
+	return new Error(`MARKLESS_ASYNC_SETTLE_SOURCE_AMBIGUOUS: ${boundaryId}`);
+}
+
+function emptySettleRenderError(boundaryId: string): Error {
+	return new Error(`MARKLESS_ASYNC_SETTLE_RECORDS_MISSING: ${boundaryId}`);
 }
 
 // The settle commit shape shared by the snapshot and html paths: replace the
@@ -276,6 +321,16 @@ function composedBoundaryArmRecords(
 	boundaryId: string,
 	set: ResumeArmRecordSet,
 ): ResumeArmRecordSet {
+	const exhaustive = {
+		locators: true,
+		events: true,
+		domUpdates: true,
+		behaviors: true,
+		elementHandles: true,
+		keyedRepeats: true,
+		branches: true,
+	} satisfies Record<keyof ResumeArmRecordSet, true>;
+	void exhaustive;
 	const prefix = boundaryId.slice(0, boundaryId.lastIndexOf('boundary:'));
 	if (!prefix) return set;
 	const prefixHost = <T extends { readonly hostNodeId: string }>(record: T): T => ({
@@ -288,11 +343,24 @@ function composedBoundaryArmRecords(
 			...prefixHost(event),
 			symbolIds: event.symbolIds.map((symbolId) => prefix + symbolId),
 		})),
+		domUpdates: set.domUpdates?.map((update) => ({
+			...prefixHost(update),
+			...(update.symbolId ? { symbolId: prefix + update.symbolId } : {}),
+		})),
 		behaviors: set.behaviors.map((behavior) => ({
 			...prefixHost(behavior),
 			...(behavior.symbolId ? { symbolId: prefix + behavior.symbolId } : {}),
 		})),
 		elementHandles: set.elementHandles.map(prefixHost),
+		keyedRepeats: set.keyedRepeats?.map((repeat) => ({
+			...repeat,
+			id: prefix + repeat.id,
+			parentHostNodeId: prefix + repeat.parentHostNodeId,
+			rowEvents: repeat.rowEvents.map((event) => ({
+				...event,
+				symbolIds: event.symbolIds.map((symbolId) => prefix + symbolId),
+			})),
+		})),
 		...(set.branches
 			? {
 					branches: set.branches.map((branch) => ({
@@ -308,6 +376,12 @@ function composedBoundaryArmRecords(
 											symbolIds: (event.symbolIds ?? []).map(
 												(symbolId) => prefix + symbolId,
 											),
+										})),
+										domUpdates: (arm.domUpdates ?? []).map((update) => ({
+											...update,
+											...(update.symbolId
+												? { symbolId: prefix + update.symbolId }
+												: {}),
 										})),
 									})),
 								}

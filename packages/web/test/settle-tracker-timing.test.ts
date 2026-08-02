@@ -177,6 +177,25 @@ test('superseded during the hold: the stale settle commits nothing', async () =>
 	expect(tracker.hasSettledContent('slow')).toBe(false);
 });
 
+test('settled render fails loudly when the selected source returns no record set', async () => {
+	const boundary = boundaryRecord('empty', 'symbol:update');
+	await expect(
+		settleAsyncBoundaryRange(
+			{
+				graph: { read: () => 'fulfilled' } as never,
+				root: {} as never,
+				loadSymbol: async () => (() => ({ arm: 0, html: '<p>fallback</p>' })) as never,
+				renderBranchHtml: undefined,
+				renderAsyncBoundary: async () => ({ html: '', armRecords: null as never }),
+				elementHandles: { get: () => undefined } as never,
+				commitArm: async () => {},
+			},
+			boundary,
+			{ status: 'fulfilled' },
+		),
+	).rejects.toThrow('MARKLESS_ASYNC_SETTLE_RECORDS_MISSING: empty');
+});
+
 test('no active floor: the settle commits immediately without registering a wait', async () => {
 	const { clock, journal, settle } = settleHarness({ statusAfterHold: 'fulfilled' });
 	await settle({ status: 'fulfilled' });

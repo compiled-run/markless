@@ -160,6 +160,76 @@ test('commitArm replaces exactly the anchor range and disposes before re-registe
 	expect(disposedHosts.has('h-new')).toBe(false);
 });
 
+test('commitArm routes settled-arm computed refreshes through the shared registrar', async () => {
+	const { root, start, end } = fixture();
+	const count = element('output');
+	const section = element('section', [count]);
+	const subscriptions: Array<{ readonly graphNodeId: string }> = [];
+	const registeredComputed: unknown[] = [];
+	const graph = {
+		subscribe(subscription: { readonly graphNodeId: string }) {
+			subscriptions.push(subscription);
+			return () => {};
+		},
+	};
+	const commitArm = createArmCommitter(
+		({
+			root: asElement(root),
+			renderHtml: () => [asElement(section) as ResumeDomNode],
+			elementsByHostId: new Map(),
+			disposedHosts: new Set(),
+			disposeHost: () => {},
+			addEventRecord: () => {},
+			registerElementHandle: () => {},
+			graph: graph as never,
+			graphNodeIds: new Set(['state:weight', 'computed:weightedCount']),
+			loadSymbol: () => () => {},
+			storeHostSubscription: () => {},
+			registerComputedRefreshes(records: unknown) {
+				registeredComputed.push(records);
+			},
+		} as never),
+		() => {},
+	);
+
+	await commitArm(boundaryFor(start, end), {
+		html: '<section><output></output></section>',
+		computed: [
+			{
+				graphNodeId: 'computed:weightedCount',
+				name: 'weightedCount',
+				async: false,
+				deriveSymbolId: 'symbol:derive',
+				dependencies: [{ graphNodeId: 'state:weight', path: [] }],
+			},
+		],
+		armRecords: emptyArmRecords({
+			locators: [
+				{ hostNodeId: 'h-count', strategy: 'arm-relative', index: 1, tagName: 'output' },
+			],
+			domUpdates: [
+				{
+					hostNodeId: 'h-count',
+					source: 'weightedCount',
+					graphNodeId: 'computed:weightedCount',
+					path: [],
+					target: { kind: 'text' },
+					symbolId: 'symbol:update',
+				},
+			],
+		}),
+	});
+
+	expect(registeredComputed).toEqual([
+		expect.arrayContaining([
+			expect.objectContaining({ graphNodeId: 'computed:weightedCount' }),
+		]),
+	]);
+	expect(subscriptions.map((subscription) => subscription.graphNodeId)).toEqual([
+		'computed:weightedCount',
+	]);
+});
+
 test('commitArm fails loud when the anchor pair is not intact in the live DOM', async () => {
 	const { root, start, oldSection } = fixture();
 	// The end anchor lives in a DIFFERENT parent: the census is corrupt.

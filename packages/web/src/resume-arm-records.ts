@@ -7,11 +7,9 @@ import { isArmBranchAnchorComment } from './resume-anchor-census.ts';
 import type {
 	ResumeArmBranchRecord,
 	ResumeArmRecordSet,
-	ResumeAsyncBoundaryRecord,
 	ResumeDomComment,
 	ResumeDomElement,
 	ResumeDomNode,
-	ResumeViewRecord,
 } from './resume-types.ts';
 
 export function boundaryArmRecordSet(value: unknown): ResumeArmRecordSet | null {
@@ -32,6 +30,16 @@ type ArmMaterializeInput = {
 // arm-relative index); records whose host did not render in this arm are
 // skipped; arm-scoped branches resolve anchors in the arm's own census.
 export function materializeArmRecords(input: ArmMaterializeInput) {
+	const exhaustive = {
+		locators: true,
+		events: true,
+		domUpdates: true,
+		behaviors: true,
+		elementHandles: true,
+		keyedRepeats: true,
+		branches: true,
+	} satisfies Record<keyof ResumeArmRecordSet, true>;
+	void exhaustive;
 	const byHostId = new Map<string, ResumeDomElement>(input.elementsByHostId);
 	if (input.armRecords.locators.length > 0) {
 		const { elements, offset } = elementsAndAnchorOffset(input.root, input.startAnchor);
@@ -114,66 +122,6 @@ function missingArmBranchAnchorError(id: string, index: number): Error {
 		'MARKLESS_RESUME_LOCATOR_MISSING',
 		`Arm-scoped branch ${id} expected an arm-branch comment anchor at arm-local index ${index}.`,
 	);
-}
-
-export function expandBoundaryArmRecords(
-	root: ResumeDomElement,
-	view: ResumeViewRecord,
-	boundariesById: ReadonlyMap<string, ResumeAsyncBoundaryRecord>,
-): {
-	readonly view: ResumeViewRecord;
-	readonly elementsByHostId: Map<string, ResumeDomElement>;
-} | null {
-	const registrable = view.asyncBoundaries.flatMap((boundary) => {
-		const armRecords = boundaryArmRecordSet(boundary.armRecords);
-		const live = boundariesById.get(boundary.id);
-		return armRecords && live
-			? [
-					{
-						armRecords,
-						boundaryId: boundary.id,
-						startAnchor: live.startAnchor,
-						endAnchor: live.endAnchor,
-					},
-				]
-			: [];
-	});
-	if (registrable.length === 0) return null;
-
-	const elementsByHostId = new Map<string, ResumeDomElement>();
-	const events = [...view.events];
-	const behaviors = [...view.behaviors];
-	const elementHandles = [...view.elementHandles];
-	const keyedRepeats = [...(view.keyedRepeats ?? [])];
-	const branches = [...(view.branches ?? [])];
-	for (const { armRecords, boundaryId, startAnchor, endAnchor } of registrable) {
-		const materialized = materializeArmRecords({ root, startAnchor, endAnchor, armRecords });
-		for (const [hostNodeId, element] of materialized.elementsByHostId) {
-			elementsByHostId.set(hostNodeId, element);
-		}
-		events.push(...materialized.events);
-		behaviors.push(...materialized.behaviors);
-		elementHandles.push(...materialized.elementHandles);
-		keyedRepeats.push(...materialized.keyedRepeats);
-		// Arm-scoped branches join the stream with LIVE anchors + boundary id.
-		branches.push(
-			...(materialized.branches.map((record) => ({
-				...record,
-				armBoundaryId: boundaryId,
-			})) as unknown as NonNullable<ResumeViewRecord['branches']>),
-		);
-	}
-	return {
-		view: {
-			...view,
-			events,
-			behaviors,
-			elementHandles,
-			keyedRepeats,
-			...(branches.length > 0 ? { branches } : {}),
-		},
-		elementsByHostId,
-	};
 }
 
 // Pre-order element walk (root included, matching dom-order locators) that

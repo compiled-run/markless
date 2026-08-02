@@ -1,6 +1,6 @@
 import { ASYNC_BOUNDARY_ARM } from '@markless/serializer';
 import { expect, test } from 'vitest';
-import { expandBoundaryArmRecords } from '../src/resume-arm-records.ts';
+import { registerArmRecordSet } from '../src/resume-commit-arm.ts';
 import { marklessSsrArmizeBoundaries, marklessSsrComposeView } from '../src/fns/ssr.ts';
 
 test.each([
@@ -31,7 +31,17 @@ test.each([
 		const [armized] = marklessSsrArmizeBoundaries(
 			{
 				locators: [{ hostNodeId: 'h0', tagName: 'p', index: 0 }],
-				anchors: [{ kind: 'async', id: 'boundary:alternate', startIndex: 0, endIndex: 1, elementStart: 0, elementEnd: 1, html: '<p>content</p>' }],
+				anchors: [
+					{
+						kind: 'async',
+						id: 'boundary:alternate',
+						startIndex: 0,
+						endIndex: 1,
+						elementStart: 0,
+						elementEnd: 1,
+						html: '<p>content</p>',
+					},
+				],
 				elementCount: 1,
 			},
 			[boundary],
@@ -51,7 +61,17 @@ test('SSR armization records the served arm for an authored sync gate', () => {
 	const [armized] = marklessSsrArmizeBoundaries(
 		{
 			locators: [{ hostNodeId: 'h0', tagName: 'p', index: 0 }],
-			anchors: [{ kind: 'async', id: 'boundary:card', startIndex: 0, endIndex: 1, elementStart: 0, elementEnd: 1, html: '<p>east-west</p>' }],
+			anchors: [
+				{
+					kind: 'async',
+					id: 'boundary:card',
+					startIndex: 0,
+					endIndex: 1,
+					elementStart: 0,
+					elementEnd: 1,
+					html: '<p>east-west</p>',
+				},
+			],
 			elementCount: 1,
 		},
 		[
@@ -97,15 +117,17 @@ test('SSR composition keeps a rendered async-arm keyed repeat in the served arm 
 				{ hostNodeId: 'h-list', tagName: 'ul', index: 1 },
 				{ hostNodeId: 'h-row', tagName: 'li', index: 2 },
 			],
-			anchors: [{
-				kind: 'async',
-				id: 'boundary:feed',
-				startIndex: 0,
-				endIndex: 1,
-				elementStart: 1,
-				elementEnd: 3,
-				html: '<ul><li>Beacon</li></ul>',
-			}],
+			anchors: [
+				{
+					kind: 'async',
+					id: 'boundary:feed',
+					startIndex: 0,
+					endIndex: 1,
+					elementStart: 1,
+					elementEnd: 3,
+					html: '<ul><li>Beacon</li></ul>',
+				},
+			],
 			elementCount: 3,
 		},
 		{
@@ -117,27 +139,39 @@ test('SSR composition keeps a rendered async-arm keyed repeat in the served arm 
 			elementHandles: [],
 			keyedRepeats: [repeat],
 			branches: [],
-			asyncBoundaries: [{
-				id: 'boundary:feed',
-				runnerGraphNodeId: 'computed:feed',
-				initiallyServedArm: ASYNC_BOUNDARY_ARM.pending,
-				startAnchor: { strategy: 'dom-order-comment', index: 0 },
-				endAnchor: { strategy: 'dom-order-comment', index: 1 },
-				asyncReads: [],
-				armRecords: [
-					{
-						locators: [
-							{ hostNodeId: 'h-list', strategy: 'arm-relative', index: 0, tagName: 'ul' },
-							{ hostNodeId: 'h-row', strategy: 'arm-relative', index: 1, tagName: 'li' },
-						],
-						events: [],
-						behaviors: [],
-						elementHandles: [],
-					},
-					{ locators: [], events: [], behaviors: [], elementHandles: [] },
-					{ locators: [], events: [], behaviors: [], elementHandles: [] },
-				],
-			}],
+			asyncBoundaries: [
+				{
+					id: 'boundary:feed',
+					runnerGraphNodeId: 'computed:feed',
+					initiallyServedArm: ASYNC_BOUNDARY_ARM.pending,
+					startAnchor: { strategy: 'dom-order-comment', index: 0 },
+					endAnchor: { strategy: 'dom-order-comment', index: 1 },
+					asyncReads: [],
+					armRecords: [
+						{
+							locators: [
+								{
+									hostNodeId: 'h-list',
+									strategy: 'arm-relative',
+									index: 0,
+									tagName: 'ul',
+								},
+								{
+									hostNodeId: 'h-row',
+									strategy: 'arm-relative',
+									index: 1,
+									tagName: 'li',
+								},
+							],
+							events: [],
+							behaviors: [],
+							elementHandles: [],
+						},
+						{ locators: [], events: [], behaviors: [], elementHandles: [] },
+						{ locators: [], events: [], behaviors: [], elementHandles: [] },
+					],
+				},
+			],
 		},
 		[],
 		[{ graphNodeId: 'computed:feed', snapshot: { status: 'fulfilled' } }],
@@ -153,7 +187,7 @@ test('SSR composition keeps a rendered async-arm keyed repeat in the served arm 
 	});
 });
 
-test('resume expansion registers keyed repeats from the initially served async arm', () => {
+test('registration-only boot uses the shared arm core for keyed repeats', async () => {
 	const start = { nodeType: 8 as const, childNodes: [] };
 	const list = { nodeType: 1 as const, tagName: 'UL', childNodes: [] };
 	const end = { nodeType: 8 as const, childNodes: [] };
@@ -168,36 +202,33 @@ test('resume expansion registers keyed repeats from the initially served async a
 		rowElementCount: 1,
 		rowEvents: [{ hostPath: [], eventName: 'click', symbolIds: ['symbol:select'] }],
 	};
-	const view = {
-		version: 1,
-		locators: [],
-		events: [],
-		domUpdates: [],
-		behaviors: [],
-		elementHandles: [],
-		keyedRepeats: [],
-		branches: [],
-		asyncBoundaries: [{
-			id: 'boundary:feed',
-			startAnchor: { strategy: 'dom-order-comment', index: 0 },
-			endAnchor: { strategy: 'dom-order-comment', index: 1 },
-			asyncReads: [],
+	const registered: unknown[] = [];
+	const elementsByHostId = new Map();
+	await registerArmRecordSet(
+		{
+			root: root as never,
+			elementsByHostId,
+			disposedHosts: new Set(),
+			disposeHost: () => {},
+			addEventRecord: () => {},
+			registerElementHandle: () => {},
+			registerKeyedRepeats: async (records) => registered.push(...records),
+		},
+		() => {},
+		{ id: 'boundary:feed', startAnchor: start, endAnchor: end, asyncReads: [] } as never,
+		{
 			armRecords: {
-				locators: [{ hostNodeId: 'h-list', strategy: 'arm-relative', index: 0, tagName: 'ul' }],
+				locators: [
+					{ hostNodeId: 'h-list', strategy: 'arm-relative', index: 0, tagName: 'ul' },
+				],
 				events: [],
 				behaviors: [],
 				elementHandles: [],
 				keyedRepeats: [repeat],
 			},
-		}],
-	};
-
-	const expanded = expandBoundaryArmRecords(
-		root,
-		view,
-		new Map([['boundary:feed', { id: 'boundary:feed', startAnchor: start, endAnchor: end, asyncReads: [] }]]),
+		},
 	);
 
-	expect(expanded?.view.keyedRepeats).toEqual([repeat]);
-	expect(expanded?.elementsByHostId.get('h-list')).toBe(list);
+	expect(registered).toEqual([repeat]);
+	expect(elementsByHostId.get('h-list')).toBe(list);
 });

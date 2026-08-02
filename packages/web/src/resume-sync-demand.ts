@@ -12,7 +12,21 @@ export function wireSyncComputedDemandTriggersWithoutLoadingCapability(input: {
 	readonly elementHandles: ResumePreparedCore['elementHandles'];
 	readonly storeContainerSubscription: (release: () => void) => void;
 }): void {
-	for (const record of input.state?.computed ?? []) {
+	wireSyncComputedDemandRecordsWithoutLoadingCapability({
+		...input,
+		computed: input.state?.computed ?? [],
+	});
+}
+
+export function wireSyncComputedDemandRecordsWithoutLoadingCapability(input: {
+	readonly graph: ResumeRuntimeInput['graph'];
+	readonly computed: NonNullable<ResumeRuntimeInput['state']>['computed'];
+	readonly root: ResumeRuntimeInput['root'];
+	readonly loadSymbol: ResumeRuntimeInput['loadSymbol'];
+	readonly elementHandles: ResumePreparedCore['elementHandles'];
+	readonly storeContainerSubscription: (release: () => void) => void;
+}): void {
+	for (const record of input.computed) {
 		if (record.async !== false || typeof record.deriveSymbolId !== 'string') continue;
 		const computed = record as SyncComputedRecord;
 		for (const dependency of computed.dependencies ?? []) {

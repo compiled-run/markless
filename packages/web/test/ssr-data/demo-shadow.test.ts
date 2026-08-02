@@ -16,7 +16,9 @@ import {
 import {
 	derivePrerenderResumeRecords,
 	evaluateBuiltPageClosure,
+	renderPrerenderBoundary,
 } from '../../src/prerender/evaluator.ts';
+import type { SsrRenderOutput } from '../../src/render-to-string.ts';
 import { compareSsrHtml, renderSsrData, type SsrDataResidue } from '../../src/ssr-data/renderer.ts';
 
 type DemoModule = {
@@ -136,6 +138,65 @@ test('music-player records-from-chunks exactly match its renderToString twin', a
 	);
 	expect(ssrTwin).toContain(
 		`<script type="markless/view">${JSON.stringify(derivedRecords.view)}</script>`,
+	);
+});
+
+test('live-feed settled prerender arm records match its settled render twin', async () => {
+	const modules = await compileDemoModules(liveFiles);
+	const page = modules.get('demos/live-feed-ssr/pages/index.tsrx')!;
+	const artifact = {
+		renderSsr: (props?: Record<string, unknown>, renderContext?: unknown) =>
+			currentEmitterOutput(page, modules, { props, renderContext }),
+	};
+	const pending = await evaluateBuiltPageClosure(artifact);
+	const boundaryId = pending.view?.asyncBoundaries[0]?.id;
+	if (!boundaryId) throw new Error('Expected the live-feed async boundary.');
+	const settledSnapshot = {
+		status: 'fulfilled' as const,
+		version: 1,
+		key: null,
+		value: liveFeedValue,
+	};
+	const graph = {
+		read(graphNodeId: string) {
+			return graphNodeId === 'computed:feed' ? settledSnapshot : undefined;
+		},
+	};
+	const settled = await artifact.renderSsr(undefined, { prerenderSettle: { graph } });
+	const settledRecords = await prepareSsrResumeRecords(settled);
+	const boundary = settledRecords.view.asyncBoundaries.find(
+		(candidate) => candidate.id === boundaryId,
+	);
+	const rendered = await renderPrerenderBoundary(
+		artifact,
+		boundaryId,
+		'fulfilled',
+		graph as never,
+	);
+
+	expect(rendered.armRecords).toEqual(boundary?.armRecords);
+	expect(rendered.armRecords.domUpdates).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				hostNodeId: 'c0:h0',
+				graphNodeId: 'computed:weightedCount',
+				symbolId: expect.any(String),
+			}),
+		]),
+	);
+	expect(rendered.computed).toEqual(settledRecords.state.computed);
+	expect(rendered.computed).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				name: 'weightedCount',
+				async: false,
+				deriveSymbolId: expect.any(String),
+				dependencies: [
+					{ graphNodeId: 'computed:feed', path: ['updates', 'length'] },
+					{ graphNodeId: 'state:weight', path: [] },
+				],
+			}),
+		]),
 	);
 });
 
@@ -262,7 +323,7 @@ async function currentEmitterOutput(
 		readonly renderContext?: unknown;
 		readonly values?: Record<string, unknown>;
 	} = {},
-): Promise<{ readonly html: string; readonly view: ProtocolViewPayload }> {
+): Promise<SsrRenderOutput & { readonly view: ProtocolViewPayload }> {
 	const childArtifacts = await Promise.all(
 		module.compiled.semanticGraph.componentEdges.map(async (edge) => {
 			const child = resolveChildModule(module, edge, modules);
@@ -320,7 +381,7 @@ async function currentEmitterOutput(
 			readonly marklessRenderSsr: (
 				props?: Record<string, unknown>,
 				renderContext?: unknown,
-			) => Promise<{ readonly html: string; readonly view: ProtocolViewPayload }>;
+			) => Promise<SsrRenderOutput & { readonly view: ProtocolViewPayload }>;
 		};
 		return await loaded.marklessRenderSsr(options.props, options.renderContext);
 	} finally {

@@ -77,6 +77,19 @@ export async function marklessSsrRunAsyncComputed(
 	runnerDefinitions,
 	requestRuns,
 ) {
+	// Prerender records preserve the authored pending arm without executing a
+	// request-dependent runner at build time or during browser-side derivation.
+	// The resumed graph owns the one real runner invocation after self-wake.
+	if (renderContext?.prerender === true) {
+		const snapshot = { status: 'pending', version: 1, key: null };
+		marklessSsrUpsertAsyncComputedSnapshot(graphNodeId, snapshot, snapshots);
+		return snapshot;
+	}
+	if (renderContext?.prerenderSettle?.graph) {
+		const snapshot = renderContext.prerenderSettle.graph.read(graphNodeId, []);
+		marklessSsrUpsertAsyncComputedSnapshot(graphNodeId, snapshot, snapshots);
+		return snapshot;
+	}
 	// Streaming mode (T107, owner-ratified three-layer semantics): the render
 	// context carries a per-request runner registry. run() executes ONCE per
 	// graph node across streaming passes; re-render passes reuse the in-flight
@@ -346,7 +359,7 @@ export function marklessSsrComposeView(structure, view, children, asyncSnapshots
 	);
 	const localHostIds = new Set(
 		[...view.locators.map((locator) => locator.hostNodeId), ...plannedArmHostIds].flatMap(
-			(hostNodeId) => renderedHostIds.has(idPrefix + hostNodeId) ? [hostNodeId] : [],
+			(hostNodeId) => (renderedHostIds.has(idPrefix + hostNodeId) ? [hostNodeId] : []),
 		),
 	);
 	const childData = children
@@ -382,8 +395,12 @@ export function marklessSsrComposeView(structure, view, children, asyncSnapshots
 				externalSymbolIds,
 			});
 	}
-	const locatorByHostId = new Map(structure.locators.map((locator) => [locator.hostNodeId, locator]));
-	for (const locator of view.locators.filter((candidate) => localHostIds.has(candidate.hostNodeId))) {
+	const locatorByHostId = new Map(
+		structure.locators.map((locator) => [locator.hostNodeId, locator]),
+	);
+	for (const locator of view.locators.filter((candidate) =>
+		localHostIds.has(candidate.hostNodeId),
+	)) {
 		const rendered = locatorByHostId.get(idPrefix + locator.hostNodeId);
 		if (!rendered) throw new Error(`MARKLESS_SSR_DATA_HOST_MISSING: ${locator.hostNodeId}`);
 		locators.push({ ...locator, index: rendered.index, tagName: rendered.tagName });
@@ -396,7 +413,7 @@ export function marklessSsrComposeView(structure, view, children, asyncSnapshots
 	const armizedBoundaries = marklessSsrArmizeBoundaries(
 		structure,
 		marklessSsrResolveAnchorRecords(structure, 'async', asyncBoundaries, idPrefix),
-		{ locators, events, behaviors, elementHandles, keyedRepeats },
+		{ locators, events, domUpdates, behaviors, elementHandles, keyedRepeats },
 		asyncSnapshots,
 		idPrefix,
 	);
@@ -424,7 +441,13 @@ export function marklessSsrComposeView(structure, view, children, asyncSnapshots
 // taken arm's compile-time record set (events/behaviors/handles keyed by
 // hostNodeId) merges in. Composed children inside arms are covered by the
 // same positional move, so no page-absolute offset surgery remains for arms.
-export function marklessSsrArmizeBoundaries(structure, boundaries, streams, asyncSnapshots, idPrefix = '') {
+export function marklessSsrArmizeBoundaries(
+	structure,
+	boundaries,
+	streams,
+	asyncSnapshots,
+	idPrefix = '',
+) {
 	if (boundaries.length === 0) return boundaries;
 	const anchorById = new Map(
 		structure.anchors
@@ -454,11 +477,12 @@ export function marklessSsrArmizeBoundaries(structure, boundaries, streams, asyn
 			streams.locators.splice(i, 1);
 		}
 		const armHostIds = new Set(armLocators.map((locator) => locator.hostNodeId));
-		const moved = { events: [], behaviors: [], elementHandles: [] };
+		const moved = { events: [], domUpdates: [], behaviors: [], elementHandles: [] };
 		for (const key of Object.keys(moved)) {
-			for (let i = streams[key].length - 1; i >= 0; i--) {
-				if (armHostIds.has(streams[key][i].hostNodeId))
-					moved[key].unshift(...streams[key].splice(i, 1));
+			const records = streams[key] ?? [];
+			for (let i = records.length - 1; i >= 0; i--) {
+				if (armHostIds.has(records[i].hostNodeId))
+					moved[key].unshift(...records.splice(i, 1));
 			}
 		}
 		const directStatus = snapshotById.get(boundary.runnerGraphNodeId)?.status;
@@ -493,7 +517,8 @@ export function marklessSsrArmizeBoundaries(structure, boundaries, streams, asyn
 		for (const locator of planned.locators ?? []) {
 			const rendered = renderedArmLocators.get(idPrefix + locator.hostNodeId);
 			if (!rendered) continue;
-			if (armLocators.some((candidate) => candidate.hostNodeId === locator.hostNodeId)) continue;
+			if (armLocators.some((candidate) => candidate.hostNodeId === locator.hostNodeId))
+				continue;
 			armLocators.push({
 				...locator,
 				strategy: 'arm-relative',
@@ -515,6 +540,7 @@ export function marklessSsrArmizeBoundaries(structure, boundaries, streams, asyn
 			armRecords: {
 				locators: armLocators,
 				events: [...(planned.events ?? []), ...moved.events],
+				domUpdates: [...(planned.domUpdates ?? []), ...moved.domUpdates],
 				behaviors: [...(planned.behaviors ?? []), ...moved.behaviors],
 				elementHandles: [...(planned.elementHandles ?? []), ...moved.elementHandles],
 				...(keyedRepeats.length > 0 ? { keyedRepeats } : {}),
@@ -689,6 +715,16 @@ export function marklessSsrAppendChildView(context) {
 // through composition (the anchor is located live at resume); only host ids,
 // symbol ids, and behavior graph reads need the child prefixes/remaps.
 export function marklessSsrPrefixBoundaryArmRecords(set, child) {
+	const exhaustive = {
+		locators: true,
+		events: true,
+		domUpdates: true,
+		behaviors: true,
+		elementHandles: true,
+		keyedRepeats: true,
+		branches: true,
+	} satisfies Record<keyof import('../resume-types.ts').ResumeArmRecordSet, true>;
+	void exhaustive;
 	return {
 		locators: (set.locators ?? []).map((locator) => ({
 			...locator,
@@ -703,6 +739,26 @@ export function marklessSsrPrefixBoundaryArmRecords(set, child) {
 					: marklessBoundSymbolId(child, symbolId),
 			),
 		})),
+		domUpdates: (set.domUpdates ?? []).flatMap((update) => {
+			const mapped = marklessCsrRemapChildDomUpdate(
+				update,
+				child.graphProps,
+				child.hostPrefix,
+			);
+			return mapped
+				? [
+						{
+							...update,
+							hostNodeId: child.hostPrefix + update.hostNodeId,
+							graphNodeId: mapped.graphNodeId,
+							path: mapped.path,
+							...(update.symbolId
+								? { symbolId: marklessBoundSymbolId(child, update.symbolId) }
+								: {}),
+						},
+					]
+				: [];
+		}),
 		behaviors: (set.behaviors ?? []).map((behavior) => ({
 			...behavior,
 			hostNodeId: child.hostPrefix + behavior.hostNodeId,
@@ -724,6 +780,30 @@ export function marklessSsrPrefixBoundaryArmRecords(set, child) {
 			...handle,
 			hostNodeId: child.hostPrefix + handle.hostNodeId,
 		})),
+		keyedRepeats: (set.keyedRepeats ?? []).flatMap((repeat) => {
+			const mapped = marklessCsrRemapChildKeyedRepeat(
+				repeat,
+				child.graphProps,
+				child.hostPrefix,
+			);
+			return mapped
+				? [
+						{
+							...repeat,
+							id: child.hostPrefix + repeat.id,
+							parentHostNodeId: child.hostPrefix + repeat.parentHostNodeId,
+							collectionGraphNodeId: mapped.graphNodeId,
+							collectionPath: mapped.path,
+							rowEvents: repeat.rowEvents.map((event) => ({
+								...event,
+								symbolIds: event.symbolIds.map((symbolId) =>
+									marklessBoundSymbolId(child, symbolId),
+								),
+							})),
+						},
+					]
+				: [];
+		}),
 		// Arm-scoped branch records: anchors stay arm-local (resolved by
 		// position, not text); ids/symbols/test reads take the child prefixes.
 		...(set.branches

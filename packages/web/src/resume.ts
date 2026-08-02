@@ -1,6 +1,5 @@
 import { RuntimeResumeError, runtimeResumeError } from './inline/resume-errors.ts';
 import { isArmBranchAnchorComment } from './resume-anchor-census.ts';
-import { expandBoundaryArmRecords } from './resume-arm-records.ts';
 import {
 	connectedElement,
 	materializeDomLocators,
@@ -28,28 +27,17 @@ export type * from './resume-types.ts';
 
 export function createResumeRuntime(runtimeInput: ResumeRuntimeInput): ResumeRuntime {
 	const boundaries = runtimeInput.view.asyncBoundaries;
-	const asyncBoundariesById = materializeAsyncBoundaryLocators(
-		runtimeInput.root,
-		boundaries,
-	);
-	const armExpansion = expandBoundaryArmRecords(
-		runtimeInput.root,
-		runtimeInput.view,
-		asyncBoundariesById,
-	);
-	let input = armExpansion ? { ...runtimeInput, view: armExpansion.view } : runtimeInput;
+	const asyncBoundariesById = materializeAsyncBoundaryLocators(runtimeInput.root, boundaries);
+	let input = runtimeInput;
 	const elementsByHostId = input.liveHostNodes
 		? new Map(input.liveHostNodes)
 		: materializeDomLocators(input.root, input.view.locators);
-	for (const [hostNodeId, element] of armExpansion?.elementsByHostId ?? []) {
-		elementsByHostId.set(hostNodeId, element);
-	}
 	const elementHandles = materializeElementHandles(
 		input.root,
 		elementsByHostId,
 		input.view.elementHandles,
 	);
-	const prepared = {elementsByHostId, elementHandles, asyncBoundariesById};
+	const prepared = { elementsByHostId, elementHandles, asyncBoundariesById };
 	let runtime: ResumeRuntime | undefined;
 	let starting: Promise<ResumeRuntime> | undefined;
 	let coordinateSettler: CsrCoordinateSettler | undefined;
@@ -69,9 +57,14 @@ export function createResumeRuntime(runtimeInput: ResumeRuntimeInput): ResumeRun
 		async start() {
 			if (boundaries[0]?.renderArm && !coordinateSettler) {
 				const { tryStartCsrCoordinateSettler } = await import('./resume-csr-coordinate.ts');
-				coordinateSettler = tryStartCsrCoordinateSettler(input, prepared, loadRuntime, (next) => {
-					input = next;
-				});
+				coordinateSettler = tryStartCsrCoordinateSettler(
+					input,
+					prepared,
+					loadRuntime,
+					(next) => {
+						input = next;
+					},
+				);
 				if (coordinateSettler) return;
 			}
 			await (await loadRuntime()).start();
@@ -106,12 +99,12 @@ export function createResumeRuntime(runtimeInput: ResumeRuntimeInput): ResumeRun
 			runtime?.dispose();
 			elementsByHostId.clear();
 		},
-		whenAsyncBoundariesSettled: async () => coordinateSettler?.whenSettled() ??
+		whenAsyncBoundariesSettled: async () =>
+			coordinateSettler?.whenSettled() ??
 			(await loadRuntime()).whenAsyncBoundariesSettled?.(),
-		holdPendingSettleCommits: async (ms: number) => coordinateSettler?.holdCommitsFor(ms) ??
-			(coordinateSettler
-				? undefined
-				: (await loadRuntime()).holdPendingSettleCommits?.(ms)),
+		holdPendingSettleCommits: async (ms: number) =>
+			coordinateSettler?.holdCommitsFor(ms) ??
+			(coordinateSettler ? undefined : (await loadRuntime()).holdPendingSettleCommits?.(ms)),
 	};
 }
 
@@ -144,7 +137,11 @@ function walkComments(root: ResumeDomElement): ResumeDomComment[] {
 	})(root);
 	return comments;
 }
-function missingCommentAnchorError(id: string, name: 'startAnchor' | 'endAnchor', index: number): RuntimeResumeError {
+function missingCommentAnchorError(
+	id: string,
+	name: 'startAnchor' | 'endAnchor',
+	index: number,
+): RuntimeResumeError {
 	return runtimeResumeError(
 		'MARKLESS_RESUME_LOCATOR_MISSING',
 		`Resume locator ${id} ${name} expected a comment at DOM order index ${index}.`,
