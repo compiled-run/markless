@@ -190,10 +190,11 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 			async handler(builder) {
 				await buildMarklessEnvironments(builder, options);
 				if (prerender && prerenderEntry) {
+					const clientEnvironment = builder.environments[viteEnvironmentName('client', options)];
 					await emitPrerenderedPage({
-						root: resolvedRoot,
+						root: clientEnvironment?.config.root ?? resolvedRoot,
 						entry: resolve(resolvedRoot, prerenderEntry),
-						outDir: clientOutDir,
+						outDir: clientEnvironment?.config.build?.outDir ?? clientOutDir,
 						serverPlugin: createMarklessRolldownPlugin({
 							environment: 'server',
 							options: {

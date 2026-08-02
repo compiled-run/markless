@@ -438,6 +438,7 @@ describe('debug registration mirrors successful framework wiring', () => {
 		const container = await renderCsrRuntime({
 			output: {
 				root,
+				liveHostNodes: new Map([['button', button]]),
 				graph: createRuntimeGraph({ cells: [] }),
 				state: { version: 1, cells: [], computed: [] },
 				view: {
@@ -461,6 +462,11 @@ describe('debug registration mirrors successful framework wiring', () => {
 			},
 			options: {},
 		} as never);
+		expect(channel()?.explainInteraction(button as never, 'click')).toMatchObject({
+			kind: 'delegated-csr',
+			hostNodeId: 'button',
+			symbolIds: ['csr'],
+		});
 		await container.runtime.start?.();
 		expect(channel()?.containers[0]).toMatchObject({ phase: 'csr', lifecycle: 'active' });
 		expect(channel()?.explainInteraction(button as never, 'click')).toMatchObject({

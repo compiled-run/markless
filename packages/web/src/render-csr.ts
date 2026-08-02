@@ -131,6 +131,8 @@ export async function renderCsrRuntime(input: {
 			replay.__marklessCsrBootstrapReplayed = true;
 			await (await demandRuntime()).dispatch(event);
 		});
+		if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
+			await registerDelegatedTriggerDebug(output, view);
 		if ((globalThis as ExecutionLogGlobal).__mxLog) await marklessLogCsrSummary();
 		return Object.defineProperty(
 			{
@@ -196,6 +198,34 @@ export async function renderCsrRuntime(input: {
 		graph,
 		runtime,
 	};
+}
+
+async function registerDelegatedTriggerDebug(
+	output: CsrRenderOutput,
+	view: ProtocolViewPayload,
+): Promise<void> {
+	const debug = await import('./debug-channel.ts');
+	debug.__marklessDebugStartContainer(output.root as unknown as Element, 'csr', false);
+	for (const record of view.events) {
+		if (record.eventName === 'visible') continue;
+		const element =
+			output.liveHostNodes?.get(record.hostNodeId) ??
+			(view.locators.length === 1 && view.locators[0]?.hostNodeId === record.hostNodeId
+				? output.root
+				: undefined);
+		if (!element) continue;
+		debug.__marklessDebugRecordInteraction(
+			output.root as unknown as Element,
+			element as unknown as Element,
+			record.eventName,
+			{
+				kind: 'delegated-csr',
+				source: 'chunk-event',
+				hostNodeId: record.hostNodeId,
+				symbolIds: record.symbolIds ?? [],
+			},
+		);
+	}
 }
 
 async function marklessLogCsrSummary(): Promise<void> {

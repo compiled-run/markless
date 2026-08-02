@@ -4,6 +4,7 @@
 import { createResumeRuntime, type ResumeRuntime } from './resume.ts';
 import { type ResumePayloadScriptsInput, type ResumePayloadScriptsResult } from './payload-full.ts';
 import type { decodePayloadScripts } from '../../serializer/src/protocol-client.ts';
+import type { DecodedPayloadScripts } from '../../serializer/src/protocol-client-storage.ts';
 import { createRuntimeGraphFromResumePayload } from './payload-graph-construct.ts';
 import { getAlreadyResumedPayload, setResumedPayload } from './payload-resume-registry.ts';
 
@@ -44,6 +45,19 @@ export async function resumeFromPayloadScriptsImpl(
 	}));
 }
 
+export async function resumeFromPrerenderRecordsImpl(
+	input: Omit<ResumePayloadScriptsInput, 'stateScript' | 'viewScript'> & DecodedPayloadScripts,
+): Promise<ResumePayloadScriptsResult> {
+	const resumed = getAlreadyResumedPayload(input.root);
+	if (resumed) return resumed;
+	const root = input.root as typeof input.root & {
+		__mStart?: Promise<ResumePayloadScriptsResult>;
+	};
+	return (root.__mStart ??= startDecodedResume(input, input).finally(() => {
+		delete root.__mStart;
+	}));
+}
+
 async function startPayloadResume(
 	input: ResumePayloadScriptsInput,
 	decode: typeof decodePayloadScripts,
@@ -51,6 +65,13 @@ async function startPayloadResume(
 	// Streamed settles left records + snapshot patches in the document; adopt
 	// them before graph construction so the settled DOM resumes interactive.
 	const decoded = await adoptStreamedPatchesIfPresent(decode(input), input.root);
+	return startDecodedResume(input, decoded);
+}
+
+async function startDecodedResume(
+	input: Omit<ResumePayloadScriptsInput, 'stateScript' | 'viewScript'>,
+	decoded: DecodedPayloadScripts,
+): Promise<ResumePayloadScriptsResult> {
 	const graph = await createRuntimeGraphFromResumePayload({
 		state: decoded.state,
 		view: decoded.view,

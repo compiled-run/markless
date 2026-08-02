@@ -52,6 +52,12 @@ export interface MarklessDebugDirectCsrInteraction extends MarklessDebugInteract
 	readonly kind: 'direct-csr';
 	readonly source: 'static-event' | 'callback-prop';
 }
+export interface MarklessDebugDelegatedCsrInteraction extends MarklessDebugInteractionBase {
+	readonly kind: 'delegated-csr';
+	readonly source: 'chunk-event';
+	readonly hostNodeId: string;
+	readonly symbolIds: readonly string[];
+}
 export interface MarklessDebugRouterDelegationInteraction extends MarklessDebugInteractionBase {
 	readonly kind: 'router-delegation';
 	readonly source: 'ssr-link-bridge' | 'spa-click-listener' | 'navigation-event';
@@ -72,6 +78,7 @@ export type MarklessDebugInteractionExplanation =
 	| MarklessDebugResumeRecordInteraction
 	| MarklessDebugRowRecordInteraction
 	| MarklessDebugDirectCsrInteraction
+	| MarklessDebugDelegatedCsrInteraction
 	| MarklessDebugRouterDelegationInteraction
 	| MarklessDebugNoInteraction;
 export type MarklessDebugJson =
@@ -112,7 +119,8 @@ type InteractionInput =
 	| Omit<MarklessDebugInlineResumerInteraction, keyof MarklessDebugInteractionBase>
 	| Omit<MarklessDebugResumeRecordInteraction, keyof MarklessDebugInteractionBase>
 	| Omit<MarklessDebugRowRecordInteraction, keyof MarklessDebugInteractionBase>
-	| Omit<MarklessDebugDirectCsrInteraction, keyof MarklessDebugInteractionBase>;
+	| Omit<MarklessDebugDirectCsrInteraction, keyof MarklessDebugInteractionBase>
+	| Omit<MarklessDebugDelegatedCsrInteraction, keyof MarklessDebugInteractionBase>;
 type ViolationInput = Omit<MarklessDebugViolation, 'sequence' | 'timestamp'>;
 type RootControls = {
 	start(phase: MarklessDebugContainerPhase, active?: boolean): string;

@@ -351,6 +351,17 @@ export function createMarklessRolldownPlugin(input: {
 			if (!TSRX_SOURCE_FILE.test(id)) {
 				if (
 					currentEnvironment === 'client' &&
+					internalOptions.prerender === true &&
+					normalizeExecutionLogMode(internalOptions.executionLog) !== 'never' &&
+					this.getModuleInfo(id)?.isEntry === true
+				) {
+					return {
+						code: `${code}\nglobalThis.__mxLoadLog ||= () => import(${JSON.stringify(MARKLESS_EXECUTION_LOG_MODULE_ID)});\nglobalThis.__mxLoadLog().then(log => log.logMarklessRenderSummary());`,
+						map: null,
+					};
+				}
+				if (
+					currentEnvironment === 'client' &&
 					internalOptions.dev === true &&
 					normalizeExecutionLogMode(internalOptions.executionLog) !== 'never' &&
 					isMarklessRuntimeModule(id)
@@ -375,15 +386,19 @@ export function createMarklessRolldownPlugin(input: {
 			const transformInput: TransformTsrxModuleInput = {
 				filename: source,
 				source: code,
+				dev: internalOptions.dev === true,
 				buildId: internalOptions.buildId,
 				executionLog: normalizeExecutionLogMode(internalOptions.executionLog),
 				executionLogModuleHooks:
 					internalOptions.dev === true && currentEnvironment === 'client',
 				inlineResumerDebug: internalOptions.inlineResumerDebug === true,
+				prerenderRecords:
+					internalOptions.prerender === true && currentEnvironment === 'client',
 				environment: currentEnvironment,
 				clientOutput:
 					currentEnvironment === 'client' &&
-					(clientSymbolEntrySources.has(source) || isSymbolOnlySourceRequest(id))
+					((clientSymbolEntrySources.has(source) && internalOptions.prerender !== true) ||
+						isSymbolOnlySourceRequest(id))
 						? 'symbols-only'
 						: undefined,
 				// Dev resume URL points at the SOURCE module (not the virtual resume

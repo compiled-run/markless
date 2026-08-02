@@ -125,6 +125,44 @@ export function createInlineResumerSelfWakeSource(resumeModuleUrl: string | unde
 	return `;(${runInlineResumerSelfWake.toString()})(${JSON.stringify(resumeModuleUrl)});`;
 }
 
+// Prerendered CSR already carries its rendered DOM, while its resume records
+// stay in demand-loaded chunks. Delegate only the compiler-known event names;
+// the demanded resume module derives records and performs exact target matching.
+export function createPrerenderInlineResumerSource(
+	eventNames: ReadonlyArray<string>,
+	resumeModuleUrl: string | undefined,
+): string {
+	return `(${runPrerenderInlineResumer.toString()})(${JSON.stringify(eventNames)},${JSON.stringify(resumeModuleUrl)},u=>import(u));`;
+}
+
+function runPrerenderInlineResumer(
+	eventNames: ReadonlyArray<string>,
+	fallbackResumeModuleUrl: string | undefined,
+	loadModule: (url: string) => Promise<InlineResumeModule>,
+): void {
+	const currentScript = document.currentScript as HTMLScriptElement | null;
+	const root = currentScript?.closest<InlineRoot>('[data-async-container]');
+	const resumeModuleUrl =
+		currentScript?.getAttribute?.('data-markless-resume-module') ?? fallbackResumeModuleUrl;
+	if (!root || !resumeModuleUrl) return;
+	for (const eventName of eventNames) {
+		root.addEventListener(
+			eventName,
+			async (event) => {
+				if (root.__asyncResumeRuntimeStarted) return;
+				const module = await loadModule(resumeModuleUrl);
+				await module.resumeContainerEvent({
+					root,
+					event,
+					element: event.target,
+					eventRecord: null,
+				});
+			},
+			true,
+		);
+	}
+}
+
 // Serialized only into documents whose payload has an unsettled async runner.
 // Keeping this outside runInlineResumer leaves event-only documents on the
 // smaller interaction-triggered bootstrap.

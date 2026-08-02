@@ -6,7 +6,8 @@ import {
 	type SsrDataSlot,
 	type SsrRenderData,
 } from '../ssr-data/renderer.ts';
-import { renderSsrOutput, type SsrRenderable, type SsrRenderOutput } from '../render-to-string.ts';
+import type { SsrRenderable, SsrRenderOutput } from '../render-to-string.ts';
+import { prepareSsrResumeRecords } from './records.ts';
 
 type Awaitable<T> = T | Promise<T>;
 type GraphValues = ReadonlyMap<string, unknown>;
@@ -115,11 +116,17 @@ export async function evaluatePrerenderClosure(
 // Production bundles already contain the compiler-linked server closure. This
 // entry evaluates that closure directly; it does not import authored modules
 // outside the closure and it never recompiles source.
-export function evaluateBuiltPageClosure(
+export async function evaluateBuiltPageClosure(
 	page: SsrRenderable,
 	props?: unknown,
 ): Promise<SsrRenderOutput> {
-	return renderSsrOutput(page, props, undefined);
+	if (typeof page === 'function') return page(props, undefined);
+	if (page && typeof page.renderSsr === 'function') return page.renderSsr(props, undefined);
+	throw new TypeError('Prerender resume requires a compiled TSRX artifact.');
+}
+
+export async function derivePrerenderResumeRecords(page: SsrRenderable, props?: unknown) {
+	return prepareSsrResumeRecords(await evaluateBuiltPageClosure(page, props));
 }
 
 function readPath(value: unknown, path: ReadonlyArray<string>): unknown {

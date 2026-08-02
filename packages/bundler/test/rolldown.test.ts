@@ -185,6 +185,24 @@ describe('TSRX Rolldown plugin structure', () => {
 		expect(result.code).not.toContain('state: payloadState');
 	});
 
+	test('client dev keeps native CSR chunk data available without build-time HTML injection', async () => {
+		const production = await transformTsrxModule({
+			filename: '/workspace/app/src/App.tsrx',
+			source: styledSource,
+			environment: 'client',
+		});
+		const dev = await transformTsrxModule({
+			filename: '/workspace/app/src/App.tsrx',
+			source: styledSource,
+			environment: 'client',
+			dev: true,
+		});
+
+		expect(production.code).not.toContain('nativeFallback');
+		expect(dev.code).toContain('nativeFallback');
+		expect(dev.code).toContain('"statics"');
+	});
+
 	test('transformTsrxModule scopes browser symbol export names by source file', async () => {
 		const first = await transformTsrxModule({
 			filename: '/workspace/app/src/App.tsrx',
@@ -1351,6 +1369,27 @@ function renderDataModuleSource(result: Awaited<ReturnType<typeof transformTsrxM
 	if (!module) throw new Error('Expected a canonical render-data module.');
 	return module.source;
 }
+
+test('prerender client chunks carry only the linked server render closure', async () => {
+	const result = await transformTsrxModule({
+		filename: '/workspace/app/src/App.tsrx',
+		source: `
+import { state } from '@markless/core';
+export function App() @{
+	let count = state(0);
+	<button onClick={() => count++}>{count}</button>
+}
+`,
+		environment: 'client',
+		prerenderRecords: true,
+	});
+	const resume = result.virtualModules.find((module) => module.type === 'resume');
+
+	expect(result.code).toContain('marklessRenderData');
+	expect(result.code).toContain('renderSsr(props, marklessRenderContext)');
+	expect(result.code).not.toContain('renderCsr:');
+	expect(resume?.source).toContain('derivePrerenderResumeRecords');
+});
 
 function emittedAsset(emitFile: ReturnType<typeof vi.fn>, fileName: string) {
 	return emitFile.mock.calls.map((call) => call[0]).find((item) => item.fileName === fileName);

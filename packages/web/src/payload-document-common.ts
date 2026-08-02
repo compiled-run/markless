@@ -80,7 +80,7 @@ function readPayloadScriptFromDocument(
 	return `<script type="${type}">${text}</script>`;
 }
 
-function documentTemplateBranchHtml(
+export function documentTemplateBranchHtml(
 	document: PayloadScriptDocument,
 ): ResumeRuntimeInput['renderBranchHtml'] {
 	const documentLike = document as {

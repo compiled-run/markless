@@ -1,5 +1,4 @@
 import {
-	ASYNC_PROTOCOL_VERSION,
 	STORAGE_SLOT_SYMBOL_KEY,
 	storageAttributeName,
 	type ProtocolSyncPolicy,
@@ -8,20 +7,19 @@ import {
 	type ProtocolViewPayload,
 	type StorageSeedMetadata,
 } from '@markless/serializer';
-import {
-	renderPayloadScripts,
-	serializeRuntimeAsyncSnapshots,
-	serializeRuntimeStateCells,
-} from '@markless/serializer';
+import { renderPayloadScripts } from '@markless/serializer';
 import { __marklessDebugBootstrapSource } from './debug-channel.ts';
 import type { MarklessExecutionLogMode } from './dev-log.ts';
 import {
 	createInlineResumerDebugRegistrationSource,
+	createPrerenderInlineResumerSource,
 	createInlineResumerSelfWakeSource,
 	createInlineResumerSource,
 	type InlineResumerSourceVariants,
 } from './inline/resumer.ts';
-import { validateKeyedRepeatPayloadKeys } from './repeat-runtime.ts';
+import { prepareSsrResumeRecords } from './prerender/records.ts';
+
+export { prepareSsrResumeRecords } from './prerender/records.ts';
 
 export type SsrRenderOutput = {
 	readonly html: string;
@@ -96,17 +94,7 @@ export async function assembleSsrContainer(
 	options: RenderToStringOptions,
 ): Promise<string> {
 	const hasPayload = !!output.state || !!output.view;
-	const rawState = output.state ?? emptyStatePayload();
-	// Runtime-attached async snapshots and live directValue cells (host-seeded
-	// page props, need 14) carry raw values; the served payload needs
-	// envelope-encoded fields or resume rejects it on first interaction.
-	const state = {
-		...rawState,
-		cells: serializeRuntimeStateCells(rawState.cells ?? []),
-		computed: serializeRuntimeAsyncSnapshots(rawState.computed ?? []),
-	};
-	const view = containerScopedView(output.view ?? emptyViewPayload());
-	await validateKeyedRepeatPayloadKeys({ state, view });
+	const { state, view } = await prepareSsrResumeRecords(output);
 	const browserTriggers = hasBrowserTriggers(view, state);
 	const selfWake = hasUnsettledAsyncBoundaryRunner(view, state);
 	const payloadScripts =
@@ -169,6 +157,60 @@ export async function assembleSsrContainer(
 	]
 		.filter(Boolean)
 		.join('');
+}
+
+// Internal prerender assembly deliberately omits state/view scripts. The
+// demanded resume module recreates these records from the linked render closure.
+export async function assemblePrerenderContainer(
+	component: SsrRenderable,
+	output: SsrRenderOutput,
+	options: RenderToStringOptions,
+): Promise<string> {
+	const parts = await assemblePrerenderPageParts(component, output, options);
+	return `${parts.head}${parts.container}`;
+}
+
+export async function assemblePrerenderPageParts(
+	component: SsrRenderable,
+	output: SsrRenderOutput,
+	options: RenderToStringOptions,
+): Promise<{ readonly head: string; readonly container: string }> {
+	const { state, view } = await prepareSsrResumeRecords(output);
+	const browserTriggers = hasBrowserTriggers(view, state);
+	const resumeModuleUrl = options.resumeModuleUrl ?? artifactResumeModuleUrl(component);
+	const optionPreloads =
+		typeof options.modulePreloads === 'function'
+			? options.modulePreloads(output.html)
+			: options.modulePreloads;
+	const modulePreloads =
+		optionPreloads ?? (browserTriggers ? artifactModulePreloads(component) : undefined);
+	const eventNames = browserEventNames(view);
+	const resumerScript =
+		browserTriggers && resumeModuleUrl
+			? renderInlineResumerScript(
+					createPrerenderInlineResumerSource(eventNames, resumeModuleUrl),
+					options.nonce,
+					resumeModuleUrl,
+					false,
+				)
+			: '';
+
+	const head = [
+		renderStorageSeedScript(artifactStorageSeeds(component), options.nonce),
+		renderHeadInjections(artifactHeadInjections(component), options.nonce),
+		renderModulePreloadLinks(modulePreloads, options.nonce),
+	]
+		.filter(Boolean)
+		.join('');
+	const container = [
+		`<div${renderContainerAttributes(options.containerId)}>`,
+		output.html,
+		resumerScript,
+		'</div>',
+	]
+		.filter(Boolean)
+		.join('');
+	return { head, container };
 }
 
 // The optional render context is the per-request streaming channel: compiled
@@ -363,14 +405,21 @@ function boundaryArmEventNames(
 	];
 }
 
-function containerScopedView(view: ProtocolViewPayload): ProtocolViewPayload {
-	return {
-		...view,
-		locators: view.locators.map((locator) => ({
-			...locator,
-			index: locator.index + 1,
-		})),
-	};
+function browserEventNames(view: ProtocolViewPayload): ReadonlyArray<string> {
+	return [
+		...new Set([
+			...view.events.map((event) => event.eventName),
+			...(view.keyedRepeats ?? []).flatMap((repeat) =>
+				repeat.rowEvents.map((event) => event.eventName),
+			),
+			...(view.branches ?? []).flatMap((branch) =>
+				(branch.armRecords ?? []).flatMap((arm) =>
+					arm.events.map((event) => event.eventName),
+				),
+			),
+			...view.asyncBoundaries.flatMap(boundaryArmEventNames),
+		]),
+	].filter((eventName) => eventName !== 'visible');
 }
 
 function renderContainerAttributes(containerId: string | undefined): string {
@@ -392,26 +441,6 @@ function renderInlineResumerScript(
 	const selfWakeAttribute = selfWake ? ' data-markless-self-wake' : '';
 	const selfWakeSource = selfWake ? createInlineResumerSelfWakeSource(resumeModuleUrl) : '';
 	return `<script data-async-resumer${nonceAttribute}${resumeModuleAttribute}${selfWakeAttribute}>${escapeInlineScript(source + selfWakeSource)}</script>`;
-}
-
-function emptyStatePayload(): ProtocolStatePayload {
-	return {
-		version: ASYNC_PROTOCOL_VERSION,
-		cells: [],
-		computed: [],
-	};
-}
-
-function emptyViewPayload(): ProtocolViewPayload {
-	return {
-		version: ASYNC_PROTOCOL_VERSION,
-		locators: [],
-		events: [],
-		domUpdates: [],
-		behaviors: [],
-		elementHandles: [],
-		asyncBoundaries: [],
-	};
 }
 
 function hasSyncPolicies(view: ProtocolViewPayload): boolean {

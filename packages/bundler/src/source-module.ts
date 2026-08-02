@@ -134,6 +134,7 @@ export function emitSourceModule(input: {
 	readonly behaviorSymbols?: ReadonlyArray<SourceSymbolRow>;
 	readonly symbolRoutes: ReadonlyArray<SourceSymbolRoute>;
 	readonly hasBoundSymbols?: boolean;
+	readonly prerenderRecords?: boolean;
 }) {
 	const symbolsOnly = input.environment === 'client' && input.clientOutput === 'symbols-only';
 	const routeSymbols = input.environment === 'client' && input.symbolRoutes.length > 0;
@@ -141,10 +142,13 @@ export function emitSourceModule(input: {
 		(!input.publicSsrModuleSource && !input.publicRenderModuleSource) ||
 		symbolsOnly ||
 		!input.renderDataId ||
-		(input.environment === 'client' && !input.publicRenderModuleSource)
+		(input.environment === 'client' &&
+			!input.publicRenderModuleSource &&
+			!input.prerenderRecords)
 			? ''
 			: `import { marklessRenderData } from '${input.renderDataId}';`,
-		symbolsOnly || (input.environment === 'client' && input.nativeCsr)
+		symbolsOnly ||
+		(input.environment === 'client' && input.nativeCsr && !input.prerenderRecords)
 			? ''
 			: `import { state as payloadState, view as payloadView, runtimeDemandMap as payloadRuntimeDemandMap } from '${input.payloadId}';`,
 		'',
@@ -176,14 +180,16 @@ export function emitSourceModule(input: {
 			? `export { resumeContainerEvent } from '${resumeVirtualModuleId(input.filename)}';`
 			: '',
 		'',
-		input.environment === 'server' || symbolsOnly
+		input.environment === 'server' || symbolsOnly || input.prerenderRecords
 			? ''
 			: emitPublicRenderModule(input.publicRenderModuleSource, {
 					executionLogEnabled: input.executionLog !== 'never',
 					rootExportName: input.publicRenderRootExportName,
 				}),
-		input.environment === 'server' || symbolsOnly ? '' : input.publicCsrModuleSource,
-		input.environment === 'client' ? '' : input.publicSsrModuleSource,
+		input.environment === 'server' || symbolsOnly || input.prerenderRecords
+			? ''
+			: input.publicCsrModuleSource,
+		input.environment === 'client' && !input.prerenderRecords ? '' : input.publicSsrModuleSource,
 		routeSymbols
 			? emitLazySymbolRouteFunction(
 					input.symbolRoutes,
@@ -204,6 +210,7 @@ export function emitSourceModule(input: {
 					rootExportName: input.publicRenderRootExportName,
 					csrExportName: input.publicRenderCsrExportName,
 					ssrExportName: input.publicRenderSsrExportName,
+					prerenderRecords: input.prerenderRecords,
 				}),
 		'',
 	]
@@ -222,11 +229,15 @@ export function emitResumeModule(input: {
 	readonly symbolRoutes: ReadonlyArray<SourceSymbolRoute>;
 	readonly executionLog?: MarklessExecutionLogMode;
 	readonly hasBoundSymbols?: boolean;
+	readonly prerenderSourceId?: string;
 }) {
 	const routeSymbols = input.symbolRoutes.length > 0;
 	const resumeSymbolLoader = routeSymbols ? 'marklessSsrLoadSymbolRoute' : 'loadSymbol';
 	const scalarSpecializations = scalarDispatcherSpecializations(input);
 	return [
+		input.prerenderSourceId
+			? `import marklessPrerenderPage from ${JSON.stringify(input.prerenderSourceId)};`
+			: '',
 		`import { runtimeDemandMap as payloadRuntimeDemandMap } from '${input.payloadId}';`,
 		scalarSpecializations.length > 0
 			? [
@@ -250,7 +261,7 @@ export function emitResumeModule(input: {
 		routeSymbols ? 'export { marklessSsrLoadSymbolRoute as loadSymbol };' : '',
 		emitResumeContainerEvent(
 			resumeSymbolLoader,
-			input.needsFullResume ?? false,
+			input.prerenderSourceId ? true : (input.needsFullResume ?? false),
 			(input.payloadState as { readonly version?: unknown } | undefined)?.version ===
 				ASYNC_PROTOCOL_VERSION,
 			// Composed pages (child symbol routes) take the full path: lean record
@@ -261,6 +272,7 @@ export function emitResumeModule(input: {
 			scalarSpecializations,
 			input.runtimeDemandMap,
 			input.executionLog !== 'never',
+			input.prerenderSourceId,
 		),
 		'',
 	]
@@ -307,15 +319,18 @@ function emitCompiledAppDefault(input: {
 	readonly rootExportName: string | null;
 	readonly csrExportName: string | null;
 	readonly ssrExportName: string | null;
+	readonly prerenderRecords?: boolean;
 }): string {
 	const renderCsrEntry =
-		(input.rootExportName || input.csrExportName) && input.environment !== 'server'
+		(input.rootExportName || input.csrExportName) &&
+		input.environment !== 'server' &&
+		!input.prerenderRecords
 			? [`	renderCsr: ${input.rootExportName ?? input.csrExportName},`]
 			: [];
 	// The optional render context is the per-request streaming channel (T107):
 	// dropping it here would silently force every page back to blocking SSR.
 	const renderSsrEntry =
-		input.ssrExportName && input.environment !== 'client'
+		input.ssrExportName && (input.environment !== 'client' || input.prerenderRecords)
 			? [
 					'	renderSsr(props, marklessRenderContext) {',
 					`		return ${input.ssrExportName}(props, marklessRenderContext);`,
@@ -377,11 +392,26 @@ function emitResumeContainerEvent(
 	scalarSpecializations: ReadonlyArray<ScalarSpecialization>,
 	runtimeDemandMap: unknown,
 	executionLogEnabled: boolean,
+	prerenderSourceId?: string,
 ): string {
 	const resumeEntry = storageFreePayload
 		? '@markless/core/web/resume-storage-free'
 		: '@markless/core/web/resume';
-	const fullResumeHandoff = [
+	const fullResumeHandoff = prerenderSourceId
+		? [
+				'async function marklessFullResumeHandoff(handoff) {',
+				'\thandoff.root.__asyncResumeRuntimeStarted = true;',
+				"\tconst { derivePrerenderResumeRecords, resumeFromPrerenderRecords } = await import('@markless/web/fns/prerender-resume');",
+				'\tconst records = await derivePrerenderResumeRecords(marklessPrerenderPage);',
+				'\tconst { runtime } = await resumeFromPrerenderRecords({',
+				'\t\t...records,',
+				'\t\troot: handoff.root,',
+				`\t\tloadSymbol: ${loadSymbolName},`,
+				'\t});',
+				'\tawait runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });',
+				'}',
+			].join('\n')
+		: [
 		'async function marklessFullResumeHandoff(handoff) {',
 		'	handoff.root.__asyncResumeRuntimeStarted = true;',
 		`	const { resumeFromPayloadDocument } = await import('${resumeEntry}');`,
@@ -392,7 +422,7 @@ function emitResumeContainerEvent(
 		'	});',
 		'	await runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });',
 		'}',
-	].join('\n');
+		].join('\n');
 	const scalarOnlySpecialized =
 		leanMode === 'scalar' &&
 		scalarSpecializations.length > 0 &&

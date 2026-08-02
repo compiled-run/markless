@@ -83,6 +83,21 @@ test('emitResumeModule routes non-lean event-only entries through the full hando
 	);
 });
 
+test('emitResumeModule derives prerender records from the linked page chunk on demand', () => {
+	const resumeCode = emitResumeModule({
+		...baseInput,
+		needsFullResume: true,
+		prerenderSourceId: '/workspace/app/src/App.tsrx',
+	});
+
+	expect(resumeCode).toContain(
+		`import marklessPrerenderPage from "/workspace/app/src/App.tsrx";`,
+	);
+	expect(resumeCode).toContain('derivePrerenderResumeRecords(marklessPrerenderPage)');
+	expect(resumeCode).toContain('resumeFromPrerenderRecords');
+	expect(resumeCode).not.toContain('resumeFromPayloadDocument');
+});
+
 test('emitResumeModule selects the decoder entry from the recorded payload version', () => {
 	const storageFree = emitResumeModule({
 		...baseInput,

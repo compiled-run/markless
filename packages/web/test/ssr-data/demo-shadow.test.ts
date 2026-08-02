@@ -8,8 +8,15 @@ import type {
 	SemanticComponentEdge,
 } from '../../../compiler/src/artifacts.ts';
 import { expect, test } from 'vitest';
-import { assembleSsrContainer, renderToString } from '../../src/render-to-string.ts';
-import { evaluateBuiltPageClosure } from '../../src/prerender/evaluator.ts';
+import {
+	assemblePrerenderContainer,
+	prepareSsrResumeRecords,
+	renderToString,
+} from '../../src/render-to-string.ts';
+import {
+	derivePrerenderResumeRecords,
+	evaluateBuiltPageClosure,
+} from '../../src/prerender/evaluator.ts';
 import { compareSsrHtml, renderSsrData, type SsrDataResidue } from '../../src/ssr-data/renderer.ts';
 
 type DemoModule = {
@@ -109,22 +116,27 @@ test('demo shadow comparison reports DIFFERENT after deliberate output mutation'
 	expect(comparison).toMatchObject({ equal: false, expected: current.html });
 });
 
-test('music-player prerender container has exact renderToString parity with its SSR twin', async () => {
+test('music-player records-from-chunks exactly match its renderToString twin', async () => {
 	const modules = await compileDemoModules(musicFiles);
 	const page = modules.get('demos/music-player-ssr/pages/index.tsrx')!;
 	const artifact = {
 		renderSsr: () => currentEmitterOutput(page, modules),
 	};
 	const evaluated = await evaluateBuiltPageClosure(artifact);
-	const prerendered = await assembleSsrContainer(artifact, evaluated, {});
+	const prerendered = await assemblePrerenderContainer(artifact, evaluated, {});
+	const derivedRecords = await derivePrerenderResumeRecords(artifact);
+	const serializedBySsr = await prepareSsrResumeRecords(evaluated);
 	const ssrTwin = await renderToString(artifact);
 
-	// Named parity deltas: none. Both paths consume the same linked page closure
-	// and the same full-container assembler, so allowing any delta would hide a
-	// prerender/SSR contract split.
-	const allowedParityDeltas: ReadonlyArray<string> = [];
-	expect(allowedParityDeltas).toEqual([]);
-	expect(prerendered).toBe(ssrTwin);
+	expect(derivedRecords).toEqual(serializedBySsr);
+	expect(prerendered).not.toContain('type="markless/state"');
+	expect(prerendered).not.toContain('type="markless/view"');
+	expect(ssrTwin).toContain(
+		`<script type="markless/state">${JSON.stringify(derivedRecords.state)}</script>`,
+	);
+	expect(ssrTwin).toContain(
+		`<script type="markless/view">${JSON.stringify(derivedRecords.view)}</script>`,
+	);
 });
 
 async function compileDemoModules(files: ReadonlyArray<string>): Promise<Map<string, DemoModule>> {

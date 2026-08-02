@@ -27,8 +27,8 @@ export default box(
 			throw new Error('Expected CSR music player HTML to render modulepreload links.');
 		}
 		assertModulePreloadsInHead(html);
-		if (html.includes('data-async-resumer')) {
-			throw new Error('CSR music player HTML must not include an SSR resume payload.');
+		if (/type=["']markless\/(?:state|view)["']/.test(html)) {
+			throw new Error('Prerendered music player HTML must not include state/view payload scripts.');
 		}
 		if (!/<script\b[^>]*\btype="module"[^>]*\bsrc=/.test(html)) {
 			throw new Error(

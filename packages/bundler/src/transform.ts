@@ -170,6 +170,7 @@ export async function transformTsrxModule(
 					compiled.protocolView,
 					compiled.runtimeDemandMap,
 				),
+				prerenderSourceId: input.prerenderRecords ? input.filename : undefined,
 				hasBoundSymbols: compiled.boundSymbolResolver.rows.length > 0,
 				symbols: symbolRows,
 				symbolRoutes,
@@ -254,12 +255,13 @@ export async function transformTsrxModule(
 						compiled.protocolView,
 						compiled.runtimeDemandMap,
 					),
+					prerenderRecords: input.prerenderRecords,
 					resumeModuleUrl: input.resumeModuleUrl,
 					publicRenderModuleSource: compiled.publicRenderModule.moduleSource,
 					publicRenderRootExportName: compiled.publicRenderModule.rootExportName,
-					publicCsrModuleSource: stripCsrTestFallback(
-						compiled.publicRenderModule.csrModuleSource,
-					),
+					publicCsrModuleSource: input.dev
+						? compiled.publicRenderModule.csrModuleSource
+						: stripCsrTestFallback(compiled.publicRenderModule.csrModuleSource),
 					nativeCsr: csrNative.length > 0,
 					publicRenderCsrExportName: compiled.publicRenderModule.csrExportName,
 					publicSsrModuleSource: compiled.publicRenderModule.ssrModuleSource,

@@ -3,7 +3,10 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
 import { pathToFileURL } from 'node:url';
 import type { Plugin } from 'rolldown';
-import { assembleSsrContainer, type SsrRenderable } from '../../../web/src/render-to-string.ts';
+import {
+	assemblePrerenderPageParts,
+	type SsrRenderable,
+} from '../../../web/src/render-to-string.ts';
 import { evaluateBuiltPageClosure } from '../../../web/src/prerender/evaluator.ts';
 
 export async function emitPrerenderedPage(input: {
@@ -31,7 +34,7 @@ export async function emitPrerenderedPage(input: {
 		const built = (await import(moduleUrl)) as { readonly default?: SsrRenderable };
 		if (!built.default) throw new Error('MARKLESS_PRERENDER_ENTRY_MISSING');
 		const output = await evaluateBuiltPageClosure(built.default);
-		const container = await assembleSsrContainer(built.default, output, {});
+		const page = await assemblePrerenderPageParts(built.default, output, {});
 		const htmlFile = resolve(input.root, input.outDir, 'index.html');
 		const html = await readFile(htmlFile, 'utf8');
 		const placeholder = '<div id="app"></div>';
@@ -40,7 +43,8 @@ export async function emitPrerenderedPage(input: {
 				'MARKLESS_PRERENDER_CONTAINER_MISSING: expected exact #app build placeholder',
 			);
 		}
-		await writeFile(htmlFile, html.replace(placeholder, container));
+		const withHead = page.head ? html.replace('</head>', `${page.head}</head>`) : html;
+		await writeFile(htmlFile, withHead.replace(placeholder, page.container));
 	} finally {
 		await rm(temporaryDirectory, { force: true, recursive: true });
 	}

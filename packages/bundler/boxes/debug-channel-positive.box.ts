@@ -131,7 +131,7 @@ export function debugChannelReporter(debug: boolean): Plugin {
 }
 
 export const expectedDebugResult = (fixture: string) =>
-	// vite-csr compiles its static counter event through the optimized direct
-	// attach path (attachMarklessPublicStaticEvents in the built bundle), not a
-	// resume record — the channel must report the path that actually registered.
+	// vite-csr's optimized chunk renderer attaches this static event directly;
+	// standard native-chunk CSR paths are covered by the web delegated-trigger
+	// registration test.
 	fixture.endsWith('vite-csr') ? '1:csr:direct-csr' : '1:ssr-inline:inline-resumer';

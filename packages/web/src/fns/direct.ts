@@ -149,6 +149,7 @@ function readDirectChunkResidue(residue, graph, item) {
 }
 
 function attachDirectChunkEvents(root, graph, loadSymbol, events, sync) {
+	let debugRegistrations;
 	for (const eventRecord of events) {
 		const element = nodeAtPath(root, eventRecord.hostPath);
 		if (!element?.addEventListener) continue;
@@ -162,7 +163,30 @@ function attachDirectChunkEvents(root, graph, loadSymbol, events, sync) {
 			}
 			graph.flush();
 		});
+		if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__) {
+			const rootRef = new WeakRef(root),
+				elementRef = new WeakRef(element);
+			(debugRegistrations ??= []).push(
+				import('../debug-channel.ts')
+					.then((debug) => {
+						const liveRoot = rootRef.deref(),
+							liveElement = elementRef.deref();
+						if (!liveRoot || !liveElement) return;
+						debug.__marklessDebugStartContainer(liveRoot, 'csr');
+						debug.__marklessDebugRecordInteraction(
+							liveRoot,
+							liveElement,
+							eventRecord.eventName,
+							{ kind: 'direct-csr', source: 'static-event' },
+						);
+					})
+					.catch(() => {}),
+			);
+		}
 	}
+	return typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
+		? Promise.all(debugRegistrations ?? [])
+		: undefined;
 }
 
 function syncDirectRepeat(root, graph, loadSymbol, repeat, state, repeatIndex, cloneChunk, sync) {

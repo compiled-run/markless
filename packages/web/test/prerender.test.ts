@@ -1,5 +1,14 @@
 import { expect, test } from 'vitest';
-import { evaluatePrerenderClosure } from '../src/prerender/evaluator.ts';
+import {
+	derivePrerenderResumeRecords,
+	evaluatePrerenderClosure,
+} from '../src/prerender/evaluator.ts';
+import {
+	assemblePrerenderContainer,
+	assemblePrerenderPageParts,
+	assembleSsrContainer,
+	type SsrRenderArtifact,
+} from '../src/render-to-string.ts';
 
 test('evaluates a linked page closure without reparsing markup or authored source', async () => {
 	const child = {
@@ -128,4 +137,81 @@ test('evaluates a linked page closure without reparsing markup or authored sourc
 	expect(output.html).toBe(
 		'<main><strong>Ready</strong><!--markless:branch:branch:0--><i>READY</i><!--/markless:branch:branch:0--></main>',
 	);
+});
+
+test('derives the same resume records that SSR serializes', async () => {
+	const artifact: SsrRenderArtifact = {
+		resumeModuleUrl: '/build/resume.js',
+		renderSsr: () => ({
+			html: '<button>Ready</button>',
+			state: {
+				version: 1,
+				cells: [
+					{
+						graphNodeId: 'state:item',
+						name: 'item',
+						valueKind: 'object',
+						value: {
+							version: 1,
+							root: { $ref: 0 },
+							records: [{ id: 0, type: 'object', fields: [['label', 'Ready']] }],
+						},
+					},
+				],
+				computed: [],
+				sharedDefinitions: [],
+			},
+			view: {
+				version: 1,
+				locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'button' }],
+				events: [{ hostNodeId: 'h0', eventName: 'click', symbolIds: ['symbol:0'] }],
+				domUpdates: [],
+				behaviors: [],
+				elementHandles: [],
+				keyedRepeats: [],
+				branches: [],
+				asyncBoundaries: [],
+			},
+		}),
+	};
+	const output = await artifact.renderSsr();
+	const derived = await derivePrerenderResumeRecords(artifact);
+	const ssr = await assembleSsrContainer(artifact, output, {});
+
+	expect(ssr).toContain(`<script type="markless/state">${JSON.stringify(derived.state)}</script>`);
+	expect(ssr).toContain(`<script type="markless/view">${JSON.stringify(derived.view)}</script>`);
+	expect(derived).toEqual(await derivePrerenderResumeRecords(artifact));
+});
+
+test('assembles a prerendered container with delegated triggers and zero payload scripts', async () => {
+	const artifact: SsrRenderArtifact = {
+		resumeModuleUrl: '/build/resume.js',
+		modulePreloads: ['/build/resume.js'],
+		renderSsr: () => ({ html: '<button>Ready</button>' }),
+	};
+	const output = {
+		html: '<button>Ready</button>',
+		state: { version: 1, cells: [], computed: [], sharedDefinitions: [] },
+		view: {
+			version: 1,
+			locators: [{ hostNodeId: 'h0', strategy: 'dom-order' as const, index: 0, tagName: 'button' }],
+			events: [{ hostNodeId: 'h0', eventName: 'click', symbolIds: ['symbol:0'] }],
+			domUpdates: [],
+			behaviors: [],
+			elementHandles: [],
+			keyedRepeats: [],
+			branches: [],
+			asyncBoundaries: [],
+		},
+	};
+	const html = await assemblePrerenderContainer(artifact, output, {});
+	const parts = await assemblePrerenderPageParts(artifact, output, {});
+
+	expect(html).not.toContain('type="markless/state"');
+	expect(html).not.toContain('type="markless/view"');
+	expect(html).not.toContain('createTreeWalker');
+	expect(html).toContain('data-markless-resume-module="/build/resume.js"');
+	expect(html).toContain('addEventListener');
+	expect(parts.head).toContain('<link rel="modulepreload" href="/build/resume.js"');
+	expect(parts.container).not.toContain('rel="modulepreload"');
 });

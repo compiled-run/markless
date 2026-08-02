@@ -42,6 +42,7 @@ export interface MarklessVirtualModule {
 export interface TransformTsrxModuleInput {
 	filename: string;
 	source: string;
+	dev?: boolean;
 	importedModuleInterfaces?: SemanticGraphInput['importedModuleInterfaces'];
 	symbols?: import('@markless/compiler').SymbolResolverModuleInput['symbols'];
 	devResumeReexport?: boolean;
@@ -54,6 +55,7 @@ export interface TransformTsrxModuleInput {
 	executionLog?: MarklessExecutionLogMode;
 	executionLogModuleHooks?: boolean;
 	inlineResumerDebug?: boolean;
+	prerenderRecords?: boolean;
 }
 
 export interface TransformTsrxModuleResult {
