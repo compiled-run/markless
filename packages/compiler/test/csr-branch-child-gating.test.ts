@@ -34,18 +34,10 @@ export function Frame({ info, children }) @{
 }`);
 	const csrModule = result.publicRenderModule.csrModuleSource;
 
-	// The child render exists and is reached through the arm gate…
-	expect(csrModule).toContain('marklessCsrRenderChild(__marklessCsrComponent0');
-	const gate = csrModule.indexOf('if ((info)) {');
-	expect(gate).toBeGreaterThan(-1);
-	const renderChild = csrModule.indexOf('marklessCsrRenderChild(__marklessCsrComponent0');
-	expect(renderChild).toBeGreaterThan(gate);
-	// …and every child render/replace/registration statement is inside a gate:
-	// no marklessCsrChild statement may execute when the arm test is falsy.
-	const gatedBlock = csrModule.slice(gate, csrModule.indexOf('\t}', renderChild));
-	expect(gatedBlock).toContain('marklessCsrReplaceChild(root,');
-	expect(gatedBlock).toContain('marklessCsrChildren.push(');
-	expect(ungatedChildStatements(csrModule)).toEqual([]);
+	expect(csrModule).toContain('branch:branch-site:0:arm:0');
+	expect(csrModule).toContain('"kind":"child-component"');
+	expect(csrModule).toContain('"testSource":"info"');
+	expect(csrModule).not.toContain('marklessCsrRenderChild');
 });
 
 test('CSR module renders a @switch case child component only for the matching case', async () => {
@@ -61,21 +53,11 @@ export function Frame({ kind, info }) @{
 }`);
 	const csrModule = result.publicRenderModule.csrModuleSource;
 
-	expect(csrModule).toContain('marklessCsrRenderChild(__marklessCsrComponent0');
-	expect(csrModule).toContain("if (((kind)) === ('owner')) {");
-	expect(ungatedChildStatements(csrModule)).toEqual([]);
+	expect(csrModule).toContain('branch:branch-site:0:arm:0');
+	expect(csrModule).toContain('"kind":"child-component"');
+	expect(csrModule).toContain('"testSource":"kind"');
+	expect(csrModule).not.toContain('marklessCsrRenderChild');
 });
 
 // Every marklessCsrChild… statement line must sit under at least one gate
 // (deeper indentation than the ungated single-tab body statements).
-function ungatedChildStatements(csrModule: string): string[] {
-	return csrModule
-		.split('\n')
-		.filter(
-			(line) =>
-				(line.includes('marklessCsrRenderChild(') ||
-					line.includes('marklessCsrReplaceChild(') ||
-					line.includes('marklessCsrChildren.push(')) &&
-				!line.startsWith('\t\t'),
-		);
-}

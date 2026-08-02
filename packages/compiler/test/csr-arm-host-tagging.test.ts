@@ -37,19 +37,12 @@ export function QuotaPanel() @{
 	});
 }
 
-test('the CSR module tags @pending arm hosts so compose can armize the live arm', async () => {
+test('the CSR module records @pending arm hosts in its native chunk', async () => {
 	const result = await compilePanel();
 	const csrModule = result.publicRenderModule.csrModuleSource;
 
-	// Pending-arm hosts carry the arm-host tag in the emitted html…
-	const pendingParagraph = csrModule.indexOf('class=\\"waiting\\"');
-	expect(pendingParagraph).toBeGreaterThan(-1);
-	const tagged = csrModule.match(/data-markless-arm-host=\\"([^\\]+)\\"/g) ?? [];
-	expect(tagged.length).toBeGreaterThanOrEqual(2);
-
-	// …and hosts OUTSIDE the boundary arms stay untagged (the section root and
-	// the output resolve through the static host-path locators).
-	const sectionOpen = csrModule.indexOf('<section');
-	const sectionTag = csrModule.slice(sectionOpen, csrModule.indexOf('>', sectionOpen));
-	expect(sectionTag).not.toContain('data-markless-arm-host');
+	expect(csrModule).toContain('async:boundary:0:arm:pending');
+	expect(csrModule).toContain('data-measuring');
+	expect(csrModule).toContain('data-poke');
+	expect(csrModule).not.toContain('data-markless-arm-host');
 });

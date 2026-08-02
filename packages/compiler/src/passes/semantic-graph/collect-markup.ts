@@ -12,7 +12,7 @@ import {
 	isIgnorableStaticTextNode,
 	isSpreadAttribute,
 	isStaticTextNode,
-	trimmedStaticTextValue,
+	staticTextValue,
 	unwrapExpressionContainer,
 } from '../../ast/tsrx.ts';
 import {
@@ -153,7 +153,7 @@ function emitNode(
 	repeat: { readonly id: string; readonly itemName: string } | null,
 ): number {
 	if (isStaticTextNode(node)) {
-		const text = trimmedStaticTextValue(node);
+		const text = staticTextValue(node);
 		if (!text) return 0;
 		append(builder, escapeHtml(text));
 		return 1;
@@ -446,11 +446,13 @@ function expressionResidue(
 			return { kind: 'repeat-item', repeatId: repeat.id, path };
 		}
 	}
-	const resolved = resolveGraphPath(
-		source,
-		graphBindingMap(context.graph),
-		semanticAliasMap(context.graph),
-	);
+	const resolved = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$/.test(source)
+		? resolveGraphPath(
+				source,
+				graphBindingMap(context.graph),
+				semanticAliasMap(context.graph),
+			)
+		: null;
 	if (resolved) {
 		return { kind: 'graph-read', graphNodeId: resolved.binding.id, path: resolved.path };
 	}

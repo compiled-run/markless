@@ -34,13 +34,7 @@ test('CSR module seeds the prop:props cell from the renderCsr props argument', a
 	const result = await compilePage('{ params }');
 	const csrModule = result.publicRenderModule.csrModuleSource;
 
-	expect(csrModule).toContain(
-		'marklessCsrPayloadState.cells.push({ graphNodeId: "prop:props", directValue: props ?? {} });',
-	);
-	// The cell must exist before the state payload is composed for the runtime.
-	expect(csrModule.indexOf('marklessCsrPayloadState.cells.push')).toBeLessThan(
-		csrModule.indexOf('marklessComposeState(marklessCsrPayloadState'),
-	);
+	expect(csrModule).toContain('propCellId:"prop:props"');
 });
 
 test('CSR module seeds an identifier-parameter page under its prop:<name> cell', async () => {
@@ -58,9 +52,7 @@ export default function Page(pageProps) @{
 		symbols: [],
 	});
 
-	expect(result.publicRenderModule.csrModuleSource).toContain(
-		'marklessCsrPayloadState.cells.push({ graphNodeId: "prop:pageProps", directValue: props ?? {} });',
-	);
+	expect(result.publicRenderModule.csrModuleSource).toContain('propCellId:"prop:pageProps"');
 });
 
 test('pages without props emit no prop cell seeding', async () => {
@@ -90,10 +82,7 @@ export default function Page() @{
 	});
 
 	expect(result.publicRenderModule.csrModuleSource).toContain(
-		'm(graphProps) { marklessCsrRemapGraphOutput(this, graphProps); }',
-	);
-	expect(result.publicRenderModule.csrModuleSource).toContain(
-		'marklessCsrRemapGraphOutput(marklessCsrOutput, [{"name":"input","graphNodeId":"computed:parentValue","path":[]}]);',
+		'"name":"input","kind":"graph-reference","graphNodeId":"computed:parentValue","path":[]',
 	);
 	expect(result.publicRenderModule.ssrModuleSource).toContain(
 		'm(graphProps) { marklessSsrRemapGraphOutput(this, graphProps); }',
@@ -118,11 +107,13 @@ export default function Page() @{
 }`,
 		symbols: [],
 	});
-	const graphProps =
+	const csrGraphProps =
+		'{"name":"libraryOpen","kind":"graph-reference","graphNodeId":"state:libraryOpen","path":[],"source":"libraryOpen"}';
+	const ssrGraphProps =
 		'graphProps: [{"name":"libraryOpen","graphNodeId":"state:libraryOpen","path":[]}]';
 
-	expect(result.publicRenderModule.csrModuleSource).toContain(graphProps);
-	expect(result.publicRenderModule.ssrModuleSource).toContain(graphProps);
+	expect(result.publicRenderModule.csrModuleSource).toContain(csrGraphProps);
+	expect(result.publicRenderModule.ssrModuleSource).toContain(ssrGraphProps);
 });
 
 test('components without prop-dependent computeds do not import the graph remapper', async () => {

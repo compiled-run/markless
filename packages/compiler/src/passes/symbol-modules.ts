@@ -365,6 +365,22 @@ function eventHandlerAuthoredBody(
 	localNames: ReadonlySet<string>,
 	captureSlots: ReadonlyArray<CaptureSlot>,
 ): string {
+	const directCallbackSlot = captureSlots.find(
+		(slot) => callbackCaptureSlot(slot) && slot.source.trim() === symbol.source.trim(),
+	);
+	if (directCallbackSlot) {
+		return `return await context.capture.invoke(${JSON.stringify(directCallbackSlot.id)}, [context.event]);`;
+	}
+	const directReferenceRead = (symbol.reads ?? []).find(
+		(read) => read.source.trim() === symbol.source.trim(),
+	);
+	if (directReferenceRead && isIdentifierObjectKey(symbol.source.trim())) {
+		return `return ${graphReadCallSource(
+			'context.graph.read',
+			directReferenceRead.graphNodeId,
+			directReferenceRead.path,
+		)}(context.event);`;
+	}
 	const body = eventHandlerBodySource(symbol.source);
 	if (!body) return 'void context;';
 

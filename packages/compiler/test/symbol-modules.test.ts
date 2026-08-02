@@ -1838,6 +1838,24 @@ export function App() @{
 	expect(multiArgumentCallback).toContain('const reason = context.args?.[1];');
 });
 
+test('a direct callback prop event reference invokes its graph-routable prop', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Controls.tsrx',
+		source: `
+export function Controls({ onActivate }) @{
+	<button onClick={onActivate}>Activate</button>
+}
+`,
+		symbols: [],
+	});
+	const directHandler = result.symbolModules.modules.find(
+		(module) => module.kind === 'event-handler',
+	);
+	expect(directHandler?.source).toContain(
+		'return context.graph.read("prop:props", ["onActivate"])(context.event);',
+	);
+});
+
 test('local declarations shadow component props when callback arguments are emitted', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/ShadowedCapture.tsrx',

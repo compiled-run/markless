@@ -3,15 +3,11 @@ import { fileURLToPath } from 'node:url';
 import { collectTsrxModuleDiagnostics, compileTsrxModule } from '@markless/compiler';
 import { expect, test } from 'vitest';
 
-test('computed-repeat-async-arm.tsrx fails the build with the boundary-runner diagnostic', async () => {
+test('computed-repeat-async-arm.tsrx emits native async and repeat chunks', async () => {
 	const result = await compileFixture('computed-repeat-async-arm.tsrx');
-	expect(collectTsrxModuleDiagnostics(result)).toEqual(
-		expect.arrayContaining([
-			expect.objectContaining({
-				code: 'MARKLESS_PUBLIC_RENDER_GATE_PLAN_DISAGREEMENT',
-				severity: 'error',
-			}),
-		]),
+	expect(collectTsrxModuleDiagnostics(result).filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+	expect(result.renderData.chunks.map((chunk) => chunk.kind)).toEqual(
+		expect.arrayContaining(['async-arm', 'repeat-row']),
 	);
 });
 

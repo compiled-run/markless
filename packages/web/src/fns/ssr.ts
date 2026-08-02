@@ -5,9 +5,12 @@ import {
 	marklessCsrRemapChildDomUpdate,
 	marklessCsrRemapChildKeyedRepeat,
 	marklessCsrRemapGraphOutput,
-	marklessCsrUnbindLocalView,
 } from './csr.ts';
-import { marklessBoundSymbolId, marklessDomUpdateSymbolId } from './bound-symbol.ts';
+import {
+	marklessBaseSymbolId,
+	marklessBoundSymbolId,
+	marklessDomUpdateSymbolId,
+} from './bound-symbol.ts';
 import { ASYNC_BOUNDARY_ARM } from '@markless/serializer';
 
 export { marklessAssertComposableStateNames, marklessComposeState };
@@ -288,6 +291,54 @@ export function marklessSsrCallbackSymbol(props, path) {
 export function marklessViewWithoutAnchors(view) {
 	return { ...view, branches: [], asyncBoundaries: [] };
 }
+
+function marklessSsrUnbindLocalSymbolId(symbolId) {
+	return marklessBaseSymbolId(symbolId) ?? symbolId;
+}
+
+function marklessSsrUnbindLocalRecordSet(set) {
+	for (const event of set.events ?? [])
+		event.symbolIds = (event.symbolIds ?? []).map(marklessSsrUnbindLocalSymbolId);
+	for (const update of set.domUpdates ?? [])
+		if (update.symbolId) update.symbolId = marklessSsrUnbindLocalSymbolId(update.symbolId);
+	for (const branch of set.branches ?? [])
+		for (const arm of branch.armRecords ?? []) marklessSsrUnbindLocalRecordSet(arm);
+	return set;
+}
+
+function marklessSsrUnbindLocalView(view, localHostIds) {
+	const events = view.events.filter((event) => localHostIds.has(event.hostNodeId));
+	for (const event of events)
+		event.symbolIds = event.symbolIds.map(marklessSsrUnbindLocalSymbolId);
+	const domUpdates = view.domUpdates.filter((update) => localHostIds.has(update.hostNodeId));
+	for (const update of domUpdates)
+		if (update.symbolId) update.symbolId = marklessSsrUnbindLocalSymbolId(update.symbolId);
+	const keyedRepeats = (view.keyedRepeats ?? [])
+		.filter((repeat) => localHostIds.has(repeat.parentHostNodeId))
+		.map((repeat) => ({
+			...repeat,
+			rowEvents: repeat.rowEvents.map((event) => ({
+				...event,
+				symbolIds: event.symbolIds.map(marklessSsrUnbindLocalSymbolId),
+			})),
+		}));
+	for (const branch of view.branches ?? [])
+		for (const arm of branch.armRecords ?? []) marklessSsrUnbindLocalRecordSet(arm);
+	for (const boundary of view.asyncBoundaries ?? []) {
+		const sets = Array.isArray(boundary.armRecords)
+			? boundary.armRecords
+			: [boundary.armRecords];
+		for (const set of sets) if (set) marklessSsrUnbindLocalRecordSet(set);
+	}
+	return {
+		events,
+		domUpdates,
+		keyedRepeats,
+		branches: [...(view.branches ?? [])],
+		asyncBoundaries: [...(view.asyncBoundaries ?? [])],
+	};
+}
+
 export function marklessSsrComposeView(html, view, hostLocators, children, asyncSnapshots) {
 	const localHostIds = new Set(hostLocators.map((locator) => locator.hostNodeId));
 	const childData = children
@@ -309,7 +360,7 @@ export function marklessSsrComposeView(html, view, hostLocators, children, async
 		index: locator.index + offsetFor(locator.index),
 	}));
 	const { events, domUpdates, keyedRepeats, branches, asyncBoundaries } =
-		marklessCsrUnbindLocalView(view, localHostIds);
+		marklessSsrUnbindLocalView(view, localHostIds);
 	const behaviors = view.behaviors.filter((behavior) => localHostIds.has(behavior.hostNodeId));
 	const elementHandles = view.elementHandles.filter((handle) =>
 		localHostIds.has(handle.hostNodeId),

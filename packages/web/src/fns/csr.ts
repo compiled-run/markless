@@ -4,21 +4,13 @@ import {
 	marklessDomUpdateSymbolId,
 	marklessLiveBoundGraphRoute,
 } from './bound-symbol.ts';
+import { marklessSerializeGraphValue } from './state-serialize.ts';
 
 export function marklessCsrFragmentFromHtml(html) {
 	const template = document.createElement('template');
 	template.innerHTML = html;
 	return template.content;
 }
-export function marklessCsrRootFromHtml(html) {
-	const template = document.createElement('template');
-	template.innerHTML = html;
-	const root = template.content.firstElementChild;
-	if (!root) throw new Error('Markless CSR template did not create a root element.');
-	return root;
-}
-const MARKLESS_CSR_CALLBACK_PROP = '__marklessCsrCallbackProp';
-const MARKLESS_CSR_CALLBACK_DISPATCHED = '__marklessCsrCallbackDispatched';
 export function marklessCsrRenderChild(component, props) {
 	const callbackProps = {};
 	const childProps = { ...props };
@@ -26,7 +18,6 @@ export function marklessCsrRenderChild(component, props) {
 		const value = childProps[key];
 		if (typeof value !== 'function') continue;
 		const callback = (...args) => value(...args);
-		Object.defineProperty(callback, MARKLESS_CSR_CALLBACK_PROP, { value: true });
 		callbackProps[key] = callback;
 		childProps[key] = callback;
 	}
@@ -116,39 +107,6 @@ function marklessCsrAssertPresentationalChild(output, componentName, diagnostic)
 		docsUrl: `https://markless.dev/errors/${diagnostic.code}`,
 	});
 }
-export function marklessCsrAttachPropEvent(root, path, eventName, handler) {
-	const element = marklessCsrNodeAtPath(root, path);
-	if (!handler || !element?.addEventListener) return;
-	if (handler[MARKLESS_CSR_CALLBACK_PROP]) {
-		element.addEventListener(eventName, (event) =>
-			event?.[MARKLESS_CSR_CALLBACK_DISPATCHED] ? undefined : handler(event),
-		);
-		if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__) {
-			return marklessCsrDebugEvent(root, element, eventName);
-		}
-		return;
-	}
-	element.addEventListener(eventName, handler);
-	if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__) {
-		return marklessCsrDebugEvent(root, element, eventName);
-	}
-}
-function marklessCsrDebugEvent(root, element, eventName) {
-	const rootRef = new WeakRef(root),
-		elementRef = new WeakRef(element);
-	return import('../debug-channel.ts')
-		.then((debug) => {
-			const liveRoot = rootRef.deref(),
-				liveElement = elementRef.deref();
-			if (!liveRoot || !liveElement) return;
-			debug.__marklessDebugStartContainer(liveRoot, 'csr');
-			debug.__marklessDebugRecordInteraction(liveRoot, liveElement, eventName, {
-				kind: 'direct-csr',
-				source: 'callback-prop',
-			});
-		})
-		.catch(() => {});
-}
 export function marklessComposeState(state, children) {
 	const childStates = children.map((child) => child.output?.state).filter(Boolean);
 	if (!childStates.length) return state;
@@ -177,12 +135,6 @@ export function marklessComposeState(state, children) {
 		],
 		...(sharedDefinitions.length ? { sharedDefinitions } : {}),
 	};
-}
-export function marklessCsrLoadChildSymbol(children, loadSymbol, symbolId) {
-	for (const child of children)
-		if (symbolId.startsWith(child.symbolPrefix) && child.output?.loadSymbol)
-			return child.output.loadSymbol(symbolId.slice(child.symbolPrefix.length));
-	return loadSymbol(symbolId);
 }
 export function marklessCsrRemapGraphOutput(output, graphProps) {
 	// A composed CSR prop is the source node's committed mount value. Seed that
@@ -271,121 +223,6 @@ export function marklessAssertComposableStateNames(state, childStates) {
 			seen.add(id);
 		}
 	}
-}
-export function marklessViewWithoutAnchors(view) {
-	return { ...view, branches: [], asyncBoundaries: [] };
-}
-export function marklessCsrComposeView(root, view, hostLocators, children) {
-	marklessCsrProjectCallerHosts(root, hostLocators);
-	const elements = marklessCsrCollectElements(root);
-	const indexByElement = new Map(elements.map((element, index) => [element, index]));
-	const localHostIds = new Set();
-	const locators = [];
-	const asyncRunners = { ...view.asyncRunners };
-	const csrCallbacks = new Map();
-	for (const locator of hostLocators) {
-		const element = marklessCsrNodeAtPath(root, locator.hostPath);
-		const index = element ? indexByElement.get(element) : undefined;
-		if (index === undefined) continue;
-		localHostIds.add(locator.hostNodeId);
-		locators.push({
-			hostNodeId: locator.hostNodeId,
-			strategy: 'dom-order',
-			index,
-			tagName: locator.tagName,
-		});
-	}
-	const { events, domUpdates, keyedRepeats, branches, asyncBoundaries } =
-		marklessCsrUnbindLocalView(view, localHostIds);
-	const behaviors = view.behaviors.filter((behavior) => localHostIds.has(behavior.hostNodeId));
-	const elementHandles = view.elementHandles.filter((handle) =>
-		localHostIds.has(handle.hostNodeId),
-	);
-	for (const child of children)
-		marklessCsrAppendChildView({
-			child,
-			elements,
-			indexByElement,
-			locators,
-			events,
-			domUpdates,
-			keyedRepeats,
-			behaviors,
-			elementHandles,
-			branches,
-			asyncBoundaries,
-			asyncRunners,
-			csrCallbacks,
-		});
-	locators.sort((a, b) => a.index - b.index);
-	const armizedBoundaries = marklessCsrArmizeBoundaries(
-		root,
-		asyncBoundaries,
-		{ locators, events, behaviors, elementHandles },
-		indexByElement,
-	);
-	const composed = {
-		...view,
-		locators,
-		events,
-		domUpdates,
-		keyedRepeats,
-		behaviors,
-		elementHandles,
-		branches: marklessCsrResolveAnchorRecords(root, 'branch', branches),
-		asyncBoundaries: marklessCsrResolveAnchorRecords(root, 'async', armizedBoundaries),
-		...(Object.keys(asyncRunners).length > 0 ? { asyncRunners } : {}),
-	};
-	return csrCallbacks.size > 0
-		? { ...composed, __marklessCsrCallbacks: Object.fromEntries(csrCallbacks) }
-		: composed;
-}
-
-function marklessCsrUnbindLocalSymbolId(symbolId) {
-	return marklessBaseSymbolId(symbolId) ?? symbolId;
-}
-
-function marklessCsrUnbindLocalRecordSet(set) {
-	for (const event of set.events ?? [])
-		event.symbolIds = (event.symbolIds ?? []).map(marklessCsrUnbindLocalSymbolId);
-	for (const update of set.domUpdates ?? [])
-		if (update.symbolId) update.symbolId = marklessCsrUnbindLocalSymbolId(update.symbolId);
-	for (const branch of set.branches ?? [])
-		for (const arm of branch.armRecords ?? []) marklessCsrUnbindLocalRecordSet(arm);
-	return set;
-}
-
-export function marklessCsrUnbindLocalView(view, localHostIds) {
-	const events = view.events.filter((event) => localHostIds.has(event.hostNodeId));
-	for (const event of events)
-		event.symbolIds = event.symbolIds.map(marklessCsrUnbindLocalSymbolId);
-	const domUpdates = view.domUpdates.filter((update) => localHostIds.has(update.hostNodeId));
-	for (const update of domUpdates)
-		if (update.symbolId) update.symbolId = marklessCsrUnbindLocalSymbolId(update.symbolId);
-	const keyedRepeats = (view.keyedRepeats ?? [])
-		.filter((repeat) => localHostIds.has(repeat.parentHostNodeId))
-		.map((repeat) => ({
-			...repeat,
-			rowEvents: repeat.rowEvents.map((event) => ({
-				...event,
-				symbolIds: event.symbolIds.map(marklessCsrUnbindLocalSymbolId),
-			})),
-		}));
-	for (const branch of view.branches ?? [])
-		for (const arm of branch.armRecords ?? []) marklessCsrUnbindLocalRecordSet(arm);
-	for (const boundary of view.asyncBoundaries ?? []) {
-		const sets = Array.isArray(boundary.armRecords)
-			? boundary.armRecords
-			: [boundary.armRecords];
-		for (const set of sets) if (set) marklessCsrUnbindLocalRecordSet(set);
-	}
-	return {
-		events,
-		domUpdates,
-		keyedRepeats,
-		branches: [...(view.branches ?? [])],
-		asyncBoundaries: [...(view.asyncBoundaries ?? [])],
-	};
 }
 export function marklessCsrAppendChildView(context) {
 	const childView = context.child.output?.view;
@@ -619,93 +456,6 @@ export function marklessCsrPrefixBoundaryArmRecords(set, child) {
 // inside the arm move here from the flat streams. The result is ONE
 // registrable arm-relative record set per boundary — CSR mounts always
 // render @pending, so the planned records merged in are arm 1's.
-export function marklessCsrArmizeBoundaries(root, boundaries, streams, indexByElement) {
-	return boundaries.map((boundary) => {
-		// Child-composed boundaries already carry a single armized record set.
-		if (!Array.isArray(boundary.armRecords)) return boundary;
-		const armElements = marklessCsrElementsBetweenAnchors(root, 'async', boundary.id);
-		if (!armElements) return boundary;
-		const start = armElements.length > 0 ? indexByElement.get(armElements[0]) : 0;
-		const end = start + armElements.length;
-		const armLocators = [];
-		for (const element of armElements) {
-			const hostNodeId = element.getAttribute?.('data-markless-arm-host');
-			if (hostNodeId == null) continue;
-			element.removeAttribute('data-markless-arm-host');
-			armLocators.push({
-				hostNodeId,
-				strategy: 'arm-relative',
-				index: indexByElement.get(element) - start,
-				tagName: element.tagName.toLowerCase(),
-			});
-		}
-		for (let i = streams.locators.length - 1; i >= 0; i--) {
-			const locator = streams.locators[i];
-			if (locator.index < start || locator.index >= end) continue;
-			armLocators.push({
-				...locator,
-				strategy: 'arm-relative',
-				index: locator.index - start,
-			});
-			streams.locators.splice(i, 1);
-		}
-		armLocators.sort((a, b) => a.index - b.index);
-		const armHostIds = new Set(armLocators.map((locator) => locator.hostNodeId));
-		const moved = { events: [], behaviors: [], elementHandles: [] };
-		for (const key of Object.keys(moved)) {
-			for (let i = streams[key].length - 1; i >= 0; i--) {
-				if (armHostIds.has(streams[key][i].hostNodeId))
-					moved[key].unshift(...streams[key].splice(i, 1));
-			}
-		}
-		const planned = boundary.armRecords[1] ?? {};
-		return {
-			...boundary,
-			armRecords: {
-				locators: armLocators,
-				events: [...(planned.events ?? []), ...moved.events],
-				behaviors: [...(planned.behaviors ?? []), ...moved.behaviors],
-				elementHandles: [...(planned.elementHandles ?? []), ...moved.elementHandles],
-				branches: planned.branches ?? [],
-			},
-		};
-	});
-}
-// Elements strictly between a boundary's live comment anchors, in pre-order
-// (the dom-order locator walk). Undefined when the anchor pair is absent.
-function marklessCsrElementsBetweenAnchors(root, kind, id) {
-	const startText = `markless:${kind}:${id}`;
-	const elements = [];
-	let within = false;
-	let closed = false;
-	const visit = (node) => {
-		if (closed) return;
-		if (node?.nodeType === 8) {
-			if (node.textContent === startText) within = true;
-			else if (node.textContent === '/' + startText) {
-				within = false;
-				closed = true;
-			}
-			return;
-		}
-		if (within && node?.nodeType === 1) elements.push(node);
-		for (const child of Array.from(node?.childNodes ?? [])) visit(child);
-	};
-	visit(root);
-	return closed ? elements : undefined;
-}
-function marklessCsrProjectCallerHosts(root, hostLocators) {
-	for (const locator of hostLocators) {
-		if (!locator.hostPath || locator.tagName === '*') continue;
-		const element = marklessCsrNodeAtPath(root, locator.hostPath);
-		if (!element || marklessCsrTagMatches(element, locator.tagName)) continue;
-		if (element.nodeType === 8) continue;
-		/* authored slot is a branch/async range start comment: its content lives INSIDE the anchors; projecting would relocate the active arm out of the range and break flips */ const projected =
-			marklessCsrFollowingSiblingByTag(element, locator.tagName);
-		if (projected && projected.parentNode === element.parentNode)
-			element.parentNode?.insertBefore?.(projected, element);
-	}
-}
 function marklessCsrResolveChildLocatorElement(elements, locator, claimed) {
 	const current = elements[locator.index];
 	if (current && !claimed.has(current) && marklessCsrTagMatches(current, locator.tagName))
@@ -713,14 +463,6 @@ function marklessCsrResolveChildLocatorElement(elements, locator, claimed) {
 	return elements.find(
 		(element) => !claimed.has(element) && marklessCsrTagMatches(element, locator.tagName),
 	);
-}
-function marklessCsrFollowingSiblingByTag(element, tagName) {
-	let sibling = element.nextSibling;
-	while (sibling) {
-		if (sibling.nodeType === 1 && marklessCsrTagMatches(sibling, tagName)) return sibling;
-		sibling = sibling.nextSibling;
-	}
-	return undefined;
 }
 function marklessCsrTagMatches(element, tagName) {
 	return tagName === '*' || element?.tagName?.toLowerCase?.() === String(tagName).toLowerCase();
@@ -829,31 +571,6 @@ export function marklessCsrRenameAnchors(root, kind, id, prefixedId) {
 	};
 	visit(root);
 }
-export function marklessCsrResolveAnchorRecords(root, kind, records) {
-	if (records.length === 0) return records;
-	const comments = [];
-	/* arm-branch anchors live in their boundary's own census (T104) */ const visit = (node) => {
-		if (node?.nodeType === 8 && !/^\/?markless:arm-branch:/.test(node.textContent ?? ''))
-			comments.push(node);
-		for (const child of Array.from(node?.childNodes ?? [])) visit(child);
-	};
-	visit(root);
-	const indexByText = new Map();
-	comments.forEach((comment, index) => {
-		if (!indexByText.has(comment.textContent)) indexByText.set(comment.textContent, index);
-	});
-	return records.map((record) => {
-		const start = indexByText.get(`markless:${kind}:${record.id}`);
-		const end = indexByText.get(`/markless:${kind}:${record.id}`);
-		if (start === undefined || end === undefined)
-			throw new Error(`MARKLESS_COMPOSED_ANCHOR_MISSING: ${kind}:${record.id}`);
-		return {
-			...record,
-			startAnchor: { ...record.startAnchor, index: start },
-			endAnchor: { ...record.endAnchor, index: end },
-		};
-	});
-}
 export function marklessCsrCollectElements(root) {
 	const elements = [];
 	const visit = (node) => {
@@ -863,47 +580,600 @@ export function marklessCsrCollectElements(root) {
 	visit(root);
 	return elements;
 }
-export function marklessCsrNodeAtPath(root, path) {
-	let node = root;
-	for (const index of path) {
-		node = marklessCsrAuthoredChild(node, index);
-		if (!node) return undefined;
-	}
-	return node;
-}
-export function marklessCsrAuthoredChild(parent, index) {
-	const children = parent?.childNodes;
-	if (!children) return undefined;
-	let slot = 0;
-	for (let position = 0; position < children.length; position++) {
-		const child = children[position];
-		if (child.nodeType === 8) {
-			const text = child.textContent ?? '';
-			const range = /^markless:(branch|arm-branch|async)/.test(text);
-			if (range) {
-				const end = '/' + text;
-				let close = position + 1;
-				while (
-					close < children.length &&
-					!(children[close].nodeType === 8 && children[close].textContent === end)
-				)
-					close++;
-				if (slot === index) return child;
-				slot++;
-				position = close;
-				continue;
-			}
-			continue;
-		}
-		if (slot === index) return child;
-		slot++;
-	}
-	return undefined;
-}
 export function marklessCsrIsThenable(value) {
 	return (
 		value !== null &&
 		(typeof value === 'object' || typeof value === 'function') &&
 		typeof value.then === 'function'
 	);
+}
+
+// Native-chunk CSR bootstrap (T009b). The compiler supplies markup strings and
+// direct slot coordinates. This code visits only declared residue slots,
+// component hosts, boundary arms, and data rows; cloneNode/native parsing owns
+// every static subtree.
+export function createMarklessCsrChunkRenderer(input) {
+	return function renderMarklessCsrChunks(props = {}) {
+		const definition = input.components[input.rootComponentName];
+		if (!definition) throw new Error(`Missing Markless CSR component ${input.rootComponentName}.`);
+		return renderChunkComponent(definition, props, input.components, '', '', 0);
+	};
+}
+
+function renderChunkComponent(definition, props, components, idPrefix, symbolPrefix, depth) {
+	if (depth > 32) throw new Error(`Markless CSR component recursion exceeded at ${definition.name}.`);
+	if (definition.shouldRender && !definition.shouldRender(props)) return null;
+	const chunks = new Map(definition.chunks.map((chunk) => [chunk.id, chunk]));
+	const templates = new Map();
+	const initial = new Map();
+	for (const entry of definition.initialValues ?? []) {
+		if (entry.value.kind === 'constant') initial.set(entry.graphNodeId, entry.value.value);
+	}
+	const propCell = props ?? {};
+	let valueFunctions;
+	const read = (graphNodeId, path = []) => {
+		let value;
+		if (graphNodeId === definition.propCellId || graphNodeId === 'prop:props') value = propCell;
+		else if (graphNodeId.startsWith('prop:')) value = propCell[graphNodeId.slice(5)];
+		else if (initial.has(graphNodeId)) value = initial.get(graphNodeId);
+		else {
+			const source = definition.initialValueSources?.[graphNodeId];
+			if (source) {
+				initial.set(graphNodeId, undefined);
+				valueFunctions ??= definition.createValues(
+					props,
+					read,
+					{},
+					readMarklessCsrChunkPath,
+				);
+				value = valueFunctions[source]?.();
+				if (
+					typeof value === 'function' &&
+					definition.initialValueKinds?.[graphNodeId]?.includes('computed')
+				)
+					value = value?.();
+				initial.set(graphNodeId, value);
+			}
+		}
+		return readMarklessCsrChunkPath(value, path);
+	};
+	const runtimeState = { graph: null, root: null };
+	const childOutputs = [];
+	const activeHostNodeIds = new Set();
+	const cloneChunk = (chunkId) => {
+		const chunk = chunks.get(chunkId);
+		if (!chunk) throw new Error(`Missing Markless render chunk ${chunkId}.`);
+		let template = templates.get(chunkId);
+		if (!template) {
+			template = document.createElement('template');
+			template.innerHTML = chunk.statics.join('');
+			templates.set(chunkId, template);
+		}
+		return { chunk, content: template.content.cloneNode(true) };
+	};
+
+	const renderChunk = (chunkId, locals = {}) => {
+		const cloned = cloneChunk(chunkId);
+		const hostNodes = new Map(
+			cloned.chunk.hosts.flatMap((host) => {
+				const node = marklessCsrChunkNodeAtPath(cloned.content, host.coordinate.path);
+				return node?.nodeType === 1 ? [[host.hostNodeId, node]] : [];
+			}),
+		);
+		const renderedHostNodeIds = new Set(cloned.chunk.hosts.map((host) => host.hostNodeId));
+		for (const host of cloned.chunk.hosts) activeHostNodeIds.add(host.hostNodeId);
+		const placements = [];
+		let insertedHosts = 0;
+		let values;
+		const getValues = () =>
+			(values ??= definition.createValues(
+				props,
+				read,
+				locals,
+				readMarklessCsrChunkPath,
+			));
+		const slotTargets = new Map(
+			cloned.chunk.slots.map((slot) => [slot, marklessCsrChunkNodeAtPath(cloned.content, slot.coordinate.path)]),
+		);
+		for (const slot of cloned.chunk.slots) {
+			const target = slotTargets.get(slot);
+			if (!target) continue;
+			if (slot.kind === 'text') {
+				const value = readMarklessCsrChunkResidue(slot.residue, read, locals, getValues);
+				if (
+					value?.kind === 'static-markup' ||
+					(typeof value === 'string' && slot.residue?.kind === 'graph-read' && slot.residue.path?.[0] === 'children')
+				) {
+					const projection = document.createElement('template');
+					projection.innerHTML = value?.kind === 'static-markup' ? value.markup : value;
+					marklessCsrChunkReplace(target, projection.content);
+					insertedHosts += value?.elementCount ?? 0;
+				} else target.replaceWith(document.createTextNode(stringifyMarklessCsrChunkValue(value)));
+				continue;
+			}
+			if (slot.kind === 'attribute') {
+				const value = readMarklessCsrChunkResidue(slot.residue, read, locals, getValues);
+				if (value == null || value === false) target.removeAttribute?.(slot.name);
+				else target.setAttribute?.(slot.name, stringifyMarklessCsrChunkValue(value));
+				continue;
+			}
+			const baseIndex = countMarklessChunkHostsBefore(cloned.chunk, slot.coordinate.path) + insertedHosts;
+			if (slot.kind === 'child-component') {
+				const edge = definition.edges.find((candidate) => candidate.id === slot.componentEdgeId);
+				const childDefinition = definition.getComponent?.(slot.childComponentName) ?? components[slot.childComponentName];
+				if (!edge || !childDefinition) {
+					target.remove?.();
+					continue;
+				}
+				const childProps = marklessCsrChunkChildProps(edge, read, locals, getValues, runtimeState, definition.loadSymbol);
+				const child = renderChunkComponent(
+					childDefinition,
+					childProps,
+					components,
+					idPrefix + edge.hostPrefix,
+					symbolPrefix + edge.symbolPrefix,
+					depth + 1,
+				);
+				if (!child) {
+					target.remove?.();
+					continue;
+				}
+				marklessCsrChunkReplace(target, child.root);
+				placements.push({ edge, output: child, baseIndex });
+				childOutputs.push({ edge, output: child });
+				insertedHosts += child.elementCount;
+				continue;
+			}
+			if (slot.kind === 'repeat') {
+				const repeat = definition.repeats.find((candidate) => candidate.repeatId === slot.repeatId);
+				const collection = repeat?.collectionGraphNodeId
+					? read(repeat.collectionGraphNodeId, repeat.collectionPath)
+					: [];
+				const rows = Array.isArray(collection) ? collection : Array.from(collection ?? []);
+				const nodes = [];
+				let hostCount = 0;
+				const rowHostNodeIds = new Set();
+				if (rows.length === 0 && slot.emptyTemplateId) {
+					const empty = renderChunk(slot.emptyTemplateId, locals);
+					nodes.push(...empty.nodes);
+					hostCount += empty.hostCount;
+					for (const [hostNodeId, node] of empty.hostNodes) hostNodes.set(hostNodeId, node);
+					for (const hostNodeId of empty.hostNodeIds) renderedHostNodeIds.add(hostNodeId);
+					for (const hostNodeId of empty.hostNodeIds) rowHostNodeIds.add(hostNodeId);
+				} else {
+					for (const item of rows) {
+						const row = renderChunk(slot.rowTemplateId, { ...locals, [repeat.itemName]: item });
+						nodes.push(...row.nodes);
+						hostCount += row.hostCount;
+						for (const [hostNodeId, node] of row.hostNodes) hostNodes.set(hostNodeId, node);
+						for (const hostNodeId of row.hostNodeIds) renderedHostNodeIds.add(hostNodeId);
+						for (const hostNodeId of row.hostNodeIds) rowHostNodeIds.add(hostNodeId);
+					}
+				}
+				marklessCsrChunkReplace(target, ...nodes);
+				placements.push({ baseIndex, elementCount: hostCount, hostNodeIds: rowHostNodeIds });
+				insertedHosts += hostCount;
+				continue;
+			}
+			if (slot.kind === 'branch') {
+				const branch = definition.branches.find((candidate) => candidate.branchSiteId === slot.branchSiteId);
+				const taken = marklessCsrChunkBranchArm(branch, getValues, read);
+				const arm = renderChunk(slot.armTemplateIds[taken] ?? slot.armTemplateIds[0], locals);
+				for (const [hostNodeId, node] of arm.hostNodes) hostNodes.set(hostNodeId, node);
+				for (const hostNodeId of arm.hostNodeIds) renderedHostNodeIds.add(hostNodeId);
+				const anchors = marklessCsrChunkAnchors(target, 'branch', idPrefix + slot.branchSiteId);
+				marklessCsrChunkReplace(target, anchors.start, ...arm.nodes, anchors.end);
+				placements.push({ baseIndex, elementCount: arm.hostCount, hostNodeIds: arm.hostNodeIds });
+				insertedHosts += arm.hostCount;
+				continue;
+			}
+			if (slot.kind === 'async') {
+				const chunkId = slot.armTemplateIds.pending ?? slot.armTemplateIds.try;
+				const arm = renderChunk(chunkId, locals);
+				for (const [hostNodeId, node] of arm.hostNodes) hostNodes.set(hostNodeId, node);
+				for (const hostNodeId of arm.hostNodeIds) renderedHostNodeIds.add(hostNodeId);
+				const anchors = marklessCsrChunkAnchors(target, 'async', idPrefix + slot.boundaryId);
+				marklessCsrChunkReplace(target, anchors.start, ...arm.nodes, anchors.end);
+				placements.push({ baseIndex, elementCount: arm.hostCount, hostNodeIds: arm.hostNodeIds });
+				insertedHosts += arm.hostCount;
+				continue;
+			}
+			if (slot.kind === 'dynamic-host') {
+				const tag = readMarklessCsrChunkResidue(slot.tag, read, locals, getValues);
+				if (tag == null) {
+					target.remove?.();
+					continue;
+				}
+				const host = document.createElement(String(tag));
+				for (const [hostNodeId, node] of hostNodes)
+					if (node === target) hostNodes.set(hostNodeId, host);
+				for (const [name, value] of Object.entries(slot.staticAttributes ?? {})) host.setAttribute(name, value);
+				for (const attribute of slot.attributeSlots ?? []) {
+					const value = readMarklessCsrChunkResidue(attribute.residue, read, locals, getValues);
+					if (attribute.kind === 'attribute' && value != null && value !== false)
+						host.setAttribute(attribute.name, stringifyMarklessCsrChunkValue(value));
+					else if (attribute.kind === 'spread' && value && typeof value === 'object')
+						for (const [name, spreadValue] of Object.entries(value))
+							if (spreadValue != null && spreadValue !== false)
+								host.setAttribute(name, stringifyMarklessCsrChunkValue(spreadValue));
+				}
+				const children = renderChunk(slot.childChunkId, locals);
+				for (const hostNodeId of children.hostNodeIds) renderedHostNodeIds.add(hostNodeId);
+				for (const node of children.nodes) host.appendChild(node);
+				marklessCsrChunkReplace(target, host);
+				placements.push({ baseIndex, elementCount: 1 + children.hostCount, hostNodeIds: children.hostNodeIds });
+				insertedHosts += 1 + children.hostCount;
+			}
+		}
+		return {
+			nodes: Array.from(cloned.content.childNodes ?? []),
+			content: cloned.content,
+				hostCount: cloned.chunk.hosts.length + insertedHosts,
+				hostNodeIds: renderedHostNodeIds,
+				hostNodes,
+				placements,
+		};
+	};
+
+	const rendered = renderChunk(definition.rootChunkId);
+	const root = rendered.nodes.length === 1
+		? rendered.nodes[0]
+		: rendered.content;
+	if (!root) throw new Error('Markless CSR chunk did not create a root.');
+	runtimeState.root = root;
+	const state = marklessCsrChunkState(definition, props, initial, childOutputs);
+	let view = marklessCsrChunkView(
+		definition,
+		rendered.placements,
+		childOutputs,
+		idPrefix,
+		symbolPrefix,
+		activeHostNodeIds,
+	);
+	const liveHostNodes = new Map(
+		[...rendered.hostNodes].map(([hostNodeId, node]) => [idPrefix + hostNodeId, node]),
+	);
+	for (const child of childOutputs)
+		for (const [hostNodeId, node] of child.output.liveHostNodes ?? [])
+			liveHostNodes.set(hostNodeId, node);
+	view = marklessCsrBindChunkView(root, view, liveHostNodes);
+	const output = {
+		root,
+		state,
+		view,
+		elementCount: rendered.hostCount,
+		liveHostNodes,
+		routePrefixes: childOutputs.flatMap((child) =>
+			child.edge.symbolPrefix
+				? [child.edge.symbolPrefix]
+				: child.output.routePrefixes ?? [],
+		),
+		symbolIds: new Set([
+			...state.computed.flatMap((computed) => computed.deriveSymbolId ? [computed.deriveSymbolId] : []),
+			...view.events.flatMap((event) => event.symbolIds ?? []),
+			...view.domUpdates.flatMap((update) => update.symbolId ? [update.symbolId] : []),
+			...view.behaviors.flatMap((behavior) => behavior.symbolId ? [behavior.symbolId] : []),
+		]),
+		loadSymbol(symbolId) {
+			for (const child of childOutputs) {
+				if (child.edge.symbolPrefix && symbolId.startsWith(child.edge.symbolPrefix))
+					return marklessCsrChunkRemapLoadedSymbol(
+						child.output.loadSymbol(symbolId.slice(child.edge.symbolPrefix.length)),
+						child.edge.props,
+					);
+				if (!child.edge.symbolPrefix && child.output.symbolIds?.has(symbolId))
+					return marklessCsrChunkRemapLoadedSymbol(
+						child.output.loadSymbol(symbolId),
+						child.edge.props,
+					);
+				if (
+					!child.edge.symbolPrefix &&
+					(child.output.routePrefixes ?? []).some((prefix) => symbolId.startsWith(prefix))
+				) return marklessCsrChunkRemapLoadedSymbol(
+					child.output.loadSymbol(symbolId),
+					child.edge.props,
+				);
+			}
+			return definition.loadSymbol(symbolId);
+		},
+		connectRuntime(context) {
+			runtimeState.graph = context.graph;
+			for (const child of childOutputs) child.output.connectRuntime?.(context);
+		},
+	};
+	return output;
+}
+
+function marklessCsrChunkRemapLoadedSymbol(loaded, graphProps) {
+	if (marklessCsrIsThenable(loaded))
+		return loaded.then((symbol) => marklessCsrChunkRemapLoadedSymbol(symbol, graphProps));
+	if (typeof loaded !== 'function' || !graphProps?.length) return loaded;
+	return (context) => loaded({
+		...context,
+		graph: {
+			...context.graph,
+			read(graphNodeId, path = []) {
+				const mapped = marklessCsrRemapChildGraph({ graphNodeId, path }, graphProps);
+				return context.graph.read(mapped?.graphNodeId ?? graphNodeId, mapped?.path ?? path);
+			},
+		},
+	});
+}
+
+function marklessCsrChunkNodeAtPath(root, path) {
+	let node = root;
+	for (const index of path) {
+		node = node?.childNodes?.[index];
+		if (!node) return undefined;
+	}
+	return node;
+}
+
+function readMarklessCsrChunkPath(value, path = []) {
+	for (const segment of path) value = value?.[segment];
+	return value;
+}
+
+function readMarklessCsrChunkResidue(residue, read, locals, getValues) {
+	if (residue.kind === 'graph-read') return read(residue.graphNodeId, residue.path);
+	if (residue.kind === 'repeat-item') {
+		const item = Object.values(locals).find((value) => value && typeof value === 'object');
+		return readMarklessCsrChunkPath(item, residue.path);
+	}
+	return getValues()[residue.source]?.();
+}
+
+function stringifyMarklessCsrChunkValue(value) {
+	return value == null || value === false ? '' : String(value);
+}
+
+function marklessCsrChunkReplace(target, ...nodes) {
+	const expanded = [];
+	for (const node of nodes) {
+		if (node?.nodeType === 11) expanded.push(...Array.from(node.childNodes ?? []));
+		else if (node) expanded.push(node);
+	}
+	target.replaceWith?.(...expanded);
+}
+
+function marklessCsrChunkAnchors(anchor, kind, id) {
+	const start = anchor.cloneNode();
+	const end = anchor.cloneNode();
+	start.textContent = `markless:${kind}:${id}`;
+	end.textContent = `/markless:${kind}:${id}`;
+	return { start, end };
+}
+
+function countMarklessChunkHostsBefore(chunk, path) {
+	return chunk.hosts.filter((host) => compareMarklessChunkPaths(host.coordinate.path, path) < 0)
+		.length;
+}
+
+function compareMarklessChunkPaths(left, right) {
+	const length = Math.min(left.length, right.length);
+	for (let index = 0; index < length; index++) {
+		if (left[index] !== right[index]) return left[index] - right[index];
+	}
+	return left.length - right.length;
+}
+
+function marklessCsrChunkBranchArm(branch, getValues, read) {
+	if (!branch) return 0;
+	const evaluated = getValues()[branch.testSource]?.();
+	if (branch.kind === 'if') return evaluated ? 0 : 1;
+	if (branch.armTests) {
+		const found = branch.armTests.findIndex((value) => Object.is(value, evaluated));
+		return found < 0 ? branch.armTests.length : found;
+	}
+	return branch.testReads?.length ? (read(branch.testReads[0].graphNodeId, branch.testReads[0].path) ? 0 : 1) : 0;
+}
+
+function marklessCsrChunkChildProps(edge, read, locals, getValues, runtimeState, loadSymbol) {
+	const props = {};
+	if (edge.projection) props.children = edge.projection;
+	for (const prop of edge.props) {
+		if (prop.kind === 'graph-reference') props[prop.name] = read(prop.graphNodeId, prop.path);
+		else if (prop.kind === 'serializable' && 'value' in prop) props[prop.name] = prop.value;
+		else if (prop.kind === 'callback' && prop.symbolId) {
+			let invoking = false;
+			props[prop.name] = async (...args) => {
+				if (invoking) throw new Error(`Markless CSR callback recursion at ${prop.symbolId}.`);
+				if (!runtimeState.graph) return;
+				invoking = true;
+				const loaded = loadSymbol(prop.symbolId);
+				const symbol = marklessCsrIsThenable(loaded) ? await loaded : loaded;
+				try {
+					await symbol({ graph: runtimeState.graph, args, event: args[0], element: runtimeState.root, getElementHandle: () => undefined });
+				} finally {
+					invoking = false;
+				}
+			};
+		} else props[prop.name] = getValues()[prop.source]?.();
+	}
+	return props;
+}
+
+function marklessCsrChunkState(definition, props, initial, children) {
+	const source = definition.getState?.() ?? { version: 1, cells: [], computed: [] };
+	const owned = new Set(definition.stateGraphNodeIds ?? []);
+	const cells = (source.cells ?? [])
+		.filter((cell) => owned.has(cell.graphNodeId))
+		.map((cell) => ({ ...cell }));
+	for (const [graphNodeId, directValue] of initial) {
+		const cell = cells.find((candidate) => candidate.graphNodeId === graphNodeId);
+		if (cell) cell.value = marklessSerializeGraphValue(directValue);
+	}
+	if (definition.propCellId) cells.push({ graphNodeId: definition.propCellId, directValue: props ?? {} });
+	for (const child of children) cells.push(...(child.output.state?.cells ?? []));
+	return {
+		...source,
+		cells,
+		computed: [
+			...(source.computed ?? []).filter((computed) => owned.has(computed.graphNodeId)),
+			...children.flatMap((child) =>
+				(child.output.state?.computed ?? []).map((computed) => ({
+					...computed,
+					...(computed.deriveSymbolId && child.edge.symbolPrefix
+						? { deriveSymbolId: child.edge.symbolPrefix + computed.deriveSymbolId }
+						: {}),
+					dependencies: (computed.dependencies ?? []).map((dependency) => {
+						const mapped = marklessCsrRemapChildGraph(dependency, child.edge.props ?? []);
+						return mapped ? { ...dependency, graphNodeId: mapped.graphNodeId, path: mapped.path } : dependency;
+					}),
+				})),
+			),
+		],
+	};
+}
+
+function marklessCsrChunkView(definition, placements, children, idPrefix, symbolPrefix, activeHostNodeIds) {
+	const source = definition.getView?.() ?? {};
+	const hostIds = activeHostNodeIds ?? new Set(definition.hostNodeIds ?? []);
+	const prefixHost = (record, prefix = idPrefix) => ({ ...record, hostNodeId: prefix + record.hostNodeId });
+	const locators = (source.locators ?? [])
+		.filter((record) => hostIds.has(record.hostNodeId))
+		.sort((left, right) => left.index - right.index)
+		.map((record, index) => prefixHost({ ...record, index }));
+	const events = (source.events ?? []).filter((record) => hostIds.has(record.hostNodeId)).map((record) => ({ ...prefixHost(record), symbolIds: (record.symbolIds ?? []).map((id) => symbolPrefix + marklessCsrChunkLocalSymbolId(id)) }));
+	const domUpdates = (source.domUpdates ?? []).filter((record) => hostIds.has(record.hostNodeId)).map((record) => ({
+		...prefixHost(record),
+		...(record.symbolId ? { symbolId: symbolPrefix + marklessCsrChunkLocalSymbolId(record.symbolId) } : {}),
+	}));
+	const behaviors = (source.behaviors ?? []).filter((record) => hostIds.has(record.hostNodeId)).map((record) => ({
+		...prefixHost(record),
+		...(record.symbolId ? { symbolId: symbolPrefix + marklessCsrChunkLocalSymbolId(record.symbolId) } : {}),
+	}));
+	const elementHandles = (source.elementHandles ?? []).filter((record) => hostIds.has(record.hostNodeId)).map((record) => prefixHost(record));
+	const keyedRepeats = (source.keyedRepeats ?? [])
+		.filter((record) => definition.repeatIds.includes(record.id))
+		.map((record) => ({
+			...record,
+			id: idPrefix + record.id,
+			parentHostNodeId: idPrefix + record.parentHostNodeId,
+			...(record.rowHostNodeId ? { rowHostNodeId: idPrefix + record.rowHostNodeId } : {}),
+			rowEvents: (record.rowEvents ?? []).map((event) => ({
+				...event,
+				symbolIds: (event.symbolIds ?? []).map((id) => symbolPrefix + marklessCsrChunkLocalSymbolId(id)),
+			})),
+		}));
+	const branches = (source.branches ?? []).filter((record) => definition.branchIds.includes(record.id)).map((record) => ({
+		...record,
+		id: idPrefix + record.id,
+		...(record.symbolId ? { symbolId: symbolPrefix + marklessCsrChunkLocalSymbolId(record.symbolId) } : {}),
+	}));
+	const asyncBoundaries = (source.asyncBoundaries ?? []).filter((record) => definition.boundaryIds.includes(record.id)).map((record) => ({
+		...record,
+		id: idPrefix + record.id,
+		...(record.symbolId ? { symbolId: symbolPrefix + marklessCsrChunkLocalSymbolId(record.symbolId) } : {}),
+	}));
+	for (const placement of placements) {
+		if (!placement.output) {
+			const insertedHostIds = new Set(
+				[...(placement.hostNodeIds ?? [])].map((hostNodeId) => idPrefix + hostNodeId),
+			);
+			const represented = locators.filter((locator) => insertedHostIds.has(locator.hostNodeId)).length;
+			const delta = placement.elementCount - represented;
+			if (delta > 0)
+				for (const locator of locators)
+					if (!insertedHostIds.has(locator.hostNodeId) && locator.index >= placement.baseIndex)
+						locator.index += delta;
+			continue;
+		}
+		const child = placement.output;
+		const graphProps = placement.edge.projection
+			? [...(placement.edge.props ?? []), { name: 'children', kind: 'serializable', value: placement.edge.projection }]
+			: placement.edge.props ?? [];
+		const boundSymbols = placement.edge.boundSymbols ?? {};
+		const bindSymbol = (symbolId) => {
+			const localSymbolId =
+				placement.edge.symbolPrefix && symbolId.startsWith(placement.edge.symbolPrefix)
+					? symbolId.slice(placement.edge.symbolPrefix.length)
+					: symbolId;
+			if (boundSymbols[localSymbolId]) return boundSymbols[localSymbolId];
+			for (const edge of definition.edges ?? []) {
+				for (const [baseSymbolId, instanceSymbolId] of Object.entries(edge.boundSymbols ?? {})) {
+					if (instanceSymbolId === symbolId) return boundSymbols[baseSymbolId] ?? symbolId;
+				}
+			}
+			return symbolId;
+		};
+		for (const locator of locators)
+			if (locator.index >= placement.baseIndex) locator.index += child.elementCount;
+		for (const locator of child.view?.locators ?? []) locators.push({ ...locator, index: locator.index + placement.baseIndex });
+		events.push(...(child.view?.events ?? []).map((event) => ({
+			...event,
+			symbolIds: (event.symbolIds ?? []).map(bindSymbol),
+		})));
+		domUpdates.push(...(child.view?.domUpdates ?? []).flatMap((update) => {
+			const mapped = marklessCsrRemapChildDomUpdate(update, graphProps, '');
+			return mapped ? [{ ...update, graphNodeId: mapped.graphNodeId, path: mapped.path }] : [];
+		}));
+		behaviors.push(...(child.view?.behaviors ?? []));
+		elementHandles.push(...(child.view?.elementHandles ?? []));
+		keyedRepeats.push(...(child.view?.keyedRepeats ?? []).flatMap((repeat) => {
+			const mapped = marklessCsrRemapChildKeyedRepeat(repeat, graphProps, '');
+			return mapped ? [{ ...repeat, collectionGraphNodeId: mapped.graphNodeId, collectionPath: mapped.path }] : [];
+		}));
+		branches.push(...(child.view?.branches ?? []).map((branch) => ({
+			...branch,
+			testReads: marklessCsrRemapChildReads(branch.testReads, graphProps, branch.id),
+		})));
+		asyncBoundaries.push(...(child.view?.asyncBoundaries ?? []).map((boundary) => ({
+			...boundary,
+			asyncReads: marklessCsrRemapChildReads(boundary.asyncReads, graphProps, boundary.id),
+		})));
+	}
+	locators.sort((left, right) => left.index - right.index);
+	return { ...source, locators, events, domUpdates, behaviors, elementHandles, keyedRepeats, branches, asyncBoundaries };
+}
+
+// Render-data coordinates identify nodes inside the template clone. Materialize
+// those identities after every slot/component insertion, then translate them
+// back to the public dom-order records handed to the runtime. Payload indexes
+// describe the uncomposed template and must not be used as a substitute for
+// binding the mounted clone.
+function marklessCsrBindChunkView(root, view, liveHostNodes) {
+	const elements = marklessCsrCollectElements(root);
+	const indexByElement = new Map(elements.map((element, index) => [element, index]));
+	const locators = view.locators.map((locator) => {
+		const element = liveHostNodes.get(locator.hostNodeId);
+		const index = element ? indexByElement.get(element) : undefined;
+		return index === undefined ? locator : { ...locator, index };
+	});
+	locators.sort((left, right) => left.index - right.index);
+
+	const comments = [];
+	const commentIndexByText = new Map();
+	const visit = (node) => {
+		if (node?.nodeType === 8) {
+			const text = node.data ?? node.textContent ?? '';
+			if (!text.startsWith('markless:arm-branch:') && !text.startsWith('/markless:arm-branch:')) {
+				commentIndexByText.set(text, comments.length);
+				comments.push(node);
+			}
+		}
+		for (const child of Array.from(node?.childNodes ?? [])) visit(child);
+	};
+	visit(root);
+	const bindAnchors = (record, kind) => {
+		const start = commentIndexByText.get(`markless:${kind}:${record.id}`);
+		const end = commentIndexByText.get(`/markless:${kind}:${record.id}`);
+		return start === undefined || end === undefined
+			? record
+			: {
+					...record,
+					startAnchor: { ...record.startAnchor, index: start },
+					endAnchor: { ...record.endAnchor, index: end },
+				};
+	};
+	return {
+		...view,
+		locators,
+		branches: (view.branches ?? []).map((record) => bindAnchors(record, 'branch')),
+		asyncBoundaries: (view.asyncBoundaries ?? []).map((record) => bindAnchors(record, 'async')),
+	};
+}
+
+function marklessCsrChunkLocalSymbolId(symbolId) {
+	return marklessBaseSymbolId(symbolId) ?? symbolId;
 }

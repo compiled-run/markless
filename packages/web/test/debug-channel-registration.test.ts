@@ -15,8 +15,6 @@ import {
 import type { MarklessDebugChannelV1 } from '../src/debug-channel.ts';
 import { resumeScalarCoreEventFromPayloadDocument } from '../src/event-only-lean/scalar-core.ts';
 import { resumeScalarRowEventFromPayloadDocument } from '../src/event-only-lean/row.ts';
-import { marklessCsrAttachPropEvent } from '../src/fns/csr.ts';
-import { attachMarklessPublicStaticEvents } from '../src/fns/direct.ts';
 import { createResumeRuntime } from '../src/index.ts';
 import { renderCsrRuntime } from '../src/render-csr.ts';
 import { renderToStream } from '../src/render-to-stream.ts';
@@ -422,39 +420,6 @@ describe('debug registration mirrors successful framework wiring', () => {
 		runtime.dispose();
 		expect(channel()?.explainInteraction(rowButton as never, 'keydown')).toMatchObject({
 			reason: 'container-disposed',
-		});
-	});
-
-	test('deterministically covers direct static and both callback branches without timers', async () => {
-		const staticButton = element('BUTTON'),
-			callbackButton = element('BUTTON'),
-			markedButton = element('BUTTON'),
-			falsyButton = element('BUTTON'),
-			root = element('MAIN', [staticButton, callbackButton, markedButton, falsyButton]);
-		__marklessDebugStartContainer(root as never, 'csr');
-		const direct = attachMarklessPublicStaticEvents(root, { flush() {} }, () => () => {}, [
-			[[0], 'click', ['static']],
-		]);
-		const callback = marklessCsrAttachPropEvent(root, [1], 'change', () => {}),
-			marked = () => {};
-		Object.defineProperty(marked, '__marklessCsrCallbackProp', { value: true });
-		const callbackMarker = marklessCsrAttachPropEvent(root, [2], 'input', marked);
-		marklessCsrAttachPropEvent(root, [3], 'click', undefined);
-		await Promise.all([direct, callback, callbackMarker]);
-		expect(channel()?.explainInteraction(staticButton as never, 'click')).toMatchObject({
-			kind: 'direct-csr',
-			source: 'static-event',
-		});
-		expect(channel()?.explainInteraction(callbackButton as never, 'change')).toMatchObject({
-			kind: 'direct-csr',
-			source: 'callback-prop',
-		});
-		expect(channel()?.explainInteraction(markedButton as never, 'input')).toMatchObject({
-			kind: 'direct-csr',
-		});
-		expect(channel()?.explainInteraction(falsyButton as never, 'click')).toMatchObject({
-			kind: 'none',
-			reason: 'not-registered',
 		});
 	});
 

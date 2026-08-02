@@ -7,7 +7,7 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ASYNC_BOUNDARY_ARM } from '../../packages/serializer/src/protocol-constants.ts';
+import { ASYNC_BOUNDARY_ARM } from '../../packages/serializer/src/protocol.ts';
 
 const PACKAGE_DIR = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(PACKAGE_DIR, '../..');
@@ -200,7 +200,7 @@ async function measureCombo(combo) {
 
 		const url = comboUrl(combo);
 		await page.goto(url, { waitUntil: 'load' });
-		await assertBoundaryDecisionFieldsAgree(page, combo.id);
+		await assertBoundaryDecisionFieldsAgree(page, combo.id, combo.environment);
 		await page.waitForSelector(combo.settledSelector, { timeout: 15_000 });
 		await fixedMicrotaskWindow(page);
 		const beforeInteraction = coverageSnapshot(
@@ -237,7 +237,7 @@ async function measureCombo(combo) {
 // Transitional test-only proof for the protocol cutover: every measured demo
 // payload must carry the same runner node and served arm the former browser
 // derivations chose. Production consumers no longer perform these derivations.
-async function assertBoundaryDecisionFieldsAgree(page, comboId) {
+async function assertBoundaryDecisionFieldsAgree(page, comboId, environment) {
 	const result = await page.evaluate((asyncBoundaryArm) => {
 		const viewScripts = [...document.querySelectorAll('script[type="markless/view"]')];
 		const stateScripts = [...document.querySelectorAll('script[type="markless/state"]')];
@@ -278,6 +278,16 @@ async function assertBoundaryDecisionFieldsAgree(page, comboId) {
 			disagreements,
 		};
 	}, ASYNC_BOUNDARY_ARM);
+	if (environment === 'csr') {
+		// Chunk-based CSR carries structure in renderData chunks; serialized
+		// protocol payloads must not reappear in the page.
+		if (result.viewPayloadCount !== 0 || result.statePayloadCount !== 0) {
+			throw new Error(
+				`${comboId}: chunk CSR must not embed markless/view or markless/state payloads (found ${result.viewPayloadCount} view, ${result.statePayloadCount} state).`,
+			);
+		}
+		return;
+	}
 	if (result.viewPayloadCount === 0) {
 		throw new Error(`${comboId}: expected at least one markless/view demo payload.`);
 	}

@@ -723,8 +723,8 @@ function csrRenderTestModuleSource(
 	const source = result.publicRenderModule.csrModuleSource ?? '';
 	const csrSource = options.replaceChildImport
 		? source.replace(
-				/import (?:__marklessCsrComponent0|\{ [^}]+ as __marklessCsrComponent0 \}) from [^;]+;/,
-				'const __marklessCsrComponent0 = globalThis.__marklessPublicRenderTestChildComponent;',
+				/import \* as __marklessCsrChunkModule0 from [^;]+;/,
+				'const __marklessCsrChunkModule0 = globalThis.__marklessPublicRenderTestChildComponent;',
 			)
 		: source;
 
@@ -955,14 +955,7 @@ export function App() @{
 	}
 
 	const csrHelperImports = helperImports(result.publicRenderModule.csrModuleSource);
-	expect(csrHelperImports).toEqual(
-		expect.arrayContaining([
-			'marklessCloneState',
-			'marklessStateValue',
-			'marklessCsrFragmentFromHtml',
-			'marklessCsrText',
-		]),
-	);
+	expect(csrHelperImports).toEqual(['createMarklessCsrChunkRenderer']);
 	expect(csrHelperImports).not.toContain('marklessCsrRootFromHtml');
 	expect(csrHelperImports).not.toContain('marklessCsrRepeatRows');
 
@@ -1207,7 +1200,7 @@ export function App() @{
 	expect(output.html).toBe('<section><h2>Stable</h2><p>Static</p></section>');
 });
 
-test('compileTsrxModule executes state-reading body statements once in CSR and SSR render modules', async () => {
+test('compileTsrxModule skips non-render body effects in CSR and preserves them in SSR', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/RenderBodyLog.tsrx',
 		source: `
@@ -1229,10 +1222,11 @@ export function App({ kind = 'demo' }) @{
 			readonly root: PublicRenderTestElement;
 		};
 		expect(csrOutput.root.textContent).toBe('7');
+		expect(log.mock.calls).toEqual([]);
 
 		const ssrOutput = await renderTestSsr(result, { kind: 'demo' });
 		expect(ssrOutput.html).toBe('<p data-kind="demo">7</p>');
-		expect(log.mock.calls).toEqual([['before'], [7], ['before'], [7]]);
+		expect(log.mock.calls).toEqual([['before'], [7]]);
 	} finally {
 		log.mockRestore();
 	}
@@ -1268,7 +1262,7 @@ export function App({ suffix = 'tail' }) @{
 			source.indexOf('segments.push(suffix);'),
 		);
 	}
-	expect(csrSource.indexOf('const root = marklessCsrRootFromHtml')).toBeGreaterThan(
+	expect(csrSource.indexOf('const marklessRenderCsrChunks')).toBeGreaterThan(
 		csrSource.indexOf("const label = segments.join('-');"),
 	);
 	expect(ssrSource.indexOf('const html = ')).toBeGreaterThan(
@@ -2203,6 +2197,9 @@ export function App() @{
 	});
 
 	const document = {
+		createTextNode(value: string) {
+			return new PublicRenderTestText(value);
+		},
 		createElement(tagName: string) {
 			return tagName === 'template'
 				? new PublicRenderTestTemplate()
@@ -2336,6 +2333,9 @@ export function App() @{
 	});
 
 	const document = {
+		createTextNode(value: string) {
+			return new PublicRenderTestText(value);
+		},
 		createElement(tagName: string) {
 			return tagName === 'template'
 				? new PublicRenderTestTemplate()
@@ -2943,35 +2943,9 @@ export default function Home() @{
 `,
 		symbols: [],
 	});
-	const document = {
-		createElement(tagName: string) {
-			return tagName === 'template'
-				? new PublicRenderTestTemplate()
-				: new PublicRenderTestElement(tagName);
-		},
-	};
-	const csrModule = await importPublicRenderTestModule(
-		csrRenderTestModuleSource(result, { replaceChildImport: true }),
-		{
-			document,
-			childComponent: {
-				renderCsr(props: { readonly children?: unknown; readonly href?: string }) {
-					const anchor = new PublicRenderTestElement('a');
-					anchor.setAttribute('href', props.href ?? '');
-					anchor.textContent = String(props.children ?? '');
-					return { root: anchor };
-				},
-			},
-		},
-	);
-	const output = (
-		csrModule.marklessRenderCsr as () => { readonly root: PublicRenderTestElement }
-	)();
-	const anchors = elementsByTag(output.root, 'a');
-
-	expect(anchors).toHaveLength(1);
-	expect(anchors[0]?.getAttribute('href')).toBe('/docs');
-	expect(anchors[0]?.textContent).toBe('Docs');
+	const csrSource = result.publicRenderModule.csrModuleSource;
+	expect(csrSource).toContain('"projection":{"kind":"static-markup","markup":"Docs"');
+	expect(csrSource).toContain('"name":"href","kind":"serializable","value":"/docs"');
 });
 
 test('compileTsrxModule awaits demanded async work and serves the resolved arm in SSR', async () => {
@@ -3177,6 +3151,9 @@ export function App() @{
 	);
 
 	const document = {
+		createTextNode(value: string) {
+			return new PublicRenderTestText(value);
+		},
 		createElement(tagName: string) {
 			return tagName === 'template'
 				? new PublicRenderTestTemplate()
@@ -3223,6 +3200,9 @@ export function App({ heading }) @{
 	});
 
 	const document = {
+		createTextNode(value: string) {
+			return new PublicRenderTestText(value);
+		},
 		createElement(tagName: string) {
 			return tagName === 'template'
 				? new PublicRenderTestTemplate()
@@ -3284,6 +3264,9 @@ export function App({ heading }) @{
 
 	expect(result.publicRenderPlan.diagnostics).toEqual([]);
 	const document = {
+		createTextNode(value: string) {
+			return new PublicRenderTestText(value);
+		},
 		createElement(tagName: string) {
 			return tagName === 'template'
 				? new PublicRenderTestTemplate()
@@ -3334,6 +3317,9 @@ export function App({ heading }) @{
 	});
 
 	const document = {
+		createTextNode(value: string) {
+			return new PublicRenderTestText(value);
+		},
 		createElement(tagName: string) {
 			return tagName === 'template'
 				? new PublicRenderTestTemplate()
@@ -3380,6 +3366,9 @@ export function App({ heading }) @{
 	});
 
 	const document = {
+		createTextNode(value: string) {
+			return new PublicRenderTestText(value);
+		},
 		createElement(tagName: string) {
 			return tagName === 'template'
 				? new PublicRenderTestTemplate()
@@ -3609,7 +3598,7 @@ export function App() @{
 		{
 			document,
 			loadSymbol: parentLoadSymbol,
-			childComponent: { renderCsr: childModule.marklessRenderCsr },
+			childComponent: childModule,
 		},
 	);
 	const output = (
@@ -3627,12 +3616,10 @@ export function App() @{
 	container.graph.write({ graphNodeId: 'state:owner', value: 1 });
 	await container.graph.flush();
 
-	const childDeriveId = child.protocolState.computed[0]!.deriveSymbolId!;
-	const childDomUpdateId = child.protocolView.domUpdates[0]!.symbolId!;
 	expect(new Set(parentLoaderCalls)).toEqual(
 		new Set([...parentComputedBySymbolId.keys(), ...parentDomUpdateIds]),
 	);
-	expect(childLoaderCalls).toEqual([childDeriveId, childDomUpdateId]);
+	expect(childLoaderCalls).toEqual(['symbol:1', 'symbol:0']);
 	expect(elementsByTag(output.root, 'output').map((element) => element.textContent)).toEqual([
 		'3',
 		'4',
@@ -3913,15 +3900,15 @@ export function Catalog() @{
 		throw new Error(`Unexpected public render test symbol ${symbolId}`);
 	};
 	const document = {
+		createTextNode(value: string) {
+			return new PublicRenderTestText(value);
+		},
 		createElement(tagName: string) {
 			if (tagName === 'template') return new PublicRenderTestTemplate();
 			return new PublicRenderTestElement(tagName);
 		},
 		createDocumentFragment() {
 			return new PublicRenderTestFragment();
-		},
-		createTextNode(value: string) {
-			return new PublicRenderTestText(value);
 		},
 	};
 	const publicModule = await importPublicRenderTestModule(
@@ -4063,15 +4050,15 @@ export function Articles() @{
 		throw new Error(`Unexpected public render test symbol ${symbolId}`);
 	};
 	const document = {
+		createTextNode(value: string) {
+			return new PublicRenderTestText(value);
+		},
 		createElement(tagName: string) {
 			if (tagName === 'template') return new PublicRenderTestTemplate();
 			return new PublicRenderTestElement(tagName);
 		},
 		createDocumentFragment() {
 			return new PublicRenderTestFragment();
-		},
-		createTextNode(value: string) {
-			return new PublicRenderTestText(value);
 		},
 	};
 	const publicModule = await importPublicRenderTestModule(
@@ -4148,15 +4135,15 @@ export function InitialArticles() @{
 		throw new Error(`Unexpected public render test symbol ${symbolId}`);
 	};
 	const document = {
+		createTextNode(value: string) {
+			return new PublicRenderTestText(value);
+		},
 		createElement(tagName: string) {
 			if (tagName === 'template') return new PublicRenderTestTemplate();
 			return new PublicRenderTestElement(tagName);
 		},
 		createDocumentFragment() {
 			return new PublicRenderTestFragment();
-		},
-		createTextNode(value: string) {
-			return new PublicRenderTestText(value);
 		},
 	};
 	const publicModule = await importPublicRenderTestModule(
@@ -4214,15 +4201,15 @@ export function DuplicateArticles() @{
 		symbols: [],
 	});
 	const document = {
+		createTextNode(value: string) {
+			return new PublicRenderTestText(value);
+		},
 		createElement(tagName: string) {
 			if (tagName === 'template') return new PublicRenderTestTemplate();
 			return new PublicRenderTestElement(tagName);
 		},
 		createDocumentFragment() {
 			return new PublicRenderTestFragment();
-		},
-		createTextNode(value: string) {
-			return new PublicRenderTestText(value);
 		},
 	};
 	const publicModule = await importPublicRenderTestModule(
@@ -4372,6 +4359,9 @@ export function ReplaceArticles() @{
 	};
 	let fragmentCreations = 0;
 	const document = {
+		createTextNode(value: string) {
+			return new PublicRenderTestText(value);
+		},
 		createElement(tagName: string) {
 			if (tagName === 'template') return new PublicRenderTestTemplate();
 			return new PublicRenderTestElement(tagName);
@@ -4379,9 +4369,6 @@ export function ReplaceArticles() @{
 		createDocumentFragment() {
 			fragmentCreations++;
 			return new PublicRenderTestFragment();
-		},
-		createTextNode(value: string) {
-			return new PublicRenderTestText(value);
 		},
 	};
 	const publicModule = await importPublicRenderTestModule(
@@ -4470,15 +4457,15 @@ export function TextArticles() @{
 		throw new Error(`Unexpected public render test symbol ${symbolId}`);
 	};
 	const document = {
+		createTextNode(value: string) {
+			return new PublicRenderTestText(value);
+		},
 		createElement(tagName: string) {
 			if (tagName === 'template') return new PublicRenderTestTemplate();
 			return new PublicRenderTestElement(tagName);
 		},
 		createDocumentFragment() {
 			return new PublicRenderTestFragment();
-		},
-		createTextNode(value: string) {
-			return new PublicRenderTestText(value);
 		},
 	};
 	const publicModule = await importPublicRenderTestModule(
@@ -4567,6 +4554,9 @@ export function Scoreboard() @{
 	};
 	let templateParses = 0;
 	const document = {
+		createTextNode(value: string) {
+			return new PublicRenderTestText(value);
+		},
 		createElement(tagName: string) {
 			if (tagName === 'template') {
 				templateParses++;
@@ -4576,9 +4566,6 @@ export function Scoreboard() @{
 		},
 		createDocumentFragment() {
 			return new PublicRenderTestFragment();
-		},
-		createTextNode(value: string) {
-			return new PublicRenderTestText(value);
 		},
 	};
 	const publicModule = await importPublicRenderTestModule(
@@ -4639,6 +4626,7 @@ test('B905s2 compile output renders and updates same-module helper-created state
 
 	const incrementExports = await importPublicRenderTestModule(incrementModule!.source);
 	const document = {
+		createTextNode: (value: string) => new PublicRenderTestText(value),
 		createElement: (tagName: string) =>
 			tagName === 'template'
 				? new PublicRenderTestTemplate()
@@ -4701,6 +4689,9 @@ export function Dashboard() @{
 	]);
 
 	const document = {
+		createTextNode(value: string) {
+			return new PublicRenderTestText(value);
+		},
 		createElement(tagName: string) {
 			return tagName === 'template'
 				? new PublicRenderTestTemplate()
@@ -4714,7 +4705,7 @@ export function Dashboard() @{
 		csrRenderTestModuleSource(parent, { replaceChildImport: true }),
 		{
 			document,
-			childComponent: { renderCsr: childCsrModule.marklessRenderCsr },
+			childComponent: childCsrModule,
 		},
 	);
 	const output = (
@@ -4757,6 +4748,67 @@ export function Dashboard() @{
 		'markless:branch:c0:branch-site:0',
 		'/markless:branch:c0:branch-site:0',
 	]);
+});
+
+test('standard CSR applies an event patch after behavior activation', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/BehaviorCommand.tsrx',
+		source: `import { state } from '@markless/core';
+function Frame({ command }) @{ <div class="frame" data-command={command}></div> }
+function Controls({ onPlay }) @{ <button type="button" onClick={onPlay}>Play</button> }
+export function App() @{
+	let command = state('cue');
+	<main attach={installController}>
+		<Frame command={command} />
+		<Controls onPlay={() => command = 'play'} />
+	</main>
+}`,
+		symbols: [],
+	});
+	const activationCommands: string[] = [];
+	const loadSymbol = (symbolId: string) => {
+		const symbol = result.symbolResolver.symbols.find((candidate) => candidate.id === symbolId);
+		if (symbol?.kind === 'behavior') {
+			return ({ element }: { readonly element: PublicRenderTestElement }) => {
+				activationCommands.push(
+					elementsByTag(element, 'div')[0]?.getAttribute('data-command') ?? '<missing>',
+				);
+			};
+		}
+		if (symbol?.kind === 'event-handler')
+			return ({ graph }: { readonly graph: PublicRenderTestGraph }) =>
+				graph.write({ graphNodeId: 'state:command', value: 'play' });
+		if (symbol?.kind === 'dom-update') {
+			return (context: {
+				readonly domUpdate: { readonly hostNodeId: string; readonly target?: { readonly name?: string } };
+				readonly value: unknown;
+			}) => ({
+				type: 'setAttr' as const,
+				locator: context.domUpdate.hostNodeId,
+				name: context.domUpdate.target?.name ?? 'data-command',
+				value: context.value,
+			});
+		}
+		throw new Error(`Unexpected behavior-ordering symbol ${symbolId}`);
+	};
+	const document = publicRenderTestDocument();
+	const csrModule = await importPublicRenderTestModule(csrRenderTestModuleSource(result), {
+		document,
+		loadSymbol,
+	});
+	const output = (csrModule.marklessRenderCsr as () => {
+		readonly root: PublicRenderTestElement;
+	})();
+	const container = await render(() => output as never, {
+		target: new PublicRenderTestElement('target') as never,
+	});
+	const frame = elementsByTag(output.root, 'div')[0]!;
+	const button = elementsByTag(output.root, 'button')[0]!;
+
+	expect(activationCommands).toEqual(['cue']);
+	await container.runtime.dispatch({ type: 'click', target: button as never });
+	await container.graph.flush();
+	expect(frame.getAttribute('data-command')).toBe('play');
 });
 
 test('compileTsrxModule composes child-component branch records in SSR views', async () => {
@@ -6198,45 +6250,9 @@ export default function Page() @{
 	});
 	const csrSource = result.publicRenderModule.csrModuleSource;
 
-	expect(csrSource).toContain('let root = marklessCsrRootFromHtml');
-	expect(csrSource).toContain(
-		'root = marklessCsrReplaceChild(root, 0, marklessCsrChild0?.root);',
-	);
-
-	const childRoot = new PublicRenderTestElement('strong');
-	childRoot.textContent = 'Imported child';
-	const csrModule = await importPublicRenderTestModule(
-		csrRenderTestModuleSource(result, { replaceChildImport: true }),
-		{
-			document: publicRenderTestDocument(),
-			childComponent: {
-				renderCsr() {
-					return {
-						root: childRoot,
-						state: { version: 1, cells: [], computed: [] },
-						view: {
-							version: 1,
-							locators: [],
-							events: [],
-							domUpdates: [],
-							behaviors: [],
-							elementHandles: [],
-							asyncBoundaries: [],
-						},
-					};
-				},
-			},
-		},
-	);
-	const output = (
-		csrModule.marklessRenderCsr as () => {
-			readonly root: PublicRenderTestElement;
-		}
-	)();
-
-	expect(output.root).toBe(childRoot);
-	expect(output.root.tagName).toBe('strong');
-	expect(output.root.textContent).toBe('Imported child');
+	expect(csrSource).toContain('"kind":"child-component"');
+	expect(csrSource).toContain('"coordinate":{"kind":"comment-anchor","path":[0]}');
+	expect(csrSource).not.toContain('marklessCsrRootFromHtml');
 });
 
 test('event-handler symbol modules import every referenced module import (need 13 tail)', async () => {

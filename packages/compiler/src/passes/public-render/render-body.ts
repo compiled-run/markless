@@ -171,3 +171,86 @@ export function hasExecutableBodyStatements(
 	}
 	return false;
 }
+
+// Emits the body prefix inside a demanded render-value function. Framework
+// declarations become graph reads; ordinary locals retain authored order, but
+// this prefix is never evaluated unless a visible chunk slot needs one of its
+// values.
+export function renderValuePreludeLines(
+	input: PublicRenderModuleInput,
+	rootInfo: PublicRenderRoot,
+	demandedSources: ReadonlyArray<string>,
+): string[] {
+	const body = rootInfo.component.body as AnyNode | undefined;
+	if (!body) return [];
+	const stateBindings = new Map(
+		input.semanticGraph.graphBindings.flatMap((binding) =>
+			binding.kind === 'state' ? [[binding.name, binding] as const] : [],
+		),
+	);
+	const computedBindings = new Map(
+		input.semanticGraph.graphBindings.flatMap((binding) =>
+			binding.kind === 'computed' ? [[binding.name, binding] as const] : [],
+		),
+	);
+	const statements = childNodes(body).filter((statement) => {
+		if (isIgnorableTextNode(statement)) return false;
+		return statement !== rootInfo.root && returnArgument(statement) !== rootInfo.root;
+	});
+	const demandedText = new Set(demandedSources);
+	const demandedNames = new Set<string>();
+	for (const source of demandedSources)
+		for (const match of source.matchAll(/\b[$A-Z_a-z][$\w]*\b/g)) demandedNames.add(match[0]);
+	let changed = true;
+	while (changed) {
+		changed = false;
+		for (const statement of statements) {
+			const source = expressionSource(statement, input.source.source);
+			if (!source) continue;
+			const identifiers = [...source.matchAll(/\b[$A-Z_a-z][$\w]*\b/g)].map((match) => match[0]);
+			const demanded =
+				statement.type === 'VariableDeclaration'
+					? asNodes(statement.declarations).some((declaration) => {
+							const name = getIdentifierName(declaration.id as AnyNode | undefined);
+							return !!name && demandedNames.has(name);
+						})
+					: identifiers.some((name) => demandedNames.has(name));
+			if (!demanded || demandedText.has(source)) continue;
+			demandedText.add(source);
+			for (const name of identifiers) {
+				if (!demandedNames.has(name)) {
+					demandedNames.add(name);
+					changed = true;
+				}
+			}
+		}
+	}
+	const lines: string[] = [];
+	for (const statement of statements) {
+		if (isIgnorableTextNode(statement)) continue;
+		if (statement.type === 'VariableDeclaration') {
+			const declarations = asNodes(statement.declarations);
+			if (declarations.length === 1) {
+				const name = getIdentifierName(declarations[0]?.id as AnyNode | undefined);
+				const binding = name ? stateBindings.get(name) ?? computedBindings.get(name) : undefined;
+				if (binding) {
+					lines.push(`${binding.declarationKind ?? 'const'} ${binding.name}=read(${JSON.stringify(binding.id)},[]);`);
+					continue;
+				}
+			}
+			if (isLoweredFrameworkDeclaration(statement)) continue;
+		}
+		const source = expressionSource(statement, input.source.source);
+		if (
+			source &&
+			(statement.type === 'VariableDeclaration'
+				? asNodes(statement.declarations).some((declaration) => {
+						const name = getIdentifierName(declaration.id as AnyNode | undefined);
+						return !!name && demandedNames.has(name);
+					})
+				: [...demandedNames].some((name) => new RegExp(`\\b${name.replace(/[$]/g, '\\$&')}\\b`).test(source)))
+		)
+			lines.push(source);
+	}
+	return lines;
+}

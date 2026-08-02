@@ -162,6 +162,9 @@ export function InlineCard() @{
 	});
 
 	expect(result.publicRenderModule.csrModuleSource).toContain(
+		`"computed:displayCard":"() => ({ caption: pigment + '-fired' })"`,
+	);
+	expect(result.publicRenderModule.csrModuleSource).not.toContain(
 		"const displayCard = (() => ({ caption: pigment + '-fired' }))();",
 	);
 });

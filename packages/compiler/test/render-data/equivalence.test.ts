@@ -23,6 +23,16 @@ export function App() @{
 `,
 	},
 	{
+		name: 'slot-adjacent static whitespace',
+		source: `
+import { state } from '@markless/core';
+export function App() @{
+	const count = state(6);
+	<main><p>Weighted count {count} total</p></main>
+}
+`,
+	},
+	{
 		name: 'branch repeat and boundary shapes',
 		source: `
 import { computed, state } from '@markless/core';
@@ -70,13 +80,22 @@ export function App() @{
 ] as const;
 
 for (const fixture of fixtures) {
-	test(`renderData agrees with publicRenderPlan for ${fixture.name}`, async () => {
+		test(`renderData agrees with publicRenderPlan for ${fixture.name}`, async () => {
 		const result = await compileTsrxModule({
 			filename: `fixtures/${fixture.name.replaceAll(' ', '-')}.tsrx`,
 			source: fixture.source,
 			symbols: [],
 		});
 		assertStructuralAgreement(result);
+		if (fixture.name === 'slot-adjacent static whitespace') {
+			const root = result.renderData.chunks.find(
+				(chunk) => chunk.id === result.renderData.root?.templateId,
+			);
+			expect(root?.statics).toEqual([
+				'<main><p>Weighted count <!--markless-slot:0-->',
+				' total</p></main>',
+			]);
+		}
 	});
 }
 
@@ -162,14 +181,24 @@ function planCompatibleHtml(
 	chunks: ReadonlyArray<SemanticMarkupChunk>,
 	componentStack: ReadonlyArray<string> = [],
 ): string {
+	const textSlot = '\u0000';
 	let html = '';
+	let trimLeadingSlotWhitespace = false;
 	for (const [slotIndex, slot] of chunk.slots.entries()) {
 		let statics = chunk.statics[slot.staticIndex] ?? '';
+		if (trimLeadingSlotWhitespace) {
+			statics = statics.replace(/^\s+/, '');
+			trimLeadingSlotWhitespace = false;
+		}
 		if (slot.coordinate.kind === 'comment-anchor') {
 			statics = statics.replace(`<!--markless-slot:${slotIndex}-->`, '');
 		}
+		if (slot.kind === 'text') {
+			statics = statics.replace(/\s+$/, '');
+			trimLeadingSlotWhitespace = true;
+		}
 		html += statics;
-		if (slot.kind === 'text') html += ' ';
+		if (slot.kind === 'text') html += textSlot;
 		if (slot.kind === 'child-component' && !componentStack.includes(slot.childComponentName)) {
 			const child = chunks.find((candidate) => candidate.id === slot.childTemplateId);
 			if (child) {
@@ -180,7 +209,11 @@ function planCompatibleHtml(
 			}
 		}
 	}
-	return html + (chunk.statics.at(-1) ?? '');
+	const tail = chunk.statics.at(-1) ?? '';
+	return (html + (trimLeadingSlotWhitespace ? tail.replace(/^\s+/, '') : tail)).replace(
+		/>([^<]*)</g,
+		(_match, text: string) => `>${text.trim().replaceAll(textSlot, ' ')}<`,
+	);
 }
 
 function collectHostCoordinateCandidates(
