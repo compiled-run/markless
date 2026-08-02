@@ -116,8 +116,6 @@ function missingArmBranchAnchorError(id: string, index: number): Error {
 	);
 }
 
-// Expands every boundary's armized record set into flat runtime records so
-// the existing event/behavior/handle wiring sees them like any other record.
 export function expandBoundaryArmRecords(
 	root: ResumeDomElement,
 	view: ResumeViewRecord,
@@ -146,6 +144,7 @@ export function expandBoundaryArmRecords(
 	const events = [...view.events];
 	const behaviors = [...view.behaviors];
 	const elementHandles = [...view.elementHandles];
+	const keyedRepeats = [...(view.keyedRepeats ?? [])];
 	const branches = [...(view.branches ?? [])];
 	for (const { armRecords, boundaryId, startAnchor, endAnchor } of registrable) {
 		const materialized = materializeArmRecords({ root, startAnchor, endAnchor, armRecords });
@@ -155,6 +154,7 @@ export function expandBoundaryArmRecords(
 		events.push(...materialized.events);
 		behaviors.push(...materialized.behaviors);
 		elementHandles.push(...materialized.elementHandles);
+		keyedRepeats.push(...materialized.keyedRepeats);
 		// Arm-scoped branches join the stream with LIVE anchors + boundary id.
 		branches.push(
 			...(materialized.branches.map((record) => ({
@@ -169,6 +169,7 @@ export function expandBoundaryArmRecords(
 			events,
 			behaviors,
 			elementHandles,
+			keyedRepeats,
 			...(branches.length > 0 ? { branches } : {}),
 		},
 		elementsByHostId,

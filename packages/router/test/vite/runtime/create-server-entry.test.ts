@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vite-plus/test';
 import { MarklessCompileError, serializeMarklessDevError } from '@markless/bundler/dev-error';
+import { ASYNC_BOUNDARY_ARM } from '../../../../serializer/src/index.ts';
 import { marklessSsrAttachSnapshots, marklessSsrRunAsyncComputed } from '@markless/web/fns/ssr';
 import { createServerEntry } from '../../../src/vite/runtime/create-server-entry.ts';
 
@@ -749,7 +750,14 @@ describe('server entry rendering', () => {
 // A compiled-module-shaped page whose @try boundary demands a delayed async
 // computed, threading the render context like emitted code does (alternate-
 // shaped: a tide chart, not a dashboard).
-function tidePage(delayMs: number) {
+function tidePage(
+	delayMs: number,
+	lifecycle?: {
+		readonly onSettleStarted?: () => void;
+		readonly onSettleFinished?: () => void;
+		readonly onSettleCancelled?: () => void;
+	},
+) {
 	return {
 		resumeModuleUrl: '/build/tide-resume.js',
 		async renderSsr(_props?: unknown, renderContext?: unknown) {
@@ -757,8 +765,23 @@ function tidePage(delayMs: number) {
 			const snapshot = (await marklessSsrRunAsyncComputed(
 				snapshots as never,
 				'computed:tides',
-				async () => {
-					await new Promise((resolve) => setTimeout(resolve, delayMs));
+				async ({ signal }: { readonly signal: AbortSignal }) => {
+					lifecycle?.onSettleStarted?.();
+					await new Promise<void>((resolve, reject) => {
+						const timer = setTimeout(() => {
+							lifecycle?.onSettleFinished?.();
+							resolve();
+						}, delayMs);
+						signal.addEventListener(
+							'abort',
+							() => {
+								clearTimeout(timer);
+								lifecycle?.onSettleCancelled?.();
+								reject(signal.reason);
+							},
+							{ once: true },
+						);
+					});
 					return { crest: 'High tide 14:02' };
 				},
 				renderContext,
@@ -770,6 +793,7 @@ function tidePage(delayMs: number) {
 					: '<p data-surveying>Reading the buoys</p>';
 			return {
 				html: `<main><!--markless:async:tide:0-->${arm}<!--/markless:async:tide:0--></main>`,
+				structure: { anchors: [{ kind: 'async', id: 'tide:0', html: arm }] },
 				state: marklessSsrAttachSnapshots(
 					{
 						version: 1,
@@ -790,6 +814,13 @@ function tidePage(delayMs: number) {
 					asyncBoundaries: [
 						{
 							id: 'tide:0',
+							runnerGraphNodeId: 'computed:tides',
+							initiallyServedArm:
+								snapshot.status === 'fulfilled'
+									? ASYNC_BOUNDARY_ARM.try
+									: snapshot.status === 'rejected'
+										? ASYNC_BOUNDARY_ARM.catch
+										: ASYNC_BOUNDARY_ARM.pending,
 							startAnchor: { strategy: 'dom-order-comment', index: 0 },
 							endAnchor: { strategy: 'dom-order-comment', index: 1 },
 							asyncReads: [
@@ -857,6 +888,49 @@ describe('server entry streaming (default)', () => {
 		expect(text).toContain('__mArm("tide:0")');
 		// The document closes AFTER the streamed settle.
 		expect(text.indexOf('__mArm("tide:0")')).toBeLessThan(text.indexOf('</body></html>'));
+	});
+
+	it('cancels an in-flight settle without writing append or suffix bytes to a closed stream', async () => {
+		let settleStarted = false;
+		let settleFinished = false;
+		let settleCancelled = false;
+		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const entry = createServerEntry({
+			...entryOptions(),
+			pageModuleLoaders: {
+				'pages/index.tsrx': async () => ({
+					default: tidePage(1_000, {
+						onSettleStarted: () => {
+							settleStarted = true;
+						},
+						onSettleFinished: () => {
+							settleFinished = true;
+						},
+						onSettleCancelled: () => {
+							settleCancelled = true;
+						},
+					}),
+				}),
+			},
+		});
+
+		const response = await entry.fetch(new Request('http://markless-router.test/'));
+		const reader = response.body!.getReader();
+		const firstChunk = await reader.read();
+		expect(new TextDecoder().decode(firstChunk.value)).toContain('data-surveying');
+		expect(settleStarted).toBe(true);
+
+		await reader.cancel('measurement complete');
+		await new Promise((resolve) => setTimeout(resolve, 0));
+
+		expect(settleCancelled).toBe(true);
+		expect(settleFinished).toBe(false);
+		expect(
+			errorSpy.mock.calls.some(([message, error]) =>
+				`${String(message)} ${String(error)}`.includes('ERR_INVALID_STATE'),
+			),
+		).toBe(false);
+		errorSpy.mockRestore();
 	});
 
 	it('renders inline with zero streaming artifacts when data beats the first-flush deadline', async () => {

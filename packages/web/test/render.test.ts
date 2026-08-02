@@ -1,4 +1,8 @@
-import { ASYNC_PROTOCOL_VERSION, type ProtocolViewPayload } from '@markless/serializer';
+import {
+	ASYNC_BOUNDARY_ARM,
+	ASYNC_PROTOCOL_VERSION,
+	type ProtocolViewPayload,
+} from '@markless/serializer';
 import { createProtocolStatePayload } from '@markless/serializer';
 import { expect, test } from 'vitest';
 import { transformTsrxModule } from '../../bundler/src/transform.ts';
@@ -2863,6 +2867,46 @@ test('renderToString emits the resumer for keyed-repeat row events', async () =>
 	// unmatched events of those types without a record.
 	expect(html).toContain('keyedRepeats ?? []');
 	expect(html).toContain('eventRecord: null');
+});
+
+test('renderToString emits the resumer for keyed-repeat row events in a served async arm', async () => {
+	const html = await renderToString(
+		() => ({
+			html: '<!--markless:async:boundary:0--><ul><li>Beacon</li></ul><!--/markless:async:boundary:0-->',
+			state: createProtocolStatePayload({ cells: [] }),
+			view: {
+				...staticView(),
+				asyncBoundaries: [{
+					id: 'boundary:0',
+					runnerGraphNodeId: 'computed:feed',
+					initiallyServedArm: ASYNC_BOUNDARY_ARM.try,
+					startAnchor: { strategy: 'dom-order-comment', index: 0 },
+					endAnchor: { strategy: 'dom-order-comment', index: 1 },
+					asyncReads: [],
+					armRecords: {
+						locators: [{ hostNodeId: 'h-list', strategy: 'arm-relative', index: 0, tagName: 'ul' }],
+						events: [],
+						behaviors: [],
+						elementHandles: [],
+						keyedRepeats: [{
+							id: 'repeat:0',
+							parentHostNodeId: 'h-list',
+							collectionGraphNodeId: 'state:entries',
+							collectionPath: [],
+							keyPath: ['id'],
+							itemName: 'entry',
+							rowElementCount: 1,
+							rowEvents: [{ hostPath: [], eventName: 'click', symbolIds: ['symbol:row'] }],
+						}],
+					},
+				}],
+			} as ProtocolViewPayload,
+		}),
+		{ resumeModuleUrl: '/app.js' },
+	);
+
+	expect(html).toContain('data-async-resumer');
+	expect(html).toContain('armRecords.keyedRepeats ?? []');
 });
 
 test('renderToString emits ordered modulepreload links before interactive payload startup', async () => {

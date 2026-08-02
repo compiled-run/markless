@@ -963,10 +963,11 @@ export function App() @{
 	const ssrHelperImports = helperImports(result.publicRenderModule.ssrModuleSource);
 	expect(ssrHelperImports).toEqual(
 		expect.arrayContaining([
+			'renderSsrData',
 			'marklessCloneState',
 			'marklessStateValue',
-			'marklessSsrHost',
-			'marklessSsrText',
+			'marklessSsrComposeView',
+			'marklessSsrReadPublicPath',
 		]),
 	);
 	expect(ssrHelperImports).not.toContain('marklessSsrRepeatRows');
@@ -1068,7 +1069,7 @@ test('B910 regressions keep async computed and plain state binding artifacts sta
 		},
 	]);
 	expect(plainResult.publicRenderModule.ssrModuleSource).toContain(
-		'<p>" + marklessSsrText(count) + "</p>',
+		'"statics":["<p><!--markless-slot:0-->","</p>"]',
 	);
 });
 
@@ -2252,9 +2253,9 @@ export function Card({ children }) @{
 	// Children placement is a template projection of compiler-rendered HTML —
 	// escaping it (marklessSsrText) turns projected markup into visible text.
 	expect(result.publicRenderModule.ssrModuleSource).toContain(
-		'marklessSsrChildrenHtml(children)',
+		'"raw":true',
 	);
-	expect(result.publicRenderModule.ssrModuleSource).not.toContain('marklessSsrText(children)');
+	expect(result.publicRenderModule.ssrModuleSource).not.toContain('marklessSsrChildrenHtml(children)');
 
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
 	const output = await (
@@ -2310,7 +2311,7 @@ test('compileTsrxModule parenthesizes non-atomic @if tests in SSR output', async
 	});
 
 	expect(result.publicRenderModule.ssrModuleSource).toContain(
-		'((primary ?? fallback) ? marklessSsrBranchArm',
+		'const arm=((primary ?? fallback)?0:1)',
 	);
 });
 
@@ -2872,7 +2873,7 @@ export default function Home() @{
 		{
 			childComponent: {
 				renderSsr(props: { readonly children?: unknown; readonly href?: string }) {
-					return { html: `<a href="${props.href}">${props.children}</a>` };
+					return { html: `<a href="${props.href}">${props.children}</a>`, elementCount: 1 };
 				},
 			},
 		},
@@ -2910,7 +2911,7 @@ export default function Document({ children }: { readonly children?: unknown }) 
 		{
 			childComponent: {
 				renderSsr(props: { readonly children?: unknown }) {
-					return { html: String(props.children ?? '') };
+					return { html: String(props.children ?? ''), elementCount: 3 };
 				},
 			},
 		},
@@ -3416,7 +3417,7 @@ export default function Home() @{
 		{
 			childComponent: {
 				renderSsr(props: { readonly children?: unknown; readonly href?: string }) {
-					return { html: `<a href="${props.href}">${props.children}</a>` };
+					return { html: `<a href="${props.href}">${props.children}</a>`, elementCount: 1 };
 				},
 			},
 		},
@@ -5002,6 +5003,7 @@ export function Deck() @{
 				// composition can remap them).
 				renderSsr: () => ({
 					html: '<div class="frame"></div>',
+					elementCount: 1,
 					state: { version: 1, cells: [], computed: [] },
 					view: {
 						version: 1,
@@ -5853,6 +5855,7 @@ export default function Nav() @{
 	const jump = {
 		renderSsr: (props: { readonly children?: unknown }) => ({
 			html: `<a data-jump>${props.children == null ? '' : String(props.children)}</a>`,
+			elementCount: 1,
 		}),
 	};
 	const pageSsrModule = await importPublicRenderTestModule(
@@ -5961,7 +5964,8 @@ export default function Home() @{
 	expect(result.protocolView.asyncBoundaries[0]?.asyncReads).toEqual([
 		expect.objectContaining({ graphNodeId: 'computed:view' }),
 	]);
-	expect(result.publicRenderModule.ssrModuleSource).toContain('marklessSsrRepeatRows');
+	expect(result.publicRenderModule.ssrModuleSource).toContain('"rowChunkId":"repeat:repeat:0:row"');
+	expect(result.publicRenderModule.ssrModuleSource).not.toContain('marklessSsrRepeatRows');
 });
 
 test('keyed repeat row handlers inside async arms keep their row binding in context', async () => {

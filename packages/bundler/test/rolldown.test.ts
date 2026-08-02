@@ -124,7 +124,7 @@ describe('TSRX Rolldown plugin structure', () => {
 		expect(result.code).toContain('renderSsr(props, marklessRenderContext) {');
 		expect(result.code).toContain('const marklessSsrStateValues = new Map');
 		expect(result.code).toContain(
-			'const html = marklessSsrHost(marklessSsrHostLocators, "h0", "button") + "<button>" + marklessSsrText(count) + "</button>";',
+			'"statics": ["<button><!--markless-slot:0-->", "</button>"]',
 		);
 		expect(result.code).toContain('export default marklessCompiledApp;');
 		expect(result.code).not.toContain('source: marklessSource');
@@ -156,7 +156,9 @@ describe('TSRX Rolldown plugin structure', () => {
 		});
 
 		expect(result.code).toContain('renderSsr(props, marklessRenderContext) {');
-		expect(result.code).toContain('"<h1>" + "Markless Router" + "</h1>"');
+		expect(result.code).toContain(
+			'"<main><h1>Markless Router</h1><button>Button <!--markless-slot:0-->"',
+		);
 		expect(result.code).toContain(
 			'import { Link as __marklessSsrComponent0 } from "@markless/core/router";',
 		);
@@ -288,7 +290,7 @@ let active = state(true);
 		});
 
 		expect(result.code).toContain('renderSsr(props, marklessRenderContext) {');
-		expect(result.code).toContain('marklessSsrAttribute("class", active ? "on" : "off")');
+		expect(result.code).toContain('"source": "active ? \'on\' : \'off\'"');
 		expect(result.code).not.toContain('renderCsr: App');
 	});
 

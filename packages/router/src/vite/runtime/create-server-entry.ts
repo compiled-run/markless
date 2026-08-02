@@ -237,22 +237,34 @@ export function createServerEntry(options: ServerEntryOptions) {
 				? ''
 				: shell.slice(placeholderAt + DOCUMENT_CHILDREN_PLACEHOLDER.length);
 		const encoder = new TextEncoder();
+		let cancelled = false;
+		let completed = false;
 		const body = new ReadableStream<Uint8Array>({
 			async start(controller) {
 				controller.enqueue(encoder.encode(prefix));
 				try {
 					for await (const chunk of stream.appends()) {
+						if (cancelled) return;
 						controller.enqueue(encoder.encode(chunk));
 					}
 				} catch (error) {
+					if (cancelled) return;
 					// Headers already flushed: fail the stream loudly instead of
 					// serving a document that silently never settles.
 					console.error('[markless-router] streaming settle failed:', error);
 					controller.error(error);
+					completed = true;
 					return;
 				}
+				if (cancelled) return;
 				controller.enqueue(encoder.encode(suffix));
 				controller.close();
+				completed = true;
+			},
+			cancel(reason) {
+				if (completed) return;
+				cancelled = true;
+				stream.cancel(reason);
 			},
 		});
 		return new Response(body, { status, headers });

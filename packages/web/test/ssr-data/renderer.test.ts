@@ -143,6 +143,28 @@ describe('renderSsrData', () => {
 		);
 		expect((await render(null)).html).toBe('<section></section>');
 	});
+
+	test('fails loudly when a child renderer omits structural records', async () => {
+		const renderData = {
+			root: { componentName: 'Parent', templateId: 'template:Parent' },
+			chunks: [{
+				id: 'template:Parent', kind: 'template' as const, componentName: 'Parent',
+				statics: ['<!--markless-slot:0-->'], hosts: [],
+				slots: [{
+					kind: 'child-component' as const, componentEdgeId: 'component-edge:0',
+					childComponentName: 'Child', childTemplateId: 'template:Child', staticIndex: 0,
+					coordinate: { kind: 'comment-anchor' as const, path: [0] },
+				}],
+			}],
+			boundaries: [], repeats: [],
+		};
+
+		await expect(renderSsrData({
+			renderData,
+			read: () => undefined,
+			renderChild: async () => ({ html: '<p>unstructured</p>' }),
+		})).rejects.toThrow('MARKLESS_SSR_DATA_CHILD_STRUCTURE_MISSING: component-edge:0');
+	});
 });
 
 test('the shadow comparator reports a deliberate mutation as DIFFERENT', () => {

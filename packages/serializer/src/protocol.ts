@@ -148,6 +148,7 @@ export type ProtocolArmRecordSet = {
 	readonly events: ProtocolViewPayload['events'];
 	readonly behaviors: ProtocolViewPayload['behaviors'];
 	readonly elementHandles: ProtocolViewPayload['elementHandles'];
+	readonly keyedRepeats?: ProtocolViewPayload['keyedRepeats'];
 	readonly branches?: ReadonlyArray<ProtocolArmBranchRecord>;
 };
 

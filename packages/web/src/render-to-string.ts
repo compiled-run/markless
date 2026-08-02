@@ -27,6 +27,13 @@ export type SsrRenderOutput = {
 	readonly html: string;
 	readonly state?: ProtocolStatePayload;
 	readonly view?: ProtocolViewPayload;
+	readonly structure?: {
+		readonly anchors: ReadonlyArray<{
+			readonly kind: 'branch' | 'async';
+			readonly id: string;
+			readonly html: string;
+		}>;
+	};
 };
 
 export type SsrRenderArtifact = {
@@ -343,11 +350,17 @@ function boundaryArmEventNames(
 		boundary as {
 			readonly armRecords?: {
 				readonly events?: ReadonlyArray<{ readonly eventName: string }>;
+				readonly keyedRepeats?: ProtocolViewPayload['keyedRepeats'];
 			};
 		}
 	).armRecords;
 	if (!armRecords || Array.isArray(armRecords)) return [];
-	return (armRecords.events ?? []).map((event) => event.eventName);
+	return [
+		...(armRecords.events ?? []).map((event) => event.eventName),
+		...(armRecords.keyedRepeats ?? []).flatMap((repeat) =>
+			repeat.rowEvents.map((event) => event.eventName),
+		),
+	];
 }
 
 function containerScopedView(view: ProtocolViewPayload): ProtocolViewPayload {

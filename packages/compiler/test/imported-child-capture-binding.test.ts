@@ -82,6 +82,6 @@ test('imported child capture metadata produces one bound row per parent edge', a
 		}),
 	]);
 	expect(parent.publicRenderModule.ssrModuleSource).toContain(
-		`boundSymbols: {${JSON.stringify(childHandler.symbolId)}:`,
+		`"boundSymbols":{${JSON.stringify(childHandler.symbolId)}:`,
 	);
 });

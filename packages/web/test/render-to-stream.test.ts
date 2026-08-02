@@ -68,6 +68,7 @@ function relayArtifact(input: { readonly delayMs: number; readonly fail?: boolea
 					: { locators: [], events: [], behaviors: [], elementHandles: [] };
 			return {
 				html: `<main><!--markless:async:boundary:0-->${arm}<!--/markless:async:boundary:0--></main>`,
+				structure: { anchors: [{ kind: 'async', id: 'boundary:0', html: arm }] },
 				state: marklessSsrAttachSnapshots(
 					{
 						version: ASYNC_PROTOCOL_VERSION,
@@ -208,6 +209,7 @@ function orchardArtifact(
 			renderPass += 1;
 			const snapshots: unknown[] = [];
 			const arms: string[] = [];
+			const armBodies: string[] = [];
 			const servedArms: number[] = [];
 			for (const [index, sensor] of sensors.entries()) {
 				const snapshot = (await marklessSsrRunAsyncComputed(
@@ -236,6 +238,7 @@ function orchardArtifact(
 				arms.push(
 					`<!--markless:async:orchard:${index}-->${arm}<!--/markless:async:orchard:${index}-->`,
 				);
+				armBodies.push(arm);
 				if (renderPass === 2 && index === 0 && options.shellBoundaryLagMs) {
 					await new Promise((resolve) => setTimeout(resolve, options.shellBoundaryLagMs));
 				}
@@ -249,6 +252,9 @@ function orchardArtifact(
 			}
 			return {
 				html: `<main>${arms.join('')}</main>`,
+				structure: {
+					anchors: armBodies.map((html, index) => ({ kind: 'async', id: `orchard:${index}`, html })),
+				},
 				state: marklessSsrAttachSnapshots(
 					{
 						version: ASYNC_PROTOCOL_VERSION,
@@ -599,6 +605,12 @@ function composedGroveArtifact() {
 					'<main><header data-chrome>Grove</header>' +
 					`<!--markless:async:boundary:0-->${pageArm}<!--/markless:async:boundary:0-->` +
 					`<!--markless:async:c0:boundary:0-->${childArm}<!--/markless:async:c0:boundary:0--></main>`,
+				structure: {
+					anchors: [
+						{ kind: 'async', id: 'boundary:0', html: pageArm },
+						{ kind: 'async', id: 'c0:boundary:0', html: childArm },
+					],
+				},
 				state: marklessSsrAttachSnapshots(
 					{
 						version: ASYNC_PROTOCOL_VERSION,

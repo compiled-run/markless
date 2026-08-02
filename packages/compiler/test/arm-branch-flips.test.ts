@@ -160,14 +160,12 @@ test('the arm-scoped flip module rebuilds the range from parts + repeat rows, no
 	expect(module?.source).toContain('marklessBranchRows');
 	expect(module?.source).not.toContain('import ');
 
-	// SSR html wraps the arm-scoped @if in its own arm-branch anchor pair —
-	// invisible to the page-level census.
+	// Production SSR carries the nested branch as a renderData slot. The
+	// renderer owns its anchors directly; emitted code contains no HTML census.
 	expect(result.publicRenderModule.ssrModuleSource).toContain(
-		'<!--markless:arm-branch:branch-site:0-->',
+		'"kind":"branch","branchSiteId":"branch-site:0"',
 	);
-	expect(result.publicRenderModule.ssrModuleSource).toContain(
-		'<!--/markless:arm-branch:branch-site:0-->',
-	);
+	expect(result.publicRenderModule.ssrModuleSource).not.toContain('marklessSsrHostLocators');
 });
 
 test('an @if containing a component escalates to the whole @try re-render AND diagnoses in author words', async () => {

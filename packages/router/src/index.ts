@@ -130,7 +130,7 @@ export const Html = Object.assign(
 	},
 	{
 		renderSsr(props: { readonly children?: unknown } = {}) {
-			return { html: props.children == null ? '' : String(props.children) };
+			return { html: props.children == null ? '' : String(props.children), elementCount: 0 };
 		},
 	},
 );
@@ -153,7 +153,7 @@ export const Link = Object.assign(
 				value === '' ? name : `${name}="${escapeHtml(value)}"`,
 			);
 
-			return { html: `<a ${attributes.join(' ')}>${linkChildrenHtml(props)}</a>` };
+			return { html: `<a ${attributes.join(' ')}>${linkChildrenHtml(props)}</a>`, elementCount: 1 };
 		},
 	},
 );

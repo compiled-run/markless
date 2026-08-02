@@ -43,6 +43,8 @@ export type MarklessSsrStream = {
 	readonly shell: string;
 	readonly pendingArmCount: number;
 	readonly appends: () => AsyncGenerator<string, void, void>;
+	// Abandon pending appends and abort runner work that observes its signal.
+	readonly cancel: (reason?: unknown) => void;
 };
 
 type StreamRunEntry = {
@@ -54,6 +56,7 @@ type StreamRunEntry = {
 type StreamRenderContext = {
 	readonly streaming: {
 		readonly runs: Map<string, StreamRunEntry>;
+		readonly signal: AbortSignal;
 		readonly deadline?: Promise<void>;
 		readonly prestart?: boolean;
 	};
@@ -79,6 +82,7 @@ export async function renderToStream(
 	options: RenderToStreamOptions = {},
 ): Promise<MarklessSsrStream> {
 	const runs = new Map<string, StreamRunEntry>();
+	const settleController = new AbortController();
 	const deadline = new Promise<void>((resolve) =>
 		setTimeout(resolve, MARKLESS_STREAM_FIRST_FLUSH_DEADLINE_MS),
 	);
@@ -90,9 +94,11 @@ export async function renderToStream(
 	// faster boundaries; the shell flushes at the deadline, not at the sum of
 	// sequential waits.
 	const discoveryOutput = await renderSsrOutput(component, options.props, {
-		streaming: { runs, prestart: true },
+		streaming: { runs, signal: settleController.signal, prestart: true },
 	} satisfies StreamRenderContext);
-	const renderContext: StreamRenderContext = { streaming: { runs, deadline } };
+	const renderContext: StreamRenderContext = {
+		streaming: { runs, signal: settleController.signal, deadline },
+	};
 	let output = discoveryOutput;
 	if (runs.size > 0) {
 		// Fast pages settle before the deadline and never stream; slow pages
@@ -111,6 +117,7 @@ export async function renderToStream(
 		pendingArmCount: pendingArms.length,
 		appends: () =>
 			streamArmAppends({ component, options, renderContext, pendingArms, resumeModuleUrl }),
+		cancel: (reason) => settleController.abort(reason),
 	};
 }
 
@@ -167,44 +174,61 @@ async function* streamArmAppends(input: {
 	readonly resumeModuleUrl: string | undefined;
 }): AsyncGenerator<string, void, void> {
 	const remaining = new Map(input.pendingArms.map((arm) => [arm.graphNodeId, arm]));
+	const signal = input.renderContext.streaming.signal;
+	if (signal.aborted) return;
+	let cancelAppends!: () => void;
+	const cancelled = new Promise<void>((resolve) => {
+		cancelAppends = resolve;
+	});
+	const onCancel = () => cancelAppends();
+	signal.addEventListener('abort', onCancel, { once: true });
 	let executorEmitted = false;
-	while (remaining.size > 0) {
-		await Promise.race([...remaining.values()].map((arm) => arm.entry.promise));
-		// One re-render pass per settle wave: settled runners resolve from the
-		// per-request registry (no run() re-execution), so the pass renders the
-		// settled arm html + armized records for every boundary that just
-		// settled; still-pending boundaries render @pending again and wait.
-		const output = await renderSsrOutput(
-			input.component,
-			input.options.props,
-			input.renderContext,
-		);
-		// The wave's own render output is the settled truth (request-versioning
-		// discipline, Ripple prior art): a runner that settles WHILE this pass
-		// renders was captured by it as @pending, so it streams in the NEXT
-		// wave. Checking the live registry here would stream the pending arm
-		// as if it were the settled content.
-		const settledInWave = new Set(
-			(output.state?.computed ?? []).flatMap((computed) => {
-				const status = (computed as { readonly snapshot?: { readonly status?: string } })
-					.snapshot?.status;
-				return status === 'fulfilled' || status === 'rejected'
-					? [computed.graphNodeId]
-					: [];
-			}),
-		);
-		const parts: string[] = [];
-		// Deleting the visited entry during Map iteration is safe in JS.
-		for (const arm of remaining.values()) {
-			if (!settledInWave.has(arm.graphNodeId)) continue;
-			remaining.delete(arm.graphNodeId);
-			if (!executorEmitted) {
-				parts.push(armExecutorScript(input.resumeModuleUrl, input.options.nonce));
-				executorEmitted = true;
+	try {
+		while (remaining.size > 0) {
+			await Promise.race([
+				...[...remaining.values()].map((arm) => arm.entry.promise),
+				cancelled,
+			]);
+			if (signal.aborted) return;
+			// One re-render pass per settle wave: settled runners resolve from the
+			// per-request registry (no run() re-execution), so the pass renders the
+			// settled arm html + armized records for every boundary that just
+			// settled; still-pending boundaries render @pending again and wait.
+			const output = await renderSsrOutput(
+				input.component,
+				input.options.props,
+				input.renderContext,
+			);
+			if (signal.aborted) return;
+			// The wave's own render output is the settled truth (request-versioning
+			// discipline, Ripple prior art): a runner that settles WHILE this pass
+			// renders was captured by it as @pending, so it streams in the NEXT
+			// wave. Checking the live registry here would stream the pending arm
+			// as if it were the settled content.
+			const settledInWave = new Set(
+				(output.state?.computed ?? []).flatMap((computed) => {
+					const status = (computed as { readonly snapshot?: { readonly status?: string } })
+						.snapshot?.status;
+					return status === 'fulfilled' || status === 'rejected'
+						? [computed.graphNodeId]
+						: [];
+				}),
+			);
+			const parts: string[] = [];
+			// Deleting the visited entry during Map iteration is safe in JS.
+			for (const arm of remaining.values()) {
+				if (!settledInWave.has(arm.graphNodeId)) continue;
+				remaining.delete(arm.graphNodeId);
+				if (!executorEmitted) {
+					parts.push(armExecutorScript(input.resumeModuleUrl, input.options.nonce));
+					executorEmitted = true;
+				}
+				parts.push(renderArmAppend(output, arm, input.options.nonce));
 			}
-			parts.push(renderArmAppend(output, arm, input.options.nonce));
+			if (parts.length > 0) yield parts.join('');
 		}
-		if (parts.length > 0) yield parts.join('');
+	} finally {
+		signal.removeEventListener('abort', onCancel);
 	}
 }
 
@@ -213,13 +237,11 @@ function renderArmAppend(
 	arm: PendingArm,
 	nonce: string | undefined,
 ): string {
-	const startAnchor = `<!--markless:async:${arm.boundaryId}-->`;
-	const endAnchor = `<!--/markless:async:${arm.boundaryId}-->`;
-	const html = output.html;
-	const start = html.indexOf(startAnchor);
-	const end = html.indexOf(endAnchor);
-	if (start === -1 || end < start) throw streamArmError(arm.boundaryId, 'anchor pair', 'html');
-	const armHtml = html.slice(start + startAnchor.length, end);
+	const renderedAnchor = output.structure?.anchors.find(
+		(candidate) => candidate.kind === 'async' && candidate.id === arm.boundaryId,
+	);
+	if (!renderedAnchor) throw streamArmError(arm.boundaryId, 'renderData boundary record', 'structure');
+	const armHtml = renderedAnchor.html;
 
 	const boundary = (output.view?.asyncBoundaries ?? []).find(
 		(candidate) => candidate.id === arm.boundaryId,

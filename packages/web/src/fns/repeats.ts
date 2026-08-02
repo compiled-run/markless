@@ -31,28 +31,6 @@ export function marklessSsrRepeatRows(
 		(hostLocators.marklessSsrExtraElements ?? 0) + list.length * elementsPerRow;
 	return html;
 }
-// Component-bearing rows: each row awaits child component renders, so the
-// per-row element count is only known from the rendered truth — count element
-// opens from the joined html (the same census marklessSsrArmizeBoundaries
-// uses) instead of trusting a static count.
-export async function marklessSsrComponentRepeatRows(
-	hostLocators,
-	items,
-	keyForRow,
-	repeatId,
-	itemName,
-	keyPath,
-	renderRow,
-	renderEmpty,
-) {
-	const list = Array.isArray(items) ? items : Array.from(items ?? []);
-	marklessAssertUniqueRepeatKeys(list, keyForRow, repeatId, itemName, keyPath);
-	if (list.length === 0) return renderEmpty ? renderEmpty() : '';
-	const html = (await Promise.all(list.map(renderRow))).join('');
-	hostLocators.marklessSsrExtraElements =
-		(hostLocators.marklessSsrExtraElements ?? 0) + (html.match(/<[a-zA-Z]/g) ?? []).length;
-	return html;
-}
 export function marklessAssertUniqueRepeatKeys(items, keyForRow, repeatId, itemName, keyPath) {
 	const seen = new Set();
 	for (const item of items) {
