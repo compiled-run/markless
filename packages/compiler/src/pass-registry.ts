@@ -26,6 +26,12 @@ export const defaultCompilerPasses: ReadonlyArray<CompilerPassDefinition> = [
 		produces: ['symbolResolver'],
 	},
 	{
+		passId: 'render-data',
+		description: 'Derive native markup chunks and dynamic residue from the semantic graph.',
+		consumes: ['semanticGraph', 'symbolResolver'],
+		produces: ['renderData'],
+	},
+	{
 		passId: 'public-render-plan',
 		description: 'Plan compiler-proven direct DOM artifacts for public render().',
 		consumes: ['source', 'semanticGraph', 'payloadArena', 'symbolResolver'],

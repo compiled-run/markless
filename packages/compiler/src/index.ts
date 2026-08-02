@@ -17,6 +17,7 @@ export { emitPublicRenderModule } from './passes/public-render/module.ts';
 export { planPublicRender } from './passes/public-render/plan.ts';
 export { createProtocolStatePayloadFromArena } from './passes/protocol-state.ts';
 export { createProtocolViewPayload } from './passes/protocol-view.ts';
+export { createRenderData } from './passes/render-data/index.ts';
 export { createRuntimeDemandMap } from './passes/runtime-demand-map.ts';
 export { buildSemanticGraph } from './passes/semantic-graph/index.ts';
 export { lowerStateAccess } from './passes/state-lowering.ts';

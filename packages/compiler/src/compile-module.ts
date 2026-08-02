@@ -6,6 +6,7 @@ import type {
 	PublicRenderModuleArtifact,
 	PublicRenderPlanArtifact,
 	PayloadScriptsArtifact,
+	RenderDataArtifact,
 	RunnableCompilerPassDefinition,
 	RuntimeDemandMapArtifact,
 	SemanticGraphArtifact,
@@ -25,6 +26,7 @@ import { emitPublicRenderModule } from './passes/public-render/module.ts';
 import { planPublicRender } from './passes/public-render/plan.ts';
 import { createProtocolStatePayloadFromArena } from './passes/protocol-state.ts';
 import { createProtocolViewPayload } from './passes/protocol-view.ts';
+import { createRenderData } from './passes/render-data/index.ts';
 import { createRuntimeDemandMap } from './passes/runtime-demand-map.ts';
 import { buildSemanticGraph } from './passes/semantic-graph/index.ts';
 import { createMutableSemanticGraphArtifact } from './passes/semantic-graph/types.ts';
@@ -57,6 +59,7 @@ export async function compileTsrxModule(
 		readonly stateLowering: StateLoweringArtifact;
 		readonly payloadArena: PayloadArenaArtifact;
 		readonly symbolResolver: SymbolResolverPlan;
+		readonly renderData: RenderDataArtifact;
 		readonly captureAnalysis: CaptureAnalysisArtifact;
 		readonly protocolState: CompileTsrxModuleResult['protocolState'];
 		readonly protocolView: CompileTsrxModuleResult['protocolView'];
@@ -76,6 +79,7 @@ export async function compileTsrxModule(
 		stateLowering: artifacts.stateLowering,
 		payloadArena: artifacts.payloadArena,
 		symbolResolver: artifacts.symbolResolver,
+		renderData: artifacts.renderData,
 		boundSymbolResolver: {
 			passId: 'bound-symbol-resolver',
 			rows: artifacts.captureAnalysis.boundResolverRows ?? [],
@@ -169,6 +173,20 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 								captureAnalysis,
 							}).rows,
 						},
+					};
+				},
+			};
+		}
+
+		if (pass.passId === 'render-data') {
+			return {
+				...pass,
+				run({ inputs }) {
+					return {
+						renderData: createRenderData({
+							semanticGraph: inputs.semanticGraph as SemanticGraphArtifact,
+							symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
+						}),
 					};
 				},
 			};
