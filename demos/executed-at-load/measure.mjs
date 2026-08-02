@@ -18,6 +18,19 @@ const { chromium } = require('playwright');
 const BASELINE_PATH = resolve(PACKAGE_DIR, 'baselines/executed-at-load.json');
 const FIXED_MICROTASK_TURNS = 8;
 const MODE = process.argv[2];
+const MAX_CEILING_HEADROOM = 0.05;
+const ACCEPTED_LOAD_BYTES = {
+	'music-player-csr': 16_774,
+	'music-player-ssr': 1_213,
+	'live-feed-csr': 28_925,
+	'live-feed-ssr': 1_285,
+};
+const LOAD_BYTE_CEILINGS = Object.fromEntries(
+	Object.entries(ACCEPTED_LOAD_BYTES).map(([id, accepted]) => [
+		id,
+		Math.floor(accepted * (1 + MAX_CEILING_HEADROOM)),
+	]),
+);
 
 const combos = [
 	{
@@ -85,6 +98,7 @@ for (const combo of combos) {
 			runs.push(await measureCombo(combo));
 		}
 		assertRepeatable(combo.id, runs);
+		if (MODE === 'gate') assertLoadCeiling(combo.id, runs[0]);
 		measurements[combo.id] = runs[0];
 		console.log(
 			`-- ${combo.id}: load=${runs[0].totalExecutedBytes} post-interaction=${runs[0].postInteraction.totalExecutedBytes}`,
@@ -506,7 +520,19 @@ function assertRepeatable(label, runs) {
 	const signatures = runs.map(repeatabilitySignature);
 	if (signatures.some((signature) => signature !== signatures[0])) {
 		throw new Error(
-			`${label} precise coverage was not exactly repeatable across ${runs.length} runs.`,
+			`${label} precise coverage was not exactly repeatable across ${runs.length} runs:\n${signatures.join('\n')}`,
+		);
+	}
+}
+
+function assertLoadCeiling(label, run) {
+	const ceiling = LOAD_BYTE_CEILINGS[label];
+	if (!Number.isInteger(ceiling)) {
+		throw new Error(`${label} has no executed-at-load ceiling.`);
+	}
+	if (run.totalExecutedBytes > ceiling) {
+		throw new Error(
+			`${label} executed ${run.totalExecutedBytes} bytes at load, above its hard ceiling of ${ceiling} (accepted ${ACCEPTED_LOAD_BYTES[label]}, maximum headroom ${MAX_CEILING_HEADROOM * 100}%).`,
 		);
 	}
 }

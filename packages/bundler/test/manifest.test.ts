@@ -11,6 +11,7 @@ import { MARKLESS_BUNDLE_GRAPH } from '../src/build/chunking.ts';
 import {
 	collectHeadLinkInjections,
 	collectModulePreloadInjections,
+	injectHeadLinks,
 } from '../src/build/head-links.ts';
 import type { MarklessManifest, MarklessTransformManifest } from '../src/types.ts';
 
@@ -248,6 +249,34 @@ describe('markless build metadata output', () => {
 					fetchpriority: 'high',
 				},
 			})),
+		);
+	});
+
+	test('injects exact modulepreloads once using compact ordered tags', () => {
+		const bundle = {
+			'index.html': {
+				type: 'asset',
+				fileName: 'index.html',
+				source: '<head></head>',
+			},
+		};
+		const injections = ['/build/first.js', '/build/second.js'].map(
+			(href) => ({
+				tag: 'link',
+				location: 'head' as const,
+				attributes: {
+					rel: 'modulepreload',
+					href,
+					crossorigin: 'anonymous',
+					fetchpriority: 'high',
+				},
+			}),
+		);
+
+		injectHeadLinks(bundle, [...injections, injections[1]!]);
+
+		expect(bundle['index.html'].source).toBe(
+			'<head><link rel=modulepreload href=/build/first.js crossorigin fetchpriority=high><link rel=modulepreload href=/build/second.js crossorigin fetchpriority=high></head>',
 		);
 	});
 

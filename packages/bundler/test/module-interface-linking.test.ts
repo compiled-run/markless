@@ -177,6 +177,59 @@ test('a child interface edit recompiles the parent', async () => {
 	expect(second).not.toBe(first);
 });
 
+test('render-data-only invalidation keeps the linked module graph intact', async () => {
+	const childFilename = '/workspace/app/src/Child.tsrx';
+	const parentSource = `import { Child } from './Child.tsrx'; export function App() @{ <main><Child /></main> }`;
+	let childSource = `export function Child() @{ <p>Before</p> }`;
+	let plugin: ReturnType<typeof marklessClient>;
+	const resolve = vi.fn(async (specifier: string) =>
+		specifier === './Child.tsrx' ? { id: childFilename } : null,
+	);
+	const transformRequest = vi.fn(async (url: string) =>
+		callTransform(plugin, childSource, url, { resolve }),
+	);
+	plugin = marklessClient({ dev: true, devServer: { transformRequest } });
+	callBuildStart(plugin, { cwd: '/workspace/app' });
+
+	await callTransform(plugin, parentSource, importerFilename, { resolve });
+	await callTransform(plugin, childSource, childFilename, { resolve });
+	childSource = `export function Child() @{ <p>After</p> }`;
+
+	const invalidated = await plugin.api.invalidateGeneratedModules(
+		childFilename,
+		'client',
+		childSource,
+	);
+
+	expect(invalidated).toEqual([
+		`\0virtual:markless:render-data:${encodeURIComponent(childFilename)}`,
+	]);
+	expect(invalidated).not.toContain(
+		`\0virtual:markless:resolver:${encodeURIComponent(importerFilename)}`,
+	);
+	const childRenderData = await callLoad(plugin, invalidated[0]!);
+	expect(childRenderData).toContain('After');
+	expect(childRenderData).not.toContain('Before');
+});
+
+test('a symbol implementation edit still invalidates all generated modules', async () => {
+	const filename = '/workspace/app/src/Counter.tsrx';
+	const before = `export function Counter() @{ <button onClick={() => console.log('before')}>Go</button> }`;
+	const after = before.replace("console.log('before')", "console.log('after')");
+	const plugin = marklessClient({ dev: true });
+	callBuildStart(plugin, { cwd: '/workspace/app' });
+	await callTransform(plugin, before, filename);
+
+	const invalidated = await plugin.api.invalidateGeneratedModules(filename, 'client', after);
+
+	expect(invalidated).toContain(
+		`\0virtual:markless:symbol:${encodeURIComponent(filename)}:symbol%3A0`,
+	);
+	expect(invalidated).toContain(
+		`\0virtual:markless:render-data:${encodeURIComponent(filename)}`,
+	);
+});
+
 test('the interface cache keeps full and symbols-only client entries distinct', async () => {
 	const plugin = marklessClient();
 	callBuildStart(plugin, { cwd: '/workspace/app' });

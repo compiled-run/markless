@@ -1332,10 +1332,10 @@ export function App() @{
 
 		const htmlHrefs = [
 			...html.source.matchAll(
-				/<link\b[^>]*\brel=["']modulepreload["'][^>]*\bhref=["']([^"']+)["']/g,
+				/<link\b[^>]*\brel=(?:["']modulepreload["']|modulepreload)[^>]*\bhref=(?:["']([^"']+)["']|([^\s>]+))/g,
 			),
 		]
-			.map((match) => match[1]!)
+			.map((match) => (match[1] ?? match[2])!)
 			.sort();
 
 		expect(htmlHrefs).toEqual([

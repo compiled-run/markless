@@ -159,5 +159,9 @@ export type PreloadGraphEntriesAdder = (
 export type BundleGraphAdder = (manifest: MarklessBuildMetadata) => PreloadGraphEntries | undefined;
 
 export type MarklessRolldownPluginApi = {
-	invalidateGeneratedModules: (parent: string, environment?: MarklessEnvironment) => string[];
+	invalidateGeneratedModules: (
+		parent: string,
+		environment?: MarklessEnvironment,
+		nextSource?: string,
+	) => string[] | Promise<string[]>;
 };

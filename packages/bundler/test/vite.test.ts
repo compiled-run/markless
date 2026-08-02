@@ -148,8 +148,8 @@ describe('Vite adapter structure', () => {
 			createViteHookContext('client'),
 		);
 
-		expect(html.source).toContain('rel="modulepreload"');
-		expect(html.source).toContain('href="/docs/build/chunk-');
+		expect(html.source).toContain('rel=modulepreload');
+		expect(html.source).toContain('href=/docs/build/chunk-');
 	});
 
 	test('prebuilds the configured client and server environments once', async () => {

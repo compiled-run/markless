@@ -121,7 +121,9 @@ export function injectHeadLinks(
 ) {
 	if (injections.length === 0) return;
 
-	const links = injections.map(headLinkTag).join('');
+	const links = [...new Map(injections.map((injection) => [headLinkKey(injection), injection])).values()]
+		.map(headLinkTag)
+		.join('');
 	for (const output of Object.values(bundle)) {
 		if (!isHtmlAssetWithSource(output)) continue;
 		output.source = output.source.includes('</head>')
@@ -131,6 +133,11 @@ export function injectHeadLinks(
 }
 
 function headLinkTag(injection: GlobalInjections): string {
+	if (injection.tag === 'link' && injection.attributes?.rel === 'modulepreload') {
+		const attributes = Object.entries(injection.attributes)
+			.map(([name, value]) => compactAttribute(name, value));
+		return `<link ${attributes.join(' ')}>`;
+	}
 	const attributes = Object.entries(injection.attributes ?? {}).map(
 		([name, value]) => `${name}="${value.replaceAll('"', '&quot;')}"`,
 	);
@@ -139,6 +146,22 @@ function headLinkTag(injection: GlobalInjections): string {
 	return injection.children === undefined
 		? open
 		: `${open}${injection.children}</${injection.tag}>`;
+}
+
+function headLinkKey(injection: GlobalInjections): string {
+	return JSON.stringify([
+		injection.tag,
+		injection.location,
+		Object.entries(injection.attributes ?? {}),
+		injection.children,
+	]);
+}
+
+function compactAttribute(name: string, value: string): string {
+	if (name === 'crossorigin' && value === 'anonymous') return name;
+	return /^[^\s"'`=<>]+$/.test(value)
+		? `${name}=${value}`
+		: `${name}="${value.replaceAll('"', '&quot;')}"`;
 }
 
 function isHtmlAssetWithSource(output: unknown): output is {

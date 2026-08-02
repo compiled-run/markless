@@ -18,6 +18,7 @@ import {
 	type GlobalInjections,
 	type PreloadGraphEntriesAdder,
 	type MarklessEnvironment,
+	type MarklessRolldownPluginApi,
 	type MarklessRolldownOptions,
 } from '../types.ts';
 import { createDevTags } from './dev-tags.ts';
@@ -67,8 +68,11 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 		base: '/',
 		clientEnvironment: viteEnvironmentName('client', options),
 		enabled: false,
-		invalidateGeneratedModules: (parent: string, environment?: MarklessEnvironment) =>
-			marklessPlugin.api.invalidateGeneratedModules(parent, environment),
+		invalidateGeneratedModules: (
+			parent: string,
+			environment?: MarklessEnvironment,
+			nextSource?: string,
+		) => marklessPlugin.api.invalidateGeneratedModules(parent, environment, nextSource),
 	};
 	const devTags = createDevTags();
 	rolldownOptions.devInjections = devTags.tags;
@@ -451,7 +455,7 @@ function runHook(hook: unknown, context: unknown, ...args: unknown[]) {
 }
 
 type MarklessVitePluginApi = {
-	invalidateGeneratedModules: (parent: string, environment?: MarklessEnvironment) => string[];
+	invalidateGeneratedModules: MarklessRolldownPluginApi['invalidateGeneratedModules'];
 	registerBundleGraphAdder?: (adder: BundleGraphAdder) => void;
 	registerDevInjection?: (injection: GlobalInjections) => void;
 	registerPreloadGraphEntries?: (adder: PreloadGraphEntriesAdder) => void;

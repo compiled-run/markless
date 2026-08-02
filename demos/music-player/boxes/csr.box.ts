@@ -21,7 +21,8 @@ export default box(
 		const preview = await pipeline.preview(build);
 		const html = await preview.request('/');
 		const preloadHrefs = modulePreloadHrefs(html);
-		await expect.html.contains(html, 'rel="modulepreload"');
+		if (!/\brel="?modulepreload"?/.test(html))
+			throw new Error('Expected CSR music player HTML to carry modulepreload links (quoted or compact).');
 		if (preloadHrefs.length === 0) {
 			throw new Error('Expected CSR music player HTML to render modulepreload links.');
 		}
@@ -122,7 +123,8 @@ export default box(
 );
 
 function modulePreloadHrefs(html: string): readonly string[] {
-	return [...html.matchAll(/<link\b(?=[^>]*\brel="modulepreload")[^>]*\bhref="([^"]+)"/g)].map(
+	// The post-build compactor may emit unquoted attribute values; accept both.
+	return [...html.matchAll(/<link\b(?=[^>]*\brel="?modulepreload"?)[^>]*\bhref="?([^"\s>]+)"?/g)].map(
 		(match) => match[1]!,
 	);
 }
@@ -130,7 +132,7 @@ function modulePreloadHrefs(html: string): readonly string[] {
 function assertModulePreloadsInHead(html: string): void {
 	const headEnd = html.indexOf('</head>');
 	const bodyStart = html.indexOf('<body>');
-	const firstPreload = html.indexOf('rel="modulepreload"');
+	const firstPreload = html.search(/\brel="?modulepreload"?/);
 	if (headEnd === -1 || bodyStart === -1 || firstPreload === -1) {
 		throw new Error('Expected HTML document with modulepreload links in head.');
 	}
@@ -138,7 +140,7 @@ function assertModulePreloadsInHead(html: string): void {
 		throw new Error('Expected CSR music player modulepreloads before </head>.');
 	}
 	const bodyHtml = html.slice(bodyStart);
-	if (bodyHtml.includes('rel="modulepreload"')) {
+	if (/\brel="?modulepreload"?/.test(bodyHtml)) {
 		throw new Error('Expected CSR music player body to contain no modulepreload links.');
 	}
 }

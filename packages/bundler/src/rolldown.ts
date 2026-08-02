@@ -100,6 +100,7 @@ export function createMarklessRolldownPlugin(input: {
 			readonly source: string;
 			readonly code: string;
 			readonly importedInterfaceHashes: string;
+			readonly input: TransformTsrxModuleInput;
 			readonly result: TransformTsrxModuleResult;
 		}
 	>();
@@ -125,35 +126,101 @@ export function createMarklessRolldownPlugin(input: {
 		return root ?? internalOptions.rootDir;
 	}
 
+	function invalidateAllGeneratedModules(
+		parent: string,
+		currentEnvironment?: MarklessEnvironment,
+	) {
+		const changedSource = pathname(parent);
+		moduleLinkArtifacts.delete(changedSource);
+		transformManifests.delete(changedSource);
+		for (const [key, cached] of linkedTransformCache) {
+			if (cached.source === changedSource) linkedTransformCache.delete(key);
+		}
+		const ids = dev.clear(parent, currentEnvironment);
+		const resolvedIds = new Set<string>();
+		for (const id of ids) {
+			const type = virtualModules.get(id)?.type;
+			virtualModules.delete(id);
+			const resolvedId = resolveVirtualId(id);
+			resolvedIds.add(resolvedId);
+			if (type === 'style') resolvedIds.add(`${resolvedId}?direct`);
+		}
+		const invalidatesClient =
+			currentEnvironment === 'client' ||
+			(currentEnvironment === undefined && environment === 'client');
+		if (
+			invalidatesClient &&
+			internalOptions.dev === true &&
+			normalizeExecutionLogMode(internalOptions.executionLog) !== 'never'
+		) {
+			resolvedIds.add(resolveVirtualId(MARKLESS_EXECUTION_LOG_MODULE_ID));
+		}
+		return [...resolvedIds];
+	}
+
+	async function invalidateEditedGeneratedModules(
+		parent: string,
+		currentEnvironment: MarklessEnvironment | undefined,
+		nextSource: string,
+	) {
+		const changedSource = pathname(parent);
+		const cachedEntries = [...linkedTransformCache].filter(
+			([key, cached]) =>
+				cached.source === changedSource &&
+				(!currentEnvironment || key.startsWith(`${currentEnvironment}\0`)),
+		);
+		if (cachedEntries.length === 0) {
+			return invalidateAllGeneratedModules(parent, currentEnvironment);
+		}
+
+		const nextEntries = await Promise.all(
+			cachedEntries.map(async ([key, cached]) => {
+				const nextInput = { ...cached.input, source: nextSource };
+				return [key, cached, nextInput, await transformTsrxModule(nextInput)] as const;
+			}),
+		);
+		if (
+			nextEntries.some(
+				([, cached, , next]) => !isRenderDataOnlyTransformChange(cached.result, next),
+			)
+		) {
+			return invalidateAllGeneratedModules(parent, currentEnvironment);
+		}
+
+		const renderDataIds = new Set<string>();
+		for (const [key, cached, nextInput, next] of nextEntries) {
+			linkedTransformCache.set(key, {
+				...cached,
+				code: nextSource,
+				input: nextInput,
+				result: next,
+			});
+			moduleLinkArtifacts.set(changedSource, {
+				moduleGraphInterface: next.moduleGraphInterface,
+				interfaceHash: next.interfaceHash,
+				moduleImports: next.moduleImports,
+			});
+			transformManifests.set(changedSource, next.manifest);
+			for (const module of next.virtualModules) {
+				if (module.type !== 'render-data') continue;
+				virtualModules.set(module.id, module);
+				renderDataIds.add(resolveVirtualId(module.id));
+			}
+		}
+		return [...renderDataIds];
+	}
+
 	const plugin = {
 		api: {
-			invalidateGeneratedModules(parent: string, currentEnvironment?: MarklessEnvironment) {
-				const changedSource = pathname(parent);
-				moduleLinkArtifacts.delete(changedSource);
-				transformManifests.delete(changedSource);
-				for (const [key, cached] of linkedTransformCache) {
-					if (cached.source === changedSource) linkedTransformCache.delete(key);
+			invalidateGeneratedModules(
+				parent: string,
+				currentEnvironment?: MarklessEnvironment,
+				nextSource?: string,
+			) {
+				if (nextSource !== undefined) {
+					return invalidateEditedGeneratedModules(parent, currentEnvironment, nextSource);
 				}
-				const ids = dev.clear(parent, currentEnvironment);
-				const resolvedIds = new Set<string>();
-				for (const id of ids) {
-					const type = virtualModules.get(id)?.type;
-					virtualModules.delete(id);
-					const resolvedId = resolveVirtualId(id);
-					resolvedIds.add(resolvedId);
-					if (type === 'style') resolvedIds.add(`${resolvedId}?direct`);
-				}
-				const invalidatesClient =
-					currentEnvironment === 'client' ||
-					(currentEnvironment === undefined && environment === 'client');
-				if (
-					invalidatesClient &&
-					internalOptions.dev === true &&
-					normalizeExecutionLogMode(internalOptions.executionLog) !== 'never'
-				) {
-					resolvedIds.add(resolveVirtualId(MARKLESS_EXECUTION_LOG_MODULE_ID));
-				}
-				return [...resolvedIds];
+				return invalidateAllGeneratedModules(parent, currentEnvironment);
 			},
 		},
 		name,
@@ -357,6 +424,7 @@ export function createMarklessRolldownPlugin(input: {
 			].join('\0');
 			const cached = linkedTransformCache.get(cacheKey);
 			let transformed: TransformTsrxModuleResult;
+			let linkedTransformInput = transformInput;
 			let reusedLinkedTransform = false;
 			if (cached?.code === code) {
 				const cachedImports = await resolveImportedModuleInterfaces.call(
@@ -376,6 +444,7 @@ export function createMarklessRolldownPlugin(input: {
 					importedInterfaceHashSignature(cachedImports, moduleLinkArtifacts)
 				) {
 					transformed = cached.result;
+					linkedTransformInput = cached.input;
 					reusedLinkedTransform = true;
 				}
 			}
@@ -400,13 +469,14 @@ export function createMarklessRolldownPlugin(input: {
 						internalOptions,
 						currentEnvironment,
 					);
-					transformed = await transformTsrxModule({
+					linkedTransformInput = {
 						...transformInput,
 						importedModuleInterfaces: importedModuleInterfaces(
 							provisionalImports,
 							moduleLinkArtifacts,
 						),
-					});
+					};
+					transformed = await transformTsrxModule(linkedTransformInput);
 				}
 			}
 			// Register the first-pass artifact before loading children so the existing
@@ -452,14 +522,15 @@ export function createMarklessRolldownPlugin(input: {
 				!reusedLinkedTransform &&
 				(resolvedChildren.length > 0 || resolvedInterfaceImports.length > 0)
 			) {
-				transformed = await transformTsrxModule({
+				linkedTransformInput = {
 					...transformInput,
 					symbols: importedSymbolInputs(resolvedChildren, transformManifests),
 					importedModuleInterfaces: importedModuleInterfaces(
 						resolvedInterfaceImports,
 						moduleLinkArtifacts,
 					),
-				});
+				};
+				transformed = await transformTsrxModule(linkedTransformInput);
 			}
 			registerTransformArtifacts({
 				source,
@@ -479,6 +550,7 @@ export function createMarklessRolldownPlugin(input: {
 					resolvedInterfaceImports,
 					moduleLinkArtifacts,
 				),
+				input: linkedTransformInput,
 				result: transformed,
 			});
 			for (const child of resolvedChildren) {
@@ -995,6 +1067,27 @@ function importedInterfaceHashSignature(
 		)
 		.sort()
 		.join('|');
+}
+
+function isRenderDataOnlyTransformChange(
+	previous: TransformTsrxModuleResult,
+	next: TransformTsrxModuleResult,
+): boolean {
+	if (previous.interfaceHash !== next.interfaceHash || previous.code !== next.code) return false;
+	if (JSON.stringify(previous.moduleImports) !== JSON.stringify(next.moduleImports)) return false;
+	const withoutRenderData = (result: TransformTsrxModuleResult) =>
+		result.virtualModules.filter((module) => module.type !== 'render-data');
+	if (JSON.stringify(withoutRenderData(previous)) !== JSON.stringify(withoutRenderData(next))) {
+		return false;
+	}
+	const withoutNativeMarkup = (manifest: MarklessTransformManifest) => {
+		const { csrNativeMarkup: _csrNativeMarkup, ...stable } = manifest;
+		return stable;
+	};
+	return (
+		JSON.stringify(withoutNativeMarkup(previous.manifest)) ===
+		JSON.stringify(withoutNativeMarkup(next.manifest))
+	);
 }
 
 function clearSourceVirtualModules(

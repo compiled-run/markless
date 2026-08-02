@@ -21,7 +21,11 @@ interface ViteHmrOptions {
 	base: string;
 	clientEnvironment: string;
 	enabled: boolean;
-	invalidateGeneratedModules?: (parent: string, environment?: MarklessEnvironment) => string[];
+	invalidateGeneratedModules?: (
+		parent: string,
+		environment?: MarklessEnvironment,
+		nextSource?: string,
+	) => string[] | Promise<string[]>;
 	invalidSourceRecheckMs?: number;
 }
 
@@ -194,9 +198,9 @@ export function createViteHmr(options: ViteHmrOptions) {
 			}
 
 			let sendMessages = true;
+			let editedSource: string | undefined;
 			if (ctx.file && SOURCE_FILE_EXTENSION.test(ctx.file) && ctx.read) {
 				const sourceId = parsePath(ctx.file).pathname;
-				let editedSource: string | undefined;
 				try {
 					editedSource = await ctx.read();
 				} catch {
@@ -233,8 +237,17 @@ export function createViteHmr(options: ViteHmrOptions) {
 				env === 'server' ? server?.environments?.[options.clientEnvironment] : undefined,
 			);
 			for (const file of files) {
-				for (const candidate of hmrCandidates(file, ctx.file)) {
-					for (const id of options.invalidateGeneratedModules?.(candidate, env) ?? []) {
+				const candidates =
+					editedSource !== undefined && ctx.file
+						? [ctx.file]
+						: hmrCandidates(file, ctx.file);
+				for (const candidate of candidates) {
+					const invalidatedIds = await options.invalidateGeneratedModules?.(
+						candidate,
+						env,
+						candidate === ctx.file ? editedSource : undefined,
+					);
+					for (const id of invalidatedIds ?? []) {
 						for (const targetEnvironment of invalidationEnvironments) {
 							const module = targetEnvironment.moduleGraph?.getModuleById?.(id);
 							if (!module) continue;
