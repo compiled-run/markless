@@ -209,6 +209,8 @@ export function createResumeRuntime(
 		return branchRuntime;
 	}
 	function dispatchCaptured(event: ResumeDomEvent): Promise<void> | void {
+		if ((event as { readonly __marklessCsrBootstrapReplayed?: boolean }).__marklessCsrBootstrapReplayed)
+			return;
 		return events?.dispatch(event, { ignoreUnmatched: true });
 	}
 	async function commitBoundaryArm(

@@ -129,6 +129,7 @@ async function mountAndWrite(input: {
 		}),
 		{ target: { replaceChildren() {} } },
 	);
+	await container.runtime.start?.();
 	container.graph.write({ graphNodeId: input.cellId, value: input.value });
 	await container.graph.flush?.();
 	return container;
@@ -246,6 +247,7 @@ test('compiled same-module CSR re-derives a child computed fed by a parent compu
 		}),
 		{ target: { replaceChildren() {} } },
 	);
+	await container.runtime.start?.();
 
 	expect(evaluations).toEqual({ parent: 1, child: 1 });
 	expect(loadedSymbols).toEqual([]);
@@ -454,6 +456,7 @@ test('three same-module hops preserve one imported-child route for derive and DO
 		}),
 		{ target: { replaceChildren() {} } },
 	);
+	await container.runtime.start?.();
 
 	container.graph.write({ graphNodeId: 'state:routedLeafInput', value: 6 });
 	await container.graph.flush();

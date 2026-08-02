@@ -1,7 +1,13 @@
 import { asNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import type { SemanticModuleImport } from '../../artifacts.ts';
 
-export type FrameworkApiName = 'state' | 'computed' | 'element' | 'shared' | 'storage';
+export type FrameworkApiName =
+	| 'state'
+	| 'computed'
+	| 'element'
+	| 'shared'
+	| 'storage'
+	| 'buildComputed';
 
 const frameworkApiNames = new Set<FrameworkApiName>([
 	'state',
@@ -9,6 +15,7 @@ const frameworkApiNames = new Set<FrameworkApiName>([
 	'element',
 	'shared',
 	'storage',
+	'buildComputed',
 ]);
 
 export function frameworkApiSources(

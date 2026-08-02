@@ -807,6 +807,7 @@ test('chunk CSR binds build coordinates to the mounted clone before state journa
 		};
 		const container = await render(() => output, { target });
 		const runtime = container.runtime as { getElement(id: string): FakeElement | undefined };
+		await container.runtime.start?.();
 
 		expect(target.children[0]).toBe(output.root);
 		expect(runtime.getElement('hWest')).toBe(spans[0]);
@@ -990,6 +991,10 @@ test('render adopts the mount target as container root for fragment-rooted compo
 				: FakeElement,
 			state,
 			view,
+			liveHostNodes: new Map([
+				['h0', header],
+				['h1', button],
+			]),
 			loadSymbol(symbolId: string) {
 				loadedSymbols.push(symbolId);
 				return ({ graph }: { graph: { write(input: unknown): void } }) => {
@@ -1072,6 +1077,7 @@ test('render flips CSR branch ranges through the full resume runtime', async () 
 	// Branch-bearing views must take the full resume runtime, and the arm
 	// seeds from graph reads with no symbol load at startup.
 	expect(loadedSymbols).toEqual([]);
+	await container.runtime.start?.();
 
 	container.graph.write({ graphNodeId: 'state:open', value: false });
 	await container.graph.flush?.();
@@ -2108,7 +2114,7 @@ test('render starts artifact-owned CSR preload work without requiring app code',
 	expect(target.children).toEqual([root]);
 });
 
-test('render activates CSR behavior symbols after creating host elements', async () => {
+test('render activates only build-computed CSR behavior symbols before interaction', async () => {
 	const root = element('BUTTON');
 	const state = createProtocolStatePayload({
 		cells: [{ graphNodeId: 'state:count', name: 'count', valueKind: 'scalar', value: 0 }],
@@ -2137,6 +2143,14 @@ test('render activates CSR behavior symbols after creating host elements', async
 								functionSource: 'chart',
 								inputSources: [],
 								symbolId: 'symbol:chart',
+								buildComputed: true,
+							},
+							{
+								hostNodeId: 'h0',
+								source: 'coldChart',
+								functionSource: 'coldChart',
+								inputSources: [],
+								symbolId: 'symbol:cold-chart',
 							},
 						],
 						elementHandles: [],
@@ -2172,7 +2186,12 @@ test('render activates CSR behavior symbols after creating host elements', async
 
 	await root.listeners[0].listener(event('click', root));
 
-	expect(loadedSymbols).toEqual(['symbol:chart', 'symbol:click', 'symbol:text']);
+	expect(loadedSymbols).toEqual([
+		'symbol:chart',
+		'symbol:cold-chart',
+		'symbol:click',
+		'symbol:text',
+	]);
 	expect(root.textContent).toBe('1');
 });
 
@@ -2188,7 +2207,7 @@ test('render connects the CSR runtime before mounting visible DOM', async () => 
 	};
 	const root = element('BUTTON');
 
-	await render(
+	const container = await render(
 		() => ({
 			root,
 			state: createProtocolStatePayload({ cells: [] }),
@@ -2204,7 +2223,9 @@ test('render connects the CSR runtime before mounting visible DOM', async () => 
 		{ target },
 	);
 
-	expect(order).toEqual(['connect', 'mount:true']);
+	expect(order).toEqual(['mount:false']);
+	await container.runtime.start?.();
+	expect(order).toEqual(['mount:false', 'connect']);
 	expect(target.children).toEqual([root]);
 });
 

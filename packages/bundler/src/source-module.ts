@@ -130,6 +130,7 @@ export function emitSourceModule(input: {
 	readonly publicSsrModuleSource: string;
 	readonly publicRenderSsrExportName: string | null;
 	readonly symbols: ReadonlyArray<SourceSymbolRow>;
+	readonly buildComputedSymbols?: ReadonlyArray<SourceSymbolRow>;
 	readonly symbolRoutes: ReadonlyArray<SourceSymbolRoute>;
 	readonly hasBoundSymbols?: boolean;
 }) {
@@ -141,6 +142,12 @@ export function emitSourceModule(input: {
 			: `import { state as payloadState, view as payloadView, runtimeDemandMap as payloadRuntimeDemandMap } from '${input.payloadId}';`,
 		'',
 		emitLoadSymbol(input),
+		input.buildComputedSymbols?.length
+			? emitDirectSourceSymbolLoader(input.buildComputedSymbols).replace(
+					'function loadSymbol(',
+					'function loadBuildComputedSymbol(',
+				)
+			: '',
 		input.environment === 'client' && input.executionLog !== 'never'
 			? emitExecutionLogLoader()
 			: '',

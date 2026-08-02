@@ -452,6 +452,7 @@ describe('debug registration mirrors successful framework wiring', () => {
 			},
 			options: {},
 		} as never);
+		await container.runtime.start?.();
 		expect(channel()?.containers[0]).toMatchObject({ phase: 'csr', lifecycle: 'active' });
 		expect(channel()?.explainInteraction(button as never, 'click')).toMatchObject({
 			kind: 'resume-record',

@@ -213,6 +213,7 @@ export type ProtocolViewPayload = {
 			readonly path: ReadonlyArray<string>;
 		}>;
 		readonly symbolId?: string;
+		readonly buildComputed?: boolean;
 	}>;
 	readonly elementHandles: ReadonlyArray<{
 		readonly hostNodeId: string;

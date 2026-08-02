@@ -425,6 +425,7 @@ export type SemanticBehavior = {
 	readonly source: string;
 	readonly functionSource: string;
 	readonly inputSources: ReadonlyArray<string>;
+	readonly buildComputed?: boolean;
 	readonly keyedRepeatScopeIds?: ReadonlyArray<string>;
 };
 

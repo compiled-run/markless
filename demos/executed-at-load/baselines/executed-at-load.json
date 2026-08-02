@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "commit": "bf0bdce14de0b7375c633dd3003ee48eb77ff04a",
-  "date": "2026-08-02T17:19:24.181Z",
+  "commit": "33a0d86b8190ebc29ba4731283d32bdc5256192f",
+  "date": "2026-08-02T18:08:28.696Z",
   "metric": "v8-precise-coverage-executed-bytes",
   "posture": {
     "consumerBuild": true,
@@ -18,139 +18,23 @@
       "proof": "green",
       "posture": "client-settled",
       "path": "/",
-      "totalExecutedBytes": 49490,
+      "totalExecutedBytes": 16774,
       "perScript": [
         {
-          "url": "/build/chunk-BxXDHgPZ2.js",
-          "executedBytes": 15972
+          "url": "/build/chunk-CEBwN7DD.js",
+          "executedBytes": 14090
         },
         {
-          "url": "/build/chunk-MMYzjjBp.js",
-          "executedBytes": 14036
+          "url": "/build/chunk-ZwZ-LOVf.js",
+          "executedBytes": 1502
         },
         {
-          "url": "/build/chunk-CULPCeLd2.js",
-          "executedBytes": 3382
+          "url": "/build/chunk-BStB8rxG.js",
+          "executedBytes": 755
         },
         {
-          "url": "/build/chunk-CkTxu9gI.js",
-          "executedBytes": 2390
-        },
-        {
-          "url": "/build/chunk-Cvf9TVY_.js",
-          "executedBytes": 1682
-        },
-        {
-          "url": "/build/chunk-BLSaC1E8.js",
-          "executedBytes": 1471
-        },
-        {
-          "url": "/build/chunk-CZoe0hxI.js",
-          "executedBytes": 1364
-        },
-        {
-          "url": "/build/chunk-CjuhcL1R.js",
-          "executedBytes": 1359
-        },
-        {
-          "url": "/build/chunk-Dglu98lc.js",
-          "executedBytes": 1355
-        },
-        {
-          "url": "/build/chunk-D-FDi5dn.js",
-          "executedBytes": 934
-        },
-        {
-          "url": "/build/chunk-CFxxzdRs.js",
-          "executedBytes": 914
-        },
-        {
-          "url": "/build/chunk-C-bMkqNB2.js",
-          "executedBytes": 876
-        },
-        {
-          "url": "/build/chunk-BJH9-j1q.js",
-          "executedBytes": 466
-        },
-        {
-          "url": "/build/chunk-BTcBTwbG.js",
-          "executedBytes": 443
-        },
-        {
-          "url": "/build/chunk-V7trPciJ2.js",
-          "executedBytes": 349
-        },
-        {
-          "url": "/build/chunk-DmyVjdj1.js",
-          "executedBytes": 334
-        },
-        {
-          "url": "/build/chunk-C2Og1QcO.js",
-          "executedBytes": 264
-        },
-        {
-          "url": "/build/chunk-DyexIcpo.js",
-          "executedBytes": 259
-        },
-        {
-          "url": "/build/chunk-BGtf_lwR.js",
-          "executedBytes": 208
-        },
-        {
-          "url": "/build/chunk-CaIMrbrc.js",
-          "executedBytes": 203
-        },
-        {
-          "url": "/build/chunk-Dd_eXPnn.js",
-          "executedBytes": 163
-        },
-        {
-          "url": "/build/chunk-ChV4SEaW.js",
-          "executedBytes": 107
-        },
-        {
-          "url": "/build/chunk-B_Mz2qKz.js",
-          "executedBytes": 95
-        },
-        {
-          "url": "/build/chunk-BCcukPD6.js",
-          "executedBytes": 95
-        },
-        {
-          "url": "/build/chunk-BkF3Tqy1.js",
-          "executedBytes": 86
-        },
-        {
-          "url": "/build/chunk-D_Bn5IcD2.js",
-          "executedBytes": 86
-        },
-        {
-          "url": "/build/chunk-C7v_UdsI.js",
-          "executedBytes": 82
-        },
-        {
-          "url": "/build/chunk-Bmbx24rx2.js",
-          "executedBytes": 80
-        },
-        {
-          "url": "/build/chunk-C-6US7o9.js",
-          "executedBytes": 79
-        },
-        {
-          "url": "/build/chunk-iTZ3AbYO2.js",
-          "executedBytes": 79
-        },
-        {
-          "url": "/build/chunk-vSIMTAI0.js",
-          "executedBytes": 78
-        },
-        {
-          "url": "/build/chunk-Zf1yk4d6.js",
-          "executedBytes": 77
-        },
-        {
-          "url": "/build/chunk-CCIOJQQB.js",
-          "executedBytes": 72
+          "url": "/build/chunk-B4AicIdb.js",
+          "executedBytes": 377
         },
         {
           "url": "/build/chunk-BKQkbqpl.js",
@@ -158,119 +42,175 @@
         }
       ],
       "postInteraction": {
-        "totalExecutedBytes": 17728,
+        "totalExecutedBytes": 46912,
         "perScript": [
           {
-            "url": "/build/chunk-B7bGWLWT2.js",
-            "executedBytes": 4399
+            "url": "/build/chunk-BQHF-5AV2.js",
+            "executedBytes": 16593
           },
           {
-            "url": "/build/chunk-CkTxu9gI.js",
-            "executedBytes": 2565
+            "url": "/build/chunk-BG1H5XWC2.js",
+            "executedBytes": 4400
           },
           {
-            "url": "/build/chunk-BTcBTwbG.js",
-            "executedBytes": 1215
+            "url": "/build/chunk-CFbvJIsG.js",
+            "executedBytes": 3963
           },
           {
-            "url": "/build/chunk-CjuhcL1R.js",
-            "executedBytes": 1042
+            "url": "/build/chunk-CXs42lWA2.js",
+            "executedBytes": 3477
           },
           {
-            "url": "/build/chunk-DSBYcIje.js",
+            "url": "/build/chunk-DoCxs0Jw.js",
+            "executedBytes": 2163
+          },
+          {
+            "url": "/build/chunk-ZwZ-LOVf.js",
+            "executedBytes": 2149
+          },
+          {
+            "url": "/build/chunk-Dl_gl6wH2.js",
+            "executedBytes": 1606
+          },
+          {
+            "url": "/build/chunk-Bzp7sq7o2.js",
+            "executedBytes": 1226
+          },
+          {
+            "url": "/build/chunk-CEBwN7DD.js",
+            "executedBytes": 1046
+          },
+          {
+            "url": "/build/chunk-DuyqqZM8.js",
+            "executedBytes": 986
+          },
+          {
+            "url": "/build/chunk-B4AicIdb.js",
+            "executedBytes": 969
+          },
+          {
+            "url": "/build/chunk-D-5-y5LB.js",
+            "executedBytes": 934
+          },
+          {
+            "url": "/build/chunk-7E9mr0eS.js",
             "executedBytes": 914
           },
           {
-            "url": "/build/chunk-D-2qsUvS2.js",
+            "url": "/build/chunk-DyRvb7_02.js",
             "executedBytes": 894
           },
           {
-            "url": "/build/chunk-MMYzjjBp.js",
-            "executedBytes": 881
+            "url": "/build/chunk-Cmd0neTG.js",
+            "executedBytes": 466
           },
           {
-            "url": "/build/chunk-BxXDHgPZ2.js",
-            "executedBytes": 816
-          },
-          {
-            "url": "/build/chunk-CULPCeLd2.js",
-            "executedBytes": 776
-          },
-          {
-            "url": "/build/chunk-BLSaC1E8.js",
-            "executedBytes": 746
-          },
-          {
-            "url": "/build/chunk-EWEM6_tG.js",
+            "url": "/build/chunk-BgwR7TpG.js",
             "executedBytes": 412
           },
           {
-            "url": "/build/chunk-CZoe0hxI.js",
-            "executedBytes": 388
+            "url": "/build/chunk-T-68TBta.js",
+            "executedBytes": 393
           },
           {
-            "url": "/build/chunk-C-bMkqNB2.js",
-            "executedBytes": 387
+            "url": "/build/chunk-DRyvh3nM2.js",
+            "executedBytes": 349
           },
           {
-            "url": "/build/chunk-Dd_eXPnn.js",
-            "executedBytes": 278
+            "url": "/build/chunk-BacB6XVR.js",
+            "executedBytes": 334
           },
           {
-            "url": "/build/chunk-CFOCApaa.js",
+            "url": "/build/chunk-DfWJQvtq.js",
+            "executedBytes": 299
+          },
+          {
+            "url": "/build/chunk-CXTT9xih.js",
+            "executedBytes": 295
+          },
+          {
+            "url": "/build/chunk-0DLJLzsa.js",
             "executedBytes": 273
           },
           {
-            "url": "/build/chunk-kzEYv1E1.js",
+            "url": "/build/chunk-DQ4Dl6Yn.js",
+            "executedBytes": 260
+          },
+          {
+            "url": "/build/chunk-r9v3NWH1.js",
+            "executedBytes": 259
+          },
+          {
+            "url": "/build/chunk-BGtf_lwR.js",
+            "executedBytes": 208
+          },
+          {
+            "url": "/build/chunk-DYw8EDWZ.js",
             "executedBytes": 197
           },
           {
-            "url": "/build/chunk-JPlVyOW82.js",
+            "url": "/build/chunk-DPkpL3Ro2.js",
             "executedBytes": 194
           },
           {
-            "url": "/build/chunk-CJ5u7SHK.js",
+            "url": "/build/chunk-DeHf4Y9E.js",
             "executedBytes": 193
           },
           {
-            "url": "/build/chunk-Da4lEugc.js",
+            "url": "/build/chunk-Bi9jBhek.js",
             "executedBytes": 186
           },
           {
-            "url": "/build/chunk-DtOMGWda.js",
+            "url": "/build/chunk-CbOFcVkG2.js",
             "executedBytes": 186
           },
           {
-            "url": "/build/chunk-C7v_UdsI.js",
-            "executedBytes": 178
-          },
-          {
-            "url": "/build/chunk-CiNf-hzr.js",
+            "url": "/build/chunk-oIRH-6Pt.js",
             "executedBytes": 157
           },
           {
-            "url": "/build/chunk-V7trPciJ2.js",
-            "executedBytes": 102
+            "url": "/build/chunk-DwmuAY5W.js",
+            "executedBytes": 107
           },
           {
-            "url": "/build/chunk-CaIMrbrc.js",
-            "executedBytes": 96
+            "url": "/build/chunk-CDDZGKz9.js",
+            "executedBytes": 95
           },
           {
-            "url": "/build/chunk-YIG-iuvN.js",
+            "url": "/build/chunk-CWqxIyrI.js",
+            "executedBytes": 95
+          },
+          {
+            "url": "/build/chunk-Z7gJ_kin2.js",
+            "executedBytes": 86
+          },
+          {
+            "url": "/build/chunk-BbczDWQ4.js",
             "executedBytes": 82
           },
           {
-            "url": "/build/chunk-CFxxzdRs.js",
-            "executedBytes": 74
+            "url": "/build/chunk-a7C3_-p82.js",
+            "executedBytes": 80
           },
           {
-            "url": "/build/chunk-Cvf9TVY_.js",
-            "executedBytes": 66
+            "url": "/build/chunk-CfiuvFsr2.js",
+            "executedBytes": 79
           },
           {
-            "url": "/build/chunk-C2Og1QcO.js",
-            "executedBytes": 31
+            "url": "/build/chunk-uezdQJdO.js",
+            "executedBytes": 79
+          },
+          {
+            "url": "/build/chunk-BFWLzfyV.js",
+            "executedBytes": 78
+          },
+          {
+            "url": "/build/chunk-xWLh7lZh.js",
+            "executedBytes": 78
+          },
+          {
+            "url": "/build/chunk-Di2Cx_IN.js",
+            "executedBytes": 72
           }
         ]
       }
@@ -302,7 +242,7 @@
             "executedBytes": 4877
           },
           {
-            "url": "/build/chunk-uPKJnFdJ2.js",
+            "url": "/build/chunk-DzPG6bUv2.js",
             "executedBytes": 4268
           },
           {
@@ -310,11 +250,11 @@
             "executedBytes": 4139
           },
           {
-            "url": "/build/chunk-BT11TZis.js",
+            "url": "/build/chunk-56c8ejjY.js",
             "executedBytes": 4031
           },
           {
-            "url": "/build/chunk-9Wej-qHx.js",
+            "url": "/build/chunk-Duif5H1T.js",
             "executedBytes": 2410
           },
           {
@@ -338,7 +278,7 @@
             "executedBytes": 1590
           },
           {
-            "url": "/build/chunk-B5X-u_Wt2.js",
+            "url": "/build/chunk-DwH0SiV_2.js",
             "executedBytes": 1264
           },
           {
@@ -346,7 +286,7 @@
             "executedBytes": 1209
           },
           {
-            "url": "/build/chunk-BiVJzHya.js",
+            "url": "/build/chunk-B7mLOwgl.js",
             "executedBytes": 877
           },
           {
@@ -354,7 +294,7 @@
             "executedBytes": 766
           },
           {
-            "url": "/build/chunk-D9jl4PUC.js",
+            "url": "/build/chunk-BYtzUHX0.js",
             "executedBytes": 581
           },
           {
@@ -438,7 +378,7 @@
             "executedBytes": 171
           },
           {
-            "url": "/build/chunk-Wc3q6QIs.js",
+            "url": "/build/chunk-BsJhjbF6.js",
             "executedBytes": 143
           },
           {
@@ -452,11 +392,11 @@
       "proof": "green",
       "posture": "client-settled",
       "path": "/?latency=0",
-      "totalExecutedBytes": 28957,
+      "totalExecutedBytes": 28907,
       "perScript": [
         {
-          "url": "/build/chunk-Bx60cIx8.js",
-          "executedBytes": 12506
+          "url": "/build/chunk-C5ykNhDx.js",
+          "executedBytes": 12507
         },
         {
           "url": "/build/chunk-BGtf_lwR.js",
@@ -471,15 +411,15 @@
           "executedBytes": 1821
         },
         {
-          "url": "/build/chunk-BLSaC1E8.js",
-          "executedBytes": 1411
-        },
-        {
           "url": "/build/chunk-D-FDi5dn.js",
           "executedBytes": 1384
         },
         {
-          "url": "/build/chunk-CFxxzdRs.js",
+          "url": "/build/chunk-Ddr3eA6_.js",
+          "executedBytes": 1360
+        },
+        {
+          "url": "/build/chunk-KJJH71m3.js",
           "executedBytes": 1224
         },
         {
@@ -523,7 +463,7 @@
           "executedBytes": 182
         },
         {
-          "url": "/build/chunk-ChV4SEaW.js",
+          "url": "/build/chunk-o8IN6SZ-.js",
           "executedBytes": 107
         },
         {
@@ -555,11 +495,11 @@
         "totalExecutedBytes": 15860,
         "perScript": [
           {
-            "url": "/build/chunk-CULPCeLd2.js",
+            "url": "/build/chunk-C6oe0Uv-2.js",
             "executedBytes": 2580
           },
           {
-            "url": "/build/chunk-C-bMkqNB2.js",
+            "url": "/build/chunk-CAuYTdsx2.js",
             "executedBytes": 2469
           },
           {
@@ -567,7 +507,7 @@
             "executedBytes": 1706
           },
           {
-            "url": "/build/chunk-Bx60cIx8.js",
+            "url": "/build/chunk-C5ykNhDx.js",
             "executedBytes": 1102
           },
           {
@@ -587,7 +527,7 @@
             "executedBytes": 501
           },
           {
-            "url": "/build/chunk-BLSaC1E8.js",
+            "url": "/build/chunk-Ddr3eA6_.js",
             "executedBytes": 359
           },
           {
@@ -651,7 +591,7 @@
             "executedBytes": 157
           },
           {
-            "url": "/build/chunk-CFxxzdRs.js",
+            "url": "/build/chunk-KJJH71m3.js",
             "executedBytes": 148
           },
           {
@@ -671,15 +611,15 @@
             "executedBytes": 85
           },
           {
+            "url": "/build/chunk-4EWEWC_s2.js",
+            "executedBytes": 80
+          },
+          {
             "url": "/build/chunk-BG15Lx7w2.js",
             "executedBytes": 80
           },
           {
-            "url": "/build/chunk-Bmbx24rx2.js",
-            "executedBytes": 80
-          },
-          {
-            "url": "/build/chunk-iTZ3AbYO2.js",
+            "url": "/build/chunk-CJ5Uqp0-2.js",
             "executedBytes": 79
           },
           {
@@ -708,7 +648,7 @@
         "totalExecutedBytes": 34266,
         "perScript": [
           {
-            "url": "/build/chunk-Dm-R4xyy.js",
+            "url": "/build/chunk-C0zkxqHq.js",
             "executedBytes": 4776
           },
           {
@@ -716,7 +656,7 @@
             "executedBytes": 2744
           },
           {
-            "url": "/build/chunk-UIOVSC612.js",
+            "url": "/build/chunk-DgCDkU8Z2.js",
             "executedBytes": 2681
           },
           {
@@ -724,11 +664,11 @@
             "executedBytes": 2672
           },
           {
-            "url": "/build/chunk-BIhns2-o.js",
+            "url": "/build/chunk-OLUjnAYB.js",
             "executedBytes": 2601
           },
           {
-            "url": "/build/chunk-440hiOCe2.js",
+            "url": "/build/chunk-VuXEGYWh2.js",
             "executedBytes": 2576
           },
           {
@@ -744,7 +684,7 @@
             "executedBytes": 1743
           },
           {
-            "url": "/build/chunk-CI_5uh-W.js",
+            "url": "/build/chunk-BsxGnrfl.js",
             "executedBytes": 817
           },
           {
@@ -756,7 +696,7 @@
             "executedBytes": 703
           },
           {
-            "url": "/build/chunk-BmRudxVj.js",
+            "url": "/build/chunk-DPvohNx5.js",
             "executedBytes": 610
           },
           {
@@ -840,7 +780,7 @@
             "executedBytes": 185
           },
           {
-            "url": "/build/chunk-CHLoi-3l.js",
+            "url": "/build/chunk-BPRD4bQs.js",
             "executedBytes": 143
           },
           {
@@ -865,7 +805,7 @@
         "totalExecutedBytes": 25870,
         "perScript": [
           {
-            "url": "/build/chunk-Dm-R4xyy.js",
+            "url": "/build/chunk-C0zkxqHq.js",
             "executedBytes": 4776
           },
           {
@@ -873,11 +813,11 @@
             "executedBytes": 2499
           },
           {
-            "url": "/build/chunk-BIhns2-o.js",
+            "url": "/build/chunk-OLUjnAYB.js",
             "executedBytes": 2373
           },
           {
-            "url": "/build/chunk-UIOVSC612.js",
+            "url": "/build/chunk-DgCDkU8Z2.js",
             "executedBytes": 1961
           },
           {
@@ -885,7 +825,7 @@
             "executedBytes": 1876
           },
           {
-            "url": "/build/chunk-440hiOCe2.js",
+            "url": "/build/chunk-VuXEGYWh2.js",
             "executedBytes": 1672
           },
           {
@@ -909,11 +849,11 @@
             "executedBytes": 703
           },
           {
-            "url": "/build/chunk-BmRudxVj.js",
+            "url": "/build/chunk-BsxGnrfl.js",
             "executedBytes": 610
           },
           {
-            "url": "/build/chunk-CI_5uh-W.js",
+            "url": "/build/chunk-DPvohNx5.js",
             "executedBytes": 610
           },
           {
@@ -953,7 +893,7 @@
             "executedBytes": 191
           },
           {
-            "url": "/build/chunk-CHLoi-3l.js",
+            "url": "/build/chunk-BPRD4bQs.js",
             "executedBytes": 143
           },
           {

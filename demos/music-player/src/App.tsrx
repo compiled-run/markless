@@ -1,4 +1,4 @@
-import { state } from '@markless/core';
+import { buildComputed, state } from '@markless/core';
 import { Nav } from './components/Nav.tsrx';
 import { Song } from './components/Song.tsrx';
 import { Player } from './components/Player.tsrx';
@@ -58,7 +58,7 @@ export function App() @{
 
 	<div
 		class={libraryStatus ? 'App library-active' : 'App'}
-		attach={installYouTubeController}
+		attach={buildComputed(installYouTubeController)}
 	>
 		<Nav
 			libraryOpen={libraryStatus}

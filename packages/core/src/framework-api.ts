@@ -8,7 +8,13 @@ export type SharedOptions = {
 	readonly scope: SharedScope;
 };
 
-export type FrameworkApiName = 'state' | 'computed' | 'element' | 'shared' | 'storage';
+export type FrameworkApiName =
+	| 'state'
+	| 'computed'
+	| 'element'
+	| 'shared'
+	| 'storage'
+	| 'buildComputed';
 
 export type FrameworkApiRuntimeDiagnostic = {
 	readonly code: 'MARKLESS_FRAMEWORK_API_RUNTIME_CALL';
@@ -56,6 +62,13 @@ export function computed<T>(derive: () => T): AsyncComputedValue<T> {
 
 export function element<T extends Element = Element>(): ElementHandle<T> {
 	return frameworkApi<ElementHandle<T>>('element');
+}
+
+// Declares that an attach behavior contributes to the initially settled view.
+// The TSRX compiler unwraps this marker into behavior-record data; it must not
+// survive into component-body runtime execution.
+export function buildComputed<T>(behavior: T): T {
+	return frameworkApi<T>('buildComputed', behavior);
 }
 
 export type SharedDefinition<T> = () => T;

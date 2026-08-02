@@ -4,6 +4,8 @@ import type { RuntimeGraph } from '@markless/runtime';
 import type { CsrRenderContainer, CsrRenderOptions, CsrRenderOutput } from './render.ts';
 import type { ResumeRuntime, ResumeRuntimeInput, ResumeSymbol } from './resume.ts';
 
+declare const __MARKLESS_DEV_ENABLED__: boolean;
+
 type ExecutionLogGlobal = typeof globalThis & {
 	__mxLog?: Set<string>;
 	__mxLoadLog?: () => Promise<{
@@ -26,6 +28,126 @@ export async function renderCsrRuntime(input: {
 				),
 			)
 			.catch(() => {});
+	// CSR boundaries whose initial arm must settle are themselves a declared
+	// load-time capability. Keep their coordinate-only path; ordinary CSR pages
+	// remain graph-free until interaction.
+	if (!output.view?.asyncBoundaries.length) {
+		const state = output.state ?? emptyStatePayload();
+		const view = output.view ?? emptyViewPayload();
+		const loadSymbol = withCsrCallbackSymbols(
+			output.loadSymbol ?? options.loadSymbol ?? missingLoadSymbol,
+			view,
+		);
+
+		let graph: RuntimeGraph | undefined;
+		let runtime: ResumeRuntime | undefined;
+		let starting: Promise<ResumeRuntime> | undefined;
+		let disposed = false;
+		const cleanup = await activateBuildComputedBehaviors(
+			output,
+			view,
+			output.loadBuildComputedSymbol ?? loadSymbol,
+		);
+		const demandRuntime = async (): Promise<ResumeRuntime> => {
+			if (runtime) return runtime;
+			if (!starting)
+				starting = (async () => {
+					removeDelegatedTriggers();
+					graph =
+						output.graph ??
+						(await createFullRuntimeGraph({
+							state,
+							view,
+							root: output.root,
+							loadSymbol,
+							hasAuthoredState: !!output.state,
+						}));
+					const { createResumeRuntime } = await import('./resume.ts');
+					const runtimeView = {
+						...view,
+						behaviors: view.behaviors.filter((behavior) => !behavior.buildComputed),
+					};
+					const applyDomJournal =
+						options.applyDomJournal ??
+						((entries: ReadonlyArray<DomJournalEntry>) =>
+							applyDefaultCsrDomJournal(entries, runtime!));
+					runtime = createResumeRuntime({
+						root: output.root,
+						graph,
+						state,
+						view: runtimeView,
+						liveHostNodes: output.liveHostNodes,
+						loadSymbol,
+						createVisibilityObserver: options.createVisibilityObserver,
+						createRemovalObserver: options.createRemovalObserver,
+						applyDomJournal,
+						renderBranchHtml: options.renderBranchHtml ?? globalDocumentBranchHtml(),
+						demandAsyncBoundaries: true,
+					});
+					output.connectRuntime?.({ graph, runtime });
+					await runtime.start();
+					if (disposed) runtime.dispose();
+					return runtime;
+				})();
+			return starting;
+		};
+		const deferredRuntime: ResumeRuntime = {
+			start: async () => void (await demandRuntime()),
+			async dispatch(event, dispatchOptions) {
+				if (!event) return;
+				await (await demandRuntime()).dispatch(event, dispatchOptions);
+			},
+			async activateBehaviors(hostNodeId) {
+				await (await demandRuntime()).activateBehaviors(hostNodeId);
+			},
+			getElement(hostNodeId) {
+				return runtime?.getElement(hostNodeId) ?? output.liveHostNodes?.get(hostNodeId);
+			},
+			getAsyncBoundary(boundaryId) {
+				return runtime?.getAsyncBoundary(boundaryId);
+			},
+			getBranch(branchId) {
+				return runtime?.getBranch(branchId);
+			},
+			disposeHost(hostNodeId) {
+				runtime?.disposeHost(hostNodeId);
+			},
+			dispose() {
+				disposed = true;
+				removeDelegatedTriggers();
+				for (const release of cleanup.splice(0).reverse()) release();
+				runtime?.dispose();
+			},
+			whenAsyncBoundariesSettled: async () =>
+				(await demandRuntime()).whenAsyncBoundariesSettled?.(),
+			holdPendingSettleCommits: async (ms) =>
+				(await demandRuntime()).holdPendingSettleCommits?.(ms),
+		};
+		const removeDelegatedTriggers = installDelegatedTriggers(output, view, async (event) => {
+			const replay = event as ResumeRuntimeInput['root'] & {
+				__marklessCsrBootstrapReplayed?: boolean;
+			};
+			if (replay.__marklessCsrBootstrapReplayed) return;
+			replay.__marklessCsrBootstrapReplayed = true;
+			await (await demandRuntime()).dispatch(event);
+		});
+		if ((globalThis as ExecutionLogGlobal).__mxLog) await marklessLogCsrSummary();
+		return Object.defineProperty(
+			{
+				phase: 'csr' as const,
+				root: output.root,
+				runtime: deferredRuntime,
+			},
+			'graph',
+			{
+				enumerable: true,
+				get() {
+					if (!graph) throw new Error('MARKLESS_CSR_GRAPH_NOT_DEMANDED');
+					return graph;
+				},
+			},
+		) as CsrRenderContainer;
+	}
 	const state = output.state ?? emptyStatePayload();
 	const view = output.view ?? emptyViewPayload();
 	const loadSymbol = withCsrCallbackSymbols(
@@ -66,9 +188,8 @@ export async function renderCsrRuntime(input: {
 	});
 	output.connectRuntime?.({ graph, runtime });
 	await runtime.start();
-	await activateCsrBehaviors(runtime, view);
+	if (view.behaviors.length) await activateCsrBehaviors(runtime, view);
 	if ((globalThis as ExecutionLogGlobal).__mxLog) await marklessLogCsrSummary();
-
 	return {
 		phase: 'csr',
 		root: output.root,
@@ -85,6 +206,88 @@ async function marklessLogCsrSummary(): Promise<void> {
 	} catch {
 		// Execution logging is observability only; render must not depend on it.
 	}
+}
+
+async function activateBuildComputedBehaviors(
+	output: CsrRenderOutput,
+	view: ProtocolViewPayload,
+	loadSymbol: ResumeRuntimeInput['loadSymbol'],
+): Promise<Array<() => void>> {
+	const cleanup: Array<() => void> = [];
+	for (const behavior of view.behaviors) {
+		if (!behavior.buildComputed || !behavior.symbolId) continue;
+		const element =
+			output.liveHostNodes?.get(behavior.hostNodeId) ??
+			(view.locators.length === 1 && view.locators[0]?.hostNodeId === behavior.hostNodeId
+				? output.root
+				: undefined);
+		if (!element)
+			throw new Error(`MARKLESS_CSR_BUILD_BEHAVIOR_HOST_MISSING: ${behavior.hostNodeId}`);
+		const symbol = await loadSymbol(behavior.symbolId);
+		const result = await symbol({
+			graph: undefined as unknown as RuntimeGraph,
+			element,
+			getElementHandle: () => undefined,
+			behaviorInputs: behavior.inputValues ?? [],
+		});
+		if (typeof result === 'function') cleanup.push(result);
+	}
+	return cleanup;
+}
+
+function installDelegatedTriggers(
+	output: CsrRenderOutput,
+	view: ProtocolViewPayload,
+	dispatch: (event: NonNullable<Parameters<ResumeRuntime['dispatch']>[0]>) => Promise<void>,
+): () => void {
+	const recordsByElement = new Map<object, Set<string>>();
+	for (const record of view.events) {
+		if (record.eventName === 'visible') continue;
+		const element =
+			output.liveHostNodes?.get(record.hostNodeId) ??
+			(view.locators.length === 1 && view.locators[0]?.hostNodeId === record.hostNodeId
+				? output.root
+				: undefined);
+		if (!element) continue;
+		const names = recordsByElement.get(element) ?? new Set<string>();
+		names.add(record.eventName);
+		recordsByElement.set(element, names);
+	}
+	const rowEventNames = new Set(
+		(view.keyedRepeats ?? []).flatMap((repeat) =>
+			repeat.rowEvents.map((event) => event.eventName),
+		),
+	);
+	const eventNames = new Set([
+		...view.events.map((record) => record.eventName),
+		...rowEventNames,
+	]);
+	eventNames.delete('visible');
+	const releases: Array<() => void> = [];
+	for (const eventName of eventNames) {
+		const listener = async (event: NonNullable<Parameters<ResumeRuntime['dispatch']>[0]>) => {
+			let matched = rowEventNames.has(event.type);
+			for (
+				let element = event.target;
+				element && !matched;
+				element = element.parentElement ?? null
+			)
+				matched = recordsByElement.get(element)?.has(event.type) === true;
+			if (!matched) {
+				if (typeof __MARKLESS_DEV_ENABLED__ === 'undefined' || __MARKLESS_DEV_ENABLED__)
+					throw new Error(`MARKLESS_CSR_DELEGATED_TRIGGER_UNMATCHED: ${event.type}`);
+				return;
+			}
+			await dispatch(event);
+		};
+		output.root.addEventListener?.(eventName, listener, { capture: true });
+		releases.push(() =>
+			output.root.removeEventListener?.(eventName, listener, { capture: true }),
+		);
+	}
+	return () => {
+		for (const release of releases.splice(0)) release();
+	};
 }
 
 type CsrDomJournalTarget = {
@@ -157,16 +360,18 @@ function withCsrCallbackSymbols(
 			readonly __marklessCsrCallbacks?: Readonly<Record<string, (event: unknown) => unknown>>;
 		}
 	).__marklessCsrCallbacks;
-	return callbacks ? (symbolId) => {
-		const callback = callbacks[symbolId];
-		if (!callback) return loadSymbol(symbolId);
-		return async (context) => {
-			const event = context.event as Record<string, unknown> | undefined;
-			if (event) event.__marklessCsrCallbackDispatched = true;
-			const result = callback(context.event);
-			if (isPromiseLike(result)) await result;
-		};
-	} : loadSymbol;
+	return callbacks
+		? (symbolId) => {
+				const callback = callbacks[symbolId];
+				if (!callback) return loadSymbol(symbolId);
+				return async (context) => {
+					const event = context.event as Record<string, unknown> | undefined;
+					if (event) event.__marklessCsrCallbackDispatched = true;
+					const result = callback(context.event);
+					if (isPromiseLike(result)) await result;
+				};
+			}
+		: loadSymbol;
 }
 
 function missingCsrJournalTargetError(locator: string): Error {

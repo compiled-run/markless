@@ -83,6 +83,14 @@ export async function transformTsrxModule(
 		chunk: symbolVirtualModuleId(input.filename, module.symbolId),
 		exportName: scopedSymbolExportName(input.filename, module.exportName),
 	}));
+	const buildComputedSymbolIds = new Set(
+		(compiled.protocolView.behaviors ?? []).flatMap((behavior) =>
+			behavior.buildComputed && behavior.symbolId ? [behavior.symbolId] : [],
+		),
+	);
+	const buildComputedSymbols = symbolRows.filter((symbol) =>
+		buildComputedSymbolIds.has(symbol.id),
+	);
 	const importedBoundRows = compiled.boundSymbolResolver.rows.map((row) =>
 		row.loaderSymbolId ? { ...row, baseSymbolId: row.loaderSymbolId } : row,
 	);
@@ -245,6 +253,7 @@ export async function transformTsrxModule(
 					publicRenderSsrExportName: compiled.publicRenderModule.ssrExportName,
 					hasBoundSymbols: compiled.boundSymbolResolver.rows.length > 0,
 					symbols: symbolRows,
+					buildComputedSymbols,
 					symbolRoutes,
 				}),
 			)),
