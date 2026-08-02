@@ -1284,6 +1284,8 @@ function symbolSource(symbol: PlannedSymbol): string {
 	if (symbol.kind === 'dom-update') return symbol.source;
 	if (symbol.kind === 'behavior') return symbol.source;
 	if (symbol.kind === 'async-computed-runner') return symbol.source;
+	if (symbol.kind === 'sync-computed-derive') return symbol.source;
+	if (symbol.kind === 'state-initializer') return symbol.source;
 
 	return '';
 }

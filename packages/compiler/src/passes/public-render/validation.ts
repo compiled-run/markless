@@ -84,6 +84,7 @@ export function sameModuleChildBoundaryDiagnostics(
 				node: boundary,
 				filename,
 				suggestion: `Move <${component.name}> into its own .tsrx file and import it, or move the @try block into the page component.`,
+				severity: 'error',
 			}),
 		);
 	}
@@ -214,6 +215,9 @@ export function repeatRenderDiagnostics(input: {
 					node,
 					filename: input.filename,
 					suggestion: repeatUnsupportedSuggestion(node, gate.reason),
+					...(gate.reason === 'repeat-parent-must-contain-only-repeat'
+						? { severity: 'error' as const }
+						: {}),
 				}),
 			];
 		}

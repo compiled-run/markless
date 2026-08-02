@@ -50,7 +50,11 @@ export type MutableSemanticGraphArtifact = {
 	stateReads: SemanticStateRead[];
 	templateReads: SemanticTemplateRead[];
 	stateWrites: SemanticStateWrite[];
-	asyncBoundaries: Array<{ readonly id: string; readonly anchorOrder: number }>;
+	asyncBoundaries: Array<{
+		readonly id: string;
+		readonly anchorOrder: number;
+		readonly parentBoundaryId?: string;
+	}>;
 	branchSites: SemanticBranchSite[];
 	markup: SemanticMarkupArtifact;
 	diagnostics: SemanticGraphDiagnostic[];
@@ -154,6 +158,7 @@ export function createMutableSemanticGraphArtifact(filename: string): MutableSem
 			passId: 'module-graph-interface',
 			filename,
 			exports: [],
+			render: { version: 1, components: [] },
 		},
 		diagnostics: [],
 	};

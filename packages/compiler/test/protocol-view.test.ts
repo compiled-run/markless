@@ -4,6 +4,7 @@ import {
 	buildSemanticGraph,
 	compileTsrxModule,
 	createProtocolViewPayload,
+	createRenderData,
 	lowerStateAccess,
 	planPayloadArena,
 	planSymbolResolver,
@@ -173,6 +174,7 @@ test('createProtocolViewPayload links payload arena records to lazy symbol IDs',
 	const view = createProtocolViewPayload({
 		payloadArena,
 		symbolResolver,
+		renderData: createRenderData({ semanticGraph, symbolResolver }),
 		publicRenderPlan: allSupportedPlan(payloadArena),
 	});
 
@@ -245,6 +247,7 @@ test('createProtocolViewPayload links async boundary reads to runner symbols', a
 	const view = createProtocolViewPayload({
 		payloadArena,
 		symbolResolver,
+		renderData: createRenderData({ semanticGraph, symbolResolver }),
 		publicRenderPlan: allSupportedPlan(payloadArena),
 	});
 
@@ -295,6 +298,7 @@ test('createProtocolViewPayload links async boundary reads to runner symbols', a
 					runnerSymbolId: 'symbol:1',
 				},
 			],
+			updateSymbolId: 'symbol:2',
 		},
 	]);
 });
@@ -336,6 +340,7 @@ export function App() @{
 	const view = createProtocolViewPayload({
 		payloadArena,
 		symbolResolver,
+		renderData: createRenderData({ semanticGraph, symbolResolver }),
 		publicRenderPlan: allSupportedPlan(payloadArena),
 	});
 
@@ -398,6 +403,7 @@ export function App() @{
 	const view = createProtocolViewPayload({
 		payloadArena,
 		symbolResolver,
+		renderData: createRenderData({ semanticGraph, symbolResolver }),
 		publicRenderPlan: allSupportedPlan(payloadArena),
 	});
 

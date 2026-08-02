@@ -33,10 +33,11 @@ export function unsupportedRenderConstructDiagnostic(input: {
 	readonly node: AnyNode;
 	readonly filename: string;
 	readonly suggestion: string;
+	readonly severity?: 'warning' | 'error';
 }): CompilerDiagnostic {
 	return {
 		code: 'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
-		severity: 'warning',
+		severity: input.severity ?? 'warning',
 		phase: 'public-render',
 		title: `${input.label} is not rendered by the public render path yet`,
 		message: `${input.message} markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package`,
@@ -57,10 +58,11 @@ export function asyncArmRenderUnsupportedDiagnostic(input: {
 	readonly node: AnyNode;
 	readonly filename: string;
 	readonly suggestion: string;
+	readonly severity?: 'warning' | 'error';
 }): CompilerDiagnostic {
 	return {
 		code: 'MARKLESS_ASYNC_ARM_RENDER_UNSUPPORTED',
-		severity: 'warning',
+		severity: input.severity ?? 'warning',
 		phase: 'public-render',
 		title: 'The settled @try content cannot render in the browser yet',
 		message: input.message,

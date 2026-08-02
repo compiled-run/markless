@@ -122,6 +122,29 @@ export async function buildSemanticGraph(
 		graph,
 		hostIds: state.hostIds,
 	});
+	graph.moduleGraphInterface = {
+		...graph.moduleGraphInterface,
+		render: {
+			version: 1,
+			components: graph.components.flatMap((component) => {
+				const chunks = graph.markup.chunks.filter(
+					(chunk) => chunk.componentName === component.name,
+				);
+				const root = chunks.find((chunk) => chunk.id === `template:${component.name}`);
+				if (!root) return [];
+				return [{
+					componentName: component.name,
+					rootChunkId: root.id,
+					childChunks: chunks
+						.filter((chunk) => chunk.id !== root.id)
+						.map((chunk) => ({ id: chunk.id, kind: chunk.kind, slotCount: chunk.slots.length })),
+					inputs: graph.componentPropBindings
+						.filter((binding) => binding.componentName === component.name)
+						.map((binding) => ({ localName: binding.localName, path: binding.propPath })),
+				}];
+			}),
+		},
+	};
 
 	return {
 		...graph,

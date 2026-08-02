@@ -27,6 +27,7 @@ test('T130 produces a module graph interface for exported state helper functions
 				},
 			},
 		],
+		render: { version: 1, components: [] },
 	});
 });
 

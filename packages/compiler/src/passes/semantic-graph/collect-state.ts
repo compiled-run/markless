@@ -372,6 +372,7 @@ export function collectModuleGraphInterface(input: {
 		passId: 'module-graph-interface',
 		filename: input.state.filename,
 		exports: exportedHelpers,
+		render: { version: 1, components: [] },
 	};
 }
 

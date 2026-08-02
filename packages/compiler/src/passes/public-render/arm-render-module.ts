@@ -152,6 +152,7 @@ function planOneArmRender(
 				node: found.node,
 				filename,
 				suggestion: `Move <${sameModuleEdge.childComponentName}> into its own .tsrx file and import it.`,
+				severity: 'error',
 			}),
 		};
 	}

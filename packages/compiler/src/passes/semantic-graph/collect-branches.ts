@@ -44,6 +44,7 @@ export function collectBranchSite(node: AnyNode, state: WalkState): void {
 			armCount: asNodes(node.cases).length,
 			testSource: discriminant ? expressionSource(discriminant, state.source) : '',
 			anchorOrder: state.nextAnchorOrder++,
+			...(switchArmTests(node) ? { armTests: switchArmTests(node)! } : {}),
 			...(state.currentAsyncBoundaryId
 				? {
 						asyncBoundaryId: state.currentAsyncBoundaryId,
@@ -52,6 +53,20 @@ export function collectBranchSite(node: AnyNode, state: WalkState): void {
 				: {}),
 		});
 	}
+}
+
+function switchArmTests(node: AnyNode): ReadonlyArray<unknown> | null {
+	const tests: unknown[] = [];
+	for (const switchCase of asNodes(node.cases)) {
+		const test = switchCase.test as AnyNode | undefined;
+		if (!test) {
+			tests.push(null);
+			continue;
+		}
+		if (test.type !== 'Literal' || typeof test.value === 'object') return null;
+		tests.push(test.value);
+	}
+	return tests;
 }
 
 function collectBranchConditionAssignments(

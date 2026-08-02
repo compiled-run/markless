@@ -23,13 +23,16 @@ export function createRenderData(input: {
 		filename: semanticGraph.filename,
 		root: semanticGraph.markup.root,
 		chunks: semanticGraph.markup.chunks,
+		hosts: semanticGraph.hostNodes.map((host) => ({ ...host, hostNodeId: host.id })),
 		initialValues: semanticGraph.graphBindings.flatMap((binding) =>
 			initialValue(binding, symbolResolver),
 		),
 		branches: semanticGraph.branchSites.map((site) =>
-			branchRecord(site, slots, symbolResolver),
+			branchRecord(site, slots, semanticGraph.markup.chunks, symbolResolver),
 		),
-		repeats: semanticGraph.keyedRepeats.map((repeat) => repeatRecord(repeat, slots)),
+		repeats: semanticGraph.keyedRepeats.map((repeat) =>
+			repeatRecord(repeat, slots, semanticGraph.markup.chunks),
+		),
 		boundaries: semanticGraph.asyncBoundaries.map((boundary) => {
 			const slot = slots.find(
 				(candidate): candidate is Extract<SemanticMarkupSlot, { readonly kind: 'async' }> =>
@@ -46,6 +49,11 @@ export function createRenderData(input: {
 				armChunkIds: slot?.armTemplateIds ?? {
 					try: `async:${boundary.id}:arm:try`,
 				},
+				protocolSupported:
+					boundary.parentBoundaryId === undefined &&
+					!semanticGraph.asyncBoundaries.some(
+						(candidate) => candidate.parentBoundaryId === boundary.id,
+					),
 			};
 		}),
 		interactions: semanticGraph.events.map((event) => ({
@@ -97,18 +105,23 @@ function initialValue(
 		];
 	}
 	return binding.initializerSource
-		? [
+		? symbolResolver.symbols.flatMap((symbol) =>
+				symbol.kind === 'state-initializer' && symbol.graphNodeId === binding.id
+					? [
 				{
 					graphNodeId: binding.id,
-					value: { kind: 'value-function', source: binding.initializerSource },
+					value: { kind: 'symbol-function', symbolId: symbol.id },
 				},
-			]
+					]
+					: [],
+			)
 		: [];
 }
 
 function branchRecord(
 	site: SemanticGraphArtifact['branchSites'][number],
 	slots: ReadonlyArray<SemanticMarkupSlot>,
+	chunks: SemanticGraphArtifact['markup']['chunks'],
 	symbolResolver: SymbolResolverPlan,
 ): RenderDataBranch {
 	const slot = slots.find(
@@ -118,6 +131,15 @@ function branchRecord(
 	const symbol = symbolResolver.symbols.find(
 		(candidate) => candidate.kind === 'branch-update' && candidate.branchSiteId === site.id,
 	);
+	const armChunkIds =
+		slot?.armTemplateIds ??
+		Array.from({ length: site.armCount }, (_, index) => `branch:${site.id}:arm:${index}`);
+	const declaredEmptyArms = armChunkIds.flatMap((chunkId, index) => {
+		const chunk = chunks.find((candidate) => candidate.id === chunkId);
+		return chunk && chunk.statics.every((text) => text === '') && chunk.slots.length === 0
+			? [index]
+			: [];
+	});
 	return {
 		branchSiteId: site.id,
 		kind: site.kind,
@@ -129,31 +151,46 @@ function branchRecord(
 						path: read.path,
 					}))
 				: [],
-		armChunkIds:
-			slot?.armTemplateIds ??
-			Array.from({ length: site.armCount }, (_, index) => `branch:${site.id}:arm:${index}`),
+		armChunkIds,
 		anchorOrder: site.anchorOrder,
 		...(site.asyncBoundaryId ? { asyncBoundaryId: site.asyncBoundaryId } : {}),
 		...(site.asyncBoundaryArm !== undefined ? { asyncBoundaryArm: site.asyncBoundaryArm } : {}),
+		...(site.armTests ? { armTests: site.armTests } : {}),
+		...(declaredEmptyArms.length > 0 ? { declaredEmptyArms } : {}),
+		update:
+			site.asyncBoundaryId &&
+			(slot?.armTemplateIds ?? []).some((chunkId) =>
+				chunks
+					.find((chunk) => chunk.id === chunkId)
+					?.slots.some((candidate) => candidate.kind === 'child-component'),
+			)
+				? 'boundary'
+				: 'range',
 	};
 }
 
 function repeatRecord(
 	repeat: SemanticGraphArtifact['keyedRepeats'][number],
 	slots: ReadonlyArray<SemanticMarkupSlot>,
+	chunks: SemanticGraphArtifact['markup']['chunks'],
 ): RenderDataRepeat {
 	const slot = slots.find(
 		(candidate): candidate is Extract<SemanticMarkupSlot, { readonly kind: 'repeat' }> =>
 			candidate.kind === 'repeat' && candidate.repeatId === repeat.id,
 	);
+	const rowChunkId = slot?.rowTemplateId ?? `repeat:${repeat.id}:row`;
 	return {
 		repeatId: repeat.id,
+		parentHostNodeId: repeat.parentHostNodeId,
+		...(repeat.rowHostNodeId ? { rowHostNodeId: repeat.rowHostNodeId } : {}),
+		itemName: repeat.itemName,
 		...(repeat.collectionGraphNodeId
 			? { collectionGraphNodeId: repeat.collectionGraphNodeId }
 			: {}),
 		collectionPath: repeat.collectionPath,
 		keyPath: repeat.keyPath,
-		rowChunkId: slot?.rowTemplateId ?? `repeat:${repeat.id}:row`,
+		rowChunkId,
 		...(slot?.emptyTemplateId ? { emptyChunkId: slot.emptyTemplateId } : {}),
+		rowElementCount: chunks.find((chunk) => chunk.id === rowChunkId)?.hosts.length ?? 0,
 	};
 }

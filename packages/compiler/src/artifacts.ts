@@ -127,6 +127,22 @@ export type ModuleGraphInterfaceArtifact = {
 	readonly passId: 'module-graph-interface';
 	readonly filename: string;
 	readonly exports: ReadonlyArray<ModuleGraphInterfaceExport>;
+	readonly render: {
+		readonly version: 1;
+		readonly components: ReadonlyArray<{
+			readonly componentName: string;
+			readonly rootChunkId: string;
+			readonly childChunks: ReadonlyArray<{
+				readonly id: string;
+				readonly kind: SemanticMarkupChunk['kind'];
+				readonly slotCount: number;
+			}>;
+			readonly inputs: ReadonlyArray<{
+				readonly localName: string;
+				readonly path: ReadonlyArray<string>;
+			}>;
+		}>;
+	};
 };
 
 export type SemanticSharedScope = 'request' | 'container' | 'page';
@@ -218,6 +234,7 @@ export type SemanticBranchSite = {
 	readonly asyncBoundaryId?: string;
 	// Arm index inside the owning boundary (0 = @try, 1 = @pending, 2 = @catch).
 	readonly asyncBoundaryArm?: number;
+	readonly armTests?: ReadonlyArray<unknown>;
 };
 
 export type SemanticSyncPolicyCondition =
@@ -564,7 +581,11 @@ export type SemanticGraphArtifact = {
 	readonly stateReads: ReadonlyArray<SemanticStateRead>;
 	readonly templateReads: ReadonlyArray<SemanticTemplateRead>;
 	readonly stateWrites: ReadonlyArray<SemanticStateWrite>;
-	readonly asyncBoundaries: ReadonlyArray<{ readonly id: string; readonly anchorOrder: number }>;
+	readonly asyncBoundaries: ReadonlyArray<{
+		readonly id: string;
+		readonly anchorOrder: number;
+		readonly parentBoundaryId?: string;
+	}>;
 	readonly branchSites: ReadonlyArray<SemanticBranchSite>;
 	readonly markup: SemanticMarkupArtifact;
 	readonly moduleGraphInterface: ModuleGraphInterfaceArtifact;
@@ -575,7 +596,6 @@ export type RenderDataInitialValue = {
 	readonly graphNodeId: string;
 	readonly value:
 		| { readonly kind: 'constant'; readonly value: unknown }
-		| { readonly kind: 'value-function'; readonly source: string }
 		| { readonly kind: 'symbol-function'; readonly symbolId: string };
 };
 
@@ -591,15 +611,22 @@ export type RenderDataBranch = {
 	readonly anchorOrder: number;
 	readonly asyncBoundaryId?: string;
 	readonly asyncBoundaryArm?: number;
+	readonly armTests?: ReadonlyArray<unknown>;
+	readonly declaredEmptyArms?: ReadonlyArray<number>;
+	readonly update: 'range' | 'boundary';
 };
 
 export type RenderDataRepeat = {
 	readonly repeatId: string;
+	readonly parentHostNodeId: string;
+	readonly rowHostNodeId?: string;
+	readonly itemName: string;
 	readonly collectionGraphNodeId?: string;
 	readonly collectionPath: ReadonlyArray<string>;
 	readonly keyPath: ReadonlyArray<string>;
 	readonly rowChunkId: string;
 	readonly emptyChunkId?: string;
+	readonly rowElementCount: number;
 };
 
 export type RenderDataBoundary = {
@@ -618,6 +645,7 @@ export type RenderDataBoundary = {
 		readonly pending?: string;
 		readonly catch?: string;
 	}>;
+	readonly protocolSupported: boolean;
 };
 
 export type RenderDataInteraction = {
@@ -632,6 +660,12 @@ export type RenderDataArtifact = {
 	readonly filename: string;
 	readonly root: SemanticMarkupArtifact['root'];
 	readonly chunks: SemanticMarkupArtifact['chunks'];
+	readonly hosts: ReadonlyArray<{
+		readonly hostNodeId: string;
+		readonly tagName: string;
+		readonly asyncBoundaryId?: string;
+		readonly asyncBoundaryArm?: number;
+	}>;
 	readonly initialValues: ReadonlyArray<RenderDataInitialValue>;
 	readonly branches: ReadonlyArray<RenderDataBranch>;
 	readonly repeats: ReadonlyArray<RenderDataRepeat>;
@@ -694,6 +728,7 @@ export type StateLoweringArtifact = {
 export type PayloadArenaInput = {
 	readonly semanticGraph: SemanticGraphArtifact;
 	readonly stateLowering: StateLoweringArtifact;
+	readonly renderData?: RenderDataArtifact;
 };
 
 export type PayloadArenaDiagnostic = StateLoweringDiagnostic;
@@ -881,6 +916,14 @@ export type PlannedSymbol =
 			readonly inputSources: ReadonlyArray<string>;
 			readonly moduleImport?: SemanticModuleImport;
 			readonly order: number;
+	  }
+	| {
+			readonly id: string;
+			readonly kind: 'state-initializer';
+			readonly graphNodeId: string;
+			readonly name: string;
+			readonly source: string;
+			readonly moduleImports?: ReadonlyArray<SemanticModuleImport>;
 	  }
 	| {
 			readonly id: string;
@@ -1176,7 +1219,7 @@ export type ProtocolStatePayloadInput = {
 export type ProtocolViewPayloadInput = {
 	readonly payloadArena: PayloadArenaArtifact;
 	readonly symbolResolver: SymbolResolverPlan;
-	readonly publicRenderPlan: PublicRenderPlanArtifact;
+	readonly renderData?: RenderDataArtifact;
 	readonly captureAnalysis?: CaptureAnalysisArtifact;
 };
 
