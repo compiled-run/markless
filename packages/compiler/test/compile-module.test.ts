@@ -266,7 +266,9 @@ export function App() @{
 	expect(result.boundSymbolResolver.passId).toBe('bound-symbol-resolver');
 	expect(result.boundSymbolResolver.rows).toHaveLength(2);
 	expect(new Set(result.boundSymbolResolver.rows.map((row) => row.id)).size).toBe(2);
-	expect(result.boundSymbolResolver.rows.every((row) => row.baseSymbolId.startsWith('symbol:'))).toBe(true);
+	expect(
+		result.boundSymbolResolver.rows.every((row) => row.baseSymbolId.startsWith('symbol:')),
+	).toBe(true);
 });
 
 type PublicRenderTestEvent = {
@@ -711,6 +713,7 @@ function ssrRenderTestModuleSource(
 	return [
 		`const payloadState = ${JSON.stringify(result.protocolState)};`,
 		`const payloadView = ${JSON.stringify(result.protocolView)};`,
+		result.publicRenderModule.renderDataModuleSource,
 		ssrSource,
 		'export { marklessRenderSsr };',
 	].join('\n');
@@ -734,6 +737,7 @@ function csrRenderTestModuleSource(
 		'const loadBuildComputedSymbol = loadSymbol;',
 		`const payloadState = ${JSON.stringify(result.protocolState)};`,
 		`const payloadView = ${JSON.stringify(result.protocolView)};`,
+		result.publicRenderModule.renderDataModuleSource,
 		csrSource,
 		'export { marklessRenderCsr };',
 	].join('\n');
@@ -1068,7 +1072,7 @@ test('B910 regressions keep async computed and plain state binding artifacts sta
 			symbolId: 'symbol:0',
 		},
 	]);
-	expect(plainResult.publicRenderModule.ssrModuleSource).toContain(
+	expect(plainResult.publicRenderModule.renderDataModuleSource).toContain(
 		'"statics":["<p><!--markless-slot:0-->","</p>"]',
 	);
 });
@@ -1720,7 +1724,7 @@ export function App() @{
 	const moduleSource = result.publicRenderModule.moduleSource;
 	// The direct sync renders the empty branch when the collection is empty
 	// instead of leaving a silently blank parent (browser-matrix bug).
-	expect(moduleSource).toContain('No drafts');
+	expect(result.publicRenderModule.renderDataModuleSource).toContain('No drafts');
 	expect(moduleSource).toContain('"emptyChunkId":"repeat:repeat:0:empty"');
 });
 
@@ -2252,10 +2256,10 @@ export function Card({ children }) @{
 
 	// Children placement is a template projection of compiler-rendered HTML —
 	// escaping it (marklessSsrText) turns projected markup into visible text.
-	expect(result.publicRenderModule.ssrModuleSource).toContain(
-		'"raw":true',
+	expect(result.publicRenderModule.renderDataModuleSource).toContain('"raw":true');
+	expect(result.publicRenderModule.ssrModuleSource).not.toContain(
+		'marklessSsrChildrenHtml(children)',
 	);
-	expect(result.publicRenderModule.ssrModuleSource).not.toContain('marklessSsrChildrenHtml(children)');
 
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
 	const output = await (
@@ -2873,7 +2877,10 @@ export default function Home() @{
 		{
 			childComponent: {
 				renderSsr(props: { readonly children?: unknown; readonly href?: string }) {
-					return { html: `<a href="${props.href}">${props.children}</a>`, elementCount: 1 };
+					return {
+						html: `<a href="${props.href}">${props.children}</a>`,
+						elementCount: 1,
+					};
 				},
 			},
 		},
@@ -3417,7 +3424,10 @@ export default function Home() @{
 		{
 			childComponent: {
 				renderSsr(props: { readonly children?: unknown; readonly href?: string }) {
-					return { html: `<a href="${props.href}">${props.children}</a>`, elementCount: 1 };
+					return {
+						html: `<a href="${props.href}">${props.children}</a>`,
+						elementCount: 1,
+					};
 				},
 			},
 		},
@@ -3742,9 +3752,9 @@ export function App() @{
 	});
 	const moduleSource = result.publicRenderModule.moduleSource;
 	expect(moduleSource).toContain('createMarklessDirectChunkRenderer');
-	expect(moduleSource).toContain('"rootChunkId":"template:App"');
+	expect(moduleSource).toContain('rootChunkId:marklessRenderData.root.templateId');
 	expect(moduleSource).toContain('"rowChunkId":"repeat:repeat:0:row"');
-	expect(moduleSource).toContain('"kind":"comment-anchor"');
+	expect(result.publicRenderModule.renderDataModuleSource).toContain('"kind":"comment-anchor"');
 	expect(moduleSource).not.toContain('function createMarklessPublicRoot()');
 	expect(moduleSource).not.toContain('function createMarklessPublicRepeat0Row()');
 	expect(moduleSource).not.toContain('rowTemplateHtml');
@@ -3794,8 +3804,8 @@ export function App() @{
 	}
 	expect(moduleSource).not.toContain('function createMarklessPublicRuntime');
 	expect(moduleSource).not.toContain('view: { version: 1');
-	expect(moduleSource).toContain('"statics":["<main>');
-	expect(moduleSource).toContain('<!--markless-slot:0-->');
+	expect(result.publicRenderModule.renderDataModuleSource).toContain('"statics":["<main>');
+	expect(result.publicRenderModule.renderDataModuleSource).toContain('<!--markless-slot:0-->');
 	expect(moduleSource).toContain('"hostPath":[0],"symbolIds":["symbol:0"]');
 	expect(moduleSource).toContain('"hostPath":[1],"symbolIds":["symbol:1"]');
 	expect(moduleSource).toContain("from '@markless/web/fns/direct'");
@@ -3913,6 +3923,7 @@ export function Catalog() @{
 		[
 			'const document = globalThis.__marklessPublicRenderTestDocument;',
 			'const loadSymbol = globalThis.__marklessPublicRenderTestLoadSymbol;',
+			result.publicRenderModule.renderDataModuleSource,
 			result.publicRenderModule.moduleSource,
 		].join('\n'),
 		{ document, loadSymbol },
@@ -4063,6 +4074,7 @@ export function Articles() @{
 		[
 			'const document = globalThis.__marklessPublicRenderTestDocument;',
 			'const loadSymbol = globalThis.__marklessPublicRenderTestLoadSymbol;',
+			result.publicRenderModule.renderDataModuleSource,
 			result.publicRenderModule.moduleSource,
 		].join('\n'),
 		{ document, loadSymbol },
@@ -4148,6 +4160,7 @@ export function InitialArticles() @{
 		[
 			'const document = globalThis.__marklessPublicRenderTestDocument;',
 			'const loadSymbol = globalThis.__marklessPublicRenderTestLoadSymbol;',
+			result.publicRenderModule.renderDataModuleSource,
 			result.publicRenderModule.moduleSource,
 		].join('\n'),
 		{ document, loadSymbol },
@@ -4214,6 +4227,7 @@ export function DuplicateArticles() @{
 		[
 			'const document = globalThis.__marklessPublicRenderTestDocument;',
 			'const loadSymbol = () => undefined;',
+			result.publicRenderModule.renderDataModuleSource,
 			result.publicRenderModule.moduleSource,
 		].join('\n'),
 		{ document },
@@ -4265,6 +4279,7 @@ export function UndefinedArticles() @{
 		[
 			'const document = globalThis.__marklessPublicRenderTestDocument;',
 			'const loadSymbol = globalThis.__marklessPublicRenderTestLoadSymbol;',
+			result.publicRenderModule.renderDataModuleSource,
 			result.publicRenderModule.moduleSource,
 		].join('\n'),
 		{
@@ -4373,6 +4388,7 @@ export function ReplaceArticles() @{
 		[
 			'const document = globalThis.__marklessPublicRenderTestDocument;',
 			'const loadSymbol = globalThis.__marklessPublicRenderTestLoadSymbol;',
+			result.publicRenderModule.renderDataModuleSource,
 			result.publicRenderModule.moduleSource,
 		].join('\n'),
 		{ document, loadSymbol },
@@ -4470,6 +4486,7 @@ export function TextArticles() @{
 		[
 			'const document = globalThis.__marklessPublicRenderTestDocument;',
 			'const loadSymbol = globalThis.__marklessPublicRenderTestLoadSymbol;',
+			result.publicRenderModule.renderDataModuleSource,
 			result.publicRenderModule.moduleSource,
 		].join('\n'),
 		{ document, loadSymbol },
@@ -4539,7 +4556,7 @@ export function Scoreboard() @{
 	expect(result.publicRenderModule.moduleSource).toContain(
 		'createMarklessDirectChunkRenderer(marklessDirectChunkData)',
 	);
-	expect(result.publicRenderModule.moduleSource).toContain(
+	expect(result.publicRenderModule.renderDataModuleSource).toContain(
 		'"coordinate":{"kind":"comment-anchor","path":[0,0,0]}',
 	);
 
@@ -4570,6 +4587,7 @@ export function Scoreboard() @{
 		[
 			'const document = globalThis.__marklessPublicRenderTestDocument;',
 			'const loadSymbol = globalThis.__marklessPublicRenderTestLoadSymbol;',
+			result.publicRenderModule.renderDataModuleSource,
 			result.publicRenderModule.moduleSource,
 		].join('\n'),
 		{ document, loadSymbol },
@@ -4776,7 +4794,10 @@ export function App() @{
 				graph.write({ graphNodeId: 'state:command', value: 'play' });
 		if (symbol?.kind === 'dom-update') {
 			return (context: {
-				readonly domUpdate: { readonly hostNodeId: string; readonly target?: { readonly name?: string } };
+				readonly domUpdate: {
+					readonly hostNodeId: string;
+					readonly target?: { readonly name?: string };
+				};
 				readonly value: unknown;
 			}) => ({
 				type: 'setAttr' as const,
@@ -4792,9 +4813,11 @@ export function App() @{
 		document,
 		loadSymbol,
 	});
-	const output = (csrModule.marklessRenderCsr as () => {
-		readonly root: PublicRenderTestElement;
-	})();
+	const output = (
+		csrModule.marklessRenderCsr as () => {
+			readonly root: PublicRenderTestElement;
+		}
+	)();
 	const container = await render(() => output as never, {
 		target: new PublicRenderTestElement('target') as never,
 	});
@@ -4906,7 +4929,12 @@ export function Page() @{
 	const output = await (
 		parentSsrModule.marklessRenderSsr as () => Promise<{
 			readonly html: string;
-			readonly view: { readonly domUpdates: ReadonlyArray<{ readonly hostNodeId: string; readonly graphNodeId: string }> };
+			readonly view: {
+				readonly domUpdates: ReadonlyArray<{
+					readonly hostNodeId: string;
+					readonly graphNodeId: string;
+				}>;
+			};
 		}>
 	)();
 
@@ -5964,7 +5992,9 @@ export default function Home() @{
 	expect(result.protocolView.asyncBoundaries[0]?.asyncReads).toEqual([
 		expect.objectContaining({ graphNodeId: 'computed:view' }),
 	]);
-	expect(result.publicRenderModule.ssrModuleSource).toContain('"rowChunkId":"repeat:repeat:0:row"');
+	expect(result.publicRenderModule.renderDataModuleSource).toContain(
+		'"rowChunkId":"repeat:repeat:0:row"',
+	);
 	expect(result.publicRenderModule.ssrModuleSource).not.toContain('marklessSsrRepeatRows');
 });
 
@@ -5993,9 +6023,7 @@ export default function AsyncFeed() @{
 }`,
 		symbols: [],
 	});
-	const handler = result.symbolModules.modules.find(
-		(module) => module.kind === 'event-handler',
-	);
+	const handler = result.symbolModules.modules.find((module) => module.kind === 'event-handler');
 
 	expect(handler?.source).toContain('value: context.locals?.update?.id');
 	expect(handler?.source).not.toMatch(/\bvalue:\s*update\.id\b/);
@@ -6140,9 +6168,7 @@ export function App() @{
 	expect(result.publicRenderModule.moduleSource).toContain(
 		'"rowBehaviors":[{"hostPath":[],"symbolId":"symbol:5"',
 	);
-	expect(result.publicRenderModule.moduleSource).toContain(
-		'createMarklessDirectChunkRenderer',
-	);
+	expect(result.publicRenderModule.moduleSource).toContain('createMarklessDirectChunkRenderer');
 	expect(result.protocolView.behaviors).toEqual([]);
 	expect(result.protocolView.keyedRepeats?.[0]).not.toHaveProperty('rowBehaviors');
 
@@ -6207,6 +6233,7 @@ export function App() @{
 		[
 			'const document = globalThis.__marklessPublicRenderTestDocument;',
 			'const loadSymbol = globalThis.__marklessPublicRenderTestLoadSymbol;',
+			result.publicRenderModule.renderDataModuleSource,
 			result.publicRenderModule.moduleSource,
 		].join('\n'),
 		{ document: publicRenderTestDocument(), loadSymbol },

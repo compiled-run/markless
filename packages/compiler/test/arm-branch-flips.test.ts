@@ -162,7 +162,7 @@ test('the arm-scoped flip module rebuilds the range from parts + repeat rows, no
 
 	// Production SSR carries the nested branch as a renderData slot. The
 	// renderer owns its anchors directly; emitted code contains no HTML census.
-	expect(result.publicRenderModule.ssrModuleSource).toContain(
+	expect(result.publicRenderModule.renderDataModuleSource).toContain(
 		'"kind":"branch","branchSiteId":"branch-site:0"',
 	);
 	expect(result.publicRenderModule.ssrModuleSource).not.toContain('marklessSsrHostLocators');

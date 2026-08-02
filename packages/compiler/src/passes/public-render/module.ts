@@ -24,12 +24,14 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 	) {
 		return {
 			passId: 'public-render-module',
+			renderDataModuleSource: '',
 			moduleSource: '',
 			rootExportName: null,
 			csrModuleSource: '',
 			csrExportName: null,
 			ssrModuleSource: '',
 			ssrExportName: null,
+			csrNativeMarkup: [],
 			diagnostics: input.publicRenderPlan.diagnostics,
 		};
 	}
@@ -70,15 +72,22 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 			})
 		: '';
 	const ssrModuleSource = root ? emitPublicSsrRenderModule(input, root) : '';
-	const csrModuleSource = !moduleSource && root ? emitPublicCsrRenderModule(input, root) : '';
+	const csrModule =
+		!moduleSource && root
+			? emitPublicCsrRenderModule(input, root)
+			: { source: '', nativeMarkup: [] };
 	return {
 		passId: 'public-render-module',
+		renderDataModuleSource: root
+			? `export const marklessRenderData = ${JSON.stringify(input.renderData)};`
+			: '',
 		moduleSource,
 		rootExportName: moduleSource ? (rootComponentName ?? null) : null,
-		csrModuleSource,
-		csrExportName: csrModuleSource ? 'marklessRenderCsr' : null,
+		csrModuleSource: csrModule.source,
+		csrExportName: csrModule.source ? 'marklessRenderCsr' : null,
 		ssrModuleSource,
 		ssrExportName: ssrModuleSource ? 'marklessRenderSsr' : null,
+		csrNativeMarkup: csrModule.nativeMarkup,
 		diagnostics: input.publicRenderPlan.diagnostics,
 	};
 }

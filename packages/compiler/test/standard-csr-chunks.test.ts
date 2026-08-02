@@ -18,7 +18,7 @@ export function App() @{
 	});
 
 	const source = result.publicRenderModule.csrModuleSource;
-	const native = nativePayload(source);
+	const native = JSON.stringify(result.publicRenderModule.csrNativeMarkup);
 	expect(source).toContain('createMarklessCsrChunkRenderer');
 	expect(native).toContain('template:App');
 	expect(native).toContain('child-component');
@@ -37,7 +37,7 @@ test('T009b standard CSR exports component chunk data for parent modules', async
 	expect(result.publicRenderModule.csrModuleSource).toContain(
 		'export const marklessCsrChunkComponents',
 	);
-	expect(nativePayload(result.publicRenderModule.csrModuleSource)).toContain('template:Card');
+	expect(JSON.stringify(result.publicRenderModule.csrNativeMarkup)).toContain('template:Card');
 });
 
 test('T009b chunk statics preserve slot-adjacent text bytes', async () => {
@@ -69,7 +69,7 @@ export function App() @{ <main><First /><Second /></main> }
 		symbols: [],
 	});
 
-	const native = nativePayload(result.publicRenderModule.csrModuleSource);
+	const native = JSON.stringify(result.publicRenderModule.csrNativeMarkup);
 	expect(native).toContain('"hostPrefix":"c0:"');
 	expect(native).toContain('"hostPrefix":"c1:"');
 	expect(native).not.toContain('"hostPrefix":"c3:"');
@@ -88,7 +88,10 @@ export function App() @{
 	});
 
 	const source = result.publicRenderModule.csrModuleSource;
-	expect(source).toContain('MARKLESS_CSR_NATIVE_START');
+	expect(source).not.toContain('MARKLESS_CSR_NATIVE_START');
+	expect(result.publicRenderModule.renderDataModuleSource).toContain(
+		'export const marklessRenderData',
+	);
 	expect(source).toContain('dataId:');
 	expect(source).not.toContain('chunks:[{');
 	expect(source).not.toContain('initialValues:[{');
@@ -107,11 +110,9 @@ export function App() @{
 
 	const source = result.publicRenderModule.csrModuleSource;
 	expect(source.match(/globalThis\.__picked/g) ?? []).toHaveLength(0);
-	expect(result.symbolModules.modules.some((module) => module.source.includes('globalThis.__picked'))).toBe(true);
+	expect(
+		result.symbolModules.modules.some((module) =>
+			module.source.includes('globalThis.__picked'),
+		),
+	).toBe(true);
 });
-
-function nativePayload(source: string): string {
-	const encoded = /MARKLESS_CSR_NATIVE_START:([\s\S]*?):MARKLESS_CSR_NATIVE_END/.exec(source)?.[1];
-	if (!encoded) throw new Error('Expected native CSR payload marker.');
-	return decodeURIComponent(encoded);
-}

@@ -46,11 +46,12 @@ export function emitDirectPublicRenderModule(input: {
 		publicRenderPlan: input.publicRenderPlan,
 	});
 	if (!bootstrapData) return '';
+	const { rootChunkId: _rootChunkId, chunks: _chunks, ...directRecords } = bootstrapData;
 	const graphMethods = publicGraphMethods(input.symbolResolver);
 
 	const body = [
 		'',
-		`const marklessDirectChunkData = ${JSON.stringify(bootstrapData)};`,
+		`const marklessDirectChunkData = {...marklessRenderData,rootChunkId:marklessRenderData.root.templateId,...${JSON.stringify(directRecords)}};`,
 		'const renderMarklessDirectChunk = createMarklessDirectChunkRenderer(marklessDirectChunkData);',
 		'',
 		`export function ${componentName}() {\n\tconst graph = createMarklessPublicGraph();\n\tconst root = renderMarklessDirectChunk(graph, loadSymbol);\n\treturn { root, graph, runtime: { async dispatch() {} } };\n}`,

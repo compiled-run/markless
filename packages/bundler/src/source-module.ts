@@ -129,6 +129,7 @@ export function emitSourceModule(input: {
 	readonly publicRenderCsrExportName: string | null;
 	readonly publicSsrModuleSource: string;
 	readonly publicRenderSsrExportName: string | null;
+	readonly renderDataId?: string;
 	readonly symbols: ReadonlyArray<SourceSymbolRow>;
 	readonly buildComputedSymbols?: ReadonlyArray<SourceSymbolRow>;
 	readonly symbolRoutes: ReadonlyArray<SourceSymbolRoute>;
@@ -137,6 +138,12 @@ export function emitSourceModule(input: {
 	const symbolsOnly = input.environment === 'client' && input.clientOutput === 'symbols-only';
 	const routeSymbols = input.environment === 'client' && input.symbolRoutes.length > 0;
 	return [
+		(!input.publicSsrModuleSource && !input.publicRenderModuleSource) ||
+		symbolsOnly ||
+		!input.renderDataId ||
+		(input.environment === 'client' && !input.publicRenderModuleSource)
+			? ''
+			: `import { marklessRenderData } from '${input.renderDataId}';`,
 		symbolsOnly || (input.environment === 'client' && input.nativeCsr)
 			? ''
 			: `import { state as payloadState, view as payloadView, runtimeDemandMap as payloadRuntimeDemandMap } from '${input.payloadId}';`,
@@ -153,8 +160,12 @@ export function emitSourceModule(input: {
 			: '',
 		routeSymbols ? 'const marklessLoadLocalSymbol = loadSymbol;' : '',
 		symbolsOnly && !routeSymbols ? 'export { loadSymbol };' : '',
-		symbolsOnly || (input.environment === 'client' && input.nativeCsr) ? '' : 'export { payloadView };',
-		symbolsOnly || (input.environment === 'client' && input.nativeCsr) ? '' : 'export { payloadRuntimeDemandMap };',
+		symbolsOnly || (input.environment === 'client' && input.nativeCsr)
+			? ''
+			: 'export { payloadView };',
+		symbolsOnly || (input.environment === 'client' && input.nativeCsr)
+			? ''
+			: 'export { payloadRuntimeDemandMap };',
 		// Dev only: re-export the resume entry from the virtual resume module so the
 		// inline resumer can import THIS source module (keeping the .tsrx in the client
 		// module graph — vite's no-accepting-boundary full-reload depends on it).

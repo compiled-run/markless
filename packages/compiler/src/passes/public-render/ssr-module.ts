@@ -49,7 +49,6 @@ export function emitPublicSsrRenderModule(
 	const remapsGraphProps = hasPropDependentComputed(input);
 	const internalGraphProps = composedGraphProps(input);
 	const remapsInternalGraphProps = remapsGraphProps && internalGraphProps.length > 0;
-	const renderDataSource = JSON.stringify({ ...input.renderData, root: { componentName: rootInfo.componentName, templateId: `template:${rootInfo.componentName}` } });
 	const dataRenderLines = emitSsrDataRenderLines(input, rootInfo.componentName, references);
 	const sameModuleComponents = emitSameModuleSsrComponents(
 		input,
@@ -59,7 +58,6 @@ export function emitPublicSsrRenderModule(
 	);
 	const body = [
 		'',
-		`const marklessSsrRenderData = ${renderDataSource};`,
 		`const marklessSsrPropEvents = ${JSON.stringify(propEvents)};`,
 		'const marklessSsrStateValues = new Map([',
 		stateEntries(input).join(',\n'),
@@ -291,6 +289,6 @@ function emitSsrDataRenderLines(
 		...templateComputedLines,
 		"const marklessSsrIdPrefix=marklessSsrRenderContext?.idPrefix??'';",
 		`const marklessSsrReadData=(residue,marklessSsrDataContext)=>{if(residue.kind==='graph-read')return marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(residue.graphNodeId),residue.path);if(residue.kind==='repeat-item')return marklessSsrReadPublicPath(marklessSsrDataContext.repeatItem,residue.path);${localLines.join('')}switch(residue.source){${readCases.join('')}default:throw new Error('MARKLESS_SSR_DATA_RESIDUE_MISSING: '+residue.source);}};`,
-		`const marklessSsrRendered=await renderSsrData({renderData:{...marklessSsrRenderData,root:{componentName:${JSON.stringify(componentName)},templateId:${JSON.stringify(`template:${componentName}`)}}},idPrefix:marklessSsrIdPrefix,read:marklessSsrReadData,selectBranchArm:(marklessSsrDataSlot,marklessSsrDataContext)=>{${localLines.join('')}switch(marklessSsrDataSlot.branchSiteId){${branchCases.join('')}default:throw new Error('MARKLESS_SSR_DATA_BRANCH_MISSING: '+marklessSsrDataSlot.branchSiteId);}},selectAsyncArm:async(marklessSsrDataSlot,marklessSsrDataContext)=>{${localLines.join('')}switch(marklessSsrDataSlot.boundaryId){${boundaryCases.join('')}default:throw new Error('MARKLESS_SSR_DATA_BOUNDARY_MISSING: '+marklessSsrDataSlot.boundaryId);}},renderChild:async(marklessSsrDataSlot,marklessSsrDataContext)=>{${localLines.join('')}switch(marklessSsrDataSlot.componentEdgeId){${childCases.join('')}default:throw new Error('MARKLESS_SSR_DATA_CHILD_MISSING: '+marklessSsrDataSlot.componentEdgeId);}}});`,
+		`const marklessSsrRendered=await renderSsrData({renderData:{...marklessRenderData,root:{componentName:${JSON.stringify(componentName)},templateId:${JSON.stringify(`template:${componentName}`)}}},idPrefix:marklessSsrIdPrefix,read:marklessSsrReadData,selectBranchArm:(marklessSsrDataSlot,marklessSsrDataContext)=>{${localLines.join('')}switch(marklessSsrDataSlot.branchSiteId){${branchCases.join('')}default:throw new Error('MARKLESS_SSR_DATA_BRANCH_MISSING: '+marklessSsrDataSlot.branchSiteId);}},selectAsyncArm:async(marklessSsrDataSlot,marklessSsrDataContext)=>{${localLines.join('')}switch(marklessSsrDataSlot.boundaryId){${boundaryCases.join('')}default:throw new Error('MARKLESS_SSR_DATA_BOUNDARY_MISSING: '+marklessSsrDataSlot.boundaryId);}},renderChild:async(marklessSsrDataSlot,marklessSsrDataContext)=>{${localLines.join('')}switch(marklessSsrDataSlot.componentEdgeId){${childCases.join('')}default:throw new Error('MARKLESS_SSR_DATA_CHILD_MISSING: '+marklessSsrDataSlot.componentEdgeId);}}});`,
 	];
 }

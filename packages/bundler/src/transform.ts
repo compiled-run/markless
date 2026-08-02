@@ -70,6 +70,7 @@ export async function transformTsrxModule(
 ): Promise<TransformTsrxModuleResult> {
 	const encodedFilename = encodeURIComponent(input.filename);
 	const payloadId = `${MARKLESS_VIRTUAL_PREFIX}payload:${encodedFilename}`;
+	const renderDataId = `${MARKLESS_VIRTUAL_PREFIX}render-data:${encodedFilename}`;
 	const resolverId = `${MARKLESS_VIRTUAL_PREFIX}resolver:${encodedFilename}`;
 	const resumeId = resumeVirtualModuleId(input.filename);
 	const { compiled, blockingDiagnostics } = await compileWithBlockingDiagnostics(
@@ -77,7 +78,7 @@ export async function transformTsrxModule(
 		resolverId,
 	);
 	throwIfBlocked(input, blockingDiagnostics);
-	const csrNative = extractCsrNativeMarkup(compiled.publicRenderModule.csrModuleSource);
+	const csrNative = compiled.publicRenderModule.csrNativeMarkup ?? [];
 	const symbolRows = compiled.symbolModules.modules.map((module) => ({
 		id: module.symbolId,
 		chunk: symbolVirtualModuleId(input.filename, module.symbolId),
@@ -111,7 +112,7 @@ export async function transformTsrxModule(
 		input.executionLogModuleHooks === false ? 'never' : input.executionLog;
 	const manifest: MarklessTransformManifest = {
 		source: input.filename,
-		...(csrNative.payloads.length > 0 ? { csrNativeMarkup: csrNative.payloads } : {}),
+		...(csrNative.length > 0 ? { csrNativeMarkup: csrNative } : {}),
 		captureMetadata: compiled.captureAnalysis,
 		symbolRoutes,
 		payload: { virtualModuleId: payloadId },
@@ -129,6 +130,15 @@ export async function transformTsrxModule(
 	const styleScope = compiled.publicRenderPlan.styleScopes[0];
 	const styleId = styleScope ? `${MARKLESS_VIRTUAL_PREFIX}style:${encodedFilename}.css` : null;
 	const virtualModules: MarklessVirtualModule[] = [
+		...(compiled.publicRenderModule.renderDataModuleSource
+			? [
+					{
+						id: renderDataId,
+						type: 'render-data' as const,
+						source: compiled.publicRenderModule.renderDataModuleSource,
+					},
+				]
+			: []),
 		...(styleScope && styleId
 			? [{ id: styleId, type: 'style' as const, source: styleScope.cssText }]
 			: []),
@@ -231,6 +241,7 @@ export async function transformTsrxModule(
 					filename: input.filename,
 					payloadId,
 					resolverId,
+					renderDataId,
 					environment: input.environment ?? 'lib',
 					clientOutput: input.clientOutput ?? 'full',
 					executionLog: input.executionLog,
@@ -246,8 +257,10 @@ export async function transformTsrxModule(
 					resumeModuleUrl: input.resumeModuleUrl,
 					publicRenderModuleSource: compiled.publicRenderModule.moduleSource,
 					publicRenderRootExportName: compiled.publicRenderModule.rootExportName,
-					publicCsrModuleSource: csrNative.source,
-					nativeCsr: csrNative.payloads.length > 0,
+					publicCsrModuleSource: stripCsrTestFallback(
+						compiled.publicRenderModule.csrModuleSource,
+					),
+					nativeCsr: csrNative.length > 0,
 					publicRenderCsrExportName: compiled.publicRenderModule.csrExportName,
 					publicSsrModuleSource: compiled.publicRenderModule.ssrModuleSource,
 					publicRenderSsrExportName: compiled.publicRenderModule.ssrExportName,
@@ -261,32 +274,23 @@ export async function transformTsrxModule(
 		virtualModules,
 		manifest,
 		moduleGraphInterface: compiled.moduleGraphInterface,
+		interfaceHash: moduleInterfaceHash(compiled.moduleGraphInterface),
 		moduleImports: compiled.semanticGraph.moduleImports,
 	};
 }
 
-const CSR_NATIVE_MARKER =
-	/\/\*MARKLESS_CSR_NATIVE_START:([\s\S]*?):MARKLESS_CSR_NATIVE_END\*\//g;
-
-function extractCsrNativeMarkup(source: string): {
-	readonly source: string;
-	readonly payloads: NonNullable<MarklessTransformManifest['csrNativeMarkup']>;
-} {
-	const payloads: Array<NonNullable<MarklessTransformManifest['csrNativeMarkup']>[number]> = [];
-	const executableSource = source.replace(CSR_NATIVE_MARKER, (_marker, encoded: string) => {
-		const parsed = JSON.parse(decodeURIComponent(encoded)) as NonNullable<
-			MarklessTransformManifest['csrNativeMarkup']
-		>;
-		payloads.push(...parsed);
-		return '';
-	}).replace(/\/\*MARKLESS_CSR_TEST_START\*\/[\s\S]*?\/\*MARKLESS_CSR_TEST_END\*\//g, '');
-	return { source: executableSource, payloads };
+function stripCsrTestFallback(source: string): string {
+	return source.replace(
+		/\/\*MARKLESS_CSR_TEST_START\*\/[\s\S]*?\/\*MARKLESS_CSR_TEST_END\*\//g,
+		'',
+	);
 }
 
 export async function compileTsrxModuleLinkArtifact(
 	input: Pick<TransformTsrxModuleInput, 'filename' | 'source' | 'buildId'>,
 ): Promise<
 	Pick<CompileTsrxModuleResult, 'moduleGraphInterface'> & {
+		readonly interfaceHash: string;
 		readonly moduleImports: CompileTsrxModuleResult['semanticGraph']['moduleImports'];
 	}
 > {
@@ -298,8 +302,21 @@ export async function compileTsrxModuleLinkArtifact(
 	});
 	return {
 		moduleGraphInterface: compiled.moduleGraphInterface,
+		interfaceHash: moduleInterfaceHash(compiled.moduleGraphInterface),
 		moduleImports: compiled.semanticGraph.moduleImports,
 	};
+}
+
+function moduleInterfaceHash(
+	value: CompileTsrxModuleResult['moduleGraphInterface'] | undefined,
+): string {
+	let hash = 0x811c9dc5;
+	const source = JSON.stringify(value ?? null);
+	for (let index = 0; index < source.length; index++) {
+		hash ^= source.charCodeAt(index);
+		hash = Math.imul(hash, 0x01000193);
+	}
+	return `mgi1-${(hash >>> 0).toString(36)}`;
 }
 
 export async function preflightTsrxModuleDiagnostics(

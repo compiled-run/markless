@@ -1,6 +1,6 @@
 import { expect, test, vi } from 'vitest';
-import { marklessServer, transformTsrxModule } from '../src/rolldown.ts';
-import { callBuildStart, callTransform } from './helpers.ts';
+import { marklessClient, marklessServer, transformTsrxModule } from '../src/rolldown.ts';
+import { callBuildStart, callLoad, callTransform } from './helpers.ts';
 
 const helperFilename = '/workspace/app/src/counter.tsrx';
 const importerFilename = '/workspace/app/src/App.tsrx';
@@ -86,7 +86,9 @@ export function App() @{ <p>Ready</p> }
 	})) as { code: string };
 
 	expect(load).toHaveBeenCalledExactlyOnceWith({ id: '/workspace/app/src/missing.tsrx' });
-	expect(result.code).toContain('"statics": ["<p>Ready</p>"]');
+	expect(result.code).toContain('virtual:markless:render-data:');
+	const renderDataModule = result.virtualModules.find((module) => module.type === 'render-data');
+	expect(renderDataModule?.source).toContain('"statics":["<p>Ready</p>"]');
 });
 
 test('cyclic tsrx imports use available artifacts without recursively forcing parents', async () => {
@@ -108,7 +110,7 @@ test('cyclic tsrx imports use available artifacts without recursively forcing pa
 		callTransform(plugin, parentSource, importerFilename, {
 			resolve: vi.fn(async () => ({ id: childFilename })),
 		}),
-	).resolves.toMatchObject({ code: expect.stringContaining('Parent') });
+	).resolves.toMatchObject({ code: expect.stringContaining('virtual:markless:render-data:') });
 	expect(transformRequest).toHaveBeenCalledExactlyOnceWith(childFilename, 'server');
 });
 
@@ -125,4 +127,67 @@ test('linking leaves source-module output unchanged when there are no tsrx impor
 	const linked = (await callTransform(plugin, source, importerFilename)) as { code: string };
 
 	expect(linked.code).toBe(direct.code);
+});
+
+test('a child implementation edit reuses the parent while its versioned interface is unchanged', async () => {
+	const childFilename = '/workspace/app/src/Child.tsrx';
+	const parentSource = `import { Child } from './Child.tsrx'; export function App() @{ <main><Child /></main> }`;
+	let childSource = `export function Child() @{ <p>Before</p> }`;
+	let plugin: ReturnType<typeof marklessServer>;
+	const resolve = vi.fn(async (specifier: string) =>
+		specifier === './Child.tsrx' ? { id: childFilename } : null,
+	);
+	const transformRequest = vi.fn(async (url: string) =>
+		callTransform(plugin, childSource, url, { resolve }),
+	);
+	plugin = marklessServer({ dev: true, devServer: { transformRequest } });
+	callBuildStart(plugin, { cwd: '/workspace/app' });
+
+	const first = await callTransform(plugin, parentSource, importerFilename, { resolve });
+	childSource = `export function Child() @{ <p>After</p> }`;
+	await callTransform(plugin, childSource, childFilename, { resolve });
+	const second = await callTransform(plugin, parentSource, importerFilename, { resolve });
+
+	expect(second).toBe(first);
+	const childRenderDataId = `virtual:markless:render-data:${encodeURIComponent(childFilename)}`;
+	const childRenderData = await callLoad(plugin, `\0${childRenderDataId}`);
+	expect(childRenderData).toContain('After');
+	expect(childRenderData).not.toContain('Before');
+});
+
+test('a child interface edit recompiles the parent', async () => {
+	const childFilename = '/workspace/app/src/Child.tsrx';
+	const parentSource = `import { Child } from './Child.tsrx'; export function App() @{ <main><Child /></main> }`;
+	let childSource = `export function Child() @{ <p>Child</p> }`;
+	let plugin: ReturnType<typeof marklessServer>;
+	const resolve = vi.fn(async (specifier: string) =>
+		specifier === './Child.tsrx' ? { id: childFilename } : null,
+	);
+	const transformRequest = vi.fn(async (url: string) =>
+		callTransform(plugin, childSource, url, { resolve }),
+	);
+	plugin = marklessServer({ dev: true, devServer: { transformRequest } });
+	callBuildStart(plugin, { cwd: '/workspace/app' });
+
+	const first = await callTransform(plugin, parentSource, importerFilename, { resolve });
+	childSource = `export function Child({ title }) @{ <p>{title}</p> }`;
+	await callTransform(plugin, childSource, childFilename, { resolve });
+	const second = await callTransform(plugin, parentSource, importerFilename, { resolve });
+
+	expect(second).not.toBe(first);
+});
+
+test('the interface cache keeps full and symbols-only client entries distinct', async () => {
+	const plugin = marklessClient();
+	callBuildStart(plugin, { cwd: '/workspace/app' });
+	const source = `export function App() @{ <button onClick={() => undefined}>Ready</button> }`;
+
+	const full = await callTransform(plugin, source, importerFilename);
+	const symbolsOnly = await callTransform(plugin, source, `${importerFilename}?markless-symbols`);
+
+	expect(symbolsOnly).not.toBe(full);
+	expect((symbolsOnly as { code: string }).code).toContain('export { loadSymbol };');
+	expect((symbolsOnly as { code: string }).code).not.toContain(
+		'export default marklessCompiledApp',
+	);
 });

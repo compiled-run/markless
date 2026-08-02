@@ -513,6 +513,12 @@ async function captureDispatchModuleUrl(
 	browserModuleSource = localWebFunctionImports(
 		browserModuleSource.split(payload.id).join(javascriptModuleUrl(payload.source)),
 	);
+	const renderData = transformed.virtualModules.find((module) => module.type === 'render-data');
+	if (renderData) {
+		browserModuleSource = browserModuleSource
+			.split(renderData.id)
+			.join(javascriptModuleUrl(renderData.source));
+	}
 	for (const [moduleId, moduleUrl] of allSymbolUrls)
 		browserModuleSource = browserModuleSource.split(moduleId).join(moduleUrl);
 	for (const imported of imports) {

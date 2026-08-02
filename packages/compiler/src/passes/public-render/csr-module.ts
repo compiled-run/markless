@@ -24,12 +24,19 @@ import type { PublicRenderRoot } from './types.ts';
 export function emitPublicCsrRenderModule(
 	input: PublicRenderModuleInput,
 	rootInfo: PublicRenderRoot,
-): string {
+): {
+	readonly source: string;
+	readonly nativeMarkup: ReadonlyArray<{
+		readonly dataId: string;
+		readonly definition: Readonly<Record<string, unknown>>;
+		readonly templates: ReadonlyArray<{ readonly id: string; readonly markup: string }>;
+	}>;
+} {
 	if (
 		input.publicRenderPlan.diagnostics.some((diagnostic) => diagnostic.severity === 'error')
-	) return '';
+	) return { source: '', nativeMarkup: [] };
 	const rootChunkId = input.renderData.root?.templateId;
-	if (!rootChunkId) return '';
+	if (!rootChunkId) return { source: '', nativeMarkup: [] };
 	const ast = parseModule(input.source.source, input.source.filename) as unknown as AnyNode;
 	const componentMap = sameModuleComponentMap(ast);
 
@@ -213,10 +220,9 @@ export function emitPublicCsrRenderModule(
 		registry,
 		`const marklessRenderCsrChunks = createMarklessCsrChunkRenderer({ rootComponentName: ${JSON.stringify(rootInfo.componentName)}, components: marklessCsrAllChunkComponents });`,
 		'function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); }',
-		`/*MARKLESS_CSR_NATIVE_START:${encodeURIComponent(JSON.stringify(nativePayloads))}:MARKLESS_CSR_NATIVE_END*/`,
 	].join('\n');
 
-	return [
+	return { source: [
 		...importLines,
 		...publicRenderValueImports(
 			input.semanticGraph.moduleImports,
@@ -229,7 +235,7 @@ export function emitPublicCsrRenderModule(
 		body,
 	]
 		.filter(Boolean)
-		.join('\n');
+		.join('\n'), nativeMarkup: nativePayloads };
 }
 
 function componentValueSources(

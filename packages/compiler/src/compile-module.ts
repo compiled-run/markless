@@ -427,12 +427,14 @@ function emptyPublicRenderPlanArtifact(): PublicRenderPlanArtifact {
 function emptyPublicRenderModuleArtifact(): PublicRenderModuleArtifact {
 	return {
 		passId: 'public-render-module',
+		renderDataModuleSource: '',
 		moduleSource: '',
 		rootExportName: null,
 		csrModuleSource: '',
 		csrExportName: null,
 		ssrModuleSource: '',
 		ssrExportName: null,
+		csrNativeMarkup: [],
 		diagnostics: [],
 	};
 }

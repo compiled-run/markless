@@ -4,10 +4,7 @@ import { joinURL, parsePath, withQuery, withoutLeadingSlash } from 'ufo';
 import { type MarklessBuildMetadataBundle, createBuildMetadata } from './build/build-metadata.ts';
 import { injectCsrNativeMarkup } from './build/csr-native-markup.ts';
 import { MARKLESS_BUILD_PREFIX, MARKLESS_BUNDLE_GRAPH, outputDefaults } from './build/chunking.ts';
-import {
-	MARKLESS_EXECUTION_SIZES,
-	createExecutionSizesAsset,
-} from './build/execution-sizes.ts';
+import { MARKLESS_EXECUTION_SIZES, createExecutionSizesAsset } from './build/execution-sizes.ts';
 import { collectModulePreloadInjections, injectHeadLinks } from './build/head-links.ts';
 import { stripEmptyVitePreloadWrappers } from './build/preload-cleanup.ts';
 import {
@@ -42,6 +39,7 @@ import type {
 	MarklessRolldownPluginApi,
 	MarklessTransformManifest,
 	MarklessVirtualModule,
+	TransformTsrxModuleInput,
 	TransformTsrxModuleResult,
 } from './types.ts';
 
@@ -96,6 +94,15 @@ export function createMarklessRolldownPlugin(input: {
 	const virtualModules = new Map<string, MarklessVirtualModule>();
 	const transformManifests = new Map<string, MarklessTransformManifest>();
 	const moduleLinkArtifacts = new Map<string, MarklessModuleLinkArtifact>();
+	const linkedTransformCache = new Map<
+		string,
+		{
+			readonly source: string;
+			readonly code: string;
+			readonly importedInterfaceHashes: string;
+			readonly result: TransformTsrxModuleResult;
+		}
+	>();
 	const importedChildren = new Map<string, ImportedChild>();
 	const importedChildSources = new Set<string>();
 	const emittedClientResolverSources = new Set<string>();
@@ -121,6 +128,12 @@ export function createMarklessRolldownPlugin(input: {
 	const plugin = {
 		api: {
 			invalidateGeneratedModules(parent: string, currentEnvironment?: MarklessEnvironment) {
+				const changedSource = pathname(parent);
+				moduleLinkArtifacts.delete(changedSource);
+				transformManifests.delete(changedSource);
+				for (const [key, cached] of linkedTransformCache) {
+					if (cached.source === changedSource) linkedTransformCache.delete(key);
+				}
 				const ids = dev.clear(parent, currentEnvironment);
 				const resolvedIds = new Set<string>();
 				for (const id of ids) {
@@ -163,6 +176,7 @@ export function createMarklessRolldownPlugin(input: {
 			virtualModules.clear();
 			transformManifests.clear();
 			moduleLinkArtifacts.clear();
+			linkedTransformCache.clear();
 			importedChildren.clear();
 			importedChildSources.clear();
 			emittedClientResolverSources.clear();
@@ -289,7 +303,7 @@ export function createMarklessRolldownPlugin(input: {
 			}
 			const source = pathname(id);
 			clearSourceVirtualModules(source, virtualModules, sourceVirtualModules);
-			const transformInput = {
+			const transformInput: TransformTsrxModuleInput = {
 				filename: source,
 				source: code,
 				buildId: internalOptions.buildId,
@@ -332,34 +346,68 @@ export function createMarklessRolldownPlugin(input: {
 						: undefined,
 				devResumeReexport: internalOptions.dev === true && currentEnvironment === 'client',
 			};
+			// One source can be requested as a full environment entry, a symbols-only
+			// interaction entry, or a dev resume entry. Their linked interfaces are the
+			// same, but their emitted module shapes are deliberately different.
+			const cacheKey = [
+				currentEnvironment,
+				source,
+				transformInput.clientOutput ?? 'full',
+				isResumeSourceRequest(id) ? 'resume' : 'source',
+			].join('\0');
+			const cached = linkedTransformCache.get(cacheKey);
 			let transformed: TransformTsrxModuleResult;
-			try {
-				transformed = await transformTsrxModule(transformInput);
-			} catch (error) {
-				// Imported graph helpers can diagnose before their interface is linked.
-				// Publish only this compiler-owned link artifact so cycles never wait.
-				const provisional = await compileTsrxModuleLinkArtifact(transformInput);
-				moduleLinkArtifacts.set(source, provisional);
-				const provisionalImports = await resolveImportedModuleInterfaces.call(
+			let reusedLinkedTransform = false;
+			if (cached?.code === code) {
+				const cachedImports = await resolveImportedModuleInterfaces.call(
 					this,
 					source,
-					provisional.moduleImports,
+					cached.result.moduleImports,
 				);
-				if (provisionalImports.length === 0) throw error;
 				await forceImportedModules.call(
 					this,
-					provisionalImports,
+					cachedImports,
 					moduleLinkArtifacts,
 					internalOptions,
 					currentEnvironment,
 				);
-				transformed = await transformTsrxModule({
-					...transformInput,
-					importedModuleInterfaces: importedModuleInterfaces(
+				if (
+					cached.importedInterfaceHashes ===
+					importedInterfaceHashSignature(cachedImports, moduleLinkArtifacts)
+				) {
+					transformed = cached.result;
+					reusedLinkedTransform = true;
+				}
+			}
+			if (!reusedLinkedTransform) {
+				try {
+					transformed = await transformTsrxModule(transformInput);
+				} catch (error) {
+					// Imported graph helpers can diagnose before their interface is linked.
+					// Publish only this compiler-owned link artifact so cycles never wait.
+					const provisional = await compileTsrxModuleLinkArtifact(transformInput);
+					moduleLinkArtifacts.set(source, provisional);
+					const provisionalImports = await resolveImportedModuleInterfaces.call(
+						this,
+						source,
+						provisional.moduleImports,
+					);
+					if (provisionalImports.length === 0) throw error;
+					await forceImportedModules.call(
+						this,
 						provisionalImports,
 						moduleLinkArtifacts,
-					),
-				});
+						internalOptions,
+						currentEnvironment,
+					);
+					transformed = await transformTsrxModule({
+						...transformInput,
+						importedModuleInterfaces: importedModuleInterfaces(
+							provisionalImports,
+							moduleLinkArtifacts,
+						),
+					});
+				}
 			}
 			// Register the first-pass artifact before loading children so the existing
 			// cross-module registry can validate both sides of the composition edge.
@@ -400,7 +448,10 @@ export function createMarklessRolldownPlugin(input: {
 					validateImportedChild(child, transformManifests);
 				}
 			}
-			if (resolvedChildren.length > 0 || resolvedInterfaceImports.length > 0) {
+			if (
+				!reusedLinkedTransform &&
+				(resolvedChildren.length > 0 || resolvedInterfaceImports.length > 0)
+			) {
 				transformed = await transformTsrxModule({
 					...transformInput,
 					symbols: importedSymbolInputs(resolvedChildren, transformManifests),
@@ -420,6 +471,15 @@ export function createMarklessRolldownPlugin(input: {
 				executionLogEstimatedSizes,
 				dev,
 				environment: currentEnvironment,
+			});
+			linkedTransformCache.set(cacheKey, {
+				source,
+				code,
+				importedInterfaceHashes: importedInterfaceHashSignature(
+					resolvedInterfaceImports,
+					moduleLinkArtifacts,
+				),
+				result: transformed,
 			});
 			for (const child of resolvedChildren) {
 				dev.record(
@@ -912,10 +972,29 @@ function registerTransformArtifacts(input: {
 	input.transformManifests.set(input.source, input.result.manifest);
 	input.moduleLinkArtifacts.set(input.source, {
 		moduleGraphInterface: input.result.moduleGraphInterface,
+		interfaceHash: input.result.interfaceHash,
 		moduleImports: input.result.moduleImports,
 	});
 	input.sourceVirtualModules.set(input.source, ids);
 	input.dev.record(input.source, ids, input.environment);
+}
+
+function importedInterfaceHashSignature(
+	imports: ReadonlyArray<ImportedChild>,
+	artifacts: ReadonlyMap<string, MarklessModuleLinkArtifact>,
+): string {
+	return imports
+		.map((imported) =>
+			[
+				imported.specifier,
+				imported.source,
+				artifacts.get(imported.source)?.interfaceHash ?? 'missing',
+			]
+				.map(encodeURIComponent)
+				.join(':'),
+		)
+		.sort()
+		.join('|');
 }
 
 function clearSourceVirtualModules(

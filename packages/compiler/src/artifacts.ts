@@ -1539,12 +1539,18 @@ export type PublicRenderModuleInput = {
 
 export type PublicRenderModuleArtifact = {
 	readonly passId: 'public-render-module';
+	readonly renderDataModuleSource: string;
 	readonly moduleSource: string;
 	readonly rootExportName: string | null;
 	readonly csrModuleSource: string;
 	readonly csrExportName: string | null;
 	readonly ssrModuleSource: string;
 	readonly ssrExportName: string | null;
+	readonly csrNativeMarkup: ReadonlyArray<{
+		readonly dataId: string;
+		readonly definition: Readonly<Record<string, unknown>>;
+		readonly templates: ReadonlyArray<{ readonly id: string; readonly markup: string }>;
+	}>;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
 };
 

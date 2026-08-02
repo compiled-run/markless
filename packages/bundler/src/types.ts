@@ -23,7 +23,13 @@ export interface MarklessRolldownOptions {
 	buildId?: string;
 }
 
-export type MarklessVirtualModuleType = 'payload' | 'resolver' | 'resume' | 'symbol' | 'style';
+export type MarklessVirtualModuleType =
+	| 'payload'
+	| 'render-data'
+	| 'resolver'
+	| 'resume'
+	| 'symbol'
+	| 'style';
 
 export interface MarklessVirtualModule {
 	id: string;
@@ -56,12 +62,13 @@ export interface TransformTsrxModuleResult {
 	virtualModules: MarklessVirtualModule[];
 	manifest: MarklessTransformManifest;
 	moduleGraphInterface: ModuleGraphInterfaceArtifact;
+	interfaceHash: string;
 	moduleImports: SemanticGraphArtifact['moduleImports'];
 }
 
 export type MarklessModuleLinkArtifact = Pick<
 	TransformTsrxModuleResult,
-	'moduleGraphInterface' | 'moduleImports'
+	'interfaceHash' | 'moduleGraphInterface' | 'moduleImports'
 >;
 
 export interface MarklessTransformManifest {

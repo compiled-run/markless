@@ -117,6 +117,7 @@ async function compileFixture(
 
 function emittedSnapshot(result: CompileTsrxModuleResult): Record<string, string> {
 	return {
+		renderDataModuleSource: result.publicRenderModule.renderDataModuleSource,
 		csrModuleSource: result.publicRenderModule.csrModuleSource,
 		ssrModuleSource: result.publicRenderModule.ssrModuleSource,
 		symbolModules: result.symbolModules.modules

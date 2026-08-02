@@ -123,8 +123,8 @@ describe('TSRX Rolldown plugin structure', () => {
 		expect(result.code).toContain('renderCsr: App');
 		expect(result.code).toContain('renderSsr(props, marklessRenderContext) {');
 		expect(result.code).toContain('const marklessSsrStateValues = new Map');
-		expect(result.code).toContain(
-			'"statics": ["<button><!--markless-slot:0-->", "</button>"]',
+		expect(renderDataModuleSource(result)).toContain(
+			'"statics":["<button><!--markless-slot:0-->","</button>"]',
 		);
 		expect(result.code).toContain('export default marklessCompiledApp;');
 		expect(result.code).not.toContain('source: marklessSource');
@@ -132,7 +132,7 @@ describe('TSRX Rolldown plugin structure', () => {
 		expect(resumeModule?.source).toContain('export async function resumeContainerEvent');
 		expect(resumeModule?.source).toContain('await Promise.resolve(loadSymbol("symbol:0"))'); // T015e: specialized dispatcher awaits the symbol directly
 		expect(result.virtualModules.map((item) => item.type)).toEqual(
-			expect.arrayContaining(['payload', 'resolver', 'resume', 'symbol']),
+			expect.arrayContaining(['payload', 'render-data', 'resolver', 'resume', 'symbol']),
 		);
 		expect(result.manifest.source).toBe('/workspace/app/src/App.tsrx');
 		expect(result.manifest.symbols).toContainEqual(
@@ -156,7 +156,7 @@ describe('TSRX Rolldown plugin structure', () => {
 		});
 
 		expect(result.code).toContain('renderSsr(props, marklessRenderContext) {');
-		expect(result.code).toContain(
+		expect(renderDataModuleSource(result)).toContain(
 			'"<main><h1>Markless Router</h1><button>Button <!--markless-slot:0-->"',
 		);
 		expect(result.code).toContain(
@@ -290,7 +290,7 @@ let active = state(true);
 		});
 
 		expect(result.code).toContain('renderSsr(props, marklessRenderContext) {');
-		expect(result.code).toContain('"source": "active ? \'on\' : \'off\'"');
+		expect(renderDataModuleSource(result)).toContain('"source":"active ? \'on\' : \'off\'"');
 		expect(result.code).not.toContain('renderCsr: App');
 	});
 
@@ -314,7 +314,7 @@ let active = state(true);
 		expect(result.code).toContain('export function App()');
 		expect(result.code).toContain('renderCsr: App');
 		expect(result.code).toContain('export default marklessCompiledApp;');
-		expect(result.code).toContain('<main><section><!--markless-slot:0-->');
+		expect(renderDataModuleSource(result)).toContain('<main><section><!--markless-slot:0-->');
 		expect(result.code).toContain('const marklessDirectChunkData');
 		expect(result.code).toContain('createMarklessDirectChunkRenderer(marklessDirectChunkData)');
 		expect(result.code).toContain('const graph = createMarklessPublicGraph()');
@@ -871,7 +871,8 @@ export function App() @{
 			['component-edge:0'],
 			['component-edge:1'],
 		]);
-		const parentStartupTransport = parent.code + JSON.stringify(parent.manifest.csrNativeMarkup);
+		const parentStartupTransport =
+			parent.code + JSON.stringify(parent.manifest.csrNativeMarkup);
 		for (const row of rows) expect(parentStartupTransport).toContain(row.id);
 		const resolver = parent.virtualModules.find((module) => module.type === 'resolver')!;
 		expect(resolver.source).toContain(rows[0]!.loaderSymbolId);
@@ -1344,6 +1345,12 @@ export function App() @{
 		]);
 	});
 });
+
+function renderDataModuleSource(result: Awaited<ReturnType<typeof transformTsrxModule>>): string {
+	const module = result.virtualModules.find((candidate) => candidate.type === 'render-data');
+	if (!module) throw new Error('Expected a canonical render-data module.');
+	return module.source;
+}
 
 function emittedAsset(emitFile: ReturnType<typeof vi.fn>, fileName: string) {
 	return emitFile.mock.calls.map((call) => call[0]).find((item) => item.fileName === fileName);
