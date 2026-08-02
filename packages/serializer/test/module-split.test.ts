@@ -9,7 +9,8 @@ import {
 import {
 	decodePayloadScripts as decodeClientPayloadScripts,
 	RuntimePayloadError as ClientRuntimePayloadError,
-} from '../src/protocol-client.ts';
+} from '../src/protocol-client-storage.ts';
+import { decodePayloadScripts as decodeStorageFreePayloadScripts } from '../src/protocol-client.ts';
 import { createProtocolStatePayload } from '../src/protocol-state.ts';
 import { deserializeGraphValueForClient } from '../src/value-decode-client.ts';
 import { deserializeGraphValue } from '../src/value-decode.ts';
@@ -136,9 +137,28 @@ test('the browser decoder accepts storage protocol version 2', () => {
 	expect(() =>
 		decodeClientPayloadScripts({
 			...rendered,
+			stateScript: rendered.stateScript.replace(/,"storage":\[[^\]]+\]/, ''),
+		}),
+	).toThrow(/storage: expected array/);
+	expect(() =>
+		decodeClientPayloadScripts({
+			...rendered,
 			stateScript: rendered.stateScript.replace('"version":2', '"version":3'),
 		}),
 	).toThrow(/Unsupported markless\/state protocol version 3/);
+});
+
+test('the storage-free browser decoder has no storage validation edge and rejects version 2', async () => {
+	const source = await readFile(new URL('../src/protocol-client.ts', import.meta.url), 'utf8');
+	expect(source).not.toMatch(/storage-key|storage-record-client|isValidStorageKey/);
+	expect(() =>
+		decodeStorageFreePayloadScripts({
+			stateScript:
+				'<script type="markless/state">{"version":2,"cells":[],"computed":[],"storage":[]}</script>',
+			viewScript:
+				'<script type="markless/view">{"version":1,"locators":[],"events":[],"domUpdates":[],"behaviors":[],"elementHandles":[],"asyncBoundaries":[]}</script>',
+		}),
+	).toThrow(/Unsupported markless\/state protocol version 2/);
 });
 
 test('the browser decoder validates async boundary decision fields', () => {

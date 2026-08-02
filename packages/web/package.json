@@ -28,11 +28,11 @@
 		"./render": "./src/render.ts",
 		"./render-to-stream": "./src/render-to-stream.ts",
 		"./render-to-string": "./src/render-to-string.ts",
-		"./resume": "./src/payload-full.ts"
+		"./resume": "./src/payload-full.ts",
+		"./resume-storage-free": "./src/payload-full-storage-free.ts"
 	},
 	"publishConfig": {
 		"access": "public",
-		"provenance": true,
 		"exports": {
 			".": {
 				"types": "./dist/index.d.ts",
@@ -93,8 +93,13 @@
 			"./resume": {
 				"types": "./dist/resume.d.ts",
 				"default": "./dist/resume.js"
+			},
+			"./resume-storage-free": {
+				"types": "./dist/resume-storage-free.d.ts",
+				"default": "./dist/resume-storage-free.js"
 			}
-		}
+		},
+		"provenance": true
 	},
 	"scripts": {
 		"prepublishOnly": "node ../../scripts/release/verify-publish-ready.mjs"

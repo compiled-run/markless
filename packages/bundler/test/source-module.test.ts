@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import { ASYNC_PROTOCOL_VERSION, STORAGE_PROTOCOL_VERSION } from '@markless/serializer';
 import {
 	emitResumeModule,
 	emitSourceModule,
@@ -67,6 +68,24 @@ test('emitResumeModule routes non-lean event-only entries through the full hando
 	expect(code).not.toContain(
 		"import { resumeFromPayloadDocument } from '@markless/core/web/resume';",
 	);
+});
+
+test('emitResumeModule selects the decoder entry from the recorded payload version', () => {
+	const storageFree = emitResumeModule({
+		...baseInput,
+		payloadState: { version: ASYNC_PROTOCOL_VERSION },
+		needsFullResume: true,
+	});
+	const storage = emitResumeModule({
+		...baseInput,
+		payloadState: { version: STORAGE_PROTOCOL_VERSION },
+		needsFullResume: true,
+	});
+
+	expect(storageFree).toContain("import('@markless/core/web/resume-storage-free')");
+	expect(storageFree).not.toContain("import('@markless/core/web/resume')");
+	expect(storage).toContain("import('@markless/core/web/resume')");
+	expect(storage).not.toContain('resume-storage-free');
 });
 
 test('emitResumeModule emits a specialized scalar dispatcher with resolved constants', () => {

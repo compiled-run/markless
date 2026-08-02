@@ -5,7 +5,6 @@ import {
 	type ProtocolStatePayload,
 	type ProtocolViewPayload,
 } from './protocol.ts';
-import { isValidStorageKey } from './storage-key.ts';
 
 export type EncodedPayloadScripts = {
 	readonly stateScript: string;
@@ -60,12 +59,19 @@ export class RuntimePayloadError extends Error implements RuntimePayloadDiagnost
 }
 
 export function decodePayloadScripts(input: EncodedPayloadScripts): DecodedPayloadScripts {
+	return decodePayloadScriptsWithVersion(input, false);
+}
+
+export function decodePayloadScriptsWithVersion(
+	input: EncodedPayloadScripts,
+	allowStorage: boolean,
+): DecodedPayloadScripts {
 	const state = parseDataScript(input.stateScript, 'markless/state') as ProtocolStatePayload;
 	const view = parseDataScript(input.viewScript, 'markless/view') as ProtocolViewPayload;
 
 	assertProtocolStatePayload(state);
 	assertProtocolViewPayload(view);
-	assertProtocolVersion(state.version, 'markless/state');
+	assertProtocolVersion(state.version, 'markless/state', allowStorage);
 	assertProtocolVersion(view.version, 'markless/view');
 
 	return { state, view };
@@ -138,7 +144,6 @@ export function assertProtocolStatePayload(
 	}
 
 	assertOptionalSharedDefinitions(payload);
-	assertStorageRecords(payload);
 }
 
 export function assertProtocolStateCellPayload(
@@ -273,42 +278,16 @@ function assertAsyncBoundaryArm(value: unknown, context: string): void {
 	}
 }
 
-function assertProtocolVersion(version: unknown, type: RuntimePayloadType): void {
+function assertProtocolVersion(
+	version: unknown,
+	type: RuntimePayloadType,
+	allowStorage = false,
+): void {
 	if (
 		version !== ASYNC_PROTOCOL_VERSION &&
-		!(type === 'markless/state' && version === STORAGE_PROTOCOL_VERSION)
+		!(allowStorage && type === 'markless/state' && version === STORAGE_PROTOCOL_VERSION)
 	) {
 		throw protocolVersionMismatchError(type, version);
-	}
-}
-
-function assertStorageRecords(payload: Record<string, unknown>): void {
-	if (payload.version === ASYNC_PROTOCOL_VERSION) {
-		return;
-	}
-	if (payload.version !== STORAGE_PROTOCOL_VERSION) return;
-
-	const storage = requiredPayloadArrayField(payload, 'storage', 'markless/state');
-	const cellIds = new Set(
-		(payload.cells as ReadonlyArray<Record<string, unknown>>).map((cell) => cell.graphNodeId),
-	);
-	for (const [index, entry] of storage.entries()) {
-		const context = `markless/state storage[${index}]`;
-		assertRecordShape(entry, context);
-		assertStringField(entry, 'graphNodeId', context);
-		assertStringField(entry, 'key', context);
-		if (!cellIds.has(entry.graphNodeId)) {
-			throw invalidPayloadShapeError(
-				'markless/state',
-				`Invalid ${context}: graphNodeId must match a state cell.`,
-			);
-		}
-		if (!isValidStorageKey(entry.key as string)) {
-			throw invalidPayloadShapeError(
-				'markless/state',
-				`Invalid ${context}: key must be a verbatim key or a derived markless:<identifier>.`,
-			);
-		}
 	}
 }
 
@@ -1404,7 +1383,7 @@ export function payloadInvalidError(
 	});
 }
 
-function invalidPayloadShapeError(
+export function invalidPayloadShapeError(
 	payloadType: RuntimePayloadType,
 	message: string,
 ): RuntimePayloadError {

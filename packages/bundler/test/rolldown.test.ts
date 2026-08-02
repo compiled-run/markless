@@ -913,12 +913,7 @@ export function App() @{
 
 		expect(delivered).toBeUndefined();
 		expect(invoked).toEqual(['symbol:1', 'Literal sibling']);
-		expect(order).toEqual([
-			'parent:start',
-			'parent:end',
-			'following:complete',
-			'flush',
-		]);
+		expect(order).toEqual(['parent:start', 'parent:end', 'following:complete', 'flush']);
 		expect(flushes).toBe(1);
 		expect(plugin.api.invalidateGeneratedModules(childFilename, 'client')).toContain(
 			`\0virtual:markless:resolver:${encodeURIComponent(parentFilename)}`,
@@ -973,9 +968,7 @@ export function App() @{
 			const ssrChunks = Array.isArray(ssrBuild)
 				? ssrBuild.flatMap((item) => item.output)
 				: ssrBuild.output;
-			const ssrEntry = ssrChunks.find(
-				(item) => item.type === 'chunk' && item.isEntry,
-			);
+			const ssrEntry = ssrChunks.find((item) => item.type === 'chunk' && item.isEntry);
 			expect(ssrEntry?.type).toBe('chunk');
 			const renderedModule = (await import(
 				`${pathToFileURL(resolve(ssrOutputDirectory, ssrEntry!.fileName)).href}?t=${Date.now()}`
@@ -1439,7 +1432,7 @@ export function App() @{
 	expect(keyed.code).not.toContain('resumeEventOnlyFromPayloadDocument');
 	expect(keyed.code).not.toContain('resumeFromPayloadDocument');
 	expect(keyedResume?.source).toContain('resumeFromPayloadDocument');
-	expect(keyedResume?.source).toContain("import('@markless/core/web/resume')");
+	expect(keyedResume?.source).toContain("import('@markless/core/web/resume-storage-free')");
 	expect(keyed.code).not.toContain(
 		"import { resumeFromPayloadDocument } from '@markless/core/web/resume';",
 	);
@@ -1487,7 +1480,7 @@ export function App() @{
 	expect(handles.code).not.toContain('resumeEventOnlyFromPayloadDocument');
 	expect(handles.code).not.toContain('resumeFromPayloadDocument');
 	expect(handlesResume?.source).toContain('resumeFromPayloadDocument');
-	expect(handlesResume?.source).toContain("import('@markless/core/web/resume')");
+	expect(handlesResume?.source).toContain("import('@markless/core/web/resume-storage-free')");
 	expect(handles.code).not.toContain(
 		"import { resumeFromPayloadDocument } from '@markless/core/web/resume';",
 	);
@@ -1516,7 +1509,7 @@ export function App() @{
 	expect(boundaries.code).not.toContain('resumeEventOnlyFromPayloadDocument');
 	expect(boundaries.code).not.toContain('resumeFromPayloadDocument');
 	expect(boundariesResume?.source).toContain('resumeFromPayloadDocument');
-	expect(boundariesResume?.source).toContain("import('@markless/core/web/resume')");
+	expect(boundariesResume?.source).toContain("import('@markless/core/web/resume-storage-free')");
 	expect(boundaries.code).not.toContain(
 		"import { resumeFromPayloadDocument } from '@markless/core/web/resume';",
 	);
@@ -1543,7 +1536,7 @@ export function Shell() @{
 	const withChildResume = withChild.virtualModules.find((module) => module.type === 'resume');
 	expect(withChild.code).not.toContain('resumeEventOnlyFromPayloadDocument');
 	expect(withChildResume?.source).not.toContain('resumeEventOnlyFromPayloadDocument');
-	expect(withChildResume?.source).toContain("import('@markless/core/web/resume')");
+	expect(withChildResume?.source).toContain("import('@markless/core/web/resume-storage-free')");
 	expect(withChild.code).not.toContain('loadFullResume: marklessFullResumeHandoff');
 	expect(withChild.code).not.toContain("import('@markless/core/web/resume')");
 	expect(withChild.code).not.toContain(

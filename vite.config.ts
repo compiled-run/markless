@@ -99,7 +99,7 @@ const buildOrder: PackUserConfig[] = [
 			decode: './src/value-decode.ts',
 			'decode-client': './src/value-decode-client.ts',
 			protocol: './src/protocol.ts',
-			'protocol-validation': './src/protocol-validation.ts',
+			'protocol-validation': './src/protocol-validation-storage.ts',
 		},
 	}),
 	marklessPack({
@@ -134,6 +134,7 @@ const buildOrder: PackUserConfig[] = [
 			'render-to-string': './src/render-to-string.ts',
 			resume: './src/payload-full.ts',
 			...webFnsEntries,
+			'resume-storage-free': './src/payload-full-storage-free.ts',
 		},
 	}),
 	marklessPack({
@@ -182,6 +183,7 @@ const buildOrder: PackUserConfig[] = [
 			'web/render-to-string': './src/web/render-to-string.ts',
 			'web/resume': './src/web/resume.ts',
 			vite: './src/vite.ts',
+			'web/resume-storage-free': './src/web/resume-storage-free.ts',
 		},
 	}),
 	marklessPack({

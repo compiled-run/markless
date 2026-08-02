@@ -3,6 +3,7 @@ import { MARKLESS_EXECUTION_LOG_MODULE_ID } from './execution-log.ts';
 import type { MarklessExecutionLogMode } from './types.ts';
 import type { InlineResumerSourceVariants } from '@markless/web/inline/resumer';
 import type { StorageSeedMetadata } from '@markless/serializer';
+import { ASYNC_PROTOCOL_VERSION } from '@markless/serializer';
 
 export const MARKLESS_VIRTUAL_PREFIX = 'virtual:markless:';
 
@@ -231,6 +232,8 @@ export function emitResumeModule(input: {
 		emitResumeContainerEvent(
 			resumeSymbolLoader,
 			input.needsFullResume ?? false,
+			(input.payloadState as { readonly version?: unknown } | undefined)?.version ===
+				ASYNC_PROTOCOL_VERSION,
 			// Composed pages (child symbol routes) take the full path: lean record
 			// matching does not account for runtime child composition (same ruling
 			// as the scalar-specialization exclusion; unmatched events pass through
@@ -350,15 +353,19 @@ function emitCompiledAppDefault(input: {
 function emitResumeContainerEvent(
 	loadSymbolName: string,
 	needsFullResume: boolean,
+	storageFreePayload: boolean,
 	leanMode: LeanResumeMode,
 	scalarSpecializations: ReadonlyArray<ScalarSpecialization>,
 	runtimeDemandMap: unknown,
 	executionLogEnabled: boolean,
 ): string {
+	const resumeEntry = storageFreePayload
+		? '@markless/core/web/resume-storage-free'
+		: '@markless/core/web/resume';
 	const fullResumeHandoff = [
 		'async function marklessFullResumeHandoff(handoff) {',
 		'	handoff.root.__asyncResumeRuntimeStarted = true;',
-		"	const { resumeFromPayloadDocument } = await import('@markless/core/web/resume');",
+		`	const { resumeFromPayloadDocument } = await import('${resumeEntry}');`,
 		'	const { runtime } = await resumeFromPayloadDocument({',
 		'		document: handoff.document,',
 		'		root: handoff.root,',
