@@ -213,13 +213,11 @@ function renderArmAppend(
 	arm: PendingArm,
 	nonce: string | undefined,
 ): string {
-	const startAnchor = `<!--markless:async:${arm.boundaryId}-->`;
-	const endAnchor = `<!--/markless:async:${arm.boundaryId}-->`;
-	const html = output.html;
-	const start = html.indexOf(startAnchor);
-	const end = html.indexOf(endAnchor);
-	if (start === -1 || end < start) throw streamArmError(arm.boundaryId, 'anchor pair', 'html');
-	const armHtml = html.slice(start + startAnchor.length, end);
+	const renderedAnchor = output.structure?.anchors.find(
+		(candidate) => candidate.kind === 'async' && candidate.id === arm.boundaryId,
+	);
+	if (!renderedAnchor) throw streamArmError(arm.boundaryId, 'renderData boundary record', 'structure');
+	const armHtml = renderedAnchor.html;
 
 	const boundary = (output.view?.asyncBoundaries ?? []).find(
 		(candidate) => candidate.id === arm.boundaryId,

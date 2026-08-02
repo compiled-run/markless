@@ -86,7 +86,7 @@ export function App() @{ <p>Ready</p> }
 	})) as { code: string };
 
 	expect(load).toHaveBeenCalledExactlyOnceWith({ id: '/workspace/app/src/missing.tsrx' });
-	expect(result.code).toContain('"<p>" + "Ready" + "</p>"');
+	expect(result.code).toContain('"statics": ["<p>Ready</p>"]');
 });
 
 test('cyclic tsrx imports use available artifacts without recursively forcing parents', async () => {

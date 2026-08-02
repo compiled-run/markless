@@ -110,7 +110,7 @@ export default function Page() @{
 	const csrGraphProps =
 		'{"name":"libraryOpen","kind":"graph-reference","graphNodeId":"state:libraryOpen","path":[],"source":"libraryOpen"}';
 	const ssrGraphProps =
-		'graphProps: [{"name":"libraryOpen","graphNodeId":"state:libraryOpen","path":[]}]';
+		'"graphProps":[{"name":"libraryOpen","graphNodeId":"state:libraryOpen","path":[]}]';
 
 	expect(result.publicRenderModule.csrModuleSource).toContain(csrGraphProps);
 	expect(result.publicRenderModule.ssrModuleSource).toContain(ssrGraphProps);

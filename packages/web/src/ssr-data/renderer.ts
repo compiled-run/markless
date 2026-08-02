@@ -21,13 +21,19 @@ type LocatedSlot = { readonly staticIndex: number; readonly coordinate: SsrDataC
 
 export type SsrDataSlot = LocatedSlot &
 	(
-		| { readonly kind: 'text'; readonly residue: SsrDataResidue }
+		| { readonly kind: 'text'; readonly residue: SsrDataResidue; readonly raw?: boolean }
 		| { readonly kind: 'attribute'; readonly name: string; readonly residue: SsrDataResidue }
+		| {
+				readonly kind: 'spread-attributes';
+				readonly residue: SsrDataResidue;
+				readonly excludeNames: ReadonlyArray<string>;
+		  }
 		| {
 				readonly kind: 'child-component';
 				readonly componentEdgeId: string;
 				readonly childComponentName: string;
 				readonly childTemplateId: string;
+				readonly projectionChunkId?: string;
 		  }
 		| {
 				readonly kind: 'branch';
@@ -95,6 +101,26 @@ export type SsrDataReadContext = {
 	readonly chunkId: string;
 	readonly repeatItem?: unknown;
 	readonly repeatIndex?: number;
+	readonly asyncError?: unknown;
+	readonly projectionHtml?: string;
+};
+
+export type SsrDataStructure = {
+	readonly locators: ReadonlyArray<{
+		readonly hostNodeId: string;
+		readonly tagName: string;
+		readonly index: number;
+	}>;
+	readonly anchors: ReadonlyArray<{
+		readonly kind: 'branch' | 'async';
+		readonly id: string;
+		readonly startIndex: number;
+		readonly endIndex: number;
+		readonly elementStart: number;
+		readonly elementEnd: number;
+		readonly html: string;
+	}>;
+	readonly elementCount: number;
 };
 
 export type SsrDataCoordinates = {
@@ -119,7 +145,13 @@ export type RenderSsrDataInput = {
 	readonly renderChild?: (
 		slot: Extract<SsrDataSlot, { readonly kind: 'child-component' }>,
 		context: SsrDataReadContext,
-	) => Awaitable<{ readonly html: string; readonly coordinates?: SsrDataCoordinates } | string | null | undefined>;
+	) => Awaitable<{
+		readonly html: string;
+		readonly coordinates?: SsrDataCoordinates;
+		readonly structure?: SsrDataStructure;
+		readonly structureTokens?: ReadonlyArray<StructureToken>;
+		readonly elementCount?: number;
+	}>;
 	readonly selectBranchArm?: (
 		slot: Extract<SsrDataSlot, { readonly kind: 'branch' }>,
 		context: SsrDataReadContext,
@@ -128,6 +160,10 @@ export type RenderSsrDataInput = {
 		slot: Extract<SsrDataSlot, { readonly kind: 'repeat' }>,
 		context: SsrDataReadContext,
 	) => Awaitable<ReadonlyArray<unknown> | null | undefined>;
+	readonly selectAsyncArm?: (
+		slot: Extract<SsrDataSlot, { readonly kind: 'async' }>,
+		context: SsrDataReadContext,
+	) => Awaitable<number | { readonly arm: number; readonly error?: unknown }>;
 	readonly state?: ProtocolStatePayload;
 	readonly view?: ProtocolViewPayload;
 };
@@ -138,7 +174,22 @@ export type RenderSsrDataOutput = {
 	readonly view?: ProtocolViewPayload;
 	readonly payloadScripts?: RenderedPayloadScripts;
 	readonly coordinates: SsrDataCoordinates;
+	readonly structure: SsrDataStructure;
+	/** Internal composition stream; child renderers return it without reparsing HTML. */
+	readonly structureTokens: ReadonlyArray<StructureToken>;
 };
+
+export type StructureToken =
+	| { readonly kind: 'element'; readonly hostNodeId: string; readonly tagName: string }
+	| {
+			readonly kind: 'comment';
+			readonly anchorKind: 'branch' | 'async';
+			readonly anchorId: string;
+			readonly edge: 'start' | 'end';
+			readonly anchorHtml?: string;
+	  };
+
+type RenderedPart = { readonly html: string; readonly tokens: ReadonlyArray<StructureToken> };
 
 export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSsrDataOutput> {
 	const idPrefix = input.idPrefix ?? '';
@@ -146,7 +197,9 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 	const locators: Array<SsrDataCoordinates['locators'][number]> = [];
 	const anchors: Array<SsrDataCoordinates['anchors'][number]> = [];
 	const rootId = input.renderData.root?.templateId;
-	const html = rootId ? await renderChunk(rootId, {}) : '';
+	const rendered = rootId ? await renderChunk(rootId, {}) : { html: '', tokens: [] };
+	const html = rendered.html;
+	const structure = materializeStructure(rendered.tokens);
 	const payloadScripts = input.state && input.view
 		? renderPayloadScripts({ state: input.state, view: input.view })
 		: undefined;
@@ -157,12 +210,14 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 		...(input.view ? { view: input.view } : {}),
 		...(payloadScripts ? { payloadScripts } : {}),
 		coordinates: { locators, anchors },
+		structure,
+		structureTokens: rendered.tokens,
 	};
 
 	async function renderChunk(
 		chunkId: string,
 		repeat: { readonly item?: unknown; readonly index?: number },
-	): Promise<string> {
+	): Promise<RenderedPart> {
 		const chunk = chunks.get(chunkId);
 		if (!chunk) throw new Error(`MARKLESS_SSR_DATA_CHUNK_MISSING: ${chunkId}`);
 		for (const host of chunk.hosts) locators.push({
@@ -179,6 +234,7 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 		}
 
 		let html = '';
+		const renderedSlots = new Map<SsrDataSlot, RenderedPart>();
 		for (let index = 0; index < chunk.statics.length; index++) {
 			const slots = slotsByStatic.get(index) ?? [];
 			html += withoutSlotMarker(chunk.statics[index] ?? '', index, slots);
@@ -188,29 +244,69 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 					...(repeat.item !== undefined ? { repeatItem: repeat.item } : {}),
 					...(repeat.index !== undefined ? { repeatIndex: repeat.index } : {}),
 				};
-				html += await renderSlot(slot, context);
+				const renderedSlot = await renderSlot(slot, context);
+				renderedSlots.set(slot, renderedSlot);
+				html += renderedSlot.html;
 			}
 		}
-		return html;
+		const ordered = [
+			...chunk.hosts.map((host) => ({
+				path: host.coordinate.path,
+				order: 0,
+				tokens: [{ kind: 'element', hostNodeId: `${idPrefix}${host.hostNodeId}`, tagName: host.tagName }] as StructureToken[],
+			})),
+			...chunk.slots.flatMap((slot, order) => {
+				const tokens = renderedSlots.get(slot)?.tokens ?? [];
+				return tokens.length > 0 ? [{ path: slot.coordinate.path, order: order + 1, tokens }] : [];
+			}),
+		].sort((left, right) => comparePath(left.path, right.path) || left.order - right.order);
+		return { html, tokens: ordered.flatMap((entry) => entry.tokens) };
 	}
 
-	async function renderSlot(slot: SsrDataSlot, context: SsrDataReadContext): Promise<string> {
+	async function renderSlot(slot: SsrDataSlot, context: SsrDataReadContext): Promise<RenderedPart> {
 		switch (slot.kind) {
-			case 'text':
+			case 'text': {
+				const value = await input.read(slot.residue, context);
+				return { html: slot.raw ? String(value ?? '') : escapeHtml(value), tokens: [] };
+			}
 			case 'attribute':
-				return escapeHtml(await input.read(slot.residue, context));
+				return { html: escapeHtml(await input.read(slot.residue, context)), tokens: [] };
+			case 'spread-attributes':
+				return { html: renderSpreadAttributes(await input.read(slot.residue, context), slot.excludeNames), tokens: [] };
 			case 'child-component': {
 				anchors.push(anchorRecord(idPrefix, context.chunkId, slot, slot.componentEdgeId));
+				const projection = slot.projectionChunkId
+					? await renderChunk(slot.projectionChunkId, {})
+					: undefined;
 				if (!input.renderChild)
 					throw new Error(`MARKLESS_SSR_DATA_CHILD_RENDERER_MISSING: ${slot.componentEdgeId}`);
-				const child = await input.renderChild(slot, context);
-				if (typeof child === 'string') return child;
-				if (!child) return '';
+				const child = await input.renderChild(slot, {
+					...context,
+					...(projection ? { projectionHtml: projection.html } : {}),
+				});
+				if (!child || typeof child !== 'object')
+					throw new Error(`MARKLESS_SSR_DATA_CHILD_STRUCTURE_MISSING: ${slot.componentEdgeId}`);
 				if (child.coordinates) {
 					locators.push(...child.coordinates.locators);
 					anchors.push(...child.coordinates.anchors);
 				}
-				return child.html;
+				const childTokens = 'structureTokens' in child
+					? (child as { readonly structureTokens?: ReadonlyArray<StructureToken> }).structureTokens
+					: undefined;
+				const childElementCount = 'elementCount' in child && typeof child.elementCount === 'number'
+					? child.elementCount
+					: undefined;
+				if (!childTokens && childElementCount === undefined)
+					throw new Error(`MARKLESS_SSR_DATA_CHILD_STRUCTURE_MISSING: ${slot.componentEdgeId}`);
+				const countTokens = Array.from({ length: childElementCount }, (_, index) => ({
+					kind: 'element' as const,
+					hostNodeId: `${idPrefix}__child:${slot.componentEdgeId}:${index}`,
+					tagName: '*',
+				}));
+				return {
+					html: child.html,
+					tokens: childTokens ?? [...countTokens, ...(projection?.tokens ?? [])],
+				};
 			}
 			case 'branch': {
 				anchors.push(anchorRecord(idPrefix, context.chunkId, slot, slot.branchSiteId));
@@ -218,8 +314,12 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 					throw new Error(`MARKLESS_SSR_DATA_BRANCH_SELECTOR_MISSING: ${slot.branchSiteId}`);
 				const arm = await input.selectBranchArm(slot, context);
 				const armChunkId = slot.armTemplateIds[arm];
-				const body = armChunkId ? await renderChunk(armChunkId, {}) : '';
-				return `<!--markless:branch:${idPrefix}${slot.branchSiteId}-->${body}<!--/markless:branch:${idPrefix}${slot.branchSiteId}-->`;
+				const body = armChunkId ? await renderChunk(armChunkId, {}) : { html: '', tokens: [] };
+				const id = `${idPrefix}${slot.branchSiteId}`;
+				return {
+					html: `<!--markless:branch:${id}-->${body.html}<!--/markless:branch:${id}-->`,
+					tokens: [commentToken('branch', id, 'start', body.html), ...body.tokens, commentToken('branch', id, 'end')],
+				};
 			}
 			case 'repeat': {
 				anchors.push(anchorRecord(idPrefix, context.chunkId, slot, slot.repeatId));
@@ -234,9 +334,9 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 							}, context)
 						: [];
 				if (!Array.isArray(items) || items.length === 0)
-					return slot.emptyTemplateId ? renderChunk(slot.emptyTemplateId, {}) : '';
+					return slot.emptyTemplateId ? renderChunk(slot.emptyTemplateId, {}) : { html: '', tokens: [] };
 				const rows = await Promise.all(items.map((item, index) => renderChunk(slot.rowTemplateId, { item, index })));
-				return rows.join('');
+				return { html: rows.map((row) => row.html).join(''), tokens: rows.flatMap((row) => row.tokens) };
 			}
 			case 'async': {
 				anchors.push(anchorRecord(idPrefix, context.chunkId, slot, slot.boundaryId));
@@ -247,17 +347,27 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 				const protocolBoundary = input.view?.asyncBoundaries.find(
 					(candidate) => candidate.id === slot.boundaryId,
 				);
+				const selected = input.selectAsyncArm
+					? await input.selectAsyncArm(slot, context)
+					: protocolBoundary?.initiallyServedArm ?? boundary.initiallyServedArm;
+				const arm = typeof selected === 'number' ? selected : selected.arm;
 				const armChunkId = servedArmChunk(
-					protocolBoundary?.initiallyServedArm ?? boundary.initiallyServedArm,
+					arm,
 					slot.armTemplateIds,
 				);
-				const body = armChunkId ? await renderChunk(armChunkId, {}) : '';
-				return `<!--markless:async:${idPrefix}${slot.boundaryId}-->${body}<!--/markless:async:${idPrefix}${slot.boundaryId}-->`;
+				const body = armChunkId
+					? await renderChunk(armChunkId, { ...context, ...(typeof selected === 'number' ? {} : { asyncError: selected.error }) })
+					: { html: '', tokens: [] };
+				const id = `${idPrefix}${slot.boundaryId}`;
+				return {
+					html: `<!--markless:async:${id}-->${body.html}<!--/markless:async:${id}-->`,
+					tokens: [commentToken('async', id, 'start', body.html), ...body.tokens, commentToken('async', id, 'end')],
+				};
 			}
 			case 'dynamic-host': {
 				anchors.push(anchorRecord(idPrefix, context.chunkId, slot, slot.hostNodeId));
 				const tag = dynamicTag(await input.read(slot.tag, context));
-				if (tag === null) return '';
+				if (tag === null) return { html: '', tokens: [] };
 				locators.push({
 					chunkId: `${idPrefix}${context.chunkId}`,
 					hostNodeId: `${idPrefix}${slot.hostNodeId}`,
@@ -273,10 +383,68 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 						? renderAttribute(attribute.name, value)
 						: renderSpreadAttributes(value);
 				}
-				return `<${tag}${attributes}>${await renderChunk(slot.childChunkId, {})}</${tag}>`;
+				const body = await renderChunk(slot.childChunkId, {});
+				return {
+					html: `<${tag}${attributes}>${body.html}</${tag}>`,
+					tokens: [
+					{ kind: 'element', hostNodeId: `${idPrefix}${slot.hostNodeId}`, tagName: tag },
+					...body.tokens,
+				],
+				};
 			}
 		}
 	}
+}
+
+function commentToken(
+	anchorKind: 'branch' | 'async',
+	anchorId: string,
+	edge: 'start' | 'end',
+	anchorHtml?: string,
+): StructureToken {
+	return { kind: 'comment', anchorKind, anchorId, edge, ...(anchorHtml === undefined ? {} : { anchorHtml }) };
+}
+
+function comparePath(left: ReadonlyArray<number>, right: ReadonlyArray<number>): number {
+	for (let index = 0; index < Math.min(left.length, right.length); index++) {
+		const difference = left[index]! - right[index]!;
+		if (difference !== 0) return difference;
+	}
+	return left.length - right.length;
+}
+
+function materializeStructure(tokens: ReadonlyArray<StructureToken>): SsrDataStructure {
+	const locators: Array<SsrDataStructure['locators'][number]> = [];
+	const starts = new Map<string, { readonly comment: number; readonly element: number; readonly html: string }>();
+	const anchors: Array<SsrDataStructure['anchors'][number]> = [];
+	let commentIndex = 0;
+	for (const token of tokens) {
+		if (token.kind === 'element') {
+			locators.push({ hostNodeId: token.hostNodeId, tagName: token.tagName, index: locators.length });
+			continue;
+		}
+		if (token.edge === 'start')
+			starts.set(token.anchorId, {
+				comment: commentIndex,
+				element: locators.length,
+				html: token.anchorHtml ?? '',
+			});
+		else {
+			const start = starts.get(token.anchorId);
+			if (!start) throw new Error(`MARKLESS_SSR_DATA_ANCHOR_START_MISSING: ${token.anchorId}`);
+			anchors.push({
+				kind: token.anchorKind,
+				id: token.anchorId,
+				startIndex: start.comment,
+				endIndex: commentIndex,
+				elementStart: start.element,
+				elementEnd: locators.length,
+				html: start.html,
+			});
+		}
+		commentIndex++;
+	}
+	return { locators, anchors, elementCount: locators.length };
 }
 
 export type SsrHtmlComparison =
@@ -336,10 +504,11 @@ function renderAttribute(name: string, value: unknown): string {
 	return ` ${name}="${escapeHtml(value)}"`;
 }
 
-function renderSpreadAttributes(value: unknown): string {
+function renderSpreadAttributes(value: unknown, excludeNames: ReadonlyArray<string> = []): string {
 	if (!value || typeof value !== 'object') return '';
 	let html = '';
 	for (const [name, attribute] of Object.entries(value)) {
+		if (excludeNames.includes(name)) continue;
 		if (!/^[A-Za-z_][\w.:-]*$/.test(name) || /^on[A-Z]/.test(name) || name === 'attach' || name === 'el' || name === 'children') continue;
 		if (attribute === null || attribute === undefined || attribute === false) continue;
 		html += attribute === true ? ` ${name}=""` : renderAttribute(name, attribute);

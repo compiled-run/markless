@@ -153,6 +153,15 @@ function streamArtifact() {
 				: { locators: [], events: [], behaviors: [], elementHandles: [] };
 			return {
 				html: `<main><!--markless:async:stream-->${settled ? '<article><span>quiet</span><button>Wake</button></article>' : '<p>Waiting</p>'}<!--/markless:async:stream--></main>`,
+				structure: {
+					anchors: [{
+						kind: 'async',
+						id: 'stream',
+						html: settled
+							? '<article><span>quiet</span><button>Wake</button></article>'
+							: '<p>Waiting</p>',
+					}],
+				},
 				state: {
 					version: 1,
 					cells: [],

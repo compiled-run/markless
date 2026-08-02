@@ -13,7 +13,6 @@ describe('marklessSsrComposeView with projecting children', () => {
 		// Walk:      0 app-root    1 shell     2 header   3 main  4 button
 		const childHtml =
 			'<div class="shell"><header></header><main><button data-h="h2"></button></main></div>';
-		const html = `<div class="app-root">${childHtml}</div>`;
 		// Parent-only walk (component invisible): app-root=0, button=1.
 		const hostLocators = [
 			{ hostNodeId: 'h1', strategy: 'dom-order', index: 0 },
@@ -49,7 +48,21 @@ describe('marklessSsrComposeView with projecting children', () => {
 			},
 		];
 
-		const composed = marklessSsrComposeView(html, view, hostLocators, children);
+		const composed = marklessSsrComposeView(
+			{
+				locators: [
+					{ hostNodeId: 'h1', tagName: 'div', index: 0 },
+					{ hostNodeId: 'c0:s1', tagName: 'div', index: 1 },
+					{ hostNodeId: 'header', tagName: 'header', index: 2 },
+					{ hostNodeId: 'c0:s2', tagName: 'main', index: 3 },
+					{ hostNodeId: 'h2', tagName: 'button', index: 4 },
+				],
+				anchors: [],
+				elementCount: 5,
+			},
+			view,
+			children,
+		);
 		const byId = new Map(
 			composed.view.locators.map((l: { hostNodeId: string; index: number }) => [
 				l.hostNodeId,

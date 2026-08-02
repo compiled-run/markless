@@ -28,17 +28,19 @@ const liveFiles = [
 	'demos/live-feed-ssr/pages/UpdateSummary.tsrx',
 ] as const;
 
-test('music-player-ssr page source matches in shadow mode with documented chunk normalization', async () => {
+test('music-player-ssr production renderData SSR matches the independent data renderer', async () => {
 	const modules = await compileDemoModules(musicFiles);
 	const page = modules.get('demos/music-player-ssr/pages/index.tsrx')!;
 	const current = await currentEmitterOutput(page, modules);
 	const shadow = await dataRendererOutput(page, modules);
+	expect(page.compiled.publicRenderModule.ssrModuleSource).toContain('renderSsrData');
+	expect(page.compiled.publicRenderModule.ssrModuleSource).not.toContain('marklessSsrHostLocators');
 
 	expect(compareSsrHtml(normalizeKnownChunkBytes(current.html), normalizeKnownChunkBytes(shadow.html)))
 		.toEqual({ equal: true });
 });
 
-test('live-feed-ssr settled page source matches in shadow mode with documented chunk normalization', async () => {
+test('live-feed-ssr settled production renderData SSR matches the independent data renderer', async () => {
 	const modules = await compileDemoModules(liveFiles);
 	const page = modules.get('demos/live-feed-ssr/pages/index.tsrx')!;
 	const current = await currentEmitterOutput(page, modules, {
@@ -61,7 +63,7 @@ test('live-feed-ssr settled page source matches in shadow mode with documented c
 	).toEqual({ equal: true });
 });
 
-test('live-feed-ssr streaming pending shell matches in shadow mode', async () => {
+test('live-feed-ssr production streaming pending shell matches the independent data renderer', async () => {
 	const modules = await compileDemoModules(liveFiles);
 	const page = modules.get('demos/live-feed-ssr/pages/index.tsrx')!;
 	const streaming = { streaming: { runs: new Map<string, { readonly promise: Promise<unknown> }>() } };

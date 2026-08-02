@@ -202,7 +202,7 @@ export function SignalCard() @{
 		"const derive=() => ({ label: east.label + '-' + west.label });return derive()",
 	);
 	expect(result.publicRenderModule.ssrModuleSource).toContain(
-		'marklessSsrRunAsyncComputed(marklessSsrAsyncSnapshots, "computed:card"',
+		'marklessSsrRunAsyncComputed(marklessSsrAsyncSnapshots,"computed:card"',
 	);
 	const boundary = result.protocolView.asyncBoundaries[0];
 	const updateSymbol = result.symbolResolver.symbols.find(

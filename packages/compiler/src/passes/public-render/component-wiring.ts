@@ -160,7 +160,7 @@ function componentPropsSource(
 	return props;
 }
 
-function boundSymbolsForEdge(
+export function boundSymbolsForEdge(
 	edge: ComponentEdge | undefined,
 	symbols: ReadonlyMap<string, string>,
 ): Readonly<Record<string, string>> {

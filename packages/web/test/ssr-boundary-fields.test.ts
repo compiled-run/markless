@@ -28,7 +28,11 @@ test.each([
 			],
 		};
 		const [armized] = marklessSsrArmizeBoundaries(
-			'<!--markless:async:boundary:alternate--><p>content</p><!--/markless:async:boundary:alternate-->',
+			{
+				locators: [{ hostNodeId: 'h0', tagName: 'p', index: 0 }],
+				anchors: [{ kind: 'async', id: 'boundary:alternate', startIndex: 0, endIndex: 1, elementStart: 0, elementEnd: 1, html: '<p>content</p>' }],
+				elementCount: 1,
+			},
 			[boundary],
 			{ locators: [], events: [], behaviors: [], elementHandles: [] },
 			[
@@ -44,7 +48,11 @@ test.each([
 
 test('SSR armization records the served arm for an authored sync gate', () => {
 	const [armized] = marklessSsrArmizeBoundaries(
-		'<!--markless:async:boundary:card--><p>east-west</p><!--/markless:async:boundary:card-->',
+		{
+			locators: [{ hostNodeId: 'h0', tagName: 'p', index: 0 }],
+			anchors: [{ kind: 'async', id: 'boundary:card', startIndex: 0, endIndex: 1, elementStart: 0, elementEnd: 1, html: '<p>east-west</p>' }],
+			elementCount: 1,
+		},
 		[
 			{
 				id: 'boundary:card',

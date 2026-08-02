@@ -27,6 +27,13 @@ export type SsrRenderOutput = {
 	readonly html: string;
 	readonly state?: ProtocolStatePayload;
 	readonly view?: ProtocolViewPayload;
+	readonly structure?: {
+		readonly anchors: ReadonlyArray<{
+			readonly kind: 'branch' | 'async';
+			readonly id: string;
+			readonly html: string;
+		}>;
+	};
 };
 
 export type SsrRenderArtifact = {

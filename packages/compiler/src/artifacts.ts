@@ -484,11 +484,16 @@ type SemanticMarkupLocatedSlot = {
 
 export type SemanticMarkupSlot = SemanticMarkupLocatedSlot &
 	(
-		| { readonly kind: 'text'; readonly residue: SemanticMarkupResidue }
+		| { readonly kind: 'text'; readonly residue: SemanticMarkupResidue; readonly raw?: boolean }
 		| {
 				readonly kind: 'attribute';
 				readonly name: string;
 				readonly residue: SemanticMarkupResidue;
+		  }
+		| {
+				readonly kind: 'spread-attributes';
+				readonly residue: SemanticMarkupResidue;
+				readonly excludeNames: ReadonlyArray<string>;
 		  }
 		| {
 				readonly kind: 'child-component';

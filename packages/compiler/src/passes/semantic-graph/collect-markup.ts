@@ -26,6 +26,7 @@ import type {
 	SemanticMarkupResidue,
 	SemanticMarkupSlot,
 } from '../../artifacts.ts';
+import { collectStyleScopes } from '../public-render/style-scopes.ts';
 import type { MutableSemanticGraphArtifact } from './types.ts';
 
 type CollectionContext = {
@@ -37,6 +38,7 @@ type CollectionContext = {
 	readonly usedRepeatIds: Set<string>;
 	branchIndex: number;
 	boundaryIndex: number;
+	styleScopeClass: string | null;
 };
 
 type ChunkBuilder = {
@@ -73,6 +75,7 @@ export function collectSemanticMarkup(input: {
 		usedRepeatIds: new Set(),
 		branchIndex: 0,
 		boundaryIndex: 0,
+		styleScopeClass: null,
 	};
 	const components: Array<{
 		readonly name: string;
@@ -97,6 +100,7 @@ export function collectSemanticMarkup(input: {
 	}
 
 	for (const component of components) {
+		context.styleScopeClass = collectStyleScopes(component.root, input.filename).styleScopes[0]?.scopeId ?? null;
 		const builder = createChunk(`template:${component.name}`, 'template', component.name);
 		emitNode(component.root, [0], builder, context, null);
 		chunks.push(finishChunk(builder));
@@ -164,7 +168,11 @@ function emitNode(
 		if (!expression) return 0;
 		addAnchorSlot(
 			builder,
-			{ kind: 'text', residue: expressionResidue(expression, context, repeat) },
+			{
+				kind: 'text',
+				residue: expressionResidue(expression, context, repeat),
+				...(getIdentifierName(expression) === 'children' ? { raw: true } : {}),
+			},
 			path,
 		);
 		return 1;
@@ -318,15 +326,35 @@ function emitNode(
 	}
 
 	append(builder, `<${tagName}`);
-	for (const attribute of getElementAttributes(node)) {
-		if (isSpreadAttribute(attribute)) continue;
+	let classSeen = false;
+	const elementAttributes = getElementAttributes(node);
+	const declaredAttributeNames = elementAttributes.flatMap((candidate) => {
+		if (isSpreadAttribute(candidate)) return [];
+		const name = getIdentifierName(candidate.name as AnyNode | undefined);
+		return name ? [name] : [];
+	});
+	for (const attribute of elementAttributes) {
+		if (isSpreadAttribute(attribute)) {
+			const expression = unwrapExpressionContainer(
+				(attribute.argument ?? attribute.value) as AnyNode | undefined,
+			);
+			if (expression)
+				addSlot(builder, {
+					kind: 'spread-attributes',
+					coordinate: { kind: 'child-index', path },
+					residue: expressionResidue(expression, context, repeat),
+					excludeNames: declaredAttributeNames,
+				});
+			continue;
+		}
 		const name = getIdentifierName(attribute.name as AnyNode | undefined);
 		if (!name || isEventAttribute(name) || name === 'attach' || name === 'el') continue;
+		if (name === 'class') classSeen = true;
 		const value = attribute.value as AnyNode | undefined;
 		const expression = unwrapExpressionContainer(value);
 		const literal = staticAttributeValue(value, expression);
 		if (literal !== null) {
-			append(builder, ` ${name}="${escapeAttribute(literal)}"`);
+			append(builder, ` ${name}="${escapeAttribute(name === 'class' && context.styleScopeClass ? `${literal} ${context.styleScopeClass}` : literal)}"`);
 			continue;
 		}
 		if (!expression) continue;
@@ -339,6 +367,8 @@ function emitNode(
 		});
 		append(builder, '"');
 	}
+	if (context.styleScopeClass && !classSeen)
+		append(builder, ` class="${context.styleScopeClass}"`);
 	append(builder, '>');
 	emitNodes(asNodes(node.children), [...path, 0], builder, context, repeat);
 	append(builder, `</${tagName}>`);
@@ -391,6 +421,11 @@ function emitDynamicHost(
 				residue: expressionResidue(expression, context, repeat),
 			});
 		}
+	}
+	if (context.styleScopeClass) {
+		staticAttributes.class = staticAttributes.class
+			? `${staticAttributes.class} ${context.styleScopeClass}`
+			: context.styleScopeClass;
 	}
 
 	const childChunkId = `dynamic-host:${builder.id}:${builder.slots.length}:children`;

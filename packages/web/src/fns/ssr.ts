@@ -20,37 +20,13 @@ export const marklessSsrRemapGraphOutput = marklessCsrRemapGraphOutput;
 export async function marklessSsrRenderChild(children, component, props, child, renderContext) {
 	const output = await component?.renderSsr?.(props, renderContext);
 	if (!output) return '';
-	let html = output.html ?? '';
-	for (const branch of output.view?.branches ?? [])
-		html = marklessSsrPrefixAnchorHtml(html, 'branch', branch.id, child.hostPrefix + branch.id);
-	for (const boundary of output.view?.asyncBoundaries ?? [])
-		html = marklessSsrPrefixAnchorHtml(
-			html,
-			'async',
-			boundary.id,
-			child.hostPrefix + boundary.id,
-		);
 	const entry = {
 		...child,
-		output: { ...output, html },
+		output,
 		callbackProps: props?.__marklessSsrCallbacks ?? {},
 	};
-	// Viewless children (router <Link>-style: renderSsr returns { html } only)
-	// still render real elements that later dom-order locators must skip.
-	// Their own element count is the rendered html minus the caller's projected
-	// children content (those hosts already entered the caller's locator stream
-	// during prop evaluation).
-	if (entry.output.view === undefined && entry.output.elementCount === undefined) {
-		entry.output.elementCount = Math.max(
-			0,
-			marklessSsrCountElementOpens(html) - marklessSsrCountElementOpens(props?.children),
-		);
-	}
 	children.push(entry);
-	return html;
-}
-export function marklessSsrCountElementOpens(html) {
-	return (String(html ?? '').match(/<[a-zA-Z]/g) ?? []).length;
+	return output.html ?? '';
 }
 // Component invocation inside a keyed repeat row: rows repeat, so no composed
 // child record can exist — the child contributes MARKUP ONLY. Interactive
@@ -265,6 +241,13 @@ export function marklessSsrMergeBranches(payloadBranches, runtimeBranches) {
 		takenById.has(branch.id) ? { ...branch, takenArm: takenById.get(branch.id) } : branch,
 	);
 }
+export function marklessSsrAsyncArm(snapshot) {
+	return snapshot?.status === 'fulfilled'
+		? ASYNC_BOUNDARY_ARM.try
+		: snapshot?.status === 'rejected'
+			? ASYNC_BOUNDARY_ARM.catch
+			: ASYNC_BOUNDARY_ARM.pending;
+}
 export function marklessSsrArmHost(hostLocators) {
 	hostLocators.marklessSsrExtraElements = (hostLocators.marklessSsrExtraElements ?? 0) + 1;
 	return '';
@@ -339,26 +322,21 @@ function marklessSsrUnbindLocalView(view, localHostIds) {
 	};
 }
 
-export function marklessSsrComposeView(html, view, hostLocators, children, asyncSnapshots) {
-	const localHostIds = new Set(hostLocators.map((locator) => locator.hostNodeId));
+export function marklessSsrComposeView(structure, view, children, asyncSnapshots, idPrefix = '') {
+	const renderedHostIds = new Set(structure.locators.map((locator) => locator.hostNodeId));
+	const localHostIds = new Set(
+		view.locators.flatMap((locator) =>
+			renderedHostIds.has(idPrefix + locator.hostNodeId) ? [locator.hostNodeId] : [],
+		),
+	);
 	const childData = children
 		.map((child) => ({
 			...child,
 			view: child.output?.view,
-			hostCount: child.output?.elementCount ?? child.output?.view?.locators?.length ?? 0,
 			externalSymbolIds: new Set(child.output?.externalSymbolIds ?? []),
 		}))
-		.filter((child) => child.view || child.hostCount > 0);
-	marklessSsrDeriveChildPositions(html, childData);
-	const offsetFor = (index) =>
-		childData.reduce(
-			(total, child) => total + (child.localIndex <= index ? child.hostCount : 0),
-			0,
-		);
-	const locators = hostLocators.map((locator) => ({
-		...locator,
-		index: locator.index + offsetFor(locator.index),
-	}));
+		.filter((child) => child.view);
+	const locators = [];
 	const { events, domUpdates, keyedRepeats, branches, asyncBoundaries } =
 		marklessSsrUnbindLocalView(view, localHostIds);
 	const behaviors = view.behaviors.filter((behavior) => localHostIds.has(behavior.hostNodeId));
@@ -367,12 +345,11 @@ export function marklessSsrComposeView(html, view, hostLocators, children, async
 	);
 	const asyncRunners = { ...view.asyncRunners };
 	const externalSymbolIds = new Set();
-	let inserted = 0;
 	for (const child of childData) {
 		if (child.view)
 			marklessSsrAppendChildView({
 				child,
-				baseIndex: child.localIndex + inserted,
+				baseIndex: 0,
 				locators,
 				events,
 				domUpdates,
@@ -384,14 +361,24 @@ export function marklessSsrComposeView(html, view, hostLocators, children, async
 				asyncRunners,
 				externalSymbolIds,
 			});
-		inserted += child.hostCount;
+	}
+	const locatorByHostId = new Map(structure.locators.map((locator) => [locator.hostNodeId, locator]));
+	for (const locator of view.locators.filter((candidate) => localHostIds.has(candidate.hostNodeId))) {
+		const rendered = locatorByHostId.get(idPrefix + locator.hostNodeId);
+		if (!rendered) throw new Error(`MARKLESS_SSR_DATA_HOST_MISSING: ${locator.hostNodeId}`);
+		locators.push({ ...locator, index: rendered.index, tagName: rendered.tagName });
+	}
+	for (const locator of locators) {
+		const rendered = locatorByHostId.get(idPrefix + locator.hostNodeId);
+		if (rendered) Object.assign(locator, { index: rendered.index, tagName: rendered.tagName });
 	}
 	locators.sort((a, b) => a.index - b.index);
 	const armizedBoundaries = marklessSsrArmizeBoundaries(
-		html,
-		marklessSsrResolveAnchorRecords(html, 'async', asyncBoundaries),
+		structure,
+		marklessSsrResolveAnchorRecords(structure, 'async', asyncBoundaries, idPrefix),
 		{ locators, events, behaviors, elementHandles },
 		asyncSnapshots,
+		idPrefix,
 	);
 	return {
 		view: {
@@ -402,35 +389,28 @@ export function marklessSsrComposeView(html, view, hostLocators, children, async
 			keyedRepeats,
 			behaviors,
 			elementHandles,
-			branches: marklessSsrResolveAnchorRecords(html, 'branch', branches),
+			branches: marklessSsrResolveAnchorRecords(structure, 'branch', branches, idPrefix),
 			asyncBoundaries: armizedBoundaries,
 			...(Object.keys(asyncRunners).length > 0 ? { asyncRunners } : {}),
 		},
-		elementCount:
-			hostLocators.length +
-			(hostLocators.marklessSsrExtraElements ?? 0) +
-			childData.reduce((total, child) => total + child.hostCount, 0),
+		elementCount: structure.elementCount,
 		externalSymbolIds: [...externalSymbolIds],
 	};
 }
-// D3 arm-relative coordinates: the rendered html is the truth for which arm a
-// boundary served and where its elements sit. Element opens before the start
-// anchor give the arm's page offset; every flat record between the anchor
+// D3 arm-relative coordinates: renderData structure is the truth for which arm
+// a boundary served and where its elements sit. The structural element range
+// at the anchor gives the arm's page offset; every flat record in that range
 // pair moves into boundary.armRecords with anchor-relative indexes, and the
 // taken arm's compile-time record set (events/behaviors/handles keyed by
 // hostNodeId) merges in. Composed children inside arms are covered by the
 // same positional move, so no page-absolute offset surgery remains for arms.
-export function marklessSsrArmizeBoundaries(html, boundaries, streams, asyncSnapshots) {
-	if (typeof html !== 'string' || boundaries.length === 0) return boundaries;
-	const opensBeforeComment = [];
-	const pattern = /<!--([\s\S]*?)-->/g;
-	let match;
-	while ((match = pattern.exec(html)) !== null) {
-		// Arm-branch anchors live in their boundary's own census (T104): the
-		// page-level comment census never counts them.
-		if (marklessSsrIsArmBranchAnchor(match[1])) continue;
-		opensBeforeComment.push((html.slice(0, match.index).match(/<[a-zA-Z]/g) ?? []).length);
-	}
+export function marklessSsrArmizeBoundaries(structure, boundaries, streams, asyncSnapshots, idPrefix = '') {
+	if (boundaries.length === 0) return boundaries;
+	const anchorById = new Map(
+		structure.anchors
+			.filter((anchor) => anchor.kind === 'async')
+			.map((anchor) => [anchor.id, anchor]),
+	);
 	const snapshotById = new Map(
 		(asyncSnapshots ?? []).map((entry) => [entry.graphNodeId, entry.snapshot]),
 	);
@@ -438,9 +418,10 @@ export function marklessSsrArmizeBoundaries(html, boundaries, streams, asyncSnap
 		// Child-composed boundaries already carry a single armized record set;
 		// arm-relative coordinates survive composition untouched.
 		if (!Array.isArray(boundary.armRecords)) return boundary;
-		const opensStart = opensBeforeComment[boundary.startAnchor.index];
-		const opensEnd = opensBeforeComment[boundary.endAnchor.index];
-		if (opensStart === undefined || opensEnd === undefined) return boundary;
+		const anchor = anchorById.get(idPrefix + boundary.id);
+		if (!anchor) throw new Error(`MARKLESS_SSR_DATA_ANCHOR_MISSING: async:${boundary.id}`);
+		const opensStart = anchor.elementStart;
+		const opensEnd = anchor.elementEnd;
 		const armLocators = [];
 		for (let i = streams.locators.length - 1; i >= 0; i--) {
 			const locator = streams.locators[i];
@@ -503,33 +484,6 @@ export function marklessSsrIsArmBranchAnchor(text) {
 		typeof text === 'string' &&
 		(text.startsWith('markless:arm-branch:') || text.startsWith('/markless:arm-branch:'))
 	);
-}
-// The emitted localIndex (static parent locator count) assumes children render
-// AFTER all parent hosts — false for projecting components (wrappers around the
-// parent's projected content) and for children inside async arms. The final
-// html knows the truth: locate each child's rendered subtree in document order
-// and count element opens before it, then convert back to parent-walk
-// coordinates by subtracting earlier children's element counts (need 13).
-export function marklessSsrDeriveChildPositions(html, childData) {
-	if (typeof html !== 'string' || html === '') return;
-	let cursor = 0;
-	let insertedBefore = 0;
-	for (const child of childData) {
-		const childHtml = child.output?.html;
-		if (!childHtml) {
-			insertedBefore += child.hostCount;
-			continue;
-		}
-		const at = html.indexOf(childHtml, cursor);
-		if (at === -1) {
-			insertedBefore += child.hostCount;
-			continue;
-		}
-		const opensBefore = (html.slice(0, at).match(/<[a-zA-Z]/g) ?? []).length;
-		child.localIndex = opensBefore - insertedBefore;
-		cursor = at + childHtml.length;
-		insertedBefore += child.hostCount;
-	}
 }
 
 export function marklessSsrAppendChildView(context) {
@@ -751,11 +705,6 @@ export function marklessSsrPrefixBoundaryArmRecords(set, child) {
 			: {}),
 	};
 }
-export function marklessSsrPrefixAnchorHtml(html, kind, id, prefixedId) {
-	return html
-		.replaceAll(`<!--markless:${kind}:${id}-->`, `<!--markless:${kind}:${prefixedId}-->`)
-		.replaceAll(`<!--/markless:${kind}:${id}-->`, `<!--/markless:${kind}:${prefixedId}-->`);
-}
 export function marklessSsrRemapChildReads(reads, graphProps, recordId) {
 	return (reads ?? []).map((read) => {
 		const mapped = marklessSsrRemapChildGraph(read, graphProps);
@@ -791,26 +740,20 @@ export function marklessSsrPrefixArmRecord(arm, child) {
 		}),
 	};
 }
-export function marklessSsrResolveAnchorRecords(html, kind, records) {
+export function marklessSsrResolveAnchorRecords(structure, kind, records, idPrefix = '') {
 	if (records.length === 0) return records;
-	const pattern = /<!--([\s\S]*?)-->/g;
-	const indexByText = new Map();
-	let match;
-	let index = 0;
-	while ((match = pattern.exec(html)) !== null) {
-		if (marklessSsrIsArmBranchAnchor(match[1])) continue;
-		if (!indexByText.has(match[1])) indexByText.set(match[1], index);
-		index++;
-	}
+	const anchors = new Map(
+		structure.anchors
+			.filter((anchor) => anchor.kind === kind)
+			.map((anchor) => [anchor.id, anchor]),
+	);
 	return records.map((record) => {
-		const start = indexByText.get(`markless:${kind}:${record.id}`);
-		const end = indexByText.get(`/markless:${kind}:${record.id}`);
-		if (start === undefined || end === undefined)
-			throw new Error(`MARKLESS_COMPOSED_ANCHOR_MISSING: ${kind}:${record.id}`);
+		const anchor = anchors.get(idPrefix + record.id);
+		if (!anchor) throw new Error(`MARKLESS_SSR_DATA_ANCHOR_MISSING: ${kind}:${record.id}`);
 		return {
 			...record,
-			startAnchor: { ...record.startAnchor, index: start },
-			endAnchor: { ...record.endAnchor, index: end },
+			startAnchor: { ...record.startAnchor, index: anchor.startIndex },
+			endAnchor: { ...record.endAnchor, index: anchor.endIndex },
 		};
 	});
 }

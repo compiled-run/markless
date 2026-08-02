@@ -331,9 +331,11 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
   "styleScopes": [],
   "diagnostics": []
 }",
-    "ssrModuleSource": "import { marklessSsrRunAsyncComputed, marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrHost, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+    "ssrModuleSource": "import { renderSsrData } from '@markless/web/fns/ssr-data';
+import { marklessSsrRunAsyncComputed, marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrAsyncArm, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
-import { marklessSsrText } from '@markless/web/fns/html';
+import { marklessSsrReadPublicPath } from '@markless/web/fns/html';
+const marklessSsrRenderData = {"passId":"render-data","filename":"src/AsyncBoundary.tsrx","root":{"componentName":"App","templateId":"template:App"},"chunks":[{"id":"async:boundary:0:arm:try","kind":"async-arm","componentName":"App","statics":["<p><!--markless-slot:0-->","</p>"],"hosts":[{"hostNodeId":"h1","tagName":"p","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"text","residue":{"kind":"graph-read","graphNodeId":"computed:details","path":["title"]},"coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]},{"id":"async:boundary:0:arm:pending","kind":"async-arm","componentName":"App","statics":["<p>Loading</p>"],"hosts":[{"hostNodeId":"h3","tagName":"p","coordinate":{"kind":"child-index","path":[0]}}],"slots":[]},{"id":"async:boundary:0:arm:catch","kind":"async-arm","componentName":"App","statics":["<p>Broken</p>"],"hosts":[{"hostNodeId":"h2","tagName":"p","coordinate":{"kind":"child-index","path":[0]}}],"slots":[]},{"id":"template:App","kind":"template","componentName":"App","statics":["<main><!--markless-slot:0-->","</main>"],"hosts":[{"hostNodeId":"h0","tagName":"main","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"async","boundaryId":"boundary:0","armTemplateIds":{"try":"async:boundary:0:arm:try","pending":"async:boundary:0:arm:pending","catch":"async:boundary:0:arm:catch"},"coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]}],"hosts":[{"id":"h0","tagName":"main","hostNodeId":"h0"},{"id":"h1","tagName":"p","asyncBoundaryId":"boundary:0","asyncBoundaryArm":0,"hostNodeId":"h1"},{"id":"h2","tagName":"p","asyncBoundaryId":"boundary:0","asyncBoundaryArm":2,"hostNodeId":"h2"},{"id":"h3","tagName":"p","asyncBoundaryId":"boundary:0","asyncBoundaryArm":1,"hostNodeId":"h3"}],"initialValues":[{"graphNodeId":"state:query","value":{"kind":"constant","value":"Ada"}}],"branches":[],"repeats":[],"boundaries":[{"boundaryId":"boundary:0","anchorOrder":0,"runnerGraphNodeId":"computed:details","initiallyServedArm":1,"reads":[{"source":"details.title","graphNodeId":"computed:details","path":["title"]}],"unresolvedSources":[],"armChunkIds":{"try":"async:boundary:0:arm:try","pending":"async:boundary:0:arm:pending","catch":"async:boundary:0:arm:catch"},"protocolSupported":true}],"interactions":[]};
 const marklessSsrPropEvents = [];
 const marklessSsrStateValues = new Map([
 	["state:query", "Ada"]
@@ -345,9 +347,15 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 	const marklessSsrChildren = [];
 	const marklessSsrBranches = [];
 	const marklessSsrAsyncSnapshots = [];
-	const marklessSsrHostLocators = [];
-	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "main") + "<main>" + "<!--markless:async:boundary:0-->" + (await ((async (marklessSsrAsyncSnapshot) => marklessSsrAsyncSnapshot.status === "fulfilled" ? (async (details) => marklessSsrHost(marklessSsrHostLocators, "h1", "p") + "<p>" + marklessSsrText(details.title) + "</p>")(marklessSsrAsyncSnapshot.value) : marklessSsrAsyncSnapshot.status === "rejected" ? (async (marklessSsrAsyncError) => marklessSsrHost(marklessSsrHostLocators, "h2", "p") + "<p>" + "Broken" + "</p>")(marklessSsrAsyncSnapshot.error) : (async () => marklessSsrHost(marklessSsrHostLocators, "h3", "p") + "<p>" + "Loading" + "</p>")())(await marklessSsrRunAsyncComputed(marklessSsrAsyncSnapshots, "computed:details", async () => ({ title: query }), marklessSsrRenderContext, true)))) + "<!--/markless:async:boundary:0-->" + "</main>";
-	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren, marklessSsrAsyncSnapshots);
+	const marklessSsrAsyncRuns = marklessSsrRenderContext?.streaming?.runs ?? new Map();
+	const marklessSsrAsyncRunnerDefinitions = new Map([["computed:details",{run:async () => ({ title: query }),dependencies:[],async:true}]]);
+	marklessSsrRenderStateValues.set('prop:props',props);
+	if(typeof query!=='undefined')marklessSsrRenderStateValues.set("state:query",query);
+	const marklessSsrIdPrefix=marklessSsrRenderContext?.idPrefix??'';
+	const marklessSsrReadData=(residue,marklessSsrDataContext)=>{if(residue.kind==='graph-read')return marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(residue.graphNodeId),residue.path);if(residue.kind==='repeat-item')return marklessSsrReadPublicPath(marklessSsrDataContext.repeatItem,residue.path);const error=marklessSsrDataContext.asyncError;switch(residue.source){default:throw new Error('MARKLESS_SSR_DATA_RESIDUE_MISSING: '+residue.source);}};
+	const marklessSsrRendered=await renderSsrData({renderData:{...marklessSsrRenderData,root:{componentName:"App",templateId:"template:App"}},idPrefix:marklessSsrIdPrefix,read:marklessSsrReadData,selectBranchArm:(marklessSsrDataSlot,marklessSsrDataContext)=>{const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.branchSiteId){default:throw new Error('MARKLESS_SSR_DATA_BRANCH_MISSING: '+marklessSsrDataSlot.branchSiteId);}},selectAsyncArm:async(marklessSsrDataSlot,marklessSsrDataContext)=>{const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.boundaryId){case "boundary:0":{const snapshot=await marklessSsrRunAsyncComputed(marklessSsrAsyncSnapshots,"computed:details",async () => ({ title: query }),marklessSsrRenderContext,true,marklessSsrAsyncRunnerDefinitions,marklessSsrAsyncRuns);if(snapshot.status==='fulfilled')marklessSsrRenderStateValues.set("computed:details",snapshot.value);return {arm:marklessSsrAsyncArm(snapshot),error:snapshot.error};}default:throw new Error('MARKLESS_SSR_DATA_BOUNDARY_MISSING: '+marklessSsrDataSlot.boundaryId);}},renderChild:async(marklessSsrDataSlot,marklessSsrDataContext)=>{const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.componentEdgeId){default:throw new Error('MARKLESS_SSR_DATA_CHILD_MISSING: '+marklessSsrDataSlot.componentEdgeId);}}});
+	const html = marklessSsrRendered.html;
+	const marklessSsrComposition = marklessSsrComposeView(marklessSsrRendered.structure, payloadView, marklessSsrChildren, marklessSsrAsyncSnapshots, marklessSsrIdPrefix);
 	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
@@ -356,6 +364,8 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 		elementCount: marklessSsrComposition.elementCount,
 		propEvents: marklessSsrPropEvents,
 		externalSymbolIds: marklessSsrComposition.externalSymbolIds,
+		structure: marklessSsrRendered.structure,
+		structureTokens: marklessSsrRendered.structureTokens,
 	};
 }",
     "symbolModules": "symbol:0
@@ -615,10 +625,12 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
   "styleScopes": [],
   "diagnostics": []
 }",
-    "ssrModuleSource": "import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrHost, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+    "ssrModuleSource": "import { renderSsrData } from '@markless/web/fns/ssr-data';
+import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
-import { marklessSsrText } from '@markless/web/fns/html';
+import { marklessSsrReadPublicPath } from '@markless/web/fns/html';
 const install = (label) => (host) => { host.dataset.label = label; };
+const marklessSsrRenderData = {"passId":"render-data","filename":"src/BehaviorElement.tsrx","root":{"componentName":"App","templateId":"template:App"},"chunks":[{"id":"template:App","kind":"template","componentName":"App","statics":["<section><!--markless-slot:0-->","</section>"],"hosts":[{"hostNodeId":"h0","tagName":"section","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"text","residue":{"kind":"graph-read","graphNodeId":"state:label","path":[]},"coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]}],"hosts":[{"id":"h0","tagName":"section","hostNodeId":"h0"}],"initialValues":[{"graphNodeId":"state:label","value":{"kind":"constant","value":"ready"}}],"branches":[],"repeats":[],"boundaries":[],"interactions":[]};
 const marklessSsrPropEvents = [];
 const marklessSsrStateValues = new Map([
 	["state:label", "ready"]
@@ -630,9 +642,14 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 	const marklessSsrChildren = [];
 	const marklessSsrBranches = [];
 	const marklessSsrAsyncSnapshots = [];
-	const marklessSsrHostLocators = [];
-	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "section") + "<section>" + marklessSsrText(label) + "</section>";
-	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren, marklessSsrAsyncSnapshots);
+	marklessSsrRenderStateValues.set('prop:props',props);
+	if(typeof label!=='undefined')marklessSsrRenderStateValues.set("state:label",label);
+	if(typeof box!=='undefined')marklessSsrRenderStateValues.set("element:box",box);
+	const marklessSsrIdPrefix=marklessSsrRenderContext?.idPrefix??'';
+	const marklessSsrReadData=(residue,marklessSsrDataContext)=>{if(residue.kind==='graph-read')return marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(residue.graphNodeId),residue.path);if(residue.kind==='repeat-item')return marklessSsrReadPublicPath(marklessSsrDataContext.repeatItem,residue.path);const error=marklessSsrDataContext.asyncError;switch(residue.source){default:throw new Error('MARKLESS_SSR_DATA_RESIDUE_MISSING: '+residue.source);}};
+	const marklessSsrRendered=await renderSsrData({renderData:{...marklessSsrRenderData,root:{componentName:"App",templateId:"template:App"}},idPrefix:marklessSsrIdPrefix,read:marklessSsrReadData,selectBranchArm:(marklessSsrDataSlot,marklessSsrDataContext)=>{const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.branchSiteId){default:throw new Error('MARKLESS_SSR_DATA_BRANCH_MISSING: '+marklessSsrDataSlot.branchSiteId);}},selectAsyncArm:async(marklessSsrDataSlot,marklessSsrDataContext)=>{const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.boundaryId){default:throw new Error('MARKLESS_SSR_DATA_BOUNDARY_MISSING: '+marklessSsrDataSlot.boundaryId);}},renderChild:async(marklessSsrDataSlot,marklessSsrDataContext)=>{const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.componentEdgeId){default:throw new Error('MARKLESS_SSR_DATA_CHILD_MISSING: '+marklessSsrDataSlot.componentEdgeId);}}});
+	const html = marklessSsrRendered.html;
+	const marklessSsrComposition = marklessSsrComposeView(marklessSsrRendered.structure, payloadView, marklessSsrChildren, marklessSsrAsyncSnapshots, marklessSsrIdPrefix);
 	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
@@ -641,6 +658,8 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 		elementCount: marklessSsrComposition.elementCount,
 		propEvents: marklessSsrPropEvents,
 		externalSymbolIds: marklessSsrComposition.externalSymbolIds,
+		structure: marklessSsrRendered.structure,
+		structureTokens: marklessSsrRendered.structureTokens,
 	};
 }",
     "symbolModules": "symbol:0
@@ -984,8 +1003,11 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
   "styleScopes": [],
   "diagnostics": []
 }",
-    "ssrModuleSource": "import { marklessSsrBranchArm, marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrArmHost, marklessSsrHost, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+    "ssrModuleSource": "import { renderSsrData } from '@markless/web/fns/ssr-data';
+import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
+import { marklessSsrReadPublicPath } from '@markless/web/fns/html';
+const marklessSsrRenderData = {"passId":"render-data","filename":"src/Branches.tsrx","root":{"componentName":"App","templateId":"template:App"},"chunks":[{"id":"branch:branch-site:0:arm:0","kind":"branch-arm","componentName":"App","statics":["<p>Shown</p>"],"hosts":[{"hostNodeId":"h1","tagName":"p","coordinate":{"kind":"child-index","path":[0]}}],"slots":[]},{"id":"branch:branch-site:0:arm:1","kind":"branch-arm","componentName":"App","statics":["<p>Hidden</p>"],"hosts":[{"hostNodeId":"h2","tagName":"p","coordinate":{"kind":"child-index","path":[0]}}],"slots":[]},{"id":"template:App","kind":"template","componentName":"App","statics":["<section><!--markless-slot:0-->","</section>"],"hosts":[{"hostNodeId":"h0","tagName":"section","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"branch","branchSiteId":"branch-site:0","armTemplateIds":["branch:branch-site:0:arm:0","branch:branch-site:0:arm:1"],"coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]}],"hosts":[{"id":"h0","tagName":"section","hostNodeId":"h0"},{"id":"h1","tagName":"p","hostNodeId":"h1"},{"id":"h2","tagName":"p","hostNodeId":"h2"}],"initialValues":[{"graphNodeId":"state:open","value":{"kind":"constant","value":true}}],"branches":[{"branchSiteId":"branch-site:0","kind":"if","testSource":"open","testReads":[{"graphNodeId":"state:open","path":[]}],"armChunkIds":["branch:branch-site:0:arm:0","branch:branch-site:0:arm:1"],"anchorOrder":0,"update":"range"}],"repeats":[],"boundaries":[],"interactions":[]};
 const marklessSsrPropEvents = [];
 const marklessSsrStateValues = new Map([
 	["state:open", true]
@@ -997,9 +1019,13 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 	const marklessSsrChildren = [];
 	const marklessSsrBranches = [];
 	const marklessSsrAsyncSnapshots = [];
-	const marklessSsrHostLocators = [];
-	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "section") + "<section>" + "<!--markless:branch:branch-site:0-->" + ((open) ? marklessSsrBranchArm(marklessSsrBranches, "branch-site:0", 0) + marklessSsrArmHost(marklessSsrHostLocators) + "<p>" + "Shown" + "</p>" : marklessSsrBranchArm(marklessSsrBranches, "branch-site:0", 1) + marklessSsrArmHost(marklessSsrHostLocators) + "<p>" + "Hidden" + "</p>") + "<!--/markless:branch:branch-site:0-->" + "</section>";
-	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren, marklessSsrAsyncSnapshots);
+	marklessSsrRenderStateValues.set('prop:props',props);
+	if(typeof open!=='undefined')marklessSsrRenderStateValues.set("state:open",open);
+	const marklessSsrIdPrefix=marklessSsrRenderContext?.idPrefix??'';
+	const marklessSsrReadData=(residue,marklessSsrDataContext)=>{if(residue.kind==='graph-read')return marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(residue.graphNodeId),residue.path);if(residue.kind==='repeat-item')return marklessSsrReadPublicPath(marklessSsrDataContext.repeatItem,residue.path);const error=marklessSsrDataContext.asyncError;switch(residue.source){default:throw new Error('MARKLESS_SSR_DATA_RESIDUE_MISSING: '+residue.source);}};
+	const marklessSsrRendered=await renderSsrData({renderData:{...marklessSsrRenderData,root:{componentName:"App",templateId:"template:App"}},idPrefix:marklessSsrIdPrefix,read:marklessSsrReadData,selectBranchArm:(marklessSsrDataSlot,marklessSsrDataContext)=>{const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.branchSiteId){case "branch-site:0":{const arm=((open)?0:1);marklessSsrBranches.push({id:marklessSsrDataSlot.branchSiteId,takenArm:arm});return arm;}default:throw new Error('MARKLESS_SSR_DATA_BRANCH_MISSING: '+marklessSsrDataSlot.branchSiteId);}},selectAsyncArm:async(marklessSsrDataSlot,marklessSsrDataContext)=>{const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.boundaryId){default:throw new Error('MARKLESS_SSR_DATA_BOUNDARY_MISSING: '+marklessSsrDataSlot.boundaryId);}},renderChild:async(marklessSsrDataSlot,marklessSsrDataContext)=>{const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.componentEdgeId){default:throw new Error('MARKLESS_SSR_DATA_CHILD_MISSING: '+marklessSsrDataSlot.componentEdgeId);}}});
+	const html = marklessSsrRendered.html;
+	const marklessSsrComposition = marklessSsrComposeView(marklessSsrRendered.structure, payloadView, marklessSsrChildren, marklessSsrAsyncSnapshots, marklessSsrIdPrefix);
 	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
@@ -1008,6 +1034,8 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 		elementCount: marklessSsrComposition.elementCount,
 		propEvents: marklessSsrPropEvents,
 		externalSymbolIds: marklessSsrComposition.externalSymbolIds,
+		structure: marklessSsrRendered.structure,
+		structureTokens: marklessSsrRendered.structureTokens,
 	};
 }",
     "symbolModules": "symbol:0
@@ -1232,9 +1260,11 @@ function createUnknownSymbolError(id) {
   "styleScopes": [],
   "diagnostics": []
 }",
-    "ssrModuleSource": "import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrHost, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+    "ssrModuleSource": "import { renderSsrData } from '@markless/web/fns/ssr-data';
+import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
-import { marklessSsrText } from '@markless/web/fns/html';
+import { marklessSsrReadPublicPath } from '@markless/web/fns/html';
+const marklessSsrRenderData = {"passId":"render-data","filename":"src/GuardClauses.tsrx","root":{"componentName":"App","templateId":"template:App"},"chunks":[{"id":"template:App","kind":"template","componentName":"App","statics":["<button><!--markless-slot:0-->","</button>"],"hosts":[{"hostNodeId":"h0","tagName":"button","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"text","residue":{"kind":"graph-read","graphNodeId":"state:count","path":[]},"coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]}],"hosts":[{"id":"h0","tagName":"button","hostNodeId":"h0"}],"initialValues":[{"graphNodeId":"state:count","value":{"kind":"constant","value":0}}],"branches":[],"repeats":[],"boundaries":[],"interactions":[{"eventId":"event:0","hostNodeId":"h0","eventName":"click","symbolIds":["symbol:0"]}]};
 const marklessSsrPropEvents = [];
 const marklessSsrStateValues = new Map([
 	["state:count", 0]
@@ -1246,9 +1276,13 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 	const marklessSsrChildren = [];
 	const marklessSsrBranches = [];
 	const marklessSsrAsyncSnapshots = [];
-	const marklessSsrHostLocators = [];
-	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "button") + "<button>" + marklessSsrText(count) + "</button>";
-	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren, marklessSsrAsyncSnapshots);
+	marklessSsrRenderStateValues.set('prop:props',props);
+	if(typeof count!=='undefined')marklessSsrRenderStateValues.set("state:count",count);
+	const marklessSsrIdPrefix=marklessSsrRenderContext?.idPrefix??'';
+	const marklessSsrReadData=(residue,marklessSsrDataContext)=>{if(residue.kind==='graph-read')return marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(residue.graphNodeId),residue.path);if(residue.kind==='repeat-item')return marklessSsrReadPublicPath(marklessSsrDataContext.repeatItem,residue.path);const error=marklessSsrDataContext.asyncError;switch(residue.source){default:throw new Error('MARKLESS_SSR_DATA_RESIDUE_MISSING: '+residue.source);}};
+	const marklessSsrRendered=await renderSsrData({renderData:{...marklessSsrRenderData,root:{componentName:"App",templateId:"template:App"}},idPrefix:marklessSsrIdPrefix,read:marklessSsrReadData,selectBranchArm:(marklessSsrDataSlot,marklessSsrDataContext)=>{const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.branchSiteId){default:throw new Error('MARKLESS_SSR_DATA_BRANCH_MISSING: '+marklessSsrDataSlot.branchSiteId);}},selectAsyncArm:async(marklessSsrDataSlot,marklessSsrDataContext)=>{const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.boundaryId){default:throw new Error('MARKLESS_SSR_DATA_BOUNDARY_MISSING: '+marklessSsrDataSlot.boundaryId);}},renderChild:async(marklessSsrDataSlot,marklessSsrDataContext)=>{const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.componentEdgeId){default:throw new Error('MARKLESS_SSR_DATA_CHILD_MISSING: '+marklessSsrDataSlot.componentEdgeId);}}});
+	const html = marklessSsrRendered.html;
+	const marklessSsrComposition = marklessSsrComposeView(marklessSsrRendered.structure, payloadView, marklessSsrChildren, marklessSsrAsyncSnapshots, marklessSsrIdPrefix);
 	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
@@ -1257,6 +1291,8 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 		elementCount: marklessSsrComposition.elementCount,
 		propEvents: marklessSsrPropEvents,
 		externalSymbolIds: marklessSsrComposition.externalSymbolIds,
+		structure: marklessSsrRendered.structure,
+		structureTokens: marklessSsrRendered.structureTokens,
 	};
 }",
     "symbolModules": "symbol:0
@@ -1479,10 +1515,12 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
   "styleScopes": [],
   "diagnostics": []
 }",
-    "ssrModuleSource": "import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrHost, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+    "ssrModuleSource": "import { renderSsrData } from '@markless/web/fns/ssr-data';
+import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
 import { marklessCloneState } from '@markless/web/fns/state';
-import { marklessSsrText } from '@markless/web/fns/html';
+import { marklessSsrReadPublicPath } from '@markless/web/fns/html';
 function createCount() { const count = state(5); return count; }
+const marklessSsrRenderData = {"passId":"render-data","filename":"src/HelperState.tsrx","root":{"componentName":"App","templateId":"template:App"},"chunks":[{"id":"template:App","kind":"template","componentName":"App","statics":["<button><!--markless-slot:0-->","</button>"],"hosts":[{"hostNodeId":"h0","tagName":"button","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"text","residue":{"kind":"graph-read","graphNodeId":"state:App.count.createCount.count","path":[]},"coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]}],"hosts":[{"id":"h0","tagName":"button","hostNodeId":"h0"}],"initialValues":[{"graphNodeId":"state:App.count.createCount.count","value":{"kind":"constant","value":5}}],"branches":[],"repeats":[],"boundaries":[],"interactions":[{"eventId":"event:0","hostNodeId":"h0","eventName":"click","symbolIds":["symbol:0"]}]};
 const marklessSsrPropEvents = [];
 const marklessSsrStateValues = new Map([
 	["state:App.count.createCount.count", 5]
@@ -1494,9 +1532,13 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 	const marklessSsrChildren = [];
 	const marklessSsrBranches = [];
 	const marklessSsrAsyncSnapshots = [];
-	const marklessSsrHostLocators = [];
-	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "button") + "<button>" + marklessSsrText(count) + "</button>";
-	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren, marklessSsrAsyncSnapshots);
+	marklessSsrRenderStateValues.set('prop:props',props);
+	if(typeof App_count_createCount_count!=='undefined')marklessSsrRenderStateValues.set("state:App.count.createCount.count",App_count_createCount_count);
+	const marklessSsrIdPrefix=marklessSsrRenderContext?.idPrefix??'';
+	const marklessSsrReadData=(residue,marklessSsrDataContext)=>{if(residue.kind==='graph-read')return marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(residue.graphNodeId),residue.path);if(residue.kind==='repeat-item')return marklessSsrReadPublicPath(marklessSsrDataContext.repeatItem,residue.path);const error=marklessSsrDataContext.asyncError;switch(residue.source){default:throw new Error('MARKLESS_SSR_DATA_RESIDUE_MISSING: '+residue.source);}};
+	const marklessSsrRendered=await renderSsrData({renderData:{...marklessSsrRenderData,root:{componentName:"App",templateId:"template:App"}},idPrefix:marklessSsrIdPrefix,read:marklessSsrReadData,selectBranchArm:(marklessSsrDataSlot,marklessSsrDataContext)=>{const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.branchSiteId){default:throw new Error('MARKLESS_SSR_DATA_BRANCH_MISSING: '+marklessSsrDataSlot.branchSiteId);}},selectAsyncArm:async(marklessSsrDataSlot,marklessSsrDataContext)=>{const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.boundaryId){default:throw new Error('MARKLESS_SSR_DATA_BOUNDARY_MISSING: '+marklessSsrDataSlot.boundaryId);}},renderChild:async(marklessSsrDataSlot,marklessSsrDataContext)=>{const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.componentEdgeId){default:throw new Error('MARKLESS_SSR_DATA_CHILD_MISSING: '+marklessSsrDataSlot.componentEdgeId);}}});
+	const html = marklessSsrRendered.html;
+	const marklessSsrComposition = marklessSsrComposeView(marklessSsrRendered.structure, payloadView, marklessSsrChildren, marklessSsrAsyncSnapshots, marklessSsrIdPrefix);
 	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
@@ -1505,6 +1547,8 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 		elementCount: marklessSsrComposition.elementCount,
 		propEvents: marklessSsrPropEvents,
 		externalSymbolIds: marklessSsrComposition.externalSymbolIds,
+		structure: marklessSsrRendered.structure,
+		structureTokens: marklessSsrRendered.structureTokens,
 	};
 }",
     "symbolModules": "symbol:0
@@ -1674,8 +1718,11 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
   "diagnostics": []
 }",
     "ssrModuleSource": "import __marklessSsrComponent0 from "./ImportedChild.tsrx";
-import { marklessSsrRenderChild, marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrHost, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+import { renderSsrData } from '@markless/web/fns/ssr-data';
+import { marklessAssertPresentationalRowChild, marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
+import { marklessSsrReadPublicPath } from '@markless/web/fns/html';
+const marklessSsrRenderData = {"passId":"render-data","filename":"src/ImportedParent.tsrx","root":{"componentName":"App","templateId":"template:App"},"chunks":[{"id":"template:App","kind":"template","componentName":"App","statics":["<main><!--markless-slot:0-->","</main>"],"hosts":[{"hostNodeId":"h0","tagName":"main","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"child-component","componentEdgeId":"component-edge:0","childComponentName":"Child","childTemplateId":"template:Child","coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]}],"hosts":[{"id":"h0","tagName":"main","hostNodeId":"h0"}],"initialValues":[{"graphNodeId":"state:active","value":{"kind":"constant","value":true}}],"branches":[],"repeats":[],"boundaries":[],"interactions":[]};
 const marklessSsrPropEvents = [];
 const marklessSsrStateValues = new Map([
 	["state:active", true]
@@ -1687,9 +1734,13 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 	const marklessSsrChildren = [];
 	const marklessSsrBranches = [];
 	const marklessSsrAsyncSnapshots = [];
-	const marklessSsrHostLocators = [];
-	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "main") + "<main>" + (await marklessSsrRenderChild(marklessSsrChildren, __marklessSsrComponent0, { active: active }, { hostPrefix: "c0:", symbolPrefix: "c0:", localIndex: marklessSsrHostLocators.length, graphProps: [{"name":"active","graphNodeId":"state:active","path":[]}], boundSymbols: {} }, marklessSsrRenderContext)) + "</main>";
-	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren, marklessSsrAsyncSnapshots);
+	marklessSsrRenderStateValues.set('prop:props',props);
+	if(typeof active!=='undefined')marklessSsrRenderStateValues.set("state:active",active);
+	const marklessSsrIdPrefix=marklessSsrRenderContext?.idPrefix??'';
+	const marklessSsrReadData=(residue,marklessSsrDataContext)=>{if(residue.kind==='graph-read')return marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(residue.graphNodeId),residue.path);if(residue.kind==='repeat-item')return marklessSsrReadPublicPath(marklessSsrDataContext.repeatItem,residue.path);const error=marklessSsrDataContext.asyncError;switch(residue.source){default:throw new Error('MARKLESS_SSR_DATA_RESIDUE_MISSING: '+residue.source);}};
+	const marklessSsrRendered=await renderSsrData({renderData:{...marklessSsrRenderData,root:{componentName:"App",templateId:"template:App"}},idPrefix:marklessSsrIdPrefix,read:marklessSsrReadData,selectBranchArm:(marklessSsrDataSlot,marklessSsrDataContext)=>{const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.branchSiteId){default:throw new Error('MARKLESS_SSR_DATA_BRANCH_MISSING: '+marklessSsrDataSlot.branchSiteId);}},selectAsyncArm:async(marklessSsrDataSlot,marklessSsrDataContext)=>{const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.boundaryId){default:throw new Error('MARKLESS_SSR_DATA_BOUNDARY_MISSING: '+marklessSsrDataSlot.boundaryId);}},renderChild:async(marklessSsrDataSlot,marklessSsrDataContext)=>{const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.componentEdgeId){case "component-edge:0":{const child={"hostPrefix":"c0:","symbolPrefix":"c0:","graphProps":[{"name":"active","graphNodeId":"state:active","path":[]}],"boundSymbols":{}};const childProps={active:marklessSsrReadPublicPath(marklessSsrRenderStateValues.get("state:active"),[])};const output=await __marklessSsrComponent0?.renderSsr?.(childProps,{...marklessSsrRenderContext,idPrefix:marklessSsrIdPrefix+child.hostPrefix});if(!output)throw new Error('MARKLESS_SSR_DATA_CHILD_RENDER_MISSING: component-edge:0');if(marklessSsrDataContext.repeatItem!==undefined){marklessAssertPresentationalRowChild(output,"Child");return output;}marklessSsrChildren.push({...child,output,callbackProps:childProps.__marklessSsrCallbacks??{}});return output;}default:throw new Error('MARKLESS_SSR_DATA_CHILD_MISSING: '+marklessSsrDataSlot.componentEdgeId);}}});
+	const html = marklessSsrRendered.html;
+	const marklessSsrComposition = marklessSsrComposeView(marklessSsrRendered.structure, payloadView, marklessSsrChildren, marklessSsrAsyncSnapshots, marklessSsrIdPrefix);
 	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
@@ -1698,6 +1749,8 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 		elementCount: marklessSsrComposition.elementCount,
 		propEvents: marklessSsrPropEvents,
 		externalSymbolIds: marklessSsrComposition.externalSymbolIds,
+		structure: marklessSsrRendered.structure,
+		structureTokens: marklessSsrRendered.structureTokens,
 	};
 }",
     "symbolModules": "",
@@ -2026,8 +2079,11 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
   "styleScopes": [],
   "diagnostics": []
 }",
-    "ssrModuleSource": "import { marklessSsrBranchArm, marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrArmHost, marklessSsrHost, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+    "ssrModuleSource": "import { renderSsrData } from '@markless/web/fns/ssr-data';
+import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
 import { marklessCloneState } from '@markless/web/fns/state';
+import { marklessSsrReadPublicPath } from '@markless/web/fns/html';
+const marklessSsrRenderData = {"passId":"render-data","filename":"src/ImportedChild.tsrx","root":{"componentName":"Child","templateId":"template:Child"},"chunks":[{"id":"branch:branch-site:0:arm:0","kind":"branch-arm","componentName":"Child","statics":["<em>Live</em>"],"hosts":[{"hostNodeId":"h1","tagName":"em","coordinate":{"kind":"child-index","path":[0]}}],"slots":[]},{"id":"branch:branch-site:0:arm:1","kind":"branch-arm","componentName":"Child","statics":["<em>Idle</em>"],"hosts":[{"hostNodeId":"h2","tagName":"em","coordinate":{"kind":"child-index","path":[0]}}],"slots":[]},{"id":"template:Child","kind":"template","componentName":"Child","statics":["<span><!--markless-slot:0-->","</span>"],"hosts":[{"hostNodeId":"h0","tagName":"span","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"branch","branchSiteId":"branch-site:0","armTemplateIds":["branch:branch-site:0:arm:0","branch:branch-site:0:arm:1"],"coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]}],"hosts":[{"id":"h0","tagName":"span","hostNodeId":"h0"},{"id":"h1","tagName":"em","hostNodeId":"h1"},{"id":"h2","tagName":"em","hostNodeId":"h2"}],"initialValues":[],"branches":[{"branchSiteId":"branch-site:0","kind":"if","testSource":"active","testReads":[{"graphNodeId":"prop:props","path":["active"]}],"armChunkIds":["branch:branch-site:0:arm:0","branch:branch-site:0:arm:1"],"anchorOrder":0,"update":"range"}],"repeats":[],"boundaries":[],"interactions":[]};
 const marklessSsrPropEvents = [];
 const marklessSsrStateValues = new Map([
 ]);
@@ -2038,9 +2094,13 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 	const marklessSsrChildren = [];
 	const marklessSsrBranches = [];
 	const marklessSsrAsyncSnapshots = [];
-	const marklessSsrHostLocators = [];
-	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "span") + "<span>" + "<!--markless:branch:branch-site:0-->" + ((active) ? marklessSsrBranchArm(marklessSsrBranches, "branch-site:0", 0) + marklessSsrArmHost(marklessSsrHostLocators) + "<em>" + "Live" + "</em>" : marklessSsrBranchArm(marklessSsrBranches, "branch-site:0", 1) + marklessSsrArmHost(marklessSsrHostLocators) + "<em>" + "Idle" + "</em>") + "<!--/markless:branch:branch-site:0-->" + "</span>";
-	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren, marklessSsrAsyncSnapshots);
+	marklessSsrRenderStateValues.set('prop:props',props);
+	if(typeof props!=='undefined')marklessSsrRenderStateValues.set("prop:props",props);
+	const marklessSsrIdPrefix=marklessSsrRenderContext?.idPrefix??'';
+	const marklessSsrReadData=(residue,marklessSsrDataContext)=>{if(residue.kind==='graph-read')return marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(residue.graphNodeId),residue.path);if(residue.kind==='repeat-item')return marklessSsrReadPublicPath(marklessSsrDataContext.repeatItem,residue.path);const error=marklessSsrDataContext.asyncError;switch(residue.source){default:throw new Error('MARKLESS_SSR_DATA_RESIDUE_MISSING: '+residue.source);}};
+	const marklessSsrRendered=await renderSsrData({renderData:{...marklessSsrRenderData,root:{componentName:"Child",templateId:"template:Child"}},idPrefix:marklessSsrIdPrefix,read:marklessSsrReadData,selectBranchArm:(marklessSsrDataSlot,marklessSsrDataContext)=>{const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.branchSiteId){case "branch-site:0":{const arm=((active)?0:1);marklessSsrBranches.push({id:marklessSsrDataSlot.branchSiteId,takenArm:arm});return arm;}default:throw new Error('MARKLESS_SSR_DATA_BRANCH_MISSING: '+marklessSsrDataSlot.branchSiteId);}},selectAsyncArm:async(marklessSsrDataSlot,marklessSsrDataContext)=>{const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.boundaryId){default:throw new Error('MARKLESS_SSR_DATA_BOUNDARY_MISSING: '+marklessSsrDataSlot.boundaryId);}},renderChild:async(marklessSsrDataSlot,marklessSsrDataContext)=>{const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.componentEdgeId){default:throw new Error('MARKLESS_SSR_DATA_CHILD_MISSING: '+marklessSsrDataSlot.componentEdgeId);}}});
+	const html = marklessSsrRendered.html;
+	const marklessSsrComposition = marklessSsrComposeView(marklessSsrRendered.structure, payloadView, marklessSsrChildren, marklessSsrAsyncSnapshots, marklessSsrIdPrefix);
 	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
@@ -2049,6 +2109,8 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 		elementCount: marklessSsrComposition.elementCount,
 		propEvents: marklessSsrPropEvents,
 		externalSymbolIds: marklessSsrComposition.externalSymbolIds,
+		structure: marklessSsrRendered.structure,
+		structureTokens: marklessSsrRendered.structureTokens,
 	};
 }",
     "symbolModules": "symbol:0
@@ -2479,10 +2541,11 @@ function createUnknownSymbolError(id) {
   "styleScopes": [],
   "diagnostics": []
 }",
-    "ssrModuleSource": "import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrHost, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+    "ssrModuleSource": "import { renderSsrData } from '@markless/web/fns/ssr-data';
+import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
-import { marklessSsrText, marklessSsrAttribute } from '@markless/web/fns/html';
-import { marklessSsrRepeatRows } from '@markless/web/fns/repeats';
+import { marklessSsrReadPublicPath } from '@markless/web/fns/html';
+const marklessSsrRenderData = {"passId":"render-data","filename":"src/KeyedRepeat.tsrx","root":{"componentName":"App","templateId":"template:App"},"chunks":[{"id":"repeat:repeat:0:row","kind":"repeat-row","componentName":"App","statics":["<article class=\\"","\\"><h2><!--markless-slot:1-->","</h2><button>Choose</button></article>"],"hosts":[{"hostNodeId":"h2","tagName":"article","coordinate":{"kind":"child-index","path":[0]}},{"hostNodeId":"h3","tagName":"h2","coordinate":{"kind":"child-index","path":[0,0]}},{"hostNodeId":"h4","tagName":"button","coordinate":{"kind":"child-index","path":[0,1]}}],"slots":[{"kind":"attribute","name":"class","coordinate":{"kind":"child-index","path":[0]},"residue":{"kind":"authored-expression","source":"chosen === entry.code ? 'picked' : 'plain'"},"staticIndex":0},{"kind":"text","residue":{"kind":"repeat-item","repeatId":"repeat:0","path":["title"]},"coordinate":{"kind":"comment-anchor","path":[0,0,0]},"staticIndex":1}]},{"id":"template:App","kind":"template","componentName":"App","statics":["<main><section><!--markless-slot:0-->","</section></main>"],"hosts":[{"hostNodeId":"h0","tagName":"main","coordinate":{"kind":"child-index","path":[0]}},{"hostNodeId":"h1","tagName":"section","coordinate":{"kind":"child-index","path":[0,0]}}],"slots":[{"kind":"repeat","repeatId":"repeat:0","rowTemplateId":"repeat:repeat:0:row","coordinate":{"kind":"comment-anchor","path":[0,0,0]},"staticIndex":0}]}],"hosts":[{"id":"h0","tagName":"main","hostNodeId":"h0"},{"id":"h1","tagName":"section","hostNodeId":"h1"},{"id":"h2","tagName":"article","hostNodeId":"h2"},{"id":"h3","tagName":"h2","hostNodeId":"h3"},{"id":"h4","tagName":"button","hostNodeId":"h4"}],"initialValues":[{"graphNodeId":"state:entries","value":{"kind":"constant","value":[{"code":"a","title":"Alpha"}]}},{"graphNodeId":"state:chosen","value":{"kind":"constant","value":"a"}}],"branches":[],"repeats":[{"repeatId":"repeat:0","parentHostNodeId":"h1","rowHostNodeId":"h2","itemName":"entry","collectionGraphNodeId":"state:entries","collectionPath":[],"keyPath":["code"],"rowChunkId":"repeat:repeat:0:row","rowElementCount":3}],"boundaries":[],"interactions":[{"eventId":"event:0","hostNodeId":"h4","eventName":"click","symbolIds":["symbol:0"]}]};
 const marklessSsrPropEvents = [];
 const marklessSsrStateValues = new Map([
 	["state:entries", [{"code":"a","title":"Alpha"}]],
@@ -2496,9 +2559,14 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 	const marklessSsrChildren = [];
 	const marklessSsrBranches = [];
 	const marklessSsrAsyncSnapshots = [];
-	const marklessSsrHostLocators = [];
-	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "main") + "<main>" + marklessSsrHost(marklessSsrHostLocators, "h1", "section") + "<section>" + marklessSsrRepeatRows(marklessSsrHostLocators, entries, entry => entry.code, "repeat:0", "entry", ["code"], (entry) => "<article" + marklessSsrAttribute("class", chosen === entry.code ? 'picked' : 'plain') + ">" + "<h2>" + marklessSsrText(entry.title) + "</h2>" + "<button>" + "Choose" + "</button>" + "</article>", 3, null) + "</section>" + "</main>";
-	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren, marklessSsrAsyncSnapshots);
+	marklessSsrRenderStateValues.set('prop:props',props);
+	if(typeof entries!=='undefined')marklessSsrRenderStateValues.set("state:entries",entries);
+	if(typeof chosen!=='undefined')marklessSsrRenderStateValues.set("state:chosen",chosen);
+	const marklessSsrIdPrefix=marklessSsrRenderContext?.idPrefix??'';
+	const marklessSsrReadData=(residue,marklessSsrDataContext)=>{if(residue.kind==='graph-read')return marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(residue.graphNodeId),residue.path);if(residue.kind==='repeat-item')return marklessSsrReadPublicPath(marklessSsrDataContext.repeatItem,residue.path);const entry=marklessSsrDataContext.repeatItem;const error=marklessSsrDataContext.asyncError;switch(residue.source){case "chosen === entry.code ? 'picked' : 'plain'":return (chosen === entry.code ? 'picked' : 'plain');default:throw new Error('MARKLESS_SSR_DATA_RESIDUE_MISSING: '+residue.source);}};
+	const marklessSsrRendered=await renderSsrData({renderData:{...marklessSsrRenderData,root:{componentName:"App",templateId:"template:App"}},idPrefix:marklessSsrIdPrefix,read:marklessSsrReadData,selectBranchArm:(marklessSsrDataSlot,marklessSsrDataContext)=>{const entry=marklessSsrDataContext.repeatItem;const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.branchSiteId){default:throw new Error('MARKLESS_SSR_DATA_BRANCH_MISSING: '+marklessSsrDataSlot.branchSiteId);}},selectAsyncArm:async(marklessSsrDataSlot,marklessSsrDataContext)=>{const entry=marklessSsrDataContext.repeatItem;const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.boundaryId){default:throw new Error('MARKLESS_SSR_DATA_BOUNDARY_MISSING: '+marklessSsrDataSlot.boundaryId);}},renderChild:async(marklessSsrDataSlot,marklessSsrDataContext)=>{const entry=marklessSsrDataContext.repeatItem;const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.componentEdgeId){default:throw new Error('MARKLESS_SSR_DATA_CHILD_MISSING: '+marklessSsrDataSlot.componentEdgeId);}}});
+	const html = marklessSsrRendered.html;
+	const marklessSsrComposition = marklessSsrComposeView(marklessSsrRendered.structure, payloadView, marklessSsrChildren, marklessSsrAsyncSnapshots, marklessSsrIdPrefix);
 	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
@@ -2507,6 +2575,8 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 		elementCount: marklessSsrComposition.elementCount,
 		propEvents: marklessSsrPropEvents,
 		externalSymbolIds: marklessSsrComposition.externalSymbolIds,
+		structure: marklessSsrRendered.structure,
+		structureTokens: marklessSsrRendered.structureTokens,
 	};
 }",
     "symbolModules": "symbol:0
@@ -2641,10 +2711,12 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
   "styleScopes": [],
   "diagnostics": []
 }",
-    "ssrModuleSource": "import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrHost, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+    "ssrModuleSource": "import { renderSsrData } from '@markless/web/fns/ssr-data';
+import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
 import { marklessCloneState } from '@markless/web/fns/state';
-import { marklessSsrText, marklessSsrAttribute } from '@markless/web/fns/html';
+import { marklessSsrReadPublicPath } from '@markless/web/fns/html';
 const labels = { title: 'Hello', mode: 'compact' };
+const marklessSsrRenderData = {"passId":"render-data","filename":"src/ModuleScopeConstants.tsrx","root":{"componentName":"App","templateId":"template:App"},"chunks":[{"id":"template:App","kind":"template","componentName":"App","statics":["<section data-mode=\\"","\\"><!--markless-slot:1-->","</section>"],"hosts":[{"hostNodeId":"h0","tagName":"section","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"attribute","name":"data-mode","coordinate":{"kind":"child-index","path":[0]},"residue":{"kind":"authored-expression","source":"labels.mode"},"staticIndex":0},{"kind":"text","residue":{"kind":"authored-expression","source":"labels.title"},"coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":1}]}],"hosts":[{"id":"h0","tagName":"section","hostNodeId":"h0"}],"initialValues":[],"branches":[],"repeats":[],"boundaries":[],"interactions":[]};
 const marklessSsrPropEvents = [];
 const marklessSsrStateValues = new Map([
 ]);
@@ -2654,9 +2726,12 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 	const marklessSsrChildren = [];
 	const marklessSsrBranches = [];
 	const marklessSsrAsyncSnapshots = [];
-	const marklessSsrHostLocators = [];
-	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "section") + "<section" + marklessSsrAttribute("data-mode", labels.mode) + ">" + marklessSsrText(labels.title) + "</section>";
-	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren, marklessSsrAsyncSnapshots);
+	marklessSsrRenderStateValues.set('prop:props',props);
+	const marklessSsrIdPrefix=marklessSsrRenderContext?.idPrefix??'';
+	const marklessSsrReadData=(residue,marklessSsrDataContext)=>{if(residue.kind==='graph-read')return marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(residue.graphNodeId),residue.path);if(residue.kind==='repeat-item')return marklessSsrReadPublicPath(marklessSsrDataContext.repeatItem,residue.path);const error=marklessSsrDataContext.asyncError;switch(residue.source){case "labels.mode":return (labels.mode);case "labels.title":return (labels.title);default:throw new Error('MARKLESS_SSR_DATA_RESIDUE_MISSING: '+residue.source);}};
+	const marklessSsrRendered=await renderSsrData({renderData:{...marklessSsrRenderData,root:{componentName:"App",templateId:"template:App"}},idPrefix:marklessSsrIdPrefix,read:marklessSsrReadData,selectBranchArm:(marklessSsrDataSlot,marklessSsrDataContext)=>{const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.branchSiteId){default:throw new Error('MARKLESS_SSR_DATA_BRANCH_MISSING: '+marklessSsrDataSlot.branchSiteId);}},selectAsyncArm:async(marklessSsrDataSlot,marklessSsrDataContext)=>{const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.boundaryId){default:throw new Error('MARKLESS_SSR_DATA_BOUNDARY_MISSING: '+marklessSsrDataSlot.boundaryId);}},renderChild:async(marklessSsrDataSlot,marklessSsrDataContext)=>{const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.componentEdgeId){default:throw new Error('MARKLESS_SSR_DATA_CHILD_MISSING: '+marklessSsrDataSlot.componentEdgeId);}}});
+	const html = marklessSsrRendered.html;
+	const marklessSsrComposition = marklessSsrComposeView(marklessSsrRendered.structure, payloadView, marklessSsrChildren, marklessSsrAsyncSnapshots, marklessSsrIdPrefix);
 	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
@@ -2665,6 +2740,8 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 		elementCount: marklessSsrComposition.elementCount,
 		propEvents: marklessSsrPropEvents,
 		externalSymbolIds: marklessSsrComposition.externalSymbolIds,
+		structure: marklessSsrRendered.structure,
+		structureTokens: marklessSsrRendered.structureTokens,
 	};
 }",
     "symbolModules": "",
@@ -2872,10 +2949,11 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
   "styleScopes": [],
   "diagnostics": []
 }",
-    "ssrModuleSource": "import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrHost, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+    "ssrModuleSource": "import { renderSsrData } from '@markless/web/fns/ssr-data';
+import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
-import { marklessSsrText, marklessSsrReadPublicPath } from '@markless/web/fns/html';
-import { marklessSsrRepeatRows } from '@markless/web/fns/repeats';
+import { marklessSsrReadPublicPath } from '@markless/web/fns/html';
+const marklessSsrRenderData = {"passId":"render-data","filename":"src/PositionalRepeat.tsrx","root":{"componentName":"App","templateId":"template:App"},"chunks":[{"id":"repeat:repeat:0:row","kind":"repeat-row","componentName":"App","statics":["<li><!--markless-slot:0-->","</li>"],"hosts":[{"hostNodeId":"h1","tagName":"li","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"text","residue":{"kind":"repeat-item","repeatId":"repeat:0","path":["label"]},"coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]},{"id":"template:App","kind":"template","componentName":"App","statics":["<ol><!--markless-slot:0-->","</ol>"],"hosts":[{"hostNodeId":"h0","tagName":"ol","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"repeat","repeatId":"repeat:0","rowTemplateId":"repeat:repeat:0:row","coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]}],"hosts":[{"id":"h0","tagName":"ol","hostNodeId":"h0"},{"id":"h1","tagName":"li","hostNodeId":"h1"}],"initialValues":[{"graphNodeId":"state:records","value":{"kind":"constant","value":[{"label":"Zero"}]}}],"branches":[],"repeats":[{"repeatId":"repeat:0","parentHostNodeId":"h0","rowHostNodeId":"h1","itemName":"record","collectionGraphNodeId":"state:records","collectionPath":[],"keyPath":[],"rowChunkId":"repeat:repeat:0:row","rowElementCount":1}],"boundaries":[],"interactions":[]};
 const marklessSsrPropEvents = [];
 const marklessSsrStateValues = new Map([
 	["state:records", [{"label":"Zero"}]]
@@ -2887,9 +2965,13 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 	const marklessSsrChildren = [];
 	const marklessSsrBranches = [];
 	const marklessSsrAsyncSnapshots = [];
-	const marklessSsrHostLocators = [];
-	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "ol") + "<ol>" + marklessSsrRepeatRows(marklessSsrHostLocators, records, record => marklessSsrReadPublicPath(record, []), "repeat:0", "record", [], (record, slot) => "<li>" + marklessSsrText(record.label) + "</li>", 1, null) + "</ol>";
-	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren, marklessSsrAsyncSnapshots);
+	marklessSsrRenderStateValues.set('prop:props',props);
+	if(typeof records!=='undefined')marklessSsrRenderStateValues.set("state:records",records);
+	const marklessSsrIdPrefix=marklessSsrRenderContext?.idPrefix??'';
+	const marklessSsrReadData=(residue,marklessSsrDataContext)=>{if(residue.kind==='graph-read')return marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(residue.graphNodeId),residue.path);if(residue.kind==='repeat-item')return marklessSsrReadPublicPath(marklessSsrDataContext.repeatItem,residue.path);const record=marklessSsrDataContext.repeatItem;const slot=marklessSsrDataContext.repeatIndex;const error=marklessSsrDataContext.asyncError;switch(residue.source){default:throw new Error('MARKLESS_SSR_DATA_RESIDUE_MISSING: '+residue.source);}};
+	const marklessSsrRendered=await renderSsrData({renderData:{...marklessSsrRenderData,root:{componentName:"App",templateId:"template:App"}},idPrefix:marklessSsrIdPrefix,read:marklessSsrReadData,selectBranchArm:(marklessSsrDataSlot,marklessSsrDataContext)=>{const record=marklessSsrDataContext.repeatItem;const slot=marklessSsrDataContext.repeatIndex;const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.branchSiteId){default:throw new Error('MARKLESS_SSR_DATA_BRANCH_MISSING: '+marklessSsrDataSlot.branchSiteId);}},selectAsyncArm:async(marklessSsrDataSlot,marklessSsrDataContext)=>{const record=marklessSsrDataContext.repeatItem;const slot=marklessSsrDataContext.repeatIndex;const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.boundaryId){default:throw new Error('MARKLESS_SSR_DATA_BOUNDARY_MISSING: '+marklessSsrDataSlot.boundaryId);}},renderChild:async(marklessSsrDataSlot,marklessSsrDataContext)=>{const record=marklessSsrDataContext.repeatItem;const slot=marklessSsrDataContext.repeatIndex;const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.componentEdgeId){default:throw new Error('MARKLESS_SSR_DATA_CHILD_MISSING: '+marklessSsrDataSlot.componentEdgeId);}}});
+	const html = marklessSsrRendered.html;
+	const marklessSsrComposition = marklessSsrComposeView(marklessSsrRendered.structure, payloadView, marklessSsrChildren, marklessSsrAsyncSnapshots, marklessSsrIdPrefix);
 	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
@@ -2898,6 +2980,8 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 		elementCount: marklessSsrComposition.elementCount,
 		propEvents: marklessSsrPropEvents,
 		externalSymbolIds: marklessSsrComposition.externalSymbolIds,
+		structure: marklessSsrRendered.structure,
+		structureTokens: marklessSsrRendered.structureTokens,
 	};
 }",
     "symbolModules": "",
@@ -3143,8 +3227,10 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
   "styleScopes": [],
   "diagnostics": []
 }",
-    "ssrModuleSource": "import { marklessSsrRenderChild, marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrHost, marklessComposeState as marklessSsrComposeState, marklessViewWithoutAnchors, marklessSsrComposeView } from '@markless/web/fns/ssr';
+    "ssrModuleSource": "import { renderSsrData } from '@markless/web/fns/ssr-data';
+import { marklessAssertPresentationalRowChild, marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessViewWithoutAnchors, marklessSsrComposeView } from '@markless/web/fns/ssr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
+import { marklessSsrReadPublicPath } from '@markless/web/fns/html';
 const __marklessSsrComponent0 = { renderSsr: marklessRenderSsrBadge };
 async function marklessRenderSsrBadge(props = {}, marklessSsrRenderContext) {
 	const { active } = props ?? {};
@@ -3153,12 +3239,17 @@ async function marklessRenderSsrBadge(props = {}, marklessSsrRenderContext) {
 	const marklessSsrChildren = [];
 	const marklessSsrBranches = [];
 	const marklessSsrAsyncSnapshots = [];
-	const marklessSsrHostLocators = [];
-	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "span") + "<span>" + ((active) ? marklessSsrHost(marklessSsrHostLocators, "h1", "em") + "<em>" + "Live" + "</em>" : marklessSsrHost(marklessSsrHostLocators, "h2", "em") + "<em>" + "Idle" + "</em>") + "</span>";
-	const marklessSsrComposition = marklessSsrComposeView(html, marklessViewWithoutAnchors(payloadView), marklessSsrHostLocators, marklessSsrChildren);
+	marklessSsrRenderStateValues.set('prop:props',props);
+	if(typeof props!=='undefined')marklessSsrRenderStateValues.set("prop:props",props);
+	const marklessSsrIdPrefix=marklessSsrRenderContext?.idPrefix??'';
+	const marklessSsrReadData=(residue,marklessSsrDataContext)=>{if(residue.kind==='graph-read')return marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(residue.graphNodeId),residue.path);if(residue.kind==='repeat-item')return marklessSsrReadPublicPath(marklessSsrDataContext.repeatItem,residue.path);const error=marklessSsrDataContext.asyncError;switch(residue.source){default:throw new Error('MARKLESS_SSR_DATA_RESIDUE_MISSING: '+residue.source);}};
+	const marklessSsrRendered=await renderSsrData({renderData:{...marklessSsrRenderData,root:{componentName:"Badge",templateId:"template:Badge"}},idPrefix:marklessSsrIdPrefix,read:marklessSsrReadData,selectBranchArm:(marklessSsrDataSlot,marklessSsrDataContext)=>{const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.branchSiteId){case "branch-site:0":{const arm=((active)?0:1);marklessSsrBranches.push({id:marklessSsrDataSlot.branchSiteId,takenArm:arm});return arm;}default:throw new Error('MARKLESS_SSR_DATA_BRANCH_MISSING: '+marklessSsrDataSlot.branchSiteId);}},selectAsyncArm:async(marklessSsrDataSlot,marklessSsrDataContext)=>{const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.boundaryId){default:throw new Error('MARKLESS_SSR_DATA_BOUNDARY_MISSING: '+marklessSsrDataSlot.boundaryId);}},renderChild:async(marklessSsrDataSlot,marklessSsrDataContext)=>{const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.componentEdgeId){default:throw new Error('MARKLESS_SSR_DATA_CHILD_MISSING: '+marklessSsrDataSlot.componentEdgeId);}}});
+	const html = marklessSsrRendered.html;
+	const marklessSsrComposition = marklessSsrComposeView(marklessSsrRendered.structure, marklessViewWithoutAnchors(payloadView), marklessSsrChildren, marklessSsrAsyncSnapshots, marklessSsrIdPrefix);
 	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
-	return { html, state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots), view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) }, elementCount: marklessSsrComposition.elementCount, propEvents: [], externalSymbolIds: marklessSsrComposition.externalSymbolIds };
+	return { html, state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots), view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) }, elementCount: marklessSsrComposition.elementCount, propEvents: [], externalSymbolIds: marklessSsrComposition.externalSymbolIds, structure: marklessSsrRendered.structure, structureTokens: marklessSsrRendered.structureTokens };
 }
+const marklessSsrRenderData = {"passId":"render-data","filename":"src/SameModuleChild.tsrx","root":{"componentName":"App","templateId":"template:App"},"chunks":[{"id":"branch:branch-site:0:arm:0","kind":"branch-arm","componentName":"Badge","statics":["<em>Live</em>"],"hosts":[{"hostNodeId":"h1","tagName":"em","coordinate":{"kind":"child-index","path":[0]}}],"slots":[]},{"id":"branch:branch-site:0:arm:1","kind":"branch-arm","componentName":"Badge","statics":["<em>Idle</em>"],"hosts":[{"hostNodeId":"h2","tagName":"em","coordinate":{"kind":"child-index","path":[0]}}],"slots":[]},{"id":"template:Badge","kind":"template","componentName":"Badge","statics":["<span><!--markless-slot:0-->","</span>"],"hosts":[{"hostNodeId":"h0","tagName":"span","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"branch","branchSiteId":"branch-site:0","armTemplateIds":["branch:branch-site:0:arm:0","branch:branch-site:0:arm:1"],"coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]},{"id":"template:App","kind":"template","componentName":"App","statics":["<main><!--markless-slot:0-->","</main>"],"hosts":[{"hostNodeId":"h3","tagName":"main","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"child-component","componentEdgeId":"component-edge:0","childComponentName":"Badge","childTemplateId":"template:Badge","coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]}],"hosts":[{"id":"h0","tagName":"span","hostNodeId":"h0"},{"id":"h1","tagName":"em","hostNodeId":"h1"},{"id":"h2","tagName":"em","hostNodeId":"h2"},{"id":"h3","tagName":"main","hostNodeId":"h3"}],"initialValues":[{"graphNodeId":"state:active","value":{"kind":"constant","value":true}}],"branches":[{"branchSiteId":"branch-site:0","kind":"if","testSource":"active","testReads":[{"graphNodeId":"prop:props","path":["active"]}],"armChunkIds":["branch:branch-site:0:arm:0","branch:branch-site:0:arm:1"],"anchorOrder":0,"update":"range"}],"repeats":[],"boundaries":[],"interactions":[]};
 const marklessSsrPropEvents = [];
 const marklessSsrStateValues = new Map([
 	["state:active", true]
@@ -3170,9 +3261,13 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 	const marklessSsrChildren = [];
 	const marklessSsrBranches = [];
 	const marklessSsrAsyncSnapshots = [];
-	const marklessSsrHostLocators = [];
-	const html = marklessSsrHost(marklessSsrHostLocators, "h3", "main") + "<main>" + (await marklessSsrRenderChild(marklessSsrChildren, __marklessSsrComponent0, { active: active }, { hostPrefix: "c0:", symbolPrefix: "", localIndex: marklessSsrHostLocators.length, graphProps: [{"name":"active","graphNodeId":"state:active","path":[]}], boundSymbols: {"symbol:0":"bound:symbol%3A0:component-edge%3A0","symbol:1":"bound:symbol%3A1:component-edge%3A0"} }, marklessSsrRenderContext)) + "</main>";
-	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren, marklessSsrAsyncSnapshots);
+	marklessSsrRenderStateValues.set('prop:props',props);
+	if(typeof active!=='undefined')marklessSsrRenderStateValues.set("state:active",active);
+	const marklessSsrIdPrefix=marklessSsrRenderContext?.idPrefix??'';
+	const marklessSsrReadData=(residue,marklessSsrDataContext)=>{if(residue.kind==='graph-read')return marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(residue.graphNodeId),residue.path);if(residue.kind==='repeat-item')return marklessSsrReadPublicPath(marklessSsrDataContext.repeatItem,residue.path);const error=marklessSsrDataContext.asyncError;switch(residue.source){default:throw new Error('MARKLESS_SSR_DATA_RESIDUE_MISSING: '+residue.source);}};
+	const marklessSsrRendered=await renderSsrData({renderData:{...marklessSsrRenderData,root:{componentName:"App",templateId:"template:App"}},idPrefix:marklessSsrIdPrefix,read:marklessSsrReadData,selectBranchArm:(marklessSsrDataSlot,marklessSsrDataContext)=>{const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.branchSiteId){default:throw new Error('MARKLESS_SSR_DATA_BRANCH_MISSING: '+marklessSsrDataSlot.branchSiteId);}},selectAsyncArm:async(marklessSsrDataSlot,marklessSsrDataContext)=>{const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.boundaryId){default:throw new Error('MARKLESS_SSR_DATA_BOUNDARY_MISSING: '+marklessSsrDataSlot.boundaryId);}},renderChild:async(marklessSsrDataSlot,marklessSsrDataContext)=>{const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.componentEdgeId){case "component-edge:0":{const child={"hostPrefix":"c0:","symbolPrefix":"","graphProps":[{"name":"active","graphNodeId":"state:active","path":[]}],"boundSymbols":{"symbol:0":"bound:symbol%3A0:component-edge%3A0","symbol:1":"bound:symbol%3A1:component-edge%3A0"}};const childProps={active:marklessSsrReadPublicPath(marklessSsrRenderStateValues.get("state:active"),[])};const output=await __marklessSsrComponent0?.renderSsr?.(childProps,{...marklessSsrRenderContext,idPrefix:marklessSsrIdPrefix+child.hostPrefix});if(!output)throw new Error('MARKLESS_SSR_DATA_CHILD_RENDER_MISSING: component-edge:0');if(marklessSsrDataContext.repeatItem!==undefined){marklessAssertPresentationalRowChild(output,"Badge");return output;}marklessSsrChildren.push({...child,output,callbackProps:childProps.__marklessSsrCallbacks??{}});return output;}default:throw new Error('MARKLESS_SSR_DATA_CHILD_MISSING: '+marklessSsrDataSlot.componentEdgeId);}}});
+	const html = marklessSsrRendered.html;
+	const marklessSsrComposition = marklessSsrComposeView(marklessSsrRendered.structure, payloadView, marklessSsrChildren, marklessSsrAsyncSnapshots, marklessSsrIdPrefix);
 	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
@@ -3181,6 +3276,8 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 		elementCount: marklessSsrComposition.elementCount,
 		propEvents: marklessSsrPropEvents,
 		externalSymbolIds: marklessSsrComposition.externalSymbolIds,
+		structure: marklessSsrRendered.structure,
+		structureTokens: marklessSsrRendered.structureTokens,
 	};
 }",
     "symbolModules": "symbol:0
@@ -3240,11 +3337,11 @@ function createUnknownSymbolError(id) {
   },
   "spread-attributes": {
     "csrModuleSource": "import { createMarklessCsrChunkRenderer } from '@markless/web/fns/csr';
-export const marklessCsrChunkComponents = {"App": {name:"App",dataId:"markless-csr-data:src%2FSpreadAttributes.tsrx:App",/*MARKLESS_CSR_TEST_START*/nativeFallback:()=>({"name":"App","state":{"version":1,"cells":[],"computed":[],"sharedDefinitions":[]},"view":{"version":1,"locators":[{"hostNodeId":"h0","strategy":"dom-order","index":0,"tagName":"section"}],"events":[],"domUpdates":[],"behaviors":[],"elementHandles":[],"keyedRepeats":[],"branches":[],"asyncBoundaries":[]},"rootChunkId":"template:App","chunks":[{"id":"template:App","kind":"template","componentName":"App","statics":["<section title=\\"Final\\">Hi</section>"],"hosts":[{"hostNodeId":"h0","tagName":"section","coordinate":{"kind":"child-index","path":[0]}}],"slots":[]}],"hostNodeIds":["h0"],"branchIds":[],"boundaryIds":[],"repeatIds":[],"initialValues":[],"initialValueSources":{},"initialValueKinds":{},"stateGraphNodeIds":[],"branches":[],"repeats":[],"boundaries":[],"edges":[],"propCellId":null,"ownsModuleData":true}),/*MARKLESS_CSR_TEST_END*/getComponent:(name)=>marklessCsrAllChunkComponents[name],loadSymbol,createValues:(props,read,locals,marklessReadCsrValue)=>{const error=locals.error;return {};}}};
+export const marklessCsrChunkComponents = {"App": {name:"App",dataId:"markless-csr-data:src%2FSpreadAttributes.tsrx:App",/*MARKLESS_CSR_TEST_START*/nativeFallback:()=>({"name":"App","state":{"version":1,"cells":[],"computed":[],"sharedDefinitions":[]},"view":{"version":1,"locators":[{"hostNodeId":"h0","strategy":"dom-order","index":0,"tagName":"section"}],"events":[],"domUpdates":[],"behaviors":[],"elementHandles":[],"keyedRepeats":[],"branches":[],"asyncBoundaries":[]},"rootChunkId":"template:App","chunks":[{"id":"template:App","kind":"template","componentName":"App","statics":["<section"," title=\\"Final\\">Hi</section>"],"hosts":[{"hostNodeId":"h0","tagName":"section","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"spread-attributes","coordinate":{"kind":"child-index","path":[0]},"residue":{"kind":"authored-expression","source":"meta"},"excludeNames":["title"],"staticIndex":0}]}],"hostNodeIds":["h0"],"branchIds":[],"boundaryIds":[],"repeatIds":[],"initialValues":[],"initialValueSources":{},"initialValueKinds":{},"stateGraphNodeIds":[],"branches":[],"repeats":[],"boundaries":[],"edges":[],"propCellId":null,"ownsModuleData":true}),/*MARKLESS_CSR_TEST_END*/getComponent:(name)=>marklessCsrAllChunkComponents[name],loadSymbol,createValues:(props,read,locals,marklessReadCsrValue)=>{const meta = { 'data-kind': 'card', title: 'Draft' };const error=locals.error;return {"meta":()=>(meta)};}}};
 const marklessCsrAllChunkComponents = { ...marklessCsrChunkComponents,  };
 const marklessRenderCsrChunks = createMarklessCsrChunkRenderer({ rootComponentName: "App", components: marklessCsrAllChunkComponents });
 function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); }
-/*MARKLESS_CSR_NATIVE_START:%5B%7B%22dataId%22%3A%22markless-csr-data%3Asrc%252FSpreadAttributes.tsrx%3AApp%22%2C%22definition%22%3A%7B%22name%22%3A%22App%22%2C%22state%22%3A%7B%22version%22%3A1%2C%22cells%22%3A%5B%5D%2C%22computed%22%3A%5B%5D%2C%22sharedDefinitions%22%3A%5B%5D%7D%2C%22view%22%3A%7B%22version%22%3A1%2C%22locators%22%3A%5B%7B%22hostNodeId%22%3A%22h0%22%2C%22strategy%22%3A%22dom-order%22%2C%22index%22%3A0%2C%22tagName%22%3A%22section%22%7D%5D%2C%22events%22%3A%5B%5D%2C%22domUpdates%22%3A%5B%5D%2C%22behaviors%22%3A%5B%5D%2C%22elementHandles%22%3A%5B%5D%2C%22keyedRepeats%22%3A%5B%5D%2C%22branches%22%3A%5B%5D%2C%22asyncBoundaries%22%3A%5B%5D%7D%2C%22rootChunkId%22%3A%22template%3AApp%22%2C%22chunks%22%3A%5B%7B%22id%22%3A%22template%3AApp%22%2C%22kind%22%3A%22template%22%2C%22componentName%22%3A%22App%22%2C%22hosts%22%3A%5B%7B%22hostNodeId%22%3A%22h0%22%2C%22tagName%22%3A%22section%22%2C%22coordinate%22%3A%7B%22kind%22%3A%22child-index%22%2C%22path%22%3A%5B0%5D%7D%7D%5D%2C%22slots%22%3A%5B%5D%2C%22nativeTemplateId%22%3A%22markless-csr-data%3Asrc%252FSpreadAttributes.tsrx%3AApp%3Atemplate%3Atemplate%253AApp%22%7D%5D%2C%22hostNodeIds%22%3A%5B%22h0%22%5D%2C%22branchIds%22%3A%5B%5D%2C%22boundaryIds%22%3A%5B%5D%2C%22repeatIds%22%3A%5B%5D%2C%22initialValues%22%3A%5B%5D%2C%22initialValueSources%22%3A%7B%7D%2C%22initialValueKinds%22%3A%7B%7D%2C%22stateGraphNodeIds%22%3A%5B%5D%2C%22branches%22%3A%5B%5D%2C%22repeats%22%3A%5B%5D%2C%22boundaries%22%3A%5B%5D%2C%22edges%22%3A%5B%5D%2C%22propCellId%22%3Anull%2C%22ownsModuleData%22%3Atrue%7D%2C%22templates%22%3A%5B%7B%22id%22%3A%22markless-csr-data%3Asrc%252FSpreadAttributes.tsrx%3AApp%3Atemplate%3Atemplate%253AApp%22%2C%22markup%22%3A%22%3Csection%20title%3D%5C%22Final%5C%22%3EHi%3C%2Fsection%3E%22%7D%5D%7D%5D:MARKLESS_CSR_NATIVE_END*/",
+/*MARKLESS_CSR_NATIVE_START:%5B%7B%22dataId%22%3A%22markless-csr-data%3Asrc%252FSpreadAttributes.tsrx%3AApp%22%2C%22definition%22%3A%7B%22name%22%3A%22App%22%2C%22state%22%3A%7B%22version%22%3A1%2C%22cells%22%3A%5B%5D%2C%22computed%22%3A%5B%5D%2C%22sharedDefinitions%22%3A%5B%5D%7D%2C%22view%22%3A%7B%22version%22%3A1%2C%22locators%22%3A%5B%7B%22hostNodeId%22%3A%22h0%22%2C%22strategy%22%3A%22dom-order%22%2C%22index%22%3A0%2C%22tagName%22%3A%22section%22%7D%5D%2C%22events%22%3A%5B%5D%2C%22domUpdates%22%3A%5B%5D%2C%22behaviors%22%3A%5B%5D%2C%22elementHandles%22%3A%5B%5D%2C%22keyedRepeats%22%3A%5B%5D%2C%22branches%22%3A%5B%5D%2C%22asyncBoundaries%22%3A%5B%5D%7D%2C%22rootChunkId%22%3A%22template%3AApp%22%2C%22chunks%22%3A%5B%7B%22id%22%3A%22template%3AApp%22%2C%22kind%22%3A%22template%22%2C%22componentName%22%3A%22App%22%2C%22hosts%22%3A%5B%7B%22hostNodeId%22%3A%22h0%22%2C%22tagName%22%3A%22section%22%2C%22coordinate%22%3A%7B%22kind%22%3A%22child-index%22%2C%22path%22%3A%5B0%5D%7D%7D%5D%2C%22slots%22%3A%5B%7B%22kind%22%3A%22spread-attributes%22%2C%22coordinate%22%3A%7B%22kind%22%3A%22child-index%22%2C%22path%22%3A%5B0%5D%7D%2C%22residue%22%3A%7B%22kind%22%3A%22authored-expression%22%2C%22source%22%3A%22meta%22%7D%2C%22excludeNames%22%3A%5B%22title%22%5D%2C%22staticIndex%22%3A0%7D%5D%2C%22nativeTemplateId%22%3A%22markless-csr-data%3Asrc%252FSpreadAttributes.tsrx%3AApp%3Atemplate%3Atemplate%253AApp%22%7D%5D%2C%22hostNodeIds%22%3A%5B%22h0%22%5D%2C%22branchIds%22%3A%5B%5D%2C%22boundaryIds%22%3A%5B%5D%2C%22repeatIds%22%3A%5B%5D%2C%22initialValues%22%3A%5B%5D%2C%22initialValueSources%22%3A%7B%7D%2C%22initialValueKinds%22%3A%7B%7D%2C%22stateGraphNodeIds%22%3A%5B%5D%2C%22branches%22%3A%5B%5D%2C%22repeats%22%3A%5B%5D%2C%22boundaries%22%3A%5B%5D%2C%22edges%22%3A%5B%5D%2C%22propCellId%22%3Anull%2C%22ownsModuleData%22%3Atrue%7D%2C%22templates%22%3A%5B%7B%22id%22%3A%22markless-csr-data%3Asrc%252FSpreadAttributes.tsrx%3AApp%3Atemplate%3Atemplate%253AApp%22%2C%22markup%22%3A%22%3Csection%20title%3D%5C%22Final%5C%22%3EHi%3C%2Fsection%3E%22%7D%5D%7D%5D:MARKLESS_CSR_NATIVE_END*/",
     "payloadScripts": "{
   "state": {
     "version": 1,
@@ -3322,9 +3419,11 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
   "styleScopes": [],
   "diagnostics": []
 }",
-    "ssrModuleSource": "import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrHost, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+    "ssrModuleSource": "import { renderSsrData } from '@markless/web/fns/ssr-data';
+import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
 import { marklessCloneState } from '@markless/web/fns/state';
-import { marklessSsrSpreadAttributes } from '@markless/web/fns/html';
+import { marklessSsrReadPublicPath } from '@markless/web/fns/html';
+const marklessSsrRenderData = {"passId":"render-data","filename":"src/SpreadAttributes.tsrx","root":{"componentName":"App","templateId":"template:App"},"chunks":[{"id":"template:App","kind":"template","componentName":"App","statics":["<section"," title=\\"Final\\">Hi</section>"],"hosts":[{"hostNodeId":"h0","tagName":"section","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"spread-attributes","coordinate":{"kind":"child-index","path":[0]},"residue":{"kind":"authored-expression","source":"meta"},"excludeNames":["title"],"staticIndex":0}]}],"hosts":[{"id":"h0","tagName":"section","hostNodeId":"h0"}],"initialValues":[],"branches":[],"repeats":[],"boundaries":[],"interactions":[]};
 const marklessSsrPropEvents = [];
 const marklessSsrStateValues = new Map([
 ]);
@@ -3335,9 +3434,12 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 	const marklessSsrChildren = [];
 	const marklessSsrBranches = [];
 	const marklessSsrAsyncSnapshots = [];
-	const marklessSsrHostLocators = [];
-	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "section") + "<section" + marklessSsrSpreadAttributes({ ...(meta), title: "Final" }, null) + ">" + "Hi" + "</section>";
-	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren, marklessSsrAsyncSnapshots);
+	marklessSsrRenderStateValues.set('prop:props',props);
+	const marklessSsrIdPrefix=marklessSsrRenderContext?.idPrefix??'';
+	const marklessSsrReadData=(residue,marklessSsrDataContext)=>{if(residue.kind==='graph-read')return marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(residue.graphNodeId),residue.path);if(residue.kind==='repeat-item')return marklessSsrReadPublicPath(marklessSsrDataContext.repeatItem,residue.path);const error=marklessSsrDataContext.asyncError;switch(residue.source){case "meta":return (meta);default:throw new Error('MARKLESS_SSR_DATA_RESIDUE_MISSING: '+residue.source);}};
+	const marklessSsrRendered=await renderSsrData({renderData:{...marklessSsrRenderData,root:{componentName:"App",templateId:"template:App"}},idPrefix:marklessSsrIdPrefix,read:marklessSsrReadData,selectBranchArm:(marklessSsrDataSlot,marklessSsrDataContext)=>{const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.branchSiteId){default:throw new Error('MARKLESS_SSR_DATA_BRANCH_MISSING: '+marklessSsrDataSlot.branchSiteId);}},selectAsyncArm:async(marklessSsrDataSlot,marklessSsrDataContext)=>{const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.boundaryId){default:throw new Error('MARKLESS_SSR_DATA_BOUNDARY_MISSING: '+marklessSsrDataSlot.boundaryId);}},renderChild:async(marklessSsrDataSlot,marklessSsrDataContext)=>{const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.componentEdgeId){default:throw new Error('MARKLESS_SSR_DATA_CHILD_MISSING: '+marklessSsrDataSlot.componentEdgeId);}}});
+	const html = marklessSsrRendered.html;
+	const marklessSsrComposition = marklessSsrComposeView(marklessSsrRendered.structure, payloadView, marklessSsrChildren, marklessSsrAsyncSnapshots, marklessSsrIdPrefix);
 	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
@@ -3346,6 +3448,8 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 		elementCount: marklessSsrComposition.elementCount,
 		propEvents: marklessSsrPropEvents,
 		externalSymbolIds: marklessSsrComposition.externalSymbolIds,
+		structure: marklessSsrRendered.structure,
+		structureTokens: marklessSsrRendered.structureTokens,
 	};
 }",
     "symbolModules": "",
@@ -3565,9 +3669,11 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
   "styleScopes": [],
   "diagnostics": []
 }",
-    "ssrModuleSource": "import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrHost, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+    "ssrModuleSource": "import { renderSsrData } from '@markless/web/fns/ssr-data';
+import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
-import { marklessSsrText } from '@markless/web/fns/html';
+import { marklessSsrReadPublicPath } from '@markless/web/fns/html';
+const marklessSsrRenderData = {"passId":"render-data","filename":"src/StateHandlers.tsrx","root":{"componentName":"App","templateId":"template:App"},"chunks":[{"id":"template:App","kind":"template","componentName":"App","statics":["<button><!--markless-slot:0-->","</button>"],"hosts":[{"hostNodeId":"h0","tagName":"button","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"text","residue":{"kind":"graph-read","graphNodeId":"state:count","path":[]},"coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]}],"hosts":[{"id":"h0","tagName":"button","hostNodeId":"h0"}],"initialValues":[{"graphNodeId":"state:count","value":{"kind":"constant","value":0}}],"branches":[],"repeats":[],"boundaries":[],"interactions":[{"eventId":"event:0","hostNodeId":"h0","eventName":"click","symbolIds":["symbol:0"]}]};
 const marklessSsrPropEvents = [];
 const marklessSsrStateValues = new Map([
 	["state:count", 0]
@@ -3579,9 +3685,13 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 	const marklessSsrChildren = [];
 	const marklessSsrBranches = [];
 	const marklessSsrAsyncSnapshots = [];
-	const marklessSsrHostLocators = [];
-	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "button") + "<button>" + marklessSsrText(count) + "</button>";
-	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren, marklessSsrAsyncSnapshots);
+	marklessSsrRenderStateValues.set('prop:props',props);
+	if(typeof count!=='undefined')marklessSsrRenderStateValues.set("state:count",count);
+	const marklessSsrIdPrefix=marklessSsrRenderContext?.idPrefix??'';
+	const marklessSsrReadData=(residue,marklessSsrDataContext)=>{if(residue.kind==='graph-read')return marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(residue.graphNodeId),residue.path);if(residue.kind==='repeat-item')return marklessSsrReadPublicPath(marklessSsrDataContext.repeatItem,residue.path);const error=marklessSsrDataContext.asyncError;switch(residue.source){default:throw new Error('MARKLESS_SSR_DATA_RESIDUE_MISSING: '+residue.source);}};
+	const marklessSsrRendered=await renderSsrData({renderData:{...marklessSsrRenderData,root:{componentName:"App",templateId:"template:App"}},idPrefix:marklessSsrIdPrefix,read:marklessSsrReadData,selectBranchArm:(marklessSsrDataSlot,marklessSsrDataContext)=>{const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.branchSiteId){default:throw new Error('MARKLESS_SSR_DATA_BRANCH_MISSING: '+marklessSsrDataSlot.branchSiteId);}},selectAsyncArm:async(marklessSsrDataSlot,marklessSsrDataContext)=>{const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.boundaryId){default:throw new Error('MARKLESS_SSR_DATA_BOUNDARY_MISSING: '+marklessSsrDataSlot.boundaryId);}},renderChild:async(marklessSsrDataSlot,marklessSsrDataContext)=>{const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.componentEdgeId){default:throw new Error('MARKLESS_SSR_DATA_CHILD_MISSING: '+marklessSsrDataSlot.componentEdgeId);}}});
+	const html = marklessSsrRendered.html;
+	const marklessSsrComposition = marklessSsrComposeView(marklessSsrRendered.structure, payloadView, marklessSsrChildren, marklessSsrAsyncSnapshots, marklessSsrIdPrefix);
 	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
@@ -3590,6 +3700,8 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 		elementCount: marklessSsrComposition.elementCount,
 		propEvents: marklessSsrPropEvents,
 		externalSymbolIds: marklessSsrComposition.externalSymbolIds,
+		structure: marklessSsrRendered.structure,
+		structureTokens: marklessSsrRendered.structureTokens,
 	};
 }",
     "symbolModules": "symbol:0
@@ -3805,9 +3917,11 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
   "styleScopes": [],
   "diagnostics": []
 }",
-    "ssrModuleSource": "import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrHost, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+    "ssrModuleSource": "import { renderSsrData } from '@markless/web/fns/ssr-data';
+import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
-import { marklessSsrText } from '@markless/web/fns/html';
+import { marklessSsrReadPublicPath } from '@markless/web/fns/html';
+const marklessSsrRenderData = {"passId":"render-data","filename":"src/SyncComputed.tsrx","root":{"componentName":"App","templateId":"template:App"},"chunks":[{"id":"template:App","kind":"template","componentName":"App","statics":["<output><!--markless-slot:0-->","</output>"],"hosts":[{"hostNodeId":"h0","tagName":"output","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"text","residue":{"kind":"graph-read","graphNodeId":"computed:doubled","path":[]},"coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]}],"hosts":[{"id":"h0","tagName":"output","hostNodeId":"h0"}],"initialValues":[{"graphNodeId":"state:count","value":{"kind":"constant","value":2}},{"graphNodeId":"computed:doubled","value":{"kind":"symbol-function","symbolId":"symbol:1"}}],"branches":[],"repeats":[],"boundaries":[],"interactions":[]};
 const marklessSsrPropEvents = [];
 const marklessSsrStateValues = new Map([
 	["state:count", 2]
@@ -3820,9 +3934,14 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 	const marklessSsrChildren = [];
 	const marklessSsrBranches = [];
 	const marklessSsrAsyncSnapshots = [];
-	const marklessSsrHostLocators = [];
-	const html = marklessSsrHost(marklessSsrHostLocators, "h0", "output") + "<output>" + marklessSsrText(doubled) + "</output>";
-	const marklessSsrComposition = marklessSsrComposeView(html, payloadView, marklessSsrHostLocators, marklessSsrChildren, marklessSsrAsyncSnapshots);
+	marklessSsrRenderStateValues.set('prop:props',props);
+	if(typeof count!=='undefined')marklessSsrRenderStateValues.set("state:count",count);
+	if(typeof doubled!=='undefined')marklessSsrRenderStateValues.set("computed:doubled",doubled);
+	const marklessSsrIdPrefix=marklessSsrRenderContext?.idPrefix??'';
+	const marklessSsrReadData=(residue,marklessSsrDataContext)=>{if(residue.kind==='graph-read')return marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(residue.graphNodeId),residue.path);if(residue.kind==='repeat-item')return marklessSsrReadPublicPath(marklessSsrDataContext.repeatItem,residue.path);const error=marklessSsrDataContext.asyncError;switch(residue.source){default:throw new Error('MARKLESS_SSR_DATA_RESIDUE_MISSING: '+residue.source);}};
+	const marklessSsrRendered=await renderSsrData({renderData:{...marklessSsrRenderData,root:{componentName:"App",templateId:"template:App"}},idPrefix:marklessSsrIdPrefix,read:marklessSsrReadData,selectBranchArm:(marklessSsrDataSlot,marklessSsrDataContext)=>{const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.branchSiteId){default:throw new Error('MARKLESS_SSR_DATA_BRANCH_MISSING: '+marklessSsrDataSlot.branchSiteId);}},selectAsyncArm:async(marklessSsrDataSlot,marklessSsrDataContext)=>{const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.boundaryId){default:throw new Error('MARKLESS_SSR_DATA_BOUNDARY_MISSING: '+marklessSsrDataSlot.boundaryId);}},renderChild:async(marklessSsrDataSlot,marklessSsrDataContext)=>{const error=marklessSsrDataContext.asyncError;switch(marklessSsrDataSlot.componentEdgeId){default:throw new Error('MARKLESS_SSR_DATA_CHILD_MISSING: '+marklessSsrDataSlot.componentEdgeId);}}});
+	const html = marklessSsrRendered.html;
+	const marklessSsrComposition = marklessSsrComposeView(marklessSsrRendered.structure, payloadView, marklessSsrChildren, marklessSsrAsyncSnapshots, marklessSsrIdPrefix);
 	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
 	return {
 		html,
@@ -3831,6 +3950,8 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 		elementCount: marklessSsrComposition.elementCount,
 		propEvents: marklessSsrPropEvents,
 		externalSymbolIds: marklessSsrComposition.externalSymbolIds,
+		structure: marklessSsrRendered.structure,
+		structureTokens: marklessSsrRendered.structureTokens,
 	};
 }",
     "symbolModules": "symbol:0
