@@ -20,6 +20,87 @@ afterEach(async () => {
 });
 
 describe('SSR browser HMR', () => {
+	test('serves the framework error document when dev prerender evaluation throws', async () => {
+		const fixture = await createSsrFixture();
+		await writeFile(
+			fixture.entry,
+			"function explode() { throw new Error('dev prerender exploded'); }\n\n" +
+				'export function App() @{\n\t<section>{explode()}</section>\n}\n',
+		);
+		let server: ViteDevServer | undefined;
+		vi.stubEnv('MARKLESS_PRERENDER', '1');
+		try {
+			server = await createServer({
+				configFile: false,
+				root: fixture.root,
+				environments: {
+					ssr: {
+						consumer: 'server',
+						build: { rolldownOptions: { input: { prerender: fixture.entry } } },
+					},
+				},
+				plugins: [markless({ executionLog: 'never' })],
+				resolve: { alias: marklessSourceAliases() },
+				server: { hmr: true, middlewareMode: true, ws: false },
+			});
+
+			const html = await server.transformIndexHtml(
+				'/',
+				'<html><head></head><body><div id="app"></div></body></html>',
+			);
+			expect(html).toContain('dev prerender exploded');
+			expect(html).toContain('window.__MARKLESS_DEV_ERROR__ = ');
+			expect(html).toContain(MARKLESS_DEV_ERROR_CLIENT_ID);
+			expect(html).not.toContain('<div id="app"></div>');
+		} finally {
+			vi.unstubAllEnvs();
+			await server?.close();
+		}
+	});
+
+	test('invalidates a prerender snapshot before the edited page reloads', async () => {
+		const fixture = await createSsrFixture();
+		let server: ViteDevServer | undefined;
+		vi.stubEnv('MARKLESS_PRERENDER', '1');
+		try {
+			server = await createServer({
+				configFile: false,
+				root: fixture.root,
+				environments: {
+					ssr: {
+						consumer: 'server',
+						build: { rolldownOptions: { input: { prerender: fixture.entry } } },
+					},
+				},
+				plugins: [markless({ executionLog: 'never' })],
+				resolve: { alias: marklessSourceAliases() },
+				server: { hmr: true, middlewareMode: true, ws: false },
+			});
+
+			const indexHtml =
+				'<html><head></head><body><div id="app"></div><script type="module" src="/src/main.ts"></script></body></html>';
+			const first = await server.transformIndexHtml('/', indexHtml);
+			expect(first).toContain('<span>hello</span>');
+			expect(first).toContain('data-markless-resume-module=');
+			expect(first).not.toContain('type="markless/state"');
+
+			const send = vi.spyOn(server.environments.client.hot, 'send');
+			await editFile(
+				server,
+				fixture.entry,
+				fixture.source.replace('<span>hello</span>', '<span>fresh render data</span>'),
+			);
+			await waitForFullReloadCountAbove(send, 0);
+
+			const second = await server.transformIndexHtml('/', indexHtml);
+			expect(second).toContain('<span>fresh render data</span>');
+			expect(second).not.toContain('<span>hello</span>');
+		} finally {
+			vi.unstubAllEnvs();
+			await server?.close();
+		}
+	});
+
 	test('reports an invalid real edit without reload and clears it before the corrected reload', async () => {
 		const fixture = await createSsrFixture();
 		let server: ViteDevServer | undefined;

@@ -26,6 +26,7 @@ interface ViteHmrOptions {
 		environment?: MarklessEnvironment,
 		nextSource?: string,
 	) => string[] | Promise<string[]>;
+	invalidatePrerenderSnapshots?: (renderDataIds: readonly string[]) => void;
 	invalidSourceRecheckMs?: number;
 }
 
@@ -236,6 +237,7 @@ export function createViteHmr(options: ViteHmrOptions) {
 				environment,
 				env === 'server' ? server?.environments?.[options.clientEnvironment] : undefined,
 			);
+			const invalidatedGeneratedIds = new Set<string>();
 			for (const file of files) {
 				const candidates =
 					editedSource !== undefined && ctx.file
@@ -248,6 +250,7 @@ export function createViteHmr(options: ViteHmrOptions) {
 						candidate === ctx.file ? editedSource : undefined,
 					);
 					for (const id of invalidatedIds ?? []) {
+						invalidatedGeneratedIds.add(id);
 						for (const targetEnvironment of invalidationEnvironments) {
 							const module = targetEnvironment.moduleGraph?.getModuleById?.(id);
 							if (!module) continue;
@@ -261,6 +264,9 @@ export function createViteHmr(options: ViteHmrOptions) {
 						}
 					}
 				}
+			}
+			if (invalidatedGeneratedIds.size > 0) {
+				options.invalidatePrerenderSnapshots?.([...invalidatedGeneratedIds].sort());
 			}
 
 			if (sendMessages) {
@@ -308,7 +314,7 @@ function installFetchViteClient(server: ViteDevServer, options: ViteHmrOptions) 
 	}
 }
 
-function injectDevClients(html: string, base: string) {
+export function injectDevClients(html: string, base: string) {
 	if (!html) return html;
 	const tags = [
 		...(html.includes('/@vite/client')

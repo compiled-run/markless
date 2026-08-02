@@ -72,6 +72,7 @@ type InternalMarklessRolldownOptions = MarklessRolldownOptions & {
 	prerender?: boolean;
 	productionResumeModuleUrls?: Map<string, string>;
 	publicPath?: (fileName: string) => string;
+	updateDevPrerenderHashes?: (hashes: ReadonlyMap<string, string>) => void;
 };
 
 const TSRX_SOURCE_FILE = /\.tsrx(?:[?#].*)?$/;
@@ -351,6 +352,7 @@ export function createMarklessRolldownPlugin(input: {
 			if (!TSRX_SOURCE_FILE.test(id)) {
 				if (
 					currentEnvironment === 'client' &&
+					internalOptions.dev !== true &&
 					internalOptions.prerender === true &&
 					normalizeExecutionLogMode(internalOptions.executionLog) !== 'never' &&
 					this.getModuleInfo(id)?.isEntry === true
@@ -510,6 +512,7 @@ export function createMarklessRolldownPlugin(input: {
 				executionLogEstimatedSizes,
 				dev,
 				environment: currentEnvironment,
+				updateDevPrerenderHashes: internalOptions.updateDevPrerenderHashes,
 			});
 			const resolvedInterfaceImports = await resolveImportedModuleInterfaces.call(
 				this,
@@ -561,6 +564,7 @@ export function createMarklessRolldownPlugin(input: {
 				executionLogEstimatedSizes,
 				dev,
 				environment: currentEnvironment,
+				updateDevPrerenderHashes: internalOptions.updateDevPrerenderHashes,
 			});
 			linkedTransformCache.set(cacheKey, {
 				source,
@@ -1051,8 +1055,10 @@ function registerTransformArtifacts(input: {
 	executionLogEstimatedSizes: Map<string, number>;
 	dev: ReturnType<typeof createMarklessDevGraph>;
 	environment: MarklessEnvironment;
+	updateDevPrerenderHashes?: (hashes: ReadonlyMap<string, string>) => void;
 }) {
 	const ids = new Set<string>();
+	const renderDataHashes = new Map<string, string>();
 	for (const module of input.result.virtualModules) {
 		const isClientSymbol = input.environment === 'client' && module.type === 'symbol';
 		// The symbol virtual module id embeds the source filename, so it is the
@@ -1063,6 +1069,9 @@ function registerTransformArtifacts(input: {
 			: module;
 		input.virtualModules.set(module.id, stored);
 		ids.add(module.id);
+		if (module.type === 'render-data') {
+			renderDataHashes.set(resolveVirtualId(module.id), renderDataHash(module.source));
+		}
 		if (isClientSymbol) {
 			input.executionLogEstimatedSizes.set(module.id, stored.source.length);
 		}
@@ -1075,6 +1084,16 @@ function registerTransformArtifacts(input: {
 	});
 	input.sourceVirtualModules.set(input.source, ids);
 	input.dev.record(input.source, ids, input.environment);
+	if (renderDataHashes.size > 0) input.updateDevPrerenderHashes?.(renderDataHashes);
+}
+
+function renderDataHash(source: string): string {
+	let hash = 0x811c9dc5;
+	for (let index = 0; index < source.length; index += 1) {
+		hash ^= source.charCodeAt(index);
+		hash = Math.imul(hash, 0x01000193);
+	}
+	return `mrd1-${(hash >>> 0).toString(36)}`;
 }
 
 function importedInterfaceHashSignature(
