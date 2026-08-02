@@ -280,6 +280,21 @@ function emitNode(
 		const edge = context.graph.componentEdges.find(
 			(candidate) => candidate.sourceSpan?.start === span?.start,
 		);
+		const projected = asNodes(node.children).filter(
+			(child) => !isIgnorableStaticTextNode(child),
+		);
+		const projectionChunkId = projected.length > 0
+			? `projection:${edge?.id ?? `${tagName}:${span?.start ?? 0}`}`
+			: undefined;
+		if (projectionChunkId) {
+			const projection = createChunk(
+				projectionChunkId,
+				'component-projection',
+				builder.componentName,
+			);
+			emitNodes(projected, [0], projection, context, repeat);
+			context.chunks.push(finishChunk(projection));
+		}
 		addAnchorSlot(
 			builder,
 			{
@@ -287,6 +302,7 @@ function emitNode(
 				componentEdgeId: edge?.id ?? `component-edge:${tagName}:${span?.start ?? 0}`,
 				childComponentName: tagName,
 				childTemplateId: `template:${tagName}`,
+				...(projectionChunkId ? { projectionChunkId } : {}),
 			},
 			path,
 		);

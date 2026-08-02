@@ -27,9 +27,6 @@ export function createResumeRuntime(
 ): ResumeRuntime {
 	const { elementsByHostId, elementHandles } = prepared;
 	let storagePlane: import('./storage-plane.ts').StoragePlane | undefined;
-	// Load gate — contract documented in storage-plane.ts. The plane is created
-	// exactly once, from start(); `storagePlane` is its own idempotence guard, so
-	// no memoised promise is needed.
 	const hasStorageCells = (input.state?.storage?.length ?? 0) > 0;
 	let disposed = false,
 		debugModule: typeof import('./debug-channel.ts') | undefined;
@@ -53,9 +50,6 @@ export function createResumeRuntime(
 	const hostSubscriptionReleases = new Map<string, Array<() => void>>(),
 		containerSubscriptionReleases: Array<() => void> = [];
 	const asyncBoundariesById = prepared.asyncBoundariesById;
-	// D8 settled-content tracker: created by the demand-loaded start wiring
-	// when the page has async boundaries (deadline-gated pending, navigation
-	// transition settle promise, pending minimum duration — T119/T120).
 	let settleTracker: AsyncBoundarySettleTracker | undefined;
 	let behaviorRuntime: BehaviorRuntime | undefined, branchRuntime: BranchRuntime | undefined;
 	let events: EventWiring | undefined, runtimeShared: RuntimeShared | undefined;
@@ -176,10 +170,6 @@ export function createResumeRuntime(
 		});
 		return behaviorRuntime;
 	}
-	// The escalated-flip re-settle path and the pending-flip hold are built by
-	// the demand-loaded start wiring (resume-runtime-start.ts, where the
-	// settle tracker and re-settle hold live). Keep the object passed to an
-	// early-loaded branch runtime so start wiring can add the hooks in place.
 	const branchWiring: {
 		resettleBoundary?: (boundaryId: string) => Promise<DomJournalResult | void>;
 		holdPendingFlip?: (graphNodeId: string) => boolean;
@@ -218,14 +208,9 @@ export function createResumeRuntime(
 		if (branchRuntime.startupArmBehaviorHostIds.length > 0) await flushRuntimeGraph();
 		return branchRuntime;
 	}
-	// Stable wrapper: container listeners see every registered event type,
-	// including non-markless ones; unmatched events pass through.
 	function dispatchCaptured(event: ResumeDomEvent): Promise<void> | void {
 		return events?.dispatch(event, { ignoreUnmatched: true });
 	}
-	// D1 tier 4: bind the runtime's live capabilities (event wiring, behavior
-	// runtime, dispose paths) to the commitArm primitive, and give any event
-	// type a committed arm introduces its container capture listener.
 	async function commitBoundaryArm(
 		boundary: ResumeAsyncBoundaryRecord,
 		update: ArmCommitUpdate,
@@ -243,6 +228,25 @@ export function createResumeRuntime(
 				disposeHost,
 				addEventRecord: eventWiring.addEventRecord,
 				registerElementHandle: elementHandles.register,
+				graph: input.graph,
+				graphNodeIds: new Set([
+					...(input.state?.cells ?? []).map((cell) => cell.graphNodeId),
+					...(input.state?.computed ?? []).map((computed) => computed.graphNodeId),
+				]),
+				loadSymbol: input.loadSymbol,
+				getElementHandle: elementHandles.get,
+				storeHostSubscription,
+				registerKeyedRepeats: async (records) => {
+					await eventWiring.prepareSyncPolicy([], records.flatMap((repeat) => repeat.rowEvents));
+					const { wireKeyedRepeats } = await import('./resume-keyed-repeats.ts');
+					wireKeyedRepeats({
+						graph: input.graph,
+						view: { ...input.view, keyedRepeats: records },
+						elementsByHostId,
+						events: eventWiring,
+						storeContainerSubscription,
+					});
+				},
 				addBehaviors: behaviors
 					? async (hostNodeId, records) => {
 							behaviorHostIds.add(hostNodeId);
@@ -250,7 +254,6 @@ export function createResumeRuntime(
 							await behaviors.activateBehaviors(hostNodeId, { flush: false });
 						}
 					: undefined,
-				// Fresh arm-branch anchors: rewire the boundary's flips (T104).
 				registerArmBranches: async (boundaryId, records) => {
 					const branches = await loadBranchRuntime();
 					for (const hostNodeId of branches.registerArmBranches(

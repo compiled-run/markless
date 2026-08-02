@@ -229,6 +229,36 @@ test('re-settle keeps the prior snapshot: pending re-runs are suppressed after s
 	expect(releases).toHaveLength(1);
 });
 
+test('a boundary already served settled content does not demand its update symbol at startup', () => {
+	const boundary = boundaryRecord(
+		'report',
+		'symbol:removed-structural-update',
+		ASYNC_BOUNDARY_ARM.try,
+	);
+	const tracker = createAsyncBoundarySettleTracker({ boundaries: [boundary] });
+	const reads: string[] = [];
+	wireAsyncBoundariesWithoutLoadingCapability({
+		asyncBoundariesById: new Map([[boundary.id, boundary]]),
+		graph: {
+			subscribe: () => () => {},
+			read(graphNodeId: string) {
+				reads.push(graphNodeId);
+				return { status: 'fulfilled' };
+			},
+		} as never,
+		root: {} as never,
+		loadSymbol: async () => {
+			throw new Error('settled startup must not load an update symbol');
+		},
+		renderBranchHtml: undefined,
+		elementHandles: { get: () => undefined } as never,
+		storeContainerSubscription: () => {},
+		settleTracker: tracker,
+	});
+
+	expect(reads).toEqual([]);
+});
+
 function permutations<Value>(values: readonly Value[]): Value[][] {
 	if (values.length <= 1) return [values.slice()];
 	const result: Value[][] = [];

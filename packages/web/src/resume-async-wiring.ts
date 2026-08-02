@@ -155,7 +155,10 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 				}),
 			);
 		}
-		if (boundary.updateSymbolId || input.demandOnStart === true) {
+		if (
+			(boundary.updateSymbolId && !input.settleTracker?.hasSettledContent(boundary.id)) ||
+			input.demandOnStart === true
+		) {
 			for (const asyncRead of boundary.asyncReads)
 				input.graph.read(asyncRead.graphNodeId, ['status']);
 		}
@@ -218,6 +221,12 @@ export async function settleAsyncBoundaryRange(
 			input.graph.read(boundary.runnerGraphNodeId, ['status']) !== status
 		)
 			return;
+	}
+	if (input.commitArm && boundary.renderArm) {
+		const rendered = boundary.renderArm(status);
+		await input.commitArm(boundary, rendered);
+		input.settleTracker?.markSettled(boundary.id);
+		return;
 	}
 	const symbol = await input.loadSymbol(boundary.updateSymbolId!);
 	const update = await symbol({

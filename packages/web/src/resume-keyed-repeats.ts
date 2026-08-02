@@ -112,6 +112,11 @@ function applyKeyedRepeatRowOrder(
 		readonly appendChild?: (node: ResumeDomElement) => unknown;
 		readonly insertBefore?: (node: ResumeDomElement, before: unknown) => unknown;
 	};
+	const currentRows = elementChildren(parent).slice(0, nextRows.length);
+	if (
+		currentRows.length === nextRows.length &&
+		currentRows.every((row, index) => row === nextRows[index])
+	) return;
 	for (const rowRoot of nextRows) {
 		if (mutableParent.appendChild) mutableParent.appendChild(rowRoot);
 		else mutableParent.insertBefore?.(rowRoot, null);

@@ -1,4 +1,5 @@
 import type { DecodedPayloadScripts } from '../../serializer/src/protocol-client.ts';
+import { ASYNC_BOUNDARY_ARM } from '@markless/serializer';
 
 // Show-then-adopt, adopt half (T107 streaming): the __mArm executor already
 // swapped settled arm content into the boundary's anchor range pre-runtime;
@@ -78,9 +79,20 @@ export function adoptStreamedArmPatches(
 			...decoded.view,
 			asyncBoundaries: decoded.view.asyncBoundaries.map((boundary) => {
 				const armRecords = armRecordsByBoundary.get(boundary.id);
-				return armRecords
-					? { ...boundary, armRecords: armRecords as (typeof boundary)['armRecords'] }
-					: boundary;
+				if (!armRecords) return boundary;
+				const snapshot = patchByGraphNode.get(boundary.runnerGraphNodeId ?? '')?.snapshot as
+					| { readonly status?: unknown }
+					| undefined;
+				const initiallyServedArm = snapshot?.status === 'fulfilled'
+					? ASYNC_BOUNDARY_ARM.try
+					: snapshot?.status === 'rejected'
+						? ASYNC_BOUNDARY_ARM.catch
+						: boundary.initiallyServedArm;
+				return {
+					...boundary,
+					initiallyServedArm,
+					armRecords: armRecords as (typeof boundary)['armRecords'],
+				};
 			}),
 		},
 	};

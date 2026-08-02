@@ -5,8 +5,6 @@ import { transformTsrxModule } from '../../bundler/src/transform.ts';
 import { compileTsrxModule } from '../../compiler/src/index.ts';
 import {
 	createMarklessCsrChunkRenderer,
-	marklessCsrAppendChildView,
-	marklessCsrReplaceChild,
 } from '../src/fns/csr.ts';
 import { render, renderToString } from '../src/index.ts';
 import { marklessBoundSymbolId } from '../src/fns/bound-symbol.ts';
@@ -676,20 +674,6 @@ function renderedText(node: FakeElement): string {
 	return node.textContent ?? node.childNodes.map(renderedText).join('');
 }
 
-test('marklessCsrReplaceChild returns a child that replaces the root placeholder', () => {
-	const child = element('STRONG');
-	const root = {
-		getAttribute(name: string) {
-			return name === 'data-markless-csr-child' ? '3' : null;
-		},
-		querySelector() {
-			throw new Error('A matching root placeholder must not search descendants.');
-		},
-	};
-
-	expect(marklessCsrReplaceChild(root, 3, child)).toBe(child);
-	expect(marklessCsrReplaceChild(root, 3, undefined)).toBe(root);
-});
 
 test('chunk CSR binds build coordinates to the mounted clone before state journals run', async () => {
 	const global = globalThis as { document?: unknown };
@@ -785,403 +769,46 @@ test('chunk CSR binds build coordinates to the mounted clone before state journa
 	}
 });
 
-test('marklessCsrReplaceChild preserves the root when replacing a descendant placeholder', () => {
-	const child = element('STRONG');
-	let replacement: FakeElement | undefined;
-	const placeholder = {
-		replaceWith(node: FakeElement) {
-			replacement = node;
-		},
-	};
-	const root = {
-		getAttribute() {
-			return null;
-		},
-		querySelector(selector: string) {
-			expect(selector).toBe('[data-markless-csr-child="2"]');
-			return placeholder;
-		},
-	};
 
-	expect(marklessCsrReplaceChild(root, 2, child)).toBe(root);
-	expect(replacement).toBe(child);
-});
+
+
 
 function viewWithClick(): ProtocolViewPayload {
-	return {
-		version: ASYNC_PROTOCOL_VERSION,
-		locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'button' }],
-		events: [{ hostNodeId: 'h0', eventName: 'click', symbolIds: ['symbol:click'] }],
-		domUpdates: [],
-		behaviors: [],
-		elementHandles: [],
-		asyncBoundaries: [],
-	};
+	return { version: ASYNC_PROTOCOL_VERSION, locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'button' }], events: [{ hostNodeId: 'h0', eventName: 'click', symbolIds: ['symbol:click'] }], domUpdates: [], behaviors: [], elementHandles: [], asyncBoundaries: [] };
 }
 
 function viewWithClickDomUpdate(): ProtocolViewPayload {
-	return {
-		...viewWithClick(),
-		domUpdates: [
-			{
-				hostNodeId: 'h0',
-				source: 'count',
-				graphNodeId: 'state:count',
-				path: [],
-				target: { kind: 'text' },
-				symbolId: 'symbol:text',
-			},
-		],
-	};
+	return { ...viewWithClick(), domUpdates: [{ hostNodeId: 'h0', source: 'count', graphNodeId: 'state:count', path: [], target: { kind: 'text' }, symbolId: 'symbol:text' }] };
 }
 
-test('resume wakes only the graph-routed sibling text update after child composition', async () => {
-	const graphButton = element('BUTTON');
-	graphButton.textContent = 'Server spruce';
-	const literalButton = element('BUTTON');
-	literalButton.textContent = 'Server copper';
-	const root = element('MAIN', [graphButton, literalButton]);
-	const locators: ProtocolViewPayload['locators'][number][] = [];
-	const domUpdates: ProtocolViewPayload['domUpdates'][number][] = [];
-	const elements = [root, graphButton, literalButton];
-	const indexByElement = new Map(elements.map((node, index) => [node, index]));
-	const childView: ProtocolViewPayload = {
-		version: ASYNC_PROTOCOL_VERSION,
-		locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'button' }],
-		events: [],
-		domUpdates: [
-			{
-				hostNodeId: 'h0',
-				source: 'label',
-				graphNodeId: 'prop:label',
-				path: [],
-				target: { kind: 'text' },
-				symbolId: 'symbol:text',
-			},
-		],
-		behaviors: [],
-		elementHandles: [],
-		asyncBoundaries: [],
-	};
-	const append = (child: {
-		readonly root: FakeElement;
-		readonly hostPrefix: string;
-		readonly symbolPrefix: string;
-		readonly graphProps: ReadonlyArray<{
-			readonly name: string;
-			readonly kind?: 'graph-reference' | 'compiler-known-constant';
-			readonly graphNodeId?: string;
-			readonly path?: ReadonlyArray<string>;
-		}>;
-		readonly boundSymbols: Readonly<Record<string, string>>;
-	}) =>
-		marklessCsrAppendChildView({
-			child: { ...child, output: { root: child.root, view: childView } },
-			elements,
-			indexByElement,
-			locators,
-			events: [],
-			domUpdates,
-			behaviors: [],
-			elementHandles: [],
-			branches: [],
-			asyncBoundaries: [],
-			asyncRunners: {},
-			csrCallbacks: new Map(),
-		});
-	append({
-		root: graphButton,
-		hostPrefix: 'c0:',
-		symbolPrefix: 'c0:',
-		graphProps: [
-			{
-				name: 'label',
-				kind: 'graph-reference',
-				graphNodeId: 'state:graphLabel',
-				path: [],
-			},
-		],
-		boundSymbols: { 'symbol:text': 'bound:graph-text' },
-	});
-	append({
-		root: literalButton,
-		hostPrefix: 'c1:',
-		symbolPrefix: 'c1:',
-		graphProps: [{ name: 'label', kind: 'compiler-known-constant' }],
-		boundSymbols: { 'symbol:text': 'bound:literal-text' },
-	});
-
-	expect(domUpdates).toEqual([
-		expect.objectContaining({
-			hostNodeId: 'c0:h0',
-			graphNodeId: 'state:graphLabel',
-			symbolId: 'bound:graph-text',
-		}),
-	]);
-	const container = await render(
-		{
-			renderCsr: () => ({
-				root,
-				state: createProtocolStatePayload({
-					cells: [
-						{
-							graphNodeId: 'state:graphLabel',
-							name: 'graphLabel',
-							valueKind: 'scalar',
-							value: 'Server spruce',
-						},
-					],
-				}),
-				view: {
-					version: ASYNC_PROTOCOL_VERSION,
-					locators,
-					events: [],
-					domUpdates,
-					behaviors: [],
-					elementHandles: [],
-					asyncBoundaries: [],
-				},
-				loadSymbol: () => ({ value, domUpdate }: { value: unknown; domUpdate: { hostNodeId: string } }) => ({
-					type: 'setText' as const,
-					locator: domUpdate.hostNodeId,
-					value,
-				}),
-			}),
-		},
-		{ target: { replaceChildren() {} } },
-	);
-	expect(graphButton.textContent).toBe('Server spruce');
-	expect(literalButton.textContent).toBe('Server copper');
-	container.graph.write({ graphNodeId: 'state:graphLabel', value: 'Server birch' });
-	await container.graph.flush();
-
-	expect(graphButton.textContent).toBe('Server birch');
-	expect(literalButton.textContent).toBe('Server copper');
-});
-
-test('composing a child DOM update with no prop route fails loudly', () => {
-	const childRoot = captureDispatchElement('aside');
-	const childView: ProtocolViewPayload = {
-		version: ASYNC_PROTOCOL_VERSION,
-		locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'aside' }],
-		events: [],
-		domUpdates: [
-			{
-				hostNodeId: 'h0',
-				source: 'libraryOpen',
-				graphNodeId: 'prop:libraryOpen',
-				path: [],
-				target: { kind: 'class', trueValue: 'library active', falseValue: 'library' },
-				symbolId: 'symbol:library-class',
-			},
-		],
-		behaviors: [],
-		elementHandles: [],
-		asyncBoundaries: [],
-	};
-
-	expect(() =>
-		marklessCsrAppendChildView({
-			child: {
-				hostPrefix: 'c4:',
-				symbolPrefix: '',
-				graphProps: [],
-				boundSymbols: {},
-				output: { root: childRoot, view: childView },
-			},
-			elements: [childRoot],
-			indexByElement: new Map([[childRoot, 0]]),
-			locators: [],
-			events: [],
-			domUpdates: [],
-			behaviors: [],
-			elementHandles: [],
-			branches: [],
-			asyncBoundaries: [],
-			asyncRunners: {},
-			csrCallbacks: new Map(),
-		}),
-	).toThrowError(
-		'MARKLESS_COMPOSED_DOM_UPDATE_UNMAPPED: DOM update "dom-update:h0:class" on host "c4:h0" with symbol "symbol:library-class" reads prop "libraryOpen", but composition found no route.',
-	);
-});
-
-test('composing a child DOM update backed by an opaque prop drops it silently', () => {
-	const childRoot = captureDispatchElement('aside');
-	const childView: ProtocolViewPayload = {
-		version: ASYNC_PROTOCOL_VERSION,
-		locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'aside' }],
-		events: [],
-		domUpdates: [
-			{
-				hostNodeId: 'h0',
-				source: 'libraryOpen',
-				graphNodeId: 'prop:libraryOpen',
-				path: [],
-				target: { kind: 'class', trueValue: 'library active', falseValue: 'library' },
-				symbolId: 'symbol:library-class',
-			},
-		],
-		behaviors: [],
-		elementHandles: [],
-		asyncBoundaries: [],
-	};
-	const domUpdates: ProtocolViewPayload['domUpdates'][number][] = [];
-
-	expect(() =>
-		marklessCsrAppendChildView({
-			child: {
-				hostPrefix: 'c4:',
-				symbolPrefix: '',
-				graphProps: [{ name: 'libraryOpen', kind: 'opaque' }],
-				boundSymbols: {},
-				output: { root: childRoot, view: childView },
-			},
-			elements: [childRoot],
-			indexByElement: new Map([[childRoot, 0]]),
-			locators: [],
-			events: [],
-			domUpdates,
-			behaviors: [],
-			elementHandles: [],
-			branches: [],
-			asyncBoundaries: [],
-			asyncRunners: {},
-			csrCallbacks: new Map(),
-		}),
-	).not.toThrow();
-	expect(domUpdates).toEqual([]);
-});
-
 function viewWithClickSyncComputedDomUpdate(): ProtocolViewPayload {
-	return {
-		version: ASYNC_PROTOCOL_VERSION,
-		locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'button' }],
-		events: [{ hostNodeId: 'h0', eventName: 'click', symbolIds: ['symbol:click'] }],
-		domUpdates: [
-			{
-				hostNodeId: 'h0',
-				source: 'doubled',
-				graphNodeId: 'computed:doubled',
-				path: [],
-				target: { kind: 'text' },
-				symbolId: 'symbol:text',
-			},
-		],
-		behaviors: [],
-		elementHandles: [],
-		asyncBoundaries: [],
-	};
+	return { ...viewWithClick(), domUpdates: [{ hostNodeId: 'h0', source: 'doubled', graphNodeId: 'computed:doubled', path: [], target: { kind: 'text' }, symbolId: 'symbol:text' }] };
 }
 
 function viewWithSyncPolicy(): ProtocolViewPayload {
-	return {
-		version: ASYNC_PROTOCOL_VERSION,
-		locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'button' }],
-		events: [
-			{
-				hostNodeId: 'h0',
-				eventName: 'keydown',
-				syncPolicy: {
-					when: { type: 'event-equals', field: 'key', value: 'Escape' },
-					actions: ['preventDefault', 'stopPropagation'],
-				},
-				symbolIds: ['symbol:key'],
-			},
-		],
-		domUpdates: [],
-		behaviors: [],
-		elementHandles: [],
-		asyncBoundaries: [],
-	};
+	return { ...viewWithClick(), events: [{ hostNodeId: 'h0', eventName: 'keydown', syncPolicy: { when: { type: 'event-equals', field: 'key', value: 'Escape' }, actions: ['preventDefault', 'stopPropagation'] }, symbolIds: ['symbol:key'] }] };
 }
 
 function viewWithElementHandle(): ProtocolViewPayload {
-	return {
-		version: ASYNC_PROTOCOL_VERSION,
-		locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'button' }],
-		events: [{ hostNodeId: 'h0', eventName: 'click', symbolIds: ['symbol:click'] }],
-		domUpdates: [],
-		behaviors: [],
-		elementHandles: [{ hostNodeId: 'h0', handleId: 'handle:counter', name: 'counter' }],
-		asyncBoundaries: [],
-	};
+	return { ...viewWithClick(), elementHandles: [{ hostNodeId: 'h0', handleId: 'handle:counter', name: 'counter' }] };
 }
 
 function viewWithAsyncBoundary(): ProtocolViewPayload {
-	return {
-		version: ASYNC_PROTOCOL_VERSION,
-		locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'p' }],
-		events: [],
-		domUpdates: [],
-		behaviors: [],
-		elementHandles: [],
-		asyncBoundaries: [
-			{
-				id: 'boundary:0',
-				startAnchor: { strategy: 'dom-order-comment', index: 0 },
-				endAnchor: { strategy: 'dom-order-comment', index: 1 },
-				asyncReads: [
-					{
-						source: 'details',
-						graphNodeId: 'computed:details',
-						path: ['title'],
-						runnerSymbolId: 'symbol:details-runner',
-					},
-				],
-			},
-		],
-	};
+	return { version: ASYNC_PROTOCOL_VERSION, locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'p' }], events: [], domUpdates: [], behaviors: [], elementHandles: [], asyncBoundaries: [{ id: 'boundary:0', startAnchor: { strategy: 'dom-order-comment', index: 0 }, endAnchor: { strategy: 'dom-order-comment', index: 1 }, asyncReads: [{ source: 'details', graphNodeId: 'computed:details', path: ['title'], runnerSymbolId: 'symbol:details-runner' }] }] };
 }
 
 function staticView(): ProtocolViewPayload {
-	return {
-		version: ASYNC_PROTOCOL_VERSION,
-		locators: [],
-		events: [],
-		domUpdates: [],
-		behaviors: [],
-		elementHandles: [],
-		asyncBoundaries: [],
-	};
+	return { version: ASYNC_PROTOCOL_VERSION, locators: [], events: [], domUpdates: [], behaviors: [], elementHandles: [], asyncBoundaries: [] };
 }
 
 function duplicateKeyRepeatView(): ProtocolViewPayload {
-	return {
-		version: ASYNC_PROTOCOL_VERSION,
-		locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'ul' }],
-		events: [],
-		domUpdates: [],
-		behaviors: [],
-		elementHandles: [],
-		asyncBoundaries: [],
-		keyedRepeats: [
-			{
-				id: 'repeat:0',
-				parentHostNodeId: 'h0',
-				collectionGraphNodeId: 'state:rows',
-				collectionPath: [],
-				keyPath: ['category'],
-				itemName: 'row',
-				rowElementCount: 1,
-				rowEvents: [],
-			},
-		],
-	};
+	return { ...staticView(), locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'ul' }], keyedRepeats: [{ id: 'repeat:0', parentHostNodeId: 'h0', collectionGraphNodeId: 'state:rows', collectionPath: [], keyPath: ['category'], itemName: 'row', rowElementCount: 1, rowEvents: [] }] };
 }
 
-const duplicateRows = [
-	{ category: 'fruit', label: 'apple' },
-	{ category: 'fruit', label: 'pear' },
-	{ category: 'veg', label: 'kale' },
-];
+const duplicateRows = [{ category: 'fruit', label: 'apple' }, { category: 'fruit', label: 'pear' }, { category: 'veg', label: 'kale' }];
 
 function duplicateRowsState() {
-	return createProtocolStatePayload({
-		cells: [
-			{ graphNodeId: 'state:rows', name: 'rows', valueKind: 'array', value: duplicateRows },
-		],
-	});
+	return createProtocolStatePayload({ cells: [{ graphNodeId: 'state:rows', name: 'rows', valueKind: 'array', value: duplicateRows }] });
 }
 
 test('render creates a CSR container without payload scripts or the inline resumer', async () => {
@@ -3076,6 +2703,8 @@ test('renderToString self-wakes when a fulfilled boundary read has an unsettled 
 
 	expect(html).toContain('data-markless-self-wake');
 	expect(extractResumerSource(html)).toContain('queueMicrotask');
+	expect(extractResumerSource(html)).toContain('DOMContentLoaded');
+	expect(extractResumerSource(html)).toContain('requestAnimationFrame');
 });
 
 test('renderToString self-wakes through a sync computed boundary read', async () => {

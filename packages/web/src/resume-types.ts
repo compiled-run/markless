@@ -73,6 +73,13 @@ export type ResumeAsyncBoundaryRecord = {
 	readonly startAnchor: ResumeDomComment;
 	readonly endAnchor: ResumeDomComment;
 	readonly asyncReads: ProtocolViewPayload['asyncBoundaries'][number]['asyncReads'];
+	readonly renderArm?: (
+		status: 'fulfilled' | 'rejected',
+	) => {
+		readonly nodes: ReadonlyArray<ResumeDomNode>;
+		readonly armRecords: ResumeArmRecordSet;
+		readonly elementsByHostId: ReadonlyMap<string, ResumeDomElement>;
+	};
 };
 export type ResumeBehaviorRecord = ProtocolViewPayload['behaviors'][number];
 export type ResumeKeyedRepeatRecord = NonNullable<ProtocolViewPayload['keyedRepeats']>[number];
@@ -95,10 +102,7 @@ export type ResumeBranchRecord = {
 };
 export type ResumeBranchHtml = string | ReadonlyArray<string | { readonly text: string }>;
 export type ResumeBranchUpdate = { readonly arm: number; readonly html: ResumeBranchHtml };
-// D3: records for content inside an async boundary arm, indexed relative to
-// the boundary's start anchor (0 = first element after it in the rendered
-// arm). Registration adds the anchor's live element-walk offset, so one set
-// stays valid on initial load and after an arm commit replaces the range.
+// Async-arm records use indexes relative to the boundary's start anchor.
 export type ResumeArmLocator = {
 	readonly hostNodeId: string;
 	readonly strategy: 'arm-relative';
@@ -131,8 +135,10 @@ export type ResumeArmBranchRecord = {
 export type ResumeArmRecordSet = {
 	readonly locators: ReadonlyArray<ResumeArmLocator>;
 	readonly events: ProtocolViewPayload['events'];
+	readonly domUpdates?: ProtocolViewPayload['domUpdates'];
 	readonly behaviors: ProtocolViewPayload['behaviors'];
 	readonly elementHandles: ProtocolViewPayload['elementHandles'];
+	readonly keyedRepeats?: NonNullable<ProtocolViewPayload['keyedRepeats']>;
 	readonly branches?: ReadonlyArray<ResumeArmBranchRecord>;
 };
 export type ResumeAsyncBoundaryPayload = ProtocolViewPayload['asyncBoundaries'][number] & {
@@ -208,6 +214,7 @@ export type ResumeRuntimeInput = {
 	readonly graph: RuntimeGraph;
 	readonly state?: ProtocolStatePayload;
 	readonly view: ResumeViewRecord;
+	readonly liveHostNodes?: ReadonlyMap<string, ResumeDomElement>;
 	readonly loadSymbol: (symbolId: string) => ResumeSymbol | Promise<ResumeSymbol>;
 	readonly renderBranchHtml?: (html: string) => ReadonlyArray<ResumeDomNode>;
 	readonly createVisibilityObserver?: ResumeVisibilityObserverFactory;

@@ -10,13 +10,13 @@ import {
 	semanticAliasMap,
 } from '../../artifact-helpers/graph-paths.ts';
 import {
+	gatePlanDisagreementDiagnostic,
 	tryBlockToggleRerenderDiagnostic,
 	unsupportedRenderConstructDiagnostic,
 } from './diagnostics.ts';
+import { resolveBoundaryRunners } from './boundary-runner.ts';
 import { collectStyleScopes } from './style-scopes.ts';
 import { collectAsyncBoundaryNodes } from './async-boundaries.ts';
-import { planAsyncBoundaryArmRenders } from './arm-render-module.ts';
-import { componentPropNames } from './shared.ts';
 import {
 	branchArmSupported,
 	branchArms,
@@ -460,25 +460,38 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 			}
 			return { boundaryId: boundary.id, supported: true };
 		});
-
-	// D1 tier 4: boundaries the parts tier bailed on (components, repeats,
-	// @if, fragments in arms) get component-executing arm-render modules.
-	const armRenderPlans = planAsyncBoundaryArmRenders({
-		input,
-		boundaryNodes,
-		asyncBoundaryGates,
-		asyncBoundaryArms,
-		branchReactivityGates,
-		branchArms: branchArmsPlans,
-		armBranchEscalations,
-		repeatGates,
-		assignedHosts,
-		styleScopeClass: scopeClassOf(styleScopeCollection),
-		rootInfo: {
-			componentName: selectedRoot.componentName,
-			propNames: componentPropNames(selectedRoot.component),
+	const boundaryRunners = resolveBoundaryRunners(input.semanticGraph);
+	const boundaryRunnerDiagnostics = input.semanticGraph.asyncBoundaries.flatMap(
+		(boundary, index) => {
+			const found = boundaryNodes[index];
+			const gate = asyncBoundaryGates.find((item) => item.boundaryId === boundary.id);
+			if (!found || !gate?.supported) return [];
+			const resolution = boundaryRunners.get(boundary.id);
+			if (resolution?.reads.length === 0 && resolution.unresolvedSources.length === 0)
+				return [];
+			const runner = input.symbolResolver.symbols.find(
+				(symbol) =>
+					(symbol.kind === 'async-computed-runner' ||
+						symbol.kind === 'sync-computed-derive') &&
+					symbol.graphNodeId === resolution?.runnerGraphNodeId,
+			);
+			if (resolution?.runnerGraphNodeId && runner) return [];
+			const readNames = resolution?.reads.map((item) => `"${item.source}"`) ?? [];
+			return [
+				gatePlanDisagreementDiagnostic({
+					label: '@try',
+					message:
+						readNames.length > 1
+							? `This @try block reads more than one async value (${readNames.join(', ')}), so one runner cannot safely bind every name used by its settled content.`
+							: 'This @try block has no single resolvable async computed read, so no runner can settle its rendered content.',
+					node: found.node,
+					filename: input.source.filename,
+					suggestion:
+						'Make the @try content read one async computed value directly. Deriving additional values inside a settled browser arm is not supported yet.',
+				}),
+			];
 		},
-	});
+	);
 
 	const rootTemplateHtml = staticHtml(root, {
 		componentRoots,
@@ -526,12 +539,11 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 		branchArms: branchArmsPlans,
 		...(armBranchEscalations.length > 0 ? { armBranchEscalations } : {}),
 		asyncBoundaryArms,
-		asyncBoundaryArmRenders: armRenderPlans.armRenders,
 		styleScopes: styleScopeCollection.styleScopes,
-		diagnostics: [
+		 diagnostics: [
 			...styleScopeCollection.diagnostics,
 			...armEscalationDiagnostics,
-			...armRenderPlans.diagnostics,
+			...boundaryRunnerDiagnostics,
 			...sameModuleChildBoundaryDiagnostics(
 				ast,
 				selectedRoot.componentName,

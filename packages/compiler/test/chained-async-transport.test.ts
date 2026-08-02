@@ -57,7 +57,6 @@ export function CeramicLedger() @{
 			],
 		]);
 });
-
 test('async runner transport crosses a sync computed dependency hop', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/GlassArchive.tsrx',
@@ -217,36 +216,4 @@ export function SignalCard() @{
 				module.kind === 'async-boundary-update' && module.symbolId === updateSymbol?.id,
 		),
 	).toBe(true);
-});
-
-test('a composed settled arm reads an async-capable sync computed as a plain value', async () => {
-	const result = await compileTsrxModule({
-		filename: 'src/ArchivePanel.tsrx',
-		source: `
-import { computed } from '@markless/core';
-import { Badge } from './Badge.tsrx';
-
-export function ArchivePanel() @{
-	const sample = computed(async () => ({ tone: 'cobalt' }));
-	const card = computed(() => ({ label: 'Card ' + sample.tone }));
-	const record = computed(async () => ({ ready: true }));
-
-	<section>
-		@try {
-			<Badge label={record.ready ? card.label : 'Waiting'} />
-		} @pending {
-			<p>Loading</p>
-		} @catch {
-			<p>Unavailable</p>
-		}
-	</section>
-}
-`,
-		symbols: [],
-	});
-
-	const update = result.symbolModules.modules.find(
-		(module) => module.kind === 'async-boundary-update',
-	);
-	expect(update?.source).toContain('const card = context.graph.read("computed:card", []);');
 });

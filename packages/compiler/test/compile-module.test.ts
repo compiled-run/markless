@@ -3093,19 +3093,17 @@ export function App() @{
 	expect(loadedSymbols).toEqual(
 		expect.arrayContaining(
 			result.symbolModules.modules
-				.filter(
-					(module) =>
-						module.kind === 'async-computed-runner' ||
-						module.kind === 'async-boundary-update',
-				)
+				.filter((module) => module.kind === 'async-computed-runner')
 				.map((module) => module.symbolId),
 		),
 	);
-	const initialFragments = applied.flatMap((entry) =>
-		entry.type === 'insertRange' ? [String(entry.fragment)] : [],
-	);
-	expect(initialFragments).toContain('<p>first:0</p>');
-	expect(initialFragments).toContain('<p>second:0</p>');
+	expect(
+		result.symbolModules.modules
+			.filter((module) => module.kind === 'async-boundary-update')
+			.some((module) => loadedSymbols.includes(module.symbolId)),
+	).toBe(false);
+	expect(output.root.textContent).toContain('first:0');
+	expect(output.root.textContent).toContain('second:0');
 
 	applied.length = 0;
 	container.graph.write({ graphNodeId: 'state:version', value: 1 });
@@ -3114,12 +3112,9 @@ export function App() @{
 	await container.graph.flush();
 	await drainPublicRenderMicrotasks();
 
-	const updatedFragments = applied.flatMap((entry) =>
-		entry.type === 'insertRange' ? [String(entry.fragment)] : [],
-	);
-	expect(updatedFragments).toContain('<p>first:1</p>');
-	expect(updatedFragments).toContain('<p>second:1</p>');
-	expect(updatedFragments.join('')).not.toContain('[object Object]');
+	expect(output.root.textContent).toContain('first:1');
+	expect(output.root.textContent).toContain('second:1');
+	expect(output.root.textContent).not.toContain('[object Object]');
 });
 
 test('compileTsrxModule emits async boundary anchors and @pending in the CSR string path', async () => {
@@ -4714,8 +4709,8 @@ export function Dashboard() @{
 			readonly view: {
 				readonly branches?: ReadonlyArray<{
 					readonly id: string;
-					readonly startAnchor: { readonly index: number };
-					readonly endAnchor: { readonly index: number };
+					readonly startAnchor: { readonly nodeType: number };
+					readonly endAnchor: { readonly nodeType: number };
 					readonly testReads?: ReadonlyArray<{ readonly graphNodeId: string }>;
 				}>;
 			};
@@ -4723,14 +4718,12 @@ export function Dashboard() @{
 	)();
 
 	// The child's @if record must reach the composed view: prefixed id,
-	// test read remapped to the parent graph node, and anchor indexes
-	// resolved against the composed comment stream (the child's anchors are
-	// the only comments, so indexes 0 and 1).
+	// test read remapped to the parent graph node, with native live anchors.
 	expect(output.view.branches).toEqual([
 		expect.objectContaining({
 			id: 'c0:branch-site:0',
-			startAnchor: expect.objectContaining({ index: 0 }),
-			endAnchor: expect.objectContaining({ index: 1 }),
+			startAnchor: expect.objectContaining({ nodeType: 8 }),
+			endAnchor: expect.objectContaining({ nodeType: 8 }),
 			testReads: [expect.objectContaining({ graphNodeId: 'state:streaming' })],
 		}),
 	]);
@@ -5837,45 +5830,7 @@ test('interactive components in repeat rows refuse loudly at row render', async 
 // <Link> anchors on every client-side route swap (dashboard issues list).
 // They render markup-only through the projected-child splice; interactive
 // child output refuses loudly at render.
-test('CSR children projection renders component invocations markup-only (static and in rows)', async () => {
-	const page = await compileTsrxModule({
-		filename: 'src/Board.tsrx',
-		source: `import { computed } from '@markless/core';
-import { Panel } from './Panel.tsrx';
-import { Jump } from './Jump.tsrx';
 
-export default function Board() @{
-	const model = computed(async () => ({ zone: 'z1', rows: [{ id: 'i1', title: 'First' }] }));
-
-	<div class="board-root">
-		@try {
-			<Panel actors={model.rows}>
-				<Jump target={model.zone}>All</Jump>
-				<section class="rows">
-					@for (const row of model.rows; key row.id) {
-						<article data-row={row.id}><Jump target={row.id}>{row.title}</Jump></article>
-					}
-				</section>
-			</Panel>
-		} @pending { <p>Loading</p> } @catch { <p>Broken</p> }
-	</div>
-}`,
-		symbols: [],
-	});
-
-	const update = page.symbolModules.modules.find(
-		(module) => module.kind === 'async-boundary-update',
-	);
-	expect(update).toBeDefined();
-	// The projected static component renders through the markup-only splice…
-	expect(update!.source).toContain('marklessCsrProjectedChild');
-	// …and the in-row component through the row-child splice.
-	expect(update!.source).toContain('marklessCsrRowChild');
-});
-
-// Viewless children (router <Link>-style: renderSsr returns { html } only)
-// still render real elements. Composition must count them, or every host
-// locator after the child points one element short in the final DOM.
 test('viewless child components (Link-style) offset later host locators', async () => {
 	const page = await compileTsrxModule({
 		filename: 'src/Nav.tsrx',
@@ -6080,144 +6035,6 @@ export default function SignalCardSsr() @{
 // settled snapshot. Normalization note: both sides run through the test DOM's
 // parse/serialize round trip (entities stay as authored, attributes keep
 // insertion order); no other normalization is applied.
-test('arm-render modules render composed @try content byte-equal to SSR for the same snapshot', async () => {
-	const child = await compileTsrxModule({
-		filename: 'src/Shell.tsrx',
-		source: `
-export function Shell({ title }) @{
-	<header class="shell"><h1>{title}</h1></header>
-}
-`,
-		symbols: [],
-	});
-	const page = await compileTsrxModule({
-		filename: 'src/IssuesPage.tsrx',
-		source: `
-import { computed } from '@markless/core';
-import { Shell } from './Shell.tsrx';
-
-export default function Page() @{
-	const view = computed(async () => ({ title: 'Issues', repos: [{ id: 'a' }, { id: 'b' }] }));
-	<main>
-		@try {
-			<>
-				<Shell title={view.title} />
-				<ul class="rows">
-					@for (const r of view.repos; key r.id) { <li class="row">{r.id}</li> }
-				</ul>
-				@if (view.repos.length > 0) { <p class="count">{view.repos.length}</p> }
-				<button class="reload" onClick={() => console.log('reload')}>Reload</button>
-			</>
-		} @pending { <p>Loading</p> } @catch { <p>Broken</p> }
-	</main>
-}
-`,
-		symbols: [],
-	});
-
-	// SSR truth: the real async runner resolves inline and serves the @try arm.
-	const childSsrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(child));
-	const pageSsrModule = await importPublicRenderTestModule(
-		ssrRenderTestModuleSource(page, { replaceChildImport: true }),
-		{ childComponent: { renderSsr: childSsrModule.marklessRenderSsr } },
-	);
-	const ssrOutput = await (
-		pageSsrModule.marklessRenderSsr as () => Promise<{ readonly html: string }>
-	)();
-	const ssrArm = ssrOutput.html.match(
-		/<!--markless:async:[^>]*?-->([\s\S]*?)<!--\/markless:async:[^>]*?-->/,
-	);
-	expect(ssrArm?.[1]).toContain('<h1>Issues</h1>');
-
-	// Client arm render: same snapshot, browser-side component execution.
-	const update = page.symbolModules.modules.find(
-		(module) => module.kind === 'async-boundary-update',
-	);
-	expect(update).toBeDefined();
-	const document = publicRenderTestDocument();
-	const childCsrModule = await importPublicRenderTestModule(csrRenderTestModuleSource(child), {
-		document,
-	});
-	const armModuleSource = update!.source.replace(
-		/import (?:__marklessCsrComponent0|\{ [^}]+ as __marklessCsrComponent0 \}) from [^;]+;/,
-		'const __marklessCsrComponent0 = globalThis.__marklessPublicRenderTestChildComponent;',
-	);
-	const armModule = await importPublicRenderTestModule(armModuleSource, {
-		document,
-		childComponent: { renderCsr: childCsrModule.marklessRenderCsr },
-	});
-	const run = armModule[update!.exportName] as (context: unknown) => {
-		readonly arm: number;
-		readonly html: string;
-		readonly armRecords: {
-			readonly locators: ReadonlyArray<{
-				readonly hostNodeId: string;
-				readonly strategy: string;
-				readonly index: number;
-				readonly tagName: string;
-			}>;
-			readonly events: ReadonlyArray<{
-				readonly hostNodeId: string;
-				readonly eventName: string;
-				readonly symbolIds: ReadonlyArray<string>;
-			}>;
-		};
-	};
-	const snapshot = {
-		status: 'fulfilled',
-		version: 1,
-		key: null,
-		value: { title: 'Issues', repos: [{ id: 'a' }, { id: 'b' }] },
-	};
-	const graph = {
-		read: (graphNodeId: string) => (graphNodeId === 'computed:view' ? snapshot : undefined),
-	};
-	const settled = run({ graph, status: 'fulfilled' });
-
-	expect(settled.arm).toBe(0);
-	expect(settled.html).toBe(ssrArm![1]);
-
-	// armRecords live in the boundary's own coordinate space (D3): index 0 is
-	// the first element after the start anchor — the composed child's root.
-	// Repeat rows carry no locators (the keyed-repeat machinery owns rows) and
-	// neither does the arm-scoped @if's <p> since T104: flip-owned hosts
-	// re-register through the branch record on every flip.
-	expect(
-		settled.armRecords.locators.map((locator) => [
-			locator.index,
-			locator.tagName,
-			locator.strategy,
-		]),
-	).toEqual([
-		[0, 'header', 'arm-relative'],
-		[1, 'h1', 'arm-relative'],
-		[2, 'ul', 'arm-relative'],
-		[6, 'button', 'arm-relative'],
-	]);
-	const buttonLocator = settled.armRecords.locators.find(
-		(locator) => locator.tagName === 'button',
-	);
-	expect(settled.armRecords.events).toEqual([
-		expect.objectContaining({
-			hostNodeId: buttonLocator!.hostNodeId,
-			eventName: 'click',
-			symbolIds: [expect.stringMatching(/^symbol:/)],
-		}),
-	]);
-
-	// Rejected snapshots render the @catch arm through the same module.
-	const rejected = run({
-		graph: {
-			read: (graphNodeId: string) =>
-				graphNodeId === 'computed:view'
-					? { status: 'rejected', version: 1, key: null, error: new Error('nope') }
-					: undefined,
-		},
-		status: 'rejected',
-	});
-	expect(rejected.arm).toBe(1);
-	expect(rejected.html).toBe('<p>Broken</p>');
-});
 
 test('component-rooted pages emit a CSR render module (route swaps need it)', async () => {
 	const result = await compileTsrxModule({

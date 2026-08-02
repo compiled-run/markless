@@ -189,6 +189,31 @@ test('commitArm fails loud when the anchor pair is not intact in the live DOM', 
 	expect(root.childNodes.includes(oldSection)).toBe(true);
 });
 
+test('commitArm fails loud when a native arm record has no live host', async () => {
+	const { root, start, end } = fixture();
+	const commitArm = createArmCommitter(
+		{
+			root: asElement(root),
+			elementsByHostId: new Map(),
+			disposedHosts: new Set(),
+			disposeHost: () => {},
+			addEventRecord: () => {},
+			registerElementHandle: () => {},
+		},
+		() => {},
+	);
+
+	await expect(
+		commitArm(boundaryFor(start, end), {
+			nodes: [],
+			elementsByHostId: new Map(),
+			armRecords: emptyArmRecords({
+				events: [{ hostNodeId: 'h-missing', eventName: 'click', symbolIds: [] }],
+			}),
+		}),
+	).rejects.toThrow('Markless async arm native record expected live host h-missing.');
+});
+
 test('commitArm fails loud without an HTML renderer for the settled content', async () => {
 	const { root, start, end } = fixture();
 	const commitArm = createArmCommitter(

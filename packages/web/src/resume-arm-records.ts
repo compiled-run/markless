@@ -14,14 +14,6 @@ import type {
 	ResumeViewRecord,
 } from './resume-types.ts';
 
-// D3 arm-relative registration: arm records index from their boundary's start
-// anchor plus the LIVE element-walk offset added at materialization time, for
-// both the initial SSR load and re-registration after commitArm.
-
-// Narrow unknown armRecords payloads to the registrable single-set shape.
-// SSR and CSR compose both armize live arms into single sets now; a compiler
-// per-arm ARRAY reaching resume is a stale/foreign payload whose static
-// indexes earned no positional trust, so it stays fail-closed (D2).
 export function boundaryArmRecordSet(value: unknown): ResumeArmRecordSet | null {
 	if (!value || Array.isArray(value)) return null;
 	const set = value as ResumeArmRecordSet;
@@ -33,13 +25,14 @@ type ArmMaterializeInput = {
 	readonly startAnchor: ResumeDomComment;
 	readonly endAnchor?: ResumeDomComment;
 	readonly armRecords: ResumeArmRecordSet;
+	readonly elementsByHostId?: ReadonlyMap<string, ResumeDomElement>;
 };
 
 // Registers one arm record set against the live DOM at (anchor offset +
 // arm-relative index); records whose host did not render in this arm are
 // skipped; arm-scoped branches resolve anchors in the arm's own census.
 export function materializeArmRecords(input: ArmMaterializeInput) {
-	const byHostId = new Map<string, ResumeDomElement>();
+	const byHostId = new Map<string, ResumeDomElement>(input.elementsByHostId);
 	if (input.armRecords.locators.length > 0) {
 		const { elements, offset } = elementsAndAnchorOffset(input.root, input.startAnchor);
 		for (const locator of input.armRecords.locators) {
@@ -58,8 +51,12 @@ export function materializeArmRecords(input: ArmMaterializeInput) {
 	return {
 		elementsByHostId: byHostId,
 		events: input.armRecords.events.filter(rendered),
+		domUpdates: (input.armRecords.domUpdates ?? []).filter(rendered),
 		behaviors: input.armRecords.behaviors.filter(rendered),
 		elementHandles: input.armRecords.elementHandles.filter(rendered),
+		keyedRepeats: (input.armRecords.keyedRepeats ?? []).filter((repeat) =>
+			byHostId.has(repeat.parentHostNodeId),
+		),
 		branches: materializeArmBranchRecords(input),
 	};
 }

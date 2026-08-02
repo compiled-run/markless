@@ -30,14 +30,16 @@ export function createResumeRuntime(runtimeInput: ResumeRuntimeInput): ResumeRun
 		runtimeInput.root,
 		runtimeInput.view.asyncBoundaries,
 	);
-	// D3: in-arm records register at anchor offset + arm-relative index.
+	// Register the live arm.
 	const armExpansion = expandBoundaryArmRecords(
 		runtimeInput.root,
 		runtimeInput.view,
 		asyncBoundariesById,
 	);
 	const input = armExpansion ? { ...runtimeInput, view: armExpansion.view } : runtimeInput;
-	const elementsByHostId = materializeDomLocators(input.root, input.view.locators);
+	const elementsByHostId = input.liveHostNodes
+		? new Map(input.liveHostNodes)
+		: materializeDomLocators(input.root, input.view.locators);
 	for (const [hostNodeId, element] of armExpansion?.elementsByHostId ?? []) {
 		elementsByHostId.set(hostNodeId, element);
 	}
@@ -111,8 +113,9 @@ function materializeAsyncBoundaryLocators(
 	if (boundaries.length === 0) return byId;
 	const comments = walkComments(root);
 	for (const boundary of boundaries) {
-		const startAnchor = comments[boundary.startAnchor.index],
-			endAnchor = comments[boundary.endAnchor.index];
+		const live = boundary.startAnchor?.nodeType === 8 && boundary.endAnchor?.nodeType === 8;
+		const startAnchor = live ? boundary.startAnchor : comments[boundary.startAnchor.index],
+			endAnchor = live ? boundary.endAnchor : comments[boundary.endAnchor.index];
 		if (!startAnchor)
 			throw missingCommentAnchorError(boundary.id, 'startAnchor', boundary.startAnchor.index);
 		if (!endAnchor)
@@ -125,6 +128,7 @@ function materializeAsyncBoundaryLocators(
 			startAnchor,
 			endAnchor,
 			asyncReads: boundary.asyncReads,
+			renderArm: (boundary as ResumeAsyncBoundaryRecord).renderArm,
 		});
 	}
 	return byId;

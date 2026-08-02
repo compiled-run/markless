@@ -327,7 +327,6 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
       ]
     }
   ],
-  "asyncBoundaryArmRenders": [],
   "styleScopes": [],
   "diagnostics": []
 }",
@@ -611,7 +610,6 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
   "branchReactivityGates": [],
   "branchArms": [],
   "asyncBoundaryArms": [],
-  "asyncBoundaryArmRenders": [],
   "styleScopes": [],
   "diagnostics": []
 }",
@@ -980,7 +978,6 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
     }
   ],
   "asyncBoundaryArms": [],
-  "asyncBoundaryArmRenders": [],
   "styleScopes": [],
   "diagnostics": []
 }",
@@ -1229,7 +1226,6 @@ function createUnknownSymbolError(id) {
   "branchReactivityGates": [],
   "branchArms": [],
   "asyncBoundaryArms": [],
-  "asyncBoundaryArmRenders": [],
   "styleScopes": [],
   "diagnostics": []
 }",
@@ -1476,7 +1472,6 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
   "branchReactivityGates": [],
   "branchArms": [],
   "asyncBoundaryArms": [],
-  "asyncBoundaryArmRenders": [],
   "styleScopes": [],
   "diagnostics": []
 }",
@@ -1670,7 +1665,6 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
   "branchReactivityGates": [],
   "branchArms": [],
   "asyncBoundaryArms": [],
-  "asyncBoundaryArmRenders": [],
   "styleScopes": [],
   "diagnostics": []
 }",
@@ -2023,7 +2017,6 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
     }
   ],
   "asyncBoundaryArms": [],
-  "asyncBoundaryArmRenders": [],
   "styleScopes": [],
   "diagnostics": []
 }",
@@ -2477,7 +2470,6 @@ function createUnknownSymbolError(id) {
   "branchReactivityGates": [],
   "branchArms": [],
   "asyncBoundaryArms": [],
-  "asyncBoundaryArmRenders": [],
   "styleScopes": [],
   "diagnostics": []
 }",
@@ -2639,7 +2631,6 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
   "branchReactivityGates": [],
   "branchArms": [],
   "asyncBoundaryArms": [],
-  "asyncBoundaryArmRenders": [],
   "styleScopes": [],
   "diagnostics": []
 }",
@@ -2870,7 +2861,6 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
   "branchReactivityGates": [],
   "branchArms": [],
   "asyncBoundaryArms": [],
-  "asyncBoundaryArmRenders": [],
   "styleScopes": [],
   "diagnostics": []
 }",
@@ -3141,7 +3131,6 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
   ],
   "branchArms": [],
   "asyncBoundaryArms": [],
-  "asyncBoundaryArmRenders": [],
   "styleScopes": [],
   "diagnostics": []
 }",
@@ -3320,7 +3309,6 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
   "branchReactivityGates": [],
   "branchArms": [],
   "asyncBoundaryArms": [],
-  "asyncBoundaryArmRenders": [],
   "styleScopes": [],
   "diagnostics": []
 }",
@@ -3563,7 +3551,6 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
   "branchReactivityGates": [],
   "branchArms": [],
   "asyncBoundaryArms": [],
-  "asyncBoundaryArmRenders": [],
   "styleScopes": [],
   "diagnostics": []
 }",
@@ -3803,7 +3790,6 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
   "branchReactivityGates": [],
   "branchArms": [],
   "asyncBoundaryArms": [],
-  "asyncBoundaryArmRenders": [],
   "styleScopes": [],
   "diagnostics": []
 }",

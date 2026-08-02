@@ -28,12 +28,9 @@ test('browser arm render, SSR runner, and settle symbol agree on one boundary gr
 	const filename = 'src/ReleaseFeed.tsrx';
 	const result = await compileTsrxModule({ filename, source: boundarySource, symbols: [] });
 	const boundaryId = result.semanticGraph.asyncBoundaries[0]?.id;
-	const armRender = result.publicRenderPlan.asyncBoundaryArmRenders.find(
-		(entry) => entry.boundaryId === boundaryId,
-	);
-	const browserGraphNodeId = armRender?.bodyLines
-		.join('\n')
-		.match(/context\.graph\.read\("([^"]+)"/)?.[1];
+	const browserGraphNodeId = result.renderData.boundaries.find(
+		(boundary) => boundary.boundaryId === boundaryId,
+	)?.runnerGraphNodeId;
 	const ssrGraphNodeId = collectSsrAsyncRunners({
 		source: { filename, source: boundarySource },
 		semanticGraph: result.semanticGraph,
@@ -86,10 +83,9 @@ export function KilnRoster() @{
 `;
 	const result = await compileTsrxModule({ filename, source, symbols: [] });
 	const boundaryId = result.semanticGraph.asyncBoundaries[0]?.id;
-	const browserGraphNodeId = result.publicRenderPlan.asyncBoundaryArmRenders
-		.find((entry) => entry.boundaryId === boundaryId)
-		?.bodyLines.join('\n')
-		.match(/context\.graph\.read\("([^"]+)"/)?.[1];
+	const browserGraphNodeId = result.renderData.boundaries.find(
+		(boundary) => boundary.boundaryId === boundaryId,
+	)?.runnerGraphNodeId;
 	const ssrGraphNodeId = collectSsrAsyncRunners({
 		source: { filename, source },
 		semanticGraph: result.semanticGraph,
@@ -132,7 +128,6 @@ export function CompassCard() @{
 	expect(result.publicRenderPlan.asyncBoundaryArms).toContainEqual(
 		expect.objectContaining({ boundaryId }),
 	);
-	expect(result.publicRenderPlan.asyncBoundaryArmRenders).toEqual([]);
 	expect(
 		result.symbolResolver.symbols.find(
 			(symbol) => symbol.kind === 'async-boundary-update' && symbol.boundaryId === boundaryId,
@@ -172,7 +167,6 @@ export function CalledCollection() @{
 			(symbol) => symbol.kind === 'async-boundary-update' && symbol.boundaryId === boundaryId,
 		),
 	).toBe(false);
-	expect(result.publicRenderPlan.asyncBoundaryArmRenders).toEqual([]);
 	expect(collectTsrxModuleDiagnostics(result)).toEqual(
 		expect.arrayContaining([
 			expect.objectContaining({

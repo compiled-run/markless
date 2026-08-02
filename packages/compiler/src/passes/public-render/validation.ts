@@ -55,7 +55,6 @@ export function emptyPlan(
 		branchReactivityGates: [],
 		branchArms: [],
 		asyncBoundaryArms: [],
-		asyncBoundaryArmRenders: [],
 		styleScopes: [],
 		diagnostics,
 	};

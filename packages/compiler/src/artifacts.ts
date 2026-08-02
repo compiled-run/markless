@@ -495,6 +495,7 @@ export type SemanticMarkupSlot = SemanticMarkupLocatedSlot &
 				readonly componentEdgeId: string;
 				readonly childComponentName: string;
 				readonly childTemplateId: string;
+				readonly projectionChunkId?: string;
 		  }
 		| {
 				readonly kind: 'branch';
@@ -543,6 +544,7 @@ export type SemanticMarkupChunk = {
 		| 'async-arm'
 		| 'repeat-row'
 		| 'repeat-empty'
+		| 'component-projection'
 		| 'dynamic-host-children';
 	readonly componentName: string;
 	readonly statics: ReadonlyArray<string>;
@@ -1458,22 +1460,6 @@ export type PublicRenderPlanAsyncBoundaryArms = {
 	readonly arms: ReadonlyArray<ReadonlyArray<PublicRenderPlanBranchArmPart>>;
 };
 
-// D1 tier 4: a per-boundary lazy module that MAY execute components — used
-// when the parts tier cannot rebuild the arm (components, repeats, @if,
-// fragments). The plan owns the emission pieces; symbol-modules only wraps
-// them in the exported update function.
-export type PublicRenderPlanAsyncBoundaryArmRender = {
-	readonly boundaryId: string;
-	// Module-scope import statements (child components, helper catalog, value
-	// imports referenced by the arm content).
-	readonly imports: ReadonlyArray<string>;
-	// Module-scope statements (planned record constants, helpers, authored
-	// module-scope declarations the arm references).
-	readonly moduleLines: ReadonlyArray<string>;
-	// Statements for the exported `(context) => { ... }` update function.
-	readonly bodyLines: ReadonlyArray<string>;
-};
-
 export type PublicRenderPlanBranchGate =
 	| {
 			readonly branchSiteId: string;
@@ -1530,7 +1516,6 @@ export type PublicRenderPlanArtifact = {
 		readonly asyncBoundaryArm: number;
 	}>;
 	readonly asyncBoundaryArms: ReadonlyArray<PublicRenderPlanAsyncBoundaryArms>;
-	readonly asyncBoundaryArmRenders: ReadonlyArray<PublicRenderPlanAsyncBoundaryArmRender>;
 	readonly styleScopes: ReadonlyArray<{ readonly scopeId: string; readonly cssText: string }>;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
 };

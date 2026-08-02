@@ -134,12 +134,22 @@ function runInlineResumerSelfWake(fallbackResumeModuleUrl: string | undefined): 
 	const resumeModuleUrl =
 		currentScript?.getAttribute?.('data-markless-resume-module') ?? fallbackResumeModuleUrl;
 	if (!root || !resumeModuleUrl) return;
-	queueMicrotask(async () => {
-		if (!root.__asyncResumeRuntimeStarted) {
-			const module = (await import(/* @vite-ignore */ resumeModuleUrl)) as InlineResumeModule;
-			await module.resumeContainerEvent({ root, event: 0 });
-		}
-	});
+	// A streamed arm schedules its reveal while the response is still parsing.
+	// Let that earlier frame commit before event-less resume adopts the DOM.
+	const wake = () =>
+		requestAnimationFrame(() => {
+			queueMicrotask(async () => {
+				if (!root.__asyncResumeRuntimeStarted) {
+					const module = (await import(/* @vite-ignore */ resumeModuleUrl)) as InlineResumeModule;
+					await module.resumeContainerEvent({ root, event: 0 });
+				}
+			});
+		});
+	if (document.readyState === 'loading') {
+		document.addEventListener('DOMContentLoaded', wake, { once: true });
+	} else {
+		wake();
+	}
 }
 
 function registerInlineResumerDebug(input: {

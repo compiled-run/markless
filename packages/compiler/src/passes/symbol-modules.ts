@@ -1,7 +1,6 @@
 import type {
 	CaptureSlot,
 	GeneratedSymbolModule,
-	PublicRenderPlanAsyncBoundaryArmRender,
 	PublicRenderPlanAsyncBoundaryArms,
 	PublicRenderPlanBranchArms,
 	LoweredStateRead,
@@ -58,13 +57,6 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 	const boundaryArmsById = new Map(
 		(input.publicRenderPlan?.asyncBoundaryArms ?? []).map((entry) => [entry.boundaryId, entry]),
 	);
-	const boundaryArmRendersById = new Map(
-		(input.publicRenderPlan?.asyncBoundaryArmRenders ?? []).map((entry) => [
-			entry.boundaryId,
-			entry,
-		]),
-	);
-
 	return {
 		passId: 'symbol-modules',
 		modules: input.symbolResolver.symbols.flatMap((symbol) => {
@@ -76,8 +68,7 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 			if (symbol.kind === 'async-boundary-update') {
 				const arms = boundaryArmsById.get(symbol.boundaryId);
 				if (arms) return [emitAsyncBoundaryUpdateModule(symbol, arms)];
-				const armRender = boundaryArmRendersById.get(symbol.boundaryId);
-				return armRender ? [emitAsyncBoundaryArmRenderModule(symbol, armRender)] : [];
+				return [];
 			}
 			return emitSymbolModule(
 				symbol,
@@ -2560,25 +2551,6 @@ function emitAsyncBoundaryUpdateModule(
 		'	return { arm, html };',
 		'}',
 		'function marklessBoundaryText(value) { return String(value == null ? "" : value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;"); }',
-	].join('\n');
-	return { symbolId: symbol.id, kind: symbol.kind, exportName, source };
-}
-
-// Tier-4 arm renderer (D1): the public-render plan owns the emission pieces
-// (component imports, planned records, render body); this pass only names the
-// export the generated resolver dispatches to. Same callable contract as the
-// parts-based module, extended with arm-relative armRecords in the return.
-function emitAsyncBoundaryArmRenderModule(
-	symbol: Extract<PlannedSymbol, { kind: 'async-boundary-update' }>,
-	armRender: PublicRenderPlanAsyncBoundaryArmRender,
-): GeneratedSymbolModule {
-	const exportName = symbolExportName(symbol.id);
-	const source = [
-		...armRender.imports,
-		...armRender.moduleLines,
-		`export function ${exportName}(context) {`,
-		...armRender.bodyLines,
-		'}',
 	].join('\n');
 	return { symbolId: symbol.id, kind: symbol.kind, exportName, source };
 }

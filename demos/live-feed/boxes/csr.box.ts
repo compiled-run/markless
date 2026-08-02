@@ -47,21 +47,13 @@ export default box(
 		await expect.page.text(page, '[data-weighted-count]', 'Weighted count 6', WAIT);
 
 		await page.click('[data-row-key="beacon-118"]', WAIT);
-		// PINNED DISEASE (2026-08-01, precompute-first-architecture T005): row events on
-		// keyed-repeat rows inside an async arm never register an event record in EITHER
-		// environment (framework log: "click [...] — no event record matched"). The handler
-		// stays in the authored source because the construct is required and its symbol must
-		// exist in the payload; this assertion pins today's broken behavior and MUST be
-		// flipped to expect "Selected beacon-118" when the arm-commit event re-registration
-		// gap is fixed (packages 4/6 of goals/precompute-first-architecture).
-		await expect.page.text(page, '[data-selected-key]', 'Selected none', WAIT);
+		// Regression pin: keyed-repeat row events inside a settled async arm are registered.
+		await expect.page.text(page, '[data-selected-key]', 'Selected beacon-118', WAIT);
 
 		await page.click('[data-increase-weight]', WAIT);
 		await expect.page.attribute(page, '[data-weight]', 'data-weight', '3', WAIT);
-		// PINNED DISEASE (same family as the row-event pin above): the in-arm child's sync
-		// computed does not recompute when outer state changes after settle — arm-scoped
-		// records are not live post-commit. Flip to 'Weighted count 9' when fixed.
-		await expect.page.text(page, '[data-weighted-count]', 'Weighted count 6', WAIT);
+		// Regression pin: in-arm child computed records remain live after the arm commit.
+		await expect.page.text(page, '[data-weighted-count]', 'Weighted count 9', WAIT);
 
 		const failedPage = await preview.browser.visit('/?latency=40&fail=1');
 		await expect.page.text(failedPage, '[data-feed-error]', 'Local updates unavailable', WAIT);

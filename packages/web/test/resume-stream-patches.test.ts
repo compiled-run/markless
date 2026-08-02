@@ -1,4 +1,4 @@
-import { ASYNC_PROTOCOL_VERSION } from '@markless/serializer';
+import { ASYNC_BOUNDARY_ARM, ASYNC_PROTOCOL_VERSION } from '@markless/serializer';
 import { expect, test } from 'vitest';
 import { adoptStreamedArmPatches } from '../src/resume-stream-patches.ts';
 
@@ -42,6 +42,8 @@ const decoded = {
 		asyncBoundaries: [
 			{
 				id: 'boundary:0',
+				runnerGraphNodeId: 'computed:report',
+				initiallyServedArm: ASYNC_BOUNDARY_ARM.pending,
 				startAnchor: { strategy: 'dom-order-comment', index: 0 },
 				endAnchor: { strategy: 'dom-order-comment', index: 1 },
 				asyncReads: [{ source: 'report', graphNodeId: 'computed:report', path: [] }],
@@ -82,6 +84,7 @@ test('adoptStreamedArmPatches overlays streamed snapshots and arm records before
 
 	expect(adopted.state.computed[0]?.snapshot).toMatchObject({ status: 'fulfilled' });
 	expect(adopted.view.asyncBoundaries[0]?.armRecords).toEqual(settledRecords);
+	expect(adopted.view.asyncBoundaries[0]?.initiallyServedArm).toBe(ASYNC_BOUNDARY_ARM.try);
 });
 
 test('adoptStreamedArmPatches is identity without streamed scripts or a document', () => {

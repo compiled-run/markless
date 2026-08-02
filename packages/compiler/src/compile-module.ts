@@ -419,7 +419,6 @@ function emptyPublicRenderPlanArtifact(): PublicRenderPlanArtifact {
 		branchReactivityGates: [],
 		branchArms: [],
 		asyncBoundaryArms: [],
-		asyncBoundaryArmRenders: [],
 		styleScopes: [],
 		diagnostics: [],
 	};

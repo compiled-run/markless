@@ -56,6 +56,7 @@ export async function renderCsrRuntime(input: {
 		graph,
 		state,
 		view,
+		liveHostNodes: output.liveHostNodes,
 		loadSymbol,
 		createVisibilityObserver: options.createVisibilityObserver,
 		createRemovalObserver: options.createRemovalObserver,
@@ -63,8 +64,8 @@ export async function renderCsrRuntime(input: {
 		renderBranchHtml: options.renderBranchHtml ?? globalDocumentBranchHtml(),
 		demandAsyncBoundaries: true,
 	});
-	await runtime.start();
 	output.connectRuntime?.({ graph, runtime });
+	await runtime.start();
 	await activateCsrBehaviors(runtime, view);
 	await marklessLogCsrSummary();
 

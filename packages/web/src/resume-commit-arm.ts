@@ -12,6 +12,7 @@ import type {
 	ResumeDomElement,
 	ResumeDomNode,
 	ResumeEventRecord,
+	ResumeKeyedRepeatRecord,
 } from './resume-types.ts';
 
 // D1 tier 4: commitArm replaces the DOM range between an async boundary's
@@ -22,8 +23,10 @@ import type {
 // captures focus/selection/scroll first and restores what survives.
 
 export type ArmCommitUpdate = {
-	readonly html: string;
+	readonly html?: string;
+	readonly nodes?: ReadonlyArray<ResumeDomNode>;
 	readonly armRecords: ResumeArmRecordSet;
+	readonly elementsByHostId?: ReadonlyMap<string, ResumeDomElement>;
 };
 
 type CommitParent = {
@@ -31,7 +34,10 @@ type CommitParent = {
 	insertBefore: (node: ResumeDomNode, before: ResumeDomNode | null) => unknown;
 	removeChild: (node: ResumeDomNode) => unknown;
 };
-type CommitAnchor = ResumeDomNode & { readonly parentNode?: CommitParent | null };
+type CommitAnchor = ResumeDomNode & {
+	readonly parentNode?: CommitParent | null;
+	readonly parentElement?: CommitParent | null;
+};
 type FocusableElement = ResumeDomElement & {
 	readonly focus?: () => void;
 	readonly getAttribute?: (name: string) => string | null;
@@ -82,6 +88,14 @@ export function createArmCommitter(
 			boundaryId: string,
 			records: ReadonlyArray<ResumeArmBranchRecord>,
 		) => Promise<void>;
+		readonly graph?: import('@markless/runtime').RuntimeGraph;
+		readonly graphNodeIds?: ReadonlySet<string>;
+		readonly loadSymbol?: (symbolId: string) => unknown | Promise<unknown>;
+		readonly getElementHandle?: (handleId: string) => ResumeDomElement | undefined;
+		readonly storeHostSubscription?: (hostNodeId: string, release: () => void) => void;
+		readonly registerKeyedRepeats?: (
+			records: ReadonlyArray<ResumeKeyedRepeatRecord>,
+		) => Promise<void>;
 		readonly documentHost?: CommitDocument;
 	},
 	installEventType: (eventType: string) => void,
@@ -90,8 +104,10 @@ export function createArmCommitter(
 		boundary: ResumeAsyncBoundaryRecord,
 		update: ArmCommitUpdate,
 	): Promise<void> {
-		if (!deps.renderHtml) throw armCommitRendererMissingError(boundary);
-		const fresh = deps.renderHtml(update.html);
+		if (!update.nodes && (!deps.renderHtml || update.html === undefined))
+			throw armCommitRendererMissingError(boundary);
+		const fresh = update.nodes ?? deps.renderHtml!(update.html!);
+		if (update.elementsByHostId) assertNativeArmRecordHosts(update);
 		const outgoing = elementsBetweenAnchors(
 			deps.root,
 			boundary.startAnchor,
@@ -103,6 +119,8 @@ export function createArmCommitter(
 		for (const branch of update.armRecords.branches ?? [])
 			for (const arm of branch.armRecords ?? [])
 				for (const event of arm.events) installEventType(event.eventName);
+		for (const repeat of update.armRecords.keyedRepeats ?? [])
+			for (const event of repeat.rowEvents) installEventType(event.eventName);
 		for (const hostNodeId of hostIdsInsideRemovedElements(deps.elementsByHostId, outgoing)) {
 			deps.disposeHost(hostNodeId);
 		}
@@ -114,6 +132,7 @@ export function createArmCommitter(
 			startAnchor: boundary.startAnchor,
 			endAnchor: boundary.endAnchor,
 			armRecords: update.armRecords,
+			elementsByHostId: update.elementsByHostId,
 		});
 		for (const [hostNodeId, element] of materialized.elementsByHostId) {
 			deps.disposedHosts.delete(hostNodeId);
@@ -121,12 +140,17 @@ export function createArmCommitter(
 		}
 		for (const record of materialized.events) {
 			const element = materialized.elementsByHostId.get(record.hostNodeId);
-			if (element) deps.addEventRecord(element, record);
+			if (!element) throw armRecordHostMissingError(record.hostNodeId, 'event');
+			deps.addEventRecord(element, record);
 		}
 		for (const handle of materialized.elementHandles) {
 			const element = materialized.elementsByHostId.get(handle.hostNodeId);
-			if (element) deps.registerElementHandle(handle.hostNodeId, handle, element);
+			if (!element) throw armRecordHostMissingError(handle.hostNodeId, 'element handle');
+			deps.registerElementHandle(handle.hostNodeId, handle, element);
 		}
+		registerArmDomUpdates(deps, materialized.domUpdates);
+		if (deps.registerKeyedRepeats && materialized.keyedRepeats.length > 0)
+			await deps.registerKeyedRepeats(materialized.keyedRepeats);
 		if (deps.addBehaviors && materialized.behaviors.length > 0) {
 			const byHost = new Map<string, ResumeBehaviorRecord[]>();
 			for (const behavior of materialized.behaviors) {
@@ -144,6 +168,63 @@ export function createArmCommitter(
 	};
 }
 
+function assertNativeArmRecordHosts(update: ArmCommitUpdate): void {
+	const elements = update.elementsByHostId!;
+	const records = [
+		...update.armRecords.events,
+		...(update.armRecords.domUpdates ?? []),
+		...update.armRecords.behaviors,
+		...update.armRecords.elementHandles,
+	];
+	const missing = records.find((record) => !elements.has(record.hostNodeId));
+	if (missing) throw armRecordHostMissingError(missing.hostNodeId, 'native');
+	const repeat = (update.armRecords.keyedRepeats ?? []).find(
+		(record) => !elements.has(record.parentHostNodeId),
+	);
+	if (repeat) throw armRecordHostMissingError(repeat.parentHostNodeId, 'keyed repeat');
+}
+
+function registerArmDomUpdates(
+	deps: Parameters<typeof createArmCommitter>[0],
+	records: NonNullable<ResumeArmRecordSet['domUpdates']>,
+): void {
+	for (const domUpdate of records) {
+		if (!domUpdate.symbolId) continue;
+		if (!deps.graph || !deps.loadSymbol || !deps.storeHostSubscription)
+			throw new Error('Markless async arm DOM-update registration is unavailable.');
+		const element = deps.elementsByHostId.get(domUpdate.hostNodeId);
+		if (!element) throw armRecordHostMissingError(domUpdate.hostNodeId, 'DOM update');
+		if (
+			(deps.graphNodeIds?.size ?? 0) > 0 &&
+			!deps.graphNodeIds?.has(domUpdate.graphNodeId) &&
+			typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' &&
+			__MARKLESS_DEBUG_ENABLED__
+		) throw new Error(`Markless DOM update expected graph node ${domUpdate.graphNodeId}.`);
+		deps.storeHostSubscription(
+			domUpdate.hostNodeId,
+			deps.graph.subscribe({
+				id: `view-dom-update:${domUpdate.hostNodeId}:${domUpdate.graphNodeId}:${domUpdate.path.join('.')}`,
+				graphNodeId: domUpdate.graphNodeId,
+				path: domUpdate.path,
+				async run(value) {
+					const symbol = (await deps.loadSymbol(domUpdate.symbolId!)) as (context: unknown) => unknown;
+					return symbol({
+						graph: deps.graph,
+						element,
+						getElementHandle: deps.getElementHandle,
+						domUpdate,
+						value,
+					}) as import('@markless/runtime').DomJournalResult | void;
+				},
+			}),
+		);
+	}
+}
+
+function armRecordHostMissingError(hostNodeId: string, kind: string): Error {
+	return new Error(`Markless async arm ${kind} record expected live host ${hostNodeId}.`);
+}
+
 // Both anchors must be live siblings under one parent BEFORE anything is
 // removed: a corrupt census fails clean instead of half-emptying the page.
 function replaceAnchorRange(
@@ -152,8 +233,9 @@ function replaceAnchorRange(
 ): void {
 	const start = boundary.startAnchor as CommitAnchor;
 	const end = boundary.endAnchor as CommitAnchor;
-	const parent = start.parentNode;
-	if (!parent || parent !== end.parentNode) throw armCommitAnchorsError(boundary);
+	const parent = start.parentNode ?? start.parentElement;
+	if (!parent || parent !== (end.parentNode ?? end.parentElement))
+		throw armCommitAnchorsError(boundary);
 	const siblings = Array.from(parent.childNodes);
 	const startIndex = siblings.indexOf(start);
 	const endIndex = siblings.indexOf(end);
