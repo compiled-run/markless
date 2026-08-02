@@ -109,7 +109,11 @@ for (const combo of combos) {
 			assertRepeatable('live-feed-ssr-held-pending', heldPendingRuns);
 		}
 	} finally {
-		preview.kill('SIGTERM');
+		try {
+			process.kill(-preview.pid, 'SIGTERM');
+		} catch {
+			preview.kill('SIGTERM');
+		}
 		await waitForExit(preview);
 	}
 }
@@ -148,6 +152,10 @@ if (MODE === 'baseline') {
 	console.log('\nGate passed: four proofs green and three runs exactly repeatable.');
 }
 
+// Any straggler handle (an orphaned pipe, a browser that ignored close) must
+// not turn a finished measurement into an hours-long silent hang.
+process.exit(0);
+
 function startPreview(combo) {
 	const child = spawn(
 		'pnpm',
@@ -165,6 +173,10 @@ function startPreview(combo) {
 			cwd: ROOT,
 			env: { ...process.env, MARKLESS_CONSUMER_BUILD: '1' },
 			stdio: ['ignore', 'pipe', 'pipe'],
+			// The pnpm wrapper spawns the real vite server as a grandchild; a
+			// plain child.kill orphans it, leaking the preview port and hanging
+			// the script at exit. Own the whole process group instead.
+			detached: true,
 		},
 	);
 	child.stdout.pipe(process.stdout);
