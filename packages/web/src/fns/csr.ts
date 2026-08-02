@@ -644,14 +644,14 @@ function renderChunkComponent(definition, props, components, idPrefix, symbolPre
 			}
 			return definition.loadSymbol(symbolId);
 		},
-		loadBuildComputedSymbol(symbolId) {
+		loadBehaviorSymbol(symbolId) {
 			for (const child of symbolRoutes) {
 				const prefix = child.edge.symbolPrefix;
 				if (prefix && symbolId.startsWith(prefix))
-					return child.output.loadBuildComputedSymbol?.(symbolId.slice(prefix.length)) ??
+					return child.output.loadBehaviorSymbol?.(symbolId.slice(prefix.length)) ??
 						child.output.loadSymbol(symbolId.slice(prefix.length));
 			}
-			return definition.loadBuildComputedSymbol?.(symbolId) ?? definition.loadSymbol(symbolId);
+			return definition.loadBehaviorSymbol?.(symbolId) ?? definition.loadSymbol(symbolId);
 		},
 		connectRuntime(context) {
 			runtimeState.graph = context.graph;

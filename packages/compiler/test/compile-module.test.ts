@@ -734,7 +734,7 @@ function csrRenderTestModuleSource(
 	return [
 		'const document = globalThis.__marklessPublicRenderTestDocument;',
 		'const loadSymbol = globalThis.__marklessPublicRenderTestLoadSymbol;',
-		'const loadBuildComputedSymbol = loadSymbol;',
+		'const loadBehaviorSymbol = loadSymbol;',
 		`const payloadState = ${JSON.stringify(result.protocolState)};`,
 		`const payloadView = ${JSON.stringify(result.protocolView)};`,
 		result.publicRenderModule.renderDataModuleSource,
@@ -4767,12 +4767,12 @@ export function Dashboard() @{
 test('standard CSR applies an event patch after behavior activation', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/BehaviorCommand.tsrx',
-		source: `import { buildComputed, state } from '@markless/core';
+		source: `import { state } from '@markless/core';
 function Frame({ command }) @{ <div class="frame" data-command={command}></div> }
 function Controls({ onPlay }) @{ <button type="button" onClick={onPlay}>Play</button> }
 export function App() @{
 	let command = state('cue');
-	<main attach={buildComputed(installController)}>
+	<main attach={installController}>
 		<Frame command={command} />
 		<Controls onPlay={() => command = 'play'} />
 	</main>

@@ -43,10 +43,10 @@ export async function renderCsrRuntime(input: {
 		let runtime: ResumeRuntime | undefined;
 		let starting: Promise<ResumeRuntime> | undefined;
 		let disposed = false;
-		const cleanup = await activateBuildComputedBehaviors(
+		const cleanup = await activateAuthoredBehaviors(
 			output,
 			view,
-			output.loadBuildComputedSymbol ?? loadSymbol,
+			output.loadBehaviorSymbol ?? loadSymbol,
 		);
 		const demandRuntime = async (): Promise<ResumeRuntime> => {
 			if (runtime) return runtime;
@@ -65,7 +65,7 @@ export async function renderCsrRuntime(input: {
 					const { createResumeRuntime } = await import('./resume.ts');
 					const runtimeView = {
 						...view,
-						behaviors: view.behaviors.filter((behavior) => !behavior.buildComputed),
+						behaviors: [],
 					};
 					const applyDomJournal =
 						options.applyDomJournal ??
@@ -208,21 +208,21 @@ async function marklessLogCsrSummary(): Promise<void> {
 	}
 }
 
-async function activateBuildComputedBehaviors(
+async function activateAuthoredBehaviors(
 	output: CsrRenderOutput,
 	view: ProtocolViewPayload,
 	loadSymbol: ResumeRuntimeInput['loadSymbol'],
 ): Promise<Array<() => void>> {
 	const cleanup: Array<() => void> = [];
 	for (const behavior of view.behaviors) {
-		if (!behavior.buildComputed || !behavior.symbolId) continue;
+		if (!behavior.symbolId) continue;
 		const element =
 			output.liveHostNodes?.get(behavior.hostNodeId) ??
 			(view.locators.length === 1 && view.locators[0]?.hostNodeId === behavior.hostNodeId
 				? output.root
 				: undefined);
 		if (!element)
-			throw new Error(`MARKLESS_CSR_BUILD_BEHAVIOR_HOST_MISSING: ${behavior.hostNodeId}`);
+			throw new Error(`MARKLESS_CSR_BEHAVIOR_HOST_MISSING: ${behavior.hostNodeId}`);
 		const symbol = await loadSymbol(behavior.symbolId);
 		const result = await symbol({
 			graph: undefined as unknown as RuntimeGraph,

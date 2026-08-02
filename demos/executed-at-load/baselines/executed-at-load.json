@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "commit": "e4971be46ab061ac5604b0debde7b8eb0f75bc19",
-  "date": "2026-08-02T18:48:35.064Z",
+  "commit": "3f07e9df8cf56d75c258d8459193ab4884b3b12a",
+  "date": "2026-08-02T19:17:13.006Z",
   "metric": "v8-precise-coverage-executed-bytes",
   "posture": {
     "consumerBuild": true,
@@ -18,15 +18,15 @@
       "proof": "green",
       "posture": "client-settled",
       "path": "/",
-      "totalExecutedBytes": 16774,
+      "totalExecutedBytes": 16736,
       "perScript": [
         {
-          "url": "/build/chunk-CKPRByF_.js",
-          "executedBytes": 14090
+          "url": "/build/chunk-DdDLv7zs.js",
+          "executedBytes": 14075
         },
         {
-          "url": "/build/chunk-CuMivFG7.js",
-          "executedBytes": 1502
+          "url": "/build/chunk-AHWhKpVH.js",
+          "executedBytes": 1479
         },
         {
           "url": "/build/chunk-BStB8rxG.js",
@@ -42,7 +42,7 @@
         }
       ],
       "postInteraction": {
-        "totalExecutedBytes": 46930,
+        "totalExecutedBytes": 46893,
         "perScript": [
           {
             "url": "/build/chunk-BQHF-5AV2.js",
@@ -65,8 +65,8 @@
             "executedBytes": 2163
           },
           {
-            "url": "/build/chunk-CuMivFG7.js",
-            "executedBytes": 2149
+            "url": "/build/chunk-AHWhKpVH.js",
+            "executedBytes": 2112
           },
           {
             "url": "/build/chunk-Dl_gl6wH2.js",
@@ -77,7 +77,7 @@
             "executedBytes": 1226
           },
           {
-            "url": "/build/chunk-CKPRByF_.js",
+            "url": "/build/chunk-DdDLv7zs.js",
             "executedBytes": 1046
           },
           {
@@ -395,7 +395,7 @@
       "totalExecutedBytes": 28925,
       "perScript": [
         {
-          "url": "/build/chunk-OV7_KEd3.js",
+          "url": "/build/chunk-Bl33_Tpb.js",
           "executedBytes": 12507
         },
         {
@@ -415,7 +415,7 @@
           "executedBytes": 1384
         },
         {
-          "url": "/build/chunk-BfCmsq4D.js",
+          "url": "/build/chunk-C9p5Uguy.js",
           "executedBytes": 1360
         },
         {
@@ -507,7 +507,7 @@
             "executedBytes": 1706
           },
           {
-            "url": "/build/chunk-OV7_KEd3.js",
+            "url": "/build/chunk-Bl33_Tpb.js",
             "executedBytes": 1102
           },
           {
@@ -527,7 +527,7 @@
             "executedBytes": 501
           },
           {
-            "url": "/build/chunk-BfCmsq4D.js",
+            "url": "/build/chunk-C9p5Uguy.js",
             "executedBytes": 359
           },
           {

@@ -28,7 +28,6 @@ import {
 } from '../../artifact-helpers/graph-paths.ts';
 import { collectComponentEdge } from './collect-components.ts';
 import { collectExpressionReads } from './collect-expressions.ts';
-import { getFrameworkApiForCall } from './imports.ts';
 import {
 	extractSyncPolicyFromHandlers,
 	firstDetachedSyncPolicyReference,
@@ -940,10 +939,6 @@ function behaviorSourceParts(
 	node: AnyNode,
 	state: WalkState,
 ): Omit<SemanticBehavior, 'hostNodeId'> {
-	if (getFrameworkApiForCall(node, state.frameworkApiImports) === 'buildComputed') {
-		const behavior = asNodes(node.arguments)[0];
-		if (behavior) return { ...behaviorSourceParts(behavior, state), buildComputed: true };
-	}
 	const behaviorSource = expressionSource(node, state.source);
 
 	if (node.type !== 'CallExpression') {

@@ -1,6 +1,5 @@
 export {
 	computed,
-	buildComputed,
 	element,
 	shared,
 	state,

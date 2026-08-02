@@ -2124,7 +2124,7 @@ test('render starts artifact-owned CSR preload work without requiring app code',
 	expect(target.children).toEqual([root]);
 });
 
-test('render activates only build-computed CSR behavior symbols before interaction', async () => {
+test('render activates every authored CSR behavior symbol before interaction', async () => {
 	const root = element('BUTTON');
 	const state = createProtocolStatePayload({
 		cells: [{ graphNodeId: 'state:count', name: 'count', valueKind: 'scalar', value: 0 }],
@@ -2153,7 +2153,6 @@ test('render activates only build-computed CSR behavior symbols before interacti
 								functionSource: 'chart',
 								inputSources: [],
 								symbolId: 'symbol:chart',
-								buildComputed: true,
 							},
 							{
 								hostNodeId: 'h0',
@@ -2190,8 +2189,8 @@ test('render activates only build-computed CSR behavior symbols before interacti
 		{ target },
 	);
 
-	expect(loadedSymbols).toEqual(['symbol:chart']);
-	expect(installed).toEqual(['BUTTON']);
+	expect(loadedSymbols).toEqual(['symbol:chart', 'symbol:cold-chart']);
+	expect(installed).toEqual(['BUTTON', 'BUTTON']);
 	expect(target.children).toEqual([root]);
 
 	await root.listeners[0].listener(event('click', root));

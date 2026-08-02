@@ -16,7 +16,7 @@ export type CsrRenderOutput = {
 	readonly view?: ProtocolViewPayload;
 	readonly liveHostNodes?: ReadonlyMap<string, ResumeDomElement>;
 	readonly loadSymbol?: ResumeRuntimeInput['loadSymbol'];
-	readonly loadBuildComputedSymbol?: ResumeRuntimeInput['loadSymbol'];
+	readonly loadBehaviorSymbol?: ResumeRuntimeInput['loadSymbol'];
 	readonly connectRuntime?: (context: {
 		readonly graph: unknown;
 		readonly runtime: CsrRenderRuntime;

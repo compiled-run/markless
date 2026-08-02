@@ -7,7 +7,7 @@ import {
 } from '../src/index.ts';
 
 const source = `
-import { state, computed, element, buildComputed } from '@markless/core';
+import { state, computed, element } from '@markless/core';
 import { makeChart } from './chart';
 
 export function App({ label }: { label: string }) @{
@@ -37,7 +37,7 @@ export function App({ label }: { label: string }) @{
 			}}
 		/>
 		<button onClick={() => count++}>{label}: {count} and {doubled} and {menuTitle} and {menuLabel} and {menuRest.meta.label}</button>
-		<canvas attach={buildComputed(makeChart(details))} />
+		<canvas attach={makeChart(details)} />
 		@try {
 			<p>{details.title}</p>
 		} @pending {
@@ -307,7 +307,6 @@ test('buildSemanticGraph creates the first production compiler artifact', async 
 			source: 'makeChart(details)',
 			functionSource: 'makeChart',
 			inputSources: ['details'],
-			buildComputed: true,
 		}),
 	]);
 

@@ -47,6 +47,19 @@ test('emitSourceModule keeps full resume behind a dynamic handoff', () => {
 	);
 });
 
+test('emitSourceModule gives every authored behavior a direct mount-time loader', () => {
+	const code = emitSourceModule({
+		...baseInput,
+		behaviorSymbols: [
+			{ id: 'symbol:attach', chunk: './attach.js', exportName: 'installController' },
+		],
+	});
+
+	expect(code).toContain('function loadBehaviorSymbol(symbolId)');
+	expect(code).toContain(`symbolId === "symbol:attach"`);
+	expect(code).toContain(`import('./attach.js')`);
+});
+
 test('emitResumeModule routes non-lean event-only entries through the full handoff', () => {
 	const code = emitSourceModule({
 		...baseInput,

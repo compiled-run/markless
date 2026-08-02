@@ -231,7 +231,6 @@ export function assertProtocolViewPayload(
 		assertOptionalArrayField(behavior, 'inputValues', context);
 		assertOptionalBehaviorInputGraphReads(behavior, context);
 		assertOptionalStringField(behavior, 'symbolId', context);
-		if (behavior.buildComputed !== undefined) assertBooleanField(behavior, 'buildComputed', context);
 	}
 
 	for (const [index, handle] of elementHandles.entries()) {

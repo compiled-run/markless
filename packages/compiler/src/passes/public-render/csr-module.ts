@@ -51,9 +51,7 @@ export function emitPublicCsrRenderModule(
 
 	const componentNames = new Set(input.semanticGraph.components.map((component) => component.name));
 	const callbacks = callbackSymbolIds(input);
-	const hasBuildComputedBehavior = input.protocolView.behaviors.some(
-		(behavior) => behavior.buildComputed,
-	);
+	const hasAuthoredBehavior = input.protocolView.behaviors.length > 0;
 	const nativePayloads: Array<{
 		readonly dataId: string;
 		readonly definition: Record<string, unknown>;
@@ -203,7 +201,7 @@ export function emitPublicCsrRenderModule(
 				'getComponent:(name)=>marklessCsrAllChunkComponents[name],' +
 				(guard ? `shouldRender:(props)=>{${destructureProps(componentPropNames(componentNode!), componentNode!).trim()}return !(${guard});},` : '') +
 				`loadSymbol,` +
-				(hasBuildComputedBehavior ? `loadBuildComputedSymbol,` : '') +
+				(hasAuthoredBehavior ? `loadBehaviorSymbol,` : '') +
 				`createValues:${emitValueFactory(input, valueSources, componentNode && componentRoot ? { component: componentNode, componentName, root: componentRoot, propNames: componentPropNames(componentNode) } : null)}` +
 				`}`,
 		];

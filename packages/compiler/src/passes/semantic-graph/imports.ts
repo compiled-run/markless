@@ -6,8 +6,7 @@ export type FrameworkApiName =
 	| 'computed'
 	| 'element'
 	| 'shared'
-	| 'storage'
-	| 'buildComputed';
+	| 'storage';
 
 const frameworkApiNames = new Set<FrameworkApiName>([
 	'state',
@@ -15,7 +14,6 @@ const frameworkApiNames = new Set<FrameworkApiName>([
 	'element',
 	'shared',
 	'storage',
-	'buildComputed',
 ]);
 
 export function frameworkApiSources(
