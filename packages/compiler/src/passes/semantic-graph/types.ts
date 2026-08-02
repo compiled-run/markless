@@ -19,6 +19,8 @@ import type {
 	SemanticKeyedRepeat,
 	SemanticLocalBinding,
 	SemanticLocalDeclaration,
+	SemanticMarkupArtifact,
+	SemanticBranchSite,
 	SemanticStateRead,
 	SemanticStateWrite,
 	SemanticTemplateBindingTarget,
@@ -48,7 +50,9 @@ export type MutableSemanticGraphArtifact = {
 	stateReads: SemanticStateRead[];
 	templateReads: SemanticTemplateRead[];
 	stateWrites: SemanticStateWrite[];
-	asyncBoundaries: Array<{ readonly id: string }>;
+	asyncBoundaries: Array<{ readonly id: string; readonly anchorOrder: number }>;
+	branchSites: SemanticBranchSite[];
+	markup: SemanticMarkupArtifact;
 	diagnostics: SemanticGraphDiagnostic[];
 	moduleGraphInterface: ModuleGraphInterfaceArtifact;
 };
@@ -145,6 +149,7 @@ export function createMutableSemanticGraphArtifact(filename: string): MutableSem
 		stateWrites: [],
 		asyncBoundaries: [],
 		branchSites: [],
+		markup: { root: null, chunks: [] },
 		moduleGraphInterface: {
 			passId: 'module-graph-interface',
 			filename,

@@ -47,6 +47,7 @@ import { attachKeyedRepeatRowHost, collectKeyedRepeat } from './collect-repeat.t
 import { collectBranchSite } from './collect-branches.ts';
 import { collectModuleGraphInterface, collectVariableDeclaration } from './collect-state.ts';
 import { createMutableSemanticGraphArtifact, createWalkState, type WalkState } from './types.ts';
+import { collectSemanticMarkup } from './collect-markup.ts';
 
 export async function buildSemanticGraph(
 	input: SemanticGraphInput,
@@ -114,6 +115,13 @@ export async function buildSemanticGraph(
 	collectComputedDependencyCycleDiagnostics(graph);
 	collectElementHandleDiagnostics(graph);
 	collectAsyncBoundaryDiagnostics(graph);
+	graph.markup = collectSemanticMarkup({
+		ast,
+		source: input.source,
+		filename: input.filename,
+		graph,
+		hostIds: state.hostIds,
+	});
 
 	return {
 		...graph,

@@ -87,6 +87,8 @@ export type SemanticGraphBinding = {
 	readonly writable: boolean;
 	readonly valueKind?: 'scalar' | 'object' | 'array' | 'unknown';
 	readonly initialValue?: unknown;
+	readonly initialValueKnown?: boolean;
+	readonly initializerSource?: string;
 	readonly storage?: { readonly key: string };
 	readonly async?: boolean;
 	readonly asyncCapable?: boolean;
@@ -440,6 +442,106 @@ export type SemanticSyncPolicyConstant = {
 	readonly value: unknown;
 };
 
+export type SemanticMarkupSlotCoordinate =
+	| { readonly kind: 'child-index'; readonly path: ReadonlyArray<number> }
+	| { readonly kind: 'comment-anchor'; readonly path: ReadonlyArray<number> };
+
+export type SemanticMarkupResidue =
+	| {
+			readonly kind: 'graph-read';
+			readonly graphNodeId: string;
+			readonly path: ReadonlyArray<string>;
+	  }
+	| {
+			readonly kind: 'repeat-item';
+			readonly repeatId: string;
+			readonly path: ReadonlyArray<string>;
+	  }
+	| { readonly kind: 'authored-expression'; readonly source: string };
+
+type SemanticMarkupLocatedSlot = {
+	readonly coordinate: SemanticMarkupSlotCoordinate;
+	// Server rendering interleaves the residue after this statics entry.
+	readonly staticIndex: number;
+};
+
+export type SemanticMarkupSlot = SemanticMarkupLocatedSlot &
+	(
+		| { readonly kind: 'text'; readonly residue: SemanticMarkupResidue }
+		| {
+				readonly kind: 'attribute';
+				readonly name: string;
+				readonly residue: SemanticMarkupResidue;
+		  }
+		| {
+				readonly kind: 'child-component';
+				readonly componentEdgeId: string;
+				readonly childComponentName: string;
+				readonly childTemplateId: string;
+		  }
+		| {
+				readonly kind: 'branch';
+				readonly branchSiteId: string;
+				readonly armTemplateIds: ReadonlyArray<string>;
+		  }
+		| {
+				readonly kind: 'repeat';
+				readonly repeatId: string;
+				readonly rowTemplateId: string;
+				readonly emptyTemplateId?: string;
+		  }
+		| {
+				readonly kind: 'async';
+				readonly boundaryId: string;
+				readonly armTemplateIds: Readonly<{
+					readonly try: string;
+					readonly pending?: string;
+					readonly catch?: string;
+				}>;
+		  }
+		| {
+				readonly kind: 'dynamic-host';
+				readonly hostNodeId: string;
+				readonly cardinality: 'zero-or-one';
+				readonly nullishTag: 'omit';
+				readonly tag: SemanticMarkupResidue;
+				readonly staticAttributes: Readonly<Record<string, string>>;
+				readonly attributeSlots: ReadonlyArray<
+					| {
+							readonly kind: 'attribute';
+							readonly name: string;
+							readonly residue: SemanticMarkupResidue;
+					  }
+					| { readonly kind: 'spread'; readonly residue: SemanticMarkupResidue }
+				>;
+				readonly childChunkId: string;
+		  }
+	);
+
+export type SemanticMarkupChunk = {
+	readonly id: string;
+	readonly kind:
+		| 'template'
+		| 'branch-arm'
+		| 'async-arm'
+		| 'repeat-row'
+		| 'repeat-empty'
+		| 'dynamic-host-children';
+	readonly componentName: string;
+	readonly statics: ReadonlyArray<string>;
+	readonly hosts: ReadonlyArray<{
+		readonly hostNodeId: string;
+		readonly tagName: string;
+		readonly coordinate: { readonly kind: 'child-index'; readonly path: ReadonlyArray<number> };
+	}>;
+	readonly slots: ReadonlyArray<SemanticMarkupSlot>;
+};
+
+export type SemanticMarkupArtifact = {
+	readonly root: { readonly componentName: string; readonly templateId: string } | null;
+	readonly chunks: ReadonlyArray<SemanticMarkupChunk>;
+};
+
 export type SemanticGraphArtifact = {
 	readonly passId: 'tsrx-semantic-graph';
 	readonly filename: string;
@@ -464,8 +566,77 @@ export type SemanticGraphArtifact = {
 	readonly stateWrites: ReadonlyArray<SemanticStateWrite>;
 	readonly asyncBoundaries: ReadonlyArray<{ readonly id: string; readonly anchorOrder: number }>;
 	readonly branchSites: ReadonlyArray<SemanticBranchSite>;
+	readonly markup: SemanticMarkupArtifact;
 	readonly moduleGraphInterface: ModuleGraphInterfaceArtifact;
 	readonly diagnostics: ReadonlyArray<SemanticGraphDiagnostic>;
+};
+
+export type RenderDataInitialValue = {
+	readonly graphNodeId: string;
+	readonly value:
+		| { readonly kind: 'constant'; readonly value: unknown }
+		| { readonly kind: 'value-function'; readonly source: string }
+		| { readonly kind: 'symbol-function'; readonly symbolId: string };
+};
+
+export type RenderDataBranch = {
+	readonly branchSiteId: string;
+	readonly kind: SemanticBranchSite['kind'];
+	readonly testSource: string;
+	readonly testReads: ReadonlyArray<{
+		readonly graphNodeId: string;
+		readonly path: ReadonlyArray<string>;
+	}>;
+	readonly armChunkIds: ReadonlyArray<string>;
+	readonly anchorOrder: number;
+	readonly asyncBoundaryId?: string;
+	readonly asyncBoundaryArm?: number;
+};
+
+export type RenderDataRepeat = {
+	readonly repeatId: string;
+	readonly collectionGraphNodeId?: string;
+	readonly collectionPath: ReadonlyArray<string>;
+	readonly keyPath: ReadonlyArray<string>;
+	readonly rowChunkId: string;
+	readonly emptyChunkId?: string;
+};
+
+export type RenderDataBoundary = {
+	readonly boundaryId: string;
+	readonly anchorOrder: number;
+	readonly runnerGraphNodeId: string | null;
+	readonly initiallyServedArm: PayloadAsyncBoundary['initiallyServedArm'];
+	readonly reads: ReadonlyArray<{
+		readonly source: string;
+		readonly graphNodeId: string;
+		readonly path: ReadonlyArray<string>;
+	}>;
+	readonly unresolvedSources: ReadonlyArray<string>;
+	readonly armChunkIds: Readonly<{
+		readonly try: string;
+		readonly pending?: string;
+		readonly catch?: string;
+	}>;
+};
+
+export type RenderDataInteraction = {
+	readonly eventId: string;
+	readonly hostNodeId: string;
+	readonly eventName: string;
+	readonly symbolIds: ReadonlyArray<string>;
+};
+
+export type RenderDataArtifact = {
+	readonly passId: 'render-data';
+	readonly filename: string;
+	readonly root: SemanticMarkupArtifact['root'];
+	readonly chunks: SemanticMarkupArtifact['chunks'];
+	readonly initialValues: ReadonlyArray<RenderDataInitialValue>;
+	readonly branches: ReadonlyArray<RenderDataBranch>;
+	readonly repeats: ReadonlyArray<RenderDataRepeat>;
+	readonly boundaries: ReadonlyArray<RenderDataBoundary>;
+	readonly interactions: ReadonlyArray<RenderDataInteraction>;
 };
 
 export type StateLoweringInput = {
@@ -1399,6 +1570,7 @@ export type CompileTsrxModuleResult = {
 	readonly stateLowering: StateLoweringArtifact;
 	readonly payloadArena: PayloadArenaArtifact;
 	readonly symbolResolver: SymbolResolverPlan;
+	readonly renderData: RenderDataArtifact;
 	readonly boundSymbolResolver: BoundSymbolResolverArtifact;
 	readonly captureAnalysis: CaptureAnalysisArtifact;
 	readonly protocolState: ProtocolStatePayload;

@@ -8,6 +8,7 @@ import { emitPublicRenderModule } from '../src/passes/public-render/module.ts';
 import { planPublicRender } from '../src/passes/public-render/plan.ts';
 import { createProtocolStatePayloadFromArena } from '../src/passes/protocol-state.ts';
 import { createProtocolViewPayload } from '../src/passes/protocol-view.ts';
+import { createRenderData } from '../src/passes/render-data/index.ts';
 import { createRuntimeDemandMap } from '../src/passes/runtime-demand-map.ts';
 import { buildSemanticGraph } from '../src/passes/semantic-graph/index.ts';
 import { emitSymbolModules } from '../src/passes/symbol-modules.ts';
@@ -18,6 +19,7 @@ test('compiler split modules expose their owning boundaries', () => {
 		'state-lowering',
 		'payload-arena',
 		'symbol-resolver',
+		'render-data',
 		'public-render-plan',
 		'capture-analysis',
 		'protocol-state',
@@ -36,6 +38,7 @@ test('compiler split modules expose their owning boundaries', () => {
 	expect(typeof buildSemanticGraph).toBe('function');
 	expect(typeof createProtocolStatePayloadFromArena).toBe('function');
 	expect(typeof createProtocolViewPayload).toBe('function');
+	expect(typeof createRenderData).toBe('function');
 	expect(typeof renderPayloadScriptArtifact).toBe('function');
 	expect(typeof emitSymbolModules).toBe('function');
 	expect(typeof createRuntimeDemandMap).toBe('function');
