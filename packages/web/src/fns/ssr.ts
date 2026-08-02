@@ -87,7 +87,14 @@ export async function marklessSsrRunAsyncComputed(
 	const streaming = renderContext?.streaming;
 	const definitions = runnerDefinitions ?? new Map([[graphNodeId, { run, dependencies: [] }]]);
 	const runs = streaming?.runs ?? requestRuns ?? new Map();
-	const entry = marklessSsrEnsureAsyncComputedRun(graphNodeId, definitions, runs, snapshots);
+	const entry = marklessSsrEnsureAsyncComputedRun(
+		graphNodeId,
+		definitions,
+		runs,
+		snapshots,
+		new Set(),
+		streaming?.signal,
+	);
 	if (!entry) {
 		const snapshot = { status: 'rejected', version: 1, key: null, error: undefined };
 		marklessSsrUpsertAsyncComputedSnapshot(graphNodeId, snapshot, snapshots);
@@ -122,6 +129,7 @@ function marklessSsrEnsureAsyncComputedRun(
 	runs,
 	snapshots,
 	visiting = new Set(),
+	signal,
 ) {
 	if (visiting.has(graphNodeId)) {
 		const snapshot = { status: 'rejected', version: 1, key: null, error: undefined };
@@ -151,6 +159,7 @@ function marklessSsrEnsureAsyncComputedRun(
 						runs,
 						snapshots,
 						dependencyPath,
+						signal,
 					);
 					return dependency ? [dependency] : [];
 				},
@@ -169,8 +178,11 @@ function marklessSsrEnsureAsyncComputedRun(
 					error: rejected.error,
 				};
 			}
-			return marklessSsrSettleAsyncComputed(definition.run, (readGraphNodeId, path) =>
-				marklessSsrReadAsyncComputedSnapshot(readGraphNodeId, path, runs, snapshots),
+			return marklessSsrSettleAsyncComputed(
+				definition.run,
+				(readGraphNodeId, path) =>
+					marklessSsrReadAsyncComputedSnapshot(readGraphNodeId, path, runs, snapshots),
+				signal,
 			);
 		})
 		.then((settledSnapshot) => {
@@ -214,8 +226,7 @@ function marklessSsrReadAsyncComputedSnapshot(graphNodeId, path = [], runs, snap
 	return value;
 }
 
-async function marklessSsrSettleAsyncComputed(run, read) {
-	const signal = new AbortController().signal;
+async function marklessSsrSettleAsyncComputed(run, read, signal = new AbortController().signal) {
 	try {
 		const value = await run({ key: null, signal, read });
 		return { status: 'fulfilled', version: 1, key: null, value };
