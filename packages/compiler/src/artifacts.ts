@@ -1538,6 +1538,7 @@ export type PublicRenderPlanArtifact = {
 export type PublicRenderModuleInput = {
 	readonly source: SemanticGraphInput;
 	readonly semanticGraph: SemanticGraphArtifact;
+	readonly renderData: RenderDataArtifact;
 	readonly publicRenderPlan: PublicRenderPlanArtifact;
 	readonly symbolResolver: SymbolResolverPlan;
 	readonly captureAnalysis: CaptureAnalysisArtifact;

@@ -229,6 +229,7 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 						publicRenderModule: emitPublicRenderModule({
 							source: sourceInput(inputs.source),
 							semanticGraph,
+							renderData: inputs.renderData as RenderDataArtifact,
 							publicRenderPlan: inputs.publicRenderPlan as PublicRenderPlanArtifact,
 							symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
 							captureAnalysis: inputs.captureAnalysis as CaptureAnalysisArtifact,

@@ -74,6 +74,7 @@ test('default compiler passes declare stable artifact boundaries', () => {
 				consumes: [
 					'source',
 					'semanticGraph',
+					'renderData',
 					'publicRenderPlan',
 					'symbolResolver',
 					'captureAnalysis',

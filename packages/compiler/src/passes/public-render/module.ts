@@ -63,6 +63,7 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 				rootSelection,
 				componentCount,
 				publicRenderPlan: input.publicRenderPlan,
+				renderData: input.renderData,
 				protocolState: input.protocolState,
 				protocolView: input.protocolView,
 				symbolResolver: input.symbolResolver,

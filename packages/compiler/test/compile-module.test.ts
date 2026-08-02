@@ -282,7 +282,8 @@ type PublicRenderTestContainer = PublicRenderTestElement | PublicRenderTestFragm
 type PublicRenderTestNode =
 	| PublicRenderTestElement
 	| PublicRenderTestFragment
-	| PublicRenderTestText;
+	| PublicRenderTestText
+	| PublicRenderTestComment;
 
 class PublicRenderTestText {
 	readonly nodeType = 3;
@@ -497,6 +498,18 @@ class PublicRenderTestComment {
 	get tagName(): string {
 		return '#comment';
 	}
+	cloneNode() {
+		return new PublicRenderTestComment(this.textContent);
+	}
+	replaceWith(...nodes: PublicRenderTestNode[]) {
+		const parent = this.parentElement;
+		const index = parent?.childNodes.indexOf(this) ?? -1;
+		if (!parent || index < 0) return;
+		for (const node of nodes) node.parentElement?.removeChild(node);
+		for (const node of nodes) node.parentElement = parent;
+		this.parentElement = null;
+		parent.childNodes.splice(index, 1, ...nodes);
+	}
 }
 
 class PublicRenderTestTemplate {
@@ -556,6 +569,7 @@ function publicRenderTestDocument() {
 				? new PublicRenderTestTemplate()
 				: new PublicRenderTestElement(tagName),
 		createDocumentFragment: () => new PublicRenderTestFragment(),
+		createTextNode: (value: string) => new PublicRenderTestText(value),
 	};
 }
 
@@ -1711,7 +1725,7 @@ export function App() @{
 	// The direct sync renders the empty branch when the collection is empty
 	// instead of leaving a silently blank parent (browser-matrix bug).
 	expect(moduleSource).toContain('No drafts');
-	expect(moduleSource).toContain('renderMarklessPublicRepeat0Empty');
+	expect(moduleSource).toContain('"emptyChunkId":"repeat:repeat:0:empty"');
 });
 
 test('compileTsrxModule ships keyed repeat records with row events in the view payload', async () => {
@@ -3718,7 +3732,7 @@ export function App() @{
 	expect(result.protocolView.domUpdates).toEqual([]);
 });
 
-test('compileTsrxModule emits public render direct DOM artifacts for supported keyed repeats', async () => {
+test('T009a direct chunk bootstrap emits renderData statics and slot coordinates for supported keyed repeats', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/KeyedEntries.tsrx',
 		source: `
@@ -3742,6 +3756,14 @@ export function App() @{
 		symbols: [],
 	});
 	const moduleSource = result.publicRenderModule.moduleSource;
+	expect(moduleSource).toContain('createMarklessDirectChunkRenderer');
+	expect(moduleSource).toContain('"rootChunkId":"template:App"');
+	expect(moduleSource).toContain('"rowChunkId":"repeat:repeat:0:row"');
+	expect(moduleSource).toContain('"kind":"comment-anchor"');
+	expect(moduleSource).not.toContain('function createMarklessPublicRoot()');
+	expect(moduleSource).not.toContain('function createMarklessPublicRepeat0Row()');
+	expect(moduleSource).not.toContain('rowTemplateHtml');
+	expect(moduleSource).not.toContain('emptyTemplateHtml');
 	const addSymbol = result.symbolResolver.symbols.find((symbol) =>
 		symbol.source.includes('entries.push'),
 	);
@@ -3787,79 +3809,11 @@ export function App() @{
 	}
 	expect(moduleSource).not.toContain('function createMarklessPublicRuntime');
 	expect(moduleSource).not.toContain('view: { version: 1');
-	expect(moduleSource).toContain('!sameMarklessPublicKeys(state.keys, nextKeys)');
-	expect(moduleSource).toContain(
-		'const repeatState0 = { rows: new Map(), keys: [], classValue: undefined };',
-	);
-	expect(moduleSource).toContain('createMarklessPublicLoadSymbol(root, repeatState0)');
-	expect(moduleSource).toContain(
-		'syncMarklessPublicRepeat0(root, graph, componentLoadSymbol, repeatState0);',
-	);
-	expect(moduleSource).toContain(
-		'syncMarklessPublicRepeat0(root, context.graph, loadMarklessPublicSymbol, repeatState0);',
-	);
-	expect(moduleSource).not.toContain('function syncMarklessPublicRepeats');
-	expect(moduleSource).not.toContain('const marklessPublicRepeatStates');
-	expect(moduleSource).not.toContain('function repeatState(root) {');
-	expect(moduleSource).not.toContain('function repeatState(root, planIndex)');
-	expect(moduleSource).not.toContain('states = []');
-	expect(moduleSource).toContain('function createMarklessPublicRepeat0Record(row, item)');
-	expect(moduleSource).toContain('function createMarklessPublicRepeat0Row()');
-	expect(moduleSource).toContain('let marklessPublicRepeat0Template;');
-	expect(moduleSource).toContain('const rowRoot = createMarklessPublicRepeat0Row();');
-	expect(moduleSource).toContain('record = createMarklessPublicRepeat0Record(rowRoot, item);');
-	expect(moduleSource).not.toContain('createMarklessPublicRow(');
-	expect(moduleSource).not.toContain('marklessPublicRowTemplates');
-	expect(moduleSource).toContain('text0: row.childNodes?.[0]?.childNodes?.[0],');
-	expect(moduleSource).toContain('class0: row,');
-	expect(moduleSource).not.toContain('record.targets');
-	expect(moduleSource).toContain('[[0],"click",["symbol:0"]]');
-	expect(moduleSource).toContain('[[1],"click",["symbol:1"]]');
-	expect(moduleSource).toContain('attachMarklessPublicStaticEvents');
+	expect(moduleSource).toContain('"statics":["<main>');
+	expect(moduleSource).toContain('<!--markless-slot:0-->');
+	expect(moduleSource).toContain('"hostPath":[0],"symbolIds":["symbol:0"]');
+	expect(moduleSource).toContain('"hostPath":[1],"symbolIds":["symbol:1"]');
 	expect(moduleSource).toContain("from '@markless/web/fns/direct'");
-	expect(moduleSource).toContain('const parent = root.childNodes?.[2];');
-	expect(moduleSource).not.toContain('const parent = elementAtDomOrder(root');
-	expect(moduleSource).not.toContain('function elementAtDomOrder');
-	expect(moduleSource).toContain('const textTarget0 = record.text0;');
-	expect(moduleSource).toContain('item.code');
-	expect(moduleSource).toContain('item.title');
-	expect(moduleSource).not.toContain('readMarklessPublicPath(item, ["code"])');
-	expect(moduleSource).not.toContain('readMarklessPublicPath(item, ["title"])');
-	expect(moduleSource).not.toContain('nodeAtPath(record.root');
-	expect(moduleSource).not.toContain('nodeAtPath(row');
-	expect(moduleSource).not.toContain('function nodeAtPath(root, path)');
-	expect(moduleSource).not.toContain('await graph.flush();');
-	expect(moduleSource).toContain('graph.flush();');
-	expect(moduleSource).toContain('function readMarklessPublicRepeat0ClassValues(graph)');
-	expect(moduleSource).toContain(
-		'const collectionDirty = graph.isDirty?.("state:entries") ?? true;',
-	);
-	expect(moduleSource).toContain('const classDirty = graph.isDirty?.("state:chosen");');
-	expect(moduleSource).toContain('const itemsValue = graph.read("state:entries");');
-	expect(moduleSource).toContain(
-		'const items = Array.isArray(itemsValue) ? itemsValue : Array.from(itemsValue ?? []);',
-	);
-	expect(moduleSource).toContain('return graph.read("state:chosen");');
-	expect(moduleSource).not.toContain('graph.read("state:entries", [])');
-	expect(moduleSource).not.toContain('graph.read("state:chosen", [])');
-	expect(moduleSource).toContain(
-		'const classValue = readMarklessPublicRepeat0ClassValues(graph);',
-	);
-	expect(moduleSource).toContain('writeMarklessPublicRepeat0Row(record, item, classValue);');
-	expect(moduleSource).toContain('attachMarklessPublicRepeat0Events(record);');
-	expect(moduleSource).not.toContain(
-		'attachMarklessPublicRepeat0Events(record, graph, loadSymbolForRepeat);',
-	);
-	expect(moduleSource).toContain(
-		'delegateMarklessPublicRepeat0Events(parent, graph, loadSymbolForRepeat);',
-	);
-	expect(moduleSource).toContain('event0: row.childNodes?.[1],');
-	expect(moduleSource).toContain('const element0 = record.event0;');
-	expect(moduleSource).not.toContain('const element0 = record.root.childNodes?.[1];');
-	expect(moduleSource).toContain('element0.__marklessPublicRepeat0Event0 = record;');
-	expect(moduleSource).toContain('parent.addEventListener("click"');
-	expect(moduleSource).toContain('const record = eventTarget?.__marklessPublicRepeat0Event0;');
-	expect(moduleSource).not.toContain('element0.addEventListener("click"');
 	expect(moduleSource).toContain('const dirtyGraphNodeIds = new Set();');
 	expect(moduleSource).toContain('const dirtyArrayIndexes = new Map();');
 	expect(moduleSource).toContain(
@@ -3868,36 +3822,9 @@ export function App() @{
 	expect(moduleSource).toContain(
 		'dirtyIndexes(graphNodeId) { return dirtyArrayIndexes.get(graphNodeId); }',
 	);
-	expect(moduleSource).toContain('const dirtyIndexes = graph.dirtyIndexes?.("state:entries");');
-	expect(moduleSource).toContain(
-		'patchMarklessPublicRepeat0DirtyRows(state, items, dirtyIndexes, classValue)',
-	);
-	expect(moduleSource).not.toContain('function replaceMarklessPublicRows(parent, state, keys)');
-	expect(moduleSource).toContain('document.createDocumentFragment()');
-	expect(moduleSource).toContain('const newRows = document.createDocumentFragment();');
-	expect(moduleSource).toContain('newRows.appendChild(record.root);');
-	expect(moduleSource).toContain('parent.appendChild?.(newRows);');
-	expect(moduleSource).toContain('pruneMarklessPublicRows(state, nextKeys)');
-	expect(moduleSource).toContain('const record = state.rows.get(matchValue);');
-	expect(moduleSource).not.toContain('const liveKeys = new Set();');
-	expect(moduleSource).not.toContain('const nodes = [];');
-	expect(moduleSource).not.toContain('const mismatch = [];');
-	expect(moduleSource).not.toContain('function appendMarklessPublicRows');
-	expect(moduleSource).not.toContain('parent.replaceChildren(...marklessPublicRowsForKeys');
-	expect(moduleSource).not.toContain('events: new Set()');
-	expect(moduleSource).not.toContain('record.events');
-	expect(moduleSource).not.toContain('marklessPublicEventMatch');
-	expect(moduleSource).not.toContain('eventTargets');
-	expect(moduleSource).not.toContain('findMarklessPublicRepeatEventRecord');
-	expect(moduleSource).toMatch(
-		/call\(call\)[\s\S]*delete\(deletion\)[\s\S]*clearMarklessPublic(?:SingleClass)?Rows/,
-	);
-	expect(moduleSource).not.toContain(
-		'if (parent.replaceChildren) parent.replaceChildren(); else parent.textContent = "";',
-	);
-	expect(moduleSource).not.toContain(
-		'if (parent.textContent !== undefined) parent.textContent = ""; else parent.replaceChildren?.();',
-	);
+	expect(moduleSource).toMatch(/call\(call\)[\s\S]*delete\(deletion\)/);
+	expect(moduleSource).not.toContain('document.createElement');
+	expect(moduleSource).not.toContain('createMarklessPublicRepeat');
 	for (const unexpected of [
 		'state: payloadState',
 		'view: marklessPublicView',
@@ -3910,7 +3837,7 @@ export function App() @{
 	}
 });
 
-test('compileTsrxModule public render module runs alternate keyed repeat shapes', async () => {
+test('T009a direct chunk bootstrap stays DOM-equal across alternate keyed repeat shapes', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/Catalog.tsrx',
 		source: `
@@ -3992,6 +3919,9 @@ export function Catalog() @{
 		},
 		createDocumentFragment() {
 			return new PublicRenderTestFragment();
+		},
+		createTextNode(value: string) {
+			return new PublicRenderTestText(value);
 		},
 	};
 	const publicModule = await importPublicRenderTestModule(
@@ -4140,6 +4070,9 @@ export function Articles() @{
 		createDocumentFragment() {
 			return new PublicRenderTestFragment();
 		},
+		createTextNode(value: string) {
+			return new PublicRenderTestText(value);
+		},
 	};
 	const publicModule = await importPublicRenderTestModule(
 		[
@@ -4222,6 +4155,9 @@ export function InitialArticles() @{
 		createDocumentFragment() {
 			return new PublicRenderTestFragment();
 		},
+		createTextNode(value: string) {
+			return new PublicRenderTestText(value);
+		},
 	};
 	const publicModule = await importPublicRenderTestModule(
 		[
@@ -4285,6 +4221,9 @@ export function DuplicateArticles() @{
 		createDocumentFragment() {
 			return new PublicRenderTestFragment();
 		},
+		createTextNode(value: string) {
+			return new PublicRenderTestText(value);
+		},
 	};
 	const publicModule = await importPublicRenderTestModule(
 		[
@@ -4308,7 +4247,7 @@ export function DuplicateArticles() @{
 	);
 });
 
-test('compileTsrxModule public render module recovers keyed rows from undefined state', async () => {
+test('T009a direct chunk bootstrap stays DOM-equal for empty and populated keyed rows', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/UndefinedArticles.tsrx',
 		source: `
@@ -4441,6 +4380,9 @@ export function ReplaceArticles() @{
 			fragmentCreations++;
 			return new PublicRenderTestFragment();
 		},
+		createTextNode(value: string) {
+			return new PublicRenderTestText(value);
+		},
 	};
 	const publicModule = await importPublicRenderTestModule(
 		[
@@ -4535,6 +4477,9 @@ export function TextArticles() @{
 		createDocumentFragment() {
 			return new PublicRenderTestFragment();
 		},
+		createTextNode(value: string) {
+			return new PublicRenderTestText(value);
+		},
 	};
 	const publicModule = await importPublicRenderTestModule(
 		[
@@ -4572,7 +4517,7 @@ export function TextArticles() @{
 	]);
 });
 
-test('compileTsrxModule public render module runs static text state bindings', async () => {
+test('T009a direct chunk bootstrap stays DOM-equal for initial and updated static text', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/Scoreboard.tsrx',
 		source: `
@@ -4607,7 +4552,10 @@ export function Scoreboard() @{
 		},
 	]);
 	expect(result.publicRenderModule.moduleSource).toContain(
-		'function syncMarklessPublicStaticText(root, graph)',
+		'createMarklessDirectChunkRenderer(marklessDirectChunkData)',
+	);
+	expect(result.publicRenderModule.moduleSource).toContain(
+		'"coordinate":{"kind":"comment-anchor","path":[0,0,0]}',
 	);
 
 	const incrementExports = await importPublicRenderTestModule(incrementModule!.source);
@@ -4617,13 +4565,20 @@ export function Scoreboard() @{
 		if (symbolId === incrementSymbol?.id) return incrementExports[incrementModule!.exportName];
 		throw new Error(`Unexpected public render test symbol ${symbolId}`);
 	};
+	let templateParses = 0;
 	const document = {
 		createElement(tagName: string) {
-			if (tagName === 'template') return new PublicRenderTestTemplate();
+			if (tagName === 'template') {
+				templateParses++;
+				return new PublicRenderTestTemplate();
+			}
 			return new PublicRenderTestElement(tagName);
 		},
 		createDocumentFragment() {
 			return new PublicRenderTestFragment();
+		},
+		createTextNode(value: string) {
+			return new PublicRenderTestText(value);
 		},
 	};
 	const publicModule = await importPublicRenderTestModule(
@@ -4654,6 +4609,7 @@ export function Scoreboard() @{
 
 	expect(button.textContent).toBe('1');
 	expect(secondButton.textContent).toBe('1');
+	expect(templateParses).toBe(1);
 	expect(loadSymbolCalls.get(incrementSymbol!.id)).toBe(undefined);
 	await button.dispatch('click');
 	expect(rendered.graph.read('state:score', ['total'])).toBe(2);
@@ -6342,9 +6298,11 @@ export function App() @{
 		expect.objectContaining({ repeatId: 'repeat:0', supported: true }),
 	]);
 	expect(result.publicRenderModule.rootExportName).toBe('App');
-	expect(result.publicRenderModule.moduleSource).toContain('cleanupMarklessPublicRepeat0Record');
 	expect(result.publicRenderModule.moduleSource).toContain(
-		'attachMarklessPublicRepeat0Behaviors',
+		'"rowBehaviors":[{"hostPath":[],"symbolId":"symbol:5"',
+	);
+	expect(result.publicRenderModule.moduleSource).toContain(
+		'createMarklessDirectChunkRenderer',
 	);
 	expect(result.protocolView.behaviors).toEqual([]);
 	expect(result.protocolView.keyedRepeats?.[0]).not.toHaveProperty('rowBehaviors');

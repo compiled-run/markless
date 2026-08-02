@@ -62,6 +62,7 @@ export const defaultCompilerPasses: ReadonlyArray<CompilerPassDefinition> = [
 		consumes: [
 			'source',
 			'semanticGraph',
+			'renderData',
 			'publicRenderPlan',
 			'symbolResolver',
 			'captureAnalysis',
