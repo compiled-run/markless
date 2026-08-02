@@ -20,7 +20,9 @@ const FIXED_MICROTASK_TURNS = 8;
 const MODE = process.argv[2];
 const MAX_CEILING_HEADROOM = 0.05;
 const ACCEPTED_LOAD_BYTES = {
-	'music-player-csr': 16_774,
+	// Owner-signed 2026-08-02 ("parity is fine", ceiling <= 1,400): prerendered
+	// boot measured 937 — ratcheted to the real number, not the allowance.
+	'music-player-csr': 937,
 	'music-player-ssr': 1_213,
 	'live-feed-csr': 28_925,
 	'live-feed-ssr': 1_285,
