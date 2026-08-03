@@ -24,7 +24,11 @@ const ACCEPTED_LOAD_BYTES = {
 	// boot measured 937 — ratcheted to the real number, not the allowance.
 	'music-player-csr': 937,
 	'music-player-ssr': 1_213,
-	'live-feed-csr': 28_925,
+	// lf-csr ratcheted to the measured number 2026-08-03 (interim-audit item).
+	'live-feed-csr': 28_564,
+	// lf-ssr accepted stays 1,285; measures 1,320 — the +35 is documented
+	// irreducible (pre-first-click arm listener install, t010b3/T013 receipts)
+	// and passes within the 5% headroom by design.
 	'live-feed-ssr': 1_285,
 };
 const LOAD_BYTE_CEILINGS = Object.fromEntries(
