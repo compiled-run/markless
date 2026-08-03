@@ -726,6 +726,53 @@ export function App() @{
 		).toHaveLength(1);
 	});
 
+	test('invalidates prerender snapshots before sending the edit reload', async () => {
+		const filename = '/workspace/app/src/App.tsrx';
+		const order: string[] = [];
+		const send = vi.fn((message: { type?: string }) => {
+			if (message.type === 'full-reload') order.push('reload');
+		});
+		const invalidatePrerenderSnapshots = vi.fn((ids: readonly string[]) => {
+			order.push(`snapshot:${ids.join(',')}`);
+		});
+		const environment = {
+			config: { consumer: 'client' },
+			hot: { send },
+			moduleGraph: { getModuleById: vi.fn(), invalidateModule: vi.fn() },
+		};
+		const hmr = createViteHmr({
+			base: '/',
+			clientEnvironment: 'client',
+			enabled: true,
+			invalidateGeneratedModules: async () => ['\0virtual:markless:render-data:App'],
+			invalidatePrerenderSnapshots,
+		});
+		hmr.configureServer({
+			config: { root: '/workspace/app' },
+			environments: { client: environment },
+		} as never);
+
+		expect(
+			await hmr.hotUpdate(
+				environment as never,
+				{
+					file: filename,
+					modules: [],
+					read: async () => source.replace('{count}', '{count + 1}'),
+					timestamp: 126,
+					type: 'update',
+				} as never,
+			),
+		).toEqual([]);
+		expect(invalidatePrerenderSnapshots).toHaveBeenCalledExactlyOnceWith([
+			'\0virtual:markless:render-data:App',
+		]);
+		expect(order).toEqual([
+			'snapshot:\0virtual:markless:render-data:App',
+			'reload',
+		]);
+	});
+
 	test('rechecks invalid files on disk when the restoring watcher event is swallowed', async () => {
 		const fixtureRoot = await mkdtemp(join(tmpdir(), 'markless-vite-hmr-'));
 		const filename = join(fixtureRoot, 'alternate-root.tsrx');

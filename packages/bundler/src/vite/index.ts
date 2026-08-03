@@ -24,6 +24,7 @@ import {
 	type MarklessRolldownOptions,
 } from '../types.ts';
 import { createDevTags } from './dev-tags.ts';
+import { createDevPrerender } from './dev-prerender.ts';
 import {
 	isServerViteEnvironment,
 	marklessEnvironment,
@@ -57,6 +58,7 @@ type InternalMarklessRolldownOptions = MarklessRolldownOptions & {
 	prerender?: boolean;
 	productionResumeModuleUrls?: Map<string, string>;
 	publicPath?: (fileName: string) => string;
+	updateDevPrerenderHashes?: (hashes: ReadonlyMap<string, string>) => void;
 };
 type RolldownInputConfig = string | readonly string[] | Record<string, string> | undefined;
 const MARKLESS_SKIP_DUPLICATE_BUILDS = Symbol('markless-skip-duplicate-builds');
@@ -83,7 +85,11 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 			environment?: MarklessEnvironment,
 			nextSource?: string,
 		) => marklessPlugin.api.invalidateGeneratedModules(parent, environment, nextSource),
+		invalidatePrerenderSnapshots: undefined as
+			| ((renderDataIds: readonly string[]) => void)
+			| undefined,
 	};
+	let devPrerender: ReturnType<typeof createDevPrerender> | undefined;
 	const devTags = createDevTags();
 	rolldownOptions.devInjections = devTags.tags;
 	const basePlugin = createMarklessRolldownPlugin({
@@ -156,6 +162,16 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 			rolldownOptions.publicPath = (fileName) => joinURL(resolvedConfig.base, fileName);
 			if (serve) {
 				devTags.registerViteTags(resolvedConfig.base);
+				if (prerender && prerenderEntry) {
+					devPrerender = createDevPrerender({
+						base: resolvedConfig.base,
+						entry: resolve(resolvedConfig.root, prerenderEntry),
+						serverEnvironment: viteEnvironmentName('server', options),
+						reportError: (environment, error) => hmr.reportError(environment, error),
+					});
+					rolldownOptions.updateDevPrerenderHashes = devPrerender.updateHashes;
+					hmrOptions.invalidatePrerenderSnapshots = devPrerender.invalidate;
+				}
 			}
 		},
 		configEnvironment(name, config) {
@@ -216,18 +232,29 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 					transformMarklessRequest(server, url, environment, options),
 			};
 			hmr.configureServer(server);
+			devPrerender?.configureServer(server);
 		},
-		transformIndexHtml() {
+		transformIndexHtml(html) {
 			const hmrResult = hmr.transformIndexHtml();
 			const injection = executionLogActivationInjection(rolldownOptions.executionLog);
-			if (!injection) return hmrResult;
-			const tag = {
-				tag: injection.tag,
-				injectTo: injection.location,
-				attrs: injection.attributes,
-				children: injection.children,
-			};
-			return Array.isArray(hmrResult) ? [...hmrResult, tag] : [tag];
+			const tags = [
+				...(Array.isArray(hmrResult) ? hmrResult : []),
+				...(injection
+					? [
+							{
+								tag: injection.tag,
+								injectTo: injection.location,
+								attrs: injection.attributes,
+								children: injection.children,
+							},
+						]
+					: []),
+			];
+			if (!devPrerender) return tags.length > 0 ? tags : undefined;
+			return devPrerender.renderHtml(html).then((renderedHtml) => ({
+				html: renderedHtml,
+				tags,
+			}));
 		},
 		resolveId: {
 			order: 'pre',
