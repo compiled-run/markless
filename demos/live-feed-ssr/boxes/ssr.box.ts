@@ -23,6 +23,8 @@ export default box(
 		const settledHtml = await preview.request('/?latency=0');
 		await expect.html.contains(settledHtml, 'data-feed-settled');
 		await expect.html.contains(settledHtml, 'data-row-key="atlas-204"');
+		await expect.html.contains(settledHtml, '<script type="markless/state">');
+		await expect.html.contains(settledHtml, '<script type="markless/view">');
 		if (settledHtml.includes('data-feed-pending')) {
 			throw new Error('Expected the fast SSR response to settle before the shell flush.');
 		}

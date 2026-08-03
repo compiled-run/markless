@@ -187,7 +187,9 @@ export async function transformTsrxModule(
 				symbolRoutes,
 			}),
 		},
-		...(input.prerenderWakeVariant && compiled.publicRenderModule.renderDataModuleSource
+		...(input.prerenderWakeVariant &&
+		compiled.publicRenderModule.renderDataModuleSource &&
+		needsFullResume(compiled.protocolState, compiled.protocolView, compiled.runtimeDemandMap)
 			? [
 					{
 						id: prerenderWakeId,
@@ -206,6 +208,7 @@ export async function transformTsrxModule(
 							),
 							prerenderDataId: renderDataId,
 							installResumeSummary: true,
+							recordsOnly: true,
 							hasBoundSymbols: compiled.boundSymbolResolver.rows.length > 0,
 							symbols: symbolRows,
 							symbolRoutes,
@@ -294,6 +297,7 @@ export async function transformTsrxModule(
 					),
 					prerenderRecords: input.prerenderRecords,
 					resumeModuleUrl: input.resumeModuleUrl,
+					prerenderWakeModuleUrl: input.prerenderWakeModuleUrl,
 					publicRenderModuleSource: compiled.publicRenderModule.moduleSource,
 					publicRenderRootExportName: compiled.publicRenderModule.rootExportName,
 					publicCsrModuleSource: input.dev

@@ -1,6 +1,7 @@
 import { box } from '@async/witness';
+import { assertEmptyDeltaContainer } from './empty-delta-container.ts';
 
-// Product truth: an SSR-rendered @if branch must resume from the payload state
+// Product truth: an SSR-rendered @if branch must resume from prerender data
 // (no app code executed before interaction) and flip its arm in the real
 // browser when a click writes the branch's state. The flip replaces the DOM
 // range between the branch comment anchors, and the branch-update symbol may
@@ -42,11 +43,9 @@ export default box(
 		});
 
 		// Server truth: SSR HTML carries only the taken arm between the branch
-		// comment anchors, plus the resumable payload scripts.
+		// comment anchors, plus an empty-delta resumable container.
 		const html = await preview.request('/');
-		await expect.html.contains(html, 'type="markless/state"');
-		await expect.html.contains(html, 'type="markless/view"');
-		await expect.html.contains(html, 'data-async-resumer');
+		await assertEmptyDeltaContainer(preview, html, 'SSR branch HTML');
 		assertArmBetweenAnchors(html, { shows: 'class="on"', hides: 'class="off"' }, 'SSR HTML');
 		if (html.includes('Hidden')) {
 			throw new Error(
@@ -58,7 +57,7 @@ export default box(
 
 		const page = await preview.browser.visit('/');
 
-		// Resume truth: the initial arm comes from the payload, not app code.
+		// Resume truth: the initial arm comes from server HTML, not app code.
 		// Startup fetches stay inside the rendered modulepreload set; the
 		// branch-update symbol is not among them.
 		await expect.page.text(page, ON_ARM, 'Shown', WAIT);

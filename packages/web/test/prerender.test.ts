@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import { createProtocolStatePayload, renderPayloadScripts } from '@markless/serializer';
 import {
 	derivePrerenderResumeRecords,
 	evaluateBuiltPageClosure,
@@ -141,9 +142,10 @@ test('evaluates a linked page closure without reparsing markup or authored sourc
 	);
 });
 
-test('derives the same resume records that SSR serializes', async () => {
-	const artifact: SsrRenderArtifact = {
+test('empty request delta uses the hashed wake variant and zero payload-script bytes', async () => {
+	const artifact: SsrRenderArtifact & { readonly prerenderWakeModuleUrl: string } = {
 		resumeModuleUrl: '/build/resume.js',
+		prerenderWakeModuleUrl: '/build/prerender-wake-A1b2.js',
 		renderSsr: () => ({
 			html: '<button>Ready</button>',
 			state: {
@@ -180,9 +182,51 @@ test('derives the same resume records that SSR serializes', async () => {
 	const derived = await derivePrerenderResumeRecords(artifact);
 	const ssr = await assembleSsrContainer(artifact, output, {});
 
-	expect(ssr).toContain(`<script type="markless/state">${JSON.stringify(derived.state)}</script>`);
-	expect(ssr).toContain(`<script type="markless/view">${JSON.stringify(derived.view)}</script>`);
+	expect(ssr.match(/<script type="markless\/(?:state|view)">/g) ?? []).toHaveLength(0);
+	expect(ssr).toContain('data-async-resumer');
+	expect(ssr).toContain(
+		'data-markless-resume-module="/build/prerender-wake-A1b2.js"',
+	);
 	expect(derived).toEqual(await derivePrerenderResumeRecords(artifact));
+});
+
+test('non-empty request delta preserves the existing full-payload container bytes', async () => {
+	const baselineState = createProtocolStatePayload({
+		cells: [{ graphNodeId: 'state:count', name: 'count', valueKind: 'scalar', value: 0 }],
+	});
+	const requestState = createProtocolStatePayload({
+		cells: [{ graphNodeId: 'state:count', name: 'count', valueKind: 'scalar', value: 1 }],
+	});
+	const view = {
+		version: 1 as const,
+		locators: [{ hostNodeId: 'h0', strategy: 'dom-order' as const, index: 0, tagName: 'button' }],
+		events: [{ hostNodeId: 'h0', eventName: 'click', symbolIds: ['symbol:0'] }],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	const baseline = { html: '<button>Build</button>', state: baselineState, view };
+	const request = { html: '<button>Request</button>', state: requestState, view };
+	const artifact: SsrRenderArtifact & { readonly prerenderWakeModuleUrl: string } = {
+		resumeModuleUrl: '/build/resume.js',
+		prerenderWakeModuleUrl: '/build/prerender-wake-A1b2.js',
+		renderSsr: () => baseline,
+	};
+	const preparedRequestView = {
+		...view,
+		locators: view.locators.map((locator) => ({ ...locator, index: locator.index + 1 })),
+	};
+	const payload = renderPayloadScripts({ state: requestState, view: preparedRequestView });
+
+	const html = await assembleSsrContainer(artifact, request, { resumerSource: 'wake();' });
+
+	expect(html).toBe(
+		'<div data-async-container><button>Request</button>' +
+			payload.stateScript +
+			payload.viewScript +
+			'<script data-async-resumer data-markless-resume-module="/build/resume.js">wake();</script></div>',
+	);
 });
 
 test('record-only linked-data wake does not require authored markup residue', async () => {

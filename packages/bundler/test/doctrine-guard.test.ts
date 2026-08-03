@@ -32,6 +32,8 @@ const POSTURE_CONDITIONAL_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Development resume URLs are emitted by the resolved server compilation.',
 	"packages/bundler/src/rolldown.ts :: : currentEnvironment === 'server'":
 		'Production resume URLs are selected by the resolved server compilation.',
+	"packages/bundler/src/rolldown.ts :: currentEnvironment === 'server'":
+		'Production prerender-wake URLs are selected by the resolved server compilation.',
 	"packages/bundler/src/rolldown.ts :: devResumeReexport: internalOptions.dev === true && currentEnvironment === 'client',":
 		'Development resume re-exports keep source modules in the resolved client graph.',
 	"packages/bundler/src/rolldown.ts :: if (currentEnvironment === 'client' && isResumeSourceRequest(id)) {":
@@ -64,6 +66,8 @@ const POSTURE_CONDITIONAL_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Compiled app metadata includes SSR rendering outside ordinary client output.',
 	"packages/bundler/src/source-module.ts :: input.resumeModuleUrl && input.environment !== 'client'":
 		'Compiled app metadata exposes resume URLs only from non-client output.',
+	"packages/bundler/src/source-module.ts :: input.prerenderWakeModuleUrl && input.environment !== 'client'":
+		'Compiled app metadata exposes prerender-wake URLs only from non-client output.',
 	"packages/bundler/src/source-module.ts :: input.inlineResumerSources && input.environment !== 'client'":
 		'Compiled app metadata exposes inline resumers only from non-client output.',
 	"packages/bundler/src/source-module.ts :: input.headInjections?.length && input.environment !== 'client'":

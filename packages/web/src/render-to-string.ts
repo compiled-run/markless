@@ -8,6 +8,7 @@ import {
 	type StorageSeedMetadata,
 } from '@markless/serializer';
 import { renderPayloadScripts } from '@markless/serializer';
+import { classifyResumeRecordDelta } from '@markless/serializer/resume-record-delta';
 import { __marklessDebugBootstrapSource } from './debug-channel.ts';
 import type { MarklessExecutionLogMode } from './dev-log.ts';
 import {
@@ -18,6 +19,7 @@ import {
 	type InlineResumerSourceVariants,
 } from './inline/resumer.ts';
 import { prepareSsrResumeRecords } from './prerender/records.ts';
+import { derivePrerenderResumeRecords } from './prerender/evaluator.ts';
 
 export { prepareSsrResumeRecords } from './prerender/records.ts';
 
@@ -97,9 +99,23 @@ export async function assembleSsrContainer(
 	const { state, view } = await prepareSsrResumeRecords(output);
 	const browserTriggers = hasBrowserTriggers(view, state);
 	const selfWake = hasUnsettledAsyncBoundaryRunner(view, state);
-	const payloadScripts =
-		hasPayload && browserTriggers ? renderPayloadScripts({ state, view }) : undefined;
 	const resumeModuleUrl = options.resumeModuleUrl ?? artifactResumeModuleUrl(component);
+	const prerenderWakeModuleUrl = artifactPrerenderWakeModuleUrl(component);
+	const emptyRequestDelta =
+		hasPayload &&
+		browserTriggers &&
+		prerenderWakeModuleUrl !== undefined &&
+		classifyResumeRecordDelta(
+			await derivePrerenderResumeRecords(component, options.props),
+			{ state, view },
+		).kind === 'empty';
+	const payloadScripts =
+		hasPayload && browserTriggers && !emptyRequestDelta
+			? renderPayloadScripts({ state, view })
+			: undefined;
+	const selectedResumeModuleUrl = emptyRequestDelta
+		? prerenderWakeModuleUrl
+		: resumeModuleUrl;
 	const artifactSources = artifactInlineResumerSources(component);
 	const executionLog =
 		options.executionLog ??
@@ -136,9 +152,21 @@ export async function assembleSsrContainer(
 	const resumerScript =
 		hasPayload && browserTriggers
 			? renderInlineResumerScript(
-					options.resumerSource ?? defaultSource,
+					emptyRequestDelta
+						? createPrerenderInlineResumerSource(
+								browserEventNames(view),
+								selectedResumeModuleUrl,
+								{
+									...(typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' &&
+									__MARKLESS_DEBUG_ENABLED__
+										? { debug: { bootstrapSource: __marklessDebugBootstrapSource() } }
+										: {}),
+									executionLog,
+								},
+							)
+						: options.resumerSource ?? defaultSource,
 					options.nonce,
-					resumeModuleUrl,
+					selectedResumeModuleUrl,
 					selfWake,
 				)
 			: '';
@@ -237,6 +265,13 @@ export async function renderSsrOutput(
 
 export function artifactResumeModuleUrl(component: SsrRenderable): string | undefined {
 	return typeof component === 'object' ? component.resumeModuleUrl : undefined;
+}
+
+function artifactPrerenderWakeModuleUrl(component: SsrRenderable): string | undefined {
+	return typeof component === 'object'
+		? (component as SsrRenderArtifact & { readonly prerenderWakeModuleUrl?: string })
+				.prerenderWakeModuleUrl
+		: undefined;
 }
 
 function artifactModulePreloads(

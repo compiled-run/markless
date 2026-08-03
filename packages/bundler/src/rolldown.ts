@@ -75,6 +75,7 @@ type InternalMarklessRolldownOptions = MarklessRolldownOptions & {
 	inlineResumerDebug?: boolean;
 	prerender?: boolean;
 	productionResumeModuleUrls?: Map<string, string>;
+	productionPrerenderWakeModuleUrls?: Map<string, string>;
 	publicPath?: (fileName: string) => string;
 	updateDevPrerenderHashes?: (hashes: ReadonlyMap<string, string>) => void;
 };
@@ -401,10 +402,14 @@ export function createMarklessRolldownPlugin(input: {
 			}
 			const source = pathname(id);
 			const renderDataRequest = isRenderDataSourceRequest(id);
+			// Children reshape only when this build actually has wake-variant
+			// entries; router apps have none until their entry channel exists,
+			// and reshaping their children alone ships dead bytes into walls.
 			const ssrPrerenderArtifacts =
 				currentEnvironment === 'client' &&
 				internalOptions.emitResumeModules === true &&
-				(clientSymbolEntrySources.has(source) || importedChildSources.has(source));
+				(clientSymbolEntrySources.has(source) ||
+					(clientSymbolEntrySources.size > 0 && importedChildSources.has(source)));
 			const transformInput: TransformTsrxModuleInput = {
 				filename: source,
 				source: code,
@@ -440,6 +445,10 @@ export function createMarklessRolldownPlugin(input: {
 						: currentEnvironment === 'server'
 							? internalOptions.productionResumeModuleUrls?.get(source)
 							: undefined,
+				prerenderWakeModuleUrl:
+					currentEnvironment === 'server'
+						? internalOptions.productionPrerenderWakeModuleUrls?.get(source)
+						: undefined,
 				styleModuleUrl:
 					internalOptions.dev === true && currentEnvironment === 'server'
 						? (virtualId) =>
@@ -678,7 +687,12 @@ export function createMarklessRolldownPlugin(input: {
 					internalOptions.productionResumeModuleUrls,
 					internalOptions.publicPath,
 				);
-				if (!internalOptions.prerender) {
+				recordProductionPrerenderWakeModuleUrls(
+					bundle,
+					internalOptions.productionPrerenderWakeModuleUrls,
+					internalOptions.publicPath,
+				);
+					if (!internalOptions.prerender) {
 					injectCsrNativeMarkup(bundle, transformManifests.values());
 				}
 
@@ -1326,6 +1340,30 @@ function recordProductionResumeModuleUrls(
 		)
 			continue;
 		const source = sourceForResumeVirtualImporter(chunk.facadeModuleId);
+		if (source) urls.set(source, publicPath?.(chunk.fileName) ?? `/${chunk.fileName}`);
+	}
+}
+
+function recordProductionPrerenderWakeModuleUrls(
+	bundle: Record<string, unknown>,
+	urls: Map<string, string> | undefined,
+	publicPath: ((fileName: string) => string) | undefined,
+): void {
+	if (!urls) return;
+	for (const output of Object.values(bundle)) {
+		if (!output || typeof output !== 'object') continue;
+		const chunk = output as {
+			readonly type?: unknown;
+			readonly facadeModuleId?: unknown;
+			readonly fileName?: unknown;
+		};
+		if (
+			chunk.type !== 'chunk' ||
+			typeof chunk.facadeModuleId !== 'string' ||
+			typeof chunk.fileName !== 'string'
+		)
+			continue;
+		const source = sourceForPrerenderWakeVirtualImporter(chunk.facadeModuleId);
 		if (source) urls.set(source, publicPath?.(chunk.fileName) ?? `/${chunk.fileName}`);
 	}
 }

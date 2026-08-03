@@ -22,6 +22,8 @@ const RUNTIME_MOUNT_SCAN_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Inline payload decoding accepts innerHTML only as a legacy script-text fallback.',
 	"packages/web/src/inline/resumer.ts :: const preloaded = currentDocument.querySelectorAll('link[rel=modulepreload]').length;":
 		'Debug instrumentation counts module-preload links and does not locate components.',
+	"packages/web/src/inline/resumer.ts :: const preloaded = document.querySelectorAll('link[rel=modulepreload]').length;":
+		'The prerender log summary counts module-preload links and does not locate components.',
 	'packages/web/src/inline/resumer.ts :: const walker = currentDocument.createTreeWalker(root, 1);':
 		'The inline resumer materializes compiler-recorded element locators in DOM order.',
 	'packages/web/src/payload-document-common.ts :: const text = element.textContent ?? element.text ?? element.innerHTML;':

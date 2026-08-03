@@ -47,6 +47,18 @@ test('emitSourceModule keeps full resume behind a dynamic handoff', () => {
 	);
 });
 
+test('server source module carries the prerender wake URL beside the regular resume URL', () => {
+	const code = emitSourceModule({
+		...baseInput,
+		environment: 'server',
+		resumeModuleUrl: '/build/resume-A1b2.js',
+		prerenderWakeModuleUrl: '/build/prerender-wake-C3d4.js',
+	});
+
+	expect(code).toContain('resumeModuleUrl: "/build/resume-A1b2.js"');
+	expect(code).toContain('prerenderWakeModuleUrl: "/build/prerender-wake-C3d4.js"');
+});
+
 test('emitSourceModule gives every authored behavior a direct mount-time loader', () => {
 	const code = emitSourceModule({
 		...baseInput,
@@ -485,4 +497,37 @@ test('symbolVirtualModuleSourceFile rejects non-symbol and malformed virtual ids
 	expect(
 		symbolVirtualModuleSourceFile('virtual:markless:symbol:%2Fapp.tsrx:symbol:extra'),
 	).toBeNull();
+});
+
+test('the wake variant is records-only: lean payload routes never emit with recordsOnly', () => {
+	const rowDemand = {
+		recordKinds: [
+			{ kind: 'keyed-repeat', replaced: true },
+			{ kind: 'dom-update', replaced: true },
+		],
+	};
+	const leanCode = emitResumeModule({
+		...baseInput,
+		needsFullResume: false,
+		runtimeDemandMap: rowDemand,
+	});
+	expect(leanCode).toContain('resumeScalarRowEventFromPayloadDocument');
+	// Lean pages keep their payload container until wake staging lands: a
+	// records-only wake variant for them must refuse to emit at all.
+	const wakeCode = (() => {
+		try {
+			emitResumeModule({
+				...baseInput,
+				needsFullResume: false,
+				runtimeDemandMap: rowDemand,
+				prerenderDataId: 'virtual:markless:render-data:app',
+				recordsOnly: true,
+			});
+			return 'emitted';
+		} catch (error) {
+			expect(String(error)).toContain('MARKLESS_WAKE_VARIANT_REQUIRES_FULL_RESUME');
+			return undefined;
+		}
+	})();
+	expect(wakeCode).toBeUndefined();
 });

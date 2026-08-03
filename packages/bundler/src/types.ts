@@ -51,6 +51,7 @@ export interface TransformTsrxModuleInput {
 	environment?: MarklessEnvironment;
 	clientOutput?: MarklessClientOutput;
 	resumeModuleUrl?: string;
+	prerenderWakeModuleUrl?: string;
 	headInjections?: GlobalInjections[];
 	styleModuleUrl?: (virtualModuleId: string) => string;
 	executionLog?: MarklessExecutionLogMode;

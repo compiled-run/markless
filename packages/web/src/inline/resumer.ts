@@ -17,7 +17,12 @@ type InlineDebugControls = {
 		},
 	): void;
 	activate(): void;
+	delegated?(eventNames: readonly string[]): void;
 };
+
+declare const __MARKLESS_PRERENDER_DEBUG_BOOTSTRAP__:
+	| ((root: Element, phase: 'ssr-inline', active: false) => InlineDebugControls)
+	| undefined;
 
 declare const __MARKLESS_INLINE_SYNC_POLICY__: boolean;
 declare const __MARKLESS_INLINE_GRAPH_SYNC_POLICY__: boolean;
@@ -131,8 +136,70 @@ export function createInlineResumerSelfWakeSource(resumeModuleUrl: string | unde
 export function createPrerenderInlineResumerSource(
 	eventNames: ReadonlyArray<string>,
 	resumeModuleUrl: string | undefined,
+	options?: {
+		readonly debug?: { readonly bootstrapSource: string };
+		readonly executionLog?: MarklessExecutionLogMode;
+	},
 ): string {
-	return `(${runPrerenderInlineResumer.toString()})(${JSON.stringify(eventNames)},${JSON.stringify(resumeModuleUrl)},u=>import(u));`;
+	const plain = `(${runPrerenderInlineResumer.toString()})(${JSON.stringify(eventNames)},${JSON.stringify(resumeModuleUrl)},u=>import(u));`;
+	const logging = options?.executionLog !== undefined && options.executionLog !== 'never';
+	if (!options?.debug && !logging) return plain;
+	return `{
+${options?.debug ? `const __MARKLESS_PRERENDER_DEBUG_BOOTSTRAP__=${options.debug.bootstrapSource};\n(${runPrerenderInlineResumerDebugSetup.toString()})(${JSON.stringify(eventNames)});` : ''}
+${logging ? `(${runPrerenderInlineResumerLogSummary.toString()})(${JSON.stringify(options.executionLog)});` : ''}
+${plain}
+}`;
+}
+
+// Flagged/log builds only: the empty-delta page executes nothing at load, so
+// the truthful summary and byte mirrors are written inline, matching the
+// standard resumer's wording so witness expectations hold across containers.
+function runPrerenderInlineResumerLogSummary(mode: 'always' | 'auto'): void {
+	const shouldLog = (() => {
+		if (mode === 'always') return true;
+		const currentLocation = location;
+		if (
+			/^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::|$)/.test(currentLocation.origin) ||
+			new URLSearchParams(currentLocation.search).has('markless-log')
+		)
+			return true;
+		try {
+			return localStorage.getItem('marklessLog') === '1';
+		} catch {
+			return false;
+		}
+	})();
+	if (!shouldLog) return;
+	const globalScope = globalThis as typeof globalThis & { __mxLog?: Set<string> };
+	const executed = [...(globalScope.__mxLog ||= new Set())];
+	const preloaded = document.querySelectorAll('link[rel=modulepreload]').length;
+	const app =
+		executed.length === 0
+			? '0.0 KB app'
+			: `${executed.length} app module${executed.length === 1 ? '' : 's'}`;
+	const summary = `markless: resumed — ${app} executed, ${preloaded} modules preloaded (${executed.length} app executed) · 0.0 KB instrument`;
+	console.log(summary);
+	const documentElement = document.documentElement;
+	if (documentElement) {
+		documentElement.setAttribute('data-markless-log-summary', summary);
+		if (executed.length === 0) {
+			documentElement.setAttribute('data-markless-log-app-bytes', '0');
+			documentElement.setAttribute('data-markless-log-instrument-bytes', '0');
+		}
+	}
+}
+
+// Flagged builds only: publish the debug channel and register the delegated
+// event names so explainInteraction answers before per-element records exist.
+function runPrerenderInlineResumerDebugSetup(eventNames: ReadonlyArray<string>): void {
+	const currentScript = document.currentScript as HTMLScriptElement | null;
+	const root = currentScript?.closest('[data-async-container]');
+	if (!root) return;
+	try {
+		const controls = __MARKLESS_PRERENDER_DEBUG_BOOTSTRAP__?.(root, 'ssr-inline', false);
+		controls?.delegated?.(eventNames);
+		controls?.activate();
+	} catch {}
 }
 
 function runPrerenderInlineResumer(

@@ -115,6 +115,7 @@ export function emitSourceModule(input: {
 	readonly environment: MarklessEnvironment;
 	readonly clientOutput: MarklessClientOutput;
 	readonly resumeModuleUrl?: string;
+	readonly prerenderWakeModuleUrl?: string;
 	readonly headInjections?: ReadonlyArray<{
 		readonly tag: string;
 		readonly attributes?: Record<string, string>;
@@ -210,7 +211,8 @@ export function emitSourceModule(input: {
 					headInjections: input.headInjections,
 					storageSeeds: input.storageSeeds,
 					inlineResumerSources: input.inlineResumerSources,
-					resumeModuleUrl: input.resumeModuleUrl,
+			resumeModuleUrl: input.resumeModuleUrl,
+			prerenderWakeModuleUrl: input.prerenderWakeModuleUrl,
 					rootExportName: input.publicRenderRootExportName,
 					csrExportName: input.publicRenderCsrExportName,
 					ssrExportName: input.publicRenderSsrExportName,
@@ -235,10 +237,18 @@ export function emitResumeModule(input: {
 	readonly hasBoundSymbols?: boolean;
 	readonly prerenderDataId?: string;
 	readonly installResumeSummary?: boolean;
+	// The wake variant serves pages whose container carries no payload
+	// scripts; lean routes read the payload document and must never emit.
+	readonly recordsOnly?: boolean;
 }) {
 	const routeSymbols = input.symbolRoutes.length > 0;
 	const resumeSymbolLoader = routeSymbols ? 'marklessSsrLoadSymbolRoute' : 'loadSymbol';
 	const scalarSpecializations = scalarDispatcherSpecializations(input);
+	if (input.recordsOnly && !input.needsFullResume) {
+		// Lean pages keep their payload container until wake staging lands;
+		// a records-only wake for them would strand lean routes payload-less.
+		throw new Error('MARKLESS_WAKE_VARIANT_REQUIRES_FULL_RESUME');
+	}
 	const resumeContainerEvent = emitResumeContainerEvent(
 		resumeSymbolLoader,
 		input.needsFullResume ?? false,
@@ -266,7 +276,7 @@ export function emitResumeModule(input: {
 		input.executionLog === 'never' ? '' : emitExecutionLogLoader(),
 		input.installResumeSummary && input.executionLog !== 'never'
 			? 'globalThis.__mxLoadLog().then(log => log.installMarklessExecutionLog());'
-			: '',
+			: null,
 		'',
 		emitLoadSymbol(input),
 		routeSymbols ? 'const marklessLoadLocalSymbol = loadSymbol;' : '',
@@ -321,6 +331,7 @@ function emitCompiledAppDefault(input: {
 	}>;
 	readonly storageSeeds?: ReadonlyArray<StorageSeedMetadata>;
 	readonly resumeModuleUrl?: string;
+	readonly prerenderWakeModuleUrl?: string;
 	readonly rootExportName: string | null;
 	readonly csrExportName: string | null;
 	readonly ssrExportName: string | null;
@@ -345,6 +356,10 @@ function emitCompiledAppDefault(input: {
 	const resumeModuleEntry =
 		input.resumeModuleUrl && input.environment !== 'client'
 			? [`	resumeModuleUrl: ${JSON.stringify(input.resumeModuleUrl)},`]
+			: [];
+	const prerenderWakeModuleEntry =
+		input.prerenderWakeModuleUrl && input.environment !== 'client'
+			? [`\tprerenderWakeModuleUrl: ${JSON.stringify(input.prerenderWakeModuleUrl)},`]
 			: [];
 	const inlineResumerEntry =
 		input.inlineResumerSources && input.environment !== 'client'
@@ -371,6 +386,7 @@ function emitCompiledAppDefault(input: {
 					...headInjectionEntry,
 					...storageSeedEntry,
 					...resumeModuleEntry,
+					...prerenderWakeModuleEntry,
 					...inlineResumerEntry,
 					...modulePreloadEntry,
 					input.executionLog && input.executionLog !== 'never'
@@ -455,6 +471,8 @@ function emitResumeContainerEvent(
 		].join('\n');
 	}
 	if (leanMode !== 'none') {
+		// recordsOnly containers carry no payload scripts; lean routes read the
+		// module-imported payload through a synthetic document instead.
 		const leanInput = [
 			'		document: input.root,',
 			'		root: input.root,',

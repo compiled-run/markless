@@ -128,6 +128,7 @@ type RootControls = {
 	dispose(): void;
 	invalidate(element: Element): void;
 	record(element: Element, eventName: string, input: InteractionInput): void;
+	delegated(eventNames: readonly string[]): void;
 	violation(input: ViolationInput): void;
 	router(source: MarklessDebugRouterDelegationInteraction['source']): void;
 	boundaries(value: readonly MarklessDebugBoundarySnapshot[]): void;
@@ -160,6 +161,7 @@ function installDebugChannelLayer(
 	const rootKey = priorContainer?.root.key ?? `root:${seed}`;
 	const rootRef = new WeakRef(root);
 	const events = new WeakMap<Element, Map<string, MarklessDebugInteractionExplanation>>();
+	const delegatedEvents = new Set<string>();
 	const keys = new WeakMap<Element, string>();
 	const invalidated = new WeakSet<Element>();
 	const routerSources = ((global as Record<PropertyKey, unknown>)[
@@ -249,6 +251,17 @@ function installDebugChannelLayer(
 		}
 		const interaction = events.get(element)?.get(eventName);
 		if (interaction) return freeze({ ...interaction });
+		// Container-level delegation (the prerender wake path): the root
+		// listener truthfully handles every delegated event name for any
+		// element in the container, before per-element records exist.
+		if (delegatedEvents.has(eventName))
+			return freeze({
+				kind: 'inline-resumer',
+				source: 'ssr-inline',
+				containerId: id,
+				elementKey: keyFor(element),
+				eventName,
+			});
 		if (invalidated.has(element)) return none(element, eventName, 'not-registered');
 		try {
 			const prior = previous?.explainInteraction(element, eventName);
@@ -372,6 +385,10 @@ function installDebugChannelLayer(
 				} as MarklessDebugInteractionExplanation),
 			);
 		},
+		delegated(eventNames) {
+			if (lifecycle === 'disposed') return;
+			for (const eventName of eventNames) delegatedEvents.add(eventName);
+		},
 		violation: pushViolation,
 		router: (source) => void routerSources.add(source),
 		boundaries(value) {
@@ -403,8 +420,15 @@ function safely<T>(run: () => T): T | undefined {
 		return undefined;
 	}
 }
+export function __marklessDebugRegisterDelegatedEvents(
+	root: Element,
+	eventNames: readonly string[],
+): void {
+	safely(() => moduleRoots.get(root)?.delegated(eventNames));
+}
+
 export function __marklessDebugBootstrapSource(): string {
-	return `((root,phase,active)=>{const controls=(${installDebugChannelLayer.toString()})(root,phase,active);return Object.freeze({record:(element,eventName,input)=>controls.record(element,eventName,input),router:(source)=>controls.router(source),activate:()=>controls.activate()})})`;
+	return `((root,phase,active)=>{const controls=(${installDebugChannelLayer.toString()})(root,phase,active);return Object.freeze({record:(element,eventName,input)=>controls.record(element,eventName,input),delegated:(eventNames)=>controls.delegated(eventNames),router:(source)=>controls.router(source),activate:()=>controls.activate()})})`;
 }
 export function __marklessDebugChannelForTest(): MarklessDebugChannelV1 | undefined {
 	return globalThis.__MARKLESS_DEBUG__;

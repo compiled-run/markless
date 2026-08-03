@@ -1,7 +1,8 @@
 import { box } from '@async/witness';
+import { assertEmptyDeltaContainer } from './empty-delta-container.ts';
 
 // Product truth: an SSR-rendered @if arm that hosts an attach behavior must
-// resume from the payload, dispatch its arm-record event as the very first
+// resume from prerender data, dispatch its arm-record event as the very first
 // interaction, and — per spec 06-runtime-resumer:222-224 — clean up the
 // behavior BEFORE the flip-out removes its host from the DOM. Flipping back
 // must rematerialize the arm's records (inner button dispatches again) and
@@ -48,12 +49,10 @@ export default box(
 
 		// Server truth: SSR HTML carries only the taken arm (the section with the
 		// inner button) between the branch comment anchors, plus the resumable
-		// payload scripts. The attach behavior must NOT run server-side: no
+		// empty-delta container. The attach behavior must NOT run server-side: no
 		// activation stamps may appear in the served HTML.
 		const html = await preview.request('/');
-		await expect.html.contains(html, 'type="markless/state"');
-		await expect.html.contains(html, 'type="markless/view"');
-		await expect.html.contains(html, 'data-async-resumer');
+		await assertEmptyDeltaContainer(preview, html, 'SSR dispose HTML');
 		assertArmBetweenAnchors(html, { shows: 'data-inner', hides: 'class="off"' }, 'SSR HTML');
 		if (html.includes('Closed')) {
 			throw new Error(
@@ -71,7 +70,7 @@ export default box(
 
 		const page = await preview.browser.visit('/');
 
-		// Resume truth: the taken arm and initial output come from the payload,
+		// Resume truth: the taken arm and initial output come from server HTML,
 		// and NO app code runs before interaction — the attach behavior has not
 		// stamped its host yet, and startup fetches stay inside the rendered
 		// modulepreload set (the resume runtime wakes on first interaction).

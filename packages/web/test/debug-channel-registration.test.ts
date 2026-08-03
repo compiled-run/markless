@@ -8,6 +8,7 @@ import {
 import {
 	__marklessDebugRecordViolation,
 	__marklessDebugInvalidateElement,
+	__marklessDebugRegisterDelegatedEvents,
 	__marklessDebugRegisterRouter,
 	__marklessDebugResetForTest,
 	__marklessDebugStartContainer,
@@ -636,6 +637,29 @@ describe('debug registration mirrors successful framework wiring', () => {
 			loadFullResume: async () => void (loaded = true),
 		} as never);
 		expect([loaded, channel()?.containers[0]?.phase]).toEqual([true, 'ssr-resume']);
+	});
+
+	test('container-delegated events explain as inline-resumer without per-element records', () => {
+		const button = element('BUTTON'),
+			root = element('MAIN', [button]);
+		__marklessDebugStartContainer(root as never, 'ssr-inline');
+		__marklessDebugRegisterDelegatedEvents(root as never, ['click']);
+		// The prerender wake path delegates compiler-known events at the root;
+		// any element in the container is truthfully handled by the inline
+		// resumer even though no per-element record exists yet.
+		expect(channel()?.explainInteraction(button as never, 'click')).toMatchObject({
+			kind: 'inline-resumer',
+			source: 'ssr-inline',
+		});
+		expect(channel()?.explainInteraction(button as never, 'keydown')).toMatchObject({
+			kind: 'none',
+		});
+		// Invalidating one element does not mask container-level delegation:
+		// the root listener still receives its events.
+		__marklessDebugInvalidateElement(root as never, button as never);
+		expect(channel()?.explainInteraction(button as never, 'click')).toMatchObject({
+			kind: 'inline-resumer',
+		});
 	});
 });
 

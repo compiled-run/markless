@@ -51,10 +51,28 @@ test('SSR client builds contain canonical linked render data and only eligible w
 	};
 	const served = await serverEntry.render();
 	const existingResumePath = await renderToString(serverEntry.default);
-	expect(served).toBe(existingResumePath);
-	expect(served).toContain('<script type="markless/state">');
-	expect(served).toContain('<script type="markless/view">');
+	// The served bundle carries the COMPILED inline resumer while the direct
+	// render path inlines its uncompiled source, so raw byte-equality can
+	// never hold; parity is everything outside inline script bodies.
+	expect(withoutInlineScriptBodies(served)).toBe(
+		withoutInlineScriptBodies(existingResumePath),
+	);
+	expect(served.match(/<script type="markless\/(?:state|view)">/g) ?? []).toHaveLength(0);
+	expect(served).toContain('data-async-resumer');
+	// The attribute must point at a real hash-addressed client chunk (the
+	// wake-variant entry; the derivation facade asserted above is its import).
+	const resumeModuleUrl = served.match(
+		/data-markless-resume-module="(\/build\/chunk-[A-Za-z0-9_-]+\.js)"/,
+	)?.[1];
+	expect(resumeModuleUrl).toBeDefined();
+	expect(
+		clientChunks.some((chunk) => chunk.path.endsWith(resumeModuleUrl!)),
+	).toBe(true);
 }, 120_000);
+
+function withoutInlineScriptBodies(html: string) {
+	return html.replace(/(<script\b[^>]*>)[\s\S]*?(<\/script>)/g, '$1$2');
+}
 
 async function readJavaScriptChunks(directory: string) {
 	const chunks: Array<{ path: string; source: string }> = [];
