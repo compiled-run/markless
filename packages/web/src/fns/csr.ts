@@ -192,6 +192,24 @@ export function marklessCsrRemapChildReads(reads, graphProps, recordId) {
 		return { ...read, graphNodeId: mapped.graphNodeId, path: mapped.path };
 	});
 }
+function marklessCsrRemapChildBranch(branch, graphProps) {
+	const testReads = (branch.testReads ?? []).flatMap((read) => {
+		const whole = read.graphNodeId === 'prop:props';
+		if (!whole && !read.graphNodeId.startsWith('prop:')) return [read];
+		const propName = whole ? read.path[0] : read.graphNodeId.slice(5);
+		const binding = (graphProps ?? []).find((prop) => prop.name === propName);
+		// A literal prop, or an omitted optional prop, selected the rendered arm
+		// during this component instance's initial render. It has no live graph
+		// route and therefore must not leave a branch record behind.
+		if (!binding || (binding.kind !== undefined && binding.kind !== 'graph-reference')) {
+			return [];
+		}
+		const mapped = marklessCsrRemapChildGraph(read, graphProps);
+		if (!mapped) throw new Error('MARKLESS_COMPOSED_READ_UNMAPPED: ' + branch.id);
+		return [{ ...read, graphNodeId: mapped.graphNodeId, path: mapped.path }];
+	});
+	return testReads.length > 0 ? { ...branch, testReads } : null;
+}
 export function marklessCsrIsThenable(value) {
 	return (
 		value !== null &&
@@ -970,10 +988,10 @@ function marklessCsrChunkView(definition, placements, children, idPrefix, symbol
 			const mapped = marklessCsrRemapChildKeyedRepeat(repeat, graphProps, '');
 			return mapped ? [{ ...repeat, collectionGraphNodeId: mapped.graphNodeId, collectionPath: mapped.path }] : [];
 		}));
-		branches.push(...(child.view?.branches ?? []).map((branch) => ({
-			...branch,
-			testReads: marklessCsrRemapChildReads(branch.testReads, graphProps, branch.id),
-		})));
+		branches.push(...(child.view?.branches ?? []).flatMap((branch) => {
+			const mapped = marklessCsrRemapChildBranch(branch, graphProps);
+			return mapped ? [mapped] : [];
+		}));
 		asyncBoundaries.push(...(child.view?.asyncBoundaries ?? []).map((boundary) => ({
 			...boundary,
 			asyncReads: marklessCsrRemapChildReads(boundary.asyncReads, graphProps, boundary.id),
