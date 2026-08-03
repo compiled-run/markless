@@ -1539,6 +1539,7 @@ export type PublicRenderModuleArtifact = {
 	readonly csrExportName: string | null;
 	readonly ssrModuleSource: string;
 	readonly ssrExportName: string | null;
+	readonly componentDefinitions: ReadonlyArray<Readonly<Record<string, unknown>>>;
 	readonly csrNativeMarkup: ReadonlyArray<{
 		readonly dataId: string;
 		readonly definition: Readonly<Record<string, unknown>>;

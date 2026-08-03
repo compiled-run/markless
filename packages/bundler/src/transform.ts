@@ -136,7 +136,7 @@ export async function transformTsrxModule(
 						id: renderDataId,
 						type: 'render-data' as const,
 						source: input.prerenderRecords
-							? prerenderDataModuleSource(compiled)
+							? prerenderDataModuleSource(compiled, input.importedModuleInterfaces)
 							: compiled.publicRenderModule.renderDataModuleSource,
 					},
 				]
@@ -283,25 +283,34 @@ export async function transformTsrxModule(
 	};
 }
 
-function prerenderDataModuleSource(compiled: CompileTsrxModuleResult): string {
+function prerenderDataModuleSource(
+	compiled: CompileTsrxModuleResult,
+	importedModuleInterfaces: TransformTsrxModuleInput['importedModuleInterfaces'],
+): string {
 	const importedComponents = new Map<string, { readonly source: string; readonly local: string }>();
 	for (const edge of compiled.semanticGraph.componentEdges) {
 		if (!edge.importSource || importedComponents.has(edge.childComponentName)) continue;
+		const linked = importedModuleInterfaces?.[edge.importSource];
+		if (!linked) {
+			throw new Error(
+				`MARKLESS_PRERENDER_RENDER_DATA_MISSING: Imported child ${JSON.stringify(edge.childComponentName)} from ${JSON.stringify(edge.importSource)} has no linked render-data artifact.`,
+			);
+		}
 		importedComponents.set(edge.childComponentName, {
-			source: edge.importSource,
+			source: `${MARKLESS_VIRTUAL_PREFIX}render-data:${encodeURIComponent(linked.filename)}`,
 			local: `marklessPrerenderImport${importedComponents.size}`,
 		});
 	}
 	const components = Object.fromEntries(
-		compiled.publicRenderModule.csrNativeMarkup.map((entry) => [
-			String(entry.definition.name),
-			entry.definition,
+		compiled.publicRenderModule.componentDefinitions.map((definition) => [
+			String(definition.name),
+			definition,
 		]),
 	);
 	return [
 		...[...importedComponents.values()].map(
 			(entry) =>
-				`import { marklessPrerenderData as ${entry.local} } from ${JSON.stringify(renderDataImportSource(entry.source))};`,
+				`import { marklessPrerenderData as ${entry.local} } from ${JSON.stringify(entry.source)};`,
 		),
 		compiled.publicRenderModule.renderDataModuleSource,
 		`const marklessPrerenderComponents = ${JSON.stringify(components)};`,
@@ -312,10 +321,6 @@ function prerenderDataModuleSource(compiled: CompileTsrxModuleResult): string {
 		`\timports: {${[...importedComponents].map(([name, entry]) => `${JSON.stringify(name)}:${entry.local}`).join(',')}},`,
 		'};',
 	].join('\n');
-}
-
-function renderDataImportSource(source: string): string {
-	return source.includes('?') ? `${source}&markless-render-data` : `${source}?markless-render-data`;
 }
 
 function stripCsrTestFallback(source: string): string {

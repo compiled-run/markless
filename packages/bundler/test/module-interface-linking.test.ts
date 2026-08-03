@@ -31,6 +31,35 @@ test('transformTsrxModule compiles an importer with its child module graph inter
 	expect(importer.code).toContain('state:App.count.counter.value');
 });
 
+test('prerender child render-data imports use the linked interface filename', async () => {
+	const childFilename = '/workspace/packages/ui/src/Badge.tsrx';
+	const child = await transformTsrxModule({
+		filename: childFilename,
+		source: `export function Badge() @{ <strong>Ready</strong> }`,
+		environment: 'client',
+		prerenderRecords: true,
+	});
+	const parent = await transformTsrxModule({
+		filename: importerFilename,
+		source: `import { Badge } from '@workspace/ui/Badge.tsrx'; export function App() @{ <Badge /> }`,
+		environment: 'client',
+		prerenderRecords: true,
+		importedModuleInterfaces: {
+			'@workspace/ui/Badge.tsrx': child.moduleGraphInterface,
+		},
+	});
+	const renderDataModule = parent.virtualModules.find(
+		(module) => module.type === 'render-data',
+	);
+
+	expect(renderDataModule?.source).toContain(
+		`from ${JSON.stringify(`virtual:markless:render-data:${encodeURIComponent(childFilename)}`)}`,
+	);
+	expect(renderDataModule?.source).not.toContain(
+		'virtual:markless:render-data:%40workspace%2Fui%2FBadge.tsrx',
+	);
+});
+
 test('build transforms link a previously compiled child interface into its importer', async () => {
 	const plugin = marklessServer();
 	const resolve = vi.fn(async (specifier: string) =>

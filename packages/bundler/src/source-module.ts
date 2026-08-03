@@ -397,6 +397,7 @@ function emitResumeContainerEvent(
 	const fullResumeHandoff = prerenderDataId
 		? [
 				'async function marklessFullResumeHandoff(handoff) {',
+				'\thandoff.root.__marklessLinkedRenderDataBoot = true;',
 				'\thandoff.root.__asyncResumeRuntimeStarted = true;',
 				"\tconst { derivePrerenderResumeRecords, renderPrerenderBoundary, resumeFromPrerenderRecords } = await import('@markless/web/fns/prerender-resume');",
 				`\tconst records = await derivePrerenderResumeRecords(marklessPrerenderData, ${loadSymbolName});`,

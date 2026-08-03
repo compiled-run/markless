@@ -435,6 +435,7 @@ function emptyPublicRenderModuleArtifact(): PublicRenderModuleArtifact {
 		csrExportName: null,
 		ssrModuleSource: '',
 		ssrExportName: null,
+		componentDefinitions: [],
 		csrNativeMarkup: [],
 		diagnostics: [],
 	};

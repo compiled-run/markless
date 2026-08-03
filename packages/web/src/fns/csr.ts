@@ -123,32 +123,40 @@ export function marklessAssertComposableStateNames(state, childStates) {
 	}
 }
 export function marklessCsrRemapChildGraph(record, graphProps) {
-	const whole = record.graphNodeId === 'prop:props';
-	if (!whole && !record.graphNodeId.startsWith('prop:')) return record;
-	const binding = graphProps.find(
-		(prop) => prop.name === (whole ? record.path[0] : record.graphNodeId.slice(5)),
-	);
+	const propName = marklessCsrPropName(record.graphNodeId, record.path);
+	if (propName === null) return record;
+	const binding = marklessCsrGraphProp(graphProps, propName);
 	const liveRoute = marklessLiveBoundGraphRoute(binding);
 	return liveRoute
 		? {
 				graphNodeId: liveRoute.graphNodeId,
-				path: [...liveRoute.path, ...record.path.slice(+whole)],
+				path: [...liveRoute.path, ...record.path.slice(+(record.graphNodeId === 'prop:props'))],
 			}
 		: null;
+}
+function marklessCsrPropName(graphNodeId, path) {
+	return graphNodeId === 'prop:props'
+		? path[0]
+		: graphNodeId.startsWith('prop:')
+			? graphNodeId.slice(5)
+			: null;
+}
+function marklessCsrGraphProp(graphProps, propName) {
+	const binding = (graphProps ?? []).find((prop) => prop.name === propName);
+	return binding?.kind === undefined || binding.kind === 'graph-reference' ? binding : null;
 }
 export function marklessCsrRemapChildKeyedRepeat(repeat, graphProps, hostPrefix = '') {
 	const graphNodeId = repeat.collectionGraphNodeId;
 	if (!graphNodeId) return null;
-	const whole = graphNodeId === 'prop:props';
-	if (!whole && !graphNodeId.startsWith('prop:')) {
+	const propName = marklessCsrPropName(graphNodeId, repeat.collectionPath);
+	if (propName === null) {
 		return { graphNodeId, path: repeat.collectionPath };
 	}
-	const propName = whole ? repeat.collectionPath[0] : graphNodeId.slice(5);
-	const binding = (graphProps ?? []).find((prop) => prop.name === propName);
-	if (binding?.kind !== undefined && binding.kind !== 'graph-reference') return null;
+	const binding = marklessCsrGraphProp(graphProps, propName);
+	if (binding === null) return null;
 	const mapped = marklessCsrRemapChildGraph(
 		{ graphNodeId, path: repeat.collectionPath },
-		graphProps ?? [],
+		graphProps,
 	);
 	if (mapped) return mapped;
 	throw new Error(
@@ -156,16 +164,15 @@ export function marklessCsrRemapChildKeyedRepeat(repeat, graphProps, hostPrefix 
 	);
 }
 export function marklessCsrRemapChildDomUpdate(update, graphProps, hostPrefix = '') {
-	const whole = update.graphNodeId === 'prop:props';
-	if (!whole && !update.graphNodeId.startsWith('prop:')) return update;
-	const propName = whole ? update.path[0] : update.graphNodeId.slice(5);
-	const binding = (graphProps ?? []).find((prop) => prop.name === propName);
-	if (binding?.kind !== undefined && binding.kind !== 'graph-reference') return null;
+	const propName = marklessCsrPropName(update.graphNodeId, update.path);
+	if (propName === null) return update;
+	const binding = marklessCsrGraphProp(graphProps, propName);
+	if (binding === null) return null;
 	// Projected children are rendered by the parent's chunk slots. A wrapper
 	// component's synthetic `children` text record therefore has no live graph
 	// route of its own and must not be registered as a child-owned refresh.
 	if (!binding && propName === 'children') return null;
-	const mapped = marklessCsrRemapChildGraph(update, graphProps ?? []);
+	const mapped = marklessCsrRemapChildGraph(update, graphProps);
 	if (mapped) return mapped;
 
 	const targetName = update.target?.name ? `:${update.target.name}` : '';
@@ -189,26 +196,8 @@ export function marklessCsrRemapChildReads(reads, graphProps, recordId) {
 	return (reads ?? []).map((read) => {
 		const mapped = marklessCsrRemapChildGraph(read, graphProps);
 		if (!mapped) throw new Error('MARKLESS_COMPOSED_READ_UNMAPPED: ' + recordId);
-		return { ...read, graphNodeId: mapped.graphNodeId, path: mapped.path };
+		return { ...read, ...mapped };
 	});
-}
-function marklessCsrRemapChildBranch(branch, graphProps) {
-	const testReads = (branch.testReads ?? []).flatMap((read) => {
-		const whole = read.graphNodeId === 'prop:props';
-		if (!whole && !read.graphNodeId.startsWith('prop:')) return [read];
-		const propName = whole ? read.path[0] : read.graphNodeId.slice(5);
-		const binding = (graphProps ?? []).find((prop) => prop.name === propName);
-		// A literal prop, or an omitted optional prop, selected the rendered arm
-		// during this component instance's initial render. It has no live graph
-		// route and therefore must not leave a branch record behind.
-		if (!binding || (binding.kind !== undefined && binding.kind !== 'graph-reference')) {
-			return [];
-		}
-		const mapped = marklessCsrRemapChildGraph(read, graphProps);
-		if (!mapped) throw new Error('MARKLESS_COMPOSED_READ_UNMAPPED: ' + branch.id);
-		return [{ ...read, graphNodeId: mapped.graphNodeId, path: mapped.path }];
-	});
-	return testReads.length > 0 ? { ...branch, testReads } : null;
 }
 export function marklessCsrIsThenable(value) {
 	return (
@@ -889,7 +878,7 @@ function marklessCsrChunkState(definition, props, initial, children) {
 						: {}),
 					dependencies: (computed.dependencies ?? []).map((dependency) => {
 						const mapped = marklessCsrRemapChildGraph(dependency, child.edge.props ?? []);
-						return mapped ? { ...dependency, graphNodeId: mapped.graphNodeId, path: mapped.path } : dependency;
+						return mapped ? { ...dependency, ...mapped } : dependency;
 					}),
 				})),
 			),
@@ -979,18 +968,25 @@ function marklessCsrChunkView(definition, placements, children, idPrefix, symbol
 			symbolIds: (event.symbolIds ?? []).map(bindSymbol),
 		})));
 		domUpdates.push(...(child.view?.domUpdates ?? []).flatMap((update) => {
-			const mapped = marklessCsrRemapChildDomUpdate(update, graphProps, '');
-			return mapped ? [{ ...update, graphNodeId: mapped.graphNodeId, path: mapped.path }] : [];
+			const mapped = marklessCsrRemapChildDomUpdate(update, graphProps);
+			return mapped ? [{ ...update, ...mapped }] : [];
 		}));
 		behaviors.push(...(child.view?.behaviors ?? []));
 		elementHandles.push(...(child.view?.elementHandles ?? []));
 		keyedRepeats.push(...(child.view?.keyedRepeats ?? []).flatMap((repeat) => {
-			const mapped = marklessCsrRemapChildKeyedRepeat(repeat, graphProps, '');
+			const mapped = marklessCsrRemapChildKeyedRepeat(repeat, graphProps);
 			return mapped ? [{ ...repeat, collectionGraphNodeId: mapped.graphNodeId, collectionPath: mapped.path }] : [];
 		}));
 		branches.push(...(child.view?.branches ?? []).flatMap((branch) => {
-			const mapped = marklessCsrRemapChildBranch(branch, graphProps);
-			return mapped ? [mapped] : [];
+			const testReads = marklessCsrRemapChildReads(
+				(branch.testReads ?? []).filter((read) => {
+					const propName = marklessCsrPropName(read.graphNodeId, read.path);
+					return propName === null || marklessCsrGraphProp(graphProps, propName);
+				}),
+				graphProps,
+				branch.id,
+			);
+			return testReads.length ? [{ ...branch, testReads }] : [];
 		}));
 		asyncBoundaries.push(...(child.view?.asyncBoundaries ?? []).map((boundary) => ({
 			...boundary,

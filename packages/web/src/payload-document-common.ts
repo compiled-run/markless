@@ -26,6 +26,7 @@ export async function resumeFromPayloadDocumentWith(
 	input: ResumePayloadDocumentInput,
 	resume: (input: ResumePayloadScriptsInput) => Promise<ResumePayloadScriptsResult>,
 ): Promise<ResumePayloadScriptsResult> {
+	assertPayloadDocumentAccessAllowed(input.root);
 	const resumed = getAlreadyResumedPayload(input.root);
 	if (resumed) return resumed;
 	return resume({
@@ -33,6 +34,20 @@ export async function resumeFromPayloadDocumentWith(
 		...readPayloadScriptsFromDocument(input.document),
 		renderBranchHtml: input.renderBranchHtml ?? documentTemplateBranchHtml(input.document),
 	});
+}
+
+declare const __MARKLESS_DEV_ENABLED__: boolean;
+
+function assertPayloadDocumentAccessAllowed(root: ResumePayloadDocumentInput['root']): void {
+	if (
+		(typeof __MARKLESS_DEV_ENABLED__ === 'undefined' || __MARKLESS_DEV_ENABLED__) &&
+		(root as typeof root & { readonly __marklessLinkedRenderDataBoot?: boolean })
+			.__marklessLinkedRenderDataBoot === true
+	) {
+		throw new Error(
+			'MARKLESS_LINKED_RENDER_DATA_PAYLOAD_ACCESS: linked render-data wake must not read markless/state or markless/view payload scripts.',
+		);
+	}
 }
 
 export function readPayloadScriptsFromDocument(

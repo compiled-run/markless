@@ -27,6 +27,24 @@ export function App() @{
 	expect(source).not.toContain('.renderCsr?.(');
 });
 
+test('direct-eligible child modules publish prerender component definitions without changing tiers', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Badge.tsrx',
+		source: `export function Badge() @{ <strong>Ready</strong> }`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderModule.moduleSource).not.toBe('');
+	expect(result.publicRenderModule.csrModuleSource).toBe('');
+	expect(result.publicRenderModule.csrNativeMarkup).toEqual([]);
+	expect(result.publicRenderModule.componentDefinitions).toEqual([
+		expect.objectContaining({
+			name: 'Badge',
+			rootChunkId: 'template:Badge',
+		}),
+	]);
+});
+
 test('T009b standard CSR exports component chunk data for parent modules', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/Card.tsrx',
