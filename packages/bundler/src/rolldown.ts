@@ -308,6 +308,12 @@ export function createMarklessRolldownPlugin(input: {
 					moduleSideEffects: true,
 				};
 			}
+			const missingSymbolSource = symbolVirtualModuleSourceFile(normalized);
+			if (missingSymbolSource && importedChildSources.has(missingSymbolSource)) {
+				throw new Error(
+					`MARKLESS_CHILD_SYMBOL_MISSING: Linked child ${JSON.stringify(missingSymbolSource)} does not provide requested symbol module ${JSON.stringify(normalized)}. Rebuild the child with the current Markless compiler and clear any stale build cache.`,
+				);
+			}
 
 			const symbolSource = sourceForSymbolVirtualImporter(importer);
 			if (symbolSource && isRelativeImport(source)) {

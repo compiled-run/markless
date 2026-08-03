@@ -185,6 +185,93 @@ test('derives the same resume records that SSR serializes', async () => {
 	expect(derived).toEqual(await derivePrerenderResumeRecords(artifact));
 });
 
+test('record-only linked-data wake does not require authored markup residue', async () => {
+	const state = {
+		version: 1 as const,
+		cells: [
+			{
+				graphNodeId: 'state:open',
+				name: 'open',
+				valueKind: 'scalar' as const,
+				directValue: false,
+			},
+		],
+		computed: [],
+		sharedDefinitions: [],
+	};
+	const view = {
+		version: 1 as const,
+		locators: [{ hostNodeId: 'h0', strategy: 'dom-order' as const, index: 0, tagName: 'div' }],
+		events: [{ hostNodeId: 'h0', eventName: 'click', symbolIds: ['symbol:0'] }],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		keyedRepeats: [],
+		branches: [],
+		asyncBoundaries: [],
+	};
+	const renderData = {
+		root: { componentName: 'App', templateId: 'template:App' },
+		chunks: [
+			{
+				id: 'template:App',
+				kind: 'template' as const,
+				componentName: 'App',
+				statics: ['<div class="', '"></div>'],
+				hosts: [
+					{
+						hostNodeId: 'h0',
+						tagName: 'div',
+						coordinate: { kind: 'child-index' as const, path: [0] },
+					},
+				],
+				slots: [
+					{
+						kind: 'attribute' as const,
+						name: 'class',
+						coordinate: { kind: 'child-index' as const, path: [0] },
+						residue: {
+							kind: 'authored-expression' as const,
+							source: `open ? 'panel open' : 'panel'`,
+						},
+						staticIndex: 0,
+					},
+				],
+			},
+		],
+		initialValues: [{ graphNodeId: 'state:open', value: { kind: 'constant', value: false } }],
+		branches: [],
+		boundaries: [],
+		repeats: [],
+	};
+	const surface = {
+		rootComponentName: 'App',
+		renderData,
+		components: {
+			App: {
+				name: 'App',
+				state,
+				view,
+				rootChunkId: 'template:App',
+				stateGraphNodeIds: ['state:open'],
+				initialValues: renderData.initialValues,
+				branches: [],
+				boundaries: [],
+				edges: [],
+				propCellId: null,
+			},
+		},
+		imports: {},
+	};
+
+	await expect(
+		derivePrerenderResumeRecords(surface as never, async () => undefined),
+	).resolves.toMatchObject({
+		state: { cells: [expect.objectContaining({ graphNodeId: 'state:open' })] },
+		view: { events: [expect.objectContaining({ symbolIds: ['symbol:0'] })] },
+	});
+});
+
 test('assembles a prerendered container with delegated triggers and zero payload scripts', async () => {
 	const artifact: SsrRenderArtifact = {
 		resumeModuleUrl: '/build/resume.js',

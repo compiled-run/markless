@@ -58,6 +58,28 @@ test('concurrent symbols-only transforms preserve sibling render-data artifacts'
 	await Promise.all(symbolsTransforms);
 });
 
+test('linked child symbol resolution fails loudly when its registered module is absent', async () => {
+	const childFilename = '/workspace/app/src/Child.tsrx';
+	const childSource = `export function Child() @{ <button onClick={() => undefined}>Child</button> }`;
+	const parentSource = `import { Child } from './Child.tsrx'; export function App() @{ <Child /> }`;
+	const plugin = marklessClient();
+	const resolve = vi.fn(async (specifier: string) =>
+		specifier === './Child.tsrx' ? { id: childFilename } : null,
+	);
+	callBuildStart(plugin, { cwd: '/workspace/app' });
+	const child = await callTransform(plugin, childSource, childFilename, { resolve });
+	await callTransform(plugin, parentSource, importerFilename, { resolve });
+	const childSymbolId = child.manifest.symbols[0]!.virtualModuleId;
+
+	expect(await callResolveId(plugin, childSymbolId)).toMatchObject({
+		id: `\0${childSymbolId}`,
+	});
+	plugin.api.invalidateGeneratedModules(childFilename, 'client');
+	await expect(callResolveId(plugin, childSymbolId)).rejects.toThrow(
+		`MARKLESS_CHILD_SYMBOL_MISSING: Linked child ${JSON.stringify(childFilename)} does not provide requested symbol module ${JSON.stringify(childSymbolId)}.`,
+	);
+});
+
 test('prerender child render-data imports use the linked interface filename', async () => {
 	const childFilename = '/workspace/packages/ui/src/Badge.tsrx';
 	const child = await transformTsrxModule({

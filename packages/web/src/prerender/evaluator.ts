@@ -188,7 +188,7 @@ export async function derivePrerenderResumeRecords(
 			throw new TypeError('Prerender render data requires a symbol loader.');
 		}
 		return prepareSsrResumeRecords(
-			await evaluatePrerenderDataSurface(page, propsOrLoadSymbol, undefined),
+			await evaluatePrerenderDataSurface(page, propsOrLoadSymbol, undefined, false),
 		);
 	}
 	return prepareSsrResumeRecords(await evaluateBuiltPageClosure(page, propsOrLoadSymbol));
@@ -209,7 +209,7 @@ export async function renderPrerenderBoundary(
 		if (typeof propsOrLoadSymbol !== 'function') {
 			throw new TypeError('Prerender render data requires a symbol loader.');
 		}
-		const output = await evaluatePrerenderDataSurface(page, propsOrLoadSymbol, graph);
+		const output = await evaluatePrerenderDataSurface(page, propsOrLoadSymbol, graph, true);
 		return settledBoundaryResult(output, boundaryId);
 	}
 	const output = await renderBuiltPage(page, propsOrLoadSymbol, { prerenderSettle: { graph } });
@@ -224,6 +224,7 @@ async function evaluatePrerenderDataSurface(
 	surface: PrerenderDataSurface,
 	loadSymbol: PrerenderLoadSymbol,
 	graph: RuntimeGraph | undefined,
+	requireHtml: boolean,
 ): Promise<SsrRenderOutput> {
 	const rootName = surface.rootComponentName;
 	if (!rootName) throw new Error('MARKLESS_PRERENDER_DATA_ROOT_MISSING');
@@ -235,6 +236,7 @@ async function evaluatePrerenderDataSurface(
 		symbolPrefix: '',
 		loadSymbol,
 		graph,
+		requireHtml,
 	});
 }
 
@@ -246,6 +248,7 @@ async function evaluatePrerenderDataComponent(input: {
 	readonly symbolPrefix: string;
 	readonly loadSymbol: PrerenderLoadSymbol;
 	readonly graph: RuntimeGraph | undefined;
+	readonly requireHtml: boolean;
 }): Promise<
 	SsrRenderOutput & {
 		readonly elementCount: number;
@@ -344,6 +347,10 @@ async function evaluatePrerenderDataComponent(input: {
 		read: (residue, context) => {
 			if (residue.kind === 'repeat-item') return readPath(context.repeatItem, residue.path);
 			if (residue.kind === 'graph-read') return read(residue.graphNodeId, residue.path);
+			// Initial wake consumes only the reconstructed state/view records. Its
+			// rendered HTML is discarded because the prerendered DOM is already live,
+			// so authored markup residue is not a dependency of record reconstruction.
+			if (!input.requireHtml) return '';
 			throw new Error(`MARKLESS_PRERENDER_RESIDUE_MISSING: ${residue.source}`);
 		},
 		selectBranchArm: (slot) => {
@@ -409,6 +416,7 @@ async function evaluatePrerenderDataComponent(input: {
 				symbolPrefix: input.symbolPrefix + edge.symbolPrefix,
 				loadSymbol: input.loadSymbol,
 				graph: input.graph,
+				requireHtml: input.requireHtml,
 			});
 			children.push({
 				output,
