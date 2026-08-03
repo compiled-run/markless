@@ -115,6 +115,52 @@ test('emitResumeModule derives prerender records from linked render data on dema
 	expect(resumeCode).not.toContain('marklessPrerenderPage');
 });
 
+test('emitResumeModule keeps trigger staging behind the prerender wake boundary', () => {
+	const ungated = emitResumeModule({
+		...baseInput,
+		needsFullResume: true,
+	});
+	const staged = emitResumeModule({
+		...baseInput,
+		needsFullResume: true,
+		recordsOnly: true,
+		// Staged modules keep the fallback surface: trigger groups are the
+		// first choice, prerenderDataId feeds the unmatched-interaction path.
+		prerenderDataId: 'virtual:markless:render-data:app',
+		prerenderTriggerGroups: [
+			{
+				id: 'host:play:click',
+				hostNodeId: 'host:play',
+				eventName: 'click',
+				hostIndex: 1,
+				hostTagName: 'button',
+				moduleId: 'virtual:markless:trigger-group:App:0',
+			},
+			{
+				id: 'branch:player:click:0',
+				hostNodeId: 'branch:player:0',
+				eventName: 'click',
+				hostIndex: -1,
+				hostTagName: '*',
+				branchStartIndex: 0,
+				branchEndIndex: 1,
+				hostPath: [0],
+				moduleId: 'virtual:markless:trigger-group:App:1',
+			},
+		],
+	});
+
+	expect(ungated).not.toContain('prerender-trigger-resume');
+	expect(ungated).not.toContain('__marklessDispatch');
+	expect(staged).toContain("import('@markless/web/fns/prerender-trigger-resume')");
+	expect(staged).toContain('graphNodeIds: group.graphNodeIds');
+	expect(staged).toContain('__marklessDispatch');
+	expect(staged).toContain('handoff.root.__marklessRegisterDispatch?.(marklessDispatchFullRuntime)');
+	expect(staged).toContain('function readMarklessWakeSourceSymbol');
+	expect(staged).toContain('marklessPrerenderBranchTriggerMatches');
+	expect(staged).not.toContain('function readMarklessSourceSymbol');
+});
+
 test('emitResumeModule keeps capability-free prerender pages on the lean handoff', () => {
 	const resumeCode = emitResumeModule({
 		...scalarResumeInput(),
@@ -309,6 +355,7 @@ test('specialized scalar dispatcher carries sync policy state through full fallb
 	expect(resumeCode).toContain(
 		'await runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });',
 	);
+	expect(resumeCode).not.toContain('__marklessCsrBootstrapReplayed');
 });
 
 test('specialized scalar dispatcher keeps full fallback for non-scalar event actions', () => {

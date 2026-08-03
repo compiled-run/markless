@@ -33,6 +33,7 @@ test('default compiler passes declare stable artifact boundaries', () => {
 		'payload-scripts',
 		'symbol-modules',
 		'runtime-demand-map',
+		'trigger-groups',
 		'symbol-resolver-module',
 	]);
 
@@ -120,6 +121,12 @@ test('default compiler passes declare stable artifact boundaries', () => {
 					'protocolView',
 				],
 				produces: ['runtimeDemandMap'],
+			}),
+			expect.objectContaining({
+				passId: 'trigger-groups',
+				description: expect.stringContaining('delegated trigger'),
+				consumes: ['symbolResolver', 'protocolState', 'protocolView', 'runtimeDemandMap'],
+				produces: ['triggerGroups'],
 			}),
 		]),
 	);

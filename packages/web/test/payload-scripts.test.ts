@@ -15,6 +15,7 @@ import {
 	RuntimePayloadError,
 } from '../src/index.ts';
 import type { ProtocolViewPayload } from '@markless/serializer';
+import { resumePrerenderTriggerGroup } from '../src/fns/prerender-trigger-resume.ts';
 
 type FakeElement = {
 	readonly nodeType: 1;
@@ -90,6 +91,17 @@ function payloadDocument(stateScript: string, viewScript: string): FakePayloadDo
 
 function scriptContent(script: string): string {
 	return script.replace(/^<script type="markless\/(?:state|view)">/, '').replace('</script>', '');
+}
+
+function decodedRecords(
+	state: ReturnType<typeof createProtocolStatePayload>,
+	view: ProtocolViewPayload,
+) {
+	const scripts = renderPayloadScripts({ state, view });
+	return decodePayloadScripts({
+		stateScript: scripts.stateScript,
+		viewScript: scripts.viewScript,
+	});
 }
 
 async function settleMicrotasks(count = 4): Promise<void> {
@@ -1434,6 +1446,118 @@ test('runtime treats a second payload resume for one container as an already-res
 			docsUrl: 'https://markless.dev/errors/MARKLESS_RESUME_ALREADY_RESUMED',
 		}),
 	]);
+});
+
+test('prerender trigger groups stage graph segments without adding a second capture authority', async () => {
+	const play = element('BUTTON');
+	const preview = element('BUTTON');
+	const root = element('SECTION', [play, preview]);
+	const emptyView = {
+		version: 1 as const,
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	const loaded: string[] = [];
+	const first = await resumePrerenderTriggerGroup({
+		groupId: 'play:click',
+		graphNodeIds: ['state:playing'],
+		root,
+		...decodedRecords(
+			createProtocolStatePayload({
+				cells: [
+					{
+						graphNodeId: 'state:playing',
+						name: 'playing',
+						valueKind: 'scalar',
+						value: false,
+					},
+				],
+			}),
+			{
+				...emptyView,
+				locators: [
+					{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'section' },
+					{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'button' },
+				],
+				events: [{ hostNodeId: 'h1', eventName: 'click', symbolIds: ['symbol:play'] }],
+			},
+		),
+		loadSymbol: async (symbolId) => {
+			loaded.push(symbolId);
+			return ({ graph }) => graph.update({ graphNodeId: 'state:playing', update: (value) => !value });
+		},
+	});
+	await first.runtime.dispatch({ type: 'click', target: play });
+	expect(first.graph.read('state:playing')).toBe(true);
+
+	const second = await resumePrerenderTriggerGroup({
+		groupId: 'preview:click',
+		graphNodeIds: ['state:playing', 'state:preview'],
+		root,
+		...decodedRecords(
+			createProtocolStatePayload({
+				cells: [
+					{
+						graphNodeId: 'state:playing',
+						name: 'playing',
+						valueKind: 'scalar',
+						value: false,
+					},
+					{
+						graphNodeId: 'state:preview',
+						name: 'preview',
+						valueKind: 'scalar',
+						value: 10,
+					},
+				],
+			}),
+			{
+				...emptyView,
+				locators: [
+					{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'section' },
+					{ hostNodeId: 'h2', strategy: 'dom-order', index: 2, tagName: 'button' },
+				],
+				events: [{ hostNodeId: 'h2', eventName: 'click', symbolIds: ['symbol:preview'] }],
+				domUpdates: [
+					{
+						hostNodeId: 'h2',
+						source: 'preview',
+						graphNodeId: 'state:preview',
+						path: [],
+						target: { kind: 'text' },
+						symbolId: 'symbol:preview-text',
+					},
+				],
+			},
+		),
+		loadSymbol: async (symbolId) => {
+			loaded.push(symbolId);
+			if (symbolId === 'symbol:preview-text') {
+				return (context) =>
+					createDomUpdateEntry({
+						locator: context.domUpdate!.hostNodeId,
+						target: context.domUpdate!.target!,
+						value: context.value,
+					});
+			}
+			return ({ graph }) =>
+				graph.update({ graphNodeId: 'state:preview', update: (value) => Number(value) + 1 });
+		},
+	});
+
+	expect(second.graph.read('state:playing')).toBe(true);
+	expect(second.graph.read('state:preview')).toBe(10);
+	expect(loaded).toEqual(['symbol:play']);
+	await second.runtime.dispatch({ type: 'click', target: preview });
+	expect(second.graph.read('state:preview')).toBe(11);
+	expect(preview.textContent).toBe('11');
+	expect(loaded).toEqual(['symbol:play', 'symbol:preview', 'symbol:preview-text']);
+	await first.runtime.dispatch({ type: 'click', target: play });
+	expect(first.graph.read('state:playing')).toBe(false);
+	expect(second.graph.read('state:playing')).toBe(false);
+	expect(root.listeners).toEqual([]);
 });
 
 test('concurrent payload resumes for one container share a single runtime startup', async () => {

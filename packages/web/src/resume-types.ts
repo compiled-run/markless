@@ -21,6 +21,10 @@ export type ResumeDomElement = ResumeDomNode & {
 		options?: { readonly capture?: boolean },
 	) => void;
 	readonly dispatchEvent?: (event: ResumeSharedPatchEvent) => boolean;
+	// The build-complete bootstrap owns DOM capture for the container lifetime.
+	// Full and staged runtimes register records only; they never add a second
+	// listener authority while this marker is present.
+	__marklessDelegatedDispatch?: boolean;
 	__marklessEventOnlyGraph?: Map<string, unknown>;
 };
 export type ResumeDomComment = ResumeDomNode & { readonly nodeType: 8; readonly data?: string };

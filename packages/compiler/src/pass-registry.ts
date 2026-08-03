@@ -104,6 +104,12 @@ export const defaultCompilerPasses: ReadonlyArray<CompilerPassDefinition> = [
 		produces: ['runtimeDemandMap'],
 	},
 	{
+		passId: 'trigger-groups',
+		description: 'Close each delegated trigger over its exact state, record, and symbol group.',
+		consumes: ['symbolResolver', 'protocolState', 'protocolView', 'runtimeDemandMap'],
+		produces: ['triggerGroups'],
+	},
+	{
 		passId: 'symbol-resolver-module',
 		description: 'Emit the generated symbol resolver module that owns dynamic imports.',
 		consumes: ['symbolResolverModuleInput'],

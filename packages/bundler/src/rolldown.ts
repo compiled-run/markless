@@ -47,6 +47,8 @@ import type {
 	TransformTsrxModuleInput,
 	TransformTsrxModuleResult,
 } from './types.ts';
+import type { BuiltPrerenderRecords } from './build/prerender.ts';
+import { triggerGroupVirtualModuleSourceFile } from './trigger-groups.ts';
 
 export type {
 	BundleGraphAdder,
@@ -101,6 +103,7 @@ export const marklessLib = (options: MarklessRolldownOptions = {}) =>
 export function createMarklessRolldownPlugin(input: {
 	environment: Environment;
 	options?: MarklessRolldownOptions;
+	prerenderRecordsBySource?: ReadonlyMap<string, BuiltPrerenderRecords>;
 }): MarklessRolldownPlugin {
 	const environment = input.environment;
 	const internalOptions = (input.options ?? {}) as InternalMarklessRolldownOptions;
@@ -345,6 +348,10 @@ export function createMarklessRolldownPlugin(input: {
 			if (symbolSource && isRelativeImport(source)) {
 				return await this.resolve(source, symbolSource, { skipSelf: true });
 			}
+			const triggerGroupSource = sourceForTriggerGroupVirtualImporter(importer);
+			if (triggerGroupSource && isRelativeImport(source)) {
+				return await this.resolve(source, triggerGroupSource, { skipSelf: true });
+			}
 			const resumeSource =
 				sourceForResumeVirtualImporter(importer) ??
 				sourceForPrerenderWakeVirtualImporter(importer);
@@ -505,6 +512,10 @@ export function createMarklessRolldownPlugin(input: {
 						? internalOptions.devInjections
 						: undefined,
 				devResumeReexport: internalOptions.dev === true && currentEnvironment === 'client',
+				prerenderRecordData:
+					currentEnvironment === 'client'
+						? input.prerenderRecordsBySource?.get(source)
+						: undefined,
 			};
 			// One source can be requested as a full environment entry, a symbols-only
 			// interaction entry, or a dev resume entry. Their linked interfaces are the
@@ -722,6 +733,7 @@ export function createMarklessRolldownPlugin(input: {
 			if (currentEnvironment === 'client' && !internalOptions.dev) {
 				for (const module of transformed.virtualModules.filter((item) => {
 					if (item.type === 'symbol') return true;
+					if (item.type === 'trigger-group') return true;
 					if (item.type === 'resolver') {
 						return (
 							(importedChildSources.has(source) ||
@@ -1412,6 +1424,11 @@ function sourceForResumeVirtualImporter(importer: string | undefined): string | 
 
 	const match = normalizeVirtualId(importer).match(RESUME_VIRTUAL_ID_RE);
 	return match?.[1] ? decodeURIComponent(match[1]) : null;
+}
+
+function sourceForTriggerGroupVirtualImporter(importer: string | undefined): string | null {
+	if (!importer) return null;
+	return triggerGroupVirtualModuleSourceFile(normalizeVirtualId(importer));
 }
 
 function sourceForPrerenderWakeVirtualImporter(importer: string | undefined): string | null {

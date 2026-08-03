@@ -214,7 +214,7 @@ export function createResumeRuntime(
 			}),
 		);
 		for (const eventType of eventTypes)
-			if (!eventTypesBefore.has(eventType))
+			if (!eventTypesBefore.has(eventType) && !input.root.__marklessDelegatedDispatch)
 				input.root.addEventListener?.(eventType, dispatchCaptured, { capture: true });
 		for (const hostNodeId of branchRuntime.startupArmBehaviorHostIds)
 			await behaviorRuntime?.activateBehaviors(hostNodeId, { flush: false });
@@ -222,11 +222,6 @@ export function createResumeRuntime(
 		return branchRuntime;
 	}
 	function dispatchCaptured(event: ResumeDomEvent): Promise<void> | void {
-		if (
-			(event as { readonly __marklessCsrBootstrapReplayed?: boolean })
-				.__marklessCsrBootstrapReplayed
-		)
-			return;
 		return events?.dispatch(event, { ignoreUnmatched: true });
 	}
 	async function commitBoundaryArm(
@@ -312,7 +307,7 @@ export function createResumeRuntime(
 	function installArmEventType(eventType: string): void {
 		if (eventTypes.has(eventType)) return;
 		eventTypes.add(eventType);
-		if (captureListenersStarted)
+		if (captureListenersStarted && !input.root.__marklessDelegatedDispatch)
 			input.root.addEventListener?.(eventType, dispatchCaptured, { capture: true });
 	}
 	async function registerServedBoundaryArms(): Promise<void> {

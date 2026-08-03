@@ -6,6 +6,7 @@ import {
 import { createProtocolStatePayload } from '@markless/serializer';
 import { expect, test } from 'vitest';
 import { transformTsrxModule } from '../../bundler/src/transform.ts';
+import { emitQueuedResumeContainerEvent } from '../../bundler/src/source-module.ts';
 import { compileTsrxModule } from '../../compiler/src/index.ts';
 import {
 	createMarklessCsrChunkRenderer,
@@ -3197,6 +3198,73 @@ test('renderToString inline event resumer imports the resume module only after i
 	}
 });
 
+test('renderToString inline event resumer serializes a cold interaction storm through one global queue', async () => {
+	const resumeModuleUrl = createQueuedResumeModuleUrl();
+	const html = await renderToString(
+		() => ({
+			html: '<button type="button">Count 0</button>',
+			state: createProtocolStatePayload({ cells: [] }),
+			view: viewWithClick(),
+		}),
+		{ executionLog: 'never', resumeModuleUrl },
+	);
+	const view = JSON.parse(extractScriptText(html, 'markless/view')) as ProtocolViewPayload;
+	const resumerSource = extractResumerSource(html);
+	const button = element('BUTTON');
+	const root = element('DIV', [button]);
+	const listeners: Array<(event: FakeEvent) => Promise<void>> = [];
+	root.querySelector = (selector) =>
+		selector === 'script[type="markless/view"]' ? { textContent: JSON.stringify(view) } : null;
+	root.addEventListener = (type, listener, options) => {
+		const capture =
+			options === true || (typeof options === 'object' && options.capture === true);
+		if (type === 'click' && capture) listeners.push(listener);
+	};
+	const document = {
+		currentScript: {
+			closest(selector: string) {
+				return selector === '[data-async-container]' ? root : null;
+			},
+		},
+		createTreeWalker() {
+			const nodes = [button];
+			return { nextNode: () => nodes.shift() ?? null };
+		},
+	};
+	const globalScope = globalThis as typeof globalThis & {
+		document?: unknown;
+		__marklessQueueTest?: { order: string[]; release?: () => void };
+	};
+	const previousDocument = globalScope.document;
+	const previousState = globalScope.__marklessQueueTest;
+	globalScope.document = document;
+	globalScope.__marklessQueueTest = { order: [] };
+
+	try {
+		await import(`data:text/javascript,${encodeURIComponent(resumerSource)}`);
+		expect(listeners).toHaveLength(1);
+		const first = listeners[0]({ ...event('click', button), key: 'first' });
+		const second = listeners[0]({ ...event('click', button), key: 'second' });
+		for (let turn = 0; turn < 20 && globalScope.__marklessQueueTest.order.length === 0; turn++)
+			await new Promise((resolve) => setTimeout(resolve, 0));
+		expect(globalScope.__marklessQueueTest.order).toEqual(['start:first']);
+		globalScope.__marklessQueueTest.release?.();
+		await Promise.all([first, second]);
+		expect(globalScope.__marklessQueueTest.order).toEqual([
+			'start:first',
+			'end:first',
+			'start:second',
+			'end:second',
+		]);
+		expect(listeners).toHaveLength(1);
+	} finally {
+		if (previousDocument === undefined) delete globalScope.document;
+		else globalScope.document = previousDocument;
+		if (previousState === undefined) delete globalScope.__marklessQueueTest;
+		else globalScope.__marklessQueueTest = previousState;
+	}
+});
+
 test('renderToString execution log activation stays inline and mirrors summary without imports', async () => {
 	const html = await renderToString(
 		() => ({
@@ -3255,7 +3323,7 @@ test('renderToString marks the typed fallback for execution-log removal when dis
 	expect(resumerSource).toContain('const __MARKLESS_INLINE_EXECUTION_LOG__="never";');
 });
 
-test('renderToString inline event resumer steps aside after runtime startup', async () => {
+test('renderToString inline event resumer remains the sole authority after runtime startup', async () => {
 	const resumeModuleUrl = createResumeRuntimeStartedModuleUrl();
 	const html = await renderToString(
 		() => ({
@@ -3312,7 +3380,7 @@ test('renderToString inline event resumer steps aside after runtime startup', as
 
 		expect(globalScope.__asyncResumerTest).toEqual({
 			imports: 1,
-			events: ['click:DIV'],
+			events: ['click:DIV', 'registered:click:DIV'],
 		});
 	} finally {
 		if (previousDocument === undefined) {
@@ -3848,15 +3916,31 @@ export async function resumeContainerEvent({ root, event }) {
 	return `data:text/javascript,${encodeURIComponent(source)}`;
 }
 
+function createQueuedResumeModuleUrl(cacheKey = 'global-queue'): string {
+	const source = emitQueuedResumeContainerEvent(`
+// ${cacheKey}
+export async function resumeContainerEvent({ event }) {
+	const state = globalThis.__marklessQueueTest;
+	state.order.push('start:' + event.key);
+	if (event.key === 'first') await new Promise((resolve) => { state.release = resolve; });
+	state.order.push('end:' + event.key);
+}
+`);
+	return `data:text/javascript,${encodeURIComponent(source)}`;
+}
+
 function createResumeRuntimeStartedModuleUrl(cacheKey = 'runtime-started'): string {
-	const source = `
+	const source = emitQueuedResumeContainerEvent(`
 // ${cacheKey}
 globalThis.__asyncResumerTest.imports++;
 export async function resumeContainerEvent({ root, event }) {
 	globalThis.__asyncResumerTest.events.push(event.type + ':' + root.tagName);
 	root.__asyncResumeRuntimeStarted = true;
+	root.__marklessRegisterDispatch?.(({ event: nextEvent }) => {
+		globalThis.__asyncResumerTest.events.push('registered:' + nextEvent.type + ':' + root.tagName);
+	});
 }
-`;
+`);
 	return `data:text/javascript,${encodeURIComponent(source)}`;
 }
 

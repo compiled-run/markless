@@ -253,16 +253,31 @@ export function emitResumeModule(input: {
 	// The wake variant serves pages whose container carries no payload
 	// scripts; lean routes read the payload document and must never emit.
 	readonly recordsOnly?: boolean;
+	readonly prerenderTriggerGroups?: ReadonlyArray<{
+		readonly id: string;
+		readonly hostNodeId: string;
+		readonly eventName: string;
+		readonly hostIndex: number;
+		readonly hostTagName: string;
+		readonly branchStartIndex?: number;
+		readonly branchEndIndex?: number;
+		readonly hostPath?: ReadonlyArray<number>;
+		readonly moduleId: string;
+	}>;
 }) {
 	const routeSymbols = input.symbolRoutes.length > 0;
 	const resumeSymbolLoader = routeSymbols ? 'marklessSsrLoadSymbolRoute' : 'loadSymbol';
 	const scalarSpecializations = scalarDispatcherSpecializations(input);
+	const stagedPrerender = (input.prerenderTriggerGroups?.length ?? 0) > 0;
 	if (input.recordsOnly && !input.needsFullResume) {
 		// Lean pages keep their payload container until wake staging lands;
 		// a records-only wake for them would strand lean routes payload-less.
 		throw new Error('MARKLESS_WAKE_VARIANT_REQUIRES_FULL_RESUME');
 	}
-	const resumeContainerEvent = emitResumeContainerEvent(
+	// The queue wrapper is part of the staged-wake contract; ungated builds
+	// keep their exact pre-staging emission (the CSR fixture walls are law
+	// until the tier demolition re-ratchets everything at once).
+	const bareResumeContainerEvent = emitResumeContainerEvent(
 		resumeSymbolLoader,
 		input.needsFullResume ?? false,
 		(input.payloadState as { readonly version?: unknown } | undefined)?.version ===
@@ -272,7 +287,11 @@ export function emitResumeModule(input: {
 		input.runtimeDemandMap,
 		input.executionLog !== 'never',
 		input.prerenderDataId,
+		stagedPrerender,
 	);
+	const resumeContainerEvent = stagedPrerender
+		? emitQueuedResumeContainerEvent(bareResumeContainerEvent)
+		: bareResumeContainerEvent;
 	return [
 		input.prerenderDataId && resumeContainerEvent.includes('marklessPrerenderData')
 			? `import { marklessPrerenderData } from '${input.prerenderDataId}';`
@@ -285,13 +304,16 @@ export function emitResumeModule(input: {
 					"import { marklessUpdateText } from '@markless/web/fns/update-text';",
 				].join('\n')
 			: '',
+		stagedPrerender
+			? "import { marklessFindElementAtDomOrderIndex } from '@markless/web/fns/scalar-specialized';"
+			: '',
 		'',
 		input.executionLog === 'never' ? '' : emitExecutionLogLoader(),
 		input.installResumeSummary && input.executionLog !== 'never'
 			? 'globalThis.__mxLoadLog().then(log => log.installMarklessExecutionLog());'
 			: null,
 		'',
-		emitLoadSymbol(input),
+		emitLoadSymbol(input, stagedPrerender ? 'readMarklessWakeSourceSymbol' : undefined),
 		routeSymbols ? 'const marklessLoadLocalSymbol = loadSymbol;' : '',
 		routeSymbols
 			? emitLazySymbolRouteFunction(
@@ -301,11 +323,44 @@ export function emitResumeModule(input: {
 				)
 			: '',
 		routeSymbols ? 'export { marklessSsrLoadSymbolRoute as loadSymbol };' : '',
+		stagedPrerender
+			? emitPrerenderTriggerGroupLoader(input.prerenderTriggerGroups ?? [])
+			: '',
 		resumeContainerEvent,
 		'',
 	]
 		.filter((line): line is string => line !== null)
 		.join('\n');
+}
+
+// Exported for witness/unit tests that synthesize demand modules: their
+// synthetic resume code must flow through the same queue wrapper the real
+// emission produces, never a restated copy.
+export function emitQueuedResumeContainerEvent(source: string): string {
+	const implementation = source.replace(
+		'export async function resumeContainerEvent',
+		'async function marklessResumeContainerEvent',
+	);
+	if (implementation === source) throw new Error('MARKLESS_RESUME_DISPATCH_EXPORT_MISSING');
+	return [
+		'function marklessQueueContainerDispatch(input) {',
+		'\tconst root = input.root;',
+		'\tif (!root.__marklessDispatch) {',
+		'\t\tlet handler = marklessResumeContainerEvent, tail = Promise.resolve();',
+		'\t\troot.__marklessRegisterDispatch = next => { handler = next; };',
+		'\t\troot.__marklessDispatch = next => {',
+		'\t\t\tconst dispatched = tail.then(() => handler(next), () => handler(next));',
+		'\t\t\ttail = dispatched.catch(() => {});',
+		'\t\t\treturn dispatched;',
+		'\t\t};',
+		'\t}',
+		'\treturn root.__marklessDispatch(input);',
+		'}',
+		implementation,
+		'export async function resumeContainerEvent(input) {',
+		'\tawait marklessQueueContainerDispatch(input);',
+		'}',
+	].join('\n');
 }
 
 function emitLazySymbolRouteFunction(
@@ -427,11 +482,43 @@ function emitResumeContainerEvent(
 	runtimeDemandMap: unknown,
 	executionLogEnabled: boolean,
 	prerenderDataId?: string,
+	stagedPrerender = false,
 ): string {
 	const resumeEntry = storageFreePayload
 		? '@markless/core/web/resume-storage-free'
 		: '@markless/core/web/resume';
-	const fullResumeHandoff = prerenderDataId
+	const fullResumeHandoff = stagedPrerender && prerenderDataId
+		? [
+				'async function marklessFullResumeHandoff(handoff) {',
+				'\thandoff.root.__asyncResumeRuntimeStarted = true;',
+				'\tconst group = await marklessLoadPrerenderTriggerGroup(handoff);',
+				"\tconst { mergePrerenderPayloadRecords, resumePrerenderTriggerGroup } = await import('@markless/web/fns/prerender-trigger-resume');",
+				// Staging is an optimization, never a correctness gate: interactions
+				// no group covers (branch-arm events today, future record kinds
+				// tomorrow) fall back to the full prerender resume.
+				'\tif (!group) {',
+				"\t\tconst { derivePrerenderResumeRecords, renderPrerenderBoundary, resumeFromPrerenderRecords } = await import('@markless/web/fns/prerender-resume');",
+				`\t\tconst fallbackRecords = mergePrerenderPayloadRecords(await derivePrerenderResumeRecords(marklessPrerenderData, ${loadSymbolName}), handoff.root);`,
+				'\t\tconst { runtime } = await resumeFromPrerenderRecords({',
+				'\t\t\t...fallbackRecords,',
+				'\t\t\troot: handoff.root,',
+				`\t\t\tloadSymbol: ${loadSymbolName},`,
+				`\t\t\trenderAsyncBoundary: (boundaryId, status, graph) => renderPrerenderBoundary(marklessPrerenderData, boundaryId, status, graph, ${loadSymbolName}),`,
+				'\t\t});',
+				'\t\tconst marklessDispatchFullRuntime = next => runtime.dispatch(next.event, { syncPolicyAlreadyApplied: next.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });',
+				'\t\thandoff.root.__marklessRegisterDispatch?.(marklessDispatchFullRuntime);',
+				'\t\tawait marklessDispatchFullRuntime(handoff);',
+				'\t\treturn;',
+				'\t}',
+				'\tconst records = mergePrerenderPayloadRecords({ state: group.state, view: group.view }, handoff.root);',
+				'\tconst { runtime } = await resumePrerenderTriggerGroup({',
+				'\t\t...records, groupId: group.groupId, graphNodeIds: group.graphNodeIds,',
+				'\t\troot: handoff.root, loadSymbol: group.loadSymbol,',
+				'\t});',
+				'\tawait runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });',
+				'}',
+			].join('\n')
+		: prerenderDataId
 		? [
 				'async function marklessFullResumeHandoff(handoff) {',
 				'\thandoff.root.__marklessLinkedRenderDataBoot = true;',
@@ -539,6 +626,53 @@ function emitResumeContainerEvent(
 		fullResumeHandoff,
 		'export async function resumeContainerEvent(input) {',
 		'	await marklessFullResumeHandoff({ ...input, document: input.root });',
+		'}',
+	].join('\n');
+}
+
+function emitPrerenderTriggerGroupLoader(
+	groups: ReadonlyArray<{
+		readonly eventName: string;
+		readonly hostIndex: number;
+		readonly hostTagName: string;
+		readonly branchStartIndex?: number;
+		readonly branchEndIndex?: number;
+		readonly hostPath?: ReadonlyArray<number>;
+		readonly moduleId: string;
+	}>,
+): string {
+	return [
+		'function marklessPrerenderTriggerMatches(input, index, tagName, eventName) {',
+		'\tif (input.event?.type !== eventName) return false;',
+		'\tconst host = marklessFindElementAtDomOrderIndex(input.root, index);',
+		'\tif (!host || (tagName !== "*" && host.tagName.toLowerCase() !== tagName)) return false;',
+		'\tconst target = input.event?.target;',
+		'\treturn host === target || (!!target?.nodeType && typeof host.contains === "function" && host.contains(target));',
+		'}',
+		'function marklessPrerenderBranchTriggerMatches(input, startIndex, endIndex, hostPath, eventName) {',
+		'\tif (input.event?.type !== eventName) return false;',
+		'\tconst comments = [];',
+		'\tconst collect = node => { for (const child of node.childNodes ?? []) { if (child.nodeType === 8) comments.push(child); collect(child); } };',
+		'\tcollect(input.root);',
+		'\tconst start = comments[startIndex], end = comments[endIndex], armNodes = [];',
+		'\tlet within = false, done = false;',
+		'\tconst between = node => { for (const child of node.childNodes ?? []) { if (child === start) { within = true; continue; } if (child === end) { done = true; return; } if (within) armNodes.push(child); else between(child); if (done) return; } };',
+		'\tbetween(input.root);',
+		'\tlet host = armNodes[hostPath[0]];',
+		'\tfor (let index = 1; host && index < hostPath.length; index++) host = host.childNodes?.[hostPath[index]];',
+		'\tconst target = input.event?.target;',
+		'\treturn host?.nodeType === 1 && (host === target || (!!target?.nodeType && typeof host.contains === "function" && host.contains(target)));',
+		'}',
+		'function marklessLoadPrerenderTriggerGroup(input) {',
+		...groups.map(
+			(group) => {
+				const matches = group.hostPath
+					? `marklessPrerenderBranchTriggerMatches(input, ${group.branchStartIndex}, ${group.branchEndIndex}, ${JSON.stringify(group.hostPath)}, ${JSON.stringify(group.eventName)})`
+					: `marklessPrerenderTriggerMatches(input, ${group.hostIndex}, ${JSON.stringify(group.hostTagName.toLowerCase())}, ${JSON.stringify(group.eventName)})`;
+				return `\tif (${matches}) return import(${JSON.stringify(group.moduleId)});`;
+			},
+		),
+		'\treturn Promise.resolve(null);',
 		'}',
 	].join('\n');
 }
@@ -876,13 +1010,13 @@ function emitLoadSymbol(input: {
 	readonly resolverId: string;
 	readonly symbols: ReadonlyArray<SourceSymbolRow>;
 	readonly hasBoundSymbols?: boolean;
-}) {
+}, sourceReaderName?: string) {
 	if (
 		!input.hasBoundSymbols &&
 		input.symbols.length > 0 &&
 		input.symbols.length <= SMALL_SYMBOL_DIRECT_LOAD_LIMIT
 	) {
-		return emitDirectSourceSymbolLoader(input.symbols);
+		return emitDirectSourceSymbolLoader(input.symbols, sourceReaderName);
 	}
 
 	return [
@@ -893,22 +1027,25 @@ function emitLoadSymbol(input: {
 	].join('\n');
 }
 
-function emitDirectSourceSymbolLoader(symbols: ReadonlyArray<SourceSymbolRow>): string {
+function emitDirectSourceSymbolLoader(
+	symbols: ReadonlyArray<SourceSymbolRow>,
+	readerName = 'readMarklessSourceSymbol',
+): string {
 	return [
 		'function loadSymbol(symbolId) {',
 		...symbols.flatMap((symbol) => [
 			`	if (symbolId === ${JSON.stringify(symbol.id)}) return import('${symbol.chunk}')`,
-			`		.then((mod) => readMarklessSourceSymbol(mod, ${JSON.stringify(symbol.exportName)}));`,
+			`		.then((mod) => ${readerName}(mod, ${JSON.stringify(symbol.exportName)}));`,
 		]),
 		'	return Promise.reject(new Error(`Unknown async symbol ${symbolId}`));',
 		'}',
-		emitSourceSymbolExportReader(),
+		emitSourceSymbolExportReader(readerName),
 	].join('\n');
 }
 
-function emitSourceSymbolExportReader(): string {
+function emitSourceSymbolExportReader(name = 'readMarklessSourceSymbol'): string {
 	return [
-		'function readMarklessSourceSymbol(mod, exportName) {',
+		`function ${name}(mod, exportName) {`,
 		'	mod.init__virtual_markless_symbol?.();',
 		'	return mod[exportName];',
 		'}',

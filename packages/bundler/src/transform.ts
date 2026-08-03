@@ -31,6 +31,12 @@ import {
 import { injectExecutionLogModuleHook } from './execution-log.ts';
 import { compileInlineResumerSources } from './inline-resumer.ts';
 import { createCompileErrorPayload, MarklessCompileError } from './dev-error/index.ts';
+import {
+	emitPrerenderTriggerGroupModule,
+	planPrerenderTriggerGroups,
+	triggerGroupVirtualModuleId,
+} from './trigger-groups.ts';
+import { adaptImportedCaptureResolver } from './bound-resolver.ts';
 
 // Authored TS (param annotations, assertions, type aliases) survives compilation
 // into emitted module code, but downstream consumers (Vite builtins, symbol
@@ -140,6 +146,15 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		})),
 		runtimeDemandMap: compiled.runtimeDemandMap,
 	};
+	const prerenderTriggerGroups = input.prerenderRecordData && input.prerenderWakeVariant
+		? planPrerenderTriggerGroups({
+				filename: input.filename,
+				...input.prerenderRecordData,
+				triggerGroups: compiled.triggerGroups,
+				symbolResolver: compiled.symbolResolver,
+				boundRows: importedBoundRows,
+			})
+		: [];
 	// Scoped <style> CSS ships through the bundler's CSS pipeline: a virtual
 	// .css module imported by the transformed module, never inline JS.
 	const styleScope = compiled.publicRenderPlan.styleScopes[0];
@@ -204,6 +219,9 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 				// pages (artifact-shaped package children) emit ordinary render
 				// data, so records mode must not import from it.
 				needsFullResume: prerenderClosureNeedsWake,
+				// Trigger groups are the staged FIRST choice, not a replacement:
+				// the unmatched-interaction fallback derives from the render-data
+				// surface, so staged modules keep their prerenderDataId.
 				prerenderDataId:
 					input.prerenderRecords &&
 					prerenderInterfacesComplete(compiled, input.importedModuleInterfaces)
@@ -231,6 +249,10 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 							executionLog: input.executionLog,
 							needsFullResume: prerenderClosureNeedsWake,
 							prerenderDataId: renderDataId,
+							prerenderTriggerGroups: prerenderTriggerGroups.map((group, index) => ({
+								...group,
+								moduleId: triggerGroupVirtualModuleId(input.filename, index),
+							})),
 							installResumeSummary: true,
 							recordsOnly: true,
 							hasBoundSymbols: compiled.boundSymbolResolver.rows.length > 0,
@@ -240,6 +262,16 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					},
 				]
 			: []),
+		...(input.prerenderWakeVariant ? prerenderTriggerGroups : []).map((group, index): MarklessVirtualModule => ({
+			id: triggerGroupVirtualModuleId(input.filename, index),
+			type: 'trigger-group',
+			source: emitPrerenderTriggerGroupModule({
+				group,
+				symbols: uniqueSymbolsById([...(input.symbols ?? []), ...symbolRows]),
+				boundRows: importedBoundRows,
+				symbolRoutes,
+			}),
+		})),
 		...(await Promise.all(
 			compiled.symbolModules.modules.map(
 				async (module, index): Promise<MarklessVirtualModule> => ({
@@ -523,46 +555,6 @@ function uniqueSymbolsById<T extends { readonly id: string }>(symbols: ReadonlyA
 // Imported child modules were compiled before their parent edges were known, so
 // their symbol code still reads the legacy prop graph cell. Bound rows carry the
 // parent-proven routes; this adapter makes those reads edge-specific at load time.
-function adaptImportedCaptureResolver(source: string, hasImportedRows: boolean): string {
-	if (!hasImportedRows) return source;
-	const original =
-		'\treturn (context) => base({ ...context, capture: createCaptureContext(context, bound) });';
-	const replacement = [
-		'\treturn async (context) => {',
-		'\t\tconst pendingCallbacks = [];',
-		'\t\tconst capture = createCaptureContext(context, bound);',
-		'\t\tconst result = await base({ ...context, graph: createBoundGraph(context, bound, capture, pendingCallbacks), capture });',
-		'\t\tawait Promise.all(pendingCallbacks);',
-		'\t\treturn result;',
-		'\t};',
-	].join('\n');
-	const helper = [
-		'function createBoundGraph(context, bound, capture, pendingCallbacks) {',
-		'\tconst legacySlots = new Map(bound.captureSlots.flatMap((slot) => slot.legacyGraphRead ? [[JSON.stringify([slot.legacyGraphRead.graphNodeId, slot.legacyGraphRead.path ?? []]), slot]] : []));',
-		'\treturn {',
-		'\t\t...context.graph,',
-		'\t\tread(graphNodeId, path = []) {',
-		'\t\t\tconst slot = legacySlots.get(JSON.stringify([graphNodeId, path]));',
-		'\t\t\tif (!slot) return context.graph.read(graphNodeId, path);',
-		'\t\t\tif (slot.route.kind === callbackRoute) return (...args) => {',
-		'\t\t\t\tconst pending = context.invokeSymbol(slot.route.callbackSymbolId, { ...context, event: context.event, args });',
-		'\t\t\t\tpendingCallbacks.push(Promise.resolve(pending));',
-		'\t\t\t\treturn pending;',
-		'\t\t\t};',
-		'\t\t\treturn capture.read(slot.slotId);',
-		'\t\t},',
-		'\t};',
-		'}',
-		'',
-	].join('\n');
-	return source
-		.replace(original, replacement)
-		.replace(
-			'function createCaptureContext(context, bound) {',
-			`${helper}function createCaptureContext(context, bound) {`,
-		);
-}
-
 function containerScopedResumeView(view: ProtocolViewPayload): ProtocolViewPayload {
 	return {
 		...view,

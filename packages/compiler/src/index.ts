@@ -19,6 +19,7 @@ export { createProtocolStatePayloadFromArena } from './passes/protocol-state.ts'
 export { createProtocolViewPayload } from './passes/protocol-view.ts';
 export { createRenderData } from './passes/render-data/index.ts';
 export { createRuntimeDemandMap } from './passes/runtime-demand-map.ts';
+export { createTriggerGroups } from './passes/trigger-groups.ts';
 export { buildSemanticGraph } from './passes/semantic-graph/index.ts';
 export { lowerStateAccess } from './passes/state-lowering.ts';
 export { emitSymbolModules } from './passes/symbol-modules.ts';

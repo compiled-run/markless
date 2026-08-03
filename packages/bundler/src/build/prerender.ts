@@ -8,6 +8,22 @@ import {
 	type SsrRenderable,
 } from '../../../web/src/render-to-string.ts';
 import { evaluateBuiltPageClosure } from '../../../web/src/prerender/evaluator.ts';
+import { prepareSsrResumeRecords } from '../../../web/src/prerender/records.ts';
+import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer';
+
+export type BuiltPrerenderRecords = {
+	readonly state: ProtocolStatePayload;
+	readonly view: ProtocolViewPayload;
+};
+
+export async function deriveBuiltPrerenderRecords(input: {
+	readonly entry: string;
+	readonly serverPlugin: Plugin;
+}): Promise<BuiltPrerenderRecords> {
+	return withBuiltPrerenderPage(input, async (page) =>
+		prepareSsrResumeRecords(await evaluateBuiltPageClosure(page)),
+	);
+}
 
 export async function emitPrerenderedPage(input: {
 	readonly root: string;
@@ -15,6 +31,26 @@ export async function emitPrerenderedPage(input: {
 	readonly outDir: string;
 	readonly serverPlugin: Plugin;
 }): Promise<void> {
+	const page = await withBuiltPrerenderPage(input, async (built) => {
+		const output = await evaluateBuiltPageClosure(built);
+		return assemblePrerenderPageParts(built, output, {});
+	});
+	const htmlFile = resolve(input.root, input.outDir, 'index.html');
+	const html = await readFile(htmlFile, 'utf8');
+	const placeholder = '<div id="app"></div>';
+	if (!html.includes(placeholder)) {
+		throw new Error(
+			'MARKLESS_PRERENDER_CONTAINER_MISSING: expected exact #app build placeholder',
+		);
+	}
+	const withHead = page.head ? html.replace('</head>', `${page.head}</head>`) : html;
+	await writeFile(htmlFile, withHead.replace(placeholder, page.container));
+}
+
+async function withBuiltPrerenderPage<T>(
+	input: { readonly entry: string; readonly serverPlugin: Plugin },
+	read: (page: SsrRenderable) => Promise<T>,
+): Promise<T> {
 	const temporaryDirectory = await mkdtemp(join(tmpdir(), 'markless-prerender-'));
 	try {
 		const { rolldown } = await import('rolldown');
@@ -33,18 +69,7 @@ export async function emitPrerenderedPage(input: {
 		const moduleUrl = `${pathToFileURL(join(temporaryDirectory, 'prerender.js')).href}?build=${Date.now()}`;
 		const built = (await import(moduleUrl)) as { readonly default?: SsrRenderable };
 		if (!built.default) throw new Error('MARKLESS_PRERENDER_ENTRY_MISSING');
-		const output = await evaluateBuiltPageClosure(built.default);
-		const page = await assemblePrerenderPageParts(built.default, output, {});
-		const htmlFile = resolve(input.root, input.outDir, 'index.html');
-		const html = await readFile(htmlFile, 'utf8');
-		const placeholder = '<div id="app"></div>';
-		if (!html.includes(placeholder)) {
-			throw new Error(
-				'MARKLESS_PRERENDER_CONTAINER_MISSING: expected exact #app build placeholder',
-			);
-		}
-		const withHead = page.head ? html.replace('</head>', `${page.head}</head>`) : html;
-		await writeFile(htmlFile, withHead.replace(placeholder, page.container));
+		return await read(built.default);
 	} finally {
 		await rm(temporaryDirectory, { force: true, recursive: true });
 	}

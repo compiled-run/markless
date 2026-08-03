@@ -52,7 +52,6 @@ export async function renderCsrRuntime(input: {
 			if (runtime) return runtime;
 			if (!starting)
 				starting = (async () => {
-					removeDelegatedTriggers();
 					graph =
 						output.graph ??
 						(await createFullRuntimeGraph({
@@ -124,11 +123,7 @@ export async function renderCsrRuntime(input: {
 				(await demandRuntime()).holdPendingSettleCommits?.(ms),
 		};
 		const removeDelegatedTriggers = installDelegatedTriggers(output, view, async (event) => {
-			const replay = event as ResumeRuntimeInput['root'] & {
-				__marklessCsrBootstrapReplayed?: boolean;
-			};
-			if (replay.__marklessCsrBootstrapReplayed) return;
-			replay.__marklessCsrBootstrapReplayed = true;
+			output.root.__marklessDelegatedDispatch = true;
 			await (await demandRuntime()).dispatch(event);
 		});
 		if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)

@@ -1211,6 +1211,18 @@ export type RuntimeDemandMapArtifact = {
 	readonly unknownRecordModuleIds: ReadonlyArray<string>;
 };
 
+export type TriggerGroupArtifact = {
+	readonly passId: 'trigger-groups';
+	readonly groups: ReadonlyArray<{
+		readonly id: string;
+		readonly hostNodeId: string;
+		readonly eventName: string;
+		readonly graphNodeIds: ReadonlyArray<string>;
+		readonly payloadRecordIds: ReadonlyArray<string>;
+		readonly symbolIds: ReadonlyArray<string>;
+	}>;
+};
+
 export type SymbolResolverModuleInput = {
 	readonly buildId?: string;
 	readonly resolverId?: string;
@@ -1618,6 +1630,7 @@ export type CompileTsrxModuleResult = {
 	readonly publicRenderModule: PublicRenderModuleArtifact;
 	readonly symbolModules: SymbolModulesArtifact;
 	readonly runtimeDemandMap: RuntimeDemandMapArtifact;
+	readonly triggerGroups: TriggerGroupArtifact;
 	readonly symbolResolverModule: string;
 	readonly symbolResolverModuleManifest: SymbolResolverModuleManifest;
 };

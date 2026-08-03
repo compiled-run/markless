@@ -9,6 +9,7 @@ import type {
 	RenderDataArtifact,
 	RunnableCompilerPassDefinition,
 	RuntimeDemandMapArtifact,
+	TriggerGroupArtifact,
 	SemanticGraphArtifact,
 	StateLoweringArtifact,
 	SymbolModulesArtifact,
@@ -28,6 +29,7 @@ import { createProtocolStatePayloadFromArena } from './passes/protocol-state.ts'
 import { createProtocolViewPayload } from './passes/protocol-view.ts';
 import { createRenderData } from './passes/render-data/index.ts';
 import { createRuntimeDemandMap } from './passes/runtime-demand-map.ts';
+import { createTriggerGroups } from './passes/trigger-groups.ts';
 import { buildSemanticGraph } from './passes/semantic-graph/index.ts';
 import { createMutableSemanticGraphArtifact } from './passes/semantic-graph/types.ts';
 import { lowerStateAccess } from './passes/state-lowering.ts';
@@ -68,6 +70,7 @@ export async function compileTsrxModule(
 		readonly publicRenderModule: PublicRenderModuleArtifact;
 		readonly symbolModules: SymbolModulesArtifact;
 		readonly runtimeDemandMap: RuntimeDemandMapArtifact;
+		readonly triggerGroups: TriggerGroupArtifact;
 		readonly symbolResolverModule: string;
 		readonly symbolResolverModuleManifest: SymbolResolverModuleManifest;
 	};
@@ -92,6 +95,7 @@ export async function compileTsrxModule(
 		publicRenderModule: artifacts.publicRenderModule,
 		symbolModules: artifacts.symbolModules,
 		runtimeDemandMap: artifacts.runtimeDemandMap,
+		triggerGroups: artifacts.triggerGroups,
 		symbolResolverModule: artifacts.symbolResolverModule,
 		symbolResolverModuleManifest: artifacts.symbolResolverModuleManifest,
 	};
@@ -323,6 +327,22 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 								inputs.protocolView as CompileTsrxModuleResult['protocolView'],
 							protocolState:
 								inputs.protocolState as CompileTsrxModuleResult['protocolState'],
+						}),
+					};
+				},
+			};
+		}
+
+		if (pass.passId === 'trigger-groups') {
+			return {
+				...pass,
+				run({ inputs }) {
+					return {
+						triggerGroups: createTriggerGroups({
+							symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
+							protocolState: inputs.protocolState as CompileTsrxModuleResult['protocolState'],
+							protocolView: inputs.protocolView as CompileTsrxModuleResult['protocolView'],
+							runtimeDemandMap: inputs.runtimeDemandMap as RuntimeDemandMapArtifact,
 						}),
 					};
 				},

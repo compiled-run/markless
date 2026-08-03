@@ -5,6 +5,7 @@ exports[`browser-trigger prerender pages keep their resume emission byte-identic
 import { runtimeDemandMap as payloadRuntimeDemandMap } from 'virtual:markless:payload:%2Fworkspace%2Fapp%2Fsrc%2FApp.tsrx';
 
 
+
 globalThis.__mxLoadLog ||= () => import("virtual:markless:dev-log");
 
 function loadSymbol(symbolId) {
@@ -20,6 +21,7 @@ function readMarklessSourceSymbol(mod, exportName) {
 	mod.init__virtual_markless_symbol?.();
 	return mod[exportName];
 }
+
 
 
 

@@ -30,7 +30,13 @@ export type MarklessVirtualModuleType =
 	| 'resolver'
 	| 'resume'
 	| 'symbol'
+	| 'trigger-group'
 	| 'style';
+
+export type BuiltPrerenderRecords = {
+	readonly state: import('@markless/serializer').ProtocolStatePayload;
+	readonly view: import('@markless/serializer').ProtocolViewPayload;
+};
 
 export interface MarklessVirtualModule {
 	id: string;
@@ -59,6 +65,7 @@ export interface TransformTsrxModuleInput {
 	inlineResumerDebug?: boolean;
 	prerenderRecords?: boolean;
 	prerenderWakeVariant?: boolean;
+	prerenderRecordData?: BuiltPrerenderRecords;
 }
 
 export interface TransformTsrxModuleResult {

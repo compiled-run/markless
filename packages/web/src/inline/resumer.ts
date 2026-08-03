@@ -66,17 +66,19 @@ type InlineView = ProtocolViewPayload;
 type InlineEventRecord = InlineView['events'][number];
 type InlineRoot = HTMLElement & {
 	__asyncResumeRuntimeStarted?: boolean;
+	__marklessDelegatedDispatch?: boolean;
 	__marklessEventOnlyGraph?: Map<string, unknown>;
 	__marklessEventOnlyGraphInitialized?: boolean;
 };
+type InlineDispatchInput = {
+	readonly root: InlineRoot;
+	readonly event: Event | 0;
+	readonly element?: Element | EventTarget | null;
+	readonly eventRecord?: InlineEventRecord | null;
+	readonly syncPolicyAlreadyApplied?: boolean;
+};
 type InlineResumeModule = {
-	resumeContainerEvent(input: {
-		readonly root: InlineRoot;
-		readonly event: Event | 0;
-		readonly element?: Element | EventTarget | null;
-		readonly eventRecord?: InlineEventRecord | null;
-		readonly syncPolicyAlreadyApplied?: boolean;
-	}): Promise<void> | void;
+	resumeContainerEvent(input: InlineDispatchInput): Promise<void> | void;
 };
 type InlineSyncPolicyRuntime = {
 	decode?: (slot: unknown, records: ReadonlyMap<number, SerializedRecord>) => unknown;
@@ -215,15 +217,16 @@ function runPrerenderInlineResumer(
 	for (const eventName of eventNames) {
 		root.addEventListener(
 			eventName,
-			async (event) => {
-				if (root.__asyncResumeRuntimeStarted) return;
-				const module = await loadModule(resumeModuleUrl);
-				await module.resumeContainerEvent({
-					root,
-					event,
-					element: event.target,
-					eventRecord: null,
-				});
+			(event) => {
+				root.__marklessDelegatedDispatch = true;
+				return loadModule(resumeModuleUrl).then((module) =>
+					module.resumeContainerEvent({
+						root,
+						event,
+						element: event.target,
+						eventRecord: null,
+					}),
+				);
 			},
 			true,
 		);
@@ -245,6 +248,7 @@ function runInlineResumerSelfWake(fallbackResumeModuleUrl: string | undefined): 
 		requestAnimationFrame(() => {
 			queueMicrotask(async () => {
 				if (!root.__asyncResumeRuntimeStarted) {
+					root.__marklessDelegatedDispatch = true;
 					const module = (await import(/* @vite-ignore */ resumeModuleUrl)) as InlineResumeModule;
 					await module.resumeContainerEvent({ root, event: 0 });
 				}
@@ -292,6 +296,12 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 		currentScript?.getAttribute?.('data-markless-resume-module') ??
 		__MARKLESS_INLINE_RESUME_MODULE_URL__;
 	if (!root || !resumeModuleUrl) return;
+	const forward = (input: Omit<InlineDispatchInput, 'root'>) => {
+		root.__marklessDelegatedDispatch = true;
+		return loadModule(resumeModuleUrl).then((module) =>
+			module.resumeContainerEvent({ root, ...input }),
+		);
+	};
 
 	if (__MARKLESS_INLINE_EXECUTION_LOG__ !== 'never') {
 		const shouldLog = (() => {
@@ -562,8 +572,7 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 		if (eventName === 'visible') continue;
 		root.addEventListener(
 			eventName,
-			async (event) => {
-				if (root.__asyncResumeRuntimeStarted) return;
+			(event) => {
 				for (
 					let element = event.target as Element | null;
 					element;
@@ -579,38 +588,24 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 							runSyncPolicy!(eventRecord.syncPolicy, event);
 							syncPolicyAlreadyApplied = true;
 						}
-						const module = await loadModule(resumeModuleUrl);
-						await module.resumeContainerEvent({
-							root,
+						const input: Omit<InlineDispatchInput, 'root'> = {
 							event,
 							element,
 							eventRecord,
-							...(__MARKLESS_INLINE_SYNC_POLICY__
-								? { syncPolicyAlreadyApplied }
-								: {}),
-						});
-						return;
+						};
+						if (__MARKLESS_INLINE_SYNC_POLICY__) {
+							(input as { syncPolicyAlreadyApplied?: boolean }).syncPolicyAlreadyApplied =
+								syncPolicyAlreadyApplied;
+						}
+						return forward(input);
 					}
 					if (element === root) break;
 				}
 				if (nestedEventNames.has(event.type)) {
-					const module = await loadModule(resumeModuleUrl);
-					await module.resumeContainerEvent({
-						root,
-						event,
-						element: event.target,
-						eventRecord: null,
-					});
-					return;
+					return forward({ event, element: event.target, eventRecord: null });
 				}
 				if (__MARKLESS_INLINE_EXECUTION_LOG__ !== 'never' && globalScope.__mxLog) {
-					const module = await loadModule(resumeModuleUrl);
-					await module.resumeContainerEvent({
-						root,
-						event,
-						element: event.target,
-						eventRecord: null,
-					});
+					return forward({ event, element: event.target, eventRecord: null });
 				}
 			},
 			true,

@@ -24,6 +24,8 @@ const POSTURE_CONDITIONAL_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Rolldown entry signatures are adjusted only for its resolved client build.',
 	"packages/bundler/src/rolldown.ts :: currentEnvironment === 'client' &&":
 		'Rolldown transform hooks project the resolved environment into client-only build behavior.',
+	"packages/bundler/src/rolldown.ts :: currentEnvironment === 'client'":
+		'Prerender records are supplied only to the resolved client compilation that emits staged wake modules.',
 	"packages/bundler/src/rolldown.ts :: internalOptions.dev === true && currentEnvironment === 'client',":
 		'Development execution logging is emitted only into the resolved client graph.',
 	"packages/bundler/src/rolldown.ts :: if (currentEnvironment === 'client' && renderDataRequest) {":

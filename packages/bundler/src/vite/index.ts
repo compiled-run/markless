@@ -11,7 +11,11 @@ import type { OutputOptions } from 'rolldown';
 import { resolve } from 'pathe';
 import { joinURL, parsePath } from 'ufo';
 import { createPreloadGraphAdder } from '../build/bundle-graph.ts';
-import { emitPrerenderedPage } from '../build/prerender.ts';
+import {
+	deriveBuiltPrerenderRecords,
+	emitPrerenderedPage,
+	type BuiltPrerenderRecords,
+} from '../build/prerender.ts';
 import { executionLogActivationInjection } from '../execution-log.ts';
 import { outputDefaults } from '../build/chunking.ts';
 import { createMarklessRolldownPlugin } from '../rolldown.ts';
@@ -70,10 +74,15 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 	let command: 'build' | 'serve' = 'build';
 	const bundleGraphAdders = new Set<BundleGraphAdder>();
 	const transformedTsrxSources = new Map<string, string>();
+	const prerenderRecordsBySource = new Map<string, BuiltPrerenderRecords>();
 	const rolldownOptions: InternalMarklessRolldownOptions = { ...options };
 	const prerender = process.env.MARKLESS_PRERENDER === '1';
 	rolldownOptions.prerender = false;
 	rolldownOptions.prerenderWakeChannel = process.env.MARKLESS_PRERENDER_WAKE === '1';
+	// T004 staging is a wake-module experiment until its byte and interaction
+	// walls are ratcheted. Ordinary prerender builds keep the established resume
+	// module; only the explicit channel may emit the staged wake surface.
+	const stagePrerenderWake = rolldownOptions.prerenderWakeChannel;
 	rolldownOptions.productionResumeModuleUrls = new Map();
 	rolldownOptions.productionPrerenderWakeModuleUrls = new Map();
 	let prerenderEntry: string | null = null;
@@ -99,6 +108,7 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 	const basePlugin = createMarklessRolldownPlugin({
 		environment: getBuildEnvironment,
 		options: rolldownOptions,
+		prerenderRecordsBySource,
 	}) as Plugin & {
 		api: { invalidateGeneratedModules: typeof hmrOptions.invalidateGeneratedModules };
 	};
@@ -150,9 +160,11 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 				__MARKLESS_DEV_ENABLED__: devDefine,
 			};
 			configDefaults(config, options, rolldownOptions);
-			if (prerender) {
+			// MARKLESS_PRERENDER apps keep their entry regardless of the wake
+			// channel; only the shell prerender itself stays MARKLESS_PRERENDER's.
+			if (prerender || stagePrerenderWake) {
 				prerenderEntry = ssrTsrxInput(config, options);
-				rolldownOptions.prerender = prerenderEntry !== null;
+				rolldownOptions.prerender = prerender && prerenderEntry !== null;
 			}
 		},
 		configResolved(resolvedConfig) {
@@ -208,6 +220,19 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 		buildApp: {
 			order: 'pre',
 			async handler(builder) {
+				if ((prerender || stagePrerenderWake) && prerenderEntry) {
+					const source = resolve(resolvedRoot, prerenderEntry);
+					prerenderRecordsBySource.set(
+						source,
+						await deriveBuiltPrerenderRecords({
+							entry: source,
+							serverPlugin: createMarklessRolldownPlugin({
+								environment: 'server',
+								options: { ...rolldownOptions, rootDir: resolvedRoot, dev: false },
+							}),
+						}),
+					);
+				}
 				await buildMarklessEnvironments(builder, options);
 				if (prerender && prerenderEntry) {
 					const clientEnvironment = builder.environments[viteEnvironmentName('client', options)];

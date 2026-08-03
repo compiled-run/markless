@@ -12,6 +12,7 @@ import { createRenderData } from '../src/passes/render-data/index.ts';
 import { createRuntimeDemandMap } from '../src/passes/runtime-demand-map.ts';
 import { buildSemanticGraph } from '../src/passes/semantic-graph/index.ts';
 import { emitSymbolModules } from '../src/passes/symbol-modules.ts';
+import { createTriggerGroups } from '../src/passes/trigger-groups.ts';
 
 test('compiler split modules expose their owning boundaries', () => {
 	expect(defaultCompilerPasses.map((pass) => pass.passId)).toEqual([
@@ -28,6 +29,7 @@ test('compiler split modules expose their owning boundaries', () => {
 		'payload-scripts',
 		'symbol-modules',
 		'runtime-demand-map',
+		'trigger-groups',
 		'symbol-resolver-module',
 	]);
 	expect(typeof validateCompilerPassGraph).toBe('function');
@@ -42,4 +44,5 @@ test('compiler split modules expose their owning boundaries', () => {
 	expect(typeof renderPayloadScriptArtifact).toBe('function');
 	expect(typeof emitSymbolModules).toBe('function');
 	expect(typeof createRuntimeDemandMap).toBe('function');
+	expect(typeof createTriggerGroups).toBe('function');
 });
