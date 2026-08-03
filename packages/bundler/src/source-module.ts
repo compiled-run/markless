@@ -518,6 +518,9 @@ function emitResumeContainerEvent(
 			'}',
 		].join('\n');
 	}
+	if (prerenderDataId) {
+		return 'export async function resumeContainerEvent(_input) {}';
+	}
 	return [
 		fullResumeHandoff,
 		'export async function resumeContainerEvent(input) {',

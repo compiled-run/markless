@@ -127,6 +127,19 @@ test('emitResumeModule keeps capability-free prerender pages on the lean handoff
 	expect(resumeCode).not.toContain("import('@markless/core/web/resume')");
 });
 
+test('emitResumeModule aligns payload-absent prerender pages with no resume handoff', () => {
+	const resumeCode = emitResumeModule({
+		...baseInput,
+		symbols: [],
+		needsFullResume: false,
+		prerenderDataId: 'virtual:markless:render-data:Static',
+	});
+
+	expect(resumeCode).not.toContain('marklessPrerenderData');
+	expect(resumeCode).not.toContain('marklessFullResumeHandoff');
+	expect(resumeCode).not.toContain('resumeFromPrerenderRecords');
+});
+
 test('emitResumeModule selects the decoder entry from the recorded payload version', () => {
 	const storageFree = emitResumeModule({
 		...baseInput,

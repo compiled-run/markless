@@ -73,6 +73,15 @@ export {
 export async function transformTsrxModule(
 	input: TransformTsrxModuleInput,
 ): Promise<TransformTsrxModuleResult> {
+	return transformTsrxModuleWithPrerenderWakeClosure(input, false);
+}
+
+// Rolldown owns linked child manifests. Keep their capability closure internal
+// instead of adding it to the consumer-facing transform input contract.
+export async function transformTsrxModuleWithPrerenderWakeClosure(
+	input: TransformTsrxModuleInput,
+	linkedChildHasBrowserTriggers: boolean,
+): Promise<TransformTsrxModuleResult> {
 	const encodedFilename = encodeURIComponent(input.filename);
 	const payloadId = `${MARKLESS_VIRTUAL_PREFIX}payload:${encodedFilename}`;
 	const renderDataId = `${MARKLESS_VIRTUAL_PREFIX}render-data:${encodedFilename}`;
@@ -135,6 +144,13 @@ export async function transformTsrxModule(
 	// .css module imported by the transformed module, never inline JS.
 	const styleScope = compiled.publicRenderPlan.styleScopes[0];
 	const styleId = styleScope ? `${MARKLESS_VIRTUAL_PREFIX}style:${encodedFilename}.css` : null;
+	const pageNeedsFullResume = needsFullResume(
+		compiled.protocolState,
+		compiled.protocolView,
+		compiled.runtimeDemandMap,
+	);
+	const prerenderClosureNeedsWake =
+		pageNeedsFullResume || (input.prerenderRecords === true && linkedChildHasBrowserTriggers);
 	const virtualModules: MarklessVirtualModule[] = [
 		...(compiled.publicRenderModule.renderDataModuleSource
 			? [
@@ -173,14 +189,11 @@ export async function transformTsrxModule(
 				payloadView: containerScopedResumeView(compiled.payloadScripts.view),
 				runtimeDemandMap: compiled.runtimeDemandMap,
 				executionLog: input.executionLog,
-				needsFullResume: needsFullResume(
-					compiled.protocolState,
-					compiled.protocolView,
-					compiled.runtimeDemandMap,
-				),
-				// The wake variant is ADDITIVE: CSR prerender pages boot through this
+				// The capability closure (page + linked children) decides the wake;
+				// the variant is ADDITIVE: CSR prerender pages boot through this
 				// regular resume module, so suppressing its records mode when a
 				// variant also exists strands them on the payload path.
+				needsFullResume: prerenderClosureNeedsWake,
 				prerenderDataId: input.prerenderRecords ? renderDataId : undefined,
 				hasBoundSymbols: compiled.boundSymbolResolver.rows.length > 0,
 				symbols: symbolRows,
@@ -189,7 +202,7 @@ export async function transformTsrxModule(
 		},
 		...(input.prerenderWakeVariant &&
 		compiled.publicRenderModule.renderDataModuleSource &&
-		needsFullResume(compiled.protocolState, compiled.protocolView, compiled.runtimeDemandMap)
+		prerenderClosureNeedsWake
 			? [
 					{
 						id: prerenderWakeId,
@@ -201,11 +214,7 @@ export async function transformTsrxModule(
 							payloadView: containerScopedResumeView(compiled.payloadScripts.view),
 							runtimeDemandMap: compiled.runtimeDemandMap,
 							executionLog: input.executionLog,
-							needsFullResume: needsFullResume(
-								compiled.protocolState,
-								compiled.protocolView,
-								compiled.runtimeDemandMap,
-							),
+							needsFullResume: prerenderClosureNeedsWake,
 							prerenderDataId: renderDataId,
 							installResumeSummary: true,
 							recordsOnly: true,
@@ -290,11 +299,9 @@ export async function transformTsrxModule(
 					storageSeeds: storageSeeds.length > 0 ? storageSeeds : undefined,
 					inlineResumerSources,
 					devResumeReexport: input.devResumeReexport === true,
-					needsFullResume: needsFullResume(
-						compiled.protocolState,
-						compiled.protocolView,
-						compiled.runtimeDemandMap,
-					),
+					// The container-event route serves linked children too, so the
+					// closure verdict, not the page-only one, decides its emission.
+					needsFullResume: prerenderClosureNeedsWake,
 					prerenderRecords: input.prerenderRecords,
 					resumeModuleUrl: input.resumeModuleUrl,
 					prerenderWakeModuleUrl: input.prerenderWakeModuleUrl,

@@ -109,6 +109,53 @@ test('prerender child render-data imports use the linked interface filename', as
 	);
 });
 
+test('a trigger-free prerender page keeps its wake when a linked child has browser triggers', async () => {
+	const childFilename = '/workspace/app/src/Child.tsrx';
+	const parentFilename = '/workspace/app/src/Page.tsrx';
+	const childSource = `
+import { state } from '@markless/core';
+export function Child() @{ let count = state(0); <button onClick={() => count++}>{count}</button> }
+`;
+	const parentSource = `
+import { Child } from './Child.tsrx';
+export function Page() @{ <main><Child /></main> }
+`;
+	const plugin = marklessClient({ prerender: true } as Parameters<typeof marklessClient>[0]);
+	const resolve = vi.fn(async (specifier: string) =>
+		specifier === './Child.tsrx' ? { id: childFilename } : null,
+	);
+	callBuildStart(plugin, { cwd: '/workspace/app' });
+	await callTransform(plugin, childSource, childFilename, { resolve });
+	const parent = await callTransform(plugin, parentSource, parentFilename, { resolve });
+	const resume = parent.virtualModules.find((module) => module.type === 'resume');
+
+	expect(resume?.source).toContain('marklessPrerenderData');
+	expect(resume?.source).toContain("import('@markless/web/fns/prerender-resume')");
+	expect(resume?.source).toContain('resumeFromPrerenderRecords');
+});
+
+test('a prerender page with only trigger-free linked children emits no wake import', async () => {
+	const childFilename = '/workspace/app/src/StaticChild.tsrx';
+	const parentFilename = '/workspace/app/src/StaticPage.tsrx';
+	const childSource = `export function StaticChild() @{ <p>Static child</p> }`;
+	const parentSource = `
+import { StaticChild } from './StaticChild.tsrx';
+export function StaticPage() @{ <main><StaticChild /></main> }
+`;
+	const plugin = marklessClient({ prerender: true } as Parameters<typeof marklessClient>[0]);
+	const resolve = vi.fn(async (specifier: string) =>
+		specifier === './StaticChild.tsrx' ? { id: childFilename } : null,
+	);
+	callBuildStart(plugin, { cwd: '/workspace/app' });
+	await callTransform(plugin, childSource, childFilename, { resolve });
+	const parent = await callTransform(plugin, parentSource, parentFilename, { resolve });
+	const resume = parent.virtualModules.find((module) => module.type === 'resume');
+
+	expect(resume?.source).not.toContain('marklessPrerenderData');
+	expect(resume?.source).not.toContain("import('@markless/web/fns/prerender-resume')");
+	expect(resume?.source).not.toContain('resumeFromPrerenderRecords');
+});
+
 test('build transforms link a previously compiled child interface into its importer', async () => {
 	const plugin = marklessServer();
 	const resolve = vi.fn(async (specifier: string) =>

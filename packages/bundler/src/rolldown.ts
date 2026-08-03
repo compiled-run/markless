@@ -35,6 +35,7 @@ import {
 	compileTsrxModuleLinkArtifact,
 	resumeVirtualModuleId,
 	transformTsrxModule,
+	transformTsrxModuleWithPrerenderWakeClosure,
 } from './transform.ts';
 import type {
 	MarklessEnvironment,
@@ -103,6 +104,7 @@ export function createMarklessRolldownPlugin(input: {
 	const internalOptions = (input.options ?? {}) as InternalMarklessRolldownOptions;
 	const virtualModules = new Map<string, MarklessVirtualModule>();
 	const transformManifests = new Map<string, MarklessTransformManifest>();
+	const prerenderWakeCapabilities = new Map<string, boolean>();
 	const moduleLinkArtifacts = new Map<string, MarklessModuleLinkArtifact>();
 	const linkedTransformCache = new Map<
 		string,
@@ -112,6 +114,7 @@ export function createMarklessRolldownPlugin(input: {
 			readonly importedInterfaceHashes: string;
 			readonly input: TransformTsrxModuleInput;
 			readonly result: TransformTsrxModuleResult;
+			readonly linkedChildHasBrowserTriggers: boolean;
 		}
 	>();
 	const importedChildren = new Map<string, ImportedChild>();
@@ -144,6 +147,7 @@ export function createMarklessRolldownPlugin(input: {
 		const changedSource = pathname(parent);
 		moduleLinkArtifacts.delete(changedSource);
 		transformManifests.delete(changedSource);
+		prerenderWakeCapabilities.delete(changedSource);
 		for (const [key, cached] of linkedTransformCache) {
 			if (cached.source === changedSource) linkedTransformCache.delete(key);
 		}
@@ -187,7 +191,15 @@ export function createMarklessRolldownPlugin(input: {
 		const nextEntries = await Promise.all(
 			cachedEntries.map(async ([key, cached]) => {
 				const nextInput = { ...cached.input, source: nextSource };
-				return [key, cached, nextInput, await transformTsrxModule(nextInput)] as const;
+				return [
+					key,
+					cached,
+					nextInput,
+					await transformTsrxModuleWithPrerenderWakeClosure(
+						nextInput,
+						cached.linkedChildHasBrowserTriggers,
+					),
+				] as const;
 			}),
 		);
 		if (
@@ -212,6 +224,10 @@ export function createMarklessRolldownPlugin(input: {
 				moduleImports: next.moduleImports,
 			});
 			transformManifests.set(changedSource, next.manifest);
+			prerenderWakeCapabilities.set(
+				changedSource,
+				manifestHasBrowserTriggers(next.manifest) || cached.linkedChildHasBrowserTriggers,
+			);
 			for (const module of next.virtualModules) {
 				if (module.type !== 'render-data') continue;
 				virtualModules.set(module.id, module);
@@ -584,6 +600,11 @@ export function createMarklessRolldownPlugin(input: {
 					validateImportedChild(child, transformManifests);
 				}
 			}
+			const linkedChildHasBrowserTriggers = linkedChildrenHaveBrowserTriggers(
+				resolvedChildren,
+				transformManifests,
+				prerenderWakeCapabilities,
+			);
 			if (
 				!reusedLinkedTransform &&
 				(resolvedChildren.length > 0 || resolvedInterfaceImports.length > 0)
@@ -596,8 +617,15 @@ export function createMarklessRolldownPlugin(input: {
 						moduleLinkArtifacts,
 					),
 				};
-				transformed = await transformTsrxModule(linkedTransformInput);
+				transformed = await transformTsrxModuleWithPrerenderWakeClosure(
+					linkedTransformInput,
+					linkedChildHasBrowserTriggers,
+				);
 			}
+			prerenderWakeCapabilities.set(
+				source,
+				manifestHasBrowserTriggers(transformed.manifest) || linkedChildHasBrowserTriggers,
+			);
 			if (!renderDataRequest)
 				registerTransformArtifacts({
 					owner: cacheKey,
@@ -623,6 +651,7 @@ export function createMarklessRolldownPlugin(input: {
 				),
 				input: linkedTransformInput,
 				result: transformed,
+				linkedChildHasBrowserTriggers,
 			});
 			if (currentEnvironment === 'client' && renderDataRequest) {
 				const renderDataModule = transformed.virtualModules.find(
@@ -936,6 +965,26 @@ function importedSymbolInputs(
 				: [];
 		});
 	});
+}
+
+function linkedChildrenHaveBrowserTriggers(
+	children: ReadonlyArray<ImportedChild>,
+	manifests: ReadonlyMap<string, MarklessTransformManifest>,
+	capabilities: ReadonlyMap<string, boolean>,
+): boolean {
+	return children.some((child) => {
+		const manifest = manifests.get(child.source);
+		return (
+			(manifest !== undefined && manifestHasBrowserTriggers(manifest)) ||
+			capabilities.get(child.source) === true
+		);
+	});
+}
+
+function manifestHasBrowserTriggers(manifest: MarklessTransformManifest): boolean {
+	return manifest.symbols.some(
+		(symbol) => symbol.kind === 'event-handler' || symbol.kind === 'behavior',
+	);
 }
 
 function fallbackImportedSource(parent: string, specifier: string): string {

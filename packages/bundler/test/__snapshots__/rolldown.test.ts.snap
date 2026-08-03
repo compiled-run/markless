@@ -1,0 +1,43 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`browser-trigger prerender pages keep their resume emission byte-identical > browser-trigger prerender resume module 1`] = `
+"import { marklessPrerenderData } from 'virtual:markless:render-data:%2Fworkspace%2Fapp%2Fsrc%2FApp.tsrx';
+import { runtimeDemandMap as payloadRuntimeDemandMap } from 'virtual:markless:payload:%2Fworkspace%2Fapp%2Fsrc%2FApp.tsrx';
+
+
+globalThis.__mxLoadLog ||= () => import("virtual:markless:dev-log");
+
+function loadSymbol(symbolId) {
+	if (symbolId === "symbol:0") return import('virtual:markless:symbol:%2Fworkspace%2Fapp%2Fsrc%2FApp.tsrx:symbol%3A0')
+		.then((mod) => readMarklessSourceSymbol(mod, "symbol_0_twcptv"));
+	if (symbolId === "symbol:1") return import('virtual:markless:symbol:%2Fworkspace%2Fapp%2Fsrc%2FApp.tsrx:symbol%3A1')
+		.then((mod) => readMarklessSourceSymbol(mod, "symbol_1_twcptv"));
+	if (symbolId === "symbol:2") return import('virtual:markless:symbol:%2Fworkspace%2Fapp%2Fsrc%2FApp.tsrx:symbol%3A2')
+		.then((mod) => readMarklessSourceSymbol(mod, "symbol_2_twcptv"));
+	return Promise.reject(new Error(\`Unknown async symbol \${symbolId}\`));
+}
+function readMarklessSourceSymbol(mod, exportName) {
+	mod.init__virtual_markless_symbol?.();
+	return mod[exportName];
+}
+
+
+
+async function marklessFullResumeHandoff(handoff) {
+	handoff.root.__marklessLinkedRenderDataBoot = true;
+	handoff.root.__asyncResumeRuntimeStarted = true;
+	const { derivePrerenderResumeRecords, renderPrerenderBoundary, resumeFromPrerenderRecords } = await import('@markless/web/fns/prerender-resume');
+	const records = await derivePrerenderResumeRecords(marklessPrerenderData, loadSymbol);
+	const { runtime } = await resumeFromPrerenderRecords({
+		...records,
+		root: handoff.root,
+		loadSymbol: loadSymbol,
+		renderAsyncBoundary: (boundaryId, status, graph) => renderPrerenderBoundary(marklessPrerenderData, boundaryId, status, graph, loadSymbol),
+	});
+	await runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });
+}
+export async function resumeContainerEvent(input) {
+	await marklessFullResumeHandoff({ ...input, document: input.root });
+}
+"
+`;

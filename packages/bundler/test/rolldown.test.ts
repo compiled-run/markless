@@ -31,6 +31,21 @@ export function App() @{
 }
 `;
 
+const capabilityFreeSource = `
+export function App() @{
+	<main>Static prerendered page</main>
+}
+`;
+
+const fullResumeSource = `
+import { state, storage } from '@markless/core';
+export const theme = storage('theme-mode', 'light');
+export function App() @{
+	let count = state(0);
+	<button data-theme={theme} onClick={() => count++}>{count}</button>
+}
+`;
+
 const styledSource = `
 import { state } from '@markless/core';
 
@@ -1397,6 +1412,32 @@ export function App() @{
 	expect(resume?.source).toContain('derivePrerenderResumeRecords');
 	expect(resume?.source).not.toContain('/workspace/app/src/App.tsrx');
 	expect(resume?.source).not.toContain('marklessPrerenderPage');
+});
+
+test('capability-free prerender pages emit no full-resume wake import', async () => {
+	const result = await transformTsrxModule({
+		filename: '/workspace/app/src/Static.tsrx',
+		source: capabilityFreeSource,
+		environment: 'client',
+		prerenderRecords: true,
+	});
+	const resume = result.virtualModules.find((module) => module.type === 'resume');
+
+	expect(resume?.source).not.toContain('marklessPrerenderData');
+	expect(resume?.source).not.toContain("import('@markless/web/fns/prerender-resume')");
+	expect(resume?.source).not.toContain('resumeFromPrerenderRecords');
+});
+
+test('browser-trigger prerender pages keep their resume emission byte-identical', async () => {
+	const result = await transformTsrxModule({
+		filename: '/workspace/app/src/App.tsrx',
+		source: fullResumeSource,
+		environment: 'client',
+		prerenderRecords: true,
+	});
+	const resume = result.virtualModules.find((module) => module.type === 'resume');
+
+	expect(resume?.source).toMatchSnapshot('browser-trigger prerender resume module');
 });
 
 function emittedAsset(emitFile: ReturnType<typeof vi.fn>, fileName: string) {
