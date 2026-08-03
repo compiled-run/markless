@@ -229,14 +229,25 @@ export function emitResumeModule(input: {
 	readonly symbolRoutes: ReadonlyArray<SourceSymbolRoute>;
 	readonly executionLog?: MarklessExecutionLogMode;
 	readonly hasBoundSymbols?: boolean;
-	readonly prerenderSourceId?: string;
+	readonly prerenderDataId?: string;
 }) {
 	const routeSymbols = input.symbolRoutes.length > 0;
 	const resumeSymbolLoader = routeSymbols ? 'marklessSsrLoadSymbolRoute' : 'loadSymbol';
 	const scalarSpecializations = scalarDispatcherSpecializations(input);
+	const resumeContainerEvent = emitResumeContainerEvent(
+		resumeSymbolLoader,
+		input.needsFullResume ?? false,
+		(input.payloadState as { readonly version?: unknown } | undefined)?.version ===
+			ASYNC_PROTOCOL_VERSION,
+		input.symbolRoutes.length > 0 ? 'none' : leanResumeMode(input.runtimeDemandMap),
+		scalarSpecializations,
+		input.runtimeDemandMap,
+		input.executionLog !== 'never',
+		input.prerenderDataId,
+	);
 	return [
-		input.prerenderSourceId
-			? `import marklessPrerenderPage from ${JSON.stringify(input.prerenderSourceId)};`
+		input.prerenderDataId && resumeContainerEvent.includes('marklessPrerenderData')
+			? `import { marklessPrerenderData } from '${input.prerenderDataId}';`
 			: '',
 		`import { runtimeDemandMap as payloadRuntimeDemandMap } from '${input.payloadId}';`,
 		scalarSpecializations.length > 0
@@ -259,21 +270,7 @@ export function emitResumeModule(input: {
 				)
 			: '',
 		routeSymbols ? 'export { marklessSsrLoadSymbolRoute as loadSymbol };' : '',
-		emitResumeContainerEvent(
-			resumeSymbolLoader,
-			input.prerenderSourceId ? true : (input.needsFullResume ?? false),
-			(input.payloadState as { readonly version?: unknown } | undefined)?.version ===
-				ASYNC_PROTOCOL_VERSION,
-			// Composed pages (child symbol routes) take the full path: lean record
-			// matching does not account for runtime child composition (same ruling
-			// as the scalar-specialization exclusion; unmatched events pass through
-			// harmlessly since the ignoreUnmatched contract landed).
-			input.symbolRoutes.length > 0 ? 'none' : leanResumeMode(input.runtimeDemandMap),
-			scalarSpecializations,
-			input.runtimeDemandMap,
-			input.executionLog !== 'never',
-			input.prerenderSourceId,
-		),
+		resumeContainerEvent,
 		'',
 	]
 		.filter((line): line is string => line !== null)
@@ -392,22 +389,22 @@ function emitResumeContainerEvent(
 	scalarSpecializations: ReadonlyArray<ScalarSpecialization>,
 	runtimeDemandMap: unknown,
 	executionLogEnabled: boolean,
-	prerenderSourceId?: string,
+	prerenderDataId?: string,
 ): string {
 	const resumeEntry = storageFreePayload
 		? '@markless/core/web/resume-storage-free'
 		: '@markless/core/web/resume';
-	const fullResumeHandoff = prerenderSourceId
+	const fullResumeHandoff = prerenderDataId
 		? [
 				'async function marklessFullResumeHandoff(handoff) {',
 				'\thandoff.root.__asyncResumeRuntimeStarted = true;',
 				"\tconst { derivePrerenderResumeRecords, renderPrerenderBoundary, resumeFromPrerenderRecords } = await import('@markless/web/fns/prerender-resume');",
-				'\tconst records = await derivePrerenderResumeRecords(marklessPrerenderPage);',
+				`\tconst records = await derivePrerenderResumeRecords(marklessPrerenderData, ${loadSymbolName});`,
 				'\tconst { runtime } = await resumeFromPrerenderRecords({',
 				'\t\t...records,',
 				'\t\troot: handoff.root,',
 				`\t\tloadSymbol: ${loadSymbolName},`,
-				'\t\trenderAsyncBoundary: (boundaryId, status, graph) => renderPrerenderBoundary(marklessPrerenderPage, boundaryId, status, graph),',
+				`\t\trenderAsyncBoundary: (boundaryId, status, graph) => renderPrerenderBoundary(marklessPrerenderData, boundaryId, status, graph, ${loadSymbolName}),`,
 				'\t});',
 				'\tawait runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });',
 				'}',
@@ -509,6 +506,7 @@ type ScalarSpecialization = {
 	readonly symbolId: string;
 	readonly cell: string;
 	readonly cellIndex: number;
+	readonly initialCell: unknown;
 	readonly hostIndex: number;
 	readonly hostTagName: string;
 	readonly syncPolicy: unknown;
@@ -563,6 +561,7 @@ function scalarDispatcherSpecializations(input: {
 		if (action?.recordKind !== 'event' || plan?.version !== 1 || plan?.kind !== 'scalar')
 			return [];
 		const cellIndex = cells.findIndex((cell) => cell?.graphNodeId === plan.cell);
+		const initialCell = cells[cellIndex];
 		const host = locators.find((locator) => locator?.hostNodeId === action.hostNodeId);
 		const event = view?.events?.find(
 			(candidate) =>
@@ -571,7 +570,7 @@ function scalarDispatcherSpecializations(input: {
 		);
 		const symbolId = scalarActionSymbolId(plan.symbolId, event, input.symbolRoutes ?? []);
 		if (!symbolId) return [];
-		if (cellIndex < 0 || !host || typeof host.index !== 'number') return [];
+		if (cellIndex < 0 || !initialCell || !host || typeof host.index !== 'number') return [];
 		if (
 			event &&
 			syncPolicyGraphNodeIds(event.syncPolicy).some(
@@ -603,6 +602,7 @@ function scalarDispatcherSpecializations(input: {
 				symbolId,
 				cell: plan.cell,
 				cellIndex,
+				initialCell,
 				hostIndex: host.index,
 				hostTagName: String(host.tagName ?? '*'),
 				syncPolicy: event?.syncPolicy ?? null,
@@ -709,7 +709,7 @@ function emitScalarAction(action: ScalarSpecialization, loadSymbolName: string):
 		'	let syncPolicyAlreadyApplied = input.syncPolicyAlreadyApplied === true;',
 		'	const values = input.root.__marklessEventOnlyGraph || new Map();',
 		'	input.root.__marklessEventOnlyGraph = values;',
-		`	if (!values.has(${JSON.stringify(action.cell)})) values.set(${JSON.stringify(action.cell)}, marklessDecodeScalarCell(marklessReadScalarCell(input.root, ${action.cellIndex}), ${JSON.stringify(action.cell)}, ${JSON.stringify(`markless/state cell[${action.cellIndex}]`)}));`,
+		`	if (!values.has(${JSON.stringify(action.cell)})) values.set(${JSON.stringify(action.cell)}, marklessDecodeScalarCell(marklessReadScalarCell(input.root, ${JSON.stringify(action.cell)}) ?? ${JSON.stringify(action.initialCell)}, ${JSON.stringify(action.cell)}, ${JSON.stringify(`markless/state cell ${action.cell}`)}));`,
 		`	const state = { value: values.get(${JSON.stringify(action.cell)}), dirty: false };`,
 		'	try {',
 		`	const host = marklessFindElementAtDomOrderIndex(input.root, ${action.hostIndex});`,

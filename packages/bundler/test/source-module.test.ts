@@ -83,19 +83,36 @@ test('emitResumeModule routes non-lean event-only entries through the full hando
 	);
 });
 
-test('emitResumeModule derives prerender records from the linked page chunk on demand', () => {
+test('emitResumeModule derives prerender records from linked render data on demand', () => {
 	const resumeCode = emitResumeModule({
 		...baseInput,
 		needsFullResume: true,
-		prerenderSourceId: '/workspace/app/src/App.tsrx',
+		prerenderDataId: 'virtual:markless:render-data:App',
 	});
 
 	expect(resumeCode).toContain(
-		`import marklessPrerenderPage from "/workspace/app/src/App.tsrx";`,
+		`import { marklessPrerenderData } from 'virtual:markless:render-data:App';`,
 	);
-	expect(resumeCode).toContain('derivePrerenderResumeRecords(marklessPrerenderPage)');
+	expect(resumeCode).toContain(
+		'derivePrerenderResumeRecords(marklessPrerenderData, loadSymbol)',
+	);
 	expect(resumeCode).toContain('resumeFromPrerenderRecords');
 	expect(resumeCode).not.toContain('resumeFromPayloadDocument');
+	expect(resumeCode).not.toContain('App.tsrx');
+	expect(resumeCode).not.toContain('marklessPrerenderPage');
+});
+
+test('emitResumeModule keeps capability-free prerender pages on the lean handoff', () => {
+	const resumeCode = emitResumeModule({
+		...scalarResumeInput(),
+		needsFullResume: false,
+		prerenderDataId: 'virtual:markless:render-data:Counter',
+	});
+
+	expect(resumeCode).not.toContain('marklessPrerenderData');
+	expect(resumeCode).not.toContain('derivePrerenderResumeRecords');
+	expect(resumeCode).not.toContain('resumeFromPrerenderRecords');
+	expect(resumeCode).not.toContain("import('@markless/core/web/resume')");
 });
 
 test('emitResumeModule selects the decoder entry from the recorded payload version', () => {
@@ -130,11 +147,12 @@ test('emitResumeModule emits a specialized scalar dispatcher with resolved const
 	expect(resumeCode).toContain('marklessFindElementAtDomOrderIndex(input.root, 3)');
 	expect(resumeCode).toContain('marklessFindElementAtDomOrderIndex(input.root, 5)');
 	expect(resumeCode).not.toContain('?? input.element ?? input.event.target');
-	expect(resumeCode).toContain('marklessReadScalarCell(input.root, 0)');
+	expect(resumeCode).toContain('marklessReadScalarCell(input.root, "state:count")');
+	expect(resumeCode).toContain('?? {"graphNodeId":"state:count"');
 	expect(resumeCode).toContain('input.root.__marklessEventOnlyGraph || new Map()');
 	expect(resumeCode).toContain('values.set("state:count", state.value)');
 	expect(resumeCode).toContain(
-		'marklessDecodeScalarCell(marklessReadScalarCell(input.root, 0), "state:count", "markless/state cell[0]")',
+		'marklessDecodeScalarCell(marklessReadScalarCell(input.root, "state:count")',
 	);
 	expect(resumeCode).not.toContain('state as payloadState');
 	expect(resumeCode).toContain('graphNodeId === "state:count"');
@@ -207,7 +225,7 @@ test('specialized scalar dispatcher excludes composed child symbols without a ro
 test('specialized scalar dispatcher raises cell validation before fallback-capable work', () => {
 	const resumeCode = emitResumeModule(scalarResumeInput());
 	const decodeIndex = resumeCode.indexOf(
-		'marklessDecodeScalarCell(marklessReadScalarCell(input.root, 0), "state:count", "markless/state cell[0]")',
+		'marklessDecodeScalarCell(marklessReadScalarCell(input.root, "state:count")',
 	);
 	const tryIndex = resumeCode.indexOf(
 		'\ttry {',

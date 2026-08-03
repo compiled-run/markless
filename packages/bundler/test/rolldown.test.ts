@@ -1370,25 +1370,33 @@ function renderDataModuleSource(result: Awaited<ReturnType<typeof transformTsrxM
 	return module.source;
 }
 
-test('prerender client chunks carry only the linked server render closure', async () => {
+test('prerender client chunks carry linked render data without a component body', async () => {
 	const result = await transformTsrxModule({
 		filename: '/workspace/app/src/App.tsrx',
 		source: `
-import { state } from '@markless/core';
+import { state, storage } from '@markless/core';
+export const theme = storage('theme-mode', 'light');
 export function App() @{
 	let count = state(0);
-	<button onClick={() => count++}>{count}</button>
+	<button data-theme={theme} onClick={() => count++}>{count}</button>
 }
 `,
 		environment: 'client',
 		prerenderRecords: true,
 	});
 	const resume = result.virtualModules.find((module) => module.type === 'resume');
+	const renderData = result.virtualModules.find((module) => module.type === 'render-data');
 
 	expect(result.code).toContain('marklessRenderData');
 	expect(result.code).toContain('renderSsr(props, marklessRenderContext)');
 	expect(result.code).not.toContain('renderCsr:');
+	expect(renderData?.source).toContain('export const marklessPrerenderData');
+	expect(resume?.source).toContain(
+		`from 'virtual:markless:render-data:${encodeURIComponent('/workspace/app/src/App.tsrx')}'`,
+	);
 	expect(resume?.source).toContain('derivePrerenderResumeRecords');
+	expect(resume?.source).not.toContain('/workspace/app/src/App.tsrx');
+	expect(resume?.source).not.toContain('marklessPrerenderPage');
 });
 
 function emittedAsset(emitFile: ReturnType<typeof vi.fn>, fileName: string) {

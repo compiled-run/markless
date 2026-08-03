@@ -13,10 +13,13 @@ export const marklessFindElementAtDomOrderIndex = (r, i) => {
 	for (; i-- && n; ) n = w.nextNode();
 	return n;
 };
-export const marklessReadScalarCell = (r, i) => {
+export const marklessReadScalarCell = (r, graphNodeId) => {
+	const script = r.querySelector('script[type="markless/state"]');
+	if (!script) return;
 	try {
-		return JSON.parse(r.querySelector('script[type="markless/state"]')?.textContent || 'null')
-			?.cells?.[i];
+		return JSON.parse(script.textContent || 'null')?.cells?.find(
+			(cell) => cell?.graphNodeId === graphNodeId,
+		);
 	} catch {}
 };
 export const marklessDecodeScalarCell = (c, g, s) => {

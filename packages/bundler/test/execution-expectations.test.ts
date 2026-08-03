@@ -119,8 +119,9 @@ test('alternate-shaped scalar action specializes from locator, cell, event, and 
 		`marklessFindElementAtDomOrderIndex(input.root, ${updateLocator.index})`,
 	);
 	expect(resumeSource).toContain(
-		'marklessDecodeScalarCell(marklessReadScalarCell(input.root, 0), "state:tally"',
+		'marklessDecodeScalarCell(marklessReadScalarCell(input.root, "state:tally")',
 	);
+	expect(resumeSource).toContain('?? {"graphNodeId":"state:tally"');
 	expect(resumeSource).toContain('marklessUpdateText');
 	expect(resumeSource).toContain('"Total: " +');
 	expect(resumeSource).not.toContain('input.eventRecord');

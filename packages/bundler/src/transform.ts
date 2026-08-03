@@ -135,7 +135,9 @@ export async function transformTsrxModule(
 					{
 						id: renderDataId,
 						type: 'render-data' as const,
-						source: compiled.publicRenderModule.renderDataModuleSource,
+						source: input.prerenderRecords
+							? prerenderDataModuleSource(compiled)
+							: compiled.publicRenderModule.renderDataModuleSource,
 					},
 				]
 			: []),
@@ -170,7 +172,7 @@ export async function transformTsrxModule(
 					compiled.protocolView,
 					compiled.runtimeDemandMap,
 				),
-				prerenderSourceId: input.prerenderRecords ? input.filename : undefined,
+				prerenderDataId: input.prerenderRecords ? renderDataId : undefined,
 				hasBoundSymbols: compiled.boundSymbolResolver.rows.length > 0,
 				symbols: symbolRows,
 				symbolRoutes,
@@ -279,6 +281,41 @@ export async function transformTsrxModule(
 		interfaceHash: moduleInterfaceHash(compiled.moduleGraphInterface),
 		moduleImports: compiled.semanticGraph.moduleImports,
 	};
+}
+
+function prerenderDataModuleSource(compiled: CompileTsrxModuleResult): string {
+	const importedComponents = new Map<string, { readonly source: string; readonly local: string }>();
+	for (const edge of compiled.semanticGraph.componentEdges) {
+		if (!edge.importSource || importedComponents.has(edge.childComponentName)) continue;
+		importedComponents.set(edge.childComponentName, {
+			source: edge.importSource,
+			local: `marklessPrerenderImport${importedComponents.size}`,
+		});
+	}
+	const components = Object.fromEntries(
+		compiled.publicRenderModule.csrNativeMarkup.map((entry) => [
+			String(entry.definition.name),
+			entry.definition,
+		]),
+	);
+	return [
+		...[...importedComponents.values()].map(
+			(entry) =>
+				`import { marklessPrerenderData as ${entry.local} } from ${JSON.stringify(renderDataImportSource(entry.source))};`,
+		),
+		compiled.publicRenderModule.renderDataModuleSource,
+		`const marklessPrerenderComponents = ${JSON.stringify(components)};`,
+		'export const marklessPrerenderData = {',
+		`\trootComponentName: ${JSON.stringify(compiled.renderData.root?.componentName ?? null)},`,
+		'\trenderData: marklessRenderData,',
+		'\tcomponents: marklessPrerenderComponents,',
+		`\timports: {${[...importedComponents].map(([name, entry]) => `${JSON.stringify(name)}:${entry.local}`).join(',')}},`,
+		'};',
+	].join('\n');
+}
+
+function renderDataImportSource(source: string): string {
+	return source.includes('?') ? `${source}&markless-render-data` : `${source}?markless-render-data`;
 }
 
 function stripCsrTestFallback(source: string): string {

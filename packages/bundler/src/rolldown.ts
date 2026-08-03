@@ -78,6 +78,7 @@ type InternalMarklessRolldownOptions = MarklessRolldownOptions & {
 const TSRX_SOURCE_FILE = /\.tsrx(?:[?#].*)?$/;
 const MARKLESS_SYMBOL_SOURCE_QUERY_RE = /[?&]markless-symbols(?:[&#]|$)/;
 const MARKLESS_RESUME_SOURCE_QUERY_RE = /[?&]markless-resume(?:[&#]|$)/;
+const MARKLESS_RENDER_DATA_SOURCE_QUERY_RE = /[?&]markless-render-data(?:[&#]|$)/;
 const RESUME_VIRTUAL_ID_RE = /^virtual:markless:resume:([^:]+)$/;
 const SYMBOL_VIRTUAL_STRING_RE = /(["'`])((?:virtual:markless:symbol:)[^"'`]+)\1/g;
 
@@ -384,6 +385,7 @@ export function createMarklessRolldownPlugin(input: {
 				return null;
 			}
 			const source = pathname(id);
+			const renderDataRequest = isRenderDataSourceRequest(id);
 			clearSourceVirtualModules(source, virtualModules, sourceVirtualModules);
 			const transformInput: TransformTsrxModuleInput = {
 				filename: source,
@@ -395,7 +397,8 @@ export function createMarklessRolldownPlugin(input: {
 					internalOptions.dev === true && currentEnvironment === 'client',
 				inlineResumerDebug: internalOptions.inlineResumerDebug === true,
 				prerenderRecords:
-					internalOptions.prerender === true && currentEnvironment === 'client',
+					currentEnvironment === 'client' &&
+					(internalOptions.prerender === true || renderDataRequest),
 				environment: currentEnvironment,
 				clientOutput:
 					currentEnvironment === 'client' &&
@@ -441,7 +444,7 @@ export function createMarklessRolldownPlugin(input: {
 				currentEnvironment,
 				source,
 				transformInput.clientOutput ?? 'full',
-				isResumeSourceRequest(id) ? 'resume' : 'source',
+				isResumeSourceRequest(id) ? 'resume' : renderDataRequest ? 'render-data' : 'source',
 			].join('\0');
 			const cached = linkedTransformCache.get(cacheKey);
 			let transformed: TransformTsrxModuleResult;
@@ -502,18 +505,26 @@ export function createMarklessRolldownPlugin(input: {
 			}
 			// Register the first-pass artifact before loading children so the existing
 			// cross-module registry can validate both sides of the composition edge.
-			registerTransformArtifacts({
-				source,
-				result: transformed,
-				virtualModules,
-				transformManifests,
-				moduleLinkArtifacts,
-				sourceVirtualModules,
-				executionLogEstimatedSizes,
-				dev,
-				environment: currentEnvironment,
-				updateDevPrerenderHashes: internalOptions.updateDevPrerenderHashes,
-			});
+			if (!renderDataRequest) {
+				registerTransformArtifacts({
+					source,
+					result: transformed,
+					virtualModules,
+					transformManifests,
+					moduleLinkArtifacts,
+					sourceVirtualModules,
+					executionLogEstimatedSizes,
+					dev,
+					environment: currentEnvironment,
+					updateDevPrerenderHashes: internalOptions.updateDevPrerenderHashes,
+				});
+			} else {
+				moduleLinkArtifacts.set(source, {
+					interfaceHash: transformed.interfaceHash,
+					moduleGraphInterface: transformed.moduleGraphInterface,
+					moduleImports: transformed.moduleImports,
+				});
+			}
 			const resolvedInterfaceImports = await resolveImportedModuleInterfaces.call(
 				this,
 				source,
@@ -554,7 +565,7 @@ export function createMarklessRolldownPlugin(input: {
 				};
 				transformed = await transformTsrxModule(linkedTransformInput);
 			}
-			registerTransformArtifacts({
+			if (!renderDataRequest) registerTransformArtifacts({
 				source,
 				result: transformed,
 				virtualModules,
@@ -576,6 +587,12 @@ export function createMarklessRolldownPlugin(input: {
 				input: linkedTransformInput,
 				result: transformed,
 			});
+			if (currentEnvironment === 'client' && renderDataRequest) {
+				const renderDataModule = transformed.virtualModules.find(
+					(module) => module.type === 'render-data',
+				);
+				if (renderDataModule) return { code: renderDataModule.source, map: null };
+			}
 			for (const child of resolvedChildren) {
 				dev.record(
 					child.source,
@@ -1225,6 +1242,10 @@ function isSymbolOnlySourceRequest(id: string): boolean {
 
 function isResumeSourceRequest(id: string): boolean {
 	return MARKLESS_RESUME_SOURCE_QUERY_RE.test(id);
+}
+
+function isRenderDataSourceRequest(id: string): boolean {
+	return MARKLESS_RENDER_DATA_SOURCE_QUERY_RE.test(id);
 }
 
 function sourceForSymbolVirtualImporter(importer: string | undefined): string | null {
