@@ -202,12 +202,9 @@ function supportedAsyncBoundaries(input: ProtocolViewPayloadInput) {
 function supportedBranchIds(input: ProtocolViewPayloadInput): ReadonlySet<string> {
 	// armScoped branches render as anchor-less ternaries re-evaluated on arm
 	// settle (need 8): no flip records, no anchor pairs.
-	const flattenedBranchIds = preLinkFlattenedBranchIds(input);
 	return new Set(
 		renderDataOf(input).branches.flatMap((branch) =>
-			branch.asyncBoundaryId ||
-			branch.update === 'boundary' ||
-			flattenedBranchIds.has(branch.branchSiteId)
+			branch.asyncBoundaryId || branch.update === 'boundary'
 				? []
 				: [branch.branchSiteId],
 		),
@@ -381,43 +378,12 @@ function wiredArmRecordSet(
 }
 
 function armHostIds(input: ProtocolViewPayloadInput): ReadonlySet<string> {
-	const flattenedBranchIds = preLinkFlattenedBranchIds(input);
 	return new Set(
 		renderDataOf(input).branches.flatMap((branch) =>
-			flattenedBranchIds.has(branch.branchSiteId)
-				? []
-				: branch.armChunkIds.flatMap((chunkId) => [
-						...hostPathsForChunk(input, chunkId).keys(),
-					]),
+			branch.armChunkIds.flatMap((chunkId) => [
+				...hostPathsForChunk(input, chunkId).keys(),
+			]),
 		),
-	);
-}
-
-// Ruled residual: no existing real-browser box proves same-module child
-// branch flips across independent chunk ranges. Until that proof exists,
-// project those arm hosts into the pre-link flat view while keeping
-// renderData's chunk ownership intact.
-function preLinkFlattenedBranchIds(input: ProtocolViewPayloadInput): ReadonlySet<string> {
-	const data = renderDataOf(input);
-	const rootComponentName = data.root?.componentName;
-	if (!rootComponentName) return new Set();
-	return new Set(
-		data.branches.flatMap((branch) => {
-			if (branch.asyncBoundaryId) return [];
-			const owner = data.chunks.find((chunk) =>
-				chunk.slots.some(
-					(slot) => slot.kind === 'branch' && slot.branchSiteId === branch.branchSiteId,
-				),
-			);
-			const composesChild = branch.armChunkIds.some((chunkId) =>
-				data.chunks
-					.find((chunk) => chunk.id === chunkId)
-					?.slots.some((slot) => slot.kind === 'child-component'),
-			);
-			return (owner && owner.componentName !== rootComponentName) || composesChild
-				? [branch.branchSiteId]
-				: [];
-		}),
 	);
 }
 

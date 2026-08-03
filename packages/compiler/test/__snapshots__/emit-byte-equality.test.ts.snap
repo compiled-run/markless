@@ -2529,7 +2529,7 @@ function createUnknownSymbolError(id) {
   },
   "same-module-child": {
     "csrModuleSource": "import { createMarklessCsrChunkRenderer } from '@markless/web/fns/csr';
-export const marklessCsrChunkComponents = {"Badge": {name:"Badge",dataId:"markless-csr-data:src%2FSameModuleChild.tsrx:Badge",/*MARKLESS_CSR_TEST_START*/nativeFallback:()=>({"name":"Badge","state":{"version":1,"cells":[{"graphNodeId":"state:active","name":"active","valueKind":"scalar","value":{"version":1,"root":true,"records":[]}}],"computed":[],"sharedDefinitions":[]},"view":{"version":1,"locators":[{"hostNodeId":"h0","strategy":"dom-order","index":0,"tagName":"span"},{"hostNodeId":"h1","strategy":"dom-order","index":1,"tagName":"em"},{"hostNodeId":"h2","strategy":"dom-order","index":2,"tagName":"em"},{"hostNodeId":"h3","strategy":"dom-order","index":3,"tagName":"main"}],"events":[],"domUpdates":[{"hostNodeId":"h1","source":"active","graphNodeId":"prop:props","path":["active"],"target":{"kind":"text","trueValue":"Live","falseValue":"Idle"},"symbolId":"bound:symbol%3A0:component-edge%3A0"},{"hostNodeId":"h2","source":"active","graphNodeId":"prop:props","path":["active"],"target":{"kind":"text","trueValue":"Live","falseValue":"Idle"},"symbolId":"bound:symbol%3A1:component-edge%3A0"}],"behaviors":[],"elementHandles":[],"keyedRepeats":[],"branches":[],"asyncBoundaries":[]},"rootChunkId":"template:Badge","chunks":[{"id":"branch:branch-site:0:arm:0","kind":"branch-arm","componentName":"Badge","statics":["<em>Live</em>"],"hosts":[{"hostNodeId":"h1","tagName":"em","coordinate":{"kind":"child-index","path":[0]}}],"slots":[]},{"id":"branch:branch-site:0:arm:1","kind":"branch-arm","componentName":"Badge","statics":["<em>Idle</em>"],"hosts":[{"hostNodeId":"h2","tagName":"em","coordinate":{"kind":"child-index","path":[0]}}],"slots":[]},{"id":"template:Badge","kind":"template","componentName":"Badge","statics":["<span><!--markless-slot:0-->","</span>"],"hosts":[{"hostNodeId":"h0","tagName":"span","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"branch","branchSiteId":"branch-site:0","armTemplateIds":["branch:branch-site:0:arm:0","branch:branch-site:0:arm:1"],"coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]}],"hostNodeIds":["h1","h2","h0"],"branchIds":["branch-site:0"],"boundaryIds":[],"repeatIds":[],"initialValues":[{"graphNodeId":"state:active","value":{"kind":"constant","value":true}}],"initialValueSources":{},"initialValueKinds":{},"stateGraphNodeIds":["prop:props"],"branches":[{"branchSiteId":"branch-site:0","kind":"if","testSource":"active","testReads":[{"graphNodeId":"prop:props","path":["active"]}],"armChunkIds":["branch:branch-site:0:arm:0","branch:branch-site:0:arm:1"],"anchorOrder":0,"update":"range"}],"repeats":[],"boundaries":[],"edges":[],"propCellId":"prop:props","ownsModuleData":false}),/*MARKLESS_CSR_TEST_END*/getComponent:(name)=>marklessCsrAllChunkComponents[name],loadSymbol,createValues:(props,read,locals,marklessReadCsrValue)=>{const { active } = props ?? {};const error=locals.error;return {"active":()=>(active)};}},"App": {name:"App",dataId:"markless-csr-data:src%2FSameModuleChild.tsrx:App",/*MARKLESS_CSR_TEST_START*/nativeFallback:()=>({"name":"App","state":{"version":1,"cells":[{"graphNodeId":"state:active","name":"active","valueKind":"scalar","value":{"version":1,"root":true,"records":[]}}],"computed":[],"sharedDefinitions":[]},"view":{"version":1,"locators":[{"hostNodeId":"h0","strategy":"dom-order","index":0,"tagName":"span"},{"hostNodeId":"h1","strategy":"dom-order","index":1,"tagName":"em"},{"hostNodeId":"h2","strategy":"dom-order","index":2,"tagName":"em"},{"hostNodeId":"h3","strategy":"dom-order","index":3,"tagName":"main"}],"events":[],"domUpdates":[{"hostNodeId":"h1","source":"active","graphNodeId":"prop:props","path":["active"],"target":{"kind":"text","trueValue":"Live","falseValue":"Idle"},"symbolId":"bound:symbol%3A0:component-edge%3A0"},{"hostNodeId":"h2","source":"active","graphNodeId":"prop:props","path":["active"],"target":{"kind":"text","trueValue":"Live","falseValue":"Idle"},"symbolId":"bound:symbol%3A1:component-edge%3A0"}],"behaviors":[],"elementHandles":[],"keyedRepeats":[],"branches":[],"asyncBoundaries":[]},"rootChunkId":"template:App","chunks":[{"id":"template:App","kind":"template","componentName":"App","statics":["<main><!--markless-slot:0-->","</main>"],"hosts":[{"hostNodeId":"h3","tagName":"main","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"child-component","componentEdgeId":"component-edge:0","childComponentName":"Badge","childTemplateId":"template:Badge","coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]}],"hostNodeIds":["h3"],"branchIds":[],"boundaryIds":[],"repeatIds":[],"initialValues":[{"graphNodeId":"state:active","value":{"kind":"constant","value":true}}],"initialValueSources":{},"initialValueKinds":{},"stateGraphNodeIds":["state:active"],"branches":[],"repeats":[],"boundaries":[],"edges":[{"id":"component-edge:0","childComponentName":"Badge","hostPrefix":"c0:","symbolPrefix":"","boundSymbols":{"symbol:0":"bound:symbol%3A0:component-edge%3A0","symbol:1":"bound:symbol%3A1:component-edge%3A0"},"props":[{"name":"active","kind":"graph-reference","graphNodeId":"state:active","path":[],"source":"active"}]}],"propCellId":null,"ownsModuleData":true}),/*MARKLESS_CSR_TEST_END*/getComponent:(name)=>marklessCsrAllChunkComponents[name],loadSymbol,createValues:(props,read,locals,marklessReadCsrValue)=>{let active=read("state:active",[]);const error=locals.error;return {"active":()=>(active)};}}};
+export const marklessCsrChunkComponents = {"Badge": {name:"Badge",dataId:"markless-csr-data:src%2FSameModuleChild.tsrx:Badge",/*MARKLESS_CSR_TEST_START*/nativeFallback:()=>({"name":"Badge","state":{"version":1,"cells":[{"graphNodeId":"state:active","name":"active","valueKind":"scalar","value":{"version":1,"root":true,"records":[]}}],"computed":[],"sharedDefinitions":[]},"view":{"version":1,"locators":[{"hostNodeId":"h0","strategy":"dom-order","index":0,"tagName":"span"},{"hostNodeId":"h3","strategy":"dom-order","index":3,"tagName":"main"}],"events":[],"domUpdates":[],"behaviors":[],"elementHandles":[],"keyedRepeats":[],"branches":[{"id":"branch-site:0","startAnchor":{"strategy":"dom-order-comment","index":0},"endAnchor":{"strategy":"dom-order-comment","index":1},"symbolId":"symbol:2","testReads":[{"source":"active","graphNodeId":"prop:props","path":["active"]}],"armRecords":[{"events":[],"domUpdates":[{"hostNodeId":"h1","source":"active","graphNodeId":"prop:props","path":["active"],"target":{"kind":"text","trueValue":"Live","falseValue":"Idle"},"hostPath":[0],"symbolId":"bound:symbol%3A0:component-edge%3A0"}],"behaviors":[],"elementHandles":[]},{"events":[],"domUpdates":[{"hostNodeId":"h2","source":"active","graphNodeId":"prop:props","path":["active"],"target":{"kind":"text","trueValue":"Live","falseValue":"Idle"},"hostPath":[0],"symbolId":"bound:symbol%3A1:component-edge%3A0"}],"behaviors":[],"elementHandles":[]}]}],"asyncBoundaries":[]},"rootChunkId":"template:Badge","chunks":[{"id":"branch:branch-site:0:arm:0","kind":"branch-arm","componentName":"Badge","statics":["<em>Live</em>"],"hosts":[{"hostNodeId":"h1","tagName":"em","coordinate":{"kind":"child-index","path":[0]}}],"slots":[]},{"id":"branch:branch-site:0:arm:1","kind":"branch-arm","componentName":"Badge","statics":["<em>Idle</em>"],"hosts":[{"hostNodeId":"h2","tagName":"em","coordinate":{"kind":"child-index","path":[0]}}],"slots":[]},{"id":"template:Badge","kind":"template","componentName":"Badge","statics":["<span><!--markless-slot:0-->","</span>"],"hosts":[{"hostNodeId":"h0","tagName":"span","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"branch","branchSiteId":"branch-site:0","armTemplateIds":["branch:branch-site:0:arm:0","branch:branch-site:0:arm:1"],"coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]}],"hostNodeIds":["h1","h2","h0"],"branchIds":["branch-site:0"],"boundaryIds":[],"repeatIds":[],"initialValues":[{"graphNodeId":"state:active","value":{"kind":"constant","value":true}}],"initialValueSources":{},"initialValueKinds":{},"stateGraphNodeIds":["prop:props"],"branches":[{"branchSiteId":"branch-site:0","kind":"if","testSource":"active","testReads":[{"graphNodeId":"prop:props","path":["active"]}],"armChunkIds":["branch:branch-site:0:arm:0","branch:branch-site:0:arm:1"],"anchorOrder":0,"update":"range"}],"repeats":[],"boundaries":[],"edges":[],"propCellId":"prop:props","ownsModuleData":false}),/*MARKLESS_CSR_TEST_END*/getComponent:(name)=>marklessCsrAllChunkComponents[name],loadSymbol,createValues:(props,read,locals,marklessReadCsrValue)=>{const { active } = props ?? {};const error=locals.error;return {"active":()=>(active)};}},"App": {name:"App",dataId:"markless-csr-data:src%2FSameModuleChild.tsrx:App",/*MARKLESS_CSR_TEST_START*/nativeFallback:()=>({"name":"App","state":{"version":1,"cells":[{"graphNodeId":"state:active","name":"active","valueKind":"scalar","value":{"version":1,"root":true,"records":[]}}],"computed":[],"sharedDefinitions":[]},"view":{"version":1,"locators":[{"hostNodeId":"h0","strategy":"dom-order","index":0,"tagName":"span"},{"hostNodeId":"h3","strategy":"dom-order","index":3,"tagName":"main"}],"events":[],"domUpdates":[],"behaviors":[],"elementHandles":[],"keyedRepeats":[],"branches":[{"id":"branch-site:0","startAnchor":{"strategy":"dom-order-comment","index":0},"endAnchor":{"strategy":"dom-order-comment","index":1},"symbolId":"symbol:2","testReads":[{"source":"active","graphNodeId":"prop:props","path":["active"]}],"armRecords":[{"events":[],"domUpdates":[{"hostNodeId":"h1","source":"active","graphNodeId":"prop:props","path":["active"],"target":{"kind":"text","trueValue":"Live","falseValue":"Idle"},"hostPath":[0],"symbolId":"bound:symbol%3A0:component-edge%3A0"}],"behaviors":[],"elementHandles":[]},{"events":[],"domUpdates":[{"hostNodeId":"h2","source":"active","graphNodeId":"prop:props","path":["active"],"target":{"kind":"text","trueValue":"Live","falseValue":"Idle"},"hostPath":[0],"symbolId":"bound:symbol%3A1:component-edge%3A0"}],"behaviors":[],"elementHandles":[]}]}],"asyncBoundaries":[]},"rootChunkId":"template:App","chunks":[{"id":"template:App","kind":"template","componentName":"App","statics":["<main><!--markless-slot:0-->","</main>"],"hosts":[{"hostNodeId":"h3","tagName":"main","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"child-component","componentEdgeId":"component-edge:0","childComponentName":"Badge","childTemplateId":"template:Badge","coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]}],"hostNodeIds":["h3"],"branchIds":[],"boundaryIds":[],"repeatIds":[],"initialValues":[{"graphNodeId":"state:active","value":{"kind":"constant","value":true}}],"initialValueSources":{},"initialValueKinds":{},"stateGraphNodeIds":["state:active"],"branches":[],"repeats":[],"boundaries":[],"edges":[{"id":"component-edge:0","childComponentName":"Badge","hostPrefix":"c0:","symbolPrefix":"","boundSymbols":{"symbol:0":"bound:symbol%3A0:component-edge%3A0","symbol:1":"bound:symbol%3A1:component-edge%3A0"},"props":[{"name":"active","kind":"graph-reference","graphNodeId":"state:active","path":[],"source":"active"}]}],"propCellId":null,"ownsModuleData":true}),/*MARKLESS_CSR_TEST_END*/getComponent:(name)=>marklessCsrAllChunkComponents[name],loadSymbol,createValues:(props,read,locals,marklessReadCsrValue)=>{let active=read("state:active",[]);const error=locals.error;return {"active":()=>(active)};}}};
 const marklessCsrAllChunkComponents = { ...marklessCsrChunkComponents,  };
 const marklessRenderCsrChunks = createMarklessCsrChunkRenderer({ rootComponentName: "App", components: marklessCsrAllChunkComponents });
 function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); }",
@@ -2561,18 +2561,6 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
         "tagName": "span"
       },
       {
-        "hostNodeId": "h1",
-        "strategy": "dom-order",
-        "index": 1,
-        "tagName": "em"
-      },
-      {
-        "hostNodeId": "h2",
-        "strategy": "dom-order",
-        "index": 2,
-        "tagName": "em"
-      },
-      {
         "hostNodeId": "h3",
         "strategy": "dom-order",
         "index": 3,
@@ -2580,44 +2568,87 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
       }
     ],
     "events": [],
-    "domUpdates": [
-      {
-        "hostNodeId": "h1",
-        "source": "active",
-        "graphNodeId": "prop:props",
-        "path": [
-          "active"
-        ],
-        "target": {
-          "kind": "text",
-          "trueValue": "Live",
-          "falseValue": "Idle"
-        },
-        "symbolId": "bound:symbol%3A0:component-edge%3A0"
-      },
-      {
-        "hostNodeId": "h2",
-        "source": "active",
-        "graphNodeId": "prop:props",
-        "path": [
-          "active"
-        ],
-        "target": {
-          "kind": "text",
-          "trueValue": "Live",
-          "falseValue": "Idle"
-        },
-        "symbolId": "bound:symbol%3A1:component-edge%3A0"
-      }
-    ],
+    "domUpdates": [],
     "behaviors": [],
     "elementHandles": [],
     "keyedRepeats": [],
-    "branches": [],
+    "branches": [
+      {
+        "id": "branch-site:0",
+        "startAnchor": {
+          "strategy": "dom-order-comment",
+          "index": 0
+        },
+        "endAnchor": {
+          "strategy": "dom-order-comment",
+          "index": 1
+        },
+        "symbolId": "symbol:2",
+        "testReads": [
+          {
+            "source": "active",
+            "graphNodeId": "prop:props",
+            "path": [
+              "active"
+            ]
+          }
+        ],
+        "armRecords": [
+          {
+            "events": [],
+            "domUpdates": [
+              {
+                "hostNodeId": "h1",
+                "source": "active",
+                "graphNodeId": "prop:props",
+                "path": [
+                  "active"
+                ],
+                "target": {
+                  "kind": "text",
+                  "trueValue": "Live",
+                  "falseValue": "Idle"
+                },
+                "hostPath": [
+                  0
+                ],
+                "symbolId": "bound:symbol%3A0:component-edge%3A0"
+              }
+            ],
+            "behaviors": [],
+            "elementHandles": []
+          },
+          {
+            "events": [],
+            "domUpdates": [
+              {
+                "hostNodeId": "h2",
+                "source": "active",
+                "graphNodeId": "prop:props",
+                "path": [
+                  "active"
+                ],
+                "target": {
+                  "kind": "text",
+                  "trueValue": "Live",
+                  "falseValue": "Idle"
+                },
+                "hostPath": [
+                  0
+                ],
+                "symbolId": "bound:symbol%3A1:component-edge%3A0"
+              }
+            ],
+            "behaviors": [],
+            "elementHandles": []
+          }
+        ]
+      }
+    ],
     "asyncBoundaries": []
   },
   "stateScript": "<script type=\\"markless/state\\">{\\"version\\":1,\\"cells\\":[{\\"graphNodeId\\":\\"state:active\\",\\"name\\":\\"active\\",\\"valueKind\\":\\"scalar\\",\\"value\\":{\\"version\\":1,\\"root\\":true,\\"records\\":[]}}],\\"computed\\":[],\\"sharedDefinitions\\":[]}</script>",
-  "viewScript": "<script type=\\"markless/view\\">{\\"version\\":1,\\"locators\\":[{\\"hostNodeId\\":\\"h0\\",\\"strategy\\":\\"dom-order\\",\\"index\\":0,\\"tagName\\":\\"span\\"},{\\"hostNodeId\\":\\"h1\\",\\"strategy\\":\\"dom-order\\",\\"index\\":1,\\"tagName\\":\\"em\\"},{\\"hostNodeId\\":\\"h2\\",\\"strategy\\":\\"dom-order\\",\\"index\\":2,\\"tagName\\":\\"em\\"},{\\"hostNodeId\\":\\"h3\\",\\"strategy\\":\\"dom-order\\",\\"index\\":3,\\"tagName\\":\\"main\\"}],\\"events\\":[],\\"domUpdates\\":[{\\"hostNodeId\\":\\"h1\\",\\"source\\":\\"active\\",\\"graphNodeId\\":\\"prop:props\\",\\"path\\":[\\"active\\"],\\"target\\":{\\"kind\\":\\"text\\",\\"trueValue\\":\\"Live\\",\\"falseValue\\":\\"Idle\\"},\\"symbolId\\":\\"bound:symbol%3A0:component-edge%3A0\\"},{\\"hostNodeId\\":\\"h2\\",\\"source\\":\\"active\\",\\"graphNodeId\\":\\"prop:props\\",\\"path\\":[\\"active\\"],\\"target\\":{\\"kind\\":\\"text\\",\\"trueValue\\":\\"Live\\",\\"falseValue\\":\\"Idle\\"},\\"symbolId\\":\\"bound:symbol%3A1:component-edge%3A0\\"}],\\"behaviors\\":[],\\"elementHandles\\":[],\\"keyedRepeats\\":[],\\"branches\\":[],\\"asyncBoundaries\\":[]}</script>"
+  "viewScript": "<script type=\\"markless/view\\">{\\"version\\":1,\\"locators\\":[{\\"hostNodeId\\":\\"h0\\",\\"strategy\\":\\"dom-order\\",\\"index\\":0,\\"tagName\\":\\"span\\"},{\\"hostNodeId\\":\\"h3\\",\\"strategy\\":\\"dom-order\\",\\"index\\":3,\\"tagName\\":\\"main\\"}],\\"events\\":[],\\"domUpdates\\":[],\\"behaviors\\":[],\\"elementHandles\\":[],\\"keyedRepeats\\":[],\\"branches\\":[{\\"id\\":\\"branch-site:0\\",\\"startAnchor\\":{\\"strategy\\":\\"dom-order-comment\\",\\"index\\":0},\\"endAnchor\\":{\\"strategy\\":\\"dom-order-comment\\",\\"index\\":1},\\"symbolId\\":\\"symbol:2\\",\\"testReads\\":[{\\"source\\":\\"active\\",\\"graphNodeId\\":\\"prop:props\\",\\"path\\":[\\"active\\"]}],\\"armRecords\\":[{\\"events\\":[],\\"domUpdates\\":[{\\"hostNodeId\\":\\"h1\\",\\"source\\":\\"active\\",\\"graphNodeId\\":\\"prop:props\\",\\"path\\":[\\"active\\"],\\"target\\":{\\"kind\\":\\"text\\",\\"trueValue\\":\\"Live\\",\\"falseValue\\":\\"Idle\\"},\\"hostPath\\":[0],\\"symbolId\\":\\"bound:symbol%3A0:component-edge%3A0\\"}],\\"behaviors\\":[],\\"elementHandles\\":[]},{\\"events\\":[],\\"domUpdates\\":[{\\"hostNodeId\\":\\"h2\\",\\"source\\":\\"active\\",\\"graphNodeId\\":\\"prop:props\\",\\"path\\":[\\"active\\"],\\"target\\":{\\"kind\\":\\"text\\",\\"trueValue\\":\\"Live\\",\\"falseValue\\":\\"Idle\\"},\\"hostPath\\":[0],\\"symbolId\\":\\"bound:symbol%3A1:component-edge%3A0\\"}],\\"behaviors\\":[],\\"elementHandles\\":[]}]}],\\"asyncBoundaries\\":[]}</script>"
 }",
     "protocolState": "{
   "version": 1,
@@ -2646,18 +2677,6 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
       "tagName": "span"
     },
     {
-      "hostNodeId": "h1",
-      "strategy": "dom-order",
-      "index": 1,
-      "tagName": "em"
-    },
-    {
-      "hostNodeId": "h2",
-      "strategy": "dom-order",
-      "index": 2,
-      "tagName": "em"
-    },
-    {
       "hostNodeId": "h3",
       "strategy": "dom-order",
       "index": 3,
@@ -2665,40 +2684,83 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
     }
   ],
   "events": [],
-  "domUpdates": [
-    {
-      "hostNodeId": "h1",
-      "source": "active",
-      "graphNodeId": "prop:props",
-      "path": [
-        "active"
-      ],
-      "target": {
-        "kind": "text",
-        "trueValue": "Live",
-        "falseValue": "Idle"
-      },
-      "symbolId": "bound:symbol%3A0:component-edge%3A0"
-    },
-    {
-      "hostNodeId": "h2",
-      "source": "active",
-      "graphNodeId": "prop:props",
-      "path": [
-        "active"
-      ],
-      "target": {
-        "kind": "text",
-        "trueValue": "Live",
-        "falseValue": "Idle"
-      },
-      "symbolId": "bound:symbol%3A1:component-edge%3A0"
-    }
-  ],
+  "domUpdates": [],
   "behaviors": [],
   "elementHandles": [],
   "keyedRepeats": [],
-  "branches": [],
+  "branches": [
+    {
+      "id": "branch-site:0",
+      "startAnchor": {
+        "strategy": "dom-order-comment",
+        "index": 0
+      },
+      "endAnchor": {
+        "strategy": "dom-order-comment",
+        "index": 1
+      },
+      "symbolId": "symbol:2",
+      "testReads": [
+        {
+          "source": "active",
+          "graphNodeId": "prop:props",
+          "path": [
+            "active"
+          ]
+        }
+      ],
+      "armRecords": [
+        {
+          "events": [],
+          "domUpdates": [
+            {
+              "hostNodeId": "h1",
+              "source": "active",
+              "graphNodeId": "prop:props",
+              "path": [
+                "active"
+              ],
+              "target": {
+                "kind": "text",
+                "trueValue": "Live",
+                "falseValue": "Idle"
+              },
+              "hostPath": [
+                0
+              ],
+              "symbolId": "bound:symbol%3A0:component-edge%3A0"
+            }
+          ],
+          "behaviors": [],
+          "elementHandles": []
+        },
+        {
+          "events": [],
+          "domUpdates": [
+            {
+              "hostNodeId": "h2",
+              "source": "active",
+              "graphNodeId": "prop:props",
+              "path": [
+                "active"
+              ],
+              "target": {
+                "kind": "text",
+                "trueValue": "Live",
+                "falseValue": "Idle"
+              },
+              "hostPath": [
+                0
+              ],
+              "symbolId": "bound:symbol%3A1:component-edge%3A0"
+            }
+          ],
+          "behaviors": [],
+          "elementHandles": []
+        }
+      ]
+    }
+  ],
   "asyncBoundaries": []
 }",
     "publicRenderPlan": "{
