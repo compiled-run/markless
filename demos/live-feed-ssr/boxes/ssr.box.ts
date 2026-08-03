@@ -68,11 +68,17 @@ export default box(
 		if (!held.firstChunk.includes('data-markless-self-wake')) {
 			throw new Error('Expected held SSR raw stream to carry the self-wake marker.');
 		}
+		const shellPayloadBytes = readPayloadScriptBytes(held.firstChunk);
+		if (shellPayloadBytes !== 0) {
+			throw new Error(
+				`Expected held SSR raw stream shell to carry zero payload bytes, got ${shellPayloadBytes}.`,
+			);
+		}
 		if (held.firstChunkElapsedMs >= held.totalElapsedMs) {
 			throw new Error('Expected a distinct pending flush before held SSR completion.');
 		}
 		receipt.note(
-			`held pending raw-stream scenario: first=${held.firstChunkElapsedMs}ms total=${held.totalElapsedMs}ms`,
+			`held pending raw-stream scenario: payload=${FULL_PAYLOAD_SCRIPT_BYTES} bytes full -> ${shellPayloadBytes} bytes shell; first=${held.firstChunkElapsedMs}ms total=${held.totalElapsedMs}ms`,
 		);
 
 		const streamedCells = reachableArmRecordCells('ssr').filter(
@@ -142,6 +148,13 @@ function readResumePayload(html: string): {
 		state: payload.state as never,
 		view: payload.view as never,
 	};
+}
+
+function readPayloadScriptBytes(html: string): number {
+	return [...html.matchAll(/<script type="markless\/(?:state|view)">[\s\S]*?<\/script>/g)].reduce(
+		(total, match) => total + new TextEncoder().encode(match[0]).length,
+		0,
+	);
 }
 
 async function waitForSettledLoadAccounting(

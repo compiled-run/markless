@@ -12,9 +12,16 @@ import { renderToStream } from '../src/render-to-stream.ts';
 // the taken arm between the boundary's comment anchors, and reports the
 // armized record set for the arm it actually served (alternate-shaped: a
 // beacon relay, not a dashboard).
-function relayArtifact(input: { readonly delayMs: number; readonly fail?: boolean }) {
+function relayArtifact(input: {
+	readonly delayMs: number;
+	readonly fail?: boolean;
+	readonly prerenderWakeModuleUrl?: string;
+}) {
 	return {
 		resumeModuleUrl: '/build/relay-resume.js',
+		...(input.prerenderWakeModuleUrl
+			? { prerenderWakeModuleUrl: input.prerenderWakeModuleUrl }
+			: {}),
 		async renderSsr(props?: unknown, renderContext?: unknown) {
 			const snapshots: unknown[] = [];
 			const snapshot = (await marklessSsrRunAsyncComputed(
@@ -517,6 +524,30 @@ test('renderToStream flushes the pending shell and appends the settled arm out o
 	expect(chunk).toContain('__mArm("boundary:0")');
 	// The executor learns the resume module for post-commit wake triggers.
 	expect(chunk).toContain('/build/relay-resume.js');
+});
+
+test('wake-channel streaming emits a zero-payload baseline shell without changing installment bytes', async () => {
+	const legacy = await renderToStream(relayArtifact({ delayMs: 40 }) as never, {});
+	const wake = await renderToStream(
+		relayArtifact({
+			delayMs: 40,
+			prerenderWakeModuleUrl: '/build/prerender-wake-relay.js',
+		}) as never,
+		{},
+	);
+
+	expect(wake.pendingArmCount).toBe(1);
+	expect(wake.shell).toContain('<p>Scanning channels</p>');
+	expect(wake.shell.match(/<script type="markless\/(?:state|view)">/g) ?? []).toHaveLength(0);
+	expect(wake.shell).toContain(
+		'data-markless-resume-module="/build/prerender-wake-relay.js"',
+	);
+
+	const [legacyInstallments, wakeInstallments] = await Promise.all([
+		collect(legacy.appends()),
+		collect(wake.appends()),
+	]);
+	expect(wakeInstallments).toEqual(legacyInstallments);
 });
 
 test('renderToStream emits the same leading storage seed contract as renderToString', async () => {
