@@ -1,5 +1,6 @@
 import { createServerEntry } from '@markless/router/vite/runtime/create-server-entry';
 import { resumeEntryPath } from 'virtual:markless-router/resume-entry-path';
+import { prerenderWakeEntryPath } from 'virtual:markless-router/prerender-wake-entry-path';
 import { navigationEntryPath } from 'virtual:markless-router/navigation-entry-path';
 import {
 	routeModulePreloads,
@@ -12,6 +13,7 @@ const documentModuleLoaders = import.meta.glob(['/document.tsrx']);
 const entry = createServerEntry({
 	dev: import.meta.env.DEV,
 	resumeEntryPath,
+	prerenderWakeEntryPath,
 	navigationEntryPath,
 	routeModulePreloads,
 	routeSsrModulePreloads,

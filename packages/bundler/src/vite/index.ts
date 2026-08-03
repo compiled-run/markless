@@ -58,6 +58,7 @@ type InternalMarklessRolldownOptions = MarklessRolldownOptions & {
 	prerender?: boolean;
 	productionResumeModuleUrls?: Map<string, string>;
 	productionPrerenderWakeModuleUrls?: Map<string, string>;
+	prerenderWakeChannel?: boolean;
 	publicPath?: (fileName: string) => string;
 	updateDevPrerenderHashes?: (hashes: ReadonlyMap<string, string>) => void;
 };
@@ -72,6 +73,7 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 	const rolldownOptions: InternalMarklessRolldownOptions = { ...options };
 	const prerender = process.env.MARKLESS_PRERENDER === '1';
 	rolldownOptions.prerender = false;
+	rolldownOptions.prerenderWakeChannel = process.env.MARKLESS_PRERENDER_WAKE === '1';
 	rolldownOptions.productionResumeModuleUrls = new Map();
 	rolldownOptions.productionPrerenderWakeModuleUrls = new Map();
 	let prerenderEntry: string | null = null;

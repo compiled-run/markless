@@ -34,6 +34,8 @@ const POSTURE_CONDITIONAL_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Production resume URLs are selected by the resolved server compilation.',
 	"packages/bundler/src/rolldown.ts :: currentEnvironment === 'server'":
 		'Production prerender-wake URLs are selected by the resolved server compilation.',
+	"packages/bundler/src/rolldown.ts :: if (currentEnvironment === 'client' && prerenderWakeRequest) {":
+		'Prerender-wake source requests are answered only in the resolved client compilation.',
 	"packages/bundler/src/rolldown.ts :: devResumeReexport: internalOptions.dev === true && currentEnvironment === 'client',":
 		'Development resume re-exports keep source modules in the resolved client graph.',
 	"packages/bundler/src/rolldown.ts :: if (currentEnvironment === 'client' && isResumeSourceRequest(id)) {":
@@ -84,6 +86,8 @@ const POSTURE_CONDITIONAL_ALLOWLIST: Readonly<Record<string, string>> = {
 		'This file is the Vite environment-name resolver for server posture.',
 	"packages/bundler/src/vite/index.ts :: const prerender = process.env.MARKLESS_PRERENDER === '1';":
 		'The Vite host adapter reads the process flag once at plugin construction.',
+	"packages/bundler/src/vite/index.ts :: rolldownOptions.prerenderWakeChannel = process.env.MARKLESS_PRERENDER_WAKE === '1';":
+		'The Vite host adapter reads the wake-channel flag once at plugin construction.',
 	"packages/bundler/src/vite/index.ts :: ...(environment === 'client'":
 		'Vite configuration projects the resolved client environment into module preload settings.',
 	"packages/bundler/src/vite/index.ts :: if (config.build?.lib || config.build?.ssr) {":

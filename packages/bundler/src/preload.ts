@@ -7,7 +7,10 @@ export {
 	type ModulePreloadPriority,
 	type ModulePreloadRoot,
 } from './build/preload-plan.ts';
-export { symbolVirtualModuleSourceFile } from './source-module.ts';
+export {
+	prerenderWakeVirtualModuleSourceFile,
+	symbolVirtualModuleSourceFile,
+} from './source-module.ts';
 export {
 	preloadLazySymbolModules,
 	type AppendedModulePreloads,

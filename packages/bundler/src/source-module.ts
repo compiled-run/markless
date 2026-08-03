@@ -59,6 +59,17 @@ export function prerenderWakeVirtualModuleId(filename: string) {
 	return `${MARKLESS_VIRTUAL_PREFIX}prerender-wake:${encodeURIComponent(filename)}`;
 }
 
+export function prerenderWakeVirtualModuleSourceFile(moduleId: string): string | null {
+	const bare = moduleId.startsWith('\0') ? moduleId.slice(1) : moduleId;
+	const prefix = `${MARKLESS_VIRTUAL_PREFIX}prerender-wake:`;
+	if (!bare.startsWith(prefix)) return null;
+	try {
+		return decodeURIComponent(bare.slice(prefix.length));
+	} catch {
+		return null;
+	}
+}
+
 export function scopedSymbolExportName(filename: string, exportName: string) {
 	return `${exportName}_${stringHash(filename)}`;
 }

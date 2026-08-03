@@ -157,9 +157,17 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					{
 						id: renderDataId,
 						type: 'render-data' as const,
-						source: input.prerenderRecords
-							? prerenderDataModuleSource(compiled, input.importedModuleInterfaces)
-							: compiled.publicRenderModule.renderDataModuleSource,
+						// Prerender emission requires every imported child's linked
+						// render-data interface. An incomplete set is an ELIGIBILITY
+						// boundary, not a failure: the pre-link pass defers to the
+						// linked pass, and pages composing artifact-shaped package
+						// children (e.g. the router's Link) stay on the payload
+						// container until artifact-child prerender lands.
+						source:
+							input.prerenderRecords &&
+							prerenderInterfacesComplete(compiled, input.importedModuleInterfaces)
+								? prerenderDataModuleSource(compiled, input.importedModuleInterfaces)
+								: compiled.publicRenderModule.renderDataModuleSource,
 					},
 				]
 			: []),
@@ -192,9 +200,15 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 				// The capability closure (page + linked children) decides the wake;
 				// the variant is ADDITIVE: CSR prerender pages boot through this
 				// regular resume module, so suppressing its records mode when a
-				// variant also exists strands them on the payload path.
+				// variant also exists strands them on the payload path. Ineligible
+				// pages (artifact-shaped package children) emit ordinary render
+				// data, so records mode must not import from it.
 				needsFullResume: prerenderClosureNeedsWake,
-				prerenderDataId: input.prerenderRecords ? renderDataId : undefined,
+				prerenderDataId:
+					input.prerenderRecords &&
+					prerenderInterfacesComplete(compiled, input.importedModuleInterfaces)
+						? renderDataId
+						: undefined,
 				hasBoundSymbols: compiled.boundSymbolResolver.rows.length > 0,
 				symbols: symbolRows,
 				symbolRoutes,
@@ -202,6 +216,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		},
 		...(input.prerenderWakeVariant &&
 		compiled.publicRenderModule.renderDataModuleSource &&
+		prerenderInterfacesComplete(compiled, input.importedModuleInterfaces) &&
 		prerenderClosureNeedsWake
 			? [
 					{
@@ -327,6 +342,15 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		interfaceHash: moduleInterfaceHash(compiled.moduleGraphInterface),
 		moduleImports: compiled.semanticGraph.moduleImports,
 	};
+}
+
+function prerenderInterfacesComplete(
+	compiled: CompileTsrxModuleResult,
+	importedModuleInterfaces: TransformTsrxModuleInput['importedModuleInterfaces'],
+): boolean {
+	return compiled.semanticGraph.componentEdges.every(
+		(edge) => !edge.importSource || importedModuleInterfaces?.[edge.importSource] !== undefined,
+	);
 }
 
 function prerenderDataModuleSource(

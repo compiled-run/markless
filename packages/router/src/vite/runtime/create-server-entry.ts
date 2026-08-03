@@ -21,6 +21,7 @@ export interface ServerEntryOptions {
 	readonly dev?: boolean;
 	readonly navigationEntryPath?: string;
 	readonly resumeEntryPath?: string;
+	readonly prerenderWakeEntryPath?: string;
 	readonly routeModulePreloads?: Record<string, readonly ModulePreloadInput[]>;
 	readonly routeSsrModulePreloads?: Record<string, readonly ModulePreloadInput[]>;
 	readonly routeStylesheets?: Record<string, readonly string[]>;
@@ -45,6 +46,7 @@ type SsrRender = (props?: unknown, renderContext?: unknown) => RenderOutput | Pr
 interface SsrArtifact {
 	readonly renderSsr?: SsrRender;
 	readonly resumeModuleUrl?: string;
+	readonly prerenderWakeModuleUrl?: string;
 	readonly inlineResumerSources?: SsrRenderArtifact['inlineResumerSources'];
 	readonly headInjections?: ReadonlyArray<RenderHeadInjection>;
 	readonly storageSeeds?: SsrRenderArtifact['storageSeeds'];
@@ -189,6 +191,9 @@ export function createServerEntry(options: ServerEntryOptions) {
 			options.navigationEntryPath,
 			options.routeStylesheets?.[file],
 		);
+		const routedArtifact = options.prerenderWakeEntryPath
+			? { ...pageArtifact, prerenderWakeModuleUrl: options.prerenderWakeEntryPath }
+			: pageArtifact;
 		const renderOptions = {
 			props: pageProps,
 			resumeModuleUrl: options.resumeEntryPath ?? baseArtifact?.resumeModuleUrl,
@@ -207,7 +212,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 		// Blocking opt-out: the pre-T107 whole-page await.
 		if (options.render === 'blocking') {
 			const pageHtml = splitLeadingHeadHtml(
-				await renderToString(pageArtifact as never, renderOptions),
+				await renderToString(routedArtifact as never, renderOptions),
 			);
 			const shell = await renderDocumentShell(documentModule, pageProps, pageHtml.headHtml);
 			return new Response(fillDocumentChildren(shell, pageHtml.bodyHtml), {
@@ -220,7 +225,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 		// the point of @try — boundaries whose data beats the first-flush
 		// deadline render inline; the rest flush @pending and settle on the
 		// same open response.
-		const stream = await renderToStream(pageArtifact as never, renderOptions);
+		const stream = await renderToStream(routedArtifact as never, renderOptions);
 		const pageHtml = splitLeadingHeadHtml(stream.shell);
 		const shell = await renderDocumentShell(documentModule, pageProps, pageHtml.headHtml);
 		if (stream.pendingArmCount === 0) {

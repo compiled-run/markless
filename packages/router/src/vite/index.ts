@@ -42,6 +42,9 @@ const CLIENT_ENTRY_ID = 'virtual:markless-router/client-entry';
 const RESUME_ENTRY_ID = 'virtual:markless-router/resume-entry';
 const RESUME_ENTRY_ORIGIN = '/entries/resume-entry.ts';
 const RESUME_ENTRY_PATH_ID = 'virtual:markless-router/resume-entry-path';
+const PRERENDER_WAKE_ENTRY_ID = 'virtual:markless-router/prerender-wake-entry';
+const PRERENDER_WAKE_ENTRY_ORIGIN = '/entries/prerender-wake-entry.ts';
+const PRERENDER_WAKE_ENTRY_PATH_ID = 'virtual:markless-router/prerender-wake-entry-path';
 const NAVIGATION_ENTRY_ID = 'virtual:markless-router/navigation-entry';
 const NAVIGATION_ENTRY_ORIGIN = '/entries/client-entry.ts';
 const NAVIGATION_ENTRY_PATH_ID = 'virtual:markless-router/navigation-entry-path';
@@ -51,7 +54,7 @@ const SERVER_ENTRY_ID = 'virtual:markless-router/server-entry';
 const ROUTE_HREF_ID = 'virtual:markless-router/route-href';
 const ROUTER_OPTIONS_ID = 'virtual:markless-router/options';
 const PUBLIC_VIRTUAL_MODULE_ID_RE =
-	/^virtual:markless-router\/(?:routes|client-entry|resume-entry|resume-entry-path|navigation-entry|navigation-entry-path|route-preloads|server-entry|route-href|options)(?:\?.*)?$/;
+	/^virtual:markless-router\/(?:routes|client-entry|resume-entry|resume-entry-path|prerender-wake-entry|prerender-wake-entry-path|navigation-entry|navigation-entry-path|route-preloads|server-entry|route-href|options)(?:\?.*)?$/;
 const VITE_PLUGIN_FILE = decodePath(parseURL(import.meta.url).pathname);
 // The app-context entry files ship as SOURCE at src/vite/entries (see the
 // `files` field): running from src, they sit next to this file; running from
@@ -70,6 +73,7 @@ const virtualEntryFiles = {
 	[ROUTE_DISCOVERY_ID]: 'route-discovery.ts',
 	[CLIENT_ENTRY_ID]: 'client-entry.ts',
 	[RESUME_ENTRY_ID]: 'resume-entry.ts',
+	[PRERENDER_WAKE_ENTRY_ID]: 'prerender-wake-entry.ts',
 	[NAVIGATION_ENTRY_ID]: 'client-entry.ts',
 	[SERVER_ENTRY_ID]: 'server-entry.ts',
 	[ROUTE_HREF_ID]: 'route-href.ts',
@@ -83,6 +87,9 @@ export interface MarklessRouterOptions {
 }
 
 export function router(options: MarklessRouterOptions = {}): PluginOption[] {
+	// Captured at factory time so config wrappers can scope the env var to the
+	// plugin construction, mirroring the MARKLESS_PRERENDER pattern.
+	prerenderWakeChannelCaptured = process.env.MARKLESS_PRERENDER_WAKE === '1';
 	if (options.nitro === false) {
 		return [
 			mdxTransformPlugin(),
@@ -96,18 +103,25 @@ export function router(options: MarklessRouterOptions = {}): PluginOption[] {
 
 	const nitroPlugins = nitro();
 	const resumeEntry = resumeEntryState();
+	const prerenderWakeEntry = resumeEntryState();
 	const navigationEntry = resumeEntryState();
 	const routePreloads = routePreloadState();
 
 	return [
-		routerConfigPlugin(nitroPlugins, resumeEntry, navigationEntry, routePreloads),
+		routerConfigPlugin(
+			nitroPlugins,
+			resumeEntry,
+			prerenderWakeEntry,
+			navigationEntry,
+			routePreloads,
+		),
 		devSourceModuleRequestPlugin(),
 		mdxTransformPlugin(),
 		requestFileTransformPlugin(),
 		routeTypegenPlugin(),
 		anchorTransformPlugin(),
 		htmlTransformPlugin(),
-		virtualModulesPlugin(resumeEntry, navigationEntry, routePreloads),
+		virtualModulesPlugin(resumeEntry, prerenderWakeEntry, navigationEntry, routePreloads),
 		nitroPlugins,
 	];
 }
@@ -151,6 +165,7 @@ function devSourceModuleRequestPlugin(): Plugin {
 function routerConfigPlugin(
 	nitroPluginsFromRouter: readonly Plugin[],
 	resumeEntry: ResumeEntryState,
+	prerenderWakeEntry: ResumeEntryState,
 	navigationEntry: ResumeEntryState,
 	routePreloads: RoutePreloadState,
 ): Plugin {
@@ -205,7 +220,7 @@ function routerConfigPlugin(
 				serverEnvironmentConfig = config.environments.ssr;
 				clientOutDir = resolve(config.root, environment.build.outDir);
 			}
-			for (const entry of [resumeEntry, navigationEntry, routePreloads]) {
+			for (const entry of [resumeEntry, prerenderWakeEntry, navigationEntry, routePreloads]) {
 				entry.base = config.base;
 			}
 			routePreloads.root = config.root;
@@ -232,6 +247,7 @@ function routerConfigPlugin(
 			if (isClientEnvironment) {
 				pendingClientAssets = undefined;
 				resumeEntry.fileName = undefined;
+				prerenderWakeEntry.fileName = undefined;
 				navigationEntry.fileName = undefined;
 				routePreloads.routes = { navigation: {}, ssr: {}, styles: {} };
 				routePreloads.persisted = false;
@@ -242,6 +258,9 @@ function routerConfigPlugin(
 
 			const manifest = await readClientAssetsManifest(clientOutDir, routePreloads.base);
 			resumeEntry.fileName = clientAssetFileName(manifest.entries.resume, manifest.base);
+			prerenderWakeEntry.fileName = manifest.entries.prerenderWake
+				? clientAssetFileName(manifest.entries.prerenderWake, manifest.base)
+				: undefined;
 			navigationEntry.fileName = clientAssetFileName(
 				manifest.entries.navigation,
 				manifest.base,
@@ -264,6 +283,14 @@ function routerConfigPlugin(
 				if (resumeChunk) {
 					resumeEntry.fileName = resumeChunk.fileName;
 				}
+				const prerenderWakeChunk = Object.values(bundle).find(
+					(item) =>
+						item.type === 'chunk' &&
+						isVirtualEntryChunk(item, PRERENDER_WAKE_ENTRY_ORIGIN),
+				);
+				if (prerenderWakeChunk) {
+					prerenderWakeEntry.fileName = prerenderWakeChunk.fileName;
+				}
 				const navigationChunk = Object.values(bundle).find(
 					(item) =>
 						item.type === 'chunk' && isVirtualEntryChunk(item, NAVIGATION_ENTRY_ORIGIN),
@@ -275,19 +302,35 @@ function routerConfigPlugin(
 					base: routePreloads.base,
 					bundle,
 					navigationChunk,
+					prerenderWakeChunk,
 					resumeChunk,
 					root: routePreloads.root,
 				});
 				patchRoutePreloadsInBundle(bundle, routePreloads.routes);
 				if (productionBuild) {
-					if (!resumeEntry.fileName || !navigationEntry.fileName) {
+					const wakeRequired = prerenderWakeChannelEnabled();
+					if (
+						!resumeEntry.fileName ||
+						(wakeRequired && !prerenderWakeEntry.fileName) ||
+						!navigationEntry.fileName
+					) {
 						throw new Error(
-							'Markless Router client build did not emit its resume and navigation entries.',
+							wakeRequired
+								? 'Markless Router client build did not emit its resume, prerender-wake, and navigation entries.'
+								: 'Markless Router client build did not emit its resume and navigation entries.',
 						);
 					}
 					pendingClientAssets = createClientAssetsManifest({
 						base: routePreloads.base,
 						resumeEntry: joinURL(routePreloads.base, resumeEntry.fileName),
+						...(prerenderWakeEntry.fileName
+							? {
+									prerenderWakeEntry: joinURL(
+										routePreloads.base,
+										prerenderWakeEntry.fileName,
+									),
+								}
+							: {}),
 						navigationEntry: joinURL(routePreloads.base, navigationEntry.fileName),
 						routes: routePreloads.routes,
 					});
@@ -526,21 +569,40 @@ function routePreloadState(): RoutePreloadState {
 	};
 }
 
+// The prerender-wake entry ships BOTH boot paths (a request-divergent hit on
+// the same route still needs the payload path), costing shipped-JS wall bytes
+// that only the tier demolition frees. Until that lands, the wake channel is
+// opt-in through the same internal env pattern as MARKLESS_PRERENDER.
+let prerenderWakeChannelCaptured = false;
+function prerenderWakeChannelEnabled(): boolean {
+	return prerenderWakeChannelCaptured;
+}
+
 function routerClientInput(input: InputOption | undefined, root: string): InputOption | undefined {
 	const resumeEntryId = scopedVirtualEntryId(RESUME_ENTRY_ID, root);
+	const prerenderWakeEntryId = scopedVirtualEntryId(PRERENDER_WAKE_ENTRY_ID, root);
 	const navigationEntryId = scopedVirtualEntryId(NAVIGATION_ENTRY_ID, root);
+	const wakeEntries = prerenderWakeChannelEnabled() ? [prerenderWakeEntryId] : [];
 	if (input === undefined) {
-		return [resumeEntryId, navigationEntryId];
+		return [resumeEntryId, ...wakeEntries, navigationEntryId];
 	}
 
 	if (typeof input === 'string' || Array.isArray(input)) {
-		return [resumeEntryId, navigationEntryId, ...(Array.isArray(input) ? input : [input])];
+		return [
+			resumeEntryId,
+			...wakeEntries,
+			navigationEntryId,
+			...(Array.isArray(input) ? input : [input]),
+		];
 	}
 
 	if (isRecord(input)) {
 		return {
 			...input,
 			'markless-router-resume': resumeEntryId,
+			...(prerenderWakeChannelEnabled()
+				? { 'markless-router-prerender-wake': prerenderWakeEntryId }
+				: {}),
 			'markless-router-navigation': navigationEntryId,
 		};
 	}
@@ -562,6 +624,7 @@ function isVirtualEntryChunk(
 
 function virtualModulesPlugin(
 	resumeEntry: ResumeEntryState = resumeEntryState(),
+	prerenderWakeEntry: ResumeEntryState = resumeEntryState(),
 	navigationEntry: ResumeEntryState = resumeEntryState(),
 	routePreloads: RoutePreloadState = routePreloadState(),
 ): Plugin {
@@ -582,6 +645,7 @@ function virtualModulesPlugin(
 				if (
 					baseId === SERVER_ENTRY_ID ||
 					baseId === RESUME_ENTRY_PATH_ID ||
+					baseId === PRERENDER_WAKE_ENTRY_PATH_ID ||
 					baseId === NAVIGATION_ENTRY_PATH_ID ||
 					baseId === ROUTE_PRELOADS_ID ||
 					baseId === ROUTER_OPTIONS_ID
@@ -602,6 +666,20 @@ function virtualModulesPlugin(
 			}
 			if (id.startsWith(`\0${RESUME_ENTRY_PATH_ID}`)) {
 				return entryPathSource('resumeEntryPath', resumeEntry, RESUME_ENTRY_ID, root);
+			}
+			if (id.startsWith(`\0${PRERENDER_WAKE_ENTRY_PATH_ID}`)) {
+				// Unlike the resume entry, there is no dev @id fallback here: a
+				// truthy path with no emitted entry would flip every served page
+				// to the empty-delta container with a dead wake URL.
+				if (!prerenderWakeChannelEnabled() || !prerenderWakeEntry.fileName) {
+					return 'export const prerenderWakeEntryPath = undefined;';
+				}
+				return entryPathSource(
+					'prerenderWakeEntryPath',
+					prerenderWakeEntry,
+					PRERENDER_WAKE_ENTRY_ID,
+					root,
+				);
 			}
 			if (id.startsWith(`\0${NAVIGATION_ENTRY_PATH_ID}`)) {
 				return entryPathSource(
@@ -641,6 +719,7 @@ function serverEntrySource(root: string): string {
 	return [
 		`import { createServerEntry } from '@markless/router/vite/runtime/create-server-entry';`,
 		`import { resumeEntryPath } from '${RESUME_ENTRY_PATH_ID}${query}';`,
+		`import { prerenderWakeEntryPath } from '${PRERENDER_WAKE_ENTRY_PATH_ID}${query}';`,
 		`import { navigationEntryPath } from '${NAVIGATION_ENTRY_PATH_ID}${query}';`,
 		`import { routeModulePreloads, routeSsrModulePreloads, routeStylesheets } from '${ROUTE_PRELOADS_ID}${query}';`,
 		`import { pageModuleLoaders, routeFileIds } from '${ROUTE_DISCOVERY_ID}${query}';`,
@@ -648,6 +727,7 @@ function serverEntrySource(root: string): string {
 		`const entry = createServerEntry({`,
 		`  dev: import.meta.env.DEV,`,
 		`  resumeEntryPath,`,
+		`  prerenderWakeEntryPath,`,
 		`  navigationEntryPath,`,
 		`  routeModulePreloads,`,
 		`  routeSsrModulePreloads,`,
@@ -748,6 +828,7 @@ function routeModulePreloadsFromBundle(input: {
 	readonly base: string;
 	readonly bundle: Record<string, unknown>;
 	readonly navigationChunk: OutputChunkLike | undefined;
+	readonly prerenderWakeChunk: OutputChunkLike | undefined;
 	readonly resumeChunk: OutputChunkLike | undefined;
 	readonly root: string;
 }): RoutePreloadMaps {
@@ -796,6 +877,18 @@ function routeModulePreloadsFromBundle(input: {
 			// Missing this walk makes the first interaction pay a serial waterfall
 			// fetch on slow networks (the preload-strategy box catches this).
 			for (const fileName of routeScopedDynamicImports(input.resumeChunk, routeFile)) {
+				includeChunk(ssrFileNames, chunksByFileName, fileName, true);
+			}
+		}
+		// Empty-delta pages boot through the prerender-wake entry instead of the
+		// resume module; its route-scoped closure obeys the same preload law —
+		// the first interaction must fetch ZERO framework chunks.
+		if (input.prerenderWakeChunk) {
+			includeChunk(ssrFileNames, chunksByFileName, input.prerenderWakeChunk.fileName);
+			for (const fileName of routeScopedDynamicImports(
+				input.prerenderWakeChunk,
+				routeFile,
+			)) {
 				includeChunk(ssrFileNames, chunksByFileName, fileName, true);
 			}
 		}

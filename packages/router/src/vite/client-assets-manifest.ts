@@ -19,6 +19,7 @@ export interface MarklessRouterClientAssetsManifest {
 	readonly base: string;
 	readonly entries: {
 		readonly resume: string;
+		readonly prerenderWake?: string;
 		readonly navigation: string;
 	};
 	readonly routes: MarklessRouterClientAssetRoutes;
@@ -27,6 +28,7 @@ export interface MarklessRouterClientAssetsManifest {
 export function createClientAssetsManifest(input: {
 	readonly base: string;
 	readonly resumeEntry: string;
+	readonly prerenderWakeEntry?: string;
 	readonly navigationEntry: string;
 	readonly routes: MarklessRouterClientAssetRoutes;
 }): MarklessRouterClientAssetsManifest {
@@ -35,6 +37,7 @@ export function createClientAssetsManifest(input: {
 		base: input.base,
 		entries: {
 			resume: input.resumeEntry,
+			...(input.prerenderWakeEntry ? { prerenderWake: input.prerenderWakeEntry } : {}),
 			navigation: input.navigationEntry,
 		},
 		routes: {
@@ -189,6 +192,14 @@ async function validateClientAssetsManifest(
 
 	const entries = {
 		resume: requiredString(input.entries.resume, 'entries.resume'),
+		...(input.entries.prerenderWake !== undefined
+			? {
+					prerenderWake: requiredString(
+						input.entries.prerenderWake,
+						'entries.prerenderWake',
+					),
+				}
+			: {}),
 		navigation: requiredString(input.entries.navigation, 'entries.navigation'),
 	};
 	const routes = {
@@ -200,6 +211,7 @@ async function validateClientAssetsManifest(
 
 	const hrefs = new Set([
 		entries.resume,
+		...(entries.prerenderWake !== undefined ? [entries.prerenderWake] : []),
 		entries.navigation,
 		...Object.values(routes.navigation).flat(),
 		...Object.values(routes.ssr).flat(),

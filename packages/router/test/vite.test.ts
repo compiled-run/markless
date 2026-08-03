@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'pathe';
-import { expect, test } from 'vitest';
+import { expect, onTestFinished, test } from 'vitest';
 import { nitro } from 'nitro/vite';
 import type { Plugin } from 'vite';
 import {
@@ -242,6 +242,63 @@ test('preserves router resume entry exports for preview resume', () => {
 	expect(clientConfig.build.rolldownOptions.preserveEntrySignatures).toBe('exports-only');
 });
 
+test('wires the routed prerender-wake entry path through the server entry', async () => {
+	process.env.MARKLESS_PRERENDER_WAKE = '1';
+	onTestFinished(() => {
+		delete process.env.MARKLESS_PRERENDER_WAKE;
+	});
+	const plugins = flattenPlugins([router()]);
+	const configPlugin = plugins.find((plugin) => plugin.name === 'markless-router:vite');
+	const routePlugin = plugins.find((plugin) => plugin.name === 'markless-router:routes');
+	const clientConfig = {
+		consumer: 'client',
+		root: '/project',
+		build: { rolldownOptions: {} },
+	};
+
+	configPlugin?.configEnvironment?.('client', clientConfig as never);
+	expect(clientConfig.build.rolldownOptions.input).toEqual(
+		expect.arrayContaining([
+			expect.stringContaining('virtual:markless-router/prerender-wake-entry'),
+		]),
+	);
+
+	configPlugin?.configResolved?.({
+		base: '/docs/',
+		command: 'serve',
+		environments: { browser: clientConfig, ssr: { consumer: 'server' } },
+		root: '/project',
+	} as never);
+	routePlugin?.configResolved?.({ root: '/project' } as never);
+	await hookHandler(configPlugin?.generateBundle)?.call(
+		{ environment: { config: clientConfig } },
+		{},
+		{
+			'build/prerender-wake-C3d4.js': {
+				type: 'chunk',
+				fileName: 'build/prerender-wake-C3d4.js',
+				facadeModuleId: '/project/node_modules/@markless/router/src/vite/entries/prerender-wake-entry.ts',
+				moduleIds: [],
+			},
+		},
+	);
+
+	const load = hookHandler(routePlugin?.load);
+	const wakePathSource = await load?.call(
+		{ environment: { config: { consumer: 'server' } } },
+		'\0virtual:markless-router/prerender-wake-entry-path',
+	);
+	const serverEntry = await load?.call(
+		{ environment: { config: { consumer: 'server' } } },
+		'\0virtual:markless-router/server-entry',
+	);
+
+	expect(wakePathSource).toContain(
+		'export const prerenderWakeEntryPath = "/docs/build/prerender-wake-C3d4.js"',
+	);
+	expect(serverEntry).toContain('prerenderWakeEntryPath,');
+});
+
 test('router resume entry imports TSRX virtual resume modules instead of page modules', async () => {
 	const source = await readFile(
 		new URL('../src/vite/entries/resume-entry.ts', import.meta.url),
@@ -318,6 +375,12 @@ test('persists client assets for a fresh server plugin instance', async () => {
 			dynamicImports: ['build/page-C3.js'],
 			fileName: 'build/resume-B2.js',
 			moduleIds: ['/repo/packages/router/src/vite/entries/resume-entry.ts'],
+		}),
+		'build/prerender-wake-K1.js': chunk({
+			code: `const wakeRoutes = {"/pages/index.tsrx":()=>import("./page-C3.js")};`,
+			dynamicImports: ['build/page-C3.js'],
+			fileName: 'build/prerender-wake-K1.js',
+			moduleIds: ['/repo/packages/router/src/vite/entries/prerender-wake-entry.ts'],
 		}),
 		'build/page-C3.js': chunk({
 			fileName: 'build/page-C3.js',
@@ -398,6 +461,7 @@ test('persists client assets for a fresh server plugin instance', async () => {
 		};
 		expect(persisted.entries).toEqual({
 			navigation: '/docs/build/navigation-A1.js',
+			prerenderWake: '/docs/build/prerender-wake-K1.js',
 			resume: '/docs/build/resume-B2.js',
 		});
 		expect(persisted.routes.styles['pages/index.tsrx']).toEqual([
@@ -414,6 +478,7 @@ test('persists client assets for a fresh server plugin instance', async () => {
 			'/docs/build/resume-B2.js',
 			'/docs/build/page-C3.js',
 			'/docs/build/styled-child-D4.js',
+			'/docs/build/prerender-wake-K1.js',
 			'/docs/build/page-handler-H8.js',
 		]);
 		expect(persisted.routes.navigation['pages/index.tsrx']).not.toContain(
@@ -485,6 +550,7 @@ test('rejects invalid persisted client-assets manifests and writes only the v1 s
 		base: '/docs/',
 		entries: {
 			resume: '/docs/build/resume.js',
+			prerenderWake: '/docs/build/prerender-wake.js',
 			navigation: '/docs/build/navigation.js',
 		},
 		routes: {
@@ -592,6 +658,7 @@ test('rejects invalid persisted client-assets manifests and writes only the v1 s
 
 		for (const fileName of [
 			'build/resume.js',
+			'build/prerender-wake.js',
 			'build/navigation.js',
 			'build/page.js',
 			'assets/page.css',

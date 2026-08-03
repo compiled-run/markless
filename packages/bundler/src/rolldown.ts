@@ -77,6 +77,7 @@ type InternalMarklessRolldownOptions = MarklessRolldownOptions & {
 	prerender?: boolean;
 	productionResumeModuleUrls?: Map<string, string>;
 	productionPrerenderWakeModuleUrls?: Map<string, string>;
+	prerenderWakeChannel?: boolean;
 	publicPath?: (fileName: string) => string;
 	updateDevPrerenderHashes?: (hashes: ReadonlyMap<string, string>) => void;
 };
@@ -85,6 +86,7 @@ const TSRX_SOURCE_FILE = /\.tsrx(?:[?#].*)?$/;
 const MARKLESS_SYMBOL_SOURCE_QUERY_RE = /[?&]markless-symbols(?:[&#]|$)/;
 const MARKLESS_RESUME_SOURCE_QUERY_RE = /[?&]markless-resume(?:[&#]|$)/;
 const MARKLESS_RENDER_DATA_SOURCE_QUERY_RE = /[?&]markless-render-data(?:[&#]|$)/;
+const MARKLESS_PRERENDER_WAKE_SOURCE_QUERY_RE = /[?&]markless-prerender-wake(?:[&#]|$)/;
 const RESUME_VIRTUAL_ID_RE = /^virtual:markless:resume:([^:]+)$/;
 const PRERENDER_WAKE_VIRTUAL_ID_RE = /^virtual:markless:prerender-wake:([^:]+)$/;
 const SYMBOL_VIRTUAL_STRING_RE = /(["'`])((?:virtual:markless:symbol:)[^"'`]+)\1/g;
@@ -123,6 +125,7 @@ export function createMarklessRolldownPlugin(input: {
 	const transformVirtualModules = new Map<string, Set<string>>();
 	const virtualModuleOwners = new Map<string, Set<string>>();
 	const clientSymbolEntrySources = new Set<string>();
+	const prerenderWakeSources = new Set<string>();
 	const executionLogEstimatedSizes = new Map<string, number>();
 	const dev = createMarklessDevGraph();
 	let root = internalOptions.rootDir;
@@ -148,6 +151,7 @@ export function createMarklessRolldownPlugin(input: {
 		moduleLinkArtifacts.delete(changedSource);
 		transformManifests.delete(changedSource);
 		prerenderWakeCapabilities.delete(changedSource);
+		prerenderWakeSources.delete(changedSource);
 		for (const [key, cached] of linkedTransformCache) {
 			if (cached.source === changedSource) linkedTransformCache.delete(key);
 		}
@@ -418,14 +422,28 @@ export function createMarklessRolldownPlugin(input: {
 			}
 			const source = pathname(id);
 			const renderDataRequest = isRenderDataSourceRequest(id);
+			const prerenderWakeRequest = isPrerenderWakeSourceRequest(id);
+			if (currentEnvironment === 'client' && prerenderWakeRequest) {
+				clientSymbolEntrySources.add(source);
+				prerenderWakeSources.add(source);
+			}
 			// Children reshape only when this build actually has wake-variant
 			// entries; router apps have none until their entry channel exists,
 			// and reshaping their children alone ships dead bytes into walls.
+			// Router apps signal wake eligibility through per-page wake requests
+			// rather than the SSR symbol input, so either signal opens the gate.
+			// With the router wake channel, every client transform is prerender
+			// shaped (same order-independent semantics as MARKLESS_PRERENDER=1):
+			// wake requests arrive after package children are already cached.
+			// The wake channel (env-captured at plugin construction, or the
+			// router's late per-page wake requests) is the ONLY trigger: bare
+			// emitResumeModules must not reshape ordinary SSR apps — their
+			// symbol-route pages would inherit prerenderDataId and the no-op
+			// container-event stub, silently swallowing clicks.
 			const ssrPrerenderArtifacts =
 				currentEnvironment === 'client' &&
-				internalOptions.emitResumeModules === true &&
-				(clientSymbolEntrySources.has(source) ||
-					(clientSymbolEntrySources.size > 0 && importedChildSources.has(source)));
+				(internalOptions.prerenderWakeChannel === true ||
+					prerenderWakeSources.size > 0);
 			const transformInput: TransformTsrxModuleInput = {
 				filename: source,
 				source: code,
@@ -438,10 +456,14 @@ export function createMarklessRolldownPlugin(input: {
 				prerenderRecords:
 					currentEnvironment === 'client' &&
 					(internalOptions.prerender === true ||
+						internalOptions.prerenderWakeChannel === true ||
 						renderDataRequest ||
+						prerenderWakeRequest ||
 						ssrPrerenderArtifacts),
 				prerenderWakeVariant:
-					ssrPrerenderArtifacts && clientSymbolEntrySources.has(source),
+					internalOptions.prerenderWakeChannel === true &&
+					(prerenderWakeRequest ||
+						(ssrPrerenderArtifacts && clientSymbolEntrySources.has(source))),
 				environment: currentEnvironment,
 				clientOutput:
 					currentEnvironment === 'client' &&
@@ -491,7 +513,13 @@ export function createMarklessRolldownPlugin(input: {
 				currentEnvironment,
 				source,
 				transformInput.clientOutput ?? 'full',
-				isResumeSourceRequest(id) ? 'resume' : renderDataRequest ? 'render-data' : 'source',
+				isResumeSourceRequest(id)
+					? 'resume'
+					: prerenderWakeRequest
+						? 'prerender-wake'
+						: renderDataRequest
+							? 'render-data'
+							: 'source',
 			].join('\0');
 			const cached = linkedTransformCache.get(cacheKey);
 			let transformed: TransformTsrxModuleResult;
@@ -672,6 +700,24 @@ export function createMarklessRolldownPlugin(input: {
 				);
 				if (resumeModule) return { code: resumeModule.source, map: null };
 			}
+			if (currentEnvironment === 'client' && prerenderWakeRequest) {
+				const wakeModule = transformed.virtualModules.find(
+					(module) => module.type === 'prerender-wake',
+				);
+				return wakeModule
+					? {
+							code: `export { resumeContainerEvent } from ${JSON.stringify(wakeModule.id)};`,
+							map: null,
+						}
+					: {
+							code: [
+								'export async function resumeContainerEvent() {',
+								"\tthrow new Error('MARKLESS_PRERENDER_WAKE_ROUTE_INELIGIBLE');",
+								'}',
+							].join('\n'),
+							map: null,
+						};
+			}
 
 			if (currentEnvironment === 'client' && !internalOptions.dev) {
 				for (const module of transformed.virtualModules.filter((item) => {
@@ -716,11 +762,13 @@ export function createMarklessRolldownPlugin(input: {
 					internalOptions.productionResumeModuleUrls,
 					internalOptions.publicPath,
 				);
-				recordProductionPrerenderWakeModuleUrls(
-					bundle,
-					internalOptions.productionPrerenderWakeModuleUrls,
-					internalOptions.publicPath,
-				);
+				if (internalOptions.prerenderWakeChannel === true) {
+					recordProductionPrerenderWakeModuleUrls(
+						bundle,
+						internalOptions.productionPrerenderWakeModuleUrls,
+						internalOptions.publicPath,
+					);
+				}
 					if (!internalOptions.prerender) {
 					injectCsrNativeMarkup(bundle, transformManifests.values());
 				}
@@ -1347,6 +1395,10 @@ function isResumeSourceRequest(id: string): boolean {
 
 function isRenderDataSourceRequest(id: string): boolean {
 	return MARKLESS_RENDER_DATA_SOURCE_QUERY_RE.test(id);
+}
+
+function isPrerenderWakeSourceRequest(id: string): boolean {
+	return MARKLESS_PRERENDER_WAKE_SOURCE_QUERY_RE.test(id);
 }
 
 function sourceForSymbolVirtualImporter(importer: string | undefined): string | null {

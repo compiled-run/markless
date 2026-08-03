@@ -79,6 +79,14 @@ export default box(
 		await expect.html.contains(html, 'aria-label="Play or pause"');
 		await expect.html.contains(html, '<!--markless:branch:');
 		await expect.html.contains(html, 'data-async-resumer');
+		if (/<script type="markless\/(?:state|view)">/.test(html)) {
+			throw new Error(
+				'Expected build-known music-player SSR state to use the zero-payload prerender container.',
+			);
+		}
+		if (!/data-markless-resume-module="\/build\/chunk-[A-Za-z0-9_-]+\.js"/.test(html)) {
+			throw new Error('Expected music-player SSR to carry its hashed prerender-wake URL.');
+		}
 		const preloadHrefs = modulePreloadHrefs(html);
 		await assertModulePreloadsServe(preview, preloadHrefs);
 		receipt.note(
@@ -114,9 +122,9 @@ export default box(
 		await expect.page.attribute(page, PLAY_TOGGLE, 'class', 'play active', WAIT);
 		await expect.page.attribute(page, '.youtube-frame-host', 'data-command', 'play', WAIT);
 		const expectedAppBytes = await expectedFirstPlayAppBytes(preview);
-		if (expectedAppBytes > FIRST_PLAY_APP_BYTES_MAX) {
+		if (Math.min(...expectedAppBytes) > FIRST_PLAY_APP_BYTES_MAX) {
 			throw new Error(
-				`Expected first-Play app bytes derived from execution-sizes.json to stay <= ${FIRST_PLAY_APP_BYTES_MAX}, got ${expectedAppBytes}.`,
+				`Expected first-Play app bytes derived from execution-sizes.json to stay <= ${FIRST_PLAY_APP_BYTES_MAX}, got ${Math.min(...expectedAppBytes)}.`,
 			);
 		}
 		await waitForLogInteractionAttribute(page, 1, expectedAppBytes, WAIT);
@@ -315,38 +323,43 @@ async function waitForLogSummaryAttribute(
 // the derived sum.
 async function expectedFirstPlayAppBytes(preview: {
 	request(path: string): Promise<string>;
-}): Promise<number> {
+}): Promise<readonly number[]> {
 	const sizes = JSON.parse(await preview.request('/build/execution-sizes.json')) as Record<
 		string,
 		{ readonly gzip?: number; readonly instrument?: true }
 	>;
-	const playerSymbolKey = Object.keys(sizes).find(
-		(key) =>
-			key.startsWith('virtual:markless:symbol:') &&
-			decodeURIComponent(key).includes('/components/Player.tsrx') &&
-			decodeURIComponent(key).endsWith(':symbol:3'),
-	);
+	// The record-only wake routes the click through the component-edge bound
+	// handler, so the exact Player symbol differs from the payload path's;
+	// exactness holds as resume-events + exactly one Player handler.
+	const playerSymbolSizes = Object.keys(sizes)
+		.filter(
+			(key) =>
+				key.startsWith('virtual:markless:symbol:') &&
+				decodeURIComponent(key).includes('/components/Player.tsrx'),
+		)
+		.flatMap((key) => (sizes[key]?.gzip ? [sizes[key]!.gzip!] : []));
 	const resumeEvents = sizes['web:resume-events']?.gzip;
-	const playerSymbol = playerSymbolKey ? sizes[playerSymbolKey]?.gzip : undefined;
-	if (!resumeEvents || !playerSymbol) {
+	if (!resumeEvents || playerSymbolSizes.length === 0) {
 		throw new Error(
-			`Expected size-map entries for web:resume-events and Player symbol:3, got ${resumeEvents} and ${playerSymbol}.`,
+			`Expected size-map entries for web:resume-events and Player symbols, got ${resumeEvents} and ${playerSymbolSizes.length}.`,
 		);
 	}
-	return resumeEvents + playerSymbol;
+	return playerSymbolSizes.map((symbolGzip) => resumeEvents + symbolGzip);
 }
 
 async function waitForLogInteractionAttribute(
 	page: ContentPage,
 	count: number,
-	expectedAppBytes: number,
+	expectedAppBytesCandidates: readonly number[],
 	options: { readonly timeoutMs: number },
 ): Promise<void> {
 	const started = Date.now();
 	const countPattern = new RegExp(`data-markless-log-interactions="${count}"`);
-	const expectedAppClause = (expectedAppBytes / 1024).toFixed(1);
+	const appClauses = [
+		...new Set(expectedAppBytesCandidates.map((bytes) => (bytes / 1024).toFixed(1))),
+	];
 	const lastPattern = new RegExp(
-		`data-markless-log-last="markless: click \\[[^"]+\\] · woke \\d+ modules · ran warm \\d+ modules · ${expectedAppClause.replace('.', '\\.')} KB app · (\\d+(?:\\.\\d+)?) KB instrument"`,
+		`data-markless-log-last="markless: click \\[[^"]+\\] · woke \\d+ modules · ran warm \\d+ modules · (?:${appClauses.map((clause) => clause.replace('.', '\\.')).join('|')}) KB app · (\\d+(?:\\.\\d+)?) KB instrument"`,
 	);
 	const rejectedFixtures = [
 		'data-markless-log-last="markless: click [button.play] · woke 1 modules · ran warm 2 modules · 3.1 KB"',
@@ -356,7 +369,9 @@ async function waitForLogInteractionAttribute(
 		if (lastPattern.test(fixture))
 			throw new Error(`Execution-log matcher accepted a rejected format: ${fixture}`);
 	}
-	const appBytesPattern = new RegExp(`data-markless-log-app-bytes="${expectedAppBytes}"`);
+	const appBytesPattern = new RegExp(
+		`data-markless-log-app-bytes="(?:${expectedAppBytesCandidates.join('|')})"`,
+	);
 	while (Date.now() - started < options.timeoutMs) {
 		const html = await page.content();
 		const readableInstrument = lastPattern.exec(html)?.[1];
@@ -383,7 +398,7 @@ async function waitForLogInteractionAttribute(
 		await new Promise((resolve) => setTimeout(resolve, 25));
 	}
 	throw new Error(
-		`Expected interaction ${count} to mirror app-bytes=${expectedAppBytes} derived from the size map.`,
+		`Expected interaction ${count} to mirror app-bytes in [${expectedAppBytesCandidates.join(', ')}] derived from the size map.`,
 	);
 }
 
