@@ -364,6 +364,9 @@ function emitNode(
 			name,
 			coordinate: { kind: 'child-index', path },
 			residue: expressionResidue(expression, context, repeat),
+			...(name === 'class' && repeat
+				? { directClassMatch: directClassMatch(expression, context, repeat) }
+				: {}),
 		});
 		append(builder, '"');
 	}
@@ -373,6 +376,36 @@ function emitNode(
 	emitNodes(asNodes(node.children), [...path, 0], builder, context, repeat);
 	append(builder, `</${tagName}>`);
 	return 1;
+}
+
+function directClassMatch(
+	expression: AnyNode,
+	context: CollectionContext,
+	repeat: { readonly id: string; readonly itemName: string },
+) {
+	if (expression.type !== 'ConditionalExpression') return undefined;
+	const test = expression.test as AnyNode | undefined;
+	if (test?.type !== 'BinaryExpression' || (test.operator !== '===' && test.operator !== '==')) {
+		return undefined;
+	}
+	const left = expressionResidue(test.left as AnyNode, context, repeat);
+	const right = expressionResidue(test.right as AnyNode, context, repeat);
+	const graph = left.kind === 'graph-read' ? left : right.kind === 'graph-read' ? right : null;
+	const item = left.kind === 'repeat-item' ? left : right.kind === 'repeat-item' ? right : null;
+	const consequent = expression.consequent as AnyNode | undefined;
+	const alternate = expression.alternate as AnyNode | undefined;
+	if (
+		!graph || !item ||
+		consequent?.type !== 'Literal' || typeof consequent.value !== 'string' ||
+		alternate?.type !== 'Literal' || typeof alternate.value !== 'string'
+	) return undefined;
+	return {
+		stateGraphNodeId: graph.graphNodeId,
+		statePath: graph.path,
+		itemPath: item.path,
+		trueClass: consequent.value,
+		falseClass: alternate.value,
+	};
 }
 
 function emitDynamicHost(

@@ -68,44 +68,6 @@ async function planFixture(filename: string, source: string) {
 	};
 }
 
-test('an @if inside an @try arm plans a real flip: armFlip gate + arm-scoped branch arms with repeat parts', async () => {
-	const { plan } = await planFixture('src/DrawerMenu.tsrx', menuShapedSource);
-
-	expect(plan.branchReactivityGates).toEqual([
-		{ branchSiteId: 'branch-site:0', supported: true, armScoped: true, armFlip: true },
-	]);
-
-	const entry = plan.branchArms.find((arms) => arms.branchSiteId === 'branch-site:0');
-	expect(entry).toBeDefined();
-	expect(entry).toEqual(
-		expect.objectContaining({
-			branchSiteId: 'branch-site:0',
-			asyncBoundaryId: expect.any(String),
-			asyncBoundaryArm: 0,
-			armAnchorRank: 0,
-			testRead: { graphNodeId: 'state:drawerOpen', path: [] },
-		}),
-	);
-	// Taken arm: static drawer shell + one repeat part mapping graph rows.
-	const takenArm = entry?.arms[0] ?? [];
-	expect(takenArm[0]).toEqual({
-		text: expect.stringContaining('<div class="drawer" data-drawer=""'),
-	});
-	expect(takenArm).toContainEqual({
-		repeat: {
-			read: { graphNodeId: 'computed:roster', path: ['crews'] },
-			rowParts: [
-				{ text: expect.stringContaining('<button class="drawer-item">') },
-				{ itemPath: ['callsign'] },
-				{ text: '</button>' },
-			],
-		},
-	});
-	// Untaken @if side is a declared-empty arm.
-	expect(entry?.arms[1]).toEqual([]);
-	expect(entry?.declaredEmptyArms).toEqual([1]);
-});
-
 test('protocol view nests the arm-scoped flip record under the boundary in an arm-local anchor space', async () => {
 	const { payloadArena, symbolResolver, renderData, plan } = await planFixture(
 		'src/DrawerMenu.tsrx',

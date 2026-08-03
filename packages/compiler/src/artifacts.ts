@@ -489,6 +489,13 @@ export type SemanticMarkupSlot = SemanticMarkupLocatedSlot &
 				readonly kind: 'attribute';
 				readonly name: string;
 				readonly residue: SemanticMarkupResidue;
+				readonly directClassMatch?: {
+					readonly stateGraphNodeId: string;
+					readonly statePath: ReadonlyArray<string>;
+					readonly itemPath: ReadonlyArray<string>;
+					readonly trueClass: string;
+					readonly falseClass: string;
+				};
 		  }
 		| {
 				readonly kind: 'spread-attributes';
@@ -634,6 +641,12 @@ export type RenderDataRepeat = {
 	readonly rowChunkId: string;
 	readonly emptyChunkId?: string;
 	readonly rowElementCount: number;
+	readonly parentPath?: ReadonlyArray<number>;
+	readonly classWrites?: ReadonlyArray<PublicRenderPlanClassWrite>;
+	readonly eventControls?: ReadonlyArray<PublicRenderPlanEventControl>;
+	readonly rowElementHandles?: PublicRenderPlanKeyedRepeat['rowElementHandles'];
+	readonly rowBehaviors?: PublicRenderPlanKeyedRepeat['rowBehaviors'];
+	readonly directSupported: boolean;
 };
 
 export type RenderDataBoundary = {
@@ -1502,25 +1515,6 @@ export type PublicRenderPlanAsyncBoundaryGate =
 
 export type PublicRenderPlanArtifact = {
 	readonly passId: 'public-render-plan';
-	readonly rootTemplateHtml: string | null;
-	readonly directRenderTemplateHtml: string | null;
-	readonly staticHostNodeIds: ReadonlyArray<string>;
-	readonly staticHostLocators: ReadonlyArray<PublicRenderPlanStaticHostLocator>;
-	readonly staticEventControls: ReadonlyArray<PublicRenderPlanStaticEventControl>;
-	readonly staticTextWrites: ReadonlyArray<PublicRenderPlanStaticTextWrite>;
-	readonly repeatGates: ReadonlyArray<PublicRenderPlanRepeatGate>;
-	readonly keyedRepeats: ReadonlyArray<PublicRenderPlanKeyedRepeat>;
-	readonly asyncBoundaryGates: ReadonlyArray<PublicRenderPlanAsyncBoundaryGate>;
-	readonly branchReactivityGates: ReadonlyArray<PublicRenderPlanBranchGate>;
-	readonly branchArms: ReadonlyArray<PublicRenderPlanBranchArms>;
-	// Arm-scoped branch sites whose content needs component execution: the
-	// toggle escalates to the boundary's arm re-render (D2 — diagnosed loud).
-	readonly armBranchEscalations?: ReadonlyArray<{
-		readonly branchSiteId: string;
-		readonly asyncBoundaryId: string;
-		readonly asyncBoundaryArm: number;
-	}>;
-	readonly asyncBoundaryArms: ReadonlyArray<PublicRenderPlanAsyncBoundaryArms>;
 	readonly styleScopes: ReadonlyArray<{ readonly scopeId: string; readonly cssText: string }>;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
 };

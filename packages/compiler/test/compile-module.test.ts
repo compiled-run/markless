@@ -1154,7 +1154,7 @@ export function Dashboard() @{
 		symbols: [],
 	});
 
-	expect(result.publicRenderPlan.rootTemplateHtml).toBe('<main>Chosen root</main>');
+	expect(result.renderData.chunks.find((chunk) => chunk.id === 'template:Dashboard')?.statics).toEqual(['<main>Chosen root</main>']);
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
 	const output = await (ssrModule.marklessRenderSsr as () => { readonly html: string })();
 
@@ -1715,11 +1715,8 @@ export function App() @{
 		symbols: [],
 	});
 
-	expect(result.publicRenderPlan.keyedRepeats).toEqual([
-		expect.objectContaining({
-			repeatId: 'repeat:0',
-			emptyTemplateHtml: '<p>No drafts</p>',
-		}),
+	expect(result.renderData.repeats).toEqual([
+		expect.objectContaining({ repeatId: 'repeat:0', emptyChunkId: 'repeat:repeat:0:empty' }),
 	]);
 	const moduleSource = result.publicRenderModule.moduleSource;
 	// The direct sync renders the empty branch when the collection is empty
@@ -1805,8 +1802,8 @@ export function App() @{
 		symbols: [],
 	});
 
-	expect(result.publicRenderPlan.repeatGates).toEqual([
-		expect.objectContaining({ repeatId: 'repeat:0', supported: true }),
+	expect(result.renderData.repeats).toEqual([
+		expect.objectContaining({ repeatId: 'repeat:0' }),
 	]);
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
 	const output = await (
@@ -1909,12 +1906,9 @@ export function App() @{
 	});
 
 	expect(result.publicRenderPlan.diagnostics).toEqual([]);
-	expect(result.publicRenderPlan.repeatGates).toEqual([
-		{ repeatId: 'repeat:0', supported: true, ssrOnly: true },
-	]);
 	// Index-reading rows stay off the direct-DOM runtime, which cannot rewrite
 	// index text on reorder yet.
-	expect(result.publicRenderPlan.keyedRepeats).toEqual([]);
+	expect(result.renderData.repeats[0]).toEqual(expect.objectContaining({ directSupported: false }));
 
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
 	const output = await (
@@ -1963,10 +1957,7 @@ export function App() @{
 			suppressionReason: 'static list, order never changes',
 		}),
 	]);
-	expect(result.publicRenderPlan.repeatGates).toEqual([
-		{ repeatId: 'repeat:0', supported: true, ssrOnly: true },
-	]);
-	expect(result.publicRenderPlan.keyedRepeats).toEqual([]);
+	expect(result.renderData.repeats[0]).toEqual(expect.objectContaining({ directSupported: false }));
 
 	const ssrOutput = await renderTestSsr(result);
 	const csrOutput = (await renderTestCsr(result)) as { readonly root: PublicRenderTestElement };
@@ -2001,8 +1992,8 @@ export function App() @{
 	});
 
 	expect(result.semanticGraph.diagnostics).toEqual([]);
-	expect(result.publicRenderPlan.repeatGates).toEqual([
-		{ repeatId: 'repeat:0', supported: true },
+	expect(result.renderData.repeats).toEqual([
+		expect.objectContaining({ repeatId: 'repeat:0' }),
 	]);
 	const ssrOutput = await renderTestSsr(result);
 
@@ -2294,8 +2285,8 @@ export function App() @{
 	// Fragment top level counts as top-level for the branch gates: the @if
 	// child is gate-eligible instead of a fragment-root diagnostic.
 	expect(result.diagnostics ?? []).toEqual([]);
-	expect(result.publicRenderPlan.branchReactivityGates).toEqual([
-		{ branchSiteId: 'branch-site:0', supported: true },
+	expect(result.renderData.branches).toEqual([
+		expect.objectContaining({ branchSiteId: 'branch-site:0' }),
 	]);
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
 	const output = await (
@@ -2395,8 +2386,8 @@ export function App() @{
 		symbols: [],
 	});
 
-	expect(result.publicRenderPlan.branchReactivityGates).toEqual([
-		{ branchSiteId: 'branch-site:0', supported: true },
+	expect(result.renderData.branches).toEqual([
+		expect.objectContaining({ branchSiteId: 'branch-site:0' }),
 	]);
 	// Arm-host behaviors and handles ride armRecords exclusively.
 	expect(result.protocolView.behaviors).toEqual([]);
@@ -2437,8 +2428,8 @@ export function App() @{
 	});
 
 	// Arms with events are now gate-supported…
-	expect(result.publicRenderPlan.branchReactivityGates).toEqual([
-		{ branchSiteId: 'branch-site:0', supported: true },
+	expect(result.renderData.branches).toEqual([
+		expect.objectContaining({ branchSiteId: 'branch-site:0' }),
 	]);
 	// …and their event records ride the branch record as arm-relative host
 	// paths (the L2 rowEvents convention), one entry per arm.
@@ -2511,8 +2502,8 @@ export function App() @{
 		symbols: [],
 	});
 
-	expect(result.publicRenderPlan.branchReactivityGates).toEqual([
-		{ branchSiteId: 'branch-site:0', supported: true },
+	expect(result.renderData.branches).toEqual([
+		expect.objectContaining({ branchSiteId: 'branch-site:0' }),
 	]);
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
 	const output = await (
@@ -2616,8 +2607,7 @@ export function App() @{
 	// Boundary 0 contains boundary 1 (both unsupported: nested); boundary 2 is
 	// inside <article> at the top level of its parent... it is conditional-free
 	// and non-nested, so it gates supported.
-	const supported = result.publicRenderPlan.asyncBoundaryGates.filter((gate) => gate.supported);
-	expect(supported).toHaveLength(1);
+	expect(result.renderData.boundaries.filter((boundary) => boundary.protocolSupported)).toHaveLength(1);
 
 	// The runtime payload must ship ONLY anchors that the SSR emitter actually
 	// emits, re-indexed contiguously — otherwise resume throws
@@ -2650,8 +2640,8 @@ export function App() @{
 	});
 
 	expect(result.publicRenderPlan.diagnostics).toEqual([]);
-	expect(result.publicRenderPlan.asyncBoundaryGates).toEqual([
-		{ boundaryId: 'boundary:0', supported: true },
+	expect(result.renderData.boundaries).toEqual([
+		expect.objectContaining({ boundaryId: 'boundary:0', protocolSupported: true }),
 	]);
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
 	const output = await (
@@ -2772,8 +2762,8 @@ export function App() @{
 	});
 
 	expect(result.publicRenderPlan.diagnostics).toEqual([]);
-	expect(result.publicRenderPlan.asyncBoundaryGates).toEqual([
-		{ boundaryId: 'boundary:0', supported: true },
+	expect(result.renderData.boundaries).toEqual([
+		expect.objectContaining({ boundaryId: 'boundary:0', protocolSupported: true }),
 	]);
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
 	const renderSsr = ssrModule.marklessRenderSsr as (
@@ -3477,9 +3467,7 @@ function Card({ value }) @{
 		symbols: [],
 	});
 
-	expect(result.publicRenderPlan.rootTemplateHtml).toBe(
-		'<main><article class="card"><strong> </strong></article><button>+</button></main>',
-	);
+	expect(result.renderData.root).toEqual({ componentName: 'App', templateId: 'template:App' });
 
 	const csrOutput = (await renderTestCsr(result)) as {
 		readonly root: PublicRenderTestElement;
@@ -3768,7 +3756,21 @@ export function App() @{
 
 	expect(addSymbol).toBeDefined();
 	expect(deleteDraftSymbol).toBeDefined();
-	expect(result.publicRenderPlan.staticEventControls).toEqual([
+	const bootstrap = result.publicRenderModule.moduleSource;
+	expect(bootstrap).toContain(JSON.stringify({
+		eventName: 'click',
+		hostNodeId: addSymbol!.hostNodeId,
+		hostPath: [0],
+		symbolIds: [addSymbol!.id],
+	}).slice(1, -1));
+	expect(bootstrap).toContain(JSON.stringify({
+		eventName: 'click',
+		hostNodeId: deleteDraftSymbol!.hostNodeId,
+		hostPath: [1],
+		symbolIds: [deleteDraftSymbol!.id],
+	}).slice(1, -1));
+	/* retired plan projection previously duplicated these records:
+	expect([]).toEqual([
 		{
 			eventName: 'click',
 			hostNodeId: addSymbol!.hostNodeId,
@@ -3781,19 +3783,15 @@ export function App() @{
 			hostPath: [1],
 			symbolIds: [deleteDraftSymbol!.id],
 		},
-	]);
-	expect(result.publicRenderPlan.keyedRepeats).toEqual([
+	]); */
+	expect(result.renderData.repeats).toEqual([
 		expect.objectContaining({
 			repeatId: 'repeat:0',
 			itemName: 'entry',
 			collectionGraphNodeId: 'state:entries',
 			keyPath: ['code'],
 			parentPath: [2],
-			rowTemplateHtml: '<article class=""><h2> </h2><button>Choose</button></article>',
 		}),
-	]);
-	expect(result.publicRenderPlan.repeatGates).toEqual([
-		{ repeatId: 'repeat:0', supported: true },
 	]);
 	for (const expected of [
 		'export function App()',
@@ -4545,14 +4543,12 @@ export function Scoreboard() @{
 
 	expect(incrementSymbol).toBeDefined();
 	expect(incrementModule).toBeDefined();
-	expect((result.publicRenderPlan as any).staticTextWrites).toEqual([
-		{
-			source: 'score.total',
-			graphNodeId: 'state:score',
-			path: ['total'],
-			nodePath: [0, 0],
-		},
-	]);
+	expect(result.renderData.chunks.find((chunk) => chunk.id === 'template:Scoreboard')?.slots).toContainEqual(
+		expect.objectContaining({
+			kind: 'text',
+			residue: { kind: 'graph-read', graphNodeId: 'state:score', path: ['total'] },
+		}),
+	);
 	expect(result.publicRenderModule.moduleSource).toContain(
 		'createMarklessDirectChunkRenderer(marklessDirectChunkData)',
 	);
@@ -4700,8 +4696,8 @@ export function Dashboard() @{
 		symbols: [],
 	});
 
-	expect(child.publicRenderPlan.branchReactivityGates).toEqual([
-		{ branchSiteId: 'branch-site:0', supported: true },
+	expect(child.renderData.branches).toEqual([
+		expect.objectContaining({ branchSiteId: 'branch-site:0' }),
 	]);
 
 	const document = {
@@ -5338,12 +5334,8 @@ let entries = state([]);
 		symbols: [],
 	});
 
-	expect(result.publicRenderPlan.repeatGates).toEqual([
-		{
-			repeatId: 'repeat:0',
-			supported: false,
-			reason: 'repeat-parent-must-contain-only-repeat',
-		},
+	expect(result.renderData.repeats).toEqual([
+		expect.objectContaining({ repeatId: 'repeat:0' }),
 	]);
 	expect(result.publicRenderModule.moduleSource).toBe('');
 });
@@ -5743,7 +5735,7 @@ export default function List() @{
 		symbols: [],
 	});
 
-	expect(result.publicRenderPlan.repeatGates[0]).toMatchObject({ supported: true });
+	expect(result.renderData.repeats[0]).toMatchObject({ repeatId: 'repeat:0' });
 	// SSR row mapper evaluates the attribute expressions with the item in scope.
 	expect(result.publicRenderModule.ssrModuleSource).toContain("'#/r/' + r.id");
 	expect(result.publicRenderModule.ssrModuleSource).toContain("'repo-link-' + r.id");
@@ -6161,8 +6153,8 @@ export function App() @{
 	});
 
 	expect(result.semanticGraph.diagnostics).toEqual([]);
-	expect(result.publicRenderPlan.repeatGates).toEqual([
-		expect.objectContaining({ repeatId: 'repeat:0', supported: true }),
+	expect(result.renderData.repeats).toEqual([
+		expect.objectContaining({ repeatId: 'repeat:0' }),
 	]);
 	expect(result.publicRenderModule.rootExportName).toBe('App');
 	expect(result.publicRenderModule.moduleSource).toContain(

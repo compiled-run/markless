@@ -27,7 +27,7 @@ export function emitPublicSsrRenderModule(
 	input: PublicRenderModuleInput,
 	rootInfo: PublicRenderRoot,
 ): string {
-	if (!input.publicRenderPlan.rootTemplateHtml && !isComponentRoot(rootInfo.root)) return '';
+	if (!input.renderData.root && !isComponentRoot(rootInfo.root)) return '';
 
 	const references = componentReferences(
 		input.semanticGraph.componentEdges,

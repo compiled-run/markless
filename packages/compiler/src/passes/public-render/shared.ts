@@ -190,10 +190,14 @@ export function composedGraphProps(input: PublicRenderModuleInput) {
 }
 
 export function staticHostLocators(input: PublicRenderModuleInput) {
-	return input.publicRenderPlan.staticHostLocators.map((locator) => ({
-		hostNodeId: locator.hostNodeId,
-		tagName: locator.tagName,
-		hostPath: locator.hostPath,
+	const rootChunkId = input.renderData.root?.templateId;
+	const rootChunk = input.renderData.chunks.find((chunk) => chunk.id === rootChunkId);
+	return (rootChunk?.hosts ?? []).map((host) => ({
+		hostNodeId: host.hostNodeId,
+		tagName: host.tagName,
+		hostPath: host.coordinate.path[0] === 0
+			? host.coordinate.path.slice(1)
+			: host.coordinate.path,
 	}));
 }
 

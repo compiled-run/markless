@@ -1,21 +1,16 @@
-import type { PublicRenderModuleInput, PublicRenderPlanArtifact } from '../../artifacts.ts';
-import { samePath } from './source-expressions.ts';
+import type { PublicRenderModuleInput, RenderDataArtifact } from '../../artifacts.ts';
 
 type ProtocolView = PublicRenderModuleInput['protocolView'];
 
 export function createPublicProtocolView(
 	protocolView: ProtocolView,
-	publicRenderPlan: PublicRenderPlanArtifact,
+	renderData: RenderDataArtifact,
 ): ProtocolView {
-	const hostNodeIds = new Set(publicRenderPlan.staticHostNodeIds);
+	const rootChunk = renderData.chunks.find((chunk) => chunk.id === renderData.root?.templateId);
+	const hostNodeIds = new Set((rootChunk?.hosts ?? []).map((host) => host.hostNodeId));
 	const hostNodeIndexes = new Map(
-		publicRenderPlan.staticHostNodeIds.map((hostNodeId, index) => [hostNodeId, index]),
+		[...(rootChunk?.hosts ?? [])].map((host, index) => [host.hostNodeId, index]),
 	);
-	const handledStaticTextUpdates = publicRenderPlan.staticTextWrites.map((write) => ({
-		graphNodeId: write.graphNodeId,
-		path: write.path,
-		source: write.source,
-	}));
 
 	return {
 		...protocolView,
@@ -26,15 +21,8 @@ export function createPublicProtocolView(
 				index: hostNodeIndexes.get(locator.hostNodeId) ?? locator.index,
 			})),
 		events: protocolView.events.filter((event) => hostNodeIds.has(event.hostNodeId)),
-		domUpdates: protocolView.domUpdates.filter((update) => {
-			if (!hostNodeIds.has(update.hostNodeId)) return false;
-			if (update.target?.kind !== 'text') return true;
-			return !handledStaticTextUpdates.some(
-				(write) =>
-					write.graphNodeId === update.graphNodeId &&
-					write.source === update.source &&
-					samePath(write.path, update.path),
-			);
-		}),
+		domUpdates: protocolView.domUpdates.filter(
+			(update) => hostNodeIds.has(update.hostNodeId) && update.target?.kind !== 'text',
+		),
 	};
 }

@@ -393,11 +393,10 @@ function armHostIds(input: ProtocolViewPayloadInput): ReadonlySet<string> {
 	);
 }
 
-// Same-module children are rendered before the linker can give their branch
-// arms an independent range. Keep renderData's chunk ownership intact, but
-// project those arm hosts back into the legacy flat view consumed by the
-// pre-link emitter. T009/T010b can remove this compatibility projection with
-// that emitter.
+// Ruled residual: no existing real-browser box proves same-module child
+// branch flips across independent chunk ranges. Until that proof exists,
+// project those arm hosts into the pre-link flat view while keeping
+// renderData's chunk ownership intact.
 function preLinkFlattenedBranchIds(input: ProtocolViewPayloadInput): ReadonlySet<string> {
 	const data = renderDataOf(input);
 	const rootComponentName = data.root?.componentName;

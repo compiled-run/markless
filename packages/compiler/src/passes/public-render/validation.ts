@@ -6,7 +6,6 @@ import {
 	getDynamicTagExpression,
 	getElementAttributes,
 	getElementTagName,
-	isHostTagName,
 	isIgnorableStaticTextNode as isIgnorableTextNode,
 	isPlainHostTemplateNode,
 	isSpreadAttribute,
@@ -17,22 +16,13 @@ import {
 	conditionalComponentRootDiagnostic,
 	elementGuardReturnUnsupportedDiagnostic,
 	noRenderableRootDiagnostic,
-	repeatRowStateScopeUnsupportedDiagnostic,
 	undeclaredTemplateReadDiagnostic,
 	unsupportedRenderBodyDiagnostic,
 	unsupportedRenderConstructDiagnostic,
 	unsupportedRenderRootDiagnostic,
 } from './diagnostics.ts';
-import type {
-	PublicRenderPlanArtifact,
-	PublicRenderPlanBranchGate,
-	PublicRenderPlanKeyedRepeat,
-	PublicRenderPlanRepeatGate,
-	PublicRenderPlanUnsupportedReason,
-} from '../../artifacts.ts';
-import type { BranchSiteNode } from './branch-planning.ts';
+import type { PublicRenderPlanArtifact } from '../../artifacts.ts';
 import {
-	singleRowRoot,
 	firstComponentRoot,
 	supportedFragmentRoot,
 	unsupportedFragmentChildKind,
@@ -43,18 +33,6 @@ export function emptyPlan(
 ): PublicRenderPlanArtifact {
 	return {
 		passId: 'public-render-plan',
-		rootTemplateHtml: null,
-		directRenderTemplateHtml: null,
-		staticHostNodeIds: [],
-		staticHostLocators: [],
-		staticEventControls: [],
-		staticTextWrites: [],
-		repeatGates: [],
-		keyedRepeats: [],
-		asyncBoundaryGates: [],
-		branchReactivityGates: [],
-		branchArms: [],
-		asyncBoundaryArms: [],
 		styleScopes: [],
 		diagnostics,
 	};
@@ -185,139 +163,6 @@ export function collectUnsupportedConstructDiagnostics(root: AnyNode, filename: 
 
 	visit(root);
 	return diagnostics;
-}
-
-export function repeatRenderDiagnostics(input: {
-	readonly componentEdgeCount: number;
-	readonly filename: string;
-	readonly keyedRepeats: ReadonlyArray<PublicRenderPlanKeyedRepeat>;
-	readonly repeatGates: ReadonlyArray<PublicRenderPlanRepeatGate>;
-	readonly repeatNodeById: ReadonlyMap<string, AnyNode>;
-}) {
-	return input.repeatGates.flatMap((gate) => {
-		const node = input.repeatNodeById.get(gate.repeatId);
-		if (!node) return [];
-		if (!gate.supported) {
-			const creation = repeatRowStateCreation(node);
-			if (creation) {
-				return [
-					repeatRowStateScopeUnsupportedDiagnostic({
-						...creation,
-						filename: input.filename,
-					}),
-				];
-			}
-			return [
-				unsupportedRenderConstructDiagnostic({
-					label: '@for',
-					message: `The @for rows are not compiler-proven (reason: ${gate.reason}), so the render module drops the list content.`,
-					node,
-					filename: input.filename,
-					suggestion: repeatUnsupportedSuggestion(node, gate.reason),
-					...(gate.reason === 'repeat-parent-must-contain-only-repeat'
-						? { severity: 'error' as const }
-						: {}),
-				}),
-			];
-		}
-		// Component-composed pages render repeat rows since the SSR/CSR row
-		// mappers append locators through the same stream child composition
-		// consumes (dashboard-migration need 6; component-wrapped-rows fixture).
-		if (
-			!gate.ssrOnly &&
-			gate.armScoped !== true &&
-			!input.keyedRepeats.some((repeat) => repeat.repeatId === gate.repeatId)
-		) {
-			return [
-				unsupportedRenderConstructDiagnostic({
-					label: '@for',
-					message:
-						'The @for rows could not be planned even though the repeat gate is supported, so the render module drops the list content.',
-					node,
-					filename: input.filename,
-					suggestion:
-						'Keep the repeat directly inside a host parent element with a single row root.',
-				}),
-			];
-		}
-		return [];
-	});
-}
-
-function repeatRowStateCreation(node: AnyNode): {
-	readonly apiName: 'state' | 'computed';
-	readonly name: string;
-	readonly node: AnyNode;
-} | null {
-	for (const child of asNodes((node.body as AnyNode | undefined)?.body)) {
-		if (isIgnorableTextNode(child)) continue;
-		if (child.type !== 'VariableDeclaration') continue;
-		for (const declaration of asNodes(child.declarations)) {
-			const init = declaration.init as AnyNode | undefined;
-			if (!init || init.type !== 'CallExpression') continue;
-			const apiName = getIdentifierName(init.callee as AnyNode | undefined);
-			if (apiName !== 'state' && apiName !== 'computed') continue;
-			const name = getIdentifierName(declaration.id as AnyNode | undefined);
-			if (!name) continue;
-			return { apiName, name, node: init };
-		}
-	}
-	return null;
-}
-
-function repeatUnsupportedSuggestion(
-	node: AnyNode,
-	reason: PublicRenderPlanUnsupportedReason,
-): string {
-	const row = singleRowRoot(node);
-	const tagName = row ? getElementTagName(row) : null;
-	if (reason === 'row-component-content-unsupported') {
-		if (tagName && !isHostTagName(tagName)) {
-			return `The @for row root is a component (<${tagName} />); the row root anchors row identity, so wrap it in a host element (for example <li><${tagName} /></li>).`;
-		}
-		return 'Components in @for rows render markup only: their props and children may read only the repeat item (and index), they cannot take event props, and row events must come before the component. Move other reads into the item, or lift the component out of the row.';
-	}
-	return 'Reshape the rows into a single host element with directly readable item bindings.';
-}
-
-export function branchRenderDiagnostics(input: {
-	readonly branchGates: ReadonlyArray<PublicRenderPlanBranchGate>;
-	readonly branchNodes: ReadonlyArray<BranchSiteNode>;
-	readonly filename: string;
-}) {
-	return input.branchGates.flatMap((gate, index) => {
-		const found = input.branchNodes[index];
-		if (gate.supported || !found) return [];
-		const label = found.node.type === 'JSXSwitchExpression' ? '@switch' : '@if';
-		const componentName = firstComponentName(found.node);
-		const componentDetail = componentName
-			? ` contain a component (<${componentName} />), and`
-			: '';
-		const suggestion = componentName
-			? 'Move the condition inside the component, or put host elements in the arms until component arms are supported.'
-			: 'Move the branch out of nested control flow, or keep branch arms to host elements, text, and graph-resolvable expressions.';
-		return [
-			unsupportedRenderConstructDiagnostic({
-				label,
-				message: `The arms of ${label}${componentDetail} are not compiler-proven (reason: ${gate.reason}), so the branch would render its initial content and never update.`,
-				node: found.node,
-				filename: input.filename,
-				suggestion,
-			}),
-		];
-	});
-}
-
-export function firstComponentName(node: AnyNode): string | null {
-	if (node.type === 'Element' || node.type === 'JSXElement') {
-		const tagName = getElementTagName(node);
-		if (tagName && !isHostTagName(tagName)) return tagName;
-	}
-	for (const child of childNodes(node)) {
-		const found = firstComponentName(child);
-		if (found) return found;
-	}
-	return null;
 }
 
 // findComponent only accepts components that already have an element root, so

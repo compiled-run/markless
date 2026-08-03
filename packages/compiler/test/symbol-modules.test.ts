@@ -206,7 +206,7 @@ test('emitSymbolModules emits conditional text DOM update values', () => {
 });
 
 test('emitSymbolModules emits repeat-local assignment values through context locals', () => {
-	const artifact = emitSelectAssignmentSymbol('entry.code', repeatLocalPublicRenderPlan());
+	const artifact = emitSelectAssignmentSymbol('entry.code', repeatLocalRenderData());
 
 	expect(artifact.modules[0].source).toContain(
 		"import { marklessWriteScalar } from '@markless/web/fns/write-scalar';",
@@ -216,9 +216,9 @@ test('emitSymbolModules emits repeat-local assignment values through context loc
 	expect(artifact.modules[0].source).toContain('value: context.locals?.entry?.code');
 });
 
-function emitSelectAssignmentSymbol(valueSource: string, publicRenderPlan?: any) {
+function emitSelectAssignmentSymbol(valueSource: string, renderData?: any) {
 	return emitSymbolModules({
-		publicRenderPlan,
+		renderData,
 		symbolResolver: {
 			passId: 'symbol-resolver',
 			dynamicImportOwner: 'generated-symbol-resolver',
@@ -249,18 +249,15 @@ function emitSelectAssignmentSymbol(valueSource: string, publicRenderPlan?: any)
 	});
 }
 
-function repeatLocalPublicRenderPlan() {
+function repeatLocalRenderData() {
 	return {
-		keyedRepeats: [
-			{
-				eventControls: [
-					{
-						symbolId: 'symbol:select',
-						itemContext: { itemName: 'entry' },
-					},
-				],
-			},
-		],
+		repeats: [{ repeatId: 'repeat:0', rowChunkId: 'repeat:repeat:0:row', itemName: 'entry' }],
+		chunks: [{
+			id: 'repeat:repeat:0:row',
+			hosts: [{ hostNodeId: 'h2' }],
+			slots: [],
+		}],
+		interactions: [{ hostNodeId: 'h2', symbolIds: ['symbol:select'] }],
 	};
 }
 

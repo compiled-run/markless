@@ -6,7 +6,6 @@ import type {
 	LoweredStateRead,
 	LoweredStateWrite,
 	PlannedSymbol,
-	PublicRenderPlanArtifact,
 	RenderDataArtifact,
 	SemanticGraphDependency,
 	SemanticModuleImport,
@@ -17,7 +16,7 @@ import { childNodes, type AnyNode } from '../ast/nodes.ts';
 import { parseJavaScriptModule } from '../js-ast.ts';
 
 export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtifact {
-	const localNamesBySymbol = rowLocalNamesBySymbol(input.publicRenderPlan, input.renderData);
+	const localNamesBySymbol = rowLocalNamesBySymbol(input.renderData);
 	const captureSlotsBySymbol = new Map(
 		input.captureAnalysis.extractedSymbols.flatMap((symbol) =>
 			symbol.loaderSymbolId
@@ -51,12 +50,8 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 		),
 	);
 
-	const branchArmsBySite = new Map(
-		(input.publicRenderPlan?.branchArms ?? []).map((entry) => [entry.branchSiteId, entry]),
-	);
-	const boundaryArmsById = new Map(
-		(input.publicRenderPlan?.asyncBoundaryArms ?? []).map((entry) => [entry.boundaryId, entry]),
-	);
+	const branchArmsBySite = renderBranchArms(input.renderData);
+	const boundaryArmsById = renderBoundaryArms(input.renderData);
 	return {
 		passId: 'symbol-modules',
 		modules: input.symbolResolver.symbols.flatMap((symbol) => {
@@ -79,6 +74,92 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 		}),
 		diagnostics: input.captureAnalysis.diagnostics,
 	};
+}
+
+function renderBranchArms(
+	renderData: RenderDataArtifact | undefined,
+): ReadonlyMap<string, PublicRenderPlanBranchArms> {
+	if (!renderData) return new Map();
+	return new Map((renderData.branches ?? []).flatMap((branch) => {
+		if (branch.update === 'boundary') return [];
+		const arms = branch.armChunkIds.map((chunkId) => renderChunkParts(renderData, chunkId));
+		if (arms.some((arm) => arm === null)) return [];
+		return [[branch.branchSiteId, {
+			branchSiteId: branch.branchSiteId,
+			testRead: branch.testReads[0] ?? null,
+			arms: arms as PublicRenderPlanBranchArms['arms'],
+			...(branch.armTests ? { armTests: branch.armTests } : {}),
+			...(branch.declaredEmptyArms ? { declaredEmptyArms: branch.declaredEmptyArms } : {}),
+		}] as const];
+	}));
+}
+
+function renderBoundaryArms(
+	renderData: RenderDataArtifact | undefined,
+): ReadonlyMap<string, PublicRenderPlanAsyncBoundaryArms> {
+	if (!renderData) return new Map();
+	return new Map((renderData.boundaries ?? []).flatMap((boundary) => {
+		const chunkIds = [boundary.armChunkIds.try, boundary.armChunkIds.catch].filter(
+			(candidate): candidate is string => candidate !== undefined,
+		);
+		const arms = chunkIds.map((chunkId) => renderChunkParts(renderData, chunkId));
+		if (arms.some((arm) => arm === null)) return [];
+		return [[boundary.boundaryId, {
+			boundaryId: boundary.boundaryId,
+			arms: arms as PublicRenderPlanAsyncBoundaryArms['arms'],
+		}] as const];
+	}));
+}
+
+function renderChunkParts(
+	renderData: RenderDataArtifact,
+	chunkId: string,
+): PublicRenderPlanBranchArms['arms'][number] | null {
+	const chunk = renderData.chunks.find((candidate) => candidate.id === chunkId);
+	if (!chunk) return null;
+	const parts: Array<PublicRenderPlanBranchArms['arms'][number][number]> = [];
+	const pushText = (text: string) => {
+		const clean = text.replace(/<!--markless-slot:\d+-->/g, '');
+		if (!clean) return;
+		const last = parts[parts.length - 1];
+		if (last && 'text' in last) parts[parts.length - 1] = { text: last.text + clean };
+		else parts.push({ text: clean });
+	};
+	for (let staticIndex = 0; staticIndex < chunk.statics.length; staticIndex++) {
+		pushText(chunk.statics[staticIndex] ?? '');
+		for (const slot of chunk.slots.filter((candidate) => candidate.staticIndex === staticIndex)) {
+			if (slot.kind === 'text' && slot.residue.kind === 'graph-read') {
+				parts.push({ read: {
+					graphNodeId: slot.residue.graphNodeId,
+					path: slot.residue.path,
+				} });
+				continue;
+			}
+			if (slot.kind === 'repeat') {
+				const repeat = renderData.repeats.find((candidate) => candidate.repeatId === slot.repeatId);
+				const row = repeat ? renderData.chunks.find((candidate) => candidate.id === repeat.rowChunkId) : undefined;
+				if (!repeat?.collectionGraphNodeId || !row) return null;
+				const rowParts: Array<{ text: string } | { read: { graphNodeId: string; path: ReadonlyArray<string> } } | { itemPath: ReadonlyArray<string> }> = [];
+				for (let rowIndex = 0; rowIndex < row.statics.length; rowIndex++) {
+					const text = (row.statics[rowIndex] ?? '').replace(/<!--markless-slot:\d+-->/g, '');
+					if (text) rowParts.push({ text });
+					for (const rowSlot of row.slots.filter((candidate) => candidate.staticIndex === rowIndex)) {
+						if (rowSlot.kind !== 'text') return null;
+						if (rowSlot.residue.kind === 'repeat-item') rowParts.push({ itemPath: rowSlot.residue.path });
+						else if (rowSlot.residue.kind === 'graph-read') rowParts.push({ read: { graphNodeId: rowSlot.residue.graphNodeId, path: rowSlot.residue.path } });
+						else return null;
+					}
+				}
+				parts.push({ repeat: {
+					read: { graphNodeId: repeat.collectionGraphNodeId, path: repeat.collectionPath },
+					rowParts,
+				} });
+				continue;
+			}
+			return null;
+		}
+	}
+	return parts;
 }
 
 // A branch flip module: evaluate the compiled test through graph reads, pick
@@ -130,7 +211,6 @@ function emitBranchUpdateModule(
 const emptyLocalNames = new Set<string>();
 
 function rowLocalNamesBySymbol(
-	publicRenderPlan: PublicRenderPlanArtifact | undefined,
 	renderData: RenderDataArtifact | undefined,
 ): ReadonlyMap<string, ReadonlySet<string>> {
 	const localNamesBySymbol = new Map<string, Set<string>>();
@@ -142,11 +222,6 @@ function rowLocalNamesBySymbol(
 		}
 		localNames.add(itemName);
 	};
-	for (const repeat of publicRenderPlan?.keyedRepeats ?? []) {
-		for (const eventControl of repeat.eventControls) {
-			addLocal(eventControl.symbolId, eventControl.itemContext.itemName);
-		}
-	}
 	if (renderData) {
 		for (const repeat of renderData.repeats) {
 			const rowHostIds = renderChunkHostIds(renderData, repeat.rowChunkId);

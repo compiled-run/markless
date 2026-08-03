@@ -4,6 +4,7 @@ import type {
 	RenderDataBranch,
 	RenderDataInitialValue,
 	RenderDataRepeat,
+	PayloadArenaArtifact,
 	SemanticMarkupSlot,
 	SemanticGraphArtifact,
 	SymbolResolverPlan,
@@ -13,6 +14,7 @@ import { resolveBoundaryRunners } from '../public-render/boundary-runner.ts';
 export function createRenderData(input: {
 	readonly semanticGraph: SemanticGraphArtifact;
 	readonly symbolResolver: SymbolResolverPlan;
+	readonly payloadArena?: PayloadArenaArtifact;
 }): RenderDataArtifact {
 	const { semanticGraph, symbolResolver } = input;
 	const slots = semanticGraph.markup.chunks.flatMap((chunk) => chunk.slots);
@@ -31,7 +33,7 @@ export function createRenderData(input: {
 			branchRecord(site, slots, semanticGraph.markup.chunks, symbolResolver),
 		),
 		repeats: semanticGraph.keyedRepeats.map((repeat) =>
-			repeatRecord(repeat, slots, semanticGraph.markup.chunks),
+			repeatRecord(repeat, slots, semanticGraph.markup.chunks, semanticGraph, symbolResolver, input.payloadArena),
 		),
 		boundaries: semanticGraph.asyncBoundaries.map((boundary) => {
 			const slot = slots.find(
@@ -173,12 +175,72 @@ function repeatRecord(
 	repeat: SemanticGraphArtifact['keyedRepeats'][number],
 	slots: ReadonlyArray<SemanticMarkupSlot>,
 	chunks: SemanticGraphArtifact['markup']['chunks'],
+	semanticGraph: SemanticGraphArtifact,
+	symbolResolver: SymbolResolverPlan,
+	payloadArena?: PayloadArenaArtifact,
 ): RenderDataRepeat {
 	const slot = slots.find(
 		(candidate): candidate is Extract<SemanticMarkupSlot, { readonly kind: 'repeat' }> =>
 			candidate.kind === 'repeat' && candidate.repeatId === repeat.id,
 	);
 	const rowChunkId = slot?.rowTemplateId ?? `repeat:${repeat.id}:row`;
+	const rowChunk = chunks.find((chunk) => chunk.id === rowChunkId);
+	const rootChunk = chunks.find((chunk) => chunk.id === semanticGraph.markup.root?.templateId);
+	const parent = rootChunk?.hosts.find((host) => host.hostNodeId === repeat.parentHostNodeId);
+	const relativePath = (path: ReadonlyArray<number>) => path[0] === 0 ? path.slice(1) : path;
+	const classWrites = (rowChunk?.slots ?? []).flatMap((rowSlot) =>
+		rowSlot.kind === 'attribute' && rowSlot.directClassMatch
+			? [{
+				source: rowSlot.residue.kind === 'authored-expression' ? rowSlot.residue.source : '',
+				hostPath: relativePath(rowSlot.coordinate.path),
+				...rowSlot.directClassMatch,
+			}]
+			: [],
+	);
+	const rowHostPaths = new Map(
+		(rowChunk?.hosts ?? []).map((host) => [host.hostNodeId, relativePath(host.coordinate.path)]),
+	);
+	const eventControls = semanticGraph.events.flatMap((event) => {
+		const hostPath = rowHostPaths.get(event.hostNodeId);
+		if (!hostPath) return [];
+		return symbolResolver.symbols.flatMap((symbol) =>
+			symbol.kind === 'event-handler' &&
+			symbol.hostNodeId === event.hostNodeId &&
+			symbol.eventName === event.eventName
+				? [{
+					eventName: event.eventName,
+					hostPath,
+					handlerSource: symbol.source,
+					symbolId: symbol.id,
+					itemContext: {
+						kind: 'keyed-repeat-item' as const,
+						repeatId: repeat.id,
+						itemName: repeat.itemName,
+						keyPath: repeat.keyPath,
+					},
+				}]
+				: [],
+		);
+	});
+	const payloadRepeat = payloadArena?.view.keyedRepeats.find((item) => item.id === repeat.id);
+	const rowElementHandles = payloadRepeat?.rowElementHandles?.flatMap((handle) => {
+		const hostPath = rowHostPaths.get(handle.hostNodeId);
+		return hostPath ? [{ hostPath, handleId: handle.handleId, name: handle.name }] : [];
+	});
+	const rowBehaviorRecords = payloadRepeat?.rowBehaviors ?? semanticGraph.behaviors.filter(
+		(behavior) => rowHostPaths.has(behavior.hostNodeId),
+	);
+	const rowBehaviors = rowBehaviorRecords.flatMap((behavior) => {
+		const hostPath = rowHostPaths.get(behavior.hostNodeId);
+		const symbol = symbolResolver.symbols.find(
+			(candidate) => candidate.kind === 'behavior' && candidate.hostNodeId === behavior.hostNodeId,
+		);
+		if (!hostPath || !symbol) return [];
+		const inputPaths = behavior.inputSources.map((source) =>
+			source === repeat.itemName ? [] : source.startsWith(`${repeat.itemName}.`) ? source.slice(repeat.itemName.length + 1).split('.') : null,
+		);
+		return inputPaths.some((path) => path === null) ? [] : [{ hostPath, symbolId: symbol.id, inputPaths: inputPaths as ReadonlyArray<ReadonlyArray<string>> }];
+	});
 	return {
 		repeatId: repeat.id,
 		parentHostNodeId: repeat.parentHostNodeId,
@@ -192,5 +254,11 @@ function repeatRecord(
 		rowChunkId,
 		...(slot?.emptyTemplateId ? { emptyChunkId: slot.emptyTemplateId } : {}),
 		rowElementCount: chunks.find((chunk) => chunk.id === rowChunkId)?.hosts.length ?? 0,
+		...(parent ? { parentPath: relativePath(parent.coordinate.path) } : {}),
+		...(classWrites.length > 0 ? { classWrites } : {}),
+		...(eventControls.length > 0 ? { eventControls } : {}),
+		...(rowElementHandles && rowElementHandles.length > 0 ? { rowElementHandles } : {}),
+		...(rowBehaviors.length > 0 ? { rowBehaviors } : {}),
+		directSupported: repeat.indexName === undefined,
 	};
 }

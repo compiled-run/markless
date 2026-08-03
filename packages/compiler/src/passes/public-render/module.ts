@@ -18,6 +18,7 @@ export type { PublicRenderRoot } from './types.ts';
 export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRenderModuleArtifact {
 	const ast = parseModule(input.source.source, input.source.filename) as unknown as AnyNode;
 	if (
+		input.publicRenderPlan.diagnostics.some((diagnostic) => diagnostic.severity === 'error') ||
 		input.semanticGraph.diagnostics.some(
 			(item) => item.code === 'MARKLESS_EVENT_SPREAD_UNSUPPORTED',
 		)
@@ -57,9 +58,10 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 		!hasExecutableBodyStatements(root.component, root.root, input.source.source) &&
 		root.propNames.length === 0 &&
 		input.semanticGraph.componentEdges.length === 0 &&
+		input.publicRenderPlan.styleScopes.length === 0 &&
 		// The direct module has no async boundary handling; boundary-bearing
 		// shapes take the standard runtime module.
-		!input.publicRenderPlan.asyncBoundaryGates.some((gate) => gate.supported);
+		input.renderData.boundaries.length === 0;
 	const moduleSource = canUseDirectCsrModule
 		? emitDirectPublicRenderModule({
 				rootSelection,

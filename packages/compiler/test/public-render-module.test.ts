@@ -57,18 +57,15 @@ test('public render module protocol view helper keeps only direct public records
 		elementHandles: [],
 		asyncBoundaries: [],
 	} as any;
-	const publicRenderPlan = {
-		staticHostNodeIds: ['host:root'],
-		staticTextWrites: [
-			{
-				graphNodeId: 'state:score',
-				path: ['total'],
-				source: 'score.total',
-			},
-		],
+	const renderData = {
+		root: { templateId: 'template:App' },
+		chunks: [{
+			id: 'template:App',
+			hosts: [{ hostNodeId: 'host:root' }],
+		}],
 	} as any;
 
-	const publicView = createPublicProtocolView(protocolView, publicRenderPlan);
+	const publicView = createPublicProtocolView(protocolView, renderData);
 
 	expect(publicView.locators).toEqual([{ hostNodeId: 'host:root', index: 0 }]);
 	expect(publicView.events).toEqual([{ hostNodeId: 'host:root', eventName: 'click' }]);

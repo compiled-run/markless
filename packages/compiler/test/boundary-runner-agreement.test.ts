@@ -121,11 +121,7 @@ export function CompassCard() @{
 	});
 
 	const boundaryId = result.semanticGraph.asyncBoundaries[0]?.id;
-	expect(result.publicRenderPlan.asyncBoundaryGates).toContainEqual({
-		boundaryId,
-		supported: true,
-	});
-	expect(result.publicRenderPlan.asyncBoundaryArms).toContainEqual(
+	expect(result.renderData.boundaries).toContainEqual(
 		expect.objectContaining({ boundaryId }),
 	);
 	expect(
@@ -158,10 +154,9 @@ export function CalledCollection() @{
 	});
 
 	const boundaryId = result.semanticGraph.asyncBoundaries[0]?.id;
-	expect(result.publicRenderPlan.asyncBoundaryGates).toContainEqual({
-		boundaryId,
-		supported: true,
-	});
+	expect(result.renderData.boundaries).toContainEqual(
+		expect.objectContaining({ boundaryId }),
+	);
 	expect(
 		result.symbolResolver.symbols.some(
 			(symbol) => symbol.kind === 'async-boundary-update' && symbol.boundaryId === boundaryId,

@@ -1,50 +1,21 @@
 import { parseModule } from '@tsrx/core';
-import { asNodes, walkNode, type AnyNode } from '../../ast/nodes.ts';
-import {
-	isIgnorableStaticTextNode as isIgnorableTextNode,
-	isPlainHostTemplateNode,
-} from '../../ast/tsrx.ts';
-import {
-	graphBindingMap,
-	resolveGraphPath,
-	semanticAliasMap,
-} from '../../artifact-helpers/graph-paths.ts';
-import {
-	gatePlanDisagreementDiagnostic,
-	tryBlockToggleRerenderDiagnostic,
-	unsupportedRenderConstructDiagnostic,
-} from './diagnostics.ts';
-import { resolveBoundaryRunners } from './boundary-runner.ts';
+import { childNodes, walkNode, type AnyNode } from '../../ast/nodes.ts';
+import { getElementTagName, isHostTagName } from '../../ast/tsrx.ts';
+import { parseJavaScriptModule } from '../../js-ast.ts';
+import type {
+	PlannedSymbol,
+	PublicRenderPlanArtifact,
+	PublicRenderPlanInput,
+	SemanticGraphArtifact,
+	SemanticSyncPolicy,
+	SemanticSyncPolicyAction,
+} from '../../artifacts.ts';
+import { extractedSyncPolicyActionCalls } from '../semantic-graph/collect-sync-policy.ts';
 import { collectStyleScopes } from './style-scopes.ts';
 import { collectAsyncBoundaryNodes } from './async-boundaries.ts';
+import { resolveBoundaryRunners } from './boundary-runner.ts';
+import { gatePlanDisagreementDiagnostic, tryBlockToggleRerenderDiagnostic } from './diagnostics.ts';
 import {
-	branchArmSupported,
-	branchArms,
-	buildBranchArmParts,
-	collectArmHosts,
-	collectBranchSiteNodes,
-	scopeClassOf,
-	switchArmTests,
-} from './branch-planning.ts';
-import {
-	assignHostIds,
-	collectHostPaths,
-	collectStaticEventControls,
-	collectStaticHostNodeIds,
-	keyedRepeatNodes,
-} from './host-locators.ts';
-import { collectRowPlan, planKeyedRepeat, supportedRepeatGate } from './repeat-planning.ts';
-import {
-	firstComponentRoot,
-	sameModuleComponentRoots,
-	selectPublicRenderRoot,
-	singleRowRoot,
-	staticHtml,
-	staticShellSupported,
-} from './template.ts';
-import { collectStaticTextWrites } from './text-bindings.ts';
-import {
-	branchRenderDiagnostics,
 	collectChildrenOpacityDiagnostics,
 	collectUndeclaredTemplateReadDiagnostics,
 	collectUnsupportedConstructDiagnostics,
@@ -52,28 +23,13 @@ import {
 	componentRootDiagnostics,
 	componentUnsupportedBodyDiagnostics,
 	emptyPlan,
-	firstComponentName,
-	repeatRenderDiagnostics,
 	sameModuleChildBoundaryDiagnostics,
 } from './validation.ts';
-import { parseJavaScriptModule } from '../../js-ast.ts';
-import { extractedSyncPolicyActionCalls } from '../semantic-graph/collect-sync-policy.ts';
-import type {
-	PlannedSymbol,
-	PublicRenderPlanArtifact,
-	PublicRenderPlanAsyncBoundaryGate,
-	PublicRenderPlanBranchArmPart,
-	PublicRenderPlanBranchGate,
-	PublicRenderPlanInput,
-	PublicRenderPlanKeyedRepeat,
-	PublicRenderPlanRepeatGate,
-	SemanticGraphArtifact,
-	SemanticSyncPolicy,
-	SemanticSyncPolicyAction,
-} from '../../artifacts.ts';
+import { selectPublicRenderRoot } from './template.ts';
 
-// Builds the public render artifact that the module emitter consumes. This pass
-// decides what direct DOM work is compiler-proven instead of emitting code itself.
+// The compatibility plan now owns only fail-closed diagnostics and style
+// scopes. Render and resume facts are produced once by semantic-graph and
+// render-data; emitters must not rebuild a second AST projection here.
 export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlanArtifact {
 	const ast = parseModule(input.source.source, input.source.filename) as unknown as AnyNode;
 	const conditionalRootDiagnostics = componentConditionalRootDiagnostics(
@@ -89,496 +45,101 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 	if (unsupportedBodyDiagnostics.length > 0) return emptyPlan(unsupportedBodyDiagnostics);
 
 	const selectedRoot = selectPublicRenderRoot(ast);
-	if (!selectedRoot) {
-		return emptyPlan(componentRootDiagnostics(ast, input.source.filename));
-	}
-	const root = selectedRoot.root;
-	const componentRoots = sameModuleComponentRoots(ast);
+	if (!selectedRoot) return emptyPlan(componentRootDiagnostics(ast, input.source.filename));
+
 	stripExtractedSyncPolicyCalls(input.symbolResolver.symbols, input.semanticGraph);
 	const undeclaredTemplateReadDiagnostics = collectUndeclaredTemplateReadDiagnostics({
 		ast,
 		component: selectedRoot.component,
 		filename: input.source.filename,
-		moduleImports: input.semanticGraph.moduleImports.map(
-			(moduleImport) => moduleImport.localName,
-		),
+		moduleImports: input.semanticGraph.moduleImports.map((item) => item.localName),
 		repeatLocals: input.semanticGraph.keyedRepeats.flatMap((repeat) =>
 			repeat.indexName ? [repeat.itemName, repeat.indexName] : [repeat.itemName],
 		),
-		root,
+		root: selectedRoot.root,
 		source: input.source.source,
 	});
 	if (undeclaredTemplateReadDiagnostics.length > 0) {
 		return emptyPlan(undeclaredTemplateReadDiagnostics);
 	}
 
-	const assignedHosts = assignHostIds(
-		ast,
-		input.semanticGraph.hostNodes.map((host) => host.id),
-	);
-	const hostPaths = collectHostPaths(root, assignedHosts);
-	const repeatNodes = keyedRepeatNodes(root);
-	const repeatNodeById = new Map<string, AnyNode>();
-	input.semanticGraph.keyedRepeats.forEach((repeat, index) => {
-		const node = repeatNodes[index];
-		if (node) repeatNodeById.set(repeat.id, node);
-	});
-
-	const bindings = graphBindingMap(input.semanticGraph);
-	const aliases = semanticAliasMap(input.semanticGraph);
-	const locatorByHostNodeId = new Map(
-		input.payloadArena.view.locators.map((locator) => [locator.hostNodeId, locator]),
-	);
-	const staticTextWrites = collectStaticTextWrites({
-		aliases,
-		bindings,
-		root,
-		source: input.source.source,
-	});
-
-	const repeatGates: PublicRenderPlanRepeatGate[] = [];
-	const keyedRepeats: PublicRenderPlanKeyedRepeat[] = [];
-
-	for (const payloadRepeat of input.payloadArena.view.keyedRepeats) {
-		const semanticRepeat = input.semanticGraph.keyedRepeats.find(
-			(repeat) => repeat.id === payloadRepeat.id,
-		);
-		const repeatNode = repeatNodeById.get(payloadRepeat.id);
-		if (!semanticRepeat || !repeatNode) continue;
-
-		const gate = supportedRepeatGate({
-			aliases,
-			assignedHosts,
-			bindings,
-			payloadRepeat,
-			repeatNode,
-			semanticRepeat,
-			source: input.source.source,
-			symbols: input.symbolResolver.symbols,
-		});
-		repeatGates.push(gate);
-		if (!gate.supported || gate.ssrOnly) continue;
-
-		const row = singleRowRoot(repeatNode);
-		const parentLocator = locatorByHostNodeId.get(payloadRepeat.parentHostNodeId);
-		const parentPath = hostPaths.get(payloadRepeat.parentHostNodeId);
-		if (!row || !parentLocator || !parentPath) {
-			// In-arm repeats have no top-level locator by design: the SSR/CSR arm
-			// emission maps them in scope. Mark the gate so eligibility doesn't
-			// demand a planned record that cannot exist.
-			if (semanticRepeat.asyncBoundaryId && gate.supported) {
-				repeatGates[repeatGates.length - 1] = { ...gate, armScoped: true };
-			}
-			continue;
-		}
-
-		const rowPlan = collectRowPlan({
-			aliases,
-			assignedHosts,
-			bindings,
-			itemName: semanticRepeat.itemName,
-			keyPath: payloadRepeat.keyPath,
-			payloadRepeat,
-			repeatId: payloadRepeat.id,
-			row,
-			source: input.source.source,
-			symbols: input.symbolResolver.symbols,
-		});
-		if (!rowPlan) continue;
-
-		keyedRepeats.push(
-			planKeyedRepeat({
-				payloadRepeat,
-				parentLocator,
-				parentPath,
-				row,
-				repeatNode,
-				rowPlan,
-				semanticRepeat,
-				source: input.source.source,
-			}),
-		);
-	}
-
-	const styleScopeCollection = collectStyleScopes(root, input.source.filename);
-	const branchNodes = collectBranchSiteNodes(root);
-	// Repeat nodes inside arm-scoped branch arms: the flip plan rebuilds their
-	// rows from a live graph read (no component execution, D1 tier 3).
-	const repeatInfoByNode = new Map(
-		input.semanticGraph.keyedRepeats.flatMap((repeat, index) => {
-			const node = repeatNodes[index];
-			return node
-				? [
-						[
-							node,
-							{
-								itemName: repeat.itemName,
-								collectionSource: repeat.collectionSource,
-							},
-						] as const,
-					]
-				: [];
-		}),
-	);
-	const armFlipPlansBySite = new Map<
-		string,
-		{
-			readonly arms: ReadonlyArray<ReadonlyArray<PublicRenderPlanBranchArmPart>>;
-			readonly armTests: unknown[] | null;
-		}
-	>();
-	const armBranchEscalations: Array<{
-		readonly branchSiteId: string;
-		readonly asyncBoundaryId: string;
-		readonly asyncBoundaryArm: number;
-	}> = [];
-	const armEscalationDiagnostics: ReturnType<typeof tryBlockToggleRerenderDiagnostic>[] = [];
-	const branchReactivityGates: PublicRenderPlanBranchGate[] = input.semanticGraph.branchSites.map(
-		(site, index) => {
-			const found = branchNodes[index];
-			if (!found || found.nested || found.containsNested) {
-				return {
-					branchSiteId: site.id,
-					supported: false,
-					reason: 'nested-branch-unsupported',
-				};
-			}
-			if (found.conditional) {
-				// Inside an async boundary arm the branch always renders as a
-				// ternary; T104 adds real flip wiring (armFlip) when the content is
-				// parts-buildable, and escalates LOUDLY (D2) to the boundary's arm
-				// re-render when it needs component execution. Sites inside @for
-				// rows or without a graph-resolvable test keep the plain
-				// re-evaluated ternary (need 8).
-				if (found.insideTryArm) {
-					const testResolved = resolveGraphPath(site.testSource, bindings, aliases);
-					if (found.insideRepeat || !site.asyncBoundaryId || !testResolved) {
-						return { branchSiteId: site.id, supported: true, armScoped: true };
-					}
-					const armTests = site.kind === 'switch' ? switchArmTests(found.node) : null;
-					const arms =
-						site.kind === 'switch' && armTests === null
-							? null
-							: branchArms(found.node).map((arm) =>
-									buildBranchArmParts(
-										arm,
-										bindings,
-										aliases,
-										input.source.source,
-										scopeClassOf(styleScopeCollection),
-										{ repeats: repeatInfoByNode },
-									),
-								);
-					if (arms && arms.every((arm) => arm !== null)) {
-						armFlipPlansBySite.set(site.id, {
-							arms: arms as ReadonlyArray<
-								ReadonlyArray<PublicRenderPlanBranchArmPart>
-							>,
-							armTests,
-						});
-						return {
-							branchSiteId: site.id,
-							supported: true,
-							armScoped: true,
-							armFlip: true,
-						};
-					}
-					armBranchEscalations.push({
-						branchSiteId: site.id,
-						asyncBoundaryId: site.asyncBoundaryId,
-						asyncBoundaryArm: site.asyncBoundaryArm ?? 0,
-					});
-					armEscalationDiagnostics.push(
-						tryBlockToggleRerenderDiagnostic({
-							branchLabel: site.kind === 'switch' ? '@switch' : '@if',
-							componentName: firstComponentName(found.node),
-							node: found.node,
-							filename: input.source.filename,
-						}),
-					);
-					return { branchSiteId: site.id, supported: true, armScoped: true };
-				}
-				return {
-					branchSiteId: site.id,
-					supported: false,
-					reason: 'conditional-branch-unsupported',
-				};
-			}
-			const arms = branchArms(found.node);
-			const armsSupported =
-				arms.length > 0 &&
-				arms.every((arm) =>
-					branchArmSupported(arm, bindings, aliases, input.source.source),
-				);
-			if (!armsSupported) {
-				return {
-					branchSiteId: site.id,
-					supported: false,
-					reason: 'arm-content-unsupported',
-				};
-			}
-			return { branchSiteId: site.id, supported: true };
-		},
-	);
-
-	const armAnchorRankCounters = new Map<string, number>();
-	const branchArmsPlans = input.semanticGraph.branchSites.flatMap((site, index) => {
-		const gate = branchReactivityGates[index];
-		const found = branchNodes[index];
-		if (!gate?.supported || !found) return [];
-		// Arm-scoped sites: only flip-planned ones get arm plans, in the owning
-		// boundary's arm coordinate space (escalated/plain ternaries have none).
-		if (gate.armScoped === true) {
-			const flipPlan = gate.armFlip === true ? armFlipPlansBySite.get(site.id) : undefined;
-			if (!flipPlan || !site.asyncBoundaryId) return [];
-			const testResolved = resolveGraphPath(site.testSource, bindings, aliases);
-			const rankKey = `${site.asyncBoundaryId}:${String(site.asyncBoundaryArm ?? 0)}`;
-			const armAnchorRank = armAnchorRankCounters.get(rankKey) ?? 0;
-			armAnchorRankCounters.set(rankKey, armAnchorRank + 1);
-			const declaredEmptyArms = flipPlan.arms.flatMap((arm, armIndex) =>
-				arm.length === 0 ? [armIndex] : [],
-			);
-			const ownedHostIds: string[] = [];
-			walkNode(found.node, (hostNode) => {
-				const hostNodeId = assignedHosts.hostIdByNode.get(hostNode);
-				if (hostNodeId) ownedHostIds.push(hostNodeId);
-			});
-			return [
-				{
-					branchSiteId: site.id,
-					testRead: testResolved
-						? { graphNodeId: testResolved.binding.id, path: testResolved.path }
-						: null,
-					arms: flipPlan.arms,
-					armHosts: branchArms(found.node).map((arm) =>
-						collectArmHosts(arm, assignedHosts),
-					),
-					...(flipPlan.armTests ? { armTests: flipPlan.armTests } : {}),
-					...(declaredEmptyArms.length > 0 ? { declaredEmptyArms } : {}),
-					asyncBoundaryId: site.asyncBoundaryId,
-					asyncBoundaryArm: site.asyncBoundaryArm ?? 0,
-					armAnchorRank,
-					ownedHostIds,
-				},
-			];
-		}
-		const testResolved = resolveGraphPath(site.testSource, bindings, aliases);
-		const arms = branchArms(found.node).map((arm) =>
-			buildBranchArmParts(
-				arm,
-				bindings,
-				aliases,
-				input.source.source,
-				scopeClassOf(styleScopeCollection),
-			),
-		);
-		if (arms.some((arm) => arm === null)) return [];
-		let armTests: unknown[] | null = null;
-		if (site.kind === 'switch') {
-			armTests = switchArmTests(found.node);
-			if (armTests === null) return [];
-		}
-		const armHosts = branchArms(found.node).map((arm) => collectArmHosts(arm, assignedHosts));
-		const declaredEmptyArms = arms.flatMap((arm, armIndex) =>
-			arm.length === 0 ? [armIndex] : [],
-		);
-		return [
-			{
-				branchSiteId: site.id,
-				testRead: testResolved
-					? { graphNodeId: testResolved.binding.id, path: testResolved.path }
-					: null,
-				arms: arms as ReadonlyArray<ReadonlyArray<PublicRenderPlanBranchArmPart>>,
-				armHosts,
-				...(armTests ? { armTests } : {}),
-				...(declaredEmptyArms.length > 0 ? { declaredEmptyArms } : {}),
-			},
-		];
-	});
-
-	const boundaryNodes = collectAsyncBoundaryNodes(root);
-	const asyncBoundaryArms = input.semanticGraph.asyncBoundaries.flatMap((boundarySite, index) => {
-		const boundaryNode = boundaryNodes[index];
-		if (!boundaryNode || boundaryNode.nested || boundaryNode.containsNested) return [];
-		const tryChildren = asNodes((boundaryNode.node.block as AnyNode | undefined)?.body).filter(
-			(child) => !isIgnorableTextNode(child),
-		);
-		const handler = boundaryNode.node.handler as AnyNode | undefined;
-		const catchChildren = asNodes((handler?.body as AnyNode | undefined)?.body).filter(
-			(child) => !isIgnorableTextNode(child),
-		);
-		const arms = [tryChildren, catchChildren].map((arm) =>
-			buildBranchArmParts(
-				arm,
-				bindings,
-				aliases,
-				input.source.source,
-				scopeClassOf(styleScopeCollection),
-			),
-		);
-		if (arms.some((arm) => arm === null)) return [];
-		return [
-			{
-				boundaryId: boundarySite.id,
-				arms: arms as ReadonlyArray<ReadonlyArray<PublicRenderPlanBranchArmPart>>,
-			},
-		];
-	});
-	const asyncBoundaryGates: PublicRenderPlanAsyncBoundaryGate[] =
-		input.payloadArena.view.asyncBoundaries.map((boundary, index) => {
-			const found = boundaryNodes[index];
-			if (!found) {
-				return {
-					boundaryId: boundary.id,
-					supported: false,
-					reason: 'conditional-boundary-unsupported',
-				};
-			}
-			if (found.nested || found.containsNested) {
-				return {
-					boundaryId: boundary.id,
-					supported: false,
-					reason: 'nested-boundary-unsupported',
-				};
-			}
-			if (found.conditional) {
-				return {
-					boundaryId: boundary.id,
-					supported: false,
-					reason: 'conditional-boundary-unsupported',
-				};
-			}
-			const pendingChildren = asNodes(
-				(found.node.pending as AnyNode | undefined)?.body,
-			).filter((child) => !isIgnorableTextNode(child));
-			if (pendingChildren.some((child) => !isPlainHostTemplateNode(child))) {
-				return {
-					boundaryId: boundary.id,
-					supported: false,
-					reason: 'pending-branch-unsupported',
-				};
-			}
-			return { boundaryId: boundary.id, supported: true };
-		});
+	const styles = collectStyleScopes(selectedRoot.root, input.source.filename);
+	const boundaryNodes = collectAsyncBoundaryNodes(selectedRoot.root);
 	const boundaryRunners = resolveBoundaryRunners(input.semanticGraph);
 	const boundaryRunnerDiagnostics = input.semanticGraph.asyncBoundaries.flatMap(
 		(boundary, index) => {
 			const found = boundaryNodes[index];
-			const gate = asyncBoundaryGates.find((item) => item.boundaryId === boundary.id);
-			if (!found || !gate?.supported) return [];
 			const resolution = boundaryRunners.get(boundary.id);
-			if (resolution?.reads.length === 0 && resolution.unresolvedSources.length === 0)
-				return [];
+			if (!found || !resolution) return [];
+			if (resolution.reads.length === 0 && resolution.unresolvedSources.length === 0) return [];
 			const runner = input.symbolResolver.symbols.find(
 				(symbol) =>
-					(symbol.kind === 'async-computed-runner' ||
-						symbol.kind === 'sync-computed-derive') &&
-					symbol.graphNodeId === resolution?.runnerGraphNodeId,
+					(symbol.kind === 'async-computed-runner' || symbol.kind === 'sync-computed-derive') &&
+					symbol.graphNodeId === resolution.runnerGraphNodeId,
 			);
-			if (resolution?.runnerGraphNodeId && runner) return [];
-			const readNames = resolution?.reads.map((item) => `"${item.source}"`) ?? [];
-			return [
-				gatePlanDisagreementDiagnostic({
-					label: '@try',
-					message:
-						readNames.length > 1
-							? `This @try block reads more than one async value (${readNames.join(', ')}), so one runner cannot safely bind every name used by its settled content.`
-							: 'This @try block has no single resolvable async computed read, so no runner can settle its rendered content.',
-					node: found.node,
-					filename: input.source.filename,
-					suggestion:
-						'Make the @try content read one async computed value directly. Deriving additional values inside a settled browser arm is not supported yet.',
-				}),
-			];
+			if (resolution.runnerGraphNodeId && runner) return [];
+			const readNames = resolution.reads.map((item) => `"${item.source}"`);
+			return [gatePlanDisagreementDiagnostic({
+				label: '@try',
+				message: readNames.length > 1
+					? `This @try block reads more than one async value (${readNames.join(', ')}), so one runner cannot safely bind every name used by its settled content.`
+					: 'This @try block has no single resolvable async computed read, so no runner can settle its rendered content.',
+				node: found.node,
+				filename: input.source.filename,
+				suggestion: 'Make the @try content read one async computed value directly. Deriving additional values inside a settled browser arm is not supported yet.',
+			})];
 		},
 	);
-
-	const rootTemplateHtml = staticHtml(root, {
-		componentRoots,
-		componentStack: [selectedRoot.componentName],
-		expressionText: ' ',
-		omitForExpressions: true,
+	const branchNodes: AnyNode[] = [];
+	walkNode(selectedRoot.root, (node) => {
+		if (node.type === 'JSXIfExpression' || node.type === 'JSXSwitchExpression') branchNodes.push(node);
 	});
-	const directRenderTemplateHtml =
-		staticTextWrites && staticShellSupported(root)
-			? staticHtml(root, {
-					componentRoots,
-					componentStack: [selectedRoot.componentName],
-					expressionText: ' ',
-					omitForExpressions: true,
-				})
-			: null;
-
+	const armEscalationDiagnostics = input.semanticGraph.branchSites.flatMap((site, index) => {
+		if (!site.asyncBoundaryId) return [];
+		const branchNode = branchNodes[index];
+		const containsComponent = input.semanticGraph.markup.chunks
+			.filter((chunk) => chunk.id.startsWith(`branch:${site.id}:arm:`))
+			.some((chunk) => chunk.slots.some((slot) => slot.kind === 'child-component'));
+		const componentName = branchNode ? firstComponentName(branchNode) : null;
+		if (!branchNode || !containsComponent || !componentName) return [];
+		return [tryBlockToggleRerenderDiagnostic({
+			branchLabel: site.kind === 'switch' ? '@switch' : '@if',
+			componentName,
+			node: branchNode,
+			filename: input.source.filename,
+		})];
+	});
 	return {
 		passId: 'public-render-plan',
-		rootTemplateHtml,
-		directRenderTemplateHtml,
-		staticHostNodeIds: collectStaticHostNodeIds(root, assignedHosts),
-		staticHostLocators: input.payloadArena.view.locators.flatMap((locator) => {
-			const hostPath = hostPaths.get(locator.hostNodeId);
-			return hostPath
-				? [
-						{
-							hostNodeId: locator.hostNodeId,
-							tagName: locator.tagName,
-							hostPath,
-						},
-					]
-				: [];
-		}),
-		staticEventControls: collectStaticEventControls({
-			hostPaths,
-			payloadEvents: input.payloadArena.view.events,
-			symbols: input.symbolResolver.symbols,
-		}),
-		staticTextWrites: staticTextWrites ?? [],
-		repeatGates,
-		keyedRepeats,
-		asyncBoundaryGates,
-		branchReactivityGates,
-		branchArms: branchArmsPlans,
-		...(armBranchEscalations.length > 0 ? { armBranchEscalations } : {}),
-		asyncBoundaryArms,
-		styleScopes: styleScopeCollection.styleScopes,
-		 diagnostics: [
-			...styleScopeCollection.diagnostics,
-			...armEscalationDiagnostics,
-			...boundaryRunnerDiagnostics,
+		styleScopes: styles.styleScopes,
+		diagnostics: [
+			...styles.diagnostics,
 			...sameModuleChildBoundaryDiagnostics(
 				ast,
 				selectedRoot.componentName,
 				input.source.filename,
 			),
-			...collectUnsupportedConstructDiagnostics(root, input.source.filename),
+			...collectUnsupportedConstructDiagnostics(
+				selectedRoot.root,
+				input.source.filename,
+			),
 			...collectChildrenOpacityDiagnostics(ast, input.source.filename),
-			...repeatRenderDiagnostics({
-				componentEdgeCount: input.semanticGraph.componentEdges.length,
-				filename: input.source.filename,
-				keyedRepeats,
-				repeatGates,
-				repeatNodeById,
-			}),
-			...branchRenderDiagnostics({
-				branchGates: branchReactivityGates,
-				branchNodes,
-				filename: input.source.filename,
-			}),
-			...asyncBoundaryGates.flatMap((gate, index) => {
-				const found = boundaryNodes[index];
-				if (gate.supported || !found) return [];
-				return [
-					unsupportedRenderConstructDiagnostic({
-						label: '@try/@pending/@catch',
-						message: `The async boundary branches are dropped from rendered HTML (reason: ${gate.reason}); only top-level boundaries with plain-host @pending content render anchors today.`,
-						node: found.node,
-						filename: input.source.filename,
-						suggestion:
-							'Move the boundary out of nested control flow, or keep the @pending branch to host elements, text, and expressions.',
-					}),
-				];
-			}),
+			...boundaryRunnerDiagnostics,
+			...armEscalationDiagnostics,
 		],
 	};
+}
+
+function firstComponentName(node: AnyNode): string | null {
+	if (node.type === 'Element' || node.type === 'JSXElement') {
+		const tagName = getElementTagName(node);
+		if (tagName && !isHostTagName(tagName)) return tagName;
+	}
+	for (const child of childNodes(node)) {
+		const found = firstComponentName(child);
+		if (found) return found;
+	}
+	return null;
 }
 
 function stripExtractedSyncPolicyCalls(
@@ -589,24 +150,19 @@ function stripExtractedSyncPolicyCalls(
 		if (!event.syncPolicy) continue;
 		const actions = syncPolicyActionSet(event.syncPolicy);
 		if (actions.size === 0) continue;
-
 		for (const symbol of symbols) {
 			if (
 				symbol.kind !== 'event-handler' ||
 				symbol.hostNodeId !== event.hostNodeId ||
 				symbol.eventName !== event.eventName
-			) {
-				continue;
-			}
+			) continue;
 			const stripped = stripSyncPolicyCallsFromHandlerSource(
 				symbol.source,
 				symbol.parameters[0] ?? 'event',
 				actions,
 				semanticGraph,
 			);
-			if (stripped !== symbol.source) {
-				(symbol as { source: string }).source = stripped;
-			}
+			if (stripped !== symbol.source) (symbol as { source: string }).source = stripped;
 		}
 	}
 }
@@ -614,9 +170,7 @@ function stripExtractedSyncPolicyCalls(
 function syncPolicyActionSet(policy: SemanticSyncPolicy): ReadonlySet<SemanticSyncPolicyAction> {
 	const actions = new Set<SemanticSyncPolicyAction>();
 	const branches = 'branches' in policy ? policy.branches : [policy];
-	for (const branch of branches) {
-		for (const action of branch.actions) actions.add(action);
-	}
+	for (const branch of branches) for (const action of branch.actions) actions.add(action);
 	return actions;
 }
 
@@ -632,34 +186,25 @@ function stripSyncPolicyCallsFromHandlerSource(
 	try {
 		const ast = parseJavaScriptModule(wrappedSource, 'markless-handler.js') as AnyNode;
 		walkNode(ast, (node) => {
-			if (handler) return;
 			if (
-				node.type === 'ArrowFunctionExpression' ||
-				node.type === 'FunctionExpression' ||
-				node.type === 'FunctionDeclaration'
-			) {
-				handler = node;
-			}
+				!handler &&
+				(node.type === 'ArrowFunctionExpression' ||
+					node.type === 'FunctionExpression' ||
+					node.type === 'FunctionDeclaration')
+			) handler = node;
 		});
 	} catch {
 		return source;
 	}
-
 	const body = handler?.body as AnyNode | undefined;
 	const replacements = extractedSyncPolicyActionCalls(body, eventParam, actions, {
 		graph: semanticGraph as never,
 		source: wrappedSource,
 	})
 		.flatMap((node) =>
-			removableCallSpan(
-				source,
-				(node.start ?? 0) - prefix.length,
-				(node.end ?? 0) - prefix.length,
-			),
+			removableCallSpan(source, (node.start ?? 0) - prefix.length, (node.end ?? 0) - prefix.length),
 		)
 		.sort((left, right) => right.start - left.start);
-	if (replacements.length === 0) return source;
-
 	let stripped = source;
 	for (const replacement of replacements) {
 		stripped = stripped.slice(0, replacement.start) + stripped.slice(replacement.end);
@@ -677,11 +222,11 @@ function removableCallSpan(
 	while (source[removeEnd] === ' ' || source[removeEnd] === '\t') removeEnd++;
 	if (source[removeEnd] === ';') removeEnd++;
 	const lineStart = source.lastIndexOf('\n', start - 1) + 1;
-	const linePrefix = source.slice(lineStart, start);
-	if (/^[\t ]*$/.test(linePrefix) && source[removeEnd] === '\n') {
+	if (/^[\t ]*$/.test(source.slice(lineStart, start)) && source[removeEnd] === '\n') {
 		return [{ start: lineStart, end: removeEnd + 1 }];
 	}
 	return [{ start, end: removeEnd }];
 }
 
 export { firstComponentRoot, selectPublicRenderRoot } from './template.ts';
+export type { PublicRenderRootSelection } from './template.ts';

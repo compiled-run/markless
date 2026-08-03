@@ -272,61 +272,6 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
 }",
     "publicRenderPlan": "{
   "passId": "public-render-plan",
-  "rootTemplateHtml": "<main></main>",
-  "directRenderTemplateHtml": null,
-  "staticHostNodeIds": [
-    "h0",
-    "h1",
-    "h2",
-    "h3"
-  ],
-  "staticHostLocators": [
-    {
-      "hostNodeId": "h0",
-      "tagName": "main",
-      "hostPath": []
-    }
-  ],
-  "staticEventControls": [],
-  "staticTextWrites": [],
-  "repeatGates": [],
-  "keyedRepeats": [],
-  "asyncBoundaryGates": [
-    {
-      "boundaryId": "boundary:0",
-      "supported": true
-    }
-  ],
-  "branchReactivityGates": [],
-  "branchArms": [],
-  "asyncBoundaryArms": [
-    {
-      "boundaryId": "boundary:0",
-      "arms": [
-        [
-          {
-            "text": "<p>"
-          },
-          {
-            "read": {
-              "graphNodeId": "computed:details",
-              "path": [
-                "title"
-              ]
-            }
-          },
-          {
-            "text": "</p>"
-          }
-        ],
-        [
-          {
-            "text": "<p>Broken</p>"
-          }
-        ]
-      ]
-    }
-  ],
   "styleScopes": [],
   "diagnostics": []
 }",
@@ -591,35 +536,6 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
 }",
     "publicRenderPlan": "{
   "passId": "public-render-plan",
-  "rootTemplateHtml": "<section> </section>",
-  "directRenderTemplateHtml": "<section> </section>",
-  "staticHostNodeIds": [
-    "h0"
-  ],
-  "staticHostLocators": [
-    {
-      "hostNodeId": "h0",
-      "tagName": "section",
-      "hostPath": []
-    }
-  ],
-  "staticEventControls": [],
-  "staticTextWrites": [
-    {
-      "source": "label",
-      "graphNodeId": "state:label",
-      "path": [],
-      "nodePath": [
-        0
-      ]
-    }
-  ],
-  "repeatGates": [],
-  "keyedRepeats": [],
-  "asyncBoundaryGates": [],
-  "branchReactivityGates": [],
-  "branchArms": [],
-  "asyncBoundaryArms": [],
   "styleScopes": [],
   "diagnostics": []
 }",
@@ -918,85 +834,6 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
 }",
     "publicRenderPlan": "{
   "passId": "public-render-plan",
-  "rootTemplateHtml": "<section></section>",
-  "directRenderTemplateHtml": null,
-  "staticHostNodeIds": [
-    "h0",
-    "h1",
-    "h2"
-  ],
-  "staticHostLocators": [
-    {
-      "hostNodeId": "h0",
-      "tagName": "section",
-      "hostPath": []
-    },
-    {
-      "hostNodeId": "h1",
-      "tagName": "p",
-      "hostPath": [
-        0
-      ]
-    },
-    {
-      "hostNodeId": "h2",
-      "tagName": "p",
-      "hostPath": [
-        0
-      ]
-    }
-  ],
-  "staticEventControls": [],
-  "staticTextWrites": [],
-  "repeatGates": [],
-  "keyedRepeats": [],
-  "asyncBoundaryGates": [],
-  "branchReactivityGates": [
-    {
-      "branchSiteId": "branch-site:0",
-      "supported": true
-    }
-  ],
-  "branchArms": [
-    {
-      "branchSiteId": "branch-site:0",
-      "testRead": {
-        "graphNodeId": "state:open",
-        "path": []
-      },
-      "arms": [
-        [
-          {
-            "text": "<p>Shown</p>"
-          }
-        ],
-        [
-          {
-            "text": "<p>Hidden</p>"
-          }
-        ]
-      ],
-      "armHosts": [
-        [
-          {
-            "hostPath": [
-              0
-            ],
-            "hostNodeId": "h1"
-          }
-        ],
-        [
-          {
-            "hostPath": [
-              0
-            ],
-            "hostNodeId": "h2"
-          }
-        ]
-      ]
-    }
-  ],
-  "asyncBoundaryArms": [],
   "styleScopes": [],
   "diagnostics": []
 }",
@@ -1216,44 +1053,6 @@ function createUnknownSymbolError(id) {
 }",
     "publicRenderPlan": "{
   "passId": "public-render-plan",
-  "rootTemplateHtml": "<button> </button>",
-  "directRenderTemplateHtml": "<button> </button>",
-  "staticHostNodeIds": [
-    "h0"
-  ],
-  "staticHostLocators": [
-    {
-      "hostNodeId": "h0",
-      "tagName": "button",
-      "hostPath": []
-    }
-  ],
-  "staticEventControls": [
-    {
-      "eventName": "click",
-      "hostNodeId": "h0",
-      "hostPath": [],
-      "symbolIds": [
-        "symbol:0"
-      ]
-    }
-  ],
-  "staticTextWrites": [
-    {
-      "source": "count",
-      "graphNodeId": "state:count",
-      "path": [],
-      "nodePath": [
-        0
-      ]
-    }
-  ],
-  "repeatGates": [],
-  "keyedRepeats": [],
-  "asyncBoundaryGates": [],
-  "branchReactivityGates": [],
-  "branchArms": [],
-  "asyncBoundaryArms": [],
   "styleScopes": [],
   "diagnostics": []
 }",
@@ -1470,44 +1269,6 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
 }",
     "publicRenderPlan": "{
   "passId": "public-render-plan",
-  "rootTemplateHtml": "<button> </button>",
-  "directRenderTemplateHtml": "<button> </button>",
-  "staticHostNodeIds": [
-    "h0"
-  ],
-  "staticHostLocators": [
-    {
-      "hostNodeId": "h0",
-      "tagName": "button",
-      "hostPath": []
-    }
-  ],
-  "staticEventControls": [
-    {
-      "eventName": "click",
-      "hostNodeId": "h0",
-      "hostPath": [],
-      "symbolIds": [
-        "symbol:0"
-      ]
-    }
-  ],
-  "staticTextWrites": [
-    {
-      "source": "count",
-      "graphNodeId": "state:App.count.createCount.count",
-      "path": [],
-      "nodePath": [
-        0
-      ]
-    }
-  ],
-  "repeatGates": [],
-  "keyedRepeats": [],
-  "asyncBoundaryGates": [],
-  "branchReactivityGates": [],
-  "branchArms": [],
-  "asyncBoundaryArms": [],
   "styleScopes": [],
   "diagnostics": []
 }",
@@ -1689,26 +1450,6 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
 }",
     "publicRenderPlan": "{
   "passId": "public-render-plan",
-  "rootTemplateHtml": "<main></main>",
-  "directRenderTemplateHtml": null,
-  "staticHostNodeIds": [
-    "h0"
-  ],
-  "staticHostLocators": [
-    {
-      "hostNodeId": "h0",
-      "tagName": "main",
-      "hostPath": []
-    }
-  ],
-  "staticEventControls": [],
-  "staticTextWrites": [],
-  "repeatGates": [],
-  "keyedRepeats": [],
-  "asyncBoundaryGates": [],
-  "branchReactivityGates": [],
-  "branchArms": [],
-  "asyncBoundaryArms": [],
   "styleScopes": [],
   "diagnostics": []
 }",
@@ -1989,87 +1730,6 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
 }",
     "publicRenderPlan": "{
   "passId": "public-render-plan",
-  "rootTemplateHtml": "<span></span>",
-  "directRenderTemplateHtml": null,
-  "staticHostNodeIds": [
-    "h0",
-    "h1",
-    "h2"
-  ],
-  "staticHostLocators": [
-    {
-      "hostNodeId": "h0",
-      "tagName": "span",
-      "hostPath": []
-    },
-    {
-      "hostNodeId": "h1",
-      "tagName": "em",
-      "hostPath": [
-        0
-      ]
-    },
-    {
-      "hostNodeId": "h2",
-      "tagName": "em",
-      "hostPath": [
-        0
-      ]
-    }
-  ],
-  "staticEventControls": [],
-  "staticTextWrites": [],
-  "repeatGates": [],
-  "keyedRepeats": [],
-  "asyncBoundaryGates": [],
-  "branchReactivityGates": [
-    {
-      "branchSiteId": "branch-site:0",
-      "supported": true
-    }
-  ],
-  "branchArms": [
-    {
-      "branchSiteId": "branch-site:0",
-      "testRead": {
-        "graphNodeId": "prop:props",
-        "path": [
-          "active"
-        ]
-      },
-      "arms": [
-        [
-          {
-            "text": "<em>Live</em>"
-          }
-        ],
-        [
-          {
-            "text": "<em>Idle</em>"
-          }
-        ]
-      ],
-      "armHosts": [
-        [
-          {
-            "hostPath": [
-              0
-            ],
-            "hostNodeId": "h1"
-          }
-        ],
-        [
-          {
-            "hostPath": [
-              0
-            ],
-            "hostNodeId": "h2"
-          }
-        ]
-      ]
-    }
-  ],
-  "asyncBoundaryArms": [],
   "styleScopes": [],
   "diagnostics": []
 }",
@@ -2432,110 +2092,10 @@ function createUnknownSymbolError(id) {
 }",
     "publicRenderPlan": "{
   "passId": "public-render-plan",
-  "rootTemplateHtml": "<main><section></section></main>",
-  "directRenderTemplateHtml": "<main><section></section></main>",
-  "staticHostNodeIds": [
-    "h0",
-    "h1"
-  ],
-  "staticHostLocators": [
-    {
-      "hostNodeId": "h0",
-      "tagName": "main",
-      "hostPath": []
-    },
-    {
-      "hostNodeId": "h1",
-      "tagName": "section",
-      "hostPath": [
-        0
-      ]
-    }
-  ],
-  "staticEventControls": [],
-  "staticTextWrites": [],
-  "repeatGates": [
-    {
-      "repeatId": "repeat:0",
-      "supported": true
-    }
-  ],
-  "keyedRepeats": [
-    {
-      "repeatId": "repeat:0",
-      "parentHostNodeId": "h1",
-      "parentLocator": {
-        "hostNodeId": "h1",
-        "strategy": "dom-order",
-        "index": 1,
-        "tagName": "section"
-      },
-      "parentPath": [
-        0
-      ],
-      "rowHostNodeId": "h2",
-      "itemName": "entry",
-      "collectionGraphNodeId": "state:entries",
-      "collectionPath": [],
-      "keyPath": [
-        "code"
-      ],
-      "rowTemplateHtml": "<article class=\\"\\"><h2> </h2><button>Choose</button></article>",
-      "emptyTemplateHtml": null,
-      "rowElementCount": 3,
-      "textWrites": [
-        {
-          "source": "entry.title",
-          "itemPath": [
-            "title"
-          ],
-          "nodePath": [
-            0,
-            0
-          ]
-        }
-      ],
-      "classWrites": [
-        {
-          "source": "chosen === entry.code ? 'picked' : 'plain'",
-          "hostPath": [],
-          "stateGraphNodeId": "state:chosen",
-          "statePath": [],
-          "itemPath": [
-            "code"
-          ],
-          "trueClass": "picked",
-          "falseClass": "plain"
-        }
-      ],
-      "eventControls": [
-        {
-          "eventName": "click",
-          "hostPath": [
-            1
-          ],
-          "handlerSource": "() => chosen = entry.code",
-          "symbolId": "symbol:0",
-          "itemContext": {
-            "kind": "keyed-repeat-item",
-            "repeatId": "repeat:0",
-            "itemName": "entry",
-            "keyPath": [
-              "code"
-            ]
-          }
-        }
-      ]
-    }
-  ],
-  "asyncBoundaryGates": [],
-  "branchReactivityGates": [],
-  "branchArms": [],
-  "asyncBoundaryArms": [],
   "styleScopes": [],
   "diagnostics": []
 }",
-    "renderDataModuleSource": "export const marklessRenderData = {"passId":"render-data","filename":"src/KeyedRepeat.tsrx","root":{"componentName":"App","templateId":"template:App"},"chunks":[{"id":"repeat:repeat:0:row","kind":"repeat-row","componentName":"App","statics":["<article class=\\"","\\"><h2><!--markless-slot:1-->","</h2><button>Choose</button></article>"],"hosts":[{"hostNodeId":"h2","tagName":"article","coordinate":{"kind":"child-index","path":[0]}},{"hostNodeId":"h3","tagName":"h2","coordinate":{"kind":"child-index","path":[0,0]}},{"hostNodeId":"h4","tagName":"button","coordinate":{"kind":"child-index","path":[0,1]}}],"slots":[{"kind":"attribute","name":"class","coordinate":{"kind":"child-index","path":[0]},"residue":{"kind":"authored-expression","source":"chosen === entry.code ? 'picked' : 'plain'"},"staticIndex":0},{"kind":"text","residue":{"kind":"repeat-item","repeatId":"repeat:0","path":["title"]},"coordinate":{"kind":"comment-anchor","path":[0,0,0]},"staticIndex":1}]},{"id":"template:App","kind":"template","componentName":"App","statics":["<main><section><!--markless-slot:0-->","</section></main>"],"hosts":[{"hostNodeId":"h0","tagName":"main","coordinate":{"kind":"child-index","path":[0]}},{"hostNodeId":"h1","tagName":"section","coordinate":{"kind":"child-index","path":[0,0]}}],"slots":[{"kind":"repeat","repeatId":"repeat:0","rowTemplateId":"repeat:repeat:0:row","coordinate":{"kind":"comment-anchor","path":[0,0,0]},"staticIndex":0}]}],"hosts":[{"id":"h0","tagName":"main","hostNodeId":"h0"},{"id":"h1","tagName":"section","hostNodeId":"h1"},{"id":"h2","tagName":"article","hostNodeId":"h2"},{"id":"h3","tagName":"h2","hostNodeId":"h3"},{"id":"h4","tagName":"button","hostNodeId":"h4"}],"initialValues":[{"graphNodeId":"state:entries","value":{"kind":"constant","value":[{"code":"a","title":"Alpha"}]}},{"graphNodeId":"state:chosen","value":{"kind":"constant","value":"a"}}],"branches":[],"repeats":[{"repeatId":"repeat:0","parentHostNodeId":"h1","rowHostNodeId":"h2","itemName":"entry","collectionGraphNodeId":"state:entries","collectionPath":[],"keyPath":["code"],"rowChunkId":"repeat:repeat:0:row","rowElementCount":3}],"boundaries":[],"interactions":[{"eventId":"event:0","hostNodeId":"h4","eventName":"click","symbolIds":["symbol:0"]}]};",
+    "renderDataModuleSource": "export const marklessRenderData = {"passId":"render-data","filename":"src/KeyedRepeat.tsrx","root":{"componentName":"App","templateId":"template:App"},"chunks":[{"id":"repeat:repeat:0:row","kind":"repeat-row","componentName":"App","statics":["<article class=\\"","\\"><h2><!--markless-slot:1-->","</h2><button>Choose</button></article>"],"hosts":[{"hostNodeId":"h2","tagName":"article","coordinate":{"kind":"child-index","path":[0]}},{"hostNodeId":"h3","tagName":"h2","coordinate":{"kind":"child-index","path":[0,0]}},{"hostNodeId":"h4","tagName":"button","coordinate":{"kind":"child-index","path":[0,1]}}],"slots":[{"kind":"attribute","name":"class","coordinate":{"kind":"child-index","path":[0]},"residue":{"kind":"authored-expression","source":"chosen === entry.code ? 'picked' : 'plain'"},"directClassMatch":{"stateGraphNodeId":"state:chosen","statePath":[],"itemPath":["code"],"trueClass":"picked","falseClass":"plain"},"staticIndex":0},{"kind":"text","residue":{"kind":"repeat-item","repeatId":"repeat:0","path":["title"]},"coordinate":{"kind":"comment-anchor","path":[0,0,0]},"staticIndex":1}]},{"id":"template:App","kind":"template","componentName":"App","statics":["<main><section><!--markless-slot:0-->","</section></main>"],"hosts":[{"hostNodeId":"h0","tagName":"main","coordinate":{"kind":"child-index","path":[0]}},{"hostNodeId":"h1","tagName":"section","coordinate":{"kind":"child-index","path":[0,0]}}],"slots":[{"kind":"repeat","repeatId":"repeat:0","rowTemplateId":"repeat:repeat:0:row","coordinate":{"kind":"comment-anchor","path":[0,0,0]},"staticIndex":0}]}],"hosts":[{"id":"h0","tagName":"main","hostNodeId":"h0"},{"id":"h1","tagName":"section","hostNodeId":"h1"},{"id":"h2","tagName":"article","hostNodeId":"h2"},{"id":"h3","tagName":"h2","hostNodeId":"h3"},{"id":"h4","tagName":"button","hostNodeId":"h4"}],"initialValues":[{"graphNodeId":"state:entries","value":{"kind":"constant","value":[{"code":"a","title":"Alpha"}]}},{"graphNodeId":"state:chosen","value":{"kind":"constant","value":"a"}}],"branches":[],"repeats":[{"repeatId":"repeat:0","parentHostNodeId":"h1","rowHostNodeId":"h2","itemName":"entry","collectionGraphNodeId":"state:entries","collectionPath":[],"keyPath":["code"],"rowChunkId":"repeat:repeat:0:row","rowElementCount":3,"parentPath":[0],"classWrites":[{"source":"chosen === entry.code ? 'picked' : 'plain'","hostPath":[],"stateGraphNodeId":"state:chosen","statePath":[],"itemPath":["code"],"trueClass":"picked","falseClass":"plain"}],"eventControls":[{"eventName":"click","hostPath":[1],"handlerSource":"() => chosen = entry.code","symbolId":"symbol:0","itemContext":{"kind":"keyed-repeat-item","repeatId":"repeat:0","itemName":"entry","keyPath":["code"]}}],"directSupported":true}],"boundaries":[],"interactions":[{"eventId":"event:0","hostNodeId":"h4","eventName":"click","symbolIds":["symbol:0"]}]};",
     "ssrModuleSource": "import { renderSsrData } from '@markless/web/fns/ssr-data';
 import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
@@ -2681,26 +2241,6 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
 }",
     "publicRenderPlan": "{
   "passId": "public-render-plan",
-  "rootTemplateHtml": "<section data-mode=\\"\\"> </section>",
-  "directRenderTemplateHtml": null,
-  "staticHostNodeIds": [
-    "h0"
-  ],
-  "staticHostLocators": [
-    {
-      "hostNodeId": "h0",
-      "tagName": "section",
-      "hostPath": []
-    }
-  ],
-  "staticEventControls": [],
-  "staticTextWrites": [],
-  "repeatGates": [],
-  "keyedRepeats": [],
-  "asyncBoundaryGates": [],
-  "branchReactivityGates": [],
-  "branchArms": [],
-  "asyncBoundaryArms": [],
   "styleScopes": [],
   "diagnostics": []
 }",
@@ -2776,7 +2316,7 @@ function createUnknownSymbolError(id) {
   },
   "positional-keyed-repeat": {
     "csrModuleSource": "import { createMarklessCsrChunkRenderer } from '@markless/web/fns/csr';
-export const marklessCsrChunkComponents = {"App": {name:"App",dataId:"markless-csr-data:src%2FPositionalRepeat.tsrx:App",/*MARKLESS_CSR_TEST_START*/nativeFallback:()=>({"name":"App","state":{"version":1,"cells":[{"graphNodeId":"state:records","name":"records","valueKind":"array","value":{"version":1,"root":{"$ref":0},"records":[{"id":0,"type":"array","items":[{"$ref":1}]},{"id":1,"type":"object","fields":[["label","Zero"]]}]}}],"computed":[],"sharedDefinitions":[]},"view":{"version":1,"locators":[{"hostNodeId":"h0","strategy":"dom-order","index":0,"tagName":"ol"},{"hostNodeId":"h1","strategy":"dom-order","index":1,"tagName":"li"}],"events":[],"domUpdates":[],"behaviors":[],"elementHandles":[],"keyedRepeats":[],"branches":[],"asyncBoundaries":[]},"rootChunkId":"template:App","chunks":[{"id":"repeat:repeat:0:row","kind":"repeat-row","componentName":"App","statics":["<li><!--markless-slot:0-->","</li>"],"hosts":[{"hostNodeId":"h1","tagName":"li","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"text","residue":{"kind":"repeat-item","repeatId":"repeat:0","path":["label"]},"coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]},{"id":"template:App","kind":"template","componentName":"App","statics":["<ol><!--markless-slot:0-->","</ol>"],"hosts":[{"hostNodeId":"h0","tagName":"ol","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"repeat","repeatId":"repeat:0","rowTemplateId":"repeat:repeat:0:row","coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]}],"hostNodeIds":["h1","h0"],"branchIds":[],"boundaryIds":[],"repeatIds":["repeat:0"],"initialValues":[{"graphNodeId":"state:records","value":{"kind":"constant","value":[{"label":"Zero"}]}}],"initialValueSources":{},"initialValueKinds":{},"stateGraphNodeIds":["state:records"],"branches":[],"repeats":[{"repeatId":"repeat:0","parentHostNodeId":"h0","rowHostNodeId":"h1","itemName":"record","collectionGraphNodeId":"state:records","collectionPath":[],"keyPath":[],"rowChunkId":"repeat:repeat:0:row","rowElementCount":1}],"boundaries":[],"edges":[],"propCellId":null,"ownsModuleData":true}),/*MARKLESS_CSR_TEST_END*/getComponent:(name)=>marklessCsrAllChunkComponents[name],loadSymbol,createValues:(props,read,locals,marklessReadCsrValue)=>{let records=read("state:records",[]);const record=locals["record"];const error=locals.error;return {};}}};
+export const marklessCsrChunkComponents = {"App": {name:"App",dataId:"markless-csr-data:src%2FPositionalRepeat.tsrx:App",/*MARKLESS_CSR_TEST_START*/nativeFallback:()=>({"name":"App","state":{"version":1,"cells":[{"graphNodeId":"state:records","name":"records","valueKind":"array","value":{"version":1,"root":{"$ref":0},"records":[{"id":0,"type":"array","items":[{"$ref":1}]},{"id":1,"type":"object","fields":[["label","Zero"]]}]}}],"computed":[],"sharedDefinitions":[]},"view":{"version":1,"locators":[{"hostNodeId":"h0","strategy":"dom-order","index":0,"tagName":"ol"},{"hostNodeId":"h1","strategy":"dom-order","index":1,"tagName":"li"}],"events":[],"domUpdates":[],"behaviors":[],"elementHandles":[],"keyedRepeats":[],"branches":[],"asyncBoundaries":[]},"rootChunkId":"template:App","chunks":[{"id":"repeat:repeat:0:row","kind":"repeat-row","componentName":"App","statics":["<li><!--markless-slot:0-->","</li>"],"hosts":[{"hostNodeId":"h1","tagName":"li","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"text","residue":{"kind":"repeat-item","repeatId":"repeat:0","path":["label"]},"coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]},{"id":"template:App","kind":"template","componentName":"App","statics":["<ol><!--markless-slot:0-->","</ol>"],"hosts":[{"hostNodeId":"h0","tagName":"ol","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"repeat","repeatId":"repeat:0","rowTemplateId":"repeat:repeat:0:row","coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]}],"hostNodeIds":["h1","h0"],"branchIds":[],"boundaryIds":[],"repeatIds":["repeat:0"],"initialValues":[{"graphNodeId":"state:records","value":{"kind":"constant","value":[{"label":"Zero"}]}}],"initialValueSources":{},"initialValueKinds":{},"stateGraphNodeIds":["state:records"],"branches":[],"repeats":[{"repeatId":"repeat:0","parentHostNodeId":"h0","rowHostNodeId":"h1","itemName":"record","collectionGraphNodeId":"state:records","collectionPath":[],"keyPath":[],"rowChunkId":"repeat:repeat:0:row","rowElementCount":1,"parentPath":[],"directSupported":false}],"boundaries":[],"edges":[],"propCellId":null,"ownsModuleData":true}),/*MARKLESS_CSR_TEST_END*/getComponent:(name)=>marklessCsrAllChunkComponents[name],loadSymbol,createValues:(props,read,locals,marklessReadCsrValue)=>{let records=read("state:records",[]);const record=locals["record"];const error=locals.error;return {};}}};
 const marklessCsrAllChunkComponents = { ...marklessCsrChunkComponents,  };
 const marklessRenderCsrChunks = createMarklessCsrChunkRenderer({ rootComponentName: "App", components: marklessCsrAllChunkComponents });
 function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); }",
@@ -2912,36 +2452,10 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
 }",
     "publicRenderPlan": "{
   "passId": "public-render-plan",
-  "rootTemplateHtml": "<ol></ol>",
-  "directRenderTemplateHtml": "<ol></ol>",
-  "staticHostNodeIds": [
-    "h0"
-  ],
-  "staticHostLocators": [
-    {
-      "hostNodeId": "h0",
-      "tagName": "ol",
-      "hostPath": []
-    }
-  ],
-  "staticEventControls": [],
-  "staticTextWrites": [],
-  "repeatGates": [
-    {
-      "repeatId": "repeat:0",
-      "supported": true,
-      "ssrOnly": true
-    }
-  ],
-  "keyedRepeats": [],
-  "asyncBoundaryGates": [],
-  "branchReactivityGates": [],
-  "branchArms": [],
-  "asyncBoundaryArms": [],
   "styleScopes": [],
   "diagnostics": []
 }",
-    "renderDataModuleSource": "export const marklessRenderData = {"passId":"render-data","filename":"src/PositionalRepeat.tsrx","root":{"componentName":"App","templateId":"template:App"},"chunks":[{"id":"repeat:repeat:0:row","kind":"repeat-row","componentName":"App","statics":["<li><!--markless-slot:0-->","</li>"],"hosts":[{"hostNodeId":"h1","tagName":"li","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"text","residue":{"kind":"repeat-item","repeatId":"repeat:0","path":["label"]},"coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]},{"id":"template:App","kind":"template","componentName":"App","statics":["<ol><!--markless-slot:0-->","</ol>"],"hosts":[{"hostNodeId":"h0","tagName":"ol","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"repeat","repeatId":"repeat:0","rowTemplateId":"repeat:repeat:0:row","coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]}],"hosts":[{"id":"h0","tagName":"ol","hostNodeId":"h0"},{"id":"h1","tagName":"li","hostNodeId":"h1"}],"initialValues":[{"graphNodeId":"state:records","value":{"kind":"constant","value":[{"label":"Zero"}]}}],"branches":[],"repeats":[{"repeatId":"repeat:0","parentHostNodeId":"h0","rowHostNodeId":"h1","itemName":"record","collectionGraphNodeId":"state:records","collectionPath":[],"keyPath":[],"rowChunkId":"repeat:repeat:0:row","rowElementCount":1}],"boundaries":[],"interactions":[]};",
+    "renderDataModuleSource": "export const marklessRenderData = {"passId":"render-data","filename":"src/PositionalRepeat.tsrx","root":{"componentName":"App","templateId":"template:App"},"chunks":[{"id":"repeat:repeat:0:row","kind":"repeat-row","componentName":"App","statics":["<li><!--markless-slot:0-->","</li>"],"hosts":[{"hostNodeId":"h1","tagName":"li","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"text","residue":{"kind":"repeat-item","repeatId":"repeat:0","path":["label"]},"coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]},{"id":"template:App","kind":"template","componentName":"App","statics":["<ol><!--markless-slot:0-->","</ol>"],"hosts":[{"hostNodeId":"h0","tagName":"ol","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"repeat","repeatId":"repeat:0","rowTemplateId":"repeat:repeat:0:row","coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]}],"hosts":[{"id":"h0","tagName":"ol","hostNodeId":"h0"},{"id":"h1","tagName":"li","hostNodeId":"h1"}],"initialValues":[{"graphNodeId":"state:records","value":{"kind":"constant","value":[{"label":"Zero"}]}}],"branches":[],"repeats":[{"repeatId":"repeat:0","parentHostNodeId":"h0","rowHostNodeId":"h1","itemName":"record","collectionGraphNodeId":"state:records","collectionPath":[],"keyPath":[],"rowChunkId":"repeat:repeat:0:row","rowElementCount":1,"parentPath":[],"directSupported":false}],"boundaries":[],"interactions":[]};",
     "ssrModuleSource": "import { renderSsrData } from '@markless/web/fns/ssr-data';
 import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
@@ -3189,32 +2703,6 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
 }",
     "publicRenderPlan": "{
   "passId": "public-render-plan",
-  "rootTemplateHtml": "<main><span></span></main>",
-  "directRenderTemplateHtml": null,
-  "staticHostNodeIds": [
-    "h3"
-  ],
-  "staticHostLocators": [
-    {
-      "hostNodeId": "h3",
-      "tagName": "main",
-      "hostPath": []
-    }
-  ],
-  "staticEventControls": [],
-  "staticTextWrites": [],
-  "repeatGates": [],
-  "keyedRepeats": [],
-  "asyncBoundaryGates": [],
-  "branchReactivityGates": [
-    {
-      "branchSiteId": "branch-site:0",
-      "supported": false,
-      "reason": "nested-branch-unsupported"
-    }
-  ],
-  "branchArms": [],
-  "asyncBoundaryArms": [],
   "styleScopes": [],
   "diagnostics": []
 }",
@@ -3289,7 +2777,17 @@ export function symbol_1(context) {
 		value: context.value ? "Live" : "Idle",
 	};
 }
-",
+
+
+symbol:2
+const marklessBranchArms = [[{"text":"<em>Live</em>"}],[{"text":"<em>Idle</em>"}]];
+export function symbol_2(context) {
+	const arm = context.arm ?? ((context.graph.read("prop:props", ["active"])) ? 0 : 1);
+	const parts = marklessBranchArms[arm] ?? [];
+	const html = parts.map((part) => part.text !== undefined ? part.text : marklessBranchText(context.graph.read(part.read.graphNodeId, part.read.path))).join("");
+	return { arm, html };
+}
+function marklessBranchText(value) { return String(value == null ? "" : value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;"); }",
     "symbolResolverModule": "export const symbolManifest = 
 [1,null,null,[],[],{}]
 ;
@@ -3386,26 +2884,6 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
 }",
     "publicRenderPlan": "{
   "passId": "public-render-plan",
-  "rootTemplateHtml": "<section title=\\"Final\\">Hi</section>",
-  "directRenderTemplateHtml": null,
-  "staticHostNodeIds": [
-    "h0"
-  ],
-  "staticHostLocators": [
-    {
-      "hostNodeId": "h0",
-      "tagName": "section",
-      "hostPath": []
-    }
-  ],
-  "staticEventControls": [],
-  "staticTextWrites": [],
-  "repeatGates": [],
-  "keyedRepeats": [],
-  "asyncBoundaryGates": [],
-  "branchReactivityGates": [],
-  "branchArms": [],
-  "asyncBoundaryArms": [],
   "styleScopes": [],
   "diagnostics": []
 }",
@@ -3617,44 +3095,6 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
 }",
     "publicRenderPlan": "{
   "passId": "public-render-plan",
-  "rootTemplateHtml": "<button> </button>",
-  "directRenderTemplateHtml": "<button> </button>",
-  "staticHostNodeIds": [
-    "h0"
-  ],
-  "staticHostLocators": [
-    {
-      "hostNodeId": "h0",
-      "tagName": "button",
-      "hostPath": []
-    }
-  ],
-  "staticEventControls": [
-    {
-      "eventName": "click",
-      "hostNodeId": "h0",
-      "hostPath": [],
-      "symbolIds": [
-        "symbol:0"
-      ]
-    }
-  ],
-  "staticTextWrites": [
-    {
-      "source": "count",
-      "graphNodeId": "state:count",
-      "path": [],
-      "nodePath": [
-        0
-      ]
-    }
-  ],
-  "repeatGates": [],
-  "keyedRepeats": [],
-  "asyncBoundaryGates": [],
-  "branchReactivityGates": [],
-  "branchArms": [],
-  "asyncBoundaryArms": [],
   "styleScopes": [],
   "diagnostics": []
 }",
@@ -3882,26 +3322,6 @@ function marklessRenderCsr(props = {}) { return marklessRenderCsrChunks(props); 
 }",
     "publicRenderPlan": "{
   "passId": "public-render-plan",
-  "rootTemplateHtml": "<output> </output>",
-  "directRenderTemplateHtml": null,
-  "staticHostNodeIds": [
-    "h0"
-  ],
-  "staticHostLocators": [
-    {
-      "hostNodeId": "h0",
-      "tagName": "output",
-      "hostPath": []
-    }
-  ],
-  "staticEventControls": [],
-  "staticTextWrites": [],
-  "repeatGates": [],
-  "keyedRepeats": [],
-  "asyncBoundaryGates": [],
-  "branchReactivityGates": [],
-  "branchArms": [],
-  "asyncBoundaryArms": [],
   "styleScopes": [],
   "diagnostics": []
 }",

@@ -1,4 +1,9 @@
-import type { PublicRenderModuleInput } from '../../artifacts.ts';
+import type {
+	PublicRenderModuleInput,
+	PublicRenderPlanAsyncBoundaryGate,
+	PublicRenderPlanBranchGate,
+	PublicRenderPlanRepeatGate,
+} from '../../artifacts.ts';
 import type { AnyNode } from '../../ast/nodes.ts';
 
 export type ComponentEdge = PublicRenderModuleInput['semanticGraph']['componentEdges'][number];
@@ -12,11 +17,11 @@ export type SsrRenderContext = {
 	nextChildIndex: number;
 	readonly hostIdByNode: ReadonlyMap<AnyNode, string>;
 	readonly keyedRepeats: PublicRenderModuleInput['semanticGraph']['keyedRepeats'];
-	readonly repeatGates: PublicRenderModuleInput['publicRenderPlan']['repeatGates'];
+	readonly repeatGates: ReadonlyArray<PublicRenderPlanRepeatGate>;
 	nextRepeatIndex: number;
 	readonly insideRepeatRow: boolean;
 	readonly asyncBoundaries: PublicRenderModuleInput['semanticGraph']['asyncBoundaries'];
-	readonly asyncBoundaryGates: PublicRenderModuleInput['publicRenderPlan']['asyncBoundaryGates'];
+	readonly asyncBoundaryGates: ReadonlyArray<PublicRenderPlanAsyncBoundaryGate>;
 	nextAsyncBoundaryIndex: number;
 	// boundaryId -> the async computed the SSR render awaits inline.
 	readonly asyncRunners?: ReadonlyMap<
@@ -25,7 +30,7 @@ export type SsrRenderContext = {
 	>;
 	readonly asyncDependencyRegistry?: boolean;
 	readonly branchSites: PublicRenderModuleInput['semanticGraph']['branchSites'];
-	readonly branchReactivityGates: PublicRenderModuleInput['publicRenderPlan']['branchReactivityGates'];
+	readonly branchReactivityGates: ReadonlyArray<PublicRenderPlanBranchGate>;
 	nextBranchSiteIndex: number;
 	// Inside a gate-supported branch arm, host elements skip the locator
 	// stream (their records rewire via arm-relative host paths) but must
@@ -49,13 +54,13 @@ export type CsrRenderContext = {
 	// Optional because component-children emission builds a partial context;
 	// repeats inside projected children keep the prior render-nothing behavior.
 	readonly keyedRepeats?: PublicRenderModuleInput['semanticGraph']['keyedRepeats'];
-	readonly repeatGates?: PublicRenderModuleInput['publicRenderPlan']['repeatGates'];
+	readonly repeatGates?: ReadonlyArray<PublicRenderPlanRepeatGate>;
 	nextRepeatIndex?: number;
 	readonly branchSites?: PublicRenderModuleInput['semanticGraph']['branchSites'];
-	readonly branchReactivityGates?: PublicRenderModuleInput['publicRenderPlan']['branchReactivityGates'];
+	readonly branchReactivityGates?: ReadonlyArray<PublicRenderPlanBranchGate>;
 	nextBranchSiteIndex?: number;
 	readonly asyncBoundaries?: PublicRenderModuleInput['semanticGraph']['asyncBoundaries'];
-	readonly asyncBoundaryGates?: PublicRenderModuleInput['publicRenderPlan']['asyncBoundaryGates'];
+	readonly asyncBoundaryGates?: ReadonlyArray<PublicRenderPlanAsyncBoundaryGate>;
 	nextAsyncBoundaryIndex?: number;
 	// Arm-render modules number child components page-aligned (symbol routes
 	// key on the component-edge index); unset keeps the page-module numbering.

@@ -24,15 +24,15 @@ export function emitDirectPublicRenderModule(input: {
 }) {
 	const componentName = input.rootSelection?.componentName;
 	if (
-		!input.publicRenderPlan.directRenderTemplateHtml ||
+		!input.renderData.root ||
 		!componentName ||
 		input.componentCount !== 1 ||
-		!canEmitPublicRenderModule(input.publicRenderPlan)
+		!canEmitPublicRenderModule(input.renderData)
 	) {
 		return '';
 	}
 
-	const publicView = createPublicProtocolView(input.protocolView, input.publicRenderPlan);
+	const publicView = createPublicProtocolView(input.protocolView, input.renderData);
 	const directPublicStateEntries = emitDirectPublicStateEntries(input.protocolState);
 	if (
 		directPublicStateEntries === null ||
@@ -43,7 +43,7 @@ export function emitDirectPublicRenderModule(input: {
 
 	const bootstrapData = directChunkBootstrapData({
 		renderData: input.renderData,
-		publicRenderPlan: input.publicRenderPlan,
+		protocolView: input.protocolView,
 	});
 	if (!bootstrapData) return '';
 	const { rootChunkId: _rootChunkId, chunks: _chunks, ...directRecords } = bootstrapData;
@@ -57,7 +57,7 @@ export function emitDirectPublicRenderModule(input: {
 		`export function ${componentName}() {\n\tconst graph = createMarklessPublicGraph();\n\tconst root = renderMarklessDirectChunk(graph, loadSymbol);\n\treturn { root, graph, runtime: { async dispatch() {} } };\n}`,
 		'',
 		emitCreatePublicGraph(graphMethods, directPublicStateEntries, {
-			trackArrayIndexes: input.publicRenderPlan.keyedRepeats.length > 0,
+			trackArrayIndexes: input.renderData.repeats.length > 0,
 		}),
 		'',
 	];

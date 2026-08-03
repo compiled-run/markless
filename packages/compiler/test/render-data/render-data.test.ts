@@ -80,7 +80,7 @@ export function App() @{
 	]);
 });
 
-test('renderData root and native static HTML agree with the public plan for a static page', async () => {
+test('renderData owns root native static HTML and host coordinates', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/Static.tsrx',
 		source: `export function App() @{ <main class="page"><h1>Hello</h1><p>Ready</p></main> }`,
@@ -90,13 +90,8 @@ test('renderData root and native static HTML agree with the public plan for a st
 		(chunk) => chunk.id === result.renderData.root?.templateId,
 	);
 
-	expect(root?.statics).toEqual([result.publicRenderPlan.rootTemplateHtml]);
+	expect(root?.statics).toEqual(['<main class="page"><h1>Hello</h1><p>Ready</p></main>']);
 	expect(root?.hosts.map((host) => host.coordinate.path)).toEqual([[0], [0, 0], [0, 1]]);
-	expect(result.publicRenderPlan.staticHostLocators.map((host) => host.hostPath)).toEqual([
-		[],
-		[0],
-		[1],
-	]);
 });
 
 test('renderData keeps dynamic-host interaction symbols on the dynamic host slot', async () => {
@@ -131,7 +126,7 @@ export function App() @{
 	);
 });
 
-test('renderData keeps the repeat trailing-sibling content and the legacy emitter fails the build loudly', async () => {
+test('renderData keeps repeat trailing-sibling content without a plan projection', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/RepeatLandmine.tsrx',
 		source: `
@@ -144,17 +139,7 @@ export function App() @{
 		symbols: [],
 	});
 
-	expect(result.publicRenderPlan.repeatGates).toContainEqual(
-		expect.objectContaining({ repeatId: 'repeat:0', supported: false }),
-	);
-	expect(result.publicRenderPlan.diagnostics).toContainEqual(
-		expect.objectContaining({
-			code: 'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
-			severity: 'error',
-		}),
-	);
-	expect(result.publicRenderPlan.rootTemplateHtml).toContain('<li>Trailing</li>');
-	expect(result.publicRenderPlan.rootTemplateHtml).not.toContain('<li> </li>');
+	expect(result.publicRenderPlan.diagnostics).toEqual([]);
 	expect(result.renderData.repeats).toContainEqual(
 		expect.objectContaining({ repeatId: 'repeat:0', rowChunkId: 'repeat:repeat:0:row' }),
 	);
@@ -182,7 +167,6 @@ export function App() @{ <main><Child /></main> }
 			severity: 'error',
 		}),
 	);
-	expect(result.publicRenderPlan.rootTemplateHtml).toBe('<main></main>');
 	expect(result.renderData.chunks).toContainEqual(
 		expect.objectContaining({
 			id: 'async:boundary:0:arm:try',

@@ -188,9 +188,10 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 				...pass,
 				run({ inputs }) {
 					return {
-						renderData: createRenderData({
+					renderData: createRenderData({
 							semanticGraph: inputs.semanticGraph as SemanticGraphArtifact,
 							symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
+							payloadArena: inputs.payloadArena as PayloadArenaArtifact,
 						}),
 					};
 				},

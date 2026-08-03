@@ -1,19 +1,38 @@
-import type { PublicRenderModuleInput, PublicRenderPlanArtifact } from '../../artifacts.ts';
+import type { PublicRenderModuleInput, RenderDataArtifact } from '../../artifacts.ts';
 
 type ProtocolState = PublicRenderModuleInput['protocolState'];
 type ProtocolView = PublicRenderModuleInput['protocolView'];
 
-export function canEmitPublicRenderModule(publicRenderPlan: PublicRenderPlanArtifact): boolean {
-	// Arm-scoped repeats render via in-scope SSR/CSR arm mapping and carry no
-	// top-level planned record by design.
-	const planNeeded = publicRenderPlan.repeatGates.filter(
-		(gate) => !(gate.supported && gate.armScoped === true),
-	);
-	return (
-		(!publicRenderPlan.repeatGates.some((gate) => !gate.supported) &&
-			publicRenderPlan.keyedRepeats.length === planNeeded.length) ||
-		publicRenderPlan.repeatGates.length === 0
-	);
+export function canEmitPublicRenderModule(renderData: RenderDataArtifact): boolean {
+	if (!renderData.root) return false;
+	const root = renderData.chunks.find((chunk) => chunk.id === renderData.root?.templateId);
+	if (!root) return false;
+	const directChunkIds = new Set([
+		root.id,
+		...renderData.repeats.flatMap((repeat) => [
+			repeat.rowChunkId,
+			...(repeat.emptyChunkId ? [repeat.emptyChunkId] : []),
+		]),
+	]);
+	const rootHosts = root.hosts.map((host) => host.coordinate.path[0] === 0 ? host.coordinate.path.slice(1) : host.coordinate.path);
+	const repeatsSupported = renderData.repeats.every((repeat) => {
+		if (!repeat.directSupported || repeat.collectionGraphNodeId === undefined || !repeat.parentPath) return false;
+		return !rootHosts.some((path) =>
+			path.length > repeat.parentPath!.length &&
+			repeat.parentPath!.every((segment, index) => path[index] === segment),
+		);
+	});
+	return repeatsSupported &&
+		renderData.chunks
+			.filter((chunk) => directChunkIds.has(chunk.id))
+			.every((chunk) => chunk.slots.every((slot) => {
+				if (slot.kind === 'repeat') return true;
+				if (slot.kind === 'attribute' && slot.name === 'class') {
+					return slot.directClassMatch !== undefined;
+				}
+				if (slot.kind !== 'text') return false;
+				return slot.residue.kind !== 'authored-expression';
+			}));
 }
 
 export function canUseDirectPublicRuntime(
