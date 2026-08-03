@@ -55,6 +55,10 @@ export function resumeVirtualModuleId(filename: string) {
 	return `${MARKLESS_VIRTUAL_PREFIX}resume:${encodeURIComponent(filename)}`;
 }
 
+export function prerenderWakeVirtualModuleId(filename: string) {
+	return `${MARKLESS_VIRTUAL_PREFIX}prerender-wake:${encodeURIComponent(filename)}`;
+}
+
 export function scopedSymbolExportName(filename: string, exportName: string) {
 	return `${exportName}_${stringHash(filename)}`;
 }
@@ -230,6 +234,7 @@ export function emitResumeModule(input: {
 	readonly executionLog?: MarklessExecutionLogMode;
 	readonly hasBoundSymbols?: boolean;
 	readonly prerenderDataId?: string;
+	readonly installResumeSummary?: boolean;
 }) {
 	const routeSymbols = input.symbolRoutes.length > 0;
 	const resumeSymbolLoader = routeSymbols ? 'marklessSsrLoadSymbolRoute' : 'loadSymbol';
@@ -259,6 +264,9 @@ export function emitResumeModule(input: {
 			: '',
 		'',
 		input.executionLog === 'never' ? '' : emitExecutionLogLoader(),
+		input.installResumeSummary && input.executionLog !== 'never'
+			? 'globalThis.__mxLoadLog().then(log => log.installMarklessExecutionLog());'
+			: '',
 		'',
 		emitLoadSymbol(input),
 		routeSymbols ? 'const marklessLoadLocalSymbol = loadSymbol;' : '',

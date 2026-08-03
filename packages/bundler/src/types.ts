@@ -25,6 +25,7 @@ export interface MarklessRolldownOptions {
 
 export type MarklessVirtualModuleType =
 	| 'payload'
+	| 'prerender-wake'
 	| 'render-data'
 	| 'resolver'
 	| 'resume'
@@ -56,6 +57,7 @@ export interface TransformTsrxModuleInput {
 	executionLogModuleHooks?: boolean;
 	inlineResumerDebug?: boolean;
 	prerenderRecords?: boolean;
+	prerenderWakeVariant?: boolean;
 }
 
 export interface TransformTsrxModuleResult {

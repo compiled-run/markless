@@ -25,7 +25,11 @@ import {
 	normalizeExecutionLogMode,
 	requalifyExecutionLogModuleHook,
 } from './execution-log.ts';
-import { encodedSymbolSource, symbolVirtualModuleSourceFile } from './source-module.ts';
+import {
+	encodedSymbolSource,
+	prerenderWakeVirtualModuleId,
+	symbolVirtualModuleSourceFile,
+} from './source-module.ts';
 import {
 	MARKLESS_VIRTUAL_PREFIX,
 	compileTsrxModuleLinkArtifact,
@@ -80,6 +84,7 @@ const MARKLESS_SYMBOL_SOURCE_QUERY_RE = /[?&]markless-symbols(?:[&#]|$)/;
 const MARKLESS_RESUME_SOURCE_QUERY_RE = /[?&]markless-resume(?:[&#]|$)/;
 const MARKLESS_RENDER_DATA_SOURCE_QUERY_RE = /[?&]markless-render-data(?:[&#]|$)/;
 const RESUME_VIRTUAL_ID_RE = /^virtual:markless:resume:([^:]+)$/;
+const PRERENDER_WAKE_VIRTUAL_ID_RE = /^virtual:markless:prerender-wake:([^:]+)$/;
 const SYMBOL_VIRTUAL_STRING_RE = /(["'`])((?:virtual:markless:symbol:)[^"'`]+)\1/g;
 
 export const marklessClient = (options: MarklessRolldownOptions = {}) =>
@@ -319,7 +324,9 @@ export function createMarklessRolldownPlugin(input: {
 			if (symbolSource && isRelativeImport(source)) {
 				return await this.resolve(source, symbolSource, { skipSelf: true });
 			}
-			const resumeSource = sourceForResumeVirtualImporter(importer);
+			const resumeSource =
+				sourceForResumeVirtualImporter(importer) ??
+				sourceForPrerenderWakeVirtualImporter(importer);
 			if (resumeSource && isRelativeImport(source)) {
 				return await this.resolve(source, resumeSource, { skipSelf: true });
 			}
@@ -394,6 +401,10 @@ export function createMarklessRolldownPlugin(input: {
 			}
 			const source = pathname(id);
 			const renderDataRequest = isRenderDataSourceRequest(id);
+			const ssrPrerenderArtifacts =
+				currentEnvironment === 'client' &&
+				internalOptions.emitResumeModules === true &&
+				(clientSymbolEntrySources.has(source) || importedChildSources.has(source));
 			const transformInput: TransformTsrxModuleInput = {
 				filename: source,
 				source: code,
@@ -405,7 +416,11 @@ export function createMarklessRolldownPlugin(input: {
 				inlineResumerDebug: internalOptions.inlineResumerDebug === true,
 				prerenderRecords:
 					currentEnvironment === 'client' &&
-					(internalOptions.prerender === true || renderDataRequest),
+					(internalOptions.prerender === true ||
+						renderDataRequest ||
+						ssrPrerenderArtifacts),
+				prerenderWakeVariant:
+					ssrPrerenderArtifacts && clientSymbolEntrySources.has(source),
 				environment: currentEnvironment,
 				clientOutput:
 					currentEnvironment === 'client' &&
@@ -632,7 +647,7 @@ export function createMarklessRolldownPlugin(input: {
 						);
 					}
 					return (
-						item.type === 'resume' &&
+						(item.type === 'resume' || item.type === 'prerender-wake') &&
 						internalOptions.emitResumeModules === true &&
 						clientSymbolEntrySources.has(source)
 					);
@@ -1284,6 +1299,13 @@ function sourceForResumeVirtualImporter(importer: string | undefined): string | 
 	return match?.[1] ? decodeURIComponent(match[1]) : null;
 }
 
+function sourceForPrerenderWakeVirtualImporter(importer: string | undefined): string | null {
+	if (!importer) return null;
+
+	const match = normalizeVirtualId(importer).match(PRERENDER_WAKE_VIRTUAL_ID_RE);
+	return match?.[1] ? decodeURIComponent(match[1]) : null;
+}
+
 function recordProductionResumeModuleUrls(
 	bundle: Record<string, unknown>,
 	urls: Map<string, string> | undefined,
@@ -1388,6 +1410,7 @@ export { convertManifestToBundleGraph, createPreloadGraphAdder } from './build/b
 export { collectHeadLinkInjections } from './build/head-links.ts';
 export {
 	MARKLESS_VIRTUAL_PREFIX,
+	prerenderWakeVirtualModuleId,
 	resumeVirtualModuleId,
 	transformTsrxModule,
 } from './transform.ts';

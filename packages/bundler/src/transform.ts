@@ -22,6 +22,7 @@ import {
 	emitResumeModule,
 	emitSourceModule,
 	payloadModule,
+	prerenderWakeVirtualModuleId,
 	resumeVirtualModuleId,
 	rewriteSymbolModuleExport,
 	scopedSymbolExportName,
@@ -63,7 +64,11 @@ async function stripEmittedTypes(code: string): Promise<string> {
 	}
 }
 
-export { MARKLESS_VIRTUAL_PREFIX, resumeVirtualModuleId } from './source-module.ts';
+export {
+	MARKLESS_VIRTUAL_PREFIX,
+	prerenderWakeVirtualModuleId,
+	resumeVirtualModuleId,
+} from './source-module.ts';
 
 export async function transformTsrxModule(
 	input: TransformTsrxModuleInput,
@@ -73,6 +78,7 @@ export async function transformTsrxModule(
 	const renderDataId = `${MARKLESS_VIRTUAL_PREFIX}render-data:${encodedFilename}`;
 	const resolverId = `${MARKLESS_VIRTUAL_PREFIX}resolver:${encodedFilename}`;
 	const resumeId = resumeVirtualModuleId(input.filename);
+	const prerenderWakeId = prerenderWakeVirtualModuleId(input.filename);
 	const { compiled, blockingDiagnostics } = await compileWithBlockingDiagnostics(
 		input,
 		resolverId,
@@ -172,12 +178,41 @@ export async function transformTsrxModule(
 					compiled.protocolView,
 					compiled.runtimeDemandMap,
 				),
+				// The wake variant is ADDITIVE: CSR prerender pages boot through this
+				// regular resume module, so suppressing its records mode when a
+				// variant also exists strands them on the payload path.
 				prerenderDataId: input.prerenderRecords ? renderDataId : undefined,
 				hasBoundSymbols: compiled.boundSymbolResolver.rows.length > 0,
 				symbols: symbolRows,
 				symbolRoutes,
 			}),
 		},
+		...(input.prerenderWakeVariant && compiled.publicRenderModule.renderDataModuleSource
+			? [
+					{
+						id: prerenderWakeId,
+						type: 'prerender-wake' as const,
+						source: emitResumeModule({
+							payloadId,
+							resolverId,
+							payloadState: compiled.payloadScripts.state,
+							payloadView: containerScopedResumeView(compiled.payloadScripts.view),
+							runtimeDemandMap: compiled.runtimeDemandMap,
+							executionLog: input.executionLog,
+							needsFullResume: needsFullResume(
+								compiled.protocolState,
+								compiled.protocolView,
+								compiled.runtimeDemandMap,
+							),
+							prerenderDataId: renderDataId,
+							installResumeSummary: true,
+							hasBoundSymbols: compiled.boundSymbolResolver.rows.length > 0,
+							symbols: symbolRows,
+							symbolRoutes,
+						}),
+					},
+				]
+			: []),
 		...(await Promise.all(
 			compiled.symbolModules.modules.map(
 				async (module, index): Promise<MarklessVirtualModule> => ({
