@@ -205,7 +205,9 @@ export function emitSourceModule(input: {
 		input.environment === 'server' || symbolsOnly || input.prerenderRecords
 			? ''
 			: input.publicCsrModuleSource,
-		input.environment === 'client' && !input.prerenderRecords ? '' : input.publicSsrModuleSource,
+		input.environment === 'client' && (symbolsOnly || !input.prerenderRecords)
+			? ''
+			: input.publicSsrModuleSource,
 		routeSymbols
 			? emitLazySymbolRouteFunction(
 					input.symbolRoutes,
@@ -434,10 +436,11 @@ function emitResumeContainerEvent(
 				'async function marklessFullResumeHandoff(handoff) {',
 				'\thandoff.root.__marklessLinkedRenderDataBoot = true;',
 				'\thandoff.root.__asyncResumeRuntimeStarted = true;',
-				"\tconst { derivePrerenderResumeRecords, renderPrerenderBoundary, resumeFromPrerenderRecords } = await import('@markless/web/fns/prerender-resume');",
+				"\tconst { derivePrerenderResumeRecords, mergePrerenderPayloadRecords, renderPrerenderBoundary, resumeFromPrerenderRecords } = await import('@markless/web/fns/prerender-resume');",
 				`\tconst records = await derivePrerenderResumeRecords(marklessPrerenderData, ${loadSymbolName});`,
+				'\tconst mergedRecords = mergePrerenderPayloadRecords(records, handoff.root);',
 				'\tconst { runtime } = await resumeFromPrerenderRecords({',
-				'\t\t...records,',
+				'\t\t...mergedRecords,',
 				'\t\troot: handoff.root,',
 				`\t\tloadSymbol: ${loadSymbolName},`,
 				`\t\trenderAsyncBoundary: (boundaryId, status, graph) => renderPrerenderBoundary(marklessPrerenderData, boundaryId, status, graph, ${loadSymbolName}),`,

@@ -8,7 +8,10 @@ import {
 	type StorageSeedMetadata,
 } from '@markless/serializer';
 import { renderPayloadScripts } from '@markless/serializer';
-import { classifyResumeRecordDelta } from '@markless/serializer/resume-record-delta';
+import {
+	classifyResumeRecordDelta,
+	mergeResumeRecordDelta,
+} from '@markless/serializer/resume-record-delta';
 import { __marklessDebugBootstrapSource } from './debug-channel.ts';
 import type { MarklessExecutionLogMode } from './dev-log.ts';
 import {
@@ -101,19 +104,28 @@ export async function assembleSsrContainer(
 	const selfWake = hasUnsettledAsyncBoundaryRunner(view, state);
 	const resumeModuleUrl = options.resumeModuleUrl ?? artifactResumeModuleUrl(component);
 	const prerenderWakeModuleUrl = artifactPrerenderWakeModuleUrl(component);
-	const emptyRequestDelta =
-		hasPayload &&
-		browserTriggers &&
-		prerenderWakeModuleUrl !== undefined &&
-		classifyResumeRecordDelta(
-			await derivePrerenderResumeRecords(component, options.props),
-			{ state, view },
-		).kind === 'empty';
+	const wakeChannelEnabled =
+		hasPayload && browserTriggers && prerenderWakeModuleUrl !== undefined;
+	const baseline = wakeChannelEnabled
+		? await derivePrerenderResumeRecords(component, options.props)
+		: undefined;
+	const requestRecords = { state, view };
+	const classification = baseline
+		? classifyResumeRecordDelta(baseline, requestRecords)
+		: undefined;
+	if (baseline && classification?.kind === 'divergent') {
+		const merged = mergeResumeRecordDelta(baseline, classification.delta);
+		if (classifyResumeRecordDelta(merged, requestRecords).kind !== 'empty') {
+			throw new Error('MARKLESS_RESUME_RECORD_DELTA_PARITY_MISMATCH');
+		}
+	}
+	const payloadRecords =
+		classification?.kind === 'divergent' ? classification.delta : requestRecords;
 	const payloadScripts =
-		hasPayload && browserTriggers && !emptyRequestDelta
-			? renderPayloadScripts({ state, view })
+		hasPayload && browserTriggers && classification?.kind !== 'empty'
+			? renderPayloadScripts(payloadRecords)
 			: undefined;
-	const selectedResumeModuleUrl = emptyRequestDelta
+	const selectedResumeModuleUrl = wakeChannelEnabled
 		? prerenderWakeModuleUrl
 		: resumeModuleUrl;
 	const artifactSources = artifactInlineResumerSources(component);
@@ -152,7 +164,7 @@ export async function assembleSsrContainer(
 	const resumerScript =
 		hasPayload && browserTriggers
 			? renderInlineResumerScript(
-					emptyRequestDelta
+					wakeChannelEnabled
 						? createPrerenderInlineResumerSource(
 								browserEventNames(view),
 								selectedResumeModuleUrl,

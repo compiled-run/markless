@@ -60,8 +60,8 @@ const POSTURE_CONDITIONAL_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Source emission adds the development resume edge only to client output.',
 	"packages/bundler/src/source-module.ts :: input.environment === 'server' || symbolsOnly || input.prerenderRecords":
 		'Source emission excludes client render bodies from server and symbols-only shapes.',
-	"packages/bundler/src/source-module.ts :: input.environment === 'client' && !input.prerenderRecords ? '' : input.publicSsrModuleSource,":
-		'Source emission keeps SSR code out of ordinary client output.',
+	"packages/bundler/src/source-module.ts :: input.environment === 'client' && (symbolsOnly || !input.prerenderRecords)":
+		'Source emission keeps SSR code out of ordinary and symbols-only client output.',
 	"packages/bundler/src/source-module.ts :: input.environment !== 'server' &&":
 		'Compiled app metadata includes a CSR entry outside server-only output.',
 	"packages/bundler/src/source-module.ts :: input.ssrExportName && (input.environment !== 'client' || input.prerenderRecords)":

@@ -261,6 +261,7 @@ let count = state(0);
 		expect(resumeModule?.source).toContain('marklessSsrLoadSymbolRoute'); // composed pages are excluded from specialization (T015g PM); the routed loader wires the full path
 		expect(result.code).not.toContain('function marklessResumeLoadSymbol');
 		expect(result.code).toContain('import("./Child.tsrx?markless-symbols")');
+		expect(result.code).not.toContain('import __marklessSsrComponent');
 		expect(result.code).toContain('import("virtual:markless:symbol:');
 		expect(result.code).not.toContain('document.createElement');
 		expect(result.code).not.toContain('addEventListener');

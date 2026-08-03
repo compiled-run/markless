@@ -108,6 +108,7 @@ test('emitResumeModule derives prerender records from linked render data on dema
 	expect(resumeCode).toContain(
 		'derivePrerenderResumeRecords(marklessPrerenderData, loadSymbol)',
 	);
+	expect(resumeCode).toContain('mergePrerenderPayloadRecords(records, handoff.root)');
 	expect(resumeCode).toContain('resumeFromPrerenderRecords');
 	expect(resumeCode).not.toContain('resumeFromPayloadDocument');
 	expect(resumeCode).not.toContain('App.tsrx');

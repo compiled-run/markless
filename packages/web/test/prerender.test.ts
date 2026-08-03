@@ -1,5 +1,7 @@
 import { expect, test } from 'vitest';
 import { createProtocolStatePayload, renderPayloadScripts } from '@markless/serializer';
+import { classifyResumeRecordDelta } from '@markless/serializer/resume-record-delta';
+import { createPrerenderInlineResumerSource } from '../src/inline/resumer.ts';
 import {
 	derivePrerenderResumeRecords,
 	evaluateBuiltPageClosure,
@@ -190,7 +192,7 @@ test('empty request delta uses the hashed wake variant and zero payload-script b
 	expect(derived).toEqual(await derivePrerenderResumeRecords(artifact));
 });
 
-test('non-empty request delta preserves the existing full-payload container bytes', async () => {
+test('wake-channel divergent request carries only its keyed delta records', async () => {
 	const baselineState = createProtocolStatePayload({
 		cells: [{ graphNodeId: 'state:count', name: 'count', valueKind: 'scalar', value: 0 }],
 	});
@@ -213,6 +215,52 @@ test('non-empty request delta preserves the existing full-payload container byte
 		prerenderWakeModuleUrl: '/build/prerender-wake-A1b2.js',
 		renderSsr: () => baseline,
 	};
+	const preparedRequestView = {
+		...view,
+		locators: view.locators.map((locator) => ({ ...locator, index: locator.index + 1 })),
+	};
+	const baselineRecords = { state: baselineState, view: preparedRequestView };
+	const requestRecords = { state: requestState, view: preparedRequestView };
+	const classification = classifyResumeRecordDelta(baselineRecords, requestRecords);
+	expect(classification.kind).toBe('divergent');
+	if (classification.kind !== 'divergent') return;
+	const payload = renderPayloadScripts(classification.delta);
+
+	const html = await assembleSsrContainer(artifact, request, { resumerSource: 'wake();' });
+
+	expect(html).toBe(
+		'<div data-async-container><button>Request</button>' +
+			payload.stateScript +
+			payload.viewScript +
+			'<script data-async-resumer data-markless-resume-module="/build/prerender-wake-A1b2.js">' +
+			createPrerenderInlineResumerSource(['click'], '/build/prerender-wake-A1b2.js', {
+				executionLog: 'auto',
+			}) +
+			'</script></div>',
+	);
+});
+
+test('gated-off divergent request preserves the existing full-payload container bytes', async () => {
+	const baselineState = createProtocolStatePayload({
+		cells: [{ graphNodeId: 'state:count', name: 'count', valueKind: 'scalar', value: 0 }],
+	});
+	const requestState = createProtocolStatePayload({
+		cells: [{ graphNodeId: 'state:count', name: 'count', valueKind: 'scalar', value: 1 }],
+	});
+	const view = {
+		version: 1 as const,
+		locators: [{ hostNodeId: 'h0', strategy: 'dom-order' as const, index: 0, tagName: 'button' }],
+		events: [{ hostNodeId: 'h0', eventName: 'click', symbolIds: ['symbol:0'] }],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	const artifact: SsrRenderArtifact = {
+		resumeModuleUrl: '/build/resume.js',
+		renderSsr: () => ({ html: '<button>Build</button>', state: baselineState, view }),
+	};
+	const request = { html: '<button>Request</button>', state: requestState, view };
 	const preparedRequestView = {
 		...view,
 		locators: view.locators.map((locator) => ({ ...locator, index: locator.index + 1 })),

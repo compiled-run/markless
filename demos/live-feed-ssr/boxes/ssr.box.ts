@@ -5,6 +5,8 @@ import {
 } from '../../live-feed/boxes/arm-record-cells';
 
 const WAIT = { timeoutMs: 10_000 };
+const FULL_PAYLOAD_SCRIPT_BYTES = 4_761;
+const DELTA_PAYLOAD_SCRIPT_BYTES_MAX = 3_200;
 
 export default box(
 	{
@@ -25,6 +27,27 @@ export default box(
 		await expect.html.contains(settledHtml, 'data-row-key="atlas-204"');
 		await expect.html.contains(settledHtml, '<script type="markless/state">');
 		await expect.html.contains(settledHtml, '<script type="markless/view">');
+		const deltaPayload = readResumePayload(settledHtml);
+		if (
+			deltaPayload.state.cells.length !== 0 ||
+			deltaPayload.state.computed.length === 0 ||
+			deltaPayload.view.locators.length !== 0 ||
+			deltaPayload.view.events.length !== 0 ||
+			deltaPayload.view.domUpdates.length === 0 ||
+			deltaPayload.view.asyncBoundaries.length === 0
+		) {
+			throw new Error(
+				'Expected live-feed SSR payload scripts to carry only request-divergent keyed records.',
+			);
+		}
+		if (deltaPayload.bytes > DELTA_PAYLOAD_SCRIPT_BYTES_MAX) {
+			throw new Error(
+				`Expected live-feed SSR delta payload <= ${DELTA_PAYLOAD_SCRIPT_BYTES_MAX} bytes, got ${deltaPayload.bytes}.`,
+			);
+		}
+		receipt.note(
+			`live-feed SSR payload scripts: ${FULL_PAYLOAD_SCRIPT_BYTES} bytes full -> ${deltaPayload.bytes} bytes delta`,
+		);
 		if (settledHtml.includes('data-feed-pending')) {
 			throw new Error('Expected the fast SSR response to settle before the shell flush.');
 		}
@@ -95,6 +118,31 @@ export default box(
 );
 
 type ContentPage = { content(): Promise<string> };
+
+function readResumePayload(html: string): {
+	readonly bytes: number;
+	readonly state: {
+		readonly cells: ReadonlyArray<unknown>;
+		readonly computed: ReadonlyArray<unknown>;
+	};
+	readonly view: {
+		readonly locators: ReadonlyArray<unknown>;
+		readonly events: ReadonlyArray<unknown>;
+		readonly domUpdates: ReadonlyArray<unknown>;
+		readonly asyncBoundaries: ReadonlyArray<unknown>;
+	};
+} {
+	const scripts = [...html.matchAll(/<script type="markless\/(state|view)">([\s\S]*?)<\/script>/g)];
+	const payload = Object.fromEntries(
+		scripts.map((match) => [match[1], JSON.parse(match[2]!) as unknown]),
+	) as { readonly state?: unknown; readonly view?: unknown };
+	if (!payload.state || !payload.view) throw new Error('Expected both resume delta payload scripts.');
+	return {
+		bytes: scripts.reduce((total, match) => total + new TextEncoder().encode(match[0]).length, 0),
+		state: payload.state as never,
+		view: payload.view as never,
+	};
+}
 
 async function waitForSettledLoadAccounting(
 	page: ContentPage,

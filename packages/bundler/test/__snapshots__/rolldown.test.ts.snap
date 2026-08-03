@@ -26,10 +26,11 @@ function readMarklessSourceSymbol(mod, exportName) {
 async function marklessFullResumeHandoff(handoff) {
 	handoff.root.__marklessLinkedRenderDataBoot = true;
 	handoff.root.__asyncResumeRuntimeStarted = true;
-	const { derivePrerenderResumeRecords, renderPrerenderBoundary, resumeFromPrerenderRecords } = await import('@markless/web/fns/prerender-resume');
+	const { derivePrerenderResumeRecords, mergePrerenderPayloadRecords, renderPrerenderBoundary, resumeFromPrerenderRecords } = await import('@markless/web/fns/prerender-resume');
 	const records = await derivePrerenderResumeRecords(marklessPrerenderData, loadSymbol);
+	const mergedRecords = mergePrerenderPayloadRecords(records, handoff.root);
 	const { runtime } = await resumeFromPrerenderRecords({
-		...records,
+		...mergedRecords,
 		root: handoff.root,
 		loadSymbol: loadSymbol,
 		renderAsyncBoundary: (boundaryId, status, graph) => renderPrerenderBoundary(marklessPrerenderData, boundaryId, status, graph, loadSymbol),

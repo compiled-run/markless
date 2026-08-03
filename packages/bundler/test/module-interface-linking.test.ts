@@ -31,6 +31,31 @@ test('transformTsrxModule compiles an importer with its child module graph inter
 	expect(importer.code).toContain('state:App.count.counter.value');
 });
 
+test('symbols-only wake roots do not retain linked child SSR imports', async () => {
+	const childFilename = '/workspace/app/src/UpdateSummary.tsrx';
+	const childSource = `export default function UpdateSummary() @{ <p>Ready</p> }`;
+	const parentSource = `import UpdateSummary from './UpdateSummary.tsrx';
+export default function App() @{ <main><UpdateSummary /></main> }`;
+	const child = await transformTsrxModule({
+		filename: childFilename,
+		source: childSource,
+		environment: 'client',
+		prerenderRecords: true,
+	});
+	const parent = await transformTsrxModule({
+		filename: importerFilename,
+		source: parentSource,
+		environment: 'client',
+		clientOutput: 'symbols-only',
+		prerenderRecords: true,
+		importedModuleInterfaces: {
+			'./UpdateSummary.tsrx': child.moduleGraphInterface,
+		},
+	});
+
+	expect(parent.code).not.toContain('__marklessSsrComponent');
+});
+
 test('concurrent symbols-only transforms preserve sibling render-data artifacts', async () => {
 	const plugin = marklessClient();
 	const children = [
