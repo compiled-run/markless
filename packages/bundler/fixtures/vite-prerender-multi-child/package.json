@@ -1,0 +1,17 @@
+{
+	"name": "@fixtures/vite-prerender-multi-child",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"build": "vp build"
+	},
+	"dependencies": {
+		"@markless/bundler": "workspace:*",
+		"@markless/core": "workspace:*"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"vite": "8.0.16",
+		"vite-plus": "0.1.20"
+	}
+}

@@ -1,6 +1,6 @@
 import { expect, test, vi } from 'vitest';
 import { marklessClient, marklessServer, transformTsrxModule } from '../src/rolldown.ts';
-import { callBuildStart, callLoad, callTransform } from './helpers.ts';
+import { callBuildStart, callLoad, callResolveId, callTransform } from './helpers.ts';
 
 const helperFilename = '/workspace/app/src/counter.tsrx';
 const importerFilename = '/workspace/app/src/App.tsrx';
@@ -29,6 +29,33 @@ test('transformTsrxModule compiles an importer with its child module graph inter
 	});
 
 	expect(importer.code).toContain('state:App.count.counter.value');
+});
+
+test('concurrent symbols-only transforms preserve sibling render-data artifacts', async () => {
+	const plugin = marklessClient();
+	const children = [
+		{
+			filename: '/workspace/app/src/LeftChild.tsrx',
+			source: `export function LeftChild() @{ <button onClick={() => undefined}>Left</button> }`,
+		},
+		{
+			filename: '/workspace/app/src/RightChild.tsrx',
+			source: `export function RightChild() @{ <button onClick={() => undefined}>Right</button> }`,
+		},
+	];
+	callBuildStart(plugin, { cwd: '/workspace/app' });
+	await Promise.all(children.map((child) => callTransform(plugin, child.source, child.filename)));
+
+	const symbolsTransforms = children.map((child) =>
+		callTransform(plugin, child.source, `${child.filename}?markless-symbols`),
+	);
+	for (const child of children) {
+		const renderDataId = `virtual:markless:render-data:${encodeURIComponent(child.filename)}`;
+		await expect(callResolveId(plugin, renderDataId)).resolves.toMatchObject({
+			id: `\0${renderDataId}`,
+		});
+	}
+	await Promise.all(symbolsTransforms);
 });
 
 test('prerender child render-data imports use the linked interface filename', async () => {

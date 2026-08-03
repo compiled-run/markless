@@ -111,7 +111,8 @@ export function createMarklessRolldownPlugin(input: {
 	const importedChildren = new Map<string, ImportedChild>();
 	const importedChildSources = new Set<string>();
 	const emittedClientResolverSources = new Set<string>();
-	const sourceVirtualModules = new Map<string, Set<string>>();
+	const transformVirtualModules = new Map<string, Set<string>>();
+	const virtualModuleOwners = new Map<string, Set<string>>();
 	const clientSymbolEntrySources = new Set<string>();
 	const executionLogEstimatedSizes = new Map<string, number>();
 	const dev = createMarklessDevGraph();
@@ -251,7 +252,8 @@ export function createMarklessRolldownPlugin(input: {
 			importedChildren.clear();
 			importedChildSources.clear();
 			emittedClientResolverSources.clear();
-			sourceVirtualModules.clear();
+			transformVirtualModules.clear();
+			virtualModuleOwners.clear();
 			executionLogEstimatedSizes.clear();
 			dev.reset();
 
@@ -386,7 +388,6 @@ export function createMarklessRolldownPlugin(input: {
 			}
 			const source = pathname(id);
 			const renderDataRequest = isRenderDataSourceRequest(id);
-			clearSourceVirtualModules(source, virtualModules, sourceVirtualModules);
 			const transformInput: TransformTsrxModuleInput = {
 				filename: source,
 				source: code,
@@ -507,12 +508,14 @@ export function createMarklessRolldownPlugin(input: {
 			// cross-module registry can validate both sides of the composition edge.
 			if (!renderDataRequest) {
 				registerTransformArtifacts({
+					owner: cacheKey,
 					source,
 					result: transformed,
 					virtualModules,
 					transformManifests,
 					moduleLinkArtifacts,
-					sourceVirtualModules,
+					transformVirtualModules,
+					virtualModuleOwners,
 					executionLogEstimatedSizes,
 					dev,
 					environment: currentEnvironment,
@@ -565,18 +568,22 @@ export function createMarklessRolldownPlugin(input: {
 				};
 				transformed = await transformTsrxModule(linkedTransformInput);
 			}
-			if (!renderDataRequest) registerTransformArtifacts({
-				source,
-				result: transformed,
-				virtualModules,
-				transformManifests,
-				moduleLinkArtifacts,
-				sourceVirtualModules,
-				executionLogEstimatedSizes,
-				dev,
-				environment: currentEnvironment,
-				updateDevPrerenderHashes: internalOptions.updateDevPrerenderHashes,
-			});
+			if (!renderDataRequest)
+				registerTransformArtifacts({
+					owner: cacheKey,
+					source,
+					result: transformed,
+					virtualModules,
+					transformManifests,
+					moduleLinkArtifacts,
+					transformVirtualModules,
+					virtualModuleOwners,
+					executionLogEstimatedSizes,
+					dev,
+					environment: currentEnvironment,
+					replaceOwnedArtifacts: true,
+					updateDevPrerenderHashes: internalOptions.updateDevPrerenderHashes,
+				});
 			linkedTransformCache.set(cacheKey, {
 				source,
 				code,
@@ -1063,15 +1070,18 @@ function pluginName(environment: Environment) {
 }
 
 function registerTransformArtifacts(input: {
+	owner: string;
 	source: string;
 	result: TransformTsrxModuleResult;
 	virtualModules: Map<string, MarklessVirtualModule>;
 	transformManifests: Map<string, MarklessTransformManifest>;
 	moduleLinkArtifacts: Map<string, MarklessModuleLinkArtifact>;
-	sourceVirtualModules: Map<string, Set<string>>;
+	transformVirtualModules: Map<string, Set<string>>;
+	virtualModuleOwners: Map<string, Set<string>>;
 	executionLogEstimatedSizes: Map<string, number>;
 	dev: ReturnType<typeof createMarklessDevGraph>;
 	environment: MarklessEnvironment;
+	replaceOwnedArtifacts?: boolean;
 	updateDevPrerenderHashes?: (hashes: ReadonlyMap<string, string>) => void;
 }) {
 	const ids = new Set<string>();
@@ -1086,6 +1096,9 @@ function registerTransformArtifacts(input: {
 			: module;
 		input.virtualModules.set(module.id, stored);
 		ids.add(module.id);
+		const owners = input.virtualModuleOwners.get(module.id) ?? new Set<string>();
+		owners.add(input.owner);
+		input.virtualModuleOwners.set(module.id, owners);
 		if (module.type === 'render-data') {
 			renderDataHashes.set(resolveVirtualId(module.id), renderDataHash(module.source));
 		}
@@ -1099,7 +1112,21 @@ function registerTransformArtifacts(input: {
 		interfaceHash: input.result.interfaceHash,
 		moduleImports: input.result.moduleImports,
 	});
-	input.sourceVirtualModules.set(input.source, ids);
+	const previouslyOwned = input.transformVirtualModules.get(input.owner) ?? new Set<string>();
+	if (input.replaceOwnedArtifacts === true) {
+		for (const staleId of previouslyOwned) {
+			if (ids.has(staleId)) continue;
+			const owners = input.virtualModuleOwners.get(staleId);
+			owners?.delete(input.owner);
+			if (!owners || owners.size === 0) {
+				input.virtualModuleOwners.delete(staleId);
+				input.virtualModules.delete(staleId);
+			}
+		}
+		input.transformVirtualModules.set(input.owner, ids);
+	} else {
+		input.transformVirtualModules.set(input.owner, new Set([...previouslyOwned, ...ids]));
+	}
 	input.dev.record(input.source, ids, input.environment);
 	if (renderDataHashes.size > 0) input.updateDevPrerenderHashes?.(renderDataHashes);
 }
@@ -1150,19 +1177,6 @@ function isRenderDataOnlyTransformChange(
 		JSON.stringify(withoutNativeMarkup(previous.manifest)) ===
 		JSON.stringify(withoutNativeMarkup(next.manifest))
 	);
-}
-
-function clearSourceVirtualModules(
-	source: string,
-	virtualModules: Map<string, MarklessVirtualModule>,
-	sourceVirtualModules: Map<string, Set<string>>,
-) {
-	const stale = sourceVirtualModules.get(source);
-	if (!stale) return;
-	for (const id of stale) {
-		virtualModules.delete(id);
-	}
-	sourceVirtualModules.delete(source);
 }
 
 function stripBuildPrefix(fileName: string) {
