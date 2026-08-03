@@ -238,6 +238,13 @@ async function measureCombo(combo) {
 
 		const url = comboUrl(combo);
 		await page.goto(url, { waitUntil: 'load' });
+		// S4 machine record: the served HTML's payload-script bytes. The payload
+		// delta work (T002) is judged on this number; zero for empty-delta pages.
+		const payloadScriptBytes = await page.evaluate(() =>
+			[...document.querySelectorAll('script[type="markless/state"],script[type="markless/view"]')]
+				.map((script) => script.textContent?.length ?? 0)
+				.reduce((total, length) => total + length, 0),
+		);
 		await assertBoundaryDecisionFieldsAgree(page, combo.id, combo.environment);
 		await page.waitForSelector(combo.settledSelector, { timeout: 15_000 });
 		await fixedMicrotaskWindow(page);
@@ -258,6 +265,7 @@ async function measureCombo(combo) {
 			proof: 'green',
 			posture: combo.environment === 'ssr' ? 'server-settled' : 'client-settled',
 			path: combo.path,
+			payloadScriptBytes,
 			totalExecutedBytes: beforeInteraction.executedBytes,
 			perScript: beforeInteraction.scripts,
 			postInteraction: {
@@ -586,6 +594,9 @@ function assertBaselineShape(baseline) {
 		const row = baseline.combos?.[combo.id];
 		if (!row || row.proof !== 'green' || !Number.isInteger(row.totalExecutedBytes)) {
 			throw new Error(`Committed baseline is missing a green ${combo.id} measurement.`);
+		}
+		if (!Number.isInteger(row.payloadScriptBytes)) {
+			throw new Error(`Committed baseline is missing ${combo.id} payload-script bytes.`);
 		}
 	}
 	if (!baseline.diagnostics?.heldPendingSsr?.measurement) {
