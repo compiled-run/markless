@@ -190,7 +190,10 @@ describe('package metadata', () => {
 		expect(manifest.scripts).not.toHaveProperty('smoke:ssr');
 		expect(config).not.toContain('@markless/router');
 		expect(config).toContain('...markless({ executionLog })');
-		expect(config).toContain("process.env.MARKLESS_PRERENDER !== '0'");
+		// Live-feed's DEFAULT is legacy until wake staging (T008 successor) lands:
+		// un-staged prerendered settlement measured 65,379 executed vs the 30,371
+		// ceiling. Prerender stays opt-in (=== '1') and box-tested in both postures.
+		expect(config).toContain("process.env.MARKLESS_PRERENDER === '1'");
 		expect(config).toContain("input: { prerender: resolve(root, 'src/App.tsrx') }");
 		await expect(access(resolve(root, 'demos/live-feed/index.html'))).resolves.toBe(undefined);
 		await expect(access(resolve(root, 'demos/live-feed/src/main.ts'))).resolves.toBe(undefined);
