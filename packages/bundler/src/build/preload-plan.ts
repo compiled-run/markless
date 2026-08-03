@@ -18,7 +18,7 @@ export type ModulePreloadRoot =
 			// 'dynamic-only': the root and its static closure are already being
 			// loaded (an entry chunk's script tag); plan only what a dynamic
 			// edge reaches, plus that target's full static closure.
-			readonly edges?: 'all' | 'dynamic-only';
+			readonly edges?: 'all' | 'dynamic-only' | 'dependencies-only';
 	  };
 
 export type ModulePreloadPriority = 'high' | 'auto' | 'low';
@@ -112,6 +112,7 @@ export function planModulePreloads(input: ModulePreloadPlanInput): ModulePreload
 		fetchPriority: ModulePreloadFetchPriority | undefined,
 		seen: ReadonlySet<string>,
 		suppressed = false,
+		suppressRootOnly = false,
 	) => {
 		if (probability < minProbability || planned.size >= maxPreloads) return;
 
@@ -146,7 +147,7 @@ export function planModulePreloads(input: ModulePreloadPlanInput): ModulePreload
 				priority,
 				fetchPriority,
 				nextSeen,
-				suppressed,
+				suppressed && !suppressRootOnly,
 			);
 		}
 		if (!suppressed) addModule(name, probability, priority, fetchPriority);
@@ -173,7 +174,8 @@ export function planModulePreloads(input: ModulePreloadPlanInput): ModulePreload
 			normalized.priority,
 			normalized.fetchPriority,
 			new Set(),
-			normalized.edges === 'dynamic-only',
+			normalized.edges === 'dynamic-only' || normalized.edges === 'dependencies-only',
+			normalized.edges === 'dependencies-only',
 		);
 	}
 
@@ -239,7 +241,7 @@ function normalizeRoot(root: ModulePreloadRoot): {
 	readonly name: string;
 	readonly priority: ModulePreloadPriority;
 	readonly fetchPriority?: ModulePreloadFetchPriority;
-	readonly edges?: 'all' | 'dynamic-only';
+	readonly edges?: 'all' | 'dynamic-only' | 'dependencies-only';
 } {
 	if (typeof root === 'string') {
 		return { name: root, priority: 'auto', fetchPriority: 'auto' };

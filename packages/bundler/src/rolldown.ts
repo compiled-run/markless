@@ -714,6 +714,9 @@ export function createMarklessRolldownPlugin(input: {
 					bundle,
 					collectModulePreloadInjections(clientManifest, {
 						publicPath: internalOptions.publicPath,
+						wakeChunks: internalOptions.prerender
+							? productionResumeModuleChunks(bundle)
+							: undefined,
 						entryChunks: Object.values(bundle)
 							.filter(
 								(output) =>
@@ -1303,6 +1306,27 @@ function recordProductionResumeModuleUrls(
 		const source = sourceForResumeVirtualImporter(chunk.facadeModuleId);
 		if (source) urls.set(source, publicPath?.(chunk.fileName) ?? `/${chunk.fileName}`);
 	}
+}
+
+function productionResumeModuleChunks(bundle: Record<string, unknown>): string[] {
+	const chunks: string[] = [];
+	for (const output of Object.values(bundle)) {
+		if (!output || typeof output !== 'object') continue;
+		const chunk = output as {
+			readonly type?: unknown;
+			readonly facadeModuleId?: unknown;
+			readonly fileName?: unknown;
+		};
+		if (
+			chunk.type === 'chunk' &&
+			typeof chunk.facadeModuleId === 'string' &&
+			typeof chunk.fileName === 'string' &&
+			sourceForResumeVirtualImporter(chunk.facadeModuleId)
+		) {
+			chunks.push(stripBuildPrefix(chunk.fileName));
+		}
+	}
+	return chunks;
 }
 
 function isRelativeImport(source: string): boolean {

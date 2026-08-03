@@ -98,7 +98,14 @@ test('default compiler passes declare stable artifact boundaries', () => {
 			expect.objectContaining({
 				passId: 'symbol-modules',
 				description: expect.stringContaining('symbol module'),
-				consumes: ['symbolResolver', 'captureAnalysis', 'renderData', 'publicRenderPlan'],
+				consumes: [
+					'source',
+					'semanticGraph',
+					'symbolResolver',
+					'captureAnalysis',
+					'renderData',
+					'publicRenderPlan',
+				],
 				produces: ['symbolModules'],
 			}),
 			expect.objectContaining({

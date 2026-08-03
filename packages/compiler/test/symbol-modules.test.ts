@@ -2,6 +2,24 @@ import { expect, test } from 'vitest';
 import { emitSymbolModules } from '../src/passes/symbol-modules.ts';
 import { compileTsrxModule } from '../src/compile-module.ts';
 
+test('state initializer symbols carry referenced same-module helpers', async () => {
+	const result = await compileTsrxModule({
+		filename: '/workspace/app/src/App.tsrx',
+		source: `
+import { state } from '@markless/core';
+function initialWeight() { return 2; }
+export function App() @{ let weight = state(initialWeight()); <main>{weight}</main> }
+`,
+		symbols: [],
+	});
+	const initializer = result.symbolModules.modules.find(
+		(module) => module.kind === 'state-initializer',
+	);
+
+	expect(initializer?.source).toContain('function initialWeight() { return 2; }');
+	expect(initializer?.source).toContain('return (initialWeight());');
+});
+
 test('emitSymbolModules emits event, callback, and DOM update modules', () => {
 	const artifact = emitSymbolModules({
 		symbolResolver: {

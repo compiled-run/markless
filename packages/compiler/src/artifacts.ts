@@ -1132,6 +1132,8 @@ export type CaptureAnalysisArtifact = {
 };
 
 export type SymbolModulesInput = {
+	readonly source?: SemanticGraphInput;
+	readonly semanticGraph?: SemanticGraphArtifact;
 	readonly symbolResolver: SymbolResolverPlan;
 	readonly captureAnalysis: CaptureAnalysisArtifact;
 	readonly renderData?: RenderDataArtifact;

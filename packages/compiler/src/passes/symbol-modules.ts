@@ -14,8 +14,10 @@ import type {
 } from '../artifacts.ts';
 import { childNodes, type AnyNode } from '../ast/nodes.ts';
 import { parseJavaScriptModule } from '../js-ast.ts';
+import { moduleScopeLines } from './public-render/shared.ts';
 
 export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtifact {
+	const moduleDeclarations = sourceModuleScopeLines(input.source);
 	const localNamesBySymbol = rowLocalNamesBySymbol(input.renderData);
 	const captureSlotsBySymbol = new Map(
 		input.captureAnalysis.extractedSymbols.flatMap((symbol) =>
@@ -70,10 +72,23 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 				localNamesBySymbol.get(symbol.id) ?? emptyLocalNames,
 				captureSlotsBySymbol.get(symbol.id) ?? [],
 				boundCallbackSymbolIds.has(symbol.id),
+				moduleDeclarations,
+				input.semanticGraph?.moduleImports ?? [],
 			);
 		}),
 		diagnostics: input.captureAnalysis.diagnostics,
 	};
+}
+
+function sourceModuleScopeLines(source: SymbolModulesInput['source']): string[] {
+	if (!source) return [];
+	try {
+		return moduleScopeLines(source.source, source.filename);
+	} catch {
+		// The semantic pass owns parse diagnostics. Do not let this closure
+		// projection replace its structured compile error with a raw parser error.
+		return [];
+	}
 }
 
 function renderBranchArms(
@@ -274,6 +289,8 @@ function emitSymbolModule(
 	localNames: ReadonlySet<string>,
 	captureSlots: ReadonlyArray<CaptureSlot>,
 	usesArgumentVector: boolean,
+	moduleDeclarations: readonly string[],
+	moduleImports: readonly SemanticModuleImport[],
 ): GeneratedSymbolModule[] {
 	if (symbol.kind === 'event-handler' || symbol.kind === 'callback-prop') {
 		return [
@@ -314,7 +331,7 @@ function emitSymbolModule(
 				symbolId: symbol.id,
 				kind: symbol.kind,
 				exportName: symbolExportName(symbol.id),
-				source: emitStateInitializerModule(symbol),
+				source: emitStateInitializerModule(symbol, moduleDeclarations, moduleImports),
 			},
 		];
 	}
@@ -1254,12 +1271,23 @@ function emitAsyncComputedRunnerModule(
 
 function emitStateInitializerModule(
 	symbol: Extract<PlannedSymbol, { readonly kind: 'state-initializer' }>,
+	moduleDeclarations: readonly string[],
+	moduleImports: readonly SemanticModuleImport[],
 ): string {
 	const exportName = symbolExportName(symbol.id);
-	const imports = uniqueModuleImports(symbol.moduleImports ?? []);
+	const declarations = referencedModuleDeclarations(symbol.source, moduleDeclarations);
+	const body = [symbol.source, ...declarations].join('\n');
+	const imports = uniqueModuleImports([
+		...(symbol.moduleImports ?? []),
+		...moduleImports.filter((moduleImport) =>
+			sourceReferencesIdentifier(body, moduleImport.localName),
+		),
+	]);
 	return [
 		...imports.map(emitModuleImport),
 		...(imports.length > 0 ? [''] : []),
+		...declarations,
+		...(declarations.length > 0 ? [''] : []),
 		`export const authoredSource = ${JSON.stringify(symbol.source)};`,
 		'',
 		`export function ${exportName}() {`,
@@ -1267,6 +1295,42 @@ function emitStateInitializerModule(
 		'}',
 		'',
 	].join('\n');
+}
+
+function referencedModuleDeclarations(
+	source: string,
+	declarations: readonly string[],
+): string[] {
+	const remaining = declarations.map((declaration) => ({
+		declaration,
+		names: moduleDeclarationNames(declaration),
+	}));
+	const selected: string[] = [];
+	let references = source;
+	let changed = true;
+	while (changed) {
+		changed = false;
+		for (let index = 0; index < remaining.length; index += 1) {
+			const candidate = remaining[index]!;
+			if (!candidate.names.some((name) => sourceReferencesIdentifier(references, name))) continue;
+			selected.push(candidate.declaration);
+			references += `\n${candidate.declaration}`;
+			remaining.splice(index, 1);
+			index -= 1;
+			changed = true;
+		}
+	}
+	return selected;
+}
+
+function moduleDeclarationNames(declaration: string): string[] {
+	const direct = declaration.match(/^(?:async\s+)?(?:function|class)\s+([A-Za-z_$][\w$]*)/);
+	if (direct?.[1]) return [direct[1]];
+	const variables = declaration.match(/^(?:const|let|var)\s+(.+?)(?:;|$)/s)?.[1];
+	if (!variables) return [];
+	return [...variables.matchAll(/(?:^|,)\s*([A-Za-z_$][\w$]*)\s*=/g)].map(
+		(match) => match[1]!,
+	);
 }
 
 function emitSyncComputedDeriveModule(

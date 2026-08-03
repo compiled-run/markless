@@ -296,6 +296,8 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 				run({ inputs }) {
 					return {
 						symbolModules: emitSymbolModules({
+							source: inputs.source as CompileTsrxModuleInput,
+							semanticGraph: inputs.semanticGraph as SemanticGraphArtifact,
 							symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
 							captureAnalysis: inputs.captureAnalysis as CaptureAnalysisArtifact,
 							renderData: inputs.renderData as RenderDataArtifact,

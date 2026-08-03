@@ -341,6 +341,60 @@ describe('markless build metadata output', () => {
 		]);
 	});
 
+	test('extends prerender wake preloads through the built delegated-dispatch closure', () => {
+		const metadata = createBuildMetadata(
+			{
+				'build/resume.js': chunk({
+					fileName: 'build/resume.js',
+					name: 'resume',
+					code: 'import "./linked-render-data.js"; export const wake = () => import("./child-symbol.js");',
+					imports: ['build/linked-render-data.js'],
+					dynamicImports: ['build/child-symbol.js'],
+					moduleIds: ['\0virtual:markless:resume:root'],
+					facadeModuleId: '\0virtual:markless:resume:root',
+				}),
+				'build/linked-render-data.js': chunk({
+					fileName: 'build/linked-render-data.js',
+					name: 'linked-render-data',
+					code: 'export const child = {};',
+					moduleIds: ['\0virtual:markless:render-data:child'],
+					facadeModuleId: '\0virtual:markless:render-data:child',
+				}),
+				'build/child-symbol.js': chunk({
+					fileName: 'build/child-symbol.js',
+					name: 'child-symbol',
+					code: 'export const childClick = () => {};',
+					moduleIds: ['\0virtual:markless:symbol:child:click'],
+					facadeModuleId: '\0virtual:markless:symbol:child:click',
+				}),
+			},
+			[
+				{
+					...transformManifest,
+					source: '/workspace/app/src/Child.tsrx',
+					symbols: [
+						{
+							symbolId: 'symbol:0',
+							kind: 'event-handler',
+							exportName: 'childClick',
+							virtualModuleId: 'virtual:markless:symbol:child:click',
+						},
+					],
+				},
+			],
+			'/workspace/app',
+			{ bundleGraphAsset: MARKLESS_BUNDLE_GRAPH, canonPath: stripBuildPrefix },
+		);
+
+		const hrefs = collectModulePreloadInjections(metadata, { wakeChunks: ['resume.js'] }).map(
+			(injection) => (injection.attributes as { href: string }).href,
+		);
+
+		expect(hrefs).not.toContain('/build/resume.js');
+		expect(hrefs).toContain('/build/linked-render-data.js');
+		expect(hrefs).toContain('/build/child-symbol.js');
+	});
+
 	test('encodes compact graph edges from symbol roots to separate canonical chunks', () => {
 		const metadata = createBuildMetadata(
 			{
