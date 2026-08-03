@@ -265,6 +265,41 @@ describe('Vite adapter structure', () => {
 		);
 	});
 
+	test('dev-prerender client wiring preserves capability-gated resume emission', async () => {
+		vi.stubEnv('MARKLESS_PRERENDER', '1');
+		try {
+			const plugin = getAsyncPlugin();
+			const filename = '/workspace/app/src/Static.tsrx';
+			const config = {
+				environments: {
+					ssr: { build: { rolldownOptions: { input: 'src/Static.tsrx' } } },
+				},
+			};
+
+			callConfig(plugin, config, { command: 'serve', mode: 'development' });
+			callConfigResolved(plugin, {
+				base: '/',
+				command: 'serve',
+				root: '/workspace/app',
+			});
+			callBuildStart(plugin, { cwd: '/workspace/app', input: 'src/Static.tsrx' });
+			await callTransform(
+				plugin,
+				'export function App() @{ <main>Static prerendered page</main> }',
+				filename,
+				createViteHookContext('client'),
+			);
+
+			const resumeId = `\0virtual:markless:resume:${encodeURIComponent(filename)}`;
+			const resume = await callLoad(plugin, resumeId);
+			expect(resume).not.toContain('marklessPrerenderData');
+			expect(resume).not.toContain("import('@markless/web/fns/prerender-resume')");
+			expect(resume).not.toContain('resumeFromPrerenderRecords');
+		} finally {
+			vi.unstubAllEnvs();
+		}
+	});
+
 	test('resolves, loads, and injects the base-aware development error client', async () => {
 		const plugin = getAsyncPlugin();
 		const dispatchFetch = vi.fn(
