@@ -123,6 +123,9 @@ for (const combo of combos) {
 						// STREAMED-settle path wires in-arm records is a separate open
 						// question (see T005 findings); no interaction is asserted here.
 						interact: null,
+						// Self-wake execution continues past the settled marker, so a
+						// single snapshot races it; capture only once quiesced.
+						stabilize: true,
 					}),
 				);
 			}
@@ -238,11 +241,9 @@ async function measureCombo(combo) {
 		await assertBoundaryDecisionFieldsAgree(page, combo.id, combo.environment);
 		await page.waitForSelector(combo.settledSelector, { timeout: 15_000 });
 		await fixedMicrotaskWindow(page);
-		const beforeInteraction = coverageSnapshot(
-			await cdp.send('Profiler.takePreciseCoverage'),
-			url,
-			scriptUrlById,
-		);
+		const beforeInteraction = combo.stabilize
+			? await stableCoverageSnapshot(cdp, url, scriptUrlById, page, combo.id)
+			: coverageSnapshot(await cdp.send('Profiler.takePreciseCoverage'), url, scriptUrlById);
 
 		if (combo.interact) await combo.interact(page);
 		await fixedMicrotaskWindow(page);
@@ -267,6 +268,32 @@ async function measureCombo(combo) {
 	} finally {
 		await browser.close();
 	}
+}
+
+// Coverage is cumulative, so executed bytes only grow; a scenario is quiesced
+// when two consecutive snapshots agree. Only diagnostics use this — the load
+// laws keep the single-snapshot methodology their accepted numbers were
+// ratcheted under.
+async function stableCoverageSnapshot(cdp, url, scriptUrlById, page, comboId) {
+	const maxAttempts = 40;
+	const history = [];
+	let previous = null;
+	for (let attempt = 0; attempt < maxAttempts; attempt++) {
+		const snapshot = coverageSnapshot(
+			await cdp.send('Profiler.takePreciseCoverage'),
+			url,
+			scriptUrlById,
+		);
+		history.push(snapshot.executedBytes);
+		if (previous !== null && previous.executedBytes === snapshot.executedBytes) {
+			return snapshot;
+		}
+		previous = snapshot;
+		await page.waitForTimeout(250);
+	}
+	throw new Error(
+		`${comboId}: coverage never quiesced across ${maxAttempts} snapshots: ${history.join(', ')}`,
+	);
 }
 
 // Transitional test-only proof for the protocol cutover: every measured demo
