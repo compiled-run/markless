@@ -1,6 +1,6 @@
 {
 	"name": "@markless/analyzer",
-	"version": "0.2.1",
+	"version": "0.2.2",
 	"description": "Portable browser QA analysis contracts with an optional Playwright driver.",
 	"license": "MIT",
 	"repository": {
